@@ -672,7 +672,7 @@ func TestGRPCAuthHook(t *testing.T) {
 
 	t.Run("id extractor enabled", func(t *testing.T) {
 		path := "/grpc-auth-hook-test-api-1/"
-		baseMW := gateway.BaseMiddleware{
+		baseMW := &gateway.BaseMiddleware{
 			Gw: ts.Gw,
 			Spec: &gateway.APISpec{
 				APIDefinition: &apidef.APIDefinition{
@@ -733,7 +733,6 @@ func TestGRPC_MultiAuthentication(t *testing.T) {
 				sessionMetaKey: "$tyk_meta." + sessionMetaKey,
 			},
 		}
-		spec.ResponseProcessors = []apidef.ResponseProcessor{{Name: "header_injector"}}
 		spec.CustomMiddleware.Driver = apidef.GrpcDriver
 		spec.CustomMiddleware.AuthCheck.Name = "testAuthHook1"
 		spec.CustomMiddleware.IdExtractor.Extractor = nil

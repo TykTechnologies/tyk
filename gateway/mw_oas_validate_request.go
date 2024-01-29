@@ -5,11 +5,17 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/getkin/kin-openapi/openapi3"
+
 	"github.com/getkin/kin-openapi/openapi3filter"
 )
 
+func init() {
+	openapi3.SchemaErrorDetailsDisabled = true
+}
+
 type ValidateRequest struct {
-	BaseMiddleware
+	*BaseMiddleware
 }
 
 func (k *ValidateRequest) Name() string {

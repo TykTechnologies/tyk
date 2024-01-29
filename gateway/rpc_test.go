@@ -420,7 +420,7 @@ func TestOrgSessionWithRPCDown(t *testing.T) {
 	ts := StartTest(conf)
 	defer ts.Close()
 
-	m := BaseMiddleware{
+	m := &BaseMiddleware{
 		Spec: &APISpec{
 			GlobalConfig: config.Config{
 				EnforceOrgDataAge: true,

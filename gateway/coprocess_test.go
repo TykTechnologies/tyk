@@ -245,7 +245,7 @@ func equalHeaders(h1, h2 []*coprocess.Header) bool {
 
 func TestCoProcessMiddlewareName(t *testing.T) {
 	// Initialize the CoProcessMiddleware
-	m := &CoProcessMiddleware{}
+	m := &CoProcessMiddleware{BaseMiddleware: &BaseMiddleware{}}
 
 	// Get the name using the method
 	name := m.Name()

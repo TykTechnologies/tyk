@@ -15,9 +15,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/go-jose/go-jose/v3"
 	"github.com/golang-jwt/jwt/v4"
 	"github.com/lonelycode/osin"
-	"github.com/square/go-jose"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/storage"
@@ -27,7 +27,7 @@ import (
 )
 
 type JWTMiddleware struct {
-	BaseMiddleware
+	*BaseMiddleware
 }
 
 const (
@@ -562,10 +562,18 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 		}
 	}
 
+	oauthClientID := ""
 	// Get the OAuth client ID if available:
-	oauthClientID := k.getOAuthClientIDFromClaim(claims)
-	session.OauthClientID = oauthClientID
-	if session.OauthClientID != "" {
+	if !k.Spec.IDPClientIDMappingDisabled {
+		oauthClientID = k.getOAuthClientIDFromClaim(claims)
+	}
+
+	if session.OauthClientID != oauthClientID {
+		session.OauthClientID = oauthClientID
+		updateSession = true
+	}
+
+	if !k.Spec.IDPClientIDMappingDisabled && oauthClientID != "" {
 		// Initialize the OAuthManager if empty:
 		if k.Spec.OAuthManager == nil {
 			prefix := generateOAuthPrefix(k.Spec.APIID)

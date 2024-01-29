@@ -94,7 +94,7 @@ services:
               source: ./configs/tracetest/tracetest-provision.yml
               target: /app/provision.yml
     tyk:
-        image: internal/tyk-gateway
+        image: ${GATEWAY_IMAGE:-internal/tyk-gateway}
         networks:
             default: null
         ports:

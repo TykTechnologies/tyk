@@ -42,7 +42,7 @@ func TestIPMiddlewarePass(t *testing.T) {
 			req.Header.Set(header.XRealIP, tc.xRealIP)
 		}
 
-		mw := &IPWhiteListMiddleware{}
+		mw := &IPWhiteListMiddleware{BaseMiddleware: &BaseMiddleware{}}
 		mw.Spec = spec
 		_, code := mw.ProcessRequest(rec, req, nil)
 
@@ -57,7 +57,7 @@ func BenchmarkIPMiddlewarePass(b *testing.B) {
 	b.ReportAllocs()
 
 	spec := testPrepareIPMiddlewarePass()
-	mw := &IPWhiteListMiddleware{}
+	mw := &IPWhiteListMiddleware{BaseMiddleware: &BaseMiddleware{}}
 	mw.Spec = spec
 
 	rec := httptest.NewRecorder()

@@ -13,7 +13,7 @@ import (
 // RateLimitAndQuotaCheck will check the incomming request and key whether it is within it's quota and
 // within it's rate limit, it makes use of the SessionLimiter object to do this
 type RateLimitAndQuotaCheck struct {
-	BaseMiddleware
+	*BaseMiddleware
 }
 
 func (k *RateLimitAndQuotaCheck) Name() string {

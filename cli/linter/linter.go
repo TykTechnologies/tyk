@@ -23,7 +23,7 @@ func Run(schm string, paths []string) (string, []string, error) {
 	schemaLoader := schema.NewBytesLoader([]byte(schm))
 
 	var orig map[string]interface{}
-	f, err := os.Open(conf.OriginalPath)
+	f, err := os.Open(conf.Private.OriginalPath)
 	if err != nil {
 		return "", nil, err
 	}
@@ -46,11 +46,11 @@ func Run(schm string, paths []string) (string, []string, error) {
 	}
 
 	// ensure it's well formatted and the keys are all lowercase
-	if err := config.WriteConf(conf.OriginalPath, &conf); err != nil {
+	if err := config.WriteConf(conf.Private.OriginalPath, &conf); err != nil {
 		return "", nil, err
 	}
 
-	return conf.OriginalPath, resultWarns(result), nil
+	return conf.Private.OriginalPath, resultWarns(result), nil
 }
 
 type stringFormat func(string) bool

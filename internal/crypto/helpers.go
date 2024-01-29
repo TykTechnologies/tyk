@@ -45,7 +45,7 @@ func HexSHA256(cert []byte) string {
 // A tls.Certificate is created using the PEM-encoded certificate and private key.
 // If setLeaf is true, the certificate's Leaf field is set to the template.
 func GenCertificate(template *x509.Certificate, setLeaf bool) ([]byte, []byte, []byte, tls.Certificate) {
-	priv, _ := rsa.GenerateKey(rand.Reader, 1024)
+	priv, _ := rsa.GenerateKey(rand.Reader, 2048)
 
 	serialNumberLimit := new(big.Int).Lsh(big.NewInt(1), 128)
 	serialNumber, _ := rand.Int(rand.Reader, serialNumberLimit)

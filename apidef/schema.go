@@ -152,7 +152,10 @@ const Schema = `{
 				 }
 				}
 			}
-		},  
+		},
+        "idp_client_id_mapping_disabled": {
+            "type": "boolean"
+        },
         "use_keyless": {
             "type": "boolean"
         },
@@ -686,6 +689,14 @@ const Schema = `{
                         },
                         "merged_sdl": {
                             "type": "string"
+                        }
+                    }
+                },
+                "introspection": {
+                    "type": ["object", "null"],
+                    "properties": {
+                        "disabled": {
+                            "type": "boolean"
                         }
                     }
                 },

@@ -26,6 +26,7 @@ func TestOAS(t *testing.T) {
 
 		var convertedAPI apidef.APIDefinition
 		emptyOASPaths.ExtractTo(&convertedAPI)
+		assert.True(t, convertedAPI.EnableContextVars)
 
 		var resultOAS OAS
 		resultOAS.Fill(convertedAPI)
@@ -114,7 +115,7 @@ func TestOAS_ExtractTo_DontTouchExistingClassicFields(t *testing.T) {
 	api.VersionData.Versions = map[string]apidef.VersionInfo{
 		Main: {
 			ExtendedPaths: apidef.ExtendedPathsSet{
-				TransformHeader: []apidef.HeaderInjectionMeta{
+				PersistGraphQL: []apidef.PersistGraphQLMeta{
 					{},
 				},
 			},
@@ -124,7 +125,7 @@ func TestOAS_ExtractTo_DontTouchExistingClassicFields(t *testing.T) {
 	var s OAS
 	s.ExtractTo(&api)
 
-	assert.Len(t, api.VersionData.Versions[Main].ExtendedPaths.TransformHeader, 1)
+	assert.Len(t, api.VersionData.Versions[Main].ExtendedPaths.PersistGraphQL, 1)
 }
 
 func TestOAS_ExtractTo_ResetAPIDefinition(t *testing.T) {
@@ -151,6 +152,8 @@ func TestOAS_ExtractTo_ResetAPIDefinition(t *testing.T) {
 	a.CustomMiddleware.IdExtractor.Disabled = false
 	a.TagsDisabled = false
 	a.IsOAS = false
+	a.IDPClientIDMappingDisabled = false
+	a.EnableContextVars = false
 
 	// deprecated fields
 	a.Auth = apidef.AuthConfig{}
@@ -167,15 +170,21 @@ func TestOAS_ExtractTo_ResetAPIDefinition(t *testing.T) {
 	vInfo.Paths.WhiteList = nil
 	vInfo.Paths.BlackList = nil
 	vInfo.OverrideTarget = ""
+	vInfo.GlobalHeadersDisabled = false
+	vInfo.GlobalResponseHeadersDisabled = false
 	vInfo.UseExtendedPaths = false
-	vInfo.ExtendedPaths.MockResponse = nil
-	vInfo.ExtendedPaths.Cached = nil
-	vInfo.ExtendedPaths.ValidateJSON = nil
+
+	vInfo.ExtendedPaths.Clear()
+
 	a.VersionData.Versions[""] = vInfo
 
 	assert.Empty(t, a.Name)
 
 	noOASSupportFields := getNonEmptyFields(a, "APIDefinition")
+
+	// The expectedFields value lists fields that do not support migration.
+	// When adding a migration for ExtendedPaths sections, clear the list of
+	// fields below, and clear the value in ExtendedPaths.Clear() function.
 
 	expectedFields := []string{
 		"APIDefinition.ListenPort",
@@ -194,57 +203,13 @@ func TestOAS_ExtractTo_ResetAPIDefinition(t *testing.T) {
 		"APIDefinition.VersionData.Versions[0].ExtendedPaths.TransformJQResponse[0].Filter",
 		"APIDefinition.VersionData.Versions[0].ExtendedPaths.TransformJQResponse[0].Path",
 		"APIDefinition.VersionData.Versions[0].ExtendedPaths.TransformJQResponse[0].Method",
-		"APIDefinition.VersionData.Versions[0].ExtendedPaths.TransformHeader[0].DeleteHeaders[0]",
-		"APIDefinition.VersionData.Versions[0].ExtendedPaths.TransformHeader[0].AddHeaders[0]",
-		"APIDefinition.VersionData.Versions[0].ExtendedPaths.TransformHeader[0].Path",
-		"APIDefinition.VersionData.Versions[0].ExtendedPaths.TransformHeader[0].Method",
-		"APIDefinition.VersionData.Versions[0].ExtendedPaths.TransformHeader[0].ActOnResponse",
-		"APIDefinition.VersionData.Versions[0].ExtendedPaths.TransformResponseHeader[0].DeleteHeaders[0]",
-		"APIDefinition.VersionData.Versions[0].ExtendedPaths.TransformResponseHeader[0].AddHeaders[0]",
-		"APIDefinition.VersionData.Versions[0].ExtendedPaths.TransformResponseHeader[0].Path",
-		"APIDefinition.VersionData.Versions[0].ExtendedPaths.TransformResponseHeader[0].Method",
-		"APIDefinition.VersionData.Versions[0].ExtendedPaths.TransformResponseHeader[0].ActOnResponse",
-		"APIDefinition.VersionData.Versions[0].ExtendedPaths.CircuitBreaker[0].Path",
-		"APIDefinition.VersionData.Versions[0].ExtendedPaths.CircuitBreaker[0].Method",
-		"APIDefinition.VersionData.Versions[0].ExtendedPaths.CircuitBreaker[0].ThresholdPercent",
-		"APIDefinition.VersionData.Versions[0].ExtendedPaths.CircuitBreaker[0].Samples",
-		"APIDefinition.VersionData.Versions[0].ExtendedPaths.CircuitBreaker[0].ReturnToServiceAfter",
-		"APIDefinition.VersionData.Versions[0].ExtendedPaths.CircuitBreaker[0].DisableHalfOpenState",
-		"APIDefinition.VersionData.Versions[0].ExtendedPaths.URLRewrite[0].Path",
-		"APIDefinition.VersionData.Versions[0].ExtendedPaths.URLRewrite[0].Method",
-		"APIDefinition.VersionData.Versions[0].ExtendedPaths.URLRewrite[0].MatchPattern",
-		"APIDefinition.VersionData.Versions[0].ExtendedPaths.URLRewrite[0].RewriteTo",
-		"APIDefinition.VersionData.Versions[0].ExtendedPaths.URLRewrite[0].Triggers[0].On",
-		"APIDefinition.VersionData.Versions[0].ExtendedPaths.URLRewrite[0].Triggers[0].Options.HeaderMatches[0].MatchPattern",
-		"APIDefinition.VersionData.Versions[0].ExtendedPaths.URLRewrite[0].Triggers[0].Options.HeaderMatches[0].Reverse",
-		"APIDefinition.VersionData.Versions[0].ExtendedPaths.URLRewrite[0].Triggers[0].Options.QueryValMatches[0].MatchPattern",
-		"APIDefinition.VersionData.Versions[0].ExtendedPaths.URLRewrite[0].Triggers[0].Options.QueryValMatches[0].Reverse",
-		"APIDefinition.VersionData.Versions[0].ExtendedPaths.URLRewrite[0].Triggers[0].Options.PathPartMatches[0].MatchPattern",
-		"APIDefinition.VersionData.Versions[0].ExtendedPaths.URLRewrite[0].Triggers[0].Options.PathPartMatches[0].Reverse",
-		"APIDefinition.VersionData.Versions[0].ExtendedPaths.URLRewrite[0].Triggers[0].Options.SessionMetaMatches[0].MatchPattern",
-		"APIDefinition.VersionData.Versions[0].ExtendedPaths.URLRewrite[0].Triggers[0].Options.SessionMetaMatches[0].Reverse",
-		"APIDefinition.VersionData.Versions[0].ExtendedPaths.URLRewrite[0].Triggers[0].Options.RequestContextMatches[0].MatchPattern",
-		"APIDefinition.VersionData.Versions[0].ExtendedPaths.URLRewrite[0].Triggers[0].Options.RequestContextMatches[0].Reverse",
-		"APIDefinition.VersionData.Versions[0].ExtendedPaths.URLRewrite[0].Triggers[0].Options.PayloadMatches.MatchPattern",
-		"APIDefinition.VersionData.Versions[0].ExtendedPaths.URLRewrite[0].Triggers[0].Options.PayloadMatches.Reverse",
-		"APIDefinition.VersionData.Versions[0].ExtendedPaths.URLRewrite[0].Triggers[0].RewriteTo",
 		"APIDefinition.VersionData.Versions[0].ExtendedPaths.SizeLimit[0].Path",
 		"APIDefinition.VersionData.Versions[0].ExtendedPaths.SizeLimit[0].Method",
 		"APIDefinition.VersionData.Versions[0].ExtendedPaths.SizeLimit[0].SizeLimit",
-		"APIDefinition.VersionData.Versions[0].ExtendedPaths.TrackEndpoints[0].Path",
-		"APIDefinition.VersionData.Versions[0].ExtendedPaths.TrackEndpoints[0].Method",
-		"APIDefinition.VersionData.Versions[0].ExtendedPaths.DoNotTrackEndpoints[0].Path",
-		"APIDefinition.VersionData.Versions[0].ExtendedPaths.DoNotTrackEndpoints[0].Method",
-		"APIDefinition.VersionData.Versions[0].ExtendedPaths.Internal[0].Path",
-		"APIDefinition.VersionData.Versions[0].ExtendedPaths.Internal[0].Method",
 		"APIDefinition.VersionData.Versions[0].ExtendedPaths.PersistGraphQL[0].Path",
 		"APIDefinition.VersionData.Versions[0].ExtendedPaths.PersistGraphQL[0].Method",
 		"APIDefinition.VersionData.Versions[0].ExtendedPaths.PersistGraphQL[0].Operation",
 		"APIDefinition.VersionData.Versions[0].ExtendedPaths.PersistGraphQL[0].Variables[0]",
-		"APIDefinition.VersionData.Versions[0].GlobalHeaders[0]",
-		"APIDefinition.VersionData.Versions[0].GlobalHeadersRemove[0]",
-		"APIDefinition.VersionData.Versions[0].GlobalResponseHeaders[0]",
-		"APIDefinition.VersionData.Versions[0].GlobalResponseHeadersRemove[0]",
 		"APIDefinition.VersionData.Versions[0].IgnoreEndpointCase",
 		"APIDefinition.VersionData.Versions[0].GlobalSizeLimit",
 		"APIDefinition.UptimeTests.CheckList[0].CheckURL",
@@ -290,9 +255,7 @@ func TestOAS_ExtractTo_ResetAPIDefinition(t *testing.T) {
 		"APIDefinition.ExpireAnalyticsAfter",
 		"APIDefinition.ResponseProcessors[0].Name",
 		"APIDefinition.ResponseProcessors[0].Options",
-		"APIDefinition.Certificates[0]",
 		"APIDefinition.DoNotTrack",
-		"APIDefinition.EnableContextVars",
 		"APIDefinition.TagHeaders[0]",
 		"APIDefinition.GlobalRateLimit.Rate",
 		"APIDefinition.GlobalRateLimit.Per",
@@ -335,6 +298,7 @@ func TestOAS_ExtractTo_ResetAPIDefinition(t *testing.T) {
 		"APIDefinition.GraphQL.Supergraph.MergedSDL",
 		"APIDefinition.GraphQL.Supergraph.GlobalHeaders[0]",
 		"APIDefinition.GraphQL.Supergraph.DisableQueryBatching",
+		"APIDefinition.GraphQL.Introspection.Disabled",
 		"APIDefinition.AnalyticsPlugin.Enabled",
 		"APIDefinition.AnalyticsPlugin.PluginPath",
 		"APIDefinition.AnalyticsPlugin.FuncName",

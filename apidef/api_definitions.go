@@ -81,9 +81,8 @@ const (
 	UnsetAuth     AuthTypeEnum = ""
 
 	// For routing triggers
-	All    RoutingTriggerOnType = "all"
-	Any    RoutingTriggerOnType = "any"
-	Ignore RoutingTriggerOnType = ""
+	All RoutingTriggerOnType = "all"
+	Any RoutingTriggerOnType = "any"
 
 	// Subscription Types
 	GQLSubscriptionUndefined   SubscriptionType = ""
@@ -114,7 +113,9 @@ const (
 )
 
 var (
+	// Deprecated: Use ErrClassicAPIExpected instead.
 	ErrAPIMigrated                = errors.New("the supplied API definition is in Tyk classic format, please use OAS format for this API")
+	ErrClassicAPIExpected         = errors.New("this API endpoint only supports Tyk Classic APIs; please use the appropriate Tyk OAS API endpoint")
 	ErrAPINotMigrated             = errors.New("the supplied API definition is in OAS format, please use the Tyk classic format for this API")
 	ErrOASGetForOldAPI            = errors.New("the requested API definition is in Tyk classic format, please use old api endpoint")
 	ErrImportWithTykExtension     = errors.New("the import payload should not contain x-tyk-api-gateway")
@@ -181,11 +182,16 @@ type TransformJQMeta struct {
 }
 
 type HeaderInjectionMeta struct {
+	Disabled      bool              `bson:"disabled" json:"disabled"`
 	DeleteHeaders []string          `bson:"delete_headers" json:"delete_headers"`
 	AddHeaders    map[string]string `bson:"add_headers" json:"add_headers"`
 	Path          string            `bson:"path" json:"path"`
 	Method        string            `bson:"method" json:"method"`
 	ActOnResponse bool              `bson:"act_on" json:"act_on"`
+}
+
+func (h *HeaderInjectionMeta) Enabled() bool {
+	return !h.Disabled && (len(h.AddHeaders) > 0 || len(h.DeleteHeaders) > 0)
 }
 
 type HardTimeoutMeta struct {
@@ -196,13 +202,15 @@ type HardTimeoutMeta struct {
 }
 
 type TrackEndpointMeta struct {
-	Path   string `bson:"path" json:"path"`
-	Method string `bson:"method" json:"method"`
+	Disabled bool   `bson:"disabled" json:"disabled"`
+	Path     string `bson:"path" json:"path"`
+	Method   string `bson:"method" json:"method"`
 }
 
 type InternalMeta struct {
-	Path   string `bson:"path" json:"path"`
-	Method string `bson:"method" json:"method"`
+	Disabled bool   `bson:"disabled" json:"disabled"`
+	Path     string `bson:"path" json:"path"`
+	Method   string `bson:"method" json:"method"`
 }
 
 type RequestSizeMeta struct {
@@ -212,6 +220,7 @@ type RequestSizeMeta struct {
 }
 
 type CircuitBreakerMeta struct {
+	Disabled             bool    `bson:"disabled" json:"disabled"`
 	Path                 string  `bson:"path" json:"path"`
 	Method               string  `bson:"method" json:"method"`
 	ThresholdPercent     float64 `bson:"threshold_percent" json:"threshold_percent"`
@@ -226,6 +235,11 @@ type StringRegexMap struct {
 	matchRegex   *regexp.Regexp
 }
 
+// Empty is a utility function that returns true if the value is empty.
+func (r StringRegexMap) Empty() bool {
+	return r.MatchPattern == "" && !r.Reverse
+}
+
 type RoutingTriggerOptions struct {
 	HeaderMatches         map[string]StringRegexMap `bson:"header_matches" json:"header_matches"`
 	QueryValMatches       map[string]StringRegexMap `bson:"query_val_matches" json:"query_val_matches"`
@@ -235,6 +249,18 @@ type RoutingTriggerOptions struct {
 	PayloadMatches        StringRegexMap            `bson:"payload_matches" json:"payload_matches"`
 }
 
+// NewRoutingTriggerOptions allocates the maps inside RoutingTriggerOptions.
+func NewRoutingTriggerOptions() RoutingTriggerOptions {
+	return RoutingTriggerOptions{
+		HeaderMatches:         make(map[string]StringRegexMap),
+		QueryValMatches:       make(map[string]StringRegexMap),
+		PathPartMatches:       make(map[string]StringRegexMap),
+		SessionMetaMatches:    make(map[string]StringRegexMap),
+		RequestContextMatches: make(map[string]StringRegexMap),
+		PayloadMatches:        StringRegexMap{},
+	}
+}
+
 type RoutingTrigger struct {
 	On        RoutingTriggerOnType  `bson:"on" json:"on"`
 	Options   RoutingTriggerOptions `bson:"options" json:"options"`
@@ -242,6 +268,7 @@ type RoutingTrigger struct {
 }
 
 type URLRewriteMeta struct {
+	Disabled     bool             `bson:"disabled" json:"disabled"`
 	Path         string           `bson:"path" json:"path"`
 	Method       string           `bson:"method" json:"method"`
 	MatchPattern string           `bson:"match_pattern" json:"match_pattern"`
@@ -330,6 +357,18 @@ type ExtendedPathsSet struct {
 	PersistGraphQL          []PersistGraphQLMeta  `bson:"persist_graphql" json:"persist_graphql"`
 }
 
+// Clear omits values that have OAS API definition conversions in place.
+func (e *ExtendedPathsSet) Clear() {
+	// The values listed within don't have a conversion from OAS in place.
+	// When the conversion is added, delete the individual field to clear it.
+	*e = ExtendedPathsSet{
+		TransformJQ:         e.TransformJQ,
+		TransformJQResponse: e.TransformJQResponse,
+		SizeLimit:           e.SizeLimit,
+		PersistGraphQL:      e.PersistGraphQL,
+	}
+}
+
 type VersionDefinition struct {
 	Enabled             bool              `bson:"enabled" json:"enabled"`
 	Name                string            `bson:"name" json:"name"`
@@ -358,15 +397,53 @@ type VersionInfo struct {
 		WhiteList []string `bson:"white_list" json:"white_list"`
 		BlackList []string `bson:"black_list" json:"black_list"`
 	} `bson:"paths" json:"paths"`
-	UseExtendedPaths            bool              `bson:"use_extended_paths" json:"use_extended_paths"`
-	ExtendedPaths               ExtendedPathsSet  `bson:"extended_paths" json:"extended_paths"`
-	GlobalHeaders               map[string]string `bson:"global_headers" json:"global_headers"`
-	GlobalHeadersRemove         []string          `bson:"global_headers_remove" json:"global_headers_remove"`
-	GlobalResponseHeaders       map[string]string `bson:"global_response_headers" json:"global_response_headers"`
-	GlobalResponseHeadersRemove []string          `bson:"global_response_headers_remove" json:"global_response_headers_remove"`
-	IgnoreEndpointCase          bool              `bson:"ignore_endpoint_case" json:"ignore_endpoint_case"`
-	GlobalSizeLimit             int64             `bson:"global_size_limit" json:"global_size_limit"`
-	OverrideTarget              string            `bson:"override_target" json:"override_target"`
+	UseExtendedPaths              bool              `bson:"use_extended_paths" json:"use_extended_paths"`
+	ExtendedPaths                 ExtendedPathsSet  `bson:"extended_paths" json:"extended_paths"`
+	GlobalHeaders                 map[string]string `bson:"global_headers" json:"global_headers"`
+	GlobalHeadersRemove           []string          `bson:"global_headers_remove" json:"global_headers_remove"`
+	GlobalHeadersDisabled         bool              `bson:"global_headers_disabled" json:"global_headers_disabled"`
+	GlobalResponseHeaders         map[string]string `bson:"global_response_headers" json:"global_response_headers"`
+	GlobalResponseHeadersRemove   []string          `bson:"global_response_headers_remove" json:"global_response_headers_remove"`
+	GlobalResponseHeadersDisabled bool              `bson:"global_response_headers_disabled" json:"global_response_headers_disabled"`
+	IgnoreEndpointCase            bool              `bson:"ignore_endpoint_case" json:"ignore_endpoint_case"`
+	GlobalSizeLimit               int64             `bson:"global_size_limit" json:"global_size_limit"`
+	OverrideTarget                string            `bson:"override_target" json:"override_target"`
+}
+
+func (v *VersionInfo) GlobalHeadersEnabled() bool {
+	return !v.GlobalHeadersDisabled && (len(v.GlobalHeaders) > 0 || len(v.GlobalHeadersRemove) > 0)
+}
+
+func (v *VersionInfo) GlobalResponseHeadersEnabled() bool {
+	return !v.GlobalResponseHeadersDisabled && (len(v.GlobalResponseHeaders) > 0 || len(v.GlobalResponseHeadersRemove) > 0)
+}
+
+func (v *VersionInfo) HasEndpointReqHeader() bool {
+	if !v.UseExtendedPaths {
+		return false
+	}
+
+	for _, trh := range v.ExtendedPaths.TransformHeader {
+		if trh.Enabled() {
+			return true
+		}
+	}
+
+	return false
+}
+
+func (v *VersionInfo) HasEndpointResHeader() bool {
+	if !v.UseExtendedPaths {
+		return false
+	}
+
+	for _, trh := range v.ExtendedPaths.TransformResponseHeader {
+		if trh.Enabled() {
+			return true
+		}
+	}
+
+	return false
 }
 
 type AuthProviderMeta struct {
@@ -563,6 +640,7 @@ type APIDefinition struct {
 	JWTNotBeforeValidationSkew           uint64                 `bson:"jwt_not_before_validation_skew" json:"jwt_not_before_validation_skew"`
 	JWTSkipKid                           bool                   `bson:"jwt_skip_kid" json:"jwt_skip_kid"`
 	Scopes                               Scopes                 `bson:"scopes" json:"scopes,omitempty"`
+	IDPClientIDMappingDisabled           bool                   `bson:"idp_client_id_mapping_disabled" json:"idp_client_id_mapping_disabled"`
 	JWTScopeToPolicyMapping              map[string]string      `bson:"jwt_scope_to_policy_mapping" json:"jwt_scope_to_policy_mapping"` // Deprecated: use Scopes.JWT.ScopeToPolicy or Scopes.OIDC.ScopeToPolicy
 	JWTScopeClaimName                    string                 `bson:"jwt_scope_claim_name" json:"jwt_scope_claim_name"`               // Deprecated: use Scopes.JWT.ScopeClaimName or Scopes.OIDC.ScopeClaimName
 	NotificationsDetails                 NotificationsManager   `bson:"notifications" json:"notifications"`
@@ -742,6 +820,8 @@ type GraphQLConfig struct {
 	Subgraph GraphQLSubgraphConfig `bson:"subgraph" json:"subgraph"`
 	// Supergraph holds the configuration for a GraphQL federation supergraph.
 	Supergraph GraphQLSupergraphConfig `bson:"supergraph" json:"supergraph"`
+	// Introspection holds the configuration for GraphQL Introspection
+	Introspection GraphQLIntrospectionConfig `bson:"introspection" json:"introspection"`
 }
 
 type GraphQLConfigVersion string
@@ -751,6 +831,10 @@ const (
 	GraphQLConfigVersion1    GraphQLConfigVersion = "1"
 	GraphQLConfigVersion2    GraphQLConfigVersion = "2"
 )
+
+type GraphQLIntrospectionConfig struct {
+	Disabled bool `bson:"disabled" json:"disabled"`
+}
 
 type GraphQLResponseExtensions struct {
 	OnErrorForwarding bool `bson:"on_error_forwarding" json:"on_error_forwarding"`

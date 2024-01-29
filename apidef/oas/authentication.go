@@ -12,19 +12,21 @@ import (
 	"github.com/TykTechnologies/tyk/apidef"
 )
 
-// Authentication types contains configuration about the authentication methods and security policies applied to requests.
+// Authentication contains configuration about the authentication methods and security policies applied to requests.
 type Authentication struct {
 	// Enabled makes the API protected when one of the authentication modes is enabled.
 	//
 	// Tyk classic API definition: `!use_keyless`.
 	Enabled bool `bson:"enabled" json:"enabled"` // required
 
-	// StripAuthorizationData ensures that any security tokens used for accessing APIs are stripped and not leaked to the upstream.
+	// StripAuthorizationData ensures that any security tokens used for accessing APIs are stripped and not passed to the upstream.
 	//
 	// Tyk classic API definition: `strip_auth_data`.
 	StripAuthorizationData bool `bson:"stripAuthorizationData,omitempty" json:"stripAuthorizationData,omitempty"`
 
-	// BaseIdentityProvider enables multi authentication mechanism and provides the session object that determines rate limits, ACL rules and quotas.
+	// BaseIdentityProvider enables the use of multiple authentication mechanisms.
+	// It provides the session object that determines access control, rate limits and usage quotas.
+	//
 	// It should be set to one of the following:
 	//
 	// - `auth_token`

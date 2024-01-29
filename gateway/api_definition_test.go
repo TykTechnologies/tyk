@@ -23,7 +23,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	redis "github.com/go-redis/redis/v8"
+	redis "github.com/TykTechnologies/tyk/internal/redis"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/test"
@@ -826,8 +826,6 @@ func TestWhitelistMethodWithAdditionalMiddleware(t *testing.T) {
 					}
 				]`), &v.ExtendedPaths.TransformResponseHeader)
 			})
-			spec.ResponseProcessors = []apidef.ResponseProcessor{{Name: "header_injector"}}
-
 		})
 
 		//headers := map[string]string{"foo": "bar"}

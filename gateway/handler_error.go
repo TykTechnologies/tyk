@@ -8,7 +8,6 @@ import (
 	"io"
 	"io/ioutil"
 	"net/http"
-	"runtime/pprof"
 	"strconv"
 	"strings"
 	"time"
@@ -79,7 +78,7 @@ type APIError struct {
 // ErrorHandler is invoked whenever there is an issue with a proxied request, most middleware will invoke
 // the ErrorHandler if something is wrong with the request and halt the request processing through the chain
 type ErrorHandler struct {
-	BaseMiddleware
+	*BaseMiddleware
 }
 
 // TemplateExecutor is an interface used to switch between text/templates and html/template.
@@ -169,10 +168,6 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 			tmplExecutor.Execute(rsp, &apiError)
 			response.Body = ioutil.NopCloser(&log)
 		}
-	}
-
-	if memProfFile != nil {
-		pprof.WriteHeapProfile(memProfFile)
 	}
 
 	if e.Spec.DoNotTrack || ctxGetDoNotTrack(r) {
@@ -318,8 +313,4 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 	}
 	// Report in health check
 	reportHealthValue(e.Spec, BlockedRequestLog, "-1")
-
-	if memProfFile != nil {
-		pprof.WriteHeapProfile(memProfFile)
-	}
 }

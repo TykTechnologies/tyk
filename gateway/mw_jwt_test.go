@@ -2306,7 +2306,7 @@ func TestGetUserIDFromClaim(t *testing.T) {
 func TestJWTMiddleware_getSecretToVerifySignature_JWKNoKID(t *testing.T) {
 	const jwkURL = "https://jwk.com"
 
-	m := JWTMiddleware{}
+	m := JWTMiddleware{BaseMiddleware: &BaseMiddleware{}}
 	api := &apidef.APIDefinition{JWTSource: jwkURL}
 	m.Spec = &APISpec{APIDefinition: api}
 
@@ -2319,4 +2319,101 @@ func TestJWTMiddleware_getSecretToVerifySignature_JWKNoKID(t *testing.T) {
 		_, err := m.getSecretToVerifySignature(nil, token)
 		assert.ErrorIs(t, err, ErrKIDNotAString)
 	})
+}
+
+func TestJWT_ExtractOAuthClientIDForDCR(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	api := ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		spec.UseKeylessAccess = false
+		spec.EnableJWT = true
+		spec.JWTSigningMethod = RSASign
+		spec.JWTSource = base64.StdEncoding.EncodeToString([]byte(jwtRSAPubKey))
+		spec.JWTIdentityBaseField = "user_id"
+		spec.JWTPolicyFieldName = "policy_id"
+		spec.Proxy.ListenPath = "/"
+	})[0]
+
+	pID := ts.CreatePolicy()
+	userID := uuid.New()
+	const myOKTAClientID = "myOKTAClientID"
+
+	jwtToken := CreateJWKToken(func(t *jwt.Token) {
+		t.Claims.(jwt.MapClaims)["sub"] = userID
+		t.Claims.(jwt.MapClaims)["policy_id"] = pID
+		t.Claims.(jwt.MapClaims)["cid"] = myOKTAClientID // cid is specific to OKTA
+		t.Claims.(jwt.MapClaims)["exp"] = time.Now().Add(time.Second * 72).Unix()
+	})
+
+	authHeaders := map[string]string{"authorization": jwtToken}
+
+	keyID := fmt.Sprintf("%x", md5.Sum([]byte(userID)))
+	sessionID := ts.Gw.generateToken("default", keyID)
+
+	t.Run("DCR enabled", func(t *testing.T) {
+		_, _ = ts.Run(t, test.TestCase{Headers: authHeaders, Code: http.StatusOK})
+
+		privateSession, found := ts.Gw.GlobalSessionManager.SessionDetail("default", sessionID, false)
+		assert.True(t, found)
+		assert.Equal(t, myOKTAClientID, privateSession.OauthClientID)
+	})
+
+	t.Run("DCR disabled", func(t *testing.T) {
+		api.IDPClientIDMappingDisabled = true
+		ts.Gw.LoadAPI(api)
+		_, _ = ts.Run(t, test.TestCase{Headers: authHeaders, Code: http.StatusOK})
+
+		privateSession, found := ts.Gw.GlobalSessionManager.SessionDetail("default", sessionID, false)
+		assert.True(t, found)
+		assert.Empty(t, privateSession.OauthClientID)
+	})
+}
+
+func Test_getOAuthClientIDFromClaim(t *testing.T) {
+	testCases := []struct {
+		name             string
+		claims           jwt.MapClaims
+		expectedClientID string
+	}{
+		{
+			name: "unknown",
+			claims: jwt.MapClaims{
+				"unknown": "value",
+			},
+			expectedClientID: "",
+		},
+		{
+			name: "clientId",
+			claims: jwt.MapClaims{
+				"clientId": "value1",
+			},
+			expectedClientID: "value1",
+		},
+		{
+			name: "cid",
+			claims: jwt.MapClaims{
+				"cid": "value2",
+			},
+			expectedClientID: "value2",
+		},
+		{
+			name: "client_id",
+			claims: jwt.MapClaims{
+				"client_id": "value3",
+			},
+			expectedClientID: "value3",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			j := JWTMiddleware{BaseMiddleware: &BaseMiddleware{}}
+			j.Spec = &APISpec{APIDefinition: &apidef.APIDefinition{}}
+
+			oauthClientID := j.getOAuthClientIDFromClaim(tc.claims)
+
+			assert.Equal(t, tc.expectedClientID, oauthClientID)
+		})
+	}
 }

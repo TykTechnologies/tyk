@@ -40,7 +40,7 @@ var (
 )
 
 type GraphQLMiddleware struct {
-	BaseMiddleware
+	*BaseMiddleware
 }
 
 func (m *GraphQLMiddleware) Name() string {
@@ -189,7 +189,7 @@ func (m *GraphQLMiddleware) initGraphQLEngineV2(logger *abstractlogger.LogrusLog
 	if conf.OpenTelemetry.Enabled {
 		var executor graphqlinternal.TykOtelExecutorI
 		if m.Spec.DetailedTracing {
-			executor, err = graphqlinternal.NewOtelGraphqlEngineV2Detailed(m.Gw.TracerProvider, engine)
+			executor, err = graphqlinternal.NewOtelGraphqlEngineV2Detailed(m.Gw.TracerProvider, engine, m.Spec.GraphQLExecutor.Schema)
 		} else {
 			executor, err = graphqlinternal.NewOtelGraphqlEngineV2Basic(m.Gw.TracerProvider, engine)
 		}

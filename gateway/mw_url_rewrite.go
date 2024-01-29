@@ -38,17 +38,9 @@ var envValueMatch = regexp.MustCompile(`\$secret_env.([A-Za-z0-9_\-\.]+)`)
 var metaMatch = regexp.MustCompile(`\$tyk_meta.([A-Za-z0-9_\-\.]+)`)
 var secretsConfMatch = regexp.MustCompile(`\$secret_conf.([A-Za-z0-9[.\-\_]+)`)
 
-func (gw *Gateway) urlRewrite(meta *apidef.URLRewriteMeta, r *http.Request, decodeURL bool) (string, error) {
+func (gw *Gateway) urlRewrite(meta *apidef.URLRewriteMeta, r *http.Request) (string, error) {
 	rawPath := r.URL.String()
 	path := rawPath
-
-	if decodeURL {
-		var err error
-		path, err = url.PathUnescape(rawPath)
-		if err != nil {
-			return rawPath, fmt.Errorf("failed to decode URL path: %s", rawPath)
-		}
-	}
 
 	log.Debug("Inbound path: ", path)
 	newpath := path
@@ -170,12 +162,21 @@ func (gw *Gateway) urlRewrite(meta *apidef.URLRewriteMeta, r *http.Request, deco
 				}
 				if total == setCount {
 					rewriteToPath = triggerOpts.RewriteTo
+					break
 				}
 			}
 		}
 	}
 
 	matchGroups := meta.MatchRegexp.FindAllStringSubmatch(path, -1)
+	if len(matchGroups) == 0 && containsEscapedChars(rawPath) {
+		unescapedPath, err := url.PathUnescape(rawPath)
+		if err != nil {
+			return unescapedPath, fmt.Errorf("failed to decode URL path: %s", rawPath)
+		}
+
+		matchGroups = meta.MatchRegexp.FindAllStringSubmatch(unescapedPath, -1)
+	}
 
 	// Make sure it matches the string
 	log.Debug("Rewriter checking matches, len is: ", len(matchGroups))
@@ -205,10 +206,6 @@ func (gw *Gateway) urlRewrite(meta *apidef.URLRewriteMeta, r *http.Request, deco
 	}
 
 	newpath = gw.replaceTykVariables(r, newpath, true)
-
-	if rawPath == newpath && containsEscapedChars(rawPath) {
-		newpath, _ = gw.urlRewrite(meta, r, true)
-	}
 
 	return newpath, nil
 }
@@ -386,18 +383,26 @@ func valToStr(v interface{}) string {
 
 // URLRewriteMiddleware Will rewrite an inbund URL to a matching outbound one, it can also handle dynamic variable substitution
 type URLRewriteMiddleware struct {
-	BaseMiddleware
+	*BaseMiddleware
 }
 
 func (m *URLRewriteMiddleware) Name() string {
 	return "URLRewriteMiddleware"
 }
 
-func (m *URLRewriteMiddleware) InitTriggerRx() {
+// InitTriggerRx will go over all defined URLRewrite triggers and initialize them. It
+// will skip disabled triggers, returning true if at least one trigger is enabled.
+func (m *URLRewriteMiddleware) InitTriggerRx() (enabled bool) {
 	// Generate regexp for each special match parameter
 	for verKey := range m.Spec.VersionData.Versions {
 		for pathKey := range m.Spec.VersionData.Versions[verKey].ExtendedPaths.URLRewrite {
 			rewrite := m.Spec.VersionData.Versions[verKey].ExtendedPaths.URLRewrite[pathKey]
+
+			if rewrite.Disabled {
+				continue
+			}
+
+			enabled = true
 
 			for trKey := range rewrite.Triggers {
 				tr := rewrite.Triggers[trKey]
@@ -432,15 +437,14 @@ func (m *URLRewriteMiddleware) InitTriggerRx() {
 			m.Spec.VersionData.Versions[verKey].ExtendedPaths.URLRewrite[pathKey] = rewrite
 		}
 	}
+
+	return
 }
 
 func (m *URLRewriteMiddleware) EnabledForSpec() bool {
-	for _, version := range m.Spec.VersionData.Versions {
-		if len(version.ExtendedPaths.URLRewrite) > 0 {
-			m.Spec.URLRewriteEnabled = true
-			m.InitTriggerRx()
-			return true
-		}
+	if m.InitTriggerRx() {
+		m.Spec.URLRewriteEnabled = true
+		return true
 	}
 	return false
 }
@@ -511,7 +515,7 @@ func (m *URLRewriteMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 	log.Debug(r.URL)
 	oldPath := r.URL.String()
 
-	p, err := m.Gw.urlRewrite(umeta, r, false)
+	p, err := m.Gw.urlRewrite(umeta, r)
 	if err != nil {
 		log.Error(err)
 		return err, http.StatusInternalServerError

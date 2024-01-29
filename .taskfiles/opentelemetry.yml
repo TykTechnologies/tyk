@@ -1,0 +1,47 @@
+---
+version: "3"
+
+includes:
+  tracetest: ./tracetest/Taskfile.yml
+
+tasks:
+  default:
+    desc: "setup, execute and shutdown e2e opentelemetry tests"
+    deps: [ setup ]
+    cmds:
+      - defer:
+          task: teardown
+      - task: test
+
+  setup:
+    desc: "setup e2e opentelemetry tests"
+    deps:
+      - tracetest
+    status:
+      - tracetest version
+    cmds:
+      - docker compose -f ci/tests/tracing/docker-compose.yml up -d
+      - tracetest configure -g --endpoint http://localhost:11633
+
+  test:
+    desc: "run e2e opentelemetry tests"
+    deps: [ setup ]
+    cmds:
+      - tracetest test run -d ./ci/tests/tracing/scenarios/tyk_test_200.yml -w -o pretty
+      - tracetest test run -d ./ci/tests/tracing/scenarios/tyk_test_500.yml -w -o pretty
+      - tracetest test run -d ./ci/tests/tracing/scenarios/tyk_testauth_401.yml -w -o pretty
+      - tracetest test run -d ./ci/tests/tracing/scenarios/tyk_tykprotocol_200.yml -w -o pretty
+      - tracetest test run -d ./ci/tests/tracing/scenarios/tyk_tykprotocol-auth_401.yml -w -o pretty
+      - tracetest test run -d ./ci/tests/tracing/scenarios/tyk_grpcapi_200.yml -w -o pretty
+      - tracetest test run -d ./ci/tests/tracing/scenarios/tyk_versioned_200.yml -w -o pretty
+      - tracetest test run -d ./ci/tests/tracing/scenarios/tyk_versioned_403.yml -w -o pretty
+      - tracetest test run -d ./ci/tests/tracing/scenarios/tyk_versioned_not_detailed_200.yml -w -o pretty
+      - tracetest test run -d ./ci/tests/tracing/scenarios/tyk_versioned_not_detailed_403.yml -w -o pretty
+      - tracetest test run -d ./ci/tests/tracing/scenarios/tyk_test-graphql-tracing_200.yml -w -o pretty
+      - tracetest test run -d ./ci/tests/tracing/scenarios/tyk_test-graphql-tracing-invalid_404.yml -w -o pretty
+      - tracetest test run -d ./ci/tests/tracing/scenarios/tyk_test-graphql-detailed-tracing-disabled_200.yaml -w -o pretty
+
+  teardown:
+    desc: "teardown e2e opentelemetry tests enviroment"
+    cmds:
+      - docker compose -f ci/tests/tracing/docker-compose.yml down --remove-orphans

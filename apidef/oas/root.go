@@ -8,15 +8,17 @@ import (
 	"github.com/TykTechnologies/tyk/apidef"
 )
 
-// XTykAPIGateway contains custom Tyk API extensions for the OAS definition.
+// XTykAPIGateway contains custom Tyk API extensions for the OpenAPI definition.
+// The values for the extensions are stored inside the OpenAPI document, under
+// the key `x-tyk-api-gateway`.
 type XTykAPIGateway struct {
-	// Info contains the main metadata about the API definition.
+	// Info contains the main metadata for the API definition.
 	Info Info `bson:"info" json:"info"` // required
 	// Upstream contains the configurations related to the upstream.
 	Upstream Upstream `bson:"upstream" json:"upstream"` // required
 	// Server contains the configurations related to the server.
 	Server Server `bson:"server" json:"server"` // required
-	// Middleware contains the configurations related to the proxy middleware.
+	// Middleware contains the configurations related to the Tyk middleware.
 	Middleware *Middleware `bson:"middleware,omitempty" json:"middleware,omitempty"`
 }
 
@@ -52,14 +54,17 @@ func (x *XTykAPIGateway) ExtractTo(api *apidef.APIDefinition) {
 	}
 
 	x.Middleware.ExtractTo(api)
+
+	// will be always enabled
+	api.EnableContextVars = true
 }
 
-// Info contains the main metadata about the API definition.
+// Info contains the main metadata for the API definition.
 type Info struct {
-	// ID is the unique ID of the API.
+	// ID is the unique identifier of the API within Tyk.
 	// Tyk classic API definition: `api_id`
 	ID string `bson:"id" json:"id,omitempty"`
-	// DBID is the unique database ID of the API.
+	// DBID is the unique identifier of the API within the Tyk database.
 	// Tyk classic API definition: `id`
 	DBID model.ObjectID `bson:"dbId" json:"dbId,omitempty"`
 	// OrgID is the ID of the organisation which the API belongs to.
@@ -70,7 +75,7 @@ type Info struct {
 	Name string `bson:"name" json:"name"` // required
 	// Expiration date.
 	Expiration string `bson:"expiration,omitempty" json:"expiration,omitempty"`
-	// State holds configuration about API definition states (active, internal).
+	// State holds configuration for API definition states (active, internal).
 	State State `bson:"state" json:"state"` // required
 	// Versioning holds configuration for API versioning.
 	Versioning *Versioning `bson:"versioning,omitempty" json:"versioning,omitempty"`
@@ -123,9 +128,9 @@ func (i *Info) ExtractTo(api *apidef.APIDefinition) {
 	}
 }
 
-// State holds configuration about API definition states (active, internal).
+// State holds configuration for the status of the API within Tyk - whether it is currently active and whether it is exposed externally.
 type State struct {
-	// Active enables the API.
+	// Active enables the API so that Tyk will listen for and process requests made to the listenPath.
 	// Tyk classic API definition: `active`
 	Active bool `bson:"active" json:"active"` // required
 	// Internal makes the API accessible only internally.
@@ -149,7 +154,7 @@ func (s *State) ExtractTo(api *apidef.APIDefinition) {
 //
 // Tyk classic API definition: `version_data`.
 type Versioning struct {
-	// Enabled is a boolean flag, if set to `true` it will enable versioning of an API.
+	// Enabled is a boolean flag, if set to `true` it will enable versioning of the API.
 	Enabled bool `bson:"enabled" json:"enabled"` // required
 	// Name contains the name of the version as entered by the user ("v1" or similar).
 	Name string `bson:"name,omitempty" json:"name,omitempty"`

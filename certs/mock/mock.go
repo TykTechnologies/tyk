@@ -5,6 +5,7 @@
 //
 //	mockgen -destination=./mock/mock.go -package=mock . CertificateManager
 //
+
 // Package mock is a generated GoMock package.
 package mock
 

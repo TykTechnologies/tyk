@@ -24,6 +24,7 @@ var schemaDir embed.FS
 const (
 	keyDefinitions              = "definitions"
 	keyProperties               = "properties"
+	keyRequired                 = "required"
 	oasSchemaVersionNotFoundFmt = "Schema not found for version %q"
 )
 
@@ -96,6 +97,30 @@ func loadOASSchema() error {
 	return err
 }
 
+func validateJSON(schema, document []byte) error {
+	schemaLoader := gojsonschema.NewBytesLoader(schema)
+	documentLoader := gojsonschema.NewBytesLoader(document)
+	result, err := gojsonschema.Validate(schemaLoader, documentLoader)
+
+	if err != nil {
+		return err
+	}
+
+	if result.Valid() {
+		return nil
+	}
+
+	combinedErr := &multierror.Error{}
+	combinedErr.ErrorFormat = tykerrors.Formatter
+
+	validationErrs := result.Errors()
+	for _, validationErr := range validationErrs {
+		combinedErr = multierror.Append(combinedErr, errors.New(validationErr.String()))
+	}
+	return combinedErr.ErrorOrNil()
+
+}
+
 // ValidateOASObject validates an OAS document against a particular OAS version.
 func ValidateOASObject(documentBody []byte, oasVersion string) error {
 	oasSchema, err := GetOASSchema(oasVersion)
@@ -103,26 +128,40 @@ func ValidateOASObject(documentBody []byte, oasVersion string) error {
 		return err
 	}
 
-	schemaLoader := gojsonschema.NewBytesLoader(oasSchema)
-	documentLoader := gojsonschema.NewBytesLoader(documentBody)
-	result, err := gojsonschema.Validate(schemaLoader, documentLoader)
+	return validateJSON(oasSchema, documentBody)
+}
 
+// ValidateOASTemplate checks a Tyk OAS API template for necessary fields,
+// acknowledging that some standard Tyk OAS API fields are optional in templates.
+func ValidateOASTemplate(documentBody []byte, oasVersion string) error {
+	oasSchema, err := GetOASSchema(oasVersion)
 	if err != nil {
 		return err
 	}
 
-	if !result.Valid() {
-		combinedErr := &multierror.Error{}
-		combinedErr.ErrorFormat = tykerrors.Formatter
-
-		validationErrs := result.Errors()
-		for _, validationErr := range validationErrs {
-			combinedErr = multierror.Append(combinedErr, errors.New(validationErr.String()))
-		}
-		return combinedErr.ErrorOrNil()
+	definitions, _, _, err := jsonparser.Get(oasSchema, keyDefinitions)
+	if err != nil {
+		return err
 	}
 
-	return nil
+	unsetReqFieldsPaths := []string{
+		"X-Tyk-Info",
+		"X-Tyk-State",
+		"X-Tyk-Server",
+		"X-Tyk-ListenPath",
+		"X-Tyk-Upstream",
+	}
+
+	for _, path := range unsetReqFieldsPaths {
+		definitions = jsonparser.Delete(definitions, path, keyRequired)
+	}
+
+	oasSchema, err = jsonparser.Set(oasSchema, definitions, keyDefinitions)
+	if err != nil {
+		return err
+	}
+
+	return validateJSON(oasSchema, documentBody)
 }
 
 // GetOASSchema returns an oas schema for a particular version.

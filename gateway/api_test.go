@@ -21,10 +21,11 @@ import (
 	"time"
 
 	"github.com/getkin/kin-openapi/openapi3"
-	"github.com/go-redis/redis/v8"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/TykTechnologies/tyk/internal/redis"
 
 	"github.com/TykTechnologies/tyk/internal/uuid"
 
@@ -2730,7 +2731,7 @@ func TestOAS(t *testing.T) {
 
 					_, _ = ts.Run(t, []test.TestCase{
 						{AdminAuth: true, Method: http.MethodPut, Path: updatePath, Data: &oasAPIInOld,
-							BodyMatch: apidef.ErrAPIMigrated.Error(), Code: http.StatusBadRequest},
+							BodyMatch: apidef.ErrClassicAPIExpected.Error(), Code: http.StatusBadRequest},
 					}...)
 				})
 			})
@@ -3882,7 +3883,7 @@ func TestOrgKeyHandler_LastUpdated(t *testing.T) {
 	}...)
 }
 
-func TestPurgeOAuthClientTokens(t *testing.T) {
+func TestPurgeOAuthClientTokensEndpoint(t *testing.T) {
 	conf := func(globalConf *config.Config) {
 		// set tokens to be expired after 1 second
 		globalConf.OauthTokenExpire = 1

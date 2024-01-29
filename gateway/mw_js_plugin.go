@@ -83,7 +83,8 @@ type VMReturnObject struct {
 
 // DynamicMiddleware is a generic middleware that will execute JS code before continuing
 type DynamicMiddleware struct {
-	BaseMiddleware
+	*BaseMiddleware
+
 	MiddlewareClassName string
 	Pre                 bool
 	UseSession          bool
@@ -478,10 +479,8 @@ func (j *JSVM) LoadTykJSApi() {
 		in := call.Argument(0).String()
 		out, err := base64.RawStdEncoding.DecodeString(in)
 		if err != nil {
-			if err != nil {
-				j.Log.WithError(err).Error("Failed to base64 decode")
-				return otto.Value{}
-			}
+			j.Log.WithError(err).Error("Failed to base64 decode")
+			return otto.Value{}
 		}
 		returnVal, err := j.VM.ToValue(string(out))
 		if err != nil {

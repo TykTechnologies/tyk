@@ -7,9 +7,9 @@ import (
 	"github.com/TykTechnologies/tyk/apidef"
 )
 
-// Upstream holds configuration for an upstream server.
+// Upstream holds configuration for the upstream server to which Tyk should proxy requests.
 type Upstream struct {
-	// URL defines the target URL that the request should be proxied to.
+	// URL defines the upstream address (or Target URL) to which requests should be proxied.
 	// Tyk classic API definition: `proxy.target_url`
 	URL string `bson:"url" json:"url"` // required
 
@@ -20,7 +20,7 @@ type Upstream struct {
 	// Test contains the configuration related to uptime tests.
 	Test *Test `bson:"test,omitempty" json:"test,omitempty"`
 
-	// MutualTLS contains the configuration related to upstream mutual TLS.
+	// MutualTLS contains the configuration for establishment of mutual TLS between Tyk and the upstream server.
 	MutualTLS *MutualTLS `bson:"mutualTLS,omitempty" json:"mutualTLS,omitempty"`
 
 	// CertificatePinning contains the configuration related to certificate pinning.
@@ -140,7 +140,7 @@ type ServiceDiscovery struct {
 	// Tyk classic API definition: `service_discovery.data_path`
 	DataPath string `bson:"dataPath,omitempty" json:"dataPath,omitempty"`
 
-	// UseNestedQuery enables using a combination of `dataPath` and `parentDataPath`.
+	// UseNestedQuery enables the use of a combination of `dataPath` and `parentDataPath`.
 	// It is necessary when the data lives within this string-encoded JSON object.
 	//
 	// ```
@@ -159,7 +159,7 @@ type ServiceDiscovery struct {
 	UseNestedQuery bool `bson:"useNestedQuery,omitempty" json:"useNestedQuery,omitempty"`
 
 	// ParentDataPath is the namespace of the where to find the nested
-	// value, if `useNestedQuery` is `true`. In the above example, it
+	// value if `useNestedQuery` is `true`. In the above example, it
 	// would be `node.value`. You would change the `dataPath` setting
 	// to be `hostname`, since this is where the host name data
 	// resides in the JSON string. Tyk automatically assumes that
@@ -177,7 +177,7 @@ type ServiceDiscovery struct {
 	// Tyk classic API definition: `service_discovery.port_data_path`
 	PortDataPath string `bson:"portDataPath,omitempty" json:"portDataPath,omitempty"`
 
-	// UseTargetList should be set to `true`, if you are using load balancing. Tyk will treat the data path as a list and
+	// UseTargetList should be set to `true` if you are using load balancing. Tyk will treat the data path as a list and
 	// inject it into the target list of your API definition.
 	//
 	// Tyk classic API definition: `service_discovery.use_target_list`
@@ -199,9 +199,10 @@ type ServiceDiscovery struct {
 	// - `service_discovery.cache_timeout`
 	Cache *ServiceDiscoveryCache `bson:"cache,omitempty" json:"cache,omitempty"`
 
-	// TargetPath is to set a target path to append to the discovered endpoint, since many SD services
-	// only provide host and port data. It is important to be able to target a specific resource on that host.
-	// Setting this value will enable that.
+	// TargetPath is used to set a target path that will be appended to the
+	// discovered endpoint, since many service discovery services only provide
+	// host and port data. It is important to be able to target a specific
+	// resource on that host. Setting this value will enable that.
 	//
 	// Tyk classic API definition: `service_discovery.target_path`
 	TargetPath string `bson:"targetPath,omitempty" json:"targetPath,omitempty"`
@@ -307,9 +308,9 @@ func (t *Test) ExtractTo(uptimeTests *apidef.UptimeTests) {
 	t.ServiceDiscovery.ExtractTo(&uptimeTests.Config.ServiceDiscovery)
 }
 
-// MutualTLS holds configuration related to mTLS on APIs, domain to certificate mappings.
+// MutualTLS contains the configuration for establishment of mutual TLS between Tyk and the upstream server.
 type MutualTLS struct {
-	// Enabled enables/disables upstream mutual TLS auth for the API.
+	// Enabled enables/disables upstream mutual TLS for the API.
 	// Tyk classic API definition: `upstream_certificates_disabled`
 	Enabled bool `bson:"enabled" json:"enabled"`
 

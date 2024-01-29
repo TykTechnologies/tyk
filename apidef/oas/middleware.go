@@ -8,12 +8,12 @@ import (
 	"github.com/TykTechnologies/tyk/apidef"
 )
 
-// Middleware holds configuration for middleware.
+// Middleware holds configuration for Tyk's native middleware.
 type Middleware struct {
-	// Global contains the configurations related to the global middleware.
+	// Global contains configuration for middleware that affects the whole API (all endpoints).
 	Global *Global `bson:"global,omitempty" json:"global,omitempty"`
 
-	// Operations configuration.
+	// Operations contains configuration for middleware that can be applied to individual endpoints within the API (per-endpoint).
 	Operations Operations `bson:"operations,omitempty" json:"operations,omitempty"`
 }
 
@@ -41,34 +41,43 @@ func (m *Middleware) ExtractTo(api *apidef.APIDefinition) {
 	m.Global.ExtractTo(api)
 }
 
-// Global holds configuration applies globally: CORS and caching.
+// Global contains configuration that affects the whole API (all endpoints).
 type Global struct {
-	// PluginConfig contains the configuration related custom plugin bundles/driver.
+	// PluginConfig contains the common configuration for custom plugins.
 	PluginConfig *PluginConfig `bson:"pluginConfig,omitempty" json:"pluginConfig,omitempty"`
 
-	// CORS contains the configuration related to cross origin resource sharing.
+	// CORS contains the configuration related to Cross Origin Resource Sharing.
 	// Tyk classic API definition: `CORS`.
 	CORS *CORS `bson:"cors,omitempty" json:"cors,omitempty"`
 
-	// PrePlugin contains configuration related to custom pre-authentication plugin.
+	// PrePlugin contains configuration related to the custom plugin that is run before authentication.
 	// Tyk classic API definition: `custom_middleware.pre`.
 	PrePlugin *PrePlugin `bson:"prePlugin,omitempty" json:"prePlugin,omitempty"`
 
-	// PostAuthenticationPlugin contains configuration related to custom post authentication plugin.
+	// PostAuthenticationPlugin contains configuration related to the custom plugin that is run immediately after authentication.
 	// Tyk classic API definition: `custom_middleware.post_key_auth`.
 	PostAuthenticationPlugin *PostAuthenticationPlugin `bson:"postAuthenticationPlugin,omitempty" json:"postAuthenticationPlugin,omitempty"`
 
-	// PostPlugin contains configuration related to custom post plugin.
+	// PostPlugin contains configuration related to the custom plugin that is run immediately prior to proxying the request to the upstream.
 	// Tyk classic API definition: `custom_middleware.post`.
 	PostPlugin *PostPlugin `bson:"postPlugin,omitempty" json:"postPlugin,omitempty"`
 
-	// ResponsePlugin contains configuration related to custom post plugin.
+	// ResponsePlugin contains configuration related to to the custom plugin that is run during processing of the response from the upstream service.
+	//
 	// Tyk classic API definition: `custom_middleware.response`.
 	ResponsePlugin *ResponsePlugin `bson:"responsePlugin,omitempty" json:"responsePlugin,omitempty"`
 
 	// Cache contains the configurations related to caching.
 	// Tyk classic API definition: `cache_options`.
 	Cache *Cache `bson:"cache,omitempty" json:"cache,omitempty"`
+
+	// TransformRequestHeaders contains the configurations related to API level request header transformation.
+	// Tyk classic API definition: `global_headers`/`global_headers_remove`.
+	TransformRequestHeaders *TransformHeaders `bson:"transformRequestHeaders,omitempty" json:"transformRequestHeaders,omitempty"`
+
+	// TransformResponseHeaders contains the configurations related to API level response header transformation.
+	// Tyk classic API definition: `global_response_headers`/`global_response_headers_remove`.
+	TransformResponseHeaders *TransformHeaders `bson:"transformResponseHeaders,omitempty" json:"transformResponseHeaders,omitempty"`
 }
 
 // Fill fills *Global from apidef.APIDefinition.
@@ -134,6 +143,33 @@ func (g *Global) Fill(api apidef.APIDefinition) {
 	g.ResponsePlugin.Fill(api)
 	if ShouldOmit(g.ResponsePlugin) {
 		g.ResponsePlugin = nil
+	}
+
+	if g.TransformRequestHeaders == nil {
+		g.TransformRequestHeaders = &TransformHeaders{}
+	}
+
+	vInfo := api.VersionData.Versions[Main]
+	g.TransformRequestHeaders.Fill(apidef.HeaderInjectionMeta{
+		Disabled:      vInfo.GlobalHeadersDisabled,
+		AddHeaders:    vInfo.GlobalHeaders,
+		DeleteHeaders: vInfo.GlobalHeadersRemove,
+	})
+	if ShouldOmit(g.TransformRequestHeaders) {
+		g.TransformRequestHeaders = nil
+	}
+
+	if g.TransformResponseHeaders == nil {
+		g.TransformResponseHeaders = &TransformHeaders{}
+	}
+
+	g.TransformResponseHeaders.Fill(apidef.HeaderInjectionMeta{
+		Disabled:      vInfo.GlobalResponseHeadersDisabled,
+		AddHeaders:    vInfo.GlobalResponseHeaders,
+		DeleteHeaders: vInfo.GlobalResponseHeadersRemove,
+	})
+	if ShouldOmit(g.TransformResponseHeaders) {
+		g.TransformResponseHeaders = nil
 	}
 }
 
@@ -201,6 +237,42 @@ func (g *Global) ExtractTo(api *apidef.APIDefinition) {
 	}
 
 	g.ResponsePlugin.ExtractTo(api)
+
+	if g.TransformRequestHeaders == nil {
+		g.TransformRequestHeaders = &TransformHeaders{}
+		defer func() {
+			g.TransformRequestHeaders = nil
+		}()
+	}
+
+	var headerMeta apidef.HeaderInjectionMeta
+	g.TransformRequestHeaders.ExtractTo(&headerMeta)
+
+	if g.TransformResponseHeaders == nil {
+		g.TransformResponseHeaders = &TransformHeaders{}
+		defer func() {
+			g.TransformResponseHeaders = nil
+		}()
+	}
+
+	var resHeaderMeta apidef.HeaderInjectionMeta
+	g.TransformResponseHeaders.ExtractTo(&resHeaderMeta)
+
+	if len(api.VersionData.Versions) == 0 {
+		api.VersionData.Versions = map[string]apidef.VersionInfo{
+			Main: {},
+		}
+	}
+
+	vInfo := api.VersionData.Versions[Main]
+	vInfo.GlobalHeadersDisabled = headerMeta.Disabled
+	vInfo.GlobalHeaders = headerMeta.AddHeaders
+	vInfo.GlobalHeadersRemove = headerMeta.DeleteHeaders
+
+	vInfo.GlobalResponseHeadersDisabled = resHeaderMeta.Disabled
+	vInfo.GlobalResponseHeaders = resHeaderMeta.AddHeaders
+	vInfo.GlobalResponseHeadersRemove = resHeaderMeta.DeleteHeaders
+	api.VersionData.Versions[Main] = vInfo
 }
 
 // PluginConfigData configures config data for custom plugins.
@@ -226,8 +298,8 @@ func (p *PluginConfigData) ExtractTo(api *apidef.APIDefinition) {
 
 // PluginConfig holds configuration for custom plugins.
 type PluginConfig struct {
-	// Driver configures which custom plugin to be used.
-	// It's value should be set to one of the following:
+	// Driver configures which custom plugin driver to use.
+	// The value should be set to one of the following:
 	//
 	// - `otto`,
 	// - `python`,
@@ -868,6 +940,48 @@ func (tr *TransformBody) ExtractTo(meta *apidef.TemplateMeta) {
 	}
 }
 
+// TransformHeaders holds configuration about request/response header transformations.
+type TransformHeaders struct {
+	// Enabled enables Header Transform for the given path and method.
+	Enabled bool `bson:"enabled" json:"enabled"`
+	// Remove specifies header names to be removed from the request/response.
+	Remove []string `bson:"remove,omitempty" json:"remove,omitempty"`
+	// Add specifies headers to be added to the request/response.
+	Add []Header `bson:"add,omitempty" json:"add,omitempty"`
+}
+
+// Fill fills *TransformHeaders from apidef.HeaderInjectionMeta.
+func (th *TransformHeaders) Fill(meta apidef.HeaderInjectionMeta) {
+	th.Enabled = !meta.Disabled
+	th.Remove = meta.DeleteHeaders
+
+	th.Add = make([]Header, len(meta.AddHeaders))
+	i := 0
+	for k, v := range meta.AddHeaders {
+		th.Add[i] = Header{Name: k, Value: v}
+		i++
+	}
+
+	sort.Slice(th.Add, func(i, j int) bool {
+		return th.Add[i].Name < th.Add[j].Name
+	})
+
+	if len(th.Add) == 0 {
+		th.Add = nil
+	}
+}
+
+// ExtractTo extracts *TransformHeaders into *apidef.HeaderInjectionMeta.
+func (th *TransformHeaders) ExtractTo(meta *apidef.HeaderInjectionMeta) {
+	meta.Disabled = !th.Enabled
+	meta.DeleteHeaders = th.Remove
+
+	meta.AddHeaders = make(map[string]string, len(th.Remove))
+	for _, header := range th.Add {
+		meta.AddHeaders[header.Name] = header.Value
+	}
+}
+
 // CachePlugin holds the configuration for the cache plugins.
 type CachePlugin struct {
 	// Enabled is a boolean flag. If set to `true`, the advanced caching plugin will be enabled.
@@ -1160,4 +1274,42 @@ func (e EndpointPostPlugins) ExtractTo(meta *apidef.GoPluginMeta) {
 	meta.Disabled = !e[0].Enabled
 	meta.PluginPath = e[0].Path
 	meta.SymbolName = e[0].Name
+}
+
+// CircuitBreaker holds configuration for the circuit breaker middleware.
+// Tyk classic API definition: `version_data.versions..extended_paths.circuit_breakers[*]`.
+type CircuitBreaker struct {
+	// Enabled enables the Circuit Breaker functionality.
+	// Tyk classic API definition: `version_data.versions..extended_paths.circuit_breakers[*].disabled`.
+	Enabled bool `bson:"enabled" json:"enabled"`
+	// Threshold is the proportion from each `sampleSize` requests that must fail for the breaker to be tripped. This must be a value between 0.0 and 1.0. If `sampleSize` is 100 then a threshold of 0.4 means that the breaker will be tripped if 40 out of every 100 requests fails.
+	// Tyk classic API definition: `version_data.versions..extended_paths.circuit_breakers[*].threshold_percent`.
+	Threshold float64 `bson:"threshold" json:"threshold"`
+	// SampleSize is the size of the circuit breaker sampling window. Combining this with `threshold` gives the failure rate required to trip the circuit breaker.
+	// Tyk classic API definition: `version_data.versions..extended_paths.circuit_breakers[*].samples`.
+	SampleSize int `bson:"sampleSize" json:"sampleSize"`
+	// CoolDownPeriod is the period of time (in seconds) for which the circuit breaker will remain open before returning to service.
+	// Tyk classic API definition: `version_data.versions..extended_paths.circuit_breakers[*].return_to_service_after`.
+	CoolDownPeriod int `bson:"coolDownPeriod" json:"coolDownPeriod"`
+	// HalfOpenStateEnabled , if enabled, allows some requests to pass through the circuit breaker during the cool down period. If Tyk detects that the path is now working, the circuit breaker will be automatically reset and traffic will be resumed to the upstream.
+	// Tyk classic API definition: `version_data.versions..extended_paths.circuit_breakers[*].disable_half_open_state`.
+	HalfOpenStateEnabled bool `bson:"halfOpened" json:"halfOpened"`
+}
+
+// Fill fills *CircuitBreaker from apidef.CircuitBreakerMeta.
+func (cb *CircuitBreaker) Fill(circuitBreaker apidef.CircuitBreakerMeta) {
+	cb.Enabled = !circuitBreaker.Disabled
+	cb.Threshold = circuitBreaker.ThresholdPercent
+	cb.SampleSize = int(circuitBreaker.Samples)
+	cb.CoolDownPeriod = circuitBreaker.ReturnToServiceAfter
+	cb.HalfOpenStateEnabled = !circuitBreaker.DisableHalfOpenState
+}
+
+// ExtractTo extracts *CircuitBreaker into *apidef.CircuitBreakerMeta.
+func (cb *CircuitBreaker) ExtractTo(circuitBreaker *apidef.CircuitBreakerMeta) {
+	circuitBreaker.Disabled = !cb.Enabled
+	circuitBreaker.ThresholdPercent = cb.Threshold
+	circuitBreaker.Samples = int64(cb.SampleSize)
+	circuitBreaker.ReturnToServiceAfter = cb.CoolDownPeriod
+	circuitBreaker.DisableHalfOpenState = !cb.HalfOpenStateEnabled
 }
