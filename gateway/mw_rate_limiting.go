@@ -70,17 +70,19 @@ func (k *RateLimitAndQuotaCheck) ProcessRequest(w http.ResponseWriter, r *http.R
 	}
 
 	session := ctxGetSession(r)
-	limit_key := ctxGetAuthToken(r)
+	rateLimitKey := ctxGetAuthToken(r)
 
-	if pattern, found := session.MetaData["limit_pattern"]; found {
-	   limit_key = k.Gw.replaceTykVariables(r, pattern, false)
+	if pattern, found := session.MetaData["rate_limit_pattern"]; found {
+		if patternString, ok := pattern.(string); ok {
+			rateLimitKey = k.Gw.replaceTykVariables(r, patternString, false)
+		}
 	}
 
 	storeRef := k.Gw.GlobalSessionManager.Store()
 	reason := k.Gw.SessionLimiter.ForwardMessage(
 		r,
 		session,
-		limit_key,
+		rateLimitKey,
 		storeRef,
 		!k.Spec.DisableRateLimit,
 		!k.Spec.DisableQuota,
@@ -104,7 +106,7 @@ func (k *RateLimitAndQuotaCheck) ProcessRequest(w http.ResponseWriter, r *http.R
 	switch reason {
 	case sessionFailNone:
 	case sessionFailRateLimit:
-		err, errCode := k.handleRateLimitFailure(r, limit_key)
+		err, errCode := k.handleRateLimitFailure(r, rateLimitKey)
 		if throttleRetryLimit > 0 {
 			for {
 				ctxIncThrottleLevel(r, throttleRetryLimit)
@@ -113,7 +115,7 @@ func (k *RateLimitAndQuotaCheck) ProcessRequest(w http.ResponseWriter, r *http.R
 				reason = k.Gw.SessionLimiter.ForwardMessage(
 					r,
 					session,
-					limit_key,
+					rateLimitKey,
 					storeRef,
 					!k.Spec.DisableRateLimit,
 					!k.Spec.DisableQuota,
@@ -139,7 +141,7 @@ func (k *RateLimitAndQuotaCheck) ProcessRequest(w http.ResponseWriter, r *http.R
 		return err, errCode
 
 	case sessionFailQuota:
-		return k.handleQuotaFailure(r, limit_key)
+		return k.handleQuotaFailure(r, rateLimitKey)
 	case sessionFailInternalServerError:
 		return ProxyingRequestFailedErr, http.StatusInternalServerError
 	default:
@@ -148,7 +150,7 @@ func (k *RateLimitAndQuotaCheck) ProcessRequest(w http.ResponseWriter, r *http.R
 	}
 	// Run the trigger monitor
 	if k.Spec.GlobalConfig.Monitor.MonitorUserKeys {
-		k.Gw.SessionMonitor.Check(session, limit_key)
+		k.Gw.SessionMonitor.Check(session, rateLimitKey)
 	}
 
 	// Request is valid, carry on
