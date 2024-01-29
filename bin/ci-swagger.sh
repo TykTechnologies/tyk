@@ -1,6 +1,6 @@
 #!/bin/bash
 
-swagger2fileName="swagger2.yaml"
+swagger2fileName="/path/to/valid/swagger2.yaml"
 tempOpenAPIFileName="temp-swagger.yml"
 tempUpdatedOpenAPIFileName="temp-swagger2.yml"
 openAPIspecfileName="swagger.yml"
@@ -10,13 +10,22 @@ fatal() {
 	exit 1
 }
 
-swagger generate spec -o "$swagger2fileName"
+swagger generate spec -o "$swagger2fileName" --output=$swagger2fileName
+if [ $? -ne 0 ]; then
+    fatal "could not generate swagger2.0 spec to the specified path, $swagger2fileName"
+rm $swagger2fileName
 
 if [ $? -ne 0 ]; then
 	fatal "could not generate swagger2.0 spec to the specified path, $swagger2fileName"
 fi
 
-swagger validate "$swagger2fileName"
+api-spec-converter --from=swagger_2 --to=openapi_3 --syntax=yaml --input=$swagger2fileName --output=$tempOpenAPIFileName
+if [ $? -ne 0 ]; then
+    fatal "could not convert swagger2.0 spec to opeenapi 3.0"
+fi
+if [ $? -ne 0 ]; then
+    fatal "swagger spec is invalid... swagger spec is located at $swagger2fileName"
+fi
 
 if [ $? -ne 0 ]; then
 	fatal "swagger spec is invalid... swagger spec is located at $swagger2fileName"
@@ -46,7 +55,7 @@ if [ $? -ne 0 ]; then
 	fatal "replace operation failed"
 fi
 
-mv $tempUpdatedOpenAPIFileName $openAPIspecfileName
+mv $tempUpdatedOpenAPIFileName /path/to/desired/OpenAPI_spec.yaml
 
 ## Ideally, CI should push $openAPIspecfileName to GitHub
 ## but for now, it can be committed by users and pushed alonside their changes.
