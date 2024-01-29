@@ -761,6 +761,22 @@
         "enabled"
       ]
     },
+    "X-Tyk-RequestSizeLimit": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "value": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "enabled",
+        "value"
+      ]
+    },
     "X-Tyk-VirtualEndpoint": {
       "type": "object",
       "additionalProperties": false,
@@ -970,6 +986,9 @@
         },
         "mockResponse": {
           "$ref": "#/definitions/X-Tyk-MockResponse"
+        },
+        "requestSizeLimit": {
+          "$ref": "#/definitions/X-Tyk-RequestSizeLimit"
         }
       }
     },
