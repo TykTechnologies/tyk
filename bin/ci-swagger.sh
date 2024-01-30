@@ -5,7 +5,7 @@ tempOpenAPIFileName="temp-swagger.yml"
 tempUpdatedOpenAPIFileName="temp-swagger2.yml"
 openAPIspecfileName="swagger.yml"
 
-fatal() {
+echo "Error: $@" >&2\nexit 1() {
 	echo "$@" >&2
 	exit 1
 }
@@ -13,7 +13,7 @@ fatal() {
 swagger generate spec -o "$swagger2fileName"
 
 if [ $? -ne 0 ]; then
-	fatal "could not generate swagger2.0 spec to the specified path, $swagger2fileName"
+	echo "Error: could not generate swagger2.0 spec to the specified path, $swagger2fileName" >&2\nexit 1"could not generate swagger2.0 spec to the specified path, $swagger2fileName"
 fi
 
 swagger validate "$swagger2fileName"
@@ -36,14 +36,14 @@ rm "$swagger2fileName"
 sed -n '1,/components:/p' $openAPIspecfileName > $tempUpdatedOpenAPIFileName
 
 if [ $? -ne 0 ]; then
-	fatal "replace operation failed step 1"
+	echo "Error: replace operation failed step 1" >&2\nexit 1"replace operation failed step 1"
 fi
 
 lineToStartReplaceFrom=$(grep -n "responses:" swagger.yml | tail -1 |  awk '{split($0,a,":"); print a[1]}')
 
 sed -n "$lineToStartReplaceFrom,/components:/p" $openAPIspecfileName >> $tempUpdatedOpenAPIFileName
 if [ $? -ne 0 ]; then
-	fatal "replace operation failed"
+	echo "Error: replace operation failed" >&2\nexit 1"replace operation failed"
 fi
 
 mv $tempUpdatedOpenAPIFileName $openAPIspecfileName
