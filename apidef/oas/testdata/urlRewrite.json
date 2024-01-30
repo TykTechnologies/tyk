@@ -49,8 +49,7 @@
       "listenPath": {
         "value": "/test_url_rewrite/",
         "strip": true
-      },
-      "slug": "test_url_rewrite"
+      }
     },
     "middleware": {
       "operations": {

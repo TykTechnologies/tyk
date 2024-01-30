@@ -12,10 +12,6 @@ type Server struct {
 	// accordingly.
 	ListenPath ListenPath `bson:"listenPath" json:"listenPath"` // required
 
-	// Slug is the Tyk Cloud equivalent of listen path.
-	// Tyk classic API definition: `slug`
-	Slug string `bson:"slug,omitempty" json:"slug,omitempty"`
-
 	// Authentication contains the configurations that manage how clients can authenticate with Tyk to access the API.
 	Authentication *Authentication `bson:"authentication,omitempty" json:"authentication,omitempty"`
 
@@ -42,7 +38,6 @@ type Server struct {
 // Fill fills *Server from apidef.APIDefinition.
 func (s *Server) Fill(api apidef.APIDefinition) {
 	s.ListenPath.Fill(api)
-	s.Slug = api.Slug
 
 	if s.ClientCertificates == nil {
 		s.ClientCertificates = &ClientCertificates{}
@@ -91,7 +86,6 @@ func (s *Server) Fill(api apidef.APIDefinition) {
 // ExtractTo extracts *Server into *apidef.APIDefinition.
 func (s *Server) ExtractTo(api *apidef.APIDefinition) {
 	s.ListenPath.ExtractTo(api)
-	api.Slug = s.Slug
 
 	if s.ClientCertificates == nil {
 		s.ClientCertificates = &ClientCertificates{}
