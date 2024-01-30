@@ -1051,6 +1051,7 @@ type Config struct {
 	OAS OASConfig `json:"oas_config"`
 }
 
+// OASConfig holds the configuration for various OAS-specific functionalities
 type OASConfig struct {
 	// ValidateExamples enables validation of examples in the OAS spec. Defaults to false.
 	ValidateExamples bool `json:"validate_examples"`
