@@ -1551,3 +1551,32 @@ func TestAPISpec_setHasMock(t *testing.T) {
 	s.setHasMock()
 	assert.True(t, s.HasMock)
 }
+
+func TestReplaceSecrets(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	t.Setenv("Furkan", "Şenharputlu")
+	t.Setenv("Leonid", "Bugaev")
+
+	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		spec.APIID = "1"
+		spec.JWTSource = "env://Furkan"
+	}, func(spec *APISpec) {
+		spec.APIID = "2"
+		spec.AuthConfigs = map[string]apidef.AuthConfig{
+			apidef.BasicType: {
+				AuthHeaderName: "env://Leonid",
+			},
+			apidef.AuthTokenType: {
+				AuthHeaderName: "env://Furkan",
+			},
+		}
+	})
+
+	api1 := ts.Gw.getApiSpec("1")
+	api2 := ts.Gw.getApiSpec("2")
+	assert.Equal(t, "Şenharputlu", api1.JWTSource)
+	assert.Equal(t, "Bugaev", api2.AuthConfigs[apidef.BasicType].AuthHeaderName)
+	assert.Equal(t, "Şenharputlu", api2.AuthConfigs[apidef.AuthTokenType].AuthHeaderName)
+}
