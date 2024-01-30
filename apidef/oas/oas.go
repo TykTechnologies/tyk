@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/TykTechnologies/tyk/config"
 
 	"github.com/getkin/kin-openapi/openapi3"
 
@@ -416,7 +417,10 @@ func newOASFromClassicAPIDefinition(api *apidef.APIDefinition) (*OAS, error) {
 	oas.setRequiredFields(api.Name, api.VersionName)
 	clearClassicAPIForSomeFeatures(api)
 
-	err := oas.Validate(context.Background())
+	err := oas.Validate(context.Background(), []openapi3.ValidationOption{
+		openapi3.DisableExamplesValidation(),
+		openapi3.DisableSchemaDefaultsValidation(),
+	}...)
 	if err != nil {
 		return nil, err
 	}
@@ -446,4 +450,19 @@ func clearClassicAPIForSomeFeatures(api *apidef.APIDefinition) {
 	vInfo := api.VersionData.Versions[Main]
 	vInfo.ExtendedPaths.ValidateJSON = nil
 	api.VersionData.Versions[Main] = vInfo
+}
+
+// GetValidationOptionsFromConfig retrieves validation options based on the configuration settings.
+func GetValidationOptionsFromConfig(oasConfig config.OASConfig) []openapi3.ValidationOption {
+	var opts []openapi3.ValidationOption
+
+	if !oasConfig.ValidateSchemaDefaults {
+		opts = append(opts, openapi3.DisableSchemaDefaultsValidation())
+	}
+
+	if !oasConfig.ValidateExamples {
+		opts = append(opts, openapi3.DisableExamplesValidation())
+	}
+
+	return opts
 }

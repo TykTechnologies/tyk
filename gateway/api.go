@@ -3011,7 +3011,7 @@ func (gw *Gateway) validateOAS(next http.HandlerFunc) http.HandlerFunc {
 			return
 		}
 
-		if err = oasObj.Validate(r.Context()); err != nil {
+		if err = oasObj.Validate(r.Context(), oas.GetValidationOptionsFromConfig(gw.GetConfig().OAS)...); err != nil {
 			doJSONWrite(w, http.StatusBadRequest, apiError(err.Error()))
 			return
 		}
