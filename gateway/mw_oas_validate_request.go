@@ -4,14 +4,26 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/getkin/kin-openapi/openapi3"
 
 	"github.com/getkin/kin-openapi/openapi3filter"
 )
 
+const dateOnlyTimeLayout = "2006-01-02"
+
 func init() {
 	openapi3.SchemaErrorDetailsDisabled = true
+	openapi3.DefineStringFormatCallback("date-time", func(value string) error {
+		_, err := time.Parse(time.RFC3339, value)
+		return err
+	})
+
+	openapi3.DefineStringFormatCallback("date", func(value string) error {
+		_, err := time.Parse(dateOnlyTimeLayout, value)
+		return err
+	})
 }
 
 type ValidateRequest struct {
