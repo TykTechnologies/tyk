@@ -154,6 +154,7 @@ func TestOAS_ExtractTo_ResetAPIDefinition(t *testing.T) {
 	a.IsOAS = false
 	a.IDPClientIDMappingDisabled = false
 	a.EnableContextVars = false
+	a.DisableRateLimit = false
 
 	// deprecated fields
 	a.Auth = apidef.AuthConfig{}
@@ -232,7 +233,6 @@ func TestOAS_ExtractTo_ResetAPIDefinition(t *testing.T) {
 		"APIDefinition.Proxy.Transport.SSLMaxVersion",
 		"APIDefinition.Proxy.Transport.SSLForceCommonNameCheck",
 		"APIDefinition.Proxy.Transport.ProxyURL",
-		"APIDefinition.DisableRateLimit",
 		"APIDefinition.DisableQuota",
 		"APIDefinition.SessionLifetimeRespectsKeyExpiration",
 		"APIDefinition.SessionLifetime",
@@ -254,8 +254,6 @@ func TestOAS_ExtractTo_ResetAPIDefinition(t *testing.T) {
 		"APIDefinition.ResponseProcessors[0].Options",
 		"APIDefinition.DoNotTrack",
 		"APIDefinition.TagHeaders[0]",
-		"APIDefinition.GlobalRateLimit.Rate",
-		"APIDefinition.GlobalRateLimit.Per",
 		"APIDefinition.EnableDetailedRecording",
 		"APIDefinition.GraphQL.Enabled",
 		"APIDefinition.GraphQL.ExecutionMode",
