@@ -1,5 +1,25 @@
 # Contributing to Tyk
 
+  ## Troubleshooting GitHub Actions
+  ### Troubleshooting GitHub Actions
+
+When encountering issues related to GitHub Actions runs, follow the guidelines below to troubleshoot and resolve common problems.
+
+  ### Reporting and Documenting Error Logs
+  If the GitHub Actions run encounters errors, follow these steps to report and document the error logs:
+  - Review the error logs generated during the run to identify the root cause of the issue.
+  - Look for keywords, stack traces, or specific error messages to pinpoint the source of the problem.
+
+  ### Resolving Common Issues
+  If the issue persists, follow the steps below to troubleshoot and resolve common issues:
+  - Check for missing or incorrect dependencies in the workflow file.
+  - Ensure that environment variables are correctly defined and accessible.
+  - Review any custom scripts or commands used in the workflow for errors or misconfigurations.
+  - Refer to the project's documentation and community resources for troubleshooting guidance.
+
+  ### Continued Support
+  If the issue persists, seek help from the project maintainers or the GitHub community for continued assistance.
+
 **First**: if you're unsure or afraid of anything, just ask or submit the issue or pull request anyways. You won't be yelled at for giving your best effort. The worst that can happen is that you'll be politely asked to change something. We appreciate any sort of contributions, and don't want a wall of rules to get in the way of that.
 
 However, for those individuals who want a bit more guidance on the best way to contribute to the project, read on. This document will cover what we're looking for. By addressing all the points we're looking for, it raises the chances we can quickly merge or address your contributions.
@@ -60,20 +80,33 @@ If you want to work on a new idea of relatively small scope:
 
 If you want to work on a bigger idea, we **strongly** recommend that you start with
 some bugs or smaller features. It is always better to discuss your idea with our team first, before implementing it.
+   Contributor License Agreement (see details above).
+
+If you want to work on a bigger idea, we **strongly** recommend that you start with
+some bugs or smaller features. It is always better to discuss your idea with our team first, before implementing it.
 
 ### Downloading the project
 You need to clone Tyk from GitHub to your GOPATH folder, or alternatively you can run `go get -d github.com/TykTechnologies/tyk` which automatically downloads project to the right path.
 
-### Building the project
+### Building and Testing the Project
 You need to have working Go environment: see [golang.org](https://golang.org/doc/code.html) for more info on how Go works with code.
 
 To build and test Tyk use built-in `go` commands: `go build` and `go test -v`. If you want to just test a subset of the project, you can pass the `-run` argument with the name of the test. Note that logs are hidden by default when running the tests, which you can override by setting `TYK_LOGLEVEL=info`.
 
-Currently, in order for tests to pass, a **Redis host is required**. We know, this is terrible and should be handled with an interface, and it is, however in the current version there is a hard requirement for the application to have its default memory setup to use Redis as part of a deployment, this is to make it easier to install the application for the end-user. Future versions will work around this, or we may drop the memory requirement. The simplest way to run Redis is to use official Docker image [https://hub.docker.com/_/redis/](https://hub.docker.com/_/redis/)
+Currently, in order for tests to pass, a **Redis host is required**. 
+
+### Troubleshooting and Continued Support for GitHub Actions
+
+If you encounter issues related to GitHub Actions runs while adding dependencies, follow the steps below to troubleshoot and resolve common problems:
+- Check for missing or incorrect dependencies in the workflow file.
+- Ensure that environment variables are correctly defined and accessible.
+- Review any custom scripts or commands used in the workflow for errors or misconfigurations.We know, this is terrible and should be handled with an interface, and it is, however in the current version there is a hard requirement for the application to have its default memory setup to use Redis as part of a deployment, this is to make it easier to install the application for the end-user. Future versions will work around this, or we may drop the memory requirement. The simplest way to run Redis is to use official Docker image [https://hub.docker.com/_/redis/](https://hub.docker.com/_/redis/)
 
 ### Adding dependencies
 
 If your patch depends on new packages, ensure that they will be put in `/vendor` folder. Here at Tyk we use `govendor` for managing our dependencies. Adding new dependencies can be done using following command: `govendor fetch github.com/alicebob/miniredis`.
 
 ### Geo IP features
+
+If your proposed changes involve Geo IP features, ensure that you abide by the guidelines provided by MaxMind for using their data. The GeoLite2 data was created by MaxMind, and more information is available from [MaxMind](http://www.maxmind.com).
 This product utilises GeoLite2 data created by MaxMind, available from [http://www.maxmind.com](http://www.maxmind.com).
