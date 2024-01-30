@@ -13,7 +13,7 @@ import (
 	"github.com/TykTechnologies/tyk/storage"
 )
 
-var rc *storage.RedisController
+var rc *storage.ConnectionHandler
 
 func TestMain(m *testing.M) {
 	conf, err := config.New()
@@ -21,8 +21,8 @@ func TestMain(m *testing.M) {
 		panic(err)
 	}
 
-	rc = storage.NewRedisController(context.Background())
-	go rc.ConnectToRedis(context.Background(), nil, conf)
+	rc = storage.NewConnectionHandler(context.Background())
+	go rc.Connect(context.Background(), nil, conf)
 
 	timeout, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
@@ -41,7 +41,7 @@ func TestNewSyncForcer(t *testing.T) {
 	assert.True(t, sf.store.ControllerInitiated())
 	assert.Equal(t, "synchronizer-group-", sf.store.KeyPrefix)
 
-	assert.Equal(t, true, sf.store.RedisController.Connected())
+	assert.Equal(t, true, sf.store.C.Connected())
 }
 
 func TestGroupLoginCallback(t *testing.T) {

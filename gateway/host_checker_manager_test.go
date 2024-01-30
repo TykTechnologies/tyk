@@ -14,7 +14,7 @@ func TestHostCheckerManagerInit(t *testing.T) {
 	defer ts.Close()
 
 	hc := HostCheckerManager{Gw: ts.Gw}
-	redisStorage := &storage.RedisCluster{KeyPrefix: "host-checker-test:", RedisController: ts.Gw.RedisController}
+	redisStorage := &storage.RedisCluster{KeyPrefix: "host-checker-test:", ConnectionHandler: ts.Gw.StorageConnectionHandler}
 	hc.Init(redisStorage)
 
 	if hc.Id == "" {
@@ -45,7 +45,7 @@ func TestAmIPolling(t *testing.T) {
 	globalConf.UptimeTests.PollerGroup = groupID
 	ts.Gw.SetConfig(globalConf)
 
-	redisStorage := &storage.RedisCluster{KeyPrefix: "host-checker-test:", RedisController: ts.Gw.RedisController}
+	redisStorage := &storage.RedisCluster{KeyPrefix: "host-checker-test:", ConnectionHandler: ts.Gw.StorageConnectionHandler}
 	hc.Init(redisStorage)
 	hc2 := HostCheckerManager{Gw: ts.Gw}
 	hc2.Init(redisStorage)
@@ -74,7 +74,7 @@ func TestAmIPolling(t *testing.T) {
 
 	//Testing if the PollerCacheKey doesn't contains the poller_group by default
 	hc = HostCheckerManager{Gw: ts.Gw}
-	redisStorage = &storage.RedisCluster{KeyPrefix: "host-checker-test:", RedisController: ts.Gw.RedisController}
+	redisStorage = &storage.RedisCluster{KeyPrefix: "host-checker-test:", ConnectionHandler: ts.Gw.StorageConnectionHandler}
 	hc.Init(redisStorage)
 	hc.AmIPolling()
 
@@ -106,7 +106,7 @@ func TestCheckActivePollerLoop(t *testing.T) {
 	defer ts.Close()
 
 	hc := &HostCheckerManager{Gw: ts.Gw}
-	redisStorage := &storage.RedisCluster{KeyPrefix: "host-checker-test-1:", RedisController: ts.Gw.RedisController}
+	redisStorage := &storage.RedisCluster{KeyPrefix: "host-checker-test-1:", ConnectionHandler: ts.Gw.StorageConnectionHandler}
 	hc.Init(redisStorage)
 
 	go hc.CheckActivePollerLoop(ts.Gw.ctx)
@@ -122,7 +122,7 @@ func TestStartPoller(t *testing.T) {
 	defer ts.Close()
 
 	hc := HostCheckerManager{Gw: ts.Gw}
-	redisStorage := &storage.RedisCluster{KeyPrefix: "host-checker-TestStartPoller:", RedisController: ts.Gw.RedisController}
+	redisStorage := &storage.RedisCluster{KeyPrefix: "host-checker-TestStartPoller:", ConnectionHandler: ts.Gw.StorageConnectionHandler}
 	hc.Init(redisStorage)
 
 	hc.StartPoller(ts.Gw.ctx)
@@ -137,7 +137,7 @@ func TestRecordUptimeAnalytics(t *testing.T) {
 	defer ts.Close()
 	hc := &HostCheckerManager{Gw: ts.Gw}
 
-	redisStorage := &storage.RedisCluster{KeyPrefix: "host-checker-test-analytics:", RedisController: ts.Gw.RedisController}
+	redisStorage := &storage.RedisCluster{KeyPrefix: "host-checker-test-analytics:", ConnectionHandler: ts.Gw.StorageConnectionHandler}
 	hc.Init(redisStorage)
 
 	spec := &APISpec{}

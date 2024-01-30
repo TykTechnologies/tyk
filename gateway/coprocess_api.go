@@ -21,8 +21,8 @@ func TykStoreData(CKey, CValue *C.char, CTTL C.int) {
 	key := C.GoString(CKey)
 	value := C.GoString(CValue)
 	ttl := int64(CTTL)
-	rc := storage.NewRedisController(context.TODO())
-	store := storage.RedisCluster{KeyPrefix: CoProcessDefaultKeyPrefix, RedisController: rc}
+	rc := storage.NewConnectionHandler(context.TODO())
+	store := storage.RedisCluster{KeyPrefix: CoProcessDefaultKeyPrefix, ConnectionHandler: rc}
 	err := store.SetKey(key, value, ttl)
 	if err != nil {
 		log.WithError(err).Error("could not set key")

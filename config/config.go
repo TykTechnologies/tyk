@@ -142,6 +142,20 @@ type StorageOptionsConf struct {
 	UseSSL bool `json:"use_ssl"`
 	// Disable TLS verification
 	SSLInsecureSkipVerify bool `json:"ssl_insecure_skip_verify"`
+	// Path to the CA file.
+	CAFile string `json:"ca_file"`
+	// Path to the cert file.
+	CertFile string `json:"cert_file"`
+	// Path to the key file.
+	KeyFile string `json:"key_file"`
+	// Maximum TLS version that is supported.
+	// Options: ["1.0", "1.1", "1.2", "1.3"].
+	// Defaults to "1.3".
+	MaxVersion string `json:"max_version"`
+	// Minimum TLS version that is supported.
+	// Options: ["1.0", "1.1", "1.2", "1.3"].
+	// Defaults to "1.2".
+	MinVersion string `json:"min_version"`
 }
 
 type NormalisedURLConfig struct {

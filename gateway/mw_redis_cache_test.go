@@ -141,10 +141,10 @@ func TestRedisCacheMiddleware(t *testing.T) {
 
 		t.Run("with cache and dynamic redis", func(t *testing.T) {
 			createAPI(true)
-			ts.Gw.RedisController.DisableRedis(true)
+			ts.Gw.StorageConnectionHandler.DisableStorage(true)
 			subCheck(t, false, p)
 
-			ts.Gw.RedisController.DisableRedis(false)
+			ts.Gw.StorageConnectionHandler.DisableStorage(false)
 			subCheck(t, true, p)
 		})
 	}

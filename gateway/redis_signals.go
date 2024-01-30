@@ -52,7 +52,7 @@ func (n *Notification) Sign() {
 }
 
 func (gw *Gateway) startPubSubLoop() {
-	cacheStore := storage.RedisCluster{RedisController: gw.RedisController}
+	cacheStore := storage.RedisCluster{ConnectionHandler: gw.StorageConnectionHandler}
 	cacheStore.Connect()
 
 	message := "Connection to Redis failed, reconnect in 10s"

@@ -1721,7 +1721,7 @@ func TestGroupResetHandler(t *testing.T) {
 	didSubscribe := make(chan bool, 1)
 	didReload := make(chan bool, tryReloadCount)
 
-	cacheStore := storage.RedisCluster{RedisController: ts.Gw.RedisController}
+	cacheStore := storage.RedisCluster{ConnectionHandler: ts.Gw.StorageConnectionHandler}
 	cacheStore.Connect()
 
 	// Test usually takes 0.05sec or so, timeout after 1s

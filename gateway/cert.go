@@ -327,7 +327,7 @@ func (gw *Gateway) getTLSConfigForClient(baseConfig *tls.Config, listenPort int)
 		var waitingRedisLog sync.Once
 		// ensure that we are connected to redis
 		for {
-			if gw.RedisController.Connected() {
+			if gw.StorageConnectionHandler.Connected() {
 				break
 			}
 

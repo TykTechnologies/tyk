@@ -33,9 +33,9 @@ func (ts *Test) createSpecTestFrom(tb testing.TB, def *apidef.APIDefinition) *AP
 	loader := APIDefinitionLoader{Gw: ts.Gw}
 	spec := loader.MakeSpec(&nestedApiDefinition{APIDefinition: def}, nil)
 	tname := tb.Name()
-	redisStore := &storage.RedisCluster{KeyPrefix: tname + "-apikey.", RedisController: ts.Gw.RedisController}
-	healthStore := &storage.RedisCluster{KeyPrefix: tname + "-apihealth.", RedisController: ts.Gw.RedisController}
-	orgStore := &storage.RedisCluster{KeyPrefix: tname + "-orgKey.", RedisController: ts.Gw.RedisController}
+	redisStore := &storage.RedisCluster{KeyPrefix: tname + "-apikey.", ConnectionHandler: ts.Gw.StorageConnectionHandler}
+	healthStore := &storage.RedisCluster{KeyPrefix: tname + "-apihealth.", ConnectionHandler: ts.Gw.StorageConnectionHandler}
+	orgStore := &storage.RedisCluster{KeyPrefix: tname + "-orgKey.", ConnectionHandler: ts.Gw.StorageConnectionHandler}
 	spec.Init(redisStore, redisStore, healthStore, orgStore)
 	return spec
 }

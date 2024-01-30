@@ -57,8 +57,8 @@ func TestRollingWindow_pipelinerError(t *testing.T) {
 	conf, err := config.New()
 	assert.NoError(t, err)
 
-	rc := storage.NewRedisController(ctx)
-	go rc.ConnectToRedis(ctx, nil, conf)
+	rc := storage.NewConnectionHandler(ctx)
+	go rc.Connect(ctx, nil, conf)
 
 	timeout, cancel := context.WithTimeout(ctx, time.Second)
 	defer cancel()
@@ -68,7 +68,7 @@ func TestRollingWindow_pipelinerError(t *testing.T) {
 		panic("can't connect to redis '" + conf.Storage.Host + "', timeout")
 	}
 
-	rl, err := rate.NewSlidingLog(&storage.RedisCluster{KeyPrefix: "test-cluster", RedisController: rc}, false)
+	rl, err := rate.NewSlidingLog(&storage.RedisCluster{KeyPrefix: "test-cluster", Co: rc}, false)
 	assert.NoError(t, err)
 
 	rl.PipelineFn = func(context.Context, func(redis.Pipeliner) error) error {

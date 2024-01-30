@@ -1156,7 +1156,7 @@ func (s *Test) newGateway(genConf func(globalConf *config.Config)) *Gateway {
 
 	configs := gw.GetConfig()
 
-	go gw.RedisController.ConnectToRedis(s.ctx, func() {
+	go gw.StorageConnectionHandler.Connect(s.ctx, func() {
 		if gw.OnConnect != nil {
 			gw.OnConnect()
 		}
@@ -1165,7 +1165,7 @@ func (s *Test) newGateway(genConf func(globalConf *config.Config)) *Gateway {
 	timeout, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
 
-	connected := gw.RedisController.WaitConnect(timeout)
+	connected := gw.StorageConnectionHandler.WaitConnect(timeout)
 	if !connected {
 		panic("can't connect to redis, timeout")
 	}

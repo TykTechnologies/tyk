@@ -16,7 +16,7 @@ type redisChannelHook struct {
 func (gw *Gateway) newRedisHook() *redisChannelHook {
 	hook := &redisChannelHook{}
 	hook.formatter = new(logrus.JSONFormatter)
-	hook.notifier.store = &storage.RedisCluster{KeyPrefix: "gateway-notifications:", RedisController: gw.RedisController}
+	hook.notifier.store = &storage.RedisCluster{KeyPrefix: "gateway-notifications:", ConnectionHandler: gw.StorageConnectionHandler}
 	hook.notifier.channel = "dashboard.ui.messages"
 	return hook
 }

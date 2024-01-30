@@ -25,10 +25,10 @@ func TestRecoverLoop(t *testing.T) {
 	conf, err := config.New()
 	assert.NoError(t, err)
 
-	rc := NewRedisController(ctx)
-	go rc.ConnectToRedis(ctx, onRecover, conf)
+	rc := NewConnectionHandler(ctx)
+	go rc.Connect(ctx, onRecover, conf)
 
-	rc.DisableRedis(false)
+	rc.DisableStorage(false)
 
 	wg.Wait()
 	assert.Equal(t, 1, onReconnectCounter)
