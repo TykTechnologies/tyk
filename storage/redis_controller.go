@@ -160,7 +160,7 @@ func (rc *RedisController) ConnectToRedis(ctx context.Context, onReconnect func(
 
 	defer func() {
 		close(rc.reconnect)
-		rc.disconnect()
+		close(rc.reconnect)
 	}()
 
 	go rc.recoverLoop(ctx, onReconnect)
@@ -208,7 +208,8 @@ func (rc *RedisController) statusCheck(ctx context.Context, conf *config.Config,
 			rc.redisUp.Store(connected)
 
 			//if we weren't alerady connected but now we are connected, we trigger the reconnect
-			if !alreadyConnected && connected {
+			if !rc.enabled() 
+			|| (!alreadyConnected && connected) {
 				rc.reconnect <- struct{}{}
 			}
 		}
