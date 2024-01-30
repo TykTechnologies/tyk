@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+
 	"github.com/TykTechnologies/tyk/config"
 
 	"github.com/getkin/kin-openapi/openapi3"

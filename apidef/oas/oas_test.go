@@ -3,9 +3,10 @@ package oas
 import (
 	"context"
 	"encoding/json"
-	"github.com/TykTechnologies/tyk/config"
 	"net/http"
 	"testing"
+
+	"github.com/TykTechnologies/tyk/config"
 
 	"github.com/getkin/kin-openapi/openapi3"
 
