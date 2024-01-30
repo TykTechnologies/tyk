@@ -1553,7 +1553,11 @@ func TestAPISpec_setHasMock(t *testing.T) {
 }
 
 func TestReplaceSecrets(t *testing.T) {
-	ts := StartTest(nil)
+	ts := StartTest(func(globalConf *config.Config) {
+		globalConf.Secrets = map[string]string{
+			"Laurentiu": "Ghiur",
+		}
+	})
 	defer ts.Close()
 
 	t.Setenv("Furkan", "Şenharputlu")
@@ -1562,6 +1566,7 @@ func TestReplaceSecrets(t *testing.T) {
 	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 		spec.APIID = "1"
 		spec.JWTSource = "env://Furkan"
+		spec.JWTSigningMethod = "secrets://Laurentiu"
 	}, func(spec *APISpec) {
 		spec.APIID = "2"
 		spec.AuthConfigs = map[string]apidef.AuthConfig{
@@ -1571,6 +1576,9 @@ func TestReplaceSecrets(t *testing.T) {
 			apidef.AuthTokenType: {
 				AuthHeaderName: "env://Furkan",
 			},
+			apidef.OAuthType: {
+				AuthHeaderName: "secrets://Laurentiu",
+			},
 		}
 	})
 
@@ -1579,4 +1587,6 @@ func TestReplaceSecrets(t *testing.T) {
 	assert.Equal(t, "Şenharputlu", api1.JWTSource)
 	assert.Equal(t, "Bugaev", api2.AuthConfigs[apidef.BasicType].AuthHeaderName)
 	assert.Equal(t, "Şenharputlu", api2.AuthConfigs[apidef.AuthTokenType].AuthHeaderName)
+	assert.Equal(t, "Ghiur", api1.JWTSigningMethod)
+	assert.Equal(t, "Ghiur", api2.AuthConfigs[apidef.OAuthType].AuthHeaderName)
 }

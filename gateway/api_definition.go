@@ -566,7 +566,8 @@ func (a APIDefinitionLoader) FromDashboardService(endpoint string) ([]*APISpec, 
 var envRegex = regexp.MustCompile(`env://([^"]+)`)
 
 const (
-	prefixEnv = "env://"
+	prefixEnv     = "env://"
+	prefixSecrets = "secrets://"
 )
 
 func (a APIDefinitionLoader) replaceSecrets(in []byte) []byte {
@@ -585,6 +586,12 @@ func (a APIDefinitionLoader) replaceSecrets(in []byte) []byte {
 			if val != "" {
 				input = strings.Replace(input, m[0], val, -1)
 			}
+		}
+	}
+
+	if strings.Contains(input, prefixSecrets) {
+		for k, v := range a.Gw.GetConfig().Secrets {
+			input = strings.Replace(input, prefixSecrets+k, v, -1)
 		}
 	}
 
