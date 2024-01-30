@@ -829,7 +829,9 @@
         }
       },
       "required": [
-        "enabled"
+        "enabled",
+        "pattern",
+        "rewriteTo"
       ]
     },
     "X-Tyk-TrackEndpoint": {
