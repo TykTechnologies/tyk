@@ -41,7 +41,7 @@ func TestNewSyncForcer(t *testing.T) {
 	assert.True(t, sf.store.ControllerInitiated())
 	assert.Equal(t, "synchronizer-group-", sf.store.KeyPrefix)
 
-	assert.Equal(t, true, sf.store.C.Connected())
+	assert.Equal(t, true, sf.store.ConnectionHandler.Connected())
 }
 
 func TestGroupLoginCallback(t *testing.T) {
