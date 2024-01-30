@@ -6,6 +6,8 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/TykTechnologies/tyk/config"
+
 	"github.com/getkin/kin-openapi/openapi3"
 
 	"github.com/stretchr/testify/assert"
@@ -1179,4 +1181,27 @@ func TestMigrateAndFillOAS_PluginConfigData(t *testing.T) {
 		Value:   configData,
 	}
 	assert.Equal(t, expectedPluginConfigData, migratedAPI.OAS.GetTykExtension().Middleware.Global.PluginConfig.Data)
+}
+
+func TestAPIContext_getValidationOptionsFromConfig(t *testing.T) {
+	t.Parallel()
+
+	t.Run("should return validation options", func(t *testing.T) {
+		conf, err := config.New()
+		assert.Nil(t, err)
+		options := GetValidationOptionsFromConfig(conf.OAS)
+		assert.Len(t, options, 2)
+	})
+
+	t.Run("should return default validation options", func(t *testing.T) {
+		conf, err := config.New()
+		assert.Nil(t, err)
+
+		conf.OAS.ValidateSchemaDefaults = true
+		conf.OAS.ValidateExamples = true
+
+		options := GetValidationOptionsFromConfig(conf.OAS)
+
+		assert.Len(t, options, 0)
+	})
 }

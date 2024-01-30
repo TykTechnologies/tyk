@@ -1046,6 +1046,18 @@ type Config struct {
 
 	// DevelopmentConfig struct extends configuration for development builds.
 	DevelopmentConfig
+
+	// OAS holds the configuration for various OAS-specific functionalities
+	OAS OASConfig `json:"oas_config"`
+}
+
+// OASConfig holds the configuration for various OAS-specific functionalities
+type OASConfig struct {
+	// ValidateExamples enables validation of examples in the OAS spec. Defaults to false.
+	ValidateExamples bool `json:"validate_examples"`
+
+	// ValidateSchemaDefaults enables validation of defaults in the OAS spec. Defaults to false.
+	ValidateSchemaDefaults bool `json:"validate_schema_defaults"`
 }
 
 type ResourceSyncConfig struct {
