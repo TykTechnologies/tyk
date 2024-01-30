@@ -14,8 +14,8 @@ import (
 
 type RedisController struct {
 	singlePool          redis.UniversalClient
-	singleCachePool     redis.UniversalClient
-	singleAnalyticsPool redis.UniversalClient
+	cachePool         *redis.ClusterClient
+	analyticsPool     *redis.ClusterClient
 
 	redisUp      atomic.Value
 	disableRedis atomic.Value
@@ -108,7 +108,7 @@ func (rc *RedisController) connectSingleton(cache, analytics bool, conf config.C
 		rc.singleAnalyticsPool = NewRedisClusterPool(cache, analytics, conf)
 		return true
 	}
-	rc.singlePool = NewRedisClusterPool(cache, analytics, conf)
+	rc.cachePool = NewRedisClusterPool(cache, analytics, conf)
 	return true
 }
 
