@@ -3,6 +3,7 @@ package oas
 import (
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/TykTechnologies/tyk/apidef"
 )
@@ -25,6 +26,9 @@ type Upstream struct {
 
 	// CertificatePinning contains the configuration related to certificate pinning.
 	CertificatePinning *CertificatePinning `bson:"certificatePinning,omitempty" json:"certificatePinning,omitempty"`
+
+	// RateLimit contains the configuration related to API level rate limit.
+	RateLimit *RateLimit `bson:"rateLimit,omitempty" json:"rateLimit,omitempty"`
 }
 
 // Fill fills *Upstream from apidef.APIDefinition.
@@ -65,6 +69,15 @@ func (u *Upstream) Fill(api apidef.APIDefinition) {
 	u.CertificatePinning.Fill(api)
 	if ShouldOmit(u.CertificatePinning) {
 		u.CertificatePinning = nil
+	}
+
+	if u.RateLimit == nil {
+		u.RateLimit = &RateLimit{}
+	}
+
+	u.RateLimit.Fill(api)
+	if ShouldOmit(u.RateLimit) {
+		u.RateLimit = nil
 	}
 }
 
@@ -107,6 +120,15 @@ func (u *Upstream) ExtractTo(api *apidef.APIDefinition) {
 	}
 
 	u.CertificatePinning.ExtractTo(api)
+
+	if u.RateLimit == nil {
+		u.RateLimit = &RateLimit{}
+		defer func() {
+			u.RateLimit = nil
+		}()
+	}
+
+	u.RateLimit.ExtractTo(api)
 }
 
 // ServiceDiscovery holds configuration required for service discovery.
@@ -437,4 +459,33 @@ func (cp *CertificatePinning) ExtractTo(api *apidef.APIDefinition) {
 	} else {
 		api.PinnedPublicKeys = nil
 	}
+}
+
+// RateLimit holds the configurations related to rate limit.
+type RateLimit struct {
+	Enabled bool   `json:"enabled" bson:"enabled"`
+	Rate    int    `json:"rate" bson:"rate"`
+	Per     string `json:"per" bson:"per"`
+}
+
+// Fill fills *RateLimit from apidef.APIDefinition.
+func (r *RateLimit) Fill(api apidef.APIDefinition) {
+	r.Enabled = !api.DisableRateLimit
+	r.Rate = int(api.GlobalRateLimit.Rate)
+	if per := api.GlobalRateLimit.Per; per != 0 {
+		perDuration := time.Duration(per) * time.Second
+		r.Per = perDuration.String()
+	}
+}
+
+// ExtractTo extracts *Ratelimit into *apidef.APIDefinition.
+func (r *RateLimit) ExtractTo(api *apidef.APIDefinition) {
+	api.DisableRateLimit = !r.Enabled
+	api.GlobalRateLimit.Rate = float64(r.Rate)
+	perDuration, err := time.ParseDuration(r.Per)
+	if err != nil {
+		perDuration = 0
+	}
+
+	api.GlobalRateLimit.Per = perDuration.Seconds()
 }
