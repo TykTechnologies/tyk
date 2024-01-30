@@ -769,7 +769,8 @@
           "type": "boolean"
         },
         "value": {
-          "type": "integer"
+          "type": "integer",
+          "minimum": 0
         }
       },
       "required": [
@@ -1200,6 +1201,9 @@
         },
         "detailedActivityLogs": {
           "$ref": "#/definitions/X-Tyk-DetailedActivityLogs"
+        },
+        "detailedTracing" : {
+          "$ref": "#/definitions/X-Tyk-DetailedTracing"
         }
       },
       "required": [
@@ -1696,6 +1700,18 @@
         "enabled",
         "rate",
         "per"
+      ]
+    },
+    "X-Tyk-DetailedTracing": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "enabled"
       ]
     }
   }
