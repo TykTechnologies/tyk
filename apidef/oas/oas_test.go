@@ -154,6 +154,7 @@ func TestOAS_ExtractTo_ResetAPIDefinition(t *testing.T) {
 	a.IsOAS = false
 	a.IDPClientIDMappingDisabled = false
 	a.EnableContextVars = false
+	a.DisableRateLimit = false
 
 	// deprecated fields
 	a.Auth = apidef.AuthConfig{}
@@ -187,6 +188,7 @@ func TestOAS_ExtractTo_ResetAPIDefinition(t *testing.T) {
 	// fields below, and clear the value in ExtendedPaths.Clear() function.
 
 	expectedFields := []string{
+		"APIDefinition.Slug",
 		"APIDefinition.ListenPort",
 		"APIDefinition.Protocol",
 		"APIDefinition.EnableProxyProtocol",
@@ -203,10 +205,6 @@ func TestOAS_ExtractTo_ResetAPIDefinition(t *testing.T) {
 		"APIDefinition.VersionData.Versions[0].ExtendedPaths.TransformJQResponse[0].Filter",
 		"APIDefinition.VersionData.Versions[0].ExtendedPaths.TransformJQResponse[0].Path",
 		"APIDefinition.VersionData.Versions[0].ExtendedPaths.TransformJQResponse[0].Method",
-		"APIDefinition.VersionData.Versions[0].ExtendedPaths.SizeLimit[0].Disabled",
-		"APIDefinition.VersionData.Versions[0].ExtendedPaths.SizeLimit[0].Path",
-		"APIDefinition.VersionData.Versions[0].ExtendedPaths.SizeLimit[0].Method",
-		"APIDefinition.VersionData.Versions[0].ExtendedPaths.SizeLimit[0].SizeLimit",
 		"APIDefinition.VersionData.Versions[0].ExtendedPaths.PersistGraphQL[0].Path",
 		"APIDefinition.VersionData.Versions[0].ExtendedPaths.PersistGraphQL[0].Method",
 		"APIDefinition.VersionData.Versions[0].ExtendedPaths.PersistGraphQL[0].Operation",
@@ -236,7 +234,6 @@ func TestOAS_ExtractTo_ResetAPIDefinition(t *testing.T) {
 		"APIDefinition.Proxy.Transport.SSLMaxVersion",
 		"APIDefinition.Proxy.Transport.SSLForceCommonNameCheck",
 		"APIDefinition.Proxy.Transport.ProxyURL",
-		"APIDefinition.DisableRateLimit",
 		"APIDefinition.DisableQuota",
 		"APIDefinition.SessionLifetimeRespectsKeyExpiration",
 		"APIDefinition.SessionLifetime",
@@ -258,8 +255,6 @@ func TestOAS_ExtractTo_ResetAPIDefinition(t *testing.T) {
 		"APIDefinition.ResponseProcessors[0].Options",
 		"APIDefinition.DoNotTrack",
 		"APIDefinition.TagHeaders[0]",
-		"APIDefinition.GlobalRateLimit.Rate",
-		"APIDefinition.GlobalRateLimit.Per",
 		"APIDefinition.EnableDetailedRecording",
 		"APIDefinition.GraphQL.Enabled",
 		"APIDefinition.GraphQL.ExecutionMode",
