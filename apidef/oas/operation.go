@@ -74,6 +74,9 @@ type Operation struct {
 
 	// DoNotTrackEndpoint contains the configuration for disabling analytics and logs.
 	DoNotTrackEndpoint *TrackEndpoint `bson:"doNotTrackEndpoint,omitempty" json:"doNotTrackEndpoint,omitempty"`
+
+	// RequestSizeLimit limits the maximum allowed size of the request body in bytes.
+	RequestSizeLimit *RequestSizeLimit `bson:"requestSizeLimit,omitempty" json:"requestSizeLimit,omitempty"`
 }
 
 // AllowanceType holds the valid allowance types values.
@@ -154,6 +157,7 @@ func (s *OAS) fillPathsAndOperations(ep apidef.ExtendedPathsSet) {
 	s.fillCircuitBreaker(ep.CircuitBreaker)
 	s.fillTrackEndpoint(ep.TrackEndpoints)
 	s.fillDoNotTrackEndpoint(ep.DoNotTrackEndpoints)
+	s.fillRequestSizeLimit(ep.SizeLimit)
 }
 
 func (s *OAS) extractPathsAndOperations(ep *apidef.ExtendedPathsSet) {
@@ -186,6 +190,7 @@ func (s *OAS) extractPathsAndOperations(ep *apidef.ExtendedPathsSet) {
 					tykOp.extractCircuitBreakerTo(ep, path, method)
 					tykOp.extractTrackEndpointTo(ep, path, method)
 					tykOp.extractDoNotTrackEndpointTo(ep, path, method)
+					tykOp.extractRequestSizeLimitTo(ep, path, method)
 					break found
 				}
 			}
@@ -333,6 +338,21 @@ func (s *OAS) fillEnforceTimeout(metas []apidef.HardTimeoutMeta) {
 	}
 }
 
+func (s *OAS) fillRequestSizeLimit(metas []apidef.RequestSizeMeta) {
+	for _, meta := range metas {
+		operationID := s.getOperationID(meta.Path, meta.Method)
+		operation := s.GetTykExtension().getOperation(operationID)
+		if operation.RequestSizeLimit == nil {
+			operation.RequestSizeLimit = &RequestSizeLimit{}
+		}
+
+		operation.RequestSizeLimit.Fill(meta)
+		if ShouldOmit(operation.RequestSizeLimit) {
+			operation.RequestSizeLimit = nil
+		}
+	}
+}
+
 func (o *Operation) extractAllowanceTo(ep *apidef.ExtendedPathsSet, path string, method string, typ AllowanceType) {
 	allowance := o.Allow
 	endpointMetas := &ep.WhiteList
@@ -426,6 +446,16 @@ func (o *Operation) extractEnforceTimeoutTo(ep *apidef.ExtendedPathsSet, path st
 	meta := apidef.HardTimeoutMeta{Path: path, Method: method}
 	o.EnforceTimeout.ExtractTo(&meta)
 	ep.HardTimeouts = append(ep.HardTimeouts, meta)
+}
+
+func (o *Operation) extractRequestSizeLimitTo(ep *apidef.ExtendedPathsSet, path string, method string) {
+	if o.RequestSizeLimit == nil {
+		return
+	}
+
+	meta := apidef.RequestSizeMeta{Path: path, Method: method}
+	o.RequestSizeLimit.ExtractTo(&meta)
+	ep.SizeLimit = append(ep.SizeLimit, meta)
 }
 
 // detect possible regex pattern:
