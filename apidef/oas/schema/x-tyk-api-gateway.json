@@ -1186,9 +1186,6 @@
         "listenPath": {
           "$ref": "#/definitions/X-Tyk-ListenPath"
         },
-        "slug": {
-          "type": "string"
-        },
         "authentication": {
           "$ref": "#/definitions/X-Tyk-Authentication"
         },
