@@ -208,7 +208,8 @@ func (rc *RedisController) statusCheck(ctx context.Context, conf *config.Config,
 			rc.redisUp.Store(connected)
 
 			//if we weren't alerady connected but now we are connected, we trigger the reconnect
-			if !alreadyConnected && connected {
+			if !rc.enabled() 
+			|| (!alreadyConnected && connected) {
 				rc.reconnect <- struct{}{}
 			}
 		}
