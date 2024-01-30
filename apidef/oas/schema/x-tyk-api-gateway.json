@@ -849,7 +849,10 @@
       "additionalProperties": false,
       "properties": {
         "condition": {
-          "enum": ["any", "all"]
+          "enum": [
+            "any",
+            "all"
+          ]
         },
         "rewriteTo": {
           "type": "string"
@@ -873,7 +876,14 @@
       "additionalProperties": false,
       "properties": {
         "in": {
-          "enum": ["query", "path", "header", "sessionMetadata", "requestContext", "requestBody"]
+          "enum": [
+            "query",
+            "path",
+            "header",
+            "sessionMetadata",
+            "requestContext",
+            "requestBody"
+          ]
         },
         "name": {
           "type": "string"
@@ -962,7 +972,7 @@
         "doNotTrackEndpoint": {
           "$ref": "#/definitions/X-Tyk-TrackEndpoint"
         },
-        "circuitBreaker":{
+        "circuitBreaker": {
           "$ref": "#/definitions/X-Tyk-CircuitBreaker"
         },
         "urlRewrite": {
@@ -1170,6 +1180,9 @@
                 },
                 {
                   "$ref": "#/definitions/X-Tyk-OAuth"
+                },
+                {
+                  "$ref": "#/definitions/X-Tyk-ExternalOAuth"
                 }
               ]
             }
@@ -1202,7 +1215,7 @@
         "detailedActivityLogs": {
           "$ref": "#/definitions/X-Tyk-DetailedActivityLogs"
         },
-        "detailedTracing" : {
+        "detailedTracing": {
           "$ref": "#/definitions/X-Tyk-DetailedTracing"
         }
       },
@@ -1600,6 +1613,119 @@
         "enabled"
       ]
     },
+    "X-Tyk-ExternalOAuth": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "header": {
+          "$ref": "#/definitions/X-Tyk-AuthSource"
+        },
+        "cookie": {
+          "$ref": "#/definitions/X-Tyk-AuthSource"
+        },
+        "query": {
+          "$ref": "#/definitions/X-Tyk-AuthSource"
+        },
+        "providers": {
+          "type": "array",
+          "items": [
+            {
+              "$ref": "#/definitions/X-Tyk-OAuthProvider"
+            }
+          ]
+        }
+      },
+      "required": [
+        "enabled"
+      ]
+    },
+    "X-Tyk-OAuthProvider": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "jwt": {
+          "$ref": "#/definitions/X-Tyk-JWTValidation"
+        },
+        "introspection": {
+          "$ref": "#/definitions/X-Tyk-Introspection"
+        }
+      }
+    },
+    "X-Tyk-JWTValidation": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "signingMethod": {
+          "type": "string"
+        },
+        "source": {
+          "type": "string"
+        },
+        "identityBaseField": {
+          "type": "string"
+        },
+        "issuedAtValidationSkew": {
+          "$ref": "#/definitions/X-Tyk-UInt"
+        },
+        "notBeforeValidationSkew": {
+          "$ref": "#/definitions/X-Tyk-UInt"
+        },
+        "expiresAtValidationSkew": {
+          "$ref": "#/definitions/X-Tyk-UInt"
+        }
+      },
+      "required": [
+        "enabled",
+        "signingMethod",
+        "source"
+      ]
+    },
+    "X-Tyk-Introspection": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "url": {
+          "type": "string",
+          "format": "uri"
+        },
+        "clientId": {
+          "type": "string"
+        },
+        "clientSecret": {
+          "type": "string"
+        },
+        "identityBaseField": {
+          "type": "string"
+        },
+        "cache": {
+          "$ref": "#/definitions/X-Tyk-IntrospectionCache"
+        }
+      }
+    },
+    "X-Tyk-IntrospectionCache": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "timeout": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "enabled",
+        "timeout"
+      ]
+    },
     "X-Tyk-CustomDomain": {
       "type": "object",
       "additionalProperties": false,
@@ -1713,6 +1839,10 @@
       "required": [
         "enabled"
       ]
+    },
+    "X-Tyk-UInt": {
+      "type": "integer",
+      "minimum": 0
     }
   }
 }
