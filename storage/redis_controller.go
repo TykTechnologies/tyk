@@ -160,7 +160,7 @@ func (rc *RedisController) ConnectToRedis(ctx context.Context, onReconnect func(
 
 	defer func() {
 		close(rc.reconnect)
-		rc.disconnect()
+		close(rc.reconnect)
 	}()
 
 	go rc.recoverLoop(ctx, onReconnect)
