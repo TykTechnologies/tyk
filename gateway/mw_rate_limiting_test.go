@@ -213,8 +213,8 @@ func TestMwRateLimiting_CustomRatelimitKey(t *testing.T) {
 			},
 		}
 		s.MetaData = map[string]interface{}{
-			"quota_pattern": "$tyk_meta.developer_id",
-			"developer_id":  "portal-app-1",
+			"rate_limit_pattern": "$tyk_meta.developer_id",
+			"developer_id":       "portal-app-1",
 		}
 	})
 
@@ -231,8 +231,8 @@ func TestMwRateLimiting_CustomRatelimitKey(t *testing.T) {
 			},
 		}
 		s.MetaData = map[string]interface{}{
-			"quota_pattern": "$tyk_meta.developer_id",
-			"developer_id":  "portal-app-2",
+			"rate_limit_pattern": "$tyk_meta.developer_id",
+			"developer_id":       "portal-app-2",
 		}
 	})
 

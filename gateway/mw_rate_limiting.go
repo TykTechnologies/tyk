@@ -71,17 +71,10 @@ func (k *RateLimitAndQuotaCheck) ProcessRequest(w http.ResponseWriter, r *http.R
 
 	session := ctxGetSession(r)
 	rateLimitKey := ctxGetAuthToken(r)
-	quotaKey := ""
 
 	if pattern, found := session.MetaData["rate_limit_pattern"]; found {
 		if patternString, ok := pattern.(string); ok {
 			rateLimitKey = k.Gw.replaceTykVariables(r, patternString, false)
-		}
-	}
-
-	if pattern, found := session.MetaData["quota_pattern"]; found {
-		if patternString, ok := pattern.(string); ok {
-			quotaKey = k.Gw.replaceTykVariables(r, patternString, false)
 		}
 	}
 
@@ -90,7 +83,6 @@ func (k *RateLimitAndQuotaCheck) ProcessRequest(w http.ResponseWriter, r *http.R
 		r,
 		session,
 		rateLimitKey,
-		quotaKey,
 		storeRef,
 		!k.Spec.DisableRateLimit,
 		!k.Spec.DisableQuota,
@@ -123,7 +115,6 @@ func (k *RateLimitAndQuotaCheck) ProcessRequest(w http.ResponseWriter, r *http.R
 				reason = k.Gw.SessionLimiter.ForwardMessage(
 					r,
 					session,
-					"",
 					rateLimitKey,
 					storeRef,
 					!k.Spec.DisableRateLimit,

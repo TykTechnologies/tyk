@@ -8,9 +8,9 @@ func (s *SessionState) TagsFromMetadata(data map[string]interface{}) (updateSess
 		updateSession = true
 	}
 
-	limitPattern, keyFound := data["limit_pattern"].(string)
+	limitPattern, keyFound := data["rate_limit_pattern"].(string)
 	if keyFound {
-		s.MetaData["limit_pattern"] = limitPattern
+		s.MetaData["rate_limit_pattern"] = limitPattern
 		updateSession = true
 	}
 
