@@ -19,6 +19,8 @@ import (
 	textTemplate "text/template"
 	"time"
 
+	"github.com/TykTechnologies/tyk/storage/kv"
+
 	graphqlinternal "github.com/TykTechnologies/tyk/internal/graphql"
 
 	"github.com/getkin/kin-openapi/routers"
@@ -568,6 +570,8 @@ var envRegex = regexp.MustCompile(`env://([^"]+)`)
 const (
 	prefixEnv     = "env://"
 	prefixSecrets = "secrets://"
+	prefixConsul  = "consul://"
+	prefixKeys    = "tyk-apis"
 )
 
 func (a APIDefinitionLoader) replaceSecrets(in []byte) []byte {
@@ -594,6 +598,25 @@ func (a APIDefinitionLoader) replaceSecrets(in []byte) []byte {
 			input = strings.Replace(input, prefixSecrets+k, v, -1)
 		}
 	}
+
+	if strings.Contains(input, prefixConsul) {
+		if err := a.Gw.setUpConsul(); err != nil {
+			log.WithError(err).Error("Couldn't connect consul")
+			goto out
+		}
+
+		pairs, _, err := a.Gw.consulKVStore.(*kv.Consul).Store().List(prefixKeys, nil)
+		if err != nil {
+			log.WithError(err).Error("Couldn't get keys from consul")
+			goto out
+		}
+
+		for i := 1; i < len(pairs); i++ {
+			key := strings.TrimPrefix(pairs[i].Key, prefixKeys+"/")
+			input = strings.Replace(input, prefixConsul+key, string(pairs[i].Value), -1)
+		}
+	}
+out:
 
 	return []byte(input)
 }
