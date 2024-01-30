@@ -73,8 +73,10 @@ func (k *RateLimitAndQuotaCheck) ProcessRequest(w http.ResponseWriter, r *http.R
 	rateLimitKey := ctxGetAuthToken(r)
 
 	if pattern, found := session.MetaData["rate_limit_pattern"]; found {
-		if patternString, ok := pattern.(string); ok {
-			rateLimitKey = k.Gw.replaceTykVariables(r, patternString, false)
+		if patternString, ok := pattern.(string); ok && patternString != "" {
+			if rateLimitKeyValue := k.Gw.replaceTykVariables(r, patternString, false); rateLimitKeyValue != "" {
+				rateLimitKey = rateLimitKeyValue
+			}
 		}
 	}
 
