@@ -123,8 +123,12 @@ func (rc *RedisController) disconnect() {
 	}
 }
 
-// ConnectToRedis starts a go routine that periodically tries to connect to
+// ConnectToRedis starts a goroutine to periodically try to connect to
 // redis.
+import (
+	"time"
+	"github.com/cenk/backoff"
+)
 //
 // onReconnect will be called when we have established a successful redis reconnection
 func (rc *RedisController) ConnectToRedis(ctx context.Context, onReconnect func(), conf *config.Config) {
@@ -148,7 +152,20 @@ func (rc *RedisController) ConnectToRedis(ctx context.Context, onReconnect func(
 	}
 
 	// First time connecting to the clusters. We need this for the first connection (and avoid waiting 1second for the rc.statusCheck loop).
-	for _, v := range c {
+	for _, v := range c { 
+			err := backoff.Retry(func() error { 
+				return v.connect(connectRedisTimeout, connectRetries) 
+			}, backoff.WithMaxRetries(backoff.NewExponentialBackOff(), connectRetries)) 
+			if err != nil { 
+				log.WithError(err).Errorf("Could not connect to Redis cluster after many attempts. Host(s): %v", getRedisAddrs(conf.Storage)) 
+			} 
+			if err == nil { 
+				err = v.checkIsOpen() 
+				if err != nil { 
+					log.WithError(err).Errorf("Redis connection is not open. Host(s): %v", getRedisAddrs(conf.Storage)) 
+				}
+			} 
+			updateRedisUp(&rc.redisUp, err)
 		rc.connectSingleton(v.IsCache, v.IsAnalytics, *conf)
 		err := backoff.Retry(v.checkIsOpen, getExponentialBackoff())
 		if err != nil {
