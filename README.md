@@ -55,6 +55,26 @@ cd tyk-gateway-docker
 ```
 
 #### Step 3 - Deploy Tyk Gateway and Redis
+
+### Troubleshooting GitHub Actions
+
+If the GitHub Actions run encounters errors, you can troubleshoot and resolve common issues using the following steps:
+
+1. **Interpreting Error Logs**
+   - Review the error logs generated during the run to identify the root cause of the issue.
+   - Look for keywords, stack traces, or specific error messages to pinpoint the source of the problem.
+
+2. **Common Issues**
+   - Analyze common issues encountered during the GitHub Actions run, such as environment misconfigurations, build dependencies, or workflow file errors.
+
+3. **Troubleshooting Steps**
+   - Check for missing or incorrect dependencies in the workflow file.
+   - Ensure that environment variables are correctly defined and accessible.
+   - Review any custom scripts or commands used in the workflow for errors or misconfigurations.
+   - Consult the project's documentation and community resources for troubleshooting guidance.
+
+4. **Continued Support**
+   - If the issue persists, seek help from the project maintainers or the GitHub community for continued assistance.
 ```console
 docker-compose up
 ```
@@ -112,6 +132,22 @@ Industry Standard Authentication: [OIDC](https://tyk.io/docs/advanced-configurat
 Analytics logging - Record detailed usage data on who is using your APIs (raw data only)
 
 [CORS](https://tyk.io/docs/tyk-apis/tyk-gateway-api/api-definition-objects/cors/) - Enable CORS for certain APIs so users can make browser-based requests
+
+## Interpreting and Analyzing Error Logs
+
+When troubleshooting GitHub Actions, it's essential to interpret and analyze the error logs to identify the nature of the issue. The following steps and recommendations can help with this process:
+
+1. **Understanding Error Messages**
+   - Review the error messages and stack traces in the logs to pinpoint the root cause of the failure.
+
+2. **Analyzing Stack Trace**
+   - Look for specific stack trace information to understand the sequence of events leading to the error.
+
+3. **Identifying Error Keywords**
+   - Search for specific keywords or error codes that can provide insights into the underlying problem.
+
+4. **Utilizing Community Resources**
+   - Consult community resources or forums for support, as others may have encountered similar issues and provided solutions.
 
 [Webhooks](https://tyk.io/docs/basic-config-and-security/report-monitor-trigger-events/webhooks/) - Trigger webhooks against events such as Quota Violations and Authentication failures
 
