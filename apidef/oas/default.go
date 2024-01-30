@@ -98,6 +98,13 @@ func (s *OAS) BuildDefaultTykExtension(overRideValues TykExtensionConfigParams, 
 		}
 
 		upstreamURL = s.Servers[0].URL
+		if s.isURLParamatrized(upstreamURL) {
+			for name, variable := range s.Servers[0].Variables {
+				if strings.Contains(upstreamURL, "{"+name+"}") {
+					upstreamURL = strings.ReplaceAll(upstreamURL, "{"+name+"}", variable.Default)
+				}
+			}
+		}
 	}
 
 	if upstreamURL != "" {
@@ -118,6 +125,10 @@ func (s *OAS) BuildDefaultTykExtension(overRideValues TykExtensionConfigParams, 
 	s.importMiddlewares(overRideValues)
 
 	return nil
+}
+
+func (s *OAS) isURLParamatrized(url string) bool {
+	return strings.Contains(url, "{") && strings.Contains(url, "}")
 }
 
 func (s *OAS) importAuthentication(enable bool) error {

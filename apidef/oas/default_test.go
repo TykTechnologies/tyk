@@ -1247,6 +1247,49 @@ func TestOAS_BuildDefaultTykExtension(t *testing.T) {
 
 		assert.Equal(t, expectedTykExtension, *oasDef.GetTykExtension())
 	})
+
+	t.Run("build tyk-extension should overwrite upstream url params with defaults values", func(t *testing.T) {
+		oasDef := OAS{
+			T: openapi3.T{
+				Info: &openapi3.Info{
+					Title: "OAS API",
+				},
+				Servers: openapi3.Servers{
+					{
+						URL: "https://example-org.com/api/{bestApiGateway}",
+						Variables: map[string]*openapi3.ServerVariable{
+							"bestApiGateway": {
+								Default: "tyk",
+							},
+						},
+					},
+				},
+			},
+		}
+
+		err := oasDef.BuildDefaultTykExtension(TykExtensionConfigParams{}, true)
+		assert.NoError(t, err)
+
+		expectedTykExtension := XTykAPIGateway{
+			Server: Server{
+				ListenPath: ListenPath{
+					Value: "/",
+					Strip: true,
+				},
+			},
+			Upstream: Upstream{
+				URL: "https://example-org.com/api/tyk",
+			},
+			Info: Info{
+				Name: "OAS API",
+				State: State{
+					Active: true,
+				},
+			},
+		}
+
+		assert.Equal(t, expectedTykExtension, *oasDef.GetTykExtension())
+	})
 }
 
 func TestGetTykExtensionConfigParams(t *testing.T) {
