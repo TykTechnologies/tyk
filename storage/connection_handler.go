@@ -14,6 +14,7 @@ import (
 )
 
 type ConnectionHandler struct {
+	// TODO this should be concurrent safe
 	connections map[string]model.Connector
 
 	storageUp      atomic.Value

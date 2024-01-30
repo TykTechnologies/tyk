@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/sirupsen/logrus"
@@ -41,6 +42,7 @@ type RedisCluster struct {
 	// RedisController must be passed from the gateway
 	ConnectionHandler *ConnectionHandler
 
+	storageMu        sync.Mutex
 	kvStorage        model.KeyValue
 	flusherStorage   model.Flusher
 	queueStorage     model.Queue
@@ -144,6 +146,9 @@ func (r *RedisCluster) kv() (model.KeyValue, error) {
 		return nil, err
 	}
 
+	r.storageMu.Lock()
+	defer r.storageMu.Unlock()
+
 	if r.kvStorage != nil {
 		return r.kvStorage, nil
 	}
@@ -167,6 +172,8 @@ func (r *RedisCluster) flusher() (model.Flusher, error) {
 		return nil, err
 	}
 
+	r.storageMu.Lock()
+	defer r.storageMu.Unlock()
 	if r.flusherStorage != nil {
 		return r.flusherStorage, nil
 	}
@@ -189,6 +196,9 @@ func (r *RedisCluster) queue() (model.Queue, error) {
 	if err := r.up(); err != nil {
 		return nil, err
 	}
+
+	r.storageMu.Lock()
+	defer r.storageMu.Unlock()
 
 	if r.queueStorage != nil {
 		return r.queueStorage, nil
@@ -213,6 +223,8 @@ func (r *RedisCluster) list() (model.List, error) {
 		return nil, err
 	}
 
+	r.storageMu.Lock()
+	defer r.storageMu.Unlock()
 	if r.listStorage != nil {
 		return r.listStorage, nil
 	}
@@ -235,7 +247,8 @@ func (r *RedisCluster) set() (model.Set, error) {
 	if err := r.up(); err != nil {
 		return nil, err
 	}
-
+	r.storageMu.Lock()
+	defer r.storageMu.Unlock()
 	if r.setStorage != nil {
 		return r.setStorage, nil
 	}
@@ -258,7 +271,8 @@ func (r *RedisCluster) sortedSet() (model.SortedSet, error) {
 	if err := r.up(); err != nil {
 		return nil, err
 	}
-
+	r.storageMu.Lock()
+	defer r.storageMu.Unlock()
 	if r.sortedSetStorage != nil {
 		return r.sortedSetStorage, nil
 	}
