@@ -246,7 +246,7 @@ func (m *GraphQLMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 	}
 
 	defer ctxSetGraphQLRequest(r, &gqlRequest)
-	if conf := m.Gw.GetConfig(); conf.OpenTelemetry.Enabled && m.Spec.DetailedTracing {
+	if conf := m.Gw.GetConfig(); conf.OpenTelemetry.Enabled && m.Spec.DetailedTracing && m.Spec.GraphQL.Version == apidef.GraphQLConfigVersion2 {
 		ctx, span := m.Gw.TracerProvider.Tracer().Start(r.Context(), "GraphqlMiddleware Validation")
 		defer span.End()
 		*r = *r.WithContext(ctx)
