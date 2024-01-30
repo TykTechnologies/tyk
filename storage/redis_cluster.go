@@ -350,8 +350,6 @@ func (r *RedisCluster) GetMultiKey(keys []string) ([]string, error) {
 		return nil, ErrKeyNotFound
 	}
 
-	fmt.Println("got results:", result)
-
 	return result, nil
 }
 
