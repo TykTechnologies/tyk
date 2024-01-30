@@ -1186,9 +1186,6 @@
         "listenPath": {
           "$ref": "#/definitions/X-Tyk-ListenPath"
         },
-        "slug": {
-          "type": "string"
-        },
         "authentication": {
           "$ref": "#/definitions/X-Tyk-Authentication"
         },
@@ -1255,6 +1252,9 @@
         },
         "certificatePinning": {
           "$ref": "#/definitions/X-Tyk-CertificatePinning"
+        },
+        "rateLimit": {
+          "$ref": "#/definitions/X-Tyk-RateLimit"
         }
       },
       "required": [
@@ -1676,6 +1676,26 @@
         "sampleSize",
         "coolDownPeriod",
         "halfOpened"
+      ]
+    },
+    "X-Tyk-RateLimit": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "rate": {
+          "type": "number"
+        },
+        "per": {
+          "type": "string",
+          "pattern": "^(\\d+h)?(\\d+m)?(\\d+s)?$"
+        }
+      },
+      "required": [
+        "enabled",
+        "rate",
+        "per"
       ]
     }
   }
