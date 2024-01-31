@@ -472,7 +472,6 @@ type RateLimit struct {
 	// Rate specifies the number of requests that can be passed to the upstream in each time interval (`per`).
 	// This field sets the limit on the frequency of requests to ensure controlled
 	// resource access or to prevent abuse. The rate is defined as an integer value.
-	// representing the number of requests per time unit as defined in the Per field.
 	//
 	// A higher value indicates a higher number of allowed requests in the given
 	// time frame. For instance, if Per is set to "1m" (one minute), a Rate of 100
