@@ -462,7 +462,7 @@ func (cp *CertificatePinning) ExtractTo(api *apidef.APIDefinition) {
 }
 
 // RateLimit holds the configurations related to rate limit.
-//
+// The API-level rate limit applies a base-line limit on the frequency of requests to the upstream service for all endpoints. The frequency of requests is configured in two parts: the time interval and the number of requests that can be made during each interval.
 // Tyk classic API definition: `global_rate_limit`.
 type RateLimit struct {
 	// Enabled enables/disables API level rate limiting for this API.
