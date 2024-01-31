@@ -462,10 +462,41 @@ func (cp *CertificatePinning) ExtractTo(api *apidef.APIDefinition) {
 }
 
 // RateLimit holds the configurations related to rate limit.
+// The API-level rate limit applies a base-line limit on the frequency of requests to the upstream service for all endpoints. The frequency of requests is configured in two parts: the time interval and the number of requests that can be made during each interval.
+// Tyk classic API definition: `global_rate_limit`.
 type RateLimit struct {
-	Enabled bool   `json:"enabled" bson:"enabled"`
-	Rate    int    `json:"rate" bson:"rate"`
-	Per     string `json:"per" bson:"per"`
+	// Enabled enables/disables API level rate limiting for this API.
+	//
+	// Tyk classic API definition: `!disable_rate_limit`.
+	Enabled bool `json:"enabled" bson:"enabled"`
+	// Rate specifies the number of requests that can be passed to the upstream in each time interval (`per`).
+	// This field sets the limit on the frequency of requests to ensure controlled
+	// resource access or to prevent abuse. The rate is defined as an integer value.
+	//
+	// A higher value indicates a higher number of allowed requests in the given
+	// time frame. For instance, if `Per` is set to `1m` (one minute), a Rate of `100`
+	// means up to 100 requests can be made per minute.
+	//
+	// Tyk classic API definition: `global_rate_limit.rate`.
+	Rate int `json:"rate" bson:"rate"`
+	// Per defines the time interval for rate limiting using shorthand notation.
+	// The value of Per is a string that specifies the interval in a compact form,
+	// where hours, minutes, and seconds are denoted by 'h', 'm', and 's' respectively.
+	// Multiple units can be combined to represent the duration.
+	//
+	// Examples of valid shorthand notations:
+	// - "1h"   : one hour
+	// - "20m"  : twenty minutes
+	// - "30s"  : thirty seconds
+	// - "1m29s": one minute and twenty-nine seconds
+	// - "1h30m" : one hour and thirty minutes
+	//
+	// An empty value is interpreted as "0s", implying no rate limiting interval effectively disabling the API-level rate limit.
+	// It's important to format the string correctly, as invalid formats will
+	// be considered as 0s/empty.
+	//
+	// Tyk classic API definition: `global_rate_limit.per`.
+	Per string `json:"per" bson:"per"`
 }
 
 // Fill fills *RateLimit from apidef.APIDefinition.
