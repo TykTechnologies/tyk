@@ -137,7 +137,7 @@ func generateUrlUsingDefaultVariableValues(s *OAS, upstreamURL string) (string, 
 		}
 	}
 	if isURLParametrized(upstreamURL) {
-		return "", errors.New("server URL still contains unresolved variables")
+		return "", errors.New("server URL contains undefined variables")
 	}
 	return upstreamURL, nil
 }
