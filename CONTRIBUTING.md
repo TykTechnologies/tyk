@@ -6,7 +6,7 @@ However, for those individuals who want a bit more guidance on the best way to c
 
 ## Filing issues
 
-If you have a question about Tyk or have a problem using it, please
+If you have a question about Tyk or have a problem using it or need to report a failed GitHub Actions run, please
 start with the GitHub search and our [community forum](https://community.tyk.io). If that doesn't answer your questions, or if you think you found a bug, please [file an
 issue](https://github.com/TykTechnologies/tyk/issues/new).
 
@@ -51,7 +51,7 @@ duplicated efforts.
 
 If you want to work on a new idea of relatively small scope:
 
-1. Submit an issue describing your proposed change to the repo in question.
+1. Submit an issue describing your proposed change or a GitHub Actions run failure report to the repo in question.
 1. The repo owners will respond to your issue promptly.
 1. Clone the repo, develop, and test your changes.
 1. Submit a pull request.
@@ -73,7 +73,13 @@ Currently, in order for tests to pass, a **Redis host is required**. We know, th
 
 ### Adding dependencies
 
-If your patch depends on new packages, ensure that they will be put in `/vendor` folder. Here at Tyk we use `govendor` for managing our dependencies. Adding new dependencies can be done using following command: `govendor fetch github.com/alicebob/miniredis`.
+```markdown
+### GitHub Actions Run Failure Report
+
+- **Description**: [A brief description of the issue]
+- **Error logs**: [Paste the error logs here]
+- **Additional details**: [Any additional details about the issue]
+```
 
 ### Geo IP features
 This product utilises GeoLite2 data created by MaxMind, available from [http://www.maxmind.com](http://www.maxmind.com).

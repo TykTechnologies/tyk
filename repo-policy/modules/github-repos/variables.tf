@@ -27,12 +27,12 @@ variable "topics" {
 
 variable "default_branch" {
   type        = string
-  description = "Repository default branch name"
+  description = "The default branch for the repository. This branch is used as the base when running GitHub Actions."
 }
 
 variable "merge_commit" {
   type        = bool
-  description = "Set to false to disable merge commits on the repository"
+  description = "Set to false to disable merge commits on the repository. When running GitHub Actions, merge commits are disabled if this variable is set to false."
   default     = false
 }
 
@@ -44,25 +44,25 @@ variable "rebase_merge" {
 
 variable "delete_branch_on_merge" {
   type        = bool
-  description = "Automatically delete head branch after a pull request is merged"
+  description = "If enabled, the head branch will be automatically deleted after a pull request is merged."
   default     = true
 }
 
 variable "vulnerability_alerts" {
   type        = bool
-  description = "Set to true to enable security alerts for vulnerable dependencies. Enabling requires alerts to be enabled on the owner level. (Note for importing: GitHub enables the alerts on public repos but disables them on private repos by default.)"
+  description = "Set to true to enable security alerts for vulnerable dependencies."
   default     = true
 }
 
 variable "squash_merge_commit_message" {
   type        = string
-  description = "Can be PR_BODY, COMMIT_MESSAGES, or BLANK for a default squash merge commit message."
+  description = "Specifies the content of the default squash merge commit message. Possible values are PR_BODY, COMMIT_MESSAGES, or BLANK. This setting is used when creating a merge commit."
   default     = "COMMIT_MESSAGES"
 }
 
 variable "squash_merge_commit_title" {
   type        = string
-  description = "Can be PR_TITLE or COMMIT_OR_PR_TITLE for a default squash merge commit title."
+  description = "Specifies the content of the default squash merge commit title. Possible values are PR_TITLE or COMMIT_OR_PR_TITLE. This setting determines the title of the merge commit."
   default     = "COMMIT_OR_PR_TITLE"
 }
 
