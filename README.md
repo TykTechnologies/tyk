@@ -166,6 +166,14 @@ go build
 ```
 Go version 1.21 is required to build `master`, the current development version. Tyk is officially supported on `Linux/amd64`, `Linux/i386` and `Linux/arm64`.
 
+#### Troubleshooting and Error Analysis
+
+To access and analyze error logs from failed GitHub Actions runs, follow these steps:
+
+1. Access the 'Actions' tab in your repository.
+2. Select the specific workflow run to view the detailed error logs.
+3. Analyze the error logs to identify the cause of the failure and take necessary troubleshooting steps.
+
 To run tests locally use the following command:
 ```console
 go test ./...
