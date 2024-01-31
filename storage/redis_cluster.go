@@ -601,11 +601,12 @@ func (r *RedisCluster) DeleteScanMatch(pattern string) bool {
 	}
 	log.Debug("Deleting: ", pattern)
 
-	deleted, err := storage.DeleteScanMatch(context.Background(), pattern)
+	_, err = storage.DeleteScanMatch(context.Background(), pattern)
 	if err != nil {
 		log.WithError(err).Error("Error trying to delete key pattern ", pattern)
+		return false
 	}
-	return deleted > 0
+	return true
 }
 
 // DeleteKeys will remove a group of keys in bulk
