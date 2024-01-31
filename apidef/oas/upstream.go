@@ -480,7 +480,7 @@ type RateLimit struct {
 	// Tyk classic API definition: `global_rate_limit.rate`.
 	Rate int `json:"rate" bson:"rate"`
 	// Per defines the time interval for rate limiting using shorthand notation.
-	// The value of Per is a string that specifies the duration in a compact form,
+	// The value of Per is a string that specifies the interval in a compact form,
 	// where hours, minutes, and seconds are denoted by 'h', 'm', and 's' respectively.
 	// Multiple units can be combined to represent the duration.
 	//
