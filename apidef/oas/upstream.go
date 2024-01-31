@@ -491,7 +491,7 @@ type RateLimit struct {
 	// - "1m29s": one minute and twenty-nine seconds
 	// - "1h30m" : one hour and thirty minutes
 	//
-	// An empty value is interpreted as "0s", implying no rate limiting interval.
+	// An empty value is interpreted as "0s", implying no rate limiting interval effectively disabling the API-level rate limit.
 	// It's important to format the string correctly, as invalid formats will
 	// be considered as 0s/empty.
 	//
