@@ -7,25 +7,25 @@ openAPIspecfileName="swagger.yml"
 
 fatal() {
 	echo "$@" >&2
-	exit 1
+	fatal "Script exited with error code 1"
 }
 
 swagger generate spec -o "$swagger2fileName"
 
 if [ $? -ne 0 ]; then
-	fatal "could not generate swagger2.0 spec to the specified path, $swagger2fileName"
+	fatal "Failed to generate swagger2.0 spec to the specified path: $swagger2fileName"
 fi
 
 swagger validate "$swagger2fileName"
 
 if [ $? -ne 0 ]; then
-	fatal "swagger spec is invalid... swagger spec is located at $swagger2fileName"
+	fatal "Invalid swagger spec located at: $swagger2fileName"
 fi
 
 api-spec-converter --from=swagger_2 --to=openapi_3 --syntax=yaml "$swagger2fileName" > "$tempOpenAPIFileName"
 
 if [ $? -ne 0 ]; then
-	fatal "could not convert swagger2.0 spec to opeenapi 3.0"
+	fatal "Failed to convert swagger2.0 spec to openapi 3.0"
 fi
 
 ## clean up
@@ -36,14 +36,14 @@ rm "$swagger2fileName"
 sed -n '1,/components:/p' $openAPIspecfileName > $tempUpdatedOpenAPIFileName
 
 if [ $? -ne 0 ]; then
-	fatal "replace operation failed step 1"
+	fatal "Failed to perform replace operation for step 1"
 fi
 
 lineToStartReplaceFrom=$(grep -n "responses:" swagger.yml | tail -1 |  awk '{split($0,a,":"); print a[1]}')
 
 sed -n "$lineToStartReplaceFrom,/components:/p" $openAPIspecfileName >> $tempUpdatedOpenAPIFileName
 if [ $? -ne 0 ]; then
-	fatal "replace operation failed"
+	fatal "Failed to perform replace operation"
 fi
 
 mv $tempUpdatedOpenAPIFileName $openAPIspecfileName
