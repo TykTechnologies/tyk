@@ -474,7 +474,7 @@ type RateLimit struct {
 	// resource access or to prevent abuse. The rate is defined as an integer value.
 	//
 	// A higher value indicates a higher number of allowed requests in the given
-	// time frame. For instance, if Per is set to "1m" (one minute), a Rate of 100
+	// time frame. For instance, if `Per` is set to `1m` (one minute), a Rate of `100`
 	// means up to 100 requests can be made per minute.
 	//
 	// Tyk classic API definition: `global_rate_limit.rate`.
