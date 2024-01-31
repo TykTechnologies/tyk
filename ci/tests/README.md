@@ -1,4 +1,5 @@
 # How to write a test
+- When reporting issues related to GitHub Actions runs, please provide the error logs from 'ci/tests/error_logs.txt'.
 
 - Create a sub-directory for your test
 - Implement a script `test.sh` in your directory
