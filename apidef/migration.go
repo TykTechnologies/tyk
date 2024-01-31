@@ -238,6 +238,7 @@ func (a *APIDefinition) Migrate() (versions []APIDefinition, err error) {
 	a.migrateCustomDomain()
 	a.migrateScopeToPolicy()
 	a.migrateResponseProcessors()
+	a.migrateGlobalRateLimit()
 
 	versions, err = a.MigrateVersioning()
 	if err != nil {
@@ -450,6 +451,10 @@ func (a *APIDefinition) SetDisabledFlags() {
 			a.VersionData.Versions[version].ExtendedPaths.GoPlugin[i].Disabled = true
 		}
 	}
+
+	if a.GlobalRateLimit.Per == 0 && a.GlobalRateLimit.Rate == 0 {
+		a.DisableRateLimit = true
+	}
 }
 
 func (a *APIDefinition) migrateScopeToPolicy() {
@@ -479,4 +484,10 @@ func (a *APIDefinition) migrateResponseProcessors() {
 	}
 
 	a.ResponseProcessors = responseProcessors
+}
+
+func (a *APIDefinition) migrateGlobalRateLimit() {
+	if a.GlobalRateLimit.Per == 0 && a.GlobalRateLimit.Rate == 0 {
+		a.DisableRateLimit = true
+	}
 }
