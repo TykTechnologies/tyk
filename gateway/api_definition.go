@@ -600,25 +600,30 @@ func (a APIDefinitionLoader) replaceSecrets(in []byte) []byte {
 	}
 
 	if strings.Contains(input, prefixConsul) {
-		if err := a.Gw.setUpConsul(); err != nil {
-			log.WithError(err).Error("Couldn't connect consul")
-			goto out
-		}
-
-		pairs, _, err := a.Gw.consulKVStore.(*kv.Consul).Store().List(prefixKeys, nil)
-		if err != nil {
-			log.WithError(err).Error("Couldn't get keys from consul")
-			goto out
-		}
-
-		for i := 1; i < len(pairs); i++ {
-			key := strings.TrimPrefix(pairs[i].Key, prefixKeys+"/")
-			input = strings.Replace(input, prefixConsul+key, string(pairs[i].Value), -1)
+		if err := a.replaceConsulSecrets(&input); err != nil {
+			log.WithError(err).Error("Couldn't replace consul secrets")
 		}
 	}
-out:
 
 	return []byte(input)
+}
+
+func (a APIDefinitionLoader) replaceConsulSecrets(input *string) error {
+	if err := a.Gw.setUpConsul(); err != nil {
+		return err
+	}
+
+	pairs, _, err := a.Gw.consulKVStore.(*kv.Consul).Store().List(prefixKeys, nil)
+	if err != nil {
+		return err
+	}
+
+	for i := 1; i < len(pairs); i++ {
+		key := strings.TrimPrefix(pairs[i].Key, prefixKeys+"/")
+		*input = strings.Replace(*input, prefixConsul+key, string(pairs[i].Value), -1)
+	}
+
+	return nil
 }
 
 // FromCloud will connect and download ApiDefintions from a Mongo DB instance.
