@@ -1334,7 +1334,7 @@ func TestOAS_BuildDefaultTykExtension(t *testing.T) {
 
 		err := oasDef.BuildDefaultTykExtension(TykExtensionConfigParams{}, true)
 		assert.NotNil(t, err)
-		assert.Contains(t, err.Error(), "server URL still contains unresolved variables")
+		assert.Contains(t, err.Error(), "server URL contains undefined variables")
 	})
 
 }

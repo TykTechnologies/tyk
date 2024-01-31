@@ -131,7 +131,7 @@ func generateUrlUsingDefaultVariableValues(s *OAS, upstreamURL string) (string, 
 	for name, variable := range s.Servers[0].Variables {
 		if strings.Contains(upstreamURL, "{"+name+"}") {
 			if variable.Default == "" {
-				return "", errors.New("server variable " + name + " does not have a default value")
+				return "", fmt.Errorf("server variable %s does not have a default value", name)
 			}
 			upstreamURL = replaceParameterWithValue(upstreamURL, name, variable.Default)
 		}
