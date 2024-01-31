@@ -353,18 +353,21 @@ func (r *RedisCluster) GetMultiKey(keys []string) ([]string, error) {
 		return nil, ErrKeyNotFound
 	}
 	result := make([]string, 0)
-	for i := range values {
-		strVal := fmt.Sprint(values[i])
-		if strVal != "<nil>" {
-			result = append(result, strVal)
+	for _, val := range values {
+		strVal := fmt.Sprint(val)
+		if strVal == "<nil>" {
+			strVal = ""
+		}
+		result = append(result, strVal)
+	}
+
+	for _, val := range result {
+		if val != "" {
+			return result, nil
 		}
 	}
 
-	if len(result) == 0 {
-		return nil, ErrKeyNotFound
-	}
-
-	return result, nil
+	return nil, ErrKeyNotFound
 }
 
 func (r *RedisCluster) GetKeyTTL(keyName string) (ttl int64, err error) {
