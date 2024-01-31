@@ -469,7 +469,7 @@ type RateLimit struct {
 	//
 	// Tyk classic API definition: `!disable_rate_limit`.
 	Enabled bool `json:"enabled" bson:"enabled"`
-	// Rate specifies the number of requests allowed to pass through per unit of time.
+	// Rate specifies the number of requests that can be passed to the upstream in each time interval (`per`).
 	// This field sets the limit on the frequency of requests to ensure controlled
 	// resource access or to prevent abuse. The rate is defined as an integer value,
 	// representing the number of requests per time unit as defined in the Per field.
