@@ -23,8 +23,6 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	redis "github.com/TykTechnologies/tyk/internal/redis"
-
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/test"
 	"github.com/TykTechnologies/tyk/user"
@@ -867,7 +865,7 @@ func TestSyncAPISpecsDashboardSuccess(t *testing.T) {
 
 	var wg sync.WaitGroup
 	wg.Add(1)
-	msg := redis.Message{Payload: `{"Command": "ApiUpdated"}`}
+	msg := testMessageAdapter{Msg: `{"Command": "ApiUpdated"}`}
 	handled := func(got NotificationCommand) {
 		if want := NoticeApiUpdated; got != want {
 			t.Fatalf("want %q, got %q", want, got)
@@ -1218,7 +1216,7 @@ func TestSyncAPISpecsDashboardJSONFailure(t *testing.T) {
 
 	var wg sync.WaitGroup
 	wg.Add(1)
-	msg := redis.Message{Payload: `{"Command": "ApiUpdated"}`}
+	msg := testMessageAdapter{Msg: `{"Command": "ApiUpdated"}`}
 	handled := func(got NotificationCommand) {
 		if want := NoticeApiUpdated; got != want {
 			t.Fatalf("want %q, got %q", want, got)

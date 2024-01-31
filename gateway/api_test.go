@@ -25,8 +25,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/TykTechnologies/tyk/internal/redis"
-
+	"github.com/TykTechnologies/storage/temporal/model"
 	"github.com/TykTechnologies/tyk/internal/uuid"
 
 	"github.com/TykTechnologies/tyk/apidef"
@@ -1728,33 +1727,36 @@ func TestGroupResetHandler(t *testing.T) {
 	ctx, cancel := context.WithTimeout(ts.Gw.ctx, time.Second)
 	defer cancel()
 
-	// Using waitgroup to test cancellation
-	var wg sync.WaitGroup
-	wg.Add(1)
-
 	go func() {
 		// Clean up resources on exit
 		defer func() {
 			close(didReload)
 			close(didSubscribe)
-			wg.Done()
 		}()
 
 		err := cacheStore.StartPubSubHandler(ctx, RedisPubSubChannel, func(v interface{}) {
-			switch x := v.(type) {
-			case *redis.Subscription:
-				didSubscribe <- true
-			case *redis.Message:
-				notf := Notification{Gw: ts.Gw}
+			msg, ok := v.(model.Message)
+			assert.True(t, ok)
 
-				err := json.Unmarshal([]byte(x.Payload), &notf)
+			msgType := msg.Type()
+			switch msgType {
+			case model.MessageTypeSubscription:
+				didSubscribe <- true
+			case model.MessageTypeMessage:
+				notf := Notification{Gw: ts.Gw}
+				payload, err := msg.Payload()
+				assert.NoError(t, err)
+				err = json.Unmarshal([]byte(payload), &notf)
 				assert.NoError(t, err)
 
 				if notf.Command == NoticeGroupReload {
 					didReload <- true
 					reloadCount++
 				}
+			default:
+				assert.Fail(t, "unexpected message type")
 			}
+
 		})
 
 		select {
@@ -1781,7 +1783,6 @@ func TestGroupResetHandler(t *testing.T) {
 	// If we don't wait for the subscription to be done, we might do
 	// the reload before pub/sub is in place to receive our message.
 	<-didSubscribe
-
 	// Do a loop of tryReloadCount reloads
 	for try := 1; try <= tryReloadCount; try++ {
 		req := ts.withAuth(TestReq(t, "GET", uri, nil))
@@ -1808,9 +1809,6 @@ func TestGroupResetHandler(t *testing.T) {
 
 	// Close our *Test object, ensuring a cancelled context
 	ts.Close()
-
-	// Wait for our pubsub loop to exit
-	wg.Wait()
 
 	// Assert total reload count matches expected value
 	assert.Equal(t, tryReloadCount, reloadCount, "Unexpected number of reloads registered from pubsub")

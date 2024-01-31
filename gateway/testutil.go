@@ -1933,3 +1933,22 @@ func randStringBytes(n int) string {
 
 	return string(b)
 }
+
+type testMessageAdapter struct {
+	Msg string
+}
+
+// Type returns the message type.
+func (m *testMessageAdapter) Type() string {
+	return "message"
+}
+
+// Channel returns the channel the message was received on.
+func (m *testMessageAdapter) Channel() (string, error) {
+	return "", nil
+}
+
+// Payload returns the message payload.
+func (m *testMessageAdapter) Payload() (string, error) {
+	return m.Msg, nil
+}

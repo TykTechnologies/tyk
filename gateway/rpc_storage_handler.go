@@ -7,10 +7,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/TykTechnologies/storage/temporal/model"
 	"github.com/TykTechnologies/tyk/internal/cache"
 	"github.com/TykTechnologies/tyk/rpc"
-
-	"github.com/TykTechnologies/tyk/internal/redis"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/storage"
@@ -582,7 +581,7 @@ func (r *RPCStorageHandler) DeleteKeys(keys []string) bool {
 }
 
 // StartPubSubHandler will listen for a signal and run the callback with the message
-func (r *RPCStorageHandler) StartPubSubHandler(channel string, callback func(*redis.Message)) error {
+func (r *RPCStorageHandler) StartPubSubHandler(channel string, callback func(*model.Message)) error {
 	log.Warning("RPCStorageHandler.StartPubSubHandler - NO PUBSUB DEFINED")
 	return nil
 }

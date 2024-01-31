@@ -642,8 +642,13 @@ func (r *RedisCluster) StartPubSubHandler(ctx context.Context, channel string, c
 	defer pubsub.Close()
 
 	for {
-		if err := r.handleReceive(ctx, pubsub.Receive, callback); err != nil {
-			return err
+		select {
+		case <-ctx.Done():
+			return nil
+		default:
+			if err := r.handleReceive(ctx, pubsub.Receive, callback); err != nil {
+				return err
+			}
 		}
 	}
 }

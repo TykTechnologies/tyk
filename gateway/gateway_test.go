@@ -23,8 +23,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	msgpack "gopkg.in/vmihailenco/msgpack.v2"
 
-	"github.com/TykTechnologies/tyk/internal/redis"
-
 	"github.com/TykTechnologies/tyk-pump/analytics"
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
@@ -559,8 +557,8 @@ func TestManagementNodeRedisEvents(t *testing.T) {
 	ts.Gw.SetConfig(globalConf)
 
 	t.Run("Without signing:", func(t *testing.T) {
-		msg := redis.Message{
-			Payload: `{"Command": "NoticeGatewayDRLNotification"}`,
+		msg := testMessageAdapter{
+			Msg: `{"Command": "NoticeGatewayDRLNotification"}`,
 		}
 
 		callbackRun := false
@@ -593,9 +591,9 @@ func TestManagementNodeRedisEvents(t *testing.T) {
 			Gw:      ts.Gw,
 		}
 		n.Sign()
-		msg := redis.Message{}
+		msg := testMessageAdapter{}
 		payload := test.MarshalJSON(t)(n)
-		msg.Payload = string(payload)
+		msg.Msg = string(payload)
 
 		callbackRun := false
 		shouldHandle := func(got NotificationCommand) {
@@ -612,7 +610,7 @@ func TestManagementNodeRedisEvents(t *testing.T) {
 
 		n.Signature = "wrong"
 		payload, _ = json.Marshal(n)
-		msg.Payload = string(payload)
+		msg.Msg = string(payload)
 
 		valid := false
 		shouldFail := func(got NotificationCommand) {
