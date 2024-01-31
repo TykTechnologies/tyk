@@ -56,7 +56,6 @@ func (rc *ConnectionHandler) DisableStorage(setStorageDown bool) {
 	if !rc.WaitConnect(ctx) {
 		panic("Can't reconnect to redis after disable")
 	}
-	rc.reconnect <- struct{}{}
 }
 
 // Connected returns true if we are connected to redis
@@ -122,13 +121,6 @@ func (rc *ConnectionHandler) Connect(ctx context.Context, onConnect func(), conf
 
 	rc.storageUp.Store(true)
 
-	/*
-		defer func() {
-			close(rc.reconnect)
-			rc.disconnect()
-		}()
-	*/
-
 	// We need the ticker to constantly checking the connection status of Redis. If Redis gets down and up again, we should be able to recover.
 	go rc.statusCheck(ctx)
 }
@@ -179,16 +171,9 @@ func (rc *ConnectionHandler) statusCheck(ctx context.Context) {
 			//we check if the clusters are initialised and if connections are open
 			connected := rc.isConnected(ctx, DefaultConn) && rc.isConnected(ctx, CacheConn) && rc.isConnected(ctx, Analytics)
 
-			//we check if we are already connected connected
-			alreadyConnected := rc.Connected()
-
 			//store the actual status of redis
 			rc.storageUp.Store(connected)
 
-			//if we weren't alerady connected but now we are connected, we trigger the reconnect
-			if !alreadyConnected && connected {
-				rc.reconnect <- struct{}{}
-			}
 		}
 	}
 }

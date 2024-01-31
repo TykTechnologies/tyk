@@ -1727,11 +1727,16 @@ func TestGroupResetHandler(t *testing.T) {
 	ctx, cancel := context.WithTimeout(ts.Gw.ctx, time.Second)
 	defer cancel()
 
+	// Using waitgroup to test cancellation
+	var wg sync.WaitGroup
+	wg.Add(1)
+
 	go func() {
 		// Clean up resources on exit
 		defer func() {
 			close(didReload)
 			close(didSubscribe)
+			wg.Done()
 		}()
 
 		err := cacheStore.StartPubSubHandler(ctx, RedisPubSubChannel, func(v interface{}) {
@@ -1809,6 +1814,8 @@ func TestGroupResetHandler(t *testing.T) {
 
 	// Close our *Test object, ensuring a cancelled context
 	ts.Close()
+	// Wait for our pubsub loop to exit
+	wg.Wait()
 
 	// Assert total reload count matches expected value
 	assert.Equal(t, tryReloadCount, reloadCount, "Unexpected number of reloads registered from pubsub")
