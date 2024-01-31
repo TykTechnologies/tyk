@@ -1202,6 +1202,10 @@
         "listenPath": {
           "$ref": "#/definitions/X-Tyk-ListenPath"
         },
+        "slug": {
+          "type": "string",
+          "description": "Legacy field, unused from v5.3.0 but retained for backward compatibility."
+        },
         "authentication": {
           "$ref": "#/definitions/X-Tyk-Authentication"
         },
