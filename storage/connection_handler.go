@@ -2,6 +2,7 @@ package storage
 
 import (
 	"context"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -13,9 +14,13 @@ import (
 	"github.com/TykTechnologies/tyk/config"
 )
 
+// ConnectionHandler is a wrapper around the storage connection.
+// It allows to dynamically enable/disable talking with storage and
+// mantain a connection map to different storage types.
 type ConnectionHandler struct {
 	// TODO this should be concurrent safe
-	connections map[string]model.Connector
+	connections   map[string]model.Connector
+	connectionsMu *sync.RWMutex
 
 	storageUp      atomic.Value
 	disableStorage atomic.Value
@@ -25,17 +30,21 @@ type ConnectionHandler struct {
 }
 
 const (
+	// DefaultConn is the default connection type. Not analytics and Not cache.
 	DefaultConn = "default"
-	CacheConn   = "cache"
-	Analytics   = "analytics"
+	// CacheConn is the cache connection type
+	CacheConn = "cache"
+	// AnalyticsConn is the analytics connection type
+	Analytics = "analytics"
 )
 
 // NewConnectionHandler creates a new connection handler not connected
 func NewConnectionHandler(ctx context.Context) *ConnectionHandler {
 	return &ConnectionHandler{
-		ctx:         ctx,
-		reconnect:   make(chan struct{}, 1),
-		connections: make(map[string]model.Connector),
+		ctx:           ctx,
+		reconnect:     make(chan struct{}, 1),
+		connections:   make(map[string]model.Connector),
+		connectionsMu: &sync.RWMutex{},
 	}
 }
 
@@ -96,8 +105,7 @@ func (rc *ConnectionHandler) enabled() bool {
 func (rc *ConnectionHandler) Disconnect() error {
 	for _, v := range rc.connections {
 		if v != nil {
-			err := v.Disconnect(context.Background())
-			if err != nil {
+			if err := v.Disconnect(context.Background()); err != nil {
 				return err
 			}
 		}
@@ -135,6 +143,9 @@ func (rc *ConnectionHandler) Connect(ctx context.Context, onConnect func(), conf
 
 // initConnection initializes the connection singletons.
 func (rc *ConnectionHandler) initConnection(onConnect func(), conf config.Config) (err error) {
+	rc.connectionsMu.Lock()
+	defer rc.connectionsMu.Unlock()
+
 	connTypes := []string{
 		DefaultConn,
 		CacheConn,
@@ -187,6 +198,8 @@ func (rc *ConnectionHandler) statusCheck(ctx context.Context) {
 }
 
 func (rc *ConnectionHandler) getConnection(isCache, isAnalytics bool) model.Connector {
+	rc.connectionsMu.RLock()
+	defer rc.connectionsMu.RUnlock()
 	if isAnalytics {
 		return rc.connections[Analytics]
 	} else if isCache {

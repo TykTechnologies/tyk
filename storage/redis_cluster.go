@@ -25,8 +25,13 @@ import (
 	"github.com/TykTechnologies/tyk/config"
 )
 
-// ErrRedisIsDown is returned when we can't communicate with redis
-var ErrRedisIsDown = errors.New("storage: Redis is either down or was not configured")
+var (
+	// ErrRedisIsDown is returned when we can't communicate with redis
+	ErrRedisIsDown = errors.New("storage: Redis is either down or was not configured")
+
+	// ErrStorageConn is returned when we can't get a connection from the ConnectionHandler
+	ErrStorageConn = fmt.Errorf("Error trying to get singleton instance: %w", ErrRedisIsDown)
+)
 
 // RedisCluster is a storage manager that uses the redis database.
 type RedisCluster struct {
@@ -65,7 +70,7 @@ func (r *RedisCluster) Client() (redis.UniversalClient, error) {
 
 	conn := r.ConnectionHandler.getConnection(r.IsCache, r.IsAnalytics)
 	if conn == nil {
-		return nil, fmt.Errorf("Error trying to get singleton instance: %w", ErrRedisIsDown)
+		return nil, ErrStorageConn
 	}
 
 	var client redis.UniversalClient
@@ -91,7 +96,7 @@ func (r *RedisCluster) kv() (model.KeyValue, error) {
 
 	conn := r.ConnectionHandler.getConnection(r.IsCache, r.IsAnalytics)
 	if conn == nil {
-		return nil, fmt.Errorf("Error trying to get singleton instance: %w", ErrRedisIsDown)
+		return nil, ErrStorageConn
 	}
 
 	kvStorage, err := tempkv.NewKeyValue(conn)
@@ -116,7 +121,7 @@ func (r *RedisCluster) flusher() (model.Flusher, error) {
 
 	conn := r.ConnectionHandler.getConnection(r.IsCache, r.IsAnalytics)
 	if conn == nil {
-		return nil, fmt.Errorf("Error trying to get singleton instance: %w", ErrRedisIsDown)
+		return nil, ErrStorageConn
 	}
 
 	flusherStorage, err := tempflusher.NewFlusher(conn)
@@ -142,7 +147,7 @@ func (r *RedisCluster) queue() (model.Queue, error) {
 
 	conn := r.ConnectionHandler.getConnection(r.IsCache, r.IsAnalytics)
 	if conn == nil {
-		return nil, fmt.Errorf("Error trying to get singleton instance: %w", ErrRedisIsDown)
+		return nil, ErrStorageConn
 	}
 
 	queueStorage, err := tempqueue.NewQueue(conn)
@@ -167,7 +172,7 @@ func (r *RedisCluster) list() (model.List, error) {
 
 	conn := r.ConnectionHandler.getConnection(r.IsCache, r.IsAnalytics)
 	if conn == nil {
-		return nil, fmt.Errorf("Error trying to get singleton instance: %w", ErrRedisIsDown)
+		return nil, ErrStorageConn
 	}
 
 	listStorage, err := templist.NewList(conn)
@@ -191,7 +196,7 @@ func (r *RedisCluster) set() (model.Set, error) {
 
 	conn := r.ConnectionHandler.getConnection(r.IsCache, r.IsAnalytics)
 	if conn == nil {
-		return nil, fmt.Errorf("Error trying to get singleton instance: %w", ErrRedisIsDown)
+		return nil, ErrStorageConn
 	}
 
 	setStorage, err := tempset.NewSet(conn)
@@ -215,7 +220,7 @@ func (r *RedisCluster) sortedSet() (model.SortedSet, error) {
 
 	conn := r.ConnectionHandler.getConnection(r.IsCache, r.IsAnalytics)
 	if conn == nil {
-		return nil, fmt.Errorf("Error trying to get singleton instance: %w", ErrRedisIsDown)
+		return nil, ErrStorageConn
 	}
 
 	sortedSetStorage, err := tempsortedset.NewSortedSet(conn)
@@ -331,13 +336,7 @@ func (r *RedisCluster) GetRawKey(keyName string) (string, error) {
 }
 
 func (r *RedisCluster) GetExp(keyName string) (int64, error) {
-	storage, err := r.kv()
-	if err != nil {
-		log.Error(err)
-		return 0, err
-	}
-
-	return storage.TTL(context.Background(), r.fixKey(keyName))
+	return r.GetKeyTTL(keyName)
 }
 
 func (r *RedisCluster) SetExp(keyName string, timeout int64) error {

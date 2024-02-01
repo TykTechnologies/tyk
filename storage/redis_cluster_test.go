@@ -255,3 +255,81 @@ func TestLock(t *testing.T) {
 		mockedKv.AssertExpectations(t)
 	})
 }
+
+func TestInternalStorages(t *testing.T) {
+	tcs := []struct {
+		name         string
+		getStorageFn func(storage *RedisCluster) (interface{}, error)
+	}{
+		{
+			name: "KeyValue",
+			getStorageFn: func(storage *RedisCluster) (interface{}, error) {
+				return storage.kv()
+			},
+		},
+		{
+			name: "Set",
+			getStorageFn: func(storage *RedisCluster) (interface{}, error) {
+				return storage.set()
+			},
+		},
+		{
+			name: "Client",
+			getStorageFn: func(storage *RedisCluster) (interface{}, error) {
+				return storage.Client()
+			},
+		},
+		{
+			name: "Queue",
+			getStorageFn: func(storage *RedisCluster) (interface{}, error) {
+				return storage.queue()
+			},
+		},
+		{
+			name: "List",
+			getStorageFn: func(storage *RedisCluster) (interface{}, error) {
+				return storage.list()
+			},
+		},
+		{
+			name: "SortedSet",
+			getStorageFn: func(storage *RedisCluster) (interface{}, error) {
+				return storage.sortedSet()
+			},
+		},
+		{
+			name: "Flusher",
+			getStorageFn: func(storage *RedisCluster) (interface{}, error) {
+				return storage.flusher()
+			},
+		},
+	}
+
+	for _, tc := range tcs {
+		tc := tc
+		t.Run(tc.name+" valid client", func(t *testing.T) {
+			storage := &RedisCluster{ConnectionHandler: rc}
+			obj, err := tc.getStorageFn(storage)
+
+			assert.NoError(t, err)
+			assert.NotNil(t, obj)
+		})
+		t.Run(tc.name+" connection disabled", func(t *testing.T) {
+			storage := &RedisCluster{ConnectionHandler: rc}
+			storage.ConnectionHandler.storageUp.Store(false)
+			defer storage.ConnectionHandler.storageUp.Store(true)
+			obj, err := tc.getStorageFn(storage)
+
+			assert.Error(t, err)
+			assert.Nil(t, obj)
+		})
+		t.Run(tc.name+" connection not init", func(t *testing.T) {
+			storage := &RedisCluster{ConnectionHandler: NewConnectionHandler(context.Background())}
+			storage.ConnectionHandler.storageUp.Store(true)
+			obj, err := tc.getStorageFn(storage)
+
+			assert.Equal(t, err, ErrStorageConn)
+			assert.Nil(t, obj)
+		})
+	}
+}
