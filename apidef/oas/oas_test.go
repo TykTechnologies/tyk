@@ -762,16 +762,19 @@ func TestMigrateAndFillOAS(t *testing.T) {
 	assert.Equal(t, DefaultOpenAPI, baseAPIDef.OAS.OpenAPI)
 	assert.Equal(t, "Furkan", baseAPIDef.OAS.Info.Title)
 	assert.Equal(t, "Default", baseAPIDef.OAS.Info.Version)
+	assert.True(t, baseAPIDef.Classic.EnableContextVars)
 
 	assert.True(t, versionAPIDefs[0].Classic.IsOAS)
 	assert.Equal(t, DefaultOpenAPI, versionAPIDefs[0].OAS.OpenAPI)
 	assert.Equal(t, "Furkan-v1", versionAPIDefs[0].OAS.Info.Title)
 	assert.Equal(t, "v1", versionAPIDefs[0].OAS.Info.Version)
+	assert.True(t, versionAPIDefs[0].Classic.EnableContextVars)
 
 	assert.True(t, versionAPIDefs[1].Classic.IsOAS)
 	assert.Equal(t, DefaultOpenAPI, versionAPIDefs[1].OAS.OpenAPI)
 	assert.Equal(t, "Furkan-v2", versionAPIDefs[1].OAS.Info.Title)
 	assert.Equal(t, "v2", versionAPIDefs[1].OAS.Info.Version)
+	assert.True(t, versionAPIDefs[1].Classic.EnableContextVars)
 
 	assert.NotEqual(t, versionAPIDefs[0].Classic.APIID, versionAPIDefs[1].Classic.APIID)
 
