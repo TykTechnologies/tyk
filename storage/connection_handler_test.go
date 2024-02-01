@@ -57,9 +57,9 @@ func TestConnectionHandler_Connect(t *testing.T) {
 	conf, err := config.New()
 	assert.NoError(t, err)
 
-	var onConnectCalled bool
+	onConnectCalled := make(chan bool, 1)
 	onConnect := func() {
-		onConnectCalled = true
+		onConnectCalled <- true
 	}
 
 	rc := NewConnectionHandler(ctx)
@@ -70,8 +70,7 @@ func TestConnectionHandler_Connect(t *testing.T) {
 
 	// Allow some time for the goroutine to run
 	time.Sleep(100 * time.Millisecond)
-
-	assert.True(t, onConnectCalled, "Expected onConnect to be called")
+	<-onConnectCalled
 	assert.True(t, rc.Connected(), "Expected storage to be connected")
 }
 
