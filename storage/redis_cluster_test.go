@@ -1978,6 +1978,7 @@ func TestStartPubSubHandler(t *testing.T) {
 		}
 
 		go func() {
+			//nolint
 			_ = storage.StartPubSubHandler(context.Background(), "test-channel", callback)
 		}()
 
