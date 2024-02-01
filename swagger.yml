@@ -936,10 +936,9 @@ paths:
         '200':
           description: Success
           content:
-            text/html:
+            application/json:
               schema:
-                type: string
-              example: "Hello Tiki"
+                $ref: "#/components/schemas/SystemStatus"
   '/tyk/certs':
     get:
       parameters:
@@ -3787,6 +3786,36 @@ components:
           type: string
         isDefaultVersion:
           type: boolean
+    SystemStatus:
+      type: object
+      properties:
+        status:
+          type: string
+          example: pass
+        version:
+          type: string
+          example: 5.1.0
+        description:
+          type: string
+          example: Tyk GW
+        details:
+          type: object
+          properties:
+            redis:
+              $ref: "#/components/schemas/RedisStatus"
+    RedisStatus:
+      type: object
+      properties:
+        status:
+          type: string
+          example: pass
+        componentType:
+          type: string
+          example: datastore
+        time:
+          type: string
+          format: date-time
+          example: "2024-02-01T07:43:23Z"
   parameters:
     UpstreamURL:
       name: upstreamURL
