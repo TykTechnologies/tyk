@@ -10,8 +10,10 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/TykTechnologies/storage/temporal/model"
+	tempmocks "github.com/TykTechnologies/storage/temporal/tempmocks"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/internal/redis"
+	"github.com/stretchr/testify/mock"
 )
 
 var rc *ConnectionHandler
@@ -192,84 +194,68 @@ func TestRedisExpirationTime(t *testing.T) {
 }
 
 func TestLock(t *testing.T) {
-	/* TODO fix this test - SetNX not supported
 	t.Run("redis down", func(t *testing.T) {
-		db, _ := redis.NewClientMock()
+		mockedKv := tempmocks.NewKeyValue(t)
 		redisCluster := &RedisCluster{
-			ConnectionHandler: &ConnectionHandler{
-				ctx:        context.Background(),
-				singlePool: db,
-			},
+			ConnectionHandler: NewConnectionHandler(context.Background()),
+			kvStorage:         mockedKv,
 		}
+
 		redisCluster.ConnectionHandler.storageUp.Store(false)
 
 		ok, err := redisCluster.Lock("lock-key", time.Second)
 		assert.Error(t, err)
 		assert.False(t, ok)
-	})
-
-	t.Run("redis not configured", func(t *testing.T) {
-		redisCluster := &RedisCluster{
-			ConnectionHandler: &ConnectionHandler{
-				ctx: context.Background(),
-			},
-		}
-		redisCluster.ConnectionHandler.storageUp.Store(true)
-
-		ok, err := redisCluster.Lock("lock-key", time.Second)
-		assert.ErrorContains(t, err, "Error trying to get singleton instance")
-		assert.False(t, ok)
+		mockedKv.AssertExpectations(t)
 	})
 
 	t.Run("lock success", func(t *testing.T) {
-		db, mock := redis.NewClientMock()
-		mock.ExpectSetNX("lock-key", "1", time.Second).SetVal(true)
+		mockedKv := tempmocks.NewKeyValue(t)
+		mockedKv.On("SetIfNotExist", mock.Anything, "lock-key", "1", time.Second).Return(true, nil)
 
 		redisCluster := &RedisCluster{
-			ConnectionHandler: &ConnectionHandler{
-				ctx:        context.Background(),
-				singlePool: db,
-			},
+			ConnectionHandler: NewConnectionHandler(context.Background()),
+			kvStorage:         mockedKv,
 		}
 		redisCluster.ConnectionHandler.storageUp.Store(true)
 
 		ok, err := redisCluster.Lock("lock-key", time.Second)
 		assert.NoError(t, err)
 		assert.True(t, ok)
+		mockedKv.AssertExpectations(t)
+
 	})
 
 	t.Run("lock failure", func(t *testing.T) {
-		db, mock := redis.NewClientMock()
-		mock.ExpectSetNX("lock-key", "1", time.Second).SetVal(false)
+		mockedKv := tempmocks.NewKeyValue(t)
+		mockedKv.On("SetIfNotExist", mock.Anything, "lock-key", "1", time.Second).Return(false, nil)
 
 		redisCluster := &RedisCluster{
-			ConnectionHandler: &ConnectionHandler{
-				ctx:        context.Background(),
-				singlePool: db,
-			},
+			ConnectionHandler: NewConnectionHandler(context.Background()),
+			kvStorage:         mockedKv,
 		}
 		redisCluster.ConnectionHandler.storageUp.Store(true)
 
 		ok, err := redisCluster.Lock("lock-key", time.Second)
 		assert.NoError(t, err)
 		assert.False(t, ok)
+		mockedKv.AssertExpectations(t)
 	})
 
 	t.Run("lock error", func(t *testing.T) {
-		db, mock := redis.NewClientMock()
-		mock.ExpectSetNX("lock-key", "1", time.Second).SetErr(errors.ErrUnsupported)
+
+		mockedKv := tempmocks.NewKeyValue(t)
+		mockedKv.On("SetIfNotExist", mock.Anything, "lock-key", "1", time.Second).Return(false, errors.ErrUnsupported)
 
 		redisCluster := &RedisCluster{
-			ConnectionHandler: &ConnectionHandler{
-				ctx:        context.Background(),
-				singlePool: db,
-			},
+			ConnectionHandler: NewConnectionHandler(context.Background()),
+			kvStorage:         mockedKv,
 		}
 		redisCluster.ConnectionHandler.storageUp.Store(true)
 
 		ok, err := redisCluster.Lock("lock-key", time.Second)
 		assert.Equal(t, errors.ErrUnsupported, err)
 		assert.False(t, ok)
+		mockedKv.AssertExpectations(t)
 	})
-	*/
 }

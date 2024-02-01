@@ -25,10 +25,15 @@ func TestRollingWindow_GetCount(t *testing.T) {
 	conf, err := config.New()
 	assert.NoError(t, err)
 
-	conn := storage.NewRedisClusterPool(false, false, *conf)
+	conn, err := storage.NewConnector(storage.DefaultConn, nil, *conf)
+	assert.Nil(t, err)
+
+	var db redis.UniversalClient
+	ok := conn.As(&db)
+	assert.True(t, ok)
 
 	for _, tx := range []bool{true, false} {
-		assertGetCount(ctx, t, conn, tx)
+		assertGetCount(ctx, t, db, tx)
 	}
 }
 
@@ -41,10 +46,15 @@ func TestRollingWindow_Get(t *testing.T) {
 	conf, err := config.New()
 	assert.NoError(t, err)
 
-	conn := storage.NewRedisClusterPool(false, false, *conf)
+	conn, err := storage.NewConnector(storage.DefaultConn, nil, *conf)
+	assert.Nil(t, err)
+
+	var db redis.UniversalClient
+	ok := conn.As(&db)
+	assert.True(t, ok)
 
 	for _, tx := range []bool{true, false} {
-		assertGet(ctx, t, conn, tx)
+		assertGet(ctx, t, db, tx)
 	}
 }
 
@@ -155,13 +165,17 @@ func BenchmarkRollingWindow_New(b *testing.B) {
 	conf, err := config.New()
 	assert.NoError(b, err)
 
-	conn := storage.NewRedisClusterPool(false, false, *conf)
+	conn, err := storage.NewConnector(storage.DefaultConn, nil, *conf)
+	assert.Nil(b, err)
 
+	var db redis.UniversalClient
+	ok := conn.As(&db)
+	assert.True(b, ok)
 	b.ResetTimer()
 
 	b.Run("constructor", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
-			assertNew(ctx, b, conn, false)
+			assertNew(ctx, b, db, false)
 		}
 	})
 }
@@ -172,31 +186,36 @@ func BenchmarkRollingWindow_Count(b *testing.B) {
 	conf, err := config.New()
 	assert.NoError(b, err)
 
-	conn := storage.NewRedisClusterPool(false, false, *conf)
+	conn, err := storage.NewConnector(storage.DefaultConn, nil, *conf)
+	assert.Nil(b, err)
+
+	var db redis.UniversalClient
+	ok := conn.As(&db)
+	assert.True(b, ok)
 
 	b.ResetTimer()
 
 	b.Run("set/get count pipelined", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
-			assertGetCount(ctx, b, conn, false)
+			assertGetCount(ctx, b, db, false)
 		}
 	})
 
 	b.Run("set/get count transaction", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
-			assertGetCount(ctx, b, conn, true)
+			assertGetCount(ctx, b, db, true)
 		}
 	})
 
 	b.Run("set/get pipelined", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
-			assertGet(ctx, b, conn, false)
+			assertGet(ctx, b, db, false)
 		}
 	})
 
 	b.Run("set/get transaction", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
-			assertGet(ctx, b, conn, true)
+			assertGet(ctx, b, db, true)
 		}
 	})
 }

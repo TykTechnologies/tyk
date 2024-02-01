@@ -1323,7 +1323,6 @@ func assertTokensLen(t *testing.T, storageManager storage.Handler, storageKey st
 }
 
 func TestPurgeOAuthClientTokens(t *testing.T) {
-	/* TODO: Fix this test - MockD
 	t.Run("event", func(t *testing.T) {
 		conf := func(globalConf *config.Config) {
 			// set tokens to be expired after 1 second
@@ -1397,51 +1396,6 @@ func TestPurgeOAuthClientTokens(t *testing.T) {
 		assertTokensLen(t, storageManager, storageKey2, 0)
 	})
 
-	t.Run("errors", func(t *testing.T) {
-		t.Run("lock err", func(t *testing.T) {
-			gw := Gateway{}
-			gw.SetConfig(config.Config{
-				OauthTokenExpiredRetainPeriod: 1,
-			})
-			db, mock := redis.NewClientMock()
-			redisController := storage.NewConnectionHandler(context.Background())
-			redisController.MockWith(db, true)
-			gw.RedisController = redisController
-			mock.ExpectSetNX("oauth-purge-lock", "1", time.Minute).SetErr(errors.ErrUnsupported)
-			err := gw.purgeLapsedOAuthTokens()
-			assert.ErrorIs(t, err, errors.ErrUnsupported)
-		})
-
-		t.Run("lock failure", func(t *testing.T) {
-			gw := Gateway{}
-			gw.SetConfig(config.Config{
-				OauthTokenExpiredRetainPeriod: 1,
-			})
-			db, mock := redis.NewClientMock()
-			connectionHandler := storage.NewConnectionHandler(context.Background())
-			redisController.MockWith(db, true)
-			gw.StorageConnectionHandler = connectionHandler
-			mock.ExpectSetNX("oauth-purge-lock", "1", time.Minute).SetVal(false)
-			err := gw.purgeLapsedOAuthTokens()
-			assert.NoError(t, err)
-		})
-
-		t.Run("scan keys error", func(t *testing.T) {
-			gw := Gateway{}
-			gw.SetConfig(config.Config{
-				OauthTokenExpiredRetainPeriod: 1,
-			})
-			db, mock := redis.NewClientMock()
-			redisController := storage.NewRedisController(context.Background())
-			redisController.MockWith(db, true)
-			gw.RedisController = redisController
-			mock.ExpectSetNX("oauth-purge-lock", "1", time.Minute).SetVal(true)
-			mock.ExpectScan(0, oAuthClientTokensKeyPattern, 0).SetErr(errors.ErrUnsupported)
-			err := gw.purgeLapsedOAuthTokens()
-			assert.ErrorIs(t, err, errors.ErrUnsupported)
-		})
-	})
-	*/
 }
 
 func BenchmarkPurgeLapsedOAuthTokens(b *testing.B) {
