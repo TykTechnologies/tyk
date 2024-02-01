@@ -1773,15 +1773,6 @@
         "value"
       ]
     },
-    "X-Tyk-DetailedActivityLogs": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "enabled": {
-          "type": "boolean"
-        }
-      }
-    },
     "X-Tyk-CircuitBreaker": {
       "type": "object",
       "properties": {
