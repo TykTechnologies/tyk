@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
+
 	"strconv"
 	"strings"
 	"sync"
@@ -93,6 +94,11 @@ func (gw *Gateway) handleRedisEvent(v interface{}, handled func(NotificationComm
 	if !ok {
 		return
 	}
+
+	if message.Type() != model.MessageTypeMessage {
+		return
+	}
+
 	payload, err := message.Payload()
 	if err != nil {
 		pubSubLog.Error("Error getting payload from message: ", err)
@@ -101,6 +107,7 @@ func (gw *Gateway) handleRedisEvent(v interface{}, handled func(NotificationComm
 
 	notif := Notification{Gw: gw}
 	if err := json.Unmarshal([]byte(payload), &notif); err != nil {
+
 		pubSubLog.Error("Unmarshalling message body failed, malformed: ", err)
 		return
 	}

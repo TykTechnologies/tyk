@@ -1738,10 +1738,6 @@ func Start() {
 		}
 	}
 
-	if err := gw.StorageConnectionHandler.Disconnect(); err != nil {
-		mainLog.WithError(err).Error("disconnecting from storage")
-	}
-
 	mainLog.Info("Terminating.")
 
 	time.Sleep(time.Second)
