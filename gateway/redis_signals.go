@@ -107,7 +107,6 @@ func (gw *Gateway) handleRedisEvent(v interface{}, handled func(NotificationComm
 
 	notif := Notification{Gw: gw}
 	if err := json.Unmarshal([]byte(payload), &notif); err != nil {
-
 		pubSubLog.Error("Unmarshalling message body failed, malformed: ", err)
 		return
 	}
