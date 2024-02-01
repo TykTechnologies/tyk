@@ -1861,19 +1861,6 @@ func TestRemoveSortedSetRange(t *testing.T) {
 	})
 }
 
-/*
-// ScanKeys will return all keys according to the pattern.
-
-	func (r *RedisCluster) ScanKeys(pattern string) ([]string, error) {
-		storage, err := r.kv()
-		if err != nil {
-			log.Error(err)
-			return []string{}, err
-		}
-
-		return storage.Keys(context.Background(), pattern)
-	}
-*/
 func TestScanKeys(t *testing.T) {
 	t.Run("scan keys success", func(t *testing.T) {
 		storage := &RedisCluster{ConnectionHandler: rc}
