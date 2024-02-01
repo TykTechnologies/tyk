@@ -97,7 +97,7 @@
       "type": "object",
       "properties": {
         "domain": {
-          "type": "string"
+          "$ref": "#/definitions/X-Tyk-DomainDef"
         },
         "certificate": {
           "type": "string"
@@ -132,7 +132,7 @@
       "type": "object",
       "properties": {
         "domain": {
-          "type": "string"
+          "$ref": "#/definitions/X-Tyk-DomainDef"
         },
         "publicKeys": {
           "type": "array",
@@ -1344,6 +1344,10 @@
         "name",
         "value"
       ]
+    },
+    "X-Tyk-DomainDef": {
+      "type": "string",
+      "pattern": "^([*a-zA-Z0-9-]+(\\.[*a-zA-Z0-9-]+)*)(:\\d+)?$"
     }
   }
 }
