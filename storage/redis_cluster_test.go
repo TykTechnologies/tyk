@@ -1915,3 +1915,146 @@ func TestScanKeys(t *testing.T) {
 		mockKv.AssertExpectations(t)
 	})
 }
+
+func TestGetKeyPrefix(t *testing.T) {
+	t.Run("with prefix", func(t *testing.T) {
+		prefix := "prefix:"
+		storage := &RedisCluster{KeyPrefix: prefix}
+
+		assert.Equal(t, prefix, storage.GetKeyPrefix())
+	})
+	t.Run("without prefix", func(t *testing.T) {
+		prefix := ""
+		storage := &RedisCluster{KeyPrefix: prefix}
+
+		assert.Equal(t, prefix, storage.GetKeyPrefix())
+	})
+}
+
+func TestStartPubSubHandler(t *testing.T) {
+	t.Run("error on queue retrieval", func(t *testing.T) {
+		storage := &RedisCluster{ConnectionHandler: rc}
+		storage.ConnectionHandler.storageUp.Store(false)
+		defer storage.ConnectionHandler.storageUp.Store(true)
+		err := storage.StartPubSubHandler(context.Background(), "test-channel", nil)
+		assert.Error(t, err)
+	})
+
+	t.Run("context canceled", func(t *testing.T) {
+		storage := &RedisCluster{ConnectionHandler: rc}
+		ctx, cancel := context.WithCancel(context.Background())
+		cancel()
+
+		err := storage.StartPubSubHandler(ctx, "test-channel", nil)
+		assert.NoError(t, err)
+	})
+
+	t.Run("message received", func(t *testing.T) {
+		storage := &RedisCluster{ConnectionHandler: rc}
+		mockQueue := tempmocks.NewQueue(t)
+		storage.queueStorage = mockQueue
+
+		mockMsg := tempmocks.NewMessage(t)
+		mockMsg.On("Payload").Return("test message", nil)
+
+		mockedSubscription := tempmocks.NewSubscription(t)
+		mockedSubscription.On("Receive", mock.Anything).Return(mockMsg, nil)
+		mockedSubscription.On("Close").Return(nil).Maybe()
+
+		mockQueue.On("Subscribe", mock.Anything, "test-channel").Return(mockedSubscription, nil)
+		defer mockQueue.AssertExpectations(t)
+
+		callbackCalled := false
+		callback := func(obj interface{}) {
+			msg, ok := obj.(model.Message)
+			assert.True(t, ok)
+
+			callbackCalled = true
+			msgPayload, err := msg.Payload()
+			assert.NoError(t, err)
+			payload, err := msg.Payload()
+			assert.NoError(t, err)
+			assert.Equal(t, payload, msgPayload)
+		}
+
+		go func() {
+			_ = storage.StartPubSubHandler(context.Background(), "test-channel", callback)
+		}()
+
+		time.Sleep(100 * time.Millisecond) // Allow some time for the goroutine to run
+		assert.True(t, callbackCalled)
+	})
+
+	t.Run("error on receive", func(t *testing.T) {
+		storage := &RedisCluster{ConnectionHandler: rc}
+		mockQueue := tempmocks.NewQueue(t)
+		storage.queueStorage = mockQueue
+
+		expectedErr := errors.New("test err")
+
+		mockedSubscription := tempmocks.NewSubscription(t)
+		mockedSubscription.On("Receive", mock.Anything).Return(nil, errors.New("test err"))
+		mockedSubscription.On("Close").Return(nil).Maybe()
+
+		mockQueue.On("Subscribe", mock.Anything, "test-channel").Return(mockedSubscription, nil)
+		defer mockQueue.AssertExpectations(t)
+
+		err := storage.StartPubSubHandler(context.Background(), "test-channel", nil)
+		assert.Error(t, err)
+		assert.Equal(t, expectedErr, err)
+	})
+	t.Run("error on receive closed network", func(t *testing.T) {
+		storage := &RedisCluster{ConnectionHandler: rc}
+		mockQueue := tempmocks.NewQueue(t)
+		storage.queueStorage = mockQueue
+
+		expectedErr := errors.New("redis: client is closed")
+
+		mockedSubscription := tempmocks.NewSubscription(t)
+		mockedSubscription.On("Receive", mock.Anything).Return(nil, errors.New("use of closed network connection"))
+		mockedSubscription.On("Close").Return(nil).Maybe()
+
+		mockQueue.On("Subscribe", mock.Anything, "test-channel").Return(mockedSubscription, nil)
+		defer mockQueue.AssertExpectations(t)
+
+		err := storage.StartPubSubHandler(context.Background(), "test-channel", nil)
+		assert.Error(t, err)
+		assert.Equal(t, expectedErr, err)
+	})
+}
+
+func TestPublish(t *testing.T) {
+	t.Run("error on queue retrieval", func(t *testing.T) {
+		storage := &RedisCluster{ConnectionHandler: rc}
+		storage.ConnectionHandler.storageUp.Store(false)
+		defer storage.ConnectionHandler.storageUp.Store(true)
+		err := storage.Publish("test-channel", "test message")
+		assert.Error(t, err)
+	})
+
+	t.Run("publish success", func(t *testing.T) {
+		storage := &RedisCluster{ConnectionHandler: rc}
+		mockQueue := tempmocks.NewQueue(t)
+		storage.queueStorage = mockQueue
+
+		mockQueue.On("Publish", mock.Anything, "test-channel", "test message").Return(int64(1), nil)
+
+		err := storage.Publish("test-channel", "test message")
+		assert.NoError(t, err)
+		mockQueue.AssertExpectations(t)
+	})
+
+	t.Run("error on publish", func(t *testing.T) {
+		storage := &RedisCluster{ConnectionHandler: rc}
+		mockQueue := tempmocks.NewQueue(t)
+		storage.queueStorage = mockQueue
+
+		expectedErr := errors.New("publish error")
+		mockQueue.On("Publish", mock.Anything, "test-channel", "test message").Return(int64(0), expectedErr)
+		defer mockQueue.AssertExpectations(t)
+
+		err := storage.Publish("test-channel", "test message")
+		assert.Error(t, err)
+		assert.Equal(t, expectedErr, err)
+	})
+}
