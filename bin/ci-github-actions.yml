@@ -1,0 +1,39 @@
+name: Tyk API Gateway Workflow
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+    branches:
+      - master
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Set up Go
+        uses: actions/setup-go@v2
+        with:
+          go-version: 1.16
+
+      - name: Build
+        run: go build -o myapp
+
+      - name: Test
+        run: go test ./...
+
+      - name: Install dependencies
+        run: |
+          # Add installation steps here
+      - name: Build Tyk API Gateway
+        run: make build
+      - name: Test Tyk API Gateway
+        run: make test
+      - name: Deploy
+        run: |
+          # Add deployment steps here
