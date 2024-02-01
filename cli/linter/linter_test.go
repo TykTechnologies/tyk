@@ -76,7 +76,7 @@ var tests = []struct {
 	},
 	{
 		"BadPolicySource", `{"policies": {"policy_source": "internet"}}`,
-		`policies.policy_source: policies.policy_source must be one of the following: "", "service", "rpc"`,
+		`policies.policy_source: policies.policy_source must be one of the following: "", "file", "service", "rpc"`,
 	},
 	{
 		"MalformedDnsCacheEntry", `{"dns_cache": { "enabled": true, "tttl": 10} }`,

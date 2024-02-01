@@ -898,6 +898,7 @@
           "type": "string",
           "enum": [
             "",
+            "file",
             "service",
             "rpc"
           ]
