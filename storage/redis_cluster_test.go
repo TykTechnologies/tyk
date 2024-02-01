@@ -333,3 +333,538 @@ func TestInternalStorages(t *testing.T) {
 		})
 	}
 }
+
+func TestGetKey(t *testing.T) {
+	t.Run("storage disconnected", func(t *testing.T) {
+		storage := &RedisCluster{ConnectionHandler: rc}
+		storage.ConnectionHandler.storageUp.Store(false)
+		defer storage.ConnectionHandler.storageUp.Store(true)
+		mockKv := tempmocks.NewKeyValue(t)
+		storage.kvStorage = mockKv
+
+		_, err := storage.GetKey("key")
+		assert.Error(t, err)
+		assert.Equal(t, ErrRedisIsDown, err)
+		mockKv.AssertExpectations(t)
+	})
+	t.Run("key found", func(t *testing.T) {
+		storage := &RedisCluster{ConnectionHandler: rc}
+		mockKv := tempmocks.NewKeyValue(t)
+		storage.kvStorage = mockKv
+		mockKv.On("Get", mock.Anything, "key").Return("value", nil)
+
+		val, err := storage.GetKey("key")
+		assert.NoError(t, err)
+		assert.Equal(t, "value", val)
+		mockKv.AssertExpectations(t)
+	})
+	t.Run("key found with prefix", func(t *testing.T) {
+		storage := &RedisCluster{ConnectionHandler: rc, KeyPrefix: "prefix:"}
+		mockKv := tempmocks.NewKeyValue(t)
+		storage.kvStorage = mockKv
+		mockKv.On("Get", mock.Anything, "prefix:key").Return("value", nil)
+
+		val, err := storage.GetKey("key")
+		assert.NoError(t, err)
+		assert.Equal(t, "value", val)
+		mockKv.AssertExpectations(t)
+	})
+	t.Run("key not found", func(t *testing.T) {
+		storage := &RedisCluster{ConnectionHandler: rc}
+		mockKv := tempmocks.NewKeyValue(t)
+		storage.kvStorage = mockKv
+		mockKv.On("Get", mock.Anything, "key").Return("", errors.New("key not found"))
+
+		val, err := storage.GetKey("key")
+		assert.Error(t, err)
+		assert.Equal(t, ErrKeyNotFound, err)
+		assert.Equal(t, "", val)
+		mockKv.AssertExpectations(t)
+	})
+}
+
+func TestGetMultiKey(t *testing.T) {
+	t.Run("storage disconnected", func(t *testing.T) {
+		storage := &RedisCluster{ConnectionHandler: rc}
+		storage.ConnectionHandler.storageUp.Store(false)
+		mockKv := tempmocks.NewKeyValue(t)
+		storage.kvStorage = mockKv
+
+		defer storage.ConnectionHandler.storageUp.Store(true)
+
+		_, err := storage.GetMultiKey([]string{"key1", "key"})
+		assert.Error(t, err)
+		assert.Equal(t, ErrRedisIsDown, err)
+		mockKv.AssertExpectations(t)
+	})
+	t.Run("key found", func(t *testing.T) {
+		storage := &RedisCluster{ConnectionHandler: rc}
+		mockKv := tempmocks.NewKeyValue(t)
+		storage.kvStorage = mockKv
+		mockKv.On("GetMulti", mock.Anything, []string{"key1", "key"}).Return([]interface{}{"<nil>", "value"}, nil)
+
+		val, err := storage.GetMultiKey([]string{"key1", "key"})
+		assert.NoError(t, err)
+		assert.Equal(t, []string{"", "value"}, val)
+		mockKv.AssertExpectations(t)
+	})
+	t.Run("key found with prefix", func(t *testing.T) {
+		storage := &RedisCluster{ConnectionHandler: rc, KeyPrefix: "prefix:"}
+		mockKv := tempmocks.NewKeyValue(t)
+		storage.kvStorage = mockKv
+		mockKv.On("GetMulti", mock.Anything, []string{"prefix:key1", "prefix:key"}).Return([]interface{}{"<nil>", "value"}, nil)
+
+		val, err := storage.GetMultiKey([]string{"key1", "key"})
+		assert.NoError(t, err)
+		assert.Equal(t, []string{"", "value"}, val)
+		mockKv.AssertExpectations(t)
+	})
+	t.Run("key not found", func(t *testing.T) {
+		storage := &RedisCluster{ConnectionHandler: rc}
+		mockKv := tempmocks.NewKeyValue(t)
+		storage.kvStorage = mockKv
+		mockKv.On("GetMulti", mock.Anything, []string{"key"}).Return([]interface{}{}, errors.New("key not found"))
+
+		val, err := storage.GetMultiKey([]string{"key"})
+		assert.Error(t, err)
+		assert.Equal(t, ErrKeyNotFound, err)
+		assert.Equal(t, []string(nil), val)
+		mockKv.AssertExpectations(t)
+	})
+}
+
+func TestGetKeyTTL(t *testing.T) {
+	t.Run("storage disconnected", func(t *testing.T) {
+		storage := &RedisCluster{ConnectionHandler: rc}
+		storage.ConnectionHandler.storageUp.Store(false)
+		mockKv := tempmocks.NewKeyValue(t)
+		storage.kvStorage = mockKv
+		defer storage.ConnectionHandler.storageUp.Store(true)
+
+		_, err := storage.GetKeyTTL("key")
+		assert.Error(t, err)
+		assert.Equal(t, ErrRedisIsDown, err)
+		mockKv.AssertExpectations(t)
+	})
+	t.Run("key found", func(t *testing.T) {
+		storage := &RedisCluster{ConnectionHandler: rc}
+		mockKv := tempmocks.NewKeyValue(t)
+		storage.kvStorage = mockKv
+		mockKv.On("TTL", mock.Anything, "key").Return(int64(10), nil)
+
+		val, err := storage.GetKeyTTL("key")
+		assert.NoError(t, err)
+		assert.Equal(t, int64(10), val)
+		mockKv.AssertExpectations(t)
+	})
+	t.Run("key found with prefix", func(t *testing.T) {
+		storage := &RedisCluster{ConnectionHandler: rc, KeyPrefix: "prefix:"}
+		mockKv := tempmocks.NewKeyValue(t)
+		storage.kvStorage = mockKv
+		mockKv.On("TTL", mock.Anything, "prefix:key").Return(int64(10), nil)
+
+		val, err := storage.GetKeyTTL("key")
+		assert.NoError(t, err)
+		assert.Equal(t, int64(10), val)
+		mockKv.AssertExpectations(t)
+	})
+	t.Run("key not found", func(t *testing.T) {
+		storage := &RedisCluster{ConnectionHandler: rc}
+		mockKv := tempmocks.NewKeyValue(t)
+		storage.kvStorage = mockKv
+		mockKv.On("TTL", mock.Anything, "key").Return(int64(0), ErrKeyNotFound)
+
+		val, err := storage.GetKeyTTL("key")
+		assert.Error(t, err)
+		assert.Equal(t, ErrKeyNotFound, err)
+		assert.Equal(t, int64(0), val)
+		mockKv.AssertExpectations(t)
+	})
+}
+
+func TestGetRawKey(t *testing.T) {
+	t.Run("storage disconnected", func(t *testing.T) {
+		storage := &RedisCluster{ConnectionHandler: rc}
+		storage.ConnectionHandler.storageUp.Store(false)
+		mockKv := tempmocks.NewKeyValue(t)
+		storage.kvStorage = mockKv
+		defer storage.ConnectionHandler.storageUp.Store(true)
+
+		_, err := storage.GetRawKey("key")
+		assert.Error(t, err)
+		assert.Equal(t, ErrRedisIsDown, err)
+		mockKv.AssertExpectations(t)
+	})
+	t.Run("key found", func(t *testing.T) {
+		storage := &RedisCluster{ConnectionHandler: rc, KeyPrefix: "prefix"}
+		mockKv := tempmocks.NewKeyValue(t)
+		storage.kvStorage = mockKv
+		mockKv.On("Get", mock.Anything, "key").Return("value", nil)
+
+		val, err := storage.GetRawKey("key")
+		assert.NoError(t, err)
+		assert.Equal(t, "value", val)
+		mockKv.AssertExpectations(t)
+	})
+	t.Run("key not found", func(t *testing.T) {
+		storage := &RedisCluster{ConnectionHandler: rc}
+		mockKv := tempmocks.NewKeyValue(t)
+		storage.kvStorage = mockKv
+		mockKv.On("Get", mock.Anything, "key").Return("", ErrKeyNotFound)
+
+		val, err := storage.GetRawKey("key")
+		assert.Error(t, err)
+		assert.Equal(t, ErrKeyNotFound, err)
+		assert.Equal(t, "", val)
+		mockKv.AssertExpectations(t)
+	})
+}
+
+func TestGetExp(t *testing.T) {
+	t.Run("storage disconnected", func(t *testing.T) {
+		storage := &RedisCluster{ConnectionHandler: rc}
+		storage.ConnectionHandler.storageUp.Store(false)
+		mockKv := tempmocks.NewKeyValue(t)
+		storage.kvStorage = mockKv
+		defer storage.ConnectionHandler.storageUp.Store(true)
+
+		_, err := storage.GetExp("key")
+		assert.Error(t, err)
+		assert.Equal(t, ErrRedisIsDown, err)
+		mockKv.AssertExpectations(t)
+	})
+	t.Run("key found", func(t *testing.T) {
+		storage := &RedisCluster{ConnectionHandler: rc}
+		mockKv := tempmocks.NewKeyValue(t)
+		storage.kvStorage = mockKv
+		mockKv.On("TTL", mock.Anything, "key").Return(int64(10), nil)
+
+		val, err := storage.GetExp("key")
+		assert.NoError(t, err)
+		assert.Equal(t, int64(10), val)
+		mockKv.AssertExpectations(t)
+	})
+	t.Run("key found with prefix", func(t *testing.T) {
+		storage := &RedisCluster{ConnectionHandler: rc, KeyPrefix: "prefix:"}
+		mockKv := tempmocks.NewKeyValue(t)
+		storage.kvStorage = mockKv
+		mockKv.On("TTL", mock.Anything, "prefix:key").Return(int64(10), nil)
+
+		val, err := storage.GetExp("key")
+		assert.NoError(t, err)
+		assert.Equal(t, int64(10), val)
+		mockKv.AssertExpectations(t)
+	})
+	t.Run("key not found", func(t *testing.T) {
+		storage := &RedisCluster{ConnectionHandler: rc}
+		mockKv := tempmocks.NewKeyValue(t)
+		storage.kvStorage = mockKv
+		mockKv.On("TTL", mock.Anything, "key").Return(int64(0), ErrKeyNotFound)
+
+		val, err := storage.GetExp("key")
+		assert.Error(t, err)
+		assert.Equal(t, ErrKeyNotFound, err)
+		assert.Equal(t, int64(0), val)
+		mockKv.AssertExpectations(t)
+	})
+}
+
+func TestSetExp(t *testing.T) {
+	t.Run("storage disconnected", func(t *testing.T) {
+		storage := &RedisCluster{ConnectionHandler: rc}
+		storage.ConnectionHandler.storageUp.Store(false)
+		mockKv := tempmocks.NewKeyValue(t)
+		storage.kvStorage = mockKv
+		defer storage.ConnectionHandler.storageUp.Store(true)
+
+		err := storage.SetExp("key", 10)
+		assert.Error(t, err)
+		assert.Equal(t, ErrRedisIsDown, err)
+		mockKv.AssertExpectations(t)
+	})
+	t.Run("set ok", func(t *testing.T) {
+		storage := &RedisCluster{ConnectionHandler: rc}
+		mockKv := tempmocks.NewKeyValue(t)
+		storage.kvStorage = mockKv
+		mockKv.On("Expire", mock.Anything, "key", time.Duration(10*time.Second)).Return(nil)
+
+		err := storage.SetExp("key", 10)
+		assert.NoError(t, err)
+		mockKv.AssertExpectations(t)
+	})
+	t.Run("set ok with prefix", func(t *testing.T) {
+		storage := &RedisCluster{ConnectionHandler: rc, KeyPrefix: "prefix:"}
+		mockKv := tempmocks.NewKeyValue(t)
+		storage.kvStorage = mockKv
+		mockKv.On("Expire", mock.Anything, "prefix:key", time.Duration(-1*time.Second)).Return(nil)
+
+		err := storage.SetExp("key", -1)
+		assert.NoError(t, err)
+		mockKv.AssertExpectations(t)
+	})
+	t.Run("key not found", func(t *testing.T) {
+		storage := &RedisCluster{ConnectionHandler: rc}
+		mockKv := tempmocks.NewKeyValue(t)
+		storage.kvStorage = mockKv
+		mockKv.On("Expire", mock.Anything, "key", time.Duration(-1*time.Second)).Return(ErrKeyNotFound)
+
+		err := storage.SetExp("key", -1)
+		assert.Error(t, err)
+		assert.Equal(t, ErrKeyNotFound, err)
+		mockKv.AssertExpectations(t)
+	})
+}
+
+func TestSetKey(t *testing.T) {
+	t.Run("storage disconnected", func(t *testing.T) {
+		storage := &RedisCluster{ConnectionHandler: rc}
+		storage.ConnectionHandler.storageUp.Store(false)
+		mockKv := tempmocks.NewKeyValue(t)
+		storage.kvStorage = mockKv
+		defer storage.ConnectionHandler.storageUp.Store(true)
+
+		err := storage.SetKey("key", "value", 10)
+		assert.Error(t, err)
+		assert.Equal(t, ErrRedisIsDown, err)
+		mockKv.AssertExpectations(t)
+	})
+	t.Run("set ok", func(t *testing.T) {
+		storage := &RedisCluster{ConnectionHandler: rc}
+		mockKv := tempmocks.NewKeyValue(t)
+		storage.kvStorage = mockKv
+		mockKv.On("Set", mock.Anything, "key", "value", time.Duration(10*time.Second)).Return(nil)
+
+		err := storage.SetKey("key", "value", 10)
+		assert.NoError(t, err)
+		mockKv.AssertExpectations(t)
+	})
+	t.Run("set ok with prefix", func(t *testing.T) {
+		storage := &RedisCluster{ConnectionHandler: rc, KeyPrefix: "prefix:"}
+		mockKv := tempmocks.NewKeyValue(t)
+		storage.kvStorage = mockKv
+		mockKv.On("Set", mock.Anything, "prefix:key", "value", time.Duration(-1*time.Second)).Return(nil)
+
+		err := storage.SetKey("key", "value", -1)
+		assert.NoError(t, err)
+		mockKv.AssertExpectations(t)
+	})
+	t.Run("key not found", func(t *testing.T) {
+		storage := &RedisCluster{ConnectionHandler: rc}
+		mockKv := tempmocks.NewKeyValue(t)
+		storage.kvStorage = mockKv
+		mockKv.On("Set", mock.Anything, "key", "value", time.Duration(-1*time.Second)).Return(ErrKeyNotFound)
+
+		err := storage.SetKey("key", "value", -1)
+		assert.Error(t, err)
+		assert.Equal(t, ErrKeyNotFound, err)
+		mockKv.AssertExpectations(t)
+	})
+}
+
+func TestSetRawKey(t *testing.T) {
+	t.Run("storage disconnected", func(t *testing.T) {
+		storage := &RedisCluster{ConnectionHandler: rc}
+		storage.ConnectionHandler.storageUp.Store(false)
+		mockKv := tempmocks.NewKeyValue(t)
+		storage.kvStorage = mockKv
+		defer storage.ConnectionHandler.storageUp.Store(true)
+
+		err := storage.SetRawKey("key", "value", 10)
+		assert.Error(t, err)
+		assert.Equal(t, ErrRedisIsDown, err)
+		mockKv.AssertExpectations(t)
+	})
+	t.Run("set ok", func(t *testing.T) {
+		storage := &RedisCluster{ConnectionHandler: rc}
+		mockKv := tempmocks.NewKeyValue(t)
+		storage.kvStorage = mockKv
+		mockKv.On("Set", mock.Anything, "key", "value", time.Duration(10*time.Second)).Return(nil)
+
+		err := storage.SetRawKey("key", "value", 10)
+		assert.NoError(t, err)
+		mockKv.AssertExpectations(t)
+	})
+	t.Run("set ok with prefix", func(t *testing.T) {
+		storage := &RedisCluster{ConnectionHandler: rc, KeyPrefix: "prefix:"}
+		mockKv := tempmocks.NewKeyValue(t)
+		storage.kvStorage = mockKv
+		mockKv.On("Set", mock.Anything, "key", "value", time.Duration(-1*time.Second)).Return(nil)
+
+		err := storage.SetRawKey("key", "value", -1)
+		assert.NoError(t, err)
+		mockKv.AssertExpectations(t)
+	})
+	t.Run("key not found", func(t *testing.T) {
+		storage := &RedisCluster{ConnectionHandler: rc}
+		mockKv := tempmocks.NewKeyValue(t)
+		storage.kvStorage = mockKv
+		mockKv.On("Set", mock.Anything, "key", "value", time.Duration(-1*time.Second)).Return(ErrKeyNotFound)
+
+		err := storage.SetRawKey("key", "value", -1)
+		assert.Error(t, err)
+		assert.Equal(t, ErrKeyNotFound, err)
+		mockKv.AssertExpectations(t)
+	})
+}
+
+func TestDecrement(t *testing.T) {
+	t.Run("storage disconnected", func(t *testing.T) {
+		storage := &RedisCluster{ConnectionHandler: rc}
+		storage.ConnectionHandler.storageUp.Store(false)
+		mockKv := tempmocks.NewKeyValue(t)
+		storage.kvStorage = mockKv
+		defer storage.ConnectionHandler.storageUp.Store(true)
+
+		storage.Decrement("key")
+		mockKv.AssertExpectations(t)
+	})
+	t.Run("decrement ok", func(t *testing.T) {
+		storage := &RedisCluster{ConnectionHandler: rc}
+		mockKv := tempmocks.NewKeyValue(t)
+		storage.kvStorage = mockKv
+		mockKv.On("Decrement", mock.Anything, "key").Return(int64(1), nil)
+
+		storage.Decrement("key")
+		mockKv.AssertExpectations(t)
+	})
+	t.Run("decrement ok with prefix", func(t *testing.T) {
+		storage := &RedisCluster{ConnectionHandler: rc, KeyPrefix: "prefix:"}
+		mockKv := tempmocks.NewKeyValue(t)
+		storage.kvStorage = mockKv
+		mockKv.On("Decrement", mock.Anything, "prefix:key").Return(int64(1), nil)
+
+		storage.Decrement("key")
+		mockKv.AssertExpectations(t)
+	})
+	t.Run("key not found", func(t *testing.T) {
+		storage := &RedisCluster{ConnectionHandler: rc}
+		mockKv := tempmocks.NewKeyValue(t)
+		storage.kvStorage = mockKv
+		mockKv.On("Decrement", mock.Anything, "key").Return(int64(1), ErrKeyNotFound)
+
+		storage.Decrement("key")
+		mockKv.AssertExpectations(t)
+	})
+}
+
+func TestIncrememntWithExpire(t *testing.T) {
+	t.Run("storage disconnected", func(t *testing.T) {
+		storage := &RedisCluster{ConnectionHandler: rc}
+		storage.ConnectionHandler.storageUp.Store(false)
+		mockKv := tempmocks.NewKeyValue(t)
+		storage.kvStorage = mockKv
+		defer storage.ConnectionHandler.storageUp.Store(true)
+
+		val := storage.IncrememntWithExpire("key", 10)
+		assert.Equal(t, int64(0), val)
+		mockKv.AssertExpectations(t)
+	})
+	t.Run("increment with expire not first increment", func(t *testing.T) {
+		storage := &RedisCluster{ConnectionHandler: rc}
+		mockKv := tempmocks.NewKeyValue(t)
+		storage.kvStorage = mockKv
+		mockKv.On("Increment", mock.Anything, "key").Return(int64(2), nil)
+
+		val := storage.IncrememntWithExpire("key", 10)
+		assert.Equal(t, int64(2), val)
+		mockKv.AssertExpectations(t)
+	})
+	t.Run("increment with expire and prefix not first increment", func(t *testing.T) {
+		storage := &RedisCluster{ConnectionHandler: rc, KeyPrefix: "prefix:"}
+		mockKv := tempmocks.NewKeyValue(t)
+		storage.kvStorage = mockKv
+		// always rawkey on this
+		mockKv.On("Increment", mock.Anything, "key").Return(int64(2), nil)
+
+		val := storage.IncrememntWithExpire("key", 10)
+		assert.Equal(t, int64(2), val)
+		mockKv.AssertExpectations(t)
+	})
+	t.Run("increment with expire first increment", func(t *testing.T) {
+		storage := &RedisCluster{ConnectionHandler: rc}
+		mockKv := tempmocks.NewKeyValue(t)
+		storage.kvStorage = mockKv
+		mockKv.On("Increment", mock.Anything, "key").Return(int64(1), nil)
+		mockKv.On("Expire", mock.Anything, "key", time.Duration(10*time.Second)).Return(nil)
+
+		val := storage.IncrememntWithExpire("key", 10)
+		assert.Equal(t, int64(1), val)
+		mockKv.AssertExpectations(t)
+	})
+
+	t.Run("increment without expire first increment", func(t *testing.T) {
+		storage := &RedisCluster{ConnectionHandler: rc}
+		mockKv := tempmocks.NewKeyValue(t)
+		storage.kvStorage = mockKv
+		mockKv.On("Increment", mock.Anything, "key").Return(int64(1), nil)
+
+		val := storage.IncrememntWithExpire("key", 0)
+		assert.Equal(t, int64(1), val)
+		mockKv.AssertExpectations(t)
+	})
+	t.Run("key not found", func(t *testing.T) {
+		storage := &RedisCluster{ConnectionHandler: rc}
+		mockKv := tempmocks.NewKeyValue(t)
+		storage.kvStorage = mockKv
+		mockKv.On("Increment", mock.Anything, "key").Return(int64(0), ErrKeyNotFound)
+
+		val := storage.IncrememntWithExpire("key", 0)
+		assert.Equal(t, int64(0), val)
+		mockKv.AssertExpectations(t)
+	})
+}
+
+func TestGetKeys(t *testing.T) {
+	t.Run("storage disconnected", func(t *testing.T) {
+		storage := &RedisCluster{ConnectionHandler: rc}
+		storage.ConnectionHandler.storageUp.Store(false)
+		mockKv := tempmocks.NewKeyValue(t)
+		storage.kvStorage = mockKv
+
+		defer storage.ConnectionHandler.storageUp.Store(true)
+
+		res := storage.GetKeys("filter")
+		assert.Equal(t, []string(nil), res)
+		mockKv.AssertExpectations(t)
+	})
+	t.Run("keys found without prefix", func(t *testing.T) {
+		storage := &RedisCluster{ConnectionHandler: rc}
+		mockKv := tempmocks.NewKeyValue(t)
+		storage.kvStorage = mockKv
+		mockKv.On("Keys", mock.Anything, "key*").Return([]string{"key1", "key2"}, nil)
+
+		val := storage.GetKeys("key")
+		assert.Equal(t, []string{"key1", "key2"}, val)
+		mockKv.AssertExpectations(t)
+	})
+	t.Run("keys found with prefix but without filter", func(t *testing.T) {
+		storage := &RedisCluster{ConnectionHandler: rc, KeyPrefix: "prefix:"}
+		mockKv := tempmocks.NewKeyValue(t)
+		storage.kvStorage = mockKv
+		mockKv.On("Keys", mock.Anything, "prefix:*").Return([]string{"prefix:key1", "prefix:key2"}, nil)
+
+		val := storage.GetKeys("")
+		assert.Equal(t, []string{"key1", "key2"}, val)
+		mockKv.AssertExpectations(t)
+	})
+	t.Run("keys found with prefix", func(t *testing.T) {
+		storage := &RedisCluster{ConnectionHandler: rc, KeyPrefix: "prefix:"}
+		mockKv := tempmocks.NewKeyValue(t)
+		storage.kvStorage = mockKv
+		mockKv.On("Keys", mock.Anything, "prefix:key*").Return([]string{"prefix:key1", "prefix:key2"}, nil)
+
+		val := storage.GetKeys("key")
+		assert.Equal(t, []string{"key1", "key2"}, val)
+		mockKv.AssertExpectations(t)
+	})
+	t.Run("key not found", func(t *testing.T) {
+		storage := &RedisCluster{ConnectionHandler: rc}
+		mockKv := tempmocks.NewKeyValue(t)
+		storage.kvStorage = mockKv
+		mockKv.On("Keys", mock.Anything, "key*").Return([]string{}, errors.New("key not found"))
+
+		val := storage.GetKeys("key")
+		assert.Equal(t, []string(nil), val)
+		mockKv.AssertExpectations(t)
+	})
+}

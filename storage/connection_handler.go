@@ -18,7 +18,6 @@ import (
 // It allows to dynamically enable/disable talking with storage and
 // mantain a connection map to different storage types.
 type ConnectionHandler struct {
-	// TODO this should be concurrent safe
 	connections   map[string]model.Connector
 	connectionsMu *sync.RWMutex
 
@@ -35,7 +34,7 @@ const (
 	// CacheConn is the cache connection type
 	CacheConn = "cache"
 	// AnalyticsConn is the analytics connection type
-	Analytics = "analytics"
+	AnalyticsConn = "analytics"
 )
 
 // NewConnectionHandler creates a new connection handler not connected
@@ -149,7 +148,7 @@ func (rc *ConnectionHandler) initConnection(onConnect func(), conf config.Config
 	connTypes := []string{
 		DefaultConn,
 		CacheConn,
-		Analytics,
+		AnalyticsConn,
 	}
 
 	for _, connType := range connTypes {
@@ -188,7 +187,7 @@ func (rc *ConnectionHandler) statusCheck(ctx context.Context) {
 			}
 
 			// we check if the clusters are initialised and if connections are open
-			connected := rc.isConnected(ctx, DefaultConn) && rc.isConnected(ctx, CacheConn) && rc.isConnected(ctx, Analytics)
+			connected := rc.isConnected(ctx, DefaultConn) && rc.isConnected(ctx, CacheConn) && rc.isConnected(ctx, AnalyticsConn)
 
 			// store the actual status of redis
 			rc.storageUp.Store(connected)
@@ -201,7 +200,7 @@ func (rc *ConnectionHandler) getConnection(isCache, isAnalytics bool) model.Conn
 	rc.connectionsMu.RLock()
 	defer rc.connectionsMu.RUnlock()
 	if isAnalytics {
-		return rc.connections[Analytics]
+		return rc.connections[AnalyticsConn]
 	} else if isCache {
 		return rc.connections[CacheConn]
 	}
@@ -213,7 +212,7 @@ func NewConnector(connType string, onConnect func(), conf config.Config) (model.
 	cfg := conf.Storage
 	if connType == CacheConn && conf.EnableSeperateCacheStore {
 		cfg = conf.CacheStorage
-	} else if connType == Analytics && conf.EnableAnalytics && conf.EnableSeperateAnalyticsStore {
+	} else if connType == AnalyticsConn && conf.EnableAnalytics && conf.EnableSeperateAnalyticsStore {
 		cfg = conf.AnalyticsStorage
 	}
 	log.Debug("Creating new " + connType + " Storage connection")
