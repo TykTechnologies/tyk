@@ -254,3 +254,72 @@ func TestTagsExportServer(t *testing.T) {
 		})
 	}
 }
+
+func TestFillDetailedTracing(t *testing.T) {
+	t.Parallel()
+
+	testcases := []struct {
+		title    string
+		input    apidef.APIDefinition
+		expected *DetailedTracing
+	}{
+		{
+			"enabled",
+			apidef.APIDefinition{DetailedTracing: true},
+			&DetailedTracing{Enabled: true},
+		},
+		{
+			"disabled",
+			apidef.APIDefinition{DetailedTracing: false},
+			nil,
+		},
+	}
+
+	for _, tc := range testcases {
+		tc := tc // Creating a new 'tc' scoped to the loop
+		t.Run(tc.title, func(t *testing.T) {
+			t.Parallel()
+
+			server := new(Server)
+			server.Fill(tc.input)
+
+			assert.Equal(t, tc.expected, server.DetailedTracing)
+		})
+	}
+}
+
+func TestExportDetailedTracing(t *testing.T) {
+	t.Parallel()
+
+	testcases := []struct {
+		title    string
+		input    *DetailedTracing
+		expected bool
+	}{
+		{
+			"enabled",
+			&DetailedTracing{Enabled: true},
+			true,
+		},
+		{
+			"disabled",
+			nil,
+			false,
+		},
+	}
+
+	for _, tc := range testcases {
+		tc := tc // Creating a new 'tc' scoped to the loop
+		t.Run(tc.title, func(t *testing.T) {
+			t.Parallel()
+
+			server := new(Server)
+			server.DetailedTracing = tc.input
+
+			var apiDef apidef.APIDefinition
+			server.ExtractTo(&apiDef)
+
+			assert.Equal(t, tc.expected, apiDef.DetailedTracing)
+		})
+	}
+}

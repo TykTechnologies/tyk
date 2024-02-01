@@ -12,10 +12,6 @@ type Server struct {
 	// accordingly.
 	ListenPath ListenPath `bson:"listenPath" json:"listenPath"` // required
 
-	// Slug is the Tyk Cloud equivalent of listen path.
-	// Tyk classic API definition: `slug`
-	Slug string `bson:"slug,omitempty" json:"slug,omitempty"`
-
 	// Authentication contains the configurations that manage how clients can authenticate with Tyk to access the API.
 	Authentication *Authentication `bson:"authentication,omitempty" json:"authentication,omitempty"`
 
@@ -32,12 +28,16 @@ type Server struct {
 
 	// DetailedActivityLogs configures detailed analytics recording.
 	DetailedActivityLogs *DetailedActivityLogs `bson:"detailedActivityLogs,omitempty" json:"detailedActivityLogs,omitempty"`
+
+	// DetailedTracing enables OpenTelemetry's detailed tracing for this API.
+	//
+	// Tyk classic API definition: `detailed_tracing`
+	DetailedTracing *DetailedTracing `bson:"detailedTracing,omitempty" json:"detailedTracing,omitempty"`
 }
 
 // Fill fills *Server from apidef.APIDefinition.
 func (s *Server) Fill(api apidef.APIDefinition) {
 	s.ListenPath.Fill(api)
-	s.Slug = api.Slug
 
 	if s.ClientCertificates == nil {
 		s.ClientCertificates = &ClientCertificates{}
@@ -73,12 +73,19 @@ func (s *Server) Fill(api apidef.APIDefinition) {
 	if ShouldOmit(s.DetailedActivityLogs) {
 		s.DetailedActivityLogs = nil
 	}
+
+	if s.DetailedTracing == nil {
+		s.DetailedTracing = &DetailedTracing{}
+	}
+	s.DetailedTracing.Fill(api)
+	if ShouldOmit(s.DetailedTracing) {
+		s.DetailedTracing = nil
+	}
 }
 
 // ExtractTo extracts *Server into *apidef.APIDefinition.
 func (s *Server) ExtractTo(api *apidef.APIDefinition) {
 	s.ListenPath.ExtractTo(api)
-	api.Slug = s.Slug
 
 	if s.ClientCertificates == nil {
 		s.ClientCertificates = &ClientCertificates{}
@@ -115,6 +122,15 @@ func (s *Server) ExtractTo(api *apidef.APIDefinition) {
 	}
 
 	s.DetailedActivityLogs.ExtractTo(api)
+
+	if s.DetailedTracing == nil {
+		s.DetailedTracing = &DetailedTracing{}
+		defer func() {
+			s.DetailedTracing = nil
+		}()
+	}
+
+	s.DetailedTracing.ExtractTo(api)
 }
 
 // ListenPath is the base path on Tyk to which requests for this API
@@ -232,4 +248,20 @@ func (d *DetailedActivityLogs) ExtractTo(api *apidef.APIDefinition) {
 // Fill fills *DetailedActivityLogs from apidef.APIDefinition.
 func (d *DetailedActivityLogs) Fill(api apidef.APIDefinition) {
 	d.Enabled = !api.EnableDetailedRecording
+}
+
+// DetailedTracing holds the configuration of the detailed tracing.
+type DetailedTracing struct {
+	// Enabled enables detailed tracing.
+	Enabled bool `bson:"enabled" json:"enabled"`
+}
+
+// Fill fills *DetailedTracing from apidef.APIDefinition.
+func (dt *DetailedTracing) Fill(api apidef.APIDefinition) {
+	dt.Enabled = api.DetailedTracing
+}
+
+// ExtractTo extracts *DetailedTracing into *apidef.APIDefinition.
+func (dt *DetailedTracing) ExtractTo(api *apidef.APIDefinition) {
+	api.DetailedTracing = dt.Enabled
 }

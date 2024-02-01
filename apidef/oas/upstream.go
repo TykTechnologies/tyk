@@ -3,6 +3,7 @@ package oas
 import (
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/TykTechnologies/tyk/apidef"
 )
@@ -25,6 +26,9 @@ type Upstream struct {
 
 	// CertificatePinning contains the configuration related to certificate pinning.
 	CertificatePinning *CertificatePinning `bson:"certificatePinning,omitempty" json:"certificatePinning,omitempty"`
+
+	// RateLimit contains the configuration related to API level rate limit.
+	RateLimit *RateLimit `bson:"rateLimit,omitempty" json:"rateLimit,omitempty"`
 }
 
 // Fill fills *Upstream from apidef.APIDefinition.
@@ -65,6 +69,15 @@ func (u *Upstream) Fill(api apidef.APIDefinition) {
 	u.CertificatePinning.Fill(api)
 	if ShouldOmit(u.CertificatePinning) {
 		u.CertificatePinning = nil
+	}
+
+	if u.RateLimit == nil {
+		u.RateLimit = &RateLimit{}
+	}
+
+	u.RateLimit.Fill(api)
+	if ShouldOmit(u.RateLimit) {
+		u.RateLimit = nil
 	}
 }
 
@@ -107,6 +120,15 @@ func (u *Upstream) ExtractTo(api *apidef.APIDefinition) {
 	}
 
 	u.CertificatePinning.ExtractTo(api)
+
+	if u.RateLimit == nil {
+		u.RateLimit = &RateLimit{}
+		defer func() {
+			u.RateLimit = nil
+		}()
+	}
+
+	u.RateLimit.ExtractTo(api)
 }
 
 // ServiceDiscovery holds configuration required for service discovery.
@@ -437,4 +459,64 @@ func (cp *CertificatePinning) ExtractTo(api *apidef.APIDefinition) {
 	} else {
 		api.PinnedPublicKeys = nil
 	}
+}
+
+// RateLimit holds the configurations related to rate limit.
+// The API-level rate limit applies a base-line limit on the frequency of requests to the upstream service for all endpoints. The frequency of requests is configured in two parts: the time interval and the number of requests that can be made during each interval.
+// Tyk classic API definition: `global_rate_limit`.
+type RateLimit struct {
+	// Enabled enables/disables API level rate limiting for this API.
+	//
+	// Tyk classic API definition: `!disable_rate_limit`.
+	Enabled bool `json:"enabled" bson:"enabled"`
+	// Rate specifies the number of requests that can be passed to the upstream in each time interval (`per`).
+	// This field sets the limit on the frequency of requests to ensure controlled
+	// resource access or to prevent abuse. The rate is defined as an integer value.
+	//
+	// A higher value indicates a higher number of allowed requests in the given
+	// time frame. For instance, if `Per` is set to `1m` (one minute), a Rate of `100`
+	// means up to 100 requests can be made per minute.
+	//
+	// Tyk classic API definition: `global_rate_limit.rate`.
+	Rate int `json:"rate" bson:"rate"`
+	// Per defines the time interval for rate limiting using shorthand notation.
+	// The value of Per is a string that specifies the interval in a compact form,
+	// where hours, minutes, and seconds are denoted by 'h', 'm', and 's' respectively.
+	// Multiple units can be combined to represent the duration.
+	//
+	// Examples of valid shorthand notations:
+	// - "1h"   : one hour
+	// - "20m"  : twenty minutes
+	// - "30s"  : thirty seconds
+	// - "1m29s": one minute and twenty-nine seconds
+	// - "1h30m" : one hour and thirty minutes
+	//
+	// An empty value is interpreted as "0s", implying no rate limiting interval effectively disabling the API-level rate limit.
+	// It's important to format the string correctly, as invalid formats will
+	// be considered as 0s/empty.
+	//
+	// Tyk classic API definition: `global_rate_limit.per`.
+	Per string `json:"per" bson:"per"`
+}
+
+// Fill fills *RateLimit from apidef.APIDefinition.
+func (r *RateLimit) Fill(api apidef.APIDefinition) {
+	r.Enabled = !api.DisableRateLimit
+	r.Rate = int(api.GlobalRateLimit.Rate)
+	if per := api.GlobalRateLimit.Per; per != 0 {
+		perDuration := time.Duration(per) * time.Second
+		r.Per = perDuration.String()
+	}
+}
+
+// ExtractTo extracts *Ratelimit into *apidef.APIDefinition.
+func (r *RateLimit) ExtractTo(api *apidef.APIDefinition) {
+	api.DisableRateLimit = !r.Enabled
+	api.GlobalRateLimit.Rate = float64(r.Rate)
+	perDuration, err := time.ParseDuration(r.Per)
+	if err != nil {
+		perDuration = 0
+	}
+
+	api.GlobalRateLimit.Per = perDuration.Seconds()
 }

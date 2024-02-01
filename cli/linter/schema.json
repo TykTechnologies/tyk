@@ -1183,6 +1183,10 @@
           "minimum": 0
         }
       }
+    },
+    "oas_config": {
+      "validate_examples": false,
+      "validate_schema_defaults": false
     }
   }
 }

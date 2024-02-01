@@ -139,6 +139,8 @@ func ValidateOASTemplate(documentBody []byte, oasVersion string) error {
 		return err
 	}
 
+	oasSchema = jsonparser.Delete(oasSchema, keyProperties, ExtensionTykAPIGateway, keyRequired)
+
 	definitions, _, _, err := jsonparser.Get(oasSchema, keyDefinitions)
 	if err != nil {
 		return err
