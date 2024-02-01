@@ -44,7 +44,12 @@ We’ll install Tyk, add auth, analytics, quotas and rate limiting to your API i
 
 We recommend “[Tyk Gateway Docker](https://github.com/TykTechnologies/tyk-gateway-docker#start-up-the-deployment)” as the quickest way to get started now. Later, you can move to one of our other [supported distributions](https://tyk.io/docs/apim/open-source/installation/) if you prefer.
 
-#### Step 1 - Clone the docker-compose repository
+#### Running GitHub Actions Workflow
+
+To run the GitHub Actions workflow with Tyk API Gateway, follow these steps:
+
+1. Make a commit to the `master` branch.
+2. Push the commit to GitHub.
 ```console
 git clone https://github.com/TykTechnologies/tyk-gateway-docker
 ```
@@ -54,14 +59,29 @@ git clone https://github.com/TykTechnologies/tyk-gateway-docker
 cd tyk-gateway-docker
 ```
 
-#### Step 3 - Deploy Tyk Gateway and Redis
+#### #### Triggering the Workflow
+
+The workflow is triggered automatically on push to the `master` branch and on pull requests to the `master` branch.
 ```console
 docker-compose up
 ```
 
 You can run this in detach mode use the `-d` flag: `docker-compose up -d`
 
-**Congratulations, you’re done!**
+**### Required Environment Variables
+
+No specific environment variables are required for the workflow.
+
+### Troubleshooting
+
+If you encounter issues with the GitHub Actions run, consider the following troubleshooting steps:
+
+- Check the build and test logs for error messages.
+- Ensure that the necessary dependencies are installed.
+- Review the workflow configuration for any errors or misconfigurations.
+- Check for network connectivity issues during the workflow run.
+
+Congratulations, you’re done!**
 
 Your Tyk Gateway is now configured and ready to use. Confirm this by checking against the ‘hello’ endpoint:
 ```console
