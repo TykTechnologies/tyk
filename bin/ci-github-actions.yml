@@ -1,4 +1,4 @@
-name: CI/CD Pipeline
+name: Tyk API Gateway Workflow
 
 on:
   push:
@@ -27,6 +27,13 @@ jobs:
       - name: Test
         run: go test ./...
 
+      - name: Install dependencies
+        run: |
+          # Add installation steps here
+      - name: Build Tyk API Gateway
+        run: make build
+      - name: Test Tyk API Gateway
+        run: make test
       - name: Deploy
         run: |
           # Add deployment steps here
