@@ -59,6 +59,12 @@ func (rc *RedisController) enabled() bool {
 	}
 	return ok
 }
+	ok := true
+	if v := rc.disableRedis.Load(); v != nil {
+		ok = !v.(bool)
+	}
+	return ok
+}
 
 // Connected returns true if we are connected to redis
 func (rc *RedisController) Connected() bool {
