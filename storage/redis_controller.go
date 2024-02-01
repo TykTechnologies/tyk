@@ -114,7 +114,20 @@ func (rc *RedisController) connectSingleton(cache, analytics bool, conf config.C
 		rc.singleAnalyticsPool = NewRedisClusterPool(cache, analytics, conf)
 		return true
 	}
-	rc.singlePool = NewRedisClusterPool(cache, analytics, conf)
+
+	// Retry connection with exponential backoff
+	err := backoff.Retry(func() error {
+		rc.singlePool = NewRedisClusterPool(cache, analytics, conf)
+		if clusterConnectionIsOpen(&RedisCluster{RedisController: rc, IsCache: cache, IsAnalytics: analytics}) {
+			return nil
+		}
+		return errors.New("connection failed")
+	}, getExponentialBackoff())
+
+	if err != nil {
+		return false
+	}
+
 	return true
 }
 
