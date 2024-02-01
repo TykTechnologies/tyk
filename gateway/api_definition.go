@@ -535,8 +535,11 @@ func (a APIDefinitionLoader) FromDashboardService(endpoint string) ([]*APISpec, 
 	// Extract tagged APIs#
 	list := &nestedApiDefinitionList{}
 	if err := json.NewDecoder(resp.Body).Decode(&list); err != nil {
-		body, _ := ioutil.ReadAll(resp.Body)
-		return nil, fmt.Errorf("failed to decode body: %v body was: %v", err, string(body))
+		body, errRead := ioutil.ReadAll(resp.Body)
+		if errRead != nil {
+			return nil, fmt.Errorf("failed to decode body: %w body was: %v", err, errRead)
+		}
+		return nil, fmt.Errorf("failed to decode body: %w body was: %v", err, string(body))
 	}
 
 	// Extract tagged entries only

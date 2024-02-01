@@ -581,7 +581,7 @@ func (r *RPCStorageHandler) DeleteKeys(keys []string) bool {
 }
 
 // StartPubSubHandler will listen for a signal and run the callback with the message
-func (r *RPCStorageHandler) StartPubSubHandler(channel string, callback func(*model.Message)) error {
+func (r *RPCStorageHandler) StartPubSubHandler(_ string, _ func(*model.Message)) error {
 	log.Warning("RPCStorageHandler.StartPubSubHandler - NO PUBSUB DEFINED")
 	return nil
 }
