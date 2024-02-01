@@ -1313,3 +1313,23 @@ func (cb *CircuitBreaker) ExtractTo(circuitBreaker *apidef.CircuitBreakerMeta) {
 	circuitBreaker.ReturnToServiceAfter = cb.CoolDownPeriod
 	circuitBreaker.DisableHalfOpenState = !cb.HalfOpenStateEnabled
 }
+
+// RequestSizeLimit limits the maximum allowed size of the request body in bytes.
+type RequestSizeLimit struct {
+	// Enabled enables the Request Size Limit functionality.
+	Enabled bool `bson:"enabled" json:"enabled"`
+	// Value is the maximum allowed size of the request body in bytes.
+	Value int64 `bson:"value" json:"value"`
+}
+
+// Fill fills *RequestSizeLimit from apidef.RequestSizeMeta.
+func (r *RequestSizeLimit) Fill(meta apidef.RequestSizeMeta) {
+	r.Enabled = !meta.Disabled
+	r.Value = meta.SizeLimit
+}
+
+// ExtractTo extracts *RequestSizeLimiter into *apidef.RequestSizeMeta.
+func (r *RequestSizeLimit) ExtractTo(meta *apidef.RequestSizeMeta) {
+	meta.Disabled = !r.Enabled
+	meta.SizeLimit = r.Value
+}

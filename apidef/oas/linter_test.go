@@ -58,6 +58,8 @@ func TestXTykGateway_Lint(t *testing.T) {
 		for idx, _ := range settings.Middleware.Operations {
 			settings.Middleware.Operations[idx].CircuitBreaker.Threshold = 0.5
 		}
+
+		settings.Upstream.RateLimit.Per = "10s"
 	}
 
 	// Encode data to json
