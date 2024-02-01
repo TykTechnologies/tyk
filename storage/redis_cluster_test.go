@@ -868,3 +868,1050 @@ func TestGetKeys(t *testing.T) {
 		mockKv.AssertExpectations(t)
 	})
 }
+
+func TestGetKeysAndValuesWithFilter(t *testing.T) {
+	t.Run("storage disconnected", func(t *testing.T) {
+		storage := &RedisCluster{ConnectionHandler: rc}
+		storage.ConnectionHandler.storageUp.Store(false)
+		mockKv := tempmocks.NewKeyValue(t)
+		storage.kvStorage = mockKv
+
+		defer storage.ConnectionHandler.storageUp.Store(true)
+
+		res := storage.GetKeysAndValuesWithFilter("filter")
+		assert.Equal(t, map[string]string(map[string]string(nil)), res)
+		mockKv.AssertExpectations(t)
+	})
+	t.Run("keys found without prefix", func(t *testing.T) {
+		storage := &RedisCluster{ConnectionHandler: rc}
+		mockKv := tempmocks.NewKeyValue(t)
+		storage.kvStorage = mockKv
+		mockKv.On("GetKeysAndValuesWithFilter", mock.Anything, "key").Return(map[string]interface{}{"key1": "value1", "key2": "value2"}, nil)
+
+		res := storage.GetKeysAndValuesWithFilter("key")
+		assert.Equal(t, map[string]string{"key1": "value1", "key2": "value2"}, res)
+		mockKv.AssertExpectations(t)
+	})
+	t.Run("keys found with prefix", func(t *testing.T) {
+		storage := &RedisCluster{ConnectionHandler: rc, KeyPrefix: "prefix:"}
+		mockKv := tempmocks.NewKeyValue(t)
+		storage.kvStorage = mockKv
+		mockKv.On("GetKeysAndValuesWithFilter", mock.Anything, "prefix:key").Return(map[string]interface{}{"prefix:key1": "value1", "prefix:key2": "value2"}, nil)
+
+		res := storage.GetKeysAndValuesWithFilter("key")
+		assert.Equal(t, map[string]string{"key1": "value1", "key2": "value2"}, res)
+		mockKv.AssertExpectations(t)
+	})
+	t.Run("keys found with prefix without filter", func(t *testing.T) {
+		storage := &RedisCluster{ConnectionHandler: rc, KeyPrefix: "prefix:"}
+		mockKv := tempmocks.NewKeyValue(t)
+		storage.kvStorage = mockKv
+		mockKv.On("GetKeysAndValuesWithFilter", mock.Anything, "").Return(map[string]interface{}{"prefix:key1": "value1", "prefix:key2": "value2"}, nil)
+
+		res := storage.GetKeysAndValuesWithFilter("")
+		assert.Equal(t, map[string]string{"key1": "value1", "key2": "value2"}, res)
+		mockKv.AssertExpectations(t)
+	})
+	t.Run("key not found", func(t *testing.T) {
+		storage := &RedisCluster{ConnectionHandler: rc}
+		mockKv := tempmocks.NewKeyValue(t)
+		storage.kvStorage = mockKv
+		mockKv.On("GetKeysAndValuesWithFilter", mock.Anything, "test").Return(map[string]interface{}{}, ErrKeyNotFound)
+
+		res := storage.GetKeysAndValuesWithFilter("test")
+		assert.Equal(t, map[string]string(map[string]string(nil)), res)
+		mockKv.AssertExpectations(t)
+	})
+}
+
+func TestGetKeysAndValues(t *testing.T) {
+	t.Run("storage disconnected", func(t *testing.T) {
+		storage := &RedisCluster{ConnectionHandler: rc}
+		storage.ConnectionHandler.storageUp.Store(false)
+		mockKv := tempmocks.NewKeyValue(t)
+		storage.kvStorage = mockKv
+
+		defer storage.ConnectionHandler.storageUp.Store(true)
+
+		res := storage.GetKeysAndValues()
+		assert.Equal(t, map[string]string(map[string]string(nil)), res)
+		mockKv.AssertExpectations(t)
+	})
+	t.Run("keys found with prefix", func(t *testing.T) {
+		storage := &RedisCluster{ConnectionHandler: rc, KeyPrefix: "prefix:"}
+		mockKv := tempmocks.NewKeyValue(t)
+		storage.kvStorage = mockKv
+		mockKv.On("GetKeysAndValuesWithFilter", mock.Anything, "").Return(map[string]interface{}{"prefix:key1": "value1", "prefix:key2": "value2"}, nil)
+
+		res := storage.GetKeysAndValues()
+		assert.Equal(t, map[string]string{"key1": "value1", "key2": "value2"}, res)
+		mockKv.AssertExpectations(t)
+	})
+	t.Run("key not found", func(t *testing.T) {
+		storage := &RedisCluster{ConnectionHandler: rc}
+		mockKv := tempmocks.NewKeyValue(t)
+		storage.kvStorage = mockKv
+		mockKv.On("GetKeysAndValuesWithFilter", mock.Anything, "").Return(map[string]interface{}{}, ErrKeyNotFound)
+
+		res := storage.GetKeysAndValues()
+		assert.Equal(t, map[string]string(map[string]string(nil)), res)
+		mockKv.AssertExpectations(t)
+	})
+}
+
+func TestDeleteKey(t *testing.T) {
+	t.Run("storage disconnected", func(t *testing.T) {
+		storage := &RedisCluster{ConnectionHandler: rc}
+		storage.ConnectionHandler.storageUp.Store(false)
+		mockKv := tempmocks.NewKeyValue(t)
+		storage.kvStorage = mockKv
+		defer storage.ConnectionHandler.storageUp.Store(true)
+
+		deleted := storage.DeleteKey("key")
+		assert.False(t, deleted)
+
+		mockKv.AssertExpectations(t)
+	})
+	t.Run("delete ok", func(t *testing.T) {
+		storage := &RedisCluster{ConnectionHandler: rc}
+		mockKv := tempmocks.NewKeyValue(t)
+		storage.kvStorage = mockKv
+		mockKv.On("Delete", mock.Anything, "key").Return(nil)
+
+		deleted := storage.DeleteKey("key")
+		assert.True(t, deleted)
+		mockKv.AssertExpectations(t)
+	})
+	t.Run("delete ok with prefix", func(t *testing.T) {
+		storage := &RedisCluster{ConnectionHandler: rc, KeyPrefix: "prefix:"}
+		mockKv := tempmocks.NewKeyValue(t)
+		storage.kvStorage = mockKv
+		mockKv.On("Delete", mock.Anything, "prefix:key").Return(nil)
+
+		deleted := storage.DeleteKey("key")
+		assert.True(t, deleted)
+		mockKv.AssertExpectations(t)
+	})
+	t.Run("key not found", func(t *testing.T) {
+		storage := &RedisCluster{ConnectionHandler: rc}
+		mockKv := tempmocks.NewKeyValue(t)
+		storage.kvStorage = mockKv
+		mockKv.On("Delete", mock.Anything, "key").Return(ErrKeyNotFound)
+
+		deleted := storage.DeleteKey("key")
+		assert.False(t, deleted)
+		mockKv.AssertExpectations(t)
+	})
+}
+
+func TestDeleteAllKeys(t *testing.T) {
+	t.Run("storage disconnected", func(t *testing.T) {
+		storage := &RedisCluster{ConnectionHandler: rc}
+		storage.ConnectionHandler.storageUp.Store(false)
+		mockFlusher := tempmocks.NewFlusher(t)
+		storage.flusherStorage = mockFlusher
+		defer storage.ConnectionHandler.storageUp.Store(true)
+
+		deleted := storage.DeleteAllKeys()
+		assert.False(t, deleted)
+
+		mockFlusher.AssertExpectations(t)
+	})
+	t.Run("flush ok", func(t *testing.T) {
+		storage := &RedisCluster{ConnectionHandler: rc}
+		mockFlusher := tempmocks.NewFlusher(t)
+		storage.flusherStorage = mockFlusher
+		mockFlusher.On("FlushAll", mock.Anything).Return(nil)
+
+		deleted := storage.DeleteAllKeys()
+		assert.True(t, deleted)
+		mockFlusher.AssertExpectations(t)
+	})
+	t.Run("err flushing", func(t *testing.T) {
+		storage := &RedisCluster{ConnectionHandler: rc}
+		mockFlusher := tempmocks.NewFlusher(t)
+		storage.flusherStorage = mockFlusher
+		mockFlusher.On("FlushAll", mock.Anything).Return(errors.New("err flushing"))
+
+		deleted := storage.DeleteAllKeys()
+		assert.False(t, deleted)
+		mockFlusher.AssertExpectations(t)
+	})
+}
+
+func TestDeleteRawKey(t *testing.T) {
+	t.Run("storage disconnected", func(t *testing.T) {
+		storage := &RedisCluster{ConnectionHandler: rc}
+		storage.ConnectionHandler.storageUp.Store(false)
+		mockKv := tempmocks.NewKeyValue(t)
+		storage.kvStorage = mockKv
+		defer storage.ConnectionHandler.storageUp.Store(true)
+
+		deleted := storage.DeleteRawKey("key")
+		assert.False(t, deleted)
+
+		mockKv.AssertExpectations(t)
+	})
+	t.Run("delete ok", func(t *testing.T) {
+		storage := &RedisCluster{ConnectionHandler: rc}
+		mockKv := tempmocks.NewKeyValue(t)
+		storage.kvStorage = mockKv
+		mockKv.On("Delete", mock.Anything, "key").Return(nil)
+
+		deleted := storage.DeleteRawKey("key")
+		assert.True(t, deleted)
+		mockKv.AssertExpectations(t)
+	})
+	t.Run("delete ok with prefix", func(t *testing.T) {
+		storage := &RedisCluster{ConnectionHandler: rc, KeyPrefix: "prefix:"}
+		mockKv := tempmocks.NewKeyValue(t)
+		storage.kvStorage = mockKv
+		mockKv.On("Delete", mock.Anything, "key").Return(nil)
+
+		deleted := storage.DeleteRawKey("key")
+		assert.True(t, deleted)
+		mockKv.AssertExpectations(t)
+	})
+	t.Run("key not found", func(t *testing.T) {
+		storage := &RedisCluster{ConnectionHandler: rc}
+		mockKv := tempmocks.NewKeyValue(t)
+		storage.kvStorage = mockKv
+		mockKv.On("Delete", mock.Anything, "key").Return(ErrKeyNotFound)
+
+		deleted := storage.DeleteRawKey("key")
+		assert.False(t, deleted)
+		mockKv.AssertExpectations(t)
+	})
+}
+
+func TestDeleteScanMatch(t *testing.T) {
+	t.Run("storage disconnected", func(t *testing.T) {
+		storage := &RedisCluster{ConnectionHandler: rc}
+		storage.ConnectionHandler.storageUp.Store(false)
+		mockKv := tempmocks.NewKeyValue(t)
+		storage.kvStorage = mockKv
+		defer storage.ConnectionHandler.storageUp.Store(true)
+
+		deleted := storage.DeleteScanMatch("key")
+		assert.False(t, deleted)
+
+		mockKv.AssertExpectations(t)
+	})
+	t.Run("delete ok", func(t *testing.T) {
+		storage := &RedisCluster{ConnectionHandler: rc}
+		mockKv := tempmocks.NewKeyValue(t)
+		storage.kvStorage = mockKv
+		mockKv.On("DeleteScanMatch", mock.Anything, "key").Return(int64(3), nil)
+
+		deleted := storage.DeleteScanMatch("key")
+		assert.True(t, deleted)
+		mockKv.AssertExpectations(t)
+	})
+	t.Run("delete ok with prefix", func(t *testing.T) {
+		storage := &RedisCluster{ConnectionHandler: rc, KeyPrefix: "prefix:"}
+		mockKv := tempmocks.NewKeyValue(t)
+		storage.kvStorage = mockKv
+		mockKv.On("DeleteScanMatch", mock.Anything, "key").Return(int64(3), nil)
+
+		deleted := storage.DeleteScanMatch("key")
+		assert.True(t, deleted)
+		mockKv.AssertExpectations(t)
+	})
+	t.Run("key not found", func(t *testing.T) {
+		storage := &RedisCluster{ConnectionHandler: rc}
+		mockKv := tempmocks.NewKeyValue(t)
+		storage.kvStorage = mockKv
+		mockKv.On("DeleteScanMatch", mock.Anything, "key").Return(int64(0), ErrKeyNotFound)
+
+		deleted := storage.DeleteScanMatch("key")
+		assert.False(t, deleted)
+		mockKv.AssertExpectations(t)
+	})
+}
+
+func TestDeleteKeys(t *testing.T) {
+	t.Run("storage disconnected", func(t *testing.T) {
+		storage := &RedisCluster{ConnectionHandler: rc}
+		storage.ConnectionHandler.storageUp.Store(false)
+		mockKv := tempmocks.NewKeyValue(t)
+		storage.kvStorage = mockKv
+		defer storage.ConnectionHandler.storageUp.Store(true)
+
+		deleted := storage.DeleteKeys([]string{"key"})
+		assert.False(t, deleted)
+
+		mockKv.AssertExpectations(t)
+	})
+	t.Run("delete ok", func(t *testing.T) {
+		storage := &RedisCluster{ConnectionHandler: rc}
+		mockKv := tempmocks.NewKeyValue(t)
+		storage.kvStorage = mockKv
+		mockKv.On("DeleteKeys", mock.Anything, []string{"key", "key2"}).Return(int64(3), nil)
+
+		deleted := storage.DeleteKeys([]string{"key", "key2"})
+		assert.True(t, deleted)
+		mockKv.AssertExpectations(t)
+	})
+	t.Run("delete ok with prefix", func(t *testing.T) {
+		storage := &RedisCluster{ConnectionHandler: rc, KeyPrefix: "prefix:"}
+		mockKv := tempmocks.NewKeyValue(t)
+		storage.kvStorage = mockKv
+		mockKv.On("DeleteKeys", mock.Anything, []string{"prefix:key", "prefix:key2"}).Return(int64(3), nil)
+
+		deleted := storage.DeleteKeys([]string{"key", "key2"})
+		assert.True(t, deleted)
+		mockKv.AssertExpectations(t)
+	})
+
+	t.Run("delete ok - but none deleted", func(t *testing.T) {
+		storage := &RedisCluster{ConnectionHandler: rc, KeyPrefix: "prefix:"}
+		mockKv := tempmocks.NewKeyValue(t)
+		storage.kvStorage = mockKv
+		mockKv.On("DeleteKeys", mock.Anything, []string{"prefix:key", "prefix:key2"}).Return(int64(0), nil)
+
+		deleted := storage.DeleteKeys([]string{"key", "key2"})
+		assert.False(t, deleted)
+		mockKv.AssertExpectations(t)
+	})
+	t.Run("error deleting", func(t *testing.T) {
+		storage := &RedisCluster{ConnectionHandler: rc}
+		mockKv := tempmocks.NewKeyValue(t)
+		storage.kvStorage = mockKv
+		mockKv.On("DeleteKeys", mock.Anything, mock.Anything).Return(int64(0), ErrKeyNotFound)
+
+		deleted := storage.DeleteKeys([]string{"key"})
+		assert.False(t, deleted)
+		mockKv.AssertExpectations(t)
+	})
+}
+
+func TestGetAndDeleteSet(t *testing.T) {
+	t.Run("storage disconnected", func(t *testing.T) {
+		storage := &RedisCluster{ConnectionHandler: rc}
+		storage.ConnectionHandler.storageUp.Store(false)
+		mockList := tempmocks.NewList(t)
+		storage.listStorage = mockList
+		defer storage.ConnectionHandler.storageUp.Store(true)
+
+		result := storage.GetAndDeleteSet("key")
+		assert.Nil(t, result)
+		mockList.AssertExpectations(t)
+	})
+	t.Run("get and delete set", func(t *testing.T) {
+		storage := &RedisCluster{ConnectionHandler: rc}
+		mockList := tempmocks.NewList(t)
+		storage.listStorage = mockList
+		keyName := "key"
+		fixedKey := storage.fixKey(keyName)
+		mockList.On("Pop", mock.Anything, fixedKey, int64(-1)).Return([]string{"value1", "value2"}, nil)
+
+		result := storage.GetAndDeleteSet("key")
+		assert.Equal(t, []interface{}{"value1", "value2"}, result)
+		mockList.AssertExpectations(t)
+	})
+	t.Run("get and delete set with prefix", func(t *testing.T) {
+		storage := &RedisCluster{ConnectionHandler: rc, KeyPrefix: "prefix:"}
+		mockList := tempmocks.NewList(t)
+		storage.listStorage = mockList
+		keyName := "key"
+		fixedKey := storage.fixKey(keyName)
+		mockList.On("Pop", mock.Anything, fixedKey, int64(-1)).Return([]string{"value1", "value2"}, nil)
+
+		result := storage.GetAndDeleteSet("key")
+		assert.Equal(t, []interface{}{"value1", "value2"}, result)
+		mockList.AssertExpectations(t)
+	})
+	t.Run("empty set", func(t *testing.T) {
+		storage := &RedisCluster{ConnectionHandler: rc}
+		mockList := tempmocks.NewList(t)
+		storage.listStorage = mockList
+		keyName := "key"
+		fixedKey := storage.fixKey(keyName)
+		mockList.On("Pop", mock.Anything, fixedKey, int64(-1)).Return([]string{}, nil)
+
+		result := storage.GetAndDeleteSet("key")
+		assert.Equal(t, []interface{}{}, result)
+		mockList.AssertExpectations(t)
+	})
+	t.Run("error popping set", func(t *testing.T) {
+		storage := &RedisCluster{ConnectionHandler: rc}
+		mockList := tempmocks.NewList(t)
+		storage.listStorage = mockList
+		keyName := "key"
+		fixedKey := storage.fixKey(keyName)
+		mockList.On("Pop", mock.Anything, fixedKey, int64(-1)).Return(nil, errors.New("error popping set"))
+
+		result := storage.GetAndDeleteSet("key")
+		assert.Nil(t, result)
+		mockList.AssertExpectations(t)
+	})
+}
+
+func TestAppendToSet(t *testing.T) {
+	t.Run("storage disconnected", func(t *testing.T) {
+		storage := &RedisCluster{ConnectionHandler: rc}
+		storage.ConnectionHandler.storageUp.Store(false)
+		mockList := tempmocks.NewList(t)
+		storage.listStorage = mockList
+		keyName := "key"
+		value := "value"
+		defer storage.ConnectionHandler.storageUp.Store(true)
+
+		storage.AppendToSet(keyName, value)
+		mockList.AssertExpectations(t)
+	})
+	t.Run("append to set", func(t *testing.T) {
+		storage := &RedisCluster{ConnectionHandler: rc}
+		mockList := tempmocks.NewList(t)
+		storage.listStorage = mockList
+		keyName := "key"
+		value := "value"
+		fixedKey := storage.fixKey(keyName)
+		mockList.On("Append", mock.Anything, false, fixedKey, []byte(value)).Return(nil)
+
+		storage.AppendToSet(keyName, value)
+		mockList.AssertExpectations(t)
+	})
+	t.Run("append to set with prefix", func(t *testing.T) {
+		storage := &RedisCluster{ConnectionHandler: rc, KeyPrefix: "prefix:"}
+		mockList := tempmocks.NewList(t)
+		storage.listStorage = mockList
+		keyName := "key"
+		value := "value"
+		fixedKey := storage.fixKey(keyName)
+		mockList.On("Append", mock.Anything, false, fixedKey, []byte(value)).Return(nil)
+
+		storage.AppendToSet(keyName, value)
+		mockList.AssertExpectations(t)
+	})
+	t.Run("error appending to set", func(t *testing.T) {
+		storage := &RedisCluster{ConnectionHandler: rc}
+		mockList := tempmocks.NewList(t)
+		storage.listStorage = mockList
+		keyName := "key"
+		value := "value"
+		fixedKey := storage.fixKey(keyName)
+		mockList.On("Append", mock.Anything, false, fixedKey, []byte(value)).Return(errors.New("error appending to set"))
+
+		storage.AppendToSet(keyName, value)
+		mockList.AssertExpectations(t)
+	})
+}
+
+func TestExists(t *testing.T) {
+	t.Run("exists true", func(t *testing.T) {
+		storage := &RedisCluster{ConnectionHandler: rc}
+		mockKv := tempmocks.NewKeyValue(t)
+		storage.kvStorage = mockKv
+		keyName := "key"
+		fixedKey := storage.fixKey(keyName)
+		mockKv.On("Exists", mock.Anything, fixedKey).Return(true, nil)
+
+		exists, err := storage.Exists(keyName)
+		assert.NoError(t, err)
+		assert.True(t, exists)
+		mockKv.AssertExpectations(t)
+	})
+	t.Run("exists false", func(t *testing.T) {
+		storage := &RedisCluster{ConnectionHandler: rc}
+		mockKv := tempmocks.NewKeyValue(t)
+		storage.kvStorage = mockKv
+		keyName := "key"
+		fixedKey := storage.fixKey(keyName)
+		mockKv.On("Exists", mock.Anything, fixedKey).Return(false, nil)
+
+		exists, err := storage.Exists(keyName)
+		assert.NoError(t, err)
+		assert.False(t, exists)
+		mockKv.AssertExpectations(t)
+	})
+	t.Run("storage error", func(t *testing.T) {
+		storage := &RedisCluster{ConnectionHandler: rc}
+		mockKv := tempmocks.NewKeyValue(t)
+		storage.kvStorage = mockKv
+		keyName := "key"
+		fixedKey := storage.fixKey(keyName)
+		mockKv.On("Exists", mock.Anything, fixedKey).Return(false, errors.New("storage error"))
+
+		exists, err := storage.Exists(keyName)
+		assert.Error(t, err)
+		assert.False(t, exists)
+		mockKv.AssertExpectations(t)
+	})
+	t.Run("storage disconnected", func(t *testing.T) {
+		storage := &RedisCluster{ConnectionHandler: rc}
+		storage.ConnectionHandler.storageUp.Store(false)
+		defer storage.ConnectionHandler.storageUp.Store(true)
+
+		_, err := storage.Exists("key")
+		assert.Error(t, err)
+	})
+}
+
+func TestRemoveFromList(t *testing.T) {
+	t.Run("remove from list success", func(t *testing.T) {
+		storage := &RedisCluster{ConnectionHandler: rc}
+		mockList := tempmocks.NewList(t)
+		storage.listStorage = mockList
+		keyName := "key"
+		value := "value"
+		fixedKey := storage.fixKey(keyName)
+		mockList.On("Remove", mock.Anything, fixedKey, int64(0), value).Return(int64(1), nil)
+
+		err := storage.RemoveFromList(keyName, value)
+		assert.NoError(t, err)
+		mockList.AssertExpectations(t)
+	})
+
+	t.Run("remove from list key not found", func(t *testing.T) {
+		storage := &RedisCluster{ConnectionHandler: rc}
+		mockList := tempmocks.NewList(t)
+		storage.listStorage = mockList
+		keyName := "key"
+		value := "value"
+		fixedKey := storage.fixKey(keyName)
+		mockList.On("Remove", mock.Anything, fixedKey, int64(0), value).Return(int64(0), nil)
+
+		err := storage.RemoveFromList(keyName, value)
+		assert.NoError(t, err)
+		mockList.AssertExpectations(t)
+	})
+
+	t.Run("remove from list error", func(t *testing.T) {
+		storage := &RedisCluster{ConnectionHandler: rc}
+		mockList := tempmocks.NewList(t)
+		storage.listStorage = mockList
+		keyName := "key"
+		value := "value"
+		fixedKey := storage.fixKey(keyName)
+		mockList.On("Remove", mock.Anything, fixedKey, int64(0), value).Return(int64(0), errors.New("error removing from list"))
+
+		err := storage.RemoveFromList(keyName, value)
+		assert.Error(t, err)
+		mockList.AssertExpectations(t)
+	})
+
+	t.Run("storage disconnected", func(t *testing.T) {
+		storage := &RedisCluster{ConnectionHandler: rc}
+		storage.ConnectionHandler.storageUp.Store(false)
+		defer storage.ConnectionHandler.storageUp.Store(true)
+
+		err := storage.RemoveFromList("key", "value")
+		assert.Error(t, err)
+	})
+}
+
+func TestGetListRange(t *testing.T) {
+	t.Run("get list range success", func(t *testing.T) {
+		storage := &RedisCluster{ConnectionHandler: rc}
+		mockList := tempmocks.NewList(t)
+		storage.listStorage = mockList
+		keyName := "key"
+		from := int64(0)
+		to := int64(10)
+		fixedKey := storage.fixKey(keyName)
+		expectedRange := []string{"value1", "value2", "value3"}
+		mockList.On("Range", mock.Anything, fixedKey, from, to).Return(expectedRange, nil)
+
+		result, err := storage.GetListRange(keyName, from, to)
+		assert.NoError(t, err)
+		assert.Equal(t, expectedRange, result)
+		mockList.AssertExpectations(t)
+	})
+
+	t.Run("get list range empty", func(t *testing.T) {
+		storage := &RedisCluster{ConnectionHandler: rc}
+		mockList := tempmocks.NewList(t)
+		storage.listStorage = mockList
+		keyName := "key"
+		from := int64(0)
+		to := int64(10)
+		fixedKey := storage.fixKey(keyName)
+		mockList.On("Range", mock.Anything, fixedKey, from, to).Return([]string{}, nil)
+
+		result, err := storage.GetListRange(keyName, from, to)
+		assert.NoError(t, err)
+		assert.Empty(t, result)
+		mockList.AssertExpectations(t)
+	})
+
+	t.Run("get list range error", func(t *testing.T) {
+		storage := &RedisCluster{ConnectionHandler: rc}
+		mockList := tempmocks.NewList(t)
+		storage.listStorage = mockList
+		keyName := "key"
+		from := int64(0)
+		to := int64(10)
+		fixedKey := storage.fixKey(keyName)
+		mockList.On("Range", mock.Anything, fixedKey, from, to).Return(nil, errors.New("error getting list range"))
+
+		result, err := storage.GetListRange(keyName, from, to)
+		assert.Error(t, err)
+		assert.Nil(t, result)
+		mockList.AssertExpectations(t)
+	})
+
+	t.Run("storage disconnected", func(t *testing.T) {
+		storage := &RedisCluster{ConnectionHandler: rc}
+		storage.ConnectionHandler.storageUp.Store(false)
+		defer storage.ConnectionHandler.storageUp.Store(true)
+
+		result, err := storage.GetListRange("key", 0, 10)
+		assert.Error(t, err)
+		assert.Equal(t, []string{}, result)
+	})
+}
+
+func TestAppendToSetPipelined(t *testing.T) {
+	t.Run("append to set pipelined success", func(t *testing.T) {
+		storage := &RedisCluster{ConnectionHandler: rc}
+		mockList := tempmocks.NewList(t)
+		storage.listStorage = mockList
+		keyName := "key"
+		values := [][]byte{[]byte("value1"), []byte("value2")}
+		fixedKey := storage.fixKey(keyName)
+		mockList.On("Append", mock.Anything, true, fixedKey, values[0], values[1]).Return(nil)
+
+		storage.AppendToSetPipelined(keyName, values)
+		mockList.AssertExpectations(t)
+	})
+
+	t.Run("append to set pipelined with no values", func(t *testing.T) {
+		storage := &RedisCluster{ConnectionHandler: rc}
+		mockList := tempmocks.NewList(t)
+		storage.listStorage = mockList
+		keyName := "key"
+		values := [][]byte{}
+
+		storage.AppendToSetPipelined(keyName, values)
+		mockList.AssertExpectations(t)
+	})
+
+	t.Run("append to set pipelined error", func(t *testing.T) {
+		storage := &RedisCluster{ConnectionHandler: rc}
+		mockList := tempmocks.NewList(t)
+		storage.listStorage = mockList
+		keyName := "key"
+		values := [][]byte{[]byte("value1"), []byte("value2")}
+		fixedKey := storage.fixKey(keyName)
+		mockList.On("Append", mock.Anything, true, fixedKey, values[0], values[1]).Return(errors.New("error appending to set"))
+
+		storage.AppendToSetPipelined(keyName, values)
+		mockList.AssertExpectations(t)
+	})
+
+	t.Run("storage disconnected", func(t *testing.T) {
+		storage := &RedisCluster{ConnectionHandler: rc}
+		storage.ConnectionHandler.storageUp.Store(false)
+		defer storage.ConnectionHandler.storageUp.Store(true)
+
+		storage.AppendToSetPipelined("key", [][]byte{[]byte("value")})
+	})
+}
+
+func TestGetSet(t *testing.T) {
+	t.Run("get set success", func(t *testing.T) {
+		storage := &RedisCluster{ConnectionHandler: rc}
+		mockSet := tempmocks.NewSet(t)
+		storage.setStorage = mockSet
+		keyName := "key"
+		fixedKey := storage.fixKey(keyName)
+		expectedSet := map[string]string{"0": "value1", "1": "value2"}
+		mockSet.On("Members", mock.Anything, fixedKey).Return([]string{"value1", "value2"}, nil)
+
+		result, err := storage.GetSet(keyName)
+		assert.NoError(t, err)
+		assert.Equal(t, expectedSet, result)
+		mockSet.AssertExpectations(t)
+	})
+
+	t.Run("get set empty", func(t *testing.T) {
+		storage := &RedisCluster{ConnectionHandler: rc}
+		mockSet := tempmocks.NewSet(t)
+		storage.setStorage = mockSet
+		keyName := "key"
+		fixedKey := storage.fixKey(keyName)
+		mockSet.On("Members", mock.Anything, fixedKey).Return([]string{}, nil)
+
+		result, err := storage.GetSet(keyName)
+		assert.NoError(t, err)
+		assert.Empty(t, result)
+		mockSet.AssertExpectations(t)
+	})
+
+	t.Run("get set error", func(t *testing.T) {
+		storage := &RedisCluster{ConnectionHandler: rc}
+		mockSet := tempmocks.NewSet(t)
+		storage.setStorage = mockSet
+		keyName := "key"
+		fixedKey := storage.fixKey(keyName)
+		mockSet.On("Members", mock.Anything, fixedKey).Return(nil, errors.New("error getting set"))
+
+		result, err := storage.GetSet(keyName)
+		assert.Error(t, err)
+		assert.Nil(t, result)
+		mockSet.AssertExpectations(t)
+	})
+
+	t.Run("storage disconnected", func(t *testing.T) {
+		storage := &RedisCluster{ConnectionHandler: rc}
+		storage.ConnectionHandler.storageUp.Store(false)
+		defer storage.ConnectionHandler.storageUp.Store(true)
+
+		result, err := storage.GetSet("key")
+		assert.Error(t, err)
+		assert.Nil(t, result)
+	})
+}
+
+func TestAddToSet(t *testing.T) {
+	t.Run("add to set success", func(t *testing.T) {
+		storage := &RedisCluster{ConnectionHandler: rc}
+		mockSet := tempmocks.NewSet(t)
+		storage.setStorage = mockSet
+		keyName := "key"
+		value := "value"
+		fixedKey := storage.fixKey(keyName)
+		mockSet.On("AddMember", mock.Anything, fixedKey, value).Return(nil)
+
+		storage.AddToSet(keyName, value)
+		mockSet.AssertExpectations(t)
+	})
+
+	t.Run("add to set error", func(t *testing.T) {
+		storage := &RedisCluster{ConnectionHandler: rc}
+		mockSet := tempmocks.NewSet(t)
+		storage.setStorage = mockSet
+		keyName := "key"
+		value := "value"
+		fixedKey := storage.fixKey(keyName)
+		mockSet.On("AddMember", mock.Anything, fixedKey, value).Return(errors.New("error adding to set"))
+
+		storage.AddToSet(keyName, value)
+		mockSet.AssertExpectations(t)
+	})
+
+	t.Run("storage disconnected", func(t *testing.T) {
+		storage := &RedisCluster{ConnectionHandler: rc}
+		storage.ConnectionHandler.storageUp.Store(false)
+		defer storage.ConnectionHandler.storageUp.Store(true)
+
+		storage.AddToSet("key", "value")
+		// Expect no calls to mockSet since the storage is disconnected
+		mockSet := tempmocks.NewSet(t)
+		storage.setStorage = mockSet
+		mockSet.AssertExpectations(t)
+	})
+}
+
+func TestRemoveFromSet(t *testing.T) {
+	t.Run("remove from set success", func(t *testing.T) {
+		storage := &RedisCluster{ConnectionHandler: rc}
+		mockSet := tempmocks.NewSet(t)
+		storage.setStorage = mockSet
+		keyName := "key"
+		value := "value"
+		fixedKey := storage.fixKey(keyName)
+		mockSet.On("RemoveMember", mock.Anything, fixedKey, value).Return(nil)
+
+		storage.RemoveFromSet(keyName, value)
+		mockSet.AssertExpectations(t)
+	})
+
+	t.Run("remove from set error", func(t *testing.T) {
+		storage := &RedisCluster{ConnectionHandler: rc}
+		mockSet := tempmocks.NewSet(t)
+		storage.setStorage = mockSet
+		keyName := "key"
+		value := "value"
+		fixedKey := storage.fixKey(keyName)
+		mockSet.On("RemoveMember", mock.Anything, fixedKey, value).Return(errors.New("error removing from set"))
+
+		storage.RemoveFromSet(keyName, value)
+		mockSet.AssertExpectations(t)
+	})
+
+	t.Run("storage disconnected", func(t *testing.T) {
+		storage := &RedisCluster{ConnectionHandler: rc}
+		storage.ConnectionHandler.storageUp.Store(false)
+		defer storage.ConnectionHandler.storageUp.Store(true)
+		mockSet := tempmocks.NewSet(t)
+		storage.setStorage = mockSet
+
+		storage.RemoveFromSet("key", "value")
+
+		// Since storage is disconnected, no calls should be made to mockSet
+		mockSet.AssertExpectations(t)
+	})
+}
+
+func TestIsMemberOfSet(t *testing.T) {
+	t.Run("is member of set true", func(t *testing.T) {
+		storage := &RedisCluster{ConnectionHandler: rc}
+		mockSet := tempmocks.NewSet(t)
+		storage.setStorage = mockSet
+		keyName := "key"
+		value := "value"
+		fixedKey := storage.fixKey(keyName)
+		mockSet.On("IsMember", mock.Anything, fixedKey, value).Return(true, nil)
+
+		isMember := storage.IsMemberOfSet(keyName, value)
+		assert.True(t, isMember)
+		mockSet.AssertExpectations(t)
+	})
+
+	t.Run("is member of set false", func(t *testing.T) {
+		storage := &RedisCluster{ConnectionHandler: rc}
+		mockSet := tempmocks.NewSet(t)
+		storage.setStorage = mockSet
+		keyName := "key"
+		value := "value"
+		fixedKey := storage.fixKey(keyName)
+		mockSet.On("IsMember", mock.Anything, fixedKey, value).Return(false, nil)
+
+		isMember := storage.IsMemberOfSet(keyName, value)
+		assert.False(t, isMember)
+		mockSet.AssertExpectations(t)
+	})
+
+	t.Run("error checking membership", func(t *testing.T) {
+		storage := &RedisCluster{ConnectionHandler: rc}
+		mockSet := tempmocks.NewSet(t)
+		storage.setStorage = mockSet
+		keyName := "key"
+		value := "value"
+		fixedKey := storage.fixKey(keyName)
+		mockSet.On("IsMember", mock.Anything, fixedKey, value).Return(false, errors.New("error checking membership"))
+
+		isMember := storage.IsMemberOfSet(keyName, value)
+		assert.False(t, isMember)
+		mockSet.AssertExpectations(t)
+	})
+
+	t.Run("storage disconnected", func(t *testing.T) {
+		storage := &RedisCluster{ConnectionHandler: rc}
+		storage.ConnectionHandler.storageUp.Store(false)
+		defer storage.ConnectionHandler.storageUp.Store(true)
+		mockSet := tempmocks.NewSet(t)
+		storage.setStorage = mockSet
+
+		isMember := storage.IsMemberOfSet("key", "value")
+		assert.False(t, isMember)
+
+		// Since storage is disconnected, no calls should be made to mockSet
+		mockSet.AssertExpectations(t)
+	})
+}
+
+func TestAddToSortedSet(t *testing.T) {
+	t.Run("add to sorted set success", func(t *testing.T) {
+		storage := &RedisCluster{ConnectionHandler: rc}
+		mockSortedSet := tempmocks.NewSortedSet(t)
+		storage.sortedSetStorage = mockSortedSet
+		keyName := "key"
+		value := "value"
+		score := 1.0
+		fixedKey := storage.fixKey(keyName)
+		mockSortedSet.On("AddScoredMember", mock.Anything, fixedKey, value, score).Return(int64(1), nil)
+
+		storage.AddToSortedSet(keyName, value, score)
+		mockSortedSet.AssertExpectations(t)
+	})
+
+	t.Run("add to sorted set error", func(t *testing.T) {
+		storage := &RedisCluster{ConnectionHandler: rc}
+		mockSortedSet := tempmocks.NewSortedSet(t)
+		storage.sortedSetStorage = mockSortedSet
+		keyName := "key"
+		value := "value"
+		score := 1.0
+		fixedKey := storage.fixKey(keyName)
+		mockSortedSet.On("AddScoredMember", mock.Anything, fixedKey, value, score).Return(int64(1), errors.New("error adding to sorted set"))
+
+		storage.AddToSortedSet(keyName, value, score)
+		mockSortedSet.AssertExpectations(t)
+	})
+
+	t.Run("storage disconnected", func(t *testing.T) {
+		storage := &RedisCluster{ConnectionHandler: rc}
+		storage.ConnectionHandler.storageUp.Store(false)
+		defer storage.ConnectionHandler.storageUp.Store(true)
+		mockSortedSet := tempmocks.NewSortedSet(t)
+		storage.sortedSetStorage = mockSortedSet
+
+		storage.AddToSortedSet("key", "value", 1.0)
+		// Since storage is disconnected, no calls should be made to mockSortedSet
+
+		mockSortedSet.AssertExpectations(t)
+	})
+}
+
+func TestGetSortedSetRange(t *testing.T) {
+	t.Run("get sorted set range success", func(t *testing.T) {
+		storage := &RedisCluster{ConnectionHandler: rc}
+		mockSortedSet := tempmocks.NewSortedSet(t)
+		storage.sortedSetStorage = mockSortedSet
+		keyName := "key"
+		scoreFrom := "-inf"
+		scoreTo := "+inf"
+		fixedKey := storage.fixKey(keyName)
+		expectedValues := []string{"value1", "value2"}
+		expectedScores := []float64{1.0, 2.0}
+		mockSortedSet.On("GetMembersByScoreRange", mock.Anything, fixedKey, scoreFrom, scoreTo).Return([]interface{}{"value1", "value2"}, expectedScores, nil)
+
+		values, scores, err := storage.GetSortedSetRange(keyName, scoreFrom, scoreTo)
+		assert.NoError(t, err)
+		assert.Equal(t, expectedValues, values)
+		assert.Equal(t, expectedScores, scores)
+		mockSortedSet.AssertExpectations(t)
+	})
+
+	t.Run("get sorted set range empty", func(t *testing.T) {
+		storage := &RedisCluster{ConnectionHandler: rc}
+		mockSortedSet := tempmocks.NewSortedSet(t)
+		storage.sortedSetStorage = mockSortedSet
+		keyName := "key"
+		scoreFrom := "-inf"
+		scoreTo := "+inf"
+		fixedKey := storage.fixKey(keyName)
+		mockSortedSet.On("GetMembersByScoreRange", mock.Anything, fixedKey, scoreFrom, scoreTo).Return([]interface{}{}, []float64{}, nil)
+
+		values, scores, err := storage.GetSortedSetRange(keyName, scoreFrom, scoreTo)
+		assert.NoError(t, err)
+		assert.Empty(t, values)
+		assert.Empty(t, scores)
+		mockSortedSet.AssertExpectations(t)
+	})
+
+	t.Run("get sorted set range error", func(t *testing.T) {
+		storage := &RedisCluster{ConnectionHandler: rc}
+		mockSortedSet := tempmocks.NewSortedSet(t)
+		storage.sortedSetStorage = mockSortedSet
+		keyName := "key"
+		scoreFrom := "-inf"
+		scoreTo := "+inf"
+		fixedKey := storage.fixKey(keyName)
+		mockSortedSet.On("GetMembersByScoreRange", mock.Anything, fixedKey, scoreFrom, scoreTo).Return(nil, nil, errors.New("error getting sorted set range"))
+
+		values, scores, err := storage.GetSortedSetRange(keyName, scoreFrom, scoreTo)
+		assert.Error(t, err)
+		assert.Nil(t, values)
+		assert.Nil(t, scores)
+		mockSortedSet.AssertExpectations(t)
+	})
+
+	t.Run("storage disconnected", func(t *testing.T) {
+		storage := &RedisCluster{ConnectionHandler: rc}
+		storage.ConnectionHandler.storageUp.Store(false)
+		defer storage.ConnectionHandler.storageUp.Store(true)
+		mockSortedSet := tempmocks.NewSortedSet(t)
+		storage.sortedSetStorage = mockSortedSet
+
+		values, scores, err := storage.GetSortedSetRange("key", "-inf", "+inf")
+		assert.Error(t, err)
+		assert.Nil(t, values)
+		assert.Nil(t, scores)
+		// Expect no calls to mockSortedSet since the storage is disconnected
+		mockSortedSet.AssertExpectations(t)
+	})
+}
+
+func TestRemoveSortedSetRange(t *testing.T) {
+	t.Run("remove sorted set range success", func(t *testing.T) {
+		storage := &RedisCluster{ConnectionHandler: rc}
+		mockSortedSet := tempmocks.NewSortedSet(t)
+		storage.sortedSetStorage = mockSortedSet
+		keyName := "key"
+		scoreFrom := "-inf"
+		scoreTo := "+inf"
+		fixedKey := storage.fixKey(keyName)
+		mockSortedSet.On("RemoveMembersByScoreRange", mock.Anything, fixedKey, scoreFrom, scoreTo).Return(int64(2), nil)
+
+		err := storage.RemoveSortedSetRange(keyName, scoreFrom, scoreTo)
+		assert.NoError(t, err)
+		mockSortedSet.AssertExpectations(t)
+	})
+
+	t.Run("remove sorted set range error", func(t *testing.T) {
+		storage := &RedisCluster{ConnectionHandler: rc}
+		mockSortedSet := tempmocks.NewSortedSet(t)
+		storage.sortedSetStorage = mockSortedSet
+		keyName := "key"
+		scoreFrom := "-inf"
+		scoreTo := "+inf"
+		fixedKey := storage.fixKey(keyName)
+		mockSortedSet.On("RemoveMembersByScoreRange", mock.Anything, fixedKey, scoreFrom, scoreTo).Return(int64(0), errors.New("error removing sorted set range"))
+
+		err := storage.RemoveSortedSetRange(keyName, scoreFrom, scoreTo)
+		assert.Error(t, err)
+		mockSortedSet.AssertExpectations(t)
+	})
+
+	t.Run("storage disconnected", func(t *testing.T) {
+		storage := &RedisCluster{ConnectionHandler: rc}
+		storage.ConnectionHandler.storageUp.Store(false)
+		defer storage.ConnectionHandler.storageUp.Store(true)
+		mockSortedSet := tempmocks.NewSortedSet(t)
+		storage.sortedSetStorage = mockSortedSet
+
+		err := storage.RemoveSortedSetRange("key", "-inf", "+inf")
+		assert.Error(t, err)
+		// Expect no calls to mockSortedSet since the storage is disconnected
+		mockSortedSet.AssertExpectations(t)
+	})
+}
+
+/*
+// ScanKeys will return all keys according to the pattern.
+
+	func (r *RedisCluster) ScanKeys(pattern string) ([]string, error) {
+		storage, err := r.kv()
+		if err != nil {
+			log.Error(err)
+			return []string{}, err
+		}
+
+		return storage.Keys(context.Background(), pattern)
+	}
+*/
+func TestScanKeys(t *testing.T) {
+	t.Run("scan keys success", func(t *testing.T) {
+		storage := &RedisCluster{ConnectionHandler: rc}
+		mockKv := tempmocks.NewKeyValue(t)
+		storage.kvStorage = mockKv
+		pattern := "prefix:*"
+		expectedKeys := []string{"prefix:key1", "prefix:key2"}
+		mockKv.On("Keys", mock.Anything, pattern).Return(expectedKeys, nil)
+
+		keys, err := storage.ScanKeys(pattern)
+		assert.NoError(t, err)
+		assert.Equal(t, expectedKeys, keys)
+		mockKv.AssertExpectations(t)
+	})
+
+	t.Run("scan keys error", func(t *testing.T) {
+		storage := &RedisCluster{ConnectionHandler: rc}
+		mockKv := tempmocks.NewKeyValue(t)
+		storage.kvStorage = mockKv
+		pattern := "prefix:*"
+		mockKv.On("Keys", mock.Anything, pattern).Return(nil, errors.New("error scanning keys"))
+
+		keys, err := storage.ScanKeys(pattern)
+		assert.Error(t, err)
+		assert.Nil(t, keys)
+		mockKv.AssertExpectations(t)
+	})
+
+	t.Run("storage disconnected", func(t *testing.T) {
+		storage := &RedisCluster{ConnectionHandler: rc}
+		storage.ConnectionHandler.storageUp.Store(false)
+		defer storage.ConnectionHandler.storageUp.Store(true)
+		mockKv := tempmocks.NewKeyValue(t)
+		storage.kvStorage = mockKv
+
+		keys, err := storage.ScanKeys("prefix:*")
+		assert.Error(t, err)
+		assert.Nil(t, keys)
+		mockKv.AssertExpectations(t)
+	})
+}

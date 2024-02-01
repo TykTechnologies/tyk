@@ -456,6 +456,10 @@ func (r *RedisCluster) GetKeysAndValuesWithFilter(filter string) map[string]stri
 		return nil
 	}
 
+	if filter != "" && !strings.Contains(filter, r.KeyPrefix) {
+		filter = r.KeyPrefix + filter
+	}
+
 	keysAndValues, err := storage.GetKeysAndValuesWithFilter(context.Background(), filter)
 	if err != nil {
 		log.Error("Error trying to get client keys: ", err)
@@ -1044,7 +1048,7 @@ func (r *RedisCluster) ScanKeys(pattern string) ([]string, error) {
 	storage, err := r.kv()
 	if err != nil {
 		log.Error(err)
-		return []string{}, err
+		return nil, err
 	}
 
 	return storage.Keys(context.Background(), pattern)
