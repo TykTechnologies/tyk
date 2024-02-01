@@ -30,6 +30,7 @@ const (
 	Analytics   = "analytics"
 )
 
+// NewConnectionHandler creates a new connection handler not connected
 func NewConnectionHandler(ctx context.Context) *ConnectionHandler {
 	return &ConnectionHandler{
 		ctx:         ctx,
@@ -38,7 +39,7 @@ func NewConnectionHandler(ctx context.Context) *ConnectionHandler {
 	}
 }
 
-// DisableRedis allows to dynamically enable/disable talking with redisW
+// DisableStorage allows to dynamically enable/disable talking with storage
 func (rc *ConnectionHandler) DisableStorage(setStorageDown bool) {
 	if setStorageDown {
 		// we make sure x set that redis is down
@@ -67,6 +68,7 @@ func (rc *ConnectionHandler) Connected() bool {
 	return false
 }
 
+// WaitConnect waits until we are connected to the storage
 func (rc *ConnectionHandler) WaitConnect(ctx context.Context) bool {
 	for {
 		select {
@@ -89,18 +91,24 @@ func (rc *ConnectionHandler) enabled() bool {
 	}
 	return ok
 }
-func (rc *ConnectionHandler) disconnect() {
+
+// Disconnect closes the connection to the storage
+func (rc *ConnectionHandler) Disconnect() error {
 	for _, v := range rc.connections {
 		if v != nil {
-			v.Disconnect(context.Background())
+			err := v.Disconnect(context.Background())
+			if err != nil {
+				return err
+			}
 		}
 	}
+	return nil
 }
 
-// ConnectToRedis starts a go routine that periodically tries to connect to
-// redis.
+// Connect starts a go routine that periodically tries to connect to
+// storage.
 //
-// onReconnect will be called when we have established a successful redis reconnection
+// onConnect will be called when we have established a successful storage reconnection
 func (rc *ConnectionHandler) Connect(ctx context.Context, onConnect func(), conf *config.Config) {
 	err := rc.initConnection(onConnect, *conf)
 	if err != nil {
@@ -152,7 +160,7 @@ func (rc *ConnectionHandler) isConnected(ctx context.Context, connType string) b
 	return false
 }
 
-// statusCheck will check the Redis status each second. If we transition from a disconnected to connected state, it will send a msg to the reconnect chan.
+// statusCheck will check the storage status each second.
 // This method will be constantly modifying the redisUp control flag.
 func (rc *ConnectionHandler) statusCheck(ctx context.Context) {
 	tick := time.NewTicker(time.Second)
@@ -163,15 +171,15 @@ func (rc *ConnectionHandler) statusCheck(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case <-tick.C:
-			//if we disabled redis - we don't want to check anything
+			// if we disabled storage - we don't want to check anything
 			if !rc.enabled() {
 				continue
 			}
 
-			//we check if the clusters are initialised and if connections are open
+			// we check if the clusters are initialised and if connections are open
 			connected := rc.isConnected(ctx, DefaultConn) && rc.isConnected(ctx, CacheConn) && rc.isConnected(ctx, Analytics)
 
-			//store the actual status of redis
+			// store the actual status of redis
 			rc.storageUp.Store(connected)
 
 		}
@@ -189,7 +197,6 @@ func (rc *ConnectionHandler) getConnection(isCache, isAnalytics bool) model.Conn
 
 // NewConnector creates a new storage connection.
 func NewConnector(connType string, onConnect func(), conf config.Config) (model.Connector, error) {
-	// redisSingletonMu is locked and we know the singleton is nil
 	cfg := conf.Storage
 	if connType == CacheConn && conf.EnableSeperateCacheStore {
 		cfg = conf.CacheStorage

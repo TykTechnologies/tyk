@@ -13,6 +13,7 @@ import (
 	tempmocks "github.com/TykTechnologies/storage/temporal/tempmocks"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/internal/redis"
+
 	"github.com/stretchr/testify/mock"
 )
 
@@ -78,7 +79,6 @@ func TestHandleReceive(t *testing.T) {
 }
 
 func TestRedisClusterGetMultiKey(t *testing.T) {
-
 	keys := []string{"first", "second"}
 	r := RedisCluster{KeyPrefix: "test-cluster", ConnectionHandler: rc}
 
@@ -103,7 +103,6 @@ func TestRedisClusterGetMultiKey(t *testing.T) {
 }
 
 func TestRedisAddressConfiguration(t *testing.T) {
-
 	t.Run("Host but no port", func(t *testing.T) {
 		cfg := config.StorageOptionsConf{Host: "host"}
 		if len(getRedisAddrs(cfg)) != 0 {
@@ -174,23 +173,22 @@ func TestRedisExpirationTime(t *testing.T) {
 	assert.Equal(t, testValue, key)
 	assert.Equal(t, nil, err)
 
-	//testing if GetExp returns -2 for non existent keys
+	// testing if GetExp returns -2 for non existent keys
 	ttl, errGetExp := storage.GetExp(testKey + "random")
 	assert.Equal(t, int64(-2), ttl)
 	assert.Equal(t, nil, errGetExp)
 
-	//testing if GetExp returns -1 for keys without expiration
+	// testing if GetExp returns -1 for keys without expiration
 	ttl, errGetExp = storage.GetExp(testKey)
 	assert.Equal(t, int64(-1), ttl)
 	assert.Equal(t, nil, errGetExp)
 
-	//Testing if SetExp actually sets the expiration.
+	// Testing if SetExp actually sets the expiration.
 	errSetExp := storage.SetExp(testKey, 40)
 	assert.Equal(t, nil, errSetExp)
 	ttl, errGetExp = storage.GetExp(testKey)
 	assert.Equal(t, int64(40), ttl)
 	assert.Equal(t, nil, errGetExp)
-
 }
 
 func TestLock(t *testing.T) {
@@ -223,7 +221,6 @@ func TestLock(t *testing.T) {
 		assert.NoError(t, err)
 		assert.True(t, ok)
 		mockedKv.AssertExpectations(t)
-
 	})
 
 	t.Run("lock failure", func(t *testing.T) {
@@ -243,7 +240,6 @@ func TestLock(t *testing.T) {
 	})
 
 	t.Run("lock error", func(t *testing.T) {
-
 		mockedKv := tempmocks.NewKeyValue(t)
 		mockedKv.On("SetIfNotExist", mock.Anything, "lock-key", "1", time.Second).Return(false, errors.ErrUnsupported)
 

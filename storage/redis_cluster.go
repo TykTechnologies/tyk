@@ -16,6 +16,8 @@ import (
 	templist "github.com/TykTechnologies/storage/temporal/list"
 	"github.com/TykTechnologies/storage/temporal/model"
 	tempqueue "github.com/TykTechnologies/storage/temporal/queue"
+
+	//nolint:misspell
 	tempset "github.com/TykTechnologies/storage/temporal/set"
 	tempsortedset "github.com/TykTechnologies/storage/temporal/sortedset"
 	redis "github.com/TykTechnologies/tyk/internal/redis"
@@ -226,7 +228,6 @@ func (r *RedisCluster) sortedSet() (model.SortedSet, error) {
 }
 
 func (r *RedisCluster) hashKey(in string) string {
-
 	if !r.HashKeys {
 		// Not hashing? Return the raw key
 		return in
@@ -268,7 +269,6 @@ func (r *RedisCluster) GetKey(keyName string) (string, error) {
 
 // GetMultiKey gets multiple keys from the database
 func (r *RedisCluster) GetMultiKey(keys []string) ([]string, error) {
-
 	storage, err := r.kv()
 	if err != nil {
 		log.Error(err)
@@ -901,7 +901,6 @@ func (r *RedisCluster) SetRollingWindow(keyName string, per int64, value_overrid
 }
 
 func (r *RedisCluster) GetRollingWindow(keyName string, per int64, pipeline bool) (int, []interface{}) {
-
 	now := time.Now()
 	onePeriodAgo := now.Add(time.Duration(-1*per) * time.Second)
 
