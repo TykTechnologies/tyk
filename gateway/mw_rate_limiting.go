@@ -70,13 +70,21 @@ func (k *RateLimitAndQuotaCheck) ProcessRequest(w http.ResponseWriter, r *http.R
 	}
 
 	session := ctxGetSession(r)
-	token := ctxGetAuthToken(r)
+	rateLimitKey := ctxGetAuthToken(r)
+
+	if pattern, found := session.MetaData["rate_limit_pattern"]; found {
+		if patternString, ok := pattern.(string); ok && patternString != "" {
+			if rateLimitKeyValue := k.Gw.replaceTykVariables(r, patternString, false); rateLimitKeyValue != "" {
+				rateLimitKey = rateLimitKeyValue
+			}
+		}
+	}
 
 	storeRef := k.Gw.GlobalSessionManager.Store()
 	reason := k.Gw.SessionLimiter.ForwardMessage(
 		r,
 		session,
-		token,
+		rateLimitKey,
 		storeRef,
 		!k.Spec.DisableRateLimit,
 		!k.Spec.DisableQuota,
@@ -100,7 +108,7 @@ func (k *RateLimitAndQuotaCheck) ProcessRequest(w http.ResponseWriter, r *http.R
 	switch reason {
 	case sessionFailNone:
 	case sessionFailRateLimit:
-		err, errCode := k.handleRateLimitFailure(r, token)
+		err, errCode := k.handleRateLimitFailure(r, rateLimitKey)
 		if throttleRetryLimit > 0 {
 			for {
 				ctxIncThrottleLevel(r, throttleRetryLimit)
@@ -109,7 +117,7 @@ func (k *RateLimitAndQuotaCheck) ProcessRequest(w http.ResponseWriter, r *http.R
 				reason = k.Gw.SessionLimiter.ForwardMessage(
 					r,
 					session,
-					token,
+					rateLimitKey,
 					storeRef,
 					!k.Spec.DisableRateLimit,
 					!k.Spec.DisableQuota,
@@ -135,7 +143,7 @@ func (k *RateLimitAndQuotaCheck) ProcessRequest(w http.ResponseWriter, r *http.R
 		return err, errCode
 
 	case sessionFailQuota:
-		return k.handleQuotaFailure(r, token)
+		return k.handleQuotaFailure(r, rateLimitKey)
 	case sessionFailInternalServerError:
 		return ProxyingRequestFailedErr, http.StatusInternalServerError
 	default:
@@ -144,7 +152,7 @@ func (k *RateLimitAndQuotaCheck) ProcessRequest(w http.ResponseWriter, r *http.R
 	}
 	// Run the trigger monitor
 	if k.Spec.GlobalConfig.Monitor.MonitorUserKeys {
-		k.Gw.SessionMonitor.Check(session, token)
+		k.Gw.SessionMonitor.Check(session, rateLimitKey)
 	}
 
 	// Request is valid, carry on

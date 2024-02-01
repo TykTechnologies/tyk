@@ -8,6 +8,12 @@ func (s *SessionState) TagsFromMetadata(data map[string]interface{}) (updateSess
 		updateSession = true
 	}
 
+	limitPattern, keyFound := data["rate_limit_pattern"].(string)
+	if keyFound {
+		s.MetaData["rate_limit_pattern"] = limitPattern
+		updateSession = true
+	}
+
 	// pteam-<id>, porg-<id>
 	clientTags, ok := data["tags"].([]interface{})
 	if ok {
