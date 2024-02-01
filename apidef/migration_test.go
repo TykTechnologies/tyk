@@ -691,6 +691,7 @@ func TestSetDisabledFlags(t *testing.T) {
 				},
 			},
 		},
+		DisableRateLimit: true,
 	}
 	apiDef.SetDisabledFlags()
 	assert.Equal(t, expectedAPIDef, apiDef)
@@ -761,4 +762,24 @@ func TestAPIDefinition_migrateResponseProcessors(t *testing.T) {
 	assert.NoError(t, err)
 
 	assert.Empty(t, base.ResponseProcessors)
+}
+
+func TestAPIDefinition_migrateGlobalRateLimit(t *testing.T) {
+	t.Run("per=0,rate=0", func(t *testing.T) {
+		base := oldTestAPI()
+		_, err := base.Migrate()
+		assert.NoError(t, err)
+
+		assert.True(t, base.DisableRateLimit)
+	})
+
+	t.Run("per!=0,rate=0", func(t *testing.T) {
+		base := oldTestAPI()
+		base.GlobalRateLimit.Per = 120
+		_, err := base.Migrate()
+		assert.NoError(t, err)
+
+		assert.False(t, base.DisableRateLimit)
+	})
+
 }

@@ -6,6 +6,8 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/TykTechnologies/tyk/config"
+
 	"github.com/getkin/kin-openapi/openapi3"
 
 	"github.com/stretchr/testify/assert"
@@ -26,6 +28,7 @@ func TestOAS(t *testing.T) {
 
 		var convertedAPI apidef.APIDefinition
 		emptyOASPaths.ExtractTo(&convertedAPI)
+		assert.True(t, convertedAPI.EnableContextVars)
 
 		var resultOAS OAS
 		resultOAS.Fill(convertedAPI)
@@ -152,6 +155,8 @@ func TestOAS_ExtractTo_ResetAPIDefinition(t *testing.T) {
 	a.TagsDisabled = false
 	a.IsOAS = false
 	a.IDPClientIDMappingDisabled = false
+	a.EnableContextVars = false
+	a.DisableRateLimit = false
 
 	// deprecated fields
 	a.Auth = apidef.AuthConfig{}
@@ -185,6 +190,7 @@ func TestOAS_ExtractTo_ResetAPIDefinition(t *testing.T) {
 	// fields below, and clear the value in ExtendedPaths.Clear() function.
 
 	expectedFields := []string{
+		"APIDefinition.Slug",
 		"APIDefinition.ListenPort",
 		"APIDefinition.Protocol",
 		"APIDefinition.EnableProxyProtocol",
@@ -201,9 +207,6 @@ func TestOAS_ExtractTo_ResetAPIDefinition(t *testing.T) {
 		"APIDefinition.VersionData.Versions[0].ExtendedPaths.TransformJQResponse[0].Filter",
 		"APIDefinition.VersionData.Versions[0].ExtendedPaths.TransformJQResponse[0].Path",
 		"APIDefinition.VersionData.Versions[0].ExtendedPaths.TransformJQResponse[0].Method",
-		"APIDefinition.VersionData.Versions[0].ExtendedPaths.SizeLimit[0].Path",
-		"APIDefinition.VersionData.Versions[0].ExtendedPaths.SizeLimit[0].Method",
-		"APIDefinition.VersionData.Versions[0].ExtendedPaths.SizeLimit[0].SizeLimit",
 		"APIDefinition.VersionData.Versions[0].ExtendedPaths.PersistGraphQL[0].Path",
 		"APIDefinition.VersionData.Versions[0].ExtendedPaths.PersistGraphQL[0].Method",
 		"APIDefinition.VersionData.Versions[0].ExtendedPaths.PersistGraphQL[0].Operation",
@@ -233,7 +236,6 @@ func TestOAS_ExtractTo_ResetAPIDefinition(t *testing.T) {
 		"APIDefinition.Proxy.Transport.SSLMaxVersion",
 		"APIDefinition.Proxy.Transport.SSLForceCommonNameCheck",
 		"APIDefinition.Proxy.Transport.ProxyURL",
-		"APIDefinition.DisableRateLimit",
 		"APIDefinition.DisableQuota",
 		"APIDefinition.SessionLifetimeRespectsKeyExpiration",
 		"APIDefinition.SessionLifetime",
@@ -254,10 +256,7 @@ func TestOAS_ExtractTo_ResetAPIDefinition(t *testing.T) {
 		"APIDefinition.ResponseProcessors[0].Name",
 		"APIDefinition.ResponseProcessors[0].Options",
 		"APIDefinition.DoNotTrack",
-		"APIDefinition.EnableContextVars",
 		"APIDefinition.TagHeaders[0]",
-		"APIDefinition.GlobalRateLimit.Rate",
-		"APIDefinition.GlobalRateLimit.Per",
 		"APIDefinition.EnableDetailedRecording",
 		"APIDefinition.GraphQL.Enabled",
 		"APIDefinition.GraphQL.ExecutionMode",
@@ -301,7 +300,6 @@ func TestOAS_ExtractTo_ResetAPIDefinition(t *testing.T) {
 		"APIDefinition.AnalyticsPlugin.Enabled",
 		"APIDefinition.AnalyticsPlugin.PluginPath",
 		"APIDefinition.AnalyticsPlugin.FuncName",
-		"APIDefinition.DetailedTracing",
 	}
 
 	assert.Equal(t, expectedFields, noOASSupportFields)
@@ -764,16 +762,19 @@ func TestMigrateAndFillOAS(t *testing.T) {
 	assert.Equal(t, DefaultOpenAPI, baseAPIDef.OAS.OpenAPI)
 	assert.Equal(t, "Furkan", baseAPIDef.OAS.Info.Title)
 	assert.Equal(t, "Default", baseAPIDef.OAS.Info.Version)
+	assert.True(t, baseAPIDef.Classic.EnableContextVars)
 
 	assert.True(t, versionAPIDefs[0].Classic.IsOAS)
 	assert.Equal(t, DefaultOpenAPI, versionAPIDefs[0].OAS.OpenAPI)
 	assert.Equal(t, "Furkan-v1", versionAPIDefs[0].OAS.Info.Title)
 	assert.Equal(t, "v1", versionAPIDefs[0].OAS.Info.Version)
+	assert.True(t, versionAPIDefs[0].Classic.EnableContextVars)
 
 	assert.True(t, versionAPIDefs[1].Classic.IsOAS)
 	assert.Equal(t, DefaultOpenAPI, versionAPIDefs[1].OAS.OpenAPI)
 	assert.Equal(t, "Furkan-v2", versionAPIDefs[1].OAS.Info.Title)
 	assert.Equal(t, "v2", versionAPIDefs[1].OAS.Info.Version)
+	assert.True(t, versionAPIDefs[1].Classic.EnableContextVars)
 
 	assert.NotEqual(t, versionAPIDefs[0].Classic.APIID, versionAPIDefs[1].Classic.APIID)
 
@@ -1183,4 +1184,27 @@ func TestMigrateAndFillOAS_PluginConfigData(t *testing.T) {
 		Value:   configData,
 	}
 	assert.Equal(t, expectedPluginConfigData, migratedAPI.OAS.GetTykExtension().Middleware.Global.PluginConfig.Data)
+}
+
+func TestAPIContext_getValidationOptionsFromConfig(t *testing.T) {
+	t.Parallel()
+
+	t.Run("should return validation options", func(t *testing.T) {
+		conf, err := config.New()
+		assert.Nil(t, err)
+		options := GetValidationOptionsFromConfig(conf.OAS)
+		assert.Len(t, options, 2)
+	})
+
+	t.Run("should return default validation options", func(t *testing.T) {
+		conf, err := config.New()
+		assert.Nil(t, err)
+
+		conf.OAS.ValidateSchemaDefaults = true
+		conf.OAS.ValidateExamples = true
+
+		options := GetValidationOptionsFromConfig(conf.OAS)
+
+		assert.Len(t, options, 0)
+	})
 }
