@@ -47,7 +47,7 @@ func (rc *RedisController) DisableRedis(setRedisDown bool) {
 	defer cancel()
 
 	if !rc.WaitConnect(ctx) {
-		panic("Can't reconnect to redis after disable")
+		log.Errorf("Can't reconnect to redis after disable")
 	}
 	rc.reconnect <- struct{}{}
 }
@@ -126,7 +126,7 @@ func (rc *RedisController) disconnect() {
 // ConnectToRedis starts a go routine that periodically tries to connect to
 // redis.
 //
-// onReconnect will be called when we have established a successful redis reconnection
+// onReconnect will be called when a successful redis reconnection is established
 func (rc *RedisController) ConnectToRedis(ctx context.Context, onReconnect func(), conf *config.Config) {
 	if onReconnect == nil {
 		onReconnect = func() {
