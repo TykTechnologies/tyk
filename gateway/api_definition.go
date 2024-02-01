@@ -568,10 +568,12 @@ func (a APIDefinitionLoader) FromDashboardService(endpoint string) ([]*APISpec, 
 var envRegex = regexp.MustCompile(`env://([^"]+)`)
 
 const (
-	prefixEnv     = "env://"
-	prefixSecrets = "secrets://"
-	prefixConsul  = "consul://"
-	prefixKeys    = "tyk-apis"
+	prefixEnv       = "env://"
+	prefixSecrets   = "secrets://"
+	prefixConsul    = "consul://"
+	prefixVault     = "vault://"
+	prefixKeys      = "tyk-apis"
+	vaultSecretPath = "secret/data/"
 )
 
 func (a APIDefinitionLoader) replaceSecrets(in []byte) []byte {
@@ -605,6 +607,12 @@ func (a APIDefinitionLoader) replaceSecrets(in []byte) []byte {
 		}
 	}
 
+	if strings.Contains(input, prefixVault) {
+		if err := a.replaceVaultSecrets(&input); err != nil {
+			log.WithError(err).Error("Couldn't replace vault secrets")
+		}
+	}
+
 	return []byte(input)
 }
 
@@ -621,6 +629,33 @@ func (a APIDefinitionLoader) replaceConsulSecrets(input *string) error {
 	for i := 1; i < len(pairs); i++ {
 		key := strings.TrimPrefix(pairs[i].Key, prefixKeys+"/")
 		*input = strings.Replace(*input, prefixConsul+key, string(pairs[i].Value), -1)
+	}
+
+	return nil
+}
+
+func (a APIDefinitionLoader) replaceVaultSecrets(input *string) error {
+	if err := a.Gw.setUpVault(); err != nil {
+		return err
+	}
+
+	secret, err := a.Gw.vaultKVStore.(*kv.Vault).Client().Logical().Read(vaultSecretPath + prefixKeys)
+	if err != nil {
+		return err
+	}
+
+	pairs, ok := secret.Data["data"]
+	if !ok {
+		return errors.New("no data returned")
+	}
+
+	pairsMap, ok := pairs.(map[string]interface{})
+	if !ok {
+		return errors.New("data is not in the map format")
+	}
+
+	for k, v := range pairsMap {
+		*input = strings.Replace(*input, prefixVault+k, fmt.Sprintf("%v", v), -1)
 	}
 
 	return nil
