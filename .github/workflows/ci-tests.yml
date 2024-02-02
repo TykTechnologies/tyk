@@ -1,6 +1,6 @@
 name: CI tests
 
-on: 
+on:
   pull_request:
     branches:
       - master
@@ -18,7 +18,7 @@ on:
 env:
   TYK_DB_REDISHOST: localhost
   TYK_GW_STORAGE_HOST: localhost
-  PYTHON_VERSION: '3.11'
+  PYTHON_VERSION: "3.11"
   PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION: python
 
 jobs:
@@ -28,8 +28,8 @@ jobs:
     strategy:
       fail-fast: true
       matrix:
-        redis-version: [5]
-        python-version: ['3.11']
+        redis-version: [5, 7]
+        python-version: ["3.11"]
         go-version: [1.21.x]
 
     steps:
@@ -46,7 +46,7 @@ jobs:
       - name: Setup Python
         uses: actions/setup-python@v4
         with:
-            python-version: ${{ matrix.python-version }}
+          python-version: ${{ matrix.python-version }}
 
       - name: Install Dependencies and basic hygiene test
         id: hygiene
@@ -59,15 +59,15 @@ jobs:
           pip install 'protobuf==4.24.4'
 
           make lint
-          
+
           git add --all
 
           git diff HEAD > git-state.log
 
           git_state_count=$(wc -l < git-state.log)
-          
+
           if [[ $git_state_count -ne 0 ]]
-          then 
+          then
             echo "git-state<<EOF" >> $GITHUB_OUTPUT
             cat git-state.log >> $GITHUB_OUTPUT
             echo "EOF" >> $GITHUB_OUTPUT
@@ -109,7 +109,7 @@ jobs:
             ```shellsession
             ${{ steps.hygiene.outputs.git-state || 'all ok' }}
             ```
-            
+
             Please look at [the run](https://github.com/TykTechnologies/tyk/pull/${{ github.event.pull_request.number }}/checks?check_run_id=${{ github.run_id }}) or in the _Checks_ tab.
 
       - name: Download golangci-lint

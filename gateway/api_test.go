@@ -25,8 +25,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/TykTechnologies/tyk/internal/redis"
-
+	"github.com/TykTechnologies/storage/temporal/model"
 	"github.com/TykTechnologies/tyk/internal/uuid"
 
 	"github.com/TykTechnologies/tyk/apidef"
@@ -881,6 +880,8 @@ func TestHashKeyHandler(t *testing.T) {
 		gwConf := ts.Gw.GetConfig()
 		gwConf.HashKeyFunction = tc.hashFunction
 		ts.Gw.SetConfig(gwConf)
+		ok := ts.Gw.GlobalSessionManager.Store().DeleteAllKeys()
+		assert.True(t, ok)
 
 		t.Run(fmt.Sprintf("%sHash fn: %s", tc.desc, tc.hashFunction), func(t *testing.T) {
 			ts.testHashKeyHandlerHelper(t, tc.expectedHashSize)
@@ -1721,7 +1722,7 @@ func TestGroupResetHandler(t *testing.T) {
 	didSubscribe := make(chan bool, 1)
 	didReload := make(chan bool, tryReloadCount)
 
-	cacheStore := storage.RedisCluster{RedisController: ts.Gw.RedisController}
+	cacheStore := storage.RedisCluster{ConnectionHandler: ts.Gw.StorageConnectionHandler}
 	cacheStore.Connect()
 
 	// Test usually takes 0.05sec or so, timeout after 1s
@@ -1741,20 +1742,28 @@ func TestGroupResetHandler(t *testing.T) {
 		}()
 
 		err := cacheStore.StartPubSubHandler(ctx, RedisPubSubChannel, func(v interface{}) {
-			switch x := v.(type) {
-			case *redis.Subscription:
-				didSubscribe <- true
-			case *redis.Message:
-				notf := Notification{Gw: ts.Gw}
+			msg, ok := v.(model.Message)
+			assert.True(t, ok)
 
-				err := json.Unmarshal([]byte(x.Payload), &notf)
+			msgType := msg.Type()
+			switch msgType {
+			case model.MessageTypeSubscription:
+				didSubscribe <- true
+			case model.MessageTypeMessage:
+				notf := Notification{Gw: ts.Gw}
+				payload, err := msg.Payload()
+				assert.NoError(t, err)
+				err = json.Unmarshal([]byte(payload), &notf)
 				assert.NoError(t, err)
 
 				if notf.Command == NoticeGroupReload {
 					didReload <- true
 					reloadCount++
 				}
+			default:
+				assert.Fail(t, "unexpected message type")
 			}
+
 		})
 
 		select {
@@ -1781,7 +1790,6 @@ func TestGroupResetHandler(t *testing.T) {
 	// If we don't wait for the subscription to be done, we might do
 	// the reload before pub/sub is in place to receive our message.
 	<-didSubscribe
-
 	// Do a loop of tryReloadCount reloads
 	for try := 1; try <= tryReloadCount; try++ {
 		req := ts.withAuth(TestReq(t, "GET", uri, nil))
@@ -1808,7 +1816,6 @@ func TestGroupResetHandler(t *testing.T) {
 
 	// Close our *Test object, ensuring a cancelled context
 	ts.Close()
-
 	// Wait for our pubsub loop to exit
 	wg.Wait()
 
