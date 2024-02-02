@@ -5,12 +5,13 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
+
 	"strconv"
 	"strings"
 	"sync"
 	"time"
 
-	"github.com/TykTechnologies/tyk/internal/redis"
+	"github.com/TykTechnologies/storage/temporal/model"
 
 	"github.com/TykTechnologies/goverify"
 	"github.com/TykTechnologies/tyk/internal/crypto"
@@ -52,7 +53,7 @@ func (n *Notification) Sign() {
 }
 
 func (gw *Gateway) startPubSubLoop() {
-	cacheStore := storage.RedisCluster{RedisController: gw.RedisController}
+	cacheStore := storage.RedisCluster{ConnectionHandler: gw.StorageConnectionHandler}
 	cacheStore.Connect()
 
 	message := "Connection to Redis failed, reconnect in 10s"
@@ -89,12 +90,23 @@ func (gw *Gateway) logPubSubError(err error, message string) bool {
 }
 
 func (gw *Gateway) handleRedisEvent(v interface{}, handled func(NotificationCommand), reloaded func()) {
-	message, ok := v.(*redis.Message)
+	message, ok := v.(model.Message)
 	if !ok {
 		return
 	}
+
+	if message.Type() != model.MessageTypeMessage {
+		return
+	}
+
+	payload, err := message.Payload()
+	if err != nil {
+		pubSubLog.Error("Error getting payload from message: ", err)
+		return
+	}
+
 	notif := Notification{Gw: gw}
-	if err := json.Unmarshal([]byte(message.Payload), &notif); err != nil {
+	if err := json.Unmarshal([]byte(payload), &notif); err != nil {
 		pubSubLog.Error("Unmarshalling message body failed, malformed: ", err)
 		return
 	}
