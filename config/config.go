@@ -1056,7 +1056,7 @@ type OASConfig struct {
 	// ValidateExamples enables validation of values provided in `example` and `examples` fields against the declared schemas in the OpenAPI Document. Defaults to false.
 	ValidateExamples bool `json:"validate_examples"`
 
-	// ValidateSchemaDefaults validation of values provided in `default` fields against the declared schemas in the OpenAPI Document. Defaults to false.
+	// ValidateSchemaDefaults enables validation of values provided in `default` fields against the declared schemas in the OpenAPI Document. Defaults to false.
 	ValidateSchemaDefaults bool `json:"validate_schema_defaults"`
 }
 
