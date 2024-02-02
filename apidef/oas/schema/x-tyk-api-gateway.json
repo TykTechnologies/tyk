@@ -1793,7 +1793,7 @@
           "type": "integer",
           "minimum": 0
         },
-        "halfOpened": {
+        "halfOpenStateEnabled": {
           "type": "boolean"
         }
       },
@@ -1802,7 +1802,7 @@
         "threshold",
         "sampleSize",
         "coolDownPeriod",
-        "halfOpened"
+        "halfOpenStateEnabled"
       ]
     },
     "X-Tyk-RateLimit": {
