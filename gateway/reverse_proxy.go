@@ -1095,7 +1095,7 @@ func (p *ReverseProxy) handleGraphQLEngineWebsocketUpgrade(roundTripper *TykRoun
 	return nil, true, nil
 }
 
-func returnErrorsFromUpstream(proxyOnlyCtx *GraphQLProxyOnlyContext, resultWriter *graphql.EngineResultWriter) error {
+func returnErrorsFromUpstream(proxyOnlyCtx *GraphQLProxyOnlyContextValues, resultWriter *graphql.EngineResultWriter) error {
 	body, ok := proxyOnlyCtx.upstreamResponse.Body.(*nopCloserBuffer)
 	if !ok {
 		// Response body already read by graphql-go-tools, and it's not re-readable. Quit silently.
@@ -1131,6 +1131,9 @@ func headerStructToHeaderMap(headers []apidef.UDGGlobalHeader) map[string]string
 
 func (p *ReverseProxy) handoverRequestToGraphQLExecutionEngine(roundTripper *TykRoundTripper, gqlRequest *graphql.Request, outreq *http.Request) (res *http.Response, hijacked bool, err error) {
 	p.TykAPISpec.GraphQLExecutor.Client.Transport = NewGraphQLEngineTransport(DetermineGraphQLEngineTransportType(p.TykAPISpec), roundTripper)
+	if p.Gw.GetConfig().OpenTelemetry.Enabled {
+		p.TykAPISpec.GraphQLExecutor.Client.Transport = NewGraphQLEngineTransport(DetermineGraphQLEngineTransportType(p.TykAPISpec), roundTripper, WithOtelEnabled())
+	}
 
 	switch p.TykAPISpec.GraphQL.Version {
 	case apidef.GraphQLConfigVersionNone:
@@ -1159,7 +1162,7 @@ func (p *ReverseProxy) handoverRequestToGraphQLExecutionEngine(roundTripper *Tyk
 		span := otel.SpanFromContext(outreq.Context())
 		reqCtx := otel.ContextWithSpan(context.Background(), span)
 		if isProxyOnly {
-			reqCtx = NewGraphQLProxyOnlyContext(reqCtx, outreq)
+			reqCtx = SetProxyOnlyContextValue(reqCtx, outreq)
 		}
 
 		resultWriter := graphql.NewEngineResultWriter()
@@ -1187,7 +1190,7 @@ func (p *ReverseProxy) handoverRequestToGraphQLExecutionEngine(roundTripper *Tyk
 		header.Set("Content-Type", "application/json")
 
 		if isProxyOnly {
-			proxyOnlyCtx := reqCtx.(*GraphQLProxyOnlyContext)
+			proxyOnlyCtx := GetProxyOnlyContextValue(reqCtx)
 			// There is a case in the proxy-only mode where the request can be handled
 			// by the library without calling the upstream.
 			// This is a valid query for proxy-only mode: query { __typename }

@@ -27,35 +27,50 @@ func DetermineGraphQLEngineTransportType(apiSpec *APISpec) GraphQLEngineTranspor
 	return GraphQLEngineTransportTypeMultiUpstream
 }
 
-type GraphQLProxyOnlyContext struct {
-	context.Context
+type contextKey struct{}
+
+var graphqlProxyContextInfo = contextKey{}
+
+type GraphQLProxyOnlyContextValues struct {
 	forwardedRequest       *http.Request
 	upstreamResponse       *http.Response
 	ignoreForwardedHeaders map[string]bool
 }
 
-func NewGraphQLProxyOnlyContext(ctx context.Context, forwardedRequest *http.Request) *GraphQLProxyOnlyContext {
-	return &GraphQLProxyOnlyContext{
-		Context:          ctx,
-		forwardedRequest: forwardedRequest,
+func SetProxyOnlyContextValue(ctx context.Context, req *http.Request) context.Context {
+	value := &GraphQLProxyOnlyContextValues{
+		forwardedRequest: req,
 		ignoreForwardedHeaders: map[string]bool{
 			http.CanonicalHeaderKey("date"):           true,
 			http.CanonicalHeaderKey("content-type"):   true,
 			http.CanonicalHeaderKey("content-length"): true,
 		},
 	}
+
+	return context.WithValue(ctx, graphqlProxyContextInfo, value)
 }
 
-func (g *GraphQLProxyOnlyContext) Response() *http.Response {
-	return g.upstreamResponse
+func GetProxyOnlyContextValue(ctx context.Context) *GraphQLProxyOnlyContextValues {
+	val, ok := ctx.Value(graphqlProxyContextInfo).(*GraphQLProxyOnlyContextValues)
+	if !ok {
+		return nil
+	}
+	return val
 }
 
 type GraphQLEngineTransport struct {
 	originalTransport http.RoundTripper
 	transportType     GraphQLEngineTransportType
+	otelEnabled       bool
 }
 
 type GraphqlEngineTransportOption func(transport *GraphQLEngineTransport)
+
+func WithOtelEnabled() GraphqlEngineTransportOption {
+	return func(transport *GraphQLEngineTransport) {
+		transport.otelEnabled = true
+	}
+}
 
 func NewGraphQLEngineTransport(transportType GraphQLEngineTransportType, originalTransport http.RoundTripper, options ...GraphqlEngineTransportOption) *GraphQLEngineTransport {
 	transport := &GraphQLEngineTransport{
@@ -71,18 +86,18 @@ func NewGraphQLEngineTransport(transportType GraphQLEngineTransportType, origina
 func (g *GraphQLEngineTransport) RoundTrip(request *http.Request) (res *http.Response, err error) {
 	switch g.transportType {
 	case GraphQLEngineTransportTypeProxyOnly:
-		proxyOnlyCtx, ok := request.Context().(*GraphQLProxyOnlyContext)
-		if ok {
-			return g.handleProxyOnly(proxyOnlyCtx, request)
+		val := GetProxyOnlyContextValue(request.Context())
+		if val != nil {
+			return g.handleProxyOnly(val, request)
 		}
 	}
 
 	return g.originalTransport.RoundTrip(request)
 }
 
-func (g *GraphQLEngineTransport) handleProxyOnly(proxyOnlyCtx *GraphQLProxyOnlyContext, request *http.Request) (*http.Response, error) {
-	request.Method = proxyOnlyCtx.forwardedRequest.Method
-	g.setProxyOnlyHeaders(proxyOnlyCtx, request)
+func (g *GraphQLEngineTransport) handleProxyOnly(proxyOnlyValues *GraphQLProxyOnlyContextValues, request *http.Request) (*http.Response, error) {
+	request.Method = proxyOnlyValues.forwardedRequest.Method
+	g.setProxyOnlyHeaders(proxyOnlyValues, request)
 
 	response, err := g.originalTransport.RoundTrip(request)
 	if err != nil {
@@ -109,11 +124,11 @@ func (g *GraphQLEngineTransport) handleProxyOnly(proxyOnlyCtx *GraphQLProxyOnlyC
 		}
 		response.Body = reusableBody
 	}
-	proxyOnlyCtx.upstreamResponse = response
+	proxyOnlyValues.upstreamResponse = response
 	return response, err
 }
 
-func (g *GraphQLEngineTransport) setProxyOnlyHeaders(proxyOnlyCtx *GraphQLProxyOnlyContext, r *http.Request) {
+func (g *GraphQLEngineTransport) setProxyOnlyHeaders(proxyOnlyCtx *GraphQLProxyOnlyContextValues, r *http.Request) {
 	for forwardedHeaderKey, forwardedHeaderValues := range proxyOnlyCtx.forwardedRequest.Header {
 		if proxyOnlyCtx.ignoreForwardedHeaders[forwardedHeaderKey] {
 			continue

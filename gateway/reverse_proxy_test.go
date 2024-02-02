@@ -995,8 +995,10 @@ func TestGraphQL_ProxyOnlyHeaders(t *testing.T) {
 	})
 }
 
-func TestGraphQL_ProxyOnlyPassHeaders(t *testing.T) {
-	g := StartTest(nil)
+func TestGraphQL_ProxyOnlyPassHeadersWithOTel(t *testing.T) {
+	g := StartTest(func(globalConf *config.Config) {
+		globalConf.OpenTelemetry.Enabled = true
+	})
 	defer g.Close()
 
 	spec := BuildAPI(func(spec *APISpec) {
