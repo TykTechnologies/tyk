@@ -1053,10 +1053,10 @@ type Config struct {
 
 // OASConfig holds the configuration for various OpenAPI-specific functionalities
 type OASConfig struct {
-	// ValidateExamples enables validation of examples in the OpenAPI document. Defaults to false.
+	// ValidateExamples enables validation of values provided in `example` and `examples` fields against the declared schemas in the OpenAPI Document. Defaults to false.
 	ValidateExamples bool `json:"validate_examples"`
 
-	// ValidateSchemaDefaults enables validation of defaults in the OpenAPI document. Defaults to false.
+	// ValidateSchemaDefaults validation of values provided in `default` fields against the declared schemas in the OpenAPI Document. Defaults to false.
 	ValidateSchemaDefaults bool `json:"validate_schema_defaults"`
 }
 
