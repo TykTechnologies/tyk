@@ -4,10 +4,9 @@ import (
 	"context"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/mock"
-
-	"time"
 
 	"github.com/stretchr/testify/assert"
 
@@ -63,10 +62,13 @@ func TestConnectionHandler_Connect(t *testing.T) {
 	}
 
 	rc := NewConnectionHandler(ctx)
+	rc.storageUp.Store(false)
 	go rc.Connect(ctx, onConnect, conf)
 
+	// let's wait one statusCheck cycle
+	time.Sleep(1100 * time.Millisecond)
 	// Simulate a connection event
-	rc.storageUp.Store(true)
+	rc.storageUp.Store(false)
 
 	// Allow some time for the goroutine to run
 	time.Sleep(100 * time.Millisecond)
@@ -79,15 +81,9 @@ func TestNewConnectorDefaultConn(t *testing.T) {
 	conf, err := config.New()
 	assert.NoError(t, err)
 
-	var onConnectCalled bool
-	onConnect := func() {
-		onConnectCalled = true
-	}
-
-	conn, err := NewConnector(DefaultConn, onConnect, *conf)
+	conn, err := NewConnector(DefaultConn, *conf)
 	assert.NoError(t, err)
 	assert.NotNil(t, conn)
-	assert.Equal(t, false, onConnectCalled, "onConnect should not be called for default connection type")
 }
 
 // TestNewConnectorCacheConn tests the creation of a new cache connection.
@@ -95,15 +91,11 @@ func TestNewConnectorCacheConn(t *testing.T) {
 	conf, err := config.New()
 	assert.NoError(t, err)
 
-	var onConnectCalled bool
-	onConnect := func() {
-		onConnectCalled = true
-	}
+	conf.EnableSeperateCacheStore = true
 
-	conn, err := NewConnector(CacheConn, onConnect, *conf)
+	conn, err := NewConnector(CacheConn, *conf)
 	assert.NoError(t, err)
 	assert.NotNil(t, conn)
-	assert.Equal(t, false, onConnectCalled, "onConnect should not be called for cache connection type")
 }
 
 // TestNewConnectorAnalyticsConn tests the creation of a new analytics connection.
@@ -111,15 +103,12 @@ func TestNewConnectorAnalyticsConn(t *testing.T) {
 	conf, err := config.New()
 	assert.NoError(t, err)
 
-	var onConnectCalled bool
-	onConnect := func() {
-		onConnectCalled = true
-	}
+	conf.EnableAnalytics = true
+	conf.EnableSeperateAnalyticsStore = true
 
-	conn, err := NewConnector(AnalyticsConn, onConnect, *conf)
+	conn, err := NewConnector(AnalyticsConn, *conf)
 	assert.NoError(t, err)
 	assert.NotNil(t, conn)
-	assert.Equal(t, false, onConnectCalled, "onConnect should not be called for analytics connection type")
 }
 
 // TestConnectionHandler_DisableStorage tests disabling the storage.
@@ -170,6 +159,9 @@ func TestConnectionHandler_statusCheck(t *testing.T) {
 			wg.Done()
 		}
 	})
+
+	rc.storageUp.Store(false)
+	rc.disableStorage.Store(false)
 
 	rc.connections[DefaultConn] = mockConn
 	rc.connections[CacheConn] = mockConn

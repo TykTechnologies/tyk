@@ -65,6 +65,7 @@ func (rc *ConnectionHandler) DisableStorage(setStorageDown bool) {
 	if !rc.WaitConnect(ctx) {
 		panic("Can't reconnect to redis after disable")
 	}
+	rc.reconnect <- struct{}{}
 }
 
 // Connected returns true if we are connected to redis
@@ -112,12 +113,23 @@ func (rc *ConnectionHandler) Disconnect() error {
 	return nil
 }
 
+func (rc *ConnectionHandler) recoverLoop(ctx context.Context, onReconnect func()) {
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-rc.reconnect:
+			onReconnect()
+		}
+	}
+}
+
 // Connect starts a go routine that periodically tries to connect to
 // storage.
 //
 // onConnect will be called when we have established a successful storage reconnection
 func (rc *ConnectionHandler) Connect(ctx context.Context, onConnect func(), conf *config.Config) {
-	err := rc.initConnection(onConnect, *conf)
+	err := rc.initConnection(*conf)
 	if err != nil {
 		log.WithError(err).Error("Could not initialize connection to Redis cluster")
 		return
@@ -135,13 +147,14 @@ func (rc *ConnectionHandler) Connect(ctx context.Context, onConnect func(), conf
 	}
 
 	rc.storageUp.Store(true)
+	go rc.recoverLoop(ctx, onConnect)
 
 	// We need the ticker to constantly checking the connection status of Redis. If Redis gets down and up again, we should be able to recover.
 	go rc.statusCheck(ctx)
 }
 
 // initConnection initializes the connection singletons.
-func (rc *ConnectionHandler) initConnection(onConnect func(), conf config.Config) (err error) {
+func (rc *ConnectionHandler) initConnection(conf config.Config) (err error) {
 	rc.connectionsMu.Lock()
 	defer rc.connectionsMu.Unlock()
 
@@ -152,7 +165,7 @@ func (rc *ConnectionHandler) initConnection(onConnect func(), conf config.Config
 	}
 
 	for _, connType := range connTypes {
-		conn, err := NewConnector(connType, onConnect, conf)
+		conn, err := NewConnector(connType, conf)
 		if err != nil {
 			return err
 		}
@@ -189,8 +202,16 @@ func (rc *ConnectionHandler) statusCheck(ctx context.Context) {
 			// we check if the clusters are initialised and if connections are open
 			connected := rc.isConnected(ctx, DefaultConn) && rc.isConnected(ctx, CacheConn) && rc.isConnected(ctx, AnalyticsConn)
 
+			// we check if we are already connected connected
+			alreadyConnected := rc.Connected()
+
 			// store the actual status of redis
 			rc.storageUp.Store(connected)
+
+			// if we weren't alerady connected but now we are connected, we trigger the reconnect
+			if !alreadyConnected && connected {
+				rc.reconnect <- struct{}{}
+			}
 
 		}
 	}
@@ -208,7 +229,7 @@ func (rc *ConnectionHandler) getConnection(isCache, isAnalytics bool) model.Conn
 }
 
 // NewConnector creates a new storage connection.
-func NewConnector(connType string, onConnect func(), conf config.Config) (model.Connector, error) {
+func NewConnector(connType string, conf config.Config) (model.Connector, error) {
 	cfg := conf.Storage
 	if connType == CacheConn && conf.EnableSeperateCacheStore {
 		cfg = conf.CacheStorage
@@ -256,15 +277,6 @@ func NewConnector(connType string, onConnect func(), conf config.Config) (model.
 			MaxVersion:         cfg.MaxVersion,
 		}
 		opts = append(opts, model.WithTLS(&tls))
-	}
-
-	if connType == DefaultConn {
-		opts = append(opts, model.WithOnConnect(func(ctx context.Context) error {
-			if onConnect != nil {
-				onConnect()
-			}
-			return nil
-		}))
 	}
 
 	return connector.NewConnector(model.RedisV9Type, opts...)

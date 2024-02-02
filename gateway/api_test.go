@@ -880,6 +880,8 @@ func TestHashKeyHandler(t *testing.T) {
 		gwConf := ts.Gw.GetConfig()
 		gwConf.HashKeyFunction = tc.hashFunction
 		ts.Gw.SetConfig(gwConf)
+		ok := ts.Gw.GlobalSessionManager.Store().DeleteAllKeys()
+		assert.True(t, ok)
 
 		t.Run(fmt.Sprintf("%sHash fn: %s", tc.desc, tc.hashFunction), func(t *testing.T) {
 			ts.testHashKeyHandlerHelper(t, tc.expectedHashSize)
