@@ -62,7 +62,7 @@ jobs:
           registry: docker.tyk.io
           username: ${{ secrets.CLOUDSMITH_USERNAME }}
           password: ${{ secrets.CLOUDSMITH_API_KEY }}
-      - uses: actions/cache@v3
+      - uses: actions/cache@v4
         with:
           path: |
             ~/.cache/go-build
