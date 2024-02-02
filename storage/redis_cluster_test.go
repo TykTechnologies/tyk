@@ -977,6 +977,7 @@ func TestDeleteKey(t *testing.T) {
 		mockKv := tempmocks.NewKeyValue(t)
 		storage.kvStorage = mockKv
 		mockKv.On("Delete", mock.Anything, "key").Return(nil)
+		mockKv.On("Exists", mock.Anything, "key").Return(true, nil)
 
 		deleted := storage.DeleteKey("key")
 		assert.True(t, deleted)
@@ -987,6 +988,7 @@ func TestDeleteKey(t *testing.T) {
 		mockKv := tempmocks.NewKeyValue(t)
 		storage.kvStorage = mockKv
 		mockKv.On("Delete", mock.Anything, "prefix:key").Return(nil)
+		mockKv.On("Exists", mock.Anything, "prefix:key").Return(true, nil)
 
 		deleted := storage.DeleteKey("key")
 		assert.True(t, deleted)
@@ -996,7 +998,19 @@ func TestDeleteKey(t *testing.T) {
 		storage := &RedisCluster{ConnectionHandler: rc}
 		mockKv := tempmocks.NewKeyValue(t)
 		storage.kvStorage = mockKv
-		mockKv.On("Delete", mock.Anything, "key").Return(ErrKeyNotFound)
+		mockKv.On("Exists", mock.Anything, "key").Return(false, nil)
+
+		deleted := storage.DeleteKey("key")
+		assert.False(t, deleted)
+		mockKv.AssertExpectations(t)
+	})
+
+	t.Run("error deleting", func(t *testing.T) {
+		storage := &RedisCluster{ConnectionHandler: rc}
+		mockKv := tempmocks.NewKeyValue(t)
+		storage.kvStorage = mockKv
+		mockKv.On("Exists", mock.Anything, "key").Return(true, nil)
+		mockKv.On("Delete", mock.Anything, "key").Return(errors.New("test"))
 
 		deleted := storage.DeleteKey("key")
 		assert.False(t, deleted)
