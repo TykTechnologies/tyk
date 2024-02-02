@@ -25,7 +25,7 @@ func TestRollingWindow_GetCount(t *testing.T) {
 	conf, err := config.New()
 	assert.NoError(t, err)
 
-	conn, err := storage.NewConnector(storage.DefaultConn, nil, *conf)
+	conn, err := storage.NewConnector(storage.DefaultConn, *conf)
 	assert.Nil(t, err)
 
 	var db redis.UniversalClient
@@ -46,7 +46,7 @@ func TestRollingWindow_Get(t *testing.T) {
 	conf, err := config.New()
 	assert.NoError(t, err)
 
-	conn, err := storage.NewConnector(storage.DefaultConn, nil, *conf)
+	conn, err := storage.NewConnector(storage.DefaultConn, *conf)
 	assert.Nil(t, err)
 
 	var db redis.UniversalClient
@@ -165,7 +165,7 @@ func BenchmarkRollingWindow_New(b *testing.B) {
 	conf, err := config.New()
 	assert.NoError(b, err)
 
-	conn, err := storage.NewConnector(storage.DefaultConn, nil, *conf)
+	conn, err := storage.NewConnector(storage.DefaultConn, *conf)
 	assert.Nil(b, err)
 
 	var db redis.UniversalClient
@@ -186,7 +186,7 @@ func BenchmarkRollingWindow_Count(b *testing.B) {
 	conf, err := config.New()
 	assert.NoError(b, err)
 
-	conn, err := storage.NewConnector(storage.DefaultConn, nil, *conf)
+	conn, err := storage.NewConnector(storage.DefaultConn, *conf)
 	assert.Nil(b, err)
 
 	var db redis.UniversalClient
