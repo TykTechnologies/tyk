@@ -487,6 +487,11 @@ func (r *RedisCluster) DeleteKey(keyName string) bool {
 		return false
 	}
 
+	exist, err := storage.Exists(context.Background(), r.fixKey(keyName))
+	if err != nil || !exist {
+		return false
+	}
+
 	err = storage.Delete(context.Background(), r.fixKey(keyName))
 	if err != nil {
 		log.WithError(err).Error("Error trying to delete key")
