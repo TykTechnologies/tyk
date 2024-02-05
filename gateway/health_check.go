@@ -66,7 +66,7 @@ type SafeHealthCheck struct {
 func (gw *Gateway) gatherHealthChecks() {
 	allInfos := SafeHealthCheck{info: make(map[string]apidef.HealthCheckItem, 3)}
 
-	redisStore := storage.RedisCluster{KeyPrefix: "livenesscheck-", RedisController: gw.RedisController}
+	redisStore := storage.RedisCluster{KeyPrefix: "livenesscheck-", ConnectionHandler: gw.StorageConnectionHandler}
 
 	key := "tyk-liveness-probe"
 

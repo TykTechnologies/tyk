@@ -292,7 +292,7 @@ func isExpired(claims jwt.MapClaims) bool {
 }
 
 func newIntrospectionCache(gw *Gateway) *introspectionCache {
-	return &introspectionCache{RedisCluster: storage.RedisCluster{KeyPrefix: "introspection-", RedisController: gw.RedisController}}
+	return &introspectionCache{RedisCluster: storage.RedisCluster{KeyPrefix: "introspection-", ConnectionHandler: gw.StorageConnectionHandler}}
 }
 
 type introspectionCache struct {

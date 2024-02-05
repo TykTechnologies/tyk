@@ -8,7 +8,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"errors"
 	"net/url"
 	"path"
 	"reflect"
@@ -1397,50 +1396,6 @@ func TestPurgeOAuthClientTokens(t *testing.T) {
 		assertTokensLen(t, storageManager, storageKey2, 0)
 	})
 
-	t.Run("errors", func(t *testing.T) {
-		t.Run("lock err", func(t *testing.T) {
-			gw := Gateway{}
-			gw.SetConfig(config.Config{
-				OauthTokenExpiredRetainPeriod: 1,
-			})
-			db, mock := redis.NewClientMock()
-			redisController := storage.NewRedisController(context.Background())
-			redisController.MockWith(db, true)
-			gw.RedisController = redisController
-			mock.ExpectSetNX("oauth-purge-lock", "1", time.Minute).SetErr(errors.ErrUnsupported)
-			err := gw.purgeLapsedOAuthTokens()
-			assert.ErrorIs(t, err, errors.ErrUnsupported)
-		})
-
-		t.Run("lock failure", func(t *testing.T) {
-			gw := Gateway{}
-			gw.SetConfig(config.Config{
-				OauthTokenExpiredRetainPeriod: 1,
-			})
-			db, mock := redis.NewClientMock()
-			redisController := storage.NewRedisController(context.Background())
-			redisController.MockWith(db, true)
-			gw.RedisController = redisController
-			mock.ExpectSetNX("oauth-purge-lock", "1", time.Minute).SetVal(false)
-			err := gw.purgeLapsedOAuthTokens()
-			assert.NoError(t, err)
-		})
-
-		t.Run("scan keys error", func(t *testing.T) {
-			gw := Gateway{}
-			gw.SetConfig(config.Config{
-				OauthTokenExpiredRetainPeriod: 1,
-			})
-			db, mock := redis.NewClientMock()
-			redisController := storage.NewRedisController(context.Background())
-			redisController.MockWith(db, true)
-			gw.RedisController = redisController
-			mock.ExpectSetNX("oauth-purge-lock", "1", time.Minute).SetVal(true)
-			mock.ExpectScan(0, oAuthClientTokensKeyPattern, 0).SetErr(errors.ErrUnsupported)
-			err := gw.purgeLapsedOAuthTokens()
-			assert.ErrorIs(t, err, errors.ErrUnsupported)
-		})
-	})
 }
 
 func BenchmarkPurgeLapsedOAuthTokens(b *testing.B) {

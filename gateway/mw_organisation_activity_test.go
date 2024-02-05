@@ -26,7 +26,7 @@ func (ts *Test) testPrepareProcessRequestQuotaLimit(tb testing.TB, data map[stri
 	})
 
 	data["org_id"] = orgID
-	ts.Gw.RedisController.DisableRedis(true)
+	ts.Gw.StorageConnectionHandler.DisableStorage(true)
 	expectBody := `{"status":"error","message":"Error writing to key store storage: Redis is either down or was not configured"}`
 	// create org key with quota
 	ts.Run(tb, test.TestCase{
@@ -37,7 +37,7 @@ func (ts *Test) testPrepareProcessRequestQuotaLimit(tb testing.TB, data map[stri
 		Code:      http.StatusInternalServerError,
 		BodyMatch: expectBody,
 	})
-	ts.Gw.RedisController.DisableRedis(false)
+	ts.Gw.StorageConnectionHandler.DisableStorage(false)
 
 	ts.Run(tb, test.TestCase{
 		Path:      "/tyk/org/keys/" + orgID + "?reset_quota=1",
