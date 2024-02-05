@@ -543,7 +543,7 @@ paths:
     get:
       summary: Check the Health of the Gateway
       description: |
-          You can rename the `/hello` endpoint by setting   `health_check_endpoint_name` field in `tyk.conf`
+          You can rename the `/hello` endpoint by setting `health_check_endpoint_name` field in `tyk.conf`
 
           Returns 200 response in case of success
       tags:
