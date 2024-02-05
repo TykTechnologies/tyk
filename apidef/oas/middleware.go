@@ -1293,7 +1293,7 @@ type CircuitBreaker struct {
 	CoolDownPeriod int `bson:"coolDownPeriod" json:"coolDownPeriod"`
 	// HalfOpenStateEnabled , if enabled, allows some requests to pass through the circuit breaker during the cool down period. If Tyk detects that the path is now working, the circuit breaker will be automatically reset and traffic will be resumed to the upstream.
 	// Tyk classic API definition: `version_data.versions..extended_paths.circuit_breakers[*].disable_half_open_state`.
-	HalfOpenStateEnabled bool `bson:"halfOpened" json:"halfOpened"`
+	HalfOpenStateEnabled bool `bson:"halfOpenStateEnabled" json:"halfOpenStateEnabled"`
 }
 
 // Fill fills *CircuitBreaker from apidef.CircuitBreakerMeta.

@@ -1156,7 +1156,7 @@ func (s *Test) newGateway(genConf func(globalConf *config.Config)) *Gateway {
 
 	configs := gw.GetConfig()
 
-	go gw.RedisController.ConnectToRedis(s.ctx, func() {
+	go gw.StorageConnectionHandler.Connect(s.ctx, func() {
 		if gw.OnConnect != nil {
 			gw.OnConnect()
 		}
@@ -1165,7 +1165,7 @@ func (s *Test) newGateway(genConf func(globalConf *config.Config)) *Gateway {
 	timeout, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
 
-	connected := gw.RedisController.WaitConnect(timeout)
+	connected := gw.StorageConnectionHandler.WaitConnect(timeout)
 	if !connected {
 		panic("can't connect to redis, timeout")
 	}
@@ -1932,4 +1932,23 @@ func randStringBytes(n int) string {
 	}
 
 	return string(b)
+}
+
+type testMessageAdapter struct {
+	Msg string
+}
+
+// Type returns the message type.
+func (m *testMessageAdapter) Type() string {
+	return "message"
+}
+
+// Channel returns the channel the message was received on.
+func (m *testMessageAdapter) Channel() (string, error) {
+	return "", nil
+}
+
+// Payload returns the message payload.
+func (m *testMessageAdapter) Payload() (string, error) {
+	return m.Msg, nil
 }

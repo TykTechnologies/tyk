@@ -150,13 +150,13 @@ func TestSignatureValidation(t *testing.T) {
 		emptySigHeader := map[string]string{
 			"authorization": key,
 		}
-		ts.Gw.RedisController.DisableRedis(true)
+		ts.Gw.StorageConnectionHandler.DisableStorage(true)
 		ts.Run(t, []test.TestCase{
 			{Headers: emptySigHeader, Code: http.StatusForbidden},
 			{Headers: invalidSigHeader, Code: http.StatusForbidden},
 			{Headers: validSigHeader, Code: http.StatusForbidden},
 		}...)
-		ts.Gw.RedisController.DisableRedis(false)
+		ts.Gw.StorageConnectionHandler.DisableStorage(false)
 		ts.Run(t, []test.TestCase{
 			{Headers: emptySigHeader, Code: http.StatusUnauthorized},
 			{Headers: invalidSigHeader, Code: http.StatusUnauthorized},
@@ -173,13 +173,13 @@ func TestSignatureValidation(t *testing.T) {
 		invalidSigPath := emptySigPath + "&sig=junk"
 		validSigPath := emptySigPath + "&sig=" + hex.EncodeToString(validHash)
 
-		ts.Gw.RedisController.DisableRedis(true)
+		ts.Gw.StorageConnectionHandler.DisableStorage(true)
 		_, _ = ts.Run(t, []test.TestCase{
 			{Path: emptySigPath, Code: http.StatusForbidden},
 			{Path: invalidSigPath, Code: http.StatusForbidden},
 			{Path: validSigPath, Code: http.StatusForbidden},
 		}...)
-		ts.Gw.RedisController.DisableRedis(false)
+		ts.Gw.StorageConnectionHandler.DisableStorage(false)
 		_, _ = ts.Run(t, []test.TestCase{
 			{Path: emptySigPath, Code: http.StatusUnauthorized},
 			{Path: invalidSigPath, Code: http.StatusUnauthorized},
@@ -211,12 +211,12 @@ func TestSignatureValidation(t *testing.T) {
 			"authorization": key,
 			"signature":     "junk",
 		}
-		ts.Gw.RedisController.DisableRedis(true)
+		ts.Gw.StorageConnectionHandler.DisableStorage(true)
 		ts.Run(t, []test.TestCase{
 			{Headers: invalidSigHeader, Code: http.StatusForbidden},
 			{Headers: validSigHeader, Code: http.StatusForbidden},
 		}...)
-		ts.Gw.RedisController.DisableRedis(false)
+		ts.Gw.StorageConnectionHandler.DisableStorage(false)
 		ts.Run(t, []test.TestCase{
 			{Headers: invalidSigHeader, Code: http.StatusUnauthorized},
 			{Headers: validSigHeader, Code: http.StatusOK},
@@ -280,7 +280,7 @@ func TestSignatureValidation(t *testing.T) {
 			"authorization": customKey,
 			"signature":     "junk",
 		}
-		ts.Gw.RedisController.DisableRedis(true)
+		ts.Gw.StorageConnectionHandler.DisableStorage(true)
 		ts.Run(t, []test.TestCase{
 			{Headers: invalidSigHeader, Code: http.StatusForbidden},
 			{Headers: validSigHeader, Code: http.StatusForbidden},
@@ -288,7 +288,7 @@ func TestSignatureValidation(t *testing.T) {
 			{Headers: validSigHeader3, Code: http.StatusForbidden},
 			{Headers: validSigHeader4, Code: http.StatusForbidden},
 		}...)
-		ts.Gw.RedisController.DisableRedis(false)
+		ts.Gw.StorageConnectionHandler.DisableStorage(false)
 		ts.Run(t, []test.TestCase{
 			{Headers: invalidSigHeader, Code: http.StatusUnauthorized},
 			{Headers: validSigHeader, Code: http.StatusOK},

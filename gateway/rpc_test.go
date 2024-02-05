@@ -369,7 +369,7 @@ func TestSyncAPISpecsRPC_redis_failure(t *testing.T) {
 
 	t.Run("Should load apis when redis is down", func(t *testing.T) {
 
-		ts.Gw.RedisController.DisableRedis(true)
+		ts.Gw.StorageConnectionHandler.DisableStorage(true)
 		//defer ts.Gw.RedisController.DisableRedis((false)
 
 		authHeaders := map[string]string{"Authorization": "test"}
@@ -380,7 +380,7 @@ func TestSyncAPISpecsRPC_redis_failure(t *testing.T) {
 
 	t.Run("Should reload when redis is back up", func(t *testing.T) {
 
-		ts.Gw.RedisController.DisableRedis(true)
+		ts.Gw.StorageConnectionHandler.DisableStorage(true)
 		event := make(chan struct{}, 1)
 		ts.Gw.OnConnect = func() {
 			event <- struct{}{}
@@ -392,7 +392,7 @@ func TestSyncAPISpecsRPC_redis_failure(t *testing.T) {
 			t.Fatal("OnConnect should only run after reconnection")
 		case <-time.After(1 * time.Second):
 		}
-		ts.Gw.RedisController.DisableRedis(false)
+		ts.Gw.StorageConnectionHandler.DisableStorage(false)
 
 		select {
 		case <-event:

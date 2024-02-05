@@ -230,7 +230,7 @@ func (sfr sessionFailReason) String() string {
 // sessionFailReason if session limits have been exceeded.
 // Key values to manage rate are Rate and Per, e.g. Rate of 10 messages
 // Per 10 seconds
-func (l *SessionLimiter) ForwardMessage(r *http.Request, currentSession *user.SessionState, key string, store storage.Handler, enableRL, enableQ bool, globalConf *config.Config, api *APISpec, dryRun bool) sessionFailReason {
+func (l *SessionLimiter) ForwardMessage(r *http.Request, currentSession *user.SessionState, rateLimitKey string, store storage.Handler, enableRL, enableQ bool, globalConf *config.Config, api *APISpec, dryRun bool) sessionFailReason {
 	// check for limit on API level (set to session by ApplyPolicies)
 	accessDef, allowanceScope, err := GetAccessDefinitionByAPIIDOrSession(currentSession, api)
 	if err != nil {
@@ -247,7 +247,7 @@ func (l *SessionLimiter) ForwardMessage(r *http.Request, currentSession *user.Se
 
 		limiter := rate.Limiter(l.config, l.limiterStorage)
 		if limiter != nil {
-			prefix := rate.Prefix(key, allowanceScope)
+			prefix := rate.Prefix(rateLimitKey, allowanceScope)
 
 			err := limiter(r.Context(), prefix, accessDef.Limit.Rate, accessDef.Limit.Per)
 
@@ -259,11 +259,11 @@ func (l *SessionLimiter) ForwardMessage(r *http.Request, currentSession *user.Se
 
 		switch {
 		case globalConf.EnableSentinelRateLimiter:
-			if l.limitSentinel(currentSession, key, rateScope, store, globalConf, &accessDef.Limit, dryRun) {
+			if l.limitSentinel(currentSession, rateLimitKey, rateScope, store, globalConf, &accessDef.Limit, dryRun) {
 				return sessionFailRateLimit
 			}
 		case globalConf.EnableRedisRollingLimiter:
-			if l.limitRedis(currentSession, key, rateScope, store, globalConf, &accessDef.Limit, dryRun) {
+			if l.limitRedis(currentSession, rateLimitKey, rateScope, store, globalConf, &accessDef.Limit, dryRun) {
 				return sessionFailRateLimit
 			}
 		default:
@@ -281,11 +281,11 @@ func (l *SessionLimiter) ForwardMessage(r *http.Request, currentSession *user.Se
 			if n <= 1 || n*c < cost {
 				// If we have 1 server, there is no need to strain redis at all the leaky
 				// bucket algorithm will suffice.
-				if l.limitDRL(currentSession, key, rateScope, &accessDef.Limit, dryRun) {
+				if l.limitDRL(currentSession, rateLimitKey, rateScope, &accessDef.Limit, dryRun) {
 					return sessionFailRateLimit
 				}
 			} else {
-				if l.limitRedis(currentSession, key, rateScope, store, globalConf, &accessDef.Limit, dryRun) {
+				if l.limitRedis(currentSession, rateLimitKey, rateScope, store, globalConf, &accessDef.Limit, dryRun) {
 					return sessionFailRateLimit
 				}
 			}
@@ -297,7 +297,7 @@ func (l *SessionLimiter) ForwardMessage(r *http.Request, currentSession *user.Se
 			currentSession.Allowance = currentSession.Allowance - 1
 		}
 
-		if l.RedisQuotaExceeded(r, currentSession, allowanceScope, &accessDef.Limit, store, globalConf.HashKeys) {
+		if l.RedisQuotaExceeded(r, currentSession, rateLimitKey, allowanceScope, &accessDef.Limit, store, globalConf.HashKeys) {
 			return sessionFailQuota
 		}
 	}
@@ -306,7 +306,7 @@ func (l *SessionLimiter) ForwardMessage(r *http.Request, currentSession *user.Se
 
 }
 
-func (l *SessionLimiter) RedisQuotaExceeded(r *http.Request, currentSession *user.SessionState, scope string, limit *user.APILimit, store storage.Handler, hashKeys bool) bool {
+func (l *SessionLimiter) RedisQuotaExceeded(r *http.Request, currentSession *user.SessionState, quotaKey, scope string, limit *user.APILimit, store storage.Handler, hashKeys bool) bool {
 	// Unlimited?
 	if limit.QuotaMax == -1 || limit.QuotaMax == 0 {
 		// No quota set
@@ -319,6 +319,9 @@ func (l *SessionLimiter) RedisQuotaExceeded(r *http.Request, currentSession *use
 	}
 
 	key := currentSession.KeyID
+	if quotaKey != "" {
+		key = quotaKey
+	}
 
 	if hashKeys {
 		key = storage.HashStr(currentSession.KeyID)

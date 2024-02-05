@@ -1740,8 +1740,7 @@
           "type": "boolean"
         },
         "name": {
-          "type": "string",
-          "format": "hostname"
+          "$ref": "#/definitions/X-Tyk-DomainDef"
         },
         "certificates": {
           "type": "array",
@@ -1793,7 +1792,7 @@
           "type": "integer",
           "minimum": 0
         },
-        "halfOpened": {
+        "halfOpenStateEnabled": {
           "type": "boolean"
         }
       },
@@ -1802,7 +1801,7 @@
         "threshold",
         "sampleSize",
         "coolDownPeriod",
-        "halfOpened"
+        "halfOpenStateEnabled"
       ]
     },
     "X-Tyk-RateLimit": {
