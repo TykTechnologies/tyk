@@ -212,7 +212,7 @@ func TestOAS_RegexPaths(t *testing.T) {
 			pathKeys = append(pathKeys, k)
 		}
 
-		assert.Lenf(t, oas.Paths, 1, "Expected one path key being created, got %#v", pathKeys)
+		assert.Equal(t, 1, oas.Paths.Len(), "Expected one path key being created, got %#v", pathKeys)
 		assert.NotNil(t, oas.Paths.Find(tc.want))
 
 		p := oas.Paths.Find(tc.want)
