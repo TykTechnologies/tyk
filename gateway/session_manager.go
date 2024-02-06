@@ -319,12 +319,13 @@ func (l *SessionLimiter) RedisQuotaExceeded(r *http.Request, currentSession *use
 	}
 
 	key := currentSession.KeyID
-	if quotaKey != "" {
-		key = quotaKey
-	}
 
 	if hashKeys {
 		key = storage.HashStr(currentSession.KeyID)
+	}
+
+	if quotaKey != "" {
+		key = quotaKey
 	}
 
 	rawKey := QuotaKeyPrefix + quotaScope + key
