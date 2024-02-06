@@ -56,17 +56,17 @@ type APILimit struct {
 // in the gateway/policy.go:19
 // TODO: is it possible to share fields?
 type AccessDefinition struct {
-	APIName              string                  `json:"api_name" msg:"api_name"`
-	APIID                string                  `json:"api_id" msg:"api_id"`
-	Versions             []string                `json:"versions" msg:"versions"`
+	APIName              string                  `json:"api_name" bson:"api_name" msg:"api_name"`
+	APIID                string                  `json:"api_id" bson:"api_id" msg:"api_id"`
+	Versions             []string                `json:"versions" bson:"versions" msg:"versions"`
 	AllowedURLs          []AccessSpec            `bson:"allowed_urls" json:"allowed_urls" msg:"allowed_urls"` // mapped string MUST be a valid regex
-	RestrictedTypes      []graphql.Type          `json:"restricted_types" msg:"restricted_types"`
-	AllowedTypes         []graphql.Type          `json:"allowed_types" msg:"allowed_types"`
-	Limit                APILimit                `json:"limit" msg:"limit"`
-	FieldAccessRights    []FieldAccessDefinition `json:"field_access_rights" msg:"field_access_rights"`
-	DisableIntrospection bool                    `json:"disable_introspection" msg:"disable_introspection"`
+	RestrictedTypes      []graphql.Type          `json:"restricted_types" bson:"restricted_types" msg:"restricted_types"`
+	AllowedTypes         []graphql.Type          `json:"allowed_types" bson:"allowed_types" msg:"allowed_types"`
+	Limit                APILimit                `json:"limit" bson:"limit" msg:"limit"`
+	FieldAccessRights    []FieldAccessDefinition `json:"field_access_rights" bson:"field_access_rights" msg:"field_access_rights"`
+	DisableIntrospection bool                    `json:"disable_introspection" bson:"disable_introspection" msg:"disable_introspection"`
 
-	AllowanceScope string `json:"allowance_scope" msg:"allowance_scope"`
+	AllowanceScope string `json:"allowance_scope" bson:"allowance_scope" msg:"allowance_scope"`
 }
 
 func (limit APILimit) IsEmpty() bool {
