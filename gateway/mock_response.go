@@ -104,8 +104,8 @@ func mockFromOAS(r *http.Request, operation *openapi3.Operation, fromOASExamples
 		contentType = headerContentType
 	}
 
-	response, ok := operation.Responses[strconv.Itoa(code)]
-	if !ok {
+	response := operation.Responses.Status(code)
+	if response == nil {
 		return http.StatusNotFound, "", nil, nil, fmt.Errorf("there is no example response for the code: %d", code)
 	}
 

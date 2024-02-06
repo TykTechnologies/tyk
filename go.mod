@@ -29,7 +29,7 @@ require (
 	github.com/clbanning/mxj v1.8.4
 	github.com/evalphobia/logrus_sentry v0.8.2
 	github.com/gemnasium/logrus-graylog-hook v2.0.7+incompatible
-	github.com/getkin/kin-openapi v0.115.0
+	github.com/getkin/kin-openapi v0.124.0
 	github.com/go-jose/go-jose/v3 v3.0.3
 	github.com/go-redis/redis/v8 v8.11.5 // indirect
 	github.com/gocraft/health v0.0.0-20170925182251-8675af27fef0
@@ -129,8 +129,8 @@ require (
 	github.com/ghodss/yaml v1.0.0 // indirect
 	github.com/go-logr/logr v1.3.0 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
-	github.com/go-openapi/jsonpointer v0.19.6 // indirect
-	github.com/go-openapi/swag v0.22.4 // indirect
+	github.com/go-openapi/jsonpointer v0.20.2 // indirect
+	github.com/go-openapi/swag v0.22.8 // indirect
 	github.com/gobwas/httphead v0.0.0-20180130184737-2c6c146eadee // indirect
 	github.com/gobwas/pool v0.2.0 // indirect
 	github.com/gobwas/ws v1.0.4 // indirect

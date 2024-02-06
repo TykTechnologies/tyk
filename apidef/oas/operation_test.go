@@ -30,13 +30,12 @@ func TestOAS_PathsAndOperations(t *testing.T) {
 	const existingOperationId = "userPOST"
 
 	var oas OAS
-	oas.Paths = openapi3.Paths{
-		"/user": {
-			Get: &openapi3.Operation{
-				OperationID: operationId,
-			},
+	oas.Paths = openapi3.NewPaths()
+	oas.Paths.Set("/user", &openapi3.PathItem{
+		Get: &openapi3.Operation{
+			OperationID: operationId,
 		},
-	}
+	})
 
 	var operation Operation
 	Fill(t, &operation, 0)
@@ -66,31 +65,29 @@ func TestOAS_PathsAndOperations(t *testing.T) {
 	oas.extractPathsAndOperations(&ep)
 
 	convertedOAS := minimumValidOAS()
-	convertedOAS.Paths = openapi3.Paths{
-		"/user": {
-			Post: &openapi3.Operation{
-				OperationID: existingOperationId,
-				Responses:   openapi3.NewResponses(),
-			},
+	convertedOAS.Paths = openapi3.NewPaths()
+	convertedOAS.Paths.Set("/user", &openapi3.PathItem{
+		Post: &openapi3.Operation{
+			OperationID: existingOperationId,
+			Responses:   openapi3.NewResponses(),
 		},
-	}
+	})
 	convertedOAS.SetTykExtension(&XTykAPIGateway{Middleware: &Middleware{Operations: Operations{}}})
 	convertedOAS.fillPathsAndOperations(ep)
 
 	assert.Equal(t, oas.getTykOperations(), convertedOAS.getTykOperations())
 
-	expCombinedPaths := openapi3.Paths{
-		"/user": {
-			Post: &openapi3.Operation{
-				OperationID: existingOperationId,
-				Responses:   openapi3.NewResponses(),
-			},
-			Get: &openapi3.Operation{
-				OperationID: operationId,
-				Responses:   openapi3.NewResponses(),
-			},
+	expCombinedPaths := openapi3.NewPaths()
+	expCombinedPaths.Set("/user", &openapi3.PathItem{
+		Post: &openapi3.Operation{
+			OperationID: existingOperationId,
+			Responses:   openapi3.NewResponses(),
 		},
-	}
+		Get: &openapi3.Operation{
+			OperationID: operationId,
+			Responses:   openapi3.NewResponses(),
+		},
+	})
 
 	assert.Equal(t, expCombinedPaths, convertedOAS.Paths)
 
@@ -107,46 +104,45 @@ func TestOAS_PathsAndOperationsRegex(t *testing.T) {
 	expectedPath := "/users/{customRegex1}/{customRegex2}"
 
 	var oas OAS
-	oas.Paths = openapi3.Paths{}
+	oas.Paths = openapi3.NewPaths()
 
 	_ = oas.getOperationID("/users/[a-z]+/[0-9]+$", "GET")
 
-	expectedPathItems := openapi3.Paths{
-		expectedPath: &openapi3.PathItem{
-			Get: &openapi3.Operation{
-				OperationID: expectedOperationID,
-				Responses:   openapi3.NewResponses(),
-			},
-			Parameters: []*openapi3.ParameterRef{
-				{
-					Value: &openapi3.Parameter{
-						Schema: &openapi3.SchemaRef{
-							Value: &openapi3.Schema{
-								Type:    "string",
-								Pattern: "[a-z]+",
-							},
+	expectedPathItems := openapi3.NewPaths()
+	expectedPathItems.Set(expectedPath, &openapi3.PathItem{
+		Get: &openapi3.Operation{
+			OperationID: expectedOperationID,
+			Responses:   openapi3.NewResponses(),
+		},
+		Parameters: []*openapi3.ParameterRef{
+			{
+				Value: &openapi3.Parameter{
+					Schema: &openapi3.SchemaRef{
+						Value: &openapi3.Schema{
+							Type:    "string",
+							Pattern: "[a-z]+",
 						},
-						Name:     "customRegex1",
-						In:       "path",
-						Required: true,
 					},
+					Name:     "customRegex1",
+					In:       "path",
+					Required: true,
 				},
-				{
-					Value: &openapi3.Parameter{
-						Schema: &openapi3.SchemaRef{
-							Value: &openapi3.Schema{
-								Type:    "string",
-								Pattern: "[0-9]+$",
-							},
+			},
+			{
+				Value: &openapi3.Parameter{
+					Schema: &openapi3.SchemaRef{
+						Value: &openapi3.Schema{
+							Type:    "string",
+							Pattern: "[0-9]+$",
 						},
-						Name:     "customRegex2",
-						In:       "path",
-						Required: true,
 					},
+					Name:     "customRegex2",
+					In:       "path",
+					Required: true,
 				},
 			},
 		},
-	}
+	})
 
 	assert.Equal(t, expectedPathItems, oas.Paths, "expected path item differs")
 }
@@ -174,11 +170,10 @@ func TestOAS_RegexOperationIDs(t *testing.T) {
 
 	for i, tc := range tests {
 		var oas OAS
-		oas.Paths = openapi3.Paths{
-			tc.input: {
-				Get: &openapi3.Operation{},
-			},
-		}
+		oas.Paths = openapi3.NewPaths()
+		oas.Paths.Set(tc.input, &openapi3.PathItem{
+			Get: openapi3.NewOperation(),
+		})
 		got := oas.getOperationID(tc.input, tc.method)
 		assert.Equalf(t, tc.want, got, "test %d: expected operationID %v, got %v", i, tc.want, got)
 	}
@@ -209,20 +204,19 @@ func TestOAS_RegexPaths(t *testing.T) {
 
 	for i, tc := range tests {
 		var oas OAS
-		oas.Paths = openapi3.Paths{}
+		oas.Paths = openapi3.NewPaths()
 		_ = oas.getOperationID(tc.input, "GET")
 
-		pathKeys := make([]string, 0, len(oas.Paths))
-		for k := range oas.Paths {
+		pathKeys := make([]string, 0, oas.Paths.Len())
+		for k := range oas.Paths.Map() {
 			pathKeys = append(pathKeys, k)
 		}
 
 		assert.Lenf(t, oas.Paths, 1, "Expected one path key being created, got %#v", pathKeys)
-		_, ok := oas.Paths[tc.want]
-		assert.True(t, ok)
+		assert.NotNil(t, oas.Paths.Find(tc.want))
 
-		p, ok := oas.Paths[tc.want]
-		assert.Truef(t, ok, "test %d: path doesn't exist in OAS: %v", i, tc.want)
+		p := oas.Paths.Find(tc.want)
+		assert.NotNilf(t, p, "test %d: path doesn't exist in OAS: %v", i, tc.want)
 		assert.Lenf(t, p.Parameters, tc.params, "test %d: expected %d parameters, got %d", i, tc.params, len(p.Parameters))
 
 		// rebuild original link

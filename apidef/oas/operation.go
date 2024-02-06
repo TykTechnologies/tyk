@@ -136,7 +136,7 @@ func (s *OAS) fillPathsAndOperations(ep apidef.ExtendedPathsSet) {
 	// Regardless if `ep` is a zero value, we need a non-nil paths
 	// to produce a valid OAS document
 	if s.Paths == nil {
-		s.Paths = make(openapi3.Paths)
+		s.Paths = openapi3.NewPaths()
 	}
 
 	s.fillAllowance(ep.WhiteList, allow)
@@ -170,7 +170,7 @@ func (s *OAS) extractPathsAndOperations(ep *apidef.ExtendedPathsSet) {
 
 	for id, tykOp := range tykOperations {
 	found:
-		for path, pathItem := range s.Paths {
+		for path, pathItem := range s.Paths.Map() {
 			for method, operation := range pathItem.Operations() {
 				if id == operation.OperationID {
 					tykOp.extractAllowanceTo(ep, path, method, allow)
@@ -536,11 +536,11 @@ func (s *OAS) getOperationID(inPath, method string) string {
 	operationID := strings.TrimPrefix(inPath, "/") + method
 
 	createOrGetPathItem := func(item string) *openapi3.PathItem {
-		if s.Paths[item] == nil {
-			s.Paths[item] = &openapi3.PathItem{}
+		if s.Paths.Find(item) == nil {
+			s.Paths.Set(item, &openapi3.PathItem{})
 		}
 
-		return s.Paths[item]
+		return s.Paths.Find(item)
 	}
 
 	createOrUpdateOperation := func(p *openapi3.PathItem) *openapi3.Operation {
@@ -736,7 +736,7 @@ type FromOASExamples struct {
 }
 
 func (*MockResponse) shouldImport(operation *openapi3.Operation) bool {
-	for _, response := range operation.Responses {
+	for _, response := range operation.Responses.Map() {
 		for _, content := range response.Value.Content {
 			if content.Example != nil || content.Schema != nil {
 				return true

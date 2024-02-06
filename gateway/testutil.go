@@ -1683,7 +1683,7 @@ func getSampleOASAPI() oas.OAS {
 				Title:   "oas doc",
 				Version: "1",
 			},
-			Paths: make(openapi3.Paths),
+			Paths: openapi3.NewPaths(),
 		}}
 
 	oasAPI.SetTykExtension(tykExtension)

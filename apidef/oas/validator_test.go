@@ -25,23 +25,23 @@ func getBoolPointer(b bool) *bool {
 
 func TestValidateOASObject(t *testing.T) {
 	t.Parallel()
+	paths := openapi3.NewPaths()
+	res := openapi3.NewResponses()
+	res.Set("200", &openapi3.ResponseRef{
+		Value: &openapi3.Response{
+			Description: getStrPointer("A paged array of pets"),
+		},
+	})
+	paths.Set("/pets", &openapi3.PathItem{
+		Get: &openapi3.Operation{
+			Responses: res,
+		},
+	})
 	validOASObject := OAS{
 		openapi3.T{
 			OpenAPI: "3.0.3",
 			Info:    &openapi3.Info{},
-			Paths: map[string]*openapi3.PathItem{
-				"/pets": {
-					Get: &openapi3.Operation{
-						Responses: openapi3.Responses{
-							"200": &openapi3.ResponseRef{
-								Value: &openapi3.Response{
-									Description: getStrPointer("A paged array of pets"),
-								},
-							},
-						},
-					},
-				},
-			},
+			Paths:   paths,
 		},
 	}
 
@@ -77,7 +77,7 @@ func TestValidateOASObject(t *testing.T) {
 	invalidXTykAPIGateway.Info = Info{}
 	invalidXTykAPIGateway.Server.GatewayTags = &GatewayTags{Enabled: true, Tags: []string{}}
 	invalidOASObject.SetTykExtension(&invalidXTykAPIGateway)
-	invalidOASObject.Paths["/pets"].Get.Responses["200"].Value.Description = nil
+	invalidOASObject.Paths.Find("/pets").Get.Responses.Status(200).Value.Description = nil
 	invalidOAS3Definition, _ := invalidOASObject.MarshalJSON()
 
 	t.Run("invalid OAS object", func(t *testing.T) {

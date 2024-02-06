@@ -206,7 +206,7 @@ func (s *OAS) importMiddlewares(overRideValues TykExtensionConfigParams) {
 		xTykAPIGateway.Middleware = &Middleware{}
 	}
 
-	for path, pathItem := range s.Paths {
+	for path, pathItem := range s.Paths.Map() {
 		for _, method := range allowedMethods {
 			if operation := pathItem.GetOperation(method); operation != nil {
 				tykOperation := s.getTykOperation(method, path)
