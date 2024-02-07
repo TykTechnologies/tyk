@@ -38,11 +38,21 @@ func TestXTykGateway_Lint(t *testing.T) {
 						Rules:     []*URLRewriteRule{},
 					}
 					for _, in := range URLRewriteInputs {
-						rule := &URLRewriteRule{
-							In:      in,
-							Pattern: ".*",
+						var rule URLRewriteRule
+						if in == InputRequestBody {
+							rule = URLRewriteRule{
+								In:      in,
+								Pattern: ".*",
+							}
+						} else {
+							rule = URLRewriteRule{
+								In:      in,
+								Name:    "test",
+								Pattern: ".*",
+							}
 						}
-						trigger.Rules = append(trigger.Rules, rule)
+
+						trigger.Rules = append(trigger.Rules, &rule)
 					}
 					triggers = append(triggers, trigger)
 				}
