@@ -1724,7 +1724,7 @@
           "type": "boolean"
         },
         "timeout": {
-          "type": "string"
+          "type": "integer"
         }
       },
       "required": [
