@@ -21,8 +21,6 @@ import (
 
 	"github.com/TykTechnologies/tyk/storage/kv"
 
-	graphqlinternal "github.com/TykTechnologies/tyk/internal/graphql"
-
 	"github.com/getkin/kin-openapi/routers"
 
 	"github.com/TykTechnologies/tyk/internal/graphengine"
