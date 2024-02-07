@@ -102,11 +102,14 @@ func (k *OrganizationMonitor) ProcessRequestLive(r *http.Request, orgSession *us
 		return errors.New("this organisation access has been disabled, please contact your API administrator"), http.StatusForbidden
 	}
 
+	customQuotaKey := ""
+
 	// We found a session, apply the quota and rate limiter
 	reason := k.Gw.SessionLimiter.ForwardMessage(
 		r,
 		orgSession,
 		k.Spec.OrgID,
+		customQuotaKey,
 		k.Spec.OrgSessionManager.Store(),
 		orgSession.Per > 0 && orgSession.Rate > 0,
 		true,
@@ -233,11 +236,15 @@ func (k *OrganizationMonitor) AllowAccessNext(
 		orgChan <- false
 		return
 	}
+
+	customQuotaKey := ""
+
 	// We found a session, apply the quota and rate limiter
 	reason := k.Gw.SessionLimiter.ForwardMessage(
 		r,
 		session,
 		k.Spec.OrgID,
+		customQuotaKey,
 		k.Spec.OrgSessionManager.Store(),
 		session.Per > 0 && session.Rate > 0,
 		true,
