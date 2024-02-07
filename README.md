@@ -1,8 +1,17 @@
 ![tyk-github-header](https://github.com/TykTechnologies/tyk/assets/8012032/02b3fbae-80ed-4d1f-be87-016326f82ece)
+![License: MPL 2.0](https://img.shields.io/badge/License-MPL%202.0-brightgreen.svg?style=flat_card&color=8836FB)
+[![FOSSA Status](https://app.fossa.io/api/projects/git%2Bgithub.com%2FTykTechnologies%2Ftyk.svg?type=shield)](https://app.fossa.io/projects/git%2Bgithub.com%2FTykTechnologies%2Ftyk?ref=badge_shield)
 
-![GitHub release (release name instead of tag name)](https://img.shields.io/github/v/release/TykTechnologies/tyk?color=5900CB) ![Docker Pulls](https://img.shields.io/docker/pulls/tykio/tyk-gateway?color=8438FA) ![GitHub Workflow Status (with event)](https://img.shields.io/github/actions/workflow/status/TykTechnologies/tyk/ci-tests.yml?label=Build%20%26%20Tests&color=8438FA) [![Go Report Card](https://img.shields.io/badge/go%20report-A+-brightgreen.svg?style=flat_card&color=8438FA)](https://goreportcard.com/report/github.com/TykTechnologies/tyk?style=flat-square) ![GitHub commit activity (branch)](https://img.shields.io/github/commit-activity/m/TykTechnologies/tyk?style=flat-square&color=8836FB) ![GitHub Repo stars](https://img.shields.io/github/stars/TykTechnologies/tyk?color=ffc743) ![License: MPL 2.0](https://img.shields.io/badge/License-MPL%202.0-brightgreen.svg?style=flat_card&color=8438FA) [![FOSSA Status](https://app.fossa.io/api/projects/git%2Bgithub.com%2FTykTechnologies%2Ftyk.svg?type=shield)](https://app.fossa.io/projects/git%2Bgithub.com%2FTykTechnologies%2Ftyk?ref=badge_shield) ![Twitter Follow](https://img.shields.io/twitter/follow/tyk_io)
+[![GitHub Latest Release](https://img.shields.io/github/v/release/TykTechnologies/tyk?color=8836FB)](https://github.com/TykTechnologies/tyk/releases)
+[![GitHub Release Date](https://img.shields.io/github/release-date/TykTechnologies/tyk?color=8836FB)](https://github.com/TykTechnologies/tyk/releases)
+[![Docker Pulls](https://img.shields.io/docker/pulls/tykio/tyk-gateway?color=8836FB)](https://hub.docker.com/r/tykio/tyk-gateway/)
+[![GitHub Workflow Status (with event)](https://img.shields.io/github/actions/workflow/status/TykTechnologies/tyk/ci-tests.yml?label=Build%20%26%20Tests&color=8438FA)](https://github.com/TykTechnologies/tyk/actions/workflows/ci-tests.yml)
+[![Go Report Card](https://img.shields.io/badge/go%20report-A+-brightgreen.svg?color=8836FB)](https://goreportcard.com/report/github.com/TykTechnologies/tyk)
 
-
+![GitHub commit activity](https://img.shields.io/github/commit-activity/m/TykTechnologies/tyk?color=8836FB)
+[![GitHub Repo Stars](https://img.shields.io/github/stars/TykTechnologies/tyk?logoColor=8836FB)](https://github.com/TykTechnologies/tyk/stargazers)
+[![GitHub Repo Forks](https://img.shields.io/github/forks/TykTechnologies/tyk.svg?logoColor=8836FB)](https://github.com/TykTechnologies/tyk/fork)
+![X twitter Follow](https://img.shields.io/twitter/follow/tyk_io?logoColor=8836FB&cacheSeconds=120)
 
 
 # Tyk API Gateway
@@ -59,7 +68,7 @@ cd tyk-gateway-docker
 docker-compose up
 ```
 
-You can run this in detach mode use the `-d` flag: `docker-compose up -d`
+You can run this in detach mode using the `-d` flag: `docker-compose up -d`
 
 **Congratulations, you’re done!**
 
@@ -172,7 +181,7 @@ go test ./...
 ```
 Note that tests require Redis to be running on the same machine (default port).
 
-In order to write your own test please use this guide [https://github.com/TykTechnologies/tyk/blob/master/TESTING.md](https://github.com/TykTechnologies/tyk/blob/master/TESTING.md)
+To write your own test please use this guide [https://github.com/TykTechnologies/tyk/blob/master/TESTING.md](https://github.com/TykTechnologies/tyk/blob/master/TESTING.md)
 
 ## Contributing
 
