@@ -2165,18 +2165,18 @@ components:
           type: string
           x-go-name: JWTClientIDBaseField
         jwt_expires_at_validation_skew:
-          format: uint64
+          format: int64
           type: integer
           x-go-name: JWTExpiresAtValidationSkew
         jwt_identity_base_field:
           type: string
           x-go-name: JWTIdentityBaseField
         jwt_issued_at_validation_skew:
-          format: uint64
+          format: int64
           type: integer
           x-go-name: JWTIssuedAtValidationSkew
         jwt_not_before_validation_skew:
-          format: uint64
+          format: int64
           type: integer
           x-go-name: JWTNotBeforeValidationSkew
         jwt_policy_field_name:
