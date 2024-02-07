@@ -1740,7 +1740,7 @@
           "type": "boolean"
         },
         "name": {
-          "$ref": "#/definitions/X-Tyk-DomainDef"
+          "type": "string"
         },
         "certificates": {
           "type": "array",
