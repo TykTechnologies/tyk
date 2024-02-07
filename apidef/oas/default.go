@@ -27,7 +27,7 @@ var (
 	errInvalidUpstreamURL  = errors.New("invalid upstream URL")
 	errInvalidServerURL    = errors.New("error validating servers entry in OAS")
 
-	allowedMethods = []string{
+	allowedMethods = StringSlice{
 		http.MethodConnect,
 		http.MethodDelete,
 		http.MethodGet,

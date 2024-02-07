@@ -22,7 +22,7 @@ type URLRewrite struct {
 
 	// Triggers contain advanced additional triggers for the URL rewrite.
 	// The triggers are processed only if the requested URL matches the pattern above.
-	Triggers []*URLRewriteTrigger `bson:"triggers,omitempty" json:"triggers,omitempty"`
+	Triggers URLRewriteTriggers `bson:"triggers,omitempty" json:"triggers,omitempty"`
 }
 
 // URLRewriteInput defines the input for an URL rewrite rule.
@@ -74,6 +74,8 @@ var (
 		InputRequestContext,
 	}
 )
+
+type URLRewriteTriggers []URLRewriteTrigger
 
 // URLRewriteTrigger represents a set of matching rules for a rewrite.
 type URLRewriteTrigger struct {
@@ -138,15 +140,15 @@ func (v *URLRewrite) Fill(meta apidef.URLRewriteMeta) {
 	v.Sort()
 }
 
-func (v *URLRewrite) fillTriggers(from []apidef.RoutingTrigger) []*URLRewriteTrigger {
-	result := make([]*URLRewriteTrigger, 0)
+func (v *URLRewrite) fillTriggers(from []apidef.RoutingTrigger) URLRewriteTriggers {
+	result := make(URLRewriteTriggers, 0)
 	for _, t := range from {
 		rules := v.fillRules(t.Options)
 		if len(rules) == 0 {
 			continue
 		}
 
-		trigger := &URLRewriteTrigger{
+		trigger := URLRewriteTrigger{
 			Condition: URLRewriteCondition(t.On),
 			Rules:     rules,
 			RewriteTo: t.RewriteTo,

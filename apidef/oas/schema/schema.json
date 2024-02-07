@@ -1,0 +1,1403 @@
+{
+  "$defs": {
+    "X-Tyk-Allowance": {
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "ignoreCase": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "enabled"
+      ],
+      "type": "object"
+    },
+    "X-Tyk-AuthSource": {
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "name": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "enabled"
+      ],
+      "type": "object"
+    },
+    "X-Tyk-Authentication": {
+      "additionalProperties": false,
+      "properties": {
+        "baseIdentityProvider": {
+          "type": "string"
+        },
+        "custom": {
+          "$ref": "#/$defs/X-Tyk-CustomPluginAuthentication"
+        },
+        "enabled": {
+          "type": "boolean"
+        },
+        "hmac": {
+          "$ref": "#/$defs/X-Tyk-HMAC"
+        },
+        "oidc": {
+          "$ref": "#/$defs/X-Tyk-OIDC"
+        },
+        "securitySchemes": {
+          "$ref": "#/$defs/X-Tyk-SecuritySchemes"
+        },
+        "stripAuthorizationData": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "enabled"
+      ],
+      "type": "object"
+    },
+    "X-Tyk-AuthenticationPlugin": {
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "functionName": {
+          "type": "string"
+        },
+        "idExtractor": {
+          "$ref": "#/$defs/X-Tyk-IDExtractor"
+        },
+        "path": {
+          "type": "string"
+        },
+        "rawBodyOnly": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "enabled",
+        "functionName",
+        "path"
+      ],
+      "type": "object"
+    },
+    "X-Tyk-CORS": {
+      "additionalProperties": false,
+      "properties": {
+        "allowCredentials": {
+          "type": "boolean"
+        },
+        "allowedHeaders": {
+          "$ref": "#/$defs/X-Tyk-StringSlice"
+        },
+        "allowedMethods": {
+          "$ref": "#/$defs/X-Tyk-StringSlice"
+        },
+        "allowedOrigins": {
+          "$ref": "#/$defs/X-Tyk-StringSlice"
+        },
+        "debug": {
+          "type": "boolean"
+        },
+        "enabled": {
+          "type": "boolean"
+        },
+        "exposedHeaders": {
+          "$ref": "#/$defs/X-Tyk-StringSlice"
+        },
+        "maxAge": {
+          "type": "integer"
+        },
+        "optionsPassthrough": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "enabled"
+      ],
+      "type": "object"
+    },
+    "X-Tyk-Cache": {
+      "additionalProperties": false,
+      "properties": {
+        "cacheAllSafeRequests": {
+          "type": "boolean"
+        },
+        "cacheByHeaders": {
+          "$ref": "#/$defs/X-Tyk-StringSlice"
+        },
+        "cacheResponseCodes": {
+          "items": {
+            "type": "integer"
+          },
+          "type": "array"
+        },
+        "controlTTLHeaderName": {
+          "type": "string"
+        },
+        "enableUpstreamCacheControl": {
+          "type": "boolean"
+        },
+        "enabled": {
+          "type": "boolean"
+        },
+        "timeout": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "enabled"
+      ],
+      "type": "object"
+    },
+    "X-Tyk-CachePlugin": {
+      "additionalProperties": false,
+      "properties": {
+        "cacheByRegex": {
+          "type": "string"
+        },
+        "cacheResponseCodes": {
+          "items": {
+            "type": "integer"
+          },
+          "type": "array"
+        },
+        "enabled": {
+          "type": "boolean"
+        },
+        "timeout": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "enabled"
+      ],
+      "type": "object"
+    },
+    "X-Tyk-CertificatePinning": {
+      "additionalProperties": false,
+      "properties": {
+        "domainToPublicKeysMapping": {
+          "$ref": "#/$defs/X-Tyk-PinnedPublicKeys"
+        },
+        "enabled": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "enabled",
+        "domainToPublicKeysMapping"
+      ],
+      "type": "object"
+    },
+    "X-Tyk-CircuitBreaker": {
+      "additionalProperties": false,
+      "properties": {
+        "coolDownPeriod": {
+          "type": "integer"
+        },
+        "enabled": {
+          "type": "boolean"
+        },
+        "halfOpenStateEnabled": {
+          "type": "boolean"
+        },
+        "sampleSize": {
+          "type": "integer"
+        },
+        "threshold": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "enabled",
+        "threshold",
+        "sampleSize",
+        "coolDownPeriod",
+        "halfOpenStateEnabled"
+      ],
+      "type": "object"
+    },
+    "X-Tyk-ClientCertificates": {
+      "additionalProperties": false,
+      "properties": {
+        "allowlist": {
+          "$ref": "#/$defs/X-Tyk-StringSlice"
+        },
+        "enabled": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "enabled",
+        "allowlist"
+      ],
+      "type": "object"
+    },
+    "X-Tyk-ClientToPolicies": {
+      "items": {
+        "$ref": "#/$defs/X-Tyk-ClientToPolicy"
+      },
+      "type": "array"
+    },
+    "X-Tyk-ClientToPolicy": {
+      "additionalProperties": false,
+      "properties": {
+        "clientId": {
+          "type": "string"
+        },
+        "policyId": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "X-Tyk-CustomPlugin": {
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "functionName": {
+          "type": "string"
+        },
+        "path": {
+          "type": "string"
+        },
+        "rawBodyOnly": {
+          "type": "boolean"
+        },
+        "requireSession": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "enabled",
+        "functionName",
+        "path"
+      ],
+      "type": "object"
+    },
+    "X-Tyk-CustomPluginAuthentication": {
+      "additionalProperties": false,
+      "properties": {
+        "config": {
+          "$ref": "#/$defs/X-Tyk-AuthenticationPlugin"
+        },
+        "cookie": {
+          "$ref": "#/$defs/X-Tyk-AuthSource"
+        },
+        "enabled": {
+          "type": "boolean"
+        },
+        "header": {
+          "$ref": "#/$defs/X-Tyk-AuthSource"
+        },
+        "query": {
+          "$ref": "#/$defs/X-Tyk-AuthSource"
+        }
+      },
+      "required": [
+        "enabled"
+      ],
+      "type": "object"
+    },
+    "X-Tyk-CustomPlugins": {
+      "items": {
+        "$ref": "#/$defs/X-Tyk-CustomPlugin"
+      },
+      "type": "array"
+    },
+    "X-Tyk-DetailedActivityLogs": {
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "enabled"
+      ],
+      "type": "object"
+    },
+    "X-Tyk-DetailedTracing": {
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "enabled"
+      ],
+      "type": "object"
+    },
+    "X-Tyk-Domain": {
+      "additionalProperties": false,
+      "properties": {
+        "certificates": {
+          "$ref": "#/$defs/X-Tyk-StringSlice"
+        },
+        "enabled": {
+          "type": "boolean"
+        },
+        "name": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "enabled",
+        "name"
+      ],
+      "type": "object"
+    },
+    "X-Tyk-DomainToCertificate": {
+      "additionalProperties": false,
+      "properties": {
+        "certificate": {
+          "type": "string"
+        },
+        "domain": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "domain",
+        "certificate"
+      ],
+      "type": "object"
+    },
+    "X-Tyk-DomainToCertificates": {
+      "items": {
+        "$ref": "#/$defs/X-Tyk-DomainToCertificate"
+      },
+      "type": "array"
+    },
+    "X-Tyk-EndpointPostPlugin": {
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "name": {
+          "type": "string"
+        },
+        "path": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "enabled",
+        "name",
+        "path"
+      ],
+      "type": "object"
+    },
+    "X-Tyk-EndpointPostPlugins": {
+      "items": {
+        "$ref": "#/$defs/X-Tyk-EndpointPostPlugin"
+      },
+      "type": "array"
+    },
+    "X-Tyk-EnforceTimeout": {
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "value": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "enabled",
+        "value"
+      ],
+      "type": "object"
+    },
+    "X-Tyk-FromOASExamples": {
+      "additionalProperties": false,
+      "properties": {
+        "code": {
+          "type": "integer"
+        },
+        "contentType": {
+          "type": "string"
+        },
+        "enabled": {
+          "type": "boolean"
+        },
+        "exampleName": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "enabled"
+      ],
+      "type": "object"
+    },
+    "X-Tyk-GatewayTags": {
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "tags": {
+          "$ref": "#/$defs/X-Tyk-StringSlice"
+        }
+      },
+      "required": [
+        "enabled",
+        "tags"
+      ],
+      "type": "object"
+    },
+    "X-Tyk-Global": {
+      "additionalProperties": false,
+      "properties": {
+        "cache": {
+          "$ref": "#/$defs/X-Tyk-Cache"
+        },
+        "cors": {
+          "$ref": "#/$defs/X-Tyk-CORS"
+        },
+        "pluginConfig": {
+          "$ref": "#/$defs/X-Tyk-PluginConfig"
+        },
+        "postAuthenticationPlugin": {
+          "$ref": "#/$defs/X-Tyk-PostAuthenticationPlugin"
+        },
+        "postPlugin": {
+          "$ref": "#/$defs/X-Tyk-PostPlugin"
+        },
+        "prePlugin": {
+          "$ref": "#/$defs/X-Tyk-PrePlugin"
+        },
+        "responsePlugin": {
+          "$ref": "#/$defs/X-Tyk-ResponsePlugin"
+        },
+        "transformRequestHeaders": {
+          "$ref": "#/$defs/X-Tyk-TransformHeaders"
+        },
+        "transformResponseHeaders": {
+          "$ref": "#/$defs/X-Tyk-TransformHeaders"
+        }
+      },
+      "type": "object"
+    },
+    "X-Tyk-HMAC": {
+      "additionalProperties": false,
+      "properties": {
+        "allowedAlgorithms": {
+          "$ref": "#/$defs/X-Tyk-StringSlice"
+        },
+        "allowedClockSkew": {
+          "type": "number"
+        },
+        "cookie": {
+          "$ref": "#/$defs/X-Tyk-AuthSource"
+        },
+        "enabled": {
+          "type": "boolean"
+        },
+        "header": {
+          "$ref": "#/$defs/X-Tyk-AuthSource"
+        },
+        "query": {
+          "$ref": "#/$defs/X-Tyk-AuthSource"
+        }
+      },
+      "required": [
+        "enabled"
+      ],
+      "type": "object"
+    },
+    "X-Tyk-Header": {
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "value": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "value"
+      ],
+      "type": "object"
+    },
+    "X-Tyk-Headers": {
+      "items": {
+        "$ref": "#/$defs/X-Tyk-Header"
+      },
+      "type": "array"
+    },
+    "X-Tyk-IDExtractor": {
+      "additionalProperties": false,
+      "properties": {
+        "config": {
+          "$ref": "#/$defs/X-Tyk-IDExtractorConfig"
+        },
+        "enabled": {
+          "type": "boolean"
+        },
+        "source": {
+          "type": "string"
+        },
+        "with": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "enabled",
+        "source",
+        "with",
+        "config"
+      ],
+      "type": "object"
+    },
+    "X-Tyk-IDExtractorConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "formParamName": {
+          "type": "string"
+        },
+        "headerName": {
+          "type": "string"
+        },
+        "regexp": {
+          "type": "string"
+        },
+        "regexpMatchIndex": {
+          "type": "integer"
+        },
+        "xPathExp": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "X-Tyk-Info": {
+      "additionalProperties": false,
+      "properties": {
+        "dbId": {
+          "type": "string"
+        },
+        "expiration": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "orgId": {
+          "type": "string"
+        },
+        "state": {
+          "$ref": "#/$defs/X-Tyk-State"
+        },
+        "versioning": {
+          "$ref": "#/$defs/X-Tyk-Versioning"
+        }
+      },
+      "required": [
+        "name",
+        "state"
+      ],
+      "type": "object"
+    },
+    "X-Tyk-Internal": {
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "enabled"
+      ],
+      "type": "object"
+    },
+    "X-Tyk-ListenPath": {
+      "additionalProperties": false,
+      "properties": {
+        "strip": {
+          "type": "boolean"
+        },
+        "value": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "value"
+      ],
+      "type": "object"
+    },
+    "X-Tyk-Middleware": {
+      "additionalProperties": false,
+      "properties": {
+        "global": {
+          "$ref": "#/$defs/X-Tyk-Global"
+        },
+        "operations": {
+          "$ref": "#/$defs/X-Tyk-Operations"
+        }
+      },
+      "type": "object"
+    },
+    "X-Tyk-MockResponse": {
+      "additionalProperties": false,
+      "properties": {
+        "body": {
+          "type": "string"
+        },
+        "code": {
+          "type": "integer"
+        },
+        "enabled": {
+          "type": "boolean"
+        },
+        "fromOASExamples": {
+          "$ref": "#/$defs/X-Tyk-FromOASExamples"
+        },
+        "headers": {
+          "$ref": "#/$defs/X-Tyk-Headers"
+        }
+      },
+      "required": [
+        "enabled"
+      ],
+      "type": "object"
+    },
+    "X-Tyk-MutualTLS": {
+      "additionalProperties": false,
+      "properties": {
+        "domainToCertificateMapping": {
+          "$ref": "#/$defs/X-Tyk-DomainToCertificates"
+        },
+        "enabled": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "enabled",
+        "domainToCertificateMapping"
+      ],
+      "type": "object"
+    },
+    "X-Tyk-OIDC": {
+      "additionalProperties": false,
+      "properties": {
+        "cookie": {
+          "$ref": "#/$defs/X-Tyk-AuthSource"
+        },
+        "enabled": {
+          "type": "boolean"
+        },
+        "header": {
+          "$ref": "#/$defs/X-Tyk-AuthSource"
+        },
+        "providers": {
+          "$ref": "#/$defs/X-Tyk-Providers"
+        },
+        "query": {
+          "$ref": "#/$defs/X-Tyk-AuthSource"
+        },
+        "scopes": {
+          "$ref": "#/$defs/X-Tyk-Scopes"
+        },
+        "segregateByClientId": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "enabled"
+      ],
+      "type": "object"
+    },
+    "X-Tyk-Operation": {
+      "additionalProperties": false,
+      "properties": {
+        "allow": {
+          "$ref": "#/$defs/X-Tyk-Allowance"
+        },
+        "block": {
+          "$ref": "#/$defs/X-Tyk-Allowance"
+        },
+        "cache": {
+          "$ref": "#/$defs/X-Tyk-CachePlugin"
+        },
+        "circuitBreaker": {
+          "$ref": "#/$defs/X-Tyk-CircuitBreaker"
+        },
+        "doNotTrackEndpoint": {
+          "$ref": "#/$defs/X-Tyk-TrackEndpoint"
+        },
+        "enforceTimeout": {
+          "$ref": "#/$defs/X-Tyk-EnforceTimeout"
+        },
+        "ignoreAuthentication": {
+          "$ref": "#/$defs/X-Tyk-Allowance"
+        },
+        "internal": {
+          "$ref": "#/$defs/X-Tyk-Internal"
+        },
+        "mockResponse": {
+          "$ref": "#/$defs/X-Tyk-MockResponse"
+        },
+        "postPlugins": {
+          "$ref": "#/$defs/X-Tyk-EndpointPostPlugins"
+        },
+        "requestSizeLimit": {
+          "$ref": "#/$defs/X-Tyk-RequestSizeLimit"
+        },
+        "trackEndpoint": {
+          "$ref": "#/$defs/X-Tyk-TrackEndpoint"
+        },
+        "transformRequestBody": {
+          "$ref": "#/$defs/X-Tyk-TransformBody"
+        },
+        "transformRequestHeaders": {
+          "$ref": "#/$defs/X-Tyk-TransformHeaders"
+        },
+        "transformRequestMethod": {
+          "$ref": "#/$defs/X-Tyk-TransformRequestMethod"
+        },
+        "transformResponseBody": {
+          "$ref": "#/$defs/X-Tyk-TransformBody"
+        },
+        "transformResponseHeaders": {
+          "$ref": "#/$defs/X-Tyk-TransformHeaders"
+        },
+        "urlRewrite": {
+          "$ref": "#/$defs/X-Tyk-URLRewrite"
+        },
+        "validateRequest": {
+          "$ref": "#/$defs/X-Tyk-ValidateRequest"
+        },
+        "virtualEndpoint": {
+          "$ref": "#/$defs/X-Tyk-VirtualEndpoint"
+        }
+      },
+      "type": "object"
+    },
+    "X-Tyk-Operations": {
+      "additionalProperties": {
+        "$ref": "#/$defs/X-Tyk-Operation"
+      },
+      "type": "object"
+    },
+    "X-Tyk-PinnedPublicKey": {
+      "additionalProperties": false,
+      "properties": {
+        "domain": {
+          "type": "string"
+        },
+        "publicKeys": {
+          "$ref": "#/$defs/X-Tyk-StringSlice"
+        }
+      },
+      "required": [
+        "domain",
+        "publicKeys"
+      ],
+      "type": "object"
+    },
+    "X-Tyk-PinnedPublicKeys": {
+      "items": {
+        "$ref": "#/$defs/X-Tyk-PinnedPublicKey"
+      },
+      "type": "array"
+    },
+    "X-Tyk-PluginBundle": {
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "path": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "enabled",
+        "path"
+      ],
+      "type": "object"
+    },
+    "X-Tyk-PluginConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "bundle": {
+          "$ref": "#/$defs/X-Tyk-PluginBundle"
+        },
+        "data": {
+          "$ref": "#/$defs/X-Tyk-PluginConfigData"
+        },
+        "driver": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "X-Tyk-PluginConfigData": {
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "value": {
+          "type": "object"
+        }
+      },
+      "required": [
+        "enabled",
+        "value"
+      ],
+      "type": "object"
+    },
+    "X-Tyk-PostAuthenticationPlugin": {
+      "additionalProperties": false,
+      "properties": {
+        "plugins": {
+          "$ref": "#/$defs/X-Tyk-CustomPlugins"
+        }
+      },
+      "type": "object"
+    },
+    "X-Tyk-PostPlugin": {
+      "additionalProperties": false,
+      "properties": {
+        "plugins": {
+          "$ref": "#/$defs/X-Tyk-CustomPlugins"
+        }
+      },
+      "type": "object"
+    },
+    "X-Tyk-PrePlugin": {
+      "additionalProperties": false,
+      "properties": {
+        "plugins": {
+          "$ref": "#/$defs/X-Tyk-CustomPlugins"
+        }
+      },
+      "type": "object"
+    },
+    "X-Tyk-Provider": {
+      "additionalProperties": false,
+      "properties": {
+        "clientToPolicyMapping": {
+          "$ref": "#/$defs/X-Tyk-ClientToPolicies"
+        },
+        "issuer": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "X-Tyk-Providers": {
+      "items": {
+        "$ref": "#/$defs/X-Tyk-Provider"
+      },
+      "type": "array"
+    },
+    "X-Tyk-RateLimit": {
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "per": {
+          "type": "string"
+        },
+        "rate": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "enabled",
+        "rate",
+        "per"
+      ],
+      "type": "object"
+    },
+    "X-Tyk-RequestSizeLimit": {
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "value": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "enabled",
+        "value"
+      ],
+      "type": "object"
+    },
+    "X-Tyk-ResponsePlugin": {
+      "additionalProperties": false,
+      "properties": {
+        "plugins": {
+          "$ref": "#/$defs/X-Tyk-CustomPlugins"
+        }
+      },
+      "type": "object"
+    },
+    "X-Tyk-ScopeToPolicies": {
+      "items": {
+        "$ref": "#/$defs/X-Tyk-ScopeToPolicy"
+      },
+      "type": "array"
+    },
+    "X-Tyk-ScopeToPolicy": {
+      "additionalProperties": false,
+      "properties": {
+        "policyId": {
+          "type": "string"
+        },
+        "scope": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "X-Tyk-Scopes": {
+      "additionalProperties": false,
+      "properties": {
+        "claimName": {
+          "type": "string"
+        },
+        "scopeToPolicyMapping": {
+          "$ref": "#/$defs/X-Tyk-ScopeToPolicies"
+        }
+      },
+      "type": "object"
+    },
+    "X-Tyk-SecuritySchemes": {
+      "type": "object"
+    },
+    "X-Tyk-Server": {
+      "additionalProperties": false,
+      "properties": {
+        "authentication": {
+          "$ref": "#/$defs/X-Tyk-Authentication"
+        },
+        "clientCertificates": {
+          "$ref": "#/$defs/X-Tyk-ClientCertificates"
+        },
+        "customDomain": {
+          "$ref": "#/$defs/X-Tyk-Domain"
+        },
+        "detailedActivityLogs": {
+          "$ref": "#/$defs/X-Tyk-DetailedActivityLogs"
+        },
+        "detailedTracing": {
+          "$ref": "#/$defs/X-Tyk-DetailedTracing"
+        },
+        "gatewayTags": {
+          "$ref": "#/$defs/X-Tyk-GatewayTags"
+        },
+        "listenPath": {
+          "$ref": "#/$defs/X-Tyk-ListenPath"
+        }
+      },
+      "required": [
+        "listenPath"
+      ],
+      "type": "object"
+    },
+    "X-Tyk-ServiceDiscovery": {
+      "additionalProperties": false,
+      "properties": {
+        "cache": {
+          "$ref": "#/$defs/X-Tyk-ServiceDiscoveryCache"
+        },
+        "cacheTimeout": {
+          "type": "integer"
+        },
+        "dataPath": {
+          "type": "string"
+        },
+        "enabled": {
+          "type": "boolean"
+        },
+        "endpointReturnsList": {
+          "type": "boolean"
+        },
+        "parentDataPath": {
+          "type": "string"
+        },
+        "portDataPath": {
+          "type": "string"
+        },
+        "queryEndpoint": {
+          "type": "string"
+        },
+        "targetPath": {
+          "type": "string"
+        },
+        "useNestedQuery": {
+          "type": "boolean"
+        },
+        "useTargetList": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "enabled"
+      ],
+      "type": "object"
+    },
+    "X-Tyk-ServiceDiscoveryCache": {
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "timeout": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "enabled"
+      ],
+      "type": "object"
+    },
+    "X-Tyk-State": {
+      "additionalProperties": false,
+      "properties": {
+        "active": {
+          "type": "boolean"
+        },
+        "internal": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "active"
+      ],
+      "type": "object"
+    },
+    "X-Tyk-StringSlice": {
+      "items": {
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "X-Tyk-Test": {
+      "additionalProperties": false,
+      "properties": {
+        "serviceDiscovery": {
+          "$ref": "#/$defs/X-Tyk-ServiceDiscovery"
+        }
+      },
+      "type": "object"
+    },
+    "X-Tyk-TrackEndpoint": {
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "enabled"
+      ],
+      "type": "object"
+    },
+    "X-Tyk-TransformBody": {
+      "additionalProperties": false,
+      "properties": {
+        "body": {
+          "type": "string"
+        },
+        "enabled": {
+          "type": "boolean"
+        },
+        "format": {
+          "type": "string"
+        },
+        "path": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "enabled",
+        "format"
+      ],
+      "type": "object"
+    },
+    "X-Tyk-TransformHeaders": {
+      "additionalProperties": false,
+      "properties": {
+        "add": {
+          "$ref": "#/$defs/X-Tyk-Headers"
+        },
+        "enabled": {
+          "type": "boolean"
+        },
+        "remove": {
+          "$ref": "#/$defs/X-Tyk-StringSlice"
+        }
+      },
+      "required": [
+        "enabled"
+      ],
+      "type": "object"
+    },
+    "X-Tyk-TransformRequestMethod": {
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "toMethod": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "enabled",
+        "toMethod"
+      ],
+      "type": "object"
+    },
+    "X-Tyk-URLRewrite": {
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "pattern": {
+          "type": "string"
+        },
+        "rewriteTo": {
+          "type": "string"
+        },
+        "triggers": {
+          "$ref": "#/$defs/X-Tyk-URLRewriteTriggers"
+        }
+      },
+      "required": [
+        "enabled"
+      ],
+      "type": "object"
+    },
+    "X-Tyk-URLRewriteRule": {
+      "additionalProperties": false,
+      "properties": {
+        "in": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "negate": {
+          "type": "boolean"
+        },
+        "pattern": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "in",
+        "pattern"
+      ],
+      "type": "object"
+    },
+    "X-Tyk-URLRewriteTrigger": {
+      "additionalProperties": false,
+      "properties": {
+        "condition": {
+          "type": "string"
+        },
+        "rewriteTo": {
+          "type": "string"
+        },
+        "rules": {
+          "items": {
+            "$ref": "#/$defs/X-Tyk-URLRewriteRule"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "condition",
+        "rewriteTo"
+      ],
+      "type": "object"
+    },
+    "X-Tyk-URLRewriteTriggers": {
+      "items": {
+        "$ref": "#/$defs/X-Tyk-URLRewriteTrigger"
+      },
+      "type": "array"
+    },
+    "X-Tyk-Upstream": {
+      "additionalProperties": false,
+      "properties": {
+        "certificatePinning": {
+          "$ref": "#/$defs/X-Tyk-CertificatePinning"
+        },
+        "mutualTLS": {
+          "$ref": "#/$defs/X-Tyk-MutualTLS"
+        },
+        "rateLimit": {
+          "$ref": "#/$defs/X-Tyk-RateLimit"
+        },
+        "serviceDiscovery": {
+          "$ref": "#/$defs/X-Tyk-ServiceDiscovery"
+        },
+        "test": {
+          "$ref": "#/$defs/X-Tyk-Test"
+        },
+        "url": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "url"
+      ],
+      "type": "object"
+    },
+    "X-Tyk-ValidateRequest": {
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "errorResponseCode": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "enabled"
+      ],
+      "type": "object"
+    },
+    "X-Tyk-VersionToID": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "id"
+      ],
+      "type": "object"
+    },
+    "X-Tyk-VersionToIDs": {
+      "items": {
+        "$ref": "#/$defs/X-Tyk-VersionToID"
+      },
+      "type": "array"
+    },
+    "X-Tyk-Versioning": {
+      "additionalProperties": false,
+      "properties": {
+        "default": {
+          "type": "string"
+        },
+        "enabled": {
+          "type": "boolean"
+        },
+        "fallbackToDefault": {
+          "type": "boolean"
+        },
+        "key": {
+          "type": "string"
+        },
+        "location": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "stripVersioningData": {
+          "type": "boolean"
+        },
+        "versions": {
+          "$ref": "#/$defs/X-Tyk-VersionToIDs"
+        }
+      },
+      "required": [
+        "enabled",
+        "default",
+        "location",
+        "key",
+        "versions"
+      ],
+      "type": "object"
+    },
+    "X-Tyk-VirtualEndpoint": {
+      "additionalProperties": false,
+      "properties": {
+        "body": {
+          "type": "string"
+        },
+        "enabled": {
+          "type": "boolean"
+        },
+        "name": {
+          "type": "string"
+        },
+        "path": {
+          "type": "string"
+        },
+        "proxyOnError": {
+          "type": "boolean"
+        },
+        "requireSession": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "enabled",
+        "name"
+      ],
+      "type": "object"
+    },
+    "X-Tyk-XTykAPIGateway": {
+      "additionalProperties": false,
+      "properties": {
+        "info": {
+          "$ref": "#/$defs/X-Tyk-Info"
+        },
+        "middleware": {
+          "$ref": "#/$defs/X-Tyk-Middleware"
+        },
+        "server": {
+          "$ref": "#/$defs/X-Tyk-Server"
+        },
+        "upstream": {
+          "$ref": "#/$defs/X-Tyk-Upstream"
+        }
+      },
+      "required": [
+        "info",
+        "upstream",
+        "server"
+      ],
+      "type": "object"
+    }
+  },
+  "$id": "https://github.com/TykTechnologies/tyk/apidef/oas/x--tyk-x-tyk-api-gateway",
+  "$ref": "#/$defs/X-Tyk-XTykAPIGateway",
+  "$schema": "https://json-schema.org/draft/2020-12/schema"
+}

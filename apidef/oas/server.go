@@ -170,7 +170,7 @@ type ClientCertificates struct {
 	// Enabled enables static mTLS for the API.
 	Enabled bool `bson:"enabled" json:"enabled"`
 	// Allowlist is the list of client certificates which are allowed.
-	Allowlist []string `bson:"allowlist" json:"allowlist"`
+	Allowlist StringSlice `bson:"allowlist" json:"allowlist"`
 }
 
 // Fill fills *ClientCertificates from apidef.APIDefinition.
@@ -190,7 +190,7 @@ type GatewayTags struct {
 	// Enabled enables use of segment tags.
 	Enabled bool `bson:"enabled" json:"enabled"`
 	// Tags is a list of segment tags
-	Tags []string `bson:"tags" json:"tags"`
+	Tags StringSlice `bson:"tags" json:"tags"`
 }
 
 // Fill fills *GatewayTags from apidef.APIDefinition.
@@ -215,7 +215,7 @@ type Domain struct {
 	// that the Gateway can utilize to dynamically load certificates for your custom domain.
 	//
 	// Tyk classic API definition: `certificates`
-	Certificates []string `bson:"certificates,omitempty" json:"certificates,omitempty"`
+	Certificates StringSlice `bson:"certificates,omitempty" json:"certificates,omitempty"`
 }
 
 // ExtractTo extracts *Domain into *apidef.APIDefinition.

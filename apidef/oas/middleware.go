@@ -407,12 +407,12 @@ type CORS struct {
 	// ExposedHeaders indicates which headers are safe to expose to the API of a CORS API specification.
 	//
 	// Tyk classic API definition: `CORS.exposed_headers`.
-	ExposedHeaders []string `bson:"exposedHeaders,omitempty" json:"exposedHeaders,omitempty"`
+	ExposedHeaders StringSlice `bson:"exposedHeaders,omitempty" json:"exposedHeaders,omitempty"`
 
 	// AllowedHeaders holds a list of non simple headers the client is allowed to use with cross-domain requests.
 	//
 	// Tyk classic API definition: `CORS.allowed_headers`.
-	AllowedHeaders []string `bson:"allowedHeaders,omitempty" json:"allowedHeaders,omitempty"`
+	AllowedHeaders StringSlice `bson:"allowedHeaders,omitempty" json:"allowedHeaders,omitempty"`
 
 	// OptionsPassthrough is a boolean flag. If set to `true`, it will proxy the CORS OPTIONS pre-flight
 	// request directly to upstream, without authentication and any CORS checks. This means that pre-flight
@@ -432,12 +432,12 @@ type CORS struct {
 	// AllowedOrigins holds a list of origin domains to allow access from. Wildcards are also supported, e.g. `http://*.foo.com`
 	//
 	// Tyk classic API definition: `CORS.allowed_origins`.
-	AllowedOrigins []string `bson:"allowedOrigins,omitempty" json:"allowedOrigins,omitempty"`
+	AllowedOrigins StringSlice `bson:"allowedOrigins,omitempty" json:"allowedOrigins,omitempty"`
 
 	// AllowedMethods holds a list of methods to allow access via.
 	//
 	// Tyk classic API definition: `CORS.allowed_methods`.
-	AllowedMethods []string `bson:"allowedMethods,omitempty" json:"allowedMethods,omitempty"`
+	AllowedMethods StringSlice `bson:"allowedMethods,omitempty" json:"allowedMethods,omitempty"`
 }
 
 // Fill fills *CORS from apidef.CORSConfig.
@@ -493,7 +493,7 @@ type Cache struct {
 	// CacheByHeaders allows header values to be used as part of the cache key.
 	//
 	// Tyk classic API definition: `cache_options.cache_by_headers`
-	CacheByHeaders []string `bson:"cacheByHeaders,omitempty" json:"cacheByHeaders,omitempty"`
+	CacheByHeaders StringSlice `bson:"cacheByHeaders,omitempty" json:"cacheByHeaders,omitempty"`
 
 	// EnableUpstreamCacheControl instructs Tyk Cache to respect upstream cache control headers.
 	//
@@ -634,7 +634,7 @@ func (ps Paths) fillEnforceTimeout(metas []apidef.HardTimeoutMeta) {
 
 // ExtractTo extracts Paths into *apidef.ExtendedPathsSet.
 func (ps Paths) ExtractTo(ep *apidef.ExtendedPathsSet) {
-	var paths []string
+	var paths StringSlice
 	for path := range ps {
 		paths = append(paths, path)
 	}
@@ -875,6 +875,8 @@ func (a *Allowance) Import(enabled bool) {
 	a.Enabled = enabled
 }
 
+type Headers []Header
+
 // Header holds a header name and value pair.
 type Header struct {
 	// Name is the name of the header.
@@ -945,9 +947,9 @@ type TransformHeaders struct {
 	// Enabled enables Header Transform for the given path and method.
 	Enabled bool `bson:"enabled" json:"enabled"`
 	// Remove specifies header names to be removed from the request/response.
-	Remove []string `bson:"remove,omitempty" json:"remove,omitempty"`
+	Remove StringSlice `bson:"remove,omitempty" json:"remove,omitempty"`
 	// Add specifies headers to be added to the request/response.
-	Add []Header `bson:"add,omitempty" json:"add,omitempty"`
+	Add Headers `bson:"add,omitempty" json:"add,omitempty"`
 }
 
 // Fill fills *TransformHeaders from apidef.HeaderInjectionMeta.
@@ -955,7 +957,7 @@ func (th *TransformHeaders) Fill(meta apidef.HeaderInjectionMeta) {
 	th.Enabled = !meta.Disabled
 	th.Remove = meta.DeleteHeaders
 
-	th.Add = make([]Header, len(meta.AddHeaders))
+	th.Add = make(Headers, len(meta.AddHeaders))
 	i := 0
 	for k, v := range meta.AddHeaders {
 		th.Add[i] = Header{Name: k, Value: v}

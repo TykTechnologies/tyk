@@ -150,6 +150,8 @@ func (s *State) ExtractTo(api *apidef.APIDefinition) {
 	api.Internal = s.Internal
 }
 
+type VersionToIDs []VersionToID
+
 // Versioning holds configuration for API versioning.
 //
 // Tyk classic API definition: `version_data`.
@@ -169,7 +171,7 @@ type Versioning struct {
 	// Key contains the name of the key to check for versioning information.
 	Key string `bson:"key" json:"key"` // required
 	// Versions contains a list of versions that map to individual API IDs.
-	Versions []VersionToID `bson:"versions" json:"versions"` // required
+	Versions VersionToIDs `bson:"versions" json:"versions"` // required
 	// StripVersioningData is a boolean flag, if set to `true`, the API responses will be stripped of versioning data.
 	StripVersioningData bool `bson:"stripVersioningData,omitempty" json:"stripVersioningData,omitempty"`
 	// FallbackToDefault controls the behaviour of Tyk when a versioned API is called with a nonexistent version name.
@@ -185,7 +187,7 @@ func (v *Versioning) Fill(api apidef.APIDefinition) {
 	v.Default = api.VersionDefinition.Default
 	v.Location = api.VersionDefinition.Location
 	v.Key = api.VersionDefinition.Key
-	v.Versions = []VersionToID{}
+	v.Versions = VersionToIDs{}
 	for vName, apiID := range api.VersionDefinition.Versions {
 		v.Versions = append(v.Versions, VersionToID{vName, apiID})
 	}
@@ -230,3 +232,5 @@ type VersionToID struct {
 	// ID is the API ID for the version set in Name.
 	ID string `bson:"id" json:"id"`
 }
+
+type StringSlice []string

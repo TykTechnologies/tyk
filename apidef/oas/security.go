@@ -97,17 +97,17 @@ func (s *OAS) extractTokenTo(api *apidef.APIDefinition, name string) {
 type JWT struct {
 	Enabled                 bool `bson:"enabled" json:"enabled"` // required
 	AuthSources             `bson:",inline" json:",inline"`
-	Source                  string   `bson:"source,omitempty" json:"source,omitempty"`
-	SigningMethod           string   `bson:"signingMethod,omitempty" json:"signingMethod,omitempty"`
-	IdentityBaseField       string   `bson:"identityBaseField,omitempty" json:"identityBaseField,omitempty"`
-	SkipKid                 bool     `bson:"skipKid,omitempty" json:"skipKid,omitempty"`
-	PolicyFieldName         string   `bson:"policyFieldName,omitempty" json:"policyFieldName,omitempty"`
-	ClientBaseField         string   `bson:"clientBaseField,omitempty" json:"clientBaseField,omitempty"`
-	Scopes                  *Scopes  `bson:"scopes,omitempty" json:"scopes,omitempty"`
-	DefaultPolicies         []string `bson:"defaultPolicies,omitempty" json:"defaultPolicies,omitempty"`
-	IssuedAtValidationSkew  uint64   `bson:"issuedAtValidationSkew,omitempty" json:"issuedAtValidationSkew,omitempty"`
-	NotBeforeValidationSkew uint64   `bson:"notBeforeValidationSkew,omitempty" json:"notBeforeValidationSkew,omitempty"`
-	ExpiresAtValidationSkew uint64   `bson:"expiresAtValidationSkew,omitempty" json:"expiresAtValidationSkew,omitempty"`
+	Source                  string      `bson:"source,omitempty" json:"source,omitempty"`
+	SigningMethod           string      `bson:"signingMethod,omitempty" json:"signingMethod,omitempty"`
+	IdentityBaseField       string      `bson:"identityBaseField,omitempty" json:"identityBaseField,omitempty"`
+	SkipKid                 bool        `bson:"skipKid,omitempty" json:"skipKid,omitempty"`
+	PolicyFieldName         string      `bson:"policyFieldName,omitempty" json:"policyFieldName,omitempty"`
+	ClientBaseField         string      `bson:"clientBaseField,omitempty" json:"clientBaseField,omitempty"`
+	Scopes                  *Scopes     `bson:"scopes,omitempty" json:"scopes,omitempty"`
+	DefaultPolicies         StringSlice `bson:"defaultPolicies,omitempty" json:"defaultPolicies,omitempty"`
+	IssuedAtValidationSkew  uint64      `bson:"issuedAtValidationSkew,omitempty" json:"issuedAtValidationSkew,omitempty"`
+	NotBeforeValidationSkew uint64      `bson:"notBeforeValidationSkew,omitempty" json:"notBeforeValidationSkew,omitempty"`
+	ExpiresAtValidationSkew uint64      `bson:"expiresAtValidationSkew,omitempty" json:"expiresAtValidationSkew,omitempty"`
 	// IDPClientIDMappingDisabled prevents Tyk from automatically detecting the use of certain IDPs based on standard claims
 	// that they include in the JWT: `client_id`, `cid`, `clientId`. Setting this flag to `true` disables the mapping and avoids
 	// accidentally misidentifying the use of one of these IDPs if one of their standard values is configured in your JWT.
@@ -321,14 +321,16 @@ func (e *ExtractCredentialsFromBody) ExtractTo(api *apidef.APIDefinition) {
 	api.BasicAuth.BodyPasswordRegexp = e.PasswordRegexp
 }
 
+type AuthorizeRequestTypes []osin.AuthorizeRequestType
+
 // OAuth configures the OAuth middleware.
 type OAuth struct {
 	Enabled               bool `bson:"enabled" json:"enabled"` // required
 	AuthSources           `bson:",inline" json:",inline"`
-	AllowedAuthorizeTypes []osin.AuthorizeRequestType `bson:"allowedAuthorizeTypes,omitempty" json:"allowedAuthorizeTypes,omitempty"`
-	RefreshToken          bool                        `bson:"refreshToken,omitempty" json:"refreshToken,omitempty"`
-	AuthLoginRedirect     string                      `bson:"authLoginRedirect,omitempty" json:"authLoginRedirect,omitempty"`
-	Notifications         *Notifications              `bson:"notifications,omitempty" json:"notifications,omitempty"`
+	AllowedAuthorizeTypes AuthorizeRequestTypes `bson:"allowedAuthorizeTypes,omitempty" json:"allowedAuthorizeTypes,omitempty"`
+	RefreshToken          bool                  `bson:"refreshToken,omitempty" json:"refreshToken,omitempty"`
+	AuthLoginRedirect     string                `bson:"authLoginRedirect,omitempty" json:"authLoginRedirect,omitempty"`
+	Notifications         *Notifications        `bson:"notifications,omitempty" json:"notifications,omitempty"`
 }
 
 // Import populates *OAuth from it's arguments.
@@ -401,6 +403,7 @@ func (s *OAS) extractOAuthTo(api *apidef.APIDefinition, name string) {
 	api.AuthConfigs[apidef.OAuthType] = authConfig
 }
 
+type OAuthProviders []OAuthProvider
 type OAuthProvider struct {
 	JWT           *JWTValidation `bson:"jwt,omitempty" json:"jwt,omitempty"`
 	Introspection *Introspection `bson:"introspection,omitempty" json:"introspection,omitempty"`
@@ -511,7 +514,7 @@ func (c *IntrospectionCache) ExtractTo(cache *apidef.IntrospectionCache) {
 type ExternalOAuth struct {
 	Enabled     bool `bson:"enabled" json:"enabled"` // required
 	AuthSources `bson:",inline" json:",inline"`
-	Providers   []OAuthProvider `bson:"providers" json:"providers"` // required
+	Providers   OAuthProviders `bson:"providers" json:"providers"` // required
 }
 
 func (s *OAS) fillExternalOAuth(api apidef.APIDefinition) {
@@ -526,7 +529,7 @@ func (s *OAS) fillExternalOAuth(api apidef.APIDefinition) {
 	externalOAuth.Enabled = api.ExternalOAuth.Enabled
 	externalOAuth.AuthSources.Fill(authConfig)
 
-	externalOAuth.Providers = make([]OAuthProvider, len(api.ExternalOAuth.Providers))
+	externalOAuth.Providers = make(OAuthProviders, len(api.ExternalOAuth.Providers))
 	for i, provider := range api.ExternalOAuth.Providers {
 		p := OAuthProvider{}
 		if p.JWT == nil {
@@ -926,7 +929,7 @@ func (s *OAS) appendSecurity(name string) {
 	}
 
 	if _, found := s.Security[0][name]; !found {
-		s.Security[0][name] = []string{}
+		s.Security[0][name] = StringSlice{}
 	}
 }
 

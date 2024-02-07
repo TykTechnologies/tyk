@@ -379,14 +379,14 @@ type Scopes struct {
 	ClaimName string `bson:"claimName,omitempty" json:"claimName,omitempty"`
 
 	// ScopeToPolicyMapping contains the mappings of scopes to policy IDs.
-	ScopeToPolicyMapping []ScopeToPolicy `bson:"scopeToPolicyMapping,omitempty" json:"scopeToPolicyMapping,omitempty"`
+	ScopeToPolicyMapping ScopeToPolicies `bson:"scopeToPolicyMapping,omitempty" json:"scopeToPolicyMapping,omitempty"`
 }
 
 // Fill fills *Scopes from *apidef.ScopeClaim.
 func (s *Scopes) Fill(scopeClaim *apidef.ScopeClaim) {
 	s.ClaimName = scopeClaim.ScopeClaimName
 
-	s.ScopeToPolicyMapping = []ScopeToPolicy{}
+	s.ScopeToPolicyMapping = ScopeToPolicies{}
 
 	for scope, policyID := range scopeClaim.ScopeToPolicy {
 		s.ScopeToPolicyMapping = append(s.ScopeToPolicyMapping, ScopeToPolicy{Scope: scope, PolicyID: policyID})
@@ -410,6 +410,8 @@ func (s *Scopes) ExtractTo(scopeClaim *apidef.ScopeClaim) {
 		scopeClaim.ScopeToPolicy[v.Scope] = v.PolicyID
 	}
 }
+
+type ScopeToPolicies []ScopeToPolicy
 
 // ScopeToPolicy contains a single scope to policy ID mapping.
 type ScopeToPolicy struct {
@@ -439,7 +441,7 @@ type HMAC struct {
 	// and reads the value from algorithm header.
 	//
 	// Tyk classic API definition: `hmac_allowed_algorithms`
-	AllowedAlgorithms []string `bson:"allowedAlgorithms,omitempty" json:"allowedAlgorithms,omitempty"`
+	AllowedAlgorithms StringSlice `bson:"allowedAlgorithms,omitempty" json:"allowedAlgorithms,omitempty"`
 
 	// AllowedClockSkew is the amount of milliseconds that will be tolerated for clock skew. It is used against replay attacks.
 	// The default value is `0`, which deactivates clock skew checks.
@@ -492,7 +494,7 @@ type OIDC struct {
 	// Providers contains a list of authorised providers and their Client IDs, and matched policies.
 	//
 	// Tyk classic API definition: `openid_options.providers`.
-	Providers []Provider `bson:"providers,omitempty" json:"providers,omitempty"`
+	Providers Providers `bson:"providers,omitempty" json:"providers,omitempty"`
 
 	// Scopes contains the defined scope claims.
 	Scopes *Scopes `bson:"scopes,omitempty" json:"scopes,omitempty"`
@@ -506,9 +508,9 @@ func (o *OIDC) Fill(api apidef.APIDefinition) {
 
 	o.SegregateByClientId = api.OpenIDOptions.SegregateByClient
 
-	o.Providers = []Provider{}
+	o.Providers = Providers{}
 	for _, v := range api.OpenIDOptions.Providers {
-		var mapping []ClientToPolicy
+		var mapping ClientToPolicies
 		for clientID, polID := range v.ClientIDs {
 			mapping = append(mapping, ClientToPolicy{ClientID: clientID, PolicyID: polID})
 		}
@@ -568,14 +570,18 @@ func (o *OIDC) ExtractTo(api *apidef.APIDefinition) {
 	}
 }
 
+type Providers []Provider
+
 // Provider defines an issuer to validate and the Client ID to Policy ID mappings.
 type Provider struct {
 	// Issuer contains a validation value for the issuer claim, usually a domain name e.g. `accounts.google.com` or similar.
 	Issuer string `bson:"issuer,omitempty" json:"issuer,omitempty"`
 
 	// ClientToPolicyMapping contains mappings of Client IDs to Policy IDs.
-	ClientToPolicyMapping []ClientToPolicy `bson:"clientToPolicyMapping,omitempty" json:"clientToPolicyMapping,omitempty"`
+	ClientToPolicyMapping ClientToPolicies `bson:"clientToPolicyMapping,omitempty" json:"clientToPolicyMapping,omitempty"`
 }
+
+type ClientToPolicies []ClientToPolicy
 
 // ClientToPolicy contains a 1-1 mapping between Client ID and Policy ID.
 type ClientToPolicy struct {

@@ -338,8 +338,10 @@ type MutualTLS struct {
 
 	// DomainToCertificates maintains the mapping of domain to certificate.
 	// Tyk classic API definition: `upstream_certificates`
-	DomainToCertificates []DomainToCertificate `bson:"domainToCertificateMapping" json:"domainToCertificateMapping"`
+	DomainToCertificates DomainToCertificates `bson:"domainToCertificateMapping" json:"domainToCertificateMapping"`
 }
+
+type DomainToCertificates []DomainToCertificate
 
 // DomainToCertificate holds a single mapping of domain name into a certificate.
 type DomainToCertificate struct {
@@ -353,7 +355,7 @@ type DomainToCertificate struct {
 // Fill fills *MutualTLS from apidef.APIDefinition.
 func (m *MutualTLS) Fill(api apidef.APIDefinition) {
 	m.Enabled = !api.UpstreamCertificatesDisabled
-	m.DomainToCertificates = make([]DomainToCertificate, len(api.UpstreamCertificates))
+	m.DomainToCertificates = make(DomainToCertificates, len(api.UpstreamCertificates))
 
 	i := 0
 	for domain, cert := range api.UpstreamCertificates {
@@ -387,7 +389,7 @@ type PinnedPublicKey struct {
 	Domain string `bson:"domain" json:"domain"`
 
 	// PublicKeys contains a list of the public keys pinned to the domain name.
-	PublicKeys []string `bson:"publicKeys" json:"publicKeys"`
+	PublicKeys StringSlice `bson:"publicKeys" json:"publicKeys"`
 }
 
 // PinnedPublicKeys is a list of domains and pinned public keys for them.
