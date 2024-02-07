@@ -2311,8 +2311,6 @@
       "type": "object"
     }
   },
-  "$id": "https://github.com/TykTechnologies/tyk/apidef/oas/x--tyk-x-tyk-api-gateway",
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
   "description": "XTykAPIGateway contains custom Tyk API extensions for the OpenAPI definition.",
   "properties": {

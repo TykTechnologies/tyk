@@ -8,6 +8,7 @@ import (
 	"reflect"
 
 	"github.com/TykTechnologies/tyk/apidef/oas"
+	"github.com/buger/jsonparser"
 	"github.com/invopop/jsonschema"
 	log "github.com/sirupsen/logrus"
 )
@@ -40,6 +41,8 @@ func main() {
 	out, _ = json.MarshalIndent(outMap, "", "  ")
 
 	out = bytes.Replace(out, []byte("$defs"), []byte("definitions"), -1)
+	out = jsonparser.Delete(out, "$id")
+	out = jsonparser.Delete(out, "$schema")
 	err = os.WriteFile("apidef/oas/schema/x-tyk-api-gateway.json", out, 0644)
 	if err != nil {
 		log.Fatal("error writing generated schema")
