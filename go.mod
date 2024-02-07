@@ -85,7 +85,7 @@ require (
 
 require (
 	github.com/Jeffail/gabs/v2 v2.7.0
-	github.com/TykTechnologies/graphql-go-tools/v2 v2.0.0-20240119121455-385ba43daaa4
+	github.com/TykTechnologies/graphql-go-tools/v2 v2.0.0-20240131151522-40a1ee2bbfc3
 	github.com/TykTechnologies/kin-openapi v0.90.0
 	github.com/TykTechnologies/opentelemetry v0.0.20
 	github.com/alecthomas/kingpin/v2 v2.4.0
