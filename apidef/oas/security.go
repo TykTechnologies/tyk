@@ -2,6 +2,7 @@ package oas
 
 import (
 	"github.com/getkin/kin-openapi/openapi3"
+	"github.com/invopop/jsonschema"
 	"github.com/lonelycode/osin"
 
 	"github.com/TykTechnologies/tyk/apidef"
@@ -21,6 +22,18 @@ const (
 	query  = "query"
 	cookie = "cookie"
 )
+
+func (t *Token) JSONSchema() *jsonschema.Schema {
+	ref := jsonschema.Reflector{
+		Anonymous:      true,
+		ExpandedStruct: true,
+		DoNotReference: true,
+	}
+	type Alias Token
+	schema := ref.Reflect(&Alias{})
+	schema.Version = ""
+	return schema
+}
 
 // Token holds the values related to authentication tokens.
 type Token struct {

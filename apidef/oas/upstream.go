@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/invopop/jsonschema"
 )
 
 // Upstream holds configuration for the upstream server to which Tyk should proxy requests.
@@ -341,12 +342,22 @@ type MutualTLS struct {
 	DomainToCertificates DomainToCertificates `bson:"domainToCertificateMapping" json:"domainToCertificateMapping"`
 }
 
+// DomainDef is schema for domain ref.
+type DomainDef string
+
+func (d DomainDef) JSONSchema() *jsonschema.Schema {
+	return &jsonschema.Schema{
+		Type:    "string",
+		Pattern: "^([*a-zA-Z0-9-]+(\\.[*a-zA-Z0-9-]+)*)(:\\d+)?$",
+	}
+}
+
 type DomainToCertificates []DomainToCertificate
 
 // DomainToCertificate holds a single mapping of domain name into a certificate.
 type DomainToCertificate struct {
 	// Domain contains the domain name.
-	Domain string `bson:"domain" json:"domain"`
+	Domain DomainDef `bson:"domain" json:"domain"`
 
 	// Certificate contains the certificate mapped to the domain.
 	Certificate string `bson:"certificate" json:"certificate"`
@@ -359,7 +370,7 @@ func (m *MutualTLS) Fill(api apidef.APIDefinition) {
 
 	i := 0
 	for domain, cert := range api.UpstreamCertificates {
-		m.DomainToCertificates[i] = DomainToCertificate{Domain: domain, Certificate: cert}
+		m.DomainToCertificates[i] = DomainToCertificate{Domain: DomainDef(domain), Certificate: cert}
 		i++
 	}
 
@@ -379,14 +390,14 @@ func (m *MutualTLS) ExtractTo(api *apidef.APIDefinition) {
 	}
 
 	for _, domainToCert := range m.DomainToCertificates {
-		api.UpstreamCertificates[domainToCert.Domain] = domainToCert.Certificate
+		api.UpstreamCertificates[string(domainToCert.Domain)] = domainToCert.Certificate
 	}
 }
 
 // PinnedPublicKey contains a mapping from the domain name into a list of public keys.
 type PinnedPublicKey struct {
 	// Domain contains the domain name.
-	Domain string `bson:"domain" json:"domain"`
+	Domain DomainDef `bson:"domain" json:"domain" jsonschema:"pattern=^([*a-zA-Z0-9-]+(\.[*a-zA-Z0-9-]+)*)(:\d+)?$"`
 
 	// PublicKeys contains a list of the public keys pinned to the domain name.
 	PublicKeys StringSlice `bson:"publicKeys" json:"publicKeys"`
@@ -411,7 +422,7 @@ func (ppk PinnedPublicKeys) Fill(publicKeys map[string]string) {
 
 	i = 0
 	for _, domain := range domains {
-		ppk[i] = PinnedPublicKey{Domain: domain, PublicKeys: strings.Split(strings.ReplaceAll(publicKeys[domain], " ", ""), ",")}
+		ppk[i] = PinnedPublicKey{Domain: DomainDef(domain), PublicKeys: strings.Split(strings.ReplaceAll(publicKeys[domain], " ", ""), ",")}
 		i++
 	}
 }
@@ -419,7 +430,7 @@ func (ppk PinnedPublicKeys) Fill(publicKeys map[string]string) {
 // ExtractTo extracts PinnedPublicKeys values into the publicKeys map.
 func (ppk PinnedPublicKeys) ExtractTo(publicKeys map[string]string) {
 	for _, publicKey := range ppk {
-		publicKeys[publicKey.Domain] = strings.Join(publicKey.PublicKeys, ",")
+		publicKeys[string(publicKey.Domain)] = strings.Join(publicKey.PublicKeys, ",")
 	}
 }
 

@@ -7,6 +7,7 @@ import (
 	"sort"
 
 	"github.com/getkin/kin-openapi/openapi3"
+	"github.com/invopop/jsonschema"
 	"github.com/mitchellh/mapstructure"
 
 	"github.com/TykTechnologies/tyk/apidef"
@@ -130,6 +131,40 @@ func (a *Authentication) ExtractTo(api *apidef.APIDefinition) {
 
 // SecuritySchemes holds security scheme values, filled with Import().
 type SecuritySchemes map[string]interface{}
+
+func (ss SecuritySchemes) JSONSchema() *jsonschema.Schema {
+	ref := jsonschema.Reflector{
+		Anonymous:      true,
+		ExpandedStruct: true,
+		DoNotReference: true,
+	}
+
+	err := ref.AddGoComments("github.com/TykTechnologies/tyk/", "apidef/oas/")
+	if err != nil {
+		log.Println("error adding comments")
+	}
+
+	tokenSchema := ref.Reflect(&Token{})
+	basicAuthSchema := ref.Reflect(&Basic{})
+	jwtSchema := ref.Reflect(&JWT{})
+	oAuthSchema := ref.Reflect(&OAuth{})
+	externalOAuthSchema := ref.Reflect(&ExternalOAuth{})
+
+	return &jsonschema.Schema{
+		Type: "object",
+		PatternProperties: map[string]*jsonschema.Schema{
+			"^[a-zA-Z0-9\\.\\-_]+$": {
+				AnyOf: []*jsonschema.Schema{
+					tokenSchema,
+					basicAuthSchema,
+					jwtSchema,
+					oAuthSchema,
+					externalOAuthSchema,
+				},
+			},
+		},
+	}
+}
 
 // SecurityScheme defines an Importer interface for security schemes.
 type SecurityScheme interface {

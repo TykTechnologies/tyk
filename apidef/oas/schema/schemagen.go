@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -19,6 +20,12 @@ func main() {
 			}
 			return r.Name()
 		},
+		ExpandedStruct: true,
+	}
+
+	err := ref.AddGoComments("github.com/TykTechnologies/tyk/", "apidef/oas/")
+	if err != nil {
+		log.Println("error adding comments")
 	}
 
 	schema := ref.Reflect(&oas.XTykAPIGateway{})
@@ -32,7 +39,8 @@ func main() {
 
 	out, _ = json.MarshalIndent(outMap, "", "  ")
 
-	err = os.WriteFile("apidef/oas/schema/schema.json", out, 0644)
+	out = bytes.Replace(out, []byte("$defs"), []byte("definitions"), -1)
+	err = os.WriteFile("apidef/oas/schema/x-tyk-api-gateway.json", out, 0644)
 	if err != nil {
 		log.Fatal("error writing generated schema")
 	}

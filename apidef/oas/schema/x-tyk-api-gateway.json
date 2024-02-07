@@ -1,1799 +1,269 @@
 {
-  "$schema": "http://json-schema.org/draft-04/schema#",
-  "type": "object",
-  "properties": {
-    "info": {
-      "$ref": "#/definitions/X-Tyk-Info"
-    },
-    "upstream": {
-      "$ref": "#/definitions/X-Tyk-Upstream"
-    },
-    "server": {
-      "$ref": "#/definitions/X-Tyk-Server"
-    },
-    "middleware": {
-      "$ref": "#/definitions/X-Tyk-Middleware"
-    }
-  },
-  "additionalProperties": false,
-  "required": [
-    "info",
-    "upstream",
-    "server"
-  ],
   "definitions": {
-    "X-Tyk-ServiceDiscovery": {
-      "type": "object",
+    "X-Tyk-Allowance": {
       "additionalProperties": false,
+      "description": "Allowance describes allowance actions and behaviour.",
       "properties": {
         "enabled": {
+          "description": "Enabled is a boolean flag, if set to `true`, then individual allowances (allow, block, ignore) will be enforced.",
           "type": "boolean"
         },
-        "queryEndpoint": {
-          "type": "string"
-        },
-        "dataPath": {
-          "type": "string"
-        },
-        "useNestedQuery": {
-          "type": "boolean"
-        },
-        "parentDataPath": {
-          "type": "string"
-        },
-        "portDataPath": {
-          "type": "string"
-        },
-        "useTargetList": {
-          "type": "boolean"
-        },
-        "cache": {
-          "$ref": "#/definitions/X-Tyk-ServiceDiscoveryCache"
-        },
-        "cacheTimeout": {
-          "type": "integer",
-          "format": "int64"
-        },
-        "targetPath": {
-          "type": "string"
-        },
-        "endpointReturnsList": {
+        "ignoreCase": {
+          "description": "IgnoreCase is a boolean flag, If set to `true`, checks for requests allowance will be case insensitive.",
           "type": "boolean"
         }
       },
       "required": [
         "enabled"
-      ]
-    },
-    "X-Tyk-ServiceDiscoveryCache": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "enabled": {
-          "type": "boolean"
-        },
-        "timeout": {
-          "type": "integer",
-          "format": "int64"
-        }
-      },
-      "required": [
-        "enabled"
-      ]
-    },
-    "X-Tyk-DetailedActivityLogs": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "enabled": {
-          "type": "boolean"
-        }
-      },
-      "required": [
-        "enabled"
-      ]
+      ],
+      "type": "object"
     },
     "X-Tyk-AuthSource": {
-      "type": "object",
       "additionalProperties": false,
+      "description": "AuthSource defines an authentication source.",
       "properties": {
         "enabled": {
+          "description": "Enabled enables the auth source.\nTyk classic API definition: `auth_configs[X].use_param/use_cookie`",
           "type": "boolean"
         },
         "name": {
+          "description": "Name is the name of the auth source.\nTyk classic API definition: `auth_configs[X].param_name/cookie_name`",
           "type": "string"
         }
       },
       "required": [
         "enabled"
-      ]
+      ],
+      "type": "object"
     },
-    "X-Tyk-MutualTLS": {
-      "type": "object",
+    "X-Tyk-Authentication": {
       "additionalProperties": false,
+      "description": "Authentication contains configuration about the authentication methods and security policies applied to requests.",
       "properties": {
+        "baseIdentityProvider": {
+          "description": "BaseIdentityProvider enables the use of multiple authentication mechanisms.\nIt provides the session object that determines access control, rate limits and usage quotas.\n\nIt should be set to one of the following:\n\n- `auth_token`\n- `hmac_key`\n- `basic_auth_user`\n- `jwt_claim`\n- `oidc_user`\n- `oauth_key`\n- `custom_auth`\n\nTyk classic API definition: `base_identity_provided_by`.",
+          "type": "string"
+        },
+        "custom": {
+          "$ref": "#/definitions/X-Tyk-CustomPluginAuthentication",
+          "description": "Custom contains the configurations related to Custom authentication mode.\n\nTyk classic API definition: `auth_configs[\"coprocess\"]`"
+        },
         "enabled": {
+          "description": "Enabled makes the API protected when one of the authentication modes is enabled.\n\nTyk classic API definition: `!use_keyless`.",
           "type": "boolean"
         },
-        "domainToCertificateMapping": {
-          "type": "array",
-          "items": [
-            {
-              "$ref": "#/definitions/X-Tyk-DomainToCertificate"
-            }
-          ]
+        "hmac": {
+          "$ref": "#/definitions/X-Tyk-HMAC",
+          "description": "HMAC contains the configurations related to HMAC authentication mode.\n\nTyk classic API definition: `auth_configs[\"hmac\"]`"
+        },
+        "oidc": {
+          "$ref": "#/definitions/X-Tyk-OIDC",
+          "description": "OIDC contains the configurations related to OIDC authentication mode.\n\nTyk classic API definition: `auth_configs[\"oidc\"]`"
+        },
+        "securitySchemes": {
+          "$ref": "#/definitions/X-Tyk-SecuritySchemes",
+          "description": "SecuritySchemes contains security schemes definitions."
+        },
+        "stripAuthorizationData": {
+          "description": "StripAuthorizationData ensures that any security tokens used for accessing APIs are stripped and not passed to the upstream.\n\nTyk classic API definition: `strip_auth_data`.",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "enabled"
+      ],
+      "type": "object"
+    },
+    "X-Tyk-AuthenticationPlugin": {
+      "additionalProperties": false,
+      "description": "AuthenticationPlugin holds the configuration for custom authentication plugin.",
+      "properties": {
+        "enabled": {
+          "description": "Enabled enables custom authentication plugin.",
+          "type": "boolean"
+        },
+        "functionName": {
+          "description": "FunctionName is the name of authentication method.",
+          "type": "string"
+        },
+        "idExtractor": {
+          "$ref": "#/definitions/X-Tyk-IDExtractor",
+          "description": "IDExtractor configures ID extractor with coprocess custom authentication."
+        },
+        "path": {
+          "description": "Path is the path to shared object file in case of gopluign mode or path to js code in case of otto auth plugin.",
+          "type": "string"
+        },
+        "rawBodyOnly": {
+          "description": "RawBodyOnly if set to true, do not fill body in request or response object.",
+          "type": "boolean"
         }
       },
       "required": [
         "enabled",
-        "domainToCertificateMapping"
-      ]
+        "functionName",
+        "path"
+      ],
+      "type": "object"
     },
-    "X-Tyk-DomainToCertificate": {
-      "type": "object",
+    "X-Tyk-CORS": {
       "additionalProperties": false,
+      "description": "CORS holds configuration for cross-origin resource sharing.",
       "properties": {
-        "domain": {
-          "$ref": "#/definitions/X-Tyk-DomainDef"
+        "allowCredentials": {
+          "description": "AllowCredentials indicates whether the request can include user credentials like cookies,\nHTTP authentication or client side SSL certificates.\n\nTyk classic API definition: `CORS.allow_credentials`.",
+          "type": "boolean"
         },
-        "certificate": {
-          "type": "string"
+        "allowedHeaders": {
+          "$ref": "#/definitions/X-Tyk-StringSlice",
+          "description": "AllowedHeaders holds a list of non simple headers the client is allowed to use with cross-domain requests.\n\nTyk classic API definition: `CORS.allowed_headers`."
+        },
+        "allowedMethods": {
+          "$ref": "#/definitions/X-Tyk-StringSlice",
+          "description": "AllowedMethods holds a list of methods to allow access via.\n\nTyk classic API definition: `CORS.allowed_methods`."
+        },
+        "allowedOrigins": {
+          "$ref": "#/definitions/X-Tyk-StringSlice",
+          "description": "AllowedOrigins holds a list of origin domains to allow access from. Wildcards are also supported, e.g. `http://*.foo.com`\n\nTyk classic API definition: `CORS.allowed_origins`."
+        },
+        "debug": {
+          "description": "Debug is a boolean flag, If set to `true`, this option produces log files for the CORS middleware.\n\nTyk classic API definition: `CORS.debug`.",
+          "type": "boolean"
+        },
+        "enabled": {
+          "description": "Enabled is a boolean flag, if set to `true`, this option enables CORS processing.\n\nTyk classic API definition: `CORS.enable`.",
+          "type": "boolean"
+        },
+        "exposedHeaders": {
+          "$ref": "#/definitions/X-Tyk-StringSlice",
+          "description": "ExposedHeaders indicates which headers are safe to expose to the API of a CORS API specification.\n\nTyk classic API definition: `CORS.exposed_headers`."
+        },
+        "maxAge": {
+          "description": "MaxAge indicates how long (in seconds) the results of a preflight request can be cached. The default is 0 which stands for no max age.\n\nTyk classic API definition: `CORS.max_age`.",
+          "type": "integer"
+        },
+        "optionsPassthrough": {
+          "description": "OptionsPassthrough is a boolean flag. If set to `true`, it will proxy the CORS OPTIONS pre-flight\nrequest directly to upstream, without authentication and any CORS checks. This means that pre-flight\nrequests generated by web-clients such as SwaggerUI or the Tyk Portal documentation system\nwill be able to test the API using trial keys.\n\nIf your service handles CORS natively, then enable this option.\n\nTyk classic API definition: `CORS.options_passthrough`.",
+          "type": "boolean"
         }
       },
       "required": [
-        "domain",
-        "certificate"
-      ]
+        "enabled"
+      ],
+      "type": "object"
     },
-    "X-Tyk-CertificatePinning": {
-      "type": "object",
+    "X-Tyk-Cache": {
       "additionalProperties": false,
+      "description": "Cache holds configuration for caching the requests.",
       "properties": {
-        "enabled": {
+        "cacheAllSafeRequests": {
+          "description": "CacheAllSafeRequests caches responses to (`GET`, `HEAD`, `OPTIONS`) requests overrides per-path cache settings in versions,\napplies across versions.\n\nTyk classic API definition: `cache_options.cache_all_safe_requests`",
           "type": "boolean"
         },
+        "cacheByHeaders": {
+          "$ref": "#/definitions/X-Tyk-StringSlice",
+          "description": "CacheByHeaders allows header values to be used as part of the cache key.\n\nTyk classic API definition: `cache_options.cache_by_headers`"
+        },
+        "cacheResponseCodes": {
+          "description": "CacheResponseCodes is an array of response codes which are safe to cache e.g. `404`.\n\nTyk classic API definition: `cache_options.cache_response_codes`",
+          "items": {
+            "type": "integer"
+          },
+          "type": "array"
+        },
+        "controlTTLHeaderName": {
+          "description": "ControlTTLHeaderName is the response header which tells Tyk how long it is safe to cache the response for.\n\nTyk classic API definition: `cache_options.cache_control_ttl_header`",
+          "type": "string"
+        },
+        "enableUpstreamCacheControl": {
+          "description": "EnableUpstreamCacheControl instructs Tyk Cache to respect upstream cache control headers.\n\nTyk classic API definition: `cache_options.enable_upstream_cache_control`",
+          "type": "boolean"
+        },
+        "enabled": {
+          "description": "Enabled turns global cache middleware on or off. It is still possible to enable caching on a per-path basis\nby explicitly setting the endpoint cache middleware.\n\nTyk classic API definition: `cache_options.enable_cache`",
+          "type": "boolean"
+        },
+        "timeout": {
+          "description": "Timeout is the TTL for a cached object in seconds.\n\nTyk classic API definition: `cache_options.cache_timeout`",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "enabled"
+      ],
+      "type": "object"
+    },
+    "X-Tyk-CachePlugin": {
+      "additionalProperties": false,
+      "description": "CachePlugin holds the configuration for the cache plugins.",
+      "properties": {
+        "cacheByRegex": {
+          "description": "CacheByRegex defines a regular expression used against the request body to produce a cache key.\n\nExample value: `\\\"id\\\":[^,]*` (quoted json value).",
+          "type": "string"
+        },
+        "cacheResponseCodes": {
+          "description": "CacheResponseCodes contains a list of valid response codes for responses that are okay to add to the cache.",
+          "items": {
+            "type": "integer"
+          },
+          "type": "array"
+        },
+        "enabled": {
+          "description": "Enabled is a boolean flag. If set to `true`, the advanced caching plugin will be enabled.",
+          "type": "boolean"
+        },
+        "timeout": {
+          "description": "Timeout is the TTL for the endpoint level caching in seconds. 0 means no caching.",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "enabled"
+      ],
+      "type": "object"
+    },
+    "X-Tyk-CertificatePinning": {
+      "additionalProperties": false,
+      "description": "CertificatePinning holds the configuration about mapping of domains to pinned public keys.",
+      "properties": {
         "domainToPublicKeysMapping": {
-          "type": "array",
-          "items": [
-            {
-              "$ref": "#/definitions/X-Tyk-PinnedPublicKeys"
-            }
-          ]
+          "$ref": "#/definitions/X-Tyk-PinnedPublicKeys",
+          "description": "DomainToPublicKeysMapping maintains the mapping of domain to pinned public keys.\n\nTyk classic API definition: `pinned_public_keys`"
+        },
+        "enabled": {
+          "description": "Enabled is a boolean flag, if set to `true`, it enables certificate pinning for the API.\n\nTyk classic API definition: `certificate_pinning_disabled`",
+          "type": "boolean"
         }
       },
       "required": [
         "enabled",
         "domainToPublicKeysMapping"
-      ]
-    },
-    "X-Tyk-PinnedPublicKeys": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "domain": {
-          "$ref": "#/definitions/X-Tyk-DomainDef"
-        },
-        "publicKeys": {
-          "type": "array",
-          "items": [
-            {
-              "type": "string"
-            }
-          ]
-        }
-      }
-    },
-    "X-Tyk-ClientToPolicy": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "clientId": {
-          "type": "string"
-        },
-        "policyId": {
-          "type": "string"
-        }
-      }
-    },
-    "X-Tyk-Provider": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "issuer": {
-          "type": "string"
-        },
-        "clientToPolicyMapping": {
-          "type": "array",
-          "items": [
-            {
-              "$ref": "#/definitions/X-Tyk-ClientToPolicy"
-            }
-          ]
-        }
-      }
-    },
-    "X-Tyk-ScopeToPolicy": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "scope": {
-          "type": "string"
-        },
-        "policyId": {
-          "type": "string"
-        }
-      }
-    },
-    "X-Tyk-Scopes": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "claimName": {
-          "type": "string"
-        },
-        "scopeToPolicyMapping": {
-          "type": "array",
-          "items": [
-            {
-              "$ref": "#/definitions/X-Tyk-ScopeToPolicy"
-            }
-          ]
-        }
-      }
-    },
-    "X-Tyk-ClientCertificates": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "enabled": {
-          "type": "boolean"
-        },
-        "allowlist": {
-          "type": "array",
-          "items": [
-            {
-              "type": "string"
-            }
-          ]
-        }
-      }
-    },
-    "X-Tyk-PluginConfig": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "driver": {
-          "type": "string",
-          "enum": [
-            "otto",
-            "python",
-            "lua",
-            "grpc",
-            "goplugin"
-          ]
-        },
-        "bundle": {
-          "$ref": "#/definitions/X-Tyk-PluginBundle"
-        },
-        "data": {
-          "$ref": "#/definitions/X-Tyk-PluginConfigData"
-        }
-      }
-    },
-    "X-Tyk-PluginConfigData": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "enabled": {
-          "type": "boolean"
-        },
-        "value": {
-          "type": "object"
-        }
-      },
-      "required": [
-        "enabled",
-        "value"
-      ]
-    },
-    "X-Tyk-CustomPluginConfig": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "plugins": {
-          "type": "array",
-          "items": [
-            {
-              "$ref": "#/definitions/X-Tyk-CustomPluginDefinition"
-            }
-          ]
-        }
-      }
-    },
-    "X-Tyk-CustomPluginDefinition": {
-      "additionalProperties": false,
-      "properties": {
-        "enabled": {
-          "type": "boolean"
-        },
-        "functionName": {
-          "type": "string"
-        },
-        "path": {
-          "type": "string"
-        },
-        "rawBodyOnly": {
-          "type": "boolean"
-        },
-        "requireSession": {
-          "type": "boolean"
-        }
-      },
-      "required": [
-        "enabled",
-        "functionName"
-      ]
-    },
-    "X-Tyk-IDExtractorConfig": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "headerName": {
-          "type": "string"
-        },
-        "formParamName": {
-          "type": "string"
-        },
-        "regexp": {
-          "type": "string"
-        },
-        "regexpMatchIndex": {
-          "type": "integer"
-        },
-        "xPathExp": {
-          "type": "string"
-        }
-      }
-    },
-    "X-Tyk-IDExtractor": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "enabled": {
-          "type": "boolean"
-        },
-        "source": {
-          "type": "string",
-          "enum": [
-            "body",
-            "header",
-            "form"
-          ]
-        },
-        "with": {
-          "type": "string",
-          "enum": [
-            "value",
-            "xpath",
-            "regex"
-          ]
-        },
-        "config": {
-          "$ref": "#/definitions/X-Tyk-IDExtractorConfig"
-        }
-      },
-      "required": [
-        "enabled",
-        "source",
-        "with",
-        "config"
-      ]
-    },
-    "X-Tyk-AuthenticationPlugin": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "enabled": {
-          "type": "boolean"
-        },
-        "functionName": {
-          "type": "string"
-        },
-        "path": {
-          "type": "string"
-        },
-        "rawBodyOnly": {
-          "type": "boolean"
-        },
-        "idExtractor": {
-          "$ref": "#/definitions/X-Tyk-IDExtractor"
-        }
-      },
-      "required": [
-        "enabled",
-        "functionName"
-      ]
-    },
-    "X-Tyk-PluginBundle": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "enabled": {
-          "type": "boolean"
-        },
-        "path": {
-          "type": "string",
-          "pattern": "\\S+"
-        }
-      },
-      "required": [
-        "enabled",
-        "path"
-      ]
-    },
-    "X-Tyk-CORS": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "enabled": {
-          "type": "boolean"
-        },
-        "maxAge": {
-          "type": "integer"
-        },
-        "allowCredentials": {
-          "type": "boolean"
-        },
-        "exposedHeaders": {
-          "type": "array",
-          "items": [
-            {
-              "type": "string"
-            }
-          ]
-        },
-        "allowedHeaders": {
-          "type": "array",
-          "items": [
-            {
-              "type": "string"
-            }
-          ]
-        },
-        "optionsPassthrough": {
-          "type": "boolean"
-        },
-        "debug": {
-          "type": "boolean"
-        },
-        "allowedOrigins": {
-          "type": "array",
-          "items": [
-            {
-              "type": "string"
-            }
-          ]
-        },
-        "allowedMethods": {
-          "type": "array",
-          "items": [
-            {
-              "type": "string"
-            }
-          ]
-        }
-      },
-      "required": [
-        "enabled"
-      ]
-    },
-    "X-Tyk-Cache": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "enabled": {
-          "type": "boolean"
-        },
-        "timeout": {
-          "type": "integer",
-          "format": "int64"
-        },
-        "cacheAllSafeRequests": {
-          "type": "boolean"
-        },
-        "cacheResponseCodes": {
-          "type": "array",
-          "items": [
-            {
-              "type": "integer"
-            }
-          ]
-        },
-        "cacheByHeaders": {
-          "type": "array",
-          "items": [
-            {
-              "type": "string"
-            }
-          ]
-        },
-        "enableUpstreamCacheControl": {
-          "type": "boolean"
-        },
-        "controlTTLHeaderName": {
-          "type": "string"
-        }
-      }
-    },
-    "X-Tyk-Global": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "pluginConfig": {
-          "$ref": "#/definitions/X-Tyk-PluginConfig"
-        },
-        "cors": {
-          "$ref": "#/definitions/X-Tyk-CORS"
-        },
-        "prePlugin": {
-          "$ref": "#/definitions/X-Tyk-CustomPluginConfig"
-        },
-        "postAuthenticationPlugin": {
-          "$ref": "#/definitions/X-Tyk-CustomPluginConfig"
-        },
-        "postPlugin": {
-          "$ref": "#/definitions/X-Tyk-CustomPluginConfig"
-        },
-        "responsePlugin": {
-          "$ref": "#/definitions/X-Tyk-CustomPluginConfig"
-        },
-        "cache": {
-          "$ref": "#/definitions/X-Tyk-Cache"
-        },
-        "transformRequestHeaders": {
-          "$ref": "#/definitions/X-Tyk-TransformHeaders"
-        },
-        "transformResponseHeaders": {
-          "$ref": "#/definitions/X-Tyk-TransformHeaders"
-        }
-      }
-    },
-    "X-Tyk-Allowance": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "enabled": {
-          "type": "boolean"
-        },
-        "ignoreCase": {
-          "type": "boolean"
-        }
-      },
-      "required": [
-        "enabled"
-      ]
-    },
-    "X-Tyk-TransformRequestMethod": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "enabled": {
-          "type": "boolean"
-        },
-        "toMethod": {
-          "type": "string"
-        }
-      },
-      "required": [
-        "enabled",
-        "toMethod"
-      ]
-    },
-    "X-Tyk-TransformBody": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "enabled": {
-          "type": "boolean"
-        },
-        "format": {
-          "type": "string",
-          "enum": [
-            "json",
-            "xml"
-          ]
-        },
-        "path": {
-          "type": "string"
-        },
-        "body": {
-          "type": "string"
-        }
-      },
-      "anyOf": [
-        {
-          "required": [
-            "body"
-          ]
-        },
-        {
-          "required": [
-            "path"
-          ]
-        }
       ],
-      "required": [
-        "enabled",
-        "format"
-      ],
-      "minProperties": 3
-    },
-    "X-Tyk-TransformHeaders": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "enabled": {
-          "type": "boolean"
-        },
-        "remove": {
-          "type": "array",
-          "items": [
-            {
-              "type": "string"
-            }
-          ]
-        },
-        "add": {
-          "type": "array",
-          "items": [
-            {
-              "$ref": "#/definitions/X-Tyk-Header"
-            }
-          ]
-        }
-      },
-      "required": [
-        "enabled"
-      ]
-    },
-    "X-Tyk-CachePlugin": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "enabled": {
-          "type": "boolean"
-        },
-        "cacheByRegex": {
-          "type": "string"
-        },
-        "cacheResponseCodes": {
-          "type": "array",
-          "items": [
-            {
-              "type": "integer"
-            }
-          ]
-        },
-        "timeout": {
-          "type": "integer",
-          "format": "int64",
-          "minimum": 0
-        }
-      },
-      "required": [
-        "enabled"
-      ]
-    },
-    "X-Tyk-EnforceTimeout": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "enabled": {
-          "type": "boolean"
-        },
-        "value": {
-          "type": "integer",
-          "minimum": 0
-        }
-      },
-      "required": [
-        "enabled",
-        "value"
-      ]
-    },
-    "X-Tyk-ValidateRequest": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "enabled": {
-          "type": "boolean"
-        },
-        "errorResponseCode": {
-          "type": "integer"
-        }
-      },
-      "required": [
-        "enabled"
-      ]
-    },
-    "X-Tyk-MockResponse": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "enabled": {
-          "type": "boolean"
-        },
-        "code": {
-          "type": "integer"
-        },
-        "body": {
-          "type": "string"
-        },
-        "headers": {
-          "type": "array",
-          "items": [
-            {
-              "$ref": "#/definitions/X-Tyk-Header"
-            }
-          ]
-        },
-        "fromOASExamples": {
-          "properties": {
-            "enabled": {
-              "type": "boolean"
-            },
-            "code": {
-              "type": "integer"
-            },
-            "contentType": {
-              "type": "string"
-            },
-            "exampleName": {
-              "type": "string"
-            }
-          },
-          "required": [
-            "enabled"
-          ]
-        }
-      },
-      "required": [
-        "enabled"
-      ]
-    },
-    "X-Tyk-RequestSizeLimit": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "enabled": {
-          "type": "boolean"
-        },
-        "value": {
-          "type": "integer",
-          "minimum": 0
-        }
-      },
-      "required": [
-        "enabled",
-        "value"
-      ]
-    },
-    "X-Tyk-VirtualEndpoint": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "enabled": {
-          "type": "boolean"
-        },
-        "name": {
-          "type": "string"
-        },
-        "path": {
-          "type": "string"
-        },
-        "body": {
-          "type": "string"
-        },
-        "proxyOnError": {
-          "type": "boolean"
-        },
-        "requireSession": {
-          "type": "boolean"
-        }
-      },
-      "required": [
-        "enabled",
-        "name"
-      ]
-    },
-    "X-Tyk-URLRewrite": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "enabled": {
-          "type": "boolean"
-        },
-        "pattern": {
-          "type": "string"
-        },
-        "rewriteTo": {
-          "type": "string"
-        },
-        "triggers": {
-          "type": "array",
-          "items": [
-            {
-              "$ref": "#/definitions/X-Tyk-URLRewriteTrigger"
-            }
-          ]
-        }
-      },
-      "required": [
-        "enabled",
-        "pattern",
-        "rewriteTo"
-      ]
-    },
-    "X-Tyk-TrackEndpoint": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "enabled": {
-          "type": "boolean"
-        }
-      },
-      "required": [
-        "enabled"
-      ]
-    },
-    "X-Tyk-URLRewriteTrigger": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "condition": {
-          "enum": [
-            "any",
-            "all"
-          ]
-        },
-        "rewriteTo": {
-          "type": "string"
-        },
-        "rules": {
-          "type": "array",
-          "items": [
-            {
-              "$ref": "#/definitions/X-Tyk-URLRewriteRule"
-            }
-          ]
-        }
-      },
-      "required": [
-        "condition",
-        "rewriteTo"
-      ]
-    },
-    "X-Tyk-URLRewriteRule": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "in": {
-          "enum": [
-            "query",
-            "path",
-            "header",
-            "sessionMetadata",
-            "requestContext",
-            "requestBody"
-          ]
-        },
-        "name": {
-          "type": "string"
-        },
-        "pattern": {
-          "type": "string"
-        },
-        "negate": {
-          "type": "boolean"
-        }
-      },
-      "required": [
-        "in",
-        "pattern"
-      ]
-    },
-    "X-Tyk-EndpointPostPlugin": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "enabled": {
-          "type": "boolean"
-        },
-        "name": {
-          "type": "string"
-        },
-        "path": {
-          "type": "string"
-        }
-      },
-      "required": [
-        "enabled",
-        "name",
-        "path"
-      ]
-    },
-    "X-Tyk-Internal": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "enabled": {
-          "type": "boolean"
-        }
-      },
-      "required": [
-        "enabled"
-      ]
-    },
-    "X-Tyk-Operation": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "allow": {
-          "$ref": "#/definitions/X-Tyk-Allowance"
-        },
-        "block": {
-          "$ref": "#/definitions/X-Tyk-Allowance"
-        },
-        "ignoreAuthentication": {
-          "$ref": "#/definitions/X-Tyk-Allowance"
-        },
-        "internal": {
-          "$ref": "#/definitions/X-Tyk-Internal"
-        },
-        "transformRequestMethod": {
-          "$ref": "#/definitions/X-Tyk-TransformRequestMethod"
-        },
-        "transformRequestBody": {
-          "$ref": "#/definitions/X-Tyk-TransformBody"
-        },
-        "transformResponseBody": {
-          "$ref": "#/definitions/X-Tyk-TransformBody"
-        },
-        "transformRequestHeaders": {
-          "$ref": "#/definitions/X-Tyk-TransformHeaders"
-        },
-        "transformResponseHeaders": {
-          "$ref": "#/definitions/X-Tyk-TransformHeaders"
-        },
-        "virtualEndpoint": {
-          "$ref": "#/definitions/X-Tyk-VirtualEndpoint"
-        },
-        "trackEndpoint": {
-          "$ref": "#/definitions/X-Tyk-TrackEndpoint"
-        },
-        "doNotTrackEndpoint": {
-          "$ref": "#/definitions/X-Tyk-TrackEndpoint"
-        },
-        "circuitBreaker": {
-          "$ref": "#/definitions/X-Tyk-CircuitBreaker"
-        },
-        "urlRewrite": {
-          "$ref": "#/definitions/X-Tyk-URLRewrite"
-        },
-        "postPlugins": {
-          "type": "array",
-          "items": [
-            {
-              "$ref": "#/definitions/X-Tyk-EndpointPostPlugin"
-            }
-          ]
-        },
-        "cache": {
-          "$ref": "#/definitions/X-Tyk-CachePlugin"
-        },
-        "enforceTimeout": {
-          "$ref": "#/definitions/X-Tyk-EnforceTimeout"
-        },
-        "validateRequest": {
-          "$ref": "#/definitions/X-Tyk-ValidateRequest"
-        },
-        "mockResponse": {
-          "$ref": "#/definitions/X-Tyk-MockResponse"
-        },
-        "requestSizeLimit": {
-          "$ref": "#/definitions/X-Tyk-RequestSizeLimit"
-        }
-      }
-    },
-    "X-Tyk-Operations": {
-      "type": "object",
-      "patternProperties": {
-        "\\S+": {
-          "$ref": "#/definitions/X-Tyk-Operation"
-        }
-      },
-      "additionalProperties": false
-    },
-    "X-Tyk-Middleware": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "global": {
-          "$ref": "#/definitions/X-Tyk-Global"
-        },
-        "operations": {
-          "$ref": "#/definitions/X-Tyk-Operations"
-        }
-      }
-    },
-    "X-Tyk-ListenPath": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "value": {
-          "type": "string",
-          "pattern": "\\S+"
-        },
-        "strip": {
-          "type": "boolean"
-        }
-      },
-      "required": [
-        "value"
-      ]
-    },
-    "X-Tyk-HMAC": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "enabled": {
-          "type": "boolean"
-        },
-        "header": {
-          "$ref": "#/definitions/X-Tyk-AuthSource"
-        },
-        "cookie": {
-          "$ref": "#/definitions/X-Tyk-AuthSource"
-        },
-        "query": {
-          "$ref": "#/definitions/X-Tyk-AuthSource"
-        },
-        "allowedAlgorithms": {
-          "type": "array",
-          "items": [
-            {
-              "type": "string"
-            }
-          ]
-        },
-        "allowedClockSkew": {
-          "type": "number",
-          "format": "double"
-        }
-      },
-      "required": [
-        "enabled"
-      ]
-    },
-    "X-Tyk-OIDC": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "enabled": {
-          "type": "boolean"
-        },
-        "header": {
-          "$ref": "#/definitions/X-Tyk-AuthSource"
-        },
-        "cookie": {
-          "$ref": "#/definitions/X-Tyk-AuthSource"
-        },
-        "query": {
-          "$ref": "#/definitions/X-Tyk-AuthSource"
-        },
-        "segregateByClientId": {
-          "type": "boolean"
-        },
-        "providers": {
-          "type": "array",
-          "items": [
-            {
-              "$ref": "#/definitions/X-Tyk-Provider"
-            }
-          ]
-        },
-        "scopes": {
-          "$ref": "#/definitions/X-Tyk-Scopes"
-        }
-      },
-      "required": [
-        "enabled"
-      ]
-    },
-    "X-Tyk-CustomPluginAuthentication": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "enabled": {
-          "type": "boolean"
-        },
-        "config": {
-          "$ref": "#/definitions/X-Tyk-AuthenticationPlugin"
-        },
-        "header": {
-          "$ref": "#/definitions/X-Tyk-AuthSource"
-        },
-        "cookie": {
-          "$ref": "#/definitions/X-Tyk-AuthSource"
-        },
-        "query": {
-          "$ref": "#/definitions/X-Tyk-AuthSource"
-        }
-      },
-      "required": [
-        "enabled"
-      ]
-    },
-    "X-Tyk-Authentication": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "enabled": {
-          "type": "boolean"
-        },
-        "stripAuthorizationData": {
-          "type": "boolean"
-        },
-        "baseIdentityProvider": {
-          "type": "string",
-          "enum": [
-            "auth_token",
-            "hmac_key",
-            "basic_auth_user",
-            "jwt_claim",
-            "oidc_user",
-            "oauth_key",
-            "custom_auth",
-            ""
-          ]
-        },
-        "hmac": {
-          "$ref": "#/definitions/X-Tyk-HMAC"
-        },
-        "oidc": {
-          "$ref": "#/definitions/X-Tyk-OIDC"
-        },
-        "custom": {
-          "$ref": "#/definitions/X-Tyk-CustomPluginAuthentication"
-        },
-        "securitySchemes": {
-          "type": "object",
-          "patternProperties": {
-            "^[a-zA-Z0-9\\.\\-_]+$": {
-              "anyOf": [
-                {
-                  "$ref": "#/definitions/X-Tyk-Token"
-                },
-                {
-                  "$ref": "#/definitions/X-Tyk-JWT"
-                },
-                {
-                  "$ref": "#/definitions/X-Tyk-Basic"
-                },
-                {
-                  "$ref": "#/definitions/X-Tyk-OAuth"
-                },
-                {
-                  "$ref": "#/definitions/X-Tyk-ExternalOAuth"
-                }
-              ]
-            }
-          }
-        }
-      },
-      "required": [
-        "enabled"
-      ]
-    },
-    "X-Tyk-Server": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "listenPath": {
-          "$ref": "#/definitions/X-Tyk-ListenPath"
-        },
-        "slug": {
-          "type": "string",
-          "description": "Legacy field, unused from v5.3.0 but retained for backward compatibility."
-        },
-        "authentication": {
-          "$ref": "#/definitions/X-Tyk-Authentication"
-        },
-        "clientCertificates": {
-          "$ref": "#/definitions/X-Tyk-ClientCertificates"
-        },
-        "gatewayTags": {
-          "$ref": "#/definitions/X-Tyk-GatewayTags"
-        },
-        "customDomain": {
-          "$ref": "#/definitions/X-Tyk-CustomDomain"
-        },
-        "detailedActivityLogs": {
-          "$ref": "#/definitions/X-Tyk-DetailedActivityLogs"
-        },
-        "detailedTracing": {
-          "$ref": "#/definitions/X-Tyk-DetailedTracing"
-        }
-      },
-      "required": [
-        "listenPath"
-      ]
-    },
-    "X-Tyk-GatewayTags": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "enabled": {
-          "type": "boolean"
-        },
-        "tags": {
-          "type": "array",
-          "uniqueItems": true,
-          "items": [
-            {
-              "type": "string"
-            }
-          ]
-        }
-      },
-      "required": [
-        "enabled",
-        "tags"
-      ]
-    },
-    "X-Tyk-Upstream": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "url": {
-          "type": "string",
-          "format": "uri-reference"
-        },
-        "serviceDiscovery": {
-          "$ref": "#/definitions/X-Tyk-ServiceDiscovery"
-        },
-        "test": {
-          "type": "object",
-          "properties": {
-            "serviceDiscovery": {
-              "$ref": "#/definitions/X-Tyk-ServiceDiscovery"
-            }
-          }
-        },
-        "mutualTLS": {
-          "$ref": "#/definitions/X-Tyk-MutualTLS"
-        },
-        "certificatePinning": {
-          "$ref": "#/definitions/X-Tyk-CertificatePinning"
-        },
-        "rateLimit": {
-          "$ref": "#/definitions/X-Tyk-RateLimit"
-        }
-      },
-      "required": [
-        "url"
-      ]
-    },
-    "X-Tyk-State": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "active": {
-          "type": "boolean"
-        },
-        "internal": {
-          "type": "boolean"
-        }
-      },
-      "required": [
-        "active"
-      ]
-    },
-    "X-Tyk-Versioning": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "enabled": {
-          "type": "boolean"
-        },
-        "name": {
-          "type": "string",
-          "pattern": "\\S+"
-        },
-        "default": {
-          "type": "string"
-        },
-        "location": {
-          "type": "string",
-          "pattern": "\\S+"
-        },
-        "key": {
-          "type": "string",
-          "pattern": "\\S+"
-        },
-        "versions": {
-          "type": "array",
-          "items": [
-            {
-              "$ref": "#/definitions/X-Tyk-VersionToID"
-            }
-          ]
-        },
-        "stripVersioningData": {
-          "type": "boolean"
-        },
-        "fallbackToDefault": {
-          "type": "boolean"
-        }
-      },
-      "required": [
-        "enabled",
-        "location",
-        "key",
-        "versions"
-      ]
-    },
-    "X-Tyk-VersionToID": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "name": {
-          "type": "string",
-          "pattern": "\\S+"
-        },
-        "id": {
-          "type": "string",
-          "pattern": "\\S+"
-        }
-      },
-      "required": [
-        "name",
-        "id"
-      ]
-    },
-    "X-Tyk-Info": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "id": {
-          "type": "string"
-        },
-        "dbId": {
-          "type": "string"
-        },
-        "orgId": {
-          "type": "string"
-        },
-        "name": {
-          "type": "string",
-          "pattern": "\\S+"
-        },
-        "expiration": {
-          "type": "string"
-        },
-        "state": {
-          "$ref": "#/definitions/X-Tyk-State"
-        },
-        "versioning": {
-          "$ref": "#/definitions/X-Tyk-Versioning"
-        }
-      },
-      "required": [
-        "name",
-        "state"
-      ]
-    },
-    "X-Tyk-ExtractCredentialsFromBody": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "enabled": {
-          "type": "boolean"
-        },
-        "userRegexp": {
-          "type": "string"
-        },
-        "passwordRegexp": {
-          "type": "string"
-        }
-      },
-      "required": [
-        "enabled"
-      ]
-    },
-    "X-Tyk-Notifications": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "sharedSecret": {
-          "type": "string"
-        },
-        "onKeyChangeUrl": {
-          "type": "string"
-        }
-      }
-    },
-    "X-Tyk-Signature": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "enabled": {
-          "type": "boolean"
-        },
-        "algorithm": {
-          "type": "string"
-        },
-        "header": {
-          "type": "string"
-        },
-        "query": {
-          "$ref": "#/definitions/X-Tyk-AuthSource"
-        },
-        "secret": {
-          "type": "string"
-        },
-        "allowedClockSkew": {
-          "type": "integer",
-          "format": "int64"
-        },
-        "errorCode": {
-          "type": "integer"
-        },
-        "errorMessage": {
-          "type": "string"
-        }
-      }
-    },
-    "X-Tyk-Token": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "enabled": {
-          "type": "boolean"
-        },
-        "header": {
-          "$ref": "#/definitions/X-Tyk-AuthSource"
-        },
-        "cookie": {
-          "$ref": "#/definitions/X-Tyk-AuthSource"
-        },
-        "query": {
-          "$ref": "#/definitions/X-Tyk-AuthSource"
-        },
-        "enableClientCertificate": {
-          "type": "boolean"
-        },
-        "signatureValidation": {
-          "$ref": "#/definitions/X-Tyk-Signature"
-        }
-      },
-      "required": [
-        "enabled"
-      ]
-    },
-    "X-Tyk-JWT": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "enabled": {
-          "type": "boolean"
-        },
-        "header": {
-          "$ref": "#/definitions/X-Tyk-AuthSource"
-        },
-        "cookie": {
-          "$ref": "#/definitions/X-Tyk-AuthSource"
-        },
-        "query": {
-          "$ref": "#/definitions/X-Tyk-AuthSource"
-        },
-        "source": {
-          "type": "string"
-        },
-        "signingMethod": {
-          "type": "string"
-        },
-        "identityBaseField": {
-          "type": "string"
-        },
-        "skipKid": {
-          "type": "boolean"
-        },
-        "policyFieldName": {
-          "type": "string"
-        },
-        "clientBaseField": {
-          "type": "string"
-        },
-        "scopes": {
-          "$ref": "#/definitions/X-Tyk-Scopes"
-        },
-        "defaultPolicies": {
-          "type": "array",
-          "items": [
-            {
-              "type": "string"
-            }
-          ]
-        },
-        "issuedAtValidationSkew": {
-          "type": "integer",
-          "format": "int64",
-          "minimum": 0
-        },
-        "notBeforeValidationSkew": {
-          "type": "integer",
-          "format": "int64",
-          "minimum": 0
-        },
-        "expiresAtValidationSkew": {
-          "type": "integer",
-          "format": "int64",
-          "minimum": 0
-        },
-        "idpClientIdMappingDisabled": {
-          "type": "boolean"
-        }
-      },
-      "required": [
-        "enabled"
-      ]
-    },
-    "X-Tyk-Basic": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "enabled": {
-          "type": "boolean"
-        },
-        "header": {
-          "$ref": "#/definitions/X-Tyk-AuthSource"
-        },
-        "cookie": {
-          "$ref": "#/definitions/X-Tyk-AuthSource"
-        },
-        "query": {
-          "$ref": "#/definitions/X-Tyk-AuthSource"
-        },
-        "disableCaching": {
-          "type": "boolean"
-        },
-        "cacheTTL": {
-          "type": "integer"
-        },
-        "extractCredentialsFromBody": {
-          "$ref": "#/definitions/X-Tyk-ExtractCredentialsFromBody"
-        }
-      },
-      "required": [
-        "enabled"
-      ]
-    },
-    "X-Tyk-OAuth": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "enabled": {
-          "type": "boolean"
-        },
-        "header": {
-          "$ref": "#/definitions/X-Tyk-AuthSource"
-        },
-        "cookie": {
-          "$ref": "#/definitions/X-Tyk-AuthSource"
-        },
-        "query": {
-          "$ref": "#/definitions/X-Tyk-AuthSource"
-        },
-        "allowedAuthorizeTypes": {
-          "type": "array",
-          "items": {
-            "type": "string",
-            "enum": [
-              "code",
-              "token"
-            ]
-          }
-        },
-        "refreshToken": {
-          "type": "boolean"
-        },
-        "authLoginRedirect": {
-          "type": "string"
-        },
-        "notifications": {
-          "$ref": "#/definitions/X-Tyk-Notifications"
-        }
-      },
-      "required": [
-        "enabled"
-      ]
-    },
-    "X-Tyk-ExternalOAuth": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "enabled": {
-          "type": "boolean"
-        },
-        "header": {
-          "$ref": "#/definitions/X-Tyk-AuthSource"
-        },
-        "cookie": {
-          "$ref": "#/definitions/X-Tyk-AuthSource"
-        },
-        "query": {
-          "$ref": "#/definitions/X-Tyk-AuthSource"
-        },
-        "providers": {
-          "type": "array",
-          "items": [
-            {
-              "$ref": "#/definitions/X-Tyk-OAuthProvider"
-            }
-          ]
-        }
-      },
-      "required": [
-        "enabled"
-      ]
-    },
-    "X-Tyk-OAuthProvider": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "jwt": {
-          "$ref": "#/definitions/X-Tyk-JWTValidation"
-        },
-        "introspection": {
-          "$ref": "#/definitions/X-Tyk-Introspection"
-        }
-      }
-    },
-    "X-Tyk-JWTValidation": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "enabled": {
-          "type": "boolean"
-        },
-        "signingMethod": {
-          "type": "string"
-        },
-        "source": {
-          "type": "string"
-        },
-        "identityBaseField": {
-          "type": "string"
-        },
-        "issuedAtValidationSkew": {
-          "$ref": "#/definitions/X-Tyk-UInt"
-        },
-        "notBeforeValidationSkew": {
-          "$ref": "#/definitions/X-Tyk-UInt"
-        },
-        "expiresAtValidationSkew": {
-          "$ref": "#/definitions/X-Tyk-UInt"
-        }
-      },
-      "required": [
-        "enabled",
-        "signingMethod",
-        "source"
-      ]
-    },
-    "X-Tyk-Introspection": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "enabled": {
-          "type": "boolean"
-        },
-        "url": {
-          "type": "string",
-          "format": "uri"
-        },
-        "clientId": {
-          "type": "string"
-        },
-        "clientSecret": {
-          "type": "string"
-        },
-        "identityBaseField": {
-          "type": "string"
-        },
-        "cache": {
-          "$ref": "#/definitions/X-Tyk-IntrospectionCache"
-        }
-      }
-    },
-    "X-Tyk-IntrospectionCache": {
-      "type": "object",
-      "properties": {
-        "enabled": {
-          "type": "boolean"
-        },
-        "timeout": {
-          "type": "integer"
-        }
-      },
-      "required": [
-        "enabled",
-        "timeout"
-      ]
-    },
-    "X-Tyk-CustomDomain": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "enabled": {
-          "type": "boolean"
-        },
-        "name": {
-          "$ref": "#/definitions/X-Tyk-DomainDef"
-        },
-        "certificates": {
-          "type": "array",
-          "items": [
-            {
-              "type": "string"
-            }
-          ]
-        }
-      },
-      "required": [
-        "enabled",
-        "name"
-      ]
-    },
-    "X-Tyk-Header": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "name": {
-          "type": "string"
-        },
-        "value": {
-          "type": "string"
-        }
-      },
-      "required": [
-        "name",
-        "value"
-      ]
+      "type": "object"
     },
     "X-Tyk-CircuitBreaker": {
-      "type": "object",
+      "additionalProperties": false,
+      "description": "CircuitBreaker holds configuration for the circuit breaker middleware.",
       "properties": {
-        "enabled": {
-          "type": "boolean"
-        },
-        "threshold": {
-          "type": "number",
-          "minimum": 0,
-          "maximum": 1,
-          "multipleOf": 0.01
-        },
-        "sampleSize": {
-          "type": "integer",
-          "minimum": 0
-        },
         "coolDownPeriod": {
-          "type": "integer",
-          "minimum": 0
+          "description": "CoolDownPeriod is the period of time (in seconds) for which the circuit breaker will remain open before returning to service.\nTyk classic API definition: `version_data.versions..extended_paths.circuit_breakers[*].return_to_service_after`.",
+          "type": "integer"
+        },
+        "enabled": {
+          "description": "Enabled enables the Circuit Breaker functionality.\nTyk classic API definition: `version_data.versions..extended_paths.circuit_breakers[*].disabled`.",
+          "type": "boolean"
         },
         "halfOpenStateEnabled": {
+          "description": "HalfOpenStateEnabled , if enabled, allows some requests to pass through the circuit breaker during the cool down period. If Tyk detects that the path is now working, the circuit breaker will be automatically reset and traffic will be resumed to the upstream.\nTyk classic API definition: `version_data.versions..extended_paths.circuit_breakers[*].disable_half_open_state`.",
           "type": "boolean"
+        },
+        "sampleSize": {
+          "description": "SampleSize is the size of the circuit breaker sampling window. Combining this with `threshold` gives the failure rate required to trip the circuit breaker.\nTyk classic API definition: `version_data.versions..extended_paths.circuit_breakers[*].samples`.",
+          "type": "integer"
+        },
+        "threshold": {
+          "description": "Threshold is the proportion from each `sampleSize` requests that must fail for the breaker to be tripped. This must be a value between 0.0 and 1.0. If `sampleSize` is 100 then a threshold of 0.4 means that the breaker will be tripped if 40 out of every 100 requests fails.\nTyk classic API definition: `version_data.versions..extended_paths.circuit_breakers[*].threshold_percent`.",
+          "type": "number"
         }
       },
       "required": [
@@ -1802,47 +272,2071 @@
         "sampleSize",
         "coolDownPeriod",
         "halfOpenStateEnabled"
-      ]
+      ],
+      "type": "object"
     },
-    "X-Tyk-RateLimit": {
-      "type": "object",
+    "X-Tyk-ClientCertificates": {
+      "additionalProperties": false,
+      "description": "ClientCertificates contains the configurations related to establishing static mutual TLS between the client and Tyk.",
+      "properties": {
+        "allowlist": {
+          "$ref": "#/definitions/X-Tyk-StringSlice",
+          "description": "Allowlist is the list of client certificates which are allowed."
+        },
+        "enabled": {
+          "description": "Enabled enables static mTLS for the API.",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "enabled",
+        "allowlist"
+      ],
+      "type": "object"
+    },
+    "X-Tyk-ClientToPolicies": {
+      "items": {
+        "$ref": "#/definitions/X-Tyk-ClientToPolicy"
+      },
+      "type": "array"
+    },
+    "X-Tyk-ClientToPolicy": {
+      "additionalProperties": false,
+      "description": "ClientToPolicy contains a 1-1 mapping between Client ID and Policy ID.",
+      "properties": {
+        "clientId": {
+          "description": "ClientID contains a Client ID.",
+          "type": "string"
+        },
+        "policyId": {
+          "description": "PolicyID contains a Policy ID.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "X-Tyk-CustomPlugin": {
+      "additionalProperties": false,
+      "description": "CustomPlugin configures custom plugin.",
       "properties": {
         "enabled": {
+          "description": "Enabled enables the custom pre plugin.",
           "type": "boolean"
         },
-        "rate": {
+        "functionName": {
+          "description": "FunctionName is the name of authentication method.",
+          "type": "string"
+        },
+        "path": {
+          "description": "Path is the path to shared object file in case of gopluign mode or path to js code in case of otto auth plugin.",
+          "type": "string"
+        },
+        "rawBodyOnly": {
+          "description": "RawBodyOnly if set to true, do not fill body in request or response object.",
+          "type": "boolean"
+        },
+        "requireSession": {
+          "description": "RequireSession if set to true passes down the session information for plugins after authentication.\nRequireSession is used only with JSVM custom middleware.",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "enabled",
+        "functionName",
+        "path"
+      ],
+      "type": "object"
+    },
+    "X-Tyk-CustomPluginAuthentication": {
+      "additionalProperties": false,
+      "description": "CustomPluginAuthentication holds configuration for custom plugins.",
+      "properties": {
+        "config": {
+          "$ref": "#/definitions/X-Tyk-AuthenticationPlugin",
+          "description": "Config contains configuration related to custom authentication plugin.\nTyk classic API definition: `custom_middleware.auth_check`."
+        },
+        "cookie": {
+          "$ref": "#/definitions/X-Tyk-AuthSource",
+          "description": "Cookie contains configurations for the cookie value auth source.\n\nTyk classic API definition: `auth_configs[x].cookie`"
+        },
+        "enabled": {
+          "description": "Enabled enables the CustomPluginAuthentication authentication mode.\n\nTyk classic API definition: `enable_coprocess_auth`/`use_go_plugin_auth`.",
+          "type": "boolean"
+        },
+        "header": {
+          "$ref": "#/definitions/X-Tyk-AuthSource",
+          "description": "Header contains configurations for the header value auth source, it is enabled by default.\n\nTyk classic API definition: `auth_configs[x].header`"
+        },
+        "query": {
+          "$ref": "#/definitions/X-Tyk-AuthSource",
+          "description": "Query contains configurations for the query parameters auth source.\n\nTyk classic API definition: `auth_configs[x].query`"
+        }
+      },
+      "required": [
+        "enabled"
+      ],
+      "type": "object"
+    },
+    "X-Tyk-CustomPlugins": {
+      "description": "CustomPlugins is a list of CustomPlugin.",
+      "items": {
+        "$ref": "#/definitions/X-Tyk-CustomPlugin"
+      },
+      "type": "array"
+    },
+    "X-Tyk-DetailedActivityLogs": {
+      "additionalProperties": false,
+      "description": "DetailedActivityLogs holds the configuration related to recording detailed analytics.",
+      "properties": {
+        "enabled": {
+          "description": "Enabled enables/disables detailed activity logs.\n\nTyk classic API definition: `enable_detailed_recording`",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "enabled"
+      ],
+      "type": "object"
+    },
+    "X-Tyk-DetailedTracing": {
+      "additionalProperties": false,
+      "description": "DetailedTracing holds the configuration of the detailed tracing.",
+      "properties": {
+        "enabled": {
+          "description": "Enabled enables detailed tracing.",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "enabled"
+      ],
+      "type": "object"
+    },
+    "X-Tyk-Domain": {
+      "additionalProperties": false,
+      "description": "Domain holds the configuration of the domain name the server should listen on.",
+      "properties": {
+        "certificates": {
+          "$ref": "#/definitions/X-Tyk-StringSlice",
+          "description": "Certificates defines a field for specifying certificate IDs or file paths\nthat the Gateway can utilize to dynamically load certificates for your custom domain.\n\nTyk classic API definition: `certificates`"
+        },
+        "enabled": {
+          "description": "Enabled allow/disallow the usage of the domain.",
+          "type": "boolean"
+        },
+        "name": {
+          "description": "Name is the name of the domain.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "enabled",
+        "name"
+      ],
+      "type": "object"
+    },
+    "X-Tyk-DomainDef": {
+      "pattern": "^([*a-zA-Z0-9-]+(\\.[*a-zA-Z0-9-]+)*)(:\\d+)?$",
+      "type": "string"
+    },
+    "X-Tyk-DomainToCertificate": {
+      "additionalProperties": false,
+      "description": "DomainToCertificate holds a single mapping of domain name into a certificate.",
+      "properties": {
+        "certificate": {
+          "description": "Certificate contains the certificate mapped to the domain.",
+          "type": "string"
+        },
+        "domain": {
+          "$ref": "#/definitions/X-Tyk-DomainDef",
+          "description": "Domain contains the domain name."
+        }
+      },
+      "required": [
+        "domain",
+        "certificate"
+      ],
+      "type": "object"
+    },
+    "X-Tyk-DomainToCertificates": {
+      "items": {
+        "$ref": "#/definitions/X-Tyk-DomainToCertificate"
+      },
+      "type": "array"
+    },
+    "X-Tyk-EndpointPostPlugin": {
+      "additionalProperties": false,
+      "description": "EndpointPostPlugin contains endpoint level post plugin configuration.",
+      "properties": {
+        "enabled": {
+          "description": "Enabled enables post plugin.",
+          "type": "boolean"
+        },
+        "name": {
+          "description": "Name is the name of plugin function to be executed.",
+          "type": "string"
+        },
+        "path": {
+          "description": "Path is the path to plugin.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "enabled",
+        "name",
+        "path"
+      ],
+      "type": "object"
+    },
+    "X-Tyk-EndpointPostPlugins": {
+      "items": {
+        "$ref": "#/definitions/X-Tyk-EndpointPostPlugin"
+      },
+      "type": "array"
+    },
+    "X-Tyk-EnforceTimeout": {
+      "additionalProperties": false,
+      "description": "EnforceTimeout holds the configuration for enforcing request timeouts.",
+      "properties": {
+        "enabled": {
+          "description": "Enabled is a boolean flag. If set to `true`, requests will enforce a configured timeout.",
+          "type": "boolean"
+        },
+        "value": {
+          "description": "Value is the configured timeout in seconds.",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "enabled",
+        "value"
+      ],
+      "type": "object"
+    },
+    "X-Tyk-FromOASExamples": {
+      "additionalProperties": false,
+      "description": "FromOASExamples configures mock responses should be returned from OAS example responses.",
+      "properties": {
+        "code": {
+          "description": "Code is the default HTTP response code that the gateway reads from the path responses documented in OAS.",
+          "type": "integer"
+        },
+        "contentType": {
+          "description": "ContentType is the default HTTP response body type that the gateway reads from the path responses documented in OAS.",
+          "type": "string"
+        },
+        "enabled": {
+          "description": "Enabled enables getting a mock response from OAS examples or schemas documented in OAS.",
+          "type": "boolean"
+        },
+        "exampleName": {
+          "description": "ExampleName is the default example name among multiple path response examples documented in OAS.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "enabled"
+      ],
+      "type": "object"
+    },
+    "X-Tyk-GatewayTags": {
+      "additionalProperties": false,
+      "description": "GatewayTags holds a list of segment tags that should apply for a gateway.",
+      "properties": {
+        "enabled": {
+          "description": "Enabled enables use of segment tags.",
+          "type": "boolean"
+        },
+        "tags": {
+          "$ref": "#/definitions/X-Tyk-StringSlice",
+          "description": "Tags is a list of segment tags"
+        }
+      },
+      "required": [
+        "enabled",
+        "tags"
+      ],
+      "type": "object"
+    },
+    "X-Tyk-Global": {
+      "additionalProperties": false,
+      "description": "Global contains configuration that affects the whole API (all endpoints).",
+      "properties": {
+        "cache": {
+          "$ref": "#/definitions/X-Tyk-Cache",
+          "description": "Cache contains the configurations related to caching.\nTyk classic API definition: `cache_options`."
+        },
+        "cors": {
+          "$ref": "#/definitions/X-Tyk-CORS",
+          "description": "CORS contains the configuration related to Cross Origin Resource Sharing.\nTyk classic API definition: `CORS`."
+        },
+        "pluginConfig": {
+          "$ref": "#/definitions/X-Tyk-PluginConfig",
+          "description": "PluginConfig contains the common configuration for custom plugins."
+        },
+        "postAuthenticationPlugin": {
+          "$ref": "#/definitions/X-Tyk-PostAuthenticationPlugin",
+          "description": "PostAuthenticationPlugin contains configuration related to the custom plugin that is run immediately after authentication.\nTyk classic API definition: `custom_middleware.post_key_auth`."
+        },
+        "postPlugin": {
+          "$ref": "#/definitions/X-Tyk-PostPlugin",
+          "description": "PostPlugin contains configuration related to the custom plugin that is run immediately prior to proxying the request to the upstream.\nTyk classic API definition: `custom_middleware.post`."
+        },
+        "prePlugin": {
+          "$ref": "#/definitions/X-Tyk-PrePlugin",
+          "description": "PrePlugin contains configuration related to the custom plugin that is run before authentication.\nTyk classic API definition: `custom_middleware.pre`."
+        },
+        "responsePlugin": {
+          "$ref": "#/definitions/X-Tyk-ResponsePlugin",
+          "description": "ResponsePlugin contains configuration related to to the custom plugin that is run during processing of the response from the upstream service.\n\nTyk classic API definition: `custom_middleware.response`."
+        },
+        "transformRequestHeaders": {
+          "$ref": "#/definitions/X-Tyk-TransformHeaders",
+          "description": "TransformRequestHeaders contains the configurations related to API level request header transformation.\nTyk classic API definition: `global_headers`/`global_headers_remove`."
+        },
+        "transformResponseHeaders": {
+          "$ref": "#/definitions/X-Tyk-TransformHeaders",
+          "description": "TransformResponseHeaders contains the configurations related to API level response header transformation.\nTyk classic API definition: `global_response_headers`/`global_response_headers_remove`."
+        }
+      },
+      "type": "object"
+    },
+    "X-Tyk-HMAC": {
+      "additionalProperties": false,
+      "description": "HMAC holds the configuration for the HMAC authentication mode.",
+      "properties": {
+        "allowedAlgorithms": {
+          "$ref": "#/definitions/X-Tyk-StringSlice",
+          "description": "AllowedAlgorithms is the array of HMAC algorithms which are allowed. Tyk supports the following HMAC algorithms:\n\n- `hmac-sha1`\n- `hmac-sha256`\n- `hmac-sha384`\n- `hmac-sha512`\n\nand reads the value from algorithm header.\n\nTyk classic API definition: `hmac_allowed_algorithms`"
+        },
+        "allowedClockSkew": {
+          "description": "AllowedClockSkew is the amount of milliseconds that will be tolerated for clock skew. It is used against replay attacks.\nThe default value is `0`, which deactivates clock skew checks.\nTyk classic API definition: `hmac_allowed_clock_skew`",
           "type": "number"
         },
+        "cookie": {
+          "$ref": "#/definitions/X-Tyk-AuthSource",
+          "description": "Cookie contains configurations for the cookie value auth source.\n\nTyk classic API definition: `auth_configs[x].cookie`"
+        },
+        "enabled": {
+          "description": "Enabled enables the HMAC authentication mode.\nTyk classic API definition: `enable_signature_checking`",
+          "type": "boolean"
+        },
+        "header": {
+          "$ref": "#/definitions/X-Tyk-AuthSource",
+          "description": "Header contains configurations for the header value auth source, it is enabled by default.\n\nTyk classic API definition: `auth_configs[x].header`"
+        },
+        "query": {
+          "$ref": "#/definitions/X-Tyk-AuthSource",
+          "description": "Query contains configurations for the query parameters auth source.\n\nTyk classic API definition: `auth_configs[x].query`"
+        }
+      },
+      "required": [
+        "enabled"
+      ],
+      "type": "object"
+    },
+    "X-Tyk-Header": {
+      "additionalProperties": false,
+      "description": "Header holds a header name and value pair.",
+      "properties": {
+        "name": {
+          "description": "Name is the name of the header.",
+          "type": "string"
+        },
+        "value": {
+          "description": "Value is the value of the header.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "value"
+      ],
+      "type": "object"
+    },
+    "X-Tyk-Headers": {
+      "items": {
+        "$ref": "#/definitions/X-Tyk-Header"
+      },
+      "type": "array"
+    },
+    "X-Tyk-IDExtractor": {
+      "additionalProperties": false,
+      "description": "IDExtractor configures ID Extractor.",
+      "properties": {
+        "config": {
+          "$ref": "#/definitions/X-Tyk-IDExtractorConfig",
+          "description": "Config holds the configuration specific to ID extractor type mentioned via With."
+        },
+        "enabled": {
+          "description": "Enabled enables ID extractor with coprocess authentication.",
+          "type": "boolean"
+        },
+        "source": {
+          "description": "Source is the source from which ID to be extracted from.",
+          "type": "string"
+        },
+        "with": {
+          "description": "With is the type of ID extractor to be used.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "enabled",
+        "source",
+        "with",
+        "config"
+      ],
+      "type": "object"
+    },
+    "X-Tyk-IDExtractorConfig": {
+      "additionalProperties": false,
+      "description": "IDExtractorConfig specifies the configuration for ID extractor.",
+      "properties": {
+        "formParamName": {
+          "description": "FormParamName is the form parameter name to extract ID from.",
+          "type": "string"
+        },
+        "headerName": {
+          "description": "HeaderName is the header name to extract ID from.",
+          "type": "string"
+        },
+        "regexp": {
+          "description": "Regexp is the regular expression to match ID.",
+          "type": "string"
+        },
+        "regexpMatchIndex": {
+          "description": "RegexpMatchIndex is the index from which ID to be extracted after a match.\nDefault value is 0, ie if regexpMatchIndex is not provided ID is matched from index 0.",
+          "type": "integer"
+        },
+        "xPathExp": {
+          "description": "XPathExp is the xpath expression to match ID.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "X-Tyk-Info": {
+      "additionalProperties": false,
+      "description": "Info contains the main metadata for the API definition.",
+      "properties": {
+        "dbId": {
+          "description": "DBID is the unique identifier of the API within the Tyk database.\nTyk classic API definition: `id`",
+          "type": "string"
+        },
+        "expiration": {
+          "description": "Expiration date.",
+          "type": "string"
+        },
+        "id": {
+          "description": "ID is the unique identifier of the API within Tyk.\nTyk classic API definition: `api_id`",
+          "type": "string"
+        },
+        "name": {
+          "description": "Name is the name of the API.\nTyk classic API definition: `name`",
+          "type": "string"
+        },
+        "orgId": {
+          "description": "OrgID is the ID of the organisation which the API belongs to.\nTyk classic API definition: `org_id`",
+          "type": "string"
+        },
+        "state": {
+          "$ref": "#/definitions/X-Tyk-State",
+          "description": "State holds configuration for API definition states (active, internal)."
+        },
+        "versioning": {
+          "$ref": "#/definitions/X-Tyk-Versioning",
+          "description": "Versioning holds configuration for API versioning."
+        }
+      },
+      "required": [
+        "name",
+        "state"
+      ],
+      "type": "object"
+    },
+    "X-Tyk-Internal": {
+      "additionalProperties": false,
+      "description": "Internal holds the endpoint configuration, configuring the endpoint for internal requests.",
+      "properties": {
+        "enabled": {
+          "description": "Enabled if set to true makes the endpoint available only for internal requests.",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "enabled"
+      ],
+      "type": "object"
+    },
+    "X-Tyk-ListenPath": {
+      "additionalProperties": false,
+      "description": "ListenPath is the base path on Tyk to which requests for this API should be sent.",
+      "properties": {
+        "strip": {
+          "description": "Strip removes the inbound listen path (as accessed by the client) when generating the outgoing request (to the upstream service).\n\nFor example, a scenario where the Tyk base address is `http://acme.com/', the listen path is `example/` and the upstream URL is `http://httpbin.org/`:\n\n- If the client application sends a request to `http://acme.com/example/get` then the request will be proxied to `http://httpbin.org/example/get`\n- If stripListenPath is set to `true`, the `example` listen path is removed and the request would be proxied to `http://httpbin.org/get`.\n\nTyk classic API definition: `proxy.strip_listen_path`",
+          "type": "boolean"
+        },
+        "value": {
+          "description": "Value is the value of the listen path e.g. `/api/` or `/` or `/httpbin/`.\nTyk classic API definition: `proxy.listen_path`",
+          "type": "string"
+        }
+      },
+      "required": [
+        "value"
+      ],
+      "type": "object"
+    },
+    "X-Tyk-Middleware": {
+      "additionalProperties": false,
+      "description": "Middleware holds configuration for Tyk's native middleware.",
+      "properties": {
+        "global": {
+          "$ref": "#/definitions/X-Tyk-Global",
+          "description": "Global contains configuration for middleware that affects the whole API (all endpoints)."
+        },
+        "operations": {
+          "$ref": "#/definitions/X-Tyk-Operations",
+          "description": "Operations contains configuration for middleware that can be applied to individual endpoints within the API (per-endpoint)."
+        }
+      },
+      "type": "object"
+    },
+    "X-Tyk-MockResponse": {
+      "additionalProperties": false,
+      "description": "MockResponse configures the mock responses.",
+      "properties": {
+        "body": {
+          "description": "Body is the HTTP response body that will be returned.",
+          "type": "string"
+        },
+        "code": {
+          "description": "Code is the HTTP response code that will be returned.",
+          "type": "integer"
+        },
+        "enabled": {
+          "description": "Enabled enables the mock response middleware.",
+          "type": "boolean"
+        },
+        "fromOASExamples": {
+          "$ref": "#/definitions/X-Tyk-FromOASExamples",
+          "description": "FromOASExamples is the configuration to extract a mock response from OAS documentation."
+        },
+        "headers": {
+          "$ref": "#/definitions/X-Tyk-Headers",
+          "description": "Headers are the HTTP response headers that will be returned."
+        }
+      },
+      "required": [
+        "enabled"
+      ],
+      "type": "object"
+    },
+    "X-Tyk-MutualTLS": {
+      "additionalProperties": false,
+      "description": "MutualTLS contains the configuration for establishment of mutual TLS between Tyk and the upstream server.",
+      "properties": {
+        "domainToCertificateMapping": {
+          "$ref": "#/definitions/X-Tyk-DomainToCertificates",
+          "description": "DomainToCertificates maintains the mapping of domain to certificate.\nTyk classic API definition: `upstream_certificates`"
+        },
+        "enabled": {
+          "description": "Enabled enables/disables upstream mutual TLS for the API.\nTyk classic API definition: `upstream_certificates_disabled`",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "enabled",
+        "domainToCertificateMapping"
+      ],
+      "type": "object"
+    },
+    "X-Tyk-OIDC": {
+      "additionalProperties": false,
+      "description": "OIDC contains configuration for the OIDC authentication mode.",
+      "properties": {
+        "cookie": {
+          "$ref": "#/definitions/X-Tyk-AuthSource",
+          "description": "Cookie contains configurations for the cookie value auth source.\n\nTyk classic API definition: `auth_configs[x].cookie`"
+        },
+        "enabled": {
+          "description": "Enabled enables the OIDC authentication mode.\n\nTyk classic API definition: `use_openid`",
+          "type": "boolean"
+        },
+        "header": {
+          "$ref": "#/definitions/X-Tyk-AuthSource",
+          "description": "Header contains configurations for the header value auth source, it is enabled by default.\n\nTyk classic API definition: `auth_configs[x].header`"
+        },
+        "providers": {
+          "$ref": "#/definitions/X-Tyk-Providers",
+          "description": "Providers contains a list of authorised providers and their Client IDs, and matched policies.\n\nTyk classic API definition: `openid_options.providers`."
+        },
+        "query": {
+          "$ref": "#/definitions/X-Tyk-AuthSource",
+          "description": "Query contains configurations for the query parameters auth source.\n\nTyk classic API definition: `auth_configs[x].query`"
+        },
+        "scopes": {
+          "$ref": "#/definitions/X-Tyk-Scopes",
+          "description": "Scopes contains the defined scope claims."
+        },
+        "segregateByClientId": {
+          "description": "SegregateByClientId is a boolean flag. If set to `true, the policies will be applied to a combination of Client ID and User ID.\n\nTyk classic API definition: `openid_options.segregate_by_client`.",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "enabled"
+      ],
+      "type": "object"
+    },
+    "X-Tyk-Operation": {
+      "additionalProperties": false,
+      "description": "Operation holds a request operation configuration, allowances, tranformations, caching, timeouts and validation.",
+      "properties": {
+        "allow": {
+          "$ref": "#/definitions/X-Tyk-Allowance",
+          "description": "Allow request by allowance."
+        },
+        "block": {
+          "$ref": "#/definitions/X-Tyk-Allowance",
+          "description": "Block request by allowance."
+        },
+        "cache": {
+          "$ref": "#/definitions/X-Tyk-CachePlugin",
+          "description": "Cache contains the caching plugin configuration."
+        },
+        "circuitBreaker": {
+          "$ref": "#/definitions/X-Tyk-CircuitBreaker",
+          "description": "CircuitBreaker contains the configuration for the circuit breaker functionality."
+        },
+        "doNotTrackEndpoint": {
+          "$ref": "#/definitions/X-Tyk-TrackEndpoint",
+          "description": "DoNotTrackEndpoint contains the configuration for disabling analytics and logs."
+        },
+        "enforceTimeout": {
+          "$ref": "#/definitions/X-Tyk-EnforceTimeout",
+          "description": "EnforceTimeout contains the request timeout configuration."
+        },
+        "ignoreAuthentication": {
+          "$ref": "#/definitions/X-Tyk-Allowance",
+          "description": "IgnoreAuthentication ignores authentication on request by allowance."
+        },
+        "internal": {
+          "$ref": "#/definitions/X-Tyk-Internal",
+          "description": "Internal makes the endpoint only respond to internal requests."
+        },
+        "mockResponse": {
+          "$ref": "#/definitions/X-Tyk-MockResponse",
+          "description": "MockResponse contains the mock response configuration."
+        },
+        "postPlugins": {
+          "$ref": "#/definitions/X-Tyk-EndpointPostPlugins",
+          "description": "PostPlugins contains endpoint level post plugins configuration."
+        },
+        "requestSizeLimit": {
+          "$ref": "#/definitions/X-Tyk-RequestSizeLimit",
+          "description": "RequestSizeLimit limits the maximum allowed size of the request body in bytes."
+        },
+        "trackEndpoint": {
+          "$ref": "#/definitions/X-Tyk-TrackEndpoint",
+          "description": "TrackEndpoint contains the configuration for enabling analytics and logs."
+        },
+        "transformRequestBody": {
+          "$ref": "#/definitions/X-Tyk-TransformBody",
+          "description": "TransformRequestBody allows you to transform request body.\nWhen both `path` and `body` are provided, body would take precedence."
+        },
+        "transformRequestHeaders": {
+          "$ref": "#/definitions/X-Tyk-TransformHeaders",
+          "description": "TransformRequestHeaders allows you to transform request headers."
+        },
+        "transformRequestMethod": {
+          "$ref": "#/definitions/X-Tyk-TransformRequestMethod",
+          "description": "TransformRequestMethod allows you to transform the method of a request."
+        },
+        "transformResponseBody": {
+          "$ref": "#/definitions/X-Tyk-TransformBody",
+          "description": "TransformResponseBody allows you to transform response body.\nWhen both `path` and `body` are provided, body would take precedence."
+        },
+        "transformResponseHeaders": {
+          "$ref": "#/definitions/X-Tyk-TransformHeaders",
+          "description": "TransformResponseHeaders allows you to transform response headers."
+        },
+        "urlRewrite": {
+          "$ref": "#/definitions/X-Tyk-URLRewrite",
+          "description": "URLRewrite contains the URL rewriting configuration."
+        },
+        "validateRequest": {
+          "$ref": "#/definitions/X-Tyk-ValidateRequest",
+          "description": "ValidateRequest contains the request validation configuration."
+        },
+        "virtualEndpoint": {
+          "$ref": "#/definitions/X-Tyk-VirtualEndpoint",
+          "description": "VirtualEndpoint contains virtual endpoint configuration."
+        }
+      },
+      "type": "object"
+    },
+    "X-Tyk-Operations": {
+      "additionalProperties": {
+        "$ref": "#/definitions/X-Tyk-Operation"
+      },
+      "description": "Operations holds Operation definitions.",
+      "type": "object"
+    },
+    "X-Tyk-PinnedPublicKey": {
+      "additionalProperties": false,
+      "description": "PinnedPublicKey contains a mapping from the domain name into a list of public keys.",
+      "properties": {
+        "domain": {
+          "$ref": "#/definitions/X-Tyk-DomainDef",
+          "description": "Domain contains the domain name."
+        },
+        "publicKeys": {
+          "$ref": "#/definitions/X-Tyk-StringSlice",
+          "description": "PublicKeys contains a list of the public keys pinned to the domain name."
+        }
+      },
+      "required": [
+        "domain",
+        "publicKeys"
+      ],
+      "type": "object"
+    },
+    "X-Tyk-PinnedPublicKeys": {
+      "description": "PinnedPublicKeys is a list of domains and pinned public keys for them.",
+      "items": {
+        "$ref": "#/definitions/X-Tyk-PinnedPublicKey"
+      },
+      "type": "array"
+    },
+    "X-Tyk-PluginBundle": {
+      "additionalProperties": false,
+      "description": "PluginBundle holds configuration for custom plugins.",
+      "properties": {
+        "enabled": {
+          "description": "Enabled enables the custom plugin bundles.\n\nTyk classic API definition: `custom_middleware_bundle_disabled`",
+          "type": "boolean"
+        },
+        "path": {
+          "description": "Path is the path suffix to construct the URL to fetch plugin bundle from.\nPath will be suffixed to `bundle_base_url` in gateway config.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "enabled",
+        "path"
+      ],
+      "type": "object"
+    },
+    "X-Tyk-PluginConfig": {
+      "additionalProperties": false,
+      "description": "PluginConfig holds configuration for custom plugins.",
+      "properties": {
+        "bundle": {
+          "$ref": "#/definitions/X-Tyk-PluginBundle",
+          "description": "Bundle configures custom plugin bundles."
+        },
+        "data": {
+          "$ref": "#/definitions/X-Tyk-PluginConfigData",
+          "description": "Data configures custom plugin data."
+        },
+        "driver": {
+          "description": "Driver configures which custom plugin driver to use.\nThe value should be set to one of the following:\n\n- `otto`,\n- `python`,\n- `lua`,\n- `grpc`,\n- `goplugin`.\n\nTyk classic API definition: `custom_middleware.driver`.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "X-Tyk-PluginConfigData": {
+      "additionalProperties": false,
+      "description": "PluginConfigData configures config data for custom plugins.",
+      "properties": {
+        "enabled": {
+          "description": "Enabled enables custom plugin config data.",
+          "type": "boolean"
+        },
+        "value": {
+          "description": "Value is the value of custom plugin config data.",
+          "type": "object"
+        }
+      },
+      "required": [
+        "enabled",
+        "value"
+      ],
+      "type": "object"
+    },
+    "X-Tyk-PostAuthenticationPlugin": {
+      "additionalProperties": false,
+      "description": "PostAuthenticationPlugin configures post authentication plugins.",
+      "properties": {
+        "plugins": {
+          "$ref": "#/definitions/X-Tyk-CustomPlugins",
+          "description": "Plugins configures custom plugins to be run on pre authentication stage.\nThe plugins would be executed in the order of configuration in the list."
+        }
+      },
+      "type": "object"
+    },
+    "X-Tyk-PostPlugin": {
+      "additionalProperties": false,
+      "description": "PostPlugin configures post plugins.",
+      "properties": {
+        "plugins": {
+          "$ref": "#/definitions/X-Tyk-CustomPlugins",
+          "description": "Plugins configures custom plugins to be run on post stage.\nThe plugins would be executed in the order of configuration in the list."
+        }
+      },
+      "type": "object"
+    },
+    "X-Tyk-PrePlugin": {
+      "additionalProperties": false,
+      "description": "PrePlugin configures pre stage plugins.",
+      "properties": {
+        "plugins": {
+          "$ref": "#/definitions/X-Tyk-CustomPlugins",
+          "description": "Plugins configures custom plugins to be run on pre authentication stage.\nThe plugins would be executed in the order of configuration in the list."
+        }
+      },
+      "type": "object"
+    },
+    "X-Tyk-Provider": {
+      "additionalProperties": false,
+      "description": "Provider defines an issuer to validate and the Client ID to Policy ID mappings.",
+      "properties": {
+        "clientToPolicyMapping": {
+          "$ref": "#/definitions/X-Tyk-ClientToPolicies",
+          "description": "ClientToPolicyMapping contains mappings of Client IDs to Policy IDs."
+        },
+        "issuer": {
+          "description": "Issuer contains a validation value for the issuer claim, usually a domain name e.g. `accounts.google.com` or similar.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "X-Tyk-Providers": {
+      "items": {
+        "$ref": "#/definitions/X-Tyk-Provider"
+      },
+      "type": "array"
+    },
+    "X-Tyk-RateLimit": {
+      "additionalProperties": false,
+      "description": "RateLimit holds the configurations related to rate limit.",
+      "properties": {
+        "enabled": {
+          "description": "Enabled enables/disables API level rate limiting for this API.\n\nTyk classic API definition: `!disable_rate_limit`.",
+          "type": "boolean"
+        },
         "per": {
-          "type": "string",
-          "pattern": "^(\\d+h)?(\\d+m)?(\\d+s)?$"
+          "description": "Per defines the time interval for rate limiting using shorthand notation.\nThe value of Per is a string that specifies the interval in a compact form,\nwhere hours, minutes, and seconds are denoted by 'h', 'm', and 's' respectively.\nMultiple units can be combined to represent the duration.\n\nExamples of valid shorthand notations:\n- \"1h\"   : one hour\n- \"20m\"  : twenty minutes\n- \"30s\"  : thirty seconds\n- \"1m29s\": one minute and twenty-nine seconds\n- \"1h30m\" : one hour and thirty minutes\n\nAn empty value is interpreted as \"0s\", implying no rate limiting interval effectively disabling the API-level rate limit.\nIt's important to format the string correctly, as invalid formats will\nbe considered as 0s/empty.\n\nTyk classic API definition: `global_rate_limit.per`.",
+          "type": "string"
+        },
+        "rate": {
+          "description": "Rate specifies the number of requests that can be passed to the upstream in each time interval (`per`).\nThis field sets the limit on the frequency of requests to ensure controlled\nresource access or to prevent abuse. The rate is defined as an integer value.\n\nA higher value indicates a higher number of allowed requests in the given\ntime frame. For instance, if `Per` is set to `1m` (one minute), a Rate of `100`\nmeans up to 100 requests can be made per minute.\n\nTyk classic API definition: `global_rate_limit.rate`.",
+          "type": "integer"
         }
       },
       "required": [
         "enabled",
         "rate",
         "per"
-      ]
+      ],
+      "type": "object"
     },
-    "X-Tyk-DetailedTracing": {
-      "type": "object",
+    "X-Tyk-RequestSizeLimit": {
       "additionalProperties": false,
+      "description": "RequestSizeLimit limits the maximum allowed size of the request body in bytes.",
       "properties": {
         "enabled": {
+          "description": "Enabled enables the Request Size Limit functionality.",
+          "type": "boolean"
+        },
+        "value": {
+          "description": "Value is the maximum allowed size of the request body in bytes.",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "enabled",
+        "value"
+      ],
+      "type": "object"
+    },
+    "X-Tyk-ResponsePlugin": {
+      "additionalProperties": false,
+      "description": "ResponsePlugin configures response plugins.",
+      "properties": {
+        "plugins": {
+          "$ref": "#/definitions/X-Tyk-CustomPlugins",
+          "description": "Plugins configures custom plugins to be run on post stage.\nThe plugins would be executed in the order of configuration in the list."
+        }
+      },
+      "type": "object"
+    },
+    "X-Tyk-ScopeToPolicies": {
+      "items": {
+        "$ref": "#/definitions/X-Tyk-ScopeToPolicy"
+      },
+      "type": "array"
+    },
+    "X-Tyk-ScopeToPolicy": {
+      "additionalProperties": false,
+      "description": "ScopeToPolicy contains a single scope to policy ID mapping.",
+      "properties": {
+        "policyId": {
+          "description": "PolicyID contains the Policy ID.",
+          "type": "string"
+        },
+        "scope": {
+          "description": "Scope contains the scope name.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "X-Tyk-Scopes": {
+      "additionalProperties": false,
+      "description": "Scopes holds the scope to policy mappings for a claim name.",
+      "properties": {
+        "claimName": {
+          "description": "ClaimName contains the claim name.",
+          "type": "string"
+        },
+        "scopeToPolicyMapping": {
+          "$ref": "#/definitions/X-Tyk-ScopeToPolicies",
+          "description": "ScopeToPolicyMapping contains the mappings of scopes to policy IDs."
+        }
+      },
+      "type": "object"
+    },
+    "X-Tyk-SecuritySchemes": {
+      "patternProperties": {
+        "^[a-zA-Z0-9\\.\\-_]+$": {
+          "anyOf": [
+            {
+              "$schema": "https://json-schema.org/draft/2020-12/schema",
+              "additionalProperties": false,
+              "description": "Token holds the values related to authentication tokens.",
+              "properties": {
+                "cookie": {
+                  "additionalProperties": false,
+                  "description": "Cookie contains configurations for the cookie value auth source.\n\nTyk classic API definition: `auth_configs[x].cookie`",
+                  "properties": {
+                    "enabled": {
+                      "description": "Enabled enables the auth source.\nTyk classic API definition: `auth_configs[X].use_param/use_cookie`",
+                      "type": "boolean"
+                    },
+                    "name": {
+                      "description": "Name is the name of the auth source.\nTyk classic API definition: `auth_configs[X].param_name/cookie_name`",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "enabled"
+                  ],
+                  "type": "object"
+                },
+                "enableClientCertificate": {
+                  "description": "EnableClientCertificate allows to create dynamic keys based on certificates.\n\nTyk classic API definition: `auth_configs[\"authToken\"].use_certificate`",
+                  "type": "boolean"
+                },
+                "enabled": {
+                  "description": "Enabled enables the token based authentication mode.\n\nTyk classic API definition: `auth_configs[\"authToken\"].use_standard_auth`",
+                  "type": "boolean"
+                },
+                "header": {
+                  "additionalProperties": false,
+                  "description": "Header contains configurations for the header value auth source, it is enabled by default.\n\nTyk classic API definition: `auth_configs[x].header`",
+                  "properties": {
+                    "enabled": {
+                      "description": "Enabled enables the auth source.\nTyk classic API definition: `auth_configs[X].use_param/use_cookie`",
+                      "type": "boolean"
+                    },
+                    "name": {
+                      "description": "Name is the name of the auth source.\nTyk classic API definition: `auth_configs[X].param_name/cookie_name`",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "enabled"
+                  ],
+                  "type": "object"
+                },
+                "query": {
+                  "additionalProperties": false,
+                  "description": "Query contains configurations for the query parameters auth source.\n\nTyk classic API definition: `auth_configs[x].query`",
+                  "properties": {
+                    "enabled": {
+                      "description": "Enabled enables the auth source.\nTyk classic API definition: `auth_configs[X].use_param/use_cookie`",
+                      "type": "boolean"
+                    },
+                    "name": {
+                      "description": "Name is the name of the auth source.\nTyk classic API definition: `auth_configs[X].param_name/cookie_name`",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "enabled"
+                  ],
+                  "type": "object"
+                },
+                "signatureValidation": {
+                  "additionalProperties": false,
+                  "description": "Signature holds the configuration for verifying the signature of the token.\n\nTyk classic API definition: `auth_configs[\"authToken\"].use_certificate`",
+                  "properties": {
+                    "algorithm": {
+                      "type": "string"
+                    },
+                    "allowedClockSkew": {
+                      "type": "integer"
+                    },
+                    "enabled": {
+                      "description": "required",
+                      "type": "boolean"
+                    },
+                    "errorCode": {
+                      "type": "integer"
+                    },
+                    "errorMessage": {
+                      "type": "string"
+                    },
+                    "header": {
+                      "type": "string"
+                    },
+                    "query": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "enabled": {
+                          "description": "Enabled enables the auth source.\nTyk classic API definition: `auth_configs[X].use_param/use_cookie`",
+                          "type": "boolean"
+                        },
+                        "name": {
+                          "description": "Name is the name of the auth source.\nTyk classic API definition: `auth_configs[X].param_name/cookie_name`",
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "enabled"
+                      ],
+                      "type": "object"
+                    },
+                    "secret": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "enabled"
+                  ],
+                  "type": "object"
+                }
+              },
+              "required": [
+                "enabled"
+              ],
+              "type": "object"
+            },
+            {
+              "$schema": "https://json-schema.org/draft/2020-12/schema",
+              "additionalProperties": false,
+              "description": "Basic type holds configuration values related to http basic authentication.",
+              "properties": {
+                "cacheTTL": {
+                  "description": "CacheTTL is the TTL for a cached basic authentication key in seconds.\nTyk classic API definition: `basic_auth.cache_ttl`",
+                  "type": "integer"
+                },
+                "cookie": {
+                  "additionalProperties": false,
+                  "description": "Cookie contains configurations for the cookie value auth source.\n\nTyk classic API definition: `auth_configs[x].cookie`",
+                  "properties": {
+                    "enabled": {
+                      "description": "Enabled enables the auth source.\nTyk classic API definition: `auth_configs[X].use_param/use_cookie`",
+                      "type": "boolean"
+                    },
+                    "name": {
+                      "description": "Name is the name of the auth source.\nTyk classic API definition: `auth_configs[X].param_name/cookie_name`",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "enabled"
+                  ],
+                  "type": "object"
+                },
+                "disableCaching": {
+                  "description": "DisableCaching disables the caching of basic authentication key.\nTyk classic API definition: `basic_auth.disable_caching`",
+                  "type": "boolean"
+                },
+                "enabled": {
+                  "description": "Enabled enables the basic authentication mode.\nTyk classic API definition: `use_basic_auth`",
+                  "type": "boolean"
+                },
+                "extractCredentialsFromBody": {
+                  "additionalProperties": false,
+                  "description": "ExtractCredentialsFromBody helps to extract username and password from body. In some cases, like dealing with SOAP,\nuser credentials can be passed via request body.",
+                  "properties": {
+                    "enabled": {
+                      "description": "Enabled enables extracting credentials from body.\nTyk classic API definition: `basic_auth.extract_from_body`",
+                      "type": "boolean"
+                    },
+                    "passwordRegexp": {
+                      "description": "PasswordRegexp is the regex for password e.g. `\u003cPassword\u003e(.*)\u003c/Password\u003e`.\nTyk classic API definition: `basic_auth.passwordRegexp`",
+                      "type": "string"
+                    },
+                    "userRegexp": {
+                      "description": "UserRegexp is the regex for username e.g. `\u003cUser\u003e(.*)\u003c/User\u003e`.\nTyk classic API definition: `basic_auth.userRegexp`",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "enabled"
+                  ],
+                  "type": "object"
+                },
+                "header": {
+                  "additionalProperties": false,
+                  "description": "Header contains configurations for the header value auth source, it is enabled by default.\n\nTyk classic API definition: `auth_configs[x].header`",
+                  "properties": {
+                    "enabled": {
+                      "description": "Enabled enables the auth source.\nTyk classic API definition: `auth_configs[X].use_param/use_cookie`",
+                      "type": "boolean"
+                    },
+                    "name": {
+                      "description": "Name is the name of the auth source.\nTyk classic API definition: `auth_configs[X].param_name/cookie_name`",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "enabled"
+                  ],
+                  "type": "object"
+                },
+                "query": {
+                  "additionalProperties": false,
+                  "description": "Query contains configurations for the query parameters auth source.\n\nTyk classic API definition: `auth_configs[x].query`",
+                  "properties": {
+                    "enabled": {
+                      "description": "Enabled enables the auth source.\nTyk classic API definition: `auth_configs[X].use_param/use_cookie`",
+                      "type": "boolean"
+                    },
+                    "name": {
+                      "description": "Name is the name of the auth source.\nTyk classic API definition: `auth_configs[X].param_name/cookie_name`",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "enabled"
+                  ],
+                  "type": "object"
+                }
+              },
+              "required": [
+                "enabled"
+              ],
+              "type": "object"
+            },
+            {
+              "$schema": "https://json-schema.org/draft/2020-12/schema",
+              "additionalProperties": false,
+              "description": "JWT holds the configuration for the JWT middleware.",
+              "properties": {
+                "clientBaseField": {
+                  "type": "string"
+                },
+                "cookie": {
+                  "additionalProperties": false,
+                  "description": "Cookie contains configurations for the cookie value auth source.\n\nTyk classic API definition: `auth_configs[x].cookie`",
+                  "properties": {
+                    "enabled": {
+                      "description": "Enabled enables the auth source.\nTyk classic API definition: `auth_configs[X].use_param/use_cookie`",
+                      "type": "boolean"
+                    },
+                    "name": {
+                      "description": "Name is the name of the auth source.\nTyk classic API definition: `auth_configs[X].param_name/cookie_name`",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "enabled"
+                  ],
+                  "type": "object"
+                },
+                "defaultPolicies": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "enabled": {
+                  "description": "required",
+                  "type": "boolean"
+                },
+                "expiresAtValidationSkew": {
+                  "type": "integer"
+                },
+                "header": {
+                  "additionalProperties": false,
+                  "description": "Header contains configurations for the header value auth source, it is enabled by default.\n\nTyk classic API definition: `auth_configs[x].header`",
+                  "properties": {
+                    "enabled": {
+                      "description": "Enabled enables the auth source.\nTyk classic API definition: `auth_configs[X].use_param/use_cookie`",
+                      "type": "boolean"
+                    },
+                    "name": {
+                      "description": "Name is the name of the auth source.\nTyk classic API definition: `auth_configs[X].param_name/cookie_name`",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "enabled"
+                  ],
+                  "type": "object"
+                },
+                "identityBaseField": {
+                  "type": "string"
+                },
+                "idpClientIdMappingDisabled": {
+                  "description": "IDPClientIDMappingDisabled prevents Tyk from automatically detecting the use of certain IDPs based on standard claims\nthat they include in the JWT: `client_id`, `cid`, `clientId`. Setting this flag to `true` disables the mapping and avoids\naccidentally misidentifying the use of one of these IDPs if one of their standard values is configured in your JWT.",
+                  "type": "boolean"
+                },
+                "issuedAtValidationSkew": {
+                  "type": "integer"
+                },
+                "notBeforeValidationSkew": {
+                  "type": "integer"
+                },
+                "policyFieldName": {
+                  "type": "string"
+                },
+                "query": {
+                  "additionalProperties": false,
+                  "description": "Query contains configurations for the query parameters auth source.\n\nTyk classic API definition: `auth_configs[x].query`",
+                  "properties": {
+                    "enabled": {
+                      "description": "Enabled enables the auth source.\nTyk classic API definition: `auth_configs[X].use_param/use_cookie`",
+                      "type": "boolean"
+                    },
+                    "name": {
+                      "description": "Name is the name of the auth source.\nTyk classic API definition: `auth_configs[X].param_name/cookie_name`",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "enabled"
+                  ],
+                  "type": "object"
+                },
+                "scopes": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "claimName": {
+                      "description": "ClaimName contains the claim name.",
+                      "type": "string"
+                    },
+                    "scopeToPolicyMapping": {
+                      "description": "ScopeToPolicyMapping contains the mappings of scopes to policy IDs.",
+                      "items": {
+                        "additionalProperties": false,
+                        "description": "ScopeToPolicy contains a single scope to policy ID mapping.",
+                        "properties": {
+                          "policyId": {
+                            "description": "PolicyID contains the Policy ID.",
+                            "type": "string"
+                          },
+                          "scope": {
+                            "description": "Scope contains the scope name.",
+                            "type": "string"
+                          }
+                        },
+                        "type": "object"
+                      },
+                      "type": "array"
+                    }
+                  },
+                  "type": "object"
+                },
+                "signingMethod": {
+                  "type": "string"
+                },
+                "skipKid": {
+                  "type": "boolean"
+                },
+                "source": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "enabled"
+              ],
+              "type": "object"
+            },
+            {
+              "$schema": "https://json-schema.org/draft/2020-12/schema",
+              "additionalProperties": false,
+              "description": "OAuth configures the OAuth middleware.",
+              "properties": {
+                "allowedAuthorizeTypes": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "authLoginRedirect": {
+                  "type": "string"
+                },
+                "cookie": {
+                  "additionalProperties": false,
+                  "description": "Cookie contains configurations for the cookie value auth source.\n\nTyk classic API definition: `auth_configs[x].cookie`",
+                  "properties": {
+                    "enabled": {
+                      "description": "Enabled enables the auth source.\nTyk classic API definition: `auth_configs[X].use_param/use_cookie`",
+                      "type": "boolean"
+                    },
+                    "name": {
+                      "description": "Name is the name of the auth source.\nTyk classic API definition: `auth_configs[X].param_name/cookie_name`",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "enabled"
+                  ],
+                  "type": "object"
+                },
+                "enabled": {
+                  "description": "required",
+                  "type": "boolean"
+                },
+                "header": {
+                  "additionalProperties": false,
+                  "description": "Header contains configurations for the header value auth source, it is enabled by default.\n\nTyk classic API definition: `auth_configs[x].header`",
+                  "properties": {
+                    "enabled": {
+                      "description": "Enabled enables the auth source.\nTyk classic API definition: `auth_configs[X].use_param/use_cookie`",
+                      "type": "boolean"
+                    },
+                    "name": {
+                      "description": "Name is the name of the auth source.\nTyk classic API definition: `auth_configs[X].param_name/cookie_name`",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "enabled"
+                  ],
+                  "type": "object"
+                },
+                "notifications": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "onKeyChangeUrl": {
+                      "description": "OnKeyChangeURL is the URL a request will be triggered against.",
+                      "type": "string"
+                    },
+                    "sharedSecret": {
+                      "description": "SharedSecret is the shared secret used in the notification request.",
+                      "type": "string"
+                    }
+                  },
+                  "type": "object"
+                },
+                "query": {
+                  "additionalProperties": false,
+                  "description": "Query contains configurations for the query parameters auth source.\n\nTyk classic API definition: `auth_configs[x].query`",
+                  "properties": {
+                    "enabled": {
+                      "description": "Enabled enables the auth source.\nTyk classic API definition: `auth_configs[X].use_param/use_cookie`",
+                      "type": "boolean"
+                    },
+                    "name": {
+                      "description": "Name is the name of the auth source.\nTyk classic API definition: `auth_configs[X].param_name/cookie_name`",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "enabled"
+                  ],
+                  "type": "object"
+                },
+                "refreshToken": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "enabled"
+              ],
+              "type": "object"
+            },
+            {
+              "$schema": "https://json-schema.org/draft/2020-12/schema",
+              "additionalProperties": false,
+              "properties": {
+                "cookie": {
+                  "additionalProperties": false,
+                  "description": "Cookie contains configurations for the cookie value auth source.\n\nTyk classic API definition: `auth_configs[x].cookie`",
+                  "properties": {
+                    "enabled": {
+                      "description": "Enabled enables the auth source.\nTyk classic API definition: `auth_configs[X].use_param/use_cookie`",
+                      "type": "boolean"
+                    },
+                    "name": {
+                      "description": "Name is the name of the auth source.\nTyk classic API definition: `auth_configs[X].param_name/cookie_name`",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "enabled"
+                  ],
+                  "type": "object"
+                },
+                "enabled": {
+                  "description": "required",
+                  "type": "boolean"
+                },
+                "header": {
+                  "additionalProperties": false,
+                  "description": "Header contains configurations for the header value auth source, it is enabled by default.\n\nTyk classic API definition: `auth_configs[x].header`",
+                  "properties": {
+                    "enabled": {
+                      "description": "Enabled enables the auth source.\nTyk classic API definition: `auth_configs[X].use_param/use_cookie`",
+                      "type": "boolean"
+                    },
+                    "name": {
+                      "description": "Name is the name of the auth source.\nTyk classic API definition: `auth_configs[X].param_name/cookie_name`",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "enabled"
+                  ],
+                  "type": "object"
+                },
+                "providers": {
+                  "description": "required",
+                  "items": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "introspection": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "cache": {
+                            "additionalProperties": false,
+                            "description": "Cache is the caching mechanism for introspection responses.",
+                            "properties": {
+                              "enabled": {
+                                "description": "Enabled enables the caching mechanism for introspection responses.",
+                                "type": "boolean"
+                              },
+                              "timeout": {
+                                "description": "Timeout is the duration in seconds of how long the cached value stays.\nFor introspection caching, it is suggested to use a short interval.",
+                                "type": "integer"
+                              }
+                            },
+                            "required": [
+                              "enabled",
+                              "timeout"
+                            ],
+                            "type": "object"
+                          },
+                          "clientId": {
+                            "description": "ClientID is the public identifier for the client, acquired from the third party.",
+                            "type": "string"
+                          },
+                          "clientSecret": {
+                            "description": "ClientSecret is a secret known only to the client and the authorization server, acquired from the third party.",
+                            "type": "string"
+                          },
+                          "enabled": {
+                            "description": "Enabled enables OAuth access token validation by introspection to a third party.",
+                            "type": "boolean"
+                          },
+                          "identityBaseField": {
+                            "description": "IdentityBaseField is the key showing where to find the user id in the claims. If it is empty, the `sub` key is looked at.",
+                            "type": "string"
+                          },
+                          "url": {
+                            "description": "URL is the URL of the third party provider's introspection endpoint.",
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "enabled",
+                          "url",
+                          "clientId",
+                          "clientSecret",
+                          "cache"
+                        ],
+                        "type": "object"
+                      },
+                      "jwt": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "enabled": {
+                            "description": "Enabled enables OAuth access token validation by introspection to a third party.",
+                            "type": "boolean"
+                          },
+                          "expiresAtValidationSkew": {
+                            "description": "ExpiresAtValidationSkew is the clock skew to be considered while validating exp claim.",
+                            "type": "integer"
+                          },
+                          "identityBaseField": {
+                            "description": "IdentityBaseField is the identity claim name.",
+                            "type": "string"
+                          },
+                          "issuedAtValidationSkew": {
+                            "description": "IssuedAtValidationSkew is the clock skew to be considered while validating iat claim.",
+                            "type": "integer"
+                          },
+                          "notBeforeValidationSkew": {
+                            "description": "NotBeforeValidationSkew is the clock skew to be considered while validating nbf claim.",
+                            "type": "integer"
+                          },
+                          "signingMethod": {
+                            "description": "SigningMethod to verify signing method used in jwt - allowed values HMAC/RSA/ECDSA.",
+                            "type": "string"
+                          },
+                          "source": {
+                            "description": "Source is the secret to verify signature, it could be one among:\n- a base64 encoded static secret,\n- a valid JWK URL in plain text,\n- a valid JWK URL in base64 encoded format.",
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "enabled",
+                          "signingMethod",
+                          "source"
+                        ],
+                        "type": "object"
+                      }
+                    },
+                    "type": "object"
+                  },
+                  "type": "array"
+                },
+                "query": {
+                  "additionalProperties": false,
+                  "description": "Query contains configurations for the query parameters auth source.\n\nTyk classic API definition: `auth_configs[x].query`",
+                  "properties": {
+                    "enabled": {
+                      "description": "Enabled enables the auth source.\nTyk classic API definition: `auth_configs[X].use_param/use_cookie`",
+                      "type": "boolean"
+                    },
+                    "name": {
+                      "description": "Name is the name of the auth source.\nTyk classic API definition: `auth_configs[X].param_name/cookie_name`",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "enabled"
+                  ],
+                  "type": "object"
+                }
+              },
+              "required": [
+                "enabled",
+                "providers"
+              ],
+              "type": "object"
+            }
+          ]
+        }
+      },
+      "type": "object"
+    },
+    "X-Tyk-Server": {
+      "additionalProperties": false,
+      "description": "Server contains the configuration that sets Tyk up to receive requests from the client applications.",
+      "properties": {
+        "authentication": {
+          "$ref": "#/definitions/X-Tyk-Authentication",
+          "description": "Authentication contains the configurations that manage how clients can authenticate with Tyk to access the API."
+        },
+        "clientCertificates": {
+          "$ref": "#/definitions/X-Tyk-ClientCertificates",
+          "description": "ClientCertificates contains the configurations related to establishing static mutual TLS between the client and Tyk."
+        },
+        "customDomain": {
+          "$ref": "#/definitions/X-Tyk-Domain",
+          "description": "CustomDomain is the domain to bind this API to. This enforces domain matching for client requests.\n\nTyk classic API definition: `domain`"
+        },
+        "detailedActivityLogs": {
+          "$ref": "#/definitions/X-Tyk-DetailedActivityLogs",
+          "description": "DetailedActivityLogs configures detailed analytics recording."
+        },
+        "detailedTracing": {
+          "$ref": "#/definitions/X-Tyk-DetailedTracing",
+          "description": "DetailedTracing enables OpenTelemetry's detailed tracing for this API.\n\nTyk classic API definition: `detailed_tracing`"
+        },
+        "gatewayTags": {
+          "$ref": "#/definitions/X-Tyk-GatewayTags",
+          "description": "GatewayTags contain segment tags to indicate which Gateways your upstream service is connected to (and hence where to deploy the API)."
+        },
+        "listenPath": {
+          "$ref": "#/definitions/X-Tyk-ListenPath",
+          "description": "ListenPath is the base path on Tyk to which requests for this API should\nbe sent. Tyk listens for any requests coming into the host at this\npath, on the port that Tyk is configured to run on, and processes these\naccordingly."
+        }
+      },
+      "required": [
+        "listenPath"
+      ],
+      "type": "object"
+    },
+    "X-Tyk-ServiceDiscovery": {
+      "additionalProperties": false,
+      "description": "ServiceDiscovery holds configuration required for service discovery.",
+      "properties": {
+        "cache": {
+          "$ref": "#/definitions/X-Tyk-ServiceDiscoveryCache",
+          "description": "Cache holds cache related flags.\n\nTyk classic API definition:\n- `service_discovery.cache_disabled`\n- `service_discovery.cache_timeout`"
+        },
+        "cacheTimeout": {
+          "description": "CacheTimeout is the timeout of a cache value when a new data is loaded from a discovery service.\nSetting it too low will cause Tyk to call the SD service too often, setting it too high could mean that\nfailures are not recovered from quickly enough.\n\nDeprecated: The field is deprecated. Use `service_discovery` to configure service discovery cache options.\n\nTyk classic API definition: `service_discovery.cache_timeout`",
+          "type": "integer"
+        },
+        "dataPath": {
+          "description": "DataPath is the namespace of the data path - where exactly in your service response the namespace can be found.\nFor example, if your service responds with:\n\n```\n{\n \"action\": \"get\",\n \"node\": {\n   \"key\": \"/services/single\",\n   \"value\": \"http://httpbin.org:6000\",\n   \"modifiedIndex\": 6,\n   \"createdIndex\": 6\n }\n}\n```\n\nthen your namespace would be `node.value`.\n\nTyk classic API definition: `service_discovery.data_path`",
+          "type": "string"
+        },
+        "enabled": {
+          "description": "Enabled enables Service Discovery.\n\nTyk classic API definition: `service_discovery.use_discovery_service`",
+          "type": "boolean"
+        },
+        "endpointReturnsList": {
+          "description": "EndpointReturnsList is set `true` when the response type is a list instead of an object.\n\nTyk classic API definition: `service_discovery.endpoint_returns_list`",
+          "type": "boolean"
+        },
+        "parentDataPath": {
+          "description": "ParentDataPath is the namespace of the where to find the nested\nvalue if `useNestedQuery` is `true`. In the above example, it\nwould be `node.value`. You would change the `dataPath` setting\nto be `hostname`, since this is where the host name data\nresides in the JSON string. Tyk automatically assumes that\n`dataPath` in this case is in a string-encoded JSON object and\nwill try to deserialize it.\n\nTyk classic API definition: `service_discovery.parent_data_path`",
+          "type": "string"
+        },
+        "portDataPath": {
+          "description": "PortDataPath is the port of the data path. In the above nested example, we can see that there is a separate `port` value\nfor the service in the nested JSON. In this case, you can set the `portDataPath` value and Tyk will treat `dataPath` as\nthe hostname and zip them together (this assumes that the hostname element does not end in a slash or resource identifier\nsuch as `/widgets/`). In the above example, the `portDataPath` would be `port`.\n\nTyk classic API definition: `service_discovery.port_data_path`",
+          "type": "string"
+        },
+        "queryEndpoint": {
+          "description": "QueryEndpoint is the endpoint to call, this would usually be Consul, etcd or Eureka K/V store.\nTyk classic API definition: `service_discovery.query_endpoint`",
+          "type": "string"
+        },
+        "targetPath": {
+          "description": "TargetPath is used to set a target path that will be appended to the\ndiscovered endpoint, since many service discovery services only provide\nhost and port data. It is important to be able to target a specific\nresource on that host. Setting this value will enable that.\n\nTyk classic API definition: `service_discovery.target_path`",
+          "type": "string"
+        },
+        "useNestedQuery": {
+          "description": "UseNestedQuery enables the use of a combination of `dataPath` and `parentDataPath`.\nIt is necessary when the data lives within this string-encoded JSON object.\n\n```\n{\n \"action\": \"get\",\n \"node\": {\n   \"key\": \"/services/single\",\n   \"value\": \"{\"hostname\": \"http://httpbin.org\", \"port\": \"80\"}\",\n   \"modifiedIndex\": 6,\n   \"createdIndex\": 6\n }\n}\n```\n\nTyk classic API definition: `service_discovery.use_nested_query`",
+          "type": "boolean"
+        },
+        "useTargetList": {
+          "description": "UseTargetList should be set to `true` if you are using load balancing. Tyk will treat the data path as a list and\ninject it into the target list of your API definition.\n\nTyk classic API definition: `service_discovery.use_target_list`",
           "type": "boolean"
         }
       },
       "required": [
         "enabled"
-      ]
+      ],
+      "type": "object"
     },
-    "X-Tyk-UInt": {
-      "type": "integer",
-      "minimum": 0
+    "X-Tyk-ServiceDiscoveryCache": {
+      "additionalProperties": false,
+      "description": "ServiceDiscoveryCache holds configuration for caching ServiceDiscovery data.",
+      "properties": {
+        "enabled": {
+          "description": "Enabled turns service discovery cache on or off.\n\nTyk classic API definition: `service_discovery.cache_disabled`",
+          "type": "boolean"
+        },
+        "timeout": {
+          "description": "Timeout is the TTL for a cached object in seconds.\n\nTyk classic API definition: `service_discovery.cache_timeout`",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "enabled"
+      ],
+      "type": "object"
     },
-    "X-Tyk-DomainDef": {
-      "type": "string",
-      "pattern": "^([*a-zA-Z0-9-]+(\\.[*a-zA-Z0-9-]+)*)(:\\d+)?$"
+    "X-Tyk-State": {
+      "additionalProperties": false,
+      "description": "State holds configuration for the status of the API within Tyk - whether it is currently active and whether it is exposed externally.",
+      "properties": {
+        "active": {
+          "description": "Active enables the API so that Tyk will listen for and process requests made to the listenPath.\nTyk classic API definition: `active`",
+          "type": "boolean"
+        },
+        "internal": {
+          "description": "Internal makes the API accessible only internally.\nTyk classic API definition: `internal`",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "active"
+      ],
+      "type": "object"
+    },
+    "X-Tyk-StringSlice": {
+      "items": {
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "X-Tyk-Test": {
+      "additionalProperties": false,
+      "description": "Test holds the test configuration for service discovery.",
+      "properties": {
+        "serviceDiscovery": {
+          "$ref": "#/definitions/X-Tyk-ServiceDiscovery",
+          "description": "ServiceDiscovery contains the configuration related to test Service Discovery.\nTyk classic API definition: `proxy.service_discovery`"
+        }
+      },
+      "type": "object"
+    },
+    "X-Tyk-TrackEndpoint": {
+      "additionalProperties": false,
+      "description": "TrackEndpoint configures Track or DoNotTrack behaviour for an endpoint.",
+      "properties": {
+        "enabled": {
+          "description": "Enabled if set to true enables or disables tracking for an endpoint depending\nif it's used in `trackEndpoint` or `doNotTrackEndpoint`.",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "enabled"
+      ],
+      "type": "object"
+    },
+    "X-Tyk-TransformBody": {
+      "additionalProperties": false,
+      "description": "TransformBody holds configuration about request/response body transformations.",
+      "properties": {
+        "body": {
+          "description": "Body base64 encoded representation of the template.",
+          "type": "string"
+        },
+        "enabled": {
+          "description": "Enabled enables transform request/request body middleware.",
+          "type": "boolean"
+        },
+        "format": {
+          "description": "Format of the request/response body, xml or json.",
+          "type": "string"
+        },
+        "path": {
+          "description": "Path file path for the template.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "enabled",
+        "format"
+      ],
+      "type": "object"
+    },
+    "X-Tyk-TransformHeaders": {
+      "additionalProperties": false,
+      "description": "TransformHeaders holds configuration about request/response header transformations.",
+      "properties": {
+        "add": {
+          "$ref": "#/definitions/X-Tyk-Headers",
+          "description": "Add specifies headers to be added to the request/response."
+        },
+        "enabled": {
+          "description": "Enabled enables Header Transform for the given path and method.",
+          "type": "boolean"
+        },
+        "remove": {
+          "$ref": "#/definitions/X-Tyk-StringSlice",
+          "description": "Remove specifies header names to be removed from the request/response."
+        }
+      },
+      "required": [
+        "enabled"
+      ],
+      "type": "object"
+    },
+    "X-Tyk-TransformRequestMethod": {
+      "additionalProperties": false,
+      "description": "TransformRequestMethod holds configuration for rewriting request methods.",
+      "properties": {
+        "enabled": {
+          "description": "Enabled enables Method Transform for the given path and method.",
+          "type": "boolean"
+        },
+        "toMethod": {
+          "description": "ToMethod is the http method value to which the method of an incoming request will be transformed.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "enabled",
+        "toMethod"
+      ],
+      "type": "object"
+    },
+    "X-Tyk-URLRewrite": {
+      "additionalProperties": false,
+      "description": "URLRewrite configures URL rewriting.",
+      "properties": {
+        "enabled": {
+          "description": "Enabled enables URL rewriting if set to true.",
+          "type": "boolean"
+        },
+        "pattern": {
+          "description": "Pattern is the regular expression against which the request URL is compared for the primary rewrite check.\nIf this matches the defined pattern, the primary URL rewrite is triggered.",
+          "type": "string"
+        },
+        "rewriteTo": {
+          "description": "RewriteTo specifies the URL to which the request shall be rewritten if the primary URL rewrite is triggered.",
+          "type": "string"
+        },
+        "triggers": {
+          "$ref": "#/definitions/X-Tyk-URLRewriteTriggers",
+          "description": "Triggers contain advanced additional triggers for the URL rewrite.\nThe triggers are processed only if the requested URL matches the pattern above."
+        }
+      },
+      "required": [
+        "enabled"
+      ],
+      "type": "object"
+    },
+    "X-Tyk-URLRewriteRule": {
+      "additionalProperties": false,
+      "description": "URLRewriteRule represents a rewrite matching rules.",
+      "properties": {
+        "in": {
+          "description": "In specifies one of the valid inputs for URL rewriting.\nBy default, it uses `url` as the input source.\n\nThe following values are valid:\n\n- `url`, match pattern against URL\n- `query`, match pattern against named query parameter value\n- `path`, match pattern against named path parameter value\n- `header`, match pattern against named header value\n- `sessionMetadata`, match pattern against session metadata\n- `requestBody`, match pattern against request body\n- `requestContext`, match pattern against request context",
+          "type": "string"
+        },
+        "name": {
+          "description": "Name is the index in the input identified in `in` that should be used to\nlocate the value for this rule. When `in` is set to `requestBody`, the\nvalue is ignored.",
+          "type": "string"
+        },
+        "negate": {
+          "description": "Negate is a boolean negation operator. Setting it to true inverts the matching behaviour\nsuch that the rewrite will be triggered if the value does not match the `pattern` for this rule.",
+          "type": "boolean"
+        },
+        "pattern": {
+          "description": "Pattern is the regular expression against which the `in` values are compared for this rule check.\nIf the value matches the defined `pattern`, the URL rewrite is triggered for this rule.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "in",
+        "pattern"
+      ],
+      "type": "object"
+    },
+    "X-Tyk-URLRewriteTrigger": {
+      "additionalProperties": false,
+      "description": "URLRewriteTrigger represents a set of matching rules for a rewrite.",
+      "properties": {
+        "condition": {
+          "description": "Condition indicates the logical combination that will be applied to the rules for an advanced trigger:\n\n- Value `any` means any of the defined trigger rules may match\n- Value `all` means all the defined trigger rules must match",
+          "type": "string"
+        },
+        "rewriteTo": {
+          "description": "RewriteTo specifies the URL to which the request shall be rewritten\nif indicated by the combination of `condition` and `rules`.",
+          "type": "string"
+        },
+        "rules": {
+          "description": "Rules contain individual checks that are combined according to the\n`condition` to determine whether the URL rewrite will be triggered.\nIf empty, the trigger is ignored.",
+          "items": {
+            "$ref": "#/definitions/X-Tyk-URLRewriteRule"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "condition",
+        "rewriteTo"
+      ],
+      "type": "object"
+    },
+    "X-Tyk-URLRewriteTriggers": {
+      "items": {
+        "$ref": "#/definitions/X-Tyk-URLRewriteTrigger"
+      },
+      "type": "array"
+    },
+    "X-Tyk-Upstream": {
+      "additionalProperties": false,
+      "description": "Upstream holds configuration for the upstream server to which Tyk should proxy requests.",
+      "properties": {
+        "certificatePinning": {
+          "$ref": "#/definitions/X-Tyk-CertificatePinning",
+          "description": "CertificatePinning contains the configuration related to certificate pinning."
+        },
+        "mutualTLS": {
+          "$ref": "#/definitions/X-Tyk-MutualTLS",
+          "description": "MutualTLS contains the configuration for establishment of mutual TLS between Tyk and the upstream server."
+        },
+        "rateLimit": {
+          "$ref": "#/definitions/X-Tyk-RateLimit",
+          "description": "RateLimit contains the configuration related to API level rate limit."
+        },
+        "serviceDiscovery": {
+          "$ref": "#/definitions/X-Tyk-ServiceDiscovery",
+          "description": "ServiceDiscovery contains the configuration related to Service Discovery.\nTyk classic API definition: `proxy.service_discovery`"
+        },
+        "test": {
+          "$ref": "#/definitions/X-Tyk-Test",
+          "description": "Test contains the configuration related to uptime tests."
+        },
+        "url": {
+          "description": "URL defines the upstream address (or Target URL) to which requests should be proxied.\nTyk classic API definition: `proxy.target_url`",
+          "type": "string"
+        }
+      },
+      "required": [
+        "url"
+      ],
+      "type": "object"
+    },
+    "X-Tyk-ValidateRequest": {
+      "additionalProperties": false,
+      "description": "ValidateRequest holds configuration required for validating requests.",
+      "properties": {
+        "enabled": {
+          "description": "Enabled is a boolean flag, if set to `true`, it enables request validation.",
+          "type": "boolean"
+        },
+        "errorResponseCode": {
+          "description": "ErrorResponseCode is the error code emitted when the request fails validation.\nIf unset or zero, the response will returned with http status 422 Unprocessable Entity.",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "enabled"
+      ],
+      "type": "object"
+    },
+    "X-Tyk-VersionToID": {
+      "additionalProperties": false,
+      "description": "VersionToID contains a single mapping from a version name into an API ID.",
+      "properties": {
+        "id": {
+          "description": "ID is the API ID for the version set in Name.",
+          "type": "string"
+        },
+        "name": {
+          "description": "Name contains the user chosen version name, e.g. `v1` or similar.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "id"
+      ],
+      "type": "object"
+    },
+    "X-Tyk-VersionToIDs": {
+      "items": {
+        "$ref": "#/definitions/X-Tyk-VersionToID"
+      },
+      "type": "array"
+    },
+    "X-Tyk-Versioning": {
+      "additionalProperties": false,
+      "description": "Versioning holds configuration for API versioning.",
+      "properties": {
+        "default": {
+          "description": "Default contains the default version name if a request is issued without a version.",
+          "type": "string"
+        },
+        "enabled": {
+          "description": "Enabled is a boolean flag, if set to `true` it will enable versioning of the API.",
+          "type": "boolean"
+        },
+        "fallbackToDefault": {
+          "description": "FallbackToDefault controls the behaviour of Tyk when a versioned API is called with a nonexistent version name.\nIf set to `true` then the default API version will be invoked; if set to `false` Tyk will return an HTTP 404\n`This API version does not seem to exist` error in this scenario.",
+          "type": "boolean"
+        },
+        "key": {
+          "description": "Key contains the name of the key to check for versioning information.",
+          "type": "string"
+        },
+        "location": {
+          "description": "Location contains versioning location information. It can be one of the following:\n\n- `header`,\n- `url-param`,\n- `url`.",
+          "type": "string"
+        },
+        "name": {
+          "description": "Name contains the name of the version as entered by the user (\"v1\" or similar).",
+          "type": "string"
+        },
+        "stripVersioningData": {
+          "description": "StripVersioningData is a boolean flag, if set to `true`, the API responses will be stripped of versioning data.",
+          "type": "boolean"
+        },
+        "versions": {
+          "$ref": "#/definitions/X-Tyk-VersionToIDs",
+          "description": "Versions contains a list of versions that map to individual API IDs."
+        }
+      },
+      "required": [
+        "enabled",
+        "default",
+        "location",
+        "key",
+        "versions"
+      ],
+      "type": "object"
+    },
+    "X-Tyk-VirtualEndpoint": {
+      "additionalProperties": false,
+      "description": "VirtualEndpoint contains virtual endpoint configuration.",
+      "properties": {
+        "body": {
+          "description": "Body is the js function to execute encoded in base64 format.",
+          "type": "string"
+        },
+        "enabled": {
+          "description": "Enabled enables virtual endpoint.",
+          "type": "boolean"
+        },
+        "name": {
+          "description": "Name is the name of js function.",
+          "type": "string"
+        },
+        "path": {
+          "description": "Path is the path to js file.",
+          "type": "string"
+        },
+        "proxyOnError": {
+          "description": "ProxyOnError proxies if virtual endpoint errors out.",
+          "type": "boolean"
+        },
+        "requireSession": {
+          "description": "RequireSession if enabled passes session to virtual endpoint.",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "enabled",
+        "name"
+      ],
+      "type": "object"
     }
-  }
+  },
+  "$id": "https://github.com/TykTechnologies/tyk/apidef/oas/x--tyk-x-tyk-api-gateway",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "XTykAPIGateway contains custom Tyk API extensions for the OpenAPI definition.",
+  "properties": {
+    "info": {
+      "$ref": "#/definitions/X-Tyk-Info",
+      "description": "Info contains the main metadata for the API definition."
+    },
+    "middleware": {
+      "$ref": "#/definitions/X-Tyk-Middleware",
+      "description": "Middleware contains the configurations related to the Tyk middleware."
+    },
+    "server": {
+      "$ref": "#/definitions/X-Tyk-Server",
+      "description": "Server contains the configurations related to the server."
+    },
+    "upstream": {
+      "$ref": "#/definitions/X-Tyk-Upstream",
+      "description": "Upstream contains the configurations related to the upstream."
+    }
+  },
+  "required": [
+    "info",
+    "upstream",
+    "server"
+  ],
+  "type": "object"
 }
