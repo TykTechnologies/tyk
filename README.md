@@ -13,10 +13,12 @@
 [![GitHub Repo Forks](https://img.shields.io/github/forks/TykTechnologies/tyk.svg?logoColor=8836FB)](https://github.com/TykTechnologies/tyk/fork)
 ![X twitter Follow](https://img.shields.io/twitter/follow/tyk_io?logoColor=8836FB&cacheSeconds=120)
 
+---
+[Documentation](https://tyk.io/docs/) | [Forum](https://community.tyk.io) | [Blog](https://tyk.io/blog/) | [About](https://tyk.io)
+
 
 # Tyk API Gateway
-**Tyk Gateway** is the cloud-native, open source, API Gateway.  \
-We support REST, GraphQL, TCP and gRPC protocols.
+**Tyk Gateway** is the cloud-native, open source, enterprise-ready API Gateway supporting REST, GraphQL, TCP and gRPC protocols.
 
 Built from the ground up, as the [fastest API Gateway](https://tyk.io/performance-benchmarks/) on the planet since 2014.
 
@@ -24,26 +26,30 @@ _Tyk Gateway_ is provided ‘Batteries-included’, with no feature lockout. Ena
 
 Tyk runs natively on _Kubernetes_, if you prefer, thanks to the _[Tyk Kubernetes Operator](https://github.com/TykTechnologies/tyk-operator)_
 
-
 <table>
   <tr>
-   <td><strong>Tyk Open Source</strong>
+   <td>
+     <center>
+        <a href="https://tyk.io/docs/deployment-and-operations/tyk-open-source-api-gateway/quick-start"> <img src="https://raw.githubusercontent.com/TykTechnologies/tyk-docs/master/tyk-docs/assets/img/logos/tyk-logo-opensource.svg" width="30%"></a>
+     </center>
+     </br>Everything you need to manage APIs. Follow the simple Get Started guide below 👇
    </td>
-   <td><strong>Tyk API Management</strong>
+   <td>
+     <center>
+       <a href="https://tyk.io/docs/tyk-self-managed/install"> <img src="https://raw.githubusercontent.com/TykTechnologies/tyk-docs/master/tyk-docs/assets/img/logos/tyk-logo-selfmanaged.png" width="25%"></a>
+     </center>
+     </br>The Enterprise API Management platform: Management Control Plane, Dashboard GUI & Developer Portal.
+     </br><a href="https://tyk.io/api-lifecycle-management/">Install Tyk Self Managed</a>
    </td>
-  </tr>
-  <tr>
-   <td>Everything you need to manage APIs. Follow the simple Get Started guide below 👇
-   </td>
-   <td>The Enterprise API Management platform: Management Control Plane, Dashboard GUI & Developer Portal. Install <a href="https://tyk.io/api-lifecycle-management/">Tyk Self Managed</a>
+   <td>
+     <center>
+       <a href="https://tyk.io/docs/tyk-cloud"> <img src="https://raw.githubusercontent.com/TykTechnologies/tyk-docs/master/tyk-docs/assets/img/logos/tyk-logo-cloud.png" width="20%"></a>
+     </center>
+     </br>The Enterprise API Management platform SaaS: Management Control Plane, Dashboard GUI & Developer Portal. 
+     </br><a href="https://tyk.io/docs/deployment-and-operations/tyk-cloud-platform/quick-start">Deploy Tyk Cloud </a>
    </td>
   </tr>
 </table>
-
-
-\
-[Documentation](https://tyk.io/docs/) | [Forum](https://community.tyk.io) | [Blog](https://tyk.io/blog/) | [About](https://tyk.io)
-
 
 ---
 
@@ -51,7 +57,7 @@ Tyk runs natively on _Kubernetes_, if you prefer, thanks to the _[Tyk Kubernetes
 
 We’ll install Tyk, add auth, analytics, quotas and rate limiting to your API in under 5 minutes.
 
-We recommend “[Tyk Gateway Docker](https://github.com/TykTechnologies/tyk-gateway-docker#start-up-the-deployment)” as the quickest way to get started now. Later, you can move to one of our other [supported distributions](https://tyk.io/docs/apim/open-source/installation/) if you prefer.
+We recommend [Tyk Gateway Docker](https://github.com/TykTechnologies/tyk-gateway-docker#start-up-the-deployment) as the quickest way to get started now. Later, you can move to one of our other [supported distributions](https://tyk.io/docs/apim/open-source/installation/) if you prefer.
 
 #### Step 1 - Clone the docker-compose repository
 ```console
