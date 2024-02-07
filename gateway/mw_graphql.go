@@ -61,6 +61,11 @@ func (m *GraphQLMiddleware) Init() {
 	}
 
 	if m.Spec.GraphQL.Version == apidef.GraphQLConfigVersionNone || m.Spec.GraphQL.Version == apidef.GraphQLConfigVersion1 {
+		if m.Spec.GraphQL.Version == apidef.GraphQLConfigVersionNone {
+			log.Warn("GraphQL config version is not set, defaulting to version 1")
+		}
+
+		log.Info("GraphQL Config Version 1 is deprecated - Please consider migrating to version 2 or higher")
 		m.Spec.GraphEngine, err = graphengine.NewEngineV1(graphengine.EngineV1Options{
 			Logger:        log,
 			ApiDefinition: m.Spec.APIDefinition,
