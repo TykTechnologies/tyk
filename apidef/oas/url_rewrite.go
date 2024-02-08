@@ -5,6 +5,7 @@ import (
 	"sort"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/invopop/jsonschema"
 )
 
 // URLRewrite configures URL rewriting.
@@ -93,6 +94,58 @@ type URLRewriteTrigger struct {
 	// RewriteTo specifies the URL to which the request shall be rewritten
 	// if indicated by the combination of `condition` and `rules`.
 	RewriteTo string `bson:"rewriteTo" json:"rewriteTo"`
+}
+
+func (u URLRewriteTrigger) JSONSchemaExtend(schema *jsonschema.Schema) {
+	ref := jsonschema.Reflector{
+		Anonymous:      true,
+		ExpandedStruct: true,
+		DoNotReference: true,
+	}
+	urlRewriteRuleSchema := ref.Reflect(&URLRewriteRule{})
+	urlRewriteRuleSchemaBytes, err := urlRewriteRuleSchema.MarshalJSON()
+	if err != nil {
+		return
+	}
+
+	urlRewriteRuleSchemaIn, ok := urlRewriteRuleSchema.Properties.Get("in")
+	if !ok {
+		return
+	}
+
+	urlRewriteRuleSchemaIn.Enum = []any{
+		"query",
+		"path",
+		"header",
+		"sessionMetadata",
+		"requestContext",
+	}
+
+	urlRewriteRuleSchema.Required = append(urlRewriteRuleSchema.Required, "name")
+
+	var urlRewriteRuleSchemaForRequestBody jsonschema.Schema
+	err = urlRewriteRuleSchemaForRequestBody.UnmarshalJSON(urlRewriteRuleSchemaBytes)
+	if err != nil {
+		return
+	}
+
+	urlRewriteRuleSchemaForRequestBodyIn, ok := urlRewriteRuleSchemaForRequestBody.Properties.Get("in")
+	if !ok {
+		return
+	}
+
+	urlRewriteRuleSchemaForRequestBodyIn.Enum = []any{"requestBody"}
+
+	rulesSchema, ok := schema.Properties.Get("rules")
+	if !ok {
+		return
+	}
+
+	rulesSchema.Items.Ref = ""
+	rulesSchema.Items.AnyOf = []*jsonschema.Schema{
+		urlRewriteRuleSchema,
+		&urlRewriteRuleSchemaForRequestBody,
+	}
 }
 
 // URLRewriteRule represents a rewrite matching rules.

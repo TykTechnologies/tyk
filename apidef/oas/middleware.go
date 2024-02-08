@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/invopop/jsonschema"
 )
 
 // Middleware holds configuration for Tyk's native middleware.
@@ -903,6 +904,21 @@ func (tm *TransformRequestMethod) Fill(meta apidef.MethodTransformMeta) {
 func (tm *TransformRequestMethod) ExtractTo(meta *apidef.MethodTransformMeta) {
 	meta.Disabled = !tm.Enabled
 	meta.ToMethod = tm.ToMethod
+}
+
+func (t TransformBody) JSONSchemaExtend(schema *jsonschema.Schema) {
+	schema.AnyOf = []*jsonschema.Schema{
+		{
+			Required: []string{
+				"body",
+			},
+		},
+		{
+			Required: []string{
+				"path",
+			},
+		},
+	}
 }
 
 // TransformBody holds configuration about request/response body transformations.

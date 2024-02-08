@@ -2005,6 +2005,18 @@
     },
     "X-Tyk-TransformBody": {
       "additionalProperties": false,
+      "anyOf": [
+        {
+          "required": [
+            "body"
+          ]
+        },
+        {
+          "required": [
+            "path"
+          ]
+        }
+      ],
       "description": "TransformBody holds configuration about request/response body transformations.",
       "properties": {
         "body": {
@@ -2139,7 +2151,65 @@
         "rules": {
           "description": "Rules contain individual checks that are combined according to the\n`condition` to determine whether the URL rewrite will be triggered.\nIf empty, the trigger is ignored.",
           "items": {
-            "$ref": "#/definitions/X-Tyk-URLRewriteRule"
+            "anyOf": [
+              {
+                "$schema": "https://json-schema.org/draft/2020-12/schema",
+                "additionalProperties": false,
+                "properties": {
+                  "in": {
+                    "enum": [
+                      "query",
+                      "path",
+                      "header",
+                      "sessionMetadata",
+                      "requestContext"
+                    ],
+                    "type": "string"
+                  },
+                  "name": {
+                    "type": "string"
+                  },
+                  "negate": {
+                    "type": "boolean"
+                  },
+                  "pattern": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "in",
+                  "pattern",
+                  "name"
+                ],
+                "type": "object"
+              },
+              {
+                "$schema": "https://json-schema.org/draft/2020-12/schema",
+                "additionalProperties": false,
+                "properties": {
+                  "in": {
+                    "enum": [
+                      "requestBody"
+                    ],
+                    "type": "string"
+                  },
+                  "name": {
+                    "type": "string"
+                  },
+                  "negate": {
+                    "type": "boolean"
+                  },
+                  "pattern": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "in",
+                  "pattern"
+                ],
+                "type": "object"
+              }
+            ]
           },
           "type": "array"
         }
