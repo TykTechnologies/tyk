@@ -238,12 +238,6 @@ func TestMwRateLimiting_CustomRatelimitKey(t *testing.T) {
 				spec.Proxy.ListenPath = "/"
 			})[0]
 
-			if tc.hashKey {
-
-			} else {
-
-			}
-
 			_, firstQuotaKey := g.CreateSession(func(s *user.SessionState) {
 				s.MaxQueryDepth = -1
 				s.AccessRights = map[string]user.AccessDefinition{
