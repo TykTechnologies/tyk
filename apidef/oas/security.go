@@ -458,7 +458,7 @@ type Introspection struct {
 	// IdentityBaseField is the key showing where to find the user id in the claims. If it is empty, the `sub` key is looked at.
 	IdentityBaseField string `bson:"identityBaseField,omitempty" json:"identityBaseField,omitempty"`
 	// Cache is the caching mechanism for introspection responses.
-	Cache *IntrospectionCache `bson:"cache" json:"cache"`
+	Cache *IntrospectionCache `bson:"cache,omitempty" json:"cache,omitempty"`
 }
 
 func (i *Introspection) Fill(intros apidef.Introspection) {
