@@ -1595,28 +1595,28 @@ func TestInternalEndpointMW_TT_11126(t *testing.T) {
 
 	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 		UpdateAPIVersion(spec, "v1", func(v *apidef.VersionInfo) {
-			json.Unmarshal([]byte(`[
-                        {
-                            "path": "/headers",
-                            "method": "GET",
-                            "disabled": false
-						}
-				]`), &v.ExtendedPaths.Internal)
-			json.Unmarshal([]byte(`[
+			assert.NoError(t, json.Unmarshal([]byte(`[
                     {
                         "disabled": false,
                         "add_headers": {
                             "New-Header": "Value"
                         },
                         "path": "/headers",
-                        "method": "GET",
+                        "method": "GET"
                     }
-                ]`), &v.ExtendedPaths.TransformHeader)
+                ]`), &v.ExtendedPaths.TransformHeader))
+			assert.NoError(t, json.Unmarshal([]byte(`[
+                        {
+                            "path": "/headers",
+                            "method": "GET",
+                            "disabled": false
+						}
+				]`), &v.ExtendedPaths.Internal))
 		})
 		spec.Proxy.ListenPath = "/"
 	})
 
-	ts.Run(t, []test.TestCase{
+	_, _ = ts.Run(t, []test.TestCase{
 		{Path: "/headers", Code: http.StatusForbidden},
 	}...)
 }
