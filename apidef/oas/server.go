@@ -2,6 +2,7 @@ package oas
 
 import (
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/invopop/jsonschema"
 )
 
 // Server contains the configuration that sets Tyk up to receive requests from the client applications.
@@ -33,6 +34,13 @@ type Server struct {
 	//
 	// Tyk classic API definition: `detailed_tracing`
 	DetailedTracing *DetailedTracing `bson:"detailedTracing,omitempty" json:"detailedTracing,omitempty"`
+}
+
+func (s Server) JSONSchemaExtend(schema *jsonschema.Schema) {
+	schema.Properties.Set("slug", &jsonschema.Schema{
+		Type:        "string",
+		Description: "Legacy field, unused from v5.3.0 but retained for backward compatibility.",
+	})
 }
 
 // Fill fills *Server from apidef.APIDefinition.

@@ -1871,6 +1871,10 @@
         "listenPath": {
           "$ref": "#/definitions/X-Tyk-ListenPath",
           "description": "ListenPath is the base path on Tyk to which requests for this API should\nbe sent. Tyk listens for any requests coming into the host at this\npath, on the port that Tyk is configured to run on, and processes these\naccordingly."
+        },
+        "slug": {
+          "description": "Legacy field, unused from v5.3.0 but retained for backward compatibility.",
+          "type": "string"
         }
       },
       "required": [
