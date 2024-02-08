@@ -4,11 +4,12 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"net/http"
 	"strings"
 
-	uuid "github.com/satori/go.uuid"
-
 	"github.com/TykTechnologies/tyk/apidef"
+
+	"github.com/TykTechnologies/tyk/internal/uuid"
 )
 
 const SwaggerSource APIImporterSource = "swagger"
@@ -87,14 +88,19 @@ func (s *SwaggerAST) ConvertIntoApiVersion(asMock bool) (apidef.VersionInfo, err
 
 	versionInfo.UseExtendedPaths = true
 	versionInfo.Name = s.Info.Version
-	versionInfo.ExtendedPaths.TrackEndpoints = make([]apidef.TrackEndpointMeta, 0)
 
 	if len(s.Paths) == 0 {
 		return versionInfo, errors.New("no paths defined in swagger file")
 	}
 	for pathName, pathSpec := range s.Paths {
-		newEndpointMeta := apidef.TrackEndpointMeta{}
-		newEndpointMeta.Path = pathName
+		whitelistMeta := apidef.EndPointMeta{
+			Path:          pathName,
+			MethodActions: map[string]apidef.EndpointMethodMeta{},
+		}
+
+		trackMeta := apidef.TrackEndpointMeta{
+			Path: pathName,
+		}
 
 		// We just want the paths here, no mocks
 		methods := map[string]PathMethodObject{
@@ -106,15 +112,23 @@ func (s *SwaggerAST) ConvertIntoApiVersion(asMock bool) (apidef.VersionInfo, err
 			"OPTIONS": pathSpec.Options,
 			"DELETE":  pathSpec.Delete,
 		}
+
 		for methodName, m := range methods {
 			// skip methods that are not defined
 			if len(m.Responses) == 0 && m.Description == "" && m.OperationID == "" {
 				continue
 			}
 
-			newEndpointMeta.Method = methodName
-			versionInfo.ExtendedPaths.TrackEndpoints = append(versionInfo.ExtendedPaths.TrackEndpoints, newEndpointMeta)
+			whitelistMeta.MethodActions[methodName] = apidef.EndpointMethodMeta{
+				Action: apidef.NoAction,
+				Code:   http.StatusOK,
+			}
+
+			trackMeta.Method = methodName
+			versionInfo.ExtendedPaths.TrackEndpoints = append(versionInfo.ExtendedPaths.TrackEndpoints, trackMeta)
 		}
+
+		versionInfo.ExtendedPaths.WhiteList = append(versionInfo.ExtendedPaths.WhiteList, whitelistMeta)
 	}
 
 	return versionInfo, nil
@@ -131,7 +145,7 @@ func (s *SwaggerAST) ToAPIDefinition(orgId, upstreamURL string, as_mock bool) (*
 		Name:             s.Info.Title,
 		Active:           true,
 		UseKeylessAccess: true,
-		APIID:            uuid.NewV4().String(),
+		APIID:            uuid.NewHex(),
 		OrgID:            orgId,
 	}
 	ad.VersionDefinition.Key = "version"

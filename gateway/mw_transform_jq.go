@@ -1,3 +1,4 @@
+//go:build jq
 // +build jq
 
 package gateway
@@ -17,7 +18,7 @@ import (
 )
 
 type TransformJQMiddleware struct {
-	BaseMiddleware
+	*BaseMiddleware
 }
 
 // JQResult structure stores the result of Tyk-JQ filter.

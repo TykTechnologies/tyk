@@ -11,7 +11,7 @@ import (
 )
 
 type StripAuth struct {
-	BaseMiddleware
+	*BaseMiddleware
 }
 
 func (sa *StripAuth) Name() string {
@@ -41,7 +41,7 @@ func (sa *StripAuth) ProcessRequest(w http.ResponseWriter, r *http.Request, _ in
 
 	// For backward compatibility
 	if len(sa.Spec.AuthConfigs) == 0 {
-		strip(authTokenType, &sa.Spec.Auth)
+		strip(apidef.AuthTokenType, &sa.Spec.Auth)
 	}
 
 	return nil, http.StatusOK
@@ -89,7 +89,7 @@ func (sa *StripAuth) stripFromHeaders(r *http.Request, config *apidef.AuthConfig
 
 	cookies := strings.Split(cookieValue, ";")
 	for i, c := range cookies {
-		if strings.HasPrefix(c, cookieName) {
+		if strings.HasPrefix(strings.TrimSpace(c), cookieName) {
 			cookies = append(cookies[:i], cookies[i+1:]...)
 			cookieValue = strings.Join(cookies, ";")
 			r.Header.Set("Cookie", cookieValue)

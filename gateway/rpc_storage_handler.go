@@ -1,17 +1,18 @@
 package gateway
 
 import (
+	"encoding/json"
+	"net/http"
 	"strconv"
 	"strings"
 	"time"
 
-	cache "github.com/pmylund/go-cache"
-
+	"github.com/TykTechnologies/storage/temporal/model"
+	"github.com/TykTechnologies/tyk/internal/cache"
 	"github.com/TykTechnologies/tyk/rpc"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/storage"
-	"github.com/go-redis/redis/v8"
 
 	"github.com/sirupsen/logrus"
 )
@@ -84,6 +85,9 @@ var (
 		"Ping": func() bool {
 			return false
 		},
+		"Disconnect": func(clientAddr string, groupData *apidef.GroupLoginRequest) error {
+			return nil
+		},
 	}
 )
 
@@ -95,6 +99,9 @@ const (
 	OAuthRevokeAccessToken  string = "oAuthRevokeAccessToken"
 	OAuthRevokeRefreshToken string = "oAuthRevokeRefreshToken"
 	OAuthRevokeAllTokens    string = "revoke_all_tokens"
+	OauthClientAdded        string = "OauthClientAdded"
+	OauthClientRemoved      string = "OauthClientRemoved"
+	OauthClientUpdated      string = "OauthClientUpdated"
 )
 
 // RPCStorageHandler is a storage manager that uses the redis database.
@@ -106,9 +113,16 @@ type RPCStorageHandler struct {
 	Gw               *Gateway `json:"-"`
 }
 
+type RPCDataLoader interface {
+	Connect() bool
+	GetApiDefinitions(orgId string, tags []string) string
+	GetPolicies(orgId string) string
+}
+
 // Connect will establish a connection to the RPC
 func (r *RPCStorageHandler) Connect() bool {
 	slaveOptions := r.Gw.GetConfig().SlaveOptions
+
 	rpcConfig := rpc.Config{
 		UseSSL:                slaveOptions.UseSSL,
 		SSLInsecureSkipVerify: slaveOptions.SSLInsecureSkipVerify,
@@ -127,17 +141,63 @@ func (r *RPCStorageHandler) Connect() bool {
 		rpcConfig,
 		r.SuppressRegister,
 		dispatcherFuncs,
-		func(userKey string, groupID string) interface{} {
-			return apidef.GroupLoginRequest{
-				UserKey: userKey,
-				GroupID: groupID,
-			}
-		},
+		r.getGroupLoginCallback(r.Gw.GetConfig().SlaveOptions.SynchroniserEnabled),
 		func() {
 			r.Gw.reloadURLStructure(nil)
 		},
 		r.DoReload,
 	)
+}
+
+func (r *RPCStorageHandler) buildNodeInfo() []byte {
+	config := r.Gw.GetConfig()
+	node := apidef.NodeData{
+		NodeID:      r.Gw.GetNodeID(),
+		GroupID:     config.SlaveOptions.GroupID,
+		APIKey:      config.SlaveOptions.APIKey,
+		NodeVersion: VERSION,
+		TTL:         int64(config.LivenessCheck.CheckDuration),
+		Tags:        config.DBAppConfOptions.Tags,
+		Health:      r.Gw.getHealthCheckInfo(),
+		Stats: apidef.GWStats{
+			APIsCount:     r.Gw.apisByIDLen(),
+			PoliciesCount: r.Gw.policiesByIDLen(),
+		},
+	}
+
+	data, err := json.Marshal(node)
+	if err != nil {
+		log.Error("Error marshalling node info", err)
+		return nil
+	}
+
+	return data
+}
+
+func (r *RPCStorageHandler) Disconnect() error {
+	request := apidef.GroupLoginRequest{
+		UserKey: r.Gw.GetConfig().SlaveOptions.APIKey,
+		GroupID: r.Gw.GetConfig().SlaveOptions.GroupID,
+		Node:    r.buildNodeInfo(),
+	}
+
+	_, err := rpc.FuncClientSingleton("Disconnect", request)
+	return err
+}
+
+func (r *RPCStorageHandler) getGroupLoginCallback(synchroniserEnabled bool) func(userKey string, groupID string) interface{} {
+	groupLoginCallbackFn := func(userKey string, groupID string) interface{} {
+		return apidef.GroupLoginRequest{
+			UserKey: userKey,
+			GroupID: groupID,
+			Node:    r.buildNodeInfo(),
+		}
+	}
+	if synchroniserEnabled {
+		forcer := rpc.NewSyncForcer(r.Gw.StorageConnectionHandler, r.buildNodeInfo)
+		groupLoginCallbackFn = forcer.GroupLoginCallback
+	}
+	return groupLoginCallbackFn
 }
 
 func (r *RPCStorageHandler) hashKey(in string) string {
@@ -151,7 +211,7 @@ func (r *RPCStorageHandler) hashKey(in string) string {
 func (r *RPCStorageHandler) fixKey(keyName string) string {
 	setKeyName := r.KeyPrefix + r.hashKey(keyName)
 
-	log.Debug("Input key was: ", setKeyName)
+	log.Debug("Input key was: ", r.Gw.obfuscateKey(setKeyName))
 
 	return setKeyName
 }
@@ -175,14 +235,27 @@ func (r *RPCStorageHandler) GetKey(keyName string) (string, error) {
 }
 
 func (r *RPCStorageHandler) GetRawKey(keyName string) (string, error) {
-	// Check the cache first
-	if r.Gw.GetConfig().SlaveOptions.EnableRPCCache {
-		log.Debug("Using cache for: ", keyName)
-		cachedVal, found := r.Gw.RPCGlobalCache.Get(keyName)
-		log.Debug("--> Found? ", found)
-		if found {
-			return cachedVal.(string), nil
+	cacheEnabled := r.Gw.GetConfig().SlaveOptions.EnableRPCCache
+
+	var cacheStore cache.Repository
+	if cacheEnabled {
+		cacheStore = r.Gw.RPCGlobalCache
+		if strings.Contains(keyName, "cert-") {
+			cacheStore = r.Gw.RPCCertCache
 		}
+
+		if cachedVal, found := cacheStore.Get(keyName); found {
+			switch typedVal := cachedVal.(type) {
+			case string:
+				return typedVal, nil
+			case error:
+				return "", typedVal
+			}
+		}
+	}
+
+	if rpc.IsEmergencyMode() {
+		return "", storage.ErrMDCBConnectionLost
 	}
 
 	value, err := rpc.FuncClientSingleton("GetKey", keyName)
@@ -191,23 +264,22 @@ func (r *RPCStorageHandler) GetRawKey(keyName string) (string, error) {
 			rpc.FuncClientSingletonCall,
 			"GetKey",
 			err,
-			map[string]string{
-				"keyName": keyName,
-			},
+			map[string]string{"keyName": keyName},
 		)
-		if r.IsRetriableError(err) {
-			if rpc.Login() {
-				return r.GetRawKey(keyName)
-			}
+		if r.IsRetriableError(err) && rpc.Login() {
+			return r.GetRawKey(keyName)
 		}
-		log.Debug("Error trying to get value:", err)
+		if cacheEnabled {
+			// Errors, and key not found, should be cached for a small amount of time
+			cacheStore.Set(keyName, storage.ErrKeyNotFound, 1)
+		}
 		return "", storage.ErrKeyNotFound
 	}
-	if r.Gw.GetConfig().SlaveOptions.EnableRPCCache {
-		// Cache key
-		r.Gw.RPCGlobalCache.Set(keyName, value, cache.DefaultExpiration)
+
+	if cacheEnabled {
+		cacheStore.Set(keyName, value, cache.DefaultExpiration)
 	}
-	//return hash key without prefix so it doesnt get double prefixed in redis
+
 	return value.(string), nil
 }
 
@@ -422,8 +494,8 @@ func (r *RPCStorageHandler) GetKeysAndValues() map[string]string {
 // DeleteKey will remove a key from the database
 func (r *RPCStorageHandler) DeleteKey(keyName string) bool {
 
-	log.Debug("DEL Key was: ", keyName)
-	log.Debug("DEL Key became: ", r.fixKey(keyName))
+	log.Debug("DEL Key was: ", r.Gw.obfuscateKey(keyName))
+	log.Debug("DEL Key became: ", r.Gw.obfuscateKey(r.fixKey(keyName)))
 	ok, err := rpc.FuncClientSingleton("DeleteKey", r.fixKey(keyName))
 	if err != nil {
 		rpc.EmitErrorEventKv(
@@ -509,7 +581,7 @@ func (r *RPCStorageHandler) DeleteKeys(keys []string) bool {
 }
 
 // StartPubSubHandler will listen for a signal and run the callback with the message
-func (r *RPCStorageHandler) StartPubSubHandler(channel string, callback func(*redis.Message)) error {
+func (r *RPCStorageHandler) StartPubSubHandler(_ string, _ func(*model.Message)) error {
 	log.Warning("RPCStorageHandler.StartPubSubHandler - NO PUBSUB DEFINED")
 	return nil
 }
@@ -616,8 +688,9 @@ func (r RPCStorageHandler) IsRetriableError(err error) bool {
 // GetAPIDefinitions will pull API definitions from the RPC server
 func (r *RPCStorageHandler) GetApiDefinitions(orgId string, tags []string) string {
 	dr := apidef.DefRequest{
-		OrgId: orgId,
-		Tags:  tags,
+		OrgId:   orgId,
+		Tags:    tags,
+		LoadOAS: true,
 	}
 
 	defString, err := rpc.FuncClientSingleton("GetApiDefinitions", dr)
@@ -678,7 +751,13 @@ func (r *RPCStorageHandler) GetPolicies(orgId string) string {
 }
 
 // CheckForReload will start a long poll
-func (r *RPCStorageHandler) CheckForReload(orgId string) {
+func (r *RPCStorageHandler) CheckForReload(orgId string) bool {
+	select {
+	case <-r.Gw.ctx.Done():
+		return false
+	default:
+	}
+
 	log.Debug("[RPC STORE] Check Reload called...")
 	reload, err := rpc.FuncClientSingleton("CheckReload", orgId)
 	if err != nil {
@@ -707,6 +786,7 @@ func (r *RPCStorageHandler) CheckForReload(orgId string) {
 			r.Gw.MainNotifier.Notify(Notification{Command: NoticeGroupReload, Gw: r.Gw})
 		}()
 	}
+	return true
 }
 
 func (r *RPCStorageHandler) StartRPCLoopCheck(orgId string) {
@@ -728,6 +808,12 @@ func (r *RPCStorageHandler) StartRPCKeepaliveWatcher() {
 		"prefix": "RPC Conn Mgr",
 	}).Info("[RPC Conn Mgr] Starting keepalive watcher...")
 	for {
+
+		select {
+		case <-r.Gw.ctx.Done():
+			return
+		default:
+		}
 
 		if err := r.SetKey("0000", "0000", 10); err != nil {
 			log.WithError(err).WithFields(logrus.Fields{
@@ -803,20 +889,99 @@ func (r *RPCStorageHandler) CheckForKeyspaceChanges(orgId string) {
 
 func (gw *Gateway) getSessionAndCreate(keyName string, r *RPCStorageHandler, isHashed bool, orgId string) {
 
-	hashedKeyName := keyName
+	key := keyName
 	// avoid double hashing
 	if !isHashed {
-		hashedKeyName = storage.HashKey(keyName, gw.GetConfig().HashKeys)
+		key = storage.HashKey(keyName, gw.GetConfig().HashKeys)
 	}
 
-	sessionString, err := r.GetRawKey("apikey-" + hashedKeyName)
+	sessionString, err := r.GetRawKey("apikey-" + key)
 	if err != nil {
 		log.Error("Key not found in master - skipping")
 	} else {
-		gw.handleAddKey(keyName, hashedKeyName, sessionString, "-1", orgId)
+		gw.handleAddKey(key, sessionString, orgId)
 	}
 }
 
+func (gw *Gateway) ProcessSingleOauthClientEvent(apiId, oauthClientId, orgID, event string) {
+	store, _, err := gw.GetStorageForApi(apiId)
+	if err != nil {
+		log.Error("Could not get oauth storage for api")
+		return
+	}
+
+	switch event {
+	case OauthClientAdded:
+		// on add: pull from rpc and save it in local redis
+		client, err := store.GetClient(oauthClientId)
+		if err != nil {
+			log.WithError(err).Error("Could not retrieve new oauth client information")
+			return
+		}
+
+		err = store.SetClient(oauthClientId, orgID, client, false)
+		if err != nil {
+			log.WithError(err).Error("Could not save oauth client.")
+			return
+		}
+
+		log.Info("oauth client created successfully")
+	case OauthClientRemoved:
+		// on remove: remove from local redis
+		err := store.DeleteClient(oauthClientId, orgID, false)
+		if err != nil {
+			log.Errorf("Could not delete oauth client with id: %v", oauthClientId)
+			return
+		}
+		log.Infof("Oauth Client deleted successfully")
+	case OauthClientUpdated:
+		// on update: delete from local redis and pull again from rpc
+		_, err := store.GetClient(oauthClientId)
+		if err != nil {
+			log.WithError(err).Error("Could not retrieve oauth client information")
+			return
+		}
+
+		err = store.DeleteClient(oauthClientId, orgID, false)
+		if err != nil {
+			log.WithError(err).Error("Could not delete oauth client")
+			return
+		}
+
+		client, err := store.GetClient(oauthClientId)
+		if err != nil {
+			log.WithError(err).Error("Could not retrieve oauth client information")
+			return
+		}
+
+		err = store.SetClient(oauthClientId, orgID, client, false)
+		if err != nil {
+			log.WithError(err).Error("Could not save oauth client.")
+			return
+		}
+		log.Info("oauth client updated successfully")
+	default:
+		log.Warningf("Oauth client event not supported:%v", event)
+	}
+}
+
+// ProcessOauthClientsOps performs the appropriate action for the received clients
+// it can be any of the Create,Update and Delete operations
+func (gw *Gateway) ProcessOauthClientsOps(clients map[string]string) {
+	for clientInfo, action := range clients {
+		// clientInfo is: APIID.ClientID.OrgID
+		eventValues := strings.Split(clientInfo, ".")
+		apiId := eventValues[0]
+		oauthClientId := eventValues[1]
+		orgID := eventValues[2]
+
+		gw.ProcessSingleOauthClientEvent(apiId, oauthClientId, orgID, action)
+	}
+}
+
+// ProcessKeySpaceChanges receives an array of keys to be processed, those keys are considered changes in the keyspace in the
+// management layer, they could be: regular keys (hashed, unhashed), revoke oauth client, revoke single oauth token,
+// certificates (added, removed), oauth client (added, updated, removed)
 func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string, orgId string) {
 	keysToReset := map[string]bool{}
 	TokensToBeRevoked := map[string]string{}
@@ -824,6 +989,7 @@ func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string, orgId string) 
 	notRegularKeys := map[string]bool{}
 	CertificatesToRemove := map[string]string{}
 	CertificatesToAdd := map[string]string{}
+	OauthClients := map[string]string{}
 
 	for _, key := range keys {
 		splitKeys := strings.Split(key, ":")
@@ -844,12 +1010,15 @@ func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string, orgId string) 
 			case OAuthRevokeAllTokens:
 				ClientsToBeRevoked[splitKeys[1]] = key
 				notRegularKeys[key] = true
+			case OauthClientAdded, OauthClientUpdated, OauthClientRemoved:
+				OauthClients[splitKeys[0]] = action
+				notRegularKeys[key] = true
 			default:
 				log.Debug("ignoring processing of action:", action)
 			}
 		}
 	}
-
+	r.Gw.ProcessOauthClientsOps(OauthClients)
 	for clientId, key := range ClientsToBeRevoked {
 		splitKeys := strings.Split(key, ":")
 		apiId := splitKeys[0]
@@ -895,7 +1064,9 @@ func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string, orgId string) 
 	for _, certId := range CertificatesToRemove {
 		log.Debugf("Removing certificate: %v", certId)
 		r.Gw.CertificateManager.Delete(certId, orgId)
+		r.Gw.RPCCertCache.Delete("cert-raw-" + certId)
 	}
+
 	for _, certId := range CertificatesToAdd {
 		log.Debugf("Adding certificate: %v", certId)
 		//If we are in a slave node, MDCB Storage GetRaw should get the certificate from MDCB and cache it locally
@@ -905,30 +1076,38 @@ func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string, orgId string) 
 		}
 	}
 
+	synchronizerEnabled := r.Gw.GetConfig().SlaveOptions.SynchroniserEnabled
 	for _, key := range keys {
 		_, isOauthTokenKey := notRegularKeys[key]
 		if !isOauthTokenKey {
 			splitKeys := strings.Split(key, ":")
 			_, resetQuota := keysToReset[splitKeys[0]]
 
-			if len(splitKeys) > 1 && splitKeys[1] == "hashed" {
+			isHashed := len(splitKeys) > 1 && splitKeys[1] == "hashed"
+			var status int
+			if isHashed {
 				log.Info("--> removing cached (hashed) key: ", splitKeys[0])
 				key = splitKeys[0]
-				r.Gw.handleDeleteHashedKey(splitKeys[0], orgId, "", resetQuota)
-				r.Gw.getSessionAndCreate(splitKeys[0], r, true, orgId)
+				_, status = r.Gw.handleDeleteHashedKey(key, orgId, "", resetQuota)
 			} else {
-				log.Info("--> removing cached key: ", key)
-				// in case it's an username (basic auth) then generate the token
+				log.Info("--> removing cached key: ", r.Gw.obfuscateKey(key))
+				// in case it's an username (basic auth) or custom-key then generate the token
 				if storage.TokenOrg(key) == "" {
 					key = r.Gw.generateToken(orgId, key)
 				}
-				r.Gw.handleDeleteKey(key, orgId, "-1", resetQuota)
-				r.Gw.getSessionAndCreate(splitKeys[0], r, false, orgId)
+				_, status = r.Gw.handleDeleteKey(key, orgId, "-1", resetQuota)
 			}
+
+			// if key not found locally and synchroniser disabled then we should not pull it from management layer
+			if status == http.StatusNotFound && !synchronizerEnabled {
+				continue
+			}
+			r.Gw.getSessionAndCreate(key, r, isHashed, orgId)
 			r.Gw.SessionCache.Delete(key)
 			r.Gw.RPCGlobalCache.Delete(r.KeyPrefix + key)
 		}
 	}
+
 	// Notify rest of gateways in cluster to flush cache
 	n := Notification{
 		Command: KeySpaceUpdateNotification,

@@ -17,6 +17,8 @@ var ipHeaderTests = []struct {
 	{remoteAddr: "10.0.1.4:8080", key: "X-Forwarded-For", value: "10.0.0.2", expected: "10.0.0.2", comment: "X-Forwarded-For (single)"},
 	{remoteAddr: "10.0.1.4:8080", key: "X-Forwarded-For", value: "10.0.0.3, 10.0.0.2, 10.0.0.1", expected: "10.0.0.3", comment: "X-Forwarded-For (multiple)"},
 	{remoteAddr: "10.0.1.4:8080", expected: "10.0.1.4", comment: "RemoteAddr"},
+	{remoteAddr: "10.0.1.4:8080", key: "X-Forwarded-For", value: "bob", expected: "10.0.1.4", comment: "invalid X-Forwarded-For"},
+	{remoteAddr: "10.0.1.4:8080", key: "X-Real-IP", value: "bob", expected: "10.0.1.4", comment: "invalid X-Real-IP"},
 }
 
 func TestRealIP(t *testing.T) {

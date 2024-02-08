@@ -1,3 +1,4 @@
+//go:build lua
 // +build lua
 
 package gateway

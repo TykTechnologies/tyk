@@ -1,0 +1,34 @@
+type: Test
+spec:
+  id: cxWOiWj4g
+  name: ' Tyk internal API - ok request'
+  description: Testing data from a tyk:// protocol API
+  trigger:
+    type: http
+    httpRequest:
+      url: tyk:8080/tykprotocol/ip
+      method: GET
+      headers:
+      - key: Content-Type
+        value: application/json
+  specs:
+  - name: /tykprotocl/ip http attributes
+    selector: span[tracetest.span.type="http" name="GET /tykprotocol/ip" http.method="GET"]
+    assertions:
+    - attr:http.status_code = 200
+    - attr:tracetest.span.type = "http"
+    - attr:http.method = "GET"
+    - attr:http.wrote_bytes != 0
+  - name: We should have double VersionCheck spans
+    selector: span[tracetest.span.type="general" name="VersionCheck"]
+    assertions:
+    - attr:tracetest.selected_spans.count = 2
+  - name: We should have double RateCheckMW spans
+    selector: span[tracetest.span.type="general" name="RateCheckMW"]
+    assertions:
+    - attr:tracetest.selected_spans.count = 2
+  - name: We should have only 1 proxy to httpbin
+    selector: span[tracetest.span.type="http" name="HTTP GET" http.method="GET"]
+    assertions:
+    - attr:net.peer.name = "httpbin"
+    - attr:tracetest.selected_spans.count = 1

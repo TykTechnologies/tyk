@@ -7,11 +7,12 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/TykTechnologies/tyk/apidef"
-	headers2 "github.com/TykTechnologies/tyk/headers"
-	"github.com/TykTechnologies/tyk/test"
-	cache "github.com/pmylund/go-cache"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/TykTechnologies/tyk/apidef"
+	headers2 "github.com/TykTechnologies/tyk/header"
+	"github.com/TykTechnologies/tyk/internal/cache"
+	"github.com/TykTechnologies/tyk/test"
 
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/user"
@@ -19,6 +20,8 @@ import (
 
 type mockStore struct {
 	SessionHandler
+	//DetailNotFound is used to make mocked SessionDetail return (x,false), as if it don't find the session in the mocked storage.
+	DetailNotFound bool
 }
 
 var sess = user.SessionState{
@@ -26,15 +29,15 @@ var sess = user.SessionState{
 	DataExpires: 110,
 }
 
-func (mockStore) SessionDetail(orgID string, keyName string, hashed bool) (user.SessionState, bool) {
-	return sess.Clone(), true
+func (m mockStore) SessionDetail(orgID string, keyName string, hashed bool) (user.SessionState, bool) {
+	return sess.Clone(), !m.DetailNotFound
 }
 
 func TestBaseMiddleware_OrgSessionExpiry(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
-	m := BaseMiddleware{
+	m := &BaseMiddleware{
 		Spec: &APISpec{
 			GlobalConfig: config.Config{
 				EnforceOrgDataAge: true,
@@ -48,14 +51,18 @@ func TestBaseMiddleware_OrgSessionExpiry(t *testing.T) {
 	ts.Gw.ExpiryCache.Set(sess.OrgID, v, cache.DefaultExpiration)
 
 	got := m.OrgSessionExpiry(sess.OrgID)
-	if got != v {
-		t.Errorf("expected %d got %d", v, got)
-	}
+	assert.Equal(t, v, got)
 	ts.Gw.ExpiryCache.Delete(sess.OrgID)
+
 	got = m.OrgSessionExpiry(sess.OrgID)
-	if got != sess.DataExpires {
-		t.Errorf("expected %d got %d", sess.DataExpires, got)
-	}
+	assert.Equal(t, sess.DataExpires, got)
+	ts.Gw.ExpiryCache.Delete(sess.OrgID)
+
+	m.Spec.OrgSessionManager = mockStore{DetailNotFound: true}
+	noOrgSess := "nonexistent_org"
+	got = m.OrgSessionExpiry(noOrgSess)
+	assert.Equal(t, DEFAULT_ORG_SESSION_EXPIRATION, got)
+
 }
 
 func TestBaseMiddleware_getAuthType(t *testing.T) {
@@ -73,7 +80,7 @@ func TestBaseMiddleware_getAuthType(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
-	baseMid := BaseMiddleware{Spec: spec, Gw: ts.Gw}
+	baseMid := &BaseMiddleware{Spec: spec, Gw: ts.Gw}
 
 	r, _ := http.NewRequest(http.MethodGet, "", nil)
 	r.Header.Set("h1", "t1")
@@ -93,13 +100,13 @@ func TestBaseMiddleware_getAuthType(t *testing.T) {
 	oidc := &OpenIDMW{BaseMiddleware: baseMid}
 
 	// test getAuthType
-	assert.Equal(t, authTokenType, authKey.getAuthType())
-	assert.Equal(t, basicType, basic.getAuthType())
-	assert.Equal(t, coprocessType, coprocess.getAuthType())
-	assert.Equal(t, hmacType, hmac.getAuthType())
-	assert.Equal(t, jwtType, jwt.getAuthType())
-	assert.Equal(t, oauthType, oauth.getAuthType())
-	assert.Equal(t, oidcType, oidc.getAuthType())
+	assert.Equal(t, apidef.AuthTokenType, authKey.getAuthType())
+	assert.Equal(t, apidef.BasicType, basic.getAuthType())
+	assert.Equal(t, apidef.CoprocessType, coprocess.getAuthType())
+	assert.Equal(t, apidef.HMACType, hmac.getAuthType())
+	assert.Equal(t, apidef.JWTType, jwt.getAuthType())
+	assert.Equal(t, apidef.OAuthType, oauth.getAuthType())
+	assert.Equal(t, apidef.OIDCType, oidc.getAuthType())
 
 	// test getAuthToken
 	getToken := func(authType string, getAuthToken func(authType string, r *http.Request) (string, apidef.AuthConfig)) string {
@@ -114,6 +121,140 @@ func TestBaseMiddleware_getAuthType(t *testing.T) {
 	assert.Equal(t, "t5", getToken(jwt.getAuthType(), jwt.getAuthToken))
 	assert.Equal(t, "t6", getToken(oauth.getAuthType(), oauth.getAuthToken))
 	assert.Equal(t, "t7", getToken(oidc.getAuthType(), oidc.getAuthToken))
+}
+
+func TestBaseMiddleware_getAuthToken(t *testing.T) {
+	t.Run("should get token from cookie", func(t *testing.T) {
+		spec := &APISpec{APIDefinition: &apidef.APIDefinition{}}
+		spec.AuthConfigs = map[string]apidef.AuthConfig{
+			"authToken": {CookieName: "c1", UseCookie: true},
+		}
+
+		ts := StartTest(nil)
+		defer ts.Close()
+
+		baseMid := &BaseMiddleware{Spec: spec, Gw: ts.Gw}
+
+		r, _ := http.NewRequest(http.MethodGet, "", nil)
+		r.AddCookie(&http.Cookie{
+			Name:  "c1",
+			Value: "t1",
+		})
+
+		authKey := &AuthKey{BaseMiddleware: baseMid}
+
+		// test getAuthToken
+		getToken := func(authType string, getAuthToken func(authType string, r *http.Request) (string, apidef.AuthConfig)) string {
+			token, _ := getAuthToken(authType, r)
+			return token
+		}
+
+		assert.Equal(t, "t1", getToken(authKey.getAuthType(), authKey.getAuthToken))
+	})
+
+	t.Run("should not get token from cookie when use cookie is false", func(t *testing.T) {
+		spec := &APISpec{APIDefinition: &apidef.APIDefinition{}}
+		spec.AuthConfigs = map[string]apidef.AuthConfig{
+			"authToken": {CookieName: "c1", UseCookie: false},
+		}
+
+		ts := StartTest(nil)
+		defer ts.Close()
+
+		baseMid := &BaseMiddleware{Spec: spec, Gw: ts.Gw}
+
+		r, _ := http.NewRequest(http.MethodGet, "", nil)
+		r.AddCookie(&http.Cookie{
+			Name:  "c1",
+			Value: "t1",
+		})
+
+		authKey := &AuthKey{BaseMiddleware: baseMid}
+
+		// test getAuthToken
+		getToken := func(authType string, getAuthToken func(authType string, r *http.Request) (string, apidef.AuthConfig)) string {
+			token, _ := getAuthToken(authType, r)
+			return token
+		}
+
+		assert.Empty(t, getToken(authKey.getAuthType(), authKey.getAuthToken))
+	})
+
+	t.Run("should get token from header", func(t *testing.T) {
+		spec := &APISpec{APIDefinition: &apidef.APIDefinition{}}
+		spec.AuthConfigs = map[string]apidef.AuthConfig{
+			"authToken": {AuthHeaderName: "h1"},
+		}
+
+		ts := StartTest(nil)
+		defer ts.Close()
+
+		baseMid := &BaseMiddleware{Spec: spec, Gw: ts.Gw}
+
+		r, _ := http.NewRequest(http.MethodGet, "", nil)
+		r.Header.Set("h1", "t1")
+
+		authKey := &AuthKey{BaseMiddleware: baseMid}
+
+		// test getAuthToken
+		getToken := func(authType string, getAuthToken func(authType string, r *http.Request) (string, apidef.AuthConfig)) string {
+			token, _ := getAuthToken(authType, r)
+			return token
+		}
+
+		assert.Equal(t, "t1", getToken(authKey.getAuthType(), authKey.getAuthToken))
+	})
+
+	t.Run("should get token from query", func(t *testing.T) {
+		spec := &APISpec{APIDefinition: &apidef.APIDefinition{}}
+		spec.AuthConfigs = map[string]apidef.AuthConfig{
+			"authToken": {ParamName: "q1", UseParam: true},
+		}
+
+		ts := StartTest(nil)
+		defer ts.Close()
+
+		baseMid := &BaseMiddleware{Spec: spec, Gw: ts.Gw}
+
+		r, _ := http.NewRequest(http.MethodGet, "", nil)
+		r.URL.RawQuery = "q1=t1"
+
+		authKey := &AuthKey{BaseMiddleware: baseMid}
+
+		// test getAuthToken
+		getToken := func(authType string, getAuthToken func(authType string, r *http.Request) (string, apidef.AuthConfig)) string {
+			token, _ := getAuthToken(authType, r)
+			return token
+		}
+
+		assert.Equal(t, "t1", getToken(authKey.getAuthType(), authKey.getAuthToken))
+	})
+
+	t.Run("should get token from query when use param is disabled", func(t *testing.T) {
+		spec := &APISpec{APIDefinition: &apidef.APIDefinition{}}
+		spec.AuthConfigs = map[string]apidef.AuthConfig{
+			"authToken": {ParamName: "q1", UseParam: false},
+		}
+
+		ts := StartTest(nil)
+		defer ts.Close()
+
+		baseMid := &BaseMiddleware{Spec: spec, Gw: ts.Gw}
+
+		r, _ := http.NewRequest(http.MethodGet, "", nil)
+		r.URL.RawQuery = "q1=t1"
+
+		authKey := &AuthKey{BaseMiddleware: baseMid}
+
+		// test getAuthToken
+		getToken := func(authType string, getAuthToken func(authType string, r *http.Request) (string, apidef.AuthConfig)) string {
+			token, _ := getAuthToken(authType, r)
+			return token
+		}
+
+		assert.Equal(t, "", getToken(authKey.getAuthType(), authKey.getAuthToken))
+	})
+
 }
 
 func TestSessionLimiter_RedisQuotaExceeded_PerAPI(t *testing.T) {
@@ -201,4 +342,66 @@ func TestSessionLimiter_RedisQuotaExceeded_PerAPI(t *testing.T) {
 	// for api3 - global
 	sendReqAndCheckQuota(t, apis[2].APIID, 24, false)
 	sendReqAndCheckQuota(t, apis[2].APIID, 23, false)
+}
+
+func TestCopyAllowedURLs(t *testing.T) {
+	testCases := []struct {
+		name  string
+		input []user.AccessSpec
+	}{
+		{
+			name: "Copy non-empty slice of AccessSpec with non-empty Methods",
+			input: []user.AccessSpec{
+				{
+					URL:     "http://example.com",
+					Methods: []string{"GET", "POST"},
+				},
+				{
+					URL:     "http://example.org",
+					Methods: []string{"GET"},
+				},
+			},
+		},
+		{
+			name: "Copy non-empty slice of AccessSpec with empty Methods",
+			input: []user.AccessSpec{
+				{
+					URL:     "http://example.com",
+					Methods: []string{},
+				},
+				{
+					URL:     "http://example.org",
+					Methods: []string{},
+				},
+			},
+		},
+		{
+			name: "Copy non-empty slice of AccessSpec with nil Methods",
+			input: []user.AccessSpec{
+				{
+					URL:     "http://example.com",
+					Methods: nil,
+				},
+				{
+					URL:     "http://example.org",
+					Methods: nil,
+				},
+			},
+		},
+		{
+			name:  "Copy empty slice of AccessSpec",
+			input: []user.AccessSpec{},
+		},
+		{
+			name:  "Copy nil slice of AccessSpec",
+			input: []user.AccessSpec(nil),
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			copied := copyAllowedURLs(tc.input)
+			assert.Equal(t, tc.input, copied)
+		})
+	}
 }

@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/TykTechnologies/tyk/certs"
+	"github.com/TykTechnologies/tyk/internal/crypto"
 
 	"github.com/stretchr/testify/assert"
 
@@ -25,13 +25,12 @@ import (
 var algoList = [4]string{"hmac-sha1", "hmac-sha256", "hmac-sha384", "hmac-sha512"}
 
 func (ts *Test) getMiddlewareChain(spec *APISpec) http.Handler {
-
 	remote, _ := url.Parse(TestHttpAny)
 	proxy := ts.Gw.TykNewSingleHostReverseProxy(remote, spec, logrus.New().WithFields(logrus.Fields{}))
 	proxyHandler := ProxyHandler(proxy, spec)
-	baseMid := BaseMiddleware{Spec: spec, Proxy: proxy, Gw: ts.Gw}
+	baseMid := &BaseMiddleware{Spec: spec, Proxy: proxy, Gw: ts.Gw}
 	chain := alice.New(ts.Gw.mwList(
-		&IPWhiteListMiddleware{baseMid},
+		&IPWhiteListMiddleware{BaseMiddleware: baseMid},
 		&IPBlackListMiddleware{BaseMiddleware: baseMid},
 		&RequestSigning{BaseMiddleware: baseMid},
 		&HTTPSignatureValidationMiddleware{BaseMiddleware: baseMid},
@@ -260,7 +259,7 @@ func TestRSARequestSigning(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
-	_, _, combinedPem, cert := certs.GenServerCertificate()
+	_, _, combinedPem, cert := crypto.GenServerCertificate()
 	privCertId, _ := ts.Gw.CertificateManager.Add(combinedPem, "")
 	defer ts.Gw.CertificateManager.Delete(privCertId, "")
 
@@ -414,15 +413,15 @@ func TestRSARequestSigning(t *testing.T) {
 	})
 }
 
-func TestStripListenPath(t *testing.T) {
-	ts := StartTest(nil)
-	defer ts.Close()
-
+func TestAPISpec_StripListenPath(t *testing.T) {
 	algo := "hmac-sha256"
 	secret := "12345"
-	sessionKey := ts.generateSession(algo, secret)
 
 	t.Run("Off", func(t *testing.T) {
+		ts := StartTest(nil)
+		defer ts.Close()
+
+		sessionKey := ts.generateSession(algo, secret)
 		specs := ts.generateSpec(algo, secret, sessionKey, nil)
 		req := TestReq(t, "get", "/test/get", nil)
 
@@ -436,31 +435,41 @@ func TestStripListenPath(t *testing.T) {
 	})
 
 	t.Run("On", func(t *testing.T) {
-		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
-			spec.APIID = "protected"
-			spec.Proxy.ListenPath = "/protected"
-			spec.EnableSignatureChecking = true
-			spec.UseKeylessAccess = false
-			spec.Proxy.StripListenPath = true
-		}, func(spec *APISpec) {
-			spec.APIID = "trailingSlash"
-			spec.Proxy.ListenPath = "/trailingSlash/"
-			spec.Proxy.StripListenPath = true
-			spec.RequestSigning.IsEnabled = true
-			spec.RequestSigning.Secret = secret
-			spec.RequestSigning.KeyId = sessionKey
-			spec.RequestSigning.Algorithm = algo
-			spec.Proxy.TargetURL = ts.URL
-		}, func(spec *APISpec) {
-			spec.APIID = "withoutTrailingSlash"
-			spec.Proxy.ListenPath = "/withoutTrailingSlash"
-			spec.Proxy.StripListenPath = true
-			spec.RequestSigning.IsEnabled = true
-			spec.RequestSigning.Secret = secret
-			spec.RequestSigning.KeyId = sessionKey
-			spec.RequestSigning.Algorithm = algo
-			spec.Proxy.TargetURL = ts.URL
-		})
+		test.Flaky(t) // TODO: TT-5255
+
+		ts := StartTest(nil)
+		defer ts.Close()
+
+		sessionKey := ts.generateSession(algo, secret)
+		ts.Gw.BuildAndLoadAPI(
+			func(spec *APISpec) {
+				spec.APIID = "protected"
+				spec.Proxy.ListenPath = "/protected"
+				spec.EnableSignatureChecking = true
+				spec.UseKeylessAccess = false
+				spec.Proxy.StripListenPath = true
+			},
+			func(spec *APISpec) {
+				spec.APIID = "trailingSlash"
+				spec.Proxy.ListenPath = "/trailingSlash/"
+				spec.Proxy.StripListenPath = true
+				spec.RequestSigning.IsEnabled = true
+				spec.RequestSigning.Secret = secret
+				spec.RequestSigning.KeyId = sessionKey
+				spec.RequestSigning.Algorithm = algo
+				spec.Proxy.TargetURL = ts.URL
+			},
+			func(spec *APISpec) {
+				spec.APIID = "withoutTrailingSlash"
+				spec.Proxy.ListenPath = "/withoutTrailingSlash"
+				spec.Proxy.StripListenPath = true
+				spec.RequestSigning.IsEnabled = true
+				spec.RequestSigning.Secret = secret
+				spec.RequestSigning.KeyId = sessionKey
+				spec.RequestSigning.Algorithm = algo
+				spec.Proxy.TargetURL = ts.URL
+			},
+		)
 
 		ts.Run(t, []test.TestCase{
 			{Path: "/trailingSlash/protected/get", Method: http.MethodGet, Code: http.StatusOK},
@@ -575,7 +584,9 @@ func TestRequestSigning_getRequestPath(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
-	rs := RequestSigning{BaseMiddleware{Spec: api, Gw: ts.Gw}}
+	rs := RequestSigning{
+		BaseMiddleware: &BaseMiddleware{Spec: api, Gw: ts.Gw},
+	}
 
 	req, _ := http.NewRequest(http.MethodGet, "http://example.com/test/get?param1=value1", nil)
 

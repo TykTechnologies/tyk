@@ -1,5 +1,7 @@
 package importer
 
+//lint:file-ignore faillint This file should be ignored by faillint (fmt in use).
+
 import (
 	"encoding/json"
 	"errors"
@@ -9,7 +11,7 @@ import (
 
 	log "github.com/sirupsen/logrus"
 
-	kingpin "gopkg.in/alecthomas/kingpin.v2"
+	kingpin "github.com/alecthomas/kingpin/v2"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/apidef/importer"
@@ -21,7 +23,8 @@ const (
 )
 
 var (
-	imp            *Importer
+	imp *Importer = &Importer{}
+
 	errUnknownMode = errors.New("Unknown mode")
 )
 
@@ -38,10 +41,6 @@ type Importer struct {
 	asMock         *bool
 	forAPI         *string
 	asVersion      *string
-}
-
-func init() {
-	imp = &Importer{}
 }
 
 // AddTo initializes an importer object.
@@ -67,23 +66,19 @@ func (i *Importer) Import(ctx *kingpin.ParseContext) (err error) {
 		err = i.handleSwaggerMode()
 		if err != nil {
 			log.Fatal(err)
-			os.Exit(1)
 		}
 	} else if *i.bluePrintMode {
 		err = i.handleBluePrintMode()
 		if err != nil {
 			log.Fatal(err)
-			os.Exit(1)
 		}
 	} else if *i.wsdlMode {
 		err = i.handleWSDLMode()
 		if err != nil {
 			log.Fatal(err)
-			os.Exit(1)
 		}
 	} else {
 		log.Fatal(errUnknownMode)
-		os.Exit(1)
 	}
 	os.Exit(0)
 	return nil

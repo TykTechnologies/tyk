@@ -29,6 +29,8 @@ const (
 	EventOrgRateLimitExceeded apidef.TykEvent = "OrgRateLimitExceeded"
 	EventTriggerExceeded      apidef.TykEvent = "TriggerExceeded"
 	EventBreakerTriggered     apidef.TykEvent = "BreakerTriggered"
+	EventBreakerTripped       apidef.TykEvent = "BreakerTripped"
+	EventBreakerReset         apidef.TykEvent = "BreakerReset"
 	EventHOSTDOWN             apidef.TykEvent = "HostDown"
 	EventHOSTUP               apidef.TykEvent = "HostUp"
 	EventTokenCreated         apidef.TykEvent = "TokenCreated"

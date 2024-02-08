@@ -1,0 +1,27 @@
+type: Test
+spec:
+  id: 1ILVuPCVR
+  name: Versioned API - OK request
+  description: Request to a versioned API with the right header
+  trigger:
+    type: http
+    httpRequest:
+      method: GET
+      url: tyk:8080/versioned/ip
+      headers:
+      - key: Content-Type
+        value: application/json
+      - key: x-api-version
+        value: v1
+  specs:
+  - selector: span[tracetest.span.type="general" name="VersionCheck"]
+    name: Checking version attribute
+    assertions:
+    - attr:tyk.api.version = "v1"
+  - selector: span[tracetest.span.type="http" name="GET /versioned/ip" http.method="GET"]
+    name: Checking API attributes
+    assertions:
+    - attr:tyk.api.id = 6
+    - attr:tyk.api.name = "VersionedAPI"
+    - attr:tyk.api.orgid = "default"
+    - attr:tyk.api.path = "/versioned/"

@@ -9,14 +9,6 @@ import (
 	"github.com/TykTechnologies/drl"
 )
 
-func (gw *Gateway) setupDRL() {
-	drlManager := &drl.DRL{}
-	drlManager.Init()
-	drlManager.ThisServerID = gw.GetNodeID() + "|" + hostDetails.Hostname
-	log.Debug("DRL: Setting node ID: ", drlManager.ThisServerID)
-	gw.DRLManager = drlManager
-}
-
 func (gw *Gateway) startRateLimitNotifications() {
 	notificationFreq := gw.GetConfig().DRLNotificationFrequency
 	if notificationFreq == 0 {
@@ -52,7 +44,7 @@ func (gw *Gateway) getTagHash() string {
 }
 
 func (gw *Gateway) NotifyCurrentServerStatus() {
-	if !gw.DRLManager.Ready {
+	if !gw.DRLManager.Ready() {
 		return
 	}
 
@@ -62,7 +54,7 @@ func (gw *Gateway) NotifyCurrentServerStatus() {
 	}
 
 	server := drl.Server{
-		HostName:   hostDetails.Hostname,
+		HostName:   gw.hostDetails.Hostname,
 		ID:         gw.GetNodeID(),
 		LoadPerSec: rate,
 		TagHash:    gw.getTagHash(),
@@ -84,6 +76,13 @@ func (gw *Gateway) NotifyCurrentServerStatus() {
 }
 
 func (gw *Gateway) onServerStatusReceivedHandler(payload string) {
+	gw.startDRL()
+
+	if !gw.DRLManager.Ready() {
+		log.Warning("DRL not ready, skipping this notification")
+		return
+	}
+
 	serverData := drl.Server{}
 	if err := json.Unmarshal([]byte(payload), &serverData); err != nil {
 		log.WithFields(logrus.Fields{
@@ -93,17 +92,10 @@ func (gw *Gateway) onServerStatusReceivedHandler(payload string) {
 		return
 	}
 
-	// log.Debug("Received DRL data: ", serverData)
-
-	if gw.DRLManager.Ready {
-		if err := gw.DRLManager.AddOrUpdateServer(serverData); err != nil {
-			log.WithError(err).
-				WithField("serverData", serverData).
-				Debug("AddOrUpdateServer error. Seems like you running multiple segmented Tyk groups in same Redis.")
-			return
-		}
-		// log.Debug(DRLManager.Report())
-	} else {
-		log.Warning("DRL not ready, skipping this notification")
+	if err := gw.DRLManager.AddOrUpdateServer(serverData); err != nil {
+		log.WithError(err).
+			WithField("serverData", serverData).
+			Debug("AddOrUpdateServer error. Seems like you running multiple segmented Tyk groups in same Redis.")
+		return
 	}
 }

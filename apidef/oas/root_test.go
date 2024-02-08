@@ -6,6 +6,8 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/getkin/kin-openapi/openapi3"
+
 	"github.com/stretchr/testify/assert"
 
 	"github.com/TykTechnologies/tyk/apidef"
@@ -24,10 +26,58 @@ func TestXTykAPIGateway(t *testing.T) {
 		assert.Equal(t, emptyXTykAPIGateway, resultXTykAPIGateway)
 	})
 
-	t.Run("filled", func(t *testing.T) {
-		t.SkipNow() // when we don't need to skip this, it means OAS and old API definition match
+	t.Run("filled OAS", func(t *testing.T) {
+		t.SkipNow()
+		var oas OAS
+		Fill(t, &oas, 0)
+		oas.Security = openapi3.SecurityRequirements{
+			{
+				"custom": []string{},
+			},
+		}
+
+		oas.Components = &openapi3.Components{
+			SecuritySchemes: openapi3.SecuritySchemes{
+				"custom": {
+					Value: &openapi3.SecurityScheme{
+						Type: typeAPIKey,
+						Name: "x-query",
+						In:   "query",
+					},
+				},
+			},
+		}
+
+		var xTykAPIGateway XTykAPIGateway
+		Fill(t, &xTykAPIGateway, 0)
+		xTykAPIGateway.Server.Authentication = &Authentication{
+			SecuritySchemes: SecuritySchemes{
+				"custome": &Token{},
+			},
+		}
+
+		oas.Extensions = map[string]interface{}{
+			ExtensionTykAPIGateway: &xTykAPIGateway,
+		}
+
+		var convertedAPI apidef.APIDefinition
+		oas.ExtractTo(&convertedAPI)
+
+		var resultOAS OAS
+		resultOAS.Fill(convertedAPI)
+
+		assert.Equal(t, oas, resultOAS)
+	})
+
+	t.Run("filled old", func(t *testing.T) {
+		t.SkipNow() // when we don't need to skip this, it means OAS and Tyk classic API definition match
 		initialAPI := apidef.APIDefinition{}
 		Fill(t, &initialAPI, 0)
+
+		initialAPI.VersionDefinition.Enabled = false
+		initialAPI.VersionDefinition.Versions = nil
+		_, err := initialAPI.MigrateVersioning()
+		assert.NoError(t, err)
 
 		xTykAPIGateway := XTykAPIGateway{}
 		xTykAPIGateway.Fill(initialAPI)
@@ -102,7 +152,6 @@ func Fill(t *testing.T, input interface{}, index int) {
 		if v.Type() == reflect.TypeOf(map[string]apidef.AuthConfig{}) {
 			v.Set(reflect.ValueOf(FillTestAuthConfigs(t, index)))
 		} else {
-
 			newMap := reflect.MakeMapWithSize(v.Type(), 0)
 			for i := 0; i < 3; i++ {
 				newKey := reflect.New(v.Type().Key()).Elem()
@@ -116,17 +165,19 @@ func Fill(t *testing.T, input interface{}, index int) {
 
 			v.Set(newMap)
 		}
-
 	case reflect.Struct:
-		for i := 0; i < v.NumField(); i++ {
-			fv := v.Field(i)
-			if v.Type().Field(i).Tag.Get("json") == "-" || v.Type().Field(i).Tag.Get("json") == "" {
-				continue
+		if v.Type() == reflect.TypeOf(apidef.VersionData{}) {
+			v.Set(reflect.ValueOf(FillTestVersionData(t, index)))
+		} else {
+			for i := 0; i < v.NumField(); i++ {
+				fv := v.Field(i)
+				if v.Type().Field(i).Tag.Get("json") == "-" || v.Type().Field(i).Tag.Get("json") == "" {
+					continue
+				}
+
+				Fill(t, fv.Addr().Interface(), index+i+1)
 			}
-
-			Fill(t, fv.Addr().Interface(), index+i+1)
 		}
-
 	case reflect.Ptr:
 		newValue := reflect.New(v.Type().Elem()).Elem()
 		Fill(t, newValue.Addr().Interface(), index)
@@ -134,6 +185,74 @@ func Fill(t *testing.T, input interface{}, index int) {
 	default:
 		t.Fatalf("uncovered kind in API definition: %s", kind.String())
 	}
+}
+
+// getNonEmptyFields returns non-empty fields inside a struct.
+func getNonEmptyFields(data interface{}, prefix string) (fields []string) {
+	val := reflect.ValueOf(data)
+	if val.Kind() != reflect.Struct {
+		fields = append(fields, prefix)
+		return
+	}
+
+	for i := 0; i < val.NumField(); i++ {
+		field := val.Field(i)
+		fieldType := val.Type().Field(i)
+
+		fieldName := fieldType.Name
+		fullName := prefix + "." + fieldName
+
+		switch field.Kind() {
+		case reflect.String:
+			if field.String() != "" {
+				fields = append(fields, fullName)
+			}
+		case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+			if field.Int() != 0 {
+				fields = append(fields, fullName)
+			}
+		case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+			if field.Uint() != 0 {
+				fields = append(fields, fullName)
+			}
+		case reflect.Float32, reflect.Float64:
+			if field.Float() != 0 {
+				fields = append(fields, fullName)
+			}
+		case reflect.Bool:
+			if field.Bool() {
+				fields = append(fields, fullName)
+			}
+		case reflect.Struct:
+			fields = append(fields, getNonEmptyFields(field.Interface(), fullName)...)
+		case reflect.Array, reflect.Slice:
+			for j := 0; j < field.Len(); j++ {
+				elemFullName := fullName + fmt.Sprintf("[%d]", j)
+				fields = append(fields, getNonEmptyFields(field.Index(j).Interface(), elemFullName)...)
+				break
+			}
+
+		case reflect.Map:
+			for _, key := range field.MapKeys() {
+				elemFullName := fullName + "[0]"
+				fields = append(fields, getNonEmptyFields(field.MapIndex(key).Interface(), elemFullName)...)
+				break
+			}
+		case reflect.Interface:
+			if !field.IsNil() {
+				fields = append(fields, getNonEmptyFields(field.Elem().Interface(), fullName)...)
+			}
+		case reflect.Ptr:
+			if !field.IsNil() {
+				fields = append(fields, getNonEmptyFields(field.Elem().Interface(), fullName)...)
+			}
+		default:
+			panic(fmt.Sprintf("unsupported kind: %v", field.Kind()))
+		}
+
+	}
+
+	return fields
 }
 
 func FillTestAuthConfigs(t *testing.T, index int) map[string]apidef.AuthConfig {
@@ -150,6 +269,35 @@ func FillTestAuthConfigs(t *testing.T, index int) map[string]apidef.AuthConfig {
 	authConfigs["basic"] = a
 	authConfigs["oauth"] = a
 	authConfigs["hmac"] = a
+	authConfigs["coprocess"] = a
+	authConfigs["oidc"] = a
 
 	return authConfigs
+}
+
+func FillTestVersionData(t *testing.T, index int) apidef.VersionData {
+	versionInfo := apidef.VersionInfo{}
+	Fill(t, &versionInfo, index)
+
+	return apidef.VersionData{
+		NotVersioned:   false,
+		DefaultVersion: "Default",
+		Versions: map[string]apidef.VersionInfo{
+			"Default": versionInfo,
+			"v1":      {},
+			"v2":      {},
+		},
+	}
+}
+
+func TestVersioning(t *testing.T) {
+	var emptyVersioning Versioning
+
+	var convertedAPI apidef.APIDefinition
+	emptyVersioning.ExtractTo(&convertedAPI)
+
+	var resultVersioning Versioning
+	resultVersioning.Fill(convertedAPI)
+
+	assert.Equal(t, emptyVersioning, resultVersioning)
 }

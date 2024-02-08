@@ -1,3 +1,4 @@
+//go:build !cgo
 // +build !cgo
 
 // This only builds when CGO isn't enabled so that we don't attempt to do it on unsuiable environments,

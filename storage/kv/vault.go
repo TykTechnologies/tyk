@@ -4,14 +4,19 @@ import (
 	"errors"
 	"strings"
 
+	vaultApi "github.com/hashicorp/vault/api"
+
 	"github.com/TykTechnologies/tyk/config"
-	"github.com/hashicorp/vault/api"
 )
 
 // Vault is an implementation of a KV store which uses Consul as it's backend
 type Vault struct {
-	client *api.Client
+	client *vaultApi.Client
 	kvV2   bool
+}
+
+func (v *Vault) Client() *vaultApi.Client {
+	return v.client
 }
 
 // NewVault returns a configured vault KV store adapter
@@ -66,7 +71,7 @@ func (v *Vault) Get(key string) (string, error) {
 }
 
 func newVault(conf config.VaultConfig) (Store, error) {
-	defaultCfg := api.DefaultConfig()
+	defaultCfg := vaultApi.DefaultConfig()
 
 	if conf.Address != "" {
 		defaultCfg.Address = conf.Address
@@ -88,7 +93,7 @@ func newVault(conf config.VaultConfig) (Store, error) {
 		return nil, errors.New("you must provide a root token in other to use vault")
 	}
 
-	client, err := api.NewClient(defaultCfg)
+	client, err := vaultApi.NewClient(defaultCfg)
 	if err != nil {
 		return nil, err
 	}

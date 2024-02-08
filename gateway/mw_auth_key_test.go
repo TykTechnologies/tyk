@@ -1,6 +1,7 @@
 package gateway
 
 import (
+	"crypto/x509"
 	"encoding/hex"
 	"fmt"
 	"net/http"
@@ -9,15 +10,18 @@ import (
 	"testing"
 	"time"
 
-	"github.com/TykTechnologies/tyk/apidef"
-
 	"github.com/justinas/alice"
-	"github.com/lonelycode/go-uuid/uuid"
+	"github.com/stretchr/testify/assert"
 
+	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/certs"
+	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/signature_validator"
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/test"
 	"github.com/TykTechnologies/tyk/user"
+
+	"github.com/TykTechnologies/tyk/internal/uuid"
 )
 
 func TestMurmur3CharBug(t *testing.T) {
@@ -110,7 +114,7 @@ func TestSignatureValidation(t *testing.T) {
 		spec.UseKeylessAccess = false
 		spec.Proxy.ListenPath = "/"
 		spec.AuthConfigs = map[string]apidef.AuthConfig{
-			authTokenType: {
+			apidef.AuthTokenType: {
 				ValidateSignature: true,
 				UseParam:          true,
 				ParamName:         "api_key",
@@ -146,13 +150,13 @@ func TestSignatureValidation(t *testing.T) {
 		emptySigHeader := map[string]string{
 			"authorization": key,
 		}
-		ts.Gw.RedisController.DisableRedis(true)
+		ts.Gw.StorageConnectionHandler.DisableStorage(true)
 		ts.Run(t, []test.TestCase{
 			{Headers: emptySigHeader, Code: http.StatusForbidden},
 			{Headers: invalidSigHeader, Code: http.StatusForbidden},
 			{Headers: validSigHeader, Code: http.StatusForbidden},
 		}...)
-		ts.Gw.RedisController.DisableRedis(false)
+		ts.Gw.StorageConnectionHandler.DisableStorage(false)
 		ts.Run(t, []test.TestCase{
 			{Headers: emptySigHeader, Code: http.StatusUnauthorized},
 			{Headers: invalidSigHeader, Code: http.StatusUnauthorized},
@@ -169,13 +173,13 @@ func TestSignatureValidation(t *testing.T) {
 		invalidSigPath := emptySigPath + "&sig=junk"
 		validSigPath := emptySigPath + "&sig=" + hex.EncodeToString(validHash)
 
-		ts.Gw.RedisController.DisableRedis(true)
+		ts.Gw.StorageConnectionHandler.DisableStorage(true)
 		_, _ = ts.Run(t, []test.TestCase{
 			{Path: emptySigPath, Code: http.StatusForbidden},
 			{Path: invalidSigPath, Code: http.StatusForbidden},
 			{Path: validSigPath, Code: http.StatusForbidden},
 		}...)
-		ts.Gw.RedisController.DisableRedis(false)
+		ts.Gw.StorageConnectionHandler.DisableStorage(false)
 		_, _ = ts.Run(t, []test.TestCase{
 			{Path: emptySigPath, Code: http.StatusUnauthorized},
 			{Path: invalidSigPath, Code: http.StatusUnauthorized},
@@ -184,9 +188,9 @@ func TestSignatureValidation(t *testing.T) {
 	})
 
 	t.Run("Dynamic signature", func(t *testing.T) {
-		authConfig := api.AuthConfigs[authTokenType]
+		authConfig := api.AuthConfigs[apidef.AuthTokenType]
 		authConfig.Signature.Secret = "$tyk_meta.signature_secret"
-		api.AuthConfigs[authTokenType] = authConfig
+		api.AuthConfigs[apidef.AuthTokenType] = authConfig
 		ts.Gw.LoadAPI(api)
 
 		key := CreateSession(ts.Gw, func(s *user.SessionState) {
@@ -207,12 +211,12 @@ func TestSignatureValidation(t *testing.T) {
 			"authorization": key,
 			"signature":     "junk",
 		}
-		ts.Gw.RedisController.DisableRedis(true)
+		ts.Gw.StorageConnectionHandler.DisableStorage(true)
 		ts.Run(t, []test.TestCase{
 			{Headers: invalidSigHeader, Code: http.StatusForbidden},
 			{Headers: validSigHeader, Code: http.StatusForbidden},
 		}...)
-		ts.Gw.RedisController.DisableRedis(false)
+		ts.Gw.StorageConnectionHandler.DisableStorage(false)
 		ts.Run(t, []test.TestCase{
 			{Headers: invalidSigHeader, Code: http.StatusUnauthorized},
 			{Headers: validSigHeader, Code: http.StatusOK},
@@ -220,9 +224,9 @@ func TestSignatureValidation(t *testing.T) {
 	})
 
 	t.Run("Dynamic signature with custom key", func(t *testing.T) {
-		authConfig := api.AuthConfigs[authTokenType]
+		authConfig := api.AuthConfigs[apidef.AuthTokenType]
 		authConfig.Signature.Secret = "$tyk_meta.signature_secret"
-		api.AuthConfigs[authTokenType] = authConfig
+		api.AuthConfigs[apidef.AuthTokenType] = authConfig
 		ts.Gw.LoadAPI(api)
 
 		customKey := "c8zj99aze7hdvtaqh4qvcck7"
@@ -276,7 +280,7 @@ func TestSignatureValidation(t *testing.T) {
 			"authorization": customKey,
 			"signature":     "junk",
 		}
-		ts.Gw.RedisController.DisableRedis(true)
+		ts.Gw.StorageConnectionHandler.DisableStorage(true)
 		ts.Run(t, []test.TestCase{
 			{Headers: invalidSigHeader, Code: http.StatusForbidden},
 			{Headers: validSigHeader, Code: http.StatusForbidden},
@@ -284,7 +288,7 @@ func TestSignatureValidation(t *testing.T) {
 			{Headers: validSigHeader3, Code: http.StatusForbidden},
 			{Headers: validSigHeader4, Code: http.StatusForbidden},
 		}...)
-		ts.Gw.RedisController.DisableRedis(false)
+		ts.Gw.StorageConnectionHandler.DisableStorage(false)
 		ts.Run(t, []test.TestCase{
 			{Headers: invalidSigHeader, Code: http.StatusUnauthorized},
 			{Headers: validSigHeader, Code: http.StatusOK},
@@ -320,7 +324,7 @@ func getAuthKeyChain(spec *APISpec, ts *Test) http.Handler {
 	remote, _ := url.Parse(spec.Proxy.TargetURL)
 	proxy := ts.Gw.TykNewSingleHostReverseProxy(remote, spec, nil)
 	proxyHandler := ProxyHandler(proxy, spec)
-	baseMid := BaseMiddleware{Spec: spec, Proxy: proxy, Gw: ts.Gw}
+	baseMid := &BaseMiddleware{Spec: spec, Proxy: proxy, Gw: ts.Gw}
 	chain := alice.New(ts.Gw.mwList(
 		&IPWhiteListMiddleware{baseMid},
 		&IPBlackListMiddleware{BaseMiddleware: baseMid},
@@ -369,7 +373,6 @@ func TestBearerTokenAuthKeySession(t *testing.T) {
 		t.Error(recorder.Body.String())
 	}
 }
-
 func BenchmarkBearerTokenAuthKeySession(b *testing.B) {
 	ts := StartTest(nil)
 	defer ts.Close()
@@ -542,6 +545,8 @@ const multiAuthDef = `{
 	"auth": {
 		"auth_header_name": "authorization",
 		"param_name": "token",
+		"use_param": true,
+		"use_cookie": true,
 		"cookie_name": "oreo"
 	},
 	"version_data": {
@@ -585,4 +590,79 @@ func BenchmarkStripBearer(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		_ = stripBearer("Bearer abcdefghijklmnopqrstuvwxyz12345678910")
 	}
+}
+
+func TestDynamicMTLS(t *testing.T) {
+	serverCertPem, _, combinedPEM, _ := certs.GenServerCertificate()
+	certID, _, _ := certs.GetCertIDAndChainPEM(combinedPEM, "")
+
+	conf := func(globalConf *config.Config) {
+		globalConf.Security.ControlAPIUseMutualTLS = false
+		globalConf.HttpServerOptions.UseSSL = true
+		globalConf.HttpServerOptions.SSLInsecureSkipVerify = true
+		globalConf.HttpServerOptions.SSLCertificates = []string{"default" + certID}
+	}
+	ts := StartTest(conf)
+	defer ts.Close()
+
+	certID, err := ts.Gw.CertificateManager.Add(combinedPEM, "default")
+	assert.NoError(t, err)
+	defer ts.Gw.CertificateManager.Delete(certID, "default")
+	ts.ReloadGatewayProxy()
+
+	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		spec.APIID = "apiID-1"
+		spec.UseStandardAuth = true
+		spec.UseKeylessAccess = false
+		authConf := apidef.AuthConfig{
+			Name:           "authToken",
+			UseCertificate: true,
+			AuthHeaderName: "Authorization",
+		}
+		spec.AuthConfigs = map[string]apidef.AuthConfig{
+			"authToken": authConf,
+		}
+		spec.Auth = authConf
+		spec.Proxy.ListenPath = "/dynamic-mtls"
+	})
+
+	// Initialize client certificates
+	clientCertPem, _, _, clientCert := certs.GenCertificate(&x509.Certificate{}, false)
+
+	clientCertID, err := ts.Gw.CertificateManager.Add(clientCertPem, "default")
+	assert.NoError(t, err)
+
+	ts.CreateSession(func(s *user.SessionState) {
+		s.AccessRights = map[string]user.AccessDefinition{"apiID-1": {
+			APIID: "apiID-1",
+		}}
+		s.Certificate = clientCertID
+	})
+
+	t.Run("valid certificate provided", func(t *testing.T) {
+		validCertClient := GetTLSClient(&clientCert, serverCertPem)
+		_, _ = ts.Run(t, test.TestCase{
+			Domain: "localhost",
+			Client: validCertClient,
+			Path:   "/dynamic-mtls",
+			Code:   http.StatusOK,
+		})
+
+	})
+
+	t.Run("expired client cert", func(t *testing.T) {
+		_, _, _, expiredClientCert := certs.GenCertificate(&x509.Certificate{
+			NotBefore: time.Now().AddDate(-1, 0, 0),
+			NotAfter:  time.Now().AddDate(0, 0, -1),
+		}, false)
+
+		expiredCertClient := GetTLSClient(&expiredClientCert, serverCertPem)
+
+		_, _ = ts.Run(t, test.TestCase{
+			Client:    expiredCertClient,
+			Path:      "/dynamic-mtls",
+			Code:      http.StatusForbidden,
+			BodyMatch: MsgCertificateExpired,
+		})
+	})
 }

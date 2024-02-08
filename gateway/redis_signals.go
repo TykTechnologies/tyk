@@ -1,19 +1,20 @@
 package gateway
 
 import (
-	"crypto"
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
+
 	"strconv"
 	"strings"
 	"sync"
 	"time"
 
-	"github.com/go-redis/redis/v8"
+	"github.com/TykTechnologies/storage/temporal/model"
 
 	"github.com/TykTechnologies/goverify"
+	"github.com/TykTechnologies/tyk/internal/crypto"
 	"github.com/TykTechnologies/tyk/storage"
 )
 
@@ -32,8 +33,8 @@ const (
 	NoticeDashboardConfigRequest NotificationCommand = "NoticeDashboardConfigRequest"
 	NoticeGatewayConfigResponse  NotificationCommand = "NoticeGatewayConfigResponse"
 	NoticeGatewayDRLNotification NotificationCommand = "NoticeGatewayDRLNotification"
-	NoticeGatewayLENotification  NotificationCommand = "NoticeGatewayLENotification"
 	KeySpaceUpdateNotification   NotificationCommand = "KeySpaceUpdateNotification"
+	OAuthPurgeLapsedTokens       NotificationCommand = "OAuthPurgeLapsedTokens"
 )
 
 // Notification is a type that encodes a message published to a pub sub channel (shared between implementations)
@@ -52,35 +53,60 @@ func (n *Notification) Sign() {
 }
 
 func (gw *Gateway) startPubSubLoop() {
-	cacheStore := storage.RedisCluster{RedisController: gw.RedisController}
+	cacheStore := storage.RedisCluster{ConnectionHandler: gw.StorageConnectionHandler}
 	cacheStore.Connect()
-	// On message, synchronise
+
+	message := "Connection to Redis failed, reconnect in 10s"
+
 	for {
+		err := cacheStore.StartPubSubHandler(gw.ctx, RedisPubSubChannel, func(v interface{}) {
+			gw.handleRedisEvent(v, nil, nil)
+		})
+
 		select {
 		case <-gw.ctx.Done():
+			pubSubLog.Info("Context cancelled, exiting pubsub loop")
 			return
 		default:
-			err := cacheStore.StartPubSubHandler(RedisPubSubChannel, func(v interface{}) {
-				gw.handleRedisEvent(v, nil, nil)
-			})
-			if err != nil {
-				if err != storage.ErrRedisIsDown {
-					pubSubLog.WithField("err", err).Error("Connection to Redis failed, reconnect in 10s")
-				}
-				time.Sleep(10 * time.Second)
-				pubSubLog.Warning("Reconnecting ", err)
-			}
 		}
+
+		gw.logPubSubError(err, message)
+		gw.addPubSubDelay(10 * time.Second)
 	}
 }
 
+// addPubSubDelay sleeps for duration
+func (gw *Gateway) addPubSubDelay(dur time.Duration) {
+	time.Sleep(dur)
+}
+
+// isPubSubError returns true if err != nil, logs error
+func (gw *Gateway) logPubSubError(err error, message string) bool {
+	if err != nil {
+		pubSubLog.WithError(err).Error(message)
+		return true
+	}
+	return false
+}
+
 func (gw *Gateway) handleRedisEvent(v interface{}, handled func(NotificationCommand), reloaded func()) {
-	message, ok := v.(*redis.Message)
+	message, ok := v.(model.Message)
 	if !ok {
 		return
 	}
+
+	if message.Type() != model.MessageTypeMessage {
+		return
+	}
+
+	payload, err := message.Payload()
+	if err != nil {
+		pubSubLog.Error("Error getting payload from message: ", err)
+		return
+	}
+
 	notif := Notification{Gw: gw}
-	if err := json.Unmarshal([]byte(message.Payload), &notif); err != nil {
+	if err := json.Unmarshal([]byte(payload), &notif); err != nil {
 		pubSubLog.Error("Unmarshalling message body failed, malformed: ", err)
 		return
 	}
@@ -112,13 +138,15 @@ func (gw *Gateway) handleRedisEvent(v interface{}, handled func(NotificationComm
 			return
 		}
 		gw.onServerStatusReceivedHandler(notif.Payload)
-	case NoticeGatewayLENotification:
-		gw.onLESSLStatusReceivedHandler(notif.Payload)
 	case NoticeApiUpdated, NoticeApiRemoved, NoticeApiAdded, NoticePolicyChanged, NoticeGroupReload:
 		pubSubLog.Info("Reloading endpoints")
 		gw.reloadURLStructure(reloaded)
 	case KeySpaceUpdateNotification:
 		gw.handleKeySpaceEventCacheFlush(notif.Payload)
+	case OAuthPurgeLapsedTokens:
+		if err := gw.purgeLapsedOAuthTokens(); err != nil {
+			log.WithError(err).Errorf("error while purging tokens for event %s", OAuthPurgeLapsedTokens)
+		}
 	default:
 		pubSubLog.Warnf("Unknown notification command: %q", notif.Command)
 		return

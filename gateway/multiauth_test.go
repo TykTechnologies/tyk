@@ -10,13 +10,14 @@ import (
 	"testing"
 	"time"
 
-	jwt "github.com/dgrijalva/jwt-go"
+	"github.com/golang-jwt/jwt/v4"
 	"github.com/justinas/alice"
-	"github.com/lonelycode/go-uuid/uuid"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/test"
 	"github.com/TykTechnologies/tyk/user"
+
+	"github.com/TykTechnologies/tyk/internal/uuid"
 )
 
 const multiAuthDev = `{
@@ -80,7 +81,7 @@ func (ts *Test) getMultiAuthStandardAndBasicAuthChain(spec *APISpec) http.Handle
 	remote, _ := url.Parse(TestHttpAny)
 	proxy := ts.Gw.TykNewSingleHostReverseProxy(remote, spec, nil)
 	proxyHandler := ProxyHandler(proxy, spec)
-	baseMid := BaseMiddleware{Spec: spec, Proxy: proxy, Gw: ts.Gw}
+	baseMid := &BaseMiddleware{Spec: spec, Proxy: proxy, Gw: ts.Gw}
 	chain := alice.New(ts.Gw.mwList(
 		&IPWhiteListMiddleware{baseMid},
 		&IPBlackListMiddleware{BaseMiddleware: baseMid},
@@ -217,7 +218,7 @@ func TestMultiSession_BA_Standard_Identity(t *testing.T) {
 	}
 }
 
-func TestMultiSession_BA_Standard_FAILBA(t *testing.T) {
+func TestMultiSession_BA_Standard_FailBA(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
@@ -258,7 +259,7 @@ func TestMultiSession_BA_Standard_FAILBA(t *testing.T) {
 	}
 }
 
-func TestMultiSession_BA_Standard_FAILAuth(t *testing.T) {
+func TestMultiSession_BA_Standard_FailStandard(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
 

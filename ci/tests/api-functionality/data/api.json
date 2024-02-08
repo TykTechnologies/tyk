@@ -1,0 +1,26 @@
+{
+  "name": "Smoke-Test-Basic-API",
+  "slug": "smoke-test-api",
+  "api_id": "1",
+  "org_id": "1",
+  "use_keyless": true,
+  "definition": {
+    "location": "header",
+    "key": "x-api-version"
+  },
+  "version_data": {
+    "not_versioned": true,
+    "versions": {
+      "Default": {
+        "name": "Default",
+        "use_extended_paths": true
+    }
+   }
+  },
+  "proxy": {
+    "listen_path": "/smoke-test-api/",
+    "target_url": "http://httpbin.org/get",
+    "strip_listen_path": true
+  },
+  "active": true
+}

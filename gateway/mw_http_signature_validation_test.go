@@ -1,9 +1,8 @@
 package gateway
 
 import (
-	"crypto"
 	"crypto/hmac"
-	"crypto/rand"
+	cryptoRand "crypto/rand"
 	"crypto/rsa"
 	"crypto/sha1"
 	"crypto/sha256"
@@ -16,20 +15,21 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
-	"regexp"
 	"strings"
 	"sync"
 	"testing"
 	"time"
 
-	"github.com/TykTechnologies/tyk/certs"
-
 	"github.com/justinas/alice"
-	"github.com/lonelycode/go-uuid/uuid"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/certs"
 	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/regexp"
 	"github.com/TykTechnologies/tyk/user"
+
+	"github.com/TykTechnologies/tyk/internal/crypto"
+	"github.com/TykTechnologies/tyk/internal/uuid"
 )
 
 const hmacAuthDef = `{
@@ -85,7 +85,7 @@ func (ts *Test) getHMACAuthChain(spec *APISpec) http.Handler {
 	remote, _ := url.Parse(TestHttpAny)
 	proxy := ts.Gw.TykNewSingleHostReverseProxy(remote, spec, nil)
 	proxyHandler := ProxyHandler(proxy, spec)
-	baseMid := BaseMiddleware{Spec: spec, Proxy: proxy, Gw: ts.Gw}
+	baseMid := &BaseMiddleware{Spec: spec, Proxy: proxy, Gw: ts.Gw}
 	chain := alice.New(ts.Gw.mwList(
 		&IPWhiteListMiddleware{baseMid},
 		&IPBlackListMiddleware{BaseMiddleware: baseMid},
@@ -124,10 +124,7 @@ func waitTimeout(wg *sync.WaitGroup, timeout time.Duration) bool {
 	}
 }
 
-func testPrepareHMACAuthSessionPass(tb testing.TB, hashFn func() hash.Hash, eventWG *sync.WaitGroup, withHeader bool, isBench bool) (string, *APISpec, *http.Request, string) {
-	ts := StartTest(nil)
-	defer ts.Close()
-
+func testPrepareHMACAuthSessionPass(tb testing.TB, ts *Test, hashFn func() hash.Hash, eventWG *sync.WaitGroup, withHeader bool, isBench bool) (string, *APISpec, *http.Request, string) {
 	spec := ts.Gw.LoadSampleAPI(hmacAuthDef)
 
 	session := createHMACAuthSession()
@@ -194,7 +191,7 @@ func testPrepareRSAAuthSessionPass(tb testing.TB, eventWG *sync.WaitGroup, priva
 		eventWG.Done()
 	}
 	spec.EventPaths = map[apidef.TykEvent][]config.TykEventHandler{
-		"AuthFailure": {&testAuthFailEventHandler{cb}},
+		EventAuthFailure: {&testAuthFailEventHandler{cb}},
 	}
 
 	sessionKey := ""
@@ -234,7 +231,7 @@ func testPrepareRSAAuthSessionPass(tb testing.TB, eventWG *sync.WaitGroup, priva
 	h.Write([]byte(signatureString))
 	hashed := h.Sum(nil)
 
-	signature, _ := rsa.SignPKCS1v15(rand.Reader, privateKey, crypto.SHA256, hashed)
+	signature, _ := rsa.SignPKCS1v15(cryptoRand.Reader, privateKey, crypto.SHA256, hashed)
 
 	sigString := base64.StdEncoding.EncodeToString(signature)
 
@@ -242,12 +239,15 @@ func testPrepareRSAAuthSessionPass(tb testing.TB, eventWG *sync.WaitGroup, priva
 }
 
 func TestHMACAuthSessionPass(t *testing.T) {
+
 	// Should not receive an AuthFailure event
 	var eventWG sync.WaitGroup
 	eventWG.Add(1)
+
 	ts := StartTest(nil)
 	defer ts.Close()
-	encodedString, spec, req, sessionKey := testPrepareHMACAuthSessionPass(t, sha1.New, &eventWG, false, false)
+
+	encodedString, spec, req, sessionKey := testPrepareHMACAuthSessionPass(t, ts, sha1.New, &eventWG, false, false)
 
 	recorder := httptest.NewRecorder()
 	req.Header.Set("Authorization", fmt.Sprintf("Signature keyId=\"%s\",algorithm=\"hmac-sha1\",signature=\"%s\"", sessionKey, encodedString))
@@ -266,12 +266,15 @@ func TestHMACAuthSessionPass(t *testing.T) {
 }
 
 func TestHMACAuthSessionSHA512Pass(t *testing.T) {
+
 	// Should not receive an AuthFailure event
 	var eventWG sync.WaitGroup
 	eventWG.Add(1)
+
 	ts := StartTest(nil)
 	defer ts.Close()
-	encodedString, spec, req, sessionKey := testPrepareHMACAuthSessionPass(t, sha512.New, &eventWG, false, false)
+
+	encodedString, spec, req, sessionKey := testPrepareHMACAuthSessionPass(t, ts, sha512.New, &eventWG, false, false)
 
 	recorder := httptest.NewRecorder()
 	req.Header.Set("Authorization", fmt.Sprintf("Signature keyId=\"%s\",algorithm=\"hmac-sha512\",signature=\"%s\"", sessionKey, encodedString))
@@ -295,9 +298,11 @@ func BenchmarkHMACAuthSessionPass(b *testing.B) {
 
 	var eventWG sync.WaitGroup
 	eventWG.Add(b.N)
+
 	ts := StartTest(nil)
 	defer ts.Close()
-	encodedString, spec, req, sessionKey := testPrepareHMACAuthSessionPass(b, sha1.New, &eventWG, false, true)
+
+	encodedString, spec, req, sessionKey := testPrepareHMACAuthSessionPass(b, ts, sha1.New, &eventWG, false, true)
 
 	recorder := httptest.NewRecorder()
 	req.Header.Set("Authorization", fmt.Sprintf("Signature keyId=\"%s\",algorithm=\"hmac-sha1\",signature=\"%s\"", sessionKey, encodedString))
@@ -546,12 +551,15 @@ func TestHMACAuthSessionMalformedHeader(t *testing.T) {
 }
 
 func TestHMACAuthSessionPassWithHeaderField(t *testing.T) {
+
 	// Should not receive an AuthFailure event
 	var eventWG sync.WaitGroup
 	eventWG.Add(1)
+
 	ts := StartTest(nil)
 	defer ts.Close()
-	encodedString, spec, req, sessionKey := testPrepareHMACAuthSessionPass(t, sha1.New, &eventWG, true, false)
+
+	encodedString, spec, req, sessionKey := testPrepareHMACAuthSessionPass(t, ts, sha1.New, &eventWG, true, false)
 
 	recorder := httptest.NewRecorder()
 	req.Header.Set("Authorization", fmt.Sprintf("Signature keyId=\"%s\",algorithm=\"hmac-sha1\",headers=\"(request-target) date x-test-1 x-test-2\",signature=\"%s\"", sessionKey, encodedString))
@@ -571,12 +579,14 @@ func TestHMACAuthSessionPassWithHeaderField(t *testing.T) {
 
 func BenchmarkHMACAuthSessionPassWithHeaderField(b *testing.B) {
 	b.ReportAllocs()
-	ts := StartTest(nil)
-	defer ts.Close()
 
 	var eventWG sync.WaitGroup
 	eventWG.Add(b.N)
-	encodedString, spec, req, sessionKey := testPrepareHMACAuthSessionPass(b, sha1.New, &eventWG, true, true)
+
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	encodedString, spec, req, sessionKey := testPrepareHMACAuthSessionPass(b, ts, sha1.New, &eventWG, true, true)
 
 	recorder := httptest.NewRecorder()
 	req.Header.Set("Authorization", fmt.Sprintf("Signature keyId=\"%s\",algorithm=\"hmac-sha1\",headers=\"(request-target) date x-test-1 x-test-2\",signature=\"%s\"", sessionKey, encodedString))
@@ -769,17 +779,9 @@ func TestRSAAuthSessionKeyMissing(t *testing.T) {
 	pubID, _ := ts.Gw.CertificateManager.Add(pubPem, "")
 	defer ts.Gw.CertificateManager.Delete(pubID, "")
 
-	spec := ts.Gw.LoadSampleAPI(hmacAuthDef)
-
-	// Should receive an AuthFailure event
+	// Should receive an AuthFailure events
 	var eventWG sync.WaitGroup
 	eventWG.Add(1)
-	cb := func(em config.EventMessage) {
-		eventWG.Done()
-	}
-	spec.EventPaths = map[apidef.TykEvent][]config.TykEventHandler{
-		"AuthFailure": {&testAuthFailEventHandler{cb}},
-	}
 
 	recorder := httptest.NewRecorder()
 	encodedString, spec, req, _ := testPrepareRSAAuthSessionPass(t, &eventWG, privateKey, pubID, false, false, ts)

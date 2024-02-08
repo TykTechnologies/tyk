@@ -5,13 +5,13 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
-	"net/http/httputil"
 	"strings"
 
 	"github.com/gorilla/mux"
 	"github.com/sirupsen/logrus"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/internal/httputil"
 )
 
 type traceHttpRequest struct {
@@ -55,33 +55,36 @@ type traceResponse struct {
 // Used to test API definition by sending sample request,
 // and analysisng output of both response and logs
 //
-//---
+// ---
 // requestBody:
-//   content:
-//     application/json:
-//       schema:
-//         "$ref": "#/definitions/traceRequest"
-//       examples:
-//         request:
-//           method: GET
-//           path: /get
-//           headers:
-//              Authorization: key
-//         spec:
-//           api_name: "Test"
+//
+//	content:
+//	  application/json:
+//	    schema:
+//	      "$ref": "#/definitions/traceRequest"
+//	    examples:
+//	      request:
+//	        method: GET
+//	        path: /get
+//	        headers:
+//	           Authorization: key
+//	      spec:
+//	        api_name: "Test"
+//
 // responses:
-//   200:
-//     description: Success tracing request
-//     schema:
-//       "$ref": "#/definitions/traceResponse"
-//     examples:
-//       message: "ok"
-//       response:
-//         code: 200
-//         headers:
-//           Header: value
-//         body: body-value
-//       logs: {...}\n{...}
+//
+//	200:
+//	  description: Success tracing request
+//	  schema:
+//	    "$ref": "#/definitions/traceResponse"
+//	  examples:
+//	    message: "ok"
+//	    response:
+//	      code: 200
+//	      headers:
+//	        Header: value
+//	      body: body-value
+//	    logs: {...}\n{...}
 func (gw *Gateway) traceHandler(w http.ResponseWriter, r *http.Request) {
 	var traceReq traceRequest
 	if err := json.NewDecoder(r.Body).Decode(&traceReq); err != nil {
@@ -112,10 +115,13 @@ func (gw *Gateway) traceHandler(w http.ResponseWriter, r *http.Request) {
 	gs := gw.prepareStorage()
 	subrouter := mux.NewRouter()
 
-	loader := &APIDefinitionLoader{gw}
-	spec := loader.MakeSpec(traceReq.Spec, logrus.NewEntry(logger))
+	loader := &APIDefinitionLoader{Gw: gw}
+	spec := loader.MakeSpec(&nestedApiDefinition{APIDefinition: traceReq.Spec}, logrus.NewEntry(logger))
 
-	chainObj := gw.processSpec(spec, nil, &gs, subrouter, logrus.NewEntry(logger))
+	chainObj := gw.processSpec(spec, nil, &gs, logrus.NewEntry(logger))
+
+	gw.generateSubRoutes(spec, subrouter, logrus.NewEntry(logger))
+
 	spec.middlewareChain = chainObj
 
 	if chainObj.ThisHandler == nil {

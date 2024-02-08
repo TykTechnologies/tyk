@@ -1,8 +1,7 @@
 package gateway
 
 import (
-	"crypto"
-	"crypto/rand"
+	cryptoRand "crypto/rand"
 	"crypto/rsa"
 	"crypto/sha256"
 	"encoding/base64"
@@ -13,10 +12,12 @@ import (
 	"time"
 
 	"github.com/TykTechnologies/tyk/certs"
+
+	"github.com/TykTechnologies/tyk/internal/crypto"
 )
 
 type RequestSigning struct {
-	BaseMiddleware
+	*BaseMiddleware
 }
 
 func (s *RequestSigning) Name() string {
@@ -83,9 +84,6 @@ func (s *RequestSigning) getRequestPath(r *http.Request) string {
 	} else {
 		if s.Spec.Proxy.StripListenPath {
 			path = s.Spec.StripListenPath(r, path)
-			if !strings.HasPrefix(path, "/") {
-				path = "/" + path
-			}
 		}
 	}
 
@@ -197,7 +195,7 @@ func generateRSAEncodedSignature(signatureString string, privateKey *rsa.Private
 	hashFunction.Write([]byte(signatureString))
 	hashed := hashFunction.Sum(nil)
 
-	rawsignature, err := rsa.SignPKCS1v15(rand.Reader, privateKey, hashType, hashed)
+	rawsignature, err := rsa.SignPKCS1v15(cryptoRand.Reader, privateKey, hashType, hashed)
 	if err != nil {
 		return "", err
 	}

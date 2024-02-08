@@ -29,17 +29,19 @@ type TestCase struct {
 	Headers         map[string]string `json:",omitempty"`
 	PathParams      map[string]string `json:",omitempty"`
 	FormParams      map[string]string `json:",omitempty"`
+	QueryParams     map[string]string `json:",omitempty"`
 	Cookies         []*http.Cookie    `json:",omitempty"`
 	Delay           time.Duration     `json:",omitempty"`
 	BodyMatch       string            `json:",omitempty"` // regex
-	BodyMatchFunc   func([]byte) bool `json:",omitempty"`
 	BodyNotMatch    string            `json:",omitempty"`
 	HeadersMatch    map[string]string `json:",omitempty"`
 	HeadersNotMatch map[string]string `json:",omitempty"`
 	JSONMatch       map[string]string `json:",omitempty"`
 	ErrorMatch      string            `json:",omitempty"`
-	BeforeFn        func()            `json:"-"`
-	Client          *http.Client      `json:"-"`
+
+	BodyMatchFunc func([]byte) bool `json:"-"`
+	BeforeFn      func()            `json:"-"`
+	Client        *http.Client      `json:"-"`
 
 	AdminAuth      bool `json:",omitempty"`
 	ControlRequest bool `json:",omitempty"`
@@ -160,6 +162,8 @@ func NewRequest(tc *TestCase) (req *http.Request, err error) {
 		req.Header.Add(k, v)
 	}
 
+	req.Header.Add("Content-Type", "application/json")
+
 	for _, c := range tc.Cookies {
 		req.AddCookie(c)
 	}
@@ -170,6 +174,14 @@ func NewRequest(tc *TestCase) (req *http.Request, err error) {
 	}
 	req.PostForm = formParams
 	req.Form = formParams
+
+	if tc.QueryParams != nil {
+		queryParams := req.URL.Query()
+		for k, v := range tc.QueryParams {
+			queryParams.Add(k, v)
+		}
+		req.URL.RawQuery = queryParams.Encode()
+	}
 
 	return req, nil
 }
@@ -264,7 +276,9 @@ func (r HTTPTestRunner) Run(t testing.TB, testCases ...TestCase) (*http.Response
 	}
 
 	for ti, tc := range testCases {
-		req, err := r.RequestBuilder(&tc)
+		var tc *TestCase = &tc
+
+		req, err := r.RequestBuilder(tc)
 		if err != nil {
 			t.Errorf("[%d] Request build error: %s", ti, err.Error())
 			continue
@@ -273,7 +287,7 @@ func (r HTTPTestRunner) Run(t testing.TB, testCases ...TestCase) (*http.Response
 		retryCount := 0
 	retry:
 
-		lastResponse, lastError = r.Do(req, &tc)
+		lastResponse, lastError = r.Do(req, tc)
 		tcJSON, _ := json.Marshal(tc)
 
 		if lastError != nil {
@@ -296,13 +310,11 @@ func (r HTTPTestRunner) Run(t testing.TB, testCases ...TestCase) (*http.Response
 		}
 
 		respCopy := copyResponse(lastResponse)
-		if lastError = r.Assert(respCopy, &tc); lastError != nil {
+		if lastError = r.Assert(respCopy, tc); lastError != nil {
 			t.Errorf("[%d] %s. %s\n", ti, lastError.Error(), string(tcJSON))
 		}
 
-		delay := tc.Delay
-
-		if delay > 0 {
+		if delay := tc.Delay; delay > 0 {
 			time.Sleep(delay)
 		}
 	}

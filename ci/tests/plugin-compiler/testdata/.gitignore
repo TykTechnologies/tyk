@@ -1,0 +1,6 @@
+# Ignore built assets
+*.so
+
+# Ignore test scratch folder
+/complex-plugin-test
+/basic-plugin-test

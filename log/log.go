@@ -5,7 +5,8 @@ import (
 	"strings"
 
 	"github.com/sirupsen/logrus"
-	prefixed "github.com/x-cray/logrus-prefixed-formatter"
+
+	"github.com/TykTechnologies/tyk/internal/maps"
 )
 
 var (
@@ -20,15 +21,16 @@ var (
 // example:   `{"foo": {"bar": "baz"}}`
 // flattened: `foo.bar: baz`
 func LoadTranslations(thing map[string]interface{}) {
-	formatter := new(prefixed.TextFormatter)
+	formatter := new(logrus.TextFormatter)
 	formatter.TimestampFormat = `Jan 02 15:04:05`
 	formatter.FullTimestamp = true
+	formatter.DisableColors = true
 	log.Formatter = &TranslationFormatter{formatter}
-	translations, _ = Flatten(thing)
+	translations, _ = maps.Flatten(thing)
 }
 
 type TranslationFormatter struct {
-	*prefixed.TextFormatter
+	*logrus.TextFormatter
 }
 
 func (t *TranslationFormatter) Format(entry *logrus.Entry) ([]byte, error) {
@@ -46,16 +48,15 @@ func (f *RawFormatter) Format(entry *logrus.Entry) ([]byte, error) {
 	return []byte(entry.Message), nil
 }
 
+//nolint:gochecknoinits
 func init() {
-	formatter := new(prefixed.TextFormatter)
+	formatter := new(logrus.TextFormatter)
 	formatter.TimestampFormat = `Jan 02 15:04:05`
 	formatter.FullTimestamp = true
+	formatter.DisableColors = true
 
 	log.Formatter = formatter
-	rawLog.Formatter = new(RawFormatter)
-}
 
-func Get() *logrus.Logger {
 	switch strings.ToLower(os.Getenv("TYK_LOGLEVEL")) {
 	case "error":
 		log.Level = logrus.ErrorLevel
@@ -66,6 +67,11 @@ func Get() *logrus.Logger {
 	default:
 		log.Level = logrus.InfoLevel
 	}
+
+	rawLog.Formatter = new(RawFormatter)
+}
+
+func Get() *logrus.Logger {
 	return log
 }
 

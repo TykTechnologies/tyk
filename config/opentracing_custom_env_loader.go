@@ -99,7 +99,7 @@ func loadZipkin(prefix string, c *Config) error {
 
 // loads jaeger configuration from environment variables.
 //
-// List of jaeger configuration env vars
+// # List of jaeger configuration env vars
 //
 // TYK_GW_TRACER_OPTIONS_SERVICENAME
 // TYK_GW_TRACER_OPTIONS_DISABLED

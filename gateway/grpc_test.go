@@ -24,12 +24,13 @@ import (
 
 	"golang.org/x/net/http2/h2c"
 
-	"github.com/TykTechnologies/tyk/test"
-	"github.com/TykTechnologies/tyk/user"
 	"golang.org/x/net/http2"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
-	pb "google.golang.org/grpc/examples/helloworld/helloworld"
+	pbExample "google.golang.org/grpc/examples/helloworld/helloworld"
+
+	"github.com/TykTechnologies/tyk/test"
+	"github.com/TykTechnologies/tyk/user"
 )
 
 // For gRPC, we should be sure that HTTP/2 works with Tyk in H2C configuration also for insecure grpc over http.
@@ -143,7 +144,7 @@ func TestHTTP2_TLS(t *testing.T) {
 	expected := "HTTP/2.0"
 
 	// Certificates
-	_, _, _, clientCert := certs.GenCertificate(&x509.Certificate{})
+	_, _, _, clientCert := certs.GenCertificate(&x509.Certificate{}, false)
 	serverCertPem, _, combinedPEM, _ := certs.GenServerCertificate()
 	certID, _, _ := certs.GetCertIDAndChainPEM(combinedPEM, "")
 
@@ -196,7 +197,7 @@ func TestHTTP2_TLS(t *testing.T) {
 func TestTLSTyk_H2cUpstream(t *testing.T) {
 
 	// Certificates
-	_, _, _, clientCert := certs.GenCertificate(&x509.Certificate{})
+	_, _, _, clientCert := certs.GenCertificate(&x509.Certificate{}, false)
 	serverCertPem, _, combinedPEM, _ := certs.GenServerCertificate()
 	certID, _, _ := certs.GetCertIDAndChainPEM(combinedPEM, "")
 
@@ -301,7 +302,7 @@ func TestGRPC_MutualTLS(t *testing.T) {
 	// Mutual Authentication for both downstream-tyk and tyk-upstream
 
 	//generate certificates
-	_, _, combinedClientPEM, clientCert := certs.GenCertificate(&x509.Certificate{})
+	_, _, combinedClientPEM, clientCert := certs.GenCertificate(&x509.Certificate{}, false)
 	clientCert.Leaf, _ = x509.ParseCertificate(clientCert.Certificate[0])
 	serverCertPem, _, combinedPEM, _ := certs.GenServerCertificate()
 	// we can know the certId before add it to cert manager
@@ -481,12 +482,14 @@ func TestGRPC_TokenBasedAuthentication(t *testing.T) {
 }
 
 // server is used to implement helloworld.GreeterServer.
-type server struct{}
+type server struct {
+	pbExample.UnimplementedGreeterServer
+}
 
 // SayHello implements helloworld.GreeterServer
-func (s *server) SayHello(ctx context.Context, in *pb.HelloRequest) (*pb.HelloReply, error) {
+func (s *server) SayHello(ctx context.Context, in *pbExample.HelloRequest) (*pbExample.HelloReply, error) {
 	log.Printf("Received: %v", in.Name)
-	return &pb.HelloReply{Message: "Hello " + in.Name}, nil
+	return &pbExample.HelloReply{Message: "Hello " + in.Name}, nil
 }
 
 func startGRPCServerH2C(t *testing.T, fn func(*testing.T, *grpc.Server)) (net.Listener, *grpc.Server) {
@@ -522,7 +525,7 @@ func openListener(t *testing.T) net.Listener {
 }
 
 func grpcServerCreds(t *testing.T, clientCert *x509.Certificate) []grpc.ServerOption {
-	cert, key, _, _ := certs.GenCertificate(&x509.Certificate{})
+	cert, key, _, _ := certs.GenCertificate(&x509.Certificate{}, false)
 	certificate, _ := tls.X509KeyPair(cert, key)
 
 	pool := x509.NewCertPool()
@@ -550,7 +553,7 @@ func grpcServerCreds(t *testing.T, clientCert *x509.Certificate) []grpc.ServerOp
 }
 
 func setupHelloSVC(t *testing.T, s *grpc.Server) {
-	pb.RegisterGreeterServer(s, &server{})
+	pbExample.RegisterGreeterServer(s, &server{})
 }
 
 func startGRPCServer(t *testing.T, clientCert *x509.Certificate, fn func(t *testing.T, s *grpc.Server)) (net.Listener, *grpc.Server) {
@@ -569,18 +572,18 @@ func startGRPCServer(t *testing.T, clientCert *x509.Certificate, fn func(t *test
 
 }
 
-func sayHelloWithGRPCClientH2C(t *testing.T, address string, name string) *pb.HelloReply {
+func sayHelloWithGRPCClientH2C(t *testing.T, address string, name string) *pbExample.HelloReply {
 	conn, err := grpc.Dial(address, grpc.WithInsecure())
 	if err != nil {
 		t.Fatalf("did not connect: %v", err)
 	}
 	defer conn.Close()
-	c := pb.NewGreeterClient(conn)
+	c := pbExample.NewGreeterClient(conn)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	var header metadata.MD
-	r, err := c.SayHello(ctx, &pb.HelloRequest{Name: name}, grpc.Header(&header))
+	r, err := c.SayHello(ctx, &pbExample.HelloRequest{Name: name}, grpc.Header(&header))
 	if err != nil {
 		t.Fatalf("could not greet: %v", err)
 	}
@@ -621,7 +624,7 @@ func grpcCreds(cert *tls.Certificate, caCert []byte, basicAuth bool, token strin
 	return opts
 }
 
-func sayHelloWithGRPCClient(t *testing.T, cert *tls.Certificate, caCert []byte, basicAuth bool, token string, address string, name string) *pb.HelloReply {
+func sayHelloWithGRPCClient(t *testing.T, cert *tls.Certificate, caCert []byte, basicAuth bool, token string, address string, name string) *pbExample.HelloReply {
 	// gRPC client
 	opts := grpcCreds(cert, caCert, basicAuth, token)
 	conn, err := grpc.Dial(address, opts...)
@@ -629,11 +632,11 @@ func sayHelloWithGRPCClient(t *testing.T, cert *tls.Certificate, caCert []byte, 
 		t.Fatalf("did not connect: %v", err)
 	}
 	defer conn.Close()
-	c := pb.NewGreeterClient(conn)
+	c := pbExample.NewGreeterClient(conn)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	r, err := c.SayHello(ctx, &pb.HelloRequest{Name: name})
+	r, err := c.SayHello(ctx, &pbExample.HelloRequest{Name: name})
 	if err != nil {
 		t.Fatalf("could not greet: %v", err)
 	}
@@ -684,7 +687,7 @@ func TestGRPC_Stream_MutualTLS(t *testing.T) {
 	ts := StartTest(conf)
 	defer ts.Close()
 
-	_, _, combinedClientPEM, clientCert := certs.GenCertificate(&x509.Certificate{})
+	_, _, combinedClientPEM, clientCert := certs.GenCertificate(&x509.Certificate{}, false)
 	certID, _ := ts.Gw.CertificateManager.Add(combinedPEM, "") // For tyk to know downstream
 	defer ts.Gw.CertificateManager.Delete(certID, "")
 	clientCert.Leaf, _ = x509.ParseCertificate(clientCert.Certificate[0])

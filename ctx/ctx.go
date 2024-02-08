@@ -2,10 +2,15 @@ package ctx
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 
-	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/apidef/oas"
 
+	"github.com/TykTechnologies/tyk/config"
+
+	"github.com/TykTechnologies/tyk/apidef"
+	logger "github.com/TykTechnologies/tyk/log"
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/user"
 )
@@ -18,6 +23,7 @@ const (
 	AuthToken
 	HashedAuthToken
 	VersionData
+	VersionName
 	VersionDefault
 	OrgSessionContext
 	ContextData
@@ -39,6 +45,11 @@ const (
 	RequestStatus
 	GraphQLRequest
 	GraphQLIsWebSocketUpgrade
+	OASOperation
+
+	// CacheOptions holds cache options required for cache writer middleware.
+	CacheOptions
+	OASDefinition
 )
 
 func setContext(r *http.Request, ctx context.Context) {
@@ -80,13 +91,27 @@ func GetAuthToken(r *http.Request) string {
 
 func GetSession(r *http.Request) *user.SessionState {
 	if v := r.Context().Value(SessionData); v != nil {
-		return v.(*user.SessionState)
+		if val, ok := v.(*user.SessionState); ok {
+			return val
+		} else {
+			logger.Get().Warning("SessionState struct differ from the gateway version, trying to unmarshal.")
+			sess := user.SessionState{}
+			b, _ := json.Marshal(v)
+			e := json.Unmarshal(b, &sess)
+			if e == nil {
+				return &sess
+			}
+		}
 	}
 	return nil
 }
 
-func SetSession(r *http.Request, s *user.SessionState, scheduleUpdate bool, hashKey bool) {
-	ctxSetSession(r, s, scheduleUpdate, hashKey)
+func SetSession(r *http.Request, s *user.SessionState, scheduleUpdate bool, hashKey ...bool) {
+	if len(hashKey) > 1 {
+		ctxSetSession(r, s, scheduleUpdate, hashKey[0])
+	} else {
+		ctxSetSession(r, s, scheduleUpdate, config.Global().HashKeys)
+	}
 }
 
 func SetDefinition(r *http.Request, s *apidef.APIDefinition) {
@@ -97,7 +122,37 @@ func SetDefinition(r *http.Request, s *apidef.APIDefinition) {
 
 func GetDefinition(r *http.Request) *apidef.APIDefinition {
 	if v := r.Context().Value(Definition); v != nil {
-		return v.(*apidef.APIDefinition)
+		if val, ok := v.(*apidef.APIDefinition); ok {
+			return val
+		} else {
+			logger.Get().Warning("APIDefinition struct differ from the gateway version, trying to unmarshal.")
+			def := apidef.APIDefinition{}
+			b, _ := json.Marshal(v)
+			e := json.Unmarshal(b, &def)
+			if e == nil {
+				return &def
+			}
+		}
 	}
 	return nil
+}
+
+// GetOASDefinition returns a deep copy of the OAS definition of the called API.
+func GetOASDefinition(r *http.Request) *oas.OAS {
+	v := r.Context().Value(OASDefinition)
+	if v == nil {
+		return nil
+	}
+
+	val, ok := v.(*oas.OAS)
+	if !ok {
+		return nil
+	}
+
+	ret, err := val.Clone()
+	if err != nil {
+		logger.Get().WithError(err).Error("Cloning OAS object in the request context")
+	}
+
+	return ret
 }

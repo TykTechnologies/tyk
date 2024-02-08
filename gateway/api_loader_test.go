@@ -1,19 +1,29 @@
 package gateway
 
 import (
+	"context"
 	"fmt"
+	"io"
+	"net"
 	"net/http"
+	"net/http/httptest"
 	"path"
 	_ "path"
+	"reflect"
 	"sync/atomic"
 	"testing"
 
+	"github.com/TykTechnologies/storage/persistent/model"
 	"github.com/TykTechnologies/tyk/apidef"
-	"github.com/TykTechnologies/tyk/user"
+	"github.com/TykTechnologies/tyk/config"
+
+	"github.com/stretchr/testify/assert"
 
 	"github.com/TykTechnologies/tyk/test"
 	"github.com/TykTechnologies/tyk/trace"
-	"github.com/stretchr/testify/assert"
+	"github.com/TykTechnologies/tyk/user"
+
+	"github.com/TykTechnologies/tyk/internal/uuid"
 )
 
 func TestOpenTracing(t *testing.T) {
@@ -79,7 +89,6 @@ func TestInternalAPIUsage(t *testing.T) {
 
 	t.Run("with api id", func(t *testing.T) {
 		normal.Proxy.TargetURL = fmt.Sprintf("tyk://%s", internal.APIID)
-
 		g.Gw.LoadAPI(internal, normal)
 
 		_, _ = g.Run(t, []test.TestCase{
@@ -92,7 +101,7 @@ func TestFuzzyFindAPI(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
-	objectId := apidef.NewObjectId()
+	objectId := model.NewObjectID()
 
 	ts.Gw.BuildAndLoadAPI(
 		func(spec *APISpec) {
@@ -190,13 +199,13 @@ func TestGraphQLPlayground(t *testing.T) {
 			_, _ = g.Run(t, []test.TestCase{
 				{Path: playgroundPath, BodyMatch: `<title>API Playground</title>`, Code: http.StatusOK},
 				{Path: playgroundPath, BodyMatchFunc: func(bytes []byte) bool {
-					return assert.Contains(t, string(bytes), fmt.Sprintf(`const apiUrl = window.location.origin + "%s";`, endpoint))
+					return assert.Contains(t, string(bytes), fmt.Sprintf(`const url = window.location.origin + "%s";`, endpoint))
 				}, Code: http.StatusOK},
 			}...)
 		})
 		t.Run("playground.js is loaded", func(t *testing.T) {
 			_, _ = g.Run(t, []test.TestCase{
-				{Path: path.Join(playgroundPath, "playground.js"), BodyMatch: "var TykGraphiqlExplorer", Code: http.StatusOK},
+				{Path: path.Join(playgroundPath, "playground.js"), BodyMatch: "TykGraphiQL", Code: http.StatusOK},
 			}...)
 		})
 		t.Run("should get error on post request to playground path", func(t *testing.T) {
@@ -266,16 +275,19 @@ func TestCORS(t *testing.T) {
 	g := StartTest(nil)
 	defer g.Close()
 
+	api1ID := uuid.New()
+	api2ID := uuid.New()
+
 	apis := g.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 		spec.Name = "CORS test API"
-		spec.APIID = "cors-api"
+		spec.APIID = api1ID
 		spec.Proxy.ListenPath = "/cors-api/"
 		spec.CORS.Enable = false
 		spec.CORS.ExposedHeaders = []string{"Custom-Header"}
 		spec.CORS.AllowedOrigins = []string{"*"}
 	}, func(spec *APISpec) {
 		spec.Name = "Another API"
-		spec.APIID = "another-api"
+		spec.APIID = api2ID
 		spec.Proxy.ListenPath = "/another-api/"
 		spec.CORS.ExposedHeaders = []string{"Custom-Header"}
 		spec.CORS.AllowedOrigins = []string{"*"}
@@ -302,16 +314,16 @@ func TestCORS(t *testing.T) {
 
 		_, _ = g.Run(t, []test.TestCase{
 			{Path: "/cors-api/", Headers: headers, HeadersMatch: headersMatch, Code: http.StatusOK},
-		}...)
-
-		_, _ = g.Run(t, []test.TestCase{
 			{Path: "/another-api/", Headers: headers, HeadersNotMatch: headersMatch, Code: http.StatusOK},
+			{Path: "/" + api1ID + "/", Headers: headers, HeadersMatch: headersMatch, Code: http.StatusOK},
+			{Path: "/" + api2ID + "/", Headers: headers, HeadersNotMatch: headersMatch, Code: http.StatusOK},
 		}...)
 	})
 
 	t.Run("oauth endpoints", func(t *testing.T) {
 		apis[0].UseOauth2 = true
 		apis[0].CORS.Enable = false
+
 		g.Gw.LoadAPI(apis...)
 
 		t.Run("CORS disabled", func(t *testing.T) {
@@ -366,4 +378,230 @@ func TestTykRateLimitsStatusOfAPI(t *testing.T) {
 		quotaMax, quotaRemaining, rate, per)
 
 	_, _ = g.Run(t, test.TestCase{Path: "/my-api/tyk/rate-limits/", Headers: authHeader, BodyMatch: bodyMatch, Code: http.StatusOK})
+}
+
+func TestAllApisAreMTLS(t *testing.T) {
+	// Create a new instance of the Gateway
+	gw := &Gateway{
+		apisByID: make(map[string]*APISpec),
+	}
+
+	// Define API specs
+	spec1 := &APISpec{
+		APIDefinition: &apidef.APIDefinition{
+			UseMutualTLSAuth: true,
+			Active:           true,
+			APIID:            "api1",
+		},
+	}
+	spec2 := &APISpec{
+		APIDefinition: &apidef.APIDefinition{
+			UseMutualTLSAuth: true,
+			Active:           true,
+			APIID:            "api2",
+		},
+	}
+	spec3 := &APISpec{
+		APIDefinition: &apidef.APIDefinition{
+			UseMutualTLSAuth: true,
+			Active:           true,
+			APIID:            "api3",
+		},
+	}
+
+	// Add API specs to the gateway
+	gw.apisByID[spec1.APIID] = spec1
+	gw.apisByID[spec2.APIID] = spec2
+	gw.apisByID[spec3.APIID] = spec3
+
+	result := gw.allApisAreMTLS()
+
+	expected := true
+	if result != expected {
+		t.Errorf("Expected AllApisAreMTLS to return %v, but got %v", expected, result)
+	}
+
+	// Change one API to not use mutual TLS authentication
+	spec3.UseMutualTLSAuth = false
+
+	// Call the method again
+	result = gw.allApisAreMTLS()
+
+	expected = false
+	if result != expected {
+		t.Errorf("Expected AllApisAreMTLS to return %v, but got %v", expected, result)
+	}
+}
+
+func TestOpenTelemetry(t *testing.T) {
+	t.Run("Opentelemetry enabled - check if we are sending traces", func(t *testing.T) {
+		otelCollectorMock := httpCollectorMock(t, func(w http.ResponseWriter, r *http.Request) {
+			//check the body
+			body, err := io.ReadAll(r.Body)
+			assert.Nil(t, err)
+
+			assert.NotEmpty(t, body)
+
+			// check the user agent
+			agent, ok := r.Header["User-Agent"]
+			assert.True(t, ok)
+			assert.Len(t, agent, 1)
+			assert.Contains(t, agent[0], "OTLP")
+
+			//check if we are sending the traces to the right endpoint
+			assert.Contains(t, r.URL.Path, "/v1/traces")
+
+			// Here you can check the request and return a response
+			w.WriteHeader(http.StatusOK)
+		}, ":0")
+
+		// Start the server.
+		otelCollectorMock.Start()
+		// Stop the server on return from the function.
+		defer otelCollectorMock.Close()
+
+		ts := StartTest(func(globalConf *config.Config) {
+			globalConf.OpenTelemetry.Enabled = true
+			globalConf.OpenTelemetry.Exporter = "http"
+			globalConf.OpenTelemetry.Endpoint = otelCollectorMock.URL
+			globalConf.OpenTelemetry.SpanProcessorType = "simple"
+		})
+		defer ts.Close()
+		detailedTracing := []bool{true, false}
+		for _, detailed := range detailedTracing {
+			ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+				spec.APIID = "test"
+				spec.Proxy.ListenPath = "/my-api/"
+				spec.UseKeylessAccess = true
+				spec.DetailedTracing = detailed
+			})
+
+			response, _ := ts.Run(t, test.TestCase{Path: "/my-api/", Code: http.StatusOK})
+			assert.NotEmpty(t, response.Header.Get("X-Tyk-Trace-Id"))
+			assert.Equal(t, "otel", ts.Gw.TracerProvider.Type())
+		}
+
+	})
+
+	t.Run("Opentelemetry disabled - check if we are not sending traces", func(t *testing.T) {
+
+		otelCollectorMock := httpCollectorMock(t, func(w http.ResponseWriter, r *http.Request) {
+			t.Fail()
+		}, ":0")
+
+		// Start the server.
+		otelCollectorMock.Start()
+		// Stop the server on return from the function.
+		defer otelCollectorMock.Close()
+
+		ts := StartTest(func(globalConf *config.Config) {
+			globalConf.OpenTelemetry.Enabled = false
+			globalConf.OpenTelemetry.Exporter = "http"
+			globalConf.OpenTelemetry.Endpoint = otelCollectorMock.URL
+			globalConf.OpenTelemetry.SpanProcessorType = "simple"
+		})
+		defer ts.Close()
+
+		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+			spec.APIID = "test"
+			spec.Proxy.ListenPath = "/my-api/"
+			spec.UseKeylessAccess = true
+		})
+
+		response, _ := ts.Run(t, test.TestCase{Path: "/my-api/", Code: http.StatusOK})
+		assert.Empty(t, response.Header.Get("X-Tyk-Trace-Id"))
+		assert.Equal(t, "noop", ts.Gw.TracerProvider.Type())
+	})
+}
+
+func httpCollectorMock(t *testing.T, fn http.HandlerFunc, address string) *httptest.Server {
+	t.Helper()
+
+	l, err := net.Listen("tcp", address)
+	if err != nil {
+		t.Fatalf("error setting up collector mock: %s", err.Error())
+	}
+
+	otelCollectorMock := httptest.NewUnstartedServer(fn)
+	// NewUnstartedServer creates a listener. Close that listener and replace
+	// with the one we created.
+	otelCollectorMock.Listener.Close()
+	otelCollectorMock.Listener = l
+
+	return otelCollectorMock
+}
+
+func TestConfigureAuthAndOrgStores(t *testing.T) {
+
+	testCases := []struct {
+		name                 string
+		storageEngine        apidef.StorageEngineCode
+		expectedAuthStore    string
+		expectedOrgStore     string
+		expectedSessionStore string
+		configureGateway     func(gw *Gateway)
+	}{
+		{
+			name:                 "LDAP Storage Engine",
+			storageEngine:        LDAPStorageEngine,
+			expectedAuthStore:    "*gateway.LDAPStorageHandler",
+			expectedOrgStore:     "*storage.RedisCluster",
+			expectedSessionStore: "*storage.RedisCluster",
+			configureGateway: func(gw *Gateway) {
+			},
+		}, {
+			name:                 "RPC Storage engine",
+			storageEngine:        RPCStorageEngine,
+			expectedAuthStore:    "*gateway.RPCStorageHandler",
+			expectedOrgStore:     "*storage.MdcbStorage",
+			expectedSessionStore: "*gateway.RPCStorageHandler",
+			configureGateway: func(gw *Gateway) {
+				conf := gw.GetConfig()
+				conf.SlaveOptions.UseRPC = true
+				gw.SetConfig(conf, true)
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			gw := NewGateway(config.Config{}, context.Background())
+			tc.configureGateway(gw)
+			gs := gw.prepareStorage()
+
+			spec := BuildAPI(func(spec *APISpec) {
+				spec.AuthProvider.StorageEngine = tc.storageEngine
+
+				if tc.storageEngine == RPCStorageEngine {
+					spec.SessionProvider.StorageEngine = RPCStorageEngine
+				}
+
+				if tc.storageEngine == LDAPStorageEngine {
+					// populate ldap meta
+					meta := map[string]interface{}{
+						"ldap_server":            "dummy-ldap-server",
+						"ldap_port":              389.0,
+						"base_dn":                "base-dn",
+						"attributes":             []interface{}{"attr1", "attr2", "attr3"},
+						"session_attribute_name": "attr-name",
+						"search_string":          "the-search",
+					}
+					spec.AuthProvider.Meta = meta
+				}
+			})
+
+			// Call configureAuthAndOrgStores
+			authStore, orgStore, sessionStore := gw.configureAuthAndOrgStores(&gs, spec[0])
+
+			if reflect.TypeOf(authStore).String() != tc.expectedAuthStore {
+				t.Errorf("Expected authStore type %s, got %s", tc.expectedAuthStore, reflect.TypeOf(authStore).String())
+			}
+			if reflect.TypeOf(orgStore).String() != tc.expectedOrgStore {
+				t.Errorf("Expected orgStore type %s, got %s", tc.expectedOrgStore, reflect.TypeOf(orgStore).String())
+			}
+			if reflect.TypeOf(sessionStore).String() != tc.expectedSessionStore {
+				t.Errorf("Expected sessionStore type %s, got %s", tc.expectedSessionStore, reflect.TypeOf(sessionStore).String())
+			}
+		})
+	}
 }

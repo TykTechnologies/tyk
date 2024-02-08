@@ -16,7 +16,6 @@ import (
 )
 
 var (
-	muDefaultResolver  sync.RWMutex
 	DomainsToAddresses = map[string][]string{
 		"host1.": {"127.0.0.1"},
 		"host2.": {"127.0.0.1"},
@@ -111,6 +110,8 @@ type DnsMockHandle struct {
 	ShutdownDnsMock func() error
 }
 
+var once sync.Once
+
 func (h *DnsMockHandle) PushDomains(domainsMap map[string][]string, domainsErrorMap map[string]int) func() {
 	handler := h.mockServer.Handler.(*dnsMockHandler)
 	handler.muDomainsToAddresses.Lock()
@@ -197,31 +198,24 @@ func InitDNSMock(domainsMap map[string][]string, domainsErrorMap map[string]int)
 		return handle, err
 	}
 
-	muDefaultResolver.RLock()
-	defaultResolver := net.DefaultResolver
-	muDefaultResolver.RUnlock()
 	mockResolver := &net.Resolver{
 		PreferGo: true,
 		Dial: func(ctx context.Context, network, address string) (net.Conn, error) {
 			d := net.Dialer{}
-
-			//Use write lock to prevent unsafe d.DialContext update of net.DefaultResolver
-			muDefaultResolver.Lock()
-			defer muDefaultResolver.Unlock()
 			return d.DialContext(ctx, network, mockServer.PacketConn.LocalAddr().String())
 		},
 	}
 
-	muDefaultResolver.Lock()
-	net.DefaultResolver = mockResolver
-	muDefaultResolver.Unlock()
+	// TODO: this is destructive, TT-5112
+	once.Do(func() {
+		net.DefaultResolver = mockResolver
+	})
 
 	handle.ShutdownDnsMock = func() error {
-		muDefaultResolver.Lock()
-		net.DefaultResolver = defaultResolver
-		muDefaultResolver.Unlock()
-
-		return mockServer.Shutdown()
+		// We run tests against O(1) packages, we can
+		// afford a dirty shutdown, if it means less
+		// flaky tests.
+		return nil // mockServer.Shutdown()
 	}
 
 	return handle, nil

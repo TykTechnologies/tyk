@@ -26,7 +26,6 @@ const (
 )
 
 func Run(c *config.Config) {
-	legacyRateLimiters(c)
 	allowInsecureConfigs(c)
 	healthCheck(c)
 	sessionLifetimeCheck(c)
@@ -35,16 +34,6 @@ func Run(c *config.Config) {
 	cpus()
 	defaultSecrets(c)
 	defaultAnalytics(c)
-}
-
-func legacyRateLimiters(c *config.Config) {
-	if c.ManagementNode {
-		return
-	}
-
-	if c.EnableSentinelRateLimiter || c.EnableRedisRollingLimiter {
-		log.Warning("SentinelRateLimiter & RedisRollingLimiter are deprecated")
-	}
 }
 
 func allowInsecureConfigs(c *config.Config) {

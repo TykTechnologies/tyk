@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/TykTechnologies/tyk/headers"
+	"github.com/TykTechnologies/tyk/header"
 	"github.com/TykTechnologies/tyk/test"
 	"github.com/TykTechnologies/tyk/user"
 )
@@ -54,7 +54,7 @@ func TestGranularAccessMiddleware_ProcessRequest(t *testing.T) {
 
 	t.Run("Direct key", func(t *testing.T) {
 		authHeaderWithDirectKey := map[string]string{
-			headers.Authorization: directKey,
+			header.Authorization: directKey,
 		}
 
 		t.Run("should return 200 OK on allowed path with allowed method", func(t *testing.T) {
@@ -94,7 +94,7 @@ func TestGranularAccessMiddleware_ProcessRequest(t *testing.T) {
 
 	t.Run("Policy applied key", func(t *testing.T) {
 		authHeaderWithPolicyAppliedKey := map[string]string{
-			headers.Authorization: policyAppliedKey,
+			header.Authorization: policyAppliedKey,
 		}
 
 		t.Run("should return 200 OK on allowed path with allowed method", func(t *testing.T) {

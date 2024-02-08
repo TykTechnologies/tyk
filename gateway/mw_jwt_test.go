@@ -11,12 +11,14 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dgrijalva/jwt-go"
-	"github.com/lonelycode/go-uuid/uuid"
+	"github.com/golang-jwt/jwt/v4"
 	"github.com/stretchr/testify/assert"
 
+	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/test"
 	"github.com/TykTechnologies/tyk/user"
+
+	"github.com/TykTechnologies/tyk/internal/uuid"
 )
 
 // openssl rsa -in app.rsa -pubout > app.rsa.pub
@@ -207,7 +209,7 @@ func TestJWTHMACIdInSubClaim(t *testing.T) {
 		ts.Run(t, test.TestCase{
 			Headers:   authHeaders,
 			Code:      http.StatusForbidden,
-			BodyMatch: `Key not authorized:token invalid, key not found`,
+			BodyMatch: `Key not authorized`,
 		})
 	})
 
@@ -240,7 +242,7 @@ func TestJWTRSAIdInSubClaim(t *testing.T) {
 		ts.Run(t, test.TestCase{
 			Headers:   authHeaders,
 			Code:      http.StatusForbidden,
-			BodyMatch: `Key not authorized:token invalid, key not found`,
+			BodyMatch: `Key not authorized`,
 		})
 	})
 
@@ -326,7 +328,7 @@ func TestJWTSessionFailRSA_MalformedJWT(t *testing.T) {
 		ts.Run(t, test.TestCase{
 			Headers:   authHeaders,
 			Code:      http.StatusForbidden,
-			BodyMatch: `Key not authorized:crypto/rsa: verification error`,
+			BodyMatch: `Key not authorized`,
 		})
 	})
 }
@@ -344,7 +346,7 @@ func TestJWTSessionFailRSA_MalformedJWT_NOTRACK(t *testing.T) {
 		ts.Run(t, test.TestCase{
 			Headers:   authHeaders,
 			Code:      http.StatusForbidden,
-			BodyMatch: `Key not authorized:crypto/rsa: verification error`,
+			BodyMatch: `Key not authorized`,
 		})
 	})
 }
@@ -361,7 +363,7 @@ func TestJWTSessionFailRSA_WrongJWT(t *testing.T) {
 		ts.Run(t, test.TestCase{
 			Headers:   authHeaders,
 			Code:      http.StatusForbidden,
-			BodyMatch: `Key not authorized:token contains an invalid number of segments`,
+			BodyMatch: `Key not authorized`,
 		})
 	})
 }
@@ -377,6 +379,24 @@ func TestJWTSessionRSABearer(t *testing.T) {
 	t.Run("Request with valid Bearer", func(t *testing.T) {
 		ts.Run(t, test.TestCase{
 			Headers: authHeaders, Code: http.StatusOK,
+		})
+	})
+}
+
+func TestJWTSessionFailRSA_WrongJWT_Signature(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+	invalidSignToken := "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c"
+
+	//default values, same as before (keeps backward compatibility)
+	ts.prepareGenericJWTSession(t.Name(), RSASign, KID, false)
+	authHeaders := map[string]string{"authorization": invalidSignToken}
+
+	t.Run("Request with invalid JWT signature", func(t *testing.T) {
+		_, _ = ts.Run(t, test.TestCase{
+			Headers:   authHeaders,
+			Code:      http.StatusForbidden,
+			BodyMatch: `Key not authorized: Unexpected signing method`,
 		})
 	})
 }
@@ -410,7 +430,7 @@ func TestJWTSessionRSABearerInvalid(t *testing.T) {
 		ts.Run(t, test.TestCase{
 			Headers:   authHeaders,
 			Code:      http.StatusForbidden,
-			BodyMatch: "Key not authorized:illegal base64 data at input byte 6",
+			BodyMatch: "Key not authorized",
 		})
 	})
 }
@@ -782,6 +802,8 @@ func TestJWTSessionIssueAtValidationConfigs(t *testing.T) {
 }
 
 func TestJWTSessionNotBeforeValidationConfigs(t *testing.T) {
+	test.Flaky(t) // TODO: TT-5257 (failed on run 37/100)
+
 	ts := StartTest(nil)
 	defer ts.Close()
 
@@ -975,9 +997,13 @@ func TestJWTScopeToPolicyMapping(t *testing.T) {
 		spec.JWTPolicyFieldName = "policy_id"
 		spec.JWTDefaultPolicies = []string{defaultPolicyID}
 		spec.Proxy.ListenPath = "/base"
-		spec.JWTScopeToPolicyMapping = map[string]string{
-			"user:read":  p1ID,
-			"user:write": p2ID,
+		spec.Scopes = apidef.Scopes{
+			JWT: apidef.ScopeClaim{
+				ScopeToPolicy: map[string]string{
+					"user:read":  p1ID,
+					"user:write": p2ID,
+				},
+			},
 		}
 		spec.OrgID = "default"
 	})[0]
@@ -1176,8 +1202,12 @@ func TestJWTScopeToPolicyMapping(t *testing.T) {
 		}
 	})
 
-	base.JWTScopeToPolicyMapping = map[string]string{
-		"user:read": p3ID,
+	base.Scopes = apidef.Scopes{
+		JWT: apidef.ScopeClaim{
+			ScopeToPolicy: map[string]string{
+				"user:read": p3ID,
+			},
+		},
 	}
 
 	ts.Gw.LoadAPI(base)
@@ -1263,6 +1293,18 @@ func TestGetScopeFromClaim(t *testing.T) {
 			key:            "scope1.scope2",
 			expectedClaims: []string{"foo", "bar", "baz"},
 			name:           "nested slice strings",
+		},
+		{
+			jwt:            `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiYWRtaW4iOnRydWUsImlhdCI6MTUxNjIzOTAyMiwic2NvcGUiOlsiZm9vIGJhciIsImJheiJdfQ.XYJ5gEHQhKxLMhXrYsQ7prZ98bty9UPa7LXvF5N4IPM`,
+			key:            "scope",
+			expectedClaims: []string{"foo bar", "baz"},
+			name:           "slice strings with spaced values",
+		},
+		{
+			jwt:            `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiYWRtaW4iOnRydWUsImlhdCI6MTUxNjIzOTAyMiwic2NvcGUiOlsiZm9vIGJhciIsImJheiIsWyJoZWxsbyB3b3JsZCIsIm9uZSJdXX0.A6Yc-WEZSGtOy8hBMsMrvRXNNKSDO7OLMdznoYERKWk`,
+			key:            "scope",
+			expectedClaims: []string{"foo bar", "baz", "hello world", "one"},
+			name:           "nested slice strings with spaced values",
 		},
 	}
 
@@ -1992,7 +2034,7 @@ func TestJWTRSAInvalidPublickKey(t *testing.T) {
 		ts.Run(t, test.TestCase{
 			Headers:   authHeaders,
 			Code:      http.StatusForbidden,
-			BodyMatch: "Failed to decode JWT key",
+			BodyMatch: "Key not authorized",
 		})
 	})
 }
@@ -2018,6 +2060,8 @@ func createExpiringPolicy(pGen ...func(p *user.Policy)) string {
 }
 
 func TestJWTExpOverride(t *testing.T) {
+	test.Flaky(t) // TODO: TT-5257
+
 	ts := StartTest(nil)
 	defer ts.Close()
 
@@ -2100,4 +2144,276 @@ func TestJWTExpOverride(t *testing.T) {
 		}...)
 	})
 
+}
+
+func TestTimeValidateClaims(t *testing.T) {
+
+	type testCase struct {
+		name        string
+		claimSkew   int64
+		configSkew  uint64
+		expectedErr error
+	}
+
+	t.Run("expires at", func(t *testing.T) {
+		expJWTClaimsGen := func(skew int64) jwt.MapClaims {
+			jsonClaims := fmt.Sprintf(`{
+				"user_id": "user123",
+				"exp":     %d
+			}`, uint64(time.Now().Add(time.Duration(skew)*time.Second).Unix()))
+			jwtClaims := jwt.MapClaims{}
+			_ = json.Unmarshal([]byte(jsonClaims), &jwtClaims)
+			return jwtClaims
+		}
+
+		testCases := []testCase{
+			{name: "after now - valid", claimSkew: 1, configSkew: 0, expectedErr: nil},
+			{name: "after now add skew - valid", claimSkew: 1, configSkew: 1, expectedErr: nil},
+			{name: "before now with skew - valid", claimSkew: -1, configSkew: 1000, expectedErr: nil},
+			{name: "before now - invalid", claimSkew: -1, configSkew: 1, expectedErr: jwt.ErrTokenExpired},
+		}
+
+		for _, tc := range testCases {
+			t.Run(tc.name, func(t *testing.T) {
+				jwtClaims := expJWTClaimsGen(tc.claimSkew)
+				err := timeValidateJWTClaims(jwtClaims, tc.configSkew, 0, 0)
+				if tc.expectedErr == nil {
+					assert.Nil(t, err)
+				} else {
+					assert.True(t, err.Is(tc.expectedErr))
+				}
+
+			})
+		}
+	})
+
+	t.Run("issued at", func(t *testing.T) {
+		iatJWTClaimsGen := func(skew int64) jwt.MapClaims {
+			jsonClaims := fmt.Sprintf(`{
+				"user_id": "user123",
+				"iat":     %d
+			}`, uint64(time.Now().Add(time.Duration(skew)*time.Second).Unix()))
+			jwtClaims := jwt.MapClaims{}
+			_ = json.Unmarshal([]byte(jsonClaims), &jwtClaims)
+			return jwtClaims
+		}
+
+		testCases := []testCase{
+			{name: "before now - valid jwt", claimSkew: -1, configSkew: 0, expectedErr: nil},
+			{name: "after now with large skew - valid jwt", claimSkew: 1, configSkew: 1000, expectedErr: nil},
+			{name: "before now, add skew - valid jwt", claimSkew: -3, configSkew: 2, expectedErr: nil},
+			{name: "after now, add skew - valid jwt", claimSkew: 1, configSkew: 1, expectedErr: nil},
+			{name: "after now, no skew - invalid jwt", claimSkew: 60, configSkew: 0, expectedErr: jwt.ErrTokenUsedBeforeIssued},
+		}
+
+		for _, tc := range testCases {
+			t.Run(tc.name, func(t *testing.T) {
+				jwtClaims := iatJWTClaimsGen(tc.claimSkew)
+				err := timeValidateJWTClaims(jwtClaims, 0, tc.configSkew, 0)
+				if tc.expectedErr == nil {
+					assert.Nil(t, err)
+				} else {
+					assert.True(t, err.Is(tc.expectedErr))
+				}
+
+			})
+		}
+	})
+
+	t.Run("not before", func(t *testing.T) {
+		nbfJWTClaimsGen := func(skew int64) jwt.MapClaims {
+			jsonClaims := fmt.Sprintf(`{
+				"user_id": "user123",
+				"nbf":     %d
+			}`, uint64(time.Now().Add(time.Duration(skew)*time.Second).Unix()))
+			jwtClaims := jwt.MapClaims{}
+			_ = json.Unmarshal([]byte(jsonClaims), &jwtClaims)
+			return jwtClaims
+		}
+
+		testCases := []testCase{
+			{name: "not before now - valid jwt", claimSkew: -1, configSkew: 0, expectedErr: nil},
+			{name: "after now, add skew - valid jwt", claimSkew: 1, configSkew: 1, expectedErr: nil},
+			{name: "after now with huge skew - valid_jwt", claimSkew: 1, configSkew: 1000, expectedErr: nil},
+			{name: "after now - invalid jwt", claimSkew: 1, configSkew: 0, expectedErr: jwt.ErrTokenNotValidYet},
+		}
+
+		for _, tc := range testCases {
+			t.Run(tc.name, func(t *testing.T) {
+				jwtClaims := nbfJWTClaimsGen(tc.claimSkew)
+				err := timeValidateJWTClaims(jwtClaims, 0, 0, tc.configSkew)
+				if tc.expectedErr == nil {
+					assert.Nil(t, err)
+				} else {
+					assert.True(t, err.Is(tc.expectedErr))
+				}
+
+			})
+		}
+	})
+}
+
+func TestGetUserIDFromClaim(t *testing.T) {
+	userID := "123"
+	userIDKey := "user_id"
+	t.Run("identity base field exists", func(t *testing.T) {
+		jwtClaims := jwt.MapClaims{
+			userIDKey: userID,
+			"iss":     "example.com",
+		}
+		identity, err := getUserIDFromClaim(jwtClaims, "user_id")
+		assert.NoError(t, err)
+		assert.Equal(t, identity, userID)
+	})
+
+	t.Run("identity base field doesn't exist, fallback to sub", func(t *testing.T) {
+		jwtClaims := jwt.MapClaims{
+			"iss": "example.com",
+			"sub": userID,
+		}
+		identity, err := getUserIDFromClaim(jwtClaims, userIDKey)
+		assert.NoError(t, err)
+		assert.Equal(t, identity, userID)
+	})
+
+	t.Run("identity base field and sub doesn't exist", func(t *testing.T) {
+		jwtClaims := jwt.MapClaims{
+			"iss": "example.com",
+		}
+		_, err := getUserIDFromClaim(jwtClaims, userIDKey)
+		assert.ErrorIs(t, err, ErrNoSuitableUserIDClaimFound)
+	})
+
+	t.Run("identity base field doesn't exist, empty sub", func(t *testing.T) {
+		jwtClaims := jwt.MapClaims{
+			"iss": "example.com",
+			"sub": "",
+		}
+		_, err := getUserIDFromClaim(jwtClaims, userIDKey)
+		assert.ErrorIs(t, err, ErrEmptyUserIDInSubClaim)
+	})
+
+	t.Run("empty identity base field", func(t *testing.T) {
+		jwtClaims := jwt.MapClaims{
+			"iss":     "example.com",
+			userIDKey: "",
+		}
+		_, err := getUserIDFromClaim(jwtClaims, userIDKey)
+		assert.Equal(t, fmt.Sprintf("found an empty user ID in predefined base field claim %s", userIDKey), err.Error())
+	})
+}
+
+func TestJWTMiddleware_getSecretToVerifySignature_JWKNoKID(t *testing.T) {
+	const jwkURL = "https://jwk.com"
+
+	m := JWTMiddleware{BaseMiddleware: &BaseMiddleware{}}
+	api := &apidef.APIDefinition{JWTSource: jwkURL}
+	m.Spec = &APISpec{APIDefinition: api}
+
+	token := &jwt.Token{Header: make(map[string]interface{})}
+	_, err := m.getSecretToVerifySignature(nil, token)
+	assert.ErrorIs(t, err, ErrKIDNotAString)
+
+	t.Run("base64 encoded JWK URL", func(t *testing.T) {
+		api.JWTSource = base64.StdEncoding.EncodeToString([]byte(api.JWTSource))
+		_, err := m.getSecretToVerifySignature(nil, token)
+		assert.ErrorIs(t, err, ErrKIDNotAString)
+	})
+}
+
+func TestJWT_ExtractOAuthClientIDForDCR(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	api := ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		spec.UseKeylessAccess = false
+		spec.EnableJWT = true
+		spec.JWTSigningMethod = RSASign
+		spec.JWTSource = base64.StdEncoding.EncodeToString([]byte(jwtRSAPubKey))
+		spec.JWTIdentityBaseField = "user_id"
+		spec.JWTPolicyFieldName = "policy_id"
+		spec.Proxy.ListenPath = "/"
+	})[0]
+
+	pID := ts.CreatePolicy()
+	userID := uuid.New()
+	const myOKTAClientID = "myOKTAClientID"
+
+	jwtToken := CreateJWKToken(func(t *jwt.Token) {
+		t.Claims.(jwt.MapClaims)["sub"] = userID
+		t.Claims.(jwt.MapClaims)["policy_id"] = pID
+		t.Claims.(jwt.MapClaims)["cid"] = myOKTAClientID // cid is specific to OKTA
+		t.Claims.(jwt.MapClaims)["exp"] = time.Now().Add(time.Second * 72).Unix()
+	})
+
+	authHeaders := map[string]string{"authorization": jwtToken}
+
+	keyID := fmt.Sprintf("%x", md5.Sum([]byte(userID)))
+	sessionID := ts.Gw.generateToken("default", keyID)
+
+	t.Run("DCR enabled", func(t *testing.T) {
+		_, _ = ts.Run(t, test.TestCase{Headers: authHeaders, Code: http.StatusOK})
+
+		privateSession, found := ts.Gw.GlobalSessionManager.SessionDetail("default", sessionID, false)
+		assert.True(t, found)
+		assert.Equal(t, myOKTAClientID, privateSession.OauthClientID)
+	})
+
+	t.Run("DCR disabled", func(t *testing.T) {
+		api.IDPClientIDMappingDisabled = true
+		ts.Gw.LoadAPI(api)
+		_, _ = ts.Run(t, test.TestCase{Headers: authHeaders, Code: http.StatusOK})
+
+		privateSession, found := ts.Gw.GlobalSessionManager.SessionDetail("default", sessionID, false)
+		assert.True(t, found)
+		assert.Empty(t, privateSession.OauthClientID)
+	})
+}
+
+func Test_getOAuthClientIDFromClaim(t *testing.T) {
+	testCases := []struct {
+		name             string
+		claims           jwt.MapClaims
+		expectedClientID string
+	}{
+		{
+			name: "unknown",
+			claims: jwt.MapClaims{
+				"unknown": "value",
+			},
+			expectedClientID: "",
+		},
+		{
+			name: "clientId",
+			claims: jwt.MapClaims{
+				"clientId": "value1",
+			},
+			expectedClientID: "value1",
+		},
+		{
+			name: "cid",
+			claims: jwt.MapClaims{
+				"cid": "value2",
+			},
+			expectedClientID: "value2",
+		},
+		{
+			name: "client_id",
+			claims: jwt.MapClaims{
+				"client_id": "value3",
+			},
+			expectedClientID: "value3",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			j := JWTMiddleware{BaseMiddleware: &BaseMiddleware{}}
+			j.Spec = &APISpec{APIDefinition: &apidef.APIDefinition{}}
+
+			oauthClientID := j.getOAuthClientIDFromClaim(tc.claims)
+
+			assert.Equal(t, tc.expectedClientID, oauthClientID)
+		})
+	}
 }

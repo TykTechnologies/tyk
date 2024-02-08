@@ -10,24 +10,24 @@ import (
 	"encoding/pem"
 	"errors"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"strings"
 	"time"
 
-	jwt "github.com/dgrijalva/jwt-go"
+	"github.com/go-jose/go-jose/v3"
+	"github.com/golang-jwt/jwt/v4"
 	"github.com/lonelycode/osin"
-	cache "github.com/pmylund/go-cache"
-	jose "github.com/square/go-jose"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/storage"
-
 	"github.com/TykTechnologies/tyk/user"
+
+	"github.com/TykTechnologies/tyk/internal/cache"
 )
 
 type JWTMiddleware struct {
-	BaseMiddleware
+	*BaseMiddleware
 }
 
 const (
@@ -38,6 +38,8 @@ const (
 	ECDSASign = "ecdsa"
 )
 
+const UnexpectedSigningMethod = "Unexpected signing method"
+
 var (
 	// List of common OAuth Client ID claims used by IDPs:
 	oauthClientIDClaims = []string{
@@ -45,6 +47,9 @@ var (
 		"cid",       // OKTA
 		"client_id", // Gluu
 	}
+
+	ErrNoSuitableUserIDClaimFound = errors.New("no suitable claims for user ID were found")
+	ErrEmptyUserIDInSubClaim      = errors.New("found an empty user ID in sub claim")
 )
 
 func (k *JWTMiddleware) Name() string {
@@ -55,7 +60,7 @@ func (k *JWTMiddleware) EnabledForSpec() bool {
 	return k.Spec.EnableJWT
 }
 
-var JWKCache *cache.Cache
+var JWKCache cache.Repository = cache.New(240, 30)
 
 type JWK struct {
 	Alg string   `json:"alg"`
@@ -82,11 +87,6 @@ func parseJWK(buf []byte) (*jose.JSONWebKeySet, error) {
 }
 
 func (k *JWTMiddleware) legacyGetSecretFromURL(url, kid, keyType string) (interface{}, error) {
-	// Implement a cache
-	if JWKCache == nil {
-		JWKCache = cache.New(240*time.Second, 30*time.Second)
-	}
-
 	var client http.Client
 	client.Transport = &http.Transport{
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: k.Gw.GetConfig().JWTSSLInsecureSkipVerify},
@@ -134,35 +134,20 @@ func (k *JWTMiddleware) legacyGetSecretFromURL(url, kid, keyType string) (interf
 	return nil, errors.New("No matching KID could be found")
 }
 
-func (k *JWTMiddleware) getSecretFromURL(url, kid, keyType string) (interface{}, error) {
-	// Implement a cache
-	if JWKCache == nil {
-		k.Logger().Debug("Creating JWK Cache")
-		JWKCache = cache.New(240*time.Second, 30*time.Second)
+func (k *JWTMiddleware) getSecretFromURL(url string, kidVal interface{}, keyType string) (interface{}, error) {
+	kid, ok := kidVal.(string)
+	if !ok {
+		return nil, ErrKIDNotAString
 	}
 
-	var jwkSet *jose.JSONWebKeySet
-	var client http.Client
-	client.Transport = &http.Transport{
-		TLSClientConfig: &tls.Config{InsecureSkipVerify: k.Gw.GetConfig().JWTSSLInsecureSkipVerify},
-	}
+	var (
+		jwkSet *jose.JSONWebKeySet
+		err    error
+	)
 
 	cachedJWK, found := JWKCache.Get(k.Spec.APIID)
 	if !found {
-		// Get the JWK
-		k.Logger().Debug("Pulling JWK")
-		resp, err := client.Get(url)
-		if err != nil {
-			k.Logger().WithError(err).Error("Failed to get resource URL")
-			return nil, err
-		}
-		defer resp.Body.Close()
-		buf, err := ioutil.ReadAll(resp.Body)
-		if err != nil {
-			k.Logger().WithError(err).Error("Failed to get read response body")
-			return nil, err
-		}
-		if jwkSet, err = parseJWK(buf); err != nil {
+		if jwkSet, err = getJWK(url, k.Gw.GetConfig().JWTSSLInsecureSkipVerify); err != nil {
 			k.Logger().WithError(err).Info("Failed to decode JWKs body. Trying x5c PEM fallback.")
 
 			key, legacyError := k.legacyGetSecretFromURL(url, kid, keyType)
@@ -206,7 +191,7 @@ func (k *JWTMiddleware) getSecretToVerifySignature(r *http.Request, token *jwt.T
 	if config.JWTSource != "" {
 		// Is it a URL?
 		if httpScheme.MatchString(config.JWTSource) {
-			return k.getSecretFromURL(config.JWTSource, token.Header[KID].(string), k.Spec.JWTSigningMethod)
+			return k.getSecretFromURL(config.JWTSource, token.Header[KID], k.Spec.JWTSigningMethod)
 		}
 
 		// If not, return the actual value
@@ -217,12 +202,7 @@ func (k *JWTMiddleware) getSecretToVerifySignature(r *http.Request, token *jwt.T
 
 		// Is decoded url too?
 		if httpScheme.MatchString(string(decodedCert)) {
-			secret, err := k.getSecretFromURL(string(decodedCert), token.Header[KID].(string), k.Spec.JWTSigningMethod)
-			if err != nil {
-				return nil, err
-			}
-
-			return secret, nil
+			return k.getSecretFromURL(string(decodedCert), token.Header[KID], k.Spec.JWTSigningMethod)
 		}
 
 		return decodedCert, nil // Returns the decoded secret
@@ -292,52 +272,30 @@ func (k *JWTMiddleware) getBasePolicyID(r *http.Request, claims jwt.MapClaims) (
 }
 
 func (k *JWTMiddleware) getUserIdFromClaim(claims jwt.MapClaims) (string, error) {
-	var userId string
-	var found = false
-
-	if k.Spec.JWTIdentityBaseField != "" {
-		if userId, found = claims[k.Spec.JWTIdentityBaseField].(string); found {
-			if len(userId) > 0 {
-				k.Logger().WithField("userId", userId).Debug("Found User Id in Base Field")
-				return userId, nil
-			}
-			message := "found an empty user ID in predefined base field claim " + k.Spec.JWTIdentityBaseField
-			k.Logger().Error(message)
-			return "", errors.New(message)
-		}
-
-		if !found {
-			k.Logger().WithField("Base Field", k.Spec.JWTIdentityBaseField).Warning("Base Field claim not found, trying to find user ID in 'sub' claim.")
-		}
-	}
-
-	if userId, found = claims[SUB].(string); found {
-		if len(userId) > 0 {
-			k.Logger().WithField("userId", userId).Debug("Found User Id in 'sub' claim")
-			return userId, nil
-		}
-		message := "found an empty user ID in sub claim"
-		k.Logger().Error(message)
-		return "", errors.New(message)
-	}
-
-	message := "no suitable claims for user ID were found"
-	k.Logger().Error(message)
-	return "", errors.New(message)
+	return getUserIDFromClaim(claims, k.Spec.JWTIdentityBaseField)
 }
 
-func toStrings(v interface{}) []string {
+func toScopeStringsSlice(v interface{}, scopeSlice *[]string, nested bool) []string {
+	if scopeSlice == nil {
+		scopeSlice = &[]string{}
+	}
+
 	switch e := v.(type) {
 	case string:
-		return strings.Split(e, " ")
-	case []interface{}:
-		var r []string
-		for _, x := range e {
-			r = append(r, toStrings(x)...)
+		if !nested {
+			splitStringScopes := strings.Split(e, " ")
+			*scopeSlice = append(*scopeSlice, splitStringScopes...)
+		} else {
+			*scopeSlice = append(*scopeSlice, e)
 		}
-		return r
+
+	case []interface{}:
+		for _, scopeElement := range e {
+			toScopeStringsSlice(scopeElement, scopeSlice, true)
+		}
 	}
-	return nil
+
+	return *scopeSlice
 }
 
 func nestedMapLookup(m map[string]interface{}, ks ...string) interface{} {
@@ -364,7 +322,7 @@ func getMapContext(m interface{}, k string) (rval interface{}) {
 func getScopeFromClaim(claims jwt.MapClaims, scopeClaimName string) []string {
 	lookedUp := nestedMapLookup(claims, strings.Split(scopeClaimName, ".")...)
 
-	return toStrings(lookedUp)
+	return toScopeStringsSlice(lookedUp, nil, false)
 }
 
 func mapScopeToPolicies(mapping map[string]string, scope []string) []string {
@@ -406,9 +364,6 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 		k.reportLoginFailure("[NOT FOUND]", r)
 		return err, http.StatusForbidden
 	}
-
-	// Get the OAuth client ID if available:
-	oauthClientID := k.getOAuthClientIDFromClaim(claims)
 
 	// Generate a virtual token
 	data := []byte(baseFieldData)
@@ -559,13 +514,13 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 	}
 
 	// apply policies from scope if scope-to-policy mapping is specified for this API
-	if len(k.Spec.JWTScopeToPolicyMapping) != 0 {
-		scopeClaimName := k.Spec.JWTScopeClaimName
+	if len(k.Spec.GetScopeToPolicyMapping()) != 0 {
+		scopeClaimName := k.Spec.GetScopeClaimName()
 		if scopeClaimName == "" {
 			scopeClaimName = "scope"
 		}
 
-		if scope := getScopeFromClaim(claims, scopeClaimName); scope != nil {
+		if scope := getScopeFromClaim(claims, scopeClaimName); len(scope) > 0 {
 			polIDs := []string{
 				basePolicyID, // add base policy as a first one
 			}
@@ -576,7 +531,7 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 			}
 
 			// add all policies matched from scope-policy mapping
-			mappedPolIDs := mapScopeToPolicies(k.Spec.JWTScopeToPolicyMapping, scope)
+			mappedPolIDs := mapScopeToPolicies(k.Spec.GetScopeToPolicyMapping(), scope)
 			if len(mappedPolIDs) > 0 {
 				k.Logger().Debugf("Identified policy(s) to apply to this token from scope claim: %s", scopeClaimName)
 			} else {
@@ -607,19 +562,29 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 		}
 	}
 
-	session.OauthClientID = oauthClientID
-	if session.OauthClientID != "" {
+	oauthClientID := ""
+	// Get the OAuth client ID if available:
+	if !k.Spec.IDPClientIDMappingDisabled {
+		oauthClientID = k.getOAuthClientIDFromClaim(claims)
+	}
+
+	if session.OauthClientID != oauthClientID {
+		session.OauthClientID = oauthClientID
+		updateSession = true
+	}
+
+	if !k.Spec.IDPClientIDMappingDisabled && oauthClientID != "" {
 		// Initialize the OAuthManager if empty:
 		if k.Spec.OAuthManager == nil {
 			prefix := generateOAuthPrefix(k.Spec.APIID)
-			storageManager := k.Gw.getGlobalStorageHandler(prefix, false)
+			storageManager := k.Gw.getGlobalMDCBStorageHandler(prefix, false)
 			storageManager.Connect()
 			k.Spec.OAuthManager = &OAuthManager{
 				OsinServer: k.Gw.TykOsinNewServer(&osin.ServerConfig{},
 					&RedisOsinStorageInterface{
 						storageManager,
 						k.Gw.GlobalSessionManager,
-						&storage.RedisCluster{KeyPrefix: prefix, HashKeys: false, RedisController: k.Gw.RedisController},
+						&storage.RedisCluster{KeyPrefix: prefix, HashKeys: false, ConnectionHandler: k.Gw.StorageConnectionHandler},
 						k.Spec.OrgID,
 						k.Gw,
 					}),
@@ -633,14 +598,15 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 			if userData != nil {
 				data, ok := userData.(map[string]interface{})
 				if ok {
-					developerID, keyFound := data["tyk_developer_id"].(string)
-					if keyFound {
-						session.MetaData["tyk_developer_id"] = developerID
+					updateSession = session.TagsFromMetadata(data)
+
+					if err := k.ApplyPolicies(&session); err != nil {
+						return errors.New("failed to apply policies in session metadata: " + err.Error()), http.StatusInternalServerError
 					}
 				}
 			}
 		} else {
-			k.Logger().WithError(err).Error("Couldn't get OAuth client")
+			k.Logger().WithError(err).Debug("Couldn't get OAuth client")
 		}
 	}
 
@@ -692,7 +658,7 @@ func (k *JWTMiddleware) processOneToOneTokenMap(r *http.Request, token *jwt.Toke
 
 // getAuthType overrides BaseMiddleware.getAuthType.
 func (k *JWTMiddleware) getAuthType() string {
-	return jwtType
+	return apidef.JWTType
 }
 
 func (k *JWTMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
@@ -721,29 +687,13 @@ func (k *JWTMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _
 	rawJWT = stripBearer(rawJWT)
 
 	// Use own validation logic, see below
-	parser := &jwt.Parser{SkipClaimsValidation: true}
+	parser := jwt.NewParser(jwt.WithoutClaimsValidation())
 
 	// Verify the token
 	token, err := parser.Parse(rawJWT, func(token *jwt.Token) (interface{}, error) {
 		// Don't forget to validate the alg is what you expect:
-		switch k.Spec.JWTSigningMethod {
-		case HMACSign:
-			if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
-				return nil, fmt.Errorf("Unexpected signing method: %v and not HMAC signature", token.Header["alg"])
-			}
-		case RSASign:
-			if _, ok := token.Method.(*jwt.SigningMethodRSA); !ok {
-				return nil, fmt.Errorf("Unexpected signing method: %v and not RSA signature", token.Header["alg"])
-			}
-		case ECDSASign:
-			if _, ok := token.Method.(*jwt.SigningMethodECDSA); !ok {
-				return nil, fmt.Errorf("Unexpected signing method: %v and not ECDSA signature", token.Header["alg"])
-			}
-		default:
-			logger.Warning("No signing method found in API Definition, defaulting to HMAC signature")
-			if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
-				return nil, fmt.Errorf("Unexpected signing method: %v", token.Header["alg"])
-			}
+		if err := assertSigningMethod(k.Spec.JWTSigningMethod, token); err != nil {
+			return nil, err
 		}
 
 		val, err := k.getSecretToVerifySignature(r, token)
@@ -751,25 +701,8 @@ func (k *JWTMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _
 			k.Logger().WithError(err).Error("Couldn't get token")
 			return nil, err
 		}
-		switch k.Spec.JWTSigningMethod {
-		case RSASign, ECDSASign:
-			switch e := val.(type) {
-			case []byte:
-				key, err := ParseRSAPublicKey(e)
-				if err != nil {
-					logger.WithError(err).Error("Failed to decode JWT key")
-					return nil, errors.New("Failed to decode JWT key")
-				}
-				return key, nil
-			default:
-				// We have already parsed the correct key so we just return it here.No need
-				// for checks because they already happened somewhere ele.
-				return e, nil
-			}
 
-		default:
-			return val, nil
-		}
+		return parseJWTKey(k.Spec.JWTSigningMethod, val)
 	})
 
 	if err == nil && token.Valid {
@@ -792,7 +725,10 @@ func (k *JWTMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _
 	k.reportLoginFailure(tykId, r)
 	if err != nil {
 		logger.WithError(err).Error("JWT validation error")
-		return errors.New("Key not authorized:" + err.Error()), http.StatusForbidden
+		errorDetails := strings.Split(err.Error(), ":")
+		if errorDetails[0] == UnexpectedSigningMethod {
+			return errors.New(MsgKeyNotAuthorizedUnexpectedSigningMethod), http.StatusForbidden
+		}
 	}
 	return errors.New("Key not authorized"), http.StatusForbidden
 }
@@ -818,30 +754,8 @@ func ParseRSAPublicKey(data []byte) (interface{}, error) {
 }
 
 func (k *JWTMiddleware) timeValidateJWTClaims(c jwt.MapClaims) *jwt.ValidationError {
-	vErr := new(jwt.ValidationError)
-	now := time.Now().Unix()
-	// The claims below are optional, by default, so if they are set to the
-	// default value in Go, let's not fail the verification for them.
-	if !c.VerifyExpiresAt(now-int64(k.Spec.JWTExpiresAtValidationSkew), false) {
-		vErr.Inner = errors.New("token has expired")
-		vErr.Errors |= jwt.ValidationErrorExpired
-	}
-
-	if c.VerifyIssuedAt(now+int64(k.Spec.JWTIssuedAtValidationSkew), false) == false {
-		vErr.Inner = errors.New("token used before issued")
-		vErr.Errors |= jwt.ValidationErrorIssuedAt
-	}
-
-	if c.VerifyNotBefore(now+int64(k.Spec.JWTNotBeforeValidationSkew), false) == false {
-		vErr.Inner = errors.New("token is not valid yet")
-		vErr.Errors |= jwt.ValidationErrorNotValidYet
-	}
-
-	if vErr.Errors == 0 {
-		return nil
-	}
-
-	return vErr
+	return timeValidateJWTClaims(c, k.Spec.JWTExpiresAtValidationSkew, k.Spec.JWTIssuedAtValidationSkew,
+		k.Spec.JWTNotBeforeValidationSkew)
 }
 
 func ctxSetJWTContextVars(s *APISpec, r *http.Request, token *jwt.Token) {
@@ -915,4 +829,152 @@ func (gw *Gateway) generateSessionFromPolicy(policyID, orgID string, enforceOrg 
 	}
 
 	return session.Clone(), nil
+}
+
+// assertSigningMethod asserts the provided signing method with that of jwt.
+func assertSigningMethod(signingMethod string, token *jwt.Token) error {
+	switch signingMethod {
+	case HMACSign:
+		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+			return fmt.Errorf("%v: %v and not HMAC signature", UnexpectedSigningMethod, token.Header["alg"])
+		}
+	case RSASign:
+		if _, ok := token.Method.(*jwt.SigningMethodRSA); !ok {
+			return fmt.Errorf("%v: %v and not RSA signature", UnexpectedSigningMethod, token.Header["alg"])
+		}
+	case ECDSASign:
+		if _, ok := token.Method.(*jwt.SigningMethodECDSA); !ok {
+			return fmt.Errorf("%v: %v and not ECDSA signature", UnexpectedSigningMethod, token.Header["alg"])
+		}
+	default:
+		log.Warning("No signing method found in API Definition, defaulting to HMAC signature")
+		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+			return fmt.Errorf("%v: %v", UnexpectedSigningMethod, token.Header["alg"])
+		}
+	}
+
+	return nil
+}
+
+// parseJWTKey parses JWT key based on signing Method
+func parseJWTKey(signingMethod string, secret interface{}) (interface{}, error) {
+	switch signingMethod {
+	case RSASign, ECDSASign:
+		switch e := secret.(type) {
+		case []byte:
+			key, err := ParseRSAPublicKey(e)
+			if err != nil {
+				log.WithError(err).Error("Failed to decode JWT key")
+				return nil, errors.New("Failed to decode JWT key")
+			}
+			return key, nil
+		default:
+			// We have already parsed the correct key so we just return it here.No need
+			// for checks because they already happened somewhere ele.
+			return e, nil
+		}
+
+	default:
+		return secret, nil
+	}
+}
+
+// getJWK gets the JWK from URL.
+func getJWK(url string, jwtSSLInsecureSkipVerify bool) (*jose.JSONWebKeySet, error) {
+	client := http.Client{
+		Transport: &http.Transport{
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: jwtSSLInsecureSkipVerify},
+		},
+	}
+
+	// Get the JWK
+	log.Debug("Pulling JWK")
+	resp, err := client.Get(url)
+	if err != nil {
+		log.WithError(err).Error("Failed to get resource URL")
+		return nil, err
+	}
+
+	defer func() {
+		_ = resp.Body.Close()
+	}()
+
+	buf, err := io.ReadAll(resp.Body)
+	if err != nil {
+		log.WithError(err).Error("Failed to get read response body")
+		return nil, err
+	}
+
+	jwkSet, err := parseJWK(buf)
+	if err != nil {
+		return nil, err
+	}
+
+	return jwkSet, nil
+}
+
+// timeValidateJWTClaims validates JWT with provided clock skew, to overcome skew occurred with distributed systems.
+func timeValidateJWTClaims(c jwt.MapClaims, expiresAt, issuedAt, notBefore uint64) *jwt.ValidationError {
+	vErr := new(jwt.ValidationError)
+	now := time.Now().Unix()
+	// The claims below are optional, by default, so if they are set to the
+	// default value in Go, let's not fail the verification for them.
+	if !c.VerifyExpiresAt(now-int64(expiresAt), false) {
+		vErr.Inner = errors.New("token has expired")
+		vErr.Errors |= jwt.ValidationErrorExpired
+	}
+
+	if !c.VerifyIssuedAt(now+int64(issuedAt), false) {
+		vErr.Inner = errors.New("token used before issued")
+		vErr.Errors |= jwt.ValidationErrorIssuedAt
+	}
+
+	if !c.VerifyNotBefore(now+int64(notBefore), false) {
+		vErr.Inner = errors.New("token is not valid yet")
+		vErr.Errors |= jwt.ValidationErrorNotValidYet
+	}
+
+	if vErr.Errors == 0 {
+		return nil
+	}
+
+	return vErr
+}
+
+// getUserIDFromClaim parses jwt claims and get the userID from provided identityBaseField.
+func getUserIDFromClaim(claims jwt.MapClaims, identityBaseField string) (string, error) {
+	var (
+		userID string
+		found  bool
+	)
+
+	if identityBaseField != "" {
+		if userID, found = claims[identityBaseField].(string); found {
+			if len(userID) > 0 {
+				log.WithField("userId", userID).Debug("Found User Id in Base Field")
+				return userID, nil
+			}
+
+			message := "found an empty user ID in predefined base field claim " + identityBaseField
+			log.Error(message)
+			return "", errors.New(message)
+		}
+
+		if !found {
+			log.WithField("Base Field", identityBaseField).Warning("Base Field claim not found, trying to find user ID in 'sub' claim.")
+		}
+	}
+
+	if userID, found = claims[SUB].(string); found {
+		if len(userID) > 0 {
+			log.WithField("userId", userID).Debug("Found User Id in 'sub' claim")
+			return userID, nil
+		}
+
+		log.Error(ErrEmptyUserIDInSubClaim)
+		return "", ErrEmptyUserIDInSubClaim
+	}
+
+	log.Error(ErrNoSuitableUserIDClaimFound)
+	return "", ErrNoSuitableUserIDClaimFound
 }

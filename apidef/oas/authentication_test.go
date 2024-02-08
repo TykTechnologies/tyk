@@ -3,8 +3,9 @@ package oas
 import (
 	"testing"
 
-	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/TykTechnologies/tyk/apidef"
 )
 
 func TestAuthentication(t *testing.T) {
@@ -19,28 +20,16 @@ func TestAuthentication(t *testing.T) {
 	assert.Equal(t, emptyAuthentication, resultAuthentication)
 }
 
-func TestToken(t *testing.T) {
-	var emptyToken Token
+func TestScopes(t *testing.T) {
+	var emptyScopes Scopes
 
-	var convertedAPI apidef.APIDefinition
-	emptyToken.ExtractTo(&convertedAPI)
+	scopeClaim := apidef.ScopeClaim{}
+	emptyScopes.ExtractTo(&scopeClaim)
 
-	var resultToken Token
-	resultToken.Fill(convertedAPI.UseStandardAuth, convertedAPI.AuthConfigs["authToken"])
+	var resultScopes Scopes
+	resultScopes.Fill(&scopeClaim)
 
-	assert.Equal(t, emptyToken, resultToken)
-}
-
-func TestJWT(t *testing.T) {
-	var emptyJWT JWT
-
-	var convertedAPI apidef.APIDefinition
-	emptyJWT.ExtractTo(&convertedAPI)
-
-	var resultJWT JWT
-	resultJWT.Fill(convertedAPI)
-
-	assert.Equal(t, emptyJWT, resultJWT)
+	assert.Equal(t, emptyScopes, resultScopes)
 }
 
 func TestAuthSources(t *testing.T) {
@@ -56,7 +45,6 @@ func TestAuthSources(t *testing.T) {
 }
 
 func TestAuthSource(t *testing.T) {
-
 	t.Run("param", func(t *testing.T) {
 		var emptyParamSource AuthSource
 
@@ -94,30 +82,6 @@ func TestSignature(t *testing.T) {
 	assert.Equal(t, emptySignature, resultSignature)
 }
 
-func TestBasic(t *testing.T) {
-	var emptyBasic Basic
-
-	var convertedAPI apidef.APIDefinition
-	emptyBasic.ExtractTo(&convertedAPI)
-
-	var resultBasic Basic
-	resultBasic.Fill(convertedAPI)
-
-	assert.Equal(t, emptyBasic, resultBasic)
-}
-
-func TestOAuth(t *testing.T) {
-	var emptyOAuth OAuth
-
-	var convertedAPI apidef.APIDefinition
-	emptyOAuth.ExtractTo(&convertedAPI)
-
-	var resultOAuth OAuth
-	resultOAuth.Fill(convertedAPI)
-
-	assert.Equal(t, emptyOAuth, resultOAuth)
-}
-
 func TestHMAC(t *testing.T) {
 	var emptyHMAC HMAC
 
@@ -128,4 +92,181 @@ func TestHMAC(t *testing.T) {
 	resultHMAC.Fill(convertedAPI)
 
 	assert.Equal(t, emptyHMAC, resultHMAC)
+}
+
+func TestOIDC(t *testing.T) {
+	var emptyOIDC OIDC
+
+	var convertedAPI apidef.APIDefinition
+	emptyOIDC.ExtractTo(&convertedAPI)
+
+	var resultOIDC OIDC
+	emptyOIDC.Fill(convertedAPI)
+
+	assert.Equal(t, emptyOIDC, resultOIDC)
+
+	t.Run("providers", func(t *testing.T) {
+		var api apidef.APIDefinition
+		api.OpenIDOptions.Providers = []apidef.OIDProviderConfig{{Issuer: "1234"}}
+
+		var oas OAS
+		xTyk := &XTykAPIGateway{Server: Server{
+			Authentication: &Authentication{
+				OIDC: &OIDC{
+					Providers: []Provider{{Issuer: "5678"}},
+				},
+			},
+		}}
+
+		oas.SetTykExtension(xTyk)
+		oas.ExtractTo(&api)
+
+		assert.Len(t, api.OpenIDOptions.Providers, 1)
+		assert.Equal(t, "5678", api.OpenIDOptions.Providers[0].Issuer)
+	})
+}
+
+func TestCustomPlugin(t *testing.T) {
+	t.Run("empty", func(t *testing.T) {
+		var emptyCustomPlugin CustomPluginAuthentication
+
+		var convertedAPI apidef.APIDefinition
+		convertedAPI.SetDisabledFlags()
+		emptyCustomPlugin.ExtractTo(&convertedAPI)
+
+		var resultCustomPlugin CustomPluginAuthentication
+		resultCustomPlugin.Fill(convertedAPI)
+
+		assert.Equal(t, emptyCustomPlugin, resultCustomPlugin)
+	})
+
+	t.Run("values", func(t *testing.T) {
+		t.Run("goplugin", func(t *testing.T) {
+			var expectedCustomPluginAuth = CustomPluginAuthentication{
+				Enabled: true,
+				Config: &AuthenticationPlugin{
+					Enabled:      true,
+					FunctionName: "Auth",
+					Path:         "/path/to/plugin",
+				},
+			}
+
+			var convertedAPI apidef.APIDefinition
+			convertedAPI.SetDisabledFlags()
+			expectedCustomPluginAuth.ExtractTo(&convertedAPI)
+
+			var actualCustomPluginAuth CustomPluginAuthentication
+			actualCustomPluginAuth.Fill(convertedAPI)
+
+			assert.Equal(t, expectedCustomPluginAuth, actualCustomPluginAuth)
+			assert.Empty(t, actualCustomPluginAuth.AuthSources)
+		})
+
+		t.Run("coprocess", func(t *testing.T) {
+			var expectedCustomPluginAuth = CustomPluginAuthentication{
+				Enabled: true,
+				Config: &AuthenticationPlugin{
+					Enabled:      true,
+					FunctionName: "Auth",
+					Path:         "/path/to/plugin",
+				},
+				AuthSources: AuthSources{
+					Header: &AuthSource{
+						Enabled: true,
+						Name:    "Authorization",
+					},
+				},
+			}
+
+			var convertedAPI apidef.APIDefinition
+			convertedAPI.SetDisabledFlags()
+			expectedCustomPluginAuth.ExtractTo(&convertedAPI)
+
+			var actualCustomPluginAuth CustomPluginAuthentication
+			actualCustomPluginAuth.Fill(convertedAPI)
+
+			assert.Equal(t, expectedCustomPluginAuth, actualCustomPluginAuth)
+			assert.NotEmpty(t, actualCustomPluginAuth.AuthSources)
+		})
+	})
+
+}
+
+func TestIDExtractorConfig(t *testing.T) {
+	t.Parallel()
+	t.Run("empty", func(t *testing.T) {
+		t.Parallel()
+		var emptyIDExtractorConfig IDExtractorConfig
+
+		var convertedAPI apidef.APIDefinition
+		convertedAPI.SetDisabledFlags()
+		emptyIDExtractorConfig.ExtractTo(&convertedAPI)
+
+		var resultIDExtractorConfig IDExtractorConfig
+		resultIDExtractorConfig.Fill(convertedAPI)
+
+		assert.Equal(t, emptyIDExtractorConfig, resultIDExtractorConfig)
+	})
+
+	t.Run("values", func(t *testing.T) {
+		t.Parallel()
+		var expectedIDExtractorConfig = IDExtractorConfig{
+			HeaderName:       "Authorization",
+			FormParamName:    "Authorization",
+			RegexpMatchIndex: 1,
+			Regexp:           "regexp",
+			XPathExp:         "xpathexp",
+		}
+
+		var convertedAPI apidef.APIDefinition
+		convertedAPI.SetDisabledFlags()
+		expectedIDExtractorConfig.ExtractTo(&convertedAPI)
+
+		var actualIDExtractorConfig IDExtractorConfig
+		actualIDExtractorConfig.Fill(convertedAPI)
+
+		assert.Equal(t, expectedIDExtractorConfig, actualIDExtractorConfig)
+	})
+}
+
+func TestIDExtractor(t *testing.T) {
+	t.Parallel()
+	t.Run("empty", func(t *testing.T) {
+		t.Parallel()
+		var emptyIDExtractor IDExtractor
+
+		var convertedAPI apidef.APIDefinition
+		convertedAPI.SetDisabledFlags()
+		emptyIDExtractor.ExtractTo(&convertedAPI)
+
+		var resultIDExtractor IDExtractor
+		resultIDExtractor.Fill(convertedAPI)
+
+		assert.Equal(t, emptyIDExtractor, resultIDExtractor)
+	})
+
+	t.Run("values", func(t *testing.T) {
+		t.Parallel()
+		var expectedIDExtractor = IDExtractor{
+			Enabled: true,
+			Source:  apidef.HeaderSource,
+			With:    apidef.ValueExtractor,
+			Config: &IDExtractorConfig{
+				HeaderName:       "Authorization",
+				FormParamName:    "Authorization",
+				RegexpMatchIndex: 1,
+				Regexp:           "regexp",
+				XPathExp:         "xpathexp",
+			},
+		}
+
+		var convertedAPI apidef.APIDefinition
+		convertedAPI.SetDisabledFlags()
+		expectedIDExtractor.ExtractTo(&convertedAPI)
+
+		var actualIDExtractor IDExtractor
+		actualIDExtractor.Fill(convertedAPI)
+
+		assert.Equal(t, expectedIDExtractor, actualIDExtractor)
+	})
 }

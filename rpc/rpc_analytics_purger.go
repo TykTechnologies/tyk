@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"time"
 
-	msgpack "gopkg.in/vmihailenco/msgpack.v2"
+	"github.com/vmihailenco/msgpack"
 
 	"github.com/TykTechnologies/tyk/storage"
 )
@@ -104,6 +104,7 @@ func (r Purger) PurgeLoop(ctx context.Context, interval time.Duration) {
 
 // PurgeCache will pull the data from the in-memory store and drop it into the specified MongoDB collection
 func (r *Purger) PurgeCache() {
+
 	if !values.ClientIsConnected() {
 		Log.Error("RPC client is not connected, use Connect method 1st")
 	}
@@ -119,6 +120,7 @@ func (r *Purger) PurgeCache() {
 			//if it's the first iteration, we look for tyk-system-analytics to maintain backwards compatibility or if analytics_config.enable_multiple_analytics_keys is disabled in the gateway
 			analyticsKeyName = ANALYTICS_KEYNAME
 		} else {
+			// keyname + serializationmethod
 			analyticsKeyName = fmt.Sprintf("%v_%v", ANALYTICS_KEYNAME, i)
 		}
 
@@ -149,5 +151,6 @@ func (r *Purger) PurgeCache() {
 			EmitErrorEvent(FuncClientSingletonCall, "PurgeAnalyticsData", err)
 			Log.Warn("Failed to call purge, retrying: ", err)
 		}
+
 	}
 }

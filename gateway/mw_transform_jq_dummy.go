@@ -1,3 +1,4 @@
+//go:build !jq
 // +build !jq
 
 package gateway
@@ -9,7 +10,7 @@ import (
 )
 
 type TransformJQMiddleware struct {
-	BaseMiddleware
+	*BaseMiddleware
 }
 
 func (t *TransformJQMiddleware) Name() string {

@@ -31,7 +31,7 @@ var (
 	errLibLoad        = errors.New("Couldn't load library")
 	errOSNotSupported = errors.New("OS not supported")
 
-	pythonExpr = regexp.MustCompile(`(^python3(\.)?(\d)?(m)?(\-config)?$)`)
+	pythonExpr = regexp.MustCompile(`(^python3(\.)?(\d+)?(m)?(\-config)?$)`)
 
 	pythonConfigPath  string
 	pythonLibraryPath string
@@ -43,6 +43,8 @@ var (
 
 // FindPythonConfig scans PATH for common python-config locations.
 func FindPythonConfig(customVersion string) (selectedVersion string, err error) {
+	logger.Debugf("Requested python version: %q", customVersion)
+
 	// Not sure if this can be replaced with os.LookPath:
 	if paths == "" {
 		return selectedVersion, errEmptyPath
@@ -128,8 +130,18 @@ func FindPythonConfig(customVersion string) (selectedVersion string, err error) 
 	return selectedVersion, nil
 }
 
+func execPythonConfig() ([]byte, error) {
+	// Try to include the "embed" flag first
+	// introduced in Python 3.8: https://docs.python.org/3.8/whatsnew/3.8.html#debug-build-uses-the-same-abi-as-release-build
+	out, err := exec.Command(pythonConfigPath, "--ldflags", "--embed").Output()
+	if err != nil {
+		return exec.Command(pythonConfigPath, "--ldflags").Output()
+	}
+	return out, err
+}
+
 func getLibraryPathFromCfg() error {
-	out, err := exec.Command(pythonConfigPath, "--ldflags").Output()
+	out, err := execPythonConfig()
 	if err != nil {
 		logger.Errorf("Error while executing command for python config path: %s", pythonConfigPath)
 		return err

@@ -5,19 +5,24 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/sirupsen/logrus"
+
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/ctx"
 	"github.com/TykTechnologies/tyk/goplugin"
 	"github.com/TykTechnologies/tyk/user"
-	"github.com/sirupsen/logrus"
 )
 
 type ResponseGoPluginMiddleware struct {
+	BaseTykResponseHandler
 	Path       string // path to .so file
 	SymbolName string // function symbol to look up
 	logger     *logrus.Entry
-	Spec       *APISpec
 	ResHandler func(rw http.ResponseWriter, res *http.Response, req *http.Request)
+}
+
+func (h ResponseGoPluginMiddleware) Base() *BaseTykResponseHandler {
+	return &h.BaseTykResponseHandler
 }
 
 func (ResponseGoPluginMiddleware) Name() string {
@@ -40,8 +45,16 @@ func (h *ResponseGoPluginMiddleware) Init(c interface{}, spec *APISpec) error {
 		return nil
 	}
 
+	newPath, err := goplugin.GetPluginFileNameToLoad(goplugin.FileSystemStorage{}, h.Path)
+	if err != nil {
+		h.logger.WithError(err).Error("Could not load Go-plugin. File was not found")
+		return err
+	}
+	if h.Path != newPath {
+		h.Path = newPath
+	}
+
 	// try to load plugin
-	var err error
 	if h.ResHandler, err = goplugin.GetResponseHandler(h.Path, h.SymbolName); err != nil {
 		h.logger.WithError(err).Error("Could not load Go-plugin")
 		return err

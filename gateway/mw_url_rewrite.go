@@ -39,7 +39,9 @@ var metaMatch = regexp.MustCompile(`\$tyk_meta.([A-Za-z0-9_\-\.]+)`)
 var secretsConfMatch = regexp.MustCompile(`\$secret_conf.([A-Za-z0-9[.\-\_]+)`)
 
 func (gw *Gateway) urlRewrite(meta *apidef.URLRewriteMeta, r *http.Request) (string, error) {
-	path := r.URL.String()
+	rawPath := r.URL.String()
+	path := rawPath
+
 	log.Debug("Inbound path: ", path)
 	newpath := path
 
@@ -160,12 +162,21 @@ func (gw *Gateway) urlRewrite(meta *apidef.URLRewriteMeta, r *http.Request) (str
 				}
 				if total == setCount {
 					rewriteToPath = triggerOpts.RewriteTo
+					break
 				}
 			}
 		}
 	}
 
 	matchGroups := meta.MatchRegexp.FindAllStringSubmatch(path, -1)
+	if len(matchGroups) == 0 && containsEscapedChars(rawPath) {
+		unescapedPath, err := url.PathUnescape(rawPath)
+		if err != nil {
+			return unescapedPath, fmt.Errorf("failed to decode URL path: %s", rawPath)
+		}
+
+		matchGroups = meta.MatchRegexp.FindAllStringSubmatch(unescapedPath, -1)
+	}
 
 	// Make sure it matches the string
 	log.Debug("Rewriter checking matches, len is: ", len(matchGroups))
@@ -340,7 +351,7 @@ func valToStr(v interface{}) string {
 	case string:
 		s = x
 	case float64:
-		s = strconv.FormatFloat(x, 'f', -1, 32)
+		s = strconv.FormatFloat(x, 'f', -1, 64)
 	case int64:
 		s = strconv.FormatInt(x, 10)
 	case []string:
@@ -372,18 +383,26 @@ func valToStr(v interface{}) string {
 
 // URLRewriteMiddleware Will rewrite an inbund URL to a matching outbound one, it can also handle dynamic variable substitution
 type URLRewriteMiddleware struct {
-	BaseMiddleware
+	*BaseMiddleware
 }
 
 func (m *URLRewriteMiddleware) Name() string {
 	return "URLRewriteMiddleware"
 }
 
-func (m *URLRewriteMiddleware) InitTriggerRx() {
+// InitTriggerRx will go over all defined URLRewrite triggers and initialize them. It
+// will skip disabled triggers, returning true if at least one trigger is enabled.
+func (m *URLRewriteMiddleware) InitTriggerRx() (enabled bool) {
 	// Generate regexp for each special match parameter
 	for verKey := range m.Spec.VersionData.Versions {
 		for pathKey := range m.Spec.VersionData.Versions[verKey].ExtendedPaths.URLRewrite {
 			rewrite := m.Spec.VersionData.Versions[verKey].ExtendedPaths.URLRewrite[pathKey]
+
+			if rewrite.Disabled {
+				continue
+			}
+
+			enabled = true
 
 			for trKey := range rewrite.Triggers {
 				tr := rewrite.Triggers[trKey]
@@ -418,36 +437,51 @@ func (m *URLRewriteMiddleware) InitTriggerRx() {
 			m.Spec.VersionData.Versions[verKey].ExtendedPaths.URLRewrite[pathKey] = rewrite
 		}
 	}
+
+	return
 }
 
 func (m *URLRewriteMiddleware) EnabledForSpec() bool {
-	for _, version := range m.Spec.VersionData.Versions {
-		if len(version.ExtendedPaths.URLRewrite) > 0 {
-			m.Spec.URLRewriteEnabled = true
-			m.InitTriggerRx()
-			return true
-		}
+	if m.InitTriggerRx() {
+		m.Spec.URLRewriteEnabled = true
+		return true
 	}
 	return false
 }
 
-func (m *URLRewriteMiddleware) CheckHostRewrite(oldPath, newTarget string, r *http.Request) {
+func (m *URLRewriteMiddleware) CheckHostRewrite(oldPath, newTarget string, r *http.Request) error {
 	oldAsURL, errParseOld := url.Parse(oldPath)
 	if errParseOld != nil {
-		log.WithError(errParseOld).WithField("url", oldPath).Error("could not parse")
-		return
+		return errParseOld
 	}
 
 	newAsURL, errParseNew := url.Parse(newTarget)
 	if errParseNew != nil {
-		log.WithError(errParseNew).WithField("url", newTarget).Error("could not parse")
-		return
+		return errParseNew
 	}
 
-	if newAsURL.Scheme != LoopScheme && oldAsURL.Host != newAsURL.Host {
+	if shouldRewriteHost(oldAsURL, newAsURL) {
 		log.Debug("Detected a host rewrite in pattern!")
 		setCtxValue(r, ctx.RetainHost, true)
 	}
+
+	return nil
+}
+
+func shouldRewriteHost(oldURL, newURL *url.URL) bool {
+	if newURL.Scheme == "" {
+		return false
+	}
+
+	if newURL.Scheme == LoopScheme {
+		return false
+	}
+
+	if oldURL.Host == newURL.Host {
+		return false
+	}
+
+	return true
 }
 
 const LoopScheme = "tyk"
@@ -480,6 +514,7 @@ func (m *URLRewriteMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 	umeta := meta.(*apidef.URLRewriteMeta)
 	log.Debug(r.URL)
 	oldPath := r.URL.String()
+
 	p, err := m.Gw.urlRewrite(umeta, r)
 	if err != nil {
 		log.Error(err)
@@ -495,7 +530,9 @@ func (m *URLRewriteMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 		})
 	}
 
-	m.CheckHostRewrite(oldPath, p, r)
+	if err = m.CheckHostRewrite(oldPath, p, r); err != nil {
+		log.WithError(err).WithField("from", oldPath).WithField("to", p).Error("Checking Host rewrite: error parsing URL")
+	}
 
 	newURL, err := url.Parse(p)
 	if err != nil {

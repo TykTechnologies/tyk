@@ -14,18 +14,72 @@
     border-radius: 0px !important;
     height: 100vh !important;
   }
+
+  #snackbar {
+    visibility: hidden;
+    min-width: 150px;
+    margin-left: -125px;
+    color: #fff;
+    text-align: center;
+    border-radius: 2px;
+    padding: 16px;
+    z-index: 1;
+    left: 70%;  
+    font-size: 18px;
+    background-color: red;
+    position: absolute;
+    bottom: 20px;
+    right: 20px;
+  }
+
+  #snackbar.show {
+    visibility: visible;
+    -webkit-animation: fadein 0.5s, fadeout 0.5s 2.5s;
+    animation: fadein 0.5s, fadeout 0.5s 2.5s;
+  }
+
+  @-webkit-keyframes fadein {
+    from {bottom: 0; opacity: 0;} 
+    to {bottom: 30px; opacity: 1;}
+  }
+
+  @keyframes fadein {
+    from {bottom: 0; opacity: 0;}
+    to {bottom: 30px; opacity: 1;}
+  }
+
+  @-webkit-keyframes fadeout {
+    from {bottom: 30px; opacity: 1;} 
+    to {bottom: 0; opacity: 0;}
+  }
+
+  @keyframes fadeout {
+    from {bottom: 30px; opacity: 1;}
+    to {bottom: 0; opacity: 0;}
+  }
 </style>
 <body>
+  <div id="snackbar">Something went wrong, please pass appropriate headers.</div>
   <div id="root">
   </div>
   <script src="{{.PathPrefix}}/playground.js"> </script>
   <script>
-    const apiUrl = window.location.origin + "{{.Url}}";
+
+    // Start - Show Error Snackbar
+    window.showError = () => {
+      let snackBar = document.getElementById("snackbar");
+      snackBar.classList.add("show");
+      setTimeout(() => snackBar.classList.remove("show"), 3000);
+    };
+    // End - Show Error Snackbar
+
+    const url = window.location.origin + "{{.Url}}";
     const schema = {{.Schema}};
     const GraphiQlInitInstance = new window.GraphiqlInit({
       containerId: 'root',
-      url: apiUrl,
-      schema: schema
+      schemaUrls: [{url}],
+      schema: schema,
+      onSubscriptionError: window.showError
     });
   </script>
 </html>

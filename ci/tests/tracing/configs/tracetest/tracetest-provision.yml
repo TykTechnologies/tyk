@@ -1,0 +1,20 @@
+---
+type: DataStore
+spec:
+  name: otlp
+  type: otlp
+  otlp:
+    type: otlp
+---
+type: Config
+spec:
+  analyticsEnabled: true
+---
+type: PollingProfile
+spec:
+  name: Custom Profile
+  strategy: periodic
+  default: true
+  periodic:
+    timeout: 2m
+    retryDelay: 3s

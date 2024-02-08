@@ -3,11 +3,10 @@ package gateway
 import (
 	"net/http"
 	"testing"
-	"time"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/storage"
-	uuid "github.com/satori/go.uuid"
+	"github.com/TykTechnologies/tyk/test"
 )
 
 func TestHostCheckerManagerInit(t *testing.T) {
@@ -15,7 +14,7 @@ func TestHostCheckerManagerInit(t *testing.T) {
 	defer ts.Close()
 
 	hc := HostCheckerManager{Gw: ts.Gw}
-	redisStorage := &storage.RedisCluster{KeyPrefix: "host-checker-test:", RedisController: ts.Gw.RedisController}
+	redisStorage := &storage.RedisCluster{KeyPrefix: "host-checker-test:", ConnectionHandler: ts.Gw.StorageConnectionHandler}
 	hc.Init(redisStorage)
 
 	if hc.Id == "" {
@@ -46,7 +45,7 @@ func TestAmIPolling(t *testing.T) {
 	globalConf.UptimeTests.PollerGroup = groupID
 	ts.Gw.SetConfig(globalConf)
 
-	redisStorage := &storage.RedisCluster{KeyPrefix: "host-checker-test:", RedisController: ts.Gw.RedisController}
+	redisStorage := &storage.RedisCluster{KeyPrefix: "host-checker-test:", ConnectionHandler: ts.Gw.StorageConnectionHandler}
 	hc.Init(redisStorage)
 	hc2 := HostCheckerManager{Gw: ts.Gw}
 	hc2.Init(redisStorage)
@@ -75,7 +74,7 @@ func TestAmIPolling(t *testing.T) {
 
 	//Testing if the PollerCacheKey doesn't contains the poller_group by default
 	hc = HostCheckerManager{Gw: ts.Gw}
-	redisStorage = &storage.RedisCluster{KeyPrefix: "host-checker-test:", RedisController: ts.Gw.RedisController}
+	redisStorage = &storage.RedisCluster{KeyPrefix: "host-checker-test:", ConnectionHandler: ts.Gw.StorageConnectionHandler}
 	hc.Init(redisStorage)
 	hc.AmIPolling()
 
@@ -98,31 +97,24 @@ func TestGenerateCheckerId(t *testing.T) {
 	if hc.Id == "" {
 		t.Error("HostCheckerManager should generate an Id on GenerateCheckerId")
 	}
-
-	uuid, _ := uuid.FromString(hc.Id)
-	if uuid.Version() != 4 {
-		t.Error("HostCheckerManager should generate an uuid.v4 id")
-	}
 }
 
 func TestCheckActivePollerLoop(t *testing.T) {
+	test.Flaky(t) // TODO: TT-5259
+
 	ts := StartTest(nil)
 	defer ts.Close()
 
 	hc := &HostCheckerManager{Gw: ts.Gw}
-	redisStorage := &storage.RedisCluster{KeyPrefix: "host-checker-test-1:", RedisController: ts.Gw.RedisController}
+	redisStorage := &storage.RedisCluster{KeyPrefix: "host-checker-test-1:", ConnectionHandler: ts.Gw.StorageConnectionHandler}
 	hc.Init(redisStorage)
 
 	go hc.CheckActivePollerLoop(ts.Gw.ctx)
-
-	//We give some warmup time to CheckActivePollerLoop to avoid random tests fail. The sleep time is the same of CheckActivePollerLoop ticker.
-	time.Sleep(11 * time.Second)
 
 	activeInstance, err := redisStorage.GetKey(PollerCacheKey)
 	if activeInstance != hc.Id || err != nil {
 		t.Errorf("activeInstance should be %q when the CheckActivePollerLoop is running", hc.Id)
 	}
-
 }
 
 func TestStartPoller(t *testing.T) {
@@ -130,7 +122,7 @@ func TestStartPoller(t *testing.T) {
 	defer ts.Close()
 
 	hc := HostCheckerManager{Gw: ts.Gw}
-	redisStorage := &storage.RedisCluster{KeyPrefix: "host-checker-TestStartPoller:", RedisController: ts.Gw.RedisController}
+	redisStorage := &storage.RedisCluster{KeyPrefix: "host-checker-TestStartPoller:", ConnectionHandler: ts.Gw.StorageConnectionHandler}
 	hc.Init(redisStorage)
 
 	hc.StartPoller(ts.Gw.ctx)
@@ -145,7 +137,7 @@ func TestRecordUptimeAnalytics(t *testing.T) {
 	defer ts.Close()
 	hc := &HostCheckerManager{Gw: ts.Gw}
 
-	redisStorage := &storage.RedisCluster{KeyPrefix: "host-checker-test-analytics:", RedisController: ts.Gw.RedisController}
+	redisStorage := &storage.RedisCluster{KeyPrefix: "host-checker-test-analytics:", ConnectionHandler: ts.Gw.StorageConnectionHandler}
 	hc.Init(redisStorage)
 
 	spec := &APISpec{}

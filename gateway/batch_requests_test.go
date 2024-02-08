@@ -12,13 +12,13 @@ import (
 	"strings"
 	"sync/atomic"
 	"testing"
-	"time"
 
 	"github.com/TykTechnologies/tyk/certs"
 
+	"github.com/valyala/fasthttp"
+
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/test"
-	"github.com/valyala/fasthttp"
 )
 
 const testBatchRequest = `{
@@ -126,7 +126,7 @@ func TestVirtualEndpointBatch(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
-	_, _, combinedClientPEM, clientCert := certs.GenCertificate(&x509.Certificate{})
+	_, _, combinedClientPEM, clientCert := certs.GenCertificate(&x509.Certificate{}, false)
 	clientCert.Leaf, _ = x509.ParseCertificate(clientCert.Certificate[0])
 	upstream := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 	}))
@@ -160,7 +160,7 @@ func TestVirtualEndpointBatch(t *testing.T) {
 		spec.Proxy.ListenPath = "/"
 		virtualMeta := apidef.VirtualMeta{
 			ResponseFunctionName: "batchTest",
-			FunctionSourceType:   "blob",
+			FunctionSourceType:   apidef.UseBlob,
 			FunctionSourceURI:    base64.StdEncoding.EncodeToString([]byte(js)),
 			Path:                 "/virt",
 			Method:               "GET",
@@ -227,7 +227,7 @@ func TestBatchIgnoreCanonicalHeaderKey(t *testing.T) {
 		spec.Proxy.ListenPath = "/"
 		virtualMeta := apidef.VirtualMeta{
 			ResponseFunctionName: "batchTest",
-			FunctionSourceType:   "blob",
+			FunctionSourceType:   apidef.UseBlob,
 			FunctionSourceURI:    base64.StdEncoding.EncodeToString([]byte(js)),
 			Path:                 "/virt",
 			Method:               "GET",
@@ -239,9 +239,6 @@ func TestBatchIgnoreCanonicalHeaderKey(t *testing.T) {
 			}
 		})
 	})
-
-	// Let the server start
-	time.Sleep(500 * time.Millisecond)
 
 	ts.Run(t, test.TestCase{Path: "/virt", Code: 202})
 	got := header.Load().(string)

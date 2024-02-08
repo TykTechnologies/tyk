@@ -1,6 +1,5 @@
-// +build coprocess
-// +build !python
-// +build !grpc
+//go:build coprocess && !python && !grpc
+// +build coprocess,!python,!grpc
 
 package coprocess_test
 

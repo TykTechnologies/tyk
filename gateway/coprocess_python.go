@@ -1,3 +1,4 @@
+//go:build cgo
 // +build cgo
 
 package gateway
@@ -17,8 +18,9 @@ import (
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/coprocess"
 
-	python "github.com/TykTechnologies/tyk/dlpython"
 	"github.com/golang/protobuf/proto"
+
+	python "github.com/TykTechnologies/tyk/dlpython"
 )
 import (
 	"os"
@@ -188,7 +190,8 @@ func PythonInit(pythonVersion string) error {
 	if err != nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "coprocess",
-		}).Fatal("Couldn't initialize Python")
+		}).Fatalf("Couldn't initialize Python - %s", err.Error())
+		return err
 	}
 	log.WithFields(logrus.Fields{
 		"prefix": "coprocess",
@@ -254,7 +257,7 @@ func PythonSetEnv(pythonPaths ...string) {
 	python.SetPythonPath(pythonPaths)
 }
 
-//nolint getBundlePaths will return an array of the available bundle directories:
+// nolint getBundlePaths will return an array of the available bundle directories:
 func getBundlePaths(conf config.Config) []string {
 	bundlePath := filepath.Join(conf.MiddlewarePath, "bundles")
 	directories := make([]string, 0)
