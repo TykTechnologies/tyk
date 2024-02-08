@@ -2284,8 +2284,11 @@ components:
                   type: boolean
                   x-go-name: SSLInsecureSkipVerify
                 ssl_min_version:
-                  format: uint16
+                  format: int64
+                  description: Represents the SSL minimum version
                   type: integer
+                  minimum: 0
+                  maximum: 65535
                   x-go-name: SSLMinVersion
               type: object
               x-go-name: Transport
