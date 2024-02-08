@@ -1464,6 +1464,10 @@ func (a *APISpec) URLAllowedAndIgnored(r *http.Request, rxPaths []URLSpec, white
 			continue
 		}
 
+		if r.Method == rxPaths[i].Internal.Method && rxPaths[i].Status == Internal && !ctxLoopingEnabled(r) {
+			return EndPointNotAllowed, nil
+		}
+
 		if rxPaths[i].MethodActions == nil {
 			switch rxPaths[i].Status {
 			case WhiteList:
@@ -1516,10 +1520,6 @@ func (a *APISpec) URLAllowedAndIgnored(r *http.Request, rxPaths []URLSpec, white
 				log.Error("URL Method Action was not set to NoAction, blocking.")
 				return EndPointNotAllowed, nil
 			}
-		}
-
-		if r.Method == rxPaths[i].Internal.Method && rxPaths[i].Status == Internal && !ctxLoopingEnabled(r) {
-			return EndPointNotAllowed, nil
 		}
 
 		if whiteListStatus {
