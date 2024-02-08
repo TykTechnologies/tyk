@@ -31,9 +31,9 @@ func TestXTykGateway_Lint(t *testing.T) {
 				op.TransformResponseBody.Format = "json"
 			}
 			if op.URLRewrite != nil {
-				triggers := []*URLRewriteTrigger{}
+				triggers := URLRewriteTriggers{}
 				for _, cond := range URLRewriteConditions {
-					trigger := &URLRewriteTrigger{
+					trigger := URLRewriteTrigger{
 						Condition: cond,
 						Rules:     []*URLRewriteRule{},
 					}
@@ -55,7 +55,7 @@ func TestXTykGateway_Lint(t *testing.T) {
 		settings.Server.Authentication.SecuritySchemes = map[string]interface{}{
 			"test-basic": securityScheme,
 		}
-		for idx, _ := range settings.Middleware.Operations {
+		for idx := range settings.Middleware.Operations {
 			settings.Middleware.Operations[idx].CircuitBreaker.Threshold = 0.5
 		}
 
