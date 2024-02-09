@@ -861,11 +861,16 @@
         },
         "rules": {
           "type": "array",
-          "items": [
-            {
-              "$ref": "#/definitions/X-Tyk-URLRewriteRule"
-            }
-          ]
+          "items": {
+            "anyOf": [
+              {
+                "$ref": "#/definitions/X-Tyk-URLRewriteRule"
+              },
+              {
+                "$ref": "#/definitions/X-Tyk-URLRewriteRuleForRequestBody"
+              }
+            ]
+          }
         }
       },
       "required": [
@@ -873,17 +878,12 @@
         "rewriteTo"
       ]
     },
-    "X-Tyk-URLRewriteRule": {
+    "X-Tyk-URLRewriteRuleForRequestBody": {
       "type": "object",
       "additionalProperties": false,
       "properties": {
         "in": {
           "enum": [
-            "query",
-            "path",
-            "header",
-            "sessionMetadata",
-            "requestContext",
             "requestBody"
           ]
         },
@@ -899,6 +899,35 @@
       },
       "required": [
         "in",
+        "pattern"
+      ]
+    },
+    "X-Tyk-URLRewriteRule": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "in": {
+          "enum": [
+            "query",
+            "path",
+            "header",
+            "sessionMetadata",
+            "requestContext"
+          ]
+        },
+        "name": {
+          "type": "string"
+        },
+        "pattern": {
+          "type": "string"
+        },
+        "negate": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "in",
+        "name",
         "pattern"
       ]
     },
@@ -1724,7 +1753,7 @@
           "type": "boolean"
         },
         "timeout": {
-          "type": "string"
+          "type": "integer"
         }
       },
       "required": [
@@ -1740,7 +1769,7 @@
           "type": "boolean"
         },
         "name": {
-          "$ref": "#/definitions/X-Tyk-DomainDef"
+          "type": "string"
         },
         "certificates": {
           "type": "array",

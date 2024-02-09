@@ -1,69 +1,25 @@
-package gateway
+package graphengine
 
 import (
 	"bytes"
-	"context"
 	"io"
 	"net/http"
-
-	"github.com/TykTechnologies/tyk/apidef"
 )
 
-type GraphQLEngineTransportType int
-
-const (
-	GraphQLEngineTransportTypeProxyOnly GraphQLEngineTransportType = iota
-	GraphQLEngineTransportTypeMultiUpstream
-)
-
-func DetermineGraphQLEngineTransportType(apiSpec *APISpec) GraphQLEngineTransportType {
-	switch apiSpec.GraphQL.ExecutionMode {
-	case apidef.GraphQLExecutionModeSubgraph:
-		fallthrough
-	case apidef.GraphQLExecutionModeProxyOnly:
-		return GraphQLEngineTransportTypeProxyOnly
-	}
-
-	return GraphQLEngineTransportTypeMultiUpstream
-}
-
-type GraphQLProxyOnlyContext struct {
-	context.Context
-	forwardedRequest       *http.Request
-	upstreamResponse       *http.Response
-	ignoreForwardedHeaders map[string]bool
-}
-
-func NewGraphQLProxyOnlyContext(ctx context.Context, forwardedRequest *http.Request) *GraphQLProxyOnlyContext {
-	return &GraphQLProxyOnlyContext{
-		Context:          ctx,
-		forwardedRequest: forwardedRequest,
-		ignoreForwardedHeaders: map[string]bool{
-			http.CanonicalHeaderKey("date"):           true,
-			http.CanonicalHeaderKey("content-type"):   true,
-			http.CanonicalHeaderKey("content-length"): true,
-		},
-	}
-}
-
-func (g *GraphQLProxyOnlyContext) Response() *http.Response {
-	return g.upstreamResponse
-}
+type NewReusableBodyReadCloserFunc func(io.ReadCloser) (io.ReadCloser, error)
+type SeekReadCloserFunc func(io.ReadCloser) (io.ReadCloser, error)
 
 type GraphQLEngineTransport struct {
-	originalTransport http.RoundTripper
-	transportType     GraphQLEngineTransportType
+	originalTransport         http.RoundTripper
+	transportType             GraphQLEngineTransportType
+	newReusableBodyReadCloser NewReusableBodyReadCloserFunc
 }
 
-type GraphqlEngineTransportOption func(transport *GraphQLEngineTransport)
-
-func NewGraphQLEngineTransport(transportType GraphQLEngineTransportType, originalTransport http.RoundTripper, options ...GraphqlEngineTransportOption) *GraphQLEngineTransport {
+func NewGraphQLEngineTransport(transportType GraphQLEngineTransportType, originalTransport http.RoundTripper, newReusableBodyReadCloser NewReusableBodyReadCloserFunc) *GraphQLEngineTransport {
 	transport := &GraphQLEngineTransport{
-		originalTransport: originalTransport,
-		transportType:     transportType,
-	}
-	for i := range options {
-		options[i](transport)
+		originalTransport:         originalTransport,
+		transportType:             transportType,
+		newReusableBodyReadCloser: newReusableBodyReadCloser,
 	}
 	return transport
 }
@@ -103,7 +59,7 @@ func (g *GraphQLEngineTransport) handleProxyOnly(proxyOnlyCtx *GraphQLProxyOnlyC
 		// It's not possible to re-use io.ReadCloser. Because of that, we keep the
 		// original error message for later use.
 		// See TT-7808
-		reusableBody, err := newNopCloserBuffer(io.NopCloser(bytes.NewReader(body)))
+		reusableBody, err := g.newReusableBodyReadCloser(io.NopCloser(bytes.NewReader(body)))
 		if err != nil {
 			return nil, err
 		}
