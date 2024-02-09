@@ -230,7 +230,7 @@ func (sfr sessionFailReason) String() string {
 // sessionFailReason if session limits have been exceeded.
 // Key values to manage rate are Rate and Per, e.g. Rate of 10 messages
 // Per 10 seconds
-func (l *SessionLimiter) ForwardMessage(r *http.Request, currentSession *user.SessionState, rateLimitKey string, store storage.Handler, enableRL, enableQ bool, globalConf *config.Config, api *APISpec, dryRun bool) sessionFailReason {
+func (l *SessionLimiter) ForwardMessage(r *http.Request, currentSession *user.SessionState, rateLimitKey string, quotaKey string, store storage.Handler, enableRL, enableQ bool, globalConf *config.Config, api *APISpec, dryRun bool) sessionFailReason {
 	// check for limit on API level (set to session by ApplyPolicies)
 	accessDef, allowanceScope, err := GetAccessDefinitionByAPIIDOrSession(currentSession, api)
 	if err != nil {
@@ -297,7 +297,7 @@ func (l *SessionLimiter) ForwardMessage(r *http.Request, currentSession *user.Se
 			currentSession.Allowance = currentSession.Allowance - 1
 		}
 
-		if l.RedisQuotaExceeded(r, currentSession, rateLimitKey, allowanceScope, &accessDef.Limit, store, globalConf.HashKeys) {
+		if l.RedisQuotaExceeded(r, currentSession, quotaKey, allowanceScope, &accessDef.Limit, store, globalConf.HashKeys) {
 			return sessionFailQuota
 		}
 	}
@@ -319,12 +319,13 @@ func (l *SessionLimiter) RedisQuotaExceeded(r *http.Request, currentSession *use
 	}
 
 	key := currentSession.KeyID
-	if quotaKey != "" {
-		key = quotaKey
-	}
 
 	if hashKeys {
 		key = storage.HashStr(currentSession.KeyID)
+	}
+
+	if quotaKey != "" {
+		key = quotaKey
 	}
 
 	rawKey := QuotaKeyPrefix + quotaScope + key
