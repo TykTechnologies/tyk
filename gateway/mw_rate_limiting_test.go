@@ -3,6 +3,7 @@ package gateway
 import (
 	"net/http"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 
@@ -228,6 +229,8 @@ func providerCustomRatelimitKey(t *testing.T, provider string) {
 			globalConf.RateLimit.EnableNonTransactionalRateLimiter = true
 		case "DRLSentinel":
 			globalConf.RateLimit.DRLEnableSentinelRateLimiter = true
+		case "Sentinel":
+			globalConf.RateLimit.EnableSentinelRateLimiter = true
 		}
 	}
 
@@ -353,20 +356,20 @@ func providerCustomRatelimitKey(t *testing.T, provider string) {
 
 				// Make first two calls with the first key. Both calls should be 200 OK since the RL is 3 calls / 1000 s.
 				_, _ = g.Run(t, []test.TestCase{
-					{Headers: authHeaderFirstRLKey, Code: http.StatusOK},
-					{Headers: authHeaderFirstRLKey, Code: http.StatusOK},
+					{Headers: authHeaderFirstRLKey, Code: http.StatusOK, Delay: 100 * time.Millisecond},
+					{Headers: authHeaderFirstRLKey, Code: http.StatusOK, Delay: 100 * time.Millisecond},
 				}...)
 
 				// The first call with the second key should be 200 OK.
 				// The next call should be 429 since the ratelimit of 3 calls / 1000 s is shared between two credentials.
 				_, _ = g.Run(t, []test.TestCase{
-					{Headers: authHeaderSecondRLKey, Code: http.StatusOK},
-					{Headers: authHeaderSecondRLKey, Code: http.StatusTooManyRequests},
+					{Headers: authHeaderSecondRLKey, Code: http.StatusOK, Delay: 100 * time.Millisecond},
+					{Headers: authHeaderSecondRLKey, Code: http.StatusTooManyRequests, Delay: 100 * time.Millisecond},
 				}...)
 
 				// Since both keys have the same ratelimit key, the raltelimit for the first key should be already spent.
 				_, _ = g.Run(t, []test.TestCase{
-					{Headers: authHeaderFirstRLKey, Code: http.StatusTooManyRequests},
+					{Headers: authHeaderFirstRLKey, Code: http.StatusTooManyRequests, Delay: 100 * time.Millisecond},
 				}...)
 			})
 
@@ -384,4 +387,8 @@ func TestMwRateLimiting_CustomRatelimitKeyNonTransactional(t *testing.T) {
 
 func TestMwRateLimiting_CustomRatelimitKeyDRLSentinel(t *testing.T) {
 	providerCustomRatelimitKey(t, "DRLSentinel")
+}
+
+func TestMwRateLimiting_CustomRatelimitKeySentinel(t *testing.T) {
+	providerCustomRatelimitKey(t, "Sentinel")
 }
