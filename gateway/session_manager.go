@@ -146,11 +146,16 @@ const (
 	sessionFailInternalServerError
 )
 
-func (l *SessionLimiter) limitSentinel(currentSession *user.SessionState, key string, rateScope string, store storage.Handler,
-	globalConf *config.Config, apiLimit *user.APILimit, dryRun bool) bool {
+func (l *SessionLimiter) limitSentinel(currentSession *user.SessionState, key string, rateScope string, useCustomKey bool,
+	store storage.Handler, globalConf *config.Config, apiLimit *user.APILimit, dryRun bool) bool {
 
 	rateLimiterKey := RateLimitKeyPrefix + rateScope + currentSession.KeyHash()
 	rateLimiterSentinelKey := RateLimitKeyPrefix + rateScope + currentSession.KeyHash() + ".BLOCKED"
+
+	if useCustomKey {
+		rateLimiterKey = RateLimitKeyPrefix + rateScope + key
+		rateLimiterSentinelKey = RateLimitKeyPrefix + rateScope + key + ".BLOCKED"
+	}
 
 	defer func() {
 		go l.doRollingWindowWrite(key, rateLimiterKey, rateLimiterSentinelKey, currentSession, store, globalConf, apiLimit, dryRun)
@@ -166,11 +171,16 @@ func (l *SessionLimiter) limitSentinel(currentSession *user.SessionState, key st
 	return false
 }
 
-func (l *SessionLimiter) limitRedis(currentSession *user.SessionState, key string, rateScope string, store storage.Handler,
-	globalConf *config.Config, apiLimit *user.APILimit, dryRun bool) bool {
+func (l *SessionLimiter) limitRedis(currentSession *user.SessionState, key string, rateScope string, useCustomKey bool,
+	store storage.Handler, globalConf *config.Config, apiLimit *user.APILimit, dryRun bool) bool {
 
 	rateLimiterKey := RateLimitKeyPrefix + rateScope + currentSession.KeyHash()
 	rateLimiterSentinelKey := RateLimitKeyPrefix + rateScope + currentSession.KeyHash() + ".BLOCKED"
+
+	if useCustomKey {
+		rateLimiterKey = RateLimitKeyPrefix + rateScope + key
+		rateLimiterSentinelKey = RateLimitKeyPrefix + rateScope + key + ".BLOCKED"
+	}
 
 	if l.doRollingWindowWrite(key, rateLimiterKey, rateLimiterSentinelKey, currentSession, store, globalConf, apiLimit, dryRun) {
 		return true
@@ -179,9 +189,14 @@ func (l *SessionLimiter) limitRedis(currentSession *user.SessionState, key strin
 }
 
 func (l *SessionLimiter) limitDRL(currentSession *user.SessionState, key string, rateScope string,
-	apiLimit *user.APILimit, dryRun bool) bool {
+	useCustomKey bool, apiLimit *user.APILimit, dryRun bool) bool {
 
 	bucketKey := key + ":" + rateScope + currentSession.LastUpdated
+
+	if useCustomKey {
+		bucketKey = key + ":" + rateScope
+	}
+
 	currRate := apiLimit.Rate
 	per := apiLimit.Per
 
@@ -238,6 +253,9 @@ func (l *SessionLimiter) ForwardMessage(r *http.Request, currentSession *user.Se
 		return sessionFailRateLimit
 	}
 
+	// If quotaKey is not set then the default ratelimit keys should be used.
+	useCustomRateLimitKey := quotaKey != ""
+
 	// If rate is -1 or 0, it means unlimited and no need for rate limiting.
 	if enableRL && accessDef.Limit.Rate > 0 {
 		rateScope := ""
@@ -259,11 +277,11 @@ func (l *SessionLimiter) ForwardMessage(r *http.Request, currentSession *user.Se
 
 		switch {
 		case globalConf.EnableSentinelRateLimiter:
-			if l.limitSentinel(currentSession, rateLimitKey, rateScope, store, globalConf, &accessDef.Limit, dryRun) {
+			if l.limitSentinel(currentSession, rateLimitKey, rateScope, useCustomRateLimitKey, store, globalConf, &accessDef.Limit, dryRun) {
 				return sessionFailRateLimit
 			}
 		case globalConf.EnableRedisRollingLimiter:
-			if l.limitRedis(currentSession, rateLimitKey, rateScope, store, globalConf, &accessDef.Limit, dryRun) {
+			if l.limitRedis(currentSession, rateLimitKey, rateScope, useCustomRateLimitKey, store, globalConf, &accessDef.Limit, dryRun) {
 				return sessionFailRateLimit
 			}
 		default:
@@ -281,11 +299,11 @@ func (l *SessionLimiter) ForwardMessage(r *http.Request, currentSession *user.Se
 			if n <= 1 || n*c < cost {
 				// If we have 1 server, there is no need to strain redis at all the leaky
 				// bucket algorithm will suffice.
-				if l.limitDRL(currentSession, rateLimitKey, rateScope, &accessDef.Limit, dryRun) {
+				if l.limitDRL(currentSession, rateLimitKey, rateScope, useCustomRateLimitKey, &accessDef.Limit, dryRun) {
 					return sessionFailRateLimit
 				}
 			} else {
-				if l.limitRedis(currentSession, rateLimitKey, rateScope, store, globalConf, &accessDef.Limit, dryRun) {
+				if l.limitRedis(currentSession, rateLimitKey, rateScope, useCustomRateLimitKey, store, globalConf, &accessDef.Limit, dryRun) {
 					return sessionFailRateLimit
 				}
 			}
