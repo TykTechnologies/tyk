@@ -192,7 +192,7 @@ func TestMwRateLimiting_DepthLimit(t *testing.T) {
 	})
 }
 
-func TestMwRateLimiting_CustomRatelimitKey(t *testing.T) {
+func providerCustomRatelimitKey(t *testing.T, provider string) {
 	tcs := []struct {
 		name     string
 		hashKey  bool
@@ -219,19 +219,32 @@ func TestMwRateLimiting_CustomRatelimitKey(t *testing.T) {
 		},
 	}
 
+	// Tests are implemented for Redis, DRLSentinel (default) and NonTransactional rate limiters.
+	setRateLimitConfiguration := func(globalConf *config.Config, ratelimitProvider string) {
+		switch ratelimitProvider {
+		case "Redis":
+			globalConf.RateLimit.EnableRedisRollingLimiter = true
+		case "NonTransactional":
+			globalConf.RateLimit.EnableNonTransactionalRateLimiter = true
+		case "DRLSentinel":
+			globalConf.RateLimit.DRLEnableSentinelRateLimiter = true
+		}
+	}
+
 	for _, tc := range tcs {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			g := StartTest(func(globalConf *config.Config) {
 				globalConf.HashKeys = tc.hashKey
 				globalConf.HashKeyFunction = tc.hashAlgo
+				setRateLimitConfiguration(globalConf, provider)
 			})
 			defer g.Close()
 
 			ok := g.Gw.GlobalSessionManager.Store().DeleteAllKeys()
 			assert.True(t, ok)
 
-			customRateLimitKey := "portal-developer-1" + tc.hashAlgo
+			customRateLimitKey := "portal-developer-1" + tc.hashAlgo + provider
 
 			spec := g.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 				spec.UseKeylessAccess = false
@@ -315,7 +328,7 @@ func TestMwRateLimiting_CustomRatelimitKey(t *testing.T) {
 			authHeaderFirstRLKey := map[string]string{header.Authorization: firstRLKey}
 			authHeaderSecondRLKey := map[string]string{header.Authorization: secondRLKey}
 
-			t.Run("Custom quota key", func(t *testing.T) {
+			t.Run("Custom quota key for "+provider, func(t *testing.T) {
 
 				// Make first two calls with the first key. Both calls should be 200 OK since the quota is 3 calls.
 				_, _ = g.Run(t, []test.TestCase{
@@ -336,7 +349,7 @@ func TestMwRateLimiting_CustomRatelimitKey(t *testing.T) {
 				}...)
 			})
 
-			t.Run("Custom ratelimit key", func(t *testing.T) {
+			t.Run("Custom ratelimit key for "+provider, func(t *testing.T) {
 
 				// Make first two calls with the first key. Both calls should be 200 OK since the RL is 3 calls / 1000 s.
 				_, _ = g.Run(t, []test.TestCase{
@@ -359,4 +372,16 @@ func TestMwRateLimiting_CustomRatelimitKey(t *testing.T) {
 
 		})
 	}
+}
+
+func TestMwRateLimiting_CustomRatelimitKeyRedis(t *testing.T) {
+	providerCustomRatelimitKey(t, "Redis")
+}
+
+func TestMwRateLimiting_CustomRatelimitKeyNonTransactional(t *testing.T) {
+	providerCustomRatelimitKey(t, "NonTransactional")
+}
+
+func TestMwRateLimiting_CustomRatelimitKeyDRLSentinel(t *testing.T) {
+	providerCustomRatelimitKey(t, "DRLSentinel")
 }
