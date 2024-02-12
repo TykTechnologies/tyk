@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	"github.com/TykTechnologies/tyk/config"
 
@@ -332,6 +333,18 @@ func (s *OAS) AddServers(apiURLs ...string) {
 
 // UpdateServers sets or updates the first servers URL if it matches oldAPIURL.
 func (s *OAS) UpdateServers(apiURL, oldAPIURL string) {
+	apiURLContainsNamedRegex := strings.Contains(apiURL, "{") && strings.Contains(apiURL, "}")
+	serverAddedByTyk := len(s.Servers) > 0 && s.Servers[0].URL == oldAPIURL
+
+	if apiURLContainsNamedRegex && serverAddedByTyk {
+		s.Servers = s.Servers[1:]
+		return
+	}
+
+	if serverAddedByTyk {
+		s.Servers[0].URL = apiURL
+	}
+
 	if len(s.Servers) == 0 {
 		s.Servers = openapi3.Servers{
 			{
@@ -339,10 +352,6 @@ func (s *OAS) UpdateServers(apiURL, oldAPIURL string) {
 			},
 		}
 		return
-	}
-
-	if len(s.Servers) > 0 && s.Servers[0].URL == oldAPIURL {
-		s.Servers[0].URL = apiURL
 	}
 }
 
