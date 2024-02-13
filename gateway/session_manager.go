@@ -31,8 +31,10 @@ type PublicSession struct {
 }
 
 const (
-	QuotaKeyPrefix     = "quota-"
-	RateLimitKeyPrefix = "rate-limit-"
+	// QuotaKeyPrefix serves as a standard prefix for generating quota keys wherever they are required to be calculated.
+	QuotaKeyPrefix              = "quota-"
+	RateLimitKeyPrefix          = "rate-limit-"
+	SentinelRateLimitKeyPostfix = ".BLOCKED"
 )
 
 // SessionLimiter is the rate limiter for the API, use ForwardMessage() to
@@ -150,11 +152,11 @@ func (l *SessionLimiter) limitSentinel(currentSession *user.SessionState, key st
 	store storage.Handler, globalConf *config.Config, apiLimit *user.APILimit, dryRun bool) bool {
 
 	rateLimiterKey := RateLimitKeyPrefix + rateScope + currentSession.KeyHash()
-	rateLimiterSentinelKey := RateLimitKeyPrefix + rateScope + currentSession.KeyHash() + ".BLOCKED"
+	rateLimiterSentinelKey := RateLimitKeyPrefix + rateScope + currentSession.KeyHash() + SentinelRateLimitKeyPostfix
 
 	if useCustomKey {
 		rateLimiterKey = RateLimitKeyPrefix + rateScope + key
-		rateLimiterSentinelKey = RateLimitKeyPrefix + rateScope + key + ".BLOCKED"
+		rateLimiterSentinelKey = RateLimitKeyPrefix + rateScope + key + SentinelRateLimitKeyPostfix
 	}
 
 	defer func() {
@@ -175,11 +177,11 @@ func (l *SessionLimiter) limitRedis(currentSession *user.SessionState, key strin
 	store storage.Handler, globalConf *config.Config, apiLimit *user.APILimit, dryRun bool) bool {
 
 	rateLimiterKey := RateLimitKeyPrefix + rateScope + currentSession.KeyHash()
-	rateLimiterSentinelKey := RateLimitKeyPrefix + rateScope + currentSession.KeyHash() + ".BLOCKED"
+	rateLimiterSentinelKey := RateLimitKeyPrefix + rateScope + currentSession.KeyHash() + SentinelRateLimitKeyPostfix
 
 	if useCustomKey {
 		rateLimiterKey = RateLimitKeyPrefix + rateScope + key
-		rateLimiterSentinelKey = RateLimitKeyPrefix + rateScope + key + ".BLOCKED"
+		rateLimiterSentinelKey = RateLimitKeyPrefix + rateScope + key + SentinelRateLimitKeyPostfix
 	}
 
 	if l.doRollingWindowWrite(key, rateLimiterKey, rateLimiterSentinelKey, currentSession, store, globalConf, apiLimit, dryRun) {

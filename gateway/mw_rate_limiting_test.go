@@ -192,6 +192,8 @@ func TestMwRateLimiting_DepthLimit(t *testing.T) {
 }
 
 func providerCustomRatelimitKey(t *testing.T, limiter string) {
+	t.Helper()
+
 	tcs := []struct {
 		name     string
 		hashKey  bool
