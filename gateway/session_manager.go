@@ -31,8 +31,9 @@ type PublicSession struct {
 }
 
 const (
-	// QuotaKeyPrefix serves as a standard prefix for generating quota keys wherever they are required to be calculated.
-	QuotaKeyPrefix              = "quota-"
+	// QuotaKeyPrefix serves as a standard prefix for generating quota keys.
+	QuotaKeyPrefix = "quota-"
+	// RateLimitKeyPrefix serves as a standard prefix for generating rate limit keys.
 	RateLimitKeyPrefix          = "rate-limit-"
 	SentinelRateLimitKeyPostfix = ".BLOCKED"
 )
