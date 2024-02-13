@@ -225,8 +225,6 @@ func providerCustomRatelimitKey(t *testing.T, provider string) {
 		switch ratelimitProvider {
 		case "Redis":
 			globalConf.RateLimit.EnableRedisRollingLimiter = true
-		case "DRLSentinel":
-			globalConf.RateLimit.DRLEnableSentinelRateLimiter = true
 		case "Sentinel":
 			globalConf.RateLimit.EnableSentinelRateLimiter = true
 		}
@@ -373,10 +371,6 @@ func providerCustomRatelimitKey(t *testing.T, provider string) {
 
 		})
 	}
-}
-
-func TestMwRateLimiting_CustomRatelimitKeyDRLSentinel(t *testing.T) {
-	providerCustomRatelimitKey(t, "DRLSentinel")
 }
 
 func TestMwRateLimiting_CustomRatelimitKeyRedis(t *testing.T) {
