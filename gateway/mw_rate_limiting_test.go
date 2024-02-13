@@ -375,12 +375,12 @@ func providerCustomRatelimitKey(t *testing.T, provider string) {
 	}
 }
 
-func TestMwRateLimiting_CustomRatelimitKeyRedis(t *testing.T) {
-	providerCustomRatelimitKey(t, "Redis")
-}
-
 func TestMwRateLimiting_CustomRatelimitKeyDRLSentinel(t *testing.T) {
 	providerCustomRatelimitKey(t, "DRLSentinel")
+}
+
+func TestMwRateLimiting_CustomRatelimitKeyRedis(t *testing.T) {
+	providerCustomRatelimitKey(t, "Redis")
 }
 
 func TestMwRateLimiting_CustomRatelimitKeySentinel(t *testing.T) {
