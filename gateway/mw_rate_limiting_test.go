@@ -234,6 +234,12 @@ func providerCustomRatelimitKey(t *testing.T, limiter string) {
 				globalConf.RateLimit.EnableRedisRollingLimiter = true
 			case "Sentinel":
 				globalConf.RateLimit.EnableSentinelRateLimiter = true
+			case "DRL":
+				globalConf.RateLimit.DRLEnableSentinelRateLimiter = true
+			case "NonTransactional":
+				globalConf.RateLimit.EnableNonTransactionalRateLimiter = true
+			case "LeakyBucket":
+				globalConf.RateLimit.EnableLeakyBucketRateLimiter = true
 			default:
 				t.Fatal("There is no such a rate limiter:", limiter)
 			}
@@ -379,4 +385,16 @@ func TestMwRateLimiting_CustomRatelimitKeyRedis(t *testing.T) {
 
 func TestMwRateLimiting_CustomRatelimitKeySentinel(t *testing.T) {
 	providerCustomRatelimitKey(t, "Sentinel")
+}
+
+func TestMwRateLimiting_CustomRatelimitKeyDRL(t *testing.T) {
+	providerCustomRatelimitKey(t, "DRL")
+}
+
+func TestMwRateLimiting_CustomRatelimitKeyNonTransactional(t *testing.T) {
+	providerCustomRatelimitKey(t, "NonTransactional")
+}
+
+func TestMwRateLimiting_CustomRatelimitKeyEnableLeakyBucketRateLimiter(t *testing.T) {
+	providerCustomRatelimitKey(t, "LeakyBucket")
 }
