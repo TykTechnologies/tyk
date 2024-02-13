@@ -8,8 +8,6 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
-	"github.com/TykTechnologies/tyk/config"
-
 	"github.com/TykTechnologies/tyk/header"
 	"github.com/TykTechnologies/tyk/test"
 	"github.com/TykTechnologies/tyk/user"
@@ -193,7 +191,7 @@ func TestMwRateLimiting_DepthLimit(t *testing.T) {
 	})
 }
 
-func providerCustomRatelimitKey(t *testing.T, provider string) {
+func providerCustomRatelimitKey(t *testing.T, limiter string) {
 	tcs := []struct {
 		name     string
 		hashKey  bool
@@ -220,39 +218,45 @@ func providerCustomRatelimitKey(t *testing.T, provider string) {
 		},
 	}
 
-	// Tests are implemented for Redis, DRLSentinel (default) and NonTransactional rate limiters.
-	setRateLimitConfiguration := func(globalConf *config.Config, ratelimitProvider string) {
-		switch ratelimitProvider {
-		case "Redis":
-			globalConf.RateLimit.EnableRedisRollingLimiter = true
-		case "DRLSentinel":
-			globalConf.RateLimit.DRLEnableSentinelRateLimiter = true
-		case "Sentinel":
-			globalConf.RateLimit.EnableSentinelRateLimiter = true
-		}
-	}
-
 	for _, tc := range tcs {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
-			g := StartTest(func(globalConf *config.Config) {
-				globalConf.HashKeys = tc.hashKey
-				globalConf.HashKeyFunction = tc.hashAlgo
-				setRateLimitConfiguration(globalConf, provider)
-			})
-			defer g.Close()
+			ts := StartTest(nil)
+			defer ts.Close()
 
-			ok := g.Gw.GlobalSessionManager.Store().DeleteAllKeys()
+			globalConf := ts.Gw.GetConfig()
+
+			globalConf.HashKeys = tc.hashKey
+			globalConf.HashKeyFunction = tc.hashAlgo
+
+			switch limiter {
+			case "Redis":
+				globalConf.RateLimit.EnableRedisRollingLimiter = true
+			case "Sentinel":
+				globalConf.RateLimit.EnableSentinelRateLimiter = true
+			case "DRL":
+				globalConf.RateLimit.DRLEnableSentinelRateLimiter = true
+			case "NonTransactional":
+				globalConf.RateLimit.EnableNonTransactionalRateLimiter = true
+			case "LeakyBucket":
+				globalConf.RateLimit.EnableLeakyBucketRateLimiter = true
+			default:
+				t.Fatal("There is no such a rate limiter:", limiter)
+			}
+
+			ts.Gw.SetConfig(globalConf)
+
+			ok := ts.Gw.GlobalSessionManager.Store().DeleteAllKeys()
 			assert.True(t, ok)
 
-			customRateLimitKey := "portal-developer-1" + tc.hashAlgo + provider
+			customRateLimitKey := "portal-developer-1" + tc.hashAlgo + limiter
 
-			spec := g.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+			spec := ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 				spec.UseKeylessAccess = false
 				spec.Proxy.ListenPath = "/"
 			})[0]
 
-			_, firstQuotaKey := g.CreateSession(func(s *user.SessionState) {
+			_, firstQuotaKey := ts.CreateSession(func(s *user.SessionState) {
 				s.MaxQueryDepth = -1
 				s.AccessRights = map[string]user.AccessDefinition{
 					spec.APIID: {
@@ -270,7 +274,7 @@ func providerCustomRatelimitKey(t *testing.T, provider string) {
 				}
 			})
 
-			_, secondQuotaKey := g.CreateSession(func(s *user.SessionState) {
+			_, secondQuotaKey := ts.CreateSession(func(s *user.SessionState) {
 				s.MaxQueryDepth = -1
 				s.AccessRights = map[string]user.AccessDefinition{
 					spec.APIID: {
@@ -288,7 +292,7 @@ func providerCustomRatelimitKey(t *testing.T, provider string) {
 				}
 			})
 
-			_, firstRLKey := g.CreateSession(func(s *user.SessionState) {
+			_, firstRLKey := ts.CreateSession(func(s *user.SessionState) {
 				s.MaxQueryDepth = -1
 				s.AccessRights = map[string]user.AccessDefinition{
 					spec.APIID: {
@@ -306,7 +310,7 @@ func providerCustomRatelimitKey(t *testing.T, provider string) {
 				}
 			})
 
-			_, secondRLKey := g.CreateSession(func(s *user.SessionState) {
+			_, secondRLKey := ts.CreateSession(func(s *user.SessionState) {
 				s.MaxQueryDepth = -1
 				s.AccessRights = map[string]user.AccessDefinition{
 					spec.APIID: {
@@ -329,44 +333,44 @@ func providerCustomRatelimitKey(t *testing.T, provider string) {
 			authHeaderFirstRLKey := map[string]string{header.Authorization: firstRLKey}
 			authHeaderSecondRLKey := map[string]string{header.Authorization: secondRLKey}
 
-			t.Run("Custom quota key for "+provider, func(t *testing.T) {
+			t.Run("Custom quota key for "+limiter, func(t *testing.T) {
 
 				// Make first two calls with the first key. Both calls should be 200 OK since the quota is 3 calls.
-				_, _ = g.Run(t, []test.TestCase{
+				_, _ = ts.Run(t, []test.TestCase{
 					{Headers: authHeaderFirstQuotaKey, Code: http.StatusOK},
 					{Headers: authHeaderFirstQuotaKey, Code: http.StatusOK},
 				}...)
 
 				// The first call with the second key should be 200 OK.
 				// The next call should be 403 since the quota of 3 calls is shared between two credentials.
-				_, _ = g.Run(t, []test.TestCase{
+				_, _ = ts.Run(t, []test.TestCase{
 					{Headers: authHeaderSecondQuotaKey, Code: http.StatusOK},
 					{Headers: authHeaderSecondQuotaKey, Code: http.StatusForbidden},
 				}...)
 
 				// Since both keys have the same ratelimit key, the quota for the first key should be already spent.
-				_, _ = g.Run(t, []test.TestCase{
+				_, _ = ts.Run(t, []test.TestCase{
 					{Headers: authHeaderFirstQuotaKey, Code: http.StatusForbidden},
 				}...)
 			})
 
-			t.Run("Custom ratelimit key for "+provider, func(t *testing.T) {
+			t.Run("Custom ratelimit key for "+limiter, func(t *testing.T) {
 
 				// Make first two calls with the first key. Both calls should be 200 OK since the RL is 3 calls / 1000 s.
-				_, _ = g.Run(t, []test.TestCase{
+				_, _ = ts.Run(t, []test.TestCase{
 					{Headers: authHeaderFirstRLKey, Code: http.StatusOK, Delay: 100 * time.Millisecond},
 					{Headers: authHeaderFirstRLKey, Code: http.StatusOK, Delay: 100 * time.Millisecond},
 				}...)
 
 				// The first call with the second key should be 200 OK.
 				// The next call should be 429 since the ratelimit of 3 calls / 1000 s is shared between two credentials.
-				_, _ = g.Run(t, []test.TestCase{
+				_, _ = ts.Run(t, []test.TestCase{
 					{Headers: authHeaderSecondRLKey, Code: http.StatusOK, Delay: 100 * time.Millisecond},
 					{Headers: authHeaderSecondRLKey, Code: http.StatusTooManyRequests, Delay: 100 * time.Millisecond},
 				}...)
 
 				// Since both keys have the same ratelimit key, the raltelimit for the first key should be already spent.
-				_, _ = g.Run(t, []test.TestCase{
+				_, _ = ts.Run(t, []test.TestCase{
 					{Headers: authHeaderFirstRLKey, Code: http.StatusTooManyRequests, Delay: 100 * time.Millisecond},
 				}...)
 			})
@@ -379,10 +383,18 @@ func TestMwRateLimiting_CustomRatelimitKeyRedis(t *testing.T) {
 	providerCustomRatelimitKey(t, "Redis")
 }
 
-func TestMwRateLimiting_CustomRatelimitKeyDRLSentinel(t *testing.T) {
-	providerCustomRatelimitKey(t, "DRLSentinel")
-}
-
 func TestMwRateLimiting_CustomRatelimitKeySentinel(t *testing.T) {
 	providerCustomRatelimitKey(t, "Sentinel")
+}
+
+func TestMwRateLimiting_CustomRatelimitKeyDRL(t *testing.T) {
+	providerCustomRatelimitKey(t, "DRL")
+}
+
+func TestMwRateLimiting_CustomRatelimitKeyNonTransactional(t *testing.T) {
+	providerCustomRatelimitKey(t, "NonTransactional")
+}
+
+func TestMwRateLimiting_CustomRatelimitKeyEnableLeakyBucketRateLimiter(t *testing.T) {
+	providerCustomRatelimitKey(t, "LeakyBucket")
 }
