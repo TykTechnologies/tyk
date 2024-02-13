@@ -385,56 +385,116 @@ func TestOAS_AddServers(t *testing.T) {
 func TestOAS_UpdateServers(t *testing.T) {
 	t.Parallel()
 	type fields struct {
-		T openapi3.T
+		S openapi3.Servers
 	}
 	type args struct {
 		apiURL    string
 		oldAPIURL string
 	}
 	tests := []struct {
-		name        string
-		fields      fields
-		args        args
-		expectedURL string
+		name            string
+		fields          fields
+		args            args
+		expectedServers openapi3.Servers
 	}{
 		{
-			name:        "empty servers",
-			fields:      fields{T: openapi3.T{}},
-			args:        args{apiURL: "http://127.0.0.1:8080/api", oldAPIURL: ""},
-			expectedURL: "http://127.0.0.1:8080/api",
+			name:   "empty servers",
+			fields: fields{S: openapi3.Servers{}},
+			args:   args{apiURL: "http://127.0.0.1:8080/api", oldAPIURL: ""},
+			expectedServers: openapi3.Servers{
+				{
+					URL: "http://127.0.0.1:8080/api",
+				},
+			},
 		},
 		{
 			name: "non-empty servers replace with new",
-			fields: fields{T: openapi3.T{
-				Servers: openapi3.Servers{
+			fields: fields{
+				S: openapi3.Servers{
 					{
 						URL: "http://example-upstream.org/api",
 					},
 				},
-			}},
-			args:        args{apiURL: "http://127.0.0.1:8080/api", oldAPIURL: "http://example-upstream.org/api"},
-			expectedURL: "http://127.0.0.1:8080/api",
+			},
+			args: args{apiURL: "http://127.0.0.1:8080/api", oldAPIURL: "http://example-upstream.org/api"},
+			expectedServers: openapi3.Servers{
+				{
+					URL: "http://127.0.0.1:8080/api",
+				},
+			},
 		},
 		{
 			name: "non-empty servers not replace",
-			fields: fields{T: openapi3.T{
-				Servers: openapi3.Servers{
+			fields: fields{
+				S: openapi3.Servers{
 					{
 						URL: "http://example-upstream.org/api",
 					},
 				},
-			}},
-			args:        args{apiURL: "http://127.0.0.1:8080/api", oldAPIURL: "http://localhost/api"},
-			expectedURL: "http://example-upstream.org/api",
+			},
+			args: args{apiURL: "http://127.0.0.1:8080/api", oldAPIURL: "http://localhost/api"},
+			expectedServers: openapi3.Servers{
+				{
+					URL: "http://example-upstream.org/api",
+				},
+			},
+		},
+		{
+			name: "apiURL with named parameter, do not add to existing servers(not added by Tyk)",
+			fields: fields{
+				S: openapi3.Servers{
+					{
+						URL: "http://example-upstream.org/api",
+					},
+				},
+			},
+			args: args{apiURL: "http://{subdomain:[a-z]+}/api", oldAPIURL: "http://localhost/api"},
+			expectedServers: openapi3.Servers{
+				{
+					URL: "http://example-upstream.org/api",
+				},
+			},
+		},
+		{
+			name: "apiURL with named parameter, remove servers entry added by Tyk",
+			fields: fields{
+				S: openapi3.Servers{
+					{
+						URL: "http://example-upstream.org/api",
+					},
+					{
+						URL: "http://other-upstream.org/api",
+					},
+				},
+			},
+			args: args{apiURL: "http://{subdomain:[a-z]+}/api", oldAPIURL: "http://example-upstream.org/api"},
+			expectedServers: openapi3.Servers{
+				{
+					URL: "http://other-upstream.org/api",
+				},
+			},
+		},
+		{
+			name: "apiURL with named parameter, remove only servers entry added by Tyk",
+			fields: fields{
+				S: openapi3.Servers{
+					{
+						URL: "http://example-upstream.org/api",
+					},
+				},
+			},
+			args:            args{apiURL: "http://{subdomain:[a-z]+}/api", oldAPIURL: "http://example-upstream.org/api"},
+			expectedServers: openapi3.Servers{},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			s := &OAS{
-				T: tt.fields.T,
+				T: openapi3.T{Servers: tt.fields.S},
 			}
 			s.UpdateServers(tt.args.apiURL, tt.args.oldAPIURL)
-			assert.Equal(t, tt.expectedURL, s.Servers[0].URL)
+
+			assert.Equal(t, tt.expectedServers, s.Servers)
 		})
 	}
 }
