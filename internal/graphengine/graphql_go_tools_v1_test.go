@@ -538,6 +538,72 @@ func TestGranularAccessCheckerV1_CheckGraphQLRequestFieldAllowance(t *testing.T)
 		assert.Equal(t, GranularAccessFailReasonIntrospectionDisabled, result.FailReason)
 	})
 
+	t.Run("should return GranularAccessFailReasonNone if DisableIntrospection is set to false and AllowedTypes is not empty", func(t *testing.T) {
+		operation := testIntrospectionQuery
+
+		request, err := http.NewRequest(
+			http.MethodPost,
+			"http://example.com",
+			bytes.NewBuffer([]byte(
+				fmt.Sprintf(`{"query": "%s"}`, operation),
+			)))
+		require.NoError(t, err)
+
+		granularAccessChecker := newTestGranularAccessCheckerV1(t)
+		granularAccessChecker.ctxRetrieveGraphQLRequest = func(r *http.Request) *graphql.Request {
+			if r == request {
+				return &graphql.Request{
+					Query: operation,
+				}
+			}
+			return nil
+		}
+
+		result := granularAccessChecker.CheckGraphQLRequestFieldAllowance(httptest.NewRecorder(), request, &GranularAccessDefinition{
+			DisableIntrospection: false,
+			AllowedTypes: []GranularAccessType{
+				{
+					Name:   "Query",
+					Fields: []string{"hello"},
+				},
+			},
+		})
+		assert.Equal(t, GranularAccessFailReasonNone, result.FailReason)
+	})
+
+	t.Run("should return GranularAccessFailReasonNone if DisableIntrospection is set to false and RestrictedTypes is not empty", func(t *testing.T) {
+		operation := testIntrospectionQuery
+
+		request, err := http.NewRequest(
+			http.MethodPost,
+			"http://example.com",
+			bytes.NewBuffer([]byte(
+				fmt.Sprintf(`{"query": "%s"}`, operation),
+			)))
+		require.NoError(t, err)
+
+		granularAccessChecker := newTestGranularAccessCheckerV1(t)
+		granularAccessChecker.ctxRetrieveGraphQLRequest = func(r *http.Request) *graphql.Request {
+			if r == request {
+				return &graphql.Request{
+					Query: operation,
+				}
+			}
+			return nil
+		}
+
+		result := granularAccessChecker.CheckGraphQLRequestFieldAllowance(httptest.NewRecorder(), request, &GranularAccessDefinition{
+			DisableIntrospection: false,
+			RestrictedTypes: []GranularAccessType{
+				{
+					Name:   "Query",
+					Fields: []string{"helloName"},
+				},
+			},
+		})
+		assert.Equal(t, GranularAccessFailReasonNone, result.FailReason)
+	})
+
 	t.Run("allowed list", func(t *testing.T) {
 		t.Run("should return GranularAccessFailReasonNone if the field is listed in allowed list", func(t *testing.T) {
 			operation := `{ hello }`
