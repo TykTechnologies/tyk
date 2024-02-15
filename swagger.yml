@@ -2165,19 +2165,28 @@ components:
           type: string
           x-go-name: JWTClientIDBaseField
         jwt_expires_at_validation_skew:
-          format: uint64
+          format: int64
           type: integer
+          minimum: 0
+          maximum: 18446744073709551615
+          example: 18446744073615
           x-go-name: JWTExpiresAtValidationSkew
         jwt_identity_base_field:
           type: string
           x-go-name: JWTIdentityBaseField
         jwt_issued_at_validation_skew:
-          format: uint64
+          format: int64
           type: integer
+          minimum: 0
+          maximum: 18446744073709551615
+          example: 18446744073615
           x-go-name: JWTIssuedAtValidationSkew
         jwt_not_before_validation_skew:
-          format: uint64
+          format: int64
           type: integer
+          minimum: 0
+          maximum: 18446744073709551615
+          example: 18446744073615
           x-go-name: JWTNotBeforeValidationSkew
         jwt_policy_field_name:
           type: string
@@ -2275,8 +2284,11 @@ components:
                   type: boolean
                   x-go-name: SSLInsecureSkipVerify
                 ssl_min_version:
-                  format: uint16
+                  format: int64
+                  description: Represents the SSL minimum version
                   type: integer
+                  minimum: 0
+                  maximum: 65535
                   x-go-name: SSLMinVersion
               type: object
               x-go-name: Transport
