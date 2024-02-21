@@ -1849,7 +1849,9 @@ func (gw *Gateway) startDRL() {
 	disabled := gwConfig.ManagementNode || gwConfig.EnableSentinelRateLimiter || gw.GetConfig().EnableRedisRollingLimiter
 
 	gw.drlOnce.Do(func() {
-		drlManager := &drl.DRL{}
+		drlManager := &drl.DRL{
+			SkipDRLSync: gwConfig.SkipDRLSync,
+		}
 		gw.SessionLimiter = NewSessionLimiter(gw.ctx, &gwConfig, drlManager)
 
 		gw.DRLManager = drlManager

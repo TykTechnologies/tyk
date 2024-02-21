@@ -1064,6 +1064,8 @@ type Config struct {
 
 	// OAS holds the configuration for various OpenAPI-specific functionalities
 	OAS OASConfig `json:"oas_config"`
+
+	SkipDRLSync bool `json:"skip_drl_sync"`
 }
 
 // OASConfig holds the configuration for various OpenAPI-specific functionalities
