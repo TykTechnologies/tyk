@@ -1458,6 +1458,16 @@ func (a *APISpec) getURLStatus(stat URLStatus) RequestStatus {
 
 // URLAllowedAndIgnored checks if a url is allowed and ignored.
 func (a *APISpec) URLAllowedAndIgnored(r *http.Request, rxPaths []URLSpec, whiteListStatus bool) (RequestStatus, interface{}) {
+	for i := range rxPaths {
+		if !rxPaths[i].Spec.MatchString(r.URL.Path) {
+			continue
+		}
+
+		if r.Method == rxPaths[i].Internal.Method && rxPaths[i].Status == Internal && !ctxLoopingEnabled(r) {
+			return EndPointNotAllowed, nil
+		}
+	}
+
 	// Check if ignored
 	for i := range rxPaths {
 		if !rxPaths[i].Spec.MatchString(r.URL.Path) {
@@ -1516,10 +1526,6 @@ func (a *APISpec) URLAllowedAndIgnored(r *http.Request, rxPaths []URLSpec, white
 				log.Error("URL Method Action was not set to NoAction, blocking.")
 				return EndPointNotAllowed, nil
 			}
-		}
-
-		if r.Method == rxPaths[i].Internal.Method && rxPaths[i].Status == Internal && !ctxLoopingEnabled(r) {
-			return EndPointNotAllowed, nil
 		}
 
 		if whiteListStatus {
