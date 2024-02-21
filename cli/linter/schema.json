@@ -378,6 +378,9 @@
     "drl_threshold": {
       "type": "number"
     },
+    "drl_skip_sync": {
+      "type": "boolean"
+    },
     "enable_analytics": {
       "type": "boolean"
     },
@@ -1187,9 +1190,6 @@
     "oas_config": {
       "validate_examples": false,
       "validate_schema_defaults": false
-    },
-    "skip_drl_sync": {
-      "type": "boolean"
     }
   }
 }
