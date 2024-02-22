@@ -37,7 +37,7 @@ func TestJWTMiddlewarePass(t *testing.T) {
 	}
 }
 
-// func TestProcessRequest(t *testing.T) {
+// func TestProcessRequest(t *testing.T) { }
 apidef := &BasicAuthKeyIsValid{
 	BaseMiddleware: &BaseMiddleware{},
 }
