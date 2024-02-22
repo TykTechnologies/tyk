@@ -9,7 +9,7 @@ type TokenExchangeMW struct {
 	*BaseMiddleware
 }
 func (k *TokenExchangeMW) Name() string {
-	return "OAuthTokenExchangeMW"
+	return "TokenExchangeMW"
 }
 
 func (k *TokenExchangeMW) EnabledForSpec() bool {
