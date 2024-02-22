@@ -308,10 +308,18 @@ func (s *OAS) AddServers(apiURLs ...string) {
 	apiURLSet := make(map[string]struct{})
 	newServers := openapi3.Servers{}
 	for _, apiURL := range apiURLs {
+		if strings.Contains(apiURL, "{") && strings.Contains(apiURL, "}") {
+			continue
+		}
+
 		newServers = append(newServers, &openapi3.Server{
 			URL: apiURL,
 		})
 		apiURLSet[apiURL] = struct{}{}
+	}
+
+	if len(newServers) == 0 {
+		return
 	}
 
 	if len(s.Servers) == 0 {
