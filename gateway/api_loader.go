@@ -352,7 +352,7 @@ func (gw *Gateway) processSpec(spec *APISpec, apisByListen map[string]int,
 		}
 
 		if gw.mwAppendEnabled(&authArray, &TokenExchangeMW{baseMid}) {
-			logger.Info("Checking security policy: OAuthTokenExchange")
+			logger.Info("Checking security policy: TokenExchange")
 		}
 
 		if gw.mwAppendEnabled(&authArray, &OpenIDMW{BaseMiddleware: baseMid}) {

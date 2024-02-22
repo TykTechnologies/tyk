@@ -38,17 +38,18 @@ func TestJWTMiddlewarePass(t *testing.T) {
 }
 
 // func TestProcessRequest(t *testing.T) {
- 
+apidef := &BasicAuthKeyIsValid{
+	BaseMiddleware: &BaseMiddleware{},
+}
+apidef.spec = &apidef.APIDefinition {
+	TokenExchangeOptions: &TokenExchangeOptions{
+		Enable: true,
+		ClientID: "gw_client_id",
+		ClientSecret: "gw_client_secret",
+		GrantType: "client_credentials",
+		Scopes: "read write",
+	},
 
-// 	k.Spec = &apidef.APIDefinition {
-// 		jwt: OAuthTokenExchangeMW{
-// 			Enable: true,
-// 			ClientID: "gw_client_id",
-// 			ClientSecret: "gw_client_secret", 
-// 			GrantType: "client_credentials",
-// 			Scopes: "read write",
-// 		},
-// 	}
 
 
 //     // create a mock request
