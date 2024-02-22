@@ -242,12 +242,12 @@ type DetailedActivityLogs struct {
 
 // ExtractTo extracts *DetailedActivityLogs into *apidef.APIDefinition.
 func (d *DetailedActivityLogs) ExtractTo(api *apidef.APIDefinition) {
-	api.EnableDetailedRecording = !d.Enabled
+	api.EnableDetailedRecording = d.Enabled
 }
 
 // Fill fills *DetailedActivityLogs from apidef.APIDefinition.
 func (d *DetailedActivityLogs) Fill(api apidef.APIDefinition) {
-	d.Enabled = !api.EnableDetailedRecording
+	d.Enabled = api.EnableDetailedRecording
 }
 
 // DetailedTracing holds the configuration of the detailed tracing.

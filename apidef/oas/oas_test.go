@@ -257,7 +257,6 @@ func TestOAS_ExtractTo_ResetAPIDefinition(t *testing.T) {
 		"APIDefinition.ResponseProcessors[0].Options",
 		"APIDefinition.DoNotTrack",
 		"APIDefinition.TagHeaders[0]",
-		"APIDefinition.EnableDetailedRecording",
 		"APIDefinition.GraphQL.Enabled",
 		"APIDefinition.GraphQL.ExecutionMode",
 		"APIDefinition.GraphQL.Version",
