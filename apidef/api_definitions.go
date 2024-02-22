@@ -587,6 +587,7 @@ type Scopes struct {
 //
 // swagger:model
 type APIDefinition struct {
+	DetailedTracing	 	bool           `bson:"detailed_tracing" json:"detailed_tracing"`
 	Id                  model.ObjectID `bson:"_id,omitempty" json:"id,omitempty" gorm:"primaryKey;column:_id"`
 	Name                string         `bson:"name" json:"name"`
 	Expiration          string         `bson:"expiration" json:"expiration,omitempty"`
@@ -703,7 +704,7 @@ type APIDefinition struct {
 	IsOAS       bool   `bson:"is_oas" json:"is_oas,omitempty"`
 	VersionName string `bson:"-" json:"-"`
 
-	DetailedTracing bool `bson:"detailed_tracing" json:"detailed_tracing"`
+	 bool `bson:"detailed_tracing" json:"detailed_tracing"`
 
 	// For Toekn Exchange see in the struct below
 	TokenExchangeOptions TokenExchangeOptions `token_exchange_options:"token_exchange_options" bson:"token_exchange_options" json:"token_exchange_options"`
@@ -729,7 +730,7 @@ type TokenExchangeOptions struct {
 	// the security token in the subject_token parameter.
 	SubjectTokenType string `bson:"subject_token_type" json:"subject_token_type,omitempty"`
 
-	//GrantType    string `bson:"grant_type" json:"grant_type,omitempty"`
+	GrantType    string `bson:"grant_type" json:"grant_type,omitempty"`
 	Audience     string `bson:"audience" json:"audience,omitempty"`
 
 	// OPTIONAL. A URI that indicates the target service or resource where the
@@ -739,7 +740,7 @@ type TokenExchangeOptions struct {
 	Resource string `bson:"resource" json:"resource,omitempty"`
 
 	// OPTIONAL. A list of space-delimited, case-sensitive strings.  The strings
-	Scope string `bson:"scope" json:"scope,omitempty"`
+	Scopes string `bson:"scope" json:"scope,omitempty"`
 
 	// OPTIONAL. A security token that represents the identity of the acting party. Typically, 
 	// this will be the party that is authorized to use the requested security token and act on behalf of the subject.

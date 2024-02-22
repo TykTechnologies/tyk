@@ -1,13 +1,15 @@
 package gateway
 
 import (
-	"net/http"
 	"errors"
+	"fmt"
+	"net/http"
 )
 
 type TokenExchangeMW struct {
 	*BaseMiddleware
 }
+
 func (k *TokenExchangeMW) Name() string {
 	return "TokenExchangeMW"
 }
@@ -16,12 +18,11 @@ func (k *TokenExchangeMW) EnabledForSpec() bool {
 	return k.Spec.TokenExchangeOptions.Enable
 }
 
-
 func (k *TokenExchangeMW) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
 	if ctxGetRequestStatus(r) == StatusOkAndIgnore {
 		return nil, http.StatusOK
 	}
-
+	fmt.Println("TokenExchangeMW.ProcessRequest")
 	// logger := k.Logger()
 	// var tykId string
 

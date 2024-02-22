@@ -9,10 +9,22 @@ import (
 		"net/http/httptest"
 
 		"github.com/TykTechnologies/tyk/header"
+		"github.com/TykTechnologies/tyk/apidef"
+		//"github.com/TykTechnologies/tyk/test"
+		//"github.com/TykTechnologies/tyk/user"
 )
 
-func TestJWTMiddlewarePass(t *testing.T) {
-	spec := testPrepareIPMiddlewarePass()
+
+func TestProcessRequest(t *testing.T) {
+	spec := BuildAPI(func(spec *APISpec) {
+		spec.TokenExchangeOptions = apidef.TokenExchangeOptions{
+			Enable: true,
+			ClientID: "gw_client_id",
+			ClientSecret: "gw_client_secret",
+			GrantType: "client_credentials",
+			Scopes: "read write",
+		}
+	})[0]
 
 	for ti, tc := range testWhiteListIPData {
 		rec := httptest.NewRecorder()
@@ -37,18 +49,7 @@ func TestJWTMiddlewarePass(t *testing.T) {
 	}
 }
 
-// func TestProcessRequest(t *testing.T) { }
-apidef := &BasicAuthKeyIsValid{
-	BaseMiddleware: &BaseMiddleware{},
-}
-apidef.spec = &apidef.APIDefinition {
-	TokenExchangeOptions: &TokenExchangeOptions{
-		Enable: true,
-		ClientID: "gw_client_id",
-		ClientSecret: "gw_client_secret",
-		GrantType: "client_credentials",
-		Scopes: "read write",
-	},
+
 
 
 

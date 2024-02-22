@@ -351,10 +351,6 @@ func (gw *Gateway) processSpec(spec *APISpec, apisByListen map[string]int,
 			logger.Info("Checking security policy: JWT")
 		}
 
-		if gw.mwAppendEnabled(&authArray, &TokenExchangeMW{baseMid}) {
-			logger.Info("Checking security policy: TokenExchange")
-		}
-
 		if gw.mwAppendEnabled(&authArray, &OpenIDMW{BaseMiddleware: baseMid}) {
 			logger.Info("Checking security policy: OpenID")
 		}
@@ -421,6 +417,7 @@ func (gw *Gateway) processSpec(spec *APISpec, apisByListen map[string]int,
 			}
 		}
 
+		gw.mwAppendEnabled(&chainArray, &TokenExchangeMW{baseMid})
 		gw.mwAppendEnabled(&chainArray, &StripAuth{baseMid})
 		gw.mwAppendEnabled(&chainArray, &KeyExpired{baseMid})
 		gw.mwAppendEnabled(&chainArray, &AccessRightsCheck{baseMid})
