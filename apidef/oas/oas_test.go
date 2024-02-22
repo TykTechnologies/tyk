@@ -314,14 +314,22 @@ func TestOAS_AddServers(t *testing.T) {
 		apiURLs []string
 	}
 	tests := []struct {
-		name   string
-		fields fields
-		args   args
+		name         string
+		fields       fields
+		args         args
+		expectedURLs []string
 	}{
 		{
-			name:   "empty servers",
-			fields: fields{T: openapi3.T{}},
-			args:   args{apiURLs: []string{"http://127.0.0.1:8080/api"}},
+			name:         "empty servers",
+			fields:       fields{T: openapi3.T{}},
+			args:         args{apiURLs: []string{"http://127.0.0.1:8080/api"}},
+			expectedURLs: []string{"http://127.0.0.1:8080/api"},
+		},
+		{
+			name:         "empty servers and named parameters",
+			fields:       fields{T: openapi3.T{}},
+			args:         args{apiURLs: []string{"http://{subdomain}/api"}},
+			expectedURLs: nil,
 		},
 		{
 			name: "non-empty servers",
@@ -332,7 +340,20 @@ func TestOAS_AddServers(t *testing.T) {
 					},
 				},
 			}},
-			args: args{apiURLs: []string{"http://127.0.0.1:8080/api"}},
+			args:         args{apiURLs: []string{"http://127.0.0.1:8080/api"}},
+			expectedURLs: []string{"http://127.0.0.1:8080/api", "http://example-upstream.org/api"},
+		},
+		{
+			name: "non-empty servers and mix on named parameters and normal urls",
+			fields: fields{T: openapi3.T{
+				Servers: openapi3.Servers{
+					{
+						URL: "http://example-upstream.org/api",
+					},
+				},
+			}},
+			args:         args{apiURLs: []string{"http://127.0.0.1:8080/api", "http://{subdomain}/api"}},
+			expectedURLs: []string{"http://127.0.0.1:8080/api", "http://example-upstream.org/api"},
 		},
 		{
 			name: "non-empty servers having same URL that of apiURL",
@@ -350,6 +371,11 @@ func TestOAS_AddServers(t *testing.T) {
 				},
 			}},
 			args: args{apiURLs: []string{"http://127.0.0.1:8080/api"}},
+			expectedURLs: []string{
+				"http://127.0.0.1:8080/api",
+				"http://example-upstream.org/api",
+				"http://legacy-upstream.org/api",
+			},
 		},
 		{
 			name: "non-empty servers having same URL that of apiURL",
@@ -364,6 +390,10 @@ func TestOAS_AddServers(t *testing.T) {
 				},
 			}},
 			args: args{apiURLs: []string{"http://127.0.0.1:8080/api"}},
+			expectedURLs: []string{
+				"http://127.0.0.1:8080/api",
+				"http://example-upstream.org/api",
+			},
 		},
 	}
 	for _, tt := range tests {
@@ -372,12 +402,16 @@ func TestOAS_AddServers(t *testing.T) {
 				T: tt.fields.T,
 			}
 			s.AddServers(tt.args.apiURLs...)
-			addedServerURLs := make([]string, len(tt.args.apiURLs))
-			for i, server := range s.Servers[:len(tt.args.apiURLs)] {
-				addedServerURLs[i] = server.URL
+			if tt.expectedURLs == nil {
+				assert.Empty(t, s.Servers)
+				return
+			}
+			var serverURLs []string
+			for _, server := range s.Servers {
+				serverURLs = append(serverURLs, server.URL)
 			}
 
-			assert.ElementsMatch(t, tt.args.apiURLs, addedServerURLs)
+			assert.ElementsMatch(t, tt.expectedURLs, serverURLs)
 		})
 	}
 }
