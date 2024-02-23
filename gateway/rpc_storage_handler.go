@@ -152,7 +152,7 @@ func (r *RPCStorageHandler) Connect() bool {
 func (r *RPCStorageHandler) buildNodeInfo() []byte {
 	config := r.Gw.GetConfig()
 	checkDuration := config.LivenessCheck.CheckDuration
-	var intCheckDuration int64 = 0
+	var intCheckDuration int64
 	if checkDuration == 0 {
 		intCheckDuration = 10
 	} else {
