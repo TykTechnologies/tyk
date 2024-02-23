@@ -25,9 +25,21 @@
     "proxy": {
         "listen_path": "/token-exchange/",
         "target_url": "http://httpbin.org",
-        "strip_listen_path": true
+        "strip_listen_path": true,
+        "preserve_host_header": false
     },
+    "enable_jwt": true,
+    "jwt_signing_method": "rsa",
+    "jwt_source": "https://keycloak.asoorm.do.poc.tyk.technology/realms/kubecon-eu-24/protocol/openid-connect/certs",
+    "jwt_identity_base_field": "sub",
+    "jwt_policy_field_name": "pol",
+    "jwt_default_policies": ["default"],
     "token_exchange_options": {
-        "enable": true
-    }
+        "enable": true,
+        "token_endpoint": "https://keycloak.asoorm.do.poc.tyk.technology/realms/kubecon-eu-24/protocol/openid-connect/token",
+        "client_id": "gateway",
+        "client_secret": "CHANGEME",
+        "audience": ["accounts", "transactions"]
+    },
+    "active": false
 }
