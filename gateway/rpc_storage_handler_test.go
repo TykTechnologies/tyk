@@ -329,7 +329,7 @@ func TestGetGroupLoginCallback(t *testing.T) {
 				NodeID:      ts.Gw.GetNodeID(),
 				GroupID:     "",
 				APIKey:      "",
-				TTL:         0,
+				TTL:         10,
 				Tags:        nil,
 				NodeVersion: VERSION,
 				Health:      ts.Gw.getHealthCheckInfo(),
@@ -369,7 +369,7 @@ func TestRPCStorageHandler_BuildNodeInfo(t *testing.T) {
 			expectedNodeInfo: apidef.NodeData{
 				GroupID:     "",
 				APIKey:      "",
-				TTL:         0,
+				TTL:         10,
 				Tags:        nil,
 				NodeVersion: VERSION,
 				Stats: apidef.GWStats{
@@ -384,7 +384,7 @@ func TestRPCStorageHandler_BuildNodeInfo(t *testing.T) {
 				ts := StartTest(func(globalConf *config.Config) {
 					globalConf.SlaveOptions.GroupID = "group"
 					globalConf.DBAppConfOptions.Tags = []string{"tag1"}
-					globalConf.LivenessCheck.CheckDuration = 1
+					globalConf.LivenessCheck.CheckDuration = 1000000000
 					globalConf.SlaveOptions.APIKey = "apikey-test"
 				})
 
@@ -408,7 +408,7 @@ func TestRPCStorageHandler_BuildNodeInfo(t *testing.T) {
 				ts := StartTest(func(globalConf *config.Config) {
 					globalConf.SlaveOptions.GroupID = "group"
 					globalConf.DBAppConfOptions.Tags = []string{"tag1"}
-					globalConf.LivenessCheck.CheckDuration = 1
+					globalConf.LivenessCheck.CheckDuration = 1000000000
 				})
 
 				ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
@@ -444,7 +444,7 @@ func TestRPCStorageHandler_BuildNodeInfo(t *testing.T) {
 				ts := StartTest(func(globalConf *config.Config) {
 					globalConf.SlaveOptions.GroupID = "group"
 					globalConf.DBAppConfOptions.Tags = []string{"tag1", "tag2"}
-					globalConf.LivenessCheck.CheckDuration = 1
+					globalConf.LivenessCheck.CheckDuration = 1000000000
 				})
 
 				ts.Gw.SetNodeID("test-node-id")
