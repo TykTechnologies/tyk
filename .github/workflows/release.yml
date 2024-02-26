@@ -234,6 +234,7 @@ jobs:
         working-directory: auto
         id: test_execution
         run: |
+          set -o pipefail
           echo "### API tests ${{ matrix.db }} ${{ matrix.conf }}" >> $GITHUB_STEP_SUMMARY
           if docker run --rm --network auto_default --env-file pytest.env -v ${{ github.workspace }}/reports:/app/reports \
              ${{ steps.ecr.outputs.registry }}/tyk-automated-tests:${{ needs.test-controller.outputs.gd_tag }} \
