@@ -49,6 +49,9 @@ var (
 		CoProcessOptions: CoProcessConfig{
 			EnableCoProcess: false,
 		},
+		LivenessCheck: LivenessCheckConfig{
+			CheckDuration: time.Second * 10,
+		},
 	}
 )
 

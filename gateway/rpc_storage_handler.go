@@ -152,10 +152,8 @@ func (r *RPCStorageHandler) Connect() bool {
 func (r *RPCStorageHandler) buildNodeInfo() []byte {
 	config := r.Gw.GetConfig()
 	checkDuration := config.LivenessCheck.CheckDuration
-	var intCheckDuration int64
-	if checkDuration == 0 {
-		intCheckDuration = 10
-	} else {
+	var intCheckDuration int64 = 10
+	if checkDuration != 0 {
 		// NodeData.TTL expects an int64 value, so we're getting the number of seconds expressed in int64 instead of time.Second
 		intCheckDuration = int64(checkDuration / time.Second)
 	}
