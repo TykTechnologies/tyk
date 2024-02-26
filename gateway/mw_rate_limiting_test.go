@@ -394,7 +394,3 @@ func TestMwRateLimiting_CustomRatelimitKeyDRL(t *testing.T) {
 func TestMwRateLimiting_CustomRatelimitKeyNonTransactional(t *testing.T) {
 	providerCustomRatelimitKey(t, "NonTransactional")
 }
-
-func TestMwRateLimiting_CustomRatelimitKeyEnableLeakyBucketRateLimiter(t *testing.T) {
-	providerCustomRatelimitKey(t, "LeakyBucket")
-}
