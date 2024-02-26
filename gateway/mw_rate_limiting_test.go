@@ -240,8 +240,6 @@ func providerCustomRatelimitKey(t *testing.T, limiter string) {
 				globalConf.RateLimit.DRLEnableSentinelRateLimiter = true
 			case "NonTransactional":
 				globalConf.RateLimit.EnableNonTransactionalRateLimiter = true
-			case "LeakyBucket":
-				globalConf.RateLimit.EnableLeakyBucketRateLimiter = true
 			default:
 				t.Fatal("There is no such a rate limiter:", limiter)
 			}
