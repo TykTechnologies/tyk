@@ -1324,6 +1324,10 @@ func (gw *Gateway) initialiseSystem() error {
 		}
 	}
 
+	if gwConfig.LivenessCheck.CheckDuration == 0 {
+		gwConfig.LivenessCheck.CheckDuration = 10 * time.Second
+	}
+
 	gw.SetConfig(gwConfig)
 	config.Global = gw.GetConfig
 	gw.getHostDetails(gw.GetConfig().PIDFileLocation)

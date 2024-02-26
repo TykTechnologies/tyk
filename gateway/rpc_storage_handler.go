@@ -151,12 +151,19 @@ func (r *RPCStorageHandler) Connect() bool {
 
 func (r *RPCStorageHandler) buildNodeInfo() []byte {
 	config := r.Gw.GetConfig()
+	checkDuration := config.LivenessCheck.CheckDuration
+	var intCheckDuration int64 = 10
+	if checkDuration != 0 {
+		// NodeData.TTL expects an int64 value, so we're getting the number of seconds expressed in int64 instead of time.Second
+		intCheckDuration = int64(checkDuration / time.Second)
+	}
+
 	node := apidef.NodeData{
 		NodeID:      r.Gw.GetNodeID(),
 		GroupID:     config.SlaveOptions.GroupID,
 		APIKey:      config.SlaveOptions.APIKey,
 		NodeVersion: VERSION,
-		TTL:         int64(config.LivenessCheck.CheckDuration),
+		TTL:         intCheckDuration,
 		Tags:        config.DBAppConfOptions.Tags,
 		Health:      r.Gw.getHealthCheckInfo(),
 		Stats: apidef.GWStats{
