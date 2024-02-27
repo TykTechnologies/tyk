@@ -3,6 +3,7 @@ package gateway
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/TykTechnologies/tyk/internal/cache"
 	"io"
 	"net/http"
 	"net/url"
@@ -50,6 +51,7 @@ type TokenExchangeResponse struct {
 
 type TokenExchangeMW struct {
 	*BaseMiddleware
+	tokCache cache.Repository
 }
 
 func (k *TokenExchangeMW) Name() string {
@@ -57,7 +59,11 @@ func (k *TokenExchangeMW) Name() string {
 }
 
 func (k *TokenExchangeMW) EnabledForSpec() bool {
-	return k.Spec.TokenExchangeOptions.Enable
+	if k.Spec.TokenExchangeOptions.Enable {
+		k.tokCache = cache.New(240, 30)
+		return true
+	}
+	return false
 }
 
 const (
@@ -72,43 +78,52 @@ func (k *TokenExchangeMW) ProcessRequest(w http.ResponseWriter, r *http.Request,
 
 	subjectToken := strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")
 
-	ter := TokenExchangeRequest{
-		ClientID:     k.Spec.TokenExchangeOptions.ClientID,
-		ClientSecret: k.Spec.TokenExchangeOptions.ClientSecret,
-		SubjectToken: subjectToken,
-		GrantType:    TokenExchangeGrantType,
+	sig := strings.Split(subjectToken, ".")[2]
+	var newAccessToken string
+	if exchangedToken, ok := k.tokCache.Get(sig); ok {
+		newAccessToken = exchangedToken.(string)
+	} else {
+		// first time we see this token
+		ter := TokenExchangeRequest{
+			ClientID:     k.Spec.TokenExchangeOptions.ClientID,
+			ClientSecret: k.Spec.TokenExchangeOptions.ClientSecret,
+			SubjectToken: subjectToken,
+			GrantType:    TokenExchangeGrantType,
+		}
+
+		params := url.Values{}
+		params.Set("client_id", ter.ClientID)
+		params.Set("client_secret", ter.ClientSecret)
+		params.Set("subject_token", ter.SubjectToken)
+		params.Set("grant_type", ter.GrantType)
+
+		req, err := http.NewRequest(http.MethodPost, k.Spec.TokenExchangeOptions.TokenEndpoint, strings.NewReader(params.Encode()))
+		if err != nil {
+			return err, http.StatusInternalServerError
+		}
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+
+		c := &http.Client{}
+		res, err := c.Do(req)
+		if err != nil {
+			return err, http.StatusInternalServerError
+		}
+
+		defer res.Body.Close()
+
+		if res.StatusCode != http.StatusOK {
+			bodyBytes, _ := io.ReadAll(res.Body)
+			log.Error("token exchange failed: %s", string(bodyBytes))
+			return fmt.Errorf("token exchange failed: %s", res.Status), http.StatusInternalServerError
+		}
+
+		tokenResponse := TokenExchangeResponse{}
+		json.NewDecoder(res.Body).Decode(&tokenResponse)
+
+		newAccessToken = tokenResponse.AccessToken
+		k.tokCache.Set(sig, newAccessToken, 5)
 	}
 
-	params := url.Values{}
-	params.Set("client_id", ter.ClientID)
-	params.Set("client_secret", ter.ClientSecret)
-	params.Set("subject_token", ter.SubjectToken)
-	params.Set("grant_type", ter.GrantType)
-
-	req, err := http.NewRequest(http.MethodPost, k.Spec.TokenExchangeOptions.TokenEndpoint, strings.NewReader(params.Encode()))
-	if err != nil {
-		return err, http.StatusInternalServerError
-	}
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-
-	c := &http.Client{}
-	res, err := c.Do(req)
-	if err != nil {
-		return err, http.StatusInternalServerError
-	}
-
-	defer res.Body.Close()
-
-	if res.StatusCode != http.StatusOK {
-		bodyBytes, _ := io.ReadAll(res.Body)
-		log.Error("token exchange failed: %s", string(bodyBytes))
-		return fmt.Errorf("token exchange failed: %s", res.Status), http.StatusInternalServerError
-	}
-
-	tokenResponse := TokenExchangeResponse{}
-	json.NewDecoder(res.Body).Decode(&tokenResponse)
-
-	r.Header.Set("Authorization", fmt.Sprintf("Bearer %s", tokenResponse.AccessToken))
-
+	r.Header.Set("Authorization", fmt.Sprintf("Bearer %s", newAccessToken))
 	return nil, http.StatusOK
 }
