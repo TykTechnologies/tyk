@@ -154,11 +154,11 @@ type StorageOptionsConf struct {
 	// Maximum TLS version that is supported.
 	// Options: ["1.0", "1.1", "1.2", "1.3"].
 	// Defaults to "1.3".
-	MaxVersion string `json:"max_version"`
+	MaxVersion string `json:"tls_max_version"`
 	// Minimum TLS version that is supported.
 	// Options: ["1.0", "1.1", "1.2", "1.3"].
 	// Defaults to "1.2".
-	MinVersion string `json:"min_version"`
+	MinVersion string `json:"tls_min_version"`
 }
 
 type NormalisedURLConfig struct {
@@ -424,10 +424,10 @@ type HttpServerOptionsConfig struct {
 	ServerName string `json:"server_name"`
 
 	// Minimum TLS version. Possible values: https://tyk.io/docs/basic-config-and-security/security/tls-and-ssl/#values-for-tls-versions
-	MinVersion uint16 `json:"min_version"`
+	TLSMinVersion uint16 `json:"min_version"`
 
 	// Maximum TLS version.
-	MaxVersion uint16 `json:"max_version"`
+	TLSMaxVersion uint16 `json:"max_version"`
 
 	// When mTLS enabled, this option allows to skip client CA announcement in the TLS handshake.
 	// This option is useful when you have a lot of ClientCAs and you want to reduce the handshake overhead, as some clients can hit TLS handshake limits.

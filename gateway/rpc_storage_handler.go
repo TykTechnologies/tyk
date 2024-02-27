@@ -126,8 +126,8 @@ func (r *RPCStorageHandler) Connect() bool {
 	rpcConfig := rpc.Config{
 		UseSSL:                slaveOptions.UseSSL,
 		SSLInsecureSkipVerify: slaveOptions.SSLInsecureSkipVerify,
-		SSLMinVersion:         r.Gw.GetConfig().HttpServerOptions.MinVersion,
-		SSLMaxVersion:         r.Gw.GetConfig().HttpServerOptions.MaxVersion,
+		SSLMinVersion:         r.Gw.GetConfig().HttpServerOptions.TLSMinVersion,
+		SSLMaxVersion:         r.Gw.GetConfig().HttpServerOptions.TLSMaxVersion,
 		ConnectionString:      slaveOptions.ConnectionString,
 		RPCKey:                slaveOptions.RPCKey,
 		APIKey:                slaveOptions.APIKey,
