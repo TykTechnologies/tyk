@@ -5,6 +5,15 @@ package config
 
 // DevelopmentConfig extends Config for development builds.
 type DevelopmentConfig struct {
+	// EnableLeakyBucketRateLimiter enables leaky bucket rate limiting.
+	//
+	// LeakyBucket will delay requests so they are processed in a FIFO
+	// style queue, ensuring a constant request rate and smoothing out
+	// traffic spikes. This comes at some cost to gateway instances, as
+	// the connections would be held for a longer time, instead of
+	// blocking the requests when they go over the defined rate limits.
+	EnableLeakyBucketRateLimiter bool `json:"enable_leaky_bucket_rate_limiter"`
+
 	// EnableTokenBucket enables token bucket rate limiting.
 	EnableTokenBucketRateLimiter bool `json:"enable_token_bucket_rate_limiter"`
 
