@@ -77,8 +77,8 @@ func (gw *Gateway) initialiseClient() *http.Client {
 			// Setup HTTPS client
 			tlsConfig := &tls.Config{
 				InsecureSkipVerify: gw.GetConfig().HttpServerOptions.SSLInsecureSkipVerify,
-				MinVersion:         gw.GetConfig().HttpServerOptions.TLSMinVersion,
-				MaxVersion:         gw.GetConfig().HttpServerOptions.TLSMaxVersion,
+				MinVersion:         gw.GetConfig().HttpServerOptions.MinVersion,
+				MaxVersion:         gw.GetConfig().HttpServerOptions.MaxVersion,
 			}
 
 			dashClient.Transport = &http.Transport{TLSClientConfig: tlsConfig}

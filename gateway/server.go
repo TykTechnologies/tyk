@@ -1308,12 +1308,12 @@ func (gw *Gateway) initialiseSystem() error {
 		gwConfig.ProxySSLMaxVersion = gwConfig.ProxySSLMinVersion
 	}
 
-	if gwConfig.HttpServerOptions.TLSMaxVersion == 0 {
-		gwConfig.HttpServerOptions.TLSMaxVersion = tls.VersionTLS12
+	if gwConfig.HttpServerOptions.MaxVersion == 0 {
+		gwConfig.HttpServerOptions.MaxVersion = tls.VersionTLS12
 	}
 
-	if gwConfig.HttpServerOptions.TLSMinVersion > gwConfig.HttpServerOptions.TLSMaxVersion {
-		gwConfig.HttpServerOptions.TLSMaxVersion = gwConfig.HttpServerOptions.TLSMinVersion
+	if gwConfig.HttpServerOptions.MinVersion > gwConfig.HttpServerOptions.MaxVersion {
+		gwConfig.HttpServerOptions.MaxVersion = gwConfig.HttpServerOptions.MinVersion
 	}
 
 	if gwConfig.UseDBAppConfigs && gwConfig.Policies.PolicySource != config.DefaultDashPolicySource {

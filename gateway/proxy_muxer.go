@@ -523,8 +523,8 @@ func (m *proxyMux) generateListener(listenPort int, protocol string, gw *Gateway
 		tlsConfig := tls.Config{
 			GetCertificate:     dummyGetCertificate,
 			ServerName:         httpServerOptions.ServerName,
-			MinVersion:         httpServerOptions.TLSMinVersion,
-			MaxVersion:         httpServerOptions.TLSMaxVersion,
+			MinVersion:         httpServerOptions.MinVersion,
+			MaxVersion:         httpServerOptions.MaxVersion,
 			ClientAuth:         tls.NoClientCert,
 			InsecureSkipVerify: httpServerOptions.SSLInsecureSkipVerify,
 			CipherSuites:       getCipherAliases(httpServerOptions.Ciphers),
