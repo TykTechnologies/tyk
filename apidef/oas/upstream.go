@@ -21,7 +21,7 @@ type Upstream struct {
 	// Test contains the configuration related to uptime tests.
 	Test *Test `bson:"test,omitempty" json:"test,omitempty"`
 
-	// MutualTLS contains the configuration for establishment of mutual TLS between Tyk and the upstream server.
+	// MutualTLS contains the configuration for establishing a mutual TLS connection between Tyk and the upstream server.
 	MutualTLS *MutualTLS `bson:"mutualTLS,omitempty" json:"mutualTLS,omitempty"`
 
 	// CertificatePinning contains the configuration related to certificate pinning.
@@ -330,7 +330,7 @@ func (t *Test) ExtractTo(uptimeTests *apidef.UptimeTests) {
 	t.ServiceDiscovery.ExtractTo(&uptimeTests.Config.ServiceDiscovery)
 }
 
-// MutualTLS contains the configuration for establishment of mutual TLS between Tyk and the upstream server.
+// MutualTLS contains the configuration for establishing a mutual TLS connection between Tyk and the upstream server.
 type MutualTLS struct {
 	// Enabled activates upstream mutual TLS for the API.
 	// Tyk classic API definition: `upstream_certificates_disabled`
