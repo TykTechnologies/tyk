@@ -655,7 +655,7 @@ type AuthenticationPlugin struct {
 	Enabled bool `bson:"enabled" json:"enabled"` // required.
 	// FunctionName is the name of authentication method.
 	FunctionName string `bson:"functionName" json:"functionName"` // required.
-	// Path is the path to shared object file in case of gopluign mode or path to js code in case of otto auth plugin.
+	// Path is the path to shared object file in case of goplugin mode or path to JS code in case of otto auth plugin.
 	Path string `bson:"path" json:"path"`
 	// RawBodyOnly if set to true, do not fill body in request or response object.
 	RawBodyOnly bool `bson:"rawBodyOnly,omitempty" json:"rawBodyOnly,omitempty"`
