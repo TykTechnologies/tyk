@@ -1080,7 +1080,11 @@ func (c CustomPlugins) ExtractTo(mwDefs []apidef.MiddlewareDefinition) {
 	}
 }
 
-// PrePlugin configures pre stage plugins.
+// PrePlugin configures pre-request plugins.
+//
+// Pre-request plugins are executed before the request is sent to the
+// upstream target and before any authentication information is extracted
+// from the header or parameter list of the request.
 type PrePlugin struct {
 	// Plugins configures custom plugins to be run on pre authentication stage.
 	// The plugins would be executed in the order of configuration in the list.
