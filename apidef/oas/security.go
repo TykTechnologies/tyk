@@ -24,7 +24,7 @@ const (
 
 // Token holds the values related to authentication tokens.
 type Token struct {
-	// Enabled enables the token based authentication mode.
+	// Enabled activates the token based authentication mode.
 	//
 	// Tyk classic API definition: `auth_configs["authToken"].use_standard_auth`
 	Enabled bool `bson:"enabled" json:"enabled"` // required
@@ -207,7 +207,7 @@ func (s *OAS) extractJWTTo(api *apidef.APIDefinition, name string) {
 
 // Basic type holds configuration values related to http basic authentication.
 type Basic struct {
-	// Enabled enables the basic authentication mode.
+	// Enabled activates the basic authentication mode.
 	// Tyk classic API definition: `use_basic_auth`
 	Enabled     bool `bson:"enabled" json:"enabled"` // required
 	AuthSources `bson:",inline" json:",inline"`
@@ -296,7 +296,7 @@ func (s *OAS) extractBasicTo(api *apidef.APIDefinition, name string) {
 
 // ExtractCredentialsFromBody configures extracting credentials from the request body.
 type ExtractCredentialsFromBody struct {
-	// Enabled enables extracting credentials from body.
+	// Enabled activates extracting credentials from body.
 	// Tyk classic API definition: `basic_auth.extract_from_body`
 	Enabled bool `bson:"enabled" json:"enabled"` // required
 	// UserRegexp is the regex for username e.g. `<User>(.*)</User>`.
@@ -407,7 +407,7 @@ type OAuthProvider struct {
 }
 
 type JWTValidation struct {
-	// Enabled enables OAuth access token validation by introspection to a third party.
+	// Enabled activates OAuth access token validation by introspection to a third party.
 	Enabled bool `bson:"enabled" json:"enabled"`
 
 	// SigningMethod to verify signing method used in jwt - allowed values HMAC/RSA/ECDSA.
@@ -454,7 +454,7 @@ func (j *JWTValidation) ExtractTo(jwt *apidef.JWTValidation) {
 }
 
 type Introspection struct {
-	// Enabled enables OAuth access token validation by introspection to a third party.
+	// Enabled activates OAuth access token validation by introspection to a third party.
 	Enabled bool `bson:"enabled" json:"enabled"`
 	// URL is the URL of the third party provider's introspection endpoint.
 	URL string `bson:"url" json:"url"`
@@ -498,7 +498,7 @@ func (i *Introspection) ExtractTo(intros *apidef.Introspection) {
 }
 
 type IntrospectionCache struct {
-	// Enabled enables the caching mechanism for introspection responses.
+	// Enabled activates the caching mechanism for introspection responses.
 	Enabled bool `bson:"enabled" json:"enabled"`
 	// Timeout is the duration in seconds of how long the cached value stays.
 	// For introspection caching, it is suggested to use a short interval.

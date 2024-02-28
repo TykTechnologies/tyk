@@ -10,7 +10,7 @@ import (
 // URLRewrite configures URL rewriting.
 // Tyk classic API definition: `version_data.versions[].extended_paths.url_rewrite`.
 type URLRewrite struct {
-	// Enabled enables URL rewriting if set to true.
+	// Enabled activates URL rewriting if set to true.
 	Enabled bool `bson:"enabled" json:"enabled"`
 
 	// Pattern is the regular expression against which the request URL is compared for the primary rewrite check.
@@ -109,9 +109,13 @@ type URLRewriteRule struct {
 	// - `requestContext`, match pattern against request context
 	In URLRewriteInput `bson:"in" json:"in"`
 
-	// Name is the index in the input identified in `in` that should be used to
-	// locate the value for this rule. When `in` is set to `requestBody`, the
-	// value is ignored.
+	// Name is the index in the value declared inside `in`.
+	//
+	// Example: for `in=query`, `name=q`, the parameter `q` would
+	// be read from the request query parameters.
+	//
+	// The value of name is unused when `in` is set to `requestBody`,
+	// as the request body is a single value and not a set of values.
 	Name string `bson:"name,omitempty" json:"name,omitempty"`
 
 	// Pattern is the regular expression against which the `in` values are compared for this rule check.

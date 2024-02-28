@@ -277,7 +277,7 @@ func (g *Global) ExtractTo(api *apidef.APIDefinition) {
 
 // PluginConfigData configures config data for custom plugins.
 type PluginConfigData struct {
-	// Enabled enables custom plugin config data.
+	// Enabled activates custom plugin config data.
 	Enabled bool `bson:"enabled" json:"enabled"` // required.
 
 	// Value is the value of custom plugin config data.
@@ -365,7 +365,7 @@ func (p *PluginConfig) ExtractTo(api *apidef.APIDefinition) {
 
 // PluginBundle holds configuration for custom plugins.
 type PluginBundle struct {
-	// Enabled enables the custom plugin bundles.
+	// Enabled activates the custom plugin bundles.
 	//
 	// Tyk classic API definition: `custom_middleware_bundle_disabled`
 	Enabled bool `bson:"enabled" json:"enabled"` // required.
@@ -885,7 +885,7 @@ type Header struct {
 
 // TransformRequestMethod holds configuration for rewriting request methods.
 type TransformRequestMethod struct {
-	// Enabled enables Method Transform for the given path and method.
+	// Enabled activates Method Transform for the given path and method.
 	Enabled bool `bson:"enabled" json:"enabled"`
 	// ToMethod is the http method value to which the method of an incoming request will be transformed.
 	ToMethod string `bson:"toMethod" json:"toMethod"`
@@ -905,7 +905,7 @@ func (tm *TransformRequestMethod) ExtractTo(meta *apidef.MethodTransformMeta) {
 
 // TransformBody holds configuration about request/response body transformations.
 type TransformBody struct {
-	// Enabled enables transform request/request body middleware.
+	// Enabled activates transform request/request body middleware.
 	Enabled bool `bson:"enabled" json:"enabled"`
 	// Format of the request/response body, xml or json.
 	Format apidef.RequestInputType `bson:"format" json:"format"`
@@ -942,7 +942,7 @@ func (tr *TransformBody) ExtractTo(meta *apidef.TemplateMeta) {
 
 // TransformHeaders holds configuration about request/response header transformations.
 type TransformHeaders struct {
-	// Enabled enables Header Transform for the given path and method.
+	// Enabled activates Header Transform for the given path and method.
 	Enabled bool `bson:"enabled" json:"enabled"`
 	// Remove specifies header names to be removed from the request/response.
 	Remove []string `bson:"remove,omitempty" json:"remove,omitempty"`
@@ -1038,7 +1038,7 @@ func (et *EnforceTimeout) ExtractTo(meta *apidef.HardTimeoutMeta) {
 
 // CustomPlugin configures custom plugin.
 type CustomPlugin struct {
-	// Enabled enables the custom pre plugin.
+	// Enabled activates the custom pre plugin.
 	Enabled bool `bson:"enabled" json:"enabled"` // required.
 	// FunctionName is the name of authentication method.
 	FunctionName string `bson:"functionName" json:"functionName"` // required.
@@ -1198,7 +1198,7 @@ func (p *ResponsePlugin) ExtractTo(api *apidef.APIDefinition) {
 
 // VirtualEndpoint contains virtual endpoint configuration.
 type VirtualEndpoint struct {
-	// Enabled enables virtual endpoint.
+	// Enabled activates virtual endpoint.
 	Enabled bool `bson:"enabled" json:"enabled"` // required.
 	// Name is the name of JS function.
 	Name string `bson:"name" json:"name"` // required.
@@ -1244,7 +1244,7 @@ type EndpointPostPlugins []EndpointPostPlugin
 
 // EndpointPostPlugin contains endpoint level post plugin configuration.
 type EndpointPostPlugin struct {
-	// Enabled enables post plugin.
+	// Enabled activates post plugin.
 	Enabled bool `bson:"enabled" json:"enabled"` // required.
 	// Name is the name of plugin function to be executed.
 	Name string `bson:"name" json:"name"` // required.
@@ -1279,7 +1279,7 @@ func (e EndpointPostPlugins) ExtractTo(meta *apidef.GoPluginMeta) {
 // CircuitBreaker holds configuration for the circuit breaker middleware.
 // Tyk classic API definition: `version_data.versions..extended_paths.circuit_breakers[*]`.
 type CircuitBreaker struct {
-	// Enabled enables the Circuit Breaker functionality.
+	// Enabled activates the Circuit Breaker functionality.
 	// Tyk classic API definition: `version_data.versions..extended_paths.circuit_breakers[*].disabled`.
 	Enabled bool `bson:"enabled" json:"enabled"`
 	// Threshold is the proportion from each `sampleSize` requests that must fail for the breaker to be tripped. This must be a value between 0.0 and 1.0. If `sampleSize` is 100 then a threshold of 0.4 means that the breaker will be tripped if 40 out of every 100 requests fails.
@@ -1316,7 +1316,7 @@ func (cb *CircuitBreaker) ExtractTo(circuitBreaker *apidef.CircuitBreakerMeta) {
 
 // RequestSizeLimit limits the maximum allowed size of the request body in bytes.
 type RequestSizeLimit struct {
-	// Enabled enables the Request Size Limit functionality.
+	// Enabled activates the Request Size Limit functionality.
 	Enabled bool `bson:"enabled" json:"enabled"`
 	// Value is the maximum allowed size of the request body in bytes.
 	Value int64 `bson:"value" json:"value"`

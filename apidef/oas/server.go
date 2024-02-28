@@ -167,7 +167,7 @@ func (lp *ListenPath) ExtractTo(api *apidef.APIDefinition) {
 
 // ClientCertificates contains the configurations related to establishing static mutual TLS between the client and Tyk.
 type ClientCertificates struct {
-	// Enabled enables static mTLS for the API.
+	// Enabled activates static mTLS for the API.
 	Enabled bool `bson:"enabled" json:"enabled"`
 	// Allowlist is the list of client certificates which are allowed.
 	Allowlist []string `bson:"allowlist" json:"allowlist"`
@@ -187,7 +187,7 @@ func (cc *ClientCertificates) ExtractTo(api *apidef.APIDefinition) {
 
 // GatewayTags holds a list of segment tags that should apply for a gateway.
 type GatewayTags struct {
-	// Enabled enables use of segment tags.
+	// Enabled activates use of segment tags.
 	Enabled bool `bson:"enabled" json:"enabled"`
 	// Tags is a list of segment tags
 	Tags []string `bson:"tags" json:"tags"`
@@ -234,7 +234,7 @@ func (cd *Domain) Fill(api apidef.APIDefinition) {
 
 // DetailedActivityLogs holds the configuration related to recording detailed analytics.
 type DetailedActivityLogs struct {
-	// Enabled enables/disables detailed activity logs.
+	// Enabled activates detailed activity logs.
 	//
 	// Tyk classic API definition: `enable_detailed_recording`
 	Enabled bool `bson:"enabled" json:"enabled"`
@@ -252,7 +252,7 @@ func (d *DetailedActivityLogs) Fill(api apidef.APIDefinition) {
 
 // DetailedTracing holds the configuration of the detailed tracing.
 type DetailedTracing struct {
-	// Enabled enables detailed tracing.
+	// Enabled activates detailed tracing.
 	Enabled bool `bson:"enabled" json:"enabled"`
 }
 

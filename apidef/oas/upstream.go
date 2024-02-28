@@ -133,7 +133,7 @@ func (u *Upstream) ExtractTo(api *apidef.APIDefinition) {
 
 // ServiceDiscovery holds configuration required for service discovery.
 type ServiceDiscovery struct {
-	// Enabled enables Service Discovery.
+	// Enabled activates Service Discovery.
 	//
 	// Tyk classic API definition: `service_discovery.use_discovery_service`
 	Enabled bool `bson:"enabled" json:"enabled"` // required
@@ -332,7 +332,7 @@ func (t *Test) ExtractTo(uptimeTests *apidef.UptimeTests) {
 
 // MutualTLS contains the configuration for establishment of mutual TLS between Tyk and the upstream server.
 type MutualTLS struct {
-	// Enabled enables/disables upstream mutual TLS for the API.
+	// Enabled activates upstream mutual TLS for the API.
 	// Tyk classic API definition: `upstream_certificates_disabled`
 	Enabled bool `bson:"enabled" json:"enabled"`
 
@@ -465,7 +465,7 @@ func (cp *CertificatePinning) ExtractTo(api *apidef.APIDefinition) {
 // The API-level rate limit applies a base-line limit on the frequency of requests to the upstream service for all endpoints. The frequency of requests is configured in two parts: the time interval and the number of requests that can be made during each interval.
 // Tyk classic API definition: `global_rate_limit`.
 type RateLimit struct {
-	// Enabled enables/disables API level rate limiting for this API.
+	// Enabled activates API level rate limiting for this API.
 	//
 	// Tyk classic API definition: `!disable_rate_limit`.
 	Enabled bool `json:"enabled" bson:"enabled"`
