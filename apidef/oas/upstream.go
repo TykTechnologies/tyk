@@ -10,7 +10,7 @@ import (
 
 // Upstream holds configuration for the upstream server to which Tyk should proxy requests.
 type Upstream struct {
-	// URL defines the upstream address (or Target URL) to which requests should be proxied.
+	// URL defines the upstream address (or target URL) to which requests should be proxied.
 	// Tyk classic API definition: `proxy.target_url`
 	URL string `bson:"url" json:"url"` // required
 
