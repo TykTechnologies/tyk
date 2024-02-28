@@ -1051,7 +1051,7 @@ type CustomPlugin struct {
 	RequireSession bool `bson:"requireSession,omitempty" json:"requireSession,omitempty"`
 }
 
-// CustomPlugins is a list of CustomPlugin.
+// CustomPlugins is a list of CustomPlugin objects.
 type CustomPlugins []CustomPlugin
 
 // Fill fills CustomPlugins from supplied Middleware definitions.

@@ -409,20 +409,27 @@ type OAuthProvider struct {
 type JWTValidation struct {
 	// Enabled enables OAuth access token validation by introspection to a third party.
 	Enabled bool `bson:"enabled" json:"enabled"`
+
 	// SigningMethod to verify signing method used in jwt - allowed values HMAC/RSA/ECDSA.
 	SigningMethod string `bson:"signingMethod" json:"signingMethod"`
-	// Source is the secret to verify signature, it could be one among:
+
+	// Source is the secret to verify signature. Valid values are:
+	//
 	// - a base64 encoded static secret,
 	// - a valid JWK URL in plain text,
 	// - a valid JWK URL in base64 encoded format.
 	Source string `bson:"source" json:"source"`
+
 	// IdentityBaseField is the identity claim name.
 	IdentityBaseField string `bson:"identityBaseField,omitempty" json:"identityBaseField,omitempty"`
-	// IssuedAtValidationSkew is the clock skew to be considered while validating iat claim.
+
+	// IssuedAtValidationSkew is the clock skew to be considered while validating the iat claim.
 	IssuedAtValidationSkew uint64 `bson:"issuedAtValidationSkew,omitempty" json:"issuedAtValidationSkew,omitempty"`
-	// NotBeforeValidationSkew is the clock skew to be considered while validating nbf claim.
+
+	// NotBeforeValidationSkew is the clock skew to be considered while validating the nbf claim.
 	NotBeforeValidationSkew uint64 `bson:"notBeforeValidationSkew,omitempty" json:"notBeforeValidationSkew,omitempty"`
-	// ExpiresAtValidationSkew is the clock skew to be considered while validating exp claim.
+
+	// ExpiresAtValidationSkew is the clock skew to be considered while validating the exp claim.
 	ExpiresAtValidationSkew uint64 `bson:"expiresAtValidationSkew,omitempty" json:"expiresAtValidationSkew,omitempty"`
 }
 
