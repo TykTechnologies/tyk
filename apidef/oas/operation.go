@@ -711,7 +711,7 @@ func (s *OAS) fillOASValidateRequest(metas []apidef.ValidatePathMeta) {
 
 // MockResponse configures the mock responses.
 type MockResponse struct {
-	// Enabled enables the mock response middleware.
+	// Enabled activates the mock response middleware.
 	Enabled bool `bson:"enabled" json:"enabled"`
 	// Code is the HTTP response code that will be returned.
 	Code int `bson:"code,omitempty" json:"code,omitempty"`
@@ -723,9 +723,9 @@ type MockResponse struct {
 	FromOASExamples *FromOASExamples `bson:"fromOASExamples,omitempty" json:"fromOASExamples,omitempty"`
 }
 
-// FromOASExamples configures mock responses should be returned from OAS example responses.
+// FromOASExamples configures mock responses that should be returned from OAS example responses.
 type FromOASExamples struct {
-	// Enabled enables getting a mock response from OAS examples or schemas documented in OAS.
+	// Enabled activates getting a mock response from OAS examples or schemas documented in OAS.
 	Enabled bool `bson:"enabled" json:"enabled"`
 	// Code is the default HTTP response code that the gateway reads from the path responses documented in OAS.
 	Code int `bson:"code,omitempty" json:"code,omitempty"`
