@@ -10,7 +10,7 @@ import (
 
 // Upstream holds configuration for the upstream server to which Tyk should proxy requests.
 type Upstream struct {
-	// URL defines the upstream address (or Target URL) to which requests should be proxied.
+	// URL defines the upstream address (or target URL) to which requests should be proxied.
 	// Tyk classic API definition: `proxy.target_url`
 	URL string `bson:"url" json:"url"` // required
 
@@ -21,7 +21,7 @@ type Upstream struct {
 	// Test contains the configuration related to uptime tests.
 	Test *Test `bson:"test,omitempty" json:"test,omitempty"`
 
-	// MutualTLS contains the configuration for establishment of mutual TLS between Tyk and the upstream server.
+	// MutualTLS contains the configuration for establishing a mutual TLS connection between Tyk and the upstream server.
 	MutualTLS *MutualTLS `bson:"mutualTLS,omitempty" json:"mutualTLS,omitempty"`
 
 	// CertificatePinning contains the configuration related to certificate pinning.
@@ -133,7 +133,7 @@ func (u *Upstream) ExtractTo(api *apidef.APIDefinition) {
 
 // ServiceDiscovery holds configuration required for service discovery.
 type ServiceDiscovery struct {
-	// Enabled enables Service Discovery.
+	// Enabled activates Service Discovery.
 	//
 	// Tyk classic API definition: `service_discovery.use_discovery_service`
 	Enabled bool `bson:"enabled" json:"enabled"` // required
@@ -248,7 +248,7 @@ type ServiceDiscoveryCache struct {
 	Timeout int64 `bson:"timeout,omitempty" json:"timeout,omitempty"`
 }
 
-// CacheOptions returns the timeout value in effect, and a bool if cache is enabled.
+// CacheOptions returns the timeout value in effect and a bool if cache is enabled.
 func (sd *ServiceDiscovery) CacheOptions() (int64, bool) {
 	if sd.Cache != nil {
 		return sd.Cache.Timeout, sd.Cache.Enabled
@@ -330,9 +330,9 @@ func (t *Test) ExtractTo(uptimeTests *apidef.UptimeTests) {
 	t.ServiceDiscovery.ExtractTo(&uptimeTests.Config.ServiceDiscovery)
 }
 
-// MutualTLS contains the configuration for establishment of mutual TLS between Tyk and the upstream server.
+// MutualTLS contains the configuration for establishing a mutual TLS connection between Tyk and the upstream server.
 type MutualTLS struct {
-	// Enabled enables/disables upstream mutual TLS for the API.
+	// Enabled activates upstream mutual TLS for the API.
 	// Tyk classic API definition: `upstream_certificates_disabled`
 	Enabled bool `bson:"enabled" json:"enabled"`
 
@@ -465,7 +465,7 @@ func (cp *CertificatePinning) ExtractTo(api *apidef.APIDefinition) {
 // The API-level rate limit applies a base-line limit on the frequency of requests to the upstream service for all endpoints. The frequency of requests is configured in two parts: the time interval and the number of requests that can be made during each interval.
 // Tyk classic API definition: `global_rate_limit`.
 type RateLimit struct {
-	// Enabled enables/disables API level rate limiting for this API.
+	// Enabled activates API level rate limiting for this API.
 	//
 	// Tyk classic API definition: `!disable_rate_limit`.
 	Enabled bool `json:"enabled" bson:"enabled"`
@@ -481,7 +481,7 @@ type RateLimit struct {
 	Rate int `json:"rate" bson:"rate"`
 	// Per defines the time interval for rate limiting using shorthand notation.
 	// The value of Per is a string that specifies the interval in a compact form,
-	// where hours, minutes, and seconds are denoted by 'h', 'm', and 's' respectively.
+	// where hours, minutes and seconds are denoted by 'h', 'm' and 's' respectively.
 	// Multiple units can be combined to represent the duration.
 	//
 	// Examples of valid shorthand notations:
@@ -491,7 +491,7 @@ type RateLimit struct {
 	// - "1m29s": one minute and twenty-nine seconds
 	// - "1h30m" : one hour and thirty minutes
 	//
-	// An empty value is interpreted as "0s", implying no rate limiting interval effectively disabling the API-level rate limit.
+	// An empty value is interpreted as "0s", implying no rate limiting interval, which disables the API-level rate limit.
 	// It's important to format the string correctly, as invalid formats will
 	// be considered as 0s/empty.
 	//
