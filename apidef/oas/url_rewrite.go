@@ -84,7 +84,7 @@ type URLRewriteTrigger struct {
 	Condition URLRewriteCondition `bson:"condition" json:"condition"`
 
 	// Rules contain individual checks that are combined according to the
-	// `condition` to determine whether the URL rewrite will be triggered.
+	// `condition` to determine if the URL rewrite will be triggered.
 	// If empty, the trigger is ignored.
 	Rules []*URLRewriteRule `bson:"rules,omitempty" json:"rules,omitempty"`
 

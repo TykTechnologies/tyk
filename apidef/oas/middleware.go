@@ -398,7 +398,7 @@ type CORS struct {
 	// Tyk classic API definition: `CORS.max_age`.
 	MaxAge int `bson:"maxAge,omitempty" json:"maxAge,omitempty"`
 
-	// AllowCredentials indicates whether the request can include user credentials like cookies,
+	// AllowCredentials indicates if the request can include user credentials like cookies,
 	// HTTP authentication or client side SSL certificates.
 	//
 	// Tyk classic API definition: `CORS.allow_credentials`.
