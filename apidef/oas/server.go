@@ -212,7 +212,7 @@ type Domain struct {
 	// Name is the name of the domain.
 	Name string `bson:"name" json:"name"`
 	// Certificates defines a field for specifying certificate IDs or file paths
-	// that the Gateway can utilize to dynamically load certificates for your custom domain.
+	// that the Gateway can utilise to dynamically load certificates for your custom domain.
 	//
 	// Tyk classic API definition: `certificates`
 	Certificates []string `bson:"certificates,omitempty" json:"certificates,omitempty"`

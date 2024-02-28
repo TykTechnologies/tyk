@@ -429,14 +429,16 @@ type HMAC struct {
 	// AuthSources contains authentication token source configuration (header, cookie, query).
 	AuthSources `bson:",inline" json:",inline"`
 
-	// AllowedAlgorithms is the array of HMAC algorithms which are allowed. Tyk supports the following HMAC algorithms:
+	// AllowedAlgorithms is the array of HMAC algorithms which are allowed.
+	//
+	// Tyk supports the following HMAC algorithms:
 	//
 	// - `hmac-sha1`
 	// - `hmac-sha256`
 	// - `hmac-sha384`
 	// - `hmac-sha512`
 	//
-	// and reads the value from algorithm header.
+	// and reads the value from the algorithm header.
 	//
 	// Tyk classic API definition: `hmac_allowed_algorithms`
 	AllowedAlgorithms []string `bson:"allowedAlgorithms,omitempty" json:"allowedAlgorithms,omitempty"`
@@ -489,7 +491,7 @@ type OIDC struct {
 	// Tyk classic API definition: `openid_options.segregate_by_client`.
 	SegregateByClientId bool `bson:"segregateByClientId,omitempty" json:"segregateByClientId,omitempty"`
 
-	// Providers contains a list of authorised providers and their Client IDs, and matched policies.
+	// Providers contains a list of authorised providers, their Client IDs and matched policies.
 	//
 	// Tyk classic API definition: `openid_options.providers`.
 	Providers []Provider `bson:"providers,omitempty" json:"providers,omitempty"`
