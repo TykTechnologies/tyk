@@ -8,7 +8,7 @@ import (
 type Server struct {
 	// ListenPath is the base path on Tyk to which requests for this API should
 	// be sent. Tyk listens for any requests coming into the host at this
-	// path, on the port that Tyk is configured to run on, and processes these
+	// path, on the port that Tyk is configured to run on and processes these
 	// accordingly.
 	ListenPath ListenPath `bson:"listenPath" json:"listenPath"` // required
 
@@ -135,14 +135,14 @@ func (s *Server) ExtractTo(api *apidef.APIDefinition) {
 
 // ListenPath is the base path on Tyk to which requests for this API
 // should be sent. Tyk listens out for any requests coming into the host at
-// this path, on the port that Tyk is configured to run on, and processes
+// this path, on the port that Tyk is configured to run on and processes
 // these accordingly.
 type ListenPath struct {
 	// Value is the value of the listen path e.g. `/api/` or `/` or `/httpbin/`.
 	// Tyk classic API definition: `proxy.listen_path`
 	Value string `bson:"value" json:"value"` // required
 
-	// Strip removes the inbound listen path (as accessed by the client) when generating the outgoing request (to the upstream service).
+	// Strip removes the inbound listen path (as accessed by the client) when generating the outbound request for the upstream service.
 	//
 	// For example, consider the scenario where the Tyk base address is `http://acme.com/', the listen path is `example/` and the upstream URL is `http://httpbin.org/`:
 	//
