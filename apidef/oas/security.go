@@ -460,7 +460,7 @@ type Introspection struct {
 	URL string `bson:"url" json:"url"`
 	// ClientID is the public identifier for the client, acquired from the third party.
 	ClientID string `bson:"clientId" json:"clientId"`
-	// ClientSecret is a secret known only to the client and the authorization server, acquired from the third party.
+	// ClientSecret is a secret known only to the client and the authorisation server, acquired from the third party.
 	ClientSecret string `bson:"clientSecret" json:"clientSecret"`
 	// IdentityBaseField is the key showing where to find the user id in the claims. If it is empty, the `sub` key is looked at.
 	IdentityBaseField string `bson:"identityBaseField,omitempty" json:"identityBaseField,omitempty"`
