@@ -4,10 +4,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/TykTechnologies/tyk/internal/cache"
+	"github.com/golang-jwt/jwt/v4"
 	"io"
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
 )
 
 type TokenExchangeRequest struct {
@@ -121,7 +123,19 @@ func (k *TokenExchangeMW) ProcessRequest(w http.ResponseWriter, r *http.Request,
 		json.NewDecoder(res.Body).Decode(&tokenResponse)
 
 		newAccessToken = tokenResponse.AccessToken
-		k.tokCache.Set(sig, newAccessToken, 5)
+		parser := jwt.NewParser()
+		tok, parts, err := parser.ParseUnverified(newAccessToken, jwt.MapClaims{})
+		_ = parts
+		_ = err
+		claims := tok.Claims.(jwt.MapClaims)
+
+		exp, ok := claims["exp"]
+		if !ok {
+			return fmt.Errorf("exp claim not found in token"), http.StatusInternalServerError
+		}
+		expSeconds := int64(exp.(float64)) - time.Now().Unix()
+
+		k.tokCache.Set(sig, newAccessToken, expSeconds)
 	}
 
 	r.Header.Set("Authorization", fmt.Sprintf("Bearer %s", newAccessToken))
