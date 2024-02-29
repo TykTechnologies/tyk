@@ -1010,9 +1010,9 @@ func (gw *Gateway) responseProcessorByName(name string, baseHandler BaseTykRespo
 	return nil
 }
 
-func handleResponseChain(chain []TykResponseHandler, rw http.ResponseWriter, res *http.Response, req *http.Request, ses *user.SessionState) (abortRequest bool, err error) {
+func handleResponseChain(chain []TykResponseHandler, rw http.ResponseWriter, res *http.Response, req *http.Request, ses *user.SessionState, otelEnabled bool) (abortRequest bool, err error) {
 
-	if res.Request != nil {
+	if otelEnabled && res.Request != nil {
 		// res.Request context contains otel information from the otel roundtripper
 		setContext(req, res.Request.Context())
 	}

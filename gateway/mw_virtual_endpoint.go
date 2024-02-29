@@ -287,7 +287,7 @@ func (gw *Gateway) forceResponse(
 
 	if !isPre {
 		// Handle response middleware
-		if _, err := handleResponseChain(spec.ResponseChain, w, newResponse, r, session); err != nil {
+		if _, err := handleResponseChain(spec.ResponseChain, w, newResponse, r, session, gw.GetConfig().OpenTelemetry.Enabled); err != nil {
 			logger.WithError(err).Error("Response chain failed! ")
 		}
 	}
