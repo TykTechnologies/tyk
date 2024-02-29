@@ -637,6 +637,7 @@ type APIDefinition struct {
 	EnableCoProcessAuth                  bool                   `bson:"enable_coprocess_auth" json:"enable_coprocess_auth"` // Deprecated. Use CustomPluginAuthEnabled instead.
 	CustomPluginAuthEnabled              bool                   `bson:"custom_plugin_auth_enabled" json:"custom_plugin_auth_enabled"`
 	JWTSigningMethod                     string                 `bson:"jwt_signing_method" json:"jwt_signing_method"`
+	JWTRequiredAudience                  string                 `bson:"jwt_required_audience" json:"jwt_required_audience"`
 	JWTSource                            string                 `bson:"jwt_source" json:"jwt_source"`
 	JWTIdentityBaseField                 string                 `bson:"jwt_identit_base_field" json:"jwt_identity_base_field"`
 	JWTClientIDBaseField                 string                 `bson:"jwt_client_base_field" json:"jwt_client_base_field"`
