@@ -151,11 +151,11 @@ type StorageOptionsConf struct {
 	// Maximum TLS version that is supported.
 	// Options: ["1.0", "1.1", "1.2", "1.3"].
 	// Defaults to "1.3".
-	MaxVersion string `json:"max_version"`
+	TLSMaxVersion string `json:"tls_max_version"`
 	// Minimum TLS version that is supported.
 	// Options: ["1.0", "1.1", "1.2", "1.3"].
 	// Defaults to "1.2".
-	MinVersion string `json:"min_version"`
+	TLSMinVersion string `json:"tls_min_version"`
 }
 
 type NormalisedURLConfig struct {
