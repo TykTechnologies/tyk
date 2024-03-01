@@ -5,8 +5,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/TykTechnologies/graphql-go-tools/pkg/ast"
+	"github.com/TykTechnologies/graphql-go-tools/pkg/astparser"
 	"io"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/TykTechnologies/tyk/apidef"
@@ -81,9 +84,53 @@ func (i *PersistGraphQLOperationMiddleware) ProcessRequest(w http.ResponseWriter
 		variablesStr = strings.ReplaceAll(variablesStr, replacer, requestPathParts[pathIndex])
 	}
 
+	// PoC for TT-7856 starts here.
+	// See TestGraphQLPersist_TT_7856.
+
+	// 1- Parse the operation
+	doc, _ := astparser.ParseGraphqlDocumentString(mwSpec.Operation)
+
+	// 2- Parse the variables object into a map.
+	variables := make(map[string]interface{})
+	err = json.Unmarshal([]byte(variablesStr), &variables)
+	if err != nil {
+		i.Logger().WithError(err).Error("error proxying request", err)
+		return ProxyingRequestFailedErr, http.StatusInternalServerError
+	}
+
+	// 3- Iterate over the variables, assume that the values are always in string type.
+	for variable, variableValue := range variables {
+		// 4- Infer the variable type from the parsed operation.
+		variableType, err := inferVariableType(&doc, variable)
+		if err != nil {
+			i.Logger().WithError(err).Error("error proxying request", err)
+			return ProxyingRequestFailedErr, http.StatusInternalServerError
+		}
+
+		// 5- Get the variable type and cast the variable value to the inferred type.
+		variableTypeStr := doc.Input.ByteSliceString(variableType.Name)
+		if variableTypeStr == "Int" {
+			newValue, err := strconv.Atoi(variableValue.(string))
+			if err != nil {
+				i.Logger().WithError(err).Error("error proxying request", err)
+				return ProxyingRequestFailedErr, http.StatusInternalServerError
+			}
+			variables[variable] = newValue
+		}
+	}
+
+	// 6- Marshal the variables again
+	variablesData, err := json.Marshal(variables)
+	if err != nil {
+		i.Logger().WithError(err).Error("error proxying request", err)
+		return ProxyingRequestFailedErr, http.StatusInternalServerError
+	}
+
+	// PoC for TT-7856 ends here.
+
 	graphqlQuery := GraphQLRequest{
 		Query:     mwSpec.Operation,
-		Variables: []byte(variablesStr),
+		Variables: variablesData,
 	}
 
 	graphQLQueryBytes, err := json.Marshal(graphqlQuery)
@@ -103,4 +150,15 @@ func (i *PersistGraphQLOperationMiddleware) ProcessRequest(w http.ResponseWriter
 	r.URL.Path = "/"
 
 	return nil, http.StatusOK
+}
+
+func inferVariableType(document *ast.Document, name string) (*ast.Type, error) {
+	for _, variableDefinition := range document.VariableDefinitions {
+		variableValue := document.VariableValues[variableDefinition.VariableValue.Ref]
+		if document.Input.ByteSliceString(variableValue.Name) != name {
+			continue
+		}
+		return &document.Types[variableDefinition.Type], nil
+	}
+	return nil, errors.New("variable type cannot be inferred")
 }

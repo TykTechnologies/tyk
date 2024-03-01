@@ -35,6 +35,13 @@ query country($countryCode: ID!){
   }
 }`
 
+const testGQLQueryCountryCode_TT7356 = `
+query country($countryCode: Int){
+  country(code: $countryCode){
+    code
+  }
+}`
+
 const testQueryContinentCode = `
 query continent($code: ID!) {
   continent(code: $code){
@@ -279,6 +286,55 @@ func TestGraphQLPersist_VariablesListenPath(t *testing.T) {
 				return false
 			}
 			return q.Query == testGQLQueryCountryCode && string(q.Variables) == `{"countryCode":"NG"}`
+		}},
+	)
+
+	assert.NoError(t, err)
+}
+
+func TestGraphQLPersist_TT_7856(t *testing.T) {
+	ts := StartTest(nil)
+	t.Cleanup(func() {
+		ts.Close()
+	})
+	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		spec.Name = "rest-graph-listen-path"
+		spec.OrgID = "default"
+		spec.Proxy.ListenPath = "/test/"
+		spec.Proxy.TargetURL = TestHttpAny
+		spec.EnableContextVars = true
+		spec.VersionData.NotVersioned = false
+		spec.VersionData.Versions["Default"] = apidef.VersionInfo{
+			Name:             "Default",
+			Expires:          "3000-01-02 00:00",
+			UseExtendedPaths: true,
+			ExtendedPaths: apidef.ExtendedPathsSet{
+				PersistGraphQL: []apidef.PersistGraphQLMeta{
+					{
+						Path:      "/getCountryByCode/{countryCode}",
+						Method:    "GET",
+						Operation: testGQLQueryCountryCode_TT7356,
+						Variables: map[string]interface{}{
+							"countryCode": "$path.countryCode",
+						},
+					},
+				},
+			},
+		}
+	})
+
+	_, err := ts.Run(t,
+		test.TestCase{Path: "/test/getCountryByCode/20", Method: "GET", BodyMatchFunc: func(bytes []byte) bool {
+			var testResp TestHttpResponse
+			if err := json.Unmarshal(bytes, &testResp); err != nil {
+				return false
+			}
+			// Get query and variables
+			var q GraphQLRequest
+			if err := json.Unmarshal([]byte(testResp.Body), &q); err != nil {
+				return false
+			}
+			return q.Query == testGQLQueryCountryCode_TT7356 && string(q.Variables) == `{"countryCode":20}`
 		}},
 	)
 
