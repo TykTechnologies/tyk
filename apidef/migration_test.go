@@ -694,7 +694,9 @@ func TestSetDisabledFlags(t *testing.T) {
 				},
 			},
 		},
-		DisableRateLimit: true,
+		GlobalRateLimit: GlobalRateLimit{
+			Disabled: true,
+		},
 	}
 	apiDef.SetDisabledFlags()
 	assert.Equal(t, expectedAPIDef, apiDef)
@@ -773,16 +775,37 @@ func TestAPIDefinition_migrateGlobalRateLimit(t *testing.T) {
 		_, err := base.Migrate()
 		assert.NoError(t, err)
 
-		assert.True(t, base.DisableRateLimit)
+		assert.True(t, base.GlobalRateLimit.Disabled)
 	})
 
 	t.Run("per!=0,rate=0", func(t *testing.T) {
 		base := oldTestAPI()
+		base.GlobalRateLimit.Disabled = false
 		base.GlobalRateLimit.Per = 120
 		_, err := base.Migrate()
 		assert.NoError(t, err)
 
-		assert.False(t, base.DisableRateLimit)
+		assert.True(t, base.GlobalRateLimit.Disabled)
 	})
 
+	t.Run("per=0,rate!=0", func(t *testing.T) {
+		base := oldTestAPI()
+		base.GlobalRateLimit.Disabled = false
+		base.GlobalRateLimit.Rate = 1
+		_, err := base.Migrate()
+		assert.NoError(t, err)
+
+		assert.True(t, base.GlobalRateLimit.Disabled)
+	})
+
+	t.Run("per!=0,rate!=0", func(t *testing.T) {
+		base := oldTestAPI()
+		base.GlobalRateLimit.Disabled = false
+		base.GlobalRateLimit.Rate = 1
+		base.GlobalRateLimit.Per = 1
+		_, err := base.Migrate()
+		assert.NoError(t, err)
+
+		assert.False(t, base.GlobalRateLimit.Disabled)
+	})
 }
