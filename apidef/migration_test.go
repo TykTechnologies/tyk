@@ -780,7 +780,6 @@ func TestAPIDefinition_migrateGlobalRateLimit(t *testing.T) {
 
 	t.Run("per!=0,rate=0", func(t *testing.T) {
 		base := oldTestAPI()
-		base.GlobalRateLimit.Disabled = false
 		base.GlobalRateLimit.Per = 120
 		_, err := base.Migrate()
 		assert.NoError(t, err)
@@ -790,7 +789,6 @@ func TestAPIDefinition_migrateGlobalRateLimit(t *testing.T) {
 
 	t.Run("per=0,rate!=0", func(t *testing.T) {
 		base := oldTestAPI()
-		base.GlobalRateLimit.Disabled = false
 		base.GlobalRateLimit.Rate = 1
 		_, err := base.Migrate()
 		assert.NoError(t, err)
@@ -800,7 +798,6 @@ func TestAPIDefinition_migrateGlobalRateLimit(t *testing.T) {
 
 	t.Run("per!=0,rate!=0", func(t *testing.T) {
 		base := oldTestAPI()
-		base.GlobalRateLimit.Disabled = false
 		base.GlobalRateLimit.Rate = 1
 		base.GlobalRateLimit.Per = 1
 		_, err := base.Migrate()
