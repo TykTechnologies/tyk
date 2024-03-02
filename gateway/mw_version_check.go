@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"errors"
+	"github.com/TykTechnologies/tyk/internal/otel"
 	"net/http"
 	"time"
 
@@ -9,7 +10,6 @@ import (
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/apidef/oas"
-	"github.com/TykTechnologies/tyk/internal/otel"
 	"github.com/TykTechnologies/tyk/request"
 )
 
@@ -66,7 +66,9 @@ func (v *VersionCheck) ProcessRequest(w http.ResponseWriter, r *http.Request, _ 
 		targetVersion = v.Spec.VersionDefinition.Default
 	}
 
-	ctxSetSpanAttributes(r, v.Name(), otel.APIVersionAttribute(targetVersion))
+	if v.Gw.GetConfig().OpenTelemetry.Enabled {
+		ctxSetSpanAttributes(r, v.Name(), otel.APIVersionAttribute(targetVersion))
+	}
 
 	isBase := func(vName string) bool {
 		return vName == apidef.Self || vName == v.Spec.VersionDefinition.Name
