@@ -462,6 +462,32 @@ func TestRPCStorageHandler_BuildNodeInfo(t *testing.T) {
 				},
 			},
 		},
+		{
+			testName: "with segmented node",
+			givenTs: func() *Test {
+				ts := StartTest(func(globalConf *config.Config) {
+					globalConf.SlaveOptions.GroupID = "group"
+					globalConf.DBAppConfOptions.Tags = []string{"tag1", "tag2"}
+					globalConf.LivenessCheck.CheckDuration = 1000000000
+					globalConf.DBAppConfOptions.NodeIsSegmented = true
+				})
+
+				ts.Gw.SetNodeID("test-node-id")
+				return ts
+			},
+			expectedNodeInfo: apidef.NodeData{
+				NodeID:          "test-node-id",
+				GroupID:         "group",
+				TTL:             1,
+				Tags:            []string{"tag1", "tag2"},
+				NodeIsSegmented: true,
+				NodeVersion:     VERSION,
+				Stats: apidef.GWStats{
+					APIsCount:     0,
+					PoliciesCount: 0,
+				},
+			},
+		},
 	}
 
 	for _, tc := range tcs {
