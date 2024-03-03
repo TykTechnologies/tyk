@@ -1,5 +1,5 @@
-//go:build !race || unstable
-// +build !race unstable
+//go:build !race
+// +build !race
 
 package gateway
 

@@ -10,7 +10,6 @@ import (
 	"io/ioutil"
 	"net/http"
 	"strconv"
-	"sync"
 	"time"
 
 	"github.com/TykTechnologies/tyk/internal/cache"
@@ -233,30 +232,15 @@ func (gw *Gateway) mwList(mws ...TykMiddleware) []alice.Constructor {
 // BaseMiddleware wraps up the ApiSpec and Proxy objects to be included in a
 // middleware handler, this can probably be handled better.
 type BaseMiddleware struct {
-	Spec  *APISpec
-	Proxy ReturningHttpHandler
-	Gw    *Gateway `json:"-"`
-
-	loggerMu sync.Mutex
-	logger   *logrus.Entry
+	Spec   *APISpec
+	Proxy  ReturningHttpHandler
+	logger *logrus.Entry
+	Gw     *Gateway `json:"-"`
 }
 
-func (t *BaseMiddleware) Base() *BaseMiddleware {
-	t.loggerMu.Lock()
-	defer t.loggerMu.Unlock()
+func (t BaseMiddleware) Base() *BaseMiddleware { return &t }
 
-	return &BaseMiddleware{
-		Spec:   t.Spec,
-		Proxy:  t.Proxy,
-		Gw:     t.Gw,
-		logger: t.logger,
-	}
-}
-
-func (t *BaseMiddleware) Logger() (logger *logrus.Entry) {
-	t.loggerMu.Lock()
-	defer t.loggerMu.Unlock()
-
+func (t BaseMiddleware) Logger() (logger *logrus.Entry) {
 	if t.logger == nil {
 		t.logger = logrus.NewEntry(log)
 	}
@@ -265,21 +249,11 @@ func (t *BaseMiddleware) Logger() (logger *logrus.Entry) {
 }
 
 func (t *BaseMiddleware) SetName(name string) {
-	logger := t.Logger()
-
-	t.loggerMu.Lock()
-	defer t.loggerMu.Unlock()
-
-	t.logger = logger.WithField("mw", name)
+	t.logger = t.Logger().WithField("mw", name)
 }
 
 func (t *BaseMiddleware) SetRequestLogger(r *http.Request) {
-	logger := t.Logger()
-
-	t.loggerMu.Lock()
-	defer t.loggerMu.Unlock()
-
-	t.logger = t.Gw.getLogEntryForRequest(logger, r, ctxGetAuthToken(r), nil)
+	t.logger = t.Gw.getLogEntryForRequest(t.Logger(), r, ctxGetAuthToken(r), nil)
 }
 
 func (t BaseMiddleware) Init() {}
