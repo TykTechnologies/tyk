@@ -3,6 +3,8 @@ package graphengine
 import (
 	"context"
 	"errors"
+	"github.com/TykTechnologies/graphql-go-tools/pkg/ast"
+	semconv "github.com/TykTechnologies/opentelemetry/semconv/v1.0.0"
 	"net/http"
 
 	"github.com/jensneuse/abstractlogger"
@@ -214,6 +216,17 @@ func (e *EngineV2) ProcessAndStoreGraphQLRequest(w http.ResponseWriter, r *http.
 	if e.OpenTelemetry.Enabled && e.ApiDefinition.DetailedTracing {
 		ctx, span := e.OpenTelemetry.TracerProvider.Tracer().Start(r.Context(), "GraphqlMiddleware Validation")
 		defer span.End()
+
+		operationType, err := gqlRequest.OperationType()
+		if err != nil {
+			e.logger.Debug("error while getting operation type for trace", abstractlogger.Error(err))
+		}
+
+		span.SetAttributes(
+			semconv.GraphQLOperationName(gqlRequest.OperationName),
+			semconv.GraphQLOperationType(graphqlinternal.PrintOperationType(ast.OperationType(operationType))),
+			semconv.GraphQLDocument(gqlRequest.Query),
+		)
 		*r = *r.WithContext(ctx)
 	}
 

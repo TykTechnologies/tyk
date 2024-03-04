@@ -62,7 +62,7 @@ func (o *OtelGraphqlEngineV2Basic) Execute(inCtx context.Context, operation *gra
 
 	span.SetAttributes(
 		semconv.GraphQLOperationName(operation.OperationName),
-		semconv.GraphQLOperationType(printOperationType(ast.OperationType(operationType))),
+		semconv.GraphQLOperationType(PrintOperationType(ast.OperationType(operationType))),
 		semconv.GraphQLDocument(operation.Query),
 	)
 

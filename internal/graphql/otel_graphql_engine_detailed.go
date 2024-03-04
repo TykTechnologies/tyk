@@ -11,7 +11,6 @@ import (
 	"github.com/TykTechnologies/graphql-go-tools/pkg/lexer/literal"
 	"github.com/TykTechnologies/graphql-go-tools/pkg/operationreport"
 	"github.com/TykTechnologies/graphql-go-tools/pkg/postprocess"
-	semconv "github.com/TykTechnologies/opentelemetry/semconv/v1.0.0"
 	"github.com/TykTechnologies/tyk/internal/otel"
 )
 
@@ -75,19 +74,7 @@ func (o *OtelGraphqlEngineV2Detailed) ValidateForSchema(operation *graphql.Reque
 	_, span := o.tracerProvider.Tracer().Start(o.traceContext, operationName)
 	defer span.End()
 
-	operationType, err := operation.OperationType()
-	if err != nil {
-		span.SetStatus(otel.SPAN_STATUS_ERROR, "request validation failed")
-		return err
-	}
-
-	span.SetAttributes(
-		semconv.GraphQLOperationName(operation.OperationName),
-		semconv.GraphQLOperationType(printOperationType(ast.OperationType(operationType))),
-		semconv.GraphQLDocument(operation.Query),
-	)
-
-	err = o.engine.ValidateForSchema(operation)
+	err := o.engine.ValidateForSchema(operation)
 	if err != nil {
 		span.SetStatus(otel.SPAN_STATUS_ERROR, "request validation failed")
 		return err
@@ -173,7 +160,7 @@ func NewOtelGraphqlEngineV2Detailed(tracerProvider otel.TracerProvider, engine E
 	return otelEngine, nil
 }
 
-func printOperationType(operationType ast.OperationType) string {
+func PrintOperationType(operationType ast.OperationType) string {
 	switch operationType {
 	case ast.OperationTypeQuery:
 		return string(literal.QUERY)
