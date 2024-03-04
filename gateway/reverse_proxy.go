@@ -538,7 +538,6 @@ func (p *ReverseProxy) ServeHTTPForCache(rw http.ResponseWriter, req *http.Reque
 	return resp
 }
 
-// const defaultProxyTimeout float64 = 0
 const defaultProxyTimeout float64 = 30
 
 func proxyTimeout(spec *APISpec) float64 {

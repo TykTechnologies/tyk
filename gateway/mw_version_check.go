@@ -2,9 +2,10 @@ package gateway
 
 import (
 	"errors"
-	"github.com/TykTechnologies/tyk/internal/otel"
 	"net/http"
 	"time"
+
+	"github.com/TykTechnologies/tyk/internal/otel"
 
 	"github.com/getkin/kin-openapi/routers"
 
