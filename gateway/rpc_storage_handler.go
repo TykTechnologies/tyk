@@ -159,13 +159,14 @@ func (r *RPCStorageHandler) buildNodeInfo() []byte {
 	}
 
 	node := apidef.NodeData{
-		NodeID:      r.Gw.GetNodeID(),
-		GroupID:     config.SlaveOptions.GroupID,
-		APIKey:      config.SlaveOptions.APIKey,
-		NodeVersion: VERSION,
-		TTL:         intCheckDuration,
-		Tags:        config.DBAppConfOptions.Tags,
-		Health:      r.Gw.getHealthCheckInfo(),
+		NodeID:          r.Gw.GetNodeID(),
+		GroupID:         config.SlaveOptions.GroupID,
+		APIKey:          config.SlaveOptions.APIKey,
+		NodeVersion:     VERSION,
+		TTL:             intCheckDuration,
+		NodeIsSegmented: config.DBAppConfOptions.NodeIsSegmented,
+		Tags:            config.DBAppConfOptions.Tags,
+		Health:          r.Gw.getHealthCheckInfo(),
 		Stats: apidef.GWStats{
 			APIsCount:     r.Gw.apisByIDLen(),
 			PoliciesCount: r.Gw.policiesByIDLen(),
