@@ -603,7 +603,7 @@ func TestVirtualEndpoint(t *testing.T) {
 		t.Parallel()
 		expectedVirtualEndpoint := VirtualEndpoint{
 			Enabled:        true,
-			Name:           "virtualFunc",
+			FunctionName:   "virtualFunc",
 			Body:           "test body",
 			ProxyOnError:   true,
 			RequireSession: true,
@@ -631,7 +631,7 @@ func TestVirtualEndpoint(t *testing.T) {
 		t.Parallel()
 		expectedVirtualEndpoint := VirtualEndpoint{
 			Enabled:        true,
-			Name:           "virtualFunc",
+			FunctionName:   "virtualFunc",
 			Path:           "/path/to/js",
 			ProxyOnError:   true,
 			RequireSession: true,
@@ -661,7 +661,7 @@ func TestVirtualEndpoint(t *testing.T) {
 			Enabled:        true,
 			Path:           "/path/to/js",
 			Body:           "test body",
-			Name:           "virtualFunc",
+			FunctionName:   "virtualFunc",
 			ProxyOnError:   true,
 			RequireSession: true,
 		}
@@ -680,6 +680,37 @@ func TestVirtualEndpoint(t *testing.T) {
 		actualVirtualEndpoint := VirtualEndpoint{}
 		actualVirtualEndpoint.Fill(meta)
 		expectedVirtualEndpoint := virtualEndpoint
+		expectedVirtualEndpoint.Path = ""
+		assert.Equal(t, expectedVirtualEndpoint, actualVirtualEndpoint)
+	})
+
+	t.Run("functionName should have precedence", func(t *testing.T) {
+		t.Parallel()
+		virtualEndpoint := VirtualEndpoint{
+			Enabled:        true,
+			Path:           "/path/to/js",
+			Body:           "test body",
+			Name:           "virtualFunc",
+			FunctionName:   "newVirtualFunc",
+			ProxyOnError:   true,
+			RequireSession: true,
+		}
+
+		meta := apidef.VirtualMeta{}
+		virtualEndpoint.ExtractTo(&meta)
+		assert.Equal(t, apidef.VirtualMeta{
+			Disabled:             false,
+			ResponseFunctionName: "newVirtualFunc",
+			FunctionSourceURI:    "test body",
+			FunctionSourceType:   apidef.UseBlob,
+			ProxyOnError:         true,
+			UseSession:           true,
+		}, meta)
+
+		actualVirtualEndpoint := VirtualEndpoint{}
+		actualVirtualEndpoint.Fill(meta)
+		expectedVirtualEndpoint := virtualEndpoint
+		expectedVirtualEndpoint.Name = ""
 		expectedVirtualEndpoint.Path = ""
 		assert.Equal(t, expectedVirtualEndpoint, actualVirtualEndpoint)
 	})
@@ -717,9 +748,9 @@ func TestEndpointPostPlugins(t *testing.T) {
 		t.Parallel()
 		expectedEndpointPostPlugins := EndpointPostPlugins{
 			{
-				Enabled: true,
-				Name:    "symbolFunc",
-				Path:    "/path/to/so",
+				Enabled:      true,
+				FunctionName: "symbolFunc",
+				Path:         "/path/to/so",
 			},
 		}
 
@@ -729,6 +760,28 @@ func TestEndpointPostPlugins(t *testing.T) {
 		actualEndpointPostPlugins := make(EndpointPostPlugins, 1)
 		actualEndpointPostPlugins.Fill(meta)
 
+		assert.Equal(t, expectedEndpointPostPlugins, actualEndpointPostPlugins)
+	})
+
+	t.Run("value - function name should have precedence", func(t *testing.T) {
+		t.Parallel()
+		endpointPostPlugin := EndpointPostPlugins{
+			{
+				Enabled:      true,
+				Name:         "symbolFunc",
+				FunctionName: "newSymbolFunc",
+				Path:         "/path/to/so",
+			},
+		}
+
+		meta := apidef.GoPluginMeta{}
+		endpointPostPlugin.ExtractTo(&meta)
+
+		actualEndpointPostPlugins := make(EndpointPostPlugins, 1)
+		actualEndpointPostPlugins.Fill(meta)
+
+		expectedEndpointPostPlugins := endpointPostPlugin
+		expectedEndpointPostPlugins[0].Name = ""
 		assert.Equal(t, expectedEndpointPostPlugins, actualEndpointPostPlugins)
 	})
 }
