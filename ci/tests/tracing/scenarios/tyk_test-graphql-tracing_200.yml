@@ -24,16 +24,13 @@ spec:
       assertions:
         - attr:tracetest.selected_spans.count = 3
     - selector: span[tracetest.span.type="general" name="GraphqlMiddleware Validation"]
-      name: Ensure Graphql Middleware Validation Exists
+      name: Ensure Graphql Middleware Validation Exists And Spans correct
       assertions:
         - attr:tracetest.span.name  =  "GraphqlMiddleware Validation"
+        - attr:graphql.operation.type     =     "query"
+        - attr:graphql.operation.name     =     "test"
+        - "attr:graphql.document = 'query test {\n  country(code: \"NG\"){\n    name\n  }\n}'"
     - selector: span[tracetest.span.type="general" name="ResolvePlan"]
       name: Ensure resolve plan exists
       assertions:
         - attr:name = "ResolvePlan"
-    - selector: span[tracetest.span.type="general" name="ValidateRequest"]
-      name: ensure graphql span keys are correct
-      assertions:
-        - attr:graphql.operation.type     =     "query"
-        - attr:graphql.operation.name     =     "test"
-        - "attr:graphql.document = 'query test {\n  country(code: \"NG\"){\n    name\n  }\n}'"
