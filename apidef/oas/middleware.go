@@ -120,6 +120,7 @@ func (g *Global) Fill(api apidef.APIDefinition) {
 	if g.PrePlugins == nil {
 		g.PrePlugins = make(CustomPlugins, len(api.CustomMiddleware.Pre))
 		g.PrePlugins.Fill(api.CustomMiddleware.Pre)
+		g.PrePlugin = nil
 	}
 
 	if ShouldOmit(g.PrePlugins) {
@@ -129,6 +130,7 @@ func (g *Global) Fill(api apidef.APIDefinition) {
 	if g.PostAuthenticationPlugins == nil {
 		g.PostAuthenticationPlugins = make(CustomPlugins, len(api.CustomMiddleware.PostKeyAuth))
 		g.PostAuthenticationPlugins.Fill(api.CustomMiddleware.PostKeyAuth)
+		g.PostAuthenticationPlugin = nil
 	}
 
 	if ShouldOmit(g.PostAuthenticationPlugins) {
@@ -138,6 +140,7 @@ func (g *Global) Fill(api apidef.APIDefinition) {
 	if g.PostPlugins == nil {
 		g.PostPlugins = make(CustomPlugins, len(api.CustomMiddleware.Post))
 		g.PostPlugins.Fill(api.CustomMiddleware.Post)
+		g.PostPlugin = nil
 	}
 
 	if ShouldOmit(g.PostPlugins) {
@@ -156,6 +159,7 @@ func (g *Global) Fill(api apidef.APIDefinition) {
 	if g.ResponsePlugins == nil {
 		g.ResponsePlugins = make(CustomPlugins, len(api.CustomMiddleware.Response))
 		g.ResponsePlugins.Fill(api.CustomMiddleware.Response)
+		g.ResponsePlugin = nil
 	}
 
 	if ShouldOmit(g.ResponsePlugins) {

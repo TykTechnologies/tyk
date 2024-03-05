@@ -22,14 +22,12 @@ func TestMiddleware(t *testing.T) {
 	assert.Equal(t, emptyMiddleware, resultMiddleware)
 
 	t.Run("plugins", func(t *testing.T) {
-		customPlugin := CustomPlugin{
-			Enabled:      true,
-			FunctionName: "func",
-			Path:         "/path",
-		}
-
 		customPlugins := CustomPlugins{
-			customPlugin,
+			CustomPlugin{
+				Enabled:      true,
+				FunctionName: "func",
+				Path:         "/path",
+			},
 		}
 		var pluginMW = Middleware{
 			Global: &Global{
@@ -53,7 +51,14 @@ func TestMiddleware(t *testing.T) {
 
 		pluginMW.ExtractTo(&convertedAPI)
 
-		var resultMiddleware Middleware
+		var resultMiddleware = Middleware{
+			Global: &Global{
+				PrePlugin:                &PrePlugin{},
+				PostAuthenticationPlugin: &PostAuthenticationPlugin{},
+				PostPlugin:               &PostPlugin{},
+				ResponsePlugin:           &ResponsePlugin{},
+			},
+		}
 		resultMiddleware.Fill(convertedAPI)
 
 		expectedMW := Middleware{
