@@ -20,6 +20,52 @@ func TestMiddleware(t *testing.T) {
 	resultMiddleware.Fill(convertedAPI)
 
 	assert.Equal(t, emptyMiddleware, resultMiddleware)
+
+	t.Run("plugins", func(t *testing.T) {
+		customPlugin := CustomPlugin{
+			Enabled:      true,
+			FunctionName: "func",
+			Path:         "/path",
+		}
+
+		customPlugins := CustomPlugins{
+			customPlugin,
+		}
+		var pluginMW = Middleware{
+			Global: &Global{
+				PrePlugin: &PrePlugin{
+					Plugins: customPlugins,
+				},
+				PostAuthenticationPlugin: &PostAuthenticationPlugin{
+					Plugins: customPlugins,
+				},
+				PostPlugin: &PostPlugin{
+					Plugins: customPlugins,
+				},
+				ResponsePlugin: &ResponsePlugin{
+					Plugins: customPlugins,
+				},
+			},
+		}
+
+		var convertedAPI apidef.APIDefinition
+		convertedAPI.SetDisabledFlags()
+
+		pluginMW.ExtractTo(&convertedAPI)
+
+		var resultMiddleware Middleware
+		resultMiddleware.Fill(convertedAPI)
+
+		expectedMW := Middleware{
+			Global: &Global{
+				PrePlugins:                customPlugins,
+				PostAuthenticationPlugins: customPlugins,
+				PostPlugins:               customPlugins,
+				ResponsePlugins:           customPlugins,
+			},
+		}
+		assert.Equal(t, expectedMW, resultMiddleware)
+	})
 }
 
 func TestGlobal(t *testing.T) {
