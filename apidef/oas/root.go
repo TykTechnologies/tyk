@@ -1,6 +1,7 @@
 package oas
 
 import (
+	"encoding/json"
 	"sort"
 
 	"github.com/TykTechnologies/storage/persistent/model"
@@ -20,6 +21,38 @@ type XTykAPIGateway struct {
 	Server Server `bson:"server" json:"server"` // required
 	// Middleware contains the configurations related to the Tyk middleware.
 	Middleware *Middleware `bson:"middleware,omitempty" json:"middleware,omitempty"`
+}
+
+func (x *XTykAPIGateway) MarshalJSON() ([]byte, error) {
+	if x.Middleware != nil && x.Middleware.Global != nil {
+		if x.Middleware.Global.PrePlugin != nil {
+			x.Middleware.Global.PrePlugins = x.Middleware.Global.PrePlugin.Plugins
+			x.Middleware.Global.PrePlugin = nil
+		}
+
+		if x.Middleware.Global.PostAuthenticationPlugin != nil {
+			x.Middleware.Global.PostAuthenticationPlugins = x.Middleware.Global.PostAuthenticationPlugin.Plugins
+			x.Middleware.Global.PostAuthenticationPlugin = nil
+		}
+
+		if x.Middleware.Global.PostPlugin != nil {
+			x.Middleware.Global.PostPlugins = x.Middleware.Global.PostPlugin.Plugins
+			x.Middleware.Global.PostPlugin = nil
+		}
+
+		if x.Middleware.Global.ResponsePlugin != nil {
+			x.Middleware.Global.ResponsePlugins = x.Middleware.Global.ResponsePlugin.Plugins
+			x.Middleware.Global.ResponsePlugin = nil
+		}
+	}
+	type Alias XTykAPIGateway
+
+	// to prevent infinite recursion
+	return json.Marshal(&struct {
+		*Alias
+	}{
+		Alias: (*Alias)(x),
+	})
 }
 
 // Fill fills *XTykAPIGateway from apidef.APIDefinition.
