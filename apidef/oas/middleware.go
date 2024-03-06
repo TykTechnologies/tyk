@@ -1124,6 +1124,10 @@ type CustomPlugins []CustomPlugin
 
 // Fill fills CustomPlugins from supplied Middleware definitions.
 func (c *CustomPlugins) Fill(mwDefs []apidef.MiddlewareDefinition) {
+	if len(mwDefs) == 0 {
+		return
+	}
+
 	customPlugins := make(CustomPlugins, len(mwDefs))
 	for i, mwDef := range mwDefs {
 		customPlugins[i] = CustomPlugin{

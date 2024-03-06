@@ -403,6 +403,15 @@ func TestPrePlugin(t *testing.T) {
 
 func TestCustomPlugins(t *testing.T) {
 	t.Parallel()
+	t.Run("nil", func(t *testing.T) {
+		var (
+			nilCustomPlugins *CustomPlugins
+			mwDefs           []apidef.MiddlewareDefinition
+		)
+		nilCustomPlugins.ExtractTo(mwDefs)
+		assert.Nil(t, mwDefs)
+	})
+
 	t.Run("empty", func(t *testing.T) {
 		t.Parallel()
 		var (
