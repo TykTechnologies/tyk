@@ -99,6 +99,10 @@ func (k *TokenExchangeMW) ProcessRequest(w http.ResponseWriter, r *http.Request,
 		params.Set("subject_token", ter.SubjectToken)
 		params.Set("grant_type", ter.GrantType)
 
+		for paramKey, paramVal := range k.Spec.TokenExchangeOptions.CustomParams {
+			params.Set(paramKey, paramVal)
+		}
+
 		req, err := http.NewRequest(http.MethodPost, k.Spec.TokenExchangeOptions.TokenEndpoint, strings.NewReader(params.Encode()))
 		if err != nil {
 			return err, http.StatusInternalServerError
@@ -121,21 +125,30 @@ func (k *TokenExchangeMW) ProcessRequest(w http.ResponseWriter, r *http.Request,
 
 		tokenResponse := TokenExchangeResponse{}
 		json.NewDecoder(res.Body).Decode(&tokenResponse)
-
 		newAccessToken = tokenResponse.AccessToken
-		parser := jwt.NewParser()
-		tok, parts, err := parser.ParseUnverified(newAccessToken, jwt.MapClaims{})
-		_ = parts
-		_ = err
-		claims := tok.Claims.(jwt.MapClaims)
 
-		exp, ok := claims["exp"]
-		if !ok {
-			return fmt.Errorf("exp claim not found in token"), http.StatusInternalServerError
+		var expSeconds int64
+		expSeconds = int64(tokenResponse.ExpiresIn)
+
+		if expSeconds == 0 {
+			parser := jwt.NewParser()
+			tok, parts, err := parser.ParseUnverified(newAccessToken, jwt.MapClaims{})
+			if err == nil {
+				_ = parts
+
+				claims := tok.Claims.(jwt.MapClaims)
+
+				exp, ok := claims["exp"]
+				if !ok {
+					return fmt.Errorf("exp claim not found in token"), http.StatusInternalServerError
+				}
+				expSeconds = int64(exp.(float64)) - time.Now().Unix()
+			}
 		}
-		expSeconds := int64(exp.(float64)) - time.Now().Unix()
 
-		k.tokCache.Set(sig, newAccessToken, expSeconds)
+		if expSeconds > 0 {
+			k.tokCache.Set(sig, newAccessToken, expSeconds)
+		}
 	}
 
 	r.Header.Set("Authorization", fmt.Sprintf("Bearer %s", newAccessToken))
