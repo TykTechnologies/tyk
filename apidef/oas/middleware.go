@@ -1220,6 +1220,9 @@ type VirtualEndpoint struct {
 	RequireSession bool `bson:"requireSession,omitempty" json:"requireSession,omitempty"`
 }
 
+// MarshalJSON is a custom JSON marshaler for the VirtualEndpoint struct. It is implemented
+// to facilitate a smooth migration from deprecated fields that were previously used to represent
+// the same data.
 func (v *VirtualEndpoint) MarshalJSON() ([]byte, error) {
 	if v.FunctionName == "" && v.Name != "" {
 		v.FunctionName = v.Name
@@ -1286,6 +1289,9 @@ type EndpointPostPlugin struct {
 	Path string `bson:"path" json:"path"` // required.
 }
 
+// MarshalJSON is a custom JSON marshaler for the EndpointPostPlugin struct. It is implemented
+// to facilitate a smooth migration from deprecated fields that were previously used to represent
+// the same data.
 func (ep *EndpointPostPlugin) MarshalJSON() ([]byte, error) {
 	if ep.FunctionName == "" && ep.Name != "" {
 		ep.FunctionName = ep.Name
