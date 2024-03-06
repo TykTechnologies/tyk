@@ -241,50 +241,11 @@ func (g *Global) ExtractTo(api *apidef.APIDefinition) {
 
 	g.CORS.ExtractTo(&api.CORS)
 
-	if g.PrePlugins != nil {
-		api.CustomMiddleware.Pre = make([]apidef.MiddlewareDefinition, len(g.PrePlugins))
-		g.PrePlugins.ExtractTo(api.CustomMiddleware.Pre)
-		g.PrePlugin = nil
-	} else {
-		if g.PrePlugin == nil {
-			g.PrePlugin = &PrePlugin{}
-			defer func() {
-				g.PrePlugin = nil
-			}()
-		}
+	g.extractPrePluginsTo(api)
 
-		g.PrePlugin.ExtractTo(api)
-	}
+	g.extractPostAuthenticationPluginsTo(api)
 
-	if g.PostAuthenticationPlugins != nil {
-		api.CustomMiddleware.PostKeyAuth = make([]apidef.MiddlewareDefinition, len(g.PostAuthenticationPlugins))
-		g.PostAuthenticationPlugins.ExtractTo(api.CustomMiddleware.PostKeyAuth)
-		g.PostAuthenticationPlugin = nil
-	} else {
-		if g.PostAuthenticationPlugin == nil {
-			g.PostAuthenticationPlugin = &PostAuthenticationPlugin{}
-			defer func() {
-				g.PostAuthenticationPlugin = nil
-			}()
-		}
-
-		g.PostAuthenticationPlugin.ExtractTo(api)
-	}
-
-	if g.PostPlugins != nil {
-		api.CustomMiddleware.Post = make([]apidef.MiddlewareDefinition, len(g.PostPlugins))
-		g.PostPlugins.ExtractTo(api.CustomMiddleware.Post)
-		g.PostPlugin = nil
-	} else {
-		if g.PostPlugin == nil {
-			g.PostPlugin = &PostPlugin{}
-			defer func() {
-				g.PostPlugin = nil
-			}()
-		}
-
-		g.PostPlugin.ExtractTo(api)
-	}
+	g.extractPostPluginsTo(api)
 
 	if g.Cache == nil {
 		g.Cache = &Cache{}
@@ -295,20 +256,7 @@ func (g *Global) ExtractTo(api *apidef.APIDefinition) {
 
 	g.Cache.ExtractTo(&api.CacheOptions)
 
-	if g.ResponsePlugins != nil {
-		api.CustomMiddleware.Response = make([]apidef.MiddlewareDefinition, len(g.ResponsePlugins))
-		g.ResponsePlugins.ExtractTo(api.CustomMiddleware.Response)
-		g.ResponsePlugin = nil
-	} else {
-		if g.ResponsePlugin == nil {
-			g.ResponsePlugin = &ResponsePlugin{}
-			defer func() {
-				g.ResponsePlugin = nil
-			}()
-		}
-
-		g.ResponsePlugin.ExtractTo(api)
-	}
+	g.extractResponsePluginsTo(api)
 
 	if g.TransformRequestHeaders == nil {
 		g.TransformRequestHeaders = &TransformHeaders{}
@@ -345,6 +293,74 @@ func (g *Global) ExtractTo(api *apidef.APIDefinition) {
 	vInfo.GlobalResponseHeaders = resHeaderMeta.AddHeaders
 	vInfo.GlobalResponseHeadersRemove = resHeaderMeta.DeleteHeaders
 	api.VersionData.Versions[Main] = vInfo
+}
+
+func (g *Global) extractPrePluginsTo(api *apidef.APIDefinition) {
+	if g.PrePlugins != nil {
+		api.CustomMiddleware.Pre = make([]apidef.MiddlewareDefinition, len(g.PrePlugins))
+		g.PrePlugins.ExtractTo(api.CustomMiddleware.Pre)
+		g.PrePlugin = nil
+	} else {
+		if g.PrePlugin == nil {
+			g.PrePlugin = &PrePlugin{}
+			defer func() {
+				g.PrePlugin = nil
+			}()
+		}
+
+		g.PrePlugin.ExtractTo(api)
+	}
+}
+
+func (g *Global) extractPostAuthenticationPluginsTo(api *apidef.APIDefinition) {
+	if g.PostAuthenticationPlugins != nil {
+		api.CustomMiddleware.PostKeyAuth = make([]apidef.MiddlewareDefinition, len(g.PostAuthenticationPlugins))
+		g.PostAuthenticationPlugins.ExtractTo(api.CustomMiddleware.PostKeyAuth)
+		g.PostAuthenticationPlugin = nil
+	} else {
+		if g.PostAuthenticationPlugin == nil {
+			g.PostAuthenticationPlugin = &PostAuthenticationPlugin{}
+			defer func() {
+				g.PostAuthenticationPlugin = nil
+			}()
+		}
+
+		g.PostAuthenticationPlugin.ExtractTo(api)
+	}
+}
+
+func (g *Global) extractPostPluginsTo(api *apidef.APIDefinition) {
+	if g.PostPlugins != nil {
+		api.CustomMiddleware.Post = make([]apidef.MiddlewareDefinition, len(g.PostPlugins))
+		g.PostPlugins.ExtractTo(api.CustomMiddleware.Post)
+		g.PostPlugin = nil
+	} else {
+		if g.PostPlugin == nil {
+			g.PostPlugin = &PostPlugin{}
+			defer func() {
+				g.PostPlugin = nil
+			}()
+		}
+
+		g.PostPlugin.ExtractTo(api)
+	}
+}
+
+func (g *Global) extractResponsePluginsTo(api *apidef.APIDefinition) {
+	if g.ResponsePlugins != nil {
+		api.CustomMiddleware.Response = make([]apidef.MiddlewareDefinition, len(g.ResponsePlugins))
+		g.ResponsePlugins.ExtractTo(api.CustomMiddleware.Response)
+		g.ResponsePlugin = nil
+	} else {
+		if g.ResponsePlugin == nil {
+			g.ResponsePlugin = &ResponsePlugin{}
+			defer func() {
+				g.ResponsePlugin = nil
+			}()
+		}
+
+		g.ResponsePlugin.ExtractTo(api)
+	}
 }
 
 // PluginConfigData configures config data for custom plugins.
