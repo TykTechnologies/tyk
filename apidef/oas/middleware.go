@@ -97,6 +97,10 @@ type Global struct {
 	TransformResponseHeaders *TransformHeaders `bson:"transformResponseHeaders,omitempty" json:"transformResponseHeaders,omitempty"`
 }
 
+// MarshalJSON is a custom JSON marshaler for the Global struct. It is implemented
+// to facilitate a smooth migration from deprecated fields that were previously used to represent
+// the same data. This custom marshaler ensures backwards compatibility and proper handling of the
+// deprecated fields during the migration process.
 func (g *Global) MarshalJSON() ([]byte, error) {
 	if g == nil {
 		return nil, nil
