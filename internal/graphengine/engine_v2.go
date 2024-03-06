@@ -220,6 +220,7 @@ func (e *EngineV2) ProcessAndStoreGraphQLRequest(w http.ResponseWriter, r *http.
 		operationType, err := gqlRequest.OperationType()
 		if err != nil {
 			e.logger.Debug("error while getting operation type for trace", abstractlogger.Error(err))
+			return err, http.StatusBadRequest
 		}
 
 		span.SetAttributes(
