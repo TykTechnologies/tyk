@@ -718,10 +718,12 @@ type ActorTokenType string //change to enum or const?
 const GrantType = "urn:ietf:params:oauth:grant-type:token-exchange"
 
 type TokenExchangeOptions struct {
-	Enable        bool   `bson:"enable" json:"enable"`
-	TokenEndpoint string `bson:"token_endpoint" json:"token_endpoint"`
-	ClientID      string `bson:"client_id" json:"client_id"`
-	ClientSecret  string `bson:"client_secret" json:"client_secret"`
+	Enable        bool              `bson:"enable" json:"enable"`
+	TokenEndpoint string            `bson:"token_endpoint" json:"token_endpoint"`
+	ClientID      string            `bson:"client_id" json:"client_id"`
+	ClientSecret  string            `bson:"client_secret" json:"client_secret"`
+	Audience      []string          `bson:"audience" json:"audience"`
+	CustomParams  map[string]string `bson:"custom_params" json:"custom_params"`
 }
 
 type AnalyticsPluginConfig struct {
