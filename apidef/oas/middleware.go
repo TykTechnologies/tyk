@@ -97,6 +97,41 @@ type Global struct {
 	TransformResponseHeaders *TransformHeaders `bson:"transformResponseHeaders,omitempty" json:"transformResponseHeaders,omitempty"`
 }
 
+func (g *Global) MarshalJSON() ([]byte, error) {
+	if g == nil {
+		return nil, nil
+	}
+
+	if g.PrePlugin != nil {
+		g.PrePlugins = g.PrePlugin.Plugins
+		g.PrePlugin = nil
+	}
+
+	if g.PostAuthenticationPlugin != nil {
+		g.PostAuthenticationPlugins = g.PostAuthenticationPlugin.Plugins
+		g.PostAuthenticationPlugin = nil
+	}
+
+	if g.PostPlugin != nil {
+		g.PostPlugins = g.PostPlugin.Plugins
+		g.PostPlugin = nil
+	}
+
+	if g.ResponsePlugin != nil {
+		g.ResponsePlugins = g.ResponsePlugin.Plugins
+		g.ResponsePlugin = nil
+	}
+
+	type Alias Global
+
+	// to prevent infinite recursion
+	return json.Marshal(&struct {
+		*Alias
+	}{
+		Alias: (*Alias)(g),
+	})
+}
+
 // Fill fills *Global from apidef.APIDefinition.
 func (g *Global) Fill(api apidef.APIDefinition) {
 	if g.PluginConfig == nil {
@@ -117,31 +152,22 @@ func (g *Global) Fill(api apidef.APIDefinition) {
 		g.CORS = nil
 	}
 
-	if g.PrePlugins == nil {
-		g.PrePlugins = make(CustomPlugins, len(api.CustomMiddleware.Pre))
-		g.PrePlugins.Fill(api.CustomMiddleware.Pre)
-		g.PrePlugin = nil
-	}
+	g.PrePlugins.Fill(api.CustomMiddleware.Pre)
+	g.PrePlugin = nil
 
 	if ShouldOmit(g.PrePlugins) {
 		g.PrePlugins = nil
 	}
 
-	if g.PostAuthenticationPlugins == nil {
-		g.PostAuthenticationPlugins = make(CustomPlugins, len(api.CustomMiddleware.PostKeyAuth))
-		g.PostAuthenticationPlugins.Fill(api.CustomMiddleware.PostKeyAuth)
-		g.PostAuthenticationPlugin = nil
-	}
+	g.PostAuthenticationPlugins.Fill(api.CustomMiddleware.PostKeyAuth)
+	g.PostAuthenticationPlugin = nil
 
 	if ShouldOmit(g.PostAuthenticationPlugins) {
 		g.PostAuthenticationPlugins = nil
 	}
 
-	if g.PostPlugins == nil {
-		g.PostPlugins = make(CustomPlugins, len(api.CustomMiddleware.Post))
-		g.PostPlugins.Fill(api.CustomMiddleware.Post)
-		g.PostPlugin = nil
-	}
+	g.PostPlugins.Fill(api.CustomMiddleware.Post)
+	g.PostPlugin = nil
 
 	if ShouldOmit(g.PostPlugins) {
 		g.PostPlugins = nil
@@ -156,11 +182,8 @@ func (g *Global) Fill(api apidef.APIDefinition) {
 		g.Cache = nil
 	}
 
-	if g.ResponsePlugins == nil {
-		g.ResponsePlugins = make(CustomPlugins, len(api.CustomMiddleware.Response))
-		g.ResponsePlugins.Fill(api.CustomMiddleware.Response)
-		g.ResponsePlugin = nil
-	}
+	g.ResponsePlugins.Fill(api.CustomMiddleware.Response)
+	g.ResponsePlugin = nil
 
 	if ShouldOmit(g.ResponsePlugins) {
 		g.ResponsePlugins = nil
@@ -1100,9 +1123,10 @@ type CustomPlugin struct {
 type CustomPlugins []CustomPlugin
 
 // Fill fills CustomPlugins from supplied Middleware definitions.
-func (c CustomPlugins) Fill(mwDefs []apidef.MiddlewareDefinition) {
+func (c *CustomPlugins) Fill(mwDefs []apidef.MiddlewareDefinition) {
+	customPlugins := make(CustomPlugins, len(mwDefs))
 	for i, mwDef := range mwDefs {
-		c[i] = CustomPlugin{
+		customPlugins[i] = CustomPlugin{
 			Enabled:        !mwDef.Disabled,
 			Path:           mwDef.Path,
 			FunctionName:   mwDef.Name,
@@ -1110,11 +1134,17 @@ func (c CustomPlugins) Fill(mwDefs []apidef.MiddlewareDefinition) {
 			RequireSession: mwDef.RequireSession,
 		}
 	}
+
+	*c = customPlugins
 }
 
 // ExtractTo extracts CustomPlugins into supplied Middleware definitions.
-func (c CustomPlugins) ExtractTo(mwDefs []apidef.MiddlewareDefinition) {
-	for i, plugin := range c {
+func (c *CustomPlugins) ExtractTo(mwDefs []apidef.MiddlewareDefinition) {
+	if c == nil {
+		return
+	}
+
+	for i, plugin := range *c {
 		mwDefs[i] = apidef.MiddlewareDefinition{
 			Disabled:       !plugin.Enabled,
 			Name:           plugin.FunctionName,
