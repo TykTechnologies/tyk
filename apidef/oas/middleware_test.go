@@ -74,16 +74,49 @@ func TestMiddleware(t *testing.T) {
 }
 
 func TestGlobal(t *testing.T) {
-	var emptyGlobal Global
+	t.Run("empty", func(t *testing.T) {
+		var emptyGlobal Global
 
-	var convertedAPI apidef.APIDefinition
-	convertedAPI.SetDisabledFlags()
-	emptyGlobal.ExtractTo(&convertedAPI)
+		var convertedAPI apidef.APIDefinition
+		convertedAPI.SetDisabledFlags()
+		emptyGlobal.ExtractTo(&convertedAPI)
 
-	var resultGlobal Global
-	resultGlobal.Fill(convertedAPI)
+		var resultGlobal Global
+		resultGlobal.Fill(convertedAPI)
 
-	assert.Equal(t, emptyGlobal, resultGlobal)
+		assert.Equal(t, emptyGlobal, resultGlobal)
+	})
+
+	t.Run("json", func(t *testing.T) {
+		g := Global{
+			PrePlugin: &PrePlugin{
+				Plugins: make(CustomPlugins, 1),
+			},
+			PostAuthenticationPlugin: &PostAuthenticationPlugin{
+				Plugins: make(CustomPlugins, 1),
+			},
+			PostPlugin: &PostPlugin{
+				Plugins: make(CustomPlugins, 1),
+			},
+			ResponsePlugin: &ResponsePlugin{
+				Plugins: make(CustomPlugins, 1),
+			},
+		}
+
+		body, err := json.Marshal(&g)
+		assert.NoError(t, err)
+
+		var updatedGlobal Global
+		assert.NoError(t, json.Unmarshal(body, &updatedGlobal))
+		assert.Nil(t, updatedGlobal.PrePlugin)
+		assert.NotNil(t, updatedGlobal.PrePlugins)
+		assert.Nil(t, updatedGlobal.PostAuthenticationPlugin)
+		assert.NotNil(t, updatedGlobal.PostAuthenticationPlugins)
+		assert.Nil(t, updatedGlobal.PostPlugin)
+		assert.NotNil(t, updatedGlobal.PostPlugins)
+		assert.Nil(t, updatedGlobal.ResponsePlugin)
+		assert.NotNil(t, updatedGlobal.ResponsePlugins)
+	})
 }
 
 func TestPluginConfig(t *testing.T) {
