@@ -1,6 +1,7 @@
 package oas
 
 import (
+	"encoding/json"
 	"net/http"
 	"sort"
 	"strings"
@@ -1219,6 +1220,22 @@ type VirtualEndpoint struct {
 	RequireSession bool `bson:"requireSession,omitempty" json:"requireSession,omitempty"`
 }
 
+func (v *VirtualEndpoint) MarshalJSON() ([]byte, error) {
+	if v.FunctionName == "" && v.Name != "" {
+		v.FunctionName = v.Name
+		v.Name = ""
+	}
+
+	type Alias VirtualEndpoint
+
+	// to prevent infinite recursion
+	return json.Marshal(&struct {
+		*Alias
+	}{
+		Alias: (*Alias)(v),
+	})
+}
+
 // Fill fills *VirtualEndpoint from apidef.VirtualMeta.
 func (v *VirtualEndpoint) Fill(meta apidef.VirtualMeta) {
 	v.Enabled = !meta.Disabled
@@ -1267,6 +1284,22 @@ type EndpointPostPlugin struct {
 	FunctionName string `bson:"functionName" json:"functionName"` // required.
 	// Path is the path to plugin.
 	Path string `bson:"path" json:"path"` // required.
+}
+
+func (ep *EndpointPostPlugin) MarshalJSON() ([]byte, error) {
+	if ep.FunctionName == "" && ep.Name != "" {
+		ep.FunctionName = ep.Name
+		ep.Name = ""
+	}
+
+	type Alias EndpointPostPlugin
+
+	// to prevent infinite recursion
+	return json.Marshal(&struct {
+		*Alias
+	}{
+		Alias: (*Alias)(ep),
+	})
 }
 
 // Fill fills *EndpointPostPlugin from apidef.GoPluginMeta.

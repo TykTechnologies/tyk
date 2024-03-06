@@ -1,6 +1,7 @@
 package oas
 
 import (
+	"encoding/json"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -714,6 +715,17 @@ func TestVirtualEndpoint(t *testing.T) {
 		expectedVirtualEndpoint.Path = ""
 		assert.Equal(t, expectedVirtualEndpoint, actualVirtualEndpoint)
 	})
+
+	t.Run("json", func(t *testing.T) {
+		v := VirtualEndpoint{
+			Enabled: true,
+			Name:    "func",
+		}
+		body, err := json.Marshal(&v)
+		assert.NoError(t, err)
+		assert.Contains(t, string(body), "functionName")
+		assert.NotContains(t, string(body), "name")
+	})
 }
 
 func TestEndpointPostPlugins(t *testing.T) {
@@ -783,6 +795,17 @@ func TestEndpointPostPlugins(t *testing.T) {
 		expectedEndpointPostPlugins := endpointPostPlugin
 		expectedEndpointPostPlugins[0].Name = ""
 		assert.Equal(t, expectedEndpointPostPlugins, actualEndpointPostPlugins)
+	})
+
+	t.Run("json", func(t *testing.T) {
+		v := EndpointPostPlugin{
+			Enabled: true,
+			Name:    "func",
+		}
+		body, err := json.Marshal(&v)
+		assert.NoError(t, err)
+		assert.Contains(t, string(body), "functionName")
+		assert.NotContains(t, string(body), "name")
 	})
 }
 
