@@ -152,6 +152,7 @@ func TestOAS_ExtractTo_ResetAPIDefinition(t *testing.T) {
 	a.ConfigDataDisabled = false
 	a.CustomMiddleware.AuthCheck.Disabled = false
 	a.CustomMiddleware.IdExtractor.Disabled = false
+	a.GlobalRateLimit.Disabled = false
 	a.TagsDisabled = false
 	a.IsOAS = false
 	a.IDPClientIDMappingDisabled = false

@@ -501,7 +501,7 @@ type RateLimit struct {
 
 // Fill fills *RateLimit from apidef.APIDefinition.
 func (r *RateLimit) Fill(api apidef.APIDefinition) {
-	r.Enabled = !api.DisableRateLimit
+	r.Enabled = !api.GlobalRateLimit.Disabled
 	r.Rate = int(api.GlobalRateLimit.Rate)
 	if per := api.GlobalRateLimit.Per; per != 0 {
 		perDuration := time.Duration(per) * time.Second
@@ -511,7 +511,7 @@ func (r *RateLimit) Fill(api apidef.APIDefinition) {
 
 // ExtractTo extracts *Ratelimit into *apidef.APIDefinition.
 func (r *RateLimit) ExtractTo(api *apidef.APIDefinition) {
-	api.DisableRateLimit = !r.Enabled
+	api.GlobalRateLimit.Disabled = !r.Enabled
 	api.GlobalRateLimit.Rate = float64(r.Rate)
 	perDuration, err := time.ParseDuration(r.Per)
 	if err != nil {
