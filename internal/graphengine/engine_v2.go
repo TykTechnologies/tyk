@@ -3,9 +3,10 @@ package graphengine
 import (
 	"context"
 	"errors"
+	"net/http"
+
 	"github.com/TykTechnologies/graphql-go-tools/pkg/ast"
 	semconv "github.com/TykTechnologies/opentelemetry/semconv/v1.0.0"
-	"net/http"
 
 	"github.com/jensneuse/abstractlogger"
 	"github.com/sirupsen/logrus"
