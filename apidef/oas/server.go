@@ -8,7 +8,7 @@ import (
 type Server struct {
 	// ListenPath is the base path on Tyk to which requests for this API should
 	// be sent. Tyk listens for any requests coming into the host at this
-	// path, on the port that Tyk is configured to run on, and processes these
+	// path, on the port that Tyk is configured to run on and processes these
 	// accordingly.
 	ListenPath ListenPath `bson:"listenPath" json:"listenPath"` // required
 
@@ -135,16 +135,16 @@ func (s *Server) ExtractTo(api *apidef.APIDefinition) {
 
 // ListenPath is the base path on Tyk to which requests for this API
 // should be sent. Tyk listens out for any requests coming into the host at
-// this path, on the port that Tyk is configured to run on, and processes
+// this path, on the port that Tyk is configured to run on and processes
 // these accordingly.
 type ListenPath struct {
 	// Value is the value of the listen path e.g. `/api/` or `/` or `/httpbin/`.
 	// Tyk classic API definition: `proxy.listen_path`
 	Value string `bson:"value" json:"value"` // required
 
-	// Strip removes the inbound listen path (as accessed by the client) when generating the outgoing request (to the upstream service).
+	// Strip removes the inbound listen path (as accessed by the client) when generating the outbound request for the upstream service.
 	//
-	// For example, a scenario where the Tyk base address is `http://acme.com/', the listen path is `example/` and the upstream URL is `http://httpbin.org/`:
+	// For example, consider the scenario where the Tyk base address is `http://acme.com/', the listen path is `example/` and the upstream URL is `http://httpbin.org/`:
 	//
 	// - If the client application sends a request to `http://acme.com/example/get` then the request will be proxied to `http://httpbin.org/example/get`
 	// - If stripListenPath is set to `true`, the `example` listen path is removed and the request would be proxied to `http://httpbin.org/get`.
@@ -167,7 +167,7 @@ func (lp *ListenPath) ExtractTo(api *apidef.APIDefinition) {
 
 // ClientCertificates contains the configurations related to establishing static mutual TLS between the client and Tyk.
 type ClientCertificates struct {
-	// Enabled enables static mTLS for the API.
+	// Enabled activates static mTLS for the API.
 	Enabled bool `bson:"enabled" json:"enabled"`
 	// Allowlist is the list of client certificates which are allowed.
 	Allowlist []string `bson:"allowlist" json:"allowlist"`
@@ -187,7 +187,7 @@ func (cc *ClientCertificates) ExtractTo(api *apidef.APIDefinition) {
 
 // GatewayTags holds a list of segment tags that should apply for a gateway.
 type GatewayTags struct {
-	// Enabled enables use of segment tags.
+	// Enabled activates use of segment tags.
 	Enabled bool `bson:"enabled" json:"enabled"`
 	// Tags is a list of segment tags
 	Tags []string `bson:"tags" json:"tags"`
@@ -212,7 +212,7 @@ type Domain struct {
 	// Name is the name of the domain.
 	Name string `bson:"name" json:"name"`
 	// Certificates defines a field for specifying certificate IDs or file paths
-	// that the Gateway can utilize to dynamically load certificates for your custom domain.
+	// that the Gateway can utilise to dynamically load certificates for your custom domain.
 	//
 	// Tyk classic API definition: `certificates`
 	Certificates []string `bson:"certificates,omitempty" json:"certificates,omitempty"`
@@ -234,7 +234,7 @@ func (cd *Domain) Fill(api apidef.APIDefinition) {
 
 // DetailedActivityLogs holds the configuration related to recording detailed analytics.
 type DetailedActivityLogs struct {
-	// Enabled enables/disables detailed activity logs.
+	// Enabled activates detailed activity logs.
 	//
 	// Tyk classic API definition: `enable_detailed_recording`
 	Enabled bool `bson:"enabled" json:"enabled"`
@@ -242,17 +242,17 @@ type DetailedActivityLogs struct {
 
 // ExtractTo extracts *DetailedActivityLogs into *apidef.APIDefinition.
 func (d *DetailedActivityLogs) ExtractTo(api *apidef.APIDefinition) {
-	api.EnableDetailedRecording = !d.Enabled
+	api.EnableDetailedRecording = d.Enabled
 }
 
 // Fill fills *DetailedActivityLogs from apidef.APIDefinition.
 func (d *DetailedActivityLogs) Fill(api apidef.APIDefinition) {
-	d.Enabled = !api.EnableDetailedRecording
+	d.Enabled = api.EnableDetailedRecording
 }
 
 // DetailedTracing holds the configuration of the detailed tracing.
 type DetailedTracing struct {
-	// Enabled enables detailed tracing.
+	// Enabled activates detailed tracing.
 	Enabled bool `bson:"enabled" json:"enabled"`
 }
 

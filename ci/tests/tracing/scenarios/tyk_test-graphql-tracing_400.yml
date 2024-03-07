@@ -1,0 +1,20 @@
+type: Test
+spec:
+  id: IjF4ED0SR
+  name: test graphql tracing bad request
+  description: test the graphql tracing that will trigger a bad request
+  trigger:
+    type: http
+    httpRequest:
+      method: POST
+      url: tyk:8080/test-graphql-tracing/test-graphql-tracing
+      body: "{\n  \"query\": \"query test {\\n  country(code: \\\"NG\\\"){\\n    nam\\n  }\\n}\",\n  \"operationName\": \"test\"\n}"
+      headers:
+        - key: Content-Type
+          value: application/json
+  specs:
+    - selector: span[tracetest.span.type="general" name="NormalizeRequest"]
+      assertions:
+        - "attr:graphql.document = 'query test {\n  country(code: \"NG\"){\n    nam\n  }\n}'"
+        - attr:graphql.operation.name = "test"
+        - attr:graphql.operation.type = "query"

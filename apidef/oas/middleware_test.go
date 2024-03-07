@@ -1,6 +1,7 @@
 package oas
 
 import (
+	"encoding/json"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -19,19 +20,103 @@ func TestMiddleware(t *testing.T) {
 	resultMiddleware.Fill(convertedAPI)
 
 	assert.Equal(t, emptyMiddleware, resultMiddleware)
+
+	t.Run("plugins", func(t *testing.T) {
+		customPlugins := CustomPlugins{
+			CustomPlugin{
+				Enabled:      true,
+				FunctionName: "func",
+				Path:         "/path",
+			},
+		}
+		var pluginMW = Middleware{
+			Global: &Global{
+				PrePlugin: &PrePlugin{
+					Plugins: customPlugins,
+				},
+				PostAuthenticationPlugin: &PostAuthenticationPlugin{
+					Plugins: customPlugins,
+				},
+				PostPlugin: &PostPlugin{
+					Plugins: customPlugins,
+				},
+				ResponsePlugin: &ResponsePlugin{
+					Plugins: customPlugins,
+				},
+			},
+		}
+
+		var convertedAPI apidef.APIDefinition
+		convertedAPI.SetDisabledFlags()
+
+		pluginMW.ExtractTo(&convertedAPI)
+
+		var resultMiddleware = Middleware{
+			Global: &Global{
+				PrePlugin:                &PrePlugin{},
+				PostAuthenticationPlugin: &PostAuthenticationPlugin{},
+				PostPlugin:               &PostPlugin{},
+				ResponsePlugin:           &ResponsePlugin{},
+			},
+		}
+		resultMiddleware.Fill(convertedAPI)
+
+		expectedMW := Middleware{
+			Global: &Global{
+				PrePlugins:                customPlugins,
+				PostAuthenticationPlugins: customPlugins,
+				PostPlugins:               customPlugins,
+				ResponsePlugins:           customPlugins,
+			},
+		}
+		assert.Equal(t, expectedMW, resultMiddleware)
+	})
 }
 
 func TestGlobal(t *testing.T) {
-	var emptyGlobal Global
+	t.Run("empty", func(t *testing.T) {
+		var emptyGlobal Global
 
-	var convertedAPI apidef.APIDefinition
-	convertedAPI.SetDisabledFlags()
-	emptyGlobal.ExtractTo(&convertedAPI)
+		var convertedAPI apidef.APIDefinition
+		convertedAPI.SetDisabledFlags()
+		emptyGlobal.ExtractTo(&convertedAPI)
 
-	var resultGlobal Global
-	resultGlobal.Fill(convertedAPI)
+		var resultGlobal Global
+		resultGlobal.Fill(convertedAPI)
 
-	assert.Equal(t, emptyGlobal, resultGlobal)
+		assert.Equal(t, emptyGlobal, resultGlobal)
+	})
+
+	t.Run("json", func(t *testing.T) {
+		g := Global{
+			PrePlugin: &PrePlugin{
+				Plugins: make(CustomPlugins, 1),
+			},
+			PostAuthenticationPlugin: &PostAuthenticationPlugin{
+				Plugins: make(CustomPlugins, 1),
+			},
+			PostPlugin: &PostPlugin{
+				Plugins: make(CustomPlugins, 1),
+			},
+			ResponsePlugin: &ResponsePlugin{
+				Plugins: make(CustomPlugins, 1),
+			},
+		}
+
+		body, err := json.Marshal(&g)
+		assert.NoError(t, err)
+
+		var updatedGlobal Global
+		assert.NoError(t, json.Unmarshal(body, &updatedGlobal))
+		assert.Nil(t, updatedGlobal.PrePlugin)
+		assert.NotNil(t, updatedGlobal.PrePlugins)
+		assert.Nil(t, updatedGlobal.PostAuthenticationPlugin)
+		assert.NotNil(t, updatedGlobal.PostAuthenticationPlugins)
+		assert.Nil(t, updatedGlobal.PostPlugin)
+		assert.NotNil(t, updatedGlobal.PostPlugins)
+		assert.Nil(t, updatedGlobal.ResponsePlugin)
+		assert.NotNil(t, updatedGlobal.ResponsePlugins)
+	})
 }
 
 func TestPluginConfig(t *testing.T) {
@@ -351,6 +436,15 @@ func TestPrePlugin(t *testing.T) {
 
 func TestCustomPlugins(t *testing.T) {
 	t.Parallel()
+	t.Run("nil", func(t *testing.T) {
+		var (
+			nilCustomPlugins *CustomPlugins
+			mwDefs           []apidef.MiddlewareDefinition
+		)
+		nilCustomPlugins.ExtractTo(mwDefs)
+		assert.Nil(t, mwDefs)
+	})
+
 	t.Run("empty", func(t *testing.T) {
 		t.Parallel()
 		var (
@@ -603,7 +697,7 @@ func TestVirtualEndpoint(t *testing.T) {
 		t.Parallel()
 		expectedVirtualEndpoint := VirtualEndpoint{
 			Enabled:        true,
-			Name:           "virtualFunc",
+			FunctionName:   "virtualFunc",
 			Body:           "test body",
 			ProxyOnError:   true,
 			RequireSession: true,
@@ -631,7 +725,7 @@ func TestVirtualEndpoint(t *testing.T) {
 		t.Parallel()
 		expectedVirtualEndpoint := VirtualEndpoint{
 			Enabled:        true,
-			Name:           "virtualFunc",
+			FunctionName:   "virtualFunc",
 			Path:           "/path/to/js",
 			ProxyOnError:   true,
 			RequireSession: true,
@@ -661,7 +755,7 @@ func TestVirtualEndpoint(t *testing.T) {
 			Enabled:        true,
 			Path:           "/path/to/js",
 			Body:           "test body",
-			Name:           "virtualFunc",
+			FunctionName:   "virtualFunc",
 			ProxyOnError:   true,
 			RequireSession: true,
 		}
@@ -682,6 +776,48 @@ func TestVirtualEndpoint(t *testing.T) {
 		expectedVirtualEndpoint := virtualEndpoint
 		expectedVirtualEndpoint.Path = ""
 		assert.Equal(t, expectedVirtualEndpoint, actualVirtualEndpoint)
+	})
+
+	t.Run("functionName should have precedence", func(t *testing.T) {
+		t.Parallel()
+		virtualEndpoint := VirtualEndpoint{
+			Enabled:        true,
+			Path:           "/path/to/js",
+			Body:           "test body",
+			Name:           "virtualFunc",
+			FunctionName:   "newVirtualFunc",
+			ProxyOnError:   true,
+			RequireSession: true,
+		}
+
+		meta := apidef.VirtualMeta{}
+		virtualEndpoint.ExtractTo(&meta)
+		assert.Equal(t, apidef.VirtualMeta{
+			Disabled:             false,
+			ResponseFunctionName: "newVirtualFunc",
+			FunctionSourceURI:    "test body",
+			FunctionSourceType:   apidef.UseBlob,
+			ProxyOnError:         true,
+			UseSession:           true,
+		}, meta)
+
+		actualVirtualEndpoint := VirtualEndpoint{}
+		actualVirtualEndpoint.Fill(meta)
+		expectedVirtualEndpoint := virtualEndpoint
+		expectedVirtualEndpoint.Name = ""
+		expectedVirtualEndpoint.Path = ""
+		assert.Equal(t, expectedVirtualEndpoint, actualVirtualEndpoint)
+	})
+
+	t.Run("json", func(t *testing.T) {
+		v := VirtualEndpoint{
+			Enabled: true,
+			Name:    "func",
+		}
+		body, err := json.Marshal(&v)
+		assert.NoError(t, err)
+		assert.Contains(t, string(body), "functionName")
+		assert.NotContains(t, string(body), "name")
 	})
 }
 
@@ -717,9 +853,9 @@ func TestEndpointPostPlugins(t *testing.T) {
 		t.Parallel()
 		expectedEndpointPostPlugins := EndpointPostPlugins{
 			{
-				Enabled: true,
-				Name:    "symbolFunc",
-				Path:    "/path/to/so",
+				Enabled:      true,
+				FunctionName: "symbolFunc",
+				Path:         "/path/to/so",
 			},
 		}
 
@@ -730,6 +866,39 @@ func TestEndpointPostPlugins(t *testing.T) {
 		actualEndpointPostPlugins.Fill(meta)
 
 		assert.Equal(t, expectedEndpointPostPlugins, actualEndpointPostPlugins)
+	})
+
+	t.Run("value - function name should have precedence", func(t *testing.T) {
+		t.Parallel()
+		endpointPostPlugin := EndpointPostPlugins{
+			{
+				Enabled:      true,
+				Name:         "symbolFunc",
+				FunctionName: "newSymbolFunc",
+				Path:         "/path/to/so",
+			},
+		}
+
+		meta := apidef.GoPluginMeta{}
+		endpointPostPlugin.ExtractTo(&meta)
+
+		actualEndpointPostPlugins := make(EndpointPostPlugins, 1)
+		actualEndpointPostPlugins.Fill(meta)
+
+		expectedEndpointPostPlugins := endpointPostPlugin
+		expectedEndpointPostPlugins[0].Name = ""
+		assert.Equal(t, expectedEndpointPostPlugins, actualEndpointPostPlugins)
+	})
+
+	t.Run("json", func(t *testing.T) {
+		v := EndpointPostPlugin{
+			Enabled: true,
+			Name:    "func",
+		}
+		body, err := json.Marshal(&v)
+		assert.NoError(t, err)
+		assert.Contains(t, string(body), "functionName")
+		assert.NotContains(t, string(body), "name")
 	})
 }
 

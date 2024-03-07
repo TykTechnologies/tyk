@@ -1,0 +1,21 @@
+type: Test
+spec:
+  id: QG5wPvASg
+  name: Test Graphql Detailed Tracing Disabled - Invalid Request
+  description: Test Graphql Detailed Tracing Disabled - Invalid Request
+  trigger:
+    type: http
+    httpRequest:
+      method: POST
+      url: tyk:8080/test-graphql-detailed-tracing-disabled/test-graphql-detailed-tracing-disabled
+      body: "{\n  \"query\": \"query test {\\n  country(code: \\\"NG\\\"){\\n    nam\\n  }\\n}\",\n  \"operationName\": \"test\"\n}"
+      headers:
+        - key: Content-Type
+          value: application/json
+  specs:
+    - selector: span[tracetest.span.type="general" name="GraphqlMiddleware Validation"]
+      name: Ensure graphql spans still exist
+      assertions:
+        - "attr:graphql.document = 'query test {\n  country(code: \"NG\"){\n    nam\n  }\n}'"
+        - attr:graphql.operation.name = "test"
+        - attr:graphql.operation.type = "query"

@@ -314,7 +314,7 @@ func (as *AuthSources) ExtractTo(authConfig *apidef.AuthConfig) {
 
 // AuthSource defines an authentication source.
 type AuthSource struct {
-	// Enabled enables the auth source.
+	// Enabled activates the auth source.
 	// Tyk classic API definition: `auth_configs[X].use_param/use_cookie`
 	Enabled bool `bson:"enabled" json:"enabled"` // required
 	// Name is the name of the auth source.
@@ -422,21 +422,23 @@ type ScopeToPolicy struct {
 
 // HMAC holds the configuration for the HMAC authentication mode.
 type HMAC struct {
-	// Enabled enables the HMAC authentication mode.
+	// Enabled activates the HMAC authentication mode.
 	// Tyk classic API definition: `enable_signature_checking`
 	Enabled bool `bson:"enabled" json:"enabled"` // required
 
 	// AuthSources contains authentication token source configuration (header, cookie, query).
 	AuthSources `bson:",inline" json:",inline"`
 
-	// AllowedAlgorithms is the array of HMAC algorithms which are allowed. Tyk supports the following HMAC algorithms:
+	// AllowedAlgorithms is the array of HMAC algorithms which are allowed.
+	//
+	// Tyk supports the following HMAC algorithms:
 	//
 	// - `hmac-sha1`
 	// - `hmac-sha256`
 	// - `hmac-sha384`
 	// - `hmac-sha512`
 	//
-	// and reads the value from algorithm header.
+	// and reads the value from the algorithm header.
 	//
 	// Tyk classic API definition: `hmac_allowed_algorithms`
 	AllowedAlgorithms []string `bson:"allowedAlgorithms,omitempty" json:"allowedAlgorithms,omitempty"`
@@ -476,7 +478,7 @@ func (h *HMAC) ExtractTo(api *apidef.APIDefinition) {
 
 // OIDC contains configuration for the OIDC authentication mode.
 type OIDC struct {
-	// Enabled enables the OIDC authentication mode.
+	// Enabled activates the OIDC authentication mode.
 	//
 	// Tyk classic API definition: `use_openid`
 	Enabled bool `bson:"enabled" json:"enabled"` // required
@@ -489,7 +491,7 @@ type OIDC struct {
 	// Tyk classic API definition: `openid_options.segregate_by_client`.
 	SegregateByClientId bool `bson:"segregateByClientId,omitempty" json:"segregateByClientId,omitempty"`
 
-	// Providers contains a list of authorised providers and their Client IDs, and matched policies.
+	// Providers contains a list of authorised providers, their Client IDs and matched policies.
 	//
 	// Tyk classic API definition: `openid_options.providers`.
 	Providers []Provider `bson:"providers,omitempty" json:"providers,omitempty"`
@@ -588,7 +590,7 @@ type ClientToPolicy struct {
 
 // CustomPluginAuthentication holds configuration for custom plugins.
 type CustomPluginAuthentication struct {
-	// Enabled enables the CustomPluginAuthentication authentication mode.
+	// Enabled activates the CustomPluginAuthentication authentication mode.
 	//
 	// Tyk classic API definition: `enable_coprocess_auth`/`use_go_plugin_auth`.
 	Enabled bool `bson:"enabled" json:"enabled"` // required
@@ -651,11 +653,11 @@ func (c *CustomPluginAuthentication) ExtractTo(api *apidef.APIDefinition) {
 
 // AuthenticationPlugin holds the configuration for custom authentication plugin.
 type AuthenticationPlugin struct {
-	// Enabled enables custom authentication plugin.
+	// Enabled activates custom authentication plugin.
 	Enabled bool `bson:"enabled" json:"enabled"` // required.
 	// FunctionName is the name of authentication method.
 	FunctionName string `bson:"functionName" json:"functionName"` // required.
-	// Path is the path to shared object file in case of gopluign mode or path to js code in case of otto auth plugin.
+	// Path is the path to shared object file in case of goplugin mode or path to JS code in case of otto auth plugin.
 	Path string `bson:"path" json:"path"`
 	// RawBodyOnly if set to true, do not fill body in request or response object.
 	RawBodyOnly bool `bson:"rawBodyOnly,omitempty" json:"rawBodyOnly,omitempty"`
@@ -758,7 +760,7 @@ func (id *IDExtractorConfig) ExtractTo(api *apidef.APIDefinition) {
 
 // IDExtractor configures ID Extractor.
 type IDExtractor struct {
-	// Enabled enables ID extractor with coprocess authentication.
+	// Enabled activates ID extractor with coprocess authentication.
 	Enabled bool `bson:"enabled" json:"enabled"` // required
 	// Source is the source from which ID to be extracted from.
 	Source apidef.IdExtractorSource `bson:"source" json:"source"` // required

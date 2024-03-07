@@ -7,15 +7,6 @@ import (
 // RateLimit contains flags and configuration for controlling rate limiting behaviour.
 // It is embedded in the main config structure.
 type RateLimit struct {
-	// EnableLeakyBucketRateLimiter enables leaky bucket rate limiting.
-	//
-	// LeakyBucket will delay requests so they are processed in a FIFO
-	// style queue, ensuring a constant request rate and smoothing out
-	// traffic spikes. This comes at some cost to gateway instances, as
-	// the connections would be held for a longer time, instead of
-	// blocking the requests when they go over the defined rate limits.
-	EnableLeakyBucketRateLimiter bool `json:"enable_leaky_bucket_rate_limiter"`
-
 	// Redis based rate limiter with fixed window. Provides 100% rate limiting accuracy, but require two additional Redis roundtrip for each request.
 	EnableRedisRollingLimiter bool `json:"enable_redis_rolling_limiter"`
 
@@ -46,10 +37,6 @@ func (r *RateLimit) String() string {
 	info := "using transactions"
 	if r.EnableNonTransactionalRateLimiter {
 		info = "using pipeline"
-	}
-
-	if r.EnableLeakyBucketRateLimiter {
-		return "Leaky Bucket Rate Limiter enabled"
 	}
 
 	if r.EnableRedisRollingLimiter {

@@ -301,14 +301,18 @@
       "additionalProperties": false,
       "properties": {
         "plugins": {
-          "type": "array",
-          "items": [
-            {
-              "$ref": "#/definitions/X-Tyk-CustomPluginDefinition"
-            }
-          ]
+          "$ref": "#/definitions/X-Tyk-CustomPlugins"
         }
       }
+    },
+    "X-Tyk-CustomPlugins": {
+      "type": "array",
+      "items": [
+        {
+          "$ref": "#/definitions/X-Tyk-CustomPluginDefinition"
+        }
+      ],
+      "minItems": 1
     },
     "X-Tyk-CustomPluginDefinition": {
       "additionalProperties": false,
@@ -538,14 +542,26 @@
         "prePlugin": {
           "$ref": "#/definitions/X-Tyk-CustomPluginConfig"
         },
+        "prePlugins": {
+          "$ref": "#/definitions/X-Tyk-CustomPlugins"
+        },
         "postAuthenticationPlugin": {
           "$ref": "#/definitions/X-Tyk-CustomPluginConfig"
+        },
+        "postAuthenticationPlugins": {
+          "$ref": "#/definitions/X-Tyk-CustomPlugins"
         },
         "postPlugin": {
           "$ref": "#/definitions/X-Tyk-CustomPluginConfig"
         },
+        "postPlugins": {
+          "$ref": "#/definitions/X-Tyk-CustomPlugins"
+        },
         "responsePlugin": {
           "$ref": "#/definitions/X-Tyk-CustomPluginConfig"
+        },
+        "responsePlugins": {
+          "$ref": "#/definitions/X-Tyk-CustomPlugins"
         },
         "cache": {
           "$ref": "#/definitions/X-Tyk-Cache"
@@ -788,6 +804,9 @@
         "name": {
           "type": "string"
         },
+        "functionName": {
+          "type": "string"
+        },
         "path": {
           "type": "string"
         },
@@ -803,7 +822,7 @@
       },
       "required": [
         "enabled",
-        "name"
+        "functionName"
       ]
     },
     "X-Tyk-URLRewrite": {
@@ -941,13 +960,16 @@
         "name": {
           "type": "string"
         },
+        "functionName": {
+          "type": "string"
+        },
         "path": {
           "type": "string"
         }
       },
       "required": [
         "enabled",
-        "name",
+        "functionName",
         "path"
       ]
     },

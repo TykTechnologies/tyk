@@ -34,12 +34,11 @@ func (gw *Gateway) initHealthCheck(ctx context.Context) {
 
 	go func(ctx context.Context) {
 		var n = gw.GetConfig().LivenessCheck.CheckDuration
-
 		if n == 0 {
-			n = 10
+			n = 10 * time.Second
 		}
 
-		ticker := time.NewTicker(time.Second * n)
+		ticker := time.NewTicker(n)
 
 		for {
 			select {

@@ -273,8 +273,8 @@ func NewConnector(connType string, conf config.Config) (model.Connector, error) 
 			CAFile:             cfg.CAFile,
 			CertFile:           cfg.CertFile,
 			KeyFile:            cfg.KeyFile,
-			MinVersion:         cfg.MinVersion,
-			MaxVersion:         cfg.MaxVersion,
+			MinVersion:         cfg.TLSMinVersion,
+			MaxVersion:         cfg.TLSMaxVersion,
 		}
 		opts = append(opts, model.WithTLS(&tls))
 	}

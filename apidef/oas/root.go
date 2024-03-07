@@ -128,7 +128,7 @@ func (i *Info) ExtractTo(api *apidef.APIDefinition) {
 	}
 }
 
-// State holds configuration for the status of the API within Tyk - whether it is currently active and whether it is exposed externally.
+// State holds configuration for the status of the API within Tyk - if it is currently active and if it is exposed externally.
 type State struct {
 	// Active enables the API so that Tyk will listen for and process requests made to the listenPath.
 	// Tyk classic API definition: `active`
