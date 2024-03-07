@@ -12,6 +12,26 @@ servers:
 security:
 - api_key: []
 paths:
+  /tyk/apis:
+    get:
+      operationId: listApis
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: '#/components/schemas/APIDefinition'
+                type: array
+          description: OK
+        "403":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Forbidden
+      tags:
+      - APIs
   /tyk/apis/{apiID}:
     delete:
       operationId: deleteApi
@@ -34,6 +54,12 @@ paths:
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
           description: Bad Request
+        "403":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Forbidden
         "404":
           content:
             application/json:
@@ -66,6 +92,12 @@ paths:
               schema:
                 $ref: '#/components/schemas/APIDefinition'
           description: OK
+        "403":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Forbidden
         "404":
           content:
             application/json:
@@ -100,6 +132,12 @@ paths:
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
           description: Bad Request
+        "403":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Forbidden
         "404":
           content:
             application/json:
@@ -1552,6 +1590,33 @@ components:
           type: object
         use_extended_paths:
           type: boolean
+      type: object
+    VirtualMeta:
+      properties:
+        disabled:
+          type: boolean
+        function_source_type:
+          type: string
+        function_source_uri:
+          type: string
+        method:
+          type: string
+        path:
+          type: string
+        proxy_on_error:
+          type: boolean
+        response_function_name:
+          type: string
+        use_session:
+          type: boolean
+      type: object
+  securitySchemes:
+    api_key:
+      description: Api key
+      in: header
+      name: X-Tyk-Authorization
+      type: apiKey
+ype: boolean
       type: object
     VirtualMeta:
       properties:
