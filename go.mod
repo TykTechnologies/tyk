@@ -183,6 +183,9 @@ require (
 	github.com/shopspring/decimal v1.2.0 // indirect
 	github.com/spf13/cast v1.6.0 // indirect
 	github.com/stretchr/objx v0.5.0 // indirect
+	github.com/swaggest/jsonschema-go v0.3.66 // indirect
+	github.com/swaggest/openapi-go v0.2.49 // indirect
+	github.com/swaggest/refl v1.3.0 // indirect
 	github.com/tidwall/gjson v1.11.0 // indirect
 	github.com/tidwall/match v1.1.1 // indirect
 	github.com/tidwall/pretty v1.2.0 // indirect

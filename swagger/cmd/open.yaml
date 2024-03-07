@@ -1,0 +1,1473 @@
+openapi: 3.0.3
+info:
+  description: ' The Tyk Gateway API is the primary means for integrating your application
+    with the Tyk API Gateway'
+  title: Tyk Gateway API
+  version: 5.2.3
+paths:
+  /tyk/apis/{apiID}:
+    get:
+      operationId: getApi
+      parameters:
+      - in: path
+        name: apiID
+        required: true
+        schema:
+          example: keyless
+          type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIDefinition'
+          description: OK
+      tags:
+      - APIs
+components:
+  schemas:
+    APIDefinition:
+      properties:
+        CORS:
+          $ref: '#/components/schemas/CORSConfig'
+        active:
+          type: boolean
+        allowed_ips:
+          items:
+            type: string
+          nullable: true
+          type: array
+        analytics_plugin:
+          $ref: '#/components/schemas/AnalyticsPluginConfig'
+        api_id:
+          example: keyless
+          type: string
+        auth:
+          $ref: '#/components/schemas/AuthConfig'
+        auth_configs:
+          additionalProperties:
+            $ref: '#/components/schemas/AuthConfig'
+          nullable: true
+          type: object
+        auth_provider:
+          $ref: '#/components/schemas/AuthProviderMeta'
+        base_identity_provided_by:
+          type: string
+        basic_auth:
+          properties:
+            body_password_regexp:
+              type: string
+            body_user_regexp:
+              type: string
+            cache_ttl:
+              type: integer
+            disable_caching:
+              type: boolean
+            extract_from_body:
+              type: boolean
+          type: object
+        blacklisted_ips:
+          items:
+            type: string
+          nullable: true
+          type: array
+        cache_options:
+          $ref: '#/components/schemas/CacheOptions'
+        certificate_pinning_disabled:
+          type: boolean
+        certificates:
+          items:
+            type: string
+          nullable: true
+          type: array
+        client_certificates:
+          items:
+            type: string
+          nullable: true
+          type: array
+        config_data:
+          additionalProperties: {}
+          nullable: true
+          type: object
+        config_data_disabled:
+          type: boolean
+        custom_middleware:
+          $ref: '#/components/schemas/MiddlewareSection'
+        custom_middleware_bundle:
+          type: string
+        custom_middleware_bundle_disabled:
+          type: boolean
+        custom_plugin_auth_enabled:
+          type: boolean
+        definition:
+          $ref: '#/components/schemas/VersionDefinition'
+        detailed_tracing:
+          type: boolean
+        disable_quota:
+          type: boolean
+        disable_rate_limit:
+          type: boolean
+        do_not_track:
+          type: boolean
+        domain:
+          type: string
+        domain_disabled:
+          type: boolean
+        dont_set_quota_on_create:
+          type: boolean
+        enable_batch_request_support:
+          type: boolean
+        enable_context_vars:
+          type: boolean
+        enable_coprocess_auth:
+          type: boolean
+        enable_detailed_recording:
+          type: boolean
+        enable_ip_blacklisting:
+          type: boolean
+        enable_ip_whitelisting:
+          type: boolean
+        enable_jwt:
+          type: boolean
+        enable_proxy_protocol:
+          example: false
+          type: boolean
+        enable_signature_checking:
+          type: boolean
+        event_handlers:
+          $ref: '#/components/schemas/EventHandlerMetaConfig'
+        expiration:
+          type: string
+        expire_analytics_after:
+          type: integer
+        external_oauth:
+          $ref: '#/components/schemas/ExternalOAuth'
+        global_rate_limit:
+          $ref: '#/components/schemas/GlobalRateLimit'
+        graphql:
+          $ref: '#/components/schemas/GraphQLConfig'
+        hmac_allowed_algorithms:
+          items:
+            type: string
+          nullable: true
+          type: array
+        hmac_allowed_clock_skew:
+          type: number
+        id:
+          example: keyless
+          type: string
+        idp_client_id_mapping_disabled:
+          type: boolean
+        internal:
+          type: boolean
+        is_oas:
+          type: boolean
+        jwt_client_base_field:
+          type: string
+        jwt_default_policies:
+          items:
+            type: string
+          nullable: true
+          type: array
+        jwt_expires_at_validation_skew:
+          minimum: 0
+          type: integer
+        jwt_identity_base_field:
+          type: string
+        jwt_issued_at_validation_skew:
+          minimum: 0
+          type: integer
+        jwt_not_before_validation_skew:
+          minimum: 0
+          type: integer
+        jwt_policy_field_name:
+          type: string
+        jwt_scope_claim_name:
+          type: string
+        jwt_scope_to_policy_mapping:
+          additionalProperties:
+            type: string
+          nullable: true
+          type: object
+        jwt_signing_method:
+          type: string
+        jwt_skip_kid:
+          type: boolean
+        jwt_source:
+          type: string
+        listen_port:
+          example: 0
+          type: integer
+        name:
+          example: Tyk Test Keyless AP
+          type: string
+        notifications:
+          $ref: '#/components/schemas/NotificationsManager'
+        oauth_meta:
+          properties:
+            allowed_access_types:
+              items:
+                type: string
+              nullable: true
+              type: array
+            allowed_authorize_types:
+              items:
+                type: string
+              nullable: true
+              type: array
+            auth_login_redirect:
+              type: string
+          type: object
+        openid_options:
+          $ref: '#/components/schemas/OpenIDOptions'
+        org_id:
+          type: string
+        pinned_public_keys:
+          additionalProperties:
+            type: string
+          nullable: true
+          type: object
+        protocol:
+          example: http
+          type: string
+        proxy:
+          $ref: '#/components/schemas/ProxyConfig'
+        request_signing:
+          $ref: '#/components/schemas/RequestSigningMeta'
+        response_processors:
+          items:
+            $ref: '#/components/schemas/ResponseProcessor'
+          nullable: true
+          type: array
+        scopes:
+          $ref: '#/components/schemas/Scopes'
+        session_lifetime:
+          type: integer
+        session_lifetime_respects_key_expiration:
+          type: boolean
+        session_provider:
+          $ref: '#/components/schemas/SessionProviderMeta'
+        slug:
+          example: keyless
+          type: string
+        strip_auth_data:
+          type: boolean
+        tag_headers:
+          items:
+            type: string
+          nullable: true
+          type: array
+        tags:
+          items:
+            type: string
+          nullable: true
+          type: array
+        tags_disabled:
+          type: boolean
+        upstream_certificates:
+          additionalProperties:
+            type: string
+          nullable: true
+          type: object
+        upstream_certificates_disabled:
+          type: boolean
+        uptime_tests:
+          $ref: '#/components/schemas/UptimeTests'
+        use_basic_auth:
+          type: boolean
+        use_go_plugin_auth:
+          type: boolean
+        use_keyless:
+          type: boolean
+        use_mutual_tls_auth:
+          type: boolean
+        use_oauth2:
+          type: boolean
+        use_openid:
+          type: boolean
+        use_standard_auth:
+          type: boolean
+        version_data:
+          $ref: '#/components/schemas/VersionData'
+      type: object
+    AnalyticsPluginConfig:
+      properties:
+        enable:
+          type: boolean
+        func_name:
+          type: string
+        plugin_path:
+          type: string
+      type: object
+    AuthConfig:
+      properties:
+        auth_header_name:
+          type: string
+        cookie_name:
+          type: string
+        disable_header:
+          type: boolean
+        name:
+          type: string
+        param_name:
+          type: string
+        signature:
+          $ref: '#/components/schemas/SignatureConfig'
+        use_certificate:
+          type: boolean
+        use_cookie:
+          type: boolean
+        use_param:
+          type: boolean
+        validate_signature:
+          type: boolean
+      type: object
+    AuthProviderMeta:
+      properties:
+        meta:
+          additionalProperties: {}
+          nullable: true
+          type: object
+        name:
+          type: string
+        storage_engine:
+          type: string
+      type: object
+    CORSConfig:
+      properties:
+        allow_credentials:
+          type: boolean
+        allowed_headers:
+          items:
+            type: string
+          nullable: true
+          type: array
+        allowed_methods:
+          items:
+            type: string
+          nullable: true
+          type: array
+        allowed_origins:
+          items:
+            type: string
+          nullable: true
+          type: array
+        debug:
+          type: boolean
+        enable:
+          type: boolean
+        exposed_headers:
+          items:
+            type: string
+          nullable: true
+          type: array
+        max_age:
+          type: integer
+        options_passthrough:
+          type: boolean
+      type: object
+    CacheMeta:
+      properties:
+        cache_key_regex:
+          type: string
+        cache_response_codes:
+          items:
+            type: integer
+          nullable: true
+          type: array
+        disabled:
+          type: boolean
+        method:
+          type: string
+        path:
+          type: string
+        timeout:
+          type: integer
+      type: object
+    CacheOptions:
+      properties:
+        cache_all_safe_requests:
+          type: boolean
+        cache_by_headers:
+          items:
+            type: string
+          nullable: true
+          type: array
+        cache_control_ttl_header:
+          type: string
+        cache_response_codes:
+          items:
+            type: integer
+          nullable: true
+          type: array
+        cache_timeout:
+          type: integer
+        enable_cache:
+          type: boolean
+        enable_upstream_cache_control:
+          type: boolean
+      type: object
+    CheckCommand:
+      properties:
+        message:
+          type: string
+        name:
+          type: string
+      type: object
+    CircuitBreakerMeta:
+      properties:
+        disable_half_open_state:
+          type: boolean
+        disabled:
+          type: boolean
+        method:
+          type: string
+        path:
+          type: string
+        return_to_service_after:
+          type: integer
+        samples:
+          type: integer
+        threshold_percent:
+          type: number
+      type: object
+    DatasourceMappingConfiguration:
+      properties:
+        disabled:
+          type: boolean
+        path:
+          type: string
+      type: object
+    DatasourceSourceConfig:
+      properties:
+        data_source_config: {}
+        kind:
+          type: string
+      type: object
+    DatasourceTypeFieldConfiguration:
+      properties:
+        data_source:
+          $ref: '#/components/schemas/DatasourceSourceConfig'
+        field_name:
+          type: string
+        mapping:
+          $ref: '#/components/schemas/DatasourceMappingConfiguration'
+        type_name:
+          type: string
+      type: object
+    EndPointMeta:
+      properties:
+        disabled:
+          type: boolean
+        ignore_case:
+          type: boolean
+        method:
+          type: string
+        method_actions:
+          additionalProperties:
+            $ref: '#/components/schemas/EndpointMethodMeta'
+          type: object
+        path:
+          type: string
+      type: object
+    EndpointMethodMeta:
+      properties:
+        action:
+          type: string
+        code:
+          type: integer
+        data:
+          type: string
+        headers:
+          additionalProperties:
+            type: string
+          nullable: true
+          type: object
+      type: object
+    EventHandlerMetaConfig:
+      properties:
+        events:
+          additionalProperties:
+            items:
+              $ref: '#/components/schemas/EventHandlerTriggerConfig'
+            type: array
+          nullable: true
+          type: object
+      type: object
+    EventHandlerTriggerConfig:
+      properties:
+        handler_meta:
+          additionalProperties: {}
+          nullable: true
+          type: object
+        handler_name:
+          type: string
+      type: object
+    ExtendedPathsSet:
+      properties:
+        advance_cache_config:
+          items:
+            $ref: '#/components/schemas/CacheMeta'
+          type: array
+        black_list:
+          items:
+            $ref: '#/components/schemas/EndPointMeta'
+          type: array
+        cache:
+          items:
+            type: string
+          type: array
+        circuit_breakers:
+          items:
+            $ref: '#/components/schemas/CircuitBreakerMeta'
+          type: array
+        do_not_track_endpoints:
+          items:
+            $ref: '#/components/schemas/TrackEndpointMeta'
+          type: array
+        go_plugin:
+          items:
+            $ref: '#/components/schemas/GoPluginMeta'
+          type: array
+        hard_timeouts:
+          items:
+            $ref: '#/components/schemas/HardTimeoutMeta'
+          type: array
+        ignored:
+          items:
+            $ref: '#/components/schemas/EndPointMeta'
+          type: array
+        internal:
+          items:
+            $ref: '#/components/schemas/InternalMeta'
+          type: array
+        method_transforms:
+          items:
+            $ref: '#/components/schemas/MethodTransformMeta'
+          type: array
+        mock_response:
+          items:
+            $ref: '#/components/schemas/MockResponseMeta'
+          type: array
+        persist_graphql:
+          items:
+            $ref: '#/components/schemas/PersistGraphQLMeta'
+          nullable: true
+          type: array
+        size_limits:
+          items:
+            $ref: '#/components/schemas/RequestSizeMeta'
+          type: array
+        track_endpoints:
+          items:
+            $ref: '#/components/schemas/TrackEndpointMeta'
+          type: array
+        transform:
+          items:
+            $ref: '#/components/schemas/TemplateMeta'
+          type: array
+        transform_headers:
+          items:
+            $ref: '#/components/schemas/HeaderInjectionMeta'
+          type: array
+        transform_jq:
+          items:
+            $ref: '#/components/schemas/TransformJQMeta'
+          type: array
+        transform_jq_response:
+          items:
+            $ref: '#/components/schemas/TransformJQMeta'
+          type: array
+        transform_response:
+          items:
+            $ref: '#/components/schemas/TemplateMeta'
+          type: array
+        transform_response_headers:
+          items:
+            $ref: '#/components/schemas/HeaderInjectionMeta'
+          type: array
+        url_rewrites:
+          items:
+            $ref: '#/components/schemas/URLRewriteMeta'
+          type: array
+        validate_json:
+          items:
+            $ref: '#/components/schemas/ValidatePathMeta'
+          type: array
+        validate_request:
+          items:
+            $ref: '#/components/schemas/ValidateRequestMeta'
+          type: array
+        virtual:
+          items:
+            $ref: '#/components/schemas/VirtualMeta'
+          type: array
+        white_list:
+          items:
+            $ref: '#/components/schemas/EndPointMeta'
+          type: array
+      type: object
+    ExternalOAuth:
+      properties:
+        enabled:
+          type: boolean
+        providers:
+          items:
+            $ref: '#/components/schemas/Provider'
+          nullable: true
+          type: array
+      type: object
+    GlobalRateLimit:
+      properties:
+        disabled:
+          type: boolean
+        per:
+          type: number
+        rate:
+          type: number
+      type: object
+    GoPluginMeta:
+      properties:
+        disabled:
+          type: boolean
+        func_name:
+          type: string
+        method:
+          type: string
+        path:
+          type: string
+        plugin_path:
+          type: string
+      type: object
+    GraphQLConfig:
+      properties:
+        enabled:
+          type: boolean
+        engine:
+          $ref: '#/components/schemas/GraphQLEngineConfig'
+        execution_mode:
+          type: string
+        introspection:
+          $ref: '#/components/schemas/GraphQLIntrospectionConfig'
+        last_schema_update:
+          format: date-time
+          nullable: true
+          type: string
+        playground:
+          $ref: '#/components/schemas/GraphQLPlayground'
+        proxy:
+          $ref: '#/components/schemas/GraphQLProxyConfig'
+        schema:
+          type: string
+        subgraph:
+          $ref: '#/components/schemas/GraphQLSubgraphConfig'
+        supergraph:
+          $ref: '#/components/schemas/GraphQLSupergraphConfig'
+        type_field_configurations:
+          items:
+            $ref: '#/components/schemas/DatasourceTypeFieldConfiguration'
+          nullable: true
+          type: array
+        version:
+          type: string
+      type: object
+    GraphQLEngineConfig:
+      properties:
+        data_sources:
+          items:
+            $ref: '#/components/schemas/GraphQLEngineDataSource'
+          nullable: true
+          type: array
+        field_configs:
+          items:
+            $ref: '#/components/schemas/GraphQLFieldConfig'
+          nullable: true
+          type: array
+        global_headers:
+          items:
+            $ref: '#/components/schemas/UDGGlobalHeader'
+          nullable: true
+          type: array
+      type: object
+    GraphQLEngineDataSource:
+      properties:
+        config: {}
+        internal:
+          type: boolean
+        kind:
+          type: string
+        name:
+          type: string
+        root_fields:
+          items:
+            $ref: '#/components/schemas/GraphQLTypeFields'
+          nullable: true
+          type: array
+      type: object
+    GraphQLFieldConfig:
+      properties:
+        disable_default_mapping:
+          type: boolean
+        field_name:
+          type: string
+        path:
+          items:
+            type: string
+          nullable: true
+          type: array
+        type_name:
+          type: string
+      type: object
+    GraphQLIntrospectionConfig:
+      properties:
+        disabled:
+          type: boolean
+      type: object
+    GraphQLPlayground:
+      properties:
+        enabled:
+          type: boolean
+        path:
+          type: string
+      type: object
+    GraphQLProxyConfig:
+      properties:
+        auth_headers:
+          additionalProperties:
+            type: string
+          nullable: true
+          type: object
+        request_headers:
+          additionalProperties:
+            type: string
+          nullable: true
+          type: object
+        subscription_type:
+          type: string
+        use_response_extensions:
+          $ref: '#/components/schemas/GraphQLResponseExtensions'
+      type: object
+    GraphQLResponseExtensions:
+      properties:
+        on_error_forwarding:
+          type: boolean
+      type: object
+    GraphQLSubgraphConfig:
+      properties:
+        sdl:
+          type: string
+      type: object
+    GraphQLSubgraphEntity:
+      properties:
+        api_id:
+          type: string
+        headers:
+          additionalProperties:
+            type: string
+          nullable: true
+          type: object
+        name:
+          type: string
+        sdl:
+          type: string
+        subscription_type:
+          type: string
+        url:
+          type: string
+      type: object
+    GraphQLSupergraphConfig:
+      properties:
+        disable_query_batching:
+          type: boolean
+        global_headers:
+          additionalProperties:
+            type: string
+          nullable: true
+          type: object
+        merged_sdl:
+          type: string
+        subgraphs:
+          items:
+            $ref: '#/components/schemas/GraphQLSubgraphEntity'
+          nullable: true
+          type: array
+        updated_at:
+          format: date-time
+          nullable: true
+          type: string
+      type: object
+    GraphQLTypeFields:
+      properties:
+        fields:
+          items:
+            type: string
+          nullable: true
+          type: array
+        type:
+          type: string
+      type: object
+    HardTimeoutMeta:
+      properties:
+        disabled:
+          type: boolean
+        method:
+          type: string
+        path:
+          type: string
+        timeout:
+          type: integer
+      type: object
+    HeaderInjectionMeta:
+      properties:
+        act_on:
+          type: boolean
+        add_headers:
+          additionalProperties:
+            type: string
+          nullable: true
+          type: object
+        delete_headers:
+          items:
+            type: string
+          nullable: true
+          type: array
+        disabled:
+          type: boolean
+        method:
+          type: string
+        path:
+          type: string
+      type: object
+    HostCheckObject:
+      properties:
+        body:
+          type: string
+        commands:
+          items:
+            $ref: '#/components/schemas/CheckCommand'
+          nullable: true
+          type: array
+        enable_proxy_protocol:
+          type: boolean
+        headers:
+          additionalProperties:
+            type: string
+          nullable: true
+          type: object
+        method:
+          type: string
+        protocol:
+          type: string
+        timeout:
+          type: integer
+        url:
+          type: string
+      type: object
+    InternalMeta:
+      properties:
+        disabled:
+          type: boolean
+        method:
+          type: string
+        path:
+          type: string
+      type: object
+    Introspection:
+      properties:
+        cache:
+          $ref: '#/components/schemas/IntrospectionCache'
+        client_id:
+          type: string
+        client_secret:
+          type: string
+        enabled:
+          type: boolean
+        identity_base_field:
+          type: string
+        url:
+          type: string
+      type: object
+    IntrospectionCache:
+      properties:
+        enabled:
+          type: boolean
+        timeout:
+          type: integer
+      type: object
+    JWTValidation:
+      properties:
+        enabled:
+          type: boolean
+        expires_at_validation_skew:
+          minimum: 0
+          type: integer
+        identity_base_field:
+          type: string
+        issued_at_validation_skew:
+          minimum: 0
+          type: integer
+        not_before_validation_skew:
+          minimum: 0
+          type: integer
+        signing_method:
+          type: string
+        source:
+          type: string
+      type: object
+    MethodTransformMeta:
+      properties:
+        disabled:
+          type: boolean
+        method:
+          type: string
+        path:
+          type: string
+        to_method:
+          type: string
+      type: object
+    MiddlewareDefinition:
+      properties:
+        disabled:
+          type: boolean
+        name:
+          type: string
+        path:
+          type: string
+        raw_body_only:
+          type: boolean
+        require_session:
+          type: boolean
+      type: object
+    MiddlewareIdExtractor:
+      properties:
+        disabled:
+          type: boolean
+        extract_from:
+          type: string
+        extract_with:
+          type: string
+        extractor_config:
+          additionalProperties: {}
+          nullable: true
+          type: object
+      type: object
+    MiddlewareSection:
+      properties:
+        auth_check:
+          $ref: '#/components/schemas/MiddlewareDefinition'
+        driver:
+          type: string
+        id_extractor:
+          $ref: '#/components/schemas/MiddlewareIdExtractor'
+        post:
+          items:
+            $ref: '#/components/schemas/MiddlewareDefinition'
+          nullable: true
+          type: array
+        post_key_auth:
+          items:
+            $ref: '#/components/schemas/MiddlewareDefinition'
+          nullable: true
+          type: array
+        pre:
+          items:
+            $ref: '#/components/schemas/MiddlewareDefinition'
+          nullable: true
+          type: array
+        response:
+          items:
+            $ref: '#/components/schemas/MiddlewareDefinition'
+          nullable: true
+          type: array
+      type: object
+    MockResponseMeta:
+      properties:
+        body:
+          type: string
+        code:
+          type: integer
+        disabled:
+          type: boolean
+        headers:
+          additionalProperties:
+            type: string
+          nullable: true
+          type: object
+        ignore_case:
+          type: boolean
+        method:
+          type: string
+        path:
+          type: string
+      type: object
+    NotificationsManager:
+      properties:
+        oauth_on_keychange_url:
+          type: string
+        shared_secret:
+          type: string
+      type: object
+    OIDProviderConfig:
+      properties:
+        client_ids:
+          additionalProperties:
+            type: string
+          nullable: true
+          type: object
+        issuer:
+          type: string
+      type: object
+    OpenIDOptions:
+      properties:
+        providers:
+          items:
+            $ref: '#/components/schemas/OIDProviderConfig'
+          nullable: true
+          type: array
+        segregate_by_client:
+          type: boolean
+      type: object
+    PersistGraphQLMeta:
+      properties:
+        method:
+          type: string
+        operation:
+          type: string
+        path:
+          type: string
+        variables:
+          additionalProperties: {}
+          nullable: true
+          type: object
+      type: object
+    Provider:
+      properties:
+        introspection:
+          $ref: '#/components/schemas/Introspection'
+        jwt:
+          $ref: '#/components/schemas/JWTValidation'
+      type: object
+    ProxyConfig:
+      properties:
+        check_host_against_uptime_tests:
+          type: boolean
+        disable_strip_slash:
+          type: boolean
+        enable_load_balancing:
+          type: boolean
+        listen_path:
+          type: string
+        preserve_host_header:
+          type: boolean
+        service_discovery:
+          $ref: '#/components/schemas/ServiceDiscoveryConfiguration'
+        strip_listen_path:
+          type: boolean
+        target_list:
+          items:
+            type: string
+          nullable: true
+          type: array
+        target_url:
+          type: string
+        transport:
+          properties:
+            proxy_url:
+              type: string
+            ssl_ciphers:
+              items:
+                type: string
+              nullable: true
+              type: array
+            ssl_force_common_name_check:
+              type: boolean
+            ssl_insecure_skip_verify:
+              type: boolean
+            ssl_max_version:
+              minimum: 0
+              type: integer
+            ssl_min_version:
+              minimum: 0
+              type: integer
+          type: object
+      type: object
+    RequestSigningMeta:
+      properties:
+        algorithm:
+          type: string
+        certificate_id:
+          type: string
+        header_list:
+          items:
+            type: string
+          nullable: true
+          type: array
+        is_enabled:
+          type: boolean
+        key_id:
+          type: string
+        secret:
+          type: string
+        signature_header:
+          type: string
+      type: object
+    RequestSizeMeta:
+      properties:
+        disabled:
+          type: boolean
+        method:
+          type: string
+        path:
+          type: string
+        size_limit:
+          type: integer
+      type: object
+    ResponseProcessor:
+      properties:
+        name:
+          type: string
+        options: {}
+      type: object
+    RoutingTrigger:
+      properties:
+        "on":
+          type: string
+        options:
+          $ref: '#/components/schemas/RoutingTriggerOptions'
+        rewrite_to:
+          type: string
+      type: object
+    RoutingTriggerOptions:
+      properties:
+        header_matches:
+          additionalProperties:
+            $ref: '#/components/schemas/StringRegexMap'
+          nullable: true
+          type: object
+        path_part_matches:
+          additionalProperties:
+            $ref: '#/components/schemas/StringRegexMap'
+          nullable: true
+          type: object
+        payload_matches:
+          $ref: '#/components/schemas/StringRegexMap'
+        query_val_matches:
+          additionalProperties:
+            $ref: '#/components/schemas/StringRegexMap'
+          nullable: true
+          type: object
+        request_context_matches:
+          additionalProperties:
+            $ref: '#/components/schemas/StringRegexMap'
+          nullable: true
+          type: object
+        session_meta_matches:
+          additionalProperties:
+            $ref: '#/components/schemas/StringRegexMap'
+          nullable: true
+          type: object
+      type: object
+    ScopeClaim:
+      properties:
+        scope_claim_name:
+          type: string
+        scope_to_policy:
+          additionalProperties:
+            type: string
+          type: object
+      type: object
+    Scopes:
+      properties:
+        jwt:
+          $ref: '#/components/schemas/ScopeClaim'
+        oidc:
+          $ref: '#/components/schemas/ScopeClaim'
+      type: object
+    ServiceDiscoveryConfiguration:
+      properties:
+        cache_disabled:
+          type: boolean
+        cache_timeout:
+          type: integer
+        data_path:
+          type: string
+        endpoint_returns_list:
+          type: boolean
+        parent_data_path:
+          type: string
+        port_data_path:
+          type: string
+        query_endpoint:
+          type: string
+        target_path:
+          type: string
+        use_discovery_service:
+          type: boolean
+        use_nested_query:
+          type: boolean
+        use_target_list:
+          type: boolean
+      type: object
+    SessionProviderMeta:
+      properties:
+        meta:
+          additionalProperties: {}
+          nullable: true
+          type: object
+        name:
+          type: string
+        storage_engine:
+          type: string
+      type: object
+    SignatureConfig:
+      properties:
+        algorithm:
+          type: string
+        allowed_clock_skew:
+          type: integer
+        error_code:
+          type: integer
+        error_message:
+          type: string
+        header:
+          type: string
+        param_name:
+          type: string
+        secret:
+          type: string
+        use_param:
+          type: boolean
+      type: object
+    StringRegexMap:
+      properties:
+        match_rx:
+          type: string
+        reverse:
+          type: boolean
+      type: object
+    TemplateData:
+      properties:
+        enable_session:
+          type: boolean
+        input_type:
+          type: string
+        template_mode:
+          type: string
+        template_source:
+          type: string
+      type: object
+    TemplateMeta:
+      properties:
+        disabled:
+          type: boolean
+        method:
+          type: string
+        path:
+          type: string
+        template_data:
+          $ref: '#/components/schemas/TemplateData'
+      type: object
+    TrackEndpointMeta:
+      properties:
+        disabled:
+          type: boolean
+        method:
+          type: string
+        path:
+          type: string
+      type: object
+    TransformJQMeta:
+      properties:
+        filter:
+          type: string
+        method:
+          type: string
+        path:
+          type: string
+      type: object
+    UDGGlobalHeader:
+      properties:
+        key:
+          type: string
+        value:
+          type: string
+      type: object
+    URLRewriteMeta:
+      properties:
+        disabled:
+          type: boolean
+        match_pattern:
+          type: string
+        method:
+          type: string
+        path:
+          type: string
+        rewrite_to:
+          type: string
+        triggers:
+          items:
+            $ref: '#/components/schemas/RoutingTrigger'
+          nullable: true
+          type: array
+      type: object
+    UptimeTests:
+      properties:
+        check_list:
+          items:
+            $ref: '#/components/schemas/HostCheckObject'
+          nullable: true
+          type: array
+        config:
+          $ref: '#/components/schemas/UptimeTestsConfig'
+      type: object
+    UptimeTestsConfig:
+      properties:
+        expire_utime_after:
+          type: integer
+        recheck_wait:
+          type: integer
+        service_discovery:
+          $ref: '#/components/schemas/ServiceDiscoveryConfiguration'
+      type: object
+    ValidatePathMeta:
+      properties:
+        disabled:
+          type: boolean
+        error_response_code:
+          type: integer
+        method:
+          type: string
+        path:
+          type: string
+        schema:
+          additionalProperties: {}
+          nullable: true
+          type: object
+        schema_b64:
+          type: string
+      type: object
+    ValidateRequestMeta:
+      properties:
+        enabled:
+          type: boolean
+        error_response_code:
+          type: integer
+        method:
+          type: string
+        path:
+          type: string
+      type: object
+    VersionData:
+      properties:
+        default_version:
+          type: string
+        not_versioned:
+          type: boolean
+        versions:
+          additionalProperties:
+            $ref: '#/components/schemas/VersionInfo'
+          nullable: true
+          type: object
+      type: object
+    VersionDefinition:
+      properties:
+        default:
+          type: string
+        enabled:
+          type: boolean
+        fallback_to_default:
+          type: boolean
+        key:
+          type: string
+        location:
+          type: string
+        name:
+          type: string
+        strip_path:
+          type: boolean
+        strip_versioning_data:
+          type: boolean
+        versions:
+          additionalProperties:
+            type: string
+          nullable: true
+          type: object
+      type: object
+    VersionInfo:
+      properties:
+        expires:
+          type: string
+        extended_paths:
+          $ref: '#/components/schemas/ExtendedPathsSet'
+        global_headers:
+          additionalProperties:
+            type: string
+          nullable: true
+          type: object
+        global_headers_disabled:
+          type: boolean
+        global_headers_remove:
+          items:
+            type: string
+          nullable: true
+          type: array
+        global_response_headers:
+          additionalProperties:
+            type: string
+          nullable: true
+          type: object
+        global_response_headers_disabled:
+          type: boolean
+        global_response_headers_remove:
+          items:
+            type: string
+          nullable: true
+          type: array
+        global_size_limit:
+          type: integer
+        ignore_endpoint_case:
+          type: boolean
+        name:
+          type: string
+        override_target:
+          type: string
+        paths:
+          properties:
+            black_list:
+              items:
+                type: string
+              nullable: true
+              type: array
+            ignored:
+              items:
+                type: string
+              nullable: true
+              type: array
+            white_list:
+              items:
+                type: string
+              nullable: true
+              type: array
+          type: object
+        use_extended_paths:
+          type: boolean
+      type: object
+    VirtualMeta:
+      properties:
+        disabled:
+          type: boolean
+        function_source_type:
+          type: string
+        function_source_uri:
+          type: string
+        method:
+          type: string
+        path:
+          type: string
+        proxy_on_error:
+          type: boolean
+        response_function_name:
+          type: string
+        use_session:
+          type: boolean
+      type: object
