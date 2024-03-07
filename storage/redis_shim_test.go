@@ -14,7 +14,7 @@ func TestNewRedisController(t *testing.T) {
 	ctx := context.Background()
 	redisController := NewRedisController(ctx)
 
-	RunNewConnectionHandlerTest(redisController.connection, t)
+	RunNewConnectionHandlerTest(t, redisController.connection)
 }
 
 func TestDisableRedis(t *testing.T) {
