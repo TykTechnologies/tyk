@@ -305,9 +305,11 @@ func (g *Global) extractPrePluginsTo(api *apidef.APIDefinition) {
 		return
 	}
 
-	if g.PrePlugin != nil {
-		g.PrePlugin.ExtractTo(api)
+	if g.PrePlugin == nil {
+		g.PrePlugin = &PrePlugin{}
 	}
+
+	g.PrePlugin.ExtractTo(api)
 }
 
 func (g *Global) extractPostAuthenticationPluginsTo(api *apidef.APIDefinition) {
@@ -321,9 +323,11 @@ func (g *Global) extractPostAuthenticationPluginsTo(api *apidef.APIDefinition) {
 		return
 	}
 
-	if g.PostAuthenticationPlugin != nil {
-		g.PostAuthenticationPlugin.ExtractTo(api)
+	if g.PostAuthenticationPlugin == nil {
+		g.PostAuthenticationPlugin = &PostAuthenticationPlugin{}
 	}
+
+	g.PostAuthenticationPlugin.ExtractTo(api)
 }
 
 func (g *Global) extractPostPluginsTo(api *apidef.APIDefinition) {
@@ -337,9 +341,11 @@ func (g *Global) extractPostPluginsTo(api *apidef.APIDefinition) {
 		return
 	}
 
-	if g.PostPlugin != nil {
-		g.PostPlugin.ExtractTo(api)
+	if g.PostPlugin == nil {
+		g.PostPlugin = &PostPlugin{}
 	}
+
+	g.PostPlugin.ExtractTo(api)
 }
 
 func (g *Global) extractResponsePluginsTo(api *apidef.APIDefinition) {
@@ -352,9 +358,11 @@ func (g *Global) extractResponsePluginsTo(api *apidef.APIDefinition) {
 		g.ResponsePlugins.ExtractTo(api.CustomMiddleware.Response)
 	}
 
-	if g.ResponsePlugin != nil {
-		g.ResponsePlugin.ExtractTo(api)
+	if g.ResponsePlugin == nil {
+		g.ResponsePlugin = &ResponsePlugin{}
 	}
+
+	g.ResponsePlugin.ExtractTo(api)
 }
 
 // PluginConfigData configures config data for custom plugins.
