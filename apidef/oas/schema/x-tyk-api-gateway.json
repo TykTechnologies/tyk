@@ -788,6 +788,9 @@
         "name": {
           "type": "string"
         },
+        "functionName": {
+          "type": "string"
+        },
         "path": {
           "type": "string"
         },
@@ -803,7 +806,7 @@
       },
       "required": [
         "enabled",
-        "name"
+        "functionName"
       ]
     },
     "X-Tyk-URLRewrite": {
@@ -941,13 +944,16 @@
         "name": {
           "type": "string"
         },
+        "functionName": {
+          "type": "string"
+        },
         "path": {
           "type": "string"
         }
       },
       "required": [
         "enabled",
-        "name",
+        "functionName",
         "path"
       ]
     },
