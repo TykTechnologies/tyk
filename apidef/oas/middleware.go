@@ -1227,15 +1227,16 @@ func (v *VirtualEndpoint) MarshalJSON() ([]byte, error) {
 	if v == nil {
 		return nil, nil
 	}
-	copyVirtualEndpoint := *v
-	if copyVirtualEndpoint.FunctionName == "" && copyVirtualEndpoint.Name != "" {
-		copyVirtualEndpoint.FunctionName = copyVirtualEndpoint.Name
-		copyVirtualEndpoint.Name = ""
-	}
 
 	type Alias VirtualEndpoint
 
-	var payload = Alias(copyVirtualEndpoint)
+	var payload = Alias(*v)
+
+	if payload.FunctionName == "" && payload.Name != "" {
+		payload.FunctionName = payload.Name
+		payload.Name = ""
+	}
+
 	// to prevent infinite recursion
 	return json.Marshal(payload)
 }
@@ -1298,16 +1299,15 @@ func (ep *EndpointPostPlugin) MarshalJSON() ([]byte, error) {
 		return nil, nil
 	}
 
-	copyEndpointPostPlugin := *ep
-	if copyEndpointPostPlugin.FunctionName == "" && copyEndpointPostPlugin.Name != "" {
-		copyEndpointPostPlugin.FunctionName = copyEndpointPostPlugin.Name
-		copyEndpointPostPlugin.Name = ""
-	}
-
 	// to prevent infinite recursion
 	type Alias EndpointPostPlugin
 
-	payload := Alias(copyEndpointPostPlugin)
+	payload := Alias(*ep)
+	if payload.FunctionName == "" && payload.Name != "" {
+		payload.FunctionName = payload.Name
+		payload.Name = ""
+	}
+
 	return json.Marshal(payload)
 }
 
