@@ -1,6 +1,7 @@
 package oas
 
 import (
+	"encoding/json"
 	"net/http"
 	"sort"
 	"strings"
@@ -1204,8 +1205,11 @@ func (p *ResponsePlugin) ExtractTo(api *apidef.APIDefinition) {
 type VirtualEndpoint struct {
 	// Enabled activates virtual endpoint.
 	Enabled bool `bson:"enabled" json:"enabled"` // required.
-	// Name is the name of JS function.
-	Name string `bson:"name" json:"name"` // required.
+	// Name is the name of plugin function to be executed.
+	// Deprecated: Use FunctionName instead.
+	Name string `bson:"name,omitempty" json:"name,omitempty"`
+	// FunctionName is the name of plugin function to be executed.
+	FunctionName string `bson:"functionName" json:"functionName"` // required.
 	// Path is the path to JS file.
 	Path string `bson:"path,omitempty" json:"path,omitempty"`
 	// Body is the JS function to execute encoded in base64 format.
@@ -1216,10 +1220,32 @@ type VirtualEndpoint struct {
 	RequireSession bool `bson:"requireSession,omitempty" json:"requireSession,omitempty"`
 }
 
+// MarshalJSON is a custom JSON marshaler for the VirtualEndpoint struct. It is implemented
+// to facilitate a smooth migration from deprecated fields that were previously used to represent
+// the same data.
+func (v *VirtualEndpoint) MarshalJSON() ([]byte, error) {
+	if v == nil {
+		return nil, nil
+	}
+
+	type Alias VirtualEndpoint
+
+	var payload = Alias(*v)
+
+	if payload.FunctionName == "" && payload.Name != "" {
+		payload.FunctionName = payload.Name
+		payload.Name = ""
+	}
+
+	// to prevent infinite recursion
+	return json.Marshal(payload)
+}
+
 // Fill fills *VirtualEndpoint from apidef.VirtualMeta.
 func (v *VirtualEndpoint) Fill(meta apidef.VirtualMeta) {
 	v.Enabled = !meta.Disabled
-	v.Name = meta.ResponseFunctionName
+	v.FunctionName = meta.ResponseFunctionName
+	v.Name = ""
 	v.RequireSession = meta.UseSession
 	v.ProxyOnError = meta.ProxyOnError
 	if meta.FunctionSourceType == apidef.UseBlob {
@@ -1232,7 +1258,13 @@ func (v *VirtualEndpoint) Fill(meta apidef.VirtualMeta) {
 // ExtractTo extracts *VirtualEndpoint to *apidef.VirtualMeta.
 func (v *VirtualEndpoint) ExtractTo(meta *apidef.VirtualMeta) {
 	meta.Disabled = !v.Enabled
-	meta.ResponseFunctionName = v.Name
+	if v.FunctionName != "" {
+		meta.ResponseFunctionName = v.FunctionName
+		v.Name = ""
+	} else {
+		meta.ResponseFunctionName = v.Name
+	}
+
 	meta.UseSession = v.RequireSession
 	meta.ProxyOnError = v.ProxyOnError
 	if v.Body != "" {
@@ -1251,9 +1283,32 @@ type EndpointPostPlugin struct {
 	// Enabled activates post plugin.
 	Enabled bool `bson:"enabled" json:"enabled"` // required.
 	// Name is the name of plugin function to be executed.
-	Name string `bson:"name" json:"name"` // required.
+	// Deprecated: Use FunctionName instead.
+	Name string `bson:"name,omitempty" json:"name,omitempty"`
+	// FunctionName is the name of plugin function to be executed.
+	FunctionName string `bson:"functionName" json:"functionName"` // required.
 	// Path is the path to plugin.
 	Path string `bson:"path" json:"path"` // required.
+}
+
+// MarshalJSON is a custom JSON marshaler for the EndpointPostPlugin struct. It is implemented
+// to facilitate a smooth migration from deprecated fields that were previously used to represent
+// the same data.
+func (ep *EndpointPostPlugin) MarshalJSON() ([]byte, error) {
+	if ep == nil {
+		return nil, nil
+	}
+
+	// to prevent infinite recursion
+	type Alias EndpointPostPlugin
+
+	payload := Alias(*ep)
+	if payload.FunctionName == "" && payload.Name != "" {
+		payload.FunctionName = payload.Name
+		payload.Name = ""
+	}
+
+	return json.Marshal(payload)
 }
 
 // Fill fills *EndpointPostPlugin from apidef.GoPluginMeta.
@@ -1263,9 +1318,9 @@ func (e EndpointPostPlugins) Fill(meta apidef.GoPluginMeta) {
 	}
 
 	e[0] = EndpointPostPlugin{
-		Enabled: !meta.Disabled,
-		Name:    meta.SymbolName,
-		Path:    meta.PluginPath,
+		Enabled:      !meta.Disabled,
+		FunctionName: meta.SymbolName,
+		Path:         meta.PluginPath,
 	}
 }
 
@@ -1277,7 +1332,11 @@ func (e EndpointPostPlugins) ExtractTo(meta *apidef.GoPluginMeta) {
 
 	meta.Disabled = !e[0].Enabled
 	meta.PluginPath = e[0].Path
-	meta.SymbolName = e[0].Name
+	if e[0].FunctionName != "" {
+		meta.SymbolName = e[0].FunctionName
+	} else {
+		meta.SymbolName = e[0].Name
+	}
 }
 
 // CircuitBreaker holds configuration for the circuit breaker middleware.
