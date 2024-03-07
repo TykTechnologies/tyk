@@ -1224,19 +1224,20 @@ type VirtualEndpoint struct {
 // to facilitate a smooth migration from deprecated fields that were previously used to represent
 // the same data.
 func (v *VirtualEndpoint) MarshalJSON() ([]byte, error) {
-	if v.FunctionName == "" && v.Name != "" {
-		v.FunctionName = v.Name
-		v.Name = ""
+	if v == nil {
+		return nil, nil
+	}
+	copyVirtualEndpoint := *v
+	if copyVirtualEndpoint.FunctionName == "" && copyVirtualEndpoint.Name != "" {
+		copyVirtualEndpoint.FunctionName = copyVirtualEndpoint.Name
+		copyVirtualEndpoint.Name = ""
 	}
 
 	type Alias VirtualEndpoint
 
+	var payload = Alias(copyVirtualEndpoint)
 	// to prevent infinite recursion
-	return json.Marshal(&struct {
-		*Alias
-	}{
-		Alias: (*Alias)(v),
-	})
+	return json.Marshal(payload)
 }
 
 // Fill fills *VirtualEndpoint from apidef.VirtualMeta.
@@ -1293,19 +1294,21 @@ type EndpointPostPlugin struct {
 // to facilitate a smooth migration from deprecated fields that were previously used to represent
 // the same data.
 func (ep *EndpointPostPlugin) MarshalJSON() ([]byte, error) {
-	if ep.FunctionName == "" && ep.Name != "" {
-		ep.FunctionName = ep.Name
-		ep.Name = ""
+	if ep == nil {
+		return nil, nil
 	}
 
-	type Alias EndpointPostPlugin
+	copyEndpointPostPlugin := *ep
+	if copyEndpointPostPlugin.FunctionName == "" && copyEndpointPostPlugin.Name != "" {
+		copyEndpointPostPlugin.FunctionName = copyEndpointPostPlugin.Name
+		copyEndpointPostPlugin.Name = ""
+	}
 
 	// to prevent infinite recursion
-	return json.Marshal(&struct {
-		*Alias
-	}{
-		Alias: (*Alias)(ep),
-	})
+	type Alias EndpointPostPlugin
+
+	payload := Alias(copyEndpointPostPlugin)
+	return json.Marshal(payload)
 }
 
 // Fill fills *EndpointPostPlugin from apidef.GoPluginMeta.
