@@ -2,8 +2,15 @@ openapi: 3.0.3
 info:
   description: ' The Tyk Gateway API is the primary means for integrating your application
     with the Tyk API Gateway'
+  license:
+    name: Mozilla Public License Version 2.0
+    url: https://github.com/TykTechnologies/tyk/blob/master/LICENSE.md
   title: Tyk Gateway API
   version: 5.2.3
+servers:
+- url: http://localhost:8080
+security:
+- api_key: []
 paths:
   /tyk/apis/{apiID}:
     delete:
@@ -42,6 +49,9 @@ paths:
       tags:
       - APIs
     get:
+      description: |-
+        Get API definition
+                Only if used without the Tyk Dashboard
       operationId: getApi
       parameters:
       - in: path
@@ -56,6 +66,12 @@ paths:
               schema:
                 $ref: '#/components/schemas/APIDefinition'
           description: OK
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Not Found
       tags:
       - APIs
     put:
@@ -84,6 +100,18 @@ paths:
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
           description: Bad Request
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Not Found
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Internal Server Error
       tags:
       - APIs
 components:
@@ -1544,3 +1572,9 @@ components:
         use_session:
           type: boolean
       type: object
+  securitySchemes:
+    api_key:
+      description: Api key
+      in: header
+      name: X-Tyk-Authorization
+      type: apiKey

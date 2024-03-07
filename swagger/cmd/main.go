@@ -5,10 +5,13 @@ import (
 
 	log "github.com/sirupsen/logrus"
 	"github.com/swaggest/jsonschema-go"
+	"github.com/swaggest/openapi-go"
 	"github.com/swaggest/openapi-go/openapi3"
 
 	"github.com/TykTechnologies/tyk/swagger"
 )
+
+var licence = "https://github.com/TykTechnologies/tyk/blob/master/LICENSE.md"
 
 func main() {
 	r := openapi3.Reflector{
@@ -17,9 +20,15 @@ func main() {
 	r.DefaultOptions = append(r.DefaultOptions, jsonschema.StripDefinitionNamePrefix("Apidef", "Swagger"))
 
 	r.Spec = &openapi3.Spec{Openapi: "3.0.3"}
+	r.Spec.WithServers(openapi3.Server{
+		URL: "http://localhost:8080",
+	})
+	r.Spec.WithSecurity(map[string][]string{"api_key": {}})
+	r.Spec.SetAPIKeySecurity("api_key", "X-Tyk-Authorization", openapi.InHeader, "Api key")
 	r.Spec.Info.
 		WithTitle("Tyk Gateway API").
 		WithVersion("5.2.3").
+		WithLicense(openapi3.License{Name: "Mozilla Public License Version 2.0", URL: &licence}).
 		WithDescription(" The Tyk Gateway API is the primary means for integrating your application with the Tyk API Gateway")
 	err := swagger.APIS(&r)
 	if err != nil {

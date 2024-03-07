@@ -29,8 +29,10 @@ func getClassicApiRequest(r *openapi3.Reflector) error {
 	}
 	oc.AddReqStructure(new(apidef.APIDefinition))
 	oc.AddRespStructure(new(apidef.APIDefinition))
+	oc.AddRespStructure(new(apiStatusMessage), openapi.WithHTTPStatus(http.StatusNotFound))
 	oc.SetTags("APIs")
 	oc.SetID("getApi")
+	oc.SetDescription("Get API definition\n        Only if used without the Tyk Dashboard")
 	return r.AddOperation(oc)
 }
 
@@ -44,6 +46,8 @@ func putClassicApiRequest(r *openapi3.Reflector) error {
 	oc.SetID("updateApi")
 	oc.SetTags("APIs")
 	oc.AddRespStructure(new(apiStatusMessage), openapi.WithHTTPStatus(http.StatusBadRequest))
+	oc.AddRespStructure(new(apiStatusMessage), openapi.WithHTTPStatus(http.StatusNotFound))
+	oc.AddRespStructure(new(apiStatusMessage), openapi.WithHTTPStatus(http.StatusInternalServerError))
 	return r.AddOperation(oc)
 }
 
