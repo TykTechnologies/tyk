@@ -106,35 +106,32 @@ func (g *Global) MarshalJSON() ([]byte, error) {
 		return nil, nil
 	}
 
-	if g.PrePlugin != nil {
-		g.PrePlugins = g.PrePlugin.Plugins
-		g.PrePlugin = nil
+	copyGlobal := *g
+	if copyGlobal.PrePlugin != nil {
+		copyGlobal.PrePlugins = copyGlobal.PrePlugin.Plugins
+		copyGlobal.PrePlugin = nil
 	}
 
-	if g.PostAuthenticationPlugin != nil {
-		g.PostAuthenticationPlugins = g.PostAuthenticationPlugin.Plugins
-		g.PostAuthenticationPlugin = nil
+	if copyGlobal.PostAuthenticationPlugin != nil {
+		copyGlobal.PostAuthenticationPlugins = copyGlobal.PostAuthenticationPlugin.Plugins
+		copyGlobal.PostAuthenticationPlugin = nil
 	}
 
-	if g.PostPlugin != nil {
-		g.PostPlugins = g.PostPlugin.Plugins
-		g.PostPlugin = nil
+	if copyGlobal.PostPlugin != nil {
+		copyGlobal.PostPlugins = copyGlobal.PostPlugin.Plugins
+		copyGlobal.PostPlugin = nil
 	}
 
-	if g.ResponsePlugin != nil {
-		g.ResponsePlugins = g.ResponsePlugin.Plugins
-		g.ResponsePlugin = nil
+	if copyGlobal.ResponsePlugin != nil {
+		copyGlobal.ResponsePlugins = copyGlobal.ResponsePlugin.Plugins
+		copyGlobal.ResponsePlugin = nil
 	}
 
 	type Alias Global
 
-	var payload = Alias(*g)
+	var payload = Alias(copyGlobal)
 	// to prevent infinite recursion
-	return json.Marshal(&struct {
-		Alias
-	}{
-		Alias: payload,
-	})
+	return json.Marshal(payload)
 }
 
 // Fill fills *Global from apidef.APIDefinition.
