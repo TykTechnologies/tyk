@@ -13,7 +13,6 @@ paths:
         name: apiID
         required: true
         schema:
-          example: keyless
           type: string
       responses:
         "200":
@@ -22,6 +21,34 @@ paths:
               schema:
                 $ref: '#/components/schemas/APIDefinition'
           description: OK
+      tags:
+      - APIs
+    put:
+      operationId: updateApi
+      parameters:
+      - in: path
+        name: apiID
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/APIDefinition'
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiModifyKeySuccess'
+          description: OK
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Bad Request
       tags:
       - APIs
 components:
@@ -40,7 +67,6 @@ components:
         analytics_plugin:
           $ref: '#/components/schemas/AnalyticsPluginConfig'
         api_id:
-          example: keyless
           type: string
         auth:
           $ref: '#/components/schemas/AuthConfig'
@@ -130,7 +156,6 @@ components:
         enable_jwt:
           type: boolean
         enable_proxy_protocol:
-          example: false
           type: boolean
         enable_signature_checking:
           type: boolean
@@ -154,7 +179,6 @@ components:
         hmac_allowed_clock_skew:
           type: number
         id:
-          example: keyless
           type: string
         idp_client_id_mapping_disabled:
           type: boolean
@@ -196,10 +220,8 @@ components:
         jwt_source:
           type: string
         listen_port:
-          example: 0
           type: integer
         name:
-          example: Tyk Test Keyless AP
           type: string
         notifications:
           $ref: '#/components/schemas/NotificationsManager'
@@ -228,7 +250,6 @@ components:
           nullable: true
           type: object
         protocol:
-          example: http
           type: string
         proxy:
           $ref: '#/components/schemas/ProxyConfig'
@@ -248,7 +269,6 @@ components:
         session_provider:
           $ref: '#/components/schemas/SessionProviderMeta'
         slug:
-          example: keyless
           type: string
         strip_auth_data:
           type: boolean
@@ -297,6 +317,24 @@ components:
         func_name:
           type: string
         plugin_path:
+          type: string
+      type: object
+    ApiModifyKeySuccess:
+      properties:
+        action:
+          type: string
+        key:
+          type: string
+        key_hash:
+          type: string
+        status:
+          type: string
+      type: object
+    ApiStatusMessage:
+      properties:
+        message:
+          type: string
+        status:
           type: string
       type: object
     AuthConfig:
@@ -1470,4 +1508,6 @@ components:
           type: string
         use_session:
           type: boolean
+      type: object
+ boolean
       type: object

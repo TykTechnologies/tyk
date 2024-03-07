@@ -14,7 +14,7 @@ func main() {
 	r := openapi3.Reflector{
 		Reflector: jsonschema.Reflector{},
 	}
-	r.DefaultOptions = append(r.DefaultOptions, jsonschema.StripDefinitionNamePrefix("Apidef"))
+	r.DefaultOptions = append(r.DefaultOptions, jsonschema.StripDefinitionNamePrefix("Apidef", "Swagger"))
 
 	r.Spec = &openapi3.Spec{Openapi: "3.0.3"}
 	r.Spec.Info.

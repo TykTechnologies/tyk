@@ -25,20 +25,26 @@ import (
 	"github.com/TykTechnologies/tyk/internal/uuid"
 )
 
-type AuthProviderCode string
-type SessionProviderCode string
-type StorageEngineCode string
-type TykEvent string            // A type so we can ENUM event types easily, e.g. EventQuotaExceeded
-type TykEventHandlerName string // A type for handler codes in API definitions
+type (
+	AuthProviderCode    string
+	SessionProviderCode string
+	StorageEngineCode   string
+	TykEvent            string // A type so we can ENUM event types easily, e.g. EventQuotaExceeded
+	TykEventHandlerName string // A type for handler codes in API definitions
+)
 
-type EndpointMethodAction string
-type SourceMode string
+type (
+	EndpointMethodAction string
+	SourceMode           string
+)
 
-type MiddlewareDriver string
-type IdExtractorSource string
-type IdExtractorType string
-type AuthTypeEnum string
-type RoutingTriggerOnType string
+type (
+	MiddlewareDriver     string
+	IdExtractorSource    string
+	IdExtractorType      string
+	AuthTypeEnum         string
+	RoutingTriggerOnType string
+)
 
 type SubscriptionType string
 
@@ -589,7 +595,7 @@ type APIDefinition struct {
 	ListenPort          int            `bson:"listen_port" json:"listen_port"`
 	Protocol            string         `bson:"protocol" json:"protocol"`
 	EnableProxyProtocol bool           `bson:"enable_proxy_protocol" json:"enable_proxy_protocol"`
-	APIID               string         `bson:"api_id" json:"api_id"`
+	APIID               string         `bson:"api_id" json:"api_id" path:"apiID"`
 	OrgID               string         `bson:"org_id" json:"org_id"`
 	UseKeylessAccess    bool           `bson:"use_keyless" json:"use_keyless"`
 	UseOauth2           bool           `bson:"use_oauth2" json:"use_oauth2"`
