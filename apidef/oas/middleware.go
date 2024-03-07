@@ -296,69 +296,65 @@ func (g *Global) ExtractTo(api *apidef.APIDefinition) {
 }
 
 func (g *Global) extractPrePluginsTo(api *apidef.APIDefinition) {
+	defer func() {
+		g.PrePlugin = nil
+	}()
+
+	// give precedence to PrePlugins over PrePlugin
 	if g.PrePlugins != nil {
 		api.CustomMiddleware.Pre = make([]apidef.MiddlewareDefinition, len(g.PrePlugins))
 		g.PrePlugins.ExtractTo(api.CustomMiddleware.Pre)
-		g.PrePlugin = nil
-	} else {
-		if g.PrePlugin == nil {
-			g.PrePlugin = &PrePlugin{}
-			defer func() {
-				g.PrePlugin = nil
-			}()
-		}
+		return
+	}
 
+	if g.PrePlugin != nil {
 		g.PrePlugin.ExtractTo(api)
 	}
 }
 
 func (g *Global) extractPostAuthenticationPluginsTo(api *apidef.APIDefinition) {
+	defer func() {
+		g.PostAuthenticationPlugin = nil
+	}()
+
 	if g.PostAuthenticationPlugins != nil {
 		api.CustomMiddleware.PostKeyAuth = make([]apidef.MiddlewareDefinition, len(g.PostAuthenticationPlugins))
 		g.PostAuthenticationPlugins.ExtractTo(api.CustomMiddleware.PostKeyAuth)
-		g.PostAuthenticationPlugin = nil
-	} else {
-		if g.PostAuthenticationPlugin == nil {
-			g.PostAuthenticationPlugin = &PostAuthenticationPlugin{}
-			defer func() {
-				g.PostAuthenticationPlugin = nil
-			}()
-		}
+		return
+	}
 
+	if g.PostAuthenticationPlugin != nil {
 		g.PostAuthenticationPlugin.ExtractTo(api)
 	}
 }
 
 func (g *Global) extractPostPluginsTo(api *apidef.APIDefinition) {
+	defer func() {
+		g.PostPlugin = nil
+	}()
+
 	if g.PostPlugins != nil {
 		api.CustomMiddleware.Post = make([]apidef.MiddlewareDefinition, len(g.PostPlugins))
 		g.PostPlugins.ExtractTo(api.CustomMiddleware.Post)
-		g.PostPlugin = nil
-	} else {
-		if g.PostPlugin == nil {
-			g.PostPlugin = &PostPlugin{}
-			defer func() {
-				g.PostPlugin = nil
-			}()
-		}
+		return
+	}
 
+	if g.PostPlugin != nil {
 		g.PostPlugin.ExtractTo(api)
 	}
 }
 
 func (g *Global) extractResponsePluginsTo(api *apidef.APIDefinition) {
+	defer func() {
+		g.ResponsePlugin = nil
+	}()
+
 	if g.ResponsePlugins != nil {
 		api.CustomMiddleware.Response = make([]apidef.MiddlewareDefinition, len(g.ResponsePlugins))
 		g.ResponsePlugins.ExtractTo(api.CustomMiddleware.Response)
-		g.ResponsePlugin = nil
-	} else {
-		if g.ResponsePlugin == nil {
-			g.ResponsePlugin = &ResponsePlugin{}
-			defer func() {
-				g.ResponsePlugin = nil
-			}()
-		}
+	}
 
+	if g.ResponsePlugin != nil {
 		g.ResponsePlugin.ExtractTo(api)
 	}
 }
@@ -1188,6 +1184,10 @@ type PrePlugin struct {
 	// Plugins configures custom plugins to be run on pre authentication stage.
 	// The plugins would be executed in the order of configuration in the list.
 	Plugins CustomPlugins `bson:"plugins,omitempty" json:"plugins,omitempty"`
+}
+
+func (p *PrePlugin) Migrate() CustomPlugins {
+	return p.Plugins
 }
 
 // Fill fills PrePlugin from supplied Tyk classic api definition.
