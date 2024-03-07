@@ -1,6 +1,7 @@
 package oas
 
 import (
+	"encoding/json"
 	"net/http"
 	"sort"
 	"strings"
@@ -51,21 +52,37 @@ type Global struct {
 	CORS *CORS `bson:"cors,omitempty" json:"cors,omitempty"`
 
 	// PrePlugin contains configuration related to the custom plugin that is run before authentication.
-	// Tyk classic API definition: `custom_middleware.pre`.
+	// Deprecated: Use PrePlugins instead.
 	PrePlugin *PrePlugin `bson:"prePlugin,omitempty" json:"prePlugin,omitempty"`
+
+	// PrePlugins contains configuration related to the custom plugin that is run before authentication.
+	// Tyk classic API definition: `custom_middleware.pre`.
+	PrePlugins CustomPlugins `bson:"prePlugins,omitempty" json:"prePlugins,omitempty"`
+
+	// PostAuthenticationPlugin contains configuration related to the custom plugin that is run immediately after authentication.
+	// Deprecated: Use PostAuthenticationPlugins instead.
+	PostAuthenticationPlugin *PostAuthenticationPlugin `bson:"postAuthenticationPlugin,omitempty" json:"postAuthenticationPlugin,omitempty"`
 
 	// PostAuthenticationPlugin contains configuration related to the custom plugin that is run immediately after authentication.
 	// Tyk classic API definition: `custom_middleware.post_key_auth`.
-	PostAuthenticationPlugin *PostAuthenticationPlugin `bson:"postAuthenticationPlugin,omitempty" json:"postAuthenticationPlugin,omitempty"`
+	PostAuthenticationPlugins CustomPlugins `bson:"postAuthenticationPlugins,omitempty" json:"postAuthenticationPlugins,omitempty"`
 
 	// PostPlugin contains configuration related to the custom plugin that is run immediately prior to proxying the request to the upstream.
-	// Tyk classic API definition: `custom_middleware.post`.
+	// Deprecated: Use PostPlugins instead.
 	PostPlugin *PostPlugin `bson:"postPlugin,omitempty" json:"postPlugin,omitempty"`
 
-	// ResponsePlugin contains configuration related to to the custom plugin that is run during processing of the response from the upstream service.
+	// PostPlugins contains configuration related to the custom plugin that is run immediately prior to proxying the request to the upstream.
+	// Tyk classic API definition: `custom_middleware.post`.
+	PostPlugins CustomPlugins `bson:"postPlugins,omitempty" json:"postPlugins,omitempty"`
+
+	// Deprecated: ResponsePlugin contains configuration related to the custom plugin that is run during processing of the response from the upstream service.
+	// Deprecated: Use ResponsePlugins instead.
+	ResponsePlugin *ResponsePlugin `bson:"responsePlugin,omitempty" json:"responsePlugin,omitempty"`
+
+	// ResponsePlugins contains configuration related to the custom plugin that is run during processing of the response from the upstream service.
 	//
 	// Tyk classic API definition: `custom_middleware.response`.
-	ResponsePlugin *ResponsePlugin `bson:"responsePlugin,omitempty" json:"responsePlugin,omitempty"`
+	ResponsePlugins CustomPlugins `bson:"responsePlugins,omitempty" json:"responsePlugins,omitempty"`
 
 	// Cache contains the configurations related to caching.
 	// Tyk classic API definition: `cache_options`.
@@ -78,6 +95,43 @@ type Global struct {
 	// TransformResponseHeaders contains the configurations related to API level response header transformation.
 	// Tyk classic API definition: `global_response_headers`/`global_response_headers_remove`.
 	TransformResponseHeaders *TransformHeaders `bson:"transformResponseHeaders,omitempty" json:"transformResponseHeaders,omitempty"`
+}
+
+// MarshalJSON is a custom JSON marshaler for the Global struct. It is implemented
+// to facilitate a smooth migration from deprecated fields that were previously used to represent
+// the same data. This custom marshaler ensures backwards compatibility and proper handling of the
+// deprecated fields during the migration process.
+func (g *Global) MarshalJSON() ([]byte, error) {
+	if g == nil {
+		return nil, nil
+	}
+
+	type Alias Global
+
+	var payload = Alias(*g)
+
+	if payload.PrePlugin != nil {
+		payload.PrePlugins = payload.PrePlugin.Plugins
+		payload.PrePlugin = nil
+	}
+
+	if payload.PostAuthenticationPlugin != nil {
+		payload.PostAuthenticationPlugins = payload.PostAuthenticationPlugin.Plugins
+		payload.PostAuthenticationPlugin = nil
+	}
+
+	if payload.PostPlugin != nil {
+		payload.PostPlugins = payload.PostPlugin.Plugins
+		payload.PostPlugin = nil
+	}
+
+	if payload.ResponsePlugin != nil {
+		payload.ResponsePlugins = payload.ResponsePlugin.Plugins
+		payload.ResponsePlugin = nil
+	}
+
+	// to prevent infinite recursion
+	return json.Marshal(payload)
 }
 
 // Fill fills *Global from apidef.APIDefinition.
@@ -100,31 +154,25 @@ func (g *Global) Fill(api apidef.APIDefinition) {
 		g.CORS = nil
 	}
 
-	if g.PrePlugin == nil {
-		g.PrePlugin = &PrePlugin{}
+	g.PrePlugins.Fill(api.CustomMiddleware.Pre)
+	g.PrePlugin = nil
+
+	if ShouldOmit(g.PrePlugins) {
+		g.PrePlugins = nil
 	}
 
-	g.PrePlugin.Fill(api)
-	if ShouldOmit(g.PrePlugin) {
-		g.PrePlugin = nil
+	g.PostAuthenticationPlugins.Fill(api.CustomMiddleware.PostKeyAuth)
+	g.PostAuthenticationPlugin = nil
+
+	if ShouldOmit(g.PostAuthenticationPlugins) {
+		g.PostAuthenticationPlugins = nil
 	}
 
-	if g.PostAuthenticationPlugin == nil {
-		g.PostAuthenticationPlugin = &PostAuthenticationPlugin{}
-	}
+	g.PostPlugins.Fill(api.CustomMiddleware.Post)
+	g.PostPlugin = nil
 
-	g.PostAuthenticationPlugin.Fill(api)
-	if ShouldOmit(g.PostAuthenticationPlugin) {
-		g.PostAuthenticationPlugin = nil
-	}
-
-	if g.PostPlugin == nil {
-		g.PostPlugin = &PostPlugin{}
-	}
-
-	g.PostPlugin.Fill(api)
-	if ShouldOmit(g.PostPlugin) {
-		g.PostPlugin = nil
+	if ShouldOmit(g.PostPlugins) {
+		g.PostPlugins = nil
 	}
 
 	if g.Cache == nil {
@@ -136,13 +184,11 @@ func (g *Global) Fill(api apidef.APIDefinition) {
 		g.Cache = nil
 	}
 
-	if g.ResponsePlugin == nil {
-		g.ResponsePlugin = &ResponsePlugin{}
-	}
+	g.ResponsePlugins.Fill(api.CustomMiddleware.Response)
+	g.ResponsePlugin = nil
 
-	g.ResponsePlugin.Fill(api)
-	if ShouldOmit(g.ResponsePlugin) {
-		g.ResponsePlugin = nil
+	if ShouldOmit(g.ResponsePlugins) {
+		g.ResponsePlugins = nil
 	}
 
 	if g.TransformRequestHeaders == nil {
@@ -193,32 +239,11 @@ func (g *Global) ExtractTo(api *apidef.APIDefinition) {
 
 	g.CORS.ExtractTo(&api.CORS)
 
-	if g.PrePlugin == nil {
-		g.PrePlugin = &PrePlugin{}
-		defer func() {
-			g.PrePlugin = nil
-		}()
-	}
+	g.extractPrePluginsTo(api)
 
-	g.PrePlugin.ExtractTo(api)
+	g.extractPostAuthenticationPluginsTo(api)
 
-	if g.PostAuthenticationPlugin == nil {
-		g.PostAuthenticationPlugin = &PostAuthenticationPlugin{}
-		defer func() {
-			g.PostAuthenticationPlugin = nil
-		}()
-	}
-
-	g.PostAuthenticationPlugin.ExtractTo(api)
-
-	if g.PostPlugin == nil {
-		g.PostPlugin = &PostPlugin{}
-		defer func() {
-			g.PostPlugin = nil
-		}()
-	}
-
-	g.PostPlugin.ExtractTo(api)
+	g.extractPostPluginsTo(api)
 
 	if g.Cache == nil {
 		g.Cache = &Cache{}
@@ -229,14 +254,7 @@ func (g *Global) ExtractTo(api *apidef.APIDefinition) {
 
 	g.Cache.ExtractTo(&api.CacheOptions)
 
-	if g.ResponsePlugin == nil {
-		g.ResponsePlugin = &ResponsePlugin{}
-		defer func() {
-			g.ResponsePlugin = nil
-		}()
-	}
-
-	g.ResponsePlugin.ExtractTo(api)
+	g.extractResponsePluginsTo(api)
 
 	if g.TransformRequestHeaders == nil {
 		g.TransformRequestHeaders = &TransformHeaders{}
@@ -273,6 +291,78 @@ func (g *Global) ExtractTo(api *apidef.APIDefinition) {
 	vInfo.GlobalResponseHeaders = resHeaderMeta.AddHeaders
 	vInfo.GlobalResponseHeadersRemove = resHeaderMeta.DeleteHeaders
 	api.VersionData.Versions[Main] = vInfo
+}
+
+func (g *Global) extractPrePluginsTo(api *apidef.APIDefinition) {
+	defer func() {
+		g.PrePlugin = nil
+	}()
+
+	// give precedence to PrePlugins over PrePlugin
+	if g.PrePlugins != nil {
+		api.CustomMiddleware.Pre = make([]apidef.MiddlewareDefinition, len(g.PrePlugins))
+		g.PrePlugins.ExtractTo(api.CustomMiddleware.Pre)
+		return
+	}
+
+	if g.PrePlugin == nil {
+		g.PrePlugin = &PrePlugin{}
+	}
+
+	g.PrePlugin.ExtractTo(api)
+}
+
+func (g *Global) extractPostAuthenticationPluginsTo(api *apidef.APIDefinition) {
+	defer func() {
+		g.PostAuthenticationPlugin = nil
+	}()
+
+	if g.PostAuthenticationPlugins != nil {
+		api.CustomMiddleware.PostKeyAuth = make([]apidef.MiddlewareDefinition, len(g.PostAuthenticationPlugins))
+		g.PostAuthenticationPlugins.ExtractTo(api.CustomMiddleware.PostKeyAuth)
+		return
+	}
+
+	if g.PostAuthenticationPlugin == nil {
+		g.PostAuthenticationPlugin = &PostAuthenticationPlugin{}
+	}
+
+	g.PostAuthenticationPlugin.ExtractTo(api)
+}
+
+func (g *Global) extractPostPluginsTo(api *apidef.APIDefinition) {
+	defer func() {
+		g.PostPlugin = nil
+	}()
+
+	if g.PostPlugins != nil {
+		api.CustomMiddleware.Post = make([]apidef.MiddlewareDefinition, len(g.PostPlugins))
+		g.PostPlugins.ExtractTo(api.CustomMiddleware.Post)
+		return
+	}
+
+	if g.PostPlugin == nil {
+		g.PostPlugin = &PostPlugin{}
+	}
+
+	g.PostPlugin.ExtractTo(api)
+}
+
+func (g *Global) extractResponsePluginsTo(api *apidef.APIDefinition) {
+	defer func() {
+		g.ResponsePlugin = nil
+	}()
+
+	if g.ResponsePlugins != nil {
+		api.CustomMiddleware.Response = make([]apidef.MiddlewareDefinition, len(g.ResponsePlugins))
+		g.ResponsePlugins.ExtractTo(api.CustomMiddleware.Response)
+	}
+
+	if g.ResponsePlugin == nil {
+		g.ResponsePlugin = &ResponsePlugin{}
+	}
+
+	g.ResponsePlugin.ExtractTo(api)
 }
 
 // PluginConfigData configures config data for custom plugins.
@@ -1055,9 +1145,14 @@ type CustomPlugin struct {
 type CustomPlugins []CustomPlugin
 
 // Fill fills CustomPlugins from supplied Middleware definitions.
-func (c CustomPlugins) Fill(mwDefs []apidef.MiddlewareDefinition) {
+func (c *CustomPlugins) Fill(mwDefs []apidef.MiddlewareDefinition) {
+	if len(mwDefs) == 0 {
+		return
+	}
+
+	customPlugins := make(CustomPlugins, len(mwDefs))
 	for i, mwDef := range mwDefs {
-		c[i] = CustomPlugin{
+		customPlugins[i] = CustomPlugin{
 			Enabled:        !mwDef.Disabled,
 			Path:           mwDef.Path,
 			FunctionName:   mwDef.Name,
@@ -1065,11 +1160,17 @@ func (c CustomPlugins) Fill(mwDefs []apidef.MiddlewareDefinition) {
 			RequireSession: mwDef.RequireSession,
 		}
 	}
+
+	*c = customPlugins
 }
 
 // ExtractTo extracts CustomPlugins into supplied Middleware definitions.
-func (c CustomPlugins) ExtractTo(mwDefs []apidef.MiddlewareDefinition) {
-	for i, plugin := range c {
+func (c *CustomPlugins) ExtractTo(mwDefs []apidef.MiddlewareDefinition) {
+	if c == nil {
+		return
+	}
+
+	for i, plugin := range *c {
 		mwDefs[i] = apidef.MiddlewareDefinition{
 			Disabled:       !plugin.Enabled,
 			Name:           plugin.FunctionName,
@@ -1089,6 +1190,10 @@ type PrePlugin struct {
 	// Plugins configures custom plugins to be run on pre authentication stage.
 	// The plugins would be executed in the order of configuration in the list.
 	Plugins CustomPlugins `bson:"plugins,omitempty" json:"plugins,omitempty"`
+}
+
+func (p *PrePlugin) Migrate() CustomPlugins {
+	return p.Plugins
 }
 
 // Fill fills PrePlugin from supplied Tyk classic api definition.
@@ -1204,8 +1309,11 @@ func (p *ResponsePlugin) ExtractTo(api *apidef.APIDefinition) {
 type VirtualEndpoint struct {
 	// Enabled activates virtual endpoint.
 	Enabled bool `bson:"enabled" json:"enabled"` // required.
-	// Name is the name of JS function.
-	Name string `bson:"name" json:"name"` // required.
+	// Name is the name of plugin function to be executed.
+	// Deprecated: Use FunctionName instead.
+	Name string `bson:"name,omitempty" json:"name,omitempty"`
+	// FunctionName is the name of plugin function to be executed.
+	FunctionName string `bson:"functionName" json:"functionName"` // required.
 	// Path is the path to JS file.
 	Path string `bson:"path,omitempty" json:"path,omitempty"`
 	// Body is the JS function to execute encoded in base64 format.
@@ -1216,10 +1324,32 @@ type VirtualEndpoint struct {
 	RequireSession bool `bson:"requireSession,omitempty" json:"requireSession,omitempty"`
 }
 
+// MarshalJSON is a custom JSON marshaler for the VirtualEndpoint struct. It is implemented
+// to facilitate a smooth migration from deprecated fields that were previously used to represent
+// the same data.
+func (v *VirtualEndpoint) MarshalJSON() ([]byte, error) {
+	if v == nil {
+		return nil, nil
+	}
+
+	type Alias VirtualEndpoint
+
+	var payload = Alias(*v)
+
+	if payload.FunctionName == "" && payload.Name != "" {
+		payload.FunctionName = payload.Name
+		payload.Name = ""
+	}
+
+	// to prevent infinite recursion
+	return json.Marshal(payload)
+}
+
 // Fill fills *VirtualEndpoint from apidef.VirtualMeta.
 func (v *VirtualEndpoint) Fill(meta apidef.VirtualMeta) {
 	v.Enabled = !meta.Disabled
-	v.Name = meta.ResponseFunctionName
+	v.FunctionName = meta.ResponseFunctionName
+	v.Name = ""
 	v.RequireSession = meta.UseSession
 	v.ProxyOnError = meta.ProxyOnError
 	if meta.FunctionSourceType == apidef.UseBlob {
@@ -1232,7 +1362,13 @@ func (v *VirtualEndpoint) Fill(meta apidef.VirtualMeta) {
 // ExtractTo extracts *VirtualEndpoint to *apidef.VirtualMeta.
 func (v *VirtualEndpoint) ExtractTo(meta *apidef.VirtualMeta) {
 	meta.Disabled = !v.Enabled
-	meta.ResponseFunctionName = v.Name
+	if v.FunctionName != "" {
+		meta.ResponseFunctionName = v.FunctionName
+		v.Name = ""
+	} else {
+		meta.ResponseFunctionName = v.Name
+	}
+
 	meta.UseSession = v.RequireSession
 	meta.ProxyOnError = v.ProxyOnError
 	if v.Body != "" {
@@ -1251,9 +1387,32 @@ type EndpointPostPlugin struct {
 	// Enabled activates post plugin.
 	Enabled bool `bson:"enabled" json:"enabled"` // required.
 	// Name is the name of plugin function to be executed.
-	Name string `bson:"name" json:"name"` // required.
+	// Deprecated: Use FunctionName instead.
+	Name string `bson:"name,omitempty" json:"name,omitempty"`
+	// FunctionName is the name of plugin function to be executed.
+	FunctionName string `bson:"functionName" json:"functionName"` // required.
 	// Path is the path to plugin.
 	Path string `bson:"path" json:"path"` // required.
+}
+
+// MarshalJSON is a custom JSON marshaler for the EndpointPostPlugin struct. It is implemented
+// to facilitate a smooth migration from deprecated fields that were previously used to represent
+// the same data.
+func (ep *EndpointPostPlugin) MarshalJSON() ([]byte, error) {
+	if ep == nil {
+		return nil, nil
+	}
+
+	// to prevent infinite recursion
+	type Alias EndpointPostPlugin
+
+	payload := Alias(*ep)
+	if payload.FunctionName == "" && payload.Name != "" {
+		payload.FunctionName = payload.Name
+		payload.Name = ""
+	}
+
+	return json.Marshal(payload)
 }
 
 // Fill fills *EndpointPostPlugin from apidef.GoPluginMeta.
@@ -1263,9 +1422,9 @@ func (e EndpointPostPlugins) Fill(meta apidef.GoPluginMeta) {
 	}
 
 	e[0] = EndpointPostPlugin{
-		Enabled: !meta.Disabled,
-		Name:    meta.SymbolName,
-		Path:    meta.PluginPath,
+		Enabled:      !meta.Disabled,
+		FunctionName: meta.SymbolName,
+		Path:         meta.PluginPath,
 	}
 }
 
@@ -1277,7 +1436,11 @@ func (e EndpointPostPlugins) ExtractTo(meta *apidef.GoPluginMeta) {
 
 	meta.Disabled = !e[0].Enabled
 	meta.PluginPath = e[0].Path
-	meta.SymbolName = e[0].Name
+	if e[0].FunctionName != "" {
+		meta.SymbolName = e[0].FunctionName
+	} else {
+		meta.SymbolName = e[0].Name
+	}
 }
 
 // CircuitBreaker holds configuration for the circuit breaker middleware.
