@@ -14,6 +14,10 @@ func APIS(r *openapi3.Reflector) error {
 	if err != nil {
 		return err
 	}
+	err = deleteClassicApiRequest(r)
+	if err != nil {
+		return err
+	}
 
 	return putClassicApiRequest(r)
 }
@@ -40,5 +44,20 @@ func putClassicApiRequest(r *openapi3.Reflector) error {
 	oc.SetID("updateApi")
 	oc.SetTags("APIs")
 	oc.AddRespStructure(new(apiStatusMessage), openapi.WithHTTPStatus(http.StatusBadRequest))
+	return r.AddOperation(oc)
+}
+
+func deleteClassicApiRequest(r *openapi3.Reflector) error {
+	oc, err := r.NewOperationContext(http.MethodDelete, "/tyk/apis/{apiID}")
+	if err != nil {
+		return err
+	}
+	oc.AddReqStructure(new(apidef.APIDefinition))
+	oc.SetTags("APIs")
+	oc.SetID("deleteApi")
+	oc.AddRespStructure(new(apiModifyKeySuccess))
+	oc.AddRespStructure(new(apiStatusMessage), openapi.WithHTTPStatus(http.StatusBadRequest))
+	oc.AddRespStructure(new(apiStatusMessage), openapi.WithHTTPStatus(http.StatusNotFound))
+	oc.AddRespStructure(new(apiStatusMessage), openapi.WithHTTPStatus(http.StatusInternalServerError))
 	return r.AddOperation(oc)
 }

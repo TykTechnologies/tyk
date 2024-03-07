@@ -6,6 +6,41 @@ info:
   version: 5.2.3
 paths:
   /tyk/apis/{apiID}:
+    delete:
+      operationId: deleteApi
+      parameters:
+      - in: path
+        name: apiID
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiModifyKeySuccess'
+          description: OK
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Bad Request
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Not Found
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Internal Server Error
+      tags:
+      - APIs
     get:
       operationId: getApi
       parameters:
@@ -1508,6 +1543,4 @@ components:
           type: string
         use_session:
           type: boolean
-      type: object
- boolean
       type: object
