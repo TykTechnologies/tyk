@@ -12,3 +12,9 @@ spec:
       headers:
         - key: Content-Type
           value: application/json
+  specs:
+    - selector: span[tracetest.span.type="general" name="NormalizeRequest"]
+      assertions:
+        - "attr:graphql.document = 'query test {\n  country(code: \"NG\"){\n    nam\n  }\n}'"
+        - attr:graphql.operation.name = "test"
+        - attr:graphql.operation.type = "query"

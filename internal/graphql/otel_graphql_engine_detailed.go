@@ -4,6 +4,8 @@ import (
 	"context"
 	"sync"
 
+	semconv "github.com/TykTechnologies/opentelemetry/semconv/v1.0.0"
+
 	"github.com/TykTechnologies/graphql-go-tools/pkg/ast"
 	"github.com/TykTechnologies/graphql-go-tools/pkg/engine/plan"
 	"github.com/TykTechnologies/graphql-go-tools/pkg/engine/resolve"
@@ -60,6 +62,12 @@ func (o *OtelGraphqlEngineV2Detailed) Normalize(operation *graphql.Request) erro
 	defer span.End()
 	err := o.engine.Normalize(operation)
 	if err != nil {
+		operationType, _ := operation.OperationType()
+		span.SetAttributes(
+			semconv.GraphQLOperationName(operation.OperationName),
+			semconv.GraphQLOperationType(PrintOperationType(ast.OperationType(operationType))),
+			semconv.GraphQLDocument(operation.Query),
+		)
 		span.SetStatus(otel.SPAN_STATUS_ERROR, "request normalization failed")
 		return err
 	}
@@ -74,7 +82,19 @@ func (o *OtelGraphqlEngineV2Detailed) ValidateForSchema(operation *graphql.Reque
 	_, span := o.tracerProvider.Tracer().Start(o.traceContext, operationName)
 	defer span.End()
 
-	err := o.engine.ValidateForSchema(operation)
+	operationType, err := operation.OperationType()
+	if err != nil {
+		span.SetStatus(otel.SPAN_STATUS_ERROR, "request validation failed")
+		return err
+	}
+
+	span.SetAttributes(
+		semconv.GraphQLOperationName(operation.OperationName),
+		semconv.GraphQLOperationType(PrintOperationType(ast.OperationType(operationType))),
+		semconv.GraphQLDocument(operation.Query),
+	)
+
+	err = o.engine.ValidateForSchema(operation)
 	if err != nil {
 		span.SetStatus(otel.SPAN_STATUS_ERROR, "request validation failed")
 		return err
