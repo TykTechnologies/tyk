@@ -106,30 +106,30 @@ func (g *Global) MarshalJSON() ([]byte, error) {
 		return nil, nil
 	}
 
-	copyGlobal := *g
-	if copyGlobal.PrePlugin != nil {
-		copyGlobal.PrePlugins = copyGlobal.PrePlugin.Plugins
-		copyGlobal.PrePlugin = nil
-	}
-
-	if copyGlobal.PostAuthenticationPlugin != nil {
-		copyGlobal.PostAuthenticationPlugins = copyGlobal.PostAuthenticationPlugin.Plugins
-		copyGlobal.PostAuthenticationPlugin = nil
-	}
-
-	if copyGlobal.PostPlugin != nil {
-		copyGlobal.PostPlugins = copyGlobal.PostPlugin.Plugins
-		copyGlobal.PostPlugin = nil
-	}
-
-	if copyGlobal.ResponsePlugin != nil {
-		copyGlobal.ResponsePlugins = copyGlobal.ResponsePlugin.Plugins
-		copyGlobal.ResponsePlugin = nil
-	}
-
 	type Alias Global
 
-	var payload = Alias(copyGlobal)
+	var payload = Alias(*g)
+
+	if payload.PrePlugin != nil {
+		payload.PrePlugins = payload.PrePlugin.Plugins
+		payload.PrePlugin = nil
+	}
+
+	if payload.PostAuthenticationPlugin != nil {
+		payload.PostAuthenticationPlugins = payload.PostAuthenticationPlugin.Plugins
+		payload.PostAuthenticationPlugin = nil
+	}
+
+	if payload.PostPlugin != nil {
+		payload.PostPlugins = payload.PostPlugin.Plugins
+		payload.PostPlugin = nil
+	}
+
+	if payload.ResponsePlugin != nil {
+		payload.ResponsePlugins = payload.ResponsePlugin.Plugins
+		payload.ResponsePlugin = nil
+	}
+
 	// to prevent infinite recursion
 	return json.Marshal(payload)
 }
