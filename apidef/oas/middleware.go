@@ -128,11 +128,12 @@ func (g *Global) MarshalJSON() ([]byte, error) {
 
 	type Alias Global
 
+	var payload = Alias(*g)
 	// to prevent infinite recursion
 	return json.Marshal(&struct {
-		*Alias
+		Alias
 	}{
-		Alias: (*Alias)(g),
+		Alias: payload,
 	})
 }
 
