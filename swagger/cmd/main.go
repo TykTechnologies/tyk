@@ -17,7 +17,7 @@ func main() {
 	r := openapi3.Reflector{
 		Reflector: jsonschema.Reflector{},
 	}
-	r.DefaultOptions = append(r.DefaultOptions, jsonschema.StripDefinitionNamePrefix("Apidef", "Swagger"))
+	r.DefaultOptions = append(r.DefaultOptions, jsonschema.StripDefinitionNamePrefix("Apidef", "Swagger", "Oas"))
 
 	r.Spec = &openapi3.Spec{Openapi: "3.0.3"}
 	r.Spec.WithServers(openapi3.Server{
@@ -31,6 +31,10 @@ func main() {
 		WithLicense(openapi3.License{Name: "Mozilla Public License Version 2.0", URL: &licence}).
 		WithDescription(" The Tyk Gateway API is the primary means for integrating your application with the Tyk API Gateway")
 	err := swagger.APIS(&r)
+	if err != nil {
+		log.Fatal(err)
+	}
+	err = swagger.OasAPIS(&r)
 	if err != nil {
 		log.Fatal(err)
 	}

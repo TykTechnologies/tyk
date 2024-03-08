@@ -595,7 +595,7 @@ type APIDefinition struct {
 	ListenPort          int            `bson:"listen_port" json:"listen_port"`
 	Protocol            string         `bson:"protocol" json:"protocol"`
 	EnableProxyProtocol bool           `bson:"enable_proxy_protocol" json:"enable_proxy_protocol"`
-	APIID               string         `bson:"api_id" json:"api_id" path:"apiID"`
+	APIID               string         `bson:"api_id" json:"api_id"`
 	OrgID               string         `bson:"org_id" json:"org_id"`
 	UseKeylessAccess    bool           `bson:"use_keyless" json:"use_keyless"`
 	UseOauth2           bool           `bson:"use_oauth2" json:"use_oauth2"`
