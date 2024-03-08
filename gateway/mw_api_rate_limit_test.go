@@ -332,26 +332,6 @@ const openRLDefSmall = `{
 	}
 }`
 
-const defaultDisabledRl = `{
-	"api_id": "313232",
-	"org_id": "default",
-	"auth": {"auth_header_name": "authorization"},
-	"use_keyless": true,
-	"version_data": {
-		"not_versioned": true,
-		"versions": {
-			"v1": {"name": "v1"}
-		}
-	},
-	"proxy": {
-		"listen_path": "/rl_test/",
-		"target_url": "` + TestHttpAny + `"
-	},
-	"global_rate_limit": {
-		"disabled": true
-	}
-}`
-
 const closedRLDefSmall = `{
 	"api_id": "31445455",
 	"org_id": "default",
