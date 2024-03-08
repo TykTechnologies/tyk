@@ -1,6 +1,7 @@
 package gateway
 
 import (
+	"github.com/stretchr/testify/assert"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -62,6 +63,20 @@ func (ts *Test) getGlobalRLAuthKeyChain(spec *APISpec) http.Handler {
 		&RateLimitAndQuotaCheck{baseMid},
 	)...).Then(proxyHandler)
 	return chain
+}
+
+func TestRateLimitForAPI_EnabledForSpec(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	specDisabled := ts.Gw.LoadSampleAPI(defaultDisabledRl)
+
+	rlDisabled := &RateLimitForAPI{BaseMiddleware: &BaseMiddleware{Spec: specDisabled, Gw: ts.Gw}}
+	assert.False(t, rlDisabled.EnabledForSpec())
+
+	specEnabled := ts.Gw.LoadSampleAPI(openRLDefSmall)
+	rlEnabled := &RateLimitForAPI{BaseMiddleware: &BaseMiddleware{Spec: specEnabled, Gw: ts.Gw}}
+	assert.True(t, rlEnabled.EnabledForSpec())
 }
 
 func TestRLOpen(t *testing.T) {
@@ -318,6 +333,26 @@ const openRLDefSmall = `{
 	"global_rate_limit": {
 		"rate": 3,
 		"per": 1
+	}
+}`
+
+const defaultDisabledRl = `{
+	"api_id": "313232",
+	"org_id": "default",
+	"auth": {"auth_header_name": "authorization"},
+	"use_keyless": true,
+	"version_data": {
+		"not_versioned": true,
+		"versions": {
+			"v1": {"name": "v1"}
+		}
+	},
+	"proxy": {
+		"listen_path": "/rl_test/",
+		"target_url": "` + TestHttpAny + `"
+	},
+	"global_rate_limit": {
+		"disabled": true
 	}
 }`
 
