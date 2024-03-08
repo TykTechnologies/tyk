@@ -49,7 +49,7 @@ func getClassicApiRequest(r *openapi3.Reflector) error {
 	if !ok {
 		return ErrOperationExposer
 	}
-	o3.Operation().WithParameters(ApIIDParameter())
+	o3.Operation().WithParameters(apIIDParameter())
 
 	oc.SetDescription("Get API definition\n        Only if used without the Tyk Dashboard")
 	return r.AddOperation(oc)
@@ -85,7 +85,7 @@ func putClassicApiRequest(r *openapi3.Reflector) error {
 	if !ok {
 		return ErrOperationExposer
 	}
-	o3.Operation().WithParameters(ApIIDParameter())
+	o3.Operation().WithParameters(apIIDParameter())
 	return r.AddOperation(oc)
 }
 
@@ -107,7 +107,7 @@ func deleteClassicApiRequest(r *openapi3.Reflector) error {
 	if !ok {
 		return ErrOperationExposer
 	}
-	o3.Operation().WithParameters(ApIIDParameter())
+	o3.Operation().WithParameters(apIIDParameter())
 	return r.AddOperation(oc)
 }
 
@@ -130,18 +130,7 @@ func createClassicApiRequest(r *openapi3.Reflector) error {
 	return r.AddOperation(oc)
 }
 
-type postQuery struct {
-	BaseAPIID          string `json:"base_api_id" query:"base_api_id"`
-	BaseAPIVersionName string `json:"base_api_version_name" query:"base_api_version_name"`
-	NewVersionName     string `json:"new_version_name" query:"new_version_name"`
-	SetDefault         string `json:"set_default" query:"set_default"`
-}
-
-type PathID struct {
-	APIID string `bson:"api_id" json:"api_id" path:"apiID"`
-}
-
-func ApIIDParameter() openapi3.ParameterOrRef {
+func apIIDParameter() openapi3.ParameterOrRef {
 	isRequired := true
 	return openapi3.Parameter{In: openapi3.ParameterInPath, Name: "apiID", Required: &isRequired}.ToParameterOrRef()
 }
