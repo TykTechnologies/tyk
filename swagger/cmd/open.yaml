@@ -206,6 +206,47 @@ paths:
           description: Forbidden
       tags:
       - OAS APIs
+  /tyk/keys/{keyID}:
+    get:
+      description: Get session info about the specified key. Should return up to date
+        rate limit and quota usage numbers.
+      operationId: getKey
+      parameters:
+      - description: The Key ID
+        in: path
+        name: keyID
+        required: true
+      - description: Use the hash of the key as input instead of the full key
+        in: query
+        name: hashed
+        required: false
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserSessionState'
+          description: OK
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Bad Request
+        "403":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Forbidden
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Not Found
+      tags:
+      - Keys
 components:
   schemas:
     APIDefinition:
@@ -999,6 +1040,16 @@ components:
         type:
           type: string
       type: object
+    GraphqlType:
+      properties:
+        fields:
+          items:
+            type: string
+          nullable: true
+          type: array
+        name:
+          type: string
+      type: object
     HardTimeoutMeta:
       properties:
         disabled:
@@ -1772,6 +1823,201 @@ components:
           type: integer
         service_discovery:
           $ref: '#/components/schemas/ServiceDiscoveryConfiguration'
+      type: object
+    UserAPILimit:
+      properties:
+        max_query_depth:
+          type: integer
+        per:
+          type: number
+        quota_max:
+          type: integer
+        quota_remaining:
+          type: integer
+        quota_renewal_rate:
+          type: integer
+        quota_renews:
+          type: integer
+        rate:
+          type: number
+        throttle_interval:
+          type: number
+        throttle_retry_limit:
+          type: integer
+      type: object
+    UserAccessDefinition:
+      properties:
+        allowance_scope:
+          type: string
+        allowed_types:
+          items:
+            $ref: '#/components/schemas/GraphqlType'
+          nullable: true
+          type: array
+        allowed_urls:
+          items:
+            $ref: '#/components/schemas/UserAccessSpec'
+          nullable: true
+          type: array
+        api_id:
+          type: string
+        api_name:
+          type: string
+        disable_introspection:
+          type: boolean
+        field_access_rights:
+          items:
+            $ref: '#/components/schemas/UserFieldAccessDefinition'
+          nullable: true
+          type: array
+        limit:
+          $ref: '#/components/schemas/UserAPILimit'
+        restricted_types:
+          items:
+            $ref: '#/components/schemas/GraphqlType'
+          nullable: true
+          type: array
+        versions:
+          items:
+            type: string
+          nullable: true
+          type: array
+      type: object
+    UserAccessSpec:
+      properties:
+        methods:
+          items:
+            type: string
+          nullable: true
+          type: array
+        url:
+          type: string
+      type: object
+    UserBasicAuthData:
+      properties:
+        hash_type:
+          type: string
+        password:
+          type: string
+      type: object
+    UserFieldAccessDefinition:
+      properties:
+        field_name:
+          type: string
+        limits:
+          $ref: '#/components/schemas/UserFieldLimits'
+        type_name:
+          type: string
+      type: object
+    UserFieldLimits:
+      properties:
+        max_query_depth:
+          type: integer
+      type: object
+    UserJWTData:
+      properties:
+        secret:
+          type: string
+      type: object
+    UserMonitor:
+      properties:
+        trigger_limits:
+          items:
+            type: number
+          nullable: true
+          type: array
+      type: object
+    UserSessionState:
+      properties:
+        access_rights:
+          additionalProperties:
+            $ref: '#/components/schemas/UserAccessDefinition'
+          nullable: true
+          type: object
+        alias:
+          type: string
+        allowance:
+          type: number
+        apply_policies:
+          items:
+            type: string
+          nullable: true
+          type: array
+        apply_policy_id:
+          type: string
+        basic_auth_data:
+          $ref: '#/components/schemas/UserBasicAuthData'
+        certificate:
+          type: string
+        data_expires:
+          type: integer
+        date_created:
+          format: date-time
+          type: string
+        enable_detail_recording:
+          type: boolean
+        enable_detailed_recording:
+          type: boolean
+        enable_http_signature_validation:
+          type: boolean
+        expires:
+          type: integer
+        hmac_enabled:
+          type: boolean
+        hmac_string:
+          type: string
+        id_extractor_deadline:
+          type: integer
+        is_inactive:
+          type: boolean
+        jwt_data:
+          $ref: '#/components/schemas/UserJWTData'
+        last_check:
+          type: integer
+        last_updated:
+          type: string
+        max_query_depth:
+          type: integer
+        meta_data:
+          additionalProperties: {}
+          nullable: true
+          type: object
+        monitor:
+          $ref: '#/components/schemas/UserMonitor'
+        oauth_client_id:
+          type: string
+        oauth_keys:
+          additionalProperties:
+            type: string
+          nullable: true
+          type: object
+        org_id:
+          type: string
+        per:
+          type: number
+        quota_max:
+          type: integer
+        quota_remaining:
+          type: integer
+        quota_renewal_rate:
+          type: integer
+        quota_renews:
+          type: integer
+        rate:
+          type: number
+        rsa_certificate_id:
+          type: string
+        session_lifetime:
+          type: integer
+        tags:
+          items:
+            type: string
+          nullable: true
+          type: array
+        throttle_interval:
+          type: number
+        throttle_retry_limit:
+          type: integer
       type: object
     ValidatePathMeta:
       properties:
