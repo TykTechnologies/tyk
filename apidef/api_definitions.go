@@ -25,26 +25,20 @@ import (
 	"github.com/TykTechnologies/tyk/internal/uuid"
 )
 
-type (
-	AuthProviderCode    string
-	SessionProviderCode string
-	StorageEngineCode   string
-	TykEvent            string // A type so we can ENUM event types easily, e.g. EventQuotaExceeded
-	TykEventHandlerName string // A type for handler codes in API definitions
-)
+type AuthProviderCode string
+type SessionProviderCode string
+type StorageEngineCode string
+type TykEvent string            // A type so we can ENUM event types easily, e.g. EventQuotaExceeded
+type TykEventHandlerName string // A type for handler codes in API definitions
 
-type (
-	EndpointMethodAction string
-	SourceMode           string
-)
+type EndpointMethodAction string
+type SourceMode string
 
-type (
-	MiddlewareDriver     string
-	IdExtractorSource    string
-	IdExtractorType      string
-	AuthTypeEnum         string
-	RoutingTriggerOnType string
-)
+type MiddlewareDriver string
+type IdExtractorSource string
+type IdExtractorType string
+type AuthTypeEnum string
+type RoutingTriggerOnType string
 
 type SubscriptionType string
 
