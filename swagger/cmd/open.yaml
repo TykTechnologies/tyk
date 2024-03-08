@@ -206,6 +206,89 @@ paths:
           description: Forbidden
       tags:
       - OAS APIs
+  /tyk/keys:
+    get:
+      description: |2-
+         List APIs
+                 Only if used without the Tyk Dashboard
+      operationId: listKeys
+      parameters:
+      - description: we don't use filter for hashed keys
+        in: query
+        name: filter
+        required: false
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: '#/components/schemas/APIDefinition'
+                type: array
+          description: OK
+        "403":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Forbidden
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Not Found
+      summary: List Keys
+      tags:
+      - Keys
+    post:
+      description: |2-
+         Tyk will generate the access token based on the OrgID specified in the API Definition and a random UUID. This ensures that keys can be "owned" by different API Owners should segmentation be needed at an organisational level.
+                <br/><br/>
+                API keys without access_rights data will be written to all APIs on the system (this also means that they will be created across all SessionHandlers and StorageHandlers, it is recommended to always embed access_rights data in a key to ensure that only targeted APIs and their back-ends are written to.
+      operationId: addKey
+      parameters:
+      - in: query
+        name: base_api_id
+      - in: query
+        name: base_api_version_name
+      - in: query
+        name: new_version_name
+      - in: query
+        name: set_default
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserSessionState'
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiModifyKeySuccess'
+          description: OK
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Bad Request
+        "403":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Forbidden
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Internal Server Error
+      summary: Create a key
+      tags:
+      - Keys
   /tyk/keys/{keyID}:
     get:
       description: Get session info about the specified key. Should return up to date
@@ -303,6 +386,50 @@ paths:
                 $ref: '#/components/schemas/ApiStatusMessage'
           description: Internal Server Error
       summary: Update Key
+      tags:
+      - Keys
+  /tyk/keys/create:
+    post:
+      operationId: createKey
+      parameters:
+      - in: query
+        name: base_api_id
+      - in: query
+        name: base_api_version_name
+      - in: query
+        name: new_version_name
+      - in: query
+        name: set_default
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserSessionState'
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiModifyKeySuccess'
+          description: OK
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Bad Request
+        "403":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Forbidden
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Internal Server Error
       tags:
       - Keys
 components:

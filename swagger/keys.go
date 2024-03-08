@@ -6,6 +6,7 @@ import (
 	"github.com/swaggest/openapi-go"
 	"github.com/swaggest/openapi-go/openapi3"
 
+	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/user"
 )
 
@@ -19,6 +20,10 @@ func Keys(r *openapi3.Reflector) error {
 		return err
 	}
 	err = postKeyRequest(r)
+	if err != nil {
+		return err
+	}
+	err = getListOfKeys(r)
 	if err != nil {
 		return err
 	}
@@ -54,6 +59,26 @@ func getKeyWithID(r *openapi3.Reflector) error {
 	return r.AddOperation(oc)
 }
 
+func getListOfKeys(r *openapi3.Reflector) error {
+	oc, err := r.NewOperationContext(http.MethodGet, "/tyk/keys")
+	if err != nil {
+		return err
+	}
+	oc.AddRespStructure(new([]apidef.APIDefinition))
+	oc.AddRespStructure(new(apiStatusMessage), openapi.WithHTTPStatus(http.StatusForbidden))
+	oc.AddRespStructure(new(apiStatusMessage), openapi.WithHTTPStatus(http.StatusNotFound))
+	oc.SetID("listKeys")
+	oc.SetDescription(" List APIs\n         Only if used without the Tyk Dashboard")
+	oc.SetTags("Keys")
+	oc.SetSummary("List Keys")
+	o3, ok := oc.(openapi3.OperationExposer)
+	if !ok {
+		return ErrOperationExposer
+	}
+	o3.Operation().WithParameters(filterKeyQuery())
+	return r.AddOperation(oc)
+}
+
 func putKeyRequest(r *openapi3.Reflector) error {
 	oc, err := r.NewOperationContext(http.MethodPut, "/tyk/keys/{keyID}")
 	if err != nil {
@@ -80,7 +105,7 @@ func putKeyRequest(r *openapi3.Reflector) error {
 }
 
 func postKeyRequest(r *openapi3.Reflector) error {
-	oc, err := r.NewOperationContext(http.MethodPost, "/tyk/keys/create")
+	oc, err := r.NewOperationContext(http.MethodPost, "/tyk/keys")
 	if err != nil {
 		return err
 	}
@@ -140,4 +165,10 @@ func updateKeyQuery() openapi3.ParameterOrRef {
 	isRequired := false
 	desc := "Adding the suppress_reset parameter and setting it to 1, will cause Tyk not to reset the quota limit that is in the current live quota manager. By default Tyk will reset the quota in the live quota manager (initialising it) when adding a key. Adding the `suppress_reset` flag to the URL parameters will avoid this behaviour."
 	return openapi3.Parameter{In: openapi3.ParameterInQuery, Name: "suppress_reset", Required: &isRequired, Description: &desc}.ToParameterOrRef()
+}
+
+func filterKeyQuery() openapi3.ParameterOrRef {
+	isRequired := false
+	desc := "we don't use filter for hashed keys"
+	return openapi3.Parameter{In: openapi3.ParameterInQuery, Name: "filter", Required: &isRequired, Description: &desc}.ToParameterOrRef()
 }
