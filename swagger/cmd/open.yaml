@@ -471,6 +471,67 @@ paths:
           description: Internal Server Error
       tags:
       - Keys
+  /tyk/org/keys:
+    get:
+      description: You can now set rate limits at the organisation level by using
+        the following fields - allowance and rate. These are the number of allowed
+        requests for the specified per value, and need to be set to the same value.
+        If you don't want to have organisation level rate limiting, set 'rate' or
+        'per' to zero, or don't add them to your request.
+      operationId: listOrgKeys
+      parameters:
+      - description: we don't use filter for hashed keys
+        in: query
+        name: filter
+        required: false
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiAllKeys'
+          description: OK
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Not Found
+      summary: List Organisation Keys
+      tags:
+      - Organisation Quotas
+  /tyk/org/keys/{keyID}:
+    get:
+      description: Get session info about the specified key. Should return up to date
+        rate limit and quota usage numbers.
+      operationId: getOrgKey
+      parameters:
+      - description: The Key ID
+        in: path
+        name: keyID
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserSessionState'
+          description: OK
+        "403":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Forbidden
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Not Found
+      summary: Get an Organisation Key
+      tags:
+      - Organisation Quotas
 components:
   schemas:
     APIDefinition:
@@ -2393,6 +2454,13 @@ components:
         use_session:
           type: boolean
       type: object
+  securitySchemes:
+    api_key:
+      description: Api key
+      in: header
+      name: X-Tyk-Authorization
+      type: apiKey
+ type: object
   securitySchemes:
     api_key:
       description: Api key

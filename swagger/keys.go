@@ -6,7 +6,6 @@ import (
 	"github.com/swaggest/openapi-go"
 	"github.com/swaggest/openapi-go/openapi3"
 
-	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/user"
 )
 
@@ -45,7 +44,6 @@ func getKeyWithID(r *openapi3.Reflector) error {
 	if err != nil {
 		return err
 	}
-	oc.AddReqStructure(new(user.SessionState))
 	oc.AddRespStructure(new(user.SessionState))
 	oc.AddRespStructure(new(apiStatusMessage), openapi.WithHTTPStatus(http.StatusNotFound))
 	oc.AddRespStructure(new(apiStatusMessage), openapi.WithHTTPStatus(http.StatusForbidden))
@@ -68,8 +66,6 @@ func deleteKeyRequest(r *openapi3.Reflector) error {
 	if err != nil {
 		return err
 	}
-	oc.AddReqStructure(new(apidef.APIDefinition))
-
 	oc.SetTags("Keys")
 	oc.SetID("deleteApi")
 	oc.AddRespStructure(new(apiModifyKeySuccess))
