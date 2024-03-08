@@ -247,6 +247,64 @@ paths:
           description: Not Found
       tags:
       - Keys
+    put:
+      description: ' You can also manually add keys to Tyk using your own key-generation
+        algorithm. It is recommended if using this approach to ensure that the OrgID
+        being used in the API Definition and the key data is blank so that Tyk does
+        not try to prepend or manage the key in any way.'
+      operationId: updateKey
+      parameters:
+      - description: The Key ID
+        in: path
+        name: keyID
+        required: true
+      - description: Adding the suppress_reset parameter and setting it to 1, will
+          cause Tyk not to reset the quota limit that is in the current live quota
+          manager. By default Tyk will reset the quota in the live quota manager (initialising
+          it) when adding a key. Adding the `suppress_reset` flag to the URL parameters
+          will avoid this behaviour.
+        in: query
+        name: suppress_reset
+        required: false
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserSessionState'
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiModifyKeySuccess'
+          description: OK
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Bad Request
+        "403":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Forbidden
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Not Found
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Internal Server Error
+      summary: Update Key
+      tags:
+      - Keys
 components:
   schemas:
     APIDefinition:
