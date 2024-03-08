@@ -27,6 +27,10 @@ func Keys(r *openapi3.Reflector) error {
 	if err != nil {
 		return err
 	}
+	err = deleteKeyRequest(r)
+	if err != nil {
+		return err
+	}
 	return getKeyWithID(r)
 }
 
@@ -59,12 +63,37 @@ func getKeyWithID(r *openapi3.Reflector) error {
 	return r.AddOperation(oc)
 }
 
+func deleteKeyRequest(r *openapi3.Reflector) error {
+	oc, err := r.NewOperationContext(http.MethodDelete, "/tyk/keys/{keyID}")
+	if err != nil {
+		return err
+	}
+	oc.AddReqStructure(new(apidef.APIDefinition))
+
+	oc.SetTags("Keys")
+	oc.SetID("deleteApi")
+	oc.AddRespStructure(new(apiModifyKeySuccess))
+	oc.AddRespStructure(new(apiStatusMessage), openapi.WithHTTPStatus(http.StatusBadRequest))
+	oc.AddRespStructure(new(apiStatusMessage), openapi.WithHTTPStatus(http.StatusNotFound))
+	oc.AddRespStructure(new(apiStatusMessage), openapi.WithHTTPStatus(http.StatusForbidden))
+	oc.SetSummary("Delete Key")
+	oc.SetDescription("Deleting a key will remove it permanently from the system, however analytics relating to that key will still be available.")
+	o3, ok := oc.(openapi3.OperationExposer)
+	if !ok {
+		return ErrOperationExposer
+	}
+	par := []openapi3.ParameterOrRef{keyIDParameter()}
+	par = append(par, getKeyQuery()...)
+	o3.Operation().WithParameters(par...)
+	return r.AddOperation(oc)
+}
+
 func getListOfKeys(r *openapi3.Reflector) error {
 	oc, err := r.NewOperationContext(http.MethodGet, "/tyk/keys")
 	if err != nil {
 		return err
 	}
-	oc.AddRespStructure(new([]apidef.APIDefinition))
+	oc.AddRespStructure(new(apiAllKeys))
 	oc.AddRespStructure(new(apiStatusMessage), openapi.WithHTTPStatus(http.StatusForbidden))
 	oc.AddRespStructure(new(apiStatusMessage), openapi.WithHTTPStatus(http.StatusNotFound))
 	oc.SetID("listKeys")

@@ -13,3 +13,7 @@ type apiStatusMessage struct {
 	// Response details
 	Message string `json:"message"`
 }
+
+type apiAllKeys struct {
+	APIKeys []string `json:"keys"`
+}

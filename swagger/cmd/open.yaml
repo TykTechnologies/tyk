@@ -222,9 +222,7 @@ paths:
           content:
             application/json:
               schema:
-                items:
-                  $ref: '#/components/schemas/APIDefinition'
-                type: array
+                $ref: '#/components/schemas/ApiAllKeys'
           description: OK
         "403":
           content:
@@ -290,6 +288,47 @@ paths:
       tags:
       - Keys
   /tyk/keys/{keyID}:
+    delete:
+      description: Deleting a key will remove it permanently from the system, however
+        analytics relating to that key will still be available.
+      operationId: deleteApi
+      parameters:
+      - description: The Key ID
+        in: path
+        name: keyID
+        required: true
+      - description: Use the hash of the key as input instead of the full key
+        in: query
+        name: hashed
+        required: false
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiModifyKeySuccess'
+          description: OK
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Bad Request
+        "403":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Forbidden
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Not Found
+      summary: Delete Key
+      tags:
+      - Keys
     get:
       description: Get session info about the specified key. Should return up to date
         rate limit and quota usage numbers.
@@ -699,6 +738,14 @@ components:
           type: string
         plugin_path:
           type: string
+      type: object
+    ApiAllKeys:
+      properties:
+        keys:
+          items:
+            type: string
+          nullable: true
+          type: array
       type: object
     ApiModifyKeySuccess:
       properties:
