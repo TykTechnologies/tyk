@@ -39,8 +39,10 @@ type RedisCluster struct {
 	HashKeys    bool
 	IsCache     bool
 	IsAnalytics bool
-	// RedisController must be passed from the gateway
+
 	ConnectionHandler *ConnectionHandler
+	// RedisController must remain for compatibility with goplugins
+	RedisController *RedisController
 
 	storageMu        sync.Mutex
 	kvStorage        model.KeyValue
@@ -51,6 +53,13 @@ type RedisCluster struct {
 	sortedSetStorage model.SortedSet
 }
 
+func (r *RedisCluster) getConnectionHandler() *ConnectionHandler {
+	if r.RedisController != nil {
+		return r.RedisController.connection
+	}
+	return r.ConnectionHandler
+}
+
 func getRedisAddrs(conf config.StorageOptionsConf) (addrs []string) {
 	return conf.HostAddrs()
 }
@@ -58,7 +67,7 @@ func getRedisAddrs(conf config.StorageOptionsConf) (addrs []string) {
 // Connect will establish a connection this is always true because we are
 // dynamically using redis
 func (r *RedisCluster) Connect() bool {
-	return r.ConnectionHandler.Connected()
+	return r.getConnectionHandler().Connected()
 }
 
 // Client will return a redis v8 RedisClient. This function allows
@@ -68,7 +77,7 @@ func (r *RedisCluster) Client() (redis.UniversalClient, error) {
 		return nil, err
 	}
 
-	conn := r.ConnectionHandler.getConnection(r.IsCache, r.IsAnalytics)
+	conn := r.getConnectionHandler().getConnection(r.IsCache, r.IsAnalytics)
 	if conn == nil {
 		return nil, ErrStorageConn
 	}
@@ -94,7 +103,7 @@ func (r *RedisCluster) kv() (model.KeyValue, error) {
 		return r.kvStorage, nil
 	}
 
-	conn := r.ConnectionHandler.getConnection(r.IsCache, r.IsAnalytics)
+	conn := r.getConnectionHandler().getConnection(r.IsCache, r.IsAnalytics)
 	if conn == nil {
 		return nil, ErrStorageConn
 	}
@@ -119,7 +128,7 @@ func (r *RedisCluster) flusher() (model.Flusher, error) {
 		return r.flusherStorage, nil
 	}
 
-	conn := r.ConnectionHandler.getConnection(r.IsCache, r.IsAnalytics)
+	conn := r.getConnectionHandler().getConnection(r.IsCache, r.IsAnalytics)
 	if conn == nil {
 		return nil, ErrStorageConn
 	}
@@ -145,7 +154,7 @@ func (r *RedisCluster) queue() (model.Queue, error) {
 		return r.queueStorage, nil
 	}
 
-	conn := r.ConnectionHandler.getConnection(r.IsCache, r.IsAnalytics)
+	conn := r.getConnectionHandler().getConnection(r.IsCache, r.IsAnalytics)
 	if conn == nil {
 		return nil, ErrStorageConn
 	}
@@ -170,7 +179,7 @@ func (r *RedisCluster) list() (model.List, error) {
 		return r.listStorage, nil
 	}
 
-	conn := r.ConnectionHandler.getConnection(r.IsCache, r.IsAnalytics)
+	conn := r.getConnectionHandler().getConnection(r.IsCache, r.IsAnalytics)
 	if conn == nil {
 		return nil, ErrStorageConn
 	}
@@ -194,7 +203,7 @@ func (r *RedisCluster) set() (model.Set, error) {
 		return r.setStorage, nil
 	}
 
-	conn := r.ConnectionHandler.getConnection(r.IsCache, r.IsAnalytics)
+	conn := r.getConnectionHandler().getConnection(r.IsCache, r.IsAnalytics)
 	if conn == nil {
 		return nil, ErrStorageConn
 	}
@@ -218,7 +227,7 @@ func (r *RedisCluster) sortedSet() (model.SortedSet, error) {
 		return r.sortedSetStorage, nil
 	}
 
-	conn := r.ConnectionHandler.getConnection(r.IsCache, r.IsAnalytics)
+	conn := r.getConnectionHandler().getConnection(r.IsCache, r.IsAnalytics)
 	if conn == nil {
 		return nil, ErrStorageConn
 	}
@@ -249,7 +258,7 @@ func (r *RedisCluster) cleanKey(keyName string) string {
 }
 
 func (r *RedisCluster) up() error {
-	if !r.ConnectionHandler.Connected() {
+	if !r.getConnectionHandler().Connected() {
 		return ErrRedisIsDown
 	}
 	return nil
@@ -1045,7 +1054,7 @@ func (r *RedisCluster) RemoveSortedSetRange(keyName, scoreFrom, scoreTo string) 
 }
 
 func (r *RedisCluster) ControllerInitiated() bool {
-	return r.ConnectionHandler != nil
+	return r.getConnectionHandler() != nil
 }
 
 // ScanKeys will return all keys according to the pattern.
