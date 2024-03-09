@@ -67,6 +67,10 @@ func main() {
 	if err != nil {
 		return
 	}
+	err = swagger.Policies(&r)
+	if err != nil {
+		return
+	}
 	schema, err := r.Spec.MarshalYAML()
 	if err != nil {
 		log.Fatal(err)
