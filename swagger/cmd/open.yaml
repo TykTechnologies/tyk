@@ -33,25 +33,43 @@ paths:
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
           description: Forbidden
+      summary: Get list of apis
       tags:
       - APIs
     post:
+      description: |2-
+         Create API
+                 A single Tyk node can have its API Definitions queried, deleted and updated remotely. This functionality enables you to remotely update your Tyk definitions without having to manage the files manually.
       operationId: createApi
       parameters:
       - in: query
         name: base_api_id
+        schema:
+          type: string
       - in: query
         name: base_api_version_name
+        schema:
+          type: string
       - in: query
         name: new_version_name
+        schema:
+          type: string
       - in: query
         name: set_default
+        schema:
+          type: boolean
       requestBody:
         content:
           application/json:
             schema:
               $ref: '#/components/schemas/APIDefinition'
       responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiModifyKeySuccess'
+          description: OK
         "400":
           content:
             application/json:
@@ -70,15 +88,21 @@ paths:
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
           description: Internal Server Error
+      summary: Creat an API
       tags:
       - APIs
   /tyk/apis/{apiID}:
     delete:
+      description: Deleting an API definition will remove the file from the file store,
+        the API definition will NOT be unloaded, a separate reload request will need
+        to be made to disable the API endpoint.
       operationId: deleteApi
       parameters:
       - in: path
         name: apiID
         required: true
+        schema:
+          type: string
       responses:
         "200":
           content:
@@ -110,6 +134,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
           description: Internal Server Error
+      summary: Deleting an API definition with ID
       tags:
       - APIs
     get:
@@ -121,6 +146,8 @@ paths:
       - in: path
         name: apiID
         required: true
+        schema:
+          type: string
       responses:
         "200":
           content:
@@ -140,14 +167,22 @@ paths:
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
           description: Not Found
+      summary: Get API definition with ID
       tags:
       - APIs
     put:
+      description: |-
+        Updating an API definition uses the same signature an object as a `POST`, however it will first ensure that the API ID that is being updated is the same as the one in the object being `PUT`.
+
+
+                Updating will completely replace the file descriptor and will not change an API Definition that has already been loaded, the hot-reload endpoint will need to be called to push the new definition to live.
       operationId: updateApi
       parameters:
       - in: path
         name: apiID
         required: true
+        schema:
+          type: string
       requestBody:
         content:
           application/json:
@@ -184,10 +219,12 @@ paths:
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
           description: Internal Server Error
+      summary: Updating an API definition  with its ID
       tags:
       - APIs
   /tyk/apis/oas:
     get:
+      description: List all OAS format APIs, when used without the Tyk Dashboard.
       operationId: listApisOAS
       responses:
         "200":
@@ -204,6 +241,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
           description: Forbidden
+      summary: List all OAS  format APIS
       tags:
       - OAS APIs
   /tyk/keys:
@@ -217,6 +255,8 @@ paths:
         in: query
         name: filter
         required: false
+        schema:
+          type: boolean
       responses:
         "200":
           content:
@@ -240,20 +280,28 @@ paths:
       tags:
       - Keys
     post:
-      description: |2-
-         Tyk will generate the access token based on the OrgID specified in the API Definition and a random UUID. This ensures that keys can be "owned" by different API Owners should segmentation be needed at an organisational level.
+      description: |-
+        Tyk will generate the access token based on the OrgID specified in the API Definition and a random UUID. This ensures that keys can be "owned" by different API Owners should segmentation be needed at an organisational level.
                 <br/><br/>
                 API keys without access_rights data will be written to all APIs on the system (this also means that they will be created across all SessionHandlers and StorageHandlers, it is recommended to always embed access_rights data in a key to ensure that only targeted APIs and their back-ends are written to.
       operationId: addKey
       parameters:
       - in: query
         name: base_api_id
+        schema:
+          type: string
       - in: query
         name: base_api_version_name
+        schema:
+          type: string
       - in: query
         name: new_version_name
+        schema:
+          type: string
       - in: query
         name: set_default
+        schema:
+          type: boolean
       requestBody:
         content:
           application/json:
@@ -291,16 +339,20 @@ paths:
     delete:
       description: Deleting a key will remove it permanently from the system, however
         analytics relating to that key will still be available.
-      operationId: deleteApi
+      operationId: deleteKey
       parameters:
       - description: The Key ID
         in: path
         name: keyID
         required: true
+        schema:
+          type: string
       - description: Use the hash of the key as input instead of the full key
         in: query
         name: hashed
         required: false
+        schema:
+          type: boolean
       responses:
         "200":
           content:
@@ -338,10 +390,14 @@ paths:
         in: path
         name: keyID
         required: true
+        schema:
+          type: string
       - description: Use the hash of the key as input instead of the full key
         in: query
         name: hashed
         required: false
+        schema:
+          type: boolean
       responses:
         "200":
           content:
@@ -367,6 +423,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
           description: Not Found
+      summary: Get a key with ID
       tags:
       - Keys
     put:
@@ -380,6 +437,8 @@ paths:
         in: path
         name: keyID
         required: true
+        schema:
+          type: string
       - description: Adding the suppress_reset parameter and setting it to 1, will
           cause Tyk not to reset the quota limit that is in the current live quota
           manager. By default Tyk will reset the quota in the live quota manager (initialising
@@ -388,6 +447,8 @@ paths:
         in: query
         name: suppress_reset
         required: false
+        schema:
+          type: string
       requestBody:
         content:
           application/json:
@@ -433,12 +494,20 @@ paths:
       parameters:
       - in: query
         name: base_api_id
+        schema:
+          type: string
       - in: query
         name: base_api_version_name
+        schema:
+          type: string
       - in: query
         name: new_version_name
+        schema:
+          type: string
       - in: query
         name: set_default
+        schema:
+          type: boolean
       requestBody:
         content:
           application/json:
@@ -469,6 +538,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
           description: Internal Server Error
+      summary: Create a key
       tags:
       - Keys
   /tyk/org/keys:
@@ -484,6 +554,8 @@ paths:
         in: query
         name: filter
         required: false
+        schema:
+          type: boolean
       responses:
         "200":
           content:
@@ -501,6 +573,45 @@ paths:
       tags:
       - Organisation Quotas
   /tyk/org/keys/{keyID}:
+    delete:
+      description: Deleting a key will remove it permanently from the system, however
+        analytics relating to that key will still be available.
+      operationId: deleteOrgKey
+      parameters:
+      - description: The Key ID
+        in: path
+        name: keyID
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiModifyKeySuccess'
+          description: OK
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Bad Request
+        "403":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Forbidden
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Not Found
+      summary: Delete Key
+      tags:
+      - Organisation Quotas
     get:
       description: Get session info about the specified key. Should return up to date
         rate limit and quota usage numbers.
@@ -510,6 +621,8 @@ paths:
         in: path
         name: keyID
         required: true
+        schema:
+          type: string
       responses:
         "200":
           content:
@@ -530,6 +643,63 @@ paths:
                 $ref: '#/components/schemas/ApiStatusMessage'
           description: Not Found
       summary: Get an Organisation Key
+      tags:
+      - Organisation Quotas
+    post:
+      description: This work similar to Keys API except that Key ID is always equals
+        Organisation ID
+      operationId: addOrgKey
+      parameters:
+      - description: The Key ID
+        in: path
+        name: keyID
+        required: true
+        schema:
+          type: string
+      - description: Adding the reset_quota parameter and setting it to 1, will cause
+          Tyk not to reset the quota limit that is in the current live quota manager.
+        in: query
+        name: reset_quota
+        required: false
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserSessionState'
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiModifyKeySuccess'
+          description: OK
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Bad Request
+        "403":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Forbidden
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Not Found
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Internal Server Error
+      summary: Create an organisation key
       tags:
       - Organisation Quotas
 components:
@@ -2454,13 +2624,6 @@ components:
         use_session:
           type: boolean
       type: object
-  securitySchemes:
-    api_key:
-      description: Api key
-      in: header
-      name: X-Tyk-Authorization
-      type: apiKey
- type: object
   securitySchemes:
     api_key:
       description: Api key

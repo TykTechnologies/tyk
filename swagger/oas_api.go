@@ -22,6 +22,8 @@ func getListOfOASApisRequest(r *openapi3.Reflector) error {
 	oc.AddRespStructure(new([]oas.OAS))
 	oc.SetID("listApisOAS")
 	oc.SetTags("OAS APIs")
+	oc.SetSummary("List all OAS  format APIS")
+	oc.SetDescription("List all OAS format APIs, when used without the Tyk Dashboard.")
 	oc.AddRespStructure(new(apiStatusMessage), openapi.WithHTTPStatus(http.StatusForbidden))
 	return r.AddOperation(oc)
 }

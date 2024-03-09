@@ -1,5 +1,7 @@
 package swagger
 
+import "github.com/swaggest/openapi-go/openapi3"
+
 type apiModifyKeySuccess struct {
 	// in:body
 	Key     string `json:"key"`
@@ -16,4 +18,22 @@ type apiStatusMessage struct {
 
 type apiAllKeys struct {
 	APIKeys []string `json:"keys"`
+}
+
+func stringSchema() *openapi3.SchemaOrRef {
+	stringType := openapi3.SchemaTypeString
+	return &openapi3.SchemaOrRef{
+		Schema: &openapi3.Schema{
+			Type: &stringType,
+		},
+	}
+}
+
+func boolSchema() *openapi3.SchemaOrRef {
+	boolSchema := openapi3.SchemaTypeBoolean
+	return &openapi3.SchemaOrRef{
+		Schema: &openapi3.Schema{
+			Type: &boolSchema,
+		},
+	}
 }

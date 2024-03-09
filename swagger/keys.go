@@ -50,6 +50,7 @@ func getKeyWithID(r *openapi3.Reflector) error {
 	oc.AddRespStructure(new(apiStatusMessage), openapi.WithHTTPStatus(http.StatusBadRequest))
 	oc.SetTags("Keys")
 	oc.SetID("getKey")
+	oc.SetSummary("Get a key with ID")
 	o3, ok := oc.(openapi3.OperationExposer)
 	if !ok {
 		return ErrOperationExposer
@@ -67,7 +68,7 @@ func deleteKeyRequest(r *openapi3.Reflector) error {
 		return err
 	}
 	oc.SetTags("Keys")
-	oc.SetID("deleteApi")
+	oc.SetID("deleteKey")
 	oc.AddRespStructure(new(apiModifyKeySuccess))
 	oc.AddRespStructure(new(apiStatusMessage), openapi.WithHTTPStatus(http.StatusBadRequest))
 	oc.AddRespStructure(new(apiStatusMessage), openapi.WithHTTPStatus(http.StatusNotFound))
@@ -137,7 +138,7 @@ func postKeyRequest(r *openapi3.Reflector) error {
 	oc.SetTags("Keys")
 	oc.SetID("addKey")
 	oc.SetSummary("Create a key")
-	oc.SetDescription(" Tyk will generate the access token based on the OrgID specified in the API Definition and a random UUID. This ensures that keys can be \"owned\" by different API Owners should segmentation be needed at an organisational level.\n        <br/><br/>\n        API keys without access_rights data will be written to all APIs on the system (this also means that they will be created across all SessionHandlers and StorageHandlers, it is recommended to always embed access_rights data in a key to ensure that only targeted APIs and their back-ends are written to.")
+	oc.SetDescription("Tyk will generate the access token based on the OrgID specified in the API Definition and a random UUID. This ensures that keys can be \"owned\" by different API Owners should segmentation be needed at an organisational level.\n        <br/><br/>\n        API keys without access_rights data will be written to all APIs on the system (this also means that they will be created across all SessionHandlers and StorageHandlers, it is recommended to always embed access_rights data in a key to ensure that only targeted APIs and their back-ends are written to.")
 	oc.AddReqStructure(new(user.SessionState))
 	oc.AddRespStructure(new(apiModifyKeySuccess))
 	oc.AddRespStructure(new(apiStatusMessage), openapi.WithHTTPStatus(http.StatusInternalServerError))
@@ -152,12 +153,14 @@ func postKeyRequest(r *openapi3.Reflector) error {
 }
 
 func createKeyRequest(r *openapi3.Reflector) error {
+	// TODO::Inquire why we have two endpoint doing the same thing.
 	oc, err := r.NewOperationContext(http.MethodPost, "/tyk/keys/create")
 	if err != nil {
 		return err
 	}
 	oc.SetTags("Keys")
 	oc.SetID("createKey")
+	oc.SetSummary("Create a key")
 	oc.AddReqStructure(new(user.SessionState))
 	oc.AddRespStructure(new(apiModifyKeySuccess))
 	oc.AddRespStructure(new(apiStatusMessage), openapi.WithHTTPStatus(http.StatusInternalServerError))
@@ -174,7 +177,7 @@ func createKeyRequest(r *openapi3.Reflector) error {
 func keyIDParameter() openapi3.ParameterOrRef {
 	isRequired := true
 	desc := "The Key ID"
-	return openapi3.Parameter{In: openapi3.ParameterInPath, Name: "keyID", Required: &isRequired, Description: &desc}.ToParameterOrRef()
+	return openapi3.Parameter{In: openapi3.ParameterInPath, Name: "keyID", Required: &isRequired, Description: &desc, Schema: stringSchema()}.ToParameterOrRef()
 }
 
 func getKeyQuery() []openapi3.ParameterOrRef {
@@ -182,18 +185,20 @@ func getKeyQuery() []openapi3.ParameterOrRef {
 	isRequired := false
 	///example:=false
 	return []openapi3.ParameterOrRef{
-		openapi3.Parameter{In: openapi3.ParameterInQuery, Name: "hashed", Description: &hasDesc, Required: &isRequired}.ToParameterOrRef(),
+		openapi3.Parameter{In: openapi3.ParameterInQuery, Name: "hashed", Description: &hasDesc, Required: &isRequired, Schema: boolSchema()}.ToParameterOrRef(),
 	}
 }
 
 func updateKeyQuery() openapi3.ParameterOrRef {
+	// TODO::Check if this is a enum instead.
 	isRequired := false
 	desc := "Adding the suppress_reset parameter and setting it to 1, will cause Tyk not to reset the quota limit that is in the current live quota manager. By default Tyk will reset the quota in the live quota manager (initialising it) when adding a key. Adding the `suppress_reset` flag to the URL parameters will avoid this behaviour."
-	return openapi3.Parameter{In: openapi3.ParameterInQuery, Name: "suppress_reset", Required: &isRequired, Description: &desc}.ToParameterOrRef()
+	return openapi3.Parameter{In: openapi3.ParameterInQuery, Name: "suppress_reset", Required: &isRequired, Description: &desc, Schema: stringSchema()}.ToParameterOrRef()
 }
 
 func filterKeyQuery() openapi3.ParameterOrRef {
+	///TODO::Check if this is actually bool or is it a string with value 1
 	isRequired := false
 	desc := "we don't use filter for hashed keys"
-	return openapi3.Parameter{In: openapi3.ParameterInQuery, Name: "filter", Required: &isRequired, Description: &desc}.ToParameterOrRef()
+	return openapi3.Parameter{In: openapi3.ParameterInQuery, Name: "filter", Required: &isRequired, Description: &desc, Schema: boolSchema()}.ToParameterOrRef()
 }

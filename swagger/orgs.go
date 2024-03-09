@@ -18,6 +18,10 @@ func OrgsApi(r *openapi3.Reflector) error {
 	if err != nil {
 		return err
 	}
+	err = createOrgKey(r)
+	if err != nil {
+		return err
+	}
 	return getOrgKeys(r)
 }
 
@@ -89,4 +93,36 @@ func deleteOrgKeyRequest(r *openapi3.Reflector) error {
 	par := []openapi3.ParameterOrRef{keyIDParameter()}
 	o3.Operation().WithParameters(par...)
 	return r.AddOperation(oc)
+}
+
+func createOrgKey(r *openapi3.Reflector) error {
+	///TODO::check query parameter reset_quota in the code
+	oc, err := r.NewOperationContext(http.MethodPost, "/tyk/org/keys/{keyID}")
+	if err != nil {
+		return err
+	}
+	oc.SetTags("Organisation Quotas")
+	oc.SetID("addOrgKey")
+	oc.SetSummary("Create an organisation key")
+	oc.SetDescription("This work similar to Keys API except that Key ID is always equals Organisation ID")
+	oc.AddReqStructure(new(user.SessionState))
+	oc.AddRespStructure(new(apiModifyKeySuccess))
+	oc.AddRespStructure(new(apiStatusMessage), openapi.WithHTTPStatus(http.StatusInternalServerError))
+	oc.AddRespStructure(new(apiStatusMessage), openapi.WithHTTPStatus(http.StatusForbidden))
+	oc.AddRespStructure(new(apiStatusMessage), openapi.WithHTTPStatus(http.StatusNotFound))
+	oc.AddRespStructure(new(apiStatusMessage), openapi.WithHTTPStatus(http.StatusBadRequest))
+	o3, ok := oc.(openapi3.OperationExposer)
+	if !ok {
+		return ErrOperationExposer
+	}
+	par := []openapi3.ParameterOrRef{keyIDParameter(), resetQuotaKeyQuery()}
+	o3.Operation().WithParameters(par...)
+	return r.AddOperation(oc)
+}
+
+func resetQuotaKeyQuery() openapi3.ParameterOrRef {
+	isRequired := false
+	///TODO::check query parameter reset_quota in the code and make sure it is accurate also check the description
+	desc := "Adding the reset_quota parameter and setting it to 1, will cause Tyk not to reset the quota limit that is in the current live quota manager."
+	return openapi3.Parameter{In: openapi3.ParameterInQuery, Name: "reset_quota", Required: &isRequired, Description: &desc, Schema: stringSchema()}.ToParameterOrRef()
 }
