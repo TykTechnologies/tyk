@@ -1039,6 +1039,177 @@ paths:
       summary: Update Organisation Key
       tags:
       - Organisation Quotas
+  /tyk/policies:
+    get:
+      description: You can retrieve all the policies in your Tyk instance. Returns
+        an array policies.
+      operationId: listPolicies
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: '#/components/schemas/UserPolicy'
+                type: array
+          description: OK
+        "403":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Forbidden
+      summary: List Policies
+      tags:
+      - Policies
+    post:
+      description: You can create a Policy in your Tyk Instance
+      operationId: addPolicy
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserPolicy'
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiModifyKeySuccess'
+          description: OK
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Bad Request
+        "403":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Forbidden
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Internal Server Error
+      summary: Create a Policy
+      tags:
+      - Policies
+  /tyk/policies/{polID}:
+    delete:
+      description: Delete a policy by ID in your Tyk instance.
+      operationId: deletePolicy
+      parameters:
+      - description: You can retrieve details of a single policy by ID in your Tyk
+          instance.
+        in: path
+        name: polID
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiModifyKeySuccess'
+          description: OK
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Bad Request
+        "403":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Forbidden
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Internal Server Error
+      summary: Delete a Policy
+      tags:
+      - Policies
+    get:
+      description: You can retrieve details of a single policy by ID in your Tyk instance.
+      operationId: getPolicy
+      parameters:
+      - description: You can retrieve details of a single policy by ID in your Tyk
+          instance.
+        in: path
+        name: polID
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserPolicy'
+          description: OK
+        "403":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Forbidden
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Not Found
+      summary: Get a Policy
+      tags:
+      - Policies
+    put:
+      description: You can update a Policy in your Tyk Instance by ID
+      operationId: updatePolicy
+      parameters:
+      - description: You can retrieve details of a single policy by ID in your Tyk
+          instance.
+        in: path
+        name: polID
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiModifyKeySuccess'
+          description: OK
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Bad Request
+        "403":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Forbidden
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Internal Server Error
+      summary: Update a Policy
+      tags:
+      - Policies
   /tyk/reload:
     get:
       description: Tyk is capable of reloading configurations without having to stop
@@ -2857,6 +3028,8 @@ components:
         max_query_depth:
           type: integer
       type: object
+    UserGraphAccessDefinition:
+      type: object
     UserJWTData:
       properties:
         secret:
@@ -2869,6 +3042,77 @@ components:
             type: number
           nullable: true
           type: array
+      type: object
+    UserPolicy:
+      properties:
+        _id:
+          type: string
+        access_rights:
+          additionalProperties:
+            $ref: '#/components/schemas/UserAccessDefinition'
+          nullable: true
+          type: object
+        active:
+          type: boolean
+        enable_http_signature_validation:
+          type: boolean
+        graphql_access_rights:
+          additionalProperties:
+            $ref: '#/components/schemas/UserGraphAccessDefinition'
+          nullable: true
+          type: object
+        hmac_enabled:
+          type: boolean
+        id:
+          type: string
+        is_inactive:
+          type: boolean
+        key_expires_in:
+          type: integer
+        last_updated:
+          type: string
+        max_query_depth:
+          type: integer
+        meta_data:
+          additionalProperties: {}
+          nullable: true
+          type: object
+        name:
+          type: string
+        org_id:
+          type: string
+        partitions:
+          $ref: '#/components/schemas/UserPolicyPartitions'
+        per:
+          type: number
+        quota_max:
+          type: integer
+        quota_renewal_rate:
+          type: integer
+        rate:
+          type: number
+        tags:
+          items:
+            type: string
+          nullable: true
+          type: array
+        throttle_interval:
+          type: number
+        throttle_retry_limit:
+          type: integer
+      type: object
+    UserPolicyPartitions:
+      properties:
+        acl:
+          type: boolean
+        complexity:
+          type: boolean
+        per_api:
+          type: boolean
+        quota:
+          type: boolean
+        rate_limit:
+          type: boolean
       type: object
     UserSessionState:
       properties:

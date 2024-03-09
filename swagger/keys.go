@@ -256,28 +256,23 @@ func updateKeyPolicy(r *openapi3.Reflector) error {
 }
 
 func keyIDParameter() openapi3.ParameterOrRef {
-	isRequired := true
 	desc := "The Key ID"
 	return openapi3.Parameter{In: openapi3.ParameterInPath, Name: "keyID", Required: &isRequired, Description: &desc, Schema: stringSchema()}.ToParameterOrRef()
 }
 
 func hashedQuery() openapi3.ParameterOrRef {
 	hasDesc := "Use the hash of the key as input instead of the full key"
-	isRequired := false
-	///example:=false
-	return openapi3.Parameter{In: openapi3.ParameterInQuery, Name: "hashed", Description: &hasDesc, Required: &isRequired, Schema: boolSchema()}.ToParameterOrRef()
+	return openapi3.Parameter{In: openapi3.ParameterInQuery, Name: "hashed", Description: &hasDesc, Required: &isOptional, Schema: boolSchema()}.ToParameterOrRef()
 }
 
 func suppressResetQuery() openapi3.ParameterOrRef {
 	// TODO::Check if this is a enum instead.
-	isRequired := false
 	desc := "Adding the suppress_reset parameter and setting it to 1, will cause Tyk not to reset the quota limit that is in the current live quota manager. By default Tyk will reset the quota in the live quota manager (initialising it) when adding a key. Adding the `suppress_reset` flag to the URL parameters will avoid this behaviour."
-	return openapi3.Parameter{In: openapi3.ParameterInQuery, Name: "suppress_reset", Required: &isRequired, Description: &desc, Schema: stringSchema()}.ToParameterOrRef()
+	return openapi3.Parameter{In: openapi3.ParameterInQuery, Name: "suppress_reset", Required: &isOptional, Description: &desc, Schema: stringSchema()}.ToParameterOrRef()
 }
 
 func filterKeyQuery() openapi3.ParameterOrRef {
 	///TODO::Check if this is actually bool or is it a string with value 1
-	isRequired := false
 	desc := "we don't use filter for hashed keys"
-	return openapi3.Parameter{In: openapi3.ParameterInQuery, Name: "filter", Required: &isRequired, Description: &desc, Schema: boolSchema()}.ToParameterOrRef()
+	return openapi3.Parameter{In: openapi3.ParameterInQuery, Name: "filter", Required: &isOptional, Description: &desc, Schema: boolSchema()}.ToParameterOrRef()
 }

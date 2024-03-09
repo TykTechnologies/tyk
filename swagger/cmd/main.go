@@ -65,11 +65,11 @@ func main() {
 	}
 	err = swagger.HealthEndpoint(&r)
 	if err != nil {
-		return
+		log.Fatal(err)
 	}
-	err = swagger.Policies(&r)
+	err = swagger.PoliciesApis(&r)
 	if err != nil {
-		return
+		log.Fatal(err)
 	}
 	schema, err := r.Spec.MarshalYAML()
 	if err != nil {
