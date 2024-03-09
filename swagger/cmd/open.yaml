@@ -968,13 +968,16 @@ paths:
         schema:
           type: string
       - description: Adding the reset_quota parameter and setting it to 1, will cause
+
           Tyk reset the organisations quota in the live quota manager, it is recommended
           to use this mechanism to reset organisation-level access if a monthly subscription
           is in place.
+          Tyk not to reset the quota limit that is in the current live quota manager.
         in: query
         name: reset_quota
         required: false
         schema:
+
           enum:
           - "1"
           type: string
@@ -1014,6 +1017,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
           description: Internal Server Error
+<<<<<<< HEAD
       summary: Update Organisation Key
       tags:
       - Organisation Quotas
@@ -1074,6 +1078,9 @@ paths:
       summary: Hot-reload a Tyk group
       tags:
       - Hot Reload
+      summary: Update org Key
+      tags:
+      - Keys
 components:
   schemas:
     APIDefinition:
