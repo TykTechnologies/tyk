@@ -17,7 +17,7 @@ func main() {
 	r := openapi3.Reflector{
 		Reflector: jsonschema.Reflector{},
 	}
-	r.DefaultOptions = append(r.DefaultOptions, jsonschema.StripDefinitionNamePrefix("Apidef", "Swagger", "Oas"))
+	r.DefaultOptions = append(r.DefaultOptions, jsonschema.StripDefinitionNamePrefix("Apidef", "Swagger", "Oas", "Gateway"))
 
 	r.Spec = &openapi3.Spec{Openapi: "3.0.3"}
 	r.Spec.WithServers(openapi3.Server{
@@ -55,6 +55,15 @@ func main() {
 		return
 	}
 	err = swagger.ReloadApi(&r)
+	if err != nil {
+		return
+	}
+
+	err = swagger.SchemaAPi(&r)
+	if err != nil {
+		return
+	}
+	err = swagger.HealthEndpoint(&r)
 	if err != nil {
 		return
 	}

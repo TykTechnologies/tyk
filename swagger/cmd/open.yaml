@@ -27,7 +27,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/GatewayPolicyUpdateObj'
+              $ref: '#/components/schemas/PolicyUpdateObj'
       responses:
         "200":
           content:
@@ -342,7 +342,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/GatewayAPICertificateStatusMessage'
+                $ref: '#/components/schemas/APICertificateStatusMessage'
           description: OK
         "403":
           content:
@@ -392,6 +392,28 @@ paths:
       summary: Delete Certificate
       tags:
       - Certs
+  /tyk/hello:
+    get:
+      description: "From v2.7.5 you can now rename the `/hello`  endpoint by using
+        the `health_check_endpoint_name` option\n        \n        Returns 200 response
+        in case of success"
+      operationId: hello
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthCheckResponse'
+          description: OK
+        "405":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Method Not Allowed
+      summary: Check the Health of the Tyk Gateway
+      tags:
+      - Health Checking
   /tyk/keys:
     get:
       description: |2-
@@ -1074,8 +1096,48 @@ paths:
       summary: Hot-reload a Tyk group
       tags:
       - Hot Reload
+  /tyk/schema:
+    get:
+      description: Get OAS schema
+      operationId: getSchema
+      parameters:
+      - description: The OAS version
+        in: query
+        name: oasVersion
+        required: false
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OASSchemaResponse'
+          description: OK
+        "403":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Forbidden
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OASSchemaResponse'
+          description: Not Found
+      summary: Get OAS schema
 components:
   schemas:
+    APICertificateStatusMessage:
+      properties:
+        id:
+          type: string
+        message:
+          type: string
+        status:
+          type: string
+      type: object
     APIDefinition:
       properties:
         CORS:
@@ -1686,25 +1748,6 @@ components:
           nullable: true
           type: array
       type: object
-    GatewayAPICertificateStatusMessage:
-      properties:
-        id:
-          type: string
-        message:
-          type: string
-        status:
-          type: string
-      type: object
-    GatewayPolicyUpdateObj:
-      properties:
-        apply_policies:
-          items:
-            type: string
-          nullable: true
-          type: array
-        policy:
-          type: string
-      type: object
     GlobalRateLimit:
       properties:
         disabled:
@@ -1936,6 +1979,34 @@ components:
         path:
           type: string
       type: object
+    HealthCheckItem:
+      properties:
+        componentId:
+          type: string
+        componentType:
+          type: string
+        output:
+          type: string
+        status:
+          type: string
+        time:
+          type: string
+      type: object
+    HealthCheckResponse:
+      properties:
+        description:
+          type: string
+        details:
+          additionalProperties:
+            $ref: '#/components/schemas/HealthCheckItem'
+          type: object
+        output:
+          type: string
+        status:
+          type: string
+        version:
+          type: string
+      type: object
     HostCheckObject:
       properties:
         body:
@@ -2123,6 +2194,14 @@ components:
           $ref: '#/components/schemas/Openapi3Servers'
         tags:
           $ref: '#/components/schemas/Openapi3Tags'
+      type: object
+    OASSchemaResponse:
+      properties:
+        message:
+          type: string
+        schema: {}
+        status:
+          type: string
       type: object
     OIDProviderConfig:
       properties:
@@ -2388,6 +2467,16 @@ components:
           additionalProperties: {}
           nullable: true
           type: object
+      type: object
+    PolicyUpdateObj:
+      properties:
+        apply_policies:
+          items:
+            type: string
+          nullable: true
+          type: array
+        policy:
+          type: string
       type: object
     Provider:
       properties:
