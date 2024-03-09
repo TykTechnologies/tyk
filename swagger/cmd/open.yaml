@@ -12,6 +12,56 @@ servers:
 security:
 - api_key: []
 paths:
+  /keys/policy/{keyID}:
+    post:
+      description: This will add a Policy object to a hashed key
+      operationId: addPolicyToKey
+      parameters:
+      - description: The Key ID
+        in: path
+        name: keyID
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GatewayPolicyUpdateObj'
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiModifyKeySuccess'
+          description: OK
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Bad Request
+        "403":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Forbidden
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Not Found
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Internal Server Error
+      summary: Add a policy to a key.
+      tags:
+      - Keys
   /tyk/apis:
     get:
       description: |2-
@@ -244,6 +294,104 @@ paths:
       summary: List all OAS  format APIS
       tags:
       - OAS APIs
+  /tyk/cache/{apiID}:
+    delete:
+      description: Invalidate cache for the given API
+      operationId: invalidateCache
+      parameters:
+      - in: path
+        name: apiID
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: OK
+        "403":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Forbidden
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Internal Server Error
+      summary: Invalidate cache
+      tags:
+      - Cache Invalidation
+  /tyk/certs:
+    post:
+      description: Add a certificate to the Tyk Gateway
+      operationId: addCert
+      parameters:
+      - description: Organisation ID to list the certificates
+        in: query
+        name: org_id
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GatewayAPICertificateStatusMessage'
+          description: OK
+        "403":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Forbidden
+        "405":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Method Not Allowed
+      summary: Add a certificate
+      tags:
+      - Certs
+  /tyk/certs/{certID}:
+    delete:
+      description: Delete certificate by id
+      operationId: deleteCerts
+      parameters:
+      - description: Certificate ID to be deleted
+        in: path
+        name: certID
+        required: true
+        schema:
+          type: string
+      - description: Organisation ID to list the certificates
+        in: query
+        name: org_id
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: OK
+        "403":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Forbidden
+      summary: Delete Certificate
+      tags:
+      - Certs
   /tyk/keys:
     get:
       description: |2-
@@ -426,6 +574,68 @@ paths:
       summary: Get a key with ID
       tags:
       - Keys
+    post:
+      description: |
+        You can use the `POST /tyk/keys/{KEY_ID}` endpoint as defined below to import existing keys into Tyk.
+
+                This example uses standard `authorization` header authentication, and assumes that the Gateway is located at `127.0.0.1:8080` and the Tyk secret is `352d20ee67be67f6340b4c0605b044b7` - update these as necessary to match your environment.
+      operationId: createCustomKey
+      parameters:
+      - description: The Key ID
+        in: path
+        name: keyID
+        required: true
+        schema:
+          type: string
+      - description: Use the hash of the key as input instead of the full key
+        in: query
+        name: hashed
+        required: false
+        schema:
+          type: boolean
+      - description: Adding the suppress_reset parameter and setting it to 1, will
+          cause Tyk not to reset the quota limit that is in the current live quota
+          manager. By default Tyk will reset the quota in the live quota manager (initialising
+          it) when adding a key. Adding the `suppress_reset` flag to the URL parameters
+          will avoid this behaviour.
+        in: query
+        name: suppress_reset
+        required: false
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserSessionState'
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiModifyKeySuccess'
+          description: OK
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Bad Request
+        "403":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Forbidden
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Internal Server Error
+      summary: Create Custom Key / Import Key
+      tags:
+      - Keys
     put:
       description: ' You can also manually add keys to Tyk using your own key-generation
         algorithm. It is recommended if using this approach to ensure that the OrgID
@@ -449,6 +659,12 @@ paths:
         required: false
         schema:
           type: string
+      - description: Use the hash of the key as input instead of the full key
+        in: query
+        name: hashed
+        required: false
+        schema:
+          type: boolean
       requestBody:
         content:
           application/json:
@@ -541,6 +757,38 @@ paths:
       summary: Create a key
       tags:
       - Keys
+  /tyk/keys/preview:
+    post:
+      description: This will create a key and return the created key that you can
+        preview.
+      operationId: createAndPreviewKey
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserSessionState'
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserSessionState'
+          description: OK
+        "403":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Forbidden
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Internal Server Error
+      summary: Create a key and return it for preview
+      tags:
+      - Keys
   /tyk/org/keys:
     get:
       description: You can now set rate limits at the organisation level by using
@@ -574,8 +822,8 @@ paths:
       - Organisation Quotas
   /tyk/org/keys/{keyID}:
     delete:
-      description: Deleting a key will remove it permanently from the system, however
-        analytics relating to that key will still be available.
+      description: Deleting a key will remove all limits from organisation. It does
+        not affects regular keys created within organisation.
       operationId: deleteOrgKey
       parameters:
       - description: The Key ID
@@ -613,8 +861,8 @@ paths:
       tags:
       - Organisation Quotas
     get:
-      description: Get session info about the specified key. Should return up to date
-        rate limit and quota usage numbers.
+      description: Get session info about specified organisation key. Should return
+        up to date rate limit and quota usage numbers.
       operationId: getOrgKey
       parameters:
       - description: The Key ID
@@ -657,11 +905,15 @@ paths:
         schema:
           type: string
       - description: Adding the reset_quota parameter and setting it to 1, will cause
-          Tyk not to reset the quota limit that is in the current live quota manager.
+          Tyk reset the organisations quota in the live quota manager, it is recommended
+          to use this mechanism to reset organisation-level access if a monthly subscription
+          is in place.
         in: query
         name: reset_quota
         required: false
         schema:
+          enum:
+          - "1"
           type: string
       requestBody:
         content:
@@ -702,6 +954,126 @@ paths:
       summary: Create an organisation key
       tags:
       - Organisation Quotas
+    put:
+      description: |-
+        This work similar to Keys API except that Key ID is always equals Organisation ID
+
+        For Gateway v2.6.0 onwards, you can now set rate limits at the organisation level by using the following fields - allowance and rate. These are the number of allowed requests for the specified per value, and need to be set to the same value. If you don't want to have organisation level rate limiting, set `rate` or `per` to zero, or don't add them to your request.
+      operationId: updateOrgKey
+      parameters:
+      - description: The Key ID
+        in: path
+        name: keyID
+        required: true
+        schema:
+          type: string
+      - description: Adding the reset_quota parameter and setting it to 1, will cause
+          Tyk reset the organisations quota in the live quota manager, it is recommended
+          to use this mechanism to reset organisation-level access if a monthly subscription
+          is in place.
+        in: query
+        name: reset_quota
+        required: false
+        schema:
+          enum:
+          - "1"
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserSessionState'
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiModifyKeySuccess'
+          description: OK
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Bad Request
+        "403":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Forbidden
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Not Found
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Internal Server Error
+      summary: Update Organisation Key
+      tags:
+      - Organisation Quotas
+  /tyk/reload:
+    get:
+      description: Tyk is capable of reloading configurations without having to stop
+        serving requests. This means that API configurations can be added at runtime,
+        or even modified at runtime and those rules applied immediately without any
+        downtime.
+      operationId: hotReload
+      parameters:
+      - description: Block a response until the reload is performed. This can be useful
+          in scripting environments like CI/CD workflows
+        in: query
+        name: block
+        required: false
+        schema:
+          enum:
+          - true
+          type: boolean
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: OK
+        "403":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Forbidden
+      summary: Hot-reload a single node
+      tags:
+      - Hot Reload
+  /tyk/reload/group:
+    get:
+      description: To reload a whole group of Tyk nodes (without using the Dashboard
+        or host manager). You can send an API request to a single node, this node
+        will then send a notification through the pub/sub infrastructure to all other
+        listening nodes (including the host manager if it is being used to manage
+        NginX) which will then trigger a global reload.
+      operationId: hotReloadGroup
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: OK
+        "403":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Forbidden
+      summary: Hot-reload a Tyk group
+      tags:
+      - Hot Reload
 components:
   schemas:
     APIDefinition:
@@ -1313,6 +1685,25 @@ components:
             $ref: '#/components/schemas/Provider'
           nullable: true
           type: array
+      type: object
+    GatewayAPICertificateStatusMessage:
+      properties:
+        id:
+          type: string
+        message:
+          type: string
+        status:
+          type: string
+      type: object
+    GatewayPolicyUpdateObj:
+      properties:
+        apply_policies:
+          items:
+            type: string
+          nullable: true
+          type: array
+        policy:
+          type: string
       type: object
     GlobalRateLimit:
       properties:

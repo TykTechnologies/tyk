@@ -46,6 +46,18 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	err = swagger.InvalidateCache(&r)
+	if err != nil {
+		return
+	}
+	err = swagger.Certs(&r)
+	if err != nil {
+		return
+	}
+	err = swagger.ReloadApi(&r)
+	if err != nil {
+		return
+	}
 	schema, err := r.Spec.MarshalYAML()
 	if err != nil {
 		log.Fatal(err)

@@ -29,6 +29,26 @@ func stringSchema() *openapi3.SchemaOrRef {
 	}
 }
 
+func resetQuotaSchema() *openapi3.SchemaOrRef {
+	stringType := openapi3.SchemaTypeString
+	return &openapi3.SchemaOrRef{
+		Schema: &openapi3.Schema{
+			Type: &stringType,
+			Enum: []interface{}{"1"},
+		},
+	}
+}
+
+func blockSchema() *openapi3.SchemaOrRef {
+	stringType := openapi3.SchemaTypeBoolean
+	return &openapi3.SchemaOrRef{
+		Schema: &openapi3.Schema{
+			Type: &stringType,
+			Enum: []interface{}{true},
+		},
+	}
+}
+
 func boolSchema() *openapi3.SchemaOrRef {
 	boolSchema := openapi3.SchemaTypeBoolean
 	return &openapi3.SchemaOrRef{
