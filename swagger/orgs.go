@@ -22,6 +22,10 @@ func OrgsApi(r *openapi3.Reflector) error {
 	if err != nil {
 		return err
 	}
+	err = UpdateOrgKey(r)
+	if err != nil {
+		return err
+	}
 	return getOrgKeys(r)
 }
 
@@ -115,6 +119,31 @@ func createOrgKey(r *openapi3.Reflector) error {
 	if !ok {
 		return ErrOperationExposer
 	}
+	par := []openapi3.ParameterOrRef{keyIDParameter(), resetQuotaKeyQuery()}
+	o3.Operation().WithParameters(par...)
+	return r.AddOperation(oc)
+}
+
+func UpdateOrgKey(r *openapi3.Reflector) error {
+	oc, err := r.NewOperationContext(http.MethodPut, "/tyk/org/keys/{keyID}")
+	if err != nil {
+		return err
+	}
+	oc.AddReqStructure(new(user.SessionState))
+	oc.SetSummary("Update org Key")
+	oc.SetDescription("Update a key in an organization.")
+	oc.AddRespStructure(new(apiModifyKeySuccess))
+	oc.SetID("updateOrgKey")
+	oc.SetTags("Keys")
+	oc.AddRespStructure(new(apiStatusMessage), openapi.WithHTTPStatus(http.StatusBadRequest))
+	oc.AddRespStructure(new(apiStatusMessage), openapi.WithHTTPStatus(http.StatusNotFound))
+	oc.AddRespStructure(new(apiStatusMessage), openapi.WithHTTPStatus(http.StatusInternalServerError))
+	oc.AddRespStructure(new(apiStatusMessage), openapi.WithHTTPStatus(http.StatusForbidden))
+	o3, ok := oc.(openapi3.OperationExposer)
+	if !ok {
+		return ErrOperationExposer
+	}
+	// TODO::Check about reset quota if it is allowed here
 	par := []openapi3.ParameterOrRef{keyIDParameter(), resetQuotaKeyQuery()}
 	o3.Operation().WithParameters(par...)
 	return r.AddOperation(oc)

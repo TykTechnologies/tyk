@@ -30,6 +30,10 @@ func Keys(r *openapi3.Reflector) error {
 	if err != nil {
 		return err
 	}
+	err = createCustomKeyRequest(r)
+	if err != nil {
+		return err
+	}
 	return getKeyWithID(r)
 }
 
@@ -56,7 +60,7 @@ func getKeyWithID(r *openapi3.Reflector) error {
 		return ErrOperationExposer
 	}
 	par := []openapi3.ParameterOrRef{keyIDParameter()}
-	par = append(par, getKeyQuery()...)
+	par = append(par, hashedQuery())
 	o3.Operation().WithParameters(par...)
 	oc.SetDescription("Get session info about the specified key. Should return up to date rate limit and quota usage numbers.")
 	return r.AddOperation(oc)
@@ -79,8 +83,7 @@ func deleteKeyRequest(r *openapi3.Reflector) error {
 	if !ok {
 		return ErrOperationExposer
 	}
-	par := []openapi3.ParameterOrRef{keyIDParameter()}
-	par = append(par, getKeyQuery()...)
+	par := []openapi3.ParameterOrRef{keyIDParameter(), hashedQuery()}
 	o3.Operation().WithParameters(par...)
 	return r.AddOperation(oc)
 }
@@ -124,8 +127,7 @@ func putKeyRequest(r *openapi3.Reflector) error {
 	if !ok {
 		return ErrOperationExposer
 	}
-	par := []openapi3.ParameterOrRef{keyIDParameter()}
-	par = append(par, updateKeyQuery())
+	par := []openapi3.ParameterOrRef{keyIDParameter(), suppressResetQuery(), hashedQuery()}
 	o3.Operation().WithParameters(par...)
 	return r.AddOperation(oc)
 }
@@ -149,6 +151,30 @@ func postKeyRequest(r *openapi3.Reflector) error {
 		return ErrOperationExposer
 	}
 	o3.Operation().WithParameters(addApiPostQueryParam()...)
+	return r.AddOperation(oc)
+}
+
+func createCustomKeyRequest(r *openapi3.Reflector) error {
+	oc, err := r.NewOperationContext(http.MethodPost, "/tyk/keys/{keyID}")
+	if err != nil {
+		return err
+	}
+	oc.SetTags("Keys")
+	oc.SetID("createCustomKey")
+	oc.SetSummary("Create Custom Key / Import Key")
+	// TODO::Copy the description in previous oas
+	oc.SetDescription("You can use the `POST /tyk/keys/{KEY_ID}` endpoint as defined below to import existing keys into Tyk.\n\n        This example uses standard `authorization` header authentication, and assumes that the Gateway is located at `127.0.0.1:8080` and the Tyk secret is `352d20ee67be67f6340b4c0605b044b7` - update these as necessary to match your environment.\n")
+	oc.AddReqStructure(new(user.SessionState))
+	oc.AddRespStructure(new(apiModifyKeySuccess))
+	oc.AddRespStructure(new(apiStatusMessage), openapi.WithHTTPStatus(http.StatusInternalServerError))
+	oc.AddRespStructure(new(apiStatusMessage), openapi.WithHTTPStatus(http.StatusForbidden))
+	oc.AddRespStructure(new(apiStatusMessage), openapi.WithHTTPStatus(http.StatusBadRequest))
+	o3, ok := oc.(openapi3.OperationExposer)
+	if !ok {
+		return ErrOperationExposer
+	}
+	par := []openapi3.ParameterOrRef{keyIDParameter(), hashedQuery(), suppressResetQuery()}
+	o3.Operation().WithParameters(par...)
 	return r.AddOperation(oc)
 }
 
@@ -180,16 +206,14 @@ func keyIDParameter() openapi3.ParameterOrRef {
 	return openapi3.Parameter{In: openapi3.ParameterInPath, Name: "keyID", Required: &isRequired, Description: &desc, Schema: stringSchema()}.ToParameterOrRef()
 }
 
-func getKeyQuery() []openapi3.ParameterOrRef {
+func hashedQuery() openapi3.ParameterOrRef {
 	hasDesc := "Use the hash of the key as input instead of the full key"
 	isRequired := false
 	///example:=false
-	return []openapi3.ParameterOrRef{
-		openapi3.Parameter{In: openapi3.ParameterInQuery, Name: "hashed", Description: &hasDesc, Required: &isRequired, Schema: boolSchema()}.ToParameterOrRef(),
-	}
+	return openapi3.Parameter{In: openapi3.ParameterInQuery, Name: "hashed", Description: &hasDesc, Required: &isRequired, Schema: boolSchema()}.ToParameterOrRef()
 }
 
-func updateKeyQuery() openapi3.ParameterOrRef {
+func suppressResetQuery() openapi3.ParameterOrRef {
 	// TODO::Check if this is a enum instead.
 	isRequired := false
 	desc := "Adding the suppress_reset parameter and setting it to 1, will cause Tyk not to reset the quota limit that is in the current live quota manager. By default Tyk will reset the quota in the live quota manager (initialising it) when adding a key. Adding the `suppress_reset` flag to the URL parameters will avoid this behaviour."

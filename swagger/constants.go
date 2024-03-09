@@ -1,0 +1,3 @@
+package swagger
+
+const name = ""
