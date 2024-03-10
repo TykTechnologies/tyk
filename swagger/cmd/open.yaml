@@ -1033,6 +1033,56 @@ paths:
       summary: Rotate the oath client
       tags:
       - OAuth
+  /tyk/oauth/clients/{apiID}/{keyName}/tokens:
+    get:
+      description: |-
+        This endpoint allows you to retrieve a list of all current tokens and their expiry date for a provided API ID and OAuth-client ID in the following format. This endpoint will work only for newly created tokens.
+                <br/>
+                <br/>
+                You can control how long you want to store expired tokens in this list using `oauth_token_expired_retain_period` gateway option, which specifies retain period for expired tokens stored in Redis. By default expired token not get removed. See <a href="https://tyk.io/docs/configure/tyk-gateway-configuration-options/#a-name-oauth-token-expired-retain-period-a-oauth-token-expired-retain-period" target="_blank">here</a> for more details.
+      operationId: getOAuthClientTokens
+      parameters:
+      - in: path
+        name: apiID
+        required: true
+        schema:
+          type: string
+      - description: The Client ID
+        in: path
+        name: keyName
+        required: true
+        schema:
+          type: string
+      - description: The page to return
+        in: query
+        name: page
+        required: false
+        schema:
+          type: integer
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: '#/components/schemas/OAuthClientToken'
+                type: array
+          description: OK
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Not Found
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Internal Server Error
+      summary: List tokens
+      tags:
+      - OAuth
   /tyk/oauth/clients/apis/{appID}:
     get:
       description: Get Apis for Oauth app
@@ -1152,6 +1202,50 @@ paths:
                 $ref: '#/components/schemas/ApiStatusMessage'
           description: Internal Server Error
       summary: Invalidate OAuth refresh token
+      tags:
+      - OAuth
+  /tyk/oauth/revoke:
+    post:
+      description: revoke a single token
+      operationId: revokeSingleToken
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              properties:
+                client_id:
+                  description: id of oauth client
+                  type: string
+                token:
+                  description: token to be revoked
+                  type: string
+                token_type_hint:
+                  description: type of token to be revoked, if sent then the accepted
+                    values are access_token and refresh_token. String value and optional,
+                    of not provided then it will attempt to remove access and refresh
+                    tokens that matchs
+                  type: string
+              type: object
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: OK
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Bad Request
+        "403":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Forbidden
+      summary: revoke token
       tags:
       - OAuth
   /tyk/oauth/tokens:
@@ -2778,6 +2872,13 @@ components:
         schema: {}
         status:
           type: string
+      type: object
+    OAuthClientToken:
+      properties:
+        code:
+          type: string
+        expires:
+          type: integer
       type: object
     OIDProviderConfig:
       properties:

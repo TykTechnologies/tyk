@@ -47,6 +47,15 @@ func OAuthApi(r *openapi3.Reflector) error {
 	if err != nil {
 		return err
 	}
+
+	err = getAuthClientTokens(r)
+	if err != nil {
+		return err
+	}
+	err = revokeTokenHandler(r)
+	if err != nil {
+		return err
+	}
 	return createOauthClient(r)
 }
 
@@ -287,18 +296,15 @@ func revokeTokenHandler(r *openapi3.Reflector) error {
 	}
 	// TODO::This is totally wrong find out how to do it
 	oc.AddReqStructure(new(struct {
-		Token         string `json:"token"`
-		TokenTypeHint string `json:"token_type_hint"`
-		ClientID      string `json:"client_id"`
-		OrgID         string `json:"org_id"`
+		Token         string `json:"token" formData:"token" description:"token to be revoked" `
+		TokenTypeHint string `json:"token_type_hint" formData:"token_type_hint" description:"type of token to be revoked, if sent then the accepted values are access_token and refresh_token. String value and optional, of not provided then it will attempt to remove access and refresh tokens that matches"`
+		ClientID      string `json:"client_id" formData:"client_id" description:"id of oauth client"`
+		///OrgID         string `json:"org_id" formData:"org_id" description:"id of oauth client"`
 	}), func(cu *openapi.ContentUnit) {
-		cu.SetFieldMapping(openapi.InFormData, map[string]string{
-			"token_type_hint": "value3",
-			"token":           "upload6",
-			"client_id":       "",
-			"org_id":          "",
-		})
 	})
+	oc.SetID("revokeSingleToken")
+	oc.SetSummary("revoke token")
+	oc.SetDescription("revoke a single token")
 	oc.AddRespStructure(new(apiStatusMessage), openapi.WithHTTPStatus(http.StatusBadRequest))
 	oc.AddRespStructure(new(apiStatusMessage), openapi.WithHTTPStatus(http.StatusForbidden))
 	oc.AddRespStructure(new(apiStatusMessage))
