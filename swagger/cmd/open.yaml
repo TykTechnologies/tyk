@@ -931,7 +931,7 @@ paths:
       tags:
       - OAuth
     put:
-      description: Update OAuth client details and return the OAuth clients details
+      description: Allows you to update the metadata and Policy ID for an OAuth client.
       operationId: updateOAuthClient
       parameters:
       - description: Refresh token
@@ -981,7 +981,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
           description: Internal Server Error
-      summary: Update OAuth client
+      summary: Update OAuth metadata and Policy ID
       tags:
       - OAuth
   /tyk/oauth/clients/{apiID}/{keyName}/rotate:

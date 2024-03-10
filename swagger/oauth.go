@@ -256,6 +256,30 @@ func getSingleOAuthClient(r *openapi3.Reflector) error {
 	return r.AddOperation(oc)
 }
 
+func getAuthClientTokens(r *openapi3.Reflector) error {
+	oc, err := r.NewOperationContext(http.MethodGet, "/tyk/oauth/clients/{apiID}/{keyName}/tokens")
+	if err != nil {
+		return err
+	}
+	oc.AddRespStructure(new(apiStatusMessage), openapi.WithHTTPStatus(http.StatusNotFound))
+	oc.AddRespStructure(new(apiStatusMessage), openapi.WithHTTPStatus(http.StatusInternalServerError))
+	///TODO::this either returns  gateway.OAuthClientToken or  paginatedOAuthClientTokens depending on if page is sent
+	//TODO::urgent to check
+	oc.AddRespStructure(new([]gateway.OAuthClientToken), openapi.WithHTTPStatus(http.StatusOK))
+	oc.SetTags(OAuthTag)
+	oc.SetID("getOAuthClientTokens")
+	oc.SetSummary("List tokens")
+	oc.SetDescription("This endpoint allows you to retrieve a list of all current tokens and their expiry date for a provided API ID and OAuth-client ID in the following format. This endpoint will work only for newly created tokens.\n        <br/>\n        <br/>\n        You can control how long you want to store expired tokens in this list using `oauth_token_expired_retain_period` gateway option, which specifies retain period for expired tokens stored in Redis. By default expired token not get removed. See <a href=\"https://tyk.io/docs/configure/tyk-gateway-configuration-options/#a-name-oauth-token-expired-retain-period-a-oauth-token-expired-retain-period\" target=\"_blank\">here</a> for more details.")
+	o3, ok := oc.(openapi3.OperationExposer)
+	if !ok {
+		return ErrOperationExposer
+	}
+	par := []openapi3.ParameterOrRef{oauthApiIdParameter(), keyNameParameter("The Client ID"), pageQuery()}
+	o3.Operation().WithParameters(par...)
+
+	return r.AddOperation(oc)
+}
+
 func revokeTokenHandler(r *openapi3.Reflector) error {
 	oc, err := r.NewOperationContext(http.MethodPost, "/tyk/oauth/revoke")
 	if err != nil {
@@ -282,8 +306,11 @@ func revokeTokenHandler(r *openapi3.Reflector) error {
 	return r.AddOperation(oc)
 }
 
-func keyNameParameter() openapi3.ParameterOrRef {
+func keyNameParameter(description ...string) openapi3.ParameterOrRef {
 	desc := "Refresh token"
+	if len(description) != 0 {
+		desc = description[0]
+	}
 	return openapi3.Parameter{In: openapi3.ParameterInPath, Name: "keyName", Required: &isRequired, Description: &desc, Schema: stringSchema()}.ToParameterOrRef()
 }
 
@@ -308,4 +335,9 @@ func scopeQuery() openapi3.ParameterOrRef {
 			Enum: []interface{}{"lapsed"},
 		},
 	}}.ToParameterOrRef()
+}
+
+func pageQuery() openapi3.ParameterOrRef {
+	desc := "The page to return"
+	return openapi3.Parameter{In: openapi3.ParameterInQuery, Name: "page", Required: &isOptional, Description: &desc, Schema: intSchema()}.ToParameterOrRef()
 }

@@ -29,6 +29,15 @@ func stringSchema() *openapi3.SchemaOrRef {
 	}
 }
 
+func intSchema() *openapi3.SchemaOrRef {
+	intType := openapi3.SchemaTypeInteger
+	return &openapi3.SchemaOrRef{
+		Schema: &openapi3.Schema{
+			Type: &intType,
+		},
+	}
+}
+
 func resetQuotaSchema() *openapi3.SchemaOrRef {
 	stringType := openapi3.SchemaTypeString
 	return &openapi3.SchemaOrRef{
