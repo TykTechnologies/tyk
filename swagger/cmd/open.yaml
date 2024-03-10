@@ -1064,10 +1064,19 @@ paths:
           content:
             application/json:
               schema:
-                items:
-                  $ref: '#/components/schemas/OAuthClientToken'
-                type: array
-          description: OK
+                oneOf:
+                - $ref: '#/components/schemas/PaginatedOAuthClientTokens'
+                - items:
+                    $ref: '#/components/schemas/OAuthClientToken'
+                  nullable: true
+                  type: array
+          description: Get a list of tokens
+        "403":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Forbidden
         "404":
           content:
             application/json:
@@ -1216,6 +1225,8 @@ paths:
                 client_id:
                   description: id of oauth client
                   type: string
+                org_id:
+                  type: string
                 token:
                   description: token to be revoked
                   type: string
@@ -1223,8 +1234,11 @@ paths:
                   description: type of token to be revoked, if sent then the accepted
                     values are access_token and refresh_token. String value and optional,
                     of not provided then it will attempt to remove access and refresh
-                    tokens that matchs
+                    tokens that matches
                   type: string
+              required:
+              - token
+              - client_id
               type: object
       responses:
         "200":
@@ -3132,6 +3146,25 @@ components:
       items:
         $ref: '#/components/schemas/Openapi3Tag'
       type: array
+    PaginatedOAuthClientTokens:
+      properties:
+        pagination:
+          $ref: '#/components/schemas/PaginationStatus'
+        tokens:
+          items:
+            $ref: '#/components/schemas/OAuthClientToken'
+          nullable: true
+          type: array
+      type: object
+    PaginationStatus:
+      properties:
+        page_num:
+          type: integer
+        page_size:
+          type: integer
+        page_total:
+          type: integer
+      type: object
     PersistGraphQLMeta:
       properties:
         method:

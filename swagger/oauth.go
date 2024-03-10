@@ -3,6 +3,7 @@ package swagger
 import (
 	"net/http"
 
+	"github.com/swaggest/jsonschema-go"
 	"github.com/swaggest/openapi-go"
 	"github.com/swaggest/openapi-go/openapi3"
 
@@ -12,51 +13,11 @@ import (
 const OAuthTag = "OAuth"
 
 func OAuthApi(r *openapi3.Reflector) error {
-	///err := revokeTokenHandler(r)
-	err := rotateOauthClientHandler(r)
-	if err != nil {
-		return err
-	}
-	err = invalidateOauthRefresh(r)
-	if err != nil {
-		return err
-	}
-	err = updateOauthClient(r)
-	if err != nil {
-		return err
-	}
-	err = getApisForOauthApp(r)
-	if err != nil {
-		return err
-	}
-
-	err = purgeLapsedOAuthTokens(r)
-	if err != nil {
-		return err
-	}
-	err = listOAuthClients(r)
-	if err != nil {
-		return err
-	}
-
-	err = deleteOAuthClient(r)
-	if err != nil {
-		return err
-	}
-	err = getSingleOAuthClient(r)
-	if err != nil {
-		return err
-	}
-
-	err = getAuthClientTokens(r)
-	if err != nil {
-		return err
-	}
-	err = revokeTokenHandler(r)
-	if err != nil {
-		return err
-	}
-	return createOauthClient(r)
+	return addOperations(r, rotateOauthClientHandler, invalidateOauthRefresh,
+		updateOauthClient, getApisForOauthApp, purgeLapsedOAuthTokens, listOAuthClients,
+		deleteOAuthClient, getSingleOAuthClient, getAuthClientTokens, revokeTokenHandler,
+		createOauthClient,
+	)
 }
 
 func createOauthClient(r *openapi3.Reflector) error {
@@ -225,7 +186,8 @@ func deleteOAuthClient(r *openapi3.Reflector) error {
 	}
 	oc.AddRespStructure(new(apiStatusMessage), openapi.WithHTTPStatus(http.StatusNotFound))
 	oc.AddRespStructure(new(apiStatusMessage), openapi.WithHTTPStatus(http.StatusInternalServerError))
-	oc.AddRespStructure(new(apiModifyKeySuccess), openapi.WithHTTPStatus(http.StatusOK))
+	oc.AddRespStructure(new(apiModifyKeySuccess), openapi.WithHTTPStatus(http.StatusOK), func(cu *openapi.ContentUnit) {
+	})
 	oc.AddRespStructure(new(apiStatusMessage), openapi.WithHTTPStatus(http.StatusForbidden))
 	oc.SetTags(OAuthTag)
 	oc.SetID("deleteOAuthClient")
@@ -271,10 +233,13 @@ func getAuthClientTokens(r *openapi3.Reflector) error {
 		return err
 	}
 	oc.AddRespStructure(new(apiStatusMessage), openapi.WithHTTPStatus(http.StatusNotFound))
+	oc.AddRespStructure(new(apiStatusMessage), openapi.WithHTTPStatus(http.StatusForbidden))
 	oc.AddRespStructure(new(apiStatusMessage), openapi.WithHTTPStatus(http.StatusInternalServerError))
 	///TODO::this either returns  gateway.OAuthClientToken or  paginatedOAuthClientTokens depending on if page is sent
 	//TODO::urgent to check
-	oc.AddRespStructure(new([]gateway.OAuthClientToken), openapi.WithHTTPStatus(http.StatusOK))
+	oc.AddRespStructure(jsonschema.OneOf(new(paginatedOAuthClientTokens), new([]gateway.OAuthClientToken)), openapi.WithHTTPStatus(http.StatusOK), func(cu *openapi.ContentUnit) {
+		cu.Description = "Get a list of tokens"
+	})
 	oc.SetTags(OAuthTag)
 	oc.SetID("getOAuthClientTokens")
 	oc.SetSummary("List tokens")
@@ -296,10 +261,10 @@ func revokeTokenHandler(r *openapi3.Reflector) error {
 	}
 	// TODO::This is totally wrong find out how to do it
 	oc.AddReqStructure(new(struct {
-		Token         string `json:"token" formData:"token" description:"token to be revoked" `
+		Token         string `json:"token" formData:"token" description:"token to be revoked" required:"true"`
 		TokenTypeHint string `json:"token_type_hint" formData:"token_type_hint" description:"type of token to be revoked, if sent then the accepted values are access_token and refresh_token. String value and optional, of not provided then it will attempt to remove access and refresh tokens that matches"`
-		ClientID      string `json:"client_id" formData:"client_id" description:"id of oauth client"`
-		///OrgID         string `json:"org_id" formData:"org_id" description:"id of oauth client"`
+		ClientID      string `json:"client_id" formData:"client_id" description:"id of oauth client" required:"true"`
+		OrgID         string `json:"org_id" formData:"org_id"`
 	}), func(cu *openapi.ContentUnit) {
 	})
 	oc.SetID("revokeSingleToken")
@@ -307,7 +272,7 @@ func revokeTokenHandler(r *openapi3.Reflector) error {
 	oc.SetDescription("revoke a single token")
 	oc.AddRespStructure(new(apiStatusMessage), openapi.WithHTTPStatus(http.StatusBadRequest))
 	oc.AddRespStructure(new(apiStatusMessage), openapi.WithHTTPStatus(http.StatusForbidden))
-	oc.AddRespStructure(new(apiStatusMessage))
+	oc.AddRespStructure(new(apiStatusMessage), openapi.WithHTTPStatus(http.StatusOK))
 	oc.SetTags(OAuthTag)
 	return r.AddOperation(oc)
 }
@@ -346,4 +311,14 @@ func scopeQuery() openapi3.ParameterOrRef {
 func pageQuery() openapi3.ParameterOrRef {
 	desc := "The page to return"
 	return openapi3.Parameter{In: openapi3.ParameterInQuery, Name: "page", Required: &isOptional, Description: &desc, Schema: intSchema()}.ToParameterOrRef()
+}
+
+func addOperations(r *openapi3.Reflector, operations ...func(r *openapi3.Reflector) error) error {
+	for _, operation := range operations {
+		err := operation(r)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
