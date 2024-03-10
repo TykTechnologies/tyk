@@ -30,51 +30,72 @@ func main() {
 		WithVersion("5.2.3").
 		WithLicense(openapi3.License{Name: "Mozilla Public License Version 2.0", URL: &licence}).
 		WithDescription(" The Tyk Gateway API is the primary means for integrating your application with the Tyk API Gateway")
+
 	err := swagger.APIS(&r)
 	if err != nil {
 		log.Fatal(err)
 	}
+
 	err = swagger.OasAPIS(&r)
 	if err != nil {
 		log.Fatal(err)
 	}
+
 	err = swagger.Keys(&r)
 	if err != nil {
 		log.Fatal(err)
 	}
+
 	err = swagger.OrgsApi(&r)
 	if err != nil {
 		log.Fatal(err)
 	}
+
 	err = swagger.InvalidateCache(&r)
 	if err != nil {
-		return
+		log.Fatal(err)
 	}
+
 	err = swagger.Certs(&r)
 	if err != nil {
-		return
+		log.Fatal(err)
 	}
+
 	err = swagger.ReloadApi(&r)
 	if err != nil {
-		return
+		log.Fatal(err)
 	}
 
 	err = swagger.SchemaAPi(&r)
 	if err != nil {
-		return
+		log.Fatal(err)
 	}
+
+	//err = swagger.DebugApi(&r)
+	//if err != nil {
+	//	return
+	//}
+
 	err = swagger.HealthEndpoint(&r)
 	if err != nil {
 		log.Fatal(err)
 	}
+
 	err = swagger.PoliciesApis(&r)
 	if err != nil {
 		log.Fatal(err)
 	}
+
+	err = swagger.OAuthApi(&r)
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	schema, err := r.Spec.MarshalYAML()
 	if err != nil {
 		log.Fatal(err)
 	}
+
 	err = writeSchema(schema, "open.yaml")
 	if err != nil {
 		log.Fatal(err)

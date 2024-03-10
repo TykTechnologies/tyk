@@ -811,6 +811,395 @@ paths:
       summary: Create a key and return it for preview
       tags:
       - Keys
+  /tyk/oauth/clients/{apiID}:
+    delete:
+      description: OAuth Clients are organised by API ID, and therefore are queried
+        as such.
+      operationId: listOAuthClients
+      parameters:
+      - in: path
+        name: apiID
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: '#/components/schemas/NewClientRequest'
+                type: array
+          description: OK
+        "403":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Forbidden
+        "404":
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: '#/components/schemas/NewClientRequest'
+                type: array
+          description: Not Found
+      summary: List oAuth clients
+      tags:
+      - OAuth
+  /tyk/oauth/clients/{apiID}/{keyName}:
+    delete:
+      description: Please note that tokens issued with the client ID will still be
+        valid until they expire.
+      operationId: deleteOAuthClient
+      parameters:
+      - in: path
+        name: apiID
+        required: true
+        schema:
+          type: string
+      - description: Refresh token
+        in: path
+        name: keyName
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiModifyKeySuccess'
+          description: OK
+        "403":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Forbidden
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Not Found
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Internal Server Error
+      summary: Delete OAuth client
+      tags:
+      - OAuth
+    get:
+      description: Get OAuth client details
+      operationId: getOAuthClient
+      parameters:
+      - in: path
+        name: apiID
+        required: true
+        schema:
+          type: string
+      - description: Refresh token
+        in: path
+        name: keyName
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NewClientRequest'
+          description: OK
+        "403":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Forbidden
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Not Found
+      summary: Get OAuth client
+      tags:
+      - OAuth
+    put:
+      description: Update OAuth client details and return the OAuth clients details
+      operationId: updateOAuthClient
+      parameters:
+      - description: Refresh token
+        in: path
+        name: keyName
+        required: true
+        schema:
+          type: string
+      - in: path
+        name: apiID
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NewClientRequest'
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NewClientRequest'
+          description: OK
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Bad Request
+        "403":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Forbidden
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Not Found
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Internal Server Error
+      summary: Update OAuth client
+      tags:
+      - OAuth
+  /tyk/oauth/clients/{apiID}/{keyName}/rotate:
+    put:
+      operationId: rotateOauthClient
+      parameters:
+      - description: Refresh token
+        in: path
+        name: keyName
+        required: true
+        schema:
+          type: string
+      - in: path
+        name: apiID
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NewClientRequest'
+          description: OK
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Bad Request
+        "403":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Forbidden
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Not Found
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Internal Server Error
+      summary: Rotate the oath client
+      tags:
+      - OAuth
+  /tyk/oauth/clients/apis/{appID}:
+    get:
+      description: Get Apis for Oauth app
+      operationId: getApisForOauthApp
+      parameters:
+      - in: path
+        name: appID
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                items:
+                  type: string
+                type: array
+          description: OK
+        "403":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Forbidden
+      summary: Get Apis for Oauth app
+      tags:
+      - OAuth
+  /tyk/oauth/clients/create:
+    post:
+      description: |
+        Any OAuth keys must be generated with the help of a client ID. These need to be pre-registered with Tyk before they can be used (in a similar vein to how you would register your app with Twitter before attempting to ask user permissions using their API).
+                <br/><br/>
+                <h3>Creating OAuth clients with Access to Multiple APIs</h3>
+                New from Tyk Gateway 2.6.0 is the ability to create OAuth clients with access to more than one API. If you provide the api_id it works the same as in previous releases. If you don't provide the api_id the request uses policy access rights and enumerates APIs from their setting in the newly created OAuth-client.
+      operationId: createOAuthClient
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NewClientRequest'
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NewClientRequest'
+          description: OK
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Bad Request
+        "403":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Forbidden
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Internal Server Error
+      summary: Create new OAuth client
+      tags:
+      - OAuth
+  /tyk/oauth/refresh/{keyName}:
+    delete:
+      description: It is possible to invalidate refresh tokens in order to manage
+        OAuth client access more robustly.
+      operationId: invalidateOAuthRefresh
+      parameters:
+      - description: Refresh token
+        in: path
+        name: keyName
+        required: true
+        schema:
+          type: string
+      - description: The API id
+        in: query
+        name: api_id
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiModifyKeySuccess'
+          description: OK
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Bad Request
+        "403":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Forbidden
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Not Found
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Internal Server Error
+      summary: Invalidate OAuth refresh token
+      tags:
+      - OAuth
+  /tyk/oauth/tokens:
+    delete:
+      description: Purge scoped lapsed OAuth token
+      operationId: purgeLapsedOAuthTokens
+      parameters:
+      - in: query
+        name: scope
+        required: true
+        schema:
+          enum:
+          - lapsed
+          type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: OK
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Bad Request
+        "403":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Forbidden
+        "422":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Unprocessable Entity
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Internal Server Error
+      summary: Purge lapsed OAuth tokens
+      tags:
+      - OAuth
   /tyk/org/keys:
     get:
       description: You can now set rate limits at the organisation level by using
@@ -2338,6 +2727,22 @@ components:
         method:
           type: string
         path:
+          type: string
+      type: object
+    NewClientRequest:
+      properties:
+        api_id:
+          type: string
+        client_id:
+          type: string
+        description:
+          type: string
+        meta_data: {}
+        policy_id:
+          type: string
+        redirect_uri:
+          type: string
+        secret:
           type: string
       type: object
     NotificationsManager:

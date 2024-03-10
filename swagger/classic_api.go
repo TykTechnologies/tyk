@@ -140,7 +140,6 @@ func createClassicApiRequest(r *openapi3.Reflector) error {
 }
 
 func apIIDParameter() openapi3.ParameterOrRef {
-	isRequired := true
 	return openapi3.Parameter{In: openapi3.ParameterInPath, Name: "apiID", Required: &isRequired, Schema: stringSchema()}.ToParameterOrRef()
 }
 
