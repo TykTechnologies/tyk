@@ -144,10 +144,15 @@ func apIIDParameter() openapi3.ParameterOrRef {
 }
 
 func addApiPostQueryParam() []openapi3.ParameterOrRef {
+	baseApiIdDesc := "The base API which the new version will be linked to."
+	baseApiVersionNameDesc := "The version name of the base API while creating the first version. This doesn't have to be sent for the next versions but if it is set, it will override base API version name."
+	newVersionNameDesc := "The version name of the created version."
+	setVersionDesc := "If true, the new version is set as default version."
 	return []openapi3.ParameterOrRef{
-		openapi3.Parameter{In: openapi3.ParameterInQuery, Name: "base_api_id", Schema: stringSchema()}.ToParameterOrRef(),
-		openapi3.Parameter{In: openapi3.ParameterInQuery, Name: "base_api_version_name", Schema: stringSchema()}.ToParameterOrRef(),
-		openapi3.Parameter{In: openapi3.ParameterInQuery, Name: "new_version_name", Schema: stringSchema()}.ToParameterOrRef(),
-		openapi3.Parameter{In: openapi3.ParameterInQuery, Name: "set_default", Schema: boolSchema()}.ToParameterOrRef(),
+		openapi3.Parameter{In: openapi3.ParameterInQuery, Name: "base_api_id", Schema: stringSchema(), Description: &baseApiIdDesc}.ToParameterOrRef(),
+
+		openapi3.Parameter{In: openapi3.ParameterInQuery, Name: "base_api_version_name", Schema: stringSchema(), Description: &baseApiVersionNameDesc}.ToParameterOrRef(),
+		openapi3.Parameter{In: openapi3.ParameterInQuery, Name: "new_version_name", Schema: stringSchema(), Description: &newVersionNameDesc}.ToParameterOrRef(),
+		openapi3.Parameter{In: openapi3.ParameterInQuery, Name: "set_default", Schema: boolSchema(), Description: &setVersionDesc}.ToParameterOrRef(),
 	}
 }

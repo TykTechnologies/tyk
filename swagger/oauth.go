@@ -110,18 +110,22 @@ func updateOauthClient(r *openapi3.Reflector) error {
 }
 
 func getApisForOauthApp(r *openapi3.Reflector) error {
-	// TODO::This is has org_id as form value need to find a way to fix it
-	// TODO:: Go over this again
+	// TODO:: check is again about org_id should at be query or formvalue
 	oc, err := r.NewOperationContext(http.MethodGet, "/tyk/oauth/clients/apis/{appID}")
 	if err != nil {
 		return err
 	}
+	oc.AddReqStructure(new(struct {
+		OrgID string `json:"orgID" query:"orgID"`
+	}))
 	oc.SetTags(OAuthTag)
 	oc.SetID("getApisForOauthApp")
 	oc.SetSummary("Get Apis for Oauth app")
 	oc.SetDescription("Get Apis for Oauth app")
-	oc.AddRespStructure(new(apiStatusMessage), openapi.WithHTTPStatus(http.StatusForbidden))
-	oc.AddRespStructure(new([]string), openapi.WithHTTPStatus(http.StatusOK))
+	forbidden(oc)
+	oc.AddRespStructure(new([]string), openapi.WithHTTPStatus(http.StatusOK), func(cu *openapi.ContentUnit) {
+		cu.Description = "Return an array of apis ids"
+	})
 	o3, ok := oc.(openapi3.OperationExposer)
 	if !ok {
 		return ErrOperationExposer
@@ -353,6 +357,7 @@ func forbidden(oc openapi.OperationContext, description ...string) {
 		}
 	})
 }
+
 func statusNotFound(oc openapi.OperationContext, description ...string) {
 	oc.AddRespStructure(new(apiStatusMessage), openapi.WithHTTPStatus(http.StatusNotFound), func(cu *openapi.ContentUnit) {
 		if len(description) != 0 {
@@ -379,6 +384,14 @@ func statusUnauthorized(oc openapi.OperationContext, description ...string) {
 
 func statusOKApiStatusMessage(oc openapi.OperationContext, description ...string) {
 	oc.AddRespStructure(new(apiStatusMessage), openapi.WithHTTPStatus(http.StatusOK), func(cu *openapi.ContentUnit) {
+		if len(description) != 0 {
+			cu.Description = description[0]
+		}
+	})
+}
+
+func statusInternalServerError(oc openapi.OperationContext, description ...string) {
+	oc.AddRespStructure(new(apiStatusMessage), openapi.WithHTTPStatus(http.StatusInternalServerError), func(cu *openapi.ContentUnit) {
 		if len(description) != 0 {
 			cu.Description = description[0]
 		}
