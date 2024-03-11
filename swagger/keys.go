@@ -13,39 +13,7 @@ import (
 const KeysTag = "Keys"
 
 func Keys(r *openapi3.Reflector) error {
-	err := putKeyRequest(r)
-	if err != nil {
-		return err
-	}
-	err = createKeyRequest(r)
-	if err != nil {
-		return err
-	}
-	err = postKeyRequest(r)
-	if err != nil {
-		return err
-	}
-	err = getListOfKeys(r)
-	if err != nil {
-		return err
-	}
-	err = deleteKeyRequest(r)
-	if err != nil {
-		return err
-	}
-	err = createCustomKeyRequest(r)
-	if err != nil {
-		return err
-	}
-	err = previewKeyRequest(r)
-	if err != nil {
-		return err
-	}
-	err = updateKeyPolicy(r)
-	if err != nil {
-		return err
-	}
-	return getKeyWithID(r)
+	return addOperations(r, getKeyWithID, updateKeyPolicy, previewKeyRequest, putKeyRequest, createKeyRequest, postKeyRequest, getListOfKeys, deleteKeyRequest, createCustomKeyRequest)
 }
 
 func getKeyWithID(r *openapi3.Reflector) error {

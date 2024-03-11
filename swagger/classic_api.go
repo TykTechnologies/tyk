@@ -13,25 +13,7 @@ import (
 var ErrOperationExposer = errors.New("object is not of type openapi3.OperationExposer")
 
 func APIS(r *openapi3.Reflector) error {
-	err := getClassicApiRequest(r)
-	if err != nil {
-		return err
-	}
-	err = deleteClassicApiRequest(r)
-	if err != nil {
-		return err
-	}
-
-	err = getListOfClassicApisRequest(r)
-	if err != nil {
-		return err
-	}
-	err = createClassicApiRequest(r)
-	if err != nil {
-		return err
-	}
-
-	return putClassicApiRequest(r)
+	return addOperations(r, getClassicApiRequest, deleteClassicApiRequest, putClassicApiRequest, getListOfClassicApisRequest, createClassicApiRequest)
 }
 
 func getClassicApiRequest(r *openapi3.Reflector) error {

@@ -12,23 +12,7 @@ import (
 const OrgTag = "Organisation Quotas"
 
 func OrgsApi(r *openapi3.Reflector) error {
-	err := getSingleOrgKeyWithID(r)
-	if err != nil {
-		return err
-	}
-	err = deleteOrgKeyRequest(r)
-	if err != nil {
-		return err
-	}
-	err = createOrgKey(r)
-	if err != nil {
-		return err
-	}
-	err = UpdateOrgKey(r)
-	if err != nil {
-		return err
-	}
-	return getOrgKeys(r)
+	return addOperations(r, getSingleOrgKeyWithID, deleteOrgKeyRequest, createOrgKey, UpdateOrgKey, getOrgKeys)
 }
 
 func getOrgKeys(r *openapi3.Reflector) error {

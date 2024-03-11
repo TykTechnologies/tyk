@@ -10,11 +10,7 @@ import (
 const reloadTag = "Hot Reload"
 
 func ReloadApi(r *openapi3.Reflector) error {
-	err := groupReload(r)
-	if err != nil {
-		return err
-	}
-	return singleNodeReload(r)
+	return addOperations(r, groupReload, singleNodeReload)
 }
 
 func groupReload(r *openapi3.Reflector) error {

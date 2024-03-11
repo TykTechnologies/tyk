@@ -12,23 +12,7 @@ import (
 const PolicyTag = "Policies"
 
 func PoliciesApis(r *openapi3.Reflector) error {
-	err := getListOfPolicies(r)
-	if err != nil {
-		return err
-	}
-	err = getPolicyWithID(r)
-	if err != nil {
-		return err
-	}
-	err = updatePolicy(r)
-	if err != nil {
-		return err
-	}
-	err = deletePolicyWithID(r)
-	if err != nil {
-		return err
-	}
-	return createPolicy(r)
+	return addOperations(r, getListOfPolicies, getPolicyWithID, updatePolicy, deletePolicyWithID, createPolicy)
 }
 
 func createPolicy(r *openapi3.Reflector) error {
