@@ -1262,6 +1262,62 @@ paths:
       summary: revoke token
       tags:
       - OAuth
+  /tyk/oauth/revoke_all:
+    post:
+      description: revoke all the tokens for a given oauth client
+      operationId: revokeAllTokens
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              properties:
+                client_id:
+                  description: id of oauth client
+                  type: string
+                client_secret:
+                  description: OAuth client secret to ensure that its a valid operation
+                  type: string
+                org_id:
+                  type: string
+              required:
+              - client_secret
+              - client_id
+              type: object
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: tokens revoked successfully
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: cannot parse form. Form malformed
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Bad request, form malformed or client secret and client id
+            doesn't match
+        "403":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Attempted administrative access with invalid or missing key!
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: oauth client doesn't exist
+      summary: revoke all client's tokens
+      tags:
+      - OAuth
   /tyk/oauth/tokens:
     delete:
       description: Purge scoped lapsed OAuth token

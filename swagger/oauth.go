@@ -16,7 +16,7 @@ func OAuthApi(r *openapi3.Reflector) error {
 	return addOperations(r, rotateOauthClientHandler, invalidateOauthRefresh,
 		updateOauthClient, getApisForOauthApp, purgeLapsedOAuthTokens, listOAuthClients,
 		deleteOAuthClient, getSingleOAuthClient, getAuthClientTokens, revokeTokenHandler,
-		createOauthClient,
+		createOauthClient, revokeAllTokensHandler,
 	)
 }
 
@@ -235,8 +235,6 @@ func getAuthClientTokens(r *openapi3.Reflector) error {
 	oc.AddRespStructure(new(apiStatusMessage), openapi.WithHTTPStatus(http.StatusNotFound))
 	oc.AddRespStructure(new(apiStatusMessage), openapi.WithHTTPStatus(http.StatusForbidden))
 	oc.AddRespStructure(new(apiStatusMessage), openapi.WithHTTPStatus(http.StatusInternalServerError))
-	///TODO::this either returns  gateway.OAuthClientToken or  paginatedOAuthClientTokens depending on if page is sent
-	//TODO::urgent to check
 	oc.AddRespStructure(jsonschema.OneOf(new(paginatedOAuthClientTokens), new([]gateway.OAuthClientToken)), openapi.WithHTTPStatus(http.StatusOK), func(cu *openapi.ContentUnit) {
 		cu.Description = "Get a list of tokens"
 	})
@@ -272,8 +270,32 @@ func revokeTokenHandler(r *openapi3.Reflector) error {
 	oc.SetDescription("revoke a single token")
 	oc.AddRespStructure(new(apiStatusMessage), openapi.WithHTTPStatus(http.StatusBadRequest))
 	oc.AddRespStructure(new(apiStatusMessage), openapi.WithHTTPStatus(http.StatusForbidden))
-	oc.AddRespStructure(new(apiStatusMessage), openapi.WithHTTPStatus(http.StatusOK))
+	statusOKApiStatusMessage(oc)
 	oc.SetTags(OAuthTag)
+	return r.AddOperation(oc)
+}
+
+func revokeAllTokensHandler(r *openapi3.Reflector) error {
+	oc, err := r.NewOperationContext(http.MethodPost, "/tyk/oauth/revoke_all")
+	if err != nil {
+		return err
+	}
+	oc.AddReqStructure(new(struct {
+		ClientSecret string `json:"client_secret" formData:"client_secret" required:"true" description:"OAuth client secret to ensure that its a valid operation"`
+		ClientID     string `json:"client_id" formData:"client_id" description:"id of oauth client" required:"true"`
+		OrgID        string `json:"org_id" formData:"org_id"`
+	}))
+	///TODO::this why is this 401 instead of badrequest
+	statusUnauthorized(oc, "Bad request, form malformed or client secret and client id doesn't match")
+	statusBadRequest(oc, "cannot parse form. Form malformed")
+	statusNotFound(oc, "oauth client doesn't exist")
+	statusOKApiStatusMessage(oc, "tokens revoked successfully")
+	forbidden(oc)
+	oc.SetTags(OAuthTag)
+	oc.SetDescription("revoke all the tokens for a given oauth client")
+	oc.SetSummary("revoke all client's tokens")
+	oc.SetID("revokeAllTokens")
+
 	return r.AddOperation(oc)
 }
 
@@ -321,4 +343,44 @@ func addOperations(r *openapi3.Reflector, operations ...func(r *openapi3.Reflect
 		}
 	}
 	return nil
+}
+
+func forbidden(oc openapi.OperationContext, description ...string) {
+	oc.AddRespStructure(new(apiStatusMessage), openapi.WithHTTPStatus(http.StatusForbidden), func(cu *openapi.ContentUnit) {
+		cu.Description = "Attempted administrative access with invalid or missing key!"
+		if len(description) != 0 {
+			cu.Description = description[0]
+		}
+	})
+}
+func statusNotFound(oc openapi.OperationContext, description ...string) {
+	oc.AddRespStructure(new(apiStatusMessage), openapi.WithHTTPStatus(http.StatusNotFound), func(cu *openapi.ContentUnit) {
+		if len(description) != 0 {
+			cu.Description = description[0]
+		}
+	})
+}
+
+func statusBadRequest(oc openapi.OperationContext, description ...string) {
+	oc.AddRespStructure(new(apiStatusMessage), openapi.WithHTTPStatus(http.StatusBadRequest), func(cu *openapi.ContentUnit) {
+		if len(description) != 0 {
+			cu.Description = description[0]
+		}
+	})
+}
+
+func statusUnauthorized(oc openapi.OperationContext, description ...string) {
+	oc.AddRespStructure(new(apiStatusMessage), openapi.WithHTTPStatus(http.StatusUnauthorized), func(cu *openapi.ContentUnit) {
+		if len(description) != 0 {
+			cu.Description = description[0]
+		}
+	})
+}
+
+func statusOKApiStatusMessage(oc openapi.OperationContext, description ...string) {
+	oc.AddRespStructure(new(apiStatusMessage), openapi.WithHTTPStatus(http.StatusOK), func(cu *openapi.ContentUnit) {
+		if len(description) != 0 {
+			cu.Description = description[0]
+		}
+	})
 }
