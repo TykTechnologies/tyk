@@ -176,7 +176,7 @@ In order to write your own test please use this guide [https://github.com/TykTec
 
 ## Security Issues
 
-If you discover a security vulnerability within this project, please don't use the issue tracker. Instead, kindly email us directly at support@tyk.io. We take security seriously and will promptly address your concerns.
+If you discover a security vulnerability within this project, please don't use the issue tracker. Instead, kindly email us directly at [support@tyk.io](mailto:support@tyk.io). We take security seriously and will promptly address your concerns.
 
 ## Contributing
 
