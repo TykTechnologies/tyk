@@ -56,10 +56,10 @@ cd tyk-gateway-docker
 
 #### Step 3 - Deploy Tyk Gateway and Redis
 ```console
-docker-compose up
+docker compose up
 ```
 
-You can run this in detach mode use the `-d` flag: `docker-compose up -d`
+You can run this in detach mode use the `-d` flag: `docker compose up -d`
 
 **Congratulations, you’re done!**
 
