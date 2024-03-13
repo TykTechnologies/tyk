@@ -22,6 +22,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/TykTechnologies/tyk/header"
+
 	"github.com/TykTechnologies/graphql-go-tools/pkg/execution/datasource"
 	"github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
 
@@ -1821,4 +1823,51 @@ func TestCreateMemConnProviderIfNeeded(t *testing.T) {
 			return true
 		}, time.Second, time.Millisecond*25, "context was not canceled")
 	})
+}
+
+func TestQuotaResponseHeaders(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	specs := ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		spec.Proxy.ListenPath = "/quota-headers-test"
+		spec.UseKeylessAccess = false
+	})
+
+	var (
+		quotaMax, quotaRenewalRate int64 = 2, 3600
+	)
+
+	authKey := "auth-key"
+	session := createSessionWithQuota(t, specs[0].APIDefinition, quotaMax, quotaRenewalRate)
+	assert.NoError(t, ts.Gw.GlobalSessionManager.UpdateSession(authKey, session, 60, false))
+
+	authorization := map[string]string{
+		"Authorization": authKey,
+	}
+	_, _ = ts.Run(t, []test.TestCase{
+		{
+			Headers: authorization,
+			Path:    "/quota-headers-test/",
+			Code:    http.StatusOK,
+			HeadersMatch: map[string]string{
+				header.XRateLimitLimit:     fmt.Sprintf("%d", quotaMax),
+				header.XRateLimitRemaining: fmt.Sprintf("%d", quotaMax-1),
+			},
+		},
+		{
+			Headers: authorization,
+			Path:    "/quota-headers-test/",
+			Code:    http.StatusOK,
+			HeadersMatch: map[string]string{
+				header.XRateLimitLimit:     fmt.Sprintf("%d", quotaMax),
+				header.XRateLimitRemaining: fmt.Sprintf("%d", quotaMax-2),
+			},
+		},
+		{
+			Headers: authorization,
+			Path:    "/quota-headers-test/abc",
+			Code:    http.StatusForbidden,
+		},
+	}...)
 }
