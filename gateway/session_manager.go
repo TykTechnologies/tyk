@@ -273,6 +273,10 @@ func (l *SessionLimiter) RedisQuotaExceeded(r *http.Request, currentSession *use
 		return false
 	}
 
+	defer func() {
+		ctxScheduleSessionUpdate(r)
+	}()
+
 	quotaScope := ""
 	if scope != "" {
 		quotaScope = scope + "-"
@@ -321,7 +325,6 @@ func (l *SessionLimiter) RedisQuotaExceeded(r *http.Request, currentSession *use
 	// If this is a new Quota period, ensure we let the end user know
 	if qInt == 1 {
 		quotaRenews = time.Now().Unix() + quotaRenewalRate
-		ctxScheduleSessionUpdate(r)
 	}
 
 	// If not, pass and set the values of the session to quotamax - counter
