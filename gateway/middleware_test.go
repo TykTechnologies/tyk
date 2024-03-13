@@ -407,7 +407,7 @@ func TestCopyAllowedURLs(t *testing.T) {
 	}
 }
 
-func createSession(tb testing.TB, api *apidef.APIDefinition) *user.SessionState {
+func createSessionWithQuota(tb testing.TB, api *apidef.APIDefinition, quotaMax, quotaRenewalRate int64) *user.SessionState {
 	tb.Helper()
 	session := &user.SessionState{
 		DateCreated: time.Now().Add(time.Hour * -1),
@@ -418,8 +418,8 @@ func createSession(tb testing.TB, api *apidef.APIDefinition) *user.SessionState 
 				APIID:    api.APIID,
 				Versions: []string{"default"},
 				Limit: user.APILimit{
-					QuotaMax:         2,
-					QuotaRenewalRate: 3600,
+					QuotaMax:         quotaMax,
+					QuotaRenewalRate: quotaRenewalRate,
 				},
 				AllowanceScope: api.APIID,
 			},
@@ -447,7 +447,7 @@ func TestQuotaNotAppliedWithURLRewrite(t *testing.T) {
 	})
 
 	authKey := "auth-key"
-	session := createSession(t, specs[0].APIDefinition)
+	session := createSessionWithQuota(t, specs[0].APIDefinition, 2, 3600)
 	assert.NoError(t, ts.Gw.GlobalSessionManager.UpdateSession(authKey, session, 60, false))
 
 	authorization := map[string]string{
