@@ -708,6 +708,11 @@ const Schema = `{
                         },
                         "path": {
                             "type": "string"
+                        },
+                        "tags": {
+                            "type": ["array", "null"],
+                            "items": { "type": "string" },
+                            "uniqueItems": true
                         }
                     },
                     "required": [
