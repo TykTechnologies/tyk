@@ -90,7 +90,7 @@ require (
 	github.com/alecthomas/kingpin/v2 v2.4.0
 	github.com/go-redis/redismock/v9 v9.2.0
 	github.com/google/go-cmp v0.6.0
-	github.com/hashicorp/vault/api v1.10.0
+	github.com/hashicorp/vault/api v1.12.1
 	github.com/newrelic/go-agent v2.13.0+incompatible
 	go.opentelemetry.io/otel v1.22.0
 	go.opentelemetry.io/otel/trace v1.22.0
