@@ -560,6 +560,16 @@ const (
 	vaultSecretPath = "secret/data/"
 )
 
+func escapeStringForJSON(input string) string {
+	escaped, err := json.Marshal(input)
+	if err != nil {
+		// Handle error, for simplicity, returning the original input
+		return input
+	}
+	// trim the quotes from the escaped value
+	return string(escaped[1:len(escaped)-1])
+}
+
 func (a APIDefinitionLoader) replaceSecrets(in []byte) []byte {
 	input := string(in)
 
@@ -574,14 +584,14 @@ func (a APIDefinitionLoader) replaceSecrets(in []byte) []byte {
 			uniqueWords[m[0]] = true
 			val := os.Getenv(m[1])
 			if val != "" {
-				input = strings.Replace(input, m[0], val, -1)
+				input = strings.Replace(input, m[0], escapeStringForJSON(val), -1)
 			}
 		}
 	}
 
 	if strings.Contains(input, prefixSecrets) {
 		for k, v := range a.Gw.GetConfig().Secrets {
-			input = strings.Replace(input, prefixSecrets+k, v, -1)
+			input = strings.Replace(input, prefixSecrets+k, escapeStringForJSON(v), -1)
 		}
 	}
 
@@ -612,7 +622,9 @@ func (a APIDefinitionLoader) replaceConsulSecrets(input *string) error {
 
 	for i := 1; i < len(pairs); i++ {
 		key := strings.TrimPrefix(pairs[i].Key, prefixKeys+"/")
-		*input = strings.Replace(*input, prefixConsul+key, string(pairs[i].Value), -1)
+		val := string(pairs[i].Value)
+
+		*input = strings.ReplaceAll(*input, prefixConsul+key, escapeStringForJSON(val))
 	}
 
 	return nil
@@ -639,7 +651,14 @@ func (a APIDefinitionLoader) replaceVaultSecrets(input *string) error {
 	}
 
 	for k, v := range pairsMap {
-		*input = strings.Replace(*input, prefixVault+k, fmt.Sprintf("%v", v), -1)
+		val, ok := v.(string)
+		if !ok {
+			val = fmt.Sprint(v)
+			log.Warning("Vault secret %s is not a string (got %T, using %q)", k, v, val)
+			continue
+		}
+
+		*input = strings.ReplaceAll(*input, prefixVault+k, escapeStringForJSON(val))
 	}
 
 	return nil
