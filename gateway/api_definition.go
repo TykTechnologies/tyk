@@ -654,7 +654,7 @@ func (a APIDefinitionLoader) replaceVaultSecrets(input *string) error {
 		val, ok := v.(string)
 		if !ok {
 			val = fmt.Sprint(v)
-			log.Warning("Vault secret %s is not a string (got %T, using %q)", k, v, val)
+			log.Warningf("Vault secret %s is not a string (got %T, using %q)", k, v, val)
 			continue
 		}
 
