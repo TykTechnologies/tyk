@@ -5,8 +5,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/TykTechnologies/tyk/internal/reflect"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/TykTechnologies/tyk/internal/reflect"
 )
 
 func TestConfig_replaceKeyValue(t *testing.T) {
