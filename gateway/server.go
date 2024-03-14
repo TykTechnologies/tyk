@@ -28,6 +28,7 @@ import (
 	"github.com/TykTechnologies/tyk/internal/crypto"
 	"github.com/TykTechnologies/tyk/internal/httputil"
 	"github.com/TykTechnologies/tyk/internal/otel"
+	"github.com/TykTechnologies/tyk/internal/reflect"
 	"github.com/TykTechnologies/tyk/internal/scheduler"
 	"github.com/TykTechnologies/tyk/test"
 
@@ -1403,44 +1404,86 @@ func (gw *Gateway) afterConfSetup() {
 		conf.HealthCheckEndpointName = "hello"
 	}
 
+	// replace any KV store reference
+	if err := gw.configReplaceKV_v2(conf); err != nil {
+		log.WithError(err).Fatal("Can't replace KV value")
+	}
+}
+
+func (gw *Gateway) configReplaceKV_v2(conf config.Config) error {
+	kvStores := []string{"secrets", "env", "consul", "vault"}
+	for _, kvStore := range kvStores {
+		prefix := kvStore + "://"
+		find := func(s string) bool {
+			return strings.HasPrefix(s, prefix)
+		}
+
+		values := reflect.TraverseAndFind(&conf, find)
+		if len(values) == 0 {
+			continue
+		}
+
+		replacements := map[string]string{}
+
+		var err error
+		for _, v := range values {
+			replacements[v], err = gw.kvStore(v)
+			if err != nil {
+				return err
+			}
+		}
+
+		replace := func(s string) (string, bool) {
+			v, ok := replacements[s]
+			return v, ok
+		}
+
+		reflect.TraverseAndReplace(&conf, replace)
+	}
+
+	gw.SetConfig(conf)
+	return nil
+}
+
+func (gw *Gateway) configReplaceKV_v1(conf config.Config) error {
 	var err error
 
 	conf.Secret, err = gw.kvStore(conf.Secret)
 	if err != nil {
-		log.Fatalf("could not retrieve the secret key.. %v", err)
+		return fmt.Errorf("could not retrieve the secret key: %w", err)
 	}
 
 	conf.NodeSecret, err = gw.kvStore(conf.NodeSecret)
 	if err != nil {
-		log.Fatalf("could not retrieve the NodeSecret key.. %v", err)
+		return fmt.Errorf("could not retrieve the NodeSecret key: %w", err)
 	}
 
 	conf.Storage.Password, err = gw.kvStore(conf.Storage.Password)
 	if err != nil {
-		log.Fatalf("Could not retrieve redis password... %v", err)
+		return fmt.Errorf("Could not retrieve redis password: %w", err)
 	}
 
 	conf.CacheStorage.Password, err = gw.kvStore(conf.CacheStorage.Password)
 	if err != nil {
-		log.Fatalf("Could not retrieve cache storage password... %v", err)
+		return fmt.Errorf("Could not retrieve cache storage password: %w", err)
 	}
 
 	conf.Security.PrivateCertificateEncodingSecret, err = gw.kvStore(conf.Security.PrivateCertificateEncodingSecret)
 	if err != nil {
-		log.Fatalf("Could not retrieve the private certificate encoding secret... %v", err)
+		return fmt.Errorf("Could not retrieve the private certificate encoding secret: %w", err)
 	}
 
 	if conf.UseDBAppConfigs {
 		conf.DBAppConfOptions.ConnectionString, err = gw.kvStore(conf.DBAppConfOptions.ConnectionString)
 		if err != nil {
-			log.Fatalf("Could not fetch dashboard connection string.. %v", err)
+			return fmt.Errorf("Could not fetch dashboard connection string: %w", err)
 		}
 	}
 
 	if conf.Policies.PolicySource == "service" {
 		conf.Policies.PolicyConnectionString, err = gw.kvStore(conf.Policies.PolicyConnectionString)
 		if err != nil {
-			log.Fatalf("Could not fetch policy connection string... %v", err)
+			return fmt.Errorf("Could not fetch policy connection string: %w", err)
 		}
 	}
 
@@ -1453,10 +1496,10 @@ func (gw *Gateway) afterConfSetup() {
 	}
 
 	gw.SetConfig(conf)
+	return nil
 }
 
 func (gw *Gateway) kvStore(value string) (string, error) {
-
 	if strings.HasPrefix(value, "secrets://") {
 		key := strings.TrimPrefix(value, "secrets://")
 		log.Debugf("Retrieving %s from secret store in config", key)
@@ -1478,10 +1521,7 @@ func (gw *Gateway) kvStore(value string) (string, error) {
 		key := strings.TrimPrefix(value, "consul://")
 		log.Debugf("Retrieving %s from consul", key)
 		if err := gw.setUpConsul(); err != nil {
-			log.Error("Failed to setup consul: ", err)
-
-			// Return value as is. If consul cannot be set up
-			return value, nil
+			return value, fmt.Errorf("Failed to setup consul: %w", err)
 		}
 
 		return gw.consulKVStore.Get(key)
@@ -1491,9 +1531,7 @@ func (gw *Gateway) kvStore(value string) (string, error) {
 		key := strings.TrimPrefix(value, "vault://")
 		log.Debugf("Retrieving %s from vault", key)
 		if err := gw.setUpVault(); err != nil {
-			log.Error("Failed to setup vault: ", err)
-			// Return value as is If vault cannot be set up
-			return value, nil
+			return value, fmt.Errorf("Failed to setup vault: %w", err)
 		}
 
 		return gw.vaultKVStore.Get(key)
