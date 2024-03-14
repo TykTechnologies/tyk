@@ -102,6 +102,7 @@ func updatePolicy(r *openapi3.Reflector) error {
 	oc.AddRespStructure(new(apiStatusMessage), openapi.WithHTTPStatus(http.StatusInternalServerError))
 	oc.AddRespStructure(new(apiStatusMessage), openapi.WithHTTPStatus(http.StatusForbidden))
 	oc.AddRespStructure(new(apiModifyKeySuccess))
+	oc.AddReqStructure(new(user.Policy))
 	o3, ok := oc.(openapi3.OperationExposer)
 	if !ok {
 		return ErrOperationExposer

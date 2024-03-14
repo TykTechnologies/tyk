@@ -25,20 +25,26 @@ import (
 	"github.com/TykTechnologies/tyk/internal/uuid"
 )
 
-type AuthProviderCode string
-type SessionProviderCode string
-type StorageEngineCode string
-type TykEvent string            // A type so we can ENUM event types easily, e.g. EventQuotaExceeded
-type TykEventHandlerName string // A type for handler codes in API definitions
+type (
+	AuthProviderCode    string
+	SessionProviderCode string
+	StorageEngineCode   string
+	TykEvent            string // A type so we can ENUM event types easily, e.g. EventQuotaExceeded
+	TykEventHandlerName string // A type for handler codes in API definitions
+)
 
-type EndpointMethodAction string
-type SourceMode string
+type (
+	EndpointMethodAction string
+	SourceMode           string
+)
 
-type MiddlewareDriver string
-type IdExtractorSource string
-type IdExtractorType string
-type AuthTypeEnum string
-type RoutingTriggerOnType string
+type (
+	MiddlewareDriver     string
+	IdExtractorSource    string
+	IdExtractorType      string
+	AuthTypeEnum         string
+	RoutingTriggerOnType string
+)
 
 type SubscriptionType string
 
@@ -125,7 +131,7 @@ var (
 )
 
 type EndpointMethodMeta struct {
-	Action  EndpointMethodAction `bson:"action" json:"action"`
+	Action  EndpointMethodAction `bson:"action" json:"action" enum:"no_action,reply"`
 	Code    int                  `bson:"code" json:"code"`
 	Data    string               `bson:"data" json:"data"`
 	Headers map[string]string    `bson:"headers" json:"headers"`
@@ -156,14 +162,14 @@ type CacheMeta struct {
 	Path                   string `bson:"path" json:"path"`
 	CacheKeyRegex          string `bson:"cache_key_regex" json:"cache_key_regex"`
 	CacheOnlyResponseCodes []int  `bson:"cache_response_codes" json:"cache_response_codes"`
-	Timeout                int64  `bson:"timeout" json:"timeout"`
+	Timeout                int64  `bson:"timeout" json:"timeout" format:"int64"`
 }
 
 type RequestInputType string
 
 type TemplateData struct {
-	Input          RequestInputType `bson:"input_type" json:"input_type"`
-	Mode           SourceMode       `bson:"template_mode" json:"template_mode"`
+	Input          RequestInputType `bson:"input_type" json:"input_type" enum:"json,xml"`
+	Mode           SourceMode       `bson:"template_mode" json:"template_mode" enum:"blob,file"`
 	EnableSession  bool             `bson:"enable_session" json:"enable_session"`
 	TemplateSource string           `bson:"template_source" json:"template_source"`
 }
@@ -217,7 +223,7 @@ type RequestSizeMeta struct {
 	Disabled  bool   `bson:"disabled" json:"disabled"`
 	Path      string `bson:"path" json:"path"`
 	Method    string `bson:"method" json:"method"`
-	SizeLimit int64  `bson:"size_limit" json:"size_limit"`
+	SizeLimit int64  `bson:"size_limit" json:"size_limit" format:"int64"`
 }
 
 type CircuitBreakerMeta struct {
@@ -225,7 +231,7 @@ type CircuitBreakerMeta struct {
 	Path                 string  `bson:"path" json:"path"`
 	Method               string  `bson:"method" json:"method"`
 	ThresholdPercent     float64 `bson:"threshold_percent" json:"threshold_percent"`
-	Samples              int64   `bson:"samples" json:"samples"`
+	Samples              int64   `bson:"samples" json:"samples" format:"int64"`
 	ReturnToServiceAfter int     `bson:"return_to_service_after" json:"return_to_service_after"`
 	DisableHalfOpenState bool    `bson:"disable_half_open_state" json:"disable_half_open_state"`
 }
@@ -263,7 +269,7 @@ func NewRoutingTriggerOptions() RoutingTriggerOptions {
 }
 
 type RoutingTrigger struct {
-	On        RoutingTriggerOnType  `bson:"on" json:"on"`
+	On        RoutingTriggerOnType  `bson:"on" json:"on" enum:"all,any"`
 	Options   RoutingTriggerOptions `bson:"options" json:"options"`
 	RewriteTo string                `bson:"rewrite_to" json:"rewrite_to"`
 }
@@ -281,7 +287,7 @@ type URLRewriteMeta struct {
 type VirtualMeta struct {
 	Disabled             bool       `bson:"disabled" json:"disabled"`
 	ResponseFunctionName string     `bson:"response_function_name" json:"response_function_name"`
-	FunctionSourceType   SourceMode `bson:"function_source_type" json:"function_source_type"`
+	FunctionSourceType   SourceMode `bson:"function_source_type" json:"function_source_type" enum:"blob,file"`
 	FunctionSourceURI    string     `bson:"function_source_uri" json:"function_source_uri"`
 	Path                 string     `bson:"path" json:"path"`
 	Method               string     `bson:"method" json:"method"`
@@ -373,8 +379,8 @@ type VersionDefinition struct {
 	Enabled             bool              `bson:"enabled" json:"enabled"`
 	Name                string            `bson:"name" json:"name"`
 	Default             string            `bson:"default" json:"default"`
-	Location            string            `bson:"location" json:"location"`
-	Key                 string            `bson:"key" json:"key"`
+	Location            string            `bson:"location" json:"location" example:"header"`
+	Key                 string            `bson:"key" json:"key" example:"x-api-version"`
 	StripPath           bool              `bson:"strip_path" json:"strip_path"` // Deprecated. Use StripVersioningData instead.
 	StripVersioningData bool              `bson:"strip_versioning_data" json:"strip_versioning_data"`
 	FallbackToDefault   bool              `bson:"fallback_to_default" json:"fallback_to_default"`
@@ -397,7 +403,7 @@ type VersionInfo struct {
 		WhiteList []string `bson:"white_list" json:"white_list"`
 		BlackList []string `bson:"black_list" json:"black_list"`
 	} `bson:"paths" json:"paths"`
-	UseExtendedPaths              bool              `bson:"use_extended_paths" json:"use_extended_paths"`
+	UseExtendedPaths              bool              `bson:"use_extended_paths" json:"use_extended_paths" example:"true"`
 	ExtendedPaths                 ExtendedPathsSet  `bson:"extended_paths" json:"extended_paths"`
 	GlobalHeaders                 map[string]string `bson:"global_headers" json:"global_headers"`
 	GlobalHeadersRemove           []string          `bson:"global_headers_remove" json:"global_headers_remove"`
@@ -406,7 +412,7 @@ type VersionInfo struct {
 	GlobalResponseHeadersRemove   []string          `bson:"global_response_headers_remove" json:"global_response_headers_remove"`
 	GlobalResponseHeadersDisabled bool              `bson:"global_response_headers_disabled" json:"global_response_headers_disabled"`
 	IgnoreEndpointCase            bool              `bson:"ignore_endpoint_case" json:"ignore_endpoint_case"`
-	GlobalSizeLimit               int64             `bson:"global_size_limit" json:"global_size_limit"`
+	GlobalSizeLimit               int64             `bson:"global_size_limit" json:"global_size_limit" format:"int64"`
 	OverrideTarget                string            `bson:"override_target" json:"override_target"`
 }
 
@@ -469,10 +475,10 @@ type EventHandlerMetaConfig struct {
 
 type MiddlewareDefinition struct {
 	Disabled       bool   `bson:"disabled" json:"disabled"`
-	Name           string `bson:"name" json:"name"`
+	Name           string `bson:"name" json:"name" example:"PreMiddlewareFunction"`
 	Path           string `bson:"path" json:"path"`
-	RequireSession bool   `bson:"require_session" json:"require_session"`
-	RawBodyOnly    bool   `bson:"raw_body_only" json:"raw_body_only"`
+	RequireSession bool   `bson:"require_session" json:"require_session" example:"false"`
+	RawBodyOnly    bool   `bson:"raw_body_only" json:"raw_body_only" example:"false"`
 }
 
 // IDExtractorConfig specifies the configuration for ID extractor
@@ -508,11 +514,11 @@ type MiddlewareSection struct {
 }
 
 type CacheOptions struct {
-	CacheTimeout               int64    `bson:"cache_timeout" json:"cache_timeout"`
-	EnableCache                bool     `bson:"enable_cache" json:"enable_cache"`
-	CacheAllSafeRequests       bool     `bson:"cache_all_safe_requests" json:"cache_all_safe_requests"`
+	CacheTimeout               int64    `bson:"cache_timeout" json:"cache_timeout" example:"60" format:"int64"`
+	EnableCache                bool     `bson:"enable_cache" json:"enable_cache" example:"true"`
+	CacheAllSafeRequests       bool     `bson:"cache_all_safe_requests" json:"cache_all_safe_requests" example:"false"`
 	CacheOnlyResponseCodes     []int    `bson:"cache_response_codes" json:"cache_response_codes"`
-	EnableUpstreamCacheControl bool     `bson:"enable_upstream_cache_control" json:"enable_upstream_cache_control"`
+	EnableUpstreamCacheControl bool     `bson:"enable_upstream_cache_control" json:"enable_upstream_cache_control" example:"false"`
 	CacheControlTTLHeader      string   `bson:"cache_control_ttl_header" json:"cache_control_ttl_header"`
 	CacheByHeaders             []string `bson:"cache_by_headers" json:"cache_by_headers"`
 }
@@ -724,7 +730,7 @@ type AuthConfig struct {
 	UseCookie         bool            `mapstructure:"use_cookie" bson:"use_cookie" json:"use_cookie"`
 	CookieName        string          `mapstructure:"cookie_name" bson:"cookie_name" json:"cookie_name"`
 	DisableHeader     bool            `mapstructure:"disable_header" bson:"disable_header" json:"disable_header"`
-	AuthHeaderName    string          `mapstructure:"auth_header_name" bson:"auth_header_name" json:"auth_header_name"`
+	AuthHeaderName    string          `mapstructure:"auth_header_name" bson:"auth_header_name" json:"auth_header_name" example:"Authorization"`
 	UseCertificate    bool            `mapstructure:"use_certificate" bson:"use_certificate" json:"use_certificate"`
 	ValidateSignature bool            `mapstructure:"validate_signature" bson:"validate_signature" json:"validate_signature"`
 	Signature         SignatureConfig `mapstructure:"signature" bson:"signature" json:"signature,omitempty"`
@@ -766,10 +772,10 @@ type RequestSigningMeta struct {
 
 type ProxyConfig struct {
 	PreserveHostHeader          bool                          `bson:"preserve_host_header" json:"preserve_host_header"`
-	ListenPath                  string                        `bson:"listen_path" json:"listen_path"`
-	TargetURL                   string                        `bson:"target_url" json:"target_url"`
+	ListenPath                  string                        `bson:"listen_path" json:"listen_path" example:"/relative-path-examples/"`
+	TargetURL                   string                        `bson:"target_url" json:"target_url" example:"https://httpbin.org/"`
 	DisableStripSlash           bool                          `bson:"disable_strip_slash" json:"disable_strip_slash"`
-	StripListenPath             bool                          `bson:"strip_listen_path" json:"strip_listen_path"`
+	StripListenPath             bool                          `bson:"strip_listen_path" json:"strip_listen_path" example:"true"`
 	EnableLoadBalancing         bool                          `bson:"enable_load_balancing" json:"enable_load_balancing"`
 	Targets                     []string                      `bson:"target_list" json:"target_list"`
 	StructuredTargetList        *HostList                     `bson:"-" json:"-"`
@@ -786,15 +792,15 @@ type ProxyConfig struct {
 }
 
 type CORSConfig struct {
-	Enable             bool     `bson:"enable" json:"enable"`
-	AllowedOrigins     []string `bson:"allowed_origins" json:"allowed_origins"`
-	AllowedMethods     []string `bson:"allowed_methods" json:"allowed_methods"`
-	AllowedHeaders     []string `bson:"allowed_headers" json:"allowed_headers"`
-	ExposedHeaders     []string `bson:"exposed_headers" json:"exposed_headers"`
-	AllowCredentials   bool     `bson:"allow_credentials" json:"allow_credentials"`
-	MaxAge             int      `bson:"max_age" json:"max_age"`
-	OptionsPassthrough bool     `bson:"options_passthrough" json:"options_passthrough"`
-	Debug              bool     `bson:"debug" json:"debug"`
+	Enable             bool     `bson:"enable" json:"enable" example:"false"`
+	AllowedOrigins     []string `bson:"allowed_origins" json:"allowed_origins" example:"https://*.foo.com"`
+	AllowedMethods     []string `bson:"allowed_methods" json:"allowed_methods" example:"[\"GET\",\"HEAD\",\"POST\"]"`
+	AllowedHeaders     []string `bson:"allowed_headers" json:"allowed_headers" example:"[\"Origin\",\"Accept\",\"Content-Type\",\"Authorization\"]"`
+	ExposedHeaders     []string `bson:"exposed_headers" json:"exposed_headers" example:"[\"Accept\",\"Content-Type\"]"`
+	AllowCredentials   bool     `bson:"allow_credentials" json:"allow_credentials" example:"false"`
+	MaxAge             int      `bson:"max_age" json:"max_age" example:"24"`
+	OptionsPassthrough bool     `bson:"options_passthrough" json:"options_passthrough" example:"false"`
+	Debug              bool     `bson:"debug" json:"debug" example:"true"`
 }
 
 // GraphQLConfig is the root config object for a GraphQL API.
@@ -802,9 +808,9 @@ type GraphQLConfig struct {
 	// Enabled indicates if GraphQL should be enabled.
 	Enabled bool `bson:"enabled" json:"enabled"`
 	// ExecutionMode is the mode to define how an api behaves.
-	ExecutionMode GraphQLExecutionMode `bson:"execution_mode" json:"execution_mode"`
+	ExecutionMode GraphQLExecutionMode `bson:"execution_mode" json:"execution_mode" enum:"proxyOnly,executionEngine,subgraph,supergraph"`
 	// Version defines the version of the GraphQL config and engine to be used.
-	Version GraphQLConfigVersion `bson:"version" json:"version"`
+	Version GraphQLConfigVersion `bson:"version" json:"version" enum:"',1,2"`
 	// Schema is the GraphQL Schema exposed by the GraphQL API/Upstream/Engine.
 	Schema string `bson:"schema" json:"schema"`
 	// LastSchemaUpdate contains the date and time of the last triggered schema update to the upstream.
@@ -857,7 +863,7 @@ type GraphQLSupergraphConfig struct {
 	UpdatedAt            *time.Time              `bson:"updated_at" json:"updated_at,omitempty"`
 	Subgraphs            []GraphQLSubgraphEntity `bson:"subgraphs" json:"subgraphs"`
 	MergedSDL            string                  `bson:"merged_sdl" json:"merged_sdl"`
-	GlobalHeaders        map[string]string       `bson:"global_headers" json:"global_headers"`
+	GlobalHeaders        map[string]string       `bson:"global_headers" json:"global_headers" jsonschema:"example={'header1':'value1','header2':'value2'}"`
 	DisableQueryBatching bool                    `bson:"disable_query_batching" json:"disable_query_batching"`
 }
 
@@ -1399,5 +1405,5 @@ type Introspection struct {
 
 type IntrospectionCache struct {
 	Enabled bool  `bson:"enabled" json:"enabled"`
-	Timeout int64 `bson:"timeout" json:"timeout"`
+	Timeout int64 `bson:"timeout" json:"timeout" format:"int64"`
 }

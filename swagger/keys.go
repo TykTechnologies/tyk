@@ -38,6 +38,7 @@ func getKeyWithID(r *openapi3.Reflector) error {
 	if !ok {
 		return ErrOperationExposer
 	}
+	//"b13d928b9972bd18"
 	par := []openapi3.ParameterOrRef{keyIDParameter()}
 	par = append(par, hashedQuery())
 	o3.Operation().WithParameters(par...)
@@ -224,6 +225,7 @@ func updateKeyPolicy(r *openapi3.Reflector) error {
 }
 
 func keyIDParameter() openapi3.ParameterOrRef {
+	///b13d928b9972bd18
 	desc := "The Key ID"
 	return openapi3.Parameter{In: openapi3.ParameterInPath, Name: "keyID", Required: &isRequired, Description: &desc, Schema: stringSchema()}.ToParameterOrRef()
 }

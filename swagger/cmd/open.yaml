@@ -362,6 +362,104 @@ paths:
       summary: Create API with OAS format
       tags:
       - OAS APIs
+  /tyk/apis/oas/{apiID}:
+    get:
+      description: |-
+        Get OAS Api definition
+          using the api Id
+      operationId: getOASApi
+      parameters:
+      - in: path
+        name: apiID
+        required: true
+        schema:
+          type: string
+      - description: "Mode of OAS get, by default mode could be empty which means
+          to get OAS spec including OAS Tyk extension. \n When mode=public, OAS spec
+          excluding Tyk extension will be returned in the response"
+        in: query
+        name: mode
+        required: false
+        schema:
+          enum:
+          - public
+          type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OAS'
+          description: Api fetched successfully
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: the requested API definition is in Tyk classic format, please
+            use old api endpoint
+        "403":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Attempted administrative access with invalid or missing key!
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: API not found
+      summary: Get OAS Api definition
+      tags:
+      - OAS APIs
+    put:
+      description: |-
+        Updating an API definition uses the same signature an object as a `POST`, however it will first ensure that the API ID that is being updated is the same as the one in the object being `PUT`.
+
+
+                Updating will completely replace the file descriptor and will not change an API Definition that has already been loaded, the hot-reload endpoint will need to be called to push the new definition to live.
+      operationId: updateApiOAS
+      parameters:
+      - in: path
+        name: apiID
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OAS'
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiModifyKeySuccess'
+          description: API updated
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: 'Must specify an apiID to update '
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: API not found
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Due to enabled use_db_app_configs, please use the Dashboard
+            API
+      summary: Update OAS API definition
+      tags:
+      - OAS APIs
   /tyk/apis/oas/export:
     get:
       description: Download all OAS format APIs, when used without the Tyk Dashboard.
@@ -380,7 +478,7 @@ paths:
       responses:
         "200":
           content:
-            application/json:
+            application/octet-stream:
               schema:
                 items:
                   $ref: '#/components/schemas/OAS'
@@ -583,7 +681,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/UserSessionState'
+              $ref: '#/components/schemas/SessionState'
       responses:
         "200":
           content:
@@ -680,7 +778,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/UserSessionState'
+                $ref: '#/components/schemas/SessionState'
           description: OK
         "400":
           content:
@@ -736,7 +834,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/UserSessionState'
+              $ref: '#/components/schemas/SessionState'
       responses:
         "200":
           content:
@@ -798,7 +896,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/UserSessionState'
+              $ref: '#/components/schemas/SessionState'
       responses:
         "200":
           content:
@@ -863,7 +961,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/UserSessionState'
+              $ref: '#/components/schemas/SessionState'
       responses:
         "200":
           content:
@@ -901,13 +999,13 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/UserSessionState'
+              $ref: '#/components/schemas/SessionState'
       responses:
         "200":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/UserSessionState'
+                $ref: '#/components/schemas/SessionState'
           description: OK
         "403":
           content:
@@ -1568,7 +1666,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/UserSessionState'
+                $ref: '#/components/schemas/SessionState'
           description: OK
         "403":
           content:
@@ -1611,7 +1709,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/UserSessionState'
+              $ref: '#/components/schemas/SessionState'
       responses:
         "200":
           content:
@@ -1674,7 +1772,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/UserSessionState'
+              $ref: '#/components/schemas/SessionState'
       responses:
         "200":
           content:
@@ -1720,7 +1818,7 @@ paths:
             application/json:
               schema:
                 items:
-                  $ref: '#/components/schemas/UserPolicy'
+                  $ref: '#/components/schemas/Policy'
                 type: array
           description: OK
         "403":
@@ -1739,7 +1837,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/UserPolicy'
+              $ref: '#/components/schemas/Policy'
       responses:
         "200":
           content:
@@ -1824,7 +1922,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/UserPolicy'
+                $ref: '#/components/schemas/Policy'
           description: OK
         "403":
           content:
@@ -1852,6 +1950,11 @@ paths:
         required: true
         schema:
           type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Policy'
       responses:
         "200":
           content:
@@ -2236,6 +2339,96 @@ components:
         version_data:
           $ref: '#/components/schemas/VersionData'
       type: object
+    APILimit:
+      properties:
+        max_query_depth:
+          example: -1
+          type: integer
+        per:
+          example: 5
+          format: double
+          type: number
+        quota_max:
+          example: 20000
+          format: int64
+          type: integer
+        quota_remaining:
+          example: 20000
+          format: int64
+          type: integer
+        quota_renewal_rate:
+          example: 2.592e+06
+          format: int64
+          type: integer
+        quota_renews:
+          example: 0
+          format: int64
+          type: integer
+        rate:
+          example: 1
+          format: double
+          type: number
+        throttle_interval:
+          example: 10
+          format: double
+          type: number
+        throttle_retry_limit:
+          example: 1000
+          type: integer
+      type: object
+    AccessDefinition:
+      properties:
+        allowance_scope:
+          example: d371b83b249845a2497ab9a947fd6210
+          type: string
+        allowed_types:
+          items:
+            $ref: '#/components/schemas/GraphqlType'
+          nullable: true
+          type: array
+        allowed_urls:
+          items:
+            $ref: '#/components/schemas/AccessSpec'
+          nullable: true
+          type: array
+        api_id:
+          example: d1dfc6a927a046c54c0ed470f19757cc
+          type: string
+        api_name:
+          example: Rate Limit Proxy API
+          type: string
+        disable_introspection:
+          example: false
+          type: boolean
+        field_access_rights:
+          items:
+            $ref: '#/components/schemas/FieldAccessDefinition'
+          nullable: true
+          type: array
+        limit:
+          $ref: '#/components/schemas/APILimit'
+        restricted_types:
+          items:
+            $ref: '#/components/schemas/GraphqlType'
+          nullable: true
+          type: array
+        versions:
+          items:
+            type: string
+          nullable: true
+          type: array
+      type: object
+    AccessSpec:
+      properties:
+        methods:
+          items:
+            type: string
+          nullable: true
+          type: array
+        url:
+          example: anything/rate-limit-1-per-5
+          type: string
+      type: object
     AnalyticsPluginConfig:
       properties:
         enable:
@@ -2256,12 +2449,15 @@ components:
     ApiModifyKeySuccess:
       properties:
         action:
+          example: modified
           type: string
         key:
+          example: b13d928b9972bd18
           type: string
         key_hash:
           type: string
         status:
+          example: ok
           type: string
       type: object
     ApiStatusMessage:
@@ -2274,6 +2470,7 @@ components:
     AuthConfig:
       properties:
         auth_header_name:
+          example: Authorization
           type: string
         cookie_name:
           type: string
@@ -2305,37 +2502,53 @@ components:
         storage_engine:
           type: string
       type: object
+    BasicAuthData:
+      properties:
+        hash_type:
+          type: string
+        password:
+          type: string
+      type: object
     CORSConfig:
       properties:
         allow_credentials:
+          example: false
           type: boolean
         allowed_headers:
           items:
+            example: '["Origin","Accept","Content-Type","Authorization"]'
             type: string
           nullable: true
           type: array
         allowed_methods:
           items:
+            example: '["GET","HEAD","POST"]'
             type: string
           nullable: true
           type: array
         allowed_origins:
           items:
+            example: https://*.foo.com
             type: string
           nullable: true
           type: array
         debug:
+          example: true
           type: boolean
         enable:
+          example: false
           type: boolean
         exposed_headers:
           items:
+            example: '["Accept","Content-Type"]'
             type: string
           nullable: true
           type: array
         max_age:
+          example: 24
           type: integer
         options_passthrough:
+          example: false
           type: boolean
       type: object
     CacheMeta:
@@ -2354,11 +2567,13 @@ components:
         path:
           type: string
         timeout:
+          format: int64
           type: integer
       type: object
     CacheOptions:
       properties:
         cache_all_safe_requests:
+          example: false
           type: boolean
         cache_by_headers:
           items:
@@ -2373,10 +2588,14 @@ components:
           nullable: true
           type: array
         cache_timeout:
+          example: 60
+          format: int64
           type: integer
         enable_cache:
+          example: true
           type: boolean
         enable_upstream_cache_control:
+          example: false
           type: boolean
       type: object
     CheckCommand:
@@ -2399,6 +2618,7 @@ components:
         return_to_service_after:
           type: integer
         samples:
+          format: int64
           type: integer
         threshold_percent:
           type: number
@@ -2445,6 +2665,9 @@ components:
     EndpointMethodMeta:
       properties:
         action:
+          enum:
+          - no_action
+          - reply
           type: string
         code:
           type: integer
@@ -2589,6 +2812,20 @@ components:
           nullable: true
           type: array
       type: object
+    FieldAccessDefinition:
+      properties:
+        field_name:
+          type: string
+        limits:
+          $ref: '#/components/schemas/FieldLimits'
+        type_name:
+          type: string
+      type: object
+    FieldLimits:
+      properties:
+        max_query_depth:
+          type: integer
+      type: object
     GlobalRateLimit:
       properties:
         disabled:
@@ -2611,6 +2848,8 @@ components:
         plugin_path:
           type: string
       type: object
+    GraphAccessDefinition:
+      type: object
     GraphQLConfig:
       properties:
         enabled:
@@ -2618,6 +2857,11 @@ components:
         engine:
           $ref: '#/components/schemas/GraphQLEngineConfig'
         execution_mode:
+          enum:
+          - proxyOnly
+          - executionEngine
+          - subgraph
+          - supergraph
           type: string
         introspection:
           $ref: '#/components/schemas/GraphQLIntrospectionConfig'
@@ -2641,6 +2885,10 @@ components:
           nullable: true
           type: array
         version:
+          enum:
+          - ''''
+          - "1"
+          - "2"
           type: string
       type: object
     GraphQLEngineConfig:
@@ -2902,7 +3150,13 @@ components:
         enabled:
           type: boolean
         timeout:
+          format: int64
           type: integer
+      type: object
+    JWTData:
+      properties:
+        secret:
+          type: string
       type: object
     JWTValidation:
       properties:
@@ -2940,12 +3194,15 @@ components:
         disabled:
           type: boolean
         name:
+          example: PreMiddlewareFunction
           type: string
         path:
           type: string
         raw_body_only:
+          example: false
           type: boolean
         require_session:
+          example: false
           type: boolean
       type: object
     MiddlewareIdExtractor:
@@ -3009,6 +3266,14 @@ components:
           type: string
         path:
           type: string
+      type: object
+    Monitor:
+      properties:
+        trigger_limits:
+          items:
+            type: number
+          nullable: true
+          type: array
       type: object
     NewClientRequest:
       properties:
@@ -3351,6 +3616,105 @@ components:
           nullable: true
           type: object
       type: object
+    Policy:
+      properties:
+        _id:
+          example: 5ead7120575961000181867e
+          type: string
+        access_rights:
+          additionalProperties:
+            $ref: '#/components/schemas/AccessDefinition'
+          nullable: true
+          type: object
+        active:
+          example: true
+          type: boolean
+        enable_http_signature_validation:
+          example: false
+          type: boolean
+        graphql_access_rights:
+          additionalProperties:
+            $ref: '#/components/schemas/GraphAccessDefinition'
+          nullable: true
+          type: object
+        hmac_enabled:
+          example: false
+          type: boolean
+        id:
+          example: 5ead7120575961000181867e
+          type: string
+        is_inactive:
+          example: false
+          type: boolean
+        key_expires_in:
+          example: 0
+          format: int64
+          type: integer
+        last_updated:
+          example: "1655965189"
+          type: string
+        max_query_depth:
+          example: -1
+          type: integer
+        meta_data:
+          additionalProperties: {}
+          nullable: true
+          type: object
+        name:
+          example: Swagger Petstore Policy
+          type: string
+        org_id:
+          example: 5e9d9544a1dcd60001d0ed20
+          type: string
+        partitions:
+          $ref: '#/components/schemas/PolicyPartitions'
+        per:
+          example: 60
+          format: double
+          type: number
+        quota_max:
+          example: -1
+          format: int64
+          type: integer
+        quota_renewal_rate:
+          example: 3600
+          format: int64
+          type: integer
+        rate:
+          example: 1000
+          format: double
+          type: number
+        tags:
+          items:
+            type: string
+          nullable: true
+          type: array
+        throttle_interval:
+          example: -1
+          format: double
+          type: number
+        throttle_retry_limit:
+          example: -1
+          type: integer
+      type: object
+    PolicyPartitions:
+      properties:
+        acl:
+          example: true
+          type: boolean
+        complexity:
+          example: false
+          type: boolean
+        per_api:
+          example: false
+          type: boolean
+        quota:
+          example: true
+          type: boolean
+        rate_limit:
+          example: true
+          type: boolean
+      type: object
     PolicyUpdateObj:
       properties:
         apply_policies:
@@ -3377,12 +3741,14 @@ components:
         enable_load_balancing:
           type: boolean
         listen_path:
+          example: /relative-path-examples/
           type: string
         preserve_host_header:
           type: boolean
         service_discovery:
           $ref: '#/components/schemas/ServiceDiscoveryConfiguration'
         strip_listen_path:
+          example: true
           type: boolean
         target_list:
           items:
@@ -3390,6 +3756,7 @@ components:
           nullable: true
           type: array
         target_url:
+          example: https://httpbin.org/
           type: string
         transport:
           properties:
@@ -3441,6 +3808,7 @@ components:
         path:
           type: string
         size_limit:
+          format: int64
           type: integer
       type: object
     ResponseProcessor:
@@ -3452,6 +3820,9 @@ components:
     RoutingTrigger:
       properties:
         "on":
+          enum:
+          - all
+          - any
           type: string
         options:
           $ref: '#/components/schemas/RoutingTriggerOptions'
@@ -3540,6 +3911,137 @@ components:
         storage_engine:
           type: string
       type: object
+    SessionState:
+      properties:
+        access_rights:
+          additionalProperties:
+            $ref: '#/components/schemas/AccessDefinition'
+          nullable: true
+          type: object
+        alias:
+          example: portal-developer@example.org
+          type: string
+        allowance:
+          example: 1000
+          format: double
+          type: number
+        apply_policies:
+          items:
+            type: string
+          nullable: true
+          type: array
+        apply_policy_id:
+          example: 641c15dd0fffb800010197bf
+          type: string
+        basic_auth_data:
+          $ref: '#/components/schemas/BasicAuthData'
+        certificate:
+          type: string
+        data_expires:
+          example: 0
+          format: int64
+          type: integer
+        date_created:
+          example: "2024-03-13T03:56:46.568042549Z"
+          format: date-time
+          type: string
+        enable_detail_recording:
+          deprecated: true
+          description: deprecated use enable_detailed_recording going forward instead
+          example: false
+          type: boolean
+        enable_detailed_recording:
+          example: true
+          type: boolean
+        enable_http_signature_validation:
+          example: false
+          type: boolean
+        expires:
+          example: 1.712895619e+09
+          format: int64
+          type: integer
+        hmac_enabled:
+          example: false
+          type: boolean
+        hmac_string:
+          type: string
+        id_extractor_deadline:
+          format: int64
+          type: integer
+        is_inactive:
+          example: false
+          type: boolean
+        jwt_data:
+          $ref: '#/components/schemas/JWTData'
+        last_check:
+          example: 0
+          format: int64
+          type: integer
+        last_updated:
+          example: "1710302206"
+          type: string
+        max_query_depth:
+          example: -1
+          type: integer
+        meta_data:
+          additionalProperties: {}
+          nullable: true
+          type: object
+        monitor:
+          $ref: '#/components/schemas/Monitor'
+        oauth_client_id:
+          type: string
+        oauth_keys:
+          additionalProperties:
+            type: string
+          nullable: true
+          type: object
+        org_id:
+          example: 5e9d9544a1dcd60001d0ed20
+          type: string
+        per:
+          example: 5
+          format: double
+          type: number
+        quota_max:
+          example: 20000
+          format: int64
+          type: integer
+        quota_remaining:
+          example: 20000
+          format: int64
+          type: integer
+        quota_renewal_rate:
+          example: 3.1556952e+07
+          format: int64
+          type: integer
+        quota_renews:
+          example: 1.710302205e+09
+          format: int64
+          type: integer
+        rate:
+          example: 1
+          format: double
+          type: number
+        rsa_certificate_id:
+          type: string
+        session_lifetime:
+          example: 0
+          format: int64
+          type: integer
+        tags:
+          items:
+            type: string
+          nullable: true
+          type: array
+        throttle_interval:
+          example: 10
+          format: double
+          type: number
+        throttle_retry_limit:
+          example: 1000
+          type: integer
+      type: object
     SignatureConfig:
       properties:
         algorithm:
@@ -3571,8 +4073,14 @@ components:
         enable_session:
           type: boolean
         input_type:
+          enum:
+          - json
+          - xml
           type: string
         template_mode:
+          enum:
+          - blob
+          - file
           type: string
         template_source:
           type: string
@@ -3650,274 +4158,6 @@ components:
         service_discovery:
           $ref: '#/components/schemas/ServiceDiscoveryConfiguration'
       type: object
-    UserAPILimit:
-      properties:
-        max_query_depth:
-          type: integer
-        per:
-          type: number
-        quota_max:
-          type: integer
-        quota_remaining:
-          type: integer
-        quota_renewal_rate:
-          type: integer
-        quota_renews:
-          type: integer
-        rate:
-          type: number
-        throttle_interval:
-          type: number
-        throttle_retry_limit:
-          type: integer
-      type: object
-    UserAccessDefinition:
-      properties:
-        allowance_scope:
-          type: string
-        allowed_types:
-          items:
-            $ref: '#/components/schemas/GraphqlType'
-          nullable: true
-          type: array
-        allowed_urls:
-          items:
-            $ref: '#/components/schemas/UserAccessSpec'
-          nullable: true
-          type: array
-        api_id:
-          type: string
-        api_name:
-          type: string
-        disable_introspection:
-          type: boolean
-        field_access_rights:
-          items:
-            $ref: '#/components/schemas/UserFieldAccessDefinition'
-          nullable: true
-          type: array
-        limit:
-          $ref: '#/components/schemas/UserAPILimit'
-        restricted_types:
-          items:
-            $ref: '#/components/schemas/GraphqlType'
-          nullable: true
-          type: array
-        versions:
-          items:
-            type: string
-          nullable: true
-          type: array
-      type: object
-    UserAccessSpec:
-      properties:
-        methods:
-          items:
-            type: string
-          nullable: true
-          type: array
-        url:
-          type: string
-      type: object
-    UserBasicAuthData:
-      properties:
-        hash_type:
-          type: string
-        password:
-          type: string
-      type: object
-    UserFieldAccessDefinition:
-      properties:
-        field_name:
-          type: string
-        limits:
-          $ref: '#/components/schemas/UserFieldLimits'
-        type_name:
-          type: string
-      type: object
-    UserFieldLimits:
-      properties:
-        max_query_depth:
-          type: integer
-      type: object
-    UserGraphAccessDefinition:
-      type: object
-    UserJWTData:
-      properties:
-        secret:
-          type: string
-      type: object
-    UserMonitor:
-      properties:
-        trigger_limits:
-          items:
-            type: number
-          nullable: true
-          type: array
-      type: object
-    UserPolicy:
-      properties:
-        _id:
-          type: string
-        access_rights:
-          additionalProperties:
-            $ref: '#/components/schemas/UserAccessDefinition'
-          nullable: true
-          type: object
-        active:
-          type: boolean
-        enable_http_signature_validation:
-          type: boolean
-        graphql_access_rights:
-          additionalProperties:
-            $ref: '#/components/schemas/UserGraphAccessDefinition'
-          nullable: true
-          type: object
-        hmac_enabled:
-          type: boolean
-        id:
-          type: string
-        is_inactive:
-          type: boolean
-        key_expires_in:
-          type: integer
-        last_updated:
-          type: string
-        max_query_depth:
-          type: integer
-        meta_data:
-          additionalProperties: {}
-          nullable: true
-          type: object
-        name:
-          type: string
-        org_id:
-          type: string
-        partitions:
-          $ref: '#/components/schemas/UserPolicyPartitions'
-        per:
-          type: number
-        quota_max:
-          type: integer
-        quota_renewal_rate:
-          type: integer
-        rate:
-          type: number
-        tags:
-          items:
-            type: string
-          nullable: true
-          type: array
-        throttle_interval:
-          type: number
-        throttle_retry_limit:
-          type: integer
-      type: object
-    UserPolicyPartitions:
-      properties:
-        acl:
-          type: boolean
-        complexity:
-          type: boolean
-        per_api:
-          type: boolean
-        quota:
-          type: boolean
-        rate_limit:
-          type: boolean
-      type: object
-    UserSessionState:
-      properties:
-        access_rights:
-          additionalProperties:
-            $ref: '#/components/schemas/UserAccessDefinition'
-          nullable: true
-          type: object
-        alias:
-          type: string
-        allowance:
-          type: number
-        apply_policies:
-          items:
-            type: string
-          nullable: true
-          type: array
-        apply_policy_id:
-          type: string
-        basic_auth_data:
-          $ref: '#/components/schemas/UserBasicAuthData'
-        certificate:
-          type: string
-        data_expires:
-          type: integer
-        date_created:
-          format: date-time
-          type: string
-        enable_detail_recording:
-          type: boolean
-        enable_detailed_recording:
-          type: boolean
-        enable_http_signature_validation:
-          type: boolean
-        expires:
-          type: integer
-        hmac_enabled:
-          type: boolean
-        hmac_string:
-          type: string
-        id_extractor_deadline:
-          type: integer
-        is_inactive:
-          type: boolean
-        jwt_data:
-          $ref: '#/components/schemas/UserJWTData'
-        last_check:
-          type: integer
-        last_updated:
-          type: string
-        max_query_depth:
-          type: integer
-        meta_data:
-          additionalProperties: {}
-          nullable: true
-          type: object
-        monitor:
-          $ref: '#/components/schemas/UserMonitor'
-        oauth_client_id:
-          type: string
-        oauth_keys:
-          additionalProperties:
-            type: string
-          nullable: true
-          type: object
-        org_id:
-          type: string
-        per:
-          type: number
-        quota_max:
-          type: integer
-        quota_remaining:
-          type: integer
-        quota_renewal_rate:
-          type: integer
-        quota_renews:
-          type: integer
-        rate:
-          type: number
-        rsa_certificate_id:
-          type: string
-        session_lifetime:
-          type: integer
-        tags:
-          items:
-            type: string
-          nullable: true
-          type: array
-        throttle_interval:
-          type: number
-        throttle_retry_limit:
-          type: integer
-      type: object
     ValidatePathMeta:
       properties:
         disabled:
@@ -3967,8 +4207,10 @@ components:
         fallback_to_default:
           type: boolean
         key:
+          example: x-api-version
           type: string
         location:
+          example: header
           type: string
         name:
           type: string
@@ -4013,6 +4255,7 @@ components:
           nullable: true
           type: array
         global_size_limit:
+          format: int64
           type: integer
         ignore_endpoint_case:
           type: boolean
@@ -4039,6 +4282,7 @@ components:
               type: array
           type: object
         use_extended_paths:
+          example: true
           type: boolean
       type: object
     VirtualMeta:
@@ -4046,6 +4290,9 @@ components:
         disabled:
           type: boolean
         function_source_type:
+          enum:
+          - blob
+          - file
           type: string
         function_source_uri:
           type: string

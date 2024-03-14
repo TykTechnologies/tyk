@@ -19,9 +19,9 @@ type paginatedOAuthClientTokens struct {
 
 type apiModifyKeySuccess struct {
 	// in:body
-	Key     string `json:"key"`
-	Status  string `json:"status"`
-	Action  string `json:"action"`
+	Key     string `json:"key" example:"b13d928b9972bd18"`
+	Status  string `json:"status" example:"ok"`
+	Action  string `json:"action" example:"modified"`
 	KeyHash string `json:"key_hash,omitempty"`
 }
 
