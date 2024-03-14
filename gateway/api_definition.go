@@ -567,7 +567,7 @@ func escapeStringForJSON(input string) string {
 		return input
 	}
 	// trim the quotes from the escaped value
-	return string(escaped[1:len(escaped)-1])
+	return string(escaped[1 : len(escaped)-1])
 }
 
 func (a APIDefinitionLoader) replaceSecrets(in []byte) []byte {
