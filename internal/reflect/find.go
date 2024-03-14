@@ -6,7 +6,7 @@ import (
 )
 
 // TraverseAndFind traverses any object and invokes a specified function on string fields.
-// If a replacement has been made, it updates the values in the object with the new ones.
+// If the function returns true, the value will be returned in the result.
 func TraverseAndFind(obj interface{}, findFunc func(string) bool) []string {
 	var results []string
 
