@@ -18,8 +18,10 @@ func groupReload(r *openapi3.Reflector) error {
 	if err != nil {
 		return err
 	}
-	oc.AddRespStructure(new(apiStatusMessage))
-	oc.AddRespStructure(new(apiStatusMessage), openapi.WithHTTPStatus(http.StatusForbidden))
+	oc.AddRespStructure(new(apiStatusMessage), func(cu *openapi.ContentUnit) {
+		cu.Description = "Reload the Tyk Gateway"
+	})
+	forbidden(oc)
 	oc.SetTags(reloadTag)
 	oc.SetID("hotReloadGroup")
 	oc.SetSummary("Hot-reload a Tyk group")
@@ -36,8 +38,10 @@ func singleNodeReload(r *openapi3.Reflector) error {
 	oc.SetSummary("Hot-reload a single node")
 	oc.SetDescription("Tyk is capable of reloading configurations without having to stop serving requests. This means that API configurations can be added at runtime, or even modified at runtime and those rules applied immediately without any downtime.")
 	oc.SetID("hotReload")
-	oc.AddRespStructure(new(apiStatusMessage))
-	oc.AddRespStructure(new(apiStatusMessage), openapi.WithHTTPStatus(http.StatusForbidden))
+	oc.AddRespStructure(new(apiStatusMessage), func(cu *openapi.ContentUnit) {
+		cu.Description = "Reload gateway"
+	})
+	forbidden(oc)
 	o3, ok := oc.(openapi3.OperationExposer)
 	if !ok {
 		return ErrOperationExposer

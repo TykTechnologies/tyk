@@ -20,7 +20,9 @@ func HealthEndpoint(r *openapi3.Reflector) error {
 	oc.SetID("hello")
 	oc.SetSummary("Check the Health of the Tyk Gateway")
 	oc.SetDescription("From v2.7.5 you can now rename the `/hello`  endpoint by using the `health_check_endpoint_name` option\n        \n        Returns 200 response in case of success")
-	oc.AddRespStructure(new(apidef.HealthCheckResponse))
+	oc.AddRespStructure(new(apidef.HealthCheckResponse), openapi.WithHTTPStatus(http.StatusOK), func(cu *openapi.ContentUnit) {
+		cu.Description = "Success"
+	})
 	oc.AddRespStructure(new(apiStatusMessage), openapi.WithHTTPStatus(http.StatusMethodNotAllowed))
 	return r.AddOperation(oc)
 }

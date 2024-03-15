@@ -363,6 +363,51 @@ paths:
       tags:
       - OAS APIs
   /tyk/apis/oas/{apiID}:
+    delete:
+      description: Deleting an API definition will remove the file from the file store,
+        the API definition will NOT be unloaded, a separate reload request will need
+        to be made to disable the API endpoint.
+      operationId: deleteOASApi
+      parameters:
+      - in: path
+        name: apiID
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiModifyKeySuccess'
+          description: API deleted
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: API ID not specified
+        "403":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Attempted administrative access with invalid or missing key!
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: API not found
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: When delete request is sent while using dashboard app configs
+      summary: Deleting an OAS API
+      tags:
+      - OAS APIs
     get:
       description: |-
         Get OAS Api definition
@@ -443,7 +488,13 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: 'Must specify an apiID to update '
+          description: 'When you fail to specify an apiID to update '
+        "403":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Attempted administrative access with invalid or missing key!
         "404":
           content:
             application/json:
@@ -455,9 +506,56 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: Due to enabled use_db_app_configs, please use the Dashboard
-            API
+          description: When delete request is sent while using dashboard app configs
       summary: Update OAS API definition
+      tags:
+      - OAS APIs
+  /tyk/apis/oas/{apiID}/export:
+    get:
+      description: "Mode of OAS export, by default mode could be empty which means
+        to export OAS spec including OAS Tyk extension. \n  When mode=public, OAS
+        spec excluding Tyk extension is exported"
+      operationId: downloadApiOASPublic
+      parameters:
+      - in: path
+        name: apiID
+        required: true
+        schema:
+          type: string
+      - description: Can be set to public
+        in: query
+        name: mode
+        required: false
+        schema:
+          enum:
+          - public
+          type: string
+      responses:
+        "200":
+          content:
+            application/octet-stream:
+              schema:
+                $ref: '#/components/schemas/OAS'
+          description: API definition
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: requesting API definition that is in Tyk classic format
+        "403":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Attempted administrative access with invalid or missing key!
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: API not found
+      summary: Download an OAS format APIs, when used without the Tyk Dashboard.
       tags:
       - OAS APIs
   /tyk/apis/oas/export:
@@ -603,7 +701,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HealthCheckResponse'
-          description: OK
+          description: Success
         "405":
           content:
             application/json:
@@ -2006,13 +2104,13 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: OK
+          description: Reload gateway
         "403":
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: Forbidden
+          description: Attempted administrative access with invalid or missing key!
       summary: Hot-reload a single node
       tags:
       - Hot Reload
@@ -2030,13 +2128,13 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: OK
+          description: Reload the Tyk Gateway
         "403":
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: Forbidden
+          description: Attempted administrative access with invalid or missing key!
       summary: Hot-reload a Tyk group
       tags:
       - Hot Reload
@@ -3077,6 +3175,10 @@ components:
         output:
           type: string
         status:
+          enum:
+          - pass
+          - fail
+          - warn
           type: string
         time:
           type: string
@@ -3092,6 +3194,10 @@ components:
         output:
           type: string
         status:
+          enum:
+          - pass
+          - fail
+          - warn
           type: string
         version:
           type: string
