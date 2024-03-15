@@ -154,7 +154,7 @@ func NewSessionState() *SessionState {
 }
 
 // Clone  returns a fresh copy of s
-func (s SessionState) Clone() SessionState {	
+func (s SessionState) Clone() SessionState {
 	// Simple vales are cloned by value
 	newSession := s
 	newSession.AccessRights = cloneAccess(s.AccessRights)
