@@ -33,6 +33,7 @@ import (
 	"github.com/TykTechnologies/tyk/user"
 )
 
+// dummy import to remove false positive CVE reporte.
 var _ = vault.Version
 
 func TestMain(m *testing.M) {
