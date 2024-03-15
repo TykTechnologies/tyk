@@ -23,13 +23,14 @@ import (
 	"github.com/stretchr/testify/assert"
 	msgpack "gopkg.in/vmihailenco/msgpack.v2"
 
+	"github.com/hashicorp/vault"
+
 	"github.com/TykTechnologies/tyk-pump/analytics"
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/test"
 	"github.com/TykTechnologies/tyk/user"
-	"github.com/hashicorp/vault"
 )
 
 var _ = vault.Version
