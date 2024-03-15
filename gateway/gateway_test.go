@@ -29,7 +29,10 @@ import (
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/test"
 	"github.com/TykTechnologies/tyk/user"
+	"github.com/hashicorp/vault"
 )
+
+var _ = vault.Version
 
 func TestMain(m *testing.M) {
 	os.Exit(InitTestMain(context.Background(), m))
