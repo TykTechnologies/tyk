@@ -684,7 +684,7 @@ func (t *BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 		session.Tags = appendIfMissing(session.Tags, tag)
 	}
 
-	session.Metadata = metadata
+	session.MetaData = metadata
 
 	if len(policyIDs) == 0 {
 		for apiID, accessRight := range session.AccessRights {
