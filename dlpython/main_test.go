@@ -1,7 +1,6 @@
 package python
 
 import (
-	"fmt"
 	"os"
 	"testing"
 )
@@ -12,7 +11,7 @@ func TestMain(m *testing.M) {
 	if versionOverride := os.Getenv("PYTHON_VERSION"); versionOverride != "" {
 		testVersion = versionOverride
 	}
-	fmt.Printf("Using Python %s for tests\n", testVersion)
+	t.Logf("Using Python %s for tests\n", testVersion)
 
 	os.Exit(m.Run())
 }
