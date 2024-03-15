@@ -71,10 +71,11 @@ linters:
     - tagliatelle
     - testpackage
     - paralleltest
-    - forbidigo
     - ireturn
     - goerr113
   enable:
+    - govet
+    - forbidigo
     - gochecknoinits
     - thelper
     - errcheck
@@ -86,6 +87,34 @@ linters:
     - goimports
 
 linters-settings:
+  fobidigo:
+    forbid:
+      - p: ^fmt\.Print.*$
+        msg: Do not commit print statements, use t.Log or Logrus.
+      - p: ^net\/http\.(Get|Head|Post|Form).*$
+        msg: Do not use top level http package functions, NewRequestWithContext is encouraged.
+    exclude-godoc-examples: false
+    analyze-types: true
+
+  revive:
+    ignore-generated-header: true
+    severity: error
+    enable-all-rules: false
+    rules:
+      - name: unused-parameter
+        disabled: false
+        arguments:
+          - allowRegex: "^_"
+      - name: exported
+        disabled: false
+
+  govet:
+    check-shadowing: true
+    enable-all: true
+    disable:
+      - fieldalignment
+      - shadow
+
   goimports:
     local-prefixes: github.com/TykTechnologies,github.com/TykTechnologies/tyk/internal
 
@@ -96,7 +125,13 @@ linters-settings:
       - (*github.com/TykTechnologies/tyk/gateway.Test).Run
 
 issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0
+  exclude-use-default: false
   exclude-rules:
+    - path: ^cli/
+      linters:
+        - forbidigo # cli package uses fmt.Print by design
     - path: _test\.go
       linters:
         - dupl # many functions looks like dupes
