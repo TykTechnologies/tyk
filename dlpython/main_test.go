@@ -13,9 +13,6 @@ func TestMain(m *testing.M) {
 	if versionOverride := os.Getenv("PYTHON_VERSION"); versionOverride != "" {
 		testVersion = versionOverride
 	}
-
-	log.Printf("Using Python %s for tests\n", testVersion)
-
 	os.Exit(m.Run())
 }
 
