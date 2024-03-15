@@ -23,8 +23,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	msgpack "gopkg.in/vmihailenco/msgpack.v2"
 
-	"github.com/hashicorp/vault"
-
 	"github.com/TykTechnologies/tyk-pump/analytics"
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
@@ -32,9 +30,6 @@ import (
 	"github.com/TykTechnologies/tyk/test"
 	"github.com/TykTechnologies/tyk/user"
 )
-
-// dummy import to remove false positive CVE reporte.
-var _ = vault.Version
 
 func TestMain(m *testing.M) {
 	os.Exit(InitTestMain(context.Background(), m))
