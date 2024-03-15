@@ -381,10 +381,15 @@ func (t *BaseMiddleware) clearSession(session *user.SessionState) {
 // ApplyPolicies will check if any policies are loaded. If any are, it
 // will overwrite the session state to use the policy values.
 func (t *BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
+	session.Mu.Lock()
+	defer session.Mu.Unlock()
+	
 	rights := make(map[string]user.AccessDefinition)
 	tags := make(map[string]bool)
-	if session.MetaData == nil {
-		session.MetaData = make(map[string]interface{})
+	metadata := make(map[string]interface{})
+
+	for k, v := range session.MetaData {
+		metadata[k] = v
 	}
 
 	t.clearSession(session)
@@ -664,7 +669,7 @@ func (t *BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 		}
 
 		for k, v := range policy.MetaData {
-			session.MetaData[k] = v
+			metadata[k] = v
 		}
 
 		if policy.LastUpdated > session.LastUpdated {
@@ -681,6 +686,8 @@ func (t *BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 	for tag := range tags {
 		session.Tags = appendIfMissing(session.Tags, tag)
 	}
+
+	session.Metadata = metadata
 
 	if len(policyIDs) == 0 {
 		for apiID, accessRight := range session.AccessRights {
