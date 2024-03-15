@@ -3,7 +3,6 @@ package gateway
 import (
 	"bytes"
 	"context"
-	"fmt"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -214,8 +213,8 @@ func TestReverseProxyAllDown(t *testing.T) {
 	}
 	ts.Gw.GlobalHostChecker.checkerMu.Lock()
 	if ts.Gw.GlobalHostChecker.checker == nil {
-		fmt.Printf("\nStop loop: %v\n", !ts.Gw.GlobalHostChecker.stopLoop)
-		fmt.Printf("\n Am I pooling: %v\n", ts.Gw.GlobalHostChecker.AmIPolling())
+		t.Logf("Stop loop: %v\n", !ts.Gw.GlobalHostChecker.stopLoop)
+		t.Logf("Am I pooling: %v\n", ts.Gw.GlobalHostChecker.AmIPolling())
 	}
 	ts.Gw.GlobalHostChecker.checkerMu.Unlock()
 

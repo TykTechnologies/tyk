@@ -71,10 +71,14 @@ linters:
     - tagliatelle
     - testpackage
     - paralleltest
-    - forbidigo
     - ireturn
     - goerr113
   enable:
+<<<<<<< HEAD
+=======
+    - govet
+    - forbidigo
+>>>>>>> 3c796bf9b... [TT-11627] Migrate failling to golangci-lint/forbidigo, fix issues (#6152)
     - gochecknoinits
     - thelper
     - errcheck
@@ -86,6 +90,37 @@ linters:
     - goimports
 
 linters-settings:
+<<<<<<< HEAD
+=======
+  fobidigo:
+    forbid:
+      - p: ^fmt\.Print.*$
+        msg: Do not commit print statements, use t.Log or Logrus.
+      - p: ^net\/http\.(Get|Head|Post|Form).*$
+        msg: Do not use top level http package functions, NewRequestWithContext is encouraged.
+    exclude-godoc-examples: false
+    analyze-types: true
+
+  revive:
+    ignore-generated-header: true
+    severity: error
+    enable-all-rules: false
+    rules:
+      - name: unused-parameter
+        disabled: false
+        arguments:
+          - allowRegex: "^_"
+      - name: exported
+        disabled: false
+
+  govet:
+    check-shadowing: true
+    enable-all: true
+    disable:
+      - fieldalignment
+      - shadow
+
+>>>>>>> 3c796bf9b... [TT-11627] Migrate failling to golangci-lint/forbidigo, fix issues (#6152)
   goimports:
     local-prefixes: github.com/TykTechnologies,github.com/TykTechnologies/tyk/internal
 
@@ -96,7 +131,16 @@ linters-settings:
       - (*github.com/TykTechnologies/tyk/gateway.Test).Run
 
 issues:
+<<<<<<< HEAD
+=======
+  max-issues-per-linter: 0
+  max-same-issues: 0
+  exclude-use-default: false
+>>>>>>> 3c796bf9b... [TT-11627] Migrate failling to golangci-lint/forbidigo, fix issues (#6152)
   exclude-rules:
+    - path: ^cli/
+      linters:
+        - forbidigo # cli package uses fmt.Print by design
     - path: _test\.go
       linters:
         - dupl # many functions looks like dupes
