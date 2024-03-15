@@ -3,6 +3,8 @@ package python
 import (
 	"os"
 	"testing"
+
+	log "github.com/sirupsen/logrus"
 )
 
 var testVersion = "3.5"
@@ -11,7 +13,8 @@ func TestMain(m *testing.M) {
 	if versionOverride := os.Getenv("PYTHON_VERSION"); versionOverride != "" {
 		testVersion = versionOverride
 	}
-	t.Logf("Using Python %s for tests\n", testVersion)
+
+	log.Printf("Using Python %s for tests\n", testVersion)
 
 	os.Exit(m.Run())
 }
