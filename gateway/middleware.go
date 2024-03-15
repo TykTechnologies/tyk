@@ -381,9 +381,6 @@ func (t *BaseMiddleware) clearSession(session *user.SessionState) {
 // ApplyPolicies will check if any policies are loaded. If any are, it
 // will overwrite the session state to use the policy values.
 func (t *BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
-	session.Mu.Lock()
-	defer session.Mu.Unlock()
-	
 	rights := make(map[string]user.AccessDefinition)
 	tags := make(map[string]bool)
 	metadata := make(map[string]interface{})
