@@ -3,8 +3,6 @@ package python
 import (
 	"os"
 	"testing"
-
-	log "github.com/sirupsen/logrus"
 )
 
 var testVersion = "3.5"
