@@ -132,7 +132,7 @@ type Gateway struct {
 	// RPCCertCache stores certificates
 	RPCCertCache cache.Repository
 	// key session memory cache
-	SessionCache cache.Repository
+	SessionCache user.SessionCache
 	// org session memory cache
 	ExpiryCache cache.Repository
 	// memory cache to store arbitrary items
@@ -226,7 +226,7 @@ func NewGateway(config config.Config, ctx context.Context) *Gateway {
 	}
 	gw.ConnectionWatcher = httputil.NewConnectionWatcher()
 
-	gw.SessionCache = cache.New(10, 5)
+	gw.SessionCache = user.NewSessionCache()
 	gw.ExpiryCache = cache.New(600, 10*60)
 	gw.UtilCache = cache.New(3600, 10*60)
 
