@@ -35,16 +35,9 @@ lint-fast: lint-install
 	go mod tidy
 
 lint-install:
-<<<<<<< HEAD
 	go install golang.org/x/tools/cmd/goimports@v0.10.0
 	go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.45.0
-	go install github.com/fatih/faillint@latest
 	go install github.com/golang/mock/mockgen@v1.6.0
-=======
-	go install golang.org/x/tools/cmd/goimports@latest
-	go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.55.2
-	go install go.uber.org/mock/mockgen@v0.4.0
->>>>>>> 3c796bf9b... [TT-11627] Migrate failling to golangci-lint/forbidigo, fix issues (#6152)
 
 .PHONY: bench
 bench:
