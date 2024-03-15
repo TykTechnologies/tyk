@@ -74,11 +74,8 @@ linters:
     - ireturn
     - goerr113
   enable:
-<<<<<<< HEAD
-=======
     - govet
     - forbidigo
->>>>>>> 3c796bf9b... [TT-11627] Migrate failling to golangci-lint/forbidigo, fix issues (#6152)
     - gochecknoinits
     - thelper
     - errcheck
@@ -90,8 +87,6 @@ linters:
     - goimports
 
 linters-settings:
-<<<<<<< HEAD
-=======
   fobidigo:
     forbid:
       - p: ^fmt\.Print.*$
@@ -120,7 +115,6 @@ linters-settings:
       - fieldalignment
       - shadow
 
->>>>>>> 3c796bf9b... [TT-11627] Migrate failling to golangci-lint/forbidigo, fix issues (#6152)
   goimports:
     local-prefixes: github.com/TykTechnologies,github.com/TykTechnologies/tyk/internal
 
@@ -131,12 +125,9 @@ linters-settings:
       - (*github.com/TykTechnologies/tyk/gateway.Test).Run
 
 issues:
-<<<<<<< HEAD
-=======
   max-issues-per-linter: 0
   max-same-issues: 0
   exclude-use-default: false
->>>>>>> 3c796bf9b... [TT-11627] Migrate failling to golangci-lint/forbidigo, fix issues (#6152)
   exclude-rules:
     - path: ^cli/
       linters:
