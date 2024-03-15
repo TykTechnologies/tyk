@@ -3,7 +3,6 @@ package oas
 import (
 	"bytes"
 	"encoding/json"
-	"fmt"
 	"os"
 	"testing"
 
@@ -101,7 +100,7 @@ func TestXTykGateway_Lint(t *testing.T) {
 	errs := result.Errors()
 	if len(errs) > 0 {
 		for _, err := range errs {
-			fmt.Printf("%s\n", err)
+			t.Logf("%s\n", err)
 		}
 		t.Fail()
 	}
