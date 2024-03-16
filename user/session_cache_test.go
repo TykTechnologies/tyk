@@ -1,7 +1,9 @@
 package user
 
 import (
+	"runtime"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -33,4 +35,31 @@ func TestSessionCache(t *testing.T) {
 
 	assert.Nil(t, retrievedData)
 	assert.False(t, ok)
+}
+
+func TestSessionCache_leaks(t *testing.T) {
+	before := runtime.NumGoroutine()
+
+	// Test data
+	testData := SessionState{
+		OrgID: "Tyk",
+	}
+
+	// Create session cache object
+	for i := 0; i < 10; i++ {
+		cache := NewSessionCache()
+		cache.Set("k", testData, 0)
+		cache = nil
+	}
+
+	// Wait a bit and trigger GC
+	time.Sleep(time.Second)
+	runtime.GC()
+
+	// Assert on goroutine count
+	after := runtime.NumGoroutine()
+
+	if before < after {
+		t.Errorf("Goroutine leak, was: %d, after reload: %d", before, after)
+	}
 }
