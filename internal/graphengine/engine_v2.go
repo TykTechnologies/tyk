@@ -262,7 +262,7 @@ func (e *EngineV2) handoverRequestToGraphQLExecutionEngine(gqlRequest *graphql.R
 	span := otel.SpanFromContext(outreq.Context())
 	reqCtx := otel.ContextWithSpan(context.Background(), span)
 	if isProxyOnly {
-		reqCtx = NewGraphQLProxyOnlyContext(reqCtx, outreq)
+		reqCtx = SetProxyOnlyContextValue(reqCtx, outreq)
 	}
 
 	resultWriter := graphql.NewEngineResultWriter()
@@ -290,7 +290,7 @@ func (e *EngineV2) handoverRequestToGraphQLExecutionEngine(gqlRequest *graphql.R
 	header.Set("Content-Type", "application/json")
 
 	if isProxyOnly {
-		proxyOnlyCtx := reqCtx.(*GraphQLProxyOnlyContext)
+		proxyOnlyCtx := GetProxyOnlyContextValue(reqCtx)
 		// There is a case in the proxy-only mode where the request can be handled
 		// by the library without calling the upstream.
 		// This is a valid query for proxy-only mode: query { __typename }
