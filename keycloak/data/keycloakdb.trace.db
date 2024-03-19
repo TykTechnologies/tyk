@@ -1,0 +1,76 @@
+2024-03-19 09:11:02.418192Z jdbc[3]: exception
+org.h2.jdbc.JdbcSQLSyntaxErrorException: Table "MIGRATION_MODEL" not found (this database is empty); SQL statement:
+SELECT ID, VERSION FROM MIGRATION_MODEL ORDER BY UPDATE_TIME DESC [42104-224]
+2024-03-19 09:11:03.619273Z jdbc[3]: exception
+org.h2.jdbc.JdbcSQLSyntaxErrorException: Table "DATABASECHANGELOG" not found (this database is empty); SQL statement:
+SELECT COUNT(*) FROM PUBLIC.DATABASECHANGELOG [42104-224]
+2024-03-19 09:11:03.732900Z jdbc[4]: exception
+org.h2.jdbc.JdbcSQLSyntaxErrorException: Table "DATABASECHANGELOGLOCK" not found (this database is empty); SQL statement:
+SELECT COUNT(*) FROM PUBLIC.DATABASECHANGELOGLOCK [42104-224]
+2024-03-19 09:11:03.741561Z jdbc[3]: exception
+org.h2.jdbc.JdbcSQLSyntaxErrorException: Table "DATABASECHANGELOG" not found; SQL statement:
+SELECT COUNT(*) FROM PUBLIC.DATABASECHANGELOG [42102-224]
+2024-03-19 09:11:15.843820Z jdbc[3]: exception
+org.h2.jdbc.JdbcSQLNonTransientConnectionException: Database is already closed (to disable automatic closing at VM shutdown, add ";DB_CLOSE_ON_EXIT=FALSE" to the db URL) [90121-224]
+	at org.h2.message.DbException.getJdbcSQLException(DbException.java:690)
+	at org.h2.message.DbException.getJdbcSQLException(DbException.java:489)
+	at org.h2.message.DbException.get(DbException.java:223)
+	at org.h2.message.DbException.get(DbException.java:199)
+	at org.h2.message.DbException.get(DbException.java:188)
+	at org.h2.jdbc.JdbcConnection.checkClosed(JdbcConnection.java:1425)
+	at org.h2.jdbcx.JdbcXAConnection$PooledJdbcConnection.checkClosed(JdbcXAConnection.java:485)
+	at org.h2.jdbc.JdbcConnection.rollback(JdbcConnection.java:511)
+	at org.h2.jdbcx.JdbcXAConnection$PooledJdbcConnection.close(JdbcXAConnection.java:455)
+	at org.h2.jdbcx.JdbcXAConnection.close(JdbcXAConnection.java:76)
+	at io.agroal.pool.ConnectionHandler.closeConnection(ConnectionHandler.java:185)
+	at io.agroal.pool.ConnectionPool$DestroyConnectionTask.run(ConnectionPool.java:787)
+	at io.agroal.pool.ConnectionPool.close(ConnectionPool.java:196)
+	at io.agroal.pool.DataSource.close(DataSource.java:79)
+	at io.quarkus.agroal.runtime.DataSources.stop(DataSources.java:454)
+	at io.quarkus.agroal.runtime.DataSources_Bean.doDestroy(Unknown Source)
+	at io.quarkus.agroal.runtime.DataSources_Bean.destroy(Unknown Source)
+	at io.quarkus.agroal.runtime.DataSources_Bean.destroy(Unknown Source)
+	at io.quarkus.arc.impl.AbstractInstanceHandle.destroyInternal(AbstractInstanceHandle.java:82)
+	at io.quarkus.arc.impl.ContextInstanceHandleImpl.destroy(ContextInstanceHandleImpl.java:21)
+	at io.quarkus.arc.impl.AbstractSharedContext.destroy(AbstractSharedContext.java:96)
+	at io.quarkus.arc.impl.ArcContainerImpl.shutdown(ArcContainerImpl.java:472)
+	at io.quarkus.arc.Arc.shutdown(Arc.java:66)
+	at io.quarkus.arc.runtime.ArcRecorder$1.run(ArcRecorder.java:53)
+	at io.quarkus.runtime.StartupContext.runAllInReverseOrder(StartupContext.java:84)
+	at io.quarkus.runtime.StartupContext.close(StartupContext.java:73)
+	at io.quarkus.runner.ApplicationImpl.doStop(Unknown Source)
+	at io.quarkus.runtime.Application.stop(Application.java:208)
+	at io.quarkus.runtime.Application.stop(Application.java:155)
+	at io.quarkus.runtime.ApplicationLifecycleManager$ShutdownHookThread.run(ApplicationLifecycleManager.java:436)
+2024-03-19 09:11:15.848793Z jdbc[4]: exception
+org.h2.jdbc.JdbcSQLNonTransientConnectionException: Database is already closed (to disable automatic closing at VM shutdown, add ";DB_CLOSE_ON_EXIT=FALSE" to the db URL) [90121-224]
+	at org.h2.message.DbException.getJdbcSQLException(DbException.java:690)
+	at org.h2.message.DbException.getJdbcSQLException(DbException.java:489)
+	at org.h2.message.DbException.get(DbException.java:223)
+	at org.h2.message.DbException.get(DbException.java:199)
+	at org.h2.message.DbException.get(DbException.java:188)
+	at org.h2.jdbc.JdbcConnection.checkClosed(JdbcConnection.java:1425)
+	at org.h2.jdbcx.JdbcXAConnection$PooledJdbcConnection.checkClosed(JdbcXAConnection.java:485)
+	at org.h2.jdbc.JdbcConnection.rollback(JdbcConnection.java:511)
+	at org.h2.jdbcx.JdbcXAConnection$PooledJdbcConnection.close(JdbcXAConnection.java:455)
+	at org.h2.jdbcx.JdbcXAConnection.close(JdbcXAConnection.java:76)
+	at io.agroal.pool.ConnectionHandler.closeConnection(ConnectionHandler.java:185)
+	at io.agroal.pool.ConnectionPool$DestroyConnectionTask.run(ConnectionPool.java:787)
+	at io.agroal.pool.ConnectionPool.close(ConnectionPool.java:196)
+	at io.agroal.pool.DataSource.close(DataSource.java:79)
+	at io.quarkus.agroal.runtime.DataSources.stop(DataSources.java:454)
+	at io.quarkus.agroal.runtime.DataSources_Bean.doDestroy(Unknown Source)
+	at io.quarkus.agroal.runtime.DataSources_Bean.destroy(Unknown Source)
+	at io.quarkus.agroal.runtime.DataSources_Bean.destroy(Unknown Source)
+	at io.quarkus.arc.impl.AbstractInstanceHandle.destroyInternal(AbstractInstanceHandle.java:82)
+	at io.quarkus.arc.impl.ContextInstanceHandleImpl.destroy(ContextInstanceHandleImpl.java:21)
+	at io.quarkus.arc.impl.AbstractSharedContext.destroy(AbstractSharedContext.java:96)
+	at io.quarkus.arc.impl.ArcContainerImpl.shutdown(ArcContainerImpl.java:472)
+	at io.quarkus.arc.Arc.shutdown(Arc.java:66)
+	at io.quarkus.arc.runtime.ArcRecorder$1.run(ArcRecorder.java:53)
+	at io.quarkus.runtime.StartupContext.runAllInReverseOrder(StartupContext.java:84)
+	at io.quarkus.runtime.StartupContext.close(StartupContext.java:73)
+	at io.quarkus.runner.ApplicationImpl.doStop(Unknown Source)
+	at io.quarkus.runtime.Application.stop(Application.java:208)
+	at io.quarkus.runtime.Application.stop(Application.java:155)
+	at io.quarkus.runtime.ApplicationLifecycleManager$ShutdownHookThread.run(ApplicationLifecycleManager.java:436)
