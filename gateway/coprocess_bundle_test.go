@@ -135,12 +135,14 @@ func TestBundleLoader(t *testing.T) {
 		cfg := ts.Gw.GetConfig()
 		cfg.PublicKeyPath = "random/path/to/public.key"
 		ts.Gw.SetConfig(cfg)
+
 		spec := &APISpec{
 			APIDefinition: &apidef.APIDefinition{
 				CustomMiddlewareBundle: unsignedBundleID,
 			},
 		}
 		err := ts.Gw.loadBundle(spec)
+
 		assert.ErrorContains(t, err, "Bundle isn't signed")
 	})
 
@@ -181,8 +183,8 @@ func TestBundleLoader(t *testing.T) {
 				CustomMiddlewareBundle: badSignatureBundleID,
 			},
 		}
-
 		err = ts.Gw.loadBundle(spec)
+
 		assert.ErrorContains(t, err, "crypto/rsa: verification error")
 	})
 }
