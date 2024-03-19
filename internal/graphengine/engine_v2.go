@@ -297,7 +297,7 @@ func (e *EngineV2) handoverRequestToGraphQLExecutionEngine(gqlRequest *graphql.R
 		// In this case, upstreamResponse is nil.
 		// See TT-6419 for further info.
 		if proxyOnlyCtx.upstreamResponse != nil {
-			header = proxyOnlyCtx.upstreamResponse.Header
+			header = proxyOnlyCtx.forwardedRequest.Header
 			httpStatus = proxyOnlyCtx.upstreamResponse.StatusCode
 			if e.ApiDefinition.GraphQL.Proxy.UseResponseExtensions.OnErrorForwarding && httpStatus >= http.StatusBadRequest {
 				err = e.gqlTools.returnErrorsFromUpstream(proxyOnlyCtx, &resultWriter, e.seekReadCloser)
