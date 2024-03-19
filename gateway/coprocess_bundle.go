@@ -331,6 +331,7 @@ func loadBundleManifest(bundle *Bundle, spec *APISpec, skipVerification bool) er
 		log.WithFields(logrus.Fields{
 			"prefix": "main",
 		}).Info("----> Bundle verification failed: ", spec.CustomMiddlewareBundle)
+		return err
 	}
 	return nil
 }
@@ -425,7 +426,7 @@ func (gw *Gateway) loadBundle(spec *APISpec) error {
 		if err := os.RemoveAll(bundle.Path); err != nil {
 			bundleError(spec, err, "Couldn't remove bundle")
 		}
-		return nil
+		return err
 	}
 
 	log.WithFields(logrus.Fields{
