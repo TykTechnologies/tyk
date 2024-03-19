@@ -6,7 +6,7 @@ spec:
   trigger:
     type: http
     httpRequest:
-      method: GET
+      method: POST
       url: tyk:8080/test-graphql-tracing-invalid/test-graphql-tracing-invalid
       body: "{\n  \"query\": \"{\\n  country(code: \\\"NG\\\"){\\n    name\\n  }\\n}\"\n}"
       headers:
