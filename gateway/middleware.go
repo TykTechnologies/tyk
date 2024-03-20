@@ -193,12 +193,13 @@ func (gw *Gateway) createMiddleware(actualMW TykMiddleware) func(http.Handler) h
 
 			mw.Logger().WithField("code", errCode).WithField("ns", finishTime.Nanoseconds()).Debug("Finished")
 
-			mw.Base().UpdateRequestSession(r)
 			// Special code, bypasses all other execution
 			if errCode != mwStatusRespond {
 				// No error, carry on...
 				meta["bypass"] = "1"
 				h.ServeHTTP(w, r)
+			} else {
+				mw.Base().UpdateRequestSession(r)
 			}
 		})
 	}
