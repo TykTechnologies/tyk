@@ -3,7 +3,9 @@ package graphengine
 import (
 	"context"
 	"errors"
+	"github.com/TykTechnologies/graphql-go-tools/pkg/engine/datasource/httpclient"
 	"net/http"
+	"strings"
 
 	"github.com/jensneuse/abstractlogger"
 	"github.com/sirupsen/logrus"
@@ -297,7 +299,7 @@ func (e *EngineV2) handoverRequestToGraphQLExecutionEngine(gqlRequest *graphql.R
 		// In this case, upstreamResponse is nil.
 		// See TT-6419 for further info.
 		if proxyOnlyCtx.upstreamResponse != nil {
-			header = proxyOnlyCtx.forwardedRequest.Header
+			header = proxyOnlyCtx.upstreamResponse.Header
 			httpStatus = proxyOnlyCtx.upstreamResponse.StatusCode
 			if e.ApiDefinition.GraphQL.Proxy.UseResponseExtensions.OnErrorForwarding && httpStatus >= http.StatusBadRequest {
 				err = e.gqlTools.returnErrorsFromUpstream(proxyOnlyCtx, &resultWriter, e.seekReadCloser)
@@ -305,11 +307,42 @@ func (e *EngineV2) handoverRequestToGraphQLExecutionEngine(gqlRequest *graphql.R
 					return
 				}
 			}
+
+			// change the value of the header's content encoding to use the content encoding defined by the accept encoding
+			contentEncoding := selectContentEncodingToBeUsed(proxyOnlyCtx.forwardedRequest.Header.Get(httpclient.AcceptEncodingHeader))
+			header.Set(httpclient.ContentEncodingHeader, contentEncoding)
 		}
 	}
-
 	res = resultWriter.AsHTTPResponse(httpStatus, header)
 	return
+}
+
+// selectContentEncodingToBeUsed selects the encoding value to be returned based on the IETF standards
+// if acceptedEncoding is a list of comma separated strings br,gzip, deflate; then it selects the first supported one
+// if it is a single value then it returns that value
+// if no supported encoding is found, it returns the last value
+func selectContentEncodingToBeUsed(acceptedEncoding string) string {
+	supportedHeaders := map[string]struct{}{
+		"gzip":    {},
+		"deflate": {},
+		"br":      {},
+	}
+
+	values := strings.Split(acceptedEncoding, ",")
+	if len(values) < 2 {
+		return values[0]
+	}
+
+	for i, e := range values {
+		enc := strings.TrimSpace(e)
+		if _, ok := supportedHeaders[enc]; ok {
+			return enc
+		}
+		if i == len(values)-1 {
+			return enc
+		}
+	}
+	return ""
 }
 
 func (e *EngineV2) handoverWebSocketConnectionToGraphQLExecutionEngine(params *ReverseProxyParams) (res *http.Response, hijacked bool, err error) {
