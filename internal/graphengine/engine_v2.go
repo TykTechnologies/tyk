@@ -3,9 +3,10 @@ package graphengine
 import (
 	"context"
 	"errors"
-	"github.com/TykTechnologies/graphql-go-tools/pkg/engine/datasource/httpclient"
 	"net/http"
 	"strings"
+
+	"github.com/TykTechnologies/graphql-go-tools/pkg/engine/datasource/httpclient"
 
 	"github.com/jensneuse/abstractlogger"
 	"github.com/sirupsen/logrus"
