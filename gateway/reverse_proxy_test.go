@@ -23,8 +23,6 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/TykTechnologies/tyk/header"
-
 	"github.com/TykTechnologies/graphql-go-tools/pkg/execution/datasource"
 	"github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
 
@@ -1787,79 +1785,3 @@ func TestSetCustomHeaderMultipleValues(t *testing.T) {
 		})
 	}
 }
-<<<<<<< HEAD
-=======
-
-func TestCreateMemConnProviderIfNeeded(t *testing.T) {
-	t.Run("should propagate context", func(t *testing.T) {
-		propagationContext := context.WithValue(context.Background(), "parentContextKey", "parentContextValue")
-		propagationContextWithCancel, cancel := context.WithCancel(propagationContext)
-		internalReq, err := http.NewRequest(http.MethodGet, "http://memoryhost/", nil)
-		require.NoError(t, err)
-
-		handler := http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
-			assert.Equal(t, "parentContextValue", req.Context().Value("parentContextKey"))
-			cancel()
-		})
-
-		err = createMemConnProviderIfNeeded(handler, internalReq.WithContext(propagationContextWithCancel))
-		require.NoError(t, err)
-
-		assert.Eventuallyf(t, func() bool {
-			testReq, err := http.NewRequest(http.MethodGet, "http://memoryhost/", nil)
-			require.NoError(t, err)
-			_, err = memConnClient.Do(testReq)
-			require.NoError(t, err)
-			<-propagationContextWithCancel.Done()
-			return true
-		}, time.Second, time.Millisecond*25, "context was not canceled")
-	})
-}
-
-func TestQuotaResponseHeaders(t *testing.T) {
-	ts := StartTest(nil)
-	defer ts.Close()
-
-	specs := ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
-		spec.Proxy.ListenPath = "/quota-headers-test"
-		spec.UseKeylessAccess = false
-	})
-
-	var (
-		quotaMax, quotaRenewalRate int64 = 2, 3600
-	)
-
-	authKey := "auth-key"
-	session := createSessionWithQuota(t, specs[0].APIDefinition, quotaMax, quotaRenewalRate)
-	assert.NoError(t, ts.Gw.GlobalSessionManager.UpdateSession(authKey, session, 60, false))
-
-	authorization := map[string]string{
-		"Authorization": authKey,
-	}
-	_, _ = ts.Run(t, []test.TestCase{
-		{
-			Headers: authorization,
-			Path:    "/quota-headers-test/",
-			Code:    http.StatusOK,
-			HeadersMatch: map[string]string{
-				header.XRateLimitLimit:     fmt.Sprintf("%d", quotaMax),
-				header.XRateLimitRemaining: fmt.Sprintf("%d", quotaMax-1),
-			},
-		},
-		{
-			Headers: authorization,
-			Path:    "/quota-headers-test/",
-			Code:    http.StatusOK,
-			HeadersMatch: map[string]string{
-				header.XRateLimitLimit:     fmt.Sprintf("%d", quotaMax),
-				header.XRateLimitRemaining: fmt.Sprintf("%d", quotaMax-2),
-			},
-		},
-		{
-			Headers: authorization,
-			Path:    "/quota-headers-test/abc",
-			Code:    http.StatusForbidden,
-		},
-	}...)
-}
->>>>>>> 3a78b0d05... [TT-10856/TT-11593]fix quota limits not working with url rewrite to self (#6133)
