@@ -1,6 +1,6 @@
 {
-  "name": "Token Exchange",
-  "api_id": "token-exchange",
+  "name": "Google APIs",
+  "api_id": "google",
   "org_id": "default",
   "definition": {
     "location": "header",
@@ -23,8 +23,8 @@
     }
   },
   "proxy": {
-    "listen_path": "/token-exchange/",
-    "target_url": "http://httpbin.org",
+    "listen_path": "/google/",
+    "target_url": "https://www.googleapis.com",
     "strip_listen_path": true,
     "preserve_host_header": false
   },
@@ -41,7 +41,10 @@
     "enable": true,
     "token_endpoint": "http://localhost:8081/realms/kubecon-eu-24/protocol/openid-connect/token",
     "client_id": "tyk-gateway",
-    "client_secret": "5gsQmAbA1xBdOAlEl1g9u0L2c23vVKLG"
+    "client_secret": "5gsQmAbA1xBdOAlEl1g9u0L2c23vVKLG",
+    "custom_params": {
+      "requested_issuer": "google"
+    }
   },
   "active": true
 }
