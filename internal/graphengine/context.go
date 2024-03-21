@@ -14,6 +14,37 @@ const (
 	GraphQLEngineTransportTypeMultiUpstream
 )
 
+type contextKey struct{}
+
+var graphqlProxyContextInfo = contextKey{}
+
+type GraphQLProxyOnlyContextValues struct {
+	forwardedRequest       *http.Request
+	upstreamResponse       *http.Response
+	ignoreForwardedHeaders map[string]bool
+}
+
+func SetProxyOnlyContextValue(ctx context.Context, req *http.Request) context.Context {
+	value := &GraphQLProxyOnlyContextValues{
+		forwardedRequest: req,
+		ignoreForwardedHeaders: map[string]bool{
+			http.CanonicalHeaderKey("date"):           true,
+			http.CanonicalHeaderKey("content-type"):   true,
+			http.CanonicalHeaderKey("content-length"): true,
+		},
+	}
+
+	return context.WithValue(ctx, graphqlProxyContextInfo, value)
+}
+
+func GetProxyOnlyContextValue(ctx context.Context) *GraphQLProxyOnlyContextValues {
+	val, ok := ctx.Value(graphqlProxyContextInfo).(*GraphQLProxyOnlyContextValues)
+	if !ok {
+		return nil
+	}
+	return val
+}
+
 func DetermineGraphQLEngineTransportType(apiDefinition *apidef.APIDefinition) GraphQLEngineTransportType {
 	switch apiDefinition.GraphQL.ExecutionMode {
 	case apidef.GraphQLExecutionModeSubgraph:
