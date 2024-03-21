@@ -302,6 +302,9 @@ func (e *EngineV2) handoverRequestToGraphQLExecutionEngine(gqlRequest *graphql.R
 		if proxyOnlyCtx.upstreamResponse != nil {
 			header = proxyOnlyCtx.upstreamResponse.Header
 			httpStatus = proxyOnlyCtx.upstreamResponse.StatusCode
+			// change the value of the header's content encoding to use the content encoding defined by the accept encoding
+			contentEncoding := selectContentEncodingToBeUsed(proxyOnlyCtx.forwardedRequest.Header.Get(httpclient.AcceptEncodingHeader))
+			header.Set(httpclient.ContentEncodingHeader, contentEncoding)
 			if e.ApiDefinition.GraphQL.Proxy.UseResponseExtensions.OnErrorForwarding && httpStatus >= http.StatusBadRequest {
 				err = e.gqlTools.returnErrorsFromUpstream(proxyOnlyCtx, &resultWriter, e.seekReadCloser)
 				if err != nil {
@@ -309,9 +312,6 @@ func (e *EngineV2) handoverRequestToGraphQLExecutionEngine(gqlRequest *graphql.R
 				}
 			}
 
-			// change the value of the header's content encoding to use the content encoding defined by the accept encoding
-			contentEncoding := selectContentEncodingToBeUsed(proxyOnlyCtx.forwardedRequest.Header.Get(httpclient.AcceptEncodingHeader))
-			header.Set(httpclient.ContentEncodingHeader, contentEncoding)
 		}
 	}
 	res = resultWriter.AsHTTPResponse(httpStatus, header)
