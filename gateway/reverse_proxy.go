@@ -28,6 +28,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/TykTechnologies/graphql-go-tools/pkg/engine/datasource/httpclient"
+
 	"github.com/buger/jsonparser"
 
 	"github.com/gorilla/websocket"
@@ -1077,7 +1079,7 @@ func (p *ReverseProxy) handleGraphQLEngineWebsocketUpgrade(roundTripper *TykRoun
 	return nil, true, nil
 }
 
-func returnErrorsFromUpstream(proxyOnlyCtx *GraphQLProxyOnlyContext, resultWriter *graphql.EngineResultWriter) error {
+func returnErrorsFromUpstream(proxyOnlyCtx *GraphQLProxyOnlyContextValues, resultWriter *graphql.EngineResultWriter) error {
 	body, ok := proxyOnlyCtx.upstreamResponse.Body.(*nopCloserBuffer)
 	if !ok {
 		// Response body already read by graphql-go-tools, and it's not re-readable. Quit silently.
@@ -1132,7 +1134,11 @@ func (p *ReverseProxy) handoverRequestToGraphQLExecutionEngine(roundTripper *Tyk
 		isProxyOnly := isGraphQLProxyOnly(p.TykAPISpec)
 		reqCtx := context.Background()
 		if isProxyOnly {
+<<<<<<< HEAD
 			reqCtx = NewGraphQLProxyOnlyContext(context.Background(), outreq)
+=======
+			reqCtx = SetProxyOnlyContextValue(reqCtx, outreq)
+>>>>>>> 0d9895c00... [TT-11683]: fixed header forwarding (#6174)
 		}
 
 		resultWriter := graphql.NewEngineResultWriter()
@@ -1154,7 +1160,7 @@ func (p *ReverseProxy) handoverRequestToGraphQLExecutionEngine(roundTripper *Tyk
 		header.Set("Content-Type", "application/json")
 
 		if isProxyOnly {
-			proxyOnlyCtx := reqCtx.(*GraphQLProxyOnlyContext)
+			proxyOnlyCtx := GetProxyOnlyContextValue(reqCtx)
 			// There is a case in the proxy-only mode where the request can be handled
 			// by the library without calling the upstream.
 			// This is a valid query for proxy-only mode: query { __typename }
@@ -1163,6 +1169,9 @@ func (p *ReverseProxy) handoverRequestToGraphQLExecutionEngine(roundTripper *Tyk
 			if proxyOnlyCtx.upstreamResponse != nil {
 				header = proxyOnlyCtx.upstreamResponse.Header
 				httpStatus = proxyOnlyCtx.upstreamResponse.StatusCode
+				// change the value of the header's content encoding to use the content encoding defined by the accept encoding
+				contentEncoding := selectContentEncodingToBeUsed(proxyOnlyCtx.forwardedRequest.Header.Get(httpclient.AcceptEncodingHeader))
+				header.Set(httpclient.ContentEncodingHeader, contentEncoding)
 				if p.TykAPISpec.GraphQL.Proxy.UseResponseExtensions.OnErrorForwarding && httpStatus >= http.StatusBadRequest {
 					err = returnErrorsFromUpstream(proxyOnlyCtx, &resultWriter)
 					if err != nil {
@@ -1177,6 +1186,34 @@ func (p *ReverseProxy) handoverRequestToGraphQLExecutionEngine(roundTripper *Tyk
 	}
 
 	return nil, false, errors.New("graphql configuration is invalid")
+}
+
+// selectContentEncodingToBeUsed selects the encoding value to be returned based on the IETF standards
+// if acceptedEncoding is a list of comma separated strings br,gzip, deflate; then it selects the first supported one
+// if it is a single value then it returns that value
+// if no supported encoding is found, it returns the last value
+func selectContentEncodingToBeUsed(acceptedEncoding string) string {
+	supportedHeaders := map[string]struct{}{
+		"gzip":    {},
+		"deflate": {},
+		"br":      {},
+	}
+
+	values := strings.Split(acceptedEncoding, ",")
+	if len(values) < 2 {
+		return values[0]
+	}
+
+	for i, e := range values {
+		enc := strings.TrimSpace(e)
+		if _, ok := supportedHeaders[enc]; ok {
+			return enc
+		}
+		if i == len(values)-1 {
+			return enc
+		}
+	}
+	return ""
 }
 
 func (p *ReverseProxy) handoverWebSocketConnectionToGraphQLExecutionEngine(roundTripper *TykRoundTripper, conn net.Conn, req *http.Request) {

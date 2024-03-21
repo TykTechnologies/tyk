@@ -27,6 +27,37 @@ func DetermineGraphQLEngineTransportType(apiSpec *APISpec) GraphQLEngineTranspor
 	return GraphQLEngineTransportTypeMultiUpstream
 }
 
+type contextKey struct{}
+
+var graphqlProxyContextInfo = contextKey{}
+
+type GraphQLProxyOnlyContextValues struct {
+	forwardedRequest       *http.Request
+	upstreamResponse       *http.Response
+	ignoreForwardedHeaders map[string]bool
+}
+
+func SetProxyOnlyContextValue(ctx context.Context, req *http.Request) context.Context {
+	value := &GraphQLProxyOnlyContextValues{
+		forwardedRequest: req,
+		ignoreForwardedHeaders: map[string]bool{
+			http.CanonicalHeaderKey("date"):           true,
+			http.CanonicalHeaderKey("content-type"):   true,
+			http.CanonicalHeaderKey("content-length"): true,
+		},
+	}
+
+	return context.WithValue(ctx, graphqlProxyContextInfo, value)
+}
+
+func GetProxyOnlyContextValue(ctx context.Context) *GraphQLProxyOnlyContextValues {
+	val, ok := ctx.Value(graphqlProxyContextInfo).(*GraphQLProxyOnlyContextValues)
+	if !ok {
+		return nil
+	}
+	return val
+}
+
 type GraphQLProxyOnlyContext struct {
 	context.Context
 	forwardedRequest       *http.Request
@@ -65,16 +96,16 @@ func NewGraphQLEngineTransport(transportType GraphQLEngineTransportType, origina
 func (g *GraphQLEngineTransport) RoundTrip(request *http.Request) (res *http.Response, err error) {
 	switch g.transportType {
 	case GraphQLEngineTransportTypeProxyOnly:
-		proxyOnlyCtx, ok := request.Context().(*GraphQLProxyOnlyContext)
-		if ok {
-			return g.handleProxyOnly(proxyOnlyCtx, request)
+		val := GetProxyOnlyContextValue(request.Context())
+		if val != nil {
+			return g.handleProxyOnly(val, request)
 		}
 	}
 
 	return g.originalTransport.RoundTrip(request)
 }
 
-func (g *GraphQLEngineTransport) handleProxyOnly(proxyOnlyCtx *GraphQLProxyOnlyContext, request *http.Request) (*http.Response, error) {
+func (g *GraphQLEngineTransport) handleProxyOnly(proxyOnlyCtx *GraphQLProxyOnlyContextValues, request *http.Request) (*http.Response, error) {
 	request.Method = proxyOnlyCtx.forwardedRequest.Method
 	g.setProxyOnlyHeaders(proxyOnlyCtx, request)
 
@@ -107,7 +138,7 @@ func (g *GraphQLEngineTransport) handleProxyOnly(proxyOnlyCtx *GraphQLProxyOnlyC
 	return response, err
 }
 
-func (g *GraphQLEngineTransport) setProxyOnlyHeaders(proxyOnlyCtx *GraphQLProxyOnlyContext, r *http.Request) {
+func (g *GraphQLEngineTransport) setProxyOnlyHeaders(proxyOnlyCtx *GraphQLProxyOnlyContextValues, r *http.Request) {
 	for forwardedHeaderKey, forwardedHeaderValues := range proxyOnlyCtx.forwardedRequest.Header {
 		if proxyOnlyCtx.ignoreForwardedHeaders[forwardedHeaderKey] {
 			continue
