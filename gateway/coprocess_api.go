@@ -17,12 +17,12 @@ import (
 const CoProcessDefaultKeyPrefix = "coprocess-data:"
 
 func getStorageForPython(ctx context.Context) storage.RedisCluster {
-	rc := storage.NewConnectionHandler(ctx)
+	rc := storage.NewRedisController(ctx)
 
-	go rc.Connect(ctx, nil, &config.Config{})
+	go rc.ConnectToRedis(ctx, nil, &config.Config{})
 	rc.WaitConnect(ctx)
 
-	return storage.RedisCluster{KeyPrefix: CoProcessDefaultKeyPrefix, ConnectionHandler: rc}
+	return storage.RedisCluster{KeyPrefix: CoProcessDefaultKeyPrefix, RedisController: rc}
 }
 
 // TykStoreData is a CoProcess API function for storing data.
@@ -32,10 +32,6 @@ func TykStoreData(CKey, CValue *C.char, CTTL C.int) {
 	key := C.GoString(CKey)
 	value := C.GoString(CValue)
 	ttl := int64(CTTL)
-<<<<<<< HEAD
-	rc := storage.NewRedisController(context.TODO())
-	store := storage.RedisCluster{KeyPrefix: CoProcessDefaultKeyPrefix, RedisController: rc}
-=======
 
 	// Timeout storing data after 1 second
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
@@ -43,7 +39,6 @@ func TykStoreData(CKey, CValue *C.char, CTTL C.int) {
 
 	store := getStorageForPython(ctx)
 
->>>>>>> 9cb830488... [TT-6011] Fix non-functional coprocess apis, add tests (#4055)
 	err := store.SetKey(key, value, ttl)
 	if err != nil {
 		log.WithError(err).Error("could not set key")
