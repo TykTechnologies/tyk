@@ -16,6 +16,15 @@ import (
 // CoProcessDefaultKeyPrefix is used as a key prefix for this CP.
 const CoProcessDefaultKeyPrefix = "coprocess-data:"
 
+func getStorageForPython(ctx context.Context) storage.RedisCluster {
+	rc := storage.NewConnectionHandler(ctx)
+
+	go rc.Connect(ctx, nil, &config.Config{})
+	rc.WaitConnect(ctx)
+
+	return storage.RedisCluster{KeyPrefix: CoProcessDefaultKeyPrefix, ConnectionHandler: rc}
+}
+
 // TykStoreData is a CoProcess API function for storing data.
 //
 //export TykStoreData
@@ -28,12 +37,7 @@ func TykStoreData(CKey, CValue *C.char, CTTL C.int) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
 
-	rc := storage.NewConnectionHandler(ctx)
-
-	go rc.Connect(ctx, nil, &config.Config{})
-	rc.WaitConnect(ctx)
-
-	store := storage.RedisCluster{KeyPrefix: CoProcessDefaultKeyPrefix, ConnectionHandler: rc}
+	store := getStorageForPython(ctx)
 
 	err := store.SetKey(key, value, ttl)
 	if err != nil {
@@ -51,12 +55,7 @@ func TykGetData(CKey *C.char) *C.char {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
 
-	rc := storage.NewConnectionHandler(ctx)
-
-	go rc.Connect(ctx, nil, &config.Config{})
-	rc.WaitConnect(ctx)
-
-	store := storage.RedisCluster{KeyPrefix: CoProcessDefaultKeyPrefix, ConnectionHandler: rc}
+	store := getStorageForPython(ctx)
 
 	val, err := store.GetKey(key)
 	if err != nil {
