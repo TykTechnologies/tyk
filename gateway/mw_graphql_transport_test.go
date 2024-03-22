@@ -121,7 +121,7 @@ func TestGraphQLEngineTransport_RoundTrip(t *testing.T) {
 
 		forwardedRequest.Header.Set("X-Custom-Key", "custom-value")
 		forwardedRequest.Header.Set("X-Other-Value", "other-value")
-		ctx := NewGraphQLProxyOnlyContext(context.Background(), forwardedRequest)
+		ctx := SetProxyOnlyContextValue(context.Background(), forwardedRequest)
 
 		httpClient := http.Client{
 			Transport: NewGraphQLEngineTransport(GraphQLEngineTransportTypeProxyOnly, http.DefaultTransport),
