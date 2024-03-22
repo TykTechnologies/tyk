@@ -47,14 +47,16 @@ func TykStoreData(CKey, CValue *C.char, CTTL C.int) {
 func TykGetData(CKey *C.char) *C.char {
 	key := C.GoString(CKey)
 
+	// Timeout storing data after 1 second
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
 
-	rc := storage.NewRedisController(ctx)
-	go rc.ConnectToRedis(ctx, nil, &config.Config{})
+	rc := storage.NewConnectionHandler(ctx)
+
+	go rc.Connect(ctx, nil, &config.Config{})
 	rc.WaitConnect(ctx)
 
-	store := storage.RedisCluster{KeyPrefix: CoProcessDefaultKeyPrefix, RedisController: rc}
+	store := storage.RedisCluster{KeyPrefix: CoProcessDefaultKeyPrefix, ConnectionHandler: rc}
 
 	val, err := store.GetKey(key)
 	if err != nil {
