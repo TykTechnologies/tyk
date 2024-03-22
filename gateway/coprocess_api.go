@@ -30,7 +30,7 @@ func TykStoreData(CKey, CValue *C.char, CTTL C.int) {
 
 	rc := storage.NewConnectionHandler(ctx)
 
-	go rc.ConnectToRedis(ctx, nil, &config.Config{})
+	go rc.Connect(ctx, nil, &config.Config{})
 	rc.WaitConnect(ctx)
 
 	store := storage.RedisCluster{KeyPrefix: CoProcessDefaultKeyPrefix, ConnectionHandler: rc}
