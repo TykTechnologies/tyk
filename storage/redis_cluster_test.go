@@ -39,6 +39,37 @@ func TestMain(m *testing.M) {
 	os.Exit(m.Run())
 }
 
+func TestRedisClusterGetConnectionHandler(t *testing.T) {
+	// Scenario 1: RedisController is not nil.
+	t.Run("with RedisController", func(t *testing.T) {
+		connHandler := NewConnectionHandler(context.Background())
+		mockRedisController := &RedisController{
+			connection: connHandler,
+		}
+		redisCluster := &RedisCluster{
+			RedisController: mockRedisController,
+		}
+
+		got := redisCluster.getConnectionHandler()
+		if got != connHandler {
+			t.Errorf("getConnectionHandler() with RedisController = %v, want %v", got, connHandler)
+		}
+	})
+
+	// Scenario 2: RedisController is nil.
+	t.Run("without RedisController", func(t *testing.T) {
+		connHandler := NewConnectionHandler(context.Background())
+		redisCluster := &RedisCluster{
+			ConnectionHandler: connHandler,
+		}
+
+		got := redisCluster.getConnectionHandler()
+		if got != connHandler {
+			t.Errorf("getConnectionHandler() without RedisController = %v, want %v", got, connHandler)
+		}
+	})
+}
+
 func TestHandleMessage(t *testing.T) {
 	cluster := &RedisCluster{}
 

@@ -42,6 +42,12 @@ func TestRecoverLoop(t *testing.T) {
 func TestNewConnectionHandler(t *testing.T) {
 	ctx := context.Background()
 	handler := NewConnectionHandler(ctx)
+	RunNewConnectionHandlerTest(t, handler)
+}
+
+func RunNewConnectionHandlerTest(t *testing.T, handler *ConnectionHandler) {
+	t.Helper()
+
 	assert.NotNil(t, handler)
 	assert.NotNil(t, handler.connections)
 	assert.NotNil(t, handler.connectionsMu)

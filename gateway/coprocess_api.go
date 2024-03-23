@@ -4,15 +4,26 @@ import "C"
 
 import (
 	"context"
+	"time"
 
 	"github.com/sirupsen/logrus"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/storage"
 )
 
 // CoProcessDefaultKeyPrefix is used as a key prefix for this CP.
 const CoProcessDefaultKeyPrefix = "coprocess-data:"
+
+func getStorageForPython(ctx context.Context) storage.RedisCluster {
+	rc := storage.NewConnectionHandler(ctx)
+
+	go rc.Connect(ctx, nil, &config.Config{})
+	rc.WaitConnect(ctx)
+
+	return storage.RedisCluster{KeyPrefix: CoProcessDefaultKeyPrefix, ConnectionHandler: rc}
+}
 
 // TykStoreData is a CoProcess API function for storing data.
 //
@@ -21,8 +32,13 @@ func TykStoreData(CKey, CValue *C.char, CTTL C.int) {
 	key := C.GoString(CKey)
 	value := C.GoString(CValue)
 	ttl := int64(CTTL)
-	rc := storage.NewConnectionHandler(context.TODO())
-	store := storage.RedisCluster{KeyPrefix: CoProcessDefaultKeyPrefix, ConnectionHandler: rc}
+
+	// Timeout storing data after 1 second
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+
+	store := getStorageForPython(ctx)
+
 	err := store.SetKey(key, value, ttl)
 	if err != nil {
 		log.WithError(err).Error("could not set key")
@@ -35,9 +51,17 @@ func TykStoreData(CKey, CValue *C.char, CTTL C.int) {
 func TykGetData(CKey *C.char) *C.char {
 	key := C.GoString(CKey)
 
-	store := storage.RedisCluster{KeyPrefix: CoProcessDefaultKeyPrefix}
-	// TODO: return error
-	val, _ := store.GetKey(key)
+	// Timeout storing data after 1 second
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+
+	store := getStorageForPython(ctx)
+
+	val, err := store.GetKey(key)
+	if err != nil {
+		log.WithError(err).Error("could not get key")
+	}
+
 	return C.CString(val)
 }
 
@@ -80,4 +104,16 @@ func CoProcessLog(CMessage, CLogLevel *C.char) {
 			"prefix": "python",
 		}).Info(message)
 	}
+}
+
+func cgoCString(in string) *C.char {
+	return C.CString(in)
+}
+
+func cgoGoString(in *C.char) string {
+	return C.GoString(in)
+}
+
+func cgoCint(in int) C.int {
+	return C.int(in)
 }

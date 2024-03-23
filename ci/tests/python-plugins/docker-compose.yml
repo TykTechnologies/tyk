@@ -18,7 +18,10 @@ services:
         - BASE_IMAGE=${GATEWAY_IMAGE}
       
   gw:
-    image: ${GATEWAY_IMAGE}
+    build:
+      context: ./extend-python
+      args:
+        - BASE_IMAGE=${GATEWAY_IMAGE}
     volumes:
       - ./src/apidef.json:/opt/tyk-gateway/apps/python.json
       - ./src/tyk.conf:/opt/tyk-gateway/tyk.conf

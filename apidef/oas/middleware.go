@@ -1192,10 +1192,6 @@ type PrePlugin struct {
 	Plugins CustomPlugins `bson:"plugins,omitempty" json:"plugins,omitempty"`
 }
 
-func (p *PrePlugin) Migrate() CustomPlugins {
-	return p.Plugins
-}
-
 // Fill fills PrePlugin from supplied Tyk classic api definition.
 func (p *PrePlugin) Fill(api apidef.APIDefinition) {
 	if len(api.CustomMiddleware.Pre) == 0 {

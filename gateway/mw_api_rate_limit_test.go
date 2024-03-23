@@ -7,6 +7,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/TykTechnologies/tyk/apidef"
+
+	"github.com/stretchr/testify/assert"
+
 	"github.com/justinas/alice"
 
 	"github.com/TykTechnologies/tyk/internal/uuid"
@@ -62,6 +66,13 @@ func (ts *Test) getGlobalRLAuthKeyChain(spec *APISpec) http.Handler {
 		&RateLimitAndQuotaCheck{baseMid},
 	)...).Then(proxyHandler)
 	return chain
+}
+
+func TestRateLimitForAPI_EnabledForSpec(t *testing.T) {
+	apiSpecDisabled := APISpec{APIDefinition: &apidef.APIDefinition{GlobalRateLimit: apidef.GlobalRateLimit{Disabled: true, Rate: 2, Per: 1}}}
+
+	rlDisabled := &RateLimitForAPI{BaseMiddleware: &BaseMiddleware{Spec: &apiSpecDisabled}}
+	assert.False(t, rlDisabled.EnabledForSpec())
 }
 
 func TestRLOpen(t *testing.T) {
