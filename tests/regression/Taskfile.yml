@@ -1,0 +1,42 @@
+---
+version: "3"
+
+env:
+  TYK_LOGLEVEL: debug
+
+includes:
+  services:
+    taskfile: ../../docker/services/Taskfile.yml
+    dir: ../../docker/services
+
+tasks:
+  default:
+    desc: "Run everything"
+    cmds:
+      - defer: { task: clean }
+      - task: fmt
+      - task: test
+
+  fmt:
+    desc: "Run formatters"
+    cmds:
+      - goimports -w .
+      - go fmt ./...
+
+  test:build:
+    desc: "Build tests"
+    cmds:
+      - go test -c .
+
+  test:
+    desc: "Run tests"
+    deps: [ services:up ]
+    cmds:
+      - task: test:build
+      - defer: { task: services:down }
+      - ./regression.test -test.v
+
+  clean:
+    desc: "Clean up temporary files"
+    cmds:
+      - rm regression.test -f
