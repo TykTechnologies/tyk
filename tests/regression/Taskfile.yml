@@ -20,7 +20,7 @@ tasks:
   fmt:
     desc: "Run formatters"
     cmds:
-      - goimports -w .
+      - goimports -local github.com/TykTechnologies,github.com/TykTechnologies/tyk/internal -w .
       - go fmt ./...
 
   test:build:
