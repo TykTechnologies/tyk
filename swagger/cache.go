@@ -13,6 +13,7 @@ func InvalidateCache(r *openapi3.Reflector) error {
 	return invalidateCache(r)
 }
 
+// Done
 func invalidateCache(r *openapi3.Reflector) error {
 	// TODO::Ask why we don't have error 404 for this
 	oc, err := r.NewOperationContext(http.MethodDelete, "/tyk/cache/{apiID}")
@@ -26,9 +27,11 @@ func invalidateCache(r *openapi3.Reflector) error {
 	oc.AddRespStructure(apiStatusMessage{
 		Status:  "ok",
 		Message: "cache invalidated",
+	}, func(cu *openapi.ContentUnit) {
+		cu.Description = "cache invalidated"
 	})
-	oc.AddRespStructure(new(apiStatusMessage), openapi.WithHTTPStatus(http.StatusInternalServerError))
-	oc.AddRespStructure(new(apiStatusMessage), openapi.WithHTTPStatus(http.StatusForbidden))
+	statusInternalServerError(oc, "when cache invalidation fails")
+	forbidden(oc)
 	o3, ok := oc.(openapi3.OperationExposer)
 	if !ok {
 		return ErrOperationExposer

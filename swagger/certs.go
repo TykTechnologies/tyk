@@ -137,15 +137,16 @@ func orgIDQuery(description ...string) openapi3.ParameterOrRef {
 
 func certModeQuery(description ...string) openapi3.ParameterOrRef {
 	stringType := openapi3.SchemaTypeString
-
+	var example interface{} = "detailed"
 	desc := "Mode to list the certificate details"
 	if len(description) != 0 {
 		desc = description[0]
 	}
 	return openapi3.Parameter{In: openapi3.ParameterInQuery, Name: "mode", Required: &isOptional, Description: &desc, Schema: &openapi3.SchemaOrRef{
 		Schema: &openapi3.Schema{
-			Type: &stringType,
-			Enum: []interface{}{"detailed"},
+			Type:    &stringType,
+			Example: &example,
+			Enum:    []interface{}{"detailed"},
 		},
 	}}.ToParameterOrRef()
 }
