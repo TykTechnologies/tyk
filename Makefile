@@ -27,7 +27,6 @@ test:
 lint: lint-fast
 	goimports -local github.com/TykTechnologies,github.com/TykTechnologies/tyk/internal -w .
 	gofmt -w .
-	faillint -ignore-tests -paths "$(shell grep -v '^#' .faillint | xargs echo | sed 's/ /,/g')" ./...
 
 lint-fast: lint-install
 	go generate ./...
@@ -38,7 +37,6 @@ lint-fast: lint-install
 lint-install:
 	go install golang.org/x/tools/cmd/goimports@latest
 	go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.55.2
-	go install github.com/fatih/faillint@latest
 	go install go.uber.org/mock/mockgen@v0.4.0
 
 .PHONY: bench
@@ -102,7 +100,7 @@ mongo-shell:
 .PHONY: docker docker-std
 
 docker:
-	docker build --platform ${BUILD_PLATFORM} --rm -t internal/tyk-gateway --squash .
+	docker build --platform ${BUILD_PLATFORM} --rm -t internal/tyk-gateway .
 
 docker-std: build
 	docker build --platform ${BUILD_PLATFORM} --no-cache -t internal/tyk-gateway:std -f ci/Dockerfile.std .

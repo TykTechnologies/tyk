@@ -25,10 +25,15 @@ func TestRollingWindow_GetCount(t *testing.T) {
 	conf, err := config.New()
 	assert.NoError(t, err)
 
-	conn := storage.NewRedisClusterPool(false, false, *conf)
+	conn, err := storage.NewConnector(storage.DefaultConn, *conf)
+	assert.Nil(t, err)
+
+	var db redis.UniversalClient
+	ok := conn.As(&db)
+	assert.True(t, ok)
 
 	for _, tx := range []bool{true, false} {
-		assertGetCount(ctx, t, conn, tx)
+		assertGetCount(ctx, t, db, tx)
 	}
 }
 
@@ -41,10 +46,15 @@ func TestRollingWindow_Get(t *testing.T) {
 	conf, err := config.New()
 	assert.NoError(t, err)
 
-	conn := storage.NewRedisClusterPool(false, false, *conf)
+	conn, err := storage.NewConnector(storage.DefaultConn, *conf)
+	assert.Nil(t, err)
+
+	var db redis.UniversalClient
+	ok := conn.As(&db)
+	assert.True(t, ok)
 
 	for _, tx := range []bool{true, false} {
-		assertGet(ctx, t, conn, tx)
+		assertGet(ctx, t, db, tx)
 	}
 }
 
@@ -57,8 +67,8 @@ func TestRollingWindow_pipelinerError(t *testing.T) {
 	conf, err := config.New()
 	assert.NoError(t, err)
 
-	rc := storage.NewRedisController(ctx)
-	go rc.ConnectToRedis(ctx, nil, conf)
+	rc := storage.NewConnectionHandler(ctx)
+	go rc.Connect(ctx, nil, conf)
 
 	timeout, cancel := context.WithTimeout(ctx, time.Second)
 	defer cancel()
@@ -68,7 +78,7 @@ func TestRollingWindow_pipelinerError(t *testing.T) {
 		panic("can't connect to redis '" + conf.Storage.Host + "', timeout")
 	}
 
-	rl, err := rate.NewSlidingLog(&storage.RedisCluster{KeyPrefix: "test-cluster", RedisController: rc}, false)
+	rl, err := rate.NewSlidingLog(&storage.RedisCluster{KeyPrefix: "test-cluster", ConnectionHandler: rc}, false)
 	assert.NoError(t, err)
 
 	rl.PipelineFn = func(context.Context, func(redis.Pipeliner) error) error {
@@ -155,13 +165,17 @@ func BenchmarkRollingWindow_New(b *testing.B) {
 	conf, err := config.New()
 	assert.NoError(b, err)
 
-	conn := storage.NewRedisClusterPool(false, false, *conf)
+	conn, err := storage.NewConnector(storage.DefaultConn, *conf)
+	assert.Nil(b, err)
 
+	var db redis.UniversalClient
+	ok := conn.As(&db)
+	assert.True(b, ok)
 	b.ResetTimer()
 
 	b.Run("constructor", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
-			assertNew(ctx, b, conn, false)
+			assertNew(ctx, b, db, false)
 		}
 	})
 }
@@ -172,31 +186,36 @@ func BenchmarkRollingWindow_Count(b *testing.B) {
 	conf, err := config.New()
 	assert.NoError(b, err)
 
-	conn := storage.NewRedisClusterPool(false, false, *conf)
+	conn, err := storage.NewConnector(storage.DefaultConn, *conf)
+	assert.Nil(b, err)
+
+	var db redis.UniversalClient
+	ok := conn.As(&db)
+	assert.True(b, ok)
 
 	b.ResetTimer()
 
 	b.Run("set/get count pipelined", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
-			assertGetCount(ctx, b, conn, false)
+			assertGetCount(ctx, b, db, false)
 		}
 	})
 
 	b.Run("set/get count transaction", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
-			assertGetCount(ctx, b, conn, true)
+			assertGetCount(ctx, b, db, true)
 		}
 	})
 
 	b.Run("set/get pipelined", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
-			assertGet(ctx, b, conn, false)
+			assertGet(ctx, b, db, false)
 		}
 	})
 
 	b.Run("set/get transaction", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
-			assertGet(ctx, b, conn, true)
+			assertGet(ctx, b, db, true)
 		}
 	})
 }

@@ -23,8 +23,6 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	redis "github.com/TykTechnologies/tyk/internal/redis"
-
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/test"
 	"github.com/TykTechnologies/tyk/user"
@@ -867,7 +865,7 @@ func TestSyncAPISpecsDashboardSuccess(t *testing.T) {
 
 	var wg sync.WaitGroup
 	wg.Add(1)
-	msg := redis.Message{Payload: `{"Command": "ApiUpdated"}`}
+	msg := testMessageAdapter{Msg: `{"Command": "ApiUpdated"}`}
 	handled := func(got NotificationCommand) {
 		if want := NoticeApiUpdated; got != want {
 			t.Fatalf("want %q, got %q", want, got)
@@ -1218,7 +1216,7 @@ func TestSyncAPISpecsDashboardJSONFailure(t *testing.T) {
 
 	var wg sync.WaitGroup
 	wg.Add(1)
-	msg := redis.Message{Payload: `{"Command": "ApiUpdated"}`}
+	msg := testMessageAdapter{Msg: `{"Command": "ApiUpdated"}`}
 	handled := func(got NotificationCommand) {
 		if want := NoticeApiUpdated; got != want {
 			t.Fatalf("want %q, got %q", want, got)
@@ -1550,4 +1548,75 @@ func TestAPISpec_setHasMock(t *testing.T) {
 	mock.Enabled = true
 	s.setHasMock()
 	assert.True(t, s.HasMock)
+}
+
+func TestReplaceSecrets(t *testing.T) {
+	ts := StartTest(func(globalConf *config.Config) {
+		globalConf.Secrets = map[string]string{
+			"Laurentiu": "Ghiur",
+		}
+	})
+	defer ts.Close()
+
+	t.Setenv("Furkan", "Şenharputlu")
+	t.Setenv("Leonid", "Bugaev")
+
+	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		spec.APIID = "1"
+		spec.JWTSource = "env://Furkan"
+		spec.JWTSigningMethod = "secrets://Laurentiu"
+	}, func(spec *APISpec) {
+		spec.APIID = "2"
+		spec.AuthConfigs = map[string]apidef.AuthConfig{
+			apidef.BasicType: {
+				AuthHeaderName: "env://Leonid",
+			},
+			apidef.AuthTokenType: {
+				AuthHeaderName: "env://Furkan",
+			},
+			apidef.OAuthType: {
+				AuthHeaderName: "secrets://Laurentiu",
+			},
+		}
+	})
+
+	api1 := ts.Gw.getApiSpec("1")
+	api2 := ts.Gw.getApiSpec("2")
+	assert.Equal(t, "Şenharputlu", api1.JWTSource)
+	assert.Equal(t, "Bugaev", api2.AuthConfigs[apidef.BasicType].AuthHeaderName)
+	assert.Equal(t, "Şenharputlu", api2.AuthConfigs[apidef.AuthTokenType].AuthHeaderName)
+	assert.Equal(t, "Ghiur", api1.JWTSigningMethod)
+	assert.Equal(t, "Ghiur", api2.AuthConfigs[apidef.OAuthType].AuthHeaderName)
+}
+
+func TestInternalEndpointMW_TT_11126(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		UpdateAPIVersion(spec, "v1", func(v *apidef.VersionInfo) {
+			assert.NoError(t, json.Unmarshal([]byte(`[
+                    {
+                        "disabled": false,
+                        "add_headers": {
+                            "New-Header": "Value"
+                        },
+                        "path": "/headers",
+                        "method": "GET"
+                    }
+                ]`), &v.ExtendedPaths.TransformHeader))
+			assert.NoError(t, json.Unmarshal([]byte(`[
+                        {
+                            "path": "/headers",
+                            "method": "GET",
+                            "disabled": false
+						}
+				]`), &v.ExtendedPaths.Internal))
+		})
+		spec.Proxy.ListenPath = "/"
+	})
+
+	_, _ = ts.Run(t, []test.TestCase{
+		{Path: "/headers", Code: http.StatusForbidden},
+	}...)
 }

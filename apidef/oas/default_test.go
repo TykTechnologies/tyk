@@ -1247,6 +1247,96 @@ func TestOAS_BuildDefaultTykExtension(t *testing.T) {
 
 		assert.Equal(t, expectedTykExtension, *oasDef.GetTykExtension())
 	})
+
+	t.Run("build tyk-extension should overwrite upstream url params with defaults values", func(t *testing.T) {
+		oasDef := OAS{
+			T: openapi3.T{
+				Info: &openapi3.Info{
+					Title: "OAS API",
+				},
+				Servers: openapi3.Servers{
+					{
+						URL: "https://example-org.com/api/{bestApiGateway}",
+						Variables: map[string]*openapi3.ServerVariable{
+							"bestApiGateway": {
+								Default: "tyk",
+							},
+						},
+					},
+				},
+			},
+		}
+
+		err := oasDef.BuildDefaultTykExtension(TykExtensionConfigParams{}, true)
+		assert.NoError(t, err)
+
+		expectedTykExtension := XTykAPIGateway{
+			Server: Server{
+				ListenPath: ListenPath{
+					Value: "/",
+					Strip: true,
+				},
+			},
+			Upstream: Upstream{
+				URL: "https://example-org.com/api/tyk",
+			},
+			Info: Info{
+				Name: "OAS API",
+				State: State{
+					Active: true,
+				},
+			},
+		}
+
+		assert.Equal(t, expectedTykExtension, *oasDef.GetTykExtension())
+	})
+
+	t.Run("build tyk-extension should error when a parameter does not have a default value", func(t *testing.T) {
+		oasDef := OAS{
+			T: openapi3.T{
+				Info: &openapi3.Info{
+					Title: "OAS API",
+				},
+				Servers: openapi3.Servers{
+					{
+						URL: "https://example-org.com/api/{bestApiGateway}",
+						Variables: map[string]*openapi3.ServerVariable{
+							"bestApiGateway": {},
+						},
+					},
+				},
+			},
+		}
+
+		err := oasDef.BuildDefaultTykExtension(TykExtensionConfigParams{}, true)
+		assert.NotNil(t, err)
+		assert.Contains(t, err.Error(), "does not have a default value")
+	})
+
+	t.Run("build tyk-extension should error when url still contains parameters after replacing is done", func(t *testing.T) {
+		oasDef := OAS{
+			T: openapi3.T{
+				Info: &openapi3.Info{
+					Title: "OAS API",
+				},
+				Servers: openapi3.Servers{
+					{
+						URL: "https://example-org.com/api/{bestApiGateway}/{extraParam}",
+						Variables: map[string]*openapi3.ServerVariable{
+							"bestApiGateway": {
+								Default: "tyk",
+							},
+						},
+					},
+				},
+			},
+		}
+
+		err := oasDef.BuildDefaultTykExtension(TykExtensionConfigParams{}, true)
+		assert.NotNil(t, err)
+		assert.Contains(t, err.Error(), "server URL contains undefined variables")
+	})
+
 }
 
 func TestGetTykExtensionConfigParams(t *testing.T) {

@@ -7,13 +7,12 @@ import (
 	"testing"
 
 	"github.com/buger/jsonparser"
-	"github.com/stretchr/testify/require"
-
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
-//go:embed testdata/minimal-valid-oas-template.json
+//go:embed testdata/*-oas-template.json
 var oasTemplateFS embed.FS
 
 func getStrPointer(str string) *string {
@@ -194,10 +193,19 @@ func TestValidateOASObject(t *testing.T) {
 }
 
 func TestValidateOASTemplate(t *testing.T) {
-	body, err := oasTemplateFS.ReadFile("testdata/minimal-valid-oas-template.json")
-	require.NoError(t, err)
-	err = ValidateOASTemplate(body, "")
-	assert.NoError(t, err)
+	t.Run("empty x-tyk ext", func(t *testing.T) {
+		body, err := oasTemplateFS.ReadFile("testdata/empty-x-tyk-ext-oas-template.json")
+		require.NoError(t, err)
+		err = ValidateOASTemplate(body, "")
+		assert.NoError(t, err)
+	})
+
+	t.Run("non-empty x-tyk-ext", func(t *testing.T) {
+		body, err := oasTemplateFS.ReadFile("testdata/non-empty-x-tyk-ext-oas-template.json")
+		require.NoError(t, err)
+		err = ValidateOASTemplate(body, "")
+		assert.NoError(t, err)
+	})
 }
 
 func Test_loadOASSchema(t *testing.T) {

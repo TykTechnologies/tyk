@@ -21,7 +21,23 @@ type OtelGraphqlEngineV2Basic struct {
 }
 
 func (o *OtelGraphqlEngineV2Basic) Normalize(operation *graphql.Request) error {
-	return o.engine.Normalize(operation)
+	opType, err := operation.OperationType()
+	if err != nil {
+		return err
+	}
+	err = o.engine.Normalize(operation)
+	if err != nil {
+		_, span := o.tracerProvider.Tracer().Start(o.traceContext, "GraphqlMiddleware Validation")
+		defer span.End()
+
+		span.SetAttributes(
+			semconv.GraphQLOperationName(operation.OperationName),
+			semconv.GraphQLOperationType(PrintOperationType(ast.OperationType(opType))),
+			semconv.GraphQLDocument(operation.Query),
+		)
+		return err
+	}
+	return nil
 }
 
 func (o *OtelGraphqlEngineV2Basic) ValidateForSchema(operation *graphql.Request) error {
@@ -62,7 +78,7 @@ func (o *OtelGraphqlEngineV2Basic) Execute(inCtx context.Context, operation *gra
 
 	span.SetAttributes(
 		semconv.GraphQLOperationName(operation.OperationName),
-		semconv.GraphQLOperationType(printOperationType(ast.OperationType(operationType))),
+		semconv.GraphQLOperationType(PrintOperationType(ast.OperationType(operationType))),
 		semconv.GraphQLDocument(operation.Query),
 	)
 

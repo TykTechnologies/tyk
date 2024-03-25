@@ -15,6 +15,10 @@ type Vault struct {
 	kvV2   bool
 }
 
+func (v *Vault) Client() *vaultApi.Client {
+	return v.client
+}
+
 // NewVault returns a configured vault KV store adapter
 func NewVault(conf config.VaultConfig) (Store, error) {
 	return newVault(conf)

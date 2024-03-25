@@ -16,6 +16,10 @@ func NewConsul(conf config.ConsulConfig) (Store, error) {
 	return newConsul(conf)
 }
 
+func (c *Consul) Store() *consulApi.KV {
+	return c.store
+}
+
 func (c *Consul) Get(key string) (string, error) {
 	pair, _, err := c.store.Get(key, nil)
 	if err != nil {
@@ -34,6 +38,10 @@ func newConsul(conf config.ConsulConfig) (Store, error) {
 
 	if conf.Address != "" {
 		defaultCfg.Address = conf.Address
+	}
+
+	if conf.Scheme != "" {
+		defaultCfg.Scheme = conf.Scheme
 	}
 
 	if conf.Datacenter != "" {

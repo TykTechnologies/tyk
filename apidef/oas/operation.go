@@ -74,6 +74,9 @@ type Operation struct {
 
 	// DoNotTrackEndpoint contains the configuration for disabling analytics and logs.
 	DoNotTrackEndpoint *TrackEndpoint `bson:"doNotTrackEndpoint,omitempty" json:"doNotTrackEndpoint,omitempty"`
+
+	// RequestSizeLimit limits the maximum allowed size of the request body in bytes.
+	RequestSizeLimit *RequestSizeLimit `bson:"requestSizeLimit,omitempty" json:"requestSizeLimit,omitempty"`
 }
 
 // AllowanceType holds the valid allowance types values.
@@ -154,6 +157,7 @@ func (s *OAS) fillPathsAndOperations(ep apidef.ExtendedPathsSet) {
 	s.fillCircuitBreaker(ep.CircuitBreaker)
 	s.fillTrackEndpoint(ep.TrackEndpoints)
 	s.fillDoNotTrackEndpoint(ep.DoNotTrackEndpoints)
+	s.fillRequestSizeLimit(ep.SizeLimit)
 }
 
 func (s *OAS) extractPathsAndOperations(ep *apidef.ExtendedPathsSet) {
@@ -186,6 +190,7 @@ func (s *OAS) extractPathsAndOperations(ep *apidef.ExtendedPathsSet) {
 					tykOp.extractCircuitBreakerTo(ep, path, method)
 					tykOp.extractTrackEndpointTo(ep, path, method)
 					tykOp.extractDoNotTrackEndpointTo(ep, path, method)
+					tykOp.extractRequestSizeLimitTo(ep, path, method)
 					break found
 				}
 			}
@@ -333,6 +338,21 @@ func (s *OAS) fillEnforceTimeout(metas []apidef.HardTimeoutMeta) {
 	}
 }
 
+func (s *OAS) fillRequestSizeLimit(metas []apidef.RequestSizeMeta) {
+	for _, meta := range metas {
+		operationID := s.getOperationID(meta.Path, meta.Method)
+		operation := s.GetTykExtension().getOperation(operationID)
+		if operation.RequestSizeLimit == nil {
+			operation.RequestSizeLimit = &RequestSizeLimit{}
+		}
+
+		operation.RequestSizeLimit.Fill(meta)
+		if ShouldOmit(operation.RequestSizeLimit) {
+			operation.RequestSizeLimit = nil
+		}
+	}
+}
+
 func (o *Operation) extractAllowanceTo(ep *apidef.ExtendedPathsSet, path string, method string, typ AllowanceType) {
 	allowance := o.Allow
 	endpointMetas := &ep.WhiteList
@@ -426,6 +446,16 @@ func (o *Operation) extractEnforceTimeoutTo(ep *apidef.ExtendedPathsSet, path st
 	meta := apidef.HardTimeoutMeta{Path: path, Method: method}
 	o.EnforceTimeout.ExtractTo(&meta)
 	ep.HardTimeouts = append(ep.HardTimeouts, meta)
+}
+
+func (o *Operation) extractRequestSizeLimitTo(ep *apidef.ExtendedPathsSet, path string, method string) {
+	if o.RequestSizeLimit == nil {
+		return
+	}
+
+	meta := apidef.RequestSizeMeta{Path: path, Method: method}
+	o.RequestSizeLimit.ExtractTo(&meta)
+	ep.SizeLimit = append(ep.SizeLimit, meta)
 }
 
 // detect possible regex pattern:
@@ -681,7 +711,7 @@ func (s *OAS) fillOASValidateRequest(metas []apidef.ValidatePathMeta) {
 
 // MockResponse configures the mock responses.
 type MockResponse struct {
-	// Enabled enables the mock response middleware.
+	// Enabled activates the mock response middleware.
 	Enabled bool `bson:"enabled" json:"enabled"`
 	// Code is the HTTP response code that will be returned.
 	Code int `bson:"code,omitempty" json:"code,omitempty"`
@@ -693,9 +723,9 @@ type MockResponse struct {
 	FromOASExamples *FromOASExamples `bson:"fromOASExamples,omitempty" json:"fromOASExamples,omitempty"`
 }
 
-// FromOASExamples configures mock responses should be returned from OAS example responses.
+// FromOASExamples configures mock responses that should be returned from OAS example responses.
 type FromOASExamples struct {
-	// Enabled enables getting a mock response from OAS examples or schemas documented in OAS.
+	// Enabled activates getting a mock response from OAS examples or schemas documented in OAS.
 	Enabled bool `bson:"enabled" json:"enabled"`
 	// Code is the default HTTP response code that the gateway reads from the path responses documented in OAS.
 	Code int `bson:"code,omitempty" json:"code,omitempty"`

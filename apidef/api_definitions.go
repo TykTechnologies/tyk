@@ -214,6 +214,7 @@ type InternalMeta struct {
 }
 
 type RequestSizeMeta struct {
+	Disabled  bool   `bson:"disabled" json:"disabled"`
 	Path      string `bson:"path" json:"path"`
 	Method    string `bson:"method" json:"method"`
 	SizeLimit int64  `bson:"size_limit" json:"size_limit"`
@@ -364,7 +365,6 @@ func (e *ExtendedPathsSet) Clear() {
 	*e = ExtendedPathsSet{
 		TransformJQ:         e.TransformJQ,
 		TransformJQResponse: e.TransformJQResponse,
-		SizeLimit:           e.SizeLimit,
 		PersistGraphQL:      e.PersistGraphQL,
 	}
 }
@@ -742,8 +742,9 @@ type SignatureConfig struct {
 }
 
 type GlobalRateLimit struct {
-	Rate float64 `bson:"rate" json:"rate"`
-	Per  float64 `bson:"per" json:"per"`
+	Disabled bool    `bson:"disabled" json:"disabled"`
+	Rate     float64 `bson:"rate" json:"rate"`
+	Per      float64 `bson:"per" json:"per"`
 }
 
 type BundleManifest struct {

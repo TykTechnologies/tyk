@@ -7,10 +7,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/TykTechnologies/storage/temporal/model"
 	"github.com/TykTechnologies/tyk/internal/cache"
 	"github.com/TykTechnologies/tyk/rpc"
-
-	"github.com/TykTechnologies/tyk/internal/redis"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/storage"
@@ -152,14 +151,22 @@ func (r *RPCStorageHandler) Connect() bool {
 
 func (r *RPCStorageHandler) buildNodeInfo() []byte {
 	config := r.Gw.GetConfig()
+	checkDuration := config.LivenessCheck.CheckDuration
+	var intCheckDuration int64 = 10
+	if checkDuration != 0 {
+		// NodeData.TTL expects an int64 value, so we're getting the number of seconds expressed in int64 instead of time.Second
+		intCheckDuration = int64(checkDuration / time.Second)
+	}
+
 	node := apidef.NodeData{
-		NodeID:      r.Gw.GetNodeID(),
-		GroupID:     config.SlaveOptions.GroupID,
-		APIKey:      config.SlaveOptions.APIKey,
-		NodeVersion: VERSION,
-		TTL:         int64(config.LivenessCheck.CheckDuration),
-		Tags:        config.DBAppConfOptions.Tags,
-		Health:      r.Gw.getHealthCheckInfo(),
+		NodeID:          r.Gw.GetNodeID(),
+		GroupID:         config.SlaveOptions.GroupID,
+		APIKey:          config.SlaveOptions.APIKey,
+		NodeVersion:     VERSION,
+		TTL:             intCheckDuration,
+		NodeIsSegmented: config.DBAppConfOptions.NodeIsSegmented,
+		Tags:            config.DBAppConfOptions.Tags,
+		Health:          r.Gw.getHealthCheckInfo(),
 		Stats: apidef.GWStats{
 			APIsCount:     r.Gw.apisByIDLen(),
 			PoliciesCount: r.Gw.policiesByIDLen(),
@@ -195,7 +202,7 @@ func (r *RPCStorageHandler) getGroupLoginCallback(synchroniserEnabled bool) func
 		}
 	}
 	if synchroniserEnabled {
-		forcer := rpc.NewSyncForcer(r.Gw.RedisController, r.buildNodeInfo)
+		forcer := rpc.NewSyncForcer(r.Gw.StorageConnectionHandler, r.buildNodeInfo)
 		groupLoginCallbackFn = forcer.GroupLoginCallback
 	}
 	return groupLoginCallbackFn
@@ -582,7 +589,7 @@ func (r *RPCStorageHandler) DeleteKeys(keys []string) bool {
 }
 
 // StartPubSubHandler will listen for a signal and run the callback with the message
-func (r *RPCStorageHandler) StartPubSubHandler(channel string, callback func(*redis.Message)) error {
+func (r *RPCStorageHandler) StartPubSubHandler(_ string, _ func(*model.Message)) error {
 	log.Warning("RPCStorageHandler.StartPubSubHandler - NO PUBSUB DEFINED")
 	return nil
 }

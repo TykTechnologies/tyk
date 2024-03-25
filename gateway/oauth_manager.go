@@ -1189,7 +1189,7 @@ func (gw *Gateway) purgeLapsedOAuthTokens() error {
 		return nil
 	}
 
-	redisCluster := &storage.RedisCluster{KeyPrefix: "", HashKeys: false, RedisController: gw.RedisController}
+	redisCluster := &storage.RedisCluster{KeyPrefix: "", HashKeys: false, ConnectionHandler: gw.StorageConnectionHandler}
 
 	ok, err := redisCluster.Lock("oauth-purge-lock", time.Minute)
 	if err != nil {

@@ -6,7 +6,7 @@ import (
 	"reflect"
 )
 
-// ShouldOmit checks whether a field should be set to empty and omitted from OAS JSON.
+// ShouldOmit checks if a field should be set to empty and omitted from OAS JSON.
 func ShouldOmit(i interface{}) bool {
 	return IsZero(reflect.ValueOf(i))
 }

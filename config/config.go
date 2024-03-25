@@ -49,6 +49,9 @@ var (
 		CoProcessOptions: CoProcessConfig{
 			EnableCoProcess: false,
 		},
+		LivenessCheck: LivenessCheckConfig{
+			CheckDuration: time.Second * 10,
+		},
 	}
 )
 
@@ -142,6 +145,20 @@ type StorageOptionsConf struct {
 	UseSSL bool `json:"use_ssl"`
 	// Disable TLS verification
 	SSLInsecureSkipVerify bool `json:"ssl_insecure_skip_verify"`
+	// Path to the CA file.
+	CAFile string `json:"ca_file"`
+	// Path to the cert file.
+	CertFile string `json:"cert_file"`
+	// Path to the key file.
+	KeyFile string `json:"key_file"`
+	// Maximum TLS version that is supported.
+	// Options: ["1.0", "1.1", "1.2", "1.3"].
+	// Defaults to "1.3".
+	TLSMaxVersion string `json:"tls_max_version"`
+	// Minimum TLS version that is supported.
+	// Options: ["1.0", "1.1", "1.2", "1.3"].
+	// Defaults to "1.2".
+	TLSMinVersion string `json:"tls_min_version"`
 }
 
 type NormalisedURLConfig struct {
@@ -240,7 +257,9 @@ type HealthCheckConfig struct {
 }
 
 type LivenessCheckConfig struct {
-	// Frequencies of performing interval healthchecks for Redis, Dashboard, and RPC layer. Default: 10 seconds.
+	// Frequencies of performing interval healthchecks for Redis, Dashboard, and RPC layer.
+	// Expressed in Nanoseconds. For example: 1000000000 -> 1s.
+	// Default: 10 seconds.
 	CheckDuration time.Duration `json:"check_duration"`
 }
 
@@ -797,6 +816,7 @@ type Config struct {
 	ProxySSLCipherSuites []string `json:"proxy_ssl_ciphers"`
 
 	// This can specify a default timeout in seconds for upstream API requests.
+	// Default: 30 seconds
 	ProxyDefaultTimeout float64 `json:"proxy_default_timeout"`
 
 	// Disable TLS renegotiation.
@@ -1051,6 +1071,18 @@ type Config struct {
 
 	// DevelopmentConfig struct extends configuration for development builds.
 	DevelopmentConfig
+
+	// OAS holds the configuration for various OpenAPI-specific functionalities
+	OAS OASConfig `json:"oas_config"`
+}
+
+// OASConfig holds the configuration for various OpenAPI-specific functionalities
+type OASConfig struct {
+	// ValidateExamples enables validation of values provided in `example` and `examples` fields against the declared schemas in the OpenAPI Document. Defaults to false.
+	ValidateExamples bool `json:"validate_examples"`
+
+	// ValidateSchemaDefaults enables validation of values provided in `default` fields against the declared schemas in the OpenAPI Document. Defaults to false.
+	ValidateSchemaDefaults bool `json:"validate_schema_defaults"`
 }
 
 type ResourceSyncConfig struct {

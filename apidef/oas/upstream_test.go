@@ -95,16 +95,65 @@ func TestCacheOptions(t *testing.T) {
 }
 
 func TestUpstream(t *testing.T) {
-	var emptyUpstream Upstream
+	t.Run("empty", func(t *testing.T) {
+		var emptyUpstream Upstream
 
-	var convertedAPI apidef.APIDefinition
-	convertedAPI.SetDisabledFlags()
-	emptyUpstream.ExtractTo(&convertedAPI)
+		var convertedAPI apidef.APIDefinition
+		convertedAPI.SetDisabledFlags()
+		emptyUpstream.ExtractTo(&convertedAPI)
 
-	var resultUpstream Upstream
-	resultUpstream.Fill(convertedAPI)
+		var resultUpstream Upstream
+		resultUpstream.Fill(convertedAPI)
 
-	assert.Equal(t, emptyUpstream, resultUpstream)
+		assert.Equal(t, emptyUpstream, resultUpstream)
+	})
+
+	t.Run("rate limit", func(t *testing.T) {
+		t.Run("valid duration", func(t *testing.T) {
+			rateLimitUpstream := Upstream{
+				RateLimit: &RateLimit{
+					Enabled: true,
+					Rate:    10,
+					Per:     "1h20m10s",
+				},
+			}
+
+			var convertedAPI apidef.APIDefinition
+			convertedAPI.SetDisabledFlags()
+			rateLimitUpstream.ExtractTo(&convertedAPI)
+
+			assert.Equal(t, float64(4810), convertedAPI.GlobalRateLimit.Per)
+
+			var resultUpstream Upstream
+			resultUpstream.Fill(convertedAPI)
+
+			assert.Equal(t, rateLimitUpstream, resultUpstream)
+		})
+
+		t.Run("invalid duration", func(t *testing.T) {
+			rateLimitUpstream := Upstream{
+				RateLimit: &RateLimit{
+					Enabled: true,
+					Rate:    10,
+					Per:     "1d1h",
+				},
+			}
+
+			var convertedAPI apidef.APIDefinition
+			convertedAPI.SetDisabledFlags()
+			rateLimitUpstream.ExtractTo(&convertedAPI)
+
+			assert.Equal(t, float64(0), convertedAPI.GlobalRateLimit.Per)
+
+			var resultUpstream Upstream
+			resultUpstream.Fill(convertedAPI)
+
+			expectedUpstream := rateLimitUpstream
+			expectedUpstream.RateLimit.Per = ""
+			assert.Equal(t, rateLimitUpstream, resultUpstream)
+		})
+
+	})
 }
 
 func TestServiceDiscovery(t *testing.T) {

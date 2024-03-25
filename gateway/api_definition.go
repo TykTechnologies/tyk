@@ -19,9 +19,11 @@ import (
 	textTemplate "text/template"
 	"time"
 
-	graphqlinternal "github.com/TykTechnologies/tyk/internal/graphql"
+	"github.com/TykTechnologies/tyk/storage/kv"
 
 	"github.com/getkin/kin-openapi/routers"
+
+	"github.com/TykTechnologies/tyk/internal/graphengine"
 
 	"github.com/getkin/kin-openapi/routers/gorillamux"
 
@@ -31,16 +33,12 @@ import (
 
 	"github.com/cenk/backoff"
 
-	"github.com/TykTechnologies/graphql-go-tools/pkg/engine/resolve"
-
 	"github.com/Masterminds/sprig/v3"
 
 	"github.com/gorilla/mux"
 	"github.com/sirupsen/logrus"
 
 	circuit "github.com/TykTechnologies/circuitbreaker"
-
-	"github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
 
 	"github.com/TykTechnologies/gojsonschema"
 
@@ -218,19 +216,7 @@ type APISpec struct {
 
 	network analytics.NetworkStats
 
-	GraphQLExecutor struct {
-		Engine       *graphql.ExecutionEngine
-		CancelV2     context.CancelFunc
-		EngineV2     *graphql.ExecutionEngineV2
-		OtelExecutor graphqlinternal.TykOtelExecutorI
-		HooksV2      struct {
-			BeforeFetchHook resolve.BeforeFetchHook
-			AfterFetchHook  resolve.AfterFetchHook
-		}
-		Client          *http.Client
-		StreamingClient *http.Client
-		Schema          *graphql.Schema
-	} `json:"-"`
+	GraphEngine graphengine.Engine
 
 	HasMock            bool
 	HasValidateRequest bool
@@ -260,8 +246,8 @@ func (s *APISpec) Release() {
 	}
 
 	// cancel execution contexts
-	if s.GraphQLExecutor.CancelV2 != nil {
-		s.GraphQLExecutor.CancelV2()
+	if s.GraphEngine != nil {
+		s.GraphEngine.Cancel()
 	}
 
 	// release all other resources associated with spec
@@ -279,9 +265,9 @@ func (s *APISpec) Release() {
 }
 
 // Validate returns nil if s is a valid spec and an error stating why the spec is not valid.
-func (s *APISpec) Validate() error {
+func (s *APISpec) Validate(oasConfig config.OASConfig) error {
 	if s.IsOAS {
-		err := s.OAS.Validate(context.Background())
+		err := s.OAS.Validate(context.Background(), oas.GetValidationOptionsFromConfig(oasConfig)...)
 		if err != nil {
 			return err
 		}
@@ -534,9 +520,18 @@ func (a APIDefinitionLoader) FromDashboardService(endpoint string) ([]*APISpec, 
 
 	// Extract tagged APIs#
 	list := &nestedApiDefinitionList{}
-	if err := json.NewDecoder(resp.Body).Decode(&list); err != nil {
-		body, _ := ioutil.ReadAll(resp.Body)
-		return nil, fmt.Errorf("failed to decode body: %v body was: %v", err, string(body))
+	inBytes, err := io.ReadAll(resp.Body)
+	if err != nil {
+		log.Error("Couldn't read api definition list")
+		return nil, err
+	}
+
+	inBytes = a.replaceSecrets(inBytes)
+
+	err = json.Unmarshal(inBytes, &list)
+	if err != nil {
+		log.Error("Couldn't unmarshal api definition list")
+		return nil, err
 	}
 
 	// Extract tagged entries only
@@ -552,6 +547,102 @@ func (a APIDefinitionLoader) FromDashboardService(endpoint string) ([]*APISpec, 
 	log.Debug("Loading APIS Finished: Nonce Set: ", list.Nonce)
 
 	return specs, nil
+}
+
+var envRegex = regexp.MustCompile(`env://([^"]+)`)
+
+const (
+	prefixEnv       = "env://"
+	prefixSecrets   = "secrets://"
+	prefixConsul    = "consul://"
+	prefixVault     = "vault://"
+	prefixKeys      = "tyk-apis"
+	vaultSecretPath = "secret/data/"
+)
+
+func (a APIDefinitionLoader) replaceSecrets(in []byte) []byte {
+	input := string(in)
+
+	if strings.Contains(input, prefixEnv) {
+		matches := envRegex.FindAllStringSubmatch(input, -1)
+		uniqueWords := map[string]bool{}
+		for _, m := range matches {
+			if uniqueWords[m[0]] {
+				continue
+			}
+
+			uniqueWords[m[0]] = true
+			val := os.Getenv(m[1])
+			if val != "" {
+				input = strings.Replace(input, m[0], val, -1)
+			}
+		}
+	}
+
+	if strings.Contains(input, prefixSecrets) {
+		for k, v := range a.Gw.GetConfig().Secrets {
+			input = strings.Replace(input, prefixSecrets+k, v, -1)
+		}
+	}
+
+	if strings.Contains(input, prefixConsul) {
+		if err := a.replaceConsulSecrets(&input); err != nil {
+			log.WithError(err).Error("Couldn't replace consul secrets")
+		}
+	}
+
+	if strings.Contains(input, prefixVault) {
+		if err := a.replaceVaultSecrets(&input); err != nil {
+			log.WithError(err).Error("Couldn't replace vault secrets")
+		}
+	}
+
+	return []byte(input)
+}
+
+func (a APIDefinitionLoader) replaceConsulSecrets(input *string) error {
+	if err := a.Gw.setUpConsul(); err != nil {
+		return err
+	}
+
+	pairs, _, err := a.Gw.consulKVStore.(*kv.Consul).Store().List(prefixKeys, nil)
+	if err != nil {
+		return err
+	}
+
+	for i := 1; i < len(pairs); i++ {
+		key := strings.TrimPrefix(pairs[i].Key, prefixKeys+"/")
+		*input = strings.Replace(*input, prefixConsul+key, string(pairs[i].Value), -1)
+	}
+
+	return nil
+}
+
+func (a APIDefinitionLoader) replaceVaultSecrets(input *string) error {
+	if err := a.Gw.setUpVault(); err != nil {
+		return err
+	}
+
+	secret, err := a.Gw.vaultKVStore.(*kv.Vault).Client().Logical().Read(vaultSecretPath + prefixKeys)
+	if err != nil {
+		return err
+	}
+
+	pairs, ok := secret.Data["data"]
+	if !ok {
+		return errors.New("no data returned")
+	}
+
+	pairsMap, ok := pairs.(map[string]interface{})
+	if !ok {
+		return errors.New("data is not in the map format")
+	}
+
+	for k, v := range pairsMap {
+		*input = strings.Replace(*input, prefixVault+k, fmt.Sprintf("%v", v), -1)
+	}
+
+	return nil
 }
 
 // FromCloud will connect and download ApiDefintions from a Mongo DB instance.
@@ -572,6 +663,7 @@ func (a APIDefinitionLoader) FromRPC(store RPCDataLoader, orgId string, gw *Gate
 	}
 
 	apiCollection := store.GetApiDefinitions(orgId, tags)
+	apiCollection = string(a.replaceSecrets([]byte(apiCollection)))
 
 	//store.Disconnect()
 
@@ -673,20 +765,22 @@ func (a APIDefinitionLoader) FromDir(dir string) []*APISpec {
 }
 func (a APIDefinitionLoader) loadDefFromFilePath(filePath string) (*APISpec, error) {
 	log.Info("Loading API Specification from ", filePath)
-	f, err := os.Open(filePath)
-	defer func() {
-		err = f.Close()
-		if err != nil {
-			log.WithError(err).Error("error while closing file ", filePath)
-		}
-	}()
 
+	data, err := os.ReadFile(filePath)
 	if err != nil {
-		log.Error("Couldn't open api configuration file: ", err)
+		log.Error("Couldn't read api configuration file: ", err)
 		return nil, err
 	}
 
-	def := a.ParseDefinition(f)
+	data = a.replaceSecrets(data)
+
+	var def apidef.APIDefinition
+	err = json.Unmarshal(data, &def)
+	if err != nil {
+		log.Error("Couldn't unmarshal read file: ", err)
+		return nil, err
+	}
+
 	nestDef := nestedApiDefinition{APIDefinition: &def}
 	if def.IsOAS {
 		loader := openapi3.NewLoader()
@@ -969,6 +1063,10 @@ func (a APIDefinitionLoader) compileRequestSizePathSpec(paths []apidef.RequestSi
 	urlSpec := []URLSpec{}
 
 	for _, stringSpec := range paths {
+		if stringSpec.Disabled {
+			continue
+		}
+
 		newSpec := URLSpec{}
 		a.generateRegex(stringSpec.Path, &newSpec, stat, conf)
 		// Extend with method actions
@@ -1360,6 +1458,16 @@ func (a *APISpec) getURLStatus(stat URLStatus) RequestStatus {
 
 // URLAllowedAndIgnored checks if a url is allowed and ignored.
 func (a *APISpec) URLAllowedAndIgnored(r *http.Request, rxPaths []URLSpec, whiteListStatus bool) (RequestStatus, interface{}) {
+	for i := range rxPaths {
+		if !rxPaths[i].Spec.MatchString(r.URL.Path) {
+			continue
+		}
+
+		if r.Method == rxPaths[i].Internal.Method && rxPaths[i].Status == Internal && !ctxLoopingEnabled(r) {
+			return EndPointNotAllowed, nil
+		}
+	}
+
 	// Check if ignored
 	for i := range rxPaths {
 		if !rxPaths[i].Spec.MatchString(r.URL.Path) {
@@ -1418,10 +1526,6 @@ func (a *APISpec) URLAllowedAndIgnored(r *http.Request, rxPaths []URLSpec, white
 				log.Error("URL Method Action was not set to NoAction, blocking.")
 				return EndPointNotAllowed, nil
 			}
-		}
-
-		if r.Method == rxPaths[i].Internal.Method && rxPaths[i].Status == Internal && !ctxLoopingEnabled(r) {
-			return EndPointNotAllowed, nil
 		}
 
 		if whiteListStatus {
