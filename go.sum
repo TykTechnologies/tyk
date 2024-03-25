@@ -613,8 +613,12 @@ github.com/stvp/tempredis v0.0.0-20181119212430-b82af8480203 h1:QVqDTf3h2WHt08Yu
 github.com/stvp/tempredis v0.0.0-20181119212430-b82af8480203/go.mod h1:oqN97ltKNihBbwlX8dLpwxCl3+HnXKV/R0e+sRLd9C8=
 github.com/swaggest/jsonschema-go v0.3.66 h1:4c5d7NRRqPLTswsbaypKqcMe3Z+CYHE3/lGsPIByp8o=
 github.com/swaggest/jsonschema-go v0.3.66/go.mod h1:7N43/CwdaWgPUDfYV70K7Qm79tRqe/al7gLSt9YeGIE=
+github.com/swaggest/jsonschema-go v0.3.70 h1:8Vx5nm5t/6DBFw2+WC0/Vp1ZVe9/4mpuA0tuAe0wwCI=
+github.com/swaggest/jsonschema-go v0.3.70/go.mod h1:7N43/CwdaWgPUDfYV70K7Qm79tRqe/al7gLSt9YeGIE=
 github.com/swaggest/openapi-go v0.2.49 h1:WxAfdde6DlfQPQayHWTb64CywK9+vpToi7iN17iDPO8=
 github.com/swaggest/openapi-go v0.2.49/go.mod h1:MK5O26lG289kFgMOyXK1VXDoTZ89KJ8Vt0v0ic23zZw=
+github.com/swaggest/openapi-go v0.2.50 h1:5yQ7N/IhMK9bQSk2yFAEbB75DvoXzyEmji3Q2iS++is=
+github.com/swaggest/openapi-go v0.2.50/go.mod h1:5R2TWYBz0U7P3vwIwN0ytwSxqONXZnbiAaa+DQ3Sq1k=
 github.com/swaggest/refl v1.3.0 h1:PEUWIku+ZznYfsoyheF97ypSduvMApYyGkYF3nabS0I=
 github.com/swaggest/refl v1.3.0/go.mod h1:3Ujvbmh1pfSbDYjC6JGG7nMgPvpG0ehQL4iNonnLNbg=
 github.com/tidwall/gjson v1.11.0 h1:C16pk7tQNiH6VlCrtIXL1w8GaOsi1X3W8KDkE1BuYd4=

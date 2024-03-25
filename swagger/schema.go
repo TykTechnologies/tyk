@@ -20,10 +20,15 @@ func getSchemaRequest(r *openapi3.Reflector) error {
 		return err
 	}
 	oc.SetID("getSchema")
+	oc.SetTags("Schema")
 	oc.SetSummary("Get OAS schema")
 	oc.SetDescription("Get OAS schema")
-	oc.AddRespStructure(new(gateway.OASSchemaResponse))
-	oc.AddRespStructure(new(gateway.OASSchemaResponse), openapi.WithHTTPStatus(http.StatusNotFound))
+	oc.AddRespStructure(new(gateway.OASSchemaResponse), openapi.WithHTTPStatus(http.StatusOK), func(cu *openapi.ContentUnit) {
+		cu.Description = "OAS schema response"
+	})
+	oc.AddRespStructure(new(gateway.OASSchemaResponse), openapi.WithHTTPStatus(http.StatusNotFound), func(cu *openapi.ContentUnit) {
+		cu.Description = "The response when the requested OAS schema is not found"
+	})
 	oc.AddRespStructure(new(apiStatusMessage), openapi.WithHTTPStatus(http.StatusForbidden))
 	o3, ok := oc.(openapi3.OperationExposer)
 	if !ok {

@@ -46,7 +46,7 @@ func TykSessionState(session *coprocess.SessionState) *user.SessionState {
 	}
 
 	var monitor struct {
-		TriggerLimits []float64 `json:"trigger_limits" msg:"trigger_limits"`
+		TriggerLimits []float64 `json:"trigger_limits" msg:"trigger_limits" example:"[80, 60, 50]"`
 	}
 
 	if session.Monitor != nil {
@@ -97,7 +97,6 @@ func TykSessionState(session *coprocess.SessionState) *user.SessionState {
 
 // ProtoSessionState takes a standard SessionState and outputs a SessionState object compatible with Protocol Buffers.
 func ProtoSessionState(session *user.SessionState) *coprocess.SessionState {
-
 	accessDefinitions := make(map[string]*coprocess.AccessDefinition, len(session.AccessRights))
 
 	for key, accessDefinition := range session.AccessRights {

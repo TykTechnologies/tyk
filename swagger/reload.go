@@ -13,6 +13,7 @@ func ReloadApi(r *openapi3.Reflector) error {
 	return addOperations(r, groupReload, singleNodeReload)
 }
 
+// Done
 func groupReload(r *openapi3.Reflector) error {
 	oc, err := r.NewOperationContext(http.MethodGet, "/tyk/reload/group")
 	if err != nil {
@@ -29,6 +30,7 @@ func groupReload(r *openapi3.Reflector) error {
 	return r.AddOperation(oc)
 }
 
+// Done
 func singleNodeReload(r *openapi3.Reflector) error {
 	oc, err := r.NewOperationContext(http.MethodGet, "/tyk/reload")
 	if err != nil {

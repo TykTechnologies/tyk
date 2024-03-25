@@ -697,7 +697,7 @@ type APIDefinition struct {
 
 	// Gateway segment tags
 	TagsDisabled bool     `bson:"tags_disabled" json:"tags_disabled,omitempty"`
-	Tags         []string `bson:"tags" json:"tags"`
+	Tags         []string `bson:"tags" json:"tags" example:"[\"Default\",\"v1\"]"`
 
 	// IsOAS is set to true when API has an OAS definition (created in OAS or migrated to OAS)
 	IsOAS       bool   `bson:"is_oas" json:"is_oas,omitempty"`
@@ -793,7 +793,7 @@ type ProxyConfig struct {
 
 type CORSConfig struct {
 	Enable             bool     `bson:"enable" json:"enable" example:"false"`
-	AllowedOrigins     []string `bson:"allowed_origins" json:"allowed_origins" example:"https://*.foo.com"`
+	AllowedOrigins     []string `bson:"allowed_origins" json:"allowed_origins" example:"[\"https://*.foo.com\"]"`
 	AllowedMethods     []string `bson:"allowed_methods" json:"allowed_methods" example:"[\"GET\",\"HEAD\",\"POST\"]"`
 	AllowedHeaders     []string `bson:"allowed_headers" json:"allowed_headers" example:"[\"Origin\",\"Accept\",\"Content-Type\",\"Authorization\"]"`
 	ExposedHeaders     []string `bson:"exposed_headers" json:"exposed_headers" example:"[\"Accept\",\"Content-Type\"]"`

@@ -34,7 +34,7 @@ func IsHashType(t string) bool {
 // AccessSpecs define what URLS a user has access to an what methods are enabled
 type AccessSpec struct {
 	URL     string   `json:"url" msg:"url" example:"anything/rate-limit-1-per-5"`
-	Methods []string `json:"methods" msg:"methods"`
+	Methods []string `json:"methods" msg:"methods" example:"[\"GET\",\"POST\",\"DELETE\",\"PUT\"]"`
 }
 
 // APILimit stores quota and rate limit on ACL level (per API)
@@ -58,7 +58,7 @@ type APILimit struct {
 type AccessDefinition struct {
 	APIName              string                  `json:"api_name" msg:"api_name" example:"Rate Limit Proxy API"`
 	APIID                string                  `json:"api_id" msg:"api_id" example:"d1dfc6a927a046c54c0ed470f19757cc"`
-	Versions             []string                `json:"versions" msg:"versions"`
+	Versions             []string                `json:"versions" msg:"versions" example:"[\"Default\",\"v2\"]"`
 	AllowedURLs          []AccessSpec            `bson:"allowed_urls" json:"allowed_urls" msg:"allowed_urls"` // mapped string MUST be a valid regex
 	RestrictedTypes      []graphql.Type          `json:"restricted_types" msg:"restricted_types"`
 	AllowedTypes         []graphql.Type          `json:"allowed_types" msg:"allowed_types"`
@@ -96,7 +96,7 @@ type JWTData struct {
 }
 
 type Monitor struct {
-	TriggerLimits []float64 `json:"trigger_limits" msg:"trigger_limits"`
+	TriggerLimits []float64 `json:"trigger_limits" msg:"trigger_limits" example:"[80, 60, 50]"`
 }
 
 // SessionState objects represent a current API session, mainly used for rate limiting.
@@ -130,15 +130,15 @@ type SessionState struct {
 	RSACertificateId              string                      `json:"rsa_certificate_id" msg:"rsa_certificate_id"`
 	IsInactive                    bool                        `json:"is_inactive" msg:"is_inactive" example:"false"`
 	ApplyPolicyID                 string                      `json:"apply_policy_id" msg:"apply_policy_id" example:"641c15dd0fffb800010197bf"`
-	ApplyPolicies                 []string                    `json:"apply_policies" msg:"apply_policies"`
+	ApplyPolicies                 []string                    `json:"apply_policies" msg:"apply_policies" example:"[\"641c15dd0fffb800010197bf\"]"`
 	DataExpires                   int64                       `json:"data_expires" msg:"data_expires" format:"int64" example:"0"`
 	Monitor                       Monitor                     `json:"monitor" msg:"monitor"`
 	// Deprecated: EnableDetailRecording is deprecated. Use EnableDetailedRecording
 	// going forward instead
 	EnableDetailRecording   bool                   `json:"enable_detail_recording" msg:"enable_detail_recording" example:"false" deprecated:"true" description:"deprecated use enable_detailed_recording going forward instead"`
 	EnableDetailedRecording bool                   `json:"enable_detailed_recording" msg:"enable_detailed_recording" example:"true"`
-	MetaData                map[string]interface{} `json:"meta_data" msg:"meta_data"`
-	Tags                    []string               `json:"tags" msg:"tags"`
+	MetaData                map[string]interface{} `json:"meta_data" msg:"meta_data" example:"{\"tyk_developer_id\": \"62b3fb9a1d5e4f00017226f5\"}"`
+	Tags                    []string               `json:"tags" msg:"tags" example:"[\"641c15dd0fffb800010197bf\"]"`
 	Alias                   string                 `json:"alias" msg:"alias" example:"portal-developer@example.org"`
 	LastUpdated             string                 `json:"last_updated" msg:"last_updated" example:"1710302206"`
 	IdExtractorDeadline     int64                  `json:"id_extractor_deadline" msg:"id_extractor_deadline" format:"int64"`

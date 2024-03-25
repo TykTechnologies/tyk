@@ -307,7 +307,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: Attempted administrative access with invalid or missing key!
+          description: Attempting to access a protected api with an invalid or a missing
+            X-Tyk-Authorization in the headers
       summary: List all OAS format APIS
       tags:
       - OAS APIs
@@ -392,7 +393,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: Attempted administrative access with invalid or missing key!
+          description: Attempting to access a protected api with an invalid or a missing
+            X-Tyk-Authorization in the headers
         "404":
           content:
             application/json:
@@ -448,7 +450,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: Attempted administrative access with invalid or missing key!
+          description: Attempting to access a protected api with an invalid or a missing
+            X-Tyk-Authorization in the headers
         "404":
           content:
             application/json:
@@ -494,7 +497,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: Attempted administrative access with invalid or missing key!
+          description: Attempting to access a protected api with an invalid or a missing
+            X-Tyk-Authorization in the headers
         "404":
           content:
             application/json:
@@ -548,7 +552,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: Attempted administrative access with invalid or missing key!
+          description: Attempting to access a protected api with an invalid or a missing
+            X-Tyk-Authorization in the headers
         "404":
           content:
             application/json:
@@ -587,7 +592,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: Attempted administrative access with invalid or missing key!
+          description: Attempting to access a protected api with an invalid or a missing
+            X-Tyk-Authorization in the headers
       summary: Download all OAS format APIs
       tags:
       - OAS APIs
@@ -624,35 +630,79 @@ paths:
       tags:
       - Cache Invalidation
   /tyk/certs:
-    post:
-      description: Add a certificate to the Tyk Gateway
-      operationId: addCert
+    get:
+      description: List All Certificates in the Tyk Gateway
+      operationId: listCerts
       parameters:
       - description: Organisation ID to list the certificates
+        example: 5e9d9544a1dcd60001d0ed20
         in: query
         name: org_id
         required: true
         schema:
+          type: string
+      - description: Mode to list the certificate details
+        in: query
+        name: mode
+        required: false
+        schema:
+          enum:
+          - detailed
           type: string
       responses:
         "200":
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/APICertificateStatusMessage'
+                oneOf:
+                - $ref: '#/components/schemas/APIAllCertificateBasics'
+                - $ref: '#/components/schemas/APIAllCertificates'
           description: OK
         "403":
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: Forbidden
+          description: Attempting to access a protected api with an invalid or a missing
+            X-Tyk-Authorization in the headers
+      summary: List Certificates
+      tags:
+      - Certs
+    post:
+      description: Add a certificate to the Tyk Gateway
+      operationId: addCert
+      parameters:
+      - description: Organisation ID to add the certificate to
+        example: 5e9d9544a1dcd60001d0ed20
+        in: query
+        name: org_id
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          text/plain:
+            schema:
+              type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APICertificateStatusMessage'
+          description: New Certificate added
+        "403":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: When certificates you send already exist in the gateway
         "405":
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: Method Not Allowed
+          description: When you send a malformed request body
       summary: Add a certificate
       tags:
       - Certs
@@ -662,15 +712,17 @@ paths:
       operationId: deleteCerts
       parameters:
       - description: Certificate ID to be deleted
+        example: 5e9d9544a1dcd60001d0ed20a6ab77653d5da938f452bb8cc9b55b0630a6743dabd8dc92bfb025abb09ce035
         in: path
         name: certID
         required: true
         schema:
           type: string
-      - description: Organisation ID to list the certificates
+      - description: Organisation ID to delete the certificates from
+        example: 5e9d9544a1dcd60001d0ed20
         in: query
         name: org_id
-        required: true
+        required: false
         schema:
           type: string
       responses:
@@ -679,14 +731,57 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: OK
+          description: Deleted certificate
         "403":
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: Forbidden
+          description: Attempting to access a protected api with an invalid or a missing
+            X-Tyk-Authorization in the headers
       summary: Delete Certificate
+      tags:
+      - Certs
+    get:
+      description: |-
+        Note that the certID path parameter can take a list of certIDs separated with commas (e.g /tyk/certs/certIDOne,certIDTwo).
+         If you send a single certID it will return a single CertificateMeta object otherwise if you send more than two certIDs is will return an array of CertificateMeta objects.
+      operationId: listCertsWithIDs
+      parameters:
+      - description: Comma separated list of certificates to list
+        example: e6ce2b49-3e31-44de-95a7-12f054724283,5e9d9544a1dcd60001d0ed20a6ab77653d5da938f452bb8cc9b55b0630a6743dabd8dc92bfb025abb09ce035
+        in: path
+        name: certID
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                oneOf:
+                - $ref: '#/components/schemas/CertsCertificateMeta'
+                - items:
+                    $ref: '#/components/schemas/CertsCertificateMeta'
+                  nullable: true
+                  type: array
+          description: Certificates returned successfully
+        "403":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Attempting to access a protected api with an invalid or a missing
+            X-Tyk-Authorization in the headers
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: When you send a single certificate ID and it does not exist
+      summary: Return one certificate or List multiple Certificates in the Tyk Gateway
+        given a comma separated list of certIDs
       tags:
       - Certs
   /tyk/hello:
@@ -1429,7 +1524,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: Attempted administrative access with invalid or missing key!
+          description: Attempting to access a protected api with an invalid or a missing
+            X-Tyk-Authorization in the headers
       summary: Get Apis for Oauth app
       tags:
       - OAuth
@@ -1621,7 +1717,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: Attempted administrative access with invalid or missing key!
+          description: Attempting to access a protected api with an invalid or a missing
+            X-Tyk-Authorization in the headers
         "404":
           content:
             application/json:
@@ -2110,7 +2207,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: Attempted administrative access with invalid or missing key!
+          description: Attempting to access a protected api with an invalid or a missing
+            X-Tyk-Authorization in the headers
       summary: Hot-reload a single node
       tags:
       - Hot Reload
@@ -2134,7 +2232,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: Attempted administrative access with invalid or missing key!
+          description: Attempting to access a protected api with an invalid or a missing
+            X-Tyk-Authorization in the headers
       summary: Hot-reload a Tyk group
       tags:
       - Hot Reload
@@ -2155,7 +2254,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/OASSchemaResponse'
-          description: OK
+          description: OAS schema response
         "403":
           content:
             application/json:
@@ -2167,17 +2266,38 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/OASSchemaResponse'
-          description: Not Found
+          description: The response when the requested OAS schema is not found
       summary: Get OAS schema
+      tags:
+      - Schema
 components:
   schemas:
+    APIAllCertificateBasics:
+      properties:
+        certs:
+          items:
+            $ref: '#/components/schemas/CertsCertificateBasics'
+          nullable: true
+          type: array
+      type: object
+    APIAllCertificates:
+      properties:
+        certs:
+          items:
+            type: string
+          nullable: true
+          type: array
+      type: object
     APICertificateStatusMessage:
       properties:
         id:
+          example: 5e9d9544a1dcd60001d0ed207c440d66ebb0a4629d21329808dce9091acf5f2fde328067a6e60e5347271d90
           type: string
         message:
+          example: Certificate added
           type: string
         status:
+          example: ok
           type: string
       type: object
     APIDefinition:
@@ -2405,6 +2525,9 @@ components:
           nullable: true
           type: array
         tags:
+          example:
+          - Default
+          - v1
           items:
             type: string
           nullable: true
@@ -2511,6 +2634,9 @@ components:
           nullable: true
           type: array
         versions:
+          example:
+          - Default
+          - v2
           items:
             type: string
           nullable: true
@@ -2519,6 +2645,11 @@ components:
     AccessSpec:
       properties:
         methods:
+          example:
+          - GET
+          - POST
+          - DELETE
+          - PUT
           items:
             type: string
           nullable: true
@@ -2613,20 +2744,28 @@ components:
           example: false
           type: boolean
         allowed_headers:
+          example:
+          - Origin
+          - Accept
+          - Content-Type
+          - Authorization
           items:
-            example: '["Origin","Accept","Content-Type","Authorization"]'
             type: string
           nullable: true
           type: array
         allowed_methods:
+          example:
+          - GET
+          - HEAD
+          - POST
           items:
-            example: '["GET","HEAD","POST"]'
             type: string
           nullable: true
           type: array
         allowed_origins:
+          example:
+          - https://*.foo.com
           items:
-            example: https://*.foo.com
             type: string
           nullable: true
           type: array
@@ -2637,8 +2776,10 @@ components:
           example: false
           type: boolean
         exposed_headers:
+          example:
+          - Accept
+          - Content-Type
           items:
-            example: '["Accept","Content-Type"]'
             type: string
           nullable: true
           type: array
@@ -2695,6 +2836,58 @@ components:
         enable_upstream_cache_control:
           example: false
           type: boolean
+      type: object
+    CertsCertificateBasics:
+      properties:
+        dns_names:
+          items:
+            type: string
+          nullable: true
+          type: array
+        has_private:
+          type: boolean
+        id:
+          type: string
+        issuer_cn:
+          type: string
+        not_after:
+          format: date-time
+          type: string
+        not_before:
+          format: date-time
+          type: string
+        subject_cn:
+          type: string
+      type: object
+    CertsCertificateMeta:
+      properties:
+        dns_names:
+          example:
+          - .*tyk.io
+          items:
+            type: string
+          type: array
+        fingerprint:
+          example: 7c440d66ebb0a4629d21329808dce9091acf5f2fde328067a6e60e5347271d90
+          type: string
+        has_private:
+          example: false
+          type: boolean
+        id:
+          example: 5e9d9544a1dcd60001d0ed207c440d66ebb0a4629d21329808dce9091acf5f2fde328067a6e60e5347271d90
+          type: string
+        issuer:
+          $ref: '#/components/schemas/PkixName'
+        not_after:
+          example: "2034-03-26T08:46:37Z"
+          format: date-time
+          type: string
+        not_before:
+          example: "2024-03-25T08:46:37Z"
+          format: date-time
+          type: string
+        subject:
+          $ref: '#/components/schemas/PkixName'
       type: object
     CheckCommand:
       properties:
@@ -3376,6 +3569,10 @@ components:
     Monitor:
       properties:
         trigger_limits:
+          example:
+          - 80
+          - 60
+          - 50
           items:
             type: number
           nullable: true
@@ -3722,6 +3919,8 @@ components:
           nullable: true
           type: object
       type: object
+    PkixName:
+      type: object
     Policy:
       properties:
         _id:
@@ -4032,6 +4231,8 @@ components:
           format: double
           type: number
         apply_policies:
+          example:
+          - 641c15dd0fffb800010197bf
           items:
             type: string
           nullable: true
@@ -4091,6 +4292,8 @@ components:
           type: integer
         meta_data:
           additionalProperties: {}
+          example:
+            tyk_developer_id: 62b3fb9a1d5e4f00017226f5
           nullable: true
           type: object
         monitor:
@@ -4136,6 +4339,8 @@ components:
           format: int64
           type: integer
         tags:
+          example:
+          - 641c15dd0fffb800010197bf
           items:
             type: string
           nullable: true

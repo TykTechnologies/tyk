@@ -11,6 +11,7 @@ import (
 
 const helloTag = "Health Checking"
 
+// Done
 func HealthEndpoint(r *openapi3.Reflector) error {
 	oc, err := r.NewOperationContext(http.MethodGet, "/tyk/hello")
 	if err != nil {

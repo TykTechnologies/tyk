@@ -96,7 +96,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	err = writeSchema(schema, "open.yaml")
+	err = writeSchema(schema, "swagger.yaml")
 	if err != nil {
 		log.Fatal(err)
 	}

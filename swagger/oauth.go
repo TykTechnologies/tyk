@@ -111,6 +111,7 @@ func updateOauthClient(r *openapi3.Reflector) error {
 
 func getApisForOauthApp(r *openapi3.Reflector) error {
 	// TODO:: check is again about org_id should at be query or formvalue
+	// it is a query parameter
 	oc, err := r.NewOperationContext(http.MethodGet, "/tyk/oauth/clients/apis/{appID}")
 	if err != nil {
 		return err
@@ -351,7 +352,7 @@ func addOperations(r *openapi3.Reflector, operations ...func(r *openapi3.Reflect
 
 func forbidden(oc openapi.OperationContext, description ...string) {
 	oc.AddRespStructure(new(apiStatusMessage), openapi.WithHTTPStatus(http.StatusForbidden), func(cu *openapi.ContentUnit) {
-		cu.Description = "Attempted administrative access with invalid or missing key!"
+		cu.Description = "Attempting to access a protected api with an invalid or a missing X-Tyk-Authorization in the headers"
 		if len(description) != 0 {
 			cu.Description = description[0]
 		}

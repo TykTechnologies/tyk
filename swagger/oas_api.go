@@ -25,6 +25,7 @@ func getListOfOASApisRequest(r *openapi3.Reflector) error {
 	if !ok {
 		return ErrOperationExposer
 	}
+	///recommended i use external reference just incase it is updated
 	par := []openapi3.ParameterOrRef{oasModeQuery("Mode of OAS get, by default mode could be empty which means to get OAS spec including OAS Tyk extension. \n When mode=public, OAS spec excluding Tyk extension will be returned in the response")}
 	o3.Operation().WithParameters(par...)
 	oc.AddRespStructure(new([]oas.OAS), openapi.WithHTTPStatus(http.StatusOK), func(cu *openapi.ContentUnit) {
@@ -219,6 +220,7 @@ func deleteOASHandler(r *openapi3.Reflector) error {
 
 func apiOASPatchHandler(r *openapi3.Reflector) error {
 	// TODO:: abit complex to ask
+
 	oc, err := r.NewOperationContext(http.MethodPatch, "/tyk/apis/oas/{apiID}")
 	if err != nil {
 		return err
