@@ -5,6 +5,8 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/TykTechnologies/graphql-go-tools/pkg/engine/datasource/httpclient"
+
 	"github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
 	"github.com/TykTechnologies/tyk-pump/analytics"
 	"github.com/TykTechnologies/tyk/test"
@@ -228,6 +230,9 @@ func TestAnalyticRecord_GraphStats(t *testing.T) {
 				Data:   tc.request,
 				Method: http.MethodPost,
 				Code:   tc.code,
+				Headers: map[string]string{
+					httpclient.AcceptEncodingHeader: "",
+				},
 			})
 			assert.NoError(t, err)
 		})

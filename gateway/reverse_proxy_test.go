@@ -22,6 +22,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/TykTechnologies/tyk/header"
+
 	"github.com/TykTechnologies/graphql-go-tools/pkg/execution/datasource"
 	"github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
 
@@ -995,6 +997,44 @@ func TestGraphQL_ProxyOnlyHeaders(t *testing.T) {
 	})
 }
 
+func TestGraphQL_ProxyOnlyPassHeadersWithOTel(t *testing.T) {
+	g := StartTest(func(globalConf *config.Config) {
+		globalConf.OpenTelemetry.Enabled = true
+	})
+	defer g.Close()
+
+	spec := BuildAPI(func(spec *APISpec) {
+		spec.Name = "tyk-api"
+		spec.APIID = "tyk-api"
+		spec.GraphQL.Enabled = true
+		spec.GraphQL.ExecutionMode = apidef.GraphQLExecutionModeProxyOnly
+		spec.GraphQL.Schema = gqlCountriesSchema
+		spec.GraphQL.Version = apidef.GraphQLConfigVersion2
+		spec.Proxy.TargetURL = TestHttpAny + "/dynamic"
+		spec.Proxy.ListenPath = "/"
+	})[0]
+
+	g.Gw.LoadAPI(spec)
+	g.AddDynamicHandler("/dynamic", func(writer http.ResponseWriter, r *http.Request) {
+		if gotten := r.Header.Get("custom-client-header"); gotten != "custom-value" {
+			t.Errorf("expected upstream to recieve header `custom-client-header` with value of `custom-value`, instead got %s", gotten)
+		}
+	})
+
+	_, err := g.Run(t, test.TestCase{
+		Path: "/",
+		Headers: map[string]string{
+			"custom-client-header": "custom-value",
+		},
+		Method: http.MethodPost,
+		Data: graphql.Request{
+			Query: gqlContinentQuery,
+		},
+	})
+
+	assert.NoError(t, err)
+}
+
 func TestGraphQL_InternalDataSource(t *testing.T) {
 	g := StartTest(nil)
 	defer g.Close()
@@ -1821,4 +1861,51 @@ func TestCreateMemConnProviderIfNeeded(t *testing.T) {
 			return true
 		}, time.Second, time.Millisecond*25, "context was not canceled")
 	})
+}
+
+func TestQuotaResponseHeaders(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	specs := ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		spec.Proxy.ListenPath = "/quota-headers-test"
+		spec.UseKeylessAccess = false
+	})
+
+	var (
+		quotaMax, quotaRenewalRate int64 = 2, 3600
+	)
+
+	authKey := "auth-key"
+	session := createSessionWithQuota(t, specs[0].APIDefinition, quotaMax, quotaRenewalRate)
+	assert.NoError(t, ts.Gw.GlobalSessionManager.UpdateSession(authKey, session, 60, false))
+
+	authorization := map[string]string{
+		"Authorization": authKey,
+	}
+	_, _ = ts.Run(t, []test.TestCase{
+		{
+			Headers: authorization,
+			Path:    "/quota-headers-test/",
+			Code:    http.StatusOK,
+			HeadersMatch: map[string]string{
+				header.XRateLimitLimit:     fmt.Sprintf("%d", quotaMax),
+				header.XRateLimitRemaining: fmt.Sprintf("%d", quotaMax-1),
+			},
+		},
+		{
+			Headers: authorization,
+			Path:    "/quota-headers-test/",
+			Code:    http.StatusOK,
+			HeadersMatch: map[string]string{
+				header.XRateLimitLimit:     fmt.Sprintf("%d", quotaMax),
+				header.XRateLimitRemaining: fmt.Sprintf("%d", quotaMax-2),
+			},
+		},
+		{
+			Headers: authorization,
+			Path:    "/quota-headers-test/abc",
+			Code:    http.StatusForbidden,
+		},
+	}...)
 }

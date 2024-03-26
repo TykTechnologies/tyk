@@ -26,7 +26,7 @@ func (k *RateLimitForAPI) Name() string {
 }
 
 func (k *RateLimitForAPI) EnabledForSpec() bool {
-	if k.Spec.DisableRateLimit || k.Spec.GlobalRateLimit.Rate == 0 {
+	if k.Spec.DisableRateLimit || k.Spec.GlobalRateLimit.Rate == 0 || k.Spec.GlobalRateLimit.Disabled {
 		return false
 	}
 
@@ -69,8 +69,11 @@ func (k *RateLimitForAPI) ProcessRequest(w http.ResponseWriter, r *http.Request,
 	}
 
 	storeRef := k.Gw.GlobalSessionManager.Store()
+	customQuotaKey := ""
+
 	reason := k.Gw.SessionLimiter.ForwardMessage(r, k.apiSess,
 		k.keyName,
+		customQuotaKey,
 		storeRef,
 		true,
 		false,

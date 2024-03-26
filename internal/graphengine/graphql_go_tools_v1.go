@@ -87,7 +87,7 @@ func (g graphqlGoToolsV1) headerModifier(outreq *http.Request, additionalHeaders
 	}
 }
 
-func (g graphqlGoToolsV1) returnErrorsFromUpstream(proxyOnlyCtx *GraphQLProxyOnlyContext, resultWriter *graphql.EngineResultWriter, seekReadCloser SeekReadCloserFunc) error {
+func (g graphqlGoToolsV1) returnErrorsFromUpstream(proxyOnlyCtx *GraphQLProxyOnlyContextValues, resultWriter *graphql.EngineResultWriter, seekReadCloser SeekReadCloserFunc) error {
 	body, err := seekReadCloser(proxyOnlyCtx.upstreamResponse.Body)
 	if body == nil {
 		// Response body already read by graphql-go-tools, and it's not re-readable. Quit silently.
@@ -420,6 +420,15 @@ func (g *granularAccessCheckerV1) CheckGraphQLRequestFieldAllowance(w http.Respo
 		if accessDefinition.DisableIntrospection {
 			return GraphQLGranularAccessResult{FailReason: GranularAccessFailReasonIntrospectionDisabled}
 		}
+
+		// See TT-11260
+		//
+		// Introspection should be possible when Disable Introspection is turned off in policy settings,
+		// regardless of Allow List or Block List settings.
+		//
+		// Agreed solution: if Disable Introspection is turned off, then the Allow or Block list settings
+		// should be ignored, but only for the introspection query.
+		return GraphQLGranularAccessResult{FailReason: GranularAccessFailReasonNone}
 	}
 
 	if len(accessDefinition.AllowedTypes) != 0 {
