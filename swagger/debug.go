@@ -17,11 +17,12 @@ func DebugApi(r *openapi3.Reflector) error {
 		return err
 	}
 	oc.SetTags(debugTag)
+	oc.SetID("debugApiDefinition")
 	forbidden(oc)
 	statusBadRequest(oc, "Request malformed , missing spec field or missing request field")
 	oc.AddReqStructure(new(traceRequest), func(cu *openapi.ContentUnit) {
 	})
-	oc.SetSummary("Tracing request")
+	oc.SetSummary("Test an an API definition")
 	oc.SetDescription("Used to test API definition by sending sample request and analysing output of both response and logs")
 	statusInternalServerError(oc, "Unexpected failure")
 	oc.AddRespStructure(new(traceResponse), func(cu *openapi.ContentUnit) {
