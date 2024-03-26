@@ -12,106 +12,6 @@ servers:
 security:
 - api_key: []
 paths:
-  /apis/{apiID}/versions:
-    get:
-      description: Listing versions of an API
-      operationId: listApiVersions
-      parameters:
-      - description: The API ID
-        example: keyless
-        in: path
-        name: apiID
-        required: true
-        schema:
-          type: string
-      - description: Search for API version name
-        in: query
-        name: searchText
-        required: false
-        schema:
-          type: string
-      - description: Filter for internal or external API versions
-        in: query
-        name: accessType
-        required: false
-        schema:
-          enum:
-          - internal
-          - external
-          type: string
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/VersionMetas'
-          description: API version metas
-        "403":
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiStatusMessage'
-          description: Attempting to access a protected api with an invalid or a missing
-            X-Tyk-Authorization in the headers
-        "404":
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiStatusMessage'
-          description: API not found
-      summary: Listing versions of an API
-      tags:
-      - APIs
-  /keys/policy/{keyID}:
-    post:
-      description: This will add a Policy object to a hashed key
-      operationId: addPolicyToKey
-      parameters:
-      - description: The Key ID
-        in: path
-        name: keyID
-        required: true
-        schema:
-          type: string
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/PolicyUpdateObj'
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiModifyKeySuccess'
-          description: OK
-        "400":
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiStatusMessage'
-          description: Bad Request
-        "403":
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiStatusMessage'
-          description: Forbidden
-        "404":
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiStatusMessage'
-          description: Not Found
-        "500":
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiStatusMessage'
-          description: Internal Server Error
-      summary: Add a policy to a key.
-      tags:
-      - Keys
   /tyk/apis:
     get:
       description: |2-
@@ -339,6 +239,56 @@ paths:
                 $ref: '#/components/schemas/ApiStatusMessage'
           description: Unexpected error.
       summary: Updating an API definition  with its ID
+      tags:
+      - APIs
+  /tyk/apis/{apiID}/versions:
+    get:
+      description: Listing versions of an API
+      operationId: listApiVersions
+      parameters:
+      - description: The API ID
+        example: keyless
+        in: path
+        name: apiID
+        required: true
+        schema:
+          type: string
+      - description: Search for API version name
+        in: query
+        name: searchText
+        required: false
+        schema:
+          type: string
+      - description: Filter for internal or external API versions
+        in: query
+        name: accessType
+        required: false
+        schema:
+          enum:
+          - internal
+          - external
+          type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VersionMetas'
+          description: API version metas
+        "403":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Attempting to access a protected api with an invalid or a missing
+            X-Tyk-Authorization in the headers
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: API not found
+      summary: Listing versions of an API
       tags:
       - APIs
   /tyk/apis/oas:
@@ -859,6 +809,44 @@ paths:
         given a comma separated list of certIDs
       tags:
       - Certs
+  /tyk/debug:
+    post:
+      description: Used to test API definition by sending sample request and analysing
+        output of both response and logs
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TraceRequest'
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TraceResponse'
+          description: Success tracing request
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Request malformed , missing spec field or missing request field
+        "403":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Attempting to access a protected api with an invalid or a missing
+            X-Tyk-Authorization in the headers
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Unexpected failure
+      summary: Tracing request
+      tags:
+      - Debug
   /tyk/hello:
     get:
       description: "From v2.7.5 you can now rename the `/hello`  endpoint by using
@@ -1256,6 +1244,56 @@ paths:
                 $ref: '#/components/schemas/ApiStatusMessage'
           description: Internal Server Error
       summary: Create a key
+      tags:
+      - Keys
+  /tyk/keys/policy/{keyID}:
+    post:
+      description: This will add a Policy object to a hashed key
+      operationId: addPolicyToKey
+      parameters:
+      - description: The Key ID
+        in: path
+        name: keyID
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PolicyUpdateObj'
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiModifyKeySuccess'
+          description: OK
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Bad Request
+        "403":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Forbidden
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Not Found
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Internal Server Error
+      summary: Add a policy to a key.
       tags:
       - Keys
   /tyk/keys/preview:
@@ -3495,6 +3533,12 @@ components:
         url:
           type: string
       type: object
+    HttpHeader:
+      additionalProperties:
+        items:
+          type: string
+        type: array
+      type: object
     InternalMeta:
       properties:
         disabled:
@@ -4481,6 +4525,33 @@ components:
           type: string
         template_data:
           $ref: '#/components/schemas/TemplateData'
+      type: object
+    TraceHttpRequest:
+      properties:
+        body:
+          type: string
+        headers:
+          $ref: '#/components/schemas/HttpHeader'
+        method:
+          type: string
+        path:
+          type: string
+      type: object
+    TraceRequest:
+      properties:
+        request:
+          $ref: '#/components/schemas/TraceHttpRequest'
+        spec:
+          $ref: '#/components/schemas/APIDefinition'
+      type: object
+    TraceResponse:
+      properties:
+        logs:
+          type: string
+        message:
+          type: string
+        response:
+          type: string
       type: object
     TrackEndpointMeta:
       properties:

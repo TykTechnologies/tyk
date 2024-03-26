@@ -144,7 +144,7 @@ func createClassicApiRequest(r *openapi3.Reflector) error {
 
 // Done
 func getApiVersions(r *openapi3.Reflector) error {
-	oc, err := r.NewOperationContext(http.MethodGet, "/apis/{apiID}/versions")
+	oc, err := r.NewOperationContext(http.MethodGet, "/tyk/apis/{apiID}/versions")
 	if err != nil {
 		return err
 	}

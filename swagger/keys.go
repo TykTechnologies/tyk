@@ -201,7 +201,7 @@ func previewKeyRequest(r *openapi3.Reflector) error {
 
 func updateKeyPolicy(r *openapi3.Reflector) error {
 	// TODO::check this one as it might be wrong what is it used for
-	oc, err := r.NewOperationContext(http.MethodPost, "/keys/policy/{keyID}")
+	oc, err := r.NewOperationContext(http.MethodPost, "/tyk/keys/policy/{keyID}")
 	if err != nil {
 		return err
 	}

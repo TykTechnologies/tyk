@@ -90,6 +90,10 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	err = swagger.DebugApi(&r)
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	schema, err := r.Spec.MarshalYAML()
 	if err != nil {
