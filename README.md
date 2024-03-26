@@ -1,13 +1,24 @@
 ![tyk-github-header](https://github.com/TykTechnologies/tyk/assets/8012032/02b3fbae-80ed-4d1f-be87-016326f82ece)
+![License: MPL 2.0](https://img.shields.io/badge/License-MPL%202.0-brightgreen.svg?style=flat_card&color=8836FB)
+[![FOSSA Status](https://app.fossa.io/api/projects/git%2Bgithub.com%2FTykTechnologies%2Ftyk.svg?type=shield)](https://app.fossa.io/projects/git%2Bgithub.com%2FTykTechnologies%2Ftyk?ref=badge_shield)
 
-![GitHub release (release name instead of tag name)](https://img.shields.io/github/v/release/TykTechnologies/tyk?color=5900CB) ![Docker Pulls](https://img.shields.io/docker/pulls/tykio/tyk-gateway?color=8438FA) ![GitHub Workflow Status (with event)](https://img.shields.io/github/actions/workflow/status/TykTechnologies/tyk/ci-tests.yml?label=Build%20%26%20Tests&color=8438FA) [![Go Report Card](https://img.shields.io/badge/go%20report-A+-brightgreen.svg?style=flat_card&color=8438FA)](https://goreportcard.com/report/github.com/TykTechnologies/tyk?style=flat-square) ![GitHub commit activity (branch)](https://img.shields.io/github/commit-activity/m/TykTechnologies/tyk?style=flat-square&color=8836FB) ![GitHub Repo stars](https://img.shields.io/github/stars/TykTechnologies/tyk?color=ffc743) ![License: MPL 2.0](https://img.shields.io/badge/License-MPL%202.0-brightgreen.svg?style=flat_card&color=8438FA) [![FOSSA Status](https://app.fossa.io/api/projects/git%2Bgithub.com%2FTykTechnologies%2Ftyk.svg?type=shield)](https://app.fossa.io/projects/git%2Bgithub.com%2FTykTechnologies%2Ftyk?ref=badge_shield) ![Twitter Follow](https://img.shields.io/twitter/follow/tyk_io)
+[![GitHub Latest Release](https://img.shields.io/github/v/release/TykTechnologies/tyk?color=8836FB)](https://github.com/TykTechnologies/tyk/releases)
+[![GitHub Release Date](https://img.shields.io/github/release-date/TykTechnologies/tyk?color=8836FB)](https://github.com/TykTechnologies/tyk/releases)
+[![Docker Pulls](https://img.shields.io/docker/pulls/tykio/tyk-gateway?color=8836FB)](https://hub.docker.com/r/tykio/tyk-gateway/)
+[![GitHub Workflow Status (with event)](https://img.shields.io/github/actions/workflow/status/TykTechnologies/tyk/ci-tests.yml?label=Build%20%26%20Tests&color=8438FA)](https://github.com/TykTechnologies/tyk/actions/workflows/ci-tests.yml)
+[![Go Report Card](https://img.shields.io/badge/go%20report-A+-brightgreen.svg?color=8836FB)](https://goreportcard.com/report/github.com/TykTechnologies/tyk)
 
+![GitHub commit activity](https://img.shields.io/github/commit-activity/m/TykTechnologies/tyk?color=8836FB)
+[![GitHub Repo Stars](https://img.shields.io/github/stars/TykTechnologies/tyk?logoColor=8836FB)](https://github.com/TykTechnologies/tyk/stargazers)
+[![GitHub Repo Forks](https://img.shields.io/github/forks/TykTechnologies/tyk.svg?logoColor=8836FB)](https://github.com/TykTechnologies/tyk/fork)
+![X twitter Follow](https://img.shields.io/twitter/follow/tyk_io?logoColor=8836FB&cacheSeconds=120)
 
+---
+[Documentation](https://tyk.io/docs/) | [Forum](https://community.tyk.io) | [Blog](https://tyk.io/blog/) | [About](https://tyk.io)
 
 
 # Tyk API Gateway
-**Tyk Gateway** is the cloud-native, open source, API Gateway.  \
-We support REST, GraphQL, TCP and gRPC protocols.
+**Tyk Gateway** is the cloud-native, open source, enterprise-ready API Gateway supporting REST, GraphQL, TCP and gRPC protocols.
 
 Built from the ground up, as the [fastest API Gateway](https://tyk.io/performance-benchmarks/) on the planet since 2014.
 
@@ -15,26 +26,30 @@ _Tyk Gateway_ is provided ‘Batteries-included’, with no feature lockout. Ena
 
 Tyk runs natively on _Kubernetes_, if you prefer, thanks to the _[Tyk Kubernetes Operator](https://github.com/TykTechnologies/tyk-operator)_
 
-
 <table>
   <tr>
-   <td><strong>Tyk Open Source</strong>
+   <td>
+     <center>
+        <a href="https://tyk.io/docs/deployment-and-operations/tyk-open-source-api-gateway/quick-start"> <img src="https://raw.githubusercontent.com/TykTechnologies/tyk-docs/master/tyk-docs/assets/img/logos/tyk-logo-opensource.svg" width="30%"></a>
+     </center>
+     </br>Everything you need to manage APIs. Follow the simple Get Started guide below 👇
    </td>
-   <td><strong>Tyk API Management</strong>
+   <td>
+     <center>
+       <a href="https://tyk.io/docs/tyk-self-managed/install"> <img src="https://raw.githubusercontent.com/TykTechnologies/tyk-docs/master/tyk-docs/assets/img/logos/tyk-logo-selfmanaged.png" width="25%"></a>
+     </center>
+     </br>The Enterprise API Management platform: Management Control Plane, Dashboard GUI & Developer Portal.
+     </br><a href="https://tyk.io/api-lifecycle-management/">Install Tyk Self Managed</a>
    </td>
-  </tr>
-  <tr>
-   <td>Everything you need to manage APIs. Follow the simple Get Started guide below 👇
-   </td>
-   <td>The Enterprise API Management platform: Management Control Plane, Dashboard GUI & Developer Portal. Install <a href="https://tyk.io/api-lifecycle-management/">Tyk Self Managed</a>
+   <td>
+     <center>
+       <a href="https://tyk.io/docs/tyk-cloud"> <img src="https://raw.githubusercontent.com/TykTechnologies/tyk-docs/master/tyk-docs/assets/img/logos/tyk-logo-cloud.png" width="20%"></a>
+     </center>
+     </br>The Enterprise API Management platform SaaS: Management Control Plane, Dashboard GUI & Developer Portal. 
+     </br><a href="https://tyk.io/docs/deployment-and-operations/tyk-cloud-platform/quick-start">Deploy Tyk Cloud </a>
    </td>
   </tr>
 </table>
-
-
-\
-[Documentation](https://tyk.io/docs/) | [Forum](https://community.tyk.io) | [Blog](https://tyk.io/blog/) | [About](https://tyk.io)
-
 
 ---
 
@@ -42,7 +57,7 @@ Tyk runs natively on _Kubernetes_, if you prefer, thanks to the _[Tyk Kubernetes
 
 We’ll install Tyk, add auth, analytics, quotas and rate limiting to your API in under 5 minutes.
 
-We recommend “[Tyk Gateway Docker](https://github.com/TykTechnologies/tyk-gateway-docker#start-up-the-deployment)” as the quickest way to get started now. Later, you can move to one of our other [supported distributions](https://tyk.io/docs/apim/open-source/installation/) if you prefer.
+We recommend [Tyk Gateway Docker](https://github.com/TykTechnologies/tyk-gateway-docker#start-up-the-deployment) as the quickest way to get started now. Later, you can move to one of our other [supported distributions](https://tyk.io/docs/apim/open-source/installation/) if you prefer.
 
 #### Step 1 - Clone the docker-compose repository
 ```console
@@ -59,7 +74,7 @@ cd tyk-gateway-docker
 docker-compose up
 ```
 
-You can run this in detach mode use the `-d` flag: `docker-compose up -d`
+You can run this in detach mode using the `-d` flag: `docker-compose up -d`
 
 **Congratulations, you’re done!**
 
@@ -172,7 +187,7 @@ go test ./...
 ```
 Note that tests require Redis to be running on the same machine (default port).
 
-In order to write your own test please use this guide [https://github.com/TykTechnologies/tyk/blob/master/TESTING.md](https://github.com/TykTechnologies/tyk/blob/master/TESTING.md)
+To write your own test please use this guide [https://github.com/TykTechnologies/tyk/blob/master/TESTING.md](https://github.com/TykTechnologies/tyk/blob/master/TESTING.md)
 
 ## Contributing
 
