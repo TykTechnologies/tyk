@@ -1,6 +1,8 @@
 package swagger
 
 import (
+	"strconv"
+
 	"github.com/swaggest/openapi-go/openapi3"
 
 	"github.com/TykTechnologies/tyk/gateway"
@@ -53,6 +55,20 @@ func intSchema() *openapi3.SchemaOrRef {
 	}
 }
 
+func stringEnumSchema(enums ...string) *openapi3.SchemaOrRef {
+	stringType := openapi3.SchemaTypeString
+	item := []interface{}{}
+	for _, enum := range enums {
+		item = append(item, enum)
+	}
+	return &openapi3.SchemaOrRef{
+		Schema: &openapi3.Schema{
+			Type: &stringType,
+			Enum: item,
+		},
+	}
+}
+
 func resetQuotaSchema() *openapi3.SchemaOrRef {
 	stringType := openapi3.SchemaTypeString
 	return &openapi3.SchemaOrRef{
@@ -80,6 +96,39 @@ func boolSchema() *openapi3.SchemaOrRef {
 			Type: &boolSchema,
 		},
 	}
+}
+
+type HeaderCr struct {
+	Key         string              `json:"key"`
+	Description string              `json:"description"`
+	Type        openapi3.SchemaType `json:"type"`
+}
+
+func addNewResponseHeader(o3 openapi3.OperationExposer, httpStatus int, cr HeaderCr) {
+	code := strconv.Itoa(httpStatus)
+	value, ok := o3.Operation().Responses.MapOfResponseOrRefValues[code]
+	if !ok {
+		return
+	}
+	newHeaders := value.Response.Headers
+	if newHeaders == nil {
+		newHeaders = map[string]openapi3.HeaderOrRef{}
+	}
+	newHeaders[cr.Key] = openapi3.HeaderOrRef{
+		Header: &openapi3.Header{
+			Description: &cr.Description,
+			Schema: &openapi3.SchemaOrRef{
+				Schema: &openapi3.Schema{
+					Type: &cr.Type,
+				},
+			},
+		},
+	}
+	value.Response.WithHeaders(newHeaders)
+}
+
+func stringPointerValue(value string) *string {
+	return &value
 }
 
 ////2256b0b7877f85d9e2ecd2b7c59acd47ce8f42725ad0c5275fd4e213dddea8ad

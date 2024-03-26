@@ -12,6 +12,56 @@ servers:
 security:
 - api_key: []
 paths:
+  /apis/{apiID}/versions:
+    get:
+      description: Listing versions of an API
+      operationId: listApiVersions
+      parameters:
+      - description: The API ID
+        example: keyless
+        in: path
+        name: apiID
+        required: true
+        schema:
+          type: string
+      - description: Search for API version name
+        in: query
+        name: searchText
+        required: false
+        schema:
+          type: string
+      - description: Filter for internal or external API versions
+        in: query
+        name: accessType
+        required: false
+        schema:
+          enum:
+          - internal
+          - external
+          type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VersionMetas'
+          description: API version metas
+        "403":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Attempting to access a protected api with an invalid or a missing
+            X-Tyk-Authorization in the headers
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: API not found
+      summary: Listing versions of an API
+      tags:
+      - APIs
   /keys/policy/{keyID}:
     post:
       description: This will add a Policy object to a hashed key
@@ -76,13 +126,14 @@ paths:
                 items:
                   $ref: '#/components/schemas/APIDefinition'
                 type: array
-          description: OK
+          description: List of API definitions
         "403":
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: Forbidden
+          description: Attempting to access a protected api with an invalid or a missing
+            X-Tyk-Authorization in the headers
       summary: Get list of apis
       tags:
       - APIs
@@ -131,19 +182,21 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: Bad Request
+          description: Returned when you send a malformed body or when the request
+            body fails validation
         "403":
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: Forbidden
+          description: Attempting to access a protected api with an invalid or a missing
+            X-Tyk-Authorization in the headers
         "500":
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: Internal Server Error
+          description: Unexpected error.
       summary: Creat an API
       tags:
       - APIs
@@ -154,7 +207,9 @@ paths:
         to be made to disable the API endpoint.
       operationId: deleteApi
       parameters:
-      - in: path
+      - description: The API ID
+        example: keyless
+        in: path
         name: apiID
         required: true
         schema:
@@ -165,31 +220,26 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiModifyKeySuccess'
-          description: OK
-        "400":
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiStatusMessage'
-          description: Bad Request
+          description: API deleted
         "403":
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: Forbidden
+          description: Attempting to access a protected api with an invalid or a missing
+            X-Tyk-Authorization in the headers
         "404":
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: Not Found
+          description: An Api with the specified ApiID was not found.
         "500":
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: Internal Server Error
+          description: Unexpected error.
       summary: Deleting an API definition with ID
       tags:
       - APIs
@@ -199,7 +249,9 @@ paths:
                 Only if used without the Tyk Dashboard
       operationId: getApi
       parameters:
-      - in: path
+      - description: The API ID
+        example: keyless
+        in: path
         name: apiID
         required: true
         schema:
@@ -210,19 +262,26 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/APIDefinition'
-          description: OK
+          description: API definition
+          headers:
+            x-tyk-base-api-id:
+              description: ID of the base API if the requested API is a version.
+              schema:
+                type: string
+              style: simple
         "403":
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: Forbidden
+          description: Attempting to access a protected api with an invalid or a missing
+            X-Tyk-Authorization in the headers
         "404":
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: Not Found
+          description: Api not found
       summary: Get API definition with ID
       tags:
       - APIs
@@ -234,7 +293,9 @@ paths:
                 Updating will completely replace the file descriptor and will not change an API Definition that has already been loaded, the hot-reload endpoint will need to be called to push the new definition to live.
       operationId: updateApi
       parameters:
-      - in: path
+      - description: The API ID
+        example: keyless
+        in: path
         name: apiID
         required: true
         schema:
@@ -250,31 +311,33 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiModifyKeySuccess'
-          description: OK
+          description: API updated
         "400":
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: Bad Request
+          description: Bad request.Sending a ApiID for an OAs api or apiID in path
+            does not match the one in the body.
         "403":
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: Forbidden
+          description: Attempting to access a protected api with an invalid or a missing
+            X-Tyk-Authorization in the headers
         "404":
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: Not Found
+          description: An Api with the specified ApiID was not found.
         "500":
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: Internal Server Error
+          description: Unexpected error.
       summary: Updating an API definition  with its ID
       tags:
       - APIs
@@ -370,7 +433,9 @@ paths:
         to be made to disable the API endpoint.
       operationId: deleteOASApi
       parameters:
-      - in: path
+      - description: The API ID
+        example: keyless
+        in: path
         name: apiID
         required: true
         schema:
@@ -416,7 +481,9 @@ paths:
           using the api Id
       operationId: getOASApi
       parameters:
-      - in: path
+      - description: The API ID
+        example: keyless
+        in: path
         name: apiID
         required: true
         schema:
@@ -469,7 +536,9 @@ paths:
                 Updating will completely replace the file descriptor and will not change an API Definition that has already been loaded, the hot-reload endpoint will need to be called to push the new definition to live.
       operationId: updateApiOAS
       parameters:
-      - in: path
+      - description: The API ID
+        example: keyless
+        in: path
         name: apiID
         required: true
         schema:
@@ -521,7 +590,9 @@ paths:
         spec excluding Tyk extension is exported"
       operationId: downloadApiOASPublic
       parameters:
-      - in: path
+      - description: The API ID
+        example: keyless
+        in: path
         name: apiID
         required: true
         schema:
@@ -602,7 +673,9 @@ paths:
       description: Invalidate cache for the given API
       operationId: invalidateCache
       parameters:
-      - in: path
+      - description: The API ID
+        example: keyless
+        in: path
         name: apiID
         required: true
         schema:
@@ -613,19 +686,20 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: OK
+          description: cache invalidated
         "403":
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: Forbidden
+          description: Attempting to access a protected api with an invalid or a missing
+            X-Tyk-Authorization in the headers
         "500":
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: Internal Server Error
+          description: when cache invalidation fails
       summary: Invalidate cache
       tags:
       - Cache Invalidation
@@ -648,6 +722,7 @@ paths:
         schema:
           enum:
           - detailed
+          example: detailed
           type: string
       responses:
         "200":
@@ -779,7 +854,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: When you send a single certificate ID and it does not exist
+          description: When you send a single certID and it does not exist
       summary: Return one certificate or List multiple Certificates in the Tyk Gateway
         given a comma separated list of certIDs
       tags:
@@ -4595,6 +4670,38 @@ components:
         use_extended_paths:
           example: true
           type: boolean
+      type: object
+    VersionMeta:
+      properties:
+        expirationDate:
+          example: 2026-03-26 09:00
+          type: string
+        id:
+          example: keyless
+          type: string
+        internal:
+          example: false
+          type: boolean
+        isDefaultVersion:
+          example: true
+          type: boolean
+        name:
+          example: Tyk Test Keyless API
+          type: string
+        versionName:
+          example: v2
+          type: string
+      type: object
+    VersionMetas:
+      properties:
+        apis:
+          items:
+            $ref: '#/components/schemas/VersionMeta'
+          nullable: true
+          type: array
+        status:
+          example: success
+          type: string
       type: object
     VirtualMeta:
       properties:
