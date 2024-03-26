@@ -267,7 +267,7 @@ func (d *DynamicMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 	// Save the session data (if modified)
 	if !d.Pre && d.UseSession {
 		newMeta := mapStrsToIfaces(newRequestData.SessionMeta)
-		if !reflect.DeepEqual(session.MetaData, newMeta) {
+		if session != nil && !reflect.DeepEqual(session.MetaData, newMeta) {
 			session.MetaData = newMeta
 			ctxScheduleSessionUpdate(r)
 		}
