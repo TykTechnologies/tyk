@@ -3,18 +3,20 @@ set -e
 
 GATEWAY_VERSION=$(echo $GITHUB_TAG | perl -n -e'/v(\d+).(\d+).(\d+)/'' && print "v$1\.$2\.$3"')
 
-# Plugin compiler arguments:
+# This script builds a plugin for the Tyk Gateway with the specified name, version, OS, and architecture.
+# Usage: ./build.sh <plugin_name> <plugin_id> [GOOS] [GOARCH]
+# - <plugin_id> is optional
+# - [GOOS] is an optional override of GOOS
+# - [GOARCH] is an optional override of GOARCH
+# Example: ./build.sh tyk-extras 1 linux amd64
 #
 # - 1. plugin_name = vendor-plugin.so
 # - 2. plugin_id = optional, sets build folder to `/opt/plugin_{plugin_name}{plugin_id}`
-# - 3. GOOS = optional override of GOOS
-# - 4. GOARCH = optional override of GOARCH
+# - 3. GOOS: Optional - The operating system for which to build the plugin (e.g. linux, darwin)
+# - 4. GOARCH: Optional - The architecture for which to build the plugin (e.g. amd64, arm64)
 #
-# The script will build a plugin named according to the following:
-#
-# - `{plugin_name%.*}_{GATEWAY_VERSION}_{GOOS}_{GOARCH}.so`
-#
-# If GOOS and GOARCH are not set, it will build `{plugin_name}`.
+    echo "Example command: $0 tyk-extras 1 linux amd64"
+    echo "Example output: The resulting plugin file will be named according to the provided parameters."
 #
 # Example command: ./build.sh 
 # Example output: tyk-extras_5.0.0_linux_amd64.so
@@ -30,11 +32,23 @@ WORKSPACE_ROOT=$(dirname $TYK_GW_PATH)
 PLUGIN_SOURCE_PATH=${PLUGIN_SOURCE_PATH:-"/plugin-source"}
 PLUGIN_BUILD_PATH=${PLUGIN_BUILD_PATH:-"${WORKSPACE_ROOT}/plugin_${plugin_name%.*}$plugin_id"}
 
+# Provide usage instructions for building a plugin:
 function usage() {
+    echo "Usage: $0 <plugin_name> [<plugin_id>] [<GOOS>] [<GOARCH>]
+    <plugin_name>  : Name of the plugin to build (e.g. vendor-plugin.so) (required)
+    <plugin_id>   : Optional - sets the build folder to `/opt/plugin_{plugin_name}{plugin_id}` or uses the default build folder (optional) (optional)
+    <GOOS>        : Optional - override the GOOS value (default: linux)
+    <GOARCH>      : Optional - override the GOARCH value (default: amd64)"
+    echo "    <plugin_name>  : Name of the plugin to build (e.g. vendor-plugin.so)"
+    echo "    <plugin_id>   : Optional - sets the build folder to `/opt/plugin_{plugin_name}{plugin_id}`"
+    echo "    <GOOS>        : Optional - override the GOOS value"
+    echo "    <GOARCH>      : Optional - override the GOARCH value"
+    echo "
+Example:"
+    echo "    $0 tyk-extras 1 linux amd64"
     cat <<EOF
 To build a plugin:
       $0 <plugin_name> <plugin_id>
-
 <plugin_id> is optional
 EOF
 }
@@ -83,6 +97,8 @@ fi
 
 # ensureGoMod rewrites a go module based on plugin_id if available.
 function ensureGoMod {
+    echo "INFO: Create or update the go.mod file with the specified plugin_id"
+    echo "Plugin_id: $plugin_id"
 	NEW_MODULE=tyk.internal/tyk_plugin${plugin_id}
 
 	# Create go.mod if it doesn't exist.
