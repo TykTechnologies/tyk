@@ -82,8 +82,10 @@ func TestXTykAPIGateway(t *testing.T) {
 		xTykAPIGateway := XTykAPIGateway{}
 		xTykAPIGateway.Fill(initialAPI)
 
-		ss, _ := json.MarshalIndent(xTykAPIGateway, "", "  ")
-		fmt.Println(string(ss))
+		ss, err := json.MarshalIndent(xTykAPIGateway, "", "  ")
+		assert.NoError(t, err)
+
+		t.Logf("JSON from filled old:\n%s", string(ss))
 
 		var convertedAPI apidef.APIDefinition
 		xTykAPIGateway.ExtractTo(&convertedAPI)
