@@ -995,6 +995,44 @@ func TestGraphQL_ProxyOnlyHeaders(t *testing.T) {
 	})
 }
 
+func TestGraphQL_ProxyOnlyPassHeadersWithOTel(t *testing.T) {
+	g := StartTest(func(globalConf *config.Config) {
+		globalConf.OpenTelemetry.Enabled = true
+	})
+	defer g.Close()
+
+	spec := BuildAPI(func(spec *APISpec) {
+		spec.Name = "tyk-api"
+		spec.APIID = "tyk-api"
+		spec.GraphQL.Enabled = true
+		spec.GraphQL.ExecutionMode = apidef.GraphQLExecutionModeProxyOnly
+		spec.GraphQL.Schema = gqlCountriesSchema
+		spec.GraphQL.Version = apidef.GraphQLConfigVersion2
+		spec.Proxy.TargetURL = TestHttpAny + "/dynamic"
+		spec.Proxy.ListenPath = "/"
+	})[0]
+
+	g.Gw.LoadAPI(spec)
+	g.AddDynamicHandler("/dynamic", func(writer http.ResponseWriter, r *http.Request) {
+		if gotten := r.Header.Get("custom-client-header"); gotten != "custom-value" {
+			t.Errorf("expected upstream to recieve header `custom-client-header` with value of `custom-value`, instead got %s", gotten)
+		}
+	})
+
+	_, err := g.Run(t, test.TestCase{
+		Path: "/",
+		Headers: map[string]string{
+			"custom-client-header": "custom-value",
+		},
+		Method: http.MethodPost,
+		Data: graphql.Request{
+			Query: gqlContinentQuery,
+		},
+	})
+
+	assert.NoError(t, err)
+}
+
 func TestGraphQL_InternalDataSource(t *testing.T) {
 	g := StartTest(nil)
 	defer g.Close()
