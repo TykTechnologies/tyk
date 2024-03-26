@@ -272,7 +272,7 @@ jobs:
           name: docker-compose-logs-api-${{ matrix.db }}-${{ matrix.conf }}-${{ github.run_id }}
           path: ${{ github.workspace }}/docker-compose-api.log
           retention-days: 3
-          override: true
+          overwrite: true
       - name: Archive Integration tests report
         if: always()
         uses: actions/upload-artifact@v4
@@ -280,7 +280,7 @@ jobs:
           name: api-test-report-${{ matrix.db }}-${{ matrix.conf }}-${{ github.run_id }}
           retention-days: 3
           path: ${{ github.workspace }}/reports
-          override: true
+          overwrite: true
       - name: Fetch commit author
         if: failure() && steps.test_execution.outcome != 'success' && github.event_name == 'push'
         env:
