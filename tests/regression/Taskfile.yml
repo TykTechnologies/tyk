@@ -53,4 +53,4 @@ tasks:
     desc: "Clean up temporary files"
     aliases: [ clean ]
     cmds:
-      - rm regression.test -f
+      - rm -f regression.test
