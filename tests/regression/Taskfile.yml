@@ -24,6 +24,7 @@ tasks:
     deps: [ test:build ]
     cmds:
       - defer: { task: test:clean }
+      - task: test:lint
       - task: test:run
 
   test:build:
@@ -37,6 +38,16 @@ tasks:
     cmds:
       - defer: { task: services:down }
       - ./regression.test -test.v
+
+  test:lint:
+    desc: "Lint tests"
+    internal: true
+    quiet: true
+    vars:
+      funcs:
+        sh: ./regression.test -test.list=Test | egrep -v 'Test_Issue[0-9]+' || true
+    cmds:
+      - cmd: '{{if ne .funcs ""}}echo -e "Naming violations:\n{{.funcs}}" && exit 1 {{end}}'
 
   test:clean:
     desc: "Clean up temporary files"
