@@ -102,7 +102,7 @@ const (
 	OauthClientAdded        string = "OauthClientAdded"
 	OauthClientRemoved      string = "OauthClientRemoved"
 	OauthClientUpdated      string = "OauthClientUpdated"
-	DeleteAPICache          string = "DeleteAPICache"
+	deleteAPICache          string = "DeleteAPICache"
 )
 
 // RPCStorageHandler is a storage manager that uses the redis database.
@@ -1023,7 +1023,7 @@ func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string, orgId string) 
 			case OauthClientAdded, OauthClientUpdated, OauthClientRemoved:
 				OauthClients[splitKeys[0]] = action
 				notRegularKeys[key] = true
-			case DeleteAPICache:
+			case deleteAPICache:
 				apiIDsToDeleteCache = append(apiIDsToDeleteCache, splitKeys[0])
 			default:
 				log.Debug("ignoring processing of action:", action)

@@ -23,7 +23,7 @@ func TestDeleteAPICache(t *testing.T) {
 		// send requests to cache the API
 		// emit event
 		n := Notification{
-			Command: NoticeDeleteAPICache,
+			Command: noticeDeleteAPICache,
 			Payload: specs[0].APIID,
 			Gw:      ts.Gw,
 		}

@@ -45,8 +45,8 @@ func buildStringEvent(eventType, token, apiId string) string {
 	case RevokeOauthRefreshHashedToken:
 		// string is as= {the-token}:{api-id}:oAuthRevokeToken
 		return fmt.Sprintf("%s:%s:oAuthRevokeToken", token, apiId)
-	case DeleteAPICache:
-		return fmt.Sprintf("%s:%s", apiId, DeleteAPICache)
+	case deleteAPICache:
+		return fmt.Sprintf("%s:%s", apiId, deleteAPICache)
 	}
 	return ""
 }
@@ -653,13 +653,13 @@ func TestRPCDeleteAPICache(t *testing.T) {
 	}
 	t.Run("different api id in event", func(t *testing.T) {
 		scanKeys(t, false)
-		rpcListener.ProcessKeySpaceChanges([]string{buildStringEvent(DeleteAPICache, "", "non-existing-api-id")}, api.OrgID)
+		rpcListener.ProcessKeySpaceChanges([]string{buildStringEvent(deleteAPICache, "", "non-existing-api-id")}, api.OrgID)
 		scanKeys(t, false)
 	})
 
 	t.Run("same api id in event", func(t *testing.T) {
 		scanKeys(t, false)
-		rpcListener.ProcessKeySpaceChanges([]string{buildStringEvent(DeleteAPICache, "", api.APIID)}, api.OrgID)
+		rpcListener.ProcessKeySpaceChanges([]string{buildStringEvent(deleteAPICache, "", api.APIID)}, api.OrgID)
 		scanKeys(t, true)
 	})
 }
