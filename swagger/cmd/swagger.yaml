@@ -241,56 +241,6 @@ paths:
       summary: Updating an API definition  with its ID
       tags:
       - APIs
-  /tyk/apis/{apiID}/versions:
-    get:
-      description: Listing versions of an API
-      operationId: listApiVersions
-      parameters:
-      - description: The API ID
-        example: keyless
-        in: path
-        name: apiID
-        required: true
-        schema:
-          type: string
-      - description: Search for API version name
-        in: query
-        name: searchText
-        required: false
-        schema:
-          type: string
-      - description: Filter for internal or external API versions
-        in: query
-        name: accessType
-        required: false
-        schema:
-          enum:
-          - internal
-          - external
-          type: string
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/VersionMetas'
-          description: API version metas
-        "403":
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiStatusMessage'
-          description: Attempting to access a protected api with an invalid or a missing
-            X-Tyk-Authorization in the headers
-        "404":
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiStatusMessage'
-          description: API not found
-      summary: Listing versions of an API
-      tags:
-      - APIs
   /tyk/apis/oas:
     get:
       description: List all OAS format APIs, when used without the Tyk Dashboard.
@@ -813,6 +763,7 @@ paths:
     post:
       description: Used to test API definition by sending sample request and analysing
         output of both response and logs
+      operationId: debugApiDefinition
       requestBody:
         content:
           application/json:
@@ -844,7 +795,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
           description: Unexpected failure
-      summary: Tracing request
+      summary: Test an an API definition
       tags:
       - Debug
   /tyk/hello:
@@ -876,31 +827,36 @@ paths:
                  Only if used without the Tyk Dashboard
       operationId: listKeys
       parameters:
-      - description: we don't use filter for hashed keys
+      - description: Retrieves all keys starting with the specified filter(filter
+          is a prefix - e.g. default* or default will return all keys starting with
+          default  like defaultbd,defaulttwo etc).We don't use filter for hashed keys
+        example: default*
         in: query
         name: filter
         required: false
         schema:
-          type: boolean
+          type: string
       responses:
         "200":
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiAllKeys'
-          description: OK
+          description: List of all API keys
         "403":
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: Forbidden
+          description: Attempting to access a protected api with an invalid or a missing
+            X-Tyk-Authorization in the headers
         "404":
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: Not Found
+          description: When hash_keys is enabled in gateway config and enable_hashed_keys_listing
+            is disabled
       summary: List Keys
       tags:
       - Keys
@@ -911,26 +867,11 @@ paths:
                 API keys without access_rights data will be written to all APIs on the system (this also means that they will be created across all SessionHandlers and StorageHandlers, it is recommended to always embed access_rights data in a key to ensure that only targeted APIs and their back-ends are written to.
       operationId: addKey
       parameters:
-      - description: The base API which the new version will be linked to.
+      - description: when set to true the key_hash returned will be similar to the
+          un hashed key name
         in: query
-        name: base_api_id
-        schema:
-          type: string
-      - description: The version name of the base API while creating the first version.
-          This doesn't have to be sent for the next versions but if it is set, it
-          will override base API version name.
-        in: query
-        name: base_api_version_name
-        schema:
-          type: string
-      - description: The version name of the created version.
-        in: query
-        name: new_version_name
-        schema:
-          type: string
-      - description: If true, the new version is set as default version.
-        in: query
-        name: set_default
+        name: hashed
+        required: false
         schema:
           type: boolean
       requestBody:
@@ -944,25 +885,26 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiModifyKeySuccess'
-          description: OK
+          description: New Key added
         "400":
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: Bad Request
+          description: Malformed request
         "403":
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: Forbidden
+          description: Attempting to access a protected api with an invalid or a missing
+            X-Tyk-Authorization in the headers
         "500":
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: Internal Server Error
+          description: Unexpected error
       summary: Create a key
       tags:
       - Keys
@@ -990,25 +932,26 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiModifyKeySuccess'
-          description: OK
+          description: Key deleted
         "400":
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: Bad Request
+          description: Failed to remove the key
         "403":
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: Forbidden
+          description: Attempting to access a protected api with an invalid or a missing
+            X-Tyk-Authorization in the headers
         "404":
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: Not Found
+          description: Key not found
       summary: Delete Key
       tags:
       - Keys
@@ -1035,25 +978,26 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/SessionState'
-          description: OK
+          description: Key fetched
         "400":
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: Bad Request
+          description: requesting key using a hash when key hashing is not enabled
         "403":
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: Forbidden
+          description: Attempting to access a protected api with an invalid or a missing
+            X-Tyk-Authorization in the headers
         "404":
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: Not Found
+          description: Key not found
       summary: Get a key with ID
       tags:
       - Keys
@@ -1070,12 +1014,6 @@ paths:
         required: true
         schema:
           type: string
-      - description: Use the hash of the key as input instead of the full key
-        in: query
-        name: hashed
-        required: false
-        schema:
-          type: boolean
       - description: Adding the suppress_reset parameter and setting it to 1, will
           cause Tyk not to reset the quota limit that is in the current live quota
           manager. By default Tyk will reset the quota in the live quota manager (initialising
@@ -1085,7 +1023,16 @@ paths:
         name: suppress_reset
         required: false
         schema:
+          enum:
+          - "1"
           type: string
+      - description: when set to true the key_hash returned will be similar to the
+          un hashed key name
+        in: query
+        name: hashed
+        required: false
+        schema:
+          type: boolean
       requestBody:
         content:
           application/json:
@@ -1097,25 +1044,26 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiModifyKeySuccess'
-          description: OK
+          description: New custom Key added
         "400":
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: Bad Request
+          description: Malformed request
         "403":
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: Forbidden
+          description: Attempting to access a protected api with an invalid or a missing
+            X-Tyk-Authorization in the headers
         "500":
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: Internal Server Error
+          description: Unexpected error
       summary: Create Custom Key / Import Key
       tags:
       - Keys
@@ -1141,6 +1089,8 @@ paths:
         name: suppress_reset
         required: false
         schema:
+          enum:
+          - "1"
           type: string
       - description: Use the hash of the key as input instead of the full key
         in: query
@@ -1159,60 +1109,38 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiModifyKeySuccess'
-          description: OK
+          description: Key updated
         "400":
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: Bad Request
+          description: Malformed request
         "403":
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: Forbidden
+          description: Attempting to access a protected api with an invalid or a missing
+            X-Tyk-Authorization in the headers
         "404":
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: Not Found
+          description: Key not found
         "500":
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: Internal Server Error
+          description: Unexpected error
       summary: Update Key
       tags:
       - Keys
   /tyk/keys/create:
     post:
       operationId: createKey
-      parameters:
-      - description: The base API which the new version will be linked to.
-        in: query
-        name: base_api_id
-        schema:
-          type: string
-      - description: The version name of the base API while creating the first version.
-          This doesn't have to be sent for the next versions but if it is set, it
-          will override base API version name.
-        in: query
-        name: base_api_version_name
-        schema:
-          type: string
-      - description: The version name of the created version.
-        in: query
-        name: new_version_name
-        schema:
-          type: string
-      - description: If true, the new version is set as default version.
-        in: query
-        name: set_default
-        schema:
-          type: boolean
       requestBody:
         content:
           application/json:
@@ -1224,32 +1152,33 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiModifyKeySuccess'
-          description: OK
+          description: Key created
         "400":
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: Bad Request
+          description: keys must have at least one Access Rights record set
         "403":
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: Forbidden
+          description: Attempting to access a protected api with an invalid or a missing
+            X-Tyk-Authorization in the headers
         "500":
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: Internal Server Error
+          description: Failed to create key
       summary: Create a key
       tags:
       - Keys
   /tyk/keys/policy/{keyID}:
     post:
-      description: This will add a Policy object to a hashed key
-      operationId: addPolicyToKey
+      description: This will set policies  to a hashed key
+      operationId: setPoliciesToHashedKey
       parameters:
       - description: The Key ID
         in: path
@@ -1268,39 +1197,40 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiModifyKeySuccess'
-          description: OK
+          description: Updated hashed key
         "400":
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: Bad Request
+          description: malformed request body
         "403":
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: Forbidden
+          description: Attempting to access a protected api with an invalid or a missing
+            X-Tyk-Authorization in the headers
         "404":
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: Not Found
+          description: Key not found
         "500":
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: Internal Server Error
-      summary: Add a policy to a key.
+          description: Unexpected error
+      summary: Set policies for a hashed key.
       tags:
       - Keys
   /tyk/keys/preview:
     post:
-      description: This will create a key and return the created key that you can
-        preview.
-      operationId: createAndPreviewKey
+      description: This will check if the body of a key definition is valid.And return
+        a response with how the key would look like if you create it
+      operationId: validateAKeyDefinition
       requestBody:
         content:
           application/json:
@@ -1312,20 +1242,21 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/SessionState'
-          description: OK
+          description: Key definition is valid
         "403":
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: Forbidden
+          description: Attempting to access a protected api with an invalid or a missing
+            X-Tyk-Authorization in the headers
         "500":
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: Internal Server Error
-      summary: Create a key and return it for preview
+          description: malformed request body
+      summary: This will validate key a definition
       tags:
       - Keys
   /tyk/oauth/clients/{apiID}:
@@ -1896,12 +1827,15 @@ paths:
         'per' to zero, or don't add them to your request.
       operationId: listOrgKeys
       parameters:
-      - description: we don't use filter for hashed keys
+      - description: Retrieves all keys starting with the specified filter(filter
+          is a prefix - e.g. default* or default will return all keys starting with
+          default  like defaultbd,defaulttwo etc).We don't use filter for hashed keys
+        example: default*
         in: query
         name: filter
         required: false
         schema:
-          type: boolean
+          type: string
       responses:
         "200":
           content:
@@ -4533,8 +4467,10 @@ components:
         headers:
           $ref: '#/components/schemas/HttpHeader'
         method:
+          example: GET
           type: string
         path:
+          example: /keyless-test/
           type: string
       type: object
     TraceRequest:
@@ -4547,10 +4483,14 @@ components:
     TraceResponse:
       properties:
         logs:
+          example: '{"level":"warning","msg":"Legacy path detected! Upgrade to extended....'
           type: string
         message:
+          example: ok
           type: string
         response:
+          example: "====== Request ======\nGET / HTTP/1.1\r\nHost: httpbin.org\r\n\r\n\n======
+            Response..."
           type: string
       type: object
     TrackEndpointMeta:
@@ -4741,38 +4681,6 @@ components:
         use_extended_paths:
           example: true
           type: boolean
-      type: object
-    VersionMeta:
-      properties:
-        expirationDate:
-          example: 2026-03-26 09:00
-          type: string
-        id:
-          example: keyless
-          type: string
-        internal:
-          example: false
-          type: boolean
-        isDefaultVersion:
-          example: true
-          type: boolean
-        name:
-          example: Tyk Test Keyless API
-          type: string
-        versionName:
-          example: v2
-          type: string
-      type: object
-    VersionMetas:
-      properties:
-        apis:
-          items:
-            $ref: '#/components/schemas/VersionMeta'
-          nullable: true
-          type: array
-        status:
-          example: success
-          type: string
       type: object
     VirtualMeta:
       properties:
