@@ -613,19 +613,16 @@ func TestGetRawKey(t *testing.T) {
 }
 
 func TestRPCDeleteAPICache(t *testing.T) {
-	g := StartTest(nil)
-	defer g.Close()
+	ts := StartTest(nil)
+	defer ts.Close()
 
 	rpcListener := RPCStorageHandler{
 		KeyPrefix:        "rpc.listener.",
 		SuppressRegister: true,
-		Gw:               g.Gw,
+		Gw:               ts.Gw,
 	}
 
-	g.Gw.GlobalSessionManager.Store().DeleteAllKeys()
-	defer g.Gw.GlobalSessionManager.Store().DeleteAllKeys()
-
-	api := g.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+	api := ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 		spec.UseKeylessAccess = true
 		spec.Proxy.ListenPath = "/cache-api/"
 		spec.CacheOptions = apidef.CacheOptions{
@@ -636,30 +633,29 @@ func TestRPCDeleteAPICache(t *testing.T) {
 	})[0]
 
 	// hit an api to create cache
-	_, _ = g.Run(t, test.TestCase{
+	_, _ = ts.Run(t, test.TestCase{
 		Path: "/cache-api/",
 		Code: http.StatusOK,
 	})
 
-	keyPrefix := fmt.Sprintf("cache-%s*", api.APIID)
-	store := storage.RedisCluster{KeyPrefix: keyPrefix, IsCache: true, ConnectionHandler: g.Gw.StorageConnectionHandler}
-	assert.True(t, store.Connect())
-
-	scanKeys := func(t *testing.T, empty bool) {
-		t.Helper()
-		cacheKeys, err := store.ScanKeys(keyPrefix)
-		assert.NoError(t, err)
-		assert.Equal(t, empty, len(cacheKeys) == 0)
-	}
 	t.Run("different api id in event", func(t *testing.T) {
-		scanKeys(t, false)
+		scanCacheKeys(t, ts.Gw.StorageConnectionHandler, api.APIID, false)
 		rpcListener.ProcessKeySpaceChanges([]string{buildStringEvent(deleteAPICache, "", "non-existing-api-id")}, api.OrgID)
-		scanKeys(t, false)
+		scanCacheKeys(t, ts.Gw.StorageConnectionHandler, api.APIID, false)
 	})
 
 	t.Run("same api id in event", func(t *testing.T) {
-		scanKeys(t, false)
+		scanCacheKeys(t, ts.Gw.StorageConnectionHandler, api.APIID, false)
 		rpcListener.ProcessKeySpaceChanges([]string{buildStringEvent(deleteAPICache, "", api.APIID)}, api.OrgID)
-		scanKeys(t, true)
+		scanCacheKeys(t, ts.Gw.StorageConnectionHandler, api.APIID, true)
 	})
+}
+
+func scanCacheKeys(t *testing.T, storageConnHandler *storage.ConnectionHandler, apiID string, expectEmtpy bool) {
+	t.Helper()
+	keyPrefix := fmt.Sprintf("cache-%s*", apiID)
+	store := storage.RedisCluster{KeyPrefix: keyPrefix, IsCache: true, ConnectionHandler: storageConnHandler}
+	cacheKeys, err := store.ScanKeys(keyPrefix)
+	assert.NoError(t, err)
+	assert.Equal(t, expectEmtpy, len(cacheKeys) == 0)
 }
