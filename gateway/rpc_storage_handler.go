@@ -1125,7 +1125,7 @@ func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string, orgId string) 
 			continue
 		}
 
-		log.WithField("apiID", apiID).Info("cache invalidation failed")
+		log.WithField("apiID", apiID).Error("cache invalidation failed")
 	}
 	// Notify rest of gateways in cluster to flush cache
 	n := Notification{
