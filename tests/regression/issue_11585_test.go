@@ -13,8 +13,8 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestIssue_11585_DeleteAPICache(t *testing.T) {
-	t.Run("event", func(t *testing.T) {
+func Test_Issue_11585_DeleteAPICache(t *testing.T) {
+	t.Run("redis event", func(t *testing.T) {
 		ts := gateway.StartTest(nil)
 		defer ts.Close()
 
@@ -45,55 +45,55 @@ func TestIssue_11585_DeleteAPICache(t *testing.T) {
 		time.Sleep(time.Millisecond * 50)
 		scanCacheKeys(t, ts.Gw.StorageConnectionHandler, api.APIID, true)
 	})
-}
 
-func TestIssue_11585_RPCDeleteAPICache(t *testing.T) {
-	ts := gateway.StartTest(nil)
-	defer ts.Close()
+	t.Run("rpc", func(t *testing.T) {
+		ts := gateway.StartTest(nil)
+		defer ts.Close()
 
-	rpcListener := gateway.RPCStorageHandler{
-		KeyPrefix:        "rpc.listener.",
-		SuppressRegister: true,
-		Gw:               ts.Gw,
-	}
-
-	api := ts.Gw.BuildAndLoadAPI(func(spec *gateway.APISpec) {
-		spec.UseKeylessAccess = true
-		spec.Proxy.ListenPath = "/cache-api/"
-		spec.CacheOptions = apidef.CacheOptions{
-			EnableCache:          true,
-			CacheTimeout:         120,
-			CacheAllSafeRequests: true,
+		rpcListener := gateway.RPCStorageHandler{
+			KeyPrefix:        "rpc.listener.",
+			SuppressRegister: true,
+			Gw:               ts.Gw,
 		}
-	})[0]
 
-	// hit an api to create cache
-	_, _ = ts.Run(t, test.TestCase{
-		Path: "/cache-api/",
-		Code: http.StatusOK,
-	})
+		api := ts.Gw.BuildAndLoadAPI(func(spec *gateway.APISpec) {
+			spec.UseKeylessAccess = true
+			spec.Proxy.ListenPath = "/cache-api/"
+			spec.CacheOptions = apidef.CacheOptions{
+				EnableCache:          true,
+				CacheTimeout:         120,
+				CacheAllSafeRequests: true,
+			}
+		})[0]
 
-	buildStringEvent := func(apiID string) string {
-		return fmt.Sprintf("%s:%s", apiID, gateway.NoticeDeleteAPICache.String())
-	}
+		// hit an api to create cache
+		_, _ = ts.Run(t, test.TestCase{
+			Path: "/cache-api/",
+			Code: http.StatusOK,
+		})
 
-	t.Run("different api id in event", func(t *testing.T) {
-		scanCacheKeys(t, ts.Gw.StorageConnectionHandler, api.APIID, false)
-		rpcListener.ProcessKeySpaceChanges([]string{buildStringEvent("non-existing-api-id")}, api.OrgID)
-		scanCacheKeys(t, ts.Gw.StorageConnectionHandler, api.APIID, false)
-	})
+		buildStringEvent := func(apiID string) string {
+			return fmt.Sprintf("%s:%s", apiID, gateway.NoticeDeleteAPICache.String())
+		}
 
-	t.Run("same api id in event", func(t *testing.T) {
-		scanCacheKeys(t, ts.Gw.StorageConnectionHandler, api.APIID, false)
-		rpcListener.ProcessKeySpaceChanges([]string{buildStringEvent(api.APIID)}, api.OrgID)
-		scanCacheKeys(t, ts.Gw.StorageConnectionHandler, api.APIID, true)
+		t.Run("different api id in event", func(t *testing.T) {
+			scanCacheKeys(t, ts.Gw.StorageConnectionHandler, api.APIID, false)
+			rpcListener.ProcessKeySpaceChanges([]string{buildStringEvent("non-existing-api-id")}, api.OrgID)
+			scanCacheKeys(t, ts.Gw.StorageConnectionHandler, api.APIID, false)
+		})
+
+		t.Run("same api id in event", func(t *testing.T) {
+			scanCacheKeys(t, ts.Gw.StorageConnectionHandler, api.APIID, false)
+			rpcListener.ProcessKeySpaceChanges([]string{buildStringEvent(api.APIID)}, api.OrgID)
+			scanCacheKeys(t, ts.Gw.StorageConnectionHandler, api.APIID, true)
+		})
 	})
 }
 
 func scanCacheKeys(t *testing.T, storageConnHandler *storage.ConnectionHandler, apiID string, expectEmtpy bool) {
 	t.Helper()
 	keyPrefix := fmt.Sprintf("cache-%s*", apiID)
-	store := storage.RedisCluster{KeyPrefix: keyPrefix, IsCache: true, ConnectionHandler: storageConnHandler}
+	store := storage.RedisCluster{IsCache: true, ConnectionHandler: storageConnHandler}
 	cacheKeys, err := store.ScanKeys(keyPrefix)
 	assert.NoError(t, err)
 	assert.Equal(t, expectEmtpy, len(cacheKeys) == 0)
