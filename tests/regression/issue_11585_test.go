@@ -13,7 +13,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestDeleteAPICache_Issue_11585(t *testing.T) {
+func TestIssue_11585_DeleteAPICache(t *testing.T) {
 	t.Run("event", func(t *testing.T) {
 		ts := gateway.StartTest(nil)
 		defer ts.Close()
@@ -47,7 +47,7 @@ func TestDeleteAPICache_Issue_11585(t *testing.T) {
 	})
 }
 
-func TestRPCDeleteAPICache_Issue_11585(t *testing.T) {
+func TestIssue_11585_RPCDeleteAPICache(t *testing.T) {
 	ts := gateway.StartTest(nil)
 	defer ts.Close()
 
