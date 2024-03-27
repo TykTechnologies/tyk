@@ -35,6 +35,7 @@ const (
 	NoticeGatewayDRLNotification NotificationCommand = "NoticeGatewayDRLNotification"
 	KeySpaceUpdateNotification   NotificationCommand = "KeySpaceUpdateNotification"
 	OAuthPurgeLapsedTokens       NotificationCommand = "OAuthPurgeLapsedTokens"
+	NoticeDeleteAPICache                             = NotificationCommand(DeleteAPICache)
 )
 
 // Notification is a type that encodes a message published to a pub sub channel (shared between implementations)
@@ -146,6 +147,10 @@ func (gw *Gateway) handleRedisEvent(v interface{}, handled func(NotificationComm
 	case OAuthPurgeLapsedTokens:
 		if err := gw.purgeLapsedOAuthTokens(); err != nil {
 			log.WithError(err).Errorf("error while purging tokens for event %s", OAuthPurgeLapsedTokens)
+		}
+	case NoticeDeleteAPICache:
+		if ok := gw.invalidateAPICache(notif.Payload); !ok {
+			log.WithError(err).Errorf("cache invalidation failed for: %s", notif.Payload)
 		}
 	default:
 		pubSubLog.Warnf("Unknown notification command: %q", notif.Command)

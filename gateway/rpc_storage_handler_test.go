@@ -45,6 +45,8 @@ func buildStringEvent(eventType, token, apiId string) string {
 	case RevokeOauthRefreshHashedToken:
 		// string is as= {the-token}:{api-id}:oAuthRevokeToken
 		return fmt.Sprintf("%s:%s:oAuthRevokeToken", token, apiId)
+	case DeleteAPICache:
+		return fmt.Sprintf("%s:%s", apiId, DeleteAPICache)
 	}
 	return ""
 }
@@ -608,4 +610,45 @@ func TestGetRawKey(t *testing.T) {
 		_, err := rpcListener.GetRawKey("any-key")
 		assert.Equal(t, storage.ErrMDCBConnectionLost, err)
 	})
+}
+
+func TestRPCDeleteAPICache(t *testing.T) {
+	g := StartTest(nil)
+	defer g.Close()
+
+	rpcListener := RPCStorageHandler{
+		KeyPrefix:        "rpc.listener.",
+		SuppressRegister: true,
+		Gw:               g.Gw,
+	}
+
+	g.Gw.GlobalSessionManager.Store().DeleteAllKeys()
+	defer g.Gw.GlobalSessionManager.Store().DeleteAllKeys()
+
+	api := g.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		spec.UseKeylessAccess = true
+		spec.Proxy.ListenPath = "/cache-api"
+		spec.CacheOptions = apidef.CacheOptions{
+			EnableCache:          true,
+			CacheTimeout:         120,
+			CacheAllSafeRequests: true,
+		}
+	})[0]
+
+	// hit an api to create cache
+	_, _ = g.Run(t, []test.TestCase{
+		{Path: "/cache-api", Code: http.StatusOK},
+	}...)
+
+	store := storage.RedisCluster{IsCache: true, ConnectionHandler: g.Gw.StorageConnectionHandler}
+
+	keyPrefix := "cache-"
+	cacheKeys, err := store.ScanKeys(keyPrefix)
+	assert.NoError(t, err)
+	assert.NotEmpty(t, cacheKeys)
+	rpcListener.ProcessKeySpaceChanges([]string{buildStringEvent(DeleteAPICache, "", api.APIID)}, api.OrgID)
+
+	cacheKeys, err = store.ScanKeys(keyPrefix)
+	assert.NoError(t, err)
+	assert.Empty(t, cacheKeys)
 }
