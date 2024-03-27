@@ -92,9 +92,8 @@ func Test_Issue_11585_DeleteAPICache(t *testing.T) {
 
 func scanCacheKeys(t *testing.T, storageConnHandler *storage.ConnectionHandler, apiID string, expectEmtpy bool) {
 	t.Helper()
-	keyPrefix := fmt.Sprintf("cache-%s*", apiID)
 	store := storage.RedisCluster{IsCache: true, ConnectionHandler: storageConnHandler}
-	cacheKeys, err := store.ScanKeys(keyPrefix)
+	cacheKeys, err := store.ScanKeys(fmt.Sprintf("cache-%s*", apiID))
 	assert.NoError(t, err)
 	assert.Equal(t, expectEmtpy, len(cacheKeys) == 0)
 }
