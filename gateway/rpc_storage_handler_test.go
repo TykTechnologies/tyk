@@ -45,8 +45,6 @@ func buildStringEvent(eventType, token, apiId string) string {
 	case RevokeOauthRefreshHashedToken:
 		// string is as= {the-token}:{api-id}:oAuthRevokeToken
 		return fmt.Sprintf("%s:%s:oAuthRevokeToken", token, apiId)
-	case deleteAPICache:
-		return fmt.Sprintf("%s:%s", apiId, deleteAPICache)
 	}
 	return ""
 }
@@ -610,52 +608,4 @@ func TestGetRawKey(t *testing.T) {
 		_, err := rpcListener.GetRawKey("any-key")
 		assert.Equal(t, storage.ErrMDCBConnectionLost, err)
 	})
-}
-
-func TestRPCDeleteAPICache(t *testing.T) {
-	ts := StartTest(nil)
-	defer ts.Close()
-
-	rpcListener := RPCStorageHandler{
-		KeyPrefix:        "rpc.listener.",
-		SuppressRegister: true,
-		Gw:               ts.Gw,
-	}
-
-	api := ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
-		spec.UseKeylessAccess = true
-		spec.Proxy.ListenPath = "/cache-api/"
-		spec.CacheOptions = apidef.CacheOptions{
-			EnableCache:          true,
-			CacheTimeout:         120,
-			CacheAllSafeRequests: true,
-		}
-	})[0]
-
-	// hit an api to create cache
-	_, _ = ts.Run(t, test.TestCase{
-		Path: "/cache-api/",
-		Code: http.StatusOK,
-	})
-
-	t.Run("different api id in event", func(t *testing.T) {
-		scanCacheKeys(t, ts.Gw.StorageConnectionHandler, api.APIID, false)
-		rpcListener.ProcessKeySpaceChanges([]string{buildStringEvent(deleteAPICache, "", "non-existing-api-id")}, api.OrgID)
-		scanCacheKeys(t, ts.Gw.StorageConnectionHandler, api.APIID, false)
-	})
-
-	t.Run("same api id in event", func(t *testing.T) {
-		scanCacheKeys(t, ts.Gw.StorageConnectionHandler, api.APIID, false)
-		rpcListener.ProcessKeySpaceChanges([]string{buildStringEvent(deleteAPICache, "", api.APIID)}, api.OrgID)
-		scanCacheKeys(t, ts.Gw.StorageConnectionHandler, api.APIID, true)
-	})
-}
-
-func scanCacheKeys(t *testing.T, storageConnHandler *storage.ConnectionHandler, apiID string, expectEmtpy bool) {
-	t.Helper()
-	keyPrefix := fmt.Sprintf("cache-%s*", apiID)
-	store := storage.RedisCluster{KeyPrefix: keyPrefix, IsCache: true, ConnectionHandler: storageConnHandler}
-	cacheKeys, err := store.ScanKeys(keyPrefix)
-	assert.NoError(t, err)
-	assert.Equal(t, expectEmtpy, len(cacheKeys) == 0)
 }

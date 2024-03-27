@@ -1,6 +1,8 @@
 package gateway
 
-import "github.com/TykTechnologies/tyk/storage"
+import (
+	"github.com/TykTechnologies/tyk/storage"
+)
 
 func (gw *Gateway) invalidateAPICache(apiID string) bool {
 	keyPrefix := "cache-" + apiID

@@ -20,6 +20,10 @@ import (
 
 type NotificationCommand string
 
+func (n NotificationCommand) String() string {
+	return string(n)
+}
+
 const (
 	RedisPubSubChannel = "tyk.cluster.notifications"
 
@@ -35,7 +39,8 @@ const (
 	NoticeGatewayDRLNotification NotificationCommand = "NoticeGatewayDRLNotification"
 	KeySpaceUpdateNotification   NotificationCommand = "KeySpaceUpdateNotification"
 	OAuthPurgeLapsedTokens       NotificationCommand = "OAuthPurgeLapsedTokens"
-	noticeDeleteAPICache                             = NotificationCommand(deleteAPICache)
+	// NoticeDeleteAPICache is the command with which event is emitted from dashboard to invalidate cache for an API.
+	NoticeDeleteAPICache NotificationCommand = "DeleteAPICache"
 )
 
 // Notification is a type that encodes a message published to a pub sub channel (shared between implementations)
@@ -148,7 +153,7 @@ func (gw *Gateway) handleRedisEvent(v interface{}, handled func(NotificationComm
 		if err := gw.purgeLapsedOAuthTokens(); err != nil {
 			log.WithError(err).Errorf("error while purging tokens for event %s", OAuthPurgeLapsedTokens)
 		}
-	case noticeDeleteAPICache:
+	case NoticeDeleteAPICache:
 		if ok := gw.invalidateAPICache(notif.Payload); !ok {
 			log.WithError(err).Errorf("cache invalidation failed for: %s", notif.Payload)
 		}
