@@ -16,7 +16,7 @@ var ErrOperationExposer = errors.New("object is not of type openapi3.OperationEx
 const APIsTag = "APIs"
 
 func APIS(r *openapi3.Reflector) error {
-	return addOperations(r, getClassicApiRequest, deleteClassicApiRequest, putClassicApiRequest, getListOfClassicApisRequest, createClassicApiRequest, getApiVersions)
+	return addOperations(r, getClassicApiRequest, deleteClassicApiRequest, putClassicApiRequest, getListOfClassicApisRequest, createClassicApiRequest)
 }
 
 // Done
