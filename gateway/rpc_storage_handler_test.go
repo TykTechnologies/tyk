@@ -627,7 +627,7 @@ func TestRPCDeleteAPICache(t *testing.T) {
 
 	api := g.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 		spec.UseKeylessAccess = true
-		spec.Proxy.ListenPath = "/cache-api"
+		spec.Proxy.ListenPath = "/cache-api/"
 		spec.CacheOptions = apidef.CacheOptions{
 			EnableCache:          true,
 			CacheTimeout:         120,
@@ -636,19 +636,30 @@ func TestRPCDeleteAPICache(t *testing.T) {
 	})[0]
 
 	// hit an api to create cache
-	_, _ = g.Run(t, []test.TestCase{
-		{Path: "/cache-api", Code: http.StatusOK},
-	}...)
+	_, _ = g.Run(t, test.TestCase{
+		Path: "/cache-api/",
+		Code: http.StatusOK,
+	})
 
-	store := storage.RedisCluster{IsCache: true, ConnectionHandler: g.Gw.StorageConnectionHandler}
+	keyPrefix := fmt.Sprintf("cache-%s*", api.APIID)
+	store := storage.RedisCluster{KeyPrefix: keyPrefix, IsCache: true, ConnectionHandler: g.Gw.StorageConnectionHandler}
+	assert.True(t, store.Connect())
 
-	keyPrefix := "cache-"
-	cacheKeys, err := store.ScanKeys(keyPrefix)
-	assert.NoError(t, err)
-	assert.NotEmpty(t, cacheKeys)
-	rpcListener.ProcessKeySpaceChanges([]string{buildStringEvent(DeleteAPICache, "", api.APIID)}, api.OrgID)
+	scanKeys := func(t *testing.T, empty bool) {
+		t.Helper()
+		cacheKeys, err := store.ScanKeys(keyPrefix)
+		assert.NoError(t, err)
+		assert.Equal(t, empty, len(cacheKeys) == 0)
+	}
+	t.Run("different api id in event", func(t *testing.T) {
+		scanKeys(t, false)
+		rpcListener.ProcessKeySpaceChanges([]string{buildStringEvent(DeleteAPICache, "", "non-existing-api-id")}, api.OrgID)
+		scanKeys(t, false)
+	})
 
-	cacheKeys, err = store.ScanKeys(keyPrefix)
-	assert.NoError(t, err)
-	assert.Empty(t, cacheKeys)
+	t.Run("same api id in event", func(t *testing.T) {
+		scanKeys(t, false)
+		rpcListener.ProcessKeySpaceChanges([]string{buildStringEvent(DeleteAPICache, "", api.APIID)}, api.OrgID)
+		scanKeys(t, true)
+	})
 }
