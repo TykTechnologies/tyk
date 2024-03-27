@@ -1,0 +1,47 @@
+{
+  "name": "Token Exchange",
+  "api_id": "token-exchange",
+  "org_id": "default",
+  "definition": {
+    "location": "header",
+    "key": "version"
+  },
+  "use_keyless": false,
+  "version_data": {
+    "not_versioned": true,
+    "versions": {
+      "Default": {
+        "name": "Default",
+        "expires": "3000-01-02 15:04",
+        "use_extended_paths": true,
+        "extended_paths": {
+          "ignored": [],
+          "white_list": [],
+          "black_list": []
+        }
+      }
+    }
+  },
+  "proxy": {
+    "listen_path": "/token-exchange/",
+    "target_url": "http://httpbin.org",
+    "strip_listen_path": true,
+    "preserve_host_header": false
+  },
+  "enable_jwt": true,
+  "jwt_signing_method": "rsa",
+  "jwt_source": "http://localhost:8081/realms/kubecon-eu-24/protocol/openid-connect/certs",
+  "jwt_identity_base_field": "sub",
+  "jwt_policy_field_name": "pol",
+  "jwt_required_audience": "tyk-gateway",
+  "jwt_default_policies": [
+    "default"
+  ],
+  "token_exchange_options": {
+    "enable": true,
+    "token_endpoint": "http://localhost:8081/realms/kubecon-eu-24/protocol/openid-connect/token",
+    "client_id": "tyk-gateway",
+    "client_secret": "5gsQmAbA1xBdOAlEl1g9u0L2c23vVKLG"
+  },
+  "active": true
+}

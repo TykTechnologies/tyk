@@ -90,6 +90,7 @@ const (
 	Internal
 	GoPlugin
 	PersistGraphQL
+	TokenExchange
 )
 
 // RequestStatus is a custom type to avoid collisions
@@ -126,6 +127,7 @@ const (
 	StatusInternal                 RequestStatus = "Internal path"
 	StatusGoPlugin                 RequestStatus = "Go plugin"
 	StatusPersistGraphQL           RequestStatus = "Persist GraphQL"
+	StatusTokenExchange            RequestStatus = "Token Exchange"
 )
 
 // URLSpec represents a flattened specification for URLs, used to check if a proxy URL
