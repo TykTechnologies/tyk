@@ -1,0 +1,112 @@
+version: api.keploy.io/v1beta1
+kind: Http
+name: test-1
+spec:
+    metadata: {}
+    req:
+        method: POST
+        proto_major: 1
+        proto_minor: 1
+        url: http://localhost:8080/tyk/apis
+        header:
+            Accept: '*/*'
+            Content-Length: "767"
+            Content-Type: application/json
+            Host: localhost:8080
+            User-Agent: curl/7.81.0
+            X-Tyk-Authorization: 352d20ee67be67f6340b4c0605b044b7
+        body: |-
+            {
+                "name": "Tyk Test Keyless API",
+                "api_id": "keyless",
+                "org_id": "default",
+                "definition": {
+                    "location": "header",
+                    "key": "version"
+                },
+                "use_keyless": true,
+                "version_data": {
+                    "not_versioned": true,
+                    "versions": {
+                        "Default": {
+                            "name": "Default"
+                        }
+                    }
+                },
+                "custom_middleware": {
+                    "pre": [
+                      {
+                        "name": "testJSVMData",
+                        "path": "./middleware/injectHeader.js",
+                        "require_session": false,
+                        "raw_body_only": false
+                      }
+                    ]
+              },
+                "driver": "otto",
+                "proxy": {
+                    "listen_path": "/keyless-test/",
+                    "target_url": "http://httpbin.org",
+                    "strip_listen_path": true
+                }
+            }
+        timestamp: 2024-03-28T12:05:32.228722511Z
+    resp:
+        status_code: 200
+        header:
+            Content-Length: "49"
+            Content-Type: application/json
+            Date: Thu, 28 Mar 2024 12:05:32 GMT
+        body: |
+            {"key":"keyless","status":"ok","action":"added"}
+        status_message: OK
+        proto_major: 0
+        proto_minor: 0
+        timestamp: 2024-03-28T12:05:34.246438789Z
+    objects: []
+    assertions:
+        noise:
+            header.Date: []
+    created: 1711627534
+curl: |-
+    curl --request POST \
+      --url http://localhost:8080/tyk/apis \
+      --header 'User-Agent: curl/7.81.0' \
+      --header 'Accept: */*' \
+      --header 'X-Tyk-Authorization: 352d20ee67be67f6340b4c0605b044b7' \
+      --header 'Content-Type: application/json' \
+      --header 'Host: localhost:8080' \
+      --data '{
+        "name": "Tyk Test Keyless API",
+        "api_id": "keyless",
+        "org_id": "default",
+        "definition": {
+            "location": "header",
+            "key": "version"
+        },
+        "use_keyless": true,
+        "version_data": {
+            "not_versioned": true,
+            "versions": {
+                "Default": {
+                    "name": "Default"
+                }
+            }
+        },
+        "custom_middleware": {
+            "pre": [
+              {
+                "name": "testJSVMData",
+                "path": "./middleware/injectHeader.js",
+                "require_session": false,
+                "raw_body_only": false
+              }
+            ]
+      },
+        "driver": "otto",
+        "proxy": {
+            "listen_path": "/keyless-test/",
+            "target_url": "http://httpbin.org",
+            "strip_listen_path": true
+        }
+    }'
