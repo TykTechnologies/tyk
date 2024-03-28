@@ -302,6 +302,13 @@ func (gw *Gateway) processSpec(spec *APISpec, apisByListen map[string]int,
 
 	gw.mwAppendEnabled(&chainArray, &VersionCheck{BaseMiddleware: baseMid})
 
+	gw.mwAppendEnabled(&chainArray, &RateCheckMW{BaseMiddleware: baseMid})
+	gw.mwAppendEnabled(&chainArray, &IPWhiteListMiddleware{BaseMiddleware: baseMid})
+	gw.mwAppendEnabled(&chainArray, &IPBlackListMiddleware{BaseMiddleware: baseMid})
+	gw.mwAppendEnabled(&chainArray, &CertificateCheckMW{BaseMiddleware: baseMid})
+	gw.mwAppendEnabled(&chainArray, &RequestSizeLimitMiddleware{baseMid})
+	gw.mwAppendEnabled(&chainArray, &OrganizationMonitor{BaseMiddleware: baseMid, mon: Monitor{Gw: gw}})
+
 	for _, obj := range mwPreFuncs {
 		if mwDriver == apidef.GoPluginDriver {
 			gw.mwAppendEnabled(
@@ -321,12 +328,6 @@ func (gw *Gateway) processSpec(spec *APISpec, apisByListen map[string]int,
 		}
 	}
 
-	gw.mwAppendEnabled(&chainArray, &RateCheckMW{BaseMiddleware: baseMid})
-	gw.mwAppendEnabled(&chainArray, &IPWhiteListMiddleware{BaseMiddleware: baseMid})
-	gw.mwAppendEnabled(&chainArray, &IPBlackListMiddleware{BaseMiddleware: baseMid})
-	gw.mwAppendEnabled(&chainArray, &CertificateCheckMW{BaseMiddleware: baseMid})
-	gw.mwAppendEnabled(&chainArray, &OrganizationMonitor{BaseMiddleware: baseMid, mon: Monitor{Gw: gw}})
-	gw.mwAppendEnabled(&chainArray, &RequestSizeLimitMiddleware{baseMid})
 	gw.mwAppendEnabled(&chainArray, &MiddlewareContextVars{BaseMiddleware: baseMid})
 	gw.mwAppendEnabled(&chainArray, &TrackEndpointMiddleware{baseMid})
 
