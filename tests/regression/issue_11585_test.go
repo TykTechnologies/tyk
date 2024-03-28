@@ -14,7 +14,7 @@ import (
 	"github.com/TykTechnologies/tyk/test"
 )
 
-func Test_Issue11585_DeleteAPICache(t *testing.T) {
+func Test_Issue11585_DeleteAPICacheSignal(t *testing.T) {
 	t.Run("redis event", func(t *testing.T) {
 		ts := gateway.StartTest(nil)
 		defer ts.Close()
