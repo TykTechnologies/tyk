@@ -319,7 +319,7 @@ func TestSessionLimiter_RedisQuotaExceeded_PerAPI(t *testing.T) {
 		_, _ = g.Run(t, test.TestCase{Path: fmt.Sprintf("/%s/", apiID), Headers: headers, Code: http.StatusOK})
 
 		resp, _ := g.Run(t, test.TestCase{Path: "/tyk/keys/" + key, AdminAuth: true, Code: http.StatusOK})
-		bodyInBytes, _ := ioutil.ReadAll(resp.Body)
+		bodyInBytes, _ := io.ReadAll(resp.Body)
 		var session user.SessionState
 		_ = json.Unmarshal(bodyInBytes, &session)
 

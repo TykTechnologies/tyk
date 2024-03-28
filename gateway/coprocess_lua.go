@@ -172,7 +172,7 @@ func (d *LuaDispatcher) Reload() {
 
 	for _, f := range files {
 		middlewarePath := filepath.Join(MiddlewareBasePath, f.Name())
-		contents, err := ioutil.ReadFile(middlewarePath)
+		contents, err := os.ReadFile(middlewarePath)
 		if err != nil {
 			log.WithFields(logrus.Fields{
 				"prefix": "coprocess",
@@ -186,7 +186,7 @@ func (d *LuaDispatcher) Reload() {
 func (d *LuaDispatcher) HandleMiddlewareCache(b *apidef.BundleManifest, basePath string) {
 	for _, f := range b.FileList {
 		fullPath := filepath.Join(basePath, f)
-		contents, err := ioutil.ReadFile(fullPath)
+		contents, err := os.ReadFile(fullPath)
 		if err == nil {
 			d.ModuleCache[f] = string(contents)
 		} else {
@@ -208,7 +208,7 @@ func (d *LuaDispatcher) LoadModules() {
 	}
 
 	middlewarePath := filepath.Join(ModuleBasePath, "bundle.lua")
-	contents, err := ioutil.ReadFile(middlewarePath)
+	contents, err := os.ReadFile(middlewarePath)
 
 	if err == nil {
 		d.ModuleCache["bundle.lua"] = string(contents)

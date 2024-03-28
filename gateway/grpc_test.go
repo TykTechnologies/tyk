@@ -7,7 +7,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"github.com/TykTechnologies/tyk/certs"
+	"google.golang.org/grpc/credentials/insecure"
 
 	"github.com/TykTechnologies/tyk/config"
 
@@ -84,7 +85,7 @@ func TestHTTP2_h2C(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer w.Body.Close()
-	b, err := ioutil.ReadAll(w.Body)
+	b, err := io.ReadAll(w.Body)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -462,7 +463,7 @@ func TestGRPC_TokenBasedAuthentication(t *testing.T) {
 	}...)
 
 	// Read key
-	body, _ := ioutil.ReadAll(resp.Body)
+	body, _ := io.ReadAll(resp.Body)
 	var resMap map[string]string
 	err := json.Unmarshal(body, &resMap)
 	if err != nil {
@@ -573,7 +574,7 @@ func startGRPCServer(t *testing.T, clientCert *x509.Certificate, fn func(t *test
 }
 
 func sayHelloWithGRPCClientH2C(t *testing.T, address string, name string) *pbExample.HelloReply {
-	conn, err := grpc.Dial(address, grpc.WithInsecure())
+	conn, err := grpc.Dial(address, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		t.Fatalf("did not connect: %v", err)
 	}
@@ -781,7 +782,7 @@ func TestGRPC_Stream_TokenBasedAuthentication(t *testing.T) {
 	}
 
 	// Read key
-	body, err := ioutil.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		t.Error("Fail reading body from create key request")
 	}
@@ -885,5 +886,5 @@ func TestGRPC_Stream_H2C(t *testing.T) {
 	})
 
 	// gRPC client
-	testGRPCStreamClient(t, "localhost:6666", grpc.WithInsecure())
+	testGRPCStreamClient(t, "localhost:6666", grpc.WithTransportCredentials(insecure.NewCredentials()))
 }

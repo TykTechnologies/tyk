@@ -90,11 +90,11 @@ func (h *HostUptimeChecker) getStaggeredTime() time.Duration {
 		return time.Duration(h.checkTimeout) * time.Second
 	}
 
-	mathRand.Seed(time.Now().Unix())
+	rand := mathRand.New(mathRand.NewSource(time.Now().Unix()))
 	min := h.checkTimeout - 3
 	max := h.checkTimeout + 3
 
-	dur := mathRand.Intn(max-min) + min
+	dur := rand.Intn(max-min) + min
 
 	return time.Duration(dur) * time.Second
 }
@@ -259,7 +259,6 @@ func (h *HostUptimeChecker) CheckHost(toCheck HostData) {
 				if err != nil {
 					log.Errorf("Failed to send %s :%v", cmd.Message, err)
 					report.IsTCPError = true
-					break
 				}
 			case "expect":
 				buf := make([]byte, len(cmd.Message))

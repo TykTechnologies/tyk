@@ -91,7 +91,7 @@ func (t *TransformJQMiddleware) transformJQBody(r *http.Request, ts *TransformJQ
 
 	transformed, _ := json.Marshal(jqResult.Body)
 	bodyBuffer := bytes.NewBuffer(transformed)
-	r.Body = ioutil.NopCloser(bodyBuffer)
+	r.Body = io.NopCloser(bodyBuffer)
 	r.ContentLength = int64(bodyBuffer.Len())
 	t
 	// Replace header in the request

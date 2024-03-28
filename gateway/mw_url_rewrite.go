@@ -692,7 +692,7 @@ func checkContextTrigger(r *http.Request, options map[string]apidef.StringRegexM
 
 func checkPayload(r *http.Request, options apidef.StringRegexMap, triggernum int) bool {
 	contextData := ctxGetData(r)
-	bodyBytes, _ := ioutil.ReadAll(r.Body)
+	bodyBytes, _ := io.ReadAll(r.Body)
 
 	matched, matches := options.FindAllStringSubmatch(string(bodyBytes), -1)
 

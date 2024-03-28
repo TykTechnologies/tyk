@@ -52,7 +52,7 @@ func (s *ServiceDiscovery) getServiceData(name string) (string, error) {
 	}
 
 	defer resp.Body.Close()
-	contents, err := ioutil.ReadAll(resp.Body)
+	contents, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return "", err
 	}

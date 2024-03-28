@@ -6,7 +6,6 @@ import (
 	"crypto/x509/pkix"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -46,7 +45,7 @@ func TestGatewayTLS(t *testing.T) {
 	// Configure server
 	serverCertPem, serverPrivPem, combinedPEM, _ := crypto.GenServerCertificate()
 
-	dir, _ := ioutil.TempDir("", "certs")
+	dir, _ := os.MkdirTemp("", "certs")
 	defer os.RemoveAll(dir)
 
 	client := GetTLSClient(nil, nil)
@@ -69,13 +68,13 @@ func TestGatewayTLS(t *testing.T) {
 	t.Run("Legacy TLS certificate path", func(t *testing.T) {
 
 		certFilePath := filepath.Join(dir, "server.crt")
-		err := ioutil.WriteFile(certFilePath, serverCertPem, 0666)
+		err := os.WriteFile(certFilePath, serverCertPem, 0666)
 		if err != nil {
 			t.Error("writing serverCertPem")
 		}
 
 		certKeyPath := filepath.Join(dir, "server.key")
-		err = ioutil.WriteFile(certKeyPath, serverPrivPem, 0666)
+		err = os.WriteFile(certKeyPath, serverPrivPem, 0666)
 		if err != nil {
 			t.Error("writing serverPrivPem")
 		}
@@ -104,7 +103,7 @@ func TestGatewayTLS(t *testing.T) {
 
 	t.Run("File certificate path", func(t *testing.T) {
 		certPath := filepath.Join(dir, "server.pem")
-		err := ioutil.WriteFile(certPath, combinedPEM, 0666)
+		err := os.WriteFile(certPath, combinedPEM, 0666)
 		if err != nil {
 			t.Error("could not write server.pem file")
 		}
@@ -160,7 +159,7 @@ func TestGatewayTLS(t *testing.T) {
 func TestGatewayControlAPIMutualTLS(t *testing.T) {
 	// Configure server
 	serverCertPem, _, combinedPEM, _ := crypto.GenServerCertificate()
-	dir, _ := ioutil.TempDir("", "certs")
+	dir, _ := os.MkdirTemp("", "certs")
 
 	defer func() {
 		os.RemoveAll(dir)

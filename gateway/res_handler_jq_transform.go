@@ -60,7 +60,7 @@ func (h *ResponseTransformJQMiddleware) HandleResponse(rw http.ResponseWriter, r
 	bodyBuffer := bytes.NewBuffer(transformed)
 	res.Header.Set("Content-Length", strconv.Itoa(bodyBuffer.Len()))
 	res.ContentLength = int64(bodyBuffer.Len())
-	res.Body = ioutil.NopCloser(bodyBuffer)
+	res.Body = io.NopCloser(bodyBuffer)
 
 	// Replace header in the response
 	ignoreCanonical := h.GetConfig().IgnoreCanonicalMIMEHeaderKey

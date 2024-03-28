@@ -12,8 +12,8 @@ import (
 	"os"
 	"testing"
 
-	"github.com/golang/protobuf/proto"
 	"github.com/justinas/alice"
+	"google.golang.org/protobuf/proto"
 
 	"github.com/sirupsen/logrus"
 

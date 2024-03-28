@@ -5,7 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"math/rand"
 	"mime/multipart"
 	"net"
@@ -484,7 +484,7 @@ func TestGRPCDispatch(t *testing.T) {
 	defer ts.Close()
 	defer grpcServer.Stop()
 
-	keyID := gateway.CreateSession(ts.Gw, func(s *user.SessionState) {
+	_, keyID := ts.CreateSession(func(s *user.SessionState) {
 		s.MetaData = map[string]interface{}{
 			"testkey":  map[string]interface{}{"nestedkey": "nestedvalue"},
 			"testkey2": "testvalue",
@@ -502,7 +502,8 @@ func TestGRPCDispatch(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Request failed: %s", err.Error())
 		}
-		data, err := ioutil.ReadAll(res.Body)
+
+		data, err := io.ReadAll(res.Body)
 		if err != nil {
 			t.Fatalf("Couldn't read response body: %s", err.Error())
 		}
@@ -602,7 +603,7 @@ func BenchmarkGRPCDispatch(b *testing.B) {
 	defer ts.Close()
 	defer grpcServer.Stop()
 
-	keyID := gateway.CreateSession(ts.Gw)
+	_, keyID := ts.CreateSession()
 	headers := map[string]string{"authorization": keyID}
 
 	b.Run("Pre Hook with SetHeaders", func(b *testing.B) {

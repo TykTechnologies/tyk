@@ -83,7 +83,7 @@ func (w *customResponseWriter) getHttpResponse(r *http.Request) *http.Response {
 		ContentLength: w.dataLength,
 	}
 	if w.copyData {
-		httpResponse.Body = ioutil.NopCloser(bytes.NewReader(w.data))
+		httpResponse.Body = io.NopCloser(bytes.NewReader(w.data))
 	}
 
 	return httpResponse

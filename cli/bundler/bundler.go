@@ -10,7 +10,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 
 	"github.com/TykTechnologies/goverify"
@@ -74,7 +73,7 @@ func (b *Bundler) Build(ctx *kingpin.ParseContext) error {
 	bundleBuf := new(bytes.Buffer)
 	for _, file := range manifest.FileList {
 		var data []byte
-		data, err = ioutil.ReadFile(file)
+		data, err = os.ReadFile(file)
 		if err != nil {
 			break
 		}
@@ -121,7 +120,7 @@ func (b *Bundler) Build(ctx *kingpin.ParseContext) error {
 			break
 		}
 		var data []byte
-		data, err = ioutil.ReadFile(file)
+		data, err = os.ReadFile(file)
 		if err != nil {
 			break
 		}
@@ -137,7 +136,7 @@ func (b *Bundler) Build(ctx *kingpin.ParseContext) error {
 	newManifest, err := zipWriter.Create(defaultManifestPath)
 	_, err = newManifest.Write(manifestData)
 	zipWriter.Close()
-	err = ioutil.WriteFile(bundlePath, buf.Bytes(), defaultBundlePerm)
+	err = os.WriteFile(bundlePath, buf.Bytes(), defaultBundlePerm)
 	if err != nil {
 		return err
 	}
@@ -188,7 +187,7 @@ func (b *Bundler) validateManifest(manifest *apidef.BundleManifest) (err error) 
 }
 
 func (b *Bundler) loadManifest(path string) (manifest *apidef.BundleManifest, err error) {
-	rawManifest, err := ioutil.ReadFile(path)
+	rawManifest, err := os.ReadFile(path)
 	if err != nil {
 		return manifest, errManifestLoad
 	}
