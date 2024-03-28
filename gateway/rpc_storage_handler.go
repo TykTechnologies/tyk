@@ -990,6 +990,7 @@ func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string, orgId string) 
 	CertificatesToRemove := map[string]string{}
 	CertificatesToAdd := map[string]string{}
 	OauthClients := map[string]string{}
+	apiIDsToDeleteCache := make([]string, 0)
 
 	for _, key := range keys {
 		splitKeys := strings.Split(key, ":")
@@ -1013,6 +1014,8 @@ func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string, orgId string) 
 			case OauthClientAdded, OauthClientUpdated, OauthClientRemoved:
 				OauthClients[splitKeys[0]] = action
 				notRegularKeys[key] = true
+			case NoticeDeleteAPICache.String():
+				apiIDsToDeleteCache = append(apiIDsToDeleteCache, splitKeys[0])
 			default:
 				log.Debug("ignoring processing of action:", action)
 			}
@@ -1108,6 +1111,14 @@ func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string, orgId string) 
 		}
 	}
 
+	for _, apiID := range apiIDsToDeleteCache {
+		if r.Gw.invalidateAPICache(apiID) {
+			log.WithField("apiID", apiID).Info("cache invalidated")
+			continue
+		}
+
+		log.WithField("apiID", apiID).Error("cache invalidation failed")
+	}
 	// Notify rest of gateways in cluster to flush cache
 	n := Notification{
 		Command: KeySpaceUpdateNotification,
