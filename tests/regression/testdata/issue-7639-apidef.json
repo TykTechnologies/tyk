@@ -333,8 +333,8 @@
         "pre": [],
         "post": [
             {
-                "name": "sampleMiddleware_post",
-                "path": "middleware/sampleMiddleware_post.js",
+                "name": "bug_tt7639",
+                "path": "./testdata/issue-7639-script.js",
                 "require_session": true,
                 "raw_body_only": false
             }
