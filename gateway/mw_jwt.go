@@ -114,7 +114,7 @@ func (k *JWTMiddleware) legacyGetSecretFromURL(url, kid, keyType string) (interf
 	}
 
 	for _, val := range jwkSet.Keys {
-		if val.KID != kid || strings.ToLower(val.Kty) != strings.ToLower(keyType) {
+		if val.KID != kid || !strings.EqualFold(val.Kty, keyType) {
 			continue
 		}
 		if len(val.X5c) > 0 {

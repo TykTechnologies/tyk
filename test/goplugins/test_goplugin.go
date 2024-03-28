@@ -103,7 +103,7 @@ func MyPluginResponse(rw http.ResponseWriter, res *http.Response, req *http.Requ
 
 	buf.Write([]byte(`{"message":"response injected message"}`))
 
-	res.Body = ioutil.NopCloser(&buf)
+	res.Body = io.NopCloser(&buf)
 
 	apiDefinition := ctx.GetDefinition(req)
 	if apiDefinition == nil {

@@ -9,6 +9,7 @@ import (
 
 	"github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/coprocess"
@@ -93,7 +94,7 @@ func (gw *Gateway) NewGRPCDispatcher() (coprocess.Dispatcher, error) {
 	var err error
 	grpcConnection, err = grpc.Dial("",
 		gw.grpcCallOpts(),
-		grpc.WithInsecure(),
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
 		grpc.WithAuthority(authority),
 		grpc.WithDialer(gw.dialer),
 	)

@@ -4,12 +4,12 @@ import (
 	"archive/zip"
 	"bytes"
 	"encoding/json"
-	"io/ioutil"
 	"os"
 	"strings"
 	"testing"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/stretchr/testify/assert"
 
 	kingpin "github.com/alecthomas/kingpin/v2"
 )
@@ -56,7 +56,7 @@ func writeManifestFile(t testing.TB, manifest interface{}, filename string) *str
 		manifestString := manifest.(string)
 		data = []byte(manifestString)
 	}
-	ioutil.WriteFile(filename, data, 0600)
+	err = os.WriteFile(filename, data, 0600)
 	if err != nil {
 		t.Fatalf("Couldn't write manifest file: %s", err.Error())
 	}
@@ -135,7 +135,7 @@ func TestBuild(t *testing.T) {
 	// Build a simple bundle:
 	t.Run("Simple bundle build", func(t *testing.T) {
 		ctx := &kingpin.ParseContext{}
-		err := ioutil.WriteFile("middleware.py", []byte(""), 0600)
+		err := os.WriteFile("middleware.py", []byte(""), 0600)
 		if err != nil {
 			t.Fatalf("Couldn't write middleware.py: %s", err.Error())
 		}
@@ -157,6 +157,8 @@ func TestBuild(t *testing.T) {
 		skipSigning := true
 		bundler.skipSigning = &skipSigning
 		err = bundler.Build(ctx)
+		assert.NoError(t, err)
+
 		zipFile, err := zip.OpenReader("bundle.zip")
 		if err != nil {
 			t.Fatalf("Couldn't initialize ZIP reader: %s\n", err.Error())

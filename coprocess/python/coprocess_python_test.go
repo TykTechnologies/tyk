@@ -310,7 +310,7 @@ func TestPythonBundles(t *testing.T) {
 
 		postHookBundle := ts.RegisterBundle("python_with_post_hook", pythonBundleWithPostHook)
 
-		keyID := gateway.CreateSession(ts.Gw, func(s *user.SessionState) {
+		_, keyID := ts.CreateSession(func(s *user.SessionState) {
 			s.MetaData = map[string]interface{}{
 				"testkey":   map[string]interface{}{"nestedkey": "nestedvalue"},
 				"stringkey": "testvalue",
@@ -338,7 +338,7 @@ func TestPythonBundles(t *testing.T) {
 
 		responseHookBundle := ts.RegisterBundle("python_with_response_hook", pythonBundleWithResponseHook)
 
-		keyID := gateway.CreateSession(ts.Gw, func(s *user.SessionState) {
+		_, keyID := ts.CreateSession(func(s *user.SessionState) {
 			s.MetaData = map[string]interface{}{
 				"testkey":   map[string]interface{}{"nestedkey": "nestedvalue"},
 				"stringkey": "testvalue",

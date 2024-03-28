@@ -231,7 +231,6 @@ func getNonEmptyFields(data interface{}, prefix string) (fields []string) {
 			for j := 0; j < field.Len(); j++ {
 				elemFullName := fullName + fmt.Sprintf("[%d]", j)
 				fields = append(fields, getNonEmptyFields(field.Index(j).Interface(), elemFullName)...)
-				break
 			}
 
 		case reflect.Map:

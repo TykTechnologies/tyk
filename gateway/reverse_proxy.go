@@ -19,7 +19,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net"
 	"net/http"
 	"net/url"
@@ -570,7 +569,7 @@ func (p *ReverseProxy) CheckHeaderInRemoveList(hdr string, spec *APISpec, req *h
 	vInfo, _ := spec.Version(req)
 	versionPaths := spec.RxPaths[vInfo.Name]
 	for _, gdKey := range vInfo.GlobalHeadersRemove {
-		if strings.ToLower(gdKey) == strings.ToLower(hdr) {
+		if strings.EqualFold(gdKey, hdr) {
 			return true
 		}
 	}
@@ -579,7 +578,7 @@ func (p *ReverseProxy) CheckHeaderInRemoveList(hdr string, spec *APISpec, req *h
 	if found, meta := spec.CheckSpecMatchesStatus(req, versionPaths, HeaderInjected); found {
 		hmeta := meta.(*apidef.HeaderInjectionMeta)
 		for _, gdKey := range hmeta.DeleteHeaders {
-			if strings.ToLower(gdKey) == strings.ToLower(hdr) {
+			if strings.EqualFold(gdKey, hdr) {
 				return true
 			}
 		}
@@ -1324,8 +1323,8 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 			*bodyBuffer2 = bodyBuffer
 
 			// Create new ReadClosers so we can split output
-			res.Body = ioutil.NopCloser(&bodyBuffer)
-			inres.Body = ioutil.NopCloser(bodyBuffer2)
+			res.Body = io.NopCloser(&bodyBuffer)
+			inres.Body = io.NopCloser(bodyBuffer2)
 		}
 	}
 
@@ -1528,7 +1527,7 @@ func (p *ReverseProxy) handleUpgradeResponse(rw http.ResponseWriter, req *http.R
 	go spc.copyFromBackend(errc)
 	<-errc
 
-	res.Body = ioutil.NopCloser(strings.NewReader(""))
+	res.Body = io.NopCloser(strings.NewReader(""))
 
 	return nil
 }

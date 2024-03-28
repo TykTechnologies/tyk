@@ -8,7 +8,6 @@ import (
 	"errors"
 	"hash"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"strconv"
 	"strings"
@@ -104,7 +103,7 @@ func readBody(req *http.Request) (bodyBytes []byte, err error) {
 	if err != nil {
 		return nil, err
 	}
-	return ioutil.ReadAll(req.Body)
+	return io.ReadAll(req.Body)
 }
 
 func isBodyHashRequired(request *http.Request) bool {

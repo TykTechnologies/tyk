@@ -1,11 +1,12 @@
 package gateway
 
 import (
+	"context"
 	"crypto/sha256"
 	"crypto/tls"
 	"crypto/x509"
 	"errors"
-	"io/ioutil"
+	"io"
 	"net"
 	"net/http"
 	"net/url"
@@ -187,6 +188,14 @@ func validateCommonName(host string, cert *x509.Certificate) error {
 	}
 
 	return nil
+}
+
+func (gw *Gateway) customDialTLSCtxCheck(spec *APISpec, tc *tls.Config) func(ctx context.Context, network, addr string) (net.Conn, error) {
+	dialTLS := gw.customDialTLSCheck(spec, tc)
+
+	return func(_ context.Context, network, addr string) (net.Conn, error) {
+		return dialTLS(network, addr)
+	}
 }
 
 func (gw *Gateway) customDialTLSCheck(spec *APISpec, tc *tls.Config) func(network, addr string) (net.Conn, error) {
@@ -512,7 +521,7 @@ func (gw *Gateway) certHandler(w http.ResponseWriter, r *http.Request) {
 
 	switch r.Method {
 	case "POST":
-		content, err := ioutil.ReadAll(r.Body)
+		content, err := io.ReadAll(r.Body)
 		if err != nil {
 			doJSONWrite(w, 405, apiError("Malformed request body"))
 			return

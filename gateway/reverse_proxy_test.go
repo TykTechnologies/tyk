@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	mathRand "math/rand"
 	"net/http"
 	"net/http/httptest"
@@ -429,7 +428,7 @@ func TestCircuitBreakerEvents(t *testing.T) {
 
 	// Establish a simple HTTP server that takes webhook input and passes the event to above channel:
 	webHookServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		rawBody, err := ioutil.ReadAll(r.Body)
+		rawBody, err := io.ReadAll(r.Body)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -792,14 +791,14 @@ func TestNopCloseRequestBody(t *testing.T) {
 		t.Error("Request's body was not replaced with nopCloser")
 	} else {
 		// try to read body 1st time
-		if data, err := ioutil.ReadAll(body); err != nil {
+		if data, err := io.ReadAll(body); err != nil {
 			t.Error("1st read, error while reading body:", err)
 		} else if !bytes.Equal(data, []byte("abcxyz")) { // compare with expected data
 			t.Error("1st read, body's data is not as expectd")
 		}
 
 		// try to read body again without closing
-		if data, err := ioutil.ReadAll(body); err != nil {
+		if data, err := io.ReadAll(body); err != nil {
 			t.Error("2nd read, error while reading body:", err)
 		} else if !bytes.Equal(data, []byte("abcxyz")) { // compare with expected data
 			t.Error("2nd read, body's data is not as expectd")
@@ -807,7 +806,7 @@ func TestNopCloseRequestBody(t *testing.T) {
 
 		// close body and try to read "closed" one
 		body.Close()
-		if data, err := ioutil.ReadAll(body); err != nil {
+		if data, err := io.ReadAll(body); err != nil {
 			t.Error("3rd read, error while reading body:", err)
 		} else if !bytes.Equal(data, []byte("abcxyz")) { // compare with expected data
 			t.Error("3rd read, body's data is not as expectd")
@@ -829,20 +828,20 @@ func TestNopCloseResponseBody(t *testing.T) {
 
 	// try to pass not nil body and check that it was replaced with nopCloser
 	resp = &http.Response{}
-	resp.Body = ioutil.NopCloser(strings.NewReader("abcxyz"))
+	resp.Body = io.NopCloser(strings.NewReader("abcxyz"))
 	nopCloseResponseBody(resp)
 	if body, ok := resp.Body.(*nopCloserBuffer); !ok {
 		t.Error("Response's body was not replaced with nopCloser")
 	} else {
 		// try to read body 1st time
-		if data, err := ioutil.ReadAll(body); err != nil {
+		if data, err := io.ReadAll(body); err != nil {
 			t.Error("1st read, error while reading body:", err)
 		} else if !bytes.Equal(data, []byte("abcxyz")) { // compare with expected data
 			t.Error("1st read, body's data is not as expectd")
 		}
 
 		// try to read body again without closing
-		if data, err := ioutil.ReadAll(body); err != nil {
+		if data, err := io.ReadAll(body); err != nil {
 			t.Error("2nd read, error while reading body:", err)
 		} else if !bytes.Equal(data, []byte("abcxyz")) { // compare with expected data
 			t.Error("2nd read, body's data is not as expectd")
@@ -850,7 +849,7 @@ func TestNopCloseResponseBody(t *testing.T) {
 
 		// close body and try to read "closed" one
 		body.Close()
-		if data, err := ioutil.ReadAll(body); err != nil {
+		if data, err := io.ReadAll(body); err != nil {
 			t.Error("3rd read, error while reading body:", err)
 		} else if !bytes.Equal(data, []byte("abcxyz")) { // compare with expected data
 			t.Error("3rd read, body's data is not as expectd")
@@ -1570,8 +1569,8 @@ func BenchmarkCopyRequestResponse(b *testing.B) {
 	req := &http.Request{}
 	res := &http.Response{}
 	for i := 0; i < b.N; i++ {
-		req.Body = ioutil.NopCloser(strings.NewReader(str))
-		res.Body = ioutil.NopCloser(strings.NewReader(str))
+		req.Body = io.NopCloser(strings.NewReader(str))
+		res.Body = io.NopCloser(strings.NewReader(str))
 		for j := 0; j < 10; j++ {
 			req, _ = copyRequest(req)
 			res, _ = copyResponse(res)
@@ -1838,14 +1837,16 @@ func TestSetCustomHeaderMultipleValues(t *testing.T) {
 }
 
 func TestCreateMemConnProviderIfNeeded(t *testing.T) {
+	type ctxKey string
 	t.Run("should propagate context", func(t *testing.T) {
-		propagationContext := context.WithValue(context.Background(), "parentContextKey", "parentContextValue")
+		parentCtxKey := ctxKey("parentContextKey")
+		propagationContext := context.WithValue(context.Background(), parentCtxKey, "parentContextValue")
 		propagationContextWithCancel, cancel := context.WithCancel(propagationContext)
 		internalReq, err := http.NewRequest(http.MethodGet, "http://memoryhost/", nil)
 		require.NoError(t, err)
 
 		handler := http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
-			assert.Equal(t, "parentContextValue", req.Context().Value("parentContextKey"))
+			assert.Equal(t, "parentContextValue", req.Context().Value(parentCtxKey))
 			cancel()
 		})
 
