@@ -210,6 +210,96 @@ func TestGraphQLMiddleware_RequestValidation(t *testing.T) {
 			})
 		assert.NoError(t, err)
 	})
+<<<<<<< HEAD
+=======
+
+	t.Run("fail input validation with otel tracing active", func(t *testing.T) {
+		local := StartTest(func(globalConf *config.Config) {
+			globalConf.OpenTelemetry.Enabled = true
+		})
+		defer local.Close()
+		testSpec := BuildAPI(func(spec *APISpec) {
+			spec.GraphQL.ExecutionMode = apidef.GraphQLExecutionModeProxyOnly
+			spec.GraphQL.Schema = gqlCountriesSchema
+			spec.GraphQL.Version = apidef.GraphQLConfigVersion2
+			spec.Proxy.TargetURL = testGraphQLProxyUpstream
+			spec.Proxy.ListenPath = "/"
+			spec.GraphQL.Enabled = true
+		})[0]
+
+		local.Gw.LoadAPI(testSpec)
+
+		_, err := local.Run(
+			t,
+			test.TestCase{
+				Path:   "/",
+				Method: http.MethodPost,
+				Data: gql.Request{
+					Query:     gqlContinentQueryVariable,
+					Variables: []byte(`{"code":null}`),
+				},
+				Code: 400,
+			},
+			test.TestCase{
+				Path:   "/",
+				Method: http.MethodPost,
+				Data: gql.Request{
+					Query:     gqlStateQueryVariable,
+					Variables: []byte(`{"filter":{"code":{"eq":"filterString"}}}`),
+				},
+				Code: 400,
+				BodyMatchFunc: func(i []byte) bool {
+					return strings.Contains(string(i), `Validation for variable \"filter\" failed`)
+				},
+			})
+		assert.NoError(t, err)
+	})
+
+	t.Run("fail input validation if GQL engine is not v2, but OTel and detailed tracing is enabled", func(t *testing.T) {
+		// See TT-11119, if OTel and detailed tracing is enabled but the GQL version is not 2 GW fails to serve the request
+		// and panics.
+		local := StartTest(func(globalConf *config.Config) {
+			globalConf.OpenTelemetry.Enabled = true
+		})
+		defer local.Close()
+		testSpec := BuildAPI(func(spec *APISpec) {
+			spec.GraphQL.ExecutionMode = apidef.GraphQLExecutionModeProxyOnly
+			spec.GraphQL.Schema = gqlCountriesSchema
+			spec.DetailedTracing = true
+			spec.GraphQL.Version = apidef.GraphQLConfigVersionNone
+			spec.Proxy.TargetURL = testGraphQLProxyUpstream
+			spec.Proxy.ListenPath = "/"
+			spec.GraphQL.Enabled = true
+		})[0]
+
+		local.Gw.LoadAPI(testSpec)
+
+		_, err := local.Run(
+			t,
+			test.TestCase{
+				Path:   "/",
+				Method: http.MethodPost,
+				Data: gql.Request{
+					Query:     gqlContinentQueryVariable,
+					Variables: []byte(`{"code":null}`),
+				},
+				Code: 400,
+			},
+			test.TestCase{
+				Path:   "/",
+				Method: http.MethodPost,
+				Data: gql.Request{
+					Query:     gqlStateQueryVariable,
+					Variables: []byte(`{"filter":{"code":{"eq":"filterString"}}}`),
+				},
+				Code: 400,
+				BodyMatchFunc: func(i []byte) bool {
+					return strings.Contains(string(i), `Validation for variable \"filter\" failed`)
+				},
+			})
+		assert.NoError(t, err)
+	})
+>>>>>>> 86b69f8de... [TT-11119] "Error socket hang up" for GQL proxy with OTel. (#5978)
 }
 
 func TestGraphQLMiddleware_EngineMode(t *testing.T) {
