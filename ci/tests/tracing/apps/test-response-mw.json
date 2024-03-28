@@ -44,7 +44,6 @@
             }
         ]
     },
-    "response_processors":[{"name": "header_injector"}],
     "do_not_track": true,
     "detailed_tracing":true
 }
