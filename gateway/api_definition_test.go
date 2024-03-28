@@ -1553,7 +1553,7 @@ func TestAPISpec_setHasMock(t *testing.T) {
 func TestReplaceSecrets(t *testing.T) {
 	ts := StartTest(func(globalConf *config.Config) {
 		globalConf.Secrets = map[string]string{
-			"Laurentiu": "Ghiur",
+			"Laurentiu": "A\nB\n\"quote\"",
 		}
 	})
 	defer ts.Close()
