@@ -79,6 +79,7 @@ const defaultTestPol = `{
 
 }`
 
+// TestPolicyAPI includes creating, modifying, and deleting policies, as well as checking their persistence through system reloads.
 func TestPolicyAPI(t *testing.T) {
 	ts := StartTest(nil)
 	globalConf := ts.Gw.GetConfig()
