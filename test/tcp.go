@@ -90,6 +90,7 @@ func (r TCPTestRunner) Run(t testing.TB, testCases ...TCPTestCase) error {
 
 func TcpMock(useSSL bool, cb func(in []byte, err error) (out []byte)) net.Listener {
 	var l net.Listener
+	var err error
 
 	if useSSL {
 		tlsConfig := &tls.Config{
@@ -98,9 +99,14 @@ func TcpMock(useSSL bool, cb func(in []byte, err error) (out []byte)) net.Listen
 			MaxVersion:         tls.VersionTLS12,
 		}
 		tlsConfig.BuildNameToCertificate()
-		l, _ = tls.Listen("tcp", ":0", tlsConfig)
+		l, err = tls.Listen("tcp", ":0", tlsConfig)
 	} else {
-		l, _ = net.Listen("tcp", ":0")
+		l, err = net.Listen("tcp", ":0")
+	}
+
+	// Panic, as we don't return err
+	if err != nil {
+		panic(err)
 	}
 
 	go func() {
@@ -108,6 +114,11 @@ func TcpMock(useSSL bool, cb func(in []byte, err error) (out []byte)) net.Listen
 			// Listen for an incoming connection.
 			conn, err := l.Accept()
 			if err != nil {
+				// Fixed in go 1.16 with net.ErrClosed
+				if IsSocketClosed(err) {
+					return
+				}
+
 				log.Println("Mock Accept error", err.Error())
 				return
 			}
@@ -158,4 +169,11 @@ func Cert(domain string) tls.Certificate {
 	tlscert, _ := tls.X509KeyPair(cert.Bytes(), key.Bytes())
 
 	return tlscert
+}
+
+// IsSocketClosed returns true if err is a result of reading from closed network
+// connection
+func IsSocketClosed(err error) bool {
+	// Fixed in go 1.16 with net.ErrClosed
+	return strings.Contains(err.Error(), "use of closed network connection")
 }
