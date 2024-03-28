@@ -2845,11 +2845,15 @@ func userRatesCheck(w http.ResponseWriter, r *http.Request) {
 func (gw *Gateway) invalidateCacheHandler(w http.ResponseWriter, r *http.Request) {
 	apiID := mux.Vars(r)["apiID"]
 
+<<<<<<< HEAD
 	keyPrefix := "cache-" + apiID
 	matchPattern := keyPrefix + "*"
 	store := storage.RedisCluster{KeyPrefix: keyPrefix, IsCache: true, RedisController: gw.RedisController}
 
 	if ok := store.DeleteScanMatch(matchPattern); !ok {
+=======
+	if ok := gw.invalidateAPICache(apiID); !ok {
+>>>>>>> 43f5f5c0a... [TT-11585] Process DeleteAPICache event (#6190)
 		err := errors.New("scan/delete failed")
 		var orgid string
 		if spec := gw.getApiSpec(apiID); spec != nil {
