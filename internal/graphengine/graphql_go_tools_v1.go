@@ -87,7 +87,7 @@ func (g graphqlGoToolsV1) headerModifier(outreq *http.Request, additionalHeaders
 	}
 }
 
-func (g graphqlGoToolsV1) returnErrorsFromUpstream(proxyOnlyCtx *GraphQLProxyOnlyContext, resultWriter *graphql.EngineResultWriter, seekReadCloser SeekReadCloserFunc) error {
+func (g graphqlGoToolsV1) returnErrorsFromUpstream(proxyOnlyCtx *GraphQLProxyOnlyContextValues, resultWriter *graphql.EngineResultWriter, seekReadCloser SeekReadCloserFunc) error {
 	body, err := seekReadCloser(proxyOnlyCtx.upstreamResponse.Body)
 	if body == nil {
 		// Response body already read by graphql-go-tools, and it's not re-readable. Quit silently.
