@@ -7,38 +7,35 @@ spec:
         method: GET
         proto_major: 1
         proto_minor: 1
-        url: http://localhost:8080/keyless-test/get
+        url: http://localhost:8080/tyk/reload/group
         header:
             Accept: '*/*'
             Host: localhost:8080
             User-Agent: curl/7.81.0
+            X-Tyk-Authorization: 352d20ee67be67f6340b4c0605b044b7
         body: ""
-        timestamp: 2024-03-28T12:07:06.704164482Z
+        timestamp: 2024-04-01T06:21:52.035612565Z
     resp:
         status_code: 200
         header:
-            Access-Control-Allow-Credentials: "true"
-            Access-Control-Allow-Origin: '*'
-            Content-Length: "292"
+            Content-Length: "29"
             Content-Type: application/json
-            Date: Thu, 28 Mar 2024 12:07:08 GMT
-            Server: gunicorn/19.9.0
-            X-Ratelimit-Limit: "0"
-            X-Ratelimit-Remaining: "0"
-            X-Ratelimit-Reset: "0"
-        body: "{\n  \"args\": {}, \n  \"headers\": {\n    \"Accept\": \"*/*\", \n    \"Accept-Encoding\": \"gzip\", \n    \"Host\": \"httpbin.org\", \n    \"User-Agent\": \"curl/7.81.0\", \n    \"X-Amzn-Trace-Id\": \"Root=1-66055d6c-441f2b8859c995057749643e\"\n  }, \n  \"origin\": \"::1, 152.58.209.160\", \n  \"url\": \"http://httpbin.org/get\"\n}\n"
+            Date: Mon, 01 Apr 2024 06:21:52 GMT
+        body: |
+            {"status":"ok","message":""}
         status_message: OK
         proto_major: 0
         proto_minor: 0
-        timestamp: 2024-03-28T12:07:10.38525476Z
+        timestamp: 2024-04-01T06:21:54.057423423Z
     objects: []
     assertions:
         noise:
             header.Date: []
-    created: 1711627630
+    created: 1711952514
 curl: |
     curl --request GET \
-      --url http://localhost:8080/keyless-test/get \
-      --header 'Host: localhost:8080' \
+      --url http://localhost:8080/tyk/reload/group \
       --header 'User-Agent: curl/7.81.0' \
       --header 'Accept: */*' \
+      --header 'X-Tyk-Authorization: 352d20ee67be67f6340b4c0605b044b7' \
+      --header 'Host: localhost:8080' \
