@@ -2,6 +2,7 @@ package swagger
 
 import (
 	"strconv"
+	"strings"
 
 	"github.com/swaggest/openapi-go/openapi3"
 
@@ -55,6 +56,38 @@ func intSchema() *openapi3.SchemaOrRef {
 	}
 }
 
+type ParameterValues struct {
+	Name        string
+	Description string
+	Type        openapi3.SchemaType
+	Example     interface{}
+	Required    bool
+	In          openapi3.ParameterIn
+}
+
+func createParameter(value ParameterValues) openapi3.ParameterOrRef {
+	if value.Type == "" {
+		value.Type = openapi3.SchemaTypeString
+	}
+	vl := openapi3.Schema{
+		Type: &value.Type,
+	}
+	if value.In == "" {
+		value.In = openapi3.ParameterInQuery
+	}
+	if strings.TrimSpace(value.Description) != "" {
+		vl.Description = stringPointerValue(value.Description)
+	}
+	return openapi3.Parameter{
+		In:       value.In,
+		Name:     value.Name,
+		Required: &value.Required,
+		Schema: &openapi3.SchemaOrRef{
+			Schema: &vl,
+		},
+	}.ToParameterOrRef()
+}
+
 func stringEnumSchema(enums ...string) *openapi3.SchemaOrRef {
 	stringType := openapi3.SchemaTypeString
 	item := []interface{}{}
@@ -102,6 +135,15 @@ type HeaderCr struct {
 	Key         string              `json:"key"`
 	Description string              `json:"description"`
 	Type        openapi3.SchemaType `json:"type"`
+}
+
+func addBinaryFormat(o3 openapi3.OperationExposer, httpStatus int) {
+	code := strconv.Itoa(httpStatus)
+	value, ok := o3.Operation().Responses.MapOfResponseOrRefValues[code]
+	if !ok {
+		return
+	}
+	value.Response.Content["application/octet-stream"].Schema.Schema.Format = stringPointerValue("binary")
 }
 
 func addNewResponseHeader(o3 openapi3.OperationExposer, httpStatus int, cr HeaderCr) {

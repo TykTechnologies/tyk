@@ -7,16 +7,18 @@ import (
 	"github.com/swaggest/openapi-go/openapi3"
 
 	"github.com/TykTechnologies/tyk/apidef/oas"
+	"github.com/TykTechnologies/tyk/gateway"
 )
 
 const OASTag = "OAS APIs"
 
+var applicationOctetStream = "application/octet-stream"
+
 func OasAPIS(r *openapi3.Reflector) error {
-	return addOperations(r, getListOfOASApisRequest, postOAsApi, apiOASExportHandler, getOASApiRequest, apiOASPutHandler, deleteOASHandler, apiOASExportWithIDHandler)
+	return addOperations(r, getListOfOASApisRequest, postOAsApi, apiOASExportHandler, getOASApiRequest, apiOASPutHandler, deleteOASHandler, apiOASExportWithIDHandler, importApiOASPostHandler, oasVersionsHandler, apiOASPatchHandler)
 }
 
 func getListOfOASApisRequest(r *openapi3.Reflector) error {
-	// TODO::check response header for this
 	oc, err := r.NewOperationContext(http.MethodGet, "/tyk/apis/oas")
 	if err != nil {
 		return err
@@ -25,6 +27,7 @@ func getListOfOASApisRequest(r *openapi3.Reflector) error {
 	if !ok {
 		return ErrOperationExposer
 	}
+	//TODO
 	///recommended i use external reference just incase it is updated
 	par := []openapi3.ParameterOrRef{oasModeQuery("Mode of OAS get, by default mode could be empty which means to get OAS spec including OAS Tyk extension. \n When mode=public, OAS spec excluding Tyk extension will be returned in the response")}
 	o3.Operation().WithParameters(par...)
@@ -47,7 +50,8 @@ func postOAsApi(r *openapi3.Reflector) error {
 	}
 	oc.SetTags(OASTag)
 	statusBadRequest(oc, "Malformed API data")
-	statusInternalServerError(oc, "Due to enabled use_db_app_configs, please use the Dashboard API")
+	forbidden(oc)
+	statusInternalServerError(oc, "Unexpected error")
 	oc.AddRespStructure(new(apiModifyKeySuccess), func(cu *openapi.ContentUnit) {
 		cu.Description = "API created"
 	})
@@ -63,9 +67,9 @@ func postOAsApi(r *openapi3.Reflector) error {
 }
 
 func apiOASExportHandler(r *openapi3.Reflector) error {
-	// TODO::This is super wrong because of doJSONExport as it returns  application/octet-stream
+	// TODO::This is super wrong in previous oas because of doJSONExport as it returns  application/octet-stream
 	// TODO::I should ask about it.
-	///TODO:: add Content-Disposition headers
+	///TODO:: should  Content-Disposition be added as headers
 	oc, err := r.NewOperationContext(http.MethodGet, "/tyk/apis/oas/export")
 	if err != nil {
 		return err
@@ -74,19 +78,26 @@ func apiOASExportHandler(r *openapi3.Reflector) error {
 	oc.SetSummary("Download all OAS format APIs")
 	oc.SetDescription("Download all OAS format APIs, when used without the Tyk Dashboard.")
 	oc.SetTags(OASTag)
-	oc.AddRespStructure(new([]oas.OAS), openapi.WithContentType("application/octet-stream"), func(cu *openapi.ContentUnit) {
+	oc.AddRespStructure(new(string), openapi.WithContentType("application/octet-stream"), func(cu *openapi.ContentUnit) {
 		cu.Description = "Get list of oas API definition"
 	})
 	forbidden(oc)
+	statusInternalServerError(oc, "Unexpected error")
 	o3, ok := oc.(openapi3.OperationExposer)
 	if !ok {
 		return ErrOperationExposer
 	}
 	par := []openapi3.ParameterOrRef{oasModeQuery("Mode of OAS get, by default mode could be empty which means to get OAS spec including OAS Tyk extension. \n When mode=public, OAS spec excluding Tyk extension will be returned in the response")}
 	o3.Operation().WithParameters(par...)
-	return r.AddOperation(oc)
+	err = r.AddOperation(oc)
+	if err != nil {
+		return err
+	}
+	addBinaryFormat(o3, http.StatusOK)
+	return nil
 }
 
+// Done
 func getOASApiRequest(r *openapi3.Reflector) error {
 	// TODO::response of this is different from previous
 	oc, err := r.NewOperationContext(http.MethodGet, "/tyk/apis/oas/{apiID}")
@@ -95,14 +106,10 @@ func getOASApiRequest(r *openapi3.Reflector) error {
 	}
 	oc.AddRespStructure(new(oas.OAS), func(cu *openapi.ContentUnit) {
 		cu.Description = "Api fetched successfully"
-		// todo figure out to fix this and add new headers
-		cu.SetFieldMapping(openapi.InHeader, map[string]string{
-			"x-tyk-base-api-id": "x-tyk-base-api-id",
-		})
 	})
 	forbidden(oc)
 	statusNotFound(oc, "API not found")
-	statusBadRequest(oc, "the requested API definition is in Tyk classic format, please use old api endpoint")
+	statusBadRequest(oc, "trying to access an API whose definition is in Tyk classic format")
 	oc.SetTags(OASTag)
 	oc.SetID("getOASApi")
 	oc.SetSummary("Get OAS Api definition")
@@ -113,17 +120,27 @@ func getOASApiRequest(r *openapi3.Reflector) error {
 	}
 	par := []openapi3.ParameterOrRef{apIIDParameter(), oasModeQuery("Mode of OAS get, by default mode could be empty which means to get OAS spec including OAS Tyk extension. \n When mode=public, OAS spec excluding Tyk extension will be returned in the response")}
 	o3.Operation().WithParameters(par...)
-	return r.AddOperation(oc)
+	err = r.AddOperation(oc)
+	if err != nil {
+		return err
+	}
+	addNewResponseHeader(o3, http.StatusOK, HeaderCr{
+		Key:         "x-tyk-base-api-id",
+		Description: "ID of the base API if the requested API is a version.",
+		Type:        openapi3.SchemaTypeString,
+	})
+	return nil
 }
 
+// Done
 func apiOASPutHandler(r *openapi3.Reflector) error {
 	oc, err := r.NewOperationContext(http.MethodPut, "/tyk/apis/oas/{apiID}")
 	if err != nil {
 		return err
 	}
 	forbidden(oc)
-	statusInternalServerError(oc, "When delete request is sent while using dashboard app configs")
-	statusBadRequest(oc, "When you fail to specify an apiID to update ")
+	statusInternalServerError(oc, "Unexpected error")
+	statusBadRequest(oc, "Malformed Request or trying to update api in tyk classic format")
 	statusNotFound(oc, "API not found")
 	oc.AddRespStructure(new(apiModifyKeySuccess), openapi.WithHTTPStatus(http.StatusOK), func(cu *openapi.ContentUnit) {
 		cu.Description = "API updated"
@@ -143,14 +160,15 @@ func apiOASPutHandler(r *openapi3.Reflector) error {
 }
 
 func apiOASExportWithIDHandler(r *openapi3.Reflector) error {
-	///TODO:: add Content-Disposition headers
+	///TODO:: should we add Content-Disposition headers
 	oc, err := r.NewOperationContext(http.MethodGet, "/tyk/apis/oas/{apiID}/export")
 	if err != nil {
 		return err
 	}
-	oc.AddRespStructure(new(oas.OAS), openapi.WithContentType("application/octet-stream"), func(cu *openapi.ContentUnit) {
-		cu.Description = "API definition"
+	oc.AddRespStructure(new(string), openapi.WithContentType(applicationOctetStream), func(cu *openapi.ContentUnit) {
+		cu.Description = "Exported API definition file"
 	})
+	statusInternalServerError(oc, "Unexpected error")
 	statusBadRequest(oc, "requesting API definition that is in Tyk classic format")
 	statusNotFound(oc, "API not found")
 	forbidden(oc)
@@ -164,22 +182,43 @@ func apiOASExportWithIDHandler(r *openapi3.Reflector) error {
 	}
 	par := []openapi3.ParameterOrRef{apIIDParameter(), oasModeQuery()}
 	o3.Operation().WithParameters(par...)
-	return r.AddOperation(oc)
-}
-
-func importApiOASPostHandler(r *openapi3.Reflector) error {
-	///TODO::work in this later
-	oc, err := r.NewOperationContext(http.MethodGet, "/tyk/apis/oas/{apiID}/export")
+	err = r.AddOperation(oc)
 	if err != nil {
 		return err
 	}
-	statusInternalServerError(oc, "When delete request is sent while using dashboard app configs")
-	statusBadRequest(oc, "when you send payload that contain x-tyk-api-gateway")
+	addBinaryFormat(o3, http.StatusOK)
+	return nil
+}
+
+func importApiOASPostHandler(r *openapi3.Reflector) error {
+	///TODO:: check if the OAs post query parameters can be applied here.
+	oc, err := r.NewOperationContext(http.MethodPost, "/tyk/apis/oas/import")
+	if err != nil {
+		return err
+	}
+	oc.SetTags(OASTag)
+	oc.SetSummary("Create a new OAS format API, without x-tyk-gateway")
+	oc.SetID("importOAS")
+	forbidden(oc)
+	oc.AddRespStructure(new(apiModifyKeySuccess), func(cu *openapi.ContentUnit) {
+		cu.Description = "API definition created"
+	})
+	oc.AddReqStructure(new(oas.OAS), func(cu *openapi.ContentUnit) {
+	})
+	oc.SetDescription("Create a new OAS format API, without x-tyk-gateway.\n        For use with an existing OAS API that you want to expose via your Tyk Gateway. (New)")
+	statusInternalServerError(oc, "Unexpected error")
+	statusBadRequest(oc, "Malformed request or when the payload contain x-tyk-api-gateway")
+	o3, ok := oc.(openapi3.OperationExposer)
+	if !ok {
+		return ErrOperationExposer
+	}
+	o3.Operation().WithParameters(patchAndImportQueryParameters(true)...)
 	return r.AddOperation(oc)
 }
 
+// Done
 func oasVersionsHandler(r *openapi3.Reflector) error {
-	// TODO::to do this one later
+	// TODO::in previous api this was wrong
 	oc, err := r.NewOperationContext(http.MethodGet, "/tyk/apis/oas/{apiID}/versions")
 	if err != nil {
 		return err
@@ -188,11 +227,21 @@ func oasVersionsHandler(r *openapi3.Reflector) error {
 	if !ok {
 		return ErrOperationExposer
 	}
-	par := []openapi3.ParameterOrRef{apIIDParameter()}
-	o3.Operation().WithParameters(par...)
+	statusNotFound(oc, "API not found")
+	forbidden(oc)
+	oc.SetID("listOASApiVersions")
+	oc.SetDescription("Listing versions of an OAS API")
+	oc.AddRespStructure(new(gateway.VersionMetas), func(cu *openapi.ContentUnit) {
+		cu.Description = "API version metas"
+	})
+	oc.SetSummary("Listing versions of an OAS API")
+	oc.SetTags(OASTag)
+	o3.Operation().WithParameters(apIIDParameter(), searchTextQuery(), accessTypeQuery())
+
 	return r.AddOperation(oc)
 }
 
+// /Done
 func deleteOASHandler(r *openapi3.Reflector) error {
 	oc, err := r.NewOperationContext(http.MethodDelete, "/tyk/apis/oas/{apiID}")
 	if err != nil {
@@ -219,24 +268,28 @@ func deleteOASHandler(r *openapi3.Reflector) error {
 }
 
 func apiOASPatchHandler(r *openapi3.Reflector) error {
-	// TODO:: abit complex to ask
-
 	oc, err := r.NewOperationContext(http.MethodPatch, "/tyk/apis/oas/{apiID}")
 	if err != nil {
 		return err
 	}
-	statusInternalServerError(oc, "Due to enabled use_db_app_configs, please use the Dashboard API")
-	statusBadRequest(oc, "Must specify an apiID to patch")
+	oc.AddReqStructure(new(oas.OAS))
+	statusInternalServerError(oc, "Unexpected error")
+	statusBadRequest(oc, "Malformed request")
 	statusNotFound(oc, "API not found")
 	oc.AddRespStructure(new(apiModifyKeySuccess), func(cu *openapi.ContentUnit) {
 		cu.Description = "API patched"
 	})
+	oc.SetSummary("Patch API with OAS format.")
+	oc.SetDescription("Update API with OAS format. You can use this endpoint to update OAS part of the tyk API definition.\n        This endpoint allows you to configure tyk OAS extension based on query params provided(similar to import)")
 	oc.SetTags(OASTag)
+	oc.SetID("patchApiOAS")
+
 	o3, ok := oc.(openapi3.OperationExposer)
 	if !ok {
 		return ErrOperationExposer
 	}
 	par := []openapi3.ParameterOrRef{apIIDParameter()}
+	par = append(par, patchAndImportQueryParameters(false)...)
 	o3.Operation().WithParameters(par...)
 	return r.AddOperation(oc)
 }
@@ -244,15 +297,64 @@ func apiOASPatchHandler(r *openapi3.Reflector) error {
 func oasModeQuery(description ...string) openapi3.ParameterOrRef {
 	stringType := openapi3.SchemaTypeString
 	desc := "Can be set to public"
+	var example interface{} = "public"
 	if len(description) != 0 {
 		desc = description[0]
 	}
 	return openapi3.Parameter{
-		In: openapi3.ParameterInQuery, Name: "mode", Required: &isOptional, Description: &desc, Schema: &openapi3.SchemaOrRef{
+		In: openapi3.ParameterInQuery, Name: "mode", Example: &example, Required: &isOptional, Description: &desc, Schema: &openapi3.SchemaOrRef{
 			Schema: &openapi3.Schema{
 				Type: &stringType,
 				Enum: []interface{}{"public"},
 			},
 		},
 	}.ToParameterOrRef()
+}
+
+type BinarySchema struct {
+	Name string `json:"name"`
+}
+
+func patchAndImportQueryParameters(includeApiID bool) []openapi3.ParameterOrRef {
+	par := []openapi3.ParameterOrRef{
+		createParameter(ParameterValues{
+			Name:        "upstreamURL",
+			Description: "Upstream URL for the API",
+		}),
+		createParameter(ParameterValues{
+			Name:        "listenPath",
+			Description: "Listen path for the API",
+		}),
+		createParameter(ParameterValues{
+			Name:        "customDomain",
+			Description: "Custom domain for the API",
+		}),
+		createParameter(ParameterValues{
+			Name:        "authentication",
+			Type:        openapi3.SchemaTypeBoolean,
+			Description: "Enable or disable authentication in your Tyk Gateway as per your OAS document.",
+		}),
+		createParameter(ParameterValues{
+			Name:        "validateRequest",
+			Type:        openapi3.SchemaTypeBoolean,
+			Description: "Enable validateRequest middleware for all endpoints having a request body with media type application/json",
+		}),
+		createParameter(ParameterValues{
+			Name:        "allowList",
+			Description: "Enable allowList middleware for all endpoints",
+			Type:        openapi3.SchemaTypeBoolean,
+		}),
+		createParameter(ParameterValues{
+			Name:        "mockResponse",
+			Description: "Enable mockResponse middleware for all endpoints having responses configured.",
+			Type:        openapi3.SchemaTypeBoolean,
+		}),
+	}
+	if includeApiID {
+		par = append(par, createParameter(ParameterValues{
+			Name:        "apiID",
+			Description: "ID of the API",
+		}))
+	}
+	return par
 }
