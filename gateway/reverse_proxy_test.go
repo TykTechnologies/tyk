@@ -20,8 +20,10 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
-
 	"github.com/stretchr/testify/require"
+
+	"github.com/TykTechnologies/tyk/header"
+	"github.com/TykTechnologies/tyk/user"
 
 	"github.com/TykTechnologies/graphql-go-tools/pkg/execution/datasource"
 	"github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
@@ -1820,4 +1822,131 @@ func TestSetCustomHeaderMultipleValues(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestQuotaResponseHeaders(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	spec := ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		spec.Proxy.ListenPath = "/quota-headers-test"
+		spec.UseKeylessAccess = false
+	})[0]
+
+	var (
+		quotaMax, quotaRenewalRate int64 = 2, 3600
+	)
+
+	assertQuota := func(t *testing.T, ts *Test, key string) {
+		t.Helper()
+
+		authorization := map[string]string{
+			"Authorization": key,
+		}
+
+		_, _ = ts.Run(t, []test.TestCase{
+			{
+				Headers: authorization,
+				Path:    "/quota-headers-test/",
+				Code:    http.StatusOK,
+				HeadersMatch: map[string]string{
+					header.XRateLimitLimit:     fmt.Sprintf("%d", quotaMax),
+					header.XRateLimitRemaining: fmt.Sprintf("%d", quotaMax-1),
+				},
+			},
+			{
+				Headers: authorization,
+				Path:    "/quota-headers-test/",
+				Code:    http.StatusOK,
+				HeadersMatch: map[string]string{
+					header.XRateLimitLimit:     fmt.Sprintf("%d", quotaMax),
+					header.XRateLimitRemaining: fmt.Sprintf("%d", quotaMax-2),
+				},
+			},
+			{
+				Headers: authorization,
+				Path:    "/quota-headers-test/abc",
+				Code:    http.StatusForbidden,
+			},
+		}...)
+	}
+
+	t.Run("key without policy", func(t *testing.T) {
+		_, authKey := ts.CreateSession(func(s *user.SessionState) {
+			s.AccessRights = map[string]user.AccessDefinition{
+				spec.APIID: {
+					APIName:  spec.Name,
+					APIID:    spec.APIID,
+					Versions: []string{"default"},
+					Limit: user.APILimit{
+						QuotaMax:         quotaMax,
+						QuotaRenewalRate: quotaRenewalRate,
+					},
+					AllowanceScope: spec.APIID,
+				},
+			}
+			s.OrgID = spec.OrgID
+		})
+		assertQuota(t, ts, authKey)
+	})
+
+	t.Run("key from policy with per api limits", func(t *testing.T) {
+		polID := ts.CreatePolicy(func(p *user.Policy) {
+			p.Name = "p1"
+			p.KeyExpiresIn = 3600
+			p.Partitions = user.PolicyPartitions{
+				PerAPI: true,
+			}
+			p.OrgID = spec.OrgID
+			p.AccessRights = map[string]user.AccessDefinition{
+				spec.APIID: {
+					APIName:  spec.Name,
+					APIID:    spec.APIID,
+					Versions: []string{"default"},
+					Limit: user.APILimit{
+						QuotaMax:         quotaMax,
+						QuotaRenewalRate: quotaRenewalRate,
+					},
+					AllowanceScope: spec.APIID,
+				},
+			}
+		})
+
+		_, policyKey := ts.CreateSession(func(s *user.SessionState) {
+			s.ApplyPolicies = []string{polID}
+		})
+
+		assertQuota(t, ts, policyKey)
+	})
+
+	t.Run("key from policy with global limits", func(t *testing.T) {
+		polID := ts.CreatePolicy(func(p *user.Policy) {
+			p.Name = "p1"
+			p.KeyExpiresIn = 3600
+			p.Partitions = user.PolicyPartitions{
+				Quota:     true,
+				RateLimit: true,
+				Acl:       true,
+			}
+			p.OrgID = spec.OrgID
+			p.QuotaMax = quotaMax
+			p.QuotaRenewalRate = quotaRenewalRate
+			p.AccessRights = map[string]user.AccessDefinition{
+				spec.APIID: {
+					APIName:        spec.Name,
+					APIID:          spec.APIID,
+					Versions:       []string{"default"},
+					Limit:          user.APILimit{},
+					AllowanceScope: spec.APIID,
+				},
+			}
+		})
+
+		_, policyKey := ts.CreateSession(func(s *user.SessionState) {
+			s.ApplyPolicies = []string{polID}
+		})
+
+		assertQuota(t, ts, policyKey)
+	})
+
 }
