@@ -249,6 +249,7 @@ paths:
       - description: "Mode of OAS get, by default mode could be empty which means
           to get OAS spec including OAS Tyk extension. \n When mode=public, OAS spec
           excluding Tyk extension will be returned in the response"
+        example: public
         in: query
         name: mode
         required: false
@@ -316,13 +317,19 @@ paths:
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
           description: Malformed API data
+        "403":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Attempting to access a protected api with an invalid or a missing
+            X-Tyk-Authorization in the headers
         "500":
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: Due to enabled use_db_app_configs, please use the Dashboard
-            API
+          description: Unexpected error
       summary: Create API with OAS format
       tags:
       - OAS APIs
@@ -391,6 +398,7 @@ paths:
       - description: "Mode of OAS get, by default mode could be empty which means
           to get OAS spec including OAS Tyk extension. \n When mode=public, OAS spec
           excluding Tyk extension will be returned in the response"
+        example: public
         in: query
         name: mode
         required: false
@@ -405,13 +413,19 @@ paths:
               schema:
                 $ref: '#/components/schemas/OAS'
           description: Api fetched successfully
+          headers:
+            x-tyk-base-api-id:
+              description: ID of the base API if the requested API is a version.
+              schema:
+                type: string
+              style: simple
         "400":
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: the requested API definition is in Tyk classic format, please
-            use old api endpoint
+          description: trying to access an API whose definition is in Tyk classic
+            format
         "403":
           content:
             application/json:
@@ -426,6 +440,97 @@ paths:
                 $ref: '#/components/schemas/ApiStatusMessage'
           description: API not found
       summary: Get OAS Api definition
+      tags:
+      - OAS APIs
+    patch:
+      description: |-
+        Update API with OAS format. You can use this endpoint to update OAS part of the tyk API definition.
+                This endpoint allows you to configure tyk OAS extension based on query params provided(similar to import)
+      operationId: patchApiOAS
+      parameters:
+      - description: The API ID
+        example: keyless
+        in: path
+        name: apiID
+        required: true
+        schema:
+          type: string
+      - in: query
+        name: upstreamURL
+        required: false
+        schema:
+          description: Upstream URL for the API
+          type: string
+      - in: query
+        name: listenPath
+        required: false
+        schema:
+          description: Listen path for the API
+          type: string
+      - in: query
+        name: customDomain
+        required: false
+        schema:
+          description: Custom domain for the API
+          type: string
+      - in: query
+        name: authentication
+        required: false
+        schema:
+          description: Enable or disable authentication in your Tyk Gateway as per
+            your OAS document.
+          type: boolean
+      - in: query
+        name: validateRequest
+        required: false
+        schema:
+          description: Enable validateRequest middleware for all endpoints having
+            a request body with media type application/json
+          type: boolean
+      - in: query
+        name: allowList
+        required: false
+        schema:
+          description: Enable allowList middleware for all endpoints
+          type: boolean
+      - in: query
+        name: mockResponse
+        required: false
+        schema:
+          description: Enable mockResponse middleware for all endpoints having responses
+            configured.
+          type: boolean
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OAS'
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiModifyKeySuccess'
+          description: API patched
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Malformed request
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: API not found
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Unexpected error
+      summary: Patch API with OAS format.
       tags:
       - OAS APIs
     put:
@@ -460,7 +565,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: 'When you fail to specify an apiID to update '
+          description: Malformed Request or trying to update api in tyk classic format
         "403":
           content:
             application/json:
@@ -479,7 +584,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: When delete request is sent while using dashboard app configs
+          description: Unexpected error
       summary: Update OAS API definition
       tags:
       - OAS APIs
@@ -498,6 +603,7 @@ paths:
         schema:
           type: string
       - description: Can be set to public
+        example: public
         in: query
         name: mode
         required: false
@@ -510,8 +616,9 @@ paths:
           content:
             application/octet-stream:
               schema:
-                $ref: '#/components/schemas/OAS'
-          description: API definition
+                format: binary
+                type: string
+          description: Exported API definition file
         "400":
           content:
             application/json:
@@ -531,7 +638,63 @@ paths:
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
           description: API not found
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Unexpected error
       summary: Download an OAS format APIs, when used without the Tyk Dashboard.
+      tags:
+      - OAS APIs
+  /tyk/apis/oas/{apiID}/versions:
+    get:
+      description: Listing versions of an OAS API
+      operationId: listOASApiVersions
+      parameters:
+      - description: The API ID
+        example: keyless
+        in: path
+        name: apiID
+        required: true
+        schema:
+          type: string
+      - description: Search for API version name
+        in: query
+        name: searchText
+        required: false
+        schema:
+          type: string
+      - description: Filter for internal or external API versions
+        in: query
+        name: accessType
+        required: false
+        schema:
+          enum:
+          - internal
+          - external
+          type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VersionMetas'
+          description: API version metas
+        "403":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Attempting to access a protected api with an invalid or a missing
+            X-Tyk-Authorization in the headers
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: API not found
+      summary: Listing versions of an OAS API
       tags:
       - OAS APIs
   /tyk/apis/oas/export:
@@ -542,6 +705,7 @@ paths:
       - description: "Mode of OAS get, by default mode could be empty which means
           to get OAS spec including OAS Tyk extension. \n When mode=public, OAS spec
           excluding Tyk extension will be returned in the response"
+        example: public
         in: query
         name: mode
         required: false
@@ -554,9 +718,8 @@ paths:
           content:
             application/octet-stream:
               schema:
-                items:
-                  $ref: '#/components/schemas/OAS'
-                type: array
+                format: binary
+                type: string
           description: Get list of oas API definition
         "403":
           content:
@@ -565,7 +728,105 @@ paths:
                 $ref: '#/components/schemas/ApiStatusMessage'
           description: Attempting to access a protected api with an invalid or a missing
             X-Tyk-Authorization in the headers
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Unexpected error
       summary: Download all OAS format APIs
+      tags:
+      - OAS APIs
+  /tyk/apis/oas/import:
+    post:
+      description: |-
+        Create a new OAS format API, without x-tyk-gateway.
+                For use with an existing OAS API that you want to expose via your Tyk Gateway. (New)
+      operationId: importOAS
+      parameters:
+      - in: query
+        name: upstreamURL
+        required: false
+        schema:
+          description: Upstream URL for the API
+          type: string
+      - in: query
+        name: listenPath
+        required: false
+        schema:
+          description: Listen path for the API
+          type: string
+      - in: query
+        name: customDomain
+        required: false
+        schema:
+          description: Custom domain for the API
+          type: string
+      - in: query
+        name: authentication
+        required: false
+        schema:
+          description: Enable or disable authentication in your Tyk Gateway as per
+            your OAS document.
+          type: boolean
+      - in: query
+        name: validateRequest
+        required: false
+        schema:
+          description: Enable validateRequest middleware for all endpoints having
+            a request body with media type application/json
+          type: boolean
+      - in: query
+        name: allowList
+        required: false
+        schema:
+          description: Enable allowList middleware for all endpoints
+          type: boolean
+      - in: query
+        name: mockResponse
+        required: false
+        schema:
+          description: Enable mockResponse middleware for all endpoints having responses
+            configured.
+          type: boolean
+      - in: query
+        name: apiID
+        required: false
+        schema:
+          description: ID of the API
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OAS'
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiModifyKeySuccess'
+          description: API definition created
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Malformed request or when the payload contain x-tyk-api-gateway
+        "403":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Attempting to access a protected api with an invalid or a missing
+            X-Tyk-Authorization in the headers
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Unexpected error
+      summary: Create a new OAS format API, without x-tyk-gateway
       tags:
       - OAS APIs
   /tyk/cache/{apiID}:
@@ -4681,6 +4942,38 @@ components:
         use_extended_paths:
           example: true
           type: boolean
+      type: object
+    VersionMeta:
+      properties:
+        expirationDate:
+          example: 2026-03-26 09:00
+          type: string
+        id:
+          example: keyless
+          type: string
+        internal:
+          example: false
+          type: boolean
+        isDefaultVersion:
+          example: true
+          type: boolean
+        name:
+          example: Tyk Test Keyless API
+          type: string
+        versionName:
+          example: v2
+          type: string
+      type: object
+    VersionMetas:
+      properties:
+        apis:
+          items:
+            $ref: '#/components/schemas/VersionMeta'
+          nullable: true
+          type: array
+        status:
+          example: success
+          type: string
       type: object
     VirtualMeta:
       properties:
