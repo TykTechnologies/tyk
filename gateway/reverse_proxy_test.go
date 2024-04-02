@@ -21,7 +21,13 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
+<<<<<<< HEAD
 	"github.com/stretchr/testify/require"
+=======
+	"github.com/TykTechnologies/tyk/user"
+
+	"github.com/TykTechnologies/tyk/header"
+>>>>>>> 83cfda178... [TT-10856/TT-11778] fix quota limit remaining header value when key is created from policy and API is looped (#6199)
 
 	"github.com/TykTechnologies/graphql-go-tools/pkg/execution/datasource"
 	"github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
@@ -1821,3 +1827,159 @@ func TestSetCustomHeaderMultipleValues(t *testing.T) {
 		})
 	}
 }
+<<<<<<< HEAD
+=======
+
+func TestCreateMemConnProviderIfNeeded(t *testing.T) {
+	t.Run("should propagate context", func(t *testing.T) {
+		propagationContext := context.WithValue(context.Background(), "parentContextKey", "parentContextValue")
+		propagationContextWithCancel, cancel := context.WithCancel(propagationContext)
+		internalReq, err := http.NewRequest(http.MethodGet, "http://memoryhost/", nil)
+		require.NoError(t, err)
+
+		handler := http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
+			assert.Equal(t, "parentContextValue", req.Context().Value("parentContextKey"))
+			cancel()
+		})
+
+		err = createMemConnProviderIfNeeded(handler, internalReq.WithContext(propagationContextWithCancel))
+		require.NoError(t, err)
+
+		assert.Eventuallyf(t, func() bool {
+			testReq, err := http.NewRequest(http.MethodGet, "http://memoryhost/", nil)
+			require.NoError(t, err)
+			_, err = memConnClient.Do(testReq)
+			require.NoError(t, err)
+			<-propagationContextWithCancel.Done()
+			return true
+		}, time.Second, time.Millisecond*25, "context was not canceled")
+	})
+}
+
+func TestQuotaResponseHeaders(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	spec := ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		spec.Proxy.ListenPath = "/quota-headers-test"
+		spec.UseKeylessAccess = false
+	})[0]
+
+	var (
+		quotaMax, quotaRenewalRate int64 = 2, 3600
+	)
+
+	assertQuota := func(t *testing.T, ts *Test, key string) {
+		t.Helper()
+
+		authorization := map[string]string{
+			"Authorization": key,
+		}
+
+		_, _ = ts.Run(t, []test.TestCase{
+			{
+				Headers: authorization,
+				Path:    "/quota-headers-test/",
+				Code:    http.StatusOK,
+				HeadersMatch: map[string]string{
+					header.XRateLimitLimit:     fmt.Sprintf("%d", quotaMax),
+					header.XRateLimitRemaining: fmt.Sprintf("%d", quotaMax-1),
+				},
+			},
+			{
+				Headers: authorization,
+				Path:    "/quota-headers-test/",
+				Code:    http.StatusOK,
+				HeadersMatch: map[string]string{
+					header.XRateLimitLimit:     fmt.Sprintf("%d", quotaMax),
+					header.XRateLimitRemaining: fmt.Sprintf("%d", quotaMax-2),
+				},
+			},
+			{
+				Headers: authorization,
+				Path:    "/quota-headers-test/abc",
+				Code:    http.StatusForbidden,
+			},
+		}...)
+	}
+
+	t.Run("key without policy", func(t *testing.T) {
+		_, authKey := ts.CreateSession(func(s *user.SessionState) {
+			s.AccessRights = map[string]user.AccessDefinition{
+				spec.APIID: {
+					APIName:  spec.Name,
+					APIID:    spec.APIID,
+					Versions: []string{"default"},
+					Limit: user.APILimit{
+						QuotaMax:         quotaMax,
+						QuotaRenewalRate: quotaRenewalRate,
+					},
+					AllowanceScope: spec.APIID,
+				},
+			}
+			s.OrgID = spec.OrgID
+		})
+		assertQuota(t, ts, authKey)
+	})
+
+	t.Run("key from policy with per api limits", func(t *testing.T) {
+		polID := ts.CreatePolicy(func(p *user.Policy) {
+			p.Name = "p1"
+			p.KeyExpiresIn = 3600
+			p.Partitions = user.PolicyPartitions{
+				PerAPI: true,
+			}
+			p.OrgID = spec.OrgID
+			p.AccessRights = map[string]user.AccessDefinition{
+				spec.APIID: {
+					APIName:  spec.Name,
+					APIID:    spec.APIID,
+					Versions: []string{"default"},
+					Limit: user.APILimit{
+						QuotaMax:         quotaMax,
+						QuotaRenewalRate: quotaRenewalRate,
+					},
+					AllowanceScope: spec.APIID,
+				},
+			}
+		})
+
+		_, policyKey := ts.CreateSession(func(s *user.SessionState) {
+			s.ApplyPolicies = []string{polID}
+		})
+
+		assertQuota(t, ts, policyKey)
+	})
+
+	t.Run("key from policy with global limits", func(t *testing.T) {
+		polID := ts.CreatePolicy(func(p *user.Policy) {
+			p.Name = "p1"
+			p.KeyExpiresIn = 3600
+			p.Partitions = user.PolicyPartitions{
+				Quota:     true,
+				RateLimit: true,
+				Acl:       true,
+			}
+			p.OrgID = spec.OrgID
+			p.QuotaMax = quotaMax
+			p.QuotaRenewalRate = quotaRenewalRate
+			p.AccessRights = map[string]user.AccessDefinition{
+				spec.APIID: {
+					APIName:        spec.Name,
+					APIID:          spec.APIID,
+					Versions:       []string{"default"},
+					Limit:          user.APILimit{},
+					AllowanceScope: spec.APIID,
+				},
+			}
+		})
+
+		_, policyKey := ts.CreateSession(func(s *user.SessionState) {
+			s.ApplyPolicies = []string{polID}
+		})
+
+		assertQuota(t, ts, policyKey)
+	})
+
+}
+>>>>>>> 83cfda178... [TT-10856/TT-11778] fix quota limit remaining header value when key is created from policy and API is looped (#6199)

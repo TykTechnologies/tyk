@@ -6,7 +6,6 @@ import (
 	"io/ioutil"
 	"net/http"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/assert"
 
@@ -407,33 +406,11 @@ func TestCopyAllowedURLs(t *testing.T) {
 	}
 }
 
-func createSessionWithQuota(tb testing.TB, api *apidef.APIDefinition, quotaMax, quotaRenewalRate int64) *user.SessionState {
-	tb.Helper()
-	session := &user.SessionState{
-		DateCreated: time.Now().Add(time.Hour * -1),
-		Expires:     time.Now().Add(time.Hour).Unix(),
-		AccessRights: map[string]user.AccessDefinition{
-			api.APIID: {
-				APIName:  api.Name,
-				APIID:    api.APIID,
-				Versions: []string{"default"},
-				Limit: user.APILimit{
-					QuotaMax:         quotaMax,
-					QuotaRenewalRate: quotaRenewalRate,
-				},
-				AllowanceScope: api.APIID,
-			},
-		},
-		OrgID: api.OrgID,
-	}
-	return session
-}
-
 func TestQuotaNotAppliedWithURLRewrite(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
-	specs := ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+	spec := ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 		spec.Proxy.ListenPath = "/quota-test"
 		spec.UseKeylessAccess = false
 		UpdateAPIVersion(spec, "Default", func(v *apidef.VersionInfo) {
@@ -444,11 +421,23 @@ func TestQuotaNotAppliedWithURLRewrite(t *testing.T) {
 				RewriteTo:    "tyk://self/anything",
 			}}
 		})
-	})
+	})[0]
 
-	authKey := "auth-key"
-	session := createSessionWithQuota(t, specs[0].APIDefinition, 2, 3600)
-	assert.NoError(t, ts.Gw.GlobalSessionManager.UpdateSession(authKey, session, 60, false))
+	_, authKey := ts.CreateSession(func(s *user.SessionState) {
+		s.AccessRights = map[string]user.AccessDefinition{
+			spec.APIID: {
+				APIName:  spec.Name,
+				APIID:    spec.APIID,
+				Versions: []string{"default"},
+				Limit: user.APILimit{
+					QuotaMax:         2,
+					QuotaRenewalRate: 3600,
+				},
+				AllowanceScope: spec.APIID,
+			},
+		}
+		s.OrgID = spec.OrgID
+	})
 
 	authorization := map[string]string{
 		"Authorization": authKey,
