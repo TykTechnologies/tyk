@@ -19,9 +19,10 @@ import (
 	textTemplate "text/template"
 	"time"
 
-	"github.com/TykTechnologies/tyk/user"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/TykTechnologies/tyk/user"
 
 	"github.com/TykTechnologies/tyk/header"
 
