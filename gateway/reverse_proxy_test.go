@@ -20,14 +20,10 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
-
-<<<<<<< HEAD
 	"github.com/stretchr/testify/require"
-=======
-	"github.com/TykTechnologies/tyk/user"
 
 	"github.com/TykTechnologies/tyk/header"
->>>>>>> 83cfda178... [TT-10856/TT-11778] fix quota limit remaining header value when key is created from policy and API is looped (#6199)
+	"github.com/TykTechnologies/tyk/user"
 
 	"github.com/TykTechnologies/graphql-go-tools/pkg/execution/datasource"
 	"github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
@@ -1827,34 +1823,6 @@ func TestSetCustomHeaderMultipleValues(t *testing.T) {
 		})
 	}
 }
-<<<<<<< HEAD
-=======
-
-func TestCreateMemConnProviderIfNeeded(t *testing.T) {
-	t.Run("should propagate context", func(t *testing.T) {
-		propagationContext := context.WithValue(context.Background(), "parentContextKey", "parentContextValue")
-		propagationContextWithCancel, cancel := context.WithCancel(propagationContext)
-		internalReq, err := http.NewRequest(http.MethodGet, "http://memoryhost/", nil)
-		require.NoError(t, err)
-
-		handler := http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
-			assert.Equal(t, "parentContextValue", req.Context().Value("parentContextKey"))
-			cancel()
-		})
-
-		err = createMemConnProviderIfNeeded(handler, internalReq.WithContext(propagationContextWithCancel))
-		require.NoError(t, err)
-
-		assert.Eventuallyf(t, func() bool {
-			testReq, err := http.NewRequest(http.MethodGet, "http://memoryhost/", nil)
-			require.NoError(t, err)
-			_, err = memConnClient.Do(testReq)
-			require.NoError(t, err)
-			<-propagationContextWithCancel.Done()
-			return true
-		}, time.Second, time.Millisecond*25, "context was not canceled")
-	})
-}
 
 func TestQuotaResponseHeaders(t *testing.T) {
 	ts := StartTest(nil)
@@ -1982,4 +1950,3 @@ func TestQuotaResponseHeaders(t *testing.T) {
 	})
 
 }
->>>>>>> 83cfda178... [TT-10856/TT-11778] fix quota limit remaining header value when key is created from policy and API is looped (#6199)
