@@ -129,7 +129,7 @@ type SessionState struct {
 	HmacSecret                    string                      `json:"hmac_string" msg:"hmac_string"`
 	RSACertificateId              string                      `json:"rsa_certificate_id" msg:"rsa_certificate_id"`
 	IsInactive                    bool                        `json:"is_inactive" msg:"is_inactive" example:"false"`
-	ApplyPolicyID                 string                      `json:"apply_policy_id" msg:"apply_policy_id" example:"641c15dd0fffb800010197bf"`
+	ApplyPolicyID                 string                      `json:"apply_policy_id" msg:"apply_policy_id" example:"641c15dd0fffb800010197bf" deprecated:"true"`
 	ApplyPolicies                 []string                    `json:"apply_policies" msg:"apply_policies" example:"[\"641c15dd0fffb800010197bf\"]"`
 	DataExpires                   int64                       `json:"data_expires" msg:"data_expires" format:"int64" example:"0"`
 	Monitor                       Monitor                     `json:"monitor" msg:"monitor"`

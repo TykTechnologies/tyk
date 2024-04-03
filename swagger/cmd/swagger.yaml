@@ -2103,13 +2103,13 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiAllKeys'
-          description: OK
+          description: ' List of all org keys'
         "404":
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: Not Found
+          description: ORG not found
       summary: List Organisation Keys
       tags:
       - Organisation Quotas
@@ -4552,6 +4552,7 @@ components:
           nullable: true
           type: array
         apply_policy_id:
+          deprecated: true
           example: 641c15dd0fffb800010197bf
           type: string
         basic_auth_data:

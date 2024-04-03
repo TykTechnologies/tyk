@@ -20,7 +20,10 @@ func getOrgKeys(r *openapi3.Reflector) error {
 	if err != nil {
 		return err
 	}
-	oc.AddRespStructure(new(apiAllKeys))
+	statusNotFound(oc, "ORG not found")
+	oc.AddRespStructure(new(apiAllKeys), func(cu *openapi.ContentUnit) {
+		cu.Description = " List of all org keys"
+	})
 	o3, ok := oc.(openapi3.OperationExposer)
 	if !ok {
 		return ErrOperationExposer
@@ -30,7 +33,6 @@ func getOrgKeys(r *openapi3.Reflector) error {
 	oc.SetTags(OrgTag)
 	oc.SetDescription("You can now set rate limits at the organisation level by using the following fields - allowance and rate. These are the number of allowed requests for the specified per value, and need to be set to the same value. If you don't want to have organisation level rate limiting, set 'rate' or 'per' to zero, or don't add them to your request.")
 	o3.Operation().WithParameters(filterKeyQuery())
-	oc.AddRespStructure(new(apiStatusMessage), openapi.WithHTTPStatus(http.StatusNotFound))
 	return r.AddOperation(oc)
 }
 

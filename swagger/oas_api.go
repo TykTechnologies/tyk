@@ -67,8 +67,6 @@ func postOAsApi(r *openapi3.Reflector) error {
 }
 
 func apiOASExportHandler(r *openapi3.Reflector) error {
-	// TODO::This is super wrong in previous oas because of doJSONExport as it returns  application/octet-stream
-	// TODO::I should ask about it.
 	///TODO:: should  Content-Disposition be added as headers
 	oc, err := r.NewOperationContext(http.MethodGet, "/tyk/apis/oas/export")
 	if err != nil {
