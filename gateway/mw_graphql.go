@@ -118,6 +118,11 @@ func (m *GraphQLMiddleware) Init() {
 				TykVariableReplacer: m.Gw.replaceTykVariables,
 			},
 		})
+	} else if m.Spec.GraphQL.Version == apidef.GraphQLConfigVersion3Preview {
+		m.Spec.GraphEngine, err = graphengine.NewEngineV3(graphengine.EngineV3Options{
+			Logger: log,
+			Schema: schema,
+		})
 	} else {
 		log.Errorf("Could not init GraphQL middleware: invalid config version provided: %s", m.Spec.GraphQL.Version)
 	}

@@ -833,9 +833,10 @@ type GraphQLConfig struct {
 type GraphQLConfigVersion string
 
 const (
-	GraphQLConfigVersionNone GraphQLConfigVersion = ""
-	GraphQLConfigVersion1    GraphQLConfigVersion = "1"
-	GraphQLConfigVersion2    GraphQLConfigVersion = "2"
+	GraphQLConfigVersionNone     GraphQLConfigVersion = ""
+	GraphQLConfigVersion1        GraphQLConfigVersion = "1"
+	GraphQLConfigVersion2        GraphQLConfigVersion = "2"
+	GraphQLConfigVersion3Preview GraphQLConfigVersion = "3-preview"
 )
 
 type GraphQLIntrospectionConfig struct {

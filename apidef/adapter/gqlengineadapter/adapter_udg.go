@@ -103,7 +103,7 @@ func (u *UniversalDataGraph) engineConfigV2DataSources() (planDataSources []plan
 					Method: restConfig.Method,
 					Body:   restConfig.Body,
 					Query:  queryConfigs,
-					Header: convertApiDefinitionHeadersToHttpHeaders(restConfig.Headers),
+					Header: ConvertApiDefinitionHeadersToHttpHeaders(restConfig.Headers),
 				},
 			})
 

@@ -1,12 +1,12 @@
-package gqlengineadapter
+package v2
 
 import (
-	"net/http"
-
-	graphqlDataSource "github.com/TykTechnologies/graphql-go-tools/pkg/engine/datasource/graphql_datasource"
-	"github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
-
+	graphqlDataSource "github.com/TykTechnologies/graphql-go-tools/v2/pkg/engine/datasource/graphql_datasource"
+	"github.com/TykTechnologies/graphql-go-tools/v2/pkg/graphql"
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/apidef/adapter/gqlengineadapter"
+	"net/http"
+	"strings"
 )
 
 type Supergraph struct {
@@ -17,7 +17,7 @@ type Supergraph struct {
 	subscriptionClientFactory graphqlDataSource.GraphQLSubscriptionClientFactory
 }
 
-func (s *Supergraph) EngineConfig() (*graphql.EngineV2Configuration, error) {
+func (s *Supergraph) EngineConfigV2() (*graphql.EngineV2Configuration, error) {
 	dataSourceConfs := s.subgraphDataSourceConfigs()
 	var federationConfigV2Factory *graphql.FederationEngineConfigFactory
 	if s.ApiDefinition.GraphQL.Supergraph.DisableQueryBatching {
@@ -31,7 +31,6 @@ func (s *Supergraph) EngineConfig() (*graphql.EngineV2Configuration, error) {
 	} else {
 		federationConfigV2Factory = graphql.NewFederationEngineConfigFactory(
 			dataSourceConfs,
-			graphqlDataSource.NewBatchFactory(),
 			graphql.WithFederationHttpClient(s.HttpClient),
 			graphql.WithFederationStreamingClient(s.StreamingClient),
 			graphql.WithFederationSubscriptionClientFactory(subscriptionClientFactoryOrDefault(s.subscriptionClientFactory)),
@@ -49,9 +48,6 @@ func (s *Supergraph) EngineConfig() (*graphql.EngineV2Configuration, error) {
 	}
 
 	conf.EnableSingleFlight(true)
-	if !s.ApiDefinition.GraphQL.Supergraph.DisableQueryBatching {
-		conf.EnableDataLoader(true)
-	}
 
 	return &conf, nil
 }
@@ -66,7 +62,7 @@ func (s *Supergraph) subgraphDataSourceConfigs() []graphqlDataSource.Configurati
 		if len(apiDefSubgraphConf.SDL) == 0 {
 			continue
 		}
-		hdr := RemoveDuplicateApiDefinitionHeaders(apiDefSubgraphConf.Headers, s.ApiDefinition.GraphQL.Supergraph.GlobalHeaders)
+		hdr := gqlengineadapter.RemoveDuplicateApiDefinitionHeaders(apiDefSubgraphConf.Headers, s.ApiDefinition.GraphQL.Supergraph.GlobalHeaders)
 		conf := graphqlDataSourceConfiguration(
 			apiDefSubgraphConf.URL,
 			http.MethodPost,
@@ -81,4 +77,30 @@ func (s *Supergraph) subgraphDataSourceConfigs() []graphqlDataSource.Configurati
 	}
 
 	return confs
+}
+
+func graphqlDataSourceConfiguration(url string, method string, headers map[string]string, subscriptionType apidef.SubscriptionType) graphqlDataSource.Configuration {
+	dataSourceHeaders := make(map[string]string)
+	for name, value := range headers {
+		dataSourceHeaders[name] = value
+	}
+
+	if strings.HasPrefix(url, "tyk://") {
+		url = strings.ReplaceAll(url, "tyk://", "http://")
+		dataSourceHeaders[apidef.TykInternalApiHeader] = "true"
+	}
+
+	cfg := graphqlDataSource.Configuration{
+		Fetch: graphqlDataSource.FetchConfiguration{
+			URL:    url,
+			Method: method,
+			Header: gqlengineadapter.ConvertApiDefinitionHeadersToHttpHeaders(dataSourceHeaders),
+		},
+		Subscription: graphqlDataSource.SubscriptionConfiguration{
+			URL:    url,
+			UseSSE: subscriptionType == apidef.GQLSubscriptionSSE,
+		},
+	}
+
+	return cfg
 }
