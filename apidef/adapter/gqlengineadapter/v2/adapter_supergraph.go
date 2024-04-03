@@ -20,22 +20,12 @@ type Supergraph struct {
 func (s *Supergraph) EngineConfigV2() (*graphql.EngineV2Configuration, error) {
 	dataSourceConfs := s.subgraphDataSourceConfigs()
 	var federationConfigV2Factory *graphql.FederationEngineConfigFactory
-	if s.ApiDefinition.GraphQL.Supergraph.DisableQueryBatching {
-		federationConfigV2Factory = graphql.NewFederationEngineConfigFactory(
-			dataSourceConfs,
-			nil,
-			graphql.WithFederationHttpClient(s.HttpClient),
-			graphql.WithFederationStreamingClient(s.StreamingClient),
-			graphql.WithFederationSubscriptionClientFactory(subscriptionClientFactoryOrDefault(s.subscriptionClientFactory)),
-		)
-	} else {
-		federationConfigV2Factory = graphql.NewFederationEngineConfigFactory(
-			dataSourceConfs,
-			graphql.WithFederationHttpClient(s.HttpClient),
-			graphql.WithFederationStreamingClient(s.StreamingClient),
-			graphql.WithFederationSubscriptionClientFactory(subscriptionClientFactoryOrDefault(s.subscriptionClientFactory)),
-		)
-	}
+	federationConfigV2Factory = graphql.NewFederationEngineConfigFactory(
+		dataSourceConfs,
+		graphql.WithFederationHttpClient(s.HttpClient),
+		graphql.WithFederationStreamingClient(s.StreamingClient),
+		graphql.WithFederationSubscriptionClientFactory(subscriptionClientFactoryOrDefault(s.subscriptionClientFactory)),
+	)
 
 	err := federationConfigV2Factory.SetMergedSchemaFromString(s.ApiDefinition.GraphQL.Supergraph.MergedSDL)
 	if err != nil {
