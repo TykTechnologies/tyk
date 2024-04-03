@@ -143,7 +143,7 @@ func (gw *Gateway) handleRedisEvent(v interface{}, handled func(NotificationComm
 		}
 	case NoticeDeleteAPICache:
 		if ok := gw.invalidateAPICache(notif.Payload); !ok {
-			log.WithError(err).Errorf("cache invalidation failed for: %s", notif.Payload)
+			log.Errorf("cache invalidation failed for: %s", notif.Payload)
 		}
 	default:
 		pubSubLog.Warnf("Unknown notification command: %q", notif.Command)

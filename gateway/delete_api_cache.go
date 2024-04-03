@@ -7,6 +7,6 @@ import (
 )
 
 func (gw *Gateway) invalidateAPICache(apiID string) bool {
-	store := storage.RedisCluster{IsCache: true, ConnectionHandler: gw.StorageConnectionHandler}
+	store := storage.RedisCluster{IsCache: true, RedisController: gw.RedisController}
 	return store.DeleteScanMatch(fmt.Sprintf("cache-%s*", apiID))
 }
