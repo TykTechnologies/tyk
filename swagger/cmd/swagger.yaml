@@ -4553,6 +4553,8 @@ components:
           type: array
         apply_policy_id:
           deprecated: true
+          description: deprecated use apply_policies going forward instead to send
+            a list of policies ids
           example: 641c15dd0fffb800010197bf
           type: string
         basic_auth_data:
