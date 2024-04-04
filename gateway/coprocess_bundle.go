@@ -124,8 +124,8 @@ type HTTPBundleGetter struct {
 	InsecureSkipVerify bool
 }
 
-// MockBundleGetter is a BundleGetter for testing.
-type MockBundleGetter struct {
+// FileBundleGetter is a BundleGetter for testing.
+type FileBundleGetter struct {
 	URL                string
 	InsecureSkipVerify bool
 }
@@ -156,7 +156,7 @@ func (g *HTTPBundleGetter) Get() ([]byte, error) {
 }
 
 // Get mocks an HTTP(S) GET request.
-func (g *MockBundleGetter) Get() ([]byte, error) {
+func (g *FileBundleGetter) Get() ([]byte, error) {
 	return os.ReadFile(strings.TrimPrefix(g.URL, "file://"))
 }
 
@@ -240,7 +240,7 @@ func (gw *Gateway) FetchBundle(spec *APISpec) (Bundle, error) {
 			InsecureSkipVerify: gw.GetConfig().BundleInsecureSkipVerify,
 		}
 	case "file":
-		getter = &MockBundleGetter{
+		getter = &FileBundleGetter{
 			URL:                bundleURL,
 			InsecureSkipVerify: gw.GetConfig().BundleInsecureSkipVerify,
 		}
