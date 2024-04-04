@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"path"
+	"strings"
 	"time"
 
 	"github.com/cenk/backoff"
@@ -23,12 +24,13 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/TykTechnologies/goverify"
 	"github.com/TykTechnologies/tyk/apidef"
 )
 
-const BackoffMultiplier = 2
-const MaxBackoffRetries = 4
+var (
+	BackoffMultiplier float64 = 2
+	MaxBackoffRetries uint64  = 4
+)
 
 // Bundle is the basic bundle data structure, it holds the bundle name and the data.
 type Bundle struct {
@@ -47,20 +49,17 @@ func (b *Bundle) Verify() error {
 	}).Info("----> Verifying bundle: ", b.Spec.CustomMiddlewareBundle)
 
 	var useSignature bool
-	bundleVerifier := b.Gw.NotificationVerifier
 
-	// Perform signature verification if a public key path is set:
+	verifier, err := b.Gw.SignatureVerifier()
+
 	if b.Gw.GetConfig().PublicKeyPath != "" {
+		// Perform signature verification if a public key path is set:
 		if b.Manifest.Signature == "" {
 			// Error: A public key is set, but the bundle isn't signed.
 			return errors.New("Bundle isn't signed")
 		}
-		if bundleVerifier == nil {
-			var err error
-			bundleVerifier, err = goverify.LoadPublicKeyFromFile(b.Gw.GetConfig().PublicKeyPath)
-			if err != nil {
-				return err
-			}
+		if err != nil {
+			return err
 		}
 		useSignature = true
 	}
@@ -82,7 +81,6 @@ func (b *Bundle) Verify() error {
 	}
 
 	checksum := fmt.Sprintf("%x", md5.Sum(bundleData.Bytes()))
-
 	if checksum != b.Manifest.Checksum {
 		return errors.New("Invalid checksum")
 	}
@@ -92,7 +90,7 @@ func (b *Bundle) Verify() error {
 		if err != nil {
 			return err
 		}
-		if err := bundleVerifier.Verify(bundleData.Bytes(), signed); err != nil {
+		if err := verifier.Verify(bundleData.Bytes(), signed); err != nil {
 			return err
 		}
 	}
@@ -134,8 +132,8 @@ type HTTPBundleGetter struct {
 	InsecureSkipVerify bool
 }
 
-// MockBundleGetter is a BundleGetter for testing.
-type MockBundleGetter struct {
+// FileBundleGetter is a BundleGetter for testing.
+type FileBundleGetter struct {
 	URL                string
 	InsecureSkipVerify bool
 }
@@ -166,11 +164,8 @@ func (g *HTTPBundleGetter) Get() ([]byte, error) {
 }
 
 // Get mocks an HTTP(S) GET request.
-func (g *MockBundleGetter) Get() ([]byte, error) {
-	if g.InsecureSkipVerify {
-		return []byte("bundle-insecure"), nil
-	}
-	return []byte("bundle"), nil
+func (g *FileBundleGetter) Get() ([]byte, error) {
+	return os.ReadFile(strings.TrimPrefix(g.URL, "file://"))
 }
 
 // BundleSaver is an interface used by bundle saver structures.
@@ -217,8 +212,8 @@ func (ZipBundleSaver) Save(bundle *Bundle, bundlePath string, spec *APISpec) err
 	return nil
 }
 
-// fetchBundle will fetch a given bundle, using the right BundleGetter. The first argument is the bundle name, the base bundle URL will be used as prefix.
-func (gw *Gateway) fetchBundle(spec *APISpec) (Bundle, error) {
+// FetchBundle will fetch a given bundle, using the right BundleGetter. The first argument is the bundle name, the base bundle URL will be used as prefix.
+func (gw *Gateway) FetchBundle(spec *APISpec) (Bundle, error) {
 	bundle := Bundle{Gw: gw}
 	var err error
 
@@ -252,8 +247,8 @@ func (gw *Gateway) fetchBundle(spec *APISpec) (Bundle, error) {
 			URL:                bundleURL,
 			InsecureSkipVerify: gw.GetConfig().BundleInsecureSkipVerify,
 		}
-	case "mock":
-		getter = &MockBundleGetter{
+	case "file":
+		getter = &FileBundleGetter{
 			URL:                bundleURL,
 			InsecureSkipVerify: gw.GetConfig().BundleInsecureSkipVerify,
 		}
@@ -278,6 +273,11 @@ func pullBundle(getter BundleGetter, backoffMultiplier float64) ([]byte, error) 
 	downloadBundle := func() error {
 		bundleData, err = getter.Get()
 		return err
+	}
+
+	if MaxBackoffRetries == 0 {
+		downloadBundle()
+		return bundleData, err
 	}
 
 	exponentialBackoff := backoff.NewExponentialBackOff()
@@ -400,7 +400,7 @@ func (gw *Gateway) loadBundle(spec *APISpec) error {
 		"prefix": "main",
 	}).Info("----> Fetching Bundle: ", spec.CustomMiddlewareBundle)
 
-	bundle, err := gw.fetchBundle(spec)
+	bundle, err := gw.FetchBundle(spec)
 	if err != nil {
 		return bundleError(spec, err, "Couldn't fetch bundle")
 	}
