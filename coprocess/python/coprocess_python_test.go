@@ -3,6 +3,8 @@ package python
 import (
 	"bytes"
 	"context"
+	"crypto/md5"
+	"fmt"
 	"mime/multipart"
 	"net/http"
 	"os"
@@ -48,9 +50,10 @@ def MyAuthHook(request, session, metadata, spec):
 
 	middleware = strings.ReplaceAll(middleware, "valid_token", token1)
 	middleware = strings.ReplaceAll(middleware, "token_without_quota", token2)
+	checksum := fmt.Sprintf("%x", md5.Sum([]byte(middleware)))
 
 	return map[string]string{
-		"manifest.json": `
+		"manifest.json": fmt.Sprintf(`
 		{
 		    "file_list": [
 		        "middleware.py"
@@ -60,9 +63,9 @@ def MyAuthHook(request, session, metadata, spec):
 		        "auth_check": {
 		            "name": "MyAuthHook"
 		        }
-		    }
-		}
-`,
+		    },
+		    "checksum": "%s"
+		}`, checksum),
 		"middleware.py": middleware,
 	}
 }
