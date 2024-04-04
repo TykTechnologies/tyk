@@ -204,7 +204,7 @@ from gateway import TykGateway as tyk
 
 @Hook
 def MyResponseHook(request, response, session, metadata, spec):
-  response.raw_body = b'newbody'
+  response.raw_body = 'newbody'
   return response
 
 `
