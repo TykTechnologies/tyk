@@ -1317,6 +1317,15 @@ func (gw *Gateway) initialiseSystem() error {
 	gw.InitializeRPCCache()
 	gw.setupInstrumentation()
 
+	log.Warnf("Creating new NotificationVerifier with pubkey: %q", gwConfig.PublicKeyPath)
+	if gwConfig.PublicKeyPath != "" {
+		var err error
+		gw.NotificationVerifier, err = goverify.LoadPublicKeyFromFile(gwConfig.PublicKeyPath)
+		if err != nil {
+			mainLog.WithError(err).Fatalf("Failed loading public key from path: %s", err)
+		}
+	}
+
 	// cleanIdleMemConnProviders checks memconn.Provider (a part of internal API handling)
 	// instances periodically and deletes idle items, closes net.Listener instances to
 	// free resources.
@@ -1433,14 +1442,6 @@ func (gw *Gateway) afterConfSetup() {
 		}
 
 		conf.OpenTelemetry.SetDefaults()
-	}
-
-	if conf.PublicKeyPath != "" {
-		var err error
-		gw.NotificationVerifier, err = goverify.LoadPublicKeyFromFile(conf.PublicKeyPath)
-		if err != nil {
-			mainLog.WithError(err).Fatalf("Failed loading public key from path: %s", err)
-		}
 	}
 
 	gw.SetConfig(conf)
