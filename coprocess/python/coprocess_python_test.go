@@ -97,7 +97,6 @@ def MyPostHook(request, session, spec):
         request.object.return_overrides.response_error = "'stringkey' value doesn't match"
         return request, session	
     return request, session
-
 `
 	checksum := fmt.Sprintf("%x", md5.Sum([]byte(middleware)))
 	return map[string]string{
@@ -204,9 +203,8 @@ from gateway import TykGateway as tyk
 
 @Hook
 def MyResponseHook(request, response, session, metadata, spec):
-  response.raw_body = 'newbody'
+  response.raw_body = b'newbody'
   return response
-
 `
 	checksum := fmt.Sprintf("%x", md5.Sum([]byte(middleware)))
 	return map[string]string{
