@@ -423,8 +423,8 @@ func (gw *Gateway) loadBundle(spec *APISpec) error {
 	if err := loadBundleManifest(&bundle, spec, false); err != nil {
 		bundleError(spec, err, "Couldn't load bundle")
 
-		if err := os.RemoveAll(bundle.Path); err != nil {
-			bundleError(spec, err, "Couldn't remove bundle")
+		if removeErr := os.RemoveAll(bundle.Path); removeErr != nil {
+			bundleError(spec, removeErr, "Couldn't remove bundle")
 		}
 		return err
 	}
