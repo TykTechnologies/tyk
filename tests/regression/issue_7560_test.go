@@ -58,7 +58,7 @@ func Test_Issue7560(t *testing.T) {
 
 	t.Run("Signed bundle but no public key should error", func(t *testing.T) {
 		ts := gateway.StartTest(func(c *config.Config) {
-			c.PublicKeyPath = "testdata/issue-7560-server-invalid.pub"
+			c.PublicKeyPath = ""
 			c.BundleBaseURL = "file://testdata/"
 		})
 		defer ts.Close()
