@@ -1452,6 +1452,14 @@ func (gw *Gateway) afterConfSetup() {
 		conf.OpenTelemetry.SetDefaults()
 	}
 
+	if conf.PublicKeyPath != "" {
+		var err error
+		gw.NotificationVerifier, err = goverify.LoadPublicKeyFromFile(conf.PublicKeyPath)
+		if err != nil {
+			mainLog.WithError(err).Fatalf("Failed loading public key from path: %s", err)
+		}
+	}
+
 	gw.SetConfig(conf)
 }
 
