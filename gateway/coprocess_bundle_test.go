@@ -240,7 +240,8 @@ var overrideResponsePython = map[string]string{
 		        "pre": [{
 		            "name": "MyRequestHook"
 		        }]
-		    }
+		    },
+			"checksum": "81f585cdf7bf352e3c33ed62396b1e8e"
 		}
 	`,
 	"middleware.py": `
@@ -274,7 +275,8 @@ var overrideResponseJSVM = map[string]string{
             "name": "pre",
             "path": "pre.js"
         }]
-    }
+    },
+	"checksum": "d41d8cd98f00b204e9800998ecf8427e"
 }
 `,
 	"pre.js": `
