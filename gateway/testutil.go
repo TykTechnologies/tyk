@@ -238,6 +238,9 @@ func (r *ReloadMachinery) TickOk(t *testing.T) {
 func InitTestMain(ctx context.Context, m *testing.M) int {
 	test.InitTestMain(ctx, m)
 
+	BackoffMultiplier = 0
+	MaxBackoffRetries = 0
+
 	if EnableTestDNSMock {
 		var errMock error
 		MockHandle, errMock = test.InitDNSMock(test.DomainsToAddresses, nil)
@@ -1326,7 +1329,6 @@ func (s *Test) RemoveApis() error {
 	if err != nil {
 		log.WithError(err).Error("removing apis from gw")
 	}
-
 
 	return err
 }

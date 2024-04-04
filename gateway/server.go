@@ -159,7 +159,8 @@ type Gateway struct {
 	consulKVStore kv.Store
 	vaultKVStore  kv.Store
 
-	NotificationVerifier goverify.Verifier
+	// signatureVerifier is used to verify signatures with config.PublicKeyPath.
+	signatureVerifier atomic.Pointer[goverify.Verifier]
 
 	RedisPurgeOnce sync.Once
 	RpcPurgeOnce   sync.Once
@@ -1317,20 +1318,34 @@ func (gw *Gateway) initialiseSystem() error {
 	gw.InitializeRPCCache()
 	gw.setupInstrumentation()
 
-	log.Warnf("Creating new NotificationVerifier with pubkey: %q", gwConfig.PublicKeyPath)
-	if gwConfig.PublicKeyPath != "" {
-		var err error
-		gw.NotificationVerifier, err = goverify.LoadPublicKeyFromFile(gwConfig.PublicKeyPath)
-		if err != nil {
-			mainLog.WithError(err).Fatalf("Failed loading public key from path: %s", err)
-		}
-	}
-
 	// cleanIdleMemConnProviders checks memconn.Provider (a part of internal API handling)
 	// instances periodically and deletes idle items, closes net.Listener instances to
 	// free resources.
 	go cleanIdleMemConnProviders(gw.ctx)
 	return nil
+}
+
+func (gw *Gateway) SignatureVerifier() (goverify.Verifier, error) {
+	gwConfig := gw.GetConfig()
+	if gwConfig.PublicKeyPath == "" {
+		return nil, nil
+	}
+
+	cached := gw.signatureVerifier.Load()
+	if cached != nil {
+		return *cached, nil
+	}
+
+	log.Warnf("Creating new NotificationVerifier with pubkey: %q", gwConfig.PublicKeyPath)
+
+	verifier, err := goverify.LoadPublicKeyFromFile(gwConfig.PublicKeyPath)
+	if err != nil {
+		mainLog.WithError(err).Errorf("Failed loading public key from path: %s", err)
+		return nil, err
+	}
+
+	gw.signatureVerifier.Store(&verifier)
+	return verifier, nil
 }
 
 func writePIDFile(file string) error {
