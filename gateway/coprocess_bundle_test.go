@@ -179,56 +179,6 @@ func TestBundleLoader(t *testing.T) {
 	})
 }
 
-func TestBundleFetcher(t *testing.T) {
-	bundleID := "testbundle"
-	ts := StartTest(nil)
-	defer ts.Close()
-
-	t.Run("Simple bundle base URL", func(t *testing.T) {
-		globalConf := ts.Gw.GetConfig()
-		globalConf.BundleBaseURL = "mock://somepath"
-		globalConf.BundleInsecureSkipVerify = false
-		ts.Gw.SetConfig(globalConf)
-		specs := ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
-			spec.CustomMiddlewareBundle = bundleID
-		})
-		spec := specs[0]
-		bundle, err := ts.Gw.fetchBundle(spec)
-		if err != nil {
-			t.Fatalf("Couldn't fetch bundle: %s", err.Error())
-		}
-
-		if string(bundle.Data) != "bundle" {
-			t.Errorf("Wrong bundle data: %s", bundle.Data)
-		}
-		if bundle.Name != bundleID {
-			t.Errorf("Wrong bundle name: %s", bundle.Name)
-		}
-	})
-
-	t.Run("Bundle base URL with querystring", func(t *testing.T) {
-		globalConf := ts.Gw.GetConfig()
-		globalConf.BundleBaseURL = "mock://somepath?api_key=supersecret"
-		globalConf.BundleInsecureSkipVerify = true
-		ts.Gw.SetConfig(globalConf)
-		specs := ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
-			spec.CustomMiddlewareBundle = bundleID
-		})
-		spec := specs[0]
-		bundle, err := ts.Gw.fetchBundle(spec)
-		if err != nil {
-			t.Fatalf("Couldn't fetch bundle: %s", err.Error())
-		}
-
-		if string(bundle.Data) != "bundle-insecure" {
-			t.Errorf("Wrong bundle data: %s", bundle.Data)
-		}
-		if bundle.Name != bundleID {
-			t.Errorf("Wrong bundle name: %s", bundle.Name)
-		}
-	})
-}
-
 var overrideResponsePython = map[string]string{
 	"manifest.json": `
 		{

@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"path"
+	"strings"
 	"time"
 
 	"github.com/cenk/backoff"
@@ -156,10 +157,7 @@ func (g *HTTPBundleGetter) Get() ([]byte, error) {
 
 // Get mocks an HTTP(S) GET request.
 func (g *MockBundleGetter) Get() ([]byte, error) {
-	if g.InsecureSkipVerify {
-		return []byte("bundle-insecure"), nil
-	}
-	return []byte("bundle"), nil
+	return os.ReadFile(strings.TrimPrefix(g.URL, "file://"))
 }
 
 // BundleSaver is an interface used by bundle saver structures.
@@ -206,8 +204,8 @@ func (ZipBundleSaver) Save(bundle *Bundle, bundlePath string, spec *APISpec) err
 	return nil
 }
 
-// fetchBundle will fetch a given bundle, using the right BundleGetter. The first argument is the bundle name, the base bundle URL will be used as prefix.
-func (gw *Gateway) fetchBundle(spec *APISpec) (Bundle, error) {
+// FetchBundle will fetch a given bundle, using the right BundleGetter. The first argument is the bundle name, the base bundle URL will be used as prefix.
+func (gw *Gateway) FetchBundle(spec *APISpec) (Bundle, error) {
 	bundle := Bundle{Gw: gw}
 	var err error
 
@@ -241,7 +239,7 @@ func (gw *Gateway) fetchBundle(spec *APISpec) (Bundle, error) {
 			URL:                bundleURL,
 			InsecureSkipVerify: gw.GetConfig().BundleInsecureSkipVerify,
 		}
-	case "mock":
+	case "file":
 		getter = &MockBundleGetter{
 			URL:                bundleURL,
 			InsecureSkipVerify: gw.GetConfig().BundleInsecureSkipVerify,
@@ -389,7 +387,7 @@ func (gw *Gateway) loadBundle(spec *APISpec) error {
 		"prefix": "main",
 	}).Info("----> Fetching Bundle: ", spec.CustomMiddlewareBundle)
 
-	bundle, err := gw.fetchBundle(spec)
+	bundle, err := gw.FetchBundle(spec)
 	if err != nil {
 		return bundleError(spec, err, "Couldn't fetch bundle")
 	}
