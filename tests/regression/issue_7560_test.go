@@ -52,11 +52,11 @@ func Test_Issue7560(t *testing.T) {
 		_ = spec
 
 		ts.Run(t, []test.TestCase{
-			{Path: "/test/", Code: http.StatusInternalServerError},
+			{Path: "/test/", Code: http.StatusOK, BodyNotMatch: `New Request body`},
 		}...)
 	})
 
-	t.Run("Signed bundle but no public key should error", func(t *testing.T) {
+	t.Run("Signed bundle but no public key should load bundle", func(t *testing.T) {
 		ts := gateway.StartTest(func(c *config.Config) {
 			c.PublicKeyPath = ""
 			c.BundleBaseURL = "file://testdata/"
@@ -72,7 +72,7 @@ func Test_Issue7560(t *testing.T) {
 		_ = spec
 
 		ts.Run(t, []test.TestCase{
-			{Path: "/test/", Code: http.StatusInternalServerError},
+			{Path: "/test/", Code: http.StatusOK, BodyMatch: `New Request body`},
 		}...)
 	})
 
@@ -92,7 +92,7 @@ func Test_Issue7560(t *testing.T) {
 		_ = spec
 
 		ts.Run(t, []test.TestCase{
-			{Path: "/test/", Code: http.StatusInternalServerError},
+			{Path: "/test/", Code: http.StatusOK, BodyNotMatch: `New Request body`},
 		}...)
 	})
 }
