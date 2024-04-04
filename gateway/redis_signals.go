@@ -200,14 +200,20 @@ func isPayloadSignatureValid(notification Notification) bool {
 			return false
 		}
 	default:
-		if notification.Gw.NotificationVerifier != nil {
+		verifier, err := notification.Gw.SignatureVerifier()
+		if err != nil {
+			pubSubLog.Error("Notification signer: Failed loading public key from path: ", err)
+			return false
+		}
+
+		if verifier != nil {
 			signed, err := base64.StdEncoding.DecodeString(notification.Signature)
 			if err != nil {
 				pubSubLog.Error("Failed to decode signature: ", err)
 				return false
 			}
 
-			if err := notification.Gw.NotificationVerifier.Verify([]byte(notification.Payload), signed); err != nil {
+			if err := verifier.Verify([]byte(notification.Payload), signed); err != nil {
 				pubSubLog.Error("Could not verify notification: ", err, ": ", notification)
 				return false
 			}

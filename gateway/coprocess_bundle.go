@@ -27,8 +27,10 @@ import (
 	"github.com/TykTechnologies/tyk/apidef"
 )
 
-const BackoffMultiplier = 2
-const MaxBackoffRetries = 4
+var (
+	BackoffMultiplier float64 = 2
+	MaxBackoffRetries uint64  = 4
+)
 
 // Bundle is the basic bundle data structure, it holds the bundle name and the data.
 type Bundle struct {
@@ -46,13 +48,20 @@ func (b *Bundle) Verify() error {
 		"prefix": "main",
 	}).Info("----> Verifying bundle: ", b.Spec.CustomMiddlewareBundle)
 
-	bundleVerifier := b.Gw.NotificationVerifier
-	useSignature := bundleVerifier != nil
+	var useSignature bool
 
-	// Perform signature verification if a public key path is set:
-	if useSignature && b.Manifest.Signature == "" {
-		// Error: A public key is set, but the bundle isn't signed.
-		return errors.New("Bundle isn't signed")
+	verifier, err := b.Gw.SignatureVerifier()
+
+	if b.Gw.GetConfig().PublicKeyPath != "" {
+		// Perform signature verification if a public key path is set:
+		if b.Manifest.Signature == "" {
+			// Error: A public key is set, but the bundle isn't signed.
+			return errors.New("Bundle isn't signed")
+		}
+		if err != nil {
+			return err
+		}
+		useSignature = true
 	}
 
 	var bundleData bytes.Buffer
@@ -72,7 +81,6 @@ func (b *Bundle) Verify() error {
 	}
 
 	checksum := fmt.Sprintf("%x", md5.Sum(bundleData.Bytes()))
-
 	if checksum != b.Manifest.Checksum {
 		return errors.New("Invalid checksum")
 	}
@@ -82,7 +90,7 @@ func (b *Bundle) Verify() error {
 		if err != nil {
 			return err
 		}
-		if err := bundleVerifier.Verify(bundleData.Bytes(), signed); err != nil {
+		if err := verifier.Verify(bundleData.Bytes(), signed); err != nil {
 			return err
 		}
 	}
@@ -265,6 +273,11 @@ func pullBundle(getter BundleGetter, backoffMultiplier float64) ([]byte, error) 
 	downloadBundle := func() error {
 		bundleData, err = getter.Get()
 		return err
+	}
+
+	if MaxBackoffRetries == 0 {
+		downloadBundle()
+		return bundleData, err
 	}
 
 	exponentialBackoff := backoff.NewExponentialBackOff()
