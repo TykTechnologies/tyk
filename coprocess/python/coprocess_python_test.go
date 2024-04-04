@@ -208,7 +208,8 @@ def MyResponseHook(request, response, session, metadata, spec):
 `
 	checksum := fmt.Sprintf("%x", md5.Sum([]byte(middleware)))
 	return map[string]string{
-		`manifest.json`: fmt.Sprintf(`{		{
+		`manifest.json`: fmt.Sprintf(`
+		{
 		    "file_list": [
 		        "middleware.py"
 		    ],
@@ -219,7 +220,8 @@ def MyResponseHook(request, response, session, metadata, spec):
 		        }]
 		    },
 			"checksum": "%s"
-		}}`, checksum),
+		}
+`, checksum),
 		"middleware.py": middleware,
 	}
 }
