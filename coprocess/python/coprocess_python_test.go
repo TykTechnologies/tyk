@@ -203,7 +203,7 @@ from gateway import TykGateway as tyk
 
 @Hook
 def MyResponseHook(request, response, session, metadata, spec):
-  response.raw_body = b'newbody'
+  response.raw_body = 'newbody'
   return response
 `
 	checksum := fmt.Sprintf("%x", md5.Sum([]byte(middleware)))
