@@ -107,7 +107,6 @@ jobs:
           -e PKG_SIGNING_KEY="$PKG_SIGNING_KEY" \
           -e PACKAGECLOUD_TOKEN=$PACKAGECLOUD_TOKEN \
           -v /go/src:/go/src \
-          -v ${{github.workspace}}:/go/src/github.com/TykTechnologies/tyk \
           -v /var/run/docker.sock:/var/run/docker.sock \
           -v ~/.docker/config.json:/root/.docker/config.json \
           -v /tmp/build.sh:/tmp/build.sh \
