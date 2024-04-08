@@ -108,8 +108,8 @@ jobs:
           -v ${{github.workspace}}:/go/src/github.com/TykTechnologies/tyk \
           -v /var/run/docker.sock:/var/run/docker.sock \
           -v ~/.docker/config.json:/root/.docker/config.json \
-          -v ~/go/pkg/mod:/go/pkg/mod \
           -v /tmp/build.sh:/tmp/build.sh \
+          -v /go/src/github.com:/go/src/github.com \
           -w /go/src/github.com/TykTechnologies/tyk \
           tykio/golang-cross:${{ matrix.golang_cross }} /tmp/build.sh
       - uses: aws-actions/configure-aws-credentials@v4
