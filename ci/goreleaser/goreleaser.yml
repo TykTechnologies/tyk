@@ -17,6 +17,8 @@ builds:
       - linux
     goarch:
       - amd64
+    env:
+      - GO111MODULE=off
     binary: tyk
   - id: std-arm64
     flags:
@@ -27,6 +29,7 @@ builds:
       - -X github.com/TykTechnologies/tyk/internal/build.BuildDate={{.Date}}
       - -X github.com/TykTechnologies/tyk/internal/build.BuiltBy=goreleaser
     env:
+      - GO111MODULE=off
       - CC=aarch64-linux-gnu-gcc
     goos:
       - linux
