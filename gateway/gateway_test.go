@@ -1653,9 +1653,21 @@ func TestTracing(t *testing.T) {
 	defer ts.Close()
 
 	ts.Gw.prepareStorage()
+
+	{
+		conf := ts.Gw.GetConfig()
+		conf.EnableBundleDownloader = true
+		conf.BundleBaseURL = "http://some-invalid-path"
+		ts.Gw.SetConfig(conf)
+	}
+
 	spec := BuildAPI(func(spec *APISpec) {
 		spec.UseKeylessAccess = false
 	})[0]
+
+	apiDefWithBundle := &apidef.APIDefinition{
+		CustomMiddlewareBundle: "some-path",
+	}
 
 	keyID := CreateSession(ts.Gw)
 	authHeaders := map[string][]string{"Authorization": {keyID}}
@@ -1667,6 +1679,7 @@ func TestTracing(t *testing.T) {
 		{Method: "POST", Path: "/tyk/debug", Data: `{"Spec": {}}`, AdminAuth: true, Code: 400, BodyMatch: "Request field is missing"},
 		{Method: "POST", Path: "/tyk/debug", Data: `{"Spec": {}, "Request": {}}`, AdminAuth: true, Code: 400, BodyMatch: "Spec not valid, skipped!"},
 		{Method: "POST", Path: "/tyk/debug", Data: traceRequest{Spec: spec.APIDefinition, Request: &traceHttpRequest{Method: "GET", Path: "/"}}, AdminAuth: true, Code: 200, BodyMatch: `401 Unauthorized`},
+		{Method: "POST", Path: "/tyk/debug", Data: traceRequest{Spec: apiDefWithBundle, Request: &traceHttpRequest{Method: "GET", Path: "/", Headers: authHeaders}}, AdminAuth: true, Code: http.StatusBadRequest, BodyMatch: `Couldn't load bundle`},
 		{Method: "POST", Path: "/tyk/debug", Data: traceRequest{Spec: spec.APIDefinition, Request: &traceHttpRequest{Path: "/", Headers: authHeaders}}, AdminAuth: true, Code: 200, BodyMatch: `200 OK`},
 	}...)
 

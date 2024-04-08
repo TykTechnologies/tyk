@@ -312,12 +312,12 @@ type APIDefinitionLoader struct {
 
 // MakeSpec will generate a flattened URLSpec from and APIDefinitions' VersionInfo data. paths are
 // keyed to the Api version name, which is determined during routing to speed up lookups
-func (a APIDefinitionLoader) MakeSpec(def *nestedApiDefinition, logger *logrus.Entry) *APISpec {
+func (a APIDefinitionLoader) MakeSpec(def *nestedApiDefinition, logger *logrus.Entry) (*APISpec, error) {
 	spec := &APISpec{}
 	apiString, err := json.Marshal(def)
 	if err != nil {
 		logger.WithError(err).WithField("name", def.Name).Error("Failed to JSON marshal API definition")
-		return spec
+		return nil, err
 	}
 
 	sha256hash := sha256.Sum256(apiString)
@@ -327,7 +327,7 @@ func (a APIDefinitionLoader) MakeSpec(def *nestedApiDefinition, logger *logrus.E
 	spec.APIDefinition = def.APIDefinition
 
 	if currSpec := a.Gw.getApiSpec(def.APIID); !shouldReloadSpec(currSpec, spec) {
-		return currSpec
+		return currSpec, nil
 	}
 
 	if logger == nil {
@@ -376,6 +376,7 @@ func (a APIDefinitionLoader) MakeSpec(def *nestedApiDefinition, logger *logrus.E
 
 	if err = a.Gw.loadBundle(spec); err != nil {
 		logger.WithError(err).Error("Couldn't load bundle")
+		return nil, err
 	}
 
 	if a.Gw.GetConfig().EnableJSVM && (spec.hasVirtualEndpoint() || spec.CustomMiddleware.Driver == apidef.OttoDriver) {
@@ -441,7 +442,7 @@ func (a APIDefinitionLoader) MakeSpec(def *nestedApiDefinition, logger *logrus.E
 
 	spec.setHasMock()
 
-	return spec
+	return spec, nil
 }
 
 // nestedApiDefinitionList is the response body for FromDashboardService
@@ -619,7 +620,11 @@ func (a APIDefinitionLoader) prepareSpecs(apiDefs []nestedApiDefinition, gwConfi
 			}
 		}
 
-		spec := a.MakeSpec(&def, nil)
+		spec, err := a.MakeSpec(&def, nil)
+		if err != nil {
+			continue
+		}
+
 		specs = append(specs, spec)
 	}
 
@@ -692,9 +697,7 @@ func (a APIDefinitionLoader) loadDefFromFilePath(filePath string) (*APISpec, err
 		}
 	}
 
-	spec := a.MakeSpec(&nestDef, nil)
-
-	return spec, nil
+	return a.MakeSpec(&nestDef, nil)
 }
 
 func (a APIDefinitionLoader) getPathSpecs(apiVersionDef apidef.VersionInfo, conf config.Config) ([]URLSpec, bool) {
