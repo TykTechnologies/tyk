@@ -65,7 +65,7 @@ jobs:
           PLUGIN_COMPILER_IMAGE: ${{ steps.ecr-login.outputs.registry }}/tyk-plugin-compiler:sha-${{ github.sha }}
         run: |
           set -eaxo pipefail
-          for d in smoke-tests/*/
+          for d in ci/smoke-tests/*/
           do
               echo Attempting to test $d
               if [ -d $d ] && [ -e $d/test.sh ]; then
