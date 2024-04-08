@@ -227,6 +227,30 @@ func TestBundleFetcher(t *testing.T) {
 			t.Errorf("Wrong bundle name: %s", bundle.Name)
 		}
 	})
+
+	t.Run("bundle fetch scenario with api load", func(t *testing.T) {
+		t.Run("do not skip when fetch is successful", func(t *testing.T) {
+			globalConf := ts.Gw.GetConfig()
+			globalConf.BundleBaseURL = "mock://somepath"
+			globalConf.BundleInsecureSkipVerify = false
+			ts.Gw.SetConfig(globalConf)
+			_ = ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+				spec.CustomMiddlewareBundle = bundleID
+			})
+			assert.NotEmpty(t, ts.Gw.apiSpecs)
+		})
+
+		t.Run("skip when fetch is successful", func(t *testing.T) {
+			globalConf := ts.Gw.GetConfig()
+			globalConf.BundleBaseURL = "http://some-invalid-path"
+			globalConf.BundleInsecureSkipVerify = false
+			ts.Gw.SetConfig(globalConf)
+			_ = ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+				spec.CustomMiddlewareBundle = bundleID
+			})
+			assert.Empty(t, ts.Gw.apiSpecs)
+		})
+	})
 }
 
 var overrideResponsePython = map[string]string{
