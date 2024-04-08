@@ -2,6 +2,10 @@ package gateway
 
 import (
 	"crypto/md5"
+	"crypto/rand"
+	"crypto/rsa"
+	"crypto/x509"
+	"encoding/pem"
 	"fmt"
 	"io"
 	"net/http"
@@ -36,7 +40,24 @@ var grpcBundleWithAuthCheck = map[string]string{
 		        "auth_check": {
 		            "name": "MyAuthHook"
 		        }
-		    }
+		    },
+			"checksum": "d41d8cd98f00b204e9800998ecf8427e"
+		}
+	`,
+}
+
+var bundleWithBadSignature = map[string]string{
+	"manifest.json": `
+		{
+		    "file_list": [],
+		    "custom_middleware": {
+		        "driver": "grpc",
+		        "auth_check": {
+		            "name": "MyAuthHook"
+		        }
+		    },
+			"checksum": "d41d8cd98f00b204e9800998ecf8427e",
+			"signature": "dGVzdC1wdWJsaWMta2V5"
 		}
 	`,
 }
@@ -46,6 +67,8 @@ func TestBundleLoader(t *testing.T) {
 	defer ts.Close()
 
 	bundleID := ts.RegisterBundle("grpc_with_auth_check", grpcBundleWithAuthCheck)
+	unsignedBundleID := ts.RegisterBundle("grpc_with_auth_check_signed", grpcBundleWithAuthCheck)
+	badSignatureBundleID := ts.RegisterBundle("bad_signature", bundleWithBadSignature)
 
 	t.Run("Nonexistent bundle", func(t *testing.T) {
 		specs := ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
@@ -102,6 +125,57 @@ func TestBundleLoader(t *testing.T) {
 		err := ts.Gw.loadBundle(spec)
 		assert.Empty(t, spec.CustomMiddleware)
 		assert.NoError(t, err)
+	})
+
+	t.Run("Load bundle fails if public key path is set but no signature is provided", func(t *testing.T) {
+		cfg := ts.Gw.GetConfig()
+		cfg.PublicKeyPath = "random/path/to/public.key"
+		ts.Gw.SetConfig(cfg)
+		specs := ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+			spec.CustomMiddlewareBundle = unsignedBundleID
+		})
+		spec := specs[0]
+		err := ts.Gw.loadBundle(spec)
+		assert.ErrorContains(t, err, "Bundle isn't signed")
+	})
+
+	t.Run("Load bundle fails if public key path is set but signature verification fails", func(t *testing.T) {
+		privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
+		if err != nil {
+			t.Fatalf("rsa.GenerateKey() failed: %v", err)
+		}
+		publicKey := &privateKey.PublicKey
+
+		publicKeyDER, err := x509.MarshalPKIXPublicKey(publicKey)
+		if err != nil {
+			t.Fatalf("x509.MarshalPKIXPublicKey() failed: %v", err)
+		}
+
+		pemBlock := &pem.Block{
+			Type:  "PUBLIC KEY",
+			Bytes: publicKeyDER,
+		}
+
+		tmpfile, err := os.CreateTemp("", "example")
+		if err != nil {
+			t.Fatalf("os.CreateTemp() failed: %v", err)
+		}
+		defer tmpfile.Close()
+		defer os.Remove(tmpfile.Name())
+
+		if err := pem.Encode(tmpfile, pemBlock); err != nil {
+			t.Fatalf("pem.Encode() failed: %v", err)
+		}
+
+		cfg := ts.Gw.GetConfig()
+		cfg.PublicKeyPath = tmpfile.Name()
+		ts.Gw.SetConfig(cfg)
+		specs := ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+			spec.CustomMiddlewareBundle = badSignatureBundleID
+		})
+		spec := specs[0]
+		err = ts.Gw.loadBundle(spec)
+		assert.ErrorContains(t, err, "crypto/rsa: verification error")
 	})
 }
 
@@ -166,7 +240,8 @@ var overrideResponsePython = map[string]string{
 		        "pre": [{
 		            "name": "MyRequestHook"
 		        }]
-		    }
+		    },
+			"checksum": "81f585cdf7bf352e3c33ed62396b1e8e"
 		}
 	`,
 	"middleware.py": `
@@ -200,7 +275,8 @@ var overrideResponseJSVM = map[string]string{
             "name": "pre",
             "path": "pre.js"
         }]
-    }
+    },
+	"checksum": "d41d8cd98f00b204e9800998ecf8427e"
 }
 `,
 	"pre.js": `
