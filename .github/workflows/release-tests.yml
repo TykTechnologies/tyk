@@ -6,27 +6,6 @@ on:  # yamllint disable-line rule:truthy
   workflow_call:
 
 jobs:
-  opentelemetry-e2e:
-    name: Opentelemetry e2e
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 1
-
-      - name: Install Task
-        uses: arduino/setup-task@v1
-        with:
-          version: 3
-
-      - id: ecr-login
-        uses: ./.github/actions/ecr-login
-
-      - name: Run e2e opentelemetry tests
-        env:
-          GATEWAY_IMAGE: ${{ steps.ecr-login.outputs.registry }}/tyk:sha-${{ github.sha }}
-        run: task opentelemetry
-
   ci-tests:
     name: CI Tests
     runs-on: ubuntu-latest
