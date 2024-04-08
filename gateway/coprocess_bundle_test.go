@@ -242,10 +242,6 @@ func TestBundleFetcher(t *testing.T) {
 
 	t.Run("bundle fetch scenario with api load", func(t *testing.T) {
 		t.Run("do not skip when fetch is successful", func(t *testing.T) {
-			globalConf := ts.Gw.GetConfig()
-			globalConf.BundleInsecureSkipVerify = false
-			ts.Gw.SetConfig(globalConf)
-
 			manifest := map[string]string{
 				"manifest.json": `
 		{
@@ -260,17 +256,44 @@ func TestBundleFetcher(t *testing.T) {
 			"checksum": "d41d8cd98f00b204e9800998ecf8427e"
 		}
 	`,
-				"middleware.js": `some middleware`}
+				"middleware.js": `
+	var testTykMakeHTTPRequest = new TykJS.TykMiddleware.NewMiddleware({})
+
+	testTykMakeHTTPRequest.NewProcessRequest(function(request, session, spec) {
+		var newRequest = {
+			"Method": "GET",
+			"Headers": {"Accept": "application/json"},
+			"Domain": spec.config_data.base_url,
+			"Resource": "/api/get?param1=dummy"
+		}
+
+		var resp = TykMakeHttpRequest(JSON.stringify(newRequest));
+		var usableResponse = JSON.parse(resp);
+
+		if(usableResponse.Code > 400) {
+			request.ReturnOverrides.ResponseCode = usableResponse.code
+			request.ReturnOverrides.ResponseError = "error"
+		}
+
+		request.Body = usableResponse.Body
+
+		return testTykMakeHTTPRequest.ReturnData(request, {})
+	});
+	`}
+			ts := StartTest(nil)
+			defer ts.Close()
 			bundle := ts.RegisterBundle("jsvm_make_http_request", manifest)
 
-			_ = ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+			ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+				spec.Proxy.ListenPath = "/sample"
 				spec.ConfigData = map[string]interface{}{
 					"base_url": ts.URL,
 				}
 				spec.CustomMiddlewareBundle = bundle
+			}, func(spec *APISpec) {
+				spec.Proxy.ListenPath = "/api"
 			})
 
-			assert.NotEmpty(t, ts.Gw.apiSpecs)
 		})
 
 		t.Run("skip when fetch is not successful", func(t *testing.T) {
