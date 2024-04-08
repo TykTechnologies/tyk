@@ -29,8 +29,8 @@ jobs:
         shell: bash
         env:
           GITHUB_TAG: ${{ github.ref }}
-          GATEWAY_IMAGE: ${{ steps.ecr-login.outputs.registry }}/tyk:sha-${{ github.sha }}
-          PLUGIN_COMPILER_IMAGE: ${{ steps.ecr-login.outputs.registry }}/tyk-plugin-compiler:sha-${{ github.sha }}
+          GATEWAY_IMAGE: tykio/tyk-gateway:${{ GITHUB_TAG }}
+          PLUGIN_COMPILER_IMAGE: tykio/tyk-plugin-compiler:${{ GITHUB_TAG }}
         run: |
           set -eaxo pipefail
           for d in ci/tests/*/
@@ -68,8 +68,8 @@ jobs:
         shell: bash
         env:
           GITHUB_TAG: ${{ github.ref }}
-          GATEWAY_IMAGE: ${{ steps.ecr-login.outputs.registry }}/tyk:sha-${{ github.sha }}
-          PLUGIN_COMPILER_IMAGE: ${{ steps.ecr-login.outputs.registry }}/tyk-plugin-compiler:sha-${{ github.sha }}
+          GATEWAY_IMAGE: tykio/tyk-gateway:${{ GITHUB_TAG }}
+          PLUGIN_COMPILER_IMAGE: tykio/tyk-plugin-compiler:${{ GITHUB_TAG }}
         run: |
           set -eaxo pipefail
           for d in ci/smoke-tests/*/
