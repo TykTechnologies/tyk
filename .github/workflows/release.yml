@@ -85,8 +85,8 @@ jobs:
           echo '#!/bin/sh
           ci/bin/unlock-agent.sh
           mkdir -p /go/src
-          go mod tidy
-          go mod vendor
+          GO111MODULE=on go mod tidy
+          GO111MODULE=on go mod vendor
           cp -r -f vendor/* /go/src
           mkdir -p /go/src/github.com/TykTechnologies/tyk
           cp -r ./* /go/src/github.com/TykTechnologies/tyk
@@ -106,7 +106,7 @@ jobs:
           -e GPG_FINGERPRINT=12B5D62C28F57592D1575BD51ED14C59E37DAC20 \
           -e PKG_SIGNING_KEY="$PKG_SIGNING_KEY" \
           -e PACKAGECLOUD_TOKEN=$PACKAGECLOUD_TOKEN \
-          -v /go/src:/go/src \
+          -v ${{github.workspace}}:/go/src/github.com/TykTechnologies/tyk \
           -v /var/run/docker.sock:/var/run/docker.sock \
           -v ~/.docker/config.json:/root/.docker/config.json \
           -v /tmp/build.sh:/tmp/build.sh \
