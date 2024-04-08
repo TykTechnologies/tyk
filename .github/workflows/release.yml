@@ -106,11 +106,11 @@ jobs:
           -e GPG_FINGERPRINT=12B5D62C28F57592D1575BD51ED14C59E37DAC20 \
           -e PKG_SIGNING_KEY="$PKG_SIGNING_KEY" \
           -e PACKAGECLOUD_TOKEN=$PACKAGECLOUD_TOKEN \
+          -v /go/src:/go/src \
           -v ${{github.workspace}}:/go/src/github.com/TykTechnologies/tyk \
           -v /var/run/docker.sock:/var/run/docker.sock \
           -v ~/.docker/config.json:/root/.docker/config.json \
           -v /tmp/build.sh:/tmp/build.sh \
-          -v /go/src/github.com:/go/src/github.com \
           -w /go/src/github.com/TykTechnologies/tyk \
           tykio/golang-cross:${{ matrix.golang_cross }} /tmp/build.sh
       - uses: aws-actions/configure-aws-credentials@v4
