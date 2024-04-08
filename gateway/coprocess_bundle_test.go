@@ -243,16 +243,37 @@ func TestBundleFetcher(t *testing.T) {
 	t.Run("bundle fetch scenario with api load", func(t *testing.T) {
 		t.Run("do not skip when fetch is successful", func(t *testing.T) {
 			globalConf := ts.Gw.GetConfig()
-			globalConf.BundleBaseURL = "mock://somepath"
 			globalConf.BundleInsecureSkipVerify = false
 			ts.Gw.SetConfig(globalConf)
+
+			manifest := map[string]string{
+				"manifest.json": `
+		{
+		    "file_list": [],
+		    "custom_middleware": {
+		        "driver": "otto",
+		        "pre": [{
+		            "name": "testTykMakeHTTPRequest",
+		            "path": "middleware.js"
+		        }]
+		    },
+			"checksum": "d41d8cd98f00b204e9800998ecf8427e"
+		}
+	`,
+				"middleware.js": `some middleware`}
+			bundle := ts.RegisterBundle("jsvm_make_http_request", manifest)
+
 			_ = ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
-				spec.CustomMiddlewareBundle = bundleID
+				spec.ConfigData = map[string]interface{}{
+					"base_url": ts.URL,
+				}
+				spec.CustomMiddlewareBundle = bundle
 			})
+
 			assert.NotEmpty(t, ts.Gw.apiSpecs)
 		})
 
-		t.Run("skip when fetch is successful", func(t *testing.T) {
+		t.Run("skip when fetch is not successful", func(t *testing.T) {
 			globalConf := ts.Gw.GetConfig()
 			globalConf.BundleBaseURL = "http://some-invalid-path"
 			globalConf.BundleInsecureSkipVerify = false
