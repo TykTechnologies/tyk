@@ -99,7 +99,7 @@ jobs:
 
       - name: Notify status
         if: ${{ failure() && github.event.pull_request.number && !github.event.pull_request.draft }}
-        uses: peter-evans/create-or-update-comment@v1
+        uses: peter-evans/create-or-update-comment@v4
         with:
           issue-number: ${{ github.event.pull_request.number }}
           body: |
