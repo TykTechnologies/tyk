@@ -33,7 +33,8 @@ TYK_GW_VERSION=$(perl -n -e'/v(\d+).(\d+).(\d+)/'' && print "v$1\.$2\.$3"' ./../
 
 # if params were not sent, then attempt to get them from env vars
 if [[ $GOOS == "" ]] && [[ $GOARCH == "" ]]; then
-	@@ -38,21 +36,20 @@ if [[ $GOOS == "" ]] && [[ $GOARCH == "" ]]; then
+    GOOS=$(go env GOOS)
+    GOARCH=$(go env GOARCH)
 fi
 
 # pass plugin params
