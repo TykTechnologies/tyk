@@ -7,6 +7,7 @@ function usage {
     cat <<EOF
 Usage:
 $progname <tag>
+
 Builds the plugin in testplugin using the supplied tag and tests it in the corresponding gw image.
 Requires docker compose.
 EOF

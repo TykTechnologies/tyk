@@ -8,7 +8,7 @@ services:
       retries: 10
       start_period: 2s
       timeout: 10s
-
+      
   gw:
     image: tykio/tyk-gateway:${tag}
     networks: [ test-plugin-compiler ]
@@ -39,10 +39,10 @@ services:
   wait:
     image: hello-world:linux
     depends_on:
-      redis:
-        condition: service_healthy
-      gw-checker:
-        condition: service_healthy
+        redis:
+            condition: service_healthy
+        gw-checker:
+            condition: service_healthy
 
 networks:
   test-plugin-compiler:

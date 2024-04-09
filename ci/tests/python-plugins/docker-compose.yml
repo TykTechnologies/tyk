@@ -16,7 +16,7 @@ services:
       context: ./src
       args:
         - tag=${tag}
-
+      
   gw:
     image: tykio/tyk-gateway:${tag}
     volumes:
@@ -42,7 +42,7 @@ services:
   wait:
     image: hello-world:linux
     depends_on:
-      redis:
-        condition: service_healthy
-      gw-checker:
-        condition: service_healthy
+        redis:
+            condition: service_healthy
+        gw-checker:
+            condition: service_healthy
