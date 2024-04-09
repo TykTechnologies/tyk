@@ -15,6 +15,7 @@ func SchemaAPi(r *openapi3.Reflector) error {
 
 func getSchemaRequest(r *openapi3.Reflector) error {
 	///TODO::we dont return error 400 from code as old api says (which is wrong)
+	///TODO::we produce schema: {} for array is that accurate ?
 	oc, err := r.NewOperationContext(http.MethodGet, "/tyk/schema")
 	if err != nil {
 		return err
@@ -29,7 +30,7 @@ func getSchemaRequest(r *openapi3.Reflector) error {
 	oc.AddRespStructure(new(gateway.OASSchemaResponse), openapi.WithHTTPStatus(http.StatusNotFound), func(cu *openapi.ContentUnit) {
 		cu.Description = "The response when the requested OAS schema is not found"
 	})
-	oc.AddRespStructure(new(apiStatusMessage), openapi.WithHTTPStatus(http.StatusForbidden))
+	forbidden(oc)
 	o3, ok := oc.(openapi3.OperationExposer)
 	if !ok {
 		return ErrOperationExposer

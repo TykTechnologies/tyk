@@ -2323,13 +2323,14 @@ paths:
                 items:
                   $ref: '#/components/schemas/Policy'
                 type: array
-          description: OK
+          description: List of all policies
         "403":
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: Forbidden
+          description: Attempting to access a protected api with an invalid or a missing
+            X-Tyk-Authorization in the headers
       summary: List Policies
       tags:
       - Policies
@@ -2347,25 +2348,26 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiModifyKeySuccess'
-          description: OK
+          description: Policy created
         "400":
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: Bad Request
+          description: Malformed request
         "403":
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: Forbidden
+          description: Attempting to access a protected api with an invalid or a missing
+            X-Tyk-Authorization in the headers
         "500":
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: Internal Server Error
+          description: Internal server error.
       summary: Create a Policy
       tags:
       - Policies
@@ -2387,25 +2389,26 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiModifyKeySuccess'
-          description: OK
+          description: Deleted policy by ID
         "400":
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: Bad Request
+          description: Returned when you fail to specify an polID to delete
         "403":
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: Forbidden
+          description: Attempting to access a protected api with an invalid or a missing
+            X-Tyk-Authorization in the headers
         "500":
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: Internal Server Error
+          description: Internal server error
       summary: Delete a Policy
       tags:
       - Policies
@@ -2426,19 +2429,20 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Policy'
-          description: OK
+          description: Get details of a single Policy
         "403":
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: Forbidden
+          description: Attempting to access a protected api with an invalid or a missing
+            X-Tyk-Authorization in the headers
         "404":
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: Not Found
+          description: Policy not found
       summary: Get a Policy
       tags:
       - Policies
@@ -2464,25 +2468,27 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiModifyKeySuccess'
-          description: OK
+          description: Policy updated
         "400":
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: Bad Request
+          description: Returned when you fail to specify an polID to update or due
+            to a malformed request body
         "403":
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: Forbidden
+          description: Attempting to access a protected api with an invalid or a missing
+            X-Tyk-Authorization in the headers
         "500":
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: Internal Server Error
+          description: Internal server error
       summary: Update a Policy
       tags:
       - Policies
@@ -2568,7 +2574,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: Forbidden
+          description: Attempting to access a protected api with an invalid or a missing
+            X-Tyk-Authorization in the headers
         "404":
           content:
             application/json:
