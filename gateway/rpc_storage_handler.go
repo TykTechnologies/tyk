@@ -1024,6 +1024,7 @@ func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string, orgId string) 
 				notRegularKeys[key] = true
 			case NoticeDeleteAPICache.String():
 				apiIDsToDeleteCache = append(apiIDsToDeleteCache, splitKeys[0])
+				notRegularKeys[key] = true
 			default:
 				log.Debug("ignoring processing of action:", action)
 			}
