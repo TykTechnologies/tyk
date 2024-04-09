@@ -85,8 +85,8 @@ jobs:
           echo '#!/bin/sh
           ci/bin/unlock-agent.sh
           mkdir -p /go/src
-          go mod tidy
-          go mod vendor
+          GO111MODULE=on go mod tidy
+          GO111MODULE=on go mod vendor
           cp -r -f vendor/* /go/src
           mkdir -p /go/src/github.com/TykTechnologies/tyk
           cp -r ./* /go/src/github.com/TykTechnologies/tyk
@@ -98,7 +98,7 @@ jobs:
           chmod +x /tmp/build.sh
           docker run --rm --privileged -e GITHUB_TOKEN=${{ github.token }} \
           -e GOPRIVATE=github.com/TykTechnologies \
-          -e GO111MODULE=on \
+          -e GO111MODULE=off \
           -e DEBVERS='${{ matrix.debvers }}' \
           -e RPMVERS='${{ matrix.rpmvers }}' \
           -e CGO_ENABLED=${{ matrix.cgo }}  \
@@ -109,7 +109,6 @@ jobs:
           -v ${{github.workspace}}:/go/src/github.com/TykTechnologies/tyk \
           -v /var/run/docker.sock:/var/run/docker.sock \
           -v ~/.docker/config.json:/root/.docker/config.json \
-          -v ~/go/pkg/mod:/go/pkg/mod \
           -v /tmp/build.sh:/tmp/build.sh \
           -w /go/src/github.com/TykTechnologies/tyk \
           tykio/golang-cross:${{ matrix.golang_cross }} /tmp/build.sh
