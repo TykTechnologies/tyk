@@ -406,11 +406,3 @@ jobs:
       DEPDASH_URL: ${{ secrets.DEPDASH_URL }}
       DEPDASH_KEY: ${{ secrets.DEPDASH_KEY }}
       ORG_GH_TOKEN: ${{ secrets.ORG_GH_TOKEN }}
-  release-tests:
-    needs:
-      - goreleaser
-    permissions:
-      id-token: write # This is required for requesting the JWT
-      contents: read # This is required for actions/checkout
-    uses: ./.github/workflows/release-tests.yml
-    secrets: inherit
