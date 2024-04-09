@@ -1851,7 +1851,11 @@ func (gw *Gateway) handleGetAllOrgKeys(filter string) (interface{}, int) {
 	if spec == nil {
 		return apiError("ORG not found"), http.StatusNotFound
 	}
-
+	log.WithFields(logrus.Fields{
+		"prefix": "api",
+		"org":    "keith is here",
+		"status": "ok",
+	}).Info("Retrieved record for ORG ID.")
 	sessions := spec.OrgSessionManager.Sessions(filter)
 	fixed_sessions := make([]string, 0)
 	for _, s := range sessions {

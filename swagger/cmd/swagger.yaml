@@ -2182,7 +2182,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: Not Found
+          description: Org not found
       summary: Get an Organisation Key
       tags:
       - Organisation Quotas

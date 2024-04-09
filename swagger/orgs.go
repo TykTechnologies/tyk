@@ -15,6 +15,7 @@ func OrgsApi(r *openapi3.Reflector) error {
 	return addOperations(r, getSingleOrgKeyWithID, deleteOrgKeyRequest, createOrgKey, UpdateOrgKey, getOrgKeys)
 }
 
+// done
 func getOrgKeys(r *openapi3.Reflector) error {
 	oc, err := r.NewOperationContext(http.MethodGet, "/tyk/org/keys")
 	if err != nil {
@@ -48,7 +49,7 @@ func getSingleOrgKeyWithID(r *openapi3.Reflector) error {
 		return err
 	}
 	oc.AddRespStructure(new(user.SessionState))
-	oc.AddRespStructure(new(apiStatusMessage), openapi.WithHTTPStatus(http.StatusNotFound))
+	statusNotFound(oc, "Org not found")
 	oc.AddRespStructure(new(apiStatusMessage), openapi.WithHTTPStatus(http.StatusForbidden))
 	oc.SetTags(OrgTag)
 	oc.SetID("getOrgKey")
