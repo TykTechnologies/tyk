@@ -2,6 +2,10 @@ package gateway
 
 import (
 	"crypto/md5"
+	"crypto/rand"
+	"crypto/rsa"
+	"crypto/x509"
+	"encoding/pem"
 	"fmt"
 	"io"
 	"net/http"
@@ -36,7 +40,24 @@ var grpcBundleWithAuthCheck = map[string]string{
 		        "auth_check": {
 		            "name": "MyAuthHook"
 		        }
-		    }
+		    },
+			"checksum": "d41d8cd98f00b204e9800998ecf8427e"
+		}
+	`,
+}
+
+var bundleWithBadSignature = map[string]string{
+	"manifest.json": `
+		{
+		    "file_list": [],
+		    "custom_middleware": {
+		        "driver": "grpc",
+		        "auth_check": {
+		            "name": "MyAuthHook"
+		        }
+		    },
+			"checksum": "d41d8cd98f00b204e9800998ecf8427e",
+			"signature": "dGVzdC1wdWJsaWMta2V5"
 		}
 	`,
 }
@@ -46,26 +67,27 @@ func TestBundleLoader(t *testing.T) {
 	defer ts.Close()
 
 	bundleID := ts.RegisterBundle("grpc_with_auth_check", grpcBundleWithAuthCheck)
+	unsignedBundleID := ts.RegisterBundle("grpc_with_auth_check_signed", grpcBundleWithAuthCheck)
+	badSignatureBundleID := ts.RegisterBundle("bad_signature", bundleWithBadSignature)
 
 	t.Run("Nonexistent bundle", func(t *testing.T) {
-		specs := ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
-			spec.CustomMiddlewareBundle = "nonexistent.zip"
-		})
-		err := ts.Gw.loadBundle(specs[0])
-		if err == nil {
-			t.Fatal("Fetching a nonexistent bundle, expected an error")
+		spec := &APISpec{
+			APIDefinition: &apidef.APIDefinition{
+				CustomMiddlewareBundle: "nonexistent.zip",
+			},
 		}
+		err := ts.Gw.loadBundle(spec)
+		assert.Error(t, err)
 	})
 
 	t.Run("Existing bundle with auth check", func(t *testing.T) {
-		specs := ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
-			spec.CustomMiddlewareBundle = bundleID
-		})
-		spec := specs[0]
-		err := ts.Gw.loadBundle(spec)
-		if err != nil {
-			t.Fatalf("Bundle not found: %s\n", bundleID)
+		spec := &APISpec{
+			APIDefinition: &apidef.APIDefinition{
+				CustomMiddlewareBundle: bundleID,
+			},
 		}
+		err := ts.Gw.loadBundle(spec)
+		assert.NoError(t, err)
 
 		bundleNameHash := md5.New()
 		io.WriteString(bundleNameHash, spec.CustomMiddlewareBundle)
@@ -85,23 +107,83 @@ func TestBundleLoader(t *testing.T) {
 	})
 
 	t.Run("bundle disabled with bundle value", func(t *testing.T) {
-		spec := ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
-			spec.CustomMiddlewareBundle = "bundle.zip"
-			spec.CustomMiddlewareBundleDisabled = true
-		})[0]
+		spec := &APISpec{
+			APIDefinition: &apidef.APIDefinition{
+				CustomMiddlewareBundle:         "bundle.zip",
+				CustomMiddlewareBundleDisabled: true,
+			},
+		}
 		err := ts.Gw.loadBundle(spec)
 		assert.Empty(t, spec.CustomMiddleware)
 		assert.NoError(t, err)
 	})
 
 	t.Run("bundle enabled with empty bundle value", func(t *testing.T) {
-		spec := ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
-			spec.CustomMiddlewareBundle = ""
-			spec.CustomMiddlewareBundleDisabled = false
-		})[0]
+		spec := &APISpec{
+			APIDefinition: &apidef.APIDefinition{
+				CustomMiddlewareBundle:         "",
+				CustomMiddlewareBundleDisabled: false,
+			},
+		}
+
 		err := ts.Gw.loadBundle(spec)
 		assert.Empty(t, spec.CustomMiddleware)
 		assert.NoError(t, err)
+	})
+
+	t.Run("Load bundle fails if public key path is set but no signature is provided", func(t *testing.T) {
+		cfg := ts.Gw.GetConfig()
+		cfg.PublicKeyPath = "random/path/to/public.key"
+		ts.Gw.SetConfig(cfg)
+		spec := &APISpec{
+			APIDefinition: &apidef.APIDefinition{
+				CustomMiddlewareBundle: unsignedBundleID,
+			},
+		}
+		err := ts.Gw.loadBundle(spec)
+		assert.ErrorContains(t, err, "Bundle isn't signed")
+	})
+
+	t.Run("Load bundle fails if public key path is set but signature verification fails", func(t *testing.T) {
+		privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
+		if err != nil {
+			t.Fatalf("rsa.GenerateKey() failed: %v", err)
+		}
+		publicKey := &privateKey.PublicKey
+
+		publicKeyDER, err := x509.MarshalPKIXPublicKey(publicKey)
+		if err != nil {
+			t.Fatalf("x509.MarshalPKIXPublicKey() failed: %v", err)
+		}
+
+		pemBlock := &pem.Block{
+			Type:  "PUBLIC KEY",
+			Bytes: publicKeyDER,
+		}
+
+		tmpfile, err := os.CreateTemp("", "example")
+		if err != nil {
+			t.Fatalf("os.CreateTemp() failed: %v", err)
+		}
+		defer tmpfile.Close()
+		defer os.Remove(tmpfile.Name())
+
+		if err := pem.Encode(tmpfile, pemBlock); err != nil {
+			t.Fatalf("pem.Encode() failed: %v", err)
+		}
+
+		cfg := ts.Gw.GetConfig()
+		cfg.PublicKeyPath = tmpfile.Name()
+		ts.Gw.SetConfig(cfg)
+
+		spec := &APISpec{
+			APIDefinition: &apidef.APIDefinition{
+				CustomMiddlewareBundle: badSignatureBundleID,
+			},
+		}
+
+		err = ts.Gw.loadBundle(spec)
+		assert.ErrorContains(t, err, "crypto/rsa: verification error")
 	})
 }
 
@@ -115,10 +197,12 @@ func TestBundleFetcher(t *testing.T) {
 		globalConf.BundleBaseURL = "mock://somepath"
 		globalConf.BundleInsecureSkipVerify = false
 		ts.Gw.SetConfig(globalConf)
-		specs := ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
-			spec.CustomMiddlewareBundle = bundleID
-		})
-		spec := specs[0]
+		spec := &APISpec{
+			APIDefinition: &apidef.APIDefinition{
+				CustomMiddlewareBundle: bundleID,
+			},
+		}
+
 		bundle, err := ts.Gw.fetchBundle(spec)
 		if err != nil {
 			t.Fatalf("Couldn't fetch bundle: %s", err.Error())
@@ -137,10 +221,12 @@ func TestBundleFetcher(t *testing.T) {
 		globalConf.BundleBaseURL = "mock://somepath?api_key=supersecret"
 		globalConf.BundleInsecureSkipVerify = true
 		ts.Gw.SetConfig(globalConf)
-		specs := ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
-			spec.CustomMiddlewareBundle = bundleID
-		})
-		spec := specs[0]
+		spec := &APISpec{
+			APIDefinition: &apidef.APIDefinition{
+				CustomMiddlewareBundle: bundleID,
+			},
+		}
+
 		bundle, err := ts.Gw.fetchBundle(spec)
 		if err != nil {
 			t.Fatalf("Couldn't fetch bundle: %s", err.Error())
@@ -152,6 +238,74 @@ func TestBundleFetcher(t *testing.T) {
 		if bundle.Name != bundleID {
 			t.Errorf("Wrong bundle name: %s", bundle.Name)
 		}
+	})
+
+	t.Run("bundle fetch scenario with api load", func(t *testing.T) {
+		t.Run("do not skip when fetch is successful", func(t *testing.T) {
+			manifest := map[string]string{
+				"manifest.json": `
+		{
+		    "file_list": [],
+		    "custom_middleware": {
+		        "driver": "otto",
+		        "pre": [{
+		            "name": "testTykMakeHTTPRequest",
+		            "path": "middleware.js"
+		        }]
+		    },
+			"checksum": "d41d8cd98f00b204e9800998ecf8427e"
+		}
+	`,
+				"middleware.js": `
+	var testTykMakeHTTPRequest = new TykJS.TykMiddleware.NewMiddleware({})
+
+	testTykMakeHTTPRequest.NewProcessRequest(function(request, session, spec) {
+		var newRequest = {
+			"Method": "GET",
+			"Headers": {"Accept": "application/json"},
+			"Domain": spec.config_data.base_url,
+			"Resource": "/api/get?param1=dummy"
+		}
+
+		var resp = TykMakeHttpRequest(JSON.stringify(newRequest));
+		var usableResponse = JSON.parse(resp);
+
+		if(usableResponse.Code > 400) {
+			request.ReturnOverrides.ResponseCode = usableResponse.code
+			request.ReturnOverrides.ResponseError = "error"
+		}
+
+		request.Body = usableResponse.Body
+
+		return testTykMakeHTTPRequest.ReturnData(request, {})
+	});
+	`}
+			ts := StartTest(nil)
+			defer ts.Close()
+			bundle := ts.RegisterBundle("jsvm_make_http_request", manifest)
+
+			ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+				spec.Proxy.ListenPath = "/sample"
+				spec.ConfigData = map[string]interface{}{
+					"base_url": ts.URL,
+				}
+				spec.CustomMiddlewareBundle = bundle
+			}, func(spec *APISpec) {
+				spec.Proxy.ListenPath = "/api"
+			})
+
+		})
+
+		t.Run("skip when fetch is not successful", func(t *testing.T) {
+			globalConf := ts.Gw.GetConfig()
+			globalConf.BundleBaseURL = "http://some-invalid-path"
+			globalConf.BundleInsecureSkipVerify = false
+			ts.Gw.SetConfig(globalConf)
+			_ = ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+				spec.CustomMiddlewareBundle = bundleID
+			})
+			assert.Empty(t, ts.Gw.apiSpecs)
+		})
 	})
 }
 
@@ -166,7 +320,8 @@ var overrideResponsePython = map[string]string{
 		        "pre": [{
 		            "name": "MyRequestHook"
 		        }]
-		    }
+		    },
+			"checksum": "81f585cdf7bf352e3c33ed62396b1e8e"
 		}
 	`,
 	"middleware.py": `
@@ -200,7 +355,8 @@ var overrideResponseJSVM = map[string]string{
             "name": "pre",
             "path": "pre.js"
         }]
-    }
+    },
+	"checksum": "d41d8cd98f00b204e9800998ecf8427e"
 }
 `,
 	"pre.js": `

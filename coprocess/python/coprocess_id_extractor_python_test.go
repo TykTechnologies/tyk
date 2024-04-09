@@ -1,6 +1,8 @@
 package python
 
 import (
+	"crypto/md5"
+	"fmt"
 	"net/http"
 	"net/url"
 	"strings"
@@ -34,9 +36,10 @@ def MyAuthHook(request, session, metadata, spec):
 	`
 
 	middleware = strings.ReplaceAll(middleware, "valid_token", token)
+	checksum := fmt.Sprintf("%x", md5.Sum([]byte(middleware)))
 
 	return map[string]string{
-		"manifest.json": `
+		"manifest.json": fmt.Sprintf(`
 		{
 		    "file_list": [
 		        "middleware.py"
@@ -53,9 +56,10 @@ def MyAuthHook(request, session, metadata, spec):
 		        		"header_name": "Authorization"
 		        	}
 		        }
-		    }
+		    },
+			"checksum":"%s"
 		}
-	`,
+	`, checksum),
 		"middleware.py": middleware,
 	}
 }
@@ -83,9 +87,10 @@ def MyAuthHook(request, session, metadata, spec):
 `
 
 	middleware = strings.ReplaceAll(middleware, "valid_token", token)
+	checksum := fmt.Sprintf("%x", md5.Sum([]byte(middleware)))
 
 	return map[string]string{
-		"manifest.json": `
+		"manifest.json": fmt.Sprintf(`
 		{
 		    "file_list": [
 		        "middleware.py"
@@ -102,9 +107,10 @@ def MyAuthHook(request, session, metadata, spec):
 		        		"param_name": "auth"
 		        	}
 		        }
-		    }
+		    },
+			"checksum":"%s"
 		}
-	`,
+	`, checksum),
 		"middleware.py": middleware,
 	}
 }
@@ -132,9 +138,10 @@ def MyAuthHook(request, session, metadata, spec):
 	`
 
 	middleware = strings.ReplaceAll(middleware, "valid_token", token)
+	checksum := fmt.Sprintf("%x", md5.Sum([]byte(middleware)))
 
 	return map[string]string{
-		"manifest.json": `
+		"manifest.json": fmt.Sprintf(`
 		{
 		    "file_list": [
 		        "middleware.py"
@@ -153,9 +160,10 @@ def MyAuthHook(request, session, metadata, spec):
 						"regex_match_index": 0
 		        	}
 		        }
-		    }
+		    },
+			"checksum":"%s"
 		}
-	`,
+	`, checksum),
 		"middleware.py": middleware,
 	}
 }
