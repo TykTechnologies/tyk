@@ -180,7 +180,7 @@ jobs:
         env:
           REPO: ${{ github.repository }}
           # Cover pull_request_target too
-          BASE_REF: release-5-lts
+          BASE_REF: master
           TAGS: ${{ needs.goreleaser.outputs.tags }}
           IS_PR: no
           IS_TAG: no
