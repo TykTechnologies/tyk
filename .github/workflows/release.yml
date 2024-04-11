@@ -165,7 +165,7 @@ jobs:
   test-controller-api:
     needs: goreleaser
     runs-on: ubuntu-latest
-    container: tykio/gromit:v1.7
+    container: tykio/gromit:v1.6
     outputs:
       conf: ${{ steps.params.outputs.api_conf }}
       db: ${{ steps.params.outputs.api_db }}
