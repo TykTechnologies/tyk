@@ -78,10 +78,13 @@ func invalidateOauthRefresh(r *openapi3.Reflector) error {
 	oc.SetSummary("Invalidate OAuth refresh token")
 	oc.SetDescription("It is possible to invalidate refresh tokens in order to manage OAuth client access more robustly.")
 	oc.AddRespStructure(new(apiStatusMessage), openapi.WithHTTPStatus(http.StatusNotFound))
-	oc.AddRespStructure(new(apiStatusMessage), openapi.WithHTTPStatus(http.StatusBadRequest))
-	oc.AddRespStructure(new(apiStatusMessage), openapi.WithHTTPStatus(http.StatusForbidden))
-	oc.AddRespStructure(new(apiStatusMessage), openapi.WithHTTPStatus(http.StatusInternalServerError))
-	oc.AddRespStructure(new(apiModifyKeySuccess), openapi.WithHTTPStatus(http.StatusOK))
+	statusNotFound(oc, "Returned when the API for this refresh token is not found")
+	statusBadRequest(oc, "Returned when you fail to send the api_id or when OAuth is not enabled on the API")
+	forbidden(oc)
+	statusInternalServerError(oc, "internal server error")
+	oc.AddRespStructure(new(apiModifyKeySuccess), openapi.WithHTTPStatus(http.StatusOK), func(cu *openapi.ContentUnit) {
+		cu.Description = "Deleted"
+	})
 	o3, ok := oc.(openapi3.OperationExposer)
 	if !ok {
 		return ErrOperationExposer
@@ -123,15 +126,15 @@ func updateOauthClient(r *openapi3.Reflector) error {
 
 func getApisForOauthApp(r *openapi3.Reflector) error {
 	// TODO:: check is again about org_id be required. After testing it seems it should be required even if it is empty
-	// it is a query parameter
+	// if i don't send the org_id another url is called instead.
 	oc, err := r.NewOperationContext(http.MethodGet, "/tyk/oauth/clients/apis/{appID}")
 	if err != nil {
 		return err
 	}
 	oc.SetTags(OAuthTag)
 	oc.SetID("getApisForOauthApp")
-	oc.SetSummary("Get Apis for Oauth app")
-	oc.SetDescription("Get Apis for Oauth app")
+	oc.SetSummary("Get API IDs for APIS that use the specified client_id(appID) for OAuth")
+	oc.SetDescription("Get all API IDs for APIs that have use_oauth2 enabled and use the client_id (appID) specified in the path parameter for OAuth2. You can use the org_id query parameter to specify from which organization you want the API IDs to be returned. To return APIs from all organizations, send org_id as an empty string.")
 	forbidden(oc)
 	oc.AddRespStructure(new([]string), openapi.WithHTTPStatus(http.StatusOK), func(cu *openapi.ContentUnit) {
 		cu.Description = "Return an array of apis ids"
@@ -326,12 +329,11 @@ func oauthApiIdParameter() openapi3.ParameterOrRef {
 }
 
 func requiredApiIdQuery() openapi3.ParameterOrRef {
-	desc := "The API id"
-	return openapi3.Parameter{In: openapi3.ParameterInQuery, Name: "api_id", Required: &isRequired, Description: &desc, Schema: stringSchema()}.ToParameterOrRef()
+	return openapi3.Parameter{In: openapi3.ParameterInQuery, Name: "api_id", Required: &isRequired, Description: stringPointerValue("The API id"), Schema: stringSchema()}.ToParameterOrRef()
 }
 
 func appIDParameter() openapi3.ParameterOrRef {
-	return openapi3.Parameter{In: openapi3.ParameterInPath, Name: "appID", Required: &isRequired, Schema: stringSchema()}.ToParameterOrRef()
+	return openapi3.Parameter{In: openapi3.ParameterInPath, Description: stringPointerValue("The Client ID"), Name: "appID", Required: &isRequired, Schema: stringSchema()}.ToParameterOrRef()
 }
 
 func scopeQuery() openapi3.ParameterOrRef {
