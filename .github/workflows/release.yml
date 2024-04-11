@@ -181,7 +181,7 @@ jobs:
           REPO: ${{ github.repository }}
           # Cover pull_request_target too
           BASE_REF: release-5-lts
-          TAGS: v1.0
+          TAGS: ${{ needs.goreleaser.outputs.tags }}
           IS_PR: no
           IS_TAG: no
           JOB: api
