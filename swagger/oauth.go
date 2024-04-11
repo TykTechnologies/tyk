@@ -68,6 +68,7 @@ func rotateOauthClientHandler(r *openapi3.Reflector) error {
 	return r.AddOperation(oc)
 }
 
+// Done
 func invalidateOauthRefresh(r *openapi3.Reflector) error {
 	oc, err := r.NewOperationContext(http.MethodDelete, "/tyk/oauth/refresh/{keyName}")
 	if err != nil {
@@ -77,7 +78,6 @@ func invalidateOauthRefresh(r *openapi3.Reflector) error {
 	oc.SetID("invalidateOAuthRefresh")
 	oc.SetSummary("Invalidate OAuth refresh token")
 	oc.SetDescription("It is possible to invalidate refresh tokens in order to manage OAuth client access more robustly.")
-	oc.AddRespStructure(new(apiStatusMessage), openapi.WithHTTPStatus(http.StatusNotFound))
 	statusNotFound(oc, "Returned when the API for this refresh token is not found")
 	statusBadRequest(oc, "Returned when you fail to send the api_id or when OAuth is not enabled on the API")
 	forbidden(oc)

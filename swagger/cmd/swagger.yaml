@@ -1526,7 +1526,8 @@ paths:
         as such.
       operationId: listOAuthClients
       parameters:
-      - in: path
+      - description: The API ID
+        in: path
         name: apiID
         required: true
         schema:
@@ -1563,7 +1564,8 @@ paths:
         valid until they expire.
       operationId: deleteOAuthClient
       parameters:
-      - in: path
+      - description: The API ID
+        in: path
         name: apiID
         required: true
         schema:
@@ -1606,7 +1608,8 @@ paths:
       description: Get OAuth client details
       operationId: getOAuthClient
       parameters:
-      - in: path
+      - description: The API ID
+        in: path
         name: apiID
         required: true
         schema:
@@ -1650,7 +1653,8 @@ paths:
         required: true
         schema:
           type: string
-      - in: path
+      - description: The API ID
+        in: path
         name: apiID
         required: true
         schema:
@@ -1686,7 +1690,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: Returned when api APi with the api_id sent in the body doesn't
+          description: Returned when api with the api_id sent in the apiID parameter  doesn't
             exist or when the OAuth Client ID is not found
         "500":
           content:
@@ -1699,6 +1703,7 @@ paths:
       - OAuth
   /tyk/oauth/clients/{apiID}/{keyName}/rotate:
     put:
+      description: Generate a new secret
       operationId: rotateOauthClient
       parameters:
       - description: Refresh token
@@ -1707,7 +1712,8 @@ paths:
         required: true
         schema:
           type: string
-      - in: path
+      - description: The API ID
+        in: path
         name: apiID
         required: true
         schema:
@@ -1718,32 +1724,28 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/NewClientRequest'
-          description: OK
-        "400":
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiStatusMessage'
-          description: Bad Request
+          description: New secret has been created
         "403":
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: Forbidden
+          description: Attempting to access a protected api with an invalid or a missing
+            X-Tyk-Authorization in the headers
         "404":
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: Not Found
+          description: Returned when api with the api_id sent in the apiID parameter  doesn't
+            exist or when the OAuth Client ID is not found
         "500":
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: Internal Server Error
-      summary: Rotate the oath client
+          description: internal server error
+      summary: Rotate the oath client secret
       tags:
       - OAuth
   /tyk/oauth/clients/{apiID}/{keyName}/tokens:
@@ -1755,7 +1757,8 @@ paths:
                 You can control how long you want to store expired tokens in this list using `oauth_token_expired_retain_period` gateway option, which specifies retain period for expired tokens stored in Redis. By default expired token not get removed. See <a href="https://tyk.io/docs/configure/tyk-gateway-configuration-options/#a-name-oauth-token-expired-retain-period-a-oauth-token-expired-retain-period" target="_blank">here</a> for more details.
       operationId: getOAuthClientTokens
       parameters:
-      - in: path
+      - description: The API ID
+        in: path
         name: apiID
         required: true
         schema:
@@ -1807,16 +1810,22 @@ paths:
       - OAuth
   /tyk/oauth/clients/apis/{appID}:
     get:
-      description: Get Apis for Oauth app
+      description: Get all API IDs for APIs that have use_oauth2 enabled and use the
+        client_id (appID) specified in the path parameter for OAuth2. You can use
+        the org_id query parameter to specify from which organization you want the
+        API IDs to be returned. To return APIs from all organizations, send org_id
+        as an empty string.
       operationId: getApisForOauthApp
       parameters:
-      - in: path
+      - description: The Client ID
+        in: path
         name: appID
         required: true
         schema:
           type: string
       - in: query
         name: orgID
+        required: true
         schema:
           type: string
       responses:
@@ -1835,7 +1844,7 @@ paths:
                 $ref: '#/components/schemas/ApiStatusMessage'
           description: Attempting to access a protected api with an invalid or a missing
             X-Tyk-Authorization in the headers
-      summary: Get Apis for Oauth app
+      summary: Get API IDs for APIS that use the specified client_id(appID) for OAuth
       tags:
       - OAuth
   /tyk/oauth/clients/create:
@@ -1904,31 +1913,33 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiModifyKeySuccess'
-          description: OK
+          description: Deleted
         "400":
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: Bad Request
+          description: Returned when you fail to send the api_id or when OAuth is
+            not enabled on the API
         "403":
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: Forbidden
+          description: Attempting to access a protected api with an invalid or a missing
+            X-Tyk-Authorization in the headers
         "404":
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: Not Found
+          description: Returned when the API for this refresh token is not found
         "500":
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: Internal Server Error
+          description: internal server error
       summary: Invalidate OAuth refresh token
       tags:
       - OAuth
@@ -3907,17 +3918,22 @@ components:
     NewClientRequest:
       properties:
         api_id:
+          example: keyless
           type: string
         client_id:
+          example: 2a06b398c17f46908de3dffcb71ef87b
           type: string
         description:
+          example: google client login
           type: string
         meta_data: {}
         policy_id:
           type: string
         redirect_uri:
+          example: https://httpbin.org/ip
           type: string
         secret:
+          example: MmQwNTI5NGQtYjU0YS00NjMyLWIwZjktNTZjY2M1ZjhjYWY0
           type: string
       type: object
     NotificationsManager:
