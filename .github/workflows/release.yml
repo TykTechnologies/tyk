@@ -165,7 +165,7 @@ jobs:
   test-controller-api:
     needs: goreleaser
     runs-on: ubuntu-latest
-    container: tykio/gromit:v1.6
+    container: tykio/gromit:v1.7.2-alpha
     outputs:
       conf: ${{ steps.params.outputs.api_conf }}
       db: ${{ steps.params.outputs.api_db }}
@@ -173,6 +173,7 @@ jobs:
       sink: ${{ steps.params.outputs.sink }}
       gd_tag: ${{ steps.params.outputs.gd_tag }}
       versions: ${{ steps.params.outputs.versions }}
+      exclude: ${{ steps.params.outputs.exclude }}
     steps:
       - name: set params
         id: params
@@ -201,6 +202,7 @@ jobs:
         include:
           - db: postgres15
             markers: "and not sql"
+        exclude: ${{ fromJson(needs.test-controller-api.outputs.exclude) }}
     steps:
       - uses: aws-actions/configure-aws-credentials@v4
         with:
