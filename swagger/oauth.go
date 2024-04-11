@@ -20,6 +20,7 @@ func OAuthApi(r *openapi3.Reflector) error {
 	)
 }
 
+// Done
 func createOauthClient(r *openapi3.Reflector) error {
 	oc, err := r.NewOperationContext(http.MethodPost, "/tyk/oauth/clients/create")
 	if err != nil {
@@ -27,19 +28,23 @@ func createOauthClient(r *openapi3.Reflector) error {
 	}
 	oc.SetTags(OAuthTag)
 	oc.AddReqStructure(new(gateway.NewClientRequest))
-	oc.AddRespStructure(new(gateway.NewClientRequest))
-	oc.AddRespStructure(new(apiStatusMessage), openapi.WithHTTPStatus(http.StatusForbidden))
+	oc.AddRespStructure(new(gateway.NewClientRequest), func(cu *openapi.ContentUnit) {
+		cu.Description = "Client created"
+	})
+	forbidden(oc)
+	statusInternalServerError(oc, "Internal server error")
 	// TODO::ask why we return 500 instead of 400 for wrong body
-	oc.AddRespStructure(new(apiStatusMessage), openapi.WithHTTPStatus(http.StatusInternalServerError))
-	oc.AddRespStructure(new(apiStatusMessage), openapi.WithHTTPStatus(http.StatusBadRequest))
+	statusBadRequest(oc, "Bad request")
 	oc.SetID("createOAuthClient")
 	oc.SetSummary("Create new OAuth client")
 	oc.SetDescription("Any OAuth keys must be generated with the help of a client ID. These need to be pre-registered with Tyk before they can be used (in a similar vein to how you would register your app with Twitter before attempting to ask user permissions using their API).\n        <br/><br/>\n        <h3>Creating OAuth clients with Access to Multiple APIs</h3>\n        New from Tyk Gateway 2.6.0 is the ability to create OAuth clients with access to more than one API. If you provide the api_id it works the same as in previous releases. If you don't provide the api_id the request uses policy access rights and enumerates APIs from their setting in the newly created OAuth-client.\n")
 	return r.AddOperation(oc)
 }
 
+// Done
 func rotateOauthClientHandler(r *openapi3.Reflector) error {
 	// TODO::find summary and description for this
+	// TODO::this is not in  the old swagger
 	oc, err := r.NewOperationContext(http.MethodPut, "/tyk/oauth/clients/{apiID}/{keyName}/rotate")
 	if err != nil {
 		return err
@@ -48,13 +53,15 @@ func rotateOauthClientHandler(r *openapi3.Reflector) error {
 	if !ok {
 		return ErrOperationExposer
 	}
-	oc.AddRespStructure(new(apiStatusMessage), openapi.WithHTTPStatus(http.StatusNotFound))
-	oc.AddRespStructure(new(apiStatusMessage), openapi.WithHTTPStatus(http.StatusInternalServerError))
-	oc.AddRespStructure(new(gateway.NewClientRequest), openapi.WithHTTPStatus(http.StatusOK))
-	oc.AddRespStructure(new(apiStatusMessage), openapi.WithHTTPStatus(http.StatusBadRequest))
-	oc.AddRespStructure(new(apiStatusMessage), openapi.WithHTTPStatus(http.StatusForbidden))
+	statusNotFound(oc, "Returned when api with the api_id sent in the apiID parameter  doesn't exist or when the OAuth Client ID is not found")
+	statusInternalServerError(oc, "internal server error")
+	oc.AddRespStructure(new(gateway.NewClientRequest), openapi.WithHTTPStatus(http.StatusOK), func(cu *openapi.ContentUnit) {
+		cu.Description = "New secret has been created"
+	})
+	forbidden(oc)
 	oc.SetID("rotateOauthClient")
-	oc.SetSummary("Rotate the oath client")
+	oc.SetSummary("Rotate the oath client secret")
+	oc.SetDescription("Generate a new secret")
 	oc.SetTags(OAuthTag)
 	par := []openapi3.ParameterOrRef{keyNameParameter(), oauthApiIdParameter()}
 	o3.Operation().WithParameters(par...)
@@ -84,6 +91,8 @@ func invalidateOauthRefresh(r *openapi3.Reflector) error {
 	return r.AddOperation(oc)
 }
 
+// /https://deploy-preview-4394--tyk-docs.netlify.app/docs/nightly/apim/
+// Done
 func updateOauthClient(r *openapi3.Reflector) error {
 	// TODO:: in previous OAs this was '/tyk/oauth/clients/{apiID}' inquire
 	oc, err := r.NewOperationContext(http.MethodPut, "/tyk/oauth/clients/{apiID}/{keyName}")
@@ -91,14 +100,17 @@ func updateOauthClient(r *openapi3.Reflector) error {
 		return err
 	}
 	oc.AddReqStructure(new(gateway.NewClientRequest))
-	oc.AddRespStructure(new(apiStatusMessage), openapi.WithHTTPStatus(http.StatusInternalServerError))
-	oc.AddRespStructure(new(apiStatusMessage), openapi.WithHTTPStatus(http.StatusForbidden))
-	oc.AddRespStructure(new(apiStatusMessage), openapi.WithHTTPStatus(http.StatusNotFound))
-	oc.AddRespStructure(new(apiStatusMessage), openapi.WithHTTPStatus(http.StatusBadRequest))
-	oc.AddRespStructure(new(gateway.NewClientRequest), openapi.WithHTTPStatus(http.StatusOK))
+	// TODO:: we return error 500 instead of error 400
+	statusInternalServerError(oc, "internal server error")
+	forbidden(oc)
+	statusNotFound(oc, "Returned when api with the api_id sent in the apiID parameter  doesn't exist or when the OAuth Client ID is not found")
+	statusBadRequest(oc, "Returned when the policy access rights doesn't contain API this OAuth client belongs to")
+	oc.AddRespStructure(new(gateway.NewClientRequest), openapi.WithHTTPStatus(http.StatusOK), func(cu *openapi.ContentUnit) {
+		cu.Description = "OAuth client updated"
+	})
 	oc.SetID("updateOAuthClient")
-	oc.SetSummary("Update OAuth metadata and Policy ID")
-	oc.SetDescription("Allows you to update the metadata and Policy ID for an OAuth client.")
+	oc.SetSummary("Update OAuth metadata,redirecturi,description and Policy ID")
+	oc.SetDescription("Allows you to update the metadata,redirecturi,description and Policy ID for an OAuth client.")
 	oc.SetTags(OAuthTag)
 	o3, ok := oc.(openapi3.OperationExposer)
 	if !ok {
@@ -110,15 +122,12 @@ func updateOauthClient(r *openapi3.Reflector) error {
 }
 
 func getApisForOauthApp(r *openapi3.Reflector) error {
-	// TODO:: check is again about org_id should at be query or formvalue
+	// TODO:: check is again about org_id be required. After testing it seems it should be required even if it is empty
 	// it is a query parameter
 	oc, err := r.NewOperationContext(http.MethodGet, "/tyk/oauth/clients/apis/{appID}")
 	if err != nil {
 		return err
 	}
-	oc.AddReqStructure(new(struct {
-		OrgID string `json:"orgID" query:"orgID"`
-	}))
 	oc.SetTags(OAuthTag)
 	oc.SetID("getApisForOauthApp")
 	oc.SetSummary("Get Apis for Oauth app")
@@ -131,7 +140,7 @@ func getApisForOauthApp(r *openapi3.Reflector) error {
 	if !ok {
 		return ErrOperationExposer
 	}
-	par := []openapi3.ParameterOrRef{appIDParameter()}
+	par := []openapi3.ParameterOrRef{appIDParameter(), requiredOrgIdForOauth()}
 	o3.Operation().WithParameters(par...)
 	return r.AddOperation(oc)
 }
@@ -313,7 +322,7 @@ func keyNameParameter(description ...string) openapi3.ParameterOrRef {
 }
 
 func oauthApiIdParameter() openapi3.ParameterOrRef {
-	return openapi3.Parameter{In: openapi3.ParameterInPath, Name: "apiID", Required: &isRequired, Schema: stringSchema()}.ToParameterOrRef()
+	return openapi3.Parameter{Description: stringPointerValue("The API ID"), In: openapi3.ParameterInPath, Name: "apiID", Required: &isRequired, Schema: stringSchema()}.ToParameterOrRef()
 }
 
 func requiredApiIdQuery() openapi3.ParameterOrRef {
@@ -338,6 +347,10 @@ func scopeQuery() openapi3.ParameterOrRef {
 func pageQuery() openapi3.ParameterOrRef {
 	desc := "The page to return"
 	return openapi3.Parameter{In: openapi3.ParameterInQuery, Name: "page", Required: &isOptional, Description: &desc, Schema: intSchema()}.ToParameterOrRef()
+}
+
+func requiredOrgIdForOauth() openapi3.ParameterOrRef {
+	return openapi3.Parameter{In: openapi3.ParameterInQuery, Name: "orgID", Required: &isRequired, Schema: stringSchema()}.ToParameterOrRef()
 }
 
 func addOperations(r *openapi3.Reflector, operations ...func(r *openapi3.Reflector) error) error {

@@ -2105,13 +2105,13 @@ func (gw *Gateway) previewKeyHandler(w http.ResponseWriter, r *http.Request) {
 //
 // swagger:model NewClientRequest
 type NewClientRequest struct {
-	ClientID          string      `json:"client_id"`
-	ClientRedirectURI string      `json:"redirect_uri"`
-	APIID             string      `json:"api_id,omitempty"`
+	ClientID          string      `json:"client_id" example:"2a06b398c17f46908de3dffcb71ef87b"`
+	ClientRedirectURI string      `json:"redirect_uri" example:"https://httpbin.org/ip"`
+	APIID             string      `json:"api_id,omitempty" example:"keyless"`
 	PolicyID          string      `json:"policy_id,omitempty"`
-	ClientSecret      string      `json:"secret"`
+	ClientSecret      string      `json:"secret" example:"MmQwNTI5NGQtYjU0YS00NjMyLWIwZjktNTZjY2M1ZjhjYWY0"`
 	MetaData          interface{} `json:"meta_data"`
-	Description       string      `json:"description"`
+	Description       string      `json:"description" example:"google client login"`
 }
 
 func oauthClientStorageID(clientID string) string {
@@ -2522,6 +2522,7 @@ func (gw *Gateway) oAuthClientHandler(w http.ResponseWriter, r *http.Request) {
 	case http.MethodGet:
 		if keyName != "" {
 			// Return single client detail
+
 			obj, code = gw.getOauthClientDetails(keyName, apiID)
 		} else {
 			// Return list of keys

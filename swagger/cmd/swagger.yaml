@@ -1640,7 +1640,8 @@ paths:
       tags:
       - OAuth
     put:
-      description: Allows you to update the metadata and Policy ID for an OAuth client.
+      description: Allows you to update the metadata,redirecturi,description and Policy
+        ID for an OAuth client.
       operationId: updateOAuthClient
       parameters:
       - description: Refresh token
@@ -1665,32 +1666,35 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/NewClientRequest'
-          description: OK
+          description: OAuth client updated
         "400":
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: Bad Request
+          description: Returned when the policy access rights doesn't contain API
+            this OAuth client belongs to
         "403":
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: Forbidden
+          description: Attempting to access a protected api with an invalid or a missing
+            X-Tyk-Authorization in the headers
         "404":
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: Not Found
+          description: Returned when api APi with the api_id sent in the body doesn't
+            exist or when the OAuth Client ID is not found
         "500":
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: Internal Server Error
-      summary: Update OAuth metadata and Policy ID
+          description: internal server error
+      summary: Update OAuth metadata,redirecturi,description and Policy ID
       tags:
       - OAuth
   /tyk/oauth/clients/{apiID}/{keyName}/rotate:
@@ -1853,25 +1857,26 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/NewClientRequest'
-          description: OK
+          description: Client created
         "400":
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: Bad Request
+          description: Bad request
         "403":
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: Forbidden
+          description: Attempting to access a protected api with an invalid or a missing
+            X-Tyk-Authorization in the headers
         "500":
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: Internal Server Error
+          description: Internal server error
       summary: Create new OAuth client
       tags:
       - OAuth
