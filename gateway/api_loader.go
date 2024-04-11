@@ -994,12 +994,13 @@ func (gw *Gateway) loadApps(specs []*APISpec) {
 
 	gw.DefaultProxyMux.swap(muxer, gw)
 
+	var specsToRelease []*APISpec
 	gw.apisMu.Lock()
 
 	for _, spec := range specs {
 		curSpec, ok := gw.apisByID[spec.APIID]
-		if ok && shouldReloadSpec(curSpec, spec) {
-			curSpec.Release()
+		if ok && curSpec != nil && shouldReloadSpec(curSpec, spec) {
+			specsToRelease = append(specsToRelease, curSpec)
 		}
 
 		// Bind versions to base APIs again
@@ -1014,6 +1015,10 @@ func (gw *Gateway) loadApps(specs []*APISpec) {
 	gw.apisHandlesByID = tmpSpecHandles
 
 	gw.apisMu.Unlock()
+
+	for _, spec := range specsToRelease {
+		spec.Release()
+	}
 
 	mainLog.Debug("Checker host list")
 
