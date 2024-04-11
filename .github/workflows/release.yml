@@ -180,10 +180,10 @@ jobs:
         env:
           REPO: ${{ github.repository }}
           # Cover pull_request_target too
-          BASE_REF: ${{startsWith(github.event_name, 'pull_request') && github.base_ref || github.ref}}
-          TAGS: ${{ needs.goreleaser.outputs.tags }}
-          IS_PR: ${{startsWith(github.event_name, 'pull_request') && 'yes' }}
-          IS_TAG: ${{startsWith(github.ref, 'refs/tags') && 'yes' }}
+          BASE_REF: release-5-lts
+          TAGS: v1.0
+          IS_PR: no
+          IS_TAG: no
           JOB: api
         run: gromit policy controller --loglevel debug | tee -a "$GITHUB_OUTPUT"
   api-tests:
