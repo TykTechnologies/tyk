@@ -9,9 +9,14 @@ import (
 	"github.com/TykTechnologies/tyk/user"
 )
 
-const PolicyTag = "Policies"
+const (
+	PolicyTag     = "Policies"
+	PolicyTagDesc = `A Tyk security policy incorporates several security options that can be applied to an API key. It acts as a template that can override individual sections of an API key (or identity) in Tyk.
+`
+)
 
 func PoliciesApis(r *openapi3.Reflector) error {
+	addTag(PolicyTag, PolicyTagDesc)
 	return addOperations(r, getListOfPolicies, getPolicyWithID, updatePolicy, deletePolicyWithID, createPolicy)
 }
 
@@ -104,7 +109,7 @@ func deletePolicyWithID(r *openapi3.Reflector) error {
 }
 
 func updatePolicy(r *openapi3.Reflector) error {
-	//TODO:: Why don't we have error 404
+	// TODO:: Why don't we have error 404
 	oc, err := r.NewOperationContext(http.MethodPut, "/tyk/policies/{polID}")
 	if err != nil {
 		return err

@@ -10,9 +10,14 @@ import (
 	"github.com/TykTechnologies/tyk/user"
 )
 
-const KeysTag = "Keys"
+const (
+	KeysTag     = "Keys"
+	KeyTagsDesc = `All keys that are used to access services via Tyk correspond to a session object that informs Tyk about the context of this particular token, like access rules and rate/quota allowance.
+`
+)
 
 func Keys(r *openapi3.Reflector) error {
+	addTag(KeysTag, KeyTagsDesc)
 	return addOperations(r, getKeyWithID, updateKeyPolicy, previewKeyRequest, putKeyRequest, createKeyRequest, postKeyRequest, getListOfKeys, deleteKeyRequest, createCustomKeyRequest)
 }
 

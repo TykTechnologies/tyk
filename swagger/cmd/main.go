@@ -26,11 +26,10 @@ func main() {
 	r.Spec.WithSecurity(map[string][]string{"api_key": {}})
 	r.Spec.SetAPIKeySecurity("api_key", "X-Tyk-Authorization", openapi.InHeader, "Api key")
 	r.Spec.Info.
-		WithTitle("Tyk Gateway API").
-		WithVersion("5.2.3").
 		WithLicense(openapi3.License{Name: "Mozilla Public License Version 2.0", URL: &licence}).
-		WithDescription(" The Tyk Gateway API is the primary means for integrating your application with the Tyk API Gateway")
-
+		WithDescription(swagger.TykDesc).
+		WithTitle("Tyk Gateway API").
+		WithVersion("5.2.3")
 	err := swagger.APIS(&r)
 	if err != nil {
 		log.Fatal(err)
@@ -94,7 +93,8 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-
+	r.Spec.Tags = swagger.Tags
+	log.Println(len(swagger.Tags))
 	schema, err := r.Spec.MarshalYAML()
 	if err != nil {
 		log.Fatal(err)

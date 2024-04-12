@@ -14,6 +14,7 @@ import (
 const CertsTag = "Certs"
 
 func Certs(r *openapi3.Reflector) error {
+	///addTag(CertsTag,"")
 	return addOperations(r, deleteCertWithID, createCertificate, getCertsList, getCertsWithIDs)
 }
 

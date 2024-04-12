@@ -9,10 +9,15 @@ import (
 	"github.com/TykTechnologies/tyk/apidef"
 )
 
-const helloTag = "Health Checking"
+const (
+	helloTag     = "Health Checking"
+	helloTagDesc = `Check health status of the Gateway and loaded APIs
+`
+)
 
 // Done
 func HealthEndpoint(r *openapi3.Reflector) error {
+	addTag(helloTag, helloTagDesc)
 	oc, err := r.NewOperationContext(http.MethodGet, "/tyk/hello")
 	if err != nil {
 		return err

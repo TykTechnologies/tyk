@@ -1,7 +1,25 @@
 openapi: 3.0.3
 info:
-  description: ' The Tyk Gateway API is the primary means for integrating your application
-    with the Tyk API Gateway'
+  description: |+
+    The Tyk Gateway API is the primary means for integrating your application with the Tyk API Gateway system. This API is very small, and has no granular permissions system. It is intended to be used purely for internal automation and integration.
+
+    **Warning: Under no circumstances should outside parties be granted access to this API.**
+
+    * Managing session objects (key generation)
+    * Managing and listing policies
+    * Managing and listing API Definitions (only when not using the Dashboard)
+    * Hot reloads / reloading a cluster configuration
+    * OAuth client creation (only when not using the Dashboard)
+
+    In order to use the Gateway API, you'll need to set the **secret** parameter in your tyk.conf file.
+
+    The shared secret you set should then be sent along as a header with each Gateway API Request in order for it to be successful:
+
+    **x-tyk-authorization: <your-secret>***
+    <br/>
+
+    <b>The Tyk Gateway API is subsumed by the Tyk Dashboard API in Pro installations.</b>
+
   license:
     name: Mozilla Public License Version 2.0
     url: https://github.com/TykTechnologies/tyk/blob/master/LICENSE.md
@@ -11,6 +29,45 @@ servers:
 - url: http://localhost:8080
 security:
 - api_key: []
+tags:
+- description: |
+    **Note: Applies only to Tyk Gateway Community Edition** <br/>
+
+    API Management is very simple using the Tyk REST API: each update only affects the underlying file, and this endpoint will only work with disk based installations, not Database-backed ones.<br/>
+
+    APIs that are added this way are flushed to to disk into the app_path folder using the format: *{api-id}.json*. Updating existing APIs that use a different naming convention will cause those APIs to be added, which could subsequently lead to a loading error and crash if they use the same listen_path. <br/>
+
+    These methods only work on a single API node. If updating a cluster, it is important to ensure that all nodes are updated before initiating a reload.<br/>
+  name: APIs
+- description: |
+    All keys that are used to access services via Tyk correspond to a session object that informs Tyk about the context of this particular token, like access rules and rate/quota allowance.
+  name: Keys
+- description: |
+    It is possible to force API quota and rate limit across all keys that belong to a specific organisation ID. Rate limiting at an organisation level is useful for creating tiered access levels and trial accounts.<br />
+
+    The Organisation rate limiting middleware works with both Quotas and Rate Limiters. In order to manage this functionality, a simple API has been put in place to manage these sessions. <br />
+
+    Although the Organisation session-limiter uses the same session object, all other security keys are optional as they are not used. <br />
+
+    <h3>Managing active status</h3> <br />
+
+    To disallow access to an entire group of keys without rate limiting the organisation, create a session object with the "is_inactive" key set to true. This will block access before any other middleware is executed. It is useful when managing subscriptions for an organisation group and access needs to be blocked because of non-payment. <br />
+  name: Organisation Quotas
+- description: |
+    Sometimes a cache might contain stale data, or it may just need to be cleared because of an invalid configuration. This call will purge all keys associated with a cache on an API-by-API basis.
+  name: Cache Invalidation
+- description: |
+    Force restart of the Gateway or whole cluster
+  name: Hot Reload
+- description: |
+    Check health status of the Gateway and loaded APIs
+  name: Health Checking
+- description: |
+    A Tyk security policy incorporates several security options that can be applied to an API key. It acts as a template that can override individual sections of an API key (or identity) in Tyk.
+  name: Policies
+- description: |
+    Manage OAuth clients, and manage their tokens
+  name: OAuth
 paths:
   /tyk/apis:
     get:
@@ -2055,7 +2112,7 @@ paths:
       - OAuth
   /tyk/oauth/tokens:
     delete:
-      description: Purge lapsed OAuth token
+      description: Purge all lapsed OAuth token
       operationId: purgeLapsedOAuthTokens
       parameters:
       - in: query

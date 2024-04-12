@@ -7,9 +7,14 @@ import (
 	"github.com/swaggest/openapi-go/openapi3"
 )
 
-const CacheTag = "Cache Invalidation"
+const (
+	CacheTag     = "Cache Invalidation"
+	CacheTagDesc = `Sometimes a cache might contain stale data, or it may just need to be cleared because of an invalid configuration. This call will purge all keys associated with a cache on an API-by-API basis.
+`
+)
 
 func InvalidateCache(r *openapi3.Reflector) error {
+	addTag(CacheTag, CacheTagDesc)
 	return invalidateCache(r)
 }
 

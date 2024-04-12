@@ -10,9 +10,14 @@ import (
 	"github.com/TykTechnologies/tyk/gateway"
 )
 
-const OAuthTag = "OAuth"
+const (
+	OAuthTag     = "OAuth"
+	OAuthTagDesc = `Manage OAuth clients, and manage their tokens
+`
+)
 
 func OAuthApi(r *openapi3.Reflector) error {
+	addTag(OAuthTag, OAuthTagDesc)
 	return addOperations(r, rotateOauthClientHandler, invalidateOauthRefresh,
 		updateOauthClient, getApisForOauthApp, purgeLapsedOAuthTokens, listOAuthClients,
 		deleteOAuthClient, getSingleOAuthClientDetails, getAuthClientTokens, revokeTokenHandler,

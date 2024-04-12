@@ -13,9 +13,20 @@ import (
 
 var ErrOperationExposer = errors.New("object is not of type openapi3.OperationExposer")
 
-const APIsTag = "APIs"
+const (
+	APIsTag    = "APIs"
+	ApiTagDesc = `**Note: Applies only to Tyk Gateway Community Edition** <br/>
+
+API Management is very simple using the Tyk REST API: each update only affects the underlying file, and this endpoint will only work with disk based installations, not Database-backed ones.<br/>
+
+APIs that are added this way are flushed to to disk into the app_path folder using the format: *{api-id}.json*. Updating existing APIs that use a different naming convention will cause those APIs to be added, which could subsequently lead to a loading error and crash if they use the same listen_path. <br/>
+
+These methods only work on a single API node. If updating a cluster, it is important to ensure that all nodes are updated before initiating a reload.<br/>
+`
+)
 
 func APIS(r *openapi3.Reflector) error {
+	addTag(APIsTag, ApiTagDesc)
 	return addOperations(r, getClassicApiRequest, deleteClassicApiRequest, putClassicApiRequest, getListOfClassicApisRequest, createClassicApiRequest)
 }
 

@@ -9,9 +9,22 @@ import (
 	"github.com/TykTechnologies/tyk/user"
 )
 
-const OrgTag = "Organisation Quotas"
+const (
+	OrgTag     = "Organisation Quotas"
+	OrgTagDesc = `It is possible to force API quota and rate limit across all keys that belong to a specific organisation ID. Rate limiting at an organisation level is useful for creating tiered access levels and trial accounts.<br />
+
+The Organisation rate limiting middleware works with both Quotas and Rate Limiters. In order to manage this functionality, a simple API has been put in place to manage these sessions. <br />
+
+Although the Organisation session-limiter uses the same session object, all other security keys are optional as they are not used. <br />
+
+<h3>Managing active status</h3> <br />
+
+To disallow access to an entire group of keys without rate limiting the organisation, create a session object with the "is_inactive" key set to true. This will block access before any other middleware is executed. It is useful when managing subscriptions for an organisation group and access needs to be blocked because of non-payment. <br />
+`
+)
 
 func OrgsApi(r *openapi3.Reflector) error {
+	addTag(OrgTag, OrgTagDesc)
 	return addOperations(r, getSingleOrgKeyWithID, deleteOrgKeyRequest, createOrgKey, UpdateOrgKey, getOrgKeys)
 }
 

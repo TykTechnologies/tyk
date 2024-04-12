@@ -7,9 +7,14 @@ import (
 	"github.com/swaggest/openapi-go/openapi3"
 )
 
-const reloadTag = "Hot Reload"
+const (
+	reloadTag     = "Hot Reload"
+	reloadTagDesc = `Force restart of the Gateway or whole cluster
+`
+)
 
 func ReloadApi(r *openapi3.Reflector) error {
+	addTag(reloadTag, reloadTagDesc)
 	return addOperations(r, groupReload, singleNodeReload)
 }
 
