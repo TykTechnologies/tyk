@@ -17,7 +17,7 @@ func main() {
 	r := openapi3.Reflector{
 		Reflector: jsonschema.Reflector{},
 	}
-	r.DefaultOptions = append(r.DefaultOptions, jsonschema.StripDefinitionNamePrefix("Apidef", "Swagger", "Oas", "Gateway", "User"))
+	r.DefaultOptions = append(r.DefaultOptions, jsonschema.StripDefinitionNamePrefix("FormData", "Apidef", "Swagger", "Oas", "Gateway", "User"))
 
 	r.Spec = &openapi3.Spec{Openapi: "3.0.3"}
 	r.Spec.WithServers(openapi3.Server{

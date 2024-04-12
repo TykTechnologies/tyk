@@ -1970,6 +1970,7 @@ paths:
               - token
               - client_id
               type: object
+        description: token revoked successfully
       responses:
         "200":
           content:
@@ -1982,13 +1983,15 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: Bad Request
+          description: Returned when you send a malformed request or when the oauth
+            client doesn't exist
         "403":
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: Forbidden
+          description: Attempting to access a protected api with an invalid or a missing
+            X-Tyk-Authorization in the headers
       summary: revoke token
       tags:
       - OAuth
@@ -2031,7 +2034,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: Bad request, form malformed or client secret and client id
+          description: Bad request, form dmalforme or client secret and client id
             doesn't match
         "403":
           content:

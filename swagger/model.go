@@ -9,6 +9,10 @@ import (
 	"github.com/TykTechnologies/tyk/gateway"
 )
 
+const applicationForm = "application/x-www-form-urlencoded"
+
+var applicationOctetStream = "application/octet-stream"
+
 type paginationStatus struct {
 	PageNum   int `json:"page_num"`
 	PageTotal int `json:"page_total"`
@@ -171,6 +175,13 @@ func addNewResponseHeader(o3 openapi3.OperationExposer, httpStatus int, cr Heade
 
 func stringPointerValue(value string) *string {
 	return &value
+}
+
+type Revoke struct {
+	Token         string `json:"token" formData:"token" description:"token to be revoked" required:"true"`
+	TokenTypeHint string `json:"token_type_hint" formData:"token_type_hint" description:"type of token to be revoked, if sent then the accepted values are access_token and refresh_token. String value and optional, of not provided then it will attempt to remove access and refresh tokens that matches"`
+	ClientID      string `json:"client_id" formData:"client_id" description:"id of oauth client" required:"true"`
+	OrgID         string `json:"org_id" formData:"org_id"`
 }
 
 ////2256b0b7877f85d9e2ecd2b7c59acd47ce8f42725ad0c5275fd4e213dddea8ad

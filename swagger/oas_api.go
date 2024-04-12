@@ -12,8 +12,6 @@ import (
 
 const OASTag = "OAS APIs"
 
-var applicationOctetStream = "application/octet-stream"
-
 func OasAPIS(r *openapi3.Reflector) error {
 	return addOperations(r, getListOfOASApisRequest, postOAsApi, apiOASExportHandler, getOASApiRequest, apiOASPutHandler, deleteOASHandler, apiOASExportWithIDHandler, importApiOASPostHandler, oasVersionsHandler, apiOASPatchHandler)
 }

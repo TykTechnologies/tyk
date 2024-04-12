@@ -269,24 +269,25 @@ func getAuthClientTokens(r *openapi3.Reflector) error {
 	return r.AddOperation(oc)
 }
 
+// Done
 func revokeTokenHandler(r *openapi3.Reflector) error {
 	oc, err := r.NewOperationContext(http.MethodPost, "/tyk/oauth/revoke")
 	if err != nil {
 		return err
 	}
-	// TODO::This is totally wrong find out how to do it
 	oc.AddReqStructure(new(struct {
 		Token         string `json:"token" formData:"token" description:"token to be revoked" required:"true"`
 		TokenTypeHint string `json:"token_type_hint" formData:"token_type_hint" description:"type of token to be revoked, if sent then the accepted values are access_token and refresh_token. String value and optional, of not provided then it will attempt to remove access and refresh tokens that matches"`
 		ClientID      string `json:"client_id" formData:"client_id" description:"id of oauth client" required:"true"`
 		OrgID         string `json:"org_id" formData:"org_id"`
 	}), func(cu *openapi.ContentUnit) {
+		cu.Description = "token revoked successfully"
 	})
 	oc.SetID("revokeSingleToken")
 	oc.SetSummary("revoke token")
 	oc.SetDescription("revoke a single token")
-	oc.AddRespStructure(new(apiStatusMessage), openapi.WithHTTPStatus(http.StatusBadRequest))
-	oc.AddRespStructure(new(apiStatusMessage), openapi.WithHTTPStatus(http.StatusForbidden))
+	statusBadRequest(oc, "Returned when you send a malformed request or when the oauth client doesn't exist")
+	forbidden(oc)
 	statusOKApiStatusMessage(oc)
 	oc.SetTags(OAuthTag)
 	return r.AddOperation(oc)
@@ -303,7 +304,7 @@ func revokeAllTokensHandler(r *openapi3.Reflector) error {
 		OrgID        string `json:"org_id" formData:"org_id"`
 	}))
 	///TODO::this why is this 401 instead of badrequest
-	statusUnauthorized(oc, "Bad request, form malformed or client secret and client id doesn't match")
+	statusUnauthorized(oc, "Bad request, form dmalforme or client secret and client id doesn't match")
 	statusBadRequest(oc, "cannot parse form. Form malformed")
 	statusNotFound(oc, "oauth client doesn't exist")
 	statusOKApiStatusMessage(oc, "tokens revoked successfully")
