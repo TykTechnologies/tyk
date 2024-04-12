@@ -1521,7 +1521,7 @@ paths:
       tags:
       - Keys
   /tyk/oauth/clients/{apiID}:
-    delete:
+    get:
       description: OAuth Clients are organised by API ID, and therefore are queried
         as such.
       operationId: listOAuthClients
@@ -1540,22 +1540,17 @@ paths:
                 items:
                   $ref: '#/components/schemas/NewClientRequest'
                 type: array
-          description: OK
+          description: List of OAuth clients
         "403":
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: Forbidden
+          description: Attempting to access a protected api with an invalid or a missing
+            X-Tyk-Authorization in the headers
         "404":
-          content:
-            application/json:
-              schema:
-                items:
-                  $ref: '#/components/schemas/NewClientRequest'
-                type: array
           description: Not Found
-      summary: List oAuth clients
+      summary: List oAuth clients for an Api
       tags:
       - OAuth
   /tyk/oauth/clients/{apiID}/{keyName}:
@@ -1570,7 +1565,7 @@ paths:
         required: true
         schema:
           type: string
-      - description: Refresh token
+      - description: The Client ID
         in: path
         name: keyName
         required: true
@@ -1582,30 +1577,32 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiModifyKeySuccess'
-          description: OK
+          description: OAuth client deleted
         "403":
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: Forbidden
+          description: Attempting to access a protected api with an invalid or a missing
+            X-Tyk-Authorization in the headers
         "404":
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: Not Found
+          description: Returned when the API with the specified apiID or when the
+            client the specified keyName doesn't exist.
         "500":
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: Internal Server Error
+          description: Internal server error
       summary: Delete OAuth client
       tags:
       - OAuth
     get:
-      description: Get OAuth client details
+      description: Get OAuth client details tied to an api
       operationId: getOAuthClient
       parameters:
       - description: The API ID
@@ -1614,7 +1611,7 @@ paths:
         required: true
         schema:
           type: string
-      - description: Refresh token
+      - description: The Client ID
         in: path
         name: keyName
         required: true
@@ -1626,19 +1623,21 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/NewClientRequest'
-          description: OK
+          description: OAuth client details
         "403":
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: Forbidden
+          description: Attempting to access a protected api with an invalid or a missing
+            X-Tyk-Authorization in the headers
         "404":
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: Not Found
+          description: Returned when the API with the specified apiID or when the
+            client the specified keyName doesn't exist.
       summary: Get OAuth client
       tags:
       - OAuth
@@ -1647,7 +1646,7 @@ paths:
         ID for an OAuth client.
       operationId: updateOAuthClient
       parameters:
-      - description: Refresh token
+      - description: The Client ID
         in: path
         name: keyName
         required: true
@@ -1706,7 +1705,7 @@ paths:
       description: Generate a new secret
       operationId: rotateOauthClient
       parameters:
-      - description: Refresh token
+      - description: The Client ID
         in: path
         name: keyName
         required: true
@@ -1786,26 +1785,28 @@ paths:
                     $ref: '#/components/schemas/OAuthClientToken'
                   nullable: true
                   type: array
-          description: Get a list of tokens
+          description: Tokens returned successfully
         "403":
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: Forbidden
+          description: Attempting to access a protected api with an invalid or a missing
+            X-Tyk-Authorization in the headers
         "404":
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: Not Found
+          description: Returned when the API with the specified apiID or when the
+            client the specified keyName doesn't exist.
         "500":
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: Internal Server Error
-      summary: List tokens
+          description: internal server error
+      summary: List tokens for a provided API ID and OAuth-client ID
       tags:
       - OAuth
   /tyk/oauth/clients/apis/{appID}:
@@ -1895,7 +1896,7 @@ paths:
         OAuth client access more robustly.
       operationId: invalidateOAuthRefresh
       parameters:
-      - description: Refresh token
+      - description: The Client ID
         in: path
         name: keyName
         required: true
@@ -2054,7 +2055,7 @@ paths:
       - OAuth
   /tyk/oauth/tokens:
     delete:
-      description: Purge scoped lapsed OAuth token
+      description: Purge lapsed OAuth token
       operationId: purgeLapsedOAuthTokens
       parameters:
       - in: query
@@ -2070,13 +2071,13 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: OK
+          description: lapsed tokens purged successfully
         "400":
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: Bad Request
+          description: Returned when the scope query parameter is set to lapsed
         "403":
           content:
             application/json:
@@ -2088,13 +2089,13 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: Unprocessable Entity
+          description: Returned when you fail to send the scope query parameter
         "500":
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: Internal Server Error
+          description: internal server error
       summary: Purge lapsed OAuth tokens
       tags:
       - OAuth

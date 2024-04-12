@@ -15,7 +15,7 @@ const OAuthTag = "OAuth"
 func OAuthApi(r *openapi3.Reflector) error {
 	return addOperations(r, rotateOauthClientHandler, invalidateOauthRefresh,
 		updateOauthClient, getApisForOauthApp, purgeLapsedOAuthTokens, listOAuthClients,
-		deleteOAuthClient, getSingleOAuthClient, getAuthClientTokens, revokeTokenHandler,
+		deleteOAuthClient, getSingleOAuthClientDetails, getAuthClientTokens, revokeTokenHandler,
 		createOauthClient, revokeAllTokensHandler,
 	)
 }
@@ -148,19 +148,24 @@ func getApisForOauthApp(r *openapi3.Reflector) error {
 	return r.AddOperation(oc)
 }
 
+// Done
 func purgeLapsedOAuthTokens(r *openapi3.Reflector) error {
 	oc, err := r.NewOperationContext(http.MethodDelete, "/tyk/oauth/tokens")
 	if err != nil {
 		return err
 	}
 	oc.AddRespStructure(new(apiStatusMessage), openapi.WithHTTPStatus(http.StatusForbidden))
-	oc.AddRespStructure(new(apiStatusMessage), openapi.WithHTTPStatus(http.StatusUnprocessableEntity))
-	oc.AddRespStructure(new(apiStatusMessage), openapi.WithHTTPStatus(http.StatusBadRequest))
-	oc.AddRespStructure(new(apiStatusMessage), openapi.WithHTTPStatus(http.StatusInternalServerError))
-	oc.AddRespStructure(new(apiStatusMessage))
+	oc.AddRespStructure(new(apiStatusMessage), openapi.WithHTTPStatus(http.StatusUnprocessableEntity), func(cu *openapi.ContentUnit) {
+		cu.Description = "Returned when you fail to send the scope query parameter"
+	})
+	statusBadRequest(oc, "Returned when the scope query parameter is set to lapsed")
+	statusInternalServerError(oc, "internal server error")
+	oc.AddRespStructure(new(apiStatusMessage), func(cu *openapi.ContentUnit) {
+		cu.Description = "lapsed tokens purged successfully"
+	})
 	oc.SetID("purgeLapsedOAuthTokens")
 	oc.SetSummary("Purge lapsed OAuth tokens")
-	oc.SetDescription("Purge scoped lapsed OAuth token")
+	oc.SetDescription("Purge all lapsed OAuth token")
 	o3, ok := oc.(openapi3.OperationExposer)
 	if !ok {
 		return ErrOperationExposer
@@ -172,19 +177,21 @@ func purgeLapsedOAuthTokens(r *openapi3.Reflector) error {
 	return r.AddOperation(oc)
 }
 
+// Done
 func listOAuthClients(r *openapi3.Reflector) error {
-	oc, err := r.NewOperationContext(http.MethodDelete, "/tyk/oauth/clients/{apiID}")
+	oc, err := r.NewOperationContext(http.MethodGet, "/tyk/oauth/clients/{apiID}")
 	if err != nil {
 		return err
 	}
 	oc.SetTags(OAuthTag)
-	oc.AddRespStructure(new(apiStatusMessage), openapi.WithHTTPStatus(http.StatusForbidden))
-	oc.AddRespStructure(new([]gateway.NewClientRequest), openapi.WithHTTPStatus(http.StatusOK))
 	// TODO:: ask why 404 returns null
-	oc.AddRespStructure(new(*[]gateway.NewClientRequest), openapi.WithHTTPStatus(http.StatusNotFound))
-	oc.AddRespStructure(new([]gateway.NewClientRequest), openapi.WithHTTPStatus(http.StatusOK))
+	oc.AddRespStructure(nil, openapi.WithHTTPStatus(http.StatusNotFound))
+	oc.AddRespStructure(new([]gateway.NewClientRequest), openapi.WithHTTPStatus(http.StatusOK), func(cu *openapi.ContentUnit) {
+		cu.Description = "List of OAuth clients"
+	})
+	forbidden(oc)
 	oc.SetID("listOAuthClients")
-	oc.SetSummary("List oAuth clients")
+	oc.SetSummary("List oAuth clients for an Api")
 	oc.SetDescription("OAuth Clients are organised by API ID, and therefore are queried as such.")
 	o3, ok := oc.(openapi3.OperationExposer)
 	if !ok {
@@ -196,16 +203,18 @@ func listOAuthClients(r *openapi3.Reflector) error {
 	return r.AddOperation(oc)
 }
 
+// Done
 func deleteOAuthClient(r *openapi3.Reflector) error {
 	oc, err := r.NewOperationContext(http.MethodDelete, "/tyk/oauth/clients/{apiID}/{keyName}")
 	if err != nil {
 		return err
 	}
-	oc.AddRespStructure(new(apiStatusMessage), openapi.WithHTTPStatus(http.StatusNotFound))
-	oc.AddRespStructure(new(apiStatusMessage), openapi.WithHTTPStatus(http.StatusInternalServerError))
+	statusNotFound(oc, "Returned when the API with the specified apiID or when the client the specified keyName doesn't exist.")
+	statusInternalServerError(oc, "Internal server error")
 	oc.AddRespStructure(new(apiModifyKeySuccess), openapi.WithHTTPStatus(http.StatusOK), func(cu *openapi.ContentUnit) {
+		cu.Description = "OAuth client deleted"
 	})
-	oc.AddRespStructure(new(apiStatusMessage), openapi.WithHTTPStatus(http.StatusForbidden))
+	forbidden(oc)
 	oc.SetTags(OAuthTag)
 	oc.SetID("deleteOAuthClient")
 	oc.SetSummary("Delete OAuth client")
@@ -220,19 +229,20 @@ func deleteOAuthClient(r *openapi3.Reflector) error {
 	return r.AddOperation(oc)
 }
 
-func getSingleOAuthClient(r *openapi3.Reflector) error {
+// Done
+func getSingleOAuthClientDetails(r *openapi3.Reflector) error {
 	oc, err := r.NewOperationContext(http.MethodGet, "/tyk/oauth/clients/{apiID}/{keyName}")
 	if err != nil {
 		return err
 	}
-	oc.AddRespStructure(new(apiStatusMessage), openapi.WithHTTPStatus(http.StatusNotFound))
-	oc.AddRespStructure(new(gateway.NewClientRequest), openapi.WithHTTPStatus(http.StatusOK))
-	// TODO::returned when basing dowritejsonfails
-	// oc.AddRespStructure(new(apiStatusMessage), openapi.WithHTTPStatus(http.StatusInternalServerError))
-	oc.AddRespStructure(new(apiStatusMessage), openapi.WithHTTPStatus(http.StatusForbidden))
+	statusNotFound(oc, "Returned when the API with the specified apiID or when the client the specified keyName doesn't exist.")
+	oc.AddRespStructure(new(gateway.NewClientRequest), openapi.WithHTTPStatus(http.StatusOK), func(cu *openapi.ContentUnit) {
+		cu.Description = "OAuth client details"
+	})
+	forbidden(oc)
 	oc.SetID("getOAuthClient")
 	oc.SetSummary("Get OAuth client")
-	oc.SetDescription("Get OAuth client details")
+	oc.SetDescription("Get OAuth client details tied to an api")
 	oc.SetTags(OAuthTag)
 	o3, ok := oc.(openapi3.OperationExposer)
 	if !ok {
@@ -244,20 +254,23 @@ func getSingleOAuthClient(r *openapi3.Reflector) error {
 	return r.AddOperation(oc)
 }
 
+// done
 func getAuthClientTokens(r *openapi3.Reflector) error {
+	// TODO::this was different in previous versions it only returned one response type
 	oc, err := r.NewOperationContext(http.MethodGet, "/tyk/oauth/clients/{apiID}/{keyName}/tokens")
 	if err != nil {
 		return err
 	}
-	oc.AddRespStructure(new(apiStatusMessage), openapi.WithHTTPStatus(http.StatusNotFound))
-	oc.AddRespStructure(new(apiStatusMessage), openapi.WithHTTPStatus(http.StatusForbidden))
+	statusNotFound(oc, "Returned when the API with the specified apiID or when the client the specified keyName doesn't exist.")
+	forbidden(oc)
+	statusInternalServerError(oc, "internal server error")
 	oc.AddRespStructure(new(apiStatusMessage), openapi.WithHTTPStatus(http.StatusInternalServerError))
 	oc.AddRespStructure(jsonschema.OneOf(new(paginatedOAuthClientTokens), new([]gateway.OAuthClientToken)), openapi.WithHTTPStatus(http.StatusOK), func(cu *openapi.ContentUnit) {
-		cu.Description = "Get a list of tokens"
+		cu.Description = "Tokens returned successfully"
 	})
 	oc.SetTags(OAuthTag)
 	oc.SetID("getOAuthClientTokens")
-	oc.SetSummary("List tokens")
+	oc.SetSummary("List tokens for a provided API ID and OAuth-client ID")
 	oc.SetDescription("This endpoint allows you to retrieve a list of all current tokens and their expiry date for a provided API ID and OAuth-client ID in the following format. This endpoint will work only for newly created tokens.\n        <br/>\n        <br/>\n        You can control how long you want to store expired tokens in this list using `oauth_token_expired_retain_period` gateway option, which specifies retain period for expired tokens stored in Redis. By default expired token not get removed. See <a href=\"https://tyk.io/docs/configure/tyk-gateway-configuration-options/#a-name-oauth-token-expired-retain-period-a-oauth-token-expired-retain-period\" target=\"_blank\">here</a> for more details.")
 	o3, ok := oc.(openapi3.OperationExposer)
 	if !ok {
@@ -319,7 +332,7 @@ func revokeAllTokensHandler(r *openapi3.Reflector) error {
 }
 
 func keyNameParameter(description ...string) openapi3.ParameterOrRef {
-	desc := "Refresh token"
+	desc := "The Client ID"
 	if len(description) != 0 {
 		desc = description[0]
 	}
