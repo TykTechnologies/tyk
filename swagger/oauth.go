@@ -293,6 +293,7 @@ func revokeTokenHandler(r *openapi3.Reflector) error {
 	return r.AddOperation(oc)
 }
 
+// Done
 func revokeAllTokensHandler(r *openapi3.Reflector) error {
 	oc, err := r.NewOperationContext(http.MethodPost, "/tyk/oauth/revoke_all")
 	if err != nil {
@@ -303,15 +304,15 @@ func revokeAllTokensHandler(r *openapi3.Reflector) error {
 		ClientID     string `json:"client_id" formData:"client_id" description:"id of oauth client" required:"true"`
 		OrgID        string `json:"org_id" formData:"org_id"`
 	}))
-	///TODO::this why is this 401 instead of badrequest
-	statusUnauthorized(oc, "Bad request, form dmalforme or client secret and client id doesn't match")
-	statusBadRequest(oc, "cannot parse form. Form malformed")
-	statusNotFound(oc, "oauth client doesn't exist")
+	///TODO::why is this 401 instead of badRequest
+	statusUnauthorized(oc, "Returned when you fail to send a  client secret or client id in you form data")
+	statusBadRequest(oc, "Returned when the gateway cannot parse form data sent in request.")
+	statusNotFound(oc, "Returned when the sent oauth client doesn't exist")
 	statusOKApiStatusMessage(oc, "tokens revoked successfully")
 	forbidden(oc)
 	oc.SetTags(OAuthTag)
-	oc.SetDescription("revoke all the tokens for a given oauth client")
-	oc.SetSummary("revoke all client's tokens")
+	oc.SetDescription("Revoke all the tokens for a given oauth client")
+	oc.SetSummary("Revoke all client's tokens")
 	oc.SetID("revokeAllTokens")
 
 	return r.AddOperation(oc)

@@ -1997,7 +1997,7 @@ paths:
       - OAuth
   /tyk/oauth/revoke_all:
     post:
-      description: revoke all the tokens for a given oauth client
+      description: Revoke all the tokens for a given oauth client
       operationId: revokeAllTokens
       requestBody:
         content:
@@ -2028,14 +2028,14 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: cannot parse form. Form malformed
+          description: Returned when the gateway cannot parse form data sent in request.
         "401":
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: Bad request, form dmalforme or client secret and client id
-            doesn't match
+          description: Returned when you fail to send a  client secret or client id
+            in you form data
         "403":
           content:
             application/json:
@@ -2048,8 +2048,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: oauth client doesn't exist
-      summary: revoke all client's tokens
+          description: Returned when the sent oauth client doesn't exist
+      summary: Revoke all client's tokens
       tags:
       - OAuth
   /tyk/oauth/tokens:
