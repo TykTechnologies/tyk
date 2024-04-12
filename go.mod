@@ -106,6 +106,7 @@ require (
 	github.com/Masterminds/semver/v3 v3.2.0 // indirect
 	github.com/Masterminds/sprig v2.22.0+incompatible // indirect
 	github.com/alecthomas/units v0.0.0-20211218093645-b94a6e3cc137 // indirect
+	github.com/alitto/pond v1.8.3 // indirect
 	github.com/andybalholm/brotli v1.1.0 // indirect
 	github.com/armon/go-metrics v0.4.1 // indirect
 	github.com/asyncapi/converter-go v0.3.0 // indirect
@@ -222,3 +223,5 @@ require (
 )
 
 replace github.com/TykTechnologies/graphql-go-tools => ../graphql-go-tools
+
+replace github.com/TykTechnologies/graphql-go-tools/v2 => ../graphql-go-tools/v2

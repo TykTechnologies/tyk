@@ -21,6 +21,7 @@ import (
 	"github.com/TykTechnologies/tyk/user"
 
 	gql "github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
+	gqlV2 "github.com/TykTechnologies/graphql-go-tools/v2/pkg/graphql"
 )
 
 var (
@@ -119,9 +120,14 @@ func (m *GraphQLMiddleware) Init() {
 			},
 		})
 	} else if m.Spec.GraphQL.Version == apidef.GraphQLConfigVersion3Preview {
+		v2Schema, err := gqlV2.NewSchemaFromString(m.Spec.GraphQL.Schema)
+		if err != nil {
+			log.Errorf("Error while creating schema from API definition: %v", err)
+			return
+		}
 		m.Spec.GraphEngine, err = graphengine.NewEngineV3(graphengine.EngineV3Options{
 			Logger: log,
-			Schema: schema,
+			Schema: v2Schema,
 		})
 	} else {
 		log.Errorf("Could not init GraphQL middleware: invalid config version provided: %s", m.Spec.GraphQL.Version)

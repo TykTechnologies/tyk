@@ -17,7 +17,6 @@ import (
 
 	"github.com/TykTechnologies/tyk/internal/reflect"
 
-	"github.com/TykTechnologies/graphql-go-tools/pkg/engine/datasource/kafka_datasource"
 	"github.com/TykTechnologies/graphql-go-tools/pkg/execution/datasource"
 
 	"github.com/TykTechnologies/gojsonschema"
@@ -940,15 +939,21 @@ type GraphQLEngineDataSourceConfigGraphQL struct {
 }
 
 type GraphQLEngineDataSourceConfigKafka struct {
-	BrokerAddresses      []string              `bson:"broker_addresses" json:"broker_addresses"`
-	Topics               []string              `bson:"topics" json:"topics"`
-	GroupID              string                `bson:"group_id" json:"group_id"`
-	ClientID             string                `bson:"client_id" json:"client_id"`
-	KafkaVersion         string                `bson:"kafka_version" json:"kafka_version"`
-	StartConsumingLatest bool                  `json:"start_consuming_latest"`
-	BalanceStrategy      string                `json:"balance_strategy"`
-	IsolationLevel       string                `json:"isolation_level"`
-	SASL                 kafka_datasource.SASL `json:"sasl"`
+	BrokerAddresses      []string               `bson:"broker_addresses" json:"broker_addresses"`
+	Topics               []string               `bson:"topics" json:"topics"`
+	GroupID              string                 `bson:"group_id" json:"group_id"`
+	ClientID             string                 `bson:"client_id" json:"client_id"`
+	KafkaVersion         string                 `bson:"kafka_version" json:"kafka_version"`
+	StartConsumingLatest bool                   `json:"start_consuming_latest"`
+	BalanceStrategy      string                 `json:"balance_strategy"`
+	IsolationLevel       string                 `json:"isolation_level"`
+	SASL                 GraphQLEngineKafkaSASL `json:"sasl"`
+}
+
+type GraphQLEngineKafkaSASL struct {
+	Enable   bool   `json:"enable"`
+	User     string `json:"user"`
+	Password string `json:"password"`
 }
 
 type QueryVariable struct {
