@@ -105,7 +105,7 @@ func (g *GraphQLConfigAdapter) EngineConfigV2() (*graphql.EngineV2Configuration,
 }
 
 func (g *GraphQLConfigAdapter) EngineConfigV3() (*graphqlv2.EngineV2Configuration, error) {
-	if g.apiDefinition.GraphQL.Version != apidef.GraphQLConfigVersion2 {
+	if g.apiDefinition.GraphQL.Version != apidef.GraphQLConfigVersion3Preview {
 		return nil, ErrUnsupportedGraphQLConfigVersion
 	}
 

@@ -125,9 +125,10 @@ func (m *GraphQLMiddleware) Init() {
 			log.Errorf("Error while creating schema from API definition: %v", err)
 			return
 		}
-		m.Spec.GraphEngine, err = graphengine.NewEngineV3(graphengine.EngineV3Options{
-			Logger: log,
-			Schema: v2Schema,
+		engine, err := graphengine.NewEngineV3(graphengine.EngineV3Options{
+			Logger:        log,
+			Schema:        v2Schema,
+			ApiDefinition: m.Spec.APIDefinition,
 			OpenTelemetry: graphengine.EngineV2OTelConfig{
 				Enabled:        m.Gw.GetConfig().OpenTelemetry.Enabled,
 				TracerProvider: m.Gw.TracerProvider,
@@ -137,6 +138,11 @@ func (m *GraphQLMiddleware) Init() {
 				ContextStoreRequest:    ctxSetGraphQLRequestV2,
 			},
 		})
+		if err != nil {
+			log.Errorf("Error creating enginev3: %v", err)
+			return
+		}
+		m.Spec.GraphEngine = engine
 	} else {
 		log.Errorf("Could not init GraphQL middleware: invalid config version provided: %s", m.Spec.GraphQL.Version)
 	}
