@@ -11,7 +11,7 @@ ENV PLUGIN_SOURCE_PATH=/plugin-source
 RUN mkdir -p $PLUGIN_SOURCE_PATH
 
 # remove for avoiding CVEs
-RUN apt-get purge -y --allow-remove-essential --auto-remove mercurial wget curl cmake ruby* python* docker* libsqlite* \
+RUN apt-get purge -y --allow-remove-essential --auto-remove mercurial wget curl automake cmake ruby* python* docker* libsqlite* qemu* \
 	&& rm -f /usr/bin/passwd /usr/sbin/adduser /usr/bin/goreleaser
 
 # This is already vendored from release pipeline
