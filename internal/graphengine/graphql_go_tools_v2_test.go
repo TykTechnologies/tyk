@@ -64,7 +64,7 @@ func TestGraphqlRequestProcessorV2_ProcessRequest(t *testing.T) {
 
 		assert.Error(t, err)
 		assert.Equal(t, 400, statusCode)
-		assert.Equal(t, `{"errors":[{"message":"Variable \"$name\" got invalid value 123; String cannot represent a non string value: 123","locations":[{"line":1,"column":7}],"path":["query"]}],"data":null}`, body.String())
+		assert.Equal(t, `{"errors":[{"message":"Variable \"$name\" got invalid value 123; String cannot represent a non string value: 123"}],"data":null}`, body.String())
 	})
 
 	t.Run("should return no error and 200 when everything passes", func(t *testing.T) {
