@@ -13,11 +13,24 @@ ENV PLUGIN_SOURCE_PATH=/plugin-source
 
 RUN mkdir -p $TYK_GW_PATH $PLUGIN_SOURCE_PATH
 
+<<<<<<< HEAD
 RUN apt-get remove -y --allow-remove-essential --auto-remove mercurial ruby* python* || true \
 	&& rm /usr/bin/passwd && rm /usr/sbin/adduser
 
 ADD go.mod go.sum $TYK_GW_PATH
 WORKDIR $TYK_GW_PATH
+=======
+# remove for avoiding CVEs
+RUN apt-get purge -y --allow-remove-essential --auto-remove mercurial wget curl automake cmake ruby* python* docker* libsqlite* qemu* \
+	&& rm -f /usr/bin/passwd /usr/sbin/adduser /usr/bin/goreleaser
+
+# This is already vendored from release pipeline
+WORKDIR /opt/tyk-gateway/src
+ADD . /opt/tyk-gateway/src
+
+# TYK_GW_PATH points to the GOHOME source for gateway.
+ENV TYK_GW_PATH /go/src/github.com/TykTechnologies/tyk
+>>>>>>> 6f3540e34... [TT-11855] remove unnecessary packages resolving cve reports (#6223)
 
 RUN --mount=type=cache,mode=0755,target=/go/pkg/mod go mod download
 
