@@ -1,6 +1,8 @@
 package graphengine
 
 import (
+	"context"
+	"github.com/TykTechnologies/graphql-go-tools/pkg/engine/resolve"
 	"github.com/TykTechnologies/graphql-go-tools/v2/pkg/graphql"
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/apidef/adapter"
@@ -12,12 +14,24 @@ import (
 type EngineV3 struct {
 	engine         *graphql.ExecutionEngineV2
 	schema         *graphql.Schema
-	logger         *logrus.Logger
+	logger         abstractlogger.Logger
 	openTelemetry  *EngineV2OTelConfig
 	apiDefinitions *apidef.APIDefinition
 
 	ctxStoreRequestFunc    ContextStoreRequestV2Func
 	ctxRetrieveRequestFunc ContextRetrieveRequestV2Func
+
+	gqlTools                  graphqlGoToolsV2
+	graphqlRequestProcessor   GraphQLRequestProcessor
+	complexityChecker         ComplexityChecker
+	granularAccessChecker     GranularAccessChecker
+	reverseProxyPreHandler    ReverseProxyPreHandler
+	contextCancel             context.CancelFunc
+	beforeFetchHook           resolve.BeforeFetchHook
+	afterFetchHook            resolve.AfterFetchHook
+	newReusableBodyReadCloser NewReusableBodyReadCloserFunc
+	seekReadCloser            SeekReadCloserFunc
+	tykVariableReplacer       TykVariableReplacer
 }
 
 type EngineV3Injections struct {
@@ -42,7 +56,7 @@ type EngineV3Options struct {
 }
 
 func NewEngineV3(options EngineV3Options) (*EngineV3, error) {
-	//logger := createAbstractLogrusLogger(options.Logger)
+	logger := createAbstractLogrusLogger(options.Logger)
 	//gqlTools := graphqlGoToolsV2{}
 
 	// TODO check the streaming client usage here
@@ -93,7 +107,7 @@ func NewEngineV3(options EngineV3Options) (*EngineV3, error) {
 	//}
 
 	engine := EngineV3{
-		logger:                 options.Logger,
+		logger:                 logger,
 		schema:                 options.Schema,
 		ctxRetrieveRequestFunc: options.Injections.ContextRetrieveRequest,
 		ctxStoreRequestFunc:    options.Injections.ContextStoreRequest,
@@ -131,9 +145,52 @@ func (e *EngineV3) ProcessAndStoreGraphQLRequest(w http.ResponseWriter, r *http.
 		defer span.End()
 		*r = *r.WithContext(ctx)
 	}
-	return
+
+	return e.ProcessRequest(r.Context(), w, r)
 }
 
+func (e *EngineV3) ProcessRequest(ctx context.Context, w http.ResponseWriter, r *http.Request) (error, int) {
+	if r == nil {
+		e.logger.Error("request is nil")
+		return ProxyingRequestFailedErr, http.StatusInternalServerError
+	}
+
+	v1Request := e.ctxRetrieveRequestFunc(r)
+	gqlRequest := graphql.Request{
+		Variables:     v1Request.Variables,
+		Query:         v1Request.Query,
+		OperationName: v1Request.OperationName,
+	}
+	normalizationResult, err := gqlRequest.Normalize(e.schema)
+	if err != nil {
+		e.logger.Error("error while normalizing GraphQL request", abstractlogger.Error(err))
+		return ProxyingRequestFailedErr, http.StatusInternalServerError
+	}
+
+	if normalizationResult.Errors != nil && normalizationResult.Errors.Count() > 0 {
+		return writeGraphQLError(e.logger, w, normalizationResult.Errors)
+	}
+
+	validationResult, err := gqlRequest.ValidateForSchema(e.schema)
+	if err != nil {
+		e.logger.Error("error while validating GraphQL request", abstractlogger.Error(err))
+		return ProxyingRequestFailedErr, http.StatusInternalServerError
+	}
+
+	if validationResult.Errors != nil && validationResult.Errors.Count() > 0 {
+		return writeGraphQLError(e.logger, w, validationResult.Errors)
+	}
+
+	inputValidationResult, err := gqlRequest.ValidateInput(e.schema)
+	if err != nil {
+		e.logger.Error("error while validating variables for request", abstractlogger.Error(err))
+		return ProxyingRequestFailedErr, http.StatusInternalServerError
+	}
+	if inputValidationResult.Errors != nil && inputValidationResult.Errors.Count() > 0 {
+		return writeGraphQLError(e.logger, w, inputValidationResult.Errors)
+	}
+	return nil, http.StatusOK
+}
 func (e *EngineV3) ProcessGraphQLComplexity(r *http.Request, accessDefinition *ComplexityAccessDefinition) (err error, statusCode int) {
 	//TODO implement me
 	panic("implement me")
