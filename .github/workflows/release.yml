@@ -417,7 +417,7 @@ jobs:
     secrets: inherit
   sbom:
     needs: goreleaser
-    uses: TykTechnologies/github-actions/.github/workflows/sbom.yaml@main
+    uses: TykTechnologies/github-actions/.github/workflows/sbom.yaml@fix/TT-11825/sbom
     secrets:
       DEPDASH_URL: ${{ secrets.DEPDASH_URL }}
       DEPDASH_KEY: ${{ secrets.DEPDASH_KEY }}
