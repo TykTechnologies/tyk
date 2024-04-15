@@ -366,6 +366,64 @@ func TestGraphQLMiddleware_EngineMode(t *testing.T) {
 		})
 	})
 
+	t.Run("graphql engine v3", func(t *testing.T) {
+		g := StartTest(nil)
+		defer g.Close()
+
+		t.Run("proxy only", func(t *testing.T) {
+			g.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+				spec.UseKeylessAccess = true
+				spec.GraphQL.Enabled = true
+				spec.GraphQL.ExecutionMode = apidef.GraphQLExecutionModeProxyOnly
+				spec.GraphQL.Version = apidef.GraphQLConfigVersion3Preview
+				spec.GraphQL.Schema = gqlProxyUpstreamSchema
+				spec.GraphQL.Proxy.RequestHeaders = map[string]string{
+					"Authorization": "123abc",
+				}
+				spec.Proxy.ListenPath = "/"
+				spec.Proxy.TargetURL = testGraphQLProxyUpstream
+			})
+
+			request := gql.Request{
+				Query: `{ hello(name: "World") httpMethod }`,
+			}
+
+			_, _ = g.Run(t, []test.TestCase{
+				{
+					Data:   request,
+					Method: http.MethodPost,
+					Headers: map[string]string{
+						"X-Tyk-Key":   "tyk-value",
+						"X-Other-Key": "other-value",
+					},
+					Code:      http.StatusOK,
+					BodyMatch: `{"data":{"hello":"World","httpMethod":"POST"}}`,
+					HeadersMatch: map[string]string{
+						"Authorization": "123abc",
+						"X-Tyk-Key":     "tyk-value",
+						"X-Other-Key":   "other-value",
+					},
+				},
+				{
+					Data:   request,
+					Method: http.MethodPut,
+					Headers: map[string]string{
+						"X-Tyk-Key":       "tyk-value",
+						"X-Other-Key":     "other-value",
+						"X-Response-Code": "201",
+					},
+					Code:      201,
+					BodyMatch: `{"data":{"hello":"World","httpMethod":"PUT"}}`,
+					HeadersMatch: map[string]string{
+						"Authorization": "123abc",
+						"X-Tyk-Key":     "tyk-value",
+						"X-Other-Key":   "other-value",
+					},
+				},
+			}...)
+		})
+	})
+
 	t.Run("graphql engine v2", func(t *testing.T) {
 		g := StartTest(nil)
 		defer g.Close()

@@ -128,6 +128,14 @@ func (m *GraphQLMiddleware) Init() {
 		m.Spec.GraphEngine, err = graphengine.NewEngineV3(graphengine.EngineV3Options{
 			Logger: log,
 			Schema: v2Schema,
+			OpenTelemetry: graphengine.EngineV2OTelConfig{
+				Enabled:        m.Gw.GetConfig().OpenTelemetry.Enabled,
+				TracerProvider: m.Gw.TracerProvider,
+			},
+			Injections: graphengine.EngineV3Injections{
+				ContextRetrieveRequest: ctxGetGraphQLRequestV2,
+				ContextStoreRequest:    ctxSetGraphQLRequestV2,
+			},
 		})
 	} else {
 		log.Errorf("Could not init GraphQL middleware: invalid config version provided: %s", m.Spec.GraphQL.Version)
