@@ -11,11 +11,8 @@ ENV PLUGIN_SOURCE_PATH=/plugin-source
 RUN mkdir -p $PLUGIN_SOURCE_PATH
 
 # remove for avoiding CVEs
-RUN apt-get remove -y --allow-remove-essential --auto-remove mercurial ruby-dev \
-	&& rm /usr/bin/passwd && rm /usr/sbin/adduser
-
-# remove python 3.9 if exists.
-RUN apt-get remove -y --allow-remove-essential --auto-remove python3.9 || true
+RUN apt-get purge -y --allow-remove-essential --auto-remove mercurial wget curl automake cmake ruby* python* docker* libsqlite* qemu* \
+	&& rm -f /usr/bin/passwd /usr/sbin/adduser /usr/bin/goreleaser
 
 # This is already vendored from release pipeline
 WORKDIR /opt/tyk-gateway/src
