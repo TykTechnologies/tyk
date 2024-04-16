@@ -39,13 +39,13 @@ jobs:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
 
-      - name: Build and push to dockerhub/ECR
+      - name: Build and push to dockerhub
         uses: docker/build-push-action@v4
         with:
           context: .
           file: ci/images/plugin-compiler/Dockerfile
           platforms: linux/amd64
-          push: true
+          push: ${{ startsWith(github.ref, 'refs/tags') }}
           labels: ${{ steps.set-metadata.outputs.labels }}
           tags: ${{ steps.set-metadata.outputs.tags }}
           build-args: |
