@@ -136,6 +136,21 @@ func (m *GraphQLMiddleware) Init() {
 			Injections: graphengine.EngineV3Injections{
 				ContextRetrieveRequest: ctxGetGraphQLRequestV2,
 				ContextStoreRequest:    ctxSetGraphQLRequestV2,
+				// TODO use proper version or request for this
+				WebsocketOnBeforeStart:    m,
+				NewReusableBodyReadCloser: reusableBodyReadCloser,
+				SeekReadCloser: func(readCloser io.ReadCloser) (io.ReadCloser, error) {
+					body, ok := readCloser.(*nopCloserBuffer)
+					if !ok {
+						return nil, nil
+					}
+					_, err := body.Seek(0, io.SeekStart)
+					if err != nil {
+						return nil, err
+					}
+					return body, nil
+				},
+				TykVariableReplacer: m.Gw.replaceTykVariables,
 			},
 		})
 		if err != nil {

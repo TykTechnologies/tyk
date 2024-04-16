@@ -35,8 +35,8 @@ func TestEngineV3_ProcessRequest(t *testing.T) {
 	})
 
 	t.Run("should return error and 400 when validation fails", func(t *testing.T) {
-		processor := newTestGraphqlRequestProcessorV2(t)
-		processor.ctxRetrieveRequest = func(r *http.Request) *graphql.Request {
+		engine := NewTestEngine(t)
+		engine.ctxRetrieveRequestFunc = func(r *http.Request) *graphql.Request {
 			return &graphql.Request{
 				Query: "query { goodBye }",
 			}
@@ -47,7 +47,7 @@ func TestEngineV3_ProcessRequest(t *testing.T) {
 
 		recorder := httptest.NewRecorder()
 
-		err, statusCode := processor.ProcessRequest(context.Background(), recorder, request)
+		err, statusCode := engine.ProcessRequest(context.Background(), recorder, request)
 		body := bytes.Buffer{}
 		_, _ = body.ReadFrom(recorder.Body)
 
@@ -57,8 +57,8 @@ func TestEngineV3_ProcessRequest(t *testing.T) {
 	})
 
 	t.Run("should return error and 400 when input validation fails", func(t *testing.T) {
-		processor := newTestGraphqlRequestProcessorV2(t)
-		processor.ctxRetrieveRequest = func(r *http.Request) *graphql.Request {
+		engine := NewTestEngine(t)
+		engine.ctxRetrieveRequestFunc = func(r *http.Request) *graphql.Request {
 			return &graphql.Request{
 				Query:     "query($name: String!) { helloName(name: $name) }",
 				Variables: json.RawMessage(`{"name": 123}`),
@@ -70,7 +70,7 @@ func TestEngineV3_ProcessRequest(t *testing.T) {
 
 		recorder := httptest.NewRecorder()
 
-		err, statusCode := processor.ProcessRequest(context.Background(), recorder, request)
+		err, statusCode := engine.ProcessRequest(context.Background(), recorder, request)
 		body := bytes.Buffer{}
 		_, _ = body.ReadFrom(recorder.Body)
 
@@ -80,8 +80,8 @@ func TestEngineV3_ProcessRequest(t *testing.T) {
 	})
 
 	t.Run("should return no error and 200 when everything passes", func(t *testing.T) {
-		processor := newTestGraphqlRequestProcessorV2(t)
-		processor.ctxRetrieveRequest = func(r *http.Request) *graphql.Request {
+		engine := NewTestEngine(t)
+		engine.ctxRetrieveRequestFunc = func(r *http.Request) *graphql.Request {
 			return &graphql.Request{
 				Query:     "query($name: String!) { helloName(name: $name) }",
 				Variables: json.RawMessage(`{"name": "James T. Kirk"}`),
@@ -93,7 +93,7 @@ func TestEngineV3_ProcessRequest(t *testing.T) {
 
 		recorder := httptest.NewRecorder()
 
-		err, statusCode := processor.ProcessRequest(context.Background(), recorder, request)
+		err, statusCode := engine.ProcessRequest(context.Background(), recorder, request)
 		assert.NoError(t, err)
 		assert.Equal(t, 200, statusCode)
 	})
