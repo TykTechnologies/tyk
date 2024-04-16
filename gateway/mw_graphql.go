@@ -133,11 +133,14 @@ func (m *GraphQLMiddleware) Init() {
 				Enabled:        m.Gw.GetConfig().OpenTelemetry.Enabled,
 				TracerProvider: m.Gw.TracerProvider,
 			},
+			HttpClient: &http.Client{
+				Transport: &http.Transport{TLSClientConfig: tlsClientConfig(m.Spec, nil)},
+			},
 			Injections: graphengine.EngineV3Injections{
 				ContextRetrieveRequest: ctxGetGraphQLRequestV2,
 				ContextStoreRequest:    ctxSetGraphQLRequestV2,
 				// TODO use proper version or request for this
-				WebsocketOnBeforeStart:    m,
+				//WebsocketOnBeforeStart:    m,
 				NewReusableBodyReadCloser: reusableBodyReadCloser,
 				SeekReadCloser: func(readCloser io.ReadCloser) (io.ReadCloser, error) {
 					body, ok := readCloser.(*nopCloserBuffer)
@@ -318,7 +321,7 @@ func needsGraphQLExecutionEngine(apiSpec *APISpec) bool {
 	case apidef.GraphQLExecutionModeSubgraph:
 		return true
 	case apidef.GraphQLExecutionModeProxyOnly:
-		if apiSpec.GraphQL.Version == apidef.GraphQLConfigVersion2 {
+		if apiSpec.GraphQL.Version == apidef.GraphQLConfigVersion2 || apiSpec.GraphQL.Version == apidef.GraphQLConfigVersion3Preview {
 			return true
 		}
 	}

@@ -40,6 +40,9 @@ func (e *EngineV3) HandleReverseProxy(params ReverseProxyParams) (res *http.Resp
 	case ReverseProxyTypeNone:
 		return nil, false, nil
 	}
+
+	e.logger.Error("unknown reverse proxy type", abstractlogger.Int("reverseProxyType", int(reverseProxyType)))
+	return nil, false, ErrUnknownReverseProxyType
 }
 
 func (e *EngineV3) handoverWebSocketConnectionToGraphQLExecutionEngine(params *ReverseProxyParams) (res *http.Response, hijacked bool, err error) {
@@ -104,9 +107,9 @@ func (e *EngineV3) handoverRequestToGraphQLExecutionEngine(gqlRequest *graphql.R
 	execOptions = append(execOptions, graphql.WithHeaderModifier(e.gqlTools.headerModifier(outreq, upstreamHeaders, e.tykVariableReplacer)))
 
 	if e.openTelemetry.Executor != nil {
-		if err = e.openTelemetry.Executor.Execute(reqCtx, gqlRequest, &resultWriter, execOptions...); err != nil {
-			return
-		}
+		//if err = e.openTelemetry.Executor.Execute(reqCtx, gqlRequest, &resultWriter, execOptions...); err != nil {
+		//	return
+		//}
 	} else {
 		err = e.engine.Execute(reqCtx, gqlRequest, &resultWriter, execOptions...)
 		if err != nil {

@@ -122,6 +122,8 @@ func NewEngineV3(options EngineV3Options) (*EngineV3, error) {
 		apiDefinitions:         options.ApiDefinition,
 		reverseProxyPreHandler: reverseProxyPreHandler,
 		gqlTools:               gqlTools,
+		tykVariableReplacer:    options.Injections.TykVariableReplacer,
+		seekReadCloser:         options.Injections.SeekReadCloser,
 	}
 
 	if engine.openTelemetry == nil {
@@ -131,9 +133,9 @@ func NewEngineV3(options EngineV3Options) (*EngineV3, error) {
 	if engine.openTelemetry.Enabled {
 		var executor graphqlinternal.TykOtelExecutorI
 		if options.ApiDefinition.DetailedTracing {
-			executor, err = graphqlinternal.NewOtelGraphqlEngineV2Detailed(engine.openTelemetry.TracerProvider, executionEngine, parsedSchema)
+			//executor, err = graphqlinternal.NewOtelGraphqlEngineV2Detailed(engine.openTelemetry.TracerProvider, executionEngine, parsedSchema)
 		} else {
-			executor, err = graphqlinternal.NewOtelGraphqlEngineV2Basic(engine.openTelemetry.TracerProvider, executionEngine)
+			//executor, err = graphqlinternal.NewOtelGraphqlEngineV2Basic(engine.openTelemetry.TracerProvider, executionEngine)
 		}
 		if err != nil {
 			options.Logger.WithError(err).Error("error creating custom execution engine v2")
@@ -142,10 +144,10 @@ func NewEngineV3(options EngineV3Options) (*EngineV3, error) {
 		}
 
 		otelRequestProcessor := &graphqlRequestProcessorWithOTelV1{
-			logger:             logger,
-			schema:             parsedSchema,
-			otelExecutor:       executor,
-			ctxRetrieveRequest: options.Injections.ContextRetrieveRequest,
+			logger: logger,
+			//schema:             parsedSchema,
+			otelExecutor: executor,
+			//ctxRetrieveRequest: options.Injections.ContextRetrieveRequest,
 		}
 		engine.graphqlRequestProcessor = otelRequestProcessor
 		engine.openTelemetry.Executor = executor

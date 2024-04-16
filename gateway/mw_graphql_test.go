@@ -424,6 +424,35 @@ func TestGraphQLMiddleware_EngineMode(t *testing.T) {
 			}...)
 			fmt.Println(err, resp)
 		})
+
+		t.Run("proxy-only return errors from upstream", func(t *testing.T) {
+			g.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+				spec.UseKeylessAccess = true
+				spec.GraphQL.Enabled = true
+				spec.GraphQL.ExecutionMode = apidef.GraphQLExecutionModeProxyOnly
+				spec.GraphQL.Version = apidef.GraphQLConfigVersion3Preview
+				spec.GraphQL.Schema = gqlProxyUpstreamSchema
+				spec.GraphQL.Proxy.UseResponseExtensions.OnErrorForwarding = true
+				spec.Proxy.ListenPath = "/"
+				spec.Proxy.TargetURL = testGraphQLProxyUpstreamError
+			})
+
+			request := gql.Request{
+				Query: `{ hello(name: "World") httpMethod }`,
+			}
+			_, _ = g.Run(t, test.TestCase{
+				Data:   request,
+				Method: http.MethodPost,
+				Code:   http.StatusInternalServerError,
+				BodyMatchFunc: func(i []byte) bool {
+					value, _, _, err := jsonparser.Get(i, "errors", "[0]", "extensions", "error")
+					if err != nil {
+						return false
+					}
+					return string(value) == "Something went wrong"
+				},
+			})
+		})
 	})
 
 	t.Run("graphql engine v2", func(t *testing.T) {
