@@ -49,4 +49,4 @@ jobs:
           labels: ${{ steps.set-metadata.outputs.labels }}
           tags: ${{ steps.set-metadata.outputs.tags }}
           build-args: |
-            GOLANG_CROSS=tykio/golang-cross:${{ env.GOLANG_CROSS }}
+            GOLANG_CROSS=${{ env.GOLANG_CROSS }}
