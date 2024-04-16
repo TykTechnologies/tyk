@@ -1,0 +1,52 @@
+---
+name: Plugin-compiler build
+
+on:
+  pull_request:
+  push:
+    tags:
+      - 'v*'
+
+env:
+  GOLANG_CROSS: 1.15
+
+jobs:
+  docker-build:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Set docker metadata
+        id: set-metadata
+        uses: docker/metadata-action@v4
+        with:
+          images: |
+            tykio/tyk-plugin-compiler,enable=${{ startsWith(github.ref, 'refs/tags') }}
+          labels: |
+            org.opencontainers.image.title=tyk-plugin-compiler
+            org.opencontainers.image.description=Plugin compiler for the Tyk API Gateway
+          tags: |
+            type=semver,pattern=v{{version}}
+            type=semver,pattern=v{{major}}.{{minor}}
+            type=semver,pattern={{raw}}
+
+      - name: Login to Dockerhub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Build and push to dockerhub/ECR
+        uses: docker/build-push-action@v4
+        with:
+          context: .
+          file: ci/images/plugin-compiler/Dockerfile
+          platforms: linux/amd64
+          push: true
+          labels: ${{ steps.set-metadata.outputs.labels }}
+          tags: ${{ steps.set-metadata.outputs.tags }}
+          build-args: |
+            GOLANG_CROSS=tykio/golang-cross:${{ env.GOLANG_CROSS }}
