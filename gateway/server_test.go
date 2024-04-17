@@ -3,14 +3,15 @@ package gateway
 import (
 	"context"
 	"errors"
+	"regexp"
 	"testing"
 	"time"
-
-	"github.com/stretchr/testify/assert"
 
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/internal/otel"
 	"github.com/TykTechnologies/tyk/user"
+	"github.com/sirupsen/logrus"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestGateway_afterConfSetup(t *testing.T) {
@@ -215,4 +216,110 @@ func TestGateway_SyncResourcesWithReload(t *testing.T) {
 		assert.Equal(t, 2, *hitCounter)
 	})
 
+}
+
+func TestGateway_getHostDetails(t *testing.T) {
+	type checkFn func(*testing.T, *BufferedLogger, *Gateway)
+
+	var (
+		orig_readPIDFromFile = readPIDFromFile
+		orig_mainLog         = mainLog
+		bl                   = NewBufferingLogger()
+		check                = func(fns ...checkFn) []checkFn { return fns }
+
+		hasErr = func(wantErr bool, errorText string) checkFn {
+			return func(t *testing.T, bl *BufferedLogger, gw *Gateway) {
+				logs := bl.GetLogs(logrus.ErrorLevel)
+				if !wantErr && assert.Empty(t, logs) {
+					return
+				}
+
+				if wantErr && !assert.NotEmpty(t, logs) {
+					return
+				}
+
+				if wantErr && errorText != "" {
+					for _, log := range logs {
+						assert.Contains(t, log.Message, errorText)
+					}
+				}
+			}
+		}
+
+		hasAddress = func(addr string) checkFn {
+			return func(t *testing.T, bl *BufferedLogger, gw *Gateway) {
+				matched, err := regexp.MatchString(addr, gw.hostDetails.Address)
+				if err != nil {
+					t.Errorf("Failed to compile regex pattern: %v", err)
+				}
+				if !matched {
+					t.Errorf("Wanted address %s, got %s", addr, gw.hostDetails.Address)
+				}
+			}
+		}
+	)
+
+	// replace the logger with a mock to capture the errors
+	mainLog = bl.Logger.WithField("prefix", "test")
+
+	// get back the original functions
+	defer func() {
+		readPIDFromFile = orig_readPIDFromFile
+		mainLog = orig_mainLog
+	}()
+
+	tests := []struct {
+		name            string
+		before          func(*Gateway)
+		readPIDFromFile func(string) (int, error)
+		checks          []checkFn
+	}{
+		// {
+		// 	name:            "fail-read-pid",
+		// 	readPIDFromFile: func(file string) (int, error) { return 0, fmt.Errorf("Error opening file") },
+		// 	before: func(gw *Gateway) {
+		// 		gw.SetConfig(config.Config{
+		// 			ListenAddress: "127.0.0.1",
+		// 		})
+		// 	},
+		// 	checks: check(
+		// 		hasErr(true, "Error opening file"),
+		// 	),
+		// },
+		{
+			name:            "success-listen-address-exists",
+			readPIDFromFile: func(file string) (int, error) { return 1000, nil },
+			before: func(gw *Gateway) {
+				gw.SetConfig(config.Config{
+					ListenAddress: "127.0.0.1",
+				})
+			},
+			checks: check(
+				hasErr(false, ""),
+				hasAddress("127.0.0.1"),
+			),
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			readPIDFromFile = tt.readPIDFromFile
+			gw := &Gateway{}
+
+			if tt.before != nil {
+				tt.before(gw)
+			}
+
+			// gw.SetConfig(config.Config{
+			// 	PIDFileLocation: "./test.pid",
+			// })
+
+			// ts := StartTest(tt.before)
+			// defer ts.Close()
+
+			gw.getHostDetails(gw.GetConfig().PIDFileLocation)
+			for _, c := range tt.checks {
+				c(t, bl, gw)
+			}
+		})
+	}
 }

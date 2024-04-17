@@ -216,3 +216,28 @@ func containsEscapedChars(str string) bool {
 
 	return str != unescaped
 }
+
+// getIpAddress returns the first non-loopback IPv4 address found. Returns error if it fails
+// to get the list of addresses. Returns empty if there's no valid IP addresses.
+// netInterfaceAddrs is used to allow mocking in the tests
+var (
+	netInterfaceAddrs = net.InterfaceAddrs
+)
+
+func getIpAddress() (string, error) {
+	// Get the IP address
+	addrs, err := netInterfaceAddrs()
+	if err != nil {
+		return "", err
+	}
+
+	for _, addr := range addrs {
+		if ipnet, ok := addr.(*net.IPNet); ok && !ipnet.IP.IsLoopback() {
+			if ipnet.IP.To4() != nil {
+				return ipnet.IP.String(), nil
+			}
+		}
+	}
+
+	return "", nil
+}

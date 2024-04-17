@@ -203,6 +203,7 @@ type Gateway struct {
 type hostDetails struct {
 	Hostname string
 	PID      int
+	Address  string
 }
 
 func NewGateway(config config.Config, ctx context.Context) *Gateway {
@@ -1349,7 +1350,7 @@ func writePIDFile(file string) error {
 	return ioutil.WriteFile(file, []byte(pid), 0600)
 }
 
-func readPIDFromFile(file string) (int, error) {
+var readPIDFromFile = func(file string) (int, error) {
 	b, err := ioutil.ReadFile(file)
 	if err != nil {
 		return 0, err
@@ -1539,6 +1540,13 @@ func (gw *Gateway) getHostDetails(file string) {
 	}
 	if gw.hostDetails.Hostname, err = os.Hostname(); err != nil {
 		mainLog.Error("Failed to get hostname: ", err)
+	}
+
+	gw.hostDetails.Address = gw.GetConfig().ListenAddress
+	if gw.hostDetails.Address == "" {
+		if gw.hostDetails.Address, err = getIpAddress(); err != nil {
+			mainLog.Error("Failed to get node address: ", err)
+		}
 	}
 }
 
