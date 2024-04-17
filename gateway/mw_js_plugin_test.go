@@ -577,7 +577,8 @@ func TestTykMakeHTTPRequest(t *testing.T) {
 		            "name": "testTykMakeHTTPRequest",
 		            "path": "middleware.js"
 		        }]
-		    }
+		    },
+			"checksum": "d41d8cd98f00b204e9800998ecf8427e"
 		}
 	`,
 		"middleware.js": `
@@ -795,7 +796,8 @@ post.NewProcessRequest(function(request, session) {
 		            "name": "post",
 		            "path": "post.js"
 		        }]
-		    }
+		    },
+			"checksum": "d41d8cd98f00b204e9800998ecf8427e"
 		}
 	`,
 			"pre.js":  pre,
@@ -927,7 +929,7 @@ func TestJSVM_Auth(t *testing.T) {
 					"extractor_config": null
 				}
 			},
-			"checksum": "65694908d609b14df0e280c1a95a8ca4",
+			"checksum": "9529d0f95290c7026dd8049b981ec7b1",
 			"signature": ""
 		}`,
 		"testmw.js": `log("====> JS Auth initialising");
