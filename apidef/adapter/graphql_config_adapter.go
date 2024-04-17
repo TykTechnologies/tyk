@@ -125,13 +125,13 @@ func (g *GraphQLConfigAdapter) EngineConfigV3() (*graphqlv2.EngineV2Configuratio
 			HttpClient:      g.getHttpClient(),
 			StreamingClient: g.getStreamingClient(),
 		}
-	//case GraphQLEngineAdapterTypeUniversalDataGraph:
-	//	engineAdapter = &gqlengineadapter.UniversalDataGraph{
-	//		ApiDefinition:   g.apiDefinition,
-	//		HttpClient:      g.getHttpClient(),
-	//		StreamingClient: g.getStreamingClient(),
-	//		Schema:          g.schema,
-	//}
+	case GraphQLEngineAdapterTypeUniversalDataGraph:
+		engineAdapter = &v2.UniversalDataGraph{
+			ApiDefinition:   g.apiDefinition,
+			HttpClient:      g.getHttpClient(),
+			StreamingClient: g.getStreamingClient(),
+			Schema:          g.schemaV2,
+		}
 	default:
 		return nil, ErrUnsupportedGraphQLExecutionMode
 	}

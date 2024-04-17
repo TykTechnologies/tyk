@@ -453,6 +453,80 @@ func TestGraphQLMiddleware_EngineMode(t *testing.T) {
 				},
 			})
 		})
+
+		t.Run("subgraph", func(t *testing.T) {
+			g.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+				spec.UseKeylessAccess = true
+				spec.Proxy.TargetURL = testSubgraphReviews
+				spec.Proxy.ListenPath = "/"
+				spec.GraphQL.Enabled = true
+				spec.GraphQL.ExecutionMode = apidef.GraphQLExecutionModeSubgraph
+				spec.GraphQL.Version = apidef.GraphQLConfigVersion3Preview
+				spec.GraphQL.Schema = gqlSubgraphSchemaReviews
+			})
+
+			t.Run("should execute subgraph successfully", func(t *testing.T) {
+				request := gql.Request{
+					Query:     gqlSubgraphQueryReviews,
+					Variables: []byte(gqlSubgraphVariables),
+				}
+
+				_, _ = g.Run(t, test.TestCase{
+					Data:          request,
+					BodyMatchFunc: assertReviewsSubgraphResponse(t),
+					Code:          http.StatusOK,
+				})
+			})
+		})
+
+		t.Run("udg", func(t *testing.T) {
+			g.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+				spec.UseKeylessAccess = true
+				spec.Proxy.ListenPath = "/"
+				spec.GraphQL.Enabled = true
+				spec.GraphQL.ExecutionMode = apidef.GraphQLExecutionModeExecutionEngine
+				spec.GraphQL.Schema = testComposedSchemaNotExtended
+				spec.GraphQL.Version = apidef.GraphQLConfigVersion3Preview
+			})
+
+			t.Run("graphql api requests", func(t *testing.T) {
+				//countries1 := gql.Request{
+				//	Query: "query Query { countries { name } }",
+				//}
+				//
+				//countries2 := gql.Request{
+				//	Query: "query Query { countries { name code } }",
+				//}
+
+				people1 := gql.Request{
+					Query: "query Query { people { name } }",
+				}
+
+				//people2 := gql.Request{
+				//	Query: "query Query { people { country { name } name } }",
+				//}
+
+				_, _ = g.Run(t, []test.TestCase{
+					// GraphQL Data Source
+					//{Data: countries1, BodyMatch: `"countries":.*{"name":"Turkey"},{"name":"Russia"}.*`, Code: http.StatusOK},
+					//{Data: countries2, BodyMatch: `"countries":.*{"name":"Turkey","code":"TR"},{"name":"Russia","code":"RU"}.*`, Code: http.StatusOK},
+
+					// REST Data Source
+					{Data: people1, BodyMatch: `"people":.*{"name":"Furkan"},{"name":"Leo"}.*`, Code: http.StatusOK},
+					//{Data: people2, BodyMatch: `"people":.*{"country":{"name":"Turkey"},"name":"Furkan"},{"country":{"name":"Russia"},"name":"Leo"}.*`, Code: http.StatusOK},
+				}...)
+			})
+
+			t.Run("introspection query", func(t *testing.T) {
+				request := gql.Request{
+					OperationName: "IntrospectionQuery",
+					Variables:     nil,
+					Query:         gqlIntrospectionQuery,
+				}
+
+				_, _ = g.Run(t, test.TestCase{Data: request, BodyMatch: `{"kind":"OBJECT","name":"Country"`, Code: http.StatusOK})
+			})
+		})
 	})
 
 	t.Run("graphql engine v2", func(t *testing.T) {

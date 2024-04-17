@@ -20,7 +20,7 @@ type UniversalDataGraph struct {
 	subscriptionClientFactory graphqlDataSource.GraphQLSubscriptionClientFactory
 }
 
-func (u *UniversalDataGraph) EngineConfig() (*graphql.EngineV2Configuration, error) {
+func (u *UniversalDataGraph) EngineConfigV2() (*graphql.EngineV2Configuration, error) {
 	var err error
 	if u.Schema == nil {
 		u.Schema, err = parseSchema(u.ApiDefinition.GraphQL.Schema)

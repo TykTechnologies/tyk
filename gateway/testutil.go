@@ -1453,6 +1453,11 @@ const testComposedSchema = "type Query {countries: [Country] headers: [Header]} 
 	"type Country {code: String name: String} " +
 	"type Header {name:String value: String}"
 
+const testComposedSchemaNotExtended = "type Query {countries: [Country] headers: [Header] people: [Person]} " +
+	"type Person {name: String country: Country} " +
+	"type Country {code: String name: String} " +
+	"type Header {name:String value: String}"
+
 const testGraphQLDataSourceConfigurationV2 = `
 {
 	"kind": "GraphQL",

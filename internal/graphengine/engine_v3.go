@@ -124,6 +124,7 @@ func NewEngineV3(options EngineV3Options) (*EngineV3, error) {
 		gqlTools:               gqlTools,
 		tykVariableReplacer:    options.Injections.TykVariableReplacer,
 		seekReadCloser:         options.Injections.SeekReadCloser,
+		contextCancel:          cancel,
 	}
 
 	if engine.openTelemetry == nil {
@@ -169,8 +170,9 @@ func (e *EngineV3) HasSchema() bool {
 }
 
 func (e *EngineV3) Cancel() {
-	//TODO implement me
-	panic("implement me")
+	if e.contextCancel != nil {
+		e.contextCancel()
+	}
 }
 
 func (e *EngineV3) ProcessAndStoreGraphQLRequest(w http.ResponseWriter, r *http.Request) (err error, statusCode int) {
@@ -197,12 +199,7 @@ func (e *EngineV3) ProcessRequest(ctx context.Context, w http.ResponseWriter, r 
 		return ProxyingRequestFailedErr, http.StatusInternalServerError
 	}
 
-	v1Request := e.ctxRetrieveRequestFunc(r)
-	gqlRequest := graphql.Request{
-		Variables:     v1Request.Variables,
-		Query:         v1Request.Query,
-		OperationName: v1Request.OperationName,
-	}
+	gqlRequest := e.ctxRetrieveRequestFunc(r)
 	normalizationResult, err := gqlRequest.Normalize(e.schema)
 	if err != nil {
 		e.logger.Error("error while normalizing GraphQL request", abstractlogger.Error(err))
