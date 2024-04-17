@@ -1588,3 +1588,35 @@ func TestReplaceSecrets(t *testing.T) {
 	assert.Equal(t, "Ghiur", api1.JWTSigningMethod)
 	assert.Equal(t, "Ghiur", api2.AuthConfigs[apidef.OAuthType].AuthHeaderName)
 }
+
+func TestInternalEndpointMW_TT_11126(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		UpdateAPIVersion(spec, "v1", func(v *apidef.VersionInfo) {
+			assert.NoError(t, json.Unmarshal([]byte(`[
+                    {
+                        "disabled": false,
+                        "add_headers": {
+                            "New-Header": "Value"
+                        },
+                        "path": "/headers",
+                        "method": "GET"
+                    }
+                ]`), &v.ExtendedPaths.TransformHeader))
+			assert.NoError(t, json.Unmarshal([]byte(`[
+                        {
+                            "path": "/headers",
+                            "method": "GET",
+                            "disabled": false
+						}
+				]`), &v.ExtendedPaths.Internal))
+		})
+		spec.Proxy.ListenPath = "/"
+	})
+
+	_, _ = ts.Run(t, []test.TestCase{
+		{Path: "/headers", Code: http.StatusForbidden},
+	}...)
+}

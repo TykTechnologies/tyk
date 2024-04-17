@@ -94,6 +94,11 @@ func (k *AuthKey) ProcessRequest(_ http.ResponseWriter, r *http.Request, _ inter
 		return nil, http.StatusOK
 	}
 
+	// skip auth key check if the request is looped.
+	if ses := ctxGetSession(r); ses != nil && !ctxCheckLimits(r) {
+		return nil, http.StatusOK
+	}
+
 	key, authConfig := k.getAuthToken(k.getAuthType(), r)
 	var certHash string
 

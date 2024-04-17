@@ -49,6 +49,9 @@ var (
 		CoProcessOptions: CoProcessConfig{
 			EnableCoProcess: false,
 		},
+		LivenessCheck: LivenessCheckConfig{
+			CheckDuration: time.Second * 10,
+		},
 	}
 )
 
@@ -156,11 +159,11 @@ type StorageOptionsConf struct {
 	// Maximum TLS version that is supported.
 	// Options: ["1.0", "1.1", "1.2", "1.3"].
 	// Defaults to "1.3".
-	MaxVersion string `json:"max_version"`
+	TLSMaxVersion string `json:"tls_max_version"`
 	// Minimum TLS version that is supported.
 	// Options: ["1.0", "1.1", "1.2", "1.3"].
 	// Defaults to "1.2".
-	MinVersion string `json:"min_version"`
+	TLSMinVersion string `json:"tls_min_version"`
 }
 
 type NormalisedURLConfig struct {
@@ -259,7 +262,9 @@ type HealthCheckConfig struct {
 }
 
 type LivenessCheckConfig struct {
-	// Frequencies of performing interval healthchecks for Redis, Dashboard, and RPC layer. Default: 10 seconds.
+	// Frequencies of performing interval healthchecks for Redis, Dashboard, and RPC layer.
+	// Expressed in Nanoseconds. For example: 1000000000 -> 1s.
+	// Default: 10 seconds.
 	CheckDuration time.Duration `json:"check_duration"`
 }
 
@@ -816,6 +821,7 @@ type Config struct {
 	ProxySSLCipherSuites []string `json:"proxy_ssl_ciphers"`
 
 	// This can specify a default timeout in seconds for upstream API requests.
+	// Default: 30 seconds
 	ProxyDefaultTimeout float64 `json:"proxy_default_timeout"`
 
 	// Disable TLS renegotiation.

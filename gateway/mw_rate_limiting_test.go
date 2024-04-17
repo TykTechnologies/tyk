@@ -3,11 +3,11 @@ package gateway
 import (
 	"net/http"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 
 	"github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
-
 	"github.com/TykTechnologies/tyk/header"
 	"github.com/TykTechnologies/tyk/test"
 	"github.com/TykTechnologies/tyk/user"
@@ -191,137 +191,206 @@ func TestMwRateLimiting_DepthLimit(t *testing.T) {
 	})
 }
 
-func TestMwRateLimiting_CustomRatelimitKey(t *testing.T) {
-	g := StartTest(nil)
-	defer g.Close()
+func providerCustomRatelimitKey(t *testing.T, limiter string) {
+	t.Helper()
 
-	spec := g.Gw.BuildAndLoadAPI(func(spec *APISpec) {
-		spec.UseKeylessAccess = false
-		spec.Proxy.ListenPath = "/"
-	})[0]
+	tcs := []struct {
+		name     string
+		hashKey  bool
+		hashAlgo string
+	}{
+		{
+			name:    "hash_key false",
+			hashKey: false,
+		},
+		{
+			name:     "hash_key true murmur64",
+			hashKey:  true,
+			hashAlgo: "murmur64",
+		},
+		{
+			name:     "hash_key true murmur32",
+			hashKey:  true,
+			hashAlgo: "murmur32",
+		},
+		{
+			name:     "hash_key true sha256",
+			hashKey:  true,
+			hashAlgo: "sha256",
+		},
+	}
 
-	sessionWithQuotaSettings, keyWithQuotaSettings := g.CreateSession(func(s *user.SessionState) {
-		s.MaxQueryDepth = -1
-		s.AccessRights = map[string]user.AccessDefinition{
-			spec.APIID: {
-				APIID:   spec.APIID,
-				APIName: spec.Name,
-				Limit: user.APILimit{
-					QuotaRenewalRate: 0,
-					QuotaMax:         1,
-				},
-			},
-		}
-		s.MetaData = map[string]interface{}{
-			"rate_limit_pattern": "$tyk_meta.developer_id",
-			"developer_id":       "portal-app-1",
-		}
-	})
+	for _, tc := range tcs {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			ts := StartTest(nil)
+			defer ts.Close()
 
-	_, keyWithExceededQuotaSettings := g.CreateSession(func(s *user.SessionState) {
-		s.MaxQueryDepth = -1
-		s.AccessRights = map[string]user.AccessDefinition{
-			spec.APIID: {
-				APIID:   spec.APIID,
-				APIName: spec.Name,
-				Limit: user.APILimit{
-					QuotaRenewalRate: 0,
-					QuotaMax:         1,
-				},
-			},
-		}
-		s.MetaData = map[string]interface{}{
-			"rate_limit_pattern": "$tyk_meta.developer_id",
-			"developer_id":       "portal-app-2",
-		}
-	})
+			globalConf := ts.Gw.GetConfig()
 
-	sessionWithRatelimitSettings, keyWithRatelimitSettings := g.CreateSession(func(s *user.SessionState) {
-		s.MaxQueryDepth = -1
-		s.AccessRights = map[string]user.AccessDefinition{
-			spec.APIID: {
-				APIID:   spec.APIID,
-				APIName: spec.Name,
-				Limit: user.APILimit{
-					Rate: 1,
-					Per:  1000,
-				},
-			},
-		}
-		s.MetaData = map[string]interface{}{
-			"rate_limit_pattern": "$tyk_meta.developer_id",
-			"developer_id":       "portal-app-1",
-		}
-	})
+			globalConf.HashKeys = tc.hashKey
+			globalConf.HashKeyFunction = tc.hashAlgo
 
-	_, keyWithExceededRatelimitSettings := g.CreateSession(func(s *user.SessionState) {
-		s.MaxQueryDepth = -1
-		s.AccessRights = map[string]user.AccessDefinition{
-			spec.APIID: {
-				APIID:   spec.APIID,
-				APIName: spec.Name,
-				Limit: user.APILimit{
-					Rate: 1,
-					Per:  1000,
-				},
-			},
-		}
-		s.MetaData = map[string]interface{}{
-			"rate_limit_pattern": "$tyk_meta.developer_id",
-			"developer_id":       "portal-app-2",
-		}
-	})
+			switch limiter {
+			case "Redis":
+				globalConf.RateLimit.EnableRedisRollingLimiter = true
+			case "Sentinel":
+				globalConf.RateLimit.EnableSentinelRateLimiter = true
+			case "DRL":
+				globalConf.RateLimit.DRLEnableSentinelRateLimiter = true
+			case "NonTransactional":
+				globalConf.RateLimit.EnableNonTransactionalRateLimiter = true
+			default:
+				t.Fatal("There is no such a rate limiter:", limiter)
+			}
 
-	authHeaderWithQuotaSettings := map[string]string{header.Authorization: keyWithQuotaSettings}
-	authHeaderWithExceededQuotaSettings := map[string]string{header.Authorization: keyWithExceededQuotaSettings}
-	authHeaderWithRatelimitSettings := map[string]string{header.Authorization: keyWithRatelimitSettings}
-	authHeaderWithExceededRatelimitSettings := map[string]string{header.Authorization: keyWithExceededRatelimitSettings}
+			ts.Gw.SetConfig(globalConf)
 
-	t.Run("Custom quota key", func(t *testing.T) {
+			ok := ts.Gw.GlobalSessionManager.Store().DeleteAllKeys()
+			assert.True(t, ok)
 
-		// Reach quota.
-		_, _ = g.Run(t, []test.TestCase{
-			{Headers: authHeaderWithQuotaSettings, Code: http.StatusOK},
-			{Headers: authHeaderWithQuotaSettings, Code: http.StatusForbidden},
-		}...)
+			customRateLimitKey := "portal-developer-1" + tc.hashAlgo + limiter
 
-		// Update the custom quota key, the gateway should pick up the new custom key.
-		sessionWithQuotaSettings.MetaData["developer_id"] = "portal-app-2"
-		_ = g.Gw.GlobalSessionManager.UpdateSession(keyWithQuotaSettings, sessionWithQuotaSettings, 0, false)
+			spec := ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+				spec.UseKeylessAccess = false
+				spec.Proxy.ListenPath = "/"
+			})[0]
 
-		// The first call should go through because now the quota is calculated against the new quota key.
-		_, _ = g.Run(t, []test.TestCase{
-			{Headers: authHeaderWithQuotaSettings, Code: http.StatusOK},
-			{Headers: authHeaderWithQuotaSettings, Code: http.StatusForbidden},
-		}...)
+			_, firstQuotaKey := ts.CreateSession(func(s *user.SessionState) {
+				s.MaxQueryDepth = -1
+				s.AccessRights = map[string]user.AccessDefinition{
+					spec.APIID: {
+						APIID:   spec.APIID,
+						APIName: spec.Name,
+						Limit: user.APILimit{
+							QuotaRenewalRate: 0,
+							QuotaMax:         3,
+						},
+					},
+				}
+				s.MetaData = map[string]interface{}{
+					"rate_limit_pattern": "$tyk_meta.developer_id",
+					"developer_id":       customRateLimitKey,
+				}
+			})
 
-		// Now trying to call the same API with the same quota key as in the previous example but from different session.
-		_, _ = g.Run(t, []test.TestCase{
-			{Headers: authHeaderWithExceededQuotaSettings, Code: http.StatusForbidden},
-		}...)
-	})
+			_, secondQuotaKey := ts.CreateSession(func(s *user.SessionState) {
+				s.MaxQueryDepth = -1
+				s.AccessRights = map[string]user.AccessDefinition{
+					spec.APIID: {
+						APIID:   spec.APIID,
+						APIName: spec.Name,
+						Limit: user.APILimit{
+							QuotaRenewalRate: 0,
+							QuotaMax:         3,
+						},
+					},
+				}
+				s.MetaData = map[string]interface{}{
+					"rate_limit_pattern": "$tyk_meta.developer_id",
+					"developer_id":       customRateLimitKey,
+				}
+			})
 
-	t.Run("Custom ratelimit key", func(t *testing.T) {
+			_, firstRLKey := ts.CreateSession(func(s *user.SessionState) {
+				s.MaxQueryDepth = -1
+				s.AccessRights = map[string]user.AccessDefinition{
+					spec.APIID: {
+						APIID:   spec.APIID,
+						APIName: spec.Name,
+						Limit: user.APILimit{
+							Rate: 3,
+							Per:  1000,
+						},
+					},
+				}
+				s.MetaData = map[string]interface{}{
+					"rate_limit_pattern": "$tyk_meta.developer_id",
+					"developer_id":       customRateLimitKey,
+				}
+			})
 
-		// Reach quota.
-		_, _ = g.Run(t, []test.TestCase{
-			{Headers: authHeaderWithRatelimitSettings, Code: http.StatusOK},
-			{Headers: authHeaderWithRatelimitSettings, Code: http.StatusTooManyRequests},
-		}...)
+			_, secondRLKey := ts.CreateSession(func(s *user.SessionState) {
+				s.MaxQueryDepth = -1
+				s.AccessRights = map[string]user.AccessDefinition{
+					spec.APIID: {
+						APIID:   spec.APIID,
+						APIName: spec.Name,
+						Limit: user.APILimit{
+							Rate: 3,
+							Per:  1000,
+						},
+					},
+				}
+				s.MetaData = map[string]interface{}{
+					"rate_limit_pattern": "$tyk_meta.developer_id",
+					"developer_id":       customRateLimitKey,
+				}
+			})
 
-		// Update the custom quota key, the gateway should pick up the new custom key.
-		sessionWithRatelimitSettings.MetaData["developer_id"] = "portal-app-2"
-		_ = g.Gw.GlobalSessionManager.UpdateSession(keyWithRatelimitSettings, sessionWithRatelimitSettings, 0, false)
+			authHeaderFirstQuotaKey := map[string]string{header.Authorization: firstQuotaKey}
+			authHeaderSecondQuotaKey := map[string]string{header.Authorization: secondQuotaKey}
+			authHeaderFirstRLKey := map[string]string{header.Authorization: firstRLKey}
+			authHeaderSecondRLKey := map[string]string{header.Authorization: secondRLKey}
 
-		// The first call should go through because now the quota is calculated against the new quota key.
-		_, _ = g.Run(t, []test.TestCase{
-			{Headers: authHeaderWithRatelimitSettings, Code: http.StatusOK},
-			{Headers: authHeaderWithRatelimitSettings, Code: http.StatusTooManyRequests},
-		}...)
+			t.Run("Custom quota key for "+limiter, func(t *testing.T) {
 
-		// Now trying to call the same API with the same ratelimit key as in the previous example but from different session.
-		_, _ = g.Run(t, []test.TestCase{
-			{Headers: authHeaderWithExceededRatelimitSettings, Code: http.StatusTooManyRequests},
-		}...)
-	})
+				// Make first two calls with the first key. Both calls should be 200 OK since the quota is 3 calls.
+				_, _ = ts.Run(t, []test.TestCase{
+					{Headers: authHeaderFirstQuotaKey, Code: http.StatusOK},
+					{Headers: authHeaderFirstQuotaKey, Code: http.StatusOK},
+				}...)
+
+				// The first call with the second key should be 200 OK.
+				// The next call should be 403 since the quota of 3 calls is shared between two credentials.
+				_, _ = ts.Run(t, []test.TestCase{
+					{Headers: authHeaderSecondQuotaKey, Code: http.StatusOK},
+					{Headers: authHeaderSecondQuotaKey, Code: http.StatusForbidden},
+				}...)
+
+				// Since both keys have the same ratelimit key, the quota for the first key should be already spent.
+				_, _ = ts.Run(t, []test.TestCase{
+					{Headers: authHeaderFirstQuotaKey, Code: http.StatusForbidden},
+				}...)
+			})
+
+			t.Run("Custom ratelimit key for "+limiter, func(t *testing.T) {
+
+				// Make first two calls with the first key. Both calls should be 200 OK since the RL is 3 calls / 1000 s.
+				_, _ = ts.Run(t, []test.TestCase{
+					{Headers: authHeaderFirstRLKey, Code: http.StatusOK, Delay: 100 * time.Millisecond},
+					{Headers: authHeaderFirstRLKey, Code: http.StatusOK, Delay: 100 * time.Millisecond},
+				}...)
+
+				// The first call with the second key should be 200 OK.
+				// The next call should be 429 since the ratelimit of 3 calls / 1000 s is shared between two credentials.
+				_, _ = ts.Run(t, []test.TestCase{
+					{Headers: authHeaderSecondRLKey, Code: http.StatusOK, Delay: 100 * time.Millisecond},
+					{Headers: authHeaderSecondRLKey, Code: http.StatusTooManyRequests, Delay: 100 * time.Millisecond},
+				}...)
+
+				// Since both keys have the same ratelimit key, the raltelimit for the first key should be already spent.
+				_, _ = ts.Run(t, []test.TestCase{
+					{Headers: authHeaderFirstRLKey, Code: http.StatusTooManyRequests, Delay: 100 * time.Millisecond},
+				}...)
+			})
+
+		})
+	}
+}
+
+func TestMwRateLimiting_CustomRatelimitKeyRedis(t *testing.T) {
+	providerCustomRatelimitKey(t, "Redis")
+}
+
+func TestMwRateLimiting_CustomRatelimitKeySentinel(t *testing.T) {
+	providerCustomRatelimitKey(t, "Sentinel")
+}
+
+func TestMwRateLimiting_CustomRatelimitKeyDRL(t *testing.T) {
+	providerCustomRatelimitKey(t, "DRL")
+}
+
+func TestMwRateLimiting_CustomRatelimitKeyNonTransactional(t *testing.T) {
+	providerCustomRatelimitKey(t, "NonTransactional")
 }

@@ -12,8 +12,8 @@ import (
 	"github.com/getkin/kin-openapi/openapi3"
 
 	"github.com/TykTechnologies/graphql-go-tools/pkg/astprinter"
-	"github.com/TykTechnologies/graphql-go-tools/pkg/openapi"
 	"github.com/TykTechnologies/graphql-go-tools/pkg/operationreport"
+	"github.com/TykTechnologies/graphql-translator/openapi"
 	"github.com/TykTechnologies/tyk/apidef"
 )
 

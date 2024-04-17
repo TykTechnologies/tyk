@@ -455,8 +455,8 @@ func (a *APIDefinition) SetDisabledFlags() {
 		}
 	}
 
-	if a.GlobalRateLimit.Per == 0 && a.GlobalRateLimit.Rate == 0 {
-		a.DisableRateLimit = true
+	if a.GlobalRateLimit.Per <= 0 || a.GlobalRateLimit.Rate <= 0 {
+		a.GlobalRateLimit.Disabled = true
 	}
 }
 
@@ -490,7 +490,7 @@ func (a *APIDefinition) migrateResponseProcessors() {
 }
 
 func (a *APIDefinition) migrateGlobalRateLimit() {
-	if a.GlobalRateLimit.Per == 0 && a.GlobalRateLimit.Rate == 0 {
-		a.DisableRateLimit = true
+	if a.GlobalRateLimit.Per <= 0 || a.GlobalRateLimit.Rate <= 0 {
+		a.GlobalRateLimit.Disabled = true
 	}
 }

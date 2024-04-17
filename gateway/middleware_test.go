@@ -405,3 +405,58 @@ func TestCopyAllowedURLs(t *testing.T) {
 		})
 	}
 }
+
+func TestQuotaNotAppliedWithURLRewrite(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	spec := ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		spec.Proxy.ListenPath = "/quota-test"
+		spec.UseKeylessAccess = false
+		UpdateAPIVersion(spec, "Default", func(v *apidef.VersionInfo) {
+			v.ExtendedPaths.URLRewrite = []apidef.URLRewriteMeta{{
+				Path:         "/abc",
+				Method:       http.MethodGet,
+				MatchPattern: "/abc",
+				RewriteTo:    "tyk://self/anything",
+			}}
+		})
+	})[0]
+
+	_, authKey := ts.CreateSession(func(s *user.SessionState) {
+		s.AccessRights = map[string]user.AccessDefinition{
+			spec.APIID: {
+				APIName:  spec.Name,
+				APIID:    spec.APIID,
+				Versions: []string{"default"},
+				Limit: user.APILimit{
+					QuotaMax:         2,
+					QuotaRenewalRate: 3600,
+				},
+				AllowanceScope: spec.APIID,
+			},
+		}
+		s.OrgID = spec.OrgID
+	})
+
+	authorization := map[string]string{
+		"Authorization": authKey,
+	}
+	_, _ = ts.Run(t, []test.TestCase{
+		{
+			Headers: authorization,
+			Path:    "/quota-test/abc",
+			Code:    http.StatusOK,
+		},
+		{
+			Headers: authorization,
+			Path:    "/quota-test/abc",
+			Code:    http.StatusOK,
+		},
+		{
+			Headers: authorization,
+			Path:    "/quota-test/abc",
+			Code:    http.StatusForbidden,
+		},
+	}...)
+}

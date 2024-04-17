@@ -4,6 +4,8 @@ import (
 	"context"
 	"sync"
 
+	semconv "github.com/TykTechnologies/opentelemetry/semconv/v1.0.0"
+
 	"github.com/TykTechnologies/graphql-go-tools/pkg/ast"
 	"github.com/TykTechnologies/graphql-go-tools/pkg/engine/plan"
 	"github.com/TykTechnologies/graphql-go-tools/pkg/engine/resolve"
@@ -11,7 +13,6 @@ import (
 	"github.com/TykTechnologies/graphql-go-tools/pkg/lexer/literal"
 	"github.com/TykTechnologies/graphql-go-tools/pkg/operationreport"
 	"github.com/TykTechnologies/graphql-go-tools/pkg/postprocess"
-	semconv "github.com/TykTechnologies/opentelemetry/semconv/v1.0.0"
 	"github.com/TykTechnologies/tyk/internal/otel"
 )
 
@@ -61,6 +62,12 @@ func (o *OtelGraphqlEngineV2Detailed) Normalize(operation *graphql.Request) erro
 	defer span.End()
 	err := o.engine.Normalize(operation)
 	if err != nil {
+		operationType, _ := operation.OperationType()
+		span.SetAttributes(
+			semconv.GraphQLOperationName(operation.OperationName),
+			semconv.GraphQLOperationType(PrintOperationType(ast.OperationType(operationType))),
+			semconv.GraphQLDocument(operation.Query),
+		)
 		span.SetStatus(otel.SPAN_STATUS_ERROR, "request normalization failed")
 		return err
 	}
@@ -83,7 +90,7 @@ func (o *OtelGraphqlEngineV2Detailed) ValidateForSchema(operation *graphql.Reque
 
 	span.SetAttributes(
 		semconv.GraphQLOperationName(operation.OperationName),
-		semconv.GraphQLOperationType(printOperationType(ast.OperationType(operationType))),
+		semconv.GraphQLOperationType(PrintOperationType(ast.OperationType(operationType))),
 		semconv.GraphQLDocument(operation.Query),
 	)
 
@@ -173,7 +180,7 @@ func NewOtelGraphqlEngineV2Detailed(tracerProvider otel.TracerProvider, engine E
 	return otelEngine, nil
 }
 
-func printOperationType(operationType ast.OperationType) string {
+func PrintOperationType(operationType ast.OperationType) string {
 	switch operationType {
 	case ast.OperationTypeQuery:
 		return string(literal.QUERY)
