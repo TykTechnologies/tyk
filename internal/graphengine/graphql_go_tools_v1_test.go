@@ -886,6 +886,30 @@ func TestReverseProxyPreHandlerV1_PreHandle(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, ReverseProxyTypeNone, result)
 	})
+
+	t.Run("should return ReverseProxyTypePreFlight if CORS pre flight is true", func(t *testing.T) {
+		operation := `{ hello }`
+
+		request, err := http.NewRequest(
+			http.MethodOptions,
+			"http://example.com",
+			bytes.NewBuffer([]byte(
+				fmt.Sprintf(`{"query": "%s"}`, operation),
+			)))
+		require.NoError(t, err)
+
+		reverseProxyPreHandler := newTestReverseProxyPreHandlerV1(t)
+		reverseProxyPreHandler.ctxRetrieveGraphQLRequest = func(r *http.Request) *graphql.Request {
+			return nil
+		}
+
+		result, err := reverseProxyPreHandler.PreHandle(ReverseProxyParams{
+			OutRequest:      request,
+			IsCORSPreflight: true,
+		})
+		assert.NoError(t, err)
+		assert.Equal(t, ReverseProxyTypePreFlight, result)
+	})
 }
 
 func newTestGraphqlRequestProcessorV1(t *testing.T) *graphqlRequestProcessorV1 {
