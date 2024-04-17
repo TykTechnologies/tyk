@@ -24,4 +24,5 @@ const (
 	ReverseProxyTypeIntrospection
 	ReverseProxyTypeWebsocketUpgrade
 	ReverseProxyTypeGraphEngine
+	ReverseProxyTypePreFlight
 )

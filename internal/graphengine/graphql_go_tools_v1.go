@@ -494,9 +494,7 @@ func (r *reverseProxyPreHandlerV1) PreHandle(params ReverseProxyParams) (reverse
 
 	switch {
 	case params.IsCORSPreflight:
-		if params.NeedsEngine {
-			return ReverseProxyTypeNone, nil
-		}
+		return ReverseProxyTypePreFlight, nil
 	case params.IsWebSocketUpgrade:
 		if params.NeedsEngine {
 			return ReverseProxyTypeWebsocketUpgrade, nil

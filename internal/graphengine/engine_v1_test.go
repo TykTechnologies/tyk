@@ -270,10 +270,64 @@ func TestEngineV1_HandleReverseProxy(t *testing.T) {
 		assert.Equal(t, 200, result.StatusCode)
 		assert.Equal(t, `{"data":{"hello":"world"}}`, body.String())
 	})
+
+	t.Run("should return error if reverse proxy pre handler returns proxy type preflight and execution mode is NOT proxy only", func(t *testing.T) {
+		engine, mocks := newTestEngineV1(t, withExecutionModeTestEngineV1(apidef.GraphQLExecutionModeSubgraph))
+		defer mocks.controller.Finish()
+		params := ReverseProxyParams{
+			OutRequest:      &http.Request{},
+			IsCORSPreflight: true,
+		}
+		mocks.reverseProxyPreHandler.EXPECT().PreHandle(gomock.Eq(params)).
+			Return(ReverseProxyTypePreFlight, nil)
+
+		engine.ctxRetrieveRequestFunc = func(r *http.Request) *graphql.Request {
+			return &graphql.Request{
+				Query: "query { hello }",
+			}
+		}
+
+		result, hijacked, err := engine.HandleReverseProxy(params)
+		var body bytes.Buffer
+		if result != nil {
+			_, _ = body.ReadFrom(result.Body)
+		}
+
+		assert.Error(t, err)
+		assert.False(t, hijacked)
+		assert.Nil(t, result)
+	})
+
+	t.Run("should return successful if reverse proxy pre handler returns proxy type preflight and execution mode is proxy only", func(t *testing.T) {
+		engine, mocks := newTestEngineV1(t, withExecutionModeTestEngineV1(apidef.GraphQLExecutionModeProxyOnly))
+		defer mocks.controller.Finish()
+		params := ReverseProxyParams{
+			OutRequest:      &http.Request{},
+			IsCORSPreflight: true,
+		}
+		mocks.reverseProxyPreHandler.EXPECT().PreHandle(gomock.Eq(params)).
+			Return(ReverseProxyTypePreFlight, nil)
+
+		engine.ctxRetrieveRequestFunc = func(r *http.Request) *graphql.Request {
+			return &graphql.Request{}
+		}
+
+		result, hijacked, err := engine.HandleReverseProxy(params)
+		var body bytes.Buffer
+		if result != nil {
+			_, _ = body.ReadFrom(result.Body)
+		}
+
+		assert.NoError(t, err)
+		assert.False(t, hijacked)
+		assert.Nil(t, result)
+	})
+
 }
 
 type testEngineV1Options struct {
-	targetURL string
+	targetURL     string
+	executionMode apidef.GraphQLExecutionMode
 }
 
 type testEngineV1Option func(*testEngineV1Options)
@@ -281,6 +335,12 @@ type testEngineV1Option func(*testEngineV1Options)
 func withTargetURLTestEngineV1(targetURL string) testEngineV1Option {
 	return func(options *testEngineV1Options) {
 		options.targetURL = targetURL
+	}
+}
+
+func withExecutionModeTestEngineV1(executionMode apidef.GraphQLExecutionMode) testEngineV1Option {
+	return func(options *testEngineV1Options) {
+		options.executionMode = executionMode
 	}
 }
 
@@ -299,19 +359,21 @@ func newTestEngineV1(t *testing.T, options ...testEngineV1Option) (*EngineV1, en
 		reverseProxyPreHandler: NewMockReverseProxyPreHandler(ctrl),
 	}
 
+	apiDefinition := generateApiDefinitionEngineV1(definedOptions.targetURL, definedOptions.executionMode)
 	gqlTools := graphqlGoToolsV1{}
 	schema, err := gqlTools.parseSchema(testSchemaEngineV1)
 	require.NoError(t, err)
 
 	executionEngine, err := gqlTools.createExecutionEngine(createExecutionEngineV1Params{
 		logger: abstractlogger.NoopLogger,
-		apiDef: generateApiDefinitionEngineV1(definedOptions.targetURL),
+		apiDef: apiDefinition,
 		schema: schema,
 	})
 
 	engine := &EngineV1{
 		ExecutionEngine:         executionEngine,
 		Schema:                  schema,
+		ApiDefinition:           apiDefinition,
 		logger:                  abstractlogger.NoopLogger,
 		graphqlRequestProcessor: mocks.requestProcessor,
 		complexityChecker:       mocks.complexityChecker,
@@ -322,11 +384,11 @@ func newTestEngineV1(t *testing.T, options ...testEngineV1Option) (*EngineV1, en
 	return engine, mocks
 }
 
-func generateApiDefinitionEngineV1(targetURL string) *apidef.APIDefinition {
+func generateApiDefinitionEngineV1(targetURL string, executionMode apidef.GraphQLExecutionMode) *apidef.APIDefinition {
 	return &apidef.APIDefinition{
 		GraphQL: apidef.GraphQLConfig{
 			Enabled:          true,
-			ExecutionMode:    apidef.GraphQLExecutionModeExecutionEngine,
+			ExecutionMode:    executionMode,
 			Version:          apidef.GraphQLConfigVersion1,
 			Schema:           testSchemaEngineV1,
 			LastSchemaUpdate: nil,
