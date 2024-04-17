@@ -573,7 +573,7 @@ func (s *OAS) getOperationID(inPath, method string) string {
 			if part.isRegex {
 				schema := &openapi3.SchemaRef{
 					Value: &openapi3.Schema{
-						Type:    "string",
+						Type:    &openapi3.Types{openapi3.TypeString},
 						Pattern: part.value,
 					},
 				}
