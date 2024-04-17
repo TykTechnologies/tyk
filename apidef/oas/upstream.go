@@ -29,6 +29,43 @@ type Upstream struct {
 
 	// RateLimit contains the configuration related to API level rate limit.
 	RateLimit *RateLimit `bson:"rateLimit,omitempty" json:"rateLimit,omitempty"`
+
+	// TokenExchange contains the configuration related to security token exchange.
+	TokenExchange *TokenExchangeOptions `bson:"tokenExchange" json:"tokenExchange"`
+}
+
+type TokenExchangeOptions struct {
+	Enabled       bool              `bson:"enabled" json:"enabled"`
+	TokenEndpoint string            `bson:"tokenEndpoint" json:"tokenEndpoint"`
+	ClientID      string            `bson:"clientId" json:"clientId"`
+	ClientSecret  string            `bson:"clientSecret" json:"clientSecret"`
+	Audience      []string          `bson:"audience" json:"audience"`
+	CustomParams  map[string]string `bson:"customParams" json:"customParams"`
+}
+
+func (t *TokenExchangeOptions) Fill(tokenExchangeOpts apidef.TokenExchangeOptions) {
+	t.Enabled = tokenExchangeOpts.Enable
+	t.TokenEndpoint = tokenExchangeOpts.TokenEndpoint
+	t.ClientID = tokenExchangeOpts.ClientID
+	t.ClientSecret = tokenExchangeOpts.ClientSecret
+	t.Audience = tokenExchangeOpts.Audience
+
+	if !ShouldOmit(tokenExchangeOpts.CustomParams) {
+		t.CustomParams = tokenExchangeOpts.CustomParams
+	}
+}
+
+func (t *TokenExchangeOptions) ExtractTo(tokenExchangeOpts *apidef.TokenExchangeOptions) {
+	tokenExchangeOpts.Enable = t.Enabled
+	tokenExchangeOpts.TokenEndpoint = t.TokenEndpoint
+	tokenExchangeOpts.ClientID = t.ClientID
+	tokenExchangeOpts.ClientSecret = t.ClientSecret
+	tokenExchangeOpts.Audience = t.Audience
+	tokenExchangeOpts.CustomParams = t.CustomParams
+
+	if !ShouldOmit(t.CustomParams) {
+		tokenExchangeOpts.CustomParams = t.CustomParams
+	}
 }
 
 // Fill fills *Upstream from apidef.APIDefinition.
@@ -78,6 +115,15 @@ func (u *Upstream) Fill(api apidef.APIDefinition) {
 	u.RateLimit.Fill(api)
 	if ShouldOmit(u.RateLimit) {
 		u.RateLimit = nil
+	}
+
+	if u.TokenExchange == nil {
+		u.TokenExchange = &TokenExchangeOptions{}
+	}
+
+	u.TokenExchange.Fill(api.TokenExchangeOptions)
+	if ShouldOmit(u.TokenExchange) {
+		u.TokenExchange = nil
 	}
 }
 
