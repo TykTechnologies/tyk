@@ -32,7 +32,7 @@ func (u *UniversalDataGraph) EngineConfig() (*graphql.EngineV2Configuration, err
 	}
 
 	conf := graphql.NewEngineV2Configuration(u.Schema)
-	conf.EnableSingleFlight(true)
+	conf.EnableSingleFlight(false)
 
 	fieldConfigs := u.engineConfigV2FieldConfigs()
 	datsSources, err := u.engineConfigV2DataSources()

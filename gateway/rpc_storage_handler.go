@@ -151,14 +151,22 @@ func (r *RPCStorageHandler) Connect() bool {
 
 func (r *RPCStorageHandler) buildNodeInfo() []byte {
 	config := r.Gw.GetConfig()
+	checkDuration := config.LivenessCheck.CheckDuration
+	var intCheckDuration int64 = 10
+	if checkDuration != 0 {
+		// NodeData.TTL expects an int64 value, so we're getting the number of seconds expressed in int64 instead of time.Second
+		intCheckDuration = int64(checkDuration / time.Second)
+	}
+
 	node := apidef.NodeData{
-		NodeID:      r.Gw.GetNodeID(),
-		GroupID:     config.SlaveOptions.GroupID,
-		APIKey:      config.SlaveOptions.APIKey,
-		NodeVersion: VERSION,
-		TTL:         int64(config.LivenessCheck.CheckDuration),
-		Tags:        config.DBAppConfOptions.Tags,
-		Health:      r.Gw.getHealthCheckInfo(),
+		NodeID:          r.Gw.GetNodeID(),
+		GroupID:         config.SlaveOptions.GroupID,
+		APIKey:          config.SlaveOptions.APIKey,
+		NodeVersion:     VERSION,
+		TTL:             intCheckDuration,
+		NodeIsSegmented: config.DBAppConfOptions.NodeIsSegmented,
+		Tags:            config.DBAppConfOptions.Tags,
+		Health:          r.Gw.getHealthCheckInfo(),
 		Stats: apidef.GWStats{
 			APIsCount:     r.Gw.apisByIDLen(),
 			PoliciesCount: r.Gw.policiesByIDLen(),
@@ -990,6 +998,7 @@ func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string, orgId string) 
 	CertificatesToRemove := map[string]string{}
 	CertificatesToAdd := map[string]string{}
 	OauthClients := map[string]string{}
+	apiIDsToDeleteCache := make([]string, 0)
 
 	for _, key := range keys {
 		splitKeys := strings.Split(key, ":")
@@ -1012,6 +1021,9 @@ func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string, orgId string) 
 				notRegularKeys[key] = true
 			case OauthClientAdded, OauthClientUpdated, OauthClientRemoved:
 				OauthClients[splitKeys[0]] = action
+				notRegularKeys[key] = true
+			case NoticeDeleteAPICache.String():
+				apiIDsToDeleteCache = append(apiIDsToDeleteCache, splitKeys[0])
 				notRegularKeys[key] = true
 			default:
 				log.Debug("ignoring processing of action:", action)
@@ -1108,6 +1120,14 @@ func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string, orgId string) 
 		}
 	}
 
+	for _, apiID := range apiIDsToDeleteCache {
+		if r.Gw.invalidateAPICache(apiID) {
+			log.WithField("apiID", apiID).Info("cache invalidated")
+			continue
+		}
+
+		log.WithField("apiID", apiID).Error("cache invalidation failed")
+	}
 	// Notify rest of gateways in cluster to flush cache
 	n := Notification{
 		Command: KeySpaceUpdateNotification,

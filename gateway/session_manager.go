@@ -31,8 +31,11 @@ type PublicSession struct {
 }
 
 const (
-	QuotaKeyPrefix     = "quota-"
-	RateLimitKeyPrefix = "rate-limit-"
+	// QuotaKeyPrefix serves as a standard prefix for generating quota keys.
+	QuotaKeyPrefix = "quota-"
+	// RateLimitKeyPrefix serves as a standard prefix for generating rate limit keys.
+	RateLimitKeyPrefix          = "rate-limit-"
+	SentinelRateLimitKeyPostfix = ".BLOCKED"
 )
 
 // SessionLimiter is the rate limiter for the API, use ForwardMessage() to
@@ -146,11 +149,16 @@ const (
 	sessionFailInternalServerError
 )
 
-func (l *SessionLimiter) limitSentinel(currentSession *user.SessionState, key string, rateScope string, store storage.Handler,
-	globalConf *config.Config, apiLimit *user.APILimit, dryRun bool) bool {
+func (l *SessionLimiter) limitSentinel(currentSession *user.SessionState, key string, rateScope string, useCustomKey bool,
+	store storage.Handler, globalConf *config.Config, apiLimit *user.APILimit, dryRun bool) bool {
 
 	rateLimiterKey := RateLimitKeyPrefix + rateScope + currentSession.KeyHash()
-	rateLimiterSentinelKey := RateLimitKeyPrefix + rateScope + currentSession.KeyHash() + ".BLOCKED"
+	rateLimiterSentinelKey := RateLimitKeyPrefix + rateScope + currentSession.KeyHash() + SentinelRateLimitKeyPostfix
+
+	if useCustomKey {
+		rateLimiterKey = RateLimitKeyPrefix + rateScope + key
+		rateLimiterSentinelKey = RateLimitKeyPrefix + rateScope + key + SentinelRateLimitKeyPostfix
+	}
 
 	defer func() {
 		go l.doRollingWindowWrite(key, rateLimiterKey, rateLimiterSentinelKey, currentSession, store, globalConf, apiLimit, dryRun)
@@ -166,11 +174,16 @@ func (l *SessionLimiter) limitSentinel(currentSession *user.SessionState, key st
 	return false
 }
 
-func (l *SessionLimiter) limitRedis(currentSession *user.SessionState, key string, rateScope string, store storage.Handler,
-	globalConf *config.Config, apiLimit *user.APILimit, dryRun bool) bool {
+func (l *SessionLimiter) limitRedis(currentSession *user.SessionState, key string, rateScope string, useCustomKey bool,
+	store storage.Handler, globalConf *config.Config, apiLimit *user.APILimit, dryRun bool) bool {
 
 	rateLimiterKey := RateLimitKeyPrefix + rateScope + currentSession.KeyHash()
-	rateLimiterSentinelKey := RateLimitKeyPrefix + rateScope + currentSession.KeyHash() + ".BLOCKED"
+	rateLimiterSentinelKey := RateLimitKeyPrefix + rateScope + currentSession.KeyHash() + SentinelRateLimitKeyPostfix
+
+	if useCustomKey {
+		rateLimiterKey = RateLimitKeyPrefix + rateScope + key
+		rateLimiterSentinelKey = RateLimitKeyPrefix + rateScope + key + SentinelRateLimitKeyPostfix
+	}
 
 	if l.doRollingWindowWrite(key, rateLimiterKey, rateLimiterSentinelKey, currentSession, store, globalConf, apiLimit, dryRun) {
 		return true
@@ -179,9 +192,14 @@ func (l *SessionLimiter) limitRedis(currentSession *user.SessionState, key strin
 }
 
 func (l *SessionLimiter) limitDRL(currentSession *user.SessionState, key string, rateScope string,
-	apiLimit *user.APILimit, dryRun bool) bool {
+	useCustomKey bool, apiLimit *user.APILimit, dryRun bool) bool {
 
 	bucketKey := key + ":" + rateScope + currentSession.LastUpdated
+
+	if useCustomKey {
+		bucketKey = key + ":" + rateScope
+	}
+
 	currRate := apiLimit.Rate
 	per := apiLimit.Per
 
@@ -238,6 +256,9 @@ func (l *SessionLimiter) ForwardMessage(r *http.Request, currentSession *user.Se
 		return sessionFailRateLimit
 	}
 
+	// If quotaKey is not set then the default ratelimit keys should be used.
+	useCustomRateLimitKey := quotaKey != ""
+
 	// If rate is -1 or 0, it means unlimited and no need for rate limiting.
 	if enableRL && accessDef.Limit.Rate > 0 {
 		rateScope := ""
@@ -259,11 +280,11 @@ func (l *SessionLimiter) ForwardMessage(r *http.Request, currentSession *user.Se
 
 		switch {
 		case globalConf.EnableSentinelRateLimiter:
-			if l.limitSentinel(currentSession, rateLimitKey, rateScope, store, globalConf, &accessDef.Limit, dryRun) {
+			if l.limitSentinel(currentSession, rateLimitKey, rateScope, useCustomRateLimitKey, store, globalConf, &accessDef.Limit, dryRun) {
 				return sessionFailRateLimit
 			}
 		case globalConf.EnableRedisRollingLimiter:
-			if l.limitRedis(currentSession, rateLimitKey, rateScope, store, globalConf, &accessDef.Limit, dryRun) {
+			if l.limitRedis(currentSession, rateLimitKey, rateScope, useCustomRateLimitKey, store, globalConf, &accessDef.Limit, dryRun) {
 				return sessionFailRateLimit
 			}
 		default:
@@ -281,11 +302,11 @@ func (l *SessionLimiter) ForwardMessage(r *http.Request, currentSession *user.Se
 			if n <= 1 || n*c < cost {
 				// If we have 1 server, there is no need to strain redis at all the leaky
 				// bucket algorithm will suffice.
-				if l.limitDRL(currentSession, rateLimitKey, rateScope, &accessDef.Limit, dryRun) {
+				if l.limitDRL(currentSession, rateLimitKey, rateScope, useCustomRateLimitKey, &accessDef.Limit, dryRun) {
 					return sessionFailRateLimit
 				}
 			} else {
-				if l.limitRedis(currentSession, rateLimitKey, rateScope, store, globalConf, &accessDef.Limit, dryRun) {
+				if l.limitRedis(currentSession, rateLimitKey, rateScope, useCustomRateLimitKey, store, globalConf, &accessDef.Limit, dryRun) {
 					return sessionFailRateLimit
 				}
 			}
@@ -312,6 +333,10 @@ func (l *SessionLimiter) RedisQuotaExceeded(r *http.Request, currentSession *use
 		// No quota set
 		return false
 	}
+
+	defer func() {
+		ctxScheduleSessionUpdate(r)
+	}()
 
 	quotaScope := ""
 	if scope != "" {
@@ -365,7 +390,6 @@ func (l *SessionLimiter) RedisQuotaExceeded(r *http.Request, currentSession *use
 	// If this is a new Quota period, ensure we let the end user know
 	if qInt == 1 {
 		quotaRenews = time.Now().Unix() + quotaRenewalRate
-		ctxScheduleSessionUpdate(r)
 	}
 
 	// If not, pass and set the values of the session to quotamax - counter

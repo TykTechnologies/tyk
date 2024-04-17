@@ -929,7 +929,7 @@ func TestReq(t testing.TB, method, urlStr string, body interface{}) *http.Reques
 func (gw *Gateway) CreateDefinitionFromString(defStr string) *APISpec {
 	loader := APIDefinitionLoader{Gw: gw}
 	def := loader.ParseDefinition(strings.NewReader(defStr))
-	spec := loader.MakeSpec(&nestedApiDefinition{APIDefinition: &def}, nil)
+	spec, _ := loader.MakeSpec(&nestedApiDefinition{APIDefinition: &def}, nil)
 	return spec
 }
 

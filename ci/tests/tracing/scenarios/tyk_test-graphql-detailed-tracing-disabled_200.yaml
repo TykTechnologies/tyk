@@ -8,7 +8,7 @@ spec:
     httpRequest:
       method: POST
       url: tyk:8080/test-graphql-detailed-tracing-disabled/test-graphql-detailed-tracing-disabled
-      body: "{\n  \"query\": \"{\\n  country(code: \\\"NG\\\"){\\n    name\\n  }\\n}\"\n}"
+      body: "{\n  \"query\": \"query test {\\n  country(code: \\\"NG\\\"){\\n    name\\n  }\\n}\",\n  \"operationName\": \"test\"\n}"
       headers:
         - key: Content-Type
           value: application/json
@@ -23,3 +23,9 @@ spec:
       name: Make sure there is no subspan for graphql engine
       assertions:
         - attr:tracetest.selected_spans.count = 0
+    - selector: span[tracetest.span.type="general" name="GraphqlEngine"]
+      name: ensure span attributes are correct
+      assertions:
+        - "attr:graphql.document = 'query test {\n  country(code: \"NG\"){\n    name\n  }\n}'"
+        - attr:graphql.operation.name = "test"
+        - attr:graphql.operation.type = "query"
