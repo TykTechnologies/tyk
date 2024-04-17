@@ -23,7 +23,7 @@ func TestOAS(t *testing.T) {
 
 		var emptyOASPaths OAS
 		emptyOASPaths.Components = &openapi3.Components{}
-		emptyOASPaths.Paths = make(openapi3.Paths)
+		emptyOASPaths.Paths = openapi3.NewPaths()
 		emptyOASPaths.SetTykExtension(&XTykAPIGateway{})
 
 		var convertedAPI apidef.APIDefinition
@@ -52,7 +52,7 @@ func TestOAS(t *testing.T) {
 		resultOAS.Fill(convertedAPI)
 
 		// No paths in base OAS produce empty paths{} when converted back
-		nilOASPaths.Paths = make(openapi3.Paths)
+		nilOASPaths.Paths = openapi3.NewPaths()
 		nilOASPaths.Extensions = nil
 		assert.Equal(t, nilOASPaths, resultOAS)
 	})
@@ -74,14 +74,13 @@ func TestOAS(t *testing.T) {
 				},
 			},
 		})
-		oasWithPaths.Paths = openapi3.Paths{
-			"/user": {
-				Get: &openapi3.Operation{
-					OperationID: operationID,
-					Responses:   openapi3.NewResponses(),
-				},
+		oasWithPaths.Paths = openapi3.NewPaths()
+		oasWithPaths.Paths.Set("/user", &openapi3.PathItem{
+			Get: &openapi3.Operation{
+				OperationID: operationID,
+				Responses:   openapi3.NewResponses(),
 			},
-		}
+		})
 
 		var convertedAPI apidef.APIDefinition
 		oasWithPaths.ExtractTo(&convertedAPI)
@@ -808,24 +807,24 @@ func TestOAS_Clone(t *testing.T) {
 }
 
 func BenchmarkOAS_Clone(b *testing.B) {
+	paths := openapi3.NewPaths()
+	res := openapi3.NewResponses()
+	res.Set("200", &openapi3.ResponseRef{
+		Value: &openapi3.Response{
+			Description: getStrPointer("some example endpoint"),
+		},
+	})
+	paths.Set("/get", &openapi3.PathItem{
+		Get: &openapi3.Operation{
+			Responses: res,
+		},
+	})
 	oas := &OAS{
 		T: openapi3.T{
 			Info: &openapi3.Info{
 				Title: "my-oas-doc",
 			},
-			Paths: map[string]*openapi3.PathItem{
-				"/get": {
-					Get: &openapi3.Operation{
-						Responses: openapi3.Responses{
-							"200": &openapi3.ResponseRef{
-								Value: &openapi3.Response{
-									Description: getStrPointer("some example endpoint"),
-								},
-							},
-						},
-					},
-				},
-			},
+			Paths: paths,
 		},
 	}
 

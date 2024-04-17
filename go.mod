@@ -15,7 +15,7 @@ require (
 	github.com/TykTechnologies/gorpc v0.0.0-20210624160652-fe65bda0ccb9
 	github.com/TykTechnologies/goverify v0.0.0-20220808203004-1486f89e7708
 	github.com/TykTechnologies/graphql-go-tools v1.6.2-0.20240325095122-27642576e0c2
-	github.com/TykTechnologies/graphql-translator v0.0.0-20240319092712-4ba87e4c06ff
+	github.com/TykTechnologies/graphql-translator v0.0.0-20240417142220-6171e464b7f6
 	github.com/TykTechnologies/leakybucket v0.0.0-20170301023702-71692c943e3c
 	github.com/TykTechnologies/murmur3 v0.0.0-20230310161213-aad17efd5632
 	github.com/TykTechnologies/openid2go v0.1.2
@@ -29,7 +29,7 @@ require (
 	github.com/clbanning/mxj v1.8.4
 	github.com/evalphobia/logrus_sentry v0.8.2
 	github.com/gemnasium/logrus-graylog-hook v2.0.7+incompatible
-	github.com/getkin/kin-openapi v0.115.0
+	github.com/getkin/kin-openapi v0.124.0
 	github.com/go-jose/go-jose/v3 v3.0.3
 	github.com/go-redis/redis/v8 v8.11.5 // indirect
 	github.com/gocraft/health v0.0.0-20170925182251-8675af27fef0
@@ -129,8 +129,8 @@ require (
 	github.com/ghodss/yaml v1.0.0 // indirect
 	github.com/go-logr/logr v1.3.0 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
-	github.com/go-openapi/jsonpointer v0.19.6 // indirect
-	github.com/go-openapi/swag v0.22.4 // indirect
+	github.com/go-openapi/jsonpointer v0.20.2 // indirect
+	github.com/go-openapi/swag v0.22.8 // indirect
 	github.com/gobwas/httphead v0.0.0-20180130184737-2c6c146eadee // indirect
 	github.com/gobwas/pool v0.2.0 // indirect
 	github.com/gobwas/ws v1.0.4 // indirect
@@ -220,5 +220,3 @@ require (
 	gorm.io/gorm v1.21.16 // indirect
 	nhooyr.io/websocket v1.8.10 // indirect
 )
-
-//replace github.com/TykTechnologies/graphql-go-tools => ../graphql-go-tools
