@@ -20,7 +20,8 @@ message Object {
   /* The plugin name */
   string hook_name = 2;
 
-  /* The main request data structure used by rich plugins. It’s used for middleware calls 
+  /*
+   * The main request data structure used by rich plugins. It’s used for middleware calls 
    * and contains important fields like headers, parameters, body and URL
    */
   MiniRequestObject request = 3;
