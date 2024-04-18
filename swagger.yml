@@ -7,7 +7,7 @@ info:
 
     **Warning: Under no circumstances should outside parties be granted access to this API.**
 
-    The Tyk Gateway API is capable of:
+    The Tyk Gateway API is capable of: 
 
     * Managing session objects (key generation)
     * Managing and listing policies
