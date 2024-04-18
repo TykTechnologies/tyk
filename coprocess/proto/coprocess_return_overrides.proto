@@ -12,18 +12,18 @@ option go_package = "/coprocess";
  *
  */
 message ReturnOverrides {
-  /* This field overrides the HTTP response code and can be used for error codes (403, 500, etc.) or for overriding the response */
+  /* Override upstream response status code */
   int32 response_code = 1;
   
-  /* This field overrides the HTTP response body */
+  /* Override upstream response error message */
   string response_error = 2;
 
-  /* This field overrides response HTTP headers */
+  /* Override upstream response headers */
   map<string, string> headers = 3;
 
-  /* This field allows higher customisation when returning custom errors. Should be used in combination with response_body */
+  /* If true then override upstream error response with response_error */
   bool override_error = 4;
 
-  /* This field is the alias for response_error. Contains the HTTP response body */
+  /* Alias of response_error, contains the response body */
   string response_body = 5;
 }
