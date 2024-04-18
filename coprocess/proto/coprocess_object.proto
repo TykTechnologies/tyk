@@ -48,6 +48,7 @@ message Event {
   string payload = 1;
 }
 
+/* Response for event */
 message EventReply {}
 
 /* The service interface that must be implemented by the target language */
