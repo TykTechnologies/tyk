@@ -12,7 +12,7 @@ option go_package = "/coprocess";
 enum HookType {
   
   /*
-   * Use for error checking and handling of an unrecognsied hook type.
+   * Use for error checking and handling of an unrecognised hook type.
    */
   Unknown = 0;
   
