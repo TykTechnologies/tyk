@@ -31,4 +31,5 @@ We used the golang library [openapi-go](https://github.com/swaggest/openapi-go) 
 ## File structure
 
 . In the swagger file we have a file for each OAS tag e.g the cache tag,the key tag etc . If you want to add a new endpoint add it to it specific tag.
+
 . We then have a cmd directory that has the main.go file (used to call all tge generation functions), we also have a makefile and the generated swagger.yaml file . 
