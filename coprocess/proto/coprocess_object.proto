@@ -35,7 +35,8 @@ message Object {
   /* Contains information about API definition, including APIID, OrgID and config_data */ 
   map<string, string> spec = 6;
 
-  /* The ResponseObject is used by response hooks. The fields are populated with the upstream HTTP
+  /*
+   * The ResponseObject is used by response hooks. The fields are populated with the upstream HTTP
    * response data. All the field contents can be modified.
    */
   ResponseObject response = 7;
