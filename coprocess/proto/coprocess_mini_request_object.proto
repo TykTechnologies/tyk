@@ -31,7 +31,7 @@ message MiniRequestObject {
   /* Map of parameter keys and values to add to the request */
   map<string, string> add_params = 7;
 
-  /* TODO */
+  /* Currently unsupported, WIP */
   map<string, string> extended_params = 8;
 
   /* List of parameter keys to be removed from the request */
