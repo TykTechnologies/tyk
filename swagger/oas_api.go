@@ -201,6 +201,7 @@ func importApiOASPostHandler(r *openapi3.Reflector) error {
 	})
 	oc.AddReqStructure(new(oas.OAS), func(cu *openapi.ContentUnit) {
 	})
+
 	oc.SetDescription("Create a new OAS format API, without x-tyk-gateway.\n        For use with an existing OAS API that you want to expose via your Tyk Gateway. (New)")
 	statusInternalServerError(oc, "Unexpected error")
 	statusBadRequest(oc, "Malformed request or when the payload contain x-tyk-api-gateway")

@@ -178,7 +178,7 @@ func getApiVersions(r *openapi3.Reflector) error {
 
 func apIIDParameter() openapi3.ParameterOrRef {
 	var example interface{} = "keyless"
-	return openapi3.Parameter{Description: stringPointerValue("The API ID"), In: openapi3.ParameterInPath, Example: &example, Name: "apiID", Required: &isRequired, Schema: stringSchema()}.ToParameterOrRef()
+	return openapi3.Parameter{Description: StringPointerValue("The API ID"), In: openapi3.ParameterInPath, Example: &example, Name: "apiID", Required: &isRequired, Schema: stringSchema()}.ToParameterOrRef()
 }
 
 func addApiPostQueryParam() []openapi3.ParameterOrRef {
@@ -196,9 +196,9 @@ func addApiPostQueryParam() []openapi3.ParameterOrRef {
 }
 
 func searchTextQuery() openapi3.ParameterOrRef {
-	return openapi3.Parameter{Description: stringPointerValue("Search for API version name"), In: openapi3.ParameterInQuery, Name: "searchText", Required: &isOptional, Schema: stringSchema()}.ToParameterOrRef()
+	return openapi3.Parameter{Description: StringPointerValue("Search for API version name"), In: openapi3.ParameterInQuery, Name: "searchText", Required: &isOptional, Schema: stringSchema()}.ToParameterOrRef()
 }
 
 func accessTypeQuery() openapi3.ParameterOrRef {
-	return openapi3.Parameter{Description: stringPointerValue("Filter for internal or external API versions"), In: openapi3.ParameterInQuery, Name: "accessType", Required: &isOptional, Schema: stringEnumSchema("internal", "external")}.ToParameterOrRef()
+	return openapi3.Parameter{Description: StringPointerValue("Filter for internal or external API versions"), In: openapi3.ParameterInQuery, Name: "accessType", Required: &isOptional, Schema: stringEnumSchema("internal", "external")}.ToParameterOrRef()
 }

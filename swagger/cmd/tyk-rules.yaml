@@ -1,0 +1,117 @@
+description: All OWASP Rules, or 'hard mode' as we call it.
+documentationUrl: https://quobix.com/vacuum/rulesets/owasp
+rules:
+    oas-schema-check:
+      category:
+        description: Schemas are how request bodies and response payloads are defined. They define the data going in and the data flowing out of an operation. These rules check for structural validity, checking types, checking required fields and validating correct use of structures.
+        id: schemas
+        name: Schemas
+      description: All document schemas must have a valid type defined
+      formats:
+        - oas3
+        - oas3_1
+      given: $
+      howToFix: Make sure each schema has a value type defined. Without a type, the schema is useless
+      id: oas-schema-check
+      recommended: true
+      severity: error
+      then:
+        function: schemaTypeCheck
+      type: validation
+    paths-kebab-case:
+      category:
+        description: Operations are the core of the contract, they define paths and HTTP methods. These rules check operations have been well constructed, looks for operationId, parameter, schema and return types in depth.
+        id: operations
+        name: Operations
+      description: Path segments must only use kebab-case (no underscores or uppercase)
+      formats:
+        - oas3
+        - oas3_1
+        - oas2
+      given: $
+      howToFix: Path segments should not contain any uppercase letters, punctuation or underscores. The only valid way to separate words in a segment, is to use a hyphen '-'. The elements that are violating the rule are highlighted in the violation description. These are the elements that need to change.
+      id: paths-kebab-case
+      recommended: true
+      severity: warn
+      then:
+        function: pathsKebabCase
+      type: validation
+    no-ambiguous-paths:
+      category:
+        description: Operations are the core of the contract, they define paths and HTTP methods. These rules check operations have been well constructed, looks for operationId, parameter, schema and return types in depth.
+        id: operations
+        name: Operations
+      description: Paths need to resolve unambiguously from one another
+      formats:
+        - oas3
+        - oas3_1
+        - oas2
+      given: $
+      howToFix: Paths must all resolve unambiguously, they can't be confused with one another (/{id}/ambiguous and /ambiguous/{id} are the same thing. Make sure every path and the variables used are unique and do conflict with one another. Check the ordering of variables and the naming of path segments.
+      id: no-ambiguous-paths
+      recommended: true
+      resolved: true
+      severity: error
+      then:
+        function: ambiguousPaths
+      type: validation
+    operation-4xx-response:
+      category:
+        description: Operations are the core of the contract, they define paths and HTTP methods. These rules check operations have been well constructed, looks for operationId, parameter, schema and return types in depth.
+        id: operations
+        name: Operations
+      description: Make sure operations return at least one `4xx` error response to help with bad requests
+      formats:
+        - oas3
+        - oas3_1
+        - oas2
+      given: $.paths
+      howToFix: Make sure each operation defines at least one 4xx error response. 4xx Errors are used to inform clients they are using the API incorrectly, with bad input, or malformed requests. An API with no errorsdefined is really hard to navigate.
+      id: operation-4xx-response
+      resolved: true
+      severity: warn
+      then:
+        function: oasOpErrorResponse
+      type: validation
+    path-declarations-must-exist:
+      category:
+        description: Operations are the core of the contract, they define paths and HTTP methods. These rules check operations have been well constructed, looks for operationId, parameter, schema and return types in depth.
+        id: operations
+        name: Operations
+      description: Path parameter declarations must not be empty ex. `/api/{}` is invalid
+      formats:
+        - oas3
+        - oas3_1
+        - oas2
+      given: $.paths
+      howToFix: Paths define the endpoint for operations. Without paths, there is no API. You need to add 'paths' to the root of the specification.
+      id: path-declarations-must-exist
+      recommended: true
+      resolved: true
+      severity: error
+      then:
+        function: pattern
+        functionOptions:
+          notMatch: '{}'
+      type: validation
+    path-keys-no-trailing-slash:
+      category:
+        description: Operations are the core of the contract, they define paths and HTTP methods. These rules check operations have been well constructed, looks for operationId, parameter, schema and return types in depth.
+        id: operations
+        name: Operations
+      description: Path must not end with a slash
+      formats:
+        - oas3
+        - oas3_1
+        - oas2
+      given: $.paths
+      howToFix: Paths should not end with a trailing slash, it can confuse tooling and isn't valid as a path Remove the trailing slash from the path.
+      id: path-keys-no-trailing-slash
+      recommended: true
+      resolved: true
+      severity: warn
+      then:
+        function: pattern
+        functionOptions:
+          notMatch: .+\/$
+      type: validation

@@ -268,7 +268,7 @@ func hashedQuery(description ...string) openapi3.ParameterOrRef {
 	if len(description) != 0 {
 		desc = description[0]
 	}
-	return openapi3.Parameter{In: openapi3.ParameterInQuery, Name: "hashed", Description: stringPointerValue(desc), Required: &isOptional, Schema: boolSchema()}.ToParameterOrRef()
+	return openapi3.Parameter{In: openapi3.ParameterInQuery, Name: "hashed", Description: StringPointerValue(desc), Required: &isOptional, Schema: boolSchema()}.ToParameterOrRef()
 }
 
 func suppressResetQuery() openapi3.ParameterOrRef {

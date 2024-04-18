@@ -80,7 +80,7 @@ func createParameter(value ParameterValues) openapi3.ParameterOrRef {
 		value.In = openapi3.ParameterInQuery
 	}
 	if strings.TrimSpace(value.Description) != "" {
-		vl.Description = stringPointerValue(value.Description)
+		vl.Description = StringPointerValue(value.Description)
 	}
 	return openapi3.Parameter{
 		In:       value.In,
@@ -147,7 +147,7 @@ func addBinaryFormat(o3 openapi3.OperationExposer, httpStatus int) {
 	if !ok {
 		return
 	}
-	value.Response.Content["application/octet-stream"].Schema.Schema.Format = stringPointerValue("binary")
+	value.Response.Content["application/octet-stream"].Schema.Schema.Format = StringPointerValue("binary")
 }
 
 func addNewResponseHeader(o3 openapi3.OperationExposer, httpStatus int, cr HeaderCr) {
@@ -173,7 +173,7 @@ func addNewResponseHeader(o3 openapi3.OperationExposer, httpStatus int, cr Heade
 	value.Response.WithHeaders(newHeaders)
 }
 
-func stringPointerValue(value string) *string {
+func StringPointerValue(value string) *string {
 	return &value
 }
 

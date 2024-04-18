@@ -1,0 +1,25 @@
+rules:
+  #Special rules
+  no-unresolved-refs: error
+  no-unused-components: warn
+  security-defined: error
+  spec: error
+  spec-components-invalid-map-name: error #All the fixed fields declared below are objects that MUST use keys that match the regular expression
+  spec-strict-refs: error
+  #info
+  info-contact: warn
+  info-license: warn
+  info-license-url: warn
+  #Operations
+  operation-operationId: error
+  operation-operationId-unique: error
+  operation-operationId-url-safe: error
+  operation-summary: error
+  operation-2xx-response: error
+  operation-4xx-response: error
+
+  no-invalid-schema-examples:
+    severity: error
+    allowAdditionalProperties: false
+
+

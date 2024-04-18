@@ -29,7 +29,12 @@ func main() {
 		WithLicense(openapi3.License{Name: "Mozilla Public License Version 2.0", URL: &licence}).
 		WithDescription(swagger.TykDesc).
 		WithTitle("Tyk Gateway API").
-		WithVersion("5.2.3")
+		WithVersion("5.2.3").
+		WithContact(openapi3.Contact{
+			Name:  swagger.StringPointerValue("Tyk Technologies"),
+			URL:   swagger.StringPointerValue("https://tyk.io/contact"),
+			Email: swagger.StringPointerValue("support@tyk.io"),
+		})
 	err := swagger.APIS(&r)
 	if err != nil {
 		log.Fatal(err)

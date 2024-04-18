@@ -16,6 +16,7 @@ const (
 `
 )
 
+// OAuthApi is a good thing Keith
 func OAuthApi(r *openapi3.Reflector) error {
 	addTag(OAuthTag, OAuthTagDesc)
 	return addOperations(r, rotateOauthClientHandler, invalidateOauthRefresh,
@@ -99,7 +100,6 @@ func invalidateOauthRefresh(r *openapi3.Reflector) error {
 	return r.AddOperation(oc)
 }
 
-// /https://deploy-preview-4394--tyk-docs.netlify.app/docs/nightly/apim/
 // Done
 func updateOauthClient(r *openapi3.Reflector) error {
 	// TODO:: in previous OAs this was '/tyk/oauth/clients/{apiID}' inquire
@@ -345,15 +345,15 @@ func keyNameParameter(description ...string) openapi3.ParameterOrRef {
 }
 
 func oauthApiIdParameter() openapi3.ParameterOrRef {
-	return openapi3.Parameter{Description: stringPointerValue("The API ID"), In: openapi3.ParameterInPath, Name: "apiID", Required: &isRequired, Schema: stringSchema()}.ToParameterOrRef()
+	return openapi3.Parameter{Description: StringPointerValue("The API ID"), In: openapi3.ParameterInPath, Name: "apiID", Required: &isRequired, Schema: stringSchema()}.ToParameterOrRef()
 }
 
 func requiredApiIdQuery() openapi3.ParameterOrRef {
-	return openapi3.Parameter{In: openapi3.ParameterInQuery, Name: "api_id", Required: &isRequired, Description: stringPointerValue("The API id"), Schema: stringSchema()}.ToParameterOrRef()
+	return openapi3.Parameter{In: openapi3.ParameterInQuery, Name: "api_id", Required: &isRequired, Description: StringPointerValue("The API id"), Schema: stringSchema()}.ToParameterOrRef()
 }
 
 func appIDParameter() openapi3.ParameterOrRef {
-	return openapi3.Parameter{In: openapi3.ParameterInPath, Description: stringPointerValue("The Client ID"), Name: "appID", Required: &isRequired, Schema: stringSchema()}.ToParameterOrRef()
+	return openapi3.Parameter{In: openapi3.ParameterInPath, Description: StringPointerValue("The Client ID"), Name: "appID", Required: &isRequired, Schema: stringSchema()}.ToParameterOrRef()
 }
 
 func scopeQuery() openapi3.ParameterOrRef {
