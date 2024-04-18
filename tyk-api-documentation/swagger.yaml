@@ -1,0 +1,5097 @@
+openapi: 3.0.3
+info:
+  description: |+
+    The Tyk Gateway API is the primary means for integrating your application with the Tyk API Gateway system. This API is very small, and has no granular permissions system. It is intended to be used purely for internal automation and integration.
+
+    **Warning: Under no circumstances should outside parties be granted access to this API.**
+
+    * Managing session objects (key generation)
+    * Managing and listing policies
+    * Managing and listing API Definitions (only when not using the Dashboard)
+    * Hot reloads / reloading a cluster configuration
+    * OAuth client creation (only when not using the Dashboard)
+
+    In order to use the Gateway API, you'll need to set the **secret** parameter in your tyk.conf file.
+
+    The shared secret you set should then be sent along as a header with each Gateway API Request in order for it to be successful:
+
+    **x-tyk-authorization: <your-secret>***
+    <br/>
+
+    <b>The Tyk Gateway API is subsumed by the Tyk Dashboard API in Pro installations.</b>
+
+  license:
+    name: Mozilla Public License Version 2.0
+    url: https://github.com/TykTechnologies/tyk/blob/master/LICENSE.md
+  title: Tyk Gateway API
+  version: 5.2.3
+servers:
+  - url: http://localhost:8080
+security:
+  - api_key: []
+tags:
+  - description: |
+      **Note: Applies only to Tyk Gateway Community Edition** <br/>
+      
+      API Management is very simple using the Tyk REST API: each update only affects the underlying file, and this endpoint will only work with disk based installations, not Database-backed ones.<br/>
+      
+      APIs that are added this way are flushed to to disk into the app_path folder using the format: *{api-id}.json*. Updating existing APIs that use a different naming convention will cause those APIs to be added, which could subsequently lead to a loading error and crash if they use the same listen_path. <br/>
+      
+      These methods only work on a single API node. If updating a cluster, it is important to ensure that all nodes are updated before initiating a reload.<br/>
+    name: APIs
+  - description: |
+      All keys that are used to access services via Tyk correspond to a session object that informs Tyk about the context of this particular token, like access rules and rate/quota allowance.
+    name: Keys
+  - description: |
+      It is possible to force API quota and rate limit across all keys that belong to a specific organisation ID. Rate limiting at an organisation level is useful for creating tiered access levels and trial accounts.<br />
+      
+      The Organisation rate limiting middleware works with both Quotas and Rate Limiters. In order to manage this functionality, a simple API has been put in place to manage these sessions. <br />
+      
+      Although the Organisation session-limiter uses the same session object, all other security keys are optional as they are not used. <br />
+      
+      <h3>Managing active status</h3> <br />
+      
+      To disallow access to an entire group of keys without rate limiting the organisation, create a session object with the "is_inactive" key set to true. This will block access before any other middleware is executed. It is useful when managing subscriptions for an organisation group and access needs to be blocked because of non-payment. <br />
+    name: Organisation Quotas
+  - description: |
+      Sometimes a cache might contain stale data, or it may just need to be cleared because of an invalid configuration. This call will purge all keys associated with a cache on an API-by-API basis.
+    name: Cache Invalidation
+  - description: |
+      Force restart of the Gateway or whole cluster
+    name: Hot Reload
+  - description: |
+      Check health status of the Gateway and loaded APIs
+    name: Health Checking
+  - description: |
+      A Tyk security policy incorporates several security options that can be applied to an API key. It acts as a template that can override individual sections of an API key (or identity) in Tyk.
+    name: Policies
+  - description: |
+      Manage OAuth clients, and manage their tokens
+    name: OAuth
+paths:
+  /tyk/apis:
+    get:
+      description: |2-
+         List APIs
+                 Only if used without the Tyk Dashboard
+      operationId: listApis
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: '#/components/schemas/APIDefinition'
+                type: array
+          description: List of API definitions
+        "403":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Attempting to access a protected api with an invalid or a missing
+            X-Tyk-Authorization in the headers
+      summary: Get list of apis
+      tags:
+        - APIs
+    post:
+      description: |2-
+         Create API
+                 A single Tyk node can have its API Definitions queried, deleted and updated remotely. This functionality enables you to remotely update your Tyk definitions without having to manage the files manually.
+      operationId: createApi
+      parameters:
+        - description: The base API which the new version will be linked to.
+          in: query
+          name: base_api_id
+          schema:
+            type: string
+        - description: The version name of the base API while creating the first version.
+            This doesn't have to be sent for the next versions but if it is set, it
+            will override base API version name.
+          in: query
+          name: base_api_version_name
+          schema:
+            type: string
+        - description: The version name of the created version.
+          in: query
+          name: new_version_name
+          schema:
+            type: string
+        - description: If true, the new version is set as default version.
+          in: query
+          name: set_default
+          schema:
+            type: boolean
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/APIDefinition'
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiModifyKeySuccess'
+          description: OK
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Returned when you send a malformed body or when the request
+            body fails validation
+        "403":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Attempting to access a protected api with an invalid or a missing
+            X-Tyk-Authorization in the headers
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Unexpected error.
+      summary: Creat an API
+      tags:
+        - APIs
+  /tyk/apis/{apiID}:
+    delete:
+      description: Deleting an API definition will remove the file from the file store,
+        the API definition will NOT be unloaded, a separate reload request will need
+        to be made to disable the API endpoint.
+      operationId: deleteApi
+      parameters:
+        - description: The API ID
+          example: keyless
+          in: path
+          name: apiID
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiModifyKeySuccess'
+          description: API deleted
+        "403":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Attempting to access a protected api with an invalid or a missing
+            X-Tyk-Authorization in the headers
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: An Api with the specified ApiID was not found.
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Unexpected error.
+      summary: Deleting an API definition with ID
+      tags:
+        - APIs
+    get:
+      description: |-
+        Get API definition
+                Only if used without the Tyk Dashboard
+      operationId: getApi
+      parameters:
+        - description: The API ID
+          example: keyless
+          in: path
+          name: apiID
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIDefinition'
+          description: API definition
+          headers:
+            x-tyk-base-api-id:
+              description: ID of the base API if the requested API is a version.
+              schema:
+                type: string
+              style: simple
+        "403":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Attempting to access a protected api with an invalid or a missing
+            X-Tyk-Authorization in the headers
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Api not found
+      summary: Get API definition with ID
+      tags:
+        - APIs
+    put:
+      description: |-
+        Updating an API definition uses the same signature an object as a `POST`, however it will first ensure that the API ID that is being updated is the same as the one in the object being `PUT`.
+
+
+                Updating will completely replace the file descriptor and will not change an API Definition that has already been loaded, the hot-reload endpoint will need to be called to push the new definition to live.
+      operationId: updateApi
+      parameters:
+        - description: The API ID
+          example: keyless
+          in: path
+          name: apiID
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/APIDefinition'
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiModifyKeySuccess'
+          description: API updated
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Bad request.Sending a ApiID for an OAs api or apiID in path
+            does not match the one in the body.
+        "403":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Attempting to access a protected api with an invalid or a missing
+            X-Tyk-Authorization in the headers
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: An Api with the specified ApiID was not found.
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Unexpected error.
+      summary: Updating an API definition  with its ID
+      tags:
+        - APIs
+  /tyk/apis/oas:
+    get:
+      description: List all OAS format APIs, when used without the Tyk Dashboard.
+      operationId: listApisOAS
+      parameters:
+        - description: "Mode of OAS get, by default mode could be empty which means
+          to get OAS spec including OAS Tyk extension. \n When mode=public, OAS spec
+          excluding Tyk extension will be returned in the response"
+          example: public
+          in: query
+          name: mode
+          required: false
+          schema:
+            enum:
+              - public
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: '#/components/schemas/OAS'
+                type: array
+          description: List of API definitions in OAS format
+        "403":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Attempting to access a protected api with an invalid or a missing
+            X-Tyk-Authorization in the headers
+      summary: List all OAS format APIS
+      tags:
+        - OAS APIs
+    post:
+      description: |2-
+         Create API with OAS format
+                 A single Tyk node can have its API Definitions queried, deleted and updated remotely. This functionality enables you to remotely update your Tyk definitions without having to manage the files manually.
+      operationId: createApiOAS
+      parameters:
+        - description: The base API which the new version will be linked to.
+          in: query
+          name: base_api_id
+          schema:
+            type: string
+        - description: The version name of the base API while creating the first version.
+            This doesn't have to be sent for the next versions but if it is set, it
+            will override base API version name.
+          in: query
+          name: base_api_version_name
+          schema:
+            type: string
+        - description: The version name of the created version.
+          in: query
+          name: new_version_name
+          schema:
+            type: string
+        - description: If true, the new version is set as default version.
+          in: query
+          name: set_default
+          schema:
+            type: boolean
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiModifyKeySuccess'
+          description: API created
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Malformed API data
+        "403":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Attempting to access a protected api with an invalid or a missing
+            X-Tyk-Authorization in the headers
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Unexpected error
+      summary: Create API with OAS format
+      tags:
+        - OAS APIs
+  /tyk/apis/oas/{apiID}:
+    delete:
+      description: Deleting an API definition will remove the file from the file store,
+        the API definition will NOT be unloaded, a separate reload request will need
+        to be made to disable the API endpoint.
+      operationId: deleteOASApi
+      parameters:
+        - description: The API ID
+          example: keyless
+          in: path
+          name: apiID
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiModifyKeySuccess'
+          description: API deleted
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: API ID not specified
+        "403":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Attempting to access a protected api with an invalid or a missing
+            X-Tyk-Authorization in the headers
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: API not found
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: When delete request is sent while using dashboard app configs
+      summary: Deleting an OAS API
+      tags:
+        - OAS APIs
+    get:
+      description: |-
+        Get OAS Api definition
+          using the api Id
+      operationId: getOASApi
+      parameters:
+        - description: The API ID
+          example: keyless
+          in: path
+          name: apiID
+          required: true
+          schema:
+            type: string
+        - description: "Mode of OAS get, by default mode could be empty which means
+          to get OAS spec including OAS Tyk extension. \n When mode=public, OAS spec
+          excluding Tyk extension will be returned in the response"
+          example: public
+          in: query
+          name: mode
+          required: false
+          schema:
+            enum:
+              - public
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OAS'
+          description: Api fetched successfully
+          headers:
+            x-tyk-base-api-id:
+              description: ID of the base API if the requested API is a version.
+              schema:
+                type: string
+              style: simple
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: trying to access an API whose definition is in Tyk classic
+            format
+        "403":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Attempting to access a protected api with an invalid or a missing
+            X-Tyk-Authorization in the headers
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: API not found
+      summary: Get OAS Api definition
+      tags:
+        - OAS APIs
+    patch:
+      description: |-
+        Update API with OAS format. You can use this endpoint to update OAS part of the tyk API definition.
+                This endpoint allows you to configure tyk OAS extension based on query params provided(similar to import)
+      operationId: patchApiOAS
+      parameters:
+        - description: The API ID
+          example: keyless
+          in: path
+          name: apiID
+          required: true
+          schema:
+            type: string
+        - in: query
+          name: upstreamURL
+          required: false
+          schema:
+            description: Upstream URL for the API
+            type: string
+        - in: query
+          name: listenPath
+          required: false
+          schema:
+            description: Listen path for the API
+            type: string
+        - in: query
+          name: customDomain
+          required: false
+          schema:
+            description: Custom domain for the API
+            type: string
+        - in: query
+          name: authentication
+          required: false
+          schema:
+            description: Enable or disable authentication in your Tyk Gateway as per
+              your OAS document.
+            type: boolean
+        - in: query
+          name: validateRequest
+          required: false
+          schema:
+            description: Enable validateRequest middleware for all endpoints having
+              a request body with media type application/json
+            type: boolean
+        - in: query
+          name: allowList
+          required: false
+          schema:
+            description: Enable allowList middleware for all endpoints
+            type: boolean
+        - in: query
+          name: mockResponse
+          required: false
+          schema:
+            description: Enable mockResponse middleware for all endpoints having responses
+              configured.
+            type: boolean
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OAS'
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiModifyKeySuccess'
+          description: API patched
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Malformed request
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: API not found
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Unexpected error
+      summary: Patch API with OAS format.
+      tags:
+        - OAS APIs
+    put:
+      description: |-
+        Updating an API definition uses the same signature an object as a `POST`, however it will first ensure that the API ID that is being updated is the same as the one in the object being `PUT`.
+
+
+                Updating will completely replace the file descriptor and will not change an API Definition that has already been loaded, the hot-reload endpoint will need to be called to push the new definition to live.
+      operationId: updateApiOAS
+      parameters:
+        - description: The API ID
+          example: keyless
+          in: path
+          name: apiID
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OAS'
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiModifyKeySuccess'
+          description: API updated
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Malformed Request or trying to update api in tyk classic format
+        "403":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Attempting to access a protected api with an invalid or a missing
+            X-Tyk-Authorization in the headers
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: API not found
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Unexpected error
+      summary: Update OAS API definition
+      tags:
+        - OAS APIs
+  /tyk/apis/oas/{apiID}/export:
+    get:
+      description: "Mode of OAS export, by default mode could be empty which means
+        to export OAS spec including OAS Tyk extension. \n  When mode=public, OAS
+        spec excluding Tyk extension is exported"
+      operationId: downloadApiOASPublic
+      parameters:
+        - description: The API ID
+          example: keyless
+          in: path
+          name: apiID
+          required: true
+          schema:
+            type: string
+        - description: Can be set to public
+          example: public
+          in: query
+          name: mode
+          required: false
+          schema:
+            enum:
+              - public
+            type: string
+      responses:
+        "200":
+          content:
+            application/octet-stream:
+              schema:
+                format: binary
+                type: string
+          description: Exported API definition file
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: requesting API definition that is in Tyk classic format
+        "403":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Attempting to access a protected api with an invalid or a missing
+            X-Tyk-Authorization in the headers
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: API not found
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Unexpected error
+      summary: Download an OAS format APIs, when used without the Tyk Dashboard.
+      tags:
+        - OAS APIs
+  /tyk/apis/oas/{apiID}/versions:
+    get:
+      description: Listing versions of an OAS API
+      operationId: listOASApiVersions
+      parameters:
+        - description: The API ID
+          example: keyless
+          in: path
+          name: apiID
+          required: true
+          schema:
+            type: string
+        - description: Search for API version name
+          in: query
+          name: searchText
+          required: false
+          schema:
+            type: string
+        - description: Filter for internal or external API versions
+          in: query
+          name: accessType
+          required: false
+          schema:
+            enum:
+              - internal
+              - external
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VersionMetas'
+          description: API version metas
+        "403":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Attempting to access a protected api with an invalid or a missing
+            X-Tyk-Authorization in the headers
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: API not found
+      summary: Listing versions of an OAS API
+      tags:
+        - OAS APIs
+  /tyk/apis/oas/export:
+    get:
+      description: Download all OAS format APIs, when used without the Tyk Dashboard.
+      operationId: downloadApisOASPublic
+      parameters:
+        - description: "Mode of OAS get, by default mode could be empty which means
+          to get OAS spec including OAS Tyk extension. \n When mode=public, OAS spec
+          excluding Tyk extension will be returned in the response"
+          example: public
+          in: query
+          name: mode
+          required: false
+          schema:
+            enum:
+              - public
+            type: string
+      responses:
+        "200":
+          content:
+            application/octet-stream:
+              schema:
+                format: binary
+                type: string
+          description: Get list of oas API definition
+        "403":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Attempting to access a protected api with an invalid or a missing
+            X-Tyk-Authorization in the headers
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Unexpected error
+      summary: Download all OAS format APIs
+      tags:
+        - OAS APIs
+  /tyk/apis/oas/import:
+    post:
+      description: |-
+        Create a new OAS format API, without x-tyk-gateway.
+                For use with an existing OAS API that you want to expose via your Tyk Gateway. (New)
+      operationId: importOAS
+      parameters:
+        - in: query
+          name: upstreamURL
+          required: false
+          schema:
+            description: Upstream URL for the API
+            type: string
+        - in: query
+          name: listenPath
+          required: false
+          schema:
+            description: Listen path for the API
+            type: string
+        - in: query
+          name: customDomain
+          required: false
+          schema:
+            description: Custom domain for the API
+            type: string
+        - in: query
+          name: authentication
+          required: false
+          schema:
+            description: Enable or disable authentication in your Tyk Gateway as per
+              your OAS document.
+            type: boolean
+        - in: query
+          name: validateRequest
+          required: false
+          schema:
+            description: Enable validateRequest middleware for all endpoints having
+              a request body with media type application/json
+            type: boolean
+        - in: query
+          name: allowList
+          required: false
+          schema:
+            description: Enable allowList middleware for all endpoints
+            type: boolean
+        - in: query
+          name: mockResponse
+          required: false
+          schema:
+            description: Enable mockResponse middleware for all endpoints having responses
+              configured.
+            type: boolean
+        - in: query
+          name: apiID
+          required: false
+          schema:
+            description: ID of the API
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OAS'
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiModifyKeySuccess'
+          description: API definition created
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Malformed request or when the payload contain x-tyk-api-gateway
+        "403":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Attempting to access a protected api with an invalid or a missing
+            X-Tyk-Authorization in the headers
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Unexpected error
+      summary: Create a new OAS format API, without x-tyk-gateway
+      tags:
+        - OAS APIs
+  /tyk/cache/{apiID}:
+    delete:
+      description: Invalidate cache for the given API
+      operationId: invalidateCache
+      parameters:
+        - description: The API ID
+          example: keyless
+          in: path
+          name: apiID
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: cache invalidated
+        "403":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Attempting to access a protected api with an invalid or a missing
+            X-Tyk-Authorization in the headers
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: when cache invalidation fails
+      summary: Invalidate cache
+      tags:
+        - Cache Invalidation
+  /tyk/certs:
+    get:
+      description: List All Certificates in the Tyk Gateway
+      operationId: listCerts
+      parameters:
+        - description: Organisation ID to list the certificates
+          example: 5e9d9544a1dcd60001d0ed20
+          in: query
+          name: org_id
+          required: true
+          schema:
+            type: string
+        - description: Mode to list the certificate details
+          in: query
+          name: mode
+          required: false
+          schema:
+            enum:
+              - detailed
+            example: detailed
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/APIAllCertificateBasics'
+                  - $ref: '#/components/schemas/APIAllCertificates'
+          description: OK
+        "403":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Attempting to access a protected api with an invalid or a missing
+            X-Tyk-Authorization in the headers
+      summary: List Certificates
+      tags:
+        - Certs
+    post:
+      description: Add a certificate to the Tyk Gateway
+      operationId: addCert
+      parameters:
+        - description: Organisation ID to add the certificate to
+          example: 5e9d9544a1dcd60001d0ed20
+          in: query
+          name: org_id
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          text/plain:
+            schema:
+              type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APICertificateStatusMessage'
+          description: New Certificate added
+        "403":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: When certificates you send already exist in the gateway
+        "405":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: When you send a malformed request body
+      summary: Add a certificate
+      tags:
+        - Certs
+  /tyk/certs/{certID}:
+    delete:
+      description: Delete certificate by id
+      operationId: deleteCerts
+      parameters:
+        - description: Certificate ID to be deleted
+          example: 5e9d9544a1dcd60001d0ed20a6ab77653d5da938f452bb8cc9b55b0630a6743dabd8dc92bfb025abb09ce035
+          in: path
+          name: certID
+          required: true
+          schema:
+            type: string
+        - description: Organisation ID to delete the certificates from
+          example: 5e9d9544a1dcd60001d0ed20
+          in: query
+          name: org_id
+          required: false
+          schema:
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Deleted certificate
+        "403":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Attempting to access a protected api with an invalid or a missing
+            X-Tyk-Authorization in the headers
+      summary: Delete Certificate
+      tags:
+        - Certs
+    get:
+      description: |-
+        Note that the certID path parameter can take a list of certIDs separated with commas (e.g /tyk/certs/certIDOne,certIDTwo).
+         If you send a single certID it will return a single CertificateMeta object otherwise if you send more than two certIDs is will return an array of CertificateMeta objects.
+      operationId: listCertsWithIDs
+      parameters:
+        - description: Comma separated list of certificates to list
+          example: e6ce2b49-3e31-44de-95a7-12f054724283,5e9d9544a1dcd60001d0ed20a6ab77653d5da938f452bb8cc9b55b0630a6743dabd8dc92bfb025abb09ce035
+          in: path
+          name: certID
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/CertsCertificateMeta'
+                  - items:
+                      $ref: '#/components/schemas/CertsCertificateMeta'
+                    nullable: true
+                    type: array
+          description: Certificates returned successfully
+        "403":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Attempting to access a protected api with an invalid or a missing
+            X-Tyk-Authorization in the headers
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: When you send a single certID and it does not exist
+      summary: Return one certificate or List multiple Certificates in the Tyk Gateway
+        given a comma separated list of certIDs
+      tags:
+        - Certs
+  /tyk/debug:
+    post:
+      description: Used to test API definition by sending sample request and analysing
+        output of both response and logs
+      operationId: debugApiDefinition
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TraceRequest'
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TraceResponse'
+          description: Success tracing request
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Request malformed , missing spec field or missing request field
+        "403":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Attempting to access a protected api with an invalid or a missing
+            X-Tyk-Authorization in the headers
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Unexpected failure
+      summary: Test an an API definition
+      tags:
+        - Debug
+  /tyk/hello:
+    get:
+      description: "From v2.7.5 you can now rename the `/hello`  endpoint by using
+        the `health_check_endpoint_name` option\n        \n        Returns 200 response
+        in case of success"
+      operationId: hello
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthCheckResponse'
+          description: Success
+        "405":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Method Not Allowed
+      summary: Check the Health of the Tyk Gateway
+      tags:
+        - Health Checking
+  /tyk/keys:
+    get:
+      description: |2-
+         List APIs
+                 Only if used without the Tyk Dashboard
+      operationId: listKeys
+      parameters:
+        - description: Retrieves all keys starting with the specified filter(filter
+            is a prefix - e.g. default* or default will return all keys starting with
+            default  like defaultbd,defaulttwo etc).We don't use filter for hashed keys
+          example: default*
+          in: query
+          name: filter
+          required: false
+          schema:
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiAllKeys'
+          description: List of all API keys
+        "403":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Attempting to access a protected api with an invalid or a missing
+            X-Tyk-Authorization in the headers
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: When hash_keys is enabled in gateway config and enable_hashed_keys_listing
+            is disabled
+      summary: List Keys
+      tags:
+        - Keys
+    post:
+      description: |-
+        Tyk will generate the access token based on the OrgID specified in the API Definition and a random UUID. This ensures that keys can be "owned" by different API Owners should segmentation be needed at an organisational level.
+                <br/><br/>
+                API keys without access_rights data will be written to all APIs on the system (this also means that they will be created across all SessionHandlers and StorageHandlers, it is recommended to always embed access_rights data in a key to ensure that only targeted APIs and their back-ends are written to.
+      operationId: addKey
+      parameters:
+        - description: when set to true the key_hash returned will be similar to the
+            un hashed key name
+          in: query
+          name: hashed
+          required: false
+          schema:
+            type: boolean
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SessionState'
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiModifyKeySuccess'
+          description: New Key added
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Malformed request
+        "403":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Attempting to access a protected api with an invalid or a missing
+            X-Tyk-Authorization in the headers
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Unexpected error
+      summary: Create a key
+      tags:
+        - Keys
+  /tyk/keys/{keyID}:
+    delete:
+      description: Deleting a key will remove it permanently from the system, however
+        analytics relating to that key will still be available.
+      operationId: deleteKey
+      parameters:
+        - description: The Key ID
+          in: path
+          name: keyID
+          required: true
+          schema:
+            type: string
+        - description: Use the hash of the key as input instead of the full key
+          in: query
+          name: hashed
+          required: false
+          schema:
+            type: boolean
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiModifyKeySuccess'
+          description: Key deleted
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Failed to remove the key
+        "403":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Attempting to access a protected api with an invalid or a missing
+            X-Tyk-Authorization in the headers
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Key not found
+      summary: Delete Key
+      tags:
+        - Keys
+    get:
+      description: Get session info about the specified key. Should return up to date
+        rate limit and quota usage numbers.
+      operationId: getKey
+      parameters:
+        - description: The Key ID
+          in: path
+          name: keyID
+          required: true
+          schema:
+            type: string
+        - description: Use the hash of the key as input instead of the full key
+          in: query
+          name: hashed
+          required: false
+          schema:
+            type: boolean
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SessionState'
+          description: Key fetched
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: requesting key using a hash when key hashing is not enabled
+        "403":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Attempting to access a protected api with an invalid or a missing
+            X-Tyk-Authorization in the headers
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Key not found
+      summary: Get a key with ID
+      tags:
+        - Keys
+    post:
+      description: |
+        You can use the `POST /tyk/keys/{KEY_ID}` endpoint as defined below to import existing keys into Tyk.
+
+                This example uses standard `authorization` header authentication, and assumes that the Gateway is located at `127.0.0.1:8080` and the Tyk secret is `352d20ee67be67f6340b4c0605b044b7` - update these as necessary to match your environment.
+      operationId: createCustomKey
+      parameters:
+        - description: The Key ID
+          in: path
+          name: keyID
+          required: true
+          schema:
+            type: string
+        - description: Adding the suppress_reset parameter and setting it to 1, will
+            cause Tyk not to reset the quota limit that is in the current live quota
+            manager. By default Tyk will reset the quota in the live quota manager (initialising
+            it) when adding a key. Adding the `suppress_reset` flag to the URL parameters
+            will avoid this behaviour.
+          in: query
+          name: suppress_reset
+          required: false
+          schema:
+            enum:
+              - "1"
+            type: string
+        - description: when set to true the key_hash returned will be similar to the
+            un hashed key name
+          in: query
+          name: hashed
+          required: false
+          schema:
+            type: boolean
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SessionState'
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiModifyKeySuccess'
+          description: New custom Key added
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Malformed request
+        "403":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Attempting to access a protected api with an invalid or a missing
+            X-Tyk-Authorization in the headers
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Unexpected error
+      summary: Create Custom Key / Import Key
+      tags:
+        - Keys
+    put:
+      description: ' You can also manually add keys to Tyk using your own key-generation
+        algorithm. It is recommended if using this approach to ensure that the OrgID
+        being used in the API Definition and the key data is blank so that Tyk does
+        not try to prepend or manage the key in any way.'
+      operationId: updateKey
+      parameters:
+        - description: The Key ID
+          in: path
+          name: keyID
+          required: true
+          schema:
+            type: string
+        - description: Adding the suppress_reset parameter and setting it to 1, will
+            cause Tyk not to reset the quota limit that is in the current live quota
+            manager. By default Tyk will reset the quota in the live quota manager (initialising
+            it) when adding a key. Adding the `suppress_reset` flag to the URL parameters
+            will avoid this behaviour.
+          in: query
+          name: suppress_reset
+          required: false
+          schema:
+            enum:
+              - "1"
+            type: string
+        - description: Use the hash of the key as input instead of the full key
+          in: query
+          name: hashed
+          required: false
+          schema:
+            type: boolean
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SessionState'
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiModifyKeySuccess'
+          description: Key updated
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Malformed request
+        "403":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Attempting to access a protected api with an invalid or a missing
+            X-Tyk-Authorization in the headers
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Key not found
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Unexpected error
+      summary: Update Key
+      tags:
+        - Keys
+  /tyk/keys/create:
+    post:
+      operationId: createKey
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SessionState'
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiModifyKeySuccess'
+          description: Key created
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: keys must have at least one Access Rights record set
+        "403":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Attempting to access a protected api with an invalid or a missing
+            X-Tyk-Authorization in the headers
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Failed to create key
+      summary: Create a key
+      tags:
+        - Keys
+  /tyk/keys/policy/{keyID}:
+    post:
+      description: This will set policies  to a hashed key
+      operationId: setPoliciesToHashedKey
+      parameters:
+        - description: The Key ID
+          in: path
+          name: keyID
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PolicyUpdateObj'
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiModifyKeySuccess'
+          description: Updated hashed key
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: malformed request body
+        "403":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Attempting to access a protected api with an invalid or a missing
+            X-Tyk-Authorization in the headers
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Key not found
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Unexpected error
+      summary: Set policies for a hashed key.
+      tags:
+        - Keys
+  /tyk/keys/preview:
+    post:
+      description: This will check if the body of a key definition is valid.And return
+        a response with how the key would look like if you create it
+      operationId: validateAKeyDefinition
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SessionState'
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SessionState'
+          description: Key definition is valid
+        "403":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Attempting to access a protected api with an invalid or a missing
+            X-Tyk-Authorization in the headers
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: malformed request body
+      summary: This will validate key a definition
+      tags:
+        - Keys
+  /tyk/oauth/clients/{apiID}:
+    get:
+      description: OAuth Clients are organised by API ID, and therefore are queried
+        as such.
+      operationId: listOAuthClients
+      parameters:
+        - description: The API ID
+          in: path
+          name: apiID
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: '#/components/schemas/NewClientRequest'
+                type: array
+          description: List of OAuth clients
+        "403":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Attempting to access a protected api with an invalid or a missing
+            X-Tyk-Authorization in the headers
+        "404":
+          description: Not Found
+      summary: List oAuth clients for an Api
+      tags:
+        - OAuth
+  /tyk/oauth/clients/{apiID}/{keyName}:
+    delete:
+      description: Please note that tokens issued with the client ID will still be
+        valid until they expire.
+      operationId: deleteOAuthClient
+      parameters:
+        - description: The API ID
+          in: path
+          name: apiID
+          required: true
+          schema:
+            type: string
+        - description: The Client ID
+          in: path
+          name: keyName
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiModifyKeySuccess'
+          description: OAuth client deleted
+        "403":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Attempting to access a protected api with an invalid or a missing
+            X-Tyk-Authorization in the headers
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Returned when the API with the specified apiID or when the
+            client the specified keyName doesn't exist.
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Internal server error
+      summary: Delete OAuth client
+      tags:
+        - OAuth
+    get:
+      description: Get OAuth client details tied to an api
+      operationId: getOAuthClient
+      parameters:
+        - description: The API ID
+          in: path
+          name: apiID
+          required: true
+          schema:
+            type: string
+        - description: The Client ID
+          in: path
+          name: keyName
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NewClientRequest'
+          description: OAuth client details
+        "403":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Attempting to access a protected api with an invalid or a missing
+            X-Tyk-Authorization in the headers
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Returned when the API with the specified apiID or when the
+            client the specified keyName doesn't exist.
+      summary: Get OAuth client
+      tags:
+        - OAuth
+    put:
+      description: Allows you to update the metadata,redirecturi,description and Policy
+        ID for an OAuth client.
+      operationId: updateOAuthClient
+      parameters:
+        - description: The Client ID
+          in: path
+          name: keyName
+          required: true
+          schema:
+            type: string
+        - description: The API ID
+          in: path
+          name: apiID
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NewClientRequest'
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NewClientRequest'
+          description: OAuth client updated
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Returned when the policy access rights doesn't contain API
+            this OAuth client belongs to
+        "403":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Attempting to access a protected api with an invalid or a missing
+            X-Tyk-Authorization in the headers
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Returned when api with the api_id sent in the apiID parameter  doesn't
+            exist or when the OAuth Client ID is not found
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: internal server error
+      summary: Update OAuth metadata,redirecturi,description and Policy ID
+      tags:
+        - OAuth
+  /tyk/oauth/clients/{apiID}/{keyName}/rotate:
+    put:
+      description: Generate a new secret
+      operationId: rotateOauthClient
+      parameters:
+        - description: The Client ID
+          in: path
+          name: keyName
+          required: true
+          schema:
+            type: string
+        - description: The API ID
+          in: path
+          name: apiID
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NewClientRequest'
+          description: New secret has been created
+        "403":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Attempting to access a protected api with an invalid or a missing
+            X-Tyk-Authorization in the headers
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Returned when api with the api_id sent in the apiID parameter  doesn't
+            exist or when the OAuth Client ID is not found
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: internal server error
+      summary: Rotate the oath client secret
+      tags:
+        - OAuth
+  /tyk/oauth/clients/{apiID}/{keyName}/tokens:
+    get:
+      description: |-
+        This endpoint allows you to retrieve a list of all current tokens and their expiry date for a provided API ID and OAuth-client ID in the following format. This endpoint will work only for newly created tokens.
+                <br/>
+                <br/>
+                You can control how long you want to store expired tokens in this list using `oauth_token_expired_retain_period` gateway option, which specifies retain period for expired tokens stored in Redis. By default expired token not get removed. See <a href="https://tyk.io/docs/configure/tyk-gateway-configuration-options/#a-name-oauth-token-expired-retain-period-a-oauth-token-expired-retain-period" target="_blank">here</a> for more details.
+      operationId: getOAuthClientTokens
+      parameters:
+        - description: The API ID
+          in: path
+          name: apiID
+          required: true
+          schema:
+            type: string
+        - description: The Client ID
+          in: path
+          name: keyName
+          required: true
+          schema:
+            type: string
+        - description: The page to return
+          in: query
+          name: page
+          required: false
+          schema:
+            type: integer
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/PaginatedOAuthClientTokens'
+                  - items:
+                      $ref: '#/components/schemas/OAuthClientToken'
+                    nullable: true
+                    type: array
+          description: Tokens returned successfully
+        "403":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Attempting to access a protected api with an invalid or a missing
+            X-Tyk-Authorization in the headers
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Returned when the API with the specified apiID or when the
+            client the specified keyName doesn't exist.
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: internal server error
+      summary: List tokens for a provided API ID and OAuth-client ID
+      tags:
+        - OAuth
+  /tyk/oauth/clients/apis/{appID}:
+    get:
+      description: Get all API IDs for APIs that have use_oauth2 enabled and use the
+        client_id (appID) specified in the path parameter for OAuth2. You can use
+        the org_id query parameter to specify from which organization you want the
+        API IDs to be returned. To return APIs from all organizations, send org_id
+        as an empty string.
+      operationId: getApisForOauthApp
+      parameters:
+        - description: The Client ID
+          in: path
+          name: appID
+          required: true
+          schema:
+            type: string
+        - in: query
+          name: orgID
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                items:
+                  type: string
+                type: array
+          description: Return an array of apis ids
+        "403":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Attempting to access a protected api with an invalid or a missing
+            X-Tyk-Authorization in the headers
+      summary: Get API IDs for APIS that use the specified client_id(appID) for OAuth
+      tags:
+        - OAuth
+  /tyk/oauth/clients/create:
+    post:
+      description: |
+        Any OAuth keys must be generated with the help of a client ID. These need to be pre-registered with Tyk before they can be used (in a similar vein to how you would register your app with Twitter before attempting to ask user permissions using their API).
+                <br/><br/>
+                <h3>Creating OAuth clients with Access to Multiple APIs</h3>
+                New from Tyk Gateway 2.6.0 is the ability to create OAuth clients with access to more than one API. If you provide the api_id it works the same as in previous releases. If you don't provide the api_id the request uses policy access rights and enumerates APIs from their setting in the newly created OAuth-client.
+      operationId: createOAuthClient
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NewClientRequest'
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NewClientRequest'
+          description: Client created
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Bad request
+        "403":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Attempting to access a protected api with an invalid or a missing
+            X-Tyk-Authorization in the headers
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Internal server error
+      summary: Create new OAuth client
+      tags:
+        - OAuth
+  /tyk/oauth/refresh/{keyName}:
+    delete:
+      description: It is possible to invalidate refresh tokens in order to manage
+        OAuth client access more robustly.
+      operationId: invalidateOAuthRefresh
+      parameters:
+        - description: The Client ID
+          in: path
+          name: keyName
+          required: true
+          schema:
+            type: string
+        - description: The API id
+          in: query
+          name: api_id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiModifyKeySuccess'
+          description: Deleted
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Returned when you fail to send the api_id or when OAuth is
+            not enabled on the API
+        "403":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Attempting to access a protected api with an invalid or a missing
+            X-Tyk-Authorization in the headers
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Returned when the API for this refresh token is not found
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: internal server error
+      summary: Invalidate OAuth refresh token
+      tags:
+        - OAuth
+  /tyk/oauth/revoke:
+    post:
+      description: revoke a single token
+      operationId: revokeSingleToken
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              properties:
+                client_id:
+                  description: id of oauth client
+                  type: string
+                org_id:
+                  type: string
+                token:
+                  description: token to be revoked
+                  type: string
+                token_type_hint:
+                  description: type of token to be revoked, if sent then the accepted
+                    values are access_token and refresh_token. String value and optional,
+                    of not provided then it will attempt to remove access and refresh
+                    tokens that matches
+                  type: string
+              required:
+                - token
+                - client_id
+              type: object
+        description: token revoked successfully
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: OK
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Returned when you send a malformed request or when the oauth
+            client doesn't exist
+        "403":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Attempting to access a protected api with an invalid or a missing
+            X-Tyk-Authorization in the headers
+      summary: revoke token
+      tags:
+        - OAuth
+  /tyk/oauth/revoke_all:
+    post:
+      description: Revoke all the tokens for a given oauth client
+      operationId: revokeAllTokens
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              properties:
+                client_id:
+                  description: id of oauth client
+                  type: string
+                client_secret:
+                  description: OAuth client secret to ensure that its a valid operation
+                  type: string
+                org_id:
+                  type: string
+              required:
+                - client_secret
+                - client_id
+              type: object
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: tokens revoked successfully
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Returned when the gateway cannot parse form data sent in request.
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Returned when you fail to send a  client secret or client id
+            in you form data
+        "403":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Attempting to access a protected api with an invalid or a missing
+            X-Tyk-Authorization in the headers
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Returned when the sent oauth client doesn't exist
+      summary: Revoke all client's tokens
+      tags:
+        - OAuth
+  /tyk/oauth/tokens:
+    delete:
+      description: Purge all lapsed OAuth token
+      operationId: purgeLapsedOAuthTokens
+      parameters:
+        - in: query
+          name: scope
+          required: true
+          schema:
+            enum:
+              - lapsed
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: lapsed tokens purged successfully
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Returned when the scope query parameter is set to lapsed
+        "403":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Forbidden
+        "422":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Returned when you fail to send the scope query parameter
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: internal server error
+      summary: Purge lapsed OAuth tokens
+      tags:
+        - OAuth
+  /tyk/org/keys:
+    get:
+      description: You can now set rate limits at the organisation level by using
+        the following fields - allowance and rate. These are the number of allowed
+        requests for the specified per value, and need to be set to the same value.
+        If you don't want to have organisation level rate limiting, set 'rate' or
+        'per' to zero, or don't add them to your request.
+      operationId: listOrgKeys
+      parameters:
+        - description: Retrieves all keys starting with the specified filter(filter
+            is a prefix - e.g. default* or default will return all keys starting with
+            default  like defaultbd,defaulttwo etc).We don't use filter for hashed keys
+          example: default*
+          in: query
+          name: filter
+          required: false
+          schema:
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiAllKeys'
+          description: ' List of all org keys'
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: ORG not found
+      summary: List Organisation Keys
+      tags:
+        - Organisation Quotas
+  /tyk/org/keys/{keyID}:
+    delete:
+      description: Deleting a key will remove all limits from organisation. It does
+        not affects regular keys created within organisation.
+      operationId: deleteOrgKey
+      parameters:
+        - description: The Key ID
+          in: path
+          name: keyID
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiModifyKeySuccess'
+          description: OK
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Bad Request
+        "403":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Forbidden
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Not Found
+      summary: Delete Key
+      tags:
+        - Organisation Quotas
+    get:
+      description: Get session info about specified organisation key. Should return
+        up to date rate limit and quota usage numbers.
+      operationId: getOrgKey
+      parameters:
+        - description: The Key ID
+          in: path
+          name: keyID
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SessionState'
+          description: OK
+        "403":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Forbidden
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Org not found
+      summary: Get an Organisation Key
+      tags:
+        - Organisation Quotas
+    post:
+      description: This work similar to Keys API except that Key ID is always equals
+        Organisation ID
+      operationId: addOrgKey
+      parameters:
+        - description: The Key ID
+          in: path
+          name: keyID
+          required: true
+          schema:
+            type: string
+        - description: Adding the reset_quota parameter and setting it to 1, will cause
+            Tyk reset the organisations quota in the live quota manager, it is recommended
+            to use this mechanism to reset organisation-level access if a monthly subscription
+            is in place.
+          in: query
+          name: reset_quota
+          required: false
+          schema:
+            enum:
+              - "1"
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SessionState'
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiModifyKeySuccess'
+          description: OK
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Bad Request
+        "403":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Forbidden
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Not Found
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Internal Server Error
+      summary: Create an organisation key
+      tags:
+        - Organisation Quotas
+    put:
+      description: |-
+        This work similar to Keys API except that Key ID is always equals Organisation ID
+
+        For Gateway v2.6.0 onwards, you can now set rate limits at the organisation level by using the following fields - allowance and rate. These are the number of allowed requests for the specified per value, and need to be set to the same value. If you don't want to have organisation level rate limiting, set `rate` or `per` to zero, or don't add them to your request.
+      operationId: updateOrgKey
+      parameters:
+        - description: The Key ID
+          in: path
+          name: keyID
+          required: true
+          schema:
+            type: string
+        - description: Adding the reset_quota parameter and setting it to 1, will cause
+            Tyk reset the organisations quota in the live quota manager, it is recommended
+            to use this mechanism to reset organisation-level access if a monthly subscription
+            is in place.
+          in: query
+          name: reset_quota
+          required: false
+          schema:
+            enum:
+              - "1"
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SessionState'
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiModifyKeySuccess'
+          description: OK
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Bad Request
+        "403":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Forbidden
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Not Found
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Internal Server Error
+      summary: Update Organisation Key
+      tags:
+        - Organisation Quotas
+  /tyk/policies:
+    get:
+      description: You can retrieve all the policies in your Tyk instance. Returns
+        an array policies.
+      operationId: listPolicies
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: '#/components/schemas/Policy'
+                type: array
+          description: List of all policies
+        "403":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Attempting to access a protected api with an invalid or a missing
+            X-Tyk-Authorization in the headers
+      summary: List Policies
+      tags:
+        - Policies
+    post:
+      description: You can create a Policy in your Tyk Instance
+      operationId: addPolicy
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Policy'
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiModifyKeySuccess'
+          description: Policy created
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Malformed request
+        "403":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Attempting to access a protected api with an invalid or a missing
+            X-Tyk-Authorization in the headers
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Internal server error.
+      summary: Create a Policy
+      tags:
+        - Policies
+  /tyk/policies/{polID}:
+    delete:
+      description: Delete a policy by ID in your Tyk instance.
+      operationId: deletePolicy
+      parameters:
+        - description: You can retrieve details of a single policy by ID in your Tyk
+            instance.
+          in: path
+          name: polID
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiModifyKeySuccess'
+          description: Deleted policy by ID
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Returned when you fail to specify an polID to delete
+        "403":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Attempting to access a protected api with an invalid or a missing
+            X-Tyk-Authorization in the headers
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Internal server error
+      summary: Delete a Policy
+      tags:
+        - Policies
+    get:
+      description: You can retrieve details of a single policy by ID in your Tyk instance.
+      operationId: getPolicy
+      parameters:
+        - description: You can retrieve details of a single policy by ID in your Tyk
+            instance.
+          in: path
+          name: polID
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Policy'
+          description: Get details of a single Policy
+        "403":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Attempting to access a protected api with an invalid or a missing
+            X-Tyk-Authorization in the headers
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Policy not found
+      summary: Get a Policy
+      tags:
+        - Policies
+    put:
+      description: You can update a Policy in your Tyk Instance by ID
+      operationId: updatePolicy
+      parameters:
+        - description: You can retrieve details of a single policy by ID in your Tyk
+            instance.
+          in: path
+          name: polID
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Policy'
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiModifyKeySuccess'
+          description: Policy updated
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Returned when you fail to specify an polID to update or due
+            to a malformed request body
+        "403":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Attempting to access a protected api with an invalid or a missing
+            X-Tyk-Authorization in the headers
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Internal server error
+      summary: Update a Policy
+      tags:
+        - Policies
+  /tyk/reload:
+    get:
+      description: Tyk is capable of reloading configurations without having to stop
+        serving requests. This means that API configurations can be added at runtime,
+        or even modified at runtime and those rules applied immediately without any
+        downtime.
+      operationId: hotReload
+      parameters:
+        - description: Block a response until the reload is performed. This can be useful
+            in scripting environments like CI/CD workflows
+          in: query
+          name: block
+          required: false
+          schema:
+            enum:
+              - true
+            type: boolean
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Reload gateway
+        "403":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Attempting to access a protected api with an invalid or a missing
+            X-Tyk-Authorization in the headers
+      summary: Hot-reload a single node
+      tags:
+        - Hot Reload
+  /tyk/reload/group:
+    get:
+      description: To reload a whole group of Tyk nodes (without using the Dashboard
+        or host manager). You can send an API request to a single node, this node
+        will then send a notification through the pub/sub infrastructure to all other
+        listening nodes (including the host manager if it is being used to manage
+        NginX) which will then trigger a global reload.
+      operationId: hotReloadGroup
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Reload the Tyk Gateway
+        "403":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Attempting to access a protected api with an invalid or a missing
+            X-Tyk-Authorization in the headers
+      summary: Hot-reload a Tyk group
+      tags:
+        - Hot Reload
+  /tyk/schema:
+    get:
+      description: Get OAS schema
+      operationId: getSchema
+      parameters:
+        - description: The OAS version
+          in: query
+          name: oasVersion
+          required: false
+          schema:
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OASSchemaResponse'
+          description: OAS schema response
+        "403":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Attempting to access a protected api with an invalid or a missing
+            X-Tyk-Authorization in the headers
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OASSchemaResponse'
+          description: The response when the requested OAS schema is not found
+      summary: Get OAS schema
+      tags:
+        - Schema
+components:
+  schemas:
+    APIAllCertificateBasics:
+      properties:
+        certs:
+          items:
+            $ref: '#/components/schemas/CertsCertificateBasics'
+          nullable: true
+          type: array
+      type: object
+    APIAllCertificates:
+      properties:
+        certs:
+          items:
+            type: string
+          nullable: true
+          type: array
+      type: object
+    APICertificateStatusMessage:
+      properties:
+        id:
+          example: 5e9d9544a1dcd60001d0ed207c440d66ebb0a4629d21329808dce9091acf5f2fde328067a6e60e5347271d90
+          type: string
+        message:
+          example: Certificate added
+          type: string
+        status:
+          example: ok
+          type: string
+      type: object
+    APIDefinition:
+      properties:
+        CORS:
+          $ref: '#/components/schemas/CORSConfig'
+        active:
+          type: boolean
+        allowed_ips:
+          items:
+            type: string
+          nullable: true
+          type: array
+        analytics_plugin:
+          $ref: '#/components/schemas/AnalyticsPluginConfig'
+        api_id:
+          type: string
+        auth:
+          $ref: '#/components/schemas/AuthConfig'
+        auth_configs:
+          additionalProperties:
+            $ref: '#/components/schemas/AuthConfig'
+          nullable: true
+          type: object
+        auth_provider:
+          $ref: '#/components/schemas/AuthProviderMeta'
+        base_identity_provided_by:
+          type: string
+        basic_auth:
+          properties:
+            body_password_regexp:
+              type: string
+            body_user_regexp:
+              type: string
+            cache_ttl:
+              type: integer
+            disable_caching:
+              type: boolean
+            extract_from_body:
+              type: boolean
+          type: object
+        blacklisted_ips:
+          items:
+            type: string
+          nullable: true
+          type: array
+        cache_options:
+          $ref: '#/components/schemas/CacheOptions'
+        certificate_pinning_disabled:
+          type: boolean
+        certificates:
+          items:
+            type: string
+          nullable: true
+          type: array
+        client_certificates:
+          items:
+            type: string
+          nullable: true
+          type: array
+        config_data:
+          additionalProperties: {}
+          nullable: true
+          type: object
+        config_data_disabled:
+          type: boolean
+        custom_middleware:
+          $ref: '#/components/schemas/MiddlewareSection'
+        custom_middleware_bundle:
+          type: string
+        custom_middleware_bundle_disabled:
+          type: boolean
+        custom_plugin_auth_enabled:
+          type: boolean
+        definition:
+          $ref: '#/components/schemas/VersionDefinition'
+        detailed_tracing:
+          type: boolean
+        disable_quota:
+          type: boolean
+        disable_rate_limit:
+          type: boolean
+        do_not_track:
+          type: boolean
+        domain:
+          type: string
+        domain_disabled:
+          type: boolean
+        dont_set_quota_on_create:
+          type: boolean
+        enable_batch_request_support:
+          type: boolean
+        enable_context_vars:
+          type: boolean
+        enable_coprocess_auth:
+          type: boolean
+        enable_detailed_recording:
+          type: boolean
+        enable_ip_blacklisting:
+          type: boolean
+        enable_ip_whitelisting:
+          type: boolean
+        enable_jwt:
+          type: boolean
+        enable_proxy_protocol:
+          type: boolean
+        enable_signature_checking:
+          type: boolean
+        event_handlers:
+          $ref: '#/components/schemas/EventHandlerMetaConfig'
+        expiration:
+          type: string
+        expire_analytics_after:
+          type: integer
+        external_oauth:
+          $ref: '#/components/schemas/ExternalOAuth'
+        global_rate_limit:
+          $ref: '#/components/schemas/GlobalRateLimit'
+        graphql:
+          $ref: '#/components/schemas/GraphQLConfig'
+        hmac_allowed_algorithms:
+          items:
+            type: string
+          nullable: true
+          type: array
+        hmac_allowed_clock_skew:
+          type: number
+        id:
+          type: string
+        idp_client_id_mapping_disabled:
+          type: boolean
+        internal:
+          type: boolean
+        is_oas:
+          type: boolean
+        jwt_client_base_field:
+          type: string
+        jwt_default_policies:
+          items:
+            type: string
+          nullable: true
+          type: array
+        jwt_expires_at_validation_skew:
+          minimum: 0
+          type: integer
+        jwt_identity_base_field:
+          type: string
+        jwt_issued_at_validation_skew:
+          minimum: 0
+          type: integer
+        jwt_not_before_validation_skew:
+          minimum: 0
+          type: integer
+        jwt_policy_field_name:
+          type: string
+        jwt_scope_claim_name:
+          type: string
+        jwt_scope_to_policy_mapping:
+          additionalProperties:
+            type: string
+          nullable: true
+          type: object
+        jwt_signing_method:
+          type: string
+        jwt_skip_kid:
+          type: boolean
+        jwt_source:
+          type: string
+        listen_port:
+          type: integer
+        name:
+          type: string
+        notifications:
+          $ref: '#/components/schemas/NotificationsManager'
+        oauth_meta:
+          properties:
+            allowed_access_types:
+              items:
+                type: string
+              nullable: true
+              type: array
+            allowed_authorize_types:
+              items:
+                type: string
+              nullable: true
+              type: array
+            auth_login_redirect:
+              type: string
+          type: object
+        openid_options:
+          $ref: '#/components/schemas/OpenIDOptions'
+        org_id:
+          type: string
+        pinned_public_keys:
+          additionalProperties:
+            type: string
+          nullable: true
+          type: object
+        protocol:
+          type: string
+        proxy:
+          $ref: '#/components/schemas/ProxyConfig'
+        request_signing:
+          $ref: '#/components/schemas/RequestSigningMeta'
+        response_processors:
+          items:
+            $ref: '#/components/schemas/ResponseProcessor'
+          nullable: true
+          type: array
+        scopes:
+          $ref: '#/components/schemas/Scopes'
+        session_lifetime:
+          type: integer
+        session_lifetime_respects_key_expiration:
+          type: boolean
+        session_provider:
+          $ref: '#/components/schemas/SessionProviderMeta'
+        slug:
+          type: string
+        strip_auth_data:
+          type: boolean
+        tag_headers:
+          items:
+            type: string
+          nullable: true
+          type: array
+        tags:
+          example:
+            - Default
+            - v1
+          items:
+            type: string
+          nullable: true
+          type: array
+        tags_disabled:
+          type: boolean
+        upstream_certificates:
+          additionalProperties:
+            type: string
+          nullable: true
+          type: object
+        upstream_certificates_disabled:
+          type: boolean
+        uptime_tests:
+          $ref: '#/components/schemas/UptimeTests'
+        use_basic_auth:
+          type: boolean
+        use_go_plugin_auth:
+          type: boolean
+        use_keyless:
+          type: boolean
+        use_mutual_tls_auth:
+          type: boolean
+        use_oauth2:
+          type: boolean
+        use_openid:
+          type: boolean
+        use_standard_auth:
+          type: boolean
+        version_data:
+          $ref: '#/components/schemas/VersionData'
+      type: object
+    APILimit:
+      properties:
+        max_query_depth:
+          example: -1
+          type: integer
+        per:
+          example: 5
+          format: double
+          type: number
+        quota_max:
+          example: 20000
+          format: int64
+          type: integer
+        quota_remaining:
+          example: 20000
+          format: int64
+          type: integer
+        quota_renewal_rate:
+          example: 2.592e+06
+          format: int64
+          type: integer
+        quota_renews:
+          example: 0
+          format: int64
+          type: integer
+        rate:
+          example: 1
+          format: double
+          type: number
+        throttle_interval:
+          example: 10
+          format: double
+          type: number
+        throttle_retry_limit:
+          example: 1000
+          type: integer
+      type: object
+    AccessDefinition:
+      properties:
+        allowance_scope:
+          example: d371b83b249845a2497ab9a947fd6210
+          type: string
+        allowed_types:
+          items:
+            $ref: '#/components/schemas/GraphqlType'
+          nullable: true
+          type: array
+        allowed_urls:
+          items:
+            $ref: '#/components/schemas/AccessSpec'
+          nullable: true
+          type: array
+        api_id:
+          example: d1dfc6a927a046c54c0ed470f19757cc
+          type: string
+        api_name:
+          example: Rate Limit Proxy API
+          type: string
+        disable_introspection:
+          example: false
+          type: boolean
+        field_access_rights:
+          items:
+            $ref: '#/components/schemas/FieldAccessDefinition'
+          nullable: true
+          type: array
+        limit:
+          $ref: '#/components/schemas/APILimit'
+        restricted_types:
+          items:
+            $ref: '#/components/schemas/GraphqlType'
+          nullable: true
+          type: array
+        versions:
+          example:
+            - Default
+            - v2
+          items:
+            type: string
+          nullable: true
+          type: array
+      type: object
+    AccessSpec:
+      properties:
+        methods:
+          example:
+            - GET
+            - POST
+            - DELETE
+            - PUT
+          items:
+            type: string
+          nullable: true
+          type: array
+        url:
+          example: anything/rate-limit-1-per-5
+          type: string
+      type: object
+    AnalyticsPluginConfig:
+      properties:
+        enable:
+          type: boolean
+        func_name:
+          type: string
+        plugin_path:
+          type: string
+      type: object
+    ApiAllKeys:
+      properties:
+        keys:
+          items:
+            type: string
+          nullable: true
+          type: array
+      type: object
+    ApiModifyKeySuccess:
+      properties:
+        action:
+          example: modified
+          type: string
+        key:
+          example: b13d928b9972bd18
+          type: string
+        key_hash:
+          type: string
+        status:
+          example: ok
+          type: string
+      type: object
+    ApiStatusMessage:
+      properties:
+        message:
+          type: string
+        status:
+          type: string
+      type: object
+    AuthConfig:
+      properties:
+        auth_header_name:
+          example: Authorization
+          type: string
+        cookie_name:
+          type: string
+        disable_header:
+          type: boolean
+        name:
+          type: string
+        param_name:
+          type: string
+        signature:
+          $ref: '#/components/schemas/SignatureConfig'
+        use_certificate:
+          type: boolean
+        use_cookie:
+          type: boolean
+        use_param:
+          type: boolean
+        validate_signature:
+          type: boolean
+      type: object
+    AuthProviderMeta:
+      properties:
+        meta:
+          additionalProperties: {}
+          nullable: true
+          type: object
+        name:
+          type: string
+        storage_engine:
+          type: string
+      type: object
+    BasicAuthData:
+      properties:
+        hash_type:
+          type: string
+        password:
+          type: string
+      type: object
+    CORSConfig:
+      properties:
+        allow_credentials:
+          example: false
+          type: boolean
+        allowed_headers:
+          example:
+            - Origin
+            - Accept
+            - Content-Type
+            - Authorization
+          items:
+            type: string
+          nullable: true
+          type: array
+        allowed_methods:
+          example:
+            - GET
+            - HEAD
+            - POST
+          items:
+            type: string
+          nullable: true
+          type: array
+        allowed_origins:
+          example:
+            - https://*.foo.com
+          items:
+            type: string
+          nullable: true
+          type: array
+        debug:
+          example: true
+          type: boolean
+        enable:
+          example: false
+          type: boolean
+        exposed_headers:
+          example:
+            - Accept
+            - Content-Type
+          items:
+            type: string
+          nullable: true
+          type: array
+        max_age:
+          example: 24
+          type: integer
+        options_passthrough:
+          example: false
+          type: boolean
+      type: object
+    CacheMeta:
+      properties:
+        cache_key_regex:
+          type: string
+        cache_response_codes:
+          items:
+            type: integer
+          nullable: true
+          type: array
+        disabled:
+          type: boolean
+        method:
+          type: string
+        path:
+          type: string
+        timeout:
+          format: int64
+          type: integer
+      type: object
+    CacheOptions:
+      properties:
+        cache_all_safe_requests:
+          example: false
+          type: boolean
+        cache_by_headers:
+          items:
+            type: string
+          nullable: true
+          type: array
+        cache_control_ttl_header:
+          type: string
+        cache_response_codes:
+          items:
+            type: integer
+          nullable: true
+          type: array
+        cache_timeout:
+          example: 60
+          format: int64
+          type: integer
+        enable_cache:
+          example: true
+          type: boolean
+        enable_upstream_cache_control:
+          example: false
+          type: boolean
+      type: object
+    CertsCertificateBasics:
+      properties:
+        dns_names:
+          items:
+            type: string
+          nullable: true
+          type: array
+        has_private:
+          type: boolean
+        id:
+          type: string
+        issuer_cn:
+          type: string
+        not_after:
+          format: date-time
+          type: string
+        not_before:
+          format: date-time
+          type: string
+        subject_cn:
+          type: string
+      type: object
+    CertsCertificateMeta:
+      properties:
+        dns_names:
+          example:
+            - .*tyk.io
+          items:
+            type: string
+          type: array
+        fingerprint:
+          example: 7c440d66ebb0a4629d21329808dce9091acf5f2fde328067a6e60e5347271d90
+          type: string
+        has_private:
+          example: false
+          type: boolean
+        id:
+          example: 5e9d9544a1dcd60001d0ed207c440d66ebb0a4629d21329808dce9091acf5f2fde328067a6e60e5347271d90
+          type: string
+        issuer:
+          $ref: '#/components/schemas/PkixName'
+        not_after:
+          example: "2034-03-26T08:46:37Z"
+          format: date-time
+          type: string
+        not_before:
+          example: "2024-03-25T08:46:37Z"
+          format: date-time
+          type: string
+        subject:
+          $ref: '#/components/schemas/PkixName'
+      type: object
+    CheckCommand:
+      properties:
+        message:
+          type: string
+        name:
+          type: string
+      type: object
+    CircuitBreakerMeta:
+      properties:
+        disable_half_open_state:
+          type: boolean
+        disabled:
+          type: boolean
+        method:
+          type: string
+        path:
+          type: string
+        return_to_service_after:
+          type: integer
+        samples:
+          format: int64
+          type: integer
+        threshold_percent:
+          type: number
+      type: object
+    DatasourceMappingConfiguration:
+      properties:
+        disabled:
+          type: boolean
+        path:
+          type: string
+      type: object
+    DatasourceSourceConfig:
+      properties:
+        data_source_config: {}
+        kind:
+          type: string
+      type: object
+    DatasourceTypeFieldConfiguration:
+      properties:
+        data_source:
+          $ref: '#/components/schemas/DatasourceSourceConfig'
+        field_name:
+          type: string
+        mapping:
+          $ref: '#/components/schemas/DatasourceMappingConfiguration'
+        type_name:
+          type: string
+      type: object
+    EndPointMeta:
+      properties:
+        disabled:
+          type: boolean
+        ignore_case:
+          type: boolean
+        method:
+          type: string
+        method_actions:
+          additionalProperties:
+            $ref: '#/components/schemas/EndpointMethodMeta'
+          type: object
+        path:
+          type: string
+      type: object
+    EndpointMethodMeta:
+      properties:
+        action:
+          enum:
+            - no_action
+            - reply
+          type: string
+        code:
+          type: integer
+        data:
+          type: string
+        headers:
+          additionalProperties:
+            type: string
+          nullable: true
+          type: object
+      type: object
+    EventHandlerMetaConfig:
+      properties:
+        events:
+          additionalProperties:
+            items:
+              $ref: '#/components/schemas/EventHandlerTriggerConfig'
+            type: array
+          nullable: true
+          type: object
+      type: object
+    EventHandlerTriggerConfig:
+      properties:
+        handler_meta:
+          additionalProperties: {}
+          nullable: true
+          type: object
+        handler_name:
+          type: string
+      type: object
+    ExtendedPathsSet:
+      properties:
+        advance_cache_config:
+          items:
+            $ref: '#/components/schemas/CacheMeta'
+          type: array
+        black_list:
+          items:
+            $ref: '#/components/schemas/EndPointMeta'
+          type: array
+        cache:
+          items:
+            type: string
+          type: array
+        circuit_breakers:
+          items:
+            $ref: '#/components/schemas/CircuitBreakerMeta'
+          type: array
+        do_not_track_endpoints:
+          items:
+            $ref: '#/components/schemas/TrackEndpointMeta'
+          type: array
+        go_plugin:
+          items:
+            $ref: '#/components/schemas/GoPluginMeta'
+          type: array
+        hard_timeouts:
+          items:
+            $ref: '#/components/schemas/HardTimeoutMeta'
+          type: array
+        ignored:
+          items:
+            $ref: '#/components/schemas/EndPointMeta'
+          type: array
+        internal:
+          items:
+            $ref: '#/components/schemas/InternalMeta'
+          type: array
+        method_transforms:
+          items:
+            $ref: '#/components/schemas/MethodTransformMeta'
+          type: array
+        mock_response:
+          items:
+            $ref: '#/components/schemas/MockResponseMeta'
+          type: array
+        persist_graphql:
+          items:
+            $ref: '#/components/schemas/PersistGraphQLMeta'
+          nullable: true
+          type: array
+        size_limits:
+          items:
+            $ref: '#/components/schemas/RequestSizeMeta'
+          type: array
+        track_endpoints:
+          items:
+            $ref: '#/components/schemas/TrackEndpointMeta'
+          type: array
+        transform:
+          items:
+            $ref: '#/components/schemas/TemplateMeta'
+          type: array
+        transform_headers:
+          items:
+            $ref: '#/components/schemas/HeaderInjectionMeta'
+          type: array
+        transform_jq:
+          items:
+            $ref: '#/components/schemas/TransformJQMeta'
+          type: array
+        transform_jq_response:
+          items:
+            $ref: '#/components/schemas/TransformJQMeta'
+          type: array
+        transform_response:
+          items:
+            $ref: '#/components/schemas/TemplateMeta'
+          type: array
+        transform_response_headers:
+          items:
+            $ref: '#/components/schemas/HeaderInjectionMeta'
+          type: array
+        url_rewrites:
+          items:
+            $ref: '#/components/schemas/URLRewriteMeta'
+          type: array
+        validate_json:
+          items:
+            $ref: '#/components/schemas/ValidatePathMeta'
+          type: array
+        validate_request:
+          items:
+            $ref: '#/components/schemas/ValidateRequestMeta'
+          type: array
+        virtual:
+          items:
+            $ref: '#/components/schemas/VirtualMeta'
+          type: array
+        white_list:
+          items:
+            $ref: '#/components/schemas/EndPointMeta'
+          type: array
+      type: object
+    ExternalOAuth:
+      properties:
+        enabled:
+          type: boolean
+        providers:
+          items:
+            $ref: '#/components/schemas/Provider'
+          nullable: true
+          type: array
+      type: object
+    FieldAccessDefinition:
+      properties:
+        field_name:
+          type: string
+        limits:
+          $ref: '#/components/schemas/FieldLimits'
+        type_name:
+          type: string
+      type: object
+    FieldLimits:
+      properties:
+        max_query_depth:
+          type: integer
+      type: object
+    GlobalRateLimit:
+      properties:
+        disabled:
+          type: boolean
+        per:
+          type: number
+        rate:
+          type: number
+      type: object
+    GoPluginMeta:
+      properties:
+        disabled:
+          type: boolean
+        func_name:
+          type: string
+        method:
+          type: string
+        path:
+          type: string
+        plugin_path:
+          type: string
+      type: object
+    GraphAccessDefinition:
+      type: object
+    GraphQLConfig:
+      properties:
+        enabled:
+          type: boolean
+        engine:
+          $ref: '#/components/schemas/GraphQLEngineConfig'
+        execution_mode:
+          enum:
+            - proxyOnly
+            - executionEngine
+            - subgraph
+            - supergraph
+          type: string
+        introspection:
+          $ref: '#/components/schemas/GraphQLIntrospectionConfig'
+        last_schema_update:
+          format: date-time
+          nullable: true
+          type: string
+        playground:
+          $ref: '#/components/schemas/GraphQLPlayground'
+        proxy:
+          $ref: '#/components/schemas/GraphQLProxyConfig'
+        schema:
+          type: string
+        subgraph:
+          $ref: '#/components/schemas/GraphQLSubgraphConfig'
+        supergraph:
+          $ref: '#/components/schemas/GraphQLSupergraphConfig'
+        type_field_configurations:
+          items:
+            $ref: '#/components/schemas/DatasourceTypeFieldConfiguration'
+          nullable: true
+          type: array
+        version:
+          enum:
+            - ''''
+            - "1"
+            - "2"
+          type: string
+      type: object
+    GraphQLEngineConfig:
+      properties:
+        data_sources:
+          items:
+            $ref: '#/components/schemas/GraphQLEngineDataSource'
+          nullable: true
+          type: array
+        field_configs:
+          items:
+            $ref: '#/components/schemas/GraphQLFieldConfig'
+          nullable: true
+          type: array
+        global_headers:
+          items:
+            $ref: '#/components/schemas/UDGGlobalHeader'
+          nullable: true
+          type: array
+      type: object
+    GraphQLEngineDataSource:
+      properties:
+        config: {}
+        internal:
+          type: boolean
+        kind:
+          type: string
+        name:
+          type: string
+        root_fields:
+          items:
+            $ref: '#/components/schemas/GraphQLTypeFields'
+          nullable: true
+          type: array
+      type: object
+    GraphQLFieldConfig:
+      properties:
+        disable_default_mapping:
+          type: boolean
+        field_name:
+          type: string
+        path:
+          items:
+            type: string
+          nullable: true
+          type: array
+        type_name:
+          type: string
+      type: object
+    GraphQLIntrospectionConfig:
+      properties:
+        disabled:
+          type: boolean
+      type: object
+    GraphQLPlayground:
+      properties:
+        enabled:
+          type: boolean
+        path:
+          type: string
+      type: object
+    GraphQLProxyConfig:
+      properties:
+        auth_headers:
+          additionalProperties:
+            type: string
+          nullable: true
+          type: object
+        request_headers:
+          additionalProperties:
+            type: string
+          nullable: true
+          type: object
+        subscription_type:
+          type: string
+        use_response_extensions:
+          $ref: '#/components/schemas/GraphQLResponseExtensions'
+      type: object
+    GraphQLResponseExtensions:
+      properties:
+        on_error_forwarding:
+          type: boolean
+      type: object
+    GraphQLSubgraphConfig:
+      properties:
+        sdl:
+          type: string
+      type: object
+    GraphQLSubgraphEntity:
+      properties:
+        api_id:
+          type: string
+        headers:
+          additionalProperties:
+            type: string
+          nullable: true
+          type: object
+        name:
+          type: string
+        sdl:
+          type: string
+        subscription_type:
+          type: string
+        url:
+          type: string
+      type: object
+    GraphQLSupergraphConfig:
+      properties:
+        disable_query_batching:
+          type: boolean
+        global_headers:
+          additionalProperties:
+            type: string
+          nullable: true
+          type: object
+        merged_sdl:
+          type: string
+        subgraphs:
+          items:
+            $ref: '#/components/schemas/GraphQLSubgraphEntity'
+          nullable: true
+          type: array
+        updated_at:
+          format: date-time
+          nullable: true
+          type: string
+      type: object
+    GraphQLTypeFields:
+      properties:
+        fields:
+          items:
+            type: string
+          nullable: true
+          type: array
+        type:
+          type: string
+      type: object
+    GraphqlType:
+      properties:
+        fields:
+          items:
+            type: string
+          nullable: true
+          type: array
+        name:
+          type: string
+      type: object
+    HardTimeoutMeta:
+      properties:
+        disabled:
+          type: boolean
+        method:
+          type: string
+        path:
+          type: string
+        timeout:
+          type: integer
+      type: object
+    HeaderInjectionMeta:
+      properties:
+        act_on:
+          type: boolean
+        add_headers:
+          additionalProperties:
+            type: string
+          nullable: true
+          type: object
+        delete_headers:
+          items:
+            type: string
+          nullable: true
+          type: array
+        disabled:
+          type: boolean
+        method:
+          type: string
+        path:
+          type: string
+      type: object
+    HealthCheckItem:
+      properties:
+        componentId:
+          type: string
+        componentType:
+          type: string
+        output:
+          type: string
+        status:
+          enum:
+            - pass
+            - fail
+            - warn
+          type: string
+        time:
+          type: string
+      type: object
+    HealthCheckResponse:
+      properties:
+        description:
+          type: string
+        details:
+          additionalProperties:
+            $ref: '#/components/schemas/HealthCheckItem'
+          type: object
+        output:
+          type: string
+        status:
+          enum:
+            - pass
+            - fail
+            - warn
+          type: string
+        version:
+          type: string
+      type: object
+    HostCheckObject:
+      properties:
+        body:
+          type: string
+        commands:
+          items:
+            $ref: '#/components/schemas/CheckCommand'
+          nullable: true
+          type: array
+        enable_proxy_protocol:
+          type: boolean
+        headers:
+          additionalProperties:
+            type: string
+          nullable: true
+          type: object
+        method:
+          type: string
+        protocol:
+          type: string
+        timeout:
+          type: integer
+        url:
+          type: string
+      type: object
+    HttpHeader:
+      additionalProperties:
+        items:
+          type: string
+        type: array
+      type: object
+    InternalMeta:
+      properties:
+        disabled:
+          type: boolean
+        method:
+          type: string
+        path:
+          type: string
+      type: object
+    Introspection:
+      properties:
+        cache:
+          $ref: '#/components/schemas/IntrospectionCache'
+        client_id:
+          type: string
+        client_secret:
+          type: string
+        enabled:
+          type: boolean
+        identity_base_field:
+          type: string
+        url:
+          type: string
+      type: object
+    IntrospectionCache:
+      properties:
+        enabled:
+          type: boolean
+        timeout:
+          format: int64
+          type: integer
+      type: object
+    JWTData:
+      properties:
+        secret:
+          type: string
+      type: object
+    JWTValidation:
+      properties:
+        enabled:
+          type: boolean
+        expires_at_validation_skew:
+          minimum: 0
+          type: integer
+        identity_base_field:
+          type: string
+        issued_at_validation_skew:
+          minimum: 0
+          type: integer
+        not_before_validation_skew:
+          minimum: 0
+          type: integer
+        signing_method:
+          type: string
+        source:
+          type: string
+      type: object
+    MethodTransformMeta:
+      properties:
+        disabled:
+          type: boolean
+        method:
+          type: string
+        path:
+          type: string
+        to_method:
+          type: string
+      type: object
+    MiddlewareDefinition:
+      properties:
+        disabled:
+          type: boolean
+        name:
+          example: PreMiddlewareFunction
+          type: string
+        path:
+          type: string
+        raw_body_only:
+          example: false
+          type: boolean
+        require_session:
+          example: false
+          type: boolean
+      type: object
+    MiddlewareIdExtractor:
+      properties:
+        disabled:
+          type: boolean
+        extract_from:
+          type: string
+        extract_with:
+          type: string
+        extractor_config:
+          additionalProperties: {}
+          nullable: true
+          type: object
+      type: object
+    MiddlewareSection:
+      properties:
+        auth_check:
+          $ref: '#/components/schemas/MiddlewareDefinition'
+        driver:
+          type: string
+        id_extractor:
+          $ref: '#/components/schemas/MiddlewareIdExtractor'
+        post:
+          items:
+            $ref: '#/components/schemas/MiddlewareDefinition'
+          nullable: true
+          type: array
+        post_key_auth:
+          items:
+            $ref: '#/components/schemas/MiddlewareDefinition'
+          nullable: true
+          type: array
+        pre:
+          items:
+            $ref: '#/components/schemas/MiddlewareDefinition'
+          nullable: true
+          type: array
+        response:
+          items:
+            $ref: '#/components/schemas/MiddlewareDefinition'
+          nullable: true
+          type: array
+      type: object
+    MockResponseMeta:
+      properties:
+        body:
+          type: string
+        code:
+          type: integer
+        disabled:
+          type: boolean
+        headers:
+          additionalProperties:
+            type: string
+          nullable: true
+          type: object
+        ignore_case:
+          type: boolean
+        method:
+          type: string
+        path:
+          type: string
+      type: object
+    Monitor:
+      properties:
+        trigger_limits:
+          example:
+            - 80
+            - 60
+            - 50
+          items:
+            type: number
+          nullable: true
+          type: array
+      type: object
+    NewClientRequest:
+      properties:
+        api_id:
+          example: keyless
+          type: string
+        client_id:
+          example: 2a06b398c17f46908de3dffcb71ef87b
+          type: string
+        description:
+          example: google client login
+          type: string
+        meta_data: {}
+        policy_id:
+          type: string
+        redirect_uri:
+          example: https://httpbin.org/ip
+          type: string
+        secret:
+          example: MmQwNTI5NGQtYjU0YS00NjMyLWIwZjktNTZjY2M1ZjhjYWY0
+          type: string
+      type: object
+    NotificationsManager:
+      properties:
+        oauth_on_keychange_url:
+          type: string
+        shared_secret:
+          type: string
+      type: object
+    OAS:
+      properties:
+        components:
+          $ref: '#/components/schemas/Openapi3Components'
+        externalDocs:
+          $ref: '#/components/schemas/Openapi3ExternalDocs'
+        info:
+          $ref: '#/components/schemas/Openapi3Info'
+        openapi:
+          type: string
+        paths:
+          $ref: '#/components/schemas/Openapi3Paths'
+        security:
+          $ref: '#/components/schemas/Openapi3SecurityRequirements'
+        servers:
+          $ref: '#/components/schemas/Openapi3Servers'
+        tags:
+          $ref: '#/components/schemas/Openapi3Tags'
+      type: object
+    OASSchemaResponse:
+      properties:
+        message:
+          type: string
+        schema: {}
+        status:
+          type: string
+      type: object
+    OAuthClientToken:
+      properties:
+        code:
+          type: string
+        expires:
+          type: integer
+      type: object
+    OIDProviderConfig:
+      properties:
+        client_ids:
+          additionalProperties:
+            type: string
+          nullable: true
+          type: object
+        issuer:
+          type: string
+      type: object
+    OpenIDOptions:
+      properties:
+        providers:
+          items:
+            $ref: '#/components/schemas/OIDProviderConfig'
+          nullable: true
+          type: array
+        segregate_by_client:
+          type: boolean
+      type: object
+    Openapi3CallbackRef:
+      type: object
+    Openapi3Callbacks:
+      additionalProperties:
+        $ref: '#/components/schemas/Openapi3CallbackRef'
+      type: object
+    Openapi3Components:
+      properties:
+        callbacks:
+          $ref: '#/components/schemas/Openapi3Callbacks'
+        examples:
+          $ref: '#/components/schemas/Openapi3Examples'
+        headers:
+          $ref: '#/components/schemas/Openapi3Headers'
+        links:
+          $ref: '#/components/schemas/Openapi3Links'
+        parameters:
+          $ref: '#/components/schemas/Openapi3ParametersMap'
+        requestBodies:
+          $ref: '#/components/schemas/Openapi3RequestBodies'
+        responses:
+          $ref: '#/components/schemas/Openapi3Responses'
+        schemas:
+          $ref: '#/components/schemas/Openapi3Schemas'
+        securitySchemes:
+          $ref: '#/components/schemas/Openapi3SecuritySchemes'
+      type: object
+    Openapi3Contact:
+      properties:
+        email:
+          type: string
+        name:
+          type: string
+        url:
+          type: string
+      type: object
+    Openapi3ExampleRef:
+      type: object
+    Openapi3Examples:
+      additionalProperties:
+        $ref: '#/components/schemas/Openapi3ExampleRef'
+      type: object
+    Openapi3ExternalDocs:
+      properties:
+        description:
+          type: string
+        url:
+          type: string
+      type: object
+    Openapi3HeaderRef:
+      type: object
+    Openapi3Headers:
+      additionalProperties:
+        $ref: '#/components/schemas/Openapi3HeaderRef'
+      type: object
+    Openapi3Info:
+      properties:
+        contact:
+          $ref: '#/components/schemas/Openapi3Contact'
+        description:
+          type: string
+        license:
+          $ref: '#/components/schemas/Openapi3License'
+        termsOfService:
+          type: string
+        title:
+          type: string
+        version:
+          type: string
+      type: object
+    Openapi3License:
+      properties:
+        name:
+          type: string
+        url:
+          type: string
+      type: object
+    Openapi3LinkRef:
+      type: object
+    Openapi3Links:
+      additionalProperties:
+        $ref: '#/components/schemas/Openapi3LinkRef'
+      type: object
+    Openapi3Operation:
+      properties:
+        callbacks:
+          $ref: '#/components/schemas/Openapi3Callbacks'
+        deprecated:
+          type: boolean
+        description:
+          type: string
+        externalDocs:
+          $ref: '#/components/schemas/Openapi3ExternalDocs'
+        operationId:
+          type: string
+        parameters:
+          $ref: '#/components/schemas/Openapi3Parameters'
+        requestBody:
+          $ref: '#/components/schemas/Openapi3RequestBodyRef'
+        responses:
+          $ref: '#/components/schemas/Openapi3Responses'
+        security:
+          $ref: '#/components/schemas/Openapi3SecurityRequirements'
+        servers:
+          $ref: '#/components/schemas/Openapi3Servers'
+        summary:
+          type: string
+        tags:
+          items:
+            type: string
+          type: array
+      type: object
+    Openapi3ParameterRef:
+      type: object
+    Openapi3Parameters:
+      items:
+        $ref: '#/components/schemas/Openapi3ParameterRef'
+      type: array
+    Openapi3ParametersMap:
+      additionalProperties:
+        $ref: '#/components/schemas/Openapi3ParameterRef'
+      type: object
+    Openapi3PathItem:
+      properties:
+        $ref:
+          type: string
+        connect:
+          $ref: '#/components/schemas/Openapi3Operation'
+        delete:
+          $ref: '#/components/schemas/Openapi3Operation'
+        description:
+          type: string
+        get:
+          $ref: '#/components/schemas/Openapi3Operation'
+        head:
+          $ref: '#/components/schemas/Openapi3Operation'
+        options:
+          $ref: '#/components/schemas/Openapi3Operation'
+        parameters:
+          $ref: '#/components/schemas/Openapi3Parameters'
+        patch:
+          $ref: '#/components/schemas/Openapi3Operation'
+        post:
+          $ref: '#/components/schemas/Openapi3Operation'
+        put:
+          $ref: '#/components/schemas/Openapi3Operation'
+        servers:
+          $ref: '#/components/schemas/Openapi3Servers'
+        summary:
+          type: string
+        trace:
+          $ref: '#/components/schemas/Openapi3Operation'
+      type: object
+    Openapi3Paths:
+      additionalProperties:
+        $ref: '#/components/schemas/Openapi3PathItem'
+      type: object
+    Openapi3RequestBodies:
+      additionalProperties:
+        $ref: '#/components/schemas/Openapi3RequestBodyRef'
+      type: object
+    Openapi3RequestBodyRef:
+      type: object
+    Openapi3ResponseRef:
+      type: object
+    Openapi3Responses:
+      additionalProperties:
+        $ref: '#/components/schemas/Openapi3ResponseRef'
+      type: object
+    Openapi3SchemaRef:
+      type: object
+    Openapi3Schemas:
+      additionalProperties:
+        $ref: '#/components/schemas/Openapi3SchemaRef'
+      type: object
+    Openapi3SecurityRequirement:
+      additionalProperties:
+        items:
+          type: string
+        type: array
+      type: object
+    Openapi3SecurityRequirements:
+      items:
+        $ref: '#/components/schemas/Openapi3SecurityRequirement'
+      nullable: true
+      type: array
+    Openapi3SecuritySchemeRef:
+      type: object
+    Openapi3SecuritySchemes:
+      additionalProperties:
+        $ref: '#/components/schemas/Openapi3SecuritySchemeRef'
+      type: object
+    Openapi3Server:
+      properties:
+        description:
+          type: string
+        url:
+          type: string
+        variables:
+          additionalProperties:
+            $ref: '#/components/schemas/Openapi3ServerVariable'
+          type: object
+      type: object
+    Openapi3ServerVariable:
+      properties:
+        default:
+          type: string
+        description:
+          type: string
+        enum:
+          items:
+            type: string
+          type: array
+      type: object
+    Openapi3Servers:
+      items:
+        $ref: '#/components/schemas/Openapi3Server'
+      nullable: true
+      type: array
+    Openapi3Tag:
+      properties:
+        description:
+          type: string
+        externalDocs:
+          $ref: '#/components/schemas/Openapi3ExternalDocs'
+        name:
+          type: string
+      type: object
+    Openapi3Tags:
+      items:
+        $ref: '#/components/schemas/Openapi3Tag'
+      type: array
+    PaginatedOAuthClientTokens:
+      properties:
+        pagination:
+          $ref: '#/components/schemas/PaginationStatus'
+        tokens:
+          items:
+            $ref: '#/components/schemas/OAuthClientToken'
+          nullable: true
+          type: array
+      type: object
+    PaginationStatus:
+      properties:
+        page_num:
+          type: integer
+        page_size:
+          type: integer
+        page_total:
+          type: integer
+      type: object
+    PersistGraphQLMeta:
+      properties:
+        method:
+          type: string
+        operation:
+          type: string
+        path:
+          type: string
+        variables:
+          additionalProperties: {}
+          nullable: true
+          type: object
+      type: object
+    PkixName:
+      type: object
+    Policy:
+      properties:
+        _id:
+          example: 5ead7120575961000181867e
+          type: string
+        access_rights:
+          additionalProperties:
+            $ref: '#/components/schemas/AccessDefinition'
+          nullable: true
+          type: object
+        active:
+          example: true
+          type: boolean
+        enable_http_signature_validation:
+          example: false
+          type: boolean
+        graphql_access_rights:
+          additionalProperties:
+            $ref: '#/components/schemas/GraphAccessDefinition'
+          nullable: true
+          type: object
+        hmac_enabled:
+          example: false
+          type: boolean
+        id:
+          example: 5ead7120575961000181867e
+          type: string
+        is_inactive:
+          example: false
+          type: boolean
+        key_expires_in:
+          example: 0
+          format: int64
+          type: integer
+        last_updated:
+          example: "1655965189"
+          type: string
+        max_query_depth:
+          example: -1
+          type: integer
+        meta_data:
+          additionalProperties: {}
+          nullable: true
+          type: object
+        name:
+          example: Swagger Petstore Policy
+          type: string
+        org_id:
+          example: 5e9d9544a1dcd60001d0ed20
+          type: string
+        partitions:
+          $ref: '#/components/schemas/PolicyPartitions'
+        per:
+          example: 60
+          format: double
+          type: number
+        quota_max:
+          example: -1
+          format: int64
+          type: integer
+        quota_renewal_rate:
+          example: 3600
+          format: int64
+          type: integer
+        rate:
+          example: 1000
+          format: double
+          type: number
+        tags:
+          items:
+            type: string
+          nullable: true
+          type: array
+        throttle_interval:
+          example: -1
+          format: double
+          type: number
+        throttle_retry_limit:
+          example: -1
+          type: integer
+      type: object
+    PolicyPartitions:
+      properties:
+        acl:
+          example: true
+          type: boolean
+        complexity:
+          example: false
+          type: boolean
+        per_api:
+          example: false
+          type: boolean
+        quota:
+          example: true
+          type: boolean
+        rate_limit:
+          example: true
+          type: boolean
+      type: object
+    PolicyUpdateObj:
+      properties:
+        apply_policies:
+          items:
+            type: string
+          nullable: true
+          type: array
+        policy:
+          type: string
+      type: object
+    Provider:
+      properties:
+        introspection:
+          $ref: '#/components/schemas/Introspection'
+        jwt:
+          $ref: '#/components/schemas/JWTValidation'
+      type: object
+    ProxyConfig:
+      properties:
+        check_host_against_uptime_tests:
+          type: boolean
+        disable_strip_slash:
+          type: boolean
+        enable_load_balancing:
+          type: boolean
+        listen_path:
+          example: /relative-path-examples/
+          type: string
+        preserve_host_header:
+          type: boolean
+        service_discovery:
+          $ref: '#/components/schemas/ServiceDiscoveryConfiguration'
+        strip_listen_path:
+          example: true
+          type: boolean
+        target_list:
+          items:
+            type: string
+          nullable: true
+          type: array
+        target_url:
+          example: https://httpbin.org/
+          type: string
+        transport:
+          properties:
+            proxy_url:
+              type: string
+            ssl_ciphers:
+              items:
+                type: string
+              nullable: true
+              type: array
+            ssl_force_common_name_check:
+              type: boolean
+            ssl_insecure_skip_verify:
+              type: boolean
+            ssl_max_version:
+              minimum: 0
+              type: integer
+            ssl_min_version:
+              minimum: 0
+              type: integer
+          type: object
+      type: object
+    RequestSigningMeta:
+      properties:
+        algorithm:
+          type: string
+        certificate_id:
+          type: string
+        header_list:
+          items:
+            type: string
+          nullable: true
+          type: array
+        is_enabled:
+          type: boolean
+        key_id:
+          type: string
+        secret:
+          type: string
+        signature_header:
+          type: string
+      type: object
+    RequestSizeMeta:
+      properties:
+        disabled:
+          type: boolean
+        method:
+          type: string
+        path:
+          type: string
+        size_limit:
+          format: int64
+          type: integer
+      type: object
+    ResponseProcessor:
+      properties:
+        name:
+          type: string
+        options: {}
+      type: object
+    RoutingTrigger:
+      properties:
+        "on":
+          enum:
+            - all
+            - any
+          type: string
+        options:
+          $ref: '#/components/schemas/RoutingTriggerOptions'
+        rewrite_to:
+          type: string
+      type: object
+    RoutingTriggerOptions:
+      properties:
+        header_matches:
+          additionalProperties:
+            $ref: '#/components/schemas/StringRegexMap'
+          nullable: true
+          type: object
+        path_part_matches:
+          additionalProperties:
+            $ref: '#/components/schemas/StringRegexMap'
+          nullable: true
+          type: object
+        payload_matches:
+          $ref: '#/components/schemas/StringRegexMap'
+        query_val_matches:
+          additionalProperties:
+            $ref: '#/components/schemas/StringRegexMap'
+          nullable: true
+          type: object
+        request_context_matches:
+          additionalProperties:
+            $ref: '#/components/schemas/StringRegexMap'
+          nullable: true
+          type: object
+        session_meta_matches:
+          additionalProperties:
+            $ref: '#/components/schemas/StringRegexMap'
+          nullable: true
+          type: object
+      type: object
+    ScopeClaim:
+      properties:
+        scope_claim_name:
+          type: string
+        scope_to_policy:
+          additionalProperties:
+            type: string
+          type: object
+      type: object
+    Scopes:
+      properties:
+        jwt:
+          $ref: '#/components/schemas/ScopeClaim'
+        oidc:
+          $ref: '#/components/schemas/ScopeClaim'
+      type: object
+    ServiceDiscoveryConfiguration:
+      properties:
+        cache_disabled:
+          type: boolean
+        cache_timeout:
+          type: integer
+        data_path:
+          type: string
+        endpoint_returns_list:
+          type: boolean
+        parent_data_path:
+          type: string
+        port_data_path:
+          type: string
+        query_endpoint:
+          type: string
+        target_path:
+          type: string
+        use_discovery_service:
+          type: boolean
+        use_nested_query:
+          type: boolean
+        use_target_list:
+          type: boolean
+      type: object
+    SessionProviderMeta:
+      properties:
+        meta:
+          additionalProperties: {}
+          nullable: true
+          type: object
+        name:
+          type: string
+        storage_engine:
+          type: string
+      type: object
+    SessionState:
+      properties:
+        access_rights:
+          additionalProperties:
+            $ref: '#/components/schemas/AccessDefinition'
+          nullable: true
+          type: object
+        alias:
+          example: portal-developer@example.org
+          type: string
+        allowance:
+          example: 1000
+          format: double
+          type: number
+        apply_policies:
+          example:
+            - 641c15dd0fffb800010197bf
+          items:
+            type: string
+          nullable: true
+          type: array
+        apply_policy_id:
+          deprecated: true
+          description: deprecated use apply_policies going forward instead to send
+            a list of policies ids
+          example: 641c15dd0fffb800010197bf
+          type: string
+        basic_auth_data:
+          $ref: '#/components/schemas/BasicAuthData'
+        certificate:
+          type: string
+        data_expires:
+          example: 0
+          format: int64
+          type: integer
+        date_created:
+          example: "2024-03-13T03:56:46.568042549Z"
+          format: date-time
+          type: string
+        enable_detail_recording:
+          deprecated: true
+          description: deprecated use enable_detailed_recording going forward instead
+          example: false
+          type: boolean
+        enable_detailed_recording:
+          example: true
+          type: boolean
+        enable_http_signature_validation:
+          example: false
+          type: boolean
+        expires:
+          example: 1.712895619e+09
+          format: int64
+          type: integer
+        hmac_enabled:
+          example: false
+          type: boolean
+        hmac_string:
+          type: string
+        id_extractor_deadline:
+          format: int64
+          type: integer
+        is_inactive:
+          example: false
+          type: boolean
+        jwt_data:
+          $ref: '#/components/schemas/JWTData'
+        last_check:
+          example: 0
+          format: int64
+          type: integer
+        last_updated:
+          example: "1710302206"
+          type: string
+        max_query_depth:
+          example: -1
+          type: integer
+        meta_data:
+          additionalProperties: {}
+          example:
+            tyk_developer_id: 62b3fb9a1d5e4f00017226f5
+          nullable: true
+          type: object
+        monitor:
+          $ref: '#/components/schemas/Monitor'
+        oauth_client_id:
+          type: string
+        oauth_keys:
+          additionalProperties:
+            type: string
+          nullable: true
+          type: object
+        org_id:
+          example: 5e9d9544a1dcd60001d0ed20
+          type: string
+        per:
+          example: 5
+          format: double
+          type: number
+        quota_max:
+          example: 20000
+          format: int64
+          type: integer
+        quota_remaining:
+          example: 20000
+          format: int64
+          type: integer
+        quota_renewal_rate:
+          example: 3.1556952e+07
+          format: int64
+          type: integer
+        quota_renews:
+          example: 1.710302205e+09
+          format: int64
+          type: integer
+        rate:
+          example: 1
+          format: double
+          type: number
+        rsa_certificate_id:
+          type: string
+        session_lifetime:
+          example: 0
+          format: int64
+          type: integer
+        tags:
+          example:
+            - 641c15dd0fffb800010197bf
+          items:
+            type: string
+          nullable: true
+          type: array
+        throttle_interval:
+          example: 10
+          format: double
+          type: number
+        throttle_retry_limit:
+          example: 1000
+          type: integer
+      type: object
+    SignatureConfig:
+      properties:
+        algorithm:
+          type: string
+        allowed_clock_skew:
+          type: integer
+        error_code:
+          type: integer
+        error_message:
+          type: string
+        header:
+          type: string
+        param_name:
+          type: string
+        secret:
+          type: string
+        use_param:
+          type: boolean
+      type: object
+    StringRegexMap:
+      properties:
+        match_rx:
+          type: string
+        reverse:
+          type: boolean
+      type: object
+    TemplateData:
+      properties:
+        enable_session:
+          type: boolean
+        input_type:
+          enum:
+            - json
+            - xml
+          type: string
+        template_mode:
+          enum:
+            - blob
+            - file
+          type: string
+        template_source:
+          type: string
+      type: object
+    TemplateMeta:
+      properties:
+        disabled:
+          type: boolean
+        method:
+          type: string
+        path:
+          type: string
+        template_data:
+          $ref: '#/components/schemas/TemplateData'
+      type: object
+    TraceHttpRequest:
+      properties:
+        body:
+          type: string
+        headers:
+          $ref: '#/components/schemas/HttpHeader'
+        method:
+          example: GET
+          type: string
+        path:
+          example: /keyless-test/
+          type: string
+      type: object
+    TraceRequest:
+      properties:
+        request:
+          $ref: '#/components/schemas/TraceHttpRequest'
+        spec:
+          $ref: '#/components/schemas/APIDefinition'
+      type: object
+    TraceResponse:
+      properties:
+        logs:
+          example: '{"level":"warning","msg":"Legacy path detected! Upgrade to extended....'
+          type: string
+        message:
+          example: ok
+          type: string
+        response:
+          example: "====== Request ======\nGET / HTTP/1.1\r\nHost: httpbin.org\r\n\r\n\n======
+            Response..."
+          type: string
+      type: object
+    TrackEndpointMeta:
+      properties:
+        disabled:
+          type: boolean
+        method:
+          type: string
+        path:
+          type: string
+      type: object
+    TransformJQMeta:
+      properties:
+        filter:
+          type: string
+        method:
+          type: string
+        path:
+          type: string
+      type: object
+    UDGGlobalHeader:
+      properties:
+        key:
+          type: string
+        value:
+          type: string
+      type: object
+    URLRewriteMeta:
+      properties:
+        disabled:
+          type: boolean
+        match_pattern:
+          type: string
+        method:
+          type: string
+        path:
+          type: string
+        rewrite_to:
+          type: string
+        triggers:
+          items:
+            $ref: '#/components/schemas/RoutingTrigger'
+          nullable: true
+          type: array
+      type: object
+    UptimeTests:
+      properties:
+        check_list:
+          items:
+            $ref: '#/components/schemas/HostCheckObject'
+          nullable: true
+          type: array
+        config:
+          $ref: '#/components/schemas/UptimeTestsConfig'
+      type: object
+    UptimeTestsConfig:
+      properties:
+        expire_utime_after:
+          type: integer
+        recheck_wait:
+          type: integer
+        service_discovery:
+          $ref: '#/components/schemas/ServiceDiscoveryConfiguration'
+      type: object
+    ValidatePathMeta:
+      properties:
+        disabled:
+          type: boolean
+        error_response_code:
+          type: integer
+        method:
+          type: string
+        path:
+          type: string
+        schema:
+          additionalProperties: {}
+          nullable: true
+          type: object
+        schema_b64:
+          type: string
+      type: object
+    ValidateRequestMeta:
+      properties:
+        enabled:
+          type: boolean
+        error_response_code:
+          type: integer
+        method:
+          type: string
+        path:
+          type: string
+      type: object
+    VersionData:
+      properties:
+        default_version:
+          type: string
+        not_versioned:
+          type: boolean
+        versions:
+          additionalProperties:
+            $ref: '#/components/schemas/VersionInfo'
+          nullable: true
+          type: object
+      type: object
+    VersionDefinition:
+      properties:
+        default:
+          type: string
+        enabled:
+          type: boolean
+        fallback_to_default:
+          type: boolean
+        key:
+          example: x-api-version
+          type: string
+        location:
+          example: header
+          type: string
+        name:
+          type: string
+        strip_path:
+          type: boolean
+        strip_versioning_data:
+          type: boolean
+        versions:
+          additionalProperties:
+            type: string
+          nullable: true
+          type: object
+      type: object
+    VersionInfo:
+      properties:
+        expires:
+          type: string
+        extended_paths:
+          $ref: '#/components/schemas/ExtendedPathsSet'
+        global_headers:
+          additionalProperties:
+            type: string
+          nullable: true
+          type: object
+        global_headers_disabled:
+          type: boolean
+        global_headers_remove:
+          items:
+            type: string
+          nullable: true
+          type: array
+        global_response_headers:
+          additionalProperties:
+            type: string
+          nullable: true
+          type: object
+        global_response_headers_disabled:
+          type: boolean
+        global_response_headers_remove:
+          items:
+            type: string
+          nullable: true
+          type: array
+        global_size_limit:
+          format: int64
+          type: integer
+        ignore_endpoint_case:
+          type: boolean
+        name:
+          type: string
+        override_target:
+          type: string
+        paths:
+          properties:
+            black_list:
+              items:
+                type: string
+              nullable: true
+              type: array
+            ignored:
+              items:
+                type: string
+              nullable: true
+              type: array
+            white_list:
+              items:
+                type: string
+              nullable: true
+              type: array
+          type: object
+        use_extended_paths:
+          example: true
+          type: boolean
+      type: object
+    VersionMeta:
+      properties:
+        expirationDate:
+          example: 2026-03-26 09:00
+          type: string
+        id:
+          example: keyless
+          type: string
+        internal:
+          example: false
+          type: boolean
+        isDefaultVersion:
+          example: true
+          type: boolean
+        name:
+          example: Tyk Test Keyless API
+          type: string
+        versionName:
+          example: v2
+          type: string
+      type: object
+    VersionMetas:
+      properties:
+        apis:
+          items:
+            $ref: '#/components/schemas/VersionMeta'
+          nullable: true
+          type: array
+        status:
+          example: success
+          type: string
+      type: object
+    VirtualMeta:
+      properties:
+        disabled:
+          type: boolean
+        function_source_type:
+          enum:
+            - blob
+            - file
+          type: string
+        function_source_uri:
+          type: string
+        method:
+          type: string
+        path:
+          type: string
+        proxy_on_error:
+          type: boolean
+        response_function_name:
+          type: string
+        use_session:
+          type: boolean
+      type: object
+  securitySchemes:
+    api_key:
+      description: Api key
+      in: header
+      name: X-Tyk-Authorization
+      type: apiKey
