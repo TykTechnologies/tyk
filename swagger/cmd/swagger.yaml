@@ -1462,6 +1462,7 @@ paths:
       - Keys
   /tyk/keys/create:
     post:
+      description: Create a key
       operationId: createKey
       requestBody:
         content:

@@ -17,6 +17,11 @@ rules:
   operation-summary: error
   operation-2xx-response: error
   operation-4xx-response: error
+  operation-description: error
+  #Parameters
+  no-invalid-parameter-examples:
+    severity: error
+    allowAdditionalProperties: false
 
   no-invalid-schema-examples:
     severity: error

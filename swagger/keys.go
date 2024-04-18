@@ -200,6 +200,7 @@ func createKeyRequest(r *openapi3.Reflector) error {
 	oc.SetTags(KeysTag)
 	oc.SetID("createKey")
 	oc.SetSummary("Create a key")
+	oc.SetDescription("Create a key")
 	oc.AddReqStructure(new(user.SessionState))
 	oc.AddRespStructure(new(apiModifyKeySuccess), func(cu *openapi.ContentUnit) {
 		cu.Description = "Key created"
