@@ -9,12 +9,15 @@ message AccessSpec {
   /* A URL (endpoint) belonging to the API associated with the request session */
   string url = 1;
 
-  /* List of allowed methods for the URL (endpoint), e.g. `"methods": [ "GET". "POST", "PUT", "PATCH" ]` */
+  /*
+   * List of allowed methods for the URL (endpoint), e.g. `"methods": [ "GET". "POST", "PUT", "PATCH" ]` */
+   * The list of methods are case sensitive
+   */
   repeated string methods = 2;
 }
 
 /* 
- * Defined as an attribute within a [SessionState](#session-state) instance.
+ * Defined as an attribute within a SessionState instance.
  * Contains the allowed versions and URLs (endpoints) for the API that the session request relates to.
  * Each URL (endpoint) specifies an associated list of allowed methods. See also AccessSpec
  */
@@ -128,7 +131,7 @@ message SessionState {
    */
   string oauth_client_id = 12;
   
-  /* Map of OAuth keys, keyed by OAuth client ID. Work in progress */
+  /* Map of OAuth keys, keyed by OAuth client ID. Currently unsupported, work in progress */
   map<string, string> oauth_keys = 13;
 
   /* Contains a hashed password and the name of the hashing algorithm used */
@@ -213,9 +216,9 @@ message SessionState {
   /* List of IDs for the policies that are bound to the token */
   repeated string apply_policies = 29;
 
-  /* Unsupported in gRPC sessions */
+  /* Currently unsupported in gRPC sessions */
   string certificate = 30;
 
-  /* Relates to graphQL max_query_depth. Unsupported in gRPC sessions */
+  /* Relates to graphQL max_query_depth. Currently unsupported in gRPC sessions */
   int64 max_query_depth = 31;
 }
