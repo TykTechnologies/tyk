@@ -18,7 +18,7 @@ message ResponseObject {
   /* Headers received from the upstream */
   map<string, string> headers = 4;
 
-  /** A list of headers. Useful when header has multiple values. See Header */
+  /* A list of headers. Useful when header has multiple values. See Header */
   repeated Header multivalue_headers = 5;
 }
 
