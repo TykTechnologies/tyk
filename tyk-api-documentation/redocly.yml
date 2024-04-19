@@ -40,8 +40,8 @@ rules:
   no-invalid-media-type-examples:
     severity: error
     allowAdditionalProperties: false
-  scalar-property-missing-example:
-    severity: warn
+  #scalar-property-missing-example:
+    #severity: warn
   no-invalid-schema-examples:
     severity: error
     allowAdditionalProperties: false
