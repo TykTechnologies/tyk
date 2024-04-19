@@ -4,7 +4,6 @@ on:
       - master
       - release-**
       - document-process-to-generate-the-oas
-
 jobs:
   test_swagger_editor_validator_remote:
     runs-on: redocly/cli
