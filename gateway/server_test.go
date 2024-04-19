@@ -3,6 +3,8 @@ package gateway
 import (
 	"context"
 	"errors"
+	"fmt"
+	"net"
 	"regexp"
 	"testing"
 	"time"
@@ -222,10 +224,11 @@ func TestGateway_getHostDetails(t *testing.T) {
 	type checkFn func(*testing.T, *BufferedLogger, *Gateway)
 
 	var (
-		orig_readPIDFromFile = readPIDFromFile
-		orig_mainLog         = mainLog
-		bl                   = NewBufferingLogger()
-		check                = func(fns ...checkFn) []checkFn { return fns }
+		orig_readPIDFromFile   = readPIDFromFile
+		orig_mainLog           = mainLog
+		orig_netInterfaceAddrs = net.InterfaceAddrs
+		bl                     = NewBufferingLogger()
+		check                  = func(fns ...checkFn) []checkFn { return fns }
 
 		hasErr = func(wantErr bool, errorText string) checkFn {
 			return func(t *testing.T, bl *BufferedLogger, gw *Gateway) {
@@ -259,35 +262,27 @@ func TestGateway_getHostDetails(t *testing.T) {
 		}
 	)
 
-	// replace the logger with a mock to capture the errors
-	mainLog = bl.Logger.WithField("prefix", "test")
-
-	// get back the original functions
-	defer func() {
-		readPIDFromFile = orig_readPIDFromFile
-		mainLog = orig_mainLog
-	}()
-
 	tests := []struct {
-		name            string
-		before          func(*Gateway)
-		readPIDFromFile func(string) (int, error)
-		checks          []checkFn
+		name              string
+		before            func(*Gateway)
+		readPIDFromFile   func(string) (int, error)
+		netInterfaceAddrs func() ([]net.Addr, error)
+		checks            []checkFn
 	}{
-		// {
-		// 	name:            "fail-read-pid",
-		// 	readPIDFromFile: func(file string) (int, error) { return 0, fmt.Errorf("Error opening file") },
-		// 	before: func(gw *Gateway) {
-		// 		gw.SetConfig(config.Config{
-		// 			ListenAddress: "127.0.0.1",
-		// 		})
-		// 	},
-		// 	checks: check(
-		// 		hasErr(true, "Error opening file"),
-		// 	),
-		// },
 		{
-			name:            "success-listen-address-exists",
+			name:            "fail-read-pid",
+			readPIDFromFile: func(file string) (int, error) { return 0, fmt.Errorf("Error opening file") },
+			before: func(gw *Gateway) {
+				gw.SetConfig(config.Config{
+					ListenAddress: "127.0.0.1",
+				})
+			},
+			checks: check(
+				hasErr(true, "Error opening file"),
+			),
+		},
+		{
+			name:            "success-listen-address-set",
 			readPIDFromFile: func(file string) (int, error) { return 1000, nil },
 			before: func(gw *Gateway) {
 				gw.SetConfig(config.Config{
@@ -296,25 +291,62 @@ func TestGateway_getHostDetails(t *testing.T) {
 			},
 			checks: check(
 				hasErr(false, ""),
-				hasAddress("127.0.0.1"),
+				hasAddress("127\\.0\\.0\\.1"),
+			),
+		},
+		{
+			name:            "success-listen-address-not-set",
+			readPIDFromFile: func(file string) (int, error) { return 1000, nil },
+			before: func(gw *Gateway) {
+				gw.SetConfig(config.Config{
+					ListenAddress: "",
+				})
+			},
+			checks: check(
+				hasErr(false, ""),
+				hasAddress(`\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}`),
+			),
+		},
+		{
+			name:            "fail-getting-network-address",
+			readPIDFromFile: func(file string) (int, error) { return 1000, nil },
+			before: func(gw *Gateway) {
+				gw.SetConfig(config.Config{
+					ListenAddress: "",
+				})
+			},
+			netInterfaceAddrs: func() ([]net.Addr, error) { return nil, fmt.Errorf("Error getting network addresses") },
+			checks: check(
+				hasErr(true, "Error getting network addresses"),
 			),
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			readPIDFromFile = tt.readPIDFromFile
+			// clear logger mock buffer
+			bl.ClearLogs()
+			// replace fucntions with mocks
+			mainLog = bl.Logger.WithField("prefix", "test")
+			if tt.readPIDFromFile != nil {
+				readPIDFromFile = tt.readPIDFromFile
+			}
+
+			if tt.netInterfaceAddrs != nil {
+				netInterfaceAddrs = tt.netInterfaceAddrs
+			}
+
+			// restore the original functions
+			defer func() {
+				readPIDFromFile = orig_readPIDFromFile
+				mainLog = orig_mainLog
+				netInterfaceAddrs = orig_netInterfaceAddrs
+			}()
+
 			gw := &Gateway{}
 
 			if tt.before != nil {
 				tt.before(gw)
 			}
-
-			// gw.SetConfig(config.Config{
-			// 	PIDFileLocation: "./test.pid",
-			// })
-
-			// ts := StartTest(tt.before)
-			// defer ts.Close()
 
 			gw.getHostDetails(gw.GetConfig().PIDFileLocation)
 			for _, c := range tt.checks {

@@ -70,3 +70,9 @@ func NewBufferingLogger() *BufferedLogger {
 	}
 	return buflogger
 }
+
+func (bl *BufferedLogger) ClearLogs() {
+	bl.bufferingFormatter.bufferMutex.Lock()
+	defer bl.bufferingFormatter.bufferMutex.Unlock()
+	bl.bufferingFormatter.buffer = make([]*BufferedLog, 0)
+}
