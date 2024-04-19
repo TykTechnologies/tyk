@@ -1,0 +1,15 @@
+on:
+  pull_request:
+    branches:
+      - master
+      - release-**
+      - document-process-to-generate-the-oas
+
+jobs:
+  test_swagger_editor_validator_remote:
+    runs-on: redocly/cli
+    name: Validate the swagger with redocly
+
+    steps:
+      - uses: actions/checkout@v2
+      - name: Validate OpenAPI definition with redocly
