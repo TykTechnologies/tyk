@@ -21,7 +21,11 @@ func main() {
 
 	r.Spec = &openapi3.Spec{Openapi: "3.0.3"}
 	r.Spec.WithServers(openapi3.Server{
-		URL: "http://localhost:8080",
+		URL: "https://{tenant}",
+		Variables: map[string]openapi3.ServerVariable{"tenant": {
+			Default:     "localhost:8080",
+			Description: swagger.StringPointerValue("Your gateway host"),
+		}},
 	})
 	r.Spec.WithSecurity(map[string][]string{"api_key": {}})
 	r.Spec.SetAPIKeySecurity("api_key", "X-Tyk-Authorization", openapi.InHeader, "Api key")

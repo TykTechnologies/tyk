@@ -40,9 +40,13 @@ rules:
   no-invalid-media-type-examples:
     severity: error
     allowAdditionalProperties: false
-  scalar-property-missing-example:
-    severity: warn
+  #scalar-property-missing-example:
+    #severity: warn
   no-invalid-schema-examples:
     severity: error
     allowAdditionalProperties: false
+  #Server rules
+  no-empty-servers: error
+  no-server-trailing-slash: error
+  no-undefined-server-variable: error
 

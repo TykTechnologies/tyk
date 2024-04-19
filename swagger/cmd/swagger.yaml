@@ -30,7 +30,11 @@ info:
   title: Tyk Gateway API
   version: 5.2.3
 servers:
-- url: http://localhost:8080
+- url: https://{tenant}
+  variables:
+    tenant:
+      default: localhost:8080
+      description: Your gateway host
 security:
 - api_key: []
 tags:
