@@ -22,6 +22,9 @@ rules:
   no-invalid-parameter-examples:
     severity: error
     allowAdditionalProperties: false
+  operation-parameters-unique: error
+  #parameter-description: error    #uncomment this
+  path-declaration-must-exist: error
 
   no-invalid-schema-examples:
     severity: error
