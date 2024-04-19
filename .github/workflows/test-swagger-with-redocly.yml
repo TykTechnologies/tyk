@@ -6,7 +6,7 @@ on:
       - document-process-to-generate-the-oas
 jobs:
   test_swagger_editor_validator_remote:
-    runs-on: redocly/cli
+    runs-on: ubuntu-latest
     name: Validate the swagger with redocly
 
     steps:
