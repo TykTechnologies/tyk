@@ -321,9 +321,7 @@ func TestEngineV2_HandleReverseProxy(t *testing.T) {
 	})
 
 	t.Run("should return error if reverse proxy pre handler returns proxy type preflight and execution mode is NOT proxy only", func(t *testing.T) {
-		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			_, _ = w.Write([]byte(`{"hello": "world"}`))
-		}))
+		server := httptest.NewServer(http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) {}))
 		t.Cleanup(server.Close)
 
 		engine, mocks := newTestEngineV2(t, withApiDefinitionTestEngineV2(newTestApiDefinitionV2(apidef.GraphQLExecutionModeSubgraph, server.URL)))
@@ -352,9 +350,7 @@ func TestEngineV2_HandleReverseProxy(t *testing.T) {
 	})
 
 	t.Run("should return successful if reverse proxy pre handler returns proxy type preflight and execution mode is proxy only", func(t *testing.T) {
-		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			_, _ = w.Write([]byte(`{"hello": "world"}`))
-		}))
+		server := httptest.NewServer(http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) {}))
 		t.Cleanup(server.Close)
 
 		engine, mocks := newTestEngineV2(t, withApiDefinitionTestEngineV2(newTestApiDefinitionV2(apidef.GraphQLExecutionModeProxyOnly, server.URL)))

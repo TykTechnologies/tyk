@@ -6,9 +6,8 @@ import (
 	"io"
 	"net/http"
 
-	"github.com/gorilla/websocket"
-
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/gorilla/websocket"
 )
 
 type EngineVersion int
