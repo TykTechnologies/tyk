@@ -25,9 +25,24 @@ rules:
   operation-parameters-unique: error
   #parameter-description: error    #uncomment this
   path-declaration-must-exist: error
+  path-parameters-defined: error
+  #path rules
+  no-ambiguous-paths: error
+  no-http-verbs-in-paths:
+    severity: warn
+    splitIntoWords: true
+  no-identical-paths: error
+  no-path-trailing-slash: error
 
+  #Requests, Responses, and Schemas  rules
+  no-enum-type-mismatch: error
+  no-example-value-and-externalValue: error
+  no-invalid-media-type-examples:
+    severity: error
+    allowAdditionalProperties: false
+  scalar-property-missing-example:
+    severity: warn
   no-invalid-schema-examples:
     severity: error
     allowAdditionalProperties: false
-
 
