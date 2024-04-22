@@ -6,6 +6,7 @@ import (
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
+
 	"github.com/stretchr/testify/assert"
 )
 
