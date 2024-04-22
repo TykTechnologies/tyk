@@ -8,7 +8,7 @@ option go_package = "/coprocess";
  * @hidecollaborationgraph
  * @brief Contains the HTTP reponse data received from the upstream
  *
- * Used by response hooks All fields are modifiable
+ * Used by response hooks. All fields are modifiable
  */
 message ResponseObject {
   /** HTTP status code received from the upstream */
@@ -25,9 +25,8 @@ message ResponseObject {
 
 /**
  * @hidecollaborationgraph
- * @brief Response header
  *
- * A reponse header that contains multiple associated values
+ * @brief A reponse header that contains multiple associated values
  */
 message Header {
   /** The header name */

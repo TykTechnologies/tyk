@@ -8,14 +8,13 @@ option go_package = "/coprocess";
  * @hidecollaborationgraph
  * @brief Used to override the response for a given HTTP request
  *
- * When returned within a Object for a given HTTP request, the upstream reponse 
- * is replaced with the fields encapsulated within ReturnOverrides
+ * The upstream reponse is replaced with the fields encapsulated here
  */
 message ReturnOverrides {
   /** Override upstream response status code*/
   int32 response_code = 1;
 
-  /** Override upstream response error message */
+  /** Override upstream response error */
   string response_error = 2;
 
   /** Override upstream response headers */

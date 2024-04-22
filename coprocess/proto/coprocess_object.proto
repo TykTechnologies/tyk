@@ -30,11 +30,10 @@ message Object {
                                  modified */
 }
 
-/*!
+/**
  * @hidecollaborationgraph
- * @brief The JSON payload of an event
  *
- * An event is represented as a JSON payload
+ * @brief An event is represented as a JSON payload
  */
 message Event {
   /** The JSON payload */

@@ -19,14 +19,16 @@ enum HookType {
   /** Use for error checking and handling of an unrecognised hook type */
   Unknown = 0;
 
-  /** Executed before request sent to upstream target and before any
+  /**
+   * Executed before request sent to upstream target and before any
    * authentication information is extracted from the header or
    * parameter list of the request. Applies to both keyless and protected
    * APIs.
    */
   Pre = 1;
 
-  /** Executed after authentication, validation, throttling, and quota-limiting
+  /**
+   * Executed after authentication, validation, throttling, and quota-limiting
    * middleware has been executed, just before the request is proxied upstream. Use this
    * to post-process a request before sending it to upstream API. This is only called
    * when using protected APIs.
@@ -40,7 +42,8 @@ enum HookType {
   /** Executed for performing customised authentication.*/
   CustomKeyCheck = 4;
 
-  /** Executed after the upstream API replies. The arguments passed to this hook include
+  /**
+   * Executed after the upstream API replies. The arguments passed to this hook include
    * both the request and response data. Use this to modify the HTTP response before it’s
    * sent to the client. This hook also receives the request object, the session object,
    * the metadata and API definition associated with the request.
@@ -56,10 +59,10 @@ enum HookType {
 
 /**
  * @hidecollaborationgraph
- * @brief List of strings
- *
+ * 
  * A list of strings
  */
 message StringSlice {
+  /** The list of string items */
   repeated string items = 1;
 }

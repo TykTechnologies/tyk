@@ -8,11 +8,9 @@ option go_package = "/coprocess";
 
 /**
  * @hidecollaborationgraph
- * @brief Represents a request
+ * @brief Represents a request that can be modified by middleware
  *
- * Used for middleware calls and contains important fields like headers, parameters, body and URL.
- * 
- * Attribute of an Object
+ * Contains important fields like headers, parameters, body and URL
  */
 message MiniRequestObject {
   
@@ -46,7 +44,7 @@ message MiniRequestObject {
   /** Override the response for the request, see ReturnOverrides */
   ReturnOverrides return_overrides = 10;
 
-  /** Request method, eg GET, POST, etc */
+  /** Request method, eg GET, POST etc */
   string method = 11;
 
   /** The raw unprocessed request URL, including query string and fragments */
