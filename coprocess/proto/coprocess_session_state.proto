@@ -60,12 +60,11 @@ message JWTData {
 /*
  * Monitors allow API endpoint users, stakeholders or your own organisation to be notified when
  * certain quota thresholds have been reached for their session token.
- * This feature is currently unsupported and work in progress for SessionState in gRPC servers
  */
 message Monitor {
    /* 
     * List of percentage threshold values in descending order that trigger a
-    * notification when reached
+    * notification when the corresponding percentage of the quota has been reached
     */ 
   repeated double trigger_limits = 1;
 }
