@@ -58,14 +58,11 @@ message JWTData {
 }
 
 /*
- * Monitors allow API endpoint users, stakeholders or your own organisation to be notified when
- * certain quota thresholds have been reached for their session token.
+ * Monitors allow API endpoint users, stakeholders or an organisation to be notified by webhook when
+ * certain quota limits have been reached for their session token.
  */
 message Monitor {
-   /* 
-    * List of percentage threshold values in descending order that trigger a
-    * notification when the corresponding percentage of the quota has been reached
-    */ 
+   /* List of quota percentage limits, defined in descending order */ 
   repeated double trigger_limits = 1;
 }
 
