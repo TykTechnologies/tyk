@@ -472,9 +472,8 @@ func TestGraphQLMiddleware_EngineMode(t *testing.T) {
 				}
 
 				_, _ = g.Run(t, test.TestCase{
-					Data:          request,
-					BodyMatchFunc: assertReviewsSubgraphResponse(t),
-					Code:          http.StatusOK,
+					Data: request,
+					Code: http.StatusInternalServerError,
 				})
 			})
 		})

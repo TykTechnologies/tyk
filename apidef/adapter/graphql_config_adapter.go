@@ -120,11 +120,7 @@ func (g *GraphQLConfigAdapter) EngineConfigV3() (*graphqlv2.EngineV2Configuratio
 			Schema:          g.schemaV2,
 		}
 	case GraphQLEngineAdapterTypeSupergraph:
-		engineAdapter = &v2.Supergraph{
-			ApiDefinition:   g.apiDefinition,
-			HttpClient:      g.getHttpClient(),
-			StreamingClient: g.getStreamingClient(),
-		}
+		return nil, ErrUnsupportedGraphQLConfigVersion
 	case GraphQLEngineAdapterTypeUniversalDataGraph:
 		engineAdapter = &v2.UniversalDataGraph{
 			ApiDefinition:   g.apiDefinition,
