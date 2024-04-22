@@ -10,7 +10,7 @@ option go_package = "/coprocess";
  */
 message AccessSpec {
 
-  /** The URL that the key can access, eg  \"/resource/(.*)\" */
+  /** The URL that the key can access, e.g.  \"/resource/(.*)\" */
   string url = 1;
 
   /** List of allowed methods for the URL (endpoint), e.g. "methods": [ "GET", "POST", "PUT", "PATCH" ] */
@@ -29,7 +29,7 @@ message AccessDefinition {
   /** The ID of the API that the session request relates to */
   string api_id = 2;
 
-  /** List of allowed API versions, e.g.  `"versions": [ "Default" ]` */
+  /** List of allowed API versions, e.g. `"versions": [ "Default" ]` */
   repeated string versions = 3;
 
   /** 
@@ -51,8 +51,7 @@ message BasicAuthData {
   string password = 1;
 
   /**
-   * Name of the hashing algorithm used to hash the password, e.g. bcrypt,
-   * Argon2
+   * Name of the hashing algorithm used to hash the password, e.g. murmur64, murmur128, sha256 or bcrypt
    */
   string hash = 2;
 }
@@ -209,9 +208,11 @@ message SessionState {
    */
   int64 id_extractor_deadline = 27;
 
-  /** UNIX timestamp that denotes when the key will automatically expire. Any 
+  /**
+   * UNIX timestamp that denotes when the key will automatically expire. Any 
    * subsequent API request made using the key will be rejected. Overrides the
-   * global session lifetime */
+   * global session lifetime
+   */
   int64 session_lifetime = 28;
 
   /** List of IDs for the policies that are bound to the token */
