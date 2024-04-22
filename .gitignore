@@ -2,6 +2,7 @@
 .idea/
 .vagrant/
 .vscode/
+.venv/
 temp/
 /middleware/bundles
 testapps/
