@@ -31,7 +31,7 @@ message MiniRequestObject {
   /* Map of parameter keys and values to add to the request */
   map<string, string> add_params = 7;
 
-  /* This field allows a parameter to have a list of values. Currently, unsupported. */
+  /* Allows a parameter to have multiple values, currently unsupported */
   map<string, string> extended_params = 8;
 
   /* List of parameter keys to be removed from the request */
