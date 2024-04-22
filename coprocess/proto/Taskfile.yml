@@ -47,6 +47,8 @@ tasks:
       - protoc -I. --ruby_out=plugins=grpc:../bindings/ruby *.proto
       - cp ../bindings/python/* ../python/proto/
       - echo "Done"
+    deps: [install-deps]
+
 
   docs:
     desc: Generate supporting protobuf documentation for protobuf using doxygen
