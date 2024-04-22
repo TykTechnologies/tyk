@@ -989,7 +989,7 @@ func newTestGranularAccessCheckerV1(t *testing.T) *granularAccessCheckerV1 {
 	}
 }
 
-func newTestReverseProxyPreHandlerV1(t *testing.T, executionMode apidef.GraphQLExecutionMode) *reverseProxyPreHandlerV1 {
+func newTestReverseProxyPreHandlerV1(_ *testing.T, executionMode apidef.GraphQLExecutionMode) *reverseProxyPreHandlerV1 {
 	return &reverseProxyPreHandlerV1{
 		apiDefinition: &apidef.APIDefinition{
 			GraphQL: apidef.GraphQLConfig{
