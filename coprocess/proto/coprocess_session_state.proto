@@ -127,7 +127,7 @@ message SessionState {
    */
   string oauth_client_id = 12;
   
-  /* Map of OAuth keys, keyed by OAuth client ID. Currently unsupported, work in progress */
+  /* Maps an OAuth client ID with a corresponding access token value. Currently unsupported and under development
   map<string, string> oauth_keys = 13;
 
   /* Contains a hashed password and the name of the hashing algorithm used */
@@ -212,9 +212,15 @@ message SessionState {
   /* List of IDs for the policies that are bound to the token */
   repeated string apply_policies = 29;
 
-  /* Currently unsupported in gRPC sessions */
+  /*
+   * The client certificate used to authenticate the request. Exists in the session instance if mTLS is configured
+   * for the API. Currently unsupported
+   */
   string certificate = 30;
 
-  /* Relates to graphQL max_query_depth. Currently unsupported in gRPC sessions */
+  /*
+   * For graphQL APIs, if the session key has a maximum query depth limit defined then it is included in the
+   * session instance. Currently unsupported and under development
+   */
   int64 max_query_depth = 31;
 }
