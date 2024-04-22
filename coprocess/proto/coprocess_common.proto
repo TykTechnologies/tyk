@@ -60,7 +60,9 @@ enum HookType {
 /**
  * @hidecollaborationgraph
  * 
- * A list of strings
+ * @brief A list of strings
+ *
+ *
  */
 message StringSlice {
   /** The list of string items */
