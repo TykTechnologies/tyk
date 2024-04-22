@@ -16,7 +16,7 @@ option go_package = "/coprocess";
  * Used to identify the type of plugin
  */
 enum HookType {
-  /** Unknown plugin type */ 
+  /** Use for error checking and handling of an unrecognised hook type */
   Unknown = 0;
 
   /** Executed before request sent to upstream target and before any
