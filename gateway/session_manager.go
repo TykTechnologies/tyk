@@ -288,27 +288,8 @@ func (l *SessionLimiter) ForwardMessage(r *http.Request, currentSession *user.Se
 				return sessionFailRateLimit
 			}
 		default:
-			var n float64
-			if l.drlManager.Servers != nil {
-				n = float64(l.drlManager.Servers.Count())
-			}
-			cost := accessDef.Limit.Rate / accessDef.Limit.Per
-			c := globalConf.DRLThreshold
-			if c == 0 {
-				// defaults to 5
-				c = 5
-			}
-
-			if n <= 1 || n*c < cost {
-				// If we have 1 server, there is no need to strain redis at all the leaky
-				// bucket algorithm will suffice.
-				if l.limitDRL(currentSession, rateLimitKey, rateScope, useCustomRateLimitKey, &accessDef.Limit, dryRun) {
-					return sessionFailRateLimit
-				}
-			} else {
-				if l.limitRedis(currentSession, rateLimitKey, rateScope, useCustomRateLimitKey, store, globalConf, &accessDef.Limit, dryRun) {
-					return sessionFailRateLimit
-				}
+			if l.RedisQuotaExceeded(r, currentSession, quotaKey, allowanceScope, &accessDef.Limit, store, globalConf.HashKeys) {
+				return sessionFailRateLimit
 			}
 		}
 	}
