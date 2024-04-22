@@ -4,12 +4,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"net"
 	"regexp"
 	"testing"
 	"time"
 
 	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/internal/netutil"
 	"github.com/TykTechnologies/tyk/internal/otel"
 	"github.com/TykTechnologies/tyk/user"
 	"github.com/sirupsen/logrus"
@@ -224,11 +224,16 @@ func TestGateway_getHostDetails(t *testing.T) {
 	type checkFn func(*testing.T, *BufferedLogger, *Gateway)
 
 	var (
-		orig_readPIDFromFile   = readPIDFromFile
-		orig_mainLog           = mainLog
-		orig_netInterfaceAddrs = net.InterfaceAddrs
-		bl                     = NewBufferingLogger()
-		check                  = func(fns ...checkFn) []checkFn { return fns }
+		orig_readPIDFromFile = readPIDFromFile
+		orig_mainLog         = mainLog
+		orig_getIpAddress    = netutil.GetIpAddress
+		bl                   = NewBufferingLogger()
+		check                = func(fns ...checkFn) []checkFn { return fns }
+
+		// matches ipv6 and ipv4
+		// https://go.dev/play/p/cbOQUiqNqyU
+		// https://regex101.com/r/lIWfaA/1
+		ipAddrPattern = `^((([a-f0-9]{1,4}):){7}([a-f0-9]{1,4})|(([a-f0-9]{1,4})(:([a-f0-9]{1,4})){0,6})?::(([a-f0-9]{1,4})(:([a-f0-9]{1,4})){0,6})?|((([a-f0-9]{1,4}):){5}[a-f0-9]{1,4}|(([a-f0-9]{1,4}):){0,5}:([a-f0-9]{1,4}))|(([a-f0-9]{1,4}:){0,6}[a-f0-9]{1,4}|(([a-f0-9]{1,4}:){0,6}:([a-f0-9]{1,4})){0,1})|([a-f0-9]{1,4}:){0,7}:|([a-f0-9]{1,4}:){0,6}[a-f0-9]{1,4}|(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?))$`
 
 		hasErr = func(wantErr bool, errorText string) checkFn {
 			return func(t *testing.T, bl *BufferedLogger, gw *Gateway) {
@@ -263,11 +268,11 @@ func TestGateway_getHostDetails(t *testing.T) {
 	)
 
 	tests := []struct {
-		name              string
-		before            func(*Gateway)
-		readPIDFromFile   func(string) (int, error)
-		netInterfaceAddrs func() ([]net.Addr, error)
-		checks            []checkFn
+		name                string
+		before              func(*Gateway)
+		readPIDFromFile     func(string) (int, error)
+		netutilGetIpAddress func() ([]string, error)
+		checks              []checkFn
 	}{
 		{
 			name:            "fail-read-pid",
@@ -304,7 +309,7 @@ func TestGateway_getHostDetails(t *testing.T) {
 			},
 			checks: check(
 				hasErr(false, ""),
-				hasAddress(`\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}`),
+				hasAddress(ipAddrPattern),
 			),
 		},
 		{
@@ -315,7 +320,7 @@ func TestGateway_getHostDetails(t *testing.T) {
 					ListenAddress: "",
 				})
 			},
-			netInterfaceAddrs: func() ([]net.Addr, error) { return nil, fmt.Errorf("Error getting network addresses") },
+			netutilGetIpAddress: func() ([]string, error) { return nil, fmt.Errorf("Error getting network addresses") },
 			checks: check(
 				hasErr(true, "Error getting network addresses"),
 			),
@@ -331,15 +336,15 @@ func TestGateway_getHostDetails(t *testing.T) {
 				readPIDFromFile = tt.readPIDFromFile
 			}
 
-			if tt.netInterfaceAddrs != nil {
-				netInterfaceAddrs = tt.netInterfaceAddrs
+			if tt.netutilGetIpAddress != nil {
+				getIpAddress = tt.netutilGetIpAddress
 			}
 
 			// restore the original functions
 			defer func() {
 				readPIDFromFile = orig_readPIDFromFile
 				mainLog = orig_mainLog
-				netInterfaceAddrs = orig_netInterfaceAddrs
+				getIpAddress = orig_getIpAddress
 			}()
 
 			gw := &Gateway{}

@@ -65,6 +65,7 @@ import (
 	"github.com/TykTechnologies/tyk/user"
 
 	"github.com/TykTechnologies/tyk/internal/cache"
+	"github.com/TykTechnologies/tyk/internal/netutil"
 )
 
 var (
@@ -1533,6 +1534,8 @@ func (gw *Gateway) setUpConsul() error {
 	return err
 }
 
+var getIpAddress = netutil.GetIpAddress
+
 func (gw *Gateway) getHostDetails(file string) {
 	var err error
 	if gw.hostDetails.PID, err = readPIDFromFile(file); err != nil {
@@ -1544,8 +1547,12 @@ func (gw *Gateway) getHostDetails(file string) {
 
 	gw.hostDetails.Address = gw.GetConfig().ListenAddress
 	if gw.hostDetails.Address == "" {
-		if gw.hostDetails.Address, err = getIpAddress(); err != nil {
+		ips, err := getIpAddress()
+		if err != nil {
 			mainLog.Error("Failed to get node address: ", err)
+		}
+		if len(ips) > 0 {
+			gw.hostDetails.Address = ips[0]
 		}
 	}
 }
