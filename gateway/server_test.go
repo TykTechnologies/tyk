@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/TykTechnologies/tyk/config"
+	il "github.com/TykTechnologies/tyk/internal/log"
 	"github.com/TykTechnologies/tyk/internal/netutil"
 	"github.com/TykTechnologies/tyk/internal/otel"
 	"github.com/TykTechnologies/tyk/user"
@@ -221,13 +222,13 @@ func TestGateway_SyncResourcesWithReload(t *testing.T) {
 }
 
 func TestGateway_getHostDetails(t *testing.T) {
-	type checkFn func(*testing.T, *BufferedLogger, *Gateway)
+	type checkFn func(*testing.T, *il.BufferedLogger, *Gateway)
 
 	var (
 		orig_readPIDFromFile = readPIDFromFile
 		orig_mainLog         = mainLog
 		orig_getIpAddress    = netutil.GetIpAddress
-		bl                   = NewBufferingLogger()
+		bl                   = il.NewBufferingLogger()
 		check                = func(fns ...checkFn) []checkFn { return fns }
 
 		// matches ipv6 and ipv4
@@ -236,7 +237,7 @@ func TestGateway_getHostDetails(t *testing.T) {
 		ipAddrPattern = `^((([a-f0-9]{1,4}):){7}([a-f0-9]{1,4})|(([a-f0-9]{1,4})(:([a-f0-9]{1,4})){0,6})?::(([a-f0-9]{1,4})(:([a-f0-9]{1,4})){0,6})?|((([a-f0-9]{1,4}):){5}[a-f0-9]{1,4}|(([a-f0-9]{1,4}):){0,5}:([a-f0-9]{1,4}))|(([a-f0-9]{1,4}:){0,6}[a-f0-9]{1,4}|(([a-f0-9]{1,4}:){0,6}:([a-f0-9]{1,4})){0,1})|([a-f0-9]{1,4}:){0,7}:|([a-f0-9]{1,4}:){0,6}[a-f0-9]{1,4}|(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?))$`
 
 		hasErr = func(wantErr bool, errorText string) checkFn {
-			return func(t *testing.T, bl *BufferedLogger, gw *Gateway) {
+			return func(t *testing.T, bl *il.BufferedLogger, gw *Gateway) {
 				logs := bl.GetLogs(logrus.ErrorLevel)
 				if !wantErr && assert.Empty(t, logs) {
 					return
@@ -255,7 +256,7 @@ func TestGateway_getHostDetails(t *testing.T) {
 		}
 
 		hasAddress = func(addr string) checkFn {
-			return func(t *testing.T, bl *BufferedLogger, gw *Gateway) {
+			return func(t *testing.T, bl *il.BufferedLogger, gw *Gateway) {
 				matched, err := regexp.MatchString(addr, gw.hostDetails.Address)
 				if err != nil {
 					t.Errorf("Failed to compile regex pattern: %v", err)
