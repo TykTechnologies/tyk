@@ -25,3 +25,9 @@ tasks:
       - protoc -I. --ruby_out=plugins=grpc:../bindings/ruby *.proto
       - cp ../bindings/python/* ../python/proto/
       - echo "Done"
+
+  docs:
+    desc: Generate supporting protobuf documentation for protobuf using doxygen
+    cmds:
+      - echo "Generate supporting documentation using doxygen"
+      - doxygen Doxyfile
