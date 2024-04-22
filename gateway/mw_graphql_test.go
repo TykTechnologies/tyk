@@ -480,6 +480,10 @@ func TestGraphQLMiddleware_EngineMode(t *testing.T) {
 		})
 
 		t.Run("udg", func(t *testing.T) {
+			ds := apidef.GraphQLEngineDataSource{}
+			if err := json.Unmarshal([]byte(testRESTDataSourceConfigurationV3), &ds); err != nil {
+				panic(err)
+			}
 			g.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 				spec.UseKeylessAccess = true
 				spec.Proxy.ListenPath = "/"
@@ -487,33 +491,36 @@ func TestGraphQLMiddleware_EngineMode(t *testing.T) {
 				spec.GraphQL.ExecutionMode = apidef.GraphQLExecutionModeExecutionEngine
 				spec.GraphQL.Schema = testComposedSchemaNotExtended
 				spec.GraphQL.Version = apidef.GraphQLConfigVersion3Preview
+				spec.GraphQL.Engine.DataSources[0] = ds
+				spec.GraphQL.Engine.FieldConfigs[0].DisableDefaultMapping = false
+				spec.GraphQL.Engine.FieldConfigs[0].Path = []string{"data"}
 			})
 
 			t.Run("graphql api requests", func(t *testing.T) {
-				//countries1 := gql.Request{
-				//	Query: "query Query { countries { name } }",
-				//}
-				//
-				//countries2 := gql.Request{
-				//	Query: "query Query { countries { name code } }",
-				//}
+				countries1 := gql.Request{
+					Query: "query Query { countries { name } }",
+				}
+
+				countries2 := gql.Request{
+					Query: "query Query { countries { name code } }",
+				}
 
 				people1 := gql.Request{
 					Query: "query Query { people { name } }",
 				}
 
-				//people2 := gql.Request{
-				//	Query: "query Query { people { country { name } name } }",
-				//}
+				people2 := gql.Request{
+					Query: "query Query { people { country { name } name } }",
+				}
 
 				_, _ = g.Run(t, []test.TestCase{
 					// GraphQL Data Source
-					//{Data: countries1, BodyMatch: `"countries":.*{"name":"Turkey"},{"name":"Russia"}.*`, Code: http.StatusOK},
-					//{Data: countries2, BodyMatch: `"countries":.*{"name":"Turkey","code":"TR"},{"name":"Russia","code":"RU"}.*`, Code: http.StatusOK},
+					{Data: countries1, BodyMatch: `"countries":.*{"name":"Turkey"},{"name":"Russia"}.*`, Code: http.StatusOK},
+					{Data: countries2, BodyMatch: `"countries":.*{"name":"Turkey","code":"TR"},{"name":"Russia","code":"RU"}.*`, Code: http.StatusOK},
 
 					// REST Data Source
 					{Data: people1, BodyMatch: `"people":.*{"name":"Furkan"},{"name":"Leo"}.*`, Code: http.StatusOK},
-					//{Data: people2, BodyMatch: `"people":.*{"country":{"name":"Turkey"},"name":"Furkan"},{"country":{"name":"Russia"},"name":"Leo"}.*`, Code: http.StatusOK},
+					{Data: people2, BodyMatch: `"people":.*{"country":{"name":"Turkey"},"name":"Furkan"},{"country":{"name":"Russia"},"name":"Leo"}.*`, Code: http.StatusOK},
 				}...)
 			})
 
@@ -690,30 +697,30 @@ func TestGraphQLMiddleware_EngineMode(t *testing.T) {
 			})
 
 			t.Run("graphql api requests", func(t *testing.T) {
-				countries1 := gql.Request{
-					Query: "query Query { countries { name } }",
-				}
-
-				countries2 := gql.Request{
-					Query: "query Query { countries { name code } }",
-				}
+				//countries1 := gql.Request{
+				//	Query: "query Query { countries { name } }",
+				//}
+				//
+				//countries2 := gql.Request{
+				//	Query: "query Query { countries { name code } }",
+				//}
 
 				people1 := gql.Request{
 					Query: "query Query { people { name } }",
 				}
 
-				people2 := gql.Request{
-					Query: "query Query { people { country { name } name } }",
-				}
+				//people2 := gql.Request{
+				//	Query: "query Query { people { country { name } name } }",
+				//}
 
 				_, _ = g.Run(t, []test.TestCase{
 					// GraphQL Data Source
-					{Data: countries1, BodyMatch: `"countries":.*{"name":"Turkey"},{"name":"Russia"}.*`, Code: http.StatusOK},
-					{Data: countries2, BodyMatch: `"countries":.*{"name":"Turkey","code":"TR"},{"name":"Russia","code":"RU"}.*`, Code: http.StatusOK},
+					//{Data: countries1, BodyMatch: `"countries":.*{"name":"Turkey"},{"name":"Russia"}.*`, Code: http.StatusOK},
+					//{Data: countries2, BodyMatch: `"countries":.*{"name":"Turkey","code":"TR"},{"name":"Russia","code":"RU"}.*`, Code: http.StatusOK},
 
 					// REST Data Source
 					{Data: people1, BodyMatch: `"people":.*{"name":"Furkan"},{"name":"Leo"}.*`, Code: http.StatusOK},
-					{Data: people2, BodyMatch: `"people":.*{"country":{"name":"Turkey"},"name":"Furkan"},{"country":{"name":"Russia"},"name":"Leo"}.*`, Code: http.StatusOK},
+					//{Data: people2, BodyMatch: `"people":.*{"country":{"name":"Turkey"},"name":"Furkan"},{"country":{"name":"Russia"},"name":"Leo"}.*`, Code: http.StatusOK},
 				}...)
 			})
 

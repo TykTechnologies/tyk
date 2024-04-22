@@ -405,6 +405,7 @@ const (
 	handlerPathGraphQLProxyUpstream      = "/graphql-proxy-upstream"
 	handlerPathGraphQLProxyUpstreamError = "/graphql-proxy-upstream-error"
 	handlerPathRestDataSource            = "/rest-data-source"
+	handlerPathRestDataSourceV3          = "/rest-data-source-v2"
 	handlerPathGraphQLDataSource         = "/graphql-data-source"
 	handlerPathHeadersRestDataSource     = "/rest-headers-data-source"
 	handlerSubgraphAccounts              = "/subgraph-accounts"
@@ -424,6 +425,7 @@ const (
 	testGraphQLProxyUpstreamError = TestHttpAny + handlerPathGraphQLProxyUpstreamError
 	testGraphQLDataSource         = TestHttpAny + handlerPathGraphQLDataSource
 	testRESTDataSource            = TestHttpAny + handlerPathRestDataSource
+	testRESTDataSourceV3          = TestHttpAny + handlerPathRestDataSourceV3
 	testRESTHeadersDataSource     = TestHttpAny + handlerPathHeadersRestDataSource
 	testSubgraphAccounts          = TestHttpAny + handlerSubgraphAccounts
 	testSubgraphAccountsModified  = TestHttpAny + handlerSubgraphAccountsModified
@@ -520,6 +522,7 @@ func (s *Test) testHttpHandler(gw *Gateway) *mux.Router {
 	r.HandleFunc(handlerPathGraphQLProxyUpstreamError, graphqlProxyUpstreamHandlerError)
 	r.HandleFunc(handlerPathGraphQLDataSource, graphqlDataSourceHandler)
 	r.HandleFunc(handlerPathRestDataSource, restDataSourceHandler)
+	r.HandleFunc(handlerPathRestDataSourceV3, restDataSourceHandlerV2)
 	r.HandleFunc(handlerPathHeadersRestDataSource, restHeadersDataSourceHandler)
 	r.HandleFunc(handlerSubgraphAccounts, subgraphAccountsHandler)
 	r.HandleFunc(handlerSubgraphAccountsModified, subGraphAccountsHandlerAllAccounts)
@@ -692,6 +695,37 @@ func restDataSourceHandler(w http.ResponseWriter, r *http.Request) {
 				}
 			}
 		]`))
+}
+
+func restDataSourceHandlerV2(w http.ResponseWriter, r *http.Request) {
+	_, _ = w.Write([]byte(`{
+  "data": [
+    {
+      "name": "Furkan",
+      "country": {
+        "name": "Turkey"
+      }
+    },
+    {
+      "name": "Leo",
+      "country": {
+        "name": "Russia"
+      }
+    },
+    {
+      "name": "Josh",
+      "country": {
+        "name": "UK"
+      }
+    },
+    {
+      "name": "Patric",
+      "country": {
+        "name": "Germany"
+      }
+    }
+  ]
+}`))
 }
 
 func subgraphAccountsHandler(w http.ResponseWriter, r *http.Request) {
@@ -1424,8 +1458,8 @@ const sampleAPI = `{
 			{
 				"type_name": "Query",
 				"field_name": "people",
-				"disable_default_mapping": false,
-				"path": ["test"]
+				"disable_default_mapping": true,
+				"path": [""]
 			},
 			{
 				"type_name": "Query",
@@ -1522,6 +1556,23 @@ const testRESTDataSourceConfigurationV2 = `
 	],
 	"config": {
 		"url": "` + testRESTDataSource + `",
+		"method": "GET",
+		"headers": {},
+		"query": [],
+		"body": ""
+	}
+}`
+
+const testRESTDataSourceConfigurationV3 = `
+{
+	"kind": "REST",
+	"name": "people",
+	"internal": true,
+	"root_fields": [
+		{ "type": "Query", "fields": ["people"] }
+	],
+	"config": {
+		"url": "` + testRESTDataSourceV3 + `",
 		"method": "GET",
 		"headers": {},
 		"query": [],
