@@ -10,10 +10,12 @@ import (
 	"github.com/TykTechnologies/drl"
 	"github.com/TykTechnologies/leakybucket"
 	"github.com/TykTechnologies/leakybucket/memorycache"
+	"github.com/sirupsen/logrus"
 
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/internal/rate"
 	"github.com/TykTechnologies/tyk/internal/redis"
+	"github.com/TykTechnologies/tyk/internal/state"
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/user"
 )
@@ -46,6 +48,8 @@ type SessionLimiter struct {
 	config         *config.Config
 	bucketStore    leakybucket.Storage
 	limiterStorage redis.UniversalClient
+
+	stateManager *state.Engine
 }
 
 // NewSessionLimiter initializes the session limiter.
@@ -63,7 +67,12 @@ func NewSessionLimiter(ctx context.Context, conf *config.Config, drlManager *drl
 		bucketStore: memorycache.New(),
 	}
 
-	log.Infof("[RATELIMIT] %s", conf.RateLimit.String())
+	stateManager := state.New()
+	stateManager.AddListener(sessionLimiter.onChange)
+
+	sessionLimiter.stateManager = stateManager
+
+	sessionLimiter.Logger().Infof("[RATELIMIT] %s", conf.RateLimit.String())
 
 	storageConf := conf.GetRateLimiterStorage()
 
@@ -73,6 +82,21 @@ func NewSessionLimiter(ctx context.Context, conf *config.Config, drlManager *drl
 	}
 
 	return sessionLimiter
+}
+
+// onChange receives events from stateManager. It logs the change between three
+// levels according to the following criteria:
+//
+// - `ok`, traffic is below 80% of the defined rate limits
+// - `warning`, traffic is above 80% of the defined rate limits
+// - `error`, traffic is above 100% and is being blocked
+func (l *SessionLimiter) onChange(key, previous, current string) {
+	l.Logger().Info("Rate limit state changed from %q to %q for key %s", previous, current, key)
+}
+
+// Logger returns a new log entry with a set prefix.
+func (l *SessionLimiter) Logger() *logrus.Entry {
+	return log.WithField("prefix", "session-limiter")
 }
 
 func (l *SessionLimiter) Context() context.Context {
@@ -97,13 +121,13 @@ func (l *SessionLimiter) doRollingWindowWrite(key, rateLimiterKey, rateLimiterSe
 		cost = currentSession.Rate
 	}
 
-	log.Debug("[RATELIMIT] Inbound raw key is: ", key)
-	log.Debug("[RATELIMIT] Rate limiter key is: ", rateLimiterKey)
+	l.Logger().Debug("[RATELIMIT] Inbound raw key is: ", key)
+	l.Logger().Debug("[RATELIMIT] Rate limiter key is: ", rateLimiterKey)
 	pipeline := globalConf.EnableNonTransactionalRateLimiter
 
 	ratelimit, err := rate.NewSlidingLog(store, pipeline)
 	if err != nil {
-		log.WithError(err).Error("error creating sliding log")
+		l.Logger().WithError(err).Error("error creating sliding log")
 		return true
 	}
 
@@ -115,7 +139,7 @@ func (l *SessionLimiter) doRollingWindowWrite(key, rateLimiterKey, rateLimiterSe
 	}
 
 	if err != nil {
-		log.WithError(err).Error("error writing sliding log")
+		l.Logger().WithError(err).Error("error writing sliding log")
 	}
 
 	// Subtract by 1 because of the delayed add in the window
@@ -124,6 +148,26 @@ func (l *SessionLimiter) doRollingWindowWrite(key, rateLimiterKey, rateLimiterSe
 		// and another subtraction because of the preemptive limit
 		subtractor = 2
 	}
+
+	var trafficUsed float64
+
+	// avoid division by zero
+	if cost > 0 {
+		trafficUsed = float64(ratePerPeriodNow) / float64(cost)
+	}
+
+	// state below 80% of limits
+	state := "ok"
+
+	// state above 80% of limits
+	if trafficUsed > 0.8 {
+		state = "warning"
+	}
+
+	defer func() {
+		// store key state and trigger a change event
+		l.stateManager.Set(rateLimiterKey, state)
+	}()
 
 	// The test TestRateLimitForAPIAndRateLimitAndQuotaCheck
 	// will only work with these two lines here
@@ -134,6 +178,9 @@ func (l *SessionLimiter) doRollingWindowWrite(key, rateLimiterKey, rateLimiterSe
 				store.SetRawKey(rateLimiterSentinelKey, "1", int64(per))
 			}
 		}
+
+		// state above 100% of limits (blocking)
+		state = "error"
 		return true
 	}
 
@@ -213,7 +260,7 @@ func (l *SessionLimiter) limitDRL(currentSession *user.SessionState, key string,
 
 	userBucket, err := l.bucketStore.Create(bucketKey, cost, time.Duration(per)*time.Second)
 	if err != nil {
-		log.Error("Failed to create bucket!")
+		l.Logger().Error("Failed to create bucket!")
 		return true
 	}
 
@@ -252,7 +299,7 @@ func (l *SessionLimiter) ForwardMessage(r *http.Request, currentSession *user.Se
 	// check for limit on API level (set to session by ApplyPolicies)
 	accessDef, allowanceScope, err := GetAccessDefinitionByAPIIDOrSession(currentSession, api)
 	if err != nil {
-		log.WithField("apiID", api.APIID).Debugf("[RATE] %s", err.Error())
+		l.Logger().WithField("apiID", api.APIID).Debugf("[RATE] %s", err.Error())
 		return sessionFailRateLimit
 	}
 
@@ -358,26 +405,28 @@ func (l *SessionLimiter) RedisQuotaExceeded(r *http.Request, currentSession *use
 	quotaRenews := limit.QuotaRenews
 	quotaMax := limit.QuotaMax
 
-	log.Debug("[QUOTA] Quota limiter key is: ", rawKey)
-	log.Debug("Renewing with TTL: ", quotaRenewalRate)
+	l.Logger().Debug("[QUOTA] Quota limiter key is: ", rawKey)
+	l.Logger().Debug("Renewing with TTL: ", quotaRenewalRate)
 	// INCR the key (If it equals 1 - set EXPIRE)
 	qInt := store.IncrememntWithExpire(rawKey, quotaRenewalRate)
 	// if the returned val is >= quota: block
 	if qInt-1 >= quotaMax {
 		renewalDate := time.Unix(quotaRenews, 0)
-		log.Debug("Renewal Date is: ", renewalDate)
-		log.Debug("As epoch: ", quotaRenews)
-		log.Debug("Session: ", currentSession)
-		log.Debug("Now:", time.Now())
+		l.Logger().Debug("Renewal Date is: ", renewalDate)
+		l.Logger().Debug("As epoch: ", quotaRenews)
+		l.Logger().Debug("Session: ", currentSession)
+		l.Logger().Debug("Now:", time.Now())
 		if time.Now().After(renewalDate) {
 			//for renew quota = never, once we get the quota max we must not allow using it again
 
 			if quotaRenewalRate <= 0 {
 				return true
 			}
+
 			// The renewal date is in the past, we should update the quota!
 			// Also, this fixes legacy issues where there is no TTL on quota buckets
-			log.Debug("Incorrect key expiry setting detected, correcting")
+			l.Logger().Debug("Incorrect key expiry setting detected, correcting")
+
 			go store.DeleteRawKey(rawKey)
 			qInt = 1
 		} else {
