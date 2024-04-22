@@ -4,15 +4,61 @@ package coprocess;
 
 option go_package = "/coprocess";
 
+/**
+ * @defgroup enums Enumerations
+ * @{
+ */
+
+/**
+ * @enum HookType
+ * @brief Plugin hooks
+ *
+ * Used to identify the type of plugin
+ */
 enum HookType {
+  /** Unknown plugin type */ 
   Unknown = 0;
+
+  /** Executed before request sent to upstream target and before any
+   * authentication information is extracted from the header or
+   * parameter list of the request. Applies to both keyless and protected
+   * APIs.
+   */
   Pre = 1;
-	Post = 2;
-	PostKeyAuth = 3;
-	CustomKeyCheck  = 4;
+
+  /** Executed after authentication, validation, throttling, and quota-limiting
+   * middleware has been executed, just before the request is proxied upstream. Use this
+   * to post-process a request before sending it to upstream API. This is only called
+   * when using protected APIs.
+   */
+  Post = 2;
+
+  /** Executed after the authentication process.*/
+  PostKeyAuth = 3;
+
+  /** Custom auth ?*/
+  CustomKeyCheck = 4;
+
+  /** Executed after the upstream API replies. The arguments passed to this hook include
+   * both the request and response data. Use this to modify the HTTP response before it’s
+   * sent to the client. This hook also receives the request object, the session object,
+   * the metadata and API definition associated with the request.
+   */
   Response = 5;
 }
 
+/**
+ * @}
+ */
+
+
+
+/**
+ * @hidecollaborationgraph
+ * @brief List of strings
+ *
+ * A list of strings
+ */
 message StringSlice {
   repeated string items = 1;
 }
