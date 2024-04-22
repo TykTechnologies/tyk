@@ -1,4 +1,4 @@
-# Introduction
+# Tyk gRPC protobuf documentation
 
 gRPC is a very powerful framework for RPC communication across different languages.
 It was created by Google and makes heavy use of HTTP2 capabilities and the Protocol
@@ -31,3 +31,34 @@ You may re-use the bindings that were generated for our samples. In case you fin
 necessary, or you don’t find a sample that uses your target language, you may generate
 the bindings yourself. The Protocol Buffers and gRPC documentation provide specific
 requirements and instructions for each language.
+
+This website documents the protobuf Services and Messages for the gRPC server.
+
+## Generating the docs
+
+To generate the documentation for the gRPC protobuf files, firstly ensure the following pre-requisites are installed:
+
+- [Task](https://taskfile.dev/installation/)
+- [Doxygen](https://www.doxygen.nl/index.html)
+
+Subsequently, issue the following command:
+
+```bash
+task docs
+```
+
+This will generate a *html* and *xml* output folders. The documentation for the Tyk gRPC protobuf files is available within the *index.html* file of the *html* folder.
+
+## Generating the gRPC bindings
+
+To generate the gRPC bindings for Go, Python and Ruby, firstly ensure that the following pre-requisite is installed:
+
+- [Task](https://taskfile.dev/installation/)
+
+Subsequently, issue the following command:
+
+```bash
+task generate
+```
+
+This will install module dependencies for Go and Python. The source bindings will be generated in the *coprocess/bindings* folder of your [local Tyk repository](https://github.com/TykTechnologies/tyk)
