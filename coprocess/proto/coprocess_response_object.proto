@@ -4,15 +4,34 @@ package coprocess;
 
 option go_package = "/coprocess";
 
+/**
+ * @hidecollaborationgraph
+ * @brief Contains the HTTP reponse data received from the upstream
+ *
+ * Used by response hooks All fields are modifiable
+ */
 message ResponseObject {
+  /** HTTP status code received from the upstream */
   int32 status_code = 1;
-  bytes raw_body = 2;
-  string body = 3;
-  map<string, string> headers = 4;
-  repeated Header multivalue_headers = 5;
+  /** Raw bytes of HTTP response body */
+  bytes raw_body = 2; 
+  /** HTTP response body Excluded when the raw_body contains invalid UTF-8 characters */
+  string body = 3; 
+  /** Headers received from the upstream */
+  map<string, string> headers = 4; 
+  /** A list of headers Useful when header has multiple values */
+  repeated Header multivalue_headers = 5; 
 }
 
+/**
+ * @hidecollaborationgraph
+ * @brief Response header
+ *
+ * A reponse header that contains multiple associated values
+ */
 message Header {
-  string key = 1;
-  repeated string values = 2;
+  /** The header name */
+  string key = 1; 
+  /** List of values representing the header content */
+  repeated string values = 2; 
 }
