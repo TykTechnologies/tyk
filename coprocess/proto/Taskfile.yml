@@ -37,7 +37,10 @@ tasks:
       - echo "Generating bindings for Python."
       - mkdir -p ../bindings/python
       - protoc -I. --python_out=../bindings/python *.proto
-      - python3 codegen.py
+      - |-
+        source .venv/bin/activate
+        python codegen.py
+        source deactivate
       
       - echo "Generating bindings for Ruby."
       - mkdir -p ../bindings/ruby
