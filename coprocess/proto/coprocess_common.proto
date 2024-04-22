@@ -36,7 +36,8 @@ enum HookType {
   /** Executed after the authentication process.*/
   PostKeyAuth = 3;
 
-  /** Custom auth ?*/
+  	
+  /** Executed for performing customised authentication.*/
   CustomKeyCheck = 4;
 
   /** Executed after the upstream API replies. The arguments passed to this hook include
