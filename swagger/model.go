@@ -9,9 +9,11 @@ import (
 	"github.com/TykTechnologies/tyk/gateway"
 )
 
-const applicationForm = "application/x-www-form-urlencoded"
-
-var applicationOctetStream = "application/octet-stream"
+const (
+	applicationForm        = "application/x-www-form-urlencoded"
+	applicationOctetStream = "application/octet-stream"
+	applicationJSON        = "application/json"
+)
 
 type paginationStatus struct {
 	PageNum   int `json:"page_num"`
@@ -148,6 +150,35 @@ func addBinaryFormat(o3 openapi3.OperationExposer, httpStatus int) {
 		return
 	}
 	value.Response.Content["application/octet-stream"].Schema.Schema.Format = StringPointerValue("binary")
+}
+
+func addExternalRefToResponse(o3 openapi3.OperationExposer, httpStatus int) {
+	code := strconv.Itoa(httpStatus)
+	_, ok := o3.Operation().Responses.MapOfResponseOrRefValues[code]
+	if !ok {
+		return
+	}
+	o3.Operation().Responses.MapOfResponseOrRefValues[code] = openapi3.ResponseOrRef{
+		Response: nil,
+		ResponseReference: &openapi3.ResponseReference{
+			Ref: ExternalOASRef,
+		},
+	}
+}
+
+func addExternalRefToRequest(o3 openapi3.OperationExposer) {
+	o3.Operation().RequestBody = &openapi3.RequestBodyOrRef{
+		RequestBodyReference: nil,
+		RequestBody: &openapi3.RequestBody{
+			Content: map[string]openapi3.MediaType{applicationJSON: {
+				Schema: &openapi3.SchemaOrRef{
+					SchemaReference: &openapi3.SchemaReference{
+						Ref: ExternalOASRef,
+					},
+				},
+			}},
+		},
+	}
 }
 
 func addNewResponseHeader(o3 openapi3.OperationExposer, httpStatus int, cr HeaderCr) {

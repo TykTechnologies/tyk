@@ -3,6 +3,7 @@ package swagger
 import (
 	"net/http"
 
+	log "github.com/sirupsen/logrus"
 	"github.com/swaggest/openapi-go"
 	"github.com/swaggest/openapi-go/openapi3"
 
@@ -61,6 +62,7 @@ func postOAsApi(r *openapi3.Reflector) error {
 		return ErrOperationExposer
 	}
 	o3.Operation().WithParameters(addApiPostQueryParam()...)
+	addExternalRefToRequest(o3)
 	return r.AddOperation(oc)
 }
 
@@ -199,9 +201,6 @@ func importApiOASPostHandler(r *openapi3.Reflector) error {
 	oc.AddRespStructure(new(apiModifyKeySuccess), func(cu *openapi.ContentUnit) {
 		cu.Description = "API definition created"
 	})
-	oc.AddReqStructure(new(oas.OAS), func(cu *openapi.ContentUnit) {
-	})
-
 	oc.SetDescription("Create a new OAS format API, without x-tyk-gateway.\n        For use with an existing OAS API that you want to expose via your Tyk Gateway. (New)")
 	statusInternalServerError(oc, "Unexpected error")
 	statusBadRequest(oc, "Malformed request or when the payload contain x-tyk-api-gateway")
@@ -210,6 +209,7 @@ func importApiOASPostHandler(r *openapi3.Reflector) error {
 		return ErrOperationExposer
 	}
 	o3.Operation().WithParameters(patchAndImportQueryParameters(true)...)
+	addExternalRefToRequest(o3)
 	return r.AddOperation(oc)
 }
 
@@ -265,6 +265,7 @@ func deleteOASHandler(r *openapi3.Reflector) error {
 }
 
 func apiOASPatchHandler(r *openapi3.Reflector) error {
+	log.Println("oas patch this")
 	oc, err := r.NewOperationContext(http.MethodPatch, "/tyk/apis/oas/{apiID}")
 	if err != nil {
 		return err
@@ -288,7 +289,16 @@ func apiOASPatchHandler(r *openapi3.Reflector) error {
 	par := []openapi3.ParameterOrRef{apIIDParameter()}
 	par = append(par, patchAndImportQueryParameters(false)...)
 	o3.Operation().WithParameters(par...)
-	return r.AddOperation(oc)
+	err = r.AddOperation(oc)
+	if err != nil {
+		log.Println("mmmh hhere it is mmimi")
+		return err
+	}
+	log.Println("no eerr in patch")
+	// addExternalRefToResponse(o3, http.StatusOK)
+	// addExternalRefToRequest(o3)
+	// addBinaryFormat(o3, http.StatusOK)
+	return nil
 }
 
 func oasModeQuery(description ...string) openapi3.ParameterOrRef {

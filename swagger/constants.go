@@ -25,3 +25,5 @@ The shared secret you set should then be sent along as a header with each Gatewa
 <b>The Tyk Gateway API is subsumed by the Tyk Dashboard API in Pro installations.</b>
 
 `
+
+const ExternalOASRef = "https://raw.githubusercontent.com/OAI/OpenAPI-Specification/main/schemas/v3.0/schema.json"
