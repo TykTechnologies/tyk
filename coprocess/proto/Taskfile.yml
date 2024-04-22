@@ -1,6 +1,19 @@
 version: '3'
 
 tasks:
+  setup_venv:
+    internal: true
+    silent: true
+    cmds:
+      - |
+        if [ ! -d .venv ]; then
+          echo "Creating virtual environment"
+          python3 -m venv .venv
+          source .venv/bin/activate
+          pip install grpcio grpcio-tools
+          source deactivate
+        fi
+
   install-deps:
     desc: install the required dependencies to generate the bindings. gRPC is required to be installed
     cmds:
