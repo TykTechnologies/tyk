@@ -684,6 +684,7 @@ func TestGraphQLMiddleware_EngineMode(t *testing.T) {
 				spec.UseKeylessAccess = true
 				spec.Proxy.ListenPath = "/"
 				spec.GraphQL.Enabled = true
+				spec.GraphQL.Schema = testComposedSchemaNotExtended
 				spec.GraphQL.ExecutionMode = apidef.GraphQLExecutionModeExecutionEngine
 				spec.GraphQL.Version = apidef.GraphQLConfigVersion2
 			})
