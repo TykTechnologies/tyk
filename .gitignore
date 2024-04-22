@@ -3,6 +3,8 @@
 .vagrant/
 .vscode/
 .venv/
+html/
+xml/
 temp/
 /middleware/bundles
 testapps/
