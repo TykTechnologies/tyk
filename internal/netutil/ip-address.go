@@ -19,7 +19,6 @@ func GetIpAddress() ([]string, error) {
 
 	for _, addr := range addrs {
 		if ipnet, ok := addr.(*net.IPNet); ok && !ipnet.IP.IsLoopback() {
-
 			if ipAdrr := ipnet.IP.To16(); ipAdrr != nil {
 				ips = append(ips, ipAdrr.String())
 			}

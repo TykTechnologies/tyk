@@ -13,7 +13,6 @@ type BufferedLog struct {
 	Message string       `json:"message"`
 	Time    time.Time    `json:"time"`
 	Level   logrus.Level `json:"level"`
-	// TimeSpent time.Time `json:"time_spent,omitempty"`
 }
 
 type BufferingFormatter struct {
