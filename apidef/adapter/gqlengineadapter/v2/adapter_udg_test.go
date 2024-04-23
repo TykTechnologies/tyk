@@ -32,7 +32,7 @@ func TestUniversalDataGraph_EngineConfig(t *testing.T) {
 			subscriptionClientFactory: &MockSubscriptionClientFactory{},
 		}
 
-		_, err := adapter.EngineConfig()
+		_, err := adapter.EngineConfigV2()
 		assert.NoError(t, err)
 	})
 }
@@ -217,6 +217,12 @@ func TestUniversalDataGraph_engineConfigV2DataSources(t *testing.T) {
 					FieldNames: []string{"withChildren"},
 				},
 			},
+			ChildNodes: []plan.TypeField{
+				{
+					TypeName:   "WithChildren",
+					FieldNames: []string{"id", "name", "__typename"},
+				},
+			},
 			Factory: &restDataSource.Factory{
 				Client: httpClient,
 			},
@@ -232,6 +238,12 @@ func TestUniversalDataGraph_engineConfigV2DataSources(t *testing.T) {
 				{
 					TypeName:   "WithChildren",
 					FieldNames: []string{"nested"},
+				},
+			},
+			ChildNodes: []plan.TypeField{
+				{
+					TypeName:   "Nested",
+					FieldNames: []string{"id", "name", "__typename"},
 				},
 			},
 			Factory: &restDataSource.Factory{

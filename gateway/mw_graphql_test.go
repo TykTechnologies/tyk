@@ -388,7 +388,7 @@ func TestGraphQLMiddleware_EngineMode(t *testing.T) {
 				Query: `{ hello(name: "World") httpMethod }`,
 			}
 
-			resp, err := g.Run(t, []test.TestCase{
+			_, err := g.Run(t, []test.TestCase{
 				{
 					Data:   request,
 					Method: http.MethodPost,
@@ -405,24 +405,8 @@ func TestGraphQLMiddleware_EngineMode(t *testing.T) {
 						"X-Other-Key":   "other-value",
 					},
 				},
-				//{
-				//	Data:   request,
-				//	Method: http.MethodPut,
-				//	Headers: map[string]string{
-				//		"X-Tyk-Key":       "tyk-value",
-				//		"X-Other-Key":     "other-value",
-				//		"X-Response-Code": "201",
-				//	},
-				//	Code:      201,
-				//	BodyMatch: `{"data":{"hello":"World","httpMethod":"PUT"}}`,
-				//	HeadersMatch: map[string]string{
-				//		"Authorization": "123abc",
-				//		"X-Tyk-Key":     "tyk-value",
-				//		"X-Other-Key":   "other-value",
-				//	},
-				//},
 			}...)
-			fmt.Println(err, resp)
+			assert.NoError(t, err)
 		})
 
 		t.Run("proxy-only return errors from upstream", func(t *testing.T) {
