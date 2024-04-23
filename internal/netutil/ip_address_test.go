@@ -3,8 +3,9 @@ package netutil
 import (
 	"fmt"
 	"net"
-	"reflect"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func Test_getIpAddress(t *testing.T) {
@@ -75,12 +76,11 @@ func Test_getIpAddress(t *testing.T) {
 			netInterfaceAddrs = tt.netInterfaceAddrs
 
 			got, err := GetIpAddress()
-			if (err != nil) != tt.wantErr {
-				t.Errorf("getIpAddress() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-			if !tt.wantErr && !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("getIpAddress() = %v, want %v", got, tt.want)
+			if tt.wantErr {
+				assert.Error(t, err, "getIpAddress() should return an error")
+			} else {
+				assert.NoError(t, err, "getIpAddress() should not return an error")
+				assert.Equal(t, tt.want, got, "getIpAddress() should return the correct IP address")
 			}
 		})
 	}
