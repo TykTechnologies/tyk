@@ -72,7 +72,9 @@ const (
 	oAuthClientTokensKeyPattern = "oauth-data.*oauth-client-tokens.*"
 )
 
-var ErrRequestMalformed = errors.New("request malformed")
+var (
+	ErrRequestMalformed = errors.New("request malformed")
+)
 
 // apiModifyKeySuccess represents when a Key modification was successful
 //
@@ -141,12 +143,14 @@ func doJSONWrite(w http.ResponseWriter, code int, obj interface{}) {
 }
 
 func doJSONExport(w http.ResponseWriter, code int, obj interface{}, fileName string) {
+
 	if code != http.StatusOK {
 		doJSONWrite(w, code, obj)
 		return
 	}
 
 	stream, err := json.MarshalIndent(obj, "", "  ")
+
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -161,6 +165,7 @@ func doJSONExport(w http.ResponseWriter, code int, obj interface{}, fileName str
 		job := instrument.NewJob("SystemAPIError")
 		job.Event(err.Error())
 	}
+
 }
 
 type MethodNotAllowedHandler struct{}
@@ -503,7 +508,7 @@ func (gw *Gateway) handleAddOrUpdate(keyName string, r *http.Request, isHashed b
 		keyName = gw.generateToken(newSession.OrgID, keyName)
 	}
 
-	// set the original expiry if the content in payload is a past time
+	//set the original expiry if the content in payload is a past time
 	if time.Now().After(time.Unix(newSession.Expires, 0)) && newSession.Expires > 1 {
 		newSession.Expires = originalKey.Expires
 	}
@@ -834,10 +839,12 @@ func (gw *Gateway) handleDeleteHashedKeyWithLogs(keyName, orgID, apiID string, r
 }
 
 func (gw *Gateway) handleDeleteHashedKey(keyName, orgID, apiID string, resetQuota bool) (interface{}, int) {
+
 	session, ok := gw.GlobalSessionManager.SessionDetail(orgID, keyName, true)
 	keyName = session.KeyID
 	if !ok {
 		return apiError("There is no such key found"), http.StatusNotFound
+
 	}
 
 	if apiID == "-1" {
@@ -932,7 +939,7 @@ func (gw *Gateway) handleAddOrUpdatePolicy(polID string, r *http.Request) (inter
 		return apiError("Marshalling failed"), http.StatusInternalServerError
 	}
 
-	if err := ioutil.WriteFile(polFilePath, asByte, 0o644); err != nil {
+	if err := ioutil.WriteFile(polFilePath, asByte, 0644); err != nil {
 		log.Error("Failed to create file! - ", err)
 		return apiError("Failed to create file!"), http.StatusInternalServerError
 	}
@@ -1037,6 +1044,7 @@ func (gw *Gateway) handleGetAPIOAS(apiID string, modePublic bool) (interface{}, 
 		return oasCopy, code
 	}
 	return obj, code
+
 }
 
 func (gw *Gateway) handleAddApi(r *http.Request, fs afero.Fs, oasEndpoint bool) (interface{}, int) {
@@ -1260,7 +1268,7 @@ func (gw *Gateway) writeToFile(fs afero.Fs, newDef interface{}, filename string)
 		return errors.New("marshalling failed"), http.StatusInternalServerError
 	}
 
-	if err := ioutil.WriteFile(defFilePath, asByte, 0o644); err != nil {
+	if err := ioutil.WriteFile(defFilePath, asByte, 0644); err != nil {
 		log.Infof("EL file path: %v", defFilePath)
 		log.Error("Failed to create file! - ", err)
 		return errors.New("file object creation failed, write error"), http.StatusInternalServerError
@@ -1497,6 +1505,7 @@ func (gw *Gateway) apiOASPatchHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	reqBodyInBytes, oasObj, err := extractOASObjFromReq(r.Body)
+
 	if err != nil {
 		doJSONWrite(w, http.StatusBadRequest, apiError(err.Error()))
 		return
@@ -2042,6 +2051,7 @@ func (gw *Gateway) createKeyHandler(w http.ResponseWriter, r *http.Request) {
 			doJSONWrite(w, http.StatusBadRequest, apiError("Failed to create key, keys must have at least one Access Rights record set."))
 			return
 		}
+
 	}
 
 	obj := apiModifyKeySuccess{
@@ -2476,6 +2486,7 @@ func (gw *Gateway) invalidateOauthRefresh(w http.ResponseWriter, r *http.Request
 }
 
 func (gw *Gateway) rotateOauthClientHandler(w http.ResponseWriter, r *http.Request) {
+
 	apiID := mux.Vars(r)["apiID"]
 	keyName := mux.Vars(r)["keyName"]
 
@@ -2489,7 +2500,7 @@ func (gw *Gateway) getApisForOauthApp(w http.ResponseWriter, r *http.Request) {
 	appID := mux.Vars(r)["appID"]
 	orgID := r.FormValue("orgID")
 
-	// get all organization apis
+	//get all organization apis
 	apisIds := gw.getApisIdsForOrg(orgID)
 
 	for index := range apisIds {
@@ -2708,14 +2719,12 @@ func (gw *Gateway) handleDeleteOAuthClient(keyName, apiID string) (interface{}, 
 	return apiError("OAuth Client ID not found"), http.StatusNotFound
 }
 
-const (
-	oAuthNotPropagatedErr  = "OAuth client list isn't available or hasn't been propagated yet."
-	oAuthClientNotFound    = "OAuth client not found"
-	oauthClientIdEmpty     = "client_id is required"
-	oauthClientSecretEmpty = "client_secret is required"
-	oauthClientSecretWrong = "client secret is wrong"
-	oauthTokenEmpty        = "token is required"
-)
+const oAuthNotPropagatedErr = "OAuth client list isn't available or hasn't been propagated yet."
+const oAuthClientNotFound = "OAuth client not found"
+const oauthClientIdEmpty = "client_id is required"
+const oauthClientSecretEmpty = "client_secret is required"
+const oauthClientSecretWrong = "client secret is wrong"
+const oauthTokenEmpty = "token is required"
 
 func (gw *Gateway) getApiClients(apiID string) ([]ExtendedOsinClientInterface, apiStatusMessage, int) {
 	var err error
@@ -2752,6 +2761,7 @@ func (gw *Gateway) getApiClients(apiID string) ([]ExtendedOsinClientInterface, a
 
 // List Clients
 func (gw *Gateway) getOauthClients(apiID string) (interface{}, int) {
+
 	clientData, _, apiStatusCode := gw.getApiClients(apiID)
 
 	if apiStatusCode != 200 {
@@ -2864,6 +2874,7 @@ func (gw *Gateway) invalidateCacheHandler(w http.ResponseWriter, r *http.Request
 
 func (gw *Gateway) RevokeTokenHandler(w http.ResponseWriter, r *http.Request) {
 	err := r.ParseForm()
+
 	if err != nil {
 		doJSONWrite(w, http.StatusBadRequest, apiError("cannot parse form. Form malformed"))
 		return
@@ -2928,6 +2939,7 @@ func (gw *Gateway) GetStorageForApi(apiID string) (ExtendedOsinStorageInterface,
 
 func (gw *Gateway) RevokeAllTokensHandler(w http.ResponseWriter, r *http.Request) {
 	err := r.ParseForm()
+
 	if err != nil {
 		doJSONWrite(w, http.StatusBadRequest, apiError("cannot parse form. Form malformed"))
 		return
@@ -2949,7 +2961,7 @@ func (gw *Gateway) RevokeAllTokensHandler(w http.ResponseWriter, r *http.Request
 
 	apis := gw.getApisForOauthClientId(clientId, orgId)
 	if len(apis) == 0 {
-		// if api is 0 is because the client wasn't found
+		//if api is 0 is because the client wasn't found
 		doJSONWrite(w, http.StatusNotFound, apiError("oauth client doesn't exist"))
 		return
 	}
@@ -2976,6 +2988,7 @@ func (gw *Gateway) RevokeAllTokensHandler(w http.ResponseWriter, r *http.Request
 func (gw *Gateway) validateOAS(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		reqBodyInBytes, oasObj, err := extractOASObjFromReq(r.Body)
+
 		if err != nil {
 			doJSONWrite(w, http.StatusBadRequest, apiError(err.Error()))
 			return
@@ -3059,7 +3072,6 @@ func setContext(r *http.Request, ctx context.Context) {
 	r2 := r.WithContext(ctx)
 	*r = *r2
 }
-
 func setCtxValue(r *http.Request, key, val interface{}) {
 	setContext(r, context.WithValue(r.Context(), key, val))
 }
@@ -3410,6 +3422,7 @@ var createOauthClientSecret = func() string {
 
 // invalidate tokens if we had a new policy
 func invalidateTokens(prevClient ExtendedOsinClientInterface, updatedClient OAuthClient, oauthManager *OAuthManager) {
+
 	if prevPolicy := prevClient.GetPolicyID(); prevPolicy != "" && prevPolicy != updatedClient.PolicyID {
 		tokenList, err := oauthManager.OsinServer.Storage.GetClientTokens(updatedClient.ClientID)
 		if err != nil {
