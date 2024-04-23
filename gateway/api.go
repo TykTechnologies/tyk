@@ -1039,7 +1039,10 @@ func (gw *Gateway) handleGetAPIOAS(apiID string, modePublic bool) (interface{}, 
 
 	obj, code := gw.handleGetAPI(apiID, true)
 	if apiOAS, ok := obj.(*oas.OAS); ok && modePublic {
-		oasCopy := *apiOAS
+		oasCopy,err := apiOAS.Clone()
+		if(err!=nil){
+			return apiError("marshalling failed"), http.StatusInternalServerError
+		}
 		oasCopy.RemoveTykExtension()
 		return oasCopy, code
 	}
