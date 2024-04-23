@@ -4,13 +4,15 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"github.com/TykTechnologies/graphql-go-tools/v2/pkg/graphql"
-	"github.com/jensneuse/abstractlogger"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 	"net/http"
 	"net/http/httptest"
 	"testing"
+
+	"github.com/jensneuse/abstractlogger"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
+	"github.com/TykTechnologies/graphql-go-tools/v2/pkg/graphql"
 )
 
 func NewTestEngine(t *testing.T) *EngineV3 {

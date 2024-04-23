@@ -3,13 +3,15 @@ package graphengine
 import (
 	"bytes"
 	"fmt"
-	"github.com/TykTechnologies/graphql-go-tools/v2/pkg/graphql"
-	"github.com/TykTechnologies/tyk/apidef"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 	"io"
 	"net/http"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
+	"github.com/TykTechnologies/graphql-go-tools/v2/pkg/graphql"
+	"github.com/TykTechnologies/tyk/apidef"
 )
 
 func TestReverseProxyPreHandlerV2_PreHandle(t *testing.T) {

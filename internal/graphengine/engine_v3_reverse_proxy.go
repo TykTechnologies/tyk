@@ -3,13 +3,15 @@ package graphengine
 import (
 	"context"
 	"errors"
+	"net/http"
+
+	"github.com/jensneuse/abstractlogger"
+
 	"github.com/TykTechnologies/graphql-go-tools/v2/pkg/engine/datasource/httpclient"
 	"github.com/TykTechnologies/graphql-go-tools/v2/pkg/graphql"
 	"github.com/TykTechnologies/graphql-go-tools/v2/pkg/subscription"
 	gqlwebsocketV2 "github.com/TykTechnologies/graphql-go-tools/v2/pkg/subscription/websocket"
 	"github.com/TykTechnologies/tyk/internal/otel"
-	"github.com/jensneuse/abstractlogger"
-	"net/http"
 )
 
 func (e *EngineV3) ProcessGraphQLComplexity(r *http.Request, accessDefinition *ComplexityAccessDefinition) (err error, statusCode int) {

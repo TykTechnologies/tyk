@@ -2,9 +2,10 @@ package adapter
 
 import (
 	"errors"
+	"net/http"
+
 	graphqlv2 "github.com/TykTechnologies/graphql-go-tools/v2/pkg/graphql"
 	v2 "github.com/TykTechnologies/tyk/apidef/adapter/gqlengineadapter/v2"
-	"net/http"
 
 	"github.com/TykTechnologies/graphql-go-tools/pkg/engine/datasource/httpclient"
 	"github.com/TykTechnologies/graphql-go-tools/pkg/graphql"

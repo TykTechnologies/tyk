@@ -2,13 +2,15 @@ package graphengine
 
 import (
 	"context"
+	"net/http"
+
+	"github.com/jensneuse/abstractlogger"
+	"github.com/sirupsen/logrus"
+
 	"github.com/TykTechnologies/graphql-go-tools/v2/pkg/graphql"
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/apidef/adapter"
 	graphqlinternal "github.com/TykTechnologies/tyk/internal/graphql"
-	"github.com/jensneuse/abstractlogger"
-	"github.com/sirupsen/logrus"
-	"net/http"
 )
 
 type EngineV3 struct {

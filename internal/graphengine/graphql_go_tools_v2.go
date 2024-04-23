@@ -5,15 +5,17 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
+	"net/http"
+
+	"github.com/buger/jsonparser"
+
 	"github.com/TykTechnologies/graphql-go-tools/v2/pkg/astparser"
 	"github.com/TykTechnologies/graphql-go-tools/v2/pkg/engine/postprocess"
 	"github.com/TykTechnologies/graphql-go-tools/v2/pkg/graphql"
 	"github.com/TykTechnologies/graphql-go-tools/v2/pkg/introspection"
 	"github.com/TykTechnologies/graphql-go-tools/v2/pkg/operationreport"
 	"github.com/TykTechnologies/tyk/apidef"
-	"github.com/buger/jsonparser"
-	"io"
-	"net/http"
 )
 
 type ContextRetrieveRequestV2Func func(r *http.Request) *graphql.Request

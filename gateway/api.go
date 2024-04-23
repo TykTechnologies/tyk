@@ -32,7 +32,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	gqlV2 "github.com/TykTechnologies/graphql-go-tools/v2/pkg/graphql"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -43,6 +42,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	gqlV2 "github.com/TykTechnologies/graphql-go-tools/v2/pkg/graphql"
 
 	"github.com/getkin/kin-openapi/openapi3"
 
