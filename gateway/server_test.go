@@ -226,6 +226,7 @@ type gatewayGetHostDetailsTestCheckFn func(*testing.T, *test.BufferedLogger, *Ga
 
 func gatewayGetHostDetailsTestHasErr(wantErr bool, errorText string) gatewayGetHostDetailsTestCheckFn {
 	return func(t *testing.T, bl *test.BufferedLogger, _ *Gateway) {
+		t.Helper()
 		logs := bl.GetLogs(logrus.ErrorLevel)
 		if !wantErr && assert.Empty(t, logs) {
 			return
@@ -244,7 +245,8 @@ func gatewayGetHostDetailsTestHasErr(wantErr bool, errorText string) gatewayGetH
 }
 
 func gatewayGetHostDetailsTesHasAddress(addr string) gatewayGetHostDetailsTestCheckFn {
-	return func(t *testing.T, bl *test.BufferedLogger, gw *Gateway) {
+	return func(t *testing.T, _ *test.BufferedLogger, gw *Gateway) {
+		t.Helper()
 		matched, err := regexp.MatchString(addr, gw.hostDetails.Address)
 		if err != nil {
 			t.Errorf("Failed to compile regex pattern: %v", err)
@@ -280,7 +282,7 @@ func defineGatewayGetHostDetailsTests() []struct {
 	}{
 		{
 			name:            "fail-read-pid",
-			readPIDFromFile: func(file string) (int, error) { return 0, fmt.Errorf("Error opening file") },
+			readPIDFromFile: func(_ string) (int, error) { return 0, fmt.Errorf("Error opening file") },
 			before: func(gw *Gateway) {
 				gw.SetConfig(config.Config{
 					ListenAddress: "127.0.0.1",
@@ -305,7 +307,7 @@ func defineGatewayGetHostDetailsTests() []struct {
 		},
 		{
 			name:            "success-listen-address-not-set",
-			readPIDFromFile: func(file string) (int, error) { return 1000, nil },
+			readPIDFromFile: func(_ string) (int, error) { return 1000, nil },
 			before: func(gw *Gateway) {
 				gw.SetConfig(config.Config{
 					ListenAddress: "",
@@ -318,7 +320,7 @@ func defineGatewayGetHostDetailsTests() []struct {
 		},
 		{
 			name:            "fail-getting-network-address",
-			readPIDFromFile: func(file string) (int, error) { return 1000, nil },
+			readPIDFromFile: func(_ string) (int, error) { return 1000, nil },
 			before: func(gw *Gateway) {
 				gw.SetConfig(config.Config{
 					ListenAddress: "",
@@ -354,7 +356,7 @@ func TestGatewayGetHostDetails(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			// clear logger mock buffer
 			bl.ClearLogs()
-			// replace fucntions with mocks
+			// replace functions with mocks
 			mainLog = bl.Logger.WithField("prefix", "test")
 			if tt.readPIDFromFile != nil {
 				readPIDFromFile = tt.readPIDFromFile
