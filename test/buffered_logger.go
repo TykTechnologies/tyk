@@ -58,6 +58,14 @@ func (bl *BufferedLogger) GetLogs(Level logrus.Level) []*BufferedLog {
 	return logs
 }
 
+// ClearLogs clears the logs from the buffer.
+// IMPORTANT: Must be called before each test iteration.
+func (bl *BufferedLogger) ClearLogs() {
+	bl.bufferingFormatter.bufferMutex.Lock()
+	defer bl.bufferingFormatter.bufferMutex.Unlock()
+	bl.bufferingFormatter.buffer = make([]*BufferedLog, 0)
+}
+
 var buflogger *BufferedLogger
 
 // NewBufferingLogger creates a new buffered logger.
@@ -75,12 +83,4 @@ func NewBufferingLogger() *BufferedLogger {
 		bufferingFormatter: bufferingFormatter,
 	}
 	return buflogger
-}
-
-// ClearLogs clears the logs from the buffer.
-// IMPORTANT: Must be called before each test iteration.
-func (bl *BufferedLogger) ClearLogs() {
-	bl.bufferingFormatter.bufferMutex.Lock()
-	defer bl.bufferingFormatter.bufferMutex.Unlock()
-	bl.bufferingFormatter.buffer = make([]*BufferedLog, 0)
 }
