@@ -14,9 +14,8 @@ EOF
     exit 1
 }
 
-compose='docker-compose'
-# composev2 is a client plugin
-[[ $(docker version --format='{{ .Client.Version }}') =~ "20.10" ]] && compose='docker compose'
+# assume that the env has a recent docker installation with compose being a client plugin
+compose='docker compose'
 
 [[ -z $1 ]] && usage $0
 export tag=$1
