@@ -24,7 +24,7 @@ env:
 jobs:
   goreleaser:
     name: '${{ matrix.golang_cross }}'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-latest-m
     permissions:
       id-token: write # AWS OIDC JWT
       contents: read # actions/checkout
@@ -91,7 +91,7 @@ jobs:
           rm -rf vendor
           git config --global url."https://${{ secrets.ORG_GH_TOKEN }}@github.com".insteadOf "https://github.com"
           git config --global --add safe.directory /go/src/github.com/TykTechnologies/tyk
-          goreleaser release --clean -f ${{ matrix.goreleaser }} ${{ !startsWith(github.ref, 'refs/tags/') && ' --snapshot' || '' }}' | tee /tmp/build.sh
+          goreleaser release --clean -f ${{ matrix.goreleaser }} ${{ !startsWith(github.ref, 'refs/tags/') && ' --snapshot --skip-sign' || '' }}' | tee /tmp/build.sh
           chmod +x /tmp/build.sh
           docker run --rm --privileged -e GITHUB_TOKEN=${{ github.token }} \
           -e GOPRIVATE=github.com/TykTechnologies                                \
