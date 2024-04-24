@@ -136,7 +136,7 @@ func TestBufferingFormatter_Format(t *testing.T) {
 }
 
 func TestBufferedLogger_GetLogs(t *testing.T) {
-	type checkFn func(*BufferedLogger)
+	type checkFn func(*testing.T, *BufferedLogger)
 
 	var (
 		check = func(fns ...checkFn) []checkFn { return fns }
@@ -148,7 +148,7 @@ func TestBufferedLogger_GetLogs(t *testing.T) {
 		}
 
 		hasLogs = func(level logrus.Level, count int) checkFn {
-			return func(f *BufferedLogger) {
+			return func(t *testing.T, f *BufferedLogger) {
 				logs := f.GetLogs(level)
 				assert.Len(t, logs, count, "Expected buffer to have %d log", count)
 			}
@@ -191,14 +191,14 @@ func TestBufferedLogger_GetLogs(t *testing.T) {
 			}
 
 			for _, check := range tt.checks {
-				check(bl)
+				check(t, bl)
 			}
 		})
 	}
 }
 
 func TestBufferedLogger_ClearLogs(t *testing.T) {
-	type checkFn func(*BufferedLogger)
+	type checkFn func(*testing.T, *BufferedLogger)
 
 	var (
 		check = func(fns ...checkFn) []checkFn { return fns }
@@ -209,7 +209,7 @@ func TestBufferedLogger_ClearLogs(t *testing.T) {
 		}
 
 		empty = func(empty bool) checkFn {
-			return func(bl *BufferedLogger) {
+			return func(t *testing.T, bl *BufferedLogger) {
 				if empty {
 					assert.LessOrEqual(t, 0, len(bl.bufferingFormatter.buffer), 0, "Expected buffer to be empty")
 				} else {
@@ -250,7 +250,7 @@ func TestBufferedLogger_ClearLogs(t *testing.T) {
 
 			bl.ClearLogs()
 			for _, check := range tt.checks {
-				check(bl)
+				check(t, bl)
 			}
 		})
 	}

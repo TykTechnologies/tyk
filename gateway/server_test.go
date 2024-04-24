@@ -223,7 +223,7 @@ func TestGateway_SyncResourcesWithReload(t *testing.T) {
 }
 
 func TestGateway_getHostDetails(t *testing.T) {
-	type checkFn func(*test.BufferedLogger, *Gateway)
+	type checkFn func(*testing.T, *test.BufferedLogger, *Gateway)
 
 	var (
 		orig_readPIDFromFile = readPIDFromFile
@@ -238,7 +238,7 @@ func TestGateway_getHostDetails(t *testing.T) {
 		ipAddrPattern = `^((([a-f0-9]{1,4}):){7}([a-f0-9]{1,4})|(([a-f0-9]{1,4})(:([a-f0-9]{1,4})){0,6})?::(([a-f0-9]{1,4})(:([a-f0-9]{1,4})){0,6})?|((([a-f0-9]{1,4}):){5}[a-f0-9]{1,4}|(([a-f0-9]{1,4}):){0,5}:([a-f0-9]{1,4}))|(([a-f0-9]{1,4}:){0,6}[a-f0-9]{1,4}|(([a-f0-9]{1,4}:){0,6}:([a-f0-9]{1,4})){0,1})|([a-f0-9]{1,4}:){0,7}:|([a-f0-9]{1,4}:){0,6}[a-f0-9]{1,4}|(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?))$`
 
 		hasErr = func(wantErr bool, errorText string) checkFn {
-			return func(bl *test.BufferedLogger, gw *Gateway) {
+			return func(t *testing.T, bl *test.BufferedLogger, gw *Gateway) {
 				logs := bl.GetLogs(logrus.ErrorLevel)
 				if !wantErr && assert.Empty(t, logs) {
 					return
@@ -257,7 +257,7 @@ func TestGateway_getHostDetails(t *testing.T) {
 		}
 
 		hasAddress = func(addr string) checkFn {
-			return func(bl *test.BufferedLogger, gw *Gateway) {
+			return func(t *testing.T, bl *test.BufferedLogger, gw *Gateway) {
 				matched, err := regexp.MatchString(addr, gw.hostDetails.Address)
 				if err != nil {
 					t.Errorf("Failed to compile regex pattern: %v", err)
@@ -357,7 +357,7 @@ func TestGateway_getHostDetails(t *testing.T) {
 
 			gw.getHostDetails(gw.GetConfig().PIDFileLocation)
 			for _, c := range tt.checks {
-				c(bl, gw)
+				c(t, bl, gw)
 			}
 		})
 	}
