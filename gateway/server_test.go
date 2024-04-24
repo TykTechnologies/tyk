@@ -222,59 +222,61 @@ func TestGateway_SyncResourcesWithReload(t *testing.T) {
 
 }
 
-func TestGateway_getHostDetails(t *testing.T) {
-	type checkFn func(*testing.T, *test.BufferedLogger, *Gateway)
+type gatewayGetHostDetailsTestCheckFn func(*testing.T, *test.BufferedLogger, *Gateway)
 
+func gatewayGetHostDetailsTestHasErr(wantErr bool, errorText string) gatewayGetHostDetailsTestCheckFn {
+	return func(t *testing.T, bl *test.BufferedLogger, _ *Gateway) {
+		logs := bl.GetLogs(logrus.ErrorLevel)
+		if !wantErr && assert.Empty(t, logs) {
+			return
+		}
+
+		if wantErr && !assert.NotEmpty(t, logs) {
+			return
+		}
+
+		if wantErr && errorText != "" {
+			for _, log := range logs {
+				assert.Contains(t, log.Message, errorText)
+			}
+		}
+	}
+}
+
+func gatewayGetHostDetailsTesHasAddress(addr string) gatewayGetHostDetailsTestCheckFn {
+	return func(t *testing.T, bl *test.BufferedLogger, gw *Gateway) {
+		matched, err := regexp.MatchString(addr, gw.hostDetails.Address)
+		if err != nil {
+			t.Errorf("Failed to compile regex pattern: %v", err)
+		}
+		if !matched {
+			t.Errorf("Wanted address %s, got %s", addr, gw.hostDetails.Address)
+		}
+	}
+}
+
+func defineGatewayGetHostDetailsTests() []struct {
+	name                string
+	before              func(*Gateway)
+	readPIDFromFile     func(string) (int, error)
+	netutilGetIpAddress func() ([]string, error)
+	checks              []gatewayGetHostDetailsTestCheckFn
+	// config              config.Config
+} {
 	var (
-		orig_readPIDFromFile = readPIDFromFile
-		orig_mainLog         = mainLog
-		orig_getIpAddress    = netutil.GetIpAddress
-		bl                   = test.NewBufferingLogger()
-		check                = func(fns ...checkFn) []checkFn { return fns }
-
+		check = func(fns ...gatewayGetHostDetailsTestCheckFn) []gatewayGetHostDetailsTestCheckFn { return fns }
 		// matches ipv6 and ipv4
 		// https://go.dev/play/p/cbOQUiqNqyU
 		// https://regex101.com/r/lIWfaA/1
 		ipAddrPattern = `^((([a-f0-9]{1,4}):){7}([a-f0-9]{1,4})|(([a-f0-9]{1,4})(:([a-f0-9]{1,4})){0,6})?::(([a-f0-9]{1,4})(:([a-f0-9]{1,4})){0,6})?|((([a-f0-9]{1,4}):){5}[a-f0-9]{1,4}|(([a-f0-9]{1,4}):){0,5}:([a-f0-9]{1,4}))|(([a-f0-9]{1,4}:){0,6}[a-f0-9]{1,4}|(([a-f0-9]{1,4}:){0,6}:([a-f0-9]{1,4})){0,1})|([a-f0-9]{1,4}:){0,7}:|([a-f0-9]{1,4}:){0,6}[a-f0-9]{1,4}|(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?))$`
-
-		hasErr = func(wantErr bool, errorText string) checkFn {
-			return func(t *testing.T, bl *test.BufferedLogger, gw *Gateway) {
-				logs := bl.GetLogs(logrus.ErrorLevel)
-				if !wantErr && assert.Empty(t, logs) {
-					return
-				}
-
-				if wantErr && !assert.NotEmpty(t, logs) {
-					return
-				}
-
-				if wantErr && errorText != "" {
-					for _, log := range logs {
-						assert.Contains(t, log.Message, errorText)
-					}
-				}
-			}
-		}
-
-		hasAddress = func(addr string) checkFn {
-			return func(t *testing.T, bl *test.BufferedLogger, gw *Gateway) {
-				matched, err := regexp.MatchString(addr, gw.hostDetails.Address)
-				if err != nil {
-					t.Errorf("Failed to compile regex pattern: %v", err)
-				}
-				if !matched {
-					t.Errorf("Wanted address %s, got %s", addr, gw.hostDetails.Address)
-				}
-			}
-		}
 	)
-
-	tests := []struct {
+	return []struct {
 		name                string
 		before              func(*Gateway)
 		readPIDFromFile     func(string) (int, error)
 		netutilGetIpAddress func() ([]string, error)
-		checks              []checkFn
+		checks              []gatewayGetHostDetailsTestCheckFn
+		// config              config.Config
 	}{
 		{
 			name:            "fail-read-pid",
@@ -285,7 +287,7 @@ func TestGateway_getHostDetails(t *testing.T) {
 				})
 			},
 			checks: check(
-				hasErr(true, "Error opening file"),
+				gatewayGetHostDetailsTestHasErr(true, "Error opening file"),
 			),
 		},
 		{
@@ -297,8 +299,8 @@ func TestGateway_getHostDetails(t *testing.T) {
 				})
 			},
 			checks: check(
-				hasErr(false, ""),
-				hasAddress("127\\.0\\.0\\.1"),
+				gatewayGetHostDetailsTestHasErr(false, ""),
+				gatewayGetHostDetailsTesHasAddress("127\\.0\\.0\\.1"),
 			),
 		},
 		{
@@ -310,8 +312,8 @@ func TestGateway_getHostDetails(t *testing.T) {
 				})
 			},
 			checks: check(
-				hasErr(false, ""),
-				hasAddress(ipAddrPattern),
+				gatewayGetHostDetailsTestHasErr(false, ""),
+				gatewayGetHostDetailsTesHasAddress(ipAddrPattern),
 			),
 		},
 		{
@@ -324,10 +326,30 @@ func TestGateway_getHostDetails(t *testing.T) {
 			},
 			netutilGetIpAddress: func() ([]string, error) { return nil, fmt.Errorf("Error getting network addresses") },
 			checks: check(
-				hasErr(true, "Error getting network addresses"),
+				gatewayGetHostDetailsTestHasErr(true, "Error getting network addresses"),
 			),
-		},
+		}, // Define your test cases here
 	}
+}
+
+func TestGatewayGetHostDetails(t *testing.T) {
+
+	var (
+		orig_readPIDFromFile = readPIDFromFile
+		orig_mainLog         = mainLog
+		orig_getIpAddress    = netutil.GetIpAddress
+		bl                   = test.NewBufferingLogger()
+	)
+
+	tests := defineGatewayGetHostDetailsTests()
+
+	// restore the original functions
+	defer func() {
+		readPIDFromFile = orig_readPIDFromFile
+		mainLog = orig_mainLog
+		getIpAddress = orig_getIpAddress
+	}()
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// clear logger mock buffer
@@ -341,13 +363,6 @@ func TestGateway_getHostDetails(t *testing.T) {
 			if tt.netutilGetIpAddress != nil {
 				getIpAddress = tt.netutilGetIpAddress
 			}
-
-			// restore the original functions
-			defer func() {
-				readPIDFromFile = orig_readPIDFromFile
-				mainLog = orig_mainLog
-				getIpAddress = orig_getIpAddress
-			}()
 
 			gw := &Gateway{}
 

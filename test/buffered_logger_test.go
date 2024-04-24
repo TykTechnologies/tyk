@@ -62,7 +62,7 @@ func TestNewBufferingLogger(t *testing.T) {
 	}
 }
 
-func TestBufferingFormatter_Format(t *testing.T) {
+func TestBufferingFormatterFormat(t *testing.T) {
 	type checkFn func(*BufferingFormatter, error)
 
 	var (
@@ -135,7 +135,7 @@ func TestBufferingFormatter_Format(t *testing.T) {
 	}
 }
 
-func TestBufferedLogger_GetLogs(t *testing.T) {
+func TestBufferedLoggerGetLogs(t *testing.T) {
 	type checkFn func(*testing.T, *BufferedLogger)
 
 	var (
@@ -197,7 +197,7 @@ func TestBufferedLogger_GetLogs(t *testing.T) {
 	}
 }
 
-func TestBufferedLogger_ClearLogs(t *testing.T) {
+func TestBufferedLoggerClearLogs(t *testing.T) {
 	type checkFn func(*testing.T, *BufferedLogger)
 
 	var (
