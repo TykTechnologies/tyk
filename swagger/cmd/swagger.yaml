@@ -481,7 +481,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/OAS'
+                $ref: https://raw.githubusercontent.com/OAI/OpenAPI-Specification/main/schemas/v3.0/schema.json
           description: Api fetched successfully
           headers:
             x-tyk-base-api-id:
@@ -574,7 +574,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/OAS'
+              $ref: https://raw.githubusercontent.com/OAI/OpenAPI-Specification/main/schemas/v3.0/schema.json
       responses:
         "200":
           content:
@@ -622,7 +622,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/OAS'
+              $ref: https://raw.githubusercontent.com/OAI/OpenAPI-Specification/main/schemas/v3.0/schema.json
       responses:
         "200":
           content:

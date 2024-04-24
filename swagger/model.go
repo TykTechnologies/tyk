@@ -152,16 +152,23 @@ func addBinaryFormat(o3 openapi3.OperationExposer, httpStatus int) {
 	value.Response.Content["application/octet-stream"].Schema.Schema.Format = StringPointerValue("binary")
 }
 
-func addExternalRefToResponse(o3 openapi3.OperationExposer, httpStatus int) {
+func addExternalRefToResponse(o3 openapi3.OperationExposer, httpStatus int, description string) {
 	code := strconv.Itoa(httpStatus)
 	_, ok := o3.Operation().Responses.MapOfResponseOrRefValues[code]
 	if !ok {
-		return
+		// return
 	}
 	o3.Operation().Responses.MapOfResponseOrRefValues[code] = openapi3.ResponseOrRef{
-		Response: nil,
-		ResponseReference: &openapi3.ResponseReference{
-			Ref: ExternalOASRef,
+		Response: &openapi3.Response{
+			Description: description,
+			Content: map[string]openapi3.MediaType{applicationJSON: {
+				Schema: &openapi3.SchemaOrRef{
+					Schema: nil,
+					SchemaReference: &openapi3.SchemaReference{
+						Ref: ExternalOASRef,
+					},
+				},
+			}},
 		},
 	}
 }

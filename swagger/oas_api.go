@@ -3,7 +3,6 @@ package swagger
 import (
 	"net/http"
 
-	log "github.com/sirupsen/logrus"
 	"github.com/swaggest/openapi-go"
 	"github.com/swaggest/openapi-go/openapi3"
 
@@ -102,9 +101,6 @@ func getOASApiRequest(r *openapi3.Reflector) error {
 	if err != nil {
 		return err
 	}
-	oc.AddRespStructure(new(oas.OAS), func(cu *openapi.ContentUnit) {
-		cu.Description = "Api fetched successfully"
-	})
 	forbidden(oc)
 	statusNotFound(oc, "API not found")
 	statusBadRequest(oc, "trying to access an API whose definition is in Tyk classic format")
@@ -122,6 +118,7 @@ func getOASApiRequest(r *openapi3.Reflector) error {
 	if err != nil {
 		return err
 	}
+	addExternalRefToResponse(o3, 200, "Api fetched successfully")
 	addNewResponseHeader(o3, http.StatusOK, HeaderCr{
 		Key:         "x-tyk-base-api-id",
 		Description: "ID of the base API if the requested API is a version.",
@@ -143,7 +140,6 @@ func apiOASPutHandler(r *openapi3.Reflector) error {
 	oc.AddRespStructure(new(apiModifyKeySuccess), openapi.WithHTTPStatus(http.StatusOK), func(cu *openapi.ContentUnit) {
 		cu.Description = "API updated"
 	})
-	oc.AddReqStructure(new(oas.OAS))
 	oc.SetID("updateApiOAS")
 	oc.SetSummary("Update OAS API definition")
 	oc.SetDescription("Updating an API definition uses the same signature an object as a `POST`, however it will first ensure that the API ID that is being updated is the same as the one in the object being `PUT`.\n\n\n        Updating will completely replace the file descriptor and will not change an API Definition that has already been loaded, the hot-reload endpoint will need to be called to push the new definition to live.")
@@ -152,6 +148,7 @@ func apiOASPutHandler(r *openapi3.Reflector) error {
 	if !ok {
 		return ErrOperationExposer
 	}
+	addExternalRefToRequest(o3)
 	par := []openapi3.ParameterOrRef{apIIDParameter()}
 	o3.Operation().WithParameters(par...)
 	return r.AddOperation(oc)
@@ -265,16 +262,14 @@ func deleteOASHandler(r *openapi3.Reflector) error {
 }
 
 func apiOASPatchHandler(r *openapi3.Reflector) error {
-	log.Println("oas patch this")
 	oc, err := r.NewOperationContext(http.MethodPatch, "/tyk/apis/oas/{apiID}")
 	if err != nil {
 		return err
 	}
-	oc.AddReqStructure(new(oas.OAS))
 	statusInternalServerError(oc, "Unexpected error")
 	statusBadRequest(oc, "Malformed request")
 	statusNotFound(oc, "API not found")
-	oc.AddRespStructure(new(apiModifyKeySuccess), func(cu *openapi.ContentUnit) {
+	oc.AddRespStructure(apiModifyKeySuccess{}, func(cu *openapi.ContentUnit) {
 		cu.Description = "API patched"
 	})
 	oc.SetSummary("Patch API with OAS format.")
@@ -286,19 +281,11 @@ func apiOASPatchHandler(r *openapi3.Reflector) error {
 	if !ok {
 		return ErrOperationExposer
 	}
+	addExternalRefToRequest(o3)
 	par := []openapi3.ParameterOrRef{apIIDParameter()}
 	par = append(par, patchAndImportQueryParameters(false)...)
 	o3.Operation().WithParameters(par...)
-	err = r.AddOperation(oc)
-	if err != nil {
-		log.Println("mmmh hhere it is mmimi")
-		return err
-	}
-	log.Println("no eerr in patch")
-	// addExternalRefToResponse(o3, http.StatusOK)
-	// addExternalRefToRequest(o3)
-	// addBinaryFormat(o3, http.StatusOK)
-	return nil
+	return r.AddOperation(oc)
 }
 
 func oasModeQuery(description ...string) openapi3.ParameterOrRef {
