@@ -16,6 +16,7 @@ RUN rm -fv /usr/bin/passwd /usr/sbin/adduser || true
 RUN rm -rf /root/.cache \
     && apt-get -y autoremove \
     && apt-get clean \
+    && rm -rf /usr/include/* /var/cache/apt/archives /var/lib/{apt,dpkg,cache,log} \
     && find /usr/lib -type f -name '*.a' -o -name '*.o' -delete
 
 # Comment this to test in dev
