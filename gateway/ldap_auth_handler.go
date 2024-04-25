@@ -3,6 +3,7 @@ package gateway
 import (
 	"errors"
 	"strings"
+	"time"
 
 	"github.com/mavricknz/ldap"
 )
@@ -237,6 +238,11 @@ func (l *LDAPStorageHandler) GetListRange(keyName string, from, to int64) ([]str
 }
 
 func (l LDAPStorageHandler) Exists(keyName string) (bool, error) {
+	log.Error("Not implemented")
+	return false, nil
+}
+
+func (l LDAPStorageHandler) Lock(string, time.Duration) (bool, error) {
 	log.Error("Not implemented")
 	return false, nil
 }

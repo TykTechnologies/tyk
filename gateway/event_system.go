@@ -36,6 +36,7 @@ const (
 	EventTokenCreated         apidef.TykEvent = "TokenCreated"
 	EventTokenUpdated         apidef.TykEvent = "TokenUpdated"
 	EventTokenDeleted         apidef.TykEvent = "TokenDeleted"
+	EventRateLimitingSmoothed apidef.TykEvent = "RateLimitSmoothing"
 )
 
 // EventMetaDefault is a standard embedded struct to be used with custom event metadata types, gives an interface for

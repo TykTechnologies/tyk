@@ -49,6 +49,17 @@ type APILimit struct {
 	QuotaRemaining     int64   `json:"quota_remaining" msg:"quota_remaining"`
 	QuotaRenewalRate   int64   `json:"quota_renewal_rate" msg:"quota_renewal_rate"`
 	SetBy              string  `json:"-" msg:"-"`
+
+	// smoothing related configuration
+	Smoothing *RateLimitSmoothing `json:"smoothing,omitempty" msg:"smoothing,omitempty"`
+}
+
+type RateLimitSmoothing struct {
+	Rate             int64   `json:"rate"`
+	Interval         int64   `json:"interval"`
+	Threshold        int64   `json:"threshold"`
+	Trigger          float64 `json:"trigger"`
+	CurrentAllowance int64   `json:"currentAllowance"`
 }
 
 // AccessDefinition defines which versions of an API a key has access to
@@ -147,6 +158,9 @@ type SessionState struct {
 	// Used to store token hash
 	keyHash string
 	KeyID   string `json:"-"`
+
+	// smoothing related configuration
+	Smoothing *RateLimitSmoothing `json:"smoothing,omitempty" msg:"smoothing,omitempty"`
 }
 
 func NewSessionState() *SessionState {

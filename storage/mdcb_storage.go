@@ -3,6 +3,7 @@ package storage
 import (
 	"errors"
 	"strings"
+	"time"
 
 	"github.com/sirupsen/logrus"
 )
@@ -253,4 +254,8 @@ func (m MdcbStorage) Exists(key string) (bool, error) {
 	}
 
 	return foundLocal && foundRpc, nil
+}
+
+func (m MdcbStorage) Lock(key string, timeout time.Duration) (bool, error) {
+	return m.local.Lock(key, timeout)
 }

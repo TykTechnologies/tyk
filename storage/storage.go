@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"hash"
 	"strings"
+	"time"
 
 	"github.com/buger/jsonparser"
 
@@ -61,6 +62,7 @@ type Handler interface {
 	RemoveFromList(string, string) error
 	AppendToSet(string, string)
 	Exists(string) (bool, error)
+	Lock(string, time.Duration) (bool, error)
 }
 
 type AnalyticsHandler interface {
