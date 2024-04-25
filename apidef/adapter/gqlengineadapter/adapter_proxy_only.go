@@ -1,6 +1,7 @@
 package gqlengineadapter
 
 import (
+	"github.com/TykTechnologies/graphql-go-tools/pkg/customdirective"
 	"net/http"
 	"strings"
 
@@ -45,6 +46,11 @@ func (p *ProxyOnly) EngineConfig() (*graphql.EngineV2Configuration, error) {
 		SubscriptionType: graphqlSubscriptionType(p.ApiDefinition.GraphQL.Proxy.SubscriptionType),
 	}
 
+	customDirectives := make(map[string]customdirective.CustomDirective)
+
+	toUpperDirective := NewToUpperDirective()
+	customDirectives[toUpperDirective.Name()] = toUpperDirective
+
 	v2Config, err := graphql.NewProxyEngineConfigFactory(
 		p.Schema,
 		upstreamConfig,
@@ -52,6 +58,7 @@ func (p *ProxyOnly) EngineConfig() (*graphql.EngineV2Configuration, error) {
 		graphql.WithProxyHttpClient(p.HttpClient),
 		graphql.WithProxyStreamingClient(p.StreamingClient),
 		graphql.WithProxySubscriptionClientFactory(subscriptionClientFactoryOrDefault(p.subscriptionClientFactory)),
+		graphql.WithProxyCustomDirectives(customDirectives),
 	).EngineV2Configuration()
 
 	v2Config.EnableSingleFlight(false)
