@@ -127,7 +127,7 @@ message SessionState {
    */
   string oauth_client_id = 12;
   
-  /* Maps an OAuth client ID with a corresponding access token value. Currently unsupported and under development
+  /* Maps an OAuth client ID with a corresponding access token value. Currently unsupported and under development */
   map<string, string> oauth_keys = 13;
 
   /* Contains a hashed password and the name of the hashing algorithm used */
