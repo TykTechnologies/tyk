@@ -377,6 +377,7 @@ jobs:
           - amd64
           - arm64
         distro:
+          - ubuntu:xenial
           - ubuntu:bionic
           - ubuntu:focal
           - ubuntu:jammy
@@ -431,6 +432,8 @@ jobs:
           - amazonlinux:2023
           - registry.access.redhat.com/ubi8/ubi
           - registry.access.redhat.com/ubi9/ubi
+          - amazonlinux:2
+          - registry.access.redhat.com/ubi7/ubi          
     steps:
       - uses: actions/checkout@v4
         with:
