@@ -7,6 +7,9 @@ import (
 // RateLimit contains flags and configuration for controlling rate limiting behaviour.
 // It is embedded in the main config structure.
 type RateLimit struct {
+	// EnableFixedWindow enables fixed window rate limiting.
+	EnableFixedWindowRateLimiter bool `json:"enable_fixed_window_rate_limiter"`
+
 	// Redis based rate limiter with fixed window. Provides 100% rate limiting accuracy, but require two additional Redis roundtrip for each request.
 	EnableRedisRollingLimiter bool `json:"enable_redis_rolling_limiter"`
 
@@ -37,6 +40,10 @@ func (r *RateLimit) String() string {
 	info := "using transactions"
 	if r.EnableNonTransactionalRateLimiter {
 		info = "using pipeline"
+	}
+
+	if r.EnableFixedWindowRateLimiter {
+		return fmt.Sprintf("Fixed Window Rate Limiter enabled")
 	}
 
 	if r.EnableRedisRollingLimiter {
