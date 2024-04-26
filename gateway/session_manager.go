@@ -160,16 +160,16 @@ func (l *SessionLimiter) limitSentinel(currentSession *user.SessionState, key st
 		rateLimiterSentinelKey = RateLimitKeyPrefix + rateScope + key + SentinelRateLimitKeyPostfix
 	}
 
+	defer func() {
+		go l.doRollingWindowWrite(key, rateLimiterKey, rateLimiterSentinelKey, currentSession, store, globalConf, apiLimit, dryRun)
+	}()
+
 	// Check sentinel
 	_, sentinelActive := store.GetRawKey(rateLimiterSentinelKey)
 	if sentinelActive == nil {
 		// Sentinel is set, fail
 		return true
 	}
-
-	defer func() {
-		go l.doRollingWindowWrite(key, rateLimiterKey, rateLimiterSentinelKey, currentSession, store, globalConf, apiLimit, dryRun)
-	}()
 
 	return false
 }
@@ -188,49 +188,6 @@ func (l *SessionLimiter) limitRedis(currentSession *user.SessionState, key strin
 	if l.doRollingWindowWrite(key, rateLimiterKey, rateLimiterSentinelKey, currentSession, store, globalConf, apiLimit, dryRun) {
 		return true
 	}
-	return false
-}
-
-func (l *SessionLimiter) limitRedisFixedWindow(currentSession *user.SessionState, key string, rateScope string, useCustomKey bool,
-	store storage.Handler, globalConf *config.Config, apiLimit *user.APILimit, dryRun bool) bool {
-
-	rateLimiterKey := RateLimitKeyPrefix + rateScope + currentSession.KeyHash()
-	rateLimiterSentinelKey := RateLimitKeyPrefix + rateScope + currentSession.KeyHash() + SentinelRateLimitKeyPostfix
-
-	if useCustomKey {
-		rateLimiterKey = RateLimitKeyPrefix + rateScope + key
-		rateLimiterSentinelKey = RateLimitKeyPrefix + rateScope + key + SentinelRateLimitKeyPostfix
-	}
-
-	if l.doFixedWindowWrite(key, rateLimiterKey, rateLimiterSentinelKey, currentSession, store, globalConf, apiLimit, dryRun) {
-		return true
-	}
-	return false
-}
-
-func (l *SessionLimiter) doFixedWindowWrite(key, rateLimiterKey, rateLimiterSentinelKey string,
-	currentSession *user.SessionState,
-	store storage.Handler,
-	globalConf *config.Config,
-	apiLimit *user.APILimit, dryRun bool) bool {
-
-	var per, rate float64
-
-	if apiLimit != nil { // respect limit on API level
-		per = apiLimit.Per
-		rate = apiLimit.Rate
-	} else {
-		per = currentSession.Per
-		rate = currentSession.Rate
-	}
-
-	qInt := store.IncrememntWithExpire(rateLimiterKey, int64(per))
-
-	// if the returned val is >= the defined rate, block
-	if qInt-1 >= int64(rate) {
-		return true
-	}
-
 	return false
 }
 
@@ -331,8 +288,27 @@ func (l *SessionLimiter) ForwardMessage(r *http.Request, currentSession *user.Se
 				return sessionFailRateLimit
 			}
 		default:
-			if l.limitRedisFixedWindow(currentSession, rateLimitKey, rateScope, useCustomRateLimitKey, store, globalConf, &accessDef.Limit, dryRun) {
-				return sessionFailRateLimit
+			var n float64
+			if l.drlManager.Servers != nil {
+				n = float64(l.drlManager.Servers.Count())
+			}
+			cost := accessDef.Limit.Rate / accessDef.Limit.Per
+			c := globalConf.DRLThreshold
+			if c == 0 {
+				// defaults to 5
+				c = 5
+			}
+
+			if n <= 1 || n*c < cost {
+				// If we have 1 server, there is no need to strain redis at all the leaky
+				// bucket algorithm will suffice.
+				if l.limitDRL(currentSession, rateLimitKey, rateScope, useCustomRateLimitKey, &accessDef.Limit, dryRun) {
+					return sessionFailRateLimit
+				}
+			} else {
+				if l.limitRedis(currentSession, rateLimitKey, rateScope, useCustomRateLimitKey, store, globalConf, &accessDef.Limit, dryRun) {
+					return sessionFailRateLimit
+				}
 			}
 		}
 	}
