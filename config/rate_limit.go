@@ -43,7 +43,7 @@ func (r *RateLimit) String() string {
 	}
 
 	if r.EnableFixedWindowRateLimiter {
-		return fmt.Sprintf("Fixed Window Rate Limiter enabled")
+		return "Fixed Window Rate Limiter enabled"
 	}
 
 	if r.EnableRedisRollingLimiter {
