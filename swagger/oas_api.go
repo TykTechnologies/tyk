@@ -6,7 +6,6 @@ import (
 	"github.com/swaggest/openapi-go"
 	"github.com/swaggest/openapi-go/openapi3"
 
-	"github.com/TykTechnologies/tyk/apidef/oas"
 	"github.com/TykTechnologies/tyk/gateway"
 )
 
@@ -29,15 +28,17 @@ func getListOfOASApisRequest(r *openapi3.Reflector) error {
 	///recommended i use external reference just incase it is updated
 	par := []openapi3.ParameterOrRef{oasModeQuery("Mode of OAS get, by default mode could be empty which means to get OAS spec including OAS Tyk extension. \n When mode=public, OAS spec excluding Tyk extension will be returned in the response")}
 	o3.Operation().WithParameters(par...)
-	oc.AddRespStructure(new([]oas.OAS), openapi.WithHTTPStatus(http.StatusOK), func(cu *openapi.ContentUnit) {
-		cu.Description = "List of API definitions in OAS format"
-	})
 	oc.SetID("listApisOAS")
 	oc.SetTags(OASTag)
 	oc.SetSummary("List all OAS format APIS")
 	oc.SetDescription("List all OAS format APIs, when used without the Tyk Dashboard.")
 	forbidden(oc)
-	return r.AddOperation(oc)
+	err = r.AddOperation(oc)
+	if err != nil {
+		return err
+	}
+	addExternalRefResponseAsArray(o3, http.StatusOK, "List of API definitions in OAS format")
+	return nil
 }
 
 func postOAsApi(r *openapi3.Reflector) error {
@@ -54,7 +55,7 @@ func postOAsApi(r *openapi3.Reflector) error {
 		cu.Description = "API created"
 	})
 	oc.SetID("createApiOAS")
-	oc.SetDescription(" Create API with OAS format\n         A single Tyk node can have its API Definitions queried, deleted and updated remotely. This functionality enables you to remotely update your Tyk definitions without having to manage the files manually.")
+	oc.SetDescription("Create API with OAS format\n         A single Tyk node can have its API Definitions queried, deleted and updated remotely. This functionality enables you to remotely update your Tyk definitions without having to manage the files manually.")
 	oc.SetSummary("Create API with OAS format")
 	o3, ok := oc.(openapi3.OperationExposer)
 	if !ok {

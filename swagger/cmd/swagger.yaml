@@ -328,7 +328,7 @@ paths:
             application/json:
               schema:
                 items:
-                  $ref: '#/components/schemas/OAS'
+                  $ref: https://raw.githubusercontent.com/OAI/OpenAPI-Specification/main/schemas/v3.0/schema.json
                 type: array
           description: List of API definitions in OAS format
         "403":
@@ -342,8 +342,8 @@ paths:
       tags:
       - OAS APIs
     post:
-      description: |2-
-         Create API with OAS format
+      description: |-
+        Create API with OAS format
                  A single Tyk node can have its API Definitions queried, deleted and updated remotely. This functionality enables you to remotely update your Tyk definitions without having to manage the files manually.
       operationId: createApiOAS
       parameters:
@@ -4018,25 +4018,6 @@ components:
         shared_secret:
           type: string
       type: object
-    OAS:
-      properties:
-        components:
-          $ref: '#/components/schemas/Openapi3Components'
-        externalDocs:
-          $ref: '#/components/schemas/Openapi3ExternalDocs'
-        info:
-          $ref: '#/components/schemas/Openapi3Info'
-        openapi:
-          type: string
-        paths:
-          $ref: '#/components/schemas/Openapi3Paths'
-        security:
-          $ref: '#/components/schemas/Openapi3SecurityRequirements'
-        servers:
-          $ref: '#/components/schemas/Openapi3Servers'
-        tags:
-          $ref: '#/components/schemas/Openapi3Tags'
-      type: object
     OASSchemaResponse:
       properties:
         message:
@@ -4072,238 +4053,6 @@ components:
         segregate_by_client:
           type: boolean
       type: object
-    Openapi3CallbackRef:
-      type: object
-    Openapi3Callbacks:
-      additionalProperties:
-        $ref: '#/components/schemas/Openapi3CallbackRef'
-      type: object
-    Openapi3Components:
-      properties:
-        callbacks:
-          $ref: '#/components/schemas/Openapi3Callbacks'
-        examples:
-          $ref: '#/components/schemas/Openapi3Examples'
-        headers:
-          $ref: '#/components/schemas/Openapi3Headers'
-        links:
-          $ref: '#/components/schemas/Openapi3Links'
-        parameters:
-          $ref: '#/components/schemas/Openapi3ParametersMap'
-        requestBodies:
-          $ref: '#/components/schemas/Openapi3RequestBodies'
-        responses:
-          $ref: '#/components/schemas/Openapi3Responses'
-        schemas:
-          $ref: '#/components/schemas/Openapi3Schemas'
-        securitySchemes:
-          $ref: '#/components/schemas/Openapi3SecuritySchemes'
-      type: object
-    Openapi3Contact:
-      properties:
-        email:
-          type: string
-        name:
-          type: string
-        url:
-          type: string
-      type: object
-    Openapi3ExampleRef:
-      type: object
-    Openapi3Examples:
-      additionalProperties:
-        $ref: '#/components/schemas/Openapi3ExampleRef'
-      type: object
-    Openapi3ExternalDocs:
-      properties:
-        description:
-          type: string
-        url:
-          type: string
-      type: object
-    Openapi3HeaderRef:
-      type: object
-    Openapi3Headers:
-      additionalProperties:
-        $ref: '#/components/schemas/Openapi3HeaderRef'
-      type: object
-    Openapi3Info:
-      properties:
-        contact:
-          $ref: '#/components/schemas/Openapi3Contact'
-        description:
-          type: string
-        license:
-          $ref: '#/components/schemas/Openapi3License'
-        termsOfService:
-          type: string
-        title:
-          type: string
-        version:
-          type: string
-      type: object
-    Openapi3License:
-      properties:
-        name:
-          type: string
-        url:
-          type: string
-      type: object
-    Openapi3LinkRef:
-      type: object
-    Openapi3Links:
-      additionalProperties:
-        $ref: '#/components/schemas/Openapi3LinkRef'
-      type: object
-    Openapi3Operation:
-      properties:
-        callbacks:
-          $ref: '#/components/schemas/Openapi3Callbacks'
-        deprecated:
-          type: boolean
-        description:
-          type: string
-        externalDocs:
-          $ref: '#/components/schemas/Openapi3ExternalDocs'
-        operationId:
-          type: string
-        parameters:
-          $ref: '#/components/schemas/Openapi3Parameters'
-        requestBody:
-          $ref: '#/components/schemas/Openapi3RequestBodyRef'
-        responses:
-          $ref: '#/components/schemas/Openapi3Responses'
-        security:
-          $ref: '#/components/schemas/Openapi3SecurityRequirements'
-        servers:
-          $ref: '#/components/schemas/Openapi3Servers'
-        summary:
-          type: string
-        tags:
-          items:
-            type: string
-          type: array
-      type: object
-    Openapi3ParameterRef:
-      type: object
-    Openapi3Parameters:
-      items:
-        $ref: '#/components/schemas/Openapi3ParameterRef'
-      type: array
-    Openapi3ParametersMap:
-      additionalProperties:
-        $ref: '#/components/schemas/Openapi3ParameterRef'
-      type: object
-    Openapi3PathItem:
-      properties:
-        $ref:
-          type: string
-        connect:
-          $ref: '#/components/schemas/Openapi3Operation'
-        delete:
-          $ref: '#/components/schemas/Openapi3Operation'
-        description:
-          type: string
-        get:
-          $ref: '#/components/schemas/Openapi3Operation'
-        head:
-          $ref: '#/components/schemas/Openapi3Operation'
-        options:
-          $ref: '#/components/schemas/Openapi3Operation'
-        parameters:
-          $ref: '#/components/schemas/Openapi3Parameters'
-        patch:
-          $ref: '#/components/schemas/Openapi3Operation'
-        post:
-          $ref: '#/components/schemas/Openapi3Operation'
-        put:
-          $ref: '#/components/schemas/Openapi3Operation'
-        servers:
-          $ref: '#/components/schemas/Openapi3Servers'
-        summary:
-          type: string
-        trace:
-          $ref: '#/components/schemas/Openapi3Operation'
-      type: object
-    Openapi3Paths:
-      additionalProperties:
-        $ref: '#/components/schemas/Openapi3PathItem'
-      type: object
-    Openapi3RequestBodies:
-      additionalProperties:
-        $ref: '#/components/schemas/Openapi3RequestBodyRef'
-      type: object
-    Openapi3RequestBodyRef:
-      type: object
-    Openapi3ResponseRef:
-      type: object
-    Openapi3Responses:
-      additionalProperties:
-        $ref: '#/components/schemas/Openapi3ResponseRef'
-      type: object
-    Openapi3SchemaRef:
-      type: object
-    Openapi3Schemas:
-      additionalProperties:
-        $ref: '#/components/schemas/Openapi3SchemaRef'
-      type: object
-    Openapi3SecurityRequirement:
-      additionalProperties:
-        items:
-          type: string
-        type: array
-      type: object
-    Openapi3SecurityRequirements:
-      items:
-        $ref: '#/components/schemas/Openapi3SecurityRequirement'
-      nullable: true
-      type: array
-    Openapi3SecuritySchemeRef:
-      type: object
-    Openapi3SecuritySchemes:
-      additionalProperties:
-        $ref: '#/components/schemas/Openapi3SecuritySchemeRef'
-      type: object
-    Openapi3Server:
-      properties:
-        description:
-          type: string
-        url:
-          type: string
-        variables:
-          additionalProperties:
-            $ref: '#/components/schemas/Openapi3ServerVariable'
-          type: object
-      type: object
-    Openapi3ServerVariable:
-      properties:
-        default:
-          type: string
-        description:
-          type: string
-        enum:
-          items:
-            type: string
-          type: array
-      type: object
-    Openapi3Servers:
-      items:
-        $ref: '#/components/schemas/Openapi3Server'
-      nullable: true
-      type: array
-    Openapi3Tag:
-      properties:
-        description:
-          type: string
-        externalDocs:
-          $ref: '#/components/schemas/Openapi3ExternalDocs'
-        name:
-          type: string
-      type: object
-    Openapi3Tags:
-      items:
-        $ref: '#/components/schemas/Openapi3Tag'
-      type: array
     PaginatedOAuthClientTokens:
       properties:
         pagination:
