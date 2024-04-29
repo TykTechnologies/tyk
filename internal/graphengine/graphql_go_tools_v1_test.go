@@ -753,7 +753,7 @@ func TestReverseProxyPreHandlerV1_PreHandle(t *testing.T) {
 			)))
 		require.NoError(t, err)
 
-		reverseProxyPreHandler := newTestReverseProxyPreHandlerV1(t)
+		reverseProxyPreHandler := newTestReverseProxyPreHandlerV1(t, apidef.GraphQLExecutionModeSubgraph)
 		reverseProxyPreHandler.ctxRetrieveGraphQLRequest = func(r *http.Request) *graphql.Request {
 			if r == request {
 				return &graphql.Request{
@@ -766,11 +766,10 @@ func TestReverseProxyPreHandlerV1_PreHandle(t *testing.T) {
 
 		result, err := reverseProxyPreHandler.PreHandle(ReverseProxyParams{
 			OutRequest:      request,
-			NeedsEngine:     true,
 			IsCORSPreflight: true,
 		})
-		assert.Error(t, err)
-		assert.Equal(t, ReverseProxyTypeNone, result)
+		assert.NoError(t, err)
+		assert.Equal(t, ReverseProxyTypePreFlight, result)
 	})
 
 	t.Run("should return ReverseProxyTypeWebsocketUpgrade on websocket upgrade", func(t *testing.T) {
@@ -784,7 +783,7 @@ func TestReverseProxyPreHandlerV1_PreHandle(t *testing.T) {
 			)))
 		require.NoError(t, err)
 
-		reverseProxyPreHandler := newTestReverseProxyPreHandlerV1(t)
+		reverseProxyPreHandler := newTestReverseProxyPreHandlerV1(t, apidef.GraphQLExecutionModeProxyOnly)
 		reverseProxyPreHandler.ctxRetrieveGraphQLRequest = func(r *http.Request) *graphql.Request {
 			return nil // an upgrade request won't contain a graphql operation
 		}
@@ -809,7 +808,7 @@ func TestReverseProxyPreHandlerV1_PreHandle(t *testing.T) {
 			)))
 		require.NoError(t, err)
 
-		reverseProxyPreHandler := newTestReverseProxyPreHandlerV1(t)
+		reverseProxyPreHandler := newTestReverseProxyPreHandlerV1(t, apidef.GraphQLExecutionModeProxyOnly)
 		reverseProxyPreHandler.ctxRetrieveGraphQLRequest = func(r *http.Request) *graphql.Request {
 			if r == request {
 				return &graphql.Request{
@@ -838,7 +837,7 @@ func TestReverseProxyPreHandlerV1_PreHandle(t *testing.T) {
 			)))
 		require.NoError(t, err)
 
-		reverseProxyPreHandler := newTestReverseProxyPreHandlerV1(t)
+		reverseProxyPreHandler := newTestReverseProxyPreHandlerV1(t, apidef.GraphQLExecutionModeProxyOnly)
 		reverseProxyPreHandler.ctxRetrieveGraphQLRequest = func(r *http.Request) *graphql.Request {
 			if r == request {
 				return &graphql.Request{
@@ -868,7 +867,7 @@ func TestReverseProxyPreHandlerV1_PreHandle(t *testing.T) {
 			)))
 		require.NoError(t, err)
 
-		reverseProxyPreHandler := newTestReverseProxyPreHandlerV1(t)
+		reverseProxyPreHandler := newTestReverseProxyPreHandlerV1(t, apidef.GraphQLExecutionModeProxyOnly)
 		reverseProxyPreHandler.ctxRetrieveGraphQLRequest = func(r *http.Request) *graphql.Request {
 			if r == request {
 				return &graphql.Request{
@@ -885,6 +884,30 @@ func TestReverseProxyPreHandlerV1_PreHandle(t *testing.T) {
 		})
 		assert.NoError(t, err)
 		assert.Equal(t, ReverseProxyTypeNone, result)
+	})
+
+	t.Run("should return ReverseProxyTypePreFlight if CORS pre flight is true", func(t *testing.T) {
+		operation := `{ hello }`
+
+		request, err := http.NewRequest(
+			http.MethodOptions,
+			"http://example.com",
+			bytes.NewBuffer([]byte(
+				fmt.Sprintf(`{"query": "%s"}`, operation),
+			)))
+		require.NoError(t, err)
+
+		reverseProxyPreHandler := newTestReverseProxyPreHandlerV1(t, apidef.GraphQLExecutionModeProxyOnly)
+		reverseProxyPreHandler.ctxRetrieveGraphQLRequest = func(r *http.Request) *graphql.Request {
+			return nil
+		}
+
+		result, err := reverseProxyPreHandler.PreHandle(ReverseProxyParams{
+			OutRequest:      request,
+			IsCORSPreflight: true,
+		})
+		assert.NoError(t, err)
+		assert.Equal(t, ReverseProxyTypePreFlight, result)
 	})
 }
 
@@ -966,12 +989,12 @@ func newTestGranularAccessCheckerV1(t *testing.T) *granularAccessCheckerV1 {
 	}
 }
 
-func newTestReverseProxyPreHandlerV1(t *testing.T) *reverseProxyPreHandlerV1 {
+func newTestReverseProxyPreHandlerV1(_ *testing.T, executionMode apidef.GraphQLExecutionMode) *reverseProxyPreHandlerV1 {
 	return &reverseProxyPreHandlerV1{
 		apiDefinition: &apidef.APIDefinition{
 			GraphQL: apidef.GraphQLConfig{
 				Enabled:       true,
-				ExecutionMode: apidef.GraphQLExecutionModeProxyOnly,
+				ExecutionMode: executionMode,
 			},
 		},
 		httpClient: &http.Client{},
