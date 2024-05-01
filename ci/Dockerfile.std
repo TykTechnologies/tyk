@@ -10,7 +10,13 @@ EXPOSE $PORTS
 WORKDIR /opt/tyk-gateway/
 
 COPY tyk.conf.example tyk.conf
-COPY ./ .
+COPY tyk .
+COPY templates/*.json ./templates/
+COPY templates/playground ./templates/playground
+COPY apps ./apps
+COPY middleware/*.js ./middleware/
+COPY coprocess ./coprocess
+COPY policies/*.json ./policies/
 
 ENTRYPOINT ["/opt/tyk-gateway/tyk" ]
 CMD [ "--conf=/opt/tyk-gateway/tyk.conf" ]
