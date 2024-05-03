@@ -54,7 +54,7 @@ builds:
 dockers:
   # Build tykio/tyk-gateway, docker.tyk.io/tyk-gateway/tyk-gateway (amd64)
   - ids:
-      - std-linux
+      - std
     image_templates:
       - "tykio/tyk-gateway:{{.Tag}}-amd64"
       - "docker.tyk.io/tyk-gateway/tyk-gateway:{{.Tag}}-amd64"
@@ -101,7 +101,7 @@ dockers:
   # plugin-compiler-build workflow.
   # Build tykio/tyk-gateway, docker.tyk.io/tyk-gateway/tyk-gateway (arm64)
   - ids:
-      - std-arm64
+      - std
     image_templates:
       - "tykio/tyk-gateway:{{.Tag}}-arm64"
       - "docker.tyk.io/tyk-gateway/tyk-gateway:{{.Tag}}-arm64"
