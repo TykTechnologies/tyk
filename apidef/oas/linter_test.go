@@ -7,10 +7,11 @@ import (
 	"os"
 	"testing"
 
-	tykevent "github.com/TykTechnologies/tyk/pkg/event"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/xeipuuv/gojsonschema"
+
+	tykevent "github.com/TykTechnologies/tyk/pkg/event"
 )
 
 func TestXTykGateway_Lint(t *testing.T) {
