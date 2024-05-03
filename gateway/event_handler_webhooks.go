@@ -32,7 +32,8 @@ const (
 	WH_DELETE WebHookRequestMethod = "DELETE"
 	WH_PATCH  WebHookRequestMethod = "PATCH"
 
-	// Define the Event Handler name so we can register it
+	// EH_WebHook is an alias maintained for backwards compatibility.
+	// it is the handler to register a webhook event.
 	EH_WebHook = event.WebHookHandler
 )
 

@@ -19,6 +19,8 @@ import (
 
 // The name for event handlers as defined in the API Definition JSON/BSON format
 const (
+	// EH_LogHandler is an alias maintained for backwards compatibility.
+	// It is used to register log handler on an event.
 	EH_LogHandler = event.LogHandler
 )
 
