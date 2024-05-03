@@ -3,9 +3,11 @@ package oas
 import (
 	"bytes"
 	"encoding/json"
+	"net/http"
 	"os"
 	"testing"
 
+	tykevent "github.com/TykTechnologies/tyk/pkg/event"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/xeipuuv/gojsonschema"
@@ -64,6 +66,12 @@ func TestXTykGateway_Lint(t *testing.T) {
 		settings.Server.Authentication.SecuritySchemes = map[string]interface{}{
 			"test-basic": securityScheme,
 		}
+		for i := range settings.Server.Events {
+			settings.Server.Events[i].Action = tykevent.WebhookAction
+			settings.Server.Events[i].Method = http.MethodPost
+			settings.Server.Events[i].Type = tykevent.QuotaExceeded
+		}
+
 		for idx, _ := range settings.Middleware.Operations {
 			settings.Middleware.Operations[idx].CircuitBreaker.Threshold = 0.5
 		}
