@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/TykTechnologies/storage/persistent/model"
+	"github.com/TykTechnologies/tyk/pkg/event"
 
 	"github.com/clbanning/mxj"
 	"github.com/lonelycode/osin"
@@ -28,8 +29,9 @@ import (
 type AuthProviderCode string
 type SessionProviderCode string
 type StorageEngineCode string
-type TykEvent string            // A type so we can ENUM event types easily, e.g. EventQuotaExceeded
-type TykEventHandlerName string // A type for handler codes in API definitions
+
+type TykEvent event.Event
+type TykEventHandlerName event.HandlerName
 
 type EndpointMethodAction string
 type SourceMode string
@@ -459,12 +461,12 @@ type SessionProviderMeta struct {
 }
 
 type EventHandlerTriggerConfig struct {
-	Handler     TykEventHandlerName    `bson:"handler_name" json:"handler_name"`
+	Handler     event.HandlerName      `bson:"handler_name" json:"handler_name"`
 	HandlerMeta map[string]interface{} `bson:"handler_meta" json:"handler_meta"`
 }
 
 type EventHandlerMetaConfig struct {
-	Events map[TykEvent][]EventHandlerTriggerConfig `bson:"events" json:"events"`
+	Events map[event.Event][]EventHandlerTriggerConfig `bson:"events" json:"events"`
 }
 
 type MiddlewareDefinition struct {
@@ -1406,4 +1408,34 @@ type Introspection struct {
 type IntrospectionCache struct {
 	Enabled bool  `bson:"enabled" json:"enabled"`
 	Timeout int64 `bson:"timeout" json:"timeout"`
+}
+
+// WebHookHandlerConf holds configuration related to webhook event handler.
+type WebHookHandlerConf struct {
+	// Disabled enables/disables this webhook
+	Disabled bool `bson:"disabled" json:"disabled"`
+	// ID optional ID of the webhook, to be used in pro mode.
+	ID string `bson:"id" json:"id"`
+	// Name is the name of webhook.
+	Name string `bson:"name" json:"name"`
+	// The method to use for the webhook.
+	Method string `bson:"method" json:"method"`
+	// The target path on which to send the request.
+	TargetPath string `bson:"target_path" json:"target_path"`
+	// The template to load in order to format the request.
+	TemplatePath string `bson:"template_path" json:"template_path"`
+	// Headers to set when firing the webhook.
+	HeaderList map[string]string `bson:"header_map" json:"header_map"`
+	// The cool-down for the event so it does not trigger again (in seconds).
+	EventTimeout int64 `bson:"event_timeout" json:"event_timeout"`
+}
+
+// Decode decodes WebHookHandlerConf into map[string]interface{}.
+func (w *WebHookHandlerConf) Decode(in map[string]interface{}) error {
+	data, err := json.Marshal(in)
+	if err != nil {
+		return err
+	}
+
+	return json.Unmarshal(data, w)
 }

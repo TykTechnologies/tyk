@@ -14,6 +14,7 @@ import (
 
 	"github.com/TykTechnologies/tyk/internal/cache"
 	"github.com/TykTechnologies/tyk/internal/otel"
+	"github.com/TykTechnologies/tyk/pkg/event"
 	"github.com/TykTechnologies/tyk/rpc"
 
 	"github.com/TykTechnologies/tyk/header"
@@ -884,7 +885,7 @@ func (t *BaseMiddleware) CheckSessionAndIdentityForValidKey(originalKey string, 
 
 // FireEvent is added to the BaseMiddleware object so it is available across the entire stack
 func (t *BaseMiddleware) FireEvent(name apidef.TykEvent, meta interface{}) {
-	fireEvent(name, meta, t.Spec.EventPaths)
+	fireEvent(event.Event(name), meta, t.Spec.EventPaths)
 }
 
 func (t *BaseMiddleware) getAuthType() string {

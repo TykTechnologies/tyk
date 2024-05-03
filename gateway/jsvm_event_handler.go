@@ -3,11 +3,12 @@ package gateway
 import (
 	"encoding/json"
 
-	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/pkg/event"
 )
 
-const EH_JSVMHandler apidef.TykEventHandlerName = "eh_dynamic_handler"
+// EH_JSVMHandler is aliased for backwards compatibility.
+const EH_JSVMHandler = event.JSVMHandler
 
 type JSVMContextGlobal struct {
 	APIID string

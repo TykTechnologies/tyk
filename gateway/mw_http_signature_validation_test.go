@@ -22,7 +22,8 @@ import (
 
 	"github.com/justinas/alice"
 
-	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/pkg/event"
+
 	"github.com/TykTechnologies/tyk/certs"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/regexp"
@@ -133,7 +134,7 @@ func testPrepareHMACAuthSessionPass(tb testing.TB, ts *Test, hashFn func() hash.
 	cb := func(em config.EventMessage) {
 		eventWG.Done()
 	}
-	spec.EventPaths = map[apidef.TykEvent][]config.TykEventHandler{
+	spec.EventPaths = map[event.Event][]config.TykEventHandler{
 		"AuthFailure": {&testAuthFailEventHandler{cb}},
 	}
 
@@ -190,8 +191,8 @@ func testPrepareRSAAuthSessionPass(tb testing.TB, eventWG *sync.WaitGroup, priva
 	cb := func(em config.EventMessage) {
 		eventWG.Done()
 	}
-	spec.EventPaths = map[apidef.TykEvent][]config.TykEventHandler{
-		EventAuthFailure: {&testAuthFailEventHandler{cb}},
+	spec.EventPaths = map[event.Event][]config.TykEventHandler{
+		event.AuthFailure: {&testAuthFailEventHandler{cb}},
 	}
 
 	sessionKey := ""
@@ -331,7 +332,7 @@ func TestHMACAuthSessionAuxDateHeader(t *testing.T) {
 	cb := func(em config.EventMessage) {
 		eventWG.Done()
 	}
-	spec.EventPaths = map[apidef.TykEvent][]config.TykEventHandler{
+	spec.EventPaths = map[event.Event][]config.TykEventHandler{
 		"AuthFailure": {&testAuthFailEventHandler{cb}},
 	}
 
@@ -389,7 +390,7 @@ func TestHMACAuthSessionFailureDateExpired(t *testing.T) {
 	cb := func(em config.EventMessage) {
 		eventWG.Done()
 	}
-	spec.EventPaths = map[apidef.TykEvent][]config.TykEventHandler{
+	spec.EventPaths = map[event.Event][]config.TykEventHandler{
 		"AuthFailure": {&testAuthFailEventHandler{cb}},
 	}
 
@@ -447,7 +448,7 @@ func TestHMACAuthSessionKeyMissing(t *testing.T) {
 	cb := func(em config.EventMessage) {
 		eventWG.Done()
 	}
-	spec.EventPaths = map[apidef.TykEvent][]config.TykEventHandler{
+	spec.EventPaths = map[event.Event][]config.TykEventHandler{
 		"AuthFailure": {&testAuthFailEventHandler{cb}},
 	}
 
@@ -505,7 +506,7 @@ func TestHMACAuthSessionMalformedHeader(t *testing.T) {
 	cb := func(em config.EventMessage) {
 		eventWG.Done()
 	}
-	spec.EventPaths = map[apidef.TykEvent][]config.TykEventHandler{
+	spec.EventPaths = map[event.Event][]config.TykEventHandler{
 		"AuthFailure": {&testAuthFailEventHandler{cb}},
 	}
 
@@ -630,7 +631,7 @@ func TestHMACAuthSessionPassWithHeaderFieldLowerCase(t *testing.T) {
 	cb := func(em config.EventMessage) {
 		eventWG.Done()
 	}
-	spec.EventPaths = map[apidef.TykEvent][]config.TykEventHandler{
+	spec.EventPaths = map[event.Event][]config.TykEventHandler{
 		"AuthFailure": {&testAuthFailEventHandler{cb}},
 	}
 

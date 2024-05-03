@@ -19,6 +19,7 @@ import (
 	textTemplate "text/template"
 	"time"
 
+	"github.com/TykTechnologies/tyk/pkg/event"
 	"github.com/TykTechnologies/tyk/storage/kv"
 
 	"github.com/getkin/kin-openapi/routers"
@@ -193,7 +194,7 @@ type APISpec struct {
 	AuthManager              SessionHandler
 	OAuthManager             *OAuthManager
 	OrgSessionManager        SessionHandler
-	EventPaths               map[apidef.TykEvent][]config.TykEventHandler
+	EventPaths               map[event.Event][]config.TykEventHandler
 	Health                   HealthChecker
 	JSVM                     JSVM
 	ResponseChain            []TykResponseHandler
@@ -379,7 +380,7 @@ func (a APIDefinitionLoader) MakeSpec(def *nestedApiDefinition, logger *logrus.E
 	if len(def.EventHandlers.Events) > 0 {
 		logger.Debug("Initializing event handlers")
 	}
-	spec.EventPaths = make(map[apidef.TykEvent][]config.TykEventHandler)
+	spec.EventPaths = make(map[event.Event][]config.TykEventHandler)
 	for eventName, eventHandlerConfs := range def.EventHandlers.Events {
 		logger.Debug("FOUND EVENTS TO INIT")
 		for _, handlerConf := range eventHandlerConfs {

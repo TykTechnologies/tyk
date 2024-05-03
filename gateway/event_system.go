@@ -10,32 +10,52 @@ import (
 
 	"github.com/sirupsen/logrus"
 
+	"github.com/TykTechnologies/tyk/pkg/event"
+
 	circuit "github.com/TykTechnologies/circuitbreaker"
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
 )
 
 // The name for event handlers as defined in the API Definition JSON/BSON format
-const EH_LogHandler apidef.TykEventHandlerName = "eh_log_handler"
-
-// Register new event types here, the string is the code used to hook at the Api Deifnititon JSON/BSON level
 const (
-	EventQuotaExceeded        apidef.TykEvent = "QuotaExceeded"
-	EventRateLimitExceeded    apidef.TykEvent = "RatelimitExceeded"
-	EventAuthFailure          apidef.TykEvent = "AuthFailure"
-	EventKeyExpired           apidef.TykEvent = "KeyExpired"
-	EventVersionFailure       apidef.TykEvent = "VersionFailure"
-	EventOrgQuotaExceeded     apidef.TykEvent = "OrgQuotaExceeded"
-	EventOrgRateLimitExceeded apidef.TykEvent = "OrgRateLimitExceeded"
-	EventTriggerExceeded      apidef.TykEvent = "TriggerExceeded"
-	EventBreakerTriggered     apidef.TykEvent = "BreakerTriggered"
-	EventBreakerTripped       apidef.TykEvent = "BreakerTripped"
-	EventBreakerReset         apidef.TykEvent = "BreakerReset"
-	EventHOSTDOWN             apidef.TykEvent = "HostDown"
-	EventHOSTUP               apidef.TykEvent = "HostUp"
-	EventTokenCreated         apidef.TykEvent = "TokenCreated"
-	EventTokenUpdated         apidef.TykEvent = "TokenUpdated"
-	EventTokenDeleted         apidef.TykEvent = "TokenDeleted"
+	EH_LogHandler = event.LogHandler
+)
+
+const (
+	// EventQuotaExceeded is an alias maintained for backwards compatibility.
+	EventQuotaExceeded = apidef.TykEvent(event.QuotaExceeded)
+	// EventRateLimitExceeded is an alias maintained for backwards compatibility.
+	EventRateLimitExceeded = apidef.TykEvent(event.RateLimitExceeded)
+
+	// EventAuthFailure is an alias maintained for backwards compatibility.
+	EventAuthFailure = apidef.TykEvent(event.AuthFailure)
+	// EventKeyExpired is an alias maintained for backwards compatibility.
+	EventKeyExpired = apidef.TykEvent(event.KeyExpired)
+	// EventVersionFailure is an alias maintained for backwards compatibility.
+	EventVersionFailure = apidef.TykEvent(event.VersionFailure)
+	// EventOrgQuotaExceeded is an alias maintained for backwards compatibility.
+	EventOrgQuotaExceeded = apidef.TykEvent(event.OrgQuotaExceeded)
+	// EventOrgRateLimitExceeded is an alias maintained for backwards compatibility.
+	EventOrgRateLimitExceeded = apidef.TykEvent(event.OrgRateLimitExceeded)
+	// EventTriggerExceeded is an alias maintained for backwards compatibility.
+	EventTriggerExceeded = apidef.TykEvent(event.TriggerExceeded)
+	// EventBreakerTriggered is an alias maintained for backwards compatibility.
+	EventBreakerTriggered = apidef.TykEvent(event.BreakerTriggered)
+	// EventBreakerTripped is an alias maintained for backwards compatibility.
+	EventBreakerTripped = apidef.TykEvent(event.BreakerTripped)
+	// EventBreakerReset is an alias maintained for backwards compatibility.
+	EventBreakerReset = apidef.TykEvent(event.BreakerReset)
+	// EventHOSTDOWN is an alias maintained for backwards compatibility.
+	EventHOSTDOWN = apidef.TykEvent(event.HostDown)
+	// EventHOSTUP is an alias maintained for backwards compatibility.
+	EventHOSTUP = apidef.TykEvent(event.HostUp)
+	// EventTokenCreated is an alias maintained for backwards compatibility.
+	EventTokenCreated = apidef.TykEvent(event.TokenCreated)
+	// EventTokenUpdated is an alias maintained for backwards compatibility.
+	EventTokenUpdated = apidef.TykEvent(event.TokenUpdated)
+	// EventTokenDeleted is an alias maintained for backwards compatibility.
+	EventTokenDeleted = apidef.TykEvent(event.TokenDeleted)
 )
 
 // EventMetaDefault is a standard embedded struct to be used with custom event metadata types, gives an interface for
@@ -138,13 +158,13 @@ func (gw *Gateway) EventHandlerByName(handlerConf apidef.EventHandlerTriggerConf
 	return nil, errors.New("Handler not found")
 }
 
-func fireEvent(name apidef.TykEvent, meta interface{}, handlers map[apidef.TykEvent][]config.TykEventHandler) {
+func fireEvent(name event.Event, meta interface{}, handlers map[event.Event][]config.TykEventHandler) {
 	log.Debug("EVENT FIRED: ", name)
 	if handlers, e := handlers[name]; e {
 		log.Debugf("FOUND %d EVENT HANDLERS", len(handlers))
 		eventMessage := config.EventMessage{
 			Meta:      meta,
-			Type:      name,
+			Type:      apidef.TykEvent(name),
 			TimeStamp: time.Now().Local().String(),
 		}
 		for _, handler := range handlers {
@@ -155,11 +175,11 @@ func fireEvent(name apidef.TykEvent, meta interface{}, handlers map[apidef.TykEv
 }
 
 func (s *APISpec) FireEvent(name apidef.TykEvent, meta interface{}) {
-	fireEvent(name, meta, s.EventPaths)
+	fireEvent(event.Event(name), meta, s.EventPaths)
 }
 
 func (gw *Gateway) FireSystemEvent(name apidef.TykEvent, meta interface{}) {
-	fireEvent(name, meta, gw.GetConfig().GetEventTriggers())
+	fireEvent(event.Event(name), meta, gw.GetConfig().GetEventTriggers())
 }
 
 // LogMessageEventHandler is a sample Event Handler
@@ -203,7 +223,7 @@ func (l *LogMessageEventHandler) HandleEvent(em config.EventMessage) {
 
 func (gw *Gateway) initGenericEventHandlers() {
 	conf := gw.GetConfig()
-	handlers := make(map[apidef.TykEvent][]config.TykEventHandler)
+	handlers := make(map[event.Event][]config.TykEventHandler)
 	for eventName, eventHandlerConfs := range conf.EventHandlers.Events {
 		log.Debug("FOUND EVENTS TO INIT")
 		for _, handlerConf := range eventHandlerConfs {

@@ -1,7 +1,10 @@
 package oas
 
 import (
+	"encoding/json"
+
 	"github.com/TykTechnologies/tyk/apidef"
+	tykevent "github.com/TykTechnologies/tyk/pkg/event"
 )
 
 // Server contains the configuration that sets Tyk up to receive requests from the client applications.
@@ -33,6 +36,8 @@ type Server struct {
 	//
 	// Tyk classic API definition: `detailed_tracing`
 	DetailedTracing *DetailedTracing `bson:"detailedTracing,omitempty" json:"detailedTracing,omitempty"`
+
+	Events Events `bson:"events" json:"events"`
 }
 
 // Fill fills *Server from apidef.APIDefinition.
@@ -80,6 +85,14 @@ func (s *Server) Fill(api apidef.APIDefinition) {
 	s.DetailedTracing.Fill(api)
 	if ShouldOmit(s.DetailedTracing) {
 		s.DetailedTracing = nil
+	}
+
+	if s.Events == nil {
+		s.Events = Events{}
+	}
+	s.Events.Fill(api)
+	if ShouldOmit(s.Events) {
+		s.Events = nil
 	}
 }
 
@@ -131,6 +144,15 @@ func (s *Server) ExtractTo(api *apidef.APIDefinition) {
 	}
 
 	s.DetailedTracing.ExtractTo(api)
+
+	if s.Events == nil {
+		s.Events = Events{}
+		defer func() {
+			s.Events = nil
+		}()
+	}
+
+	s.Events.ExtractTo(api)
 }
 
 // ListenPath is the base path on Tyk to which requests for this API
@@ -264,4 +286,132 @@ func (dt *DetailedTracing) Fill(api apidef.APIDefinition) {
 // ExtractTo extracts *DetailedTracing into *apidef.APIDefinition.
 func (dt *DetailedTracing) ExtractTo(api *apidef.APIDefinition) {
 	api.DetailedTracing = dt.Enabled
+}
+
+// Event holds information about individual event to be configured on the API.
+type Event struct {
+	Enabled bool            `json:"enabled" bson:"enabled"`
+	Type    tykevent.Event  `json:"type" bson:"type"`
+	Action  tykevent.Action `json:"action" bson:"action"`
+	ID      string          `json:"id,omitempty" bson:"id,omitempty"`
+
+	WebhookCore
+}
+
+// WebhookCore stores the core information about a webhook event.
+type WebhookCore struct {
+	Name         string            `json:"name" bson:"name"`
+	URL          string            `json:"url" bson:"url"`
+	Method       string            `json:"method" bson:"method"`
+	Timeout      int64             `json:"timeout" bson:"timeout"`
+	BodyTemplate string            `json:"bodyTemplate,omitempty" bson:"bodyTemplate,omitempty"`
+	Headers      map[string]string `json:"headers,omitempty" bson:"headers,omitempty"`
+}
+
+// ToConfMap converts WebhookCore to map[string]interface{}
+// with apidef.WebHookHandlerConf structure for classic API definition compatibility.
+func (c *WebhookCore) ToConfMap(enabled bool, id string) (map[string]interface{}, error) {
+	webhookConf := apidef.WebHookHandlerConf{
+		Disabled:     !enabled,
+		ID:           id,
+		Name:         c.Name,
+		Method:       c.Method,
+		TargetPath:   c.URL,
+		HeaderList:   c.Headers,
+		EventTimeout: c.Timeout,
+		TemplatePath: c.BodyTemplate,
+	}
+
+	data, err := json.Marshal(webhookConf)
+	if err != nil {
+		return nil, err
+	}
+	var handlerMeta map[string]interface{}
+	err = json.Unmarshal(data, &handlerMeta)
+	return handlerMeta, err
+}
+
+// Events holds the list of events to be processed for the API.
+type Events []Event
+
+// Fill fills Events from classic API definition. Currently only webhook events are supported.
+func (e *Events) Fill(api apidef.APIDefinition) {
+	if len(api.EventHandlers.Events) == 0 {
+		return
+	}
+
+	events := Events{}
+	for gwEvent, ehs := range api.EventHandlers.Events {
+		for _, eh := range ehs {
+			if eh.Handler == tykevent.WebHookHandler {
+				whConf := apidef.WebHookHandlerConf{}
+				err := whConf.Decode(eh.HandlerMeta)
+				if err != nil {
+					continue
+				}
+
+				event := Event{
+					Enabled: !whConf.Disabled,
+					Type:    gwEvent,
+					Action:  tykevent.WebhookAction,
+					ID:      whConf.ID,
+					WebhookCore: WebhookCore{
+						Name:         whConf.Name,
+						URL:          whConf.TargetPath,
+						Method:       whConf.Method,
+						Headers:      whConf.HeaderList,
+						Timeout:      whConf.EventTimeout,
+						BodyTemplate: whConf.TemplatePath,
+					},
+				}
+
+				events = append(events, event)
+			}
+		}
+	}
+
+	*e = events
+}
+
+// ExtractTo extracts events to apidef.APIDefinition.
+func (e *Events) ExtractTo(api *apidef.APIDefinition) {
+	if e == nil {
+		return
+	}
+
+	for _, event := range *e {
+		var (
+			handler     tykevent.HandlerName
+			handlerMeta map[string]interface{}
+			err         error
+		)
+
+		switch event.Action {
+		case tykevent.WebhookAction:
+			handler = tykevent.WebHookHandler
+			handlerMeta, err = event.WebhookCore.ToConfMap(event.Enabled, event.ID)
+		default:
+			continue
+		}
+
+		if err != nil {
+			continue
+		}
+
+		eventHandlerTriggerConfig := apidef.EventHandlerTriggerConfig{
+			Handler:     handler,
+			HandlerMeta: handlerMeta,
+		}
+
+		if api.EventHandlers.Events == nil {
+			api.EventHandlers.Events = make(map[tykevent.Event][]apidef.EventHandlerTriggerConfig)
+		}
+
+		if val, ok := api.EventHandlers.Events[event.Type]; ok {
+			api.EventHandlers.Events[event.Type] = append(val, eventHandlerTriggerConfig)
+			continue
+		}
+
+		api.EventHandlers.Events[event.Type] = []apidef.EventHandlerTriggerConfig{eventHandlerTriggerConfig}
+	}
 }

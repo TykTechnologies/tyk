@@ -14,7 +14,7 @@ import (
 	"github.com/nsf/jsondiff"
 	"github.com/stretchr/testify/assert"
 
-	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/pkg/event"
 )
 
 func TestDefaultValueAndWriteDefaultConf(t *testing.T) {
@@ -171,7 +171,7 @@ func TestConfig_GetEventTriggers(t *testing.T) {
 
 		triggers := conf.GetEventTriggers()
 
-		if _, ok := triggers[apidef.TykEvent(expected)]; !ok || len(triggers) != 1 {
+		if _, ok := triggers[event.Event(expected)]; !ok || len(triggers) != 1 {
 			t.Fatal("Config is not loaded correctly")
 		}
 	}

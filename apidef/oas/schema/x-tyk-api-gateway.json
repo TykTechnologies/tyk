@@ -1274,6 +1274,14 @@
         },
         "detailedTracing": {
           "$ref": "#/definitions/X-Tyk-DetailedTracing"
+        },
+        "events": {
+          "type": "array",
+          "items": [
+            {
+              "$ref": "#/definitions/X-Tyk-Events"
+            }
+          ]
         }
       },
       "required": [
@@ -1885,6 +1893,89 @@
       },
       "required": [
         "enabled"
+      ]
+    },
+    "X-Tyk-Events": {
+      "type": "object",
+      "anyOf": [
+        {
+          "$ref": "#/definitions/X-Tyk-Webhooks"
+        }
+      ]
+    },
+    "X-Tyk-Webhooks": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "type": {
+          "type": "string",
+          "enum": [
+            "QuotaExceeded",
+            "RatelimitExceeded",
+            "AuthFailure",
+            "KeyExpired",
+            "VersionFailure",
+            "OrgQuotaExceeded",
+            "OrgRateLimitExceeded",
+            "TriggerExceeded",
+            "BreakerTriggered",
+            "BreakerTripped",
+            "BreakerReset",
+            "HostDown",
+            "HostUp",
+            "TokenCreated",
+            "TokenUpdated",
+            "TokenDeleted"
+          ]
+        },
+        "action": {
+          "type": "string",
+          "enum": [
+            "webhook"
+          ]
+        },
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "url": {
+          "type": "string",
+          "format": "uri-reference"
+        },
+        "method": {
+          "type": "string",
+          "enum": [
+            "GET",
+            "PUT",
+            "POST",
+            "DELETE",
+            "PATCH"
+          ]
+        },
+        "timeout": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "bodyTemplate": {
+          "type": "string"
+        },
+        "headers": {
+          "type": "object",
+          "additionalProperties": { "type": "string" }
+        }
+      },
+      "required": [
+        "enabled",
+        "type",
+        "action",
+        "url",
+        "method",
+        "timeout"
       ]
     },
     "X-Tyk-UInt": {
