@@ -4,8 +4,9 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/TykTechnologies/tyk/pkg/event"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/TykTechnologies/tyk/pkg/event"
 )
 
 const (
