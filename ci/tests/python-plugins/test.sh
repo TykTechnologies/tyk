@@ -7,7 +7,7 @@ function setup {
 	# Setup required env vars for docker compose
 	export GATEWAY_IMAGE=${GATEWAY_IMAGE:-"tykio/tyk-gateway:${tag}"}
 
-	docker pull -q $GATEWAY_IMAGE
+	#docker pull -q $GATEWAY_IMAGE
 }
 
 setup $1
