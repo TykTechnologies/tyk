@@ -37,7 +37,7 @@ type Server struct {
 	// Tyk classic API definition: `detailed_tracing`
 	DetailedTracing *DetailedTracing `bson:"detailedTracing,omitempty" json:"detailedTracing,omitempty"`
 
-	Events Events `bson:"events" json:"events"`
+	Events Events `bson:"events,omitempty" json:"events,omitempty"`
 }
 
 // Fill fills *Server from apidef.APIDefinition.

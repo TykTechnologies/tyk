@@ -458,6 +458,14 @@ func (a *APIDefinition) SetDisabledFlags() {
 	if a.GlobalRateLimit.Per <= 0 || a.GlobalRateLimit.Rate <= 0 {
 		a.GlobalRateLimit.Disabled = true
 	}
+
+	for k := range a.EventHandlers.Events {
+		for i := range a.EventHandlers.Events[k] {
+			if a.EventHandlers.Events[k][i].HandlerMeta != nil {
+				a.EventHandlers.Events[k][i].HandlerMeta["disabled"] = true
+			}
+		}
+	}
 }
 
 func (a *APIDefinition) migrateScopeToPolicy() {
