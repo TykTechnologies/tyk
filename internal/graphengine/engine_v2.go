@@ -247,6 +247,11 @@ func (e *EngineV2) HandleReverseProxy(params ReverseProxyParams) (res *http.Resp
 		return e.handoverWebSocketConnectionToGraphQLExecutionEngine(&params)
 	case ReverseProxyTypeGraphEngine:
 		return e.handoverRequestToGraphQLExecutionEngine(gqlRequest, params.OutRequest)
+	case ReverseProxyTypePreFlight:
+		if e.ApiDefinition.GraphQL.ExecutionMode == apidef.GraphQLExecutionModeProxyOnly {
+			return nil, false, nil
+		}
+		return nil, false, errors.New("options passthrough not allowed")
 	case ReverseProxyTypeNone:
 		return nil, false, nil
 	}
