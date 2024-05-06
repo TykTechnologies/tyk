@@ -1182,6 +1182,7 @@ func (c Config) GetEventTriggers() map[event.Event][]TykEventHandler {
 	return c.EventTriggersDefunct
 }
 
+// SetEventTriggers sets events for backwards compatibility
 func (c *Config) SetEventTriggers(eventTriggers map[event.Event][]TykEventHandler) {
 	c.EventTriggersDefunct = eventTriggers
 }

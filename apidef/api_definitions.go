@@ -30,7 +30,10 @@ type AuthProviderCode string
 type SessionProviderCode string
 type StorageEngineCode string
 
+// TykEvent is an alias maintained for backwards compatibility.
 type TykEvent event.Event
+
+// TykEventHandlerName is an alias maintained for backwards compatibility.
 type TykEventHandlerName event.HandlerName
 
 type EndpointMethodAction string

@@ -459,6 +459,10 @@ func (a *APIDefinition) SetDisabledFlags() {
 		a.GlobalRateLimit.Disabled = true
 	}
 
+	a.setEventHandlersDisabledFlags()
+}
+
+func (a *APIDefinition) setEventHandlersDisabledFlags() {
 	for k := range a.EventHandlers.Events {
 		for i := range a.EventHandlers.Events[k] {
 			if a.EventHandlers.Events[k][i].HandlerMeta != nil {
