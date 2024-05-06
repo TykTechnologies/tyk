@@ -1969,13 +1969,31 @@
           "additionalProperties": { "type": "string" }
         }
       },
-      "required": [
-        "enabled",
-        "type",
-        "action",
-        "url",
-        "method",
-        "timeout"
+      "anyOf": [
+        {
+          "required": [
+            "enabled",
+            "type",
+            "action",
+            "id"
+          ]
+        },
+        {
+          "required": [
+            "enabled",
+            "type",
+            "action",
+            "url",
+            "method",
+            "timeout",
+            "bodyTemplate"
+          ],
+          "not": {
+            "required": [
+              "id"
+            ]
+          }
+        }
       ]
     },
     "X-Tyk-UInt": {
