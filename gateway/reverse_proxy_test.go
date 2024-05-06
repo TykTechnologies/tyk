@@ -468,7 +468,7 @@ func TestCircuitBreakerEvents(t *testing.T) {
 
 	// Events to capture on this API, we use default webhook template:
 	events := map[event.Event][]apidef.EventHandlerTriggerConfig{
-		event.BreakerTriggered: {
+		event.BreakerTripped: {
 			{
 				Handler: EH_WebHook,
 				HandlerMeta: map[string]interface{}{
