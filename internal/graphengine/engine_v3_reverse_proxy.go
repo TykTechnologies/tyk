@@ -3,8 +3,9 @@ package graphengine
 import (
 	"context"
 	"errors"
-	"github.com/TykTechnologies/tyk/apidef"
 	"net/http"
+
+	"github.com/TykTechnologies/tyk/apidef"
 
 	"github.com/jensneuse/abstractlogger"
 
@@ -16,13 +17,13 @@ import (
 )
 
 func (e *EngineV3) ProcessGraphQLComplexity(r *http.Request, accessDefinition *ComplexityAccessDefinition) (err error, statusCode int) {
-	//TODO implement me
-	panic("implement me")
+	e.logger.Error("graphql complexity checker not supported for v3-preview")
+	return ProxyingRequestFailedErr, http.StatusInternalServerError
 }
 
 func (e *EngineV3) ProcessGraphQLGranularAccess(w http.ResponseWriter, r *http.Request, accessDefinition *GranularAccessDefinition) (err error, statusCode int) {
-	//TODO implement me
-	panic("implement me")
+	e.logger.Error("graphql granular access not supported for v3-preview")
+	return ProxyingRequestFailedErr, http.StatusInternalServerError
 }
 
 func (e *EngineV3) HandleReverseProxy(params ReverseProxyParams) (res *http.Response, hijacked bool, err error) {
