@@ -1,4 +1,4 @@
-package v2
+package enginev3
 
 import (
 	"net/http"
@@ -18,7 +18,7 @@ type Supergraph struct {
 	subscriptionClientFactory graphqlDataSource.GraphQLSubscriptionClientFactory
 }
 
-func (s *Supergraph) EngineConfigV2() (*graphql.EngineV2Configuration, error) {
+func (s *Supergraph) EngineConfigV3() (*graphql.EngineV2Configuration, error) {
 	dataSourceConfs := s.subgraphDataSourceConfigs()
 	var federationConfigV2Factory *graphql.FederationEngineConfigFactory
 	federationConfigV2Factory = graphql.NewFederationEngineConfigFactory(

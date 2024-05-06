@@ -1,4 +1,4 @@
-package v2
+package enginev3
 
 import (
 	"net/http"
@@ -18,7 +18,7 @@ type ProxyOnly struct {
 	subscriptionClientFactory graphqlDataSource.GraphQLSubscriptionClientFactory
 }
 
-func (p *ProxyOnly) EngineConfigV2() (*graphql.EngineV2Configuration, error) {
+func (p *ProxyOnly) EngineConfigV3() (*graphql.EngineV2Configuration, error) {
 	var err error
 	if p.Schema == nil {
 		p.Schema, err = parseSchema(p.ApiDefinition.GraphQL.Schema)

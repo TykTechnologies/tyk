@@ -1,4 +1,4 @@
-package v2
+package enginev3
 
 import (
 	"context"
@@ -36,7 +36,7 @@ func TestProxyOnly_EngineConfigV2(t *testing.T) {
 			subscriptionClientFactory: &MockSubscriptionClientFactory{},
 		}
 
-		engineV2Config, err := adapter.EngineConfigV2()
+		engineV2Config, err := adapter.EngineConfigV3()
 		assert.NoError(t, err)
 
 		expectedDataSource := plan.DataSourceConfiguration{
@@ -99,7 +99,7 @@ func TestProxyOnly_EngineConfigV2(t *testing.T) {
 			subscriptionClientFactory: &MockSubscriptionClientFactory{},
 		}
 
-		engineV2Config, err := adapter.EngineConfigV2()
+		engineV2Config, err := adapter.EngineConfigV3()
 		assert.NoError(t, err)
 
 		expectedDataSource := plan.DataSourceConfiguration{
@@ -164,7 +164,7 @@ func TestProxyOnly_EngineConfigV2(t *testing.T) {
 			subscriptionClientFactory: &MockSubscriptionClientFactory{},
 		}
 
-		engineV2Config, err := adapter.EngineConfigV2()
+		engineV2Config, err := adapter.EngineConfigV3()
 		assert.NoError(t, err)
 
 		expectedDataSource := plan.DataSourceConfiguration{

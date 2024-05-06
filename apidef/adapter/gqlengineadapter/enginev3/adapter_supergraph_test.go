@@ -1,4 +1,4 @@
-package v2
+package enginev3
 
 import (
 	"encoding/json"
@@ -31,7 +31,7 @@ func TestSupergraph_EngineConfigV2(t *testing.T) {
 			subscriptionClientFactory: &MockSubscriptionClientFactory{},
 		}
 
-		_, err := adapter.EngineConfigV2()
+		_, err := adapter.EngineConfigV3()
 		assert.NoError(t, err)
 	})
 	t.Run("should create v2 config for supergraph with batching disabled", func(t *testing.T) {
@@ -52,7 +52,7 @@ func TestSupergraph_EngineConfigV2(t *testing.T) {
 			subscriptionClientFactory: &MockSubscriptionClientFactory{},
 		}
 
-		v2Config, err := adapter.EngineConfigV2()
+		v2Config, err := adapter.EngineConfigV3()
 		assert.NoError(t, err)
 		expectedDataSource := plan.DataSourceConfiguration{
 			RootNodes: []plan.TypeField{

@@ -1,4 +1,4 @@
-package v2
+package enginev3
 
 import (
 	"encoding/json"
@@ -21,7 +21,7 @@ type UniversalDataGraph struct {
 	subscriptionClientFactory graphqlDataSource.GraphQLSubscriptionClientFactory
 }
 
-func (u *UniversalDataGraph) EngineConfigV2() (*graphql.EngineV2Configuration, error) {
+func (u *UniversalDataGraph) EngineConfigV3() (*graphql.EngineV2Configuration, error) {
 	var err error
 	if u.Schema == nil {
 		u.Schema, err = parseSchema(u.ApiDefinition.GraphQL.Schema)

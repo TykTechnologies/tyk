@@ -4,8 +4,8 @@ import (
 	"errors"
 	"net/http"
 
-	graphqlv2 "github.com/TykTechnologies/graphql-go-tools/v2/pkg/graphql"
-	v2 "github.com/TykTechnologies/tyk/apidef/adapter/gqlengineadapter/v2"
+	gqlv2 "github.com/TykTechnologies/graphql-go-tools/v2/pkg/graphql"
+	v3adapter "github.com/TykTechnologies/tyk/apidef/adapter/gqlengineadapter/enginev3"
 
 	"github.com/TykTechnologies/graphql-go-tools/pkg/engine/datasource/httpclient"
 	"github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
@@ -21,8 +21,8 @@ type GraphQLEngineAdapter interface {
 	EngineConfig() (*graphql.EngineV2Configuration, error)
 }
 
-type GraphQLEngineV2Adapter interface {
-	EngineConfigV2() (*graphqlv2.EngineV2Configuration, error)
+type GraphQLEngineAdapterV3 interface {
+	EngineConfigV3() (*gqlv2.EngineV2Configuration, error)
 }
 
 type GraphQLConfigAdapterOption func(adapter *GraphQLConfigAdapter)
@@ -33,7 +33,7 @@ func WithSchema(schema *graphql.Schema) GraphQLConfigAdapterOption {
 	}
 }
 
-func WithV2Schema(schema *graphqlv2.Schema) GraphQLConfigAdapterOption {
+func WithV2Schema(schema *gqlv2.Schema) GraphQLConfigAdapterOption {
 	return func(adapter *GraphQLConfigAdapter) {
 		adapter.schemaV2 = schema
 	}
@@ -56,7 +56,7 @@ type GraphQLConfigAdapter struct {
 	httpClient      *http.Client
 	streamingClient *http.Client
 	schema          *graphql.Schema
-	schemaV2        *graphqlv2.Schema
+	schemaV2        *gqlv2.Schema
 }
 
 func NewGraphQLConfigAdapter(apiDefinition *apidef.APIDefinition, options ...GraphQLConfigAdapterOption) GraphQLConfigAdapter {
@@ -105,16 +105,16 @@ func (g *GraphQLConfigAdapter) EngineConfigV2() (*graphql.EngineV2Configuration,
 	return engineAdapter.EngineConfig()
 }
 
-func (g *GraphQLConfigAdapter) EngineConfigV3() (*graphqlv2.EngineV2Configuration, error) {
+func (g *GraphQLConfigAdapter) EngineConfigV3() (*gqlv2.EngineV2Configuration, error) {
 	if g.apiDefinition.GraphQL.Version != apidef.GraphQLConfigVersion3Preview {
 		return nil, ErrUnsupportedGraphQLConfigVersion
 	}
 
-	var engineAdapter GraphQLEngineV2Adapter
+	var engineAdapter GraphQLEngineAdapterV3
 	adapterType := graphqlEngineAdapterTypeFromApiDefinition(g.apiDefinition)
 	switch adapterType {
 	case GraphQLEngineAdapterTypeProxyOnly:
-		engineAdapter = &v2.ProxyOnly{
+		engineAdapter = &v3adapter.ProxyOnly{
 			ApiDefinition:   g.apiDefinition,
 			HttpClient:      g.getHttpClient(),
 			StreamingClient: g.getStreamingClient(),
@@ -123,7 +123,7 @@ func (g *GraphQLConfigAdapter) EngineConfigV3() (*graphqlv2.EngineV2Configuratio
 	case GraphQLEngineAdapterTypeSupergraph:
 		return nil, ErrUnsupportedGraphQLConfigVersion
 	case GraphQLEngineAdapterTypeUniversalDataGraph:
-		engineAdapter = &v2.UniversalDataGraph{
+		engineAdapter = &v3adapter.UniversalDataGraph{
 			ApiDefinition:   g.apiDefinition,
 			HttpClient:      g.getHttpClient(),
 			StreamingClient: g.getStreamingClient(),
@@ -133,7 +133,7 @@ func (g *GraphQLConfigAdapter) EngineConfigV3() (*graphqlv2.EngineV2Configuratio
 		return nil, ErrUnsupportedGraphQLExecutionMode
 	}
 
-	return engineAdapter.EngineConfigV2()
+	return engineAdapter.EngineConfigV3()
 }
 
 func (g *GraphQLConfigAdapter) getHttpClient() *http.Client {

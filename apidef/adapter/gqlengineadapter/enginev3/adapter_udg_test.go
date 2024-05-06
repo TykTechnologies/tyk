@@ -1,4 +1,4 @@
-package v2
+package enginev3
 
 import (
 	"encoding/json"
@@ -34,7 +34,7 @@ func TestUniversalDataGraph_EngineConfig(t *testing.T) {
 			subscriptionClientFactory: &MockSubscriptionClientFactory{},
 		}
 
-		_, err := adapter.EngineConfigV2()
+		_, err := adapter.EngineConfigV3()
 		assert.NoError(t, err)
 	})
 }
