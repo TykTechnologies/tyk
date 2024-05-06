@@ -79,9 +79,9 @@ tags:
 paths:
   /tyk/apis:
     get:
-      description: |2-
-         List APIs
-                 Only if used without the Tyk Dashboard
+      description: |-
+        List APIs
+        Only if used without the Tyk Dashboard
       operationId: listApis
       responses:
         "200":
@@ -103,8 +103,8 @@ paths:
       tags:
       - APIs
     post:
-      description: |2-
-         Create API
+      description: |-
+        Create API
                  A single Tyk node can have its API Definitions queried, deleted and updated remotely. This functionality enables you to remotely update your Tyk definitions without having to manage the files manually.
       operationId: createApi
       parameters:
@@ -211,7 +211,7 @@ paths:
     get:
       description: |-
         Get API definition
-                Only if used without the Tyk Dashboard
+        Only if used without the Tyk Dashboard
       operationId: getApi
       parameters:
       - description: The API ID
@@ -247,15 +247,14 @@ paths:
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
           description: Api not found
-      summary: Get API definition with ID
+      summary: Get API definition with it's ID
       tags:
       - APIs
     put:
       description: |-
         Updating an API definition uses the same signature an object as a `POST`, however it will first ensure that the API ID that is being updated is the same as the one in the object being `PUT`.
 
-
-                Updating will completely replace the file descriptor and will not change an API Definition that has already been loaded, the hot-reload endpoint will need to be called to push the new definition to live.
+        Updating will completely replace the file descriptor and will not change an API Definition that has already been loaded, the hot-reload endpoint will need to be called to push the new definition to live.
       operationId: updateApi
       parameters:
       - description: The API ID
@@ -303,7 +302,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
           description: Unexpected error.
-      summary: Updating an API definition  with its ID
+      summary: Updating an API definition with its ID
       tags:
       - APIs
   /tyk/apis/oas:
@@ -1153,9 +1152,9 @@ paths:
       - Health Checking
   /tyk/keys:
     get:
-      description: |2-
-         List APIs
-                 Only if used without the Tyk Dashboard
+      description: |-
+        List APIs
+          Only if used without the Tyk Dashboard
       operationId: listKeys
       parameters:
       - description: Retrieves all keys starting with the specified filter(filter

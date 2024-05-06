@@ -95,7 +95,7 @@ func getListOfKeys(r *openapi3.Reflector) error {
 	forbidden(oc)
 	statusNotFound(oc, "When hash_keys is enabled in gateway config and enable_hashed_keys_listing is disabled")
 	oc.SetID("listKeys")
-	oc.SetDescription(" List APIs\n         Only if used without the Tyk Dashboard")
+	oc.SetDescription("List APIs\n  Only if used without the Tyk Dashboard")
 	oc.SetTags(KeysTag)
 	oc.SetSummary("List Keys")
 	o3, ok := oc.(openapi3.OperationExposer)

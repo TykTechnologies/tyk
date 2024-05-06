@@ -1,7 +1,6 @@
 package swagger
 
 import (
-	"errors"
 	"net/http"
 
 	"github.com/swaggest/openapi-go"
@@ -10,8 +9,6 @@ import (
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/gateway"
 )
-
-var ErrOperationExposer = errors.New("object is not of type openapi3.OperationExposer")
 
 const (
 	APIsTag    = "APIs"
@@ -43,14 +40,14 @@ func getClassicApiRequest(r *openapi3.Reflector) error {
 	forbidden(oc)
 	oc.SetTags(APIsTag)
 	oc.SetID("getApi")
-	oc.SetSummary("Get API definition with ID")
-	oc.SetDescription("Get API definition\n        Only if used without the Tyk Dashboard")
+	oc.SetSummary("Get API definition with it's ID")
+	oc.SetDescription("Get API definition\nOnly if used without the Tyk Dashboard")
 	o3, ok := oc.(openapi3.OperationExposer)
 	if !ok {
 		return ErrOperationExposer
 	}
 	o3.Operation().WithParameters(apIIDParameter())
-	oc.SetDescription("Get API definition\n        Only if used without the Tyk Dashboard")
+	oc.SetDescription("Get API definition\nOnly if used without the Tyk Dashboard")
 	err = r.AddOperation(oc)
 	if err != nil {
 		return err
@@ -73,7 +70,7 @@ func getListOfClassicApisRequest(r *openapi3.Reflector) error {
 		cu.Description = "List of API definitions"
 	})
 	oc.SetID("listApis")
-	oc.SetDescription(" List APIs\n         Only if used without the Tyk Dashboard")
+	oc.SetDescription("List APIs\nOnly if used without the Tyk Dashboard")
 	oc.SetSummary("Get list of apis")
 	oc.SetTags(APIsTag)
 	forbidden(oc)
@@ -91,8 +88,8 @@ func putClassicApiRequest(r *openapi3.Reflector) error {
 		cu.Description = "API updated"
 	})
 	oc.SetID("updateApi")
-	oc.SetSummary("Updating an API definition  with its ID")
-	oc.SetDescription("Updating an API definition uses the same signature an object as a `POST`, however it will first ensure that the API ID that is being updated is the same as the one in the object being `PUT`.\n\n\n        Updating will completely replace the file descriptor and will not change an API Definition that has already been loaded, the hot-reload endpoint will need to be called to push the new definition to live.")
+	oc.SetSummary("Updating an API definition with its ID")
+	oc.SetDescription("Updating an API definition uses the same signature an object as a `POST`, however it will first ensure that the API ID that is being updated is the same as the one in the object being `PUT`.\n\nUpdating will completely replace the file descriptor and will not change an API Definition that has already been loaded, the hot-reload endpoint will need to be called to push the new definition to live.")
 	oc.SetTags(APIsTag)
 	statusNotFound(oc, "An Api with the specified ApiID was not found.")
 	statusBadRequest(oc, "Bad request.Sending a ApiID for an OAs api or apiID in path does not match the one in the body.")
@@ -138,7 +135,7 @@ func createClassicApiRequest(r *openapi3.Reflector) error {
 	}
 	oc.SetTags(APIsTag)
 	oc.SetID("createApi")
-	oc.SetDescription(" Create API\n         A single Tyk node can have its API Definitions queried, deleted and updated remotely. This functionality enables you to remotely update your Tyk definitions without having to manage the files manually.")
+	oc.SetDescription("Create API\n         A single Tyk node can have its API Definitions queried, deleted and updated remotely. This functionality enables you to remotely update your Tyk definitions without having to manage the files manually.")
 	oc.SetSummary("Creat an API")
 	oc.AddReqStructure(new(apidef.APIDefinition))
 	oc.AddRespStructure(new(apiModifyKeySuccess), openapi.WithHTTPStatus(http.StatusOK))

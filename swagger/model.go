@@ -1,9 +1,12 @@
 package swagger
 
 import (
+	"errors"
+	"log"
 	"strconv"
 	"strings"
 
+	"github.com/swaggest/openapi-go"
 	"github.com/swaggest/openapi-go/openapi3"
 
 	"github.com/TykTechnologies/tyk/gateway"
@@ -14,6 +17,8 @@ const (
 	applicationOctetStream = "application/octet-stream"
 	applicationJSON        = "application/json"
 )
+
+var ErrOperationExposer = errors.New("object is not of type openapi3.OperationExposer")
 
 type paginationStatus struct {
 	PageNum   int `json:"page_num"`
@@ -246,6 +251,23 @@ type Revoke struct {
 	TokenTypeHint string `json:"token_type_hint" formData:"token_type_hint" description:"type of token to be revoked, if sent then the accepted values are access_token and refresh_token. String value and optional, of not provided then it will attempt to remove access and refresh tokens that matches"`
 	ClientID      string `json:"client_id" formData:"client_id" description:"id of oauth client" required:"true"`
 	OrgID         string `json:"org_id" formData:"org_id"`
+}
+
+func addResponseWithExamples(oc openapi.OperationContext, body interface{}, httpStatus int, description string) error {
+	oc.AddRespStructure(body, openapi.WithHTTPStatus(httpStatus), func(cu *openapi.ContentUnit) {
+		if len(description) > 0 {
+			cu.Description = description
+		}
+	})
+
+	o3, ok := oc.(openapi3.OperationExposer)
+	if !ok {
+		return ErrOperationExposer
+	}
+
+	code := strconv.Itoa(httpStatus)
+	log.Println(o3.Operation().Responses.MapOfResponseOrRefValues[code])
+	return nil
 }
 
 ////2256b0b7877f85d9e2ecd2b7c59acd47ce8f42725ad0c5275fd4e213dddea8ad
