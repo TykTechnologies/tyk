@@ -9,11 +9,11 @@ import (
 	"text/template"
 	"time"
 
-	"github.com/TykTechnologies/storage/persistent/model"
-	"github.com/TykTechnologies/tyk/pkg/event"
-
 	"github.com/clbanning/mxj"
 	"github.com/lonelycode/osin"
+
+	"github.com/TykTechnologies/storage/persistent/model"
+	"github.com/TykTechnologies/tyk/internal/event"
 
 	"github.com/TykTechnologies/tyk/internal/reflect"
 
@@ -31,10 +31,10 @@ type SessionProviderCode string
 type StorageEngineCode string
 
 // TykEvent is an alias maintained for backwards compatibility.
-type TykEvent event.Event
+type TykEvent = event.Event
 
 // TykEventHandlerName is an alias maintained for backwards compatibility.
-type TykEventHandlerName event.HandlerName
+type TykEventHandlerName = event.HandlerName
 
 type EndpointMethodAction string
 type SourceMode string
@@ -464,12 +464,12 @@ type SessionProviderMeta struct {
 }
 
 type EventHandlerTriggerConfig struct {
-	Handler     event.HandlerName      `bson:"handler_name" json:"handler_name"`
+	Handler     TykEventHandlerName    `bson:"handler_name" json:"handler_name"`
 	HandlerMeta map[string]interface{} `bson:"handler_meta" json:"handler_meta"`
 }
 
 type EventHandlerMetaConfig struct {
-	Events map[event.Event][]EventHandlerTriggerConfig `bson:"events" json:"events"`
+	Events map[TykEvent][]EventHandlerTriggerConfig `bson:"events" json:"events"`
 }
 
 type MiddlewareDefinition struct {
@@ -1434,7 +1434,7 @@ type WebHookHandlerConf struct {
 }
 
 // Decode decodes WebHookHandlerConf into map[string]interface{}.
-func (w *WebHookHandlerConf) Decode(in map[string]interface{}) error {
+func (w *WebHookHandlerConf) Decode(in any) error {
 	data, err := json.Marshal(in)
 	if err != nil {
 		return err

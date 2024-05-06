@@ -11,7 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/xeipuuv/gojsonschema"
 
-	tykevent "github.com/TykTechnologies/tyk/pkg/event"
+	tykevent "github.com/TykTechnologies/tyk/internal/event"
 )
 
 func TestXTykGateway_Lint(t *testing.T) {

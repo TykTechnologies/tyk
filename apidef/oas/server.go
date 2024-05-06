@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 
 	"github.com/TykTechnologies/tyk/apidef"
-	tykevent "github.com/TykTechnologies/tyk/pkg/event"
+	tykevent "github.com/TykTechnologies/tyk/internal/event"
 )
 
 // Server contains the configuration that sets Tyk up to receive requests from the client applications.
@@ -300,7 +300,7 @@ type Event struct {
 
 // WebhookCore stores the core information about a webhook event.
 type WebhookCore struct {
-	Name         string            `json:"name" bson:"name"`
+	Name         string            `json:"name,omitempty" bson:"name,omitempty"`
 	URL          string            `json:"url" bson:"url"`
 	Method       string            `json:"method" bson:"method"`
 	Timeout      int64             `json:"timeout" bson:"timeout"`
@@ -395,6 +395,7 @@ func (e *Events) ExtractTo(api *apidef.APIDefinition) {
 		}
 
 		if err != nil {
+			log.WithError(err).Error("error converting event to map")
 			continue
 		}
 
@@ -404,7 +405,7 @@ func (e *Events) ExtractTo(api *apidef.APIDefinition) {
 		}
 
 		if api.EventHandlers.Events == nil {
-			api.EventHandlers.Events = make(map[tykevent.Event][]apidef.EventHandlerTriggerConfig)
+			api.EventHandlers.Events = make(map[apidef.TykEvent][]apidef.EventHandlerTriggerConfig)
 		}
 
 		if val, ok := api.EventHandlers.Events[event.Type]; ok {

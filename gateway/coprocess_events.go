@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	"github.com/TykTechnologies/tyk/config"
-	"github.com/TykTechnologies/tyk/pkg/event"
+	"github.com/TykTechnologies/tyk/internal/event"
 )
 
 // EH_CoProcessHandler is used for event system, maintained here for backwards compatibility.

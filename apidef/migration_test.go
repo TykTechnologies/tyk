@@ -6,7 +6,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/TykTechnologies/tyk/pkg/event"
+	"github.com/TykTechnologies/tyk/internal/event"
 )
 
 const (
@@ -628,7 +628,7 @@ func TestSetDisabledFlags(t *testing.T) {
 			},
 		},
 		EventHandlers: EventHandlerMetaConfig{
-			Events: map[event.Event][]EventHandlerTriggerConfig{
+			Events: map[TykEvent][]EventHandlerTriggerConfig{
 				event.QuotaExceeded: {
 					{
 						Handler: event.WebHookHandler,

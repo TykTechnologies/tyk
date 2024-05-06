@@ -16,8 +16,6 @@ import (
 	proxyproto "github.com/pires/go-proxyproto"
 	"github.com/stretchr/testify/assert"
 
-	"github.com/TykTechnologies/tyk/pkg/event"
-
 	"github.com/TykTechnologies/tyk/internal/uuid"
 
 	"github.com/TykTechnologies/tyk/apidef"
@@ -103,7 +101,7 @@ func TestHostChecker(t *testing.T) {
 		eventWG.Done()
 	}
 
-	spec.EventPaths = map[event.Event][]config.TykEventHandler{
+	spec.EventPaths = map[apidef.TykEvent][]config.TykEventHandler{
 		"HostDown": {&testEventHandler{cb}},
 	}
 
@@ -210,7 +208,7 @@ func TestReverseProxyAllDown(t *testing.T) {
 	cb := func(em config.EventMessage) {
 		eventWG.Done()
 	}
-	spec.EventPaths = map[event.Event][]config.TykEventHandler{
+	spec.EventPaths = map[apidef.TykEvent][]config.TykEventHandler{
 		"HostDown": {&testEventHandler{cb}},
 	}
 	ts.Gw.GlobalHostChecker.checkerMu.Lock()

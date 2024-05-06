@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 
 	"github.com/TykTechnologies/tyk/config"
-	"github.com/TykTechnologies/tyk/pkg/event"
+	"github.com/TykTechnologies/tyk/internal/event"
 )
 
 // EH_JSVMHandler is aliased for backwards compatibility.

@@ -7,7 +7,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	tykevent "github.com/TykTechnologies/tyk/pkg/event"
+	tykevent "github.com/TykTechnologies/tyk/internal/event"
 
 	"github.com/TykTechnologies/tyk/apidef"
 )

@@ -1899,11 +1899,11 @@
       "type": "object",
       "anyOf": [
         {
-          "$ref": "#/definitions/X-Tyk-Webhooks"
+          "$ref": "#/definitions/X-Tyk-Webhook"
         }
       ]
     },
-    "X-Tyk-Webhooks": {
+    "X-Tyk-Webhook": {
       "type": "object",
       "additionalProperties": false,
       "properties": {

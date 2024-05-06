@@ -22,8 +22,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/TykTechnologies/tyk/pkg/event"
-
 	"github.com/TykTechnologies/tyk/user"
 
 	"github.com/TykTechnologies/tyk/header"
@@ -467,8 +465,8 @@ func TestCircuitBreakerEvents(t *testing.T) {
 	defer ts.Close()
 
 	// Events to capture on this API, we use default webhook template:
-	events := map[event.Event][]apidef.EventHandlerTriggerConfig{
-		event.BreakerTripped: {
+	events := map[apidef.TykEvent][]apidef.EventHandlerTriggerConfig{
+		EventBreakerTripped: {
 			{
 				Handler: EH_WebHook,
 				HandlerMeta: map[string]interface{}{
@@ -479,7 +477,7 @@ func TestCircuitBreakerEvents(t *testing.T) {
 				},
 			},
 		},
-		event.BreakerReset: {
+		EventBreakerReset: {
 			{
 				Handler: EH_WebHook,
 				HandlerMeta: map[string]interface{}{

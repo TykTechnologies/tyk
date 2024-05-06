@@ -8,14 +8,12 @@ import (
 
 	"github.com/sirupsen/logrus"
 
-	"github.com/TykTechnologies/tyk/pkg/event"
-
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
 )
 
 var (
-	handlerTypes = []event.HandlerName{
+	handlerTypes = []apidef.TykEventHandlerName{
 		EH_LogHandler,
 		EH_WebHook,
 	}
@@ -28,8 +26,8 @@ func (ts *Test) prepareSpecWithEvents(logger *logrus.Logger) (spec *APISpec) {
 	}
 	def := &apidef.APIDefinition{
 		EventHandlers: apidef.EventHandlerMetaConfig{
-			Events: map[event.Event][]apidef.EventHandlerTriggerConfig{
-				event.AuthFailure: {
+			Events: map[apidef.TykEvent][]apidef.EventHandlerTriggerConfig{
+				EventAuthFailure: {
 					{
 						Handler: EH_LogHandler,
 						HandlerMeta: map[string]interface{}{
@@ -44,7 +42,7 @@ func (ts *Test) prepareSpecWithEvents(logger *logrus.Logger) (spec *APISpec) {
 
 	spec = &APISpec{APIDefinition: def}
 	// From api_definition.go:
-	spec.EventPaths = make(map[event.Event][]config.TykEventHandler)
+	spec.EventPaths = make(map[apidef.TykEvent][]config.TykEventHandler)
 	for eventName, eventHandlerConfs := range def.EventHandlers.Events {
 		for _, handlerConf := range eventHandlerConfs {
 			eventHandlerInstance, err := ts.Gw.EventHandlerByName(handlerConf, spec)
@@ -64,8 +62,8 @@ func (ts *Test) prepareSpecWithEvents(logger *logrus.Logger) (spec *APISpec) {
 func prepareEventsConf() (conf *config.Config) {
 	return &config.Config{
 		EventHandlers: apidef.EventHandlerMetaConfig{
-			Events: map[event.Event][]apidef.EventHandlerTriggerConfig{
-				event.QuotaExceeded: {
+			Events: map[apidef.TykEvent][]apidef.EventHandlerTriggerConfig{
+				EventQuotaExceeded: {
 					{
 						Handler: EH_LogHandler,
 						HandlerMeta: map[string]interface{}{
@@ -74,7 +72,7 @@ func prepareEventsConf() (conf *config.Config) {
 						},
 					},
 				},
-				event.AuthFailure: {
+				EventAuthFailure: {
 					{
 						Handler: EH_LogHandler,
 						HandlerMeta: map[string]interface{}{
@@ -88,7 +86,7 @@ func prepareEventsConf() (conf *config.Config) {
 	}
 }
 
-func prepareEventHandlerConfig(handler event.HandlerName) (config apidef.EventHandlerTriggerConfig) {
+func prepareEventHandlerConfig(handler apidef.TykEventHandlerName) (config apidef.EventHandlerTriggerConfig) {
 	config.Handler = handler
 	switch handler {
 	case EH_LogHandler:
@@ -128,7 +126,7 @@ func TestLogMessageEventHandler(t *testing.T) {
 	testLogger := logrus.New()
 	testLogger.Out = buf
 	spec := ts.prepareSpecWithEvents(testLogger)
-	handler := spec.EventPaths[event.AuthFailure][0]
+	handler := spec.EventPaths[EventAuthFailure][0]
 	em := config.EventMessage{
 		Type: EventAuthFailure,
 		Meta: EventKeyFailureMeta{
@@ -162,7 +160,7 @@ func TestInitGenericEventHandlers(t *testing.T) {
 	if len(triggers) != 2 {
 		t.Fatal("EventTriggers length doesn't match")
 	}
-	for _, e := range []event.Event{event.QuotaExceeded, event.AuthFailure} {
+	for _, e := range []apidef.TykEvent{EventQuotaExceeded, EventAuthFailure} {
 		if triggers[e] == nil {
 			t.Fatalf("EventTriggers doesn't contain %s handlers", e)
 		}

@@ -13,8 +13,6 @@ import (
 
 	"github.com/kelseyhightower/envconfig"
 
-	"github.com/TykTechnologies/tyk/pkg/event"
-
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/internal/otel"
 	logger "github.com/TykTechnologies/tyk/log"
@@ -1003,9 +1001,9 @@ type Config struct {
 	StatsdPrefix string `json:"statsd_prefix"`
 
 	// Event System
-	EventHandlers        apidef.EventHandlerMetaConfig     `json:"event_handlers"`
-	EventTriggers        map[event.Event][]TykEventHandler `json:"event_trigers_defunct"`  // Deprecated: Config.GetEventTriggers instead.
-	EventTriggersDefunct map[event.Event][]TykEventHandler `json:"event_triggers_defunct"` // Deprecated: Config.GetEventTriggers instead.
+	EventHandlers        apidef.EventHandlerMetaConfig         `json:"event_handlers"`
+	EventTriggers        map[apidef.TykEvent][]TykEventHandler `json:"event_trigers_defunct"`  // Deprecated: Config.GetEventTriggers instead.
+	EventTriggersDefunct map[apidef.TykEvent][]TykEventHandler `json:"event_triggers_defunct"` // Deprecated: Config.GetEventTriggers instead.
 
 	// HideGeneratorHeader will mask the 'X-Generator' and 'X-Mascot-...' headers, if set to true.
 	HideGeneratorHeader bool `json:"hide_generator_header"`
@@ -1169,7 +1167,7 @@ type ConsulConfig struct {
 
 // GetEventTriggers returns event triggers. There was a typo in the json tag.
 // To maintain backward compatibility, this solution is chosen.
-func (c Config) GetEventTriggers() map[event.Event][]TykEventHandler {
+func (c Config) GetEventTriggers() map[apidef.TykEvent][]TykEventHandler {
 	if c.EventTriggersDefunct == nil {
 		return c.EventTriggers
 	}
@@ -1183,7 +1181,7 @@ func (c Config) GetEventTriggers() map[event.Event][]TykEventHandler {
 }
 
 // SetEventTriggers sets events for backwards compatibility
-func (c *Config) SetEventTriggers(eventTriggers map[event.Event][]TykEventHandler) {
+func (c *Config) SetEventTriggers(eventTriggers map[apidef.TykEvent][]TykEventHandler) {
 	c.EventTriggersDefunct = eventTriggers
 }
 
