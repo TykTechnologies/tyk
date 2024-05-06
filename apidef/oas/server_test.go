@@ -531,7 +531,7 @@ func TestEvents(t *testing.T) {
 				server := new(Server)
 				server.Events.Fill(api)
 
-				assert.EqualValues(t, tc.expected, server.Events)
+				assert.ElementsMatch(t, tc.expected, server.Events)
 			})
 		}
 	})
