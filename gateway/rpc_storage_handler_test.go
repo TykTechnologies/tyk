@@ -7,6 +7,8 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/TykTechnologies/tyk/rpc"
+
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
 
@@ -311,26 +313,26 @@ func TestGetGroupLoginCallback(t *testing.T) {
 
 	for _, tc := range tcs {
 		t.Run(tc.testName, func(t *testing.T) {
-			g := StartTest(func(globalConf *config.Config) {
+			ts := StartTest(func(globalConf *config.Config) {
 				globalConf.SlaveOptions.SynchroniserEnabled = tc.syncEnabled
 			})
-			defer g.Close()
-			defer g.Gw.GlobalSessionManager.Store().DeleteAllKeys()
+			defer ts.Close()
+			defer ts.Gw.GlobalSessionManager.Store().DeleteAllKeys()
 
 			rpcListener := RPCStorageHandler{
 				KeyPrefix:        "rpc.listener.",
 				SuppressRegister: true,
-				Gw:               g.Gw,
+				Gw:               ts.Gw,
 			}
 
 			expectedNodeInfo := apidef.NodeData{
-				NodeID:      "",
+				NodeID:      ts.Gw.GetNodeID(),
 				GroupID:     "",
 				APIKey:      "",
-				TTL:         0,
+				TTL:         10,
 				Tags:        nil,
 				NodeVersion: VERSION,
-				Health:      g.Gw.getHealthCheckInfo(),
+				Health:      ts.Gw.getHealthCheckInfo(),
 				Stats: apidef.GWStats{
 					APIsCount:     0,
 					PoliciesCount: 0,
@@ -365,10 +367,9 @@ func TestRPCStorageHandler_BuildNodeInfo(t *testing.T) {
 				return ts
 			},
 			expectedNodeInfo: apidef.NodeData{
-				NodeID:      "",
 				GroupID:     "",
 				APIKey:      "",
-				TTL:         0,
+				TTL:         10,
 				Tags:        nil,
 				NodeVersion: VERSION,
 				Stats: apidef.GWStats{
@@ -383,14 +384,13 @@ func TestRPCStorageHandler_BuildNodeInfo(t *testing.T) {
 				ts := StartTest(func(globalConf *config.Config) {
 					globalConf.SlaveOptions.GroupID = "group"
 					globalConf.DBAppConfOptions.Tags = []string{"tag1"}
-					globalConf.LivenessCheck.CheckDuration = 1
+					globalConf.LivenessCheck.CheckDuration = 1000000000
 					globalConf.SlaveOptions.APIKey = "apikey-test"
 				})
 
 				return ts
 			},
 			expectedNodeInfo: apidef.NodeData{
-				NodeID:      "",
 				GroupID:     "group",
 				APIKey:      "apikey-test",
 				TTL:         1,
@@ -408,7 +408,7 @@ func TestRPCStorageHandler_BuildNodeInfo(t *testing.T) {
 				ts := StartTest(func(globalConf *config.Config) {
 					globalConf.SlaveOptions.GroupID = "group"
 					globalConf.DBAppConfOptions.Tags = []string{"tag1"}
-					globalConf.LivenessCheck.CheckDuration = 1
+					globalConf.LivenessCheck.CheckDuration = 1000000000
 				})
 
 				ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
@@ -425,11 +425,9 @@ func TestRPCStorageHandler_BuildNodeInfo(t *testing.T) {
 						"p1-meta": "p1-value",
 					}
 				})
-
 				return ts
 			},
 			expectedNodeInfo: apidef.NodeData{
-				NodeID:      "",
 				GroupID:     "group",
 				TTL:         1,
 				Tags:        []string{"tag1"},
@@ -446,7 +444,7 @@ func TestRPCStorageHandler_BuildNodeInfo(t *testing.T) {
 				ts := StartTest(func(globalConf *config.Config) {
 					globalConf.SlaveOptions.GroupID = "group"
 					globalConf.DBAppConfOptions.Tags = []string{"tag1", "tag2"}
-					globalConf.LivenessCheck.CheckDuration = 1
+					globalConf.LivenessCheck.CheckDuration = 1000000000
 				})
 
 				ts.Gw.SetNodeID("test-node-id")
@@ -464,6 +462,32 @@ func TestRPCStorageHandler_BuildNodeInfo(t *testing.T) {
 				},
 			},
 		},
+		{
+			testName: "with segmented node",
+			givenTs: func() *Test {
+				ts := StartTest(func(globalConf *config.Config) {
+					globalConf.SlaveOptions.GroupID = "group"
+					globalConf.DBAppConfOptions.Tags = []string{"tag1", "tag2"}
+					globalConf.LivenessCheck.CheckDuration = 1000000000
+					globalConf.DBAppConfOptions.NodeIsSegmented = true
+				})
+
+				ts.Gw.SetNodeID("test-node-id")
+				return ts
+			},
+			expectedNodeInfo: apidef.NodeData{
+				NodeID:          "test-node-id",
+				GroupID:         "group",
+				TTL:             1,
+				Tags:            []string{"tag1", "tag2"},
+				NodeIsSegmented: true,
+				NodeVersion:     VERSION,
+				Stats: apidef.GWStats{
+					APIsCount:     0,
+					PoliciesCount: 0,
+				},
+			},
+		},
 	}
 
 	for _, tc := range tcs {
@@ -474,6 +498,10 @@ func TestRPCStorageHandler_BuildNodeInfo(t *testing.T) {
 			r := &RPCStorageHandler{Gw: ts.Gw}
 
 			tc.expectedNodeInfo.Health = ts.Gw.getHealthCheckInfo()
+
+			if tc.expectedNodeInfo.NodeID == "" {
+				tc.expectedNodeInfo.NodeID = ts.Gw.GetNodeID()
+			}
 
 			expected, err := json.Marshal(tc.expectedNodeInfo)
 			assert.Nil(t, err)
@@ -495,5 +523,89 @@ func TestRPCStorageHandler_Disconnect(t *testing.T) {
 		err := r.Disconnect()
 		expectedErr := errors.New("RPCStorageHandler: rpc is either down or was not configured")
 		assert.EqualError(t, err, expectedErr.Error())
+	})
+}
+
+func TestGetRawKey(t *testing.T) {
+
+	t.Run("rpc cache enabled - normal key", func(t *testing.T) {
+		ts := StartTest(func(globalConf *config.Config) {
+			globalConf.SlaveOptions.EnableRPCCache = true
+		})
+		defer ts.Close()
+
+		rpcListener := RPCStorageHandler{
+			KeyPrefix:        "rpc.listener.",
+			SuppressRegister: true,
+			Gw:               ts.Gw,
+		}
+
+		// first call should fail - key not found
+		givenKey := "test-key"
+		_, err := rpcListener.GetRawKey(givenKey)
+		assert.NotNil(t, err)
+		assert.Equal(t, "key not found", err.Error())
+
+		// second call still fail but from cache
+		_, err = rpcListener.GetRawKey(givenKey)
+		assert.NotNil(t, err)
+		assert.Equal(t, "key not found", err.Error())
+
+		// we override the key in the cache
+		rpcListener.Gw.RPCGlobalCache.Set(givenKey, "test-value", -1)
+		defer rpcListener.Gw.RPCGlobalCache.Delete(givenKey)
+
+		// third call should succeed
+		value, err := rpcListener.GetRawKey(givenKey)
+		assert.Nil(t, err)
+		assert.Equal(t, "test-value", value)
+	})
+	t.Run("rpc cache enabled - cert key", func(t *testing.T) {
+		ts := StartTest(func(globalConf *config.Config) {
+			globalConf.SlaveOptions.EnableRPCCache = true
+		})
+		defer ts.Close()
+
+		rpcListener := RPCStorageHandler{
+			KeyPrefix:        "rpc.listener.",
+			SuppressRegister: true,
+			Gw:               ts.Gw,
+		}
+
+		// first call should fail - key not found
+		givenKey := "cert-test-key"
+		_, err := rpcListener.GetRawKey(givenKey)
+		assert.NotNil(t, err)
+		assert.Equal(t, "key not found", err.Error())
+
+		// second call still fail but from cache
+		_, err = rpcListener.GetRawKey(givenKey)
+		assert.NotNil(t, err)
+		assert.Equal(t, "key not found", err.Error())
+
+		// we override the key in the cache
+		rpcListener.Gw.RPCCertCache.Set(givenKey, "test-value", -1)
+		defer rpcListener.Gw.RPCCertCache.Delete(givenKey)
+
+		// third call should succeed
+		value, err := rpcListener.GetRawKey(givenKey)
+		assert.Nil(t, err)
+		assert.Equal(t, "test-value", value)
+	})
+
+	t.Run("MDCB down, return mdcb lost connection err", func(t *testing.T) {
+		ts := StartTest(func(globalConf *config.Config) {
+			globalConf.SlaveOptions.EnableRPCCache = true
+		})
+		defer ts.Close()
+		rpc.SetEmergencyMode(t, true)
+		rpcListener := RPCStorageHandler{
+			KeyPrefix:        "rpc.listener.",
+			SuppressRegister: true,
+			Gw:               ts.Gw,
+		}
+
+		_, err := rpcListener.GetRawKey("any-key")
+		assert.Equal(t, storage.ErrMDCBConnectionLost, err)
 	})
 }

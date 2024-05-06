@@ -3,9 +3,9 @@ package kv
 import (
 	"testing"
 
-	"github.com/TykTechnologies/tyk/config"
+	consulApi "github.com/hashicorp/consul/api"
 
-	"github.com/hashicorp/consul/api"
+	"github.com/TykTechnologies/tyk/config"
 )
 
 var _ Store = (*Consul)(nil)
@@ -26,7 +26,7 @@ func TestConsul_Get(t *testing.T) {
 
 	con := store.(*Consul)
 
-	_, err = con.store.Put(&api.KVPair{
+	_, err = con.store.Put(&consulApi.KVPair{
 		Key:   "key",
 		Value: []byte("value"),
 	}, nil)

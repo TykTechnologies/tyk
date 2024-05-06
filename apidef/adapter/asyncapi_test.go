@@ -325,7 +325,8 @@ const expectedGraphqlConfig = `{
         "request_headers": null,
         "use_response_extensions": {
             "on_error_forwarding": false
-        }
+        },
+        "request_headers_rewrite": null
     },
     "subgraph": {
         "sdl": ""
@@ -335,6 +336,9 @@ const expectedGraphqlConfig = `{
         "merged_sdl": "",
         "global_headers": null,
         "disable_query_batching": false
+    },
+    "introspection": {
+        "disabled": false
     }
 }`
 

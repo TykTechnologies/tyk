@@ -2,6 +2,7 @@ package storage
 
 import (
 	"errors"
+	"strings"
 
 	"github.com/sirupsen/logrus"
 )
@@ -35,7 +36,8 @@ func (m MdcbStorage) GetKey(key string) (string, error) {
 		val, err = m.rpc.GetKey(key)
 
 		if err != nil {
-			m.logger.Error("cannot retrieve key from rpc:" + err.Error())
+			resourceType := getResourceType(key)
+			m.logger.Errorf("cannot retrieve %v from rpc: %v", resourceType, err.Error())
 			return val, err
 		}
 
@@ -50,8 +52,32 @@ func (m MdcbStorage) GetKey(key string) (string, error) {
 	return val, err
 }
 
-func (m MdcbStorage) GetMultiKey([]string) ([]string, error) {
-	panic("implement me")
+func getResourceType(key string) string {
+	switch {
+	case strings.Contains(key, "oauth-clientid."):
+		return "Oauth Client"
+	case strings.HasPrefix(key, "cert"):
+		return "certificate"
+	case strings.HasPrefix(key, "apikey"):
+		return "api key"
+	default:
+		return "key"
+	}
+}
+
+// GetMultiKey gets multiple keys from the MDCB layer
+func (m MdcbStorage) GetMultiKey(keyNames []string) ([]string, error) {
+	var err error
+	var value string
+
+	for _, key := range keyNames {
+		value, err = m.GetKey(key)
+		if err == nil {
+			return []string{value}, nil
+		}
+	}
+
+	return nil, err
 }
 
 func (m MdcbStorage) GetRawKey(string) (string, error) {

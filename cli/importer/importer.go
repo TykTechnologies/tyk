@@ -11,7 +11,7 @@ import (
 
 	log "github.com/sirupsen/logrus"
 
-	kingpin "gopkg.in/alecthomas/kingpin.v2"
+	kingpin "github.com/alecthomas/kingpin/v2"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/apidef/importer"
@@ -23,7 +23,8 @@ const (
 )
 
 var (
-	imp            *Importer
+	imp *Importer = &Importer{}
+
 	errUnknownMode = errors.New("Unknown mode")
 )
 
@@ -40,10 +41,6 @@ type Importer struct {
 	asMock         *bool
 	forAPI         *string
 	asVersion      *string
-}
-
-func init() {
-	imp = &Importer{}
 }
 
 // AddTo initializes an importer object.

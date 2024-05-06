@@ -74,6 +74,7 @@ func (r rpcOpts) ClientIsConnected() bool {
 	if v := r.clientIsConnected.Load(); v != nil {
 		return v.(bool)
 	}
+
 	return false
 }
 

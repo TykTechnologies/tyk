@@ -5,68 +5,69 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+
+	"github.com/TykTechnologies/tyk/internal/build"
 )
 
 // GetPluginFileNameToLoad check which file to load based on name, tyk version, os and architecture
 // but it also takes care of returning the name of the file that exists
-func GetPluginFileNameToLoad(pluginStorage storage, path string, version string) (string, error) {
-
-	prefixedGwVersion := getPrefixedVersion(version)
-	newNamingFormat := getPluginNameFromTykVersion(prefixedGwVersion, path)
+func GetPluginFileNameToLoad(pluginStorage storage, pluginPath string) (string, error) {
+	var (
+		versionPrefixed = getPrefixedVersion()
+		version         = versionPrefixed[1:]
+	)
 
 	// 1. attempt to load a plugin that follow the new standard
+	newNamingFormat := getPluginNameFromTykVersion(versionPrefixed, pluginPath)
 	if pluginStorage.fileExist(newNamingFormat) {
 		return newNamingFormat, nil
 	}
 
 	// 2. attempt to load a plugin that follows the new standard but gw version is not prefixed
-	if !strings.HasPrefix(version, "v") {
-		newNamingFormat = getPluginNameFromTykVersion(version, path)
-
-		if pluginStorage.fileExist(newNamingFormat) {
-			return newNamingFormat, nil
-		}
+	newNamingFormat = getPluginNameFromTykVersion(version, pluginPath)
+	if pluginStorage.fileExist(newNamingFormat) {
+		return newNamingFormat, nil
 	}
 
 	// 3. attempt to load the exact name provided
-	if !pluginStorage.fileExist(path) {
+	if !pluginStorage.fileExist(pluginPath) {
 		return "", errors.New("plugin file not found")
 	}
 
-	return path, nil
+	return pluginPath, nil
 }
 
-// getPluginNameFromTykVersion builds a name of plugin based on tyk version
-// os and architecture. The structure of the plugin name looks like:
+// getPluginNameFromTykVersion builds a name of plugin based on tyk version,
+// GOOS, and GOARCH of the build. The structure of the plugin name looks like:
 // {plugin-dir}/{plugin-name}_{GW-version}_{OS}_{arch}.so
-// it doesn't check if the file exist
-func getPluginNameFromTykVersion(version string, path string) string {
-	if path == "" {
+func getPluginNameFromTykVersion(version string, pluginPath string) string {
+	if pluginPath == "" {
 		return ""
 	}
 
-	pluginDir := filepath.Dir(path)
 	// remove plugin extension to have the plugin's clean name
-	pluginName := strings.TrimSuffix(filepath.Base(path), ".so")
-	os := runtime.GOOS
-	architecture := runtime.GOARCH
+	pluginName := strings.TrimSuffix(filepath.Base(pluginPath), ".so")
+	pluginDir := filepath.Dir(pluginPath)
 
-	// sanitize away `-rc15` suffixes (remove `-*`) from version
-	vs := strings.Split(version, "-")
-	if len(vs) > 0 {
-		version = vs[0]
-	}
-
-	newPluginName := strings.Join([]string{pluginName, version, os, architecture}, "_")
+	// produce a `name_{version}_{goos}_{goarch}` for loading
+	newPluginName := strings.Join([]string{pluginName, version, runtime.GOOS, runtime.GOARCH}, "_")
 	newPluginPath := pluginDir + "/" + newPluginName + ".so"
 
 	return newPluginPath
 }
 
-// getPrefixedVersion receives a version and check that it has the prefix 'v' otherwise, it adds it
-func getPrefixedVersion(version string) string {
+// getPrefixedVersion takes the injected build.Version and ensures
+// it's returned containing a `v` prefix. It cleans up any rc tags
+// that are delimited with a `-`.
+func getPrefixedVersion() string {
+	version := build.Version
 	if !strings.HasPrefix(version, "v") {
 		version = "v" + version
+	}
+	// sanitize away `-rc15`-like suffixes (remove `-*`) from version
+	if strings.Contains(version, "-") {
+		vs := strings.SplitN(version, "-", 2)
+		version = vs[0]
 	}
 	return version
 }

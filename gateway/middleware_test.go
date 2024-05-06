@@ -37,7 +37,7 @@ func TestBaseMiddleware_OrgSessionExpiry(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
-	m := BaseMiddleware{
+	m := &BaseMiddleware{
 		Spec: &APISpec{
 			GlobalConfig: config.Config{
 				EnforceOrgDataAge: true,
@@ -80,7 +80,7 @@ func TestBaseMiddleware_getAuthType(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
-	baseMid := BaseMiddleware{Spec: spec, Gw: ts.Gw}
+	baseMid := &BaseMiddleware{Spec: spec, Gw: ts.Gw}
 
 	r, _ := http.NewRequest(http.MethodGet, "", nil)
 	r.Header.Set("h1", "t1")
@@ -133,7 +133,7 @@ func TestBaseMiddleware_getAuthToken(t *testing.T) {
 		ts := StartTest(nil)
 		defer ts.Close()
 
-		baseMid := BaseMiddleware{Spec: spec, Gw: ts.Gw}
+		baseMid := &BaseMiddleware{Spec: spec, Gw: ts.Gw}
 
 		r, _ := http.NewRequest(http.MethodGet, "", nil)
 		r.AddCookie(&http.Cookie{
@@ -161,7 +161,7 @@ func TestBaseMiddleware_getAuthToken(t *testing.T) {
 		ts := StartTest(nil)
 		defer ts.Close()
 
-		baseMid := BaseMiddleware{Spec: spec, Gw: ts.Gw}
+		baseMid := &BaseMiddleware{Spec: spec, Gw: ts.Gw}
 
 		r, _ := http.NewRequest(http.MethodGet, "", nil)
 		r.AddCookie(&http.Cookie{
@@ -189,7 +189,7 @@ func TestBaseMiddleware_getAuthToken(t *testing.T) {
 		ts := StartTest(nil)
 		defer ts.Close()
 
-		baseMid := BaseMiddleware{Spec: spec, Gw: ts.Gw}
+		baseMid := &BaseMiddleware{Spec: spec, Gw: ts.Gw}
 
 		r, _ := http.NewRequest(http.MethodGet, "", nil)
 		r.Header.Set("h1", "t1")
@@ -214,7 +214,7 @@ func TestBaseMiddleware_getAuthToken(t *testing.T) {
 		ts := StartTest(nil)
 		defer ts.Close()
 
-		baseMid := BaseMiddleware{Spec: spec, Gw: ts.Gw}
+		baseMid := &BaseMiddleware{Spec: spec, Gw: ts.Gw}
 
 		r, _ := http.NewRequest(http.MethodGet, "", nil)
 		r.URL.RawQuery = "q1=t1"
@@ -239,7 +239,7 @@ func TestBaseMiddleware_getAuthToken(t *testing.T) {
 		ts := StartTest(nil)
 		defer ts.Close()
 
-		baseMid := BaseMiddleware{Spec: spec, Gw: ts.Gw}
+		baseMid := &BaseMiddleware{Spec: spec, Gw: ts.Gw}
 
 		r, _ := http.NewRequest(http.MethodGet, "", nil)
 		r.URL.RawQuery = "q1=t1"
@@ -342,4 +342,121 @@ func TestSessionLimiter_RedisQuotaExceeded_PerAPI(t *testing.T) {
 	// for api3 - global
 	sendReqAndCheckQuota(t, apis[2].APIID, 24, false)
 	sendReqAndCheckQuota(t, apis[2].APIID, 23, false)
+}
+
+func TestCopyAllowedURLs(t *testing.T) {
+	testCases := []struct {
+		name  string
+		input []user.AccessSpec
+	}{
+		{
+			name: "Copy non-empty slice of AccessSpec with non-empty Methods",
+			input: []user.AccessSpec{
+				{
+					URL:     "http://example.com",
+					Methods: []string{"GET", "POST"},
+				},
+				{
+					URL:     "http://example.org",
+					Methods: []string{"GET"},
+				},
+			},
+		},
+		{
+			name: "Copy non-empty slice of AccessSpec with empty Methods",
+			input: []user.AccessSpec{
+				{
+					URL:     "http://example.com",
+					Methods: []string{},
+				},
+				{
+					URL:     "http://example.org",
+					Methods: []string{},
+				},
+			},
+		},
+		{
+			name: "Copy non-empty slice of AccessSpec with nil Methods",
+			input: []user.AccessSpec{
+				{
+					URL:     "http://example.com",
+					Methods: nil,
+				},
+				{
+					URL:     "http://example.org",
+					Methods: nil,
+				},
+			},
+		},
+		{
+			name:  "Copy empty slice of AccessSpec",
+			input: []user.AccessSpec{},
+		},
+		{
+			name:  "Copy nil slice of AccessSpec",
+			input: []user.AccessSpec(nil),
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			copied := copyAllowedURLs(tc.input)
+			assert.Equal(t, tc.input, copied)
+		})
+	}
+}
+
+func TestQuotaNotAppliedWithURLRewrite(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	spec := ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		spec.Proxy.ListenPath = "/quota-test"
+		spec.UseKeylessAccess = false
+		UpdateAPIVersion(spec, "Default", func(v *apidef.VersionInfo) {
+			v.ExtendedPaths.URLRewrite = []apidef.URLRewriteMeta{{
+				Path:         "/abc",
+				Method:       http.MethodGet,
+				MatchPattern: "/abc",
+				RewriteTo:    "tyk://self/anything",
+			}}
+		})
+	})[0]
+
+	_, authKey := ts.CreateSession(func(s *user.SessionState) {
+		s.AccessRights = map[string]user.AccessDefinition{
+			spec.APIID: {
+				APIName:  spec.Name,
+				APIID:    spec.APIID,
+				Versions: []string{"default"},
+				Limit: user.APILimit{
+					QuotaMax:         2,
+					QuotaRenewalRate: 3600,
+				},
+				AllowanceScope: spec.APIID,
+			},
+		}
+		s.OrgID = spec.OrgID
+	})
+
+	authorization := map[string]string{
+		"Authorization": authKey,
+	}
+	_, _ = ts.Run(t, []test.TestCase{
+		{
+			Headers: authorization,
+			Path:    "/quota-test/abc",
+			Code:    http.StatusOK,
+		},
+		{
+			Headers: authorization,
+			Path:    "/quota-test/abc",
+			Code:    http.StatusOK,
+		},
+		{
+			Headers: authorization,
+			Path:    "/quota-test/abc",
+			Code:    http.StatusForbidden,
+		},
+	}...)
 }

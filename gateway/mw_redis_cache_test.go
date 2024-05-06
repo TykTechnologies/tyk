@@ -27,7 +27,7 @@ func TestRedisCacheMiddlewareUnit(t *testing.T) {
 		{
 			Name: "isTimeStampExpired",
 			Fn: func(t *testing.T) {
-				mw := &RedisCacheMiddleware{}
+				mw := &RedisCacheMiddleware{BaseMiddleware: &BaseMiddleware{}}
 
 				assert.True(t, mw.isTimeStampExpired("invalid"))
 				assert.True(t, mw.isTimeStampExpired("1"))
@@ -38,7 +38,7 @@ func TestRedisCacheMiddlewareUnit(t *testing.T) {
 		{
 			Name: "decodePayload",
 			Fn: func(t *testing.T) {
-				mw := &RedisCacheMiddleware{}
+				mw := &RedisCacheMiddleware{BaseMiddleware: &BaseMiddleware{}}
 
 				if data, expire, err := mw.decodePayload("dGVzdGluZwo=|123"); true {
 					assert.Equal(t, "testing\n", data)
@@ -141,10 +141,10 @@ func TestRedisCacheMiddleware(t *testing.T) {
 
 		t.Run("with cache and dynamic redis", func(t *testing.T) {
 			createAPI(true)
-			ts.Gw.RedisController.DisableRedis(true)
+			ts.Gw.StorageConnectionHandler.DisableStorage(true)
 			subCheck(t, false, p)
 
-			ts.Gw.RedisController.DisableRedis(false)
+			ts.Gw.StorageConnectionHandler.DisableStorage(false)
 			subCheck(t, true, p)
 		})
 	}

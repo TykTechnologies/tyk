@@ -27,7 +27,7 @@ import (
 	"golang.org/x/net/http2"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
-	pb "google.golang.org/grpc/examples/helloworld/helloworld"
+	pbExample "google.golang.org/grpc/examples/helloworld/helloworld"
 
 	"github.com/TykTechnologies/tyk/test"
 	"github.com/TykTechnologies/tyk/user"
@@ -483,13 +483,13 @@ func TestGRPC_TokenBasedAuthentication(t *testing.T) {
 
 // server is used to implement helloworld.GreeterServer.
 type server struct {
-	pb.UnimplementedGreeterServer
+	pbExample.UnimplementedGreeterServer
 }
 
 // SayHello implements helloworld.GreeterServer
-func (s *server) SayHello(ctx context.Context, in *pb.HelloRequest) (*pb.HelloReply, error) {
+func (s *server) SayHello(ctx context.Context, in *pbExample.HelloRequest) (*pbExample.HelloReply, error) {
 	log.Printf("Received: %v", in.Name)
-	return &pb.HelloReply{Message: "Hello " + in.Name}, nil
+	return &pbExample.HelloReply{Message: "Hello " + in.Name}, nil
 }
 
 func startGRPCServerH2C(t *testing.T, fn func(*testing.T, *grpc.Server)) (net.Listener, *grpc.Server) {
@@ -553,7 +553,7 @@ func grpcServerCreds(t *testing.T, clientCert *x509.Certificate) []grpc.ServerOp
 }
 
 func setupHelloSVC(t *testing.T, s *grpc.Server) {
-	pb.RegisterGreeterServer(s, &server{})
+	pbExample.RegisterGreeterServer(s, &server{})
 }
 
 func startGRPCServer(t *testing.T, clientCert *x509.Certificate, fn func(t *testing.T, s *grpc.Server)) (net.Listener, *grpc.Server) {
@@ -572,18 +572,18 @@ func startGRPCServer(t *testing.T, clientCert *x509.Certificate, fn func(t *test
 
 }
 
-func sayHelloWithGRPCClientH2C(t *testing.T, address string, name string) *pb.HelloReply {
+func sayHelloWithGRPCClientH2C(t *testing.T, address string, name string) *pbExample.HelloReply {
 	conn, err := grpc.Dial(address, grpc.WithInsecure())
 	if err != nil {
 		t.Fatalf("did not connect: %v", err)
 	}
 	defer conn.Close()
-	c := pb.NewGreeterClient(conn)
+	c := pbExample.NewGreeterClient(conn)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	var header metadata.MD
-	r, err := c.SayHello(ctx, &pb.HelloRequest{Name: name}, grpc.Header(&header))
+	r, err := c.SayHello(ctx, &pbExample.HelloRequest{Name: name}, grpc.Header(&header))
 	if err != nil {
 		t.Fatalf("could not greet: %v", err)
 	}
@@ -624,7 +624,7 @@ func grpcCreds(cert *tls.Certificate, caCert []byte, basicAuth bool, token strin
 	return opts
 }
 
-func sayHelloWithGRPCClient(t *testing.T, cert *tls.Certificate, caCert []byte, basicAuth bool, token string, address string, name string) *pb.HelloReply {
+func sayHelloWithGRPCClient(t *testing.T, cert *tls.Certificate, caCert []byte, basicAuth bool, token string, address string, name string) *pbExample.HelloReply {
 	// gRPC client
 	opts := grpcCreds(cert, caCert, basicAuth, token)
 	conn, err := grpc.Dial(address, opts...)
@@ -632,11 +632,11 @@ func sayHelloWithGRPCClient(t *testing.T, cert *tls.Certificate, caCert []byte, 
 		t.Fatalf("did not connect: %v", err)
 	}
 	defer conn.Close()
-	c := pb.NewGreeterClient(conn)
+	c := pbExample.NewGreeterClient(conn)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	r, err := c.SayHello(ctx, &pb.HelloRequest{Name: name})
+	r, err := c.SayHello(ctx, &pbExample.HelloRequest{Name: name})
 	if err != nil {
 		t.Fatalf("could not greet: %v", err)
 	}

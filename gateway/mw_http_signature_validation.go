@@ -1,7 +1,6 @@
 package gateway
 
 import (
-	"crypto"
 	"crypto/hmac"
 	"crypto/rsa"
 	"crypto/sha1"
@@ -21,6 +20,7 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/internal/crypto"
 	"github.com/TykTechnologies/tyk/regexp"
 	"github.com/TykTechnologies/tyk/user"
 )
@@ -30,7 +30,8 @@ const altHeaderSpec = "x-aux-date"
 
 // HTTPSignatureValidationMiddleware will check if the request has a signature, and if the request is allowed through
 type HTTPSignatureValidationMiddleware struct {
-	BaseMiddleware
+	*BaseMiddleware
+
 	lowercasePattern *regexp.Regexp
 }
 
@@ -184,8 +185,7 @@ func (hm *HTTPSignatureValidationMiddleware) ProcessRequest(w http.ResponseWrite
 
 		if !matchPass {
 			logger.WithFields(logrus.Fields{
-				"expected": encodedSignature,
-				"got":      fieldValues.Signature,
+				"got": fieldValues.Signature,
 			}).Error("Signature string does not match!")
 			return hm.authorizationError(r)
 		}

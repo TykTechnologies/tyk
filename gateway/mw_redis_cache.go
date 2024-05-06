@@ -29,7 +29,7 @@ const (
 
 // RedisCacheMiddleware is a caching middleware that will pull data from Redis instead of the upstream proxy
 type RedisCacheMiddleware struct {
-	BaseMiddleware
+	*BaseMiddleware
 
 	store storage.Handler
 	sh    SuccessHandler

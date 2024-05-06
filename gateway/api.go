@@ -68,6 +68,10 @@ import (
 	gql "github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
 )
 
+const (
+	oAuthClientTokensKeyPattern = "oauth-data.*oauth-client-tokens.*"
+)
+
 var (
 	ErrRequestMalformed = errors.New("request malformed")
 )
@@ -252,7 +256,7 @@ func (gw *Gateway) checkAndApplyTrialPeriod(keyName string, newSession *user.Ses
 
 func (gw *Gateway) applyPoliciesAndSave(keyName string, session *user.SessionState, spec *APISpec, isHashed bool) error {
 	// use basic middleware to apply policies to key/session (it also saves it)
-	mw := BaseMiddleware{
+	mw := &BaseMiddleware{
 		Spec: spec,
 		Gw:   gw,
 	}
@@ -443,7 +447,7 @@ func (gw *Gateway) handleAddOrUpdate(keyName string, r *http.Request, isHashed b
 		return apiError("Request malformed"), http.StatusBadRequest
 	}
 
-	mw := BaseMiddleware{Gw: gw}
+	mw := &BaseMiddleware{Gw: gw}
 	// TODO: handle apply policies error
 	mw.ApplyPolicies(newSession)
 	// DO ADD OR UPDATE
@@ -603,7 +607,7 @@ func (gw *Gateway) handleGetDetail(sessionKey, apiID, orgID string, byHash bool)
 		return apiError("Key not found"), http.StatusNotFound
 	}
 
-	mw := BaseMiddleware{Spec: spec, Gw: gw}
+	mw := &BaseMiddleware{Spec: spec, Gw: gw}
 	// TODO: handle apply policies error
 	mw.ApplyPolicies(&session)
 
@@ -739,12 +743,13 @@ func (gw *Gateway) handleAddKey(keyName, sessionString, orgId string) {
 			"status": "fail",
 			"err":    err,
 		}).Error("Failed to update key.")
+		return
 	}
 	log.WithFields(logrus.Fields{
 		"prefix": "RPC",
 		"key":    gw.obfuscateKey(keyName),
 		"status": "ok",
-	}).Info("Updated hashed key in slave storage.")
+	}).Info("Updated key in slave storage.")
 }
 
 func (gw *Gateway) handleDeleteKey(keyName, orgID, apiID string, resetQuota bool) (interface{}, int) {
@@ -1183,7 +1188,7 @@ func (gw *Gateway) handleUpdateApi(apiID string, r *http.Request, fs afero.Fs, o
 		oasObj.ExtractTo(&newDef)
 	} else {
 		if spec.IsOAS {
-			return apiError(apidef.ErrAPIMigrated.Error()), http.StatusBadRequest
+			return apiError(apidef.ErrClassicAPIExpected.Error()), http.StatusBadRequest
 		}
 
 		if err := json.NewDecoder(r.Body).Decode(&newDef); err != nil {
@@ -1891,11 +1896,9 @@ func (gw *Gateway) handleDeleteOrgKey(orgID string) (interface{}, int) {
 	}).Info("Org key deleted.")
 
 	// identify that spec has no org session
-	if spec != nil {
-		spec.Lock()
-		spec.OrgHasNoSession = true
-		spec.Unlock()
-	}
+	spec.Lock()
+	spec.OrgHasNoSession = true
+	spec.Unlock()
 
 	statusObj := apiModifyKeySuccess{
 		Key:    orgID,
@@ -1975,7 +1978,7 @@ func (gw *Gateway) createKeyHandler(w http.ResponseWriter, r *http.Request) {
 
 	sessionManager := gw.GlobalSessionManager
 
-	mw := BaseMiddleware{Gw: gw}
+	mw := &BaseMiddleware{Gw: gw}
 	if err := mw.ApplyPolicies(newSession); err != nil {
 		doJSONWrite(w, http.StatusInternalServerError, apiError("Failed to create key - "+err.Error()))
 		return
@@ -2097,7 +2100,7 @@ func (gw *Gateway) previewKeyHandler(w http.ResponseWriter, r *http.Request) {
 	newSession.LastUpdated = strconv.Itoa(int(time.Now().Unix()))
 	newSession.DateCreated = time.Now()
 
-	mw := BaseMiddleware{Gw: gw}
+	mw := &BaseMiddleware{Gw: gw}
 	// TODO: handle apply policies error
 	mw.ApplyPolicies(newSession)
 
@@ -2236,7 +2239,7 @@ func (gw *Gateway) createOauthClient(w http.ResponseWriter, r *http.Request) {
 							&RedisOsinStorageInterface{
 								storageManager,
 								gw.GlobalSessionManager,
-								&storage.RedisCluster{KeyPrefix: prefix, HashKeys: false, RedisController: gw.RedisController},
+								&storage.RedisCluster{KeyPrefix: prefix, HashKeys: false, ConnectionHandler: gw.StorageConnectionHandler},
 								apiSpec.OrgID,
 								gw,
 							}),
@@ -2622,7 +2625,7 @@ func (gw *Gateway) getOauthClientDetails(keyName, apiID string) (interface{}, in
 				&RedisOsinStorageInterface{
 					storageManager,
 					gw.GlobalSessionManager,
-					&storage.RedisCluster{KeyPrefix: prefix, HashKeys: false, RedisController: gw.RedisController},
+					&storage.RedisCluster{KeyPrefix: prefix, HashKeys: false, ConnectionHandler: gw.StorageConnectionHandler},
 					apiSpec.OrgID,
 					gw,
 				}),
@@ -2650,6 +2653,26 @@ func (gw *Gateway) getOauthClientDetails(keyName, apiID string) (interface{}, in
 	}).Info("Retrieved OAuth client ID")
 
 	return reportableClientData, http.StatusOK
+}
+
+func (gw *Gateway) oAuthTokensHandler(w http.ResponseWriter, r *http.Request) {
+	if !r.URL.Query().Has("scope") {
+		doJSONWrite(w, http.StatusUnprocessableEntity, apiError("scope parameter is required"))
+		return
+	}
+
+	if r.URL.Query().Get("scope") != "lapsed" {
+		doJSONWrite(w, http.StatusBadRequest, apiError("unknown scope"))
+		return
+	}
+
+	err := gw.purgeLapsedOAuthTokens()
+	if err != nil {
+		doJSONWrite(w, http.StatusInternalServerError, apiError("error purging lapsed tokens"))
+		return
+	}
+
+	doJSONWrite(w, http.StatusOK, apiOk("lapsed tokens purged"))
 }
 
 // Delete Client
@@ -2822,11 +2845,7 @@ func userRatesCheck(w http.ResponseWriter, r *http.Request) {
 func (gw *Gateway) invalidateCacheHandler(w http.ResponseWriter, r *http.Request) {
 	apiID := mux.Vars(r)["apiID"]
 
-	keyPrefix := "cache-" + apiID
-	matchPattern := keyPrefix + "*"
-	store := storage.RedisCluster{KeyPrefix: keyPrefix, IsCache: true, RedisController: gw.RedisController}
-
-	if ok := store.DeleteScanMatch(matchPattern); !ok {
+	if ok := gw.invalidateAPICache(apiID); !ok {
 		err := errors.New("scan/delete failed")
 		var orgid string
 		if spec := gw.getApiSpec(apiID); spec != nil {
@@ -2988,7 +3007,7 @@ func (gw *Gateway) validateOAS(next http.HandlerFunc) http.HandlerFunc {
 			return
 		}
 
-		if err = oasObj.Validate(r.Context()); err != nil {
+		if err = oasObj.Validate(r.Context(), oas.GetValidationOptionsFromConfig(gw.GetConfig().OAS)...); err != nil {
 			doJSONWrite(w, http.StatusBadRequest, apiError(err.Error()))
 			return
 		}

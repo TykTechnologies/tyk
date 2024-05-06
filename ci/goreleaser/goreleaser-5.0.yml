@@ -10,7 +10,10 @@ builds:
     flags:
       - -tags=goplugin
     ldflags:
-      - -X github.com/TykTechnologies/tyk/gateway.VERSION={{.Version}} -X github.com/TykTechnologies/tyk/gateway.Commit={{.FullCommit}} -X github.com/TykTechnologies/tyk/gateway.buildDate={{.Date}} -X github.com/TykTechnologies/tyk/gateway.builtBy=goreleaser
+      - -X github.com/TykTechnologies/tyk/internal/build.Version={{.Version}}
+      - -X github.com/TykTechnologies/tyk/internal/build.Commit={{.FullCommit}}
+      - -X github.com/TykTechnologies/tyk/internal/build.BuildDate={{.Date}}
+      - -X github.com/TykTechnologies/tyk/internal/build.BuiltBy=goreleaser
     goos:
       - linux
     goarch:
@@ -20,7 +23,10 @@ builds:
     flags:
       - -tags=goplugin
     ldflags:
-      - -X github.com/TykTechnologies/tyk/gateway.VERSION={{.Version}} -X github.com/TykTechnologies/tyk/gateway.Commit={{.FullCommit}} -X github.com/TykTechnologies/tyk/gateway.buildDate={{.Date}} -X github.com/TykTechnologies/tyk/gateway.builtBy=goreleaser
+      - -X github.com/TykTechnologies/tyk/internal/build.Version={{.Version}}
+      - -X github.com/TykTechnologies/tyk/internal/build.Commit={{.FullCommit}}
+      - -X github.com/TykTechnologies/tyk/internal/build.BuildDate={{.Date}}
+      - -X github.com/TykTechnologies/tyk/internal/build.BuiltBy=goreleaser
     env:
       - CC=aarch64-linux-gnu-gcc
     goos:

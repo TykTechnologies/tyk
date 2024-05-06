@@ -7,6 +7,7 @@ import (
 
 	"github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
 
+	"github.com/TykTechnologies/tyk/internal/graphengine"
 	"github.com/TykTechnologies/tyk/user"
 )
 
@@ -19,7 +20,7 @@ const (
 )
 
 type GraphQLComplexityMiddleware struct {
-	BaseMiddleware
+	*BaseMiddleware
 }
 
 func (m *GraphQLComplexityMiddleware) Name() string {
@@ -38,14 +39,24 @@ func (m *GraphQLComplexityMiddleware) ProcessRequest(w http.ResponseWriter, r *h
 		return m.handleComplexityFailReason(ComplexityFailReasonInternalError)
 	}
 
-	gqlRequest := ctxGetGraphQLRequest(r)
-	if gqlRequest == nil {
-		return nil, http.StatusOK
+	graphEngineComplexityAccessDefinition := &graphengine.ComplexityAccessDefinition{
+		Limit: graphengine.ComplexityLimit{
+			MaxQueryDepth: accessDef.Limit.MaxQueryDepth,
+		},
+		FieldAccessRights: []graphengine.ComplexityFieldAccessDefinition{},
 	}
 
-	complexityCheck := &GraphqlComplexityChecker{logger: m.Logger()}
-	failReason := complexityCheck.DepthLimitExceeded(gqlRequest, accessDef, m.Spec.GraphQLExecutor.Schema)
-	return m.handleComplexityFailReason(failReason)
+	for _, fieldAccessRight := range accessDef.FieldAccessRights {
+		graphEngineComplexityAccessDefinition.FieldAccessRights = append(graphEngineComplexityAccessDefinition.FieldAccessRights, graphengine.ComplexityFieldAccessDefinition{
+			TypeName:  fieldAccessRight.TypeName,
+			FieldName: fieldAccessRight.FieldName,
+			Limits: graphengine.ComplexityFieldLimits{
+				MaxQueryDepth: fieldAccessRight.Limits.MaxQueryDepth,
+			},
+		})
+	}
+
+	return m.Spec.GraphEngine.ProcessGraphQLComplexity(r, graphEngineComplexityAccessDefinition)
 }
 
 func (m *GraphQLComplexityMiddleware) handleComplexityFailReason(failReason ComplexityFailReason) (error, int) {

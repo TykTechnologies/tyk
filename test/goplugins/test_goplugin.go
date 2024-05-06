@@ -189,13 +189,26 @@ func MyAnalyticsPluginMaskJSONLoginBody(record *analytics.AnalyticsRecord) {
 		jsonparser.EachKey(body, func(idx int, _ []byte, _ jsonparser.ValueType, _ error) {
 			body, _ = jsonparser.Set(body, mask, paths[idx]...)
 		}, paths...)
-		if err == nil {
-			record.RawRequest = base64.StdEncoding.EncodeToString(append(d[:i+4], body...))
-		}
+
+		record.RawRequest = base64.StdEncoding.EncodeToString(append(d[:i+4], body...))
 	}
 }
 
 func MyPluginAccessingOASAPI(rw http.ResponseWriter, r *http.Request) {
 	oas := ctx.GetOASDefinition(r)
 	rw.Header().Add("X-OAS-Doc-Title", oas.Info.Title)
+}
+
+func MyPluginReturningError(rw http.ResponseWriter, r *http.Request) {
+	rw.WriteHeader(http.StatusTeapot)
+	rw.Write([]byte(http.StatusText(http.StatusTeapot)))
+}
+
+func MyPluginApplyingPolicy(rw http.ResponseWriter, r *http.Request) {
+	session := &user.SessionState{
+		KeyID:         "my-key",
+		ApplyPolicies: []string{"my-pol"},
+	}
+
+	ctx.SetSession(r, session, true)
 }

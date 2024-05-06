@@ -4,6 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
+
+	"github.com/TykTechnologies/tyk/config"
 
 	"github.com/getkin/kin-openapi/openapi3"
 
@@ -305,10 +308,18 @@ func (s *OAS) AddServers(apiURLs ...string) {
 	apiURLSet := make(map[string]struct{})
 	newServers := openapi3.Servers{}
 	for _, apiURL := range apiURLs {
+		if strings.Contains(apiURL, "{") && strings.Contains(apiURL, "}") {
+			continue
+		}
+
 		newServers = append(newServers, &openapi3.Server{
 			URL: apiURL,
 		})
 		apiURLSet[apiURL] = struct{}{}
+	}
+
+	if len(newServers) == 0 {
+		return
 	}
 
 	if len(s.Servers) == 0 {
@@ -330,6 +341,18 @@ func (s *OAS) AddServers(apiURLs ...string) {
 
 // UpdateServers sets or updates the first servers URL if it matches oldAPIURL.
 func (s *OAS) UpdateServers(apiURL, oldAPIURL string) {
+	apiURLContainsNamedRegex := strings.Contains(apiURL, "{") && strings.Contains(apiURL, "}")
+	serverAddedByTyk := len(s.Servers) > 0 && s.Servers[0].URL == oldAPIURL
+
+	if apiURLContainsNamedRegex && serverAddedByTyk {
+		s.Servers = s.Servers[1:]
+		return
+	}
+
+	if serverAddedByTyk {
+		s.Servers[0].URL = apiURL
+	}
+
 	if len(s.Servers) == 0 {
 		s.Servers = openapi3.Servers{
 			{
@@ -337,10 +360,6 @@ func (s *OAS) UpdateServers(apiURL, oldAPIURL string) {
 			},
 		}
 		return
-	}
-
-	if len(s.Servers) > 0 && s.Servers[0].URL == oldAPIURL {
-		s.Servers[0].URL = apiURL
 	}
 }
 
@@ -411,12 +430,16 @@ func MigrateAndFillOAS(api *apidef.APIDefinition) (APIDef, []APIDef, error) {
 
 func newOASFromClassicAPIDefinition(api *apidef.APIDefinition) (*OAS, error) {
 	api.IsOAS = true
+	api.EnableContextVars = true
 	var oas OAS
 	oas.Fill(*api)
 	oas.setRequiredFields(api.Name, api.VersionName)
 	clearClassicAPIForSomeFeatures(api)
 
-	err := oas.Validate(context.Background())
+	err := oas.Validate(context.Background(), []openapi3.ValidationOption{
+		openapi3.DisableExamplesValidation(),
+		openapi3.DisableSchemaDefaultsValidation(),
+	}...)
 	if err != nil {
 		return nil, err
 	}
@@ -446,4 +469,19 @@ func clearClassicAPIForSomeFeatures(api *apidef.APIDefinition) {
 	vInfo := api.VersionData.Versions[Main]
 	vInfo.ExtendedPaths.ValidateJSON = nil
 	api.VersionData.Versions[Main] = vInfo
+}
+
+// GetValidationOptionsFromConfig retrieves validation options based on the configuration settings.
+func GetValidationOptionsFromConfig(oasConfig config.OASConfig) []openapi3.ValidationOption {
+	var opts []openapi3.ValidationOption
+
+	if !oasConfig.ValidateSchemaDefaults {
+		opts = append(opts, openapi3.DisableSchemaDefaultsValidation())
+	}
+
+	if !oasConfig.ValidateExamples {
+		opts = append(opts, openapi3.DisableExamplesValidation())
+	}
+
+	return opts
 }

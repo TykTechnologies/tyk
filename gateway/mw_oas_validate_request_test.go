@@ -41,6 +41,14 @@ const testOASForValidateRequest = `{
           },
           "owner": {
             "$ref": "#/components/schemas/Owner"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "expiryOn": {
+            "type": "string",
+            "format": "date"
           }
         }
       }
@@ -149,7 +157,7 @@ func TestValidateRequest(t *testing.T) {
 				{Data: `{"name": 123}`, Code: http.StatusUnprocessableEntity, Method: http.MethodPost, Headers: headers, Path: "/product/post"},
 				{Data: `{"name": "my-product"}`, Code: http.StatusOK, Method: http.MethodPost, Headers: headers, Path: "/product/post"},
 				{Data: `{"name": "my-product", "owner": {"name": 123}}`, Code: http.StatusUnprocessableEntity, Method: http.MethodPost,
-					Headers: headers, Path: "/product/post"},
+					BodyNotMatch: `Schema:`, Headers: headers, Path: "/product/post"},
 				{Data: `{"name": "my-product", "owner": {"name": "Furkan"}}`, Code: http.StatusUnprocessableEntity, BodyMatch: "query has an error", Method: http.MethodPost,
 					Headers: headers, Path: "/product/post?id=ten"},
 				{Data: `{"name": "my-product", "owner": {"name": "Furkan"}}`, Code: http.StatusOK, Method: http.MethodPost,
@@ -177,6 +185,20 @@ func TestValidateRequest(t *testing.T) {
 			apis[2].Proxy.StripListenPath = true
 			ts.Gw.LoadAPI(apis...)
 			check(t)
+		})
+
+		t.Run("validate date/date-time format", func(t *testing.T) {
+			apiPath := "/product/post"
+			_, _ = ts.Run(t, []test.TestCase{
+				{Data: `{"name": "123", "createdAt": "2016-02-30T14:30:15Z"}`, Code: http.StatusUnprocessableEntity,
+					Method: http.MethodPost, Headers: headers, Path: apiPath},
+				{Data: `{"name": "123", "createdAt": "2016-02-28T30:30:15Z"}`, Code: http.StatusUnprocessableEntity,
+					Method: http.MethodPost, Headers: headers, Path: apiPath},
+				{Data: `{"name": "123", "createdAt": "2016-02-28T12:30:15Z"}`, Code: http.StatusOK,
+					Method: http.MethodPost, Headers: headers, Path: apiPath},
+				{Data: `{"name": "123", "expiryOn": "2016-02-28"}`, Code: http.StatusOK,
+					Method: http.MethodPost, Headers: headers, Path: apiPath},
+			}...)
 		})
 	})
 

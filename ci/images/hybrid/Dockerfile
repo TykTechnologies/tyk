@@ -1,13 +1,14 @@
-FROM debian:bullseye-slim
+FROM debian:bookworm-slim
 ARG TARGETARCH
 
 LABEL Description="Tyk Hybrid Gateway image" Vendor="Tyk"
 
+RUN echo http://deb.debian.org/debian/ bookworm main >> /etc/apt/sources.list.d/debian.sources && \
+    echo deb http://deb.debian.org/debian/ bookworm-updates main >> /etc/apt/sources.list.d/debian.sources
+
 RUN apt-get update \
  && apt-get dist-upgrade -y --no-install-recommends redis-server nginx \
-            python3-setuptools libpython3-dev curl ca-certificates  \
- && curl https://bootstrap.pypa.io/get-pip.py | python3 \
- && pip3 install --only-binary ":all:" grpcio protobuf==3.20.1 \
+            python3-setuptools libpython3-dev curl ca-certificates python3-grpcio \
  && apt-get autoremove -y \
  && rm -rf /usr/include/* && rm /usr/lib/*-linux-gnu/*.a && rm /usr/lib/*-linux-gnu/*.o \
  && rm -rf /root/.cache \

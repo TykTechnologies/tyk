@@ -155,7 +155,10 @@ const Schema = `{
 				 }
 				}
 			}
-		},  
+		},
+        "idp_client_id_mapping_disabled": {
+            "type": "boolean"
+        },
         "use_keyless": {
             "type": "boolean"
         },
@@ -643,7 +646,22 @@ const Schema = `{
                     "properties": {
                         "auth_headers": {
                             "type": ["object", "null"]
-                        }
+                        },
+						"request_headers_rewrite": {
+        					"type": ["object", "null"],
+        					"additionalProperties": {
+          						"type": "object",
+          						"properties": {
+            						"value": {
+										"type": "string"
+            						},
+            						"remove": {
+              							"type": "boolean"
+            						}
+          						},
+          						"required": ["value", "remove"]
+        					}
+      					}
                     }
                 },
                 "subgraph": {
@@ -689,6 +707,14 @@ const Schema = `{
                         },
                         "merged_sdl": {
                             "type": "string"
+                        }
+                    }
+                },
+                "introspection": {
+                    "type": ["object", "null"],
+                    "properties": {
+                        "disabled": {
+                            "type": "boolean"
                         }
                     }
                 },

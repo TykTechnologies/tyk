@@ -21,11 +21,11 @@ import (
 	"time"
 
 	"github.com/getkin/kin-openapi/openapi3"
-	"github.com/go-redis/redis/v8"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/TykTechnologies/storage/temporal/model"
 	"github.com/TykTechnologies/tyk/internal/uuid"
 
 	"github.com/TykTechnologies/tyk/apidef"
@@ -880,6 +880,8 @@ func TestHashKeyHandler(t *testing.T) {
 		gwConf := ts.Gw.GetConfig()
 		gwConf.HashKeyFunction = tc.hashFunction
 		ts.Gw.SetConfig(gwConf)
+		ok := ts.Gw.GlobalSessionManager.Store().DeleteAllKeys()
+		assert.True(t, ok)
 
 		t.Run(fmt.Sprintf("%sHash fn: %s", tc.desc, tc.hashFunction), func(t *testing.T) {
 			ts.testHashKeyHandlerHelper(t, tc.expectedHashSize)
@@ -1720,7 +1722,7 @@ func TestGroupResetHandler(t *testing.T) {
 	didSubscribe := make(chan bool, 1)
 	didReload := make(chan bool, tryReloadCount)
 
-	cacheStore := storage.RedisCluster{RedisController: ts.Gw.RedisController}
+	cacheStore := storage.RedisCluster{ConnectionHandler: ts.Gw.StorageConnectionHandler}
 	cacheStore.Connect()
 
 	// Test usually takes 0.05sec or so, timeout after 1s
@@ -1740,20 +1742,28 @@ func TestGroupResetHandler(t *testing.T) {
 		}()
 
 		err := cacheStore.StartPubSubHandler(ctx, RedisPubSubChannel, func(v interface{}) {
-			switch x := v.(type) {
-			case *redis.Subscription:
-				didSubscribe <- true
-			case *redis.Message:
-				notf := Notification{Gw: ts.Gw}
+			msg, ok := v.(model.Message)
+			assert.True(t, ok)
 
-				err := json.Unmarshal([]byte(x.Payload), &notf)
+			msgType := msg.Type()
+			switch msgType {
+			case model.MessageTypeSubscription:
+				didSubscribe <- true
+			case model.MessageTypeMessage:
+				notf := Notification{Gw: ts.Gw}
+				payload, err := msg.Payload()
+				assert.NoError(t, err)
+				err = json.Unmarshal([]byte(payload), &notf)
 				assert.NoError(t, err)
 
 				if notf.Command == NoticeGroupReload {
 					didReload <- true
 					reloadCount++
 				}
+			default:
+				assert.Fail(t, "unexpected message type")
 			}
+
 		})
 
 		select {
@@ -1780,7 +1790,6 @@ func TestGroupResetHandler(t *testing.T) {
 	// If we don't wait for the subscription to be done, we might do
 	// the reload before pub/sub is in place to receive our message.
 	<-didSubscribe
-
 	// Do a loop of tryReloadCount reloads
 	for try := 1; try <= tryReloadCount; try++ {
 		req := ts.withAuth(TestReq(t, "GET", uri, nil))
@@ -1807,7 +1816,6 @@ func TestGroupResetHandler(t *testing.T) {
 
 	// Close our *Test object, ensuring a cancelled context
 	ts.Close()
-
 	// Wait for our pubsub loop to exit
 	wg.Wait()
 
@@ -2730,7 +2738,7 @@ func TestOAS(t *testing.T) {
 
 					_, _ = ts.Run(t, []test.TestCase{
 						{AdminAuth: true, Method: http.MethodPut, Path: updatePath, Data: &oasAPIInOld,
-							BodyMatch: apidef.ErrAPIMigrated.Error(), Code: http.StatusBadRequest},
+							BodyMatch: apidef.ErrClassicAPIExpected.Error(), Code: http.StatusBadRequest},
 					}...)
 				})
 			})
@@ -3880,4 +3888,72 @@ func TestOrgKeyHandler_LastUpdated(t *testing.T) {
 			return true
 		}},
 	}...)
+}
+
+func TestPurgeOAuthClientTokensEndpoint(t *testing.T) {
+	conf := func(globalConf *config.Config) {
+		// set tokens to be expired after 1 second
+		globalConf.OauthTokenExpire = 1
+		// cleanup tokens older than 2 seconds
+		globalConf.OauthTokenExpiredRetainPeriod = 2
+	}
+
+	ts := StartTest(conf)
+	defer ts.Close()
+
+	t.Run("scope validation", func(t *testing.T) {
+		ts.Run(t, []test.TestCase{
+			{
+				AdminAuth: true,
+				Path:      "/tyk/oauth/tokens/",
+				Method:    http.MethodDelete,
+				Code:      http.StatusUnprocessableEntity,
+			},
+			{
+				AdminAuth:   true,
+				Path:        "/tyk/oauth/tokens/",
+				QueryParams: map[string]string{"scope": "expired"},
+				Method:      http.MethodDelete,
+				Code:        http.StatusBadRequest,
+			},
+		}...)
+	})
+
+	assertTokensLen := func(t *testing.T, storageManager storage.Handler, storageKey string, expectedTokensLen int) {
+		nowTs := time.Now().Unix()
+		startScore := strconv.FormatInt(nowTs, 10)
+		tokens, _, err := storageManager.GetSortedSetRange(storageKey, startScore, "+inf")
+		assert.NoError(t, err)
+		assert.Equal(t, expectedTokensLen, len(tokens))
+	}
+
+	t.Run("scope=lapsed", func(t *testing.T) {
+		spec := ts.LoadTestOAuthSpec()
+
+		clientID1, clientID2 := uuid.New(), uuid.New()
+
+		ts.createOAuthClientIDAndTokens(t, spec, clientID1)
+		ts.createOAuthClientIDAndTokens(t, spec, clientID2)
+		storageKey1, storageKey2 := fmt.Sprintf("%s%s", prefixClientTokens, clientID1),
+			fmt.Sprintf("%s%s", prefixClientTokens, clientID2)
+
+		storageManager := ts.Gw.getGlobalMDCBStorageHandler(generateOAuthPrefix(spec.APIID), false)
+		storageManager.Connect()
+
+		assertTokensLen(t, storageManager, storageKey1, 3)
+		assertTokensLen(t, storageManager, storageKey2, 3)
+
+		time.Sleep(time.Second * 3)
+		ts.Run(t, test.TestCase{
+			ControlRequest: true,
+			AdminAuth:      true,
+			Path:           "/tyk/oauth/tokens",
+			QueryParams:    map[string]string{"scope": "lapsed"},
+			Method:         http.MethodDelete,
+			Code:           http.StatusOK,
+		})
+
+		assertTokensLen(t, storageManager, storageKey1, 0)
+		assertTokensLen(t, storageManager, storageKey2, 0)
+	})
 }

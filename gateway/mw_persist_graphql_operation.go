@@ -14,7 +14,7 @@ import (
 
 // PersistGraphQLOperationMiddleware lets you convert any HTTP request into a GraphQL Operation
 type PersistGraphQLOperationMiddleware struct {
-	BaseMiddleware
+	*BaseMiddleware
 }
 
 func (i *PersistGraphQLOperationMiddleware) Name() string {

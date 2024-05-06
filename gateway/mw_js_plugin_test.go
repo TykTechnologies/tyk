@@ -8,23 +8,20 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
-	"regexp"
 	"strings"
 	"testing"
 	"time"
 
-	"github.com/TykTechnologies/tyk/config"
-
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 
-	"github.com/TykTechnologies/tyk/ctx"
-	"github.com/TykTechnologies/tyk/user"
-
-	"github.com/sirupsen/logrus"
-
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/ctx"
 	logger "github.com/TykTechnologies/tyk/log"
+	"github.com/TykTechnologies/tyk/regexp"
 	"github.com/TykTechnologies/tyk/test"
+	"github.com/TykTechnologies/tyk/user"
 )
 
 func TestJSVM_StopProxyWhenFail(t *testing.T) {
@@ -158,7 +155,7 @@ func TestJSVMBody(t *testing.T) {
 	defer ts.Close()
 
 	dynMid := &DynamicMiddleware{
-		BaseMiddleware: BaseMiddleware{
+		BaseMiddleware: &BaseMiddleware{
 			Spec: &APISpec{APIDefinition: &apidef.APIDefinition{}},
 			Gw:   ts.Gw,
 		},
@@ -199,7 +196,7 @@ func TestJSVMSessionMetadataUpdate(t *testing.T) {
 	defer ts.Close()
 
 	dynMid := &DynamicMiddleware{
-		BaseMiddleware: BaseMiddleware{
+		BaseMiddleware: &BaseMiddleware{
 			Spec: &APISpec{APIDefinition: &apidef.APIDefinition{}},
 			Gw:   ts.Gw,
 		},
@@ -290,7 +287,6 @@ testJSVMMiddleware.NewProcessRequest(function(request, session) {
 		spec.CustomMiddleware.AuthCheck.Path = ts.Gw.GetConfig().MiddlewarePath + "/my-api-id/auth.js"
 		spec.UseStandardAuth = true
 		spec.BaseIdentityProvidedBy = apidef.AuthToken
-		spec.ResponseProcessors = []apidef.ResponseProcessor{{Name: "header_injector"}}
 		spec.VersionData.Versions["v1"] = apidef.VersionInfo{
 			GlobalResponseHeaders: map[string]string{
 				sessionMetaKey: "$tyk_meta." + sessionMetaKey,
@@ -338,7 +334,7 @@ func TestJSVMProcessTimeout(t *testing.T) {
 	defer ts.Close()
 
 	dynMid := &DynamicMiddleware{
-		BaseMiddleware: BaseMiddleware{
+		BaseMiddleware: &BaseMiddleware{
 			Spec: &APISpec{APIDefinition: &apidef.APIDefinition{}},
 			Gw:   ts.Gw,
 		},
@@ -394,7 +390,7 @@ func TestJSVMConfigData(t *testing.T) {
 			"foo": "bar",
 		}
 		dynMid := &DynamicMiddleware{
-			BaseMiddleware:      BaseMiddleware{Spec: spec, Proxy: nil, Gw: ts.Gw},
+			BaseMiddleware:      &BaseMiddleware{Spec: spec, Proxy: nil, Gw: ts.Gw},
 			MiddlewareClassName: "testJSVMData",
 			Pre:                 true,
 		}
@@ -418,7 +414,7 @@ func TestJSVMConfigData(t *testing.T) {
 		spec.ConfigDataDisabled = true
 
 		dynMid := &DynamicMiddleware{
-			BaseMiddleware:      BaseMiddleware{Spec: spec, Proxy: nil, Gw: ts.Gw},
+			BaseMiddleware:      &BaseMiddleware{Spec: spec, Proxy: nil, Gw: ts.Gw},
 			MiddlewareClassName: "testJSVMData",
 			Pre:                 true,
 		}
@@ -448,7 +444,7 @@ testJSVMData.NewProcessRequest(function(request, session, spec) {
 	return testJSVMData.ReturnData(request, {})
 });`
 	dynMid := &DynamicMiddleware{
-		BaseMiddleware:      BaseMiddleware{Spec: spec, Proxy: nil, Gw: ts.Gw},
+		BaseMiddleware:      &BaseMiddleware{Spec: spec, Proxy: nil, Gw: ts.Gw},
 		MiddlewareClassName: "testJSVMData",
 		Pre:                 true,
 	}
@@ -492,7 +488,7 @@ testJSVMCore.NewProcessRequest(function(request, session, config) {
 	return testJSVMCore.ReturnData(request, {})
 });`
 	dynMid := &DynamicMiddleware{
-		BaseMiddleware:      BaseMiddleware{Spec: spec, Proxy: nil, Gw: ts.Gw},
+		BaseMiddleware:      &BaseMiddleware{Spec: spec, Proxy: nil, Gw: ts.Gw},
 		MiddlewareClassName: "testJSVMCore",
 		Pre:                 true,
 	}
@@ -531,7 +527,7 @@ func TestJSVMRequestScheme(t *testing.T) {
 	defer ts.Close()
 
 	dynMid := &DynamicMiddleware{
-		BaseMiddleware: BaseMiddleware{
+		BaseMiddleware: &BaseMiddleware{
 			Spec: &APISpec{APIDefinition: &apidef.APIDefinition{}},
 			Gw:   ts.Gw,
 		},
@@ -581,7 +577,8 @@ func TestTykMakeHTTPRequest(t *testing.T) {
 		            "name": "testTykMakeHTTPRequest",
 		            "path": "middleware.js"
 		        }]
-		    }
+		    },
+			"checksum": "d41d8cd98f00b204e9800998ecf8427e"
 		}
 	`,
 		"middleware.js": `
@@ -799,7 +796,8 @@ post.NewProcessRequest(function(request, session) {
 		            "name": "post",
 		            "path": "post.js"
 		        }]
-		    }
+		    },
+			"checksum": "d41d8cd98f00b204e9800998ecf8427e"
 		}
 	`,
 			"pre.js":  pre,
@@ -931,7 +929,7 @@ func TestJSVM_Auth(t *testing.T) {
 					"extractor_config": null
 				}
 			},
-			"checksum": "65694908d609b14df0e280c1a95a8ca4",
+			"checksum": "9529d0f95290c7026dd8049b981ec7b1",
 			"signature": ""
 		}`,
 		"testmw.js": `log("====> JS Auth initialising");

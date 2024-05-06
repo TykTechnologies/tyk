@@ -45,6 +45,7 @@ var (
 type TykMiddleware interface {
 	Init()
 	Base() *BaseMiddleware
+
 	SetName(string)
 	SetRequestLogger(*http.Request)
 	Logger() *logrus.Entry
@@ -97,7 +98,7 @@ func (tr TraceMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request,
 	return tr.TykMiddleware.ProcessRequest(w, r, conf)
 }
 
-func (gw *Gateway) createDynamicMiddleware(name string, isPre, useSession bool, baseMid BaseMiddleware) func(http.Handler) http.Handler {
+func (gw *Gateway) createDynamicMiddleware(name string, isPre, useSession bool, baseMid *BaseMiddleware) func(http.Handler) http.Handler {
 	dMiddleware := &DynamicMiddleware{
 		BaseMiddleware:      baseMid,
 		MiddlewareClassName: name,
@@ -161,8 +162,14 @@ func (gw *Gateway) createMiddleware(actualMW TykMiddleware) func(http.Handler) h
 
 			err, errCode := mw.ProcessRequest(w, r, mwConf)
 			if err != nil {
-				handler := ErrorHandler{*mw.Base()}
-				handler.HandleError(w, r, err.Error(), errCode, true)
+				writeResponse := true
+				// Prevent double error write
+				if goPlugin, isGoPlugin := actualMW.(*GoPluginMiddleware); isGoPlugin && goPlugin.handler != nil {
+					writeResponse = false
+				}
+
+				handler := ErrorHandler{mw.Base()}
+				handler.HandleError(w, r, err.Error(), errCode, writeResponse)
 
 				meta["error"] = err.Error()
 
@@ -186,13 +193,12 @@ func (gw *Gateway) createMiddleware(actualMW TykMiddleware) func(http.Handler) h
 
 			mw.Logger().WithField("code", errCode).WithField("ns", finishTime.Nanoseconds()).Debug("Finished")
 
+			mw.Base().UpdateRequestSession(r)
 			// Special code, bypasses all other execution
 			if errCode != mwStatusRespond {
 				// No error, carry on...
 				meta["bypass"] = "1"
 				h.ServeHTTP(w, r)
-			} else {
-				mw.Base().UpdateRequestSession(r)
 			}
 		})
 	}
@@ -232,9 +238,11 @@ type BaseMiddleware struct {
 	Gw     *Gateway `json:"-"`
 }
 
-func (t BaseMiddleware) Base() *BaseMiddleware { return &t }
+func (t BaseMiddleware) Base() *BaseMiddleware {
+	return &t
+}
 
-func (t BaseMiddleware) Logger() (logger *logrus.Entry) {
+func (t *BaseMiddleware) Logger() (logger *logrus.Entry) {
 	if t.logger == nil {
 		t.logger = logrus.NewEntry(log)
 	}
@@ -250,15 +258,15 @@ func (t *BaseMiddleware) SetRequestLogger(r *http.Request) {
 	t.logger = t.Gw.getLogEntryForRequest(t.Logger(), r, ctxGetAuthToken(r), nil)
 }
 
-func (t BaseMiddleware) Init() {}
-func (t BaseMiddleware) EnabledForSpec() bool {
+func (t *BaseMiddleware) Init() {}
+func (t *BaseMiddleware) EnabledForSpec() bool {
 	return true
 }
-func (t BaseMiddleware) Config() (interface{}, error) {
+func (t *BaseMiddleware) Config() (interface{}, error) {
 	return nil, nil
 }
 
-func (t BaseMiddleware) OrgSession(orgID string) (user.SessionState, bool) {
+func (t *BaseMiddleware) OrgSession(orgID string) (user.SessionState, bool) {
 
 	if rpc.IsEmergencyMode() {
 		return user.SessionState{}, false
@@ -279,12 +287,13 @@ func (t BaseMiddleware) OrgSession(orgID string) (user.SessionState, bool) {
 	return session.Clone(), found
 }
 
-func (t BaseMiddleware) SetOrgExpiry(orgid string, expiry int64) {
+func (t *BaseMiddleware) SetOrgExpiry(orgid string, expiry int64) {
 	t.Gw.ExpiryCache.Set(orgid, expiry, cache.DefaultExpiration)
 }
 
-func (t BaseMiddleware) OrgSessionExpiry(orgid string) int64 {
+func (t *BaseMiddleware) OrgSessionExpiry(orgid string) int64 {
 	t.Logger().Debug("Checking: ", orgid)
+
 	// Cache failed attempt
 	id, err, _ := orgSessionExpiryCache.Do(orgid, func() (interface{}, error) {
 		cachedVal, found := t.Gw.ExpiryCache.Get(orgid)
@@ -296,11 +305,10 @@ func (t BaseMiddleware) OrgSessionExpiry(orgid string) int64 {
 		if found && t.Spec.GlobalConfig.EnforceOrgDataAge {
 			return s.DataExpires, nil
 		}
-
 		return 0, errors.New("missing session")
 	})
-	if err != nil {
 
+	if err != nil {
 		t.Logger().Debug("no cached entry found, returning 7 days")
 		t.SetOrgExpiry(orgid, DEFAULT_ORG_SESSION_EXPIRATION)
 		return DEFAULT_ORG_SESSION_EXPIRATION
@@ -309,7 +317,7 @@ func (t BaseMiddleware) OrgSessionExpiry(orgid string) int64 {
 	return id.(int64)
 }
 
-func (t BaseMiddleware) UpdateRequestSession(r *http.Request) bool {
+func (t *BaseMiddleware) UpdateRequestSession(r *http.Request) bool {
 	session := ctxGetSession(r)
 	token := ctxGetAuthToken(r)
 
@@ -340,7 +348,7 @@ func (t BaseMiddleware) UpdateRequestSession(r *http.Request) bool {
 
 // clearSession clears the quota, rate limit and complexity values so that partitioned policies can apply their values.
 // Otherwise, if the session has already a higher value, an applied policy will not win, and its values will be ignored.
-func (t BaseMiddleware) clearSession(session *user.SessionState) {
+func (t *BaseMiddleware) clearSession(session *user.SessionState) {
 	policies := session.PolicyIDs()
 	for _, polID := range policies {
 		t.Gw.policiesMu.RLock()
@@ -372,7 +380,7 @@ func (t BaseMiddleware) clearSession(session *user.SessionState) {
 
 // ApplyPolicies will check if any policies are loaded. If any are, it
 // will overwrite the session state to use the policy values.
-func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
+func (t *BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 	rights := make(map[string]user.AccessDefinition)
 	tags := make(map[string]bool)
 	if session.MetaData == nil {
@@ -485,6 +493,8 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 
 				if !usePartitions || policy.Partitions.Acl {
 					didACL[k] = true
+
+					ar.AllowedURLs = copyAllowedURLs(v.AllowedURLs)
 
 					// Merge ACLs for the same API
 					if r, ok := rights[k]; ok {
@@ -754,9 +764,29 @@ func (t BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 	return nil
 }
 
+func copyAllowedURLs(input []user.AccessSpec) []user.AccessSpec {
+	if input == nil {
+		return nil
+	}
+
+	copied := make([]user.AccessSpec, len(input))
+
+	for i, as := range input {
+		copied[i] = user.AccessSpec{
+			URL: as.URL,
+		}
+		if as.Methods != nil {
+			copied[i].Methods = make([]string, len(as.Methods))
+			copy(copied[i].Methods, as.Methods)
+		}
+	}
+
+	return copied
+}
+
 // CheckSessionAndIdentityForValidKey will check first the Session store for a valid key, if not found, it will try
 // the Auth Handler, if not found it will fail
-func (t BaseMiddleware) CheckSessionAndIdentityForValidKey(originalKey string, r *http.Request) (user.SessionState, bool) {
+func (t *BaseMiddleware) CheckSessionAndIdentityForValidKey(originalKey string, r *http.Request) (user.SessionState, bool) {
 	key := originalKey
 	minLength := t.Spec.GlobalConfig.MinTokenLength
 	if minLength == 0 {
@@ -853,19 +883,20 @@ func (t BaseMiddleware) CheckSessionAndIdentityForValidKey(originalKey string, r
 }
 
 // FireEvent is added to the BaseMiddleware object so it is available across the entire stack
-func (t BaseMiddleware) FireEvent(name apidef.TykEvent, meta interface{}) {
+func (t *BaseMiddleware) FireEvent(name apidef.TykEvent, meta interface{}) {
 	fireEvent(name, meta, t.Spec.EventPaths)
 }
 
-func (b BaseMiddleware) getAuthType() string {
+func (t *BaseMiddleware) getAuthType() string {
 	return ""
 }
 
-func (b BaseMiddleware) getAuthToken(authType string, r *http.Request) (string, apidef.AuthConfig) {
-	config, ok := b.Base().Spec.AuthConfigs[authType]
+func (t *BaseMiddleware) getAuthToken(authType string, r *http.Request) (string, apidef.AuthConfig) {
+	spec := t.Base().Spec
+	config, ok := spec.AuthConfigs[authType]
 	// Auth is deprecated. To maintain backward compatibility authToken and jwt cases are added.
 	if !ok && (authType == apidef.AuthTokenType || authType == apidef.JWTType) {
-		config = b.Base().Spec.Auth
+		config = spec.Auth
 	}
 
 	var (
@@ -918,11 +949,11 @@ func (b BaseMiddleware) getAuthToken(authType string, r *http.Request) (string, 
 	return key, config
 }
 
-func (b BaseMiddleware) generateSessionID(id string) string {
+func (t *BaseMiddleware) generateSessionID(id string) string {
 	// generate a virtual token
 	data := []byte(id)
 	keyID := fmt.Sprintf("%x", md5.Sum(data))
-	return b.Gw.generateToken(b.Spec.OrgID, keyID)
+	return t.Gw.generateToken(t.Spec.OrgID, keyID)
 }
 
 type TykResponseHandler interface {
@@ -941,8 +972,6 @@ type TykGoPluginResponseHandler interface {
 
 func (gw *Gateway) responseProcessorByName(name string, baseHandler BaseTykResponseHandler) TykResponseHandler {
 	switch name {
-	case "header_injector":
-		return &HeaderInjector{BaseTykResponseHandler: baseHandler}
 	case "response_body_transform_jq":
 		return &ResponseTransformJQMiddleware{BaseTykResponseHandler: baseHandler}
 	case "header_transform":

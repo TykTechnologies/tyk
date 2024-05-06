@@ -18,7 +18,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/go-redis/redis/v8"
 	"github.com/gorilla/websocket"
 	proxyproto "github.com/pires/go-proxyproto"
 	"github.com/stretchr/testify/assert"
@@ -558,8 +557,8 @@ func TestManagementNodeRedisEvents(t *testing.T) {
 	ts.Gw.SetConfig(globalConf)
 
 	t.Run("Without signing:", func(t *testing.T) {
-		msg := redis.Message{
-			Payload: `{"Command": "NoticeGatewayDRLNotification"}`,
+		msg := testMessageAdapter{
+			Msg: `{"Command": "NoticeGatewayDRLNotification"}`,
 		}
 
 		callbackRun := false
@@ -592,9 +591,9 @@ func TestManagementNodeRedisEvents(t *testing.T) {
 			Gw:      ts.Gw,
 		}
 		n.Sign()
-		msg := redis.Message{}
+		msg := testMessageAdapter{}
 		payload := test.MarshalJSON(t)(n)
-		msg.Payload = string(payload)
+		msg.Msg = string(payload)
 
 		callbackRun := false
 		shouldHandle := func(got NotificationCommand) {
@@ -611,7 +610,7 @@ func TestManagementNodeRedisEvents(t *testing.T) {
 
 		n.Signature = "wrong"
 		payload, _ = json.Marshal(n)
-		msg.Payload = string(payload)
+		msg.Msg = string(payload)
 
 		valid := false
 		shouldFail := func(got NotificationCommand) {
@@ -940,7 +939,7 @@ func TestGatewayHealthCheck(t *testing.T) {
 func TestCacheAllSafeRequests(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
-	cache := storage.RedisCluster{KeyPrefix: "cache-", RedisController: ts.Gw.RedisController}
+	cache := storage.RedisCluster{KeyPrefix: "cache-", ConnectionHandler: ts.Gw.StorageConnectionHandler}
 	defer cache.DeleteScanMatch("*")
 
 	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
@@ -966,7 +965,7 @@ func TestCacheAllSafeRequests(t *testing.T) {
 func TestCacheAllSafeRequestsWithCachedHeaders(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
-	cache := storage.RedisCluster{KeyPrefix: "cache-", RedisController: ts.Gw.RedisController}
+	cache := storage.RedisCluster{KeyPrefix: "cache-", ConnectionHandler: ts.Gw.StorageConnectionHandler}
 	defer cache.DeleteScanMatch("*")
 	authorization := "authorization"
 	tenant := "tenant-id"
@@ -1007,7 +1006,7 @@ func TestCacheAllSafeRequestsWithCachedHeaders(t *testing.T) {
 func TestCacheWithAdvanceUrlRewrite(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
-	cache := storage.RedisCluster{KeyPrefix: "cache-", RedisController: ts.Gw.RedisController}
+	cache := storage.RedisCluster{KeyPrefix: "cache-", ConnectionHandler: ts.Gw.StorageConnectionHandler}
 	defer cache.DeleteScanMatch("*")
 
 	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
@@ -1062,7 +1061,7 @@ func TestCacheWithAdvanceUrlRewrite(t *testing.T) {
 func TestCachePostRequest(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
-	cache := storage.RedisCluster{KeyPrefix: "cache-", RedisController: ts.Gw.RedisController}
+	cache := storage.RedisCluster{KeyPrefix: "cache-", ConnectionHandler: ts.Gw.StorageConnectionHandler}
 	defer cache.DeleteScanMatch("*")
 	tenant := "tenant-id"
 
@@ -1104,7 +1103,7 @@ func TestCachePostRequest(t *testing.T) {
 func TestAdvanceCachePutRequest(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
-	cache := storage.RedisCluster{KeyPrefix: "cache-", RedisController: ts.Gw.RedisController}
+	cache := storage.RedisCluster{KeyPrefix: "cache-", ConnectionHandler: ts.Gw.StorageConnectionHandler}
 	defer cache.DeleteScanMatch("*")
 	tenant := "tenant-id"
 
@@ -1192,7 +1191,7 @@ func TestAdvanceCachePutRequest(t *testing.T) {
 func TestCacheAllSafeRequestsWithAdvancedCacheEndpoint(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
-	cache := storage.RedisCluster{KeyPrefix: "cache-", RedisController: ts.Gw.RedisController}
+	cache := storage.RedisCluster{KeyPrefix: "cache-", ConnectionHandler: ts.Gw.StorageConnectionHandler}
 	defer cache.DeleteScanMatch("*")
 
 	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
@@ -1227,7 +1226,7 @@ func TestCacheAllSafeRequestsWithAdvancedCacheEndpoint(t *testing.T) {
 func TestCacheEtag(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
-	cache := storage.RedisCluster{KeyPrefix: "cache-", RedisController: ts.Gw.RedisController}
+	cache := storage.RedisCluster{KeyPrefix: "cache-", ConnectionHandler: ts.Gw.StorageConnectionHandler}
 	defer cache.DeleteScanMatch("*")
 
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -1276,7 +1275,7 @@ func TestOldCachePlugin(t *testing.T) {
 	headerCache := map[string]string{"x-tyk-cached-response": "1"}
 
 	check := func(t *testing.T) {
-		cache := storage.RedisCluster{KeyPrefix: "cache-", RedisController: ts.Gw.RedisController}
+		cache := storage.RedisCluster{KeyPrefix: "cache-", ConnectionHandler: ts.Gw.StorageConnectionHandler}
 		defer cache.DeleteScanMatch("*")
 
 		ts.Gw.LoadAPI(api)
@@ -1301,7 +1300,7 @@ func TestOldCachePlugin(t *testing.T) {
 func TestAdvanceCacheTimeoutPerEndpoint(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
-	cache := storage.RedisCluster{KeyPrefix: "cache-", RedisController: ts.Gw.RedisController}
+	cache := storage.RedisCluster{KeyPrefix: "cache-", ConnectionHandler: ts.Gw.StorageConnectionHandler}
 	defer cache.DeleteScanMatch("*")
 
 	extendedPaths := apidef.ExtendedPathsSet{
@@ -1699,9 +1698,21 @@ func TestTracing(t *testing.T) {
 	defer ts.Close()
 
 	ts.Gw.prepareStorage()
+
+	{
+		conf := ts.Gw.GetConfig()
+		conf.EnableBundleDownloader = true
+		conf.BundleBaseURL = "http://some-invalid-path"
+		ts.Gw.SetConfig(conf)
+	}
+
 	spec := BuildAPI(func(spec *APISpec) {
 		spec.UseKeylessAccess = false
 	})[0]
+
+	apiDefWithBundle := &apidef.APIDefinition{
+		CustomMiddlewareBundle: "some-path",
+	}
 
 	keyID := CreateSession(ts.Gw)
 	authHeaders := map[string][]string{"Authorization": {keyID}}
@@ -1713,6 +1724,7 @@ func TestTracing(t *testing.T) {
 		{Method: "POST", Path: "/tyk/debug", Data: `{"Spec": {}}`, AdminAuth: true, Code: 400, BodyMatch: "Request field is missing"},
 		{Method: "POST", Path: "/tyk/debug", Data: `{"Spec": {}, "Request": {}}`, AdminAuth: true, Code: 400, BodyMatch: "Spec not valid, skipped!"},
 		{Method: "POST", Path: "/tyk/debug", Data: traceRequest{Spec: spec.APIDefinition, Request: &traceHttpRequest{Method: "GET", Path: "/"}}, AdminAuth: true, Code: 200, BodyMatch: `401 Unauthorized`},
+		{Method: "POST", Path: "/tyk/debug", Data: traceRequest{Spec: apiDefWithBundle, Request: &traceHttpRequest{Method: "GET", Path: "/", Headers: authHeaders}}, AdminAuth: true, Code: http.StatusBadRequest, BodyMatch: `Couldn't load bundle`},
 		{Method: "POST", Path: "/tyk/debug", Data: traceRequest{Spec: spec.APIDefinition, Request: &traceHttpRequest{Path: "/", Headers: authHeaders}}, AdminAuth: true, Code: 200, BodyMatch: `200 OK`},
 	}...)
 

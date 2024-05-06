@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"strings"
 	"testing"
-	"text/template"
+	textTemplate "text/template"
 
 	"github.com/TykTechnologies/tyk/test"
 
@@ -22,7 +22,7 @@ func testPrepareTransformNonAscii() (*TransformSpec, string) {
 	tmpl := `[{{range $x, $s := .names.name}}"{{$s}}"{{if not $x}}, {{end}}{{end}}]`
 	tmeta := &TransformSpec{}
 	tmeta.TemplateData.Input = apidef.RequestXML
-	tmeta.Template = template.Must(template.New("blob").Parse(tmpl))
+	tmeta.Template = textTemplate.Must(textTemplate.New("blob").Parse(tmpl))
 	return tmeta, in
 }
 
@@ -40,7 +40,7 @@ func TestTransformNonAscii(t *testing.T) {
 	ad := apidef.APIDefinition{}
 	spec := APISpec{APIDefinition: &ad}
 	spec.EnableContextVars = false
-	base := BaseMiddleware{Spec: &spec, Gw: ts.Gw}
+	base := &BaseMiddleware{Spec: &spec, Gw: ts.Gw}
 	base.Spec.EnableContextVars = false
 	transform := TransformMiddleware{base}
 
@@ -65,7 +65,7 @@ func BenchmarkTransformNonAscii(b *testing.B) {
 	defer ts.Close()
 
 	spec := APISpec{}
-	base := BaseMiddleware{Spec: &spec, Gw: ts.Gw}
+	base := &BaseMiddleware{Spec: &spec, Gw: ts.Gw}
 	base.Spec.EnableContextVars = false
 	transform := TransformMiddleware{base}
 
@@ -85,14 +85,14 @@ func TestTransformXMLCrash(t *testing.T) {
 	r := TestReq(t, "GET", "/", in)
 	tmeta := &TransformSpec{}
 	tmeta.TemplateData.Input = apidef.RequestXML
-	tmeta.Template = template.Must(apidef.Template.New("").Parse(""))
+	tmeta.Template = textTemplate.Must(apidef.Template.New("").Parse(""))
 
 	ts := StartTest(nil)
 	defer ts.Close()
 
 	ad := apidef.APIDefinition{}
 	spec := APISpec{APIDefinition: &ad}
-	base := BaseMiddleware{Spec: &spec, Gw: ts.Gw}
+	base := &BaseMiddleware{Spec: &spec, Gw: ts.Gw}
 	base.Spec.EnableContextVars = false
 	transform := TransformMiddleware{base}
 
@@ -105,7 +105,7 @@ func testPrepareTransformJSONMarshal(inputType string) (tmeta *TransformSpec, in
 	tmeta = &TransformSpec{}
 	tmpl := `[{{range $x, $s := .names.name}}{{$s | jsonMarshal}}{{if not $x}}, {{end}}{{end}}]`
 	tmeta.TemplateData.Input = apidef.RequestXML
-	tmeta.Template = template.Must(apidef.Template.New("").Parse(tmpl))
+	tmeta.Template = textTemplate.Must(apidef.Template.New("").Parse(tmpl))
 
 	switch inputType {
 	case "json":
@@ -124,7 +124,7 @@ func testPrepareTransformJSONMarshal(inputType string) (tmeta *TransformSpec, in
 
 func testPrepareTransformXMLMarshal(tmpl string, inputType apidef.RequestInputType) (tmeta *TransformSpec) {
 	tmeta = &TransformSpec{}
-	tmeta.Template = template.Must(apidef.Template.New("").Parse(tmpl))
+	tmeta.Template = textTemplate.Must(apidef.Template.New("").Parse(tmpl))
 
 	switch inputType {
 	case apidef.RequestJSON:
@@ -147,7 +147,7 @@ func TestTransformJSONMarshalXMLInput(t *testing.T) {
 
 	ad := apidef.APIDefinition{}
 	spec := APISpec{APIDefinition: &ad}
-	base := BaseMiddleware{Spec: &spec, Gw: ts.Gw}
+	base := &BaseMiddleware{Spec: &spec, Gw: ts.Gw}
 	base.Spec.EnableContextVars = false
 	transform := TransformMiddleware{base}
 
@@ -174,7 +174,7 @@ func TestTransformJSONMarshalJSONInput(t *testing.T) {
 
 	ad := apidef.APIDefinition{}
 	spec := APISpec{APIDefinition: &ad}
-	base := BaseMiddleware{Spec: &spec, Gw: ts.Gw}
+	base := &BaseMiddleware{Spec: &spec, Gw: ts.Gw}
 	base.Spec.EnableContextVars = false
 	transform := TransformMiddleware{base}
 
@@ -194,7 +194,7 @@ func testPrepareTransformJSONMarshalArray(tb testing.TB) (tmeta *TransformSpec, 
 	tmeta = &TransformSpec{}
 	tmpl := `[{{ range $key, $value := .array }}{{ if $key }},{{ end }}{{ .abc }}{{ end }}]`
 	tmeta.TemplateData.Input = apidef.RequestXML
-	tmeta.Template = template.Must(apidef.Template.New("").Parse(tmpl))
+	tmeta.Template = textTemplate.Must(apidef.Template.New("").Parse(tmpl))
 
 	tmeta.TemplateData.Input = apidef.RequestJSON
 	in = `[{"abc": 123}, {"abc": 456}]`
@@ -213,7 +213,7 @@ func TestTransformJSONMarshalJSONArrayInput(t *testing.T) {
 
 	ad := apidef.APIDefinition{}
 	spec := APISpec{APIDefinition: &ad}
-	base := BaseMiddleware{Spec: &spec, Gw: ts.Gw}
+	base := &BaseMiddleware{Spec: &spec, Gw: ts.Gw}
 	base.Spec.EnableContextVars = false
 	transform := TransformMiddleware{base}
 
@@ -237,7 +237,7 @@ func BenchmarkTransformJSONMarshal(b *testing.B) {
 	defer ts.Close()
 
 	spec := APISpec{}
-	base := BaseMiddleware{Spec: &spec, Gw: ts.Gw}
+	base := &BaseMiddleware{Spec: &spec, Gw: ts.Gw}
 	base.Spec.EnableContextVars = false
 	transform := TransformMiddleware{base}
 
@@ -259,7 +259,7 @@ func TestTransformXMLMarshal(t *testing.T) {
 
 		ad := apidef.APIDefinition{}
 		spec := APISpec{APIDefinition: &ad}
-		base := BaseMiddleware{Spec: &spec, Gw: ts.Gw}
+		base := &BaseMiddleware{Spec: &spec, Gw: ts.Gw}
 		base.Spec.EnableContextVars = false
 		transform := TransformMiddleware{base}
 

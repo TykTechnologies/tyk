@@ -17,7 +17,8 @@ const XTykAPIExpires = "x-tyk-api-expires"
 
 // VersionCheck will check whether the version of the requested API the request is accessing has any restrictions on URL endpoints
 type VersionCheck struct {
-	BaseMiddleware
+	*BaseMiddleware
+
 	sh SuccessHandler
 }
 
@@ -68,7 +69,11 @@ func (v *VersionCheck) ProcessRequest(w http.ResponseWriter, r *http.Request, _ 
 
 	ctxSetSpanAttributes(r, v.Name(), otel.APIVersionAttribute(targetVersion))
 
-	if v.Spec.VersionDefinition.Enabled && targetVersion != apidef.Self && targetVersion != v.Spec.VersionDefinition.Name {
+	isBase := func(vName string) bool {
+		return vName == apidef.Self || vName == v.Spec.VersionDefinition.Name
+	}
+
+	if v.Spec.VersionDefinition.Enabled && !isBase(targetVersion) {
 		if targetVersion == "" {
 			return errors.New(string(VersionNotFound)), http.StatusForbidden
 		}
@@ -76,7 +81,25 @@ func (v *VersionCheck) ProcessRequest(w http.ResponseWriter, r *http.Request, _ 
 		subVersionID := v.Spec.VersionDefinition.Versions[targetVersion]
 		handler, _, found := v.Gw.findInternalHttpHandlerByNameOrID(subVersionID)
 		if !found {
-			return errors.New(string(VersionDoesNotExist)), http.StatusNotFound
+			if !v.Spec.VersionDefinition.FallbackToDefault {
+				return errors.New(string(VersionDoesNotExist)), http.StatusNotFound
+			}
+
+			if isBase(v.Spec.VersionDefinition.Default) {
+				goto outside
+			}
+
+			targetID, ok := v.Spec.VersionDefinition.Versions[v.Spec.VersionDefinition.Default]
+			if !ok {
+				log.Errorf("fallback to default but %s is not in the versions list", v.Spec.VersionDefinition.Default)
+				return errors.New(http.StatusText(http.StatusInternalServerError)), http.StatusInternalServerError
+			}
+
+			handler, _, found = v.Gw.findInternalHttpHandlerByNameOrID(targetID)
+			if !found {
+				log.Errorf("fallback to default but there is no such API found with the id: %s", targetID)
+				return errors.New(http.StatusText(http.StatusInternalServerError)), http.StatusInternalServerError
+			}
 		}
 
 		v.Spec.SanitizeProxyPaths(r)
@@ -84,6 +107,7 @@ func (v *VersionCheck) ProcessRequest(w http.ResponseWriter, r *http.Request, _ 
 		handler.ServeHTTP(w, r)
 		return nil, mwStatusRespond
 	}
+outside:
 
 	// For OAS route matching
 	if v.Spec.HasMock || v.Spec.HasValidateRequest {

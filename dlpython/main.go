@@ -31,7 +31,7 @@ var (
 	errLibLoad        = errors.New("Couldn't load library")
 	errOSNotSupported = errors.New("OS not supported")
 
-	pythonExpr = regexp.MustCompile(`(^python3(\.)?(\d)?(m)?(\-config)?$)`)
+	pythonExpr = regexp.MustCompile(`(^python3(\.)?(\d+)?(m)?(\-config)?$)`)
 
 	pythonConfigPath  string
 	pythonLibraryPath string

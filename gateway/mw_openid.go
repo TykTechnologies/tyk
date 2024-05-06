@@ -19,7 +19,8 @@ import (
 const OIDPREFIX = "openid"
 
 type OpenIDMW struct {
-	BaseMiddleware
+	*BaseMiddleware
+
 	providerConfiguration     *openid.Configuration
 	provider_client_policymap map[string]map[string]string
 	lock                      sync.RWMutex

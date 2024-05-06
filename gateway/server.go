@@ -6,7 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"html/template"
+	htmlTemplate "html/template"
 	"io/ioutil"
 	stdlog "log"
 	"log/syslog"
@@ -21,14 +21,14 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/TykTechnologies/tyk/internal/httputil"
-
 	"sync/atomic"
 	textTemplate "text/template"
 	"time"
 
 	"github.com/TykTechnologies/tyk/internal/crypto"
+	"github.com/TykTechnologies/tyk/internal/httputil"
 	"github.com/TykTechnologies/tyk/internal/otel"
+	"github.com/TykTechnologies/tyk/internal/scheduler"
 	"github.com/TykTechnologies/tyk/test"
 
 	logstashHook "github.com/bshuster-repo/logrus-logstash-hook"
@@ -99,8 +99,9 @@ type Gateway struct {
 
 	ctx context.Context
 
-	muNodeID   sync.Mutex // guards NodeID
-	NodeID     string
+	nodeIDMu sync.Mutex
+	nodeID   string
+
 	drlOnce    sync.Once
 	DRLManager *drl.DRL
 	reloadMu   sync.Mutex
@@ -187,12 +188,12 @@ type Gateway struct {
 	TestBundles  map[string]map[string]string
 	TestBundleMu sync.Mutex
 
-	templates    *template.Template
+	templates    *htmlTemplate.Template
 	templatesRaw *textTemplate.Template
 
 	// RedisController keeps track of redis connection and singleton
-	RedisController *storage.RedisController
-	hostDetails     hostDetails
+	StorageConnectionHandler *storage.ConnectionHandler
+	hostDetails              hostDetails
 
 	healthCheckInfo atomic.Value
 
@@ -205,21 +206,20 @@ type hostDetails struct {
 }
 
 func NewGateway(config config.Config, ctx context.Context) *Gateway {
-	gw := Gateway{
+	gw := &Gateway{
 		DefaultProxyMux: &proxyMux{
 			again: again.New(),
 		},
 		ctx: ctx,
 	}
-
-	gw.Analytics = RedisAnalyticsHandler{Gw: &gw}
 	gw.SetConfig(config)
-	sessionManager := DefaultSessionManager{Gw: &gw}
+
+	gw.Analytics = RedisAnalyticsHandler{Gw: gw}
+	sessionManager := DefaultSessionManager{Gw: gw}
 	gw.GlobalSessionManager = SessionHandler(&sessionManager)
-	gw.DefaultOrgStore = DefaultSessionManager{Gw: &gw}
-	gw.DefaultQuotaStore = DefaultSessionManager{Gw: &gw}
-	gw.SessionLimiter = SessionLimiter{Gw: &gw}
-	gw.SessionMonitor = Monitor{Gw: &gw}
+	gw.DefaultOrgStore = DefaultSessionManager{Gw: gw}
+	gw.DefaultQuotaStore = DefaultSessionManager{Gw: gw}
+	gw.SessionMonitor = Monitor{Gw: gw}
 	gw.HostCheckTicker = make(chan struct{})
 	gw.HostCheckerClient = &http.Client{
 		Timeout: 500 * time.Millisecond,
@@ -248,9 +248,12 @@ func NewGateway(config config.Config, ctx context.Context) *Gateway {
 	gw.ReloadTestCase = NewReloadMachinery()
 	gw.TestBundles = map[string]map[string]string{}
 
-	gw.RedisController = storage.NewRedisController(ctx)
+	gw.StorageConnectionHandler = storage.NewConnectionHandler(ctx)
 
-	return &gw
+	gw.SetNodeID("solo-" + uuid.New())
+	gw.SessionID = uuid.New()
+
+	return gw
 }
 
 func (gw *Gateway) UnmarshalJSON(data []byte) error {
@@ -268,16 +271,16 @@ func (gw *Gateway) InitializeRPCCache() {
 
 // SetNodeID writes NodeID safely.
 func (gw *Gateway) SetNodeID(nodeID string) {
-	gw.muNodeID.Lock()
-	gw.NodeID = nodeID
-	gw.muNodeID.Unlock()
+	gw.nodeIDMu.Lock()
+	gw.nodeID = nodeID
+	gw.nodeIDMu.Unlock()
 }
 
 // GetNodeID reads NodeID safely.
 func (gw *Gateway) GetNodeID() string {
-	gw.muNodeID.Lock()
-	defer gw.muNodeID.Unlock()
-	return gw.NodeID
+	gw.nodeIDMu.Lock()
+	defer gw.nodeIDMu.Unlock()
+	return gw.nodeID
 }
 
 func (gw *Gateway) isRunningTests() bool {
@@ -333,6 +336,8 @@ func (gw *Gateway) setupGlobals() {
 	gw.reloadMu.Lock()
 	defer gw.reloadMu.Unlock()
 
+	defaultTykErrors()
+
 	gwConfig := gw.GetConfig()
 	checkup.Run(&gwConfig)
 
@@ -355,16 +360,16 @@ func (gw *Gateway) setupGlobals() {
 			mainLog.Warn("Running Uptime checks in a management node.")
 		}
 
-		healthCheckStore := storage.RedisCluster{KeyPrefix: "host-checker:", IsAnalytics: true, RedisController: gw.RedisController}
+		healthCheckStore := storage.RedisCluster{KeyPrefix: "host-checker:", IsAnalytics: true, ConnectionHandler: gw.StorageConnectionHandler}
 		gw.InitHostCheckManager(gw.ctx, &healthCheckStore)
 	}
 
 	gw.initHealthCheck(gw.ctx)
 
-	redisStore := storage.RedisCluster{KeyPrefix: "apikey-", HashKeys: gwConfig.HashKeys, RedisController: gw.RedisController}
+	redisStore := storage.RedisCluster{KeyPrefix: "apikey-", HashKeys: gwConfig.HashKeys, ConnectionHandler: gw.StorageConnectionHandler}
 	gw.GlobalSessionManager.Init(&redisStore)
 
-	versionStore := storage.RedisCluster{KeyPrefix: "version-check-", RedisController: gw.RedisController}
+	versionStore := storage.RedisCluster{KeyPrefix: "version-check-", ConnectionHandler: gw.StorageConnectionHandler}
 	versionStore.Connect()
 	err := versionStore.SetKey("gateway", VERSION, 0)
 
@@ -378,11 +383,11 @@ func (gw *Gateway) setupGlobals() {
 		gw.SetConfig(Conf)
 		mainLog.Debug("Setting up analytics DB connection")
 
-		analyticsStore := storage.RedisCluster{KeyPrefix: "analytics-", IsAnalytics: true, RedisController: gw.RedisController}
+		analyticsStore := storage.RedisCluster{KeyPrefix: "analytics-", IsAnalytics: true, ConnectionHandler: gw.StorageConnectionHandler}
 		gw.Analytics.Store = &analyticsStore
 		gw.Analytics.Init()
 
-		store := storage.RedisCluster{KeyPrefix: "analytics-", IsAnalytics: true, RedisController: gw.RedisController}
+		store := storage.RedisCluster{KeyPrefix: "analytics-", IsAnalytics: true, ConnectionHandler: gw.StorageConnectionHandler}
 		redisPurger := RedisPurger{Store: &store, Gw: gw}
 		go redisPurger.PurgeLoop(gw.ctx)
 
@@ -392,7 +397,7 @@ func (gw *Gateway) setupGlobals() {
 			} else {
 				mainLog.Debug("Using RPC cache purge")
 
-				store := storage.RedisCluster{KeyPrefix: "analytics-", IsAnalytics: true, RedisController: gw.RedisController}
+				store := storage.RedisCluster{KeyPrefix: "analytics-", IsAnalytics: true, ConnectionHandler: gw.StorageConnectionHandler}
 				purger := rpc.Purger{
 					Store: &store,
 				}
@@ -407,13 +412,13 @@ func (gw *Gateway) setupGlobals() {
 	// Load all the files that have the "error" prefix.
 	//	gwConfig.TemplatePath = "/Users/sredny/go/src/github.com/TykTechnologies/tyk/templates"
 	templatesDir := filepath.Join(gwConfig.TemplatePath, "error*")
-	gw.templates = template.Must(template.ParseGlob(templatesDir))
+	gw.templates = htmlTemplate.Must(htmlTemplate.ParseGlob(templatesDir))
 	gw.templatesRaw = textTemplate.Must(textTemplate.ParseGlob(templatesDir))
 	gw.CoProcessInit()
 
 	// Get the notifier ready
 	mainLog.Debug("Notifier will not work in hybrid mode")
-	mainNotifierStore := &storage.RedisCluster{RedisController: gw.RedisController}
+	mainNotifierStore := &storage.RedisCluster{ConnectionHandler: gw.StorageConnectionHandler}
 	mainNotifierStore.Connect()
 	gw.MainNotifier = RedisNotifier{mainNotifierStore, RedisPubSubChannel, gw}
 
@@ -437,7 +442,7 @@ func (gw *Gateway) setupGlobals() {
 		certificateSecret = gw.GetConfig().Security.PrivateCertificateEncodingSecret
 	}
 
-	storeCert := &storage.RedisCluster{KeyPrefix: "cert-", HashKeys: false, RedisController: gw.RedisController}
+	storeCert := &storage.RedisCluster{KeyPrefix: "cert-", HashKeys: false, ConnectionHandler: gw.StorageConnectionHandler}
 	gw.CertificateManager = certs.NewCertificateManager(storeCert, certificateSecret, log, !gw.GetConfig().Cloud)
 	if gw.GetConfig().SlaveOptions.UseRPC {
 		rpcStore := &RPCStorageHandler{
@@ -516,7 +521,7 @@ func (gw *Gateway) syncAPISpecs() (int, error) {
 	}
 	var filter []*APISpec
 	for _, v := range s {
-		if err := v.Validate(); err != nil {
+		if err := v.Validate(gw.GetConfig().OAS); err != nil {
 			mainLog.WithError(err).WithField("spec", v.Name).Error("Skipping loading spec because it failed validation")
 			continue
 		}
@@ -703,6 +708,7 @@ func (gw *Gateway) loadControlAPIEndpoints(muxer *mux.Router) {
 	r.HandleFunc("/oauth/clients/{apiID}", gw.oAuthClientHandler).Methods("GET", "DELETE")
 	r.HandleFunc("/oauth/clients/{apiID}/{keyName:[^/]*}", gw.oAuthClientHandler).Methods("GET", "DELETE")
 	r.HandleFunc("/oauth/clients/{apiID}/{keyName}/tokens", gw.oAuthClientTokensHandler).Methods("GET")
+	r.HandleFunc("/oauth/tokens", gw.oAuthTokensHandler).Methods(http.MethodDelete)
 
 	r.HandleFunc("/schema", gw.schemaHandler).Methods(http.MethodGet)
 
@@ -760,7 +766,7 @@ func (gw *Gateway) addOAuthHandlers(spec *APISpec, muxer *mux.Router) *OAuthMana
 	osinStorage := &RedisOsinStorageInterface{
 		storageManager,
 		gw.GlobalSessionManager,
-		&storage.RedisCluster{KeyPrefix: prefix, HashKeys: false, RedisController: gw.RedisController},
+		&storage.RedisCluster{KeyPrefix: prefix, HashKeys: false, ConnectionHandler: gw.StorageConnectionHandler},
 		spec.OrgID,
 		gw,
 	}
@@ -899,16 +905,34 @@ func (gw *Gateway) createResponseMiddlewareChain(spec *APISpec, responseFuncs []
 		baseHandler     = BaseTykResponseHandler{Spec: spec, Gw: gw}
 	)
 	gw.responseMWAppendEnabled(&responseMWChain, &ResponseTransformMiddleware{BaseTykResponseHandler: baseHandler})
+
+	headerInjector := &HeaderInjector{BaseTykResponseHandler: baseHandler}
+	headerInjectorAdded := gw.responseMWAppendEnabled(&responseMWChain, headerInjector)
 	for _, processorDetail := range spec.ResponseProcessors {
+		// This if statement will be removed in 5.4 as header_injector response processor will be removed
+		if processorDetail.Name == "header_injector" {
+			if !headerInjectorAdded {
+				responseMWChain = append(responseMWChain, headerInjector)
+			}
+
+			if err := headerInjector.Init(processorDetail.Options, spec); err != nil {
+				mainLog.Debug("Failed to init header injector processor: ", err)
+			}
+
+			continue
+		}
+
 		processor := gw.responseProcessorByName(processorDetail.Name, baseHandler)
 		if processor == nil {
 			mainLog.Error("No such processor: ", processorDetail.Name)
 			continue
 		}
+
 		if err := processor.Init(processorDetail.Options, spec); err != nil {
 			mainLog.Debug("Failed to init processor: ", err)
 		}
 		mainLog.Debug("Loading Response processor: ", processorDetail.Name)
+
 		responseMWChain = append(responseMWChain, processor)
 	}
 
@@ -934,7 +958,7 @@ func (gw *Gateway) createResponseMiddlewareChain(spec *APISpec, responseFuncs []
 	}
 
 	keyPrefix := "cache-" + spec.APIID
-	cacheStore := &storage.RedisCluster{KeyPrefix: keyPrefix, IsCache: true, RedisController: gw.RedisController}
+	cacheStore := &storage.RedisCluster{KeyPrefix: keyPrefix, IsCache: true, ConnectionHandler: gw.StorageConnectionHandler}
 	cacheStore.Connect()
 
 	// Add cache writer as the final step of the response middleware chain
@@ -1154,25 +1178,23 @@ func (gw *Gateway) setupLogger() {
 	if gwConfig.UseLogstash {
 		mainLog.Debug("Enabling Logstash support")
 
-		var hook *logstashHook.Hook
+		var hook logrus.Hook
 		var err error
 		var conn net.Conn
 		if gwConfig.LogstashTransport == "udp" {
 			mainLog.Debug("Connecting to Logstash with udp")
-			hook, err = logstashHook.NewHook(gwConfig.LogstashTransport,
-				gwConfig.LogstashNetworkAddr,
-				appName)
+			conn, err = net.Dial(gwConfig.LogstashTransport, gwConfig.LogstashNetworkAddr)
 		} else {
 			mainLog.Debugf("Connecting to Logstash with %s", gwConfig.LogstashTransport)
 			conn, err = gas.Dial(gwConfig.LogstashTransport, gwConfig.LogstashNetworkAddr)
-			if err == nil {
-				hook, err = logstashHook.NewHookWithConn(conn, appName)
-			}
 		}
 
 		if err != nil {
 			log.Errorf("Error making connection for logstash: %v", err)
 		} else {
+			hook = logstashHook.New(conn, logstashHook.DefaultFormatter(logrus.Fields{
+				"type": appName,
+			}))
 			log.Hooks.Add(hook)
 			rawLog.Hooks.Add(hook)
 			mainLog.Debug("Logstash hook active")
@@ -1300,6 +1322,10 @@ func (gw *Gateway) initialiseSystem() error {
 		if gwConfig.Policies.PolicyRecordName == "" {
 			gwConfig.Policies.PolicyRecordName = config.DefaultDashPolicyRecordName
 		}
+	}
+
+	if gwConfig.LivenessCheck.CheckDuration == 0 {
+		gwConfig.LivenessCheck.CheckDuration = 10 * time.Second
 	}
 
 	gw.SetConfig(gwConfig)
@@ -1517,7 +1543,7 @@ func (gw *Gateway) getHostDetails(file string) {
 }
 
 func (gw *Gateway) getGlobalMDCBStorageHandler(keyPrefix string, hashKeys bool) storage.Handler {
-	localStorage := &storage.RedisCluster{KeyPrefix: keyPrefix, HashKeys: hashKeys, RedisController: gw.RedisController}
+	localStorage := &storage.RedisCluster{KeyPrefix: keyPrefix, HashKeys: hashKeys, ConnectionHandler: gw.StorageConnectionHandler}
 	logger := logrus.New().WithFields(logrus.Fields{"prefix": "mdcb-storage-handler"})
 
 	if gw.GetConfig().SlaveOptions.UseRPC {
@@ -1542,34 +1568,46 @@ func (gw *Gateway) getGlobalStorageHandler(keyPrefix string, hashKeys bool) stor
 			Gw:        gw,
 		}
 	}
-	return &storage.RedisCluster{KeyPrefix: keyPrefix, HashKeys: hashKeys, RedisController: gw.RedisController}
+	return &storage.RedisCluster{KeyPrefix: keyPrefix, HashKeys: hashKeys, ConnectionHandler: gw.StorageConnectionHandler}
 }
 
 func Start() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	cli.Init(VERSION, confPaths)
+	cli.Init(confPaths)
 	cli.Parse()
 	// Stop gateway process if not running in "start" mode:
 	if !cli.DefaultMode {
 		os.Exit(0)
 	}
 
-	// ToDo:Config replace for get default conf
-	gw := NewGateway(config.Default, ctx)
-	gw.SetNodeID("solo-" + uuid.New())
+	gwConfig := config.Config{}
+	if err := config.Load(confPaths, &gwConfig); err != nil {
+		mainLog.Errorf("Error loading config, using defaults: %v", err)
 
-	gw.SessionID = uuid.New()
+		defaultConfig, err := config.NewDefaultWithEnv()
+		if err != nil {
+			mainLog.Fatalf("Error falling back to default config with env: %v", err)
+		}
+		gwConfig = *defaultConfig
+	}
+
+	if gwConfig.PIDFileLocation == "" {
+		gwConfig.PIDFileLocation = "/var/run/tyk/tyk-gateway.pid"
+	}
+
+	gw := NewGateway(gwConfig, ctx)
 
 	if err := gw.initialiseSystem(); err != nil {
 		mainLog.Fatalf("Error initialising system: %v", err)
 	}
 
-	gwConfig := gw.GetConfig()
+	gwConfig = gw.GetConfig()
 	if gwConfig.ControlAPIPort == 0 {
 		mainLog.Warn("The control_api_port should be changed for production")
 	}
+
 	gw.setupPortsWhitelist()
 	gw.keyGen = DefaultKeyGenerator{Gw: gw}
 
@@ -1615,7 +1653,7 @@ func Start() {
 
 	gw.start()
 	configs := gw.GetConfig()
-	go gw.RedisController.ConnectToRedis(gw.ctx, func() {
+	go gw.StorageConnectionHandler.Connect(gw.ctx, func() {
 		gw.reloadURLStructure(func() {})
 	}, &configs)
 
@@ -1632,7 +1670,10 @@ func Start() {
 		if memProfFile, err = os.Create(memprofile); err != nil {
 			panic(err)
 		}
-		defer memProfFile.Close()
+		defer func() {
+			pprof.WriteHeapProfile(memProfFile)
+			memProfFile.Close()
+		}()
 	}
 	if *cli.CPUProfile {
 		mainLog.Info("Cpu profiling active")
@@ -1730,8 +1771,10 @@ func writeProfiles() {
 }
 
 func (gw *Gateway) start() {
+	conf := gw.GetConfig()
+
 	// Set up a default org manager so we can traverse non-live paths
-	if !gw.GetConfig().SupressDefaultOrgStore {
+	if !conf.SupressDefaultOrgStore {
 		mainLog.Debug("Initialising default org store")
 		gw.DefaultOrgStore.Init(gw.getGlobalStorageHandler("orgkey.", false))
 		//DefaultQuotaStore.Init(getGlobalStorageHandler(CloudHandler, "orgkey.", false))
@@ -1739,11 +1782,16 @@ func (gw *Gateway) start() {
 	}
 
 	// Start listening for reload messages
-	if !gw.GetConfig().SuppressRedisSignalReload {
+	if !conf.SuppressRedisSignalReload {
 		go gw.startPubSubLoop()
 	}
 
-	conf := gw.GetConfig()
+	purgeInterval := conf.Private.GetOAuthTokensPurgeInterval()
+	purgeJob := scheduler.NewJob("purge-oauth-tokens", gw.purgeLapsedOAuthTokens, purgeInterval)
+
+	oauthTokensPurger := scheduler.NewScheduler(log)
+	go oauthTokensPurger.Start(gw.ctx, purgeJob)
+
 	if slaveOptions := conf.SlaveOptions; slaveOptions.UseRPC {
 		mainLog.Debug("Starting RPC reload listener")
 		gw.RPCListener = RPCStorageHandler{
@@ -1806,6 +1854,8 @@ func (gw *Gateway) startDRL() {
 
 	gw.drlOnce.Do(func() {
 		drlManager := &drl.DRL{}
+		gw.SessionLimiter = NewSessionLimiter(gw.ctx, &gwConfig, drlManager)
+
 		gw.DRLManager = drlManager
 
 		if disabled {
