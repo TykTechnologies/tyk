@@ -14,11 +14,11 @@ import (
 )
 
 type EngineV3 struct {
-	engine         *graphql.ExecutionEngineV2
-	schema         *graphql.Schema
-	logger         abstractlogger.Logger
-	openTelemetry  *EngineV2OTelConfig
-	apiDefinitions *apidef.APIDefinition
+	engine        *graphql.ExecutionEngineV2
+	schema        *graphql.Schema
+	logger        abstractlogger.Logger
+	openTelemetry *EngineV2OTelConfig
+	apiDefinition *apidef.APIDefinition
 
 	ctxStoreRequestFunc    ContextStoreRequestV2Func
 	ctxRetrieveRequestFunc ContextRetrieveRequestV2Func
@@ -121,7 +121,7 @@ func NewEngineV3(options EngineV3Options) (*EngineV3, error) {
 		ctxRetrieveRequestFunc: options.Injections.ContextRetrieveRequest,
 		ctxStoreRequestFunc:    options.Injections.ContextStoreRequest,
 		openTelemetry:          &options.OpenTelemetry,
-		apiDefinitions:         options.ApiDefinition,
+		apiDefinition:          options.ApiDefinition,
 		reverseProxyPreHandler: reverseProxyPreHandler,
 		gqlTools:               gqlTools,
 		tykVariableReplacer:    options.Injections.TykVariableReplacer,
@@ -157,7 +157,7 @@ func NewEngineV3(options EngineV3Options) (*EngineV3, error) {
 	}
 
 	if isSupergraph(options.ApiDefinition) {
-		engine.apiDefinitions.GraphQL.Schema = engine.apiDefinitions.GraphQL.Supergraph.MergedSDL
+		engine.apiDefinition.GraphQL.Schema = engine.apiDefinition.GraphQL.Supergraph.MergedSDL
 	}
 
 	return &engine, nil
@@ -186,7 +186,7 @@ func (e *EngineV3) ProcessAndStoreGraphQLRequest(w http.ResponseWriter, r *http.
 	}
 
 	e.ctxStoreRequestFunc(r, &gqlRequest)
-	if e.openTelemetry.Enabled && e.apiDefinitions.DetailedTracing {
+	if e.openTelemetry.Enabled && e.apiDefinition.DetailedTracing {
 		ctx, span := e.openTelemetry.TracerProvider.Tracer().Start(r.Context(), "GraphqlMiddleware Validation")
 		defer span.End()
 		*r = *r.WithContext(ctx)

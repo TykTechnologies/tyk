@@ -3,6 +3,7 @@ package graphengine
 import (
 	"context"
 	"errors"
+	"github.com/TykTechnologies/tyk/apidef"
 	"net/http"
 
 	"github.com/jensneuse/abstractlogger"
@@ -39,6 +40,11 @@ func (e *EngineV3) HandleReverseProxy(params ReverseProxyParams) (res *http.Resp
 		return e.handoverWebSocketConnectionToGraphQLExecutionEngine(&params)
 	case ReverseProxyTypeGraphEngine:
 		return e.handoverRequestToGraphQLExecutionEngine(gqlRequest, params.OutRequest)
+	case ReverseProxyTypePreFlight:
+		if e.apiDefinition.GraphQL.ExecutionMode == apidef.GraphQLExecutionModeProxyOnly {
+			return nil, false, nil
+		}
+		return nil, false, errors.New("options passthrough not allowed")
 	case ReverseProxyTypeNone:
 		return nil, false, nil
 	}
@@ -64,7 +70,7 @@ func (e *EngineV3) handoverWebSocketConnectionToGraphQLExecutionEngine(params *R
 		return
 	}
 	initialRequestContext := subscription.NewInitialHttpRequestContext(params.OutRequest)
-	upstreamHeaders := additionalUpstreamHeaders(e.logger, params.OutRequest, e.apiDefinitions)
+	upstreamHeaders := additionalUpstreamHeaders(e.logger, params.OutRequest, e.apiDefinition)
 	executorPool = subscription.NewExecutorV2Pool(
 		e.engine,
 		initialRequestContext,
@@ -94,7 +100,7 @@ func (e *EngineV3) handoverRequestToGraphQLExecutionEngine(gqlRequest *graphql.R
 		return
 	}
 
-	isProxyOnly := isProxyOnly(e.apiDefinitions)
+	isProxyOnly := isProxyOnly(e.apiDefinition)
 	span := otel.SpanFromContext(outreq.Context())
 	reqCtx := otel.ContextWithSpan(context.Background(), span)
 	if isProxyOnly {
@@ -105,7 +111,7 @@ func (e *EngineV3) handoverRequestToGraphQLExecutionEngine(gqlRequest *graphql.R
 	resultWriter := graphql.NewEngineResultWriter()
 	execOptions := make([]graphql.ExecutionOptionsV2, 0)
 
-	upstreamHeaders := additionalUpstreamHeaders(e.logger, outreq, e.apiDefinitions)
+	upstreamHeaders := additionalUpstreamHeaders(e.logger, outreq, e.apiDefinition)
 	execOptions = append(execOptions, graphql.WithHeaderModifier(e.gqlTools.headerModifier(outreq, upstreamHeaders, e.tykVariableReplacer)))
 
 	if e.openTelemetry.Executor != nil {
@@ -136,7 +142,7 @@ func (e *EngineV3) handoverRequestToGraphQLExecutionEngine(gqlRequest *graphql.R
 			// change the value of the header's content encoding to use the content encoding defined by the accept encoding
 			contentEncoding := selectContentEncodingToBeUsed(proxyOnlyCtx.forwardedRequest.Header.Get(httpclient.AcceptEncodingHeader))
 			header.Set(httpclient.ContentEncodingHeader, contentEncoding)
-			if e.apiDefinitions.GraphQL.Proxy.UseResponseExtensions.OnErrorForwarding && httpStatus >= http.StatusBadRequest {
+			if e.apiDefinition.GraphQL.Proxy.UseResponseExtensions.OnErrorForwarding && httpStatus >= http.StatusBadRequest {
 				err = e.gqlTools.returnErrorsFromUpstream(proxyOnlyCtx, &resultWriter, e.seekReadCloser)
 				if err != nil {
 					return
