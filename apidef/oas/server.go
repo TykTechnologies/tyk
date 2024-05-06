@@ -37,6 +37,9 @@ type Server struct {
 	// Tyk classic API definition: `detailed_tracing`
 	DetailedTracing *DetailedTracing `bson:"detailedTracing,omitempty" json:"detailedTracing,omitempty"`
 
+	// Events contains the configuration related to Tyk Events.
+	//
+	// Tyk classic API definition: `event_handlers`
 	Events Events `bson:"events,omitempty" json:"events,omitempty"`
 }
 
