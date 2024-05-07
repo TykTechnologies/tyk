@@ -9,10 +9,11 @@ import (
 	"text/template"
 	"time"
 
-	"github.com/TykTechnologies/storage/persistent/model"
-
 	"github.com/clbanning/mxj"
 	"github.com/lonelycode/osin"
+
+	"github.com/TykTechnologies/storage/persistent/model"
+	"github.com/TykTechnologies/tyk/internal/event"
 
 	"github.com/TykTechnologies/tyk/internal/reflect"
 
@@ -28,8 +29,12 @@ import (
 type AuthProviderCode string
 type SessionProviderCode string
 type StorageEngineCode string
-type TykEvent string            // A type so we can ENUM event types easily, e.g. EventQuotaExceeded
-type TykEventHandlerName string // A type for handler codes in API definitions
+
+// TykEvent is an alias maintained for backwards compatibility.
+type TykEvent = event.Event
+
+// TykEventHandlerName is an alias maintained for backwards compatibility.
+type TykEventHandlerName = event.HandlerName
 
 type EndpointMethodAction string
 type SourceMode string
@@ -1406,4 +1411,35 @@ type Introspection struct {
 type IntrospectionCache struct {
 	Enabled bool  `bson:"enabled" json:"enabled"`
 	Timeout int64 `bson:"timeout" json:"timeout"`
+}
+
+// WebHookHandlerConf holds configuration related to webhook event handler.
+type WebHookHandlerConf struct {
+	// Disabled enables/disables this webhook.
+	Disabled bool `bson:"disabled" json:"disabled"`
+	// ID optional ID of the webhook, to be used in pro mode.
+	ID string `bson:"id" json:"id"`
+	// Name is the name of webhook.
+	Name string `bson:"name" json:"name"`
+	// The method to use for the webhook.
+	Method string `bson:"method" json:"method"`
+	// The target path on which to send the request.
+	TargetPath string `bson:"target_path" json:"target_path"`
+	// The template to load in order to format the request.
+	TemplatePath string `bson:"template_path" json:"template_path"`
+	// Headers to set when firing the webhook.
+	HeaderList map[string]string `bson:"header_map" json:"header_map"`
+	// The cool-down for the event so it does not trigger again (in seconds).
+	EventTimeout int64 `bson:"event_timeout" json:"event_timeout"`
+}
+
+// Scan scans WebHookHandlerConf from `any` in.
+func (w *WebHookHandlerConf) Scan(in any) error {
+	conf, err := reflect.Cast[WebHookHandlerConf](in)
+	if err != nil {
+		return err
+	}
+
+	*w = conf
+	return nil
 }
