@@ -1,7 +1,11 @@
 package oas
 
 import (
+	"encoding/json"
+
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/internal/event"
+	"github.com/TykTechnologies/tyk/internal/reflect"
 )
 
 // Server contains the configuration that sets Tyk up to receive requests from the client applications.
@@ -33,6 +37,11 @@ type Server struct {
 	//
 	// Tyk classic API definition: `detailed_tracing`
 	DetailedTracing *DetailedTracing `bson:"detailedTracing,omitempty" json:"detailedTracing,omitempty"`
+
+	// Events contains the configuration related to Tyk Events.
+	//
+	// Tyk classic API definition: `event_handlers`
+	Events Events `bson:"events,omitempty" json:"events,omitempty"`
 }
 
 // Fill fills *Server from apidef.APIDefinition.
@@ -80,6 +89,14 @@ func (s *Server) Fill(api apidef.APIDefinition) {
 	s.DetailedTracing.Fill(api)
 	if ShouldOmit(s.DetailedTracing) {
 		s.DetailedTracing = nil
+	}
+
+	if s.Events == nil {
+		s.Events = Events{}
+	}
+	s.Events.Fill(api)
+	if ShouldOmit(s.Events) {
+		s.Events = nil
 	}
 }
 
@@ -131,6 +148,15 @@ func (s *Server) ExtractTo(api *apidef.APIDefinition) {
 	}
 
 	s.DetailedTracing.ExtractTo(api)
+
+	if s.Events == nil {
+		s.Events = Events{}
+		defer func() {
+			s.Events = nil
+		}()
+	}
+
+	s.Events.ExtractTo(api)
 }
 
 // ListenPath is the base path on Tyk to which requests for this API
@@ -264,4 +290,174 @@ func (dt *DetailedTracing) Fill(api apidef.APIDefinition) {
 // ExtractTo extracts *DetailedTracing into *apidef.APIDefinition.
 func (dt *DetailedTracing) ExtractTo(api *apidef.APIDefinition) {
 	api.DetailedTracing = dt.Enabled
+}
+
+// Event holds information about individual event to be configured on the API.
+type Event struct {
+	// Enabled enables the event handler.
+	Enabled bool `json:"enabled" bson:"enabled"`
+	// Type specifies the TykEvent that should trigger the event handler.
+	Type event.Event `json:"type" bson:"type"`
+	// Action specifies the action to be taken on the event trigger.
+	Action event.Action `json:"action" bson:"action"`
+	// ID is the ID of event handler in storage.
+	ID string `json:"id,omitempty" bson:"id,omitempty"`
+	// Name is the name of event handler
+	Name string `json:"name,omitempty" bson:"name,omitempty"`
+
+	Webhook WebhookEvent `bson:"-" json:"-"`
+}
+
+// MarshalJSON marshals Event as per Tyk OAS API definition contract.
+func (e *Event) MarshalJSON() ([]byte, error) {
+	outMap, err := reflect.Cast[map[string]interface{}](*e)
+	if err != nil {
+		return nil, err
+	}
+
+	webhookMap, err := reflect.Cast[map[string]interface{}](e.Webhook)
+	if err != nil {
+		return nil, err
+	}
+
+	for k, v := range webhookMap {
+		outMap[k] = v
+	}
+
+	return json.Marshal(outMap)
+}
+
+// UnmarshalJSON unmarshals Event as per Tyk OAS API definition contract.
+func (e *Event) UnmarshalJSON(in []byte) error {
+	type helperEvent Event
+	helper := helperEvent{}
+	if err := json.Unmarshal(in, &helper); err != nil {
+		return err
+	}
+
+	if err := json.Unmarshal(in, &helper.Webhook); err != nil {
+		return err
+	}
+
+	*e = Event(helper)
+	return nil
+}
+
+// WebhookEvent stores the core information about a webhook event.
+type WebhookEvent struct {
+	URL          string            `json:"url" bson:"url"`
+	Method       string            `json:"method" bson:"method"`
+	Timeout      int64             `json:"timeout" bson:"timeout"`
+	BodyTemplate string            `json:"bodyTemplate,omitempty" bson:"bodyTemplate,omitempty"`
+	Headers      map[string]string `json:"headers,omitempty" bson:"headers,omitempty"`
+}
+
+// GetWebhookConf converts Event.WebhookEvent to map[string]interface{}
+// with apidef.WebHookHandlerConf structure for classic API definition compatibility.
+func (e *Event) GetWebhookConf() (map[string]interface{}, error) {
+	webhookConf := apidef.WebHookHandlerConf{
+		Disabled:     !e.Enabled,
+		ID:           e.ID,
+		Name:         e.Name,
+		Method:       e.Webhook.Method,
+		TargetPath:   e.Webhook.URL,
+		HeaderList:   e.Webhook.Headers,
+		EventTimeout: e.Webhook.Timeout,
+		TemplatePath: e.Webhook.BodyTemplate,
+	}
+
+	data, err := json.Marshal(webhookConf)
+	if err != nil {
+		return nil, err
+	}
+	var handlerMeta map[string]interface{}
+	err = json.Unmarshal(data, &handlerMeta)
+	return handlerMeta, err
+}
+
+// Events holds the list of events to be processed for the API.
+type Events []Event
+
+// Fill fills Events from classic API definition. Currently only webhook events are supported.
+func (e *Events) Fill(api apidef.APIDefinition) {
+	if len(api.EventHandlers.Events) == 0 {
+		return
+	}
+
+	events := Events{}
+	for gwEvent, ehs := range api.EventHandlers.Events {
+		for _, eh := range ehs {
+			if eh.Handler == event.WebHookHandler {
+				whConf := apidef.WebHookHandlerConf{}
+				err := whConf.Scan(eh.HandlerMeta)
+				if err != nil {
+					continue
+				}
+
+				ev := Event{
+					Enabled: !whConf.Disabled,
+					Type:    gwEvent,
+					Action:  event.WebhookAction,
+					ID:      whConf.ID,
+					Name:    whConf.Name,
+					Webhook: WebhookEvent{
+
+						URL:          whConf.TargetPath,
+						Method:       whConf.Method,
+						Headers:      whConf.HeaderList,
+						Timeout:      whConf.EventTimeout,
+						BodyTemplate: whConf.TemplatePath,
+					},
+				}
+
+				events = append(events, ev)
+			}
+		}
+	}
+
+	*e = events
+}
+
+// ExtractTo extracts events to apidef.APIDefinition.
+func (e *Events) ExtractTo(api *apidef.APIDefinition) {
+	if e == nil {
+		return
+	}
+
+	for _, ev := range *e {
+		var (
+			handler     event.HandlerName
+			handlerMeta map[string]interface{}
+			err         error
+		)
+
+		switch ev.Action {
+		case event.WebhookAction:
+			handler = event.WebHookHandler
+			handlerMeta, err = ev.GetWebhookConf()
+		default:
+			continue
+		}
+
+		if err != nil {
+			log.WithError(err).Error("error converting event to map")
+			continue
+		}
+
+		eventHandlerTriggerConfig := apidef.EventHandlerTriggerConfig{
+			Handler:     handler,
+			HandlerMeta: handlerMeta,
+		}
+
+		if api.EventHandlers.Events == nil {
+			api.EventHandlers.Events = make(map[apidef.TykEvent][]apidef.EventHandlerTriggerConfig)
+		}
+
+		if val, ok := api.EventHandlers.Events[ev.Type]; ok {
+			api.EventHandlers.Events[ev.Type] = append(val, eventHandlerTriggerConfig)
+			continue
+		}
+
+		api.EventHandlers.Events[ev.Type] = []apidef.EventHandlerTriggerConfig{eventHandlerTriggerConfig}
+	}
 }
