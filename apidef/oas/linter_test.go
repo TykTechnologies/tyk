@@ -11,7 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/xeipuuv/gojsonschema"
 
-	tykevent "github.com/TykTechnologies/tyk/internal/event"
+	"github.com/TykTechnologies/tyk/internal/event"
 )
 
 func TestXTykGateway_Lint(t *testing.T) {
@@ -68,9 +68,9 @@ func TestXTykGateway_Lint(t *testing.T) {
 			"test-basic": securityScheme,
 		}
 		for i := range settings.Server.Events {
-			settings.Server.Events[i].Action = tykevent.WebhookAction
+			settings.Server.Events[i].Action = event.WebhookAction
 			settings.Server.Events[i].Method = http.MethodPost
-			settings.Server.Events[i].Type = tykevent.QuotaExceeded
+			settings.Server.Events[i].Type = event.QuotaExceeded
 		}
 
 		for idx, _ := range settings.Middleware.Operations {

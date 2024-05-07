@@ -23,8 +23,6 @@ import (
 	"github.com/justinas/alice"
 
 	"github.com/TykTechnologies/tyk/apidef"
-	"github.com/TykTechnologies/tyk/internal/event"
-
 	"github.com/TykTechnologies/tyk/certs"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/regexp"
@@ -193,7 +191,7 @@ func testPrepareRSAAuthSessionPass(tb testing.TB, eventWG *sync.WaitGroup, priva
 		eventWG.Done()
 	}
 	spec.EventPaths = map[apidef.TykEvent][]config.TykEventHandler{
-		event.AuthFailure: {&testAuthFailEventHandler{cb}},
+		EventAuthFailure: {&testAuthFailEventHandler{cb}},
 	}
 
 	sessionKey := ""

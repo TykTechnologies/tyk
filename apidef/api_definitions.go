@@ -1415,7 +1415,7 @@ type IntrospectionCache struct {
 
 // WebHookHandlerConf holds configuration related to webhook event handler.
 type WebHookHandlerConf struct {
-	// Disabled enables/disables this webhook
+	// Disabled enables/disables this webhook.
 	Disabled bool `bson:"disabled" json:"disabled"`
 	// ID optional ID of the webhook, to be used in pro mode.
 	ID string `bson:"id" json:"id"`
@@ -1433,8 +1433,8 @@ type WebHookHandlerConf struct {
 	EventTimeout int64 `bson:"event_timeout" json:"event_timeout"`
 }
 
-// Decode decodes WebHookHandlerConf into map[string]interface{}.
-func (w *WebHookHandlerConf) Decode(in any) error {
+// Scan scans WebHookHandlerConf from `any` in.
+func (w *WebHookHandlerConf) Scan(in any) error {
 	data, err := json.Marshal(in)
 	if err != nil {
 		return err

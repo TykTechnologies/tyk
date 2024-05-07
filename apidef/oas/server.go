@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 
 	"github.com/TykTechnologies/tyk/apidef"
-	tykevent "github.com/TykTechnologies/tyk/internal/event"
+	"github.com/TykTechnologies/tyk/internal/event"
 )
 
 // Server contains the configuration that sets Tyk up to receive requests from the client applications.
@@ -293,16 +293,16 @@ func (dt *DetailedTracing) ExtractTo(api *apidef.APIDefinition) {
 
 // Event holds information about individual event to be configured on the API.
 type Event struct {
-	Enabled bool            `json:"enabled" bson:"enabled"`
-	Type    tykevent.Event  `json:"type" bson:"type"`
-	Action  tykevent.Action `json:"action" bson:"action"`
-	ID      string          `json:"id,omitempty" bson:"id,omitempty"`
+	Enabled bool         `json:"enabled" bson:"enabled"`
+	Type    event.Event  `json:"type" bson:"type"`
+	Action  event.Action `json:"action" bson:"action"`
+	ID      string       `json:"id,omitempty" bson:"id,omitempty"`
 
-	WebhookCore
+	WebhookEvent
 }
 
-// WebhookCore stores the core information about a webhook event.
-type WebhookCore struct {
+// WebhookEvent stores the core information about a webhook event.
+type WebhookEvent struct {
 	Name         string            `json:"name,omitempty" bson:"name,omitempty"`
 	URL          string            `json:"url" bson:"url"`
 	Method       string            `json:"method" bson:"method"`
@@ -311,9 +311,9 @@ type WebhookCore struct {
 	Headers      map[string]string `json:"headers,omitempty" bson:"headers,omitempty"`
 }
 
-// ToConfMap converts WebhookCore to map[string]interface{}
+// ToConfMap converts WebhookEvent to map[string]interface{}
 // with apidef.WebHookHandlerConf structure for classic API definition compatibility.
-func (c *WebhookCore) ToConfMap(enabled bool, id string) (map[string]interface{}, error) {
+func (c *WebhookEvent) ToConfMap(enabled bool, id string) (map[string]interface{}, error) {
 	webhookConf := apidef.WebHookHandlerConf{
 		Disabled:     !enabled,
 		ID:           id,
@@ -346,9 +346,9 @@ func (e *Events) Fill(api apidef.APIDefinition) {
 	events := Events{}
 	for gwEvent, ehs := range api.EventHandlers.Events {
 		for _, eh := range ehs {
-			if eh.Handler == tykevent.WebHookHandler {
+			if eh.Handler == event.WebHookHandler {
 				whConf := apidef.WebHookHandlerConf{}
-				err := whConf.Decode(eh.HandlerMeta)
+				err := whConf.Scan(eh.HandlerMeta)
 				if err != nil {
 					continue
 				}
@@ -356,9 +356,9 @@ func (e *Events) Fill(api apidef.APIDefinition) {
 				event := Event{
 					Enabled: !whConf.Disabled,
 					Type:    gwEvent,
-					Action:  tykevent.WebhookAction,
+					Action:  event.WebhookAction,
 					ID:      whConf.ID,
-					WebhookCore: WebhookCore{
+					WebhookEvent: WebhookEvent{
 						Name:         whConf.Name,
 						URL:          whConf.TargetPath,
 						Method:       whConf.Method,
@@ -382,17 +382,17 @@ func (e *Events) ExtractTo(api *apidef.APIDefinition) {
 		return
 	}
 
-	for _, event := range *e {
+	for _, ev := range *e {
 		var (
-			handler     tykevent.HandlerName
+			handler     event.HandlerName
 			handlerMeta map[string]interface{}
 			err         error
 		)
 
-		switch event.Action {
-		case tykevent.WebhookAction:
-			handler = tykevent.WebHookHandler
-			handlerMeta, err = event.WebhookCore.ToConfMap(event.Enabled, event.ID)
+		switch ev.Action {
+		case event.WebhookAction:
+			handler = event.WebHookHandler
+			handlerMeta, err = ev.WebhookEvent.ToConfMap(ev.Enabled, ev.ID)
 		default:
 			continue
 		}
@@ -411,11 +411,11 @@ func (e *Events) ExtractTo(api *apidef.APIDefinition) {
 			api.EventHandlers.Events = make(map[apidef.TykEvent][]apidef.EventHandlerTriggerConfig)
 		}
 
-		if val, ok := api.EventHandlers.Events[event.Type]; ok {
-			api.EventHandlers.Events[event.Type] = append(val, eventHandlerTriggerConfig)
+		if val, ok := api.EventHandlers.Events[ev.Type]; ok {
+			api.EventHandlers.Events[ev.Type] = append(val, eventHandlerTriggerConfig)
 			continue
 		}
 
-		api.EventHandlers.Events[event.Type] = []apidef.EventHandlerTriggerConfig{eventHandlerTriggerConfig}
+		api.EventHandlers.Events[ev.Type] = []apidef.EventHandlerTriggerConfig{eventHandlerTriggerConfig}
 	}
 }

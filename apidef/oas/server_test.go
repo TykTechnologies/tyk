@@ -7,7 +7,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	tykevent "github.com/TykTechnologies/tyk/internal/event"
+	"github.com/TykTechnologies/tyk/internal/event"
 
 	"github.com/TykTechnologies/tyk/apidef"
 )
@@ -341,10 +341,10 @@ func TestEvents(t *testing.T) {
 				input: Events{
 					{
 						Enabled: true,
-						Type:    tykevent.QuotaExceeded,
-						Action:  tykevent.WebhookAction,
+						Type:    event.QuotaExceeded,
+						Action:  event.WebhookAction,
 						ID:      "random-id",
-						WebhookCore: WebhookCore{
+						WebhookEvent: WebhookEvent{
 							Name:         "test-webhook",
 							URL:          "https://webhook.site/uuid",
 							Headers:      map[string]string{"Auth": "key"},
@@ -355,10 +355,10 @@ func TestEvents(t *testing.T) {
 					},
 					{
 						Enabled: false,
-						Type:    tykevent.RateLimitExceeded,
-						Action:  tykevent.WebhookAction,
+						Type:    event.RateLimitExceeded,
+						Action:  event.WebhookAction,
 						ID:      "random-id",
-						WebhookCore: WebhookCore{
+						WebhookEvent: WebhookEvent{
 							Name:         "test-webhook",
 							URL:          "https://webhook.site/uuid",
 							Headers:      map[string]string{"Auth": "key"},
@@ -369,10 +369,10 @@ func TestEvents(t *testing.T) {
 					},
 				},
 				expected: apidef.EventHandlerMetaConfig{
-					Events: map[tykevent.Event][]apidef.EventHandlerTriggerConfig{
-						tykevent.QuotaExceeded: {
+					Events: map[event.Event][]apidef.EventHandlerTriggerConfig{
+						event.QuotaExceeded: {
 							{
-								Handler: tykevent.WebHookHandler,
+								Handler: event.WebHookHandler,
 								HandlerMeta: map[string]interface{}{
 									"disabled":      false,
 									"method":        "POST",
@@ -385,9 +385,9 @@ func TestEvents(t *testing.T) {
 								},
 							},
 						},
-						tykevent.RateLimitExceeded: {
+						event.RateLimitExceeded: {
 							{
-								Handler: tykevent.WebHookHandler,
+								Handler: event.WebHookHandler,
 								HandlerMeta: map[string]interface{}{
 									"disabled":      true,
 									"method":        "POST",
@@ -408,10 +408,10 @@ func TestEvents(t *testing.T) {
 				input: Events{
 					{
 						Enabled: true,
-						Type:    tykevent.QuotaExceeded,
-						Action:  tykevent.Action("invalid-action"),
+						Type:    event.QuotaExceeded,
+						Action:  event.Action("invalid-action"),
 						ID:      "random-id",
-						WebhookCore: WebhookCore{
+						WebhookEvent: WebhookEvent{
 							Name:         "test-webhook",
 							URL:          "https://webhook.site/uuid",
 							Headers:      map[string]string{"Auth": "key"},
@@ -450,10 +450,10 @@ func TestEvents(t *testing.T) {
 			{
 				title: "webhook",
 				input: apidef.EventHandlerMetaConfig{
-					Events: map[tykevent.Event][]apidef.EventHandlerTriggerConfig{
-						tykevent.QuotaExceeded: {
+					Events: map[event.Event][]apidef.EventHandlerTriggerConfig{
+						event.QuotaExceeded: {
 							{
-								Handler: tykevent.WebHookHandler,
+								Handler: event.WebHookHandler,
 								HandlerMeta: map[string]interface{}{
 									"disabled":      false,
 									"method":        "POST",
@@ -466,9 +466,9 @@ func TestEvents(t *testing.T) {
 								},
 							},
 						},
-						tykevent.RateLimitExceeded: {
+						event.RateLimitExceeded: {
 							{
-								Handler: tykevent.WebHookHandler,
+								Handler: event.WebHookHandler,
 								HandlerMeta: map[string]interface{}{
 									"disabled":      true,
 									"method":        "POST",
@@ -486,10 +486,10 @@ func TestEvents(t *testing.T) {
 				expected: Events{
 					{
 						Enabled: true,
-						Type:    tykevent.QuotaExceeded,
-						Action:  tykevent.WebhookAction,
+						Type:    event.QuotaExceeded,
+						Action:  event.WebhookAction,
 						ID:      "random-id",
-						WebhookCore: WebhookCore{
+						WebhookEvent: WebhookEvent{
 							Name:         "test-webhook",
 							URL:          "https://webhook.site/uuid",
 							Headers:      map[string]string{"Auth": "key"},
@@ -500,10 +500,10 @@ func TestEvents(t *testing.T) {
 					},
 					{
 						Enabled: false,
-						Type:    tykevent.RateLimitExceeded,
-						Action:  tykevent.WebhookAction,
+						Type:    event.RateLimitExceeded,
+						Action:  event.WebhookAction,
 						ID:      "random-id",
-						WebhookCore: WebhookCore{
+						WebhookEvent: WebhookEvent{
 							Name:         "test-webhook",
 							URL:          "https://webhook.site/uuid",
 							Headers:      map[string]string{"Auth": "key"},
