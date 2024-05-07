@@ -69,7 +69,7 @@ func TestXTykGateway_Lint(t *testing.T) {
 		}
 		for i := range settings.Server.Events {
 			settings.Server.Events[i].Action = event.WebhookAction
-			settings.Server.Events[i].Method = http.MethodPost
+			settings.Server.Events[i].Webhook.Method = http.MethodPost
 			settings.Server.Events[i].Type = event.QuotaExceeded
 		}
 
