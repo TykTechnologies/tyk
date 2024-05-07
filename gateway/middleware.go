@@ -891,6 +891,10 @@ func (t *BaseMiddleware) getAuthType() string {
 	return ""
 }
 
+func (t *BaseMiddleware) GetAuthToken(authType string, r *http.Request) (string, apidef.AuthConfig) {
+	return t.getAuthToken(authType, r)
+}
+
 func (t *BaseMiddleware) getAuthToken(authType string, r *http.Request) (string, apidef.AuthConfig) {
 	spec := t.Base().Spec
 	config, ok := spec.AuthConfigs[authType]

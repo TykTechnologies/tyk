@@ -387,8 +387,10 @@ func (gw *Gateway) processSpec(spec *APISpec, apisByListen map[string]int,
 		}
 
 		if spec.UseStandardAuth || len(authArray) == 0 {
+			AuthKeyFunc := LoadAuthKeyMW()
+			AuthKey := AuthKeyFunc(baseMid)
 			logger.Info("Checking security policy: Token")
-			authArray = append(authArray, gw.createMiddleware(&AuthKey{baseMid}))
+			authArray = append(authArray, gw.createMiddleware(AuthKey))
 		}
 
 		chainArray = append(chainArray, authArray...)
