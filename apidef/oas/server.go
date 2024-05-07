@@ -308,6 +308,7 @@ type Event struct {
 	Webhook WebhookEvent `bson:"-" json:"-"`
 }
 
+// MarshalJSON marshals Event as per Tyk OAS API definition contract.
 func (e *Event) MarshalJSON() ([]byte, error) {
 	outMap, err := reflect.Cast[map[string]interface{}](*e)
 	if err != nil {
@@ -326,6 +327,7 @@ func (e *Event) MarshalJSON() ([]byte, error) {
 	return json.Marshal(outMap)
 }
 
+// UnmarshalJSON unmarshals Event as per Tyk OAS API definition contract.
 func (e *Event) UnmarshalJSON(in []byte) error {
 	type helperEvent Event
 	helper := helperEvent{}
