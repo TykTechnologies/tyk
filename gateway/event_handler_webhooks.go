@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"crypto/md5"
 	"encoding/hex"
-	"encoding/json"
 	htmlTemplate "html/template"
 	"io/ioutil"
 	"net/http"
@@ -47,40 +46,23 @@ type WebHookHandler struct {
 	Gw               *Gateway
 }
 
-// createConfigObject by default tyk will provide a map[string]interface{} type as a conf, converting it
-// specifically here makes it easier to handle, only happens once, so not a massive issue, but not pretty
-func (w *WebHookHandler) createConfigObject(handlerConf interface{}) (apidef.WebHookHandlerConf, error) {
-	newConf := apidef.WebHookHandlerConf{}
-
-	asJSON, _ := json.Marshal(handlerConf)
-	if err := json.Unmarshal(asJSON, &newConf); err != nil {
-		log.WithFields(logrus.Fields{
-			"prefix": "webhooks",
-		}).Error("Format of webhook configuration is incorrect: ", err)
-		return newConf, err
-	}
-
-	return newConf, nil
-}
-
 // Init enables the init of event handler instances when they are created on ApiSpec creation
 func (w *WebHookHandler) Init(handlerConf interface{}) error {
-	whConf, err := w.createConfigObject(handlerConf)
-	if err != nil {
+	var err error
+	if err = w.conf.Scan(handlerConf); err != nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "webhooks",
 		}).Error("Problem getting configuration, skipping. ", err)
 		return err
 	}
 
-	if whConf.Disabled {
+	if w.conf.Disabled {
 		log.WithFields(logrus.Fields{
 			"prefix": "webhooks",
-		}).Infof("skipping disabled webhook %s", whConf.Name)
+		}).Infof("skipping disabled webhook %s", w.conf.Name)
 		return nil
 	}
 
-	w.conf = whConf
 	w.store = &storage.RedisCluster{KeyPrefix: "webhook.cache.", ConnectionHandler: w.Gw.StorageConnectionHandler}
 	w.store.Connect()
 
