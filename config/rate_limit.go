@@ -30,6 +30,9 @@ type RateLimit struct {
 
 	// Controls which algorthm to use as a fallback when your distributed rate limiter can't be used.
 	DRLEnableSentinelRateLimiter bool `json:"drl_enable_sentinel_rate_limiter"`
+
+	// EnableRateLimitSmoothing enables rate limit smoothing.
+	EnableRateLimitSmoothing bool `json:"enable_rate_limit_smoothing"`
 }
 
 // String returns a readable setting for the rate limiter in effect.

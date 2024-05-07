@@ -1173,3 +1173,8 @@ func (r *RPCStorageHandler) Exists(keyName string) (bool, error) {
 	log.Error("Not implemented")
 	return false, nil
 }
+
+func (r *RPCStorageHandler) Lock(key string, timeout time.Duration) (bool, error) {
+	log.Error("Not implemented")
+	return false, nil
+}

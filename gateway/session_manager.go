@@ -10,7 +10,6 @@ import (
 	"github.com/TykTechnologies/drl"
 	"github.com/TykTechnologies/leakybucket"
 	"github.com/TykTechnologies/leakybucket/memorycache"
-
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/internal/rate"
 	"github.com/TykTechnologies/tyk/internal/redis"
@@ -79,7 +78,7 @@ func (l *SessionLimiter) Context() context.Context {
 	return l.ctx
 }
 
-func (l *SessionLimiter) doRollingWindowWrite(key, rateLimiterKey, rateLimiterSentinelKey string,
+func (l *SessionLimiter) doRollingWindowWrite(r *http.Request, key, rateLimiterKey, rateLimiterSentinelKey string,
 	currentSession *user.SessionState,
 	store storage.Handler,
 	globalConf *config.Config,
@@ -87,15 +86,35 @@ func (l *SessionLimiter) doRollingWindowWrite(key, rateLimiterKey, rateLimiterSe
 
 	ctx := l.Context()
 
-	var per, cost float64
+	var per, cost, maxCost float64
 
 	if apiLimit != nil { // respect limit on API level
 		per = apiLimit.Per
 		cost = apiLimit.Rate
+		maxCost = apiLimit.Rate
 	} else {
 		per = currentSession.Per
 		cost = currentSession.Rate
+		maxCost = currentSession.Rate
 	}
+
+	smoothingEnabled := globalConf.EnableRateLimitSmoothing
+	var smoothedAllowance float64
+	var smoothingConfig *user.RateLimitSmoothing
+	if smoothingEnabled && apiLimit != nil && apiLimit.Smoothing != nil {
+		smoothedAllowance = float64(getAllowanceFromSmoothing(apiLimit.Smoothing))
+		smoothingConfig = apiLimit.Smoothing
+	} else if smoothingEnabled && currentSession.Smoothing != nil {
+		smoothedAllowance = float64(getAllowanceFromSmoothing(currentSession.Smoothing))
+		smoothingConfig = currentSession.Smoothing
+	}
+	log.Debugf("before cost=%v, smoothedAllowance=%v", cost, smoothedAllowance)
+
+	if smoothedAllowance > 0 && smoothedAllowance <= cost {
+		cost = smoothedAllowance
+	}
+
+	log.Debugf("after cost=%v, smoothedAllowance=%v", cost, smoothedAllowance)
 
 	log.Debug("[RATELIMIT] Inbound raw key is: ", key)
 	log.Debug("[RATELIMIT] Rate limiter key is: ", rateLimiterKey)
@@ -116,6 +135,10 @@ func (l *SessionLimiter) doRollingWindowWrite(key, rateLimiterKey, rateLimiterSe
 
 	if err != nil {
 		log.WithError(err).Error("error writing sliding log")
+	}
+
+	if !dryRun && smoothingEnabled && doSmoothing(key, ratePerPeriodNow, smoothingConfig, store, maxCost) {
+		ctxScheduleSessionUpdate(r)
 	}
 
 	// Subtract by 1 because of the delayed add in the window
@@ -140,6 +163,67 @@ func (l *SessionLimiter) doRollingWindowWrite(key, rateLimiterKey, rateLimiterSe
 	return false
 }
 
+func getAllowanceFromSmoothing(smoothing *user.RateLimitSmoothing) int64 {
+	if smoothing.CurrentAllowance == 0 {
+		smoothing.CurrentAllowance = smoothing.Threshold
+		return smoothing.Threshold
+	}
+
+	return smoothing.CurrentAllowance
+}
+
+func doSmoothing(key string, currentRate int64,
+	smoothing *user.RateLimitSmoothing,
+	store storage.Handler, maxAllowedRate float64) bool {
+
+	if smoothing == nil {
+		return false
+	}
+
+	var newAllowance int64
+	if float64(currentRate) >= smoothing.Trigger*float64(smoothing.CurrentAllowance) {
+		// step up
+		newAllowance = smoothing.CurrentAllowance + smoothing.Rate
+	}
+
+	if float64(currentRate) <= smoothing.Trigger*float64(smoothing.CurrentAllowance-smoothing.Rate) {
+		// step down
+		newAllowance = smoothing.CurrentAllowance - smoothing.Rate
+	}
+
+	if newAllowance == 0 {
+		log.Debug("no smoothing opportunity, skipping")
+		return false
+	}
+
+	// boundary values
+	if newAllowance > int64(maxAllowedRate) {
+		log.Debugf("skipping smoothing, new allowance=(%d) over allowed rate=(%d)", newAllowance, maxAllowedRate)
+		return false
+	}
+
+	if newAllowance < smoothing.Threshold {
+		log.Debugf("skipping smoothing, new allowance=(%d) less than threshold=(%d)", newAllowance, smoothing.Threshold)
+		return false
+	}
+
+	// add next resetAt
+	lockAcquired, err := store.Lock(fmt.Sprintf("reset-smoothed-%s", key), time.Second*time.Duration(smoothing.Interval))
+	if err != nil {
+		log.Info("skipping smoothing with lock db error", err)
+		return false
+	}
+
+	if !lockAcquired {
+		log.Info("skipping smoothing: failed to acquire lock")
+		return false
+	}
+
+	smoothing.CurrentAllowance = newAllowance
+	log.Infof("smoothing done, updated rate to %d", newAllowance)
+	return true
+}
+
 type sessionFailReason uint
 
 const (
@@ -149,7 +233,7 @@ const (
 	sessionFailInternalServerError
 )
 
-func (l *SessionLimiter) limitSentinel(currentSession *user.SessionState, key string, rateScope string, useCustomKey bool,
+func (l *SessionLimiter) limitSentinel(r *http.Request, currentSession *user.SessionState, key string, rateScope string, useCustomKey bool,
 	store storage.Handler, globalConf *config.Config, apiLimit *user.APILimit, dryRun bool) bool {
 
 	rateLimiterKey := RateLimitKeyPrefix + rateScope + currentSession.KeyHash()
@@ -161,7 +245,8 @@ func (l *SessionLimiter) limitSentinel(currentSession *user.SessionState, key st
 	}
 
 	defer func() {
-		go l.doRollingWindowWrite(key, rateLimiterKey, rateLimiterSentinelKey, currentSession, store, globalConf, apiLimit, dryRun)
+		go l.doRollingWindowWrite(r, key, rateLimiterKey, rateLimiterSentinelKey, currentSession, store, globalConf,
+			apiLimit, dryRun)
 	}()
 
 	// Check sentinel
@@ -174,7 +259,7 @@ func (l *SessionLimiter) limitSentinel(currentSession *user.SessionState, key st
 	return false
 }
 
-func (l *SessionLimiter) limitRedis(currentSession *user.SessionState, key string, rateScope string, useCustomKey bool,
+func (l *SessionLimiter) limitRedis(r *http.Request, currentSession *user.SessionState, key string, rateScope string, useCustomKey bool,
 	store storage.Handler, globalConf *config.Config, apiLimit *user.APILimit, dryRun bool) bool {
 
 	rateLimiterKey := RateLimitKeyPrefix + rateScope + currentSession.KeyHash()
@@ -185,10 +270,7 @@ func (l *SessionLimiter) limitRedis(currentSession *user.SessionState, key strin
 		rateLimiterSentinelKey = RateLimitKeyPrefix + rateScope + key + SentinelRateLimitKeyPostfix
 	}
 
-	if l.doRollingWindowWrite(key, rateLimiterKey, rateLimiterSentinelKey, currentSession, store, globalConf, apiLimit, dryRun) {
-		return true
-	}
-	return false
+	return l.doRollingWindowWrite(r, key, rateLimiterKey, rateLimiterSentinelKey, currentSession, store, globalConf, apiLimit, dryRun)
 }
 
 func (l *SessionLimiter) limitDRL(currentSession *user.SessionState, key string, rateScope string,
@@ -248,7 +330,9 @@ func (sfr sessionFailReason) String() string {
 // sessionFailReason if session limits have been exceeded.
 // Key values to manage rate are Rate and Per, e.g. Rate of 10 messages
 // Per 10 seconds
-func (l *SessionLimiter) ForwardMessage(r *http.Request, currentSession *user.SessionState, rateLimitKey string, quotaKey string, store storage.Handler, enableRL, enableQ bool, globalConf *config.Config, api *APISpec, dryRun bool) sessionFailReason {
+func (l *SessionLimiter) ForwardMessage(r *http.Request, currentSession *user.SessionState,
+	rateLimitKey string, quotaKey string, store storage.Handler, enableRL, enableQ bool,
+	globalConf *config.Config, api *APISpec, dryRun bool) sessionFailReason {
 	// check for limit on API level (set to session by ApplyPolicies)
 	accessDef, allowanceScope, err := GetAccessDefinitionByAPIIDOrSession(currentSession, api)
 	if err != nil {
@@ -280,11 +364,13 @@ func (l *SessionLimiter) ForwardMessage(r *http.Request, currentSession *user.Se
 
 		switch {
 		case globalConf.EnableSentinelRateLimiter:
-			if l.limitSentinel(currentSession, rateLimitKey, rateScope, useCustomRateLimitKey, store, globalConf, &accessDef.Limit, dryRun) {
+			if l.limitSentinel(r, currentSession, rateLimitKey, rateScope, useCustomRateLimitKey, store, globalConf,
+				&accessDef.Limit, dryRun) {
 				return sessionFailRateLimit
 			}
 		case globalConf.EnableRedisRollingLimiter:
-			if l.limitRedis(currentSession, rateLimitKey, rateScope, useCustomRateLimitKey, store, globalConf, &accessDef.Limit, dryRun) {
+			if l.limitRedis(r, currentSession, rateLimitKey, rateScope, useCustomRateLimitKey, store, globalConf,
+				&accessDef.Limit, dryRun) {
 				return sessionFailRateLimit
 			}
 		default:
@@ -306,7 +392,8 @@ func (l *SessionLimiter) ForwardMessage(r *http.Request, currentSession *user.Se
 					return sessionFailRateLimit
 				}
 			} else {
-				if l.limitRedis(currentSession, rateLimitKey, rateScope, useCustomRateLimitKey, store, globalConf, &accessDef.Limit, dryRun) {
+				if l.limitRedis(r, currentSession, rateLimitKey, rateScope, useCustomRateLimitKey, store, globalConf,
+					&accessDef.Limit, dryRun) {
 					return sessionFailRateLimit
 				}
 			}
@@ -327,7 +414,8 @@ func (l *SessionLimiter) ForwardMessage(r *http.Request, currentSession *user.Se
 
 }
 
-func (l *SessionLimiter) RedisQuotaExceeded(r *http.Request, currentSession *user.SessionState, quotaKey, scope string, limit *user.APILimit, store storage.Handler, hashKeys bool) bool {
+func (l *SessionLimiter) RedisQuotaExceeded(r *http.Request, currentSession *user.SessionState, quotaKey, scope string,
+	limit *user.APILimit, store storage.Handler, hashKeys bool) bool {
 	// Unlimited?
 	if limit.QuotaMax == -1 || limit.QuotaMax == 0 {
 		// No quota set
@@ -442,6 +530,7 @@ func GetAccessDefinitionByAPIIDOrSession(currentSession *user.SessionState, api 
 			ThrottleInterval:   currentSession.ThrottleInterval,
 			ThrottleRetryLimit: currentSession.ThrottleRetryLimit,
 			MaxQueryDepth:      currentSession.MaxQueryDepth,
+			Smoothing:          currentSession.Smoothing,
 		}
 	}
 
