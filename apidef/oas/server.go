@@ -352,10 +352,9 @@ type WebhookEvent struct {
 	Headers      map[string]string `json:"headers,omitempty" bson:"headers,omitempty"`
 }
 
-// GetWebhookConf converts Event.WebhookEvent to map[string]interface{}
-// with apidef.WebHookHandlerConf structure for classic API definition compatibility.
-func (e *Event) GetWebhookConf() (map[string]interface{}, error) {
-	webhookConf := apidef.WebHookHandlerConf{
+// GetWebhookConf converts Event to apidef.WebHookHandlerConf.
+func (e *Event) GetWebhookConf() apidef.WebHookHandlerConf {
+	return apidef.WebHookHandlerConf{
 		Disabled:     !e.Enabled,
 		ID:           e.ID,
 		Name:         e.Name,
@@ -365,14 +364,6 @@ func (e *Event) GetWebhookConf() (map[string]interface{}, error) {
 		EventTimeout: e.Webhook.Timeout,
 		TemplatePath: e.Webhook.BodyTemplate,
 	}
-
-	data, err := json.Marshal(webhookConf)
-	if err != nil {
-		return nil, err
-	}
-	var handlerMeta map[string]interface{}
-	err = json.Unmarshal(data, &handlerMeta)
-	return handlerMeta, err
 }
 
 // Events holds the list of events to be processed for the API.
@@ -434,7 +425,8 @@ func (e *Events) ExtractTo(api *apidef.APIDefinition) {
 		switch ev.Action {
 		case event.WebhookAction:
 			handler = event.WebHookHandler
-			handlerMeta, err = ev.GetWebhookConf()
+			whConf := ev.GetWebhookConf()
+			handlerMeta, err = reflect.Cast[map[string]interface{}](whConf)
 		default:
 			continue
 		}
