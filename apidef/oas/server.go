@@ -311,18 +311,18 @@ type WebhookEvent struct {
 	Headers      map[string]string `json:"headers,omitempty" bson:"headers,omitempty"`
 }
 
-// ToConfMap converts WebhookEvent to map[string]interface{}
+// GetWebhookConf converts Event.WebhookEvent to map[string]interface{}
 // with apidef.WebHookHandlerConf structure for classic API definition compatibility.
-func (c *WebhookEvent) ToConfMap(enabled bool, id string) (map[string]interface{}, error) {
+func (e *Event) GetWebhookConf() (map[string]interface{}, error) {
 	webhookConf := apidef.WebHookHandlerConf{
-		Disabled:     !enabled,
-		ID:           id,
-		Name:         c.Name,
-		Method:       c.Method,
-		TargetPath:   c.URL,
-		HeaderList:   c.Headers,
-		EventTimeout: c.Timeout,
-		TemplatePath: c.BodyTemplate,
+		Disabled:     !e.Enabled,
+		ID:           e.ID,
+		Name:         e.WebhookEvent.Name,
+		Method:       e.WebhookEvent.Method,
+		TargetPath:   e.WebhookEvent.URL,
+		HeaderList:   e.WebhookEvent.Headers,
+		EventTimeout: e.WebhookEvent.Timeout,
+		TemplatePath: e.WebhookEvent.BodyTemplate,
 	}
 
 	data, err := json.Marshal(webhookConf)
@@ -392,7 +392,7 @@ func (e *Events) ExtractTo(api *apidef.APIDefinition) {
 		switch ev.Action {
 		case event.WebhookAction:
 			handler = event.WebHookHandler
-			handlerMeta, err = ev.WebhookEvent.ToConfMap(ev.Enabled, ev.ID)
+			handlerMeta, err = ev.GetWebhookConf()
 		default:
 			continue
 		}
