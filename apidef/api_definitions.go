@@ -1435,10 +1435,11 @@ type WebHookHandlerConf struct {
 
 // Scan scans WebHookHandlerConf from `any` in.
 func (w *WebHookHandlerConf) Scan(in any) error {
-	data, err := json.Marshal(in)
+	conf, err := reflect.Cast[WebHookHandlerConf](in)
 	if err != nil {
 		return err
 	}
 
-	return json.Unmarshal(data, w)
+	*w = conf
+	return nil
 }

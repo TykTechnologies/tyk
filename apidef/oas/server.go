@@ -5,6 +5,7 @@ import (
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/internal/event"
+	"github.com/TykTechnologies/tyk/internal/reflect"
 )
 
 // Server contains the configuration that sets Tyk up to receive requests from the client applications.
@@ -293,17 +294,55 @@ func (dt *DetailedTracing) ExtractTo(api *apidef.APIDefinition) {
 
 // Event holds information about individual event to be configured on the API.
 type Event struct {
-	Enabled bool         `json:"enabled" bson:"enabled"`
-	Type    event.Event  `json:"type" bson:"type"`
-	Action  event.Action `json:"action" bson:"action"`
-	ID      string       `json:"id,omitempty" bson:"id,omitempty"`
+	// Enabled enables the event handler.
+	Enabled bool `json:"enabled" bson:"enabled"`
+	// Type specifies the TykEvent that should trigger the event handler.
+	Type event.Event `json:"type" bson:"type"`
+	// Action specifies the action to be taken on the event trigger.
+	Action event.Action `json:"action" bson:"action"`
+	// ID is the ID of event handler in storage.
+	ID string `json:"id,omitempty" bson:"id,omitempty"`
+	// Name is the name of event handler
+	Name string `json:"name,omitempty" bson:"name,omitempty"`
 
-	WebhookEvent
+	Webhook WebhookEvent `bson:"-" json:"-"`
+}
+
+func (e *Event) MarshalJSON() ([]byte, error) {
+	outMap, err := reflect.Cast[map[string]interface{}](*e)
+	if err != nil {
+		return nil, err
+	}
+
+	webhookMap, err := reflect.Cast[map[string]interface{}](e.Webhook)
+	if err != nil {
+		return nil, err
+	}
+
+	for k, v := range webhookMap {
+		outMap[k] = v
+	}
+
+	return json.Marshal(outMap)
+}
+
+func (e *Event) UnmarshalJSON(in []byte) error {
+	type helperEvent Event
+	helper := helperEvent{}
+	if err := json.Unmarshal(in, &helper); err != nil {
+		return err
+	}
+
+	if err := json.Unmarshal(in, &helper.Webhook); err != nil {
+		return err
+	}
+
+	*e = Event(helper)
+	return nil
 }
 
 // WebhookEvent stores the core information about a webhook event.
 type WebhookEvent struct {
-	Name         string            `json:"name,omitempty" bson:"name,omitempty"`
 	URL          string            `json:"url" bson:"url"`
 	Method       string            `json:"method" bson:"method"`
 	Timeout      int64             `json:"timeout" bson:"timeout"`
@@ -317,12 +356,12 @@ func (e *Event) GetWebhookConf() (map[string]interface{}, error) {
 	webhookConf := apidef.WebHookHandlerConf{
 		Disabled:     !e.Enabled,
 		ID:           e.ID,
-		Name:         e.WebhookEvent.Name,
-		Method:       e.WebhookEvent.Method,
-		TargetPath:   e.WebhookEvent.URL,
-		HeaderList:   e.WebhookEvent.Headers,
-		EventTimeout: e.WebhookEvent.Timeout,
-		TemplatePath: e.WebhookEvent.BodyTemplate,
+		Name:         e.Name,
+		Method:       e.Webhook.Method,
+		TargetPath:   e.Webhook.URL,
+		HeaderList:   e.Webhook.Headers,
+		EventTimeout: e.Webhook.Timeout,
+		TemplatePath: e.Webhook.BodyTemplate,
 	}
 
 	data, err := json.Marshal(webhookConf)
@@ -353,13 +392,14 @@ func (e *Events) Fill(api apidef.APIDefinition) {
 					continue
 				}
 
-				event := Event{
+				ev := Event{
 					Enabled: !whConf.Disabled,
 					Type:    gwEvent,
 					Action:  event.WebhookAction,
 					ID:      whConf.ID,
-					WebhookEvent: WebhookEvent{
-						Name:         whConf.Name,
+					Name:    whConf.Name,
+					Webhook: WebhookEvent{
+
 						URL:          whConf.TargetPath,
 						Method:       whConf.Method,
 						Headers:      whConf.HeaderList,
@@ -368,7 +408,7 @@ func (e *Events) Fill(api apidef.APIDefinition) {
 					},
 				}
 
-				events = append(events, event)
+				events = append(events, ev)
 			}
 		}
 	}

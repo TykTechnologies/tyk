@@ -44,6 +44,7 @@ func TestNewValid(t *testing.T) {
 		h := &WebHookHandler{Gw: ts.Gw}
 		err := h.Init(conf)
 		assert.NoError(t, err)
+		assert.False(t, h.conf.Disabled)
 	})
 
 	t.Run("disabled", func(t *testing.T) {

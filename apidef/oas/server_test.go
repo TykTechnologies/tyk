@@ -344,8 +344,8 @@ func TestEvents(t *testing.T) {
 						Type:    event.QuotaExceeded,
 						Action:  event.WebhookAction,
 						ID:      "random-id",
-						WebhookEvent: WebhookEvent{
-							Name:         "test-webhook",
+						Name:    "test-webhook",
+						Webhook: WebhookEvent{
 							URL:          "https://webhook.site/uuid",
 							Headers:      map[string]string{"Auth": "key"},
 							BodyTemplate: "/path/to/template",
@@ -358,8 +358,8 @@ func TestEvents(t *testing.T) {
 						Type:    event.RateLimitExceeded,
 						Action:  event.WebhookAction,
 						ID:      "random-id",
-						WebhookEvent: WebhookEvent{
-							Name:         "test-webhook",
+						Name:    "test-webhook",
+						Webhook: WebhookEvent{
 							URL:          "https://webhook.site/uuid",
 							Headers:      map[string]string{"Auth": "key"},
 							BodyTemplate: "/path/to/template",
@@ -411,8 +411,8 @@ func TestEvents(t *testing.T) {
 						Type:    event.QuotaExceeded,
 						Action:  event.Action("invalid-action"),
 						ID:      "random-id",
-						WebhookEvent: WebhookEvent{
-							Name:         "test-webhook",
+						Name:    "test-webhook",
+						Webhook: WebhookEvent{
 							URL:          "https://webhook.site/uuid",
 							Headers:      map[string]string{"Auth": "key"},
 							BodyTemplate: "/path/to/template",
@@ -489,8 +489,8 @@ func TestEvents(t *testing.T) {
 						Type:    event.QuotaExceeded,
 						Action:  event.WebhookAction,
 						ID:      "random-id",
-						WebhookEvent: WebhookEvent{
-							Name:         "test-webhook",
+						Name:    "test-webhook",
+						Webhook: WebhookEvent{
 							URL:          "https://webhook.site/uuid",
 							Headers:      map[string]string{"Auth": "key"},
 							BodyTemplate: "/path/to/template",
@@ -503,8 +503,8 @@ func TestEvents(t *testing.T) {
 						Type:    event.RateLimitExceeded,
 						Action:  event.WebhookAction,
 						ID:      "random-id",
-						WebhookEvent: WebhookEvent{
-							Name:         "test-webhook",
+						Name:    "test-webhook",
+						Webhook: WebhookEvent{
 							URL:          "https://webhook.site/uuid",
 							Headers:      map[string]string{"Auth": "key"},
 							BodyTemplate: "/path/to/template",
