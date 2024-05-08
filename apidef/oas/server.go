@@ -320,11 +320,12 @@ func (e *Event) MarshalJSON() ([]byte, error) {
 		return nil, err
 	}
 
-	for k, v := range webhookMap {
-		outMap[k] = v
+	outMapVal := *outMap
+	for k, v := range *webhookMap {
+		outMapVal[k] = v
 	}
 
-	return json.Marshal(outMap)
+	return json.Marshal(outMapVal)
 }
 
 // UnmarshalJSON unmarshals Event as per Tyk OAS API definition contract.
@@ -427,7 +428,7 @@ func (e *Events) ExtractTo(api *apidef.APIDefinition) {
 	for _, ev := range *e {
 		var (
 			handler     event.HandlerName
-			handlerMeta map[string]interface{}
+			handlerMeta *map[string]interface{}
 			err         error
 		)
 
@@ -446,7 +447,7 @@ func (e *Events) ExtractTo(api *apidef.APIDefinition) {
 
 		eventHandlerTriggerConfig := apidef.EventHandlerTriggerConfig{
 			Handler:     handler,
-			HandlerMeta: handlerMeta,
+			HandlerMeta: *handlerMeta,
 		}
 
 		if api.EventHandlers.Events == nil {

@@ -66,13 +66,16 @@ func IsZero(v reflect.Value) bool {
 // Note: The Cast function assumes that the source value can be marshaled
 // and unmarshaled as JSON. If the source value contains types or values
 // that cannot be represented in JSON, the function will return an error.
-func Cast[T any](src any) (T, error) {
+func Cast[T any](src any) (*T, error) {
 	var dst T
 	b, err := json.Marshal(src)
 	if err != nil {
-		return dst, err
+		return nil, err
 	}
 
 	err = json.Unmarshal(b, &dst)
-	return dst, err
+	if err != nil {
+		return nil, err
+	}
+	return &dst, nil
 }
