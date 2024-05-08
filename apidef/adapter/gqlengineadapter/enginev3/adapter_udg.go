@@ -1,15 +1,14 @@
-package gqlengineadapter
+package enginev3
 
 import (
 	"encoding/json"
 	"net/http"
 
-	graphqlDataSource "github.com/TykTechnologies/graphql-go-tools/pkg/engine/datasource/graphql_datasource"
-	kafkaDataSource "github.com/TykTechnologies/graphql-go-tools/pkg/engine/datasource/kafka_datasource"
-	restDataSource "github.com/TykTechnologies/graphql-go-tools/pkg/engine/datasource/rest_datasource"
-	"github.com/TykTechnologies/graphql-go-tools/pkg/engine/plan"
-	"github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
-
+	graphqlDataSource "github.com/TykTechnologies/graphql-go-tools/v2/pkg/engine/datasource/graphql_datasource"
+	kafkaDataSource "github.com/TykTechnologies/graphql-go-tools/v2/pkg/engine/datasource/kafka_datasource"
+	restDataSource "github.com/TykTechnologies/graphql-go-tools/v2/pkg/engine/datasource/rest_datasource"
+	"github.com/TykTechnologies/graphql-go-tools/v2/pkg/engine/plan"
+	"github.com/TykTechnologies/graphql-go-tools/v2/pkg/graphql"
 	"github.com/TykTechnologies/tyk/apidef"
 )
 
@@ -22,7 +21,7 @@ type UniversalDataGraph struct {
 	subscriptionClientFactory graphqlDataSource.GraphQLSubscriptionClientFactory
 }
 
-func (u *UniversalDataGraph) EngineConfig() (*graphql.EngineV2Configuration, error) {
+func (u *UniversalDataGraph) EngineConfigV3() (*graphql.EngineV2Configuration, error) {
 	var err error
 	if u.Schema == nil {
 		u.Schema, err = parseSchema(u.ApiDefinition.GraphQL.Schema)
@@ -203,9 +202,6 @@ func (u *UniversalDataGraph) engineConfigV2Arguments(fieldConfs *plan.FieldConfi
 
 func (u *UniversalDataGraph) determineChildNodes(planDataSources []plan.DataSourceConfiguration) error {
 	for i := range planDataSources {
-		if _, ok := planDataSources[i].Factory.(*restDataSource.Factory); ok {
-			continue
-		}
 		for j := range planDataSources[i].RootNodes {
 			typeName := planDataSources[i].RootNodes[j].TypeName
 			for k := range planDataSources[i].RootNodes[j].FieldNames {
