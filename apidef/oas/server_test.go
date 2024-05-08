@@ -421,7 +421,9 @@ func TestEvents(t *testing.T) {
 						},
 					},
 				},
-				expected: apidef.EventHandlerMetaConfig{},
+				expected: apidef.EventHandlerMetaConfig{
+					Events: map[apidef.TykEvent][]apidef.EventHandlerTriggerConfig{},
+				},
 			},
 		}
 

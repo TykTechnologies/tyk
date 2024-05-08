@@ -63,16 +63,41 @@ func IsZero(v reflect.Value) bool {
 // This function can be useful when dealing with dynamic or untyped data,
 // such as data obtained from external sources or user input.
 //
+// The function returns a pointer to the converted value of type *T,
+// and an error value if the conversion fails.
+//
+// Example:
+//
+//	type Person struct {
+//		Name string
+//		Age  int
+//	}
+//
+//	data := map[string]any{
+//		"Name": "Alice",
+//		"Age":  30,
+//	}
+//
+//	var p Person
+//	pptr, err := Cast[Person](data)
+//	if err != nil {
+//		// Handle error
+//	}
+//	p = *pptr
+//
 // Note: The Cast function assumes that the source value can be marshaled
 // and unmarshaled as JSON. If the source value contains types or values
 // that cannot be represented in JSON, the function will return an error.
-func Cast[T any](src any) (T, error) {
+func Cast[T any](src any) (*T, error) {
 	var dst T
 	b, err := json.Marshal(src)
 	if err != nil {
-		return dst, err
+		return nil, err
 	}
 
 	err = json.Unmarshal(b, &dst)
-	return dst, err
+	if err != nil {
+		return nil, err
+	}
+	return &dst, nil
 }
