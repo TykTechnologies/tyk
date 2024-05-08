@@ -4,9 +4,10 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/internal/event"
-	"github.com/stretchr/testify/assert"
 )
 
 func TestEvents(t *testing.T) {
