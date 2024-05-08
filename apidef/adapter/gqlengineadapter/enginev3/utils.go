@@ -1,65 +1,20 @@
-package gqlengineadapter
+package enginev3
 
 import (
+	"encoding/json"
 	"errors"
 	"net/http"
 	neturl "net/url"
 	"sort"
 	"strings"
 
-	graphqlDataSource "github.com/TykTechnologies/graphql-go-tools/pkg/engine/datasource/graphql_datasource"
-	restDataSource "github.com/TykTechnologies/graphql-go-tools/pkg/engine/datasource/rest_datasource"
-	"github.com/TykTechnologies/graphql-go-tools/pkg/engine/plan"
-
+	graphqlDataSource "github.com/TykTechnologies/graphql-go-tools/v2/pkg/engine/datasource/graphql_datasource"
+	restDataSource "github.com/TykTechnologies/graphql-go-tools/v2/pkg/engine/datasource/rest_datasource"
+	"github.com/TykTechnologies/graphql-go-tools/v2/pkg/engine/plan"
+	"github.com/TykTechnologies/graphql-go-tools/v2/pkg/graphql"
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/apidef/adapter/gqlengineadapter"
 )
-
-type createGraphQLDataSourceFactoryParams struct {
-	graphqlConfig             apidef.GraphQLEngineDataSourceConfigGraphQL
-	subscriptionClientFactory graphqlDataSource.GraphQLSubscriptionClientFactory
-	httpClient                *http.Client
-	streamingClient           *http.Client
-}
-
-func graphqlDataSourceConfiguration(url string, method string, headers map[string]string, subscriptionType apidef.SubscriptionType) graphqlDataSource.Configuration {
-	dataSourceHeaders := make(map[string]string)
-	for name, value := range headers {
-		dataSourceHeaders[name] = value
-	}
-
-	if strings.HasPrefix(url, "tyk://") {
-		url = strings.ReplaceAll(url, "tyk://", "http://")
-		dataSourceHeaders[apidef.TykInternalApiHeader] = "true"
-	}
-
-	cfg := graphqlDataSource.Configuration{
-		Fetch: graphqlDataSource.FetchConfiguration{
-			URL:    url,
-			Method: method,
-			Header: ConvertApiDefinitionHeadersToHttpHeaders(dataSourceHeaders),
-		},
-		Subscription: graphqlDataSource.SubscriptionConfiguration{
-			URL:    url,
-			UseSSE: subscriptionType == apidef.GQLSubscriptionSSE,
-		},
-	}
-
-	return cfg
-}
-
-func createArgumentConfigurationsForArgumentNames(argumentNames ...string) plan.ArgumentsConfigurations {
-	argConfs := plan.ArgumentsConfigurations{}
-	for _, argName := range argumentNames {
-		argConf := plan.ArgumentConfiguration{
-			Name:       argName,
-			SourceType: plan.FieldArgumentSource,
-		}
-
-		argConfs = append(argConfs, argConf)
-	}
-
-	return argConfs
-}
 
 func extractURLQueryParamsForEngineV2(url string, providedApiDefQueries []apidef.QueryVariable) (urlWithoutParams string, engineV2Queries []restDataSource.QueryConfiguration, err error) {
 	urlParts := strings.Split(url, "?")
@@ -114,6 +69,50 @@ func appendApiDefQueriesConfigToEngineV2Queries(engineV2Queries *[]restDataSourc
 	}
 }
 
+func ConvertApiDefinitionHeadersToHttpHeaders(apiDefHeaders map[string]string) http.Header {
+	if len(apiDefHeaders) == 0 {
+		return nil
+	}
+
+	engineV2Headers := make(http.Header)
+	for apiDefHeaderKey, apiDefHeaderValue := range apiDefHeaders {
+		engineV2Headers.Add(apiDefHeaderKey, apiDefHeaderValue)
+	}
+
+	return engineV2Headers
+
+}
+
+func generateRestDataSourceFromGraphql(config apidef.GraphQLEngineDataSourceConfigGraphQL) (json.RawMessage, error) {
+	if !config.HasOperation {
+		return nil, gqlengineadapter.ErrGraphQLConfigIsMissingOperation
+	}
+	req := graphql.Request{
+		Query:     config.Operation,
+		Variables: config.Variables,
+	}
+	body, err := graphql.MarshalRequestString(req)
+	if err != nil {
+		return nil, err
+	}
+	customMessage := restDataSource.ConfigJSON(restDataSource.Configuration{
+		Fetch: restDataSource.FetchConfiguration{
+			URL:    config.URL,
+			Method: config.Method,
+			Body:   body,
+			Header: ConvertApiDefinitionHeadersToHttpHeaders(config.Headers),
+		},
+	})
+	return customMessage, nil
+}
+
+type createGraphQLDataSourceFactoryParams struct {
+	graphqlConfig             apidef.GraphQLEngineDataSourceConfigGraphQL
+	subscriptionClientFactory graphqlDataSource.GraphQLSubscriptionClientFactory
+	httpClient                *http.Client
+	streamingClient           *http.Client
+}
+
 func createGraphQLDataSourceFactory(params createGraphQLDataSourceFactoryParams) (*graphqlDataSource.Factory, error) {
 	factory := &graphqlDataSource.Factory{
 		HTTPClient:      params.httpClient,
@@ -136,9 +135,24 @@ func createGraphQLDataSourceFactory(params createGraphQLDataSourceFactoryParams)
 	return factory, nil
 }
 
-func subscriptionClientFactoryOrDefault(providedSubscriptionClientFactory graphqlDataSource.GraphQLSubscriptionClientFactory) graphqlDataSource.GraphQLSubscriptionClientFactory {
-	if providedSubscriptionClientFactory != nil {
-		return providedSubscriptionClientFactory
+func graphqlDataSourceWebSocketProtocol(subscriptionType apidef.SubscriptionType) string {
+	wsProtocol := graphqlDataSource.ProtocolGraphQLWS
+	if subscriptionType == apidef.GQLSubscriptionTransportWS {
+		wsProtocol = graphqlDataSource.ProtocolGraphQLTWS
 	}
-	return &graphqlDataSource.DefaultSubscriptionClientFactory{}
+	return wsProtocol
+}
+
+func createArgumentConfigurationsForArgumentNames(argumentNames ...string) plan.ArgumentsConfigurations {
+	argConfs := plan.ArgumentsConfigurations{}
+	for _, argName := range argumentNames {
+		argConf := plan.ArgumentConfiguration{
+			Name:       argName,
+			SourceType: plan.FieldArgumentSource,
+		}
+
+		argConfs = append(argConfs, argConf)
+	}
+
+	return argConfs
 }

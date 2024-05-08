@@ -43,6 +43,8 @@ import (
 	"sync"
 	"time"
 
+	gqlV2 "github.com/TykTechnologies/graphql-go-tools/v2/pkg/graphql"
+
 	"github.com/getkin/kin-openapi/openapi3"
 
 	"github.com/TykTechnologies/tyk/config"
@@ -3263,6 +3265,19 @@ func ctxSetGraphQLRequest(r *http.Request, gqlRequest *gql.Request) {
 func ctxGetGraphQLRequest(r *http.Request) (gqlRequest *gql.Request) {
 	if v := r.Context().Value(ctx.GraphQLRequest); v != nil {
 		if gqlRequest, ok := v.(*gql.Request); ok {
+			return gqlRequest
+		}
+	}
+	return nil
+}
+
+func ctxSetGraphQLRequestV2(r *http.Request, gqlRequest *gqlV2.Request) {
+	setCtxValue(r, ctx.GraphQLRequest, gqlRequest)
+}
+
+func ctxGetGraphQLRequestV2(r *http.Request) (gqlRequest *gqlV2.Request) {
+	if v := r.Context().Value(ctx.GraphQLRequest); v != nil {
+		if gqlRequest, ok := v.(*gqlV2.Request); ok {
 			return gqlRequest
 		}
 	}

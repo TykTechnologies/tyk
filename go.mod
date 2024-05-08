@@ -86,7 +86,7 @@ require (
 
 require (
 	github.com/Jeffail/gabs/v2 v2.7.0
-	github.com/TykTechnologies/graphql-go-tools/v2 v2.0.0-20240131151522-40a1ee2bbfc3
+	github.com/TykTechnologies/graphql-go-tools/v2 v2.0.0-20240423054836-fbbf825644b3
 	github.com/TykTechnologies/kin-openapi v0.90.0
 	github.com/TykTechnologies/opentelemetry v0.0.21
 	github.com/alecthomas/kingpin/v2 v2.4.0
@@ -106,6 +106,7 @@ require (
 	github.com/Masterminds/semver/v3 v3.2.0 // indirect
 	github.com/Masterminds/sprig v2.22.0+incompatible // indirect
 	github.com/alecthomas/units v0.0.0-20211218093645-b94a6e3cc137 // indirect
+	github.com/alitto/pond v1.8.3 // indirect
 	github.com/andybalholm/brotli v1.1.0 // indirect
 	github.com/armon/go-metrics v0.4.1 // indirect
 	github.com/asyncapi/converter-go v0.3.0 // indirect
@@ -222,3 +223,5 @@ require (
 )
 
 //replace github.com/TykTechnologies/graphql-go-tools => ../graphql-go-tools
+
+//replace github.com/TykTechnologies/graphql-go-tools/v2 => ../graphql-go-tools/v2
