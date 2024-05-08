@@ -38,8 +38,9 @@ func LimiterKey(currentSession *user.SessionState, allowanceScope string, key st
 		rateScope = allowanceScope + "-"
 	}
 
-	if useCustomKey {
-		return Prefix(LimiterKeyPrefix, rateScope, key)
+	if !useCustomKey && !currentSession.KeyHashEmpty() {
+		return Prefix(LimiterKeyPrefix, rateScope, currentSession.KeyHash())
 	}
-	return Prefix(LimiterKeyPrefix, rateScope, currentSession.KeyHash())
+
+	return Prefix(LimiterKeyPrefix, rateScope, key)
 }

@@ -904,7 +904,15 @@ func TestMiniRequestObject_ReconstructParams(t *testing.T) {
 }
 
 func TestJSVM_Auth(t *testing.T) {
-	ts := StartTest(nil)
+	for _, hashKeys := range []bool{true, false} {
+		testJSVM_Auth(t, hashKeys)
+	}
+}
+
+func testJSVM_Auth(t *testing.T, hashKeys bool) {
+	ts := StartTest(func(c *config.Config) {
+		c.HashKeys = hashKeys
+	})
 	defer ts.Close()
 
 	bundle := ts.RegisterBundle("custom_auth", map[string]string{
@@ -991,30 +999,49 @@ func TestJSVM_Auth(t *testing.T) {
 		spec.UseKeylessAccess = false
 	})
 	_, _ = ts.Run(t, []test.TestCase{
-		{Path: "/sample", Code: http.StatusUnauthorized, BodyMatchFunc: func(b []byte) bool {
-			return strings.Contains(string(b), "Header missing (JS middleware)")
+		{
+			Path: "/sample",
+			Code: http.StatusUnauthorized,
+			BodyMatchFunc: func(b []byte) bool {
+				return strings.Contains(string(b), "Header missing (JS middleware)")
+			},
 		},
-		},
-		{Path: "/sample", Code: http.StatusUnauthorized, BodyMatchFunc: func(b []byte) bool {
-			return strings.Contains(string(b), "Not authorized (JS middleware)")
-		},
+		{
+			Path: "/sample",
+			Code: http.StatusUnauthorized,
+			BodyMatchFunc: func(b []byte) bool {
+				return strings.Contains(string(b), "Not authorized (JS middleware)")
+			},
 			Headers: map[string]string{"Authorization": "foo"},
 		},
-		{Path: "/sample", Code: http.StatusOK, Headers: map[string]string{
-			"Authorization": "foobar",
-		}},
-
-		{Path: "/sample-with-customplugin-auth-enabled", Code: http.StatusUnauthorized, BodyMatchFunc: func(b []byte) bool {
-			return strings.Contains(string(b), "Header missing (JS middleware)")
+		{
+			Path: "/sample",
+			Code: http.StatusOK,
+			Headers: map[string]string{
+				"Authorization": "foobar",
+			},
 		},
+		{
+			Path: "/sample-with-customplugin-auth-enabled",
+			Code: http.StatusUnauthorized,
+			BodyMatchFunc: func(b []byte) bool {
+				return strings.Contains(string(b), "Header missing (JS middleware)")
+			},
 		},
-		{Path: "/sample-with-customplugin-auth-enabled", Code: http.StatusUnauthorized, BodyMatchFunc: func(b []byte) bool {
-			return strings.Contains(string(b), "Not authorized (JS middleware)")
-		},
+		{
+			Path: "/sample-with-customplugin-auth-enabled",
+			Code: http.StatusUnauthorized,
+			BodyMatchFunc: func(b []byte) bool {
+				return strings.Contains(string(b), "Not authorized (JS middleware)")
+			},
 			Headers: map[string]string{"Authorization": "foo"},
 		},
-		{Path: "/sample-with-customplugin-auth-enabled", Code: http.StatusOK, Headers: map[string]string{
-			"Authorization": "foobar",
-		}},
+		{
+			Path: "/sample-with-customplugin-auth-enabled",
+			Code: http.StatusOK,
+			Headers: map[string]string{
+				"Authorization": "foobar",
+			},
+		},
 	}...)
 }

@@ -71,7 +71,9 @@ func (k *RateLimitForAPI) ProcessRequest(w http.ResponseWriter, r *http.Request,
 	storeRef := k.Gw.GlobalSessionManager.Store()
 	customQuotaKey := ""
 
-	reason := k.Gw.SessionLimiter.ForwardMessage(r, k.apiSess,
+	reason := k.Gw.SessionLimiter.ForwardMessage(
+		r,
+		k.apiSess,
 		k.keyName,
 		customQuotaKey,
 		storeRef,
