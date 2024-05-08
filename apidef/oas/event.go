@@ -8,6 +8,10 @@ import (
 	"github.com/TykTechnologies/tyk/internal/reflect"
 )
 
+type Action = event.Action
+
+const WebhookAction = event.WebhookAction
+
 // Event holds information about individual event to be configured on the API.
 type Event struct {
 	// Enabled enables the event handler.
@@ -15,7 +19,7 @@ type Event struct {
 	// Type specifies the TykEvent that should trigger the event handler.
 	Type event.Event `json:"type" bson:"type"`
 	// Action specifies the action to be taken on the event trigger.
-	Action event.Action `json:"action" bson:"action"`
+	Action Action `json:"action" bson:"action"`
 	// ID is the ID of event handler in storage.
 	ID string `json:"id,omitempty" bson:"id,omitempty"`
 	// Name is the name of event handler
@@ -108,7 +112,7 @@ func (e *Events) Fill(api apidef.APIDefinition) {
 			ev := Event{
 				Enabled: !whConf.Disabled,
 				Type:    gwEvent,
-				Action:  event.WebhookAction,
+				Action:  WebhookAction,
 				ID:      whConf.ID,
 				Name:    whConf.Name,
 				Webhook: WebhookEvent{
@@ -161,7 +165,7 @@ func (e *Events) ExtractTo(api *apidef.APIDefinition) {
 		)
 
 		switch ev.Action {
-		case event.WebhookAction:
+		case WebhookAction:
 			handler = event.WebHookHandler
 			whConf := ev.GetWebhookConf()
 			handlerMeta, err = reflect.Cast[map[string]interface{}](whConf)

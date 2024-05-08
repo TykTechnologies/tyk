@@ -1899,11 +1899,44 @@
       "type": "object",
       "anyOf": [
         {
-          "$ref": "#/definitions/X-Tyk-Webhook"
+          "$ref": "#/definitions/X-Tyk-Webhook-With-ID"
+        },
+        {
+          "$ref": "#/definitions/X-Tyk-Webhook-Without-ID"
         }
       ]
     },
-    "X-Tyk-Webhook": {
+    "X-Tyk-Webhook-With-ID": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "type": {
+          "$ref": "#/definitions/X-Tyk-EventType"
+        },
+        "action": {
+          "method": {
+            "$ref": "#/definitions/X-Tyk-EventAction"
+          }
+        },
+        "id": {
+          "type": "string"
+        },
+        "timeout": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "enabled",
+        "type",
+        "action",
+        "id",
+        "timeout"
+      ]
+    },
+    "X-Tyk-Webhook-Without-ID": {
       "type": "object",
       "additionalProperties": false,
       "properties": {
@@ -1911,34 +1944,10 @@
           "type": "boolean"
         },
         "type": {
-          "type": "string",
-          "enum": [
-            "QuotaExceeded",
-            "RatelimitExceeded",
-            "AuthFailure",
-            "KeyExpired",
-            "VersionFailure",
-            "OrgQuotaExceeded",
-            "OrgRateLimitExceeded",
-            "TriggerExceeded",
-            "BreakerTriggered",
-            "BreakerTripped",
-            "BreakerReset",
-            "HostDown",
-            "HostUp",
-            "TokenCreated",
-            "TokenUpdated",
-            "TokenDeleted"
-          ]
+          "$ref": "#/definitions/X-Tyk-EventType"
         },
         "action": {
-          "type": "string",
-          "enum": [
-            "webhook"
-          ]
-        },
-        "id": {
-          "type": "string"
+          "$ref": "#/definitions/X-Tyk-EventAction"
         },
         "name": {
           "type": "string"
@@ -1969,31 +1978,41 @@
           "additionalProperties": { "type": "string" }
         }
       },
-      "anyOf": [
-        {
-          "required": [
-            "enabled",
-            "type",
-            "action",
-            "id"
-          ]
-        },
-        {
-          "required": [
-            "enabled",
-            "type",
-            "action",
-            "url",
-            "method",
-            "timeout",
-            "bodyTemplate"
-          ],
-          "not": {
-            "required": [
-              "id"
-            ]
-          }
-        }
+      "required": [
+        "enabled",
+        "type",
+        "action",
+        "url",
+        "method",
+        "timeout",
+        "bodyTemplate"
+      ]
+    },
+    "X-Tyk-EventAction": {
+      "type": "string",
+      "enum": [
+        "webhook"
+      ]
+    },
+    "X-Tyk-EventType": {
+      "type": "string",
+      "enum": [
+        "QuotaExceeded",
+        "RatelimitExceeded",
+        "AuthFailure",
+        "KeyExpired",
+        "VersionFailure",
+        "OrgQuotaExceeded",
+        "OrgRateLimitExceeded",
+        "TriggerExceeded",
+        "BreakerTriggered",
+        "BreakerTripped",
+        "BreakerReset",
+        "HostDown",
+        "HostUp",
+        "TokenCreated",
+        "TokenUpdated",
+        "TokenDeleted"
       ]
     },
     "X-Tyk-UInt": {
