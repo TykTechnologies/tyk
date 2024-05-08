@@ -1850,7 +1850,7 @@ func handleDashboardRegistration(gw *Gateway) {
 func (gw *Gateway) startDRL() {
 	gwConfig := gw.GetConfig()
 
-	disabled := gwConfig.ManagementNode || gwConfig.EnableSentinelRateLimiter || gw.GetConfig().EnableRedisRollingLimiter
+	disabled := gwConfig.ManagementNode || gwConfig.EnableSentinelRateLimiter || gwConfig.EnableRedisRollingLimiter || gwConfig.EnableFixedWindowRateLimiter
 
 	gw.drlOnce.Do(func() {
 		drlManager := &drl.DRL{}
