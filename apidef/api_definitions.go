@@ -1440,6 +1440,6 @@ func (w *WebHookHandlerConf) Scan(in any) error {
 		return err
 	}
 
-	*w = conf
+	*w = *conf
 	return nil
 }
