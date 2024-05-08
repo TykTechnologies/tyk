@@ -412,10 +412,11 @@ func (e *Events) Fill(api apidef.APIDefinition) {
 
 // ExtractTo extracts events to apidef.APIDefinition.
 func (e *Events) ExtractTo(api *apidef.APIDefinition) {
-	if e == nil {
+	if e == nil || len(*e) == 0 {
 		return
 	}
 
+	api.EventHandlers.Events = make(map[apidef.TykEvent][]apidef.EventHandlerTriggerConfig)
 	for _, ev := range *e {
 		var (
 			handler     event.HandlerName
@@ -440,10 +441,6 @@ func (e *Events) ExtractTo(api *apidef.APIDefinition) {
 		eventHandlerTriggerConfig := apidef.EventHandlerTriggerConfig{
 			Handler:     handler,
 			HandlerMeta: *handlerMeta,
-		}
-
-		if api.EventHandlers.Events == nil {
-			api.EventHandlers.Events = make(map[apidef.TykEvent][]apidef.EventHandlerTriggerConfig)
 		}
 
 		if val, ok := api.EventHandlers.Events[ev.Type]; ok {
