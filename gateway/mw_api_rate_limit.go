@@ -77,7 +77,6 @@ func (k *RateLimitForAPI) ProcessRequest(w http.ResponseWriter, r *http.Request,
 		storeRef,
 		true,
 		false,
-		&k.Spec.GlobalConfig,
 		k.Spec,
 		false,
 	)
