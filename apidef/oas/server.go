@@ -379,31 +379,33 @@ func (e *Events) Fill(api apidef.APIDefinition) {
 	events := Events{}
 	for gwEvent, ehs := range api.EventHandlers.Events {
 		for _, eh := range ehs {
-			if eh.Handler == event.WebHookHandler {
-				whConf := apidef.WebHookHandlerConf{}
-				err := whConf.Scan(eh.HandlerMeta)
-				if err != nil {
-					continue
-				}
-
-				ev := Event{
-					Enabled: !whConf.Disabled,
-					Type:    gwEvent,
-					Action:  event.WebhookAction,
-					ID:      whConf.ID,
-					Name:    whConf.Name,
-					Webhook: WebhookEvent{
-
-						URL:          whConf.TargetPath,
-						Method:       whConf.Method,
-						Headers:      whConf.HeaderList,
-						Timeout:      whConf.EventTimeout,
-						BodyTemplate: whConf.TemplatePath,
-					},
-				}
-
-				events = append(events, ev)
+			if eh.Handler != event.WebHookHandler {
+				continue
 			}
+
+			whConf := apidef.WebHookHandlerConf{}
+			err := whConf.Scan(eh.HandlerMeta)
+			if err != nil {
+				continue
+			}
+
+			ev := Event{
+				Enabled: !whConf.Disabled,
+				Type:    gwEvent,
+				Action:  event.WebhookAction,
+				ID:      whConf.ID,
+				Name:    whConf.Name,
+				Webhook: WebhookEvent{
+
+					URL:          whConf.TargetPath,
+					Method:       whConf.Method,
+					Headers:      whConf.HeaderList,
+					Timeout:      whConf.EventTimeout,
+					BodyTemplate: whConf.TemplatePath,
+				},
+			}
+
+			events = append(events, ev)
 		}
 	}
 
@@ -416,7 +418,25 @@ func (e *Events) ExtractTo(api *apidef.APIDefinition) {
 		return
 	}
 
-	api.EventHandlers.Events = make(map[apidef.TykEvent][]apidef.EventHandlerTriggerConfig)
+	if api.EventHandlers.Events == nil {
+		api.EventHandlers.Events = make(map[apidef.TykEvent][]apidef.EventHandlerTriggerConfig)
+	}
+
+	// this blocks helps with extracting OAS into APIDefinition.
+	// update this when new event handlers are added to OAS support.
+	for eventType, eventTriggers := range api.EventHandlers.Events {
+		triggersExcludingWebhooks := make([]apidef.EventHandlerTriggerConfig, 0)
+		for _, eventTrigger := range eventTriggers {
+			if eventTrigger.Handler == event.WebHookHandler {
+				continue
+			}
+
+			triggersExcludingWebhooks = append(triggersExcludingWebhooks, eventTrigger)
+		}
+
+		api.EventHandlers.Events[eventType] = triggersExcludingWebhooks
+	}
+
 	for _, ev := range *e {
 		var (
 			handler     event.HandlerName
