@@ -42,8 +42,8 @@ func TestReverseProxyPreHandlerV2_PreHandle(t *testing.T) {
 			NeedsEngine:     true,
 			IsCORSPreflight: true,
 		})
-		assert.Error(t, err)
-		assert.Equal(t, ReverseProxyTypeNone, result)
+		assert.NoError(t, err)
+		assert.Equal(t, ReverseProxyTypePreFlight, result)
 	})
 
 	t.Run("should return ReverseProxyTypeWebsocketUpgrade on websocket upgrade", func(t *testing.T) {
