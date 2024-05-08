@@ -81,9 +81,15 @@ jobs:
         run: |
           echo '#!/bin/sh
           ci/bin/unlock-agent.sh
-          mkdir -p /go/src
+          # This step fetches all the gateway vendor dependencies so that
+          # they could be moved to the correct directories in the GOPATH
+          # for a GOPATH build.
+          # Since the container itself is run with GO111MODULE=off and both
+          # these are go mod specific commands, these must be run with
+          # GO111MODULE=on explicitly set.
           GO111MODULE=on go mod tidy
           GO111MODULE=on go mod vendor
+          mkdir -p /go/src
           cp -r -f vendor/* /go/src
           mkdir -p /go/src/github.com/TykTechnologies/tyk
           cp -r ./* /go/src/github.com/TykTechnologies/tyk
@@ -183,6 +189,7 @@ jobs:
           - amd64
           - arm64
         distro:
+          - ubuntu:xenial
           - ubuntu:bionic
           - ubuntu:focal
           - ubuntu:jammy
@@ -237,6 +244,8 @@ jobs:
           - amazonlinux:2023
           - registry.access.redhat.com/ubi8/ubi
           - registry.access.redhat.com/ubi9/ubi
+          - amazonlinux:2
+          - registry.access.redhat.com/ubi7/ubi
     steps:
       - uses: actions/checkout@v4
         with:
