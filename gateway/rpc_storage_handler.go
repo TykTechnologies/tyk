@@ -2,11 +2,12 @@ package gateway
 
 import (
 	"encoding/json"
-	"github.com/TykTechnologies/tyk/internal/models"
 	"net/http"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/TykTechnologies/tyk/internal/models"
 
 	"github.com/TykTechnologies/storage/temporal/model"
 	"github.com/TykTechnologies/tyk/internal/cache"

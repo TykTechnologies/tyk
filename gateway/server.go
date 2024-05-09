@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/TykTechnologies/tyk/internal/models"
 	htmlTemplate "html/template"
 	"io/ioutil"
 	stdlog "log"
@@ -21,6 +20,8 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+
+	"github.com/TykTechnologies/tyk/internal/models"
 
 	"sync/atomic"
 	textTemplate "text/template"
