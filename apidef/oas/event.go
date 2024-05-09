@@ -150,11 +150,6 @@ func (e *EventHandlers) Fill(api apidef.APIDefinition) {
 					},
 				}
 
-				if timeout := whConf.EventTimeout; timeout != 0 {
-					//timeoutDuration := time.Duration(timeout) * time.Second
-					//ev.Webhook.CoolDownPeriod = timeoutDuration.String()
-				}
-
 				events = append(events, ev)
 			default:
 				continue
