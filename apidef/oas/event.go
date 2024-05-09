@@ -94,7 +94,7 @@ type WebhookEvent struct {
 	// An empty value is interpreted as "0s", implying no cool-down.
 	// It's important to format the string correctly, as invalid formats will
 	// be considered as 0s/empty.
-	CoolDownPeriod time.ReadableDuration `json:"coolDownPeriod" bson:"coolDownPeriod"`
+	CoolDownPeriod time.ReadableDuration `json:"cooldownPeriod" bson:"cooldownPeriod"`
 	// BodyTemplate is the template to be used for request payload.
 	BodyTemplate string `json:"bodyTemplate,omitempty" bson:"bodyTemplate,omitempty"`
 	// Headers are the list of request headers to be used.
