@@ -1,6 +1,7 @@
 package oas
 
 import (
+	"encoding/json"
 	"net/http"
 	"testing"
 
@@ -10,7 +11,7 @@ import (
 	"github.com/TykTechnologies/tyk/internal/event"
 )
 
-func TestEvents(t *testing.T) {
+func TestEventHandlers(t *testing.T) {
 	t.Parallel()
 
 	t.Run("extractTo", func(t *testing.T) {
@@ -220,4 +221,88 @@ func TestEvents(t *testing.T) {
 			})
 		}
 	})
+}
+
+func TestEventHandler_MarshalJSON(t *testing.T) {
+	e := EventHandler{
+		Enabled: true,
+		Trigger: event.QuotaExceeded,
+		Kind:    event.WebhookKind,
+		ID:      "random-id",
+		Name:    "test-webhook",
+		Webhook: WebhookEvent{
+			URL:            "https://webhook.site/uuid",
+			Headers:        Headers{{Name: "Auth", Value: "key"}},
+			BodyTemplate:   "/path/to/template",
+			CoolDownPeriod: "20s",
+			Method:         http.MethodPost,
+		},
+	}
+
+	data, err := json.Marshal(e)
+	assert.NoError(t, err)
+	expected := map[string]interface{}{
+		"id":      "random-id",
+		"enabled": true,
+		"trigger": "QuotaExceeded",
+		"type":    "webhook",
+		"name":    "test-webhook",
+		"url":     "https://webhook.site/uuid",
+		"headers": []interface{}{
+			map[string]interface{}{
+				"name":  "Auth",
+				"value": "key",
+			},
+		},
+		"bodyTemplate":   "/path/to/template",
+		"coolDownPeriod": "20s",
+		"method":         "POST",
+	}
+
+	actual := map[string]interface{}{}
+	err = json.Unmarshal(data, &actual)
+	assert.NoError(t, err)
+	assert.EqualValues(t, expected, actual)
+}
+
+func TestEventHandler_UnmarshalJSON(t *testing.T) {
+	in := map[string]interface{}{
+		"id":      "random-id",
+		"enabled": true,
+		"trigger": "QuotaExceeded",
+		"type":    "webhook",
+		"name":    "test-webhook",
+		"url":     "https://webhook.site/uuid",
+		"headers": []interface{}{
+			map[string]interface{}{
+				"name":  "Auth",
+				"value": "key",
+			},
+		},
+		"bodyTemplate":   "/path/to/template",
+		"coolDownPeriod": "20s",
+		"method":         "POST",
+	}
+
+	data, err := json.Marshal(in)
+	assert.NoError(t, err)
+
+	e := EventHandler{}
+	err = json.Unmarshal(data, &e)
+	expected := EventHandler{
+		Enabled: true,
+		Trigger: event.QuotaExceeded,
+		Kind:    event.WebhookKind,
+		ID:      "random-id",
+		Name:    "test-webhook",
+		Webhook: WebhookEvent{
+			URL:            "https://webhook.site/uuid",
+			Headers:        Headers{{Name: "Auth", Value: "key"}},
+			BodyTemplate:   "/path/to/template",
+			CoolDownPeriod: "20s",
+			Method:         http.MethodPost,
+		},
+	}
+
+	assert.EqualValues(t, expected, e)
 }

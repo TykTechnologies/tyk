@@ -32,13 +32,15 @@ type EventHandler struct {
 }
 
 // MarshalJSON marshals EventHandler as per Tyk OAS API definition contract.
-func (e *EventHandler) MarshalJSON() ([]byte, error) {
-	outMap, err := reflect.Cast[map[string]interface{}](*e)
+func (e EventHandler) MarshalJSON() ([]byte, error) {
+	type helperEventHandler EventHandler
+	helper := helperEventHandler(e)
+	outMap, err := reflect.Cast[map[string]interface{}](helper)
 	if err != nil {
 		return nil, err
 	}
 
-	webhookMap, err := reflect.Cast[map[string]interface{}](e.Webhook)
+	webhookMap, err := reflect.Cast[map[string]interface{}](helper.Webhook)
 	if err != nil {
 		return nil, err
 	}
@@ -53,8 +55,8 @@ func (e *EventHandler) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON unmarshal EventHandler as per Tyk OAS API definition contract.
 func (e *EventHandler) UnmarshalJSON(in []byte) error {
-	type helperEvent EventHandler
-	helper := helperEvent{}
+	type helperEventHandler EventHandler
+	helper := helperEventHandler{}
 	if err := json.Unmarshal(in, &helper); err != nil {
 		return err
 	}
