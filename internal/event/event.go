@@ -53,10 +53,10 @@ const (
 	CoProcessHandler HandlerName = "cp_dynamic_handler"
 )
 
-// Action is the action to be performed when an event is triggered, to be used in OAS API definition.
-type Action string
+// Kind is the action to be performed when an event is triggered, to be used in OAS API definition.
+type Kind string
 
 const (
-	// WebhookAction is the action to be specified in OAS API definition.
-	WebhookAction Action = "webhook"
+	// WebhookKind is the action to be specified in OAS API definition.
+	WebhookKind Kind = "webhook"
 )
