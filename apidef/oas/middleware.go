@@ -965,14 +965,6 @@ func (a *Allowance) Import(enabled bool) {
 	a.Enabled = enabled
 }
 
-// Header holds a header name and value pair.
-type Header struct {
-	// Name is the name of the header.
-	Name string `bson:"name" json:"name"`
-	// Value is the value of the header.
-	Value string `bson:"value" json:"value"`
-}
-
 // TransformRequestMethod holds configuration for rewriting request methods.
 type TransformRequestMethod struct {
 	// Enabled activates Method Transform for the given path and method.
@@ -1037,24 +1029,14 @@ type TransformHeaders struct {
 	// Remove specifies header names to be removed from the request/response.
 	Remove []string `bson:"remove,omitempty" json:"remove,omitempty"`
 	// Add specifies headers to be added to the request/response.
-	Add []Header `bson:"add,omitempty" json:"add,omitempty"`
+	Add Headers `bson:"add,omitempty" json:"add,omitempty"`
 }
 
 // Fill fills *TransformHeaders from apidef.HeaderInjectionMeta.
 func (th *TransformHeaders) Fill(meta apidef.HeaderInjectionMeta) {
 	th.Enabled = !meta.Disabled
 	th.Remove = meta.DeleteHeaders
-
-	th.Add = make([]Header, len(meta.AddHeaders))
-	i := 0
-	for k, v := range meta.AddHeaders {
-		th.Add[i] = Header{Name: k, Value: v}
-		i++
-	}
-
-	sort.Slice(th.Add, func(i, j int) bool {
-		return th.Add[i].Name < th.Add[j].Name
-	})
+	th.Add = NewHeaders(meta.AddHeaders)
 
 	if len(th.Add) == 0 {
 		th.Add = nil
