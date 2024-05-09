@@ -256,7 +256,7 @@ func TestEventHandler_MarshalJSON(t *testing.T) {
 			},
 		},
 		"bodyTemplate":   "/path/to/template",
-		"coolDownPeriod": "20s",
+		"cooldownPeriod": "20s",
 		"method":         "POST",
 	}
 
@@ -281,7 +281,7 @@ func TestEventHandler_UnmarshalJSON(t *testing.T) {
 			},
 		},
 		"bodyTemplate":   "/path/to/template",
-		"coolDownPeriod": "20s",
+		"cooldownPeriod": "20s",
 		"method":         "POST",
 	}
 
