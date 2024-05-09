@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/TykTechnologies/tyk/internal/models"
 	htmlTemplate "html/template"
 	"io/ioutil"
 	stdlog "log"
@@ -194,17 +195,11 @@ type Gateway struct {
 
 	// RedisController keeps track of redis connection and singleton
 	StorageConnectionHandler *storage.ConnectionHandler
-	hostDetails              hostDetails
+	hostDetails              models.HostDetails
 
 	healthCheckInfo atomic.Value
 
 	dialCtxFn test.DialContext
-}
-
-type hostDetails struct {
-	Hostname string
-	PID      int
-	Address  string
 }
 
 func NewGateway(config config.Config, ctx context.Context) *Gateway {

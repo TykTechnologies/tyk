@@ -1,5 +1,7 @@
 package apidef
 
+import "github.com/TykTechnologies/tyk/internal/models"
+
 type InboundData struct {
 	KeyName      string
 	Value        string
@@ -32,6 +34,7 @@ type NodeData struct {
 	Tags            []string                   `json:"tags"`
 	Health          map[string]HealthCheckItem `json:"health"`
 	Stats           GWStats                    `json:"stats"`
+	HostDetails     models.HostDetails         `json:"host_details"`
 }
 
 type GWStats struct {

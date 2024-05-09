@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"encoding/json"
+	"github.com/TykTechnologies/tyk/internal/models"
 	"net/http"
 	"strconv"
 	"strings"
@@ -158,6 +159,7 @@ func (r *RPCStorageHandler) buildNodeInfo() []byte {
 		intCheckDuration = int64(checkDuration / time.Second)
 	}
 
+	r.Gw.getHostDetails(r.Gw.GetConfig().PIDFileLocation)
 	node := apidef.NodeData{
 		NodeID:          r.Gw.GetNodeID(),
 		GroupID:         config.SlaveOptions.GroupID,
@@ -170,6 +172,11 @@ func (r *RPCStorageHandler) buildNodeInfo() []byte {
 		Stats: apidef.GWStats{
 			APIsCount:     r.Gw.apisByIDLen(),
 			PoliciesCount: r.Gw.policiesByIDLen(),
+		},
+		HostDetails: models.HostDetails{
+			Hostname: r.Gw.hostDetails.Hostname,
+			PID:      r.Gw.hostDetails.PID,
+			Address:  r.Gw.hostDetails.Address,
 		},
 	}
 
