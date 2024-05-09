@@ -7,6 +7,8 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/TykTechnologies/tyk/internal/models"
+
 	"github.com/TykTechnologies/tyk/rpc"
 
 	"github.com/TykTechnologies/tyk/apidef"
@@ -336,6 +338,11 @@ func TestGetGroupLoginCallback(t *testing.T) {
 				Stats: apidef.GWStats{
 					APIsCount:     0,
 					PoliciesCount: 0,
+				},
+				HostDetails: models.HostDetails{
+					Hostname: ts.Gw.hostDetails.Hostname,
+					PID:      ts.Gw.hostDetails.PID,
+					Address:  ts.Gw.hostDetails.Address,
 				},
 			}
 
