@@ -57,8 +57,11 @@ func (e *EventHandler) UnmarshalJSON(in []byte) error {
 		return err
 	}
 
-	if err := json.Unmarshal(in, &helper.Webhook); err != nil {
-		return err
+	switch helper.Kind {
+	case WebhookKind:
+		if err := json.Unmarshal(in, &helper.Webhook); err != nil {
+			return err
+		}
 	}
 
 	*e = EventHandler(helper)
@@ -108,7 +111,7 @@ func (e *EventHandler) GetWebhookConf() apidef.WebHookHandlerConf {
 		Method:       e.Webhook.Method,
 		TargetPath:   e.Webhook.URL,
 		HeaderList:   e.Webhook.Headers.Map(),
-		EventTimeout: int64(coolDownPeriod),
+		EventTimeout: int64(coolDownPeriod.Seconds()),
 		TemplatePath: e.Webhook.BodyTemplate,
 	}
 }
@@ -125,36 +128,37 @@ func (e *EventHandlers) Fill(api apidef.APIDefinition) {
 	events := EventHandlers{}
 	for gwEvent, ehs := range api.EventHandlers.Events {
 		for _, eh := range ehs {
-			if eh.Handler != event.WebHookHandler {
+			switch eh.Handler {
+			case event.WebHookHandler:
+				whConf := apidef.WebHookHandlerConf{}
+				err := whConf.Scan(eh.HandlerMeta)
+				if err != nil {
+					continue
+				}
+
+				ev := EventHandler{
+					Enabled: !whConf.Disabled,
+					Trigger: gwEvent,
+					Kind:    WebhookKind,
+					ID:      whConf.ID,
+					Name:    whConf.Name,
+					Webhook: WebhookEvent{
+						URL:          whConf.TargetPath,
+						Method:       whConf.Method,
+						Headers:      NewHeaders(whConf.HeaderList),
+						BodyTemplate: whConf.TemplatePath,
+					},
+				}
+
+				if timeout := whConf.EventTimeout; timeout != 0 {
+					timeoutDuration := time.Duration(timeout) * time.Second
+					ev.Webhook.CoolDownPeriod = timeoutDuration.String()
+				}
+
+				events = append(events, ev)
+			default:
 				continue
 			}
-
-			whConf := apidef.WebHookHandlerConf{}
-			err := whConf.Scan(eh.HandlerMeta)
-			if err != nil {
-				continue
-			}
-
-			ev := EventHandler{
-				Enabled: !whConf.Disabled,
-				Trigger: gwEvent,
-				Kind:    WebhookKind,
-				ID:      whConf.ID,
-				Name:    whConf.Name,
-				Webhook: WebhookEvent{
-					URL:          whConf.TargetPath,
-					Method:       whConf.Method,
-					Headers:      NewHeaders(whConf.HeaderList),
-					BodyTemplate: whConf.TemplatePath,
-				},
-			}
-
-			if timeout := whConf.EventTimeout; timeout != 0 {
-				timeoutDuration := time.Duration(timeout) * time.Second
-				ev.Webhook.CoolDownPeriod = timeoutDuration.String()
-			}
-
-			events = append(events, ev)
 		}
 	}
 
@@ -176,7 +180,8 @@ func (e *EventHandlers) ExtractTo(api *apidef.APIDefinition) {
 	for eventType, eventTriggers := range api.EventHandlers.Events {
 		triggersExcludingWebhooks := make([]apidef.EventHandlerTriggerConfig, 0)
 		for _, eventTrigger := range eventTriggers {
-			if eventTrigger.Handler == event.WebHookHandler {
+			switch eventTrigger.Handler {
+			case event.WebHookHandler:
 				continue
 			}
 
