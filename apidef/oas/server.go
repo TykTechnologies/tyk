@@ -37,7 +37,7 @@ type Server struct {
 	// Events contains the configuration related to Tyk Events.
 	//
 	// Tyk classic API definition: `event_handlers`
-	Events Events `bson:"events,omitempty" json:"events,omitempty"`
+	Events EventHandlers `bson:"events,omitempty" json:"events,omitempty"`
 }
 
 // Fill fills *Server from apidef.APIDefinition.
@@ -88,7 +88,7 @@ func (s *Server) Fill(api apidef.APIDefinition) {
 	}
 
 	if s.Events == nil {
-		s.Events = Events{}
+		s.Events = EventHandlers{}
 	}
 	s.Events.Fill(api)
 	if ShouldOmit(s.Events) {
@@ -146,7 +146,7 @@ func (s *Server) ExtractTo(api *apidef.APIDefinition) {
 	s.DetailedTracing.ExtractTo(api)
 
 	if s.Events == nil {
-		s.Events = Events{}
+		s.Events = EventHandlers{}
 		defer func() {
 			s.Events = nil
 		}()

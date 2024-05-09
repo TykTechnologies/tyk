@@ -12,8 +12,8 @@ type Kind = event.Kind
 
 const WebhookKind = event.WebhookKind
 
-// Event holds information about individual event to be configured on the API.
-type Event struct {
+// EventHandler holds information about individual event to be configured on the API.
+type EventHandler struct {
 	// Enabled enables the event handler.
 	Enabled bool `json:"enabled" bson:"enabled"`
 	// Trigger specifies the TykEvent that should trigger the event handler.
@@ -28,8 +28,8 @@ type Event struct {
 	Webhook WebhookEvent `bson:"-" json:"-"`
 }
 
-// MarshalJSON marshals Event as per Tyk OAS API definition contract.
-func (e *Event) MarshalJSON() ([]byte, error) {
+// MarshalJSON marshals EventHandler as per Tyk OAS API definition contract.
+func (e *EventHandler) MarshalJSON() ([]byte, error) {
 	outMap, err := reflect.Cast[map[string]interface{}](*e)
 	if err != nil {
 		return nil, err
@@ -48,9 +48,9 @@ func (e *Event) MarshalJSON() ([]byte, error) {
 	return json.Marshal(outMapVal)
 }
 
-// UnmarshalJSON unmarshal Event as per Tyk OAS API definition contract.
-func (e *Event) UnmarshalJSON(in []byte) error {
-	type helperEvent Event
+// UnmarshalJSON unmarshal EventHandler as per Tyk OAS API definition contract.
+func (e *EventHandler) UnmarshalJSON(in []byte) error {
+	type helperEvent EventHandler
 	helper := helperEvent{}
 	if err := json.Unmarshal(in, &helper); err != nil {
 		return err
@@ -60,21 +60,26 @@ func (e *Event) UnmarshalJSON(in []byte) error {
 		return err
 	}
 
-	*e = Event(helper)
+	*e = EventHandler(helper)
 	return nil
 }
 
 // WebhookEvent stores the core information about a webhook event.
 type WebhookEvent struct {
-	URL            string  `json:"url" bson:"url"`
-	Method         string  `json:"method" bson:"method"`
-	CoolDownPeriod int64   `json:"coolDownPeriod" bson:"coolDownPeriod"`
-	BodyTemplate   string  `json:"bodyTemplate,omitempty" bson:"bodyTemplate,omitempty"`
-	Headers        Headers `json:"headers,omitempty" bson:"headers,omitempty"`
+	// URL is the target URL for the webhook.
+	URL string `json:"url" bson:"url"`
+	// Method is the HTTP method for the webhook.
+	Method string `json:"method" bson:"method"`
+	// CoolDownPeriod is the cool-down for the event, so it does not trigger again (in seconds).
+	CoolDownPeriod int64 `json:"coolDownPeriod" bson:"coolDownPeriod"`
+	// BodyTemplate is the template to be used for request payload.
+	BodyTemplate string `json:"bodyTemplate,omitempty" bson:"bodyTemplate,omitempty"`
+	// Headers are the list of request headers to be used.
+	Headers Headers `json:"headers,omitempty" bson:"headers,omitempty"`
 }
 
-// GetWebhookConf converts Event.WebhookEvent apidef.WebHookHandlerConf.
-func (e *Event) GetWebhookConf() apidef.WebHookHandlerConf {
+// GetWebhookConf converts EventHandler.WebhookEvent apidef.WebHookHandlerConf.
+func (e *EventHandler) GetWebhookConf() apidef.WebHookHandlerConf {
 	return apidef.WebHookHandlerConf{
 		Disabled:     !e.Enabled,
 		ID:           e.ID,
@@ -87,16 +92,16 @@ func (e *Event) GetWebhookConf() apidef.WebHookHandlerConf {
 	}
 }
 
-// Events holds the list of events to be processed for the API.
-type Events []Event
+// EventHandlers holds the list of events to be processed for the API.
+type EventHandlers []EventHandler
 
-// Fill fills Events from classic API definition. Currently only webhook events are supported.
-func (e *Events) Fill(api apidef.APIDefinition) {
+// Fill fills EventHandlers from classic API definition. Currently only webhook events are supported.
+func (e *EventHandlers) Fill(api apidef.APIDefinition) {
 	if len(api.EventHandlers.Events) == 0 {
 		return
 	}
 
-	events := Events{}
+	events := EventHandlers{}
 	for gwEvent, ehs := range api.EventHandlers.Events {
 		for _, eh := range ehs {
 			if eh.Handler != event.WebHookHandler {
@@ -109,7 +114,7 @@ func (e *Events) Fill(api apidef.APIDefinition) {
 				continue
 			}
 
-			ev := Event{
+			ev := EventHandler{
 				Enabled: !whConf.Disabled,
 				Trigger: gwEvent,
 				Kind:    WebhookKind,
@@ -133,7 +138,7 @@ func (e *Events) Fill(api apidef.APIDefinition) {
 }
 
 // ExtractTo extracts events to apidef.APIDefinition.
-func (e *Events) ExtractTo(api *apidef.APIDefinition) {
+func (e *EventHandlers) ExtractTo(api *apidef.APIDefinition) {
 	if e == nil || len(*e) == 0 {
 		return
 	}

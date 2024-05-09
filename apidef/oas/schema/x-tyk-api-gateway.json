@@ -1279,7 +1279,7 @@
           "type": "array",
           "items": [
             {
-              "$ref": "#/definitions/X-Tyk-Events"
+              "$ref": "#/definitions/X-Tyk-EventHandlers"
             }
           ]
         }
@@ -1895,7 +1895,7 @@
         "enabled"
       ]
     },
-    "X-Tyk-Events": {
+    "X-Tyk-EventHandlers": {
       "type": "object",
       "anyOf": [
         {

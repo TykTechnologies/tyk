@@ -16,12 +16,12 @@ func TestEvents(t *testing.T) {
 	t.Run("extractTo", func(t *testing.T) {
 		testcases := []struct {
 			title    string
-			input    Events
+			input    EventHandlers
 			expected apidef.EventHandlerMetaConfig
 		}{
 			{
 				title: "webhook",
-				input: Events{
+				input: EventHandlers{
 					{
 						Enabled: true,
 						Trigger: event.QuotaExceeded,
@@ -88,7 +88,7 @@ func TestEvents(t *testing.T) {
 			},
 			{
 				title: "skip non webhook actions",
-				input: Events{
+				input: EventHandlers{
 					{
 						Enabled: true,
 						Trigger: event.QuotaExceeded,
@@ -130,7 +130,7 @@ func TestEvents(t *testing.T) {
 		testcases := []struct {
 			title    string
 			input    apidef.EventHandlerMetaConfig
-			expected Events
+			expected EventHandlers
 		}{
 			{
 				title: "webhook",
@@ -168,7 +168,7 @@ func TestEvents(t *testing.T) {
 						},
 					},
 				},
-				expected: Events{
+				expected: EventHandlers{
 					{
 						Enabled: true,
 						Trigger: event.QuotaExceeded,
