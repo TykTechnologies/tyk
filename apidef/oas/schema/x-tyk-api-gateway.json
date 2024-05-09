@@ -1923,7 +1923,7 @@
         "id": {
           "type": "string"
         },
-        "coolDownPeriod": {
+        "cooldownPeriod": {
           "type": "string",
           "pattern": "^(\\d+h)?(\\d+m)?(\\d+s)?$"
         }
@@ -1933,7 +1933,7 @@
         "type",
         "trigger",
         "id",
-        "coolDownPeriod"
+        "cooldownPeriod"
       ]
     },
     "X-Tyk-Webhook-Without-ID": {
@@ -1966,7 +1966,7 @@
             "PATCH"
           ]
         },
-        "coolDownPeriod": {
+        "cooldownPeriod": {
           "type": "string",
           "pattern": "^(\\d+h)?(\\d+m)?(\\d+s)?$"
         },
@@ -1988,7 +1988,7 @@
         "trigger",
         "url",
         "method",
-        "coolDownPeriod",
+        "cooldownPeriod",
         "bodyTemplate"
       ]
     },
