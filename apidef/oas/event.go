@@ -9,8 +9,10 @@ import (
 	"github.com/TykTechnologies/tyk/internal/reflect"
 )
 
+// Kind is an alias maintained to be used in imports.
 type Kind = event.Kind
 
+// WebhookKind is an alias maintained to be used in imports.
 const WebhookKind = event.WebhookKind
 
 // EventHandler holds information about individual event to be configured on the API.
@@ -167,7 +169,11 @@ func (e *EventHandlers) Fill(api apidef.APIDefinition) {
 
 // ExtractTo extracts events to apidef.APIDefinition.
 func (e *EventHandlers) ExtractTo(api *apidef.APIDefinition) {
-	if e == nil || len(*e) == 0 {
+	if e == nil {
+		return
+	}
+
+	if len(*e) == 0 {
 		return
 	}
 
