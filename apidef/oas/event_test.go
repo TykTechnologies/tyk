@@ -9,6 +9,7 @@ import (
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/internal/event"
+	"github.com/TykTechnologies/tyk/internal/time"
 )
 
 func TestEventHandlers(t *testing.T) {
@@ -33,7 +34,7 @@ func TestEventHandlers(t *testing.T) {
 							URL:            "https://webhook.site/uuid",
 							Headers:        Headers{{Name: "Auth", Value: "key"}},
 							BodyTemplate:   "/path/to/template",
-							CoolDownPeriod: "20s",
+							CoolDownPeriod: time.ReadableDuration(time.Second * 20),
 							Method:         http.MethodPost,
 						},
 					},
@@ -47,7 +48,7 @@ func TestEventHandlers(t *testing.T) {
 							URL:            "https://webhook.site/uuid",
 							Headers:        Headers{{Name: "Auth", Value: "key"}},
 							BodyTemplate:   "/path/to/template",
-							CoolDownPeriod: "20s",
+							CoolDownPeriod: time.ReadableDuration(time.Second * 20),
 							Method:         http.MethodPost,
 						},
 					},
@@ -100,7 +101,7 @@ func TestEventHandlers(t *testing.T) {
 							URL:            "https://webhook.site/uuid",
 							Headers:        Headers{{Name: "Auth", Value: "key"}},
 							BodyTemplate:   "/path/to/template",
-							CoolDownPeriod: "20s",
+							CoolDownPeriod: time.ReadableDuration(time.Second * 20),
 							Method:         http.MethodPost,
 						},
 					},
@@ -180,7 +181,7 @@ func TestEventHandlers(t *testing.T) {
 							URL:            "https://webhook.site/uuid",
 							Headers:        Headers{{Name: "Auth", Value: "key"}},
 							BodyTemplate:   "/path/to/template",
-							CoolDownPeriod: "20s",
+							CoolDownPeriod: time.ReadableDuration(time.Second * 20),
 							Method:         http.MethodPost,
 						},
 					},
@@ -194,7 +195,7 @@ func TestEventHandlers(t *testing.T) {
 							URL:            "https://webhook.site/uuid",
 							Headers:        Headers{{Name: "Auth", Value: "key"}},
 							BodyTemplate:   "/path/to/template",
-							CoolDownPeriod: "20s",
+							CoolDownPeriod: time.ReadableDuration(time.Second * 20),
 							Method:         http.MethodPost,
 						},
 					},
@@ -234,7 +235,7 @@ func TestEventHandler_MarshalJSON(t *testing.T) {
 			URL:            "https://webhook.site/uuid",
 			Headers:        Headers{{Name: "Auth", Value: "key"}},
 			BodyTemplate:   "/path/to/template",
-			CoolDownPeriod: "20s",
+			CoolDownPeriod: time.ReadableDuration(time.Second * 20),
 			Method:         http.MethodPost,
 		},
 	}
@@ -299,7 +300,7 @@ func TestEventHandler_UnmarshalJSON(t *testing.T) {
 			URL:            "https://webhook.site/uuid",
 			Headers:        Headers{{Name: "Auth", Value: "key"}},
 			BodyTemplate:   "/path/to/template",
-			CoolDownPeriod: "20s",
+			CoolDownPeriod: time.ReadableDuration(time.Second * 20),
 			Method:         http.MethodPost,
 		},
 	}

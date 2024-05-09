@@ -2,11 +2,11 @@ package oas
 
 import (
 	"encoding/json"
-	"time"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/internal/event"
 	"github.com/TykTechnologies/tyk/internal/reflect"
+	"github.com/TykTechnologies/tyk/internal/time"
 )
 
 // Kind is an alias maintained to be used in imports.
@@ -94,7 +94,7 @@ type WebhookEvent struct {
 	// An empty value is interpreted as "0s", implying no cool-down.
 	// It's important to format the string correctly, as invalid formats will
 	// be considered as 0s/empty.
-	CoolDownPeriod string `json:"coolDownPeriod" bson:"coolDownPeriod"`
+	CoolDownPeriod time.ReadableDuration `json:"coolDownPeriod" bson:"coolDownPeriod"`
 	// BodyTemplate is the template to be used for request payload.
 	BodyTemplate string `json:"bodyTemplate,omitempty" bson:"bodyTemplate,omitempty"`
 	// Headers are the list of request headers to be used.
@@ -103,11 +103,6 @@ type WebhookEvent struct {
 
 // GetWebhookConf converts EventHandler.WebhookEvent apidef.WebHookHandlerConf.
 func (e *EventHandler) GetWebhookConf() apidef.WebHookHandlerConf {
-	coolDownPeriod, err := time.ParseDuration(e.Webhook.CoolDownPeriod)
-	if err != nil {
-		coolDownPeriod = 0
-	}
-
 	return apidef.WebHookHandlerConf{
 		Disabled:     !e.Enabled,
 		ID:           e.ID,
@@ -115,7 +110,7 @@ func (e *EventHandler) GetWebhookConf() apidef.WebHookHandlerConf {
 		Method:       e.Webhook.Method,
 		TargetPath:   e.Webhook.URL,
 		HeaderList:   e.Webhook.Headers.Map(),
-		EventTimeout: int64(coolDownPeriod.Seconds()),
+		EventTimeout: int64(e.Webhook.CoolDownPeriod.Seconds()),
 		TemplatePath: e.Webhook.BodyTemplate,
 	}
 }
@@ -147,16 +142,17 @@ func (e *EventHandlers) Fill(api apidef.APIDefinition) {
 					ID:      whConf.ID,
 					Name:    whConf.Name,
 					Webhook: WebhookEvent{
-						URL:          whConf.TargetPath,
-						Method:       whConf.Method,
-						Headers:      NewHeaders(whConf.HeaderList),
-						BodyTemplate: whConf.TemplatePath,
+						URL:            whConf.TargetPath,
+						Method:         whConf.Method,
+						Headers:        NewHeaders(whConf.HeaderList),
+						BodyTemplate:   whConf.TemplatePath,
+						CoolDownPeriod: time.ReadableDuration(time.Duration(whConf.EventTimeout) * time.Second),
 					},
 				}
 
 				if timeout := whConf.EventTimeout; timeout != 0 {
-					timeoutDuration := time.Duration(timeout) * time.Second
-					ev.Webhook.CoolDownPeriod = timeoutDuration.String()
+					//timeoutDuration := time.Duration(timeout) * time.Second
+					//ev.Webhook.CoolDownPeriod = timeoutDuration.String()
 				}
 
 				events = append(events, ev)
