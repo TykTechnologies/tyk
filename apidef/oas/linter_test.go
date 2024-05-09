@@ -71,6 +71,7 @@ func TestXTykGateway_Lint(t *testing.T) {
 			settings.Server.EventHandlers[i].Kind = event.WebhookKind
 			settings.Server.EventHandlers[i].Webhook.Method = http.MethodPost
 			settings.Server.EventHandlers[i].Trigger = event.QuotaExceeded
+			settings.Server.EventHandlers[i].Webhook.CoolDownPeriod = "20s"
 		}
 
 		for idx, _ := range settings.Middleware.Operations {

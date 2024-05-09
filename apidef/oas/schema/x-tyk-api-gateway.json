@@ -1912,28 +1912,28 @@
         "enabled": {
           "type": "boolean"
         },
-        "type": {
-          "$ref": "#/definitions/X-Tyk-EventType"
+        "trigger": {
+          "$ref": "#/definitions/X-Tyk-EventTrigger"
         },
-        "action": {
+        "type": {
           "method": {
-            "$ref": "#/definitions/X-Tyk-EventAction"
+            "$ref": "#/definitions/X-Tyk-EventType"
           }
         },
         "id": {
           "type": "string"
         },
         "coolDownPeriod": {
-          "type": "integer",
-          "minimum": 0
+          "type": "string",
+          "pattern": "^(\\d+h)?(\\d+m)?(\\d+s)?$"
         }
       },
       "required": [
         "enabled",
         "type",
-        "action",
+        "trigger",
         "id",
-        "timeout"
+        "coolDownPeriod"
       ]
     },
     "X-Tyk-Webhook-Without-ID": {
@@ -1943,11 +1943,11 @@
         "enabled": {
           "type": "boolean"
         },
+        "trigger": {
+          "$ref": "#/definitions/X-Tyk-EventTrigger"
+        },
         "type": {
           "$ref": "#/definitions/X-Tyk-EventType"
-        },
-        "action": {
-          "$ref": "#/definitions/X-Tyk-EventAction"
         },
         "name": {
           "type": "string"
@@ -1967,8 +1967,8 @@
           ]
         },
         "coolDownPeriod": {
-          "type": "integer",
-          "minimum": 0
+          "type": "string",
+          "pattern": "^(\\d+h)?(\\d+m)?(\\d+s)?$"
         },
         "bodyTemplate": {
           "type": "string"
@@ -1985,20 +1985,20 @@
       "required": [
         "enabled",
         "type",
-        "action",
+        "trigger",
         "url",
         "method",
-        "timeout",
+        "coolDownPeriod",
         "bodyTemplate"
       ]
     },
-    "X-Tyk-EventAction": {
+    "X-Tyk-EventType": {
       "type": "string",
       "enum": [
         "webhook"
       ]
     },
-    "X-Tyk-EventType": {
+    "X-Tyk-EventTrigger": {
       "type": "string",
       "enum": [
         "QuotaExceeded",
