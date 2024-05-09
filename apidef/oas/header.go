@@ -25,9 +25,14 @@ func (hs Headers) Map() map[string]string {
 
 // NewHeaders creates Headers from in map.
 func NewHeaders(in map[string]string) Headers {
-	var headers = make(Headers, len(in))
+	var (
+		headers = make(Headers, len(in))
+		i       = 0
+	)
+
 	for k, v := range in {
-		headers = append(headers, Header{Name: k, Value: v})
+		headers[i] = Header{Name: k, Value: v}
+		i++
 	}
 
 	sort.Slice(headers, func(i, j int) bool {
