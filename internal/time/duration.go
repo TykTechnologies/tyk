@@ -7,15 +7,22 @@ import (
 	"time"
 )
 
+// Duration is an alias maintained to be used across the project.
 type Duration = time.Duration
 
 const (
-	Nanosecond  = time.Nanosecond
+	// Nanosecond is an alias maintained to be used across the project.
+	Nanosecond = time.Nanosecond
+	// Microsecond is an alias maintained to be used across the project.
 	Microsecond = time.Microsecond
+	// Millisecond is an alias maintained to be used across the project.
 	Millisecond = time.Millisecond
-	Second      = time.Second
-	Minute      = time.Minute
-	Hour        = time.Hour
+	// Second is an alias maintained to be used across the project.
+	Second = time.Second
+	// Minute is an alias maintained to be used across the project.
+	Minute = time.Minute
+	// Hour is an alias maintained to be used across the project.
+	Hour = time.Hour
 )
 
 // ReadableDuration is a type alias for time.Duration, so that shorthand notation can be used.
@@ -31,10 +38,12 @@ const (
 // be considered as 0s/empty.
 type ReadableDuration time.Duration
 
+// MarshalJSON converts ReadableDuration into human-readable shorthand notation for time.Duration into json format.
 func (d ReadableDuration) MarshalJSON() ([]byte, error) {
 	return []byte(fmt.Sprintf(`"%s"`, time.Duration(d).String())), nil
 }
 
+// UnmarshalJSON converts human-readable shorthand notation for time.Duration into ReadableDuration from json format.
 func (d *ReadableDuration) UnmarshalJSON(data []byte) error {
 	in, err := strconv.Unquote(string(data))
 	if err != nil {
@@ -47,11 +56,12 @@ func (d *ReadableDuration) UnmarshalJSON(data []byte) error {
 	}
 
 	// suppress error, return zero value
-	duration, _ := time.ParseDuration(in)
+	duration, _ := time.ParseDuration(in) //nolint:errcheck
 	*d = ReadableDuration(duration)
 	return nil
 }
 
+// Seconds returns ReadableDuration in seconds.
 func (d ReadableDuration) Seconds() float64 {
 	return Duration(d).Seconds()
 }
