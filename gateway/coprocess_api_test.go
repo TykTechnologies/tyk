@@ -10,7 +10,6 @@ import (
 )
 
 func TestCoprocessAPIs(t *testing.T) {
-
 	k := "keyName"
 	v := "valueOf"
 
