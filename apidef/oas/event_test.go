@@ -290,6 +290,7 @@ func TestEventHandler_UnmarshalJSON(t *testing.T) {
 
 	e := EventHandler{}
 	err = json.Unmarshal(data, &e)
+	assert.NoError(t, err)
 	expected := EventHandler{
 		Enabled: true,
 		Trigger: event.QuotaExceeded,

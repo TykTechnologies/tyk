@@ -165,7 +165,7 @@ func (e *EventHandlers) Fill(api apidef.APIDefinition) {
 	*e = events
 }
 
-// ExtractTo extracts events to apidef.APIDefinition.
+// ExtractTo EventHandlers events to apidef.APIDefinition.
 func (e *EventHandlers) ExtractTo(api *apidef.APIDefinition) {
 	if e == nil {
 		return
@@ -179,21 +179,7 @@ func (e *EventHandlers) ExtractTo(api *apidef.APIDefinition) {
 		api.EventHandlers.Events = make(map[apidef.TykEvent][]apidef.EventHandlerTriggerConfig)
 	}
 
-	// this blocks helps with extracting OAS into APIDefinition.
-	// update this when new event handlers are added to OAS support.
-	for eventType, eventTriggers := range api.EventHandlers.Events {
-		triggersExcludingWebhooks := make([]apidef.EventHandlerTriggerConfig, 0)
-		for _, eventTrigger := range eventTriggers {
-			switch eventTrigger.Handler {
-			case event.WebHookHandler:
-				continue
-			}
-
-			triggersExcludingWebhooks = append(triggersExcludingWebhooks, eventTrigger)
-		}
-
-		api.EventHandlers.Events[eventType] = triggersExcludingWebhooks
-	}
+	resetOASSupportedEventHandlers(api)
 
 	for _, ev := range *e {
 		var (
@@ -227,5 +213,23 @@ func (e *EventHandlers) ExtractTo(api *apidef.APIDefinition) {
 		}
 
 		api.EventHandlers.Events[ev.Trigger] = []apidef.EventHandlerTriggerConfig{eventHandlerTriggerConfig}
+	}
+}
+
+func resetOASSupportedEventHandlers(api *apidef.APIDefinition) {
+	// this blocks helps with extracting OAS into APIDefinition.
+	// update this when new event handlers are added to OAS support.
+	for eventType, eventTriggers := range api.EventHandlers.Events {
+		triggersExcludingWebhooks := make([]apidef.EventHandlerTriggerConfig, 0)
+		for _, eventTrigger := range eventTriggers {
+			switch eventTrigger.Handler {
+			case event.WebHookHandler:
+				continue
+			}
+
+			triggersExcludingWebhooks = append(triggersExcludingWebhooks, eventTrigger)
+		}
+
+		api.EventHandlers.Events[eventType] = triggersExcludingWebhooks
 	}
 }
