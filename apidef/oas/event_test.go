@@ -116,7 +116,7 @@ func TestEvents(t *testing.T) {
 				t.Parallel()
 
 				server := new(Server)
-				server.Events = tc.input
+				server.EventHandlers = tc.input
 
 				var apiDef apidef.APIDefinition
 				server.ExtractTo(&apiDef)
@@ -214,9 +214,9 @@ func TestEvents(t *testing.T) {
 				var api apidef.APIDefinition
 				api.EventHandlers = tc.input
 				server := new(Server)
-				server.Events.Fill(api)
+				server.EventHandlers.Fill(api)
 
-				assert.ElementsMatch(t, tc.expected, server.Events)
+				assert.ElementsMatch(t, tc.expected, server.EventHandlers)
 			})
 		}
 	})
