@@ -8,18 +8,18 @@ import (
 	"github.com/TykTechnologies/tyk/internal/reflect"
 )
 
-type Action = event.Action
+type Kind = event.Kind
 
-const WebhookAction = event.WebhookAction
+const WebhookKind = event.WebhookKind
 
 // Event holds information about individual event to be configured on the API.
 type Event struct {
 	// Enabled enables the event handler.
 	Enabled bool `json:"enabled" bson:"enabled"`
-	// Type specifies the TykEvent that should trigger the event handler.
-	Type event.Event `json:"type" bson:"type"`
-	// Action specifies the action to be taken on the event trigger.
-	Action Action `json:"action" bson:"action"`
+	// Trigger specifies the TykEvent that should trigger the event handler.
+	Trigger event.Event `json:"trigger" bson:"trigger"`
+	// Kind specifies the action to be taken on the event trigger.
+	Kind Kind `json:"type" bson:"type"` // json tag is changed as per contract
 	// ID is the ID of event handler in storage.
 	ID string `json:"id,omitempty" bson:"id,omitempty"`
 	// Name is the name of event handler
@@ -48,7 +48,7 @@ func (e *Event) MarshalJSON() ([]byte, error) {
 	return json.Marshal(outMapVal)
 }
 
-// UnmarshalJSON unmarshals Event as per Tyk OAS API definition contract.
+// UnmarshalJSON unmarshal Event as per Tyk OAS API definition contract.
 func (e *Event) UnmarshalJSON(in []byte) error {
 	type helperEvent Event
 	helper := helperEvent{}
@@ -66,11 +66,11 @@ func (e *Event) UnmarshalJSON(in []byte) error {
 
 // WebhookEvent stores the core information about a webhook event.
 type WebhookEvent struct {
-	URL          string            `json:"url" bson:"url"`
-	Method       string            `json:"method" bson:"method"`
-	Timeout      int64             `json:"timeout" bson:"timeout"`
-	BodyTemplate string            `json:"bodyTemplate,omitempty" bson:"bodyTemplate,omitempty"`
-	Headers      map[string]string `json:"headers,omitempty" bson:"headers,omitempty"`
+	URL          string  `json:"url" bson:"url"`
+	Method       string  `json:"method" bson:"method"`
+	Timeout      int64   `json:"timeout" bson:"timeout"`
+	BodyTemplate string  `json:"bodyTemplate,omitempty" bson:"bodyTemplate,omitempty"`
+	Headers      Headers `json:"headers,omitempty" bson:"headers,omitempty"`
 }
 
 // GetWebhookConf converts Event.WebhookEvent apidef.WebHookHandlerConf.
@@ -81,7 +81,7 @@ func (e *Event) GetWebhookConf() apidef.WebHookHandlerConf {
 		Name:         e.Name,
 		Method:       e.Webhook.Method,
 		TargetPath:   e.Webhook.URL,
-		HeaderList:   e.Webhook.Headers,
+		HeaderList:   e.Webhook.Headers.Map(),
 		EventTimeout: e.Webhook.Timeout,
 		TemplatePath: e.Webhook.BodyTemplate,
 	}
@@ -111,15 +111,15 @@ func (e *Events) Fill(api apidef.APIDefinition) {
 
 			ev := Event{
 				Enabled: !whConf.Disabled,
-				Type:    gwEvent,
-				Action:  WebhookAction,
+				Trigger: gwEvent,
+				Kind:    WebhookKind,
 				ID:      whConf.ID,
 				Name:    whConf.Name,
 				Webhook: WebhookEvent{
 
 					URL:          whConf.TargetPath,
 					Method:       whConf.Method,
-					Headers:      whConf.HeaderList,
+					Headers:      NewHeaders(whConf.HeaderList),
 					Timeout:      whConf.EventTimeout,
 					BodyTemplate: whConf.TemplatePath,
 				},
@@ -164,8 +164,8 @@ func (e *Events) ExtractTo(api *apidef.APIDefinition) {
 			err         error
 		)
 
-		switch ev.Action {
-		case WebhookAction:
+		switch ev.Kind {
+		case WebhookKind:
 			handler = event.WebHookHandler
 			whConf := ev.GetWebhookConf()
 			handlerMeta, err = reflect.Cast[map[string]interface{}](whConf)
@@ -183,11 +183,11 @@ func (e *Events) ExtractTo(api *apidef.APIDefinition) {
 			HandlerMeta: *handlerMeta,
 		}
 
-		if val, ok := api.EventHandlers.Events[ev.Type]; ok {
-			api.EventHandlers.Events[ev.Type] = append(val, eventHandlerTriggerConfig)
+		if val, ok := api.EventHandlers.Events[ev.Trigger]; ok {
+			api.EventHandlers.Events[ev.Trigger] = append(val, eventHandlerTriggerConfig)
 			continue
 		}
 
-		api.EventHandlers.Events[ev.Type] = []apidef.EventHandlerTriggerConfig{eventHandlerTriggerConfig}
+		api.EventHandlers.Events[ev.Trigger] = []apidef.EventHandlerTriggerConfig{eventHandlerTriggerConfig}
 	}
 }

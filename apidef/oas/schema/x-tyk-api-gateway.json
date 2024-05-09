@@ -1275,7 +1275,7 @@
         "detailedTracing": {
           "$ref": "#/definitions/X-Tyk-DetailedTracing"
         },
-        "events": {
+        "eventHandlers": {
           "type": "array",
           "items": [
             {
@@ -1974,8 +1974,12 @@
           "type": "string"
         },
         "headers": {
-          "type": "object",
-          "additionalProperties": { "type": "string" }
+          "type": "array",
+          "items": [
+            {
+              "$ref": "#/definitions/X-Tyk-Header"
+            }
+          ]
         }
       },
       "required": [

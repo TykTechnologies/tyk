@@ -68,9 +68,9 @@ func TestXTykGateway_Lint(t *testing.T) {
 			"test-basic": securityScheme,
 		}
 		for i := range settings.Server.Events {
-			settings.Server.Events[i].Action = event.WebhookAction
+			settings.Server.Events[i].Kind = event.WebhookKind
 			settings.Server.Events[i].Webhook.Method = http.MethodPost
-			settings.Server.Events[i].Type = event.QuotaExceeded
+			settings.Server.Events[i].Trigger = event.QuotaExceeded
 		}
 
 		for idx, _ := range settings.Middleware.Operations {

@@ -24,13 +24,13 @@ func TestEvents(t *testing.T) {
 				input: Events{
 					{
 						Enabled: true,
-						Type:    event.QuotaExceeded,
-						Action:  event.WebhookAction,
+						Trigger: event.QuotaExceeded,
+						Kind:    event.WebhookKind,
 						ID:      "random-id",
 						Name:    "test-webhook",
 						Webhook: WebhookEvent{
 							URL:          "https://webhook.site/uuid",
-							Headers:      map[string]string{"Auth": "key"},
+							Headers:      Headers{{Name: "Auth", Value: "key"}},
 							BodyTemplate: "/path/to/template",
 							Timeout:      20,
 							Method:       http.MethodPost,
@@ -38,13 +38,13 @@ func TestEvents(t *testing.T) {
 					},
 					{
 						Enabled: false,
-						Type:    event.RateLimitExceeded,
-						Action:  event.WebhookAction,
+						Trigger: event.RateLimitExceeded,
+						Kind:    event.WebhookKind,
 						ID:      "random-id",
 						Name:    "test-webhook",
 						Webhook: WebhookEvent{
 							URL:          "https://webhook.site/uuid",
-							Headers:      map[string]string{"Auth": "key"},
+							Headers:      Headers{{Name: "Auth", Value: "key"}},
 							BodyTemplate: "/path/to/template",
 							Timeout:      20,
 							Method:       http.MethodPost,
@@ -91,13 +91,13 @@ func TestEvents(t *testing.T) {
 				input: Events{
 					{
 						Enabled: true,
-						Type:    event.QuotaExceeded,
-						Action:  event.Action("invalid-action"),
+						Trigger: event.QuotaExceeded,
+						Kind:    event.Kind("invalid-action"),
 						ID:      "random-id",
 						Name:    "test-webhook",
 						Webhook: WebhookEvent{
 							URL:          "https://webhook.site/uuid",
-							Headers:      map[string]string{"Auth": "key"},
+							Headers:      Headers{{Name: "Auth", Value: "key"}},
 							BodyTemplate: "/path/to/template",
 							Timeout:      20,
 							Method:       http.MethodPost,
@@ -171,13 +171,13 @@ func TestEvents(t *testing.T) {
 				expected: Events{
 					{
 						Enabled: true,
-						Type:    event.QuotaExceeded,
-						Action:  event.WebhookAction,
+						Trigger: event.QuotaExceeded,
+						Kind:    event.WebhookKind,
 						ID:      "random-id",
 						Name:    "test-webhook",
 						Webhook: WebhookEvent{
 							URL:          "https://webhook.site/uuid",
-							Headers:      map[string]string{"Auth": "key"},
+							Headers:      Headers{{Name: "Auth", Value: "key"}},
 							BodyTemplate: "/path/to/template",
 							Timeout:      20,
 							Method:       http.MethodPost,
@@ -185,13 +185,13 @@ func TestEvents(t *testing.T) {
 					},
 					{
 						Enabled: false,
-						Type:    event.RateLimitExceeded,
-						Action:  event.WebhookAction,
+						Trigger: event.RateLimitExceeded,
+						Kind:    event.WebhookKind,
 						ID:      "random-id",
 						Name:    "test-webhook",
 						Webhook: WebhookEvent{
 							URL:          "https://webhook.site/uuid",
-							Headers:      map[string]string{"Auth": "key"},
+							Headers:      Headers{{Name: "Auth", Value: "key"}},
 							BodyTemplate: "/path/to/template",
 							Timeout:      20,
 							Method:       http.MethodPost,
