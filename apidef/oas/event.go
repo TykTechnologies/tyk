@@ -66,11 +66,11 @@ func (e *Event) UnmarshalJSON(in []byte) error {
 
 // WebhookEvent stores the core information about a webhook event.
 type WebhookEvent struct {
-	URL          string  `json:"url" bson:"url"`
-	Method       string  `json:"method" bson:"method"`
-	Timeout      int64   `json:"timeout" bson:"timeout"`
-	BodyTemplate string  `json:"bodyTemplate,omitempty" bson:"bodyTemplate,omitempty"`
-	Headers      Headers `json:"headers,omitempty" bson:"headers,omitempty"`
+	URL            string  `json:"url" bson:"url"`
+	Method         string  `json:"method" bson:"method"`
+	CoolDownPeriod int64   `json:"coolDownPeriod" bson:"coolDownPeriod"`
+	BodyTemplate   string  `json:"bodyTemplate,omitempty" bson:"bodyTemplate,omitempty"`
+	Headers        Headers `json:"headers,omitempty" bson:"headers,omitempty"`
 }
 
 // GetWebhookConf converts Event.WebhookEvent apidef.WebHookHandlerConf.
@@ -82,7 +82,7 @@ func (e *Event) GetWebhookConf() apidef.WebHookHandlerConf {
 		Method:       e.Webhook.Method,
 		TargetPath:   e.Webhook.URL,
 		HeaderList:   e.Webhook.Headers.Map(),
-		EventTimeout: e.Webhook.Timeout,
+		EventTimeout: e.Webhook.CoolDownPeriod,
 		TemplatePath: e.Webhook.BodyTemplate,
 	}
 }
@@ -117,11 +117,11 @@ func (e *Events) Fill(api apidef.APIDefinition) {
 				Name:    whConf.Name,
 				Webhook: WebhookEvent{
 
-					URL:          whConf.TargetPath,
-					Method:       whConf.Method,
-					Headers:      NewHeaders(whConf.HeaderList),
-					Timeout:      whConf.EventTimeout,
-					BodyTemplate: whConf.TemplatePath,
+					URL:            whConf.TargetPath,
+					Method:         whConf.Method,
+					Headers:        NewHeaders(whConf.HeaderList),
+					CoolDownPeriod: whConf.EventTimeout,
+					BodyTemplate:   whConf.TemplatePath,
 				},
 			}
 

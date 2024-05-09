@@ -1923,7 +1923,7 @@
         "id": {
           "type": "string"
         },
-        "timeout": {
+        "coolDownPeriod": {
           "type": "integer",
           "minimum": 0
         }
@@ -1966,7 +1966,7 @@
             "PATCH"
           ]
         },
-        "timeout": {
+        "coolDownPeriod": {
           "type": "integer",
           "minimum": 0
         },
