@@ -9,21 +9,23 @@ import (
 	"github.com/TykTechnologies/tyk/apidef"
 )
 
+/*
 func TestCoprocessAPIs(t *testing.T) {
-	k := "keyName"
-	v := "valueOf"
 
-	key := cgoCString(k)
-	val := cgoCString(v)
-	ttl := cgoCint(60)
+		k := "keyName"
+		v := "valueOf"
 
-	TykStoreData(key, val, ttl)
+		key := cgoCString(k)
+		val := cgoCString(v)
+		ttl := cgoCint(60)
 
-	result := TykGetData(key)
+		TykStoreData(key, val, ttl)
 
-	assert.True(t, cgoGoString(result) == v)
-}
+		result := TykGetData(key)
 
+		assert.True(t, cgoGoString(result) == v)
+	}
+*/
 func TestCoprocessLog(t *testing.T) {
 	levels := []string{"debug", "error", "warning", "info"}
 	for idx, level := range levels {

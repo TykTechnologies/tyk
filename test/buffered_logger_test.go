@@ -42,7 +42,7 @@ func TestNewBufferingLogger(t *testing.T) {
 	}{
 		{
 			name:   "NewBufferingLogger initialize",
-			before: func(bl *BufferedLogger) {},
+			before: func(*BufferedLogger) {},
 			checks: check(isNil, isSingleton, isBufferingFormatter, isEmpty),
 		},
 	}
@@ -68,18 +68,18 @@ func TestBufferingFormatterFormat(t *testing.T) {
 	var (
 		check = func(fns ...checkFn) []checkFn { return fns }
 
-		hasError = func(f *BufferingFormatter, err error) {
+		hasError = func(_ *BufferingFormatter, err error) {
 			assert.Nil(t, err, "Expected no error from Format method")
 		}
 
 		logLen = func(count int) checkFn {
-			return func(f *BufferingFormatter, err error) {
+			return func(f *BufferingFormatter, _ error) {
 				assert.Len(t, f.buffer, count, "Expected buffer to have %d log", count)
 			}
 		}
 
 		content = func(expected *BufferedLog) checkFn {
-			return func(f *BufferingFormatter, err error) {
+			return func(f *BufferingFormatter, _ error) {
 				log := f.buffer[0]
 				assert.Equal(t, expected.Message, log.Message, "Expected log message to match")
 				assert.Equal(t, expected.Time.UTC(), log.Time, "Expected log time to be in UTC")
@@ -116,7 +116,7 @@ func TestBufferingFormatterFormat(t *testing.T) {
 	}
 	for _, tt := range tests {
 		tt := tt
-		t.Run(tt.name, func(t *testing.T) {
+		t.Run(tt.name, func(*testing.T) {
 			f := &BufferingFormatter{
 				bufferMutex: sync.Mutex{},
 				buffer:      []*BufferedLog{},
@@ -149,6 +149,7 @@ func TestBufferedLoggerGetLogs(t *testing.T) {
 
 		hasLogs = func(level logrus.Level, count int) checkFn {
 			return func(t *testing.T, f *BufferedLogger) {
+				t.Helper()
 				logs := f.GetLogs(level)
 				assert.Len(t, logs, count, "Expected buffer to have %d log", count)
 			}
@@ -210,6 +211,7 @@ func TestBufferedLoggerClearLogs(t *testing.T) {
 
 		empty = func(empty bool) checkFn {
 			return func(t *testing.T, bl *BufferedLogger) {
+				t.Helper()
 				if empty {
 					assert.LessOrEqual(t, 0, len(bl.bufferingFormatter.buffer), 0, "Expected buffer to be empty")
 				} else {

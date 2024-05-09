@@ -294,7 +294,7 @@ func defineGatewayGetHostDetailsTests() []struct {
 		},
 		{
 			name:            "success-listen-address-set",
-			readPIDFromFile: func(file string) (int, error) { return 1000, nil },
+			readPIDFromFile: func(string) (int, error) { return 1000, nil },
 			before: func(gw *Gateway) {
 				gw.SetConfig(config.Config{
 					ListenAddress: "127.0.0.1",
