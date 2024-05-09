@@ -510,6 +510,14 @@ func TestRPCStorageHandler_BuildNodeInfo(t *testing.T) {
 				tc.expectedNodeInfo.NodeID = ts.Gw.GetNodeID()
 			}
 
+			if tc.expectedNodeInfo.HostDetails.Hostname == "" {
+				tc.expectedNodeInfo.HostDetails = models.HostDetails{
+					Hostname: ts.Gw.hostDetails.Hostname,
+					PID:      ts.Gw.hostDetails.PID,
+					Address:  ts.Gw.hostDetails.Address,
+				}
+			}
+
 			expected, err := json.Marshal(tc.expectedNodeInfo)
 			assert.Nil(t, err)
 
