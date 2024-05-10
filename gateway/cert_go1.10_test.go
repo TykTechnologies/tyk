@@ -259,7 +259,7 @@ func TestProxyTransport(t *testing.T) {
 		// force creating new transport on each reque
 		globalConf.MaxConnTime = -1
 
-		globalConf.ProxySSLCipherSuites = []string{"TLS_RSA_WITH_AES_128_CBC_SHA"}
+		globalConf.ProxySSLCipherSuites = []string{"TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA"}
 		ts.Gw.SetConfig(globalConf)
 		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 			spec.Proxy.ListenPath = "/"
@@ -294,7 +294,7 @@ func TestProxyTransport(t *testing.T) {
 		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 			spec.Proxy.ListenPath = "/"
 			spec.Proxy.TargetURL = upstream.URL
-			spec.Proxy.Transport.SSLCipherSuites = []string{"TLS_RSA_WITH_AES_128_CBC_SHA"}
+			spec.Proxy.Transport.SSLCipherSuites = []string{"TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA"}
 		})
 
 		ts.Run(t, test.TestCase{Path: "/", Code: 200})
@@ -328,7 +328,7 @@ func TestProxyTransport(t *testing.T) {
 		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 			spec.Proxy.ListenPath = "/"
 			spec.Proxy.TargetURL = upstream.URL
-			spec.Proxy.Transport.SSLCipherSuites = []string{"TLS_RSA_WITH_AES_128_CBC_SHA"}
+			spec.Proxy.Transport.SSLCipherSuites = []string{"TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA"}
 			// Invalid proxy
 			spec.Proxy.Transport.ProxyURL = upstream.URL
 		})
@@ -359,7 +359,7 @@ func TestProxyTransport(t *testing.T) {
 
 		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 			spec.Proxy.ListenPath = "/"
-			spec.Proxy.Transport.SSLCipherSuites = []string{"TLS_RSA_WITH_AES_128_CBC_SHA"}
+			spec.Proxy.Transport.SSLCipherSuites = []string{"TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA"}
 			spec.Proxy.Transport.ProxyURL = proxy.URL
 		})
 
