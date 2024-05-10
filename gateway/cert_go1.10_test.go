@@ -244,7 +244,8 @@ func TestProxyTransport(t *testing.T) {
 
 	upstream := httptest.NewUnstartedServer(handlerEcho("test"))
 	upstream.TLS = &tls.Config{
-		MaxVersion: tls.VersionTLS12,
+		MaxVersion:   tls.VersionTLS12,
+		CipherSuites: getCipherAliases([]string{"TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA"}),
 	}
 	upstream.StartTLS()
 
@@ -265,7 +266,18 @@ func TestProxyTransport(t *testing.T) {
 			spec.Proxy.ListenPath = "/"
 			spec.Proxy.TargetURL = upstream.URL
 		})
-		ts.Run(t, test.TestCase{Path: "/", Code: 200})
+
+		//client := &http.Client{Transport: &http.Transport{TLSClientConfig: &tls.Config{
+		//	CipherSuites:       getCipherAliases([]string{"TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA"}),
+		//	InsecureSkipVerify: true,
+		//	MaxVersion:         tls.VersionTLS12,
+		//}}}
+
+		ts.Run(t, test.TestCase{
+			Path: "/",
+			Code: 200,
+			//Client: client
+		})
 	})
 
 	t.Run("Global: Cipher not match", func(t *testing.T) {
