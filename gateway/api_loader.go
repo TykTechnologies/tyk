@@ -142,6 +142,13 @@ func (gw *Gateway) generateSubRoutes(spec *APISpec, router *mux.Router, logger *
 func (gw *Gateway) processSpec(spec *APISpec, apisByListen map[string]int,
 	gs *generalStores, logger *logrus.Entry) *ChainObject {
 
+	gwConfig := gw.GetConfig()
+
+	// overrideChain is a replacement input for middlewares based on their
+	// name. This allows us to replace any middleware in the chain with a
+	// different middleware, for example disabling them.
+	var overrideChain map[string]TykMiddleware
+
 	var chainDef ChainObject
 
 	logger = logger.WithFields(logrus.Fields{
@@ -240,7 +247,7 @@ func (gw *Gateway) processSpec(spec *APISpec, apisByListen map[string]int,
 	var mwPaths []string
 
 	mwPaths, mwAuthCheckFunc, mwPreFuncs, mwPostFuncs, mwPostAuthCheckFuncs, mwResponseFuncs, mwDriver = gw.loadCustomMiddleware(spec)
-	if gw.GetConfig().EnableJSVM && (spec.hasVirtualEndpoint() || mwDriver == apidef.OttoDriver) {
+	if gwConfig.EnableJSVM && (spec.hasVirtualEndpoint() || mwDriver == apidef.OttoDriver) {
 		logger.Debug("Loading JS Paths")
 		spec.JSVM.LoadJSPaths(mwPaths, prefix)
 	}
@@ -292,8 +299,8 @@ func (gw *Gateway) processSpec(spec *APISpec, apisByListen map[string]int,
 	cacheStore.Connect()
 
 	var chain http.Handler
-	var chainArray []alice.Constructor
-	var authArray []alice.Constructor
+	var chainArray []TykMiddleware
+	var authArray []TykMiddleware
 
 	if spec.UseKeylessAccess {
 		chainDef.Open = true
@@ -362,12 +369,12 @@ func (gw *Gateway) processSpec(spec *APISpec, apisByListen map[string]int,
 			switch spec.CustomMiddleware.Driver {
 			case apidef.OttoDriver:
 				logger.Info("----> Checking security policy: JS Plugin")
-				authArray = append(authArray, gw.createMiddleware(&DynamicMiddleware{
+				authArray = append(authArray, &DynamicMiddleware{
 					BaseMiddleware:      baseMid,
 					MiddlewareClassName: mwAuthCheckFunc.Name,
 					Pre:                 true,
 					Auth:                true,
-				}))
+				})
 			case apidef.GoPluginDriver:
 				gw.mwAppendEnabled(
 					&authArray,
@@ -388,13 +395,13 @@ func (gw *Gateway) processSpec(spec *APISpec, apisByListen map[string]int,
 
 		if spec.UseStandardAuth || len(authArray) == 0 {
 			logger.Info("Checking security policy: Token")
-			authArray = append(authArray, gw.createMiddleware(&AuthKey{baseMid}))
+			authArray = append(authArray, &AuthKey{baseMid})
 		}
 
 		chainArray = append(chainArray, authArray...)
 
 		// if gw is edge, then prefetch any existent org session expiry
-		if gw.GetConfig().SlaveOptions.UseRPC {
+		if gwConfig.SlaveOptions.UseRPC {
 			// if not in emergency so load from backup is not blocked
 			if !rpc.IsEmergencyMode() {
 				baseMid.OrgSessionExpiry(spec.OrgID)
@@ -467,10 +474,10 @@ func (gw *Gateway) processSpec(spec *APISpec, apisByListen map[string]int,
 		}
 	}
 
-	chain = alice.New(chainArray...).Then(&DummyProxyHandler{SH: SuccessHandler{baseMid}, Gw: gw})
+	chain = alice.New(gw.mwProcessChain(chainArray, overrideChain)...).Then(&DummyProxyHandler{SH: SuccessHandler{baseMid}, Gw: gw})
 
 	if !spec.UseKeylessAccess {
-		var simpleArray []alice.Constructor
+		var simpleArray []TykMiddleware
 		gw.mwAppendEnabled(&simpleArray, &IPWhiteListMiddleware{baseMid})
 		gw.mwAppendEnabled(&simpleArray, &IPBlackListMiddleware{BaseMiddleware: baseMid})
 		gw.mwAppendEnabled(&simpleArray, &OrganizationMonitor{BaseMiddleware: baseMid, mon: Monitor{Gw: gw}})
@@ -482,15 +489,14 @@ func (gw *Gateway) processSpec(spec *APISpec, apisByListen map[string]int,
 		rateLimitPath := path.Join(spec.Proxy.ListenPath, rateLimitEndpoint)
 		logger.Debug("Rate limit endpoint is: ", rateLimitPath)
 
-		chainDef.RateLimitChain = alice.New(simpleArray...).
-			Then(http.HandlerFunc(userRatesCheck))
+		chainDef.RateLimitChain = alice.New(gw.mwProcessChain(simpleArray, overrideChain)...).Then(http.HandlerFunc(userRatesCheck))
 	}
 
 	logger.Debug("Setting Listen Path: ", spec.Proxy.ListenPath)
 
 	if trace.IsEnabled() { // trace.IsEnabled = check if opentracing is enabled
 		chainDef.ThisHandler = trace.Handle(spec.Name, chain)
-	} else if gw.GetConfig().OpenTelemetry.Enabled { // check if opentelemetry is enabled
+	} else if gwConfig.OpenTelemetry.Enabled { // check if opentelemetry is enabled
 		spanAttrs := []otel.SpanAttribute{}
 		spanAttrs = append(spanAttrs, otel.ApidefSpanAttributes(spec.APIDefinition)...)
 		chainDef.ThisHandler = otel.HTTPHandler(spec.Name, chain, gw.TracerProvider, spanAttrs...)

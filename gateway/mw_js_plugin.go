@@ -91,6 +91,10 @@ type DynamicMiddleware struct {
 	Auth                bool
 }
 
+func (d *DynamicMiddleware) Base() *BaseMiddleware {
+	return d.BaseMiddleware
+}
+
 func (d *DynamicMiddleware) Name() string {
 	return "DynamicMiddleware"
 }

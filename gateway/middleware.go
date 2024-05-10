@@ -98,15 +98,13 @@ func (tr TraceMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request,
 	return tr.TykMiddleware.ProcessRequest(w, r, conf)
 }
 
-func (gw *Gateway) createDynamicMiddleware(name string, isPre, useSession bool, baseMid *BaseMiddleware) func(http.Handler) http.Handler {
-	dMiddleware := &DynamicMiddleware{
+func (gw *Gateway) createDynamicMiddleware(name string, isPre, useSession bool, baseMid *BaseMiddleware) *DynamicMiddleware {
+	return &DynamicMiddleware{
 		BaseMiddleware:      baseMid,
 		MiddlewareClassName: name,
 		Pre:                 isPre,
 		UseSession:          useSession,
 	}
-
-	return gw.createMiddleware(dMiddleware)
 }
 
 // Generic middleware caller to make extension easier
@@ -204,12 +202,31 @@ func (gw *Gateway) createMiddleware(actualMW TykMiddleware) func(http.Handler) h
 	}
 }
 
-func (gw *Gateway) mwAppendEnabled(chain *[]alice.Constructor, mw TykMiddleware) bool {
-	if mw.EnabledForSpec() {
-		*chain = append(*chain, gw.createMiddleware(mw))
-		return true
+func (gw *Gateway) mwProcessChain(mws []TykMiddleware, override map[string]TykMiddleware) []alice.Constructor {
+	var result []alice.Constructor
+	for _, mw := range mws {
+		if !mw.EnabledForSpec() {
+			continue
+		}
+		if mwOverride, ok := override[mw.Name()]; ok {
+			mw = mwOverride
+		}
+
+		result = append(result, gw.createMiddleware(mw))
 	}
-	return false
+	return result
+}
+
+func (gw *Gateway) mwAppendEnabled(chain *[]TykMiddleware, mw TykMiddleware) bool {
+	ok := mw.EnabledForSpec()
+	if ok {
+		gw.mwAppend(chain, mw)
+	}
+	return ok
+}
+
+func (gw *Gateway) mwAppend(chain *[]TykMiddleware, mw TykMiddleware) {
+	*chain = append(*chain, mw)
 }
 
 func (gw *Gateway) responseMWAppendEnabled(chain *[]TykResponseHandler, responseMW TykResponseHandler) bool {
@@ -219,14 +236,6 @@ func (gw *Gateway) responseMWAppendEnabled(chain *[]TykResponseHandler, response
 	}
 
 	return false
-}
-
-func (gw *Gateway) mwList(mws ...TykMiddleware) []alice.Constructor {
-	var list []alice.Constructor
-	for _, mw := range mws {
-		gw.mwAppendEnabled(&list, mw)
-	}
-	return list
 }
 
 // BaseMiddleware wraps up the ApiSpec and Proxy objects to be included in a
