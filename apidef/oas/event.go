@@ -120,11 +120,12 @@ type EventHandlers []EventHandler
 
 // Fill fills EventHandlers from classic API definition. Currently only webhook events are supported.
 func (e *EventHandlers) Fill(api apidef.APIDefinition) {
+	events := EventHandlers{}
 	if len(api.EventHandlers.Events) == 0 {
+		*e = events
 		return
 	}
 
-	events := EventHandlers{}
 	for gwEvent, ehs := range api.EventHandlers.Events {
 		for _, eh := range ehs {
 			switch eh.Handler {
@@ -162,6 +163,12 @@ func (e *EventHandlers) Fill(api apidef.APIDefinition) {
 
 // ExtractTo EventHandlers events to apidef.APIDefinition.
 func (e *EventHandlers) ExtractTo(api *apidef.APIDefinition) {
+	if api.EventHandlers.Events == nil {
+		api.EventHandlers.Events = make(map[apidef.TykEvent][]apidef.EventHandlerTriggerConfig)
+	}
+
+	resetOASSupportedEventHandlers(api)
+
 	if e == nil {
 		return
 	}
@@ -169,12 +176,6 @@ func (e *EventHandlers) ExtractTo(api *apidef.APIDefinition) {
 	if len(*e) == 0 {
 		return
 	}
-
-	if api.EventHandlers.Events == nil {
-		api.EventHandlers.Events = make(map[apidef.TykEvent][]apidef.EventHandlerTriggerConfig)
-	}
-
-	resetOASSupportedEventHandlers(api)
 
 	for _, ev := range *e {
 		var (
@@ -214,6 +215,7 @@ func (e *EventHandlers) ExtractTo(api *apidef.APIDefinition) {
 func resetOASSupportedEventHandlers(api *apidef.APIDefinition) {
 	// this blocks helps with extracting OAS into APIDefinition.
 	// update this when new event handlers are added to OAS support.
+	eventHandlers := map[apidef.TykEvent][]apidef.EventHandlerTriggerConfig{}
 	for eventType, eventTriggers := range api.EventHandlers.Events {
 		triggersExcludingWebhooks := make([]apidef.EventHandlerTriggerConfig, 0)
 		for _, eventTrigger := range eventTriggers {
@@ -225,6 +227,10 @@ func resetOASSupportedEventHandlers(api *apidef.APIDefinition) {
 			triggersExcludingWebhooks = append(triggersExcludingWebhooks, eventTrigger)
 		}
 
-		api.EventHandlers.Events[eventType] = triggersExcludingWebhooks
+		if len(triggersExcludingWebhooks) > 0 {
+			eventHandlers[eventType] = triggersExcludingWebhooks
+		}
 	}
+
+	api.EventHandlers.Events = eventHandlers
 }
