@@ -110,6 +110,20 @@ func TestEventHandlers(t *testing.T) {
 					Events: map[apidef.TykEvent][]apidef.EventHandlerTriggerConfig{},
 				},
 			},
+			{
+				title: "nil event handlers",
+				input: nil,
+				expected: apidef.EventHandlerMetaConfig{
+					Events: map[apidef.TykEvent][]apidef.EventHandlerTriggerConfig{},
+				},
+			},
+			{
+				title: "empty event handlers",
+				input: EventHandlers{},
+				expected: apidef.EventHandlerMetaConfig{
+					Events: map[apidef.TykEvent][]apidef.EventHandlerTriggerConfig{},
+				},
+			},
 		}
 
 		for _, tc := range testcases {
@@ -130,9 +144,10 @@ func TestEventHandlers(t *testing.T) {
 
 	t.Run("fill", func(t *testing.T) {
 		testcases := []struct {
-			title    string
-			input    apidef.EventHandlerMetaConfig
-			expected EventHandlers
+			title            string
+			existingHandlers EventHandlers
+			input            apidef.EventHandlerMetaConfig
+			expected         EventHandlers
 		}{
 			{
 				title: "webhook",
@@ -206,6 +221,19 @@ func TestEventHandlers(t *testing.T) {
 				input:    apidef.EventHandlerMetaConfig{},
 				expected: nil,
 			},
+			{
+				title: "set eventHandlers to be empty from classic API def, when OAS is not empty",
+				existingHandlers: EventHandlers{
+					{
+						Enabled: true,
+						Trigger: event.BreakerTriggered,
+						Kind:    WebhookKind,
+						ID:      "random-id",
+					},
+				},
+				input:    apidef.EventHandlerMetaConfig{},
+				expected: nil,
+			},
 		}
 
 		for _, tc := range testcases {
@@ -215,7 +243,9 @@ func TestEventHandlers(t *testing.T) {
 
 				var api apidef.APIDefinition
 				api.EventHandlers = tc.input
-				server := new(Server)
+				server := Server{
+					EventHandlers: tc.existingHandlers,
+				}
 				server.EventHandlers.Fill(api)
 
 				assert.ElementsMatch(t, tc.expected, server.EventHandlers)
