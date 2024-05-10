@@ -205,11 +205,11 @@ func (gw *Gateway) createMiddleware(actualMW TykMiddleware) func(http.Handler) h
 func (gw *Gateway) mwProcessChain(mws []TykMiddleware, override map[string]TykMiddleware) []alice.Constructor {
 	var result []alice.Constructor
 	for _, mw := range mws {
-		if !mw.EnabledForSpec() {
-			continue
-		}
 		if mwOverride, ok := override[mw.Name()]; ok {
 			mw = mwOverride
+		}
+		if !mw.EnabledForSpec() {
+			continue
 		}
 
 		result = append(result, gw.createMiddleware(mw))
