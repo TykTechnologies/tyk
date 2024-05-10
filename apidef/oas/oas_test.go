@@ -286,6 +286,8 @@ func TestOAS_ExtractTo_ResetAPIDefinition(t *testing.T) {
 		"APIDefinition.GraphQL.Proxy.SubscriptionType",
 		"APIDefinition.GraphQL.Proxy.RequestHeaders[0]",
 		"APIDefinition.GraphQL.Proxy.UseResponseExtensions.OnErrorForwarding",
+		"APIDefinition.GraphQL.Proxy.RequestHeadersRewrite[0].Value",
+		"APIDefinition.GraphQL.Proxy.RequestHeadersRewrite[0].Remove",
 		"APIDefinition.GraphQL.Subgraph.SDL",
 		"APIDefinition.GraphQL.Supergraph.Subgraphs[0].APIID",
 		"APIDefinition.GraphQL.Supergraph.Subgraphs[0].Name",

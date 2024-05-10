@@ -6,6 +6,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/header"
 )
@@ -29,17 +31,29 @@ func TestNewValid(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
-	h := &WebHookHandler{Gw: ts.Gw}
-	err := h.Init(map[string]interface{}{
+	conf := map[string]interface{}{
+		"disabled":      false,
 		"method":        "POST",
 		"target_path":   testHttpPost,
 		"template_path": "../templates/default_webhook.json",
 		"header_map":    map[string]string{"X-Tyk-Test-Header": "Tyk v1.BANANA"},
 		"event_timeout": 10,
-	})
-	if err != nil {
-		t.Error("Webhook Handler should have created valid configuration")
 	}
+
+	t.Run("enabled", func(t *testing.T) {
+		h := &WebHookHandler{Gw: ts.Gw}
+		err := h.Init(conf)
+		assert.NoError(t, err)
+		assert.False(t, h.conf.Disabled)
+	})
+
+	t.Run("disabled", func(t *testing.T) {
+		conf["disabled"] = true
+		h := &WebHookHandler{Gw: ts.Gw}
+		err := h.Init(conf)
+		assert.NoError(t, err)
+		assert.True(t, h.conf.Disabled)
+	})
 }
 
 func TestNewInvalid(t *testing.T) {
