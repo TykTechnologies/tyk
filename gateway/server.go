@@ -1582,7 +1582,10 @@ func Start() {
 		os.Exit(0)
 	}
 
-	// https://github.com/golang/go/issues/63413
+	// With go 1.22 a few ciphers have been deprecated by the golang team due to security concerns
+	// To mitigate this, we need to set the GODEBUG environment variable to re-enable the deprecated ciphers
+	// to ensure that our clients can still upgrade to the lastest version of Tyk without any functionality breaking
+	// For more details see: https://github.com/golang/go/issues/63413
 	if os.Getenv("GODEBUG") == "" {
 		os.Setenv("GODEBUG", "tlsrsakex=1")
 	} else {
