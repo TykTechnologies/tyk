@@ -1604,6 +1604,13 @@ func Start() {
 		os.Exit(0)
 	}
 
+	// https://github.com/golang/go/issues/63413
+	if os.Getenv("GODEBUG") == "" {
+		os.Setenv("GODEBUG", "tlsrsakex=1")
+	} else {
+		os.Setenv("GODEBUG", "tlsrsakex=1,"+os.Getenv("GODEBUG"))
+	}
+
 	gwConfig := config.Config{}
 	if err := config.Load(confPaths, &gwConfig); err != nil {
 		mainLog.Errorf("Error loading config, using defaults: %v", err)
