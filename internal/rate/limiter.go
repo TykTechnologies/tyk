@@ -14,16 +14,16 @@ func Limiter(gwConfig *config.Config, redis redis.UniversalClient) limiter.Limit
 		return nil
 	}
 
-	res := limiter.NewLimiter(name, redis)
+	res := limiter.NewLimiter(redis)
 
-	switch {
-	case name == LimitLeakyBucket:
+	switch name {
+	case LimitLeakyBucket:
 		return res.LeakyBucket
-	case name == LimitTokenBucket:
+	case LimitTokenBucket:
 		return res.TokenBucket
-	case name == LimitFixedWindow:
+	case LimitFixedWindow:
 		return res.FixedWindow
-	case name == LimitSlidingWindow:
+	case LimitSlidingWindow:
 		return res.SlidingWindow
 	}
 

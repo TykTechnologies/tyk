@@ -2,7 +2,6 @@ package limiter
 
 import (
 	"context"
-	"strings"
 
 	"github.com/TykTechnologies/exp/pkg/limiters"
 
@@ -12,8 +11,7 @@ import (
 var ErrLimitExhausted = limiters.ErrLimitExhausted
 
 type Limiter struct {
-	prefix string
-	redis  redis.UniversalClient
+	redis redis.UniversalClient
 
 	lock   limiters.DistLocker
 	logger limiters.Logger
@@ -22,9 +20,8 @@ type Limiter struct {
 
 type LimiterFunc func(ctx context.Context, key string, rate float64, per float64) error
 
-func NewLimiter(prefix string, redis redis.UniversalClient) *Limiter {
+func NewLimiter(redis redis.UniversalClient) *Limiter {
 	return &Limiter{
-		prefix: prefix,
 		redis:  redis,
 		lock:   limiters.NewLockNoop(),
 		logger: limiters.NewStdLogger(),
@@ -34,26 +31,4 @@ func NewLimiter(prefix string, redis redis.UniversalClient) *Limiter {
 
 func (l *Limiter) redisLock(name string) limiters.DistLocker {
 	return limiters.NewLockRedis(redis.NewPool(l.redis), name+"-lock")
-}
-
-func Prefix(params ...string) string {
-	var res strings.Builder
-	var written int
-
-	for _, p := range params {
-		p = strings.Trim(p, "-")
-		if p == "" {
-			continue
-		}
-
-		if written == 0 {
-			res.Write([]byte(p))
-			written++
-			continue
-		}
-
-		res.Write([]byte("-"))
-		res.Write([]byte(p))
-	}
-	return res.String()
 }
