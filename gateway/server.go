@@ -1593,6 +1593,23 @@ func (gw *Gateway) getGlobalStorageHandler(keyPrefix string, hashKeys bool) stor
 	return &storage.RedisCluster{KeyPrefix: keyPrefix, HashKeys: hashKeys, ConnectionHandler: gw.StorageConnectionHandler}
 }
 
+func setGODEBUG() {
+	// With go 1.22 a few ciphers have been deprecated by the golang team due to security concerns
+	// To mitigate this, we need to set the GODEBUG environment variable to re-enable the deprecated ciphers
+	// to ensure that our clients can still upgrade to the lastest version of Tyk without any functionality breaking
+	// For more details see: https://github.com/golang/go/issues/63413
+	var goDebugVal string
+	if os.Getenv("GODEBUG") == "" {
+		goDebugVal = "tlsrsakex=1"
+	} else {
+		goDebugVal = "tlsrsakex=1," + os.Getenv("GODEBUG")
+	}
+	err := os.Setenv("GODEBUG", goDebugVal)
+	if err != nil {
+		mainLog.Warn("Could not set GODEBUG=tlsrsakex=1, some deprecated ciphers might stop working")
+	}
+}
+
 func Start() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -1604,15 +1621,7 @@ func Start() {
 		os.Exit(0)
 	}
 
-	// With go 1.22 a few ciphers have been deprecated by the golang team due to security concerns
-	// To mitigate this, we need to set the GODEBUG environment variable to re-enable the deprecated ciphers
-	// to ensure that our clients can still upgrade to the lastest version of Tyk without any functionality breaking
-	// For more details see: https://github.com/golang/go/issues/63413
-	if os.Getenv("GODEBUG") == "" {
-		os.Setenv("GODEBUG", "tlsrsakex=1")
-	} else {
-		os.Setenv("GODEBUG", "tlsrsakex=1,"+os.Getenv("GODEBUG"))
-	}
+	setGODEBUG()
 
 	gwConfig := config.Config{}
 	if err := config.Load(confPaths, &gwConfig); err != nil {

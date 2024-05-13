@@ -3,8 +3,6 @@ package gateway
 import (
 	"context"
 	"errors"
-	"fmt"
-	"net"
 	"testing"
 	"time"
 
@@ -362,4 +360,21 @@ func TestGatewayGetHostDetails(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestSetGODEBUG(t *testing.T) {
+	// Backup the current GODEBUG environment variable and restore it after the test
+	originalGODEBUG := os.Getenv("GODEBUG")
+	defer os.Setenv("GODEBUG", originalGODEBUG)
+
+	// Test when GODEBUG is not set
+	os.Unsetenv("GODEBUG")
+	setGODEBUG()
+
+	assert.Equal(t, "tlsrsakex=1", os.Getenv("GODEBUG"))
+
+	// Test when GODEBUG is already set
+	os.Setenv("GODEBUG", "existing_value")
+	setGODEBUG()
+	assert.Equal(t, "tlsrsakex=1,existing_value", os.Getenv("GODEBUG"))
 }
