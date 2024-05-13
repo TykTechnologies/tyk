@@ -41,6 +41,7 @@ func Prefix(params ...string) string {
 	var written int
 
 	for _, p := range params {
+		p = strings.Trim(p, "-")
 		if p == "" {
 			continue
 		}
