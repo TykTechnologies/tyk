@@ -34,8 +34,10 @@ const (
 	// QuotaKeyPrefix serves as a standard prefix for generating quota keys.
 	QuotaKeyPrefix = "quota-"
 
+	// RateLimitKeyPrefix serves as a standard prefix for generating rate limiter keys.
 	RateLimitKeyPrefix = rate.LimiterKeyPrefix
 
+	// SentinelRateLimitKeyPostfix is appended to the rate limiting key to combine into a sentinel key.
 	SentinelRateLimitKeyPostfix = ".BLOCKED"
 )
 

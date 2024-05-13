@@ -905,11 +905,15 @@ func TestMiniRequestObject_ReconstructParams(t *testing.T) {
 
 func TestJSVM_Auth(t *testing.T) {
 	for _, hashKeys := range []bool{true, false} {
-		testJSVM_Auth(t, hashKeys)
+		t.Run(fmt.Sprintf("hashKeys=%v", hashKeys), func(t *testing.T) {
+			testJSVM_Auth(t, hashKeys)
+		})
 	}
 }
 
 func testJSVM_Auth(t *testing.T, hashKeys bool) {
+	t.Helper()
+
 	ts := StartTest(func(c *config.Config) {
 		c.HashKeys = hashKeys
 	})

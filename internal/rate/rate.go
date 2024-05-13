@@ -5,8 +5,11 @@ import (
 )
 
 var (
+	// ErrLimitExhausted is returned when the request should be blocked.
 	ErrLimitExhausted = limiter.ErrLimitExhausted
-	Prefix            = limiter.Prefix
+
+	// Prefix is a utility function to generate rate limiter redis key names.
+	Prefix = limiter.Prefix
 )
 
 // The following constants enumerate implemented rate limiters.
