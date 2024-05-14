@@ -76,6 +76,10 @@ func (g *GraphQLEngineTransport) setProxyOnlyHeaders(proxyOnlyValues *GraphQLPro
 		}
 
 		for _, forwardedHeaderValue := range forwardedHeaderValues {
+			exitingHeader := r.Header.Get(forwardedHeaderKey)
+			if exitingHeader != "" {
+				r.Header.Del(forwardedHeaderKey)
+			}
 			r.Header.Add(forwardedHeaderKey, forwardedHeaderValue)
 		}
 	}
