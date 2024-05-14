@@ -124,21 +124,26 @@ func urlFromService(spec *APISpec, gw *Gateway) (*apidef.HostList, error) {
 // httpScheme matches http://* and https://*, case insensitive
 var httpScheme = regexp.MustCompile(`^(?i)https?://`)
 
+// EnsureTransport sanitizes host/protocol pairs and returns a valid URL.
 func EnsureTransport(host, protocol string) string {
 	host = strings.TrimSpace(host)
 	protocol = strings.TrimSpace(protocol)
+
+	// sanitize protocol
+	if protocol == "" {
+		protocol = "http"
+	}
+
+	// if host has no protocol, amend it
+	if !strings.Contains(host, "://") {
+		host = protocol + "://" + host
+	}
+
+	host = strings.Replace(host, "h2c://", "http://", 1)
+
 	u, err := url.Parse(host)
 	if err != nil {
 		return host
-	}
-	switch u.Scheme {
-	case "":
-		if protocol == "" {
-			protocol = "http"
-		}
-		u.Scheme = protocol
-	case "h2c":
-		u.Scheme = "http"
 	}
 	return u.String()
 }
