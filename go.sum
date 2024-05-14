@@ -49,6 +49,7 @@ github.com/TykTechnologies/goverify v0.0.0-20220808203004-1486f89e7708 h1:cmXjlM
 github.com/TykTechnologies/goverify v0.0.0-20220808203004-1486f89e7708/go.mod h1:mkS8jKcz8otdfEXhJs1QQ/DKoIY1NFFsRPKS0RwQENI=
 github.com/TykTechnologies/graphql-go-tools v1.6.2-0.20240307094213-c97832a5054b h1:2yI9WrfsLvDX8WqtbNUsMUAbJx7FuixrkwtUMa4nczo=
 github.com/TykTechnologies/graphql-go-tools v1.6.2-0.20240307094213-c97832a5054b/go.mod h1:ZWio73jm6W96BcZGmGZlKGZ+JGfjAaTwTdLQbpSeJz8=
+github.com/TykTechnologies/graphql-go-tools v1.6.2-0.20240514110121-f9fa4a18e042/go.mod h1:DCYkq1ZoUZ/pGESE+j3C7wuyDPSt1Mlu0jVgIoDABJY=
 github.com/TykTechnologies/graphql-go-tools/v2 v2.0.0-20240131151522-40a1ee2bbfc3 h1:AN/173UtBXp69KOYxv02wi4dySSz0BzGj57x5dwiMrA=
 github.com/TykTechnologies/graphql-go-tools/v2 v2.0.0-20240131151522-40a1ee2bbfc3/go.mod h1:2WzP19RkAqCmrNOJFRR+u9pYkccG1UHkBbxVySwtnG4=
 github.com/TykTechnologies/kin-openapi v0.90.0 h1:kHw0mtANwIpmlU6eCeeCgRMa52EiPPhEZPuHc3lKawo=
