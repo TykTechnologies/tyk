@@ -11,8 +11,8 @@ require (
 	github.com/TykTechnologies/goautosocket v0.0.0-20190430121222-97bfa5e7e481
 	github.com/TykTechnologies/gorpc v0.0.0-20241016124253-606484472fbb
 	github.com/TykTechnologies/goverify v0.0.0-20220808203004-1486f89e7708
-	github.com/TykTechnologies/graphql-go-tools v1.6.2-0.20241212110213-7724a3b64bb2
-	github.com/TykTechnologies/graphql-translator v0.0.0-20240319092712-4ba87e4c06ff
+	github.com/TykTechnologies/graphql-go-tools v1.6.2-0.20240514110121-f9fa4a18e042
+	github.com/TykTechnologies/leakybucket v0.0.0-20170301023702-71692c943e3c
 	github.com/TykTechnologies/murmur3 v0.0.0-20230310161213-aad17efd5632
 	github.com/TykTechnologies/openid2go v0.1.2
 	github.com/TykTechnologies/storage v1.2.2
@@ -81,7 +81,8 @@ require (
 require (
 	github.com/IBM/sarama v1.43.3
 	github.com/Jeffail/gabs/v2 v2.7.0
-	github.com/TykTechnologies/graphql-go-tools/v2 v2.0.0-20240509085643-e95cdc317e1d
+	github.com/TykTechnologies/graphql-go-tools/v2 v2.0.0-20240131151522-40a1ee2bbfc3
+	github.com/TykTechnologies/graphql-translator v0.0.0-20240319092712-4ba87e4c06ff
 	github.com/TykTechnologies/kin-openapi v0.90.0
 	github.com/TykTechnologies/opentelemetry v0.0.22
 	github.com/alecthomas/kingpin/v2 v2.4.0
