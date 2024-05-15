@@ -78,14 +78,11 @@ services:
             timeout: 3s
             interval: 1s
             retries: 60
-        image: kubeshop/tracetest:v0.12.2
+        image: kubeshop/tracetest:v1.0.0
         networks:
             default: null
         ports:
-            - mode: ingress
-              target: 11633
-              published: 11633
-              protocol: tcp
+            - 11633:11633
         volumes:
             - type: bind
               source: ./configs/tracetest/tracetest.yml
