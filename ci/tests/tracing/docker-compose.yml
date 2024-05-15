@@ -97,10 +97,20 @@ services:
         depends_on:
             - redis
 
+    tyk-checker:
+      image: badouralix/curl-jq
+      command: tail -f /dev/null
+      depends_on:
+        - tyk
+      healthcheck:
+        test: curl -s --fail http://tyk:8080/hello | jq --exit-status -n 'inputs | if has("status") then .status=="pass" else false end' > /dev/null || exit 1
+        interval: 5s
+        retries: 10
+        start_period: 4s
+        timeout: 10s
+
     redis:
         image: redis:4.0-alpine
-        ports:
-            - 6379:6379
         command: redis-server --appendonly yes
 
     httpbin:
