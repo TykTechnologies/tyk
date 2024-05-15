@@ -18,6 +18,8 @@ tasks:
     desc: "Print pre-flight info"
     cmds:
       - docker compose run --rm tyk version
+      - docker version
+      - docker compose ps
       - tracetest version
 
   setup:

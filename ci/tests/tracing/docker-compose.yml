@@ -19,7 +19,7 @@ services:
             - /otel-local-config.yml
         environment:
             TRACETEST_ENDPOINT: tracetest:4317
-        image: otel/opentelemetry-collector-contrib:0.80.0
+        image: otel/opentelemetry-collector-contrib:0.100.0
         ports:
             - 4317:4317
             - 4318:4318
@@ -65,8 +65,6 @@ services:
                 condition: service_healthy
         environment:
             TRACETEST_DEV: true
-        extra_hosts:
-            host.docker.internal: host-gateway
         healthcheck:
             test:
                 - CMD
