@@ -11,7 +11,14 @@ tasks:
       - defer:
           task: teardown
       - task: setup
+      - task: info
       - task: test
+
+  info:
+    desc: "Print pre-flight info"
+    cmds:
+      - docker compose run --rm tyk version
+      - tracetest version
 
   setup:
     desc: "setup e2e opentelemetry tests"

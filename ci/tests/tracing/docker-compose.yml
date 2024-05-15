@@ -1,3 +1,5 @@
+# yamllint disable rule:line-length
+---
 services:
     cache:
         healthcheck:
@@ -9,9 +11,8 @@ services:
             interval: 1s
             retries: 60
         image: redis:6
-        networks:
-            default: null
         restart: unless-stopped
+
     otel-collector:
         command:
             - --config
@@ -22,14 +23,13 @@ services:
         ports:
             - 4317:4317
             - 4318:4318
-        networks:
-            default: null
         volumes:
             - type: bind
               source: ./configs/otelcollector/collector.config.yml
               target: /otel-local-config.yml
               bind:
                 create_host_path: true
+
     postgres:
         environment:
             POSTGRES_PASSWORD: postgres
@@ -42,8 +42,7 @@ services:
             interval: 1s
             retries: 60
         image: postgres:14
-        networks:
-            default: null
+
     queue:
         healthcheck:
             test:
@@ -53,9 +52,8 @@ services:
             interval: 1s
             retries: 60
         image: rabbitmq:3.8-management
-        networks:
-            default: null
         restart: unless-stopped
+
     tracetest:
         command:
             - --provisioning-file
@@ -79,8 +77,7 @@ services:
             interval: 1s
             retries: 60
         image: kubeshop/tracetest:v1.0.0
-        networks:
-            default: null
+        platform: linux/amd64
         ports:
             - 11633:11633
         volumes:
@@ -90,10 +87,9 @@ services:
             - type: bind
               source: ./configs/tracetest/tracetest-provision.yml
               target: /app/provision.yml
+
     tyk:
         image: ${GATEWAY_IMAGE:-internal/tyk-gateway}
-        networks:
-            default: null
         ports:
             - 9000:8080
         env_file:
@@ -102,23 +98,17 @@ services:
             - ${TYK_APPS:-./apps}:/opt/tyk-gateway/apps
         depends_on:
             - redis
+
     redis:
         image: redis:4.0-alpine
-        networks:
-            default: null
         ports:
             - 6379:6379
         command: redis-server --appendonly yes
+
     httpbin:
         image: kennethreitz/httpbin:latest
-        networks:
-            default: null
+
     grpcapi:
         image: romk/grpc-helloworld-reflection
-        networks:
-            default: null
         ports:
             - 50001:50051
-networks:
-    default:
-        name: _default
