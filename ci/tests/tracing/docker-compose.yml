@@ -24,11 +24,7 @@ services:
             - 4317:4317
             - 4318:4318
         volumes:
-            - type: bind
-              source: ./configs/otelcollector/collector.config.yml
-              target: /otel-local-config.yml
-              bind:
-                create_host_path: true
+            - ./configs/otelcollector/collector.config.yml:/otel-local-config.yml
 
     postgres:
         environment:
@@ -59,6 +55,8 @@ services:
             - --provisioning-file
             - /app/provision.yml
         depends_on:
+            tyk-checker:
+                condition: service_healthy
             otel-collector:
                 condition: service_started
             postgres:
@@ -93,7 +91,7 @@ services:
         env_file:
             - ./configs/tyk.env
         volumes:
-            - ${TYK_APPS:-./apps}:/opt/tyk-gateway/apps
+            - ./apps:/opt/tyk-gateway/apps
         depends_on:
             - redis
 
@@ -110,7 +108,7 @@ services:
         timeout: 10s
 
     redis:
-        image: redis:4.0-alpine
+        image: redis:6
         command: redis-server --appendonly yes
 
     httpbin:

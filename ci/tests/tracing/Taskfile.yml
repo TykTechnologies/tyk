@@ -33,21 +33,21 @@ tasks:
     deps: [ setup ]
     cmds:
       - docker compose logs -f &
-      - tracetest test run -d ./scenarios/tyk_test_200.yml -w -o pretty
-      - tracetest test run -d ./scenarios/tyk_test_500.yml -w -o pretty
-      - tracetest test run -d ./scenarios/tyk_testauth_401.yml -w -o pretty
-      - tracetest test run -d ./scenarios/tyk_tykprotocol_200.yml -w -o pretty
-      - tracetest test run -d ./scenarios/tyk_tykprotocol-auth_401.yml -w -o pretty
-      - tracetest test run -d ./scenarios/tyk_grpcapi_200.yml -w -o pretty
-      - tracetest test run -d ./scenarios/tyk_versioned_200.yml -w -o pretty
-      - tracetest test run -d ./scenarios/tyk_versioned_403.yml -w -o pretty
-      - tracetest test run -d ./scenarios/tyk_versioned_not_detailed_200.yml -w -o pretty
-      - tracetest test run -d ./scenarios/tyk_versioned_not_detailed_403.yml -w -o pretty
-      - tracetest test run -d ./scenarios/tyk_test-graphql-tracing_200.yml -w -o pretty
-      - tracetest test run -d ./scenarios/tyk_test-graphql-tracing_400.yml -w -o pretty
-      - tracetest test run -d ./scenarios/tyk_test-graphql-tracing-invalid_404.yml -w -o pretty
-      - tracetest test run -d ./scenarios/tyk_test-graphql-detailed-tracing-disabled_200.yaml -w -o pretty
-      - tracetest test run -d ./scenarios/tyk_test-graphql-detailed-tracing-disabled_400.yaml -w -o pretty
+      - tracetest run test -f ./scenarios/tyk_test_200.yml -o pretty
+      - tracetest run test -f ./scenarios/tyk_test_500.yml -o pretty
+      - tracetest run test -f ./scenarios/tyk_testauth_401.yml -o pretty
+      - tracetest run test -f ./scenarios/tyk_tykprotocol_200.yml -o pretty
+      - tracetest run test -f ./scenarios/tyk_tykprotocol-auth_401.yml -o pretty
+      - tracetest run test -f ./scenarios/tyk_grpcapi_200.yml -o pretty
+      - tracetest run test -f ./scenarios/tyk_versioned_200.yml -o pretty
+      - tracetest run test -f ./scenarios/tyk_versioned_403.yml -o pretty
+      - tracetest run test -f ./scenarios/tyk_versioned_not_detailed_200.yml -o pretty
+      - tracetest run test -f ./scenarios/tyk_versioned_not_detailed_403.yml -o pretty
+      - tracetest run test -f ./scenarios/tyk_test-graphql-tracing_200.yml -o pretty
+      - tracetest run test -f ./scenarios/tyk_test-graphql-tracing_400.yml -o pretty
+      - tracetest run test -f ./scenarios/tyk_test-graphql-tracing-invalid_404.yml -o pretty
+      - tracetest run test -f ./scenarios/tyk_test-graphql-detailed-tracing-disabled_200.yaml -o pretty
+      - tracetest run test -f ./scenarios/tyk_test-graphql-detailed-tracing-disabled_400.yaml -o pretty
 
   teardown:
     desc: "teardown e2e opentelemetry tests enviroment"
