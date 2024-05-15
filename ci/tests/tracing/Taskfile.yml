@@ -43,4 +43,4 @@ tasks:
   teardown:
     desc: "teardown e2e opentelemetry tests enviroment"
     cmds:
-      - docker compose -f ci/tests/tracing/docker-compose.yml down --remove-orphans
+      - docker compose down --remove-orphans
