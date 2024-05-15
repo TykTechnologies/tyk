@@ -575,6 +575,47 @@ func TestGraphQLMiddleware_EngineMode(t *testing.T) {
 			}...)
 		})
 
+		t.Run("prioritize consumer's header value", func(t *testing.T) {
+			// See TT-11990
+			g.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+				spec.UseKeylessAccess = true
+				spec.GraphQL.Enabled = true
+				spec.GraphQL.ExecutionMode = apidef.GraphQLExecutionModeProxyOnly
+				spec.GraphQL.Version = apidef.GraphQLConfigVersion2
+				spec.GraphQL.Schema = gqlProxyUpstreamSchema
+				spec.GraphQL.Proxy.RequestHeaders = map[string]string{
+					"Authorization": "123abc",
+					"X-Tyk-Test":    "value-from-request-headers",
+				}
+				spec.Proxy.ListenPath = "/"
+				spec.Proxy.TargetURL = testGraphQLProxyUpstream
+			})
+
+			request := gql.Request{
+				Query: `{ hello(name: "World") httpMethod }`,
+			}
+
+			_, _ = g.Run(t, []test.TestCase{
+				{
+					Data:   request,
+					Method: http.MethodPost,
+					Headers: map[string]string{
+						"X-Tyk-Key":   "tyk-value",
+						"X-Other-Key": "other-value",
+						"X-Tyk-Test":  "value-from-consumer",
+					},
+					Code:      http.StatusOK,
+					BodyMatch: `{"data":{"hello":"World","httpMethod":"POST"}}`,
+					HeadersMatch: map[string]string{
+						"Authorization": "123abc",
+						"X-Tyk-Key":     "tyk-value",
+						"X-Other-Key":   "other-value",
+						"X-Tyk-Test":    "value-from-consumer",
+					},
+				},
+			}...)
+		})
+
 		t.Run("proxy-only return errors from upstream", func(t *testing.T) {
 			g.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 				spec.UseKeylessAccess = true
