@@ -1282,6 +1282,9 @@
               "$ref": "#/definitions/X-Tyk-EventHandlers"
             }
           ]
+        },
+        "contextVariables": {
+          "$ref": "#/definitions/X-Tyk-ContextVariables"
         }
       },
       "required": [
@@ -2017,6 +2020,17 @@
         "TokenCreated",
         "TokenUpdated",
         "TokenDeleted"
+      ]
+    },
+    "X-Tyk-ContextVariables": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "enabled"
       ]
     },
     "X-Tyk-UInt": {
