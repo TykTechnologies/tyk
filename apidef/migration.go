@@ -459,6 +459,8 @@ func (a *APIDefinition) SetDisabledFlags() {
 		a.GlobalRateLimit.Disabled = true
 	}
 
+	a.DoNotTrack = true
+
 	a.setEventHandlersDisabledFlags()
 }
 

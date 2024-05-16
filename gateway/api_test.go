@@ -3521,6 +3521,8 @@ func TestOAS(t *testing.T) {
 			assert.True(t, importedOAS.GetTykExtension().Server.ListenPath.Strip)
 			// ensure context variables are enabled by default in import
 			assert.True(t, importedOAS.GetTykMiddleware().Global.ContextVariables.Enabled)
+			// ensure traffic logs are enabled by default in import
+			assert.True(t, importedOAS.GetTykMiddleware().Global.TrafficLogs.Enabled)
 		})
 
 		t.Run("block when dashboard app config set to true", func(t *testing.T) {
