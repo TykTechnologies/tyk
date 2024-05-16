@@ -221,6 +221,10 @@ func (g *Global) Fill(api apidef.APIDefinition) {
 		g.TransformResponseHeaders = nil
 	}
 
+	g.fillContextVariables(api)
+}
+
+func (g *Global) fillContextVariables(api apidef.APIDefinition) {
 	if g.ContextVariables == nil {
 		g.ContextVariables = &ContextVariables{}
 	}
@@ -268,14 +272,7 @@ func (g *Global) ExtractTo(api *apidef.APIDefinition) {
 
 	g.extractResponsePluginsTo(api)
 
-	if g.ContextVariables == nil {
-		g.ContextVariables = &ContextVariables{}
-		defer func() {
-			g.ContextVariables = nil
-		}()
-	}
-
-	g.ContextVariables.ExtractTo(api)
+	g.extractContextVariablesTo(api)
 
 	if g.TransformRequestHeaders == nil {
 		g.TransformRequestHeaders = &TransformHeaders{}
@@ -312,6 +309,17 @@ func (g *Global) ExtractTo(api *apidef.APIDefinition) {
 	vInfo.GlobalResponseHeaders = resHeaderMeta.AddHeaders
 	vInfo.GlobalResponseHeadersRemove = resHeaderMeta.DeleteHeaders
 	api.VersionData.Versions[Main] = vInfo
+}
+
+func (g *Global) extractContextVariablesTo(api *apidef.APIDefinition) {
+	if g.ContextVariables == nil {
+		g.ContextVariables = &ContextVariables{}
+		defer func() {
+			g.ContextVariables = nil
+		}()
+	}
+
+	g.ContextVariables.ExtractTo(api)
 }
 
 func (g *Global) extractPrePluginsTo(api *apidef.APIDefinition) {
