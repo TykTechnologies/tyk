@@ -9,7 +9,7 @@ GOINSTALL=$(GOCMD) install
 BINARY_NAME=tyk
 BINARY_LINUX=tyk
 BUILD_PLATFORM=linux/amd64
-TAGS=coprocess grpc goplugin dev
+TAGS=coprocess grpc goplugin
 CONF=tyk.conf
 
 TEST_REGEX=.
