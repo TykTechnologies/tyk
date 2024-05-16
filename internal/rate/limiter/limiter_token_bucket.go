@@ -17,14 +17,12 @@ func (l *Limiter) TokenBucket(ctx context.Context, key string, rate float64, per
 		raceCheck = false
 	)
 
-	rateLimitPrefix := Prefix(l.prefix, key)
-
 	if l.redis != nil {
-		locker = l.redisLock(l.prefix)
-		storage = limiters.NewTokenBucketRedis(l.redis, rateLimitPrefix, ttl, raceCheck)
+		locker = l.redisLock(key)
+		storage = limiters.NewTokenBucketRedis(l.redis, key, ttl, raceCheck)
 	} else {
 		locker = l.lock
-		storage = limiters.LocalTokenBucket(rateLimitPrefix)
+		storage = limiters.LocalTokenBucket(key)
 	}
 
 	limiter := limiters.NewTokenBucket(capacity, ttl, locker, storage, l.clock, l.logger)
