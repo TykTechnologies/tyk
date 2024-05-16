@@ -95,6 +95,8 @@ services:
               target: /app/provision.yml
     tyk:
         image: ${GATEWAY_IMAGE:-internal/tyk-gateway}
+        environment:
+            - TYK_LOGLEVEL=debug
         networks:
             default: null
         ports:
