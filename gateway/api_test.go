@@ -3051,6 +3051,12 @@ func TestOAS(t *testing.T) {
 			}
 
 			expectedTykExt.Middleware = &oas.Middleware{
+				// context variables are enabled by default on OAS APIs, during import/create API.
+				Global: &oas.Global{
+					ContextVariables: &oas.ContextVariables{
+						Enabled: true,
+					},
+				},
 				Operations: oas.Operations{
 					"petsGET": {
 						Allow: &oas.Allowance{
@@ -3110,6 +3116,12 @@ func TestOAS(t *testing.T) {
 				Name:    customDomain,
 			}
 			expectedTykExt.Middleware = &oas.Middleware{
+				// context variables are enabled by default on OAS APIs, during import/create API.
+				Global: &oas.Global{
+					ContextVariables: &oas.ContextVariables{
+						Enabled: true,
+					},
+				},
 				Operations: oas.Operations{
 					"petsGET": {
 						Allow: &oas.Allowance{
