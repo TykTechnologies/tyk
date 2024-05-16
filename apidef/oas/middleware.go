@@ -223,15 +223,12 @@ func (g *Global) Fill(api apidef.APIDefinition) {
 
 	if g.ContextVariables == nil {
 		g.ContextVariables = &ContextVariables{}
-		// special case, do ShouldOmit omit check only if s.ContextVariables was nil.
-		defer func() {
-			if ShouldOmit(g.ContextVariables) {
-				g.ContextVariables = nil
-			}
-		}()
 	}
 
 	g.ContextVariables.Fill(api)
+	if ShouldOmit(g.ContextVariables) {
+		g.ContextVariables = nil
+	}
 }
 
 // ExtractTo extracts *Global into *apidef.APIDefinition.
