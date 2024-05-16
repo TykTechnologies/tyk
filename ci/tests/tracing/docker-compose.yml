@@ -1,3 +1,5 @@
+# yamllint disable rule:line-length
+---
 services:
     cache:
         healthcheck:
@@ -9,27 +11,21 @@ services:
             interval: 1s
             retries: 60
         image: redis:6
-        networks:
-            default: null
         restart: unless-stopped
+
     otel-collector:
         command:
             - --config
             - /otel-local-config.yml
         environment:
             TRACETEST_ENDPOINT: tracetest:4317
-        image: otel/opentelemetry-collector-contrib:0.80.0
+        image: otel/opentelemetry-collector-contrib:0.100.0
         ports:
             - 4317:4317
             - 4318:4318
-        networks:
-            default: null
         volumes:
-            - type: bind
-              source: ./configs/otelcollector/collector.config.yml
-              target: /otel-local-config.yml
-              bind:
-                create_host_path: true
+            - ./configs/otelcollector/collector.config.yml:/otel-local-config.yml
+
     postgres:
         environment:
             POSTGRES_PASSWORD: postgres
@@ -42,8 +38,7 @@ services:
             interval: 1s
             retries: 60
         image: postgres:14
-        networks:
-            default: null
+
     queue:
         healthcheck:
             test:
@@ -53,22 +48,21 @@ services:
             interval: 1s
             retries: 60
         image: rabbitmq:3.8-management
-        networks:
-            default: null
         restart: unless-stopped
+
     tracetest:
         command:
             - --provisioning-file
             - /app/provision.yml
         depends_on:
+            tyk-checker:
+                condition: service_healthy
             otel-collector:
                 condition: service_started
             postgres:
                 condition: service_healthy
         environment:
             TRACETEST_DEV: true
-        extra_hosts:
-            host.docker.internal: host-gateway
         healthcheck:
             test:
                 - CMD
@@ -78,14 +72,10 @@ services:
             timeout: 3s
             interval: 1s
             retries: 60
-        image: kubeshop/tracetest:v0.12.2
-        networks:
-            default: null
+        image: kubeshop/tracetest:v1.0.0
+        platform: linux/amd64
         ports:
-            - mode: ingress
-              target: 11633
-              published: 11633
-              protocol: tcp
+            - 11633:11633
         volumes:
             - type: bind
               source: ./configs/tracetest/tracetest.yml
@@ -93,35 +83,38 @@ services:
             - type: bind
               source: ./configs/tracetest/tracetest-provision.yml
               target: /app/provision.yml
+
     tyk:
         image: ${GATEWAY_IMAGE:-internal/tyk-gateway}
-        networks:
-            default: null
         ports:
             - 9000:8080
         env_file:
             - ./configs/tyk.env
         volumes:
-            - ${TYK_APPS:-./apps}:/opt/tyk-gateway/apps
+            - ./apps:/opt/tyk-gateway/apps
         depends_on:
             - redis
+
+    tyk-checker:
+      image: badouralix/curl-jq
+      command: tail -f /dev/null
+      depends_on:
+        - tyk
+      healthcheck:
+        test: curl -s --fail http://tyk:8080/hello | jq --exit-status -n 'inputs | if has("status") then .status=="pass" else false end' > /dev/null || exit 1
+        interval: 5s
+        retries: 10
+        start_period: 4s
+        timeout: 10s
+
     redis:
-        image: redis:4.0-alpine
-        networks:
-            default: null
-        ports:
-            - 6379:6379
+        image: redis:6
         command: redis-server --appendonly yes
+
     httpbin:
         image: kennethreitz/httpbin:latest
-        networks:
-            default: null
+
     grpcapi:
         image: romk/grpc-helloworld-reflection
-        networks:
-            default: null
         ports:
             - 50001:50051
-networks:
-    default:
-        name: _default

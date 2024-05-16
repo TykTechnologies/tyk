@@ -32,9 +32,9 @@ jobs:
       fail-fast: false
       matrix:
         golang_cross:
-          - 1.21-bullseye
+          - 1.22-bullseye
         include:
-          - golang_cross: 1.21-bullseye
+          - golang_cross: 1.22-bullseye
             goreleaser: 'ci/goreleaser/goreleaser.yml'
             cgo: 1
             rpmvers: 'el/7 el/8 el/9 amazon/2 amazon/2023'
@@ -70,9 +70,9 @@ jobs:
           path: |
             ~/.cache/go-build
             ~/go/pkg/mod
-          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          key: ${{ runner.os }}-${{ matrix.golang_cross }}-go-${{ hashFiles('**/go.sum') }}
           restore-keys: |
-            ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+            ${{ runner.os }}-${{ matrix.golang_cross }}-go-${{ hashFiles('**/go.sum') }}
       - name: Build
         env:
           NFPM_STD_PASSPHRASE: ${{ secrets.SIGNING_KEY_PASSPHRASE }}
@@ -83,7 +83,8 @@ jobs:
           ci/bin/unlock-agent.sh
           git config --global url."https://${{ secrets.ORG_GH_TOKEN }}@github.com".insteadOf "https://github.com"
           git config --global --add safe.directory /go/src/github.com/TykTechnologies/tyk
-          goreleaser release --clean -f ${{ matrix.goreleaser }} ${{ !startsWith(github.ref, 'refs/tags/') && ' --snapshot --skip=sign' || '' }}' | tee /tmp/build.sh
+          go env
+          goreleaser release --debug --clean -f ${{ matrix.goreleaser }} ${{ !startsWith(github.ref, 'refs/tags/') && ' --snapshot --skip=sign' || '' }}' | tee /tmp/build.sh
           chmod +x /tmp/build.sh
           docker run --rm --privileged -e GITHUB_TOKEN=${{ github.token }} \
           -e GOPRIVATE=github.com/TykTechnologies                                \
@@ -113,12 +114,12 @@ jobs:
           mask-aws-account-id: false
       - uses: aws-actions/amazon-ecr-login@v2
         id: ecr
-        if: ${{ matrix.golang_cross == '1.21-bullseye' }}
+        if: ${{ matrix.golang_cross == '1.22-bullseye' }}
         with:
           mask-password: 'true'
       - name: Docker metadata for CI
         id: ci_metadata
-        if: ${{ matrix.golang_cross == '1.21-bullseye' }}
+        if: ${{ matrix.golang_cross == '1.22-bullseye' }}
         uses: docker/metadata-action@v5
         with:
           images: ${{ steps.ecr.outputs.registry }}/tyk
@@ -131,7 +132,7 @@ jobs:
             type=semver,pattern=v{{major}}.{{minor}},prefix=v
             type=semver,pattern=v{{version}},prefix=v
       - name: CI push
-        if: ${{ matrix.golang_cross == '1.21-bullseye' }}
+        if: ${{ matrix.golang_cross == '1.22-bullseye' }}
         shell: bash
         env:
           t: ${{ steps.ci_metadata.outputs.tags }}
@@ -146,7 +147,7 @@ jobs:
              docker manifest create ${tag} ${tag}-amd64 ${tag}-arm64 && docker manifest push ${tag}
           done
       - uses: actions/upload-artifact@v4
-        if: ${{ matrix.golang_cross == '1.21-bullseye' }}
+        if: ${{ matrix.golang_cross == '1.22-bullseye' }}
         with:
           name: deb
           retention-days: 1
@@ -154,7 +155,7 @@ jobs:
             dist/*.deb
             !dist/*PAYG*.deb
       - uses: actions/upload-artifact@v4
-        if: ${{ matrix.golang_cross == '1.21-bullseye' }}
+        if: ${{ matrix.golang_cross == '1.22-bullseye' }}
         with:
           name: rpm
           retention-days: 1

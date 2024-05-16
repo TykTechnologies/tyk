@@ -11,6 +11,7 @@ if [[ -z "$OPTS" ]]; then
 fi
 
 export PKG_PATH=${GOPATH}/src/github.com/TykTechnologies/tyk
+export GODEBUG=tlsrsakex=1
 
 # exit on non-zero exit from go test/vet
 set -e

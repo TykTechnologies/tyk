@@ -1,22 +1,24 @@
-exporters:
-    otlp/1:
-        endpoint: tracetest:4317
-        tls:
-            insecure: true
-processors:
-    batch:
-        timeout: 100ms
 receivers:
-    otlp:
-        protocols:
-            grpc: null
-            http: null
+  otlp:
+    protocols:
+      grpc:
+      http:
+
+processors:
+  batch:
+    timeout: 100ms
+
+exporters:
+  logging:
+    loglevel: debug
+  otlp/1:
+    endpoint: tracetest:4317
+    tls:
+      insecure: true
+
 service:
-    pipelines:
-        traces/1:
-            exporters:
-                - otlp/1
-            processors:
-                - batch
-            receivers:
-                - otlp
+  pipelines:
+    traces/1:
+      receivers: [ otlp ]
+      processors: [ batch ]
+      exporters: [ otlp/1 ]
