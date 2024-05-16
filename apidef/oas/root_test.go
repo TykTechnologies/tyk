@@ -182,7 +182,7 @@ func TestXTykAPIGateway_EnableContextVariables(t *testing.T) {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			tc.in.EnableContextVariablesIfEmpty()
+			tc.in.enableContextVariablesIfEmpty()
 			assert.EqualExportedValues(t, tc.expect, tc.in)
 		})
 	}

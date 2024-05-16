@@ -65,6 +65,7 @@ func (s *OAS) BuildDefaultTykExtension(overRideValues TykExtensionConfigParams, 
 		xTykAPIGateway.Info.State.Active = true
 		xTykAPIGateway.Info.State.Internal = false
 		xTykAPIGateway.Server.ListenPath.Strip = true
+		xTykAPIGateway.enableContextVariablesIfEmpty()
 	}
 
 	if xTykAPIGateway.Info.Name == "" {
