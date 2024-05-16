@@ -430,7 +430,6 @@ func MigrateAndFillOAS(api *apidef.APIDefinition) (APIDef, []APIDef, error) {
 
 func newOASFromClassicAPIDefinition(api *apidef.APIDefinition) (*OAS, error) {
 	api.IsOAS = true
-	api.EnableContextVars = true
 	var oas OAS
 	oas.Fill(*api)
 	oas.setRequiredFields(api.Name, api.VersionName)

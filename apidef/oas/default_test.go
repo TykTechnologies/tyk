@@ -48,6 +48,13 @@ func TestOAS_BuildDefaultTykExtension(t *testing.T) {
 					Active: true,
 				},
 			},
+			Middleware: &Middleware{
+				Global: &Global{
+					ContextVariables: &ContextVariables{
+						Enabled: true,
+					},
+				},
+			},
 		}
 
 		assert.Equal(t, expectedTykExtension, *oasDef.GetTykExtension())
@@ -94,6 +101,13 @@ func TestOAS_BuildDefaultTykExtension(t *testing.T) {
 				Name: "OAS API",
 				State: State{
 					Active: true,
+				},
+			},
+			Middleware: &Middleware{
+				Global: &Global{
+					ContextVariables: &ContextVariables{
+						Enabled: true,
+					},
 				},
 			},
 		}
@@ -145,6 +159,13 @@ func TestOAS_BuildDefaultTykExtension(t *testing.T) {
 				Name: "New OAS API",
 				State: State{
 					Active: true,
+				},
+			},
+			Middleware: &Middleware{
+				Global: &Global{
+					ContextVariables: &ContextVariables{
+						Enabled: true,
+					},
 				},
 			},
 		}
@@ -253,6 +274,13 @@ func TestOAS_BuildDefaultTykExtension(t *testing.T) {
 				Name: "New OAS API",
 				State: State{
 					Active: true,
+				},
+			},
+			Middleware: &Middleware{
+				Global: &Global{
+					ContextVariables: &ContextVariables{
+						Enabled: true,
+					},
 				},
 			},
 		}
@@ -961,7 +989,14 @@ func TestOAS_BuildDefaultTykExtension(t *testing.T) {
 					err := oasDef.BuildDefaultTykExtension(tykExtensionConfigParams, true)
 
 					assert.NoError(t, err)
-					assert.Nil(t, oasDef.GetTykExtension().Middleware)
+					assert.EqualValues(t, &Middleware{
+						Global: &Global{
+							ContextVariables: &ContextVariables{
+								Enabled: true,
+							},
+						},
+						Operations: Operations{},
+					}, oasDef.GetTykExtension().Middleware)
 				})
 		})
 
@@ -975,7 +1010,14 @@ func TestOAS_BuildDefaultTykExtension(t *testing.T) {
 				err := oasDef.BuildDefaultTykExtension(tykExtensionConfigParams, true)
 
 				assert.NoError(t, err)
-				assert.Nil(t, oasDef.GetTykExtension().Middleware)
+				assert.EqualValues(t, &Middleware{
+					Global: &Global{
+						ContextVariables: &ContextVariables{
+							Enabled: true,
+						},
+					},
+					Operations: Operations{},
+				}, oasDef.GetTykExtension().Middleware)
 			})
 
 			t.Run("do not configure MockResponse if no valid examples/example/schema found but configured response",
@@ -998,7 +1040,14 @@ func TestOAS_BuildDefaultTykExtension(t *testing.T) {
 					err := oasDef.BuildDefaultTykExtension(tykExtensionConfigParams, true)
 
 					assert.NoError(t, err)
-					assert.Nil(t, oasDef.GetTykExtension().Middleware)
+					assert.EqualValues(t, &Middleware{
+						Global: &Global{
+							ContextVariables: &ContextVariables{
+								Enabled: true,
+							},
+						},
+						Operations: Operations{},
+					}, oasDef.GetTykExtension().Middleware)
 				})
 
 			t.Run("enable oasMockResponse for all paths when operationID is configured in OAS with valid examples in response",
@@ -1201,6 +1250,13 @@ func TestOAS_BuildDefaultTykExtension(t *testing.T) {
 		expectedTykExtension := existingTykExtension
 		expectedTykExtension.Server.ListenPath.Value = newListenPath
 		expectedTykExtension.Info.State.Active = true
+		expectedTykExtension.Middleware = &Middleware{
+			Global: &Global{
+				ContextVariables: &ContextVariables{
+					Enabled: true,
+				},
+			},
+		}
 
 		err := oasDef.BuildDefaultTykExtension(TykExtensionConfigParams{
 			ListenPath: newListenPath,
@@ -1284,6 +1340,13 @@ func TestOAS_BuildDefaultTykExtension(t *testing.T) {
 				Name: "OAS API",
 				State: State{
 					Active: true,
+				},
+			},
+			Middleware: &Middleware{
+				Global: &Global{
+					ContextVariables: &ContextVariables{
+						Enabled: true,
+					},
 				},
 			},
 		}
