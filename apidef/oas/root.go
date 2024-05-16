@@ -228,9 +228,9 @@ type VersionToID struct {
 	ID string `bson:"id" json:"id"`
 }
 
-// SetContextVariablesIfEmpty enables context variables in middleware.global.contextVariables.
+// EnableContextVariablesIfEmpty enables context variables in middleware.global.contextVariables.
 // Context variables will be set only if it is not set, if it is already set to false, it won't be enabled.
-func (x *XTykAPIGateway) SetContextVariablesIfEmpty() {
+func (x *XTykAPIGateway) EnableContextVariablesIfEmpty() {
 	if x.Middleware == nil {
 		x.Middleware = &Middleware{}
 	}
