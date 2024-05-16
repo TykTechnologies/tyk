@@ -54,9 +54,6 @@ func (x *XTykAPIGateway) ExtractTo(api *apidef.APIDefinition) {
 	}
 
 	x.Middleware.ExtractTo(api)
-
-	// will be always enabled
-	api.EnableContextVars = true
 }
 
 // Info contains the main metadata for the API definition.
