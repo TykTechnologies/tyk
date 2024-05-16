@@ -1064,8 +1064,8 @@ func (gw *Gateway) handleAddApi(r *http.Request, fs afero.Fs, oasEndpoint bool) 
 		}
 
 		// enable context variable by default for OAS APIs if not explicitly set to false.
-		if oasObj.GetTykExtension().Server.ContextVariables == nil {
-			oasObj.GetTykExtension().Server.ContextVariables = &oas.ContextVariables{Enabled: true}
+		if oasObj.GetTykMiddleware().Global.ContextVariables == nil {
+			oasObj.GetTykMiddleware().Global.ContextVariables = &oas.ContextVariables{Enabled: true}
 		}
 
 		oasObj.ExtractTo(&newDef)

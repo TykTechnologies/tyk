@@ -2616,7 +2616,7 @@ func TestOAS(t *testing.T) {
 	assert.NotNil(t, oasAPI.Servers)
 	// assert context variables are enabled when contextVariables are not configured in the payload
 	tykOASAPI := oas.OAS{T: oasAPI}
-	assert.True(t, tykOASAPI.GetTykExtension().Server.ContextVariables.Enabled)
+	assert.True(t, tykOASAPI.GetTykMiddleware().Global.ContextVariables.Enabled)
 
 	createdOldAPI := testGetOldAPI(t, ts, oldAPIID, "old api")
 	assert.NotNil(t, createdOldAPI)
@@ -2626,7 +2626,7 @@ func TestOAS(t *testing.T) {
 		apiID2 := "apiid-2"
 		tykExt := *copyOASAPI.GetTykExtension()
 		tykExt.Info.ID = apiID2
-		tykExt.Server.ContextVariables = &oas.ContextVariables{Enabled: false}
+		tykExt.Middleware.Global.ContextVariables = &oas.ContextVariables{Enabled: false}
 		copyOASAPI.SetTykExtension(&tykExt)
 		// Create OAS API
 		_, _ = ts.Run(t, test.TestCase{AdminAuth: true, Method: http.MethodPost, Path: oasBasePath, Data: &copyOASAPI,
@@ -2634,7 +2634,7 @@ func TestOAS(t *testing.T) {
 
 		ts.Gw.DoReload()
 		oasAPI = testGetOASAPI(t, ts, apiID2, "oas api", "oas doc")
-		assert.False(t, tykOASAPI.GetTykExtension().Server.ContextVariables.Enabled)
+		assert.False(t, tykOASAPI.GetTykMiddleware().Global.ContextVariables.Enabled)
 	})
 
 	t.Run("OAS validation - should fail without x-tyk-api-gateway", func(t *testing.T) {
@@ -3539,7 +3539,7 @@ func TestOAS(t *testing.T) {
 			importedOAS := oas.OAS{T: importT}
 			assert.True(t, importedOAS.GetTykExtension().Server.ListenPath.Strip)
 			// ensure context variables are enabled by default in import
-			assert.True(t, importedOAS.GetTykExtension().Server.ContextVariables.Enabled)
+			assert.True(t, importedOAS.GetTykMiddleware().Global.ContextVariables.Enabled)
 		})
 
 		t.Run("block when dashboard app config set to true", func(t *testing.T) {

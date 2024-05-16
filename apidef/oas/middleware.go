@@ -95,6 +95,9 @@ type Global struct {
 	// TransformResponseHeaders contains the configurations related to API level response header transformation.
 	// Tyk classic API definition: `global_response_headers`/`global_response_headers_remove`.
 	TransformResponseHeaders *TransformHeaders `bson:"transformResponseHeaders,omitempty" json:"transformResponseHeaders,omitempty"`
+
+	// ContextVariables contains the configuration related to Tyk context variables.
+	ContextVariables *ContextVariables `bson:"contextVariables,omitempty" json:"contextVariables,omitempty"`
 }
 
 // MarshalJSON is a custom JSON marshaler for the Global struct. It is implemented
@@ -217,6 +220,18 @@ func (g *Global) Fill(api apidef.APIDefinition) {
 	if ShouldOmit(g.TransformResponseHeaders) {
 		g.TransformResponseHeaders = nil
 	}
+
+	if g.ContextVariables == nil {
+		g.ContextVariables = &ContextVariables{}
+		// special case, do ShouldOmit omit check only if s.ContextVariables was nil.
+		defer func() {
+			if ShouldOmit(g.ContextVariables) {
+				g.ContextVariables = nil
+			}
+		}()
+	}
+
+	g.ContextVariables.Fill(api)
 }
 
 // ExtractTo extracts *Global into *apidef.APIDefinition.
@@ -255,6 +270,15 @@ func (g *Global) ExtractTo(api *apidef.APIDefinition) {
 	g.Cache.ExtractTo(&api.CacheOptions)
 
 	g.extractResponsePluginsTo(api)
+
+	if g.ContextVariables == nil {
+		g.ContextVariables = &ContextVariables{}
+		defer func() {
+			g.ContextVariables = nil
+		}()
+	}
+
+	g.ContextVariables.ExtractTo(api)
 
 	if g.TransformRequestHeaders == nil {
 		g.TransformRequestHeaders = &TransformHeaders{}
@@ -1477,4 +1501,21 @@ func (r *RequestSizeLimit) Fill(meta apidef.RequestSizeMeta) {
 func (r *RequestSizeLimit) ExtractTo(meta *apidef.RequestSizeMeta) {
 	meta.Disabled = !r.Enabled
 	meta.SizeLimit = r.Value
+}
+
+// ContextVariables holds the configuration related to Tyk context variables.
+type ContextVariables struct {
+	// Enabled enables context variables to be passed to Tyk middlewares.
+	// Tyk classic API definition: `enable_context_vars`.
+	Enabled bool `json:"enabled" bson:"enabled"`
+}
+
+// Fill fills *ContextVariables from apidef.APIDefinition.
+func (c *ContextVariables) Fill(api apidef.APIDefinition) {
+	c.Enabled = api.EnableContextVars
+}
+
+// ExtractTo extracts *ContextVariables into *apidef.APIDefinition.
+func (c *ContextVariables) ExtractTo(api *apidef.APIDefinition) {
+	api.EnableContextVars = c.Enabled
 }
