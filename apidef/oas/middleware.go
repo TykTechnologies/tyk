@@ -98,6 +98,9 @@ type Global struct {
 
 	// ContextVariables contains the configuration related to Tyk context variables.
 	ContextVariables *ContextVariables `bson:"contextVariables,omitempty" json:"contextVariables,omitempty"`
+
+	// TrafficLogs contains the configurations related to API level log analytics.
+	TrafficLogs *TrafficLogs `bson:"trafficLogs,omitempty" json:"trafficLogs,omitempty"`
 }
 
 // MarshalJSON is a custom JSON marshaler for the Global struct. It is implemented
@@ -222,6 +225,19 @@ func (g *Global) Fill(api apidef.APIDefinition) {
 	}
 
 	g.fillContextVariables(api)
+
+	g.fillTrafficLogs(api)
+}
+
+func (g *Global) fillTrafficLogs(api apidef.APIDefinition) {
+	if g.TrafficLogs == nil {
+		g.TrafficLogs = &TrafficLogs{}
+	}
+
+	g.TrafficLogs.Fill(api)
+	if ShouldOmit(g.TrafficLogs) {
+		g.TrafficLogs = nil
+	}
 }
 
 func (g *Global) fillContextVariables(api apidef.APIDefinition) {
@@ -274,6 +290,8 @@ func (g *Global) ExtractTo(api *apidef.APIDefinition) {
 
 	g.extractContextVariablesTo(api)
 
+	g.extractTrafficLogsTo(api)
+
 	if g.TransformRequestHeaders == nil {
 		g.TransformRequestHeaders = &TransformHeaders{}
 		defer func() {
@@ -309,6 +327,17 @@ func (g *Global) ExtractTo(api *apidef.APIDefinition) {
 	vInfo.GlobalResponseHeaders = resHeaderMeta.AddHeaders
 	vInfo.GlobalResponseHeadersRemove = resHeaderMeta.DeleteHeaders
 	api.VersionData.Versions[Main] = vInfo
+}
+
+func (g *Global) extractTrafficLogsTo(api *apidef.APIDefinition) {
+	if g.TrafficLogs == nil {
+		g.TrafficLogs = &TrafficLogs{}
+		defer func() {
+			g.TrafficLogs = nil
+		}()
+	}
+
+	g.TrafficLogs.ExtractTo(api)
 }
 
 func (g *Global) extractContextVariablesTo(api *apidef.APIDefinition) {
@@ -1506,6 +1535,23 @@ func (r *RequestSizeLimit) Fill(meta apidef.RequestSizeMeta) {
 func (r *RequestSizeLimit) ExtractTo(meta *apidef.RequestSizeMeta) {
 	meta.Disabled = !r.Enabled
 	meta.SizeLimit = r.Value
+}
+
+// TrafficLogs holds configuration about API log analytics.
+type TrafficLogs struct {
+	// Enabled enables traffic log analytics for the API.
+	// Tyk classic API definition: `do_not_track`.
+	Enabled bool `bson:"enabled" json:"enabled"`
+}
+
+// Fill fills *TrafficLogs from apidef.APIDefinition.
+func (t *TrafficLogs) Fill(api apidef.APIDefinition) {
+	t.Enabled = !api.DoNotTrack
+}
+
+// ExtractTo extracts *TrafficLogs into *apidef.APIDefinition.
+func (t *TrafficLogs) ExtractTo(api *apidef.APIDefinition) {
+	api.DoNotTrack = !t.Enabled
 }
 
 // ContextVariables holds the configuration related to Tyk context variables.

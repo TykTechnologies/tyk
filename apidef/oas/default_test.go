@@ -50,6 +50,9 @@ func TestOAS_BuildDefaultTykExtension(t *testing.T) {
 			},
 			Middleware: &Middleware{
 				Global: &Global{
+					TrafficLogs: &TrafficLogs{
+						Enabled: true,
+					},
 					ContextVariables: &ContextVariables{
 						Enabled: true,
 					},
@@ -105,6 +108,9 @@ func TestOAS_BuildDefaultTykExtension(t *testing.T) {
 			},
 			Middleware: &Middleware{
 				Global: &Global{
+					TrafficLogs: &TrafficLogs{
+						Enabled: true,
+					},
 					ContextVariables: &ContextVariables{
 						Enabled: true,
 					},
@@ -163,6 +169,9 @@ func TestOAS_BuildDefaultTykExtension(t *testing.T) {
 			},
 			Middleware: &Middleware{
 				Global: &Global{
+					TrafficLogs: &TrafficLogs{
+						Enabled: true,
+					},
 					ContextVariables: &ContextVariables{
 						Enabled: true,
 					},
@@ -278,6 +287,9 @@ func TestOAS_BuildDefaultTykExtension(t *testing.T) {
 			},
 			Middleware: &Middleware{
 				Global: &Global{
+					TrafficLogs: &TrafficLogs{
+						Enabled: true,
+					},
 					ContextVariables: &ContextVariables{
 						Enabled: true,
 					},
@@ -989,8 +1001,11 @@ func TestOAS_BuildDefaultTykExtension(t *testing.T) {
 					err := oasDef.BuildDefaultTykExtension(tykExtensionConfigParams, true)
 
 					assert.NoError(t, err)
-					assert.EqualValues(t, &Middleware{
+					assert.Equal(t, &Middleware{
 						Global: &Global{
+							TrafficLogs: &TrafficLogs{
+								Enabled: true,
+							},
 							ContextVariables: &ContextVariables{
 								Enabled: true,
 							},
@@ -1010,8 +1025,11 @@ func TestOAS_BuildDefaultTykExtension(t *testing.T) {
 				err := oasDef.BuildDefaultTykExtension(tykExtensionConfigParams, true)
 
 				assert.NoError(t, err)
-				assert.EqualValues(t, &Middleware{
+				assert.Equal(t, &Middleware{
 					Global: &Global{
+						TrafficLogs: &TrafficLogs{
+							Enabled: true,
+						},
 						ContextVariables: &ContextVariables{
 							Enabled: true,
 						},
@@ -1040,8 +1058,11 @@ func TestOAS_BuildDefaultTykExtension(t *testing.T) {
 					err := oasDef.BuildDefaultTykExtension(tykExtensionConfigParams, true)
 
 					assert.NoError(t, err)
-					assert.EqualValues(t, &Middleware{
+					assert.Equal(t, &Middleware{
 						Global: &Global{
+							TrafficLogs: &TrafficLogs{
+								Enabled: true,
+							},
 							ContextVariables: &ContextVariables{
 								Enabled: true,
 							},
@@ -1252,6 +1273,9 @@ func TestOAS_BuildDefaultTykExtension(t *testing.T) {
 		expectedTykExtension.Info.State.Active = true
 		expectedTykExtension.Middleware = &Middleware{
 			Global: &Global{
+				TrafficLogs: &TrafficLogs{
+					Enabled: true,
+				},
 				ContextVariables: &ContextVariables{
 					Enabled: true,
 				},
@@ -1344,6 +1368,9 @@ func TestOAS_BuildDefaultTykExtension(t *testing.T) {
 			},
 			Middleware: &Middleware{
 				Global: &Global{
+					TrafficLogs: &TrafficLogs{
+						Enabled: true,
+					},
 					ContextVariables: &ContextVariables{
 						Enabled: true,
 					},
@@ -1399,7 +1426,6 @@ func TestOAS_BuildDefaultTykExtension(t *testing.T) {
 		assert.NotNil(t, err)
 		assert.Contains(t, err.Error(), "server URL contains undefined variables")
 	})
-
 }
 
 func TestGetTykExtensionConfigParams(t *testing.T) {
