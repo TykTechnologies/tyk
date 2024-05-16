@@ -1,5 +1,5 @@
 http:
-  address: 0.0.0.0:5999
+  address: 127.0.0.1:5999
   enabled: true
   root_path: /benthos
   debug_endpoints: false
