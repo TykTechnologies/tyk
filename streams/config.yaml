@@ -1,0 +1,11 @@
+http:
+  address: 0.0.0.0:5999
+  enabled: true
+  root_path: /benthos
+  debug_endpoints: false
+  basic_auth:
+    enabled: false
+    username: "tyk"
+    password_hash: "6cec8efbde8cd9fd5311f7420d8d14df1cc7b583f822a08c97eb052d0965aef4"
+    algorithm: "sha256"
+    salt: ""

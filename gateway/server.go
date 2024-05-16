@@ -29,8 +29,10 @@ import (
 	"github.com/TykTechnologies/tyk/internal/httputil"
 	"github.com/TykTechnologies/tyk/internal/otel"
 	"github.com/TykTechnologies/tyk/internal/scheduler"
+	"github.com/TykTechnologies/tyk/streams"
 	"github.com/TykTechnologies/tyk/test"
 
+	benthosClient "github.com/TykTechnologies/tyk/benthos-client"
 	logstashHook "github.com/bshuster-repo/logrus-logstash-hook"
 	"github.com/evalphobia/logrus_sentry"
 	graylogHook "github.com/gemnasium/logrus-graylog-hook"
@@ -96,6 +98,8 @@ type Gateway struct {
 	DefaultProxyMux *proxyMux
 	config          atomic.Value
 	configMu        sync.Mutex
+	StreamClient    *benthosClient.Client
+	streamServer    *streams.Server
 
 	ctx context.Context
 
@@ -253,7 +257,34 @@ func NewGateway(config config.Config, ctx context.Context) *Gateway {
 	gw.SetNodeID("solo-" + uuid.New())
 	gw.SessionID = uuid.New()
 
+	// Default is `HelloTiki101!`
+	gw.StreamClient = benthosClient.NewClient("http://localhost:5999/benthos", "tyk", os.Getenv("STREAMS_KEY"))
+
 	return gw
+}
+
+func (gw *Gateway) StartStreamServer() {
+	gw.streamServer = streams.New()
+	gw.streamServer.Start()
+	t := 0
+	for {
+		time.Sleep(1 * time.Second)
+		_, err := gw.StreamClient.GetReady()
+		if err == nil {
+			break
+		}
+		t += 1
+
+		if t == 10 {
+			log.Error("failed to get ready status from streams server")
+			return
+		}
+	}
+
+	err := gw.LoadStreamsFromDisk()
+	if err != nil {
+		log.WithError(err).Error("failed to load streams from disk")
+	}
 }
 
 func (gw *Gateway) UnmarshalJSON(data []byte) error {
@@ -693,6 +724,8 @@ func (gw *Gateway) loadControlAPIEndpoints(muxer *mux.Router) {
 		r.HandleFunc("/oauth/refresh/{keyName}", gw.invalidateOauthRefresh).Methods("DELETE")
 		r.HandleFunc("/oauth/revoke", gw.RevokeTokenHandler).Methods("POST")
 		r.HandleFunc("/oauth/revoke_all", gw.RevokeAllTokensHandler).Methods("POST")
+		r.HandleFunc("/streams/{streamID}", gw.StreamHandler).Methods("GET", "POST", "PUT", "DELETE")
+		r.HandleFunc("/streams", gw.StreamListHandler).Methods("GET")
 
 	} else {
 		mainLog.Info("Node is slaved, REST API minimised")
@@ -1698,6 +1731,7 @@ func Start() {
 	// TODO: replace goagain with something that support multiple listeners
 	// Example: https://gravitational.com/blog/golang-ssh-bastion-graceful-restarts/
 	gw.startServer()
+	gw.StartStreamServer()
 
 	if again.Child() {
 		// This is a child process, we need to murder the parent now
