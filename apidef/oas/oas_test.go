@@ -157,6 +157,7 @@ func TestOAS_ExtractTo_ResetAPIDefinition(t *testing.T) {
 	a.IDPClientIDMappingDisabled = false
 	a.EnableContextVars = false
 	a.DisableRateLimit = false
+	a.DoNotTrack = false
 
 	// deprecated fields
 	a.Auth = apidef.AuthConfig{}
@@ -255,7 +256,6 @@ func TestOAS_ExtractTo_ResetAPIDefinition(t *testing.T) {
 		"APIDefinition.ExpireAnalyticsAfter",
 		"APIDefinition.ResponseProcessors[0].Name",
 		"APIDefinition.ResponseProcessors[0].Options",
-		"APIDefinition.DoNotTrack",
 		"APIDefinition.TagHeaders[0]",
 		"APIDefinition.GraphQL.Enabled",
 		"APIDefinition.GraphQL.ExecutionMode",
@@ -931,7 +931,13 @@ func TestMigrateAndFillOAS_DropEmpties(t *testing.T) {
 	})
 
 	t.Run("plugin bundle", func(t *testing.T) {
-		assert.Nil(t, baseAPI.OAS.GetTykExtension().Middleware)
+		assert.Equal(t, &Middleware{
+			Global: &Global{
+				TrafficLogs: &TrafficLogs{
+					Enabled: true,
+				},
+			},
+		}, baseAPI.OAS.GetTykExtension().Middleware)
 	})
 
 	t.Run("mutualTLS", func(t *testing.T) {
