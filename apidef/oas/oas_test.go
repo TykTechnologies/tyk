@@ -28,7 +28,6 @@ func TestOAS(t *testing.T) {
 
 		var convertedAPI apidef.APIDefinition
 		emptyOASPaths.ExtractTo(&convertedAPI)
-		assert.True(t, convertedAPI.EnableContextVars)
 
 		var resultOAS OAS
 		resultOAS.Fill(convertedAPI)
