@@ -38,9 +38,6 @@ type Server struct {
 	//
 	// Tyk classic API definition: `event_handlers`
 	EventHandlers EventHandlers `bson:"eventHandlers,omitempty" json:"eventHandlers,omitempty"`
-
-	// ContextVariables contains the configuration related to Tyk context variables.
-	ContextVariables *ContextVariables `bson:"contextVariables,omitempty" json:"contextVariables,omitempty"`
 }
 
 // Fill fills *Server from apidef.APIDefinition.
@@ -97,18 +94,6 @@ func (s *Server) Fill(api apidef.APIDefinition) {
 	if ShouldOmit(s.EventHandlers) {
 		s.EventHandlers = nil
 	}
-
-	if s.ContextVariables == nil {
-		s.ContextVariables = &ContextVariables{}
-		// special case, do ShouldOmit omit check only if s.ContextVariables was nil.
-		defer func() {
-			if ShouldOmit(s.ContextVariables) {
-				s.ContextVariables = nil
-			}
-		}()
-	}
-
-	s.ContextVariables.Fill(api)
 }
 
 // ExtractTo extracts *Server into *apidef.APIDefinition.
@@ -168,15 +153,6 @@ func (s *Server) ExtractTo(api *apidef.APIDefinition) {
 	}
 
 	s.EventHandlers.ExtractTo(api)
-
-	if s.ContextVariables == nil {
-		s.ContextVariables = &ContextVariables{}
-		defer func() {
-			s.ContextVariables = nil
-		}()
-	}
-
-	s.ContextVariables.ExtractTo(api)
 }
 
 // ListenPath is the base path on Tyk to which requests for this API
@@ -310,21 +286,4 @@ func (dt *DetailedTracing) Fill(api apidef.APIDefinition) {
 // ExtractTo extracts *DetailedTracing into *apidef.APIDefinition.
 func (dt *DetailedTracing) ExtractTo(api *apidef.APIDefinition) {
 	api.DetailedTracing = dt.Enabled
-}
-
-// ContextVariables holds the configuration related to Tyk context variables.
-type ContextVariables struct {
-	// Enabled enables context variables to be passed to Tyk middlewares.
-	// Tyk classic API definition: `enable_context_vars`.
-	Enabled bool `json:"enabled" bson:"enabled"`
-}
-
-// Fill fills *ContextVariables from apidef.APIDefinition.
-func (c *ContextVariables) Fill(api apidef.APIDefinition) {
-	c.Enabled = api.EnableContextVars
-}
-
-// ExtractTo extracts *ContextVariables into *apidef.APIDefinition.
-func (c *ContextVariables) ExtractTo(api *apidef.APIDefinition) {
-	api.EnableContextVars = c.Enabled
 }
