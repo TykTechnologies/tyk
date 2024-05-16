@@ -574,6 +574,9 @@
         },
         "contextVariables": {
           "$ref": "#/definitions/X-Tyk-ContextVariables"
+        },
+        "trafficLogs": {
+          "$ref": "#/definitions/X-Tyk-TrafficLogs"
         }
       }
     },
@@ -1285,6 +1288,9 @@
               "$ref": "#/definitions/X-Tyk-EventHandlers"
             }
           ]
+        },
+        "contextVariables": {
+          "$ref": "#/definitions/X-Tyk-ContextVariables"
         }
       },
       "required": [
@@ -2023,6 +2029,17 @@
       ]
     },
     "X-Tyk-ContextVariables": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "enabled"
+      ]
+    },
+    "X-Tyk-TrafficLogs": {
       "type": "object",
       "properties": {
         "enabled": {

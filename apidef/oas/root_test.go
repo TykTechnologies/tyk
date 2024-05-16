@@ -397,3 +397,97 @@ func TestVersioning(t *testing.T) {
 
 	assert.Equal(t, emptyVersioning, resultVersioning)
 }
+
+func TestXTykAPIGateway_enableTrafficLogsIfEmpty(t *testing.T) {
+	t.Parallel()
+	enabledExpectation := XTykAPIGateway{
+		Middleware: &Middleware{
+			Global: &Global{
+				TrafficLogs: &TrafficLogs{
+					Enabled: true,
+				},
+			},
+		},
+	}
+	disabledExpectation := XTykAPIGateway{
+		Middleware: &Middleware{
+			Global: &Global{
+				TrafficLogs: &TrafficLogs{
+					Enabled: false,
+				},
+			},
+		},
+	}
+	testCases := []struct {
+		name   string
+		in     XTykAPIGateway
+		expect XTykAPIGateway
+	}{
+		{
+			name:   "empty XTykAPIGateway",
+			in:     XTykAPIGateway{},
+			expect: enabledExpectation,
+		},
+		{
+			name: "empty XTykAPIGateway.Middleware",
+			in: XTykAPIGateway{
+				Middleware: &Middleware{},
+			},
+			expect: enabledExpectation,
+		},
+		{
+			name: "empty XTykAPIGateway.Middleware.Global",
+			in: XTykAPIGateway{
+				Middleware: &Middleware{
+					Global: &Global{},
+				},
+			},
+			expect: enabledExpectation,
+		},
+		{
+			name: "empty XTykAPIGateway.Middleware.Global.TrafficLogs",
+			in: XTykAPIGateway{
+				Middleware: &Middleware{
+					Global: &Global{
+						TrafficLogs: &TrafficLogs{},
+					},
+				},
+			},
+			expect: disabledExpectation,
+		},
+		{
+			name: "enabled XTykAPIGateway.Middleware.Global.TrafficLogs",
+			in: XTykAPIGateway{
+				Middleware: &Middleware{
+					Global: &Global{
+						TrafficLogs: &TrafficLogs{
+							Enabled: true,
+						},
+					},
+				},
+			},
+			expect: enabledExpectation,
+		},
+		{
+			name: "disabled XTykAPIGateway.Middleware.Global.TrafficLogs",
+			in: XTykAPIGateway{
+				Middleware: &Middleware{
+					Global: &Global{
+						TrafficLogs: &TrafficLogs{
+							Enabled: false,
+						},
+					},
+				},
+			},
+			expect: disabledExpectation,
+		},
+	}
+	for _, tc := range testCases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			tc.in.enableTrafficLogsIfEmpty()
+			assert.EqualExportedValues(t, tc.expect, tc.in)
+		})
+	}
+}
