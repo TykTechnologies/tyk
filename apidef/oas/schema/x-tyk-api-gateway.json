@@ -571,6 +571,9 @@
         },
         "transformResponseHeaders": {
           "$ref": "#/definitions/X-Tyk-TransformHeaders"
+        },
+        "contextVariables": {
+          "$ref": "#/definitions/X-Tyk-ContextVariables"
         }
       }
     },
@@ -1275,8 +1278,18 @@
         "detailedTracing": {
           "$ref": "#/definitions/X-Tyk-DetailedTracing"
         },
+<<<<<<< HEAD
         "contextVariables": {
           "$ref": "#/definitions/X-Tyk-ContextVariables"
+=======
+        "eventHandlers": {
+          "type": "array",
+          "items": [
+            {
+              "$ref": "#/definitions/X-Tyk-EventHandlers"
+            }
+          ]
+>>>>>>> 63963725d... [TT-11954/TT-12115]fix location of contextVariables (#6285)
         }
       },
       "required": [
