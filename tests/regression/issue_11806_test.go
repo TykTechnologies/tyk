@@ -136,9 +136,7 @@ func testRouteLongestPathFirst(t *testing.T) {
 	inputs := map[hostAndPath]bool{}
 	hosts := []string{"host1.local", "host2.local", "host3.local"}
 	paths := []string{"a", "ab", "a/b/c", "ab/c", "abc", "a/b/c"}
-	// Use a map so that we get a somewhat random order when
-	// iterating. Would be better to use math/rand.Shuffle once we
-	// need only support Go 1.10 and later.
+
 	for _, host := range hosts {
 		for _, path := range paths {
 			inputs[hostAndPath{host, path}] = true
