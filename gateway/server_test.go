@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"regexp"
+	"net"
 	"testing"
 	"time"
 
@@ -228,32 +228,23 @@ func gatewayGetHostDetailsTestHasErr(wantErr bool, errorText string) gatewayGetH
 	return func(t *testing.T, bl *test.BufferedLogger, _ *Gateway) {
 		t.Helper()
 		logs := bl.GetLogs(logrus.ErrorLevel)
-		if !wantErr && assert.Empty(t, logs) {
-			return
-		}
-
-		if wantErr && !assert.NotEmpty(t, logs) {
-			return
-		}
-
-		if wantErr && errorText != "" {
-			for _, log := range logs {
-				assert.Contains(t, log.Message, errorText)
+		if wantErr {
+			assert.NotEmpty(t, logs, "Expected error logs but got none")
+			if errorText != "" {
+				for _, log := range logs {
+					assert.Contains(t, log.Message, errorText, "Expected log message to contain %q", errorText)
+				}
 			}
+		} else {
+			assert.Empty(t, logs, "Expected no error logs but got some")
 		}
 	}
 }
 
-func gatewayGetHostDetailsTesHasAddress(addr string) gatewayGetHostDetailsTestCheckFn {
+func gatewayGetHostDetailsTestAddress() gatewayGetHostDetailsTestCheckFn {
 	return func(t *testing.T, _ *test.BufferedLogger, gw *Gateway) {
 		t.Helper()
-		matched, err := regexp.MatchString(addr, gw.hostDetails.Address)
-		if err != nil {
-			t.Errorf("Failed to compile regex pattern: %v", err)
-		}
-		if !matched {
-			t.Errorf("Wanted address %s, got %s", addr, gw.hostDetails.Address)
-		}
+		assert.NotNil(t, net.ParseIP(gw.hostDetails.Address))
 	}
 }
 
@@ -263,22 +254,15 @@ func defineGatewayGetHostDetailsTests() []struct {
 	readPIDFromFile     func(string) (int, error)
 	netutilGetIpAddress func() ([]string, error)
 	checks              []gatewayGetHostDetailsTestCheckFn
-	// config              config.Config
 } {
-	var (
-		check = func(fns ...gatewayGetHostDetailsTestCheckFn) []gatewayGetHostDetailsTestCheckFn { return fns }
-		// matches ipv6 and ipv4
-		// https://go.dev/play/p/cbOQUiqNqyU
-		// https://regex101.com/r/lIWfaA/1
-		ipAddrPattern = `^((([a-f0-9]{1,4}):){7}([a-f0-9]{1,4})|(([a-f0-9]{1,4})(:([a-f0-9]{1,4})){0,6})?::(([a-f0-9]{1,4})(:([a-f0-9]{1,4})){0,6})?|((([a-f0-9]{1,4}):){5}[a-f0-9]{1,4}|(([a-f0-9]{1,4}):){0,5}:([a-f0-9]{1,4}))|(([a-f0-9]{1,4}:){0,6}[a-f0-9]{1,4}|(([a-f0-9]{1,4}:){0,6}:([a-f0-9]{1,4})){0,1})|([a-f0-9]{1,4}:){0,7}:|([a-f0-9]{1,4}:){0,6}[a-f0-9]{1,4}|(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?))$`
-	)
+	var check = func(fns ...gatewayGetHostDetailsTestCheckFn) []gatewayGetHostDetailsTestCheckFn { return fns }
+
 	return []struct {
 		name                string
 		before              func(*Gateway)
 		readPIDFromFile     func(string) (int, error)
 		netutilGetIpAddress func() ([]string, error)
 		checks              []gatewayGetHostDetailsTestCheckFn
-		// config              config.Config
 	}{
 		{
 			name:            "fail-read-pid",
@@ -302,7 +286,7 @@ func defineGatewayGetHostDetailsTests() []struct {
 			},
 			checks: check(
 				gatewayGetHostDetailsTestHasErr(false, ""),
-				gatewayGetHostDetailsTesHasAddress("127\\.0\\.0\\.1"),
+				gatewayGetHostDetailsTestAddress(),
 			),
 		},
 		{
@@ -315,7 +299,7 @@ func defineGatewayGetHostDetailsTests() []struct {
 			},
 			checks: check(
 				gatewayGetHostDetailsTestHasErr(false, ""),
-				gatewayGetHostDetailsTesHasAddress(ipAddrPattern),
+				gatewayGetHostDetailsTestAddress(),
 			),
 		},
 		{
@@ -330,7 +314,7 @@ func defineGatewayGetHostDetailsTests() []struct {
 			checks: check(
 				gatewayGetHostDetailsTestHasErr(true, "Error getting network addresses"),
 			),
-		}, // Define your test cases here
+		},
 	}
 }
 

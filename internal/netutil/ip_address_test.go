@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func Test_getIpAddress(t *testing.T) {
+func Test_GetIpAddress(t *testing.T) {
 	defer func() { netInterfaceAddrs = net.InterfaceAddrs }()
 
 	tests := []struct {
