@@ -1,6 +1,7 @@
 package regression
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -50,6 +51,8 @@ func Test_Issue11806_DomainRouting(t *testing.T) {
 }
 
 func testDomainRouting(tb testing.TB, ts *gateway.Test) {
+	tb.Helper()
+
 	ts.Run(tb, []test.TestCase{
 		{
 			Path:      "/test/",
@@ -74,6 +77,7 @@ func testSubrouterHost(t *testing.T) {
 
 	// Create the main router
 	router := mux.NewRouter()
+	ctx := context.Background()
 
 	// Create a subrouter with a specific host
 	subrouter := router.Host("customer.mydomain.com").Subrouter()
@@ -89,7 +93,7 @@ func testSubrouterHost(t *testing.T) {
 	})
 
 	// Test a request without the host header
-	reqWithoutHost, err := http.NewRequest("GET", "/test", nil)
+	reqWithoutHost, err := http.NewRequestWithContext(ctx, "GET", "/test", nil)
 	assert.NoError(t, err)
 
 	respWithoutHost := httptest.NewRecorder()
@@ -99,7 +103,7 @@ func testSubrouterHost(t *testing.T) {
 	}
 
 	// Test a request with a random host header
-	reqWithRandomHost, err := http.NewRequest("GET", "/test", nil)
+	reqWithRandomHost, err := http.NewRequestWithContext(ctx, "GET", "/test", nil)
 	assert.NoError(t, err)
 
 	reqWithRandomHost.Host = "random.mydomain.com"
@@ -110,7 +114,7 @@ func testSubrouterHost(t *testing.T) {
 	}
 
 	// Test a request with the specific host header
-	reqWithSpecificHost, err := http.NewRequest("GET", "/test", nil)
+	reqWithSpecificHost, err := http.NewRequestWithContext(ctx, "GET", "/test", nil)
 	assert.NoError(t, err)
 
 	reqWithSpecificHost.Host = "customer.mydomain.com"
