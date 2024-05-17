@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/gorilla/mux"
+	"github.com/stretchr/testify/assert"
 
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/gateway"
@@ -76,17 +77,21 @@ func testSubrouterHost(t *testing.T) {
 
 	// Create a subrouter with a specific host
 	subrouter := router.Host("customer.mydomain.com").Subrouter()
-	subrouter.HandleFunc("/test", func(w http.ResponseWriter, r *http.Request) {
-		w.Write([]byte("Subrouter"))
+	subrouter.HandleFunc("/test", func(w http.ResponseWriter, _ *http.Request) {
+		_, err := w.Write([]byte("Subrouter"))
+		assert.NoError(t, err)
 	})
 
 	// Register a handler for /test on the main router
-	router.HandleFunc("/test", func(w http.ResponseWriter, r *http.Request) {
-		w.Write([]byte("Main Router"))
+	router.HandleFunc("/test", func(w http.ResponseWriter, _ *http.Request) {
+		_, err := w.Write([]byte("Main Router"))
+		assert.NoError(t, err)
 	})
 
 	// Test a request without the host header
-	reqWithoutHost, _ := http.NewRequest("GET", "/test", nil)
+	reqWithoutHost, err := http.NewRequest("GET", "/test", nil)
+	assert.NoError(t, err)
+
 	respWithoutHost := httptest.NewRecorder()
 	router.ServeHTTP(respWithoutHost, reqWithoutHost)
 	if respWithoutHost.Body.String() != "Main Router" {
@@ -94,7 +99,9 @@ func testSubrouterHost(t *testing.T) {
 	}
 
 	// Test a request with a random host header
-	reqWithRandomHost, _ := http.NewRequest("GET", "/test", nil)
+	reqWithRandomHost, err := http.NewRequest("GET", "/test", nil)
+	assert.NoError(t, err)
+
 	reqWithRandomHost.Host = "random.mydomain.com"
 	respWithRandomHost := httptest.NewRecorder()
 	router.ServeHTTP(respWithRandomHost, reqWithRandomHost)
@@ -103,7 +110,9 @@ func testSubrouterHost(t *testing.T) {
 	}
 
 	// Test a request with the specific host header
-	reqWithSpecificHost, _ := http.NewRequest("GET", "/test", nil)
+	reqWithSpecificHost, err := http.NewRequest("GET", "/test", nil)
+	assert.NoError(t, err)
+
 	reqWithSpecificHost.Host = "customer.mydomain.com"
 	respWithSpecificHost := httptest.NewRecorder()
 	router.ServeHTTP(respWithSpecificHost, reqWithSpecificHost)
