@@ -29,6 +29,7 @@ import (
 	"github.com/TykTechnologies/tyk/internal/httputil"
 	"github.com/TykTechnologies/tyk/internal/otel"
 	"github.com/TykTechnologies/tyk/internal/scheduler"
+	"github.com/TykTechnologies/tyk/internal/streaming"
 	"github.com/TykTechnologies/tyk/test"
 
 	logstashhook "github.com/bshuster-repo/logrus-logstash-hook"
@@ -100,6 +101,8 @@ type Gateway struct {
 	DefaultProxyMux *proxyMux
 	config          atomic.Value
 	configMu        sync.Mutex
+
+	StreamingServer *streaming.Server
 
 	ctx context.Context
 
@@ -1934,6 +1937,14 @@ func (gw *Gateway) setupPortsWhitelist() {
 }
 
 func (gw *Gateway) startServer() {
+	if gw.GetConfig().Streaming.Enabled {
+		gw.StreamingServer = streaming.New()
+		err := gw.StreamingServer.Start()
+		if err != nil {
+			mainLog.WithError(err).Error("Error starting streaming server")
+		}
+	}
+
 	// Ensure that Control listener and default http listener running on first start
 	muxer := &proxyMux{}
 
