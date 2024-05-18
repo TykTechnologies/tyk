@@ -1301,6 +1301,10 @@ func (s *Test) Close() {
 	s.Gw.ReloadTestCase.StopTicker()
 	s.Gw.GlobalHostChecker.StopPoller()
 
+	if s.Gw.StreamingServer != nil {
+		s.Gw.StreamingServer.Reset()
+	}
+
 	err = s.RemoveApis()
 	if err != nil {
 		log.Error("could not remove apis")
