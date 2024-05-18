@@ -15,6 +15,7 @@ import (
 	"sync"
 	textTemplate "text/template"
 
+	"github.com/TykTechnologies/tyk/apidef/oas"
 	"github.com/TykTechnologies/tyk/rpc"
 
 	"github.com/gorilla/mux"
@@ -997,7 +998,29 @@ func (gw *Gateway) loadApps(specs []*APISpec) {
 	var specsToRelease []*APISpec
 	gw.apisMu.Lock()
 
+	activeStreams := map[string]struct{}{}
+
 	for _, spec := range specs {
+		// Check if the API is a streaming API and add it to the streaming server
+		if gw.GetConfig().Streaming.Enabled && spec.IsOAS {
+			if ext, ok := spec.OAS.T.Extensions[oas.ExtensionTykStreaming]; ok {
+				if streamsMap, ok := ext.(map[string]interface{}); ok {
+					if streams, ok := streamsMap["streams"].(map[string]interface{}); ok {
+						for streamID, stream := range streams {
+							if streamMap, ok := stream.(map[string]interface{}); ok {
+								if err := gw.StreamingServer.AddStream(spec.APIID+"_"+streamID, streamMap); err != nil {
+									mainLog.Errorf("Error adding stream to streaming server: %v", err)
+								} else {
+									activeStreams[spec.APIID+"_"+streamID] = struct{}{}
+									mainLog.Infof("Added stream %s to streaming server", spec.APIID+"_"+streamID)
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+
 		curSpec, ok := gw.apisByID[spec.APIID]
 		if ok && curSpec != nil && shouldReloadSpec(curSpec, spec) {
 			specsToRelease = append(specsToRelease, curSpec)
@@ -1015,6 +1038,24 @@ func (gw *Gateway) loadApps(specs []*APISpec) {
 	gw.apisHandlesByID = tmpSpecHandles
 
 	gw.apisMu.Unlock()
+
+	// Remove any streams that are no longer active
+	if gw.GetConfig().Streaming.Enabled {
+		existingStreams, err := gw.StreamingServer.Streams()
+		if err != nil {
+			mainLog.Errorf("Error fetching existing streams: %v", err)
+		} else {
+			for streamID := range existingStreams {
+				if _, ok := activeStreams[streamID]; !ok {
+					if err := gw.StreamingServer.RemoveStream(streamID); err != nil {
+						mainLog.Errorf("Error removing stream %s: %v", streamID, err)
+					}
+
+					mainLog.Infof("Removed stream %s", streamID)
+				}
+			}
+		}
+	}
 
 	for _, spec := range specsToRelease {
 		spec.Release()
