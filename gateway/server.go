@@ -102,7 +102,7 @@ type Gateway struct {
 	config          atomic.Value
 	configMu        sync.Mutex
 
-	StreamingServer *streaming.Server
+	StreamingServer *streaming.StreamManager
 
 	ctx context.Context
 
@@ -1938,11 +1938,7 @@ func (gw *Gateway) setupPortsWhitelist() {
 
 func (gw *Gateway) startServer() {
 	if gw.GetConfig().Streaming.Enabled {
-		gw.StreamingServer = streaming.New()
-		err := gw.StreamingServer.Start()
-		if err != nil {
-			mainLog.WithError(err).Error("Error starting streaming server")
-		}
+		gw.StreamingServer = streaming.NewStreamManager()
 	}
 
 	// Ensure that Control listener and default http listener running on first start
