@@ -2,16 +2,15 @@ package streaming
 
 import (
 	"testing"
+	"time"
+
+	"gopkg.in/yaml.v2"
 )
 
 func TestStreamingServer(t *testing.T) {
-	s := New()
+	s := NewStreamManager()
 	// Do not call Stop because it cause os.Exit(0), instead Reset ensure that streams will be cleaned up in the end of test
 	defer s.Reset()
-
-	if err := s.Start(); err != nil {
-		t.Fatalf("Failed to start server: %v", err)
-	}
 
 	streamID := "test-stream"
 	configPayload := []byte(`input:
@@ -26,15 +25,19 @@ output:
   label: ""
   drop: {}`)
 
-	err := s.AddStream(streamID, configPayload)
+	var config map[string]interface{}
+	if err := yaml.Unmarshal(configPayload, &config); err != nil {
+		t.Fatalf("Failed to unmarshal config payload: %v", err)
+	}
+
+	err := s.AddStream(streamID, config)
 	if err != nil {
 		t.Fatalf("Failed to add stream: %v", err)
 	}
 
-	streams, err := s.Streams()
-	if err != nil {
-		t.Fatalf("Failed to get streams: %v", err)
-	}
+	time.Sleep(500 * time.Millisecond)
+
+	streams := s.Streams()
 
 	if _, exists := streams[streamID]; !exists {
 		t.Fatalf("Stream %s was not found after being added, %v", streamID, streams)
@@ -46,10 +49,9 @@ output:
 		t.Fatalf("Failed to remove stream: %v", err)
 	}
 
-	streams, err = s.Streams()
-	if err != nil {
-		t.Fatalf("Failed to get streams after removal: %v", err)
-	}
+	time.Sleep(500 * time.Millisecond)
+
+	streams = s.Streams()
 
 	if len(streams) != 0 {
 		t.Fatalf("Expected 0 streams after removal, got %d", len(streams))
