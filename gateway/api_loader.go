@@ -947,7 +947,6 @@ func (gw *Gateway) loadApps(specs []*APISpec) {
 	gw.loadControlAPIEndpoints(router)
 
 	muxer.setRouter(port, "", router, gw.GetConfig())
-
 	gs := gw.prepareStorage()
 	shouldTrace := trace.IsEnabled()
 
@@ -998,8 +997,8 @@ func (gw *Gateway) loadApps(specs []*APISpec) {
 	gw.DefaultProxyMux.swap(muxer, gw)
 
 	var specsToRelease []*APISpec
-	gw.apisMu.Lock()
 
+	gw.apisMu.Lock()
 	activeStreams := map[string]struct{}{}
 
 	for _, spec := range specs {
@@ -1041,20 +1040,16 @@ func (gw *Gateway) loadApps(specs []*APISpec) {
 
 	gw.apisMu.Unlock()
 
-	// Remove any streams that are no longer active
+	// // Remove any streams that are no longer active
 	if gw.GetConfig().Streaming.Enabled {
-		existingStreams, err := gw.StreamingServer.Streams()
-		if err != nil {
-			mainLog.Errorf("Error fetching existing streams: %v", err)
-		} else {
-			for streamID := range existingStreams {
-				if _, ok := activeStreams[streamID]; !ok {
-					if err := gw.StreamingServer.RemoveStream(streamID); err != nil {
-						mainLog.Errorf("Error removing stream %s: %v", streamID, err)
-					}
-
-					mainLog.Infof("Removed stream %s", streamID)
+		existingStreams := gw.StreamingServer.Streams()
+		for streamID := range existingStreams {
+			if _, ok := activeStreams[streamID]; !ok {
+				if err := gw.StreamingServer.RemoveStream(streamID); err != nil {
+					mainLog.Errorf("Error removing stream %s: %v", streamID, err)
 				}
+
+				mainLog.Infof("Removed stream %s", streamID)
 			}
 		}
 	}
