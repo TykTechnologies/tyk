@@ -140,10 +140,7 @@ streams:
 
 	ts.Gw.DoReload()
 
-	streams, err := ts.Gw.StreamingServer.Streams()
-	if err != nil {
-		t.Fatalf("Failed to get streams: %v", err)
-	}
+	streams := ts.Gw.StreamingServer.Streams()
 
 	if len(streams) != 1 {
 		t.Fatalf("Expected 1 stream, got %d", len(streams))
