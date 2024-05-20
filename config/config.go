@@ -331,7 +331,7 @@ type SlaveOptionsConfig struct {
 	// For an Self-Managed installation this can be left at `false` (the default setting). For Legacy Cloud Gateways it must be set to ‘true’.
 	BindToSlugsInsteadOfListenPaths bool `json:"bind_to_slugs"`
 
-	// Set this option to `true` if you don’t want to monitor changes in the keys from a master Gateway.
+	// Set this option to `true` if you don’t want to monitor changes in the keys from a primary Gateway.
 	DisableKeySpaceSync bool `json:"disable_keyspace_sync"`
 
 	// This is the `zone` that this instance inhabits, e.g. the cluster/data-centre the Gateway lives in.
@@ -807,7 +807,7 @@ type Config struct {
 	// Maximum TLS version for connection between Tyk and your upstream service.
 	ProxySSLMaxVersion uint16 `json:"proxy_ssl_max_version"`
 
-	// Whitelist ciphers for connection between Tyk and your upstream service.
+	// Allow list of ciphers for connection between Tyk and your upstream service.
 	ProxySSLCipherSuites []string `json:"proxy_ssl_ciphers"`
 
 	// This can specify a default timeout in seconds for upstream API requests.
