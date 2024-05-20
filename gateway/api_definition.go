@@ -1860,3 +1860,22 @@ func (s *APISpec) isListeningOnPort(port int, gwConfig *config.Config) bool {
 
 	return s.ListenPort == port
 }
+
+// Streams extracts streaming configurations from an API spec if available.
+func (s *APISpec) Streams() map[string]interface{} {
+	streamConfigs := make(map[string]interface{})
+
+	if s.IsOAS {
+		if ext, ok := s.OAS.T.Extensions[oas.ExtensionTykStreaming]; ok {
+			if streamsMap, ok := ext.(map[string]interface{}); ok {
+				if streams, ok := streamsMap["streams"].(map[string]interface{}); ok {
+					for streamID, stream := range streams {
+						streamConfigs[streamID] = stream
+					}
+				}
+			}
+		}
+	}
+
+	return streamConfigs
+}
