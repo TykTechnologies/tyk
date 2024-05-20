@@ -25,7 +25,7 @@ func NewStreamManager() *StreamManager {
 	}
 }
 
-func (sm *StreamManager) AddStream(streamID string, config map[string]interface{}) error {
+func (sm *StreamManager) AddStream(streamID string, config map[string]interface{}, mux service.HTTPMultiplexer) error {
 	sm.mu.Lock()
 	defer sm.mu.Unlock()
 
@@ -46,10 +46,27 @@ func (sm *StreamManager) AddStream(streamID string, config map[string]interface{
 
 	builder := service.NewStreamBuilder()
 
+	// builder.AddProcessorYAML(`type: metadata
+	//  metadata:
+	//    operator: set
+	//    key: "stream_id"
+	//    value: "asdasd"`)
+
 	err = builder.SetYAML(string(configPayload))
 	if err != nil {
 		return err
 	}
+
+	if mux != nil {
+		builder.SetHTTPMux(mux)
+	}
+
+	// builder.AddConsumerFunc(func(ctx context.Context, msg *service.Message) error {
+	// 	b, _ := msg.AsBytes()
+	// 	log.Println("received message", string(b))
+	// 	msg.MetaSetMut("stream-id", streamID)
+	// 	return nil
+	// })
 
 	stream, err := builder.Build()
 	if err != nil {

@@ -21,6 +21,15 @@ func TestStreamingServer(t *testing.T) {
     mapping: |
       root.content = "test message"
 
+pipeline:
+  processors:
+    - type: log
+      log:
+        level: INFO
+        message: |
+          Content: ${!content()}
+          Metadata: ${!meta()}
+
 output:
   label: ""
   drop: {}`)
@@ -30,7 +39,7 @@ output:
 		t.Fatalf("Failed to unmarshal config payload: %v", err)
 	}
 
-	err := s.AddStream(streamID, config)
+	err := s.AddStream(streamID, config, nil)
 	if err != nil {
 		t.Fatalf("Failed to add stream: %v", err)
 	}
