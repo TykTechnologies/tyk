@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"crypto/md5"
 	"encoding/hex"
-	"encoding/json"
 	htmlTemplate "html/template"
 	"io/ioutil"
 	"net/http"
@@ -18,6 +17,7 @@ import (
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/header"
+	"github.com/TykTechnologies/tyk/internal/event"
 	"github.com/TykTechnologies/tyk/storage"
 )
 
@@ -30,13 +30,14 @@ const (
 	WH_DELETE WebHookRequestMethod = "DELETE"
 	WH_PATCH  WebHookRequestMethod = "PATCH"
 
-	// Define the Event Handler name so we can register it
-	EH_WebHook apidef.TykEventHandlerName = "eh_web_hook_handler"
+	// EH_WebHook is an alias maintained for backwards compatibility.
+	// it is the handler to register a webhook event.
+	EH_WebHook = event.WebHookHandler
 )
 
 // WebHookHandler is an event handler that triggers web hooks
 type WebHookHandler struct {
-	conf     config.WebHookHandlerConf
+	conf     apidef.WebHookHandlerConf
 	template *htmlTemplate.Template // non-nil if Init is run without error
 	store    storage.Handler
 
@@ -45,31 +46,21 @@ type WebHookHandler struct {
 	Gw               *Gateway
 }
 
-// createConfigObject by default tyk will provide a map[string]interface{} type as a conf, converting it
-// specifically here makes it easier to handle, only happens once, so not a massive issue, but not pretty
-func (w *WebHookHandler) createConfigObject(handlerConf interface{}) (config.WebHookHandlerConf, error) {
-	newConf := config.WebHookHandlerConf{}
-
-	asJSON, _ := json.Marshal(handlerConf)
-	if err := json.Unmarshal(asJSON, &newConf); err != nil {
-		log.WithFields(logrus.Fields{
-			"prefix": "webhooks",
-		}).Error("Format of webhook configuration is incorrect: ", err)
-		return newConf, err
-	}
-
-	return newConf, nil
-}
-
 // Init enables the init of event handler instances when they are created on ApiSpec creation
 func (w *WebHookHandler) Init(handlerConf interface{}) error {
 	var err error
-	w.conf, err = w.createConfigObject(handlerConf)
-	if err != nil {
+	if err = w.conf.Scan(handlerConf); err != nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "webhooks",
 		}).Error("Problem getting configuration, skipping. ", err)
 		return err
+	}
+
+	if w.conf.Disabled {
+		log.WithFields(logrus.Fields{
+			"prefix": "webhooks",
+		}).Infof("skipping disabled webhook %s", w.conf.Name)
+		return nil
 	}
 
 	w.store = &storage.RedisCluster{KeyPrefix: "webhook.cache.", ConnectionHandler: w.Gw.StorageConnectionHandler}

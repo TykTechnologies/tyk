@@ -15,12 +15,10 @@ func (l *Limiter) FixedWindow(ctx context.Context, key string, rate float64, per
 		ttl      = time.Duration(per * float64(time.Second))
 	)
 
-	rateLimitPrefix := Prefix(l.prefix, key)
-
 	if l.redis != nil {
-		storage = limiters.NewFixedWindowRedis(l.redis, rateLimitPrefix)
+		storage = limiters.NewFixedWindowRedis(l.redis, key)
 	} else {
-		storage = limiters.LocalFixedWindow(rateLimitPrefix)
+		storage = limiters.LocalFixedWindow(key)
 	}
 
 	limiter := limiters.NewFixedWindow(capacity, ttl, storage, l.clock)

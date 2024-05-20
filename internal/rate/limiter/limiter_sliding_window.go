@@ -15,12 +15,10 @@ func (l *Limiter) SlidingWindow(ctx context.Context, key string, rate float64, p
 		ttl      = time.Duration(per * float64(time.Second))
 	)
 
-	rateLimitPrefix := Prefix(l.prefix, key)
-
 	if l.redis != nil {
-		storage = limiters.NewSlidingWindowRedis(l.redis, rateLimitPrefix)
+		storage = limiters.NewSlidingWindowRedis(l.redis, key)
 	} else {
-		storage = limiters.LocalSlidingWindow(rateLimitPrefix)
+		storage = limiters.LocalSlidingWindow(key)
 	}
 
 	// TODO: when doing rate sliding rate limits, the counts for two windows are

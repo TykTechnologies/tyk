@@ -7,7 +7,10 @@ import (
 // RateLimit contains flags and configuration for controlling rate limiting behaviour.
 // It is embedded in the main config structure.
 type RateLimit struct {
-	// Redis based rate limiter with fixed window. Provides 100% rate limiting accuracy, but require two additional Redis roundtrip for each request.
+	// EnableFixedWindow enables fixed window rate limiting.
+	EnableFixedWindowRateLimiter bool `json:"enable_fixed_window_rate_limiter"`
+
+	// Redis based rate limiter with sliding log. Provides 100% rate limiting accuracy, but require two additional Redis roundtrip for each request.
 	EnableRedisRollingLimiter bool `json:"enable_redis_rolling_limiter"`
 
 	// To enable, set to `true`. The sentinel-based rate limiter delivers a smoother performance curve as rate-limit calculations happen off-thread, but a stricter time-out based cool-down for clients. For example, when a throttling action is triggered, they are required to cool-down for the period of the rate limit.
@@ -37,6 +40,10 @@ func (r *RateLimit) String() string {
 	info := "using transactions"
 	if r.EnableNonTransactionalRateLimiter {
 		info = "using pipeline"
+	}
+
+	if r.EnableFixedWindowRateLimiter {
+		return "Fixed Window Rate Limiter enabled"
 	}
 
 	if r.EnableRedisRollingLimiter {

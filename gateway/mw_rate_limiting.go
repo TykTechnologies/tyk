@@ -91,7 +91,6 @@ func (k *RateLimitAndQuotaCheck) ProcessRequest(w http.ResponseWriter, r *http.R
 		storeRef,
 		!k.Spec.DisableRateLimit,
 		!k.Spec.DisableQuota,
-		&k.Spec.GlobalConfig,
 		k.Spec,
 		false,
 	)
@@ -125,7 +124,6 @@ func (k *RateLimitAndQuotaCheck) ProcessRequest(w http.ResponseWriter, r *http.R
 					storeRef,
 					!k.Spec.DisableRateLimit,
 					!k.Spec.DisableQuota,
-					&k.Spec.GlobalConfig,
 					k.Spec,
 					true,
 				)

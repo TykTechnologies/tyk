@@ -1185,6 +1185,7 @@ func (c Config) GetEventTriggers() map[apidef.TykEvent][]TykEventHandler {
 	return c.EventTriggersDefunct
 }
 
+// SetEventTriggers sets events for backwards compatibility
 func (c *Config) SetEventTriggers(eventTriggers map[apidef.TykEvent][]TykEventHandler) {
 	c.EventTriggersDefunct = eventTriggers
 }

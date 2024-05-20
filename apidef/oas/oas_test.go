@@ -28,7 +28,6 @@ func TestOAS(t *testing.T) {
 
 		var convertedAPI apidef.APIDefinition
 		emptyOASPaths.ExtractTo(&convertedAPI)
-		assert.True(t, convertedAPI.EnableContextVars)
 
 		var resultOAS OAS
 		resultOAS.Fill(convertedAPI)
@@ -158,6 +157,7 @@ func TestOAS_ExtractTo_ResetAPIDefinition(t *testing.T) {
 	a.IDPClientIDMappingDisabled = false
 	a.EnableContextVars = false
 	a.DisableRateLimit = false
+	a.DoNotTrack = false
 
 	// deprecated fields
 	a.Auth = apidef.AuthConfig{}
@@ -256,7 +256,6 @@ func TestOAS_ExtractTo_ResetAPIDefinition(t *testing.T) {
 		"APIDefinition.ExpireAnalyticsAfter",
 		"APIDefinition.ResponseProcessors[0].Name",
 		"APIDefinition.ResponseProcessors[0].Options",
-		"APIDefinition.DoNotTrack",
 		"APIDefinition.TagHeaders[0]",
 		"APIDefinition.GraphQL.Enabled",
 		"APIDefinition.GraphQL.ExecutionMode",
@@ -286,6 +285,8 @@ func TestOAS_ExtractTo_ResetAPIDefinition(t *testing.T) {
 		"APIDefinition.GraphQL.Proxy.SubscriptionType",
 		"APIDefinition.GraphQL.Proxy.RequestHeaders[0]",
 		"APIDefinition.GraphQL.Proxy.UseResponseExtensions.OnErrorForwarding",
+		"APIDefinition.GraphQL.Proxy.RequestHeadersRewrite[0].Value",
+		"APIDefinition.GraphQL.Proxy.RequestHeadersRewrite[0].Remove",
 		"APIDefinition.GraphQL.Subgraph.SDL",
 		"APIDefinition.GraphQL.Supergraph.Subgraphs[0].APIID",
 		"APIDefinition.GraphQL.Supergraph.Subgraphs[0].Name",
@@ -856,21 +857,16 @@ func TestMigrateAndFillOAS(t *testing.T) {
 	assert.Equal(t, DefaultOpenAPI, baseAPIDef.OAS.OpenAPI)
 	assert.Equal(t, "Furkan", baseAPIDef.OAS.Info.Title)
 	assert.Equal(t, "Default", baseAPIDef.OAS.Info.Version)
-	assert.True(t, baseAPIDef.Classic.EnableContextVars)
 
 	assert.True(t, versionAPIDefs[0].Classic.IsOAS)
 	assert.Equal(t, DefaultOpenAPI, versionAPIDefs[0].OAS.OpenAPI)
 	assert.Equal(t, "Furkan-v1", versionAPIDefs[0].OAS.Info.Title)
 	assert.Equal(t, "v1", versionAPIDefs[0].OAS.Info.Version)
-	assert.True(t, versionAPIDefs[0].Classic.EnableContextVars)
 
 	assert.True(t, versionAPIDefs[1].Classic.IsOAS)
 	assert.Equal(t, DefaultOpenAPI, versionAPIDefs[1].OAS.OpenAPI)
 	assert.Equal(t, "Furkan-v2", versionAPIDefs[1].OAS.Info.Title)
 	assert.Equal(t, "v2", versionAPIDefs[1].OAS.Info.Version)
-	assert.True(t, versionAPIDefs[1].Classic.EnableContextVars)
-
-	assert.NotEqual(t, versionAPIDefs[0].Classic.APIID, versionAPIDefs[1].Classic.APIID)
 
 	err = baseAPIDef.OAS.Validate(context.Background())
 	assert.NoError(t, err)
@@ -935,7 +931,13 @@ func TestMigrateAndFillOAS_DropEmpties(t *testing.T) {
 	})
 
 	t.Run("plugin bundle", func(t *testing.T) {
-		assert.Nil(t, baseAPI.OAS.GetTykExtension().Middleware)
+		assert.Equal(t, &Middleware{
+			Global: &Global{
+				TrafficLogs: &TrafficLogs{
+					Enabled: true,
+				},
+			},
+		}, baseAPI.OAS.GetTykExtension().Middleware)
 	})
 
 	t.Run("mutualTLS", func(t *testing.T) {

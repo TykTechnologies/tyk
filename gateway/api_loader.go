@@ -89,13 +89,12 @@ func countApisByListenHash(specs []*APISpec) map[string]int {
 		domain := spec.GetAPIDomain()
 		domainHash := generateDomainPath(domain, spec.Proxy.ListenPath)
 		if count[domainHash] == 0 {
-			dN := domain
-			if dN == "" {
-				dN = "(no host)"
+			if domain == "" {
+				domain = "(no host)"
 			}
 			mainLog.WithFields(logrus.Fields{
 				"api_name": spec.Name,
-				"domain":   dN,
+				"domain":   domain,
 			}).Info("Tracking hostname")
 		}
 		count[domainHash]++
@@ -792,7 +791,7 @@ func (gw *Gateway) loadHTTPService(spec *APISpec, apisByListen map[string]int, g
 		spec.Proxy.ListenPath,
 	}
 
-	// Register routes for each prefixe
+	// Register routes for each prefix
 	for _, prefix := range prefixes {
 		subrouter := router.PathPrefix(prefix).Subrouter()
 
@@ -923,6 +922,9 @@ func (gw *Gateway) loadApps(specs []*APISpec) {
 	// sort by listen path from longer to shorter, so that /foo
 	// doesn't break /foo-bar
 	sort.Slice(specs, func(i, j int) bool {
+		if specs[i].Domain != specs[j].Domain {
+			return len(specs[i].Domain) > len(specs[j].Domain)
+		}
 		return len(specs[i].Proxy.ListenPath) > len(specs[j].Proxy.ListenPath)
 	})
 

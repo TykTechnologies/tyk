@@ -81,7 +81,7 @@ func TestGraphqlSubscriptionType(t *testing.T) {
 
 func TestConvertApiDefinitionHeadersToHttpHeaders(t *testing.T) {
 	t.Run("should return nil for empty input", func(t *testing.T) {
-		assert.Nil(t, convertApiDefinitionHeadersToHttpHeaders(nil))
+		assert.Nil(t, ConvertApiDefinitionHeadersToHttpHeaders(nil))
 	})
 
 	t.Run("should successfully convert API Definition header to Http Headers", func(t *testing.T) {
@@ -95,7 +95,7 @@ func TestConvertApiDefinitionHeadersToHttpHeaders(t *testing.T) {
 			"X-Tyk-Key":     {"value"},
 		}
 
-		actualHttpHeaders := convertApiDefinitionHeadersToHttpHeaders(apiDefinitionHeaders)
+		actualHttpHeaders := ConvertApiDefinitionHeadersToHttpHeaders(apiDefinitionHeaders)
 		assert.Equal(t, expectedHttpHeaders, actualHttpHeaders)
 	})
 }
@@ -114,7 +114,7 @@ func TestRemoveDuplicateApiDefinitionHeaders(t *testing.T) {
 		"Non-Duplicate-Header": "another_value",
 	}
 
-	actualDeduplicatedHeaders := removeDuplicateApiDefinitionHeaders(apiDefinitionHeadersFirstArgument, apiDefinitionHeadersSecondArgument)
+	actualDeduplicatedHeaders := RemoveDuplicateApiDefinitionHeaders(apiDefinitionHeadersFirstArgument, apiDefinitionHeadersSecondArgument)
 	assert.Equal(t, expectedDeduplicatedHeaders, actualDeduplicatedHeaders)
 }
 
