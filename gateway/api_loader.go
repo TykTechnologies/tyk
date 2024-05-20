@@ -1,10 +1,13 @@
 package gateway
 
 import (
+	"bufio"
 	"crypto/tls"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"net/http"
+	"net/http/httptest"
 	"net/url"
 	"path"
 	"path/filepath"
@@ -15,10 +18,10 @@ import (
 	"sync"
 	texttemplate "text/template"
 
-	"github.com/TykTechnologies/tyk/apidef/oas"
 	"github.com/TykTechnologies/tyk/rpc"
 
 	"github.com/gorilla/mux"
+	"github.com/gorilla/websocket"
 	"github.com/justinas/alice"
 	"github.com/rs/cors"
 	"github.com/sirupsen/logrus"
@@ -921,35 +924,189 @@ func (gw *Gateway) loadGraphQLPlayground(spec *APISpec, subrouter *mux.Router) {
 }
 
 type handleFuncAdapter struct {
-	gw   *Gateway
-	spec *APISpec
+	streamID string
+	gw       *Gateway
+	spec     *APISpec
 }
 
 func (h *handleFuncAdapter) HandleFunc(path string, f func(http.ResponseWriter, *http.Request)) {
-	mainLog.Debugf("Registering streaming handleFunc for path: %s, %v", path, h.spec.router)
-	// h.router.Walk(func(route *mux.Route, router *mux.Router, ancestors []*mux.Route) error {
-	// 	pathTemplate, err := route.GetPathTemplate()
-	// 	if err == nil {
-	// 		mainLog.Debug("Route:", pathTemplate)
-	// 	}
-	// 	return nil
-	// })
-	//
+	mainLog.Debugf("Registering streaming handleFunc for path: %s", path)
+
+	httpOutputConfig, _ := h.gw.StreamingServer.GetHTTPPaths("output", h.streamID)
 
 	wrappedFunc := func(w http.ResponseWriter, r *http.Request) {
 		mainLog.Debug("Entering debug for wrapped function on path: ", path)
 
+		// Define a function pointer to the original or overridden function
+		var targetFunc func(http.ResponseWriter, *http.Request) = f
+
+		if httpOutputConfig["ws_path"] == path {
+			mainLog.Debug("Handling websocket subscription")
+			targetFunc = handleWebsocket(h.gw, h.streamID)
+
+			// Internal benthos magic, we still need to consumer original handler
+			wsConsumer := consumeWebsocket(f)
+			defer wsConsumer.Close()
+		} else if httpOutputConfig["sse_path"] == path {
+			mainLog.Debug("Handling SSE subscription")
+			targetFunc = handleSSE(h.gw, h.streamID)
+
+			// Internal benthos magic, we still need to consumer original handler
+			sseConsumer := consumeSSE(f)
+			defer sseConsumer.Close()
+		}
+
 		specHandle, found := h.gw.apisHandlesByID.Load(h.spec.APIID)
 		if !found {
 			mainLog.Errorf("Could not find spec handle for API ID: %s", h.spec.APIID)
-			f(w, r)
+			targetFunc(w, r) // Use the targetFunc which might have been replaced based on path matching
 		} else {
 			mainLog.Debugf("Streaming chain: %d", len(specHandle.(*ChainObject).StreamingChain))
-			chain := alice.New(specHandle.(*ChainObject).StreamingChain...).ThenFunc(f)
+			chain := alice.New(specHandle.(*ChainObject).StreamingChain...).ThenFunc(targetFunc)
 			chain.ServeHTTP(w, r)
+			mainLog.Debug("Exiting debug for wrapped function on path: ", path)
 		}
 	}
 	h.spec.router.HandleFunc(path, wrappedFunc)
+}
+
+func consumeWebsocket(f func(http.ResponseWriter, *http.Request)) *httptest.Server {
+	server := httptest.NewServer(http.HandlerFunc(f))
+
+	go func() {
+		ws, _, err := websocket.DefaultDialer.Dial(strings.Replace(server.URL, "http", "ws", 1), nil)
+		if err != nil {
+			log.Fatal("dial:", err)
+		}
+
+		defer ws.Close()
+
+		for {
+			_, message, err := ws.ReadMessage()
+			if err != nil {
+				log.Println("read:", err)
+				return
+			}
+			log.Printf("recv: %s", message)
+		}
+	}()
+
+	return server
+}
+
+func consumeSSE(f func(http.ResponseWriter, *http.Request)) *httptest.Server {
+	server := httptest.NewServer(http.HandlerFunc(f))
+
+	go func() {
+		resp, err := http.Get(server.URL)
+		if err != nil {
+			log.Fatal("get:", err)
+		}
+		defer resp.Body.Close()
+
+		reader := bufio.NewReader(resp.Body)
+
+		for {
+			line, err := reader.ReadBytes('\n')
+			if err != nil {
+				if err == io.EOF {
+					break
+				}
+				log.Println("read:", err)
+				return
+			}
+			log.Printf("recv: %s", line)
+		}
+	}()
+
+	return server
+}
+
+func handleWebsocket(gw *Gateway, streamID string) http.HandlerFunc {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mainLog.Debug("Handling websocket request")
+		upgrader := websocket.Upgrader{
+			ReadBufferSize:  1024,
+			WriteBufferSize: 1024,
+			CheckOrigin: func(r *http.Request) bool {
+				// Check origin here if needed
+				return true
+			},
+		}
+
+		conn, err := upgrader.Upgrade(w, r, nil)
+		if err != nil {
+			log.Printf("Failed to set websocket upgrade: %+v", err)
+			return
+		}
+		defer conn.Close()
+
+		messageChan, err := gw.StreamingServer.Subscribe(streamID, 100)
+		defer gw.StreamingServer.Unsubscribe(streamID, messageChan)
+
+		if err != nil {
+			log.Printf("Failed to subscribe to stream: %+v", err)
+			return
+		}
+
+		for message := range messageChan {
+			if err := conn.WriteMessage(websocket.BinaryMessage, message); err != nil {
+				mainLog.Errorf("Failed to write message to websocket: %s", err)
+				break
+			} else {
+				mainLog.Debugf("Sent message to websocket: %s", message)
+			}
+		}
+	})
+}
+
+func handleSSE(gw *Gateway, streamID string) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		mainLog.Debug("Handling SSE request")
+		flusher, ok := w.(http.Flusher)
+		if !ok {
+			http.Error(w, "Streaming unsupported!", http.StatusInternalServerError)
+			return
+		}
+
+		w.Header().Set("Content-Type", "text/event-stream")
+		w.Header().Set("Cache-Control", "no-cache")
+		w.Header().Set("Connection", "keep-alive")
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+
+		messageChan, err := gw.StreamingServer.Subscribe(streamID, 100)
+		if err != nil {
+			log.Printf("Failed to subscribe to stream: %+v", err)
+			return
+		}
+		defer gw.StreamingServer.Unsubscribe(streamID, messageChan)
+
+		// Listen to connection close and un-register messageChan
+		notify := r.Context().Done()
+		go func() {
+			<-notify
+			// When the client closes the connection, un-register the message channel
+		}()
+
+		for {
+			select {
+			case message, ok := <-messageChan:
+				if !ok {
+					// Channel closed
+					return
+				}
+				// Write to the ResponseWriter
+				// Server Sent Events compatible
+				fmt.Fprintf(w, "data: %s\n\n", message)
+
+				// Flush the data immediately instead of buffering it for later.
+				flusher.Flush()
+			case <-notify:
+				// Client closed connection
+				return
+			}
+		}
+	}
 }
 
 // Create the individual API (app) specs based on live configurations and assign middleware
@@ -1042,20 +1199,17 @@ func (gw *Gateway) loadApps(specs []*APISpec) {
 
 	for _, spec := range specs {
 		// Check if the API is a streaming API and add it to the streaming server
-		if gw.GetConfig().Streaming.Enabled && spec.IsOAS {
-			if ext, ok := spec.OAS.T.Extensions[oas.ExtensionTykStreaming]; ok {
-				if streamsMap, ok := ext.(map[string]interface{}); ok {
-					if streams, ok := streamsMap["streams"].(map[string]interface{}); ok {
-						for streamID, stream := range streams {
-							if streamMap, ok := stream.(map[string]interface{}); ok {
-								if err := gw.StreamingServer.AddStream(spec.APIID+"_"+streamID, streamMap, &handleFuncAdapter{gw, spec}); err != nil {
-									mainLog.Errorf("Error adding stream to streaming server: %v", err)
-								} else {
-									activeStreams[spec.APIID+"_"+streamID] = struct{}{}
-									mainLog.Infof("Added stream %s to streaming server", spec.APIID+"_"+streamID)
-								}
-							}
-						}
+		for _, spec := range specs {
+			streamConfigs := spec.Streams()
+			for streamKey, stream := range streamConfigs {
+				if streamMap, ok := stream.(map[string]interface{}); ok {
+					streamID := spec.APIID + "_" + streamKey
+
+					if err := gw.StreamingServer.AddStream(streamID, streamMap, &handleFuncAdapter{gw: gw, spec: spec, streamID: streamID}); err != nil {
+						mainLog.Errorf("Error adding stream to streaming server: %v", err)
+					} else {
+						activeStreams[streamID] = struct{}{}
+						mainLog.Infof("Added stream %s to streaming server", streamID)
 					}
 				}
 			}
