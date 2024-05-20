@@ -37,6 +37,7 @@ const (
 type ChainObject struct {
 	ThisHandler    http.Handler
 	RateLimitChain http.Handler
+	StreamingChain []alice.Constructor
 	Open           bool
 	Skip           bool
 }
@@ -425,6 +426,10 @@ func (gw *Gateway) processSpec(spec *APISpec, apisByListen map[string]int,
 		gw.mwAppendEnabled(&chainArray, &RateLimitAndQuotaCheck{baseMid})
 	}
 
+	streamingChain := make([]alice.Constructor, 0)
+	streamingChain = append(streamingChain, chainArray...)
+	chainDef.StreamingChain = streamingChain
+
 	gw.mwAppendEnabled(&chainArray, &RateLimitForAPI{BaseMiddleware: baseMid})
 	gw.mwAppendEnabled(&chainArray, &GraphQLMiddleware{BaseMiddleware: baseMid})
 	if !spec.UseKeylessAccess {
@@ -805,7 +810,9 @@ func (gw *Gateway) loadHTTPService(spec *APISpec, apisByListen map[string]int, g
 		httpHandler := explicitRouteSubpaths(prefix, chainObj.ThisHandler, gwConfig.HttpServerOptions.EnableStrictRoutes)
 
 		// Attach handlers
-		subrouter.NewRoute().Handler(httpHandler)
+		route := subrouter.NewRoute().Handler(httpHandler)
+
+		spec.router = route.Subrouter()
 	}
 
 	return chainObj
@@ -913,6 +920,38 @@ func (gw *Gateway) loadGraphQLPlayground(spec *APISpec, subrouter *mux.Router) {
 	})
 }
 
+type handleFuncAdapter struct {
+	gw   *Gateway
+	spec *APISpec
+}
+
+func (h *handleFuncAdapter) HandleFunc(path string, f func(http.ResponseWriter, *http.Request)) {
+	mainLog.Debugf("Registering streaming handleFunc for path: %s, %v", path, h.spec.router)
+	// h.router.Walk(func(route *mux.Route, router *mux.Router, ancestors []*mux.Route) error {
+	// 	pathTemplate, err := route.GetPathTemplate()
+	// 	if err == nil {
+	// 		mainLog.Debug("Route:", pathTemplate)
+	// 	}
+	// 	return nil
+	// })
+	//
+
+	wrappedFunc := func(w http.ResponseWriter, r *http.Request) {
+		mainLog.Debug("Entering debug for wrapped function on path: ", path)
+
+		specHandle, found := h.gw.apisHandlesByID.Load(h.spec.APIID)
+		if !found {
+			mainLog.Errorf("Could not find spec handle for API ID: %s", h.spec.APIID)
+			f(w, r)
+		} else {
+			mainLog.Debugf("Streaming chain: %d", len(specHandle.(*ChainObject).StreamingChain))
+			chain := alice.New(specHandle.(*ChainObject).StreamingChain...).ThenFunc(f)
+			chain.ServeHTTP(w, r)
+		}
+	}
+	h.spec.router.HandleFunc(path, wrappedFunc)
+}
+
 // Create the individual API (app) specs based on live configurations and assign middleware
 func (gw *Gateway) loadApps(specs []*APISpec) {
 	mainLog.Info("Loading API configurations.")
@@ -1009,7 +1048,7 @@ func (gw *Gateway) loadApps(specs []*APISpec) {
 					if streams, ok := streamsMap["streams"].(map[string]interface{}); ok {
 						for streamID, stream := range streams {
 							if streamMap, ok := stream.(map[string]interface{}); ok {
-								if err := gw.StreamingServer.AddStream(spec.APIID+"_"+streamID, streamMap); err != nil {
+								if err := gw.StreamingServer.AddStream(spec.APIID+"_"+streamID, streamMap, &handleFuncAdapter{gw, spec}); err != nil {
 									mainLog.Errorf("Error adding stream to streaming server: %v", err)
 								} else {
 									activeStreams[spec.APIID+"_"+streamID] = struct{}{}
