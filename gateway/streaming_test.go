@@ -186,11 +186,19 @@ func TestAsyncAPIHttp(t *testing.T) {
 	)
 
 	streamingConfig := `
+logger:
+  level: ALL
+  format: logfmt
+  add_timestamp: true
+  static_fields:
+    '@service': benthos
+
 streams:
   test:
     input:
       http_server:
         path: /post
+        timeout: 1s
 
     output:
       http_server:
@@ -256,14 +264,21 @@ streams:
 
 	time.Sleep(500 * time.Millisecond)
 
-	// Create a websocket client
+	// Create first websocket client
 	dialer := websocket.Dialer{}
 	wsURL := "ws" + strings.TrimPrefix(ts.URL, "http") + "/streaming-api/get/ws"
-	wsConn, _, err := dialer.Dial(wsURL, nil)
+	wsConn1, _, err := dialer.Dial(wsURL, nil)
 	if err != nil {
 		t.Fatalf("Failed to connect to websocket: %v", err)
 	}
-	defer wsConn.Close()
+	defer wsConn1.Close()
+
+	// Create second websocket client
+	wsConn2, _, err := dialer.Dial(wsURL, nil)
+	if err != nil {
+		t.Fatalf("Failed to connect to websocket: %v", err)
+	}
+	defer wsConn2.Close()
 
 	// Send message to HTTP input
 	httpClient := &http.Client{}
@@ -282,14 +297,25 @@ streams:
 		t.Fatalf("Expected status code 200, got %d", resp.StatusCode)
 	}
 
-	// Read message from websocket
-	_, p, err := wsConn.ReadMessage()
+	// Read message from first websocket
+	_, p1, err := wsConn1.ReadMessage()
 	if err != nil {
-		t.Fatalf("Failed to read message from websocket: %v", err)
+		t.Fatalf("Failed to read message from first websocket: %v", err)
 	}
 
-	receivedMessage := string(p)
-	if receivedMessage != messageToSend {
-		t.Fatalf("Expected message '%s', got '%s'", messageToSend, receivedMessage)
+	receivedMessage1 := string(p1)
+	if receivedMessage1 != messageToSend {
+		t.Fatalf("Expected message '%s', got '%s' from first websocket", messageToSend, receivedMessage1)
+	}
+
+	// Read message from second websocket
+	_, p2, err := wsConn2.ReadMessage()
+	if err != nil {
+		t.Fatalf("Failed to read message from second websocket: %v", err)
+	}
+
+	receivedMessage2 := string(p2)
+	if receivedMessage2 != messageToSend {
+		t.Fatalf("Expected message '%s', got '%s' from second websocket", messageToSend, receivedMessage2)
 	}
 }
