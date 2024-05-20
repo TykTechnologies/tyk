@@ -17,13 +17,12 @@ import (
 )
 
 func (e *EngineV3) ProcessGraphQLComplexity(r *http.Request, accessDefinition *ComplexityAccessDefinition) (err error, statusCode int) {
-	e.logger.Error("graphql complexity checker not supported for v3-preview")
-	return ProxyingRequestFailedErr, http.StatusInternalServerError
+	return complexityFailReasonAsHttpStatusCode(e.complexityChecker.DepthLimitExceeded(r, accessDefinition))
 }
 
 func (e *EngineV3) ProcessGraphQLGranularAccess(w http.ResponseWriter, r *http.Request, accessDefinition *GranularAccessDefinition) (err error, statusCode int) {
-	e.logger.Error("graphql granular access not supported for v3-preview")
-	return ProxyingRequestFailedErr, http.StatusInternalServerError
+	result := e.granularAccessChecker.CheckGraphQLRequestFieldAllowance(w, r, accessDefinition)
+	return granularAccessFailReasonAsHttpStatusCode(e.logger, &result, w)
 }
 
 func (e *EngineV3) HandleReverseProxy(params ReverseProxyParams) (res *http.Response, hijacked bool, err error) {
