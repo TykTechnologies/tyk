@@ -5,9 +5,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/jensneuse/abstractlogger"
 	"io"
 	"net/http"
+
+	"github.com/jensneuse/abstractlogger"
 
 	"github.com/buger/jsonparser"
 
