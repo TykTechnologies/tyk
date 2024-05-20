@@ -217,6 +217,7 @@ type APISpec struct {
 	AnalyticsPluginConfig    *GoAnalyticsPlugin
 
 	middlewareChain *ChainObject
+	router          *mux.Router
 
 	network analytics.NetworkStats
 
