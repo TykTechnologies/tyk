@@ -571,6 +571,12 @@
         },
         "transformResponseHeaders": {
           "$ref": "#/definitions/X-Tyk-TransformHeaders"
+        },
+        "contextVariables": {
+          "$ref": "#/definitions/X-Tyk-ContextVariables"
+        },
+        "trafficLogs": {
+          "$ref": "#/definitions/X-Tyk-TrafficLogs"
         }
       }
     },
@@ -2023,6 +2029,17 @@
       ]
     },
     "X-Tyk-ContextVariables": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "enabled"
+      ]
+    },
+    "X-Tyk-TrafficLogs": {
       "type": "object",
       "properties": {
         "enabled": {

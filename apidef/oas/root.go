@@ -227,3 +227,39 @@ type VersionToID struct {
 	// ID is the API ID for the version set in Name.
 	ID string `bson:"id" json:"id"`
 }
+
+// enableContextVariablesIfEmpty enables context variables in middleware.global.contextVariables.
+// Context variables will be set only if it is not set, if it is already set to false, it won't be enabled.
+func (x *XTykAPIGateway) enableContextVariablesIfEmpty() {
+	if x.Middleware == nil {
+		x.Middleware = &Middleware{}
+	}
+
+	if x.Middleware.Global == nil {
+		x.Middleware.Global = &Global{}
+	}
+
+	if x.Middleware.Global.ContextVariables == nil {
+		x.Middleware.Global.ContextVariables = &ContextVariables{
+			Enabled: true,
+		}
+	}
+}
+
+// enableTrafficLogsIfEmpty enables traffic logs in middleware.global.trafficLogs.
+// Traffic logs will be set only if it is not set. If it is already set to false, it won't be enabled.
+func (x *XTykAPIGateway) enableTrafficLogsIfEmpty() {
+	if x.Middleware == nil {
+		x.Middleware = &Middleware{}
+	}
+
+	if x.Middleware.Global == nil {
+		x.Middleware.Global = &Global{}
+	}
+
+	if x.Middleware.Global.TrafficLogs == nil {
+		x.Middleware.Global.TrafficLogs = &TrafficLogs{
+			Enabled: true,
+		}
+	}
+}
