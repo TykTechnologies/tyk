@@ -19,7 +19,6 @@ type Key uint
 
 const (
 	SessionData Key = iota
-	UpdateSession
 	AuthToken
 	HashedAuthToken
 	VersionData
