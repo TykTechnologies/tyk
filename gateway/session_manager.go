@@ -290,9 +290,7 @@ func (l *SessionLimiter) RedisQuotaExceeded(r *http.Request, currentSession *use
 		return false
 	}
 
-	defer func() {
-		ctxScheduleSessionUpdate(r)
-	}()
+	currentSession.Touch()
 
 	quotaScope := ""
 	if scope != "" {

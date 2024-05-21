@@ -325,7 +325,7 @@ func (t *BaseMiddleware) UpdateRequestSession(r *http.Request) bool {
 		return false
 	}
 
-	if !ctxSessionUpdateScheduled(r) {
+	if !session.IsModified() {
 		return false
 	}
 
@@ -334,10 +334,6 @@ func (t *BaseMiddleware) UpdateRequestSession(r *http.Request) bool {
 		t.Logger().WithError(err).Error("Can't update session")
 		return false
 	}
-
-	// Set context state back
-	// Useful for benchmarks when request object stays same
-	ctxDisableSessionUpdate(r)
 
 	if !t.Spec.GlobalConfig.LocalSessionCache.DisableCacheSessionState {
 		t.Gw.SessionCache.Set(session.KeyHash(), session.Clone(), cache.DefaultExpiration)
@@ -873,7 +869,9 @@ func (t *BaseMiddleware) CheckSessionAndIdentityForValidKey(originalKey string, 
 		}
 
 		t.Logger().Debug("Lifetime is: ", session.Lifetime(t.Spec.GetSessionLifetimeRespectsKeyExpiration(), t.Spec.SessionLifetime, t.Gw.GetConfig().ForceGlobalSessionLifetime, t.Gw.GetConfig().GlobalSessionLifetime))
-		ctxScheduleSessionUpdate(r)
+
+		session.Touch()
+
 		return session, found
 	}
 
