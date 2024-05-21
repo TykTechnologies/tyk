@@ -16,8 +16,55 @@ import (
 	"github.com/TykTechnologies/tyk/storage"
 )
 
-// TestRollingWindow_GetCount is an integration test that tests counter behaviour.
-func TestRollingWindow_GetCount(t *testing.T) {
+// TestSlidingLog_Do is an integration test that tests counter behaviour.
+func TestSlidingLog_Do(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+
+	conf, err := config.New()
+	assert.NoError(t, err)
+
+	conn, err := storage.NewConnector(storage.DefaultConn, *conf)
+	assert.Nil(t, err)
+
+	var db redis.UniversalClient
+	ok := conn.As(&db)
+	assert.True(t, ok)
+
+	for _, tx := range []bool{true, false} {
+		rl := rate.NewSlidingLogRedis(db, tx, func(ctx context.Context, key string, currentRate int64, maxAllowedRate int64) bool {
+			assert.Equal(t, "key", key)
+			assert.Equal(t, int64(40), maxAllowedRate)
+			return true
+		})
+		assert.NotNil(t, rl)
+
+		result, err := rl.Do(ctx, time.Now(), "key", 40, 10)
+		assert.True(t, result)
+		assert.NoError(t, err)
+	}
+}
+
+type dummyClientProvider struct{}
+
+func (*dummyClientProvider) Client() (redis.UniversalClient, error) {
+	return nil, io.EOF
+}
+
+// TestSlidingLog_Errors covers some error branches.
+func TestSlidingLog_Errors(t *testing.T) {
+	var err error
+
+	_, err = rate.NewSlidingLog(nil, true, nil)
+	assert.Error(t, err)
+
+	_, err = rate.NewSlidingLog(&dummyClientProvider{}, true, nil)
+	assert.Error(t, io.EOF, err)
+}
+
+// TestSlidingLog_GetCount is an integration test that tests counter behaviour.
+func TestSlidingLog_GetCount(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()
@@ -37,8 +84,8 @@ func TestRollingWindow_GetCount(t *testing.T) {
 	}
 }
 
-// TestRollingWindow_Get is an integration test that tests log behaviour.
-func TestRollingWindow_Get(t *testing.T) {
+// TestSlidingLog_Get is an integration test that tests log behaviour.
+func TestSlidingLog_Get(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()
@@ -58,8 +105,8 @@ func TestRollingWindow_Get(t *testing.T) {
 	}
 }
 
-// TestRollingWindow_pipelinerError is testing that pipeline errors are returned as expected.
-func TestRollingWindow_pipelinerError(t *testing.T) {
+// TestSlidingLog_pipelinerError is testing that pipeline errors are returned as expected.
+func TestSlidingLog_pipelinerError(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()
@@ -159,7 +206,7 @@ func assertNew(ctx context.Context, tb testing.TB, conn redis.UniversalClient, t
 	assert.NotNil(tb, rl)
 }
 
-func BenchmarkRollingWindow_New(b *testing.B) {
+func BenchmarkSlidingLog_New(b *testing.B) {
 	ctx := context.Background()
 
 	conf, err := config.New()
@@ -180,7 +227,7 @@ func BenchmarkRollingWindow_New(b *testing.B) {
 	})
 }
 
-func BenchmarkRollingWindow_Count(b *testing.B) {
+func BenchmarkSlidingLog_Count(b *testing.B) {
 	ctx := context.Background()
 
 	conf, err := config.New()
