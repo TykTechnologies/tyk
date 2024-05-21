@@ -18,8 +18,11 @@ type RateLimitSmoothing struct {
 	Interval int64 `json:"interval" bson:"interval"`
 
 	// Treshold is the value above which gateway will apply smoothing.
-	Threshold int64 `json:"threshold" bson:"treshold"`
+	Threshold int64 `json:"threshold" bson:"threshold"`
 
+	// Triger holds a value between 0..1 and is used as a percentage value of the
+	// rate limit to reach, before triggering a SmoothingUp event. Similarly the
+	// value is also used to decrease the allowance when rate limits decrease.
 	Trigger float64 `json:"trigger" bson:"trigger"`
 
 	// Allowance is the current allowance in effect. It's not
