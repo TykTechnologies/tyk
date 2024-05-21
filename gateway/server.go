@@ -1903,9 +1903,10 @@ func (gw *Gateway) setupPortsWhitelist() {
 }
 
 func (gw *Gateway) startServer() {
-	if gw.GetConfig().Streaming.Enabled {
-		gw.StreamingServer = streaming.NewStreamManager()
-	}
+	streamingConn := &storage.RedisCluster{ConnectionHandler: gw.StorageConnectionHandler}
+	client, _ := streamingConn.Client()
+
+	gw.StreamingServer = streaming.NewStreamManager(client)
 
 	// Ensure that Control listener and default http listener running on first start
 	muxer := &proxyMux{}

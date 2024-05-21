@@ -1042,8 +1042,28 @@ func handleWebsocket(gw *Gateway, streamID string) http.HandlerFunc {
 		}
 		defer conn.Close()
 
-		messageChan, err := gw.StreamingServer.Subscribe(streamID, 100)
-		defer gw.StreamingServer.Unsubscribe(streamID, messageChan)
+		session := ctxGetSession(r)
+		consumer_group := ctxGetAuthToken(r)
+		streamConsumerGroup, _ := gw.StreamingServer.ConsumerGroup(streamID)
+
+		if streamConsumerGroup != "" {
+			consumer_group = streamConsumerGroup
+		}
+
+		if session != nil {
+			if pattern, found := session.MetaData["consumer_group"]; found {
+				if patternString, ok := pattern.(string); ok && patternString != "" {
+					consumer_group = patternString
+				}
+			}
+		}
+
+		if customKeyValue := gw.replaceTykVariables(r, consumer_group, false); customKeyValue != "" {
+			consumer_group = customKeyValue
+		}
+
+		messageChan, err := gw.StreamingServer.Subscribe(streamID, consumer_group, 100)
+		defer gw.StreamingServer.Unsubscribe(streamID, consumer_group, messageChan)
 
 		if err != nil {
 			log.Printf("Failed to subscribe to stream: %+v", err)
@@ -1075,12 +1095,32 @@ func handleSSE(gw *Gateway, streamID string) http.HandlerFunc {
 		w.Header().Set("Connection", "keep-alive")
 		w.Header().Set("Access-Control-Allow-Origin", "*")
 
-		messageChan, err := gw.StreamingServer.Subscribe(streamID, 100)
+		session := ctxGetSession(r)
+		consumer_group := ctxGetAuthToken(r)
+		streamConsumerGroup, _ := gw.StreamingServer.ConsumerGroup(streamID)
+
+		if streamConsumerGroup != "" {
+			consumer_group = streamConsumerGroup
+		}
+
+		if session != nil {
+			if pattern, found := session.MetaData["consumer_group"]; found {
+				if patternString, ok := pattern.(string); ok && patternString != "" {
+					consumer_group = patternString
+				}
+			}
+		}
+
+		if customKeyValue := gw.replaceTykVariables(r, consumer_group, false); customKeyValue != "" {
+			consumer_group = customKeyValue
+		}
+
+		messageChan, err := gw.StreamingServer.Subscribe(streamID, consumer_group, 100)
 		if err != nil {
 			log.Printf("Failed to subscribe to stream: %+v", err)
 			return
 		}
-		defer gw.StreamingServer.Unsubscribe(streamID, messageChan)
+		defer gw.StreamingServer.Unsubscribe(streamID, consumer_group, messageChan)
 
 		// Listen to connection close and un-register messageChan
 		notify := r.Context().Done()
