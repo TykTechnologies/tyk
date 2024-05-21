@@ -94,7 +94,9 @@ const (
 	WebhookKind Kind = "webhook"
 )
 
-const eventContextKey = "events"
+type contextKey string
+
+const eventContextKey contextKey = "events"
 
 // Add adds an event to the request context.
 // Add adds an event to the context value in the request.
