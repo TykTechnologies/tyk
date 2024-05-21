@@ -82,7 +82,7 @@ func (l *SessionLimiter) Context() context.Context {
 	return l.ctx
 }
 
-func (l *SessionLimiter) rateLimitSmoothing(ctx context.Context, rate, currentRate int64) bool {
+func (l *SessionLimiter) rateLimitSmoothing(ctx context.Context, key string, rate, currentRate int64) bool {
 	// Subtract by 1 because of the delayed add in the window
 	var subtractor int64 = 1
 	if l.config.EnableSentinelRateLimiter || l.config.DRLEnableSentinelRateLimiter {
@@ -93,11 +93,11 @@ func (l *SessionLimiter) rateLimitSmoothing(ctx context.Context, rate, currentRa
 	return currentRate > rate-subtractor
 }
 
-func (l *SessionLimiter) doRollingWindowWrite(rateLimiterKey, rateLimiterSentinelKey string,
-	store storage.Handler,
+func (l *SessionLimiter) doRollingWindowWrite(rateLimiterKey string,
 	apiLimit *user.APILimit, dryRun bool) bool {
 
 	ctx := l.Context()
+	rateLimiterSentinelKey := rateLimiterKey + SentinelRateLimitKeyPostfix
 
 	var per, cost float64
 
@@ -108,18 +108,13 @@ func (l *SessionLimiter) doRollingWindowWrite(rateLimiterKey, rateLimiterSentine
 
 	pipeline := l.config.EnableNonTransactionalRateLimiter
 
-	ratelimit, err := rate.NewSlidingLog(store, pipeline, l.rateLimitSmoothing)
-	if err != nil {
-		log.WithError(err).Error("error creating sliding log")
-		return true
-	}
-
+	ratelimit := rate.NewSlidingLogRedis(l.limiterStorage, pipeline, l.rateLimitSmoothing)
 	shouldBlock, err := ratelimit.Do(ctx, time.Now(), rateLimiterKey, int64(cost), int64(per))
 	if shouldBlock {
 		// Set a sentinel value with expire
 		if l.config.EnableSentinelRateLimiter || l.config.DRLEnableSentinelRateLimiter {
 			if !dryRun {
-				store.SetRawKey(rateLimiterSentinelKey, "1", int64(per))
+				l.limiterStorage.SetNX(ctx, rateLimiterSentinelKey, "1", time.Second*time.Duration(int64(per)))
 			}
 		}
 	}
@@ -140,24 +135,20 @@ const (
 	sessionFailInternalServerError
 )
 
-func (l *SessionLimiter) limitSentinel(rateLimiterKey string, store storage.Handler, apiLimit *user.APILimit, dryRun bool) bool {
-	rateLimiterSentinelKey := rateLimiterKey + SentinelRateLimitKeyPostfix
-
+func (l *SessionLimiter) limitSentinel(rateLimiterKey string, apiLimit *user.APILimit, dryRun bool) bool {
 	defer func() {
-		go l.doRollingWindowWrite(rateLimiterKey, rateLimiterSentinelKey, store, apiLimit, dryRun)
+		go l.doRollingWindowWrite(rateLimiterKey, apiLimit, dryRun)
 	}()
 
 	// Check sentinel
-	_, sentinelActive := store.GetRawKey(rateLimiterSentinelKey)
+	_, sentinelActive := l.limiterStorage.Get(l.Context(), rateLimiterKey+SentinelRateLimitKeyPostfix).Result()
 
 	// Sentinel is set, fail
 	return sentinelActive == nil
 }
 
-func (l *SessionLimiter) limitRedis(rateLimiterKey string, store storage.Handler, apiLimit *user.APILimit, dryRun bool) bool {
-	rateLimiterSentinelKey := rateLimiterKey + SentinelRateLimitKeyPostfix
-
-	return l.doRollingWindowWrite(rateLimiterKey, rateLimiterSentinelKey, store, apiLimit, dryRun)
+func (l *SessionLimiter) limitRedis(rateLimiterKey string, apiLimit *user.APILimit, dryRun bool) bool {
+	return l.doRollingWindowWrite(rateLimiterKey, apiLimit, dryRun)
 }
 
 func (l *SessionLimiter) limitDRL(bucketKey string, apiLimit *user.APILimit, dryRun bool) bool {
@@ -239,11 +230,11 @@ func (l *SessionLimiter) ForwardMessage(r *http.Request, currentSession *user.Se
 			}
 
 		case l.config.EnableSentinelRateLimiter:
-			if l.limitSentinel(limiterKey, store, &accessDef.Limit, dryRun) {
+			if l.limitSentinel(limiterKey, &accessDef.Limit, dryRun) {
 				return sessionFailRateLimit
 			}
 		case l.config.EnableRedisRollingLimiter:
-			if l.limitRedis(limiterKey, store, &accessDef.Limit, dryRun) {
+			if l.limitRedis(limiterKey, &accessDef.Limit, dryRun) {
 				return sessionFailRateLimit
 			}
 		default:
@@ -271,7 +262,7 @@ func (l *SessionLimiter) ForwardMessage(r *http.Request, currentSession *user.Se
 					return sessionFailRateLimit
 				}
 			} else {
-				if l.limitRedis(limiterKey, store, &accessDef.Limit, dryRun) {
+				if l.limitRedis(limiterKey, &accessDef.Limit, dryRun) {
 					return sessionFailRateLimit
 				}
 			}
