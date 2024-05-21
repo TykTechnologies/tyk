@@ -165,10 +165,12 @@ func NewSessionState() *SessionState {
 }
 
 // Touch will mark the session as modified in order to trigger an update.
+// Touch marks the session as modified, indicating that it should be updated.
 func (s *SessionState) Touch() {
 	s.modified = true
 }
 
+// IsModified checks if the session has been marked as modified.
 // IsModified will return true if session has been modified to trigger an update.
 func (s *SessionState) IsModified() bool {
 	return s.modified

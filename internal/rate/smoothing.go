@@ -11,6 +11,7 @@ import (
 // Smoothing will process the rate limit smoothing based on passed arguments.
 // The first returned value indicates if smoothing was performed. An optionally filled error
 // returns any details as to why smoothing wasn't performed for logging purposes.
+// Smoothing processes the rate limit smoothing based on the provided session settings and current rate.
 func Smoothing(r *http.Request, session *apidef.RateLimitSmoothing, key string, currentRate int64, maxAllowedRate int64) (bool, error) {
 	// Rate limit smoothing is disabled, no change, no error.
 	if !session.Valid() {

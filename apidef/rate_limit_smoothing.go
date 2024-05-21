@@ -35,6 +35,7 @@ type RateLimitSmoothing struct {
 	AllowanceNextUpdateAt time.Time `json:"allowance_next_update_at" bson:"-"`
 }
 
+// Valid checks if the rate limit smoothing settings are valid and should be applied.
 // Valid will return true if the rate limit smoothing should be applied.
 func (r *RateLimitSmoothing) Valid() bool {
 	if err := r.Err(); err != nil {
@@ -43,6 +44,7 @@ func (r *RateLimitSmoothing) Valid() bool {
 	return true
 }
 
+// Err checks the rate limit smoothing configuration for validity and returns an error if it is not valid.
 // Err will return an error if the rate limit smoothing configuration is not valid.
 // It checks for a nil value, the enabled flag, and valid values for each setting.
 func (r *RateLimitSmoothing) Err() error {
@@ -66,17 +68,20 @@ func (r *RateLimitSmoothing) Err() error {
 	return nil
 }
 
+// GetInterval returns the interval for rate limit smoothing as a time.Duration.
 // GetInterval returns a time.Duration of the configured interval value.
 func (r *RateLimitSmoothing) GetInterval() time.Duration {
 	return time.Second * time.Duration(r.Interval)
 }
 
+// SetAllowance updates the current allowance to the specified value and sets the next update time based on the interval.
 // SetAllowance will update the allowance and set a new timestamp for the next update.
 func (r *RateLimitSmoothing) SetAllowance(allowance int64) {
 	r.Allowance = allowance
 	r.AllowanceNextUpdateAt = time.Now().Add(r.GetInterval())
 }
 
+// CanSetAllowance checks if the allowance can be updated based on the configured interval.
 // CanSetAllowance will return true if allowance can be updated based on the configured interval.
 func (r *RateLimitSmoothing) CanSetAllowance() bool {
 	return time.Since(r.AllowanceNextUpdateAt) > 0

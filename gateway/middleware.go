@@ -886,6 +886,7 @@ func (t *BaseMiddleware) FireEvent(name apidef.TykEvent, meta interface{}) {
 	fireEvent(name, meta, t.Spec.EventPaths)
 }
 
+// emitRateLimitEvents emits rate limit related events based on the request context.
 func (t *BaseMiddleware) emitRateLimitEvents(r *http.Request, rateLimitKey string) {
 	// Emit events triggered from request context.
 	if events := event.Get(r.Context()); len(events) > 0 {
@@ -898,6 +899,7 @@ func (t *BaseMiddleware) emitRateLimitEvents(r *http.Request, rateLimitKey strin
 	}
 }
 
+// emitRateLimitEvent emits a specific rate limit event with an optional custom message.
 func (t *BaseMiddleware) emitRateLimitEvent(r *http.Request, e event.Event, message string, rateLimitKey string) {
 	if message == "" {
 		message = e.String()
@@ -916,6 +918,7 @@ func (t *BaseMiddleware) emitRateLimitEvent(r *http.Request, e event.Event, mess
 	})
 }
 
+// handleRateLimitFailure handles the actions to be taken when a rate limit failure occurs.
 func (t *BaseMiddleware) handleRateLimitFailure(r *http.Request, e event.Event, message string, rateLimitKey string) (error, int) {
 	t.emitRateLimitEvent(r, e, message, rateLimitKey)
 

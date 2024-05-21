@@ -92,6 +92,7 @@ const (
 
 const eventContextKey = "events"
 
+// Add adds an event to the request context.
 // Add adds an event to the context value in the request.
 func Add(r *http.Request, event Event) {
 	ctx := r.Context()
@@ -102,11 +103,13 @@ func Add(r *http.Request, event Event) {
 	*r = *(r.WithContext(Set(ctx, events)))
 }
 
+// Set updates the context with the provided events and returns the new context.
 // Set will update the context with a new value and return the new context.
 func Set(ctx context.Context, events []Event) context.Context {
 	return context.WithValue(ctx, eventContextKey, events)
 }
 
+// Get retrieves the events from the context.
 // Get will get the events from context. It will return nil if no events in context.
 func Get(ctx context.Context) []Event {
 	v, _ := ctx.Value(eventContextKey).([]Event)
