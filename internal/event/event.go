@@ -1,5 +1,10 @@
 package event
 
+import (
+	"context"
+	"net/http"
+)
+
 // Event is the type to bind events.
 type Event string
 
@@ -70,3 +75,26 @@ const (
 	// WebhookKind is the action to be specified in OAS API definition.
 	WebhookKind Kind = "webhook"
 )
+
+const eventContextKey = "events"
+
+// Add adds an event to the context value in the request.
+func Add(r *http.Request, event Event) {
+	ctx := r.Context()
+
+	events := Get(ctx)
+	events = append(events, event)
+
+	*r = *(r.WithContext(Set(ctx, events)))
+}
+
+// Set will update the context with a new value and return the new context.
+func Set(ctx context.Context, events []Event) context.Context {
+	return context.WithValue(ctx, eventContextKey, events)
+}
+
+// Get will get the events from context. It will return nil if no events in context.
+func Get(ctx context.Context) []Event {
+	v, _ := ctx.Value(eventContextKey).([]Event)
+	return v
+}
