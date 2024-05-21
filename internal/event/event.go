@@ -6,8 +6,6 @@ type Event string
 const (
 	// QuotaExceeded is the event triggered when quota for a specific key has been exceeded.
 	QuotaExceeded Event = "QuotaExceeded"
-	// RateLimitExceeded is the event triggered when rate limit has been exceeded for a specific key.
-	RateLimitExceeded Event = "RatelimitExceeded"
 	// AuthFailure is the event triggered when key has failed authentication or has attempted access and was denied.
 	AuthFailure Event = "AuthFailure"
 	// KeyExpired is the event triggered when a key has attempted access but is expired.
@@ -37,6 +35,18 @@ const (
 	TokenUpdated Event = "TokenUpdated"
 	// TokenDeleted is the event triggered when a token is deleted.
 	TokenDeleted Event = "TokenDeleted"
+)
+
+// Rate limiter events
+const (
+	// RateLimitExceeded is the event triggered when rate limit has been exceeded for a specific key.
+	RateLimitExceeded Event = "RatelimitExceeded"
+
+	// RateLimitSmoothingUp is the event triggered when rate limit smoothing increases the rate limits.
+	RateLimitSmoothingUp Event = "RateLimitSmoothingUp"
+
+	// RateLimitSmoothingDown is the event triggered when rate limit smoothing decreases the rate limits.
+	RateLimitSmoothingDown Event = "RateLimitSmoothingDown"
 )
 
 // HandlerName to be used as handler codes in API definitions.
