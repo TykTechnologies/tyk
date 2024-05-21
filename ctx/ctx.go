@@ -75,8 +75,9 @@ func ctxSetSession(r *http.Request, s *user.SessionState, scheduleUpdate bool, h
 	ctx = context.WithValue(ctx, SessionData, s)
 
 	ctx = context.WithValue(ctx, AuthToken, s.KeyID)
+
 	if scheduleUpdate {
-		ctx = context.WithValue(ctx, UpdateSession, true)
+		s.Touch()
 	}
 
 	setContext(r, ctx)
