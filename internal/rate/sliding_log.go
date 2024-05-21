@@ -179,7 +179,7 @@ func (r *SlidingLog) Get(ctx context.Context, now time.Time, keyName string, per
 }
 
 // Do will return two values, the first indicates if a request should be blocked, and the second
-// returns an error if any occured. In case an error occurs, the first value will be `true`.
+// returns an error if any occurred. In case an error occurs, the first value will be `true`.
 // If there are issues with storage availability for example, requests will be blocked rather
 // than let through, as no rate limit can be enforced without storage.
 func (r *SlidingLog) Do(ctx context.Context, now time.Time, key string, maxAllowedRate int64, per int64) (bool, error) {

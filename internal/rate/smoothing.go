@@ -38,7 +38,7 @@ func Smoothing(r *http.Request, session *apidef.RateLimitSmoothing, key string, 
 	}
 
 	if newAllowance == 0 {
-		// no smoothing occured
+		// no smoothing occurred
 		return false, nil
 	}
 
