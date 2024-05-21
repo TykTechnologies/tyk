@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/TykTechnologies/tyk/internal/cache"
+	"github.com/TykTechnologies/tyk/internal/event"
 	"github.com/TykTechnologies/tyk/internal/otel"
 	"github.com/TykTechnologies/tyk/rpc"
 
@@ -883,6 +884,45 @@ func (t *BaseMiddleware) CheckSessionAndIdentityForValidKey(originalKey string, 
 // FireEvent is added to the BaseMiddleware object so it is available across the entire stack
 func (t *BaseMiddleware) FireEvent(name apidef.TykEvent, meta interface{}) {
 	fireEvent(name, meta, t.Spec.EventPaths)
+}
+
+func (t *BaseMiddleware) emitRateLimitEvents(r *http.Request, rateLimitKey string) {
+	// Emit events triggered from request context.
+	if events := event.Get(r.Context()); len(events) > 0 {
+		for _, e := range events {
+			switch e {
+			case event.RateLimitSmoothingUp, event.RateLimitSmoothingDown:
+				t.emitRateLimitEvent(r, e, "", rateLimitKey)
+			}
+		}
+	}
+}
+
+func (t *BaseMiddleware) emitRateLimitEvent(r *http.Request, e event.Event, message string, rateLimitKey string) {
+	if message == "" {
+		message = e.String()
+	}
+
+	t.Logger().WithField("key", t.Gw.obfuscateKey(rateLimitKey)).Info(message)
+
+	t.FireEvent(e, EventKeyFailureMeta{
+		EventMetaDefault: EventMetaDefault{
+			Message:            message,
+			OriginatingRequest: EncodeRequestToEvent(r),
+		},
+		Path:   r.URL.Path,
+		Origin: request.RealIP(r),
+		Key:    rateLimitKey,
+	})
+}
+
+func (t *BaseMiddleware) handleRateLimitFailure(r *http.Request, e event.Event, message string, rateLimitKey string) (error, int) {
+	t.emitRateLimitEvent(r, e, message, rateLimitKey)
+
+	// Report in health check
+	reportHealthValue(t.Spec, Throttle, "-1")
+
+	return errors.New(e.String()), http.StatusTooManyRequests
 }
 
 func (t *BaseMiddleware) getAuthType() string {
