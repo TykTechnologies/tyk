@@ -54,6 +54,20 @@ const (
 	RateLimitSmoothingDown Event = "RateLimitSmoothingDown"
 )
 
+// eventMap contains a map of events to a readable title for the event.
+// The title value should not contain ending punctuation.
+var eventMap = map[Event]string{
+	RateLimitExceeded:      "Key Rate Limit Exceeded",
+	RateLimitSmoothingUp:   "Rate limits increased with smoothing",
+	RateLimitSmoothingDown: "Rate limits decreased with smoothing",
+}
+
+// String will return the description for the event if any.
+func (e Event) String() string {
+	v, _ := eventMap[e]
+	return v
+}
+
 // HandlerName to be used as handler codes in API definitions.
 type HandlerName string
 
