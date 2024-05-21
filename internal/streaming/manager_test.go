@@ -8,7 +8,7 @@ import (
 )
 
 func TestStreamingServer(t *testing.T) {
-	s := NewStreamManager()
+	s := NewStreamManager(nil)
 	// Do not call Stop because it cause os.Exit(0), instead Reset ensure that streams will be cleaned up in the end of test
 	defer s.Reset()
 
@@ -68,7 +68,7 @@ output:
 }
 
 func TestGetHTTPPaths(t *testing.T) {
-	s := NewStreamManager()
+	s := NewStreamManager(nil)
 	defer s.Reset()
 
 	streamID := "test-stream"
@@ -120,5 +120,43 @@ output:
 		if outputPaths[key] != expected {
 			t.Errorf("Expected output %s to be %s, got %s", key, expected, outputPaths[key])
 		}
+	}
+}
+
+func TestConsumerGroup(t *testing.T) {
+	s := NewStreamManager(nil)
+	defer s.Reset()
+
+	streamID := "test-stream"
+	consumerGroup := "test-group"
+	configPayload := []byte(`input:
+  type: generate
+  generate:
+    count: 1
+    interval: ""
+    mapping: |
+      root.content = "test message"
+
+output:
+  http_server:
+    consumer_group: "` + consumerGroup + `"`)
+
+	var config map[string]interface{}
+	if err := yaml.Unmarshal(configPayload, &config); err != nil {
+		t.Fatalf("Failed to unmarshal config payload: %v", err)
+	}
+
+	err := s.AddStream(streamID, config, nil)
+	if err != nil {
+		t.Fatalf("Failed to add stream: %v", err)
+	}
+
+	cg, exists := s.ConsumerGroup(streamID)
+	if !exists {
+		t.Fatalf("Consumer group for stream %s was not found", streamID)
+	}
+
+	if cg != consumerGroup {
+		t.Errorf("Expected consumer group to be %s, got %s", consumerGroup, cg)
 	}
 }
