@@ -1,14 +1,36 @@
 package event
 
 import (
+	"context"
 	"net/http"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 )
 
+func TestEventToString(t *testing.T) {
+	t.Parallel()
+
+	t.Run("Event with description", func(t *testing.T) {
+		t.Parallel()
+
+		s := String(RateLimitExceeded)
+		assert.NotEmpty(t, s)
+		assert.Contains(t, s, " ")
+	})
+
+	t.Run("Event without description", func(t *testing.T) {
+		t.Parallel()
+
+		s := String(Event("invalid"))
+		assert.Equal(t, "invalid", s)
+	})
+}
+
 func TestAddEventToRequest(t *testing.T) {
-	req, err := http.NewRequest("GET", "http://example.com", nil)
+	t.Parallel()
+
+	req, err := http.NewRequestWithContext(context.Background(), "GET", "http://example.com", nil)
 	assert.NoError(t, err)
 
 	// Test adding events to the request context
