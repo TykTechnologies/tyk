@@ -63,9 +63,13 @@ var eventMap = map[Event]string{
 }
 
 // String will return the description for the event if any.
-func (e Event) String() string {
-	v, _ := eventMap[e]
-	return v
+// If no description exists, it will return the event value.
+func String(e Event) string {
+	v, ok := eventMap[e]
+	if ok {
+		return v
+	}
+	return string(e)
 }
 
 // HandlerName to be used as handler codes in API definitions.

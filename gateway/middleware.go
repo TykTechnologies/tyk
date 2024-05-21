@@ -905,7 +905,7 @@ func (t *BaseMiddleware) emitRateLimitEvents(r *http.Request, rateLimitKey strin
 // emitRateLimitEvent emits a specific rate limit event with an optional custom message.
 func (t *BaseMiddleware) emitRateLimitEvent(r *http.Request, e event.Event, message string, rateLimitKey string) {
 	if message == "" {
-		message = e.String()
+		message = event.String(e)
 	}
 
 	t.Logger().WithField("key", t.Gw.obfuscateKey(rateLimitKey)).Info(message)
@@ -928,7 +928,7 @@ func (t *BaseMiddleware) handleRateLimitFailure(r *http.Request, e event.Event, 
 	// Report in health check
 	reportHealthValue(t.Spec, Throttle, "-1")
 
-	return errors.New(e.String()), http.StatusTooManyRequests
+	return errors.New(event.String(e)), http.StatusTooManyRequests
 }
 
 func (t *BaseMiddleware) getAuthType() string {
