@@ -336,6 +336,9 @@ func (t *BaseMiddleware) UpdateRequestSession(r *http.Request) bool {
 		return false
 	}
 
+	// Reset session state, useful for benchmarks when request object stays the same.
+	session.Reset()
+
 	if !t.Spec.GlobalConfig.LocalSessionCache.DisableCacheSessionState {
 		t.Gw.SessionCache.Set(session.KeyHash(), session.Clone(), cache.DefaultExpiration)
 	}
