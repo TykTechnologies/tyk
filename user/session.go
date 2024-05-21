@@ -169,6 +169,11 @@ func (s *SessionState) Touch() {
 	s.modified = true
 }
 
+// Reset marks the session as not modified, skipping related updates.
+func (s *SessionState) Reset() {
+	s.modified = false
+}
+
 // IsModified will return true if session has been modified to trigger an update.
 func (s *SessionState) IsModified() bool {
 	return s.modified
