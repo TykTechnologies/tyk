@@ -122,6 +122,7 @@ func (k *AuthKey) ProcessRequest(_ http.ResponseWriter, r *http.Request, _ inter
 
 	session, keyExists = k.CheckSessionAndIdentityForValidKey(key, r)
 	key = session.KeyID
+	hashedKey := session.KeyHash()
 	if !keyExists {
 		// fallback to search by cert
 		session, keyExists = k.CheckSessionAndIdentityForValidKey(certHash, r)
@@ -152,7 +153,7 @@ func (k *AuthKey) ProcessRequest(_ http.ResponseWriter, r *http.Request, _ inter
 		ctxSetSession(r, &session, updateSession, k.Gw.GetConfig().HashKeys)
 		k.setContextVars(r, key)
 		ctxSetSpanAttributes(r, k.Name(), []otel.SpanAttribute{
-			otel.APIKeyAttribute(key),
+			otel.APIKeyAttribute(hashedKey),
 			otel.APIKeyAliasAttribute(session.Alias),
 		}...)
 	}

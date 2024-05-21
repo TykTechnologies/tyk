@@ -130,7 +130,7 @@ func (k *Oauth2KeyExists) ProcessRequest(w http.ResponseWriter, r *http.Request,
 	switch k.Spec.BaseIdentityProvidedBy {
 	case apidef.OAuthKey, apidef.UnsetAuth:
 		ctxSetSession(r, &session, false, k.Gw.GetConfig().HashKeys)
-		ctxSetSpanAttributes(r, k.Name(), otel.OAuthClientIDAttribute(session.OauthClientID))
+		ctxSetSpanAttributes(r, k.Name(), otel.OAuthClientIDAttribute(session.KeyHash()))
 	}
 
 	// Request is valid, carry on
