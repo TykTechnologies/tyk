@@ -19,6 +19,10 @@ type RateLimit struct {
 	// The standard rate limiter offers similar performance as the sentinel-based limiter. This is disabled by default.
 	EnableSentinelRateLimiter bool `json:"enable_sentinel_rate_limiter"`
 
+	// EnableRateLimitSmoothing enables or disables rate smoothing. The rate smoothing is only supported on the
+	// Redis Rate Limiter, or the Sentinel Rate Limiter, as both algorythms implement a sliding log.
+	EnableRateLimitSmoothing bool `json:"enable_rate_limit_smoothing"`
+
 	// An enhancement for the Redis and Sentinel rate limiters, that offers a significant improvement in performance by not using transactions on Redis rate-limit buckets.
 	EnableNonTransactionalRateLimiter bool `json:"enable_non_transactional_rate_limiter"`
 
