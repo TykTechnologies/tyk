@@ -10,7 +10,7 @@ import (
 )
 
 // SmoothingFn is the signature for a rate limiter decision based on rate.
-type SmoothingFn func(ctx context.Context, key string, rate int64, currentRate int64) bool
+type SmoothingFn func(ctx context.Context, key string, currentRate int64, maxAllowedRate int64) bool
 
 // SlidingLog implements sliding log storage in redis.
 type SlidingLog struct {
@@ -182,10 +182,10 @@ func (r *SlidingLog) Get(ctx context.Context, now time.Time, keyName string, per
 // returns an error if any occured. In case an error occurs, the first value will be `true`.
 // If there are issues with storage availability for example, requests will be blocked rather
 // than let through, as no rate limit can be enforced without storage.
-func (r *SlidingLog) Do(ctx context.Context, now time.Time, key string, rate int64, per int64) (bool, error) {
-	current, err := r.SetCount(ctx, now, key, per)
+func (r *SlidingLog) Do(ctx context.Context, now time.Time, key string, maxAllowedRate int64, per int64) (bool, error) {
+	currentRate, err := r.SetCount(ctx, now, key, per)
 	if err != nil {
 		return true, err
 	}
-	return r.smoothingFn(ctx, key, rate, current), err
+	return r.smoothingFn(ctx, key, currentRate, maxAllowedRate), err
 }

@@ -50,6 +50,9 @@ type APILimit struct {
 	QuotaRemaining     int64   `json:"quota_remaining" msg:"quota_remaining"`
 	QuotaRenewalRate   int64   `json:"quota_renewal_rate" msg:"quota_renewal_rate"`
 	SetBy              string  `json:"-" msg:"-"`
+
+	// RateLimitSmoothing contains rate limit smoothing settings.
+	RateLimitSmoothing *apidef.RateLimitSmoothing `json:"rate_limit_smoothing" bson:"rate_limit_smoothing"`
 }
 
 // AccessDefinition defines which versions of an API a key has access to
@@ -68,9 +71,6 @@ type AccessDefinition struct {
 	DisableIntrospection bool                    `json:"disable_introspection" msg:"disable_introspection"`
 
 	AllowanceScope string `json:"allowance_scope" msg:"allowance_scope"`
-
-	// RateLimitSmoothing contains rate limit smoothing settings.
-	RateLimitSmoothing *apidef.RateLimitSmoothing
 }
 
 func (limit APILimit) IsEmpty() bool {
@@ -153,7 +153,7 @@ type SessionState struct {
 	KeyID   string `json:"-"`
 
 	// RateLimitSmoothing contains rate limit smoothing settings.
-	RateLimitSmoothing *apidef.RateLimitSmoothing
+	RateLimitSmoothing *apidef.RateLimitSmoothing `json:"rate_limit_smoothing" bson:"rate_limit_smoothing"`
 
 	// modified holds the hint if a session has been modified for update.
 	// use Touch() to set it, and IsModified() to get it.
