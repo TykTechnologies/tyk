@@ -82,6 +82,17 @@ func (l *SessionLimiter) Context() context.Context {
 	return l.ctx
 }
 
+func (l *SessionLimiter) rateLimitSmoothing(ctx context.Context, rate, currentRate int64) bool {
+	// Subtract by 1 because of the delayed add in the window
+	var subtractor int64 = 1
+	if l.config.EnableSentinelRateLimiter || l.config.DRLEnableSentinelRateLimiter {
+		// and another subtraction because of the preemptive limit
+		subtractor = 2
+	}
+
+	return currentRate > rate-subtractor
+}
+
 func (l *SessionLimiter) doRollingWindowWrite(rateLimiterKey, rateLimiterSentinelKey string,
 	store storage.Handler,
 	apiLimit *user.APILimit, dryRun bool) bool {
@@ -97,43 +108,27 @@ func (l *SessionLimiter) doRollingWindowWrite(rateLimiterKey, rateLimiterSentine
 
 	pipeline := l.config.EnableNonTransactionalRateLimiter
 
-	ratelimit, err := rate.NewSlidingLog(store, pipeline)
+	ratelimit, err := rate.NewSlidingLog(store, pipeline, l.rateLimitSmoothing)
 	if err != nil {
 		log.WithError(err).Error("error creating sliding log")
 		return true
 	}
 
-	var ratePerPeriodNow int64
-	if dryRun {
-		ratePerPeriodNow, err = ratelimit.GetCount(ctx, time.Now(), rateLimiterKey, int64(per))
-	} else {
-		ratePerPeriodNow, err = ratelimit.SetCount(ctx, time.Now(), rateLimiterKey, int64(per))
-	}
-
-	if err != nil {
-		log.WithError(err).Error("error writing sliding log")
-	}
-
-	// Subtract by 1 because of the delayed add in the window
-	var subtractor int64 = 1
-	if l.config.EnableSentinelRateLimiter || l.config.DRLEnableSentinelRateLimiter {
-		// and another subtraction because of the preemptive limit
-		subtractor = 2
-	}
-
-	// The test TestRateLimitForAPIAndRateLimitAndQuotaCheck
-	// will only work with these two lines here
-	if ratePerPeriodNow > int64(cost)-subtractor {
+	shouldBlock, err := ratelimit.Do(ctx, time.Now(), rateLimiterKey, int64(cost), int64(per))
+	if shouldBlock {
 		// Set a sentinel value with expire
 		if l.config.EnableSentinelRateLimiter || l.config.DRLEnableSentinelRateLimiter {
 			if !dryRun {
 				store.SetRawKey(rateLimiterSentinelKey, "1", int64(per))
 			}
 		}
-		return true
 	}
 
-	return false
+	if err != nil {
+		log.WithError(err).Error("error writing sliding log")
+	}
+
+	return shouldBlock
 }
 
 type sessionFailReason uint
