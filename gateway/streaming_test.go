@@ -173,6 +173,23 @@ streams:
 }
 
 func TestAsyncAPIHttp(t *testing.T) {
+	tests := []struct {
+		name             string
+		consumerGroup    string
+		expectedMessages int
+	}{
+		{"DynamicConsumerGroup", "$tyk_context.request_id", 2},
+		{"StaticConsumerGroup", "static-group", 1},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			testAsyncAPIHttp(t, tc.consumerGroup, tc.expectedMessages)
+		})
+	}
+}
+
+func testAsyncAPIHttp(t *testing.T, consumerGroup string, expectedMessages int) {
 	ts := StartTest(func(globalConf *config.Config) {
 		globalConf.Streaming.Enabled = true
 	})
@@ -185,24 +202,27 @@ func TestAsyncAPIHttp(t *testing.T) {
 		messageToSend = "hello websocket"
 	)
 
-	streamingConfig := `
+	streamingConfigTemplate := `
 logger:
-  level: ALL
-  format: logfmt
-  add_timestamp: true
-  static_fields:
-    '@service': benthos
+ level: ALL
+ format: logfmt
+ add_timestamp: true
+ static_fields:
+  '@service': benthos
 
 streams:
-  test:
-    input:
-      http_server:
-        path: /post
-        timeout: 1s
+ test:
+  input:
+   http_server:
+    path: /post
+    timeout: 1s
 
-    output:
-      http_server:
-        path: /get`
+  output:
+   http_server:
+    consumer_group: "%s"
+    path: /get`
+
+	streamingConfig := fmt.Sprintf(streamingConfigTemplate, consumerGroup)
 
 	streamingConfigJSON, err := ConvertYAMLToJSON([]byte(streamingConfig))
 	if err != nil {
@@ -226,9 +246,6 @@ streams:
 			URL: TestHttpAny,
 		},
 		Server: oas.Server{
-			// Authentication: &oas.Authentication{
-			// 	Enabled: true,
-			// },
 			ListenPath: oas.ListenPath{
 				Value: "/streaming-api/",
 				Strip: false,
@@ -297,25 +314,27 @@ streams:
 		t.Fatalf("Expected status code 200, got %d", resp.StatusCode)
 	}
 
+	messagesReceived := 0
+
 	// Read message from first websocket
-	_, p1, err := wsConn1.ReadMessage()
-	if err != nil {
-		t.Fatalf("Failed to read message from first websocket: %v", err)
+	if _, p1, err := wsConn1.ReadMessage(); err == nil {
+		receivedMessage1 := string(p1)
+		if receivedMessage1 == messageToSend {
+			messagesReceived++
+		}
 	}
 
-	receivedMessage1 := string(p1)
-	if receivedMessage1 != messageToSend {
-		t.Fatalf("Expected message '%s', got '%s' from first websocket", messageToSend, receivedMessage1)
+	// Read message from second websocket if expected
+	if expectedMessages > 1 {
+		if _, p2, err := wsConn2.ReadMessage(); err == nil {
+			receivedMessage2 := string(p2)
+			if receivedMessage2 == messageToSend {
+				messagesReceived++
+			}
+		}
 	}
 
-	// Read message from second websocket
-	_, p2, err := wsConn2.ReadMessage()
-	if err != nil {
-		t.Fatalf("Failed to read message from second websocket: %v", err)
-	}
-
-	receivedMessage2 := string(p2)
-	if receivedMessage2 != messageToSend {
-		t.Fatalf("Expected message '%s', got '%s' from second websocket", messageToSend, receivedMessage2)
+	if messagesReceived != expectedMessages {
+		t.Fatalf("Expected %d messages, but received %d", expectedMessages, messagesReceived)
 	}
 }
