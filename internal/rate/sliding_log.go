@@ -10,7 +10,7 @@ import (
 )
 
 // SmoothingFn is the signature for a rate limiter decision based on rate.
-type SmoothingFn func(ctx context.Context, rate int64, currentRate int64) bool
+type SmoothingFn func(ctx context.Context, key string, rate int64, currentRate int64) bool
 
 // SlidingLog implements sliding log storage in redis.
 type SlidingLog struct {
@@ -187,5 +187,5 @@ func (r *SlidingLog) Do(ctx context.Context, now time.Time, key string, rate int
 	if err != nil {
 		return true, err
 	}
-	return r.smoothingFn(ctx, rate, current), err
+	return r.smoothingFn(ctx, key, rate, current), err
 }

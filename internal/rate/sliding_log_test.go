@@ -78,7 +78,7 @@ func TestRollingWindow_pipelinerError(t *testing.T) {
 		panic("can't connect to redis '" + conf.Storage.Host + "', timeout")
 	}
 
-	rl, err := rate.NewSlidingLog(&storage.RedisCluster{KeyPrefix: "test-cluster", ConnectionHandler: rc}, false)
+	rl, err := rate.NewSlidingLog(&storage.RedisCluster{KeyPrefix: "test-cluster", ConnectionHandler: rc}, false, nil)
 	assert.NoError(t, err)
 
 	rl.PipelineFn = func(context.Context, func(redis.Pipeliner) error) error {
@@ -101,7 +101,7 @@ func TestRollingWindow_pipelinerError(t *testing.T) {
 const testRequestCount int = 1000
 
 func assertPipelinerError(ctx context.Context, tb testing.TB, conn redis.UniversalClient, tx bool) {
-	rl := rate.NewSlidingLogRedis(conn, tx)
+	rl := rate.NewSlidingLogRedis(conn, tx, nil)
 
 	key, per := uuid.New(), int64(5)
 
@@ -119,7 +119,7 @@ func assertPipelinerError(ctx context.Context, tb testing.TB, conn redis.Univers
 }
 
 func assertGetCount(ctx context.Context, tb testing.TB, conn redis.UniversalClient, tx bool) {
-	rl := rate.NewSlidingLogRedis(conn, tx)
+	rl := rate.NewSlidingLogRedis(conn, tx, nil)
 
 	key, per := uuid.New(), int64(5)
 
@@ -137,7 +137,7 @@ func assertGetCount(ctx context.Context, tb testing.TB, conn redis.UniversalClie
 }
 
 func assertGet(ctx context.Context, tb testing.TB, conn redis.UniversalClient, tx bool) {
-	rl := rate.NewSlidingLogRedis(conn, tx)
+	rl := rate.NewSlidingLogRedis(conn, tx, nil)
 
 	key, per := uuid.New(), int64(5)
 
@@ -155,7 +155,7 @@ func assertGet(ctx context.Context, tb testing.TB, conn redis.UniversalClient, t
 }
 
 func assertNew(ctx context.Context, tb testing.TB, conn redis.UniversalClient, tx bool) {
-	rl := rate.NewSlidingLogRedis(conn, tx)
+	rl := rate.NewSlidingLogRedis(conn, tx, nil)
 	assert.NotNil(tb, rl)
 }
 
