@@ -9,21 +9,26 @@ import (
 
 	_ "github.com/benthosdev/benthos/v4/public/components/all"
 	"github.com/benthosdev/benthos/v4/public/service"
+	"github.com/redis/go-redis/v9"
 	"gopkg.in/yaml.v2"
 )
 
 type StreamManager struct {
-	streamConfigs   map[string]string
-	streams         map[string]*service.Stream
-	mu              sync.Mutex
-	subscriberChans map[string][]chan []byte
+	streamConfigs       map[string]string
+	streams             map[string]*service.Stream
+	streamConsumerGroup map[string]string
+	mu                  sync.Mutex
+	subscriberChans     map[string][]chan []byte
+	redis               redis.UniversalClient
 }
 
-func NewStreamManager() *StreamManager {
+func NewStreamManager(rcon redis.UniversalClient) *StreamManager {
 	return &StreamManager{
-		streamConfigs:   make(map[string]string),
-		streams:         make(map[string]*service.Stream),
-		subscriberChans: make(map[string][]chan []byte),
+		streamConfigs:       make(map[string]string),
+		streams:             make(map[string]*service.Stream),
+		subscriberChans:     make(map[string][]chan []byte),
+		streamConsumerGroup: make(map[string]string),
+		redis:               rcon,
 	}
 }
 
@@ -53,6 +58,11 @@ func (sm *StreamManager) AddStream(streamID string, config map[string]interface{
 		return err
 	}
 
+	configPayload, consumerGroup, err := readConsumerGroup(configPayload)
+	if err != nil {
+		return err
+	}
+
 	err = builder.SetYAML(string(configPayload))
 	if err != nil {
 		return err
@@ -62,7 +72,38 @@ func (sm *StreamManager) AddStream(streamID string, config map[string]interface{
 		builder.SetHTTPMux(mux)
 	}
 
-	builder.AddConsumerFunc(func(ctx context.Context, msg *service.Message) error {
+	if sm.redis != nil {
+		builder.AddConsumerFunc(sm.ConsumerHook(streamID))
+	}
+
+	stream, err := builder.Build()
+	if err != nil {
+		return err
+	}
+
+	sm.streamConfigs[streamID] = string(configPayload)
+	sm.streams[streamID] = stream
+	sm.streamConsumerGroup[streamID] = consumerGroup
+
+	go func() {
+		if err := stream.Run(context.Background()); err != nil {
+			log.Printf("stream %s encountered an error: %v", streamID, err)
+		}
+	}()
+
+	return nil
+}
+
+func (sm *StreamManager) ConsumerGroup(streamID string) (string, bool) {
+	sm.mu.Lock()
+	defer sm.mu.Unlock()
+
+	consumerGroup, exists := sm.streamConsumerGroup[streamID]
+	return consumerGroup, exists
+}
+
+func (sm *StreamManager) ConsumerHook(streamID string) func(ctx context.Context, msg *service.Message) error {
+	return func(ctx context.Context, msg *service.Message) error {
 		sm.mu.Lock()
 		subs, ok := sm.subscriberChans[streamID]
 		sm.mu.Unlock()
@@ -73,6 +114,16 @@ func (sm *StreamManager) AddStream(streamID string, config map[string]interface{
 				log.Println("failed to convert message to bytes:", err)
 				return err
 			}
+
+			err = sm.redis.XAdd(context.Background(), &redis.XAddArgs{
+				Stream: streamID,
+				Values: map[string]interface{}{"message": b},
+			}).Err()
+			if err != nil {
+				log.Printf("error relaying message to Redis stream %s: %v", streamID, err)
+			}
+
+			return nil
 
 			log.Printf("fan out message to %d subscribers", len(subs))
 			// Fan out the message to all subscribers
@@ -95,26 +146,10 @@ func (sm *StreamManager) AddStream(streamID string, config map[string]interface{
 			log.Println("message sent to all subscribers")
 		}
 		return nil
-	})
-
-	stream, err := builder.Build()
-	if err != nil {
-		return err
 	}
-
-	sm.streamConfigs[streamID] = string(configPayload)
-	sm.streams[streamID] = stream
-
-	go func() {
-		if err := stream.Run(context.Background()); err != nil {
-			log.Printf("stream %s encountered an error: %v", streamID, err)
-		}
-	}()
-
-	return nil
 }
 
-func (sm *StreamManager) Subscribe(streamID string, bufferSize int) (chan []byte, error) {
+func (sm *StreamManager) Subscribe(streamID string, consumerGroup string, bufferSize int) (chan []byte, error) {
 	sm.mu.Lock()
 	defer sm.mu.Unlock()
 
@@ -123,14 +158,59 @@ func (sm *StreamManager) Subscribe(streamID string, bufferSize int) (chan []byte
 		return nil, fmt.Errorf("stream not found: %s", streamID)
 	}
 
+	// Check if the consumer group exists, if not create it
+	err := sm.redis.XGroupCreateMkStream(context.Background(), streamID, consumerGroup, "$").Err()
+	if err != nil && err != redis.Nil {
+		return nil, fmt.Errorf("error creating consumer group %s for stream %s: %v", consumerGroup, streamID, err)
+	}
+
 	// Create and add the subscriber channel
 	subChan := make(chan []byte, bufferSize)
 	sm.subscriberChans[streamID] = append(sm.subscriberChans[streamID], subChan)
+	go func() {
+		for {
+			msgs, err := sm.redis.XReadGroup(context.Background(), &redis.XReadGroupArgs{
+				Group:    consumerGroup,
+				Consumer: "consumer-" + streamID,
+				Streams:  []string{streamID, ">"},
+				Count:    10,
+				Block:    0,
+			}).Result()
+
+			if err == redis.Nil {
+				return // Exit the loop if the stream is empty or does not exist
+			}
+			if err != nil {
+				log.Printf("error reading from stream %s: %v", streamID, err)
+				continue
+			}
+
+			for _, msg := range msgs {
+				for _, xmsg := range msg.Messages {
+					message, ok := xmsg.Values["message"].([]byte)
+					if !ok {
+						if strMsg, ok := xmsg.Values["message"].(string); ok {
+							message = []byte(strMsg)
+						} else {
+							log.Println("Message is neither []byte nor string")
+							continue
+						}
+					}
+					select {
+					case subChan <- message:
+						log.Println("message sent to subscriber")
+					default:
+						log.Println("Dropping message for a full subscriber queue")
+					}
+				}
+			}
+		}
+	}()
 
 	return subChan, nil
 }
 
-func (sm *StreamManager) Unsubscribe(streamID string, unsubChan chan []byte) error {
+func (sm *StreamManager) Unsubscribe(streamID string, consumerGroup string, unsubChan chan []byte) error {
 	sm.mu.Lock()
 	defer sm.mu.Unlock()
 
@@ -178,6 +258,7 @@ func (sm *StreamManager) RemoveStream(streamID string) error {
 	delete(sm.streamConfigs, streamID)
 	delete(sm.streams, streamID)
 	delete(sm.subscriberChans, streamID)
+	delete(sm.streamConsumerGroup, streamID)
 
 	return nil
 }
@@ -233,6 +314,39 @@ func addMetadata(configPayload []byte, key, value string) ([]byte, error) {
 		return nil, err
 	}
 	return configPayload, nil
+}
+
+func readConsumerGroup(configPayload []byte) ([]byte, string, error) {
+	var parsedConfig map[string]interface{}
+	if err := yaml.Unmarshal(configPayload, &parsedConfig); err != nil {
+		return nil, "", err
+	}
+
+	var consumerGroup string
+	if output, found := parsedConfig["output"]; found {
+		outputMap, ok := output.(map[interface{}]interface{})
+		if !ok {
+			return configPayload, "", nil // Return original payload and no error if parsing fails
+		}
+		if httpServer, found := outputMap["http_server"]; found {
+			httpServerMap, ok := httpServer.(map[interface{}]interface{})
+			if !ok {
+				return configPayload, "", nil // Return original payload and no error if parsing fails
+			}
+			if cg, found := httpServerMap["consumer_group"]; found {
+				consumerGroup, _ = cg.(string)
+				delete(httpServerMap, "consumer_group")
+			}
+		}
+	}
+
+	// Re-marshal the modified configuration without the consumer_group in http_server
+	newConfigPayload, err := yaml.Marshal(parsedConfig)
+	if err != nil {
+		return nil, "", err
+	}
+
+	return newConfigPayload, consumerGroup, nil
 }
 
 func (sm *StreamManager) GetHTTPPaths(component, streamID string) (map[string]string, error) {
