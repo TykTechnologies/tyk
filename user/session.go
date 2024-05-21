@@ -147,10 +147,24 @@ type SessionState struct {
 	// Used to store token hash
 	keyHash string
 	KeyID   string `json:"-"`
+
+	// modified holds the hint if a session has been modified for update.
+	// use Touch() to set it, and IsModified() to get it.
+	modified bool
 }
 
 func NewSessionState() *SessionState {
 	return &SessionState{}
+}
+
+// Touch will mark the session as modified in order to trigger an update.
+func (s *SessionState) Touch() {
+	s.modified = true
+}
+
+// IsModified will return true if session has been modified to trigger an update.
+func (s *SessionState) IsModified() bool {
+	return s.modified
 }
 
 // Clone  returns a fresh copy of s

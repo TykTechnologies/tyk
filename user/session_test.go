@@ -1,11 +1,38 @@
 package user
 
 import (
+	"encoding/json"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
 )
+
+func TestSessionState_Touch_and_IsModified(t *testing.T) {
+	result := NewSessionState()
+
+	sess := NewSessionState()
+	sess.OrgID = "tyk"
+
+	// ensure session not modified
+	assert.False(t, sess.IsModified())
+
+	// modify session
+	sess.Touch()
+	assert.True(t, sess.IsModified())
+
+	// encode session to json
+	sb, err := json.Marshal(sess)
+	assert.NoError(t, err)
+
+	// decode session from json
+	err = json.Unmarshal(sb, result)
+	assert.NoError(t, err)
+
+	// ensure session not modified
+	assert.False(t, result.IsModified())
+	assert.Equal(t, "tyk", result.OrgID)
+}
 
 func TestIsHashType(t *testing.T) {
 	assert.False(t, IsHashType(""))
