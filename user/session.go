@@ -7,6 +7,7 @@ import (
 
 	"github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
 
+	"github.com/TykTechnologies/tyk/apidef"
 	logger "github.com/TykTechnologies/tyk/log"
 )
 
@@ -67,6 +68,9 @@ type AccessDefinition struct {
 	DisableIntrospection bool                    `json:"disable_introspection" msg:"disable_introspection"`
 
 	AllowanceScope string `json:"allowance_scope" msg:"allowance_scope"`
+
+	// RateLimitSmoothing contains rate limit smoothing settings.
+	RateLimitSmoothing *apidef.RateLimitSmoothing
 }
 
 func (limit APILimit) IsEmpty() bool {
@@ -147,6 +151,9 @@ type SessionState struct {
 	// Used to store token hash
 	keyHash string
 	KeyID   string `json:"-"`
+
+	// RateLimitSmoothing contains rate limit smoothing settings.
+	RateLimitSmoothing *apidef.RateLimitSmoothing
 
 	// modified holds the hint if a session has been modified for update.
 	// use Touch() to set it, and IsModified() to get it.
