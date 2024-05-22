@@ -83,6 +83,9 @@ jobs:
           echo '#!/bin/sh
           ci/bin/unlock-agent.sh
           go install github.com/tyklabs/packagecloud@latest
+          curl -fsSL https://download.docker.com/linux/debian/gpg | apt-key add -
+          echo "deb [arch=amd64] https://download.docker.com/linux/debian $(lsb_release -cs) stable" > /etc/apt/sources.list.d/docker.list
+          apt-get update && apt-get install -y docker-ce-cli
           curl -fsSL https://github.com/goreleaser/goreleaser/releases/latest/download/goreleaser_Linux_x86_64.tar.gz  | tar -C /usr/bin/ -xzf - goreleaser
           git config --global url."https://${{ secrets.ORG_GH_TOKEN }}@github.com".insteadOf "https://github.com"
           git config --global --add safe.directory /go/src/github.com/TykTechnologies/tyk
