@@ -42,8 +42,8 @@ func Smoothing(r *http.Request, session *apidef.RateLimitSmoothing, key string, 
 }
 
 func increaseRateAllowance(session *apidef.RateLimitSmoothing, currentRate int64, maxAllowedRate int64) (int64, bool) {
-	step := float64(session.Allowance) - session.Trigger*float64(session.Rate)
-	newAllowance := session.Allowance + session.Rate
+	step := float64(session.Allowance) - session.Trigger*float64(session.Step)
+	newAllowance := session.Allowance + session.Step
 	if float64(currentRate) >= step {
 		// clamp to the max rate
 		if newAllowance > maxAllowedRate {
@@ -56,8 +56,8 @@ func increaseRateAllowance(session *apidef.RateLimitSmoothing, currentRate int64
 }
 
 func decreaseRateAllowance(session *apidef.RateLimitSmoothing, currentRate int64, minAllowedRate int64) (int64, bool) {
-	newAllowance := session.Allowance - session.Rate
-	step := float64(newAllowance) - session.Trigger*float64(session.Rate)
+	newAllowance := session.Allowance - session.Step
+	step := float64(newAllowance) - session.Trigger*float64(session.Step)
 	if float64(currentRate) <= step {
 		if newAllowance < minAllowedRate {
 			newAllowance = minAllowedRate

@@ -11,19 +11,32 @@ type RateLimitSmoothing struct {
 	// Enabled if true will enable rate limit smoothing.
 	Enabled bool `json:"enabled" bson:"enabled"`
 
-	// Rate defines the step amount for a rate smoothing increase or decrease.
-	Rate int64 `json:"rate" bson:"rate"`
-
-	// Interval holds the number of seconds between allowance updates.
-	Interval int64 `json:"interval" bson:"interval"`
-
 	// Treshold is the value above which gateway will apply smoothing.
 	Threshold int64 `json:"threshold" bson:"threshold"`
 
 	// Triger holds a value between 0..1 and is used as a percentage value of the
-	// rate limit to reach, before triggering a SmoothingUp event. Similarly the
+	// rate limit step to reach, before triggering a SmoothingUp event. Similarly the
 	// value is also used to decrease the allowance when rate limits decrease.
+	//
+	// Example:
+	//
+	// - Allowance 600,
+	// - Current rate 500,
+	// - Step 100,
+	// - Trigger 0.5
+	//
+	// To trigger a RateLimitSmoothingUp event, the rate needs to exceed 550.
+	// The new allowance is calculated as: `Allowance - Trigger * Step`.
+	//
+	// To trigger a RateLimitSmoothingDown event, rate needs to fall below 450.
+	// The new allowance is calculated as: `Allowance - Trigger - (Trigger*Step)`
 	Trigger float64 `json:"trigger" bson:"trigger"`
+
+	// Step defines the step amount for a rate smoothing increase or decrease.
+	Step int64 `json:"step" bson:"step"`
+
+	// Delay is the amount of seconds to wait between allowance updates.
+	Delay int64 `json:"delay" bson:"delay"`
 
 	// Allowance is the current allowance in effect. It's not
 	// serialized for the database (bson), but has JSON tags
@@ -50,11 +63,11 @@ func (r *RateLimitSmoothing) Err() error {
 		return errors.New("Rate limit smoothing disabled")
 	}
 
-	if r.Rate <= 0 {
+	if r.Step <= 0 {
 		return fmt.Errorf("Rate limit smoothing disabled: rate invalid")
 	}
-	if r.Interval <= 0 {
-		return fmt.Errorf("Rate limit smoothing disabled: interval invalid")
+	if r.Delay <= 0 {
+		return fmt.Errorf("Rate limit smoothing disabled: delay invalid")
 	}
 	if r.Threshold <= 0 {
 		return fmt.Errorf("Rate limit smoothing disabled: threshold invalid")
@@ -66,24 +79,24 @@ func (r *RateLimitSmoothing) Err() error {
 	return nil
 }
 
-// GetInterval returns the interval for rate limit smoothing as a time.Duration.
-func (r *RateLimitSmoothing) GetInterval() time.Duration {
-	return time.Second * time.Duration(r.Interval)
+// GetDelay returns the delay for rate limit smoothing as a time.Duration.
+func (r *RateLimitSmoothing) GetDelay() time.Duration {
+	return time.Second * time.Duration(r.Delay)
 }
 
 // SetAllowance updates the current allowance to the specified value and
-// sets the next update time based on the configured interval.
+// sets the next update time based on the configured delay.
 func (r *RateLimitSmoothing) SetAllowance(allowance int64) {
 	r.Allowance = allowance
 	r.Touch()
 }
 
-// Touch updates the next allowance time to the configured interval.
+// Touch updates the next allowance time to the configured delay.
 func (r *RateLimitSmoothing) Touch() {
-	r.AllowanceNextUpdateAt = time.Now().Add(r.GetInterval())
+	r.AllowanceNextUpdateAt = time.Now().Add(r.GetDelay())
 }
 
-// CanSetAllowance checks if the allowance can be updated based on the configured interval.
+// CanSetAllowance checks if the allowance can be updated based on the configured delay.
 func (r *RateLimitSmoothing) CanSetAllowance() bool {
 	return time.Since(r.AllowanceNextUpdateAt) > 0
 }
