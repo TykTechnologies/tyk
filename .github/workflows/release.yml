@@ -82,6 +82,7 @@ jobs:
         run: |
           echo '#!/bin/sh
           ci/bin/unlock-agent.sh
+          apt-get update && apt-get upgrade && apt install -y lsb-release
           go install github.com/tyklabs/packagecloud@latest
           curl -fsSL https://download.docker.com/linux/debian/gpg | apt-key add -
           echo "deb [arch=amd64] https://download.docker.com/linux/debian $(lsb_release -cs) stable" > /etc/apt/sources.list.d/docker.list
