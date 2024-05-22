@@ -35,6 +35,7 @@ jobs:
           - 1.21-bullseye
         include:
           - golang_cross: 1.21-bullseye
+            override: golang:1.22
             goreleaser: 'ci/goreleaser/goreleaser.yml'
             cgo: 1
             rpmvers: 'el/7 el/8 el/9 amazon/2 amazon/2023'
@@ -81,6 +82,8 @@ jobs:
         run: |
           echo '#!/bin/sh
           ci/bin/unlock-agent.sh
+          go install github.com/tyklabs/packagecloud@latest
+          curl -fsSL https://github.com/goreleaser/goreleaser/releases/latest/download/goreleaser_Linux_x86_64.tar.gz  | tar -C /usr/bin/ -xzf - goreleaser
           git config --global url."https://${{ secrets.ORG_GH_TOKEN }}@github.com".insteadOf "https://github.com"
           git config --global --add safe.directory /go/src/github.com/TykTechnologies/tyk
           goreleaser release --clean -f ${{ matrix.goreleaser }} ${{ !startsWith(github.ref, 'refs/tags/') && ' --snapshot --skip=sign' || '' }}' | tee /tmp/build.sh
@@ -103,7 +106,7 @@ jobs:
           -v ~/.cache/go-build:/cache/go-build                                   \
           -v /tmp/build.sh:/tmp/build.sh                                         \
           -w /go/src/github.com/TykTechnologies/tyk                      \
-          tykio/golang-cross:${{ matrix.golang_cross }} /tmp/build.sh
+          ${{ matrix.override }} /tmp/build.sh
       - uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: arn:aws:iam::754489498669:role/ecr_rw_tyk
