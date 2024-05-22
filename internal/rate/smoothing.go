@@ -1,7 +1,6 @@
 package rate
 
 import (
-	"fmt"
 	"net/http"
 
 	"github.com/TykTechnologies/tyk/apidef"
@@ -12,7 +11,7 @@ import (
 // The first returned value indicates if smoothing was performed. An optionally filled error
 // returns any details as to why smoothing wasn't performed and should be used for logging purposes.
 func Smoothing(r *http.Request, session *apidef.RateLimitSmoothing, key string, currentRate int64, maxAllowedRate int64) (bool, error) {
-	// Rate limit smoothing is disabled, no change, no error.
+	// Rate limit smoothing is disabled or threshold is unset, no change, no error.
 	if !session.Valid() {
 		return false, nil
 	}
@@ -22,40 +21,49 @@ func Smoothing(r *http.Request, session *apidef.RateLimitSmoothing, key string, 
 		return false, nil
 	}
 
-	var (
-		newAllowance int64
-		eventName    event.Event
-	)
-
-	if float64(currentRate) >= session.Trigger*float64(session.Allowance) {
-		eventName = event.RateLimitSmoothingUp
-		newAllowance = session.Allowance + session.Rate
+	// Increase allowance if necessary
+	if newAllowance, changed := increaseRateAllowance(session, currentRate, maxAllowedRate); changed {
+		event.Add(r, event.RateLimitSmoothingUp)
+		session.SetAllowance(newAllowance)
+		return true, nil
 	}
 
-	if float64(currentRate) <= session.Trigger*float64(session.Allowance-session.Rate) {
-		eventName = event.RateLimitSmoothingDown
-		newAllowance = session.Allowance - session.Rate
+	// Decrease allowance if necessary
+	if newAllowance, changed := decreaseRateAllowance(session, currentRate, session.Threshold); changed {
+		event.Add(r, event.RateLimitSmoothingDown)
+		session.SetAllowance(newAllowance)
+		return true, nil
 	}
 
-	if newAllowance == 0 {
-		// no smoothing occurred
-		return false, nil
+	// Respect configured smoothing interval by updating the session
+	session.Touch()
+
+	return false, nil
+}
+
+func increaseRateAllowance(session *apidef.RateLimitSmoothing, currentRate int64, maxAllowedRate int64) (int64, bool) {
+	step := float64(session.Allowance) - session.Trigger*float64(session.Rate)
+	newAllowance := session.Allowance + session.Rate
+	if float64(currentRate) >= step {
+		// clamp to the max rate
+		if newAllowance > maxAllowedRate {
+			newAllowance = maxAllowedRate
+			return newAllowance, newAllowance != session.Allowance
+		}
+		return newAllowance, true
 	}
+	return session.Allowance, false
+}
 
-	if newAllowance > int64(maxAllowedRate) {
-		return false, fmt.Errorf("skipping smoothing, new allowance over allowed rate (%d > %d)", newAllowance, maxAllowedRate)
+func decreaseRateAllowance(session *apidef.RateLimitSmoothing, currentRate int64, minAllowedRate int64) (int64, bool) {
+	newAllowance := session.Allowance - session.Rate
+	step := float64(newAllowance) - session.Trigger*float64(session.Rate)
+	if float64(currentRate) <= step {
+		if newAllowance < minAllowedRate {
+			newAllowance = minAllowedRate
+			return newAllowance, newAllowance != session.Allowance
+		}
+		return newAllowance, true
 	}
-
-	if newAllowance < session.Threshold {
-		return false, fmt.Errorf("skipping smoothing, new allowance less than threshold (%d < %d)", newAllowance, session.Threshold)
-	}
-
-	// Update session allowance
-	session.SetAllowance(newAllowance)
-
-	// Trigger smoothing events
-	event.Add(r, eventName)
-
-	// Let the outside know that smoothing has been done.
-	return true, nil
+	return session.Allowance, false
 }

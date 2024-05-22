@@ -75,6 +75,11 @@ func (r *RateLimitSmoothing) GetInterval() time.Duration {
 // sets the next update time based on the configured interval.
 func (r *RateLimitSmoothing) SetAllowance(allowance int64) {
 	r.Allowance = allowance
+	r.Touch()
+}
+
+// Touch updates the next allowance time to the configured interval.
+func (r *RateLimitSmoothing) Touch() {
 	r.AllowanceNextUpdateAt = time.Now().Add(r.GetInterval())
 }
 
