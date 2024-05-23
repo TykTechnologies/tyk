@@ -5,7 +5,7 @@ FROM debian:bookworm AS assets
 # If you need to tweak the environment for testing, you can override the
 # `GO_VERSION` and `PYTHON_VERSION` as docker build arguments.
 
-ARG GO_VERSION=1.21.4
+ARG GO_VERSION=1.22.3
 ARG PYTHON_VERSION=3.11.6
 
 WORKDIR /assets
@@ -16,7 +16,7 @@ RUN	apt update && apt install wget -y && \
 
 FROM debian:bookworm
 
-ARG GO_VERSION=1.21.4
+ARG GO_VERSION=1.22.3
 ARG PYTHON_VERSION=3.11.6
 
 COPY --from=assets /assets/ /tmp/
@@ -31,7 +31,7 @@ RUN	tar -C /usr/local -xzf go${GO_VERSION}.linux-amd64.tar.gz && \
 
 # Build essentials
 
-RUN apt update && apt install build-essential zlib1g-dev libncurses5-dev libgdbm-dev libnss3-dev libssl-dev libsqlite3-dev libreadline-dev libffi-dev curl wget libbz2-dev -y
+RUN apt update && apt install git build-essential zlib1g-dev libncurses5-dev libgdbm-dev libnss3-dev libssl-dev libsqlite3-dev libreadline-dev libffi-dev curl wget libbz2-dev -y
 
 # Install $PYTHON_VERSION
 
@@ -61,6 +61,8 @@ WORKDIR /opt/tyk-gateway
 ADD go.mod go.sum /opt/tyk-gateway/
 RUN go mod download
 ADD . /opt/tyk-gateway
+
+RUN git config --global --add safe.directory /opt/tyk-gateway
 
 RUN make build
 

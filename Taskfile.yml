@@ -41,3 +41,35 @@ tasks:
         yq -i ".dockers[0].extra_files |= [\"$replacement\"]" ci/goreleaser/goreleaser-el7.yml
         yq -i ".dockers[4].extra_files |= [\"$replacement\"]" ci/goreleaser/goreleaser.yml
       - echo goreleaser release --clean --snapshot -f ci/goreleaser/goreleaser.yml
+
+  test:build:
+    desc: "Build with go 1.22"
+    vars:
+      buildDir: /src
+    cmds:
+      - |
+        docker run --rm \
+                   -v $PWD:{{.buildDir}} \
+                   -v /var/run/docker.sock:/var/run/docker.sock \
+                   -w {{.buildDir}} \
+                   -v /cache:/cache \
+                   -e GOMODCACHE=/cache/mod \
+                   -e GOCACHE=/cache/go-build \
+                  tykio/golang-cross:1.22-bookworm \
+                  bash -c "git config --global --add safe.directory {{.buildDir}}; goreleaser --clean -f ci/goreleaser/goreleaser.yml --snapshot --skip=sign"
+
+  test:build-binary:
+    desc: "Build with go 1.22"
+    vars:
+      buildDir: /src
+    cmds:
+      - |
+        docker run --rm \
+                   -v $PWD:{{.buildDir}} \
+                   -v /var/run/docker.sock:/var/run/docker.sock \
+                   -w {{.buildDir}} \
+                   -v /cache:/cache \
+                   -e GOMODCACHE=/cache/mod \
+                   -e GOCACHE=/cache/go-build \
+                  tykio/golang-cross:1.22-bookworm \
+                  bash -c "git config --global --add safe.directory {{.buildDir}}; goreleaser build --single-target --debug --clean -f ci/goreleaser/goreleaser.yml --snapshot"
