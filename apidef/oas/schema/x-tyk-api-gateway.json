@@ -1274,20 +1274,9 @@
         },
         "detailedTracing": {
           "$ref": "#/definitions/X-Tyk-DetailedTracing"
-<<<<<<< HEAD
-=======
-        },
-        "eventHandlers": {
-          "type": "array",
-          "items": [
-            {
-              "$ref": "#/definitions/X-Tyk-EventHandlers"
-            }
-          ]
         },
         "contextVariables": {
           "$ref": "#/definitions/X-Tyk-ContextVariables"
->>>>>>> 6b7c9ad54 ([TT-11954/TT-12155] add x-tyk-api-gateway.servers.contextVariables.enabled (#6281))
         }
       },
       "required": [
