@@ -1062,8 +1062,8 @@ func handleWebsocket(gw *Gateway, streamID string) http.HandlerFunc {
 			consumer_group = customKeyValue
 		}
 
-		messageChan, err := gw.StreamingServer.Subscribe(streamID, consumer_group, 100)
-		defer gw.StreamingServer.Unsubscribe(streamID, consumer_group, messageChan)
+		messageChan, cancel, err := gw.StreamingServer.Subscribe(streamID, consumer_group, 100)
+		defer gw.StreamingServer.Unsubscribe(streamID, consumer_group, messageChan, cancel)
 
 		if err != nil {
 			log.Printf("Failed to subscribe to stream: %+v", err)
@@ -1115,12 +1115,12 @@ func handleSSE(gw *Gateway, streamID string) http.HandlerFunc {
 			consumer_group = customKeyValue
 		}
 
-		messageChan, err := gw.StreamingServer.Subscribe(streamID, consumer_group, 100)
+		messageChan, cancel, err := gw.StreamingServer.Subscribe(streamID, consumer_group, 100)
 		if err != nil {
 			log.Printf("Failed to subscribe to stream: %+v", err)
 			return
 		}
-		defer gw.StreamingServer.Unsubscribe(streamID, consumer_group, messageChan)
+		defer gw.StreamingServer.Unsubscribe(streamID, consumer_group, messageChan, cancel)
 
 		// Listen to connection close and un-register messageChan
 		notify := r.Context().Done()
