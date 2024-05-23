@@ -1064,6 +1064,11 @@ func (gw *Gateway) handleAddApi(r *http.Request, fs afero.Fs, oasEndpoint bool) 
 			return apiError("Request malformed"), http.StatusBadRequest
 		}
 
+		// enable context variable by default for OAS APIs if not explicitly set to false.
+		if oasObj.GetTykExtension().Server.ContextVariables == nil {
+			oasObj.GetTykExtension().Server.ContextVariables = &oas.ContextVariables{Enabled: true}
+		}
+
 		oasObj.ExtractTo(&newDef)
 	} else {
 		if err := json.NewDecoder(r.Body).Decode(&newDef); err != nil {
