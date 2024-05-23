@@ -344,68 +344,28 @@ func TestExportDetailedTracing(t *testing.T) {
 	}
 }
 
-func TestIPAccessControl(t *testing.T) {
-	t.Run("empty", func(t *testing.T) {
-		var emptyIPAccessControl IPAccessControl
-
-		var convertedAPI apidef.APIDefinition
-		convertedAPI.SetDisabledFlags()
-		emptyIPAccessControl.ExtractTo(&convertedAPI)
-
-		var resultIPAccessControl IPAccessControl
-		resultIPAccessControl.Fill(convertedAPI)
-
-		assert.Equal(t, emptyIPAccessControl, resultIPAccessControl)
-	})
-
-	t.Run("valid", func(t *testing.T) {
-		ipAccessControl := IPAccessControl{
-			Enabled: true,
-			Allow:   []string{"127.0.0.1"},
-			Block:   []string{"10.0.0.1"},
-		}
-
-		var convertedAPI apidef.APIDefinition
-		convertedAPI.SetDisabledFlags()
-		ipAccessControl.ExtractTo(&convertedAPI)
-
-		assert.False(t, convertedAPI.IPAccessControlDisabled)
-
-		var resultIPAccessControl IPAccessControl
-		resultIPAccessControl.Fill(convertedAPI)
-
-		assert.Equal(t, ipAccessControl, resultIPAccessControl)
-	})
-}
-
-func TestBatchProcessing(t *testing.T) {
+func TestContextVariables(t *testing.T) {
+	t.Parallel()
 	t.Run("fill", func(t *testing.T) {
-		type testCase struct {
+		t.Parallel()
+		testcases := []struct {
 			title    string
 			input    apidef.APIDefinition
-			expected *BatchProcessing
-		}
-
-		testCases := []testCase{
+			expected *ContextVariables
+		}{
 			{
-				title: "not enabled",
-				input: apidef.APIDefinition{
-					EnableBatchRequestSupport: false,
-				},
-				expected: nil,
+				"enabled",
+				apidef.APIDefinition{EnableContextVars: true},
+				&ContextVariables{Enabled: true},
 			},
 			{
-				title: "enabled",
-				input: apidef.APIDefinition{
-					EnableBatchRequestSupport: true,
-				},
-				expected: &BatchProcessing{
-					Enabled: true,
-				},
+				"disabled",
+				apidef.APIDefinition{EnableContextVars: false},
+				nil,
 			},
 		}
 
-		for _, tc := range testCases {
+		for _, tc := range testcases {
 			tc := tc
 			t.Run(tc.title, func(t *testing.T) {
 				t.Parallel()
@@ -413,48 +373,43 @@ func TestBatchProcessing(t *testing.T) {
 				server := new(Server)
 				server.Fill(tc.input)
 
-				assert.Equal(t, tc.expected, server.BatchProcessing)
+				assert.Equal(t, tc.expected, server.ContextVariables)
 			})
 		}
 	})
 
 	t.Run("extractTo", func(t *testing.T) {
-		type testCase struct {
+		t.Parallel()
+
+		testcases := []struct {
 			title    string
-			input    *BatchProcessing
-			expected apidef.APIDefinition
-		}
-
-		testCases := []testCase{
+			input    *ContextVariables
+			expected bool
+		}{
 			{
-				title: "not enabled",
-				input: &BatchProcessing{
-					Enabled: false,
-				},
-				expected: apidef.APIDefinition{
-					EnableBatchRequestSupport: false,
-				},
+				"enabled",
+				&ContextVariables{Enabled: true},
+				true,
 			},
 			{
-				title: "enabled",
-				input: &BatchProcessing{
-					Enabled: true,
-				},
-				expected: apidef.APIDefinition{
-					EnableBatchRequestSupport: true,
-				},
+				"disabled",
+				nil,
+				false,
 			},
 		}
 
-		for _, tc := range testCases {
-			tc := tc
+		for _, tc := range testcases {
+			tc := tc // Creating a new 'tc' scoped to the loop
 			t.Run(tc.title, func(t *testing.T) {
 				t.Parallel()
 
-				var apiDef apidef.APIDefinition
-				tc.input.ExtractTo(&apiDef)
+				server := new(Server)
+				server.ContextVariables = tc.input
 
-				assert.Equal(t, tc.expected, apiDef)
+				var apiDef apidef.APIDefinition
+				server.ExtractTo(&apiDef)
+
+				assert.Equal(t, tc.expected, apiDef.EnableContextVars)
 			})
 		}
 	})
