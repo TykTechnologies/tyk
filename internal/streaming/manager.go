@@ -12,6 +12,8 @@ import (
 	"github.com/redis/go-redis/v9"
 	"github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v2"
+
+	_ "github.com/TykTechnologies/tyk/internal/portal"
 )
 
 type StreamManager struct {
@@ -87,7 +89,7 @@ func (sm *StreamManager) AddStream(streamID string, config map[string]interface{
 		return err
 	}
 
-	configPayload, consumerGroup, err := readConsumerGroup(configPayload)
+	configPayload, consumerGroup, err := sm.readConsumerGroup(configPayload)
 	if err != nil {
 		return err
 	}
@@ -341,26 +343,63 @@ func (sm *StreamManager) addMetadata(configPayload []byte, key, value string) ([
 	return configPayload, nil
 }
 
-func readConsumerGroup(configPayload []byte) ([]byte, string, error) {
+func (sm *StreamManager) readConsumerGroup(configPayload []byte) ([]byte, string, error) {
 	var parsedConfig map[string]interface{}
 	if err := yaml.Unmarshal(configPayload, &parsedConfig); err != nil {
 		return nil, "", err
 	}
 
 	var consumerGroup string
-	if output, found := parsedConfig["output"]; found {
-		outputMap, ok := output.(map[interface{}]interface{})
-		if !ok {
-			return configPayload, "", nil // Return original payload and no error if parsing fails
+	handleHttpServer := func(httpServerMap map[interface{}]interface{}) {
+		if cg, found := httpServerMap["consumer_group"]; found {
+			consumerGroup, _ = cg.(string)
+			delete(httpServerMap, "consumer_group")
 		}
-		if httpServer, found := outputMap["http_server"]; found {
-			httpServerMap, ok := httpServer.(map[interface{}]interface{})
-			if !ok {
-				return configPayload, "", nil // Return original payload and no error if parsing fails
+	}
+
+	if output, found := parsedConfig["output"]; found {
+		switch outputTyped := output.(type) {
+		case map[interface{}]interface{}:
+			if httpServer, found := outputTyped["http_server"]; found {
+				httpServerMap, ok := httpServer.(map[interface{}]interface{})
+				if ok {
+					handleHttpServer(httpServerMap)
+				}
 			}
-			if cg, found := httpServerMap["consumer_group"]; found {
-				consumerGroup, _ = cg.(string)
-				delete(httpServerMap, "consumer_group")
+		case []interface{}:
+			for _, out := range outputTyped {
+				outMap, ok := out.(map[interface{}]interface{})
+				if ok {
+					if httpServer, found := outMap["http_server"]; found {
+						httpServerMap, ok := httpServer.(map[interface{}]interface{})
+						if ok {
+							handleHttpServer(httpServerMap)
+						}
+					}
+				}
+			}
+		}
+	}
+
+	// Handle nested http_server within broker
+	if broker, found := parsedConfig["output"].(map[interface{}]interface{})["broker"]; found {
+		brokerMap, ok := broker.(map[interface{}]interface{})
+		if ok {
+			if outputs, found := brokerMap["outputs"]; found {
+				outputsSlice, ok := outputs.([]interface{})
+				if ok {
+					for _, output := range outputsSlice {
+						outputMap, ok := output.(map[interface{}]interface{})
+						if ok {
+							if httpServer, found := outputMap["http_server"]; found {
+								httpServerMap, ok := httpServer.(map[interface{}]interface{})
+								if ok {
+									handleHttpServer(httpServerMap)
+								}
+							}
+						}
+					}
+				}
 			}
 		}
 	}
@@ -370,6 +409,8 @@ func readConsumerGroup(configPayload []byte) ([]byte, string, error) {
 	if err != nil {
 		return nil, "", err
 	}
+
+	sm.log.Printf("New config: %s", string(newConfigPayload))
 
 	return newConfigPayload, consumerGroup, nil
 }
