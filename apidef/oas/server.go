@@ -33,9 +33,6 @@ type Server struct {
 	//
 	// Tyk classic API definition: `detailed_tracing`
 	DetailedTracing *DetailedTracing `bson:"detailedTracing,omitempty" json:"detailedTracing,omitempty"`
-
-	// ContextVariables contains the configuration related to Tyk context variables.
-	ContextVariables *ContextVariables `bson:"contextVariables,omitempty" json:"contextVariables,omitempty"`
 }
 
 // Fill fills *Server from apidef.APIDefinition.
@@ -84,18 +81,6 @@ func (s *Server) Fill(api apidef.APIDefinition) {
 	if ShouldOmit(s.DetailedTracing) {
 		s.DetailedTracing = nil
 	}
-
-	if s.ContextVariables == nil {
-		s.ContextVariables = &ContextVariables{}
-		// special case, do ShouldOmit omit check only if s.ContextVariables was nil.
-		defer func() {
-			if ShouldOmit(s.ContextVariables) {
-				s.ContextVariables = nil
-			}
-		}()
-	}
-
-	s.ContextVariables.Fill(api)
 }
 
 // ExtractTo extracts *Server into *apidef.APIDefinition.
@@ -146,15 +131,6 @@ func (s *Server) ExtractTo(api *apidef.APIDefinition) {
 	}
 
 	s.DetailedTracing.ExtractTo(api)
-
-	if s.ContextVariables == nil {
-		s.ContextVariables = &ContextVariables{}
-		defer func() {
-			s.ContextVariables = nil
-		}()
-	}
-
-	s.ContextVariables.ExtractTo(api)
 }
 
 // ListenPath is the base path on Tyk to which requests for this API
