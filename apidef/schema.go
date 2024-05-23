@@ -641,6 +641,14 @@ const Schema = `{
                 "proxy": {
                     "type": ["object", "null"],
                     "properties": {
+						"features": {
+							"type": ["object", "null"],
+							"properties": {
+								"use_immutable_headers": {
+									"type": "boolean"
+								}
+							}
+						},
                         "auth_headers": {
                             "type": ["object", "null"]
                         },

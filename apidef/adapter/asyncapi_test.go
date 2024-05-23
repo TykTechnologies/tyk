@@ -321,6 +321,9 @@ const expectedGraphqlConfig = `{
         "global_headers": null
     },
     "proxy": {
+        "features": {
+            "use_immutable_headers": false
+        },
         "auth_headers": {},
         "request_headers": null,
         "use_response_extensions": {
