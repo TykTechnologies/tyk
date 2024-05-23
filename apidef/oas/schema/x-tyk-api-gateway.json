@@ -1274,6 +1274,9 @@
         },
         "detailedTracing": {
           "$ref": "#/definitions/X-Tyk-DetailedTracing"
+        },
+        "contextVariables": {
+          "$ref": "#/definitions/X-Tyk-ContextVariables"
         }
       },
       "required": [
@@ -1878,6 +1881,17 @@
     "X-Tyk-DetailedTracing": {
       "type": "object",
       "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "enabled"
+      ]
+    },
+    "X-Tyk-ContextVariables": {
+      "type": "object",
       "properties": {
         "enabled": {
           "type": "boolean"
