@@ -1,15 +1,16 @@
 package streaming
 
 import (
-	// Import all standard Benthos components
 	"context"
 	"fmt"
 	"log"
+	"runtime"
 	"sync"
 
 	_ "github.com/benthosdev/benthos/v4/public/components/all"
 	"github.com/benthosdev/benthos/v4/public/service"
 	"github.com/redis/go-redis/v9"
+	"github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v2"
 )
 
@@ -20,15 +21,30 @@ type StreamManager struct {
 	mu                  sync.Mutex
 	subscriberChans     map[string][]chan []byte
 	redis               redis.UniversalClient
+	log                 *logrus.Logger
 }
 
 func NewStreamManager(rcon redis.UniversalClient) *StreamManager {
+	logger := logrus.New()
+	logger.Out = log.Writer()
+	logger.Formatter = &logrus.TextFormatter{
+		FullTimestamp: true,
+	}
+	logger.Level = logrus.DebugLevel
+
 	return &StreamManager{
 		streamConfigs:       make(map[string]string),
 		streams:             make(map[string]*service.Stream),
 		subscriberChans:     make(map[string][]chan []byte),
 		streamConsumerGroup: make(map[string]string),
 		redis:               rcon,
+		log:                 logger,
+	}
+}
+
+func (sm *StreamManager) SetLogger(logger *logrus.Logger) {
+	if logger != nil {
+		sm.log = logger
 	}
 }
 
@@ -36,13 +52,26 @@ func (sm *StreamManager) AddStream(streamID string, config map[string]interface{
 	sm.mu.Lock()
 	defer sm.mu.Unlock()
 
+	pc := make([]uintptr, 10) // at most 10 entries
+	n := runtime.Callers(2, pc)
+	frames := runtime.CallersFrames(pc[:n])
+
+	sm.log.Println("Adding stream:")
+	for {
+		frame, more := frames.Next()
+		sm.log.Printf("- %s\n\t%s:%d", frame.Function, frame.File, frame.Line)
+		if !more {
+			break
+		}
+	}
+
 	configPayload, err := yaml.Marshal(config)
 	if err != nil {
 		return err
 	}
 
 	if _, exists := sm.streams[streamID]; exists {
-		log.Printf("stream %s already exists, removing it first", streamID)
+		sm.log.Printf("stream %s already exists, removing it first", streamID)
 
 		sm.mu.Unlock()
 		if err := sm.RemoveStream(streamID); err != nil {
@@ -53,7 +82,7 @@ func (sm *StreamManager) AddStream(streamID string, config map[string]interface{
 
 	builder := service.NewStreamBuilder()
 
-	configPayload, err = addMetadata(configPayload, "stream_id", streamID)
+	configPayload, err = sm.addMetadata(configPayload, "stream_id", streamID)
 	if err != nil {
 		return err
 	}
@@ -87,7 +116,7 @@ func (sm *StreamManager) AddStream(streamID string, config map[string]interface{
 
 	go func() {
 		if err := stream.Run(context.Background()); err != nil {
-			log.Printf("stream %s encountered an error: %v", streamID, err)
+			sm.log.Printf("stream %s encountered an error: %v", streamID, err)
 		}
 	}()
 
@@ -105,13 +134,13 @@ func (sm *StreamManager) ConsumerGroup(streamID string) (string, bool) {
 func (sm *StreamManager) ConsumerHook(streamID string) func(ctx context.Context, msg *service.Message) error {
 	return func(ctx context.Context, msg *service.Message) error {
 		sm.mu.Lock()
-		subs, ok := sm.subscriberChans[streamID]
+		_, ok := sm.subscriberChans[streamID]
 		sm.mu.Unlock()
 
 		if ok {
 			b, err := msg.AsBytes()
 			if err != nil {
-				log.Println("failed to convert message to bytes:", err)
+				sm.log.Println("failed to convert message to bytes:", err)
 				return err
 			}
 
@@ -120,30 +149,8 @@ func (sm *StreamManager) ConsumerHook(streamID string) func(ctx context.Context,
 				Values: map[string]interface{}{"message": b},
 			}).Err()
 			if err != nil {
-				log.Printf("error relaying message to Redis stream %s: %v", streamID, err)
+				sm.log.Printf("error relaying message to Redis stream %s: %v", streamID, err)
 			}
-
-			return nil
-
-			log.Printf("fan out message to %d subscribers", len(subs))
-			// Fan out the message to all subscribers
-			for i, sub := range subs {
-				select {
-				case sub <- b:
-				case <-ctx.Done():
-					// Context cancelled, remove subscriber
-					close(sub)
-					subs = append(subs[:i], subs[i+1:]...)
-
-					sm.mu.Lock()
-					sm.subscriberChans[streamID] = subs
-					sm.mu.Unlock()
-				default:
-					log.Println("Dropping message for a full subscriber queue")
-				}
-			}
-
-			log.Println("message sent to all subscribers")
 		}
 		return nil
 	}
@@ -153,6 +160,8 @@ func (sm *StreamManager) Subscribe(streamID string, consumerGroup string, buffer
 	sm.mu.Lock()
 	defer sm.mu.Unlock()
 
+	sm.log.Printf("Subscribing to stream %s with consumer group %s", streamID, consumerGroup)
+
 	// Check if the stream exists
 	if _, exists := sm.streams[streamID]; !exists {
 		return nil, nil, fmt.Errorf("stream not found: %s", streamID)
@@ -161,7 +170,7 @@ func (sm *StreamManager) Subscribe(streamID string, consumerGroup string, buffer
 	// Check if the consumer group exists, if not create it
 	err := sm.redis.XGroupCreateMkStream(context.Background(), streamID, consumerGroup, "$").Err()
 	if err != nil && err != redis.Nil {
-		return nil, nil, fmt.Errorf("error creating consumer group %s for stream %s: %v", consumerGroup, streamID, err)
+		sm.log.Printf("Error while creating consumer group %s for stream %s: %v", consumerGroup, streamID, err)
 	}
 
 	// Create and add the subscriber channel
@@ -181,7 +190,7 @@ func (sm *StreamManager) Subscribe(streamID string, consumerGroup string, buffer
 
 			select {
 			case <-ctx.Done():
-				log.Println("context cancelled, stopping subscriber")
+				sm.log.Println("context cancelled, stopping subscriber")
 				close(subChan)
 				return
 			default:
@@ -191,7 +200,7 @@ func (sm *StreamManager) Subscribe(streamID string, consumerGroup string, buffer
 				return // Exit the loop if the stream is empty or does not exist
 			}
 			if err != nil {
-				log.Printf("error reading from stream %s: %v", streamID, err)
+				sm.log.Printf("error reading from stream %s: %v", streamID, err)
 				continue
 			}
 
@@ -202,19 +211,19 @@ func (sm *StreamManager) Subscribe(streamID string, consumerGroup string, buffer
 						if strMsg, ok := xmsg.Values["message"].(string); ok {
 							message = []byte(strMsg)
 						} else {
-							log.Println("Message is neither []byte nor string")
+							sm.log.Println("Message is neither []byte nor string")
 							continue
 						}
 					}
 					select {
 					case <-ctx.Done():
-						log.Println("context cancelled with messages left, stopping send")
+						sm.log.Println("context cancelled with messages left, stopping send")
 						close(subChan)
 						return
 					case subChan <- message:
-						log.Println("message sent to subscriber")
+						sm.log.Println("message sent to subscriber")
 					default:
-						log.Println("Dropping message for a full subscriber queue")
+						sm.log.Println("Dropping message for a full subscriber queue")
 					}
 				}
 			}
@@ -249,6 +258,8 @@ func (sm *StreamManager) RemoveStream(streamID string) error {
 	sm.mu.Lock()
 	defer sm.mu.Unlock()
 
+	sm.log.Printf("stopping stream %s", streamID)
+
 	stream, exists := sm.streams[streamID]
 	if !exists {
 		return fmt.Errorf("stream not found: %s", streamID)
@@ -256,10 +267,10 @@ func (sm *StreamManager) RemoveStream(streamID string) error {
 
 	go func() {
 		if err := stream.Stop(context.Background()); err != nil {
-			log.Printf("error stopping stream %s: %v", streamID, err)
+			sm.log.Printf("error stopping stream %s: %v", streamID, err)
 		}
 
-		log.Printf("stream %s stopped", streamID)
+		sm.log.Printf("stream %s stopped", streamID)
 	}()
 
 	// Close all subscriber channels for the stream
@@ -287,14 +298,14 @@ func (sm *StreamManager) Streams() map[string]string {
 func (sm *StreamManager) Reset() error {
 	for streamID := range sm.streams {
 		if err := sm.RemoveStream(streamID); err != nil {
-			log.Printf("error removing stream %s: %v", streamID, err)
+			sm.log.Printf("error removing stream %s: %v", streamID, err)
 		}
 	}
 
 	return nil
 }
 
-func addMetadata(configPayload []byte, key, value string) ([]byte, error) {
+func (sm *StreamManager) addMetadata(configPayload []byte, key, value string) ([]byte, error) {
 	var parsedConfig map[string]interface{}
 	if err := yaml.Unmarshal(configPayload, &parsedConfig); err != nil {
 		return nil, err
@@ -308,7 +319,7 @@ func addMetadata(configPayload []byte, key, value string) ([]byte, error) {
 		if key == "input" {
 			inputMap, ok := value.(map[interface{}]interface{})
 			if !ok {
-				log.Printf("expected map[interface{}]interface{}, got %T", value)
+				sm.log.Printf("expected map[interface{}]interface{}, got %T", value)
 				continue
 			}
 
