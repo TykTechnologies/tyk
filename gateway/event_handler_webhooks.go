@@ -213,11 +213,12 @@ func (w *WebHookHandler) BuildRequest(reqBody string) (*http.Request, error) {
 // If an error occurs, an empty string will be returned alongside an error.
 func (w *WebHookHandler) CreateBody(em config.EventMessage) (string, error) {
 	var reqBody bytes.Buffer
-	err := w.template.Execute(&reqBody, em)
-	if err != nil {
+
+	if err := w.template.Execute(&reqBody, em); err != nil {
 		return "", err
 	}
-	return reqBody.String(), err
+
+	return reqBody.String(), nil
 }
 
 // HandleEvent will be fired when the event handler instance is found in an APISpec EventPaths object during a request chain
