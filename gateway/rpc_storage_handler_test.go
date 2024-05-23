@@ -7,8 +7,7 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/TykTechnologies/tyk/internal/models"
-
+	"github.com/TykTechnologies/tyk/internal/model"
 	"github.com/TykTechnologies/tyk/rpc"
 
 	"github.com/TykTechnologies/tyk/apidef"
@@ -339,7 +338,7 @@ func TestGetGroupLoginCallback(t *testing.T) {
 					APIsCount:     0,
 					PoliciesCount: 0,
 				},
-				HostDetails: models.HostDetails{
+				HostDetails: model.HostDetails{
 					Hostname: ts.Gw.hostDetails.Hostname,
 					PID:      ts.Gw.hostDetails.PID,
 					Address:  ts.Gw.hostDetails.Address,
@@ -511,7 +510,7 @@ func TestRPCStorageHandler_BuildNodeInfo(t *testing.T) {
 			}
 
 			if tc.expectedNodeInfo.HostDetails.Hostname == "" {
-				tc.expectedNodeInfo.HostDetails = models.HostDetails{
+				tc.expectedNodeInfo.HostDetails = model.HostDetails{
 					Hostname: ts.Gw.hostDetails.Hostname,
 					PID:      ts.Gw.hostDetails.PID,
 					Address:  ts.Gw.hostDetails.Address,

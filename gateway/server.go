@@ -21,8 +21,6 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/TykTechnologies/tyk/internal/models"
-
 	"sync/atomic"
 	textTemplate "text/template"
 	"time"
@@ -196,7 +194,7 @@ type Gateway struct {
 
 	// RedisController keeps track of redis connection and singleton
 	StorageConnectionHandler *storage.ConnectionHandler
-	hostDetails              models.HostDetails
+	hostDetails              model.HostDetails
 
 	healthCheckInfo atomic.Value
 
