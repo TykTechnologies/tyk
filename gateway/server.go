@@ -28,6 +28,7 @@ import (
 	"github.com/TykTechnologies/tyk/internal/crypto"
 	"github.com/TykTechnologies/tyk/internal/httputil"
 	"github.com/TykTechnologies/tyk/internal/otel"
+	"github.com/TykTechnologies/tyk/internal/redis"
 	"github.com/TykTechnologies/tyk/internal/scheduler"
 	"github.com/TykTechnologies/tyk/internal/streaming"
 	"github.com/TykTechnologies/tyk/test"
@@ -1904,7 +1905,24 @@ func (gw *Gateway) setupPortsWhitelist() {
 
 func (gw *Gateway) startServer() {
 	streamingConn := &storage.RedisCluster{ConnectionHandler: gw.StorageConnectionHandler}
-	client, _ := streamingConn.Client()
+	var client redis.UniversalClient
+	var err error
+	t := 1
+	for {
+		client, err = streamingConn.Client()
+		if err == nil {
+			log.Info("Connected to Redis!")
+			break
+		}
+
+		if t == 10 {
+			log.Fatal("fatal error connecting to redis after 10s: ", err)
+		}
+
+		mainLog.Warnf("Error connecting to Redis: %v, sleeping", err)
+		t++
+		time.Sleep(1 * time.Second)
+	}
 
 	gw.StreamingServer = streaming.NewStreamManager(client)
 
