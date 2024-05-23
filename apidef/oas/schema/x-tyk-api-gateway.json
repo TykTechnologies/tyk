@@ -566,12 +566,6 @@
         },
         "contextVariables": {
           "$ref": "#/definitions/X-Tyk-ContextVariables"
-        },
-        "trafficLogs": {
-          "$ref": "#/definitions/X-Tyk-TrafficLogs"
-        },
-        "requestSizeLimit": {
-          "$ref": "#/definitions/X-Tyk-GlobalRequestSizeLimit"
         }
       }
     },
@@ -1274,9 +1268,6 @@
         },
         "detailedTracing": {
           "$ref": "#/definitions/X-Tyk-DetailedTracing"
-        },
-        "contextVariables": {
-          "$ref": "#/definitions/X-Tyk-ContextVariables"
         }
       },
       "required": [

@@ -99,12 +99,6 @@ type Global struct {
 
 	// ContextVariables contains the configuration related to Tyk context variables.
 	ContextVariables *ContextVariables `bson:"contextVariables,omitempty" json:"contextVariables,omitempty"`
-
-	// TrafficLogs contains the configurations related to API level log analytics.
-	TrafficLogs *TrafficLogs `bson:"trafficLogs,omitempty" json:"trafficLogs,omitempty"`
-
-	// RequestSizeLimit contains the configuration related to limiting the global request size.
-	RequestSizeLimit *GlobalRequestSizeLimit `bson:"requestSizeLimit,omitempty" json:"requestSizeLimit,omitempty"`
 }
 
 // MarshalJSON is a custom JSON marshaler for the Global struct. It is implemented
@@ -229,32 +223,6 @@ func (g *Global) Fill(api apidef.APIDefinition) {
 	}
 
 	g.fillContextVariables(api)
-
-	g.fillTrafficLogs(api)
-
-	g.fillRequestSizeLimit(api)
-}
-
-func (g *Global) fillTrafficLogs(api apidef.APIDefinition) {
-	if g.TrafficLogs == nil {
-		g.TrafficLogs = &TrafficLogs{}
-	}
-
-	g.TrafficLogs.Fill(api)
-	if ShouldOmit(g.TrafficLogs) {
-		g.TrafficLogs = nil
-	}
-}
-
-func (g *Global) fillRequestSizeLimit(api apidef.APIDefinition) {
-	if g.RequestSizeLimit == nil {
-		g.RequestSizeLimit = &GlobalRequestSizeLimit{}
-	}
-
-	g.RequestSizeLimit.Fill(api)
-	if ShouldOmit(g.RequestSizeLimit) {
-		g.RequestSizeLimit = nil
-	}
 }
 
 func (g *Global) fillContextVariables(api apidef.APIDefinition) {
@@ -306,8 +274,6 @@ func (g *Global) ExtractTo(api *apidef.APIDefinition) {
 	g.extractResponsePluginsTo(api)
 
 	g.extractContextVariablesTo(api)
-
-	g.extractTrafficLogsTo(api)
 
 	if g.TransformRequestHeaders == nil {
 		g.TransformRequestHeaders = &TransformHeaders{}
@@ -363,6 +329,17 @@ func (g *Global) extractRequestSizeLimitTo(api *apidef.APIDefinition) {
 	}
 
 	g.RequestSizeLimit.ExtractTo(api)
+}
+
+func (g *Global) extractContextVariablesTo(api *apidef.APIDefinition) {
+	if g.ContextVariables == nil {
+		g.ContextVariables = &ContextVariables{}
+		defer func() {
+			g.ContextVariables = nil
+		}()
+	}
+
+	g.ContextVariables.ExtractTo(api)
 }
 
 func (g *Global) extractContextVariablesTo(api *apidef.APIDefinition) {
@@ -1571,123 +1548,6 @@ func (r *RequestSizeLimit) Fill(meta apidef.RequestSizeMeta) {
 func (r *RequestSizeLimit) ExtractTo(meta *apidef.RequestSizeMeta) {
 	meta.Disabled = !r.Enabled
 	meta.SizeLimit = r.Value
-}
-
-// TrafficLogs holds configuration about API log analytics.
-type TrafficLogs struct {
-	// Enabled enables traffic log analytics for the API.
-	// Tyk classic API definition: `do_not_track`.
-	Enabled bool `bson:"enabled" json:"enabled"`
-	// TagHeaders is a string array of HTTP headers that can be extracted
-	// and transformed into analytics tags (statistics aggregated by tag, per hour).
-	TagHeaders []string `bson:"tagHeaders" json:"tagHeaders,omitempty"`
-	// CustomRetentionPeriod configures a custom value for how long the analytics is retained for,
-	// defaults to 100 years.
-	CustomRetentionPeriod ReadableDuration `bson:"customRetentionPeriod,omitempty" json:"customRetentionPeriod,omitempty"`
-	// Plugins configures custom plugins to allow for extensive modifications to analytics records
-	// The plugins would be executed in the order of configuration in the list.
-	Plugins CustomAnalyticsPlugins `bson:"plugins,omitempty" json:"plugins,omitempty"`
-}
-
-// Fill fills *TrafficLogs from apidef.APIDefinition.
-func (t *TrafficLogs) Fill(api apidef.APIDefinition) {
-	t.Enabled = !api.DoNotTrack
-	t.TagHeaders = api.TagHeaders
-	t.CustomRetentionPeriod = ReadableDuration(time.Duration(api.ExpireAnalyticsAfter) * time.Second)
-
-	if t.Plugins == nil {
-		t.Plugins = make(CustomAnalyticsPlugins, 0)
-	}
-	t.Plugins.Fill(api)
-	if ShouldOmit(t.Plugins) {
-		t.Plugins = nil
-	}
-}
-
-// ExtractTo extracts *TrafficLogs into *apidef.APIDefinition.
-func (t *TrafficLogs) ExtractTo(api *apidef.APIDefinition) {
-	api.DoNotTrack = !t.Enabled
-	api.TagHeaders = t.TagHeaders
-	api.ExpireAnalyticsAfter = int64(t.CustomRetentionPeriod.Seconds())
-
-	if t.Plugins == nil {
-		t.Plugins = make(CustomAnalyticsPlugins, 0)
-		defer func() {
-			t.Plugins = nil
-		}()
-	}
-	t.Plugins.ExtractTo(api)
-}
-
-// CustomAnalyticsPlugins is a list of CustomPlugin objects for analytics.
-type CustomAnalyticsPlugins []CustomPlugin
-
-// Fill fills CustomAnalyticsPlugins from AnalyticsPlugin in the supplied api.
-func (c *CustomAnalyticsPlugins) Fill(api apidef.APIDefinition) {
-	if api.AnalyticsPlugin.Enabled {
-		customPlugins := []CustomPlugin{
-			{
-				Enabled:      api.AnalyticsPlugin.Enabled,
-				FunctionName: api.AnalyticsPlugin.FuncName,
-				Path:         api.AnalyticsPlugin.PluginPath,
-			},
-		}
-		*c = customPlugins
-	}
-}
-
-// ExtractTo extracts CustomAnalyticsPlugins into AnalyticsPlugin of supplied api.
-func (c *CustomAnalyticsPlugins) ExtractTo(api *apidef.APIDefinition) {
-	if len(*c) > 0 {
-		// extract the first item in the customAnalyticsPlugin into apidef
-		plugin := (*c)[0]
-		api.AnalyticsPlugin.Enabled = plugin.Enabled
-		api.AnalyticsPlugin.FuncName = plugin.FunctionName
-		api.AnalyticsPlugin.PluginPath = plugin.Path
-	}
-}
-
-// GlobalRequestSizeLimit holds configuration about the global limits for request sizes.
-type GlobalRequestSizeLimit struct {
-	// Enabled activates the Request Size Limit.
-	// Tyk classic API definition: `version_data.versions..global_size_limit_disabled`.
-	Enabled bool `bson:"enabled" json:"enabled"`
-	// Value contains the value of the request size limit.
-	// Tyk classic API definition: `version_data.versions..global_size_limit`.
-	Value int64 `bson:"value" json:"value"`
-}
-
-// Fill fills *GlobalRequestSizeLimit from apidef.APIDefinition.
-func (g *GlobalRequestSizeLimit) Fill(api apidef.APIDefinition) {
-	ok := false
-	if api.VersionData.Versions != nil {
-		_, ok = api.VersionData.Versions[Main]
-	}
-	if !ok || api.VersionData.Versions[Main].GlobalSizeLimit == 0 {
-		g.Enabled = false
-		g.Value = 0
-		return
-	}
-
-	g.Enabled = !api.VersionData.Versions[Main].GlobalSizeLimitDisabled
-	g.Value = api.VersionData.Versions[Main].GlobalSizeLimit
-}
-
-// ExtractTo extracts *GlobalRequestSizeLimit into *apidef.APIDefinition.
-func (g *GlobalRequestSizeLimit) ExtractTo(api *apidef.APIDefinition) {
-	mainVersion := requireMainVersion(api)
-	defer func() {
-		updateMainVersion(api, mainVersion)
-	}()
-
-	if g.Value == 0 {
-		mainVersion.GlobalSizeLimit = 0
-		mainVersion.GlobalSizeLimitDisabled = true
-		return
-	}
-
-	mainVersion.GlobalSizeLimitDisabled = !g.Enabled
-	mainVersion.GlobalSizeLimit = g.Value
 }
 
 // ContextVariables holds the configuration related to Tyk context variables.
