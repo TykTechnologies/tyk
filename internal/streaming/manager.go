@@ -149,25 +149,27 @@ func (sm *StreamManager) ConsumerHook(streamID string) func(ctx context.Context,
 	}
 }
 
-func (sm *StreamManager) Subscribe(streamID string, consumerGroup string, bufferSize int) (chan []byte, error) {
+func (sm *StreamManager) Subscribe(streamID string, consumerGroup string, bufferSize int) (chan []byte, context.CancelFunc, error) {
 	sm.mu.Lock()
 	defer sm.mu.Unlock()
 
 	// Check if the stream exists
 	if _, exists := sm.streams[streamID]; !exists {
-		return nil, fmt.Errorf("stream not found: %s", streamID)
+		return nil, nil, fmt.Errorf("stream not found: %s", streamID)
 	}
 
 	// Check if the consumer group exists, if not create it
 	err := sm.redis.XGroupCreateMkStream(context.Background(), streamID, consumerGroup, "$").Err()
 	if err != nil && err != redis.Nil {
-		return nil, fmt.Errorf("error creating consumer group %s for stream %s: %v", consumerGroup, streamID, err)
+		return nil, nil, fmt.Errorf("error creating consumer group %s for stream %s: %v", consumerGroup, streamID, err)
 	}
 
 	// Create and add the subscriber channel
 	subChan := make(chan []byte, bufferSize)
 	sm.subscriberChans[streamID] = append(sm.subscriberChans[streamID], subChan)
-	go func() {
+	ctxWithCancel, cancel := context.WithCancel(context.Background())
+
+	go func(ctx context.Context) {
 		for {
 			msgs, err := sm.redis.XReadGroup(context.Background(), &redis.XReadGroupArgs{
 				Group:    consumerGroup,
@@ -176,6 +178,14 @@ func (sm *StreamManager) Subscribe(streamID string, consumerGroup string, buffer
 				Count:    10,
 				Block:    0,
 			}).Result()
+
+			select {
+			case <-ctx.Done():
+				log.Println("context cancelled, stopping subscriber")
+				close(subChan)
+				return
+			default:
+			}
 
 			if err == redis.Nil {
 				return // Exit the loop if the stream is empty or does not exist
@@ -197,6 +207,10 @@ func (sm *StreamManager) Subscribe(streamID string, consumerGroup string, buffer
 						}
 					}
 					select {
+					case <-ctx.Done():
+						log.Println("context cancelled with messages left, stopping send")
+						close(subChan)
+						return
 					case subChan <- message:
 						log.Println("message sent to subscriber")
 					default:
@@ -205,12 +219,12 @@ func (sm *StreamManager) Subscribe(streamID string, consumerGroup string, buffer
 				}
 			}
 		}
-	}()
+	}(ctxWithCancel)
 
-	return subChan, nil
+	return subChan, cancel, nil
 }
 
-func (sm *StreamManager) Unsubscribe(streamID string, consumerGroup string, unsubChan chan []byte) error {
+func (sm *StreamManager) Unsubscribe(streamID string, consumerGroup string, unsubChan chan []byte, cancel context.CancelFunc) error {
 	sm.mu.Lock()
 	defer sm.mu.Unlock()
 
@@ -221,7 +235,7 @@ func (sm *StreamManager) Unsubscribe(streamID string, consumerGroup string, unsu
 
 	for i, sub := range subs {
 		if sub == unsubChan {
-			close(sub)
+			cancel()
 			subs = append(subs[:i], subs[i+1:]...)
 			sm.subscriberChans[streamID] = subs
 			return nil
