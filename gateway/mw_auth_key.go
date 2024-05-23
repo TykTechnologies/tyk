@@ -122,7 +122,6 @@ func (k *AuthKey) ProcessRequest(_ http.ResponseWriter, r *http.Request, _ inter
 
 	session, keyExists = k.CheckSessionAndIdentityForValidKey(key, r)
 	key = session.KeyID
-	hashedKey := session.KeyHash()
 	if !keyExists {
 		// fallback to search by cert
 		session, keyExists = k.CheckSessionAndIdentityForValidKey(certHash, r)
@@ -150,12 +149,18 @@ func (k *AuthKey) ProcessRequest(_ http.ResponseWriter, r *http.Request, _ inter
 	// Set session state on context, we will need it later
 	switch k.Spec.BaseIdentityProvidedBy {
 	case apidef.AuthToken, apidef.UnsetAuth:
-		ctxSetSession(r, &session, updateSession, k.Gw.GetConfig().HashKeys)
+		hashKeys := k.Gw.GetConfig().HashKeys
+		ctxSetSession(r, &session, updateSession, hashKeys)
+
 		k.setContextVars(r, key)
-		ctxSetSpanAttributes(r, k.Name(), []otel.SpanAttribute{
-			otel.APIKeyAttribute(hashedKey),
-			otel.APIKeyAliasAttribute(session.Alias),
-		}...)
+
+		attributes := []otel.SpanAttribute{otel.APIKeyAliasAttribute(session.Alias)}
+
+		if hashKeys {
+			attributes = append(attributes, otel.APIKeyAttribute(session.KeyHash()))
+		}
+
+		ctxSetSpanAttributes(r, k.Name(), attributes...)
 	}
 
 	// Try using org-key format first:
