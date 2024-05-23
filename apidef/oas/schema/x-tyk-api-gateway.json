@@ -571,6 +571,9 @@
         },
         "transformResponseHeaders": {
           "$ref": "#/definitions/X-Tyk-TransformHeaders"
+        },
+        "contextVariables": {
+          "$ref": "#/definitions/X-Tyk-ContextVariables"
         }
       }
     },
@@ -1274,9 +1277,6 @@
         },
         "detailedTracing": {
           "$ref": "#/definitions/X-Tyk-DetailedTracing"
-        },
-        "contextVariables": {
-          "$ref": "#/definitions/X-Tyk-ContextVariables"
         }
       },
       "required": [
