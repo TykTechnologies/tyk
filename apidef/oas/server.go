@@ -34,15 +34,8 @@ type Server struct {
 	// Tyk classic API definition: `detailed_tracing`
 	DetailedTracing *DetailedTracing `bson:"detailedTracing,omitempty" json:"detailedTracing,omitempty"`
 
-<<<<<<< HEAD
 	// ContextVariables contains the configuration related to Tyk context variables.
 	ContextVariables *ContextVariables `bson:"contextVariables,omitempty" json:"contextVariables,omitempty"`
-=======
-	// Events contains the configuration related to Tyk Events.
-	//
-	// Tyk classic API definition: `event_handlers`
-	EventHandlers EventHandlers `bson:"eventHandlers,omitempty" json:"eventHandlers,omitempty"`
->>>>>>> 63963725d... [TT-11954/TT-12115]fix location of contextVariables (#6285)
 }
 
 // Fill fills *Server from apidef.APIDefinition.
@@ -92,7 +85,6 @@ func (s *Server) Fill(api apidef.APIDefinition) {
 		s.DetailedTracing = nil
 	}
 
-<<<<<<< HEAD
 	if s.ContextVariables == nil {
 		s.ContextVariables = &ContextVariables{}
 		// special case, do ShouldOmit omit check only if s.ContextVariables was nil.
@@ -104,15 +96,6 @@ func (s *Server) Fill(api apidef.APIDefinition) {
 	}
 
 	s.ContextVariables.Fill(api)
-=======
-	if s.EventHandlers == nil {
-		s.EventHandlers = EventHandlers{}
-	}
-	s.EventHandlers.Fill(api)
-	if ShouldOmit(s.EventHandlers) {
-		s.EventHandlers = nil
-	}
->>>>>>> 63963725d... [TT-11954/TT-12115]fix location of contextVariables (#6285)
 }
 
 // ExtractTo extracts *Server into *apidef.APIDefinition.
@@ -164,7 +147,6 @@ func (s *Server) ExtractTo(api *apidef.APIDefinition) {
 
 	s.DetailedTracing.ExtractTo(api)
 
-<<<<<<< HEAD
 	if s.ContextVariables == nil {
 		s.ContextVariables = &ContextVariables{}
 		defer func() {
@@ -173,16 +155,6 @@ func (s *Server) ExtractTo(api *apidef.APIDefinition) {
 	}
 
 	s.ContextVariables.ExtractTo(api)
-=======
-	if s.EventHandlers == nil {
-		s.EventHandlers = EventHandlers{}
-		defer func() {
-			s.EventHandlers = nil
-		}()
-	}
-
-	s.EventHandlers.ExtractTo(api)
->>>>>>> 63963725d... [TT-11954/TT-12115]fix location of contextVariables (#6285)
 }
 
 // ListenPath is the base path on Tyk to which requests for this API
