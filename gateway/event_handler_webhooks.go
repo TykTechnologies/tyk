@@ -200,7 +200,10 @@ func (w *WebHookHandler) BuildRequest(reqBody string) (*http.Request, error) {
 
 func (w *WebHookHandler) CreateBody(em config.EventMessage) (string, error) {
 	var reqBody bytes.Buffer
-	w.template.Execute(&reqBody, em)
+
+	if err := w.template.Execute(&reqBody, em); err != nil {
+		return "", err
+	}
 
 	return reqBody.String(), nil
 }
