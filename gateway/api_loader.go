@@ -968,7 +968,10 @@ func (h *handleFuncAdapter) HandleFunc(path string, f func(http.ResponseWriter, 
 			mainLog.Debug("Exiting debug for wrapped function on path: ", path)
 		}
 	}
-	h.spec.router.HandleFunc(path, wrappedFunc)
+
+	if h.spec.router != nil {
+		h.spec.router.HandleFunc(path, wrappedFunc)
+	}
 }
 
 func consumeWebsocket(f func(http.ResponseWriter, *http.Request)) *httptest.Server {
@@ -1030,9 +1033,15 @@ func handleWebsocket(gw *Gateway, streamID string) http.HandlerFunc {
 			ReadBufferSize:  1024,
 			WriteBufferSize: 1024,
 			CheckOrigin: func(r *http.Request) bool {
-				// Check origin here if needed
+				// Allow all origins
 				return true
 			},
+		}
+
+		if r.Header.Get("Upgrade") != "" {
+			r.URL.Scheme = "ws"
+		} else {
+			r.URL.Scheme = "http"
 		}
 
 		conn, err := upgrader.Upgrade(w, r, nil)
@@ -1236,19 +1245,19 @@ func (gw *Gateway) loadApps(specs []*APISpec) {
 	activeStreams := map[string]struct{}{}
 
 	for _, spec := range specs {
-		// Check if the API is a streaming API and add it to the streaming server
-		for _, spec := range specs {
-			streamConfigs := spec.Streams()
-			for streamKey, stream := range streamConfigs {
-				if streamMap, ok := stream.(map[string]interface{}); ok {
-					streamID := spec.APIID + "_" + streamKey
+		streamConfigs := spec.Streams()
+		mainLog.Infof("API %s has %d streams, %v", spec.APIID, len(streamConfigs), streamConfigs)
+		for streamKey, stream := range streamConfigs {
+			if streamMap, ok := stream.(map[string]interface{}); ok {
+				streamID := spec.APIID + "_" + streamKey
 
-					if err := gw.StreamingServer.AddStream(streamID, streamMap, &handleFuncAdapter{gw: gw, spec: spec, streamID: streamID}); err != nil {
-						mainLog.Errorf("Error adding stream to streaming server: %v", err)
-					} else {
-						activeStreams[streamID] = struct{}{}
-						mainLog.Infof("Added stream %s to streaming server", streamID)
-					}
+				mainLog.Infof("Adding stream %s to streaming server", streamID)
+
+				if err := gw.StreamingServer.AddStream(streamID, streamMap, &handleFuncAdapter{gw: gw, spec: spec, streamID: streamID}); err != nil {
+					mainLog.Errorf("Error adding stream to streaming server: %v", err)
+				} else {
+					activeStreams[streamID] = struct{}{}
+					mainLog.Infof("Added stream %s to streaming server", streamID)
 				}
 			}
 		}
