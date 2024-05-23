@@ -9,6 +9,7 @@ import (
 
 	"github.com/TykTechnologies/storage/temporal/model"
 	"github.com/TykTechnologies/tyk/internal/cache"
+	im "github.com/TykTechnologies/tyk/internal/model"
 	"github.com/TykTechnologies/tyk/rpc"
 
 	"github.com/TykTechnologies/tyk/apidef"
@@ -172,7 +173,7 @@ func (r *RPCStorageHandler) buildNodeInfo() []byte {
 			APIsCount:     r.Gw.apisByIDLen(),
 			PoliciesCount: r.Gw.policiesByIDLen(),
 		},
-		HostDetails: model.HostDetails{
+		HostDetails: im.HostDetails{
 			Hostname: r.Gw.hostDetails.Hostname,
 			PID:      r.Gw.hostDetails.PID,
 			Address:  r.Gw.hostDetails.Address,
