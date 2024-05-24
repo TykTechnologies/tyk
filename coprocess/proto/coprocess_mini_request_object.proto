@@ -6,49 +6,47 @@ package coprocess;
 
 option go_package = "/coprocess";
 
-/*
- * Used for middleware calls and contains important fields like headers, parameters, body and URL.
- */
+// Used for middleware calls and contains important fields like headers, parameters, body and URL.
 message MiniRequestObject {
-  /* A read-only field for reading headers injected by previous middleware */
+  // A read-only field for reading headers injected by previous middleware
   map<string, string> headers = 1;
   
-  /* Map of header key values to append to the request */
+  // Map of header key values to append to the request
   map<string, string> set_headers = 2;
   
-  /* List of header names to be removed from the request */
+  // List of header names to be removed from the request
   repeated string delete_headers = 3;
   
-  /* Request body */
+  // Request body
   string body = 4;
 
-  /* Request URL */
+  // Request URL
   string url = 5;
 
-  /* Read only map of request params */
+  // Read only map of request params
   map<string, string> params = 6;
 
-  /* Map of parameter keys and values to add to the request */
+  // Map of parameter keys and values to add to the request
   map<string, string> add_params = 7;
 
-  /* Allows a parameter to have multiple values, currently unsupported */
+  // Allows a parameter to have multiple values, currently unsupported
   map<string, string> extended_params = 8;
 
-  /* List of parameter keys to be removed from the request */
+  // List of parameter keys to be removed from the request
   repeated string delete_params = 9;
   
-  /* Override the response for the request, see ReturnOverrides */
+  // Override the response for the request, see ReturnOverrides
   ReturnOverrides return_overrides = 10;
 
-  /* Request method, eg GET, POST, etc */
+  // Request method, eg GET, POST, etc.
   string method = 11;
 
-  /* The raw unprocessed request URL, including query string and fragments */
+  // The raw unprocessed request URL, including query string and fragments
   string request_uri = 12;
 
-  /* The URL scheme, e.g. http or https */
+  // The URL scheme, e.g. http or https
   string scheme = 13;
 
-  /* The raw request body */
+  // The raw request body
   bytes raw_body = 14;
 }

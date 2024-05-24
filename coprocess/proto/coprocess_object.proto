@@ -9,53 +9,49 @@ package coprocess;
 
 option go_package = "/coprocess";
 
-/* 
- * Wraps a MiniRequestObject and contains additional fields that are useful for users that implement
- * their own request dispatchers, like the middleware hook type and name
- */
+// Wraps a MiniRequestObject and contains additional fields that are useful for users that implement
+// their own request dispatchers, like the middleware hook type and name
 message Object {
-  /* The plugin hook type */
+
+  // The plugin hook type
   HookType hook_type = 1;
   
-  /* The plugin name */
+  // The plugin name
   string hook_name = 2;
 
-  /*
-   * The main request data structure used by rich plugins. It’s used for middleware calls 
-   * and contains important fields like headers, parameters, body and URL
-   */
+  // The main request data structure used by rich plugins. It’s used for middleware calls 
+  // and contains important fields like headers, parameters, body and URL
   MiniRequestObject request = 3;
 
-  /* Stores information about the current key/user that’s used for authentication */
+  // Stores information about the current key/user that’s used for authentication
   SessionState session = 4;
   
-  /* Contains the metadata. This is a dynamic field */
+  // Contains the metadata. This is a dynamic field
   map<string, string> metadata = 5;
 
-  /* Contains information about API definition, including APIID, OrgID and config_data */ 
+  // Contains information about API definition, including APIID, OrgID and config_data 
   map<string, string> spec = 6;
 
-  /*
-   * The ResponseObject is used by response hooks. The fields are populated with the upstream HTTP
-   * response data. All the field contents can be modified.
-   */
+  // The ResponseObject is used by response hooks. The fields are populated with the upstream HTTP
+  // response data. All the field contents can be modified
   ResponseObject response = 7;
 }
 
-/* An event is represented as a JSON payload */
+// An event is represented as a JSON payload
 message Event {
-  /* The JSON payload */
+
+  // The JSON payload
   string payload = 1;
 }
 
-/* Response for event */
+// Response for event
 message EventReply {}
 
-/* The service interface that must be implemented by the target language */
+// The service interface that must be implemented by the target language
 service Dispatcher {
-  /* Accepts and returns an Object */
+  // Accepts and returns an Object
   rpc Dispatch (Object) returns (Object) {}
 
-  /* Dispatches an event to the target language */
+  // Dispatches an event to the target language
   rpc DispatchEvent (Event) returns (EventReply) {}
 }
