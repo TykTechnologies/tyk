@@ -14,7 +14,7 @@ type RateLimitSmoothing struct {
 	// Threshold is the request rate (measured over the rate limiter's `per` interval) above which gateway will apply smoothing. This must be lower than the configured `rate`, which indicates the absolute maximum request rate.
 	Threshold int64 `json:"threshold" bson:"threshold"`
 
-	// Trigger holds a value between 0..1 and is used to determine at which request rate smoothing will be triggered. 
+	// Trigger holds a value between 0..1 and is used to determine at which request rate smoothing will be triggered.
 	// A RateLimitSmoothingUp event will be triggered when the request rate reaches (step * trigger) below the current allowance.
 	// A RateLimitSmoothingDown event will be triggered when the request rate is consistently below (step + (step * trigger)) below the current allowance.
 	//
