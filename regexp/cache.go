@@ -39,7 +39,7 @@ func (c *cache) add(key string, value interface{}) {
 
 func (c *cache) getRegexp(key string) (*regexp.Regexp, bool) {
 	if val, found := c.Get(key); found {
-		return val.(*regexp.Regexp).Copy(), true
+		return val.(*regexp.Regexp), true
 	}
 
 	return nil, false

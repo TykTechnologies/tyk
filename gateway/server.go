@@ -15,6 +15,7 @@ import (
 	pprofhttp "net/http/pprof"
 	"os"
 	"path/filepath"
+	stdregexp "regexp"
 	"runtime"
 	"runtime/pprof"
 	"strconv"
@@ -1471,6 +1472,16 @@ func (gw *Gateway) afterConfSetup() {
 	rpc.GlobalRPCPingTimeout = time.Second * time.Duration(conf.SlaveOptions.PingTimeout)
 	rpc.GlobalRPCCallTimeout = time.Second * time.Duration(conf.SlaveOptions.CallTimeout)
 	gw.initGenericEventHandlers()
+
+	// Use regexp package compile function to cache compiled regular expressions.
+	// This helps with reload performance, as mux only has to compile them once.
+	if conf.HttpServerOptions.EnableRegexpCache {
+		mainLog.Info("Enabling regexp cache for API routes")
+		mux.RegexpCompileFunc = regexp.CompileNative
+	} else {
+		mux.RegexpCompileFunc = stdregexp.Compile
+	}
+
 	regexp.ResetCache(time.Second*time.Duration(conf.RegexpCacheExpire), !conf.DisableRegexpCache)
 
 	if conf.HealthCheckEndpointName == "" {

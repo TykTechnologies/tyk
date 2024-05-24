@@ -570,6 +570,9 @@
         "enable_path_suffix_matching": {
           "type": "boolean"
         },
+        "enable_regexp_cache": {
+          "type": "boolean"
+        },
         "flush_interval": {
           "type": "integer"
         },
