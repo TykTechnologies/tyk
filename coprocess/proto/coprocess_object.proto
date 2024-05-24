@@ -9,25 +9,37 @@ package coprocess;
 
 option go_package = "/coprocess";
 
-/*!
+/**
  * @brief Main entry point
  *
  * Wraps a MiniRequestObject and contains additional fields that are useful for users that implement their own request dispatchers, like the middleware hook type and name
  */
 message Object {
-  HookType hook_type = 1; /**< The plugin hook type */
-  string hook_name = 2; /**< The plugin name */
-  MiniRequestObject request = 3; /**< The main request data structure used by rich plugins\. It’s used for middleware calls and contains important fields like headers, parameters, body and URL */
-  SessionState session = 4; /**< Stores information about the current key/user
-                              that’s used for authentication */
-  map<string, string> metadata = 5; /**< Contains the metadata. This is a
-                                      dynamic field */
-  map<string, string> spec = 6; /**< Contains information about API definition,
-                                  including APIID, OrgID and config_data */
-  ResponseObject response = 7; /**< The ResponseObject is used by response
-                                 hooks. The fields are populated with the upstream HTTP
-                                 response data. All the field contents can be
-                                 modified */
+  /** The plugin hook type */
+  HookType hook_type = 1;
+  
+  /** The plugin name */
+  string hook_name = 2;
+
+  /**
+   * The main request data structure used by rich plugins. Used for middleware calls and contains important fields like headers, parameters, body and URL
+   */
+  MiniRequestObject request = 3; 
+  
+  /** Stores information about the current key/user that’s used for authentication */
+  SessionState session = 4;
+
+  /** Contains the metadata. This is a dynamic field */
+  map<string, string> metadata = 5;
+
+  /** Contains information about API definition, including APIID, OrgID and config_data */
+  map<string, string> spec = 6;
+
+  /**
+   * The ResponseObject is used by response hooks. The fields are populated with the
+   * upstream HTTP response data. All the field contents can be modified
+   */
+  ResponseObject response = 7;                                
 }
 
 /**
