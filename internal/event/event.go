@@ -47,10 +47,10 @@ const (
 	// RateLimitExceeded is the event triggered when rate limit has been exceeded for a specific key.
 	RateLimitExceeded Event = "RatelimitExceeded"
 
-	// RateLimitSmoothingUp is the event triggered when rate limit smoothing increases the rate limits.
+	// RateLimitSmoothingUp is the event triggered when rate limit smoothing increases the currently enforced rate limit.
 	RateLimitSmoothingUp Event = "RateLimitSmoothingUp"
 
-	// RateLimitSmoothingDown is the event triggered when rate limit smoothing decreases the rate limits.
+	// RateLimitSmoothingDown is the event triggered when rate limit smoothing decreases the currently enforced rate limit.
 	RateLimitSmoothingDown Event = "RateLimitSmoothingDown"
 )
 
@@ -58,8 +58,8 @@ const (
 // The title value should not contain ending punctuation.
 var eventMap = map[Event]string{
 	RateLimitExceeded:      "Key Rate Limit Exceeded",
-	RateLimitSmoothingUp:   "Rate limits increased with smoothing",
-	RateLimitSmoothingDown: "Rate limits decreased with smoothing",
+	RateLimitSmoothingUp:   "Rate limit increased with smoothing",
+	RateLimitSmoothingDown: "Rate limit decreased with smoothing",
 }
 
 // String will return the description for the event if any.
