@@ -198,12 +198,14 @@ func (w *WebHookHandler) BuildRequest(reqBody string) (*http.Request, error) {
 	return req, nil
 }
 
-// CreateBody will render the webhook event message template.
-// If an error occurs, a partially rendered template will be
-// returned alongside the error that occured.
+// CreateBody will render the webhook event message template and return it as a string.
+// If an error occurs, an empty string will be returned alongside an error.
 func (w *WebHookHandler) CreateBody(em config.EventMessage) (string, error) {
 	var reqBody bytes.Buffer
 	err := w.template.Execute(&reqBody, em)
+	if err != nil {
+		return "", err
+	}
 	return reqBody.String(), err
 }
 
@@ -217,7 +219,8 @@ func (w *WebHookHandler) HandleEvent(em config.EventMessage) {
 		// but we're passing on the partial rendered contents
 		log.WithError(err).WithFields(logrus.Fields{
 			"prefix": "webhooks",
-		}).Warn("Webhook template rendering error")
+		}).Error("Webhook template rendering error")
+		return
 	}
 
 	// Construct request (method, body, params)
