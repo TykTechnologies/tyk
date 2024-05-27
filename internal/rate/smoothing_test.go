@@ -26,8 +26,8 @@ func TestSmoothing(t *testing.T) {
 		{
 			name: "Smoothing disabled",
 			session: &apidef.RateLimitSmoothing{
-				Enabled:  false,
-				Interval: 1,
+				Enabled: false,
+				Delay:   1,
 			},
 			currentRate:    50,
 			maxAllowedRate: 100,
@@ -39,10 +39,10 @@ func TestSmoothing(t *testing.T) {
 			session: &apidef.RateLimitSmoothing{
 				Enabled:   true,
 				Allowance: 100,
-				Rate:      10,
+				Step:      10,
 				Trigger:   0.8,
 				Threshold: 80,
-				Interval:  1,
+				Delay:     1,
 			},
 			currentRate:       70, // Below the threshold
 			maxAllowedRate:    150,
@@ -56,10 +56,10 @@ func TestSmoothing(t *testing.T) {
 			session: &apidef.RateLimitSmoothing{
 				Enabled:   true,
 				Allowance: 400,
-				Rate:      100,
+				Step:      100,
 				Trigger:   0.8,
 				Threshold: 50,
-				Interval:  1,
+				Delay:     1,
 			},
 			currentRate:       350, // currentRate > allowance - (trigger * session.Rate) => 350 > 400 - (0.8 * 100)
 			maxAllowedRate:    500,
@@ -73,10 +73,10 @@ func TestSmoothing(t *testing.T) {
 			session: &apidef.RateLimitSmoothing{
 				Enabled:   true,
 				Allowance: 100,
-				Rate:      10,
+				Step:      10,
 				Trigger:   0.8,
 				Threshold: 50,
-				Interval:  1,
+				Delay:     1,
 			},
 			currentRate:       40, // currentRate <= (newAllowance - trigger * rate) => 40 <= (90 - 0.8 * 10)
 			maxAllowedRate:    150,
@@ -90,10 +90,10 @@ func TestSmoothing(t *testing.T) {
 			session: &apidef.RateLimitSmoothing{
 				Enabled:   true,
 				Allowance: 400,
-				Rate:      100,
+				Step:      100,
 				Trigger:   0.8,
 				Threshold: 50,
-				Interval:  1,
+				Delay:     1,
 			},
 			currentRate:       350, // currentRate > allowance - (trigger * session.Rate) => 350 > 400 - (0.8 * 100)
 			maxAllowedRate:    450,
@@ -107,10 +107,10 @@ func TestSmoothing(t *testing.T) {
 			session: &apidef.RateLimitSmoothing{
 				Enabled:   true,
 				Allowance: 70,
-				Rate:      20,
+				Step:      20,
 				Trigger:   0.8,
 				Threshold: 60,
-				Interval:  1,
+				Delay:     1,
 			},
 			currentRate:       10,
 			maxAllowedRate:    150,

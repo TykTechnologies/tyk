@@ -48,9 +48,8 @@ func increaseRateAllowance(session *apidef.RateLimitSmoothing, currentRate int64
 		// clamp to the max rate
 		if newAllowance > maxAllowedRate {
 			newAllowance = maxAllowedRate
-			return newAllowance, newAllowance != session.Allowance
 		}
-		return newAllowance, true
+		return newAllowance, newAllowance != session.Allowance
 	}
 	return session.Allowance, false
 }
@@ -61,9 +60,8 @@ func decreaseRateAllowance(session *apidef.RateLimitSmoothing, currentRate int64
 	if float64(currentRate) <= step {
 		if newAllowance < minAllowedRate {
 			newAllowance = minAllowedRate
-			return newAllowance, newAllowance != session.Allowance
 		}
-		return newAllowance, true
+		return newAllowance, newAllowance != session.Allowance
 	}
 	return session.Allowance, false
 }
