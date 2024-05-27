@@ -6,45 +6,70 @@ import (
 	"time"
 )
 
-// RateLimitSmoothing holds the rate smoothing configuration in effect.
+// RateLimitSmoothing holds the rate smoothing configuration.
+//
+// Rate Limit Smoothing is a mechanism to dynamically adjust the request rate
+// limits based on the current traffic patterns. It helps in managing request
+// spikes by gradually increasing or decreasing the rate limit instead of making
+// abrupt changes or blocking requests excessively.
+//
+// Once the rate limit smoothing triggers an allowance change, one of the
+// following events is emitted:
+//
+// - `RateLimitSmoothingUp` when the allowance increases
+// - `RateLimitSmoothingDown` when the allowance decreases
+//
+// Events are triggered based on the configuration:
+//
+// - `enabled` (boolean) to enable or disable rate limit smoothing
+// - `threshold` after which to apply smoothing (minimum rate for window)
+// - `trigger` configures at which fraction of a step a smoothing event is triggered
+// - `step` is the value by which the rate allowance will get adjusted
+// - `delay` is the amount of seconds between smoothing updates
+//
+// This configuration in turn updates two fields:
+//
+// - `allowance` - the current rate allowance enforced in rate limiting
+// - `allowance_next_update_at` - a timestamp when the next allowance update may occur
+//
+// For any allowance, events are triggered based on the following calculations:
+//
+//   - When the request rate rises above `allowance - (step * trigger)`,
+//     a RateLimitSmoothingUp event is emitted, and allowance increases by `step`.
+//   - When the request rate falls below `allowance - (step + step * trigger)`,
+//     a RateLimitSmoothingDown event is emitted and allowance decreases by `step`.
+//
+// Example: Allowance: 600, Current rate: 500, Step: 100, Trigger: 0.5
+//
+//   - To trigger a RateLimitSmoothingUp event, the request rate must exceed:
+//     Allowance - (Step * Trigger)
+//     Calculation: 600 - (100 * 0.5) = 550
+//     Exceeding a request rate of 550 will increase the allowance to 700 (Allowance + Step).
+//
+//   - To trigger a RateLimitSmoothingDown event, the request rate must fall below:
+//     Allowance - (Step + (Step * Trigger))
+//     Calculation: 600 - (100 + (100 * 0.5)) = 450
+//     As the request rate falls below 450, that will decrease the allowance to 500 (Allowance - Step).
 type RateLimitSmoothing struct {
-	// Enabled if true will enable rate limit smoothing.
+	// Enabled indicates if rate limit smoothing is active.
 	Enabled bool `json:"enabled" bson:"enabled"`
 
-	// Threshold is the request rate (measured over the rate limiter's `per` interval) above which gateway will apply smoothing. This must be lower than the configured `rate`, which indicates the absolute maximum request rate.
+	// Threshold is the request rate above which smoothing is applied.
 	Threshold int64 `json:"threshold" bson:"threshold"`
 
-	// Trigger holds a value between 0..1 and is used to determine at which request rate smoothing will be triggered.
-	// A RateLimitSmoothingUp event will be triggered when the request rate reaches (step * trigger) below the current allowance.
-	// A RateLimitSmoothingDown event will be triggered when the request rate is consistently below (step + (step * trigger)) below the current allowance.
-	//
-	// Example:
-	//
-	// - Allowance 600,
-	// - Current rate 500,
-	// - Step 100,
-	// - Trigger 0.5
-	//
-	// To trigger a RateLimitSmoothingUp event, the current rate needs to exceed 550 requests per second.
-	// The new allowance would be: `Allowance + Step`, i.e. 700.
-	//
-	// To trigger a RateLimitSmoothingDown event, the current rate needs to fall below 450.
-	// The new allowance would be: `Allowance - Step`, i.e. 500.
+	// Trigger is the step factor (0..1) determining when smoothing events trigger.
 	Trigger float64 `json:"trigger" bson:"trigger"`
 
-	// Step defines the amount by which the currently enforced rate limit will be adjusted for a rate smoothing increase or decrease event.
+	// Step is the increment/decrement for adjusting the rate limit.
 	Step int64 `json:"step" bson:"step"`
 
-	// Delay is the minimum period between changes to the currently enforced rate limit. This provides a hold-off to manage the smoothing of request spikes. It is a value in seconds.
+	// Delay is the minimum time between rate limit changes (in seconds).
 	Delay int64 `json:"delay" bson:"delay"`
 
-	// Allowance is the current allowance in effect. It's not
-	// serialized for the database (bson), but has JSON tags
-	// in order to store and return it with session data.
-	Allowance int64 `json:"allowance_current" bson:"-"`
+	// Allowance is the current rate limit allowance in effect.
+	Allowance int64 `json:"allowance" bson:"-"`
 
-	// AllowanceNextUpdateAt is the time when Allowance is again allowed to update.
-	// It's updated in SetAllowance.
+	// AllowanceNextUpdateAt is the next allowable update time for the allowance.
 	AllowanceNextUpdateAt time.Time `json:"allowance_next_update_at" bson:"-"`
 }
 
