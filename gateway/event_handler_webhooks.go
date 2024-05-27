@@ -212,7 +212,13 @@ func (w *WebHookHandler) CreateBody(em config.EventMessage) (string, error) {
 func (w *WebHookHandler) HandleEvent(em config.EventMessage) {
 
 	// Inject event message into template, render to string
-	reqBody, _ := w.CreateBody(em)
+	reqBody, err := w.CreateBody(em)
+	if err != nil {
+		log.WithFields(logrus.Fields{
+			"prefix": "webhooks",
+		}).Error("Webhook request failed: ", err)
+		return
+	}
 
 	// Construct request (method, body, params)
 	req, err := w.BuildRequest(reqBody)
