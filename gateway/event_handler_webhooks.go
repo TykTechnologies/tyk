@@ -215,9 +215,9 @@ func (w *WebHookHandler) HandleEvent(em config.EventMessage) {
 	if err != nil {
 		// We're just logging the template rendering issue here
 		// but we're passing on the partial rendered contents
-		log.WithFields(logrus.Fields{
+		log.WithError(err).WithFields(logrus.Fields{
 			"prefix": "webhooks",
-		}).Error("Webhook request failed: ", err)
+		}).Warn("Webhook template rendering error")
 	}
 
 	// Construct request (method, body, params)
