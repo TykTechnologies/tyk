@@ -8,6 +8,8 @@ import (
 	"io"
 	"net/http"
 
+	"github.com/jensneuse/abstractlogger"
+
 	"github.com/buger/jsonparser"
 
 	"github.com/TykTechnologies/graphql-go-tools/v2/pkg/astparser"
@@ -154,4 +156,195 @@ func (r *reverseProxyPreHandlerV2) PreHandle(params ReverseProxyParams) (reverse
 	}
 
 	return ReverseProxyTypeNone, nil
+}
+
+type complexityCheckerV2 struct {
+	schema             *graphql.Schema
+	logger             abstractlogger.Logger
+	ctxRetrieveRequest ContextRetrieveRequestV2Func
+}
+
+func (c *complexityCheckerV2) DepthLimitExceeded(r *http.Request, accessDefinition *ComplexityAccessDefinition) ComplexityFailReason {
+	if !c.depthLimitEnabled(accessDefinition) {
+		return ComplexityFailReasonNone
+	}
+
+	gqlRequest := c.ctxRetrieveRequest(r)
+	if gqlRequest == nil {
+		return ComplexityFailReasonNone
+	}
+
+	isIntrospectionQuery, err := gqlRequest.IsIntrospectionQuery()
+	if err != nil {
+		c.logger.Debug("error while checking for introspection query", abstractlogger.Error(err))
+		return ComplexityFailReasonInternalError
+	}
+
+	if isIntrospectionQuery {
+		return ComplexityFailReasonNone
+	}
+
+	complexityRes, err := gqlRequest.CalculateComplexity(graphql.DefaultComplexityCalculator, c.schema)
+	if err != nil {
+		c.logger.Error("error while calculating complexity of GraphQL request", abstractlogger.Error(err))
+		return ComplexityFailReasonInternalError
+	}
+
+	if complexityRes.Errors != nil && complexityRes.Errors.Count() > 0 {
+		c.logger.Error("error while calculating complexity of GraphQL request", abstractlogger.Error(complexityRes.Errors.ErrorByIndex(0)))
+		return ComplexityFailReasonInternalError
+	}
+
+	// do per query depth check
+	if len(accessDefinition.FieldAccessRights) == 0 {
+		if accessDefinition.Limit.MaxQueryDepth > 0 && complexityRes.Depth > accessDefinition.Limit.MaxQueryDepth {
+			c.logger.Debug("complexity of the request is higher than the allowed limit", abstractlogger.Int("maxQueryDepth", accessDefinition.Limit.MaxQueryDepth))
+			return ComplexityFailReasonDepthLimitExceeded
+		}
+		return ComplexityFailReasonNone
+	}
+
+	// do per query field depth check
+	for _, fieldComplexityRes := range complexityRes.PerRootField {
+		var (
+			fieldAccessDefinition ComplexityFieldAccessDefinition
+			hasPerFieldLimits     bool
+		)
+
+		for _, fieldAccessRight := range accessDefinition.FieldAccessRights {
+			if fieldComplexityRes.TypeName != fieldAccessRight.TypeName {
+				continue
+			}
+			if fieldComplexityRes.FieldName != fieldAccessRight.FieldName {
+				continue
+			}
+
+			fieldAccessDefinition = fieldAccessRight
+			hasPerFieldLimits = true
+			break
+		}
+
+		if hasPerFieldLimits {
+			if greaterThanIntConsideringUnlimited(fieldComplexityRes.Depth, fieldAccessDefinition.Limits.MaxQueryDepth) {
+				c.logger.Debug(
+					"depth of the root field is higher than the allowed field limit",
+					abstractlogger.Int("depth", fieldComplexityRes.Depth),
+					abstractlogger.String("rootField", fmt.Sprintf("%s.%s", fieldAccessDefinition.TypeName, fieldAccessDefinition.FieldName)),
+					abstractlogger.Int("maxQueryDepth", fieldAccessDefinition.Limits.MaxQueryDepth),
+				)
+
+				return ComplexityFailReasonDepthLimitExceeded
+			}
+			continue
+		}
+
+		// favour global limit for query field
+		// have to increase resulting field depth by 1 to get a global depth
+		queryDepth := fieldComplexityRes.Depth + 1
+		if greaterThanIntConsideringUnlimited(queryDepth, accessDefinition.Limit.MaxQueryDepth) {
+			c.logger.Debug(
+				"depth of the root field is higher than the allowed global limit",
+				abstractlogger.Int("depth", queryDepth),
+				abstractlogger.String("rootField", fmt.Sprintf("%s.%s", fieldComplexityRes.TypeName, fieldComplexityRes.FieldName)),
+				abstractlogger.Int("maxQueryDepth", accessDefinition.Limit.MaxQueryDepth),
+			)
+
+			return ComplexityFailReasonDepthLimitExceeded
+		}
+	}
+	return ComplexityFailReasonNone
+
+}
+
+func (c *complexityCheckerV2) depthLimitEnabled(accessDefinition *ComplexityAccessDefinition) bool {
+	if accessDefinition == nil {
+		return false
+	}
+
+	if accessDefinition.Limit.MaxQueryDepth == -1 && len(accessDefinition.FieldAccessRights) == 0 {
+		return false
+	}
+
+	return accessDefinition.Limit.MaxQueryDepth != -1 || len(accessDefinition.FieldAccessRights) != 0
+}
+
+type granularAccessCheckerV2 struct {
+	logger                    abstractlogger.Logger
+	schema                    *graphql.Schema
+	ctxRetrieveGraphQLRequest ContextRetrieveRequestV2Func
+}
+
+func (g *granularAccessCheckerV2) CheckGraphQLRequestFieldAllowance(w http.ResponseWriter, r *http.Request, accessDefinition *GranularAccessDefinition) GraphQLGranularAccessResult {
+	gqlRequest := g.ctxRetrieveGraphQLRequest(r)
+	if gqlRequest == nil {
+		return GraphQLGranularAccessResult{FailReason: GranularAccessFailReasonNone}
+	}
+
+	isIntrospection, err := gqlRequest.IsIntrospectionQueryStrict()
+	if err != nil {
+		return GraphQLGranularAccessResult{
+			FailReason:  GranularAccessFailReasonInternalError,
+			InternalErr: err,
+		}
+	}
+	if isIntrospection {
+		if accessDefinition.DisableIntrospection {
+			return GraphQLGranularAccessResult{FailReason: GranularAccessFailReasonIntrospectionDisabled}
+		}
+
+		// See TT-11260
+		//
+		// Introspection should be possible when Disable Introspection is turned off in policy settings,
+		// regardless of Allow List or Block List settings.
+		//
+		// Agreed solution: if Disable Introspection is turned off, then the Allow or Block list settings
+		// should be ignored, but only for the introspection query.
+		return GraphQLGranularAccessResult{FailReason: GranularAccessFailReasonNone}
+	}
+
+	if len(accessDefinition.AllowedTypes) != 0 {
+		fieldRestrictionList := graphql.FieldRestrictionList{
+			Kind:  graphql.AllowList,
+			Types: g.convertGranularAccessTypeToGraphQLType(accessDefinition.AllowedTypes),
+		}
+		return g.validateFieldRestrictions(gqlRequest, fieldRestrictionList, g.schema)
+	}
+
+	if len(accessDefinition.RestrictedTypes) != 0 {
+		fieldRestrictionList := graphql.FieldRestrictionList{
+			Kind:  graphql.BlockList,
+			Types: g.convertGranularAccessTypeToGraphQLType(accessDefinition.RestrictedTypes),
+		}
+		return g.validateFieldRestrictions(gqlRequest, fieldRestrictionList, g.schema)
+	}
+
+	// There are no restricted types. Every field is allowed access.
+	return GraphQLGranularAccessResult{FailReason: GranularAccessFailReasonNone}
+}
+
+func (g *granularAccessCheckerV2) convertGranularAccessTypeToGraphQLType(accessTypes []GranularAccessType) []graphql.Type {
+	var types []graphql.Type
+	for _, accessType := range accessTypes {
+		types = append(types, graphql.Type{
+			Name:   accessType.Name,
+			Fields: accessType.Fields,
+		})
+	}
+	return types
+}
+
+func (g *granularAccessCheckerV2) validateFieldRestrictions(gqlRequest *graphql.Request, fieldRestrictionList graphql.FieldRestrictionList, schema *graphql.Schema) GraphQLGranularAccessResult {
+	result, err := gqlRequest.ValidateFieldRestrictions(schema, fieldRestrictionList, graphql.DefaultFieldsValidator{})
+	if err != nil {
+		return GraphQLGranularAccessResult{FailReason: GranularAccessFailReasonInternalError, InternalErr: err}
+	}
+
+	if !result.Valid || (result.Errors != nil && result.Errors.Count() > 0) {
+		return GraphQLGranularAccessResult{FailReason: GranularAccessFailReasonValidationError, ValidationError: result.Errors, writeErrorResponse: g.writeErrorResponse}
+	}
+	return GraphQLGranularAccessResult{FailReason: GranularAccessFailReasonNone}
+}
+
+func (g *granularAccessCheckerV2) writeErrorResponse(w io.Writer, providedErr error) (n int, err error) {
+	return graphql.RequestErrorsFromError(providedErr).WriteResponse(w)
 }

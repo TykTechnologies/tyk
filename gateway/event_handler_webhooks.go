@@ -198,18 +198,27 @@ func (w *WebHookHandler) BuildRequest(reqBody string) (*http.Request, error) {
 	return req, nil
 }
 
+// CreateBody will render the webhook event message template.
+// If an error occurs, a partially rendered template will be
+// returned alongside the error that occured.
 func (w *WebHookHandler) CreateBody(em config.EventMessage) (string, error) {
 	var reqBody bytes.Buffer
-	w.template.Execute(&reqBody, em)
-
-	return reqBody.String(), nil
+	err := w.template.Execute(&reqBody, em)
+	return reqBody.String(), err
 }
 
 // HandleEvent will be fired when the event handler instance is found in an APISpec EventPaths object during a request chain
 func (w *WebHookHandler) HandleEvent(em config.EventMessage) {
 
 	// Inject event message into template, render to string
-	reqBody, _ := w.CreateBody(em)
+	reqBody, err := w.CreateBody(em)
+	if err != nil {
+		// We're just logging the template rendering issue here
+		// but we're passing on the partial rendered contents
+		log.WithError(err).WithFields(logrus.Fields{
+			"prefix": "webhooks",
+		}).Warn("Webhook template rendering error")
+	}
 
 	// Construct request (method, body, params)
 	req, err := w.BuildRequest(reqBody)
