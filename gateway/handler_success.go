@@ -3,6 +3,7 @@ package gateway
 import (
 	"bytes"
 	"encoding/base64"
+	"github.com/sirupsen/logrus"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -380,6 +381,22 @@ func (s *SuccessHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) *http
 		s.RecordHit(r, latency, resp.Response.StatusCode, resp.Response)
 	}
 	log.Debug("Done proxy")
+
+	// Don't print a transaction log there is no "resp", that indicates an error.
+	// In error situations, transaction log is already printed by "handler_error.go"
+	if resp.Response != nil || s.Spec.GlobalConfig.DisableTransactionLogs {
+		tLog.WithFields(logrus.Fields{
+			"host":            r.Host,
+			"userAgent":       r.UserAgent(),
+			"requestMethod":   r.Method,
+			"requestUri":      r.RequestURI,
+			"protocol":        r.Proto,
+			"responseCode":    resp.Response.StatusCode,
+			"upstreamAddress": r.URL.Scheme + "://" + r.URL.Host + r.URL.RequestURI(),
+			"clientIp":        request.RealIP(r),
+		}).Info("Transaction log")
+	}
+
 	return nil
 }
 

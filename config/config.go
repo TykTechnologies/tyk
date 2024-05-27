@@ -667,6 +667,10 @@ type Config struct {
 	// Enable Key hashing
 	HashKeys bool `json:"hash_keys"`
 
+	// DisableTransactionLogs disables printing of API calls to stdout
+	// By default, the Gateway will print the details of API requests and the client
+	DisableTransactionLogs bool `json:"disable_transaction_logs"`
+
 	// DisableKeyActionsByUsername disables key search by username.
 	// When this is set to `true` you are able to search for keys only by keyID or key hash (if `hash_keys` is also set to `true`)
 	// Note that if `hash_keys` is also set to `true` then the keyID will not be provided for APIs secured using basic auth. In this scenario the only search option would be to use key hash

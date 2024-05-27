@@ -72,6 +72,7 @@ var (
 	mainLog   = log.WithField("prefix", "main")
 	pubSubLog = log.WithField("prefix", "pub-sub")
 	rawLog    = logger.GetRaw()
+	tLog      = logger.GetTransactionLogger()
 
 	memProfFile         *os.File
 	NewRelicApplication newrelic.Application
