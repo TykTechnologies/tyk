@@ -103,29 +103,36 @@ func (l *SessionLimiter) doRollingWindowWrite(r *http.Request, session *user.Ses
 			subtractor = 2
 		}
 
+		allowedRate := maxAllowedRate
+
 		// Smoothing of the defined rate limits
 		if l.config.EnableRateLimitSmoothing {
-			var done bool
-			var err error
-
-			if apiLimit != nil {
-				done, err = rate.Smoothing(r, apiLimit.RateLimitSmoothing, key, currentRate, maxAllowedRate)
-			} else {
-				done, err = rate.Smoothing(r, session.RateLimitSmoothing, key, currentRate, maxAllowedRate)
+			smoothingConf := session.RateLimitSmoothing
+			if apiLimit != nil && apiLimit.RateLimitSmoothing.Valid() {
+				smoothingConf = apiLimit.RateLimitSmoothing
 			}
 
-			// Smoothing change returned as error, log it.
-			if err != nil {
-				log.Info(err)
-			}
+			if smoothingConf.Valid() {
+				var changed bool
+				var err error
 
-			// Smoothing adjustment has been done, trigger session update.
-			if done {
-				session.Touch()
+				// allowed rate before smoothing
+				allowedRate = smoothingConf.Allowance
+				if changed, err = rate.Smoothing(r, smoothingConf, key, currentRate, maxAllowedRate); changed {
+					// update allowed rate
+					allowedRate = smoothingConf.Allowance
+					// update session with allowance
+					session.Touch()
+				}
+
+				// If smoothing change returned any error, log it.
+				if err != nil {
+					log.Warn(err)
+				}
 			}
 		}
 
-		return currentRate > maxAllowedRate-subtractor
+		return currentRate > allowedRate-subtractor
 	}
 
 	ratelimit := rate.NewSlidingLogRedis(l.limiterStorage, pipeline, smoothingFn)
