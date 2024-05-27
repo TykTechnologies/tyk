@@ -50,6 +50,12 @@ func (r *RateLimit) String() string {
 		return "Fixed Window Rate Limiter enabled"
 	}
 
+	// Smoothing check is here, because the rate limiters above this line
+	// do not support smoothing. Smoothing is applied for RRL/Sentinel.
+	if r.EnableRateLimitSmoothing {
+		info = info + ", with smoothing"
+	}
+
 	if r.EnableRedisRollingLimiter {
 		return fmt.Sprintf("Redis Rate Limiter enabled (%s)", info)
 	}
