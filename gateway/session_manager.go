@@ -107,9 +107,9 @@ func (l *SessionLimiter) doRollingWindowWrite(r *http.Request, session *user.Ses
 
 		// Smoothing of the defined rate limits
 		if l.config.EnableRateLimitSmoothing {
-			smoothingConf := session.RateLimitSmoothing
-			if apiLimit != nil && apiLimit.RateLimitSmoothing.Valid() {
-				smoothingConf = apiLimit.RateLimitSmoothing
+			smoothingConf := session.Smoothing
+			if apiLimit != nil && apiLimit.Smoothing.Valid() {
+				smoothingConf = apiLimit.Smoothing
 			}
 
 			if smoothingConf.Valid() {
@@ -423,7 +423,7 @@ func GetAccessDefinitionByAPIIDOrSession(session *user.SessionState, api *APISpe
 			ThrottleInterval:   session.ThrottleInterval,
 			ThrottleRetryLimit: session.ThrottleRetryLimit,
 			MaxQueryDepth:      session.MaxQueryDepth,
-			RateLimitSmoothing: session.RateLimitSmoothing,
+			Smoothing:          session.Smoothing,
 		}
 	}
 

@@ -51,8 +51,8 @@ type APILimit struct {
 	QuotaRenewalRate   int64   `json:"quota_renewal_rate" msg:"quota_renewal_rate"`
 	SetBy              string  `json:"-" msg:"-"`
 
-	// RateLimitSmoothing contains rate limit smoothing settings.
-	RateLimitSmoothing *apidef.RateLimitSmoothing `json:"rate_limit_smoothing" bson:"rate_limit_smoothing"`
+	// Smoothing contains rate limit smoothing settings.
+	Smoothing *apidef.RateLimitSmoothing `json:"smoothing" bson:"smoothing"`
 }
 
 // AccessDefinition defines which versions of an API a key has access to
@@ -152,8 +152,8 @@ type SessionState struct {
 	keyHash string
 	KeyID   string `json:"-"`
 
-	// RateLimitSmoothing contains rate limit smoothing settings.
-	RateLimitSmoothing *apidef.RateLimitSmoothing `json:"rate_limit_smoothing" bson:"rate_limit_smoothing"`
+	// Smoothing contains rate limit smoothing settings.
+	Smoothing *apidef.RateLimitSmoothing `json:"smoothing" bson:"smoothing"`
 
 	// modified holds the hint if a session has been modified for update.
 	// use Touch() to set it, and IsModified() to get it.
