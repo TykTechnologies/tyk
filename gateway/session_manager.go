@@ -95,7 +95,7 @@ func (l *SessionLimiter) doRollingWindowWrite(r *http.Request, session *user.Ses
 
 	pipeline := l.config.EnableNonTransactionalRateLimiter
 
-	smoothingFn := func(ctx context.Context, key string, currentRate, maxAllowedRate int64) bool {
+	smoothingFn := func(_ context.Context, key string, currentRate, maxAllowedRate int64) bool {
 		// Subtract by 1 because of the delayed add in the window
 		var subtractor int64 = 1
 		if l.config.EnableSentinelRateLimiter || l.config.DRLEnableSentinelRateLimiter {
