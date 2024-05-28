@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -3521,7 +3520,7 @@ func testGetOASAPI(t *testing.T, d *Test, id, name, title string) (oasDoc openap
 	resp, _ := d.Run(t, test.TestCase{AdminAuth: true, Method: http.MethodGet, Path: getPath,
 		BodyMatch: bodyMatch, Code: http.StatusOK})
 
-	respInBytes, _ := ioutil.ReadAll(resp.Body)
+	respInBytes, _ := io.ReadAll(resp.Body)
 	_ = json.Unmarshal(respInBytes, &oasDoc)
 
 	return oasDoc
@@ -3536,7 +3535,7 @@ func testGetOldAPI(t *testing.T, d *Test, id, name string) (oldAPI apidef.APIDef
 	resp, _ := d.Run(t, test.TestCase{AdminAuth: true, Method: http.MethodGet, Path: getPath,
 		BodyMatch: bodyMatch, BodyNotMatch: "components", Code: http.StatusOK})
 
-	respInBytes, _ := ioutil.ReadAll(resp.Body)
+	respInBytes, _ := io.ReadAll(resp.Body)
 	_ = json.Unmarshal(respInBytes, &oldAPI)
 
 	return oldAPI
@@ -3560,7 +3559,7 @@ func testImportOAS(t *testing.T, ts *Test, testCase test.TestCase) string {
 	testCase.Method = http.MethodPost
 	resp, _ := ts.Run(t, testCase)
 
-	respInBytes, _ := ioutil.ReadAll(resp.Body)
+	respInBytes, _ := io.ReadAll(resp.Body)
 	_ = json.Unmarshal(respInBytes, &importResp)
 
 	ts.Gw.DoReload()

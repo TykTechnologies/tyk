@@ -124,8 +124,8 @@ func (k *BasicAuthKeyIsValid) basicAuthHeaderCredentials(w http.ResponseWriter, 
 }
 
 func (k *BasicAuthKeyIsValid) basicAuthBodyCredentials(w http.ResponseWriter, r *http.Request) (username, password string, err error, code int) {
-	body, _ := ioutil.ReadAll(r.Body)
-	r.Body = ioutil.NopCloser(bytes.NewReader(body))
+	body, _ := io.ReadAll(r.Body)
+	r.Body = io.NopCloser(bytes.NewReader(body))
 
 	userMatch := k.bodyUserRegexp.FindAllSubmatch(body, 1)
 	if len(userMatch) == 0 {

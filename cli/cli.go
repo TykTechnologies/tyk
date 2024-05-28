@@ -4,7 +4,6 @@ package cli
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 
 	kingpin "github.com/alecthomas/kingpin/v2"
@@ -78,7 +77,7 @@ func Init(confPaths []string) {
 	// Linter:
 	lintCmd := app.Command("lint", "Runs a linter on Tyk configuration file")
 	lintCmd.Action(func(c *kingpin.ParseContext) error {
-		confSchema, err := ioutil.ReadFile("cli/linter/schema.json")
+		confSchema, err := os.ReadFile("cli/linter/schema.json")
 		if err != nil {
 			return err
 		}

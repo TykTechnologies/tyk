@@ -3,7 +3,6 @@ package config
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -82,10 +81,9 @@ func TestDefaultValueAndWriteDefaultConf(t *testing.T) {
 }
 
 func TestConfigFiles(t *testing.T) {
-	dir, err := ioutil.TempDir("", "tyk")
-	if err != nil {
-		t.Fatal(err)
-	}
+	dir, err := os.MkdirTemp("", "tyk")
+	assert.NoError(t, err)
+
 	defer os.RemoveAll(dir)
 	conf := &Config{}
 	path1 := filepath.Join(dir, "tyk1.conf")
@@ -97,11 +95,13 @@ func TestConfigFiles(t *testing.T) {
 	if conf.ListenPort != 8080 {
 		t.Fatalf("Expected ListenPort to be set to its default")
 	}
-	bs, _ := ioutil.ReadFile(path1)
+	bs, _ := os.ReadFile(path1)
 	if !strings.Contains(string(bs), "8080") {
 		t.Fatalf("Expected 8080 to be in the written conf file")
 	}
-	os.Remove(path1)
+
+	err = os.Remove(path1)
+	assert.NoError(t, err)
 
 	paths := []string{path1, path2}
 	// should write default config to path1 and return nil
@@ -119,7 +119,9 @@ func TestConfigFiles(t *testing.T) {
 	}
 
 	// both exist, we use path1
-	os.Link(path1, path2)
+	err = os.Link(path1, path2)
+	assert.NoError(t, err)
+
 	if err := Load(paths, conf); err != nil {
 		t.Fatalf("Load with an existing config errored")
 	}
@@ -128,7 +130,9 @@ func TestConfigFiles(t *testing.T) {
 	}
 
 	// path2 exists but path1 doesn't
-	os.Remove(path1)
+	err = os.Remove(path1)
+	assert.NoError(t, err)
+
 	if err := Load(paths, conf); err != nil {
 		t.Fatalf("Load with an existing config errored")
 	}
@@ -140,8 +144,12 @@ func TestConfigFiles(t *testing.T) {
 	}
 
 	// path1 exists but is invalid
-	os.Remove(path2)
-	ioutil.WriteFile(path1, []byte("{"), 0644)
+	err = os.Remove(path2)
+	assert.NoError(t, err)
+
+	err = os.WriteFile(path1, []byte("{"), 0644)
+	assert.NoError(t, err)
+
 	if err := Load(paths, conf); err == nil {
 		t.Fatalf("Load with an invalid config did not error")
 	}
@@ -152,7 +160,7 @@ func TestConfig_GetEventTriggers(t *testing.T) {
 	assert := func(t *testing.T, config string, expected string) {
 		conf := &Config{}
 
-		f, err := ioutil.TempFile("", "tyk.conf")
+		f, err := os.CreateTemp("", "tyk.conf")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -194,7 +202,7 @@ func TestConfig_GetEventTriggers(t *testing.T) {
 }
 
 func TestLoad_tracing(t *testing.T) {
-	dir, err := ioutil.TempDir("", "tyk")
+	dir, err := os.MkdirTemp("", "tyk")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -212,7 +220,7 @@ func TestLoad_tracing(t *testing.T) {
 					filepath.Dir(f),
 					"expect."+filepath.Base(f),
 				)
-				expect, err := ioutil.ReadFile(o)
+				expect, err := os.ReadFile(o)
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -269,7 +277,7 @@ func TestLoad_tracing(t *testing.T) {
 					filepath.Dir(v.file),
 					"expect."+filepath.Base(v.file),
 				)
-				expect, err := ioutil.ReadFile(o)
+				expect, err := os.ReadFile(o)
 				if err != nil {
 					t.Fatal(err)
 				}

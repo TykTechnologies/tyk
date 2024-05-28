@@ -33,7 +33,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"net/url"
 	"os"
@@ -441,8 +440,8 @@ func (gw *Gateway) handleAddOrUpdate(keyName string, r *http.Request, isHashed b
 	// decode payload
 	newSession := &user.SessionState{}
 
-	contents, _ := ioutil.ReadAll(r.Body)
-	r.Body = ioutil.NopCloser(bytes.NewReader(contents))
+	contents, _ := io.ReadAll(r.Body)
+	r.Body = io.NopCloser(bytes.NewReader(contents))
 
 	if err := json.Unmarshal(contents, newSession); err != nil {
 		log.Error("Couldn't decode new session object: ", err)
@@ -941,7 +940,7 @@ func (gw *Gateway) handleAddOrUpdatePolicy(polID string, r *http.Request) (inter
 		return apiError("Marshalling failed"), http.StatusInternalServerError
 	}
 
-	if err := ioutil.WriteFile(polFilePath, asByte, 0644); err != nil {
+	if err := os.WriteFile(polFilePath, asByte, 0644); err != nil {
 		log.Error("Failed to create file! - ", err)
 		return apiError("Failed to create file!"), http.StatusInternalServerError
 	}
@@ -1268,7 +1267,7 @@ func (gw *Gateway) writeToFile(fs afero.Fs, newDef interface{}, filename string)
 		return errors.New("marshalling failed"), http.StatusInternalServerError
 	}
 
-	if err := ioutil.WriteFile(defFilePath, asByte, 0644); err != nil {
+	if err := os.WriteFile(defFilePath, asByte, 0644); err != nil {
 		log.Infof("EL file path: %v", defFilePath)
 		log.Error("Failed to create file! - ", err)
 		return errors.New("file object creation failed, write error"), http.StatusInternalServerError
@@ -1514,7 +1513,7 @@ func (gw *Gateway) apiOASPatchHandler(w http.ResponseWriter, r *http.Request) {
 	tykExtensionConfigParams := oas.GetTykExtensionConfigParams(r)
 
 	if oasObj.GetTykExtension() != nil && tykExtensionConfigParams == nil {
-		r.Body = ioutil.NopCloser(bytes.NewReader(reqBodyInBytes))
+		r.Body = io.NopCloser(bytes.NewReader(reqBodyInBytes))
 		obj, code := gw.handleUpdateApi(apiID, r, afero.NewOsFs(), true)
 		doJSONWrite(w, code, obj)
 		return
@@ -1552,7 +1551,7 @@ func (gw *Gateway) apiOASPatchHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	r.Body = ioutil.NopCloser(bytes.NewReader(oasAPIInBytes))
+	r.Body = io.NopCloser(bytes.NewReader(oasAPIInBytes))
 
 	log.Debugf("PATCHing API: %q", apiID)
 	obj, code := gw.handleUpdateApi(apiID, r, afero.NewOsFs(), true)
@@ -3014,7 +3013,7 @@ func (gw *Gateway) validateOAS(next http.HandlerFunc) http.HandlerFunc {
 			return
 		}
 
-		r.Body = ioutil.NopCloser(bytes.NewReader(reqBodyInBytes))
+		r.Body = io.NopCloser(bytes.NewReader(reqBodyInBytes))
 		next.ServeHTTP(w, r)
 	}
 }
@@ -3057,7 +3056,7 @@ func (gw *Gateway) makeImportedOASTykAPI(next http.HandlerFunc) http.HandlerFunc
 			return
 		}
 
-		r.Body = ioutil.NopCloser(bytes.NewReader(apiInBytes))
+		r.Body = io.NopCloser(bytes.NewReader(apiInBytes))
 		next.ServeHTTP(w, r)
 	}
 }
@@ -3452,7 +3451,7 @@ func invalidateTokens(prevClient ExtendedOsinClientInterface, updatedClient OAut
 
 func extractOASObjFromReq(reqBody io.Reader) ([]byte, *oas.OAS, error) {
 	var oasObj oas.OAS
-	reqBodyInBytes, err := ioutil.ReadAll(reqBody)
+	reqBodyInBytes, err := io.ReadAll(reqBody)
 	if err != nil {
 		return nil, nil, ErrRequestMalformed
 	}
