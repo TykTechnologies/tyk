@@ -29,13 +29,13 @@ import (
 //
 // This configuration in turn updates two fields:
 //
-// - `allowance` - the current rate allowance enforced in rate limiting
+// - `allowance` - the current rate allowance enforced when rate limiting
 // - `allowance_next_update_at` - a timestamp when the next allowance update may occur
 //
 // For any allowance, events are triggered based on the following calculations:
 //
 //   - When the request rate rises above `allowance - (step * trigger)`,
-//     a RateLimitSmoothingUp event is emitted, and allowance increases by `step`.
+//     a RateLimitSmoothingUp event is emitted and allowance increases by `step`.
 //   - When the request rate falls below `allowance - (step + step * trigger)`,
 //     a RateLimitSmoothingDown event is emitted and allowance decreases by `step`.
 //
@@ -82,7 +82,7 @@ func (r *RateLimitSmoothing) Valid() bool {
 }
 
 // Err checks the rate limit smoothing configuration for validity and returns an error if it is not valid.
-// It checks for a nil value, the enabled flag, and valid values for each setting.
+// It checks for a nil value, the enabled flag and valid values for each setting.
 func (r *RateLimitSmoothing) Err() error {
 	if r == nil || !r.Enabled {
 		return errors.New("Rate limit smoothing disabled")
