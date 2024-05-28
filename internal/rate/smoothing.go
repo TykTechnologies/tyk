@@ -10,7 +10,8 @@ import (
 // Smoothing processes the rate limit smoothing based on the provided session settings and current rate.
 // The first returned value indicates if smoothing was performed. An optionally filled error
 // returns any details as to why smoothing wasn't performed and should be used for logging purposes.
-func Smoothing(r *http.Request, session *apidef.RateLimitSmoothing, key string, currentRate int64, maxAllowedRate int64) (bool, error) {
+// The third parameter, `key` is the redis rate limit key. It is currently unused.
+func Smoothing(r *http.Request, session *apidef.RateLimitSmoothing, _ string, currentRate int64, maxAllowedRate int64) (bool, error) {
 	// Rate limit smoothing is disabled or threshold is unset, no change, no error.
 	if !session.Valid() {
 		return false, nil

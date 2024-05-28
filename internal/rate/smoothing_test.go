@@ -125,7 +125,8 @@ func TestSmoothing(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			// Create a mock HTTP request with context
 			ctx := context.Background()
-			req, _ := http.NewRequestWithContext(ctx, http.MethodGet, "http://example.com/foo", nil)
+			req, err := http.NewRequestWithContext(ctx, http.MethodGet, "http://example.com/foo", nil)
+			assert.NoError(t, err)
 
 			// Ensure the AllowanceNextUpdateAt is reset to allow changes
 			tt.session.AllowanceNextUpdateAt = time.Time{}

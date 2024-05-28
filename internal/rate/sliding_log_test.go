@@ -33,7 +33,7 @@ func TestSlidingLog_Do(t *testing.T) {
 	assert.True(t, ok)
 
 	for _, tx := range []bool{true, false} {
-		rl := rate.NewSlidingLogRedis(db, tx, func(ctx context.Context, key string, currentRate int64, maxAllowedRate int64) bool {
+		rl := rate.NewSlidingLogRedis(db, tx, func(_ context.Context, key string, currentRate int64, maxAllowedRate int64) bool {
 			assert.Equal(t, "key", key)
 			assert.Equal(t, int64(40), maxAllowedRate)
 			return true

@@ -118,6 +118,8 @@ func Set(ctx context.Context, events []Event) context.Context {
 // Get retrieves the events from the context.
 // Get will get the events from context. It will return nil if no events in context.
 func Get(ctx context.Context) []Event {
-	v, _ := ctx.Value(eventContextKey).([]Event)
-	return v
+	if v, ok := ctx.Value(eventContextKey).([]Event); ok {
+		return v
+	}
+	return nil
 }
