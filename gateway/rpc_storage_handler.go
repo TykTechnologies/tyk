@@ -9,6 +9,7 @@ import (
 
 	"github.com/TykTechnologies/storage/temporal/model"
 	"github.com/TykTechnologies/tyk/internal/cache"
+	im "github.com/TykTechnologies/tyk/internal/model"
 	"github.com/TykTechnologies/tyk/rpc"
 
 	"github.com/TykTechnologies/tyk/apidef"
@@ -158,6 +159,7 @@ func (r *RPCStorageHandler) buildNodeInfo() []byte {
 		intCheckDuration = int64(checkDuration / time.Second)
 	}
 
+	r.Gw.getHostDetails(r.Gw.GetConfig().PIDFileLocation)
 	node := apidef.NodeData{
 		NodeID:          r.Gw.GetNodeID(),
 		GroupID:         config.SlaveOptions.GroupID,
@@ -170,6 +172,11 @@ func (r *RPCStorageHandler) buildNodeInfo() []byte {
 		Stats: apidef.GWStats{
 			APIsCount:     r.Gw.apisByIDLen(),
 			PoliciesCount: r.Gw.policiesByIDLen(),
+		},
+		HostDetails: im.HostDetails{
+			Hostname: r.Gw.hostDetails.Hostname,
+			PID:      r.Gw.hostDetails.PID,
+			Address:  r.Gw.hostDetails.Address,
 		},
 	}
 
