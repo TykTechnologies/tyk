@@ -124,6 +124,7 @@ func (r *reverseProxyPreHandlerV2) PreHandle(params ReverseProxyParams) (reverse
 		DetermineGraphQLEngineTransportType(r.apiDefinition),
 		params.RoundTripper,
 		r.newReusableBodyReadCloser,
+		params.RequestHeadersRewrite,
 	)
 
 	switch {

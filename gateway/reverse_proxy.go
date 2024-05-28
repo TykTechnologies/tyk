@@ -1011,13 +1011,14 @@ func (p *ReverseProxy) handleGraphQL(roundTripper *TykRoundTripper, outreq *http
 	needsEngine := needsGraphQLExecutionEngine(p.TykAPISpec)
 
 	res, hijacked, err = p.TykAPISpec.GraphEngine.HandleReverseProxy(graphengine.ReverseProxyParams{
-		RoundTripper:       roundTripper,
-		ResponseWriter:     w,
-		OutRequest:         outreq,
-		WebSocketUpgrader:  &p.wsUpgrader,
-		NeedsEngine:        needsEngine,
-		IsCORSPreflight:    isCORSPreflight(outreq),
-		IsWebSocketUpgrade: isWebSocketUpgrade,
+		RoundTripper:          roundTripper,
+		ResponseWriter:        w,
+		OutRequest:            outreq,
+		WebSocketUpgrader:     &p.wsUpgrader,
+		NeedsEngine:           needsEngine,
+		IsCORSPreflight:       isCORSPreflight(outreq),
+		IsWebSocketUpgrade:    isWebSocketUpgrade,
+		RequestHeadersRewrite: p.TykAPISpec.GraphQL.Proxy.RequestHeadersRewrite,
 	})
 	if err != nil {
 		return nil, hijacked, err
