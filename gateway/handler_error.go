@@ -44,10 +44,14 @@ func errorAndStatusCode(errType string) (error, int) {
 	return errors.New(err.Message), err.Code
 }
 
+func ErrorAndStatusCode(errType string) (error, int) {
+	return errorAndStatusCode(errType)
+}
+
 func defaultTykErrors() {
 	TykErrors = make(map[string]config.TykError)
 
-	initAuthKeyErrors()
+	//initAuthKeyErrors()
 	initOauth2KeyExistsErrors()
 }
 

@@ -3083,11 +3083,20 @@ func ctxGetData(r *http.Request) map[string]interface{} {
 	return nil
 }
 
+// exported version
+func CtxGetData(r *http.Request) map[string]interface{} {
+	return ctxGetData(r)
+}
+
 func ctxSetData(r *http.Request, m map[string]interface{}) {
 	if m == nil {
 		panic("setting a nil context ContextData")
 	}
 	setCtxValue(r, ctx.ContextData, m)
+}
+
+func CtxSetData(r *http.Request, m map[string]interface{}) {
+	ctxSetData(r, m)
 }
 
 // ctxSetCacheOptions sets a cache key to use for the http request
@@ -3105,8 +3114,16 @@ func ctxGetSession(r *http.Request) *user.SessionState {
 	return ctx.GetSession(r)
 }
 
+func CtxGetSession(r *http.Request) *user.SessionState {
+	return ctxGetSession(r)
+}
+
 func ctxSetSession(r *http.Request, s *user.SessionState, scheduleUpdate bool, hashKey bool) {
 	ctx.SetSession(r, s, scheduleUpdate, hashKey)
+}
+
+func CtxSetSession(r *http.Request, s *user.SessionState, scheduleUpdate bool, hashKey bool) {
+	ctxSetSession(r, s, scheduleUpdate, hashKey)
 }
 
 func ctxScheduleSessionUpdate(r *http.Request) {
@@ -3230,6 +3247,10 @@ func ctxCheckLimits(r *http.Request) bool {
 	}
 
 	return false
+}
+
+func CtxCheckLimits(r *http.Request) bool {
+	return ctxCheckLimits(r)
 }
 
 func ctxSetRequestMethod(r *http.Request, path string) {
@@ -3396,6 +3417,10 @@ func ctxSetSpanAttributes(r *http.Request, mwName string, attrs ...otel.SpanAttr
 	}
 }
 
+func CtxSetSpanAttributes(r *http.Request, mwName string, attrs ...otel.SpanAttribute) {
+	ctxSetSpanAttributes(r, mwName, attrs...)
+}
+
 func ctxGetSpanAttributes(r *http.Request, mwName string) (attrs []otel.SpanAttribute) {
 	if v := r.Context().Value(mwName); v != nil {
 		got, ok := v.([]otel.SpanAttribute)
@@ -3415,6 +3440,10 @@ func ctxGetRequestStatus(r *http.Request) (stat RequestStatus) {
 		stat = v.(RequestStatus)
 	}
 	return
+}
+
+func CtxGetRequestStatus(r *http.Request) (stat RequestStatus) {
+	return ctxGetRequestStatus(r)
 }
 
 func ctxSetOperation(r *http.Request, op *Operation) {

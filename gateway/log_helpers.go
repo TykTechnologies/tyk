@@ -22,6 +22,10 @@ func (gw *Gateway) obfuscateKey(keyName string) string {
 	return "--"
 }
 
+func (gw *Gateway) ObfuscateKey(keyName string) string {
+	return gw.obfuscateKey(keyName)
+}
+
 func (gw *Gateway) getLogEntryForRequest(logger *logrus.Entry, r *http.Request, key string, data map[string]interface{}) *logrus.Entry {
 	if logger == nil {
 		logger = logrus.NewEntry(log)

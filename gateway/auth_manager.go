@@ -226,6 +226,10 @@ func (gw *Gateway) generateToken(orgID, keyID string, customHashKeyFunction ...s
 	return token
 }
 
+func (gw *Gateway) GenerateToken(orgID, keyID string, customHashKeyFunction ...string) string {
+	return gw.generateToken(orgID, keyID, customHashKeyFunction...)
+}
+
 // GenerateAuthKey is a utility function for generating new auth keys. Returns the storage key name and the actual key
 func (d DefaultKeyGenerator) GenerateAuthKey(orgID string) string {
 	return d.Gw.generateToken(orgID, "")

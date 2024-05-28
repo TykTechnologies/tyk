@@ -62,6 +62,11 @@ func reportHealthValue(spec *APISpec, counter HealthPrefix, value string) {
 	spec.Health.StoreCounterVal(counter, value)
 }
 
+func ReportHealthValue(spec *APISpec, counter HealthPrefix, value string) {
+	reportHealthValue(spec, counter, value)
+
+}
+
 func (h *DefaultHealthChecker) StoreCounterVal(counterType HealthPrefix, value string) {
 	searchStr := h.CreateKeyName(counterType)
 	log.Debug("Adding Healthcheck to: ", searchStr)

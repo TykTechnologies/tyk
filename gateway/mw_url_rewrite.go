@@ -255,6 +255,11 @@ func (gw *Gateway) replaceTykVariables(r *http.Request, in string, escape bool) 
 	return in
 }
 
+func (gw *Gateway) ReplaceTykVariables(r *http.Request, in string, escape bool) string {
+	return gw.replaceTykVariables(r, in, escape)
+
+}
+
 func (gw *Gateway) replaceVariables(in string, vars []string, vals map[string]interface{}, label string, escape bool) string {
 
 	emptyStringFn := func(key, in, val string) string {
