@@ -18,11 +18,11 @@ import (
 // - `RateLimitSmoothingUp` when the allowance increases
 // - `RateLimitSmoothingDown` when the allowance decreases
 //
-// Events are triggered based on the configuration:
+// Events are emitted based on the configuration:
 //
 // - `enabled` (boolean) to enable or disable rate limit smoothing
 // - `threshold` after which to apply smoothing (minimum rate for window)
-// - `trigger` configures at which fraction of a step a smoothing event is triggered
+// - `trigger` configures at which fraction of a step a smoothing event is emitted
 // - `step` is the value by which the rate allowance will get adjusted
 // - `delay` is the amount of seconds between smoothing updates
 //
@@ -30,7 +30,13 @@ import (
 // be smoothed between `threshold`, and the defined rate limits (maximum).
 // The request allowance will be updated internally every `delay` seconds.
 //
-// For any allowance, events are triggered based on the following calculations:
+// The `step * trigger` value is substracted from the request allowance, and if
+// your request rate goes above that, then a RateLimitSmoothingUp event is
+// emitted and the allowance is increased by `step`. A RateLimitSmoothingDown
+// event is emitted when the request rate drops one step below that, and the
+// allowance then decreases by step.
+//
+// For any allowance, events are emitted based on the following calculations:
 //
 //   - When the request rate rises above `allowance - (step * trigger)`,
 //     a RateLimitSmoothingUp event is emitted and allowance increases by `step`.
@@ -55,7 +61,7 @@ type RateLimitSmoothing struct {
 	// Threshold is the request rate above which smoothing is applied.
 	Threshold int64 `json:"threshold" bson:"threshold"`
 
-	// Trigger is the step factor (0..1) determining when smoothing events trigger.
+	// Trigger is the step factor determining when smoothing events trigger.
 	Trigger float64 `json:"trigger" bson:"trigger"`
 
 	// Step is the increment/decrement for adjusting the rate limit.
