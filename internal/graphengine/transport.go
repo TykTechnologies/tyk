@@ -100,7 +100,6 @@ func (g *GraphQLEngineTransport) applyRequestHeadersRewriteRules(r *http.Request
 				// Has more than one value, so it's different.
 				// OR
 				// It has only one value, check and overwrite it if required.
-				r.Header.Del(key)
 				r.Header.Set(key, rewriteRule.Value)
 				return true // applied
 			}
@@ -136,6 +135,8 @@ func (g *GraphQLEngineTransport) applyRequestHeadersRewriteRules(r *http.Request
 			// This should not be possible but this check makes the rest of code simpler.
 			continue
 		}
+
+		// forwardedHeaderKey is already canonical.
 
 		if ruleOne(r, forwardedHeaderKey, forwardedHeaderValues) {
 			continue
