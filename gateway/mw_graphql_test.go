@@ -798,6 +798,53 @@ func TestGraphQLMiddleware_EngineMode(t *testing.T) {
 			}...)
 		})
 
+		t.Run("apply request headers rewrite, case insensitivity", func(t *testing.T) {
+			// Rule one:
+			//
+			// If header key/value is defined in request_headers_rewrite and remove
+			// is set to false and client sends a request with the same header key but
+			// different value, the value gets overwritten to the defined value before
+			// hitting the upstream.
+			g.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+				spec.UseKeylessAccess = true
+				spec.GraphQL.Enabled = true
+				spec.GraphQL.ExecutionMode = apidef.GraphQLExecutionModeProxyOnly
+				spec.GraphQL.Version = apidef.GraphQLConfigVersion2
+				spec.GraphQL.Schema = gqlProxyUpstreamSchema
+				spec.GraphQL.Proxy.RequestHeadersRewrite = map[string]apidef.RequestHeadersRewriteConfig{
+					"X-TyK-TeSt": {
+						Remove: false,
+						Value:  "value-from-rewrite-config",
+					},
+				}
+				spec.Proxy.ListenPath = "/"
+				spec.Proxy.TargetURL = testGraphQLProxyUpstream
+			})
+
+			request := gql.Request{
+				Query: `{ hello(name: "World") httpMethod }`,
+			}
+
+			_, _ = g.Run(t, []test.TestCase{
+				{
+					Data:   request,
+					Method: http.MethodPost,
+					Headers: map[string]string{
+						"X-Tyk-Key":   "tyk-value",
+						"X-Other-Key": "other-value",
+						"X-Tyk-Test":  "value-from-consumer",
+					},
+					Code:      http.StatusOK,
+					BodyMatch: `{"data":{"hello":"World","httpMethod":"POST"}}`,
+					HeadersMatch: map[string]string{
+						"X-Tyk-Key":   "tyk-value",
+						"X-Other-Key": "other-value",
+						"X-Tyk-Test":  "value-from-rewrite-config",
+					},
+				},
+			}...)
+		})
+
 		t.Run("proxy-only return errors from upstream", func(t *testing.T) {
 			g.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 				spec.UseKeylessAccess = true
