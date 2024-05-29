@@ -575,45 +575,90 @@ func TestGraphQLMiddleware_EngineMode(t *testing.T) {
 			}...)
 		})
 
-		t.Run("prioritize consumer's header value", func(t *testing.T) {
-			// See TT-11990
-			g.Gw.BuildAndLoadAPI(func(spec *APISpec) {
-				spec.UseKeylessAccess = true
-				spec.GraphQL.Enabled = true
-				spec.GraphQL.ExecutionMode = apidef.GraphQLExecutionModeProxyOnly
-				spec.GraphQL.Version = apidef.GraphQLConfigVersion2
-				spec.GraphQL.Schema = gqlProxyUpstreamSchema
-				spec.GraphQL.Proxy.RequestHeaders = map[string]string{
-					"Authorization": "123abc",
-					"X-Tyk-Test":    "value-from-request-headers",
+		t.Run("feature use_immutable_headers", func(t *testing.T) {
+			t.Run("prioritize consumer's header value when use_immutable_headers is true", func(t *testing.T) {
+				// See TT-11990 && TT-12190
+				g.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+					spec.UseKeylessAccess = true
+					spec.GraphQL.Enabled = true
+					spec.GraphQL.ExecutionMode = apidef.GraphQLExecutionModeProxyOnly
+					spec.GraphQL.Version = apidef.GraphQLConfigVersion2
+					spec.GraphQL.Schema = gqlProxyUpstreamSchema
+					spec.GraphQL.Proxy.Features.UseImmutableHeaders = true
+					spec.GraphQL.Proxy.RequestHeaders = map[string]string{
+						"Authorization": "123abc",
+						"X-Tyk-Test":    "value-from-request-headers",
+					}
+					spec.Proxy.ListenPath = "/"
+					spec.Proxy.TargetURL = testGraphQLProxyUpstream
+				})
+
+				request := gql.Request{
+					Query: `{ hello(name: "World") httpMethod }`,
 				}
-				spec.Proxy.ListenPath = "/"
-				spec.Proxy.TargetURL = testGraphQLProxyUpstream
+
+				_, _ = g.Run(t, []test.TestCase{
+					{
+						Data:   request,
+						Method: http.MethodPost,
+						Headers: map[string]string{
+							"X-Tyk-Key":   "tyk-value",
+							"X-Other-Key": "other-value",
+							"X-Tyk-Test":  "value-from-consumer",
+						},
+						Code:      http.StatusOK,
+						BodyMatch: `{"data":{"hello":"World","httpMethod":"POST"}}`,
+						HeadersMatch: map[string]string{
+							"Authorization": "123abc",
+							"X-Tyk-Key":     "tyk-value",
+							"X-Other-Key":   "other-value",
+							"X-Tyk-Test":    "value-from-consumer",
+						},
+					},
+				}...)
 			})
 
-			request := gql.Request{
-				Query: `{ hello(name: "World") httpMethod }`,
-			}
-
-			_, _ = g.Run(t, []test.TestCase{
-				{
-					Data:   request,
-					Method: http.MethodPost,
-					Headers: map[string]string{
-						"X-Tyk-Key":   "tyk-value",
-						"X-Other-Key": "other-value",
-						"X-Tyk-Test":  "value-from-consumer",
-					},
-					Code:      http.StatusOK,
-					BodyMatch: `{"data":{"hello":"World","httpMethod":"POST"}}`,
-					HeadersMatch: map[string]string{
+			t.Run("overwrite consumer's header value when use_immutable_headers is false (legacy behavior)", func(t *testing.T) {
+				// See TT-12190
+				g.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+					spec.UseKeylessAccess = true
+					spec.GraphQL.Enabled = true
+					spec.GraphQL.ExecutionMode = apidef.GraphQLExecutionModeProxyOnly
+					spec.GraphQL.Version = apidef.GraphQLConfigVersion2
+					spec.GraphQL.Schema = gqlProxyUpstreamSchema
+					spec.GraphQL.Proxy.Features.UseImmutableHeaders = false
+					spec.GraphQL.Proxy.RequestHeaders = map[string]string{
 						"Authorization": "123abc",
-						"X-Tyk-Key":     "tyk-value",
-						"X-Other-Key":   "other-value",
-						"X-Tyk-Test":    "value-from-consumer",
+						"X-Tyk-Test":    "value-from-request-headers",
+					}
+					spec.Proxy.ListenPath = "/"
+					spec.Proxy.TargetURL = testGraphQLProxyUpstream
+				})
+
+				request := gql.Request{
+					Query: `{ hello(name: "World") httpMethod }`,
+				}
+
+				_, _ = g.Run(t, []test.TestCase{
+					{
+						Data:   request,
+						Method: http.MethodPost,
+						Headers: map[string]string{
+							"X-Tyk-Key":   "tyk-value",
+							"X-Other-Key": "other-value",
+							"X-Tyk-Test":  "value-from-consumer",
+						},
+						Code:      http.StatusOK,
+						BodyMatch: `{"data":{"hello":"World","httpMethod":"POST"}}`,
+						HeadersMatch: map[string]string{
+							"Authorization": "123abc",
+							"X-Tyk-Key":     "tyk-value",
+							"X-Other-Key":   "other-value",
+							"X-Tyk-Test":    "value-from-request-headers",
+						},
 					},
-				},
-			}...)
+				}...)
+			})
 		})
 
 		t.Run("apply request headers rewrite, rule one", func(t *testing.T) {
