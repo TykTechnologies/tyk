@@ -4,8 +4,6 @@ import (
 	"bytes"
 	"io"
 	"net/http"
-
-	"github.com/TykTechnologies/tyk/apidef"
 )
 
 type NewReusableBodyReadCloserFunc func(io.ReadCloser) (io.ReadCloser, error)
@@ -15,20 +13,20 @@ type GraphQLEngineTransport struct {
 	originalTransport         http.RoundTripper
 	transportType             GraphQLEngineTransportType
 	newReusableBodyReadCloser NewReusableBodyReadCloserFunc
-	requestHeadersRewrite     map[string]apidef.RequestHeadersRewriteConfig
+	headersConfig             ReverseProxyHeadersConfig
 }
 
 func NewGraphQLEngineTransport(
 	transportType GraphQLEngineTransportType,
 	originalTransport http.RoundTripper,
 	newReusableBodyReadCloser NewReusableBodyReadCloserFunc,
-	requestHeadersRewrite map[string]apidef.RequestHeadersRewriteConfig,
+	headersConfig ReverseProxyHeadersConfig,
 ) *GraphQLEngineTransport {
 	transport := &GraphQLEngineTransport{
 		originalTransport:         originalTransport,
 		transportType:             transportType,
 		newReusableBodyReadCloser: newReusableBodyReadCloser,
-		requestHeadersRewrite:     requestHeadersRewrite,
+		headersConfig:             headersConfig,
 	}
 	return transport
 }
@@ -80,7 +78,7 @@ func (g *GraphQLEngineTransport) handleProxyOnly(proxyOnlyValues *GraphQLProxyOn
 }
 
 func (g *GraphQLEngineTransport) applyRequestHeadersRewriteRules(r *http.Request) {
-	if len(g.requestHeadersRewrite) == 0 {
+	if len(g.headersConfig.ProxyOnly.RequestHeadersRewrite) == 0 {
 		// There is no request rewrite rule, quit early.
 		return
 	}
@@ -93,7 +91,7 @@ func (g *GraphQLEngineTransport) applyRequestHeadersRewriteRules(r *http.Request
 		// different value, the value gets overwritten to the defined value before
 		// hitting the upstream.
 
-		rewriteRule, ok := g.requestHeadersRewrite[key]
+		rewriteRule, ok := g.headersConfig.ProxyOnly.RequestHeadersRewrite[key]
 		if !ok {
 			return false // key not exists, not apply the rule
 		}
@@ -116,7 +114,7 @@ func (g *GraphQLEngineTransport) applyRequestHeadersRewriteRules(r *http.Request
 		// If header key is defined in request_headers_rewrite and remove is set
 		// to true and client sends a request with the same header key but different value,
 		// the headers gets removed completely before hitting the upstream.
-		rewriteRule, ok := g.requestHeadersRewrite[key]
+		rewriteRule, ok := g.headersConfig.ProxyOnly.RequestHeadersRewrite[key]
 		if !ok {
 			return false // key not exists, not apply the rule
 		}
@@ -153,7 +151,7 @@ func (g *GraphQLEngineTransport) applyRequestHeadersRewriteRules(r *http.Request
 	// If header key/value is defined in request_headers_rewrite and remove is
 	// set to false and client sends a request that does not have the same header key,
 	// the header key/value gets added before hitting the upstream.
-	for headerKey, rewriteRule := range g.requestHeadersRewrite {
+	for headerKey, rewriteRule := range g.headersConfig.ProxyOnly.RequestHeadersRewrite {
 		if rewriteRule.Remove {
 			continue
 		}
@@ -172,9 +170,9 @@ func (g *GraphQLEngineTransport) setProxyOnlyHeaders(proxyOnlyValues *GraphQLPro
 
 		for _, forwardedHeaderValue := range forwardedHeaderValues {
 			exitingHeaderValue := r.Header.Get(forwardedHeaderKey)
-			// Prioritize consumer's header value. Delete the header from request_headers
-			// and add the consumer's value. See TT-11990.
-			if exitingHeaderValue != "" {
+			// Prioritize consumer's header value when immutable headers are turned on.
+			// Delete the header from request_headers add the consumer's value. See TT-11990 and TT-12190.
+			if g.headersConfig.ProxyOnly.UseImmutableHeaders && exitingHeaderValue != "" {
 				r.Header.Del(forwardedHeaderKey)
 			}
 			r.Header.Add(forwardedHeaderKey, forwardedHeaderValue)
