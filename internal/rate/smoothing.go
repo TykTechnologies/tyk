@@ -21,6 +21,11 @@ func NewSmoothing(redis redis.UniversalClient) *Smoothing {
 	}
 }
 
+// String returns the String output from the allowance store.
+func (d *Smoothing) String() string {
+	return d.allowanceStore.String()
+}
+
 // Do processes the rate limit smoothing based on the provided session settings and current rate.
 //
 // Internally it will get the current allowance, and if the update is allowed will
@@ -56,7 +61,7 @@ func (d *Smoothing) Do(r *http.Request, session *apidef.RateLimitSmoothing, key 
 	}
 
 	// Allowance can only be set once per defined interval
-	if !createAllowance && !allowance.CanSet() {
+	if !createAllowance && !allowance.Expired() {
 		return allowance, nil
 	}
 
@@ -88,7 +93,7 @@ func (d *Smoothing) Do(r *http.Request, session *apidef.RateLimitSmoothing, key 
 	}
 
 	// Allowance can only be set once per defined interval
-	if !allowance.CanSet() {
+	if !allowance.Expired() {
 		return allowance, nil
 	}
 

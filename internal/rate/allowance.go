@@ -93,7 +93,7 @@ func (a *Allowance) Touch() {
 	a.NextUpdateAt = time.Now().Add(a.GetDelay())
 }
 
-// CanSet checks if the allowance can be updated based on the configured delay.
-func (a *Allowance) CanSet() bool {
+// Expired checks if the allowance can be updated based on the configured delay.
+func (a *Allowance) Expired() bool {
 	return time.Since(a.NextUpdateAt) > 0
 }

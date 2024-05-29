@@ -3,8 +3,9 @@ package rate
 import (
 	"testing"
 
-	"github.com/TykTechnologies/tyk/config"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/TykTechnologies/tyk/config"
 )
 
 func TestNewStorage(t *testing.T) {

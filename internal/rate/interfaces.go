@@ -2,6 +2,7 @@ package rate
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/TykTechnologies/exp/pkg/limiters"
 	"github.com/TykTechnologies/tyk/internal/redis"
@@ -9,6 +10,8 @@ import (
 
 // AllowanceRepository is the interface for accessing rate limit allowance.
 type AllowanceRepository interface {
+	fmt.Stringer
+
 	Locker(name string) limiters.DistLocker
 
 	Get(ctx context.Context, key string) (*Allowance, error)

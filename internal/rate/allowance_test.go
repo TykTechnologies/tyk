@@ -147,12 +147,12 @@ func TestAllowance_Touch(t *testing.T) {
 	assert.WithinDuration(t, time.Now().Add(10*time.Second), a.NextUpdateAt, time.Second)
 }
 
-func TestAllowance_CanSet(t *testing.T) {
+func TestAllowance_Expired(t *testing.T) {
 	a := &Allowance{
 		NextUpdateAt: time.Now().Add(-time.Minute),
 	}
-	assert.True(t, a.CanSet())
+	assert.True(t, a.Expired())
 
 	a.NextUpdateAt = time.Now().Add(time.Minute)
-	assert.False(t, a.CanSet())
+	assert.False(t, a.Expired())
 }
