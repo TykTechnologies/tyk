@@ -85,13 +85,22 @@ type GranularAccessChecker interface {
 }
 
 type ReverseProxyParams struct {
-	RoundTripper          http.RoundTripper
-	ResponseWriter        http.ResponseWriter
-	OutRequest            *http.Request
-	WebSocketUpgrader     *websocket.Upgrader
-	NeedsEngine           bool
-	IsCORSPreflight       bool
-	IsWebSocketUpgrade    bool
+	RoundTripper       http.RoundTripper
+	ResponseWriter     http.ResponseWriter
+	OutRequest         *http.Request
+	WebSocketUpgrader  *websocket.Upgrader
+	NeedsEngine        bool
+	IsCORSPreflight    bool
+	IsWebSocketUpgrade bool
+	HeadersConfig      ReverseProxyHeadersConfig
+}
+
+type ReverseProxyHeadersConfig struct {
+	ProxyOnly ProxyOnlyHeadersConfig
+}
+
+type ProxyOnlyHeadersConfig struct {
+	UseImmutableHeaders   bool
 	RequestHeadersRewrite map[string]apidef.RequestHeadersRewriteConfig
 }
 
