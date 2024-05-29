@@ -72,4 +72,8 @@ func TestAllowanceStore_Set(t *testing.T) {
 
 	assert.NoError(t, err)
 	assert.NoError(t, mock.ExpectationsWereMet())
+
+	a1 := store.get(key)
+	assert.Equal(t, allowance.Delay, a1.Delay)
+	assert.Equal(t, allowance.Current, a1.Current)
 }

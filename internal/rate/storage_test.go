@@ -19,4 +19,13 @@ func TestNewStorage(t *testing.T) {
 
 	client := NewStorage(&conf.Storage)
 	assert.NotNil(t, client)
+
+	conf.Storage.EnableCluster = true
+	client = NewStorage(&conf.Storage)
+	assert.NotNil(t, client)
+
+	conf.Storage.EnableCluster = false
+	conf.Storage.MasterName = "redis"
+	client = NewStorage(&conf.Storage)
+	assert.NotNil(t, client)
 }

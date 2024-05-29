@@ -2,6 +2,7 @@ package rate
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"sync"
 	"sync/atomic"
@@ -15,13 +16,17 @@ type AllowanceStore struct {
 	redis redis.UniversalClient
 
 	cacheMu sync.RWMutex
-	cache   map[string]*Allowance
+	cache   map[string][]byte
 
 	stats struct {
 		set       int64
+		setErrors int64
+
 		get       int64
 		getCached int64
-		locker    int64
+		getErrors int64
+
+		locker int64
 	}
 }
 
@@ -29,7 +34,7 @@ type AllowanceStore struct {
 func NewAllowanceStore(redis redis.UniversalClient) *AllowanceStore {
 	return &AllowanceStore{
 		redis: redis,
-		cache: map[string]*Allowance{},
+		cache: make(map[string][]byte),
 	}
 }
 
@@ -38,29 +43,35 @@ func (s *AllowanceStore) String() string {
 	var (
 		locker    = atomic.LoadInt64(&s.stats.locker)
 		set       = atomic.LoadInt64(&s.stats.set)
+		setErrors = atomic.LoadInt64(&s.stats.setErrors)
 		get       = atomic.LoadInt64(&s.stats.get)
 		getCached = atomic.LoadInt64(&s.stats.getCached)
+		getErrors = atomic.LoadInt64(&s.stats.getErrors)
 	)
-	return fmt.Sprintf("locker=%d set=%d get=%d getCached=%d", locker, set, get, getCached)
+	return fmt.Sprintf("locker=%d set=%d setErrors=%d get=%d getCached=%d getErrors=%d", locker, set, setErrors, get, getCached, getErrors)
 }
 
 func (s *AllowanceStore) get(key string) *Allowance {
 	s.cacheMu.Lock()
 	defer s.cacheMu.Unlock()
 
-	cached, _ := s.cache[key]
-	if cached != nil && cached.Expired() {
-		delete(s.cache, key)
-		return nil
+	if cached, ok := s.cache[key]; ok {
+		allowance := &Allowance{}
+		// We have control over the type, marshalling must not fail.
+		_ = json.Unmarshal(cached, allowance)
+		return allowance
 	}
-	return cached
+	return nil
 }
 
 func (s *AllowanceStore) set(key string, allowance *Allowance) {
+	// We have control over the type, marshalling must not fail.
+	b, _ := json.Marshal(allowance)
+
 	s.cacheMu.Lock()
 	defer s.cacheMu.Unlock()
 
-	s.cache[key] = allowance
+	s.cache[key] = b
 }
 
 // Locker returns a distributed locker, similar to a mutex.
@@ -82,6 +93,7 @@ func (s *AllowanceStore) Get(ctx context.Context, key string) (*Allowance, error
 
 	hval, err := s.redis.HGetAll(ctx, Prefix(key, "allowance")).Result()
 	if err != nil {
+		atomic.AddInt64(&s.stats.getErrors, 1)
 		return nil, err
 	}
 
@@ -95,7 +107,12 @@ func (s *AllowanceStore) Get(ctx context.Context, key string) (*Allowance, error
 // Set will write the passed Allowance value to storage.
 func (s *AllowanceStore) Set(ctx context.Context, key string, allowance *Allowance) error {
 	atomic.AddInt64(&s.stats.set, 1)
-	return s.redis.HSet(ctx, Prefix(key, "allowance"), allowance.Map()).Err()
+	err := s.redis.HSet(ctx, Prefix(key, "allowance"), allowance.Map()).Err()
+	if err != nil {
+		atomic.AddInt64(&s.stats.setErrors, 1)
+	}
+	s.set(key, allowance)
+	return err
 }
 
 // Compile time check that *AllowanceStore implements AllowanceRepository.

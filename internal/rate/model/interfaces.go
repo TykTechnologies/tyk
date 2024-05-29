@@ -1,4 +1,4 @@
-package rate
+package model
 
 import (
 	"context"
@@ -10,11 +10,16 @@ import (
 
 // AllowanceRepository is the interface for accessing rate limit allowance.
 type AllowanceRepository interface {
+	// Stringer is implemented to expose repository internal info/summary.
 	fmt.Stringer
 
+	// Locker implements a distributed lock.
 	Locker(name string) limiters.DistLocker
 
+	// Get will retrieve the allowance from storage.
 	Get(ctx context.Context, key string) (*Allowance, error)
+
+	// Set will write the allowance to storage.
 	Set(ctx context.Context, key string, allowance *Allowance) error
 }
 
@@ -26,3 +31,5 @@ type RedisClientProvider interface {
 	// Client returns the redis.UniversalClient or an error if not available.
 	Client() (redis.UniversalClient, error)
 }
+
+type Locker = limiters.DistLocker

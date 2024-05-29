@@ -1,4 +1,4 @@
-package rate
+package model
 
 import (
 	"testing"
@@ -7,7 +7,12 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestNewAllowanceFromMap(t *testing.T) {
+func TestNewAllowance(t *testing.T) {
+	t.Run("NewAllowance", func(t *testing.T) {
+		allowance := NewAllowance(0)
+		assert.NotNil(t, allowance)
+	})
+
 	t.Run("Valid input", func(t *testing.T) {
 		now := time.Now().Format(time.RFC3339Nano)
 		input := map[string]string{

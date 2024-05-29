@@ -15,13 +15,13 @@ tasks:
       - defer:
           task: services:down
       - task: fmt
-      - go test {{.testArgs}} -count=1 -cover -coverprofile=rate.cov .
+      - go test {{.testArgs}} -count=1 -cover -coverprofile=rate.cov -coverpkg=./... ./...
 
   bench:
     desc: "Run benchmarks"
     cmds:
       - task: fmt
-      - go test {{.testArgs}} -count=1 -tags integration -bench=. -benchtime=10s -benchmem .
+      - go test {{.testArgs}} -count=1 -tags integration -bench=. -benchtime=10s -benchmem ./...
 
   fmt:
     internal: true

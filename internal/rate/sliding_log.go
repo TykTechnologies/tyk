@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/TykTechnologies/tyk/internal/rate/model"
 	"github.com/TykTechnologies/tyk/internal/redis"
 )
 
@@ -28,7 +29,7 @@ var ErrRedisClientProvider = errors.New("Client doesn't implement RedisClientPro
 // NewSlidingLog creates a new SlidingLog instance with a storage.Handler. In case
 // the storage is offline, it's expected to return nil and an error to handle.
 func NewSlidingLog(client interface{}, pipeline bool, smoothingFn SmoothingFn) (*SlidingLog, error) {
-	cluster, ok := client.(RedisClientProvider)
+	cluster, ok := client.(model.RedisClientProvider)
 	if !ok {
 		return nil, ErrRedisClientProvider
 	}
