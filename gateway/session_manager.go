@@ -49,6 +49,7 @@ type SessionLimiter struct {
 	config         *config.Config
 	bucketStore    leakybucket.Storage
 	limiterStorage redis.UniversalClient
+	smoothing      *rate.Smoothing
 }
 
 // NewSessionLimiter initializes the session limiter.
@@ -74,6 +75,8 @@ func NewSessionLimiter(ctx context.Context, conf *config.Config, drlManager *drl
 	case "redis":
 		sessionLimiter.limiterStorage = rate.NewStorage(storageConf)
 	}
+
+	sessionLimiter.smoothing = rate.NewSmoothing(sessionLimiter.limiterStorage)
 
 	return sessionLimiter
 }
@@ -113,21 +116,17 @@ func (l *SessionLimiter) doRollingWindowWrite(r *http.Request, session *user.Ses
 			}
 
 			if smoothingConf.Valid() {
-				var changed bool
-				var err error
-
-				// allowed rate before smoothing
-				allowedRate = smoothingConf.Allowance
-				if changed, err = rate.Smoothing(r, smoothingConf, key, currentRate, maxAllowedRate); changed {
-					// update allowed rate
-					allowedRate = smoothingConf.Allowance
-					// update session with allowance
-					session.Touch()
-				}
+				// Do rate limit smoothing
+				allowance, err := l.smoothing.Do(r, smoothingConf, key, currentRate, maxAllowedRate)
 
 				// If smoothing change returned any error, log it.
 				if err != nil {
 					log.Warn(err)
+				}
+
+				// Use provided allowance
+				if allowance != nil {
+					allowedRate = allowance.Get()
 				}
 			}
 		}

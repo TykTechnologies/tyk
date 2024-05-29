@@ -9,9 +9,6 @@ import (
 	"github.com/TykTechnologies/tyk/internal/redis"
 )
 
-// SmoothingFn is the signature for a rate limiter decision based on rate.
-type SmoothingFn func(ctx context.Context, key string, currentRate int64, maxAllowedRate int64) bool
-
 // SlidingLog implements sliding log storage in redis.
 type SlidingLog struct {
 	conn     redis.UniversalClient
@@ -23,12 +20,6 @@ type SlidingLog struct {
 	// smoothingFn will evaluate the current rate and must return true if
 	// the request should be blocked. It's required.
 	smoothingFn SmoothingFn
-}
-
-// RedisClientProvider is a hidden storage API, providing us with a redis.UniversalClient.
-type RedisClientProvider interface {
-	// Client returns the redis.UniversalClient or an error if not available.
-	Client() (redis.UniversalClient, error)
 }
 
 // ErrRedisClientProvider is returned if NewSlidingLog isn't passed a valid RedisClientProvider parameter.

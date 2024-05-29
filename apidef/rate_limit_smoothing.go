@@ -3,7 +3,6 @@ package apidef
 import (
 	"errors"
 	"fmt"
-	"time"
 )
 
 // RateLimitSmoothing holds the rate smoothing configuration.
@@ -27,10 +26,9 @@ import (
 // - `step` is the value by which the rate allowance will get adjusted
 // - `delay` is the amount of seconds between smoothing updates
 //
-// This configuration in turn updates two fields:
-//
-// - `allowance` - the current rate allowance enforced when rate limiting
-// - `allowance_next_update_at` - a timestamp when the next allowance update may occur
+// This is used to compute a request allowance. The request allowance will
+// be smoothed between `threshold`, and the defined rate limits (maximum).
+// The request allowance will be updated internally every `delay` seconds.
 //
 // For any allowance, events are triggered based on the following calculations:
 //
@@ -65,12 +63,6 @@ type RateLimitSmoothing struct {
 
 	// Delay is the minimum time between rate limit changes (in seconds).
 	Delay int64 `json:"delay" bson:"delay"`
-
-	// Allowance is the current rate limit allowance in effect.
-	Allowance int64 `json:"allowance" bson:"-"`
-
-	// AllowanceNextUpdateAt is the next allowable update time for the allowance.
-	AllowanceNextUpdateAt time.Time `json:"allowance_next_update_at" bson:"-"`
 }
 
 // Valid will return true if the rate limit smoothing should be applied.
@@ -102,26 +94,4 @@ func (r *RateLimitSmoothing) Err() error {
 	}
 
 	return nil
-}
-
-// GetDelay returns the delay for rate limit smoothing as a time.Duration.
-func (r *RateLimitSmoothing) GetDelay() time.Duration {
-	return time.Second * time.Duration(r.Delay)
-}
-
-// SetAllowance updates the current allowance to the specified value and
-// sets the next update time based on the configured delay.
-func (r *RateLimitSmoothing) SetAllowance(allowance int64) {
-	r.Allowance = allowance
-	r.Touch()
-}
-
-// Touch updates the next allowance time to the configured delay.
-func (r *RateLimitSmoothing) Touch() {
-	r.AllowanceNextUpdateAt = time.Now().Add(r.GetDelay())
-}
-
-// CanSetAllowance checks if the allowance can be updated based on the configured delay.
-func (r *RateLimitSmoothing) CanSetAllowance() bool {
-	return time.Since(r.AllowanceNextUpdateAt) > 0
 }
