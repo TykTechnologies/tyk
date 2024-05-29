@@ -106,11 +106,14 @@ func (s *AllowanceStore) Get(ctx context.Context, key string) (*Allowance, error
 
 // Set will write the passed Allowance value to storage.
 func (s *AllowanceStore) Set(ctx context.Context, key string, allowance *Allowance) error {
+	allowanceKey := Prefix(key, "allowance")
+
 	atomic.AddInt64(&s.stats.set, 1)
-	err := s.redis.HSet(ctx, Prefix(key, "allowance"), allowance.Map()).Err()
+	err := s.redis.HSet(ctx, allowanceKey, allowance.Map()).Err()
 	if err != nil {
 		atomic.AddInt64(&s.stats.setErrors, 1)
 	}
+	s.redis.Expire(ctx, allowanceKey, 2*allowance.GetDelay())
 	s.set(key, allowance)
 	return err
 }
