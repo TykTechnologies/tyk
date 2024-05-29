@@ -77,20 +77,20 @@ func (r *RateLimitSmoothing) Valid() bool {
 // It checks for a nil value, the enabled flag and valid values for each setting.
 func (r *RateLimitSmoothing) Err() error {
 	if r == nil || !r.Enabled {
-		return errors.New("Rate limit smoothing disabled")
+		return errors.New("rate limit smoothing disabled")
 	}
 
 	if r.Step <= 0 {
-		return fmt.Errorf("Rate limit smoothing disabled: step invalid")
+		return fmt.Errorf("rate limit smoothing disabled: step invalid")
 	}
 	if r.Delay <= 0 {
-		return fmt.Errorf("Rate limit smoothing disabled: delay invalid")
+		return fmt.Errorf("rate limit smoothing disabled: delay invalid")
 	}
 	if r.Threshold <= 0 {
-		return fmt.Errorf("Rate limit smoothing disabled: threshold invalid")
+		return fmt.Errorf("rate limit smoothing disabled: threshold invalid")
 	}
 	if r.Trigger <= 0 {
-		return fmt.Errorf("Rate limit smoothing disabled: trigger invalid")
+		return fmt.Errorf("rate limit smoothing disabled: trigger invalid")
 	}
 
 	return nil
