@@ -137,6 +137,8 @@ func (g *GraphQLEngineTransport) applyRequestHeadersRewriteRules(r *http.Request
 			continue
 		}
 
+		// forwardedHeaderKey is already canonical.
+
 		if ruleOne(r, forwardedHeaderKey, forwardedHeaderValues) {
 			continue
 		}
