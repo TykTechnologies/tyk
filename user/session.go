@@ -55,6 +55,20 @@ type APILimit struct {
 	Smoothing *apidef.RateLimitSmoothing `json:"smoothing" bson:"smoothing"`
 }
 
+// Less will return true if the receiver has a smaller duration between requests than `in`.
+func (g *APILimit) Less(in APILimit) bool {
+	return g.Duration() < in.Duration()
+}
+
+// Duration returns the time between two allowed requests at the defined rate.
+// It's used to decide which rate limit has a bigger allowance.
+func (g *APILimit) Duration() time.Duration {
+	if g.Per <= 0 || g.Rate <= 0 {
+		return 0
+	}
+	return time.Second * time.Duration(g.Rate/g.Per)
+}
+
 // AccessDefinition defines which versions of an API a key has access to
 // NOTE: when adding new fields it is required to map them from DBAccessDefinition
 // in the gateway/policy.go:19
@@ -162,6 +176,21 @@ type SessionState struct {
 
 func NewSessionState() *SessionState {
 	return &SessionState{}
+}
+
+// APILimit returns an user.APILimit from the session data.
+func (s *SessionState) APILimit() APILimit {
+	return APILimit{
+		QuotaMax:           s.QuotaMax,
+		QuotaRenewalRate:   s.QuotaRenewalRate,
+		QuotaRenews:        s.QuotaRenews,
+		Rate:               s.Rate,
+		Per:                s.Per,
+		ThrottleInterval:   s.ThrottleInterval,
+		ThrottleRetryLimit: s.ThrottleRetryLimit,
+		MaxQueryDepth:      s.MaxQueryDepth,
+		Smoothing:          s.Smoothing,
+	}
 }
 
 // Touch marks the session as modified, indicating that it should be updated.

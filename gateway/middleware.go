@@ -451,15 +451,7 @@ func (t *BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 				if accessRights.Limit.IsEmpty() {
 					// limit was not specified on API level so we will populate it from policy
 					idForScope = policy.ID
-					accessRights.Limit = user.APILimit{
-						QuotaMax:           policy.QuotaMax,
-						QuotaRenewalRate:   policy.QuotaRenewalRate,
-						Rate:               policy.Rate,
-						Per:                policy.Per,
-						ThrottleInterval:   policy.ThrottleInterval,
-						ThrottleRetryLimit: policy.ThrottleRetryLimit,
-						MaxQueryDepth:      policy.MaxQueryDepth,
-					}
+					accessRights.Limit = policy.APILimit()
 				}
 				accessRights.AllowanceScope = idForScope
 				accessRights.Limit.SetBy = idForScope
@@ -581,17 +573,20 @@ func (t *BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 				if !usePartitions || policy.Partitions.RateLimit {
 					didRateLimit[k] = true
 
-					if greaterThanFloat64(policy.Rate, ar.Limit.Rate) {
-						ar.Limit.Rate = policy.Rate
-						if greaterThanFloat64(policy.Rate, session.Rate) {
-							session.Rate = policy.Rate
-						}
-					}
+					apiLimits := ar.Limit
+					policyLimits := policy.APILimit()
+					sessionLimits := session.APILimit()
 
-					if policy.Per > ar.Limit.Per {
-						ar.Limit.Per = policy.Per
-						if policy.Per > session.Per {
-							session.Per = policy.Per
+					// Update Rate, Per and Smoothing
+					if apiLimits.Less(policyLimits) {
+						ar.Limit.Rate = policyLimits.Rate
+						ar.Limit.Per = policyLimits.Per
+						ar.Limit.Smoothing = policyLimits.Smoothing
+
+						if sessionLimits.Less(policyLimits) {
+							session.Rate = policyLimits.Rate
+							session.Per = policyLimits.Per
+							session.Smoothing = policyLimits.Smoothing
 						}
 					}
 
@@ -634,6 +629,7 @@ func (t *BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 				if !usePartitions || policy.Partitions.RateLimit {
 					session.Rate = policy.Rate
 					session.Per = policy.Per
+					session.Smoothing = policy.Smoothing
 					session.ThrottleInterval = policy.ThrottleInterval
 					session.ThrottleRetryLimit = policy.ThrottleRetryLimit
 				}
@@ -710,6 +706,7 @@ func (t *BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 		if !didRateLimit[k] {
 			v.Limit.Rate = session.Rate
 			v.Limit.Per = session.Per
+			v.Limit.Smoothing = session.Smoothing
 			v.Limit.ThrottleInterval = session.ThrottleInterval
 			v.Limit.ThrottleRetryLimit = session.ThrottleRetryLimit
 		}
@@ -742,6 +739,7 @@ func (t *BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 			if len(didRateLimit) == 1 {
 				session.Rate = v.Limit.Rate
 				session.Per = v.Limit.Per
+				session.Smoothing = v.Limit.Smoothing
 			}
 
 			if len(didQuota) == 1 {

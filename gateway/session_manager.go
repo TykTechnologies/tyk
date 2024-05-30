@@ -413,17 +413,7 @@ func GetAccessDefinitionByAPIIDOrSession(session *user.SessionState, api *APISpe
 		}
 	}
 	if accessDef.Limit.IsEmpty() {
-		accessDef.Limit = user.APILimit{
-			QuotaMax:           session.QuotaMax,
-			QuotaRenewalRate:   session.QuotaRenewalRate,
-			QuotaRenews:        session.QuotaRenews,
-			Rate:               session.Rate,
-			Per:                session.Per,
-			ThrottleInterval:   session.ThrottleInterval,
-			ThrottleRetryLimit: session.ThrottleRetryLimit,
-			MaxQueryDepth:      session.MaxQueryDepth,
-			Smoothing:          session.Smoothing,
-		}
+		accessDef.Limit = session.APILimit()
 	}
 
 	return accessDef, allowanceScope, nil
