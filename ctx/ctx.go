@@ -19,6 +19,8 @@ type Key uint
 
 const (
 	SessionData Key = iota
+	// Deprecated: UpdateSession was used to trigger a session update, use *SessionData.Touch instead.
+	UpdateSession
 	AuthToken
 	HashedAuthToken
 	VersionData
