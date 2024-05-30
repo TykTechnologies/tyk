@@ -269,7 +269,7 @@ func (d *DynamicMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 		newMeta := mapStrsToIfaces(newRequestData.SessionMeta)
 		if session != nil && !reflect.DeepEqual(session.MetaData, newMeta) {
 			session.MetaData = newMeta
-			ctxScheduleSessionUpdate(r)
+			session.Touch()
 		}
 	}
 
