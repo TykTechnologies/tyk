@@ -27,6 +27,8 @@ const (
 const (
 	// EventQuotaExceeded is an alias maintained for backwards compatibility.
 	EventQuotaExceeded = event.QuotaExceeded
+	// RateLimitExceeded is an alias maintained for backwards compatibility.
+	RateLimitExceeded = event.RateLimitExceeded
 	// EventAuthFailure is an alias maintained for backwards compatibility.
 	EventAuthFailure = event.AuthFailure
 	// EventKeyExpired is an alias maintained for backwards compatibility.
