@@ -1,6 +1,3 @@
-//go:build go1.10
-// +build go1.10
-
 package gateway
 
 import (
@@ -10,9 +7,9 @@ import (
 	"encoding/pem"
 	"errors"
 	"fmt"
+	tykcrypto "github.com/TykTechnologies/tyk/internal/crypto"
 
 	"github.com/TykTechnologies/tyk/config"
-	tykcrypto "github.com/TykTechnologies/tyk/internal/crypto"
 
 	//	"net"
 	"net/http"
@@ -68,8 +65,6 @@ func newUpstreamSSL(t *testing.T, gw *Gateway, serverCert tls.Certificate, handl
 }
 
 func TestPublicKeyPinning(t *testing.T) {
-	test.Flaky(t) // TODO: TT-5260
-
 	_, _, _, serverCert := certs.GenServerCertificate()
 
 	t.Run("Pub key match", func(t *testing.T) {
@@ -92,6 +87,8 @@ func TestPublicKeyPinning(t *testing.T) {
 	})
 
 	t.Run("Pub key not match", func(t *testing.T) {
+		test.Flaky(t) // TODO: TT-5260
+
 		ts := StartTest(nil)
 		defer ts.Close()
 
@@ -128,6 +125,8 @@ func TestPublicKeyPinning(t *testing.T) {
 	})
 
 	t.Run("Global setting", func(t *testing.T) {
+		test.Flaky(t) // TODO: TT-5260
+
 		ts := StartTest(func(globalConf *config.Config) {
 			globalConf.Security.PinnedPublicKeys = map[string]string{"127.0.0.1": "wrong"}
 		})
@@ -243,7 +242,8 @@ func TestProxyTransport(t *testing.T) {
 
 	upstream := httptest.NewUnstartedServer(handlerEcho("test"))
 	upstream.TLS = &tls.Config{
-		MaxVersion: tls.VersionTLS12,
+		MaxVersion:   tls.VersionTLS12,
+		CipherSuites: getCipherAliases([]string{"TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384", "TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384", "TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256"}),
 	}
 	upstream.StartTLS()
 
@@ -258,7 +258,7 @@ func TestProxyTransport(t *testing.T) {
 		// force creating new transport on each reque
 		globalConf.MaxConnTime = -1
 
-		globalConf.ProxySSLCipherSuites = []string{"TLS_RSA_WITH_AES_128_CBC_SHA"}
+		globalConf.ProxySSLCipherSuites = []string{"TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384"}
 		ts.Gw.SetConfig(globalConf)
 		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 			spec.Proxy.ListenPath = "/"
@@ -273,7 +273,7 @@ func TestProxyTransport(t *testing.T) {
 		// force creating new transport on each reque
 		globalConf.MaxConnTime = -1
 
-		globalConf.ProxySSLCipherSuites = []string{"TLS_RSA_WITH_RC4_128_SHA"}
+		globalConf.ProxySSLCipherSuites = []string{"TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA256"}
 		ts.Gw.SetConfig(globalConf)
 		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 			spec.Proxy.ListenPath = "/"
@@ -288,12 +288,12 @@ func TestProxyTransport(t *testing.T) {
 		// force creating new transport on each reque
 		globalConf.MaxConnTime = -1
 
-		globalConf.ProxySSLCipherSuites = []string{"TLS_RSA_WITH_RC4_128_SHA"}
+		globalConf.ProxySSLCipherSuites = []string{"TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA256"}
 		ts.Gw.SetConfig(globalConf)
 		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 			spec.Proxy.ListenPath = "/"
 			spec.Proxy.TargetURL = upstream.URL
-			spec.Proxy.Transport.SSLCipherSuites = []string{"TLS_RSA_WITH_AES_128_CBC_SHA"}
+			spec.Proxy.Transport.SSLCipherSuites = []string{"TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384"}
 		})
 
 		ts.Run(t, test.TestCase{Path: "/", Code: 200})
@@ -310,7 +310,7 @@ func TestProxyTransport(t *testing.T) {
 		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 			spec.Proxy.ListenPath = "/"
 			spec.Proxy.TargetURL = upstream.URL
-			spec.Proxy.Transport.SSLCipherSuites = []string{"TLS_RSA_WITH_AES_128_CBC_SHA"}
+			spec.Proxy.Transport.SSLCipherSuites = []string{"TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384"}
 		})
 
 		ts.Run(t, test.TestCase{Path: "/", Code: 500})
@@ -327,7 +327,7 @@ func TestProxyTransport(t *testing.T) {
 		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 			spec.Proxy.ListenPath = "/"
 			spec.Proxy.TargetURL = upstream.URL
-			spec.Proxy.Transport.SSLCipherSuites = []string{"TLS_RSA_WITH_AES_128_CBC_SHA"}
+			spec.Proxy.Transport.SSLCipherSuites = []string{"TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384"}
 			// Invalid proxy
 			spec.Proxy.Transport.ProxyURL = upstream.URL
 		})
@@ -358,7 +358,7 @@ func TestProxyTransport(t *testing.T) {
 
 		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 			spec.Proxy.ListenPath = "/"
-			spec.Proxy.Transport.SSLCipherSuites = []string{"TLS_RSA_WITH_AES_128_CBC_SHA"}
+			spec.Proxy.Transport.SSLCipherSuites = []string{"TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384"}
 			spec.Proxy.Transport.ProxyURL = proxy.URL
 		})
 

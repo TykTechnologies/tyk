@@ -51,8 +51,66 @@ builds:
     goarch:
       - s390x
     binary: tyk
+  - id: fips-std-linux
+    flags:
+      - -tags=goplugin,boringcrypto
+    ldflags:
+      - -X github.com/TykTechnologies/tyk/internal/build.Version={{.Version}}
+      - -X github.com/TykTechnologies/tyk/internal/build.Commit={{.FullCommit}}
+      - -X github.com/TykTechnologies/tyk/internal/build.BuildDate={{.Date}}
+      - -X github.com/TykTechnologies/tyk/internal/build.BuiltBy=goreleaser
+    env:
+      - GOEXPERIMENT=boringcrypto
+    goos:
+      - linux
+    goarch:
+      - amd64
+    binary: tyk
 dockers:
   # Build tykio/tyk-gateway, docker.tyk.io/tyk-gateway/tyk-gateway (amd64)
+  - ids:
+      - fips-std
+    image_templates:
+        - "tykio/tyk-gateway:{{.Tag}}-fips-amd64"
+        - "docker.tyk.io/tyk-gateway/tyk-gateway:{{.Tag}}-fips-amd64"
+    build_flag_templates:
+      - "--build-arg=PORTS=8080"
+      - "--platform=linux/amd64"
+      - "--label=org.opencontainers.image.created={{.Date}}"
+      - "--label=org.opencontainers.image.title={{.ProjectName}}"
+      - "--label=org.opencontainers.image.revision={{.FullCommit}}"
+      - "--label=org.opencontainers.image.version={{.Version}}"
+    use: buildx
+    goarch: amd64
+    goos: linux
+    dockerfile: ci/Dockerfile.std
+    extra_files:
+      - "ci/install/"
+      - "README.md"
+      - "LICENSE.md"
+      - "apps/app_sample.json"
+      - "templates"
+      - "middleware"
+      - "event_handlers/sample"
+      - "policies"
+      - "coprocess"
+      - "tyk.conf.example"
+  - ids:
+      - fips-hybrid-std
+    image_templates:
+        - "tykio/tyk-hybrid-docker:{{.Tag}}-fips-amd64"
+    build_flag_templates:
+      - "--platform=linux/amd64"
+      - "--label=org.opencontainers.image.created={{.Date}}"
+      - "--label=org.opencontainers.image.title={{.ProjectName}}-hybrid"
+      - "--label=org.opencontainers.image.revision={{.FullCommit}}"
+      - "--label=org.opencontainers.image.version={{.Version}}"
+    use: buildx
+    goarch: amd64
+    goos: linux
+    dockerfile: ci/images/hybrid/Dockerfile
+    extra_files:
+      - "ci/images/hybrid/"
   - ids:
       - std
     image_templates:
@@ -150,22 +208,27 @@ docker_manifests:
   - name_template: tykio/tyk-gateway:{{ .Tag }}
     image_templates:
       - tykio/tyk-gateway:{{ .Tag }}-amd64
+      - tykio/tyk-gateway:{{ .Tag }}-fips-amd64
       - tykio/tyk-gateway:{{ .Tag }}-arm64
   - name_template: tykio/tyk-gateway:v{{ .Major }}.{{ .Minor }}{{.Prerelease}}
     image_templates:
       - tykio/tyk-gateway:{{ .Tag }}-amd64
+      - tykio/tyk-gateway:{{ .Tag }}-fips-amd64
       - tykio/tyk-gateway:{{ .Tag }}-arm64
   - name_template: tykio/tyk-gateway:v{{ .Major }}{{.Prerelease}}
     image_templates:
       - tykio/tyk-gateway:{{ .Tag }}-amd64
+      - tykio/tyk-gateway:{{ .Tag }}-fips-amd64
       - tykio/tyk-gateway:{{ .Tag }}-arm64
   - name_template: tykio/tyk-hybrid-docker:{{ .Tag }}
     image_templates:
       - tykio/tyk-hybrid-docker:{{ .Tag }}-amd64
+        tykio/tyk-hybrid-docker:{{ .Tag }}-fips-amd64
       - tykio/tyk-hybrid-docker:{{ .Tag }}-arm64
   - name_template: docker.tyk.io/tyk-gateway/tyk-gateway:{{ .Tag }}
     image_templates:
       - docker.tyk.io/tyk-gateway/tyk-gateway:{{ .Tag }}-amd64
+      - docker.tyk.io/tyk-gateway/tyk-gateway:{{ .Tag }}-fips-amd64
       - docker.tyk.io/tyk-gateway/tyk-gateway:{{ .Tag }}-arm64
 nfpms:
   - id: std
@@ -177,6 +240,7 @@ nfpms:
     file_name_template: "{{ .ConventionalFileName }}"
     builds:
       - std-linux
+      - fips-std-linux
       - std-arm64
       - std-s390x
     formats:

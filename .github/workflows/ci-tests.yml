@@ -31,6 +31,7 @@ jobs:
         redis-version: [5, 7]
         python-version: ["3.11"]
         go-version: [1.21.x]
+        fips: [0,1]
 
     steps:
       - name: Checkout Tyk
@@ -42,6 +43,11 @@ jobs:
         uses: actions/setup-go@v2
         with:
           go-version: ${{ matrix.go-version }}
+
+      - name: Setup Golang FIPS
+        if: ${{ contains(matrix.fips, '1') }}
+        run: |
+          echo "GOEXPERIMENT=boringcrypto" >> $GITHUB_ENV
 
       - name: Setup Python
         uses: actions/setup-python@v4

@@ -19,6 +19,10 @@ set -e
 
 tags="goplugin dev"
 
+if [[ "$GOEXPERIMENT" == "boringcrypto" ]]; then
+    tags+=" boringcrypto"
+fi
+
 # build Go-plugin used in tests
 echo "Building go plugin"
 go build -tags "${tags}" -buildmode=plugin       -o ./test/goplugins/goplugins.so      ./test/goplugins
