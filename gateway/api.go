@@ -3109,21 +3109,6 @@ func ctxSetSession(r *http.Request, s *user.SessionState, scheduleUpdate bool, h
 	ctx.SetSession(r, s, scheduleUpdate, hashKey)
 }
 
-func ctxScheduleSessionUpdate(r *http.Request) {
-	setCtxValue(r, ctx.UpdateSession, true)
-}
-
-func ctxDisableSessionUpdate(r *http.Request) {
-	setCtxValue(r, ctx.UpdateSession, false)
-}
-
-func ctxSessionUpdateScheduled(r *http.Request) bool {
-	if v := r.Context().Value(ctx.UpdateSession); v != nil {
-		return v.(bool)
-	}
-	return false
-}
-
 func ctxGetAuthToken(r *http.Request) string {
 	return ctx.GetAuthToken(r)
 }
