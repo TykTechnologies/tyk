@@ -7,6 +7,7 @@ import (
 	"encoding/pem"
 	"errors"
 	"fmt"
+
 	tykcrypto "github.com/TykTechnologies/tyk/internal/crypto"
 
 	"github.com/TykTechnologies/tyk/config"
