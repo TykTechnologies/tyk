@@ -95,18 +95,18 @@ func NewEngineV3(options EngineV3Options) (*EngineV3, error) {
 	//	ctxRetrieveRequest: options.Injections.ContextRetrieveRequest,
 	//}
 	//
-	//complexityChecker := &complexityCheckerV1{
-	//	logger:             logger,
-	//	schema:             parsedSchema,
-	//	ctxRetrieveRequest: options.Injections.ContextRetrieveRequest,
-	//}
-	//
-	//granularAccessChecker := &granularAccessCheckerV1{
-	//	logger:                    logger,
-	//	schema:                    parsedSchema,
-	//	ctxRetrieveGraphQLRequest: options.Injections.ContextRetrieveRequest,
-	//}
-	//
+	complexityChecker := &complexityCheckerV2{
+		logger:             logger,
+		schema:             parsedSchema,
+		ctxRetrieveRequest: options.Injections.ContextRetrieveRequest,
+	}
+
+	granularAccessChecker := &granularAccessCheckerV2{
+		logger:                    logger,
+		schema:                    parsedSchema,
+		ctxRetrieveGraphQLRequest: options.Injections.ContextRetrieveRequest,
+	}
+
 	reverseProxyPreHandler := &reverseProxyPreHandlerV2{
 		ctxRetrieveGraphQLRequest: options.Injections.ContextRetrieveRequest,
 		apiDefinition:             options.ApiDefinition,
@@ -127,6 +127,8 @@ func NewEngineV3(options EngineV3Options) (*EngineV3, error) {
 		tykVariableReplacer:    options.Injections.TykVariableReplacer,
 		seekReadCloser:         options.Injections.SeekReadCloser,
 		contextCancel:          cancel,
+		complexityChecker:      complexityChecker,
+		granularAccessChecker:  granularAccessChecker,
 	}
 
 	if engine.openTelemetry == nil {

@@ -281,6 +281,7 @@ func TestOAS_ExtractTo_ResetAPIDefinition(t *testing.T) {
 		"APIDefinition.GraphQL.Engine.DataSources[0].Config[0]",
 		"APIDefinition.GraphQL.Engine.GlobalHeaders[0].Key",
 		"APIDefinition.GraphQL.Engine.GlobalHeaders[0].Value",
+		"APIDefinition.GraphQL.Proxy.Features.UseImmutableHeaders",
 		"APIDefinition.GraphQL.Proxy.AuthHeaders[0]",
 		"APIDefinition.GraphQL.Proxy.SubscriptionType",
 		"APIDefinition.GraphQL.Proxy.RequestHeaders[0]",
