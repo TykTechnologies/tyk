@@ -147,9 +147,9 @@ fi
 
 tags="goplugin"
 
-if [[ "$GOEXPERIMENT" == "boringcrypto" ]]; then
-    tags+=" boringcrypto"
-fi
+#if [[ "$GOEXPERIMENT" == "boringcrypto" ]]; then
+tags+=" boringcrypto"
+#fi
 
 echo "Tags: $tags"
 

@@ -25,7 +25,7 @@ RUN --mount=type=cache,mode=0755,target=/go/pkg/mod go mod download
 ADD . $TYK_GW_PATH
 
 # Provide a gateway test binary for testing plugin loading.
-RUN --mount=type=cache,mode=0755,target=/go/pkg/mod GOBIN=/usr/local/bin go install -tags=goplugin -trimpath .
+RUN --mount=type=cache,mode=0755,target=/go/pkg/mod GOBIN=/usr/local/bin go install -tags=goplugin,boringcrypto -trimpath .
 
 ARG GITHUB_SHA
 ARG GITHUB_TAG
