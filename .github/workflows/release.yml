@@ -90,6 +90,7 @@ jobs:
           -e DEBVERS='${{ matrix.debvers }}'                               \
           -e RPMVERS='${{ matrix.rpmvers }}'                               \
           -e CGO_ENABLED=${{ matrix.cgo }}                                 \
+          -e GOEXPERIMENT=boringcrypto                                    \
           -e NFPM_STD_PASSPHRASE="$NFPM_STD_PASSPHRASE"                          \
           -e GPG_FINGERPRINT=12B5D62C28F57592D1575BD51ED14C59E37DAC20            \
           -e PKG_SIGNING_KEY="$PKG_SIGNING_KEY"                                  \
