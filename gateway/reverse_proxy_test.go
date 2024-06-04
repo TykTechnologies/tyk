@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"math/rand"
+	mathRand "math/rand"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -16,12 +16,15 @@ import (
 	"strings"
 	"sync"
 	"testing"
-	"text/template"
+	textTemplate "text/template"
 	"time"
 
 	"github.com/stretchr/testify/assert"
-
 	"github.com/stretchr/testify/require"
+
+	"github.com/TykTechnologies/tyk/user"
+
+	"github.com/TykTechnologies/tyk/header"
 
 	"github.com/TykTechnologies/graphql-go-tools/pkg/execution/datasource"
 	"github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
@@ -664,7 +667,7 @@ func TestCheckHeaderInRemoveList(t *testing.T) {
 		GlobalHeadersRemove   []string
 		ExtendedDeleteHeaders []string
 	}
-	tpl, err := template.New("test_tpl").Parse(`{
+	tpl, err := textTemplate.New("test_tpl").Parse(`{
 		"api_id": "1",
 		"version_data": {
 			"not_versioned": true,
@@ -775,9 +778,7 @@ func TestNopCloseRequestBody(t *testing.T) {
 	// try to pass nil request
 	var req *http.Request
 	nopCloseRequestBody(req)
-	if req != nil {
-		t.Error("nil Request should remain nil")
-	}
+	assert.Nil(t, req, "nil Request should remain nil")
 
 	// try to pass nil body
 	req = &http.Request{}
@@ -819,9 +820,7 @@ func TestNopCloseRequestBody(t *testing.T) {
 func TestNopCloseResponseBody(t *testing.T) {
 	var resp *http.Response
 	nopCloseResponseBody(resp)
-	if resp != nil {
-		t.Error("nil Response should remain nil")
-	}
+	assert.Nil(t, resp, "nil Response should remain nil")
 
 	// try to pass nil body
 	resp = &http.Response{}
@@ -998,6 +997,44 @@ func TestGraphQL_ProxyOnlyHeaders(t *testing.T) {
 		})
 		assert.NoError(t, err)
 	})
+}
+
+func TestGraphQL_ProxyOnlyPassHeadersWithOTel(t *testing.T) {
+	g := StartTest(func(globalConf *config.Config) {
+		globalConf.OpenTelemetry.Enabled = true
+	})
+	defer g.Close()
+
+	spec := BuildAPI(func(spec *APISpec) {
+		spec.Name = "tyk-api"
+		spec.APIID = "tyk-api"
+		spec.GraphQL.Enabled = true
+		spec.GraphQL.ExecutionMode = apidef.GraphQLExecutionModeProxyOnly
+		spec.GraphQL.Schema = gqlCountriesSchema
+		spec.GraphQL.Version = apidef.GraphQLConfigVersion2
+		spec.Proxy.TargetURL = TestHttpAny + "/dynamic"
+		spec.Proxy.ListenPath = "/"
+	})[0]
+
+	g.Gw.LoadAPI(spec)
+	g.AddDynamicHandler("/dynamic", func(writer http.ResponseWriter, r *http.Request) {
+		if gotten := r.Header.Get("custom-client-header"); gotten != "custom-value" {
+			t.Errorf("expected upstream to recieve header `custom-client-header` with value of `custom-value`, instead got %s", gotten)
+		}
+	})
+
+	_, err := g.Run(t, test.TestCase{
+		Path: "/",
+		Headers: map[string]string{
+			"custom-client-header": "custom-value",
+		},
+		Method: http.MethodPost,
+		Data: graphql.Request{
+			Query: gqlContinentQuery,
+		},
+	})
+
+	assert.NoError(t, err)
 }
 
 func TestGraphQL_InternalDataSource(t *testing.T) {
@@ -1305,7 +1342,7 @@ func TestGraphQL_InternalDataSource_memConnProviders(t *testing.T) {
 	// tests run in parallel and memConnProviders is a global struct.
 	// For consistency, we use unique names for the subgraphs.
 	tykSubgraphAccounts := BuildAPI(func(spec *APISpec) {
-		spec.Name = fmt.Sprintf("subgraph-accounts-%d", rand.Intn(1000))
+		spec.Name = fmt.Sprintf("subgraph-accounts-%d", mathRand.Intn(1000))
 		spec.APIID = "subgraph1"
 		spec.Proxy.TargetURL = testSubgraphAccounts
 		spec.Proxy.ListenPath = "/tyk-subgraph-accounts"
@@ -1321,7 +1358,7 @@ func TestGraphQL_InternalDataSource_memConnProviders(t *testing.T) {
 	})[0]
 
 	tykSubgraphReviews := BuildAPI(func(spec *APISpec) {
-		spec.Name = fmt.Sprintf("subgraph-reviews-%d", rand.Intn(1000))
+		spec.Name = fmt.Sprintf("subgraph-reviews-%d", mathRand.Intn(1000))
 		spec.APIID = "subgraph2"
 		spec.Proxy.TargetURL = testSubgraphReviews
 		spec.Proxy.ListenPath = "/tyk-subgraph-reviews"
@@ -1548,6 +1585,23 @@ func TestEnsureTransport(t *testing.T) {
 	cases := []struct {
 		host, protocol, expect string
 	}{
+		// This section tests EnsureTransport if port + IP is supplied
+		{"https://192.168.1.1:443 ", "https", "https://192.168.1.1:443"},
+		{"192.168.1.1:443 ", "https", "https://192.168.1.1:443"},
+		{"http://192.168.1.1:80 ", "https", "http://192.168.1.1:80"},
+		{"192.168.1.1:2000 ", "tls", "tls://192.168.1.1:2000"},
+		{"192.168.1.1:2000 ", "", "http://192.168.1.1:2000"},
+		// This section tests EnsureTransport if port is supplied
+		{"https://httpbin.org:443 ", "https", "https://httpbin.org:443"},
+		{"httpbin.org:443 ", "https", "https://httpbin.org:443"},
+		{"http://httpbin.org:80 ", "https", "http://httpbin.org:80"},
+		{"httpbin.org:2000 ", "tls", "tls://httpbin.org:2000"},
+		{"httpbin.org:2000 ", "", "http://httpbin.org:2000"},
+		// This is the h2c proto to http conversion
+		{"http://httpbin.org ", "h2c", "http://httpbin.org"},
+		{"h2c://httpbin.org ", "h2c", "http://httpbin.org"},
+		{"httpbin.org ", "h2c", "http://httpbin.org"},
+		// This is the default parse section
 		{"https://httpbin.org ", "https", "https://httpbin.org"},
 		{"httpbin.org ", "https", "https://httpbin.org"},
 		{"http://httpbin.org ", "https", "http://httpbin.org"},
@@ -1557,9 +1611,11 @@ func TestEnsureTransport(t *testing.T) {
 	for i, v := range cases {
 		t.Run(fmt.Sprintf("case-%d", i), func(t *testing.T) {
 			g := EnsureTransport(v.host, v.protocol)
-			if g != v.expect {
-				t.Errorf("expected %q got %q", v.expect, g)
-			}
+
+			assert.Equal(t, v.expect, g)
+
+			_, err := url.Parse(g)
+			assert.NoError(t, err)
 		})
 	}
 }
@@ -1826,4 +1882,131 @@ func TestCreateMemConnProviderIfNeeded(t *testing.T) {
 			return true
 		}, time.Second, time.Millisecond*25, "context was not canceled")
 	})
+}
+
+func TestQuotaResponseHeaders(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	spec := ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		spec.Proxy.ListenPath = "/quota-headers-test"
+		spec.UseKeylessAccess = false
+	})[0]
+
+	var (
+		quotaMax, quotaRenewalRate int64 = 2, 3600
+	)
+
+	assertQuota := func(t *testing.T, ts *Test, key string) {
+		t.Helper()
+
+		authorization := map[string]string{
+			"Authorization": key,
+		}
+
+		_, _ = ts.Run(t, []test.TestCase{
+			{
+				Headers: authorization,
+				Path:    "/quota-headers-test/",
+				Code:    http.StatusOK,
+				HeadersMatch: map[string]string{
+					header.XRateLimitLimit:     fmt.Sprintf("%d", quotaMax),
+					header.XRateLimitRemaining: fmt.Sprintf("%d", quotaMax-1),
+				},
+			},
+			{
+				Headers: authorization,
+				Path:    "/quota-headers-test/",
+				Code:    http.StatusOK,
+				HeadersMatch: map[string]string{
+					header.XRateLimitLimit:     fmt.Sprintf("%d", quotaMax),
+					header.XRateLimitRemaining: fmt.Sprintf("%d", quotaMax-2),
+				},
+			},
+			{
+				Headers: authorization,
+				Path:    "/quota-headers-test/abc",
+				Code:    http.StatusForbidden,
+			},
+		}...)
+	}
+
+	t.Run("key without policy", func(t *testing.T) {
+		_, authKey := ts.CreateSession(func(s *user.SessionState) {
+			s.AccessRights = map[string]user.AccessDefinition{
+				spec.APIID: {
+					APIName:  spec.Name,
+					APIID:    spec.APIID,
+					Versions: []string{"default"},
+					Limit: user.APILimit{
+						QuotaMax:         quotaMax,
+						QuotaRenewalRate: quotaRenewalRate,
+					},
+					AllowanceScope: spec.APIID,
+				},
+			}
+			s.OrgID = spec.OrgID
+		})
+		assertQuota(t, ts, authKey)
+	})
+
+	t.Run("key from policy with per api limits", func(t *testing.T) {
+		polID := ts.CreatePolicy(func(p *user.Policy) {
+			p.Name = "p1"
+			p.KeyExpiresIn = 3600
+			p.Partitions = user.PolicyPartitions{
+				PerAPI: true,
+			}
+			p.OrgID = spec.OrgID
+			p.AccessRights = map[string]user.AccessDefinition{
+				spec.APIID: {
+					APIName:  spec.Name,
+					APIID:    spec.APIID,
+					Versions: []string{"default"},
+					Limit: user.APILimit{
+						QuotaMax:         quotaMax,
+						QuotaRenewalRate: quotaRenewalRate,
+					},
+					AllowanceScope: spec.APIID,
+				},
+			}
+		})
+
+		_, policyKey := ts.CreateSession(func(s *user.SessionState) {
+			s.ApplyPolicies = []string{polID}
+		})
+
+		assertQuota(t, ts, policyKey)
+	})
+
+	t.Run("key from policy with global limits", func(t *testing.T) {
+		polID := ts.CreatePolicy(func(p *user.Policy) {
+			p.Name = "p1"
+			p.KeyExpiresIn = 3600
+			p.Partitions = user.PolicyPartitions{
+				Quota:     true,
+				RateLimit: true,
+				Acl:       true,
+			}
+			p.OrgID = spec.OrgID
+			p.QuotaMax = quotaMax
+			p.QuotaRenewalRate = quotaRenewalRate
+			p.AccessRights = map[string]user.AccessDefinition{
+				spec.APIID: {
+					APIName:        spec.Name,
+					APIID:          spec.APIID,
+					Versions:       []string{"default"},
+					Limit:          user.APILimit{},
+					AllowanceScope: spec.APIID,
+				},
+			}
+		})
+
+		_, policyKey := ts.CreateSession(func(s *user.SessionState) {
+			s.ApplyPolicies = []string{polID}
+		})
+
+		assertQuota(t, ts, policyKey)
+	})
+
 }

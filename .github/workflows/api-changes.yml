@@ -11,3 +11,5 @@ jobs:
     uses: TykTechnologies/github-actions/.github/workflows/godoc.yml@main
     secrets:
       ORG_GH_TOKEN: ${{ secrets.ORG_GH_TOKEN }}
+    with:
+      go-version: 1.21

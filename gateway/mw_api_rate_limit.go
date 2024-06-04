@@ -1,13 +1,12 @@
 package gateway
 
 import (
-	"errors"
 	"net/http"
 
 	"strconv"
 	"time"
 
-	"github.com/TykTechnologies/tyk/request"
+	"github.com/TykTechnologies/tyk/internal/event"
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/user"
 )
@@ -15,7 +14,8 @@ import (
 // RateLimitAndQuotaCheck will check the incoming request and key whether it is within it's quota and
 // within it's rate limit, it makes use of the SessionLimiter object to do this
 type RateLimitForAPI struct {
-	BaseMiddleware
+	*BaseMiddleware
+
 	keyName string
 	apiSess *user.SessionState
 }
@@ -25,7 +25,7 @@ func (k *RateLimitForAPI) Name() string {
 }
 
 func (k *RateLimitForAPI) EnabledForSpec() bool {
-	if k.Spec.DisableRateLimit || k.Spec.GlobalRateLimit.Rate == 0 {
+	if k.Spec.DisableRateLimit || k.Spec.GlobalRateLimit.Rate == 0 || k.Spec.GlobalRateLimit.Disabled {
 		return false
 	}
 
@@ -43,23 +43,6 @@ func (k *RateLimitForAPI) EnabledForSpec() bool {
 	return true
 }
 
-func (k *RateLimitForAPI) handleRateLimitFailure(r *http.Request, token string) (error, int) {
-	k.Logger().WithField("key", k.Gw.obfuscateKey(token)).Info("API rate limit exceeded.")
-
-	// Fire a rate limit exceeded event
-	k.FireEvent(EventRateLimitExceeded, EventKeyFailureMeta{
-		EventMetaDefault: EventMetaDefault{Message: "API Rate Limit Exceeded", OriginatingRequest: EncodeRequestToEvent(r)},
-		Path:             r.URL.Path,
-		Origin:           request.RealIP(r),
-		Key:              token,
-	})
-
-	// Report in health check
-	reportHealthValue(k.Spec, Throttle, "-1")
-
-	return errors.New("API Rate limit exceeded"), http.StatusTooManyRequests
-}
-
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail
 func (k *RateLimitForAPI) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
 	// Skip rate limiting and quotas for looping
@@ -68,18 +51,24 @@ func (k *RateLimitForAPI) ProcessRequest(w http.ResponseWriter, r *http.Request,
 	}
 
 	storeRef := k.Gw.GlobalSessionManager.Store()
-	reason := k.Gw.SessionLimiter.ForwardMessage(r, k.apiSess,
+	customQuotaKey := ""
+
+	reason := k.Gw.SessionLimiter.ForwardMessage(
+		r,
+		k.apiSess,
 		k.keyName,
+		customQuotaKey,
 		storeRef,
 		true,
 		false,
-		&k.Spec.GlobalConfig,
 		k.Spec,
 		false,
 	)
 
+	k.emitRateLimitEvents(r, k.keyName)
+
 	if reason == sessionFailRateLimit {
-		return k.handleRateLimitFailure(r, k.keyName)
+		return k.handleRateLimitFailure(r, event.RateLimitExceeded, "API Rate Limit Exceeded", k.keyName)
 	}
 
 	// Request is valid, carry on

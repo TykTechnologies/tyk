@@ -22,32 +22,25 @@ import (
 	"io/ioutil"
 	"net"
 	"net/http"
+	"net/textproto"
 	"net/url"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
 
-	"github.com/buger/jsonparser"
-
-	"github.com/gorilla/websocket"
-	"github.com/jensneuse/abstractlogger"
-
 	"github.com/akutz/memconn"
+	"github.com/gorilla/websocket"
 	"github.com/opentracing/opentracing-go"
 	"github.com/opentracing/opentracing-go/ext"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/net/http/httpguts"
 	"golang.org/x/net/http2"
 
-	"github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
-	"github.com/TykTechnologies/graphql-go-tools/pkg/postprocess"
-	"github.com/TykTechnologies/graphql-go-tools/pkg/subscription"
-	gqlwebsocket "github.com/TykTechnologies/graphql-go-tools/pkg/subscription/websocket"
-
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/ctx"
 	"github.com/TykTechnologies/tyk/header"
+	"github.com/TykTechnologies/tyk/internal/graphengine"
 	"github.com/TykTechnologies/tyk/internal/otel"
 	"github.com/TykTechnologies/tyk/regexp"
 	"github.com/TykTechnologies/tyk/trace"
@@ -132,21 +125,26 @@ func urlFromService(spec *APISpec, gw *Gateway) (*apidef.HostList, error) {
 // httpScheme matches http://* and https://*, case insensitive
 var httpScheme = regexp.MustCompile(`^(?i)https?://`)
 
+// EnsureTransport sanitizes host/protocol pairs and returns a valid URL.
 func EnsureTransport(host, protocol string) string {
 	host = strings.TrimSpace(host)
 	protocol = strings.TrimSpace(protocol)
+
+	// sanitize protocol
+	if protocol == "" {
+		protocol = "http"
+	}
+
+	// if host has no protocol, amend it
+	if !strings.Contains(host, "://") {
+		host = protocol + "://" + host
+	}
+
+	host = strings.Replace(host, "h2c://", "http://", 1)
+
 	u, err := url.Parse(host)
 	if err != nil {
 		return host
-	}
-	switch u.Scheme {
-	case "":
-		if protocol == "" {
-			protocol = "http"
-		}
-		u.Scheme = protocol
-	case "h2c":
-		u.Scheme = "http"
 	}
 	return u.String()
 }
@@ -345,7 +343,7 @@ func (gw *Gateway) TykNewSingleHostReverseProxy(target *url.URL, spec *APISpec, 
 		},
 		Gw: gw,
 	}
-	proxy.ErrorHandler.BaseMiddleware = BaseMiddleware{Spec: spec, Proxy: proxy, Gw: gw}
+	proxy.ErrorHandler.BaseMiddleware = &BaseMiddleware{Spec: spec, Proxy: proxy, Gw: gw}
 	return proxy
 }
 
@@ -516,7 +514,12 @@ var hopHeaders = []string{
 func (p *ReverseProxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) ProxyResponse {
 	startTime := time.Now()
 	p.logger.WithField("ts", startTime.UnixNano()).Debug("Started")
-	resp := p.WrappedServeHTTP(rw, req, recordDetail(req, p.TykAPISpec))
+	var resp ProxyResponse
+	if IsGrpcStreaming(req) {
+		resp = p.WrappedServeHTTP(rw, req, false)
+	} else {
+		resp = p.WrappedServeHTTP(rw, req, true)
+	}
 
 	finishTime := time.Since(startTime)
 	p.logger.WithField("ns", finishTime.Nanoseconds()).Debug("Finished")
@@ -1007,251 +1010,40 @@ func isCORSPreflight(r *http.Request) bool {
 
 func (p *ReverseProxy) handleGraphQL(roundTripper *TykRoundTripper, outreq *http.Request, w http.ResponseWriter) (res *http.Response, hijacked bool, err error) {
 	isWebSocketUpgrade := ctxGetGraphQLIsWebSocketUpgrade(outreq)
-	needEngine := needsGraphQLExecutionEngine(p.TykAPISpec)
+	needsEngine := needsGraphQLExecutionEngine(p.TykAPISpec)
 
-	switch {
-	case isCORSPreflight(outreq):
-		if needEngine {
-			err = errors.New("options passthrough not allowed")
-			return
-		}
-	case isWebSocketUpgrade:
-		if needEngine {
-			return p.handleGraphQLEngineWebsocketUpgrade(roundTripper, outreq, w)
-		}
-	default:
-		gqlRequest := ctxGetGraphQLRequest(outreq)
-		if gqlRequest == nil {
-			err = errors.New("graphql request is nil")
-			return
-		}
-		gqlRequest.SetHeader(outreq.Header)
-
-		var isIntrospection bool
-		isIntrospection, err = gqlRequest.IsIntrospectionQuery()
-		if err != nil {
-			return
-		}
-
-		if isIntrospection {
-			res, err = p.handleGraphQLIntrospection(gqlRequest)
-			return
-		}
-		if needEngine {
-			return p.handoverRequestToGraphQLExecutionEngine(roundTripper, gqlRequest, outreq)
-		}
+	requestHeadersRewrite := make(map[string]apidef.RequestHeadersRewriteConfig)
+	for key, value := range p.TykAPISpec.GraphQL.Proxy.RequestHeadersRewrite {
+		// Use the canonical format of the MIME header key.
+		requestHeadersRewrite[textproto.CanonicalMIMEHeaderKey(key)] = value
 	}
-
-	res, err = p.sendRequestToUpstream(roundTripper, outreq)
-	return
-}
-
-func (p *ReverseProxy) handleGraphQLIntrospection(gqlRequest *graphql.Request) (res *http.Response, err error) {
-	switch p.TykAPISpec.GraphQL.Version {
-	case apidef.GraphQLConfigVersion2:
-		if p.TykAPISpec.GraphQLExecutor.EngineV2 == nil {
-			err = errors.New("execution engine is nil")
-			return
-		}
-
-		reqCtx := context.Background()
-		resultWriter := graphql.NewEngineResultWriter()
-		err = p.TykAPISpec.GraphQLExecutor.EngineV2.Execute(reqCtx, gqlRequest, &resultWriter)
-		if err != nil {
-			return
-		}
-
-		httpStatus := http.StatusOK
-		headers := make(http.Header)
-		headers.Set("Content-Type", "application/json")
-		res = resultWriter.AsHTTPResponse(httpStatus, headers)
-		return
-	default:
-		var result *graphql.ExecutionResult
-		result, err = graphql.SchemaIntrospection(p.TykAPISpec.GraphQLExecutor.Schema)
-		if err != nil {
-			return
-		}
-
-		res = result.GetAsHTTPResponse()
-		return
-	}
-}
-
-func (p *ReverseProxy) handleGraphQLEngineWebsocketUpgrade(roundTripper *TykRoundTripper, r *http.Request, w http.ResponseWriter) (res *http.Response, hijacked bool, err error) {
-	conn, err := p.wsUpgrader.Upgrade(w, r, http.Header{
-		header.SecWebSocketProtocol: {r.Header.Get(header.SecWebSocketProtocol)},
+	res, hijacked, err = p.TykAPISpec.GraphEngine.HandleReverseProxy(graphengine.ReverseProxyParams{
+		RoundTripper:       roundTripper,
+		ResponseWriter:     w,
+		OutRequest:         outreq,
+		WebSocketUpgrader:  &p.wsUpgrader,
+		NeedsEngine:        needsEngine,
+		IsCORSPreflight:    isCORSPreflight(outreq),
+		IsWebSocketUpgrade: isWebSocketUpgrade,
+		HeadersConfig: graphengine.ReverseProxyHeadersConfig{
+			ProxyOnly: graphengine.ProxyOnlyHeadersConfig{
+				UseImmutableHeaders:   p.TykAPISpec.GraphQL.Proxy.Features.UseImmutableHeaders,
+				RequestHeadersRewrite: requestHeadersRewrite,
+			},
+		},
 	})
 	if err != nil {
-		p.logger.Error("websocket upgrade for GraphQL engine failed: ", err)
-		return nil, false, err
+		return nil, hijacked, err
 	}
 
-	p.handoverWebSocketConnectionToGraphQLExecutionEngine(roundTripper, conn.UnderlyingConn(), r)
-	return nil, true, nil
-}
-
-func returnErrorsFromUpstream(proxyOnlyCtx *GraphQLProxyOnlyContext, resultWriter *graphql.EngineResultWriter) error {
-	body, ok := proxyOnlyCtx.upstreamResponse.Body.(*nopCloserBuffer)
-	if !ok {
-		// Response body already read by graphql-go-tools, and it's not re-readable. Quit silently.
-		return nil
-	}
-	_, err := body.Seek(0, io.SeekStart)
-	if err != nil {
-		return err
-	}
-
-	responseBody, err := io.ReadAll(body)
-	if err != nil {
-		return err
-	}
-	// graphql-go-tools error message format: {"errors": [...]}
-	// Insert the upstream error into the first error message.
-	result, err := jsonparser.Set(resultWriter.Bytes(), responseBody, "errors", "[0]", "extensions")
-	if err != nil {
-		return err
-	}
-	resultWriter.Reset()
-	_, err = resultWriter.Write(result)
-	return err
-}
-
-func headerStructToHeaderMap(headers []apidef.UDGGlobalHeader) map[string]string {
-	headerMap := make(map[string]string)
-	for _, header := range headers {
-		headerMap[header.Key] = header.Value
-	}
-	return headerMap
-}
-
-func (p *ReverseProxy) handoverRequestToGraphQLExecutionEngine(roundTripper *TykRoundTripper, gqlRequest *graphql.Request, outreq *http.Request) (res *http.Response, hijacked bool, err error) {
-	p.TykAPISpec.GraphQLExecutor.Client.Transport = NewGraphQLEngineTransport(DetermineGraphQLEngineTransportType(p.TykAPISpec), roundTripper)
-
-	switch p.TykAPISpec.GraphQL.Version {
-	case apidef.GraphQLConfigVersionNone:
-		fallthrough
-	case apidef.GraphQLConfigVersion1:
-		if p.TykAPISpec.GraphQLExecutor.Engine == nil {
-			err = errors.New("execution engine is nil")
-			return
-		}
-
-		var result *graphql.ExecutionResult
-		result, err = p.TykAPISpec.GraphQLExecutor.Engine.Execute(context.Background(), gqlRequest, graphql.ExecutionOptions{ExtraArguments: gqlRequest.Variables})
-		if err != nil {
-			return
-		}
-
-		res = result.GetAsHTTPResponse()
-		return
-	case apidef.GraphQLConfigVersion2:
-		if p.TykAPISpec.GraphQLExecutor.EngineV2 == nil {
-			err = errors.New("execution engine is nil")
-			return
-		}
-
-		isProxyOnly := isGraphQLProxyOnly(p.TykAPISpec)
-		span := otel.SpanFromContext(outreq.Context())
-		reqCtx := otel.ContextWithSpan(context.Background(), span)
-		if isProxyOnly {
-			reqCtx = NewGraphQLProxyOnlyContext(reqCtx, outreq)
-		}
-
-		resultWriter := graphql.NewEngineResultWriter()
-		execOptions := []graphql.ExecutionOptionsV2{
-			graphql.WithBeforeFetchHook(p.TykAPISpec.GraphQLExecutor.HooksV2.BeforeFetchHook),
-			graphql.WithAfterFetchHook(p.TykAPISpec.GraphQLExecutor.HooksV2.AfterFetchHook),
-		}
-
-		upstreamHeaders := p.graphqlEngineAdditionalUpstreamHeaders(outreq)
-		execOptions = append(execOptions, graphql.WithHeaderModifier(p.graphqlEngineHeaderModifier(outreq, upstreamHeaders)))
-
-		if p.TykAPISpec.GraphQLExecutor.OtelExecutor != nil {
-			if err = p.TykAPISpec.GraphQLExecutor.OtelExecutor.Execute(reqCtx, gqlRequest, &resultWriter, execOptions...); err != nil {
-				return
-			}
-		} else {
-			err = p.TykAPISpec.GraphQLExecutor.EngineV2.Execute(reqCtx, gqlRequest, &resultWriter, execOptions...)
-			if err != nil {
-				return
-			}
-		}
-
-		httpStatus := http.StatusOK
-		header := make(http.Header)
-		header.Set("Content-Type", "application/json")
-
-		if isProxyOnly {
-			proxyOnlyCtx := reqCtx.(*GraphQLProxyOnlyContext)
-			// There is a case in the proxy-only mode where the request can be handled
-			// by the library without calling the upstream.
-			// This is a valid query for proxy-only mode: query { __typename }
-			// In this case, upstreamResponse is nil.
-			// See TT-6419 for further info.
-			if proxyOnlyCtx.upstreamResponse != nil {
-				header = proxyOnlyCtx.upstreamResponse.Header
-				httpStatus = proxyOnlyCtx.upstreamResponse.StatusCode
-				if p.TykAPISpec.GraphQL.Proxy.UseResponseExtensions.OnErrorForwarding && httpStatus >= http.StatusBadRequest {
-					err = returnErrorsFromUpstream(proxyOnlyCtx, &resultWriter)
-					if err != nil {
-						return
-					}
-				}
-			}
-		}
-
-		res = resultWriter.AsHTTPResponse(httpStatus, header)
+	// If the response is nil, then we are dealing with the legacy v1 engine, so we will do a regular proxy.
+	// This should only apply when the connection was not hijacked (= upgraded to websocket).
+	if res == nil && !hijacked {
+		res, err = p.sendRequestToUpstream(roundTripper, outreq)
 		return
 	}
 
-	return nil, false, errors.New("graphql configuration is invalid")
-}
-
-func (p *ReverseProxy) handoverWebSocketConnectionToGraphQLExecutionEngine(roundTripper *TykRoundTripper, conn net.Conn, req *http.Request) {
-	p.TykAPISpec.GraphQLExecutor.Client.Transport = NewGraphQLEngineTransport(DetermineGraphQLEngineTransportType(p.TykAPISpec), roundTripper)
-
-	absLogger := abstractlogger.NewLogrusLogger(log, absLoggerLevel(log.Level))
-	done := make(chan bool)
-	errChan := make(chan error)
-
-	var executorPool subscription.ExecutorPool
-	switch p.TykAPISpec.GraphQL.Version {
-	case apidef.GraphQLConfigVersionNone:
-		fallthrough
-	case apidef.GraphQLConfigVersion1:
-		if p.TykAPISpec.GraphQLExecutor.Engine == nil {
-			log.Error("could not start graphql websocket handler: execution engine is nil")
-			return
-		}
-		executorPool = subscription.NewExecutorV1Pool(p.TykAPISpec.GraphQLExecutor.Engine.NewExecutionHandler())
-	case apidef.GraphQLConfigVersion2:
-		if p.TykAPISpec.GraphQLExecutor.EngineV2 == nil {
-			log.Error("could not start graphql websocket handler: execution engine is nil")
-			return
-		}
-		initialRequestContext := subscription.NewInitialHttpRequestContext(req)
-		upstreamHeaders := p.graphqlEngineAdditionalUpstreamHeaders(req)
-		executorPool = subscription.NewExecutorV2Pool(
-			p.TykAPISpec.GraphQLExecutor.EngineV2,
-			initialRequestContext,
-			subscription.WithExecutorV2HeaderModifier(p.graphqlEngineHeaderModifier(req, upstreamHeaders)),
-		)
-	}
-
-	go gqlwebsocket.Handle(
-		done,
-		errChan,
-		conn,
-		executorPool,
-		gqlwebsocket.WithLogger(absLogger),
-		gqlwebsocket.WithProtocolFromRequestHeaders(req),
-	)
-	select {
-	case err := <-errChan:
-		log.Error("could not start graphql websocket handler: ", err)
-	case <-done:
-	}
+	return res, hijacked, err
 }
 
 func (p *ReverseProxy) sendRequestToUpstream(roundTripper *TykRoundTripper, outreq *http.Request) (res *http.Response, err error) {
@@ -1922,7 +1714,7 @@ func (n *nopCloserBuffer) Read(p []byte) (int, error) {
 }
 
 // Seek seeks within the buffer
-func (n *nopCloserBuffer) Seek(offset int64, whence int64) (int64, error) {
+func (n *nopCloserBuffer) Seek(offset int64, whence int) (int64, error) {
 	if whence != io.SeekStart {
 		return 0, errors.New("invalid seek method, only supporting SeekStart")
 	}
@@ -2059,45 +1851,6 @@ func (p *ReverseProxy) IsUpgrade(req *http.Request) (bool, string) {
 	}
 
 	return false, ""
-}
-
-func (p *ReverseProxy) graphqlEngineAdditionalUpstreamHeaders(outreq *http.Request) http.Header {
-	upstreamHeaders := http.Header{}
-	switch p.TykAPISpec.GraphQL.ExecutionMode {
-	case apidef.GraphQLExecutionModeSupergraph:
-		// if this context vars are enabled and this is a supergraph, inject the sub request id header
-		if !p.TykAPISpec.EnableContextVars {
-			break
-		}
-		ctxData := ctxGetData(outreq)
-		if reqID, exists := ctxData["request_id"]; !exists {
-			log.Warn("context variables enabled but request_id missing")
-		} else if requestID, ok := reqID.(string); ok {
-			upstreamHeaders.Set("X-Tyk-Parent-Request-Id", requestID)
-		}
-	case apidef.GraphQLExecutionModeExecutionEngine:
-		globalHeaders := headerStructToHeaderMap(p.TykAPISpec.GraphQL.Engine.GlobalHeaders)
-		for key, value := range globalHeaders {
-			upstreamHeaders.Set(key, value)
-		}
-	}
-
-	return upstreamHeaders
-}
-
-func (p *ReverseProxy) graphqlEngineHeaderModifier(outreq *http.Request, additionalHeaders http.Header) postprocess.HeaderModifier {
-	return func(header http.Header) {
-		for key := range additionalHeaders {
-			if header.Get(key) == "" {
-				header.Set(key, additionalHeaders.Get(key))
-			}
-		}
-
-		for key := range header {
-			val := p.Gw.replaceTykVariables(outreq, header.Get(key), false)
-			header.Set(key, val)
-		}
-	}
 }
 
 // IsGrpcStreaming  determines wether a request represents a grpc streaming req

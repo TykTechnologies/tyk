@@ -5,13 +5,13 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
-	"net/http/httputil"
 	"strings"
 
 	"github.com/gorilla/mux"
 	"github.com/sirupsen/logrus"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/internal/httputil"
 )
 
 type traceHttpRequest struct {
@@ -116,7 +116,12 @@ func (gw *Gateway) traceHandler(w http.ResponseWriter, r *http.Request) {
 	subrouter := mux.NewRouter()
 
 	loader := &APIDefinitionLoader{Gw: gw}
-	spec := loader.MakeSpec(&nestedApiDefinition{APIDefinition: traceReq.Spec}, logrus.NewEntry(logger))
+
+	spec, err := loader.MakeSpec(&nestedApiDefinition{APIDefinition: traceReq.Spec}, logrus.NewEntry(logger))
+	if err != nil {
+		doJSONWrite(w, http.StatusBadRequest, traceResponse{Message: "error", Logs: logStorage.String()})
+		return
+	}
 
 	chainObj := gw.processSpec(spec, nil, &gs, logrus.NewEntry(logger))
 

@@ -3,7 +3,7 @@ package gateway
 import (
 	"context"
 	"crypto/tls"
-	"math/rand"
+	mathRand "math/rand"
 	"net"
 	"net/http"
 	"net/url"
@@ -90,11 +90,11 @@ func (h *HostUptimeChecker) getStaggeredTime() time.Duration {
 		return time.Duration(h.checkTimeout) * time.Second
 	}
 
-	rand.Seed(time.Now().Unix())
+	mathRand.Seed(time.Now().Unix())
 	min := h.checkTimeout - 3
 	max := h.checkTimeout + 3
 
-	dur := rand.Intn(max-min) + min
+	dur := mathRand.Intn(max-min) + min
 
 	return time.Duration(dur) * time.Second
 }
@@ -369,7 +369,6 @@ func (h *HostUptimeChecker) Init(workers, triggerLimit, timeout int, hostList ma
 	log.Debug("[HOST CHECKER] Config:Timeout: ~", h.checkTimeout)
 	log.Debug("[HOST CHECKER] Config:WorkerPool: ", h.workerPoolSize)
 
-	var err error
 	h.pool = tunny.NewFunc(h.workerPoolSize, func(hostData interface{}) interface{} {
 		input, _ := hostData.(HostData)
 		h.CheckHost(input)
@@ -377,10 +376,6 @@ func (h *HostUptimeChecker) Init(workers, triggerLimit, timeout int, hostList ma
 	})
 
 	log.Debug("[HOST CHECKER] Init complete")
-
-	if err != nil {
-		log.Errorf("[HOST CHECKER POOL] Error: %v\n", err)
-	}
 }
 
 func (h *HostUptimeChecker) Start(ctx context.Context) {

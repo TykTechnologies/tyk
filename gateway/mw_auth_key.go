@@ -35,7 +35,7 @@ const (
 	MsgInvalidKey      = "Attempted access with invalid key."
 )
 
-func init() {
+func initAuthKeyErrors() {
 	TykErrors[ErrAuthAuthorizationFieldMissing] = config.TykError{
 		Message: MsgAuthFieldMissing,
 		Code:    http.StatusUnauthorized,
@@ -65,7 +65,7 @@ func init() {
 // KeyExists will check if the key being used to access the API is in the request data,
 // and then if the key is in the storage engine
 type AuthKey struct {
-	BaseMiddleware
+	*BaseMiddleware
 }
 
 func (k *AuthKey) Name() string {
@@ -91,6 +91,11 @@ func (k *AuthKey) getAuthType() string {
 
 func (k *AuthKey) ProcessRequest(_ http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
 	if ctxGetRequestStatus(r) == StatusOkAndIgnore {
+		return nil, http.StatusOK
+	}
+
+	// skip auth key check if the request is looped.
+	if ses := ctxGetSession(r); ses != nil && !ctxCheckLimits(r) {
 		return nil, http.StatusOK
 	}
 
@@ -144,12 +149,18 @@ func (k *AuthKey) ProcessRequest(_ http.ResponseWriter, r *http.Request, _ inter
 	// Set session state on context, we will need it later
 	switch k.Spec.BaseIdentityProvidedBy {
 	case apidef.AuthToken, apidef.UnsetAuth:
-		ctxSetSession(r, &session, updateSession, k.Gw.GetConfig().HashKeys)
+		hashKeys := k.Gw.GetConfig().HashKeys
+		ctxSetSession(r, &session, updateSession, hashKeys)
+
 		k.setContextVars(r, key)
-		ctxSetSpanAttributes(r, k.Name(), []otel.SpanAttribute{
-			otel.APIKeyAttribute(key),
-			otel.APIKeyAliasAttribute(session.Alias),
-		}...)
+
+		attributes := []otel.SpanAttribute{otel.APIKeyAliasAttribute(session.Alias)}
+
+		if hashKeys {
+			attributes = append(attributes, otel.APIKeyAttribute(session.KeyHash()))
+		}
+
+		ctxSetSpanAttributes(r, k.Name(), attributes...)
 	}
 
 	// Try using org-key format first:

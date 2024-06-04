@@ -144,31 +144,37 @@ func (s *Test) TestPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesD
 		"rate4": {
 			Partitions:   user.PolicyPartitions{RateLimit: true},
 			Rate:         8,
+			Per:          1,
 			AccessRights: map[string]user.AccessDefinition{"a": {}},
 		},
 		"rate5": {
 			Partitions:   user.PolicyPartitions{RateLimit: true},
 			Rate:         10,
+			Per:          1,
 			AccessRights: map[string]user.AccessDefinition{"a": {}},
 		},
 		"rate-for-a": {
 			Partitions:   user.PolicyPartitions{RateLimit: true},
 			AccessRights: map[string]user.AccessDefinition{"a": {}},
 			Rate:         4,
+			Per:          1,
 		},
 		"rate-for-b": {
 			Partitions:   user.PolicyPartitions{RateLimit: true},
 			AccessRights: map[string]user.AccessDefinition{"b": {}},
 			Rate:         2,
+			Per:          1,
 		},
 		"rate-for-a-b": {
 			Partitions:   user.PolicyPartitions{RateLimit: true},
 			AccessRights: map[string]user.AccessDefinition{"a": {}, "b": {}},
 			Rate:         4,
+			Per:          1,
 		},
 		"rate-no-partition": {
 			AccessRights: map[string]user.AccessDefinition{"a": {}},
 			Rate:         12,
+			Per:          1,
 		},
 		"acl1": {
 			Partitions:   user.PolicyPartitions{Acl: true},
@@ -304,7 +310,7 @@ func (s *Test) TestPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesD
 			ID: "per_path_1",
 			AccessRights: map[string]user.AccessDefinition{"a": {
 				AllowedURLs: []user.AccessSpec{
-					{URL: "/user", Methods: []string{"GET"}},
+					{URL: "/user", Methods: []string{"GET", "POST"}},
 				},
 			}, "b": {
 				AllowedURLs: []user.AccessSpec{
@@ -316,7 +322,7 @@ func (s *Test) TestPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesD
 			ID: "per_path_2",
 			AccessRights: map[string]user.AccessDefinition{"a": {
 				AllowedURLs: []user.AccessSpec{
-					{URL: "/user", Methods: []string{"GET", "POST"}},
+					{URL: "/user", Methods: []string{"GET"}},
 					{URL: "/companies", Methods: []string{"GET", "POST"}},
 				},
 			}},
@@ -558,9 +564,7 @@ func (s *Test) TestPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesD
 		{
 			"RatePart with unlimited", []string{"unlimited-rate"},
 			"", func(t *testing.T, s *user.SessionState) {
-				if s.Rate != -1 {
-					t.Fatalf("want unlimited rate to be -1")
-				}
+				assert.True(t, s.Rate <= 0, "want unlimited rate to be <= 0")
 			}, nil,
 		},
 		{
@@ -639,7 +643,7 @@ func (s *Test) TestPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesD
 		{
 			"Acl for a and rate for a,b", []string{"acl1", "rate-for-a-b"},
 			"", func(t *testing.T, s *user.SessionState) {
-				want := map[string]user.AccessDefinition{"a": {Limit: user.APILimit{Rate: 4}}}
+				want := map[string]user.AccessDefinition{"a": {Limit: user.APILimit{Rate: 4, Per: 1}}}
 				assert.Equal(t, want, s.AccessRights)
 			}, nil,
 		},
@@ -647,8 +651,8 @@ func (s *Test) TestPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesD
 			"Acl for a,b and individual rate for a,b", []string{"acl-for-a-b", "rate-for-a", "rate-for-b"},
 			"", func(t *testing.T, s *user.SessionState) {
 				want := map[string]user.AccessDefinition{
-					"a": {Limit: user.APILimit{Rate: 4}},
-					"b": {Limit: user.APILimit{Rate: 2}},
+					"a": {Limit: user.APILimit{Rate: 4, Per: 1}},
+					"b": {Limit: user.APILimit{Rate: 2, Per: 1}},
 				}
 				assert.Equal(t, want, s.AccessRights)
 			}, nil,
@@ -752,7 +756,7 @@ func (s *Test) TestPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesD
 		{
 			name:     "Merge per path rules for the same API",
 			policies: []string{"per-path2", "per-path1"},
-			sessMatch: func(t *testing.T, s *user.SessionState) {
+			sessMatch: func(t *testing.T, sess *user.SessionState) {
 				want := map[string]user.AccessDefinition{
 					"a": {
 						AllowedURLs: []user.AccessSpec{
@@ -769,7 +773,11 @@ func (s *Test) TestPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesD
 					},
 				}
 
-				assert.Equal(t, want, s.AccessRights)
+				assert.Equal(t, user.AccessSpec{
+					URL: "/user", Methods: []string{"GET"},
+				}, s.Gw.getPolicy("per-path2").AccessRights["a"].AllowedURLs[0])
+
+				assert.Equal(t, want, sess.AccessRights)
 			},
 		},
 		{
@@ -1375,8 +1383,6 @@ func TestApplyMultiPolicies(t *testing.T) {
 	ts.Gw.policiesMu.RLock()
 	policy1.Rate = 1
 	policy1.LastUpdated = strconv.Itoa(int(time.Now().Unix() + 1))
-	ts.Gw.DRLManager.SetCurrentTokenValue(100)
-	defer ts.Gw.DRLManager.SetCurrentTokenValue(0)
 
 	ts.Gw.policiesByID = map[string]user.Policy{
 		"policy1": policy1,

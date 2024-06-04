@@ -11,8 +11,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/go-jose/go-jose/v3"
 	"github.com/golang-jwt/jwt/v4"
-	"github.com/square/go-jose"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/storage"
@@ -30,7 +30,7 @@ var (
 )
 
 type ExternalOAuthMiddleware struct {
-	BaseMiddleware
+	*BaseMiddleware
 }
 
 func (k *ExternalOAuthMiddleware) Name() string {
@@ -292,7 +292,7 @@ func isExpired(claims jwt.MapClaims) bool {
 }
 
 func newIntrospectionCache(gw *Gateway) *introspectionCache {
-	return &introspectionCache{RedisCluster: storage.RedisCluster{KeyPrefix: "introspection-", RedisController: gw.RedisController}}
+	return &introspectionCache{RedisCluster: storage.RedisCluster{KeyPrefix: "introspection-", ConnectionHandler: gw.StorageConnectionHandler}}
 }
 
 type introspectionCache struct {

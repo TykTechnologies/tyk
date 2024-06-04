@@ -13,7 +13,7 @@ import (
 )
 
 const (
-	invalidServerURLFmt          = "Please update %q to be a valid url or pass a valid url with upstreamURL query param"
+	invalidServerURLFmt          = "Please update %q to be a valid URL or pass a valid URL with upstreamURL query param"
 	unsupportedSecuritySchemeFmt = "unsupported security scheme: %s"
 
 	middlewareValidateRequest = "validateRequest"
@@ -65,6 +65,8 @@ func (s *OAS) BuildDefaultTykExtension(overRideValues TykExtensionConfigParams, 
 		xTykAPIGateway.Info.State.Active = true
 		xTykAPIGateway.Info.State.Internal = false
 		xTykAPIGateway.Server.ListenPath.Strip = true
+		xTykAPIGateway.enableContextVariablesIfEmpty()
+		xTykAPIGateway.enableTrafficLogsIfEmpty()
 	}
 
 	if xTykAPIGateway.Info.Name == "" {
@@ -98,6 +100,13 @@ func (s *OAS) BuildDefaultTykExtension(overRideValues TykExtensionConfigParams, 
 		}
 
 		upstreamURL = s.Servers[0].URL
+		if isURLParametrized(upstreamURL) {
+			var err error
+			upstreamURL, err = generateUrlUsingDefaultVariableValues(s, upstreamURL)
+			if err != nil {
+				return err
+			}
+		}
 	}
 
 	if upstreamURL != "" {
@@ -118,6 +127,29 @@ func (s *OAS) BuildDefaultTykExtension(overRideValues TykExtensionConfigParams, 
 	s.importMiddlewares(overRideValues)
 
 	return nil
+}
+
+func generateUrlUsingDefaultVariableValues(s *OAS, upstreamURL string) (string, error) {
+	for name, variable := range s.Servers[0].Variables {
+		if strings.Contains(upstreamURL, "{"+name+"}") {
+			if variable.Default == "" {
+				return "", fmt.Errorf("server variable %s does not have a default value", name)
+			}
+			upstreamURL = replaceParameterWithValue(upstreamURL, name, variable.Default)
+		}
+	}
+	if isURLParametrized(upstreamURL) {
+		return "", errors.New("server URL contains undefined variables")
+	}
+	return upstreamURL, nil
+}
+
+func isURLParametrized(url string) bool {
+	return strings.Contains(url, "{") && strings.Contains(url, "}")
+}
+
+func replaceParameterWithValue(url string, name string, value string) string {
+	return strings.ReplaceAll(url, "{"+name+"}", value)
 }
 
 func (s *OAS) importAuthentication(enable bool) error {

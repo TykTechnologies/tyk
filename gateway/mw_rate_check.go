@@ -5,7 +5,7 @@ import (
 )
 
 type RateCheckMW struct {
-	BaseMiddleware
+	*BaseMiddleware
 }
 
 func (m *RateCheckMW) Name() string {

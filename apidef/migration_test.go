@@ -5,6 +5,8 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+
+	"github.com/TykTechnologies/tyk/internal/event"
 )
 
 const (
@@ -619,8 +621,20 @@ func TestSetDisabledFlags(t *testing.T) {
 			Versions: map[string]VersionInfo{
 				"": {
 					ExtendedPaths: ExtendedPathsSet{
-						Virtual:  make([]VirtualMeta, 1),
+						Virtual:  make([]VirtualMeta, 2),
 						GoPlugin: make([]GoPluginMeta, 1),
+					},
+				},
+			},
+		},
+		EventHandlers: EventHandlerMetaConfig{
+			Events: map[TykEvent][]EventHandlerTriggerConfig{
+				event.QuotaExceeded: {
+					{
+						Handler: event.WebHookHandler,
+						HandlerMeta: map[string]interface{}{
+							"target_path": "https://webhook.site/uuid",
+						},
 					},
 				},
 			},
@@ -681,6 +695,9 @@ func TestSetDisabledFlags(t *testing.T) {
 							{
 								Disabled: true,
 							},
+							{
+								Disabled: true,
+							},
 						},
 						GoPlugin: []GoPluginMeta{
 							{
@@ -691,9 +708,27 @@ func TestSetDisabledFlags(t *testing.T) {
 				},
 			},
 		},
+		GlobalRateLimit: GlobalRateLimit{
+			Disabled: true,
+		},
+		EventHandlers: EventHandlerMetaConfig{
+			Events: map[event.Event][]EventHandlerTriggerConfig{
+				event.QuotaExceeded: {
+					{
+						Handler: event.WebHookHandler,
+						HandlerMeta: map[string]interface{}{
+							"target_path": "https://webhook.site/uuid",
+							"disabled":    true,
+						},
+					},
+				},
+			},
+		},
+		DoNotTrack: true,
 	}
 	apiDef.SetDisabledFlags()
 	assert.Equal(t, expectedAPIDef, apiDef)
+	assert.EqualValues(t, expectedAPIDef.EventHandlers, apiDef.EventHandlers)
 }
 
 func TestAPIDefinition_migrateIDExtractor(t *testing.T) {
@@ -761,4 +796,42 @@ func TestAPIDefinition_migrateResponseProcessors(t *testing.T) {
 	assert.NoError(t, err)
 
 	assert.Empty(t, base.ResponseProcessors)
+}
+
+func TestAPIDefinition_migrateGlobalRateLimit(t *testing.T) {
+	t.Run("per=0,rate=0", func(t *testing.T) {
+		base := oldTestAPI()
+		_, err := base.Migrate()
+		assert.NoError(t, err)
+
+		assert.True(t, base.GlobalRateLimit.Disabled)
+	})
+
+	t.Run("per!=0,rate=0", func(t *testing.T) {
+		base := oldTestAPI()
+		base.GlobalRateLimit.Per = 120
+		_, err := base.Migrate()
+		assert.NoError(t, err)
+
+		assert.True(t, base.GlobalRateLimit.Disabled)
+	})
+
+	t.Run("per=0,rate!=0", func(t *testing.T) {
+		base := oldTestAPI()
+		base.GlobalRateLimit.Rate = 1
+		_, err := base.Migrate()
+		assert.NoError(t, err)
+
+		assert.True(t, base.GlobalRateLimit.Disabled)
+	})
+
+	t.Run("per!=0,rate!=0", func(t *testing.T) {
+		base := oldTestAPI()
+		base.GlobalRateLimit.Rate = 1
+		base.GlobalRateLimit.Per = 1
+		_, err := base.Migrate()
+		assert.NoError(t, err)
+
+		assert.False(t, base.GlobalRateLimit.Disabled)
+	})
 }

@@ -12,7 +12,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"math/rand"
+	mathRand "math/rand"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -231,6 +231,8 @@ func (r *ReloadMachinery) TickOk(t *testing.T) {
 }
 
 func InitTestMain(ctx context.Context, m *testing.M) int {
+	test.InitTestMain(ctx, m)
+
 	if EnableTestDNSMock {
 		var errMock error
 		MockHandle, errMock = test.InitDNSMock(test.DomainsToAddresses, nil)
@@ -392,7 +394,7 @@ type TestHttpResponse struct {
 // ProxyHandler Proxies requests through to their final destination, if they make it through the middleware chain.
 func ProxyHandler(p *ReverseProxy, apiSpec *APISpec) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		baseMid := BaseMiddleware{Spec: apiSpec, Proxy: p, Gw: p.Gw}
+		baseMid := &BaseMiddleware{Spec: apiSpec, Proxy: p, Gw: p.Gw}
 		handler := SuccessHandler{baseMid}
 		// Skip all other execution
 		handler.ServeHTTP(w, r)
@@ -403,6 +405,7 @@ const (
 	handlerPathGraphQLProxyUpstream      = "/graphql-proxy-upstream"
 	handlerPathGraphQLProxyUpstreamError = "/graphql-proxy-upstream-error"
 	handlerPathRestDataSource            = "/rest-data-source"
+	handlerPathRestDataSourceV3          = "/rest-data-source-v2"
 	handlerPathGraphQLDataSource         = "/graphql-data-source"
 	handlerPathHeadersRestDataSource     = "/rest-headers-data-source"
 	handlerSubgraphAccounts              = "/subgraph-accounts"
@@ -422,6 +425,7 @@ const (
 	testGraphQLProxyUpstreamError = TestHttpAny + handlerPathGraphQLProxyUpstreamError
 	testGraphQLDataSource         = TestHttpAny + handlerPathGraphQLDataSource
 	testRESTDataSource            = TestHttpAny + handlerPathRestDataSource
+	testRESTDataSourceV3          = TestHttpAny + handlerPathRestDataSourceV3
 	testRESTHeadersDataSource     = TestHttpAny + handlerPathHeadersRestDataSource
 	testSubgraphAccounts          = TestHttpAny + handlerSubgraphAccounts
 	testSubgraphAccountsModified  = TestHttpAny + handlerSubgraphAccountsModified
@@ -518,6 +522,7 @@ func (s *Test) testHttpHandler(gw *Gateway) *mux.Router {
 	r.HandleFunc(handlerPathGraphQLProxyUpstreamError, graphqlProxyUpstreamHandlerError)
 	r.HandleFunc(handlerPathGraphQLDataSource, graphqlDataSourceHandler)
 	r.HandleFunc(handlerPathRestDataSource, restDataSourceHandler)
+	r.HandleFunc(handlerPathRestDataSourceV3, restDataSourceHandlerV2)
 	r.HandleFunc(handlerPathHeadersRestDataSource, restHeadersDataSourceHandler)
 	r.HandleFunc(handlerSubgraphAccounts, subgraphAccountsHandler)
 	r.HandleFunc(handlerSubgraphAccountsModified, subGraphAccountsHandlerAllAccounts)
@@ -690,6 +695,37 @@ func restDataSourceHandler(w http.ResponseWriter, r *http.Request) {
 				}
 			}
 		]`))
+}
+
+func restDataSourceHandlerV2(w http.ResponseWriter, r *http.Request) {
+	_, _ = w.Write([]byte(`{
+  "data": [
+    {
+      "name": "Furkan",
+      "country": {
+        "name": "Turkey"
+      }
+    },
+    {
+      "name": "Leo",
+      "country": {
+        "name": "Russia"
+      }
+    },
+    {
+      "name": "Josh",
+      "country": {
+        "name": "UK"
+      }
+    },
+    {
+      "name": "Patric",
+      "country": {
+        "name": "Germany"
+      }
+    }
+  ]
+}`))
 }
 
 func subgraphAccountsHandler(w http.ResponseWriter, r *http.Request) {
@@ -927,7 +963,7 @@ func TestReq(t testing.TB, method, urlStr string, body interface{}) *http.Reques
 func (gw *Gateway) CreateDefinitionFromString(defStr string) *APISpec {
 	loader := APIDefinitionLoader{Gw: gw}
 	def := loader.ParseDefinition(strings.NewReader(defStr))
-	spec := loader.MakeSpec(&nestedApiDefinition{APIDefinition: &def}, nil)
+	spec, _ := loader.MakeSpec(&nestedApiDefinition{APIDefinition: &def}, nil)
 	return spec
 }
 
@@ -1083,7 +1119,7 @@ func (s *Test) newGateway(genConf func(globalConf *config.Config)) *Gateway {
 	s.MockHandle = MockHandle
 
 	var err error
-	gwConfig.Storage.Database = rand.Intn(15)
+	gwConfig.Storage.Database = mathRand.Intn(15)
 	gwConfig.AppPath, err = ioutil.TempDir("", "tyk-test-")
 
 	if err != nil {
@@ -1141,7 +1177,7 @@ func (s *Test) newGateway(genConf func(globalConf *config.Config)) *Gateway {
 	defaultTestConfig = gwConfig
 	gw.SetConfig(gwConfig)
 
-	cli.Init(VERSION, confPaths)
+	cli.Init(confPaths)
 
 	err = gw.initialiseSystem()
 	if err != nil {
@@ -1154,7 +1190,7 @@ func (s *Test) newGateway(genConf func(globalConf *config.Config)) *Gateway {
 
 	configs := gw.GetConfig()
 
-	go gw.RedisController.ConnectToRedis(s.ctx, func() {
+	go gw.StorageConnectionHandler.Connect(s.ctx, func() {
 		if gw.OnConnect != nil {
 			gw.OnConnect()
 		}
@@ -1163,7 +1199,7 @@ func (s *Test) newGateway(genConf func(globalConf *config.Config)) *Gateway {
 	timeout, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
 
-	connected := gw.RedisController.WaitConnect(timeout)
+	connected := gw.StorageConnectionHandler.WaitConnect(timeout)
 	if !connected {
 		panic("can't connect to redis, timeout")
 	}
@@ -1451,6 +1487,11 @@ const testComposedSchema = "type Query {countries: [Country] headers: [Header]} 
 	"type Country {code: String name: String} " +
 	"type Header {name:String value: String}"
 
+const testComposedSchemaNotExtended = "type Query {countries: [Country] headers: [Header] people: [Person]} " +
+	"type Person {name: String country: Country} " +
+	"type Country {code: String name: String} " +
+	"type Header {name:String value: String}"
+
 const testGraphQLDataSourceConfigurationV2 = `
 {
 	"kind": "GraphQL",
@@ -1515,6 +1556,23 @@ const testRESTDataSourceConfigurationV2 = `
 	],
 	"config": {
 		"url": "` + testRESTDataSource + `",
+		"method": "GET",
+		"headers": {},
+		"query": [],
+		"body": ""
+	}
+}`
+
+const testRESTDataSourceConfigurationV3 = `
+{
+	"kind": "REST",
+	"name": "people",
+	"internal": true,
+	"root_fields": [
+		{ "type": "Query", "fields": ["people"] }
+	],
+	"config": {
+		"url": "` + testRESTDataSourceV3 + `",
 		"method": "GET",
 		"headers": {},
 		"query": [],
@@ -1871,7 +1929,7 @@ func GenerateTestBinaryData() (buf *bytes.Buffer) {
 		c uint32
 	}
 	for i := 0; i < 10; i++ {
-		s := &testData{rand.Float32(), rand.Float64(), rand.Uint32()}
+		s := &testData{mathRand.Float32(), mathRand.Float64(), mathRand.Uint32()}
 		binary.Write(buf, binary.BigEndian, s)
 	}
 	return buf
@@ -1926,8 +1984,27 @@ func randStringBytes(n int) string {
 	b := make([]byte, n)
 
 	for i := range b {
-		b[i] = letters[rand.Intn(len(letters))]
+		b[i] = letters[mathRand.Intn(len(letters))]
 	}
 
 	return string(b)
+}
+
+type testMessageAdapter struct {
+	Msg string
+}
+
+// Type returns the message type.
+func (m *testMessageAdapter) Type() string {
+	return "message"
+}
+
+// Channel returns the channel the message was received on.
+func (m *testMessageAdapter) Channel() (string, error) {
+	return "", nil
+}
+
+// Payload returns the message payload.
+func (m *testMessageAdapter) Payload() (string, error) {
+	return m.Msg, nil
 }

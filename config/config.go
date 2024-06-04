@@ -49,6 +49,9 @@ var (
 		CoProcessOptions: CoProcessConfig{
 			EnableCoProcess: false,
 		},
+		LivenessCheck: LivenessCheckConfig{
+			CheckDuration: time.Second * 10,
+		},
 	}
 )
 
@@ -142,6 +145,20 @@ type StorageOptionsConf struct {
 	UseSSL bool `json:"use_ssl"`
 	// Disable TLS verification
 	SSLInsecureSkipVerify bool `json:"ssl_insecure_skip_verify"`
+	// Path to the CA file.
+	CAFile string `json:"ca_file"`
+	// Path to the cert file.
+	CertFile string `json:"cert_file"`
+	// Path to the key file.
+	KeyFile string `json:"key_file"`
+	// Maximum TLS version that is supported.
+	// Options: ["1.0", "1.1", "1.2", "1.3"].
+	// Defaults to "1.3".
+	TLSMaxVersion string `json:"tls_max_version"`
+	// Minimum TLS version that is supported.
+	// Options: ["1.0", "1.1", "1.2", "1.3"].
+	// Defaults to "1.2".
+	TLSMinVersion string `json:"tls_min_version"`
 }
 
 type NormalisedURLConfig struct {
@@ -240,7 +257,9 @@ type HealthCheckConfig struct {
 }
 
 type LivenessCheckConfig struct {
-	// Frequencies of performing interval healthchecks for Redis, Dashboard, and RPC layer. Default: 10 seconds.
+	// Frequencies of performing interval healthchecks for Redis, Dashboard, and RPC layer.
+	// Expressed in Nanoseconds. For example: 1000000000 -> 1s.
+	// Default: 10 seconds.
 	CheckDuration time.Duration `json:"check_duration"`
 }
 
@@ -317,7 +336,7 @@ type SlaveOptionsConfig struct {
 	// For an Self-Managed installation this can be left at `false` (the default setting). For Legacy Cloud Gateways it must be set to ‘true’.
 	BindToSlugsInsteadOfListenPaths bool `json:"bind_to_slugs"`
 
-	// Set this option to `true` if you don’t want to monitor changes in the keys from a master Gateway.
+	// Set this option to `true` if you don’t want to monitor changes in the keys from a primary Gateway.
 	DisableKeySpaceSync bool `json:"disable_keyspace_sync"`
 
 	// This is the `zone` that this instance inhabits, e.g. the cluster/data-centre the Gateway lives in.
@@ -594,11 +613,6 @@ func (pwl *PortsWhiteList) Decode(value string) error {
 
 // Config is the configuration object used by Tyk to set up various parameters.
 type Config struct {
-	// OriginalPath is the path to the config file that is read. If
-	// none was found, it's the path to the default config file that
-	// was written.
-	OriginalPath string `json:"-"`
-
 	// Force your Gateway to work only on a specific domain name. Can be overridden by API custom domain.
 	HostName string `json:"hostname"`
 
@@ -726,29 +740,8 @@ type Config struct {
 	// This is used as part of the RPC / Hybrid back-end configuration in a Tyk Enterprise installation and isn’t used anywhere else.
 	AuthOverride AuthOverrideConf `json:"auth_override"`
 
-	// Redis based rate limiter with fixed window. Provides 100% rate limiting accuracy, but require two additional Redis roundtrip for each request.
-	EnableRedisRollingLimiter bool `json:"enable_redis_rolling_limiter"`
-
-	// To enable, set to `true`. The sentinel-based rate limiter delivers a smoother performance curve as rate-limit calculations happen off-thread, but a stricter time-out based cool-down for clients. For example, when a throttling action is triggered, they are required to cool-down for the period of the rate limit.
-	// Disabling the sentinel based rate limiter will make rate-limit calculations happen on-thread and therefore offers a staggered cool-down and a smoother rate-limit experience for the client.
-	// For example, you can slow your connection throughput to regain entry into your rate limit. This is more of a “throttle” than a “block”.
-	// The standard rate limiter offers similar performance as the sentinel-based limiter. This is disabled by default.
-	EnableSentinelRateLimiter bool `json:"enable_sentinel_rate_limiter"`
-
-	// An enhancement for the Redis and Sentinel rate limiters, that offers a significant improvement in performance by not using transactions on Redis rate-limit buckets.
-	EnableNonTransactionalRateLimiter bool `json:"enable_non_transactional_rate_limiter"`
-
-	// How frequently a distributed rate limiter synchronises information between the Gateway nodes. Default: 2 seconds.
-	DRLNotificationFrequency int `json:"drl_notification_frequency"`
-
-	// A distributed rate limiter is inaccurate on small rate limits, and it will fallback to a Redis or Sentinel rate limiter on an individual user basis, if its rate limiter lower then threshold.
-	// A Rate limiter threshold calculated using the following formula: `rate_threshold = drl_threshold * number_of_gateways`.
-	// So you have 2 Gateways, and your threshold is set to 5, if a user rate limit is larger than 10, it will use the distributed rate limiter algorithm.
-	// Default: 5
-	DRLThreshold float64 `json:"drl_threshold"`
-
-	// Controls which algorthm to use as a fallback when your distributed rate limiter can't be used.
-	DRLEnableSentinelRateLimiter bool `json:"drl_enable_sentinel_rate_limiter"`
+	// RateLimit encapsulates rate limit configuration definitions.
+	RateLimit
 
 	// Allows you to dynamically configure analytics expiration on a per organisation level
 	EnforceOrgDataAge bool `json:"enforce_org_data_age"`
@@ -822,10 +815,11 @@ type Config struct {
 	// Maximum TLS version for connection between Tyk and your upstream service.
 	ProxySSLMaxVersion uint16 `json:"proxy_ssl_max_version"`
 
-	// Whitelist ciphers for connection between Tyk and your upstream service.
+	// Allow list of ciphers for connection between Tyk and your upstream service.
 	ProxySSLCipherSuites []string `json:"proxy_ssl_ciphers"`
 
 	// This can specify a default timeout in seconds for upstream API requests.
+	// Default: 30 seconds
 	ProxyDefaultTimeout float64 `json:"proxy_default_timeout"`
 
 	// Disable TLS renegotiation.
@@ -1069,10 +1063,30 @@ type Config struct {
 
 	// ResourceSync configures mitigation strategy in case sync fails.
 	ResourceSync ResourceSyncConfig `json:"resource_sync"`
+
+	// Private contains configuration fields for internal app usage.
+	Private Private `json:"-"`
+
+	// DevelopmentConfig struct extends configuration for development builds.
+	DevelopmentConfig
+
+	// OAS holds the configuration for various OpenAPI-specific functionalities
+	OAS OASConfig `json:"oas_config"`
+}
+
+// OASConfig holds the configuration for various OpenAPI-specific functionalities
+type OASConfig struct {
+	// ValidateExamples enables validation of values provided in `example` and `examples` fields against the declared schemas in the OpenAPI Document. Defaults to false.
+	ValidateExamples bool `json:"validate_examples"`
+
+	// ValidateSchemaDefaults enables validation of values provided in `default` fields against the declared schemas in the OpenAPI Document. Defaults to false.
+	ValidateSchemaDefaults bool `json:"validate_schema_defaults"`
 }
 
 type ResourceSyncConfig struct {
-	// RetryAttempts configures the number of retry attempts before returning on a resource sync.
+	// RetryAttempts defines the number of retries that the Gateway
+	// should perform during a resource sync (APIs or policies), defaulting
+	// to zero which means no retries are attempted.
 	RetryAttempts int `json:"retry_attempts"`
 
 	// Interval configures the interval in seconds between each retry on a resource sync error.
@@ -1169,6 +1183,7 @@ func (c Config) GetEventTriggers() map[apidef.TykEvent][]TykEventHandler {
 	return c.EventTriggersDefunct
 }
 
+// SetEventTriggers sets events for backwards compatibility
 func (c *Config) SetEventTriggers(eventTriggers map[apidef.TykEvent][]TykEventHandler) {
 	c.EventTriggersDefunct = eventTriggers
 }
@@ -1239,7 +1254,7 @@ func Load(paths []string, conf *Config) error {
 		if err == nil {
 			r = f
 			defer r.Close()
-			conf.OriginalPath = filename
+			conf.Private.OriginalPath = filename
 			break
 		}
 		if os.IsNotExist(err) {

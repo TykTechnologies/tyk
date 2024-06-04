@@ -128,7 +128,7 @@ func sanitizeConfig(mc map[string]interface{}) map[string]interface{} {
 }
 
 func (gw *Gateway) getExistingConfig() (map[string]interface{}, error) {
-	f, err := os.Open(gw.GetConfig().OriginalPath)
+	f, err := os.Open(gw.GetConfig().Private.OriginalPath)
 	if err != nil {
 		return nil, err
 	}

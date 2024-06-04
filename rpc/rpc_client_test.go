@@ -44,34 +44,19 @@ func TestClientIsConnected(t *testing.T) {
 	t.Parallel()
 
 	testCases := []struct {
-		name          string
-		connected     bool
-		emergencyMode bool
-		expected      bool
+		name      string
+		connected bool
+		expected  bool
 	}{
 		{
-			name:          "When client is connected and not in emergency mode",
-			connected:     true,
-			emergencyMode: false,
-			expected:      true,
+			name:      "When client is connected and not in emergency mode",
+			connected: true,
+			expected:  true,
 		},
 		{
-			name:          "When client is disconnected and not in emergency mode",
-			connected:     false,
-			emergencyMode: false,
-			expected:      false,
-		},
-		{
-			name:          "When client is connected and in emergency mode",
-			connected:     true,
-			emergencyMode: true,
-			expected:      false,
-		},
-		{
-			name:          "When client is disconnected and in emergency mode",
-			connected:     false,
-			emergencyMode: true,
-			expected:      false,
+			name:      "When client is disconnected and not in emergency mode",
+			connected: false,
+			expected:  false,
 		},
 	}
 
@@ -79,10 +64,8 @@ func TestClientIsConnected(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			r := rpcOpts{}
 			r.clientIsConnected.Store(tt.connected)
-			r.emergencyMode.Store(tt.emergencyMode)
 			defer func() {
 				r.clientIsConnected.Store(false)
-				r.emergencyMode.Store(false)
 			}()
 
 			got := r.ClientIsConnected()

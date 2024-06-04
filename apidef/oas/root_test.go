@@ -82,14 +82,110 @@ func TestXTykAPIGateway(t *testing.T) {
 		xTykAPIGateway := XTykAPIGateway{}
 		xTykAPIGateway.Fill(initialAPI)
 
-		ss, _ := json.MarshalIndent(xTykAPIGateway, "", "  ")
-		fmt.Println(string(ss))
+		ss, err := json.MarshalIndent(xTykAPIGateway, "", "  ")
+		assert.NoError(t, err)
+
+		t.Logf("JSON from filled old:\n%s", string(ss))
 
 		var convertedAPI apidef.APIDefinition
 		xTykAPIGateway.ExtractTo(&convertedAPI)
 
 		assert.Equal(t, initialAPI, convertedAPI)
 	})
+}
+
+func TestXTykAPIGateway_EnableContextVariables(t *testing.T) {
+	t.Parallel()
+	enabledExpectation := XTykAPIGateway{
+		Middleware: &Middleware{
+			Global: &Global{
+				ContextVariables: &ContextVariables{
+					Enabled: true,
+				},
+			},
+		},
+	}
+	disabledExpectation := XTykAPIGateway{
+		Middleware: &Middleware{
+			Global: &Global{
+				ContextVariables: &ContextVariables{
+					Enabled: false,
+				},
+			},
+		},
+	}
+	testCases := []struct {
+		name   string
+		in     XTykAPIGateway
+		expect XTykAPIGateway
+	}{
+		{
+			name:   "empty XTykAPIGateway",
+			in:     XTykAPIGateway{},
+			expect: enabledExpectation,
+		},
+		{
+			name: "empty XTykAPIGateway.Middleware",
+			in: XTykAPIGateway{
+				Middleware: &Middleware{},
+			},
+			expect: enabledExpectation,
+		},
+		{
+			name: "empty XTykAPIGateway.Middleware.Global",
+			in: XTykAPIGateway{
+				Middleware: &Middleware{
+					Global: &Global{},
+				},
+			},
+			expect: enabledExpectation,
+		},
+		{
+			name: "empty XTykAPIGateway.Middleware.Global.ContextVariables",
+			in: XTykAPIGateway{
+				Middleware: &Middleware{
+					Global: &Global{
+						ContextVariables: &ContextVariables{},
+					},
+				},
+			},
+			expect: disabledExpectation,
+		},
+		{
+			name: "enabled XTykAPIGateway.Middleware.Global.ContextVariables",
+			in: XTykAPIGateway{
+				Middleware: &Middleware{
+					Global: &Global{
+						ContextVariables: &ContextVariables{
+							Enabled: true,
+						},
+					},
+				},
+			},
+			expect: enabledExpectation,
+		},
+		{
+			name: "disabled XTykAPIGateway.Middleware.Global.ContextVariables",
+			in: XTykAPIGateway{
+				Middleware: &Middleware{
+					Global: &Global{
+						ContextVariables: &ContextVariables{
+							Enabled: false,
+						},
+					},
+				},
+			},
+			expect: disabledExpectation,
+		},
+	}
+	for _, tc := range testCases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			tc.in.enableContextVariablesIfEmpty()
+			assert.EqualExportedValues(t, tc.expect, tc.in)
+		})
+	}
 }
 
 func TestInfo(t *testing.T) {
@@ -300,4 +396,98 @@ func TestVersioning(t *testing.T) {
 	resultVersioning.Fill(convertedAPI)
 
 	assert.Equal(t, emptyVersioning, resultVersioning)
+}
+
+func TestXTykAPIGateway_enableTrafficLogsIfEmpty(t *testing.T) {
+	t.Parallel()
+	enabledExpectation := XTykAPIGateway{
+		Middleware: &Middleware{
+			Global: &Global{
+				TrafficLogs: &TrafficLogs{
+					Enabled: true,
+				},
+			},
+		},
+	}
+	disabledExpectation := XTykAPIGateway{
+		Middleware: &Middleware{
+			Global: &Global{
+				TrafficLogs: &TrafficLogs{
+					Enabled: false,
+				},
+			},
+		},
+	}
+	testCases := []struct {
+		name   string
+		in     XTykAPIGateway
+		expect XTykAPIGateway
+	}{
+		{
+			name:   "empty XTykAPIGateway",
+			in:     XTykAPIGateway{},
+			expect: enabledExpectation,
+		},
+		{
+			name: "empty XTykAPIGateway.Middleware",
+			in: XTykAPIGateway{
+				Middleware: &Middleware{},
+			},
+			expect: enabledExpectation,
+		},
+		{
+			name: "empty XTykAPIGateway.Middleware.Global",
+			in: XTykAPIGateway{
+				Middleware: &Middleware{
+					Global: &Global{},
+				},
+			},
+			expect: enabledExpectation,
+		},
+		{
+			name: "empty XTykAPIGateway.Middleware.Global.TrafficLogs",
+			in: XTykAPIGateway{
+				Middleware: &Middleware{
+					Global: &Global{
+						TrafficLogs: &TrafficLogs{},
+					},
+				},
+			},
+			expect: disabledExpectation,
+		},
+		{
+			name: "enabled XTykAPIGateway.Middleware.Global.TrafficLogs",
+			in: XTykAPIGateway{
+				Middleware: &Middleware{
+					Global: &Global{
+						TrafficLogs: &TrafficLogs{
+							Enabled: true,
+						},
+					},
+				},
+			},
+			expect: enabledExpectation,
+		},
+		{
+			name: "disabled XTykAPIGateway.Middleware.Global.TrafficLogs",
+			in: XTykAPIGateway{
+				Middleware: &Middleware{
+					Global: &Global{
+						TrafficLogs: &TrafficLogs{
+							Enabled: false,
+						},
+					},
+				},
+			},
+			expect: disabledExpectation,
+		},
+	}
+	for _, tc := range testCases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			tc.in.enableTrafficLogsIfEmpty()
+			assert.EqualExportedValues(t, tc.expect, tc.in)
+		})
+	}
 }

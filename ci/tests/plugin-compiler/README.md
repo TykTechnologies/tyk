@@ -30,7 +30,7 @@ The following variables are set as defaults:
 | Variable name | Default value                        |
 | ------------- | ------------------------------------ |
 | tag           | v0.0.0                               |
-| base          | tykio/golang-cross:1.19-bullseye     |
+| base          | tykio/golang-cross:1.21-bookworm     |
 | dockerfile    | ci/images/plugin-compiler/Dockerfile |
 | image         | internal/plugin-compiler             |
 | sha           | `$(git rev-parse HEAD)`              |

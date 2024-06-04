@@ -2,6 +2,7 @@ package rpc
 
 import (
 	"context"
+	"os"
 	"testing"
 	"time"
 
@@ -12,16 +13,16 @@ import (
 	"github.com/TykTechnologies/tyk/storage"
 )
 
-var rc *storage.RedisController
+var rc *storage.ConnectionHandler
 
-func init() {
+func TestMain(m *testing.M) {
 	conf, err := config.New()
 	if err != nil {
 		panic(err)
 	}
 
-	rc = storage.NewRedisController(context.Background())
-	go rc.ConnectToRedis(context.Background(), nil, conf)
+	rc = storage.NewConnectionHandler(context.Background())
+	go rc.Connect(context.Background(), nil, conf)
 
 	timeout, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
@@ -30,6 +31,8 @@ func init() {
 	if !connected {
 		panic("can't connect to redis '" + conf.Storage.Host + "', timeout")
 	}
+
+	os.Exit(m.Run())
 }
 
 func TestNewSyncForcer(t *testing.T) {
@@ -38,7 +41,7 @@ func TestNewSyncForcer(t *testing.T) {
 	assert.True(t, sf.store.ControllerInitiated())
 	assert.Equal(t, "synchronizer-group-", sf.store.KeyPrefix)
 
-	assert.Equal(t, true, sf.store.RedisController.Connected())
+	assert.Equal(t, true, sf.store.ConnectionHandler.Connected())
 }
 
 func TestGroupLoginCallback(t *testing.T) {

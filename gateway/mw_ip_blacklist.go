@@ -10,7 +10,7 @@ import (
 
 // IPBlackListMiddleware lets you define a list of IPs to block from upstream
 type IPBlackListMiddleware struct {
-	BaseMiddleware
+	*BaseMiddleware
 }
 
 func (i *IPBlackListMiddleware) Name() string {

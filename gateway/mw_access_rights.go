@@ -9,7 +9,7 @@ import (
 // permission to access the specific version. If no permission data is in the user.SessionState, then
 // it is assumed that the user can go through.
 type AccessRightsCheck struct {
-	BaseMiddleware
+	*BaseMiddleware
 }
 
 func (a *AccessRightsCheck) Name() string {
@@ -25,38 +25,40 @@ func (a *AccessRightsCheck) ProcessRequest(w http.ResponseWriter, r *http.Reques
 	session := ctxGetSession(r)
 
 	// If there's nothing in our profile, we let them through to the next phase
-	if len(session.AccessRights) > 0 {
-		// Otherwise, run auth checks
-		versionList, apiExists := session.AccessRights[a.Spec.APIID]
-		if !apiExists {
-			a.Logger().Info("Attempted access to unauthorised API")
-			return errors.New("Access to this API has been disallowed"), http.StatusForbidden
-		}
+	if len(session.AccessRights) == 0 {
+		return nil, http.StatusOK
+	}
 
-		// Find the version in their key access details
-		found := false
-		if a.Spec.VersionData.NotVersioned {
-			// Not versioned, no point checking version access rights
-			found = true
-		} else {
-			targetVersion := a.Spec.getVersionFromRequest(r)
-			if targetVersion == "" {
-				targetVersion = a.Spec.VersionData.DefaultVersion
-			}
+	// Otherwise, run auth checks
+	versionList, apiExists := session.AccessRights[a.Spec.APIID]
+	if !apiExists {
+		a.Logger().Info("Attempted access to unauthorised API")
+		return errors.New("Access to this API has been disallowed"), http.StatusForbidden
+	}
 
-			for _, vInfo := range versionList.Versions {
-				if vInfo == targetVersion {
-					found = true
-					break
-				}
-			}
-		}
+	if a.Spec.VersionData.NotVersioned {
+		return nil, http.StatusOK
+	}
 
-		if !found {
-			a.Logger().Info("Attempted access to unauthorised API version.")
-			return errors.New("Access to this API has been disallowed"), http.StatusForbidden
+	targetVersion := a.Spec.getVersionFromRequest(r)
+	if targetVersion == "" {
+		targetVersion = a.Spec.VersionData.DefaultVersion
+	}
+
+	for _, vName := range versionList.Versions {
+		if vName == targetVersion {
+			return nil, http.StatusOK
 		}
 	}
 
-	return nil, 200
+	if a.Spec.VersionDefinition.FallbackToDefault && targetVersion != a.Spec.VersionData.DefaultVersion {
+		for _, vName := range versionList.Versions {
+			if vName == a.Spec.VersionData.DefaultVersion {
+				return nil, http.StatusOK
+			}
+		}
+	}
+
+	a.Logger().Info("Attempted access to unauthorised API version.")
+	return errors.New("Access to this API has been disallowed"), http.StatusForbidden
 }

@@ -1,127 +1,129 @@
+# yamllint disable rule:line-length
+---
 services:
-    cache:
-        healthcheck:
-            test:
-                - CMD
-                - redis-cli
-                - ping
-            timeout: 3s
-            interval: 1s
-            retries: 60
-        image: redis:6
-        networks:
-            default: null
-        restart: unless-stopped
-    otel-collector:
-        command:
-            - --config
-            - /otel-local-config.yml
-        environment:
-            TRACETEST_ENDPOINT: tracetest:4317
-        image: otel/opentelemetry-collector-contrib:0.80.0
-        ports:
-            - 4317:4317
-            - 4318:4318
-        networks:
-            default: null
-        volumes:
-            - type: bind
-              source: ./configs/otelcollector/collector.config.yml
-              target: /otel-local-config.yml
-              bind:
-                create_host_path: true
-    postgres:
-        environment:
-            POSTGRES_PASSWORD: postgres
-            POSTGRES_USER: postgres
-        healthcheck:
-            test:
-                - CMD-SHELL
-                - pg_isready -U "$$POSTGRES_USER" -d "$$POSTGRES_DB"
-            timeout: 5s
-            interval: 1s
-            retries: 60
-        image: postgres:14
-        networks:
-            default: null
-    queue:
-        healthcheck:
-            test:
-                - CMD-SHELL
-                - rabbitmq-diagnostics -q check_running
-            timeout: 5s
-            interval: 1s
-            retries: 60
-        image: rabbitmq:3.8-management
-        networks:
-            default: null
-        restart: unless-stopped
-    tracetest:
-        command:
-            - --provisioning-file
-            - /app/provision.yml
-        depends_on:
-            otel-collector:
-                condition: service_started
-            postgres:
-                condition: service_healthy
-        environment:
-            TRACETEST_DEV: true
-        extra_hosts:
-            host.docker.internal: host-gateway
-        healthcheck:
-            test:
-                - CMD
-                - wget
-                - --spider
-                - localhost:11633
-            timeout: 3s
-            interval: 1s
-            retries: 60
-        image: kubeshop/tracetest:v0.12.2
-        networks:
-            default: null
-        ports:
-            - mode: ingress
-              target: 11633
-              published: 11633
-              protocol: tcp
-        volumes:
-            - type: bind
-              source: ./configs/tracetest/tracetest.yml
-              target: /app/tracetest.yml
-            - type: bind
-              source: ./configs/tracetest/tracetest-provision.yml
-              target: /app/provision.yml
-    tyk:
-        image: internal/tyk-gateway
-        networks:
-            default: null
-        ports:
-            - 9000:8080
-        env_file:
-            - ./configs/tyk.env
-        volumes:
-            - ${TYK_APPS:-./apps}:/opt/tyk-gateway/apps
-        depends_on:
-            - redis
-    redis:
-        image: redis:4.0-alpine
-        networks:
-            default: null
-        ports:
-            - 6379:6379
-        command: redis-server --appendonly yes
-    httpbin:
-        image: kennethreitz/httpbin:latest
-        networks:
-            default: null
-    grpcapi:
-        image: romk/grpc-helloworld-reflection
-        networks:
-            default: null
-        ports:
-            - 50001:50051
-networks:
-    default:
-        name: _default
+  cache:
+    image: redis:6
+    platform: linux/amd64
+    healthcheck:
+      test:
+        - CMD
+        - redis-cli
+        - ping
+      timeout: 3s
+      interval: 1s
+      retries: 60
+    restart: unless-stopped
+
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.100.0
+    platform: linux/amd64
+    command:
+      - --config
+      - /otel-local-config.yml
+    environment:
+      TRACETEST_ENDPOINT: tracetest:4317
+    ports:
+      - 4317:4317
+      - 4318:4318
+    volumes:
+      - ./configs/otelcollector/collector.config.yml:/otel-local-config.yml
+
+  postgres:
+    image: postgres:14
+    platform: linux/amd64
+    environment:
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_USER: postgres
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - pg_isready -U "$$POSTGRES_USER" -d "$$POSTGRES_DB"
+      timeout: 5s
+      interval: 1s
+      retries: 60
+
+  queue:
+    image: rabbitmq:3.8-management
+    platform: linux/amd64
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - rabbitmq-diagnostics -q check_running
+      timeout: 5s
+      interval: 1s
+      retries: 60
+    restart: unless-stopped
+
+  tracetest:
+    image: kubeshop/tracetest:v1.0.0
+    platform: linux/amd64
+    command:
+      - --provisioning-file
+      - /app/provision.yml
+    depends_on:
+      tyk-checker:
+        condition: service_healthy
+      otel-collector:
+        condition: service_started
+      postgres:
+        condition: service_healthy
+    environment:
+      TRACETEST_DEV: true
+    healthcheck:
+      test:
+        - CMD
+        - wget
+        - --spider
+        - localhost:11633
+      timeout: 3s
+      interval: 1s
+      retries: 60
+    ports:
+      - 11633:11633
+    volumes:
+      - type: bind
+        source: ./configs/tracetest/tracetest.yml
+        target: /app/tracetest.yml
+      - type: bind
+        source: ./configs/tracetest/tracetest-provision.yml
+        target: /app/provision.yml
+
+  tyk:
+    image: ${GATEWAY_IMAGE:-internal/tyk-gateway}
+    platform: linux/amd64
+    ports:
+      - 9000:8080
+    env_file:
+      - ./configs/tyk.env
+    volumes:
+      - ./apps:/opt/tyk-gateway/apps
+    depends_on:
+      - redis
+
+  tyk-checker:
+    platform: linux/amd64
+    image: badouralix/curl-jq
+    command: tail -f /dev/null
+    depends_on:
+      - tyk
+    healthcheck:
+      test: curl -s --fail http://tyk:8080/hello | jq --exit-status -n 'inputs | if has("status") then .status=="pass" else false end' > /dev/null || exit 1
+      interval: 5s
+      retries: 10
+      start_period: 4s
+      timeout: 10s
+
+  redis:
+    platform: linux/amd64
+    image: redis:6
+    command: redis-server --appendonly yes
+
+  httpbin:
+    platform: linux/amd64
+    image: kennethreitz/httpbin:latest
+
+  grpcapi:
+    platform: linux/amd64
+    image: romk/grpc-helloworld-reflection
+    ports:
+      - 50001:50051

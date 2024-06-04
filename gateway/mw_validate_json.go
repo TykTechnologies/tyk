@@ -11,7 +11,7 @@ import (
 )
 
 type ValidateJSON struct {
-	BaseMiddleware
+	*BaseMiddleware
 }
 
 func (k *ValidateJSON) Name() string {

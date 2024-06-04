@@ -13,10 +13,10 @@ type SyncronizerForcer struct {
 }
 
 // NewSyncForcer returns a new syncforcer with a connected redis with a key prefix synchronizer-group- for group synchronization control.
-func NewSyncForcer(redisController *storage.RedisController, getNodeDataFunc func() []byte) *SyncronizerForcer {
+func NewSyncForcer(controller *storage.ConnectionHandler, getNodeDataFunc func() []byte) *SyncronizerForcer {
 	sf := &SyncronizerForcer{}
 	sf.getNodeDataFunc = getNodeDataFunc
-	sf.store = &storage.RedisCluster{KeyPrefix: "synchronizer-group-", RedisController: redisController}
+	sf.store = &storage.RedisCluster{KeyPrefix: "synchronizer-group-", ConnectionHandler: controller}
 	sf.store.Connect()
 
 	return sf

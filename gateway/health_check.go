@@ -34,12 +34,11 @@ func (gw *Gateway) initHealthCheck(ctx context.Context) {
 
 	go func(ctx context.Context) {
 		var n = gw.GetConfig().LivenessCheck.CheckDuration
-
 		if n == 0 {
-			n = 10
+			n = 10 * time.Second
 		}
 
-		ticker := time.NewTicker(time.Second * n)
+		ticker := time.NewTicker(n)
 
 		for {
 			select {
@@ -66,7 +65,7 @@ type SafeHealthCheck struct {
 func (gw *Gateway) gatherHealthChecks() {
 	allInfos := SafeHealthCheck{info: make(map[string]apidef.HealthCheckItem, 3)}
 
-	redisStore := storage.RedisCluster{KeyPrefix: "livenesscheck-", RedisController: gw.RedisController}
+	redisStore := storage.RedisCluster{KeyPrefix: "livenesscheck-", ConnectionHandler: gw.StorageConnectionHandler}
 
 	key := "tyk-liveness-probe"
 

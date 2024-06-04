@@ -11,7 +11,7 @@ import (
 )
 
 type StripAuth struct {
-	BaseMiddleware
+	*BaseMiddleware
 }
 
 func (sa *StripAuth) Name() string {

@@ -238,6 +238,7 @@ func (a *APIDefinition) Migrate() (versions []APIDefinition, err error) {
 	a.migrateCustomDomain()
 	a.migrateScopeToPolicy()
 	a.migrateResponseProcessors()
+	a.migrateGlobalRateLimit()
 
 	versions, err = a.MigrateVersioning()
 	if err != nil {
@@ -246,9 +247,13 @@ func (a *APIDefinition) Migrate() (versions []APIDefinition, err error) {
 
 	a.MigrateEndpointMeta()
 	a.MigrateCachePlugin()
+	a.migrateGlobalHeaders()
+	a.migrateGlobalResponseHeaders()
 	for i := 0; i < len(versions); i++ {
 		versions[i].MigrateEndpointMeta()
 		versions[i].MigrateCachePlugin()
+		versions[i].migrateGlobalHeaders()
+		versions[i].migrateGlobalResponseHeaders()
 	}
 
 	return versions, nil
@@ -308,6 +313,22 @@ func (a *APIDefinition) migrateIDExtractor() {
 func (a *APIDefinition) migrateCustomDomain() {
 	if !a.DomainDisabled && a.Domain == "" {
 		a.DomainDisabled = true
+	}
+}
+
+func (a *APIDefinition) migrateGlobalHeaders() {
+	vInfo := a.VersionData.Versions[""]
+	if len(vInfo.GlobalHeaders) == 0 && len(vInfo.GlobalHeadersRemove) == 0 {
+		vInfo.GlobalHeadersDisabled = true
+		a.VersionData.Versions[""] = vInfo
+	}
+}
+
+func (a *APIDefinition) migrateGlobalResponseHeaders() {
+	vInfo := a.VersionData.Versions[""]
+	if len(vInfo.GlobalResponseHeaders) == 0 && len(vInfo.GlobalResponseHeadersRemove) == 0 {
+		vInfo.GlobalResponseHeadersDisabled = true
+		a.VersionData.Versions[""] = vInfo
 	}
 }
 
@@ -427,7 +448,28 @@ func (a *APIDefinition) SetDisabledFlags() {
 	for version := range a.VersionData.Versions {
 		for i := 0; i < len(a.VersionData.Versions[version].ExtendedPaths.Virtual); i++ {
 			a.VersionData.Versions[version].ExtendedPaths.Virtual[i].Disabled = true
+		}
+
+		for i := 0; i < len(a.VersionData.Versions[version].ExtendedPaths.GoPlugin); i++ {
 			a.VersionData.Versions[version].ExtendedPaths.GoPlugin[i].Disabled = true
+		}
+	}
+
+	if a.GlobalRateLimit.Per <= 0 || a.GlobalRateLimit.Rate <= 0 {
+		a.GlobalRateLimit.Disabled = true
+	}
+
+	a.DoNotTrack = true
+
+	a.setEventHandlersDisabledFlags()
+}
+
+func (a *APIDefinition) setEventHandlersDisabledFlags() {
+	for k := range a.EventHandlers.Events {
+		for i := range a.EventHandlers.Events[k] {
+			if a.EventHandlers.Events[k][i].HandlerMeta != nil {
+				a.EventHandlers.Events[k][i].HandlerMeta["disabled"] = true
+			}
 		}
 	}
 }
@@ -459,4 +501,10 @@ func (a *APIDefinition) migrateResponseProcessors() {
 	}
 
 	a.ResponseProcessors = responseProcessors
+}
+
+func (a *APIDefinition) migrateGlobalRateLimit() {
+	if a.GlobalRateLimit.Per <= 0 || a.GlobalRateLimit.Rate <= 0 {
+		a.GlobalRateLimit.Disabled = true
+	}
 }

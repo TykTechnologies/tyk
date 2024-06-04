@@ -24,6 +24,8 @@ var ErrKeyNotFound = errors.New("key not found")
 
 var ErrMDCBConnectionLost = errors.New("mdcb connection is lost")
 
+const MongoBsonIdLength = 24
+
 // Handler is a standard interface to a storage backend, used by
 // AuthorisationManager to read and write key values to the backend
 type Handler interface {
@@ -127,8 +129,12 @@ func TokenOrg(token string) string {
 	}
 
 	// 24 is mongo bson id length
-	if len(token) > 24 {
-		return token[:24]
+	if len(token) > MongoBsonIdLength {
+		newToken := token[:MongoBsonIdLength]
+		_, err := hex.DecodeString(newToken)
+		if err == nil {
+			return newToken
+		}
 	}
 
 	return ""

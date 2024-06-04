@@ -189,9 +189,8 @@ func MyAnalyticsPluginMaskJSONLoginBody(record *analytics.AnalyticsRecord) {
 		jsonparser.EachKey(body, func(idx int, _ []byte, _ jsonparser.ValueType, _ error) {
 			body, _ = jsonparser.Set(body, mask, paths[idx]...)
 		}, paths...)
-		if err == nil {
-			record.RawRequest = base64.StdEncoding.EncodeToString(append(d[:i+4], body...))
-		}
+
+		record.RawRequest = base64.StdEncoding.EncodeToString(append(d[:i+4], body...))
 	}
 }
 

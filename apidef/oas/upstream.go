@@ -5,11 +5,12 @@ import (
 	"strings"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/internal/time"
 )
 
-// Upstream holds configuration for an upstream server.
+// Upstream holds configuration for the upstream server to which Tyk should proxy requests.
 type Upstream struct {
-	// URL defines the target URL that the request should be proxied to.
+	// URL defines the upstream address (or target URL) to which requests should be proxied.
 	// Tyk classic API definition: `proxy.target_url`
 	URL string `bson:"url" json:"url"` // required
 
@@ -20,11 +21,14 @@ type Upstream struct {
 	// Test contains the configuration related to uptime tests.
 	Test *Test `bson:"test,omitempty" json:"test,omitempty"`
 
-	// MutualTLS contains the configuration related to upstream mutual TLS.
+	// MutualTLS contains the configuration for establishing a mutual TLS connection between Tyk and the upstream server.
 	MutualTLS *MutualTLS `bson:"mutualTLS,omitempty" json:"mutualTLS,omitempty"`
 
 	// CertificatePinning contains the configuration related to certificate pinning.
 	CertificatePinning *CertificatePinning `bson:"certificatePinning,omitempty" json:"certificatePinning,omitempty"`
+
+	// RateLimit contains the configuration related to API level rate limit.
+	RateLimit *RateLimit `bson:"rateLimit,omitempty" json:"rateLimit,omitempty"`
 }
 
 // Fill fills *Upstream from apidef.APIDefinition.
@@ -65,6 +69,15 @@ func (u *Upstream) Fill(api apidef.APIDefinition) {
 	u.CertificatePinning.Fill(api)
 	if ShouldOmit(u.CertificatePinning) {
 		u.CertificatePinning = nil
+	}
+
+	if u.RateLimit == nil {
+		u.RateLimit = &RateLimit{}
+	}
+
+	u.RateLimit.Fill(api)
+	if ShouldOmit(u.RateLimit) {
+		u.RateLimit = nil
 	}
 }
 
@@ -107,11 +120,20 @@ func (u *Upstream) ExtractTo(api *apidef.APIDefinition) {
 	}
 
 	u.CertificatePinning.ExtractTo(api)
+
+	if u.RateLimit == nil {
+		u.RateLimit = &RateLimit{}
+		defer func() {
+			u.RateLimit = nil
+		}()
+	}
+
+	u.RateLimit.ExtractTo(api)
 }
 
 // ServiceDiscovery holds configuration required for service discovery.
 type ServiceDiscovery struct {
-	// Enabled enables Service Discovery.
+	// Enabled activates Service Discovery.
 	//
 	// Tyk classic API definition: `service_discovery.use_discovery_service`
 	Enabled bool `bson:"enabled" json:"enabled"` // required
@@ -140,7 +162,7 @@ type ServiceDiscovery struct {
 	// Tyk classic API definition: `service_discovery.data_path`
 	DataPath string `bson:"dataPath,omitempty" json:"dataPath,omitempty"`
 
-	// UseNestedQuery enables using a combination of `dataPath` and `parentDataPath`.
+	// UseNestedQuery enables the use of a combination of `dataPath` and `parentDataPath`.
 	// It is necessary when the data lives within this string-encoded JSON object.
 	//
 	// ```
@@ -159,7 +181,7 @@ type ServiceDiscovery struct {
 	UseNestedQuery bool `bson:"useNestedQuery,omitempty" json:"useNestedQuery,omitempty"`
 
 	// ParentDataPath is the namespace of the where to find the nested
-	// value, if `useNestedQuery` is `true`. In the above example, it
+	// value if `useNestedQuery` is `true`. In the above example, it
 	// would be `node.value`. You would change the `dataPath` setting
 	// to be `hostname`, since this is where the host name data
 	// resides in the JSON string. Tyk automatically assumes that
@@ -177,7 +199,7 @@ type ServiceDiscovery struct {
 	// Tyk classic API definition: `service_discovery.port_data_path`
 	PortDataPath string `bson:"portDataPath,omitempty" json:"portDataPath,omitempty"`
 
-	// UseTargetList should be set to `true`, if you are using load balancing. Tyk will treat the data path as a list and
+	// UseTargetList should be set to `true` if you are using load balancing. Tyk will treat the data path as a list and
 	// inject it into the target list of your API definition.
 	//
 	// Tyk classic API definition: `service_discovery.use_target_list`
@@ -199,9 +221,10 @@ type ServiceDiscovery struct {
 	// - `service_discovery.cache_timeout`
 	Cache *ServiceDiscoveryCache `bson:"cache,omitempty" json:"cache,omitempty"`
 
-	// TargetPath is to set a target path to append to the discovered endpoint, since many SD services
-	// only provide host and port data. It is important to be able to target a specific resource on that host.
-	// Setting this value will enable that.
+	// TargetPath is used to set a target path that will be appended to the
+	// discovered endpoint, since many service discovery services only provide
+	// host and port data. It is important to be able to target a specific
+	// resource on that host. Setting this value will enable that.
 	//
 	// Tyk classic API definition: `service_discovery.target_path`
 	TargetPath string `bson:"targetPath,omitempty" json:"targetPath,omitempty"`
@@ -225,7 +248,7 @@ type ServiceDiscoveryCache struct {
 	Timeout int64 `bson:"timeout,omitempty" json:"timeout,omitempty"`
 }
 
-// CacheOptions returns the timeout value in effect, and a bool if cache is enabled.
+// CacheOptions returns the timeout value in effect and a bool if cache is enabled.
 func (sd *ServiceDiscovery) CacheOptions() (int64, bool) {
 	if sd.Cache != nil {
 		return sd.Cache.Timeout, sd.Cache.Enabled
@@ -307,9 +330,9 @@ func (t *Test) ExtractTo(uptimeTests *apidef.UptimeTests) {
 	t.ServiceDiscovery.ExtractTo(&uptimeTests.Config.ServiceDiscovery)
 }
 
-// MutualTLS holds configuration related to mTLS on APIs, domain to certificate mappings.
+// MutualTLS contains the configuration for establishing a mutual TLS connection between Tyk and the upstream server.
 type MutualTLS struct {
-	// Enabled enables/disables upstream mutual TLS auth for the API.
+	// Enabled activates upstream mutual TLS for the API.
 	// Tyk classic API definition: `upstream_certificates_disabled`
 	Enabled bool `bson:"enabled" json:"enabled"`
 
@@ -436,4 +459,56 @@ func (cp *CertificatePinning) ExtractTo(api *apidef.APIDefinition) {
 	} else {
 		api.PinnedPublicKeys = nil
 	}
+}
+
+// RateLimit holds the configurations related to rate limit.
+// The API-level rate limit applies a base-line limit on the frequency of requests to the upstream service for all endpoints. The frequency of requests is configured in two parts: the time interval and the number of requests that can be made during each interval.
+// Tyk classic API definition: `global_rate_limit`.
+type RateLimit struct {
+	// Enabled activates API level rate limiting for this API.
+	//
+	// Tyk classic API definition: `!disable_rate_limit`.
+	Enabled bool `json:"enabled" bson:"enabled"`
+	// Rate specifies the number of requests that can be passed to the upstream in each time interval (`per`).
+	// This field sets the limit on the frequency of requests to ensure controlled
+	// resource access or to prevent abuse. The rate is defined as an integer value.
+	//
+	// A higher value indicates a higher number of allowed requests in the given
+	// time frame. For instance, if `Per` is set to `1m` (one minute), a Rate of `100`
+	// means up to 100 requests can be made per minute.
+	//
+	// Tyk classic API definition: `global_rate_limit.rate`.
+	Rate int `json:"rate" bson:"rate"`
+	// Per defines the time interval for rate limiting using shorthand notation.
+	// The value of Per is a string that specifies the interval in a compact form,
+	// where hours, minutes and seconds are denoted by 'h', 'm' and 's' respectively.
+	// Multiple units can be combined to represent the duration.
+	//
+	// Examples of valid shorthand notations:
+	// - "1h"   : one hour
+	// - "20m"  : twenty minutes
+	// - "30s"  : thirty seconds
+	// - "1m29s": one minute and twenty-nine seconds
+	// - "1h30m" : one hour and thirty minutes
+	//
+	// An empty value is interpreted as "0s", implying no rate limiting interval, which disables the API-level rate limit.
+	// It's important to format the string correctly, as invalid formats will
+	// be considered as 0s/empty.
+	//
+	// Tyk classic API definition: `global_rate_limit.per`.
+	Per time.ReadableDuration `json:"per" bson:"per"`
+}
+
+// Fill fills *RateLimit from apidef.APIDefinition.
+func (r *RateLimit) Fill(api apidef.APIDefinition) {
+	r.Enabled = !api.GlobalRateLimit.Disabled
+	r.Rate = int(api.GlobalRateLimit.Rate)
+	r.Per = time.ReadableDuration(time.Duration(api.GlobalRateLimit.Per) * time.Second)
+}
+
+// ExtractTo extracts *Ratelimit into *apidef.APIDefinition.
+func (r *RateLimit) ExtractTo(api *apidef.APIDefinition) {
+	api.GlobalRateLimit.Disabled = !r.Enabled
+	api.GlobalRateLimit.Rate = float64(r.Rate)
+	api.GlobalRateLimit.Per = r.Per.Seconds()
 }

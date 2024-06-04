@@ -9,17 +9,19 @@ import (
 	"text/template"
 	"time"
 
-	"github.com/TykTechnologies/storage/persistent/model"
-
 	"github.com/clbanning/mxj"
 	"github.com/lonelycode/osin"
 
+	"github.com/TykTechnologies/storage/persistent/model"
+
+	"github.com/TykTechnologies/tyk/internal/event"
+
 	"github.com/TykTechnologies/tyk/internal/reflect"
 
-	"github.com/TykTechnologies/graphql-go-tools/pkg/engine/datasource/kafka_datasource"
 	"github.com/TykTechnologies/graphql-go-tools/pkg/execution/datasource"
 
 	"github.com/TykTechnologies/gojsonschema"
+
 	"github.com/TykTechnologies/tyk/regexp"
 
 	"github.com/TykTechnologies/tyk/internal/uuid"
@@ -28,8 +30,12 @@ import (
 type AuthProviderCode string
 type SessionProviderCode string
 type StorageEngineCode string
-type TykEvent string            // A type so we can ENUM event types easily, e.g. EventQuotaExceeded
-type TykEventHandlerName string // A type for handler codes in API definitions
+
+// TykEvent is an alias maintained for backwards compatibility.
+type TykEvent = event.Event
+
+// TykEventHandlerName is an alias maintained for backwards compatibility.
+type TykEventHandlerName = event.HandlerName
 
 type EndpointMethodAction string
 type SourceMode string
@@ -81,9 +87,8 @@ const (
 	UnsetAuth     AuthTypeEnum = ""
 
 	// For routing triggers
-	All    RoutingTriggerOnType = "all"
-	Any    RoutingTriggerOnType = "any"
-	Ignore RoutingTriggerOnType = ""
+	All RoutingTriggerOnType = "all"
+	Any RoutingTriggerOnType = "any"
 
 	// Subscription Types
 	GQLSubscriptionUndefined   SubscriptionType = ""
@@ -114,7 +119,9 @@ const (
 )
 
 var (
+	// Deprecated: Use ErrClassicAPIExpected instead.
 	ErrAPIMigrated                = errors.New("the supplied API definition is in Tyk classic format, please use OAS format for this API")
+	ErrClassicAPIExpected         = errors.New("this API endpoint only supports Tyk Classic APIs; please use the appropriate Tyk OAS API endpoint")
 	ErrAPINotMigrated             = errors.New("the supplied API definition is in OAS format, please use the Tyk classic format for this API")
 	ErrOASGetForOldAPI            = errors.New("the requested API definition is in Tyk classic format, please use old api endpoint")
 	ErrImportWithTykExtension     = errors.New("the import payload should not contain x-tyk-api-gateway")
@@ -181,11 +188,16 @@ type TransformJQMeta struct {
 }
 
 type HeaderInjectionMeta struct {
+	Disabled      bool              `bson:"disabled" json:"disabled"`
 	DeleteHeaders []string          `bson:"delete_headers" json:"delete_headers"`
 	AddHeaders    map[string]string `bson:"add_headers" json:"add_headers"`
 	Path          string            `bson:"path" json:"path"`
 	Method        string            `bson:"method" json:"method"`
 	ActOnResponse bool              `bson:"act_on" json:"act_on"`
+}
+
+func (h *HeaderInjectionMeta) Enabled() bool {
+	return !h.Disabled && (len(h.AddHeaders) > 0 || len(h.DeleteHeaders) > 0)
 }
 
 type HardTimeoutMeta struct {
@@ -196,22 +208,26 @@ type HardTimeoutMeta struct {
 }
 
 type TrackEndpointMeta struct {
-	Path   string `bson:"path" json:"path"`
-	Method string `bson:"method" json:"method"`
+	Disabled bool   `bson:"disabled" json:"disabled"`
+	Path     string `bson:"path" json:"path"`
+	Method   string `bson:"method" json:"method"`
 }
 
 type InternalMeta struct {
-	Path   string `bson:"path" json:"path"`
-	Method string `bson:"method" json:"method"`
+	Disabled bool   `bson:"disabled" json:"disabled"`
+	Path     string `bson:"path" json:"path"`
+	Method   string `bson:"method" json:"method"`
 }
 
 type RequestSizeMeta struct {
+	Disabled  bool   `bson:"disabled" json:"disabled"`
 	Path      string `bson:"path" json:"path"`
 	Method    string `bson:"method" json:"method"`
 	SizeLimit int64  `bson:"size_limit" json:"size_limit"`
 }
 
 type CircuitBreakerMeta struct {
+	Disabled             bool    `bson:"disabled" json:"disabled"`
 	Path                 string  `bson:"path" json:"path"`
 	Method               string  `bson:"method" json:"method"`
 	ThresholdPercent     float64 `bson:"threshold_percent" json:"threshold_percent"`
@@ -226,6 +242,11 @@ type StringRegexMap struct {
 	matchRegex   *regexp.Regexp
 }
 
+// Empty is a utility function that returns true if the value is empty.
+func (r StringRegexMap) Empty() bool {
+	return r.MatchPattern == "" && !r.Reverse
+}
+
 type RoutingTriggerOptions struct {
 	HeaderMatches         map[string]StringRegexMap `bson:"header_matches" json:"header_matches"`
 	QueryValMatches       map[string]StringRegexMap `bson:"query_val_matches" json:"query_val_matches"`
@@ -235,6 +256,18 @@ type RoutingTriggerOptions struct {
 	PayloadMatches        StringRegexMap            `bson:"payload_matches" json:"payload_matches"`
 }
 
+// NewRoutingTriggerOptions allocates the maps inside RoutingTriggerOptions.
+func NewRoutingTriggerOptions() RoutingTriggerOptions {
+	return RoutingTriggerOptions{
+		HeaderMatches:         make(map[string]StringRegexMap),
+		QueryValMatches:       make(map[string]StringRegexMap),
+		PathPartMatches:       make(map[string]StringRegexMap),
+		SessionMetaMatches:    make(map[string]StringRegexMap),
+		RequestContextMatches: make(map[string]StringRegexMap),
+		PayloadMatches:        StringRegexMap{},
+	}
+}
+
 type RoutingTrigger struct {
 	On        RoutingTriggerOnType  `bson:"on" json:"on"`
 	Options   RoutingTriggerOptions `bson:"options" json:"options"`
@@ -242,6 +275,7 @@ type RoutingTrigger struct {
 }
 
 type URLRewriteMeta struct {
+	Disabled     bool             `bson:"disabled" json:"disabled"`
 	Path         string           `bson:"path" json:"path"`
 	Method       string           `bson:"method" json:"method"`
 	MatchPattern string           `bson:"match_pattern" json:"match_pattern"`
@@ -330,6 +364,17 @@ type ExtendedPathsSet struct {
 	PersistGraphQL          []PersistGraphQLMeta  `bson:"persist_graphql" json:"persist_graphql"`
 }
 
+// Clear omits values that have OAS API definition conversions in place.
+func (e *ExtendedPathsSet) Clear() {
+	// The values listed within don't have a conversion from OAS in place.
+	// When the conversion is added, delete the individual field to clear it.
+	*e = ExtendedPathsSet{
+		TransformJQ:         e.TransformJQ,
+		TransformJQResponse: e.TransformJQResponse,
+		PersistGraphQL:      e.PersistGraphQL,
+	}
+}
+
 type VersionDefinition struct {
 	Enabled             bool              `bson:"enabled" json:"enabled"`
 	Name                string            `bson:"name" json:"name"`
@@ -358,15 +403,53 @@ type VersionInfo struct {
 		WhiteList []string `bson:"white_list" json:"white_list"`
 		BlackList []string `bson:"black_list" json:"black_list"`
 	} `bson:"paths" json:"paths"`
-	UseExtendedPaths            bool              `bson:"use_extended_paths" json:"use_extended_paths"`
-	ExtendedPaths               ExtendedPathsSet  `bson:"extended_paths" json:"extended_paths"`
-	GlobalHeaders               map[string]string `bson:"global_headers" json:"global_headers"`
-	GlobalHeadersRemove         []string          `bson:"global_headers_remove" json:"global_headers_remove"`
-	GlobalResponseHeaders       map[string]string `bson:"global_response_headers" json:"global_response_headers"`
-	GlobalResponseHeadersRemove []string          `bson:"global_response_headers_remove" json:"global_response_headers_remove"`
-	IgnoreEndpointCase          bool              `bson:"ignore_endpoint_case" json:"ignore_endpoint_case"`
-	GlobalSizeLimit             int64             `bson:"global_size_limit" json:"global_size_limit"`
-	OverrideTarget              string            `bson:"override_target" json:"override_target"`
+	UseExtendedPaths              bool              `bson:"use_extended_paths" json:"use_extended_paths"`
+	ExtendedPaths                 ExtendedPathsSet  `bson:"extended_paths" json:"extended_paths"`
+	GlobalHeaders                 map[string]string `bson:"global_headers" json:"global_headers"`
+	GlobalHeadersRemove           []string          `bson:"global_headers_remove" json:"global_headers_remove"`
+	GlobalHeadersDisabled         bool              `bson:"global_headers_disabled" json:"global_headers_disabled"`
+	GlobalResponseHeaders         map[string]string `bson:"global_response_headers" json:"global_response_headers"`
+	GlobalResponseHeadersRemove   []string          `bson:"global_response_headers_remove" json:"global_response_headers_remove"`
+	GlobalResponseHeadersDisabled bool              `bson:"global_response_headers_disabled" json:"global_response_headers_disabled"`
+	IgnoreEndpointCase            bool              `bson:"ignore_endpoint_case" json:"ignore_endpoint_case"`
+	GlobalSizeLimit               int64             `bson:"global_size_limit" json:"global_size_limit"`
+	OverrideTarget                string            `bson:"override_target" json:"override_target"`
+}
+
+func (v *VersionInfo) GlobalHeadersEnabled() bool {
+	return !v.GlobalHeadersDisabled && (len(v.GlobalHeaders) > 0 || len(v.GlobalHeadersRemove) > 0)
+}
+
+func (v *VersionInfo) GlobalResponseHeadersEnabled() bool {
+	return !v.GlobalResponseHeadersDisabled && (len(v.GlobalResponseHeaders) > 0 || len(v.GlobalResponseHeadersRemove) > 0)
+}
+
+func (v *VersionInfo) HasEndpointReqHeader() bool {
+	if !v.UseExtendedPaths {
+		return false
+	}
+
+	for _, trh := range v.ExtendedPaths.TransformHeader {
+		if trh.Enabled() {
+			return true
+		}
+	}
+
+	return false
+}
+
+func (v *VersionInfo) HasEndpointResHeader() bool {
+	if !v.UseExtendedPaths {
+		return false
+	}
+
+	for _, trh := range v.ExtendedPaths.TransformResponseHeader {
+		if trh.Enabled() {
+			return true
+		}
+	}
+
+	return false
 }
 
 type AuthProviderMeta struct {
@@ -563,6 +646,7 @@ type APIDefinition struct {
 	JWTNotBeforeValidationSkew           uint64                 `bson:"jwt_not_before_validation_skew" json:"jwt_not_before_validation_skew"`
 	JWTSkipKid                           bool                   `bson:"jwt_skip_kid" json:"jwt_skip_kid"`
 	Scopes                               Scopes                 `bson:"scopes" json:"scopes,omitempty"`
+	IDPClientIDMappingDisabled           bool                   `bson:"idp_client_id_mapping_disabled" json:"idp_client_id_mapping_disabled"`
 	JWTScopeToPolicyMapping              map[string]string      `bson:"jwt_scope_to_policy_mapping" json:"jwt_scope_to_policy_mapping"` // Deprecated: use Scopes.JWT.ScopeToPolicy or Scopes.OIDC.ScopeToPolicy
 	JWTScopeClaimName                    string                 `bson:"jwt_scope_claim_name" json:"jwt_scope_claim_name"`               // Deprecated: use Scopes.JWT.ScopeClaimName or Scopes.OIDC.ScopeClaimName
 	NotificationsDetails                 NotificationsManager   `bson:"notifications" json:"notifications"`
@@ -664,8 +748,9 @@ type SignatureConfig struct {
 }
 
 type GlobalRateLimit struct {
-	Rate float64 `bson:"rate" json:"rate"`
-	Per  float64 `bson:"per" json:"per"`
+	Disabled bool    `bson:"disabled" json:"disabled"`
+	Rate     float64 `bson:"rate" json:"rate"`
+	Per      float64 `bson:"per" json:"per"`
 }
 
 type BundleManifest struct {
@@ -742,25 +827,43 @@ type GraphQLConfig struct {
 	Subgraph GraphQLSubgraphConfig `bson:"subgraph" json:"subgraph"`
 	// Supergraph holds the configuration for a GraphQL federation supergraph.
 	Supergraph GraphQLSupergraphConfig `bson:"supergraph" json:"supergraph"`
+	// Introspection holds the configuration for GraphQL Introspection
+	Introspection GraphQLIntrospectionConfig `bson:"introspection" json:"introspection"`
 }
 
 type GraphQLConfigVersion string
 
 const (
-	GraphQLConfigVersionNone GraphQLConfigVersion = ""
-	GraphQLConfigVersion1    GraphQLConfigVersion = "1"
-	GraphQLConfigVersion2    GraphQLConfigVersion = "2"
+	GraphQLConfigVersionNone     GraphQLConfigVersion = ""
+	GraphQLConfigVersion1        GraphQLConfigVersion = "1"
+	GraphQLConfigVersion2        GraphQLConfigVersion = "2"
+	GraphQLConfigVersion3Preview GraphQLConfigVersion = "3-preview"
 )
+
+type GraphQLIntrospectionConfig struct {
+	Disabled bool `bson:"disabled" json:"disabled"`
+}
 
 type GraphQLResponseExtensions struct {
 	OnErrorForwarding bool `bson:"on_error_forwarding" json:"on_error_forwarding"`
 }
 
 type GraphQLProxyConfig struct {
-	AuthHeaders           map[string]string         `bson:"auth_headers" json:"auth_headers"`
-	SubscriptionType      SubscriptionType          `bson:"subscription_type" json:"subscription_type,omitempty"`
-	RequestHeaders        map[string]string         `bson:"request_headers" json:"request_headers"`
-	UseResponseExtensions GraphQLResponseExtensions `bson:"use_response_extensions" json:"use_response_extensions"`
+	Features              GraphQLProxyFeaturesConfig             `bson:"features" json:"features"`
+	AuthHeaders           map[string]string                      `bson:"auth_headers" json:"auth_headers"`
+	SubscriptionType      SubscriptionType                       `bson:"subscription_type" json:"subscription_type,omitempty"`
+	RequestHeaders        map[string]string                      `bson:"request_headers" json:"request_headers"`
+	UseResponseExtensions GraphQLResponseExtensions              `bson:"use_response_extensions" json:"use_response_extensions"`
+	RequestHeadersRewrite map[string]RequestHeadersRewriteConfig `json:"request_headers_rewrite" bson:"request_headers_rewrite"`
+}
+
+type GraphQLProxyFeaturesConfig struct {
+	UseImmutableHeaders bool `bson:"use_immutable_headers" json:"use_immutable_headers"`
+}
+
+type RequestHeadersRewriteConfig struct {
+	Value  string `json:"value" bson:"value"`
+	Remove bool   `json:"remove" bson:"remove"`
 }
 
 type GraphQLSubgraphConfig struct {
@@ -843,15 +946,21 @@ type GraphQLEngineDataSourceConfigGraphQL struct {
 }
 
 type GraphQLEngineDataSourceConfigKafka struct {
-	BrokerAddresses      []string              `bson:"broker_addresses" json:"broker_addresses"`
-	Topics               []string              `bson:"topics" json:"topics"`
-	GroupID              string                `bson:"group_id" json:"group_id"`
-	ClientID             string                `bson:"client_id" json:"client_id"`
-	KafkaVersion         string                `bson:"kafka_version" json:"kafka_version"`
-	StartConsumingLatest bool                  `json:"start_consuming_latest"`
-	BalanceStrategy      string                `json:"balance_strategy"`
-	IsolationLevel       string                `json:"isolation_level"`
-	SASL                 kafka_datasource.SASL `json:"sasl"`
+	BrokerAddresses      []string               `bson:"broker_addresses" json:"broker_addresses"`
+	Topics               []string               `bson:"topics" json:"topics"`
+	GroupID              string                 `bson:"group_id" json:"group_id"`
+	ClientID             string                 `bson:"client_id" json:"client_id"`
+	KafkaVersion         string                 `bson:"kafka_version" json:"kafka_version"`
+	StartConsumingLatest bool                   `json:"start_consuming_latest"`
+	BalanceStrategy      string                 `json:"balance_strategy"`
+	IsolationLevel       string                 `json:"isolation_level"`
+	SASL                 GraphQLEngineKafkaSASL `json:"sasl"`
+}
+
+type GraphQLEngineKafkaSASL struct {
+	Enable   bool   `json:"enable"`
+	User     string `json:"user"`
+	Password string `json:"password"`
 }
 
 type QueryVariable struct {
@@ -1192,6 +1301,9 @@ func DummyAPI() APIDefinition {
 		Version:          GraphQLConfigVersion2,
 		LastSchemaUpdate: nil,
 		Proxy: GraphQLProxyConfig{
+			Features: GraphQLProxyFeaturesConfig{
+				UseImmutableHeaders: true,
+			},
 			AuthHeaders: map[string]string{},
 		},
 	}
@@ -1315,4 +1427,35 @@ type Introspection struct {
 type IntrospectionCache struct {
 	Enabled bool  `bson:"enabled" json:"enabled"`
 	Timeout int64 `bson:"timeout" json:"timeout"`
+}
+
+// WebHookHandlerConf holds configuration related to webhook event handler.
+type WebHookHandlerConf struct {
+	// Disabled enables/disables this webhook.
+	Disabled bool `bson:"disabled" json:"disabled"`
+	// ID optional ID of the webhook, to be used in pro mode.
+	ID string `bson:"id" json:"id"`
+	// Name is the name of webhook.
+	Name string `bson:"name" json:"name"`
+	// The method to use for the webhook.
+	Method string `bson:"method" json:"method"`
+	// The target path on which to send the request.
+	TargetPath string `bson:"target_path" json:"target_path"`
+	// The template to load in order to format the request.
+	TemplatePath string `bson:"template_path" json:"template_path"`
+	// Headers to set when firing the webhook.
+	HeaderList map[string]string `bson:"header_map" json:"header_map"`
+	// The cool-down for the event so it does not trigger again (in seconds).
+	EventTimeout int64 `bson:"event_timeout" json:"event_timeout"`
+}
+
+// Scan scans WebHookHandlerConf from `any` in.
+func (w *WebHookHandlerConf) Scan(in any) error {
+	conf, err := reflect.Cast[WebHookHandlerConf](in)
+	if err != nil {
+		return err
+	}
+
+	*w = *conf
+	return nil
 }

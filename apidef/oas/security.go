@@ -24,7 +24,7 @@ const (
 
 // Token holds the values related to authentication tokens.
 type Token struct {
-	// Enabled enables the token based authentication mode.
+	// Enabled activates the token based authentication mode.
 	//
 	// Tyk classic API definition: `auth_configs["authToken"].use_standard_auth`
 	Enabled bool `bson:"enabled" json:"enabled"` // required
@@ -108,6 +108,10 @@ type JWT struct {
 	IssuedAtValidationSkew  uint64   `bson:"issuedAtValidationSkew,omitempty" json:"issuedAtValidationSkew,omitempty"`
 	NotBeforeValidationSkew uint64   `bson:"notBeforeValidationSkew,omitempty" json:"notBeforeValidationSkew,omitempty"`
 	ExpiresAtValidationSkew uint64   `bson:"expiresAtValidationSkew,omitempty" json:"expiresAtValidationSkew,omitempty"`
+	// IDPClientIDMappingDisabled prevents Tyk from automatically detecting the use of certain IDPs based on standard claims
+	// that they include in the JWT: `client_id`, `cid`, `clientId`. Setting this flag to `true` disables the mapping and avoids
+	// accidentally misidentifying the use of one of these IDPs if one of their standard values is configured in your JWT.
+	IDPClientIDMappingDisabled bool `bson:"idpClientIdMappingDisabled,omitempty" json:"idpClientIdMappingDisabled,omitempty"`
 }
 
 // Import populates *JWT based on arguments.
@@ -166,6 +170,7 @@ func (s *OAS) fillJWT(api apidef.APIDefinition) {
 	jwt.IssuedAtValidationSkew = api.JWTIssuedAtValidationSkew
 	jwt.NotBeforeValidationSkew = api.JWTNotBeforeValidationSkew
 	jwt.ExpiresAtValidationSkew = api.JWTExpiresAtValidationSkew
+	jwt.IDPClientIDMappingDisabled = api.IDPClientIDMappingDisabled
 
 	s.getTykSecuritySchemes()[ac.Name] = jwt
 
@@ -195,13 +200,14 @@ func (s *OAS) extractJWTTo(api *apidef.APIDefinition, name string) {
 	api.JWTIssuedAtValidationSkew = jwt.IssuedAtValidationSkew
 	api.JWTNotBeforeValidationSkew = jwt.NotBeforeValidationSkew
 	api.JWTExpiresAtValidationSkew = jwt.ExpiresAtValidationSkew
+	api.IDPClientIDMappingDisabled = jwt.IDPClientIDMappingDisabled
 
 	api.AuthConfigs[apidef.JWTType] = ac
 }
 
 // Basic type holds configuration values related to http basic authentication.
 type Basic struct {
-	// Enabled enables the basic authentication mode.
+	// Enabled activates the basic authentication mode.
 	// Tyk classic API definition: `use_basic_auth`
 	Enabled     bool `bson:"enabled" json:"enabled"` // required
 	AuthSources `bson:",inline" json:",inline"`
@@ -290,7 +296,7 @@ func (s *OAS) extractBasicTo(api *apidef.APIDefinition, name string) {
 
 // ExtractCredentialsFromBody configures extracting credentials from the request body.
 type ExtractCredentialsFromBody struct {
-	// Enabled enables extracting credentials from body.
+	// Enabled activates extracting credentials from body.
 	// Tyk classic API definition: `basic_auth.extract_from_body`
 	Enabled bool `bson:"enabled" json:"enabled"` // required
 	// UserRegexp is the regex for username e.g. `<User>(.*)</User>`.
@@ -401,22 +407,29 @@ type OAuthProvider struct {
 }
 
 type JWTValidation struct {
-	// Enabled enables OAuth access token validation by introspection to a third party.
+	// Enabled activates OAuth access token validation by introspection to a third party.
 	Enabled bool `bson:"enabled" json:"enabled"`
+
 	// SigningMethod to verify signing method used in jwt - allowed values HMAC/RSA/ECDSA.
 	SigningMethod string `bson:"signingMethod" json:"signingMethod"`
-	// Source is the secret to verify signature, it could be one among:
+
+	// Source is the secret to verify signature. Valid values are:
+	//
 	// - a base64 encoded static secret,
-	// - a valid JWK url in plain text,
-	// - a valid JWK url in base64 encoded format.
+	// - a valid JWK URL in plain text,
+	// - a valid JWK URL in base64 encoded format.
 	Source string `bson:"source" json:"source"`
+
 	// IdentityBaseField is the identity claim name.
 	IdentityBaseField string `bson:"identityBaseField,omitempty" json:"identityBaseField,omitempty"`
-	// IssuedAtValidationSkew is the clock skew to be considered while validating iat claim.
+
+	// IssuedAtValidationSkew is the clock skew to be considered while validating the iat claim.
 	IssuedAtValidationSkew uint64 `bson:"issuedAtValidationSkew,omitempty" json:"issuedAtValidationSkew,omitempty"`
-	// NotBeforeValidationSkew is the clock skew to be considered while validating nbf claim.
+
+	// NotBeforeValidationSkew is the clock skew to be considered while validating the nbf claim.
 	NotBeforeValidationSkew uint64 `bson:"notBeforeValidationSkew,omitempty" json:"notBeforeValidationSkew,omitempty"`
-	// ExpiresAtValidationSkew is the clock skew to be considered while validating exp claim.
+
+	// ExpiresAtValidationSkew is the clock skew to be considered while validating the exp claim.
 	ExpiresAtValidationSkew uint64 `bson:"expiresAtValidationSkew,omitempty" json:"expiresAtValidationSkew,omitempty"`
 }
 
@@ -441,18 +454,18 @@ func (j *JWTValidation) ExtractTo(jwt *apidef.JWTValidation) {
 }
 
 type Introspection struct {
-	// Enabled enables OAuth access token validation by introspection to a third party.
+	// Enabled activates OAuth access token validation by introspection to a third party.
 	Enabled bool `bson:"enabled" json:"enabled"`
 	// URL is the URL of the third party provider's introspection endpoint.
 	URL string `bson:"url" json:"url"`
 	// ClientID is the public identifier for the client, acquired from the third party.
 	ClientID string `bson:"clientId" json:"clientId"`
-	// ClientSecret is a secret known only to the client and the authorization server, acquired from the third party.
+	// ClientSecret is a secret known only to the client and the authorisation server, acquired from the third party.
 	ClientSecret string `bson:"clientSecret" json:"clientSecret"`
 	// IdentityBaseField is the key showing where to find the user id in the claims. If it is empty, the `sub` key is looked at.
 	IdentityBaseField string `bson:"identityBaseField,omitempty" json:"identityBaseField,omitempty"`
 	// Cache is the caching mechanism for introspection responses.
-	Cache *IntrospectionCache `bson:"cache" json:"cache"`
+	Cache *IntrospectionCache `bson:"cache,omitempty" json:"cache,omitempty"`
 }
 
 func (i *Introspection) Fill(intros apidef.Introspection) {
@@ -485,7 +498,7 @@ func (i *Introspection) ExtractTo(intros *apidef.Introspection) {
 }
 
 type IntrospectionCache struct {
-	// Enabled enables the caching mechanism for introspection responses.
+	// Enabled activates the caching mechanism for introspection responses.
 	Enabled bool `bson:"enabled" json:"enabled"`
 	// Timeout is the duration in seconds of how long the cached value stays.
 	// For introspection caching, it is suggested to use a short interval.

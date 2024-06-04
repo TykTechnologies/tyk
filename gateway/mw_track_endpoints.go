@@ -8,7 +8,7 @@ import (
 
 // TrackEndpointMiddleware sets context variables to enable or disable whether Tyk should record analytitcs for a specific path.
 type TrackEndpointMiddleware struct {
-	BaseMiddleware
+	*BaseMiddleware
 }
 
 func (t *TrackEndpointMiddleware) Name() string {

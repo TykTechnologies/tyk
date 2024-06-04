@@ -31,11 +31,11 @@ const (
 func (ts *Test) createSpecTestFrom(tb testing.TB, def *apidef.APIDefinition) *APISpec {
 	tb.Helper()
 	loader := APIDefinitionLoader{Gw: ts.Gw}
-	spec := loader.MakeSpec(&nestedApiDefinition{APIDefinition: def}, nil)
+	spec, _ := loader.MakeSpec(&nestedApiDefinition{APIDefinition: def}, nil)
 	tname := tb.Name()
-	redisStore := &storage.RedisCluster{KeyPrefix: tname + "-apikey.", RedisController: ts.Gw.RedisController}
-	healthStore := &storage.RedisCluster{KeyPrefix: tname + "-apihealth.", RedisController: ts.Gw.RedisController}
-	orgStore := &storage.RedisCluster{KeyPrefix: tname + "-orgKey.", RedisController: ts.Gw.RedisController}
+	redisStore := &storage.RedisCluster{KeyPrefix: tname + "-apikey.", ConnectionHandler: ts.Gw.StorageConnectionHandler}
+	healthStore := &storage.RedisCluster{KeyPrefix: tname + "-apihealth.", ConnectionHandler: ts.Gw.StorageConnectionHandler}
+	orgStore := &storage.RedisCluster{KeyPrefix: tname + "-orgKey.", ConnectionHandler: ts.Gw.StorageConnectionHandler}
 	spec.Init(redisStore, redisStore, healthStore, orgStore)
 	return spec
 }
@@ -56,7 +56,7 @@ func (ts *Test) prepareExtractor(tb testing.TB, extractorSource apidef.IdExtract
 	}
 
 	spec := ts.createSpecTestFrom(tb, def)
-	mw := BaseMiddleware{Spec: spec, Gw: ts.Gw}
+	mw := &BaseMiddleware{Spec: spec, Gw: ts.Gw}
 	newExtractor(spec, mw)
 
 	extractor, ok := spec.CustomMiddleware.IdExtractor.Extractor.(IdExtractor)
