@@ -153,7 +153,7 @@ tags+=" boringcrypto"
 
 echo "Tags: $tags"
 
-CC=$CC GOEXPERIMENT=${GOEXPERIMENT} CGO_ENABLED=1 GOOS=$GOOS GOARCH=$GOARCH go build -buildmode=plugin -tags=goplugin,boringcrypto -trimpath -o $plugin_name
+CC=$CC CGO_ENABLED=1 GOOS=$GOOS GOARCH=$GOARCH go build -buildmode=plugin -tags=goplugin,boringcrypto -trimpath -o $plugin_name
 
 set +x
 
