@@ -52,6 +52,15 @@ func Compile(expr string) (*Regexp, error) {
 	return compileCache.do(expr)
 }
 
+// CompileNative invokes Compile and unwraps the standard library *regexp.Regexp value.
+func CompileNative(expr string) (*regexp.Regexp, error) {
+	r, err := Compile(expr)
+	if err != nil {
+		return nil, err
+	}
+	return r.Regexp, nil
+}
+
 // CompilePOSIX does the same as regexp.CompilePOSIX but returns cached *Regexp instead.
 func CompilePOSIX(expr string) (*Regexp, error) {
 	return compilePOSIXCache.do(expr)

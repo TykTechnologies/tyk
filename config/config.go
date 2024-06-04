@@ -408,6 +408,15 @@ type HttpServerOptionsConfig struct {
 	// Regular expressions and parameterized routes will be left alone regardless of this setting.
 	EnableStrictRoutes bool `json:"enable_strict_routes"`
 
+	// EnableRegexpCache enables caching mux routes. This optimizes gateway reload behaviour, as the
+	// routes regular expressions only get compiled once. It's recommended to turn this on if you
+	// issue gateway reload commands. If you have a significant number of routes, memory usage
+	// can be optimized by keeping the cache disabled. The cache is disabled by default.
+	//
+	// The setting depends on `disable_regexp_cache=false`.
+	// By default, regexp cache is disabled.
+	EnableRegexpCache bool `json:"enable_regexp_cache"`
+
 	// Disable TLS verification. Required if you are using self-signed certificates.
 	SSLInsecureSkipVerify bool `json:"ssl_insecure_skip_verify"`
 

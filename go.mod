@@ -37,7 +37,7 @@ require (
 	github.com/golang-jwt/jwt/v4 v4.5.0
 	github.com/golang/protobuf v1.5.3
 	github.com/google/uuid v1.6.0 // indirect
-	github.com/gorilla/mux v1.8.1
+	github.com/gorilla/mux v1.8.2-0.20240522102346-de7178dc9dff
 	github.com/gorilla/websocket v1.5.1
 	github.com/hashicorp/consul/api v1.26.1
 	github.com/hashicorp/go-multierror v1.1.1
