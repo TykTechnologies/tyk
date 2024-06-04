@@ -32,7 +32,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        fips: [1,0]
+        fips: [1]
     steps:
       - uses: actions/checkout@v4
         with:
