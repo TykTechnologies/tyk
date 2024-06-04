@@ -590,7 +590,6 @@ func (gw *Gateway) handleGetDetail(sessionKey, apiID, orgID string, byHash bool)
 	if byHash && !gw.GetConfig().HashKeys {
 		return apiError("Key requested by hash but key hashing is not enabled"), http.StatusBadRequest
 	}
-
 	spec := gw.getApiSpec(apiID)
 	if spec != nil {
 		orgID = spec.OrgID
@@ -1591,6 +1590,7 @@ func (gw *Gateway) keyHandler(w http.ResponseWriter, r *http.Request) {
 	gwConfig := gw.GetConfig()
 
 	if r.Method != http.MethodPost && isUserName && !gwConfig.DisableKeyActionsByUsername {
+		log.Println("here is user name")
 		keyName = gw.generateToken(orgID, keyName)
 	}
 

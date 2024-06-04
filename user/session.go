@@ -138,7 +138,7 @@ type SessionState struct {
 	EnableDetailRecording   bool                   `json:"enable_detail_recording" msg:"enable_detail_recording" example:"false" deprecated:"true" description:"deprecated use enable_detailed_recording going forward instead"`
 	EnableDetailedRecording bool                   `json:"enable_detailed_recording" msg:"enable_detailed_recording" example:"true"`
 	MetaData                map[string]interface{} `json:"meta_data" msg:"meta_data" example:"{\"tyk_developer_id\": \"62b3fb9a1d5e4f00017226f5\"}"`
-	Tags                    []string               `json:"tags" msg:"tags" example:"[\"641c15dd0fffb800010197bf\"]"`
+	Tags                    []string               `json:"tags" msg:"tags" example:"[edge,edge-eu]"`
 	Alias                   string                 `json:"alias" msg:"alias" example:"portal-developer@example.org"`
 	LastUpdated             string                 `json:"last_updated" msg:"last_updated" example:"1710302206"`
 	IdExtractorDeadline     int64                  `json:"id_extractor_deadline" msg:"id_extractor_deadline" format:"int64"`
