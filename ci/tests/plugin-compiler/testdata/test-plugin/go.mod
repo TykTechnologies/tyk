@@ -9,3 +9,5 @@ require (
 	github.com/TykTechnologies/tyk v1.9.2-0.20240604111314-25a8a36fe795
 	github.com/kr/pretty v0.3.1
 )
+
+replace github.com/TykTechnologies/tyk => ../../../../../
