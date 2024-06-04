@@ -31,6 +31,9 @@ ARG GITHUB_SHA
 ARG GITHUB_TAG
 ENV GITHUB_SHA ${GITHUB_SHA}
 ENV GITHUB_TAG ${GITHUB_TAG}
+ENV GOEXPERIMENT ${GOEXPERIMENT}
+
+RUN echo "GOEXPERIMENT: $GOEXPERIMENT"
 
 COPY ci/images/plugin-compiler/data/build.sh /build.sh
 RUN chmod +x /build.sh
