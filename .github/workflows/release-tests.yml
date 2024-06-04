@@ -28,9 +28,11 @@ jobs:
         run: task opentelemetry
 
   ci-tests:
-    name: CI Tests
+    name: 'CI Tests with fips: ${{ matrix.fips }}'
     runs-on: ubuntu-latest
-
+    strategy:
+      matrix:
+        fips: [1,0]
     steps:
       - uses: actions/checkout@v4
         with:
@@ -38,6 +40,11 @@ jobs:
 
       - id: ecr-login
         uses: ./.github/actions/ecr-login
+
+      - name: Setup Golang FIPS
+        if: ${{ contains(matrix.fips, '1') }}
+        run: |
+          echo "GOEXPERIMENT=boringcrypto" >> $GITHUB_ENV
 
       - name: Run /ci/tests
         shell: bash
