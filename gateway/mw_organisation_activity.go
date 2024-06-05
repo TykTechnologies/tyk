@@ -113,7 +113,6 @@ func (k *OrganizationMonitor) ProcessRequestLive(r *http.Request, orgSession *us
 		k.Spec.OrgSessionManager.Store(),
 		orgSession.Per > 0 && orgSession.Rate > 0,
 		true,
-		&k.Spec.GlobalConfig,
 		k.Spec,
 		false,
 	)
@@ -248,7 +247,6 @@ func (k *OrganizationMonitor) AllowAccessNext(
 		k.Spec.OrgSessionManager.Store(),
 		session.Per > 0 && session.Rate > 0,
 		true,
-		&k.Spec.GlobalConfig,
 		k.Spec,
 		false,
 	)

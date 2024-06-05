@@ -40,7 +40,7 @@ jobs:
             rpmvers: 'el/7 el/8 el/9 amazon/2 amazon/2023'
             debvers: 'ubuntu/xenial ubuntu/bionic ubuntu/focal ubuntu/jammy debian/jessie debian/buster debian/bullseye debian/bookworm'
     outputs:
-      tags: ${{ steps.metadata.outputs.tags }}
+      tags: ${{ steps.ci_metadata.outputs.tags }}
       commit_author: ${{ steps.fetch-author.outputs.commit_author}}
     steps:
       - name: Checkout of tyk
@@ -70,9 +70,9 @@ jobs:
           path: |
             ~/.cache/go-build
             ~/go/pkg/mod
-          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          key: ${{ runner.os }}-${{ matrix.golang_cross }}-go-${{ hashFiles('**/go.sum') }}
           restore-keys: |
-            ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+            ${{ runner.os }}-${{ matrix.golang_cross }}-${{ hashFiles('**/go.sum') }}
       - name: Build
         env:
           NFPM_STD_PASSPHRASE: ${{ secrets.SIGNING_KEY_PASSPHRASE }}
@@ -83,7 +83,7 @@ jobs:
           ci/bin/unlock-agent.sh
           git config --global url."https://${{ secrets.ORG_GH_TOKEN }}@github.com".insteadOf "https://github.com"
           git config --global --add safe.directory /go/src/github.com/TykTechnologies/tyk
-          goreleaser release --clean -f ${{ matrix.goreleaser }} ${{ !startsWith(github.ref, 'refs/tags/') && ' --snapshot --skip-sign' || '' }}' | tee /tmp/build.sh
+          goreleaser release --clean -f ${{ matrix.goreleaser }} ${{ !startsWith(github.ref, 'refs/tags/') && ' --snapshot --skip=sign' || '' }}' | tee /tmp/build.sh
           chmod +x /tmp/build.sh
           docker run --rm --privileged -e GITHUB_TOKEN=${{ github.token }} \
           -e GOPRIVATE=github.com/TykTechnologies                                \
@@ -117,7 +117,7 @@ jobs:
         with:
           mask-password: 'true'
       - name: Docker metadata for CI
-        id: metadata
+        id: ci_metadata
         if: ${{ matrix.golang_cross == '1.21-bullseye' }}
         uses: docker/metadata-action@v5
         with:
@@ -134,7 +134,7 @@ jobs:
         if: ${{ matrix.golang_cross == '1.21-bullseye' }}
         shell: bash
         env:
-          t: ${{ steps.metadata.outputs.tags }}
+          t: ${{ steps.ci_metadata.outputs.tags }}
           build_tag: ${{ startswith(github.ref, 'refs/tags') && github.ref_name || 'v0.0.0' }}
         run: |
           set +e
@@ -355,6 +355,59 @@ jobs:
           SLACK_USERNAME: API INTEGRATION TESTS
           SLACK_MESSAGE: "*Test*: ${{ matrix.db }}-${{ matrix.conf }}, *Author*: ${{ steps.fetch_slack_user.outputs.slack-user-name }}"
           SLACK_FOOTER: "<https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}|SEE EXECUTION DETAILS HERE>"
+  distroless:
+    runs-on: ubuntu-latest
+    needs: goreleaser
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+      - uses: actions/download-artifact@v4
+        with:
+          name: deb
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+      - name: Login to DockerHub
+        if: startsWith(github.ref, 'refs/tags')
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+      - name: Login to Cloudsmith
+        if: startsWith(github.ref, 'refs/tags')
+        uses: docker/login-action@v3
+        with:
+          registry: docker.tyk.io
+          username: ${{ secrets.CLOUDSMITH_USERNAME }}
+          password: ${{ secrets.CLOUDSMITH_API_KEY }}
+      - name: Docker metadata for distroless
+        id: distroless_metadata
+        uses: docker/metadata-action@v5
+        with:
+          images: |
+            tykio/tyk-gateway
+            docker.tyk.io/tyk-gateway/tyk-gateway
+          flavor: |
+            latest=false
+            prefix=s
+          tags: |
+            type=semver,pattern={{major}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{version}}
+          labels: |
+            org.opencontainers.image.title=tyk-gateway (distroless)
+            org.opencontainers.image.description=Tyk Open Source API Gateway written in Go, supporting REST, GraphQL, TCP and gRPC protocols
+            org.opencontainers.image.vendor=tyk.io
+            org.opencontainers.image.version=${{ github.ref_name }}
+      - name: build distroless image
+        uses: docker/build-push-action@v5
+        with:
+          context: "."
+          platforms: linux/amd64,linux/arm64
+          file: ci/Dockerfile.distroless
+          push: ${{ startsWith(github.ref, 'refs/tags') }}
+          tags: ${{ steps.distroless_metadata.outputs.tags }}
+          labels: ${{ steps.distroless_metadata.outputs.labels }}
   upgrade-deb:
     services:
       httpbin.org:
@@ -368,6 +421,7 @@ jobs:
           - amd64
           - arm64
         distro:
+          - ubuntu:xenial
           - ubuntu:bionic
           - ubuntu:focal
           - ubuntu:jammy
@@ -390,12 +444,9 @@ jobs:
           RUN apt-get update && apt-get install -y curl
           RUN curl -fsSL https://packagecloud.io/install/repositories/tyk/tyk-gateway/script.deb.sh | bash && apt-get install -y tyk-gateway=3.0.8
           RUN dpkg -i tyk-gateway.deb
-          RUN apt-get install -y jq
           RUN /opt/tyk-gateway/install/setup.sh --listenport=8080 --redishost=localhost --redisport=6379 --domain=""
-          COPY ci/tests/api-functionality/api_test.sh /
-          COPY ci/tests/api-functionality/pkg_test.sh /
           COPY ci/tests/api-functionality/data/api.json /opt/tyk-gateway/apps/
-          CMD [ "/pkg_test.sh" ]
+          CMD ["/opt/tyk-gateway/tyk", "--conf", "/opt/tyk-gateway/tyk.conf"]
           ' > Dockerfile
       - name: install on ${{ matrix.distro }}
         uses: docker/build-push-action@v5
@@ -408,7 +459,9 @@ jobs:
           load: true
       - name: Test the built container image with api functionality test.
         run: |
-          docker run --network ${{ job.container.network }} --rm test-${{ matrix.distro }}-${{ matrix.arch }}
+          docker run -d -p8080:8080 --network ${{ job.container.network }} --rm test-${{ matrix.distro }}-${{ matrix.arch }}
+          sleep 2
+          ./ci/tests/api-functionality/api_test.sh
   upgrade-rpm:
     services:
       httpbin.org:
@@ -422,6 +475,8 @@ jobs:
           - amazonlinux:2023
           - registry.access.redhat.com/ubi8/ubi
           - registry.access.redhat.com/ubi9/ubi
+          - amazonlinux:2
+          - registry.access.redhat.com/ubi7/ubi
     steps:
       - uses: actions/checkout@v4
         with:
@@ -440,12 +495,9 @@ jobs:
           RUN curl https://keyserver.tyk.io/tyk.io.rpm.signing.key.2020 -o tyk-gateway.key && rpm --import tyk-gateway.key
           RUN rpm --checksig tyk-gateway.rpm
           RUN rpm -Uvh --force tyk-gateway.rpm
-          RUN curl -fSL https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64 --output /usr/local/bin/jq && chmod a+x /usr/local/bin/jq
           RUN /opt/tyk-gateway/install/setup.sh --listenport=8080 --redishost=localhost --redisport=6379 --domain=""
           COPY ci/tests/api-functionality/data/api.json /opt/tyk-gateway/apps/
-          COPY ci/tests/api-functionality/api_test.sh /
-          COPY ci/tests/api-functionality/pkg_test.sh /
-          CMD [ "/pkg_test.sh" ]
+          CMD ["/opt/tyk-gateway/tyk", "--conf", "/opt/tyk-gateway/tyk.conf"]
           ' > Dockerfile
       - name: install on ${{ matrix.distro }}
         uses: docker/build-push-action@v5
@@ -453,11 +505,13 @@ jobs:
           context: "."
           file: Dockerfile
           push: false
-          tags: test-${{ matrix.distro }}
+          tags: test # matrix.distro for ubi has invalid chars for a tag
           load: true
       - name: Test the built container image with api functionality test.
         run: |
-          docker run --network ${{ job.container.network }} --rm test-${{ matrix.distro }}
+          docker run -d -p8080:8080 --network ${{ job.container.network }} --rm test
+          sleep 2
+          ./ci/tests/api-functionality/api_test.sh
   release-tests:
     needs:
       - goreleaser

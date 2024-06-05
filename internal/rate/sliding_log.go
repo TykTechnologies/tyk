@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/TykTechnologies/tyk/internal/rate/model"
 	"github.com/TykTechnologies/tyk/internal/redis"
 )
 
@@ -16,12 +17,10 @@ type SlidingLog struct {
 
 	// PipelineFn is exposed for black box tests in the same package.
 	PipelineFn func(context.Context, func(redis.Pipeliner) error) error
-}
 
-// RedisClientProvider is a hidden storage API, providing us with a redis.UniversalClient.
-type RedisClientProvider interface {
-	// Client returns the redis.UniversalClient or an error if not available.
-	Client() (redis.UniversalClient, error)
+	// smoothingFn will evaluate the current rate and must return true if
+	// the request should be blocked. It's required.
+	smoothingFn SmoothingFn
 }
 
 // ErrRedisClientProvider is returned if NewSlidingLog isn't passed a valid RedisClientProvider parameter.
@@ -29,8 +28,8 @@ var ErrRedisClientProvider = errors.New("Client doesn't implement RedisClientPro
 
 // NewSlidingLog creates a new SlidingLog instance with a storage.Handler. In case
 // the storage is offline, it's expected to return nil and an error to handle.
-func NewSlidingLog(client interface{}, pipeline bool) (*SlidingLog, error) {
-	cluster, ok := client.(RedisClientProvider)
+func NewSlidingLog(client interface{}, pipeline bool, smoothingFn SmoothingFn) (*SlidingLog, error) {
+	cluster, ok := client.(model.RedisClientProvider)
 	if !ok {
 		return nil, ErrRedisClientProvider
 	}
@@ -40,14 +39,15 @@ func NewSlidingLog(client interface{}, pipeline bool) (*SlidingLog, error) {
 		return nil, err
 	}
 
-	return NewSlidingLogRedis(conn, pipeline), nil
+	return NewSlidingLogRedis(conn, pipeline, smoothingFn), nil
 }
 
 // NewSlidingLogRedis creates a new SlidingLog instance with a redis.UniversalClient.
-func NewSlidingLogRedis(conn redis.UniversalClient, pipeline bool) *SlidingLog {
+func NewSlidingLogRedis(conn redis.UniversalClient, pipeline bool, smoothingFn SmoothingFn) *SlidingLog {
 	return &SlidingLog{
-		conn:     conn,
-		pipeline: pipeline,
+		conn:        conn,
+		pipeline:    pipeline,
+		smoothingFn: smoothingFn,
 	}
 }
 
@@ -168,4 +168,16 @@ func (r *SlidingLog) Get(ctx context.Context, now time.Time, keyName string, per
 	}
 
 	return res.Result()
+}
+
+// Do will return two values, the first indicates if a request should be blocked, and the second
+// returns an error if any occurred. In case an error occurs, the first value will be `true`.
+// If there are issues with storage availability for example, requests will be blocked rather
+// than let through, as no rate limit can be enforced without storage.
+func (r *SlidingLog) Do(ctx context.Context, now time.Time, key string, maxAllowedRate int64, per int64) (bool, error) {
+	currentRate, err := r.SetCount(ctx, now, key, per)
+	if err != nil {
+		return true, err
+	}
+	return r.smoothingFn(ctx, key, currentRate, maxAllowedRate), err
 }

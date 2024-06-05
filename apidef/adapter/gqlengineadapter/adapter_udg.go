@@ -103,7 +103,7 @@ func (u *UniversalDataGraph) engineConfigV2DataSources() (planDataSources []plan
 					Method: restConfig.Method,
 					Body:   restConfig.Body,
 					Query:  queryConfigs,
-					Header: convertApiDefinitionHeadersToHttpHeaders(restConfig.Headers),
+					Header: ConvertApiDefinitionHeadersToHttpHeaders(restConfig.Headers),
 				},
 			})
 
@@ -160,7 +160,11 @@ func (u *UniversalDataGraph) engineConfigV2DataSources() (planDataSources []plan
 					StartConsumingLatest: kafkaConfig.StartConsumingLatest,
 					BalanceStrategy:      kafkaConfig.BalanceStrategy,
 					IsolationLevel:       kafkaConfig.IsolationLevel,
-					SASL:                 kafkaConfig.SASL,
+					SASL: kafkaDataSource.SASL{
+						Enable:   kafkaConfig.SASL.Enable,
+						User:     kafkaConfig.SASL.User,
+						Password: kafkaConfig.SASL.Password,
+					},
 				},
 			})
 		}

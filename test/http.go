@@ -16,6 +16,7 @@ import (
 )
 
 type TestCase struct {
+	Host    string `json:",omitempty"`
 	Method  string `json:",omitempty"`
 	Path    string `json:",omitempty"`
 	BaseURL string `json:",omitempty"`
@@ -282,6 +283,10 @@ func (r HTTPTestRunner) Run(t testing.TB, testCases ...TestCase) (*http.Response
 		if err != nil {
 			t.Errorf("[%d] Request build error: %s", ti, err.Error())
 			continue
+		}
+
+		if tc.Host != "" {
+			req.Host = tc.Host
 		}
 
 		retryCount := 0

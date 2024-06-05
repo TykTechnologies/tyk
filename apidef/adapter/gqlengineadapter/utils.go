@@ -55,7 +55,7 @@ func graphqlSubscriptionType(subscriptionType apidef.SubscriptionType) graphql.S
 	}
 }
 
-func convertApiDefinitionHeadersToHttpHeaders(apiDefHeaders map[string]string) http.Header {
+func ConvertApiDefinitionHeadersToHttpHeaders(apiDefHeaders map[string]string) http.Header {
 	if len(apiDefHeaders) == 0 {
 		return nil
 	}
@@ -68,7 +68,7 @@ func convertApiDefinitionHeadersToHttpHeaders(apiDefHeaders map[string]string) h
 	return engineV2Headers
 }
 
-func removeDuplicateApiDefinitionHeaders(headers ...map[string]string) map[string]string {
+func RemoveDuplicateApiDefinitionHeaders(headers ...map[string]string) map[string]string {
 	hdr := make(map[string]string)
 	// headers priority depends on the order of arguments
 	for _, header := range headers {
@@ -101,7 +101,7 @@ func generateRestDataSourceFromGraphql(config apidef.GraphQLEngineDataSourceConf
 			URL:    config.URL,
 			Method: config.Method,
 			Body:   body,
-			Header: convertApiDefinitionHeadersToHttpHeaders(config.Headers),
+			Header: ConvertApiDefinitionHeadersToHttpHeaders(config.Headers),
 		},
 	})
 	return customMessage, nil

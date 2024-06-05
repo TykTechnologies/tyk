@@ -7,6 +7,7 @@ import (
 
 	"github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
 
+	"github.com/TykTechnologies/tyk/apidef"
 	logger "github.com/TykTechnologies/tyk/log"
 )
 
@@ -49,6 +50,23 @@ type APILimit struct {
 	QuotaRemaining     int64   `json:"quota_remaining" msg:"quota_remaining" example:"20000" format:"int64"`
 	QuotaRenewalRate   int64   `json:"quota_renewal_rate" msg:"quota_renewal_rate" example:"2592000" format:"int64"`
 	SetBy              string  `json:"-" msg:"-"`
+
+	// Smoothing contains rate limit smoothing settings.
+	Smoothing *apidef.RateLimitSmoothing `json:"smoothing" bson:"smoothing"`
+}
+
+// Less will return true if the receiver has a smaller duration between requests than `in`.
+func (g *APILimit) Less(in APILimit) bool {
+	return g.Duration() < in.Duration()
+}
+
+// Duration returns the time between two allowed requests at the defined rate.
+// It's used to decide which rate limit has a bigger allowance.
+func (g *APILimit) Duration() time.Duration {
+	if g.Per <= 0 || g.Rate <= 0 {
+		return 0
+	}
+	return time.Second * time.Duration(g.Rate/g.Per)
 }
 
 // AccessDefinition defines which versions of an API a key has access to
@@ -147,10 +165,47 @@ type SessionState struct {
 	// Used to store token hash
 	keyHash string
 	KeyID   string `json:"-"`
+
+	// Smoothing contains rate limit smoothing settings.
+	Smoothing *apidef.RateLimitSmoothing `json:"smoothing" bson:"smoothing"`
+
+	// modified holds the hint if a session has been modified for update.
+	// use Touch() to set it, and IsModified() to get it.
+	modified bool
 }
 
 func NewSessionState() *SessionState {
 	return &SessionState{}
+}
+
+// APILimit returns an user.APILimit from the session data.
+func (s *SessionState) APILimit() APILimit {
+	return APILimit{
+		QuotaMax:           s.QuotaMax,
+		QuotaRenewalRate:   s.QuotaRenewalRate,
+		QuotaRenews:        s.QuotaRenews,
+		Rate:               s.Rate,
+		Per:                s.Per,
+		ThrottleInterval:   s.ThrottleInterval,
+		ThrottleRetryLimit: s.ThrottleRetryLimit,
+		MaxQueryDepth:      s.MaxQueryDepth,
+		Smoothing:          s.Smoothing,
+	}
+}
+
+// Touch marks the session as modified, indicating that it should be updated.
+func (s *SessionState) Touch() {
+	s.modified = true
+}
+
+// Reset marks the session as not modified, skipping related updates.
+func (s *SessionState) Reset() {
+	s.modified = false
+}
+
+// IsModified will return true if session has been modified to trigger an update.
+func (s *SessionState) IsModified() bool {
+	return s.modified
 }
 
 // Clone  returns a fresh copy of s

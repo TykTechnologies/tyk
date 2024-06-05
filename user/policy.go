@@ -2,6 +2,7 @@ package user
 
 import (
 	"github.com/TykTechnologies/storage/persistent/model"
+	"github.com/TykTechnologies/tyk/apidef"
 )
 
 type GraphAccessDefinition struct{}
@@ -31,6 +32,22 @@ type Policy struct {
 	LastUpdated                   string                           `bson:"last_updated" json:"last_updated" example:"1655965189"`
 	MetaData                      map[string]interface{}           `bson:"meta_data" json:"meta_data"`
 	GraphQL                       map[string]GraphAccessDefinition `bson:"graphql_access_rights" json:"graphql_access_rights"`
+
+	// Smoothing contains rate limit smoothing settings.
+	Smoothing *apidef.RateLimitSmoothing `json:"smoothing" bson:"smoothing"`
+}
+
+func (p *Policy) APILimit() APILimit {
+	return APILimit{
+		QuotaMax:           p.QuotaMax,
+		QuotaRenewalRate:   p.QuotaRenewalRate,
+		Rate:               p.Rate,
+		Per:                p.Per,
+		ThrottleInterval:   p.ThrottleInterval,
+		ThrottleRetryLimit: p.ThrottleRetryLimit,
+		MaxQueryDepth:      p.MaxQueryDepth,
+		Smoothing:          p.Smoothing,
+	}
 }
 
 type PolicyPartitions struct {
