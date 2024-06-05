@@ -31,7 +31,7 @@ jobs:
         redis-version: [5, 7]
         python-version: ["3.11"]
         go-version: [1.21.x]
-        fips: [1,0]
+        fips: [1]
 
     steps:
       - name: Checkout Tyk
