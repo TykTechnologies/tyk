@@ -66,7 +66,7 @@ func (s *Supergraph) subgraphDataSourceConfigs() []graphqlDataSource.Configurati
 		if len(apiDefSubgraphConf.SDL) == 0 {
 			continue
 		}
-		hdr := removeDuplicateApiDefinitionHeaders(apiDefSubgraphConf.Headers, s.ApiDefinition.GraphQL.Supergraph.GlobalHeaders)
+		hdr := RemoveDuplicateApiDefinitionHeaders(apiDefSubgraphConf.Headers, s.ApiDefinition.GraphQL.Supergraph.GlobalHeaders)
 		conf := graphqlDataSourceConfiguration(
 			apiDefSubgraphConf.URL,
 			http.MethodPost,

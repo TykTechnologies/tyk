@@ -64,6 +64,8 @@ import (
 	"github.com/TykTechnologies/tyk/user"
 
 	"github.com/TykTechnologies/tyk/internal/cache"
+	"github.com/TykTechnologies/tyk/internal/model"
+	"github.com/TykTechnologies/tyk/internal/netutil"
 )
 
 var (
@@ -192,16 +194,11 @@ type Gateway struct {
 
 	// RedisController keeps track of redis connection and singleton
 	StorageConnectionHandler *storage.ConnectionHandler
-	hostDetails              hostDetails
+	hostDetails              model.HostDetails
 
 	healthCheckInfo atomic.Value
 
 	dialCtxFn test.DialContext
-}
-
-type hostDetails struct {
-	Hostname string
-	PID      int
 }
 
 func NewGateway(config config.Config, ctx context.Context) *Gateway {
@@ -1344,7 +1341,7 @@ func writePIDFile(file string) error {
 	return ioutil.WriteFile(file, []byte(pid), 0o600)
 }
 
-func readPIDFromFile(file string) (int, error) {
+var readPIDFromFile = func(file string) (int, error) {
 	b, err := ioutil.ReadFile(file)
 	if err != nil {
 		return 0, err
@@ -1526,6 +1523,8 @@ func (gw *Gateway) setUpConsul() error {
 	return err
 }
 
+var getIpAddress = netutil.GetIpAddress
+
 func (gw *Gateway) getHostDetails(file string) {
 	var err error
 	if gw.hostDetails.PID, err = readPIDFromFile(file); err != nil {
@@ -1533,6 +1532,17 @@ func (gw *Gateway) getHostDetails(file string) {
 	}
 	if gw.hostDetails.Hostname, err = os.Hostname(); err != nil {
 		mainLog.Error("Failed to get hostname: ", err)
+	}
+
+	gw.hostDetails.Address = gw.GetConfig().ListenAddress
+	if gw.hostDetails.Address == "" {
+		ips, err := getIpAddress()
+		if err != nil {
+			mainLog.Error("Failed to get node address: ", err)
+		}
+		if len(ips) > 0 {
+			gw.hostDetails.Address = ips[0]
+		}
 	}
 }
 
@@ -1844,7 +1854,7 @@ func handleDashboardRegistration(gw *Gateway) {
 func (gw *Gateway) startDRL() {
 	gwConfig := gw.GetConfig()
 
-	disabled := gwConfig.ManagementNode || gwConfig.EnableSentinelRateLimiter || gw.GetConfig().EnableRedisRollingLimiter
+	disabled := gwConfig.ManagementNode || gwConfig.EnableSentinelRateLimiter || gwConfig.EnableRedisRollingLimiter || gwConfig.EnableFixedWindowRateLimiter
 
 	gw.drlOnce.Do(func() {
 		drlManager := &drl.DRL{}

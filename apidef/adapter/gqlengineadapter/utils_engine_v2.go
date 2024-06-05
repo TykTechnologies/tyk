@@ -36,7 +36,7 @@ func graphqlDataSourceConfiguration(url string, method string, headers map[strin
 		Fetch: graphqlDataSource.FetchConfiguration{
 			URL:    url,
 			Method: method,
-			Header: convertApiDefinitionHeadersToHttpHeaders(dataSourceHeaders),
+			Header: ConvertApiDefinitionHeadersToHttpHeaders(dataSourceHeaders),
 		},
 		Subscription: graphqlDataSource.SubscriptionConfiguration{
 			URL:    url,

@@ -33,6 +33,11 @@ type Server struct {
 	//
 	// Tyk classic API definition: `detailed_tracing`
 	DetailedTracing *DetailedTracing `bson:"detailedTracing,omitempty" json:"detailedTracing,omitempty"`
+
+	// Events contains the configuration related to Tyk Events.
+	//
+	// Tyk classic API definition: `event_handlers`
+	EventHandlers EventHandlers `bson:"eventHandlers,omitempty" json:"eventHandlers,omitempty"`
 }
 
 // Fill fills *Server from apidef.APIDefinition.
@@ -80,6 +85,14 @@ func (s *Server) Fill(api apidef.APIDefinition) {
 	s.DetailedTracing.Fill(api)
 	if ShouldOmit(s.DetailedTracing) {
 		s.DetailedTracing = nil
+	}
+
+	if s.EventHandlers == nil {
+		s.EventHandlers = EventHandlers{}
+	}
+	s.EventHandlers.Fill(api)
+	if ShouldOmit(s.EventHandlers) {
+		s.EventHandlers = nil
 	}
 }
 
@@ -131,6 +144,15 @@ func (s *Server) ExtractTo(api *apidef.APIDefinition) {
 	}
 
 	s.DetailedTracing.ExtractTo(api)
+
+	if s.EventHandlers == nil {
+		s.EventHandlers = EventHandlers{}
+		defer func() {
+			s.EventHandlers = nil
+		}()
+	}
+
+	s.EventHandlers.ExtractTo(api)
 }
 
 // ListenPath is the base path on Tyk to which requests for this API

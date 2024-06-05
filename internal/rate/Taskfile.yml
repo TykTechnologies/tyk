@@ -1,21 +1,27 @@
 ---
 version: "3"
 
+includes:
+  services: ../../docker/services/Taskfile.yml
+
 vars:
   testArgs: -v
 
 tasks:
   test:
     desc: "Run tests (requires redis)"
+    deps: [ services:up ]
     cmds:
+      - defer:
+          task: services:down
       - task: fmt
-      - go test {{.testArgs}} -count=1 -gcflags="-m=3" -cover -coverprofile=rate.cov .
+      - go test {{.testArgs}} -count=1 -cover -coverprofile=rate.cov -coverpkg=./... ./...
 
   bench:
     desc: "Run benchmarks"
     cmds:
       - task: fmt
-      - go test {{.testArgs}} -count=1 -tags integration -bench=. -benchtime=10s -benchmem .
+      - go test {{.testArgs}} -count=1 -tags integration -bench=. -benchtime=10s -benchmem ./...
 
   fmt:
     internal: true

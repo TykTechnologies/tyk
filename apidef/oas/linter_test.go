@@ -3,12 +3,16 @@ package oas
 import (
 	"bytes"
 	"encoding/json"
+	"net/http"
 	"os"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/xeipuuv/gojsonschema"
+
+	"github.com/TykTechnologies/tyk/internal/event"
+	"github.com/TykTechnologies/tyk/internal/time"
 )
 
 func TestXTykGateway_Lint(t *testing.T) {
@@ -64,11 +68,18 @@ func TestXTykGateway_Lint(t *testing.T) {
 		settings.Server.Authentication.SecuritySchemes = map[string]interface{}{
 			"test-basic": securityScheme,
 		}
+		for i := range settings.Server.EventHandlers {
+			settings.Server.EventHandlers[i].Kind = event.WebhookKind
+			settings.Server.EventHandlers[i].Webhook.Method = http.MethodPost
+			settings.Server.EventHandlers[i].Trigger = event.QuotaExceeded
+			settings.Server.EventHandlers[i].Webhook.CoolDownPeriod = time.ReadableDuration(time.Second * 20)
+		}
+
 		for idx, _ := range settings.Middleware.Operations {
 			settings.Middleware.Operations[idx].CircuitBreaker.Threshold = 0.5
 		}
 
-		settings.Upstream.RateLimit.Per = "10s"
+		settings.Upstream.RateLimit.Per = time.ReadableDuration(10 * time.Second)
 	}
 
 	// Encode data to json

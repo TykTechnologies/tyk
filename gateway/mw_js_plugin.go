@@ -166,7 +166,7 @@ func (d *DynamicMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 
 	specAsJson := specToJson(d.Spec)
 
-	session := new(user.SessionState)
+	session := &user.SessionState{}
 
 	// Encode the session object (if not a pre-process)
 	if !d.Pre && d.UseSession {
@@ -269,7 +269,7 @@ func (d *DynamicMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 		newMeta := mapStrsToIfaces(newRequestData.SessionMeta)
 		if session != nil && !reflect.DeepEqual(session.MetaData, newMeta) {
 			session.MetaData = newMeta
-			ctxScheduleSessionUpdate(r)
+			session.Touch()
 		}
 	}
 

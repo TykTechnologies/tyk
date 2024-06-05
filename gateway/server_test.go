@@ -3,13 +3,18 @@ package gateway
 import (
 	"context"
 	"errors"
+	"fmt"
+	"net"
 	"testing"
 	"time"
 
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/internal/netutil"
 	"github.com/TykTechnologies/tyk/internal/otel"
+	"github.com/TykTechnologies/tyk/test"
 	"github.com/TykTechnologies/tyk/user"
 )
 
@@ -215,4 +220,146 @@ func TestGateway_SyncResourcesWithReload(t *testing.T) {
 		assert.Equal(t, 2, *hitCounter)
 	})
 
+}
+
+type gatewayGetHostDetailsTestCheckFn func(*testing.T, *test.BufferedLogger, *Gateway)
+
+func gatewayGetHostDetailsTestHasErr(wantErr bool, errorText string) gatewayGetHostDetailsTestCheckFn {
+	return func(t *testing.T, bl *test.BufferedLogger, _ *Gateway) {
+		t.Helper()
+		logs := bl.GetLogs(logrus.ErrorLevel)
+		if wantErr {
+			assert.NotEmpty(t, logs, "Expected error logs but got none")
+			if errorText != "" {
+				for _, log := range logs {
+					assert.Contains(t, log.Message, errorText, "Expected log message to contain %q", errorText)
+				}
+			}
+		} else {
+			assert.Empty(t, logs, "Expected no error logs but got some")
+		}
+	}
+}
+
+func gatewayGetHostDetailsTestAddress() gatewayGetHostDetailsTestCheckFn {
+	return func(t *testing.T, _ *test.BufferedLogger, gw *Gateway) {
+		t.Helper()
+		assert.NotNil(t, net.ParseIP(gw.hostDetails.Address))
+	}
+}
+
+func defineGatewayGetHostDetailsTests() []struct {
+	name                string
+	before              func(*Gateway)
+	readPIDFromFile     func(string) (int, error)
+	netutilGetIpAddress func() ([]string, error)
+	checks              []gatewayGetHostDetailsTestCheckFn
+} {
+	var check = func(fns ...gatewayGetHostDetailsTestCheckFn) []gatewayGetHostDetailsTestCheckFn { return fns }
+
+	return []struct {
+		name                string
+		before              func(*Gateway)
+		readPIDFromFile     func(string) (int, error)
+		netutilGetIpAddress func() ([]string, error)
+		checks              []gatewayGetHostDetailsTestCheckFn
+	}{
+		{
+			name:            "fail-read-pid",
+			readPIDFromFile: func(_ string) (int, error) { return 0, fmt.Errorf("Error opening file") },
+			before: func(gw *Gateway) {
+				gw.SetConfig(config.Config{
+					ListenAddress: "127.0.0.1",
+				})
+			},
+			checks: check(
+				gatewayGetHostDetailsTestHasErr(true, "Error opening file"),
+			),
+		},
+		{
+			name:            "success-listen-address-set",
+			readPIDFromFile: func(string) (int, error) { return 1000, nil },
+			before: func(gw *Gateway) {
+				gw.SetConfig(config.Config{
+					ListenAddress: "127.0.0.1",
+				})
+			},
+			checks: check(
+				gatewayGetHostDetailsTestHasErr(false, ""),
+				gatewayGetHostDetailsTestAddress(),
+			),
+		},
+		{
+			name:            "success-listen-address-not-set",
+			readPIDFromFile: func(_ string) (int, error) { return 1000, nil },
+			before: func(gw *Gateway) {
+				gw.SetConfig(config.Config{
+					ListenAddress: "",
+				})
+			},
+			checks: check(
+				gatewayGetHostDetailsTestHasErr(false, ""),
+				gatewayGetHostDetailsTestAddress(),
+			),
+		},
+		{
+			name:            "fail-getting-network-address",
+			readPIDFromFile: func(_ string) (int, error) { return 1000, nil },
+			before: func(gw *Gateway) {
+				gw.SetConfig(config.Config{
+					ListenAddress: "",
+				})
+			},
+			netutilGetIpAddress: func() ([]string, error) { return nil, fmt.Errorf("Error getting network addresses") },
+			checks: check(
+				gatewayGetHostDetailsTestHasErr(true, "Error getting network addresses"),
+			),
+		},
+	}
+}
+
+func TestGatewayGetHostDetails(t *testing.T) {
+
+	var (
+		orig_readPIDFromFile = readPIDFromFile
+		orig_mainLog         = mainLog
+		orig_getIpAddress    = netutil.GetIpAddress
+		bl                   = test.NewBufferingLogger()
+	)
+
+	tests := defineGatewayGetHostDetailsTests()
+
+	// restore the original functions
+	defer func() {
+		readPIDFromFile = orig_readPIDFromFile
+		mainLog = orig_mainLog
+		getIpAddress = orig_getIpAddress
+	}()
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// clear logger mock buffer
+			bl.ClearLogs()
+			// replace functions with mocks
+			mainLog = bl.Logger.WithField("prefix", "test")
+			if tt.readPIDFromFile != nil {
+				readPIDFromFile = tt.readPIDFromFile
+			}
+
+			if tt.netutilGetIpAddress != nil {
+				getIpAddress = tt.netutilGetIpAddress
+			}
+
+			gw := &Gateway{}
+
+			if tt.before != nil {
+				tt.before(gw)
+			}
+
+			gw.getHostDetails(gw.GetConfig().PIDFileLocation)
+			for _, c := range tt.checks {
+				c(t, bl, gw)
+			}
+		})
+	}
 }
