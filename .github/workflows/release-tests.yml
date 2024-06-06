@@ -50,8 +50,8 @@ jobs:
         shell: bash
         env:
           GITHUB_TAG: ${{ github.ref }}
-          GATEWAY_IMAGE: ${{ steps.ecr-login.outputs.registry }}/tyk:sha-${{ github.sha }}
-          PLUGIN_COMPILER_IMAGE: ${{ steps.ecr-login.outputs.registry }}/tyk-plugin-compiler:sha-${{ github.sha }}
+          GATEWAY_IMAGE: ${{ steps.ecr-login.outputs.registry }}/tyk:sha-${{ github.sha }}-fips-amd64
+          PLUGIN_COMPILER_IMAGE: ${{ steps.ecr-login.outputs.registry }}/tyk-plugin-compiler:sha-${{ github.sha }}-fips-amd64
           GOEXPERIMENT: ${{ env.GOEXPERIMENT }}
         run: |
           set -eaxo pipefail
