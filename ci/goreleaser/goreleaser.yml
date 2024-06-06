@@ -69,7 +69,7 @@ builds:
 dockers:
   # Build tykio/tyk-gateway, docker.tyk.io/tyk-gateway/tyk-gateway (amd64)
   - ids:
-      - fips-std
+      - fips
     image_templates:
         - "tykio/tyk-gateway:{{.Tag}}-fips-amd64"
         - "docker.tyk.io/tyk-gateway/tyk-gateway:{{.Tag}}-fips-amd64"
@@ -95,22 +95,6 @@ dockers:
       - "policies"
       - "coprocess"
       - "tyk.conf.example"
-  - ids:
-      - fips-hybrid-std
-    image_templates:
-        - "tykio/tyk-hybrid-docker:{{.Tag}}-fips-amd64"
-    build_flag_templates:
-      - "--platform=linux/amd64"
-      - "--label=org.opencontainers.image.created={{.Date}}"
-      - "--label=org.opencontainers.image.title={{.ProjectName}}-hybrid"
-      - "--label=org.opencontainers.image.revision={{.FullCommit}}"
-      - "--label=org.opencontainers.image.version={{.Version}}"
-    use: buildx
-    goarch: amd64
-    goos: linux
-    dockerfile: ci/images/hybrid/Dockerfile
-    extra_files:
-      - "ci/images/hybrid/"
   - ids:
       - std
     image_templates:
