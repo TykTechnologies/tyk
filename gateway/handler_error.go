@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/base64"
 	"errors"
-	"github.com/sirupsen/logrus"
 	htmlTemplate "html/template"
 	"io"
 	"io/ioutil"
@@ -314,18 +313,5 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 	}
 	// Report in health check
 	reportHealthValue(e.Spec, BlockedRequestLog, "-1")
-
-	if e.Spec.GlobalConfig.DisableTransactionLogs != true {
-		tLog.WithFields(logrus.Fields{
-			"host":            r.Host,
-			"userAgent":       r.UserAgent(),
-			"requestMethod":   r.Method,
-			"requestUri":      r.RequestURI,
-			"protocol":        r.Proto,
-			"responseCode":    errCode,
-			"upstreamAddress": r.URL.Scheme + "://" + r.URL.Host + r.URL.RequestURI(),
-			"clientIp":        request.RealIP(r),
-		}).Info("Transaction log")
-	}
 
 }

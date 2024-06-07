@@ -1,10 +1,8 @@
 package log
 
 import (
-	"fmt"
 	"os"
 	"strings"
-	"time"
 
 	"github.com/sirupsen/logrus"
 
@@ -52,19 +50,16 @@ func (f *RawFormatter) Format(entry *logrus.Entry) ([]byte, error) {
 }
 
 // TransactionFormatter formats logs for transactions in the desired format
-type TransactionFormatter struct{}
+type TransactionFormatter struct {
+	*logrus.JSONFormatter
+}
 
 func (f *TransactionFormatter) Format(entry *logrus.Entry) ([]byte, error) {
-	timestamp := time.Now().Format(time.RFC3339)
-	userAgent, _ := entry.Data["userAgent"].(string)
-	requestMethod, _ := entry.Data["requestMethod"].(string)
-	requestUri, _ := entry.Data["requestUri"].(string)
-	protocol, _ := entry.Data["protocol"].(string)
-	responseCode, _ := entry.Data["responseCode"].(int)
-	upstreamAddress, _ := entry.Data["upstreamAddress"].(string)
-	clientIp, _ := entry.Data["clientIp"].(string)
-	message := fmt.Sprintf("%s \"%s %s %s\" %d \"%s\" \"%s\" %s\n", timestamp, requestMethod, requestUri, protocol, responseCode, userAgent, upstreamAddress, clientIp)
-	return []byte(message), nil
+	message, err := f.JSONFormatter.Format(entry)
+	if err != nil {
+		log.Error("Could not format transaction log entry: %v", err)
+	}
+	return message, nil
 }
 
 //nolint:gochecknoinits
@@ -88,9 +83,10 @@ func init() {
 	}
 
 	rawLog.Formatter = new(RawFormatter)
-	transactionLog.Formatter = new(TransactionFormatter)
 
-	// Set log level for transactionLog as needed
+	// Initialize and configure the transactionLogger and JSONFormatter
+	jsonFormatter := new(logrus.JSONFormatter)
+	transactionLog.Formatter = &TransactionFormatter{JSONFormatter: jsonFormatter}
 	transactionLog.Level = logrus.InfoLevel
 }
 

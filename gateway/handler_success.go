@@ -384,17 +384,29 @@ func (s *SuccessHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) *http
 
 	// Don't print a transaction log there is no "resp", that indicates an error.
 	// In error situations, transaction log is already printed by "handler_error.go"
-	if resp.Response != nil || s.Spec.GlobalConfig.DisableTransactionLogs {
-		tLog.WithFields(logrus.Fields{
-			"host":            r.Host,
-			"userAgent":       r.UserAgent(),
-			"requestMethod":   r.Method,
-			"requestUri":      r.RequestURI,
-			"protocol":        r.Proto,
-			"responseCode":    resp.Response.StatusCode,
-			"upstreamAddress": r.URL.Scheme + "://" + r.URL.Host + r.URL.RequestURI(),
-			"clientIp":        request.RealIP(r),
-		}).Info("Transaction log")
+	if resp.Response != nil && s.Spec.GlobalConfig.AccessLogs.Enabled {
+		token := ctxGetAuthToken(r)
+		tLogFields := logrus.Fields{
+			"apiID":            s.Spec.APIID,
+			"apiKey":           s.Gw.obfuscateKey(token),
+			"clientRemoteAddr": r.RemoteAddr,
+			"clientIp":         request.RealIP(r),
+			"host":             r.Host,
+			"orgID":            s.Spec.OrgID,
+			"protocol":         r.Proto,
+			"requestMethod":    r.Method,
+			"requestUri":       r.RequestURI,
+			"responseCode":     resp.Response.StatusCode,
+			"upstreamAddress":  r.URL.Scheme + "://" + r.URL.Host + r.URL.RequestURI(),
+			"upstreamUri":      r.URL.Path,
+			"userAgent":        r.UserAgent(),
+		}
+
+		if strings.EqualFold(s.Spec.GlobalConfig.AccessLogs.Template, "json") {
+			tLog.WithFields(tLogFields).Info("Transaction log")
+		} else {
+			log.WithFields(tLogFields).Info("Transaction log")
+		}
 	}
 
 	return nil
