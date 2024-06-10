@@ -522,7 +522,15 @@ func (h CustomMiddlewareResponseHook) Base() *BaseTykResponseHandler {
 }
 
 func (h *CustomMiddlewareResponseHook) Init(mwDef interface{}, spec *APISpec) error {
-	mwDefinition := mwDef.(apidef.MiddlewareDefinition)
+	mwDefBytes, err := json.Marshal(mwDef)
+	if err != nil {
+		return err
+	}
+
+	var mwDefinition apidef.MiddlewareDefinition
+	if err := json.Unmarshal(mwDefBytes, &mwDefinition); err != nil {
+		return err
+	}
 
 	h.mw = &CoProcessMiddleware{
 		BaseMiddleware: &BaseMiddleware{
