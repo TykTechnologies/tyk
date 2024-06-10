@@ -6,13 +6,12 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/TykTechnologies/tyk/config"
-
 	"github.com/getkin/kin-openapi/openapi3"
-
 	"github.com/stretchr/testify/assert"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/internal/event"
 )
 
 func TestOAS(t *testing.T) {
@@ -133,6 +132,18 @@ func TestOAS_ExtractTo_ResetAPIDefinition(t *testing.T) {
 	var a apidef.APIDefinition
 	Fill(t, &a, 0)
 
+	// Fill doesn't populate eventhandlers to a valid value, we do it now.
+	a.EventHandlers.Events = map[apidef.TykEvent][]apidef.EventHandlerTriggerConfig{
+		event.QuotaExceeded: {
+			{
+				Handler: event.WebHookHandler,
+				HandlerMeta: map[string]interface{}{
+					"target_path": "https://webhook.site/uuid",
+				},
+			},
+		},
+	}
+
 	var vInfo apidef.VersionInfo
 	Fill(t, &vInfo, 0)
 	a.VersionData.Versions = map[string]apidef.VersionInfo{
@@ -246,7 +257,6 @@ func TestOAS_ExtractTo_ResetAPIDefinition(t *testing.T) {
 		"APIDefinition.SessionProvider.Name",
 		"APIDefinition.SessionProvider.StorageEngine",
 		"APIDefinition.SessionProvider.Meta[0]",
-		"APIDefinition.EventHandlers.Events[0]",
 		"APIDefinition.EnableBatchRequestSupport",
 		"APIDefinition.EnableIpWhiteListing",
 		"APIDefinition.AllowedIPs[0]",
