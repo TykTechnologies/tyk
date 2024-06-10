@@ -398,7 +398,8 @@ func (s *SuccessHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) *http
 			"requestUri":       r.RequestURI,
 			"responseCode":     resp.Response.StatusCode,
 			"upstreamAddress":  r.URL.Scheme + "://" + r.URL.Host + r.URL.RequestURI(),
-			"upstreamUri":      r.URL.Path,
+			"upstreamPath":     r.URL.Path,
+			"upstreamUri":      r.URL.RequestURI(),
 			"userAgent":        r.UserAgent(),
 		}
 

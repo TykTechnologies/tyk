@@ -511,12 +511,6 @@ func (gw *Gateway) processSpec(spec *APISpec, apisByListen map[string]int,
 		}
 	}
 
-	// Alternative solution.. create a final middleware
-	// which prints transaction logs.
-	if spec.GlobalConfig.DisableTransactionLogs {
-		//gw.mwAppendEnabled(&simpleArray, &TransactionLogger{baseMid})
-	}
-
 	logger.WithFields(logrus.Fields{
 		"prefix":      "gateway",
 		"user_ip":     "--",

@@ -676,9 +676,6 @@ type Config struct {
 	// Enable Key hashing
 	HashKeys bool `json:"hash_keys"`
 
-	// DisableTransactionLogs disables printing of API calls to stdout
-	DisableTransactionLogs bool `json:"disable_transaction_logs"`
-
 	// AccessLogs enables the printing of API calls to stdout
 	// By default, the Gateway will print the details of API requests and the client
 	AccessLogs AccessLogsConfig `json:"access_logs"`
