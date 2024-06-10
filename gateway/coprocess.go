@@ -522,14 +522,9 @@ func (h CustomMiddlewareResponseHook) Base() *BaseTykResponseHandler {
 }
 
 func (h *CustomMiddlewareResponseHook) Init(mwDef interface{}, spec *APISpec) error {
-	mwDefBytes, err := json.Marshal(mwDef)
+	mwDefinition, err := h.scanConfig(mwDef)
 	if err != nil {
-		return err
-	}
-
-	var mwDefinition apidef.MiddlewareDefinition
-	if err := json.Unmarshal(mwDefBytes, &mwDefinition); err != nil {
-		return err
+		return fmt.Errorf("error scanning response hook config from %T: %w", mwDef, err)
 	}
 
 	h.mw = &CoProcessMiddleware{
@@ -543,6 +538,21 @@ func (h *CustomMiddlewareResponseHook) Init(mwDef interface{}, spec *APISpec) er
 		MiddlewareDriver: spec.CustomMiddleware.Driver,
 	}
 	return nil
+}
+
+// scanConfig will json encode and decode the passed argument into an *apidef.MiddlewareDefinition.
+// generally the passed argument is a `map[string]any` which should match the fields of the model.
+func (h *CustomMiddlewareResponseHook) scanConfig(mwDef any) (*apidef.MiddlewareDefinition, error) {
+	mwDefBytes, err := json.Marshal(mwDef)
+	if err != nil {
+		return nil, err
+	}
+
+	var mwDefinition *apidef.MiddlewareDefinition
+	if err := json.Unmarshal(mwDefBytes, &mwDefinition); err != nil {
+		return nil, err
+	}
+	return mwDefinition, nil
 }
 
 // getAuthType overrides BaseMiddleware.getAuthType.

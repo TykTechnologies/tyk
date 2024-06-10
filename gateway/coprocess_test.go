@@ -4,13 +4,10 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/stretchr/testify/require"
-
-	"github.com/TykTechnologies/tyk/coprocess"
-
 	"github.com/stretchr/testify/assert"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/coprocess"
 )
 
 func Test_getIDExtractor(t *testing.T) {
@@ -251,5 +248,55 @@ func TestCoProcessMiddlewareName(t *testing.T) {
 	name := m.Name()
 
 	// Check that the returned name is "CoProcessMiddleware"
-	require.Equal(t, "CoProcessMiddleware", name, "Name method did not return the expected value")
+	assert.Equal(t, "CoProcessMiddleware", name, "Name method did not return the expected value")
+}
+
+func TestCustomMiddlewareResponseHook_scanConfig(t *testing.T) {
+	hook := &CustomMiddlewareResponseHook{}
+
+	testCases := []struct {
+		name    string
+		input   any
+		want    *apidef.MiddlewareDefinition
+		wantErr bool
+	}{
+		{
+			name: "Valid input",
+			input: map[string]any{
+				"name":          "middleware1",
+				"raw_body_only": true,
+			},
+			want: &apidef.MiddlewareDefinition{
+				Name:        "middleware1",
+				RawBodyOnly: true,
+			},
+			wantErr: false,
+		},
+		{
+			name:    "Marshalling error",
+			input:   t.Log, // t.Log is a function, which will cause marshalling error
+			want:    nil,
+			wantErr: true,
+		},
+		{
+			name: "Decoding error",
+			input: map[string]any{
+				"name": 123, // Invalid type for name, should be a string
+			},
+			want:    nil,
+			wantErr: true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			result, err := hook.scanConfig(tc.input)
+			if tc.wantErr {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
+			assert.Equal(t, tc.want, result)
+		})
+	}
 }
