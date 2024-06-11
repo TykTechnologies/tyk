@@ -1,11 +1,13 @@
 package gateway
 
 import (
+	"encoding/json"
+	"io"
 	"net/http"
 
 	"github.com/mitchellh/mapstructure"
 
-	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/ctx"
 	"github.com/TykTechnologies/tyk/user"
 )
 
@@ -17,6 +19,25 @@ type LLMResponseReporter struct {
 	config HeaderInjectorOptions
 }
 
+type anthropicTokenCount struct {
+	Input  int `json:"input_tokens"`
+	Output int `json:"output_tokens"`
+}
+
+type anthropicResponse struct {
+	Usage anthropicTokenCount `json:"usage"`
+}
+
+type openAITokenCount struct {
+	Input  int `json:"prompt_tokens"`
+	Output int `json:"completion_tokens"`
+	Total  int `json:"total_tokens"`
+}
+
+type openAIResponse struct {
+	Usage openAITokenCount `json:"usage"`
+}
+
 func (h *LLMResponseReporter) Base() *BaseTykResponseHandler {
 	return &h.BaseTykResponseHandler
 }
@@ -26,11 +47,22 @@ func (*LLMResponseReporter) Name() string {
 }
 
 func (h *LLMResponseReporter) Enabled() bool {
+	tagLLM := false
 	for _, v := range h.Spec.Tags {
 		if v == "llm" {
-			return true
+			tagLLM = true
 		}
 	}
+
+	for _, v := range h.Spec.Tags {
+		if v == "openai" || v == "anthropic" {
+			if tagLLM {
+				return true
+			}
+		}
+	}
+
+	return false
 }
 
 func (h *LLMResponseReporter) Init(c interface{}, spec *APISpec) error {
@@ -42,42 +74,46 @@ func (h *LLMResponseReporter) HandleError(rw http.ResponseWriter, req *http.Requ
 }
 
 func (h *LLMResponseReporter) HandleResponse(rw http.ResponseWriter, res *http.Response, req *http.Request, ses *user.SessionState) error {
-	// TODO: This should only target specific paths
-	ignoreCanonical := h.Gw.GetConfig().IgnoreCanonicalMIMEHeaderKey
-	vInfo, _ := h.Spec.Version(req)
-	versionPaths := h.Spec.RxPaths[vInfo.Name]
+	if req.Method != http.MethodPost {
+		return nil
+	}
+	var err error
 
-	found, meta := h.Spec.CheckSpecMatchesStatus(req, versionPaths, HeaderInjectedResponse)
-	if found {
-		hmeta := meta.(*apidef.HeaderInjectionMeta)
-		for _, dKey := range hmeta.DeleteHeaders {
-			res.Header.Del(dKey)
-		}
-		for nKey, nVal := range hmeta.AddHeaders {
-			setCustomHeader(res.Header, nKey, h.Gw.replaceTykVariables(req, nVal, false), ignoreCanonical)
-		}
+	res.Body, err = copyBody(res.Body, false)
+	if err != nil {
+		return err
 	}
 
-	// Manage global response header options with versionInfo
-	if !vInfo.GlobalResponseHeadersDisabled {
-		for _, key := range vInfo.GlobalResponseHeadersRemove {
-			log.Debug("Removing: ", key)
-			res.Header.Del(key)
-		}
+	body, err := io.ReadAll(res.Body)
+	if err != nil {
+		return err
+	}
 
-		for key, val := range vInfo.GlobalResponseHeaders {
-			log.Debug("Adding: ", key)
-			setCustomHeader(res.Header, key, h.Gw.replaceTykVariables(req, val, false), ignoreCanonical)
-		}
+	for _, v := range h.Spec.Tags {
+		if v == "openai" {
+			var openAIResp openAIResponse
+			err = json.Unmarshal(body, &openAIResp)
+			if err != nil {
+				return err
+			}
 
-		// Manage global response header options with response_processors
-		for _, n := range h.config.RemoveHeaders {
-			res.Header.Del(n)
-		}
-		for header, v := range h.config.AddHeaders {
-			setCustomHeader(res.Header, header, h.Gw.replaceTykVariables(req, v, false), ignoreCanonical)
+			setCtxValue(req, ctx.LLMResponseReporterInputTokens, openAIResp.Usage.Input)
+			setCtxValue(req, ctx.LLMResponseReporterOutputTokens, openAIResp.Usage.Output)
+			setCtxValue(req, ctx.LLMResponseReporterTotalTokens, openAIResp.Usage.Total)
+
+		} else if v == "anthropic" {
+			var anthropicResp anthropicResponse
+			err = json.Unmarshal(body, &anthropicResp)
+			if err != nil {
+				return err
+			}
+
+			setCtxValue(req, ctx.LLMResponseReporterInputTokens, anthropicResp.Usage.Input)
+			setCtxValue(req, ctx.LLMResponseReporterOutputTokens, anthropicResp.Usage.Output)
+			setCtxValue(req, ctx.LLMResponseReporterTotalTokens, anthropicResp.Usage.Input+anthropicResp.Usage.Output)
 		}
 	}
 
 	return nil
+
 }
