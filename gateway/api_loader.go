@@ -445,6 +445,7 @@ func (gw *Gateway) processSpec(spec *APISpec, apisByListen map[string]int,
 
 	gw.mwAppendEnabled(&chainArray, &VirtualEndpoint{BaseMiddleware: baseMid})
 	gw.mwAppendEnabled(&chainArray, &RequestSigning{BaseMiddleware: baseMid})
+	gw.mwAppendEnabled(&chainArray, &LLMReport{BaseMiddleware: baseMid})
 	gw.mwAppendEnabled(&chainArray, &GoPluginMiddleware{BaseMiddleware: baseMid})
 
 	for _, obj := range mwPostFuncs {

@@ -47,6 +47,9 @@ const (
 	GraphQLRequest
 	GraphQLIsWebSocketUpgrade
 	OASOperation
+	LLMReport_Model
+	LLMReport_NumTokens
+	LLMReport_Estimate
 
 	// CacheOptions holds cache options required for cache writer middleware.
 	CacheOptions

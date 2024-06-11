@@ -3105,6 +3105,27 @@ func ctxGetSession(r *http.Request) *user.SessionState {
 	return ctx.GetSession(r)
 }
 
+func ctxGetLLMReportTokenCount(r *http.Request) int {
+	if v := r.Context().Value(ctx.LLMReport_NumTokens); v != nil {
+		return v.(int)
+	}
+	return 0
+}
+
+func ctxGetLLMReportModelName(r *http.Request) string {
+	if v := r.Context().Value(ctx.LLMReport_Model); v != nil {
+		return v.(string)
+	}
+	return ""
+}
+
+func ctxGetLLMReportIsEstimate(r *http.Request) bool {
+	if v := r.Context().Value(ctx.LLMReport_Estimate); v != nil {
+		return v.(bool)
+	}
+	return false
+}
+
 func ctxSetSession(r *http.Request, s *user.SessionState, scheduleUpdate bool, hashKey bool) {
 	ctx.SetSession(r, s, scheduleUpdate, hashKey)
 }
