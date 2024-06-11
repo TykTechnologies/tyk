@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"crypto/md5"
 	"encoding/hex"
+	"errors"
 	htmlTemplate "html/template"
 	"io/ioutil"
 	"net/http"
@@ -35,6 +36,11 @@ const (
 	EH_WebHook = event.WebHookHandler
 )
 
+var (
+	// ErrEventHandlerDisabled is returned when the event handler is disabled.
+	ErrEventHandlerDisabled = errors.New("event handler disabled")
+)
+
 // WebHookHandler is an event handler that triggers web hooks
 type WebHookHandler struct {
 	conf     apidef.WebHookHandlerConf
@@ -60,7 +66,7 @@ func (w *WebHookHandler) Init(handlerConf interface{}) error {
 		log.WithFields(logrus.Fields{
 			"prefix": "webhooks",
 		}).Infof("skipping disabled webhook %s", w.conf.Name)
-		return nil
+		return ErrEventHandlerDisabled
 	}
 
 	w.store = &storage.RedisCluster{KeyPrefix: "webhook.cache.", ConnectionHandler: w.Gw.StorageConnectionHandler}
