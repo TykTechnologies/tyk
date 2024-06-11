@@ -3106,7 +3106,7 @@ func ctxGetSession(r *http.Request) *user.SessionState {
 }
 
 func ctxGetLLMReportTokenCount(r *http.Request) int {
-	if v := r.Context().Value(ctx.LLMReport_NumTokens); v != nil {
+	if v := r.Context().Value(ctx.LLMReport_NumRequestTokens); v != nil {
 		return v.(int)
 	}
 	return 0

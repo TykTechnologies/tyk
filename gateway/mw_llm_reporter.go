@@ -49,12 +49,13 @@ func (sa *LLMReport) decodeBody(r *http.Request) (*baseCompletionObject, error) 
 		return nil, fmt.Errorf("Content-Type is not application/json")
 	}
 
-	dat, err := copyBody(r.Body, false)
+	var err error
+	r.Body, err = copyBody(r.Body, false)
 	if err != nil {
 		return nil, err
 	}
 
-	bd, err := io.ReadAll(dat)
+	bd, err := io.ReadAll(r.Body)
 	if err != nil {
 		return nil, err
 	}
@@ -125,7 +126,7 @@ func (sa *LLMReport) ProcessRequest(w http.ResponseWriter, r *http.Request, _ in
 
 	// Pick these up in RecordHit()
 	setCtxValue(r, ctx.LLMReport_Model, msg.Model)
-	setCtxValue(r, ctx.LLMReport_NumTokens, count)
+	setCtxValue(r, ctx.LLMReport_NumRequestTokens, count)
 	setCtxValue(r, ctx.LLMReport_Estimate, isEstimate)
 
 	return nil, http.StatusOK
