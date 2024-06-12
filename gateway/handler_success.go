@@ -3,6 +3,7 @@ package gateway
 import (
 	"bytes"
 	"encoding/base64"
+	"github.com/TykTechnologies/tyk/storage"
 	"github.com/sirupsen/logrus"
 	"io"
 	"io/ioutil"
@@ -379,30 +380,41 @@ func (s *SuccessHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) *http
 			Upstream: int64(DurationToMillisecond(resp.UpstreamLatency)),
 		}
 		s.RecordHit(r, latency, resp.Response.StatusCode, resp.Response)
+
+		// Don't print a transaction log there is no "resp", that indicates an error.
+		// In error situations, transaction log is already printed by "handler_error.go"
+		if s.Spec.GlobalConfig.EnableAccessLogs {
+			token := ctxGetAuthToken(r)
+			hashKeys := s.Gw.GetConfig().HashKeys
+
+			// Don't print the full token, handle as obfuscated key or hashed key
+			if !hashKeys {
+				token = s.Gw.obfuscateKey(token)
+			} else {
+				token = storage.HashKey(token, hashKeys)
+			}
+
+			log.WithFields(logrus.Fields{
+				"apiID":            s.Spec.APIID,
+				"apiKey":           token,
+				"clientRemoteAddr": r.RemoteAddr,
+				"clientIp":         request.RealIP(r),
+				"host":             r.Host,
+				"latency":          latency.Total,
+				"orgID":            s.Spec.OrgID,
+				"protocol":         r.Proto,
+				"requestMethod":    r.Method,
+				"requestUri":       r.RequestURI,
+				"responseCode":     resp.Response.StatusCode,
+				"upstreamAddress":  r.URL.Scheme + "://" + r.URL.Host + r.URL.RequestURI(),
+				"upstreamLatency":  latency.Upstream,
+				"upstreamPath":     r.URL.Path,
+				"upstreamUri":      r.URL.RequestURI(),
+				"userAgent":        r.UserAgent(),
+			}).Info("Transaction log")
+		}
 	}
 	log.Debug("Done proxy")
-
-	// Don't print a transaction log there is no "resp", that indicates an error.
-	// In error situations, transaction log is already printed by "handler_error.go"
-	if resp.Response != nil {
-		token := ctxGetAuthToken(r)
-		log.WithFields(logrus.Fields{
-			"apiID":            s.Spec.APIID,
-			"apiKey":           s.Gw.obfuscateKey(token),
-			"clientRemoteAddr": r.RemoteAddr,
-			"clientIp":         request.RealIP(r),
-			"host":             r.Host,
-			"orgID":            s.Spec.OrgID,
-			"protocol":         r.Proto,
-			"requestMethod":    r.Method,
-			"requestUri":       r.RequestURI,
-			"responseCode":     resp.Response.StatusCode,
-			"upstreamAddress":  r.URL.Scheme + "://" + r.URL.Host + r.URL.RequestURI(),
-			"upstreamPath":     r.URL.Path,
-			"upstreamUri":      r.URL.RequestURI(),
-			"userAgent":        r.UserAgent(),
-		}).Info("Transaction log")
-	}
 
 	return nil
 }

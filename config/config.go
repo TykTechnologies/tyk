@@ -955,6 +955,10 @@ type Config struct {
 	// If not set or left empty, it will default to `standard`.
 	LogFormat string `json:"log_format"`
 
+	// You can configure the transaction logs to be turned on
+	// If not set or left empty, it will default to 'false'
+	EnableAccessLogs bool `json:"enable_access_logs"`
+
 	// Section for configuring OpenTracing support
 	// Deprecated: use OpenTelemetry instead.
 	Tracer Tracer `json:"tracing"`

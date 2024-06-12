@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"encoding/base64"
 	"errors"
+	"github.com/TykTechnologies/tyk/storage"
+	"github.com/sirupsen/logrus"
 	htmlTemplate "html/template"
 	"io"
 	"io/ioutil"
@@ -311,6 +313,35 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 			log.WithError(err).Error("could not store analytic record")
 		}
 	}
+
+	if e.Spec.GlobalConfig.EnableAccessLogs {
+		hashKeys := e.Gw.GetConfig().HashKeys
+
+		// Don't print the full token, handle as obfuscated key or hashed key
+		if !hashKeys {
+			token = e.Gw.obfuscateKey(token)
+		} else {
+			token = storage.HashKey(token, hashKeys)
+		}
+
+		log.WithFields(logrus.Fields{
+			"apiID":            e.Spec.APIID,
+			"apiKey":           token,
+			"clientRemoteAddr": r.RemoteAddr,
+			"clientIp":         request.RealIP(r),
+			"host":             r.Host,
+			"orgID":            e.Spec.OrgID,
+			"protocol":         r.Proto,
+			"requestMethod":    r.Method,
+			"requestUri":       r.RequestURI,
+			"responseCode":     errCode,
+			"upstreamAddress":  r.URL.Scheme + "://" + r.URL.Host + r.URL.RequestURI(),
+			"upstreamPath":     r.URL.Path,
+			"upstreamUri":      r.URL.RequestURI(),
+			"userAgent":        r.UserAgent(),
+		}).Info("Transaction log")
+	}
+
 	// Report in health check
 	reportHealthValue(e.Spec, BlockedRequestLog, "-1")
 }

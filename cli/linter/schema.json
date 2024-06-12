@@ -634,7 +634,10 @@
     },
     "log_format": {
       "type": "string",
-      "enum": ["", "json"]
+      "enum": ["", "standard", "json"]
+    },
+    "enable_access_logs": {
+      "type": "boolean"
     },
     "enable_http_profiler": {
       "type": "boolean"
