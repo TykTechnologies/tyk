@@ -31,8 +31,8 @@ func (m *CertificateCheckMW) EnabledForSpec() bool {
 			m.clientCerts = append(m.clientCerts, cert)
 		}
 	}
-
-	return len(m.clientCerts) > 0
+	
+	return true
 }
 
 func (m *CertificateCheckMW) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
