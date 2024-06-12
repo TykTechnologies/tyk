@@ -108,6 +108,7 @@ func ValidateRequestCerts(r *http.Request, certs []*tls.Certificate) error {
 			continue
 		}
 
+		// it is safe to skip if the cert is a CA cert, since the verification would have already happened on TLS layer
 		if cert.Leaf.IsCA {
 			continue
 		}
