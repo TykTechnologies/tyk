@@ -632,6 +632,10 @@
       "type": "string",
       "enum": ["", "debug", "info", "warn", "error"]
     },
+    "log_format": {
+      "type": "string",
+      "enum": ["", "json"]
+    },
     "enable_http_profiler": {
       "type": "boolean"
     },
@@ -1060,19 +1064,6 @@
     },
     "health_check_endpoint_name": {
       "type": "string"
-    },
-    "access_logs": {
-      "type": ["object", "null"],
-      "additionalProperties": false,
-      "properties": {
-        "enabled": {
-          "type": "boolean"
-        },
-        "template": {
-          "type": "string",
-          "enum": ["", "json"]
-        }
-      }
     },
     "ssl_force_common_name_check": {
       "type": "boolean"

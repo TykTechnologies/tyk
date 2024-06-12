@@ -384,9 +384,9 @@ func (s *SuccessHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) *http
 
 	// Don't print a transaction log there is no "resp", that indicates an error.
 	// In error situations, transaction log is already printed by "handler_error.go"
-	if resp.Response != nil && s.Spec.GlobalConfig.AccessLogs.Enabled {
+	if resp.Response != nil {
 		token := ctxGetAuthToken(r)
-		tLogFields := logrus.Fields{
+		log.WithFields(logrus.Fields{
 			"apiID":            s.Spec.APIID,
 			"apiKey":           s.Gw.obfuscateKey(token),
 			"clientRemoteAddr": r.RemoteAddr,
@@ -401,13 +401,7 @@ func (s *SuccessHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) *http
 			"upstreamPath":     r.URL.Path,
 			"upstreamUri":      r.URL.RequestURI(),
 			"userAgent":        r.UserAgent(),
-		}
-
-		if strings.EqualFold(s.Spec.GlobalConfig.AccessLogs.Template, "json") {
-			tLog.WithFields(tLogFields).Info("Transaction log")
-		} else {
-			log.WithFields(tLogFields).Info("Transaction log")
-		}
+		}).Info("Transaction log")
 	}
 
 	return nil

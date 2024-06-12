@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/base64"
 	"errors"
-	"github.com/sirupsen/logrus"
 	htmlTemplate "html/template"
 	"io"
 	"io/ioutil"
@@ -314,23 +313,4 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 	}
 	// Report in health check
 	reportHealthValue(e.Spec, BlockedRequestLog, "-1")
-
-	// Log additional transaction log in JSON format
-	if e.Spec.GlobalConfig.AccessLogs.Enabled && strings.EqualFold(e.Spec.GlobalConfig.AccessLogs.Template, "json") {
-		tLog.WithFields(logrus.Fields{
-			"apiID":            e.Spec.APIID,
-			"apiKey":           e.Gw.obfuscateKey(token),
-			"clientRemoteAddr": r.RemoteAddr,
-			"clientIp":         request.RealIP(r),
-			"host":             r.Host,
-			"orgID":            e.Spec.OrgID,
-			"protocol":         r.Proto,
-			"requestMethod":    r.Method,
-			"requestUri":       r.RequestURI,
-			"responseCode":     errCode,
-			"upstreamPath":     r.URL.Path,
-			"upstreamUri":      r.URL.RequestURI(),
-			"userAgent":        r.UserAgent(),
-		}).Info("Transaction log")
-	}
 }

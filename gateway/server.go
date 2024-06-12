@@ -72,7 +72,6 @@ var (
 	mainLog   = log.WithField("prefix", "main")
 	pubSubLog = log.WithField("prefix", "pub-sub")
 	rawLog    = logger.GetRaw()
-	tLog      = logger.GetTransactionLogger()
 
 	memProfFile         *os.File
 	NewRelicApplication newrelic.Application
@@ -1248,7 +1247,13 @@ func (gw *Gateway) initialiseSystem() error {
 
 	overrideTykErrors(gw)
 
+	// Set the configured log formatter
 	gwConfig := gw.GetConfig()
+	if strings.ToLower(gwConfig.LogFormat) == "json" {
+		log.Formatter = logger.GetJSONFormatter()
+		mainLog.Info("Enabling log format: ", gwConfig.LogFormat)
+	}
+
 	if os.Getenv("TYK_LOGLEVEL") == "" && !*cli.DebugMode {
 		level := strings.ToLower(gwConfig.LogLevel)
 		switch level {

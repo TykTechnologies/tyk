@@ -561,15 +561,6 @@ type Tracer struct {
 	Options map[string]interface{} `json:"options"`
 }
 
-// AccessLogsConfig defines the type of transactions logs printed to stdout
-type AccessLogsConfig struct {
-	// Enable the transaction logs. Default: false
-	Enabled bool `json:"enabled"`
-
-	// Set to "json" to print the transaction logs in JSON format.
-	Template string `json:"template"`
-}
-
 // ServicePort defines a protocol and port on which a service can bind to.
 type ServicePort struct {
 	Protocol string `json:"protocol"`
@@ -675,10 +666,6 @@ type Config struct {
 
 	// Enable Key hashing
 	HashKeys bool `json:"hash_keys"`
-
-	// AccessLogs enables the printing of API calls to stdout
-	// By default, the Gateway will print the details of API requests and the client
-	AccessLogs AccessLogsConfig `json:"access_logs"`
 
 	// DisableKeyActionsByUsername disables key search by username.
 	// When this is set to `true` you are able to search for keys only by keyID or key hash (if `hash_keys` is also set to `true`)
@@ -963,6 +950,10 @@ type Config struct {
 	// You can now set a logging level (log_level). The following levels can be set: debug, info, warn, error.
 	// If not set or left empty, it will default to `info`.
 	LogLevel string `json:"log_level"`
+
+	// You can now configure the log format to be either the standard or json format
+	// If not set or left empty, it will default to `standard`.
+	LogFormat string `json:"log_format"`
 
 	// Section for configuring OpenTracing support
 	// Deprecated: use OpenTelemetry instead.

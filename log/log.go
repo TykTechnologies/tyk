@@ -3,6 +3,7 @@ package log
 import (
 	"os"
 	"strings"
+	"time"
 
 	"github.com/sirupsen/logrus"
 
@@ -10,10 +11,9 @@ import (
 )
 
 var (
-	log            = logrus.New()
-	rawLog         = logrus.New()
-	transactionLog = logrus.New()
-	translations   = make(map[string]string)
+	log          = logrus.New()
+	rawLog       = logrus.New()
+	translations = make(map[string]string)
 )
 
 // LoadTranslations takes a map[string]interface and flattens it to map[string]string
@@ -49,21 +49,9 @@ func (f *RawFormatter) Format(entry *logrus.Entry) ([]byte, error) {
 	return []byte(entry.Message), nil
 }
 
-// TransactionFormatter formats logs for transactions in the desired format
-type TransactionFormatter struct {
-	*logrus.JSONFormatter
-}
-
-func (f *TransactionFormatter) Format(entry *logrus.Entry) ([]byte, error) {
-	message, err := f.JSONFormatter.Format(entry)
-	if err != nil {
-		log.Error("Could not format transaction log entry: %v", err)
-	}
-	return message, nil
-}
-
 //nolint:gochecknoinits
 func init() {
+	// Initialize the default log formatter
 	formatter := new(logrus.TextFormatter)
 	formatter.TimestampFormat = `Jan 02 15:04:05`
 	formatter.FullTimestamp = true
@@ -83,11 +71,6 @@ func init() {
 	}
 
 	rawLog.Formatter = new(RawFormatter)
-
-	// Initialize and configure the transactionLogger and JSONFormatter
-	jsonFormatter := new(logrus.JSONFormatter)
-	transactionLog.Formatter = &TransactionFormatter{JSONFormatter: jsonFormatter}
-	transactionLog.Level = logrus.InfoLevel
 }
 
 func Get() *logrus.Logger {
@@ -98,6 +81,8 @@ func GetRaw() *logrus.Logger {
 	return rawLog
 }
 
-func GetTransactionLogger() *logrus.Logger {
-	return transactionLog
+func GetJSONFormatter() *logrus.JSONFormatter {
+	return &logrus.JSONFormatter{
+		TimestampFormat: time.RFC3339,
+	}
 }
