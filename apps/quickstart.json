@@ -6,6 +6,7 @@
         "location": "",
         "key": ""
     },
+    "tags": ["llm"],
     "use_keyless": true,
     "auth": {
         "auth_header_name": ""
@@ -30,5 +31,5 @@
         "target_url": "http://httpbin.org/",
         "strip_listen_path": true
     },
-    "do_not_track": true
+    "do_not_track": false
 }
