@@ -240,6 +240,8 @@ func (e *EngineV2) HandleReverseProxy(params ReverseProxyParams) (res *http.Resp
 	}
 
 	gqlRequest := e.ctxRetrieveRequestFunc(params.OutRequest)
+	defer gqlRequest.Cleanup()
+
 	switch reverseProxyType {
 	case ReverseProxyTypeIntrospection:
 		return e.gqlTools.handleIntrospection(e.Schema)
