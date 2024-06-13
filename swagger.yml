@@ -2971,7 +2971,7 @@ components:
         _id:
           $ref: '#/components/schemas/ObjectId'
           type: object
-          x-go-name: ID
+          x-go-name: MID
         id:
           type: string
           x-go-name: ID
@@ -3040,11 +3040,17 @@ components:
         last_updated:
           type: string
           x-go-name: LastUpdates
+        smoothing:
+          type: object
+          $ref: '#/components/schemas/RateLimitSmoothing'
+          description: Smoothing contains rate limit smoothing settings.
+          x-go-name: Smoothing
         meta_data:
           type: object
           x-go-name: MetaData
         graphql_access_rights:
           $ref: '#/components/schemas/GraphAccessDefinition'
+      title: Policy represents a user policy
       type: object
       x-go-package: github.com/TykTechnologies/tyk/user
     PolicyPartitions:
@@ -3064,6 +3070,83 @@ components:
         per_api:
           type: boolean
           x-go-name: PerAPI
+      type: object
+      x-go-package: github.com/TykTechnologies/tyk/user
+    RateLimitSmoothing:
+      properties:
+        delay:
+          type: integer
+          format: int64
+          description: Delay is the minimum time between rate limit changes (in seconds).
+          x-go-name: Delay
+        enabled:
+          type: boolean
+          description: Enabled indicates if rate limit smoothing is active.
+          x-go-name: Enabled
+        step:
+          type: integer
+          format: int64
+          description: Step is the increment/decrement for adjusting the rate limit.
+          x-go-name: Step
+        threshold:
+          type: integer
+          format: int64
+          description: Threshold is the request rate above which smoothing is applied.
+          x-go-name: Threshold
+        trigger:
+          type: number
+          format: double
+          description: Trigger is the step factor determining when smoothing events trigger.
+          x-go-name: Trigger
+      title:  RateLimitSmoothing holds the rate smoothing configuration.
+      description: |-
+        Rate Limit Smoothing is a mechanism to dynamically adjust the request rate
+        limits based on the current traffic patterns. It helps in managing request
+        spikes by gradually increasing or decreasing the rate limit instead of making
+        abrupt changes or blocking requests excessively.
+    
+        Once the rate limit smoothing triggers an allowance change, one of the
+        following events is emitted:
+    
+        - `RateLimitSmoothingUp` when the allowance increases
+        - `RateLimitSmoothingDown` when the allowance decreases
+    
+        Events are emitted based on the configuration:
+    
+        - `enabled` (boolean) to enable or disable rate limit smoothing
+        - `threshold` after which to apply smoothing (minimum rate for window)
+        - `trigger` configures at which fraction of a step a smoothing event is emitted
+        - `step` is the value by which the rate allowance will get adjusted
+        - `delay` is the amount of seconds between smoothing updates
+    
+        This is used to compute a request allowance. The request allowance will
+        be smoothed between `threshold`, and the defined rate limits (maximum).
+        The request allowance will be updated internally every `delay` seconds.
+    
+        The `step * trigger` value is substracted from the request allowance, and if
+        your request rate goes above that, then a RateLimitSmoothingUp event is
+        emitted and the allowance is increased by `step`. A RateLimitSmoothingDown
+        event is emitted when the request rate drops one step below that, and the
+        allowance then decreases by step.
+    
+        For any allowance, events are emitted based on the following calculations:
+    
+         - When the request rate rises above `allowance - (step * trigger)`,
+          a RateLimitSmoothingUp event is emitted and allowance increases by `step`.
+         - When the request rate falls below `allowance - (step + step * trigger)`,
+          a RateLimitSmoothingDown event is emitted and allowance decreases by `step`.
+    
+        Example: Allowance: 600, Current rate: 500, Step: 100, Trigger: 0.5
+    
+         - To trigger a RateLimitSmoothingUp event, the request rate must exceed:
+          Allowance - (Step * Trigger)
+          Calculation: 600 - (100 * 0.5) = 550
+          Exceeding a request rate of 550 will increase the allowance to 700 (Allowance + Step).
+    
+         - To trigger a RateLimitSmoothingDown event, the request rate must fall below:
+          Allowance - (Step + (Step * Trigger))
+          Calculation: 600 - (100 + (100 * 0.5)) = 450
+          As the request rate falls below 450, that will decrease the allowance to 500 (Allowance - Step).
       type: object
       x-go-package: github.com/TykTechnologies/tyk/user
     Regexp:
@@ -3332,6 +3415,11 @@ components:
           format: int64
           type: integer
           x-go-name: SessionLifetime
+        smoothing:
+          type: object
+          $ref: '#/components/schemas/RateLimitSmoothing'
+          description: Smoothing contains rate limit smoothing settings.
+          x-go-name: Smoothing
         throttle_interval:
           format: double
           type: number
