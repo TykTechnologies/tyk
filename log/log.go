@@ -3,6 +3,7 @@ package log
 import (
 	"os"
 	"strings"
+	"time"
 
 	"github.com/sirupsen/logrus"
 
@@ -50,12 +51,7 @@ func (f *RawFormatter) Format(entry *logrus.Entry) ([]byte, error) {
 
 //nolint:gochecknoinits
 func init() {
-	formatter := new(logrus.TextFormatter)
-	formatter.TimestampFormat = `Jan 02 15:04:05`
-	formatter.FullTimestamp = true
-	formatter.DisableColors = true
-
-	log.Formatter = formatter
+	log.Formatter = NewFormatter("")
 
 	switch strings.ToLower(os.Getenv("TYK_LOGLEVEL")) {
 	case "error":
@@ -77,4 +73,19 @@ func Get() *logrus.Logger {
 
 func GetRaw() *logrus.Logger {
 	return rawLog
+}
+
+func NewFormatter(format string) logrus.Formatter {
+	switch strings.ToLower(format) {
+	case "json":
+		return &logrus.JSONFormatter{
+			TimestampFormat: time.RFC3339,
+		}
+	default:
+		return &logrus.TextFormatter{
+			TimestampFormat: "Jan 02 15:04:05",
+			FullTimestamp:   true,
+			DisableColors:   true,
+		}
+	}
 }
