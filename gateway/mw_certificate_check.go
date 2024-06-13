@@ -31,7 +31,7 @@ func (m *CertificateCheckMW) EnabledForSpec() bool {
 			m.clientCerts = append(m.clientCerts, cert)
 		}
 	}
-	
+
 	return true
 }
 
