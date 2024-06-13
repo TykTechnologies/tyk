@@ -51,7 +51,7 @@ func (f *RawFormatter) Format(entry *logrus.Entry) ([]byte, error) {
 
 //nolint:gochecknoinits
 func init() {
-	log.Formatter = NewFormatter("")
+	log.Formatter = NewFormatter(os.Getenv("TYK_LOGFORMAT"))
 
 	switch strings.ToLower(os.Getenv("TYK_LOGLEVEL")) {
 	case "error":
