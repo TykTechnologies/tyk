@@ -1233,16 +1233,7 @@ func (gw *Gateway) initialiseSystem() error {
 
 	gwConfig := gw.GetConfig()
 	// Initialize the appropriate log formatter
-	if gwConfig.LogFormat != "" {
-		format := strings.ToLower(gwConfig.LogFormat)
-		log.Formatter = logger.NewFormatter(gwConfig.LogFormat)
-		switch format {
-		case "json":
-			mainLog.Info("Log Format set to JSON.")
-		default:
-			mainLog.Warning("Log Format config is not valid, defaulting to standard.")
-		}
-	}
+	log.Formatter = logger.NewFormatter(gwConfig.LogFormat)
 
 	if os.Getenv("TYK_LOGLEVEL") == "" && !*cli.DebugMode {
 		level := strings.ToLower(gwConfig.LogLevel)
