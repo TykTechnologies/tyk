@@ -3148,7 +3148,7 @@ components:
           Calculation: 600 - (100 + (100 * 0.5)) = 450
           As the request rate falls below 450, that will decrease the allowance to 500 (Allowance - Step).
       type: object
-      x-go-package: github.com/TykTechnologies/tyk/user
+      x-go-package: github.com/TykTechnologies/tyk/apidef
     Regexp:
       description: Regexp is a wrapper around regexp.Regexp but with caching
       properties:
