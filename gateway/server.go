@@ -1232,6 +1232,12 @@ func (gw *Gateway) initialiseSystem() error {
 	overrideTykErrors(gw)
 
 	gwConfig := gw.GetConfig()
+	// Initialize the appropriate log formatter
+	if gwConfig.LogFormat != "" {
+		log.Formatter = logger.NewFormatter(gwConfig.LogFormat)
+		mainLog.Info("Enabling log format: ", gwConfig.LogFormat)
+	}
+
 	if os.Getenv("TYK_LOGLEVEL") == "" && !*cli.DebugMode {
 		level := strings.ToLower(gwConfig.LogLevel)
 		switch level {
