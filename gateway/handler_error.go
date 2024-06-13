@@ -53,6 +53,38 @@ func defaultTykErrors() {
 	initOauth2KeyExistsErrors()
 }
 
+// logTransaction will print the transaction log to STDOUT. If hashKeys is set to false it will print an obfuscated
+// version of the key otherwise print the hashed_key.
+func (e *ErrorHandler) logTransaction(errCode int, hashKeys bool, r *http.Request, token string) {
+	// Don't print the full token, handle as obfuscated key or hashed key
+	if !hashKeys {
+		token = e.Gw.obfuscateKey(token)
+	} else {
+		token = storage.HashKey(token, hashKeys)
+	}
+
+	// Error transaction logs, contains all the available information for an error handling
+	// situation
+	log.WithFields(logrus.Fields{
+		"apiID":            e.Spec.APIID,
+		"apiKey":           token,
+		"clientRemoteAddr": r.RemoteAddr,
+		"clientIp":         request.RealIP(r),
+		"host":             r.Host,
+		"orgID":            e.Spec.OrgID,
+		"protocol":         r.Proto,
+		"requestMethod":    r.Method,
+		"requestUri":       r.RequestURI,
+		"responseCode":     errCode,
+		"upstreamAddress":  r.URL.Scheme + "://" + r.URL.Host + r.URL.RequestURI(),
+		"upstreamPath":     r.URL.Path,
+		"upstreamUri":      r.URL.RequestURI(),
+		"userAgent":        r.UserAgent(),
+	}).Info("Transaction log")
+
+	return
+}
+
 func overrideTykErrors(gw *Gateway) {
 	gwConfig := gw.GetConfig()
 
@@ -314,32 +346,9 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 		}
 	}
 
-	if e.Spec.GlobalConfig.EnableAccessLogs {
+	if e.Spec.GlobalConfig.AccessLogs.Enabled {
 		hashKeys := e.Gw.GetConfig().HashKeys
-
-		// Don't print the full token, handle as obfuscated key or hashed key
-		if !hashKeys {
-			token = e.Gw.obfuscateKey(token)
-		} else {
-			token = storage.HashKey(token, hashKeys)
-		}
-
-		log.WithFields(logrus.Fields{
-			"apiID":            e.Spec.APIID,
-			"apiKey":           token,
-			"clientRemoteAddr": r.RemoteAddr,
-			"clientIp":         request.RealIP(r),
-			"host":             r.Host,
-			"orgID":            e.Spec.OrgID,
-			"protocol":         r.Proto,
-			"requestMethod":    r.Method,
-			"requestUri":       r.RequestURI,
-			"responseCode":     errCode,
-			"upstreamAddress":  r.URL.Scheme + "://" + r.URL.Host + r.URL.RequestURI(),
-			"upstreamPath":     r.URL.Path,
-			"upstreamUri":      r.URL.RequestURI(),
-			"userAgent":        r.UserAgent(),
-		}).Info("Transaction log")
+		e.logTransaction(errCode, hashKeys, r, token)
 	}
 
 	// Report in health check

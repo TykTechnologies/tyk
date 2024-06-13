@@ -3,7 +3,6 @@ package log
 import (
 	"os"
 	"strings"
-	"time"
 
 	"github.com/sirupsen/logrus"
 
@@ -79,10 +78,4 @@ func Get() *logrus.Logger {
 
 func GetRaw() *logrus.Logger {
 	return rawLog
-}
-
-func GetJSONFormatter() *logrus.JSONFormatter {
-	return &logrus.JSONFormatter{
-		TimestampFormat: time.RFC3339,
-	}
 }

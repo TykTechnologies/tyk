@@ -122,6 +122,40 @@ func getSessionTags(session *user.SessionState) []string {
 	return tags
 }
 
+// logTransaction will print the transaction log to STDOUT. If hashKeys is set to false it will print an obfuscated
+// version of the key otherwise print the hashed_key.
+func (s *SuccessHandler) logTransaction(hashKeys bool, latency analytics.Latency, r *http.Request, resp ProxyResponse, token string) {
+	// Don't print the full token, handle as obfuscated key or hashed key
+	if !hashKeys {
+		token = s.Gw.obfuscateKey(token)
+	} else {
+		token = storage.HashKey(token, hashKeys)
+	}
+
+	// Success transaction logs, contains important fields such as latency that may not
+	// be available in an error handler
+	log.WithFields(logrus.Fields{
+		"apiID":            s.Spec.APIID,
+		"apiKey":           token,
+		"clientRemoteAddr": r.RemoteAddr,
+		"clientIp":         request.RealIP(r),
+		"host":             r.Host,
+		"latency":          latency.Total,
+		"orgID":            s.Spec.OrgID,
+		"protocol":         r.Proto,
+		"requestMethod":    r.Method,
+		"requestUri":       r.RequestURI,
+		"responseCode":     resp.Response.StatusCode,
+		"upstreamAddress":  r.URL.Scheme + "://" + r.URL.Host + r.URL.RequestURI(),
+		"upstreamLatency":  latency.Upstream,
+		"upstreamPath":     r.URL.Path,
+		"upstreamUri":      r.URL.RequestURI(),
+		"userAgent":        r.UserAgent(),
+	}).Info("Transaction log")
+
+	return
+}
+
 func recordGraphDetails(rec *analytics.AnalyticsRecord, r *http.Request, resp *http.Response, spec *APISpec) {
 	if !spec.GraphQL.Enabled || spec.GraphQL.ExecutionMode == apidef.GraphQLExecutionModeSubgraph {
 		return
@@ -383,35 +417,10 @@ func (s *SuccessHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) *http
 
 		// Don't print a transaction log there is no "resp", that indicates an error.
 		// In error situations, transaction log is already printed by "handler_error.go"
-		if s.Spec.GlobalConfig.EnableAccessLogs {
+		if s.Spec.GlobalConfig.AccessLogs.Enabled {
 			token := ctxGetAuthToken(r)
 			hashKeys := s.Gw.GetConfig().HashKeys
-
-			// Don't print the full token, handle as obfuscated key or hashed key
-			if !hashKeys {
-				token = s.Gw.obfuscateKey(token)
-			} else {
-				token = storage.HashKey(token, hashKeys)
-			}
-
-			log.WithFields(logrus.Fields{
-				"apiID":            s.Spec.APIID,
-				"apiKey":           token,
-				"clientRemoteAddr": r.RemoteAddr,
-				"clientIp":         request.RealIP(r),
-				"host":             r.Host,
-				"latency":          latency.Total,
-				"orgID":            s.Spec.OrgID,
-				"protocol":         r.Proto,
-				"requestMethod":    r.Method,
-				"requestUri":       r.RequestURI,
-				"responseCode":     resp.Response.StatusCode,
-				"upstreamAddress":  r.URL.Scheme + "://" + r.URL.Host + r.URL.RequestURI(),
-				"upstreamLatency":  latency.Upstream,
-				"upstreamPath":     r.URL.Path,
-				"upstreamUri":      r.URL.RequestURI(),
-				"userAgent":        r.UserAgent(),
-			}).Info("Transaction log")
+			s.logTransaction(hashKeys, latency, r, resp, token)
 		}
 	}
 	log.Debug("Done proxy")

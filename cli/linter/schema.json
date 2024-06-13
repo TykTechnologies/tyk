@@ -632,8 +632,14 @@
       "type": "string",
       "enum": ["", "debug", "info", "warn", "error"]
     },
-    "enable_access_logs": {
-      "type": "boolean"
+    "access_logs": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        }
+      }
     },
     "enable_http_profiler": {
       "type": "boolean"
