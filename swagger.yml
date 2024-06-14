@@ -3279,8 +3279,7 @@ components:
           type: string
           x-go-name: LastUpdated
         meta_data:
-          additionalProperties:
-            type: object
+          additionalProperties: {}
           type: object
           x-go-name: MetaData
         monitor:
