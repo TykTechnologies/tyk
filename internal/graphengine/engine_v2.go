@@ -240,7 +240,7 @@ func (e *EngineV2) HandleReverseProxy(params ReverseProxyParams) (res *http.Resp
 	}
 
 	gqlRequest := e.ctxRetrieveRequestFunc(params.OutRequest)
-	// Cleanup frees allocated resources, if they are eligible to freeing up.
+	// Cleanup method, frees allocated resources, if they are eligible for freeing up.
 	// Currently, it only frees up the allocated resources of a GraphQL query that
 	// has a cached query plan.
 	//
