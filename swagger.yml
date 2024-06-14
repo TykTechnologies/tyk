@@ -2157,7 +2157,7 @@ components:
           type: number
           x-go-name: HmacAllowedClockSkew
         id:
-          $ref: '#/components/schemas/ObjectId'
+          $ref: '#/components/schemas/ObjectID'
         internal:
           type: boolean
           x-go-name: Internal
@@ -2371,7 +2371,7 @@ components:
       type: object
       x-go-package: github.com/TykTechnologies/tyk/apidef
     APILimit:
-      description: APILimit stores quota and rate limit on ACL level (per API)
+      title: APILimit stores quota and rate limit on ACL level (per API)
       properties:
         per:
           format: double
@@ -2408,6 +2408,11 @@ components:
           format: int64
           type: integer
           x-go-name: ThrottleRetryLimit
+        smoothing:
+          type: object
+          $ref: '#/components/schemas/RateLimitSmoothing'
+          description: Smoothing contains rate limit smoothing settings.
+          x-go-name: Smoothing
       type: object
       x-go-package: github.com/TykTechnologies/tyk/user
     AccessDefinition:
@@ -2943,10 +2948,10 @@ components:
           x-go-name: Issuer
       type: object
       x-go-package: github.com/TykTechnologies/tyk/apidef
-    ObjectId:
+    ObjectID:
       description: 'http://www.mongodb.org/display/DOCS/Object+IDs'
       title: >-
-        ObjectId is a unique ID identifying a BSON value. It must be exactly 12
+        ObjectID is a unique ID identifying a BSON value. It must be exactly 12
         bytes
 
         long. MongoDB objects by default have such a property set in their "_id"
@@ -2969,7 +2974,7 @@ components:
     Policy:
       properties:
         _id:
-          $ref: '#/components/schemas/ObjectId'
+          $ref: '#/components/schemas/ObjectID'
           type: object
           x-go-name: MID
         id:
@@ -3148,7 +3153,7 @@ components:
           Calculation: 600 - (100 + (100 * 0.5)) = 450
           As the request rate falls below 450, that will decrease the allowance to 500 (Allowance - Step).
       type: object
-      x-go-package: github.com/TykTechnologies/tyk/apidef
+      x-go-package: github.com/TykTechnologies/tyk/user
     Regexp:
       description: Regexp is a wrapper around regexp.Regexp but with caching
       properties:
