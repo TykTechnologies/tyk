@@ -96,6 +96,9 @@ const Schema = `{
         "jwt_source": {
             "type": "string"
         },
+        "jwt_jwks_cache_timeout": {
+            "type": "number"
+        },
         "jwt_identity_base_field": {
             "type": "string"
         },
