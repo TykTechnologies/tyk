@@ -1,9 +1,10 @@
 package log
 
 import (
+	"testing"
+
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
-	"testing"
 )
 
 func TestNewFormatter(t *testing.T) {
