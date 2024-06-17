@@ -3083,7 +3083,7 @@ components:
           type: integer
           format: int64
           description: Delay is a hold-off between smoothing events and controls how frequently the current allowance will step up or down (in seconds).
-          mimimum: 1
+          minimum: 1
           x-go-name: Delay
         enabled:
           type: boolean
@@ -3093,19 +3093,19 @@ components:
           type: integer
           format: int64
           description: Step is the increment by which the current allowance will be increased or decreased each time a smoothing event is emitted.
-          mimimum: 1
+          minimum: 1
           x-go-name: Step
         threshold:
           type: integer
           format: int64
           description: Threshold is the initial rate limit beyond which smoothing will be applied. It is a count of requests during the `per` interval and should be less than the maximum configured `rate`.
-          mimimum: 1
+          minimum: 1
           x-go-name: Threshold
         trigger:
           type: number
           format: double
           description: Trigger is a fraction (typically in the range 0.1-1.0) of the step at which point a smoothing event will be emitted as the request rate approaches the current allowance.
-          mimimum: 0.01
+          minimum: 0.01
           multipleOf: 0.01
           x-go-name: Trigger
       title:  RateLimitSmoothing holds the rate smoothing configuration.
