@@ -49,19 +49,19 @@ import (
 //   - When the request rate falls below `allowance - (step + step * trigger)`,
 //     a RateLimitSmoothingDown event is emitted and allowance decreases by `step`.
 //
-// Example: Threshold: 400, Request allowance: 600, Current rate: 500, Step: 100, Trigger: 0.5
+// Example: Threshold: 400, Request allowance: 600, Current rate: 500, Step: 100, Trigger: 0.5.
 //
 // To trigger a RateLimitSmoothingUp event, the request rate must exceed:
 //
-//   - Allowance - (Step * Trigger)
-//   - Calculation: 600 - (100 * 0.5) = `550`
+//   - Calculation: Allowance - (Step * Trigger).
+//   - Example: 600 - (100 * 0.5) = `550`.
 //
 // Exceeding a request rate of `550` will increase the allowance to 700 (Allowance + Step).
 //
 // To trigger a RateLimitSmoothingDown event, the request rate must fall below:
 //
-//   - Allowance - (Step + (Step * Trigger))
-//   - Calculation: 600 - (100 + (100 * 0.5)) = 450
+//   - Calculation: Allowance - (Step + (Step * Trigger)).
+//   - Example: 600 - (100 + (100 * 0.5)) = 450.
 //
 // As the request rate falls below 450, that will decrease the allowance to 500 (Allowance - Step).
 //
