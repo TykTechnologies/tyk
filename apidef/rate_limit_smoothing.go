@@ -72,16 +72,16 @@ type RateLimitSmoothing struct {
 	// Enabled indicates if rate limit smoothing is active.
 	Enabled bool `json:"enabled" bson:"enabled"`
 
-	// Threshold is the request rate above which smoothing is applied.
+	// Threshold is the initial rate limit beyond which smoothing will be applied. It is a count of requests during the `per` interval and should be less than the maximum configured `rate`.
 	Threshold int64 `json:"threshold" bson:"threshold"`
 
-	// Trigger is the step factor determining when smoothing events trigger.
+	// Trigger is a fraction (typically in the range 0.1-1.0) of the step at which point a smoothing event will be emitted as the request rate approaches the current allowance.
 	Trigger float64 `json:"trigger" bson:"trigger"`
 
-	// Step is the increment/decrement for adjusting the rate limit.
+	// Step is the increment by which the current allowance will be increased or decreased each time a smoothing event is emitted.
 	Step int64 `json:"step" bson:"step"`
 
-	// Delay is the minimum time between rate limit changes (in seconds).
+	// Delay is a hold-off between smoothing events and controls how frequently the current allowance will step up or down (in seconds).
 	Delay int64 `json:"delay" bson:"delay"`
 }
 
