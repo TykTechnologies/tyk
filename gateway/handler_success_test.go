@@ -322,3 +322,8 @@ func TestAnalyticsIgnoreSubgraph(t *testing.T) {
 	)
 	assert.NoError(t, err)
 }
+
+func TestSuccessLogTransaction(t *testing.T) {
+	// Need guidance writing assertion tests for the LogTransction function if possible!
+
+}

@@ -122,3 +122,8 @@ func TestHandleDefaultErrorJSON(t *testing.T) {
 	})
 
 }
+
+func TestErrorLogTransaction(t *testing.T) {
+	// Need guidance writing assertion tests for the LogTransction function if possible!
+
+}
