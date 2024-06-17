@@ -1,5 +1,5 @@
 module github.com/TykTechnologies/tyk/smoke-tests/plugin-compiler/helloworld-plugin
 
-go 1.21
+go 1.21.0
 
-require github.com/kr/pretty v0.3.1 // indirect
+toolchain go1.21.4

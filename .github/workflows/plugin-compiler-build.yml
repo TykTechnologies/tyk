@@ -65,7 +65,9 @@ jobs:
           platforms: linux/amd64
           push: true
           labels: ${{ steps.set-metadata.outputs.labels }}
-          tags: ${{ steps.set-metadata.outputs.tags }}
+          tags: |
+            ${{ steps.set-metadata.outputs.tags }}
+            ${{ steps.login-ecr.outputs.registry }}/tyk-plugin-compiler:sha-${{ github.sha }}-fips-amd64
           build-args: |
             BASE-IMAGE=tykio/golang-cross:${{ env.GOLANG_CROSS }}
             GITHUB_SHA=${{ github.sha }}

@@ -31,8 +31,12 @@
     "policy_source": "file"
   },
   "hash_keys": true,
-  "hash_key_function": "murmur64",
+  "hash_key_function": "sha256",
   "suppress_redis_signal_reload": false,
   "force_global_session_lifetime": false,
-  "max_idle_connections_per_host": 500
+  "max_idle_connections_per_host": 500,
+  "http_server_options": {
+    "max_version": 771,
+    "ssl_ciphers": ["TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384", "TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384", "TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256", "TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA256", "TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256", "TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256", "TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA", "TLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA"]
+  }
 }
