@@ -19,19 +19,27 @@ func TestNewFormatter(t *testing.T) {
 	assert.True(t, ok)
 }
 
+type testFormatter struct {}
+func (*testFormatter) Format(entry *logrus.Entry) ([]byte, error) {
+	return []byte(entry.Message), nil
+}
+
 func BenchmarkFormatter(b *testing.B) {
 	b.Run("json", func(b *testing.B) {
-		benchmarkFormatter(b, "json")
+		benchmarkFormatter(b, NewFormatter("json"))
 	})
 	b.Run("default", func(b *testing.B) {
-		benchmarkFormatter(b, "")
+		benchmarkFormatter(b, NewFormatter(""))
+	})
+	b.Run("none", func(b *testing.B) {
+		benchmarkFormatter(b, &testFormatter{})
 	})
 }
 
-func benchmarkFormatter(b *testing.B, formatter string) {
+func benchmarkFormatter(b *testing.B, formatter logrus.Formatter) {
 	logger := logrus.New()
 	logger.Out = io.Discard
-	logger.Formatter = NewFormatter(formatter)
+	logger.Formatter = formatter
 
 	err := errors.New("Test error value")
 
