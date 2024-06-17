@@ -1,12 +1,17 @@
+# yamllint disable rule:line-length
 ---
 version: "3"
 
 includes:
   lint: .taskfiles/lint.yml
+  test: .taskfiles/test.yml
   deps: .taskfiles/deps/Taskfile.yml
   opentelemetry:
     taskfile: ci/tests/tracing/Taskfile.yml
     dir: ci/tests/tracing/
+  services:
+    taskfile: docker/services/Taskfile.yml
+    dir: docker/services/
 
 tasks:
   docker:

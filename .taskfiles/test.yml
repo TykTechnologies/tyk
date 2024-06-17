@@ -1,0 +1,84 @@
+---
+version: "3"
+
+includes:
+  deps: ./deps/Taskfile.yml
+  services:
+    taskfile: ../docker/services/Taskfile.yml
+    dir: ../docker/services
+
+vars:
+  dir:
+    sh: git rev-parse --show-toplevel
+  product: 'gateway'
+  tags: '{{ .tags | default "goplugin" }}'
+  python:
+    sh: python3 -c 'import sys; print("%d.%d" % (sys.version_info[0], sys.version_info[1]))'
+
+env:
+  PYTHON_VERSION: '{{.python}}'
+  CI: 'true'
+
+tasks:
+
+  # integration - run go tests with services
+  #
+  # Most of our go tests are integration tests using related services like
+  # mongodb, postgresql or redis. This task spins up the required services
+  # to run the tests and then runs the tests on the individual packages.
+
+  integration:
+    desc: "Run e2e/integration tests"
+    dir: '{{.dir}}'
+    aliases: [ e2e ]
+    deps: [ deps, plugin:race, plugin:norace, services:up ]
+    silent: true
+    vars:
+      args: '{{ .args | default "-timeout=15m" }}'
+      package:
+        sh: go mod edit -json | jq .Module.Path -r
+      packages:
+        sh: go list ./... | sed -e 's|{{.package}}|.|g'
+    cmds:
+      - defer: { task: services:down }
+      - rm -rf coverage && mkdir -p coverage
+      - for: { var: packages, as: package }
+        cmd: gotestsum --no-color=false --hide-summary=skipped --raw-command go test -p 1 -json -tags={{.tags}} {{.args}} -cover -coverprofile=coverage/{{.package | replace "." "gateway" | replace "/" "-"}}.cov -count=1 -v {{.package}} | head -n -2
+
+  integration-combined:
+    dir: '{{.dir}}'
+    desc: "Run e2e/integration tests"
+    aliases: [ e2e-combined ]
+    deps: [ deps, plugin:race, plugin:norace, services:up ]
+    silent: true
+    vars:
+      args: '{{ .args | default "-timeout=15m" }}'
+      package:
+        sh: go mod edit -json | jq .Module.Path -r
+    cmds:
+      - defer: { task: services:down }
+      - defer: { task: report }
+      - rm -rf coverage && mkdir -p coverage
+      - go test -p 1 -json -tags={{.tags}} {{.args}} -cover -coverprofile=coverage/{{.product}}-all.cov -count=1 -v ./... > coverage/{{.product}}-all.json
+
+  plugin:race:
+    dir: '{{.dir}}'
+    desc: "Build plugin required for tests (with race)"
+    cmds:
+      - go build -race -o ./test/goplugins/goplugins_race.so -buildmode=plugin ./test/goplugins
+
+  plugin:norace:
+    dir: '{{.dir}}'
+    desc: "Build plugin required for tests (no race)"
+    cmds:
+      - go build -o ./test/goplugins/goplugins.so -buildmode=plugin ./test/goplugins
+
+  report:
+    dir: '{{.dir}}'
+    desc: "Run gotestsum on test run output"
+    silent: true
+    vars:
+      count: '{{ .count | default "10" }}'
+    cmds:
+      - gotestsum --hide-summary=skipped --junitfile=unit-tests.xml --raw-command cat coverage/{{.product}}-all.json
+      - echo "Slowest {{.count}} tests:" && cat coverage/{{.product}}-all.json | gotestsum tool slowest | head -n {{.count}} | sed -e 's|{{.package}}/||g'
