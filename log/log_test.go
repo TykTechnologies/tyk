@@ -29,6 +29,9 @@ func BenchmarkFormatter(b *testing.B) {
 	b.Run("json", func(b *testing.B) {
 		benchmarkFormatter(b, NewFormatter("json"))
 	})
+	b.Run("json-ext", func(b *testing.B) {
+		benchmarkFormatter(b, NewFormatter("json-ext"))
+	})
 	b.Run("default", func(b *testing.B) {
 		benchmarkFormatter(b, NewFormatter(""))
 	})
