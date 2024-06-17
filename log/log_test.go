@@ -1,6 +1,8 @@
 package log
 
 import (
+	"errors"
+	"io"
 	"testing"
 
 	"github.com/sirupsen/logrus"
@@ -15,4 +17,28 @@ func TestNewFormatter(t *testing.T) {
 	jsonFormatter, ok := NewFormatter("json").(*logrus.JSONFormatter)
 	assert.NotNil(t, jsonFormatter)
 	assert.True(t, ok)
+}
+
+func BenchmarkFormatter(b *testing.B) {
+	b.Run("json", func(b *testing.B) {
+		benchmarkFormatter(b, "json")
+	})
+	b.Run("default", func(b *testing.B) {
+		benchmarkFormatter(b, "")
+	})
+}
+
+func benchmarkFormatter(b *testing.B, formatter string) {
+	logger := logrus.New()
+	logger.Out = io.Discard
+	logger.Formatter = NewFormatter(formatter)
+
+	err := errors.New("Test error value")
+
+	b.ReportAllocs()
+	b.ResetTimer()
+
+	for i := 0; i <= b.N; i++ {
+		logger.WithError(err).WithField("prefix", "test").Info("This is a typical log message")
+	}
 }
