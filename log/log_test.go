@@ -19,7 +19,8 @@ func TestNewFormatter(t *testing.T) {
 	assert.True(t, ok)
 }
 
-type testFormatter struct {}
+type testFormatter struct{}
+
 func (*testFormatter) Format(entry *logrus.Entry) ([]byte, error) {
 	return []byte(entry.Message), nil
 }
