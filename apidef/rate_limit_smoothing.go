@@ -24,17 +24,23 @@ import (
 // - `threshold` after which to apply smoothing (minimum rate for window)
 // - `trigger` configures at which fraction of a step a smoothing event is emitted
 // - `step` is the value by which the rate allowance will get adjusted
-// - `delay` is the amount of seconds between smoothing updates
+// - `delay` is a hold-off in seconds providing a minimum period between rate allowance adjustments
 //
-// This is used to compute a request allowance. The request allowance will
-// be smoothed between `threshold`, and the defined rate limits (maximum).
-// The request allowance will be updated internally every `delay` seconds.
+// To determine if the request rate is growing and needs to be smoothed, the
+// `step * trigger` value is subtracted from the request allowance and, if
+// the request rate goes above that, then a RateLimitSmoothingUp event is
+// emitted and the rate allowance is increased by `step`.
 //
-// The `step * trigger` value is substracted from the request allowance, and if
-// your request rate goes above that, then a RateLimitSmoothingUp event is
-// emitted and the allowance is increased by `step`. A RateLimitSmoothingDown
-// event is emitted when the request rate drops one step below that, and the
-// allowance then decreases by step.
+// Once the request allowance has been increased above the `threshold`, Tyk
+// will start to check for decreasing request rate. When the request rate
+// drops `step * (1 + trigger)` below the request  allowance, a
+// `RateLimitSmoothingDown` event is emitted and the rate allowance is
+// decreased by `step`.
+//
+// After the request allowance has been adjusted (up or down), the request
+// rate will be checked again over the next `delay` seconds and,  if
+// required, further adjustment made to the rate allowance after the
+// hold-off.
 //
 // For any allowance, events are emitted based on the following calculations:
 //
@@ -43,7 +49,7 @@ import (
 //   - When the request rate falls below `allowance - (step + step * trigger)`,
 //     a RateLimitSmoothingDown event is emitted and allowance decreases by `step`.
 //
-// Example: Allowance: 600, Current rate: 500, Step: 100, Trigger: 0.5
+// Example: Threshold: 400, Request allowance: 600, Current rate: 500, Step: 100, Trigger: 0.5
 //
 //   - To trigger a RateLimitSmoothingUp event, the request rate must exceed:
 //     Allowance - (Step * Trigger)
@@ -54,6 +60,10 @@ import (
 //     Allowance - (Step + (Step * Trigger))
 //     Calculation: 600 - (100 + (100 * 0.5)) = 450
 //     As the request rate falls below 450, that will decrease the allowance to 500 (Allowance - Step).
+//
+// This is used to compute a request allowance. The request allowance will
+// be smoothed between `threshold`, and the defined `rate` limit (maximum).
+// The request allowance will be updated internally every `delay` seconds.
 type RateLimitSmoothing struct {
 	// Enabled indicates if rate limit smoothing is active.
 	Enabled bool `json:"enabled" bson:"enabled"`
