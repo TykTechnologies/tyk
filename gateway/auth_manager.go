@@ -150,10 +150,12 @@ func (b *DefaultSessionManager) SessionDetail(orgID string, keyName string, hash
 	} else {
 		if storage.TokenOrg(keyName) != orgID {
 			// try to get legacy and new format key at once
-			toSearchList := []string{keyName}
+			toSearchList := []string{}
 			if !b.Gw.GetConfig().DisableKeyActionsByUsername {
 				toSearchList = append(toSearchList, b.Gw.generateToken(orgID, keyName))
 			}
+
+			toSearchList = append(toSearchList, keyName)
 
 			for _, fallback := range b.Gw.GetConfig().HashKeyFunctionFallback {
 				if !b.Gw.GetConfig().DisableKeyActionsByUsername {
