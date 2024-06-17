@@ -51,19 +51,23 @@ import (
 //
 // Example: Threshold: 400, Request allowance: 600, Current rate: 500, Step: 100, Trigger: 0.5
 //
-//   - To trigger a RateLimitSmoothingUp event, the request rate must exceed:
-//     Allowance - (Step * Trigger)
-//     Calculation: 600 - (100 * 0.5) = 550
-//     Exceeding a request rate of 550 will increase the allowance to 700 (Allowance + Step).
+// To trigger a RateLimitSmoothingUp event, the request rate must exceed:
 //
-//   - To trigger a RateLimitSmoothingDown event, the request rate must fall below:
-//     Allowance - (Step + (Step * Trigger))
-//     Calculation: 600 - (100 + (100 * 0.5)) = 450
-//     As the request rate falls below 450, that will decrease the allowance to 500 (Allowance - Step).
+//   - Allowance - (Step * Trigger)
+//   - Calculation: 600 - (100 * 0.5) = `550`
 //
-// This is used to compute a request allowance. The request allowance will
-// be smoothed between `threshold`, and the defined `rate` limit (maximum).
-// The request allowance will be updated internally every `delay` seconds.
+// Exceeding a request rate of `550` will increase the allowance to 700 (Allowance + Step).
+//
+// To trigger a RateLimitSmoothingDown event, the request rate must fall below:
+//
+//   - Allowance - (Step + (Step * Trigger))
+//   - Calculation: 600 - (100 + (100 * 0.5)) = 450
+//
+// As the request rate falls below 450, that will decrease the allowance to 500 (Allowance - Step).
+//
+// The request allowance will be smoothed between `threshold`, and the
+// defined `rate` limit (maximum). The request allowance will be updated
+// internally every `delay` seconds.
 type RateLimitSmoothing struct {
 	// Enabled indicates if rate limit smoothing is active.
 	Enabled bool `json:"enabled" bson:"enabled"`
