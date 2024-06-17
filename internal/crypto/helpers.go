@@ -97,6 +97,11 @@ func ValidateRequestCerts(r *http.Request, certs []*tls.Certificate) error {
 		return errors.New("Client TLS certificate is required")
 	}
 
+	// no certs to verify
+	if len(certs) == 0 {
+		return nil
+	}
+
 	peerCertificate := r.TLS.PeerCertificates[0]
 
 	certID := HexSHA256(peerCertificate.Raw)
