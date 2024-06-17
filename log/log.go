@@ -81,6 +81,10 @@ func NewFormatter(format string) logrus.Formatter {
 		return &logrus.JSONFormatter{
 			TimestampFormat: time.RFC3339,
 		}
+	case "json-ext":
+		return &JSONFormatter{
+			TimestampFormat: time.RFC3339,
+		}
 	default:
 		return &logrus.TextFormatter{
 			TimestampFormat: "Jan 02 15:04:05",
