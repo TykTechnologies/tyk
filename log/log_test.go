@@ -17,6 +17,10 @@ func TestNewFormatter(t *testing.T) {
 	jsonFormatter, ok := NewFormatter("json").(*logrus.JSONFormatter)
 	assert.NotNil(t, jsonFormatter)
 	assert.True(t, ok)
+
+	jsonExtFormatter, ok := NewFormatter("json-ext").(*JSONFormatter)
+	assert.NotNil(t, jsonExtFormatter)
+	assert.True(t, ok)
 }
 
 type testFormatter struct{}
