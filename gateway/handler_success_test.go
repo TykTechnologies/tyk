@@ -323,7 +323,56 @@ func TestAnalyticsIgnoreSubgraph(t *testing.T) {
 	assert.NoError(t, err)
 }
 
-func TestSuccessLogTransaction(t *testing.T) {
-	// Need guidance writing assertion tests for the LogTransction function if possible!
+func BenchmarkSuccessLogTransaction(b *testing.B) {
+	b.Run("AccessLogs enabled with Hashkeys set to true", func(b *testing.B) {
+		conf := func(globalConf *config.Config) {
+			globalConf.HashKeys = true
+			globalConf.AccessLogs.Enabled = true
+		}
+		benchmarkSuccessLogTransaction(b, conf)
 
+	})
+	b.Run("AccessLogs enabled with Hashkeys set to false", func(b *testing.B) {
+		conf := func(globalConf *config.Config) {
+			globalConf.HashKeys = false
+			globalConf.AccessLogs.Enabled = true
+		}
+		benchmarkSuccessLogTransaction(b, conf)
+	})
+	b.Run("AccessLogs disabled with Hashkeys set to true", func(b *testing.B) {
+		conf := func(globalConf *config.Config) {
+			globalConf.HashKeys = true
+			globalConf.AccessLogs.Enabled = false
+		}
+		benchmarkSuccessLogTransaction(b, conf)
+	})
+	b.Run("AccessLogs disabled with Hashkeys set to false", func(b *testing.B) {
+		conf := func(globalConf *config.Config) {
+			globalConf.HashKeys = false
+			globalConf.AccessLogs.Enabled = false
+		}
+		benchmarkSuccessLogTransaction(b, conf)
+	})
+}
+
+func benchmarkSuccessLogTransaction(b *testing.B, conf func(globalConf *config.Config)) {
+	b.ReportAllocs()
+	b.ResetTimer()
+
+	ts := StartTest(conf)
+	defer ts.Close()
+
+	API := BuildAPI(func(spec *APISpec) {
+		spec.Name = "test-api"
+		spec.APIID = "test-api-id"
+		spec.Proxy.ListenPath = "/"
+	})[0]
+
+	ts.Gw.LoadAPI(API)
+
+	for i := 0; i < b.N; i++ {
+		ts.Run(b, test.TestCase{
+			Code: http.StatusOK,
+		})
+	}
 }
