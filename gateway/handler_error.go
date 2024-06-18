@@ -4,8 +4,6 @@ import (
 	"bytes"
 	"encoding/base64"
 	"errors"
-	"github.com/TykTechnologies/tyk/storage"
-	"github.com/sirupsen/logrus"
 	htmlTemplate "html/template"
 	"io"
 	"io/ioutil"
@@ -13,6 +11,10 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/sirupsen/logrus"
+
+	"github.com/TykTechnologies/tyk/storage"
 
 	"github.com/TykTechnologies/tyk/apidef"
 

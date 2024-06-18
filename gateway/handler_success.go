@@ -3,14 +3,16 @@ package gateway
 import (
 	"bytes"
 	"encoding/base64"
-	"github.com/TykTechnologies/tyk/storage"
-	"github.com/sirupsen/logrus"
 	"io"
 	"io/ioutil"
 	"net/http"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/sirupsen/logrus"
+
+	"github.com/TykTechnologies/tyk/storage"
 
 	"github.com/TykTechnologies/tyk/internal/graphql"
 

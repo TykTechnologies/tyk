@@ -2,13 +2,14 @@ package gateway
 
 import (
 	"bytes"
-	"github.com/TykTechnologies/tyk/config"
 	"io/ioutil"
 	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/TykTechnologies/tyk/config"
 
 	"github.com/TykTechnologies/tyk/header"
 	"github.com/TykTechnologies/tyk/test"
