@@ -2,10 +2,12 @@ package gateway
 
 import (
 	"crypto/x509"
+	"encoding/json"
+	"fmt"
+	"github.com/stretchr/testify/assert"
+	"io/ioutil"
 	"net/http"
 	"testing"
-
-	"github.com/stretchr/testify/assert"
 
 	"github.com/TykTechnologies/tyk/certs"
 	"github.com/TykTechnologies/tyk/config"
@@ -282,4 +284,129 @@ func TestResetQuotaObfuscate(t *testing.T) {
 
 		assert.Equal(t, "481408ygjkbs", actual)
 	})
+}
+
+func TestCustomKeysMDCB(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	const customKey = "custom-key"
+	session := CreateStandardSession()
+	session.AccessRights = map[string]user.AccessDefinition{"test": {
+		APIID: "test", Versions: []string{"v1"},
+	}}
+	client := GetTLSClient(nil, nil)
+	resp, err := ts.Run(t, test.TestCase{AdminAuth: true, Method: http.MethodPost, Path: "/tyk/keys/" + customKey,
+		Data: session, Client: client, Code: http.StatusOK})
+	if err != nil {
+		t.Error(err)
+	}
+
+	defer resp.Body.Close()
+
+	body, _ := ioutil.ReadAll(resp.Body)
+	keyResp := apiModifyKeySuccess{}
+	err = json.Unmarshal(body, &keyResp)
+	assert.NoError(t, err)
+
+	ss, found := ts.Gw.GlobalSessionManager.SessionDetail(session.OrgID, customKey, false)
+	assert.True(t, found)
+	assert.Equal(t, ss.KeyID, keyResp.Key)
+
+	ss, found = ts.Gw.GlobalSessionManager.SessionDetail(session.OrgID, keyResp.Key, false)
+	assert.True(t, found)
+	assert.Equal(t, ss.KeyID, keyResp.Key)
+}
+
+func TestCustomKeysEdgeGw(t *testing.T) {
+
+	const customKey = "my-custom-key"
+	orgId := "default"
+
+	testCases := []struct {
+		name         string
+		useCustomKey bool
+	}{
+		{
+			name:         "sending event with custom key",
+			useCustomKey: true,
+		},
+		{
+			name:         "sending event with base64 representation",
+			useCustomKey: false,
+		},
+	}
+
+	hashKeys := []bool{true, false}
+
+	for _, hashed := range hashKeys {
+		t.Run(fmt.Sprintf("HashKeys: %v", hashed), func(t *testing.T) {
+			for _, tc := range testCases {
+				t.Run(tc.name, func(t *testing.T) {
+					// 1- execute an edge gw
+					ts := StartTest(func(globalConf *config.Config) {
+						globalConf.SlaveOptions.GroupID = "group"
+						globalConf.LivenessCheck.CheckDuration = 1000000000
+						globalConf.SlaveOptions.APIKey = "apikey-test"
+						globalConf.HashKeys = hashed
+						globalConf.SlaveOptions.SynchroniserEnabled = hashed
+					})
+
+					rpcListener := RPCStorageHandler{
+						KeyPrefix:        "rpc.listener.",
+						SuppressRegister: true,
+						HashKeys:         hashed,
+						Gw:               ts.Gw,
+					}
+
+					key := customKey
+					if !tc.useCustomKey {
+						key = ts.Gw.generateToken(orgId, key)
+					}
+
+					// 2- creates a custom key
+					session := CreateStandardSession()
+					session.AccessRights = map[string]user.AccessDefinition{"test": {
+						APIID: "test", Versions: []string{"v1"},
+					}}
+					client := GetTLSClient(nil, nil)
+
+					resp, err := ts.Run(t, test.TestCase{AdminAuth: true, Method: http.MethodPost, Path: "/tyk/keys/" + customKey,
+						Data: session, Client: client, Code: http.StatusOK})
+					assert.Nil(t, err)
+					defer resp.Body.Close()
+
+					body, _ := ioutil.ReadAll(resp.Body)
+					keyResp := apiModifyKeySuccess{}
+					err = json.Unmarshal(body, &keyResp)
+					assert.NoError(t, err)
+
+					if hashed {
+						key = keyResp.KeyHash
+					}
+
+					// 3- double check that key exists
+					_, found := ts.Gw.GlobalSessionManager.SessionDetail(orgId, key, hashed)
+					assert.True(t, found)
+					//	assert.Equal(t, ss.KeyID, keyResp.Key)
+
+					keyEvent := key
+					if hashed {
+						keyEvent += ":hashed"
+					}
+					// 4- emit events so edge process it
+					rpcListener.ProcessKeySpaceChanges([]string{keyEvent}, orgId)
+
+					// mock pull so we can update
+					//  after the update, the key must exist updated but with the format apikey-{keyid}
+
+					// 5- key should not exist in edge as it was removed
+					_, found = ts.Gw.GlobalSessionManager.SessionDetail(orgId, key, hashed)
+					assert.False(t, found)
+				})
+			}
+		})
+
+	}
+
 }

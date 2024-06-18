@@ -1110,10 +1110,11 @@ func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string, orgId string) 
 				_, status = r.Gw.handleDeleteHashedKey(key, orgId, "", resetQuota)
 			} else {
 				log.Info("--> removing cached key: ", r.Gw.obfuscateKey(key))
-				// in case it's an username (basic auth) or custom-key then generate the token
+				// in case it's a username (basic auth) or custom-key then generate the token
 				if storage.TokenOrg(key) == "" {
 					key = r.Gw.generateToken(orgId, key)
 				}
+
 				_, status = r.Gw.handleDeleteKey(key, orgId, "-1", resetQuota)
 			}
 
@@ -1121,9 +1122,11 @@ func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string, orgId string) 
 			if status == http.StatusNotFound && !synchronizerEnabled {
 				continue
 			}
+
 			r.Gw.getSessionAndCreate(key, r, isHashed, orgId)
 			r.Gw.SessionCache.Delete(key)
 			r.Gw.RPCGlobalCache.Delete(r.KeyPrefix + key)
+
 		}
 	}
 
