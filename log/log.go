@@ -50,7 +50,6 @@ func (f *RawFormatter) Format(entry *logrus.Entry) ([]byte, error) {
 
 //nolint:gochecknoinits
 func init() {
-	// Initialize the default log formatter
 	formatter := new(logrus.TextFormatter)
 	formatter.TimestampFormat = `Jan 02 15:04:05`
 	formatter.FullTimestamp = true
