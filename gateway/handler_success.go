@@ -10,8 +10,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/sirupsen/logrus"
-
 	"github.com/TykTechnologies/tyk/storage"
 
 	"github.com/TykTechnologies/tyk/internal/graphql"
@@ -134,26 +132,18 @@ func (s *SuccessHandler) logTransaction(hashKeys bool, latency analytics.Latency
 		token = storage.HashKey(token, hashKeys)
 	}
 
+	accessLog := httputil.AccessLogRecord{}
+	accessLogSpec := httputil.AccessLogAPISpec{APIID: s.Spec.APIID, OrgID: s.Spec.OrgID}
+	err := accessLog.Fill(latency, r, resp.Response, accessLogSpec, token)
+
+	if err != nil {
+		log.WithError(err).Error("error generating access logs")
+		return
+	}
+
 	// Success transaction logs, contains important fields such as latency that may not
 	// be available in an error handler
-	log.WithFields(logrus.Fields{
-		"apiID":            s.Spec.APIID,
-		"apiKey":           token,
-		"clientRemoteAddr": r.RemoteAddr,
-		"clientIp":         request.RealIP(r),
-		"host":             r.Host,
-		"latency":          latency.Total,
-		"orgID":            s.Spec.OrgID,
-		"protocol":         r.Proto,
-		"requestMethod":    r.Method,
-		"requestUri":       r.RequestURI,
-		"responseCode":     resp.Response.StatusCode,
-		"upstreamAddress":  r.URL.Scheme + "://" + r.URL.Host + r.URL.RequestURI(),
-		"upstreamLatency":  latency.Upstream,
-		"upstreamPath":     r.URL.Path,
-		"upstreamUri":      r.URL.RequestURI(),
-		"userAgent":        r.UserAgent(),
-	}).Info("Transaction log")
+	log.WithFields(accessLog.Logger(log).Data).Info()
 
 	return
 }
