@@ -167,13 +167,19 @@ func (b *DefaultSessionManager) SessionDetail(orgID string, keyName string, hash
 
 			jsonKeyValList, err = b.store.GetMultiKey(toSearchList)
 
+			keyFound := false
 			// pick the 1st non empty from the returned list
 			for idx, val := range jsonKeyValList {
 				if val != "" {
 					jsonKeyVal = val
 					keyId = toSearchList[idx]
+					keyFound = true
 					break
 				}
+			}
+			if !keyFound {
+				// try raw
+				jsonKeyVal, err = b.store.GetRawKey(b.store.GetKeyPrefix() + keyName)
 			}
 		} else {
 			// key is not an imported one
