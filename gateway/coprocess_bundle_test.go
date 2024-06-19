@@ -63,7 +63,6 @@ var bundleWithBadSignature = map[string]string{
 }
 
 func TestBundleLoader(t *testing.T) {
-	t.Skip()
 	ts := StartTest(nil)
 	defer ts.Close()
 
