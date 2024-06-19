@@ -1,7 +1,7 @@
 openapi: 3.0.0
 info:
   title: Tyk Gateway API
-  version: 5.3.0
+  version: 5.4.0
   description: |-
     The Tyk Gateway API is the primary means for integrating your application with the Tyk API Gateway system. This API is very small, and has no granular permissions system. It is intended to be used purely for internal automation and integration.
 
@@ -2157,7 +2157,7 @@ components:
           type: number
           x-go-name: HmacAllowedClockSkew
         id:
-          $ref: '#/components/schemas/ObjectId'
+          $ref: '#/components/schemas/ObjectID'
         internal:
           type: boolean
           x-go-name: Internal
@@ -2371,7 +2371,7 @@ components:
       type: object
       x-go-package: github.com/TykTechnologies/tyk/apidef
     APILimit:
-      description: APILimit stores quota and rate limit on ACL level (per API)
+      title: APILimit stores quota and rate limit on ACL level (per API)
       properties:
         per:
           format: double
@@ -2408,6 +2408,11 @@ components:
           format: int64
           type: integer
           x-go-name: ThrottleRetryLimit
+        smoothing:
+          type: object
+          $ref: '#/components/schemas/RateLimitSmoothing'
+          description: Smoothing contains rate limit smoothing settings.
+          x-go-name: Smoothing
       type: object
       x-go-package: github.com/TykTechnologies/tyk/user
     AccessDefinition:
@@ -2943,10 +2948,10 @@ components:
           x-go-name: Issuer
       type: object
       x-go-package: github.com/TykTechnologies/tyk/apidef
-    ObjectId:
+    ObjectID:
       description: 'http://www.mongodb.org/display/DOCS/Object+IDs'
       title: >-
-        ObjectId is a unique ID identifying a BSON value. It must be exactly 12
+        ObjectID is a unique ID identifying a BSON value. It must be exactly 12
         bytes
 
         long. MongoDB objects by default have such a property set in their "_id"
@@ -2969,9 +2974,9 @@ components:
     Policy:
       properties:
         _id:
-          $ref: '#/components/schemas/ObjectId'
+          $ref: '#/components/schemas/ObjectID'
           type: object
-          x-go-name: ID
+          x-go-name: MID
         id:
           type: string
           x-go-name: ID
@@ -3040,11 +3045,17 @@ components:
         last_updated:
           type: string
           x-go-name: LastUpdates
+        smoothing:
+          type: object
+          $ref: '#/components/schemas/RateLimitSmoothing'
+          description: Smoothing contains rate limit smoothing settings.
+          x-go-name: Smoothing
         meta_data:
           type: object
           x-go-name: MetaData
         graphql_access_rights:
           $ref: '#/components/schemas/GraphAccessDefinition'
+      title: Policy represents a user policy
       type: object
       x-go-package: github.com/TykTechnologies/tyk/user
     PolicyPartitions:
@@ -3066,6 +3077,103 @@ components:
           x-go-name: PerAPI
       type: object
       x-go-package: github.com/TykTechnologies/tyk/user
+    RateLimitSmoothing:
+      properties:
+        delay:
+          type: integer
+          format: int64
+          description: Delay is a hold-off between smoothing events and controls how frequently the current allowance will step up or down (in seconds).
+          minimum: 1
+          x-go-name: Delay
+        enabled:
+          type: boolean
+          description: Enabled indicates if rate limit smoothing is active.
+          x-go-name: Enabled
+        step:
+          type: integer
+          format: int64
+          description: Step is the increment by which the current allowance will be increased or decreased each time a smoothing event is emitted.
+          minimum: 1
+          x-go-name: Step
+        threshold:
+          type: integer
+          format: int64
+          description: Threshold is the initial rate limit beyond which smoothing will be applied. It is a count of requests during the `per` interval and should be less than the maximum configured `rate`.
+          minimum: 1
+          x-go-name: Threshold
+        trigger:
+          type: number
+          format: double
+          description: Trigger is a fraction (typically in the range 0.1-1.0) of the step at which point a smoothing event will be emitted as the request rate approaches the current allowance.
+          minimum: 0
+          exclusiveMinimum: true
+          multipleOf: 0.01
+          x-go-name: Trigger
+      title:  RateLimitSmoothing holds the rate smoothing configuration.
+      description: |-
+        Rate Limit Smoothing is a mechanism to dynamically adjust the request rate
+        limits based on the current traffic patterns. It helps in managing request
+        spikes by gradually increasing or decreasing the rate limit instead of making
+        abrupt changes or blocking requests excessively.
+    
+        Once the rate limit smoothing triggers an allowance change, one of the
+        following events is emitted:
+    
+        - `RateLimitSmoothingUp` when the allowance increases
+        - `RateLimitSmoothingDown` when the allowance decreases
+    
+        Events are emitted based on the configuration:
+    
+        - `enabled` (boolean) to enable or disable rate limit smoothing
+        - `threshold` after which to apply smoothing (minimum rate for window)
+        - `trigger` configures at which fraction of a step a smoothing event is emitted
+        - `step` is the value by which the rate allowance will get adjusted
+        - `delay` is a hold-off in seconds providing a minimum period between rate allowance adjustments
+    
+        To determine if the request rate is growing and needs to be smoothed, the
+        `step * trigger` value is subtracted from the request allowance and, if
+        the request rate goes above that, then a RateLimitSmoothingUp event is
+        emitted and the rate allowance is increased by `step`.
+    
+        Once the request allowance has been increased above the `threshold`, Tyk
+        will start to check for decreasing request rate. When the request rate
+        drops `step * (1 + trigger)` below the request allowance, a
+        `RateLimitSmoothingDown` event is emitted and the rate allowance is
+        decreased by `step`.
+    
+        After the request allowance has been adjusted (up or down), the request
+        rate will be checked again over the next `delay` seconds and, if
+        required, further adjustment made to the rate allowance after the
+        hold-off.
+    
+        For any allowance, events are emitted based on the following calculations:
+    
+         - When the request rate rises above `allowance - (step * trigger)`,
+          a RateLimitSmoothingUp event is emitted and allowance increases by `step`.
+         - When the request rate falls below `allowance - (step + step * trigger)`,
+          a RateLimitSmoothingDown event is emitted and allowance decreases by `step`.
+    
+        Example: Threshold: 400, Request allowance: 600, Current rate: 500, Step: 100, Trigger: 0.5.
+    
+        To trigger a RateLimitSmoothingUp event, the request rate must exceed:
+    
+         - Calculation: Allowance - (Step * Trigger).
+         - Example: 600 - (100 * 0.5) = `550`.
+    
+        Exceeding a request rate of `550` will increase the allowance to 700 (Allowance + Step).
+    
+        To trigger a RateLimitSmoothingDown event, the request rate must fall below:
+    
+         - Calculation: Allowance - (Step + (Step * Trigger)).
+         - Example: 600 - (100 + (100 * 0.5)) = 450.
+    
+        As the request rate falls below 450, that will decrease the allowance to 500 (Allowance - Step).
+    
+        The request allowance will be smoothed between `threshold`, and the
+        defined `rate` limit (maximum). The request allowance will be updated
+        internally every `delay` seconds.
+      type: object
+      x-go-package: github.com/TykTechnologies/tyk/apidef
     Regexp:
       description: Regexp is a wrapper around regexp.Regexp but with caching
       properties:
@@ -3332,6 +3440,11 @@ components:
           format: int64
           type: integer
           x-go-name: SessionLifetime
+        smoothing:
+          type: object
+          $ref: '#/components/schemas/RateLimitSmoothing'
+          description: Smoothing contains rate limit smoothing settings.
+          x-go-name: Smoothing
         throttle_interval:
           format: double
           type: number

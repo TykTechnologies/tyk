@@ -2012,6 +2012,8 @@
       "enum": [
         "QuotaExceeded",
         "RatelimitExceeded",
+        "RateLimitSmoothingUp",
+        "RateLimitSmoothingDown",
         "AuthFailure",
         "KeyExpired",
         "VersionFailure",
