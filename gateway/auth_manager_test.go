@@ -321,6 +321,7 @@ func TestCustomKeysEdgeGw(t *testing.T) {
 						globalConf.HashKeys = hashed
 						globalConf.SlaveOptions.SynchroniserEnabled = hashed
 					})
+					defer ts.Close()
 
 					rpcListener := RPCStorageHandler{
 						KeyPrefix:        "rpc.listener.",
