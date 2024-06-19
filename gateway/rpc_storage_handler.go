@@ -1104,6 +1104,7 @@ func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string, orgId string) 
 
 			isHashed := len(splitKeys) > 1 && splitKeys[1] == "hashed"
 			var status int
+			var err error
 			if isHashed {
 				log.Info("--> removing cached (hashed) key: ", splitKeys[0])
 				key = splitKeys[0]
@@ -1116,7 +1117,7 @@ func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string, orgId string) 
 				}
 				_, status = r.Gw.handleDeleteKey(key, orgId, "-1", resetQuota)
 				// check if we must remove the key by custom key id
-				status, err := r.deleteUsingTokenID(key, orgId, resetQuota, status)
+				status, err = r.deleteUsingTokenID(key, orgId, resetQuota, status)
 				if err != nil {
 					log.Debugf("cannot remove key:%v status: %v", key, status)
 				}

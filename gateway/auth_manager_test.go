@@ -345,9 +345,13 @@ func TestCustomKeysEdgeGw(t *testing.T) {
 					resp, err := ts.Run(t, test.TestCase{AdminAuth: true, Method: http.MethodPost, Path: "/tyk/keys/" + customKey,
 						Data: session, Client: client, Code: http.StatusOK})
 					assert.Nil(t, err)
-					defer resp.Body.Close()
+					defer func() {
+						err := resp.Body.Close()
+						assert.Nil(t, err)
+					}()
 
-					body, _ := io.ReadAll(resp.Body)
+					body, err := io.ReadAll(resp.Body)
+					assert.Nil(t, err)
 					keyResp := apiModifyKeySuccess{}
 					err = json.Unmarshal(body, &keyResp)
 					assert.NoError(t, err)
