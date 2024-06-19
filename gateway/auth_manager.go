@@ -156,7 +156,6 @@ func (b *DefaultSessionManager) SessionDetail(orgID string, keyName string, hash
 			}
 
 			toSearchList = append(toSearchList, keyName)
-
 			for _, fallback := range b.Gw.GetConfig().HashKeyFunctionFallback {
 				if !b.Gw.GetConfig().DisableKeyActionsByUsername {
 					toSearchList = append(toSearchList, b.Gw.generateToken(orgID, keyName, fallback))

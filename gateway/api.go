@@ -751,7 +751,7 @@ func (gw *Gateway) handleAddKey(keyName, sessionString, orgId string) {
 		"prefix": "RPC",
 		"key":    gw.obfuscateKey(keyName),
 		"status": "ok",
-	}).Info("Updated key in edge storage.")
+	}).Info("Updated key in slave storage.")
 }
 
 func (gw *Gateway) handleDeleteKey(keyName, orgID, apiID string, resetQuota bool) (interface{}, int) {

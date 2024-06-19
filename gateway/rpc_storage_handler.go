@@ -1114,8 +1114,8 @@ func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string, orgId string) 
 				if storage.TokenOrg(key) == "" {
 					key = r.Gw.generateToken(orgId, key)
 				}
-
 				_, status = r.Gw.handleDeleteKey(key, orgId, "-1", resetQuota)
+				// check if we must remove the key by custom key id
 				status, err := r.deleteUsingTokenID(key, orgId, resetQuota, status)
 				if err != nil {
 					log.Debugf("cannot remove key:%v status: %v", key, status)
@@ -1126,11 +1126,9 @@ func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string, orgId string) 
 			if status == http.StatusNotFound && !synchronizerEnabled {
 				continue
 			}
-
 			r.Gw.getSessionAndCreate(key, r, isHashed, orgId)
 			r.Gw.SessionCache.Delete(key)
 			r.Gw.RPCGlobalCache.Delete(r.KeyPrefix + key)
-
 		}
 	}
 

@@ -623,3 +623,26 @@ func TestGetRawKey(t *testing.T) {
 		assert.Equal(t, storage.ErrMDCBConnectionLost, err)
 	})
 }
+
+func TestDeleteUsingTokenID(t *testing.T) {
+	ts := StartTest(func(globalConf *config.Config) {
+		globalConf.SlaveOptions.EnableRPCCache = true
+	})
+	defer ts.Close()
+
+	rpcListener := RPCStorageHandler{
+		KeyPrefix:        "rpc.listener.",
+		SuppressRegister: true,
+		Gw:               ts.Gw,
+	}
+
+	t.Run("status not found and TokenID returns ID", func(t *testing.T) {
+
+	})
+
+	t.Run("status not found and TokenID do not exist", func(t *testing.T) {
+		status, err := rpcListener.deleteUsingTokenID("custom-key", "orgID", false, 404)
+		assert.Nil(t, err)
+		assert.Equal(t, 404, status)
+	})
+}
