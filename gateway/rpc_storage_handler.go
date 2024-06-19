@@ -1116,6 +1116,10 @@ func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string, orgId string) 
 				}
 
 				_, status = r.Gw.handleDeleteKey(key, orgId, "-1", resetQuota)
+				status, err := r.deleteUsingTokenID(key, orgId, resetQuota, status)
+				if err != nil {
+					log.Debugf("cannot remove key:%v status: %v", key, status)
+				}
 			}
 
 			// if key not found locally and synchroniser disabled then we should not pull it from management layer
@@ -1145,6 +1149,17 @@ func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string, orgId string) 
 		Gw:      r.Gw,
 	}
 	r.Gw.MainNotifier.Notify(n)
+}
+
+// Function to handle fallback deletion using token ID
+func (r *RPCStorageHandler) deleteUsingTokenID(key, orgId string, resetQuota bool, status int) (int, error) {
+	if status == http.StatusNotFound {
+		id, err := storage.TokenID(key)
+		if err == nil {
+			_, status = r.Gw.handleDeleteKey(id, orgId, "-1", resetQuota)
+		}
+	}
+	return status, nil
 }
 
 func (r *RPCStorageHandler) DeleteScanMatch(pattern string) bool {
