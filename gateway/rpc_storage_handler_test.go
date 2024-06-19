@@ -652,7 +652,7 @@ func TestDeleteUsingTokenID(t *testing.T) {
 			Data: session, Client: client, Code: http.StatusOK})
 		assert.Nil(t, err)
 		defer func() {
-			err := resp.Body.Close()
+			err = resp.Body.Close()
 			assert.Nil(t, err)
 		}()
 		body, err := io.ReadAll(resp.Body)
