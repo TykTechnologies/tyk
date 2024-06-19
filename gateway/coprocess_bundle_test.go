@@ -65,7 +65,7 @@ var bundleWithBadSignature = map[string]string{
 func TestBundleLoader(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
-
+	// eheheh
 	bundleID := ts.RegisterBundle("grpc_with_auth_check", grpcBundleWithAuthCheck)
 	unsignedBundleID := ts.RegisterBundle("grpc_with_auth_check_signed", grpcBundleWithAuthCheck)
 	badSignatureBundleID := ts.RegisterBundle("bad_signature", bundleWithBadSignature)
