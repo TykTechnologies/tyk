@@ -1049,17 +1049,23 @@ func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string, orgId string) 
 
 			isHashed := len(splitKeys) > 1 && splitKeys[1] == "hashed"
 			var status int
+			var err error
 			if isHashed {
 				log.Info("--> removing cached (hashed) key: ", splitKeys[0])
 				key = splitKeys[0]
 				_, status = r.Gw.handleDeleteHashedKey(key, orgId, "", resetQuota)
 			} else {
 				log.Info("--> removing cached key: ", r.Gw.obfuscateKey(key))
-				// in case it's an username (basic auth) or custom-key then generate the token
+				// in case it's a username (basic auth) or custom-key then generate the token
 				if storage.TokenOrg(key) == "" {
 					key = r.Gw.generateToken(orgId, key)
 				}
 				_, status = r.Gw.handleDeleteKey(key, orgId, "-1", resetQuota)
+				// check if we must remove the key by custom key id
+				status, err = r.deleteUsingTokenID(key, orgId, resetQuota, status)
+				if err != nil {
+					log.Debugf("cannot remove key:%v status: %v", key, status)
+				}
 			}
 
 			// if key not found locally and synchroniser disabled then we should not pull it from management layer
@@ -1087,6 +1093,17 @@ func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string, orgId string) 
 		Gw:      r.Gw,
 	}
 	r.Gw.MainNotifier.Notify(n)
+}
+
+// Function to handle fallback deletion using token ID
+func (r *RPCStorageHandler) deleteUsingTokenID(key, orgId string, resetQuota bool, status int) (int, error) {
+	if status == http.StatusNotFound {
+		id, err := storage.TokenID(key)
+		if err == nil {
+			_, status = r.Gw.handleDeleteKey(id, orgId, "-1", resetQuota)
+		}
+	}
+	return status, nil
 }
 
 func (r *RPCStorageHandler) DeleteScanMatch(pattern string) bool {
