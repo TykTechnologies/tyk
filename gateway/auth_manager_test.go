@@ -2,6 +2,9 @@ package gateway
 
 import (
 	"crypto/x509"
+	"encoding/json"
+	"fmt"
+	"io"
 	"net/http"
 	"testing"
 
@@ -282,4 +285,99 @@ func TestResetQuotaObfuscate(t *testing.T) {
 
 		assert.Equal(t, "481408ygjkbs", actual)
 	})
+}
+
+// TestCustomKeysEdgeGw check that custom keys are processed
+// by edge gw when a keySpace signal is received
+func TestCustomKeysEdgeGw(t *testing.T) {
+
+	const customKey = "my-custom-key"
+	orgId := "default"
+
+	testCases := []struct {
+		name         string
+		useCustomKey bool
+	}{
+		{
+			name:         "sending event with custom key",
+			useCustomKey: true,
+		},
+		{
+			name:         "sending event with base64 representation",
+			useCustomKey: false,
+		},
+	}
+
+	hashKeys := []bool{true, false}
+	for _, hashed := range hashKeys {
+		t.Run(fmt.Sprintf("HashKeys: %v", hashed), func(t *testing.T) {
+			for _, tc := range testCases {
+				t.Run(tc.name, func(t *testing.T) {
+					// 1- execute an edge gw
+					ts := StartTest(func(globalConf *config.Config) {
+						globalConf.SlaveOptions.GroupID = "group"
+						globalConf.LivenessCheck.CheckDuration = 1000000000
+						globalConf.SlaveOptions.APIKey = "apikey-test"
+						globalConf.HashKeys = hashed
+						globalConf.SlaveOptions.SynchroniserEnabled = hashed
+					})
+					defer ts.Close()
+
+					rpcListener := RPCStorageHandler{
+						KeyPrefix:        "rpc.listener.",
+						SuppressRegister: true,
+						HashKeys:         hashed,
+						Gw:               ts.Gw,
+					}
+
+					key := customKey
+					if !tc.useCustomKey {
+						key = ts.Gw.generateToken(orgId, key)
+					}
+
+					// 2- creates a custom key
+					session := CreateStandardSession()
+					session.AccessRights = map[string]user.AccessDefinition{"test": {
+						APIID: "test", Versions: []string{"v1"},
+					}}
+					client := GetTLSClient(nil, nil)
+
+					resp, err := ts.Run(t, test.TestCase{AdminAuth: true, Method: http.MethodPost, Path: "/tyk/keys/" + customKey,
+						Data: session, Client: client, Code: http.StatusOK})
+					assert.Nil(t, err)
+					defer func() {
+						err = resp.Body.Close()
+						assert.Nil(t, err)
+					}()
+
+					body, err := io.ReadAll(resp.Body)
+					assert.Nil(t, err)
+					keyResp := apiModifyKeySuccess{}
+					err = json.Unmarshal(body, &keyResp)
+					assert.NoError(t, err)
+
+					if hashed {
+						key = keyResp.KeyHash
+					}
+
+					// 3- double check that key exists
+					_, found := ts.Gw.GlobalSessionManager.SessionDetail(orgId, key, hashed)
+					assert.True(t, found)
+
+					keyEvent := key
+					if hashed {
+						keyEvent += ":hashed"
+					}
+					// 4- emit events so edge process it
+					rpcListener.ProcessKeySpaceChanges([]string{keyEvent}, orgId)
+
+					// 5- key should not exist in edge as it was removed
+					_, found = ts.Gw.GlobalSessionManager.SessionDetail(orgId, key, hashed)
+					assert.False(t, found)
+				})
+			}
+		})
+
+	}
+
 }
