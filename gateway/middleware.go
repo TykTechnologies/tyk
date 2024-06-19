@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/TykTechnologies/tyk/internal/cache"
+	"github.com/TykTechnologies/tyk/internal/event"
 	"github.com/TykTechnologies/tyk/internal/otel"
 	"github.com/TykTechnologies/tyk/rpc"
 
@@ -325,7 +326,7 @@ func (t *BaseMiddleware) UpdateRequestSession(r *http.Request) bool {
 		return false
 	}
 
-	if !ctxSessionUpdateScheduled(r) {
+	if !session.IsModified() {
 		return false
 	}
 
@@ -335,9 +336,8 @@ func (t *BaseMiddleware) UpdateRequestSession(r *http.Request) bool {
 		return false
 	}
 
-	// Set context state back
-	// Useful for benchmarks when request object stays same
-	ctxDisableSessionUpdate(r)
+	// Reset session state, useful for benchmarks when request object stays the same.
+	session.Reset()
 
 	if !t.Spec.GlobalConfig.LocalSessionCache.DisableCacheSessionState {
 		t.Gw.SessionCache.Set(session.KeyHash(), session.Clone(), cache.DefaultExpiration)
@@ -451,15 +451,7 @@ func (t *BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 				if accessRights.Limit.IsEmpty() {
 					// limit was not specified on API level so we will populate it from policy
 					idForScope = policy.ID
-					accessRights.Limit = user.APILimit{
-						QuotaMax:           policy.QuotaMax,
-						QuotaRenewalRate:   policy.QuotaRenewalRate,
-						Rate:               policy.Rate,
-						Per:                policy.Per,
-						ThrottleInterval:   policy.ThrottleInterval,
-						ThrottleRetryLimit: policy.ThrottleRetryLimit,
-						MaxQueryDepth:      policy.MaxQueryDepth,
-					}
+					accessRights.Limit = policy.APILimit()
 				}
 				accessRights.AllowanceScope = idForScope
 				accessRights.Limit.SetBy = idForScope
@@ -581,17 +573,20 @@ func (t *BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 				if !usePartitions || policy.Partitions.RateLimit {
 					didRateLimit[k] = true
 
-					if greaterThanFloat64(policy.Rate, ar.Limit.Rate) {
-						ar.Limit.Rate = policy.Rate
-						if greaterThanFloat64(policy.Rate, session.Rate) {
-							session.Rate = policy.Rate
-						}
-					}
+					apiLimits := ar.Limit
+					policyLimits := policy.APILimit()
+					sessionLimits := session.APILimit()
 
-					if policy.Per > ar.Limit.Per {
-						ar.Limit.Per = policy.Per
-						if policy.Per > session.Per {
-							session.Per = policy.Per
+					// Update Rate, Per and Smoothing
+					if apiLimits.Less(policyLimits) {
+						ar.Limit.Rate = policyLimits.Rate
+						ar.Limit.Per = policyLimits.Per
+						ar.Limit.Smoothing = policyLimits.Smoothing
+
+						if sessionLimits.Less(policyLimits) {
+							session.Rate = policyLimits.Rate
+							session.Per = policyLimits.Per
+							session.Smoothing = policyLimits.Smoothing
 						}
 					}
 
@@ -634,6 +629,7 @@ func (t *BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 				if !usePartitions || policy.Partitions.RateLimit {
 					session.Rate = policy.Rate
 					session.Per = policy.Per
+					session.Smoothing = policy.Smoothing
 					session.ThrottleInterval = policy.ThrottleInterval
 					session.ThrottleRetryLimit = policy.ThrottleRetryLimit
 				}
@@ -710,6 +706,7 @@ func (t *BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 		if !didRateLimit[k] {
 			v.Limit.Rate = session.Rate
 			v.Limit.Per = session.Per
+			v.Limit.Smoothing = session.Smoothing
 			v.Limit.ThrottleInterval = session.ThrottleInterval
 			v.Limit.ThrottleRetryLimit = session.ThrottleRetryLimit
 		}
@@ -742,6 +739,7 @@ func (t *BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 			if len(didRateLimit) == 1 {
 				session.Rate = v.Limit.Rate
 				session.Per = v.Limit.Per
+				session.Smoothing = v.Limit.Smoothing
 			}
 
 			if len(didQuota) == 1 {
@@ -873,7 +871,9 @@ func (t *BaseMiddleware) CheckSessionAndIdentityForValidKey(originalKey string, 
 		}
 
 		t.Logger().Debug("Lifetime is: ", session.Lifetime(t.Spec.GetSessionLifetimeRespectsKeyExpiration(), t.Spec.SessionLifetime, t.Gw.GetConfig().ForceGlobalSessionLifetime, t.Gw.GetConfig().GlobalSessionLifetime))
-		ctxScheduleSessionUpdate(r)
+
+		session.Touch()
+
 		return session, found
 	}
 
@@ -885,6 +885,48 @@ func (t *BaseMiddleware) CheckSessionAndIdentityForValidKey(originalKey string, 
 // FireEvent is added to the BaseMiddleware object so it is available across the entire stack
 func (t *BaseMiddleware) FireEvent(name apidef.TykEvent, meta interface{}) {
 	fireEvent(name, meta, t.Spec.EventPaths)
+}
+
+// emitRateLimitEvents emits rate limit related events based on the request context.
+func (t *BaseMiddleware) emitRateLimitEvents(r *http.Request, rateLimitKey string) {
+	// Emit events triggered from request context.
+	if events := event.Get(r.Context()); len(events) > 0 {
+		for _, e := range events {
+			switch e {
+			case event.RateLimitSmoothingUp, event.RateLimitSmoothingDown:
+				t.emitRateLimitEvent(r, e, "", rateLimitKey)
+			}
+		}
+	}
+}
+
+// emitRateLimitEvent emits a specific rate limit event with an optional custom message.
+func (t *BaseMiddleware) emitRateLimitEvent(r *http.Request, e event.Event, message string, rateLimitKey string) {
+	if message == "" {
+		message = event.String(e)
+	}
+
+	t.Logger().WithField("key", t.Gw.obfuscateKey(rateLimitKey)).Info(message)
+
+	t.FireEvent(e, EventKeyFailureMeta{
+		EventMetaDefault: EventMetaDefault{
+			Message:            message,
+			OriginatingRequest: EncodeRequestToEvent(r),
+		},
+		Path:   r.URL.Path,
+		Origin: request.RealIP(r),
+		Key:    rateLimitKey,
+	})
+}
+
+// handleRateLimitFailure handles the actions to be taken when a rate limit failure occurs.
+func (t *BaseMiddleware) handleRateLimitFailure(r *http.Request, e event.Event, message string, rateLimitKey string) (error, int) {
+	t.emitRateLimitEvent(r, e, message, rateLimitKey)
+
+	// Report in health check
+	reportHealthValue(t.Spec, Throttle, "-1")
+
+	return errors.New(event.String(e)), http.StatusTooManyRequests
 }
 
 func (t *BaseMiddleware) getAuthType() string {

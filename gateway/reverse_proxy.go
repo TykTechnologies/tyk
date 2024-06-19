@@ -22,6 +22,7 @@ import (
 	"io/ioutil"
 	"net"
 	"net/http"
+	"net/textproto"
 	"net/url"
 	"strconv"
 	"strings"
@@ -124,21 +125,26 @@ func urlFromService(spec *APISpec, gw *Gateway) (*apidef.HostList, error) {
 // httpScheme matches http://* and https://*, case insensitive
 var httpScheme = regexp.MustCompile(`^(?i)https?://`)
 
+// EnsureTransport sanitizes host/protocol pairs and returns a valid URL.
 func EnsureTransport(host, protocol string) string {
 	host = strings.TrimSpace(host)
 	protocol = strings.TrimSpace(protocol)
+
+	// sanitize protocol
+	if protocol == "" {
+		protocol = "http"
+	}
+
+	// if host has no protocol, amend it
+	if !strings.Contains(host, "://") {
+		host = protocol + "://" + host
+	}
+
+	host = strings.Replace(host, "h2c://", "http://", 1)
+
 	u, err := url.Parse(host)
 	if err != nil {
 		return host
-	}
-	switch u.Scheme {
-	case "":
-		if protocol == "" {
-			protocol = "http"
-		}
-		u.Scheme = protocol
-	case "h2c":
-		u.Scheme = "http"
 	}
 	return u.String()
 }
@@ -1005,6 +1011,11 @@ func (p *ReverseProxy) handleGraphQL(roundTripper *TykRoundTripper, outreq *http
 	isWebSocketUpgrade := ctxGetGraphQLIsWebSocketUpgrade(outreq)
 	needsEngine := needsGraphQLExecutionEngine(p.TykAPISpec)
 
+	requestHeadersRewrite := make(map[string]apidef.RequestHeadersRewriteConfig)
+	for key, value := range p.TykAPISpec.GraphQL.Proxy.RequestHeadersRewrite {
+		// Use the canonical format of the MIME header key.
+		requestHeadersRewrite[textproto.CanonicalMIMEHeaderKey(key)] = value
+	}
 	res, hijacked, err = p.TykAPISpec.GraphEngine.HandleReverseProxy(graphengine.ReverseProxyParams{
 		RoundTripper:       roundTripper,
 		ResponseWriter:     w,
@@ -1013,6 +1024,12 @@ func (p *ReverseProxy) handleGraphQL(roundTripper *TykRoundTripper, outreq *http
 		NeedsEngine:        needsEngine,
 		IsCORSPreflight:    isCORSPreflight(outreq),
 		IsWebSocketUpgrade: isWebSocketUpgrade,
+		HeadersConfig: graphengine.ReverseProxyHeadersConfig{
+			ProxyOnly: graphengine.ProxyOnlyHeadersConfig{
+				UseImmutableHeaders:   p.TykAPISpec.GraphQL.Proxy.Features.UseImmutableHeaders,
+				RequestHeadersRewrite: requestHeadersRewrite,
+			},
+		},
 	})
 	if err != nil {
 		return nil, hijacked, err

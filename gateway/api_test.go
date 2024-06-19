@@ -1909,56 +1909,6 @@ func TestContextSession(t *testing.T) {
 	ctxSetSession(r, nil, false, false)
 }
 
-func TestApiLoaderLongestPathFirst(t *testing.T) {
-	ts := StartTest(func(globalConf *config.Config) {
-		globalConf.EnableCustomDomains = true
-	})
-	defer ts.Close()
-
-	type hostAndPath struct {
-		host, path string
-	}
-
-	inputs := map[hostAndPath]bool{}
-	hosts := []string{"host1.local", "host2.local", "host3.local"}
-	paths := []string{"a", "ab", "a/b/c", "ab/c", "abc", "a/b/c"}
-	// Use a map so that we get a somewhat random order when
-	// iterating. Would be better to use math/rand.Shuffle once we
-	// need only support Go 1.10 and later.
-	for _, host := range hosts {
-		for _, path := range paths {
-			inputs[hostAndPath{host, path}] = true
-		}
-	}
-
-	var apis []*APISpec
-
-	for hp := range inputs {
-		apis = append(apis, BuildAPI(func(spec *APISpec) {
-			spec.APIID = uuid.New()
-
-			spec.Domain = hp.host
-			spec.Proxy.ListenPath = "/" + hp.path
-		})[0])
-	}
-
-	ts.Gw.LoadAPI(apis...)
-
-	var testCases []test.TestCase
-
-	for hp := range inputs {
-		testCases = append(testCases, test.TestCase{
-			Client:    test.NewClientLocal(),
-			Path:      "/" + hp.path,
-			Domain:    hp.host,
-			Code:      200,
-			BodyMatch: `"Url":"/` + hp.path + `"`,
-		})
-	}
-
-	_, _ = ts.Run(t, testCases...)
-}
-
 func TestRotateClientSecretHandler(t *testing.T) {
 
 	ts := StartTest(nil)
@@ -3519,6 +3469,10 @@ func TestOAS(t *testing.T) {
 			importT := testGetOASAPI(t, ts, importedOASAPIID, "example oas doc", "example oas doc")
 			importedOAS := oas.OAS{T: importT}
 			assert.True(t, importedOAS.GetTykExtension().Server.ListenPath.Strip)
+			// ensure context variables are enabled by default in import
+			assert.True(t, importedOAS.GetTykMiddleware().Global.ContextVariables.Enabled)
+			// ensure traffic logs are enabled by default in import
+			assert.True(t, importedOAS.GetTykMiddleware().Global.TrafficLogs.Enabled)
 		})
 
 		t.Run("block when dashboard app config set to true", func(t *testing.T) {

@@ -913,3 +913,74 @@ func TestTransformHeaders(t *testing.T) {
 
 	assert.Equal(t, emptyTransformHeaders, resultTransformHeaders)
 }
+
+func TestContextVariables(t *testing.T) {
+	t.Parallel()
+	t.Run("fill", func(t *testing.T) {
+		t.Parallel()
+		testcases := []struct {
+			title    string
+			input    apidef.APIDefinition
+			expected *ContextVariables
+		}{
+			{
+				"enabled",
+				apidef.APIDefinition{EnableContextVars: true},
+				&ContextVariables{Enabled: true},
+			},
+			{
+				"disabled",
+				apidef.APIDefinition{EnableContextVars: false},
+				nil,
+			},
+		}
+
+		for _, tc := range testcases {
+			tc := tc
+			t.Run(tc.title, func(t *testing.T) {
+				t.Parallel()
+
+				g := new(Global)
+				g.Fill(tc.input)
+
+				assert.Equal(t, tc.expected, g.ContextVariables)
+			})
+		}
+	})
+
+	t.Run("extractTo", func(t *testing.T) {
+		t.Parallel()
+
+		testcases := []struct {
+			title    string
+			input    *ContextVariables
+			expected bool
+		}{
+			{
+				"enabled",
+				&ContextVariables{Enabled: true},
+				true,
+			},
+			{
+				"disabled",
+				nil,
+				false,
+			},
+		}
+
+		for _, tc := range testcases {
+			tc := tc // Creating a new 'tc' scoped to the loop
+			t.Run(tc.title, func(t *testing.T) {
+				t.Parallel()
+
+				g := new(Global)
+				g.ContextVariables = tc.input
+
+				var apiDef apidef.APIDefinition
+				g.ExtractTo(&apiDef)
+
+				assert.Equal(t, tc.expected, apiDef.EnableContextVars)
+			})
+		}
+	})
+}

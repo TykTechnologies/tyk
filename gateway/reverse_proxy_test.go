@@ -1498,7 +1498,7 @@ func TestGraphQL_OptionsPassThrough(t *testing.T) {
 			Code:    http.StatusOK,
 			HeadersMatch: map[string]string{
 				"Access-Control-Allow-Methods": http.MethodPost,
-				"Access-Control-Allow-Headers": "Content-Type",
+				"Access-Control-Allow-Headers": "content-type",
 				"Access-Control-Allow-Origin":  "*",
 			},
 		})
@@ -1585,6 +1585,23 @@ func TestEnsureTransport(t *testing.T) {
 	cases := []struct {
 		host, protocol, expect string
 	}{
+		// This section tests EnsureTransport if port + IP is supplied
+		{"https://192.168.1.1:443 ", "https", "https://192.168.1.1:443"},
+		{"192.168.1.1:443 ", "https", "https://192.168.1.1:443"},
+		{"http://192.168.1.1:80 ", "https", "http://192.168.1.1:80"},
+		{"192.168.1.1:2000 ", "tls", "tls://192.168.1.1:2000"},
+		{"192.168.1.1:2000 ", "", "http://192.168.1.1:2000"},
+		// This section tests EnsureTransport if port is supplied
+		{"https://httpbin.org:443 ", "https", "https://httpbin.org:443"},
+		{"httpbin.org:443 ", "https", "https://httpbin.org:443"},
+		{"http://httpbin.org:80 ", "https", "http://httpbin.org:80"},
+		{"httpbin.org:2000 ", "tls", "tls://httpbin.org:2000"},
+		{"httpbin.org:2000 ", "", "http://httpbin.org:2000"},
+		// This is the h2c proto to http conversion
+		{"http://httpbin.org ", "h2c", "http://httpbin.org"},
+		{"h2c://httpbin.org ", "h2c", "http://httpbin.org"},
+		{"httpbin.org ", "h2c", "http://httpbin.org"},
+		// This is the default parse section
 		{"https://httpbin.org ", "https", "https://httpbin.org"},
 		{"httpbin.org ", "https", "https://httpbin.org"},
 		{"http://httpbin.org ", "https", "http://httpbin.org"},
@@ -1594,9 +1611,11 @@ func TestEnsureTransport(t *testing.T) {
 	for i, v := range cases {
 		t.Run(fmt.Sprintf("case-%d", i), func(t *testing.T) {
 			g := EnsureTransport(v.host, v.protocol)
-			if g != v.expect {
-				t.Errorf("expected %q got %q", v.expect, g)
-			}
+
+			assert.Equal(t, v.expect, g)
+
+			_, err := url.Parse(g)
+			assert.NoError(t, err)
 		})
 	}
 }
