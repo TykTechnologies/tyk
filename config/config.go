@@ -1086,7 +1086,18 @@ type Config struct {
 		Vault  VaultConfig  `json:"vault"`
 	} `json:"kv"`
 
-	// Secrets are key-value pairs that can be accessed in the dashboard via "secrets://"
+	// The TYK_GW_SECRETS environment variable allows you to configure the "secrets"
+	// section in the Tyk Gateway configuration file. These secrets are key-value pairs
+	// that can be dynamically injected into API Definitions and the tyk.conf configuration
+	// file using the secrets://KEY notation. For Gateway versions prior to 5.3.0 only the
+	// listen path and target URL fields can use this notation.
+	//
+	// Syntax: TYK_GW_SECRETS=key1:/value1,key2:/value2
+	// Example: TYK_GW_SECRETS=api-listen-path:/secret,api-auth-key:/another-secret
+	//
+	// In this example, api-listen-path is set to /secret and api-auth-key is set to
+	// /another-secret. If the listen path in an API Definition has value secrets://api-listen-path,
+	// then Tyk Gateway will replace it with the value of the api-listen-path key, i.e. /secret.
 	Secrets map[string]string `json:"secrets"`
 
 	// Override the default error code and or message returned by middleware.
