@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/base64"
 	"errors"
-	"github.com/TykTechnologies/tyk/internal/httputil"
 	htmlTemplate "html/template"
 	"io"
 	"io/ioutil"
@@ -12,6 +11,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/TykTechnologies/tyk/internal/httputil"
 
 	"github.com/TykTechnologies/tyk/storage"
 
@@ -56,7 +57,7 @@ func defaultTykErrors() {
 
 // logTransaction will print the transaction log to STDOUT. If hashKeys is set to false it will print an obfuscated
 // version of the key otherwise print the hashed_key.
-func (e *ErrorHandler) logTransaction(hashKeys bool, r *http.Request, resp *http.Response, token string) {
+func (e *ErrorHandler) logTransaction(hashKeys bool, r *http.Request, resp *http.Response, token string) error {
 	// Don't print the full token, handle as obfuscated key or hashed key
 	if !hashKeys {
 		token = e.Gw.obfuscateKey(token)
@@ -71,15 +72,14 @@ func (e *ErrorHandler) logTransaction(hashKeys bool, r *http.Request, resp *http
 	err := accessLog.Fill(analytics.Latency{}, r, resp, accessLogSpec, token)
 
 	if err != nil {
-		log.WithError(err).Error("error generating access logs")
-		return
+		return err
 	}
 
 	// Success transaction logs, contains important fields such as latency that may not
 	// be available in an error handler
-	log.WithFields(accessLog.Logger(log).Data).Info()
+	accessLog.LogTransaction(log)
 
-	return
+	return nil
 }
 
 func overrideTykErrors(gw *Gateway) {
@@ -345,7 +345,10 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 
 	if e.Spec.GlobalConfig.AccessLogs.Enabled {
 		hashKeys := e.Gw.GetConfig().HashKeys
-		e.logTransaction(hashKeys, r, response, token)
+		err := e.logTransaction(hashKeys, r, response, token)
+		if err != nil {
+			log.WithError(err).Error("error generating access logs")
+		}
 	}
 
 	// Report in health check

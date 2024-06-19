@@ -31,13 +31,13 @@ type AccessLogRecord struct {
 	UserAgent        string
 }
 
-type AccessLog struct {
-	*logrus.Logger
-}
-
 type AccessLogAPISpec struct {
 	APIID string
 	OrgID string
+}
+
+type AccessLog struct {
+	*logrus.Logger
 }
 
 // Fill will populate the AccessLogRecord with the appropriate data using the APISpec and request
@@ -74,9 +74,6 @@ func (a *AccessLogRecord) Fill(latency analytics.Latency, r *http.Request, res *
 // Logger provides a conversion of AccessLogRecord to a logrus.Fields object used for logging
 func (a *AccessLogRecord) Logger(log *logrus.Logger) *logrus.Entry {
 	fields := logrus.Fields{}
-	//logger := &AccessLog{
-	//	Logger: log,
-	//}
 
 	// Add prefix for logger
 	fields["prefix"] = "accessLogs"
@@ -90,4 +87,9 @@ func (a *AccessLogRecord) Logger(log *logrus.Logger) *logrus.Entry {
 	}
 
 	return log.WithFields(fields)
+}
+
+// LogTransaction prints the corresponding transaction log to STDOUT
+func (a *AccessLogRecord) LogTransaction(log *logrus.Logger) {
+	log.WithFields(a.Logger(log).Data).Info()
 }

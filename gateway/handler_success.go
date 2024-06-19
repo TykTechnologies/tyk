@@ -124,7 +124,7 @@ func getSessionTags(session *user.SessionState) []string {
 
 // logTransaction will print the transaction log to STDOUT. If hashKeys is set to false it will print an obfuscated
 // version of the key otherwise print the hashed_key.
-func (s *SuccessHandler) logTransaction(hashKeys bool, latency analytics.Latency, r *http.Request, resp ProxyResponse, token string) {
+func (s *SuccessHandler) logTransaction(hashKeys bool, latency analytics.Latency, r *http.Request, resp *http.Response, token string) error {
 	// Don't print the full token, handle as obfuscated key or hashed key
 	if !hashKeys {
 		token = s.Gw.obfuscateKey(token)
@@ -134,18 +134,17 @@ func (s *SuccessHandler) logTransaction(hashKeys bool, latency analytics.Latency
 
 	accessLog := httputil.AccessLogRecord{}
 	accessLogSpec := httputil.AccessLogAPISpec{APIID: s.Spec.APIID, OrgID: s.Spec.OrgID}
-	err := accessLog.Fill(latency, r, resp.Response, accessLogSpec, token)
+	err := accessLog.Fill(latency, r, resp, accessLogSpec, token)
 
 	if err != nil {
-		log.WithError(err).Error("error generating access logs")
-		return
+		return err
 	}
 
 	// Success transaction logs, contains important fields such as latency that may not
 	// be available in an error handler
-	log.WithFields(accessLog.Logger(log).Data).Info()
+	accessLog.LogTransaction(log)
 
-	return
+	return nil
 }
 
 func recordGraphDetails(rec *analytics.AnalyticsRecord, r *http.Request, resp *http.Response, spec *APISpec) {
@@ -412,7 +411,10 @@ func (s *SuccessHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) *http
 		if s.Spec.GlobalConfig.AccessLogs.Enabled {
 			token := ctxGetAuthToken(r)
 			hashKeys := s.Gw.GetConfig().HashKeys
-			s.logTransaction(hashKeys, latency, r, resp, token)
+			err := s.logTransaction(hashKeys, latency, r, resp.Response, token)
+			if err != nil {
+				log.WithError(err).Error("error generating access logs")
+			}
 		}
 	}
 	log.Debug("Done proxy")

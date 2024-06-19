@@ -9,6 +9,10 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+
+	"github.com/TykTechnologies/tyk/apidef"
+
 	"github.com/TykTechnologies/tyk/config"
 
 	"github.com/TykTechnologies/tyk/header"
@@ -123,6 +127,37 @@ func TestHandleDefaultErrorJSON(t *testing.T) {
 		},
 	})
 
+}
+
+func TestErrorLogTransaction(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	spec := &APISpec{APIDefinition: &apidef.APIDefinition{APIID: "test_api_id", OrgID: "test_org_id"}}
+	eHandler := &ErrorHandler{&BaseMiddleware{Spec: spec, Gw: ts.Gw}}
+
+	req, _ := http.NewRequest("GET", "/", nil)
+	resp := ProxyResponse{
+		Response: &http.Response{
+			StatusCode: http.StatusInternalServerError,
+		},
+		UpstreamLatency: 99,
+	}
+
+	hashKey := "test_hash_key"
+	token := "test_unhashed_key"
+
+	errNilReqHashed := eHandler.logTransaction(false, nil, resp.Response, token)
+	assert.Error(t, errNilReqHashed)
+	errNilReqUnhashed := eHandler.logTransaction(true, nil, resp.Response, token)
+	assert.Error(t, errNilReqUnhashed)
+	errNilRespHashed := eHandler.logTransaction(false, req, nil, hashKey)
+	assert.Error(t, errNilRespHashed)
+	errNilRespUnhashed := eHandler.logTransaction(true, req, nil, hashKey)
+	assert.Error(t, errNilRespUnhashed)
+	err := eHandler.logTransaction(true, req, resp.Response, token)
+	assert.Nil(t, err)
+	assert.NoError(t, err)
 }
 
 func BenchmarkErrorLogTransaction(b *testing.B) {
