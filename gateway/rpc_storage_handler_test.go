@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"testing"
 
@@ -636,8 +637,43 @@ func TestDeleteUsingTokenID(t *testing.T) {
 		Gw:               ts.Gw,
 	}
 
-	t.Run("status not found and TokenID returns ID", func(t *testing.T) {
+	t.Run("key could not be removed by base64 key ID but exist by custom key ID", func(t *testing.T) {
+		// create a custom key
+		const customKey = "my-custom-key"
+		orgId := "default"
+		session := CreateStandardSession()
+		session.AccessRights = map[string]user.AccessDefinition{"test": {
+			APIID: "test", Versions: []string{"v1"},
+		}}
+		client := GetTLSClient(nil, nil)
 
+		// creates a key and rename it
+		resp, err := ts.Run(t, test.TestCase{AdminAuth: true, Method: http.MethodPost, Path: "/tyk/keys/" + customKey,
+			Data: session, Client: client, Code: http.StatusOK})
+		assert.Nil(t, err)
+		defer resp.Body.Close()
+		body, _ := io.ReadAll(resp.Body)
+		keyResp := apiModifyKeySuccess{}
+
+		err = json.Unmarshal(body, &keyResp)
+		assert.NoError(t, err)
+
+		// trick to change key name from base64 to custom (emulates keys as apikey-mycustomkey)
+		val, err := ts.Gw.GlobalSessionManager.Store().GetRawKey("apikey-" + keyResp.Key)
+		assert.Nil(t, err)
+		err = ts.Gw.GlobalSessionManager.Store().SetKey(customKey, val, -1)
+		assert.Nil(t, err)
+
+		removed := ts.Gw.GlobalSessionManager.Store().DeleteRawKey("apikey-" + keyResp.Key)
+		assert.True(t, removed)
+
+		status, err := rpcListener.deleteUsingTokenID(keyResp.Key, orgId, false, 404)
+		assert.Nil(t, err)
+		// it was found
+		assert.Equal(t, http.StatusOK, status)
+		// it should not exist anymore
+		_, err = ts.Gw.GlobalSessionManager.Store().GetKey(customKey)
+		assert.ErrorIs(t, storage.ErrKeyNotFound, err)
 	})
 
 	t.Run("status not found and TokenID do not exist", func(t *testing.T) {

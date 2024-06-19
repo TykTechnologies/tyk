@@ -4,7 +4,7 @@ import (
 	"crypto/x509"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"testing"
 
@@ -346,7 +346,7 @@ func TestCustomKeysEdgeGw(t *testing.T) {
 					assert.Nil(t, err)
 					defer resp.Body.Close()
 
-					body, _ := ioutil.ReadAll(resp.Body)
+					body, _ := io.ReadAll(resp.Body)
 					keyResp := apiModifyKeySuccess{}
 					err = json.Unmarshal(body, &keyResp)
 					assert.NoError(t, err)

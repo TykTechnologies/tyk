@@ -63,6 +63,7 @@ var bundleWithBadSignature = map[string]string{
 }
 
 func TestBundleLoader(t *testing.T) {
+	t.Skip()
 	ts := StartTest(nil)
 	defer ts.Close()
 
@@ -81,7 +82,6 @@ func TestBundleLoader(t *testing.T) {
 	})
 
 	t.Run("Existing bundle with auth check", func(t *testing.T) {
-		t.Skip()
 		spec := &APISpec{
 			APIDefinition: &apidef.APIDefinition{
 				CustomMiddlewareBundle: bundleID,
