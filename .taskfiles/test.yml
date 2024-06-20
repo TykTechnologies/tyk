@@ -96,6 +96,7 @@ tasks:
 
   cover:
     desc: "Show source coverage"
+    aliases: [cov, coverage]
     deps: [cover:merge]
     cmds:
       - go tool cover -func=coverage/{{.product}}-all.cov | summary coverfunc
@@ -108,6 +109,7 @@ tasks:
 
   cover:merge:
     desc: "Merge coverage from e2e tests"
+    internal: true
     status:
       - test -f coverage/{{.product}}-all.cov
     cmds:
