@@ -97,7 +97,7 @@ jobs:
       - name: Run Gateway Tests
         id: ci-tests
         run: |
-          task test:e2e-combined
+          task test:e2e-combined args="-race -timeout=15m"
           task coverage
 
       - name: golangci-lint

@@ -7,11 +7,18 @@ includes:
     taskfile: ../docker/services/Taskfile.yml
     dir: ../docker/services
 
+# Build and test flags should match. We don't include
+# `-trimpath` in CI tests, as there is a problem resolving
+# runtime.Caller to a valid path, needs test fixes.
+
 vars:
   dir:
     sh: git rev-parse --show-toplevel
   product: 'gateway'
   tags: '{{ .tags | default "goplugin dev" }}'
+  args: '{{ .args | default "-timeout=15m" }}'
+  buildArgs: -cover -tags "{{.tags}}"
+  testArgs: -failfast -coverpkg=./... {{.buildArgs}}
   python:
     sh: python3 -c 'import sys; print("%d.%d" % (sys.version_info[0], sys.version_info[1]))'
 
@@ -34,7 +41,6 @@ tasks:
     deps: [ clean, deps, plugin:race, plugin:norace, services:up ]
     silent: true
     vars:
-      args: '{{ .args | default "-timeout=15m" }}'
       package:
         sh: go mod edit -json | jq .Module.Path -r
       packages:
@@ -45,7 +51,7 @@ tasks:
       - for: { var: packages, as: package }
         cmd: |-
           gotestsum --no-color=false --hide-summary=skipped --raw-command \
-          go test -p 1 -coverpkg=./... -json -tags="{{.tags}}" {{.args}} -count=1 -v -cover \
+          go test -p 1 -json {{.testArgs}} {{.args}} -count=1 -v \
           -coverprofile=coverage/{{.package | replace "." "gateway" | replace "/" "-"}}.cov {{.package}} | head -n -2
 
   integration-combined:
@@ -53,33 +59,30 @@ tasks:
     desc: "Run e2e/integration tests"
     aliases: [ e2e-combined ]
     deps: [ clean, deps, plugin:race, plugin:norace, services:up ]
-    silent: true
     vars:
-      args: '{{ .args | default "-timeout=15m" }}'
       package:
         sh: go mod edit -json | jq .Module.Path -r
     cmds:
       - defer: { task: services:down }
       - defer: { task: report }
       - rm -rf coverage && mkdir -p coverage
-      - go test -p 1 -json -coverpkg=./... -tags="{{.tags}}" {{.args}} -cover -coverprofile=coverage/{{.product}}-all.cov -count=1 -v ./... > coverage/{{.product}}-all.json
+      - go test -p 1 -json {{.testArgs}} {{.args}} -coverprofile=coverage/{{.product}}-all.cov -count=1 -v ./... > coverage/{{.product}}-all.json
 
   plugin:race:
     dir: '{{.dir}}'
     desc: "Build plugin required for tests (with race)"
     cmds:
-      - go build -race -o ./test/goplugins/goplugins_race.so -buildmode=plugin ./test/goplugins
+      - go build {{.buildArgs}} -race -o ./test/goplugins/goplugins_race.so -buildmode=plugin ./test/goplugins
 
   plugin:norace:
     dir: '{{.dir}}'
     desc: "Build plugin required for tests (no race)"
     cmds:
-      - go build -o ./test/goplugins/goplugins.so -buildmode=plugin ./test/goplugins
+      - go build {{.buildArgs}} -o ./test/goplugins/goplugins.so -buildmode=plugin ./test/goplugins
 
   report:
     dir: '{{.dir}}'
     desc: "Run gotestsum on test run output"
-    silent: true
     vars:
       count: '{{ .count | default "10" }}'
     cmds:
