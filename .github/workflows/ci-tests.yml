@@ -98,7 +98,7 @@ jobs:
         id: ci-tests
         run: |
           task test:e2e-combined args="-race -timeout=15m"
-          task coverage
+          task test:coverage
 
       - name: golangci-lint
         if: ${{ github.event_name == 'pull_request' }}
