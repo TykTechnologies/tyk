@@ -7,11 +7,10 @@
 package coprocess
 
 import (
-	reflect "reflect"
-	sync "sync"
-
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
+	reflect "reflect"
+	sync "sync"
 )
 
 const (
@@ -21,24 +20,23 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
-// Used to override the response for a given HTTP request
-//
+// ReturnOverrides is used to override the response for a given HTTP request
 // When returned within an Object for a given HTTP request, the upstream reponse
-// is replaced with the fields encapsulated within ReturnOverrides
+// is replaced with the fields encapsulated within ReturnOverrides.
 type ReturnOverrides struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	// Override upstream response status code
+	// ResponseCode overrides the upstream response status code.
 	ResponseCode int32 `protobuf:"varint,1,opt,name=response_code,json=responseCode,proto3" json:"response_code,omitempty"`
-	// Override upstream response error message
+	// ResponseError overrides the upstream response error message.
 	ResponseError string `protobuf:"bytes,2,opt,name=response_error,json=responseError,proto3" json:"response_error,omitempty"`
-	// Override upstream response headers
+	// Headers overrides the upstream response headers.
 	Headers map[string]string `protobuf:"bytes,3,rep,name=headers,proto3" json:"headers,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
-	// If true then override upstream error response with response_error
+	// OverrideError overrides the upstream error response with response_error when set to true.
 	OverrideError bool `protobuf:"varint,4,opt,name=override_error,json=overrideError,proto3" json:"override_error,omitempty"`
-	// Alias of response_error, contains the response body
+	// ResponseBody is an alias of response_error that contains the response body.
 	ResponseBody string `protobuf:"bytes,5,opt,name=response_body,json=responseBody,proto3" json:"response_body,omitempty"`
 }
 

@@ -7,11 +7,10 @@
 package coprocess
 
 import (
-	reflect "reflect"
-	sync "sync"
-
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
+	reflect "reflect"
+	sync "sync"
 )
 
 const (
@@ -21,27 +20,27 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
-// Wraps a MiniRequestObject and contains additional fields that are useful for users that implement
+// Object wraps a MiniRequestObject and contains additional fields that are useful for users that implement
 // their own request dispatchers, like the middleware hook type and name
 type Object struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	// The plugin hook type
+	// HookType is an enumeration that identifies the plugin hook type.
 	HookType HookType `protobuf:"varint,1,opt,name=hook_type,json=hookType,proto3,enum=coprocess.HookType" json:"hook_type,omitempty"`
-	// The plugin name
+	// HookName is the plugin name.
 	HookName string `protobuf:"bytes,2,opt,name=hook_name,json=hookName,proto3" json:"hook_name,omitempty"`
-	// The main request data structure used by rich plugins. It’s used for middleware calls
-	// and contains important fields like headers, parameters, body and URL
+	// Request relates to the main request data structure used by rich plugins. It’s used for middleware calls
+	// and contains important fields like headers, parameters, body and URL.
 	Request *MiniRequestObject `protobuf:"bytes,3,opt,name=request,proto3" json:"request,omitempty"`
-	// Stores information about the current key/user that’s used for authentication
+	// Session stores information about the current key/user that’s used for authentication.
 	Session *SessionState `protobuf:"bytes,4,opt,name=session,proto3" json:"session,omitempty"`
-	// Contains the metadata. This is a dynamic field
+	// Metadata is a dynamic filed that contains the metadata.
 	Metadata map[string]string `protobuf:"bytes,5,rep,name=metadata,proto3" json:"metadata,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
-	// Contains information about API definition, including APIID, OrgID and config_data
+	// Spec contains information about API definition, including APIID, OrgID and config_data.
 	Spec map[string]string `protobuf:"bytes,6,rep,name=spec,proto3" json:"spec,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
-	// The ResponseObject is used by response hooks. The fields are populated with the upstream HTTP
+	// Response relates to the ResponseObject used by response hooks. The fields are populated with the upstream HTTP
 	// response data. All the field contents can be modified.
 	Response *ResponseObject `protobuf:"bytes,7,opt,name=response,proto3" json:"response,omitempty"`
 }
@@ -127,13 +126,13 @@ func (x *Object) GetResponse() *ResponseObject {
 	return nil
 }
 
-// An event is represented as a JSON payload
+// Event is represented as a JSON payload
 type Event struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	// The JSON payload
+	// Payload represents the JSON payload.
 	Payload string `protobuf:"bytes,1,opt,name=payload,proto3" json:"payload,omitempty"`
 }
 
@@ -176,7 +175,7 @@ func (x *Event) GetPayload() string {
 	return ""
 }
 
-// Response for event
+// EventReply is the response for event
 type EventReply struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache

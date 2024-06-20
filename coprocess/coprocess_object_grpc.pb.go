@@ -8,7 +8,6 @@ package coprocess
 
 import (
 	context "context"
-
 	grpc "google.golang.org/grpc"
 	codes "google.golang.org/grpc/codes"
 	status "google.golang.org/grpc/status"
@@ -28,9 +27,9 @@ const (
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type DispatcherClient interface {
-	// Accepts and returns an Object
+	// Dispatch is an RPC method that accepts and returns an Object.
 	Dispatch(ctx context.Context, in *Object, opts ...grpc.CallOption) (*Object, error)
-	// Dispatches an event to the target language
+	// DispatchEvent dispatches an event to the target language.
 	DispatchEvent(ctx context.Context, in *Event, opts ...grpc.CallOption) (*EventReply, error)
 }
 
@@ -64,9 +63,9 @@ func (c *dispatcherClient) DispatchEvent(ctx context.Context, in *Event, opts ..
 // All implementations should embed UnimplementedDispatcherServer
 // for forward compatibility
 type DispatcherServer interface {
-	// Accepts and returns an Object
+	// Dispatch is an RPC method that accepts and returns an Object.
 	Dispatch(context.Context, *Object) (*Object, error)
-	// Dispatches an event to the target language
+	// DispatchEvent dispatches an event to the target language.
 	DispatchEvent(context.Context, *Event) (*EventReply, error)
 }
 

@@ -7,11 +7,10 @@
 package coprocess
 
 import (
-	reflect "reflect"
-	sync "sync"
-
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
+	reflect "reflect"
+	sync "sync"
 )
 
 const (
@@ -21,21 +20,21 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
-// Used by response hooks. All fields are modifiable
+// ResponseObject is used by response hooks. All fields are modifiable.
 type ResponseObject struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	// HTTP status code received from the upstream
+	// StatusCode is the HTTP status code received from the upstream.
 	StatusCode int32 `protobuf:"varint,1,opt,name=status_code,json=statusCode,proto3" json:"status_code,omitempty"`
-	// Raw bytes of HTTP response body
+	// RawBody represents the raw bytes of HTTP response body.
 	RawBody []byte `protobuf:"bytes,2,opt,name=raw_body,json=rawBody,proto3" json:"raw_body,omitempty"`
-	// HTTP response body. Excluded when the raw_body contains invalid UTF-8 characters
+	// Body represents the HTTP response body. Excluded when the raw_body contains invalid UTF-8 characters.
 	Body string `protobuf:"bytes,3,opt,name=body,proto3" json:"body,omitempty"`
-	// Headers received from the upstream
+	// Headers represents the headers received from upstream.
 	Headers map[string]string `protobuf:"bytes,4,rep,name=headers,proto3" json:"headers,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
-	// A list of headers. Useful when header has multiple values. See Header
+	// MultivalueHeaders is a list of headers. Useful when header has multiple values. See Header.
 	MultivalueHeaders []*Header `protobuf:"bytes,5,rep,name=multivalue_headers,json=multivalueHeaders,proto3" json:"multivalue_headers,omitempty"`
 }
 
@@ -106,15 +105,15 @@ func (x *ResponseObject) GetMultivalueHeaders() []*Header {
 	return nil
 }
 
-// A reponse header that contains multiple associated values
+// Header is a reponse header that contains multiple associated values.
 type Header struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	// The header name
+	// Key represents the name of the header.
 	Key string `protobuf:"bytes,1,opt,name=key,proto3" json:"key,omitempty"`
-	// * List of values representing the header content
+	// Values is a list of values for a given header content.
 	Values []string `protobuf:"bytes,2,rep,name=values,proto3" json:"values,omitempty"`
 }
 

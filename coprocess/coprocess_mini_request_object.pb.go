@@ -7,11 +7,10 @@
 package coprocess
 
 import (
-	reflect "reflect"
-	sync "sync"
-
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
+	reflect "reflect"
+	sync "sync"
 )
 
 const (
@@ -27,33 +26,33 @@ type MiniRequestObject struct {
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	// A read-only field for reading headers injected by previous middleware
+	// Headers is a read-only field for reading headers injected by previous middleware.
 	Headers map[string]string `protobuf:"bytes,1,rep,name=headers,proto3" json:"headers,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
-	// Map of header key values to append to the request
+	// SetHeaders is a map of header key values to append to the request.
 	SetHeaders map[string]string `protobuf:"bytes,2,rep,name=set_headers,json=setHeaders,proto3" json:"set_headers,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
-	// List of header names to be removed from the request
+	// DeleteHeaders is a list of header names to be removed from the request.
 	DeleteHeaders []string `protobuf:"bytes,3,rep,name=delete_headers,json=deleteHeaders,proto3" json:"delete_headers,omitempty"`
-	// Request body
+	// Body is the request body.
 	Body string `protobuf:"bytes,4,opt,name=body,proto3" json:"body,omitempty"`
-	// Request URL
+	// Url is the request URL.
 	Url string `protobuf:"bytes,5,opt,name=url,proto3" json:"url,omitempty"`
-	// Read only map of request params
+	// Params is a read only map of request params.
 	Params map[string]string `protobuf:"bytes,6,rep,name=params,proto3" json:"params,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
-	// Map of parameter keys and values to add to the request
+	// AddParams is a map of parameter keys and values to add to the request.
 	AddParams map[string]string `protobuf:"bytes,7,rep,name=add_params,json=addParams,proto3" json:"add_params,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
-	// Allows a parameter to have multiple values, currently unsupported
+	// ExtendedParams allows a parameter to have multiple values, currently unsupported.
 	ExtendedParams map[string]string `protobuf:"bytes,8,rep,name=extended_params,json=extendedParams,proto3" json:"extended_params,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
-	// List of parameter keys to be removed from the request
+	// DeleteParams is a list of parameter keys to be removed from the request.
 	DeleteParams []string `protobuf:"bytes,9,rep,name=delete_params,json=deleteParams,proto3" json:"delete_params,omitempty"`
-	// Override the response for the request, see ReturnOverrides
+	// ReturnOverrides override the response for the request, see ReturnOverrides.
 	ReturnOverrides *ReturnOverrides `protobuf:"bytes,10,opt,name=return_overrides,json=returnOverrides,proto3" json:"return_overrides,omitempty"`
-	// Request method, eg GET, POST, etc
+	// Method is the request method, eg GET, POST, etc.
 	Method string `protobuf:"bytes,11,opt,name=method,proto3" json:"method,omitempty"`
-	// The raw unprocessed request URL, including query string and fragments
+	// RequestUri is the raw unprocessed request URL, including query string and fragments.
 	RequestUri string `protobuf:"bytes,12,opt,name=request_uri,json=requestUri,proto3" json:"request_uri,omitempty"`
-	// The URL scheme, e.g. http or https
+	// Scheme is the URL scheme, e.g. http or https.
 	Scheme string `protobuf:"bytes,13,opt,name=scheme,proto3" json:"scheme,omitempty"`
-	// The raw request body
+	// RawBody is the raw request body.
 	RawBody []byte `protobuf:"bytes,14,opt,name=raw_body,json=rawBody,proto3" json:"raw_body,omitempty"`
 }
 

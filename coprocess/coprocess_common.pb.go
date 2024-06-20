@@ -7,11 +7,10 @@
 package coprocess
 
 import (
-	reflect "reflect"
-	sync "sync"
-
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
+	reflect "reflect"
+	sync "sync"
 )
 
 const (
@@ -21,32 +20,30 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
-// Plugin hooks
-//
-// Used to identify the type of plugin
+// HookType is an enumeration that identifies the type of plugin
 type HookType int32
 
 const (
-	// Use for error checking and handling of an unrecognised hook type.
+	// Unknown is used for error checking and handling of an unrecognised hook type.
 	HookType_Unknown HookType = 0
-	// Executed before request sent to upstream target and before any
+	// Pre is executed before request sent to upstream target and before any
 	// authentication information is extracted from the header or
 	// parameter list of the request. Applies to both keyless and protected
 	// APIs.
 	HookType_Pre HookType = 1
-	// Executed after authentication, validation, throttling and quota-limiting
+	// Post is executed after authentication, validation, throttling and quota-limiting
 	// middleware has been executed, just before the request is proxied upstream. Use this
 	// to post-process a request before sending it to upstream API. This is only called
 	// when using protected APIs.
 	HookType_Post HookType = 2
-	// Executed after authentication, validation, throttling, and quota-limiting
+	// PostKeyAuth is executed after authentication, validation, throttling, and quota-limiting
 	// middleware has been executed, just before the request is proxied upstream. Use this
 	// to post-process a request before sending it to upstream API. This is only called
 	// when using protected APIs.
 	HookType_PostKeyAuth HookType = 3
-	// Executed for performing customised authentication.
+	// CustomKeyCheck is executed for performing customised authentication.
 	HookType_CustomKeyCheck HookType = 4
-	// Executed after the upstream API replies. The arguments passed to this hook include
+	// Response is executed after the upstream API replies. The arguments passed to this hook include
 	// both the request and response data. Use this to modify the HTTP response before it’s
 	// sent to the client. This hook also receives the request object, the session object,
 	// the metadata and API definition associated with the request.
@@ -100,13 +97,13 @@ func (HookType) EnumDescriptor() ([]byte, []int) {
 	return file_coprocess_common_proto_rawDescGZIP(), []int{0}
 }
 
-// List of strings
+// StringSlice is a list of strings.
 type StringSlice struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	// List of string items
+	// Items is a list of string items.
 	Items []string `protobuf:"bytes,1,rep,name=items,proto3" json:"items,omitempty"`
 }
 
