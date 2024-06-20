@@ -38,8 +38,13 @@ require (
 	github.com/golang/protobuf v1.5.3
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/gorilla/mux v1.8.1
+<<<<<<< HEAD
 	github.com/gorilla/websocket v1.5.1
 	github.com/hashicorp/consul/api v1.26.1
+=======
+	github.com/gorilla/websocket v1.5.3
+	github.com/hashicorp/consul/api v1.29.1
+>>>>>>> 5d8cbd77a... [TT-12425] exp/modcheck: Update go.mod dependencies (#6363)
 	github.com/hashicorp/go-multierror v1.1.1
 	github.com/hashicorp/go-version v1.6.0
 	github.com/hashicorp/vault/api v1.12.1
@@ -48,7 +53,11 @@ require (
 	github.com/kelseyhightower/envconfig v1.4.0
 	github.com/lonelycode/osin v0.0.0-20160423095202-da239c9dacb6
 	github.com/mavricknz/ldap v0.0.0-20160227184754-f5a958005e43
+<<<<<<< HEAD
 	github.com/miekg/dns v1.1.57
+=======
+	github.com/miekg/dns v1.1.61
+>>>>>>> 5d8cbd77a... [TT-12425] exp/modcheck: Update go.mod dependencies (#6363)
 	github.com/mitchellh/copystructure v1.2.0 // indirect
 	github.com/mitchellh/mapstructure v1.5.0
 	github.com/nsf/jsondiff v0.0.0-20230430225905-43f6cf3098c1 // test
@@ -64,7 +73,11 @@ require (
 	github.com/spf13/afero v1.11.0
 	github.com/stretchr/testify v1.8.4 // test
 	github.com/uber/jaeger-client-go v2.30.1-0.20220110192849-8d8e8fcfd04d+incompatible
+<<<<<<< HEAD
 	github.com/valyala/fasthttp v1.51.0 // test
+=======
+	github.com/valyala/fasthttp v1.55.0 // test
+>>>>>>> 5d8cbd77a... [TT-12425] exp/modcheck: Update go.mod dependencies (#6363)
 	github.com/vmihailenco/msgpack v4.0.4+incompatible
 	github.com/xeipuuv/gojsonschema v1.2.0
 	golang.org/x/crypto v0.21.0
@@ -72,7 +85,11 @@ require (
 	golang.org/x/sync v0.6.0
 	google.golang.org/grpc v1.62.1
 	google.golang.org/grpc/examples v0.0.0-20220317213542-f95b001a48df // test
+<<<<<<< HEAD
 	google.golang.org/protobuf v1.33.0
+=======
+	google.golang.org/protobuf v1.34.2
+>>>>>>> 5d8cbd77a... [TT-12425] exp/modcheck: Update go.mod dependencies (#6363)
 	gopkg.in/vmihailenco/msgpack.v2 v2.9.2
 	gopkg.in/xmlpath.v2 v2.0.0-20150820204837-860cbeca3ebc
 	gopkg.in/yaml.v3 v3.0.1
@@ -164,7 +181,11 @@ require (
 	github.com/jinzhu/inflection v1.0.0 // indirect
 	github.com/jinzhu/now v1.1.2 // indirect
 	github.com/josharian/intern v1.0.0 // indirect
+<<<<<<< HEAD
 	github.com/klauspost/compress v1.17.0 // indirect
+=======
+	github.com/klauspost/compress v1.17.9 // indirect
+>>>>>>> 5d8cbd77a... [TT-12425] exp/modcheck: Update go.mod dependencies (#6363)
 	github.com/lonelycode/go-uuid v0.0.0-20141202165402-ed3ca8a15a93 // indirect
 	github.com/mailru/easyjson v0.7.7 // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect
@@ -206,11 +227,19 @@ require (
 	go.uber.org/multierr v1.11.0 // indirect
 	go.uber.org/zap v1.21.0 // indirect
 	golang.org/x/exp v0.0.0-20240112132812-db7319d0e0e3 // indirect
+<<<<<<< HEAD
 	golang.org/x/mod v0.14.0 // indirect
 	golang.org/x/sys v0.18.0 // indirect
 	golang.org/x/text v0.14.0 // indirect
 	golang.org/x/time v0.5.0 // indirect
 	golang.org/x/tools v0.17.0 // indirect
+=======
+	golang.org/x/mod v0.18.0 // indirect
+	golang.org/x/sys v0.21.0 // indirect
+	golang.org/x/text v0.16.0 // indirect
+	golang.org/x/time v0.5.0 // indirect
+	golang.org/x/tools v0.22.0 // indirect
+>>>>>>> 5d8cbd77a... [TT-12425] exp/modcheck: Update go.mod dependencies (#6363)
 	google.golang.org/appengine v1.6.8 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20240123012728-ef4313101c80 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20240123012728-ef4313101c80 // indirect
