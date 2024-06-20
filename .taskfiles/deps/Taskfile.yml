@@ -9,7 +9,11 @@ tasks:
       - golangci-lint
       - faillint
       - mockgen
-      - schema-gen
+    cmds:
+      - for: ['go-fsck', 'schema-gen', 'summary']
+        task: exp
+        vars:
+          name: '{{.ITEM}}'
 
   mockgen:
     internal: true
@@ -43,10 +47,11 @@ tasks:
     cmds:
       - go install github.com/fatih/faillint@latest
 
-  schema-gen:
-    internal: true
-    desc: 'Install exp/schema-gen'
+  exp:
+    desc: 'Install exp/cmd'
+    requires:
+      vars: [name]
     status:
-      - type schema-gen
+      - type {{.name}}
     cmds:
-      - go install github.com/TykTechnologies/exp/cmd/schema-gen@main
+      - go install github.com/TykTechnologies/exp/cmd/{{.name}}@main
