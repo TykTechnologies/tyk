@@ -11,7 +11,7 @@ vars:
   dir:
     sh: git rev-parse --show-toplevel
   product: 'gateway'
-  tags: '{{ .tags | default "goplugin" }}'
+  tags: '{{ .tags | default "goplugin dev" }}'
   python:
     sh: python3 -c 'import sys; print("%d.%d" % (sys.version_info[0], sys.version_info[1]))'
 
@@ -45,7 +45,7 @@ tasks:
       - for: { var: packages, as: package }
         cmd: |-
           gotestsum --no-color=false --hide-summary=skipped --raw-command \
-          go test -p 1 -coverpkg=./... -json -tags={{.tags}} {{.args}} -count=1 -v -cover \
+          go test -p 1 -coverpkg=./... -json -tags="{{.tags}}" {{.args}} -count=1 -v -cover \
           -coverprofile=coverage/{{.package | replace "." "gateway" | replace "/" "-"}}.cov {{.package}} | head -n -2
 
   integration-combined:
@@ -62,7 +62,7 @@ tasks:
       - defer: { task: services:down }
       - defer: { task: report }
       - rm -rf coverage && mkdir -p coverage
-      - go test -p 1 -json -coverpkg=./... -tags={{.tags}} {{.args}} -cover -coverprofile=coverage/{{.product}}-all.cov -count=1 -v ./... > coverage/{{.product}}-all.json
+      - go test -p 1 -json -coverpkg=./... -tags="{{.tags}}" {{.args}} -cover -coverprofile=coverage/{{.product}}-all.cov -count=1 -v ./... > coverage/{{.product}}-all.json
 
   plugin:race:
     dir: '{{.dir}}'
