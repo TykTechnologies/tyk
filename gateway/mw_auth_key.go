@@ -175,7 +175,7 @@ func (k *AuthKey) ProcessRequest(_ http.ResponseWriter, r *http.Request, _ inter
 	keyID, err := storage.TokenID(key)
 	if err == nil {
 		err, statusCode := k.validateSignature(r, keyID)
-		if err == nil {
+		if err != nil {
 			return err, statusCode
 		}
 	}
