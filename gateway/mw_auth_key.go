@@ -176,7 +176,7 @@ func (k *AuthKey) ProcessRequest(_ http.ResponseWriter, r *http.Request, _ inter
 	if err == nil {
 		err, statusCode := k.validateSignature(r, keyID)
 		if err == nil {
-			return err, statusCode
+			return nil, statusCode
 		}
 	}
 
