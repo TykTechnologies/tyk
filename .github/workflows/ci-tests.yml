@@ -113,7 +113,7 @@ jobs:
           $(go env GOPATH)/bin/golangci-lint run --out-format checkstyle --issues-exit-code=0 ./... > golanglint.xml
 
       - name: SonarCloud Scan
-        if: always()
+        if: always() && matrix.redis-version == 7
         uses: sonarsource/sonarcloud-github-action@master
         with:
           args: >
