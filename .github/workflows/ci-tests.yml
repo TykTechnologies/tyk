@@ -16,8 +16,6 @@ on:
       - release-**
 
 env:
-  TYK_DB_REDISHOST: localhost
-  TYK_GW_STORAGE_HOST: localhost
   PYTHON_VERSION: "3.11"
   PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION: python
 
@@ -31,6 +29,9 @@ jobs:
         redis-version: [5, 7]
         python-version: ["3.11"]
         go-version: [1.21.x]
+
+    env:
+      REDIS_IMAGE: redis:${{ matrix.redis-version }}
 
     steps:
       - name: Checkout Tyk
@@ -48,6 +49,23 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
 
+      - name: Setup CI Tooling
+        uses: shrink/actions-docker-extract@v3
+        with:
+          image: tykio/ci-tools:latest
+          path: /usr/local/bin/.
+          destination: /usr/local/bin
+
+      - name: Cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-${{ hashFiles('**/go.sum') }}
+
       - name: Install Dependencies and basic hygiene test
         id: hygiene
         run: |
@@ -61,9 +79,7 @@ jobs:
           make lint
 
           git add --all
-
           git diff HEAD > git-state.log
-
           git_state_count=$(wc -l < git-state.log)
 
           if [[ $git_state_count -ne 0 ]]
@@ -79,51 +95,25 @@ jobs:
       - name: Fetch base branch
         if: ${{ github.event_name == 'pull_request' }}
         run: git fetch origin ${{ github.base_ref }}
-      - name: Start Redis
-        uses: supercharge/redis-github-action@1.2.0
-        with:
-          redis-version: ${{ matrix.redis-version }}
-
-      - name: Cache
-        uses: actions/cache@v2
-        with:
-          path: ~/go/pkg/mod
-          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
-          restore-keys: |
-            ${{ runner.os }}-go-
 
       - name: Run Gateway Tests
         id: ci-tests
         run: |
-          ./bin/ci-tests.sh 2>&1
-
-      - name: Notify status
-        if: ${{ failure() && github.event.pull_request.number && !github.event.pull_request.draft }}
-        uses: peter-evans/create-or-update-comment@v1
-        with:
-          issue-number: ${{ github.event.pull_request.number }}
-          body: |
-            # :boom: CI tests failed :see_no_evil:
-
-            ## git-state
-            ```shellsession
-            ${{ steps.hygiene.outputs.git-state || 'all ok' }}
-            ```
-
-            Please look at [the run](https://github.com/TykTechnologies/tyk/pull/${{ github.event.pull_request.number }}/checks?check_run_id=${{ github.run_id }}) or in the _Checks_ tab.
-
-      - name: Download golangci-lint
-        run: curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin
+          task test:e2e-combined args="-race -timeout=15m"
+          task test:coverage
 
       - name: golangci-lint
         if: ${{ github.event_name == 'pull_request' }}
         run: |
-          $(go env GOPATH)/bin/golangci-lint run --out-format checkstyle --issues-exit-code=0 --new-from-rev=origin/${{ github.base_ref }} ./... > golanglint.xml
+          $(go env GOPATH)/bin/golangci-lint run --out-format checkstyle --issues-exit-code=1 --new-from-rev=origin/${{ github.base_ref }} ./... > golanglint.xml
+
       - name: golangci-lint-on-push
         if: ${{ github.event_name == 'push' }}
         run: |
           $(go env GOPATH)/bin/golangci-lint run --out-format checkstyle --issues-exit-code=0 ./... > golanglint.xml
+
       - name: SonarCloud Scan
+        if: always() && matrix.redis-version == 7
         uses: sonarsource/sonarcloud-github-action@master
         with:
           args: >
@@ -134,7 +124,7 @@ jobs:
             -Dsonar.coverage.exclusions=**/*_test.go,**/mock/*
             -Dsonar.test.inclusions=**/*_test.go
             -Dsonar.tests=.
-            -Dsonar.go.coverage.reportPaths=*.cov
+            -Dsonar.go.coverage.reportPaths=coverage/*.cov
             -Dsonar.go.golangci-lint.reportPaths=golanglint.xml
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
