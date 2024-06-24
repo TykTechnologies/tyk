@@ -350,9 +350,9 @@ func (t *BaseMiddleware) UpdateRequestSession(r *http.Request) bool {
 // ApplyPolicies will check if any policies are loaded. If any are, it
 // will overwrite the session state to use the policy values.
 func (t *BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
-	var orgID string
+	var orgID *string
 	if t.Spec != nil {
-		orgID = t.Spec.OrgID
+		orgID = &t.Spec.OrgID
 	}
 	store := policy.New(orgID, t.Gw, log)
 	return store.Apply(session)
