@@ -251,22 +251,7 @@ func (t *Service) Apply(session *user.SessionState) error {
 				if !usePartitions || policy.Partitions.RateLimit {
 					didRateLimit[k] = true
 
-					apiLimits := ar.Limit
-					policyLimits := policy.APILimit()
-					sessionLimits := session.APILimit()
-
-					// Update Rate, Per and Smoothing
-					if apiLimits.Less(policyLimits) {
-						ar.Limit.Rate = policyLimits.Rate
-						ar.Limit.Per = policyLimits.Per
-						ar.Limit.Smoothing = policyLimits.Smoothing
-
-						if sessionLimits.Less(policyLimits) {
-							session.Rate = policyLimits.Rate
-							session.Per = policyLimits.Per
-							session.Smoothing = policyLimits.Smoothing
-						}
-					}
+					t.ApplyRateLimits(session, policy, &ar.Limit)
 
 					if policy.ThrottleRetryLimit > ar.Limit.ThrottleRetryLimit {
 						ar.Limit.ThrottleRetryLimit = policy.ThrottleRetryLimit
@@ -442,4 +427,24 @@ func (t *Service) Apply(session *user.SessionState) error {
 
 func (t *Service) Logger() *logrus.Logger {
 	return t.logger
+}
+
+func (t *Service) ApplyRateLimits(session *user.SessionState, policy user.Policy, apiLimits *user.APILimit) {
+	policyLimits := policy.APILimit()
+	if policyLimits.Rate == 0 || policyLimits.Per == 0 {
+		return
+	}
+
+	if apiLimits.Less(policyLimits) {
+		apiLimits.Rate = policyLimits.Rate
+		apiLimits.Per = policyLimits.Per
+		apiLimits.Smoothing = policyLimits.Smoothing
+
+		sessionLimits := session.APILimit()
+		if sessionLimits.Less(policyLimits) {
+			session.Rate = policyLimits.Rate
+			session.Per = policyLimits.Per
+			session.Smoothing = policyLimits.Smoothing
+		}
+	}
 }
