@@ -102,10 +102,12 @@ jobs:
           task test:e2e-combined args="-race -timeout=15m"
           task test:coverage
 
+      # golangci-lint actions *require* issues-exit-code=0 to pass data along to sonarcloud
+      # rather than erroring out on github issues directly with out-format github.
       - name: golangci-lint
         if: ${{ github.event_name == 'pull_request' }}
         run: |
-          $(go env GOPATH)/bin/golangci-lint run --out-format checkstyle --issues-exit-code=1 --new-from-rev=origin/${{ github.base_ref }} ./... > golanglint.xml
+          $(go env GOPATH)/bin/golangci-lint run --out-format checkstyle --issues-exit-code=0 --new-from-rev=origin/${{ github.base_ref }} ./... > golanglint.xml
 
       - name: golangci-lint-on-push
         if: ${{ github.event_name == 'push' }}
