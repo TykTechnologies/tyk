@@ -53,6 +53,7 @@ func (t *Service) ClearSession(session *user.SessionState) {
 		if policy.Partitions.RateLimit || all {
 			session.Rate = 0
 			session.Per = 0
+			session.Smoothing = nil
 			session.ThrottleRetryLimit = 0
 			session.ThrottleInterval = 0
 		}
@@ -436,13 +437,13 @@ func (t *Service) ApplyRateLimits(session *user.SessionState, policy user.Policy
 		return
 	}
 
-	if apiLimits.Less(policyLimits) {
+	if apiLimits.IsEmpty() || apiLimits.Duration() > policyLimits.Duration() {
 		apiLimits.Rate = policyLimits.Rate
 		apiLimits.Per = policyLimits.Per
 		apiLimits.Smoothing = policyLimits.Smoothing
 
 		sessionLimits := session.APILimit()
-		if sessionLimits.Less(policyLimits) {
+		if sessionLimits.IsEmpty() || sessionLimits.Duration() > policyLimits.Duration() {
 			session.Rate = policyLimits.Rate
 			session.Per = policyLimits.Per
 			session.Smoothing = policyLimits.Smoothing
