@@ -73,7 +73,7 @@ func TestApplyRateLimits_PolicyLimits(t *testing.T) {
 	})
 
 	// As the policy defined a lower rate than apiLimits,
-	// no changes to api limits or session are applied.
+	// no changes to api limits are applied.
 	t.Run("policy limits skip", func(t *testing.T) {
 		session := &user.SessionState{
 			Rate: 5,
@@ -91,8 +91,12 @@ func TestApplyRateLimits_PolicyLimits(t *testing.T) {
 		svc.ApplyRateLimits(session, policy, &apiLimits)
 
 		assert.Equal(t, 15, int(apiLimits.Rate))
-		assert.Equal(t, 5, int(session.Rate))
+		assert.Equal(t, 10, int(session.Rate))
 	})
+}
+
+func TestApplyRateLimits_FromCustomPolicies(t *testing.T) {
+	svc := &policy.Service{}
 
 	t.Run("Custom policies", func(t *testing.T) {
 		session := &user.SessionState{}

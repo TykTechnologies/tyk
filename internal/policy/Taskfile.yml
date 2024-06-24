@@ -19,7 +19,7 @@ tasks:
       - defer: { task: services:down }
       - goimports -w .
       - go fmt ./...
-      - go test -run='({{.run}})' -cover -coverprofile=pkg.cov -v .
+      - go test -count=1 -run='({{.run}})' -cover -coverprofile=pkg.cov -v .
 
   cover:
     desc: "Show source coverage"
@@ -31,3 +31,10 @@ tasks:
     desc: "Show uncovered source"
     cmds:
       - uncover pkg.cov
+
+  install:uncover:
+    desc: "Install uncover"
+    env:
+      GOBIN: /usr/local/bin
+    cmds:
+      - go install github.com/gregoryv/uncover/...@latest

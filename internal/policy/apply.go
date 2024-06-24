@@ -35,12 +35,13 @@ func New(orgID *string, storage Repository, logger *logrus.Logger) *Service {
 
 // ClearSession clears the quota, rate limit and complexity values so that partitioned policies can apply their values.
 // Otherwise, if the session has already a higher value, an applied policy will not win, and its values will be ignored.
-func (t *Service) ClearSession(session *user.SessionState) {
+func (t *Service) ClearSession(session *user.SessionState) error {
 	policies := session.PolicyIDs()
+
 	for _, polID := range policies {
 		policy, ok := t.storage.PolicyByID(polID)
 		if !ok {
-			continue
+			return fmt.Errorf("policy not found: %s", polID)
 		}
 
 		all := !(policy.Partitions.Quota || policy.Partitions.RateLimit || policy.Partitions.Acl || policy.Partitions.Complexity)
@@ -62,6 +63,8 @@ func (t *Service) ClearSession(session *user.SessionState) {
 			session.MaxQueryDepth = 0
 		}
 	}
+
+	return nil
 }
 
 // ApplyPolicies will check if any policies are loaded. If any are, it
@@ -73,7 +76,9 @@ func (t *Service) Apply(session *user.SessionState) error {
 		session.MetaData = make(map[string]interface{})
 	}
 
-	t.ClearSession(session)
+	if err := t.ClearSession(session); err != nil {
+		return fmt.Errorf("error clearing session: %w", err)
+	}
 
 	didQuota, didRateLimit, didACL, didComplexity := make(map[string]bool), make(map[string]bool), make(map[string]bool), make(map[string]bool)
 
@@ -431,22 +436,43 @@ func (t *Service) Logger() *logrus.Logger {
 	return t.logger
 }
 
+// ApplyRateLimits will write policy limits to session and apiLimits.
+// The limits get written if either are empty.
+// The limits get written if filled and policyLimits allows a higher request rate.
 func (t *Service) ApplyRateLimits(session *user.SessionState, policy user.Policy, apiLimits *user.APILimit) {
 	policyLimits := policy.APILimit()
-	if policyLimits.Rate == 0 || policyLimits.Per == 0 {
+	if t.emptyRateLimit(policyLimits) {
 		return
 	}
 
-	if apiLimits.IsEmpty() || apiLimits.Duration() > policyLimits.Duration() {
+	// duration is time between requests, e.g.:
+	//
+	// apiLimits: 500ms for 2 requests / second
+	// policyLimits: 100ms for 10 requests / second
+	//
+	// if apiLimits > policyLimits (500ms > 100ms) then
+	// we apply the higher rate from the policy.
+	//
+	// the policy-defined rate limits are enforced as
+	// a minimum possible api rate limit setting,
+	// raising apiLimits.
+
+	if t.emptyRateLimit(*apiLimits) || apiLimits.Duration() > policyLimits.Duration() {
 		apiLimits.Rate = policyLimits.Rate
 		apiLimits.Per = policyLimits.Per
 		apiLimits.Smoothing = policyLimits.Smoothing
-
-		sessionLimits := session.APILimit()
-		if sessionLimits.IsEmpty() || sessionLimits.Duration() > policyLimits.Duration() {
-			session.Rate = policyLimits.Rate
-			session.Per = policyLimits.Per
-			session.Smoothing = policyLimits.Smoothing
-		}
 	}
+
+	// sessionLimits, similar to apiLimits, get policy
+	// rate applied if the policy allows more requests.
+	sessionLimits := session.APILimit()
+	if t.emptyRateLimit(sessionLimits) || sessionLimits.Duration() > policyLimits.Duration() {
+		session.Rate = policyLimits.Rate
+		session.Per = policyLimits.Per
+		session.Smoothing = policyLimits.Smoothing
+	}
+}
+
+func (t *Service) emptyRateLimit(m user.APILimit) bool {
+	return m.Rate == 0 || m.Per == 0
 }
