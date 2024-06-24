@@ -892,7 +892,7 @@ func (gw *Gateway) handleRemoveSortedSetRange(keyName, scoreFrom, scoreTo string
 }
 
 func (gw *Gateway) handleGetPolicy(polID string) (interface{}, int) {
-	if pol := gw.getPolicy(polID); pol.ID != "" {
+	if pol, ok := gw.PolicyByID(polID); ok && pol.ID != "" {
 		return pol, http.StatusOK
 	}
 
