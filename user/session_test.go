@@ -150,7 +150,10 @@ func TestAPILimit_Less(t *testing.T) {
 			Rate: 2,
 			Per:  2,
 		}
-		assert.True(t, limit1.Less(limit2))
+
+		// limit 1 is a smaller allowance
+		assert.False(t, limit1.Less(limit2))
+		assert.True(t, limit2.Less(limit1))
 	})
 
 	t.Run("limit1 equal to limit2", func(t *testing.T) {
@@ -163,18 +166,7 @@ func TestAPILimit_Less(t *testing.T) {
 			Per:  1,
 		}
 		assert.False(t, limit1.Less(limit2))
-	})
-
-	t.Run("limit1 greater than limit2", func(t *testing.T) {
-		limit1 := APILimit{
-			Rate: 3,
-			Per:  1,
-		}
-		limit2 := APILimit{
-			Rate: 1,
-			Per:  1,
-		}
-		assert.False(t, limit1.Less(limit2))
+		assert.False(t, limit2.Less(limit1))
 	})
 }
 
@@ -184,7 +176,7 @@ func TestAPILimit_Duration(t *testing.T) {
 			Rate: 1,
 			Per:  2,
 		}
-		expectedDuration := time.Second * time.Duration(limit.Rate/limit.Per)
+		expectedDuration := 2 * time.Second
 		assert.Equal(t, expectedDuration, limit.Duration())
 	})
 

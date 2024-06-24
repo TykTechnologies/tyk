@@ -66,7 +66,7 @@ func (g *APILimit) Duration() time.Duration {
 	if g.Per <= 0 || g.Rate <= 0 {
 		return 0
 	}
-	return time.Second * time.Duration(g.Rate/g.Per)
+	return time.Duration(float64(time.Second) * g.Per / g.Rate)
 }
 
 // AccessDefinition defines which versions of an API a key has access to
