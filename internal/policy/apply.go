@@ -77,7 +77,7 @@ func (t *Service) Apply(session *user.SessionState) error {
 	}
 
 	if err := t.ClearSession(session); err != nil {
-		return fmt.Errorf("error clearing session: %w", err)
+		t.logger.WithError(err).Warn("error clearing session")
 	}
 
 	didQuota, didRateLimit, didACL, didComplexity := make(map[string]bool), make(map[string]bool), make(map[string]bool), make(map[string]bool)
