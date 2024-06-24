@@ -773,9 +773,12 @@ func (s *Test) TestPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesD
 					},
 				}
 
+				gotPolicy, ok := s.Gw.PolicyByID("per-path2")
+
+				assert.True(t, ok)
 				assert.Equal(t, user.AccessSpec{
 					URL: "/user", Methods: []string{"GET"},
-				}, s.Gw.getPolicy("per-path2").AccessRights["a"].AllowedURLs[0])
+				}, gotPolicy.AccessRights["a"].AllowedURLs[0])
 
 				assert.Equal(t, want, sess.AccessRights)
 			},
