@@ -1,6 +1,7 @@
 package policy
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/sirupsen/logrus"
@@ -21,10 +22,10 @@ type Service struct {
 	logger  *logrus.Logger
 
 	// used for validation if not empty
-	orgID string
+	orgID *string
 }
 
-func New(orgID string, storage Repository, logger *logrus.Logger) *Service {
+func New(orgID *string, storage Repository, logger *logrus.Logger) *Service {
 	return &Service{
 		orgID:   orgID,
 		storage: storage,
@@ -102,8 +103,8 @@ func (t *Service) Apply(session *user.SessionState) error {
 		}
 		// Check ownership, policy org owner must be the same as API,
 		// otherwise you could overwrite a session key with a policy from a different org!
-		if t.orgID != "" && policy.OrgID != t.orgID {
-			err := fmt.Errorf("attempting to apply policy from different organisation to key, skipping")
+		if t.orgID != nil && policy.OrgID != *t.orgID {
+			err := errors.New("attempting to apply policy from different organisation to key, skipping")
 			t.Logger().Error(err)
 			return err
 		}

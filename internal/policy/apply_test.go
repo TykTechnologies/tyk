@@ -12,6 +12,23 @@ import (
 func TestApplyRateLimits_PolicyLimits(t *testing.T) {
 	svc := &policy.Service{}
 
+	t.Run("policy limits unset", func(t *testing.T) {
+		session := &user.SessionState{
+			Rate: 5,
+			Per:  10,
+		}
+		apiLimits := user.APILimit{
+			Rate: 10,
+			Per:  10,
+		}
+		policy := user.Policy{}
+
+		svc.ApplyRateLimits(session, policy, &apiLimits)
+
+		assert.Equal(t, 10, int(apiLimits.Rate))
+		assert.Equal(t, 5, int(session.APILimit().Rate))
+	})
+
 	t.Run("policy limits apply all", func(t *testing.T) {
 		session := &user.SessionState{
 			Rate: 5,
