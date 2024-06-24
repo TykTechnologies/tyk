@@ -151,9 +151,8 @@ func TestAPILimit_Less(t *testing.T) {
 			Per:  2,
 		}
 
-		// limit 1 is a smaller allowance
-		assert.False(t, limit1.Less(limit2))
-		assert.True(t, limit2.Less(limit1))
+		assert.True(t, limit1.Less(limit2))
+		assert.False(t, limit2.Less(limit1))
 	})
 
 	t.Run("limit1 equal to limit2", func(t *testing.T) {
