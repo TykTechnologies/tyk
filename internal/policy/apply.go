@@ -19,10 +19,14 @@ type Repository interface {
 type Service struct {
 	storage Repository
 	logger  *logrus.Logger
+
+	// used for validation if not empty
+	orgID string
 }
 
-func New(storage Repository, logger *logrus.Logger) *Service {
+func New(orgID string, storage Repository, logger *logrus.Logger) *Service {
 	return &Service{
+		orgID:   orgID,
 		storage: storage,
 		logger:  logger,
 	}
@@ -98,12 +102,11 @@ func (t *Service) Apply(session *user.SessionState) error {
 		}
 		// Check ownership, policy org owner must be the same as API,
 		// otherwise you could overwrite a session key with a policy from a different org!
-
-		/*if t.Spec != nil && policy.OrgID != t.Spec.OrgID {
+		if t.orgID != "" && policy.OrgID != t.orgID {
 			err := fmt.Errorf("attempting to apply policy from different organisation to key, skipping")
 			t.Logger().Error(err)
 			return err
-		}*/
+		}
 
 		if policy.Partitions.PerAPI &&
 			(policy.Partitions.Quota || policy.Partitions.RateLimit || policy.Partitions.Acl || policy.Partitions.Complexity) {
