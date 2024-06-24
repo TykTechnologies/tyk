@@ -1625,6 +1625,38 @@ mwIDAQAB
 	}
 }
 
+func TestAssertNegativePS512JWT(t *testing.T) {
+	signingMethod := "rsa"
+	rawJWT := "eyJhbGciOiJQUzUxMiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODgiLCJuYW1lIjoiSm9obiBEb2UiLCJhZG1pbiI6dHJ1ZSwiaWF0IjoxNTE2MjM5MDIyfQ.I4IxcLO5sEMPXP_gX2UyoGN0lg2DWcRTm9w2ceSxqixE67qFODWUDNxI1TdbN4oCl9ZC_Jy8G4nJhNCu9dVptkMxnawnbIUwCsILd0SLfcAi-hFcG9K0nSzagm--6CtWlve1UbuQFW9X5fTQUESIblXbMFj6L95j4exVv1l7ch-N1Jl68fGLwoXJTQSg"
+	parser := jwt.NewParser(jwt.WithoutClaimsValidation())
+	pubKeyPem := `-----BEGIN PUBLIC KEY-----
+MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAu1SU1LfVLPHCozMxH2Mo
+4lgOEePzNm0tRgeLezV6ffAt0gunVTLw7onLRnrq0/IzW7yWR7QkrmBL7jTKEn5u
++qKhbwKfBstIs+bMY2Zkp18gnTxKLxoS2tFczGkPLPgizskuemMghRniWaoLcyeh
+kd3qqGElvW/VDL5AaWTg0nLVkjRo9z+40RQzuVaE8AkAFmxZzow3x+VJYKdjykkJ
+0iT9wCS0DRTXu269V264Vf/3jvredZiKRkgwlL9xNAwxXFg0x/XFw005UWVRIkdg
+cKWTjpBP2dPwVZ4WWC+9aGVd+Gyn1o0CLelf4rEjGoXbAAEgAqeGUxrcIlbjXfbc
+mwIDAQAB
+-----END PUBLIC KEY-----`
+
+	// Convert the PEM string to a byte slice
+	pubKey := []byte(pubKeyPem)
+
+	// Verify the token
+	_, err := parser.Parse(rawJWT, func(token *jwt.Token) (interface{}, error) {
+		// Don't forget to validate the alg is what you expect:
+		if err := assertSigningMethod(signingMethod, token); err != nil {
+			return nil, err
+		}
+
+		return parseJWTKey(signingMethod, pubKey)
+	})
+
+	if err == nil {
+		t.Error("Expected an error!")
+	}
+}
+
 func TestAssertRS256JWT(t *testing.T) {
 	signingMethod := "rsa"
 	rawJWT := "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODgiLCJuYW1lIjoiSm9obiBEb2UiLCJhZG1pbiI6dHJ1ZSwiaWF0IjoxNTE2MjM5MDIyfQ.m2mydd79-40muPDwYbue7idTj-cKfW0jPYxcZH8-eqBc6WFJVCL--pr8IHqP-YdN7bNgfwq6iLh0kvOZ9l4Uu6xBaTdCpaXvJDfKqIqLzhltS4EfDNRkHRLDwLBvfsYt-9ijfNYvPOtTXfcIBXPby8fo529q7WYLFYR9tHAQYCLC_lS_2NieTQjAk5xAWIQ5LNItSM9iXmxhhqK47ZdzzVJnhtQ7onVY4LNgxxKqPPUQxQrq34cOBXozfA65bG7PLzvT7ais-E2_4AOXxDzspxYrDYwQFV2kjRijFcMcPc5pCWXWY9leUD1VklaSae6FuC9qJ2BATTsK8f92LSV4HA"
