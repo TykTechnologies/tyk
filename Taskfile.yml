@@ -63,6 +63,7 @@ tasks:
       - gofmt -w .
       - go generate ./...
       - go fmt ./...
+      - go mod tidy
       - goimports -local github.com/TykTechnologies,github.com/TykTechnologies/tyk/internal -w .
       - go mod tidy
 
@@ -81,4 +82,4 @@ tasks:
   lint:x-tyk-gateway:
     internal: true
     cmds:
-      - go test -run=TestXTykGateway_Lint -v ./apidef/oas/
+      - go test -count 1 -v -run=TestXTykGateway_Lint ./apidef/oas/
