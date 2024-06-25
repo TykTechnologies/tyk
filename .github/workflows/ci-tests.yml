@@ -76,7 +76,7 @@ jobs:
           pip install google
           pip install 'protobuf==4.24.4'
 
-          make lint
+          task lint
 
           git add --all
           git diff HEAD > git-state.log
@@ -88,7 +88,9 @@ jobs:
             cat git-state.log >> $GITHUB_OUTPUT
             echo "EOF" >> $GITHUB_OUTPUT
 
-            echo "make lint made git state dirty, please run make lint locally and update PR"
+            echo "task lint made git state dirty, please run task lint locally and update PR"
+            echo
+            cat git-state.log
             exit 1
           fi
 
@@ -107,12 +109,12 @@ jobs:
       - name: golangci-lint
         if: ${{ github.event_name == 'pull_request' }}
         run: |
-          $(go env GOPATH)/bin/golangci-lint run --out-format checkstyle --issues-exit-code=0 --new-from-rev=origin/${{ github.base_ref }} ./... > golanglint.xml
+          golangci-lint run --out-format checkstyle --issues-exit-code=0 --new-from-rev=origin/${{ github.base_ref }} ./... > golanglint.xml
 
       - name: golangci-lint-on-push
         if: ${{ github.event_name == 'push' }}
         run: |
-          $(go env GOPATH)/bin/golangci-lint run --out-format checkstyle --issues-exit-code=0 ./... > golanglint.xml
+          golangci-lint run --out-format checkstyle --issues-exit-code=0 ./... > golanglint.xml
 
       - name: SonarCloud Scan
         if: always() && matrix.redis-version == 7
