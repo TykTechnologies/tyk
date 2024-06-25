@@ -25,12 +25,12 @@ tasks:
   lint:
     desc: "Ensure linter pass"
     cmds:
+      # the replacement exists as a hack for:
+      # https://github.com/grpc/grpc-go/issues/7350
+      - sed -i -e 's/compatibility$/compatibility./g' *.pb.go
       - schema-gen extract -o - | schema-gen lint -i -
 
   deps:
     desc: "Update deps"
     cmds:
-      # the replacement exists as a hack for:
-      # https://github.com/grpc/grpc-go/issues/7350
-      - sed -i -e 's/compatibility$/compatibility./g' *.pb.go
       - go install github.com/TykTechnologies/exp/cmd/schema-gen@main
