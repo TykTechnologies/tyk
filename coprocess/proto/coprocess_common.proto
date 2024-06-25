@@ -5,7 +5,7 @@ package coprocess;
 option go_package = "/coprocess";
 
  
-// HookType is an enumeration that identifies the type of plugin
+// HookType is an enumeration that identifies the type of plugin.
 enum HookType {
   
   // Unknown is used for error checking and handling of an unrecognised hook type.

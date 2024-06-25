@@ -268,7 +268,7 @@ func (x *JWTData) GetSecret() string {
 }
 
 // Monitor allows API endpoint users, stakeholders or an organisation to be notified by webhook when
-// certain quota limits have been reached for their session token
+// certain quota limits have been reached for their session token.
 type Monitor struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache

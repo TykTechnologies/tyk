@@ -31,7 +31,7 @@ if _version_not_supported:
 
 
 class DispatcherStub(object):
-    """Dispatcher is the service interface that must be implemented by the target language
+    """Dispatcher is the service interface that must be implemented by the target language.
     """
 
     def __init__(self, channel):
@@ -53,7 +53,7 @@ class DispatcherStub(object):
 
 
 class DispatcherServicer(object):
-    """Dispatcher is the service interface that must be implemented by the target language
+    """Dispatcher is the service interface that must be implemented by the target language.
     """
 
     def Dispatch(self, request, context):
@@ -92,7 +92,7 @@ def add_DispatcherServicer_to_server(servicer, server):
 
  # This class is part of an EXPERIMENTAL API.
 class Dispatcher(object):
-    """Dispatcher is the service interface that must be implemented by the target language
+    """Dispatcher is the service interface that must be implemented by the target language.
     """
 
     @staticmethod

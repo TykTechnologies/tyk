@@ -20,7 +20,7 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
-// HookType is an enumeration that identifies the type of plugin
+// HookType is an enumeration that identifies the type of plugin.
 type HookType int32
 
 const (

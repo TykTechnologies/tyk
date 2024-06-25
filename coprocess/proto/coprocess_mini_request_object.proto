@@ -6,7 +6,7 @@ package coprocess;
 
 option go_package = "/coprocess";
 
-// Used for middleware calls and contains important fields like headers, parameters, body and URL.
+// MiniRequestObject is used for middleware calls and contains important fields like headers, parameters, body and URL.
 message MiniRequestObject {
   // Headers is a read-only field for reading headers injected by previous middleware.
   map<string, string> headers = 1;

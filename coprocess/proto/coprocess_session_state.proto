@@ -52,7 +52,7 @@ message JWTData {
 }
 
 // Monitor allows API endpoint users, stakeholders or an organisation to be notified by webhook when
-// certain quota limits have been reached for their session token
+// certain quota limits have been reached for their session token.
 message Monitor {
 
   // TriggerLimits is a list of quota percentage limits, defined in descending order.

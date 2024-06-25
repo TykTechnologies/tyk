@@ -10,7 +10,7 @@ package coprocess;
 option go_package = "/coprocess";
 
 // Object wraps a MiniRequestObject and contains additional fields that are useful for users that implement
-// their own request dispatchers, like the middleware hook type and name
+// their own request dispatchers, like the middleware hook type and name.
 message Object {
 
   // HookType is an enumeration that identifies the plugin hook type.
@@ -37,17 +37,17 @@ message Object {
   ResponseObject response = 7;
 }
 
-// Event is represented as a JSON payload
+// Event is represented as a JSON payload.
 message Event {
 
   // Payload represents the JSON payload.
   string payload = 1;
 }
 
-// EventReply is the response for event
+// EventReply is the response for event.
 message EventReply {}
 
-// Dispatcher is the service interface that must be implemented by the target language
+// Dispatcher is the service interface that must be implemented by the target language.
 service Dispatcher {
   // Dispatch is an RPC method that accepts and returns an Object.
   rpc Dispatch (Object) returns (Object) {}

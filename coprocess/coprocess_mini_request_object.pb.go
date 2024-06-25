@@ -20,7 +20,7 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
-// Used for middleware calls and contains important fields like headers, parameters, body and URL.
+// MiniRequestObject is used for middleware calls and contains important fields like headers, parameters, body and URL.
 type MiniRequestObject struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache

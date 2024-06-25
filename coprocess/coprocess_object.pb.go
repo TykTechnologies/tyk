@@ -21,7 +21,7 @@ const (
 )
 
 // Object wraps a MiniRequestObject and contains additional fields that are useful for users that implement
-// their own request dispatchers, like the middleware hook type and name
+// their own request dispatchers, like the middleware hook type and name.
 type Object struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
@@ -126,7 +126,7 @@ func (x *Object) GetResponse() *ResponseObject {
 	return nil
 }
 
-// Event is represented as a JSON payload
+// Event is represented as a JSON payload.
 type Event struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
@@ -175,7 +175,7 @@ func (x *Event) GetPayload() string {
 	return ""
 }
 
-// EventReply is the response for event
+// EventReply is the response for event.
 type EventReply struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
