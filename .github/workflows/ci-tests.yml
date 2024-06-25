@@ -76,7 +76,7 @@ jobs:
           pip install google
           pip install 'protobuf==4.24.4'
 
-          make lint
+          task lint
 
           git add --all
           git diff HEAD > git-state.log
