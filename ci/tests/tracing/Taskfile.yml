@@ -4,15 +4,20 @@ version: "3"
 includes:
   tracetest: ./tracetest/Taskfile.yml
 
+vars:
+  debug: "false"
+  output: internal/tyk-gateway
+
 tasks:
   default:
     desc: "setup, execute and shutdown e2e opentelemetry tests"
+    env:
+      COMPOSE_FILE: '{{if eq .debug "true"}}docker-compose.debug.yml{{else}}docker-compose.yml{{end}}'
     cmds:
-      - defer:
-          task: teardown
-      - task: setup
-      - task: info
-      - task: test
+      - defer: task teardown
+      - task setup
+      - task info
+      - task test
 
   info:
     desc: "Print pre-flight info"
@@ -53,3 +58,15 @@ tasks:
     desc: "teardown e2e opentelemetry tests enviroment"
     cmds:
       - docker compose down --remove-orphans
+
+  install:delve:
+    desc: "produce debug image with delve, extract binary"
+    requires:
+      vars: [ input ]
+    cmds:
+      - go install github.com/go-delve/delve/cmd/dlv@latest
+      - defer: docker rm -f tc
+      - docker create --name tc {{.input}}
+      - docker cp $GOBIN/dlv tc:/usr/bin/dlv
+      - docker cp tc:/opt/tyk-gateway/tyk ./tyk-debug
+      - docker commit tc {{.output}}
