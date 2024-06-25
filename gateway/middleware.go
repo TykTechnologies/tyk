@@ -383,8 +383,10 @@ func (t *BaseMiddleware) clearSession(session *user.SessionState) {
 func (t *BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 	rights := make(map[string]user.AccessDefinition)
 	tags := make(map[string]bool)
-	if session.MetaData == nil {
-		session.MetaData = make(map[string]interface{})
+	metadata := make(map[string]interface{})
+
+	for k, v := range session.MetaData {
+		metadata[k] = v
 	}
 
 	t.clearSession(session)
@@ -660,7 +662,7 @@ func (t *BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 		}
 
 		for k, v := range policy.MetaData {
-			session.MetaData[k] = v
+			metadata[k] = v
 		}
 
 		if policy.LastUpdated > session.LastUpdated {
@@ -677,6 +679,8 @@ func (t *BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 	for tag := range tags {
 		session.Tags = appendIfMissing(session.Tags, tag)
 	}
+
+	session.MetaData = metadata
 
 	if len(policyIDs) == 0 {
 		for apiID, accessRight := range session.AccessRights {
