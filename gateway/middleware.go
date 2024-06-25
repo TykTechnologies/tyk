@@ -522,7 +522,7 @@ func (t *BaseMiddleware) handleRateLimitFailure(r *http.Request, e event.Event, 
 	// Report in health check
 	reportHealthValue(t.Spec, Throttle, "-1")
 
-	return errors.New(event.String(e)), http.StatusTooManyRequests
+	return errors.New(message), http.StatusTooManyRequests
 }
 
 func (t *BaseMiddleware) getAuthType() string {
