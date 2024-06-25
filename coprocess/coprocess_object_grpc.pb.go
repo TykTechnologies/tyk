@@ -61,7 +61,7 @@ func (c *dispatcherClient) DispatchEvent(ctx context.Context, in *Event, opts ..
 
 // DispatcherServer is the server API for Dispatcher service.
 // All implementations should embed UnimplementedDispatcherServer
-// for forward compatibility
+// for forward compatibility.
 type DispatcherServer interface {
 	// Dispatch is an RPC method that accepts and returns an Object.
 	Dispatch(context.Context, *Object) (*Object, error)
