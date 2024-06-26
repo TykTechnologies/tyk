@@ -441,7 +441,7 @@ func (t *Service) Logger() *logrus.Logger {
 // The limits get written if filled and policyLimits allows a higher request rate.
 func (t *Service) ApplyRateLimits(session *user.SessionState, policy user.Policy, apiLimits *user.APILimit) {
 	policyLimits := policy.APILimit()
-	if policyLimits.Duration() == 0 {
+	if policyLimits.Rate != -1 && policyLimits.Duration() == 0 {
 		return
 	}
 
