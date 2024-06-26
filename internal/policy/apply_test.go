@@ -91,7 +91,7 @@ func TestApplyRateLimits_PolicyLimits(t *testing.T) {
 		svc.ApplyRateLimits(session, policy, &apiLimits)
 
 		assert.Equal(t, 15, int(apiLimits.Rate))
-		assert.Equal(t, 10, int(session.Rate))
+		assert.Equal(t, 5, int(session.Rate))
 	})
 }
 
