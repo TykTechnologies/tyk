@@ -309,19 +309,6 @@ func (gw *Gateway) getAPIDefinition(apiID string) (*apidef.APIDefinition, error)
 	return apiSpec.APIDefinition, nil
 }
 
-func (gw *Gateway) getPolicy(polID string) user.Policy {
-	gw.policiesMu.RLock()
-	pol := gw.policiesByID[polID]
-	gw.policiesMu.RUnlock()
-	return pol
-}
-
-func (gw *Gateway) policiesByIDLen() int {
-	gw.policiesMu.RLock()
-	defer gw.policiesMu.RUnlock()
-	return len(gw.policiesByID)
-}
-
 func (gw *Gateway) apisByIDLen() int {
 	gw.apisMu.RLock()
 	defer gw.apisMu.RUnlock()
