@@ -79,9 +79,20 @@ func (b *DefaultSessionManager) ResetQuota(keyName string, session *user.Session
 	// Fix the raw key
 	b.store.DeleteRawKey(rawKey)
 
+	b.deleteRawKeysWithAllowanceScope(b.store, session, keyName)
+}
+
+func (b *DefaultSessionManager) deleteRawKeysWithAllowanceScope(store storage.Handler, session *user.SessionState, keyName string) {
+	if store == nil || session == nil {
+		return
+	}
+
 	for _, acl := range session.AccessRights {
-		rawKey = QuotaKeyPrefix + acl.AllowanceScope + "-" + keyName
-		b.store.DeleteRawKey(rawKey)
+		if acl.AllowanceScope == "" {
+			continue
+		}
+		rawKey := QuotaKeyPrefix + acl.AllowanceScope + "-" + keyName
+		store.DeleteRawKey(rawKey)
 	}
 }
 
