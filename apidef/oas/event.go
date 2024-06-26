@@ -10,9 +10,11 @@ import (
 )
 
 // Kind is an alias maintained to be used in imports.
+// nolint
 type Kind = event.Kind
 
 // WebhookKind is an alias maintained to be used in imports.
+// nolint
 const WebhookKind = event.WebhookKind
 
 // EventHandler holds information about individual event to be configured on the API.
