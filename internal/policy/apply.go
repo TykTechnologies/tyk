@@ -441,7 +441,7 @@ func (t *Service) Logger() *logrus.Logger {
 // The limits get written if filled and policyLimits allows a higher request rate.
 func (t *Service) ApplyRateLimits(session *user.SessionState, policy user.Policy, apiLimits *user.APILimit) {
 	policyLimits := policy.APILimit()
-	if t.emptyRateLimit(policyLimits) {
+	if policyLimits.Duration() == 0 {
 		return
 	}
 
@@ -457,7 +457,7 @@ func (t *Service) ApplyRateLimits(session *user.SessionState, policy user.Policy
 	// a minimum possible api rate limit setting,
 	// raising apiLimits.
 
-	if t.emptyRateLimit(*apiLimits) || apiLimits.Duration() > policyLimits.Duration() {
+	if t.shouldUpdateRateLimit(policyLimits, *apiLimits) {
 		apiLimits.Rate = policyLimits.Rate
 		apiLimits.Per = policyLimits.Per
 		apiLimits.Smoothing = policyLimits.Smoothing
@@ -468,7 +468,7 @@ func (t *Service) ApplyRateLimits(session *user.SessionState, policy user.Policy
 		// sessionLimits may be set to the default GlobalRateLimit,
 		// and should update only if api limits are updated.
 		sessionLimits := session.APILimit()
-		if t.emptyRateLimit(sessionLimits) || sessionLimits.Duration() > policyLimits.Duration() {
+		if t.shouldUpdateRateLimit(policyLimits, sessionLimits) {
 			session.Rate = policyLimits.Rate
 			session.Per = policyLimits.Per
 			session.Smoothing = policyLimits.Smoothing
@@ -476,6 +476,22 @@ func (t *Service) ApplyRateLimits(session *user.SessionState, policy user.Policy
 	}
 }
 
-func (t *Service) emptyRateLimit(m user.APILimit) bool {
-	return m.Rate == 0 || m.Per == 0
+func (t *Service) shouldUpdateRateLimit(src, dest user.APILimit) bool {
+	// if the policy defined an unlimited rate, then we
+	// apply the rate to api limits and session.
+	if src.Rate == -1 {
+		return true
+	}
+
+	// if api or session define rate -1, we don't update
+	// api or session rate from policy.
+	if dest.Rate == -1 {
+		return false
+	}
+
+	// if src (policy) duration between requests is
+	// shorter, we should update rate limits with the
+	// new policy. If no limits are set on dest,
+	// pass along the policy limit.
+	return src.Duration() < dest.Duration() || dest.Duration() == 0
 }
