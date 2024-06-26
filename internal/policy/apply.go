@@ -461,15 +461,18 @@ func (t *Service) ApplyRateLimits(session *user.SessionState, policy user.Policy
 		apiLimits.Rate = policyLimits.Rate
 		apiLimits.Per = policyLimits.Per
 		apiLimits.Smoothing = policyLimits.Smoothing
-	}
 
-	// sessionLimits, similar to apiLimits, get policy
-	// rate applied if the policy allows more requests.
-	sessionLimits := session.APILimit()
-	if t.emptyRateLimit(sessionLimits) || sessionLimits.Duration() > policyLimits.Duration() {
-		session.Rate = policyLimits.Rate
-		session.Per = policyLimits.Per
-		session.Smoothing = policyLimits.Smoothing
+		// sessionLimits, similar to apiLimits, get policy
+		// rate applied if the policy allows more requests.
+		//
+		// sessionLimits may be set to the default GlobalRateLimit,
+		// and should update only if api limits are updated.
+		sessionLimits := session.APILimit()
+		if t.emptyRateLimit(sessionLimits) || sessionLimits.Duration() > policyLimits.Duration() {
+			session.Rate = policyLimits.Rate
+			session.Per = policyLimits.Per
+			session.Smoothing = policyLimits.Smoothing
+		}
 	}
 }
 
