@@ -748,9 +748,13 @@ type SignatureConfig struct {
 }
 
 type GlobalRateLimit struct {
-	Disabled bool    `bson:"disabled" json:"disabled"`
-	Rate     float64 `bson:"rate" json:"rate"`
-	Per      float64 `bson:"per" json:"per"`
+	Disabled bool `bson:"disabled" json:"disabled"`
+
+	Rate float64 `bson:"rate" json:"rate"`
+	Per  float64 `bson:"per" json:"per"`
+
+	// Smoothing contains rate limit smoothing settings.
+	Smoothing *RateLimitSmoothing `json:"smoothing" bson:"smoothing"`
 }
 
 type BundleManifest struct {

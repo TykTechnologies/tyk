@@ -36,6 +36,7 @@ func (k *RateLimitForAPI) EnabledForSpec() bool {
 	k.apiSess = &user.SessionState{
 		Rate:        k.Spec.GlobalRateLimit.Rate,
 		Per:         k.Spec.GlobalRateLimit.Per,
+		Smoothing:   k.Spec.GlobalRateLimit.Smoothing,
 		LastUpdated: strconv.Itoa(int(time.Now().UnixNano())),
 	}
 	k.apiSess.SetKeyHash(storage.HashKey(k.keyName, k.Gw.GetConfig().HashKeys))
