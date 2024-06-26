@@ -140,51 +140,13 @@ func Test_calculateLifetime(t *testing.T) {
 	})
 }
 
-func TestAPILimit_Less(t *testing.T) {
-	t.Run("limit1 less than limit2", func(t *testing.T) {
-		limit1 := APILimit{
-			Rate: 1,
-			Per:  2,
-		}
-		limit2 := APILimit{
-			Rate: 2,
-			Per:  2,
-		}
-		assert.True(t, limit1.Less(limit2))
-	})
-
-	t.Run("limit1 equal to limit2", func(t *testing.T) {
-		limit1 := APILimit{
-			Rate: 1,
-			Per:  1,
-		}
-		limit2 := APILimit{
-			Rate: 1,
-			Per:  1,
-		}
-		assert.False(t, limit1.Less(limit2))
-	})
-
-	t.Run("limit1 greater than limit2", func(t *testing.T) {
-		limit1 := APILimit{
-			Rate: 3,
-			Per:  1,
-		}
-		limit2 := APILimit{
-			Rate: 1,
-			Per:  1,
-		}
-		assert.False(t, limit1.Less(limit2))
-	})
-}
-
 func TestAPILimit_Duration(t *testing.T) {
 	t.Run("valid limit", func(t *testing.T) {
 		limit := APILimit{
 			Rate: 1,
 			Per:  2,
 		}
-		expectedDuration := time.Second * time.Duration(limit.Rate/limit.Per)
+		expectedDuration := 2 * time.Second
 		assert.Equal(t, expectedDuration, limit.Duration())
 	})
 

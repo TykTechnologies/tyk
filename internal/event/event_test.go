@@ -14,7 +14,7 @@ func TestEventToString(t *testing.T) {
 	t.Run("Event with description", func(t *testing.T) {
 		t.Parallel()
 
-		s := String(RateLimitExceeded)
+		s := String(RateLimitSmoothingUp)
 		assert.NotEmpty(t, s)
 		assert.Contains(t, s, " ")
 	})
