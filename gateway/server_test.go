@@ -153,7 +153,7 @@ func TestGateway_policiesByIDLen(t *testing.T) {
 				})
 			}
 
-			actual := ts.Gw.policiesByIDLen()
+			actual := ts.Gw.PolicyCount()
 
 			assert.Equal(t, tc.expected, actual)
 		})
