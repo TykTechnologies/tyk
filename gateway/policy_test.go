@@ -773,9 +773,12 @@ func (s *Test) TestPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesD
 					},
 				}
 
+				gotPolicy, ok := s.Gw.PolicyByID("per-path2")
+
+				assert.True(t, ok)
 				assert.Equal(t, user.AccessSpec{
 					URL: "/user", Methods: []string{"GET"},
-				}, s.Gw.getPolicy("per-path2").AccessRights["a"].AllowedURLs[0])
+				}, gotPolicy.AccessRights["a"].AllowedURLs[0])
 
 				assert.Equal(t, want, sess.AccessRights)
 			},
@@ -1193,7 +1196,6 @@ func TestApplyMultiPolicies(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
-	ts.Gw.policiesMu.RLock()
 	policy1 := user.Policy{
 		ID:               "policy1",
 		Rate:             1000,
@@ -1207,6 +1209,8 @@ func TestApplyMultiPolicies(t *testing.T) {
 			},
 		},
 	}
+
+	assert.True(t, !policy1.APILimit().IsEmpty())
 
 	policy2 := user.Policy{
 		ID:               "policy2",
@@ -1225,11 +1229,14 @@ func TestApplyMultiPolicies(t *testing.T) {
 		},
 	}
 
+	assert.True(t, !policy2.APILimit().IsEmpty())
+
+	ts.Gw.policiesMu.Lock()
 	ts.Gw.policiesByID = map[string]user.Policy{
 		"policy1": policy1,
 		"policy2": policy2,
 	}
-	ts.Gw.policiesMu.RUnlock()
+	ts.Gw.policiesMu.Unlock()
 
 	// load APIs
 	ts.Gw.BuildAndLoadAPI(
@@ -1265,7 +1272,13 @@ func TestApplyMultiPolicies(t *testing.T) {
 	// create key
 	key := uuid.New()
 	ts.Run(t, []test.TestCase{
-		{Method: http.MethodPost, Path: "/tyk/keys/" + key, Data: session, AdminAuth: true, Code: 200},
+		{
+			Method:    http.MethodPost,
+			Path:      "/tyk/keys/" + key,
+			Data:      session,
+			AdminAuth: true,
+			Code:      200,
+		},
 	}...)
 
 	// run requests to different APIs

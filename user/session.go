@@ -55,18 +55,13 @@ type APILimit struct {
 	Smoothing *apidef.RateLimitSmoothing `json:"smoothing" bson:"smoothing"`
 }
 
-// Less will return true if the receiver has a smaller duration between requests than `in`.
-func (g *APILimit) Less(in APILimit) bool {
-	return g.Duration() < in.Duration()
-}
-
 // Duration returns the time between two allowed requests at the defined rate.
 // It's used to decide which rate limit has a bigger allowance.
 func (g *APILimit) Duration() time.Duration {
 	if g.Per <= 0 || g.Rate <= 0 {
 		return 0
 	}
-	return time.Second * time.Duration(g.Rate/g.Per)
+	return time.Duration(float64(time.Second) * g.Per / g.Rate)
 }
 
 // AccessDefinition defines which versions of an API a key has access to

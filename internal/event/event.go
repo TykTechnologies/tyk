@@ -57,7 +57,6 @@ const (
 // eventMap contains a map of events to a readable title for the event.
 // The title value should not contain ending punctuation.
 var eventMap = map[Event]string{
-	RateLimitExceeded:      "Key Rate Limit Exceeded",
 	RateLimitSmoothingUp:   "Rate limit increased with smoothing",
 	RateLimitSmoothingDown: "Rate limit decreased with smoothing",
 }
