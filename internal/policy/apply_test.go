@@ -121,4 +121,28 @@ func TestApplyRateLimits_FromCustomPolicies(t *testing.T) {
 
 		assert.Equal(t, 10, int(session.Rate))
 	})
+
+	t.Run("Unlimited policy", func(t *testing.T) {
+		session := &user.SessionState{}
+		session.SetCustomPolicies([]user.Policy{
+			{
+				ID:           "pol1",
+				Partitions:   user.PolicyPartitions{RateLimit: true},
+				Rate:         -1,
+				Per:          1,
+				AccessRights: map[string]user.AccessDefinition{"a": {}},
+			},
+			{
+				ID:           "pol2",
+				Partitions:   user.PolicyPartitions{RateLimit: true},
+				Rate:         10,
+				Per:          1,
+				AccessRights: map[string]user.AccessDefinition{"a": {}},
+			},
+		})
+
+		svc.Apply(session)
+
+		assert.Equal(t, -1, int(session.Rate))
+	})
 }
