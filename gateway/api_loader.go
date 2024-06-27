@@ -813,9 +813,8 @@ func (gw *Gateway) loadHTTPService(spec *APISpec, apisByListen map[string]int, g
 		httpHandler := explicitRouteSubpaths(prefix, chainObj.ThisHandler, gwConfig.HttpServerOptions.EnableStrictRoutes)
 
 		// Attach handlers
-		route := subrouter.NewRoute().Handler(httpHandler)
-
-		spec.router = route.Subrouter()
+		subrouter.Handle("", httpHandler)
+		spec.router = subrouter
 	}
 
 	return chainObj
