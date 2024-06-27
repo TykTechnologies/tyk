@@ -1,3 +1,5 @@
+# yamllint disable rule:line-length
+---
 name: CI tests
 
 on:
@@ -25,8 +27,16 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       fail-fast: true
+      # This workflow isn't designed to be run as a pipeline, several issues:
+      #
+      # - contains golangci-lint jobs, sonarcloud (would duplicate)
+      # - cache config not suitable for multiple pipelines
+      # - python tests should be separate job, or no job
+      #
+      # Keep it to a single job run from the matrix as configured
+      # until we get a chance to redesign the pipeline properly.
       matrix:
-        redis-version: [5, 7]
+        redis-version: [7]
         python-version: ["3.11"]
         go-version: [1.21.x]
 
@@ -117,7 +127,7 @@ jobs:
           golangci-lint run --out-format checkstyle --issues-exit-code=0 ./... > golanglint.xml
 
       - name: SonarCloud Scan
-        if: always() && matrix.redis-version == 7
+        if: always()
         uses: sonarsource/sonarcloud-github-action@master
         with:
           args: >
