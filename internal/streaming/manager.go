@@ -7,8 +7,8 @@ import (
 	"runtime"
 	"sync"
 
-	_ "github.com/benthosdev/benthos/v4/public/components/all"
-	"github.com/benthosdev/benthos/v4/public/service"
+	_ "github.com/TykTechnologies/benthos/v4/public/components/all"
+	"github.com/TykTechnologies/benthos/v4/public/service"
 	"github.com/redis/go-redis/v9"
 	"github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v2"

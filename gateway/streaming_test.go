@@ -55,8 +55,16 @@ func convertToStringKeyMap(i interface{}) interface{} {
 
 func TestAsyncAPI(t *testing.T) {
 	ts := StartTest(func(globalConf *config.Config) {
-		globalConf.Streaming.Enabled = true
+		globalConf.Streaming.Enabled = false
 	})
+
+	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		spec.Proxy.ListenPath = "/test"
+		spec.UseKeylessAccess = true
+	})
+
+	// Check that standard API works
+	_, _ = ts.Run(t, test.TestCase{Code: http.StatusOK, Method: http.MethodGet, Path: "/test"})
 
 	defer ts.Close()
 
@@ -102,44 +110,39 @@ streams:
 		t.Fatalf("Failed to parse JSON: %v", err)
 	}
 
-	tykExtension := oas.XTykAPIGateway{
-		Info: oas.Info{
-			Name: "oas api",
-			ID:   oasAPIID,
-			State: oas.State{
-				Active: true,
+	oasAPI := oas.OAS{
+		T: openapi3.T{
+			OpenAPI: "3.0.3",
+			Info: &openapi3.Info{
+				Title:   "oas doc",
+				Version: "1",
 			},
+			Paths: make(openapi3.Paths),
 		},
-		Upstream: oas.Upstream{
-			URL: TestHttpAny,
-		},
-		Server: oas.Server{
-			ListenPath: oas.ListenPath{
-				Value: "/streaming-api/",
-				Strip: false,
-			},
-		},
-	}
-
-	oasAPI := openapi3.T{
-		OpenAPI: "3.0.3",
-		Info: &openapi3.Info{
-			Title:   "oas doc",
-			Version: "1",
-		},
-		Paths: make(openapi3.Paths),
 	}
 
 	oasAPI.Extensions = map[string]interface{}{
-		oas.ExtensionTykStreaming:  parsedStreamingConfig,
-		oas.ExtensionTykAPIGateway: tykExtension,
+		oas.ExtensionTykStreaming: parsedStreamingConfig,
+		// oas.ExtensionTykAPIGateway: tykExtension,
 	}
 
-	// Create OAS API
-	_, _ = ts.Run(t, test.TestCase{AdminAuth: true, Method: http.MethodPost, Path: oasBasePath, Data: &oasAPI,
-		BodyMatch: `"action":"added"`, Code: http.StatusOK})
+	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		spec.Proxy.ListenPath = "/test"
+		spec.UseKeylessAccess = true
+	}, func(spec *APISpec) {
+		spec.SetDisabledFlags()
+		spec.APIID = "base-api-id"
+		spec.VersionDefinition.Enabled = false
+		spec.VersionDefinition.Key = ""
+		spec.VersionDefinition.Location = ""
 
-	ts.Gw.DoReload()
+		spec.IsOAS = true
+		spec.OAS = oasAPI
+		spec.OAS.Fill(*spec.APIDefinition)
+	})
+
+	// Check that standard API still works
+	_, _ = ts.Run(t, test.TestCase{Code: http.StatusOK, Method: http.MethodGet, Path: "/test"})
 
 	streams := ts.Gw.StreamingServer.Streams()
 
@@ -173,6 +176,7 @@ streams:
 }
 
 func TestAsyncAPIHttp(t *testing.T) {
+	// t.SkipNow()
 	tests := []struct {
 		name             string
 		consumerGroup    string
