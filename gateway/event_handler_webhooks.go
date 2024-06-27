@@ -56,16 +56,12 @@ type WebHookHandler struct {
 func (w *WebHookHandler) Init(handlerConf interface{}) error {
 	var err error
 	if err = w.conf.Scan(handlerConf); err != nil {
-		log.WithFields(logrus.Fields{
-			"prefix": "webhooks",
-		}).Error("Problem getting configuration, skipping. ", err)
+		webhookLog.Error("Problem getting configuration, skipping. ", err)
 		return err
 	}
 
 	if w.conf.Disabled {
-		log.WithFields(logrus.Fields{
-			"prefix": "webhooks",
-		}).Infof("skipping disabled webhook %s", w.conf.Name)
+		webhookLog.Infof("skipping disabled webhook %s", w.conf.Name)
 		return ErrEventHandlerDisabled
 	}
 
@@ -76,10 +72,9 @@ func (w *WebHookHandler) Init(handlerConf interface{}) error {
 	if w.conf.TemplatePath != "" {
 		w.template, err = htmlTemplate.ParseFiles(w.conf.TemplatePath)
 		if err != nil {
-			log.WithFields(logrus.Fields{
-				"prefix": "webhooks",
-				"target": w.conf.TargetPath,
-			}).Warning("Custom template load failure, using default: ", err)
+			webhookLog.WithFields(logrus.Fields{
+   	"target": w.conf.TargetPath,
+   }).Warning("Custom template load failure, using default: ", err)
 		}
 
 		if strings.HasSuffix(w.conf.TemplatePath, ".json") {
@@ -90,29 +85,22 @@ func (w *WebHookHandler) Init(handlerConf interface{}) error {
 	// We use the default if TemplatePath was empty or if we failed
 	// to load it.
 	if w.template == nil {
-		log.WithFields(logrus.Fields{
-			"prefix": "webhooks",
-			"target": w.conf.TargetPath,
-		}).Info("Loading default template.")
+		webhookLog.WithFields(logrus.Fields{
+  	"target": w.conf.TargetPath,
+  }).Info("Loading default template.")
 		defaultPath := filepath.Join(w.Gw.GetConfig().TemplatePath, "default_webhook.json")
 		w.template, err = htmlTemplate.ParseFiles(defaultPath)
 		if err != nil {
-			log.WithFields(logrus.Fields{
-				"prefix": "webhooks",
-			}).Error("Could not load the default template: ", err)
+			webhookLog.Error("Could not load the default template: ", err)
 			return err
 		}
 		w.contentType = header.ApplicationJSON
 	}
 
-	log.WithFields(logrus.Fields{
-		"prefix": "webhooks",
-	}).Debug("Timeout set to: ", w.conf.EventTimeout)
+	webhookLog.Debug("Timeout set to: ", w.conf.EventTimeout)
 
 	if !w.checkURL(w.conf.TargetPath) {
-		log.WithFields(logrus.Fields{
-			"prefix": "webhooks",
-		}).Error("Init failed for this webhook, invalid URL, URL must be absolute")
+		webhookLog.Error("Init failed for this webhook, invalid URL, URL must be absolute")
 	}
 
 	if w.Gw.GetConfig().UseDBAppConfigs {
@@ -127,9 +115,7 @@ func (w *WebHookHandler) Init(handlerConf interface{}) error {
 func (w *WebHookHandler) WasHookFired(checksum string) bool {
 	if _, err := w.store.GetKey(checksum); err != nil {
 		// Key not found, so hook is in limit
-		log.WithFields(logrus.Fields{
-			"prefix": "webhooks",
-		}).Debug("Event can fire, no duplicates found")
+		webhookLog.Debug("Event can fire, no duplicates found")
 		return false
 	}
 
@@ -138,9 +124,7 @@ func (w *WebHookHandler) WasHookFired(checksum string) bool {
 
 // setHookFired will create an expiring key for the checksum of the event
 func (w *WebHookHandler) setHookFired(checksum string) {
-	log.WithFields(logrus.Fields{
-		"prefix": "webhooks",
-	}).Debug("Setting Webhook Checksum: ", checksum)
+	webhookLog.Debug("Setting Webhook Checksum: ", checksum)
 	err := w.store.SetKey(checksum, "1", w.conf.EventTimeout)
 	if err != nil {
 		log.WithError(err).Error("could not set key")
@@ -153,21 +137,15 @@ func (w *WebHookHandler) getRequestMethod(m string) WebHookRequestMethod {
 	case WH_GET, WH_PUT, WH_POST, WH_DELETE, WH_PATCH:
 		return upper
 	default:
-		log.WithFields(logrus.Fields{
-			"prefix": "webhooks",
-		}).Warning("Method must be one of GET, PUT, POST, DELETE or PATCH, defaulting to GET")
+		webhookLog.Warning("Method must be one of GET, PUT, POST, DELETE or PATCH, defaulting to GET")
 		return WH_GET
 	}
 }
 
 func (w *WebHookHandler) checkURL(r string) bool {
-	log.WithFields(logrus.Fields{
-		"prefix": "webhooks",
-	}).Debug("Checking URL: ", r)
+	webhookLog.Debug("Checking URL: ", r)
 	if _, err := url.ParseRequestURI(r); err != nil {
-		log.WithFields(logrus.Fields{
-			"prefix": "webhooks",
-		}).Error("Failed to parse URL! ", err, r)
+		webhookLog.Error("Failed to parse URL! ", err, r)
 		return false
 	}
 	return true
@@ -184,9 +162,7 @@ func (w *WebHookHandler) Checksum(reqBody string) (string, error) {
 func (w *WebHookHandler) BuildRequest(reqBody string) (*http.Request, error) {
 	req, err := http.NewRequest(string(w.getRequestMethod(w.conf.Method)), w.conf.TargetPath, strings.NewReader(reqBody))
 	if err != nil {
-		log.WithFields(logrus.Fields{
-			"prefix": "webhooks",
-		}).Error("Failed to create request object: ", err)
+		webhookLog.Error("Failed to create request object: ", err)
 		return nil, err
 	}
 
@@ -247,29 +223,23 @@ func (w *WebHookHandler) HandleEvent(em config.EventMessage) {
 
 	resp, err := cli.Do(req)
 	if err != nil {
-		log.WithFields(logrus.Fields{
-			"prefix": "webhooks",
-		}).Error("Webhook request failed: ", err)
+		webhookLog.Error("Webhook request failed: ", err)
 	} else {
 		defer resp.Body.Close()
 		if resp.StatusCode >= 200 && resp.StatusCode < 300 {
 			content, err := ioutil.ReadAll(resp.Body)
 			if err == nil {
-				log.WithFields(logrus.Fields{
-					"prefix":       "webhooks",
-					"responseCode": resp.StatusCode,
-				}).Debug(string(content))
+				webhookLog.WithFields(logrus.Fields{
+    	"responseCode": resp.StatusCode,
+    }).Debug(string(content))
 			} else {
-				log.WithFields(logrus.Fields{
-					"prefix": "webhooks",
-				}).Error(err)
+				webhookLog.Error(err)
 			}
 
 		} else {
-			log.WithFields(logrus.Fields{
-				"prefix":       "webhooks",
-				"responseCode": resp.StatusCode,
-			}).Error("Request to webhook failed")
+			webhookLog.WithFields(logrus.Fields{
+   	"responseCode": resp.StatusCode,
+   }).Error("Request to webhook failed")
 		}
 	}
 

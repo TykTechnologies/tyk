@@ -57,9 +57,7 @@ func CreateCoProcessMiddleware(hookName string, hookType coprocess.HookType, mwD
 }
 
 func DoCoprocessReload() {
-	log.WithFields(logrus.Fields{
-		"prefix": "coprocess",
-	}).Info("Reloading middlewares")
+	coprocessLog.Info("Reloading middlewares")
 	if dispatcher := loadedDrivers[apidef.PythonDriver]; dispatcher != nil {
 		dispatcher.Reload()
 	}
@@ -251,9 +249,7 @@ func (c *CoProcessor) ObjectPostProcess(object *coprocess.Object, r *http.Reques
 // CoProcessInit creates a new CoProcessDispatcher, it will be called when Tyk starts.
 func (gw *Gateway) CoProcessInit() {
 	if !gw.GetConfig().CoProcessOptions.EnableCoProcess {
-		log.WithFields(logrus.Fields{
-			"prefix": "coprocess",
-		}).Info("Rich plugins are disabled")
+		coprocessLog.Info("Rich plugins are disabled")
 		return
 	}
 
@@ -262,13 +258,9 @@ func (gw *Gateway) CoProcessInit() {
 		var err error
 		loadedDrivers[apidef.GrpcDriver], err = gw.NewGRPCDispatcher()
 		if err == nil {
-			log.WithFields(logrus.Fields{
-				"prefix": "coprocess",
-			}).Info("gRPC dispatcher was initialized")
+			coprocessLog.Info("gRPC dispatcher was initialized")
 		} else {
-			log.WithFields(logrus.Fields{
-				"prefix": "coprocess",
-			}).WithError(err).Error("Couldn't load gRPC dispatcher")
+			coprocessLog.WithError(err).Error("Couldn't load gRPC dispatcher")
 		}
 	}
 
@@ -278,9 +270,7 @@ func (gw *Gateway) CoProcessInit() {
 func (m *CoProcessMiddleware) EnabledForSpec() bool {
 
 	if !m.Gw.GetConfig().CoProcessOptions.EnableCoProcess {
-		log.WithFields(logrus.Fields{
-			"prefix": "coprocess",
-		}).Error("Your API specifies a CP custom middleware, either Tyk wasn't build with CP support or CP is not enabled in your Tyk configuration file!")
+		coprocessLog.Error("Your API specifies a CP custom middleware, either Tyk wasn't build with CP support or CP is not enabled in your Tyk configuration file!")
 		return false
 	}
 
@@ -292,22 +282,16 @@ func (m *CoProcessMiddleware) EnabledForSpec() bool {
 	}
 
 	if !supported {
-		log.WithFields(logrus.Fields{
-			"prefix": "coprocess",
-		}).Errorf("Unsupported driver '%s'", m.Spec.CustomMiddleware.Driver)
+		coprocessLog.Errorf("Unsupported driver '%s'", m.Spec.CustomMiddleware.Driver)
 		return false
 	}
 
 	if d, _ := loadedDrivers[m.Spec.CustomMiddleware.Driver]; d == nil {
-		log.WithFields(logrus.Fields{
-			"prefix": "coprocess",
-		}).Errorf("Driver '%s' isn't loaded", m.Spec.CustomMiddleware.Driver)
+		coprocessLog.Errorf("Driver '%s' isn't loaded", m.Spec.CustomMiddleware.Driver)
 		return false
 	}
 
-	log.WithFields(logrus.Fields{
-		"prefix": "coprocess",
-	}).Debug("Enabling CP middleware.")
+	coprocessLog.Debug("Enabling CP middleware.")
 	m.successHandler = &SuccessHandler{m.BaseMiddleware}
 	return true
 }
@@ -552,9 +536,7 @@ func (h *CustomMiddlewareResponseHook) HandleError(rw http.ResponseWriter, req *
 }
 
 func (h *CustomMiddlewareResponseHook) HandleResponse(rw http.ResponseWriter, res *http.Response, req *http.Request, ses *user.SessionState) error {
-	log.WithFields(logrus.Fields{
-		"prefix": "coprocess",
-	}).Debugf("Response hook '%s' is called", h.mw.Name())
+	coprocessLog.Debugf("Response hook '%s' is called", h.mw.Name())
 	coProcessor := CoProcessor{
 		Middleware: h.mw,
 	}

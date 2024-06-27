@@ -66,7 +66,7 @@ var cipherSuites = map[string]uint16{
 	"TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305":  0xcca9,
 }
 
-var certLog = log.WithField("prefix", "certs")
+var certLog = certLog
 
 func (gw *Gateway) getUpstreamCertificate(host string, spec *APISpec) (cert *tls.Certificate) {
 	var certID string

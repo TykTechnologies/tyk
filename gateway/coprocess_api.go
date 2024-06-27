@@ -88,21 +88,13 @@ func CoProcessLog(CMessage, CLogLevel *C.char) {
 	logLevel := C.GoString(CLogLevel)
 	switch logLevel {
 	case "debug":
-		log.WithFields(logrus.Fields{
-			"prefix": "python",
-		}).Debug(message)
+		pythonLog.Debug(message)
 	case "error":
-		log.WithFields(logrus.Fields{
-			"prefix": "python",
-		}).Error(message)
+		pythonLog.Error(message)
 	case "warning":
-		log.WithFields(logrus.Fields{
-			"prefix": "python",
-		}).Warning(message)
+		pythonLog.Warning(message)
 	default:
-		log.WithFields(logrus.Fields{
-			"prefix": "python",
-		}).Info(message)
+		pythonLog.Info(message)
 	}
 }
 

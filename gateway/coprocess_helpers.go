@@ -138,9 +138,7 @@ func ProtoSessionState(session *user.SessionState) *coprocess.SessionState {
 			default:
 				jsonValue, err := json.Marshal(v)
 				if err != nil {
-					log.WithFields(logrus.Fields{
-						"prefix": "coprocess",
-					}).WithError(err).Error("Couldn't encode session metadata")
+					coprocessLog.WithError(err).Error("Couldn't encode session metadata")
 					continue
 				}
 				metadata[k] = string(jsonValue)

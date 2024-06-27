@@ -50,9 +50,7 @@ func (d *PythonDispatcher) Dispatch(object *coprocess.Object) (*coprocess.Object
 	// Find the dispatch_hook:
 	dispatchHookFunc, err := python.PyObjectGetAttr(dispatcherInstance, "dispatch_hook")
 	if err != nil {
-		log.WithFields(logrus.Fields{
-			"prefix": "python",
-		}).Fatal(err)
+		pythonLog.Fatal(err)
 		python.PyErr_Print()
 		pythonLock.Unlock()
 		return nil, err
@@ -60,9 +58,7 @@ func (d *PythonDispatcher) Dispatch(object *coprocess.Object) (*coprocess.Object
 
 	objectBytes, err := python.PyBytesFromString(objectMsg)
 	if err != nil {
-		log.WithFields(logrus.Fields{
-			"prefix": "python",
-		}).Fatal(err)
+		pythonLog.Fatal(err)
 		python.PyErr_Print()
 		pythonLock.Unlock()
 		return nil, err
@@ -70,9 +66,7 @@ func (d *PythonDispatcher) Dispatch(object *coprocess.Object) (*coprocess.Object
 
 	args, err := python.PyTupleNew(1)
 	if err != nil {
-		log.WithFields(logrus.Fields{
-			"prefix": "python",
-		}).Fatal(err)
+		pythonLog.Fatal(err)
 		python.PyErr_Print()
 		pythonLock.Unlock()
 		return nil, err
@@ -81,9 +75,7 @@ func (d *PythonDispatcher) Dispatch(object *coprocess.Object) (*coprocess.Object
 	python.PyTupleSetItem(args, 0, objectBytes)
 	result, err := python.PyObjectCallObject(dispatchHookFunc, args)
 	if err != nil {
-		log.WithFields(logrus.Fields{
-			"prefix": "python",
-		}).Error(err)
+		pythonLog.Error(err)
 		python.PyErr_Print()
 		pythonLock.Unlock()
 		return nil, err
@@ -93,9 +85,7 @@ func (d *PythonDispatcher) Dispatch(object *coprocess.Object) (*coprocess.Object
 
 	newObjectPtr, err := python.PyTupleGetItem(result, 0)
 	if err != nil {
-		log.WithFields(logrus.Fields{
-			"prefix": "python",
-		}).Error(err)
+		pythonLog.Error(err)
 		python.PyErr_Print()
 		pythonLock.Unlock()
 		return nil, err
@@ -103,9 +93,7 @@ func (d *PythonDispatcher) Dispatch(object *coprocess.Object) (*coprocess.Object
 
 	newObjectLen, err := python.PyTupleGetItem(result, 1)
 	if err != nil {
-		log.WithFields(logrus.Fields{
-			"prefix": "python",
-		}).Error(err)
+		pythonLog.Error(err)
 		python.PyErr_Print()
 		pythonLock.Unlock()
 		return nil, err
@@ -113,9 +101,7 @@ func (d *PythonDispatcher) Dispatch(object *coprocess.Object) (*coprocess.Object
 
 	newObjectBytes, err := python.PyBytesAsString(newObjectPtr, python.PyLongAsLong(newObjectLen))
 	if err != nil {
-		log.WithFields(logrus.Fields{
-			"prefix": "python",
-		}).Error(err)
+		pythonLog.Error(err)
 		python.PyErr_Print()
 		pythonLock.Unlock()
 		return nil, err
@@ -126,9 +112,7 @@ func (d *PythonDispatcher) Dispatch(object *coprocess.Object) (*coprocess.Object
 	newObject := &coprocess.Object{}
 	err = proto.Unmarshal(newObjectBytes, newObject)
 	if err != nil {
-		log.WithFields(logrus.Fields{
-			"prefix": "python",
-		}).Error(err)
+		pythonLog.Error(err)
 		return nil, err
 	}
 	return newObject, nil
@@ -155,26 +139,20 @@ func (d *PythonDispatcher) HandleMiddlewareCache(b *apidef.BundleManifest, baseP
 	defer pythonLock.Unlock()
 	dispatcherLoadBundle, err := python.PyObjectGetAttr(dispatcherInstance, "load_bundle")
 	if err != nil {
-		log.WithFields(logrus.Fields{
-			"prefix": "python",
-		}).Error(err)
+		pythonLog.Error(err)
 		return
 	}
 
 	args, err := python.PyTupleNew(1)
 	if err != nil {
-		log.WithFields(logrus.Fields{
-			"prefix": "python",
-		}).Error(err)
+		pythonLog.Error(err)
 		python.PyErr_Print()
 		return
 	}
 	python.PyTupleSetItem(args, 0, basePath)
 	_, err = python.PyObjectCallObject(dispatcherLoadBundle, args)
 	if err != nil {
-		log.WithFields(logrus.Fields{
-			"prefix": "python",
-		}).Error(err)
+		pythonLog.Error(err)
 		python.PyErr_Print()
 	}
 }
@@ -188,14 +166,10 @@ func PythonInit(pythonVersion string) error {
 	}
 	err = python.Init()
 	if err != nil {
-		log.WithFields(logrus.Fields{
-			"prefix": "coprocess",
-		}).Fatalf("Couldn't initialize Python - %s", err.Error())
+		coprocessLog.Fatalf("Couldn't initialize Python - %s", err.Error())
 		return err
 	}
-	log.WithFields(logrus.Fields{
-		"prefix": "coprocess",
-	}).Infof("Python version '%s' loaded", ver)
+	coprocessLog.Infof("Python version '%s' loaded", ver)
 	return nil
 }
 
@@ -205,17 +179,13 @@ func PythonLoadDispatcher() error {
 	defer pythonLock.Unlock()
 	moduleDict, err := python.LoadModuleDict("dispatcher")
 	if err != nil {
-		log.WithFields(logrus.Fields{
-			"prefix": "coprocess",
-		}).Fatalf("Couldn't initialize Python dispatcher")
+		coprocessLog.Fatalf("Couldn't initialize Python dispatcher")
 		python.PyErr_Print()
 		return err
 	}
 	dispatcherClass, err = python.GetItem(moduleDict, "TykDispatcher")
 	if err != nil {
-		log.WithFields(logrus.Fields{
-			"prefix": "coprocess",
-		}).Fatalf("Couldn't initialize Python dispatcher")
+		coprocessLog.Fatalf("Couldn't initialize Python dispatcher")
 		python.PyErr_Print()
 		return err
 	}
@@ -228,23 +198,17 @@ func PythonNewDispatcher(bundleRootPath string) (coprocess.Dispatcher, error) {
 	defer pythonLock.Unlock()
 	args, err := python.PyTupleNew(1)
 	if err != nil {
-		log.WithFields(logrus.Fields{
-			"prefix": "python",
-		}).Fatal(err)
+		pythonLog.Fatal(err)
 		return nil, err
 	}
 	if err := python.PyTupleSetItem(args, 0, bundleRootPath); err != nil {
-		log.WithFields(logrus.Fields{
-			"prefix": "python",
-		}).Error(err)
+		pythonLog.Error(err)
 		python.PyErr_Print()
 		return nil, err
 	}
 	dispatcherInstance, err = python.PyObjectCallObject(dispatcherClass, args)
 	if err != nil {
-		log.WithFields(logrus.Fields{
-			"prefix": "python",
-		}).Error(err)
+		pythonLog.Error(err)
 		python.PyErr_Print()
 		return nil, err
 	}
@@ -277,9 +241,7 @@ func NewPythonDispatcher(conf config.Config) (dispatcher coprocess.Dispatcher, e
 	if workDir == "" {
 		tykBin, _ := os.Executable()
 		workDir = filepath.Dir(tykBin)
-		log.WithFields(logrus.Fields{
-			"prefix": "coprocess",
-		}).Debugf("Python path prefix isn't set, using '%s'", workDir)
+		coprocessLog.Debugf("Python path prefix isn't set, using '%s'", workDir)
 	}
 	dispatcherPath := filepath.Join(workDir, "coprocess", "python")
 	tykPath := filepath.Join(dispatcherPath, "tyk")
@@ -306,9 +268,7 @@ func NewPythonDispatcher(conf config.Config) (dispatcher coprocess.Dispatcher, e
 		}
 		dispatcher, err = PythonNewDispatcher(bundleRootPath)
 		if err != nil {
-			log.WithFields(logrus.Fields{
-				"prefix": "coprocess",
-			}).Error(err)
+			coprocessLog.Error(err)
 		}
 
 		initDone <- err

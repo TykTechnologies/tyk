@@ -71,8 +71,8 @@ import (
 
 var (
 	log       = logger.Get()
-	mainLog   = log.WithField("prefix", "main")
-	pubSubLog = log.WithField("prefix", "pub-sub")
+	mainLog   = mainLog
+	pubSubLog = pubSubLog
 	rawLog    = logger.GetRaw()
 
 	memProfFile         *os.File
