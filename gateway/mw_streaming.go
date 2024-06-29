@@ -54,7 +54,24 @@ func (s *StreamingMiddleware) Name() string {
 
 func (s *StreamingMiddleware) EnabledForSpec() bool {
 	s.Logger().Error("Streams count: ", len(s.getStreams()))
-	return len(s.getStreams()) > 0
+
+	if len(s.getStreams()) == 0 {
+		return false
+	}
+
+	labsConfig := s.Gw.GetConfig().Labs
+
+	if streamingConfig, ok := labsConfig["streaming"].(map[string]interface{}); ok {
+		if enabled, ok := streamingConfig["enabled"].(bool); ok && enabled {
+			return len(s.getStreams()) > 0
+		}
+	}
+
+	if len(s.getStreams()) > 0 {
+		s.Logger().Warn("Found Stream but streaming is disabled in gateway config. See https://tyk.io/docs/product-stack/tyk-streaming/getting-started/")
+	}
+
+	return false
 }
 
 // Init initializes the middleware
