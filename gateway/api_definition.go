@@ -217,7 +217,7 @@ type APISpec struct {
 	AnalyticsPluginConfig    *GoAnalyticsPlugin
 
 	middlewareChain *ChainObject
-	router          *mux.Router
+	unloadHooks     []func()
 
 	network analytics.NetworkStats
 
@@ -238,8 +238,13 @@ func (a *APISpec) GetSessionLifetimeRespectsKeyExpiration() bool {
 	return a.SessionLifetimeRespectsKeyExpiration
 }
 
+// AddUnloadHook adds a function to be called when the API spec is unloaded
+func (s *APISpec) AddUnloadHook(hook func()) {
+	s.unloadHooks = append(s.unloadHooks, hook)
+}
+
 // Release releases all resources associated with API spec
-func (s *APISpec) Release() {
+func (s *APISpec) Unload() {
 	// release circuit breaker resources
 	for _, path := range s.RxPaths {
 		for _, urlSpec := range path {
@@ -268,6 +273,11 @@ func (s *APISpec) Release() {
 		s.HTTPTransport.transport.CloseIdleConnections()
 		s.HTTPTransport = nil
 	}
+
+	for _, hook := range s.unloadHooks {
+		hook()
+	}
+	s.unloadHooks = nil
 }
 
 // Validate returns nil if s is a valid spec and an error stating why the spec is not valid.
@@ -1891,23 +1901,4 @@ func (s *APISpec) isListeningOnPort(port int, gwConfig *config.Config) bool {
 	}
 
 	return s.ListenPort == port
-}
-
-// Streams extracts streaming configurations from an API spec if available.
-func (s *APISpec) Streams() map[string]interface{} {
-	streamConfigs := make(map[string]interface{})
-
-	if s.IsOAS {
-		if ext, ok := s.OAS.T.Extensions[oas.ExtensionTykStreaming]; ok {
-			if streamsMap, ok := ext.(map[string]interface{}); ok {
-				if streams, ok := streamsMap["streams"].(map[string]interface{}); ok {
-					for streamID, stream := range streams {
-						streamConfigs[streamID] = stream
-					}
-				}
-			}
-		}
-	}
-
-	return streamConfigs
 }
