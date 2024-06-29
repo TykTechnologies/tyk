@@ -36,7 +36,6 @@ const (
 type ChainObject struct {
 	ThisHandler    http.Handler
 	RateLimitChain http.Handler
-	StreamingChain []alice.Constructor
 	Open           bool
 	Skip           bool
 }
@@ -1021,6 +1020,7 @@ func (gw *Gateway) loadApps(specs []*APISpec) {
 	gw.apisMu.Unlock()
 
 	for _, spec := range specsToUnload {
+		mainLog.Debugf("Unloading spec %s", spec.APIID)
 		spec.Unload()
 	}
 
