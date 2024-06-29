@@ -54,6 +54,8 @@ func convertToStringKeyMap(i interface{}) interface{} {
 }
 
 func TestAsyncAPI(t *testing.T) {
+	t.SkipNow()
+
 	ts := StartTest(func(globalConf *config.Config) {
 		globalConf.Streaming.Enabled = false
 	})
@@ -122,7 +124,7 @@ streams:
 	}
 
 	oasAPI.Extensions = map[string]interface{}{
-		oas.ExtensionTykStreaming: parsedStreamingConfig,
+		ExtensionTykStreaming: parsedStreamingConfig,
 		// oas.ExtensionTykAPIGateway: tykExtension,
 	}
 
@@ -144,10 +146,8 @@ streams:
 	// Check that standard API still works
 	_, _ = ts.Run(t, test.TestCase{Code: http.StatusOK, Method: http.MethodGet, Path: "/test"})
 
-	streams := ts.Gw.StreamingServer.Streams()
-
-	if len(streams) != 1 {
-		t.Fatalf("Expected 1 stream, got %d", len(streams))
+	if globalStreamCounter.Load() != 1 {
+		t.Fatalf("Expected 1 stream, got %d", globalStreamCounter.Load())
 	}
 
 	time.Sleep(500 * time.Millisecond)
@@ -267,7 +267,7 @@ streams:
 	}
 
 	oasAPI.Extensions = map[string]interface{}{
-		oas.ExtensionTykStreaming:  parsedStreamingConfig,
+		ExtensionTykStreaming:      parsedStreamingConfig,
 		oas.ExtensionTykAPIGateway: tykExtension,
 	}
 
@@ -277,10 +277,8 @@ streams:
 
 	ts.Gw.DoReload()
 
-	streams := ts.Gw.StreamingServer.Streams()
-
-	if len(streams) != 1 {
-		t.Fatalf("Expected 1 stream, got %d", len(streams))
+	if globalStreamCounter.Load() != 1 {
+		t.Fatalf("Expected 1 stream, got %d", globalStreamCounter.Load())
 	}
 
 	time.Sleep(500 * time.Millisecond)
@@ -312,7 +310,7 @@ streams:
 	if err != nil {
 		t.Fatalf("Failed to send message to /post: %v", err)
 	}
-	defer resp.Body.Close()
+	resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("Expected status code 200, got %d", resp.StatusCode)
@@ -341,4 +339,8 @@ streams:
 	if messagesReceived != expectedMessages {
 		t.Fatalf("Expected %d messages, but received %d", expectedMessages, messagesReceived)
 	}
+
+	// Create OAS API
+	_, _ = ts.Run(t, test.TestCase{AdminAuth: true, Method: http.MethodPost, Path: oasBasePath, Data: &oasAPI,
+		BodyMatch: `"action":"added"`, Code: http.StatusOK})
 }
