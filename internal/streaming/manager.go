@@ -410,7 +410,7 @@ func (sm *StreamManager) readConsumerGroup(configPayload []byte) ([]byte, string
 		return nil, "", err
 	}
 
-	sm.log.Printf("New config: %s", string(newConfigPayload))
+	sm.log.Printf("New config: %s. Consumer group: %s", string(newConfigPayload), consumerGroup)
 
 	return newConfigPayload, consumerGroup, nil
 }

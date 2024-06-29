@@ -202,7 +202,6 @@ func testAsyncAPIHttp(t *testing.T, consumerGroup string, expectedMessages int) 
 
 	const (
 		oasAPIID      = "oas-api-id"
-		oasBasePath   = "/tyk/apis/oas"
 		messageToSend = "hello websocket"
 	)
 
@@ -238,44 +237,28 @@ streams:
 		t.Fatalf("Failed to parse JSON: %v", err)
 	}
 
-	tykExtension := oas.XTykAPIGateway{
-		Info: oas.Info{
-			Name: "oas api",
-			ID:   oasAPIID,
-			State: oas.State{
-				Active: true,
+	oasAPI := oas.OAS{
+		T: openapi3.T{
+			OpenAPI: "3.0.3",
+			Info: &openapi3.Info{
+				Title:   "oas doc",
+				Version: "1",
 			},
+			Paths: make(openapi3.Paths),
 		},
-		Upstream: oas.Upstream{
-			URL: TestHttpAny,
-		},
-		Server: oas.Server{
-			ListenPath: oas.ListenPath{
-				Value: "/streaming-api/",
-				Strip: false,
-			},
-		},
-	}
-
-	oasAPI := openapi3.T{
-		OpenAPI: "3.0.3",
-		Info: &openapi3.Info{
-			Title:   "oas doc",
-			Version: "1",
-		},
-		Paths: make(openapi3.Paths),
 	}
 
 	oasAPI.Extensions = map[string]interface{}{
-		ExtensionTykStreaming:      parsedStreamingConfig,
-		oas.ExtensionTykAPIGateway: tykExtension,
+		ExtensionTykStreaming: parsedStreamingConfig,
 	}
 
-	// Create OAS API
-	_, _ = ts.Run(t, test.TestCase{AdminAuth: true, Method: http.MethodPost, Path: oasBasePath, Data: &oasAPI,
-		BodyMatch: `"action":"added"`, Code: http.StatusOK})
-
-	ts.Gw.DoReload()
+	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		spec.Proxy.ListenPath = "/streaming-api"
+		spec.UseKeylessAccess = true
+		spec.IsOAS = true
+		spec.OAS = oasAPI
+		spec.OAS.Fill(*spec.APIDefinition)
+	})
 
 	if globalStreamCounter.Load() != 1 {
 		t.Fatalf("Expected 1 stream, got %d", globalStreamCounter.Load())
@@ -290,6 +273,7 @@ streams:
 	if err != nil {
 		t.Fatalf("Failed to connect to websocket: %v", err)
 	}
+	wsConn1.SetReadDeadline(time.Now().Add(500 * time.Millisecond))
 	defer wsConn1.Close()
 
 	// Create second websocket client
@@ -297,6 +281,7 @@ streams:
 	if err != nil {
 		t.Fatalf("Failed to connect to websocket: %v", err)
 	}
+	wsConn2.SetReadDeadline(time.Now().Add(500 * time.Millisecond))
 	defer wsConn2.Close()
 
 	// Send message to HTTP input
@@ -339,8 +324,4 @@ streams:
 	if messagesReceived != expectedMessages {
 		t.Fatalf("Expected %d messages, but received %d", expectedMessages, messagesReceived)
 	}
-
-	// Create OAS API
-	_, _ = ts.Run(t, test.TestCase{AdminAuth: true, Method: http.MethodPost, Path: oasBasePath, Data: &oasAPI,
-		BodyMatch: `"action":"added"`, Code: http.StatusOK})
 }
