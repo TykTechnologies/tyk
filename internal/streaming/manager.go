@@ -2,9 +2,9 @@ package streaming
 
 import (
 	"context"
+	"crypto/sha256"
 	"fmt"
 	"log"
-	"runtime"
 	"sync"
 
 	_ "github.com/TykTechnologies/benthos/v4/public/components/all"
@@ -54,35 +54,10 @@ func (sm *StreamManager) AddStream(streamID string, config map[string]interface{
 	sm.mu.Lock()
 	defer sm.mu.Unlock()
 
-	pc := make([]uintptr, 10) // at most 10 entries
-	n := runtime.Callers(2, pc)
-	frames := runtime.CallersFrames(pc[:n])
-
-	sm.log.Println("Adding stream:")
-	for {
-		frame, more := frames.Next()
-		sm.log.Printf("- %s\n\t%s:%d", frame.Function, frame.File, frame.Line)
-		if !more {
-			break
-		}
-	}
-
 	configPayload, err := yaml.Marshal(config)
 	if err != nil {
 		return err
 	}
-
-	if _, exists := sm.streams[streamID]; exists {
-		sm.log.Printf("stream %s already exists, removing it first", streamID)
-
-		sm.mu.Unlock()
-		if err := sm.RemoveStream(streamID); err != nil {
-			return err
-		}
-		sm.mu.Lock()
-	}
-
-	builder := service.NewStreamBuilder()
 
 	configPayload, err = sm.addMetadata(configPayload, "stream_id", streamID)
 	if err != nil {
@@ -93,6 +68,30 @@ func (sm *StreamManager) AddStream(streamID string, config map[string]interface{
 	if err != nil {
 		return err
 	}
+
+	if existingConfig, exists := sm.streamConfigs[streamID]; exists {
+		sm.log.Printf("stream %s already exists, checking config checksum", streamID)
+
+		existingChecksum := fmt.Sprintf("%x", sha256.Sum256([]byte(existingConfig)))
+		newChecksum := fmt.Sprintf("%x", sha256.Sum256(configPayload))
+
+		if existingChecksum == newChecksum {
+			sm.log.Printf("stream %s config checksum matches, not removing", streamID)
+			return nil
+		}
+
+		sm.log.Printf("stream %s config checksum does not match, removing it first", streamID)
+
+		sm.mu.Unlock()
+		if err := sm.RemoveStream(streamID); err != nil {
+			return err
+		}
+		sm.mu.Lock()
+	}
+
+	sm.streamConfigs[streamID] = string(configPayload)
+
+	builder := service.NewStreamBuilder()
 
 	err = builder.SetYAML(string(configPayload))
 	if err != nil {
@@ -112,11 +111,12 @@ func (sm *StreamManager) AddStream(streamID string, config map[string]interface{
 		return err
 	}
 
-	sm.streamConfigs[streamID] = string(configPayload)
 	sm.streams[streamID] = stream
 	sm.streamConsumerGroup[streamID] = consumerGroup
 
 	go func() {
+		sm.log.Info("Starting stream ", streamID)
+
 		if err := stream.Run(context.Background()); err != nil {
 			sm.log.Printf("stream %s encountered an error: %v", streamID, err)
 		}
