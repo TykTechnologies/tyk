@@ -171,9 +171,7 @@ func (s *StreamingMiddleware) handleWebSocket(streamID string) http.HandlerFunc 
 		upgrader := websocket.Upgrader{
 			ReadBufferSize:  1024,
 			WriteBufferSize: 1024,
-			CheckOrigin: func(r *http.Request) bool {
-				return true
-			},
+			CheckOrigin:     func(r *http.Request) bool { return true },
 		}
 
 		conn, err := upgrader.Upgrade(w, r, nil)
@@ -181,70 +179,72 @@ func (s *StreamingMiddleware) handleWebSocket(streamID string) http.HandlerFunc 
 			s.Logger().Errorf("Failed to set websocket upgrade: %v", err)
 			return
 		}
-		defer conn.Close()
 
 		ctx, cancel := context.WithCancel(s.ctx)
+		defer cancel()
+
 		connID := uuid.New()
 		s.addConnection(streamID, connection{id: connID, cancel: cancel})
 		defer s.removeConnection(streamID, connID)
 
-		consumerGroup := s.getConsumerGroup(r)
-
+		consumerGroup := s.getConsumerGroup(r, streamID)
 		messageChan, subCancel, err := s.streamingServer.Subscribe(streamID, consumerGroup, 100)
 		if err != nil {
 			s.Logger().Errorf("Failed to subscribe to stream: %v", err)
+			conn.Close()
 			return
 		}
 		defer s.streamingServer.Unsubscribe(streamID, consumerGroup, messageChan, subCancel)
 
-		// Create a channel to signal when the WebSocket should be closed
-		closeChan := make(chan struct{})
+		go s.websocketReadPump(ctx, conn)
 
-		// Start a goroutine to watch for context cancellation
-		go func() {
-			<-ctx.Done()
-			close(closeChan)
-			conn.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, ""))
-			conn.Close()
-		}()
-
-		// Start a goroutine to read from the WebSocket
-		go func() {
-			for {
-				_, _, err := conn.ReadMessage()
-				if err != nil {
-					if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
-						s.Logger().Errorf("WebSocket read error: %v", err)
-					}
-					close(closeChan)
-					return
-				}
-			}
-		}()
-
-		ticker := time.NewTicker(time.Second * 30)
+		ticker := time.NewTicker(30 * time.Second)
 		defer ticker.Stop()
 
-		for {
-			select {
-			case <-closeChan:
-				conn.Close()
-				s.Logger().Debugf("Closing websocket connection")
+		s.websocketWritePump(ctx, conn, messageChan, ticker.C)
+	}
+}
+
+func (s *StreamingMiddleware) websocketReadPump(ctx context.Context, conn *websocket.Conn) {
+	defer conn.Close()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		default:
+			_, _, err := conn.ReadMessage()
+			if err != nil {
+				if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
+					s.Logger().Errorf("WebSocket read error: %v", err)
+				}
 				return
-			case <-ticker.C:
-				if err := conn.WriteMessage(websocket.PingMessage, nil); err != nil {
-					s.Logger().Errorf("Failed to write ping message: %v", err)
-					conn.Close()
-					return
+			}
+		}
+	}
+}
+
+func (s *StreamingMiddleware) websocketWritePump(ctx context.Context, conn *websocket.Conn, messageChan <-chan []byte, ticker <-chan time.Time) {
+	defer conn.Close()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker:
+			if err := conn.WriteMessage(websocket.PingMessage, nil); err != nil {
+				s.Logger().Errorf("Failed to write WebSocket ping message: %v", err)
+				return
+			}
+		case message, ok := <-messageChan:
+			if !ok {
+				err := conn.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, ""))
+				if err != nil {
+					s.Logger().Errorf("Failed to write WebSocket close message: %v", err)
 				}
-			case message, ok := <-messageChan:
-				if !ok {
-					return
-				}
-				if err := conn.WriteMessage(websocket.TextMessage, message); err != nil {
-					s.Logger().Errorf("Failed to write message to websocket: %v", err)
-					return
-				}
+				return
+			}
+			if err := conn.WriteMessage(websocket.TextMessage, message); err != nil {
+				s.Logger().Errorf("Failed to write message to WebSocket: %v", err)
+				return
 			}
 		}
 	}
@@ -264,30 +264,56 @@ func (s *StreamingMiddleware) handleSSE(streamID string) http.HandlerFunc {
 		w.Header().Set("Access-Control-Allow-Origin", "*")
 
 		ctx, cancel := context.WithCancel(s.ctx)
+		defer cancel()
+
 		connID := uuid.New()
 		s.addConnection(streamID, connection{id: connID, cancel: cancel})
 		defer s.removeConnection(streamID, connID)
 
-		consumerGroup := s.getConsumerGroup(r)
-
+		consumerGroup := s.getConsumerGroup(r, streamID)
 		messageChan, subCancel, err := s.streamingServer.Subscribe(streamID, consumerGroup, 100)
 		if err != nil {
-			s.Logger().Errorf("Failed to subscribe to stream: %v", err)
+			s.Logger().Errorf("Failed to subscribe to SSE stream: %v", err)
 			return
 		}
 		defer s.streamingServer.Unsubscribe(streamID, consumerGroup, messageChan, subCancel)
 
-		for {
-			select {
-			case <-ctx.Done():
+		go s.sseReadPump(ctx, r)
+
+		ticker := time.NewTicker(30 * time.Second)
+		defer ticker.Stop()
+
+		s.sseWritePump(ctx, w, flusher, messageChan, ticker.C)
+	}
+}
+
+func (s *StreamingMiddleware) sseReadPump(ctx context.Context, r *http.Request) {
+	<-ctx.Done()
+	s.Logger().Debug("SSE context cancelled, closing connection")
+}
+
+func (s *StreamingMiddleware) sseWritePump(ctx context.Context, w http.ResponseWriter, flusher http.Flusher, messageChan <-chan []byte, ticker <-chan time.Time) {
+	for {
+		select {
+		case <-ctx.Done():
+			s.Logger().Debug("SSE context cancelled, stopping write pump")
+			return
+		case <-ticker:
+			if _, err := w.Write([]byte(": ping\n\n")); err != nil {
+				s.Logger().Errorf("Failed to write SSE ping: %v", err)
 				return
-			case message, ok := <-messageChan:
-				if !ok {
-					return
-				}
-				fmt.Fprintf(w, "data: %s\n\n", message)
-				flusher.Flush()
 			}
+			flusher.Flush()
+		case message, ok := <-messageChan:
+			if !ok {
+				s.Logger().Debug("SSE message channel closed")
+				return
+			}
+			if _, err := fmt.Fprintf(w, "data: %s\n\n", message); err != nil {
+				s.Logger().Errorf("Failed to write SSE message: %v", err)
+				return
+			}
+			flusher.Flush()
 		}
 	}
 }
@@ -313,9 +339,9 @@ func (s *StreamingMiddleware) removeConnection(streamID, connID string) {
 	}
 }
 
-func (s *StreamingMiddleware) getConsumerGroup(r *http.Request) string {
+func (s *StreamingMiddleware) getConsumerGroup(r *http.Request, streamID string) string {
 	consumerGroup := ctxGetAuthToken(r)
-	streamConsumerGroup, _ := s.streamingServer.ConsumerGroup(s.Spec.APIID)
+	streamConsumerGroup, _ := s.streamingServer.ConsumerGroup(streamID)
 
 	if streamConsumerGroup != "" {
 		consumerGroup = streamConsumerGroup
