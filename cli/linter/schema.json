@@ -1184,6 +1184,11 @@
     "oas_config": {
       "validate_examples": false,
       "validate_schema_defaults": false
+    },
+    "labs": {
+      "type": ["object", "null"],
+      "additionalProperties": true,
+      "properties": {}
     }
   }
 }

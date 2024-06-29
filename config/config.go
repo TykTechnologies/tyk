@@ -384,11 +384,6 @@ func (certs *CertsData) Decode(value string) error {
 	return nil
 }
 
-type StreamingConfig struct {
-	// Set to `true` to enable the streaming feature.
-	Enabled bool `json:"enabled"`
-}
-
 type HttpServerOptionsConfig struct {
 	// No longer used
 	OverrideDefaults bool `json:"-"`
@@ -655,8 +650,6 @@ type Config struct {
 
 	// Global Certificate configuration
 	Security SecurityConfig `json:"security"`
-
-	Streaming StreamingConfig `json:"streaming"`
 
 	// Gateway HTTP server configuration
 	HttpServerOptions HttpServerOptionsConfig `json:"http_server_options"`
@@ -1076,6 +1069,20 @@ type Config struct {
 
 	// OAS holds the configuration for various OpenAPI-specific functionalities
 	OAS OASConfig `json:"oas_config"`
+
+	Labs labsConfig `json:"labs"`
+}
+
+type labsConfig map[string]interface{}
+
+func (lc *labsConfig) Decode(value string) error {
+	var temp map[string]interface{}
+	if err := json.Unmarshal([]byte(value), &temp); err != nil {
+		log.Error("Error unmarshalling labsConfig: ", err)
+		return err
+	}
+	*lc = temp
+	return nil
 }
 
 // OASConfig holds the configuration for various OpenAPI-specific functionalities
