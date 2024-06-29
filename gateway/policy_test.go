@@ -144,31 +144,37 @@ func (s *Test) TestPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesD
 		"rate4": {
 			Partitions:   user.PolicyPartitions{RateLimit: true},
 			Rate:         8,
+			Per:          1,
 			AccessRights: map[string]user.AccessDefinition{"a": {}},
 		},
 		"rate5": {
 			Partitions:   user.PolicyPartitions{RateLimit: true},
 			Rate:         10,
+			Per:          1,
 			AccessRights: map[string]user.AccessDefinition{"a": {}},
 		},
 		"rate-for-a": {
 			Partitions:   user.PolicyPartitions{RateLimit: true},
 			AccessRights: map[string]user.AccessDefinition{"a": {}},
 			Rate:         4,
+			Per:          1,
 		},
 		"rate-for-b": {
 			Partitions:   user.PolicyPartitions{RateLimit: true},
 			AccessRights: map[string]user.AccessDefinition{"b": {}},
 			Rate:         2,
+			Per:          1,
 		},
 		"rate-for-a-b": {
 			Partitions:   user.PolicyPartitions{RateLimit: true},
 			AccessRights: map[string]user.AccessDefinition{"a": {}, "b": {}},
 			Rate:         4,
+			Per:          1,
 		},
 		"rate-no-partition": {
 			AccessRights: map[string]user.AccessDefinition{"a": {}},
 			Rate:         12,
+			Per:          1,
 		},
 		"acl1": {
 			Partitions:   user.PolicyPartitions{Acl: true},
@@ -558,9 +564,7 @@ func (s *Test) TestPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesD
 		{
 			"RatePart with unlimited", []string{"unlimited-rate"},
 			"", func(t *testing.T, s *user.SessionState) {
-				if s.Rate != -1 {
-					t.Fatalf("want unlimited rate to be -1")
-				}
+				assert.True(t, s.Rate <= 0, "want unlimited rate to be <= 0")
 			}, nil,
 		},
 		{
@@ -639,7 +643,7 @@ func (s *Test) TestPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesD
 		{
 			"Acl for a and rate for a,b", []string{"acl1", "rate-for-a-b"},
 			"", func(t *testing.T, s *user.SessionState) {
-				want := map[string]user.AccessDefinition{"a": {Limit: user.APILimit{Rate: 4}}}
+				want := map[string]user.AccessDefinition{"a": {Limit: user.APILimit{Rate: 4, Per: 1}}}
 				assert.Equal(t, want, s.AccessRights)
 			}, nil,
 		},
@@ -647,8 +651,8 @@ func (s *Test) TestPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesD
 			"Acl for a,b and individual rate for a,b", []string{"acl-for-a-b", "rate-for-a", "rate-for-b"},
 			"", func(t *testing.T, s *user.SessionState) {
 				want := map[string]user.AccessDefinition{
-					"a": {Limit: user.APILimit{Rate: 4}},
-					"b": {Limit: user.APILimit{Rate: 2}},
+					"a": {Limit: user.APILimit{Rate: 4, Per: 1}},
+					"b": {Limit: user.APILimit{Rate: 2, Per: 1}},
 				}
 				assert.Equal(t, want, s.AccessRights)
 			}, nil,
@@ -769,9 +773,12 @@ func (s *Test) TestPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesD
 					},
 				}
 
+				gotPolicy, ok := s.Gw.PolicyByID("per-path2")
+
+				assert.True(t, ok)
 				assert.Equal(t, user.AccessSpec{
 					URL: "/user", Methods: []string{"GET"},
-				}, s.Gw.getPolicy("per-path2").AccessRights["a"].AllowedURLs[0])
+				}, gotPolicy.AccessRights["a"].AllowedURLs[0])
 
 				assert.Equal(t, want, sess.AccessRights)
 			},
@@ -1189,7 +1196,6 @@ func TestApplyMultiPolicies(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
-	ts.Gw.policiesMu.RLock()
 	policy1 := user.Policy{
 		ID:               "policy1",
 		Rate:             1000,
@@ -1203,6 +1209,8 @@ func TestApplyMultiPolicies(t *testing.T) {
 			},
 		},
 	}
+
+	assert.True(t, !policy1.APILimit().IsEmpty())
 
 	policy2 := user.Policy{
 		ID:               "policy2",
@@ -1221,11 +1229,14 @@ func TestApplyMultiPolicies(t *testing.T) {
 		},
 	}
 
+	assert.True(t, !policy2.APILimit().IsEmpty())
+
+	ts.Gw.policiesMu.Lock()
 	ts.Gw.policiesByID = map[string]user.Policy{
 		"policy1": policy1,
 		"policy2": policy2,
 	}
-	ts.Gw.policiesMu.RUnlock()
+	ts.Gw.policiesMu.Unlock()
 
 	// load APIs
 	ts.Gw.BuildAndLoadAPI(
@@ -1261,7 +1272,13 @@ func TestApplyMultiPolicies(t *testing.T) {
 	// create key
 	key := uuid.New()
 	ts.Run(t, []test.TestCase{
-		{Method: http.MethodPost, Path: "/tyk/keys/" + key, Data: session, AdminAuth: true, Code: 200},
+		{
+			Method:    http.MethodPost,
+			Path:      "/tyk/keys/" + key,
+			Data:      session,
+			AdminAuth: true,
+			Code:      200,
+		},
 	}...)
 
 	// run requests to different APIs

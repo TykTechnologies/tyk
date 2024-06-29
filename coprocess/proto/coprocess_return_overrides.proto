@@ -4,10 +4,23 @@ package coprocess;
 
 option go_package = "/coprocess";
 
+// ReturnOverrides is used to override the response for a given HTTP request
+// When returned within an Object for a given HTTP request, the upstream reponse 
+// is replaced with the fields encapsulated within ReturnOverrides.
 message ReturnOverrides {
+
+  // ResponseCode overrides the upstream response status code.
   int32 response_code = 1;
+  
+  // ResponseError overrides the upstream response error message.
   string response_error = 2;
+
+  // Headers overrides the upstream response headers.
   map<string, string> headers = 3;
+
+  // OverrideError overrides the upstream error response with response_error when set to true.
   bool override_error = 4;
+
+  // ResponseBody is an alias of response_error that contains the response body.
   string response_body = 5;
 }

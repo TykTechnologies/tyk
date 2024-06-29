@@ -12,19 +12,19 @@ import (
 	"github.com/TykTechnologies/tyk/header"
 )
 
-func (ts *Test) createGetHandler() *WebHookHandler {
-	eventHandlerConf := config.WebHookHandlerConf{
+func (ts *Test) createWebHookHandler(t *testing.T) *WebHookHandler {
+	t.Helper()
+
+	handler := &WebHookHandler{Gw: ts.Gw}
+	err := handler.Init(config.WebHookHandlerConf{
 		TargetPath:   TestHttpGet,
 		Method:       "GET",
 		EventTimeout: 10,
-		TemplatePath: "../templates/default_webhook.json",
 		HeaderList:   map[string]string{"x-tyk-test": "TEST"},
-	}
-	ev := &WebHookHandler{Gw: ts.Gw}
-	if err := ev.Init(eventHandlerConf); err != nil {
-		panic(err)
-	}
-	return ev
+	})
+	assert.NoError(t, err)
+
+	return handler
 }
 
 func TestNewValid(t *testing.T) {
@@ -51,7 +51,7 @@ func TestNewValid(t *testing.T) {
 		conf["disabled"] = true
 		h := &WebHookHandler{Gw: ts.Gw}
 		err := h.Init(conf)
-		assert.NoError(t, err)
+		assert.ErrorIs(t, err, ErrEventHandlerDisabled)
 		assert.True(t, h.conf.Disabled)
 	})
 }
@@ -86,7 +86,7 @@ func TestChecksum(t *testing.T) {
 		"timestamp": 2014-11-27 12:52:05.944549825 &#43;0000 GMT
 	}`
 
-	hook := ts.createGetHandler()
+	hook := ts.createWebHookHandler(t)
 	checksum, err := hook.Checksum(rBody)
 
 	if err != nil {
@@ -103,7 +103,7 @@ func TestBuildRequest(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
-	hook := ts.createGetHandler()
+	hook := ts.createWebHookHandler(t)
 
 	rBody := `{
 		"event": "QuotaExceeded",
@@ -151,9 +151,8 @@ func TestBuildRequestIngoreCanonicalHeaderKey(t *testing.T) {
 		t.Fatal(err)
 	}
 	req, err := ev.BuildRequest("")
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(t, err)
+
 	got := req.Header[NonCanonicalHeaderKey][0]
 	if got != NonCanonicalHeaderKey {
 		t.Errorf("expected %q got %q", NonCanonicalHeaderKey, got)
@@ -167,17 +166,16 @@ func TestCreateBody(t *testing.T) {
 	em := config.EventMessage{
 		Type:      EventQuotaExceeded,
 		TimeStamp: "0",
+		Meta:      EventKeyFailureMeta{},
 	}
 
-	hook := ts.createGetHandler()
+	hook := ts.createWebHookHandler(t)
 	body, err := hook.CreateBody(em)
-	if err != nil {
-		t.Error("Create body failed with error! ", err)
-	}
+	assert.NoError(t, err)
 
 	expectedBody := `"event": "QuotaExceeded"`
 	if !strings.Contains(body, expectedBody) {
-		t.Error("Body incorrect, is: ", body)
+		t.Errorf("Body incorrect, is: %q", body)
 	}
 }
 
@@ -185,7 +183,7 @@ func TestGet(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
-	eventHandler := ts.createGetHandler()
+	eventHandler := ts.createWebHookHandler(t)
 
 	eventMessage := config.EventMessage{
 		Type: EventKeyExpired,
@@ -196,7 +194,9 @@ func TestGet(t *testing.T) {
 			Key:              "123456789",
 		},
 	}
-	body, _ := eventHandler.CreateBody(eventMessage)
+
+	body, err := eventHandler.CreateBody(eventMessage)
+	assert.NoError(t, err)
 
 	checksum, _ := eventHandler.Checksum(body)
 	eventHandler.HandleEvent(eventMessage)
@@ -325,9 +325,7 @@ func TestWebhookContentTypeHeader(t *testing.T) {
 			}
 
 			req, err := hook.BuildRequest("")
-			if err != nil {
-				t.Fatal("Failed to build request with error ", err)
-			}
+			assert.NoError(t, err)
 
 			if req.Header.Get(header.ContentType) != ts.ExpectedContentType {
 				t.Fatalf("Expect Content-Type %s. Got %s", ts.ExpectedContentType, req.Header.Get("Content-Type"))

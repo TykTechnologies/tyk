@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"crypto/md5"
 	"encoding/hex"
+	"errors"
 	htmlTemplate "html/template"
 	"io/ioutil"
 	"net/http"
@@ -35,6 +36,11 @@ const (
 	EH_WebHook = event.WebHookHandler
 )
 
+var (
+	// ErrEventHandlerDisabled is returned when the event handler is disabled.
+	ErrEventHandlerDisabled = errors.New("event handler disabled")
+)
+
 // WebHookHandler is an event handler that triggers web hooks
 type WebHookHandler struct {
 	conf     apidef.WebHookHandlerConf
@@ -60,7 +66,7 @@ func (w *WebHookHandler) Init(handlerConf interface{}) error {
 		log.WithFields(logrus.Fields{
 			"prefix": "webhooks",
 		}).Infof("skipping disabled webhook %s", w.conf.Name)
-		return nil
+		return ErrEventHandlerDisabled
 	}
 
 	w.store = &storage.RedisCluster{KeyPrefix: "webhook.cache.", ConnectionHandler: w.Gw.StorageConnectionHandler}
@@ -198,18 +204,30 @@ func (w *WebHookHandler) BuildRequest(reqBody string) (*http.Request, error) {
 	return req, nil
 }
 
+// CreateBody will render the webhook event message template and return it as a string.
+// If an error occurs, an empty string will be returned alongside an error.
 func (w *WebHookHandler) CreateBody(em config.EventMessage) (string, error) {
 	var reqBody bytes.Buffer
-	w.template.Execute(&reqBody, em)
-
-	return reqBody.String(), nil
+	err := w.template.Execute(&reqBody, em)
+	if err != nil {
+		return "", err
+	}
+	return reqBody.String(), err
 }
 
 // HandleEvent will be fired when the event handler instance is found in an APISpec EventPaths object during a request chain
 func (w *WebHookHandler) HandleEvent(em config.EventMessage) {
 
 	// Inject event message into template, render to string
-	reqBody, _ := w.CreateBody(em)
+	reqBody, err := w.CreateBody(em)
+	if err != nil {
+		// We're just logging the template rendering issue here
+		// but we're passing on the partial rendered contents
+		log.WithError(err).WithFields(logrus.Fields{
+			"prefix": "webhooks",
+		}).Error("Webhook template rendering error")
+		return
+	}
 
 	// Construct request (method, body, params)
 	req, err := w.BuildRequest(reqBody)

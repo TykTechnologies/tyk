@@ -1,12 +1,19 @@
+# yamllint disable rule:line-length
 ---
 version: "3"
 
 includes:
-  lint: .taskfiles/lint.yml
+  test: .taskfiles/test.yml
   deps: .taskfiles/deps/Taskfile.yml
   opentelemetry:
     taskfile: ci/tests/tracing/Taskfile.yml
     dir: ci/tests/tracing/
+  services:
+    taskfile: docker/services/Taskfile.yml
+    dir: docker/services/
+  coprocess:
+    taskfile: coprocess/Taskfile.yml
+    dir: coprocess/
 
 tasks:
   docker:
@@ -41,3 +48,38 @@ tasks:
         yq -i ".dockers[0].extra_files |= [\"$replacement\"]" ci/goreleaser/goreleaser-el7.yml
         yq -i ".dockers[4].extra_files |= [\"$replacement\"]" ci/goreleaser/goreleaser.yml
       - echo goreleaser release --clean --snapshot -f ci/goreleaser/goreleaser.yml
+
+  # Used in CI
+  lint:
+    desc: "Tidy the codebase"
+    cmds:
+      - task: lint:tidy
+      - task: lint:all
+
+  lint:tidy:
+    desc: "Run typical code cleanup steps"
+    aliases: [fmt]
+    cmds:
+      - gofmt -w .
+      - go generate ./...
+      - go fmt ./...
+      - go mod tidy
+      - goimports -local github.com/TykTechnologies,github.com/TykTechnologies/tyk/internal -w .
+      - go mod tidy
+
+  lint:all:
+    internal: true
+    deps:
+      - lint:config
+      - lint:x-tyk-gateway
+      - coprocess:lint
+
+  lint:config:
+    internal: true
+    cmds:
+      - go test -count 1 -v ./cli/linter/...
+
+  lint:x-tyk-gateway:
+    internal: true
+    cmds:
+      - go test -count 1 -v -run=TestXTykGateway_Lint ./apidef/oas/
