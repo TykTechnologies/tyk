@@ -17,8 +17,6 @@ const (
 	// ExtensionTykAPIGateway is the OAS schema key for the Tyk extension.
 	ExtensionTykAPIGateway = "x-tyk-api-gateway"
 
-	ExtensionTykStreaming = "x-tyk-streaming"
-
 	// Main holds the default version value (empty).
 	Main = ""
 

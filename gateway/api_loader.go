@@ -1,13 +1,10 @@
 package gateway
 
 import (
-	"bufio"
 	"crypto/tls"
 	"fmt"
-	"io"
 	"io/ioutil"
 	"net/http"
-	"net/http/httptest"
 	"net/url"
 	"path"
 	"path/filepath"
@@ -21,7 +18,6 @@ import (
 	"github.com/TykTechnologies/tyk/rpc"
 
 	"github.com/gorilla/mux"
-	"github.com/gorilla/websocket"
 	"github.com/justinas/alice"
 	"github.com/rs/cors"
 	"github.com/sirupsen/logrus"
@@ -429,12 +425,10 @@ func (gw *Gateway) processSpec(spec *APISpec, apisByListen map[string]int,
 		gw.mwAppendEnabled(&chainArray, &RateLimitAndQuotaCheck{baseMid})
 	}
 
-	streamingChain := make([]alice.Constructor, 0)
-	streamingChain = append(streamingChain, chainArray...)
-	chainDef.StreamingChain = streamingChain
-
 	gw.mwAppendEnabled(&chainArray, &RateLimitForAPI{BaseMiddleware: baseMid})
 	gw.mwAppendEnabled(&chainArray, &GraphQLMiddleware{BaseMiddleware: baseMid})
+	gw.mwAppendEnabled(&chainArray, &StreamingMiddleware{BaseMiddleware: baseMid})
+
 	if !spec.UseKeylessAccess {
 		gw.mwAppendEnabled(&chainArray, &GraphQLComplexityMiddleware{BaseMiddleware: baseMid})
 		gw.mwAppendEnabled(&chainArray, &GraphQLGranularAccessMiddleware{BaseMiddleware: baseMid})
@@ -813,8 +807,7 @@ func (gw *Gateway) loadHTTPService(spec *APISpec, apisByListen map[string]int, g
 		httpHandler := explicitRouteSubpaths(prefix, chainObj.ThisHandler, gwConfig.HttpServerOptions.EnableStrictRoutes)
 
 		// Attach handlers
-		subrouter.Handle("", httpHandler)
-		spec.router = subrouter
+		subrouter.NewRoute().Handler(httpHandler)
 	}
 
 	return chainObj
@@ -922,241 +915,6 @@ func (gw *Gateway) loadGraphQLPlayground(spec *APISpec, subrouter *mux.Router) {
 	})
 }
 
-type handleFuncAdapter struct {
-	streamID string
-	gw       *Gateway
-	spec     *APISpec
-}
-
-func (h *handleFuncAdapter) HandleFunc(path string, f func(http.ResponseWriter, *http.Request)) {
-	mainLog.Debugf("Registering streaming handleFunc for path: %s", path)
-
-	httpOutputConfig, _ := h.gw.StreamingServer.GetHTTPPaths("output", h.streamID)
-
-	wrappedFunc := func(w http.ResponseWriter, r *http.Request) {
-		mainLog.Debug("Entering debug for wrapped function on path: ", path)
-
-		// Define a function pointer to the original or overridden function
-		var targetFunc func(http.ResponseWriter, *http.Request) = f
-
-		if httpOutputConfig["ws_path"] == path {
-			mainLog.Debug("Handling websocket subscription")
-			targetFunc = handleWebsocket(h.gw, h.streamID)
-
-			// Internal benthos magic, we still need to consumer original handler
-			wsConsumer := consumeWebsocket(f)
-			defer wsConsumer.Close()
-		} else if httpOutputConfig["sse_path"] == path {
-			mainLog.Debug("Handling SSE subscription")
-			targetFunc = handleSSE(h.gw, h.streamID)
-
-			// Internal benthos magic, we still need to consumer original handler
-			sseConsumer := consumeSSE(f)
-			defer sseConsumer.Close()
-		}
-
-		specHandle, found := h.gw.apisHandlesByID.Load(h.spec.APIID)
-		if !found {
-			mainLog.Errorf("Could not find spec handle for API ID: %s", h.spec.APIID)
-			targetFunc(w, r) // Use the targetFunc which might have been replaced based on path matching
-		} else {
-			mainLog.Debugf("Streaming chain: %d", len(specHandle.(*ChainObject).StreamingChain))
-			chain := alice.New(specHandle.(*ChainObject).StreamingChain...).ThenFunc(targetFunc)
-			chain.ServeHTTP(w, r)
-			mainLog.Debug("Exiting debug for wrapped function on path: ", path)
-		}
-	}
-
-	if h.spec.router != nil {
-		h.spec.router.HandleFunc(path, wrappedFunc)
-	}
-}
-
-func consumeWebsocket(f func(http.ResponseWriter, *http.Request)) *httptest.Server {
-	server := httptest.NewServer(http.HandlerFunc(f))
-
-	go func() {
-		ws, _, err := websocket.DefaultDialer.Dial(strings.Replace(server.URL, "http", "ws", 1), nil)
-		if err != nil {
-			log.Fatal("dial:", err)
-		}
-
-		defer ws.Close()
-
-		for {
-			_, message, err := ws.ReadMessage()
-			if err != nil {
-				log.Println("read:", err)
-				return
-			}
-			log.Printf("recv: %s", message)
-		}
-	}()
-
-	return server
-}
-
-func consumeSSE(f func(http.ResponseWriter, *http.Request)) *httptest.Server {
-	server := httptest.NewServer(http.HandlerFunc(f))
-
-	go func() {
-		resp, err := http.Get(server.URL)
-		if err != nil {
-			log.Fatal("get:", err)
-		}
-		defer resp.Body.Close()
-
-		reader := bufio.NewReader(resp.Body)
-
-		for {
-			line, err := reader.ReadBytes('\n')
-			if err != nil {
-				if err == io.EOF {
-					break
-				}
-				log.Println("read:", err)
-				return
-			}
-			log.Printf("recv: %s", line)
-		}
-	}()
-
-	return server
-}
-
-func handleWebsocket(gw *Gateway, streamID string) http.HandlerFunc {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		mainLog.Debug("Handling websocket request")
-		upgrader := websocket.Upgrader{
-			ReadBufferSize:  1024,
-			WriteBufferSize: 1024,
-			CheckOrigin: func(r *http.Request) bool {
-				// Allow all origins
-				return true
-			},
-		}
-
-		if r.Header.Get("Upgrade") != "" {
-			r.URL.Scheme = "ws"
-		} else {
-			r.URL.Scheme = "http"
-		}
-
-		conn, err := upgrader.Upgrade(w, r, nil)
-		if err != nil {
-			log.Printf("Failed to set websocket upgrade: %+v", err)
-			return
-		}
-		defer conn.Close()
-
-		session := ctxGetSession(r)
-		consumer_group := ctxGetAuthToken(r)
-		streamConsumerGroup, _ := gw.StreamingServer.ConsumerGroup(streamID)
-
-		if streamConsumerGroup != "" {
-			consumer_group = streamConsumerGroup
-		}
-
-		if session != nil {
-			if pattern, found := session.MetaData["consumer_group"]; found {
-				if patternString, ok := pattern.(string); ok && patternString != "" {
-					consumer_group = patternString
-				}
-			}
-		}
-
-		if customKeyValue := gw.replaceTykVariables(r, consumer_group, false); customKeyValue != "" {
-			consumer_group = customKeyValue
-		}
-
-		messageChan, cancel, err := gw.StreamingServer.Subscribe(streamID, consumer_group, 100)
-		defer gw.StreamingServer.Unsubscribe(streamID, consumer_group, messageChan, cancel)
-
-		if err != nil {
-			log.Printf("Failed to subscribe to stream: %+v", err)
-			return
-		}
-
-		for message := range messageChan {
-			if err := conn.WriteMessage(websocket.BinaryMessage, message); err != nil {
-				mainLog.Errorf("Failed to write message to websocket: %s", err)
-				break
-			} else {
-				mainLog.Debugf("Sent message to websocket: %s", message)
-			}
-		}
-	})
-}
-
-func handleSSE(gw *Gateway, streamID string) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		mainLog.Debug("Handling SSE request")
-		flusher, ok := w.(http.Flusher)
-		if !ok {
-			http.Error(w, "Streaming unsupported!", http.StatusInternalServerError)
-			return
-		}
-
-		w.Header().Set("Content-Type", "text/event-stream")
-		w.Header().Set("Cache-Control", "no-cache")
-		w.Header().Set("Connection", "keep-alive")
-		w.Header().Set("Access-Control-Allow-Origin", "*")
-
-		session := ctxGetSession(r)
-		consumer_group := ctxGetAuthToken(r)
-		streamConsumerGroup, _ := gw.StreamingServer.ConsumerGroup(streamID)
-
-		if streamConsumerGroup != "" {
-			consumer_group = streamConsumerGroup
-		}
-
-		if session != nil {
-			if pattern, found := session.MetaData["consumer_group"]; found {
-				if patternString, ok := pattern.(string); ok && patternString != "" {
-					consumer_group = patternString
-				}
-			}
-		}
-
-		if customKeyValue := gw.replaceTykVariables(r, consumer_group, false); customKeyValue != "" {
-			consumer_group = customKeyValue
-		}
-
-		messageChan, cancel, err := gw.StreamingServer.Subscribe(streamID, consumer_group, 100)
-		if err != nil {
-			log.Printf("Failed to subscribe to stream: %+v", err)
-			return
-		}
-		defer gw.StreamingServer.Unsubscribe(streamID, consumer_group, messageChan, cancel)
-
-		// Listen to connection close and un-register messageChan
-		notify := r.Context().Done()
-		go func() {
-			<-notify
-			// When the client closes the connection, un-register the message channel
-		}()
-
-		for {
-			select {
-			case message, ok := <-messageChan:
-				if !ok {
-					// Channel closed
-					return
-				}
-				// Write to the ResponseWriter
-				// Server Sent Events compatible
-				fmt.Fprintf(w, "data: %s\n\n", message)
-
-				// Flush the data immediately instead of buffering it for later.
-				flusher.Flush()
-			case <-notify:
-				// Client closed connection
-				return
-			}
-		}
-	}
-}
-
 // Create the individual API (app) specs based on live configurations and assign middleware
 func (gw *Gateway) loadApps(specs []*APISpec) {
 	mainLog.Info("Loading API configurations.")
@@ -1240,32 +998,15 @@ func (gw *Gateway) loadApps(specs []*APISpec) {
 
 	gw.DefaultProxyMux.swap(muxer, gw)
 
-	var specsToRelease []*APISpec
+	var specsToUnload []*APISpec
 
 	gw.apisMu.Lock()
-	activeStreams := map[string]struct{}{}
 
 	for _, spec := range specs {
-		streamConfigs := spec.Streams()
-		mainLog.Infof("API %s has %d streams, %v", spec.APIID, len(streamConfigs), streamConfigs)
-		for streamKey, stream := range streamConfigs {
-			if streamMap, ok := stream.(map[string]interface{}); ok {
-				streamID := spec.APIID + "_" + streamKey
-
-				mainLog.Infof("Adding stream %s to streaming server", streamID)
-
-				if err := gw.StreamingServer.AddStream(streamID, streamMap, &handleFuncAdapter{gw: gw, spec: spec, streamID: streamID}); err != nil {
-					mainLog.Errorf("Error adding stream to streaming server: %v", err)
-				} else {
-					activeStreams[streamID] = struct{}{}
-					mainLog.Infof("Added stream %s to streaming server", streamID)
-				}
-			}
-		}
-
 		curSpec, ok := gw.apisByID[spec.APIID]
 		if ok && curSpec != nil && shouldReloadSpec(curSpec, spec) {
-			specsToRelease = append(specsToRelease, curSpec)
+			mainLog.Debugf("Spec %s has changed and needs to be reloaded", curSpec.APIID)
+			specsToUnload = append(specsToUnload, curSpec)
 		}
 
 		// Bind versions to base APIs again
@@ -1281,22 +1022,8 @@ func (gw *Gateway) loadApps(specs []*APISpec) {
 
 	gw.apisMu.Unlock()
 
-	// // Remove any streams that are no longer active
-	if gw.GetConfig().Streaming.Enabled {
-		existingStreams := gw.StreamingServer.Streams()
-		for streamID := range existingStreams {
-			if _, ok := activeStreams[streamID]; !ok {
-				if err := gw.StreamingServer.RemoveStream(streamID); err != nil {
-					mainLog.Errorf("Error removing stream %s: %v", streamID, err)
-				}
-
-				mainLog.Infof("Removed stream %s", streamID)
-			}
-		}
-	}
-
-	for _, spec := range specsToRelease {
-		spec.Release()
+	for _, spec := range specsToUnload {
+		spec.Unload()
 	}
 
 	mainLog.Debug("Checker host list")
