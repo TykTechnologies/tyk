@@ -45,7 +45,7 @@ func TestListWebhookCredentialsMultipleApps(t *testing.T) {
 		{
 			AppID:             1,
 			AppName:           "Test App 1",
-			WebhookEventTypes: "bar,foo",
+			WebhookEventTypes: "abc,bar,foo",
 			WebhookSecret:     "test",
 			WebhookURL:        mockServer.URL + "/test-webhook-1",
 		},
