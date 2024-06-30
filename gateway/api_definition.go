@@ -241,6 +241,9 @@ func (s *APISpec) AddUnloadHook(hook func()) {
 
 // Release releases all resources associated with API spec
 func (s *APISpec) Unload() {
+	s.Lock()
+	defer s.Unlock()
+
 	// release circuit breaker resources
 	for _, path := range s.RxPaths {
 		for _, urlSpec := range path {
