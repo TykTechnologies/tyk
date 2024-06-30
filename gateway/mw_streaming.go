@@ -38,6 +38,7 @@ type StreamingMiddleware struct {
 	connectionsLock sync.RWMutex
 	ctx             context.Context
 	cancel          context.CancelFunc
+	allowedUnsafe   []string
 }
 
 type streamInfo struct {
@@ -64,6 +65,14 @@ func (s *StreamingMiddleware) EnabledForSpec() bool {
 
 	if streamingConfig, ok := labsConfig["streaming"].(map[string]interface{}); ok {
 		if enabled, ok := streamingConfig["enabled"].(bool); ok && enabled {
+			if allowUnsafe, ok := streamingConfig["allow_unsafe"].([]interface{}); ok {
+				s.allowedUnsafe = make([]string, len(allowUnsafe))
+				for i, v := range allowUnsafe {
+					if str, ok := v.(string); ok {
+						s.allowedUnsafe[i] = str
+					}
+				}
+			}
 			return len(s.getStreams()) > 0
 		}
 	}
@@ -89,7 +98,7 @@ func (s *StreamingMiddleware) Init() {
 		return
 	}
 
-	s.streamingServer = streaming.NewStreamManager(client)
+	s.streamingServer = streaming.NewStreamManager(client, s.allowedUnsafe)
 	s.updateStreams()
 }
 
