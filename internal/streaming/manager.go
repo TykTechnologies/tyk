@@ -5,6 +5,8 @@ import (
 	"crypto/sha256"
 	"fmt"
 	"log"
+	"regexp"
+	"strings"
 	"sync"
 
 	"github.com/redis/go-redis/v9"
@@ -18,6 +20,7 @@ import (
 )
 
 type StreamManager struct {
+	allowedUnsafe       []string
 	streamConfigs       map[string]string
 	streams             map[string]*service.Stream
 	streamConsumerGroup map[string]string
@@ -27,13 +30,17 @@ type StreamManager struct {
 	log                 *logrus.Logger
 }
 
-func NewStreamManager(rcon redis.UniversalClient) *StreamManager {
+func NewStreamManager(rcon redis.UniversalClient, allowUnsafe []string) *StreamManager {
 	logger := logrus.New()
 	logger.Out = log.Writer()
 	logger.Formatter = &logrus.TextFormatter{
 		FullTimestamp: true,
 	}
 	logger.Level = logrus.DebugLevel
+
+	if len(allowUnsafe) > 0 {
+		logger.Warnf("Allowing unsafe components: %v", allowUnsafe)
+	}
 
 	return &StreamManager{
 		streamConfigs:       make(map[string]string),
@@ -42,6 +49,7 @@ func NewStreamManager(rcon redis.UniversalClient) *StreamManager {
 		streamConsumerGroup: make(map[string]string),
 		redis:               rcon,
 		log:                 logger,
+		allowedUnsafe:       allowUnsafe,
 	}
 }
 
@@ -60,10 +68,12 @@ func (sm *StreamManager) AddStream(streamID string, config map[string]interface{
 		return err
 	}
 
-	configPayload, err = sm.addMetadata(configPayload, "stream_id", streamID)
-	if err != nil {
-		return err
-	}
+	configPayload = sm.removeUnsafe(configPayload)
+
+	// configPayload, err = sm.addMetadata(configPayload, "stream_id", streamID)
+	// if err != nil {
+	// 	return err
+	// }
 
 	configPayload, consumerGroup, err := sm.readConsumerGroup(configPayload)
 	if err != nil {
@@ -462,4 +472,48 @@ func (sm *StreamManager) GetHTTPPaths(component, streamID string) (map[string]st
 	}
 
 	return paths, nil
+}
+
+var unsafeComponents = []string{
+	// Inputs
+	"csv", "dynamic", "file", "inproc", "socket", "socket_server", "stdin", "subprocess",
+
+	// Processors
+	"command", "subprocess", "wasm",
+
+	// Outputs
+	"file", "inproc", "socket",
+
+	// Caches
+	"file",
+}
+
+func (sm *StreamManager) removeUnsafe(yamlBytes []byte) []byte {
+	filteredUnsafeComponents := []string{}
+
+	for _, component := range unsafeComponents {
+		allowed := false
+		for _, allowedComponent := range sm.allowedUnsafe {
+			if component == allowedComponent {
+				allowed = true
+				break
+			}
+		}
+		if !allowed {
+			filteredUnsafeComponents = append(filteredUnsafeComponents, component)
+		}
+	}
+
+	yamlString := string(yamlBytes)
+	for _, key := range filteredUnsafeComponents {
+		if strings.Contains(yamlString, key+":") {
+			// Use regexp to match the whole block of the given key
+			re := regexp.MustCompile(fmt.Sprintf(`(?m)^\s*%s:\s*(.*\r?\n?)(\s+.*(?:\r?\n?|\z))*`, regexp.QuoteMeta(key)))
+			// Remove matched parts
+			yamlString = re.ReplaceAllString(yamlString, "")
+
+			sm.log.Info("Removed unsafe component: ", key)
+		}
+	}
+	return []byte(yamlString)
 }
