@@ -89,7 +89,6 @@ require (
 	github.com/TykTechnologies/kin-openapi v0.90.0
 	github.com/TykTechnologies/opentelemetry v0.0.21
 	github.com/alecthomas/kingpin/v2 v2.4.0
-	github.com/benthosdev/benthos/v4 v4.27.0
 	github.com/go-redis/redismock/v9 v9.2.0
 	github.com/goccy/go-json v0.10.3
 	github.com/google/go-cmp v0.6.0
