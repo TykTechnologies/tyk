@@ -57,7 +57,11 @@ func TestAsyncAPI(t *testing.T) {
 	t.SkipNow()
 
 	ts := StartTest(func(globalConf *config.Config) {
-		globalConf.Streaming.Enabled = false
+		globalConf.Labs = map[string]interface{}{
+			"streaming": map[string]interface{}{
+				"enabled": true,
+			},
+		}
 	})
 
 	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
@@ -195,7 +199,11 @@ func TestAsyncAPIHttp(t *testing.T) {
 
 func testAsyncAPIHttp(t *testing.T, consumerGroup string, expectedMessages int) {
 	ts := StartTest(func(globalConf *config.Config) {
-		globalConf.Streaming.Enabled = true
+		globalConf.Labs = map[string]interface{}{
+			"streaming": map[string]interface{}{
+				"enabled": true,
+			},
+		}
 	})
 
 	defer ts.Close()
