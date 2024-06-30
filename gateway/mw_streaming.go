@@ -12,11 +12,12 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/gorilla/mux"
+	"github.com/gorilla/websocket"
+
 	"github.com/TykTechnologies/tyk/internal/streaming"
 	"github.com/TykTechnologies/tyk/internal/uuid"
 	"github.com/TykTechnologies/tyk/storage"
-	"github.com/gorilla/mux"
-	"github.com/gorilla/websocket"
 )
 
 const (
