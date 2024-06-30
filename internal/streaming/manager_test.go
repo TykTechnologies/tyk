@@ -1,6 +1,7 @@
 package streaming
 
 import (
+	"strings"
 	"testing"
 	"time"
 
@@ -8,7 +9,7 @@ import (
 )
 
 func TestStreamingServer(t *testing.T) {
-	s := NewStreamManager(nil)
+	s := NewStreamManager(nil, nil)
 	// Do not call Stop because it cause os.Exit(0), instead Reset ensure that streams will be cleaned up in the end of test
 	defer s.Reset()
 
@@ -68,7 +69,7 @@ output:
 }
 
 func TestGetHTTPPaths(t *testing.T) {
-	s := NewStreamManager(nil)
+	s := NewStreamManager(nil, nil)
 	defer s.Reset()
 
 	streamID := "test-stream"
@@ -124,7 +125,7 @@ output:
 }
 
 func TestConsumerGroup(t *testing.T) {
-	s := NewStreamManager(nil)
+	s := NewStreamManager(nil, nil)
 	defer s.Reset()
 
 	streamID := "test-stream"
@@ -159,4 +160,86 @@ output:
 	if cg != consumerGroup {
 		t.Errorf("Expected consumer group to be %s, got %s", consumerGroup, cg)
 	}
+}
+
+func TestRemoveAndWhitelistUnsafeComponents(t *testing.T) {
+	t.Run("Remove Unsafe Components", func(t *testing.T) {
+		// Initialize StreamManager without any allowed unsafe components
+		sm := NewStreamManager(nil, []string{})
+		defer sm.Reset()
+
+		unsafeConfig := map[string]interface{}{
+			"input": map[string]interface{}{
+				"type": "file",
+				"file": map[string]interface{}{
+					"paths": []string{"test.txt"},
+				},
+			},
+			"output": map[string]interface{}{
+				"type": "socket",
+				"socket": map[string]interface{}{
+					"network": "tcp",
+					"address": "localhost:1234",
+				},
+			},
+		}
+
+		configPayload, err := yaml.Marshal(unsafeConfig)
+		if err != nil {
+			t.Fatalf("Failed to marshal unsafe config: %v", err)
+		}
+
+		sanitizedConfig := sm.removeUnsafe(configPayload)
+		if containsUnsafeComponent(sanitizedConfig) {
+			t.Fatalf("Unsafe components were not removed: \n%s", string(sanitizedConfig))
+		}
+	})
+
+	t.Run("Whitelist Components", func(t *testing.T) {
+		// Initialize StreamManager with whitelisted unsafe components
+		sm := NewStreamManager(nil, []string{"file", "socket"})
+		defer sm.Reset()
+
+		streamID := "test-stream"
+
+		unsafeConfig := map[string]interface{}{
+			"input": map[string]interface{}{
+				"file": map[string]interface{}{
+					"paths": []string{"test.txt"},
+				},
+			},
+			"output": map[string]interface{}{
+				"socket": map[string]interface{}{
+					"network": "tcp",
+					"address": "localhost:1234",
+				},
+			},
+		}
+
+		err := sm.AddStream(streamID, unsafeConfig, nil)
+		if err != nil {
+			t.Fatalf("Failed to add stream with whitelisted components: %v", err)
+		}
+
+		configPayload, err := yaml.Marshal(unsafeConfig)
+		if err != nil {
+			t.Fatalf("Failed to marshal unsafe config: %v", err)
+		}
+
+		sanitizedConfig := sm.removeUnsafe(configPayload)
+		if !containsUnsafeComponent(sanitizedConfig) {
+			t.Fatalf("Whitelisted components were removed: \n%s", string(sanitizedConfig))
+		}
+	})
+}
+
+// Helper function to check if the config contains any unsafe component
+func containsUnsafeComponent(configPayload []byte) bool {
+	yamlString := string(configPayload)
+	for _, key := range unsafeComponents {
+		if strings.Contains(yamlString, key+":") {
+			return true
+		}
+	}
+	return false
 }
