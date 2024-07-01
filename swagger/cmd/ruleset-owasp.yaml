@@ -1,0 +1,438 @@
+description: All OWASP Rules, or 'hard mode' as we call it.
+documentationUrl: https://quobix.com/vacuum/rulesets/owasp
+rules:
+    owasp-array-limit:
+        category:
+            description: 'OWASP API rules check against the most common security risks in web applications and APIs. These rules check for common security risks and mistakes. '
+            id: OWASP
+            name: OWASP
+        description: Array size should be limited to mitigate resource exhaustion attacks.
+        formats:
+            - oas3
+            - oas3_1
+        given: $
+        howToFix: Add `maxItems` for Schema of type 'array'. You should ensure that the subschema in `items` is constrained too.
+        id: owasp-array-limit
+        recommended: true
+        severity: error
+        then:
+            function: owaspArrayLimit
+        type: validation
+    owasp-auth-insecure-schemes:
+        category:
+            description: 'OWASP API rules check against the most common security risks in web applications and APIs. These rules check for common security risks and mistakes. '
+            id: OWASP
+            name: OWASP
+        description: Authentication scheme is considered outdated or insecure
+        formats:
+            - oas3
+            - oas3_1
+        given: $
+        howToFix: Use a different authorization scheme. Refer to https://www.iana.org/assignments/http-authschemes/ to know more about HTTP Authentication Schemes.
+        id: owasp-auth-insecure-schemes
+        recommended: true
+        severity: error
+        then:
+            function: owaspAuthInsecureSchemes
+        type: validation
+    owasp-constrained-additionalProperties:
+        category:
+            description: 'OWASP API rules check against the most common security risks in web applications and APIs. These rules check for common security risks and mistakes. '
+            id: OWASP
+            name: OWASP
+        description: By default JSON Schema allows additional properties, which can potentially lead to mass assignment issues.
+        formats:
+            - oas3
+            - oas3_1
+        given: $
+        howToFix: Disable additional properties by setting `additionalProperties` to `false` or add `maxProperties`.
+        id: owasp-constrained-additionalProperties
+        recommended: true
+        severity: warn
+        then:
+            function: owaspAdditionalPropertiesConstrained
+        type: validation
+    owasp-define-error-responses-401:
+        category:
+            description: 'OWASP API rules check against the most common security risks in web applications and APIs. These rules check for common security risks and mistakes. '
+            id: OWASP
+            name: OWASP
+        description: 'OWASP API Security recommends defining schemas for all responses, even error: 401'
+        formats:
+            - oas3
+            - oas3_1
+        given: $
+        howToFix: For all endpoints, make sure that the 401 response code is defined as well as its contents.
+        id: owasp-define-error-responses-401
+        recommended: true
+        severity: warn
+        then:
+            function: owaspCheckErrorResponse
+            functionOptions:
+                code: "401"
+        type: validation
+    owasp-define-error-responses-429:
+        category:
+            description: 'OWASP API rules check against the most common security risks in web applications and APIs. These rules check for common security risks and mistakes. '
+            id: OWASP
+            name: OWASP
+        description: 'OWASP API Security recommends defining schemas for all responses, even error: 429'
+        formats:
+            - oas3
+            - oas3_1
+        given: $
+        howToFix: For all endpoints, make sure that the 429 response code is defined as well as its contents.
+        id: owasp-define-error-responses-429
+        recommended: true
+        resolved: true
+        severity: warn
+        then:
+            function: owaspCheckErrorResponse
+            functionOptions:
+                code: "429"
+        type: validation
+    owasp-define-error-responses-500:
+        category:
+            description: 'OWASP API rules check against the most common security risks in web applications and APIs. These rules check for common security risks and mistakes. '
+            id: OWASP
+            name: OWASP
+        description: 'OWASP API Security recommends defining schemas for all responses, even error: 500'
+        formats:
+            - oas3
+            - oas3_1
+        given: $
+        howToFix: For all endpoints, make sure that the 500 response code is defined as well as its contents.
+        id: owasp-define-error-responses-500
+        recommended: true
+        severity: warn
+        then:
+            function: owaspCheckErrorResponse
+            functionOptions:
+                code: "500"
+        type: validation
+    owasp-define-error-validation:
+        category:
+            description: 'OWASP API rules check against the most common security risks in web applications and APIs. These rules check for common security risks and mistakes. '
+            id: OWASP
+            name: OWASP
+        description: Missing error response of either `400`, `422` or `4XX`, Ensure all errors are documented.
+        formats:
+            - oas3
+            - oas3_1
+        given: $
+        howToFix: Extend the responses of all endpoints to support either 400, 422, or 4XX error codes.
+        id: owasp-define-error-validation
+        recommended: true
+        severity: warn
+        then:
+            function: owaspDefineErrorDefinition
+            functionOptions:
+                codes:
+                    - "400"
+                    - "422"
+                    - 4XX
+        type: validation
+    owasp-integer-format:
+        category:
+            description: 'OWASP API rules check against the most common security risks in web applications and APIs. These rules check for common security risks and mistakes. '
+            id: OWASP
+            name: OWASP
+        description: Integers should be limited to mitigate resource exhaustion attacks.
+        formats:
+            - oas3
+            - oas3_1
+        given: $
+        howToFix: Specify whether int32 or int64 is expected via `format`.
+        id: owasp-integer-format
+        recommended: true
+        severity: error
+        then:
+            function: owaspIntegerFormat
+        type: validation
+    owasp-integer-limit:
+        category:
+            description: 'OWASP API rules check against the most common security risks in web applications and APIs. These rules check for common security risks and mistakes. '
+            id: OWASP
+            name: OWASP
+        description: Integers should be limited via min/max values to mitigate resource exhaustion attacks.
+        formats:
+            - oas3
+            - oas3_1
+        given: $
+        howToFix: 'Use `minimum` and `maximum` properties for integer types: avoiding negative numbers when positive are expected, or reducing unreasonable iterations like doing something 1000 times when 10 is expected.'
+        id: owasp-integer-limit
+        recommended: true
+        severity: error
+        then:
+            function: owaspIntegerLimit
+        type: validation
+    owasp-jwt-best-practices:
+        category:
+            description: 'OWASP API rules check against the most common security risks in web applications and APIs. These rules check for common security risks and mistakes. '
+            id: OWASP
+            name: OWASP
+        description: JWTs must explicitly declare support for RFC8725 in the description
+        formats:
+            - oas3
+            - oas3_1
+        given: $
+        howToFix: 'Explicitly state, in the description of the security schemes, that it allows for support of the RFC8725: https://datatracker.ietf.org/doc/html/rfc8725.'
+        id: owasp-jwt-best-practices
+        recommended: true
+        severity: error
+        then:
+            function: owaspJWTBestPractice
+        type: validation
+    owasp-no-additionalProperties:
+        category:
+            description: 'OWASP API rules check against the most common security risks in web applications and APIs. These rules check for common security risks and mistakes. '
+            id: OWASP
+            name: OWASP
+        description: By default JSON Schema allows additional properties, which can potentially lead to mass assignment issues.
+        formats:
+            - oas2
+            - oas3
+        given: $
+        howToFix: Disable additional properties by setting `additionalProperties` to `false` or add `maxProperties`.
+        id: owasp-no-additionalProperties
+        recommended: true
+        severity: warn
+        then:
+            - function: owaspNoAdditionalProperties
+        type: validation
+    owasp-no-api-keys-in-url:
+        category:
+            description: 'OWASP API rules check against the most common security risks in web applications and APIs. These rules check for common security risks and mistakes. '
+            id: OWASP
+            name: OWASP
+        description: API Key has been detected in a URL
+        formats:
+            - oas3
+            - oas3_1
+        given: $
+        howToFix: 'Make sure that the apiKey is not part of the URL (path or query): https://blog.stoplight.io/api-keys-best-practices-to-authenticate-apis'
+        id: owasp-no-api-keys-in-url
+        recommended: true
+        severity: error
+        then:
+            function: owaspNoApiKeyInUrl
+        type: validation
+    owasp-no-credentials-in-url:
+        category:
+            description: 'OWASP API rules check against the most common security risks in web applications and APIs. These rules check for common security risks and mistakes. '
+            id: OWASP
+            name: OWASP
+        description: URL parameters must not contain credentials such as API key, password, or secret.
+        formats:
+            - oas3
+            - oas3_1
+        given: $
+        howToFix: Remove credentials from the URL.
+        id: owasp-no-credentials-in-url
+        recommended: true
+        severity: error
+        then:
+            function: owaspNoCredentialsInUrl
+        type: validation
+    owasp-no-http-basic:
+        category:
+            description: 'OWASP API rules check against the most common security risks in web applications and APIs. These rules check for common security risks and mistakes. '
+            id: OWASP
+            name: OWASP
+        description: Security scheme uses HTTP Basic. Use a more secure authentication method, like OAuth 2.0
+        formats:
+            - oas3
+            - oas3_1
+        given: $
+        howToFix: Do not use basic authentication method, use a more secure authentication method (e.g., bearer).
+        id: owasp-no-http-basic
+        recommended: true
+        severity: error
+        then:
+            function: owaspNoBasicAuth
+        type: validation
+    owasp-no-numeric-ids:
+        category:
+            description: 'OWASP API rules check against the most common security risks in web applications and APIs. These rules check for common security risks and mistakes. '
+            id: OWASP
+            name: OWASP
+        description: Use random IDs that cannot be guessed. UUIDs are preferred
+        formats:
+            - oas3
+            - oas3_1
+        given: $
+        howToFix: For any parameter which ends in id, use type string with uuid format instead of type integer.
+        id: owasp-no-numeric-ids
+        recommended: true
+        severity: error
+        then:
+            function: owaspNoNumericIds
+        type: validation
+    owasp-protection-global-safe:
+        category:
+            description: 'OWASP API rules check against the most common security risks in web applications and APIs. These rules check for common security risks and mistakes. '
+            id: OWASP
+            name: OWASP
+        description: Check if the operation is protected at operation level. Otherwise, check the global `security` property
+        formats:
+            - oas3
+            - oas3_1
+        given: $
+        howToFix: Make sure that all operations should be protected especially when they are not safe (methods that do not alter the state of the server) HTTP methods like `POST`, `PUT`, `PATCH`, and `DELETE`. This is done with one or more non-empty `security` rules. Security rules are defined in the `securityScheme` section.
+        id: owasp-protection-global-safe
+        recommended: true
+        severity: info
+        then:
+            function: owaspCheckSecurity
+            functionOptions:
+                methods:
+                    - get
+                    - head
+                nullable: true
+                schemesPath:
+                    - securitySchemes
+        type: validation
+    owasp-protection-global-unsafe:
+        category:
+            description: 'OWASP API rules check against the most common security risks in web applications and APIs. These rules check for common security risks and mistakes. '
+            id: OWASP
+            name: OWASP
+        description: API should be protected by a `security` rule either at global or operation level.
+        formats:
+            - oas3
+            - oas3_1
+        given: $
+        howToFix: Make sure that all operations should be protected especially when they are not safe (methods that do not alter the state of the server) HTTP methods like `POST`, `PUT`, `PATCH`, and `DELETE`. This is done with one or more non-empty `security` rules. Security rules are defined in the `securityScheme` section.
+        id: owasp-protection-global-unsafe
+        recommended: true
+        severity: error
+        then:
+            function: owaspCheckSecurity
+            functionOptions:
+                methods:
+                    - post
+                    - put
+                    - patch
+                    - delete
+                nullable: true
+                schemesPath:
+                    - securitySchemes
+        type: validation
+    owasp-protection-global-unsafe-strict:
+        category:
+            description: 'OWASP API rules check against the most common security risks in web applications and APIs. These rules check for common security risks and mistakes. '
+            id: OWASP
+            name: OWASP
+        description: Check if the operation is protected at operation level. Otherwise, check the global `security` property
+        formats:
+            - oas3
+            - oas3_1
+        given: $
+        howToFix: Make sure that all operations should be protected especially when they are not safe (methods that do not alter the state of the server) HTTP methods like `POST`, `PUT`, `PATCH`, and `DELETE`. This is done with one or more non-empty `security` rules. Security rules are defined in the `securityScheme` section.
+        id: owasp-protection-global-unsafe-strict
+        recommended: true
+        severity: info
+        then:
+            function: owaspCheckSecurity
+            functionOptions:
+                methods:
+                    - post
+                    - put
+                    - patch
+                    - delete
+                nullable: false
+                schemesPath:
+                    - securitySchemes
+        type: validation
+    owasp-rate-limit:
+        category:
+            description: 'OWASP API rules check against the most common security risks in web applications and APIs. These rules check for common security risks and mistakes. '
+            id: OWASP
+            name: OWASP
+        description: Define proper rate limiting to avoid attackers overloading the API.
+        formats:
+            - oas3
+            - oas3_1
+        given: $
+        howToFix: 'Implement rate-limiting using HTTP headers: https://datatracker.ietf.org/doc/draft-ietf-httpapi-ratelimit-headers/ Customer headers like X-Rate-Limit-Limit (Twitter: https://developer.twitter.com/en/docs/twitter-api/rate-limits) or X-RateLimit-Limit (GitHub: https://docs.github.com/en/rest/overview/resources-in-the-rest-api)'
+        id: owasp-rate-limit
+        recommended: true
+        severity: error
+        then:
+            function: owaspHeaderDefinition
+            functionOptions:
+                headers:
+                    - X-RateLimit-Limit
+                    - X-Rate-Limit-Limit
+                    - RateLimit-Limit||RateLimit-Reset
+                    - RateLimit
+        type: validation
+    owasp-rate-limit-retry-after:
+        category:
+            description: 'OWASP API rules check against the most common security risks in web applications and APIs. These rules check for common security risks and mistakes. '
+            id: OWASP
+            name: OWASP
+        description: Ensure that any `429` response, contains a `Retry-After` header.
+        formats:
+            - oas3
+            - oas3_1
+        given: $
+        howToFix: Set the Retry-After header in the 429 response.
+        id: owasp-rate-limit-retry-after
+        recommended: true
+        resolved: true
+        severity: error
+        then:
+            function: owaspRatelimitRetryAfter
+        type: validation
+    owasp-security-hosts-https-oas3:
+        category:
+            description: 'OWASP API rules check against the most common security risks in web applications and APIs. These rules check for common security risks and mistakes. '
+            id: OWASP
+            name: OWASP
+        description: All server interactions MUST use the https protocol, meaning server URLs should begin `https://`.
+        formats:
+            - oas3
+            - oas3_1
+        given: $
+        howToFix: 'Prefix server URLs with the HTTPS protocol: `https://`. Learn more about the importance of TLS (over SSL) here: https://cheatsheetseries.owasp.org/cheatsheets/Transport_Layer_Protection_Cheat_Sheet.html.'
+        id: owasp-security-hosts-https-oas3
+        recommended: true
+        severity: error
+        then:
+            function: owaspHostsHttps
+        type: validation
+    owasp-string-limit:
+        category:
+            description: 'OWASP API rules check against the most common security risks in web applications and APIs. These rules check for common security risks and mistakes. '
+            id: OWASP
+            name: OWASP
+        description: String size should be limited to mitigate resource exhaustion attacks.
+        formats:
+            - oas3
+            - oas3_1
+        given: $
+        howToFix: Use `maxLength`, `enum`, or `const`.
+        id: owasp-string-limit
+        recommended: true
+        severity: error
+        then:
+            function: owaspStringLimit
+        type: validation
+    owasp-string-restricted:
+        category:
+            description: 'OWASP API rules check against the most common security risks in web applications and APIs. These rules check for common security risks and mistakes. '
+            id: OWASP
+            name: OWASP
+        description: String must specify a `format`, RegEx `pattern`, `enum`, or `const`
+        formats:
+            - oas3
+            - oas3_1
+        given: $
+        howToFix: Ensure that strings have either a `format`, RegEx `pattern`, `enum`, or `const`.
+        id: owasp-string-restricted
+        recommended: true
+        severity: error
+        then:
+            function: owaspStringRestricted
+        type: validation
