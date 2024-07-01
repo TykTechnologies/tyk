@@ -18,7 +18,7 @@ func (m *MiddlewareContextVars) Name() string {
 }
 
 func (m *MiddlewareContextVars) EnabledForSpec() bool {
-	return m.Spec.EnableContextVars
+	return true
 }
 
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail
