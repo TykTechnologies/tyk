@@ -13,7 +13,7 @@ import (
 	"github.com/TykTechnologies/tyk/header"
 )
 
-var dashLog = log.WithField("prefix", "dashboard")
+var dashLog = dashLog
 
 type NodeResponseOK struct {
 	Status  string
