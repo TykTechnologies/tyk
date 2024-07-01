@@ -1695,6 +1695,7 @@ func Start() {
 	// Example: https://gravitational.com/blog/golang-ssh-bastion-graceful-restarts/
 	gw.startServer()
 
+	gw.CleanInvalidEdgeKeys()
 	if again.Child() {
 		// This is a child process, we need to murder the parent now
 		if err := again.Kill(); err != nil {
@@ -1936,4 +1937,33 @@ func (gw *Gateway) SetConfig(conf config.Config, skipReload ...bool) {
 	gw.configMu.Lock()
 	gw.config.Store(conf)
 	gw.configMu.Unlock()
+}
+
+func (gw *Gateway) CleanInvalidEdgeKeys() {
+	if !gw.GetConfig().SlaveOptions.UseRPC {
+		return
+	}
+
+	localStorage := &storage.RedisCluster{KeyPrefix: "", HashKeys: false, ConnectionHandler: gw.StorageConnectionHandler}
+	keys, err := localStorage.ScanKeys("apikey-*")
+	if err != nil {
+		log.Fatalf("Error scanning keys: %v", err)
+	}
+
+	for _, key := range keys {
+		if _, err := gw.RPCListener.GetRawKey(key); err != nil {
+			if err.Error() == "key not found" {
+				if err := localStorage.DeleteRawKey(key); err != true {
+					log.Printf("Error deleting key %s: %v", key, err)
+					continue
+				}
+				quotaKey := strings.Replace(key, "apikey", "quota", 1)
+				if err := localStorage.DeleteRawKey(quotaKey); err != true {
+					log.Printf("Error deleting quota key %s: %v", quotaKey, err)
+				}
+			} else {
+				log.Printf("Error getting raw key %s: %v", key, err)
+			}
+		}
+	}
 }
