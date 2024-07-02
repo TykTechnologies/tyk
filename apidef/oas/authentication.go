@@ -491,7 +491,7 @@ type OIDC struct {
 	// Tyk classic API definition: `openid_options.segregate_by_client`.
 	SegregateByClientId bool `bson:"segregateByClientId,omitempty" json:"segregateByClientId,omitempty"`
 
-	// Providers contains a list of authorised providers, their Client IDs and matched policies.
+	// Providers contains a list of authorized providers, their Client IDs and matched policies.
 	//
 	// Tyk classic API definition: `openid_options.providers`.
 	Providers []Provider `bson:"providers,omitempty" json:"providers,omitempty"`
