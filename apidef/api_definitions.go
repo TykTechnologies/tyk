@@ -587,6 +587,7 @@ type Scopes struct {
 //
 // swagger:model
 type APIDefinition struct {
+	DetailedTracing     bool           `bson:"detailed_tracing" json:"detailed_tracing"`
 	Id                  model.ObjectID `bson:"_id,omitempty" json:"id,omitempty" gorm:"primaryKey;column:_id"`
 	Name                string         `bson:"name" json:"name"`
 	Expiration          string         `bson:"expiration" json:"expiration,omitempty"`
@@ -636,6 +637,7 @@ type APIDefinition struct {
 	EnableCoProcessAuth                  bool                   `bson:"enable_coprocess_auth" json:"enable_coprocess_auth"` // Deprecated. Use CustomPluginAuthEnabled instead.
 	CustomPluginAuthEnabled              bool                   `bson:"custom_plugin_auth_enabled" json:"custom_plugin_auth_enabled"`
 	JWTSigningMethod                     string                 `bson:"jwt_signing_method" json:"jwt_signing_method"`
+	JWTRequiredAudience                  string                 `bson:"jwt_required_audience" json:"jwt_required_audience"`
 	JWTSource                            string                 `bson:"jwt_source" json:"jwt_source"`
 	JWTIdentityBaseField                 string                 `bson:"jwt_identit_base_field" json:"jwt_identity_base_field"`
 	JWTClientIDBaseField                 string                 `bson:"jwt_client_base_field" json:"jwt_client_base_field"`
@@ -703,7 +705,25 @@ type APIDefinition struct {
 	IsOAS       bool   `bson:"is_oas" json:"is_oas,omitempty"`
 	VersionName string `bson:"-" json:"-"`
 
-	DetailedTracing bool `bson:"detailed_tracing" json:"detailed_tracing"`
+	bool `bson:"detailed_tracing" json:"detailed_tracing"`
+
+	// For Toekn Exchange see in the struct below
+	TokenExchangeOptions TokenExchangeOptions `token_exchange_options:"token_exchange_options" bson:"token_exchange_options" json:"token_exchange_options"`
+}
+
+type ActorTokenType string //change to enum or const?
+
+// REQUIRED. The value urn:ietf:params:oauth:grant-type:token-exchange indicates
+// that a token exchange is being performed.
+const GrantType = "urn:ietf:params:oauth:grant-type:token-exchange"
+
+type TokenExchangeOptions struct {
+	Enable        bool              `bson:"enable" json:"enable"`
+	TokenEndpoint string            `bson:"token_endpoint" json:"token_endpoint"`
+	ClientID      string            `bson:"client_id" json:"client_id"`
+	ClientSecret  string            `bson:"client_secret" json:"client_secret"`
+	Audience      []string          `bson:"audience" json:"audience"`
+	CustomParams  map[string]string `bson:"custom_params" json:"custom_params"`
 }
 
 type AnalyticsPluginConfig struct {

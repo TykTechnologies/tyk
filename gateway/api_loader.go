@@ -417,6 +417,7 @@ func (gw *Gateway) processSpec(spec *APISpec, apisByListen map[string]int,
 			}
 		}
 
+		gw.mwAppendEnabled(&chainArray, &TokenExchangeMW{BaseMiddleware: baseMid})
 		gw.mwAppendEnabled(&chainArray, &StripAuth{baseMid})
 		gw.mwAppendEnabled(&chainArray, &KeyExpired{baseMid})
 		gw.mwAppendEnabled(&chainArray, &AccessRightsCheck{baseMid})

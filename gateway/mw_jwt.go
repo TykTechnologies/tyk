@@ -3,6 +3,7 @@ package gateway
 import (
 	"bytes"
 	"crypto/md5"
+	"crypto/subtle"
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/base64"
@@ -15,15 +16,13 @@ import (
 	"strings"
 	"time"
 
+	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/internal/cache"
+	"github.com/TykTechnologies/tyk/storage"
+	"github.com/TykTechnologies/tyk/user"
 	"github.com/go-jose/go-jose/v3"
 	"github.com/golang-jwt/jwt/v4"
 	"github.com/lonelycode/osin"
-
-	"github.com/TykTechnologies/tyk/apidef"
-	"github.com/TykTechnologies/tyk/storage"
-	"github.com/TykTechnologies/tyk/user"
-
-	"github.com/TykTechnologies/tyk/internal/cache"
 )
 
 type JWTMiddleware struct {
@@ -706,6 +705,10 @@ func (k *JWTMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _
 	})
 
 	if err == nil && token.Valid {
+		if jwtErr := k.validateAudience(token.Claims.(jwt.MapClaims), k.Spec.JWTRequiredAudience); jwtErr != nil {
+			return errors.New("Key not authorized: " + jwtErr.Error()), http.StatusUnauthorized
+		}
+
 		if jwtErr := k.timeValidateJWTClaims(token.Claims.(jwt.MapClaims)); jwtErr != nil {
 			return errors.New("Key not authorized: " + jwtErr.Error()), http.StatusUnauthorized
 		}
@@ -751,6 +754,41 @@ func ParseRSAPublicKey(data []byte) (interface{}, error) {
 		err = nil
 	}
 	return pub, err
+}
+
+func (k *JWTMiddleware) validateAudience(c jwt.MapClaims, requiredAudience string) *jwt.ValidationError {
+	if len(requiredAudience) == 0 {
+		return nil
+	}
+
+	// get aud claim from c
+	aud, ok := c["aud"]
+	if !ok {
+		return &jwt.ValidationError{Inner: jwt.ErrTokenInvalidAudience, Errors: jwt.ValidationErrorAudience}
+	}
+
+	// if aud is a string, compare it to requiredAudience
+	if audStr, ok := aud.(string); ok {
+		if subtle.ConstantTimeCompare([]byte(audStr), []byte(requiredAudience)) != 1 {
+			return &jwt.ValidationError{Inner: jwt.ErrTokenInvalidAudience, Errors: jwt.ValidationErrorAudience}
+		}
+		return nil
+	}
+
+	// if aud is a slice of strings, compare each string to requiredAudience
+	if audSlice, ok := aud.([]interface{}); ok {
+		for _, a := range audSlice {
+			if aStr, ok := a.(string); ok {
+				if subtle.ConstantTimeCompare([]byte(aStr), []byte(requiredAudience)) == 1 {
+					return nil
+				}
+			}
+		}
+		return &jwt.ValidationError{Inner: jwt.ErrTokenInvalidAudience, Errors: jwt.ValidationErrorAudience}
+	}
+
+	// if aud is not a string or a slice of strings, return an error
+	return &jwt.ValidationError{Inner: jwt.ErrTokenInvalidAudience, Errors: jwt.ValidationErrorAudience}
 }
 
 func (k *JWTMiddleware) timeValidateJWTClaims(c jwt.MapClaims) *jwt.ValidationError {
