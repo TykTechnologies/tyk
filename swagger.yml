@@ -2081,9 +2081,8 @@ components:
           type: array
           x-go-name: ClientCertificates
         config_data:
-          additionalProperties:
-            type: object
           type: object
+          additionalProperties: true
           x-go-name: ConfigData
         custom_middleware:
           $ref: '#/components/schemas/MiddlewareSection'
@@ -2490,9 +2489,8 @@ components:
     AuthProviderMeta:
       properties:
         meta:
-          additionalProperties:
-            type: object
           type: object
+          additionalProperties: true
           x-go-name: Meta
         name:
           $ref: '#/components/schemas/AuthProviderCode'
@@ -2847,9 +2845,8 @@ components:
         extract_with:
           $ref: '#/components/schemas/IdExtractorType'
         extractor_config:
-          additionalProperties:
-            type: object
           type: object
+          additionalProperties: true
           x-go-name: ExtractorConfig
       type: object
       x-go-package: github.com/TykTechnologies/tyk/apidef
@@ -3294,9 +3291,8 @@ components:
     SessionProviderMeta:
       properties:
         meta:
-          additionalProperties:
-            type: object
           type: object
+          additionalProperties: true
           x-go-name: Meta
         name:
           $ref: '#/components/schemas/SessionProviderCode'
@@ -3387,9 +3383,8 @@ components:
           type: string
           x-go-name: LastUpdated
         meta_data:
-          additionalProperties:
-            type: object
           type: object
+          additionalProperties: true
           x-go-name: MetaData
         monitor:
           properties:
@@ -3586,9 +3581,8 @@ components:
           type: string
           x-go-name: Path
         schema:
-          additionalProperties:
-            type: object
           type: object
+          additionalProperties: true
           x-go-name: Schema
         schema_b64:
           type: string
