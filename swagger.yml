@@ -724,7 +724,7 @@ paths:
       description: |-
         Listing versions of an OAS API
       tags:
-        - OASAPIs
+        - OAS APIs
       operationId: listOASApiVersions
       parameters:
         - $ref: '#/components/parameters/SearchText'
