@@ -17,6 +17,9 @@ includes:
   config:
     taskfile: config/Taskfile.yml
     dir: config/
+  apidef-oas:
+    taskfile: apidef/oas/Taskfile.yml
+    dir: apidef/oas/
 
 tasks:
   docker:
@@ -77,6 +80,7 @@ tasks:
       - lint:x-tyk-gateway
       - coprocess:lint
       - config:lint
+      - apidef-oas:lint
 
   lint:config:
     internal: true
