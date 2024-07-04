@@ -1,9 +1,11 @@
-package request
+package httputil_test
 
 import (
 	"context"
 	"net/http"
 	"testing"
+
+	. "github.com/TykTechnologies/tyk/internal/httputil"
 )
 
 var ipHeaderTests = []struct {

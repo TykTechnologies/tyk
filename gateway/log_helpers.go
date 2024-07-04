@@ -5,7 +5,7 @@ import (
 
 	"github.com/sirupsen/logrus"
 
-	"github.com/TykTechnologies/tyk/request"
+	"github.com/TykTechnologies/tyk/internal/httputil"
 )
 
 // identifies that field value was hidden before output to the log
@@ -30,7 +30,7 @@ func (gw *Gateway) getLogEntryForRequest(logger *logrus.Entry, r *http.Request, 
 	// populate http request fields
 	fields := logrus.Fields{
 		"path":   r.URL.Path,
-		"origin": request.RealIP(r),
+		"origin": httputil.RealIP(r),
 	}
 	// add key to log if configured to do so
 	if key != "" {

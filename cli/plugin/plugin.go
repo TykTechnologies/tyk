@@ -8,7 +8,7 @@ import (
 
 	kingpin "github.com/alecthomas/kingpin/v2"
 
-	"github.com/TykTechnologies/tyk/goplugin"
+	"github.com/TykTechnologies/tyk/internal/goplugin"
 )
 
 const (

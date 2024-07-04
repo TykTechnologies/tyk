@@ -18,8 +18,8 @@ import (
 
 	"github.com/TykTechnologies/murmur3"
 	"github.com/TykTechnologies/tyk/header"
+	"github.com/TykTechnologies/tyk/internal/httputil"
 	"github.com/TykTechnologies/tyk/regexp"
-	"github.com/TykTechnologies/tyk/request"
 	"github.com/TykTechnologies/tyk/storage"
 )
 
@@ -183,7 +183,7 @@ func (m *RedisCacheMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 
 	// No authentication data? use the IP.
 	if token == "" {
-		token = request.RealIP(r)
+		token = httputil.RealIP(r)
 	}
 
 	var retBlob string

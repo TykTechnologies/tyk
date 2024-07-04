@@ -16,7 +16,7 @@ import (
 	"github.com/TykTechnologies/tyk/internal/event"
 	"github.com/TykTechnologies/tyk/internal/otel"
 	"github.com/TykTechnologies/tyk/internal/policy"
-	"github.com/TykTechnologies/tyk/rpc"
+	"github.com/TykTechnologies/tyk/internal/rpc"
 
 	"github.com/TykTechnologies/tyk/header"
 
@@ -28,9 +28,9 @@ import (
 	"golang.org/x/sync/singleflight"
 
 	"github.com/TykTechnologies/tyk/apidef"
-	"github.com/TykTechnologies/tyk/request"
+	"github.com/TykTechnologies/tyk/internal/httputil"
+	"github.com/TykTechnologies/tyk/internal/trace"
 	"github.com/TykTechnologies/tyk/storage"
-	"github.com/TykTechnologies/tyk/trace"
 	"github.com/TykTechnologies/tyk/user"
 )
 
@@ -143,7 +143,7 @@ func (gw *Gateway) createMiddleware(actualMW TykMiddleware) func(http.Handler) h
 
 			if instrumentationEnabled {
 				meta = health.Kvs{
-					"from_ip":  request.RealIP(r),
+					"from_ip":  httputil.RealIP(r),
 					"method":   r.Method,
 					"endpoint": r.URL.Path,
 					"raw_url":  r.URL.String(),
@@ -510,7 +510,7 @@ func (t *BaseMiddleware) emitRateLimitEvent(r *http.Request, e event.Event, mess
 			OriginatingRequest: EncodeRequestToEvent(r),
 		},
 		Path:   r.URL.Path,
-		Origin: request.RealIP(r),
+		Origin: httputil.RealIP(r),
 		Key:    rateLimitKey,
 	})
 }

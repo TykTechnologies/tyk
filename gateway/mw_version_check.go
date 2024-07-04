@@ -9,8 +9,8 @@ import (
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/apidef/oas"
+	"github.com/TykTechnologies/tyk/internal/httputil"
 	"github.com/TykTechnologies/tyk/internal/otel"
-	"github.com/TykTechnologies/tyk/request"
 )
 
 const XTykAPIExpires = "x-tyk-api-expires"
@@ -124,7 +124,7 @@ outside:
 				OriginatingRequest: EncodeRequestToEvent(r),
 			},
 			Path:   r.URL.Path,
-			Origin: request.RealIP(r),
+			Origin: httputil.RealIP(r),
 			Reason: string(stat),
 		})
 		return errors.New(string(stat)), http.StatusForbidden

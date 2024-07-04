@@ -6,7 +6,7 @@ import (
 	"sync"
 
 	"github.com/TykTechnologies/tyk/ctx"
-	"github.com/TykTechnologies/tyk/request"
+	"github.com/TykTechnologies/tyk/internal/httputil"
 	"github.com/TykTechnologies/tyk/user"
 )
 
@@ -143,7 +143,7 @@ func (k *OrganizationMonitor) ProcessRequestLive(r *http.Request, orgSession *us
 					OriginatingRequest: EncodeRequestToEvent(r),
 				},
 				Path:   r.URL.Path,
-				Origin: request.RealIP(r),
+				Origin: httputil.RealIP(r),
 				Key:    k.Spec.OrgID,
 			})
 
@@ -160,7 +160,7 @@ func (k *OrganizationMonitor) ProcessRequestLive(r *http.Request, orgSession *us
 					OriginatingRequest: EncodeRequestToEvent(r),
 				},
 				Path:   r.URL.Path,
-				Origin: request.RealIP(r),
+				Origin: httputil.RealIP(r),
 				Key:    k.Spec.OrgID,
 			},
 		)
@@ -207,7 +207,7 @@ func (k *OrganizationMonitor) ProcessRequestOffThread(r *http.Request, orgSessio
 	go k.AllowAccessNext(
 		orgChan,
 		r.URL.Path,
-		request.RealIP(r),
+		httputil.RealIP(r),
 		r,
 		&orgSessionCopy,
 	)

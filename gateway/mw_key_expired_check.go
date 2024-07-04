@@ -4,7 +4,7 @@ import (
 	"errors"
 	"net/http"
 
-	"github.com/TykTechnologies/tyk/request"
+	"github.com/TykTechnologies/tyk/internal/httputil"
 )
 
 // KeyExpired middleware will check if the requesting key is expired or not. It makes use of the authManager to do so.
@@ -35,7 +35,7 @@ func (k *KeyExpired) ProcessRequest(w http.ResponseWriter, r *http.Request, _ in
 		k.FireEvent(EventKeyExpired, EventKeyFailureMeta{
 			EventMetaDefault: EventMetaDefault{Message: "Attempted access from inactive key.", OriginatingRequest: EncodeRequestToEvent(r)},
 			Path:             r.URL.Path,
-			Origin:           request.RealIP(r),
+			Origin:           httputil.RealIP(r),
 			Key:              token,
 		})
 
@@ -53,7 +53,7 @@ func (k *KeyExpired) ProcessRequest(w http.ResponseWriter, r *http.Request, _ in
 	k.FireEvent(EventKeyExpired, EventKeyFailureMeta{
 		EventMetaDefault: EventMetaDefault{Message: "Attempted access from expired key.", OriginatingRequest: EncodeRequestToEvent(r)},
 		Path:             r.URL.Path,
-		Origin:           request.RealIP(r),
+		Origin:           httputil.RealIP(r),
 		Key:              token,
 	})
 	// Report in health check

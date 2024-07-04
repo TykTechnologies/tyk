@@ -8,7 +8,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/TykTechnologies/tyk/rpc"
+	"github.com/TykTechnologies/tyk/internal/rpc"
 
 	"github.com/sirupsen/logrus"
 

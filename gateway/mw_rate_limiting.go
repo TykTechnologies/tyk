@@ -8,7 +8,7 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"github.com/TykTechnologies/tyk/internal/event"
-	"github.com/TykTechnologies/tyk/request"
+	"github.com/TykTechnologies/tyk/internal/httputil"
 )
 
 // RateLimitAndQuotaCheck will check the incomming request and key whether it is within it's quota and
@@ -32,7 +32,7 @@ func (k *RateLimitAndQuotaCheck) handleQuotaFailure(r *http.Request, token strin
 	k.FireEvent(EventQuotaExceeded, EventKeyFailureMeta{
 		EventMetaDefault: EventMetaDefault{Message: "Key Quota Limit Exceeded", OriginatingRequest: EncodeRequestToEvent(r)},
 		Path:             r.URL.Path,
-		Origin:           request.RealIP(r),
+		Origin:           httputil.RealIP(r),
 		Key:              token,
 	})
 

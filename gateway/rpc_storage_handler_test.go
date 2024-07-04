@@ -9,7 +9,7 @@ import (
 	"testing"
 
 	"github.com/TykTechnologies/tyk/internal/model"
-	"github.com/TykTechnologies/tyk/rpc"
+	"github.com/TykTechnologies/tyk/internal/rpc"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"

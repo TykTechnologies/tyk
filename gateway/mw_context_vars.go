@@ -6,7 +6,7 @@ import (
 
 	"github.com/TykTechnologies/tyk/internal/uuid"
 
-	"github.com/TykTechnologies/tyk/request"
+	"github.com/TykTechnologies/tyk/internal/httputil"
 )
 
 type MiddlewareContextVars struct {
@@ -32,7 +32,7 @@ func (m *MiddlewareContextVars) ProcessRequest(w http.ResponseWriter, r *http.Re
 		"headers_Host": r.Host,
 		"path_parts":   strings.Split(r.URL.Path, "/"), // Path parts
 		"path":         r.URL.Path,                     // path data
-		"remote_addr":  request.RealIP(r),              // IP
+		"remote_addr":  httputil.RealIP(r),             // IP
 		"request_id":   uuid.New(),                     //Correlation ID
 	}
 

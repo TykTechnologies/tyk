@@ -32,8 +32,8 @@ import (
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/ctx"
-	"github.com/TykTechnologies/tyk/dnscache"
-	"github.com/TykTechnologies/tyk/request"
+	"github.com/TykTechnologies/tyk/internal/dnscache"
+	"github.com/TykTechnologies/tyk/internal/httputil"
 	"github.com/TykTechnologies/tyk/test"
 )
 
@@ -650,7 +650,7 @@ func TestRequestIP(t *testing.T) {
 		r := &http.Request{RemoteAddr: tc.remote, Header: http.Header{}}
 		r.Header.Set("x-real-ip", tc.real)
 		r.Header.Set("x-forwarded-for", tc.forwarded)
-		got := request.RealIP(r)
+		got := httputil.RealIP(r)
 		if got != tc.want {
 			t.Errorf("requestIP({%q, %q, %q}) got %q, want %q",
 				tc.remote, tc.real, tc.forwarded, got, tc.want)
