@@ -14,6 +14,9 @@ includes:
   coprocess:
     taskfile: coprocess/Taskfile.yml
     dir: coprocess/
+  config:
+    taskfile: config/Taskfile.yml
+    dir: config/
 
 tasks:
   docker:
@@ -73,6 +76,7 @@ tasks:
       - lint:config
       - lint:x-tyk-gateway
       - coprocess:lint
+      - config:lint
 
   lint:config:
     internal: true
