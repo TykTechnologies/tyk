@@ -1,11 +1,6 @@
 ---
 version: "3"
 
-includes:
-  services:
-    taskfile: ../../docker/services/Taskfile.yml
-    dir: ../../docker/services
-
 tasks:
   default:
     desc: "Run everything"
@@ -15,9 +10,7 @@ tasks:
 
   test:
     desc: "Run tests"
-    deps: [ services:up ]
     cmds:
-      - defer: { task: services:down }
       - go fmt ./...
       - go test -count=1 ./...
 
