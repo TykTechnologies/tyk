@@ -284,7 +284,7 @@ jobs:
           echo "id=$(date +%s%N)" >> $GITHUB_OUTPUT
           # Run tests
           set -o pipefail
-          echo "### API tests ${{ matrix.db }} ${{ matrix.conf }}" >> $GITHUB_STEP_SUMMARY
+          echo "### API tests ${{ matrix.envfiles.db }} ${{ matrix.envfiles.conf }}" >> $GITHUB_STEP_SUMMARY
           if docker run --rm --network auto_default --env-file pytest.env -v ${{ github.workspace }}/reports:/app/reports \
             ${{ steps.ecr.outputs.registry }}/tyk-automated-tests:$BASE_REF \
             pytest -c pytest_ci.ini --junitxml=./${XUNIT_REPORT_PATH#"${{ github.workspace }}"} --ci -m "not local and not dind ${{ matrix.markers }}" | tee tests.out; then
@@ -335,7 +335,7 @@ jobs:
           TYK_MDCB_LICENSE: ${{ secrets.MDCB_LICENSE }}
           ECR: ${{ steps.ecr.outputs.registry }}
         run: |
-          docker compose -p auto -f pro-ha.yml -f deps_pro-ha.yml -f ${{ matrix.db }}.yml -f ${{ matrix.cache_db }}.yml  --env-file versions.env --profile all logs | sort > ${{ github.workspace }}/docker-compose.log
+          docker compose -p auto -f pro-ha.yml -f deps_pro-ha.yml -f ${{ matrix.envfiles.db }}.yml -f ${{ matrix.envfiles.cache_db }}.yml  --env-file versions.env --profile all logs | sort > ${{ github.workspace }}/docker-compose.log
           echo "::group::DockerLogs"
           cat ${{ github.workspace }}/docker-compose.log
           echo "::endgroup::"
@@ -343,7 +343,7 @@ jobs:
         uses: actions/upload-artifact@v4
         if: failure() && (steps.test_execution.outcome != 'success' || steps.env_up.outcome != 'success')
         with:
-          name: docker-compose-logs-${{ github.job }}-${{ matrix.db }}-${{ matrix.conf }}-${{ github.run_id }}
+          name: docker-compose-logs-${{ github.job }}-${{ matrix.envfiles.db }}-${{ matrix.envfiles.conf }}-${{ github.run_id }}
           path: ${{ github.workspace }}/docker-compose.log
           retention-days: 3
           overwrite: true
@@ -351,7 +351,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: api-test-report-${{ matrix.db }}-${{ matrix.conf }}-${{ github.run_id }}
+          name: api-test-report-${{ matrix.envfiles.db }}-${{ matrix.envfiles.conf }}-${{ github.run_id }}
           retention-days: 3
           path: ${{ github.workspace }}/reports
           overwrite: true
