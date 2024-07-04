@@ -1338,6 +1338,7 @@ func (a APIDefinitionLoader) compileInternalPathSpec(paths []apidef.InternalMeta
 		newSpec := URLSpec{}
 		a.generateRegex(stringSpec.Path, &newSpec, stat, conf)
 		// Extend with method actions
+		newSpec.Internal = stringSpec
 
 		urlSpec = append(urlSpec, newSpec)
 	}
@@ -1355,6 +1356,7 @@ func (a APIDefinitionLoader) compileRateLimitPathSpec(paths []apidef.RateLimitMe
 
 		newSpec := URLSpec{}
 		a.generateRegex(stringSpec.Path, &newSpec, stat, conf)
+		// Extend with method actions
 		newSpec.RateLimit = stringSpec
 
 		urlSpec = append(urlSpec, newSpec)
