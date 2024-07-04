@@ -79,8 +79,8 @@ var (
 type URLRewriteTrigger struct {
 	// Condition indicates the logical combination that will be applied to the rules for an advanced trigger:
 	//
-	// - Value `any` means any of the defined trigger rules may match
-	// - Value `all` means all the defined trigger rules must match
+	// - Value `any` means any of the defined trigger rules may match,
+	// - Value `all` means all the defined trigger rules must match.
 	Condition URLRewriteCondition `bson:"condition" json:"condition"`
 
 	// Rules contain individual checks that are combined according to the
@@ -96,7 +96,6 @@ type URLRewriteTrigger struct {
 // URLRewriteRule represents a rewrite matching rules.
 type URLRewriteRule struct {
 	// In specifies one of the valid inputs for URL rewriting.
-	// By default, it uses `url` as the input source.
 	//
 	// The following values are valid:
 	//
@@ -107,6 +106,8 @@ type URLRewriteRule struct {
 	// - `sessionMetadata`, match pattern against session metadata
 	// - `requestBody`, match pattern against request body
 	// - `requestContext`, match pattern against request context
+	//
+	// By default, it uses `url` as the input source.
 	In URLRewriteInput `bson:"in" json:"in"`
 
 	// Name is the index in the value declared inside `in`.
