@@ -41,15 +41,20 @@ jobs:
             debvers: 'ubuntu/xenial ubuntu/bionic ubuntu/focal ubuntu/jammy debian/jessie debian/buster debian/bullseye debian/bookworm'
     outputs:
       tags: ${{ steps.ci_metadata.outputs.tags }}
-      commit_author: ${{ steps.fetch-author.outputs.commit_author}}
+      commit_author: ${{ steps.set_outputs.outputs.commit_author}}
     steps:
       - name: Checkout of tyk
         uses: actions/checkout@v4
         with:
           fetch-depth: 1
-      - name: Get commit author
-        id: fetch-author
-        run: echo "commit_author=$(git show -s --format='%ae' HEAD)" >> $GITHUB_OUTPUT
+      - name: Set some outputs for later
+        id: set_outputs
+        shell: bash
+        env:
+          HEAD_REF: ${{github.head_ref}}
+        run: |
+          echo "commit_author=$(git show -s --format='%ae' HEAD)" >> $GITHUB_OUTPUT
+          echo "branch=${HEAD_REF##*/}" >> $GITHUB_OUTPUT
       - uses: docker/setup-qemu-action@v3
       - uses: docker/setup-buildx-action@v3
       - name: Login to DockerHub
@@ -75,7 +80,7 @@ jobs:
             ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
       - name: Build
         env:
-          NFPM_STD_PASSPHRASE: ${{ secrets.SIGNING_KEY_PASSPHRASE }}
+          NFPM_PASSPHRASE: ${{ secrets.SIGNING_KEY_PASSPHRASE }}
           PKG_SIGNING_KEY: ${{ secrets.SIGNING_KEY }}
           PACKAGECLOUD_TOKEN: ${{ secrets.PACKAGECLOUD_TOKEN }}
         run: |
@@ -90,7 +95,7 @@ jobs:
           -e DEBVERS='${{ matrix.debvers }}'                               \
           -e RPMVERS='${{ matrix.rpmvers }}'                               \
           -e CGO_ENABLED=${{ matrix.cgo }}                                 \
-          -e NFPM_STD_PASSPHRASE="$NFPM_STD_PASSPHRASE"                          \
+          -e NFPM_PASSPHRASE="$NFPM_PASSPHRASE"                          \
           -e GPG_FINGERPRINT=12B5D62C28F57592D1575BD51ED14C59E37DAC20            \
           -e PKG_SIGNING_KEY="$PKG_SIGNING_KEY"                                  \
           -e PACKAGECLOUD_TOKEN=$PACKAGECLOUD_TOKEN                              \
@@ -128,23 +133,24 @@ jobs:
             type=ref,event=branch
             type=ref,event=pr
             type=sha,format=long
-            type=semver,pattern=v{{major}}.{{minor}},prefix=v
-            type=semver,pattern=v{{version}},prefix=v
-      - name: CI push
+            type=semver,pattern={{major}},prefix=v
+            type=raw,priority=700,value=${{ steps.set_outputs.outputs.branch}},enable=${{ github.event_name == 'pull_request' }},prefix=
+            type=semver,pattern={{major}}.{{minor}},prefix=v
+            type=semver,pattern={{version}},prefix=v
+      - name: push image to CI
         if: ${{ matrix.golang_cross == '1.21-bullseye' }}
-        shell: bash
-        env:
-          t: ${{ steps.ci_metadata.outputs.tags }}
-          build_tag: ${{ startswith(github.ref, 'refs/tags') && github.ref_name || 'v0.0.0' }}
-        run: |
-          set +e
-          IFS=$'\n' tags=($t)
-          for tag in "${tags[@]}"; do
-             for arch in amd64 arm64; do
-                 docker tag tykio/tyk-gateway:${build_tag}-${arch} ${tag}-${arch} && docker push ${tag}-${arch}
-             done
-             docker manifest create ${tag} ${tag}-amd64 ${tag}-arm64 && docker manifest push ${tag}
-          done
+        uses: docker/build-push-action@v5
+        with:
+          context: "dist"
+          platforms: linux/amd64,linux/arm64
+          file: ci/Dockerfile.std
+          provenance: mode=max
+          sbom: true
+          push: true
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          tags: ${{ steps.ci_metadata.outputs.tags }}
+          labels: ${{ steps.tag_metadata.outputs.labels }}
       - uses: actions/upload-artifact@v4
         if: ${{ matrix.golang_cross == '1.21-bullseye' }}
         with:
@@ -163,30 +169,35 @@ jobs:
             !dist/*PAYG*.rpm
   test-controller-api:
     needs: goreleaser
-    runs-on: ubuntu-latest-m-2
-    container: tykio/gromit:v1.7
+    runs-on: ubuntu-latest
     outputs:
-      conf: ${{ steps.params.outputs.api_conf }}
-      db: ${{ steps.params.outputs.api_db }}
+      envfiles: ${{ steps.params.outputs.envfiles }}
       pump: ${{ steps.params.outputs.pump }}
       sink: ${{ steps.params.outputs.sink }}
-      gd_tag: ${{ steps.params.outputs.gd_tag }}
-      versions: ${{ steps.params.outputs.versions }}
-      exclude: ${{ steps.params.outputs.exclude }}
     steps:
       - name: set params
         id: params
+        shell: bash
         env:
-          REPO: ${{ github.repository }}
           # Cover pull_request_target too
           BASE_REF: ${{startsWith(github.event_name, 'pull_request') && github.base_ref || github.ref}}
-          TAGS: ${{ needs.goreleaser.outputs.tags }}
-          IS_PR: ${{startsWith(github.event_name, 'pull_request') && 'yes' }}
-          IS_TAG: ${{startsWith(github.ref, 'refs/tags') && 'yes' }}
-          JOB: api
-        run: gromit policy controller --loglevel debug | tee -a "$GITHUB_OUTPUT"
+        run: |
+          set -eo pipefail
+          endpoint="http://tui.internal.dev.tyk.technology/api/tyk/$BASE_REF/${{ github.event_name}}/api"
+          curl="curl -s --retry 5 --retry-delay 10 --fail-with-body --retry-all-errors"
+          echo "pump<<EOF
+          $($curl ${endpoint}/Pump)
+          EOF
+          sink<<EOF
+          $($curl ${endpoint}/Sink)
+          EOF
+          envfiles<<EOF
+          $($curl ${endpoint}/EnvFiles)
+          EOF" | tee -a "$GITHUB_OUTPUT"
   api-tests:
-    needs: [goreleaser, test-controller-api]
+    needs:
+      - goreleaser
+      - test-controller-api
     runs-on: ubuntu-latest-m-2
     env:
       METADATA_REPORT_PATH: /tmp/metadata.toml
@@ -197,14 +208,17 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        conf: ${{ fromJson(needs.test-controller-api.outputs.conf) }}
-        db: ${{ fromJson(needs.test-controller-api.outputs.db) }}
+        envfiles: ${{ fromJson(needs.test-controller-api.outputs.envfiles) }}
         pump: ${{ fromJson(needs.test-controller-api.outputs.pump) }}
         sink: ${{ fromJson(needs.test-controller-api.outputs.sink) }}
         include:
           - db: postgres15
             markers: "and not sql"
-        exclude: ${{ fromJson(needs.test-controller-api.outputs.exclude) }}
+        exclude:
+          - pump: tykio/tyk-pump-docker-pub:v1.8
+            sink: $ECR/tyk-sink:master
+          - pump: $ECR/tyk-pump:master
+            sink: tykio/tyk-mdcb-docker:v2.4
     steps:
       - uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -238,27 +252,33 @@ jobs:
           GH_TOKEN: ${{ secrets.ORG_GH_TOKEN }}
           TYK_DB_LICENSEKEY: ${{ secrets.DASH_LICENSE }}
           TYK_MDCB_LICENSE: ${{ secrets.MDCB_LICENSE }}
-          ECR: ${{ steps.ecr.outputs.registry }}
-          VERSIONS: ${{ needs.test-controller-api.outputs.versions }}
+          BASE_REF: ${{startsWith(github.event_name, 'pull_request') && github.base_ref || github.ref}}
         run: |
-          echo "ECR=${ECR}
-          $VERSIONS
+          tags=(${{ needs.goreleaser.outputs.tags }})
+          docker run -q --rm -v ~/.docker/config.json:/root/.docker/config.json tykio/gromit policy match ${tags[0]} 2>versions.env
+          echo '# alfa and beta have to come after the override
+          tyk_alfa_image=$tyk_image
+          tyk_beta_image=$tyk_image
+          ECR=${{steps.ecr.outputs.registry}}
           tyk_pump_image=${{matrix.pump}}
           tyk_sink_image=${{matrix.sink}}
           confs_dir=./pro-ha
-          env_file=local-${{ matrix.db }}.env" > versions.env
+          env_file=local-${{ matrix.envfiles.db }}.env' >> versions.env
           echo "::group::versions"
           cat versions.env
           echo "::endgroup::"
           # Add Tyk component config variations to $env_file
-          cat confs/${{ matrix.conf }}.env >> local-${{ matrix.db }}.env
+          cat confs/${{ matrix.envfiles.config }}.env >> local-${{ matrix.envfiles.db }}.env
           # bring up env, the project name is important
-          docker compose -p auto -f pro-ha.yml -f deps_pro-ha.yml -f ${{ matrix.db }}.yml --env-file versions.env --profile master-datacenter up --quiet-pull -d
+          docker compose -p auto -f pro-ha.yml -f deps_pro-ha.yml -f ${{ matrix.envfiles.db }}.yml -f ${{ matrix.envfiles.cache }}.yml  --env-file versions.env --profile master-datacenter up --quiet-pull -d
           ./dash-bootstrap.sh http://localhost:3000
-          docker compose -p auto -f pro-ha.yml -f deps_pro-ha.yml -f ${{ matrix.db }}.yml --env-file versions.env --profile slave-datacenter up --quiet-pull -d
+          docker compose -p auto -f pro-ha.yml -f deps_pro-ha.yml -f ${{ matrix.envfiles.db }}.yml -f ${{ matrix.envfiles.cache }}.yml  --env-file versions.env --profile slave-datacenter up --quiet-pull -d
       - name: Run tests
         working-directory: auto
         id: test_execution
+        env:
+          # Cover pull_request_target too
+          BASE_REF: ${{startsWith(github.event_name, 'pull_request') && github.base_ref || github.ref}}
         run: |
           # Generate report id
           echo "id=$(date +%s%N)" >> $GITHUB_OUTPUT
@@ -266,11 +286,11 @@ jobs:
           set -o pipefail
           echo "### API tests ${{ matrix.db }} ${{ matrix.conf }}" >> $GITHUB_STEP_SUMMARY
           if docker run --rm --network auto_default --env-file pytest.env -v ${{ github.workspace }}/reports:/app/reports \
-            ${{ steps.ecr.outputs.registry }}/tyk-automated-tests:${{ needs.test-controller-api.outputs.gd_tag }} \
+            ${{ steps.ecr.outputs.registry }}/tyk-automated-tests:$BASE_REF \
             pytest -c pytest_ci.ini --junitxml=./${XUNIT_REPORT_PATH#"${{ github.workspace }}"} --ci -m "not local and not dind ${{ matrix.markers }}" | tee tests.out; then
               echo "All tests passed!" >> $GITHUB_STEP_SUMMARY
           else
-            echo "::error title=API tests ${{ matrix.db }} ${{ matrix.conf }}::Test execution failed"
+            echo "::error title=API tests ${{ matrix.envfiles.db }} ${{ matrix.envfiles.conf }}::Test execution failed"
             cat tests.out >> $GITHUB_STEP_SUMMARY
             exit 1
           fi
@@ -278,6 +298,7 @@ jobs:
         if: always() && steps.test_execution.outcome != 'skipped'
         id: metadata_report
         env:
+          BASE_REF: ${{startsWith(github.event_name, 'pull_request') && github.base_ref || github.ref}}
           REPORT_NAME: ${{ github.repository }}_${{ github.run_id }}_${{ github.run_attempt }}-${{steps.test_execution.outputs.id}}
         run: |
           # Generate metadata report
@@ -285,11 +306,12 @@ jobs:
           repo = ${{ github.repository }}
           branch = ${{ github.ref }}
           commit = ${{ github.sha }}
-          test_suite_version = ${{ needs.test-controller-api.outputs.gd_tag }}
+          test_suite_version = $BASE_REF
           test_suite_name = ${{ github.job }}
           test_suite_run = ${{ github.run_id }}-${{ github.run_attempt }}
-          db = ${{ matrix.db }}
-          conf = ${{ matrix.conf }}
+          db = ${{ matrix.envfiles.db }}
+          conf = ${{ matrix.envfiles.config }}
+          cache = ${{ matrix.envfiles.cache }}
           pump_compatibility = ${{ matrix.pump }}
           sink_compatibility = ${{ matrix.sink }}
           " > ${METADATA_REPORT_PATH}
@@ -312,9 +334,8 @@ jobs:
           TYK_DB_LICENSEKEY: ${{ secrets.DASH_LICENSE }}
           TYK_MDCB_LICENSE: ${{ secrets.MDCB_LICENSE }}
           ECR: ${{ steps.ecr.outputs.registry }}
-          VERSIONS: ${{ needs.test-controller-api.outputs.versions }}
         run: |
-          docker compose -p auto -f pro-ha.yml -f deps_pro-ha.yml -f ${{ matrix.db }}.yml --env-file versions.env --profile all logs | sort > ${{ github.workspace }}/docker-compose.log
+          docker compose -p auto -f pro-ha.yml -f deps_pro-ha.yml -f ${{ matrix.db }}.yml -f ${{ matrix.cache_db }}.yml  --env-file versions.env --profile all logs | sort > ${{ github.workspace }}/docker-compose.log
           echo "::group::DockerLogs"
           cat ${{ github.workspace }}/docker-compose.log
           echo "::endgroup::"
@@ -334,80 +355,6 @@ jobs:
           retention-days: 3
           path: ${{ github.workspace }}/reports
           overwrite: true
-      - name: Fetch commit author
-        if: failure() && steps.test_execution.outcome != 'success' && github.event_name == 'push'
-        env:
-          USER_EMAIL: ${{ needs.goreleaser.outputs.commit_author }}
-        run: echo "GIT_USER_EMAIL=$USER_EMAIL" >> $GITHUB_ENV
-      - name: Fetch slack user
-        if: failure() && steps.test_execution.outcome != 'success' && github.event_name == 'push'
-        id: fetch_slack_user
-        uses: TykTechnologies/github-actions/.github/actions/github-to-slack@main
-        with:
-          github_email: ${{ env.GIT_USER_EMAIL }}
-      - name: Notify slack
-        if: failure() && steps.test_execution.outcome != 'success' && github.event_name == 'push'
-        uses: rtCamp/action-slack-notify@v2
-        env:
-          SLACK_WEBHOOK: ${{ secrets.API_TEST_ALERT_SLACK_WEBHOOK }}
-          SLACK_COLOR: ${{ job.status }}
-          SLACK_TITLE: "Result: ${{ steps.test_execution.outcome }}"
-          SLACK_USERNAME: API INTEGRATION TESTS
-          SLACK_MESSAGE: "*Test*: ${{ matrix.db }}-${{ matrix.conf }}, *Author*: ${{ steps.fetch_slack_user.outputs.slack-user-name }}"
-          SLACK_FOOTER: "<https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}|SEE EXECUTION DETAILS HERE>"
-  distroless:
-    runs-on: ubuntu-latest
-    needs: goreleaser
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 1
-      - uses: actions/download-artifact@v4
-        with:
-          name: deb
-      - uses: docker/setup-qemu-action@v3
-      - uses: docker/setup-buildx-action@v3
-      - name: Login to DockerHub
-        if: startsWith(github.ref, 'refs/tags')
-        uses: docker/login-action@v3
-        with:
-          username: ${{ secrets.DOCKER_USERNAME }}
-          password: ${{ secrets.DOCKER_PASSWORD }}
-      - name: Login to Cloudsmith
-        if: startsWith(github.ref, 'refs/tags')
-        uses: docker/login-action@v3
-        with:
-          registry: docker.tyk.io
-          username: ${{ secrets.CLOUDSMITH_USERNAME }}
-          password: ${{ secrets.CLOUDSMITH_API_KEY }}
-      - name: Docker metadata for distroless
-        id: distroless_metadata
-        uses: docker/metadata-action@v5
-        with:
-          images: |
-            tykio/tyk-gateway
-            docker.tyk.io/tyk-gateway/tyk-gateway
-          flavor: |
-            latest=false
-            prefix=s
-          tags: |
-            type=semver,pattern={{major}}
-            type=semver,pattern={{major}}.{{minor}}
-            type=semver,pattern={{version}}
-          labels: |
-            org.opencontainers.image.title=tyk-gateway (distroless)
-            org.opencontainers.image.description=Tyk Open Source API Gateway written in Go, supporting REST, GraphQL, TCP and gRPC protocols
-            org.opencontainers.image.vendor=tyk.io
-            org.opencontainers.image.version=${{ github.ref_name }}
-      - name: build distroless image
-        uses: docker/build-push-action@v5
-        with:
-          context: "."
-          platforms: linux/amd64,linux/arm64
-          file: ci/Dockerfile.distroless
-          push: ${{ startsWith(github.ref, 'refs/tags') }}
-          tags: ${{ steps.distroless_metadata.outputs.tags }}
-          labels: ${{ steps.distroless_metadata.outputs.labels }}
   upgrade-deb:
     services:
       httpbin.org:
