@@ -80,6 +80,11 @@ type AccessDefinition struct {
 	DisableIntrospection bool                    `json:"disable_introspection" msg:"disable_introspection"`
 
 	AllowanceScope string `json:"allowance_scope" msg:"allowance_scope"`
+
+	// marker, -tit
+	// could be apidef.RateLimitMeta (Path, Per, ...)
+	// could be APILimit to support quota, throttling
+	// could extend apidef to support quota, throttling
 }
 
 func (limit APILimit) IsEmpty() bool {
