@@ -8,6 +8,7 @@
 
 include:
   - ./redis.yml
+  - ./httpbin.yml
 
 networks:
   proxy:
