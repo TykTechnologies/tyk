@@ -96,36 +96,54 @@ func (s *OAS) extractTokenTo(api *apidef.APIDefinition, name string) {
 // JWT holds the configuration for the JWT middleware.
 type JWT struct {
 	// Enabled activates the basic authentication mode.
+	//
+	// Tyk classic API definition: `enable_jwt`
 	Enabled bool `bson:"enabled" json:"enabled"` // required
 
 	// AuthSources configures the source for the JWT.
 	AuthSources `bson:",inline" json:",inline"`
 
 	// Source contains the source for the JWT.
+	//
+	// Tyk classic API definition: `jwt_source`
 	Source string `bson:"source,omitempty" json:"source,omitempty"`
 
 	// SigningMethod contains the signing method to use for the JWT.
+	//
+	// Tyk classic API definition: `jwt_signing_method`
 	SigningMethod string `bson:"signingMethod,omitempty" json:"signingMethod,omitempty"`
 
 	// IdentityBaseField specifies the claim name uniquely identifying the subject of the JWT.
 	// The identity fields that are checked in order are: `kid`, IdentityBaseField, `sub`.
+	//
+	// Tyk classic API definition: `jwt_identity_base_field`
 	IdentityBaseField string `bson:"identityBaseField,omitempty" json:"identityBaseField,omitempty"`
 
 	// SkipKid controls skipping using the `kid` claim from a JWT (default behaviour).
 	// When this is true, the field configured in IdentityBaseField is checked first.
+	//
+	// Tyk classic API definition: `jwt_skip_kid`
 	SkipKid bool `bson:"skipKid,omitempty" json:"skipKid,omitempty"`
 
 	// PolicyFieldName is a configurable claim name from which a policy ID is extracted.
 	// The policy is applied to the session as a base policy.
+	//
+	// Tyk classic API definition: `jwt_policy_field_name`
 	PolicyFieldName string `bson:"policyFieldName,omitempty" json:"policyFieldName,omitempty"`
 
-	// Deprecated: ClientBaseField is unused.
+	// ClientBaseField is used when PolicyFieldName is not provided. It will get
+	// a session key and use the policies from that. The field ensures that requests
+	// use the same session.
+	//
+	// Tyk classic API definition: `jwt_client_base_field`
 	ClientBaseField string `bson:"clientBaseField,omitempty" json:"clientBaseField,omitempty"`
 
 	// Scopes holds the scope to policy mappings for a claim name.
 	Scopes *Scopes `bson:"scopes,omitempty" json:"scopes,omitempty"`
 
 	// DefaultPolicies is a list of policy IDs that apply to the session.
+	//
+	// Tyk classic API definition: `jwt_default_policies`
 	DefaultPolicies []string `bson:"defaultPolicies,omitempty" json:"defaultPolicies,omitempty"`
 
 	// IssuedAtValidationSkew contains the duration in seconds for which token issuance can predate the current time during the request.
