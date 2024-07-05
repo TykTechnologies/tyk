@@ -143,7 +143,11 @@ jobs:
              for arch in amd64 arm64; do
                  docker tag tykio/tyk-gateway:${build_tag}-${arch} ${tag}-${arch} && docker push ${tag}-${arch}
              done
+             for arch in amd64; do
+                 docker tag tykio/tyk-gateway:${build_tag}-fips-${arch} ${tag}-fips-${arch} && docker push ${tag}-fips-${arch}
+              done
              docker manifest create ${tag} ${tag}-amd64 ${tag}-arm64 && docker manifest push ${tag}
+             docker manifest create ${tag}-fips ${tag}-fips-amd64 && docker manifest push ${tag}-fips
           done
       - uses: actions/upload-artifact@v4
         if: ${{ matrix.golang_cross == '1.21-bullseye' }}

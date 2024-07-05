@@ -17,12 +17,16 @@ set -e
 
 # set tags for the CI tests run / plugin builds
 
-tags="goplugin dev"
+tags="goplugin"
+
+if [[ "$GOEXPERIMENT" == "boringcrypto" ]]; then
+    tags+=" boringcrypto"
+fi
 
 # build Go-plugin used in tests
 echo "Building go plugin"
-go build -tags "${tags}" -buildmode=plugin       -o ./test/goplugins/goplugins.so      ./test/goplugins
-go build -tags "${tags}" -buildmode=plugin -race -o ./test/goplugins/goplugins_race.so ./test/goplugins
+GOEXPERIMENT=boringcrypto go build -tags "${tags}" -buildmode=plugin       -o ./test/goplugins/goplugins.so      ./test/goplugins
+GOEXPERIMENT=boringcrypto go build -tags "${tags}" -buildmode=plugin -race -o ./test/goplugins/goplugins_race.so ./test/goplugins
 
 for pkg in ${PKGS}; do
     coveragefile=`echo "$pkg" | awk -F/ '{print $NF}'`

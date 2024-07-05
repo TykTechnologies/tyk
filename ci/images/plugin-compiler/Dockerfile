@@ -25,12 +25,15 @@ RUN --mount=type=cache,mode=0755,target=/go/pkg/mod go mod download
 ADD . $TYK_GW_PATH
 
 # Provide a gateway test binary for testing plugin loading.
-RUN --mount=type=cache,mode=0755,target=/go/pkg/mod GOBIN=/usr/local/bin go install -tags=goplugin -trimpath .
+RUN --mount=type=cache,mode=0755,target=/go/pkg/mod GOBIN=/usr/local/bin go install -tags=goplugin,boringcrypto -trimpath .
 
 ARG GITHUB_SHA
 ARG GITHUB_TAG
 ENV GITHUB_SHA ${GITHUB_SHA}
 ENV GITHUB_TAG ${GITHUB_TAG}
+ENV GOEXPERIMENT ${GOEXPERIMENT}
+
+RUN echo "GOEXPERIMENT: $GOEXPERIMENT"
 
 COPY ci/images/plugin-compiler/data/build.sh /build.sh
 RUN chmod +x /build.sh
