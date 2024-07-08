@@ -1,4 +1,18 @@
+# yamllint disable rule:line-length
+---
 version: '3'
+
+# Uses: go test, go test -c, go tool cover
+#
+# For each test function, the `inspect` target produces:
+#
+# - Test run output in json format (for test duration, status FAIL/PASS...)
+# - Cpu, memory and mutex profiles
+# - Coverage that the test function triggered
+# - Traced coverage to code areas (structs, functions).
+#
+# Depends on: covertrace.
+# Install with `go install github.com/TykTechnologies/exp/cmd/covertrace@main`.
 
 vars:
   listFile: /tmp/taskfile-inspect-list.txt
