@@ -34,7 +34,7 @@ type Server struct {
 	// Tyk classic API definition: `detailed_tracing`
 	DetailedTracing *DetailedTracing `bson:"detailedTracing,omitempty" json:"detailedTracing,omitempty"`
 
-	// Events contains the configuration related to Tyk Events.
+	// EventHandlers contains the configuration related to Tyk Events.
 	//
 	// Tyk classic API definition: `event_handlers`
 	EventHandlers EventHandlers `bson:"eventHandlers,omitempty" json:"eventHandlers,omitempty"`
@@ -211,7 +211,7 @@ func (cc *ClientCertificates) ExtractTo(api *apidef.APIDefinition) {
 type GatewayTags struct {
 	// Enabled activates use of segment tags.
 	Enabled bool `bson:"enabled" json:"enabled"`
-	// Tags is a list of segment tags
+	// Tags contains a list of segment tags.
 	Tags []string `bson:"tags" json:"tags"`
 }
 

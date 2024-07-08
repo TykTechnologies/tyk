@@ -25,9 +25,10 @@ type EventHandler struct {
 	Kind Kind `json:"type" bson:"type"` // json tag is changed as per contract
 	// ID is the ID of event handler in storage.
 	ID string `json:"id,omitempty" bson:"id,omitempty"`
-	// Name is the name of event handler
+	// Name is the name of event handler.
 	Name string `json:"name,omitempty" bson:"name,omitempty"`
 
+	// Webhook contains WebhookEvent configs. Encoding and decoding is handled by the custom marshaller.
 	Webhook WebhookEvent `bson:"-" json:"-"`
 }
 
