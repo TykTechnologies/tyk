@@ -2,7 +2,6 @@
 version: "3"
 
 includes:
-  lint: .taskfiles/lint.yml
   deps: .taskfiles/deps/Taskfile.yml
   opentelemetry: .taskfiles/opentelemetry.yml
   services:
@@ -72,7 +71,6 @@ tasks:
     deps:
       - lint:config
       - lint:x-tyk-gateway
-      - coprocess:lint
       - apidef-oas:lint
 
   lint:config:
