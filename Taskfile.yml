@@ -4,25 +4,16 @@ version: "3"
 includes:
   lint: .taskfiles/lint.yml
   deps: .taskfiles/deps/Taskfile.yml
-<<<<<<< HEAD
   opentelemetry: .taskfiles/opentelemetry.yml
-=======
-  opentelemetry:
-    taskfile: ci/tests/tracing/Taskfile.yml
-    dir: ci/tests/tracing/
   services:
     taskfile: docker/services/Taskfile.yml
     dir: docker/services/
-  coprocess:
-    taskfile: coprocess/Taskfile.yml
-    dir: coprocess/
   config:
     taskfile: config/Taskfile.yml
     dir: config/
   apidef-oas:
     taskfile: apidef/oas/Taskfile.yml
     dir: apidef/oas/
->>>>>>> 09ceda390... [TT-11032] Godoc CI lint action, config and apidef/oas (#6386)
 
 tasks:
   docker:
@@ -57,8 +48,6 @@ tasks:
         yq -i ".dockers[0].extra_files |= [\"$replacement\"]" ci/goreleaser/goreleaser-el7.yml
         yq -i ".dockers[4].extra_files |= [\"$replacement\"]" ci/goreleaser/goreleaser.yml
       - echo goreleaser release --clean --snapshot -f ci/goreleaser/goreleaser.yml
-<<<<<<< HEAD
-=======
 
   # Used in CI
   lint:
@@ -95,4 +84,3 @@ tasks:
     internal: true
     cmds:
       - go test -count 1 -v -run=TestXTykGateway_Lint ./apidef/oas/
->>>>>>> 09ceda390... [TT-11032] Godoc CI lint action, config and apidef/oas (#6386)
