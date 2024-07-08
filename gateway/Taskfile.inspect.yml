@@ -1,0 +1,85 @@
+version: '3'
+
+vars:
+  listFile: /tmp/taskfile-inspect-list.txt
+  inspectDir: inspect
+  taskfile: Taskfile.inspect.yml
+
+tasks:
+  compile:
+    desc: "Compile the test binary"
+    cmds:
+      - go test -c -o gateway.test .
+
+  clean:
+    desc: "Clean outputs"
+    cmds:
+      - rm -rf {{.inspectDir}}/*.{cov,json,mem,mutex,cpu,covertrace} gateway.test
+
+  list:
+    desc: "List all test functions"
+    deps:
+      - compile
+    cmds:
+      - go test -list '^Test' | sed '$d' > {{.listFile}}
+
+  inspect:
+    desc: "Run each test with coverage, time, and profiling data collection"
+    deps:
+      - list
+    cmds:
+      - mkdir -p {{.inspectDir}}
+      - |
+        for test in $(cat {{.listFile}}); do
+          task -t {{.taskfile}} test run=$test || true
+        done
+      - task -t {{.taskfile}} summarize
+      - task -t {{.taskfile}} coverage
+      - task -t {{.taskfile}} covertrace
+
+  test:
+    desc: "Run a specific test function directly with go test"
+    requires:
+      vars: [run]
+    vars:
+      base: '{{.inspectDir}}/{{.run}}'
+    cmds:
+      - |
+        go test -run "^{{.run}}$" \
+          -v -cover \
+          -coverprofile="{{.base}}.cov" \
+          -memprofile="{{.base}}.mem" \
+          -cpuprofile="{{.base}}.cpu" \
+          -mutexprofile="{{.base}}.mutex" \
+          -json > "{{.base}}.json" || true
+      - covertrace -i "{{.base}}.cov" --json > "{{.base}}.covertrace"
+
+  summarize:
+    desc: "Summarize test durations and other statistics"
+    cmds:
+      - |
+        for jsonfile in {{.inspectDir}}/*.json; do
+          testname=$(basename "$jsonfile" .json)
+          duration=$(cat "$jsonfile" | grep -Po '"Elapsed":\d+.\d+' | awk -F: '{sum+=$2} END {print sum}')
+          echo "$duration $testname"
+        done
+
+  coverage:
+    desc: "Print coverage information for each test function"
+    cmds:
+      - |
+        for covfile in {{.inspectDir}}/*.cov; do
+          testname=$(basename "$covfile" .cov)
+          coverage=$(go tool cover -func="$covfile" | grep total | awk '{print $3}')
+          echo "$coverage $testname"
+        done
+
+  covertrace:
+    desc: "Process each coverage file and extract the total coverage using covertrace"
+    cmds:
+      - |
+        for covfile in {{.inspectDir}}/*.covertrace; do
+          testname=$(basename "$covfile" .covertrace)
+          value=$(jq .Totals.Coverage.Total "$covfile")
+          printf "%d %s\n" "$value" "$testname"
+        done
