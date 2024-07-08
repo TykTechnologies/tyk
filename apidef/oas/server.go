@@ -33,14 +33,6 @@ type Server struct {
 	//
 	// Tyk classic API definition: `detailed_tracing`
 	DetailedTracing *DetailedTracing `bson:"detailedTracing,omitempty" json:"detailedTracing,omitempty"`
-<<<<<<< HEAD
-=======
-
-	// EventHandlers contains the configuration related to Tyk Events.
-	//
-	// Tyk classic API definition: `event_handlers`
-	EventHandlers EventHandlers `bson:"eventHandlers,omitempty" json:"eventHandlers,omitempty"`
->>>>>>> 09ceda390... [TT-11032] Godoc CI lint action, config and apidef/oas (#6386)
 }
 
 // Fill fills *Server from apidef.APIDefinition.
