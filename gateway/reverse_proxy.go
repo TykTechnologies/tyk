@@ -1836,6 +1836,8 @@ func nopCloseResponseBody(r *http.Response) {
 	copyResponse(r)
 }
 
+// IsUpgrade will return the upgrade header value and true if present for the request.
+// It requires EnableWebSockets to be enabled in the gateway HTTP server config.
 func (p *ReverseProxy) IsUpgrade(req *http.Request) (string, bool) {
 	if !p.Gw.GetConfig().HttpServerOptions.EnableWebSockets {
 		return "", false

@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -1793,13 +1794,16 @@ func TestSSE(t *testing.T) {
 		defer res.Body.Close()
 
 		i := 0
-		ok := make(chan bool)
+		okChan := make(chan error)
+
 		go func() {
 			for {
 				line, err := reader.ReadBytes('\n')
-				if err != nil && err != io.EOF {
-					t.Fatal(err)
+				if err != nil && errors.Is(err, io.EOF) {
+					err = nil
 				}
+
+				assert.NoError(t, err)
 
 				if len(line) == 0 {
 					break
@@ -1808,13 +1812,13 @@ func TestSSE(t *testing.T) {
 				assert.Equal(t, fmt.Sprintf("data: %v\n", i), string(line))
 				i++
 			}
-			close(ok)
+			close(okChan)
 		}()
 
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
-		case <-ok:
+		case <-okChan:
 		}
 		assert.Equal(t, i, 5)
 		return nil
