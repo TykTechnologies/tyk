@@ -162,7 +162,7 @@ func recordGraphDetails(rec *analytics.AnalyticsRecord, r *http.Request, resp *h
 	rec.GraphQLStats = stats
 }
 
-func (s *SuccessHandler) RecordHit(r *http.Request, timing analytics.Latency, code int, responseCopy *http.Response) {
+func (s *SuccessHandler) RecordHit(r *http.Request, timing analytics.Latency, code int, responseCopy *http.Response, cached bool) {
 
 	if s.Spec.DoNotTrack || ctxGetDoNotTrack(r) {
 		return
@@ -199,6 +199,10 @@ func (s *SuccessHandler) RecordHit(r *http.Request, timing analytics.Latency, co
 
 		if len(s.Spec.Tags) > 0 {
 			tags = append(tags, s.Spec.Tags...)
+		}
+
+		if cached {
+			tags = append(tags, "cached-response")
 		}
 
 		rawRequest := ""
@@ -377,7 +381,7 @@ func (s *SuccessHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) *http
 			Total:    int64(millisec),
 			Upstream: int64(DurationToMillisecond(resp.UpstreamLatency)),
 		}
-		s.RecordHit(r, latency, resp.Response.StatusCode, resp.Response)
+		s.RecordHit(r, latency, resp.Response.StatusCode, resp.Response, false)
 	}
 	log.Debug("Done proxy")
 	return nil
@@ -404,7 +408,7 @@ func (s *SuccessHandler) ServeHTTPWithCache(w http.ResponseWriter, r *http.Reque
 			Total:    int64(millisec),
 			Upstream: int64(DurationToMillisecond(inRes.UpstreamLatency)),
 		}
-		s.RecordHit(r, latency, inRes.Response.StatusCode, inRes.Response)
+		s.RecordHit(r, latency, inRes.Response.StatusCode, inRes.Response, false)
 	}
 
 	return inRes

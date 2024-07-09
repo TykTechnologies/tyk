@@ -1,7 +1,7 @@
 ---
 services:
   redis:
-    image: redis:6-alpine
+    image: ${REDIS_IMAGE:-redis:6-alpine}
     networks:
       - proxy
     ports:

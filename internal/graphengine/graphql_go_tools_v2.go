@@ -17,6 +17,7 @@ import (
 	"github.com/TykTechnologies/graphql-go-tools/v2/pkg/graphql"
 	"github.com/TykTechnologies/graphql-go-tools/v2/pkg/introspection"
 	"github.com/TykTechnologies/graphql-go-tools/v2/pkg/operationreport"
+
 	"github.com/TykTechnologies/tyk/apidef"
 )
 
@@ -124,7 +125,7 @@ func (r *reverseProxyPreHandlerV2) PreHandle(params ReverseProxyParams) (reverse
 		DetermineGraphQLEngineTransportType(r.apiDefinition),
 		params.RoundTripper,
 		r.newReusableBodyReadCloser,
-		params.RequestHeadersRewrite,
+		params.HeadersConfig,
 	)
 
 	switch {

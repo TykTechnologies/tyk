@@ -10,7 +10,7 @@ type RateLimit struct {
 	// EnableFixedWindow enables fixed window rate limiting.
 	EnableFixedWindowRateLimiter bool `json:"enable_fixed_window_rate_limiter"`
 
-	// Redis based rate limiter with sliding log. Provides 100% rate limiting accuracy, but require two additional Redis roundtrip for each request.
+	// Redis based rate limiter with sliding log. Provides 100% rate limiting accuracy, but require two additional Redis roundtrips for each request.
 	EnableRedisRollingLimiter bool `json:"enable_redis_rolling_limiter"`
 
 	// To enable, set to `true`. The sentinel-based rate limiter delivers a smoother performance curve as rate-limit calculations happen off-thread, but a stricter time-out based cool-down for clients. For example, when a throttling action is triggered, they are required to cool-down for the period of the rate limit.
@@ -18,6 +18,10 @@ type RateLimit struct {
 	// For example, you can slow your connection throughput to regain entry into your rate limit. This is more of a “throttle” than a “block”.
 	// The standard rate limiter offers similar performance as the sentinel-based limiter. This is disabled by default.
 	EnableSentinelRateLimiter bool `json:"enable_sentinel_rate_limiter"`
+
+	// EnableRateLimitSmoothing enables or disables rate limit smoothing. The rate smoothing is only supported on the
+	// Redis Rate Limiter, or the Sentinel Rate Limiter, as both algorithms implement a sliding log.
+	EnableRateLimitSmoothing bool `json:"enable_rate_limit_smoothing"`
 
 	// An enhancement for the Redis and Sentinel rate limiters, that offers a significant improvement in performance by not using transactions on Redis rate-limit buckets.
 	EnableNonTransactionalRateLimiter bool `json:"enable_non_transactional_rate_limiter"`
@@ -44,6 +48,12 @@ func (r *RateLimit) String() string {
 
 	if r.EnableFixedWindowRateLimiter {
 		return "Fixed Window Rate Limiter enabled"
+	}
+
+	// Smoothing check is here, because the rate limiters above this line
+	// do not support smoothing. Smoothing is applied for RRL/Sentinel.
+	if r.EnableRateLimitSmoothing {
+		info = info + ", with smoothing"
 	}
 
 	if r.EnableRedisRollingLimiter {

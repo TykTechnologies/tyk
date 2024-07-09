@@ -22,6 +22,7 @@ import (
 	"io/ioutil"
 	"net"
 	"net/http"
+	"net/textproto"
 	"net/url"
 	"strconv"
 	"strings"
@@ -1010,15 +1011,25 @@ func (p *ReverseProxy) handleGraphQL(roundTripper *TykRoundTripper, outreq *http
 	isWebSocketUpgrade := ctxGetGraphQLIsWebSocketUpgrade(outreq)
 	needsEngine := needsGraphQLExecutionEngine(p.TykAPISpec)
 
+	requestHeadersRewrite := make(map[string]apidef.RequestHeadersRewriteConfig)
+	for key, value := range p.TykAPISpec.GraphQL.Proxy.RequestHeadersRewrite {
+		// Use the canonical format of the MIME header key.
+		requestHeadersRewrite[textproto.CanonicalMIMEHeaderKey(key)] = value
+	}
 	res, hijacked, err = p.TykAPISpec.GraphEngine.HandleReverseProxy(graphengine.ReverseProxyParams{
-		RoundTripper:          roundTripper,
-		ResponseWriter:        w,
-		OutRequest:            outreq,
-		WebSocketUpgrader:     &p.wsUpgrader,
-		NeedsEngine:           needsEngine,
-		IsCORSPreflight:       isCORSPreflight(outreq),
-		IsWebSocketUpgrade:    isWebSocketUpgrade,
-		RequestHeadersRewrite: p.TykAPISpec.GraphQL.Proxy.RequestHeadersRewrite,
+		RoundTripper:       roundTripper,
+		ResponseWriter:     w,
+		OutRequest:         outreq,
+		WebSocketUpgrader:  &p.wsUpgrader,
+		NeedsEngine:        needsEngine,
+		IsCORSPreflight:    isCORSPreflight(outreq),
+		IsWebSocketUpgrade: isWebSocketUpgrade,
+		HeadersConfig: graphengine.ReverseProxyHeadersConfig{
+			ProxyOnly: graphengine.ProxyOnlyHeadersConfig{
+				UseImmutableHeaders:   p.TykAPISpec.GraphQL.Proxy.Features.UseImmutableHeaders,
+				RequestHeadersRewrite: requestHeadersRewrite,
+			},
+		},
 	})
 	if err != nil {
 		return nil, hijacked, err

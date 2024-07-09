@@ -1,11 +1,38 @@
 package user
 
 import (
+	"encoding/json"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
 )
+
+func TestSessionState_Touch_and_IsModified(t *testing.T) {
+	result := NewSessionState()
+
+	sess := NewSessionState()
+	sess.OrgID = "tyk"
+
+	// ensure session not modified
+	assert.False(t, sess.IsModified())
+
+	// modify session
+	sess.Touch()
+	assert.True(t, sess.IsModified())
+
+	// encode session to json
+	sb, err := json.Marshal(sess)
+	assert.NoError(t, err)
+
+	// decode session from json
+	err = json.Unmarshal(sb, result)
+	assert.NoError(t, err)
+
+	// ensure session not modified
+	assert.False(t, result.IsModified())
+	assert.Equal(t, "tyk", result.OrgID)
+}
 
 func TestIsHashType(t *testing.T) {
 	assert.False(t, IsHashType(""))
@@ -110,5 +137,34 @@ func Test_calculateLifetime(t *testing.T) {
 		assert.Equal(t, int64(-1), calculateLifetime(true, unixTime(2), -1))
 		assert.Equal(t, int64(0), calculateLifetime(true, 0, 1))
 		assert.Equal(t, int64(-1), calculateLifetime(true, -1, 1))
+	})
+}
+
+func TestAPILimit_Duration(t *testing.T) {
+	t.Run("valid limit", func(t *testing.T) {
+		limit := APILimit{
+			Rate: 1,
+			Per:  2,
+		}
+		expectedDuration := 2 * time.Second
+		assert.Equal(t, expectedDuration, limit.Duration())
+	})
+
+	t.Run("Per is zero", func(t *testing.T) {
+		limit := APILimit{
+			Rate: 1,
+			Per:  0,
+		}
+		expectedDuration := time.Duration(0)
+		assert.Equal(t, expectedDuration, limit.Duration())
+	})
+
+	t.Run("Rate is zero", func(t *testing.T) {
+		limit := APILimit{
+			Rate: 0,
+			Per:  2,
+		}
+		expectedDuration := time.Duration(0)
+		assert.Equal(t, expectedDuration, limit.Duration())
 	})
 }
