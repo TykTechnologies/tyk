@@ -1728,13 +1728,20 @@ func (a *APISpec) getVersionFromRequest(r *http.Request) string {
 		// First non-empty part of the path is the version ID
 		for _, part := range strings.Split(uPath, "/") {
 			if part != "" {
-				if a.VersionDefinition.StripVersioningData || a.VersionDefinition.StripPath {
+				matchesUrlVersioningPattern := true
+				if a.VersionDefinition.UrlVersioningPattern != "" {
+					re := regexp.MustCompile(a.VersionDefinition.UrlVersioningPattern)
+					matchesUrlVersioningPattern = re.Match([]byte(part))
+				}
+
+				if (a.VersionDefinition.StripVersioningData || a.VersionDefinition.StripPath) && matchesUrlVersioningPattern {
 					log.Debug("Stripping version from url: ", part)
 
 					r.URL.Path = strings.Replace(r.URL.Path, part+"/", "", 1)
 					r.URL.RawPath = strings.Replace(r.URL.RawPath, part+"/", "", 1)
 				}
 
+				//never delete this line as there's an easy to miss defer statement above
 				vName = part
 
 				return part

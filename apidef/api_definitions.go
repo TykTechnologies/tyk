@@ -376,16 +376,17 @@ func (e *ExtendedPathsSet) Clear() {
 }
 
 type VersionDefinition struct {
-	Enabled             bool              `bson:"enabled" json:"enabled"`
-	Name                string            `bson:"name" json:"name"`
-	Default             string            `bson:"default" json:"default"`
-	Location            string            `bson:"location" json:"location"`
-	Key                 string            `bson:"key" json:"key"`
-	StripPath           bool              `bson:"strip_path" json:"strip_path"` // Deprecated. Use StripVersioningData instead.
-	StripVersioningData bool              `bson:"strip_versioning_data" json:"strip_versioning_data"`
-	FallbackToDefault   bool              `bson:"fallback_to_default" json:"fallback_to_default"`
-	Versions            map[string]string `bson:"versions" json:"versions"`
-	BaseID              string            `bson:"base_id" json:"-"` // json tag is `-` because we want this to be hidden to user
+	Enabled              bool              `bson:"enabled" json:"enabled"`
+	Name                 string            `bson:"name" json:"name"`
+	Default              string            `bson:"default" json:"default"`
+	Location             string            `bson:"location" json:"location"`
+	Key                  string            `bson:"key" json:"key"`
+	StripPath            bool              `bson:"strip_path" json:"strip_path"` // Deprecated. Use StripVersioningData instead.
+	StripVersioningData  bool              `bson:"strip_versioning_data" json:"strip_versioning_data"`
+	UrlVersioningPattern string            `bson:"url_versioning_pattern" json:"url_versioning_pattern"`
+	FallbackToDefault    bool              `bson:"fallback_to_default" json:"fallback_to_default"`
+	Versions             map[string]string `bson:"versions" json:"versions"`
+	BaseID               string            `bson:"base_id" json:"-"` // json tag is `-` because we want this to be hidden to user
 }
 
 type VersionData struct {

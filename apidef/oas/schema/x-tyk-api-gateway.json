@@ -1402,6 +1402,9 @@
         },
         "fallbackToDefault": {
           "type": "boolean"
+        },
+        "urlVersioningPattern": {
+          "type": "string"
         }
       },
       "required": [
