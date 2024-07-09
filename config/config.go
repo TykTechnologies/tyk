@@ -1098,34 +1098,34 @@ type Config struct {
 	// In this example, api-listen-path is set to /secret and api-auth-key is set to
 	// /another-secret. If the listen path in an API Definition has value secrets://api-listen-path,
 	// then Tyk Gateway will replace it with the value of the api-listen-path key, i.e. /secret.
-    //
-    // As another example, if you create a Key-Value pair in the secrets section of the tyk.conf file 
-    // with the Key auth_header_name:
-    //
-    // {
-    //   "secrets": {
-    //   "auth_header_name": "Authorization"
-    // }
-    //
-    // Then within your API definition you could use the Value for the authentication header name as follows:
-    //
-    // {
-    //   "x-tyk-api-gateway": {
-    //     "components": {
-    //       "securitySchemes": {
-    //         "authToken": {
-    //           "type": "apiKey",
-    //           "in": "header",
-    //           "name": "secrets://auth_header_name"
-    //         }
-    //       }
-    //     }
-    //   }
-    // }
-    //
-    // When the Gateway starts, Tyk will read the Value from the secrets section in the Gateway config file and
-    // use this to identify the header where Tyk Gateway should look for the Authentication token in requests
-    // to your Tyk OAS API.
+	//
+	// As another example, if you create a Key-Value pair in the secrets section of the tyk.conf file
+	// with the Key auth_header_name:
+	//
+	// {
+	//   "secrets": {
+	//   "auth_header_name": "Authorization"
+	// }
+	//
+	// Then within your API definition you could use the Value for the authentication header name as follows:
+	//
+	// {
+	//   "x-tyk-api-gateway": {
+	//     "components": {
+	//       "securitySchemes": {
+	//         "authToken": {
+	//           "type": "apiKey",
+	//           "in": "header",
+	//           "name": "secrets://auth_header_name"
+	//         }
+	//       }
+	//     }
+	//   }
+	// }
+	//
+	// When the Gateway starts, Tyk will read the Value from the secrets section in the Gateway config file and
+	// use this to identify the header where Tyk Gateway should look for the Authentication token in requests
+	// to your Tyk OAS API.
 	Secrets map[string]string `json:"secrets"`
 
 	// Override the default error code and or message returned by middleware.
