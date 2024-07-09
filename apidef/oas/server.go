@@ -189,7 +189,7 @@ func (cc *ClientCertificates) ExtractTo(api *apidef.APIDefinition) {
 type GatewayTags struct {
 	// Enabled activates use of segment tags.
 	Enabled bool `bson:"enabled" json:"enabled"`
-	// Tags is a list of segment tags
+	// Tags contains a list of segment tags.
 	Tags []string `bson:"tags" json:"tags"`
 }
 
