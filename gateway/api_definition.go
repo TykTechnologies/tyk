@@ -1730,8 +1730,12 @@ func (a *APISpec) getVersionFromRequest(r *http.Request) string {
 			if part != "" {
 				matchesUrlVersioningPattern := true
 				if a.VersionDefinition.UrlVersioningPattern != "" {
-					re := regexp.MustCompile(a.VersionDefinition.UrlVersioningPattern)
-					matchesUrlVersioningPattern = re.Match([]byte(part))
+					re, err := regexp.Compile(a.VersionDefinition.UrlVersioningPattern)
+					if err != nil {
+						log.Error("Error compiling versioning pattern: ", err)
+					} else {
+						matchesUrlVersioningPattern = re.Match([]byte(part))
+					}
 				}
 
 				if (a.VersionDefinition.StripVersioningData || a.VersionDefinition.StripPath) && matchesUrlVersioningPattern {
