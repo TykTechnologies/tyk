@@ -1,12 +1,17 @@
 package gateway
 
 import (
+	"bytes"
+	"crypto/rand"
+	"crypto/rsa"
 	"crypto/tls"
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/json"
+	"encoding/pem"
 	"fmt"
 	"io/ioutil"
+	"math/big"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -284,6 +289,76 @@ func TestGatewayControlAPIMutualTLS(t *testing.T) {
 		_, _ = ts.Run(t, test.TestCase{
 			Path: "/tyk/certs", Code: 200, ControlRequest: true, AdminAuth: true, Client: clientWithCert,
 		})
+	})
+
+	t.Run("validate client cert against certificate authority", func(t *testing.T) {
+		rootCertPEM, rootKeyPEM, err := generateRootCertAndKey(t)
+		assert.NoError(t, err)
+
+		serverCertPEM, serverKeyPEM, err := generateServerCertAndKeyChain(t, rootCertPEM, rootKeyPEM)
+		assert.NoError(t, err)
+		combinedPEM := bytes.Join([][]byte{serverCertPEM.Bytes(), serverKeyPEM.Bytes()}, []byte("\n"))
+
+		certID, _, err := certs.GetCertIDAndChainPEM(combinedPEM, "")
+		assert.NoError(t, err)
+
+		rootCertID, _, err := certs.GetCertIDAndChainPEM(rootCertPEM, "")
+		assert.NoError(t, err)
+
+		conf := func(globalConf *config.Config) {
+			globalConf.HttpServerOptions.UseSSL = true
+			globalConf.HttpServerOptions.SSLInsecureSkipVerify = false
+			globalConf.HttpServerOptions.SSLCertificates = []string{"default" + certID}
+			globalConf.SuppressRedisSignalReload = true
+			globalConf.Security.ControlAPIUseMutualTLS = true
+			controlAPICerts := []string{"default" + rootCertID}
+			globalConf.Security.Certificates = config.CertificatesConfig{
+				ControlAPI: controlAPICerts,
+			}
+		}
+		ts := StartTest(conf)
+
+		certID, err = ts.Gw.CertificateManager.Add(combinedPEM, "default")
+		assert.NoError(t, err)
+
+		_, err = ts.Gw.CertificateManager.Add(rootCertPEM, "default")
+		assert.NoError(t, err)
+		defer ts.Gw.CertificateManager.Delete(rootCertID, "default")
+
+		ts.ReloadGatewayProxy()
+
+		clientCertPEM, clientKeyPEM, err := generateClientCertAndKeyChain(t, rootCertPEM, rootKeyPEM)
+		assert.NoError(t, err)
+
+		clientCert, _ := tls.X509KeyPair(clientCertPEM.Bytes(), clientKeyPEM.Bytes())
+
+		t.Run("valid client", func(t *testing.T) {
+			validCertClient := GetTLSClient(&clientCert, rootCertPEM)
+			_, _ = ts.Run(t, test.TestCase{
+				ControlRequest: true,
+				AdminAuth:      true,
+				Domain:         "localhost",
+				Client:         validCertClient,
+				Path:           "/tyk/certs",
+				Code:           http.StatusOK,
+			})
+		})
+
+		t.Run("invalid client", func(t *testing.T) {
+			_, _, _, invalidClientCert := crypto.GenCertificate(&x509.Certificate{}, false)
+			tlsConfig := GetTLSConfig(&invalidClientCert, nil)
+			tlsConfig.InsecureSkipVerify = false
+			transport := &http.Transport{TLSClientConfig: tlsConfig}
+
+			invalidClient := &http.Client{Transport: transport}
+			u, err := url.Parse(ts.URL)
+
+			req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("localhost:%s/static-mtls", u.Port()), nil)
+			assert.NoError(t, err)
+			_, err = invalidClient.Do(req)
+			assert.Error(t, err)
+		})
+
 	})
 }
 
@@ -1732,4 +1807,257 @@ func TestStaticMTLSAPI(t *testing.T) {
 			Code:      http.StatusOK,
 		})
 	})
+
+	t.Run("validate client cert against certificate authority", func(t *testing.T) {
+		rootCertPEM, rootKeyPEM, err := generateRootCertAndKey(t)
+		assert.NoError(t, err)
+
+		serverCertPEM, serverKeyPEM, err := generateServerCertAndKeyChain(t, rootCertPEM, rootKeyPEM)
+		assert.NoError(t, err)
+		combinedPEM := bytes.Join([][]byte{serverCertPEM.Bytes(), serverKeyPEM.Bytes()}, []byte("\n"))
+
+		certID, _, err := certs.GetCertIDAndChainPEM(combinedPEM, "")
+		assert.NoError(t, err)
+
+		conf := func(globalConf *config.Config) {
+			globalConf.Security.ControlAPIUseMutualTLS = false
+			globalConf.HttpServerOptions.UseSSL = true
+			globalConf.HttpServerOptions.SSLInsecureSkipVerify = false
+			globalConf.HttpServerOptions.SSLCertificates = []string{"default" + certID}
+			globalConf.SuppressRedisSignalReload = true
+		}
+		ts := StartTest(conf)
+
+		certID, err = ts.Gw.CertificateManager.Add(combinedPEM, "default")
+		assert.NoError(t, err)
+		defer ts.Gw.CertificateManager.Delete(certID, "default")
+		ts.ReloadGatewayProxy()
+
+		clientCertPEM, clientKeyPEM, err := generateClientCertAndKeyChain(t, rootCertPEM, rootKeyPEM)
+		assert.NoError(t, err)
+
+		rootCertID, err := ts.Gw.CertificateManager.Add(rootCertPEM, "default")
+		assert.NoError(t, err)
+
+		clientCert, _ := tls.X509KeyPair(clientCertPEM.Bytes(), clientKeyPEM.Bytes())
+
+		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+			spec.APIID = "apiID-1"
+			spec.UseMutualTLSAuth = true
+			spec.Proxy.ListenPath = "/static-mtls"
+			spec.ClientCertificates = []string{rootCertID}
+		})
+
+		t.Run("valid client", func(t *testing.T) {
+			validCertClient := GetTLSClient(&clientCert, rootCertPEM)
+			_, _ = ts.Run(t, test.TestCase{
+				Domain: "localhost",
+				Client: validCertClient,
+				Path:   "/static-mtls",
+				Code:   http.StatusOK,
+			})
+		})
+
+		t.Run("invalid client", func(t *testing.T) {
+			_, _, _, invalidClientCert := crypto.GenCertificate(&x509.Certificate{}, false)
+			tlsConfig := GetTLSConfig(&invalidClientCert, nil)
+			tlsConfig.InsecureSkipVerify = false
+			transport := &http.Transport{TLSClientConfig: tlsConfig}
+
+			invalidClient := &http.Client{Transport: transport}
+			u, err := url.Parse(ts.URL)
+
+			req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("localhost:%s/static-mtls", u.Port()), nil)
+			assert.NoError(t, err)
+			_, err = invalidClient.Do(req)
+			assert.Error(t, err)
+		})
+
+	})
+}
+
+func generateRootCertAndKey(tb testing.TB) ([]byte, []byte, error) {
+	tb.Helper()
+	// Generate RSA key pair
+	rootKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	// Create a template for the root certificate
+	rootCertTemplate := x509.Certificate{
+		SerialNumber: big.NewInt(1),
+		Subject: pkix.Name{
+			Organization:  []string{"Tyk Technologies Ltd"},
+			Country:       []string{"UK"},
+			Province:      []string{"London"},
+			Locality:      []string{"London"},
+			StreetAddress: []string{"Worship Street"},
+		},
+		NotBefore:             time.Now(),
+		NotAfter:              time.Now().AddDate(10, 0, 0), // 10 years
+		KeyUsage:              x509.KeyUsageCertSign | x509.KeyUsageCRLSign,
+		BasicConstraintsValid: true,
+		IsCA:                  true,
+	}
+
+	// Create the root certificate
+	rootCertDER, err := x509.CreateCertificate(rand.Reader, &rootCertTemplate, &rootCertTemplate, &rootKey.PublicKey, rootKey)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	// Encode the root certificate to PEM format
+	var rootCertPEM bytes.Buffer
+	_ = pem.Encode(&rootCertPEM, &pem.Block{Type: "CERTIFICATE", Bytes: rootCertDER})
+
+	// Encode the root private key to PEM format
+	var rootKeyPEM bytes.Buffer
+	_ = pem.Encode(&rootKeyPEM, &pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(rootKey)})
+
+	return rootCertPEM.Bytes(), rootKeyPEM.Bytes(), nil
+}
+
+func generateServerCertAndKeyPEM(tb testing.TB, rootCertPEM, rootKeyPEM []byte) (*bytes.Buffer, *bytes.Buffer, error) {
+	tb.Helper()
+
+	rootCertBlock, _ := pem.Decode(rootCertPEM)
+	if rootCertBlock == nil || rootCertBlock.Type != "CERTIFICATE" {
+		return nil, nil, fmt.Errorf("failed to decode root certificate PEM")
+	}
+	rootCert, err := x509.ParseCertificate(rootCertBlock.Bytes)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	// Decode the root private key
+	rootKeyBlock, _ := pem.Decode(rootKeyPEM)
+	if rootKeyBlock == nil || rootKeyBlock.Type != "RSA PRIVATE KEY" {
+		return nil, nil, fmt.Errorf("failed to decode root key PEM")
+	}
+	rootKey, err := x509.ParsePKCS1PrivateKey(rootKeyBlock.Bytes)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	// Generate RSA key pair for the server
+	serverKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	// Create a template for the server certificate
+	serverCertTemplate := x509.Certificate{
+		SerialNumber: big.NewInt(2),
+		Subject: pkix.Name{
+			Organization:  []string{"Tyk Technologies Ltd"},
+			Country:       []string{"UK"},
+			Province:      []string{"London"},
+			Locality:      []string{"London"},
+			StreetAddress: []string{"Worship Street"},
+		},
+		NotBefore:   time.Now(),
+		NotAfter:    time.Now().AddDate(1, 0, 0), // 1 year
+		KeyUsage:    x509.KeyUsageDigitalSignature | x509.KeyUsageKeyEncipherment,
+		ExtKeyUsage: []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
+		IPAddresses: []net.IP{net.ParseIP("127.0.0.1")},
+		DNSNames:    []string{"localhost"},
+	}
+
+	// Create the server certificate signed by the root CA
+	serverCertDER, err := x509.CreateCertificate(rand.Reader, &serverCertTemplate, rootCert, &serverKey.PublicKey, rootKey)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	// Encode the server certificate to PEM format
+	var serverCertPEM bytes.Buffer
+	_ = pem.Encode(&serverCertPEM, &pem.Block{Type: "CERTIFICATE", Bytes: serverCertDER})
+
+	// Encode the server private key to PEM format
+	var serverKeyPEM bytes.Buffer
+	_ = pem.Encode(&serverKeyPEM, &pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(serverKey)})
+
+	return &serverCertPEM, &serverKeyPEM, nil
+}
+
+func generateServerCertAndKeyChain(tb testing.TB, rootCertPEM, rootKeyPEM []byte) (*bytes.Buffer, *bytes.Buffer, error) {
+	tb.Helper()
+	serverCertPEM, serverKeyPEM, err := generateServerCertAndKeyPEM(tb, rootCertPEM, rootKeyPEM)
+	assert.NoError(tb, err)
+	// Include the root certificate in the client certificate chain
+	_, _ = serverCertPEM.Write(rootCertPEM)
+
+	return serverCertPEM, serverKeyPEM, nil
+}
+
+func generateClientCertAndKeyPEM(tb testing.TB, rootCertPEM, rootKeyPEM []byte) (*bytes.Buffer, *bytes.Buffer, error) {
+	tb.Helper()
+	// Decode the root certificate
+	rootCertBlock, _ := pem.Decode(rootCertPEM)
+	if rootCertBlock == nil || rootCertBlock.Type != "CERTIFICATE" {
+		return nil, nil, fmt.Errorf("failed to decode root certificate PEM")
+	}
+	rootCert, err := x509.ParseCertificate(rootCertBlock.Bytes)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	// Decode the root private key
+	rootKeyBlock, _ := pem.Decode(rootKeyPEM)
+	if rootKeyBlock == nil || rootKeyBlock.Type != "RSA PRIVATE KEY" {
+		return nil, nil, fmt.Errorf("failed to decode root key PEM")
+	}
+	rootKey, err := x509.ParsePKCS1PrivateKey(rootKeyBlock.Bytes)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	// Generate RSA key pair for the client
+	clientKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	// Create a template for the client certificate
+	clientCertTemplate := x509.Certificate{
+		SerialNumber: big.NewInt(3),
+		Subject: pkix.Name{
+			Organization:  []string{"Tyk Technologies Ltd"},
+			Country:       []string{"UK"},
+			Province:      []string{"London"},
+			Locality:      []string{"London"},
+			StreetAddress: []string{"Worship Street"},
+		},
+		NotBefore:   time.Now(),
+		NotAfter:    time.Now().AddDate(1, 0, 0), // 1 year
+		KeyUsage:    x509.KeyUsageDigitalSignature | x509.KeyUsageKeyEncipherment,
+		ExtKeyUsage: []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
+	}
+
+	// Create the client certificate signed by the root CA
+	clientCertDER, err := x509.CreateCertificate(rand.Reader, &clientCertTemplate, rootCert, &clientKey.PublicKey, rootKey)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	// Encode the client certificate to PEM format
+	var clientCertPEM bytes.Buffer
+	_ = pem.Encode(&clientCertPEM, &pem.Block{Type: "CERTIFICATE", Bytes: clientCertDER})
+
+	// Encode the client private key to PEM format
+	var clientKeyPEM bytes.Buffer
+	_ = pem.Encode(&clientKeyPEM, &pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(clientKey)})
+
+	return &clientCertPEM, &clientKeyPEM, nil
+}
+
+func generateClientCertAndKeyChain(tb testing.TB, rootCertPEM, rootKeyPEM []byte) (*bytes.Buffer, *bytes.Buffer, error) {
+	tb.Helper()
+	clientCertPEM, clientKeyPEM, err := generateClientCertAndKeyPEM(tb, rootCertPEM, rootKeyPEM)
+	assert.NoError(tb, err)
+	// Include the root certificate in the client certificate chain
+	_, _ = clientCertPEM.Write(rootCertPEM)
+
+	return clientCertPEM, clientKeyPEM, nil
 }
