@@ -164,11 +164,7 @@ jobs:
             type=semver,pattern={{major}}
             type=semver,pattern={{major}}.{{minor}}
             type=semver,pattern={{version}}
-          labels: |
-            org.opencontainers.image.title=tyk-gateway (distroless)
-            org.opencontainers.image.description=Tyk Open Source API Gateway written in Go, supporting REST, GraphQL, TCP and gRPC protocols
-            org.opencontainers.image.vendor=tyk.io
-            org.opencontainers.image.version=${{ github.ref_name }}
+          labels: "org.opencontainers.image.title=tyk-gateway  (distroless) \norg.opencontainers.image.description=Tyk Open Source API Gateway written in Go, supporting REST, GraphQL, TCP and gRPC protocols\norg.opencontainers.image.vendor=tyk.io\norg.opencontainers.image.version=${{ github.ref_name }}\n"
       - name: build multiarch image
         if: ${{ matrix.golang_cross == '1.21-bullseye' }}
         uses: docker/build-push-action@v5
@@ -212,7 +208,7 @@ jobs:
         shell: bash
         env:
           # Cover pull_request_target too
-          BASE_REF: ${{startsWith(github.event_name, 'pull_request') && github.base_ref || github.ref}}
+          BASE_REF: ${{startsWith(github.event_name, 'pull_request') && github.base_ref || github.ref_name}}
         run: |
           set -eo pipefail
           endpoint="http://tui.internal.dev.tyk.technology/api/tyk/$BASE_REF/${{ github.event_name}}/api"
@@ -284,33 +280,14 @@ jobs:
           GH_TOKEN: ${{ secrets.ORG_GH_TOKEN }}
           TYK_DB_LICENSEKEY: ${{ secrets.DASH_LICENSE }}
           TYK_MDCB_LICENSE: ${{ secrets.MDCB_LICENSE }}
-          BASE_REF: ${{startsWith(github.event_name, 'pull_request') && github.base_ref || github.ref}}
-        run: |
-          tags=(${{ needs.goreleaser.outputs.tags }})
-          docker run -q --rm -v ~/.docker/config.json:/root/.docker/config.json tykio/gromit policy match ${tags[0]} 2>versions.env
-          echo '# alfa and beta have to come after the override
-          tyk_alfa_image=$tyk_image
-          tyk_beta_image=$tyk_image
-          ECR=${{steps.ecr.outputs.registry}}
-          tyk_pump_image=${{matrix.pump}}
-          tyk_sink_image=${{matrix.sink}}
-          confs_dir=./pro-ha
-          env_file=local-${{ matrix.envfiles.db }}.env' >> versions.env
-          echo "::group::versions"
-          cat versions.env
-          echo "::endgroup::"
-          # Add Tyk component config variations to $env_file
-          cat confs/${{ matrix.envfiles.config }}.env >> local-${{ matrix.envfiles.db }}.env
-          # bring up env, the project name is important
-          docker compose -p auto -f pro-ha.yml -f deps_pro-ha.yml -f ${{ matrix.envfiles.db }}.yml -f ${{ matrix.envfiles.cache }}.yml  --env-file versions.env --profile master-datacenter up --quiet-pull -d
-          ./dash-bootstrap.sh http://localhost:3000
-          docker compose -p auto -f pro-ha.yml -f deps_pro-ha.yml -f ${{ matrix.envfiles.db }}.yml -f ${{ matrix.envfiles.cache }}.yml  --env-file versions.env --profile slave-datacenter up --quiet-pull -d
+          BASE_REF: ${{startsWith(github.event_name, 'pull_request') && github.base_ref || github.ref_name}}
+        run: "match_tag=${{steps.ecr.outputs.registry}}/$REPO:$BASE_REF\ntags=(${{ needs.goreleaser.outputs.tags }}) \ndocker run -q --rm -v ~/.docker/config.json:/root/.docker/config.json tykio/gromit policy match ${tags[0]} ${match_tag} 2>versions.env\necho '# alfa and beta have to come after the override\ntyk_alfa_image=$tyk_image\ntyk_beta_image=$tyk_image\nECR=${{steps.ecr.outputs.registry}}\ntyk_pump_image=${{matrix.pump}}\ntyk_sink_image=${{matrix.sink}}\nconfs_dir=./pro-ha\nenv_file=local-${{ matrix.envfiles.db }}.env' >> versions.env\necho \"::group::versions\"\ncat versions.env\necho \"::endgroup::\"\n# Add Tyk component config variations to $env_file\ncat confs/${{ matrix.envfiles.config }}.env >> local-${{ matrix.envfiles.db }}.env\n# bring up env, the project name is important\ndocker compose -p auto -f pro-ha.yml -f deps_pro-ha.yml -f ${{ matrix.envfiles.db }}.yml -f ${{ matrix.envfiles.cache }}.yml  --env-file versions.env --profile master-datacenter up --quiet-pull -d\n./dash-bootstrap.sh http://localhost:3000\ndocker compose -p auto -f pro-ha.yml -f deps_pro-ha.yml -f ${{ matrix.envfiles.db }}.yml -f ${{ matrix.envfiles.cache }}.yml  --env-file versions.env --profile slave-datacenter up --quiet-pull -d\n"
       - name: Run tests
         working-directory: auto
         id: test_execution
         env:
           # Cover pull_request_target too
-          BASE_REF: ${{startsWith(github.event_name, 'pull_request') && github.base_ref || github.ref}}
+          BASE_REF: ${{startsWith(github.event_name, 'pull_request') && github.base_ref || github.ref_name }}
         run: |
           # Generate report id
           echo "id=$(date +%s%N)" >> $GITHUB_OUTPUT
