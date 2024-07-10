@@ -134,7 +134,6 @@ jobs:
             type=ref,event=pr
             type=sha,format=long
             type=semver,pattern={{major}},prefix=v
-            type=raw,priority=700,value=${{ steps.set_outputs.outputs.branch}},enable=${{ github.event_name == 'pull_request' }},prefix=
             type=semver,pattern={{major}}.{{minor}},prefix=v
             type=semver,pattern={{version}},prefix=v
       - name: push image to CI
@@ -150,6 +149,35 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
           tags: ${{ steps.ci_metadata.outputs.tags }}
+          labels: ${{ steps.tag_metadata.outputs.labels }}
+      - name: Docker metadata for tag push
+        id: tag_metadata
+        uses: docker/metadata-action@v5
+        with:
+          images: |
+            tykio/tyk-gateway
+            docker.tyk.io/tyk-gateway/tyk-gateway
+          flavor: |
+            latest=false
+            prefix=v
+          tags: |
+            type=semver,pattern={{major}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{version}}
+          labels: "org.opencontainers.image.title=tyk-gateway \norg.opencontainers.image.description=Tyk Open Source API Gateway written in Go, supporting REST, GraphQL, TCP and gRPC protocols\norg.opencontainers.image.vendor=tyk.io\norg.opencontainers.image.version=${{ github.ref_name }}\n"
+      - name: build multiarch image
+        if: ${{ matrix.golang_cross == '1.21-bullseye' }}
+        uses: docker/build-push-action@v5
+        with:
+          context: "dist"
+          platforms: linux/amd64,linux/arm64
+          file: ci/Dockerfile.std
+          provenance: mode=max
+          sbom: true
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          push: ${{ startsWith(github.ref, 'refs/tags') }}
+          tags: ${{ steps.tag_metadata.outputs.tags }}
           labels: ${{ steps.tag_metadata.outputs.labels }}
       - uses: actions/upload-artifact@v4
         if: ${{ matrix.golang_cross == '1.21-bullseye' }}
@@ -180,7 +208,7 @@ jobs:
         shell: bash
         env:
           # Cover pull_request_target too
-          BASE_REF: ${{startsWith(github.event_name, 'pull_request') && github.base_ref || github.ref}}
+          BASE_REF: ${{startsWith(github.event_name, 'pull_request') && github.base_ref || github.ref_name}}
         run: |
           set -eo pipefail
           endpoint="http://tui.internal.dev.tyk.technology/api/tyk/$BASE_REF/${{ github.event_name}}/api"
@@ -252,10 +280,12 @@ jobs:
           GH_TOKEN: ${{ secrets.ORG_GH_TOKEN }}
           TYK_DB_LICENSEKEY: ${{ secrets.DASH_LICENSE }}
           TYK_MDCB_LICENSE: ${{ secrets.MDCB_LICENSE }}
-          BASE_REF: ${{startsWith(github.event_name, 'pull_request') && github.base_ref || github.ref}}
+          BASE_REF: ${{startsWith(github.event_name, 'pull_request') && github.base_ref || github.ref_name}}
         run: |
+          match_tag=${{steps.ecr.outputs.registry}}/$REPO:$BASE_REF
+          docker run -q --rm -v ~/.docker/config.json:/root/.docker/config.json tykio/gromit policy match ${match_tag} 2>versions.env
           tags=(${{ needs.goreleaser.outputs.tags }})
-          docker run -q --rm -v ~/.docker/config.json:/root/.docker/config.json tykio/gromit policy match ${tags[0]} 2>versions.env
+          tyk_image=${tags[0]}
           echo '# alfa and beta have to come after the override
           tyk_alfa_image=$tyk_image
           tyk_beta_image=$tyk_image
@@ -278,7 +308,7 @@ jobs:
         id: test_execution
         env:
           # Cover pull_request_target too
-          BASE_REF: ${{startsWith(github.event_name, 'pull_request') && github.base_ref || github.ref}}
+          BASE_REF: ${{startsWith(github.event_name, 'pull_request') && github.base_ref || github.ref_name }}
         run: |
           # Generate report id
           echo "id=$(date +%s%N)" >> $GITHUB_OUTPUT
@@ -335,7 +365,7 @@ jobs:
           TYK_MDCB_LICENSE: ${{ secrets.MDCB_LICENSE }}
           ECR: ${{ steps.ecr.outputs.registry }}
         run: |
-          docker compose -p auto -f pro-ha.yml -f deps_pro-ha.yml -f ${{ matrix.envfiles.db }}.yml -f ${{ matrix.envfiles.cache_db }}.yml  --env-file versions.env --profile all logs | sort > ${{ github.workspace }}/docker-compose.log
+          docker compose -p auto -f pro-ha.yml -f deps_pro-ha.yml -f ${{ matrix.envfiles.db }}.yml -f ${{ matrix.envfiles.cache }}.yml  --env-file versions.env --profile all logs | sort > ${{ github.workspace }}/docker-compose.log
           echo "::group::DockerLogs"
           cat ${{ github.workspace }}/docker-compose.log
           echo "::endgroup::"
