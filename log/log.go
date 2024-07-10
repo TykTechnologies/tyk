@@ -27,18 +27,32 @@ func init() {
 	setupGlobals()
 }
 
-func setupGlobals() {
-	log.Formatter = NewFormatter(os.Getenv("TYK_LOGFORMAT"))
+func getenv(names ...string) string {
+	for _, name := range names {
+		val := os.Getenv(name)
+		if val == "" {
+			continue
+		}
+		return strings.ToLower(val)
+	}
+	return ""
+}
 
-	switch strings.ToLower(os.Getenv("TYK_LOGLEVEL")) {
-	case "error":
-		log.Level = logrus.ErrorLevel
-	case "warn":
-		log.Level = logrus.WarnLevel
-	case "debug":
-		log.Level = logrus.DebugLevel
-	default:
-		log.Level = logrus.InfoLevel
+var logLevels = map[string]logrus.Level{
+	"error": logrus.ErrorLevel,
+	"warn":  logrus.WarnLevel,
+	"debug": logrus.DebugLevel,
+	"info":  logrus.InfoLevel,
+}
+
+func setupGlobals() {
+	format := getenv("TYK_LOGFORMAT", "TYK_GW_LOGFORMAT")
+	logLevel := getenv("TYK_LOGLEVEL", "TYK_GW_LOGLEVEL")
+
+	log.Formatter = NewFormatter(format)
+
+	if level, ok := logLevels[logLevel]; ok {
+		log.Level = level
 	}
 
 	rawLog.Formatter = new(RawFormatter)
