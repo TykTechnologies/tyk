@@ -75,21 +75,29 @@ func GetRaw() *logrus.Logger {
 	return rawLog
 }
 
-func NewFormatter(format string) logrus.Formatter {
-	switch strings.ToLower(format) {
-	case "json":
-		return &logrus.JSONFormatter{
-			TimestampFormat: time.RFC3339,
-		}
-	case "json-ext":
-		return &JSONFormatter{
-			TimestampFormat: time.RFC3339,
-		}
-	default:
-		return &logrus.TextFormatter{
-			TimestampFormat: "Jan 02 15:04:05",
-			FullTimestamp:   true,
-			DisableColors:   true,
-		}
+// formatterIndex serves as a list of formatters supported.
+// it can be extended from test scope for benchmark purposes.
+var (
+	formatterIndex = map[string]func() logrus.Formatter{
+		"default": func() logrus.Formatter {
+			return &logrus.TextFormatter{
+				TimestampFormat: "Jan 02 15:04:05",
+				FullTimestamp:   true,
+				DisableColors:   true,
+			}
+		},
+		"json": func() logrus.Formatter {
+			return &JSONFormatter{
+				TimestampFormat: time.RFC3339,
+			}
+		},
 	}
+)
+
+func NewFormatter(format string) logrus.Formatter {
+	ctor, ok := formatterIndex[format]
+	if !ok {
+		ctor, _ = formatterIndex["default"]
+	}
+	return ctor()
 }
