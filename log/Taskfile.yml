@@ -1,0 +1,8 @@
+---
+version: "3"
+
+tasks:
+  benchmark:
+    desc: "Run benchmark"
+    cmds:
+      - go test -count=1 -bench=. -benchtime=10s -benchmem ./...
