@@ -7,7 +7,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// JSONFormatter formats logs into parsable json
+// JSONFormatter formats logs into parsable json.
 type JSONFormatter struct {
 	// TimestampFormat sets the format used for marshaling timestamps.
 	// The format to use is the same than for time.Format or time.Parse from the standard
@@ -15,7 +15,7 @@ type JSONFormatter struct {
 	// The standard Library already provides a set of predefined format.
 	TimestampFormat string
 
-	// DisableTimestamp allows disabling automatic timestamps in output
+	// DisableTimestamp allows disabling automatic timestamps in output.
 	DisableTimestamp bool
 
 	// DataKey allows users to put all the log entry parameters into a nested dictionary at a given key.
