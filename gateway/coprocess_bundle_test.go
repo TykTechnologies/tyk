@@ -375,7 +375,7 @@ func TestResponseOverride(t *testing.T) {
 	})
 }
 
-func TestPullBundle(t *testing.T) {
+func TestBundle_Pull(t *testing.T) {
 	t.Skip()
 
 	testCases := []struct {
