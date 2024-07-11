@@ -20,7 +20,7 @@ import (
 
 	"github.com/golang/protobuf/proto"
 
-	python "github.com/TykTechnologies/tyk/dlpython"
+	"github.com/TykTechnologies/tyk/internal/python"
 )
 import (
 	"os"

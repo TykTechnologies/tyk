@@ -15,7 +15,7 @@ import (
 	"sync"
 	textTemplate "text/template"
 
-	"github.com/TykTechnologies/tyk/rpc"
+	"github.com/TykTechnologies/tyk/internal/rpc"
 
 	"github.com/gorilla/mux"
 	"github.com/justinas/alice"
@@ -25,8 +25,8 @@ import (
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/coprocess"
 	"github.com/TykTechnologies/tyk/internal/otel"
+	"github.com/TykTechnologies/tyk/internal/trace"
 	"github.com/TykTechnologies/tyk/storage"
-	"github.com/TykTechnologies/tyk/trace"
 )
 
 const (

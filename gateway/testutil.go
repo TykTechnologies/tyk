@@ -29,7 +29,7 @@ import (
 
 	"github.com/TykTechnologies/tyk/apidef/oas"
 
-	"github.com/TykTechnologies/tyk/rpc"
+	"github.com/TykTechnologies/tyk/internal/rpc"
 
 	"github.com/golang-jwt/jwt/v4"
 

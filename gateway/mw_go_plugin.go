@@ -18,8 +18,8 @@ import (
 
 	"github.com/sirupsen/logrus"
 
-	"github.com/TykTechnologies/tyk/goplugin"
-	"github.com/TykTechnologies/tyk/request"
+	"github.com/TykTechnologies/tyk/internal/goplugin"
+	"github.com/TykTechnologies/tyk/internal/httputil"
 )
 
 // customResponseWriter is a wrapper around standard http.ResponseWriter
@@ -252,7 +252,7 @@ func (m *GoPluginMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reque
 			m.Base().FireEvent(EventAuthFailure, EventKeyFailureMeta{
 				EventMetaDefault: EventMetaDefault{Message: "Auth Failure", OriginatingRequest: EncodeRequestToEvent(r)},
 				Path:             r.URL.Path,
-				Origin:           request.RealIP(r),
+				Origin:           httputil.RealIP(r),
 				Key:              "n/a",
 			})
 			fallthrough

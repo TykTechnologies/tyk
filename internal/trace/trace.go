@@ -5,8 +5,8 @@ import (
 
 	opentracing "github.com/opentracing/opentracing-go"
 
-	"github.com/TykTechnologies/tyk/trace/jaeger"
-	"github.com/TykTechnologies/tyk/trace/openzipkin"
+	"github.com/TykTechnologies/tyk/internal/trace/jaeger"
+	"github.com/TykTechnologies/tyk/internal/trace/openzipkin"
 )
 
 // InitFunc this is a function for initializing a Tracer

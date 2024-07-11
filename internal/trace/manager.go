@@ -12,7 +12,7 @@ import (
 
 	opentracing "github.com/opentracing/opentracing-go"
 
-	"github.com/TykTechnologies/tyk/request"
+	request "github.com/TykTechnologies/tyk/internal/httputil"
 )
 
 // ErrManagerDisabled is returned when trying to use global trace manager when

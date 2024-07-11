@@ -21,7 +21,7 @@ import (
 	"github.com/TykTechnologies/again"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/internal/httputil"
-	"github.com/TykTechnologies/tyk/tcp"
+	"github.com/TykTechnologies/tyk/internal/tcp"
 
 	"github.com/gorilla/mux"
 	"github.com/sirupsen/logrus"

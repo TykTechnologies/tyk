@@ -10,7 +10,7 @@ import (
 	"github.com/gocraft/health"
 
 	"github.com/TykTechnologies/tyk/cli"
-	"github.com/TykTechnologies/tyk/request"
+	"github.com/TykTechnologies/tyk/internal/httputil"
 )
 
 var applicationGCStats = debug.GCStats{}
@@ -55,7 +55,7 @@ func InstrumentationMW(next http.Handler) http.Handler {
 
 		next.ServeHTTP(w, r)
 		job.EventKv("called", health.Kvs{
-			"from_ip":  request.RealIP(r),
+			"from_ip":  httputil.RealIP(r),
 			"method":   r.Method,
 			"endpoint": r.URL.Path,
 			"raw_url":  r.URL.String(),

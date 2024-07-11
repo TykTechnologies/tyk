@@ -10,16 +10,13 @@ import (
 	"strings"
 	"time"
 
-	"github.com/TykTechnologies/tyk/internal/graphql"
-
-	"github.com/TykTechnologies/tyk/apidef"
-	"github.com/TykTechnologies/tyk/internal/httputil"
-
 	"github.com/TykTechnologies/tyk-pump/analytics"
+	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/ctx"
 	"github.com/TykTechnologies/tyk/header"
-	"github.com/TykTechnologies/tyk/request"
+	"github.com/TykTechnologies/tyk/internal/graphql"
+	"github.com/TykTechnologies/tyk/internal/httputil"
 	"github.com/TykTechnologies/tyk/user"
 )
 
@@ -168,7 +165,7 @@ func (s *SuccessHandler) RecordHit(r *http.Request, timing analytics.Latency, co
 		return
 	}
 
-	ip := request.RealIP(r)
+	ip := httputil.RealIP(r)
 	if s.Spec.GlobalConfig.StoreAnalytics(ip) {
 
 		t := time.Now()

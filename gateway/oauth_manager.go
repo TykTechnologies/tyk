@@ -18,8 +18,8 @@ import (
 	"golang.org/x/crypto/bcrypt"
 
 	"github.com/TykTechnologies/tyk/internal/errors"
+	"github.com/TykTechnologies/tyk/internal/httputil"
 	"github.com/TykTechnologies/tyk/internal/uuid"
-	"github.com/TykTechnologies/tyk/request"
 
 	"strconv"
 
@@ -500,7 +500,7 @@ func (o *OAuthManager) HandleAccess(r *http.Request) *osin.Response {
 			"client_id":      clientId,
 			"response error": resp.StatusText,
 			"response code":  resp.ErrorStatusCode,
-			"RemoteAddr":     request.RealIP(r), //r.RemoteAddr,
+			"RemoteAddr":     httputil.RealIP(r), //r.RemoteAddr,
 		}).Error("[OAuth] OAuth response marked as error")
 	}
 
