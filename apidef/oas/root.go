@@ -169,7 +169,7 @@ type Versioning struct {
 	Versions []VersionToID `bson:"versions" json:"versions"` // required
 	// StripVersioningData is a boolean flag, if set to `true`, the API responses will be stripped of versioning data.
 	StripVersioningData bool `bson:"stripVersioningData,omitempty" json:"stripVersioningData,omitempty"`
-	// URLVersioningPattern is a string that contains the pattern that if matched will remove the version from the URL.
+	// UrlVersioningPattern is a string that contains the pattern that if matched will remove the version from the URL.
 	UrlVersioningPattern string `bson:"urlVersioningPattern,omitempty" json:"urlVersioningPattern,omitempty"`
 	// FallbackToDefault controls the behaviour of Tyk when a versioned API is called with a nonexistent version name.
 	// If set to `true` then the default API version will be invoked; if set to `false` Tyk will return an HTTP 404
