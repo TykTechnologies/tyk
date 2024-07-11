@@ -6,6 +6,7 @@ import (
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/json"
+	"encoding/pem"
 	"fmt"
 	"io/ioutil"
 	"net"
@@ -1413,7 +1414,7 @@ func TestCertificateHandlerTLS(t *testing.T) {
 		})
 	})
 
-	rootCertPEM, _, err := generateRootCertAndKey(t)
+	rootCertPEM, _, err := crypto.GenerateRootCertAndKey(t)
 	assert.NoError(t, err)
 	rootCertID, _, err := certs.GetCertIDAndChainPEM(rootCertPEM, ts.Gw.GetConfig().Secret)
 	assert.NoError(t, err)
@@ -1907,191 +1908,4 @@ func TestStaticMTLSAPI(t *testing.T) {
 		})
 
 	})
-}
-
-func generateRootCertAndKey(tb testing.TB) ([]byte, []byte, error) {
-	tb.Helper()
-	// Generate RSA key pair
-	rootKey, err := rsa.GenerateKey(rand.Reader, 2048)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	// Create a template for the root certificate
-	rootCertTemplate := x509.Certificate{
-		SerialNumber: big.NewInt(1),
-		Subject: pkix.Name{
-			Organization:  []string{"Tyk Technologies Ltd"},
-			Country:       []string{"UK"},
-			Province:      []string{"London"},
-			Locality:      []string{"London"},
-			StreetAddress: []string{"Worship Street"},
-			CommonName:    "Tyk Certificate Authority",
-		},
-		NotBefore:             time.Now(),
-		NotAfter:              time.Now().AddDate(10, 0, 0), // 10 years
-		KeyUsage:              x509.KeyUsageCertSign | x509.KeyUsageCRLSign,
-		BasicConstraintsValid: true,
-		IsCA:                  true,
-	}
-
-	// Create the root certificate
-	rootCertDER, err := x509.CreateCertificate(rand.Reader, &rootCertTemplate, &rootCertTemplate, &rootKey.PublicKey, rootKey)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	// Encode the root certificate to PEM format
-	var rootCertPEM bytes.Buffer
-	_ = pem.Encode(&rootCertPEM, &pem.Block{Type: "CERTIFICATE", Bytes: rootCertDER})
-
-	// Encode the root private key to PEM format
-	var rootKeyPEM bytes.Buffer
-	_ = pem.Encode(&rootKeyPEM, &pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(rootKey)})
-
-	return rootCertPEM.Bytes(), rootKeyPEM.Bytes(), nil
-}
-
-func generateServerCertAndKeyPEM(tb testing.TB, rootCertPEM, rootKeyPEM []byte) (*bytes.Buffer, *bytes.Buffer, error) {
-	tb.Helper()
-
-	rootCertBlock, _ := pem.Decode(rootCertPEM)
-	if rootCertBlock == nil || rootCertBlock.Type != "CERTIFICATE" {
-		return nil, nil, fmt.Errorf("failed to decode root certificate PEM")
-	}
-	rootCert, err := x509.ParseCertificate(rootCertBlock.Bytes)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	// Decode the root private key
-	rootKeyBlock, _ := pem.Decode(rootKeyPEM)
-	if rootKeyBlock == nil || rootKeyBlock.Type != "RSA PRIVATE KEY" {
-		return nil, nil, fmt.Errorf("failed to decode root key PEM")
-	}
-	rootKey, err := x509.ParsePKCS1PrivateKey(rootKeyBlock.Bytes)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	// Generate RSA key pair for the server
-	serverKey, err := rsa.GenerateKey(rand.Reader, 2048)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	// Create a template for the server certificate
-	serverCertTemplate := x509.Certificate{
-		SerialNumber: big.NewInt(2),
-		Subject: pkix.Name{
-			Organization:  []string{"Tyk Technologies Ltd"},
-			Country:       []string{"UK"},
-			Province:      []string{"London"},
-			Locality:      []string{"London"},
-			StreetAddress: []string{"Worship Street"},
-		},
-		NotBefore:   time.Now(),
-		NotAfter:    time.Now().AddDate(1, 0, 0), // 1 year
-		KeyUsage:    x509.KeyUsageDigitalSignature | x509.KeyUsageKeyEncipherment,
-		ExtKeyUsage: []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
-		IPAddresses: []net.IP{net.ParseIP("127.0.0.1")},
-		DNSNames:    []string{"localhost"},
-	}
-
-	// Create the server certificate signed by the root CA
-	serverCertDER, err := x509.CreateCertificate(rand.Reader, &serverCertTemplate, rootCert, &serverKey.PublicKey, rootKey)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	// Encode the server certificate to PEM format
-	var serverCertPEM bytes.Buffer
-	_ = pem.Encode(&serverCertPEM, &pem.Block{Type: "CERTIFICATE", Bytes: serverCertDER})
-
-	// Encode the server private key to PEM format
-	var serverKeyPEM bytes.Buffer
-	_ = pem.Encode(&serverKeyPEM, &pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(serverKey)})
-
-	return &serverCertPEM, &serverKeyPEM, nil
-}
-
-func generateServerCertAndKeyChain(tb testing.TB, rootCertPEM, rootKeyPEM []byte) (*bytes.Buffer, *bytes.Buffer, error) {
-	tb.Helper()
-	serverCertPEM, serverKeyPEM, err := generateServerCertAndKeyPEM(tb, rootCertPEM, rootKeyPEM)
-	assert.NoError(tb, err)
-	// Include the root certificate in the client certificate chain
-	_, _ = serverCertPEM.Write(rootCertPEM)
-
-	return serverCertPEM, serverKeyPEM, nil
-}
-
-func generateClientCertAndKeyPEM(tb testing.TB, rootCertPEM, rootKeyPEM []byte) (*bytes.Buffer, *bytes.Buffer, error) {
-	tb.Helper()
-	// Decode the root certificate
-	rootCertBlock, _ := pem.Decode(rootCertPEM)
-	if rootCertBlock == nil || rootCertBlock.Type != "CERTIFICATE" {
-		return nil, nil, fmt.Errorf("failed to decode root certificate PEM")
-	}
-	rootCert, err := x509.ParseCertificate(rootCertBlock.Bytes)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	// Decode the root private key
-	rootKeyBlock, _ := pem.Decode(rootKeyPEM)
-	if rootKeyBlock == nil || rootKeyBlock.Type != "RSA PRIVATE KEY" {
-		return nil, nil, fmt.Errorf("failed to decode root key PEM")
-	}
-	rootKey, err := x509.ParsePKCS1PrivateKey(rootKeyBlock.Bytes)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	// Generate RSA key pair for the client
-	clientKey, err := rsa.GenerateKey(rand.Reader, 2048)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	// Create a template for the client certificate
-	clientCertTemplate := x509.Certificate{
-		SerialNumber: big.NewInt(3),
-		Subject: pkix.Name{
-			Organization:  []string{"Tyk Technologies Ltd"},
-			Country:       []string{"UK"},
-			Province:      []string{"London"},
-			Locality:      []string{"London"},
-			StreetAddress: []string{"Worship Street"},
-		},
-		NotBefore:   time.Now(),
-		NotAfter:    time.Now().AddDate(1, 0, 0), // 1 year
-		KeyUsage:    x509.KeyUsageDigitalSignature | x509.KeyUsageKeyEncipherment,
-		ExtKeyUsage: []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
-	}
-
-	// Create the client certificate signed by the root CA
-	clientCertDER, err := x509.CreateCertificate(rand.Reader, &clientCertTemplate, rootCert, &clientKey.PublicKey, rootKey)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	// Encode the client certificate to PEM format
-	var clientCertPEM bytes.Buffer
-	_ = pem.Encode(&clientCertPEM, &pem.Block{Type: "CERTIFICATE", Bytes: clientCertDER})
-
-	// Encode the client private key to PEM format
-	var clientKeyPEM bytes.Buffer
-	_ = pem.Encode(&clientKeyPEM, &pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(clientKey)})
-
-	return &clientCertPEM, &clientKeyPEM, nil
-}
-
-func generateClientCertAndKeyChain(tb testing.TB, rootCertPEM, rootKeyPEM []byte) (*bytes.Buffer, *bytes.Buffer, error) {
-	tb.Helper()
-	clientCertPEM, clientKeyPEM, err := generateClientCertAndKeyPEM(tb, rootCertPEM, rootKeyPEM)
-	assert.NoError(tb, err)
-	// Include the root certificate in the client certificate chain
-	_, _ = clientCertPEM.Write(rootCertPEM)
-
-	return clientCertPEM, clientKeyPEM, nil
 }
