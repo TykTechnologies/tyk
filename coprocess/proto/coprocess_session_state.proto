@@ -75,4 +75,6 @@ message SessionState {
   string certificate = 30;
 
   int64 max_query_depth = 31;
+
+  string key_id = 32;
 }
