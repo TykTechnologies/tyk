@@ -1325,6 +1325,8 @@ func (gw *Gateway) initialiseSystem() error {
 	return nil
 }
 
+// SignatureVerifier returns a verifier to use for validating signatures.
+// It is configured with the PublicKeyPath value in gateway config.
 func (gw *Gateway) SignatureVerifier() (goverify.Verifier, error) {
 	gwConfig := gw.GetConfig()
 	if gwConfig.PublicKeyPath == "" {
