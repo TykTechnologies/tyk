@@ -1,9 +1,6 @@
 ---
 version: "3"
 
-env:
-  TYK_LOGLEVEL: debug
-
 includes:
   services:
     taskfile: ../../docker/services/Taskfile.yml

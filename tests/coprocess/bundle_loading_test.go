@@ -1,4 +1,4 @@
-package regression
+package coprocess_test
 
 import (
 	"net/http"
