@@ -59,11 +59,11 @@ func GenerateRootCertAndKey(tb testing.TB) ([]byte, []byte, error) {
 
 	// Encode the root certificate to PEM format
 	var rootCertPEM bytes.Buffer
-	_ = pem.Encode(&rootCertPEM, &pem.Block{Type: "CERTIFICATE", Bytes: rootCertDER})
+	assert.NoError(tb, pem.Encode(&rootCertPEM, &pem.Block{Type: "CERTIFICATE", Bytes: rootCertDER}))
 
 	// Encode the root private key to PEM format
 	var rootKeyPEM bytes.Buffer
-	_ = pem.Encode(&rootKeyPEM, &pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(rootKey)})
+	assert.NoError(tb, pem.Encode(&rootKeyPEM, &pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(rootKey)}))
 
 	return rootCertPEM.Bytes(), rootKeyPEM.Bytes(), nil
 }
@@ -135,11 +135,11 @@ func GenerateServerCertAndKeyPEM(tb testing.TB, rootCertPEM, rootKeyPEM []byte) 
 
 	// Encode the server certificate to PEM format
 	var serverCertPEM bytes.Buffer
-	_ = pem.Encode(&serverCertPEM, &pem.Block{Type: "CERTIFICATE", Bytes: serverCertDER})
+	assert.NoError(tb, pem.Encode(&serverCertPEM, &pem.Block{Type: "CERTIFICATE", Bytes: serverCertDER}))
 
 	// Encode the server private key to PEM format
 	var serverKeyPEM bytes.Buffer
-	_ = pem.Encode(&serverKeyPEM, &pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(serverKey)})
+	assert.NoError(tb, pem.Encode(&serverKeyPEM, &pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(serverKey)}))
 
 	return &serverCertPEM, &serverKeyPEM, nil
 }
@@ -232,11 +232,11 @@ func GenerateClientCertAndKeyPEM(tb testing.TB, rootCertPEM, rootKeyPEM []byte) 
 
 	// Encode the client certificate to PEM format
 	var clientCertPEM bytes.Buffer
-	_ = pem.Encode(&clientCertPEM, &pem.Block{Type: "CERTIFICATE", Bytes: clientCertDER})
+	assert.NoError(tb, pem.Encode(&clientCertPEM, &pem.Block{Type: "CERTIFICATE", Bytes: clientCertDER}))
 
 	// Encode the client private key to PEM format
 	var clientKeyPEM bytes.Buffer
-	_ = pem.Encode(&clientKeyPEM, &pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(clientKey)})
+	assert.NoError(tb, pem.Encode(&clientKeyPEM, &pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(clientKey)}))
 
 	return &clientCertPEM, &clientKeyPEM, nil
 }
