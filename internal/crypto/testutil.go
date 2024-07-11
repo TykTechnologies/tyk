@@ -16,6 +16,14 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+var certSubject = pkix.Name{
+	Organization:  []string{"Tyk Technologies Ltd"},
+	Country:       []string{"UK"},
+	Province:      []string{"London"},
+	Locality:      []string{"London"},
+	StreetAddress: []string{"Worship Street"},
+}
+
 // GenerateRootCertAndKey generates a root certificate and private key for testing purposes.
 // It returns the root certificate and private key in PEM format along with an error, if any.
 //
@@ -36,14 +44,8 @@ func GenerateRootCertAndKey(tb testing.TB) ([]byte, []byte, error) {
 
 	// Create a template for the root certificate
 	rootCertTemplate := x509.Certificate{
-		SerialNumber: big.NewInt(1),
-		Subject: pkix.Name{
-			Organization:  []string{"Tyk Technologies Ltd"},
-			Country:       []string{"UK"},
-			Province:      []string{"London"},
-			Locality:      []string{"London"},
-			StreetAddress: []string{"Worship Street"},
-		},
+		SerialNumber:          big.NewInt(1),
+		Subject:               certSubject,
 		NotBefore:             time.Now(),
 		NotAfter:              time.Now().AddDate(10, 0, 0), // 10 years
 		KeyUsage:              x509.KeyUsageCertSign | x509.KeyUsageCRLSign,
@@ -96,19 +98,13 @@ func GenerateServerCertAndKeyPEM(tb testing.TB, rootCertPEM, rootKeyPEM []byte) 
 	// Create a template for the server certificate
 	serverCertTemplate := x509.Certificate{
 		SerialNumber: big.NewInt(2),
-		Subject: pkix.Name{
-			Organization:  []string{"Tyk Technologies Ltd"},
-			Country:       []string{"UK"},
-			Province:      []string{"London"},
-			Locality:      []string{"London"},
-			StreetAddress: []string{"Worship Street"},
-		},
-		NotBefore:   time.Now(),
-		NotAfter:    time.Now().AddDate(1, 0, 0), // 1 year
-		KeyUsage:    x509.KeyUsageDigitalSignature | x509.KeyUsageKeyEncipherment,
-		ExtKeyUsage: []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
-		IPAddresses: []net.IP{net.ParseIP("127.0.0.1")},
-		DNSNames:    []string{"localhost"},
+		Subject:      certSubject,
+		NotBefore:    time.Now(),
+		NotAfter:     time.Now().AddDate(1, 0, 0), // 1 year
+		KeyUsage:     x509.KeyUsageDigitalSignature | x509.KeyUsageKeyEncipherment,
+		ExtKeyUsage:  []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
+		IPAddresses:  []net.IP{net.ParseIP("127.0.0.1")},
+		DNSNames:     []string{"localhost"},
 	}
 
 	// Create the server certificate signed by the root CA
@@ -179,17 +175,11 @@ func GenerateClientCertAndKeyPEM(tb testing.TB, rootCertPEM, rootKeyPEM []byte) 
 	// Create a template for the client certificate
 	clientCertTemplate := x509.Certificate{
 		SerialNumber: big.NewInt(3),
-		Subject: pkix.Name{
-			Organization:  []string{"Tyk Technologies Ltd"},
-			Country:       []string{"UK"},
-			Province:      []string{"London"},
-			Locality:      []string{"London"},
-			StreetAddress: []string{"Worship Street"},
-		},
-		NotBefore:   time.Now(),
-		NotAfter:    time.Now().AddDate(1, 0, 0), // 1 year
-		KeyUsage:    x509.KeyUsageDigitalSignature | x509.KeyUsageKeyEncipherment,
-		ExtKeyUsage: []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
+		Subject:      certSubject,
+		NotBefore:    time.Now(),
+		NotAfter:     time.Now().AddDate(1, 0, 0), // 1 year
+		KeyUsage:     x509.KeyUsageDigitalSignature | x509.KeyUsageKeyEncipherment,
+		ExtKeyUsage:  []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
 	}
 
 	// Create the client certificate signed by the root CA
