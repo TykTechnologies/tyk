@@ -283,9 +283,8 @@ jobs:
           BASE_REF: ${{startsWith(github.event_name, 'pull_request') && github.base_ref || github.ref_name}}
         run: |
           match_tag=${{steps.ecr.outputs.registry}}/$REPO:$BASE_REF
-          docker run -q --rm -v ~/.docker/config.json:/root/.docker/config.json tykio/gromit policy match ${match_tag} 2>versions.env
           tags=(${{ needs.goreleaser.outputs.tags }})
-          tyk_image=${tags[0]}
+          docker run -q --rm -v ~/.docker/config.json:/root/.docker/config.json tykio/gromit policy match ${tags[0]} ${match_tag} 2>versions.env
           echo '# alfa and beta have to come after the override
           tyk_alfa_image=$tyk_image
           tyk_beta_image=$tyk_image
