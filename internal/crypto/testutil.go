@@ -84,24 +84,8 @@ func GenerateRootCertAndKey(tb testing.TB) ([]byte, []byte, error) {
 func GenerateServerCertAndKeyPEM(tb testing.TB, rootCertPEM, rootKeyPEM []byte) (*bytes.Buffer, *bytes.Buffer, error) {
 	tb.Helper()
 
-	rootCertBlock, _ := pem.Decode(rootCertPEM)
-	if rootCertBlock == nil || rootCertBlock.Type != "CERTIFICATE" {
-		return nil, nil, fmt.Errorf("failed to decode root certificate PEM")
-	}
-	rootCert, err := x509.ParseCertificate(rootCertBlock.Bytes)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	// Decode the root private key
-	rootKeyBlock, _ := pem.Decode(rootKeyPEM)
-	if rootKeyBlock == nil || rootKeyBlock.Type != "RSA PRIVATE KEY" {
-		return nil, nil, fmt.Errorf("failed to decode root key PEM")
-	}
-	rootKey, err := x509.ParsePKCS1PrivateKey(rootKeyBlock.Bytes)
-	if err != nil {
-		return nil, nil, err
-	}
+	rootCert, rootKey, err := decodeRootCertAndKey(rootCertPEM, rootKeyPEM)
+	assert.NoError(tb, err)
 
 	// Generate RSA key pair for the server
 	serverKey, err := rsa.GenerateKey(rand.Reader, 2048)
@@ -182,25 +166,9 @@ func GenerateServerCertAndKeyChain(tb testing.TB, rootCertPEM, rootKeyPEM []byte
 // - error: Any error encountered during the generation.
 func GenerateClientCertAndKeyPEM(tb testing.TB, rootCertPEM, rootKeyPEM []byte) (*bytes.Buffer, *bytes.Buffer, error) {
 	tb.Helper()
-	// Decode the root certificate
-	rootCertBlock, _ := pem.Decode(rootCertPEM)
-	if rootCertBlock == nil || rootCertBlock.Type != "CERTIFICATE" {
-		return nil, nil, fmt.Errorf("failed to decode root certificate PEM")
-	}
-	rootCert, err := x509.ParseCertificate(rootCertBlock.Bytes)
-	if err != nil {
-		return nil, nil, err
-	}
 
-	// Decode the root private key
-	rootKeyBlock, _ := pem.Decode(rootKeyPEM)
-	if rootKeyBlock == nil || rootKeyBlock.Type != "RSA PRIVATE KEY" {
-		return nil, nil, fmt.Errorf("failed to decode root key PEM")
-	}
-	rootKey, err := x509.ParsePKCS1PrivateKey(rootKeyBlock.Bytes)
-	if err != nil {
-		return nil, nil, err
-	}
+	rootCert, rootKey, err := decodeRootCertAndKey(rootCertPEM, rootKeyPEM)
+	assert.NoError(tb, err)
 
 	// Generate RSA key pair for the client
 	clientKey, err := rsa.GenerateKey(rand.Reader, 2048)
@@ -262,4 +230,29 @@ func GenerateClientCertAndKeyChain(tb testing.TB, rootCertPEM, rootKeyPEM []byte
 	_, _ = clientCertPEM.Write(rootCertPEM)
 
 	return clientCertPEM, clientKeyPEM, nil
+}
+
+func decodeRootCertAndKey(rootCertPEM, rootKeyPEM []byte) (*x509.Certificate, *rsa.PrivateKey, error) {
+	// Decode the root certificate
+	rootCertBlock, _ := pem.Decode(rootCertPEM)
+	if rootCertBlock == nil || rootCertBlock.Type != "CERTIFICATE" {
+		return nil, nil, fmt.Errorf("failed to decode root certificate PEM")
+	}
+
+	rootCert, err := x509.ParseCertificate(rootCertBlock.Bytes)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	// Decode the root private key
+	rootKeyBlock, _ := pem.Decode(rootKeyPEM)
+	if rootKeyBlock == nil || rootKeyBlock.Type != "RSA PRIVATE KEY" {
+		return nil, nil, fmt.Errorf("failed to decode root key PEM")
+	}
+	rootKey, err := x509.ParsePKCS1PrivateKey(rootKeyBlock.Bytes)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return rootCert, rootKey, nil
 }
