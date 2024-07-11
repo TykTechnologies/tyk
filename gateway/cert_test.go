@@ -344,7 +344,7 @@ func TestGatewayControlAPIMutualTLS(t *testing.T) {
 			})
 		})
 
-		t.Run("invalid client", func(t *testing.T) {
+		t.Run("invalid client with different cert authority", func(t *testing.T) {
 			_, _, _, invalidClientCert := crypto.GenCertificate(&x509.Certificate{}, false)
 			tlsConfig := GetTLSConfig(&invalidClientCert, nil)
 			tlsConfig.InsecureSkipVerify = false
@@ -353,10 +353,10 @@ func TestGatewayControlAPIMutualTLS(t *testing.T) {
 			invalidClient := &http.Client{Transport: transport}
 			u, err := url.Parse(ts.URL)
 
-			req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("localhost:%s/static-mtls", u.Port()), nil)
+			req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("https://localhost:%s/static-mtls", u.Port()), nil)
 			assert.NoError(t, err)
 			_, err = invalidClient.Do(req)
-			assert.Error(t, err)
+			assert.ErrorContains(t, err, "tls: failed to verify certificate: x509: certificate signed by unknown authority")
 		})
 
 	})
