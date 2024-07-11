@@ -1,12 +1,19 @@
+# yamllint disable rule:line-length
 ---
 version: "3"
 
 includes:
+  test: .taskfiles/test.yml
   deps: .taskfiles/deps/Taskfile.yml
-  opentelemetry: .taskfiles/opentelemetry.yml
+  opentelemetry:
+    taskfile: ci/tests/tracing/Taskfile.yml
+    dir: ci/tests/tracing/
   services:
     taskfile: docker/services/Taskfile.yml
     dir: docker/services/
+  coprocess:
+    taskfile: coprocess/Taskfile.yml
+    dir: coprocess/
   config:
     taskfile: config/Taskfile.yml
     dir: config/
@@ -27,9 +34,9 @@ tasks:
   test:plugin-compiler:
     desc: "Plugin compiler local build/test"
     cmds:
-      - docker build --build-arg GO_VERSION=1.21 --build-arg BASE_IMAGE=tykio/golang-cross:1.21-bookworm --build-arg GITHUB_TAG=v5.1.0-alpha18 --build-arg GITHUB_SHA=$(git rev-parse HEAD) --platform=linux/amd64 --rm -t internal/plugin-compiler -f ci/images/plugin-compiler/Dockerfile .
+      - docker build --build-arg GO_VERSION=1.22 --build-arg BASE_IMAGE=tykio/golang-cross:1.22-bookworm --build-arg GITHUB_TAG=v5.1.0-alpha18 --build-arg GITHUB_SHA=$(git rev-parse HEAD) --platform=linux/amd64 --rm -t internal/plugin-compiler -f ci/images/plugin-compiler/Dockerfile .
       - docker run -it -e GOARCH=arm64 -e GOOS=linux --rm -v $(readlink -f .)/ci/images/plugin-compiler/data/basic-plugin:/plugin-source internal/plugin-compiler basic-plugin.so
-      - docker run -it --rm -v $PWD:/go/src/github.com/TykTechnologies/tyk -w /go/src/github.com/TykTechnologies/tyk tykio/golang-cross:1.21-bookworm go build -trimpath -tags=goplugin .
+      - docker run -it --rm -v $PWD:/go/src/github.com/TykTechnologies/tyk -w /go/src/github.com/TykTechnologies/tyk tykio/golang-cross:1.22-bookworm go build -trimpath -tags=goplugin .
       - ./tyk plugin load -f ./ci/images/plugin-compiler/data/basic-plugin/basic-plugin*.so -s MyPluginPre
       - docker rmi internal/plugin-compiler
 
@@ -71,6 +78,7 @@ tasks:
     deps:
       - lint:config
       - lint:x-tyk-gateway
+      - coprocess:lint
       - apidef-oas:lint
 
   lint:config:
