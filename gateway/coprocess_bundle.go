@@ -151,7 +151,7 @@ func (g *HTTPBundleGetter) Get() ([]byte, error) {
 	log.Infof("Attempting to download plugin bundle: %v", g.URL)
 	resp, err := client.Get(g.URL)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("Error getting bundle: %w", err)
 	}
 
 	if resp.StatusCode != 200 {
