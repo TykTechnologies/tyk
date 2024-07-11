@@ -16,6 +16,11 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+const (
+	rsaPrivateKey = "RSA PRIVATE KEY"
+	certificate   = "CERTIFICATE"
+)
+
 var certSubject = pkix.Name{
 	Organization:  []string{"Tyk Technologies Ltd"},
 	Country:       []string{"UK"},
@@ -61,11 +66,11 @@ func GenerateRootCertAndKey(tb testing.TB) ([]byte, []byte, error) {
 
 	// Encode the root certificate to PEM format
 	var rootCertPEM bytes.Buffer
-	assert.NoError(tb, pem.Encode(&rootCertPEM, &pem.Block{Type: "CERTIFICATE", Bytes: rootCertDER}))
+	assert.NoError(tb, pem.Encode(&rootCertPEM, &pem.Block{Type: certificate, Bytes: rootCertDER}))
 
 	// Encode the root private key to PEM format
 	var rootKeyPEM bytes.Buffer
-	assert.NoError(tb, pem.Encode(&rootKeyPEM, &pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(rootKey)}))
+	assert.NoError(tb, pem.Encode(&rootKeyPEM, &pem.Block{Type: rsaPrivateKey, Bytes: x509.MarshalPKCS1PrivateKey(rootKey)}))
 
 	return rootCertPEM.Bytes(), rootKeyPEM.Bytes(), nil
 }
@@ -115,11 +120,11 @@ func GenerateServerCertAndKeyPEM(tb testing.TB, rootCertPEM, rootKeyPEM []byte) 
 
 	// Encode the server certificate to PEM format
 	var serverCertPEM bytes.Buffer
-	assert.NoError(tb, pem.Encode(&serverCertPEM, &pem.Block{Type: "CERTIFICATE", Bytes: serverCertDER}))
+	assert.NoError(tb, pem.Encode(&serverCertPEM, &pem.Block{Type: certificate, Bytes: serverCertDER}))
 
 	// Encode the server private key to PEM format
 	var serverKeyPEM bytes.Buffer
-	assert.NoError(tb, pem.Encode(&serverKeyPEM, &pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(serverKey)}))
+	assert.NoError(tb, pem.Encode(&serverKeyPEM, &pem.Block{Type: rsaPrivateKey, Bytes: x509.MarshalPKCS1PrivateKey(serverKey)}))
 
 	return &serverCertPEM, &serverKeyPEM, nil
 }
@@ -190,11 +195,11 @@ func GenerateClientCertAndKeyPEM(tb testing.TB, rootCertPEM, rootKeyPEM []byte) 
 
 	// Encode the client certificate to PEM format
 	var clientCertPEM bytes.Buffer
-	assert.NoError(tb, pem.Encode(&clientCertPEM, &pem.Block{Type: "CERTIFICATE", Bytes: clientCertDER}))
+	assert.NoError(tb, pem.Encode(&clientCertPEM, &pem.Block{Type: certificate, Bytes: clientCertDER}))
 
 	// Encode the client private key to PEM format
 	var clientKeyPEM bytes.Buffer
-	assert.NoError(tb, pem.Encode(&clientKeyPEM, &pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(clientKey)}))
+	assert.NoError(tb, pem.Encode(&clientKeyPEM, &pem.Block{Type: rsaPrivateKey, Bytes: x509.MarshalPKCS1PrivateKey(clientKey)}))
 
 	return &clientCertPEM, &clientKeyPEM, nil
 }
@@ -225,7 +230,7 @@ func GenerateClientCertAndKeyChain(tb testing.TB, rootCertPEM, rootKeyPEM []byte
 func decodeRootCertAndKey(rootCertPEM, rootKeyPEM []byte) (*x509.Certificate, *rsa.PrivateKey, error) {
 	// Decode the root certificate
 	rootCertBlock, _ := pem.Decode(rootCertPEM)
-	if rootCertBlock == nil || rootCertBlock.Type != "CERTIFICATE" {
+	if rootCertBlock == nil || rootCertBlock.Type != certificate {
 		return nil, nil, fmt.Errorf("failed to decode root certificate PEM")
 	}
 
@@ -236,7 +241,7 @@ func decodeRootCertAndKey(rootCertPEM, rootKeyPEM []byte) (*x509.Certificate, *r
 
 	// Decode the root private key
 	rootKeyBlock, _ := pem.Decode(rootKeyPEM)
-	if rootKeyBlock == nil || rootKeyBlock.Type != "RSA PRIVATE KEY" {
+	if rootKeyBlock == nil || rootKeyBlock.Type != rsaPrivateKey {
 		return nil, nil, fmt.Errorf("failed to decode root key PEM")
 	}
 	rootKey, err := x509.ParsePKCS1PrivateKey(rootKeyBlock.Bytes)
