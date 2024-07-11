@@ -313,6 +313,7 @@ func TestGatewayControlAPIMutualTLS(t *testing.T) {
 			}
 		}
 		ts := StartTest(conf)
+		defer ts.Close()
 
 		certID, err = ts.Gw.CertificateManager.Add(combinedPEM, "default")
 		assert.NoError(t, err)
@@ -1823,6 +1824,7 @@ func TestStaticMTLSAPI(t *testing.T) {
 			globalConf.SuppressRedisSignalReload = true
 		}
 		ts := StartTest(conf)
+		defer ts.Close()
 
 		certID, err = ts.Gw.CertificateManager.Add(combinedPEM, "default")
 		assert.NoError(t, err)
