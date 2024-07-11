@@ -8,7 +8,7 @@ import (
 	"testing"
 )
 
-func TestNewVersioningWithURLPath(t *testing.T) {
+func TestVersionRouting(t *testing.T) {
 	ts := gateway.StartTest(nil)
 	defer ts.Close()
 
