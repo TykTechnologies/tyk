@@ -1,6 +1,7 @@
 package gateway
 
 import (
+	"bytes"
 	"crypto/tls"
 	"crypto/x509"
 	"crypto/x509/pkix"
@@ -284,6 +285,77 @@ func TestGatewayControlAPIMutualTLS(t *testing.T) {
 		_, _ = ts.Run(t, test.TestCase{
 			Path: "/tyk/certs", Code: 200, ControlRequest: true, AdminAuth: true, Client: clientWithCert,
 		})
+	})
+
+	t.Run("validate client cert against certificate authority", func(t *testing.T) {
+		rootCertPEM, rootKeyPEM, err := crypto.GenerateRootCertAndKey(t)
+		assert.NoError(t, err)
+
+		serverCertPEM, serverKeyPEM, err := crypto.GenerateServerCertAndKeyChain(t, rootCertPEM, rootKeyPEM)
+		assert.NoError(t, err)
+		combinedPEM := bytes.Join([][]byte{serverCertPEM.Bytes(), serverKeyPEM.Bytes()}, []byte("\n"))
+
+		certID, _, err := certs.GetCertIDAndChainPEM(combinedPEM, "")
+		assert.NoError(t, err)
+
+		rootCertID, _, err := certs.GetCertIDAndChainPEM(rootCertPEM, "")
+		assert.NoError(t, err)
+
+		conf := func(globalConf *config.Config) {
+			globalConf.HttpServerOptions.UseSSL = true
+			globalConf.HttpServerOptions.SSLInsecureSkipVerify = false
+			globalConf.HttpServerOptions.SSLCertificates = []string{"default" + certID}
+			globalConf.SuppressRedisSignalReload = true
+			globalConf.Security.ControlAPIUseMutualTLS = true
+			controlAPICerts := []string{"default" + rootCertID}
+			globalConf.Security.Certificates = config.CertificatesConfig{
+				ControlAPI: controlAPICerts,
+			}
+		}
+		ts := StartTest(conf)
+		defer ts.Close()
+
+		certID, err = ts.Gw.CertificateManager.Add(combinedPEM, "default")
+		assert.NoError(t, err)
+
+		_, err = ts.Gw.CertificateManager.Add(rootCertPEM, "default")
+		assert.NoError(t, err)
+		defer ts.Gw.CertificateManager.Delete(rootCertID, "default")
+
+		ts.ReloadGatewayProxy()
+
+		clientCertPEM, clientKeyPEM, err := crypto.GenerateClientCertAndKeyChain(t, rootCertPEM, rootKeyPEM)
+		assert.NoError(t, err)
+
+		clientCert, _ := tls.X509KeyPair(clientCertPEM.Bytes(), clientKeyPEM.Bytes())
+
+		t.Run("valid client", func(t *testing.T) {
+			validCertClient := GetTLSClient(&clientCert, rootCertPEM)
+			_, _ = ts.Run(t, test.TestCase{
+				ControlRequest: true,
+				AdminAuth:      true,
+				Domain:         "localhost",
+				Client:         validCertClient,
+				Path:           "/tyk/certs",
+				Code:           http.StatusOK,
+			})
+		})
+
+		t.Run("invalid client with different cert authority", func(t *testing.T) {
+			_, _, _, invalidClientCert := crypto.GenCertificate(&x509.Certificate{}, false)
+			tlsConfig := GetTLSConfig(&invalidClientCert, nil)
+			tlsConfig.InsecureSkipVerify = false
+			transport := &http.Transport{TLSClientConfig: tlsConfig}
+
+			invalidClient := &http.Client{Transport: transport}
+			u, err := url.Parse(ts.URL)
+
+			req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("https://localhost:%s/static-mtls", u.Port()), nil)
+			assert.NoError(t, err)
+			_, err = invalidClient.Do(req)
+			assert.ErrorContains(t, err, "tls: failed to verify certificate: x509: certificate signed by unknown authority")
+		})
+
 	})
 }
 
@@ -1731,5 +1803,73 @@ func TestStaticMTLSAPI(t *testing.T) {
 			Path:      "/tyk/apis",
 			Code:      http.StatusOK,
 		})
+	})
+
+	t.Run("validate client cert against certificate authority", func(t *testing.T) {
+		rootCertPEM, rootKeyPEM, err := crypto.GenerateRootCertAndKey(t)
+		assert.NoError(t, err)
+
+		serverCertPEM, serverKeyPEM, err := crypto.GenerateServerCertAndKeyChain(t, rootCertPEM, rootKeyPEM)
+		assert.NoError(t, err)
+		combinedPEM := bytes.Join([][]byte{serverCertPEM.Bytes(), serverKeyPEM.Bytes()}, []byte("\n"))
+
+		certID, _, err := certs.GetCertIDAndChainPEM(combinedPEM, "")
+		assert.NoError(t, err)
+
+		conf := func(globalConf *config.Config) {
+			globalConf.Security.ControlAPIUseMutualTLS = false
+			globalConf.HttpServerOptions.UseSSL = true
+			globalConf.HttpServerOptions.SSLInsecureSkipVerify = false
+			globalConf.HttpServerOptions.SSLCertificates = []string{"default" + certID}
+			globalConf.SuppressRedisSignalReload = true
+		}
+		ts := StartTest(conf)
+		defer ts.Close()
+
+		certID, err = ts.Gw.CertificateManager.Add(combinedPEM, "default")
+		assert.NoError(t, err)
+		defer ts.Gw.CertificateManager.Delete(certID, "default")
+		ts.ReloadGatewayProxy()
+
+		clientCertPEM, clientKeyPEM, err := crypto.GenerateClientCertAndKeyChain(t, rootCertPEM, rootKeyPEM)
+		assert.NoError(t, err)
+
+		rootCertID, err := ts.Gw.CertificateManager.Add(rootCertPEM, "default")
+		assert.NoError(t, err)
+
+		clientCert, _ := tls.X509KeyPair(clientCertPEM.Bytes(), clientKeyPEM.Bytes())
+
+		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+			spec.APIID = "apiID-1"
+			spec.UseMutualTLSAuth = true
+			spec.Proxy.ListenPath = "/static-mtls"
+			spec.ClientCertificates = []string{rootCertID}
+		})
+
+		t.Run("valid client", func(t *testing.T) {
+			validCertClient := GetTLSClient(&clientCert, rootCertPEM)
+			_, _ = ts.Run(t, test.TestCase{
+				Domain: "localhost",
+				Client: validCertClient,
+				Path:   "/static-mtls",
+				Code:   http.StatusOK,
+			})
+		})
+
+		t.Run("invalid client with self signed certificate", func(t *testing.T) {
+			_, _, _, invalidClientCert := crypto.GenCertificate(&x509.Certificate{}, false)
+			tlsConfig := GetTLSConfig(&invalidClientCert, nil)
+			tlsConfig.InsecureSkipVerify = false
+			transport := &http.Transport{TLSClientConfig: tlsConfig}
+
+			invalidClient := &http.Client{Transport: transport}
+			u, err := url.Parse(ts.URL)
+
+			req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("https://localhost:%s/static-mtls", u.Port()), nil)
+			assert.NoError(t, err)
+			_, err = invalidClient.Do(req)
+			assert.ErrorContains(t, err, "tls: failed to verify certificate: x509: certificate signed by unknown authority")
+		})
+
 	})
 }
