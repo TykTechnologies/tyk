@@ -24,15 +24,15 @@ func buildPathRateLimitAPI(ts *Test, tb testing.TB, pathName string, rate, per i
 
 		version := spec.VersionData.Versions["v1"]
 		versionJSON := []byte(fmt.Sprintf(`{
-                "use_extended_paths": true,
-                "extended_paths": {
-                        "rate_limit": [{
-                                "method": "GET",
-				"rate": %d,
-                                "per": %d
-                        }]
-                }
-            }`, rate, per))
+                        "use_extended_paths": true,
+                        "extended_paths": {
+                                "rate_limit": [{
+                                        "method": "GET",
+        				"rate": %d,
+                                        "per": %d
+                                }]
+                        }
+                    }`, rate, per))
 		err := json.Unmarshal(versionJSON, &version)
 		assert.NoError(tb, err)
 
@@ -77,7 +77,8 @@ func TestPerAPILimit(t *testing.T) {
 			failed++
 		}
 
-		assert.Equal(t, 30, ok)
+		// assert global limit
+		assert.Equal(t, 15, ok)
 	})
 
 	t.Run("hit per-endpoint rate limit", func(t *testing.T) {
@@ -114,6 +115,7 @@ func TestPerAPILimit(t *testing.T) {
 			failed++
 		}
 
+		// assert per-endpoint limit
 		assert.Equal(t, 30, ok)
 	})
 }
