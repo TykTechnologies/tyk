@@ -6,6 +6,7 @@ import (
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/json"
+	"encoding/pem"
 	"fmt"
 	"io/ioutil"
 	"net"
@@ -1385,8 +1386,6 @@ func TestAPICertificate(t *testing.T) {
 }
 
 func TestCertificateHandlerTLS(t *testing.T) {
-	test.Flaky(t) // TODO: TT-5261
-
 	_, _, combinedServerPEM, serverCert := crypto.GenCertificate(&x509.Certificate{
 		DNSNames:    []string{"localhost", "tyk-gateway"},
 		IPAddresses: []net.IP{net.ParseIP("127.0.0.1"), net.ParseIP("::")},
@@ -1403,10 +1402,34 @@ func TestCertificateHandlerTLS(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
+	// flaky test workaround
+	certIDs := ts.Gw.CertificateManager.ListAllIds("1")
+	for _, certID := range certIDs {
+		ts.Gw.CertificateManager.Delete(certID, "1")
+	}
+
 	t.Run("List certificates, empty", func(t *testing.T) {
 		_, _ = ts.Run(t, test.TestCase{
 			Path: "/tyk/certs?org_id=1", Code: 200, AdminAuth: true, BodyMatch: `{"certs":null}`,
 		})
+	})
+
+	rootCertPEM, _, err := crypto.GenerateRootCertAndKey(t)
+	assert.NoError(t, err)
+	rootCertID, _, err := certs.GetCertIDAndChainPEM(rootCertPEM, ts.Gw.GetConfig().Secret)
+	assert.NoError(t, err)
+
+	rootCertBlock, _ := pem.Decode(rootCertPEM)
+	if rootCertBlock == nil || rootCertBlock.Type != "CERTIFICATE" {
+		t.Fatal("error decoding root cert")
+	}
+	rootCert, err := x509.ParseCertificate(rootCertBlock.Bytes)
+	assert.NoError(t, err)
+
+	// add root cert
+	_, _ = ts.Run(t, test.TestCase{
+		Method: http.MethodPost, Path: "/tyk/certs", QueryParams: map[string]string{"org_id": "1"},
+		Data: string(rootCertPEM), AdminAuth: true, Code: 200, BodyMatch: `"id":"1` + rootCertID,
 	})
 
 	t.Run("Should add certificates with and without private keys", func(t *testing.T) {
@@ -1422,6 +1445,7 @@ func TestCertificateHandlerTLS(t *testing.T) {
 		_, _ = ts.Run(t, []test.TestCase{
 			{Method: "GET", Path: "/tyk/certs?org_id=1", AdminAuth: true, Code: 200, BodyMatch: clientCertID},
 			{Method: "GET", Path: "/tyk/certs?org_id=1", AdminAuth: true, Code: 200, BodyMatch: serverCertID},
+			{Method: "GET", Path: "/tyk/certs?org_id=1", AdminAuth: true, Code: 200, BodyMatch: rootCertID},
 		}...)
 	})
 
@@ -1448,11 +1472,21 @@ func TestCertificateHandlerTLS(t *testing.T) {
 							NotAfter:      serverCert.Leaf.NotAfter.UTC().Truncate(time.Second),
 							NotBefore:     serverCert.Leaf.NotBefore.UTC().Truncate(time.Second),
 						},
+						{
+							ID:            "1" + rootCertID,
+							IssuerCN:      rootCert.Issuer.CommonName,
+							SubjectCN:     rootCert.Subject.CommonName,
+							DNSNames:      rootCert.DNSNames,
+							HasPrivateKey: false,
+							NotAfter:      rootCert.NotAfter.UTC().Truncate(time.Second),
+							NotBefore:     rootCert.NotBefore.UTC().Truncate(time.Second),
+							IsCA:          true,
+						},
 					},
 				}
 				apiAllCertificateBasics := APIAllCertificateBasics{}
 				_ = json.Unmarshal(data, &apiAllCertificateBasics)
-				assert.Equal(t, expectedAPICertBasics, apiAllCertificateBasics)
+				assert.ElementsMatch(t, expectedAPICertBasics.Certs, apiAllCertificateBasics.Certs)
 				return true
 			}},
 		}...)
@@ -1467,6 +1501,7 @@ func TestCertificateHandlerTLS(t *testing.T) {
 		_, _ = ts.Run(t, []test.TestCase{
 			{Method: "GET", Path: "/tyk/certs/1" + clientCertID + "?org_id=1", AdminAuth: true, Code: 200, BodyMatch: clientCertMeta},
 			{Method: "GET", Path: "/tyk/certs/1" + serverCertID + "?org_id=1", AdminAuth: true, Code: 200, BodyMatch: serverCertMeta},
+			{Method: "GET", Path: "/tyk/certs/1" + rootCertID + "?org_id=1", AdminAuth: true, Code: 200, BodyMatch: `"is_ca":true`},
 			{Method: "GET", Path: "/tyk/certs/1" + serverCertID + ",1" + clientCertID + "?org_id=1", AdminAuth: true, Code: 200, BodyMatch: `\[` + serverCertMeta},
 			{Method: "GET", Path: "/tyk/certs/1" + serverCertID + ",1" + clientCertID + "?org_id=1", AdminAuth: true, Code: 200, BodyMatch: clientCertMeta},
 		}...)
@@ -1476,6 +1511,7 @@ func TestCertificateHandlerTLS(t *testing.T) {
 		_, _ = ts.Run(t, []test.TestCase{
 			{Method: "DELETE", Path: "/tyk/certs/1" + serverCertID + "?org_id=1", AdminAuth: true, Code: 200},
 			{Method: "DELETE", Path: "/tyk/certs/1" + clientCertID + "?org_id=1", AdminAuth: true, Code: 200},
+			{Method: "DELETE", Path: "/tyk/certs/1" + rootCertID + "?org_id=1", AdminAuth: true, Code: 200},
 			{Method: "GET", Path: "/tyk/certs?org_id=1", AdminAuth: true, Code: 200, BodyMatch: `{"certs":null}`},
 		}...)
 	})

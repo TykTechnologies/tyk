@@ -3757,6 +3757,9 @@ components:
         not_after:
           type: string
           x-go-name: NotAfter
+        is_ca:
+          type: boolean
+          x-go-name: IsCA
       type: object
       x-go-package: github.com/TykTechnologies/tyk
     CertificateMeta:
@@ -3786,6 +3789,9 @@ components:
           items:
             type: string
           x-go-name: DNSNames
+        is_ca:
+          type: boolean
+          x-go-name: IsCA
       type: object
       x-go-package: github.com/TykTechnologies/tyk
     pkixName:
