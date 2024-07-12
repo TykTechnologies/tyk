@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/internal/event"
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/user"
@@ -24,8 +25,59 @@ func (k *RateLimitForAPI) Name() string {
 	return "RateLimitForAPI"
 }
 
+func (k *RateLimitForAPI) shouldEnable() bool {
+	if k.Spec.DisableRateLimit {
+		return false
+	}
+
+	// per endpoint rate limits
+	for _, version := range k.Spec.VersionData.Versions {
+		for _, v := range version.ExtendedPaths.RateLimit {
+			if !v.Disabled {
+				return true
+			}
+		}
+	}
+
+	// global api rate limit
+	if k.Spec.GlobalRateLimit.Rate == 0 || k.Spec.GlobalRateLimit.Disabled {
+		return false
+	}
+
+	return true
+}
+
+func (k *RateLimitForAPI) getSession(r *http.Request) *user.SessionState {
+	versionInfo, _ := k.Spec.Version(r)
+	versionPaths := k.Spec.RxPaths[versionInfo.Name]
+
+	found, meta := k.Spec.CheckSpecMatchesStatus(r, versionPaths, RateLimit)
+	if found {
+		limits, ok := meta.(*apidef.RateLimitMeta)
+		if !ok {
+			log.Fatalf("Expected RateLimitMeta, got %T", meta)
+		}
+
+		if limits.Valid() {
+			// track per-endpoint with a hash of the path
+			keyname := k.keyName + "-" + storage.HashStr(limits.Path)
+
+			session := &user.SessionState{
+				Rate:        limits.Rate,
+				Per:         limits.Per,
+				LastUpdated: k.apiSess.LastUpdated,
+			}
+			session.SetKeyHash(storage.HashKey(keyname, k.Gw.GetConfig().HashKeys))
+
+			return session
+		}
+	}
+
+	return k.apiSess
+}
+
 func (k *RateLimitForAPI) EnabledForSpec() bool {
-	if k.Spec.DisableRateLimit || k.Spec.GlobalRateLimit.Rate == 0 || k.Spec.GlobalRateLimit.Disabled {
+	if !k.shouldEnable() {
 		return false
 	}
 
@@ -55,7 +107,7 @@ func (k *RateLimitForAPI) ProcessRequest(w http.ResponseWriter, r *http.Request,
 
 	reason := k.Gw.SessionLimiter.ForwardMessage(
 		r,
-		k.apiSess,
+		k.getSession(r),
 		k.keyName,
 		customQuotaKey,
 		storeRef,

@@ -90,6 +90,7 @@ const (
 	Internal
 	GoPlugin
 	PersistGraphQL
+	RateLimit
 )
 
 // RequestStatus is a custom type to avoid collisions
@@ -126,6 +127,7 @@ const (
 	StatusInternal                 RequestStatus = "Internal path"
 	StatusGoPlugin                 RequestStatus = "Go plugin"
 	StatusPersistGraphQL           RequestStatus = "Persist GraphQL"
+	StatusRateLimit                RequestStatus = "Rate Limited"
 )
 
 // URLSpec represents a flattened specification for URLs, used to check if a proxy URL
@@ -158,6 +160,7 @@ type URLSpec struct {
 	Internal                  apidef.InternalMeta
 	GoPluginMeta              GoPluginMiddleware
 	PersistGraphQL            apidef.PersistGraphQLMeta
+	RateLimit                 apidef.RateLimitMeta
 
 	IgnoreCase bool
 }
@@ -1188,7 +1191,7 @@ func (a APIDefinitionLoader) compileURLRewritesPathSpec(paths []apidef.URLRewrit
 	return urlSpec
 }
 
-func (a APIDefinitionLoader) compileVirtualPathspathSpec(paths []apidef.VirtualMeta, stat URLStatus, apiSpec *APISpec, conf config.Config) []URLSpec {
+func (a APIDefinitionLoader) compileVirtualPathsSpec(paths []apidef.VirtualMeta, stat URLStatus, apiSpec *APISpec, conf config.Config) []URLSpec {
 	if !conf.EnableJSVM {
 		return nil
 	}
@@ -1214,7 +1217,7 @@ func (a APIDefinitionLoader) compileVirtualPathspathSpec(paths []apidef.VirtualM
 	return urlSpec
 }
 
-func (a APIDefinitionLoader) compileGopluginPathspathSpec(paths []apidef.GoPluginMeta, stat URLStatus, apiSpec *APISpec, conf config.Config) []URLSpec {
+func (a APIDefinitionLoader) compileGopluginPathsSpec(paths []apidef.GoPluginMeta, stat URLStatus, apiSpec *APISpec, conf config.Config) []URLSpec {
 
 	// transform an extended configuration URL into an array of URLSpecs
 	// This way we can iterate the whole array once, on match we break with status
@@ -1261,7 +1264,7 @@ func (a APIDefinitionLoader) compilePersistGraphQLPathSpec(paths []apidef.Persis
 	return urlSpec
 }
 
-func (a APIDefinitionLoader) compileTrackedEndpointPathspathSpec(paths []apidef.TrackEndpointMeta, stat URLStatus, conf config.Config) []URLSpec {
+func (a APIDefinitionLoader) compileTrackedEndpointPathsSpec(paths []apidef.TrackEndpointMeta, stat URLStatus, conf config.Config) []URLSpec {
 
 	urlSpec := []URLSpec{}
 
@@ -1287,7 +1290,7 @@ func (a APIDefinitionLoader) compileTrackedEndpointPathspathSpec(paths []apidef.
 	return urlSpec
 }
 
-func (a APIDefinitionLoader) compileValidateJSONPathspathSpec(paths []apidef.ValidatePathMeta, stat URLStatus, conf config.Config) []URLSpec {
+func (a APIDefinitionLoader) compileValidateJSONPathsSpec(paths []apidef.ValidatePathMeta, stat URLStatus, conf config.Config) []URLSpec {
 	var urlSpec []URLSpec
 
 	for _, stringSpec := range paths {
@@ -1307,7 +1310,7 @@ func (a APIDefinitionLoader) compileValidateJSONPathspathSpec(paths []apidef.Val
 	return urlSpec
 }
 
-func (a APIDefinitionLoader) compileUnTrackedEndpointPathspathSpec(paths []apidef.TrackEndpointMeta, stat URLStatus, conf config.Config) []URLSpec {
+func (a APIDefinitionLoader) compileUnTrackedEndpointPathsSpec(paths []apidef.TrackEndpointMeta, stat URLStatus, conf config.Config) []URLSpec {
 	urlSpec := []URLSpec{}
 
 	for _, stringSpec := range paths {
@@ -1325,7 +1328,7 @@ func (a APIDefinitionLoader) compileUnTrackedEndpointPathspathSpec(paths []apide
 	return urlSpec
 }
 
-func (a APIDefinitionLoader) compileInternalPathspathSpec(paths []apidef.InternalMeta, stat URLStatus, conf config.Config) []URLSpec {
+func (a APIDefinitionLoader) compileInternalPathsSpec(paths []apidef.InternalMeta, stat URLStatus, conf config.Config) []URLSpec {
 	urlSpec := []URLSpec{}
 
 	for _, stringSpec := range paths {
@@ -1337,6 +1340,24 @@ func (a APIDefinitionLoader) compileInternalPathspathSpec(paths []apidef.Interna
 		a.generateRegex(stringSpec.Path, &newSpec, stat, conf)
 		// Extend with method actions
 		newSpec.Internal = stringSpec
+		urlSpec = append(urlSpec, newSpec)
+	}
+
+	return urlSpec
+}
+
+func (a APIDefinitionLoader) compileRateLimitPathsSpec(paths []apidef.RateLimitMeta, stat URLStatus, conf config.Config) []URLSpec {
+	urlSpec := []URLSpec{}
+
+	for _, stringSpec := range paths {
+		if stringSpec.Disabled {
+			continue
+		}
+
+		newSpec := URLSpec{}
+		a.generateRegex(stringSpec.Path, &newSpec, stat, conf)
+		// Extend with method actions
+		newSpec.RateLimit = stringSpec
 		urlSpec = append(urlSpec, newSpec)
 	}
 
@@ -1360,15 +1381,16 @@ func (a APIDefinitionLoader) getExtendedPathSpecs(apiVersionDef apidef.VersionIn
 	hardTimeouts := a.compileTimeoutPathSpec(apiVersionDef.ExtendedPaths.HardTimeouts, HardTimeout, conf)
 	circuitBreakers := a.compileCircuitBreakerPathSpec(apiVersionDef.ExtendedPaths.CircuitBreaker, CircuitBreaker, apiSpec, conf)
 	urlRewrites := a.compileURLRewritesPathSpec(apiVersionDef.ExtendedPaths.URLRewrite, URLRewrite, conf)
-	virtualPaths := a.compileVirtualPathspathSpec(apiVersionDef.ExtendedPaths.Virtual, VirtualPath, apiSpec, conf)
+	virtualPaths := a.compileVirtualPathsSpec(apiVersionDef.ExtendedPaths.Virtual, VirtualPath, apiSpec, conf)
 	requestSizes := a.compileRequestSizePathSpec(apiVersionDef.ExtendedPaths.SizeLimit, RequestSizeLimit, conf)
 	methodTransforms := a.compileMethodTransformSpec(apiVersionDef.ExtendedPaths.MethodTransforms, MethodTransformed, conf)
-	trackedPaths := a.compileTrackedEndpointPathspathSpec(apiVersionDef.ExtendedPaths.TrackEndpoints, RequestTracked, conf)
-	unTrackedPaths := a.compileUnTrackedEndpointPathspathSpec(apiVersionDef.ExtendedPaths.DoNotTrackEndpoints, RequestNotTracked, conf)
-	validateJSON := a.compileValidateJSONPathspathSpec(apiVersionDef.ExtendedPaths.ValidateJSON, ValidateJSONRequest, conf)
-	internalPaths := a.compileInternalPathspathSpec(apiVersionDef.ExtendedPaths.Internal, Internal, conf)
-	goPlugins := a.compileGopluginPathspathSpec(apiVersionDef.ExtendedPaths.GoPlugin, GoPlugin, apiSpec, conf)
+	trackedPaths := a.compileTrackedEndpointPathsSpec(apiVersionDef.ExtendedPaths.TrackEndpoints, RequestTracked, conf)
+	unTrackedPaths := a.compileUnTrackedEndpointPathsSpec(apiVersionDef.ExtendedPaths.DoNotTrackEndpoints, RequestNotTracked, conf)
+	validateJSON := a.compileValidateJSONPathsSpec(apiVersionDef.ExtendedPaths.ValidateJSON, ValidateJSONRequest, conf)
+	internalPaths := a.compileInternalPathsSpec(apiVersionDef.ExtendedPaths.Internal, Internal, conf)
+	goPlugins := a.compileGopluginPathsSpec(apiVersionDef.ExtendedPaths.GoPlugin, GoPlugin, apiSpec, conf)
 	persistGraphQL := a.compilePersistGraphQLPathSpec(apiVersionDef.ExtendedPaths.PersistGraphQL, PersistGraphQL, apiSpec, conf)
+	rateLimitPaths := a.compileRateLimitPathsSpec(apiVersionDef.ExtendedPaths.RateLimit, RateLimit, conf)
 
 	combinedPath := []URLSpec{}
 	combinedPath = append(combinedPath, mockResponsePaths...)
@@ -1394,6 +1416,7 @@ func (a APIDefinitionLoader) getExtendedPathSpecs(apiVersionDef apidef.VersionIn
 	combinedPath = append(combinedPath, unTrackedPaths...)
 	combinedPath = append(combinedPath, validateJSON...)
 	combinedPath = append(combinedPath, internalPaths...)
+	combinedPath = append(combinedPath, rateLimitPaths...)
 
 	return combinedPath, len(whiteListPaths) > 0
 }
@@ -1454,6 +1477,8 @@ func (a *APISpec) getURLStatus(stat URLStatus) RequestStatus {
 		return StatusGoPlugin
 	case PersistGraphQL:
 		return StatusPersistGraphQL
+	case RateLimit:
+		return StatusRateLimit
 	default:
 		log.Error("URL Status was not one of Ignored, Blacklist or WhiteList! Blocking.")
 		return EndPointNotAllowed
@@ -1684,6 +1709,10 @@ func (a *APISpec) CheckSpecMatchesStatus(r *http.Request, rxPaths []URLSpec, mod
 		case PersistGraphQL:
 			if method == rxPaths[i].PersistGraphQL.Method {
 				return true, &rxPaths[i].PersistGraphQL
+			}
+		case RateLimit:
+			if method == rxPaths[i].RateLimit.Method {
+				return true, &rxPaths[i].RateLimit
 			}
 		}
 	}
