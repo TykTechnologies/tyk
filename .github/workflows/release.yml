@@ -164,11 +164,7 @@ jobs:
             type=semver,pattern={{major}}
             type=semver,pattern={{major}}.{{minor}}
             type=semver,pattern={{version}}
-          labels: |
-            org.opencontainers.image.title=tyk-gateway (distroless)
-            org.opencontainers.image.description=Tyk Open Source API Gateway written in Go, supporting REST, GraphQL, TCP and gRPC protocols
-            org.opencontainers.image.vendor=tyk.io
-            org.opencontainers.image.version=${{ github.ref_name }}
+          labels: "org.opencontainers.image.title=tyk-gateway  (distroless) \norg.opencontainers.image.description=Tyk Open Source API Gateway written in Go, supporting REST, GraphQL, TCP and gRPC protocols\norg.opencontainers.image.vendor=tyk.io\norg.opencontainers.image.version=${{ github.ref_name }}\n"
       - name: build multiarch image
         if: ${{ matrix.golang_cross == '1.21-bullseye' }}
         uses: docker/build-push-action@v5
@@ -212,7 +208,7 @@ jobs:
         shell: bash
         env:
           # Cover pull_request_target too
-          BASE_REF: ${{startsWith(github.event_name, 'pull_request') && github.base_ref || github.ref}}
+          BASE_REF: ${{startsWith(github.event_name, 'pull_request') && github.base_ref || github.ref_name}}
         run: |
           set -eo pipefail
           endpoint="http://tui.internal.dev.tyk.technology/api/tyk/$BASE_REF/${{ github.event_name}}/api"
@@ -284,10 +280,11 @@ jobs:
           GH_TOKEN: ${{ secrets.ORG_GH_TOKEN }}
           TYK_DB_LICENSEKEY: ${{ secrets.DASH_LICENSE }}
           TYK_MDCB_LICENSE: ${{ secrets.MDCB_LICENSE }}
-          BASE_REF: ${{startsWith(github.event_name, 'pull_request') && github.base_ref || github.ref}}
+          BASE_REF: ${{startsWith(github.event_name, 'pull_request') && github.base_ref || github.ref_name}}
         run: |
+          match_tag=${{steps.ecr.outputs.registry}}/$REPO:$BASE_REF
           tags=(${{ needs.goreleaser.outputs.tags }})
-          docker run -q --rm -v ~/.docker/config.json:/root/.docker/config.json tykio/gromit policy match ${tags[0]} 2>versions.env
+          docker run -q --rm -v ~/.docker/config.json:/root/.docker/config.json tykio/gromit policy match ${tags[0]} ${match_tag} 2>versions.env
           echo '# alfa and beta have to come after the override
           tyk_alfa_image=$tyk_image
           tyk_beta_image=$tyk_image
@@ -310,7 +307,7 @@ jobs:
         id: test_execution
         env:
           # Cover pull_request_target too
-          BASE_REF: ${{startsWith(github.event_name, 'pull_request') && github.base_ref || github.ref}}
+          BASE_REF: ${{startsWith(github.event_name, 'pull_request') && github.base_ref || github.ref_name }}
         run: |
           # Generate report id
           echo "id=$(date +%s%N)" >> $GITHUB_OUTPUT

@@ -3,6 +3,7 @@
 .vagrant/
 .venv/
 .vscode/
+coverage/
 temp/
 /middleware/bundles
 testapps/
