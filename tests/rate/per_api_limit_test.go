@@ -12,10 +12,10 @@ import (
 	"github.com/TykTechnologies/tyk/test"
 )
 
-func buildPathRateLimitAPI(ts *Test, tb testing.TB, pathName string, rate, per int64) {
+func buildPathRateLimitAPI(tb testing.TB, gw *Gateway, pathName string, rate, per int64) {
 	tb.Helper()
 
-	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+	gw.BuildAndLoadAPI(func(spec *APISpec) {
 		spec.Proxy.ListenPath = "/ratelimit/"
 		spec.Proxy.StripListenPath = true
 
@@ -42,43 +42,46 @@ func buildPathRateLimitAPI(ts *Test, tb testing.TB, pathName string, rate, per i
 	})
 }
 
+func testRateLimit(ts *Test, tb testing.TB, testPath string, want int) {
+	// single request
+	_, _ = ts.Run(tb, test.TestCase{
+		Path:      "/ratelimit" + testPath,
+		BodyMatch: fmt.Sprintf(`"Url":"%s"`, testPath),
+	})
+
+	// and 50 more
+	var ok, failed int = 1, 0
+	for i := 0; i < 50; i++ {
+		res, err := ts.Run(tb, test.TestCase{
+			Path: "/ratelimit" + testPath,
+		})
+
+		assert.NoError(tb, err)
+		if res.Body != nil {
+			_ = res.Body.Close()
+		}
+
+		if res.StatusCode == 200 {
+			ok++
+			continue
+		}
+		failed++
+	}
+
+	// assert global limit
+	assert.Equal(tb, want, ok)
+}
+
 func TestPerAPILimit(t *testing.T) {
 	t.Run("miss per-endpoint rate limit", func(t *testing.T) {
 		ts := StartTest(nil)
 		defer ts.Close()
 
 		forPath := "/" + uuid.New()
-		testPath := "/anything"
+		testPath := "/miss"
 
-		buildPathRateLimitAPI(ts, t, forPath, 30, 60)
-
-		// single request
-		_, _ = ts.Run(t, test.TestCase{
-			Path:      "/ratelimit" + testPath,
-			BodyMatch: fmt.Sprintf(`"Url":"%s"`, testPath),
-		})
-
-		// and 50 more
-		var ok, failed int = 1, 0
-		for i := 0; i < 50; i++ {
-			res, err := ts.Run(t, test.TestCase{
-				Path: "/ratelimit" + testPath,
-			})
-
-			assert.NoError(t, err)
-			if res.Body != nil {
-				res.Body.Close()
-			}
-
-			if res.StatusCode == 200 {
-				ok++
-				continue
-			}
-			failed++
-		}
-
-		// assert global limit
-		assert.Equal(t, 15, ok)
+		buildPathRateLimitAPI(t, ts.Gw, forPath, 30, 60)
+		testRateLimit(ts, t, testPath, 15)
 	})
 
 	t.Run("hit per-endpoint rate limit", func(t *testing.T) {
@@ -88,34 +91,7 @@ func TestPerAPILimit(t *testing.T) {
 		forPath := "/" + uuid.New()
 		testPath := forPath
 
-		buildPathRateLimitAPI(ts, t, forPath, 30, 60)
-
-		// single request
-		_, _ = ts.Run(t, test.TestCase{
-			Path:      "/ratelimit" + testPath,
-			BodyMatch: fmt.Sprintf(`"Url":"%s"`, testPath),
-		})
-
-		// and 50 more
-		var ok, failed int = 1, 0
-		for i := 0; i < 50; i++ {
-			res, err := ts.Run(t, test.TestCase{
-				Path: "/ratelimit" + testPath,
-			})
-
-			assert.NoError(t, err)
-			if res.Body != nil {
-				res.Body.Close()
-			}
-
-			if res.StatusCode == 200 {
-				ok++
-				continue
-			}
-			failed++
-		}
-
-		// assert per-endpoint limit
-		assert.Equal(t, 30, ok)
+		buildPathRateLimitAPI(t, ts.Gw, forPath, 30, 60)
+		testRateLimit(ts, t, testPath, 30)
 	})
 }
