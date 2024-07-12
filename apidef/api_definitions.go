@@ -214,6 +214,7 @@ type TrackEndpointMeta struct {
 	Method   string `bson:"method" json:"method"`
 }
 
+// RateLimitMeta configures rate limits per API path.
 type RateLimitMeta struct {
 	Disabled bool   `bson:"disabled" json:"disabled"`
 	Path     string `bson:"path" json:"path"`
