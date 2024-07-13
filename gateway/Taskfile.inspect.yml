@@ -16,7 +16,7 @@ version: '3'
 
 vars:
   listFile: /tmp/taskfile-inspect-list.txt
-  inspectDir: inspect
+  inspectDir: {{ .inspectDir || default "inspect" }}
   taskfile: Taskfile.inspect.yml
 
 tasks:
