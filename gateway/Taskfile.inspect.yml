@@ -45,11 +45,11 @@ tasks:
       - mkdir -p {{.inspectDir}}
       - |
         for test in $(cat {{.listFile}}); do
-          task -t {{.taskfile}} test run=$test || true
+          task -t {{.taskfile}} test inspectDir={{.inspectDir}} run=$test || true
         done
-      - task -t {{.taskfile}} summarize
-      - task -t {{.taskfile}} coverage
-      - task -t {{.taskfile}} covertrace
+      - task -t {{.taskfile}} inspectDir={{.inspectDir}} summarize
+      - task -t {{.taskfile}} inspectDir={{.inspectDir}} coverage
+      - task -t {{.taskfile}} inspectDir={{.inspectDir}} covertrace
 
   test:
     desc: "Run a specific test function directly with go test"
