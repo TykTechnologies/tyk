@@ -1,7 +1,9 @@
 .DS_Store
 .idea/
 .vagrant/
+.venv/
 .vscode/
+coverage/
 temp/
 /middleware/bundles
 testapps/

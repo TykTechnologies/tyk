@@ -97,28 +97,28 @@ func ValidateRequestCerts(r *http.Request, certs []*tls.Certificate) error {
 		return errors.New("Client TLS certificate is required")
 	}
 
-	leaf := r.TLS.PeerCertificates[0]
-
-	certID := HexSHA256(leaf.Raw)
-	for _, cert := range certs {
-		// In case a cert can't be parsed or is invalid,
-		// it will be present in the cert list as 'nil'
-		if cert == nil {
-			// Invalid cert, continue to next one
-			continue
-		}
-
-		// Extensions[0] contains cache of certificate SHA256
-		if string(cert.Leaf.Extensions[0].Value) == certID {
-			if time.Now().After(cert.Leaf.NotAfter) {
-				return ErrCertExpired
+	for _, peerCertificate := range r.TLS.PeerCertificates {
+		certID := HexSHA256(peerCertificate.Raw)
+		for _, cert := range certs {
+			// In case a cert can't be parsed or is invalid,
+			// it will be present in the cert list as 'nil'
+			if cert == nil {
+				// Invalid cert, continue to next one
+				continue
 			}
-			// Happy flow, we matched a certificate
-			return nil
+
+			// Extensions[0] contains cache of certificate SHA256
+			if string(cert.Leaf.Extensions[0].Value) == certID {
+				if time.Now().After(cert.Leaf.NotAfter) {
+					return ErrCertExpired
+				}
+				// Happy flow, we matched a certificate
+				return nil
+			}
 		}
 	}
 
-	return errors.New("Certificate with SHA256 " + certID + " not allowed")
+	return errors.New("Certificate with SHA256 " + HexSHA256(r.TLS.PeerCertificates[0].Raw) + " not allowed")
 }
 
 // IsPublicKey verifies if given certificate is a public key only.

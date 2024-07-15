@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -1498,7 +1499,7 @@ func TestGraphQL_OptionsPassThrough(t *testing.T) {
 			Code:    http.StatusOK,
 			HeadersMatch: map[string]string{
 				"Access-Control-Allow-Methods": http.MethodPost,
-				"Access-Control-Allow-Headers": "Content-Type",
+				"Access-Control-Allow-Headers": "content-type",
 				"Access-Control-Allow-Origin":  "*",
 			},
 		})
@@ -1750,21 +1751,15 @@ func TestReverseProxyWebSocketCancelation(t *testing.T) {
 }
 
 func TestSSE(t *testing.T) {
-	test.Flaky(t) // TODO: TT-5250
-
-	// send and receive should be in order
-	var wg sync.WaitGroup
-
 	sseServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/event-stream")
 		w.Header().Set("Connection", "keep-alive")
 
 		flusher, _ := w.(http.Flusher)
 		for i := 0; i < 5; i++ {
-			wg.Wait()
 			fmt.Fprintf(w, "data: %d\n", i)
 			flusher.Flush()
-			wg.Add(1)
+			time.Sleep(50 * time.Millisecond)
 		}
 	}))
 
@@ -1784,7 +1779,10 @@ func TestSSE(t *testing.T) {
 
 	client := http.Client{}
 
-	stream := func(enableWebSockets bool) {
+	stream := func(enableWebSockets bool) error {
+		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+		defer cancel()
+
 		globalConf := ts.Gw.GetConfig()
 		globalConf.HttpServerOptions.EnableWebSockets = enableWebSockets
 		ts.Gw.SetConfig(globalConf)
@@ -1796,28 +1794,42 @@ func TestSSE(t *testing.T) {
 		defer res.Body.Close()
 
 		i := 0
-		for {
-			line, err := reader.ReadBytes('\n')
-			if err != nil && err != io.EOF {
-				t.Fatal(err)
-			}
+		okChan := make(chan error)
 
-			if len(line) == 0 {
-				break
-			}
+		go func() {
+			for {
+				line, err := reader.ReadBytes('\n')
+				if err != nil && errors.Is(err, io.EOF) {
+					err = nil
+				}
 
-			assert.Equal(t, fmt.Sprintf("data: %v\n", i), string(line))
-			i++
-			wg.Done()
+				assert.NoError(t, err)
+
+				if len(line) == 0 {
+					break
+				}
+
+				assert.Equal(t, fmt.Sprintf("data: %v\n", i), string(line))
+				i++
+			}
+			close(okChan)
+		}()
+
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-okChan:
 		}
+		assert.Equal(t, i, 5)
+		return nil
 	}
 
 	t.Run("websockets disabled", func(t *testing.T) {
-		stream(false)
+		assert.NoError(t, stream(false))
 	})
 
 	t.Run("websockets enabled", func(t *testing.T) {
-		stream(true)
+		assert.NoError(t, stream(true))
 	})
 }
 

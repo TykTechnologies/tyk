@@ -325,7 +325,7 @@ type SlaveOptionsConfig struct {
 	// Your organisation ID to connect to the MDCB installation.
 	RPCKey string `json:"rpc_key"`
 
-	// This the API key of a user used to authenticate and authorise the Gateway’s access through MDCB.
+	// This the API key of a user used to authenticate and authorize the Gateway’s access through MDCB.
 	// The user should be a standard Dashboard user with minimal privileges so as to reduce any risk if the user is compromised.
 	// The suggested security settings are read for Real-time notifications and the remaining options set to deny.
 	APIKey string `json:"api_key"`
@@ -1046,7 +1046,7 @@ type Config struct {
 	// "override_messages": {
 	//   "oauth.auth_field_missing" : {
 	//    "code": 401,
-	//    "message": "Token is not authorised"
+	//    "message": "Token is not authorized"
 	//  }
 	// }
 	// ```
