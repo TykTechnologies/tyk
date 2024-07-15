@@ -757,7 +757,7 @@ func (gw *Gateway) loadHTTPService(spec *APISpec, apisByListen map[string]int, g
 	router := muxer.router(port, spec.Protocol, gwConfig)
 	if router == nil {
 		router = mux.NewRouter()
-		muxer.setRouter(port, spec.Protocol, spec.EnableProxyProtocol, router, gwConfig)
+		muxer.setRouter(port, spec.Protocol, router, gwConfig)
 	}
 
 	hostname := gwConfig.HostName

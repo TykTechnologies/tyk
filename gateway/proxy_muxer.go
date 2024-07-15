@@ -175,7 +175,7 @@ func (m *proxyMux) router(port int, protocol string, conf config.Config) *mux.Ro
 	return nil
 }
 
-func (m *proxyMux) setRouter(port int, protocol string, useProxyProtocol bool, router *mux.Router, conf config.Config) {
+func (m *proxyMux) setRouter(port int, protocol string, router *mux.Router, conf config.Config) {
 
 	if port == 0 {
 		port = conf.ListenPort
@@ -196,7 +196,7 @@ func (m *proxyMux) setRouter(port int, protocol string, useProxyProtocol bool, r
 			port:             port,
 			protocol:         protocol,
 			router:           router,
-			useProxyProtocol: useProxyProtocol,
+			useProxyProtocol: conf.EnableProxyProtocolHTTP,
 		}
 		m.proxies = append(m.proxies, p)
 	} else {
@@ -448,6 +448,9 @@ func (m *proxyMux) serve(gw *Gateway) {
 			if err != nil {
 				mainLog.WithError(err).Error("Can't start listener")
 				continue
+			}
+			if gw.ConnectionWatcher != nil {
+				p.httpServer.ConnState = gw.ConnectionWatcher.OnStateChange
 			}
 			if conf.CloseConnections {
 				p.httpServer.SetKeepAlivesEnabled(false)
