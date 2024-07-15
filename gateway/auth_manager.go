@@ -75,11 +75,11 @@ func (b *DefaultSessionManager) ResetQuota(keyName string, session *user.Session
 	rateLimiterSentinelKey := RateLimitKeyPrefix + keyName + ".BLOCKED"
 
 	// Clear the rate limiter
-	b.store.DeleteRawKey(rateLimiterSentinelKey)
+	go b.store.DeleteRawKey(rateLimiterSentinelKey)
 	// Fix the raw key
-	b.store.DeleteRawKey(rawKey)
+	go b.store.DeleteRawKey(rawKey)
 
-	b.deleteRawKeysWithAllowanceScope(b.store, session, keyName)
+	go b.deleteRawKeysWithAllowanceScope(b.store, session, keyName)
 }
 
 func (b *DefaultSessionManager) deleteRawKeysWithAllowanceScope(store storage.Handler, session *user.SessionState, keyName string) {
