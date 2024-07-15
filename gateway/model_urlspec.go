@@ -52,6 +52,8 @@ func (u *URLSpec) modeSpecificSpec(mode URLStatus) (interface{}, bool) {
 // matchesMethod checks if the given method matches the method required by the URLSpec for the current status.
 func (u *URLSpec) matchesMethod(method string) bool {
 	switch u.Status {
+	case Ignored, BlackList, WhiteList:
+		return true
 	case Cached:
 		return method == u.CacheConfig.Method || (u.CacheConfig.Method == SAFE_METHODS && isSafeMethod(method))
 	case Transformed:
