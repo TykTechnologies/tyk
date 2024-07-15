@@ -33,7 +33,7 @@ import (
 
 	"github.com/cenk/backoff"
 
-	"github.com/Masterminds/sprig/v3"
+	sprig "github.com/Masterminds/sprig/v3"
 
 	"github.com/gorilla/mux"
 	"github.com/sirupsen/logrus"

@@ -84,8 +84,9 @@ tasks:
 
   lint:gateway:
     internal: true
+    dir: gateway
     cmds:
-      - cd gateway && go-fsck lint
+      - go-fsck lint
 
   lint:config:
     internal: true

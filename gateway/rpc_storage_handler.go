@@ -7,9 +7,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/TykTechnologies/storage/temporal/model"
+	temporalModel "github.com/TykTechnologies/storage/temporal/model"
 	"github.com/TykTechnologies/tyk/internal/cache"
-	im "github.com/TykTechnologies/tyk/internal/model"
+	"github.com/TykTechnologies/tyk/internal/model"
 	"github.com/TykTechnologies/tyk/rpc"
 
 	"github.com/TykTechnologies/tyk/apidef"
@@ -173,7 +173,7 @@ func (r *RPCStorageHandler) buildNodeInfo() []byte {
 			APIsCount:     r.Gw.apisByIDLen(),
 			PoliciesCount: r.Gw.PolicyCount(),
 		},
-		HostDetails: im.HostDetails{
+		HostDetails: model.HostDetails{
 			Hostname: r.Gw.hostDetails.Hostname,
 			PID:      r.Gw.hostDetails.PID,
 			Address:  r.Gw.hostDetails.Address,
@@ -596,7 +596,7 @@ func (r *RPCStorageHandler) DeleteKeys(keys []string) bool {
 }
 
 // StartPubSubHandler will listen for a signal and run the callback with the message
-func (r *RPCStorageHandler) StartPubSubHandler(_ string, _ func(*model.Message)) error {
+func (r *RPCStorageHandler) StartPubSubHandler(_ string, _ func(*temporalModel.Message)) error {
 	log.Warning("RPCStorageHandler.StartPubSubHandler - NO PUBSUB DEFINED")
 	return nil
 }
