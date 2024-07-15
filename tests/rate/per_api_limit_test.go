@@ -43,6 +43,8 @@ func buildPathRateLimitAPI(tb testing.TB, gw *Gateway, pathName string, rate, pe
 }
 
 func testRateLimit(tb testing.TB, ts *Test, testPath string, want int) {
+	tb.Helper()
+
 	// single request
 	_, _ = ts.Run(tb, test.TestCase{
 		Path:      "/ratelimit" + testPath,
