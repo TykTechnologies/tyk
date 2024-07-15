@@ -6,7 +6,6 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/internal/event"
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/user"
@@ -51,14 +50,9 @@ func (k *RateLimitForAPI) getSession(r *http.Request) *user.SessionState {
 	versionInfo, _ := k.Spec.Version(r)
 	versionPaths := k.Spec.RxPaths[versionInfo.Name]
 
-	found, meta := k.Spec.CheckSpecMatchesStatus(r, versionPaths, RateLimit)
-	if found {
-		limits, ok := meta.(*apidef.RateLimitMeta)
-		if !ok {
-			log.Fatalf("Expected RateLimitMeta, got %T", meta)
-		}
-
-		if limits.Valid() {
+	spec, ok := k.Spec.FindSpecMatchesStatus(r, versionPaths, RateLimit)
+	if ok {
+		if limits := spec.RateLimit; limits.Valid() {
 			// track per-endpoint with a hash of the path
 			keyname := k.keyName + "-" + storage.HashStr(limits.Path)
 
