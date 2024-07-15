@@ -17,11 +17,12 @@ func (a *APISpec) CheckSpecMatchesStatus(r *http.Request, rxPaths []URLSpec, mod
 		if !rxPaths[i].Spec.MatchString(matchPath) {
 			continue
 		}
+		if !rxPaths[i].matchesMethod(method) {
+			continue
+		}
 
-		if rxPaths[i].matchesMethod(method) {
-			if spec, ok := rxPaths[i].modeSpecificSpec(mode); ok {
-				return true, spec
-			}
+		if spec, ok := rxPaths[i].modeSpecificSpec(mode); ok {
+			return true, spec
 		}
 	}
 	return false, nil
@@ -38,11 +39,12 @@ func (a *APISpec) FindSpecMatchesStatus(r *http.Request, rxPaths []URLSpec, mode
 		if !rxPaths[i].Spec.MatchString(matchPath) {
 			continue
 		}
+		if !rxPaths[i].matchesMethod(method) {
+			continue
+		}
 
-		if rxPaths[i].matchesMethod(method) {
-			if _, ok := rxPaths[i].modeSpecificSpec(mode); ok {
-				return &rxPaths[i], ok
-			}
+		if _, ok := rxPaths[i].modeSpecificSpec(mode); ok {
+			return &rxPaths[i], ok
 		}
 	}
 	return nil, false
@@ -50,7 +52,10 @@ func (a *APISpec) FindSpecMatchesStatus(r *http.Request, rxPaths []URLSpec, mode
 
 // getMatchPathAndMethod retrieves the match path and method from the request based on the mode.
 func (a *APISpec) getMatchPathAndMethod(r *http.Request, mode URLStatus) (string, string) {
-	var matchPath, method string
+	var (
+		matchPath = r.URL.Path
+		method    = r.Method
+	)
 
 	if mode == TransformedJQResponse || mode == HeaderInjectedResponse || mode == TransformedResponse {
 		matchPath = ctxGetUrlRewritePath(r)
@@ -58,9 +63,6 @@ func (a *APISpec) getMatchPathAndMethod(r *http.Request, mode URLStatus) (string
 		if matchPath == "" {
 			matchPath = r.URL.Path
 		}
-	} else {
-		matchPath = r.URL.Path
-		method = r.Method
 	}
 
 	if a.Proxy.ListenPath != "/" {
