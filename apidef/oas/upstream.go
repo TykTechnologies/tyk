@@ -512,3 +512,20 @@ func (r *RateLimit) ExtractTo(api *apidef.APIDefinition) {
 	api.GlobalRateLimit.Rate = float64(r.Rate)
 	api.GlobalRateLimit.Per = r.Per.Seconds()
 }
+
+// RateLimitEndpoint carries same settings as RateLimit but for endpoints.
+type RateLimitEndpoint RateLimit
+
+// Fill fills *RateLimit from apidef.RateLimitMeta.
+func (r *RateLimitEndpoint) Fill(api apidef.RateLimitMeta) {
+	r.Enabled = !api.Disabled
+	r.Rate = int(api.Rate)
+	r.Per = time.ReadableDuration(time.Duration(api.Per) * time.Second)
+}
+
+// ExtractTo extracts *Ratelimit into *apidef.APIDefinition.
+func (r *RateLimitEndpoint) ExtractTo(meta *apidef.RateLimitMeta) {
+	meta.Disabled = !r.Enabled
+	meta.Rate = float64(r.Rate)
+	meta.Per = r.Per.Seconds()
+}

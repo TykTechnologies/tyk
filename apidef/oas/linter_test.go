@@ -33,6 +33,9 @@ func TestXTykGateway_Lint(t *testing.T) {
 			if op.TransformResponseBody != nil {
 				op.TransformResponseBody.Format = "json"
 			}
+			if op.RateLimit != nil {
+				op.RateLimit.Per = time.ReadableDuration(time.Minute)
+			}
 			if op.URLRewrite != nil {
 				triggers := []*URLRewriteTrigger{}
 				for _, cond := range URLRewriteConditions {
