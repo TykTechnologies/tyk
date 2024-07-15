@@ -523,7 +523,7 @@ func (r *RateLimitEndpoint) Fill(api apidef.RateLimitMeta) {
 	r.Per = time.ReadableDuration(time.Duration(api.Per) * time.Second)
 }
 
-// ExtractTo extracts *Ratelimit into *apidef.APIDefinition.
+// ExtractTo extracts *Ratelimit into *apidef.RateLimitMeta.
 func (r *RateLimitEndpoint) ExtractTo(meta *apidef.RateLimitMeta) {
 	meta.Disabled = !r.Enabled
 	meta.Rate = float64(r.Rate)
