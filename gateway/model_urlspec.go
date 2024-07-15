@@ -15,11 +15,11 @@ func (u *URLSpec) modeSpecificSpec(mode URLStatus) (interface{}, bool) {
 	case HeaderInjected:
 		return &u.InjectHeaders, true
 	case HeaderInjectedResponse:
-		return u.InjectHeadersResponse, true
+		return &u.InjectHeadersResponse, true
 	case TransformedResponse:
 		return &u.TransformResponseAction, true
 	case TransformedJQResponse:
-		return u.TransformJQResponseAction, true
+		return &u.TransformJQResponseAction, true
 	case HardTimeout:
 		return &u.HardTimeout.TimeOut, true
 	case CircuitBreaker:
