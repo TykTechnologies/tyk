@@ -58,7 +58,7 @@ func testRateLimit(tb testing.TB, ts *Test, testPath string, want int) {
 
 		assert.NoError(tb, err)
 		if res.Body != nil {
-			_ = res.Body.Close()
+			assert.NoError(tb, res.Body.Close())
 		}
 
 		if res.StatusCode == 200 {
