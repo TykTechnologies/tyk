@@ -945,7 +945,7 @@ func (gw *Gateway) loadApps(specs []*APISpec) {
 	router.NotFoundHandler = http.HandlerFunc(muxer.handle404)
 	gw.loadControlAPIEndpoints(router)
 
-	muxer.setRouter(port, "", gwConf.EnableProxyProtocolHTTP, router, gw.GetConfig())
+	muxer.setRouter(port, "", router, gw.GetConfig())
 
 	gs := gw.prepareStorage()
 	shouldTrace := trace.IsEnabled()
