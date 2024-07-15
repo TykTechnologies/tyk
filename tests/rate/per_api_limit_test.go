@@ -42,7 +42,7 @@ func buildPathRateLimitAPI(tb testing.TB, gw *Gateway, pathName string, rate, pe
 	})
 }
 
-func testRateLimit(ts *Test, tb testing.TB, testPath string, want int) {
+func testRateLimit(tb testing.TB, ts *Test, testPath string, want int) {
 	// single request
 	_, _ = ts.Run(tb, test.TestCase{
 		Path:      "/ratelimit" + testPath,
@@ -81,7 +81,7 @@ func TestPerAPILimit(t *testing.T) {
 		testPath := "/miss"
 
 		buildPathRateLimitAPI(t, ts.Gw, forPath, 30, 60)
-		testRateLimit(ts, t, testPath, 15)
+		testRateLimit(t, ts, testPath, 15)
 	})
 
 	t.Run("hit per-endpoint rate limit", func(t *testing.T) {
@@ -92,6 +92,6 @@ func TestPerAPILimit(t *testing.T) {
 		testPath := forPath
 
 		buildPathRateLimitAPI(t, ts.Gw, forPath, 30, 60)
-		testRateLimit(ts, t, testPath, 30)
+		testRateLimit(t, ts, testPath, 30)
 	})
 }
