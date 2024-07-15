@@ -43,9 +43,7 @@ func (a *APISpec) FindSpecMatchesStatus(r *http.Request, rxPaths []URLSpec, mode
 			continue
 		}
 
-		if _, ok := rxPaths[i].modeSpecificSpec(mode); ok {
-			return &rxPaths[i], ok
-		}
+		return &rxPaths[i], true
 	}
 	return nil, false
 }
