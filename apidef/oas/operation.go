@@ -77,6 +77,9 @@ type Operation struct {
 
 	// RequestSizeLimit limits the maximum allowed size of the request body in bytes.
 	RequestSizeLimit *RequestSizeLimit `bson:"requestSizeLimit,omitempty" json:"requestSizeLimit,omitempty"`
+
+	// RateLimit contains endpoint level rate limit configuration.
+	RateLimit *RateLimitEndpoint `bson:"rateLimit,omitempty" json:"rateLimit,omitempty"`
 }
 
 // AllowanceType holds the valid allowance types values.
@@ -158,6 +161,7 @@ func (s *OAS) fillPathsAndOperations(ep apidef.ExtendedPathsSet) {
 	s.fillTrackEndpoint(ep.TrackEndpoints)
 	s.fillDoNotTrackEndpoint(ep.DoNotTrackEndpoints)
 	s.fillRequestSizeLimit(ep.SizeLimit)
+	s.fillRateLimitEndpoints(ep.RateLimit)
 }
 
 func (s *OAS) extractPathsAndOperations(ep *apidef.ExtendedPathsSet) {
@@ -191,6 +195,7 @@ func (s *OAS) extractPathsAndOperations(ep *apidef.ExtendedPathsSet) {
 					tykOp.extractTrackEndpointTo(ep, path, method)
 					tykOp.extractDoNotTrackEndpointTo(ep, path, method)
 					tykOp.extractRequestSizeLimitTo(ep, path, method)
+					tykOp.extractRateLimitEndpointTo(ep, path, method)
 					break found
 				}
 			}
@@ -784,6 +789,31 @@ func (o *Operation) extractVirtualEndpointTo(ep *apidef.ExtendedPathsSet, path s
 	meta := apidef.VirtualMeta{Path: path, Method: method}
 	o.VirtualEndpoint.ExtractTo(&meta)
 	ep.Virtual = append(ep.Virtual, meta)
+}
+
+func (s *OAS) fillRateLimitEndpoints(endpointMetas []apidef.RateLimitMeta) {
+	for _, em := range endpointMetas {
+		operationID := s.getOperationID(em.Path, em.Method)
+		operation := s.GetTykExtension().getOperation(operationID)
+		if operation.RateLimit == nil {
+			operation.RateLimit = &RateLimitEndpoint{}
+		}
+
+		operation.RateLimit.Fill(em)
+		if ShouldOmit(operation.RateLimit) {
+			operation.RateLimit = nil
+		}
+	}
+}
+
+func (o *Operation) extractRateLimitEndpointTo(ep *apidef.ExtendedPathsSet, path string, method string) {
+	if o.RateLimit == nil {
+		return
+	}
+
+	meta := apidef.RateLimitMeta{Path: path, Method: method}
+	o.RateLimit.ExtractTo(&meta)
+	ep.RateLimit = append(ep.RateLimit, meta)
 }
 
 func (s *OAS) fillEndpointPostPlugins(endpointMetas []apidef.GoPluginMeta) {
