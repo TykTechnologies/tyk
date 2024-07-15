@@ -92,6 +92,8 @@ func (u *URLSpec) matchesMethod(method string) bool {
 		return method == u.GoPluginMeta.Meta.Method
 	case PersistGraphQL:
 		return method == u.PersistGraphQL.Method
+	case RateLimit:
+		return method == u.RateLimit.Method
 	default:
 		return false
 	}
