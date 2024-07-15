@@ -496,14 +496,14 @@ type RateLimit struct {
 	// be considered as 0s/empty.
 	//
 	// Tyk classic API definition: `global_rate_limit.per`.
-	Per time.ReadableDuration `json:"per" bson:"per"`
+	Per ReadableDuration `json:"per" bson:"per"`
 }
 
 // Fill fills *RateLimit from apidef.APIDefinition.
 func (r *RateLimit) Fill(api apidef.APIDefinition) {
 	r.Enabled = !api.GlobalRateLimit.Disabled
 	r.Rate = int(api.GlobalRateLimit.Rate)
-	r.Per = time.ReadableDuration(time.Duration(api.GlobalRateLimit.Per) * time.Second)
+	r.Per = ReadableDuration(time.Duration(api.GlobalRateLimit.Per) * time.Second)
 }
 
 // ExtractTo extracts *Ratelimit into *apidef.APIDefinition.
@@ -520,7 +520,7 @@ type RateLimitEndpoint RateLimit
 func (r *RateLimitEndpoint) Fill(api apidef.RateLimitMeta) {
 	r.Enabled = !api.Disabled
 	r.Rate = int(api.Rate)
-	r.Per = time.ReadableDuration(time.Duration(api.Per) * time.Second)
+	r.Per = ReadableDuration(time.Duration(api.Per) * time.Second)
 }
 
 // ExtractTo extracts *Ratelimit into *apidef.RateLimitMeta.

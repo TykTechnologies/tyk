@@ -54,7 +54,7 @@ func TestOAS_PathsAndOperations(t *testing.T) {
 	operation.PostPlugins = operation.PostPlugins[:1] // only 1 post plugin is considered at this point, ignore others.
 	operation.PostPlugins[0].Name = ""                // Name is deprecated.
 
-	operation.RateLimit.Per = time.ReadableDuration(time.Minute)
+	operation.RateLimit.Per = ReadableDuration(time.Minute)
 
 	xTykAPIGateway := &XTykAPIGateway{
 		Middleware: &Middleware{
