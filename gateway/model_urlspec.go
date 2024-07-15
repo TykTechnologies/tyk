@@ -44,8 +44,6 @@ func (u *URLSpec) modeSpecificSpec(mode URLStatus) (interface{}, bool) {
 		return &u.GoPluginMeta, true
 	case PersistGraphQL:
 		return &u.PersistGraphQL, true
-	case RateLimit:
-		return &u.RateLimit, true
 	default:
 		return nil, false
 	}
