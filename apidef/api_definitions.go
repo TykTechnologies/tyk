@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"encoding/xml"
 	"errors"
+	"fmt"
 	"net/http"
 	"text/template"
 	"time"
@@ -213,6 +214,39 @@ type TrackEndpointMeta struct {
 	Method   string `bson:"method" json:"method"`
 }
 
+// RateLimitMeta configures rate limits per API path.
+type RateLimitMeta struct {
+	Disabled bool   `bson:"disabled" json:"disabled"`
+	Path     string `bson:"path" json:"path"`
+	Method   string `bson:"method" json:"method"`
+
+	Rate float64 `bson:"rate" json:"rate"`
+	Per  float64 `bson:"per" json:"per"`
+}
+
+// Valid will return true if the rate limit should be applied.
+func (r *RateLimitMeta) Valid() bool {
+	if err := r.Err(); err != nil {
+		return false
+	}
+	return true
+}
+
+// Err checks the rate limit configuration for validity and returns an error if it is not valid.
+// It checks for a nil value, the enabled flag and valid values for each setting.
+func (r *RateLimitMeta) Err() error {
+	if r == nil || r.Disabled {
+		return errors.New("rate limit disabled")
+	}
+	if r.Per <= 0 {
+		return fmt.Errorf("rate limit disabled: per invalid")
+	}
+	if r.Rate == 0 {
+		return fmt.Errorf("rate limit disabled: rate zero")
+	}
+	return nil
+}
+
 type InternalMeta struct {
 	Disabled bool   `bson:"disabled" json:"disabled"`
 	Path     string `bson:"path" json:"path"`
@@ -362,6 +396,7 @@ type ExtendedPathsSet struct {
 	Internal                []InternalMeta        `bson:"internal" json:"internal,omitempty"`
 	GoPlugin                []GoPluginMeta        `bson:"go_plugin" json:"go_plugin,omitempty"`
 	PersistGraphQL          []PersistGraphQLMeta  `bson:"persist_graphql" json:"persist_graphql"`
+	RateLimit               []RateLimitMeta       `bson:"rate_limit" json:"rate_limit"`
 }
 
 // Clear omits values that have OAS API definition conversions in place.

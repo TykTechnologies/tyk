@@ -95,7 +95,7 @@ type WebhookEvent struct {
 	// An empty value is interpreted as "0s", implying no cool-down.
 	// It's important to format the string correctly, as invalid formats will
 	// be considered as 0s/empty.
-	CoolDownPeriod time.ReadableDuration `json:"cooldownPeriod" bson:"cooldownPeriod"`
+	CoolDownPeriod ReadableDuration `json:"cooldownPeriod" bson:"cooldownPeriod"`
 	// BodyTemplate is the template to be used for request payload.
 	BodyTemplate string `json:"bodyTemplate,omitempty" bson:"bodyTemplate,omitempty"`
 	// Headers are the list of request headers to be used.
@@ -148,7 +148,7 @@ func (e *EventHandlers) Fill(api apidef.APIDefinition) {
 						Method:         whConf.Method,
 						Headers:        NewHeaders(whConf.HeaderList),
 						BodyTemplate:   whConf.TemplatePath,
-						CoolDownPeriod: time.ReadableDuration(time.Duration(whConf.EventTimeout) * time.Second),
+						CoolDownPeriod: ReadableDuration(time.Duration(whConf.EventTimeout) * time.Second),
 					},
 				}
 

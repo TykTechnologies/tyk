@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/internal/time"
 )
 
 func minimumValidOAS() OAS {
@@ -52,6 +53,9 @@ func TestOAS_PathsAndOperations(t *testing.T) {
 	operation.VirtualEndpoint.Name = ""               // Name is deprecated.
 	operation.PostPlugins = operation.PostPlugins[:1] // only 1 post plugin is considered at this point, ignore others.
 	operation.PostPlugins[0].Name = ""                // Name is deprecated.
+
+	operation.RateLimit.Per = ReadableDuration(time.Minute)
+
 	xTykAPIGateway := &XTykAPIGateway{
 		Middleware: &Middleware{
 			Operations: Operations{
