@@ -1,11 +1,12 @@
 package proxy
 
 import (
+	"net/http"
+	"testing"
+
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/gateway"
 	"github.com/TykTechnologies/tyk/test"
-	"net/http"
-	"testing"
 )
 
 func TestVersionRouting(t *testing.T) {
