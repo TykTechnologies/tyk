@@ -4,9 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"time"
+
 	"github.com/TykTechnologies/tyk-pump/analytics"
 	log "github.com/sirupsen/logrus"
-	"time"
 
 	"github.com/vmihailenco/msgpack"
 
@@ -14,51 +15,6 @@ import (
 )
 
 type AnalyticsRecord analytics.AnalyticsRecord
-
-type AnalyticsRecordss struct {
-	Method        string
-	Path          string
-	RawPath       string
-	ContentLength int64
-	UserAgent     string
-	Day           int
-	Month         time.Month
-	Year          int
-	Hour          int
-	ResponseCode  int
-	APIKey        string
-	TimeStamp     time.Time
-	APIVersion    string
-	APIName       string
-	APIID         string
-	OrgID         string
-	OauthID       string
-	RequestTime   int64
-	RawRequest    string
-	RawResponse   string
-	IPAddress     string
-	Geo           GeoData
-	Tags          []string
-	Alias         string
-	TrackPath     bool
-	ExpireAt      time.Time `bson:"expireAt" json:"expireAt"`
-}
-type GeoData struct {
-	Country struct {
-		ISOCode string `maxminddb:"iso_code"`
-	} `maxminddb:"country"`
-
-	City struct {
-		GeoNameID uint              `maxminddb:"geoname_id"`
-		Names     map[string]string `maxminddb:"names"`
-	} `maxminddb:"city"`
-
-	Location struct {
-		Latitude  float64 `maxminddb:"latitude"`
-		Longitude float64 `maxminddb:"longitude"`
-		TimeZone  string  `maxminddb:"time_zone"`
-	} `maxminddb:"location"`
-}
 
 const ANALYTICS_KEYNAME = "tyk-system-analytics"
 
