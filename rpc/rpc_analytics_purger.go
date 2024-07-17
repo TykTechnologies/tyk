@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/TykTechnologies/tyk-pump/analytics"
+	log "github.com/sirupsen/logrus"
 	"time"
 
 	"github.com/vmihailenco/msgpack"
@@ -11,7 +13,9 @@ import (
 	"github.com/TykTechnologies/tyk/storage"
 )
 
-type AnalyticsRecord struct {
+type AnalyticsRecord analytics.AnalyticsRecord
+
+type AnalyticsRecordss struct {
 	Method        string
 	Path          string
 	RawPath       string
@@ -147,6 +151,7 @@ func (r *Purger) PurgeCache() {
 		}
 
 		// Send keys to RPC
+		log.Info("purging analytics data")
 		if _, err := FuncClientSingleton("PurgeAnalyticsData", string(data)); err != nil {
 			EmitErrorEvent(FuncClientSingletonCall, "PurgeAnalyticsData", err)
 			Log.Warn("Failed to call purge, retrying: ", err)
