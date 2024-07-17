@@ -6,8 +6,9 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/TykTechnologies/tyk-pump/analytics"
 	log "github.com/sirupsen/logrus"
+
+	"github.com/TykTechnologies/tyk-pump/analytics"
 
 	"github.com/vmihailenco/msgpack"
 
