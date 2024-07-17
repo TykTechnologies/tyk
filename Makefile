@@ -18,6 +18,9 @@ TEST_COUNT=1
 BENCH_REGEX=.
 BENCH_RUN=NONE
 
+#The name of the kind cluster used for development
+CLUSTER_NAME ?= kind
+
 .PHONY: test
 test:
 	$(GOTEST) -run=$(TEST_REGEX) -count=$(TEST_COUNT) ./...
@@ -92,4 +95,12 @@ docker:
 
 docker-std: build
 	docker build --platform ${BUILD_PLATFORM} --no-cache -t internal/tyk-gateway:std -f ci/Dockerfile.std .
+
+.PHONY: create-kind-cluster
+create-kind-cluster:	## Create kind cluster
+	kind create cluster --config k8s/kind.yaml --name=${CLUSTER_NAME}
+
+.PHONY: delete-kind-cluster
+clean:	## Delete kind cluster
+	kind delete cluster --name=${CLUSTER_NAME}
 

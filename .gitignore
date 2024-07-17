@@ -57,3 +57,5 @@ tyk_linux_*
 .terraform**
 .task/
 *.test
+
+k8s/*Values.yaml
