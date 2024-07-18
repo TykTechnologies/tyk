@@ -6,8 +6,6 @@ import (
 	"fmt"
 	"time"
 
-	log "github.com/sirupsen/logrus"
-
 	"github.com/TykTechnologies/tyk-pump/analytics"
 
 	"github.com/vmihailenco/msgpack"
@@ -106,7 +104,6 @@ func (r *Purger) PurgeCache() {
 		}
 
 		// Send keys to RPC
-		log.Info("purging analytics data")
 		if _, err := FuncClientSingleton("PurgeAnalyticsData", string(data)); err != nil {
 			EmitErrorEvent(FuncClientSingletonCall, "PurgeAnalyticsData", err)
 			Log.Warn("Failed to call purge, retrying: ", err)
