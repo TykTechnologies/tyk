@@ -15,8 +15,6 @@ import (
 	"github.com/TykTechnologies/tyk/storage"
 )
 
-type AnalyticsRecord analytics.AnalyticsRecord
-
 const ANALYTICS_KEYNAME = "tyk-system-analytics"
 
 // RPCPurger will purge analytics data into a Mongo database, requires that the Mongo DB string is specified
@@ -92,7 +90,7 @@ func (r *Purger) PurgeCache() {
 		keys := make([]interface{}, len(analyticsValues))
 
 		for i, v := range analyticsValues {
-			decoded := AnalyticsRecord{}
+			decoded := analytics.AnalyticsRecord{}
 			if err := msgpack.Unmarshal([]byte(v.(string)), &decoded); err != nil {
 				Log.WithError(err).Error("Couldn't unmarshal analytics data")
 			} else {
