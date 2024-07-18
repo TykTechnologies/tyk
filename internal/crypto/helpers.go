@@ -108,6 +108,15 @@ func ValidateRequestCerts(r *http.Request, certs []*tls.Certificate) error {
 		if cert.Leaf.IsCA && verifyCertAgainstCA(cert, peerCertificate) {
 			return nil
 		}
+
+		// Extensions[0] contains cache of certificate SHA256
+		if string(cert.Leaf.Extensions[0].Value) == certID {
+			if time.Now().After(cert.Leaf.NotAfter) {
+				return ErrCertExpired
+			}
+			// Happy flow, we matched a certificate
+			return nil
+		}
 	}
 
 	return errors.New("Certificate with SHA256 " + certID + " not allowed")
