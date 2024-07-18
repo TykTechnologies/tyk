@@ -105,7 +105,7 @@ func ValidateRequestCerts(r *http.Request, certs []*tls.Certificate) error {
 			continue
 		}
 
-		if cert.Leaf.IsCA && verifyCertAgainstCA(cert, peerCertificate) {
+		if cert.Leaf.IsCA && verifyCertAgainstCA(cert, peerCertificate) == nil {
 			return nil
 		}
 
@@ -122,7 +122,7 @@ func ValidateRequestCerts(r *http.Request, certs []*tls.Certificate) error {
 	return errors.New("Certificate with SHA256 " + certID + " not allowed")
 }
 
-func verifyCertAgainstCA(caCert *tls.Certificate, peerCert *x509.Certificate) bool {
+func verifyCertAgainstCA(caCert *tls.Certificate, peerCert *x509.Certificate) error {
 	// Create a certificate pool and add the CA certificate to it
 	roots := x509.NewCertPool()
 	roots.AddCert(caCert.Leaf)
@@ -134,7 +134,7 @@ func verifyCertAgainstCA(caCert *tls.Certificate, peerCert *x509.Certificate) bo
 
 	// Verify the client certificate
 	_, err := peerCert.Verify(opts)
-	return err == nil
+	return err
 }
 
 // IsPublicKey verifies if given certificate is a public key only.
