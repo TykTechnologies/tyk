@@ -97,6 +97,7 @@ func ValidateRequestCerts(r *http.Request, certs []*tls.Certificate) error {
 		return errors.New("Client TLS certificate is required")
 	}
 
+	// Loop through r.TLS.PeerCertificates to add intermediate CA certificates to the allow list.
 	for _, peerCertificate := range r.TLS.PeerCertificates {
 		certID := HexSHA256(peerCertificate.Raw)
 
