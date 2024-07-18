@@ -85,17 +85,8 @@ func (r *Purger) PurgeCache() {
 		if len(analyticsValues) == 0 {
 			continue
 		}
-		keys := make([]interface{}, len(analyticsValues))
-
-		for i, v := range analyticsValues {
-			decoded := analytics.AnalyticsRecord{}
-			if err := msgpack.Unmarshal([]byte(v.(string)), &decoded); err != nil {
-				Log.WithError(err).Error("Couldn't unmarshal analytics data")
-			} else {
-				Log.WithField("decoded", decoded).Debug("Decoded Record")
-				keys[i] = decoded
-			}
-		}
+		keys, failedRecords := processAnalyticsValues(analyticsValues)
+		Log.Debugf("could not decode %v records", failedRecords)
 
 		data, err := json.Marshal(keys)
 		if err != nil {
@@ -110,4 +101,31 @@ func (r *Purger) PurgeCache() {
 		}
 
 	}
+}
+
+func processAnalyticsValues(analyticsValues []interface{}) ([]interface{}, int) {
+	keys := make([]interface{}, len(analyticsValues))
+	failedRecords := 0
+
+	for i, v := range analyticsValues {
+		decoded, err := decodeAnalyticsRecord(v)
+		if err != nil {
+			failedRecords++
+			Log.WithError(err).Error("Couldn't unmarshal analytics data")
+		} else {
+			Log.WithField("decoded", decoded).Debug("Decoded Record")
+			keys[i] = decoded
+		}
+	}
+
+	return keys, failedRecords
+}
+
+func decodeAnalyticsRecord(encoded interface{}) (analytics.AnalyticsRecord, error) {
+	decoded := analytics.AnalyticsRecord{}
+	err := msgpack.Unmarshal([]byte(encoded.(string)), &decoded)
+	if err != nil {
+		return decoded, err
+	}
+	return decoded, nil
 }
