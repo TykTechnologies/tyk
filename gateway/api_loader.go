@@ -903,8 +903,8 @@ func (gw *Gateway) loadGraphQLPlayground(spec *APISpec, subrouter *mux.Router) {
 		}
 
 		err := playgroundTemplate.ExecuteTemplate(rw, playgroundHTMLTemplateName, struct {
-			Url, Schema, PathPrefix string
-		}{endpoint, strconv.Quote(spec.GraphQL.Schema), path.Join(endpoint, playgroundPath)})
+			Url, PathPrefix string
+		}{endpoint, path.Join(endpoint, playgroundPath)})
 
 		if err != nil {
 			rw.WriteHeader(http.StatusInternalServerError)
