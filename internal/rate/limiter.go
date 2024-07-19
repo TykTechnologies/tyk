@@ -32,12 +32,7 @@ func Limiter(gwConfig *config.Config, redis redis.UniversalClient) limiter.Limit
 
 // LimiterKey returns a redis key name based on passed parameters.
 // The key should be post-fixed if multiple keys are required (sentinel).
-func LimiterKey(currentSession *user.SessionState, allowanceScope string, key string, useCustomKey bool) string {
-	var rateScope string
-	if allowanceScope != "" {
-		rateScope = allowanceScope + "-"
-	}
-
+func LimiterKey(currentSession *user.SessionState, rateScope string, key string, useCustomKey bool) string {
 	if !useCustomKey && !currentSession.KeyHashEmpty() {
 		return Prefix(LimiterKeyPrefix, rateScope, currentSession.KeyHash())
 	}
