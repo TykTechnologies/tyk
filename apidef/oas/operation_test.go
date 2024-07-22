@@ -244,3 +244,23 @@ func TestOAS_RegexPaths(t *testing.T) {
 		assert.Equalf(t, tc.input, got, "test %d: rebuilt link, expected %v, got %v", i, tc.input, got)
 	}
 }
+
+func TestOAS_sortByPathLength(t *testing.T) {
+	paths := openapi3.Paths{
+		"/test/a":    nil,
+		"/test/b":    nil,
+		"/test/c":    nil,
+		"/test/sub1": nil,
+		"/test":      nil,
+		"/test/sub2": nil,
+	}
+
+	out := sortByPathLength(paths)
+	assert.Len(t, out, 6)
+	assert.Equal(t, "/test/sub1", out[0].pathValue)
+	assert.Equal(t, "/test/sub2", out[1].pathValue)
+	assert.Equal(t, "/test/a", out[2].pathValue)
+	assert.Equal(t, "/test/b", out[3].pathValue)
+	assert.Equal(t, "/test/c", out[4].pathValue)
+	assert.Equal(t, "/test", out[5].pathValue)
+}

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"sort"
 	"strings"
 
 	"github.com/getkin/kin-openapi/openapi3"
@@ -164,6 +165,40 @@ func (s *OAS) fillPathsAndOperations(ep apidef.ExtendedPathsSet) {
 	s.fillRateLimitEndpoints(ep.RateLimit)
 }
 
+type pathItem struct {
+	pathItem  *openapi3.PathItem
+	pathValue string
+}
+
+func sortByPathLength(in openapi3.Paths) []pathItem {
+	// get urls
+	paths := []string{}
+	for k := range in {
+		paths = append(paths, k)
+	}
+
+	// sort by length
+	sort.Slice(paths, func(i, j int) bool {
+		il, jl := len(paths[i]), len(paths[j])
+		if il == jl {
+			return paths[i] < paths[j]
+		}
+		return il > jl
+	})
+
+	// collect url and pathItem
+	result := []pathItem{}
+	for _, v := range paths {
+		value := pathItem{
+			pathItem:  in[v],
+			pathValue: v,
+		}
+		result = append(result, value)
+	}
+
+	return result
+}
+
 func (s *OAS) extractPathsAndOperations(ep *apidef.ExtendedPathsSet) {
 	ep.Clear()
 
@@ -174,28 +209,29 @@ func (s *OAS) extractPathsAndOperations(ep *apidef.ExtendedPathsSet) {
 
 	for id, tykOp := range tykOperations {
 	found:
-		for path, pathItem := range s.Paths {
-			for method, operation := range pathItem.Operations() {
+		for _, pathItem := range sortByPathLength(s.Paths) {
+			pathURL := pathItem.pathValue
+			for method, operation := range pathItem.pathItem.Operations() {
 				if id == operation.OperationID {
-					tykOp.extractAllowanceTo(ep, path, method, allow)
-					tykOp.extractAllowanceTo(ep, path, method, block)
-					tykOp.extractAllowanceTo(ep, path, method, ignoreAuthentication)
-					tykOp.extractInternalTo(ep, path, method)
-					tykOp.extractTransformRequestMethodTo(ep, path, method)
-					tykOp.extractTransformRequestBodyTo(ep, path, method)
-					tykOp.extractTransformResponseBodyTo(ep, path, method)
-					tykOp.extractTransformRequestHeadersTo(ep, path, method)
-					tykOp.extractTransformResponseHeadersTo(ep, path, method)
-					tykOp.extractURLRewriteTo(ep, path, method)
-					tykOp.extractCacheTo(ep, path, method)
-					tykOp.extractEnforceTimeoutTo(ep, path, method)
-					tykOp.extractVirtualEndpointTo(ep, path, method)
-					tykOp.extractEndpointPostPluginTo(ep, path, method)
-					tykOp.extractCircuitBreakerTo(ep, path, method)
-					tykOp.extractTrackEndpointTo(ep, path, method)
-					tykOp.extractDoNotTrackEndpointTo(ep, path, method)
-					tykOp.extractRequestSizeLimitTo(ep, path, method)
-					tykOp.extractRateLimitEndpointTo(ep, path, method)
+					tykOp.extractAllowanceTo(ep, pathURL, method, allow)
+					tykOp.extractAllowanceTo(ep, pathURL, method, block)
+					tykOp.extractAllowanceTo(ep, pathURL, method, ignoreAuthentication)
+					tykOp.extractInternalTo(ep, pathURL, method)
+					tykOp.extractTransformRequestMethodTo(ep, pathURL, method)
+					tykOp.extractTransformRequestBodyTo(ep, pathURL, method)
+					tykOp.extractTransformResponseBodyTo(ep, pathURL, method)
+					tykOp.extractTransformRequestHeadersTo(ep, pathURL, method)
+					tykOp.extractTransformResponseHeadersTo(ep, pathURL, method)
+					tykOp.extractURLRewriteTo(ep, pathURL, method)
+					tykOp.extractCacheTo(ep, pathURL, method)
+					tykOp.extractEnforceTimeoutTo(ep, pathURL, method)
+					tykOp.extractVirtualEndpointTo(ep, pathURL, method)
+					tykOp.extractEndpointPostPluginTo(ep, pathURL, method)
+					tykOp.extractCircuitBreakerTo(ep, pathURL, method)
+					tykOp.extractTrackEndpointTo(ep, pathURL, method)
+					tykOp.extractDoNotTrackEndpointTo(ep, pathURL, method)
+					tykOp.extractRequestSizeLimitTo(ep, pathURL, method)
+					tykOp.extractRateLimitEndpointTo(ep, pathURL, method)
 					break found
 				}
 			}
