@@ -4,13 +4,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"regexp"
-	"sort"
 	"strings"
 
 	"github.com/getkin/kin-openapi/openapi3"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/internal/oasutil"
 )
 
 // Operations holds Operation definitions.
@@ -166,45 +165,6 @@ func (s *OAS) fillPathsAndOperations(ep apidef.ExtendedPathsSet) {
 	s.fillRateLimitEndpoints(ep.RateLimit)
 }
 
-type pathItem struct {
-	pathItem  *openapi3.PathItem
-	pathValue string
-}
-
-var pathParamRegex = regexp.MustCompile(`\{[^}]+\}`)
-
-func sortByPathLength(in openapi3.Paths) []pathItem {
-	// get urls
-	paths := []string{}
-	for k := range in {
-		paths = append(paths, k)
-	}
-
-	// sort by length and lexicographically
-	sort.Slice(paths, func(i, j int) bool {
-		pathI := pathParamRegex.ReplaceAllString(paths[i], "")
-		pathJ := pathParamRegex.ReplaceAllString(paths[j], "")
-
-		il, jl := len(pathI), len(pathJ)
-		if il == jl {
-			return pathI < pathJ
-		}
-		return il > jl
-	})
-
-	// collect url and pathItem
-	result := []pathItem{}
-	for _, v := range paths {
-		value := pathItem{
-			pathItem:  in[v],
-			pathValue: v,
-		}
-		result = append(result, value)
-	}
-
-	return result
-}
-
 func (s *OAS) extractPathsAndOperations(ep *apidef.ExtendedPathsSet) {
 	ep.Clear()
 
@@ -215,9 +175,9 @@ func (s *OAS) extractPathsAndOperations(ep *apidef.ExtendedPathsSet) {
 
 	for id, tykOp := range tykOperations {
 	found:
-		for _, pathItem := range sortByPathLength(s.Paths) {
-			pathURL := pathItem.pathValue
-			for method, operation := range pathItem.pathItem.Operations() {
+		for _, pathItem := range oasutil.SortByPathLength(s.Paths) {
+			pathURL := pathItem.Value
+			for method, operation := range pathItem.Item.Operations() {
 				if id == operation.OperationID {
 					tykOp.extractAllowanceTo(ep, pathURL, method, allow)
 					tykOp.extractAllowanceTo(ep, pathURL, method, block)
