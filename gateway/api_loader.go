@@ -323,13 +323,13 @@ func (gw *Gateway) processSpec(spec *APISpec, apisByListen map[string]int,
 	gw.mwAppendEnabled(&chainArray, &RateCheckMW{BaseMiddleware: baseMid})
 	gw.mwAppendEnabled(&chainArray, &IPWhiteListMiddleware{BaseMiddleware: baseMid})
 	gw.mwAppendEnabled(&chainArray, &IPBlackListMiddleware{BaseMiddleware: baseMid})
-	gw.mwAppendEnabled(&chainArray, &CertificateCheckMW{BaseMiddleware: baseMid})
+	//gw.mwAppendEnabled(&chainArray, &CertificateCheckMW{BaseMiddleware: baseMid})
 	gw.mwAppendEnabled(&chainArray, &OrganizationMonitor{BaseMiddleware: baseMid, mon: Monitor{Gw: gw}})
 	gw.mwAppendEnabled(&chainArray, &RequestSizeLimitMiddleware{baseMid})
 	gw.mwAppendEnabled(&chainArray, &MiddlewareContextVars{BaseMiddleware: baseMid})
 	gw.mwAppendEnabled(&chainArray, &TrackEndpointMiddleware{baseMid})
 
-	if !spec.UseKeylessAccess {
+	if !spec.UseKeylessAccess && !spec.UseMutualTLSAuth {
 		// Select the keying method to use for setting session states
 		if gw.mwAppendEnabled(&authArray, &Oauth2KeyExists{baseMid}) {
 			logger.Info("Checking security policy: OAuth")
@@ -468,7 +468,7 @@ func (gw *Gateway) processSpec(spec *APISpec, apisByListen map[string]int,
 
 	chain = alice.New(chainArray...).Then(&DummyProxyHandler{SH: SuccessHandler{baseMid}, Gw: gw})
 
-	if !spec.UseKeylessAccess {
+	if !spec.UseKeylessAccess && !spec.UseMutualTLSAuth {
 		var simpleArray []alice.Constructor
 		gw.mwAppendEnabled(&simpleArray, &IPWhiteListMiddleware{baseMid})
 		gw.mwAppendEnabled(&simpleArray, &IPBlackListMiddleware{BaseMiddleware: baseMid})
