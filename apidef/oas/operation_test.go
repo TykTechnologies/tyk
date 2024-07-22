@@ -247,20 +247,32 @@ func TestOAS_RegexPaths(t *testing.T) {
 
 func TestOAS_sortByPathLength(t *testing.T) {
 	paths := openapi3.Paths{
-		"/test/a":    nil,
-		"/test/b":    nil,
-		"/test/c":    nil,
-		"/test/sub1": nil,
-		"/test":      nil,
-		"/test/sub2": nil,
+		"/test/a":       nil,
+		"/test/b":       nil,
+		"/test/c":       nil,
+		"/test/sub1":    nil,
+		"/test/sub{id}": nil,
+		"/test":         nil,
+		"/test/{id}":    nil,
 	}
 
 	out := sortByPathLength(paths)
-	assert.Len(t, out, 6)
-	assert.Equal(t, "/test/sub1", out[0].pathValue)
-	assert.Equal(t, "/test/sub2", out[1].pathValue)
-	assert.Equal(t, "/test/a", out[2].pathValue)
-	assert.Equal(t, "/test/b", out[3].pathValue)
-	assert.Equal(t, "/test/c", out[4].pathValue)
-	assert.Equal(t, "/test", out[5].pathValue)
+
+	got := []string{}
+	for _, v := range out {
+		got = append(got, v.pathValue)
+	}
+
+	want := []string{
+		"/test/sub1",
+		"/test/sub{id}",
+		"/test/a",
+		"/test/b",
+		"/test/c",
+		"/test/{id}",
+		"/test",
+	}
+
+	assert.Equal(t, want, got)
+
 }

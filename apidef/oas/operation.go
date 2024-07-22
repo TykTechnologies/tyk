@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"regexp"
 	"sort"
 	"strings"
 
@@ -170,6 +171,8 @@ type pathItem struct {
 	pathValue string
 }
 
+var pathParamRegex = regexp.MustCompile(`\{[^}]+\}`)
+
 func sortByPathLength(in openapi3.Paths) []pathItem {
 	// get urls
 	paths := []string{}
@@ -177,11 +180,14 @@ func sortByPathLength(in openapi3.Paths) []pathItem {
 		paths = append(paths, k)
 	}
 
-	// sort by length
+	// sort by length and lexicographically
 	sort.Slice(paths, func(i, j int) bool {
-		il, jl := len(paths[i]), len(paths[j])
+		pathI := pathParamRegex.ReplaceAllString(paths[i], "")
+		pathJ := pathParamRegex.ReplaceAllString(paths[j], "")
+
+		il, jl := len(pathI), len(pathJ)
 		if il == jl {
-			return paths[i] < paths[j]
+			return pathI < pathJ
 		}
 		return il > jl
 	})
