@@ -176,28 +176,28 @@ func (s *OAS) extractPathsAndOperations(ep *apidef.ExtendedPathsSet) {
 	for id, tykOp := range tykOperations {
 	found:
 		for _, pathItem := range oasutil.SortByPathLength(s.Paths) {
-			pathURL := pathItem.Value
-			for method, operation := range pathItem.Item.Operations() {
+			path := pathItem.Path
+			for method, operation := range pathItem.Operations() {
 				if id == operation.OperationID {
-					tykOp.extractAllowanceTo(ep, pathURL, method, allow)
-					tykOp.extractAllowanceTo(ep, pathURL, method, block)
-					tykOp.extractAllowanceTo(ep, pathURL, method, ignoreAuthentication)
-					tykOp.extractInternalTo(ep, pathURL, method)
-					tykOp.extractTransformRequestMethodTo(ep, pathURL, method)
-					tykOp.extractTransformRequestBodyTo(ep, pathURL, method)
-					tykOp.extractTransformResponseBodyTo(ep, pathURL, method)
-					tykOp.extractTransformRequestHeadersTo(ep, pathURL, method)
-					tykOp.extractTransformResponseHeadersTo(ep, pathURL, method)
-					tykOp.extractURLRewriteTo(ep, pathURL, method)
-					tykOp.extractCacheTo(ep, pathURL, method)
-					tykOp.extractEnforceTimeoutTo(ep, pathURL, method)
-					tykOp.extractVirtualEndpointTo(ep, pathURL, method)
-					tykOp.extractEndpointPostPluginTo(ep, pathURL, method)
-					tykOp.extractCircuitBreakerTo(ep, pathURL, method)
-					tykOp.extractTrackEndpointTo(ep, pathURL, method)
-					tykOp.extractDoNotTrackEndpointTo(ep, pathURL, method)
-					tykOp.extractRequestSizeLimitTo(ep, pathURL, method)
-					tykOp.extractRateLimitEndpointTo(ep, pathURL, method)
+					tykOp.extractAllowanceTo(ep, path, method, allow)
+					tykOp.extractAllowanceTo(ep, path, method, block)
+					tykOp.extractAllowanceTo(ep, path, method, ignoreAuthentication)
+					tykOp.extractInternalTo(ep, path, method)
+					tykOp.extractTransformRequestMethodTo(ep, path, method)
+					tykOp.extractTransformRequestBodyTo(ep, path, method)
+					tykOp.extractTransformResponseBodyTo(ep, path, method)
+					tykOp.extractTransformRequestHeadersTo(ep, path, method)
+					tykOp.extractTransformResponseHeadersTo(ep, path, method)
+					tykOp.extractURLRewriteTo(ep, path, method)
+					tykOp.extractCacheTo(ep, path, method)
+					tykOp.extractEnforceTimeoutTo(ep, path, method)
+					tykOp.extractVirtualEndpointTo(ep, path, method)
+					tykOp.extractEndpointPostPluginTo(ep, path, method)
+					tykOp.extractCircuitBreakerTo(ep, path, method)
+					tykOp.extractTrackEndpointTo(ep, path, method)
+					tykOp.extractDoNotTrackEndpointTo(ep, path, method)
+					tykOp.extractRequestSizeLimitTo(ep, path, method)
+					tykOp.extractRateLimitEndpointTo(ep, path, method)
 					break found
 				}
 			}
