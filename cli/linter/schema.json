@@ -638,6 +638,15 @@
       "type": "string",
       "enum": ["", "debug", "info", "warn", "error"]
     },
+    "access_logs": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        }
+      }
+    },
     "enable_http_profiler": {
       "type": "boolean"
     },

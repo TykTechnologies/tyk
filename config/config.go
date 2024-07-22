@@ -246,6 +246,12 @@ type AnalyticsConfigConfig struct {
 	SerializerType string `json:"serializer_type"`
 }
 
+// AccessLogsConfig defines the type of transactions logs printed to stdout
+type AccessLogsConfig struct {
+	// Enable the transaction logs. Default: false
+	Enabled bool `json:"enabled"`
+}
+
 type HealthCheckConfig struct {
 	// Setting this value to `true` will enable the health-check endpoint on /Tyk/health.
 	EnableHealthChecks bool `json:"enable_health_checks"`
@@ -950,6 +956,10 @@ type Config struct {
 	// You can now set a logging level (log_level). The following levels can be set: debug, info, warn, error.
 	// If not set or left empty, it will default to `info`.
 	LogLevel string `json:"log_level"`
+
+	// You can configure the transaction logs to be turned on
+	// If not set or left empty, it will default to 'false'
+	AccessLogs AccessLogsConfig `json:"access_logs"`
 
 	// Section for configuring OpenTracing support
 	// Deprecated: use OpenTelemetry instead.

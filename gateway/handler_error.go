@@ -12,6 +12,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/TykTechnologies/tyk/internal/httputil"
+
+	"github.com/TykTechnologies/tyk/storage"
+
 	"github.com/TykTechnologies/tyk/apidef"
 
 	"github.com/TykTechnologies/tyk-pump/analytics"
@@ -49,6 +53,33 @@ func defaultTykErrors() {
 
 	initAuthKeyErrors()
 	initOauth2KeyExistsErrors()
+}
+
+// logTransaction will print the transaction log to STDOUT. If hashKeys is set to false it will print an obfuscated
+// version of the key otherwise print the hashed_key.
+func (e *ErrorHandler) logTransaction(hashKeys bool, r *http.Request, resp *http.Response, token string) error {
+	// Don't print the full token, handle as obfuscated key or hashed key
+	if !hashKeys {
+		token = e.Gw.obfuscateKey(token)
+	} else {
+		token = storage.HashKey(token, hashKeys)
+	}
+
+	// Error transaction logs, contains all the available information for an error handling
+	// situation
+	accessLog := httputil.AccessLogRecord{}
+	accessLogSpec := httputil.AccessLogAPISpec{APIID: e.Spec.APIID, OrgID: e.Spec.OrgID}
+	err := accessLog.Fill(analytics.Latency{}, r, resp, accessLogSpec, token)
+
+	if err != nil {
+		return err
+	}
+
+	// Success transaction logs, contains important fields such as latency that may not
+	// be available in an error handler
+	accessLog.LogTransaction(log)
+
+	return nil
 }
 
 func overrideTykErrors(gw *Gateway) {
@@ -311,6 +342,15 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 			log.WithError(err).Error("could not store analytic record")
 		}
 	}
+
+	if e.Spec.GlobalConfig.AccessLogs.Enabled {
+		hashKeys := e.Gw.GetConfig().HashKeys
+		err := e.logTransaction(hashKeys, r, response, token)
+		if err != nil {
+			log.WithError(err).Error("error generating access logs")
+		}
+	}
+
 	// Report in health check
 	reportHealthValue(e.Spec, BlockedRequestLog, "-1")
 }

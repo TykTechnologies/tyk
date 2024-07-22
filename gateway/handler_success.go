@@ -10,6 +10,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/TykTechnologies/tyk/storage"
+
 	"github.com/TykTechnologies/tyk/internal/graphql"
 
 	"github.com/TykTechnologies/tyk/apidef"
@@ -118,6 +120,31 @@ func getSessionTags(session *user.SessionState) []string {
 	tags = append(tags, session.Tags...)
 
 	return tags
+}
+
+// logTransaction will print the transaction log to STDOUT. If hashKeys is set to false it will print an obfuscated
+// version of the key otherwise print the hashed_key.
+func (s *SuccessHandler) logTransaction(hashKeys bool, latency analytics.Latency, r *http.Request, resp *http.Response, token string) error {
+	// Don't print the full token, handle as obfuscated key or hashed key
+	if !hashKeys {
+		token = s.Gw.obfuscateKey(token)
+	} else {
+		token = storage.HashKey(token, hashKeys)
+	}
+
+	accessLog := httputil.AccessLogRecord{}
+	accessLogSpec := httputil.AccessLogAPISpec{APIID: s.Spec.APIID, OrgID: s.Spec.OrgID}
+	err := accessLog.Fill(latency, r, resp, accessLogSpec, token)
+
+	if err != nil {
+		return err
+	}
+
+	// Success transaction logs, contains important fields such as latency that may not
+	// be available in an error handler
+	accessLog.LogTransaction(log)
+
+	return nil
 }
 
 func recordGraphDetails(rec *analytics.AnalyticsRecord, r *http.Request, resp *http.Response, spec *APISpec) {
@@ -382,8 +409,20 @@ func (s *SuccessHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) *http
 			Upstream: int64(DurationToMillisecond(resp.UpstreamLatency)),
 		}
 		s.RecordHit(r, latency, resp.Response.StatusCode, resp.Response, false)
+
+		// Don't print a transaction log there is no "resp", that indicates an error.
+		// In error situations, transaction log is already printed by "handler_error.go"
+		if s.Spec.GlobalConfig.AccessLogs.Enabled {
+			token := ctxGetAuthToken(r)
+			hashKeys := s.Gw.GetConfig().HashKeys
+			err := s.logTransaction(hashKeys, latency, r, resp.Response, token)
+			if err != nil {
+				log.WithError(err).Error("error generating access logs")
+			}
+		}
 	}
 	log.Debug("Done proxy")
+
 	return nil
 }
 
