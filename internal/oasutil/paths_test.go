@@ -23,7 +23,7 @@ func TestSortByPathLength(t *testing.T) {
 
 	got := []string{}
 	for _, v := range out {
-		got = append(got, v.Value)
+		got = append(got, v.Path)
 	}
 
 	want := []string{

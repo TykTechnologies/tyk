@@ -8,8 +8,9 @@ import (
 )
 
 type PathItem struct {
-	Item  *openapi3.PathItem
-	Value string
+	*openapi3.PathItem
+
+	Path string
 }
 
 var pathParamRegex = regexp.MustCompile(`\{[^}]+\}`)
@@ -37,8 +38,8 @@ func SortByPathLength(in openapi3.Paths) []PathItem {
 	result := []PathItem{}
 	for _, v := range paths {
 		value := PathItem{
-			Item:  in[v],
-			Value: v,
+			PathItem: in[v],
+			Path:     v,
 		}
 		result = append(result, value)
 	}
