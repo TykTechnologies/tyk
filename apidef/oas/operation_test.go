@@ -252,6 +252,7 @@ func TestOAS_sortByPathLength(t *testing.T) {
 		"/test/c":       nil,
 		"/test/sub1":    nil,
 		"/test/sub{id}": nil,
+		"/test/sub2":    nil,
 		"/test":         nil,
 		"/test/{id}":    nil,
 	}
@@ -265,6 +266,7 @@ func TestOAS_sortByPathLength(t *testing.T) {
 
 	want := []string{
 		"/test/sub1",
+		"/test/sub2",
 		"/test/sub{id}",
 		"/test/a",
 		"/test/b",
