@@ -7,19 +7,22 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+var testPathsForSorting = openapi3.Paths{
+	"/test/a":           nil,
+	"/test/b":           nil,
+	"/test/c":           nil,
+	"/test/{id}/asset":  nil,
+	"/test/{id}/{file}": nil,
+	"/test/sub":         nil,
+	"/test/sub1":        nil,
+	"/test/sub{id}":     nil,
+	"/test/sub2":        nil,
+	"/test":             nil,
+	"/test/{id}":        nil,
+}
+
 func TestSortByPathLength(t *testing.T) {
-	paths := openapi3.Paths{
-		"/test/a":           nil,
-		"/test/b":           nil,
-		"/test/c":           nil,
-		"/test/{id}/asset":  nil,
-		"/test/{id}/{file}": nil,
-		"/test/sub1":        nil,
-		"/test/sub{id}":     nil,
-		"/test/sub2":        nil,
-		"/test":             nil,
-		"/test/{id}":        nil,
-	}
+	paths := testPathsForSorting
 
 	out := SortByPathLength(paths)
 
@@ -33,6 +36,7 @@ func TestSortByPathLength(t *testing.T) {
 		"/test/{id}/{file}",
 		"/test/sub1",
 		"/test/sub2",
+		"/test/sub",
 		"/test/sub{id}",
 		"/test/a",
 		"/test/b",
@@ -45,18 +49,7 @@ func TestSortByPathLength(t *testing.T) {
 }
 
 func TestSortByMatchingOrder(t *testing.T) {
-	paths := openapi3.Paths{
-		"/test/a":           nil,
-		"/test/b":           nil,
-		"/test/c":           nil,
-		"/test/{id}/asset":  nil,
-		"/test/{id}/{file}": nil,
-		"/test/sub1":        nil,
-		"/test/sub{id}":     nil,
-		"/test/sub2":        nil,
-		"/test":             nil,
-		"/test/{id}":        nil,
-	}
+	paths := testPathsForSorting
 
 	out := SortByMatchingOrder(paths)
 
@@ -68,6 +61,7 @@ func TestSortByMatchingOrder(t *testing.T) {
 	want := []string{
 		"/test/sub2",
 		"/test/sub1",
+		"/test/sub",
 		"/test/c",
 		"/test/b",
 		"/test/a",
