@@ -351,6 +351,7 @@ func TestAPIDefinition_MigrateVersioning_StripPath(t *testing.T) {
 	}
 
 	check := func(t *testing.T, base APIDefinition, stripVersioningData bool) {
+		t.Helper()
 		versions, err := base.MigrateVersioning()
 		assert.NoError(t, err)
 

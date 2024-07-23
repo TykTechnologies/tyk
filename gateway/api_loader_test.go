@@ -190,6 +190,7 @@ func TestGraphQLPlayground(t *testing.T) {
 	})[0]
 
 	run := func(t *testing.T, playgroundPath string, api *APISpec, env string) {
+		t.Helper()
 		endpoint := api.Proxy.ListenPath
 		if env == "cloud" {
 			endpoint = fmt.Sprintf("/%s/", api.Slug)

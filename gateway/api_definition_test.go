@@ -666,6 +666,7 @@ func TestOldMockResponse(t *testing.T) {
 	}
 
 	check := func(t *testing.T, api *APISpec, tc []test.TestCase) {
+		t.Helper()
 		ts.Gw.LoadAPI(api)
 		_, _ = ts.Run(t, tc...)
 
@@ -1261,6 +1262,7 @@ func TestAPIDefinitionLoader(t *testing.T) {
 	l := APIDefinitionLoader{Gw: ts.Gw}
 
 	executeAndAssert := func(t *testing.T, tpl *textTemplate.Template) {
+		t.Helper()
 		var bodyBuffer bytes.Buffer
 		err := tpl.Execute(&bodyBuffer, map[string]string{
 			"value1": "value-1",

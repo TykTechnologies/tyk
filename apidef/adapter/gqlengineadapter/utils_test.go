@@ -32,6 +32,7 @@ func TestParseSchema(t *testing.T) {
 func TestGraphqlDataSourceWebSocketProtocol(t *testing.T) {
 	run := func(subscriptionType apidef.SubscriptionType, expectedWebSocketProtocol string) func(t *testing.T) {
 		return func(t *testing.T) {
+			t.Helper()
 			actualProtocol := graphqlDataSourceWebSocketProtocol(subscriptionType)
 			assert.Equal(t, expectedWebSocketProtocol, actualProtocol)
 		}
@@ -57,6 +58,7 @@ func TestGraphqlDataSourceWebSocketProtocol(t *testing.T) {
 func TestGraphqlSubscriptionType(t *testing.T) {
 	run := func(subscriptionType apidef.SubscriptionType, expectedGraphQLSubscriptionType graphql.SubscriptionType) func(t *testing.T) {
 		return func(t *testing.T) {
+			t.Helper()
 			actualSubscriptionType := graphqlSubscriptionType(subscriptionType)
 			assert.Equal(t, expectedGraphQLSubscriptionType, actualSubscriptionType)
 		}
