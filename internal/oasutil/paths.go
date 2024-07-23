@@ -19,6 +19,21 @@ type PathItem struct {
 
 var pathParamRegex = regexp.MustCompile(`\{[^}]+\}`)
 
+// ExtractPaths will extract paths with the given order.
+func ExtractPaths(in openapi3.Paths, order []string) []PathItem {
+	// collect url and pathItem
+	result := []PathItem{}
+	for _, v := range order {
+		value := PathItem{
+			PathItem: in[v],
+			Path:     v,
+		}
+		result = append(result, value)
+	}
+
+	return result
+}
+
 // SortByPathLength decomposes an openapi3.Paths to a sorted []PathItem.
 // The sorting takes the length of the paths into account, as well as
 // path parameters, sorting them by length descending, and ordering
@@ -50,17 +65,7 @@ func SortByPathLength(in openapi3.Paths) []PathItem {
 		return il > jl
 	})
 
-	// collect url and pathItem
-	result := []PathItem{}
-	for _, v := range paths {
-		value := PathItem{
-			PathItem: in[v],
-			Path:     v,
-		}
-		result = append(result, value)
-	}
-
-	return result
+	return ExtractPaths(in, paths)
 }
 
 // SortByMatchingOrder returns paths in matching order from
@@ -71,15 +76,5 @@ func SortByMatchingOrder(in openapi3.Paths) []PathItem {
 	// get urls
 	paths := in.InMatchingOrder()
 
-	// collect url and pathItem
-	result := []PathItem{}
-	for _, v := range paths {
-		value := PathItem{
-			PathItem: in[v],
-			Path:     v,
-		}
-		result = append(result, value)
-	}
-
-	return result
+	return ExtractPaths(in, paths)
 }
