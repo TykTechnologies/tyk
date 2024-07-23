@@ -3,6 +3,7 @@ package oasutil
 import (
 	"regexp"
 	"sort"
+	"strings"
 
 	"github.com/getkin/kin-openapi/openapi3"
 )
@@ -35,6 +36,12 @@ func SortByPathLength(in openapi3.Paths) []PathItem {
 	sort.Slice(paths, func(i, j int) bool {
 		pathI := pathParamRegex.ReplaceAllString(paths[i], "")
 		pathJ := pathParamRegex.ReplaceAllString(paths[j], "")
+
+		// sort by number of path fragments
+		k, v := strings.Count(pathI, "/"), strings.Count(pathJ, "/")
+		if k != v {
+			return k > v
+		}
 
 		il, jl := len(pathI), len(pathJ)
 		if il == jl {

@@ -30,10 +30,10 @@ func TestSortByPathLength(t *testing.T) {
 
 	want := []string{
 		"/test/{id}/asset",
+		"/test/{id}/{file}",
 		"/test/sub1",
 		"/test/sub2",
 		"/test/sub{id}",
-		"/test/{id}/{file}",
 		"/test/a",
 		"/test/b",
 		"/test/c",
@@ -74,7 +74,7 @@ func TestSortByMatchingOrder(t *testing.T) {
 		"/test",
 		"/test/{id}/asset",
 		"/test/{id}",
-		"/test/sub{id}",
+		"/test/sub{id}", // this is problematic, should be one line up
 		"/test/{id}/{file}",
 	}
 
