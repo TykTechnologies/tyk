@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	graphqlDataSource "github.com/TykTechnologies/graphql-go-tools/pkg/engine/datasource/graphql_datasource"
+	graphqldatasource "github.com/TykTechnologies/graphql-go-tools/pkg/engine/datasource/graphql_datasource"
 	"github.com/TykTechnologies/graphql-go-tools/pkg/engine/plan"
 
 	"github.com/TykTechnologies/tyk/apidef"
@@ -55,7 +55,7 @@ func TestSupergraph_EngineConfig(t *testing.T) {
 
 		v2Config, err := adapter.EngineConfig()
 		assert.NoError(t, err)
-		expectedDataSource := plan.DataSourceConfiguration{
+		expecteddatasource := plan.DataSourceConfiguration{
 			RootNodes: []plan.TypeField{
 				{
 					TypeName:   "Query",
@@ -72,13 +72,13 @@ func TestSupergraph_EngineConfig(t *testing.T) {
 					FieldNames: []string{"id", "username"},
 				},
 			},
-			Factory: &graphqlDataSource.Factory{
+			Factory: &graphqldatasource.Factory{
 				HTTPClient:         httpClient,
 				StreamingClient:    streamingClient,
 				SubscriptionClient: mockSubscriptionClient,
 			},
-			Custom: graphqlDataSource.ConfigJson(graphqlDataSource.Configuration{
-				Fetch: graphqlDataSource.FetchConfiguration{
+			Custom: graphqldatasource.ConfigJson(graphqldatasource.Configuration{
+				Fetch: graphqldatasource.FetchConfiguration{
 					URL:    "http://accounts.service",
 					Method: http.MethodPost,
 					Header: http.Header{
@@ -88,25 +88,25 @@ func TestSupergraph_EngineConfig(t *testing.T) {
 						"X-Tyk-Internal": []string{"true"},
 					},
 				},
-				Subscription: graphqlDataSource.SubscriptionConfiguration{
+				Subscription: graphqldatasource.SubscriptionConfiguration{
 					URL:    "http://accounts.service",
 					UseSSE: true,
 				},
-				Federation: graphqlDataSource.FederationConfiguration{
+				Federation: graphqldatasource.FederationConfiguration{
 					Enabled:    true,
 					ServiceSDL: `extend type Query {me: User} type User @key(fields: "id"){ id: ID! username: String!}`,
 				},
 			}),
 		}
-		assert.Containsf(t, v2Config.DataSources(), expectedDataSource, "engine configuration does not contain proxy-only data source")
+		assert.Containsf(t, v2Config.datasources(), expecteddatasource, "engine configuration does not contain proxy-only data source")
 
 	})
 }
 
 func TestSupergraph_supergraphDataSourceConfigs(t *testing.T) {
-	expectedDataSourceConfigs := []graphqlDataSource.Configuration{
+	expectedDataSourceConfigs := []graphqldatasource.Configuration{
 		{
-			Fetch: graphqlDataSource.FetchConfiguration{
+			Fetch: graphqldatasource.FetchConfiguration{
 				URL:    "http://accounts.service",
 				Method: http.MethodPost,
 				Header: http.Header{
@@ -116,17 +116,17 @@ func TestSupergraph_supergraphDataSourceConfigs(t *testing.T) {
 					"Auth":           []string{"appended_header"},
 				},
 			},
-			Subscription: graphqlDataSource.SubscriptionConfiguration{
+			Subscription: graphqldatasource.SubscriptionConfiguration{
 				URL:    "http://accounts.service",
 				UseSSE: true,
 			},
-			Federation: graphqlDataSource.FederationConfiguration{
+			Federation: graphqldatasource.FederationConfiguration{
 				Enabled:    true,
 				ServiceSDL: federationAccountsServiceSDL,
 			},
 		},
 		{
-			Fetch: graphqlDataSource.FetchConfiguration{
+			Fetch: graphqldatasource.FetchConfiguration{
 				URL:    "http://products.service",
 				Method: http.MethodPost,
 				Header: http.Header{
@@ -134,16 +134,16 @@ func TestSupergraph_supergraphDataSourceConfigs(t *testing.T) {
 					"Header2": []string{"value2"},
 				},
 			},
-			Subscription: graphqlDataSource.SubscriptionConfiguration{
+			Subscription: graphqldatasource.SubscriptionConfiguration{
 				URL: "http://products.service",
 			},
-			Federation: graphqlDataSource.FederationConfiguration{
+			Federation: graphqldatasource.FederationConfiguration{
 				Enabled:    true,
 				ServiceSDL: federationProductsServiceSDL,
 			},
 		},
 		{
-			Fetch: graphqlDataSource.FetchConfiguration{
+			Fetch: graphqldatasource.FetchConfiguration{
 				URL:    "http://reviews.service",
 				Method: http.MethodPost,
 				Header: http.Header{
@@ -152,10 +152,10 @@ func TestSupergraph_supergraphDataSourceConfigs(t *testing.T) {
 					"Header2": []string{"value2"},
 				},
 			},
-			Subscription: graphqlDataSource.SubscriptionConfiguration{
+			Subscription: graphqldatasource.SubscriptionConfiguration{
 				URL: "http://reviews.service",
 			},
-			Federation: graphqlDataSource.FederationConfiguration{
+			Federation: graphqldatasource.FederationConfiguration{
 				Enabled:    true,
 				ServiceSDL: federationReviewsServiceSDL,
 			},

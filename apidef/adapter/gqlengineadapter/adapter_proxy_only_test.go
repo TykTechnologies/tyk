@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	graphqlDataSource "github.com/TykTechnologies/graphql-go-tools/pkg/engine/datasource/graphql_datasource"
+	graphqldatasource "github.com/TykTechnologies/graphql-go-tools/pkg/engine/datasource/graphql_datasource"
 	"github.com/TykTechnologies/graphql-go-tools/pkg/engine/plan"
 
 	"github.com/TykTechnologies/tyk/apidef"
@@ -39,7 +39,7 @@ func TestProxyOnly_EngineConfig(t *testing.T) {
 		engineV2Config, err := adapter.EngineConfig()
 		assert.NoError(t, err)
 
-		expectedDataSource := plan.DataSourceConfiguration{
+		expecteddatasource := plan.DataSourceConfiguration{
 			RootNodes: []plan.TypeField{
 				{
 					TypeName:   "Query",
@@ -47,18 +47,18 @@ func TestProxyOnly_EngineConfig(t *testing.T) {
 				},
 			},
 			ChildNodes: []plan.TypeField{},
-			Factory: &graphqlDataSource.Factory{
-				BatchFactory:       graphqlDataSource.NewBatchFactory(),
+			Factory: &graphqldatasource.Factory{
+				BatchFactory:       graphqldatasource.NewBatchFactory(),
 				HTTPClient:         httpClient,
 				StreamingClient:    streamingClient,
 				SubscriptionClient: mockSubscriptionClient,
 			},
-			Custom: graphqlDataSource.ConfigJson(graphqlDataSource.Configuration{
-				Fetch: graphqlDataSource.FetchConfiguration{
+			Custom: graphqldatasource.ConfigJson(graphqldatasource.Configuration{
+				Fetch: graphqldatasource.FetchConfiguration{
 					URL:    "http://localhost:8080",
 					Header: map[string][]string{},
 				},
-				Subscription: graphqlDataSource.SubscriptionConfiguration{
+				Subscription: graphqldatasource.SubscriptionConfiguration{
 					URL:    "http://localhost:8080",
 					UseSSE: true,
 				},
@@ -76,7 +76,7 @@ func TestProxyOnly_EngineConfig(t *testing.T) {
 			},
 		}
 
-		assert.Containsf(t, engineV2Config.DataSources(), expectedDataSource, "engine configuration does not contain proxy-only data source")
+		assert.Containsf(t, engineV2Config.datasources(), expecteddatasource, "engine configuration does not contain proxy-only data source")
 		assert.Containsf(t, engineV2Config.FieldConfigurations(), expectedFieldConfig, "engine configuration does not contain expected field config")
 	})
 
@@ -103,7 +103,7 @@ func TestProxyOnly_EngineConfig(t *testing.T) {
 		engineV2Config, err := adapter.EngineConfig()
 		assert.NoError(t, err)
 
-		expectedDataSource := plan.DataSourceConfiguration{
+		expecteddatasource := plan.DataSourceConfiguration{
 			RootNodes: []plan.TypeField{
 				{
 					TypeName:   "Query",
@@ -111,20 +111,20 @@ func TestProxyOnly_EngineConfig(t *testing.T) {
 				},
 			},
 			ChildNodes: []plan.TypeField{},
-			Factory: &graphqlDataSource.Factory{
-				BatchFactory:       graphqlDataSource.NewBatchFactory(),
+			Factory: &graphqldatasource.Factory{
+				BatchFactory:       graphqldatasource.NewBatchFactory(),
 				HTTPClient:         httpClient,
 				StreamingClient:    streamingClient,
 				SubscriptionClient: mockSubscriptionClient,
 			},
-			Custom: graphqlDataSource.ConfigJson(graphqlDataSource.Configuration{
-				Fetch: graphqlDataSource.FetchConfiguration{
+			Custom: graphqldatasource.ConfigJson(graphqldatasource.Configuration{
+				Fetch: graphqldatasource.FetchConfiguration{
 					URL: "http://api-name",
 					Header: http.Header{
 						"X-Tyk-Internal": []string{"true"},
 					},
 				},
-				Subscription: graphqlDataSource.SubscriptionConfiguration{
+				Subscription: graphqldatasource.SubscriptionConfiguration{
 					URL:    "http://api-name",
 					UseSSE: true,
 				},
@@ -142,7 +142,7 @@ func TestProxyOnly_EngineConfig(t *testing.T) {
 			},
 		}
 
-		assert.Containsf(t, engineV2Config.DataSources(), expectedDataSource, "engine configuration does not contain proxy-only data source")
+		assert.Containsf(t, engineV2Config.datasources(), expecteddatasource, "engine configuration does not contain proxy-only data source")
 		assert.Containsf(t, engineV2Config.FieldConfigurations(), expectedFieldConfig, "engine configuration does not contain expected field config")
 	})
 
@@ -169,7 +169,7 @@ func TestProxyOnly_EngineConfig(t *testing.T) {
 		engineV2Config, err := adapter.EngineConfig()
 		assert.NoError(t, err)
 
-		expectedDataSource := plan.DataSourceConfiguration{
+		expecteddatasource := plan.DataSourceConfiguration{
 			RootNodes: []plan.TypeField{
 				{
 					TypeName:   "Query",
@@ -186,18 +186,18 @@ func TestProxyOnly_EngineConfig(t *testing.T) {
 					FieldNames: []string{"id", "username"},
 				},
 			},
-			Factory: &graphqlDataSource.Factory{
-				BatchFactory:       graphqlDataSource.NewBatchFactory(),
+			Factory: &graphqldatasource.Factory{
+				BatchFactory:       graphqldatasource.NewBatchFactory(),
 				HTTPClient:         httpClient,
 				StreamingClient:    streamingClient,
 				SubscriptionClient: mockSubscriptionClient,
 			},
-			Custom: graphqlDataSource.ConfigJson(graphqlDataSource.Configuration{
-				Fetch: graphqlDataSource.FetchConfiguration{
+			Custom: graphqldatasource.ConfigJson(graphqldatasource.Configuration{
+				Fetch: graphqldatasource.FetchConfiguration{
 					URL:    "http://localhost:8080",
 					Header: http.Header{},
 				},
-				Subscription: graphqlDataSource.SubscriptionConfiguration{
+				Subscription: graphqldatasource.SubscriptionConfiguration{
 					URL:    "http://localhost:8080",
 					UseSSE: false,
 				},
@@ -215,7 +215,7 @@ func TestProxyOnly_EngineConfig(t *testing.T) {
 			},
 		}
 
-		assert.Containsf(t, engineV2Config.DataSources(), expectedDataSource, "engine configuration does not contain proxy-only data source")
+		assert.Containsf(t, engineV2Config.datasources(), expecteddatasource, "engine configuration does not contain proxy-only data source")
 		assert.Containsf(t, engineV2Config.FieldConfigurations(), expectedFieldConfig, "engine configuration does not contain expected field config")
 	})
 }

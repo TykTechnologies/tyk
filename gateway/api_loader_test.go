@@ -15,7 +15,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	persistentModel "github.com/TykTechnologies/storage/persistent/model"
+	persistentmodel "github.com/TykTechnologies/storage/persistent/model"
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/internal/uuid"
@@ -99,7 +99,7 @@ func TestFuzzyFindAPI(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
-	objectId := persistentModel.NewObjectID()
+	objectId := persistentmodel.NewObjectID()
 
 	ts.Gw.BuildAndLoadAPI(
 		func(spec *APISpec) {

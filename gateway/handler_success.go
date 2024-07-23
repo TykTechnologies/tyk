@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	graphqlInternal "github.com/TykTechnologies/tyk/internal/graphql"
+	graphqlinternal "github.com/TykTechnologies/tyk/internal/graphql"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/internal/httputil"
@@ -153,7 +153,7 @@ func recordGraphDetails(rec *analytics.AnalyticsRecord, r *http.Request, resp *h
 		}
 	}
 
-	extractor := graphqlInternal.NewGraphStatsExtractor()
+	extractor := graphqlinternal.NewGraphStatsExtractor()
 	stats, err := extractor.ExtractStats(string(body), string(respBody), spec.GraphQL.Schema)
 	if err != nil {
 		logger.WithError(err).Error("error recording graph analytics")

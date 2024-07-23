@@ -25,7 +25,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	temporalModel "github.com/TykTechnologies/storage/temporal/model"
+	temporalmodel "github.com/TykTechnologies/storage/temporal/model"
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/apidef/oas"
 	"github.com/TykTechnologies/tyk/certs"
@@ -1741,14 +1741,14 @@ func TestGroupResetHandler(t *testing.T) {
 		}()
 
 		err := cacheStore.StartPubSubHandler(ctx, RedisPubSubChannel, func(v interface{}) {
-			msg, ok := v.(temporalModel.Message)
+			msg, ok := v.(temporalmodel.Message)
 			assert.True(t, ok)
 
 			msgType := msg.Type()
 			switch msgType {
-			case temporalModel.MessageTypeSubscription:
+			case temporalmodel.MessageTypeSubscription:
 				didSubscribe <- true
-			case temporalModel.MessageTypeMessage:
+			case temporalmodel.MessageTypeMessage:
 				notf := Notification{Gw: ts.Gw}
 				payload, err := msg.Payload()
 				assert.NoError(t, err)

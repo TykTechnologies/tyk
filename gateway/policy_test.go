@@ -12,7 +12,7 @@ import (
 	"testing"
 	"time"
 
-	persistentModel "github.com/TykTechnologies/storage/persistent/model"
+	persistentmodel "github.com/TykTechnologies/storage/persistent/model"
 
 	"github.com/stretchr/testify/assert"
 
@@ -1586,7 +1586,7 @@ func TestPerAPIPolicyUpdate(t *testing.T) {
 
 func TestParsePoliciesFromRPC(t *testing.T) {
 
-	objectID := persistentModel.NewObjectID()
+	objectID := persistentmodel.NewObjectID()
 	explicitID := "explicit_pol_id"
 	tcs := []struct {
 		testName      string
@@ -1664,7 +1664,7 @@ func (s *RPCDataLoaderMock) GetPolicies(orgId string) string {
 func Test_LoadPoliciesFromRPC(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
-	objectID := persistentModel.NewObjectID()
+	objectID := persistentmodel.NewObjectID()
 
 	t.Run("load policies from RPC - success", func(t *testing.T) {
 		mockedStorage := &RPCDataLoaderMock{

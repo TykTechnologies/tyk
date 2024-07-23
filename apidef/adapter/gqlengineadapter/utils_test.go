@@ -8,9 +8,9 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	restDataSource "github.com/TykTechnologies/graphql-go-tools/pkg/engine/datasource/rest_datasource"
+	restdatasource "github.com/TykTechnologies/graphql-go-tools/pkg/engine/datasource/rest_datasource"
 
-	graphqlDataSource "github.com/TykTechnologies/graphql-go-tools/pkg/engine/datasource/graphql_datasource"
+	graphqldatasource "github.com/TykTechnologies/graphql-go-tools/pkg/engine/datasource/graphql_datasource"
 	"github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
 
 	"github.com/TykTechnologies/tyk/apidef"
@@ -29,29 +29,29 @@ func TestParseSchema(t *testing.T) {
 	assert.NoError(t, err)
 }
 
-func TestGraphqlDataSourceWebSocketProtocol(t *testing.T) {
+func TestGraphqldatasourceWebSocketProtocol(t *testing.T) {
 	run := func(subscriptionType apidef.SubscriptionType, expectedWebSocketProtocol string) func(t *testing.T) {
 		return func(t *testing.T) {
 			t.Helper()
-			actualProtocol := graphqlDataSourceWebSocketProtocol(subscriptionType)
+			actualProtocol := graphqldatasourceWebSocketProtocol(subscriptionType)
 			assert.Equal(t, expectedWebSocketProtocol, actualProtocol)
 		}
 	}
 
 	t.Run("should return 'graphql-ws' for undefined subscription type",
-		run(apidef.GQLSubscriptionUndefined, graphqlDataSource.ProtocolGraphQLWS),
+		run(apidef.GQLSubscriptionUndefined, graphqldatasource.ProtocolGraphQLWS),
 	)
 
 	t.Run("should return 'graphql-ws' for graphql-ws subscription type",
-		run(apidef.GQLSubscriptionWS, graphqlDataSource.ProtocolGraphQLWS),
+		run(apidef.GQLSubscriptionWS, graphqldatasource.ProtocolGraphQLWS),
 	)
 
 	t.Run("should return 'graphql-ws' for sse subscription type as websocket protocol is irrelevant in that case",
-		run(apidef.GQLSubscriptionSSE, graphqlDataSource.ProtocolGraphQLWS),
+		run(apidef.GQLSubscriptionSSE, graphqldatasource.ProtocolGraphQLWS),
 	)
 
 	t.Run("should return 'graphql-transport-ws' for graphql-transport-ws subscription type",
-		run(apidef.GQLSubscriptionTransportWS, graphqlDataSource.ProtocolGraphQLTWS),
+		run(apidef.GQLSubscriptionTransportWS, graphqldatasource.ProtocolGraphQLTWS),
 	)
 }
 
@@ -120,7 +120,7 @@ func TestRemoveDuplicateApiDefinitionHeaders(t *testing.T) {
 	assert.Equal(t, expectedDeduplicatedHeaders, actualDeduplicatedHeaders)
 }
 
-func TestGenerateRestDataSourceFromGraphql(t *testing.T) {
+func TestGenerateRestdatasourceFromGraphql(t *testing.T) {
 	t.Run("should return error if generation is not possible", func(t *testing.T) {
 		gqlConfig := apidef.GraphQLEngineDataSourceConfigGraphQL{
 			URL:              "http://local.fake",
@@ -132,7 +132,7 @@ func TestGenerateRestDataSourceFromGraphql(t *testing.T) {
 			Variables:        nil,
 		}
 
-		restEngineConfig, err := generateRestDataSourceFromGraphql(gqlConfig)
+		restEngineConfig, err := generateRestdatasourceFromGraphql(gqlConfig)
 		assert.Equal(t, err, ErrGraphQLConfigIsMissingOperation)
 		assert.Nil(t, restEngineConfig)
 	})
@@ -150,8 +150,8 @@ func TestGenerateRestDataSourceFromGraphql(t *testing.T) {
 			Variables:        json.RawMessage(`{"var":"val"}`),
 		}
 
-		expectedRestEngineConfig := restDataSource.ConfigJSON(restDataSource.Configuration{
-			Fetch: restDataSource.FetchConfiguration{
+		expectedRestEngineConfig := restdatasource.ConfigJSON(restdatasource.Configuration{
+			Fetch: restdatasource.FetchConfiguration{
 				URL:    "http://local.fake",
 				Method: http.MethodPost,
 				Body:   `{"variables":{"var":"val"},"query":"mutation MyOp { myOperation }"}`,
@@ -161,16 +161,16 @@ func TestGenerateRestDataSourceFromGraphql(t *testing.T) {
 			},
 		})
 
-		actualRestEngineConfig, err := generateRestDataSourceFromGraphql(gqlConfig)
+		actualRestEngineConfig, err := generateRestdatasourceFromGraphql(gqlConfig)
 		assert.NoError(t, err)
 		assert.Equal(t, expectedRestEngineConfig, actualRestEngineConfig)
 	})
 }
 
-var mockSubscriptionClient = &graphqlDataSource.SubscriptionClient{}
+var mockSubscriptionClient = &graphqldatasource.SubscriptionClient{}
 
 type MockSubscriptionClientFactory struct{}
 
-func (m *MockSubscriptionClientFactory) NewSubscriptionClient(httpClient, streamingClient *http.Client, engineCtx context.Context, options ...graphqlDataSource.Options) graphqlDataSource.GraphQLSubscriptionClient {
+func (m *MockSubscriptionClientFactory) NewSubscriptionClient(httpClient, streamingClient *http.Client, engineCtx context.Context, options ...graphqldatasource.Options) graphqldatasource.GraphQLSubscriptionClient {
 	return mockSubscriptionClient
 }

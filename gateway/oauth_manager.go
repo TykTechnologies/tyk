@@ -18,7 +18,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"golang.org/x/crypto/bcrypt"
 
-	internalErrors "github.com/TykTechnologies/tyk/internal/errors"
+	internalerrors "github.com/TykTechnologies/tyk/internal/errors"
 	"github.com/TykTechnologies/tyk/internal/uuid"
 	"github.com/TykTechnologies/tyk/request"
 
@@ -1232,7 +1232,7 @@ func (gw *Gateway) purgeLapsedOAuthTokens() error {
 	close(errs)
 
 	combinedErr := &multierror.Error{
-		ErrorFormat: internalErrors.Formatter,
+		ErrorFormat: internalerrors.Formatter,
 	}
 
 	for err := range errs {

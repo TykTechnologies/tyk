@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/TykTechnologies/graphql-go-tools/v2/pkg/graphql"
+	grapqlv2 "github.com/TykTechnologies/graphql-go-tools/v2/pkg/graphql"
 	"github.com/TykTechnologies/tyk/apidef"
 )
 
@@ -27,9 +27,9 @@ func TestReverseProxyPreHandlerV2_PreHandle(t *testing.T) {
 		require.NoError(t, err)
 
 		reverseProxyPreHandler := newTestReverseProxyPreHandlerV2(t)
-		reverseProxyPreHandler.ctxRetrieveGraphQLRequest = func(r *http.Request) *graphql.Request {
+		reverseProxyPreHandler.ctxRetrieveGraphQLRequest = func(r *http.Request) *graphqlv2.Request {
 			if r == request {
-				return &graphql.Request{
+				return &graphqlv2.Request{
 					Query: operation,
 				}
 			}
@@ -58,7 +58,7 @@ func TestReverseProxyPreHandlerV2_PreHandle(t *testing.T) {
 		require.NoError(t, err)
 
 		reverseProxyPreHandler := newTestReverseProxyPreHandlerV2(t)
-		reverseProxyPreHandler.ctxRetrieveGraphQLRequest = func(r *http.Request) *graphql.Request {
+		reverseProxyPreHandler.ctxRetrieveGraphQLRequest = func(r *http.Request) *graphqlv2.Request {
 			return nil // an upgrade request won't contain a graphql operation
 		}
 
@@ -83,9 +83,9 @@ func TestReverseProxyPreHandlerV2_PreHandle(t *testing.T) {
 		require.NoError(t, err)
 
 		reverseProxyPreHandler := newTestReverseProxyPreHandlerV2(t)
-		reverseProxyPreHandler.ctxRetrieveGraphQLRequest = func(r *http.Request) *graphql.Request {
+		reverseProxyPreHandler.ctxRetrieveGraphQLRequest = func(r *http.Request) *graphqlv2.Request {
 			if r == request {
-				return &graphql.Request{
+				return &graphqlv2.Request{
 					Query: operation,
 				}
 			}
@@ -112,9 +112,9 @@ func TestReverseProxyPreHandlerV2_PreHandle(t *testing.T) {
 		require.NoError(t, err)
 
 		reverseProxyPreHandler := newTestReverseProxyPreHandlerV2(t)
-		reverseProxyPreHandler.ctxRetrieveGraphQLRequest = func(r *http.Request) *graphql.Request {
+		reverseProxyPreHandler.ctxRetrieveGraphQLRequest = func(r *http.Request) *graphqlv2.Request {
 			if r == request {
-				return &graphql.Request{
+				return &graphqlv2.Request{
 					Query: operation,
 				}
 			}
@@ -142,9 +142,9 @@ func TestReverseProxyPreHandlerV2_PreHandle(t *testing.T) {
 		require.NoError(t, err)
 
 		reverseProxyPreHandler := newTestReverseProxyPreHandlerV2(t)
-		reverseProxyPreHandler.ctxRetrieveGraphQLRequest = func(r *http.Request) *graphql.Request {
+		reverseProxyPreHandler.ctxRetrieveGraphQLRequest = func(r *http.Request) *graphqlv2.Request {
 			if r == request {
-				return &graphql.Request{
+				return &graphqlv2.Request{
 					Query: operation,
 				}
 			}
