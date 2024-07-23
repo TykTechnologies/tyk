@@ -21,6 +21,7 @@ var testPathsForSorting = openapi3.Paths{
 	"/test/{id}":        nil,
 }
 
+// TestSortByPathLength tests our custom sorting for the OAS paths.
 func TestSortByPathLength(t *testing.T) {
 	paths := testPathsForSorting
 
@@ -48,10 +49,12 @@ func TestSortByPathLength(t *testing.T) {
 	assert.Equal(t, want, got)
 }
 
-func TestSortByMatchingOrder(t *testing.T) {
+// TestExtractPath uses the upstream library to extract an ordered list of paths.
+func TestExtractPaths(t *testing.T) {
 	paths := testPathsForSorting
+	order := paths.InMatchingOrder()
 
-	out := SortByMatchingOrder(paths)
+	out := ExtractPaths(paths, order)
 
 	got := []string{}
 	for _, v := range out {
