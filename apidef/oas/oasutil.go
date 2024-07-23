@@ -6,8 +6,6 @@ import (
 	"github.com/TykTechnologies/tyk/internal/reflect"
 )
 
-var ShouldOmit = reflect.IsEmpty
-
 func toStructIfMap(input interface{}, val interface{}) bool {
 	mapInput, ok := input.(map[string]interface{})
 	if !ok {
@@ -26,3 +24,6 @@ func toStructIfMap(input interface{}, val interface{}) bool {
 
 	return true
 }
+
+// ShouldOmit is a compatibility alias. It may be removed in the future.
+var ShouldOmit = reflect.IsEmpty
