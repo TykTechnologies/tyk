@@ -15,7 +15,7 @@ import (
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/request"
-	"github.com/TykTechnologies/tyk/signaturevalidator"
+	signaturevalidator "github.com/TykTechnologies/tyk/signature_validator"
 )
 
 const (
