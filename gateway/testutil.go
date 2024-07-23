@@ -231,6 +231,8 @@ func (r *ReloadMachinery) TickOk(t *testing.T) {
 }
 
 func InitTestMain(ctx context.Context, m *testing.M) int {
+	runtime.SetCPUProfileRate(1000) // 1000 samples per second
+
 	test.InitTestMain(ctx, m)
 
 	if EnableTestDNSMock {

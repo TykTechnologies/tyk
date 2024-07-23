@@ -1794,6 +1794,7 @@ func TestSSE(t *testing.T) {
 		defer res.Body.Close()
 
 		i := 0
+
 		okChan := make(chan error)
 
 		go func() {
