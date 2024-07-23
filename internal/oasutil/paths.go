@@ -55,3 +55,24 @@ func SortByPathLength(in openapi3.Paths) []PathItem {
 
 	return result
 }
+
+// SortByMatchingOrder returns paths in matching order from
+// the kin-openapi library.
+//
+// Check the test function for sorting expectations.
+func SortByMatchingOrder(in openapi3.Paths) []PathItem {
+	// get urls
+	paths := in.InMatchingOrder()
+
+	// collect url and pathItem
+	result := []PathItem{}
+	for _, v := range paths {
+		value := PathItem{
+			PathItem: in[v],
+			Path:     v,
+		}
+		result = append(result, value)
+	}
+
+	return result
+}
