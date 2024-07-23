@@ -162,7 +162,7 @@ func TestDummyStorage_GetKeysAndValuesWithFilter(t *testing.T) {
 func TestDummyStorage_DeleteKeys(t *testing.T) {
 	ds := NewDummyStorage()
 	assertPanic(t, func() {
-		ds.DeleteKeys([]string{"key"})
+		ds.DeleteKeys([]string{"key"}, false)
 	})
 }
 

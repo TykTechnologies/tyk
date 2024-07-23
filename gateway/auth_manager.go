@@ -79,9 +79,12 @@ func (b *DefaultSessionManager) ResetQuota(keyName string, session *user.Session
 	keys := make([]string, 0)
 	keys = append(keys, rateLimiterSentinelKey, rawKey)
 	for _, acl := range session.AccessRights {
+		if acl.AllowanceScope == "" {
+			continue
+		}
 		keys = append(keys, QuotaKeyPrefix+acl.AllowanceScope+"-"+keyName)
 	}
-	b.store.DeleteKeys(keys)
+	b.store.DeleteKeys(keys, true)
 }
 
 func (b *DefaultSessionManager) deleteRawKeysWithAllowanceScope(store storage.Handler, session *user.SessionState, keyName string) {
@@ -89,18 +92,13 @@ func (b *DefaultSessionManager) deleteRawKeysWithAllowanceScope(store storage.Ha
 		return
 	}
 
-	keys := make([]string, 0)
 	for _, acl := range session.AccessRights {
 		if acl.AllowanceScope == "" {
-			//keys = append(keys, "scopedey"+QuotaKeyPrefix+keyName)
 			continue
 		}
 		rawKey := QuotaKeyPrefix + acl.AllowanceScope + "-" + keyName
-		keys = append(keys, rawKey)
 		store.DeleteRawKey(rawKey)
 	}
-	log.Info("Delete raw keys with scopes: ", keys)
-
 }
 
 func (b *DefaultSessionManager) clearCacheForKey(keyName string, hashed bool) {
