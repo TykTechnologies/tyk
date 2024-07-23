@@ -52,6 +52,13 @@ func SortByPathLength(in openapi3.Paths) []PathItem {
 		pathI := pathParamRegex.ReplaceAllString(paths[i], "")
 		pathJ := pathParamRegex.ReplaceAllString(paths[j], "")
 
+		// handle /sub and /sub{id} order with raw path.
+		if pathI == pathJ {
+			// we're reversing indexes here so path with
+			// parameter is sorted after the literal.
+			pathI, pathJ = paths[j], paths[i]
+		}
+
 		// sort by number of path fragments
 		k, v := strings.Count(pathI, "/"), strings.Count(pathJ, "/")
 		if k != v {
