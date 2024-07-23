@@ -669,7 +669,8 @@ func TestKeyHandler_DeleteKeyWithQuota(t *testing.T) {
 
 					// we might remove the key, but for rpc sometimes we just remove the key and not the quota
 					// so we can get the updated key and still preserving the quota count
-					_, err := ts.Gw.DefaultQuotaStore.Store().GetRawKey("quota-" + storage.HashKey(key, tc.hashKeys))
+					resp, err := ts.Gw.DefaultQuotaStore.Store().GetRawKey("quota-" + storage.HashKey(key, tc.hashKeys))
+					fmt.Println(resp)
 					found := err == nil
 					assert.Equal(t, quotaTc.quotaFound, found)
 				})

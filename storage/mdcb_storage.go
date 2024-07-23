@@ -148,7 +148,7 @@ func (m MdcbStorage) GetKeysAndValuesWithFilter(key string) map[string]string {
 	return m.local.GetKeysAndValuesWithFilter(key)
 }
 
-func (m MdcbStorage) DeleteKeys([]string) bool {
+func (m MdcbStorage) DeleteKeys([]string, bool) bool {
 	panic("implement me")
 }
 
