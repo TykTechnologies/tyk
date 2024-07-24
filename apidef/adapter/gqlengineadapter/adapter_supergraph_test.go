@@ -55,7 +55,7 @@ func TestSupergraph_EngineConfig(t *testing.T) {
 
 		v2Config, err := adapter.EngineConfig()
 		assert.NoError(t, err)
-		expecteddatasource := plan.DataSourceConfiguration{
+		expectedDataSource := plan.DataSourceConfiguration{
 			RootNodes: []plan.TypeField{
 				{
 					TypeName:   "Query",
@@ -98,7 +98,7 @@ func TestSupergraph_EngineConfig(t *testing.T) {
 				},
 			}),
 		}
-		assert.Containsf(t, v2Config.DataSources(), expecteddatasource, "engine configuration does not contain proxy-only data source")
+		assert.Containsf(t, v2Config.DataSources(), expectedDataSource, "engine configuration does not contain proxy-only data source")
 
 	})
 }

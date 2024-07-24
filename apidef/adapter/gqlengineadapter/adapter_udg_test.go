@@ -150,7 +150,7 @@ func TestUniversalDataGraph_engineConfigV2datasources(t *testing.T) {
 	httpClient := &http.Client{}
 	streamingClient := &http.Client{}
 
-	expecteddatasources := []plan.DataSourceConfiguration{
+	expectedDataSources := []plan.DataSourceConfiguration{
 		{
 			RootNodes: []plan.TypeField{
 				{
@@ -481,8 +481,8 @@ func TestUniversalDataGraph_engineConfigV2datasources(t *testing.T) {
 
 	actualdatasources, err := adapter.engineConfigV2datasources()
 	assert.NoError(t, err)
-	assert.Equal(t, expecteddatasources, actualdatasources)
-	//assert.ElementsMatch(t, expecteddatasources, actualdatasources)
+	assert.Equal(t, expectedDataSources, actualdatasources)
+	//assert.ElementsMatch(t, expectedDataSources, actualdatasources)
 }
 
 var v2Schema = strconv.Quote(`type Query {
