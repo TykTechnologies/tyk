@@ -24,6 +24,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/TykTechnologies/goverify"
 	"github.com/TykTechnologies/tyk/apidef"
 )
 
@@ -48,20 +49,23 @@ func (b *Bundle) Verify() error {
 		"prefix": "main",
 	}).Info("----> Verifying bundle: ", b.Spec.CustomMiddlewareBundle)
 
-	var useSignature bool
+	var useSignature = b.Gw.GetConfig().PublicKeyPath != ""
 
-	verifier, err := b.Gw.SignatureVerifier()
+	var (
+		verifier goverify.Verifier
+		err      error
+	)
 
-	if b.Gw.GetConfig().PublicKeyPath != "" {
+	if useSignature {
 		// Perform signature verification if a public key path is set:
 		if b.Manifest.Signature == "" {
 			// Error: A public key is set, but the bundle isn't signed.
 			return errors.New("Bundle isn't signed")
 		}
+		verifier, err = b.Gw.SignatureVerifier()
 		if err != nil {
 			return err
 		}
-		useSignature = true
 	}
 
 	var bundleData bytes.Buffer
@@ -90,9 +94,7 @@ func (b *Bundle) Verify() error {
 		if err != nil {
 			return err
 		}
-		if err := verifier.Verify(bundleData.Bytes(), signed); err != nil {
-			return err
-		}
+		return verifier.Verify(bundleData.Bytes(), signed)
 	}
 	return nil
 }
