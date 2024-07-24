@@ -4,6 +4,7 @@ import (
 	"archive/zip"
 	"bytes"
 	"encoding/json"
+	"errors"
 	"io/ioutil"
 	"os"
 	"strings"
@@ -80,7 +81,7 @@ func TestBuild(t *testing.T) {
 	t.Run("Bundle errors", func(t *testing.T) {
 		ctx := &kingpin.ParseContext{}
 		err := bundler.Build(ctx)
-		if err != errManifestLoad {
+		if !errors.Is(err, errManifestLoad) {
 			t.Fatalf("Expected manifest load error, got: %s", err.Error())
 		}
 		filename := writeManifestFile(t, "{", defaultManifestPath)
@@ -101,7 +102,7 @@ func TestBuild(t *testing.T) {
 		}, defaultManifestPath)
 		bundler.manifestPath = filename
 		err = bundler.Build(ctx)
-		if err != errNoDriver {
+		if !errors.Is(err, errNoDriver) {
 			t.Fatal("Expected no driver error")
 		}
 		filename = writeManifestFile(t, &apidef.BundleManifest{
@@ -110,7 +111,7 @@ func TestBuild(t *testing.T) {
 		}, defaultManifestPath)
 		bundler.manifestPath = filename
 		err = bundler.Build(ctx)
-		if err != errNoHooks {
+		if !errors.Is(err, errNoHooks) {
 			t.Fatal("Expected no hooks error")
 		}
 		filename = writeManifestFile(t, &apidef.BundleManifest{

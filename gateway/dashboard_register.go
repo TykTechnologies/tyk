@@ -319,11 +319,11 @@ func (h *HTTPDashboardHandler) DeRegister() error {
 	resp, err := c.Do(req)
 
 	if err != nil {
-		return fmt.Errorf("deregister request failed with error %v", err)
+		return fmt.Errorf("deregister request failed with error %w", err)
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("deregister request failed with status %v", resp.StatusCode)
+		return fmt.Errorf("deregister request failed with status %w", resp.StatusCode)
 	}
 
 	val := NodeResponseOK{}

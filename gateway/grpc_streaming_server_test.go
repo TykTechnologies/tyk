@@ -25,6 +25,7 @@ package gateway
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"math"
@@ -80,7 +81,7 @@ func (s *routeGuideServer) RecordRoute(stream pb.RouteGuide_RecordRouteServer) e
 	startTime := time.Now()
 	for {
 		point, err := stream.Recv()
-		if err == io.EOF {
+		if errors.Is(err, io.EOF) {
 			endTime := time.Now()
 			return stream.SendAndClose(&pb.RouteSummary{
 				PointCount:   pointCount,
@@ -110,7 +111,7 @@ func (s *routeGuideServer) RecordRoute(stream pb.RouteGuide_RecordRouteServer) e
 func (s *routeGuideServer) RouteChat(stream pb.RouteGuide_RouteChatServer) error {
 	for {
 		in, err := stream.Recv()
-		if err == io.EOF {
+		if errors.Is(err, io.EOF) {
 			return nil
 		}
 		if err != nil {
