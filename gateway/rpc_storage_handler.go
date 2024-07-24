@@ -562,13 +562,11 @@ func (r *RPCStorageHandler) DeleteRawKey(keyName string) bool {
 }
 
 // DeleteKeys will remove a group of keys in bulk
-func (r *RPCStorageHandler) DeleteKeys(keys []string, useRaw bool) bool {
+func (r *RPCStorageHandler) DeleteKeys(keys []string) bool {
 	if len(keys) > 0 {
 		asInterface := make([]string, len(keys))
-		if !useRaw {
-			for i, v := range keys {
-				asInterface[i] = r.fixKey(v)
-			}
+		for i, v := range keys {
+			asInterface[i] = r.fixKey(v)
 		}
 
 		log.Debug("Deleting: ", asInterface)
@@ -586,7 +584,7 @@ func (r *RPCStorageHandler) DeleteKeys(keys []string, useRaw bool) bool {
 
 			if r.IsRetriableError(err) {
 				if rpc.Login() {
-					return r.DeleteKeys(keys, false)
+					return r.DeleteKeys(keys)
 				}
 			}
 		}

@@ -561,17 +561,15 @@ func (r *RedisCluster) DeleteScanMatch(pattern string) bool {
 }
 
 // DeleteKeys will remove a group of keys in bulk
-func (r *RedisCluster) DeleteKeys(keys []string, useRaw bool) bool {
+func (r *RedisCluster) DeleteKeys(keys []string) bool {
 	storage, err := r.kv()
 	if err != nil {
 		log.Error(err)
 		return false
 	}
 
-	if !useRaw {
-		for i, v := range keys {
-			keys[i] = r.fixKey(v)
-		}
+	for i, v := range keys {
+		keys[i] = r.fixKey(v)
 	}
 
 	deleted, err := storage.DeleteKeys(context.Background(), keys)
