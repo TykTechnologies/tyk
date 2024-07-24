@@ -572,12 +572,8 @@ func startGRPCServer(t *testing.T, clientCert *x509.Certificate, fn func(t *test
 
 }
 
-<<<<<<< HEAD
-func sayHelloWithGRPCClientH2C(t *testing.T, address string, name string) *pbExample.HelloReply {
-=======
 func sayHelloWithGRPCClientH2C(t *testing.T, address string, name string) *pbexample.HelloReply {
 	t.Helper()
->>>>>>> 2ceb9d0fc... [TT-12698] Add linter to gateway to check for named scope conflicts (#6409)
 	conn, err := grpc.Dial(address, grpc.WithInsecure())
 	if err != nil {
 		t.Fatalf("did not connect: %v", err)
@@ -629,12 +625,8 @@ func grpcCreds(cert *tls.Certificate, caCert []byte, basicAuth bool, token strin
 	return opts
 }
 
-<<<<<<< HEAD
-func sayHelloWithGRPCClient(t *testing.T, cert *tls.Certificate, caCert []byte, basicAuth bool, token string, address string, name string) *pbExample.HelloReply {
-=======
 func sayHelloWithGRPCClient(t *testing.T, cert *tls.Certificate, caCert []byte, basicAuth bool, token string, address string, name string) *pbexample.HelloReply {
 	t.Helper()
->>>>>>> 2ceb9d0fc... [TT-12698] Add linter to gateway to check for named scope conflicts (#6409)
 	// gRPC client
 	opts := grpcCreds(cert, caCert, basicAuth, token)
 	conn, err := grpc.Dial(address, opts...)

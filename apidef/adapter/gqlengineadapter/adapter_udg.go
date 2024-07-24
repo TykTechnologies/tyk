@@ -160,15 +160,7 @@ func (u *UniversalDataGraph) engineConfigV2DataSources() (planDataSources []plan
 					StartConsumingLatest: kafkaConfig.StartConsumingLatest,
 					BalanceStrategy:      kafkaConfig.BalanceStrategy,
 					IsolationLevel:       kafkaConfig.IsolationLevel,
-<<<<<<< HEAD
 					SASL:                 kafkaConfig.SASL,
-=======
-					SASL: kafkadatasource.SASL{
-						Enable:   kafkaConfig.SASL.Enable,
-						User:     kafkaConfig.SASL.User,
-						Password: kafkaConfig.SASL.Password,
-					},
->>>>>>> 2ceb9d0fc... [TT-12698] Add linter to gateway to check for named scope conflicts (#6409)
 				},
 			})
 		}

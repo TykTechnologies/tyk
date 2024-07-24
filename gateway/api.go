@@ -43,11 +43,6 @@ import (
 	"sync"
 	"time"
 
-<<<<<<< HEAD
-=======
-	gqlv2 "github.com/TykTechnologies/graphql-go-tools/v2/pkg/graphql"
-
->>>>>>> 2ceb9d0fc... [TT-12698] Add linter to gateway to check for named scope conflicts (#6409)
 	"github.com/getkin/kin-openapi/openapi3"
 
 	"github.com/TykTechnologies/tyk/config"
@@ -3274,22 +3269,6 @@ func ctxGetGraphQLRequest(r *http.Request) (gqlRequest *gql.Request) {
 	return nil
 }
 
-<<<<<<< HEAD
-=======
-func ctxSetGraphQLRequestV2(r *http.Request, gqlRequest *gqlv2.Request) {
-	setCtxValue(r, ctx.GraphQLRequest, gqlRequest)
-}
-
-func ctxGetGraphQLRequestV2(r *http.Request) (gqlRequest *gqlv2.Request) {
-	if v := r.Context().Value(ctx.GraphQLRequest); v != nil {
-		if gqlRequest, ok := v.(*gqlv2.Request); ok {
-			return gqlRequest
-		}
-	}
-	return nil
-}
-
->>>>>>> 2ceb9d0fc... [TT-12698] Add linter to gateway to check for named scope conflicts (#6409)
 func ctxSetGraphQLIsWebSocketUpgrade(r *http.Request, isWebSocketUpgrade bool) {
 	setCtxValue(r, ctx.GraphQLIsWebSocketUpgrade, isWebSocketUpgrade)
 }

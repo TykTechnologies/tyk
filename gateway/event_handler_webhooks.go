@@ -4,13 +4,8 @@ import (
 	"bytes"
 	"crypto/md5"
 	"encoding/hex"
-<<<<<<< HEAD
 	"encoding/json"
-	htmlTemplate "html/template"
-=======
-	"errors"
 	htmltemplate "html/template"
->>>>>>> 2ceb9d0fc... [TT-12698] Add linter to gateway to check for named scope conflicts (#6409)
 	"io/ioutil"
 	"net/http"
 	"net/url"
@@ -41,13 +36,8 @@ const (
 
 // WebHookHandler is an event handler that triggers web hooks
 type WebHookHandler struct {
-<<<<<<< HEAD
 	conf     config.WebHookHandlerConf
-	template *htmlTemplate.Template // non-nil if Init is run without error
-=======
-	conf     apidef.WebHookHandlerConf
 	template *htmltemplate.Template // non-nil if Init is run without error
->>>>>>> 2ceb9d0fc... [TT-12698] Add linter to gateway to check for named scope conflicts (#6409)
 	store    storage.Handler
 
 	contentType      string

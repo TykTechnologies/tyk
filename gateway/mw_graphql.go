@@ -21,10 +21,6 @@ import (
 	"github.com/TykTechnologies/tyk/user"
 
 	gql "github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
-<<<<<<< HEAD
-=======
-	gqlv2 "github.com/TykTechnologies/graphql-go-tools/v2/pkg/graphql"
->>>>>>> 2ceb9d0fc... [TT-12698] Add linter to gateway to check for named scope conflicts (#6409)
 )
 
 var (
@@ -122,51 +118,6 @@ func (m *GraphQLMiddleware) Init() {
 				TykVariableReplacer: m.Gw.replaceTykVariables,
 			},
 		})
-<<<<<<< HEAD
-=======
-	} else if m.Spec.GraphQL.Version == apidef.GraphQLConfigVersion3Preview {
-		v2Schema, err := gqlv2.NewSchemaFromString(m.Spec.GraphQL.Schema)
-		if err != nil {
-			log.Errorf("Error while creating schema from API definition: %v", err)
-			return
-		}
-		engine, err := graphengine.NewEngineV3(graphengine.EngineV3Options{
-			Logger:        log,
-			Schema:        v2Schema,
-			ApiDefinition: m.Spec.APIDefinition,
-			OpenTelemetry: graphengine.EngineV2OTelConfig{
-				Enabled:        m.Gw.GetConfig().OpenTelemetry.Enabled,
-				TracerProvider: m.Gw.TracerProvider,
-			},
-			HttpClient: &http.Client{
-				Transport: &http.Transport{TLSClientConfig: tlsClientConfig(m.Spec, nil)},
-			},
-			Injections: graphengine.EngineV3Injections{
-				ContextRetrieveRequest: ctxGetGraphQLRequestV2,
-				ContextStoreRequest:    ctxSetGraphQLRequestV2,
-				// TODO use proper version or request for this
-				//WebsocketOnBeforeStart:    m,
-				NewReusableBodyReadCloser: reusableBodyReadCloser,
-				SeekReadCloser: func(readCloser io.ReadCloser) (io.ReadCloser, error) {
-					body, ok := readCloser.(*nopCloserBuffer)
-					if !ok {
-						return nil, nil
-					}
-					_, err := body.Seek(0, io.SeekStart)
-					if err != nil {
-						return nil, err
-					}
-					return body, nil
-				},
-				TykVariableReplacer: m.Gw.replaceTykVariables,
-			},
-		})
-		if err != nil {
-			log.Errorf("Error creating enginev3: %v", err)
-			return
-		}
-		m.Spec.GraphEngine = engine
->>>>>>> 2ceb9d0fc... [TT-12698] Add linter to gateway to check for named scope conflicts (#6409)
 	} else {
 		log.Errorf("Could not init GraphQL middleware: invalid config version provided: %s", m.Spec.GraphQL.Version)
 	}

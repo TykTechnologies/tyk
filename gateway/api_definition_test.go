@@ -1258,12 +1258,8 @@ func TestAPIDefinitionLoader(t *testing.T) {
 
 	l := APIDefinitionLoader{Gw: ts.Gw}
 
-<<<<<<< HEAD
-	executeAndAssert := func(t *testing.T, tpl *textTemplate.Template) {
-=======
 	executeAndAssert := func(t *testing.T, tpl *texttemplate.Template) {
 		t.Helper()
->>>>>>> 2ceb9d0fc... [TT-12698] Add linter to gateway to check for named scope conflicts (#6409)
 		var bodyBuffer bytes.Buffer
 		err := tpl.Execute(&bodyBuffer, map[string]string{
 			"value1": "value-1",
