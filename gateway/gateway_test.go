@@ -1275,6 +1275,7 @@ func TestOldCachePlugin(t *testing.T) {
 	headerCache := map[string]string{"x-tyk-cached-response": "1"}
 
 	check := func(t *testing.T) {
+		t.Helper()
 		cache := storage.RedisCluster{KeyPrefix: "cache-", ConnectionHandler: ts.Gw.StorageConnectionHandler}
 		defer cache.DeleteScanMatch("*")
 

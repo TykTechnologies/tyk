@@ -251,6 +251,7 @@ func BenchmarkTransformJSONMarshal(b *testing.B) {
 
 func TestTransformXMLMarshal(t *testing.T) {
 	assert := func(t *testing.T, input string, tmpl string, output string, inputType apidef.RequestInputType) {
+		t.Helper()
 		tmeta := testPrepareTransformXMLMarshal(tmpl, inputType)
 		r := TestReq(t, "GET", "/", input)
 
