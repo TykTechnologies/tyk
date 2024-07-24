@@ -1,4 +1,4 @@
-package gqlengineadapter
+package enginev3
 
 import (
 	"encoding/json"
@@ -9,16 +9,15 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	graphqldatasource "github.com/TykTechnologies/graphql-go-tools/pkg/engine/datasource/graphql_datasource"
-	"github.com/TykTechnologies/graphql-go-tools/pkg/engine/plan"
-
+	graphqldatasource "github.com/TykTechnologies/graphql-go-tools/v2/pkg/engine/datasource/graphql_datasource"
+	"github.com/TykTechnologies/graphql-go-tools/v2/pkg/engine/plan"
 	"github.com/TykTechnologies/tyk/apidef"
 )
 
-func TestSupergraph_EngineConfig(t *testing.T) {
+func TestSupergraph_EngineConfigV2(t *testing.T) {
 	t.Run("should create v2 config for supergraph execution mode without error", func(t *testing.T) {
 		var gqlConfig apidef.GraphQLConfig
-		require.NoError(t, json.Unmarshal([]byte(graphqlEngineV2SupergraphConfigJson), &gqlConfig))
+		require.NoError(t, json.Unmarshal([]byte(superGraphConfigJson), &gqlConfig))
 
 		apiDef := &apidef.APIDefinition{
 			GraphQL: gqlConfig,
@@ -32,12 +31,12 @@ func TestSupergraph_EngineConfig(t *testing.T) {
 			subscriptionClientFactory: &MockSubscriptionClientFactory{},
 		}
 
-		_, err := adapter.EngineConfig()
+		_, err := adapter.EngineConfigV3()
 		assert.NoError(t, err)
 	})
 	t.Run("should create v2 config for supergraph with batching disabled", func(t *testing.T) {
 		var gqlConfig apidef.GraphQLConfig
-		require.NoError(t, json.Unmarshal([]byte(graphqlEngineV2SupergraphConfigJson), &gqlConfig))
+		require.NoError(t, json.Unmarshal([]byte(superGraphConfigJson), &gqlConfig))
 
 		apiDef := &apidef.APIDefinition{
 			GraphQL: gqlConfig,
@@ -53,7 +52,7 @@ func TestSupergraph_EngineConfig(t *testing.T) {
 			subscriptionClientFactory: &MockSubscriptionClientFactory{},
 		}
 
-		v2Config, err := adapter.EngineConfig()
+		v2Config, err := adapter.EngineConfigV3()
 		assert.NoError(t, err)
 		expectedDataSource := plan.DataSourceConfiguration{
 			RootNodes: []plan.TypeField{
@@ -163,7 +162,7 @@ func TestSupergraph_supergraphDataSourceConfigs(t *testing.T) {
 	}
 
 	var gqlConfig apidef.GraphQLConfig
-	require.NoError(t, json.Unmarshal([]byte(graphqlEngineV2SupergraphConfigJson), &gqlConfig))
+	require.NoError(t, json.Unmarshal([]byte(superGraphConfigJson), &gqlConfig))
 
 	apiDef := &apidef.APIDefinition{
 		GraphQL: gqlConfig,
@@ -175,6 +174,7 @@ func TestSupergraph_supergraphDataSourceConfigs(t *testing.T) {
 	}
 	actualGraphQLConfigs := adapter.subgraphDataSourceConfigs()
 	assert.Equal(t, expectedDataSourceConfigs, actualGraphQLConfigs)
+
 }
 
 const federationAccountsServiceSDL = `extend type Query {me: User} type User @key(fields: "id"){ id: ID! username: String!}`
@@ -182,7 +182,7 @@ const federationProductsServiceSDL = `extend type Query {topProducts(first: Int 
 const federationReviewsServiceSDL = `type Review { body: String! author: User! @provides(fields: "username") product: Product! } extend type User @key(fields: "id") { id: ID! @external reviews: [Review] } extend type Product @key(fields: "upc") { upc: String! @external reviews: [Review] }`
 const federationMergedSDL = `type Query { me: User topProducts(first: Int = 5): [Product] } type User { id: ID! username: String! reviews: [Review] } type Product { upc: String! name: String! price: Int! reviews: [Review] } type Review { body: String! author: User! product: Product! }`
 
-var graphqlEngineV2SupergraphConfigJson = `{
+var superGraphConfigJson = `{
 	"enabled": true,
 	"execution_mode": "supergraph",
 	"version": "2",

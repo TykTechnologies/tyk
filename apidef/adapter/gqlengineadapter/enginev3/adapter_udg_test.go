@@ -1,4 +1,4 @@
-package gqlengineadapter
+package enginev3
 
 import (
 	"encoding/json"
@@ -9,11 +9,10 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	graphqldatasource "github.com/TykTechnologies/graphql-go-tools/pkg/engine/datasource/graphql_datasource"
-	kafkadatasource "github.com/TykTechnologies/graphql-go-tools/pkg/engine/datasource/kafka_datasource"
-	restdatasource "github.com/TykTechnologies/graphql-go-tools/pkg/engine/datasource/rest_datasource"
-	"github.com/TykTechnologies/graphql-go-tools/pkg/engine/plan"
-
+	graphqldatasource "github.com/TykTechnologies/graphql-go-tools/v2/pkg/engine/datasource/graphql_datasource"
+	kafkadatasource "github.com/TykTechnologies/graphql-go-tools/v2/pkg/engine/datasource/kafka_datasource"
+	restdatasource "github.com/TykTechnologies/graphql-go-tools/v2/pkg/engine/datasource/rest_datasource"
+	"github.com/TykTechnologies/graphql-go-tools/v2/pkg/engine/plan"
 	"github.com/TykTechnologies/tyk/apidef"
 )
 
@@ -35,7 +34,7 @@ func TestUniversalDataGraph_EngineConfig(t *testing.T) {
 			subscriptionClientFactory: &MockSubscriptionClientFactory{},
 		}
 
-		_, err := adapter.EngineConfig()
+		_, err := adapter.EngineConfigV3()
 		assert.NoError(t, err)
 	})
 }
@@ -220,6 +219,12 @@ func TestUniversalDataGraph_engineConfigV2DataSources(t *testing.T) {
 					FieldNames: []string{"withChildren"},
 				},
 			},
+			ChildNodes: []plan.TypeField{
+				{
+					TypeName:   "WithChildren",
+					FieldNames: []string{"id", "name", "__typename"},
+				},
+			},
 			Factory: &restdatasource.Factory{
 				Client: httpClient,
 			},
@@ -235,6 +240,12 @@ func TestUniversalDataGraph_engineConfigV2DataSources(t *testing.T) {
 				{
 					TypeName:   "WithChildren",
 					FieldNames: []string{"nested"},
+				},
+			},
+			ChildNodes: []plan.TypeField{
+				{
+					TypeName:   "Nested",
+					FieldNames: []string{"id", "name", "__typename"},
 				},
 			},
 			Factory: &restdatasource.Factory{

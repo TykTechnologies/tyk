@@ -1,6 +1,7 @@
-package gqlengineadapter
+package enginev3
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"strconv"
@@ -9,13 +10,12 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	graphqldatasource "github.com/TykTechnologies/graphql-go-tools/pkg/engine/datasource/graphql_datasource"
-	"github.com/TykTechnologies/graphql-go-tools/pkg/engine/plan"
-
+	graphqldatasource "github.com/TykTechnologies/graphql-go-tools/v2/pkg/engine/datasource/graphql_datasource"
+	"github.com/TykTechnologies/graphql-go-tools/v2/pkg/engine/plan"
 	"github.com/TykTechnologies/tyk/apidef"
 )
 
-func TestProxyOnly_EngineConfig(t *testing.T) {
+func TestProxyOnly_EngineConfigV2(t *testing.T) {
 	t.Run("should create v2 config for proxy-only mode", func(t *testing.T) {
 		var gqlConfig apidef.GraphQLConfig
 		require.NoError(t, json.Unmarshal([]byte(graphqlProxyOnlyConfig), &gqlConfig))
@@ -36,7 +36,7 @@ func TestProxyOnly_EngineConfig(t *testing.T) {
 			subscriptionClientFactory: &MockSubscriptionClientFactory{},
 		}
 
-		engineV2Config, err := adapter.EngineConfig()
+		engineV2Config, err := adapter.EngineConfigV3()
 		assert.NoError(t, err)
 
 		expectedDataSource := plan.DataSourceConfiguration{
@@ -48,7 +48,6 @@ func TestProxyOnly_EngineConfig(t *testing.T) {
 			},
 			ChildNodes: []plan.TypeField{},
 			Factory: &graphqldatasource.Factory{
-				BatchFactory:       graphqldatasource.NewBatchFactory(),
 				HTTPClient:         httpClient,
 				StreamingClient:    streamingClient,
 				SubscriptionClient: mockSubscriptionClient,
@@ -100,7 +99,7 @@ func TestProxyOnly_EngineConfig(t *testing.T) {
 			subscriptionClientFactory: &MockSubscriptionClientFactory{},
 		}
 
-		engineV2Config, err := adapter.EngineConfig()
+		engineV2Config, err := adapter.EngineConfigV3()
 		assert.NoError(t, err)
 
 		expectedDataSource := plan.DataSourceConfiguration{
@@ -112,7 +111,6 @@ func TestProxyOnly_EngineConfig(t *testing.T) {
 			},
 			ChildNodes: []plan.TypeField{},
 			Factory: &graphqldatasource.Factory{
-				BatchFactory:       graphqldatasource.NewBatchFactory(),
 				HTTPClient:         httpClient,
 				StreamingClient:    streamingClient,
 				SubscriptionClient: mockSubscriptionClient,
@@ -166,7 +164,7 @@ func TestProxyOnly_EngineConfig(t *testing.T) {
 			subscriptionClientFactory: &MockSubscriptionClientFactory{},
 		}
 
-		engineV2Config, err := adapter.EngineConfig()
+		engineV2Config, err := adapter.EngineConfigV3()
 		assert.NoError(t, err)
 
 		expectedDataSource := plan.DataSourceConfiguration{
@@ -187,7 +185,6 @@ func TestProxyOnly_EngineConfig(t *testing.T) {
 				},
 			},
 			Factory: &graphqldatasource.Factory{
-				BatchFactory:       graphqldatasource.NewBatchFactory(),
 				HTTPClient:         httpClient,
 				StreamingClient:    streamingClient,
 				SubscriptionClient: mockSubscriptionClient,
@@ -218,6 +215,14 @@ func TestProxyOnly_EngineConfig(t *testing.T) {
 		assert.Containsf(t, engineV2Config.DataSources(), expectedDataSource, "engine configuration does not contain proxy-only data source")
 		assert.Containsf(t, engineV2Config.FieldConfigurations(), expectedFieldConfig, "engine configuration does not contain expected field config")
 	})
+}
+
+var mockSubscriptionClient = &graphqldatasource.SubscriptionClient{}
+
+type MockSubscriptionClientFactory struct{}
+
+func (m *MockSubscriptionClientFactory) NewSubscriptionClient(httpClient, streamingClient *http.Client, engineCtx context.Context, options ...graphqldatasource.Options) graphqldatasource.GraphQLSubscriptionClient {
+	return mockSubscriptionClient
 }
 
 var graphqlProxyOnlyConfig = `{

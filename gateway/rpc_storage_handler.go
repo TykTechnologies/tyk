@@ -7,8 +7,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/TykTechnologies/storage/temporal/model"
+	temporalmodel "github.com/TykTechnologies/storage/temporal/model"
 	"github.com/TykTechnologies/tyk/internal/cache"
+<<<<<<< HEAD
+=======
+	"github.com/TykTechnologies/tyk/internal/model"
+>>>>>>> 2ceb9d0fc... [TT-12698] Add linter to gateway to check for named scope conflicts (#6409)
 	"github.com/TykTechnologies/tyk/rpc"
 
 	"github.com/TykTechnologies/tyk/apidef"
@@ -161,7 +165,16 @@ func (r *RPCStorageHandler) buildNodeInfo() []byte {
 		Health:      r.Gw.getHealthCheckInfo(),
 		Stats: apidef.GWStats{
 			APIsCount:     r.Gw.apisByIDLen(),
+<<<<<<< HEAD
 			PoliciesCount: r.Gw.policiesByIDLen(),
+=======
+			PoliciesCount: r.Gw.PolicyCount(),
+		},
+		HostDetails: model.HostDetails{
+			Hostname: r.Gw.hostDetails.Hostname,
+			PID:      r.Gw.hostDetails.PID,
+			Address:  r.Gw.hostDetails.Address,
+>>>>>>> 2ceb9d0fc... [TT-12698] Add linter to gateway to check for named scope conflicts (#6409)
 		},
 	}
 
@@ -581,7 +594,7 @@ func (r *RPCStorageHandler) DeleteKeys(keys []string) bool {
 }
 
 // StartPubSubHandler will listen for a signal and run the callback with the message
-func (r *RPCStorageHandler) StartPubSubHandler(_ string, _ func(*model.Message)) error {
+func (r *RPCStorageHandler) StartPubSubHandler(_ string, _ func(*temporalmodel.Message)) error {
 	log.Warning("RPCStorageHandler.StartPubSubHandler - NO PUBSUB DEFINED")
 	return nil
 }

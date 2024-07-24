@@ -77,9 +77,15 @@ tasks:
     internal: true
     deps:
       - lint:config
+      - lint:imports
       - lint:x-tyk-gateway
       - coprocess:lint
       - apidef-oas:lint
+
+  lint:imports:
+    internal: true
+    cmds:
+      - go-fsck lint
 
   lint:config:
     internal: true

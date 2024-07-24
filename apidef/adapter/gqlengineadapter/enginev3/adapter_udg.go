@@ -1,15 +1,14 @@
-package gqlengineadapter
+package enginev3
 
 import (
 	"encoding/json"
 	"net/http"
 
-	graphqldatasource "github.com/TykTechnologies/graphql-go-tools/pkg/engine/datasource/graphql_datasource"
-	kafkadatasource "github.com/TykTechnologies/graphql-go-tools/pkg/engine/datasource/kafka_datasource"
-	restdatasource "github.com/TykTechnologies/graphql-go-tools/pkg/engine/datasource/rest_datasource"
-	"github.com/TykTechnologies/graphql-go-tools/pkg/engine/plan"
-	"github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
-
+	graphqldatasource "github.com/TykTechnologies/graphql-go-tools/v2/pkg/engine/datasource/graphql_datasource"
+	kafkadatasource "github.com/TykTechnologies/graphql-go-tools/v2/pkg/engine/datasource/kafka_datasource"
+	restdatasource "github.com/TykTechnologies/graphql-go-tools/v2/pkg/engine/datasource/rest_datasource"
+	"github.com/TykTechnologies/graphql-go-tools/v2/pkg/engine/plan"
+	"github.com/TykTechnologies/graphql-go-tools/v2/pkg/graphql"
 	"github.com/TykTechnologies/tyk/apidef"
 )
 
@@ -22,7 +21,7 @@ type UniversalDataGraph struct {
 	subscriptionClientFactory graphqldatasource.GraphQLSubscriptionClientFactory
 }
 
-func (u *UniversalDataGraph) EngineConfig() (*graphql.EngineV2Configuration, error) {
+func (u *UniversalDataGraph) EngineConfigV3() (*graphql.EngineV2Configuration, error) {
 	var err error
 	if u.Schema == nil {
 		u.Schema, err = parseSchema(u.ApiDefinition.GraphQL.Schema)
@@ -103,7 +102,7 @@ func (u *UniversalDataGraph) engineConfigV2DataSources() (planDataSources []plan
 					Method: restConfig.Method,
 					Body:   restConfig.Body,
 					Query:  queryConfigs,
-					Header: convertApiDefinitionHeadersToHttpHeaders(restConfig.Headers),
+					Header: ConvertApiDefinitionHeadersToHttpHeaders(restConfig.Headers),
 				},
 			})
 
@@ -160,15 +159,11 @@ func (u *UniversalDataGraph) engineConfigV2DataSources() (planDataSources []plan
 					StartConsumingLatest: kafkaConfig.StartConsumingLatest,
 					BalanceStrategy:      kafkaConfig.BalanceStrategy,
 					IsolationLevel:       kafkaConfig.IsolationLevel,
-<<<<<<< HEAD
-					SASL:                 kafkaConfig.SASL,
-=======
 					SASL: kafkadatasource.SASL{
 						Enable:   kafkaConfig.SASL.Enable,
 						User:     kafkaConfig.SASL.User,
 						Password: kafkaConfig.SASL.Password,
 					},
->>>>>>> 2ceb9d0fc... [TT-12698] Add linter to gateway to check for named scope conflicts (#6409)
 				},
 			})
 		}
@@ -207,9 +202,6 @@ func (u *UniversalDataGraph) engineConfigV2Arguments(fieldConfs *plan.FieldConfi
 
 func (u *UniversalDataGraph) determineChildNodes(planDataSources []plan.DataSourceConfiguration) error {
 	for i := range planDataSources {
-		if _, ok := planDataSources[i].Factory.(*restdatasource.Factory); ok {
-			continue
-		}
 		for j := range planDataSources[i].RootNodes {
 			typeName := planDataSources[i].RootNodes[j].TypeName
 			for k := range planDataSources[i].RootNodes[j].FieldNames {

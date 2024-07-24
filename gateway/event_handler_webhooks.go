@@ -4,8 +4,13 @@ import (
 	"bytes"
 	"crypto/md5"
 	"encoding/hex"
+<<<<<<< HEAD
 	"encoding/json"
 	htmlTemplate "html/template"
+=======
+	"errors"
+	htmltemplate "html/template"
+>>>>>>> 2ceb9d0fc... [TT-12698] Add linter to gateway to check for named scope conflicts (#6409)
 	"io/ioutil"
 	"net/http"
 	"net/url"
@@ -36,8 +41,13 @@ const (
 
 // WebHookHandler is an event handler that triggers web hooks
 type WebHookHandler struct {
+<<<<<<< HEAD
 	conf     config.WebHookHandlerConf
 	template *htmlTemplate.Template // non-nil if Init is run without error
+=======
+	conf     apidef.WebHookHandlerConf
+	template *htmltemplate.Template // non-nil if Init is run without error
+>>>>>>> 2ceb9d0fc... [TT-12698] Add linter to gateway to check for named scope conflicts (#6409)
 	store    storage.Handler
 
 	contentType      string
@@ -77,7 +87,7 @@ func (w *WebHookHandler) Init(handlerConf interface{}) error {
 
 	// Pre-load template on init
 	if w.conf.TemplatePath != "" {
-		w.template, err = htmlTemplate.ParseFiles(w.conf.TemplatePath)
+		w.template, err = htmltemplate.ParseFiles(w.conf.TemplatePath)
 		if err != nil {
 			log.WithFields(logrus.Fields{
 				"prefix": "webhooks",
@@ -98,7 +108,7 @@ func (w *WebHookHandler) Init(handlerConf interface{}) error {
 			"target": w.conf.TargetPath,
 		}).Info("Loading default template.")
 		defaultPath := filepath.Join(w.Gw.GetConfig().TemplatePath, "default_webhook.json")
-		w.template, err = htmlTemplate.ParseFiles(defaultPath)
+		w.template, err = htmltemplate.ParseFiles(defaultPath)
 		if err != nil {
 			log.WithFields(logrus.Fields{
 				"prefix": "webhooks",
