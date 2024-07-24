@@ -1308,10 +1308,16 @@ func (s *Test) Close() {
 func (s *Test) RemoveApis() error {
 	s.Gw.apisMu.Lock()
 	defer s.Gw.apisMu.Unlock()
+
+	for _, spec := range s.Gw.apisByID {
+		spec.Unload()
+	}
+
 	s.Gw.apiSpecs = []*APISpec{}
 	s.Gw.apisByID = map[string]*APISpec{}
 
 	err := os.RemoveAll(s.Gw.GetConfig().AppPath)
+
 	if err != nil {
 		log.WithError(err).Error("removing apis from gw")
 	}
