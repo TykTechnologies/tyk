@@ -238,8 +238,8 @@ func (r *ReloadMachinery) TickOk(t *testing.T) {
 func InitTestMain(ctx context.Context, m *testing.M) int {
 	test.InitTestMain(ctx, m)
 
-	BackoffMultiplier = 0
-	MaxBackoffRetries = 0
+	bundleBackoffMultiplier = 0
+	bundleMaxBackoffRetries = 0
 
 	if EnableTestDNSMock {
 		var errMock error
@@ -1320,8 +1320,8 @@ func (s *Test) RemoveApis() error {
 	for _, spec := range s.Gw.apiSpecs {
 		destPath := s.Gw.getBundleDestPath(spec)
 		if _, err := os.Stat(destPath); err == nil {
-			log.Infof("Clearing bundle cache: %s", destPath)
-			_ = os.RemoveAll(destPath)
+			err = os.RemoveAll(destPath)
+			log.WithError(err).Infof("Clearing bundle cache: %s", destPath)
 		}
 	}
 

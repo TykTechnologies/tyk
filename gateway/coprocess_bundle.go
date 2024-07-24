@@ -29,8 +29,8 @@ import (
 )
 
 var (
-	BackoffMultiplier float64 = 2
-	MaxBackoffRetries uint64  = 4
+	bundleBackoffMultiplier float64 = 2
+	bundleMaxBackoffRetries uint64  = 4
 )
 
 // Bundle is the basic bundle data structure, it holds the bundle name and the data.
@@ -261,7 +261,7 @@ func (gw *Gateway) FetchBundle(spec *APISpec) (Bundle, error) {
 		return bundle, err
 	}
 
-	bundleData, err := pullBundle(getter, BackoffMultiplier)
+	bundleData, err := pullBundle(getter, bundleBackoffMultiplier)
 
 	bundle.Name = spec.CustomMiddlewareBundle
 	bundle.Data = bundleData
@@ -277,15 +277,15 @@ func pullBundle(getter BundleGetter, backoffMultiplier float64) ([]byte, error) 
 		return err
 	}
 
-	if MaxBackoffRetries == 0 {
-		downloadBundle()
+	if bundleMaxBackoffRetries == 0 {
+		err := downloadBundle()
 		return bundleData, err
 	}
 
 	exponentialBackoff := backoff.NewExponentialBackOff()
 	exponentialBackoff.Multiplier = backoffMultiplier
 	exponentialBackoff.MaxInterval = 5 * time.Second
-	err = backoff.Retry(downloadBundle, backoff.WithMaxRetries(exponentialBackoff, MaxBackoffRetries))
+	err = backoff.Retry(downloadBundle, backoff.WithMaxRetries(exponentialBackoff, bundleMaxBackoffRetries))
 	return bundleData, err
 }
 
