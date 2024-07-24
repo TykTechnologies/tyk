@@ -238,6 +238,9 @@ func (r *ReloadMachinery) TickOk(t *testing.T) {
 func InitTestMain(ctx context.Context, m *testing.M) int {
 	test.InitTestMain(ctx, m)
 
+	bundleBackoffMultiplier = 0
+	bundleMaxBackoffRetries = 0
+
 	if EnableTestDNSMock {
 		var errMock error
 		MockHandle, errMock = test.InitDNSMock(test.DomainsToAddresses, nil)
@@ -1307,9 +1310,20 @@ func (s *Test) Close() {
 // RemoveApis clean all the apis from a living gw
 func (s *Test) RemoveApis() error {
 	s.Gw.apisMu.Lock()
-	defer s.Gw.apisMu.Unlock()
-	s.Gw.apiSpecs = []*APISpec{}
-	s.Gw.apisByID = map[string]*APISpec{}
+	defer func() {
+		s.Gw.apiSpecs = []*APISpec{}
+		s.Gw.apisByID = map[string]*APISpec{}
+		s.Gw.apisMu.Unlock()
+	}()
+
+	// clear bundle caches
+	for _, spec := range s.Gw.apiSpecs {
+		destPath := s.Gw.getBundleDestPath(spec)
+		if _, err := os.Stat(destPath); err == nil {
+			err = os.RemoveAll(destPath)
+			log.WithError(err).Infof("Clearing bundle cache: %s", destPath)
+		}
+	}
 
 	err := os.RemoveAll(s.Gw.GetConfig().AppPath)
 	if err != nil {
