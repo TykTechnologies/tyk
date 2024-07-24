@@ -1,10 +1,13 @@
 package gateway
 
 import (
+	"context"
 	"encoding/base64"
 	"encoding/json"
 	"strings"
 	"time"
+
+	"github.com/TykTechnologies/tyk/internal/redis"
 
 	"github.com/sirupsen/logrus"
 
@@ -84,7 +87,23 @@ func (b *DefaultSessionManager) ResetQuota(keyName string, session *user.Session
 		}
 		keys = append(keys, QuotaKeyPrefix+acl.AllowanceScope+"-"+keyName)
 	}
-	b.store.DeleteKeys(keys, true)
+	type clientProvider interface {
+		Client() (redis.UniversalClient, error)
+	}
+
+	clientFactory, ok := b.store.(clientProvider)
+	if !ok {
+		return
+	}
+
+	client, err := clientFactory.Client()
+	if err != nil {
+		log.WithError(err).Error("Error getting client in ResetQuota")
+		return
+	}
+
+	ctx := context.TODO()
+	client.Del(ctx, keys...)
 }
 
 func (b *DefaultSessionManager) deleteRawKeysWithAllowanceScope(store storage.Handler, session *user.SessionState, keyName string) {
