@@ -61,7 +61,7 @@ func TestGraphqlDataSourceConfiguration(t *testing.T) {
 	})
 
 	t.Run("with external data source url and no sse", func(t *testing.T) {
-		externaldatasource := testInput{
+		externalDataSource := testInput{
 			url:    "http://data-source.fake",
 			method: http.MethodGet,
 			headers: map[string]string{
@@ -88,10 +88,10 @@ func TestGraphqlDataSourceConfiguration(t *testing.T) {
 		}
 
 		actualGraphqlDataSourceConfiguration := graphqlDataSourceConfiguration(
-			externaldatasource.url,
-			externaldatasource.method,
-			externaldatasource.headers,
-			externaldatasource.subscriptionType,
+			externalDataSource.url,
+			externalDataSource.method,
+			externalDataSource.headers,
+			externalDataSource.subscriptionType,
 		)
 
 		assert.Equal(t, expectedGraphqlDataSourceConfiguration, actualGraphqlDataSourceConfiguration)
