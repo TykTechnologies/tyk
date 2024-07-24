@@ -479,10 +479,10 @@ func TestUniversalDataGraph_engineConfigV2DataSources(t *testing.T) {
 	adapter.Schema, err = parseSchema(gqlConfig.Schema)
 	require.NoError(t, err)
 
-	actualdatasources, err := adapter.engineConfigV2DataSources()
+	actualDataSources, err := adapter.engineConfigV2DataSources()
 	assert.NoError(t, err)
-	assert.Equal(t, expectedDataSources, actualdatasources)
-	//assert.ElementsMatch(t, expectedDataSources, actualdatasources)
+	assert.Equal(t, expectedDataSources, actualDataSources)
+	//assert.ElementsMatch(t, expectedDataSources, actualDataSources)
 }
 
 var v2Schema = strconv.Quote(`type Query {
