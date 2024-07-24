@@ -13,7 +13,6 @@ import (
 
 	"github.com/TykTechnologies/storage/temporal/model"
 
-	"github.com/TykTechnologies/goverify"
 	"github.com/TykTechnologies/tyk/internal/crypto"
 	"github.com/TykTechnologies/tyk/storage"
 )
@@ -201,30 +200,21 @@ func isPayloadSignatureValid(notification Notification) bool {
 			return false
 		}
 	default:
-		if notification.Gw.GetConfig().PublicKeyPath != "" && notification.Gw.NotificationVerifier == nil {
-			var err error
-
-			notification.Gw.NotificationVerifier, err = goverify.LoadPublicKeyFromFile(notification.Gw.GetConfig().PublicKeyPath)
-			if err != nil {
-
-				pubSubLog.Error("Notification signer: Failed loading public key from path: ", err)
-				return false
-			}
+		verifier, err := notification.Gw.SignatureVerifier()
+		if err != nil {
+			pubSubLog.Error("Notification signer: Failed loading public key from path: ", err)
+			return false
 		}
 
-		if notification.Gw.NotificationVerifier != nil {
-
+		if verifier != nil {
 			signed, err := base64.StdEncoding.DecodeString(notification.Signature)
 			if err != nil {
-
 				pubSubLog.Error("Failed to decode signature: ", err)
 				return false
 			}
 
-			if err := notification.Gw.NotificationVerifier.Verify([]byte(notification.Payload), signed); err != nil {
-
+			if err := verifier.Verify([]byte(notification.Payload), signed); err != nil {
 				pubSubLog.Error("Could not verify notification: ", err, ": ", notification)
-
 				return false
 			}
 
