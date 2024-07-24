@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"strings"
 
-	graphqlDataSource "github.com/TykTechnologies/graphql-go-tools/v2/pkg/engine/datasource/graphql_datasource"
+	graphqldatasource "github.com/TykTechnologies/graphql-go-tools/v2/pkg/engine/datasource/graphql_datasource"
 	"github.com/TykTechnologies/graphql-go-tools/v2/pkg/graphql"
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/apidef/adapter/gqlengineadapter"
@@ -15,7 +15,7 @@ type Supergraph struct {
 	HttpClient      *http.Client
 	StreamingClient *http.Client
 
-	subscriptionClientFactory graphqlDataSource.GraphQLSubscriptionClientFactory
+	subscriptionClientFactory graphqldatasource.GraphQLSubscriptionClientFactory
 }
 
 func (s *Supergraph) EngineConfigV3() (*graphql.EngineV2Configuration, error) {
@@ -43,8 +43,8 @@ func (s *Supergraph) EngineConfigV3() (*graphql.EngineV2Configuration, error) {
 	return &conf, nil
 }
 
-func (s *Supergraph) subgraphDataSourceConfigs() []graphqlDataSource.Configuration {
-	confs := make([]graphqlDataSource.Configuration, 0)
+func (s *Supergraph) subgraphDataSourceConfigs() []graphqldatasource.Configuration {
+	confs := make([]graphqldatasource.Configuration, 0)
 	if len(s.ApiDefinition.GraphQL.Supergraph.Subgraphs) == 0 {
 		return confs
 	}
@@ -59,7 +59,7 @@ func (s *Supergraph) subgraphDataSourceConfigs() []graphqlDataSource.Configurati
 			http.MethodPost,
 			hdr,
 			apiDefSubgraphConf.SubscriptionType)
-		conf.Federation = graphqlDataSource.FederationConfiguration{
+		conf.Federation = graphqldatasource.FederationConfiguration{
 			Enabled:    true,
 			ServiceSDL: apiDefSubgraphConf.SDL,
 		}
@@ -70,7 +70,7 @@ func (s *Supergraph) subgraphDataSourceConfigs() []graphqlDataSource.Configurati
 	return confs
 }
 
-func graphqlDataSourceConfiguration(url string, method string, headers map[string]string, subscriptionType apidef.SubscriptionType) graphqlDataSource.Configuration {
+func graphqlDataSourceConfiguration(url string, method string, headers map[string]string, subscriptionType apidef.SubscriptionType) graphqldatasource.Configuration {
 	dataSourceHeaders := make(map[string]string)
 	for name, value := range headers {
 		dataSourceHeaders[name] = value
@@ -81,13 +81,13 @@ func graphqlDataSourceConfiguration(url string, method string, headers map[strin
 		dataSourceHeaders[apidef.TykInternalApiHeader] = "true"
 	}
 
-	cfg := graphqlDataSource.Configuration{
-		Fetch: graphqlDataSource.FetchConfiguration{
+	cfg := graphqldatasource.Configuration{
+		Fetch: graphqldatasource.FetchConfiguration{
 			URL:    url,
 			Method: method,
 			Header: gqlengineadapter.ConvertApiDefinitionHeadersToHttpHeaders(dataSourceHeaders),
 		},
-		Subscription: graphqlDataSource.SubscriptionConfiguration{
+		Subscription: graphqldatasource.SubscriptionConfiguration{
 			URL:    url,
 			UseSSE: subscriptionType == apidef.GQLSubscriptionSSE,
 		},
