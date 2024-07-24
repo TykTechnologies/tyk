@@ -98,7 +98,7 @@ func TestSupergraph_EngineConfig(t *testing.T) {
 				},
 			}),
 		}
-		assert.Containsf(t, v2Config.datasources(), expecteddatasource, "engine configuration does not contain proxy-only data source")
+		assert.Containsf(t, v2Config.DataSources(), expecteddatasource, "engine configuration does not contain proxy-only data source")
 
 	})
 }

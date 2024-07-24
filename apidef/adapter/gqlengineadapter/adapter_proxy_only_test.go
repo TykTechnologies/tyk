@@ -76,7 +76,7 @@ func TestProxyOnly_EngineConfig(t *testing.T) {
 			},
 		}
 
-		assert.Containsf(t, engineV2Config.datasources(), expecteddatasource, "engine configuration does not contain proxy-only data source")
+		assert.Containsf(t, engineV2Config.DataSources(), expecteddatasource, "engine configuration does not contain proxy-only data source")
 		assert.Containsf(t, engineV2Config.FieldConfigurations(), expectedFieldConfig, "engine configuration does not contain expected field config")
 	})
 
@@ -142,7 +142,7 @@ func TestProxyOnly_EngineConfig(t *testing.T) {
 			},
 		}
 
-		assert.Containsf(t, engineV2Config.datasources(), expecteddatasource, "engine configuration does not contain proxy-only data source")
+		assert.Containsf(t, engineV2Config.DataSources(), expecteddatasource, "engine configuration does not contain proxy-only data source")
 		assert.Containsf(t, engineV2Config.FieldConfigurations(), expectedFieldConfig, "engine configuration does not contain expected field config")
 	})
 
@@ -215,7 +215,7 @@ func TestProxyOnly_EngineConfig(t *testing.T) {
 			},
 		}
 
-		assert.Containsf(t, engineV2Config.datasources(), expecteddatasource, "engine configuration does not contain proxy-only data source")
+		assert.Containsf(t, engineV2Config.DataSources(), expecteddatasource, "engine configuration does not contain proxy-only data source")
 		assert.Containsf(t, engineV2Config.FieldConfigurations(), expectedFieldConfig, "engine configuration does not contain expected field config")
 	})
 }
