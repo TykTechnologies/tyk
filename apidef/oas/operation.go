@@ -192,12 +192,7 @@ func (s *OAS) extractPathsAndOperations(ep *apidef.ExtendedPathsSet) {
 					tykOp.extractTrackEndpointTo(ep, path, method)
 					tykOp.extractDoNotTrackEndpointTo(ep, path, method)
 					tykOp.extractRequestSizeLimitTo(ep, path, method)
-<<<<<<< HEAD
-					break found
-=======
-					tykOp.extractRateLimitEndpointTo(ep, path, method)
 					break
->>>>>>> cbaf8709f... [TT-12688] extractto to honor sorting (#6430)
 				}
 			}
 		}
