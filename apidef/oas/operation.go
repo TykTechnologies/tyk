@@ -169,9 +169,8 @@ func (s *OAS) extractPathsAndOperations(ep *apidef.ExtendedPathsSet) {
 		return
 	}
 
-	for id, tykOp := range tykOperations {
-	found:
-		for _, pathItem := range oasutil.SortByPathLength(s.Paths) {
+	for _, pathItem := range oasutil.SortByPathLength(s.Paths) {
+		for id, tykOp := range tykOperations {
 			path := pathItem.Path
 			for method, operation := range pathItem.Operations() {
 				if id == operation.OperationID {
@@ -193,7 +192,12 @@ func (s *OAS) extractPathsAndOperations(ep *apidef.ExtendedPathsSet) {
 					tykOp.extractTrackEndpointTo(ep, path, method)
 					tykOp.extractDoNotTrackEndpointTo(ep, path, method)
 					tykOp.extractRequestSizeLimitTo(ep, path, method)
+<<<<<<< HEAD
 					break found
+=======
+					tykOp.extractRateLimitEndpointTo(ep, path, method)
+					break
+>>>>>>> cbaf8709f... [TT-12688] extractto to honor sorting (#6430)
 				}
 			}
 		}
