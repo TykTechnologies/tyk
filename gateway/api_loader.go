@@ -13,7 +13,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-	textTemplate "text/template"
+	texttemplate "text/template"
 
 	"github.com/TykTechnologies/tyk/rpc"
 
@@ -844,7 +844,7 @@ type generalStores struct {
 	redisStore, redisOrgStore, healthStore, rpcAuthStore, rpcOrgStore storage.Handler
 }
 
-var playgroundTemplate *textTemplate.Template
+var playgroundTemplate *texttemplate.Template
 
 func (gw *Gateway) readGraphqlPlaygroundTemplate() {
 	playgroundPath := filepath.Join(gw.GetConfig().TemplatePath, "playground")
@@ -860,7 +860,7 @@ func (gw *Gateway) readGraphqlPlaygroundTemplate() {
 		paths = append(paths, filepath.Join(playgroundPath, file.Name()))
 	}
 
-	playgroundTemplate, err = textTemplate.ParseFiles(paths...)
+	playgroundTemplate, err = texttemplate.ParseFiles(paths...)
 	if err != nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "playground",

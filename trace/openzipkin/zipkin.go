@@ -7,7 +7,7 @@ import (
 	"time"
 
 	opentracing "github.com/opentracing/opentracing-go"
-	opentracingLog "github.com/opentracing/opentracing-go/log"
+	opentracinglog "github.com/opentracing/opentracing-go/log"
 	zipkin "github.com/openzipkin/zipkin-go"
 	"github.com/openzipkin/zipkin-go/model"
 	"github.com/openzipkin/zipkin-go/propagation/b3"
@@ -50,7 +50,7 @@ func (s Span) SetTag(key string, value interface{}) opentracing.Span {
 	return s
 }
 
-func (s Span) LogFields(fields ...opentracingLog.Field) {
+func (s Span) LogFields(fields ...opentracinglog.Field) {
 	now := time.Now()
 	lg := &logEncoder{h: func(key string, value interface{}) {
 		s.span.Annotate(now, fmt.Sprintf("%s %s", key, value))
@@ -79,7 +79,7 @@ func (e *logEncoder) EmitUint64(key string, value uint64)            { e.emit(ke
 func (e *logEncoder) EmitFloat32(key string, value float32)          { e.emit(key, value) }
 func (e *logEncoder) EmitFloat64(key string, value float64)          { e.emit(key, value) }
 func (e *logEncoder) EmitObject(key string, value interface{})       { e.emit(key, value) }
-func (e *logEncoder) EmitLazyLogger(value opentracingLog.LazyLogger) {}
+func (e *logEncoder) EmitLazyLogger(value opentracinglog.LazyLogger) {}
 
 func (s Span) LogKV(alternatingKeyValues ...interface{})                   {}
 func (s Span) SetBaggageItem(restrictedKey, value string) opentracing.Span { return s }
