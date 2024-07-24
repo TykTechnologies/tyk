@@ -376,6 +376,10 @@ func TestResponseOverride(t *testing.T) {
 }
 
 func TestBundle_Pull(t *testing.T) {
+	// Currently this test is impacted by global scope, and skipped.
+	// This test is skipped due to changed test environment for
+	// the backoff and retries values; it's likely HTTPBundleGetter
+	// should include the backoff and retry values to make this pass.
 	t.Skip()
 
 	testCases := []struct {
