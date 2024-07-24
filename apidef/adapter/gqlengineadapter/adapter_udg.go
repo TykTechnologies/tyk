@@ -125,7 +125,7 @@ func (u *UniversalDataGraph) engineConfigV2DataSources() (planDataSources []plan
 				break
 			}
 
-			planDataSource.Factory, err = createGraphQLdatasourceFactory(createGraphQLdatasourceFactoryParams{
+			planDataSource.Factory, err = createGraphQLDataSourceFactory(createGraphQLDataSourceFactoryParams{
 				graphqlConfig:             graphqlConfig,
 				subscriptionClientFactory: subscriptionClientFactoryOrDefault(u.subscriptionClientFactory),
 				httpClient:                u.HttpClient,

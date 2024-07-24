@@ -14,7 +14,7 @@ import (
 	"github.com/TykTechnologies/tyk/apidef"
 )
 
-type createGraphQLdatasourceFactoryParams struct {
+type createGraphQLDataSourceFactoryParams struct {
 	graphqlConfig             apidef.GraphQLEngineDataSourceConfigGraphQL
 	subscriptionClientFactory graphqldatasource.GraphQLSubscriptionClientFactory
 	httpClient                *http.Client
@@ -114,7 +114,7 @@ func appendApiDefQueriesConfigToEngineV2Queries(engineV2Queries *[]restdatasourc
 	}
 }
 
-func createGraphQLdatasourceFactory(params createGraphQLdatasourceFactoryParams) (*graphqldatasource.Factory, error) {
+func createGraphQLDataSourceFactory(params createGraphQLDataSourceFactoryParams) (*graphqldatasource.Factory, error) {
 	factory := &graphqldatasource.Factory{
 		HTTPClient:      params.httpClient,
 		StreamingClient: params.streamingClient,
