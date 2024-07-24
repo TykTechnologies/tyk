@@ -34,7 +34,7 @@ func parseSchema(schemaAsString string) (parsedSchema *graphql.Schema, err error
 	return parsedSchema, nil
 }
 
-func graphqldatasourceWebSocketProtocol(subscriptionType apidef.SubscriptionType) string {
+func graphqlDataSourceWebSocketProtocol(subscriptionType apidef.SubscriptionType) string {
 	wsProtocol := graphqldatasource.ProtocolGraphQLWS
 	if subscriptionType == apidef.GQLSubscriptionTransportWS {
 		wsProtocol = graphqldatasource.ProtocolGraphQLTWS
@@ -84,7 +84,7 @@ func RemoveDuplicateApiDefinitionHeaders(headers ...map[string]string) map[strin
 	return hdr
 }
 
-func generateRestdatasourceFromGraphql(config apidef.GraphQLEngineDataSourceConfigGraphQL) (json.RawMessage, error) {
+func generateRestDataSourceFromGraphql(config apidef.GraphQLEngineDataSourceConfigGraphQL) (json.RawMessage, error) {
 	if !config.HasOperation {
 		return nil, ErrGraphQLConfigIsMissingOperation
 	}

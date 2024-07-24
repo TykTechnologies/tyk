@@ -29,11 +29,11 @@ func TestParseSchema(t *testing.T) {
 	assert.NoError(t, err)
 }
 
-func TestGraphqldatasourceWebSocketProtocol(t *testing.T) {
+func TestGraphqlDataSourceWebSocketProtocol(t *testing.T) {
 	run := func(subscriptionType apidef.SubscriptionType, expectedWebSocketProtocol string) func(t *testing.T) {
 		return func(t *testing.T) {
 			t.Helper()
-			actualProtocol := graphqldatasourceWebSocketProtocol(subscriptionType)
+			actualProtocol := graphqlDataSourceWebSocketProtocol(subscriptionType)
 			assert.Equal(t, expectedWebSocketProtocol, actualProtocol)
 		}
 	}
@@ -120,7 +120,7 @@ func TestRemoveDuplicateApiDefinitionHeaders(t *testing.T) {
 	assert.Equal(t, expectedDeduplicatedHeaders, actualDeduplicatedHeaders)
 }
 
-func TestGenerateRestdatasourceFromGraphql(t *testing.T) {
+func TestGenerateRestDataSourceFromGraphql(t *testing.T) {
 	t.Run("should return error if generation is not possible", func(t *testing.T) {
 		gqlConfig := apidef.GraphQLEngineDataSourceConfigGraphQL{
 			URL:              "http://local.fake",
@@ -132,7 +132,7 @@ func TestGenerateRestdatasourceFromGraphql(t *testing.T) {
 			Variables:        nil,
 		}
 
-		restEngineConfig, err := generateRestdatasourceFromGraphql(gqlConfig)
+		restEngineConfig, err := generateRestDataSourceFromGraphql(gqlConfig)
 		assert.Equal(t, err, ErrGraphQLConfigIsMissingOperation)
 		assert.Nil(t, restEngineConfig)
 	})
@@ -161,7 +161,7 @@ func TestGenerateRestdatasourceFromGraphql(t *testing.T) {
 			},
 		})
 
-		actualRestEngineConfig, err := generateRestdatasourceFromGraphql(gqlConfig)
+		actualRestEngineConfig, err := generateRestDataSourceFromGraphql(gqlConfig)
 		assert.NoError(t, err)
 		assert.Equal(t, expectedRestEngineConfig, actualRestEngineConfig)
 	})

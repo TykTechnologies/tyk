@@ -120,7 +120,7 @@ func createGraphQLDataSourceFactory(params createGraphQLDataSourceFactoryParams)
 		StreamingClient: params.streamingClient,
 	}
 
-	wsProtocol := graphqldatasourceWebSocketProtocol(params.graphqlConfig.SubscriptionType)
+	wsProtocol := graphqlDataSourceWebSocketProtocol(params.graphqlConfig.SubscriptionType)
 	graphqlSubscriptionClient := params.subscriptionClientFactory.NewSubscriptionClient(
 		params.httpClient,
 		params.streamingClient,

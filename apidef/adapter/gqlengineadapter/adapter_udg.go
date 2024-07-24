@@ -118,7 +118,7 @@ func (u *UniversalDataGraph) engineConfigV2DataSources() (planDataSources []plan
 				planDataSource.Factory = &restdatasource.Factory{
 					Client: u.HttpClient,
 				}
-				planDataSource.Custom, err = generateRestdatasourceFromGraphql(graphqlConfig)
+				planDataSource.Custom, err = generateRestDataSourceFromGraphql(graphqlConfig)
 				if err != nil {
 					return nil, err
 				}
