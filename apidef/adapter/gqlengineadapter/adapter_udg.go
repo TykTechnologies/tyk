@@ -65,9 +65,9 @@ func (u *UniversalDataGraph) engineConfigV2FieldConfigs() (planFieldConfigs plan
 	return planFieldConfigs
 }
 
-func (u *UniversalDataGraph) engineConfigV2datasources() (plandatasources []plan.DataSourceConfiguration, err error) {
+func (u *UniversalDataGraph) engineConfigV2datasources() (planDataSources []plan.DataSourceConfiguration, err error) {
 	for _, ds := range u.ApiDefinition.GraphQL.Engine.DataSources {
-		plandatasource := plan.DataSourceConfiguration{
+		planDataSource := plan.DataSourceConfiguration{
 			RootNodes: []plan.TypeField{},
 		}
 
@@ -77,7 +77,7 @@ func (u *UniversalDataGraph) engineConfigV2datasources() (plandatasources []plan
 				FieldNames: typeField.Fields,
 			}
 
-			plandatasource.RootNodes = append(plandatasource.RootNodes, planTypeField)
+			planDataSource.RootNodes = append(planDataSource.RootNodes, planTypeField)
 		}
 
 		switch ds.Kind {
@@ -88,7 +88,7 @@ func (u *UniversalDataGraph) engineConfigV2datasources() (plandatasources []plan
 				return nil, err
 			}
 
-			plandatasource.Factory = &restdatasource.Factory{
+			planDataSource.Factory = &restdatasource.Factory{
 				Client: u.HttpClient,
 			}
 
@@ -97,7 +97,7 @@ func (u *UniversalDataGraph) engineConfigV2datasources() (plandatasources []plan
 				return nil, err
 			}
 
-			plandatasource.Custom = restdatasource.ConfigJSON(restdatasource.Configuration{
+			planDataSource.Custom = restdatasource.ConfigJSON(restdatasource.Configuration{
 				Fetch: restdatasource.FetchConfiguration{
 					URL:    urlWithoutQueryParams,
 					Method: restConfig.Method,
@@ -115,17 +115,17 @@ func (u *UniversalDataGraph) engineConfigV2datasources() (plandatasources []plan
 			}
 
 			if graphqlConfig.HasOperation {
-				plandatasource.Factory = &restdatasource.Factory{
+				planDataSource.Factory = &restdatasource.Factory{
 					Client: u.HttpClient,
 				}
-				plandatasource.Custom, err = generateRestdatasourceFromGraphql(graphqlConfig)
+				planDataSource.Custom, err = generateRestdatasourceFromGraphql(graphqlConfig)
 				if err != nil {
 					return nil, err
 				}
 				break
 			}
 
-			plandatasource.Factory, err = createGraphQLdatasourceFactory(createGraphQLdatasourceFactoryParams{
+			planDataSource.Factory, err = createGraphQLdatasourceFactory(createGraphQLdatasourceFactoryParams{
 				graphqlConfig:             graphqlConfig,
 				subscriptionClientFactory: subscriptionClientFactoryOrDefault(u.subscriptionClientFactory),
 				httpClient:                u.HttpClient,
@@ -135,7 +135,7 @@ func (u *UniversalDataGraph) engineConfigV2datasources() (plandatasources []plan
 				return nil, err
 			}
 
-			plandatasource.Custom = graphqldatasource.ConfigJson(graphqlDataSourceConfiguration(
+			planDataSource.Custom = graphqldatasource.ConfigJson(graphqlDataSourceConfiguration(
 				graphqlConfig.URL,
 				graphqlConfig.Method,
 				graphqlConfig.Headers,
@@ -149,8 +149,8 @@ func (u *UniversalDataGraph) engineConfigV2datasources() (plandatasources []plan
 				return nil, err
 			}
 
-			plandatasource.Factory = &kafkadatasource.Factory{}
-			plandatasource.Custom = kafkadatasource.ConfigJSON(kafkadatasource.Configuration{
+			planDataSource.Factory = &kafkadatasource.Factory{}
+			planDataSource.Custom = kafkadatasource.ConfigJSON(kafkadatasource.Configuration{
 				Subscription: kafkadatasource.SubscriptionConfiguration{
 					BrokerAddresses:      kafkaConfig.BrokerAddresses,
 					Topics:               kafkaConfig.Topics,
@@ -169,11 +169,11 @@ func (u *UniversalDataGraph) engineConfigV2datasources() (plandatasources []plan
 			})
 		}
 
-		plandatasources = append(plandatasources, plandatasource)
+		planDataSources = append(planDataSources, planDataSource)
 	}
 
-	err = u.determineChildNodes(plandatasources)
-	return plandatasources, err
+	err = u.determineChildNodes(planDataSources)
+	return planDataSources, err
 }
 
 func (u *UniversalDataGraph) engineConfigV2Arguments(fieldConfs *plan.FieldConfigurations, generatedArgs map[graphql.TypeFieldLookupKey]graphql.TypeFieldArguments) {
@@ -201,16 +201,16 @@ func (u *UniversalDataGraph) engineConfigV2Arguments(fieldConfs *plan.FieldConfi
 	}
 }
 
-func (u *UniversalDataGraph) determineChildNodes(plandatasources []plan.DataSourceConfiguration) error {
-	for i := range plandatasources {
-		if _, ok := plandatasources[i].Factory.(*restdatasource.Factory); ok {
+func (u *UniversalDataGraph) determineChildNodes(planDataSources []plan.DataSourceConfiguration) error {
+	for i := range planDataSources {
+		if _, ok := planDataSources[i].Factory.(*restdatasource.Factory); ok {
 			continue
 		}
-		for j := range plandatasources[i].RootNodes {
-			typeName := plandatasources[i].RootNodes[j].TypeName
-			for k := range plandatasources[i].RootNodes[j].FieldNames {
-				fieldName := plandatasources[i].RootNodes[j].FieldNames[k]
-				typeFields := u.Schema.GetAllNestedFieldChildrenFromTypeField(typeName, fieldName, graphql.NewIsDataSourceConfigV2RootFieldSkipFunc(plandatasources))
+		for j := range planDataSources[i].RootNodes {
+			typeName := planDataSources[i].RootNodes[j].TypeName
+			for k := range planDataSources[i].RootNodes[j].FieldNames {
+				fieldName := planDataSources[i].RootNodes[j].FieldNames[k]
+				typeFields := u.Schema.GetAllNestedFieldChildrenFromTypeField(typeName, fieldName, graphql.NewIsDataSourceConfigV2RootFieldSkipFunc(planDataSources))
 
 				children := make([]plan.TypeField, 0)
 				for _, tf := range typeFields {
@@ -220,7 +220,7 @@ func (u *UniversalDataGraph) determineChildNodes(plandatasources []plan.DataSour
 					}
 					children = append(children, childNode)
 				}
-				plandatasources[i].ChildNodes = append(plandatasources[i].ChildNodes, children...)
+				planDataSources[i].ChildNodes = append(planDataSources[i].ChildNodes, children...)
 			}
 		}
 	}
