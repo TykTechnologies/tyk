@@ -146,7 +146,7 @@ func TestUniversalDataGraph_engineConfigV2FieldConfigs(t *testing.T) {
 	assert.ElementsMatch(t, expectedFieldCfgs, actualFieldCfgs)
 }
 
-func TestUniversalDataGraph_engineConfigV2datasources(t *testing.T) {
+func TestUniversalDataGraph_engineConfigV2DataSources(t *testing.T) {
 	httpClient := &http.Client{}
 	streamingClient := &http.Client{}
 
@@ -479,7 +479,7 @@ func TestUniversalDataGraph_engineConfigV2datasources(t *testing.T) {
 	adapter.Schema, err = parseSchema(gqlConfig.Schema)
 	require.NoError(t, err)
 
-	actualdatasources, err := adapter.engineConfigV2datasources()
+	actualdatasources, err := adapter.engineConfigV2DataSources()
 	assert.NoError(t, err)
 	assert.Equal(t, expectedDataSources, actualdatasources)
 	//assert.ElementsMatch(t, expectedDataSources, actualdatasources)

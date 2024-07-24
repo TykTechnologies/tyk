@@ -35,7 +35,7 @@ func (u *UniversalDataGraph) EngineConfig() (*graphql.EngineV2Configuration, err
 	conf.EnableSingleFlight(false)
 
 	fieldConfigs := u.engineConfigV2FieldConfigs()
-	datsSources, err := u.engineConfigV2datasources()
+	datsSources, err := u.engineConfigV2DataSources()
 	if err != nil {
 		return nil, err
 	}
@@ -65,7 +65,7 @@ func (u *UniversalDataGraph) engineConfigV2FieldConfigs() (planFieldConfigs plan
 	return planFieldConfigs
 }
 
-func (u *UniversalDataGraph) engineConfigV2datasources() (planDataSources []plan.DataSourceConfiguration, err error) {
+func (u *UniversalDataGraph) engineConfigV2DataSources() (planDataSources []plan.DataSourceConfiguration, err error) {
 	for _, ds := range u.ApiDefinition.GraphQL.Engine.DataSources {
 		planDataSource := plan.DataSourceConfiguration{
 			RootNodes: []plan.TypeField{},
