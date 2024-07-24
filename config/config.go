@@ -210,7 +210,7 @@ type AnalyticsConfigConfig struct {
 
 	// Set this value to `true` to have Tyk store the inbound request and outbound response data in HTTP Wire format as part of the Analytics data.
 	// Please note, this will greatly increase your analytics DB size and can cause performance degradation on analytics processing by the Dashboard.
-	// This setting can be overridden with an organisation flag, enabed at an API level, or on individual Key level.
+	// This setting can be overridden with an organization flag, enabed at an API level, or on individual Key level.
 	EnableDetailedRecording bool `json:"enable_detailed_recording"`
 
 	// Tyk can store GeoIP information based on MaxMind DB’s to enable GeoIP tracking on inbound request analytics. Set this value to `true` and assign a DB using the `geo_ip_db_path` setting.
@@ -291,7 +291,7 @@ type MonitorConfig struct {
 	GlobalTriggerLimit float64 `json:"global_trigger_limit"`
 	// Apply the monitoring subsystem to user keys.
 	MonitorUserKeys bool `json:"monitor_user_keys"`
-	// Apply the monitoring subsystem to organisation keys.
+	// Apply the monitoring subsystem to organization keys.
 	MonitorOrgKeys bool `json:"monitor_org_keys"`
 }
 
@@ -322,7 +322,7 @@ type SlaveOptionsConfig struct {
 	// Use this setting to add the URL for your MDCB or load balancer host.
 	ConnectionString string `json:"connection_string"`
 
-	// Your organisation ID to connect to the MDCB installation.
+	// Your organization ID to connect to the MDCB installation.
 	RPCKey string `json:"rpc_key"`
 
 	// This the API key of a user used to authenticate and authorize the Gateway’s access through MDCB.
@@ -743,22 +743,22 @@ type Config struct {
 	// RateLimit encapsulates rate limit configuration definitions.
 	RateLimit
 
-	// Allows you to dynamically configure analytics expiration on a per organisation level
+	// Allows you to dynamically configure analytics expiration on a per organization level
 	EnforceOrgDataAge bool `json:"enforce_org_data_age"`
 
-	// Allows you to dynamically configure detailed logging on a per organisation level
+	// Allows you to dynamically configure detailed logging on a per organization level
 	EnforceOrgDataDetailLogging bool `json:"enforce_org_data_detail_logging"`
 
-	// Allows you to dynamically configure organisation quotas on a per organisation level
+	// Allows you to dynamically configure organization quotas on a per organization level
 	EnforceOrgQuotas bool `json:"enforce_org_quotas"`
 
 	ExperimentalProcessOrgOffThread bool `json:"experimental_process_org_off_thread"`
 
-	// The monitor section is useful if you wish to enforce a global trigger limit on organisation and user quotas.
+	// The monitor section is useful if you wish to enforce a global trigger limit on organization and user quotas.
 	// This feature will trigger a webhook event to fire when specific triggers are reached.
-	// Triggers can be global (set in the node), by organisation (set in the organisation session object) or by key (set in the key session object)
+	// Triggers can be global (set in the node), by organization (set in the organization session object) or by key (set in the key session object)
 	//
-	// While Organisation-level and Key-level triggers can be tiered (e.g. trigger at 10%, trigger at 20%, trigger at 80%), in the node-level configuration only a global value can be set.
+	// While Organization-level and Key-level triggers can be tiered (e.g. trigger at 10%, trigger at 20%, trigger at 80%), in the node-level configuration only a global value can be set.
 	// If a global value and specific trigger level are the same the trigger will only fire once:
 	//
 	// ```
