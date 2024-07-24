@@ -3,7 +3,7 @@ package gateway
 import (
 	"context"
 	"crypto/tls"
-	mathRand "math/rand"
+	mathrand "math/rand"
 	"net"
 	"net/http"
 	"net/url"
@@ -90,11 +90,11 @@ func (h *HostUptimeChecker) getStaggeredTime() time.Duration {
 		return time.Duration(h.checkTimeout) * time.Second
 	}
 
-	mathRand.Seed(time.Now().Unix())
+	mathrand.Seed(time.Now().Unix())
 	min := h.checkTimeout - 3
 	max := h.checkTimeout + 3
 
-	dur := mathRand.Intn(max-min) + min
+	dur := mathrand.Intn(max-min) + min
 
 	return time.Duration(dur) * time.Second
 }

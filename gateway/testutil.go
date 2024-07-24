@@ -12,7 +12,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	mathRand "math/rand"
+	mathrand "math/rand"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -1088,7 +1088,7 @@ func (s *Test) newGateway(genConf func(globalConf *config.Config)) *Gateway {
 	s.MockHandle = MockHandle
 
 	var err error
-	gwConfig.Storage.Database = mathRand.Intn(15)
+	gwConfig.Storage.Database = mathrand.Intn(15)
 	gwConfig.AppPath, err = ioutil.TempDir("", "tyk-test-")
 
 	if err != nil {
@@ -1887,7 +1887,7 @@ func GenerateTestBinaryData() (buf *bytes.Buffer) {
 		c uint32
 	}
 	for i := 0; i < 10; i++ {
-		s := &testData{mathRand.Float32(), mathRand.Float64(), mathRand.Uint32()}
+		s := &testData{mathrand.Float32(), mathrand.Float64(), mathrand.Uint32()}
 		binary.Write(buf, binary.BigEndian, s)
 	}
 	return buf
@@ -1942,7 +1942,7 @@ func randStringBytes(n int) string {
 	b := make([]byte, n)
 
 	for i := range b {
-		b[i] = letters[mathRand.Intn(len(letters))]
+		b[i] = letters[mathrand.Intn(len(letters))]
 	}
 
 	return string(b)

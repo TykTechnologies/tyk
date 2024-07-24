@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/TykTechnologies/storage/temporal/model"
+	temporalmodel "github.com/TykTechnologies/storage/temporal/model"
 	"github.com/TykTechnologies/tyk/internal/cache"
 	"github.com/TykTechnologies/tyk/rpc"
 
@@ -581,7 +581,7 @@ func (r *RPCStorageHandler) DeleteKeys(keys []string) bool {
 }
 
 // StartPubSubHandler will listen for a signal and run the callback with the message
-func (r *RPCStorageHandler) StartPubSubHandler(_ string, _ func(*model.Message)) error {
+func (r *RPCStorageHandler) StartPubSubHandler(_ string, _ func(*temporalmodel.Message)) error {
 	log.Warning("RPCStorageHandler.StartPubSubHandler - NO PUBSUB DEFINED")
 	return nil
 }

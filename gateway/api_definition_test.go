@@ -12,18 +12,16 @@ import (
 	"net/http/httptest"
 	"sync"
 	"testing"
-	textTemplate "text/template"
+	texttemplate "text/template"
 	"time"
-
-	"github.com/TykTechnologies/tyk/apidef/oas"
-
-	"github.com/TykTechnologies/storage/persistent/model"
-	"github.com/TykTechnologies/tyk/config"
-	"github.com/TykTechnologies/tyk/rpc"
 
 	"github.com/stretchr/testify/assert"
 
+	persistentmodel "github.com/TykTechnologies/storage/persistent/model"
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/apidef/oas"
+	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/rpc"
 	"github.com/TykTechnologies/tyk/test"
 	"github.com/TykTechnologies/tyk/user"
 )
@@ -1260,7 +1258,8 @@ func TestAPIDefinitionLoader(t *testing.T) {
 
 	l := APIDefinitionLoader{Gw: ts.Gw}
 
-	executeAndAssert := func(t *testing.T, tpl *textTemplate.Template) {
+	executeAndAssert := func(t *testing.T, tpl *texttemplate.Template) {
+		t.Helper()
 		var bodyBuffer bytes.Buffer
 		err := tpl.Execute(&bodyBuffer, map[string]string{
 			"value1": "value-1",
@@ -1462,7 +1461,7 @@ func TestAPISpec_isListeningOnPort(t *testing.T) {
 func Test_LoadAPIsFromRPC(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
-	objectID := model.NewObjectID()
+	objectID := persistentmodel.NewObjectID()
 	loader := APIDefinitionLoader{Gw: ts.Gw}
 
 	t.Run("load APIs from RPC - success", func(t *testing.T) {

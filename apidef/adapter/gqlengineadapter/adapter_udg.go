@@ -4,9 +4,9 @@ import (
 	"encoding/json"
 	"net/http"
 
-	graphqlDataSource "github.com/TykTechnologies/graphql-go-tools/pkg/engine/datasource/graphql_datasource"
-	kafkaDataSource "github.com/TykTechnologies/graphql-go-tools/pkg/engine/datasource/kafka_datasource"
-	restDataSource "github.com/TykTechnologies/graphql-go-tools/pkg/engine/datasource/rest_datasource"
+	graphqldatasource "github.com/TykTechnologies/graphql-go-tools/pkg/engine/datasource/graphql_datasource"
+	kafkadatasource "github.com/TykTechnologies/graphql-go-tools/pkg/engine/datasource/kafka_datasource"
+	restdatasource "github.com/TykTechnologies/graphql-go-tools/pkg/engine/datasource/rest_datasource"
 	"github.com/TykTechnologies/graphql-go-tools/pkg/engine/plan"
 	"github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
 
@@ -19,7 +19,7 @@ type UniversalDataGraph struct {
 	StreamingClient *http.Client
 	Schema          *graphql.Schema
 
-	subscriptionClientFactory graphqlDataSource.GraphQLSubscriptionClientFactory
+	subscriptionClientFactory graphqldatasource.GraphQLSubscriptionClientFactory
 }
 
 func (u *UniversalDataGraph) EngineConfig() (*graphql.EngineV2Configuration, error) {
@@ -88,7 +88,7 @@ func (u *UniversalDataGraph) engineConfigV2DataSources() (planDataSources []plan
 				return nil, err
 			}
 
-			planDataSource.Factory = &restDataSource.Factory{
+			planDataSource.Factory = &restdatasource.Factory{
 				Client: u.HttpClient,
 			}
 
@@ -97,8 +97,8 @@ func (u *UniversalDataGraph) engineConfigV2DataSources() (planDataSources []plan
 				return nil, err
 			}
 
-			planDataSource.Custom = restDataSource.ConfigJSON(restDataSource.Configuration{
-				Fetch: restDataSource.FetchConfiguration{
+			planDataSource.Custom = restdatasource.ConfigJSON(restdatasource.Configuration{
+				Fetch: restdatasource.FetchConfiguration{
 					URL:    urlWithoutQueryParams,
 					Method: restConfig.Method,
 					Body:   restConfig.Body,
@@ -115,7 +115,7 @@ func (u *UniversalDataGraph) engineConfigV2DataSources() (planDataSources []plan
 			}
 
 			if graphqlConfig.HasOperation {
-				planDataSource.Factory = &restDataSource.Factory{
+				planDataSource.Factory = &restdatasource.Factory{
 					Client: u.HttpClient,
 				}
 				planDataSource.Custom, err = generateRestDataSourceFromGraphql(graphqlConfig)
@@ -135,7 +135,7 @@ func (u *UniversalDataGraph) engineConfigV2DataSources() (planDataSources []plan
 				return nil, err
 			}
 
-			planDataSource.Custom = graphqlDataSource.ConfigJson(graphqlDataSourceConfiguration(
+			planDataSource.Custom = graphqldatasource.ConfigJson(graphqlDataSourceConfiguration(
 				graphqlConfig.URL,
 				graphqlConfig.Method,
 				graphqlConfig.Headers,
@@ -149,9 +149,9 @@ func (u *UniversalDataGraph) engineConfigV2DataSources() (planDataSources []plan
 				return nil, err
 			}
 
-			planDataSource.Factory = &kafkaDataSource.Factory{}
-			planDataSource.Custom = kafkaDataSource.ConfigJSON(kafkaDataSource.Configuration{
-				Subscription: kafkaDataSource.SubscriptionConfiguration{
+			planDataSource.Factory = &kafkadatasource.Factory{}
+			planDataSource.Custom = kafkadatasource.ConfigJSON(kafkadatasource.Configuration{
+				Subscription: kafkadatasource.SubscriptionConfiguration{
 					BrokerAddresses:      kafkaConfig.BrokerAddresses,
 					Topics:               kafkaConfig.Topics,
 					GroupID:              kafkaConfig.GroupID,
@@ -199,7 +199,7 @@ func (u *UniversalDataGraph) engineConfigV2Arguments(fieldConfs *plan.FieldConfi
 
 func (u *UniversalDataGraph) determineChildNodes(planDataSources []plan.DataSourceConfiguration) error {
 	for i := range planDataSources {
-		if _, ok := planDataSources[i].Factory.(*restDataSource.Factory); ok {
+		if _, ok := planDataSources[i].Factory.(*restdatasource.Factory); ok {
 			continue
 		}
 		for j := range planDataSources[i].RootNodes {

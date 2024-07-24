@@ -11,7 +11,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/TykTechnologies/storage/temporal/model"
+	temporalmodel "github.com/TykTechnologies/storage/temporal/model"
 
 	"github.com/TykTechnologies/tyk/internal/crypto"
 	"github.com/TykTechnologies/tyk/storage"
@@ -95,12 +95,12 @@ func (gw *Gateway) logPubSubError(err error, message string) bool {
 }
 
 func (gw *Gateway) handleRedisEvent(v interface{}, handled func(NotificationCommand), reloaded func()) {
-	message, ok := v.(model.Message)
+	message, ok := v.(temporalmodel.Message)
 	if !ok {
 		return
 	}
 
-	if message.Type() != model.MessageTypeMessage {
+	if message.Type() != temporalmodel.MessageTypeMessage {
 		return
 	}
 
