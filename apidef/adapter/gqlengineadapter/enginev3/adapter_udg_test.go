@@ -9,9 +9,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	graphqlDataSource "github.com/TykTechnologies/graphql-go-tools/v2/pkg/engine/datasource/graphql_datasource"
-	kafkaDataSource "github.com/TykTechnologies/graphql-go-tools/v2/pkg/engine/datasource/kafka_datasource"
-	restDataSource "github.com/TykTechnologies/graphql-go-tools/v2/pkg/engine/datasource/rest_datasource"
+	graphqldatasource "github.com/TykTechnologies/graphql-go-tools/v2/pkg/engine/datasource/graphql_datasource"
+	kafkadatasource "github.com/TykTechnologies/graphql-go-tools/v2/pkg/engine/datasource/kafka_datasource"
+	restdatasource "github.com/TykTechnologies/graphql-go-tools/v2/pkg/engine/datasource/rest_datasource"
 	"github.com/TykTechnologies/graphql-go-tools/v2/pkg/engine/plan"
 	"github.com/TykTechnologies/tyk/apidef"
 )
@@ -157,11 +157,11 @@ func TestUniversalDataGraph_engineConfigV2DataSources(t *testing.T) {
 					FieldNames: []string{"rest"},
 				},
 			},
-			Factory: &restDataSource.Factory{
+			Factory: &restdatasource.Factory{
 				Client: httpClient,
 			},
-			Custom: restDataSource.ConfigJSON(restDataSource.Configuration{
-				Fetch: restDataSource.FetchConfiguration{
+			Custom: restdatasource.ConfigJSON(restdatasource.Configuration{
+				Fetch: restdatasource.FetchConfiguration{
 					URL:    "tyk://rest-example",
 					Method: "POST",
 					Header: map[string][]string{
@@ -169,7 +169,7 @@ func TestUniversalDataGraph_engineConfigV2DataSources(t *testing.T) {
 						"X-Custom":      {"A, B"},
 					},
 					Body: "body",
-					Query: []restDataSource.QueryConfiguration{
+					Query: []restdatasource.QueryConfiguration{
 						{
 							Name:  "q",
 							Value: "val1,val2",
@@ -193,20 +193,20 @@ func TestUniversalDataGraph_engineConfigV2DataSources(t *testing.T) {
 					FieldNames: []string{"gql"},
 				},
 			},
-			Factory: &graphqlDataSource.Factory{
+			Factory: &graphqldatasource.Factory{
 				HTTPClient:         httpClient,
 				StreamingClient:    streamingClient,
 				SubscriptionClient: mockSubscriptionClient,
 			},
-			Custom: graphqlDataSource.ConfigJson(graphqlDataSource.Configuration{
-				Fetch: graphqlDataSource.FetchConfiguration{
+			Custom: graphqldatasource.ConfigJson(graphqldatasource.Configuration{
+				Fetch: graphqldatasource.FetchConfiguration{
 					URL:    "http://graphql-example",
 					Method: "POST",
 					Header: http.Header{
 						"X-Tyk-Internal": []string{"true"},
 					},
 				},
-				Subscription: graphqlDataSource.SubscriptionConfiguration{
+				Subscription: graphqldatasource.SubscriptionConfiguration{
 					URL:    "http://graphql-example",
 					UseSSE: true,
 				},
@@ -225,11 +225,11 @@ func TestUniversalDataGraph_engineConfigV2DataSources(t *testing.T) {
 					FieldNames: []string{"id", "name", "__typename"},
 				},
 			},
-			Factory: &restDataSource.Factory{
+			Factory: &restdatasource.Factory{
 				Client: httpClient,
 			},
-			Custom: restDataSource.ConfigJSON(restDataSource.Configuration{
-				Fetch: restDataSource.FetchConfiguration{
+			Custom: restdatasource.ConfigJSON(restdatasource.Configuration{
+				Fetch: restdatasource.FetchConfiguration{
 					URL:    "https://rest.example.com",
 					Method: "POST",
 				},
@@ -248,11 +248,11 @@ func TestUniversalDataGraph_engineConfigV2DataSources(t *testing.T) {
 					FieldNames: []string{"id", "name", "__typename"},
 				},
 			},
-			Factory: &restDataSource.Factory{
+			Factory: &restdatasource.Factory{
 				Client: httpClient,
 			},
-			Custom: restDataSource.ConfigJSON(restDataSource.Configuration{
-				Fetch: restDataSource.FetchConfiguration{
+			Custom: restdatasource.ConfigJSON(restdatasource.Configuration{
+				Fetch: restdatasource.FetchConfiguration{
 					URL:    "https://rest.example.com",
 					Method: "POST",
 				},
@@ -275,20 +275,20 @@ func TestUniversalDataGraph_engineConfigV2DataSources(t *testing.T) {
 					FieldNames: []string{"name", "__typename"},
 				},
 			},
-			Factory: &graphqlDataSource.Factory{
+			Factory: &graphqldatasource.Factory{
 				HTTPClient:         httpClient,
 				StreamingClient:    streamingClient,
 				SubscriptionClient: mockSubscriptionClient,
 			},
-			Custom: graphqlDataSource.ConfigJson(graphqlDataSource.Configuration{
-				Fetch: graphqlDataSource.FetchConfiguration{
+			Custom: graphqldatasource.ConfigJson(graphqldatasource.Configuration{
+				Fetch: graphqldatasource.FetchConfiguration{
 					URL:    "https://graphql.example.com",
 					Method: "POST",
 					Header: map[string][]string{
 						"Auth": {"123"},
 					},
 				},
-				Subscription: graphqlDataSource.SubscriptionConfiguration{
+				Subscription: graphqldatasource.SubscriptionConfiguration{
 					URL:    "https://graphql.example.com",
 					UseSSE: false,
 				},
@@ -301,14 +301,14 @@ func TestUniversalDataGraph_engineConfigV2DataSources(t *testing.T) {
 					FieldNames: []string{"restWithQueryParams"},
 				},
 			},
-			Factory: &restDataSource.Factory{
+			Factory: &restdatasource.Factory{
 				Client: httpClient,
 			},
-			Custom: restDataSource.ConfigJSON(restDataSource.Configuration{
-				Fetch: restDataSource.FetchConfiguration{
+			Custom: restdatasource.ConfigJSON(restdatasource.Configuration{
+				Fetch: restdatasource.FetchConfiguration{
 					URL:    "https://rest-with-query-params.example.com",
 					Method: "POST",
-					Query: []restDataSource.QueryConfiguration{
+					Query: []restdatasource.QueryConfiguration{
 						{
 							Name:  "order",
 							Value: "{{.arguments.order}}",
@@ -332,11 +332,11 @@ func TestUniversalDataGraph_engineConfigV2DataSources(t *testing.T) {
 					FieldNames: []string{"restWithPathParams"},
 				},
 			},
-			Factory: &restDataSource.Factory{
+			Factory: &restdatasource.Factory{
 				Client: httpClient,
 			},
-			Custom: restDataSource.ConfigJSON(restDataSource.Configuration{
-				Fetch: restDataSource.FetchConfiguration{
+			Custom: restdatasource.ConfigJSON(restdatasource.Configuration{
+				Fetch: restdatasource.FetchConfiguration{
 					URL:    "https://rest-with-path-params.example.com/{{.arguments.id}}",
 					Method: "POST",
 				},
@@ -349,11 +349,11 @@ func TestUniversalDataGraph_engineConfigV2DataSources(t *testing.T) {
 					FieldNames: []string{"restWithFullUrlAsParam"},
 				},
 			},
-			Factory: &restDataSource.Factory{
+			Factory: &restdatasource.Factory{
 				Client: httpClient,
 			},
-			Custom: restDataSource.ConfigJSON(restDataSource.Configuration{
-				Fetch: restDataSource.FetchConfiguration{
+			Custom: restdatasource.ConfigJSON(restdatasource.Configuration{
+				Fetch: restdatasource.FetchConfiguration{
 					URL:    "{{.arguments.url}}",
 					Method: "POST",
 				},
@@ -376,20 +376,20 @@ func TestUniversalDataGraph_engineConfigV2DataSources(t *testing.T) {
 					FieldNames: []string{"id", "__typename"},
 				},
 			},
-			Factory: &graphqlDataSource.Factory{
+			Factory: &graphqldatasource.Factory{
 				HTTPClient:         httpClient,
 				StreamingClient:    streamingClient,
 				SubscriptionClient: mockSubscriptionClient,
 			},
-			Custom: graphqlDataSource.ConfigJson(graphqlDataSource.Configuration{
-				Fetch: graphqlDataSource.FetchConfiguration{
+			Custom: graphqldatasource.ConfigJson(graphqldatasource.Configuration{
+				Fetch: graphqldatasource.FetchConfiguration{
 					URL:    "https://graphql.example.com",
 					Method: "POST",
 					Header: map[string][]string{
 						"Auth": {"123"},
 					},
 				},
-				Subscription: graphqlDataSource.SubscriptionConfiguration{
+				Subscription: graphqldatasource.SubscriptionConfiguration{
 					URL:    "https://graphql.example.com",
 					UseSSE: false,
 				},
@@ -403,11 +403,11 @@ func TestUniversalDataGraph_engineConfigV2DataSources(t *testing.T) {
 				},
 			},
 			ChildNodes: nil,
-			Factory: &restDataSource.Factory{
+			Factory: &restdatasource.Factory{
 				Client: httpClient,
 			},
-			Custom: restDataSource.ConfigJSON(restDataSource.Configuration{
-				Fetch: restDataSource.FetchConfiguration{
+			Custom: restdatasource.ConfigJSON(restdatasource.Configuration{
+				Fetch: restdatasource.FetchConfiguration{
 					URL:    "https://graphql.example.com",
 					Method: "POST",
 					Header: http.Header{
@@ -425,18 +425,18 @@ func TestUniversalDataGraph_engineConfigV2DataSources(t *testing.T) {
 					FieldNames: []string{"foobar"},
 				},
 			},
-			Factory: &kafkaDataSource.Factory{},
-			Custom: kafkaDataSource.ConfigJSON(kafkaDataSource.Configuration{
-				Subscription: kafkaDataSource.SubscriptionConfiguration{
+			Factory: &kafkadatasource.Factory{},
+			Custom: kafkadatasource.ConfigJSON(kafkadatasource.Configuration{
+				Subscription: kafkadatasource.SubscriptionConfiguration{
 					BrokerAddresses:      []string{"localhost:9092"},
 					Topics:               []string{"test.topic"},
 					GroupID:              "test.consumer.group",
 					ClientID:             "test.client.id",
 					KafkaVersion:         "V2_8_0_0",
 					StartConsumingLatest: true,
-					BalanceStrategy:      kafkaDataSource.BalanceStrategySticky,
-					IsolationLevel:       kafkaDataSource.IsolationLevelReadCommitted,
-					SASL: kafkaDataSource.SASL{
+					BalanceStrategy:      kafkadatasource.BalanceStrategySticky,
+					IsolationLevel:       kafkadatasource.IsolationLevelReadCommitted,
+					SASL: kafkadatasource.SASL{
 						Enable:   true,
 						User:     "admin",
 						Password: "admin-secret",
@@ -451,18 +451,18 @@ func TestUniversalDataGraph_engineConfigV2DataSources(t *testing.T) {
 					FieldNames: []string{"foobarTopicWithVariable"},
 				},
 			},
-			Factory: &kafkaDataSource.Factory{},
-			Custom: kafkaDataSource.ConfigJSON(kafkaDataSource.Configuration{
-				Subscription: kafkaDataSource.SubscriptionConfiguration{
+			Factory: &kafkadatasource.Factory{},
+			Custom: kafkadatasource.ConfigJSON(kafkadatasource.Configuration{
+				Subscription: kafkadatasource.SubscriptionConfiguration{
 					BrokerAddresses:      []string{"localhost:9092"},
 					Topics:               []string{"test.topic.{{.arguments.name}}"},
 					GroupID:              "test.consumer.group",
 					ClientID:             "test.client.id",
 					KafkaVersion:         "V2_8_0_0",
 					StartConsumingLatest: true,
-					BalanceStrategy:      kafkaDataSource.BalanceStrategySticky,
-					IsolationLevel:       kafkaDataSource.IsolationLevelReadCommitted,
-					SASL: kafkaDataSource.SASL{
+					BalanceStrategy:      kafkadatasource.BalanceStrategySticky,
+					IsolationLevel:       kafkadatasource.IsolationLevelReadCommitted,
+					SASL: kafkadatasource.SASL{
 						Enable:   true,
 						User:     "admin",
 						Password: "admin-secret",
