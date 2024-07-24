@@ -142,6 +142,7 @@ func TestAnalyticRecord_GraphStats(t *testing.T) {
 				Query: `{ hello(name: "World") httpMethod }`,
 			},
 			checkFunc: func(t *testing.T, record *analytics.AnalyticsRecord) {
+				t.Helper()
 				assert.True(t, record.GraphQLStats.IsGraphQL)
 				assert.False(t, record.GraphQLStats.HasErrors)
 				assert.ElementsMatch(t, []string{"hello", "httpMethod"}, record.GraphQLStats.RootFields)
@@ -157,6 +158,7 @@ func TestAnalyticRecord_GraphStats(t *testing.T) {
 				Variables: []byte(`{"in":"hello"}`),
 			},
 			checkFunc: func(t *testing.T, record *analytics.AnalyticsRecord) {
+				t.Helper()
 				assert.True(t, record.GraphQLStats.IsGraphQL)
 				assert.False(t, record.GraphQLStats.HasErrors)
 				assert.ElementsMatch(t, []string{"httpMethod", "hello"}, record.GraphQLStats.RootFields)
@@ -177,6 +179,7 @@ func TestAnalyticRecord_GraphStats(t *testing.T) {
 				spec.EnableDetailedRecording = true
 			},
 			checkFunc: func(t *testing.T, record *analytics.AnalyticsRecord) {
+				t.Helper()
 				assert.True(t, record.GraphQLStats.IsGraphQL)
 				assert.True(t, record.GraphQLStats.HasErrors)
 				assert.ElementsMatch(t, []string{"hello", "httpMethod"}, record.GraphQLStats.RootFields)
@@ -199,6 +202,7 @@ func TestAnalyticRecord_GraphStats(t *testing.T) {
 				spec.Proxy.TargetURL = testGraphQLProxyUpstreamError
 			},
 			checkFunc: func(t *testing.T, record *analytics.AnalyticsRecord) {
+				t.Helper()
 				assert.True(t, record.GraphQLStats.IsGraphQL)
 				assert.True(t, record.GraphQLStats.HasErrors)
 				assert.ElementsMatch(t, []string{"hello", "httpMethod"}, record.GraphQLStats.RootFields)

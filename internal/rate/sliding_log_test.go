@@ -80,7 +80,7 @@ func TestSlidingLog_GetCount(t *testing.T) {
 	assert.True(t, ok)
 
 	for _, tx := range []bool{true, false} {
-		assertGetCount(ctx, t, db, tx)
+		assertGetCount(t, ctx, db, tx)
 	}
 }
 
@@ -101,7 +101,7 @@ func TestSlidingLog_Get(t *testing.T) {
 	assert.True(t, ok)
 
 	for _, tx := range []bool{true, false} {
-		assertGet(ctx, t, db, tx)
+		assertGet(t, ctx, db, tx)
 	}
 }
 
@@ -165,7 +165,9 @@ func assertPipelinerError(ctx context.Context, tb testing.TB, conn redis.Univers
 	assert.Equal(tb, int64(testRequestCount), count)
 }
 
-func assertGetCount(ctx context.Context, tb testing.TB, conn redis.UniversalClient, tx bool) {
+func assertGetCount(tb testing.TB, ctx context.Context, conn redis.UniversalClient, tx bool) {
+	tb.Helper()
+
 	rl := rate.NewSlidingLogRedis(conn, tx, nil)
 
 	key, per := uuid.New(), int64(5)
@@ -183,7 +185,9 @@ func assertGetCount(ctx context.Context, tb testing.TB, conn redis.UniversalClie
 	assert.Equal(tb, int64(testRequestCount), count)
 }
 
-func assertGet(ctx context.Context, tb testing.TB, conn redis.UniversalClient, tx bool) {
+func assertGet(tb testing.TB, ctx context.Context, conn redis.UniversalClient, tx bool) {
+	tb.Helper()
+
 	rl := rate.NewSlidingLogRedis(conn, tx, nil)
 
 	key, per := uuid.New(), int64(5)
@@ -244,25 +248,25 @@ func BenchmarkSlidingLog_Count(b *testing.B) {
 
 	b.Run("set/get count pipelined", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
-			assertGetCount(ctx, b, db, false)
+			assertGetCount(b, ctx, db, false)
 		}
 	})
 
 	b.Run("set/get count transaction", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
-			assertGetCount(ctx, b, db, true)
+			assertGetCount(b, ctx, db, true)
 		}
 	})
 
 	b.Run("set/get pipelined", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
-			assertGet(ctx, b, db, false)
+			assertGet(b, ctx, db, false)
 		}
 	})
 
 	b.Run("set/get transaction", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
-			assertGet(ctx, b, db, true)
+			assertGet(b, ctx, db, true)
 		}
 	})
 }

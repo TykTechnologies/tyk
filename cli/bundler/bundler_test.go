@@ -44,6 +44,7 @@ func TestMain(m *testing.M) {
 }
 
 func writeManifestFile(t testing.TB, manifest interface{}, filename string) *string {
+	t.Helper()
 	var data []byte
 	var err error
 	switch manifest.(type) {

@@ -419,6 +419,8 @@ func withOpenTelemetryTestEngineV2(detailedTracing bool) testEngineV2Option {
 }
 
 func newTestEngineV2(t *testing.T, options ...testEngineV2Option) (*EngineV2, engineV2Mocks) {
+	t.Helper()
+
 	definedOptions := testEngineV2Options{
 		otelConfig:    EngineV2OTelConfig{},
 		apiDefinition: newTestApiDefinitionV2(apidef.GraphQLExecutionModeProxyOnly, "http://example.com"),

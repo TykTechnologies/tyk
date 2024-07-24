@@ -48,6 +48,7 @@ var (
 )
 
 func newUpstreamSSL(t *testing.T, gw *Gateway, serverCert tls.Certificate, handler http.HandlerFunc) (*httptest.Server, string, func()) {
+	t.Helper()
 	pubID, err := gw.uploadCertPublicKey(serverCert)
 	if err != nil {
 		t.Error(err)
