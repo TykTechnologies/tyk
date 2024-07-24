@@ -1182,7 +1182,7 @@ func TestDeleteKeys(t *testing.T) {
 		storage.kvStorage = mockKv
 		defer storage.ConnectionHandler.storageUp.Store(true)
 
-		deleted := storage.DeleteKeys([]string{"key"}, false)
+		deleted := storage.DeleteKeys([]string{"key"})
 		assert.False(t, deleted)
 
 		mockKv.AssertExpectations(t)
@@ -1193,7 +1193,7 @@ func TestDeleteKeys(t *testing.T) {
 		storage.kvStorage = mockKv
 		mockKv.On("DeleteKeys", mock.Anything, []string{"key", "key2"}).Return(int64(3), nil)
 
-		deleted := storage.DeleteKeys([]string{"key", "key2"}, false)
+		deleted := storage.DeleteKeys([]string{"key", "key2"})
 		assert.True(t, deleted)
 		mockKv.AssertExpectations(t)
 	})
@@ -1203,7 +1203,7 @@ func TestDeleteKeys(t *testing.T) {
 		storage.kvStorage = mockKv
 		mockKv.On("DeleteKeys", mock.Anything, []string{"prefix:key", "prefix:key2"}).Return(int64(3), nil)
 
-		deleted := storage.DeleteKeys([]string{"key", "key2"}, false)
+		deleted := storage.DeleteKeys([]string{"key", "key2"})
 		assert.True(t, deleted)
 		mockKv.AssertExpectations(t)
 	})
@@ -1214,7 +1214,7 @@ func TestDeleteKeys(t *testing.T) {
 		storage.kvStorage = mockKv
 		mockKv.On("DeleteKeys", mock.Anything, []string{"prefix:key", "prefix:key2"}).Return(int64(0), nil)
 
-		deleted := storage.DeleteKeys([]string{"key", "key2"}, false)
+		deleted := storage.DeleteKeys([]string{"key", "key2"})
 		assert.False(t, deleted)
 		mockKv.AssertExpectations(t)
 	})
@@ -1224,7 +1224,7 @@ func TestDeleteKeys(t *testing.T) {
 		storage.kvStorage = mockKv
 		mockKv.On("DeleteKeys", mock.Anything, mock.Anything).Return(int64(0), ErrKeyNotFound)
 
-		deleted := storage.DeleteKeys([]string{"key"}, false)
+		deleted := storage.DeleteKeys([]string{"key"})
 		assert.False(t, deleted)
 		mockKv.AssertExpectations(t)
 	})

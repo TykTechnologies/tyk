@@ -98,7 +98,7 @@ func (s *DummyStorage) GetKeysAndValuesWithFilter(string) map[string]string {
 }
 
 // DeleteKeys removes a list of keys from DummyStorage, returning a success status; not yet implemented.
-func (s *DummyStorage) DeleteKeys([]string, bool) bool {
+func (s *DummyStorage) DeleteKeys([]string) bool {
 	panic("implement me")
 }
 
