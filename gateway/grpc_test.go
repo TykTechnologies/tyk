@@ -493,6 +493,7 @@ func (s *server) SayHello(ctx context.Context, in *pbExample.HelloRequest) (*pbE
 }
 
 func startGRPCServerH2C(t *testing.T, fn func(*testing.T, *grpc.Server)) (net.Listener, *grpc.Server) {
+	t.Helper()
 	ls := openListener(t)
 	s := grpc.NewServer()
 	fn(t, s)
@@ -506,6 +507,7 @@ func startGRPCServerH2C(t *testing.T, fn func(*testing.T, *grpc.Server)) (net.Li
 }
 
 func toTarget(t *testing.T, scheme string, ls net.Listener) string {
+	t.Helper()
 	_, port, err := net.SplitHostPort(ls.Addr().String())
 	if err != nil {
 		t.Fatal(err)
@@ -557,6 +559,7 @@ func setupHelloSVC(t *testing.T, s *grpc.Server) {
 }
 
 func startGRPCServer(t *testing.T, clientCert *x509.Certificate, fn func(t *testing.T, s *grpc.Server)) (net.Listener, *grpc.Server) {
+	t.Helper()
 	// Server
 	ls := openListener(t)
 	opts := grpcServerCreds(t, clientCert)
@@ -573,6 +576,7 @@ func startGRPCServer(t *testing.T, clientCert *x509.Certificate, fn func(t *test
 }
 
 func sayHelloWithGRPCClientH2C(t *testing.T, address string, name string) *pbExample.HelloReply {
+	t.Helper()
 	conn, err := grpc.Dial(address, grpc.WithInsecure())
 	if err != nil {
 		t.Fatalf("did not connect: %v", err)
@@ -625,6 +629,7 @@ func grpcCreds(cert *tls.Certificate, caCert []byte, basicAuth bool, token strin
 }
 
 func sayHelloWithGRPCClient(t *testing.T, cert *tls.Certificate, caCert []byte, basicAuth bool, token string, address string, name string) *pbExample.HelloReply {
+	t.Helper()
 	// gRPC client
 	opts := grpcCreds(cert, caCert, basicAuth, token)
 	conn, err := grpc.Dial(address, opts...)

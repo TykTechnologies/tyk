@@ -137,6 +137,7 @@ func (s *routeGuideServer) RouteChat(stream pb.RouteGuide_RouteChatServer) error
 
 // loadFeatures loads features from a JSON file.
 func (s *routeGuideServer) loadFeatures(t *testing.T) {
+	t.Helper()
 	if err := json.Unmarshal(exampleData, &s.savedFeatures); err != nil {
 		t.Fatalf("Failed to load default features: %v", err)
 	}
@@ -187,12 +188,14 @@ func serialize(point *pb.Point) string {
 }
 
 func newServer(t *testing.T) *routeGuideServer {
+	t.Helper()
 	s := &routeGuideServer{routeNotes: make(map[string][]*pb.RouteNote)}
 	s.loadFeatures(t)
 	return s
 }
 
 func setupStreamSVC(t *testing.T, grpcServer *grpc.Server) {
+	t.Helper()
 	pb.RegisterRouteGuideServer(grpcServer, newServer(t))
 }
 

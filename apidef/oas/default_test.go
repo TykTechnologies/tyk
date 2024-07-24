@@ -1546,6 +1546,7 @@ func TestOAS_importAuthentication(t *testing.T) {
 
 	t.Run("add first authentication in case of OR condition", func(t *testing.T) {
 		check := func(t *testing.T, enable bool) {
+			t.Helper()
 			oas := OAS{}
 			oas.Security = openapi3.SecurityRequirements{
 				{testSecurityNameToken: []string{}},
@@ -1672,6 +1673,7 @@ func TestOAS_importAuthentication(t *testing.T) {
 
 	t.Run("add multiple authentication with AND condition", func(t *testing.T) {
 		check := func(t *testing.T, enable bool) {
+			t.Helper()
 			oas := OAS{}
 			oas.Security = openapi3.SecurityRequirements{
 				{testSecurityNameToken: []string{}, testSecurityNameJWT: []string{}},
@@ -1754,6 +1756,7 @@ func TestSecuritySchemes_Import(t *testing.T) {
 
 	t.Run("token", func(t *testing.T) {
 		check := func(t *testing.T, enable bool) {
+			t.Helper()
 			securitySchemes := SecuritySchemes{}
 			nativeSecurityScheme := &openapi3.SecurityScheme{
 				Type: typeAPIKey,

@@ -175,6 +175,7 @@ func (r *ReloadMachinery) Queued() bool {
 // EnsureQueued this will block until any queue happens. It will timeout after
 // 100ms
 func (r *ReloadMachinery) EnsureQueued(t *testing.T) {
+	t.Helper()
 	tick := time.NewTicker(time.Millisecond)
 	defer tick.Stop()
 
@@ -198,6 +199,8 @@ func (r *ReloadMachinery) EnsureQueued(t *testing.T) {
 // EnsureReloaded this will block until any reload happens. It will timeout after
 // 200ms
 func (r *ReloadMachinery) EnsureReloaded(t *testing.T) {
+	t.Helper()
+
 	tick := time.NewTicker(time.Millisecond)
 	defer tick.Stop()
 	for {
@@ -225,6 +228,8 @@ func (r *ReloadMachinery) Tick() {
 // TickOk triggers a reload and ensures a queue happened and a reload cycle
 // happens. This will block until all the cases are met.
 func (r *ReloadMachinery) TickOk(t *testing.T) {
+	t.Helper()
+
 	r.EnsureQueued(t)
 	r.Tick()
 	r.EnsureReloaded(t)
@@ -1321,6 +1326,8 @@ func (s *Test) Run(t testing.TB, testCases ...test.TestCase) (*http.Response, er
 
 // TODO:(gernest) when hot reload is supported enable this.
 func (s *Test) RunExt(t testing.TB, testCases ...test.TestCase) {
+	t.Helper()
+
 	s.Run(t, testCases...)
 	var testMatrix = []struct {
 		goagain          bool

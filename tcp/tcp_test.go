@@ -194,6 +194,8 @@ func TestProxyMultiTarget(t *testing.T) {
 }
 
 func testRunner(t *testing.T, proxy *Proxy, hostname string, useSSL bool, testCases ...test.TCPTestCase) {
+	t.Helper()
+
 	var proxyLn net.Listener
 	var err error
 

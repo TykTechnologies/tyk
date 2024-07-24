@@ -517,6 +517,7 @@ func testAPIMutualTLSHelper(t *testing.T, skipCAAnnounce bool) {
 
 	t.Run("Multiple APIs on same domain", func(t *testing.T) {
 		testSameDomain := func(t *testing.T, domain string) {
+			t.Helper()
 			clientCertID, _ := ts.Gw.CertificateManager.Add(clientCertPem, "")
 			defer ts.Gw.CertificateManager.Delete(clientCertID, "")
 
@@ -597,6 +598,7 @@ func testAPIMutualTLSHelper(t *testing.T, skipCAAnnounce bool) {
 
 	t.Run("Multiple APIs with Mutual TLS on the same domain", func(t *testing.T) {
 		testSameDomain := func(t *testing.T, domain string) {
+			t.Helper()
 			clientCertID, _ := ts.Gw.CertificateManager.Add(clientCertPem, "")
 			defer ts.Gw.CertificateManager.Delete(clientCertID, "")
 
@@ -710,6 +712,7 @@ func testAPIMutualTLSHelper(t *testing.T, skipCAAnnounce bool) {
 
 	t.Run("Multiple APIs, mutual on custom", func(t *testing.T) {
 		testSameDomain := func(t *testing.T, domain string) {
+			t.Helper()
 			clientCertID, _ := ts.Gw.CertificateManager.Add(clientCertPem, "")
 			defer ts.Gw.CertificateManager.Delete(clientCertID, "")
 
@@ -804,6 +807,7 @@ func testAPIMutualTLSHelper(t *testing.T, skipCAAnnounce bool) {
 
 	t.Run("Multiple APIs, mutual on empty", func(t *testing.T) {
 		testSameDomain := func(t *testing.T, domain string) {
+			t.Helper()
 			clientCertID, _ := ts.Gw.CertificateManager.Add(clientCertPem, "")
 			defer ts.Gw.CertificateManager.Delete(clientCertID, "")
 

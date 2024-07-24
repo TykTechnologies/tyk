@@ -440,6 +440,8 @@ func (s *Test) TestPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesD
 			name:     "MultiNonPart",
 			policies: []string{"nonpart1", "nonpart2", "nonexistent"},
 			sessMatch: func(t *testing.T, s *user.SessionState) {
+				t.Helper()
+
 				want := map[string]user.AccessDefinition{
 					"a": {
 						Limit:          user.APILimit{},
@@ -458,6 +460,8 @@ func (s *Test) TestPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesD
 			name:     "MultiACLPolicy",
 			policies: []string{"nonpart3"},
 			sessMatch: func(t *testing.T, s *user.SessionState) {
+				t.Helper()
+
 				want := map[string]user.AccessDefinition{
 					"a": {
 						Limit: user.APILimit{},
@@ -688,6 +692,8 @@ func (s *Test) TestPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesD
 			name:     "Per API is set to true with no other partitions set to true",
 			policies: []string{"per_api_and_no_other_partitions"},
 			sessMatch: func(t *testing.T, s *user.SessionState) {
+				t.Helper()
+
 				want := map[string]user.AccessDefinition{
 					"d": {
 						Limit: user.APILimit{
@@ -730,6 +736,8 @@ func (s *Test) TestPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesD
 			name:     "Per API is set to true and some API gets limit set from policy's fields",
 			policies: []string{"per_api_with_limit_set_from_policy"},
 			sessMatch: func(t *testing.T, s *user.SessionState) {
+				t.Helper()
+
 				want := map[string]user.AccessDefinition{
 					"e": {
 						Limit: user.APILimit{
@@ -787,6 +795,8 @@ func (s *Test) TestPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesD
 			name:     "Merge restricted fields for the same GraphQL API",
 			policies: []string{"restricted-types1", "restricted-types2"},
 			sessMatch: func(t *testing.T, s *user.SessionState) {
+				t.Helper()
+
 				want := map[string]user.AccessDefinition{
 					"a": { // It should get intersection of restricted types.
 						RestrictedTypes: []graphql.Type{
@@ -804,6 +814,8 @@ func (s *Test) TestPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesD
 			name:     "Merge allowed fields for the same GraphQL API",
 			policies: []string{"allowed-types1", "allowed-types2"},
 			sessMatch: func(t *testing.T, s *user.SessionState) {
+				t.Helper()
+
 				want := map[string]user.AccessDefinition{
 					"a": { // It should get intersection of restricted types.
 						AllowedTypes: []graphql.Type{
@@ -821,6 +833,8 @@ func (s *Test) TestPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesD
 			name:     "If GQL introspection is disabled, it remains disabled after merging",
 			policies: []string{"introspection-disabled", "introspection-enabled"},
 			sessMatch: func(t *testing.T, s *user.SessionState) {
+				t.Helper()
+
 				want := map[string]user.AccessDefinition{
 					"a": {
 						DisableIntrospection: true, // If GQL introspection is disabled, it remains disabled after merging.
@@ -835,6 +849,8 @@ func (s *Test) TestPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesD
 			name:     "Merge field level depth limit for the same GraphQL API",
 			policies: []string{"field-level-depth-limit1", "field-level-depth-limit2"},
 			sessMatch: func(t *testing.T, s *user.SessionState) {
+				t.Helper()
+
 				want := map[string]user.AccessDefinition{
 					"graphql-api": {
 						Limit: user.APILimit{},
@@ -863,6 +879,8 @@ func (s *Test) TestPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesD
 			policies: []string{"throttle1"},
 			errMatch: "",
 			sessMatch: func(t *testing.T, s *user.SessionState) {
+				t.Helper()
+
 				if s.ThrottleRetryLimit != 99 {
 					t.Fatalf("Throttle interval should be 9 inherited from policy")
 				}
@@ -873,6 +891,8 @@ func (s *Test) TestPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesD
 			name:     "inherit quota and rate from partitioned policies",
 			policies: []string{"quota1", "rate3"},
 			sessMatch: func(t *testing.T, s *user.SessionState) {
+				t.Helper()
+
 				if s.QuotaMax != 2 {
 					t.Fatalf("quota should be the same as quota policy")
 				}
@@ -888,6 +908,8 @@ func (s *Test) TestPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesD
 			name:     "inherit quota and rate from partitioned policies applied in different order",
 			policies: []string{"rate3", "quota1"},
 			sessMatch: func(t *testing.T, s *user.SessionState) {
+				t.Helper()
+
 				if s.QuotaMax != 2 {
 					t.Fatalf("quota should be the same as quota policy")
 				}

@@ -16,6 +16,8 @@ import (
 )
 
 func NewTestEngine(t *testing.T) *EngineV3 {
+	t.Helper()
+
 	gqlTools := graphqlGoToolsV2{}
 	parsedSchema, err := gqlTools.parseSchema(testSchemaEngineV1)
 	require.NoError(t, err)
