@@ -795,7 +795,7 @@ type Config struct {
 
 	// If AllowMasterKeys is set to true, session objects (key definitions) that do not have explicit access rights set
 	// will be allowed by Tyk. This means that keys that are created have access to ALL APIs, which in many cases is
-	// unwanted behaviour unless you are sure about what you are doing.
+	// unwanted behavior unless you are sure about what you are doing.
 	AllowMasterKeys bool `json:"allow_master_keys"`
 
 	ServiceDiscovery ServiceDiscoveryConf `json:"service_discovery"`
