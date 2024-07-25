@@ -339,8 +339,8 @@ type SlaveOptionsConfig struct {
 	// Set this option to `true` if you don’t want to monitor changes in the keys from a primary Gateway.
 	DisableKeySpaceSync bool `json:"disable_keyspace_sync"`
 
-	// This is the `zone` that this instance inhabits, e.g. the cluster/data-centre the Gateway lives in.
-	// The group ID must be the same across all the Gateways of a data-centre/cluster which are also sharing the same Redis instance.
+	// This is the `zone` that this instance inhabits, e.g. the cluster/data-center the Gateway lives in.
+	// The group ID must be the same across all the Gateways of a data-center/cluster which are also sharing the same Redis instance.
 	// This ID should also be unique per cluster (otherwise another Gateway cluster can pick up your keyspace events and your cluster will get zero updates).
 	GroupID string `json:"group_id"`
 
@@ -723,7 +723,7 @@ type Config struct {
 
 	// Disable the capability of the Gateway to `autodiscover` the Dashboard through heartbeat messages via Redis.
 	// The goal of zeroconf is auto-discovery, so you do not have to specify the Tyk Dashboard address in your Gateway`tyk.conf` file.
-	// In some specific cases, for example, when the Dashboard is bound to a public domain, not accessible inside an internal network, or similar, `disable_dashboard_zeroconf` can be set to `true`, in favour of directly specifying a Tyk Dashboard address.
+	// In some specific cases, for example, when the Dashboard is bound to a public domain, not accessible inside an internal network, or similar, `disable_dashboard_zeroconf` can be set to `true`, in favor of directly specifying a Tyk Dashboard address.
 	DisableDashboardZeroConf bool `json:"disable_dashboard_zeroconf"`
 
 	// The `slave_options` allow you to configure the RPC slave connection required for MDCB installations.
