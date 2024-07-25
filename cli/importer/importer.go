@@ -254,7 +254,7 @@ func (i *Importer) handleWSDLMode() error {
 		//Add into existing API
 		def, err = i.apiDefLoadFile(*i.forAPI)
 		if err != nil {
-			return fmt.Errorf("failed to load and decode file data for API Definition: %v", err)
+			return fmt.Errorf("failed to load and decode file data for API Definition: %w", err)
 		}
 
 		versionData, err := w.ConvertIntoApiVersion(*i.asMock)
