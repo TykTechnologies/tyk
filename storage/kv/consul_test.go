@@ -3,6 +3,8 @@ package kv
 import (
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+
 	consulapi "github.com/hashicorp/consul/api"
 
 	"github.com/TykTechnologies/tyk/config"
@@ -20,9 +22,7 @@ func TestConsul_Get(t *testing.T) {
 
 	_, err = store.Get("key")
 
-	if err != ErrKeyNotFound {
-		t.Fatal("Expect key not to exists")
-	}
+	assert.ErrorIs(t, err, ErrKeyNotFound)
 
 	con := store.(*Consul)
 
