@@ -1297,10 +1297,10 @@ func FillEnv(conf *Config) error {
 	}
 
 	if err := envconfig.Process(envPrefix, conf); err != nil {
-		return fmt.Errorf("failed to process config env vars: %v", err)
+		return fmt.Errorf("failed to process config env vars: %w", err)
 	}
 	if err := processCustom(envPrefix, conf, loadZipkin, loadJaeger); err != nil {
-		return fmt.Errorf("failed to process config custom loader: %v", err)
+		return fmt.Errorf("failed to process config custom loader: %w", err)
 	}
 	return nil
 }

@@ -3,6 +3,7 @@ package test
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -197,8 +198,8 @@ type nopCloser struct {
 // to have it ready for next read-cycle
 func (n nopCloser) Read(p []byte) (int, error) {
 	num, err := n.ReadSeeker.Read(p)
-	if err == io.EOF { // move to start to have it ready for next read cycle
-		n.Seek(0, io.SeekStart)
+	if errors.Is(err, io.EOF) { // move to start to have it ready for next read cycle
+		_, _ = n.Seek(0, io.SeekStart)
 	}
 	return num, err
 }

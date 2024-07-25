@@ -315,6 +315,7 @@ func TestSessionLimiter_RedisQuotaExceeded_PerAPI(t *testing.T) {
 	assert.Equal(t, session.AccessRights[apis[2].APIID].AllowanceScope, "")
 
 	sendReqAndCheckQuota := func(t *testing.T, apiID string, expectedQuotaRemaining int64, perAPI bool) {
+		t.Helper()
 		_, _ = g.Run(t, test.TestCase{Path: fmt.Sprintf("/%s/", apiID), Headers: headers, Code: http.StatusOK})
 
 		resp, _ := g.Run(t, test.TestCase{Path: "/tyk/keys/" + key, AdminAuth: true, Code: http.StatusOK})

@@ -16,7 +16,7 @@ import (
 	"strings"
 	"sync"
 	"sync/atomic"
-	textTemplate "text/template"
+	texttemplate "text/template"
 	"time"
 
 	"github.com/TykTechnologies/tyk/storage/kv"
@@ -33,7 +33,7 @@ import (
 
 	"github.com/cenk/backoff"
 
-	"github.com/Masterminds/sprig/v3"
+	sprig "github.com/Masterminds/sprig/v3"
 
 	"github.com/gorilla/mux"
 	"github.com/sirupsen/logrus"
@@ -174,7 +174,7 @@ type EndPointCacheMeta struct {
 
 type TransformSpec struct {
 	apidef.TemplateMeta
-	Template *textTemplate.Template
+	Template *texttemplate.Template
 }
 
 type ExtendedCircuitBreakerMeta struct {
@@ -924,21 +924,21 @@ func (a APIDefinitionLoader) compileCachedPathSpec(oldpaths []string, newpaths [
 	return urlSpec
 }
 
-func (a APIDefinitionLoader) filterSprigFuncs() textTemplate.FuncMap {
+func (a APIDefinitionLoader) filterSprigFuncs() texttemplate.FuncMap {
 	tmp := sprig.GenericFuncMap()
 	delete(tmp, "env")
 	delete(tmp, "expandenv")
 
-	return textTemplate.FuncMap(tmp)
+	return texttemplate.FuncMap(tmp)
 }
 
-func (a APIDefinitionLoader) loadFileTemplate(path string) (*textTemplate.Template, error) {
+func (a APIDefinitionLoader) loadFileTemplate(path string) (*texttemplate.Template, error) {
 	log.Debug("-- Loading template: ", path)
 	tmpName := filepath.Base(path)
 	return apidef.Template.New(tmpName).Funcs(a.filterSprigFuncs()).ParseFiles(path)
 }
 
-func (a APIDefinitionLoader) loadBlobTemplate(blob string) (*textTemplate.Template, error) {
+func (a APIDefinitionLoader) loadBlobTemplate(blob string) (*texttemplate.Template, error) {
 	log.Debug("-- Loading blob")
 	uDec, err := base64.StdEncoding.DecodeString(blob)
 	if err != nil {
@@ -1635,13 +1635,24 @@ func (a *APISpec) getVersionFromRequest(r *http.Request) string {
 		// First non-empty part of the path is the version ID
 		for _, part := range strings.Split(uPath, "/") {
 			if part != "" {
-				if a.VersionDefinition.StripVersioningData || a.VersionDefinition.StripPath {
+				matchesUrlVersioningPattern := true
+				if a.VersionDefinition.UrlVersioningPattern != "" {
+					re, err := regexp.Compile(a.VersionDefinition.UrlVersioningPattern)
+					if err != nil {
+						log.Error("Error compiling versioning pattern: ", err)
+					} else {
+						matchesUrlVersioningPattern = re.Match([]byte(part))
+					}
+				}
+
+				if (a.VersionDefinition.StripVersioningData || a.VersionDefinition.StripPath) && matchesUrlVersioningPattern {
 					log.Debug("Stripping version from url: ", part)
 
 					r.URL.Path = strings.Replace(r.URL.Path, part+"/", "", 1)
 					r.URL.RawPath = strings.Replace(r.URL.RawPath, part+"/", "", 1)
 				}
 
+				//never delete this line as there's an easy to miss defer statement above
 				vName = part
 
 				return part

@@ -152,6 +152,7 @@ func TestValidateRequest(t *testing.T) {
 
 	t.Run("default error response code", func(t *testing.T) {
 		check := func(t *testing.T) {
+			t.Helper()
 			_, _ = ts.Run(t, []test.TestCase{
 				{Data: `{"name": 123}`, Code: http.StatusOK, Method: http.MethodPost, Headers: headers, Path: "/product/push"},
 				{Data: `{"name": 123}`, Code: http.StatusUnprocessableEntity, Method: http.MethodPost, Headers: headers, Path: "/product/post"},

@@ -9,7 +9,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	mathRand "math/rand"
+	mathrand "math/rand"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -17,7 +17,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
-	textTemplate "text/template"
+	texttemplate "text/template"
 	"time"
 
 	"github.com/stretchr/testify/assert"
@@ -668,7 +668,7 @@ func TestCheckHeaderInRemoveList(t *testing.T) {
 		GlobalHeadersRemove   []string
 		ExtendedDeleteHeaders []string
 	}
-	tpl, err := textTemplate.New("test_tpl").Parse(`{
+	tpl, err := texttemplate.New("test_tpl").Parse(`{
 		"api_id": "1",
 		"version_data": {
 			"not_versioned": true,
@@ -759,6 +759,7 @@ func TestCheckHeaderInRemoveList(t *testing.T) {
 }
 
 func testRequestIPHops(t testing.TB) {
+	t.Helper()
 	req := &http.Request{
 		Header:     http.Header{},
 		RemoteAddr: "test.com:80",
@@ -1343,7 +1344,7 @@ func TestGraphQL_InternalDataSource_memConnProviders(t *testing.T) {
 	// tests run in parallel and memConnProviders is a global struct.
 	// For consistency, we use unique names for the subgraphs.
 	tykSubgraphAccounts := BuildAPI(func(spec *APISpec) {
-		spec.Name = fmt.Sprintf("subgraph-accounts-%d", mathRand.Intn(1000))
+		spec.Name = fmt.Sprintf("subgraph-accounts-%d", mathrand.Intn(1000))
 		spec.APIID = "subgraph1"
 		spec.Proxy.TargetURL = testSubgraphAccounts
 		spec.Proxy.ListenPath = "/tyk-subgraph-accounts"
@@ -1359,7 +1360,7 @@ func TestGraphQL_InternalDataSource_memConnProviders(t *testing.T) {
 	})[0]
 
 	tykSubgraphReviews := BuildAPI(func(spec *APISpec) {
-		spec.Name = fmt.Sprintf("subgraph-reviews-%d", mathRand.Intn(1000))
+		spec.Name = fmt.Sprintf("subgraph-reviews-%d", mathrand.Intn(1000))
 		spec.APIID = "subgraph2"
 		spec.Proxy.TargetURL = testSubgraphReviews
 		spec.Proxy.ListenPath = "/tyk-subgraph-reviews"
@@ -1737,7 +1738,7 @@ func TestReverseProxyWebSocketCancelation(t *testing.T) {
 		case line == terminalMsg: // this case before "err == io.EOF"
 			t.Fatalf("The websocket request was not canceled, unfortunately!")
 
-		case err == io.EOF:
+		case errors.Is(err, io.EOF):
 			return
 
 		case err != nil:

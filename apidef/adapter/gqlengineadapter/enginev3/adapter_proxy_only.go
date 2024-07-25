@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"strings"
 
-	graphqlDataSource "github.com/TykTechnologies/graphql-go-tools/v2/pkg/engine/datasource/graphql_datasource"
+	graphqldatasource "github.com/TykTechnologies/graphql-go-tools/v2/pkg/engine/datasource/graphql_datasource"
 	"github.com/TykTechnologies/graphql-go-tools/v2/pkg/graphql"
 	"github.com/TykTechnologies/tyk/apidef"
 )
@@ -15,7 +15,7 @@ type ProxyOnly struct {
 	StreamingClient *http.Client
 	Schema          *graphql.Schema
 
-	subscriptionClientFactory graphqlDataSource.GraphQLSubscriptionClientFactory
+	subscriptionClientFactory graphqldatasource.GraphQLSubscriptionClientFactory
 }
 
 func (p *ProxyOnly) EngineConfigV3() (*graphql.EngineV2Configuration, error) {
@@ -87,9 +87,9 @@ func graphqlSubscriptionType(subscriptionType apidef.SubscriptionType) graphql.S
 	}
 }
 
-func subscriptionClientFactoryOrDefault(providedSubscriptionClientFactory graphqlDataSource.GraphQLSubscriptionClientFactory) graphqlDataSource.GraphQLSubscriptionClientFactory {
+func subscriptionClientFactoryOrDefault(providedSubscriptionClientFactory graphqldatasource.GraphQLSubscriptionClientFactory) graphqldatasource.GraphQLSubscriptionClientFactory {
 	if providedSubscriptionClientFactory != nil {
 		return providedSubscriptionClientFactory
 	}
-	return &graphqlDataSource.DefaultSubscriptionClientFactory{}
+	return &graphqldatasource.DefaultSubscriptionClientFactory{}
 }

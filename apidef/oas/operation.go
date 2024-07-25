@@ -9,6 +9,7 @@ import (
 	"github.com/getkin/kin-openapi/openapi3"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/internal/oasutil"
 )
 
 // Operations holds Operation definitions.
@@ -172,9 +173,9 @@ func (s *OAS) extractPathsAndOperations(ep *apidef.ExtendedPathsSet) {
 		return
 	}
 
-	for id, tykOp := range tykOperations {
-	found:
-		for path, pathItem := range s.Paths {
+	for _, pathItem := range oasutil.SortByPathLength(s.Paths) {
+		for id, tykOp := range tykOperations {
+			path := pathItem.Path
 			for method, operation := range pathItem.Operations() {
 				if id == operation.OperationID {
 					tykOp.extractAllowanceTo(ep, path, method, allow)
@@ -196,7 +197,7 @@ func (s *OAS) extractPathsAndOperations(ep *apidef.ExtendedPathsSet) {
 					tykOp.extractDoNotTrackEndpointTo(ep, path, method)
 					tykOp.extractRequestSizeLimitTo(ep, path, method)
 					tykOp.extractRateLimitEndpointTo(ep, path, method)
-					break found
+					break
 				}
 			}
 		}
