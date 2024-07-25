@@ -1,8 +1,9 @@
 package kv
 
 import (
-	"github.com/stretchr/testify/assert"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 
 	consulapi "github.com/hashicorp/consul/api"
 
@@ -21,7 +22,7 @@ func TestConsul_Get(t *testing.T) {
 
 	_, err = store.Get("key")
 
-	assert.ErrorIsf(t, err, ErrKeyNotFound, "Expect key not to exists")
+	assert.ErrorIs(t, err, ErrKeyNotFound)
 
 	con := store.(*Consul)
 
