@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 
 	"strconv"
 	"strings"
@@ -250,7 +251,7 @@ func (r *RedisNotifier) Notify(notif interface{}) bool {
 	// pubSubLog.Debug("Sending notification", notif)
 
 	if err := r.store.Publish(r.channel, string(toSend)); err != nil {
-		if err != storage.ErrRedisIsDown {
+		if !errors.Is(err, storage.ErrRedisIsDown) {
 			pubSubLog.Error("Could not send notification: ", err)
 		}
 		return false
