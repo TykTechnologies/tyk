@@ -24,6 +24,7 @@ package gateway
 
 import (
 	"context"
+	"errors"
 	"io"
 	mathrand "math/rand"
 	"sync"
@@ -73,7 +74,7 @@ func printFeatures(t *testing.T, client pb.RouteGuideClient, rect *pb.Rectangle)
 	var features []*pb.Feature
 	for {
 		feature, err := stream.Recv()
-		if err == io.EOF {
+		if errors.Is(err, io.EOF) {
 			b := test.MarshalJSON(t)(features)
 			got := string(b)
 			if got != expectedFeatures {
