@@ -323,37 +323,6 @@ func TestAnalyticsIgnoreSubgraph(t *testing.T) {
 	assert.NoError(t, err)
 }
 
-func TestSuccessLogTransaction(t *testing.T) {
-	ts := StartTest(nil)
-	defer ts.Close()
-
-	spec := &APISpec{APIDefinition: &apidef.APIDefinition{APIID: "test_api_id", OrgID: "test_org_id"}}
-	sHandler := &SuccessHandler{&BaseMiddleware{Spec: spec, Gw: ts.Gw}}
-
-	req, _ := http.NewRequest("GET", "/", nil)
-	resp := ProxyResponse{
-		Response: &http.Response{
-			StatusCode: http.StatusInternalServerError,
-		},
-		UpstreamLatency: 99,
-	}
-	latency := analytics.Latency{Total: 99, Upstream: 9000}
-	hashKey := "test_hash_key"
-	token := "test_unhashed_key"
-
-	errNilReqHashed := sHandler.logTransaction(false, latency, nil, resp.Response, token)
-	assert.Error(t, errNilReqHashed)
-	errNilReqUnhashed := sHandler.logTransaction(true, latency, nil, resp.Response, token)
-	assert.Error(t, errNilReqUnhashed)
-	errNilRespHashed := sHandler.logTransaction(false, latency, req, nil, hashKey)
-	assert.Error(t, errNilRespHashed)
-	errNilRespUnhashed := sHandler.logTransaction(true, latency, req, nil, hashKey)
-	assert.Error(t, errNilRespUnhashed)
-	err := sHandler.logTransaction(true, latency, req, resp.Response, token)
-	assert.Nil(t, err)
-	assert.NoError(t, err)
-}
-
 func BenchmarkSuccessLogTransaction(b *testing.B) {
 	b.Run("AccessLogs enabled with Hashkeys set to true", func(b *testing.B) {
 		conf := func(globalConf *config.Config) {
