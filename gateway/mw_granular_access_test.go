@@ -25,6 +25,10 @@ func TestGranularAccessMiddleware_ProcessRequest(t *testing.T) {
 				APIName: api.Name,
 				AllowedURLs: []user.AccessSpec{
 					{
+						URL:     "^/*.",
+						Methods: []string{"GET"},
+					},
+					{
 						URL:     "^/valid_path.*",
 						Methods: []string{"GET"},
 					},
