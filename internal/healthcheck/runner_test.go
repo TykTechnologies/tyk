@@ -5,6 +5,7 @@ import (
 	"io"
 	"net/http"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 
@@ -20,6 +21,7 @@ func TestRunner_Info(t *testing.T) {
 	runner.Info(healthcheck.NewFakeCheck(name, io.EOF))
 
 	result := runner.Do(context.Background())
+	result.Components[0].ObservationTS = time.Time{}
 
 	want := healthcheck.Response{
 		Status:     healthcheck.StatusPass,
@@ -43,6 +45,7 @@ func TestRunner_Optional(t *testing.T) {
 	runner.Optional(healthcheck.NewFakeCheck(name, io.EOF))
 
 	result := runner.Do(context.Background())
+	result.Components[0].ObservationTS = time.Time{}
 
 	want := healthcheck.Response{
 		Status:     healthcheck.StatusWarn,
@@ -66,6 +69,7 @@ func TestRunner_Required(t *testing.T) {
 	runner.Require(healthcheck.NewFakeCheck(name, io.EOF))
 
 	result := runner.Do(context.Background())
+	result.Components[0].ObservationTS = time.Time{}
 
 	want := healthcheck.Response{
 		Status:     healthcheck.StatusFail,

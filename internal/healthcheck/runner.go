@@ -48,7 +48,7 @@ func (r *Runner) Info(check ...Checker) {
 
 // Do will run all health checks sequentially.
 func (r *Runner) Do(ctx context.Context) Response {
-	result := Response{
+	resp := Response{
 		Status:     StatusPass,
 		StatusCode: http.StatusOK,
 	}
@@ -57,12 +57,8 @@ func (r *Runner) Do(ctx context.Context) Response {
 			r.logger.Infof("[info] HealthCheck %s reports: %s", err)
 		}
 
-		checkResult := CheckResult{
-			Name:   check.Name(),
-			Status: StatusPass,
-		}
-
-		result.Components = append(result.Components, checkResult)
+		result := NewCheckResult(check.Name(), StatusPass)
+		resp.Components = append(resp.Components, result)
 	}
 
 	for _, check := range r.optional {
@@ -70,14 +66,12 @@ func (r *Runner) Do(ctx context.Context) Response {
 		if err := check.Result(ctx); err != nil {
 			status = StatusWarn
 			// return HTTP 207 on a failing optional check
-			result.Status = status
-			result.StatusCode = http.StatusMultiStatus
+			resp.Status = status
+			resp.StatusCode = http.StatusMultiStatus
 		}
-		checkResult := CheckResult{
-			Name:   check.Name(),
-			Status: status,
-		}
-		result.Components = append(result.Components, checkResult)
+
+		result := NewCheckResult(check.Name(), status)
+		resp.Components = append(resp.Components, result)
 	}
 
 	for _, check := range r.required {
@@ -85,15 +79,12 @@ func (r *Runner) Do(ctx context.Context) Response {
 		if err := check.Result(ctx); err != nil {
 			status = StatusFail
 			// return HTTP 503 for a failing required check
-			result.Status = status
-			result.StatusCode = http.StatusServiceUnavailable
+			resp.Status = status
+			resp.StatusCode = http.StatusServiceUnavailable
 		}
-		checkResult := CheckResult{
-			Name:   check.Name(),
-			Status: status,
-		}
-		result.Components = append(result.Components, checkResult)
+		result := NewCheckResult(check.Name(), status)
+		resp.Components = append(resp.Components, result)
 	}
 
-	return result
+	return resp
 }
