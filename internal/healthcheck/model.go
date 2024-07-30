@@ -51,3 +51,10 @@ const (
 	// StatusFail is a failing required health check.
 	StatusFail CheckStatus = "fail"
 )
+
+// Logger is the logging interface in use for the runner.
+type Logger interface {
+	Infof(string, ...any)
+	Warnf(string, ...any)
+	Errorf(string, ...any)
+}

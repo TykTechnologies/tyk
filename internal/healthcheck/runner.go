@@ -9,13 +9,6 @@ import (
 	"time"
 )
 
-// Logger is the logging interface in use for the runner.
-type Logger interface {
-	Infof(string, ...any)
-	Warnf(string, ...any)
-	Errorf(string, ...any)
-}
-
 // Runner is an object holding Checker implementations.
 type Runner struct {
 	required []Checker
