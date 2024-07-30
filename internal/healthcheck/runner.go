@@ -84,7 +84,7 @@ func (r *Runner) Do(ctx context.Context) Response {
 		status := StatusPass
 		if err := check.Result(ctx); err != nil {
 			status = StatusFail
-			// return HTTP 207 on a failing optional check
+			// return HTTP 503 for a failing required check
 			result.Status = status
 			result.StatusCode = http.StatusServiceUnavailable
 		}
