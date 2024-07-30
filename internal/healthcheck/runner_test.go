@@ -121,3 +121,31 @@ func TestRunner_Required(t *testing.T) {
 
 	assert.Equal(t, "runner cache hits: 100, misses: 1", runner.String())
 }
+
+func BenchmarkRunner(b *testing.B) {
+	name := "TestRunner check"
+	logger := test.NewBufferingLogger()
+	ctx := context.Background()
+
+	b.Run("no cache", func(b *testing.B) {
+		runner := healthcheck.NewRunner(logger)
+		runner.Require(healthcheck.NewFakeCheck(name, io.EOF))
+
+		b.ResetTimer()
+
+		for i := 0; i < b.N; i++ {
+			_ = runner.Do(ctx, 0)
+		}
+	})
+
+	b.Run("cache 1s", func(b *testing.B) {
+		runner := healthcheck.NewRunner(logger)
+		runner.Require(healthcheck.NewFakeCheck(name, io.EOF))
+
+		b.ResetTimer()
+
+		for i := 0; i < b.N; i++ {
+			_ = runner.Do(ctx, time.Second)
+		}
+	})
+}
