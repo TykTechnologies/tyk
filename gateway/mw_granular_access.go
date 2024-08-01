@@ -36,17 +36,22 @@ func (m *GranularAccessMiddleware) ProcessRequest(w http.ResponseWriter, r *http
 	}
 
 	for _, accessSpec := range sessionVersionData.AllowedURLs {
-		clean := httputil.RouteRegexString(accessSpec.URL)
+		url := accessSpec.URL
+		clean, err := httputil.GetPathRegexp(url)
+		if err != nil {
+			logger.WithError(err).Errorf("error getting path regex: %q, skipping", url)
+			continue
+		}
 
 		asRegex, err := regexp.Compile(clean)
 		if err != nil {
-			logger.WithError(err).Errorf("error compiling allowed url: %q, skipping", accessSpec.URL)
+			logger.WithError(err).Errorf("error compiling path regex: %q, skipping", url)
 			continue
 		}
 
 		match := asRegex.MatchString(r.URL.Path)
 
-		logger.WithField("pattern", accessSpec.URL).WithField("match", match).Debug("checking allowed url")
+		logger.WithField("pattern", url).WithField("match", match).Debug("checking allowed url")
 
 		if match {
 			// if a path is matched, but isn't matched on method,

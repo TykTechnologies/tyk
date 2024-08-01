@@ -1,44 +1,31 @@
 package httputil
 
 import (
-	"strings"
+	"github.com/gorilla/mux"
+
+	"github.com/TykTechnologies/tyk/internal/maps"
 )
 
+// routeCache holds the raw routes as they are mapped to mux regular expressions.
+// e.g. `/foo` becomes `^/foo$` or similar, and parameters get matched and replaced.
+var pathRegexpCache = maps.NewStringMap()
+
 // RouteRegexString will convert a mux route url to a regular expression string.
-//
-// The `{id}` named parameters will be converted to `.*`.
-// Extended `{id:regex}` parameters will use the defined regex.
-// The returned regex is encapsulated with `^` (start) and `$` (end).
-func RouteRegexString(pattern string) string {
-	var builder strings.Builder
-	start := 0
-
-	builder.WriteString("^")
-	for start < len(pattern) {
-		open := strings.Index(pattern[start:], "{")
-		if open == -1 {
-			builder.WriteString(pattern[start:])
-			break
-		}
-		open += start
-		builder.WriteString(pattern[start:open])
-		end := strings.Index(pattern[open:], "}")
-		if end == -1 {
-			builder.WriteString(pattern[open:])
-			break
-		}
-		end += open
-		tag := pattern[open+1 : end]
-
-		colon := strings.Index(tag, ":")
-		if colon == -1 {
-			builder.WriteString(".*")
-		} else {
-			builder.WriteString(tag[colon+1:])
-		}
-		start = end + 1
+// The results for subsequent invocations with the same parameters are cached.
+func GetPathRegexp(pattern string) (string, error) {
+	val, ok := pathRegexpCache.Get(pattern)
+	if ok {
+		return val, nil
 	}
-	builder.WriteString("$")
 
-	return builder.String()
+	dummyRouter := mux.NewRouter()
+	route := dummyRouter.PathPrefix(pattern)
+	result, err := route.GetPathRegexp()
+	if err != nil {
+		return "", err
+	}
+
+	pathRegexpCache.Set(pattern, result)
+
+	return result, nil
 }
