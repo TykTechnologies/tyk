@@ -7,113 +7,66 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestIsGrpcStreaming(t *testing.T) {
-	// Happy path
+// Helper function to create a request with specified headers
+func newRequestWithHeaders(tb testing.TB, contentLength int64, headers map[string]string) *http.Request {
+	tb.Helper()
 	req := &http.Request{
-		ContentLength: -1,
-		Header:        http.Header{headerContentType: []string{"application/grpc"}},
+		ContentLength: contentLength,
+		Header:        make(http.Header),
 	}
-	assert.True(t, IsGrpcStreaming(req))
+	for key, value := range headers {
+		req.Header.Set(key, value)
+	}
+	return req
+}
 
-	// Unhappy path - wrong content length
-	req = &http.Request{
-		ContentLength: 0,
-		Header:        http.Header{headerContentType: []string{"application/grpc"}},
+// Helper function to create a response with specified headers
+func newResponseWithHeaders(tb testing.TB, headers map[string]string) *http.Response {
+	tb.Helper()
+	resp := &http.Response{
+		Header: make(http.Header),
 	}
-	assert.False(t, IsGrpcStreaming(req))
+	for key, value := range headers {
+		resp.Header.Set(key, value)
+	}
+	return resp
+}
 
-	// Unhappy path - wrong content type
-	req = &http.Request{
-		ContentLength: -1,
-		Header:        http.Header{headerContentType: []string{"text/plain"}},
-	}
-	assert.False(t, IsGrpcStreaming(req))
+func TestIsGrpcStreaming(t *testing.T) {
+	assert.True(t, IsGrpcStreaming(newRequestWithHeaders(t, -1, map[string]string{headerContentType: "application/grpc"})))
+	assert.False(t, IsGrpcStreaming(newRequestWithHeaders(t, 0, map[string]string{headerContentType: "application/grpc"})))
+	assert.False(t, IsGrpcStreaming(newRequestWithHeaders(t, -1, map[string]string{headerContentType: "text/plain"})))
 }
 
 func TestIsSseStreamingResponse(t *testing.T) {
-	// Happy path
-	resp := &http.Response{
-		Header: http.Header{headerContentType: []string{"text/event-stream"}},
-	}
-	assert.True(t, IsSseStreamingResponse(resp))
-
-	// Unhappy path - wrong content type
-	resp = &http.Response{
-		Header: http.Header{headerContentType: []string{"application/json"}},
-	}
-	assert.False(t, IsSseStreamingResponse(resp))
+	assert.True(t, IsSseStreamingResponse(newResponseWithHeaders(t, map[string]string{headerContentType: "text/event-stream"})))
+	assert.False(t, IsSseStreamingResponse(newResponseWithHeaders(t, map[string]string{headerContentType: "application/json"})))
 }
 
 func TestIsUpgrade(t *testing.T) {
-	// Happy path
-	req := &http.Request{
-		Header: http.Header{
-			headerConnection: []string{"Upgrade"},
-			headerUpgrade:    []string{"websocket"},
-		},
-	}
+	req := newRequestWithHeaders(t, 0, map[string]string{headerConnection: "Upgrade", headerUpgrade: "websocket"})
 	upgradeType, ok := IsUpgrade(req)
 	assert.True(t, ok)
 	assert.Equal(t, "websocket", upgradeType)
 
-	// Unhappy path - wrong connection header
-	req = &http.Request{
-		Header: http.Header{
-			headerConnection: []string{"keep-alive"},
-			headerUpgrade:    []string{"websocket"},
-		},
-	}
+	req = newRequestWithHeaders(t, 0, map[string]string{headerConnection: "keep-alive", headerUpgrade: "websocket"})
 	upgradeType, ok = IsUpgrade(req)
 	assert.False(t, ok)
 	assert.Empty(t, upgradeType)
 
-	// Unhappy path - missing upgrade header
-	req = &http.Request{
-		Header: http.Header{
-			headerConnection: []string{"Upgrade"},
-		},
-	}
+	req = newRequestWithHeaders(t, 0, map[string]string{headerConnection: "Upgrade"})
 	upgradeType, ok = IsUpgrade(req)
 	assert.False(t, ok)
 	assert.Empty(t, upgradeType)
 }
 
 func TestIsStreamingRequest(t *testing.T) {
-	// Happy path - gRPC streaming
-	req := &http.Request{
-		ContentLength: -1,
-		Header:        http.Header{headerContentType: []string{"application/grpc"}},
-	}
-	assert.True(t, IsStreamingRequest(req))
-
-	// Happy path - WebSocket upgrade
-	req = &http.Request{
-		Header: http.Header{
-			headerConnection: []string{"Upgrade"},
-			headerUpgrade:    []string{"websocket"},
-		},
-	}
-	assert.True(t, IsStreamingRequest(req))
-
-	// Unhappy path - not streaming
-	req = &http.Request{
-		Header: http.Header{
-			headerConnection: []string{"keep-alive"},
-		},
-	}
-	assert.False(t, IsStreamingRequest(req))
+	assert.True(t, IsStreamingRequest(newRequestWithHeaders(t, -1, map[string]string{headerContentType: "application/grpc"})))
+	assert.True(t, IsStreamingRequest(newRequestWithHeaders(t, 0, map[string]string{headerConnection: "Upgrade", headerUpgrade: "websocket"})))
+	assert.False(t, IsStreamingRequest(newRequestWithHeaders(t, 0, map[string]string{headerConnection: "keep-alive"})))
 }
 
 func TestIsStreamingResponse(t *testing.T) {
-	// Happy path - SSE streaming
-	resp := &http.Response{
-		Header: http.Header{headerContentType: []string{"text/event-stream"}},
-	}
-	assert.True(t, IsStreamingResponse(resp))
-
-	// Unhappy path - not streaming
-	resp = &http.Response{
-		Header: http.Header{headerContentType: []string{"application/json"}},
-	}
-	assert.False(t, IsStreamingResponse(resp))
+	assert.True(t, IsStreamingResponse(newResponseWithHeaders(t, map[string]string{headerContentType: "text/event-stream"})))
+	assert.False(t, IsStreamingResponse(newResponseWithHeaders(t, map[string]string{headerContentType: "application/json"})))
 }
