@@ -19,6 +19,7 @@ type AccessLogRecord struct {
 	Response *http.Response
 }
 
+// NewAccessLogRecord returns an AccessLogRecord object
 func NewAccessLogRecord(apiID string, apiKey string, orgId string) *AccessLogRecord {
 	return &AccessLogRecord{
 		APIID:  apiID,
@@ -27,6 +28,7 @@ func NewAccessLogRecord(apiID string, apiKey string, orgId string) *AccessLogRec
 	}
 }
 
+// Logger renders a single access log entry
 func (a *AccessLogRecord) Logger(log *logrus.Logger) *logrus.Entry {
 	// Default fields
 	fields := logrus.Fields{
@@ -64,6 +66,7 @@ func (a *AccessLogRecord) Logger(log *logrus.Logger) *logrus.Entry {
 	return log.WithFields(fields)
 }
 
+// WithLatency sets the latency of the AccessLogRecord
 func (a *AccessLogRecord) WithLatency(latency *analytics.Latency) *AccessLogRecord {
 	if latency != nil {
 		a.Latency = latency
@@ -71,6 +74,7 @@ func (a *AccessLogRecord) WithLatency(latency *analytics.Latency) *AccessLogReco
 	return a
 }
 
+// WithRequest sets the request of the AccessLogRecord
 func (a *AccessLogRecord) WithRequest(req *http.Request) *AccessLogRecord {
 	if req != nil {
 		a.Request = req
@@ -78,6 +82,7 @@ func (a *AccessLogRecord) WithRequest(req *http.Request) *AccessLogRecord {
 	return a
 }
 
+// WithResponse sets the request of the AccessLogRecord
 func (a *AccessLogRecord) WithResponse(resp *http.Response) *AccessLogRecord {
 	if resp != nil {
 		a.Response = resp

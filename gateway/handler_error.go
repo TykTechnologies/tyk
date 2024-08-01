@@ -315,11 +315,13 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 		}
 	}
 
+	// Print the transaction logs for error situations if enabled. Success transaction
+	// logs will be handled by the "handler_success.go"
 	if e.Spec.GlobalConfig.AccessLogs.Enabled {
+		// Don't print the full token, handle as obfuscated key or hashed key for security reasons
 		hashKeys := e.Gw.GetConfig().HashKeys
 		key := ""
 
-		// Don't print the full token, handle as obfuscated key or hashed key
 		if !hashKeys {
 			key = e.Gw.obfuscateKey(token)
 		} else {

@@ -388,11 +388,10 @@ func (s *SuccessHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) *http
 		// Don't print a transaction log there is no "resp", that indicates an error.
 		// In error situations, transaction log is already printed by "handler_error.go"
 		if s.Spec.GlobalConfig.AccessLogs.Enabled {
-			// Don't print the full token, handle as obfuscated key or hashed key
+			// Don't print the full token, handle as obfuscated key or hashed key for security reasons
 			hashKeys := s.Gw.GetConfig().HashKeys
 			token := ctxGetAuthToken(r)
 
-			// Hash key if needed for security reasons
 			if !hashKeys {
 				token = s.Gw.obfuscateKey(token)
 			} else {
