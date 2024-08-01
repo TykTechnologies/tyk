@@ -1,10 +1,18 @@
-package httputil
+package httputil_test
 
 import (
 	"net/http"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+
+	. "github.com/TykTechnologies/tyk/internal/httputil"
+)
+
+const (
+	headerContentType = "Content-Type"
+	headerUpgrade     = "Upgrade"
+	headerConnection  = "Connection"
 )
 
 // Helper function to create a request with specified headers

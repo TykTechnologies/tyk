@@ -35,6 +35,11 @@ tasks:
     cmds:
       - uncover rate.cov
 
+  lint:
+    desc: "Lint docs"
+    cmds:
+      - schema-gen extract -o - | schema-gen lint -i -
+
   install:uncover:
     desc: "Install uncover"
     internal: true

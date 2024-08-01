@@ -12,7 +12,7 @@ import (
 // e.g. `/foo` becomes `^/foo$` or similar, and parameters get matched and replaced.
 var pathRegexpCache = maps.NewStringMap()
 
-// RouteRegexString will convert a mux route url to a regular expression string.
+// GetPathRegexp will convert a mux route url to a regular expression string.
 // The results for subsequent invocations with the same parameters are cached.
 func GetPathRegexp(pattern string) (string, error) {
 	val, ok := pathRegexpCache.Get(pattern)
