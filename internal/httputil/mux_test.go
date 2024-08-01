@@ -1,16 +1,18 @@
-package httputil
+package httputil_test
 
 import (
 	"regexp"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+
+	"github.com/TykTechnologies/tyk/internal/httputil"
 )
 
 func testPathRegexp(tb testing.TB, in string, want string) string {
 	tb.Helper()
 
-	res, err := GetPathRegexp(in)
+	res, err := httputil.GetPathRegexp(in)
 	assert.NoError(tb, err)
 	if want != "" {
 		assert.Equal(tb, want, res)
