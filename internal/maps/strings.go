@@ -2,7 +2,7 @@ package maps
 
 import "sync"
 
-// Strings holds a concurrency safe, type safe access to map[string]string.
+// StringMap holds a concurrency safe, type safe access to map[string]string.
 // Access is protected with a sync.RWMutex, optimized for reads.
 type StringMap struct {
 	mu   sync.RWMutex
