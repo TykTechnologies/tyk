@@ -78,6 +78,8 @@ func (b *DefaultSessionManager) ResetQuota(keyName string, session *user.Session
 	b.store.DeleteRawKey(rateLimiterSentinelKey)
 	// Fix the raw key
 	b.store.DeleteRawKey(rawKey)
+	// Delete the expiration
+	b.store.DeleteRawKey(rawKey + "-time")
 
 	b.deleteRawKeysWithAllowanceScope(b.store, session, keyName)
 }
