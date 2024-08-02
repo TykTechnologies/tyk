@@ -414,6 +414,7 @@ func (g *Global) extractResponsePluginsTo(api *apidef.APIDefinition) {
 	if g.ResponsePlugins != nil {
 		api.CustomMiddleware.Response = make([]apidef.MiddlewareDefinition, len(g.ResponsePlugins))
 		g.ResponsePlugins.ExtractTo(api.CustomMiddleware.Response)
+		return
 	}
 
 	if g.ResponsePlugin == nil {
