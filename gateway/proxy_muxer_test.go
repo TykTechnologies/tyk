@@ -428,16 +428,19 @@ func TestHandleSubroutes(t *testing.T) {
 
 func TestRequestBodyLimit(t *testing.T) {
 	ts := StartTest(func(globalConf *config.Config) {
-		globalConf.HttpServerOptions.MaxRequestBodySize = 1024
+		globalConf.HttpServerOptions.MaxRequestBodySize = 10
 	})
 	defer ts.Close()
 
 	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		spec.Proxy.ListenPath = "/my-client-api/"
 		spec.UseKeylessAccess = true
 	})
 
 	_, _ = ts.Run(t, []test.TestCase{
-		{Path: "/sample/", Method: "POST", Data: strings.Repeat("a", 1024), Code: http.StatusOK},
-		{Path: "/sample/", Method: "POST", Data: strings.Repeat("a", 1025), Code: http.StatusRequestEntityTooLarge},
+		{Path: "/my-client-api/", Method: http.MethodPost, Data: strings.Repeat("a", 10), Code: http.StatusOK},
+		{Path: "/my-client-api/", Method: http.MethodPost, Data: strings.Repeat("a", 11), Code: http.StatusBadRequest},
+		// The gateway control api should not be affected
+		{AdminAuth: true, Path: "/tyk/keys", Data: strings.Repeat("a", 11), Code: http.StatusOK},
 	}...)
 }
