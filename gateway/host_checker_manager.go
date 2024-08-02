@@ -100,9 +100,7 @@ func (hc *HostCheckerManager) CheckActivePollerLoop(ctx context.Context) {
 	tick := time.NewTicker(10 * time.Second)
 	defer func() {
 		tick.Stop()
-		log.WithFields(logrus.Fields{
-			"prefix": "host-check-mgr",
-		}).Debug("Stopping uptime tests")
+		hostCheckLog.Debug("Stopping uptime tests")
 	}()
 	for {
 		select {
@@ -118,16 +116,12 @@ func (hc *HostCheckerManager) checkPollerLoop(ctx context.Context) {
 	if !hc.stopLoop {
 		if hc.AmIPolling() {
 			if !hc.pollerStarted {
-				log.WithFields(logrus.Fields{
-					"prefix": "host-check-mgr",
-				}).Info("Starting Poller")
+				hostCheckLog.Info("Starting Poller")
 				hc.pollerStarted = true
 				hc.StartPoller(ctx)
 			}
 		} else {
-			log.WithFields(logrus.Fields{
-				"prefix": "host-check-mgr",
-			}).Debug("New master found, no tests running")
+			hostCheckLog.Debug("New master found, no tests running")
 			if hc.pollerStarted {
 				hc.StopPoller()
 				hc.pollerStarted = false
@@ -138,9 +132,7 @@ func (hc *HostCheckerManager) checkPollerLoop(ctx context.Context) {
 
 func (hc *HostCheckerManager) AmIPolling() bool {
 	if hc.store == nil {
-		log.WithFields(logrus.Fields{
-			"prefix": "host-check-mgr",
-		}).Error("No storage instance set for uptime tests! Disabling poller...")
+		hostCheckLog.Error("No storage instance set for uptime tests! Disabling poller...")
 		return false
 	}
 	pollerCacheKey := PollerCacheKey
@@ -150,9 +142,7 @@ func (hc *HostCheckerManager) AmIPolling() bool {
 
 	activeInstance, err := hc.store.GetKey(pollerCacheKey)
 	if err != nil {
-		log.WithFields(logrus.Fields{
-			"prefix": "host-check-mgr",
-		}).Debug("No Primary instance found, assuming control")
+		hostCheckLog.Debug("No Primary instance found, assuming control")
 		err := hc.store.SetKey(pollerCacheKey, hc.Id, 15)
 		if err != nil {
 			log.WithError(err).Error("cannot set key in pollerCacheKey")
@@ -161,9 +151,7 @@ func (hc *HostCheckerManager) AmIPolling() bool {
 	}
 
 	if activeInstance == hc.Id {
-		log.WithFields(logrus.Fields{
-			"prefix": "host-check-mgr",
-		}).Debug("Primary instance set, I am master")
+		hostCheckLog.Debug("Primary instance set, I am master")
 		err := hc.store.SetKey(pollerCacheKey, hc.Id, 15) // Reset TTL
 		if err != nil {
 			log.WithError(err).Error("could not reset TTL in polled cacheKey")
@@ -171,20 +159,14 @@ func (hc *HostCheckerManager) AmIPolling() bool {
 		return true
 	}
 
-	log.WithFields(logrus.Fields{
-		"prefix": "host-check-mgr",
-	}).Debug("Active Instance is: ", activeInstance)
-	log.WithFields(logrus.Fields{
-		"prefix": "host-check-mgr",
-	}).Debug("--- I am: ", hc.Id)
+	hostCheckLog.Debug("Active Instance is: ", activeInstance)
+	hostCheckLog.Debug("--- I am: ", hc.Id)
 	return false
 }
 
 func (hc *HostCheckerManager) StartPoller(ctx context.Context) {
 
-	log.WithFields(logrus.Fields{
-		"prefix": "host-check-mgr",
-	}).Debug("---> Initialising checker")
+	hostCheckLog.Debug("---> Initialising checker")
 
 	// If we are restarting, we want to retain the host list
 	hc.checkerMu.Lock()
@@ -204,13 +186,9 @@ func (hc *HostCheckerManager) StartPoller(ctx context.Context) {
 	)
 
 	// Start the check loop
-	log.WithFields(logrus.Fields{
-		"prefix": "host-check-mgr",
-	}).Debug("---> Starting checker")
+	hostCheckLog.Debug("---> Starting checker")
 	hc.checker.Start(ctx)
-	log.WithFields(logrus.Fields{
-		"prefix": "host-check-mgr",
-	}).Debug("---> Checker started.")
+	hostCheckLog.Debug("---> Checker started.")
 	hc.checkerMu.Unlock()
 }
 
@@ -232,9 +210,7 @@ func (hc *HostCheckerManager) OnHostReport(ctx context.Context, report HostHealt
 
 func (hc *HostCheckerManager) OnHostDown(ctx context.Context, report HostHealthReport) {
 	key := hc.getHostKey(report)
-	log.WithFields(logrus.Fields{
-		"prefix": "host-check-mgr",
-	}).Debug("Update key: ", key)
+	hostCheckLog.Debug("Update key: ", key)
 	err := hc.store.SetKey(key, "1", int64(hc.checker.checkTimeout*hc.checker.sampleTriggerLimit))
 	if err != nil {
 		log.WithError(err).Error("Host-Checker could not save key")
@@ -242,9 +218,7 @@ func (hc *HostCheckerManager) OnHostDown(ctx context.Context, report HostHealthR
 	hc.unhealthyHostList.Store(key, 1)
 	spec := hc.Gw.getApiSpec(report.MetaData[UnHealthyHostMetaDataAPIKey])
 	if spec == nil {
-		log.WithFields(logrus.Fields{
-			"prefix": "host-check-mgr",
-		}).Warning("[HOST CHECKER MANAGER] Event can't fire for API that doesn't exist")
+		hostCheckLog.Warning("[HOST CHECKER MANAGER] Event can't fire for API that doesn't exist")
 		return
 	}
 
@@ -253,9 +227,7 @@ func (hc *HostCheckerManager) OnHostDown(ctx context.Context, report HostHealthR
 		HostInfo:         report,
 	})
 
-	log.WithFields(logrus.Fields{
-		"prefix": "host-check-mgr",
-	}).Warning("[HOST CHECKER MANAGER] Host is DOWN: ", report.CheckURL)
+	hostCheckLog.Warning("[HOST CHECKER MANAGER] Host is DOWN: ", report.CheckURL)
 
 	if spec.UptimeTests.Config.ServiceDiscovery.UseDiscoveryService {
 		apiID := spec.APIID
@@ -266,9 +238,7 @@ func (hc *HostCheckerManager) OnHostDown(ctx context.Context, report HostHealthR
 			hc.resetsInitiated[apiID] = true
 			// Lets re-check the uptime tests after x seconds
 			go func() {
-				log.WithFields(logrus.Fields{
-					"prefix": "host-check-mgr",
-				}).Printf("[HOST CHECKER MANAGER] Resetting test host list in %v seconds for API: %v", spec.UptimeTests.Config.RecheckWait, apiID)
+				hostCheckLog.Printf("[HOST CHECKER MANAGER] Resetting test host list in %v seconds for API: %v", spec.UptimeTests.Config.RecheckWait, apiID)
 				time.Sleep(time.Duration(spec.UptimeTests.Config.RecheckWait) * time.Second)
 				hc.DoServiceDiscoveryListUpdateForID(apiID)
 				delete(hc.resetsInitiated, apiID)
@@ -279,16 +249,12 @@ func (hc *HostCheckerManager) OnHostDown(ctx context.Context, report HostHealthR
 
 func (hc *HostCheckerManager) OnHostBackUp(ctx context.Context, report HostHealthReport) {
 	key := hc.getHostKey(report)
-	log.WithFields(logrus.Fields{
-		"prefix": "host-check-mgr",
-	}).Debug("Delete key: ", key)
+	hostCheckLog.Debug("Delete key: ", key)
 	hc.store.DeleteKey(key)
 	hc.unhealthyHostList.Delete(key)
 	spec := hc.Gw.getApiSpec(report.MetaData[UnHealthyHostMetaDataAPIKey])
 	if spec == nil {
-		log.WithFields(logrus.Fields{
-			"prefix": "host-check-mgr",
-		}).Warning("[HOST CHECKER MANAGER] Event can't fire for API that doesn't exist")
+		hostCheckLog.Warning("[HOST CHECKER MANAGER] Event can't fire for API that doesn't exist")
 		return
 	}
 	spec.FireEvent(EventHOSTUP, EventHostStatusMeta{
@@ -296,22 +262,16 @@ func (hc *HostCheckerManager) OnHostBackUp(ctx context.Context, report HostHealt
 		HostInfo:         report,
 	})
 
-	log.WithFields(logrus.Fields{
-		"prefix": "host-check-mgr",
-	}).Warning("[HOST CHECKER MANAGER] Host is UP:   ", report.CheckURL)
+	hostCheckLog.Warning("[HOST CHECKER MANAGER] Host is UP:   ", report.CheckURL)
 }
 
 func (hc *HostCheckerManager) HostDown(urlStr string) bool {
 	u, err := url.Parse(urlStr)
 	if err != nil {
-		log.WithFields(logrus.Fields{
-			"prefix": "host-check-mgr",
-		}).Error(err)
+		hostCheckLog.Error(err)
 	}
 
-	log.WithFields(logrus.Fields{
-		"prefix": "host-check-mgr",
-	}).Debug("Key is: ", PoolerHostSentinelKeyPrefix+u.Host)
+	hostCheckLog.Debug("Key is: ", PoolerHostSentinelKeyPrefix+u.Host)
 
 	key := PoolerHostSentinelKeyPrefix + u.Host
 	// If the node doesn't perform any uptime checks, query the storage:
@@ -330,9 +290,7 @@ func (hc *HostCheckerManager) PrepareTrackingHost(checkObject apidef.HostCheckOb
 	var hostData HostData
 	u, err := url.Parse(checkObject.CheckURL)
 	if err != nil {
-		log.WithFields(logrus.Fields{
-			"prefix": "host-check-mgr",
-		}).Error(err)
+		hostCheckLog.Error(err)
 		return hostData, err
 	}
 
@@ -341,9 +299,7 @@ func (hc *HostCheckerManager) PrepareTrackingHost(checkObject apidef.HostCheckOb
 	if len(checkObject.Body) > 0 {
 		bodyByteArr, err = base64.StdEncoding.DecodeString(checkObject.Body)
 		if err != nil {
-			log.WithFields(logrus.Fields{
-				"prefix": "host-check-mgr",
-			}).Error("Failed to load blob data: ", err)
+			hostCheckLog.Error("Failed to load blob data: ", err)
 			return hostData, err
 		}
 		bodyData = string(bodyByteArr)
@@ -369,9 +325,7 @@ func (hc *HostCheckerManager) PrepareTrackingHost(checkObject apidef.HostCheckOb
 }
 
 func (hc *HostCheckerManager) UpdateTrackingList(hd []HostData) {
-	log.WithFields(logrus.Fields{
-		"prefix": "host-check-mgr",
-	}).Debug("--- Setting tracking list up")
+	hostCheckLog.Debug("--- Setting tracking list up")
 	newHostList := make(map[string]HostData)
 	for _, host := range hd {
 		newHostList[host.CheckURL] = host
@@ -380,18 +334,14 @@ func (hc *HostCheckerManager) UpdateTrackingList(hd []HostData) {
 	hc.checkerMu.Lock()
 	hc.currentHostList = newHostList
 	if hc.checker != nil {
-		log.WithFields(logrus.Fields{
-			"prefix": "host-check-mgr",
-		}).Debug("Reset initiated")
+		hostCheckLog.Debug("Reset initiated")
 		hc.checker.ResetList(newHostList)
 	}
 	hc.checkerMu.Unlock()
 }
 
 func (hc *HostCheckerManager) UpdateTrackingListByAPIID(hd []HostData, apiId string) {
-	log.WithFields(logrus.Fields{
-		"prefix": "host-check-mgr",
-	}).Debug("--- Setting tracking list up for ID: ", apiId)
+	hostCheckLog.Debug("--- Setting tracking list up for ID: ", apiId)
 	newHostList := make(map[string]HostData)
 
 	hc.checkerMu.Lock()
@@ -409,15 +359,11 @@ func (hc *HostCheckerManager) UpdateTrackingListByAPIID(hd []HostData, apiId str
 
 	hc.currentHostList = newHostList
 	if hc.checker != nil {
-		log.WithFields(logrus.Fields{
-			"prefix": "host-check-mgr",
-		}).Debug("Reset initiated")
+		hostCheckLog.Debug("Reset initiated")
 		hc.checker.ResetList(newHostList)
 	}
 	hc.checkerMu.Unlock()
-	log.WithFields(logrus.Fields{
-		"prefix": "host-check-mgr",
-	}).Info("--- Queued tracking list update for API: ", apiId)
+	hostCheckLog.Info("--- Queued tracking list update for API: ", apiId)
 }
 
 func (hc *HostCheckerManager) ListFromService(apiID string) ([]HostData, error) {
@@ -430,9 +376,7 @@ func (hc *HostCheckerManager) ListFromService(apiID string) ([]HostData, error) 
 	data, err := sd.Target(spec.UptimeTests.Config.ServiceDiscovery.QueryEndpoint)
 
 	if err != nil {
-		log.WithFields(logrus.Fields{
-			"prefix": "host-check-mgr",
-		}).Error("[HOST CHECKER MANAGER] Failed to retrieve host list: ", err)
+		hostCheckLog.Error("[HOST CHECKER MANAGER] Failed to retrieve host list: ", err)
 		return nil, err
 	}
 
@@ -440,9 +384,7 @@ func (hc *HostCheckerManager) ListFromService(apiID string) ([]HostData, error) 
 	checkTargets := make([]apidef.HostCheckObject, 0)
 	data0, _ := data.GetIndex(0)
 	if err := json.Unmarshal([]byte(data0), &checkTargets); err != nil {
-		log.WithFields(logrus.Fields{
-			"prefix": "host-check-mgr",
-		}).Error("[HOST CHECKER MANAGER] Decoder failed: ", err)
+		hostCheckLog.Error("[HOST CHECKER MANAGER] Decoder failed: ", err)
 		return nil, err
 	}
 
@@ -450,9 +392,7 @@ func (hc *HostCheckerManager) ListFromService(apiID string) ([]HostData, error) 
 	for i, target := range checkTargets {
 		newHostDoc, err := hc.Gw.GlobalHostChecker.PrepareTrackingHost(target, spec.APIID)
 		if err != nil {
-			log.WithFields(logrus.Fields{
-				"prefix": "host-check-mgr",
-			}).Error("[HOST CHECKER MANAGER] failed to convert to HostData", err)
+			hostCheckLog.Error("[HOST CHECKER MANAGER] failed to convert to HostData", err)
 		} else {
 			hostData[i] = newHostDoc
 		}
@@ -461,20 +401,14 @@ func (hc *HostCheckerManager) ListFromService(apiID string) ([]HostData, error) 
 }
 
 func (hc *HostCheckerManager) DoServiceDiscoveryListUpdateForID(apiID string) {
-	log.WithFields(logrus.Fields{
-		"prefix": "host-check-mgr",
-	}).Debug("[HOST CHECKER MANAGER] Getting data from service")
+	hostCheckLog.Debug("[HOST CHECKER MANAGER] Getting data from service")
 	hostData, err := hc.ListFromService(apiID)
 	if err != nil {
 		return
 	}
 
-	log.WithFields(logrus.Fields{
-		"prefix": "host-check-mgr",
-	}).Debug("[HOST CHECKER MANAGER] Data was: \n", hostData)
-	log.WithFields(logrus.Fields{
-		"prefix": "host-check-mgr",
-	}).Info("[HOST CHECKER MANAGER] Refreshing uptime tests from service for API: ", apiID)
+	hostCheckLog.Debug("[HOST CHECKER MANAGER] Data was: \n", hostData)
+	hostCheckLog.Info("[HOST CHECKER MANAGER] Refreshing uptime tests from service for API: ", apiID)
 	hc.UpdateTrackingListByAPIID(hostData, apiID)
 }
 
@@ -521,15 +455,11 @@ func (hc *HostCheckerManager) RecordUptimeAnalytics(report HostHealthReport) err
 	encoded, err := msgpack.Marshal(newAnalyticsRecord)
 
 	if err != nil {
-		log.WithFields(logrus.Fields{
-			"prefix": "host-check-mgr",
-		}).Error("Error encoding uptime data:", err)
+		hostCheckLog.Error("Error encoding uptime data:", err)
 		return err
 	}
 
-	log.WithFields(logrus.Fields{
-		"prefix": "host-check-mgr",
-	}).Debug("Recording uptime stat")
+	hostCheckLog.Debug("Recording uptime stat")
 	hc.store.AppendToSet(UptimeAnalytics_KEYNAME, string(encoded))
 	return nil
 }
@@ -546,9 +476,7 @@ func (gw *Gateway) InitHostCheckManager(ctx context.Context, store storage.Handl
 }
 
 func (gw *Gateway) SetCheckerHostList() {
-	log.WithFields(logrus.Fields{
-		"prefix": "host-check-mgr",
-	}).Info("Loading uptime tests...")
+	hostCheckLog.Info("Loading uptime tests...")
 	hostList := []HostData{}
 	gw.apisMu.RLock()
 	for _, spec := range gw.apisByID {
@@ -557,9 +485,7 @@ func (gw *Gateway) SetCheckerHostList() {
 			if err == nil {
 				hostList = append(hostList, hostList...)
 				for _, t := range hostList {
-					log.WithFields(logrus.Fields{
-						"prefix": "host-check-mgr",
-					}).WithFields(logrus.Fields{
+					hostCheckLog.WithFields(logrus.Fields{
 						"prefix": "host-check-mgr",
 					}).Info("---> Adding uptime test: ", t.CheckURL)
 				}
@@ -569,16 +495,10 @@ func (gw *Gateway) SetCheckerHostList() {
 				newHostDoc, err := gw.GlobalHostChecker.PrepareTrackingHost(checkItem, spec.APIID)
 				if err == nil {
 					hostList = append(hostList, newHostDoc)
-					log.WithFields(logrus.Fields{
-						"prefix": "host-check-mgr",
-					}).Info("---> Adding uptime test: ", checkItem.CheckURL)
+					hostCheckLog.Info("---> Adding uptime test: ", checkItem.CheckURL)
 				} else {
-					log.WithFields(logrus.Fields{
-						"prefix": "host-check-mgr",
-					}).Warning("---> Adding uptime test failed: ", checkItem.CheckURL)
-					log.WithFields(logrus.Fields{
-						"prefix": "host-check-mgr",
-					}).Warning("--------> Error was: ", err)
+					hostCheckLog.Warning("---> Adding uptime test failed: ", checkItem.CheckURL)
+					hostCheckLog.Warning("--------> Error was: ", err)
 				}
 
 			}
