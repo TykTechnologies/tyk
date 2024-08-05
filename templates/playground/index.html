@@ -74,11 +74,9 @@
     // End - Show Error Snackbar
 
     const url = window.location.origin + "{{.Url}}";
-    const schema = {{.Schema}};
     const GraphiQlInitInstance = new window.GraphiqlInit({
       containerId: 'root',
       schemaUrls: [{url}],
-      schema: schema,
       onSubscriptionError: window.showError
     });
   </script>

@@ -79,9 +79,20 @@ func (b *DefaultSessionManager) ResetQuota(keyName string, session *user.Session
 	// Fix the raw key
 	b.store.DeleteRawKey(rawKey)
 
+	b.deleteRawKeysWithAllowanceScope(b.store, session, keyName)
+}
+
+func (b *DefaultSessionManager) deleteRawKeysWithAllowanceScope(store storage.Handler, session *user.SessionState, keyName string) {
+	if store == nil || session == nil {
+		return
+	}
+
 	for _, acl := range session.AccessRights {
-		rawKey = QuotaKeyPrefix + acl.AllowanceScope + "-" + keyName
-		b.store.DeleteRawKey(rawKey)
+		if acl.AllowanceScope == "" {
+			continue
+		}
+		rawKey := QuotaKeyPrefix + acl.AllowanceScope + "-" + keyName
+		store.DeleteRawKey(rawKey)
 	}
 }
 
@@ -150,11 +161,12 @@ func (b *DefaultSessionManager) SessionDetail(orgID string, keyName string, hash
 	} else {
 		if storage.TokenOrg(keyName) != orgID {
 			// try to get legacy and new format key at once
-			toSearchList := []string{keyName}
+			toSearchList := []string{}
 			if !b.Gw.GetConfig().DisableKeyActionsByUsername {
 				toSearchList = append(toSearchList, b.Gw.generateToken(orgID, keyName))
 			}
 
+			toSearchList = append(toSearchList, keyName)
 			for _, fallback := range b.Gw.GetConfig().HashKeyFunctionFallback {
 				if !b.Gw.GetConfig().DisableKeyActionsByUsername {
 					toSearchList = append(toSearchList, b.Gw.generateToken(orgID, keyName, fallback))
@@ -164,7 +176,6 @@ func (b *DefaultSessionManager) SessionDetail(orgID string, keyName string, hash
 			var jsonKeyValList []string
 
 			jsonKeyValList, err = b.store.GetMultiKey(toSearchList)
-
 			// pick the 1st non empty from the returned list
 			for idx, val := range jsonKeyValList {
 				if val != "" {

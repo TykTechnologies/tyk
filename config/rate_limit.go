@@ -10,7 +10,7 @@ type RateLimit struct {
 	// EnableFixedWindow enables fixed window rate limiting.
 	EnableFixedWindowRateLimiter bool `json:"enable_fixed_window_rate_limiter"`
 
-	// Redis based rate limiter with sliding log. Provides 100% rate limiting accuracy, but require two additional Redis roundtrip for each request.
+	// Redis based rate limiter with sliding log. Provides 100% rate limiting accuracy, but require two additional Redis roundtrips for each request.
 	EnableRedisRollingLimiter bool `json:"enable_redis_rolling_limiter"`
 
 	// To enable, set to `true`. The sentinel-based rate limiter delivers a smoother performance curve as rate-limit calculations happen off-thread, but a stricter time-out based cool-down for clients. For example, when a throttling action is triggered, they are required to cool-down for the period of the rate limit.
@@ -19,7 +19,7 @@ type RateLimit struct {
 	// The standard rate limiter offers similar performance as the sentinel-based limiter. This is disabled by default.
 	EnableSentinelRateLimiter bool `json:"enable_sentinel_rate_limiter"`
 
-	// EnableRateLimitSmoothing enables or disables rate smoothing. The rate smoothing is only supported on the
+	// EnableRateLimitSmoothing enables or disables rate limit smoothing. The rate smoothing is only supported on the
 	// Redis Rate Limiter, or the Sentinel Rate Limiter, as both algorithms implement a sliding log.
 	EnableRateLimitSmoothing bool `json:"enable_rate_limit_smoothing"`
 

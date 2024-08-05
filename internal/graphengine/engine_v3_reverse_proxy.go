@@ -9,10 +9,10 @@ import (
 
 	"github.com/jensneuse/abstractlogger"
 
-	"github.com/TykTechnologies/graphql-go-tools/v2/pkg/engine/datasource/httpclient"
-	"github.com/TykTechnologies/graphql-go-tools/v2/pkg/graphql"
-	"github.com/TykTechnologies/graphql-go-tools/v2/pkg/subscription"
-	gqlwebsocketV2 "github.com/TykTechnologies/graphql-go-tools/v2/pkg/subscription/websocket"
+	httpclientv2 "github.com/TykTechnologies/graphql-go-tools/v2/pkg/engine/datasource/httpclient"
+	graphqlv2 "github.com/TykTechnologies/graphql-go-tools/v2/pkg/graphql"
+	subscriptionv2 "github.com/TykTechnologies/graphql-go-tools/v2/pkg/subscription"
+	gqlwebsocketv2 "github.com/TykTechnologies/graphql-go-tools/v2/pkg/subscription/websocket"
 	"github.com/TykTechnologies/tyk/internal/otel"
 )
 
@@ -63,27 +63,27 @@ func (e *EngineV3) handoverWebSocketConnectionToGraphQLExecutionEngine(params *R
 	done := make(chan bool)
 	errChan := make(chan error)
 
-	var executorPool subscription.ExecutorPool
+	var executorPool subscriptionv2.ExecutorPool
 
 	if e.engine == nil {
 		e.logger.Error("could not start graphql websocket handler: execution engine is nil")
 		return
 	}
-	initialRequestContext := subscription.NewInitialHttpRequestContext(params.OutRequest)
+	initialRequestContext := subscriptionv2.NewInitialHttpRequestContext(params.OutRequest)
 	upstreamHeaders := additionalUpstreamHeaders(e.logger, params.OutRequest, e.apiDefinition)
-	executorPool = subscription.NewExecutorV2Pool(
+	executorPool = subscriptionv2.NewExecutorV2Pool(
 		e.engine,
 		initialRequestContext,
-		subscription.WithExecutorV2HeaderModifier(e.gqlTools.headerModifier(params.OutRequest, upstreamHeaders, e.tykVariableReplacer)),
+		subscriptionv2.WithExecutorV2HeaderModifier(e.gqlTools.headerModifier(params.OutRequest, upstreamHeaders, e.tykVariableReplacer)),
 	)
 
-	go gqlwebsocketV2.Handle(
+	go gqlwebsocketv2.Handle(
 		done,
 		errChan,
 		conn,
 		executorPool,
-		gqlwebsocketV2.WithLogger(e.logger),
-		gqlwebsocketV2.WithProtocolFromRequestHeaders(params.OutRequest),
+		gqlwebsocketv2.WithLogger(e.logger),
+		gqlwebsocketv2.WithProtocolFromRequestHeaders(params.OutRequest),
 	)
 	select {
 	case err := <-errChan:
@@ -94,7 +94,7 @@ func (e *EngineV3) handoverWebSocketConnectionToGraphQLExecutionEngine(params *R
 	return nil, true, nil
 }
 
-func (e *EngineV3) handoverRequestToGraphQLExecutionEngine(gqlRequest *graphql.Request, outreq *http.Request) (res *http.Response, hijacked bool, err error) {
+func (e *EngineV3) handoverRequestToGraphQLExecutionEngine(gqlRequest *graphqlv2.Request, outreq *http.Request) (res *http.Response, hijacked bool, err error) {
 	if e.engine == nil {
 		err = errors.New("execution engine is nil")
 		return
@@ -108,11 +108,11 @@ func (e *EngineV3) handoverRequestToGraphQLExecutionEngine(gqlRequest *graphql.R
 	}
 
 	// TODO before fetch hook removed
-	resultWriter := graphql.NewEngineResultWriter()
-	execOptions := make([]graphql.ExecutionOptionsV2, 0)
+	resultWriter := graphqlv2.NewEngineResultWriter()
+	execOptions := make([]graphqlv2.ExecutionOptionsV2, 0)
 
 	upstreamHeaders := additionalUpstreamHeaders(e.logger, outreq, e.apiDefinition)
-	execOptions = append(execOptions, graphql.WithHeaderModifier(e.gqlTools.headerModifier(outreq, upstreamHeaders, e.tykVariableReplacer)))
+	execOptions = append(execOptions, graphqlv2.WithHeaderModifier(e.gqlTools.headerModifier(outreq, upstreamHeaders, e.tykVariableReplacer)))
 
 	if e.openTelemetry.Executor != nil {
 		//if err = e.openTelemetry.Executor.Execute(reqCtx, gqlRequest, &resultWriter, execOptions...); err != nil {
@@ -140,8 +140,8 @@ func (e *EngineV3) handoverRequestToGraphQLExecutionEngine(gqlRequest *graphql.R
 			header = proxyOnlyCtx.upstreamResponse.Header
 			httpStatus = proxyOnlyCtx.upstreamResponse.StatusCode
 			// change the value of the header's content encoding to use the content encoding defined by the accept encoding
-			contentEncoding := selectContentEncodingToBeUsed(proxyOnlyCtx.forwardedRequest.Header.Get(httpclient.AcceptEncodingHeader))
-			header.Set(httpclient.ContentEncodingHeader, contentEncoding)
+			contentEncoding := selectContentEncodingToBeUsed(proxyOnlyCtx.forwardedRequest.Header.Get(httpclientv2.AcceptEncodingHeader))
+			header.Set(httpclientv2.ContentEncodingHeader, contentEncoding)
 			if e.apiDefinition.GraphQL.Proxy.UseResponseExtensions.OnErrorForwarding && httpStatus >= http.StatusBadRequest {
 				err = e.gqlTools.returnErrorsFromUpstream(proxyOnlyCtx, &resultWriter, e.seekReadCloser)
 				if err != nil {

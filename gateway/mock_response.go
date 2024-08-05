@@ -43,7 +43,7 @@ func (p *ReverseProxy) mockResponse(r *http.Request) (*http.Response, error) {
 		code, contentType, body, headers, err = mockFromOAS(r, operation.route.Operation, mockResponse.FromOASExamples)
 		res.StatusCode = code
 		if err != nil {
-			err = fmt.Errorf("mock: %s", err)
+			err = fmt.Errorf("mock: %w", err)
 			return res, err
 		}
 	} else {

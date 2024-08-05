@@ -15,7 +15,7 @@ import (
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/request"
-	"github.com/TykTechnologies/tyk/signature_validator"
+	signaturevalidator "github.com/TykTechnologies/tyk/signature_validator"
 )
 
 const (
@@ -176,7 +176,7 @@ func (k *AuthKey) ProcessRequest(_ http.ResponseWriter, r *http.Request, _ inter
 	if err == nil {
 		err, statusCode := k.validateSignature(r, keyID)
 		if err == nil {
-			return err, statusCode
+			return nil, statusCode
 		}
 	}
 
@@ -215,7 +215,7 @@ func (k *AuthKey) validateSignature(r *http.Request, key string) (error, int) {
 		errorMessage = authConfig.Signature.ErrorMessage
 	}
 
-	validator := signature_validator.SignatureValidator{}
+	validator := signaturevalidator.SignatureValidator{}
 	if err := validator.Init(authConfig.Signature.Algorithm); err != nil {
 		logger.WithError(err).Info("Invalid signature verification algorithm")
 		return errors.New("internal server error"), http.StatusInternalServerError

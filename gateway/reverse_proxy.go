@@ -41,6 +41,7 @@ import (
 	"github.com/TykTechnologies/tyk/ctx"
 	"github.com/TykTechnologies/tyk/header"
 	"github.com/TykTechnologies/tyk/internal/graphengine"
+	"github.com/TykTechnologies/tyk/internal/httputil"
 	"github.com/TykTechnologies/tyk/internal/otel"
 	"github.com/TykTechnologies/tyk/regexp"
 	"github.com/TykTechnologies/tyk/trace"
@@ -513,12 +514,8 @@ var hopHeaders = []string{
 func (p *ReverseProxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) ProxyResponse {
 	startTime := time.Now()
 	p.logger.WithField("ts", startTime.UnixNano()).Debug("Started")
-	var resp ProxyResponse
-	if IsGrpcStreaming(req) {
-		resp = p.WrappedServeHTTP(rw, req, false)
-	} else {
-		resp = p.WrappedServeHTTP(rw, req, true)
-	}
+
+	resp := p.WrappedServeHTTP(rw, req, true)
 
 	finishTime := time.Since(startTime)
 	p.logger.WithField("ns", finishTime.Nanoseconds()).Debug("Finished")
@@ -1109,7 +1106,7 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 
 	p.logger.Debug("Outbound request URL: ", outreq.URL.String())
 
-	outReqUpgrade, reqUpType := p.IsUpgrade(req)
+	reqUpType, outReqUpgrade := p.IsUpgrade(req)
 
 	// See RFC 2616, section 14.10.
 	if c := outreq.Header.Get("Connection"); c != "" {
@@ -1299,7 +1296,7 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 		return ProxyResponse{UpstreamLatency: upstreamLatency}
 	}
 
-	upgrade, _ := p.IsUpgrade(req)
+	_, upgrade := p.IsUpgrade(req)
 	// Deal with 101 Switching Protocols responses: (WebSocket, h2c, etc)
 	if upgrade && res.StatusCode == 101 {
 		if err := p.handleUpgradeResponse(rw, outreq, res); err != nil {
@@ -1327,6 +1324,11 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 	}
 
 	inres := new(http.Response)
+
+	if httputil.IsStreamingRequest(req) || httputil.IsStreamingResponse(res) {
+		withCache = false
+	}
+
 	if withCache {
 		*inres = *res // includes shallow copies of maps, but okay
 
@@ -1472,7 +1474,7 @@ func (p *ReverseProxy) copyBuffer(dst io.Writer, src io.Reader) (int64, error) {
 	var written int64
 	for {
 		nr, rerr := src.Read(*buf)
-		if rerr != nil && rerr != io.EOF && rerr != context.Canceled {
+		if rerr != nil && !errors.Is(rerr, io.EOF) && !errors.Is(rerr, context.Canceled) {
 			p.logger.WithFields(logrus.Fields{
 				"prefix": "proxy",
 				"org_id": p.TykAPISpec.OrgID,
@@ -1529,15 +1531,15 @@ func (p *ReverseProxy) handleUpgradeResponse(rw http.ResponseWriter, req *http.R
 	defer close(backConnCloseCh)
 	conn, brw, err := hj.Hijack()
 	if err != nil {
-		return fmt.Errorf("Hijack failed on protocol switch: %v", err)
+		return fmt.Errorf("hijack failed on protocol switch: %w", err)
 	}
 	defer conn.Close()
 	res.Body = nil // so res.Write only writes the headers; we have res.Body in backConn above
 	if err := res.Write(brw); err != nil {
-		return fmt.Errorf("response write: %v", err)
+		return fmt.Errorf("response write: %w", err)
 	}
 	if err := brw.Flush(); err != nil {
-		return fmt.Errorf("response flush: %v", err)
+		return fmt.Errorf("response flush: %w", err)
 	}
 	errc := make(chan error, 1)
 	spc := switchProtocolCopier{user: conn, backend: backConn}
@@ -1643,7 +1645,7 @@ type nopCloser struct {
 // to have it ready for next read-cycle
 func (n nopCloser) Read(p []byte) (int, error) {
 	num, err := n.ReadSeeker.Read(p)
-	if err == io.EOF { // move to start to have it ready for next read cycle
+	if errors.Is(err, io.EOF) { // move to start to have it ready for next read cycle
 		_, seekErr := n.Seek(0, io.SeekStart)
 		if seekErr != nil {
 			log.WithError(seekErr).Error("can't rewind nopCloser")
@@ -1702,7 +1704,7 @@ func (n *nopCloserBuffer) Read(p []byte) (int, error) {
 	}
 
 	// move to start to have it ready for next read cycle
-	if err == io.EOF {
+	if errors.Is(err, io.EOF) {
 		_, seekErr := n.Seek(0, io.SeekStart)
 		if seekErr != nil {
 			log.WithError(seekErr).Error("can't rewind nopCloserBuffer")
@@ -1834,25 +1836,12 @@ func nopCloseResponseBody(r *http.Response) {
 	copyResponse(r)
 }
 
-func (p *ReverseProxy) IsUpgrade(req *http.Request) (bool, string) {
+// IsUpgrade will return the upgrade header value and true if present for the request.
+// It requires EnableWebSockets to be enabled in the gateway HTTP server config.
+func (p *ReverseProxy) IsUpgrade(req *http.Request) (string, bool) {
 	if !p.Gw.GetConfig().HttpServerOptions.EnableWebSockets {
-		return false, ""
+		return "", false
 	}
 
-	connection := strings.ToLower(strings.TrimSpace(req.Header.Get(header.Connection)))
-	if connection != "upgrade" {
-		return false, ""
-	}
-
-	upgrade := strings.ToLower(strings.TrimSpace(req.Header.Get("Upgrade")))
-	if upgrade != "" {
-		return true, upgrade
-	}
-
-	return false, ""
-}
-
-// IsGrpcStreaming  determines wether a request represents a grpc streaming req
-func IsGrpcStreaming(r *http.Request) bool {
-	return r.ContentLength == -1 && r.Header.Get(header.ContentType) == "application/grpc"
+	return httputil.IsUpgrade(req)
 }

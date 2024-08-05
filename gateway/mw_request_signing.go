@@ -1,7 +1,7 @@
 package gateway
 
 import (
-	cryptoRand "crypto/rand"
+	cryptorand "crypto/rand"
 	"crypto/rsa"
 	"crypto/sha256"
 	"encoding/base64"
@@ -195,7 +195,7 @@ func generateRSAEncodedSignature(signatureString string, privateKey *rsa.Private
 	hashFunction.Write([]byte(signatureString))
 	hashed := hashFunction.Sum(nil)
 
-	rawsignature, err := rsa.SignPKCS1v15(cryptoRand.Reader, privateKey, hashType, hashed)
+	rawsignature, err := rsa.SignPKCS1v15(cryptorand.Reader, privateKey, hashType, hashed)
 	if err != nil {
 		return "", err
 	}
