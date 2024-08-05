@@ -1813,6 +1813,7 @@ func TestJWTDefaultPolicies(t *testing.T) {
 	sessionID := ts.Gw.generateToken(spec.OrgID, keyID)
 
 	assert := func(t *testing.T, expected []string) {
+		t.Helper()
 		session, _ := ts.Gw.GlobalSessionManager.SessionDetail(spec.OrgID, sessionID, false)
 		actual := session.PolicyIDs()
 		if !reflect.DeepEqual(expected, actual) {

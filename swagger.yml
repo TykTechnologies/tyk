@@ -1,7 +1,7 @@
 openapi: 3.0.0
 info:
   title: Tyk Gateway API
-  version: 5.4.0
+  version: 5.5.0
   description: |-
     The Tyk Gateway API is the primary means for integrating your application with the Tyk API Gateway system. This API is very small, and has no granular permissions system. It is intended to be used purely for internal automation and integration.
 
@@ -2613,6 +2613,28 @@ components:
           x-go-name: Events
       type: object
       x-go-package: github.com/TykTechnologies/tyk/apidef
+    RateLimitMeta:
+      properties:
+        disabled:
+          type: boolean
+          x-go-name: Disabled
+        method:
+          type: string
+          x-go-name: Method
+        path:
+          type: string
+          x-go-name: Path
+        per:
+          type: number
+          format: double
+          x-go-name: Per
+        rate:
+          type: number
+          format: double
+          x-go-name: Rate
+      title: RateLimitMeta configures rate limits per API path.
+      type: object
+      x-go-package: github.com/TykTechnologies/tyk/apidef
     ExtendedPathsSet:
       properties:
         advance_cache_config:
@@ -2660,6 +2682,11 @@ components:
             $ref: '#/components/schemas/MethodTransformMeta'
           type: array
           x-go-name: MethodTransforms
+        rate_limit:
+          type: array
+          items:
+            $ref: '#/components/schemas/RateLimitMeta'
+          x-go-name: RateLimit
         size_limits:
           items:
             $ref: '#/components/schemas/RequestSizeMeta'
@@ -3757,6 +3784,9 @@ components:
         not_after:
           type: string
           x-go-name: NotAfter
+        is_ca:
+          type: boolean
+          x-go-name: IsCA
       type: object
       x-go-package: github.com/TykTechnologies/tyk
     CertificateMeta:
@@ -3786,6 +3816,9 @@ components:
           items:
             type: string
           x-go-name: DNSNames
+        is_ca:
+          type: boolean
+          x-go-name: IsCA
       type: object
       x-go-package: github.com/TykTechnologies/tyk
     pkixName:

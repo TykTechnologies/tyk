@@ -115,7 +115,7 @@ func TestUpstream(t *testing.T) {
 				RateLimit: &RateLimit{
 					Enabled: true,
 					Rate:    10,
-					Per:     time.ReadableDuration(time.Hour + 20*time.Minute + 10*time.Second),
+					Per:     ReadableDuration(time.Hour + 20*time.Minute + 10*time.Second),
 				},
 			}
 

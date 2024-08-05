@@ -1,8 +1,6 @@
 module github.com/TykTechnologies/tyk
 
-go 1.21.0
-
-toolchain go1.21.4
+go 1.21.11
 
 require (
 	github.com/Jeffail/tunny v0.1.4
@@ -14,13 +12,13 @@ require (
 	github.com/TykTechnologies/gojsonschema v0.0.0-20170222154038-dcb3e4bb7990
 	github.com/TykTechnologies/gorpc v0.0.0-20210624160652-fe65bda0ccb9
 	github.com/TykTechnologies/goverify v0.0.0-20220808203004-1486f89e7708
-	github.com/TykTechnologies/graphql-go-tools v1.6.2-0.20240614111227-107208df747e
+	github.com/TykTechnologies/graphql-go-tools v1.6.2-0.20240705065952-ae6008677a48
 	github.com/TykTechnologies/graphql-translator v0.0.0-20240319092712-4ba87e4c06ff
 	github.com/TykTechnologies/leakybucket v0.0.0-20170301023702-71692c943e3c
 	github.com/TykTechnologies/murmur3 v0.0.0-20230310161213-aad17efd5632
 	github.com/TykTechnologies/openid2go v0.1.2
 	github.com/TykTechnologies/storage v1.2.2
-	github.com/TykTechnologies/tyk-pump v1.8.1-rc1.0.20231030094653-9984a1ee29ee
+	github.com/TykTechnologies/tyk-pump v1.10.0
 	github.com/akutz/memconn v0.1.0
 	github.com/bshuster-repo/logrus-logstash-hook v1.1.0
 	github.com/buger/jsonparser v1.1.1
@@ -38,7 +36,7 @@ require (
 	github.com/golang/protobuf v1.5.4
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/gorilla/mux v1.8.1
-	github.com/gorilla/websocket v1.5.2
+	github.com/gorilla/websocket v1.5.3
 	github.com/hashicorp/consul/api v1.29.1
 	github.com/hashicorp/go-multierror v1.1.1
 	github.com/hashicorp/go-version v1.7.0
@@ -48,7 +46,7 @@ require (
 	github.com/kelseyhightower/envconfig v1.4.0
 	github.com/lonelycode/osin v0.0.0-20160423095202-da239c9dacb6
 	github.com/mavricknz/ldap v0.0.0-20160227184754-f5a958005e43
-	github.com/miekg/dns v1.1.59
+	github.com/miekg/dns v1.1.61
 	github.com/mitchellh/copystructure v1.2.0 // indirect
 	github.com/mitchellh/mapstructure v1.5.0
 	github.com/nsf/jsondiff v0.0.0-20230430225905-43f6cf3098c1 // test
@@ -64,7 +62,7 @@ require (
 	github.com/spf13/afero v1.11.0
 	github.com/stretchr/testify v1.9.0 // test
 	github.com/uber/jaeger-client-go v2.30.1-0.20220110192849-8d8e8fcfd04d+incompatible
-	github.com/valyala/fasthttp v1.54.0 // test
+	github.com/valyala/fasthttp v1.55.0 // test
 	github.com/vmihailenco/msgpack v4.0.4+incompatible
 	github.com/xeipuuv/gojsonschema v1.2.0
 	golang.org/x/crypto v0.24.0
@@ -72,7 +70,7 @@ require (
 	golang.org/x/sync v0.7.0
 	google.golang.org/grpc v1.64.0
 	google.golang.org/grpc/examples v0.0.0-20220317213542-f95b001a48df // test
-	google.golang.org/protobuf v1.34.1
+	google.golang.org/protobuf v1.34.2
 	gopkg.in/vmihailenco/msgpack.v2 v2.9.2
 	gopkg.in/xmlpath.v2 v2.0.0-20150820204837-860cbeca3ebc
 	gopkg.in/yaml.v3 v3.0.1
@@ -167,7 +165,7 @@ require (
 	github.com/jinzhu/inflection v1.0.0 // indirect
 	github.com/jinzhu/now v1.1.2 // indirect
 	github.com/josharian/intern v1.0.0 // indirect
-	github.com/klauspost/compress v1.17.8 // indirect
+	github.com/klauspost/compress v1.17.9 // indirect
 	github.com/lonelycode/go-uuid v0.0.0-20141202165402-ed3ca8a15a93 // indirect
 	github.com/mailru/easyjson v0.7.7 // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect
@@ -210,11 +208,11 @@ require (
 	go.uber.org/multierr v1.11.0 // indirect
 	go.uber.org/zap v1.21.0 // indirect
 	golang.org/x/exp v0.0.0-20240112132812-db7319d0e0e3 // indirect
-	golang.org/x/mod v0.17.0 // indirect
+	golang.org/x/mod v0.18.0 // indirect
 	golang.org/x/sys v0.21.0 // indirect
 	golang.org/x/text v0.16.0 // indirect
 	golang.org/x/time v0.5.0 // indirect
-	golang.org/x/tools v0.21.1-0.20240508182429-e35e4ccd0d2d // indirect
+	golang.org/x/tools v0.22.0 // indirect
 	google.golang.org/appengine v1.6.8 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20240318140521-94a12d6c2237 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20240415180920-8c6c420018be // indirect

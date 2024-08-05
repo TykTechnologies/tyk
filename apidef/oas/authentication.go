@@ -336,14 +336,32 @@ func (as *AuthSource) ExtractTo(enabled *bool, name *string) {
 
 // Signature holds the configuration for signature validation.
 type Signature struct {
-	Enabled          bool       `bson:"enabled" json:"enabled"` // required
-	Algorithm        string     `bson:"algorithm,omitempty" json:"algorithm,omitempty"`
-	Header           string     `bson:"header,omitempty" json:"header,omitempty"`
-	Query            AuthSource `bson:"query,omitempty" json:"query,omitempty"`
-	Secret           string     `bson:"secret,omitempty" json:"secret,omitempty"`
-	AllowedClockSkew int64      `bson:"allowedClockSkew,omitempty" json:"allowedClockSkew,omitempty"`
-	ErrorCode        int        `bson:"errorCode,omitempty" json:"errorCode,omitempty"`
-	ErrorMessage     string     `bson:"errorMessage,omitempty" json:"errorMessage,omitempty"`
+	// Enabled activates signature validation.
+	// Tyk classic API definition: `auth_configs[X].validate_signature`.
+	Enabled bool `bson:"enabled" json:"enabled"` // required
+	// Algorithm is the signature method to use.
+	// Tyk classic API definition: `auth_configs[X].signature.algorithm`.
+	Algorithm string `bson:"algorithm,omitempty" json:"algorithm,omitempty"`
+	// Header is the name of the header to consume.
+	// Tyk classic API definition: `auth_configs[X].signature.header`.
+	Header string `bson:"header,omitempty" json:"header,omitempty"`
+	// Query is the name of the query parameter to consume.
+	// Tyk classic API definition: `auth_configs[X].signature.use_param/param_name`.
+	Query AuthSource `bson:"query,omitempty" json:"query,omitempty"`
+	// Secret is the signing secret used for signature validation.
+	// Tyk classic API definition: `auth_configs[X].signature.secret`.
+	Secret string `bson:"secret,omitempty" json:"secret,omitempty"`
+	// AllowedClockSkew configures a grace period in seconds during which an expired token is still valid.
+	// Tyk classic API definition: `auth_configs[X].signature.allowed_clock_skew`.
+	AllowedClockSkew int64 `bson:"allowedClockSkew,omitempty" json:"allowedClockSkew,omitempty"`
+	// ErrorCode configures the HTTP response code for a validation failure.
+	// If unconfigured, a HTTP 401 Unauthorized status code will be emitted.
+	// Tyk classic API definition: `auth_configs[X].signature.error_code`.
+	ErrorCode int `bson:"errorCode,omitempty" json:"errorCode,omitempty"`
+	// ErrorMessage configures the error message that is emitted on validation failure.
+	// A default error message is emitted if unset.
+	// Tyk classic API definition: `auth_configs[X].signature.error_message`.
+	ErrorMessage string `bson:"errorMessage,omitempty" json:"errorMessage,omitempty"`
 }
 
 // Fill fills *Signature from apidef.AuthConfig.
@@ -491,7 +509,7 @@ type OIDC struct {
 	// Tyk classic API definition: `openid_options.segregate_by_client`.
 	SegregateByClientId bool `bson:"segregateByClientId,omitempty" json:"segregateByClientId,omitempty"`
 
-	// Providers contains a list of authorised providers, their Client IDs and matched policies.
+	// Providers contains a list of authorized providers, their Client IDs and matched policies.
 	//
 	// Tyk classic API definition: `openid_options.providers`.
 	Providers []Provider `bson:"providers,omitempty" json:"providers,omitempty"`

@@ -1059,6 +1059,9 @@
         },
         "requestSizeLimit": {
           "$ref": "#/definitions/X-Tyk-RequestSizeLimit"
+        },
+        "rateLimit": {
+          "$ref": "#/definitions/X-Tyk-RateLimit"
         }
       }
     },
@@ -1402,6 +1405,9 @@
         },
         "fallbackToDefault": {
           "type": "boolean"
+        },
+        "urlVersioningPattern": {
+          "type": "string"
         }
       },
       "required": [

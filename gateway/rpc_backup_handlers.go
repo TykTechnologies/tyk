@@ -3,7 +3,7 @@ package gateway
 import (
 	"crypto/aes"
 	"crypto/cipher"
-	cryptoRand "crypto/rand"
+	cryptorand "crypto/rand"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
@@ -156,7 +156,7 @@ func encrypt(key []byte, text string) string {
 	// include it at the beginning of the ciphertext.
 	ciphertext := make([]byte, aes.BlockSize+len(plaintext))
 	iv := ciphertext[:aes.BlockSize]
-	if _, err := io.ReadFull(cryptoRand.Reader, iv); err != nil {
+	if _, err := io.ReadFull(cryptorand.Reader, iv); err != nil {
 		log.Error(err)
 		return ""
 	}

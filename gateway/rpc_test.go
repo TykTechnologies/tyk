@@ -1,6 +1,3 @@
-//go:build !race || unstable
-// +build !race unstable
-
 package gateway
 
 import (
@@ -112,6 +109,7 @@ const apiDefListTest2 = `[{
 }]`
 
 func TestSyncAPISpecsRPCFailure_CheckGlobals(t *testing.T) {
+	test.Flaky(t) // TT-9117
 
 	// We test to check if we are actually calling the GetApiDefinitions and
 	// GetPolicies.
@@ -166,6 +164,8 @@ func TestSyncAPISpecsRPCFailure_CheckGlobals(t *testing.T) {
 }
 
 func TestSyncAPISpecsRPCSuccess(t *testing.T) {
+	test.Flaky(t) // TT-9117
+
 	// Test RPC
 	rpc.UseSyncLoginRPC = true
 	var GetKeyCounter int
@@ -345,6 +345,8 @@ func TestSyncAPISpecsRPCSuccess(t *testing.T) {
 }
 
 func TestSyncAPISpecsRPC_redis_failure(t *testing.T) {
+	test.Flaky(t) // TT-9117
+
 	dispatcher := gorpc.NewDispatcher()
 	dispatcher.AddFunc("GetApiDefinitions", func(clientAddr string, dr *apidef.DefRequest) (string, error) {
 		return jsonMarshalString(BuildAPI(func(spec *APISpec) {
@@ -409,6 +411,8 @@ func TestSyncAPISpecsRPC_redis_failure(t *testing.T) {
 }
 
 func TestOrgSessionWithRPCDown(t *testing.T) {
+	test.Flaky(t) // TT-9117
+
 	//we need rpc down
 	conf := func(globalConf *config.Config) {
 		globalConf.SlaveOptions.ConnectionString = testHttpFailure

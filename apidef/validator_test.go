@@ -43,6 +43,7 @@ func TestValidationResult_ErrorStrings(t *testing.T) {
 
 func runValidationTest(apiDef *APIDefinition, ruleSet ValidationRuleSet, expectedValidationResult ValidationResult) func(t *testing.T) {
 	return func(t *testing.T) {
+		t.Helper()
 		result := Validate(apiDef, ruleSet)
 		assert.Equal(t, expectedValidationResult.IsValid, result.IsValid)
 		assert.ElementsMatch(t, expectedValidationResult.Errors, result.Errors)
