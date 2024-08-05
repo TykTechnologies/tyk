@@ -14,7 +14,7 @@ const (
 )
 
 func InvalidateCache(r *openapi3.Reflector) error {
-	addTag(CacheTag, CacheTagDesc)
+	addTag(CacheTag, CacheTagDesc, optionalTagParameters{})
 	return invalidateCache(r)
 }
 

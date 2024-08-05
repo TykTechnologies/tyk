@@ -294,6 +294,7 @@ type CertificateMeta struct {
 	NotBefore     time.Time `json:"not_before,omitempty" example:"2024-03-25T08:46:37Z"`
 	NotAfter      time.Time `json:"not_after,omitempty" example:"2034-03-26T08:46:37Z"`
 	DNSNames      []string  `json:"dns_names,omitempty" example:"[.*tyk.io]"`
+	IsCA          bool      `json:"is_ca"`
 }
 
 func ExtractCertificateMeta(cert *tls.Certificate, certID string) *CertificateMeta {

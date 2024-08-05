@@ -16,7 +16,7 @@ const (
 )
 
 func PoliciesApis(r *openapi3.Reflector) error {
-	addTag(PolicyTag, PolicyTagDesc)
+	addTag(PolicyTag, PolicyTagDesc, optionalTagParameters{})
 	return addOperations(r, getListOfPolicies, getPolicyWithID, updatePolicy, deletePolicyWithID, createPolicy)
 }
 

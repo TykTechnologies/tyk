@@ -24,7 +24,7 @@ To disallow access to an entire group of keys without rate limiting the organisa
 )
 
 func OrgsApi(r *openapi3.Reflector) error {
-	addTag(OrgTag, OrgTagDesc)
+	addTag(OrgTag, OrgTagDesc, optionalTagParameters{})
 	return addOperations(r, getSingleOrgKeyWithID, deleteOrgKeyRequest, createOrgKey, UpdateOrgKey, getOrgKeys)
 }
 

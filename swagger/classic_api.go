@@ -23,7 +23,7 @@ These methods only work on a single API node. If updating a cluster, it is impor
 )
 
 func APIS(r *openapi3.Reflector) error {
-	addTag(APIsTag, ApiTagDesc)
+	addTag(APIsTag, ApiTagDesc, optionalTagParameters{})
 	return addOperations(r, getClassicApiRequest, deleteClassicApiRequest, putClassicApiRequest, getListOfClassicApisRequest, createClassicApiRequest)
 }
 
@@ -190,6 +190,15 @@ func addApiPostQueryParam() []openapi3.ParameterOrRef {
 		openapi3.Parameter{In: openapi3.ParameterInQuery, Name: "new_version_name", Schema: stringSchema(), Description: &newVersionNameDesc}.ToParameterOrRef(),
 		openapi3.Parameter{In: openapi3.ParameterInQuery, Name: "set_default", Schema: boolSchema(), Description: &setVersionDesc}.ToParameterOrRef(),
 	}
+}
+
+func addApiPostQueryParamv2(oc *OperationWithExample) {
+	oc.AddQueryParameter("base_api_id", "The base API which the new version will be linked to.", OptionalParameterValues{
+		Example: valueToInterface("663a4ed9b6be920001b191ae"),
+	})
+	oc.AddQueryParameter("base_api_version_name", "The version name of the base API while creating the first version. This doesn't have to be sent for the next versions but if it is set, it will override base API version name.", OptionalParameterValues{Example: valueToInterface("Default")})
+	oc.AddQueryParameter("new_version_name", "The version name of the created version.", OptionalParameterValues{Example: valueToInterface("v2")})
+	oc.AddQueryParameter("set_default", "If true, the new version is set as default version.", OptionalParameterValues{Type: openapi3.SchemaTypeBoolean, Example: valueToInterface(true)})
 }
 
 func searchTextQuery() openapi3.ParameterOrRef {

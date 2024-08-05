@@ -17,7 +17,7 @@ const (
 
 // Done
 func HealthEndpoint(r *openapi3.Reflector) error {
-	addTag(helloTag, helloTagDesc)
+	addTag(helloTag, helloTagDesc, optionalTagParameters{})
 	oc, err := r.NewOperationContext(http.MethodGet, "/tyk/hello")
 	if err != nil {
 		return err

@@ -1,7 +1,6 @@
 package swagger
 
 import (
-	"errors"
 	"log"
 	"strconv"
 	"strings"
@@ -11,14 +10,6 @@ import (
 
 	"github.com/TykTechnologies/tyk/gateway"
 )
-
-const (
-	applicationForm        = "application/x-www-form-urlencoded"
-	applicationOctetStream = "application/octet-stream"
-	applicationJSON        = "application/json"
-)
-
-var ErrOperationExposer = errors.New("object is not of type openapi3.OperationExposer")
 
 type paginationStatus struct {
 	PageNum   int `json:"page_num"`
@@ -148,7 +139,7 @@ type HeaderCr struct {
 	Type        openapi3.SchemaType `json:"type"`
 }
 
-func addBinaryFormat(o3 openapi3.OperationExposer, httpStatus int) {
+func addBinaryFormatGateway(o3 openapi3.OperationExposer, httpStatus int) {
 	code := strconv.Itoa(httpStatus)
 	value, ok := o3.Operation().Responses.MapOfResponseOrRefValues[code]
 	if !ok {
@@ -183,7 +174,7 @@ func addExternalRefResponseAsArray(o3 openapi3.OperationExposer, httpStatus int,
 	}
 }
 
-func addExternalRefToResponse(o3 openapi3.OperationExposer, httpStatus int, description string) {
+func addExternalRefToResponseGateway(o3 openapi3.OperationExposer, httpStatus int, description string) {
 	code := strconv.Itoa(httpStatus)
 	_, ok := o3.Operation().Responses.MapOfResponseOrRefValues[code]
 	if !ok {
@@ -204,7 +195,7 @@ func addExternalRefToResponse(o3 openapi3.OperationExposer, httpStatus int, desc
 	}
 }
 
-func addExternalRefToRequest(o3 openapi3.OperationExposer) {
+func addExternalRefToRequestGateway(o3 openapi3.OperationExposer) {
 	o3.Operation().RequestBody = &openapi3.RequestBodyOrRef{
 		RequestBodyReference: nil,
 		RequestBody: &openapi3.RequestBody{

@@ -14,7 +14,7 @@ const (
 )
 
 func ReloadApi(r *openapi3.Reflector) error {
-	addTag(reloadTag, reloadTagDesc)
+	addTag(reloadTag, reloadTagDesc, optionalTagParameters{})
 	return addOperations(r, groupReload, singleNodeReload)
 }
 

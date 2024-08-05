@@ -18,7 +18,7 @@ const (
 
 // OAuthApi is a good thing Keith
 func OAuthApi(r *openapi3.Reflector) error {
-	addTag(OAuthTag, OAuthTagDesc)
+	addTag(OAuthTag, OAuthTagDesc, optionalTagParameters{})
 	return addOperations(r, rotateOauthClientHandler, invalidateOauthRefresh,
 		updateOauthClient, getApisForOauthApp, purgeLapsedOAuthTokens, listOAuthClients,
 		deleteOAuthClient, getSingleOAuthClientDetails, getAuthClientTokens, revokeTokenHandler,
@@ -373,16 +373,6 @@ func pageQuery() openapi3.ParameterOrRef {
 
 func requiredOrgIdForOauth() openapi3.ParameterOrRef {
 	return openapi3.Parameter{In: openapi3.ParameterInQuery, Name: "orgID", Required: &isRequired, Schema: stringSchema()}.ToParameterOrRef()
-}
-
-func addOperations(r *openapi3.Reflector, operations ...func(r *openapi3.Reflector) error) error {
-	for _, operation := range operations {
-		err := operation(r)
-		if err != nil {
-			return err
-		}
-	}
-	return nil
 }
 
 func forbidden(oc openapi.OperationContext, description ...string) {

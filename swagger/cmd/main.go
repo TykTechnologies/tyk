@@ -39,6 +39,10 @@ func main() {
 			URL:   swagger.StringPointerValue("https://tyk.io/contact"),
 			Email: swagger.StringPointerValue("support@tyk.io"),
 		})
+
+	swagger.RefParameters(&r)
+	swagger.RefExamples(&r)
+	swagger.AddRefComponent(&r)
 	err := swagger.APIS(&r)
 	if err != nil {
 		log.Fatal(err)
@@ -109,7 +113,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	err = writeSchema(schema, "swagger.yaml")
+	err = writeSchema(schema, "swagger.yml")
 	if err != nil {
 		log.Fatal(err)
 	}

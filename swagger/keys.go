@@ -17,7 +17,7 @@ const (
 )
 
 func Keys(r *openapi3.Reflector) error {
-	addTag(KeysTag, KeyTagsDesc)
+	addTag(KeysTag, KeyTagsDesc, optionalTagParameters{})
 	return addOperations(r, getKeyWithID, updateKeyPolicy, previewKeyRequest, putKeyRequest, createKeyRequest, postKeyRequest, getListOfKeys, deleteKeyRequest, createCustomKeyRequest)
 }
 

@@ -347,30 +347,84 @@ paths:
       operationId: createApiOAS
       parameters:
       - description: The base API which the new version will be linked to.
+        example: 663a4ed9b6be920001b191ae
         in: query
         name: base_api_id
+        required: false
         schema:
           type: string
       - description: The version name of the base API while creating the first version.
           This doesn't have to be sent for the next versions but if it is set, it
           will override base API version name.
+        example: Default
         in: query
         name: base_api_version_name
+        required: false
         schema:
           type: string
       - description: The version name of the created version.
+        example: v2
         in: query
         name: new_version_name
+        required: false
         schema:
           type: string
       - description: If true, the new version is set as default version.
+        example: true
         in: query
         name: set_default
+        required: false
         schema:
           type: boolean
       requestBody:
         content:
           application/json:
+            example:
+              components:
+                securitySchemes:
+                  bearerAuth:
+                    description: The API Access Credentials
+                    scheme: bearer
+                    type: http
+              info:
+                description: This is a sample OAS.
+                title: OAS Sample
+                version: 1.0.0
+              openapi: 3.0.3
+              paths:
+                /api/sample/users:
+                  get:
+                    operationId: getUsers
+                    responses:
+                      "200":
+                        content:
+                          application/json:
+                            schema:
+                              items:
+                                properties:
+                                  name:
+                                    type: string
+                                type: object
+                              type: array
+                        description: fetched users
+                    summary: Get users
+                    tags:
+                    - users
+              security:
+              - bearerAuth: []
+              servers:
+              - url: https://localhost:8080
+              x-tyk-api-gateway:
+                info:
+                  name: user
+                  state:
+                    active: true
+                server:
+                  listenPath:
+                    strip: true
+                    value: /user-test/
+                upstream:
+                  url: https://localhost:8080
             schema:
               $ref: https://raw.githubusercontent.com/OAI/OpenAPI-Specification/main/schemas/v3.0/schema.json
       responses:
@@ -383,9 +437,12 @@ paths:
         "400":
           content:
             application/json:
+              example:
+                message: Malformed API data
+                status: Error
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: Malformed API data
+          description: Bad Request
         "403":
           content:
             application/json:
@@ -396,9 +453,12 @@ paths:
         "500":
           content:
             application/json:
+              example:
+                message: Unexpected error
+                status: Error
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: Unexpected error
+          description: Internal server error.
       summary: Create API with OAS format
       tags:
       - OAS APIs
@@ -457,13 +517,6 @@ paths:
           using the api Id
       operationId: getOASApi
       parameters:
-      - description: The API ID
-        example: keyless
-        in: path
-        name: apiID
-        required: true
-        schema:
-          type: string
       - description: "Mode of OAS get, by default mode could be empty which means
           to get OAS spec including OAS Tyk extension. \n When mode=public, OAS spec
           excluding Tyk extension will be returned in the response"
@@ -475,13 +528,23 @@ paths:
           enum:
           - public
           type: string
+      - description: ID of the api you want to fetch
+        example: 4c1c0d8fc885401053ddac4e39ef676b
+        in: path
+        name: apiID
+        required: true
+        schema:
+          type: string
       responses:
         "200":
           content:
             application/json:
+              examples:
+                oasExample:
+                  $ref: '#/components/examples/oasExample'
               schema:
                 $ref: https://raw.githubusercontent.com/OAI/OpenAPI-Specification/main/schemas/v3.0/schema.json
-          description: Api fetched successfully
+          description: OK
           headers:
             x-tyk-base-api-id:
               description: ID of the base API if the requested API is a version.
@@ -491,10 +554,13 @@ paths:
         "400":
           content:
             application/json:
+              example:
+                message: trying to access an API whose definition is in Tyk classic
+                  format
+                status: Error
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: trying to access an API whose definition is in Tyk classic
-            format
+          description: Bad Request
         "403":
           content:
             application/json:
@@ -505,9 +571,12 @@ paths:
         "404":
           content:
             application/json:
+              example:
+                message: API not found
+                status: Error
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: API not found
+          description: Not Found
       summary: Get OAS Api definition
       tags:
       - OAS APIs
@@ -517,61 +586,69 @@ paths:
                 This endpoint allows you to configure tyk OAS extension based on query params provided(similar to import)
       operationId: patchApiOAS
       parameters:
-      - description: The API ID
-        example: keyless
+      - description: ID of the api you want to fetch
+        example: 4c1c0d8fc885401053ddac4e39ef676b
         in: path
         name: apiID
         required: true
         schema:
           type: string
-      - in: query
-        name: upstreamURL
-        required: false
-        schema:
-          description: Upstream URL for the API
-          type: string
-      - in: query
-        name: listenPath
-        required: false
-        schema:
-          description: Listen path for the API
-          type: string
-      - in: query
-        name: customDomain
-        required: false
-        schema:
-          description: Custom domain for the API
-          type: string
-      - in: query
-        name: authentication
-        required: false
-        schema:
-          description: Enable or disable authentication in your Tyk Gateway as per
-            your OAS document.
-          type: boolean
-      - in: query
-        name: validateRequest
-        required: false
-        schema:
-          description: Enable validateRequest middleware for all endpoints having
-            a request body with media type application/json
-          type: boolean
-      - in: query
-        name: allowList
-        required: false
-        schema:
-          description: Enable allowList middleware for all endpoints
-          type: boolean
-      - in: query
-        name: mockResponse
-        required: false
-        schema:
-          description: Enable mockResponse middleware for all endpoints having responses
-            configured.
-          type: boolean
+      - $ref: '#/components/parameters/UpstreamURL'
+      - $ref: '#/components/parameters/ListenPath'
+      - $ref: '#/components/parameters/CustomDomain'
+      - $ref: '#/components/parameters/AllowList'
+      - $ref: '#/components/parameters/ValidateRequest'
+      - $ref: '#/components/parameters/MockResponse'
+      - $ref: '#/components/parameters/Authentication'
       requestBody:
         content:
           application/json:
+            example:
+              components:
+                securitySchemes:
+                  bearerAuth:
+                    description: The API Access Credentials
+                    scheme: bearer
+                    type: http
+              info:
+                description: This is a sample OAS.
+                title: OAS Sample
+                version: 1.0.0
+              openapi: 3.0.3
+              paths:
+                /api/sample/users:
+                  get:
+                    operationId: getUsers
+                    responses:
+                      "200":
+                        content:
+                          application/json:
+                            schema:
+                              items:
+                                properties:
+                                  name:
+                                    type: string
+                                type: object
+                              type: array
+                        description: fetched users
+                    summary: Get users
+                    tags:
+                    - users
+              security:
+              - bearerAuth: []
+              servers:
+              - url: https://localhost:8080
+              x-tyk-api-gateway:
+                info:
+                  name: user
+                  state:
+                    active: true
+                server:
+                  listenPath:
+                    strip: true
+                    value: /user-test/
+                upstream:
+                  url: https://localhost:8080
             schema:
               $ref: https://raw.githubusercontent.com/OAI/OpenAPI-Specification/main/schemas/v3.0/schema.json
       responses:
@@ -584,21 +661,37 @@ paths:
         "400":
           content:
             application/json:
+              example:
+                message: Malformed request
+                status: Error
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: Malformed request
+          description: Bad Request
+        "403":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Attempting to access a protected api with an invalid or a missing
+            X-Tyk-Authorization in the headers
         "404":
           content:
             application/json:
+              example:
+                message: API not found
+                status: Error
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: API not found
+          description: Not Found
         "500":
           content:
             application/json:
+              example:
+                message: Unexpected error
+                status: Error
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: Unexpected error
+          description: Internal server error.
       summary: Patch API with OAS format.
       tags:
       - OAS APIs
@@ -610,8 +703,8 @@ paths:
                 Updating will completely replace the file descriptor and will not change an API Definition that has already been loaded, the hot-reload endpoint will need to be called to push the new definition to live.
       operationId: updateApiOAS
       parameters:
-      - description: The API ID
-        example: keyless
+      - description: ID of the api you want to fetch
+        example: 4c1c0d8fc885401053ddac4e39ef676b
         in: path
         name: apiID
         required: true
@@ -620,6 +713,52 @@ paths:
       requestBody:
         content:
           application/json:
+            example:
+              components:
+                securitySchemes:
+                  bearerAuth:
+                    description: The API Access Credentials
+                    scheme: bearer
+                    type: http
+              info:
+                description: This is a sample OAS.
+                title: OAS Sample
+                version: 1.0.0
+              openapi: 3.0.3
+              paths:
+                /api/sample/users:
+                  get:
+                    operationId: getUsers
+                    responses:
+                      "200":
+                        content:
+                          application/json:
+                            schema:
+                              items:
+                                properties:
+                                  name:
+                                    type: string
+                                type: object
+                              type: array
+                        description: fetched users
+                    summary: Get users
+                    tags:
+                    - users
+              security:
+              - bearerAuth: []
+              servers:
+              - url: https://localhost:8080
+              x-tyk-api-gateway:
+                info:
+                  name: user
+                  state:
+                    active: true
+                server:
+                  listenPath:
+                    strip: true
+                    value: /user-test/
+                upstream:
+                  url: https://localhost:8080
             schema:
               $ref: https://raw.githubusercontent.com/OAI/OpenAPI-Specification/main/schemas/v3.0/schema.json
       responses:
@@ -632,9 +771,13 @@ paths:
         "400":
           content:
             application/json:
+              example:
+                message: Malformed Request or trying to update api in tyk classic
+                  format
+                status: Error
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: Malformed Request or trying to update api in tyk classic format
+          description: Bad Request
         "403":
           content:
             application/json:
@@ -645,75 +788,22 @@ paths:
         "404":
           content:
             application/json:
+              example:
+                message: API not found
+                status: Error
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: API not found
+          description: Not Found
         "500":
           content:
             application/json:
+              example:
+                message: Unexpected error
+                status: Error
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: Unexpected error
+          description: Internal server error.
       summary: Update OAS API definition
-      tags:
-      - OAS APIs
-  /tyk/apis/oas/{apiID}/export:
-    get:
-      description: "Mode of OAS export, by default mode could be empty which means
-        to export OAS spec including OAS Tyk extension. \n  When mode=public, OAS
-        spec excluding Tyk extension is exported"
-      operationId: downloadApiOASPublic
-      parameters:
-      - description: The API ID
-        example: keyless
-        in: path
-        name: apiID
-        required: true
-        schema:
-          type: string
-      - description: Can be set to public
-        example: public
-        in: query
-        name: mode
-        required: false
-        schema:
-          enum:
-          - public
-          type: string
-      responses:
-        "200":
-          content:
-            application/octet-stream:
-              schema:
-                format: binary
-                type: string
-          description: Exported API definition file
-        "400":
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiStatusMessage'
-          description: requesting API definition that is in Tyk classic format
-        "403":
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiStatusMessage'
-          description: Attempting to access a protected api with an invalid or a missing
-            X-Tyk-Authorization in the headers
-        "404":
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiStatusMessage'
-          description: API not found
-        "500":
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiStatusMessage'
-          description: Unexpected error
-      summary: Download an OAS format APIs, when used without the Tyk Dashboard.
       tags:
       - OAS APIs
   /tyk/apis/oas/{apiID}/versions:
@@ -800,9 +890,12 @@ paths:
         "500":
           content:
             application/json:
+              example:
+                message: Unexpected error
+                status: Error
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: Unexpected error
+          description: Internal server error.
       summary: Download all OAS format APIs
       tags:
       - OAS APIs
@@ -813,60 +906,51 @@ paths:
                 For use with an existing OAS API that you want to expose via your Tyk Gateway. (New)
       operationId: importOAS
       parameters:
-      - in: query
-        name: upstreamURL
-        required: false
-        schema:
-          description: Upstream URL for the API
-          type: string
-      - in: query
-        name: listenPath
-        required: false
-        schema:
-          description: Listen path for the API
-          type: string
-      - in: query
-        name: customDomain
-        required: false
-        schema:
-          description: Custom domain for the API
-          type: string
-      - in: query
-        name: authentication
-        required: false
-        schema:
-          description: Enable or disable authentication in your Tyk Gateway as per
-            your OAS document.
-          type: boolean
-      - in: query
-        name: validateRequest
-        required: false
-        schema:
-          description: Enable validateRequest middleware for all endpoints having
-            a request body with media type application/json
-          type: boolean
-      - in: query
-        name: allowList
-        required: false
-        schema:
-          description: Enable allowList middleware for all endpoints
-          type: boolean
-      - in: query
-        name: mockResponse
-        required: false
-        schema:
-          description: Enable mockResponse middleware for all endpoints having responses
-            configured.
-          type: boolean
-      - in: query
-        name: apiID
-        required: false
-        schema:
-          description: ID of the API
-          type: string
+      - $ref: '#/components/parameters/UpstreamURL'
+      - $ref: '#/components/parameters/ListenPath'
+      - $ref: '#/components/parameters/CustomDomain'
+      - $ref: '#/components/parameters/AllowList'
+      - $ref: '#/components/parameters/ValidateRequest'
+      - $ref: '#/components/parameters/MockResponse'
+      - $ref: '#/components/parameters/Authentication'
       requestBody:
         content:
           application/json:
+            example:
+              components:
+                securitySchemes:
+                  bearerAuth:
+                    description: The API Access Credentials
+                    scheme: bearer
+                    type: http
+              info:
+                description: This is a sample OAS.
+                title: OAS Sample
+                version: 1.0.0
+              openapi: 3.0.3
+              paths:
+                /api/sample/users:
+                  get:
+                    operationId: getUsers
+                    responses:
+                      "200":
+                        content:
+                          application/json:
+                            schema:
+                              items:
+                                properties:
+                                  name:
+                                    type: string
+                                type: object
+                              type: array
+                        description: fetched users
+                    summary: Get users
+                    tags:
+                    - users
+              security:
+              - bearerAuth: []
+              servers:
+              - url: https://localhost:8080
             schema:
               $ref: https://raw.githubusercontent.com/OAI/OpenAPI-Specification/main/schemas/v3.0/schema.json
       responses:
@@ -879,9 +963,12 @@ paths:
         "400":
           content:
             application/json:
+              example:
+                message: Malformed request or when the payload contain x-tyk-api-gateway
+                status: Error
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: Malformed request or when the payload contain x-tyk-api-gateway
+          description: Bad Request
         "403":
           content:
             application/json:
@@ -892,9 +979,12 @@ paths:
         "500":
           content:
             application/json:
+              example:
+                message: Unexpected error
+                status: Error
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: Unexpected error
+          description: Internal server error.
       summary: Create a new OAS format API, without x-tyk-gateway
       tags:
       - OAS APIs
@@ -2676,6 +2766,158 @@ paths:
       tags:
       - Schema
 components:
+  examples:
+    oasExample:
+      value:
+        components:
+          securitySchemes:
+            bearerAuth:
+              description: The API Access Credentials
+              scheme: bearer
+              type: http
+        info:
+          description: This is a sample OAS.
+          title: OAS Sample
+          version: 1.0.0
+        openapi: 3.0.3
+        paths:
+          /api/sample/users:
+            get:
+              operationId: getUsers
+              responses:
+                "200":
+                  content:
+                    application/json:
+                      schema:
+                        items:
+                          properties:
+                            name:
+                              type: string
+                          type: object
+                        type: array
+                  description: fetched users
+              summary: Get users
+              tags:
+              - users
+        security:
+        - bearerAuth: []
+        servers:
+        - url: https://localhost:8080
+        x-tyk-api-gateway:
+          info:
+            name: user
+            state:
+              active: true
+          server:
+            listenPath:
+              strip: true
+              value: /user-test/
+          upstream:
+            url: https://localhost:8080
+    stringOasExample:
+      value: "{\n\t\t  \"openapi\": \"3.0.3\",\n\t\t   \"info\": {\n\t\t\t\"title\":
+        \"OAS Sample\",\n\t\t\t\"description\": \"This is a sample OAS.\",\n\t\t\t\"version\":
+        \"1.0.0\"\n\t\t  },\n\t\t  \"servers\": [\n\t\t\t{\n\t\t\t  \"url\": \"https://localhost:8080\"\n\t\t\t}\n\t\t
+        \ ],\n\t\t  \"security\": [\n\t\t\t{\n\t\t\t  \"bearerAuth\": []\n\t\t\t}\n\t\t
+        \ ],\n\t\t  \"paths\": {\n\t\t\t\"/api/sample/users\": {\n\t\t\t  \"get\":
+        {\n\t\t\t\t\"tags\": [\n\t\t\t\t  \"users\"\n\t\t\t\t],\n\t\t\t\t\"summary\":
+        \"Get users\",\n\t\t\t\t\"operationId\": \"getUsers\",\n\t\t\t\t\"responses\":
+        {\n\t\t\t\t  \"200\": {\n\t\t\t\t\t\"description\": \"fetched users\",\n\t\t\t\t\t\"content\":
+        {\n\t\t\t\t\t  \"application/json\": {\n\t\t\t\t\t\t\"schema\": {\n\t\t\t\t\t\t
+        \ \"type\": \"array\",\n\t\t\t\t\t\t  \"items\": {\n\t\t\t\t\t\t\t\"type\":
+        \"object\",\n\t\t\t\t\t\t\t\"properties\": {\n\t\t\t\t\t\t\t  \"name\": {\n\t\t\t\t\t\t\t\t\"type\":
+        \"string\"\n\t\t\t\t\t\t\t  }\n\t\t\t\t\t\t\t}\n\t\t\t\t\t\t  }\n\t\t\t\t\t\t}\n\t\t\t\t\t
+        \ }\n\t\t\t\t\t}\n\t\t\t\t  }\n\t\t\t\t}\n\t\t\t  }\n\t\t\t}\n\t\t  },\n\t\t
+        \  \"components\": {\n\t\t\t\"securitySchemes\": {\n\t\t\t  \"bearerAuth\":
+        {\n\t\t\t\t\"type\": \"http\",\n\t\t\t\t\"scheme\": \"bearer\",\n\t\t\t\t\"description\":
+        \"The API Access Credentials\"\n\t\t\t  }\n\t\t\t}\n\t\t  },\n\t\t\t\"x-tyk-api-gateway\":
+        {\n\t\t\t\t\t\"info\": {\n\t\t\t\t\t\t\"name\": \"user\",\n\t\t\t\t\t\t\"state\":
+        {\n\t\t\t\t\t\t\t\"active\": true\n\t\t\t\t\t\t}\n\t\t\t\t\t},\n\t\t\t\t\t\"upstream\":
+        {\n\t\t\t\t\t\t\"url\": \"https://localhost:8080\"\n\t\t\t\t\t},\n\t\t\t\t\t\"server\":
+        {\n\t\t\t\t\t\t\"listenPath\": {\n\t\t\t\t\t\t\t\"value\": \"/user-test/\",\n\t\t\t\t\t\t\t\"strip\":
+        true\n\t\t\t\t\t\t}\n\t\t\t\t\t}\n\t\t\t\t}\n    }"
+  parameters:
+    AccessType:
+      description: Filter for internal or external API versions
+      example: internal
+      in: query
+      name: accessType
+      required: false
+      schema:
+        enum:
+        - internal
+        - external
+        type: string
+    AllowList:
+      description: Enable allowList middleware for all endpoints
+      in: query
+      name: allowList
+      required: false
+      schema:
+        $ref: '#/components/schemas/BooleanQueryParam'
+    Authentication:
+      description: Enable/disable the authentication mechanism in your Tyk Gateway
+        for your OAS API
+      in: query
+      name: authentication
+      schema:
+        $ref: '#/components/schemas/BooleanQueryParam'
+    CustomDomain:
+      description: Custom domain for the API
+      example: tyk.io
+      in: query
+      name: customDomain
+      required: false
+      schema:
+        type: string
+    ListenPath:
+      description: Listen path for the API
+      example: /user-test/
+      in: query
+      name: listenPath
+      required: false
+      schema:
+        type: string
+    MockResponse:
+      description: Enable mockResponse middleware for all endpoints having responses
+        configured.
+      in: query
+      name: mockResponse
+      required: false
+      schema:
+        $ref: '#/components/schemas/BooleanQueryParam'
+    SearchText:
+      description: Search for API version name
+      example: Sample oas
+      in: query
+      name: searchText
+      required: false
+      schema:
+        type: string
+    TemplateID:
+      description: The asset ID of template applied while creating or importing an
+        OAS API.
+      example: my-unique-template-id
+      in: query
+      name: templateID
+      schema:
+        type: string
+    UpstreamURL:
+      description: Upstream URL for the API
+      example: https://localhost:8080
+      in: query
+      name: upstreamURL
+      required: false
+      schema:
+        type: string
+    ValidateRequest:
+      description: Enable validateRequest middleware for all endpoints having a request
+        body with media type application/json
+      in: query
+      name: validateRequest
+      required: false
+      schema:
+        $ref: '#/components/schemas/BooleanQueryParam'
   schemas:
     APIAllCertificateBasics:
       properties:
@@ -2994,6 +3236,8 @@ components:
           example: 1
           format: double
           type: number
+        smoothing:
+          $ref: '#/components/schemas/RateLimitSmoothing'
         throttle_interval:
           example: 10
           format: double
@@ -3143,6 +3387,12 @@ components:
         password:
           type: string
       type: object
+    BooleanQueryParam:
+      enum:
+      - true
+      - false
+      example: true
+      type: boolean
     CORSConfig:
       properties:
         allow_credentials:
@@ -3253,6 +3503,8 @@ components:
           type: boolean
         id:
           type: string
+        is_ca:
+          type: boolean
         issuer_cn:
           type: string
         not_after:
@@ -3281,6 +3533,8 @@ components:
         id:
           example: 5e9d9544a1dcd60001d0ed207c440d66ebb0a4629d21329808dce9091acf5f2fde328067a6e60e5347271d90
           type: string
+        is_ca:
+          type: boolean
         issuer:
           $ref: '#/components/schemas/PkixName'
         not_after:
@@ -3443,6 +3697,11 @@ components:
         persist_graphql:
           items:
             $ref: '#/components/schemas/PersistGraphQLMeta'
+          nullable: true
+          type: array
+        rate_limit:
+          items:
+            $ref: '#/components/schemas/RateLimitMeta'
           nullable: true
           type: array
         size_limits:
@@ -3653,15 +3912,27 @@ components:
             type: string
           nullable: true
           type: object
+        features:
+          $ref: '#/components/schemas/GraphQLProxyFeaturesConfig'
         request_headers:
           additionalProperties:
             type: string
+          nullable: true
+          type: object
+        request_headers_rewrite:
+          additionalProperties:
+            $ref: '#/components/schemas/RequestHeadersRewriteConfig'
           nullable: true
           type: object
         subscription_type:
           type: string
         use_response_extensions:
           $ref: '#/components/schemas/GraphQLResponseExtensions'
+      type: object
+    GraphQLProxyFeaturesConfig:
+      properties:
+        use_immutable_headers:
+          type: boolean
       type: object
     GraphQLResponseExtensions:
       properties:
@@ -4154,6 +4425,8 @@ components:
           example: 1000
           format: double
           type: number
+        smoothing:
+          $ref: '#/components/schemas/RateLimitSmoothing'
         tags:
           items:
             type: string
@@ -4248,6 +4521,39 @@ components:
               minimum: 0
               type: integer
           type: object
+      type: object
+    RateLimitMeta:
+      properties:
+        disabled:
+          type: boolean
+        method:
+          type: string
+        path:
+          type: string
+        per:
+          type: number
+        rate:
+          type: number
+      type: object
+    RateLimitSmoothing:
+      properties:
+        delay:
+          type: integer
+        enabled:
+          type: boolean
+        step:
+          type: integer
+        threshold:
+          type: integer
+        trigger:
+          type: number
+      type: object
+    RequestHeadersRewriteConfig:
+      properties:
+        remove:
+          type: boolean
+        value:
+          type: string
       type: object
     RequestSigningMeta:
       properties:
@@ -4506,9 +4812,12 @@ components:
           example: 0
           format: int64
           type: integer
+        smoothing:
+          $ref: '#/components/schemas/RateLimitSmoothing'
         tags:
           example:
-          - 641c15dd0fffb800010197bf
+          - edge
+          - edge-eu
           items:
             type: string
           nullable: true
@@ -4730,6 +5039,8 @@ components:
           type: boolean
         strip_versioning_data:
           type: boolean
+        url_versioning_pattern:
+          type: string
         versions:
           additionalProperties:
             type: string
