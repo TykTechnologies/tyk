@@ -1,0 +1,21 @@
+on:
+  pull_request:
+    branches:
+      - master
+      - release-**
+jobs:
+  redocly_validator:
+    runs-on: ubuntu-latest
+    name: Validate the swagger with redocly cli
+
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Validate OpenAPI definition with redocly
+        run: |
+          npm install @redocly/cli -g
+          redocly lint tyk-api-documentation/swagger.yaml --config=tyk-api-documentation/redocly.yml
+
+
