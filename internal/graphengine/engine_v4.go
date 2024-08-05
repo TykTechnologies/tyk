@@ -64,7 +64,7 @@ func NewEngineV4(options EngineV4Options) *EngineV4 {
 		ctxRetrieveRequest: options.Injections.ContextRetrieveRequest,
 	}
 
-	reverseProxyPreHdlr := &reverseProxyPreHandler{
+	reverseProxyPreHdlr := &reverseProxyPreHandlerV4{
 		ctxRetrieveGraphQLRequest: options.Injections.ContextRetrieveRequest,
 		apiDefinition:             options.ApiDefinition,
 		httpClient:                options.HttpClient,

@@ -19,14 +19,14 @@ type tykGqlRequestProcessor struct {
 	ctxRetrieveRequest ContextRetrieveRequestFunc
 }
 
-type reverseProxyPreHandler struct {
+type reverseProxyPreHandlerV4 struct {
 	ctxRetrieveGraphQLRequest ContextRetrieveRequestFunc
 	apiDefinition             *apidef.APIDefinition
 	httpClient                *http.Client
 	newReusableBodyReadCloser NewReusableBodyReadCloserFunc
 }
 
-func (r *reverseProxyPreHandler) PreHandle(params ReverseProxyParams) (reverseProxyType ReverseProxyType, err error) {
+func (r *reverseProxyPreHandlerV4) PreHandle(params ReverseProxyParams) (reverseProxyType ReverseProxyType, err error) {
 	r.httpClient.Transport = NewGraphQLEngineTransport(
 		DetermineGraphQLEngineTransportType(r.apiDefinition),
 		params.RoundTripper,
