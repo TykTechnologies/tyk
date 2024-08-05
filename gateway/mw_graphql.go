@@ -161,12 +161,19 @@ func (m *GraphQLMiddleware) Init() {
 			return
 		}
 		m.Spec.GraphEngine = engine
+	} else if m.Spec.GraphQL.Version == apidef.GraphQLConfigVersion4 {
+		log.Debug("GraphQL config version is 4, passing ", m.Spec.Name)
 	} else {
 		log.Errorf("Could not init GraphQL middleware: invalid config version provided: %s", m.Spec.GraphQL.Version)
 	}
 }
 
 func (m *GraphQLMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
+	if m.Spec.GraphQL.Version == apidef.GraphQLConfigVersion4 {
+		// This request will be handled by the new GraphQL library.
+		return nil, 0
+	}
+
 	err := m.checkForUnsupportedUsage()
 	if err != nil {
 		m.Logger().WithError(err).Error("request could not be executed because of unsupported usage")

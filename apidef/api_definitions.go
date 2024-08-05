@@ -896,6 +896,7 @@ const (
 	GraphQLConfigVersion1        GraphQLConfigVersion = "1"
 	GraphQLConfigVersion2        GraphQLConfigVersion = "2"
 	GraphQLConfigVersion3Preview GraphQLConfigVersion = "3-preview"
+	GraphQLConfigVersion4        GraphQLConfigVersion = "4"
 )
 
 type GraphQLIntrospectionConfig struct {

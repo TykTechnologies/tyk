@@ -18,6 +18,7 @@ const (
 	EngineVersionV1
 	EngineVersionV2
 	EngineVersionV3
+	EngineVersionV4
 )
 
 type ProcessGraphQLComplexityParams struct {
