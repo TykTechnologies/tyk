@@ -2,6 +2,7 @@ package oas
 
 import (
 	"context"
+	"embed"
 	"strings"
 	"testing"
 
@@ -9,6 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/internal/time"
 )
 
 func minimumValidOAS() OAS {
@@ -21,6 +23,38 @@ func minimumValidOAS() OAS {
 			OpenAPI: DefaultOpenAPI,
 		},
 	}
+}
+
+//go:embed testdata/urlSorting.json
+var urlSortingFS embed.FS
+
+func TestOAS_PathsAndOperations_sorting(t *testing.T) {
+	var oasDef OAS
+	var classicDef apidef.APIDefinition
+
+	decode(t, urlSortingFS, &oasDef, "testdata/urlSorting.json")
+
+	oasDef.ExtractTo(&classicDef)
+
+	got := []string{}
+	for _, v := range classicDef.VersionData.Versions[""].ExtendedPaths.Ignored {
+		got = append(got, v.Path)
+	}
+
+	want := []string{
+		"/test/abc/def",
+		"/anything/dupa",
+		"/anything/dupe",
+		"/anything/dupi",
+		"/anything/dupo",
+		"/anything/{id}",
+		"/test/abc",
+		"/test/{id}",
+		"/anything",
+		"/test",
+	}
+
+	assert.Equal(t, want, got)
 }
 
 func TestOAS_PathsAndOperations(t *testing.T) {
@@ -52,6 +86,9 @@ func TestOAS_PathsAndOperations(t *testing.T) {
 	operation.VirtualEndpoint.Name = ""               // Name is deprecated.
 	operation.PostPlugins = operation.PostPlugins[:1] // only 1 post plugin is considered at this point, ignore others.
 	operation.PostPlugins[0].Name = ""                // Name is deprecated.
+
+	operation.RateLimit.Per = ReadableDuration(time.Minute)
+
 	xTykAPIGateway := &XTykAPIGateway{
 		Middleware: &Middleware{
 			Operations: Operations{

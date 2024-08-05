@@ -5,10 +5,11 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
-	mathRand "math/rand"
+	mathrand "math/rand"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -16,7 +17,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
-	textTemplate "text/template"
+	texttemplate "text/template"
 	"time"
 
 	"github.com/stretchr/testify/assert"
@@ -667,7 +668,7 @@ func TestCheckHeaderInRemoveList(t *testing.T) {
 		GlobalHeadersRemove   []string
 		ExtendedDeleteHeaders []string
 	}
-	tpl, err := textTemplate.New("test_tpl").Parse(`{
+	tpl, err := texttemplate.New("test_tpl").Parse(`{
 		"api_id": "1",
 		"version_data": {
 			"not_versioned": true,
@@ -758,6 +759,7 @@ func TestCheckHeaderInRemoveList(t *testing.T) {
 }
 
 func testRequestIPHops(t testing.TB) {
+	t.Helper()
 	req := &http.Request{
 		Header:     http.Header{},
 		RemoteAddr: "test.com:80",
@@ -1342,7 +1344,7 @@ func TestGraphQL_InternalDataSource_memConnProviders(t *testing.T) {
 	// tests run in parallel and memConnProviders is a global struct.
 	// For consistency, we use unique names for the subgraphs.
 	tykSubgraphAccounts := BuildAPI(func(spec *APISpec) {
-		spec.Name = fmt.Sprintf("subgraph-accounts-%d", mathRand.Intn(1000))
+		spec.Name = fmt.Sprintf("subgraph-accounts-%d", mathrand.Intn(1000))
 		spec.APIID = "subgraph1"
 		spec.Proxy.TargetURL = testSubgraphAccounts
 		spec.Proxy.ListenPath = "/tyk-subgraph-accounts"
@@ -1358,7 +1360,7 @@ func TestGraphQL_InternalDataSource_memConnProviders(t *testing.T) {
 	})[0]
 
 	tykSubgraphReviews := BuildAPI(func(spec *APISpec) {
-		spec.Name = fmt.Sprintf("subgraph-reviews-%d", mathRand.Intn(1000))
+		spec.Name = fmt.Sprintf("subgraph-reviews-%d", mathrand.Intn(1000))
 		spec.APIID = "subgraph2"
 		spec.Proxy.TargetURL = testSubgraphReviews
 		spec.Proxy.ListenPath = "/tyk-subgraph-reviews"
@@ -1498,7 +1500,7 @@ func TestGraphQL_OptionsPassThrough(t *testing.T) {
 			Code:    http.StatusOK,
 			HeadersMatch: map[string]string{
 				"Access-Control-Allow-Methods": http.MethodPost,
-				"Access-Control-Allow-Headers": "Content-Type",
+				"Access-Control-Allow-Headers": "content-type",
 				"Access-Control-Allow-Origin":  "*",
 			},
 		})
@@ -1585,6 +1587,23 @@ func TestEnsureTransport(t *testing.T) {
 	cases := []struct {
 		host, protocol, expect string
 	}{
+		// This section tests EnsureTransport if port + IP is supplied
+		{"https://192.168.1.1:443 ", "https", "https://192.168.1.1:443"},
+		{"192.168.1.1:443 ", "https", "https://192.168.1.1:443"},
+		{"http://192.168.1.1:80 ", "https", "http://192.168.1.1:80"},
+		{"192.168.1.1:2000 ", "tls", "tls://192.168.1.1:2000"},
+		{"192.168.1.1:2000 ", "", "http://192.168.1.1:2000"},
+		// This section tests EnsureTransport if port is supplied
+		{"https://httpbin.org:443 ", "https", "https://httpbin.org:443"},
+		{"httpbin.org:443 ", "https", "https://httpbin.org:443"},
+		{"http://httpbin.org:80 ", "https", "http://httpbin.org:80"},
+		{"httpbin.org:2000 ", "tls", "tls://httpbin.org:2000"},
+		{"httpbin.org:2000 ", "", "http://httpbin.org:2000"},
+		// This is the h2c proto to http conversion
+		{"http://httpbin.org ", "h2c", "http://httpbin.org"},
+		{"h2c://httpbin.org ", "h2c", "http://httpbin.org"},
+		{"httpbin.org ", "h2c", "http://httpbin.org"},
+		// This is the default parse section
 		{"https://httpbin.org ", "https", "https://httpbin.org"},
 		{"httpbin.org ", "https", "https://httpbin.org"},
 		{"http://httpbin.org ", "https", "http://httpbin.org"},
@@ -1594,9 +1613,11 @@ func TestEnsureTransport(t *testing.T) {
 	for i, v := range cases {
 		t.Run(fmt.Sprintf("case-%d", i), func(t *testing.T) {
 			g := EnsureTransport(v.host, v.protocol)
-			if g != v.expect {
-				t.Errorf("expected %q got %q", v.expect, g)
-			}
+
+			assert.Equal(t, v.expect, g)
+
+			_, err := url.Parse(g)
+			assert.NoError(t, err)
 		})
 	}
 }
@@ -1717,7 +1738,7 @@ func TestReverseProxyWebSocketCancelation(t *testing.T) {
 		case line == terminalMsg: // this case before "err == io.EOF"
 			t.Fatalf("The websocket request was not canceled, unfortunately!")
 
-		case err == io.EOF:
+		case errors.Is(err, io.EOF):
 			return
 
 		case err != nil:
@@ -1731,21 +1752,15 @@ func TestReverseProxyWebSocketCancelation(t *testing.T) {
 }
 
 func TestSSE(t *testing.T) {
-	test.Flaky(t) // TODO: TT-5250
-
-	// send and receive should be in order
-	var wg sync.WaitGroup
-
 	sseServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/event-stream")
 		w.Header().Set("Connection", "keep-alive")
 
 		flusher, _ := w.(http.Flusher)
 		for i := 0; i < 5; i++ {
-			wg.Wait()
 			fmt.Fprintf(w, "data: %d\n", i)
 			flusher.Flush()
-			wg.Add(1)
+			time.Sleep(50 * time.Millisecond)
 		}
 	}))
 
@@ -1765,7 +1780,10 @@ func TestSSE(t *testing.T) {
 
 	client := http.Client{}
 
-	stream := func(enableWebSockets bool) {
+	stream := func(enableWebSockets bool) error {
+		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+		defer cancel()
+
 		globalConf := ts.Gw.GetConfig()
 		globalConf.HttpServerOptions.EnableWebSockets = enableWebSockets
 		ts.Gw.SetConfig(globalConf)
@@ -1777,28 +1795,42 @@ func TestSSE(t *testing.T) {
 		defer res.Body.Close()
 
 		i := 0
-		for {
-			line, err := reader.ReadBytes('\n')
-			if err != nil && err != io.EOF {
-				t.Fatal(err)
-			}
+		okChan := make(chan error)
 
-			if len(line) == 0 {
-				break
-			}
+		go func() {
+			for {
+				line, err := reader.ReadBytes('\n')
+				if err != nil && errors.Is(err, io.EOF) {
+					err = nil
+				}
 
-			assert.Equal(t, fmt.Sprintf("data: %v\n", i), string(line))
-			i++
-			wg.Done()
+				assert.NoError(t, err)
+
+				if len(line) == 0 {
+					break
+				}
+
+				assert.Equal(t, fmt.Sprintf("data: %v\n", i), string(line))
+				i++
+			}
+			close(okChan)
+		}()
+
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-okChan:
 		}
+		assert.Equal(t, i, 5)
+		return nil
 	}
 
 	t.Run("websockets disabled", func(t *testing.T) {
-		stream(false)
+		assert.NoError(t, stream(false))
 	})
 
 	t.Run("websockets enabled", func(t *testing.T) {
-		stream(true)
+		assert.NoError(t, stream(true))
 	})
 }
 

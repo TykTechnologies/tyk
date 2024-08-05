@@ -2,6 +2,7 @@ package linter
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net"
 	"os"
@@ -70,7 +71,8 @@ func addFormats(chain *schema.FormatCheckerChain) {
 	}))
 	chain.Add("host-no-port", stringFormat(func(host string) bool {
 		_, port, err := net.SplitHostPort(host)
-		if a, ok := err.(*net.AddrError); ok && a.Err == "missing port in address" {
+		var a *net.AddrError
+		if errors.As(err, &a) && a.Err == "missing port in address" {
 			// port being missing is ok
 			err = nil
 		}

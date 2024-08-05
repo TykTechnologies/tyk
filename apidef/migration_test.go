@@ -5,6 +5,8 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+
+	"github.com/TykTechnologies/tyk/internal/event"
 )
 
 const (
@@ -349,6 +351,7 @@ func TestAPIDefinition_MigrateVersioning_StripPath(t *testing.T) {
 	}
 
 	check := func(t *testing.T, base APIDefinition, stripVersioningData bool) {
+		t.Helper()
 		versions, err := base.MigrateVersioning()
 		assert.NoError(t, err)
 
@@ -625,6 +628,18 @@ func TestSetDisabledFlags(t *testing.T) {
 				},
 			},
 		},
+		EventHandlers: EventHandlerMetaConfig{
+			Events: map[TykEvent][]EventHandlerTriggerConfig{
+				event.QuotaExceeded: {
+					{
+						Handler: event.WebHookHandler,
+						HandlerMeta: map[string]interface{}{
+							"target_path": "https://webhook.site/uuid",
+						},
+					},
+				},
+			},
+		},
 	}
 	expectedAPIDef := APIDefinition{
 		CustomMiddleware: MiddlewareSection{
@@ -697,9 +712,24 @@ func TestSetDisabledFlags(t *testing.T) {
 		GlobalRateLimit: GlobalRateLimit{
 			Disabled: true,
 		},
+		EventHandlers: EventHandlerMetaConfig{
+			Events: map[event.Event][]EventHandlerTriggerConfig{
+				event.QuotaExceeded: {
+					{
+						Handler: event.WebHookHandler,
+						HandlerMeta: map[string]interface{}{
+							"target_path": "https://webhook.site/uuid",
+							"disabled":    true,
+						},
+					},
+				},
+			},
+		},
+		DoNotTrack: true,
 	}
 	apiDef.SetDisabledFlags()
 	assert.Equal(t, expectedAPIDef, apiDef)
+	assert.EqualValues(t, expectedAPIDef.EventHandlers, apiDef.EventHandlers)
 }
 
 func TestAPIDefinition_migrateIDExtractor(t *testing.T) {

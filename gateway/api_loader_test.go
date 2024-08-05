@@ -13,17 +13,15 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"github.com/TykTechnologies/storage/persistent/model"
-	"github.com/TykTechnologies/tyk/apidef"
-	"github.com/TykTechnologies/tyk/config"
-
 	"github.com/stretchr/testify/assert"
 
+	persistentmodel "github.com/TykTechnologies/storage/persistent/model"
+	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/internal/uuid"
 	"github.com/TykTechnologies/tyk/test"
 	"github.com/TykTechnologies/tyk/trace"
 	"github.com/TykTechnologies/tyk/user"
-
-	"github.com/TykTechnologies/tyk/internal/uuid"
 )
 
 func TestOpenTracing(t *testing.T) {
@@ -101,7 +99,7 @@ func TestFuzzyFindAPI(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
-	objectId := model.NewObjectID()
+	objectId := persistentmodel.NewObjectID()
 
 	ts.Gw.BuildAndLoadAPI(
 		func(spec *APISpec) {
@@ -190,6 +188,7 @@ func TestGraphQLPlayground(t *testing.T) {
 	})[0]
 
 	run := func(t *testing.T, playgroundPath string, api *APISpec, env string) {
+		t.Helper()
 		endpoint := api.Proxy.ListenPath
 		if env == "cloud" {
 			endpoint = fmt.Sprintf("/%s/", api.Slug)

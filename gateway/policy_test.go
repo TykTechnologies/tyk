@@ -12,7 +12,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/TykTechnologies/storage/persistent/model"
+	persistentmodel "github.com/TykTechnologies/storage/persistent/model"
 
 	"github.com/stretchr/testify/assert"
 
@@ -144,31 +144,37 @@ func (s *Test) TestPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesD
 		"rate4": {
 			Partitions:   user.PolicyPartitions{RateLimit: true},
 			Rate:         8,
+			Per:          1,
 			AccessRights: map[string]user.AccessDefinition{"a": {}},
 		},
 		"rate5": {
 			Partitions:   user.PolicyPartitions{RateLimit: true},
 			Rate:         10,
+			Per:          1,
 			AccessRights: map[string]user.AccessDefinition{"a": {}},
 		},
 		"rate-for-a": {
 			Partitions:   user.PolicyPartitions{RateLimit: true},
 			AccessRights: map[string]user.AccessDefinition{"a": {}},
 			Rate:         4,
+			Per:          1,
 		},
 		"rate-for-b": {
 			Partitions:   user.PolicyPartitions{RateLimit: true},
 			AccessRights: map[string]user.AccessDefinition{"b": {}},
 			Rate:         2,
+			Per:          1,
 		},
 		"rate-for-a-b": {
 			Partitions:   user.PolicyPartitions{RateLimit: true},
 			AccessRights: map[string]user.AccessDefinition{"a": {}, "b": {}},
 			Rate:         4,
+			Per:          1,
 		},
 		"rate-no-partition": {
 			AccessRights: map[string]user.AccessDefinition{"a": {}},
 			Rate:         12,
+			Per:          1,
 		},
 		"acl1": {
 			Partitions:   user.PolicyPartitions{Acl: true},
@@ -434,6 +440,8 @@ func (s *Test) TestPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesD
 			name:     "MultiNonPart",
 			policies: []string{"nonpart1", "nonpart2", "nonexistent"},
 			sessMatch: func(t *testing.T, s *user.SessionState) {
+				t.Helper()
+
 				want := map[string]user.AccessDefinition{
 					"a": {
 						Limit:          user.APILimit{},
@@ -452,6 +460,8 @@ func (s *Test) TestPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesD
 			name:     "MultiACLPolicy",
 			policies: []string{"nonpart3"},
 			sessMatch: func(t *testing.T, s *user.SessionState) {
+				t.Helper()
+
 				want := map[string]user.AccessDefinition{
 					"a": {
 						Limit: user.APILimit{},
@@ -558,9 +568,7 @@ func (s *Test) TestPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesD
 		{
 			"RatePart with unlimited", []string{"unlimited-rate"},
 			"", func(t *testing.T, s *user.SessionState) {
-				if s.Rate != -1 {
-					t.Fatalf("want unlimited rate to be -1")
-				}
+				assert.True(t, s.Rate <= 0, "want unlimited rate to be <= 0")
 			}, nil,
 		},
 		{
@@ -639,7 +647,7 @@ func (s *Test) TestPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesD
 		{
 			"Acl for a and rate for a,b", []string{"acl1", "rate-for-a-b"},
 			"", func(t *testing.T, s *user.SessionState) {
-				want := map[string]user.AccessDefinition{"a": {Limit: user.APILimit{Rate: 4}}}
+				want := map[string]user.AccessDefinition{"a": {Limit: user.APILimit{Rate: 4, Per: 1}}}
 				assert.Equal(t, want, s.AccessRights)
 			}, nil,
 		},
@@ -647,8 +655,8 @@ func (s *Test) TestPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesD
 			"Acl for a,b and individual rate for a,b", []string{"acl-for-a-b", "rate-for-a", "rate-for-b"},
 			"", func(t *testing.T, s *user.SessionState) {
 				want := map[string]user.AccessDefinition{
-					"a": {Limit: user.APILimit{Rate: 4}},
-					"b": {Limit: user.APILimit{Rate: 2}},
+					"a": {Limit: user.APILimit{Rate: 4, Per: 1}},
+					"b": {Limit: user.APILimit{Rate: 2, Per: 1}},
 				}
 				assert.Equal(t, want, s.AccessRights)
 			}, nil,
@@ -684,6 +692,8 @@ func (s *Test) TestPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesD
 			name:     "Per API is set to true with no other partitions set to true",
 			policies: []string{"per_api_and_no_other_partitions"},
 			sessMatch: func(t *testing.T, s *user.SessionState) {
+				t.Helper()
+
 				want := map[string]user.AccessDefinition{
 					"d": {
 						Limit: user.APILimit{
@@ -726,6 +736,8 @@ func (s *Test) TestPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesD
 			name:     "Per API is set to true and some API gets limit set from policy's fields",
 			policies: []string{"per_api_with_limit_set_from_policy"},
 			sessMatch: func(t *testing.T, s *user.SessionState) {
+				t.Helper()
+
 				want := map[string]user.AccessDefinition{
 					"e": {
 						Limit: user.APILimit{
@@ -769,9 +781,12 @@ func (s *Test) TestPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesD
 					},
 				}
 
+				gotPolicy, ok := s.Gw.PolicyByID("per-path2")
+
+				assert.True(t, ok)
 				assert.Equal(t, user.AccessSpec{
 					URL: "/user", Methods: []string{"GET"},
-				}, s.Gw.getPolicy("per-path2").AccessRights["a"].AllowedURLs[0])
+				}, gotPolicy.AccessRights["a"].AllowedURLs[0])
 
 				assert.Equal(t, want, sess.AccessRights)
 			},
@@ -780,6 +795,8 @@ func (s *Test) TestPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesD
 			name:     "Merge restricted fields for the same GraphQL API",
 			policies: []string{"restricted-types1", "restricted-types2"},
 			sessMatch: func(t *testing.T, s *user.SessionState) {
+				t.Helper()
+
 				want := map[string]user.AccessDefinition{
 					"a": { // It should get intersection of restricted types.
 						RestrictedTypes: []graphql.Type{
@@ -797,6 +814,8 @@ func (s *Test) TestPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesD
 			name:     "Merge allowed fields for the same GraphQL API",
 			policies: []string{"allowed-types1", "allowed-types2"},
 			sessMatch: func(t *testing.T, s *user.SessionState) {
+				t.Helper()
+
 				want := map[string]user.AccessDefinition{
 					"a": { // It should get intersection of restricted types.
 						AllowedTypes: []graphql.Type{
@@ -814,6 +833,8 @@ func (s *Test) TestPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesD
 			name:     "If GQL introspection is disabled, it remains disabled after merging",
 			policies: []string{"introspection-disabled", "introspection-enabled"},
 			sessMatch: func(t *testing.T, s *user.SessionState) {
+				t.Helper()
+
 				want := map[string]user.AccessDefinition{
 					"a": {
 						DisableIntrospection: true, // If GQL introspection is disabled, it remains disabled after merging.
@@ -828,6 +849,8 @@ func (s *Test) TestPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesD
 			name:     "Merge field level depth limit for the same GraphQL API",
 			policies: []string{"field-level-depth-limit1", "field-level-depth-limit2"},
 			sessMatch: func(t *testing.T, s *user.SessionState) {
+				t.Helper()
+
 				want := map[string]user.AccessDefinition{
 					"graphql-api": {
 						Limit: user.APILimit{},
@@ -856,6 +879,8 @@ func (s *Test) TestPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesD
 			policies: []string{"throttle1"},
 			errMatch: "",
 			sessMatch: func(t *testing.T, s *user.SessionState) {
+				t.Helper()
+
 				if s.ThrottleRetryLimit != 99 {
 					t.Fatalf("Throttle interval should be 9 inherited from policy")
 				}
@@ -866,6 +891,8 @@ func (s *Test) TestPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesD
 			name:     "inherit quota and rate from partitioned policies",
 			policies: []string{"quota1", "rate3"},
 			sessMatch: func(t *testing.T, s *user.SessionState) {
+				t.Helper()
+
 				if s.QuotaMax != 2 {
 					t.Fatalf("quota should be the same as quota policy")
 				}
@@ -881,6 +908,8 @@ func (s *Test) TestPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesD
 			name:     "inherit quota and rate from partitioned policies applied in different order",
 			policies: []string{"rate3", "quota1"},
 			sessMatch: func(t *testing.T, s *user.SessionState) {
+				t.Helper()
+
 				if s.QuotaMax != 2 {
 					t.Fatalf("quota should be the same as quota policy")
 				}
@@ -1189,7 +1218,6 @@ func TestApplyMultiPolicies(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
-	ts.Gw.policiesMu.RLock()
 	policy1 := user.Policy{
 		ID:               "policy1",
 		Rate:             1000,
@@ -1203,6 +1231,8 @@ func TestApplyMultiPolicies(t *testing.T) {
 			},
 		},
 	}
+
+	assert.True(t, !policy1.APILimit().IsEmpty())
 
 	policy2 := user.Policy{
 		ID:               "policy2",
@@ -1221,11 +1251,14 @@ func TestApplyMultiPolicies(t *testing.T) {
 		},
 	}
 
+	assert.True(t, !policy2.APILimit().IsEmpty())
+
+	ts.Gw.policiesMu.Lock()
 	ts.Gw.policiesByID = map[string]user.Policy{
 		"policy1": policy1,
 		"policy2": policy2,
 	}
-	ts.Gw.policiesMu.RUnlock()
+	ts.Gw.policiesMu.Unlock()
 
 	// load APIs
 	ts.Gw.BuildAndLoadAPI(
@@ -1261,7 +1294,13 @@ func TestApplyMultiPolicies(t *testing.T) {
 	// create key
 	key := uuid.New()
 	ts.Run(t, []test.TestCase{
-		{Method: http.MethodPost, Path: "/tyk/keys/" + key, Data: session, AdminAuth: true, Code: 200},
+		{
+			Method:    http.MethodPost,
+			Path:      "/tyk/keys/" + key,
+			Data:      session,
+			AdminAuth: true,
+			Code:      200,
+		},
 	}...)
 
 	// run requests to different APIs
@@ -1547,7 +1586,7 @@ func TestPerAPIPolicyUpdate(t *testing.T) {
 
 func TestParsePoliciesFromRPC(t *testing.T) {
 
-	objectID := model.NewObjectID()
+	objectID := persistentmodel.NewObjectID()
 	explicitID := "explicit_pol_id"
 	tcs := []struct {
 		testName      string
@@ -1625,7 +1664,7 @@ func (s *RPCDataLoaderMock) GetPolicies(orgId string) string {
 func Test_LoadPoliciesFromRPC(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
-	objectID := model.NewObjectID()
+	objectID := persistentmodel.NewObjectID()
 
 	t.Run("load policies from RPC - success", func(t *testing.T) {
 		mockedStorage := &RPCDataLoaderMock{

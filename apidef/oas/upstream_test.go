@@ -6,6 +6,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/internal/time"
 )
 
 func TestCacheOptions(t *testing.T) {
@@ -114,7 +115,7 @@ func TestUpstream(t *testing.T) {
 				RateLimit: &RateLimit{
 					Enabled: true,
 					Rate:    10,
-					Per:     "1h20m10s",
+					Per:     ReadableDuration(time.Hour + 20*time.Minute + 10*time.Second),
 				},
 			}
 
@@ -127,29 +128,6 @@ func TestUpstream(t *testing.T) {
 			var resultUpstream Upstream
 			resultUpstream.Fill(convertedAPI)
 
-			assert.Equal(t, rateLimitUpstream, resultUpstream)
-		})
-
-		t.Run("invalid duration", func(t *testing.T) {
-			rateLimitUpstream := Upstream{
-				RateLimit: &RateLimit{
-					Enabled: true,
-					Rate:    10,
-					Per:     "1d1h",
-				},
-			}
-
-			var convertedAPI apidef.APIDefinition
-			convertedAPI.SetDisabledFlags()
-			rateLimitUpstream.ExtractTo(&convertedAPI)
-
-			assert.Equal(t, float64(0), convertedAPI.GlobalRateLimit.Per)
-
-			var resultUpstream Upstream
-			resultUpstream.Fill(convertedAPI)
-
-			expectedUpstream := rateLimitUpstream
-			expectedUpstream.RateLimit.Per = ""
 			assert.Equal(t, rateLimitUpstream, resultUpstream)
 		})
 

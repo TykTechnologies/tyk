@@ -3,6 +3,7 @@ package test
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -16,6 +17,7 @@ import (
 )
 
 type TestCase struct {
+	Host    string `json:",omitempty"`
 	Method  string `json:",omitempty"`
 	Path    string `json:",omitempty"`
 	BaseURL string `json:",omitempty"`
@@ -196,8 +198,8 @@ type nopCloser struct {
 // to have it ready for next read-cycle
 func (n nopCloser) Read(p []byte) (int, error) {
 	num, err := n.ReadSeeker.Read(p)
-	if err == io.EOF { // move to start to have it ready for next read cycle
-		n.Seek(0, io.SeekStart)
+	if errors.Is(err, io.EOF) { // move to start to have it ready for next read cycle
+		_, _ = n.Seek(0, io.SeekStart)
 	}
 	return num, err
 }
@@ -282,6 +284,10 @@ func (r HTTPTestRunner) Run(t testing.TB, testCases ...TestCase) (*http.Response
 		if err != nil {
 			t.Errorf("[%d] Request build error: %s", ti, err.Error())
 			continue
+		}
+
+		if tc.Host != "" {
+			req.Host = tc.Host
 		}
 
 		retryCount := 0

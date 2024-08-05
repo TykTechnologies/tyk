@@ -9,6 +9,7 @@ import (
 	"github.com/getkin/kin-openapi/openapi3"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/internal/oasutil"
 )
 
 // Operations holds Operation definitions.
@@ -77,6 +78,9 @@ type Operation struct {
 
 	// RequestSizeLimit limits the maximum allowed size of the request body in bytes.
 	RequestSizeLimit *RequestSizeLimit `bson:"requestSizeLimit,omitempty" json:"requestSizeLimit,omitempty"`
+
+	// RateLimit contains endpoint level rate limit configuration.
+	RateLimit *RateLimitEndpoint `bson:"rateLimit,omitempty" json:"rateLimit,omitempty"`
 }
 
 // AllowanceType holds the valid allowance types values.
@@ -158,6 +162,7 @@ func (s *OAS) fillPathsAndOperations(ep apidef.ExtendedPathsSet) {
 	s.fillTrackEndpoint(ep.TrackEndpoints)
 	s.fillDoNotTrackEndpoint(ep.DoNotTrackEndpoints)
 	s.fillRequestSizeLimit(ep.SizeLimit)
+	s.fillRateLimitEndpoints(ep.RateLimit)
 }
 
 func (s *OAS) extractPathsAndOperations(ep *apidef.ExtendedPathsSet) {
@@ -168,9 +173,9 @@ func (s *OAS) extractPathsAndOperations(ep *apidef.ExtendedPathsSet) {
 		return
 	}
 
-	for id, tykOp := range tykOperations {
-	found:
-		for path, pathItem := range s.Paths {
+	for _, pathItem := range oasutil.SortByPathLength(s.Paths) {
+		for id, tykOp := range tykOperations {
+			path := pathItem.Path
 			for method, operation := range pathItem.Operations() {
 				if id == operation.OperationID {
 					tykOp.extractAllowanceTo(ep, path, method, allow)
@@ -191,7 +196,8 @@ func (s *OAS) extractPathsAndOperations(ep *apidef.ExtendedPathsSet) {
 					tykOp.extractTrackEndpointTo(ep, path, method)
 					tykOp.extractDoNotTrackEndpointTo(ep, path, method)
 					tykOp.extractRequestSizeLimitTo(ep, path, method)
-					break found
+					tykOp.extractRateLimitEndpointTo(ep, path, method)
+					break
 				}
 			}
 		}
@@ -718,7 +724,7 @@ type MockResponse struct {
 	// Body is the HTTP response body that will be returned.
 	Body string `bson:"body,omitempty" json:"body,omitempty"`
 	// Headers are the HTTP response headers that will be returned.
-	Headers []Header `bson:"headers,omitempty" json:"headers,omitempty"`
+	Headers Headers `bson:"headers,omitempty" json:"headers,omitempty"`
 	// FromOASExamples is the configuration to extract a mock response from OAS documentation.
 	FromOASExamples *FromOASExamples `bson:"fromOASExamples,omitempty" json:"fromOASExamples,omitempty"`
 }
@@ -784,6 +790,31 @@ func (o *Operation) extractVirtualEndpointTo(ep *apidef.ExtendedPathsSet, path s
 	meta := apidef.VirtualMeta{Path: path, Method: method}
 	o.VirtualEndpoint.ExtractTo(&meta)
 	ep.Virtual = append(ep.Virtual, meta)
+}
+
+func (s *OAS) fillRateLimitEndpoints(endpointMetas []apidef.RateLimitMeta) {
+	for _, em := range endpointMetas {
+		operationID := s.getOperationID(em.Path, em.Method)
+		operation := s.GetTykExtension().getOperation(operationID)
+		if operation.RateLimit == nil {
+			operation.RateLimit = &RateLimitEndpoint{}
+		}
+
+		operation.RateLimit.Fill(em)
+		if ShouldOmit(operation.RateLimit) {
+			operation.RateLimit = nil
+		}
+	}
+}
+
+func (o *Operation) extractRateLimitEndpointTo(ep *apidef.ExtendedPathsSet, path string, method string) {
+	if o.RateLimit == nil {
+		return
+	}
+
+	meta := apidef.RateLimitMeta{Path: path, Method: method}
+	o.RateLimit.ExtractTo(&meta)
+	ep.RateLimit = append(ep.RateLimit, meta)
 }
 
 func (s *OAS) fillEndpointPostPlugins(endpointMetas []apidef.GoPluginMeta) {

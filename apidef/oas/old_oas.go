@@ -6,6 +6,7 @@ import (
 	openapifork "github.com/TykTechnologies/kin-openapi/openapi3"
 )
 
+// OldOAS serves for data model migration/conversion purposes (gorm).
 type OldOAS struct {
 	openapifork.T
 }

@@ -43,6 +43,8 @@ import (
 	"sync"
 	"time"
 
+	gqlv2 "github.com/TykTechnologies/graphql-go-tools/v2/pkg/graphql"
+
 	"github.com/getkin/kin-openapi/openapi3"
 
 	"github.com/TykTechnologies/tyk/config"
@@ -890,7 +892,7 @@ func (gw *Gateway) handleRemoveSortedSetRange(keyName, scoreFrom, scoreTo string
 }
 
 func (gw *Gateway) handleGetPolicy(polID string) (interface{}, int) {
-	if pol := gw.getPolicy(polID); pol.ID != "" {
+	if pol, ok := gw.PolicyByID(polID); ok && pol.ID != "" {
 		return pol, http.StatusOK
 	}
 
@@ -3107,21 +3109,6 @@ func ctxSetSession(r *http.Request, s *user.SessionState, scheduleUpdate bool, h
 	ctx.SetSession(r, s, scheduleUpdate, hashKey)
 }
 
-func ctxScheduleSessionUpdate(r *http.Request) {
-	setCtxValue(r, ctx.UpdateSession, true)
-}
-
-func ctxDisableSessionUpdate(r *http.Request) {
-	setCtxValue(r, ctx.UpdateSession, false)
-}
-
-func ctxSessionUpdateScheduled(r *http.Request) bool {
-	if v := r.Context().Value(ctx.UpdateSession); v != nil {
-		return v.(bool)
-	}
-	return false
-}
-
 func ctxGetAuthToken(r *http.Request) string {
 	return ctx.GetAuthToken(r)
 }
@@ -3263,6 +3250,19 @@ func ctxSetGraphQLRequest(r *http.Request, gqlRequest *gql.Request) {
 func ctxGetGraphQLRequest(r *http.Request) (gqlRequest *gql.Request) {
 	if v := r.Context().Value(ctx.GraphQLRequest); v != nil {
 		if gqlRequest, ok := v.(*gql.Request); ok {
+			return gqlRequest
+		}
+	}
+	return nil
+}
+
+func ctxSetGraphQLRequestV2(r *http.Request, gqlRequest *gqlv2.Request) {
+	setCtxValue(r, ctx.GraphQLRequest, gqlRequest)
+}
+
+func ctxGetGraphQLRequestV2(r *http.Request) (gqlRequest *gqlv2.Request) {
+	if v := r.Context().Value(ctx.GraphQLRequest); v != nil {
+		if gqlRequest, ok := v.(*gqlv2.Request); ok {
 			return gqlRequest
 		}
 	}
