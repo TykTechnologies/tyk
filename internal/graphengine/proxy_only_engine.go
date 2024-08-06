@@ -61,7 +61,7 @@ func NewProxyOnlyEngine(options ProxyOnlyEngineOptions) *ProxyOnlyEngine {
 	logger := createAbstractLogrusLogger(options.Logger)
 	ctx, cancel := context.WithCancel(context.Background())
 
-	requestProcessor := &tykGqlRequestProcessor{
+	requestProcessor := &proxyOnlyRequestProcessor{
 		logger:             logger,
 		schema:             options.Schema,
 		ctxRetrieveRequest: options.Injections.ContextRetrieveRequest,
@@ -134,39 +134,29 @@ func (e *ProxyOnlyEngine) ProcessGraphQLGranularAccess(w http.ResponseWriter, r 
 
 func (e *ProxyOnlyEngine) HandleReverseProxy(params ReverseProxyParams) (res *http.Response, hijacked bool, err error) {
 	e.httpClient.Transport = NewGraphQLEngineTransport(
-		DetermineGraphQLEngineTransportType(e.ApiDefinition),
+		GraphQLEngineTransportTypeProxyOnly,
 		params.RoundTripper,
 		e.newReusableBodyReadCloser,
 		params.HeadersConfig,
 	)
 
-	reverseProxyType, err := e.reverseProxyPreHandler.PreHandle(params)
-	if err != nil {
-		e.logger.Error("error on reverse proxy pre handler", abstractlogger.Error(err))
-		return nil, false, err
-	}
+	//reverseProxyType, err := e.reverseProxyPreHandler.PreHandle(params)
+	//if err != nil {
+	//	e.logger.Error("error on reverse proxy pre handler", abstractlogger.Error(err))
+	//	return nil, false, err
+	//}
 
 	//gqlRequest := e.ctxRetrieveRequestFunc(params.OutRequest)
 
 	// TODO: Bring back the Cleanup method
-	switch reverseProxyType {
-	//case ReverseProxyTypeIntrospection:
-	//	return e.gqlTools.handleIntrospection(e.Schema)
-	//case ReverseProxyTypeWebsocketUpgrade:
-	//	return e.handoverWebSocketConnectionToGraphQLExecutionEngine(&params)
-	case ReverseProxyTypeGraphEngine:
-		//return e.handoverRequestToGraphQLExecutionEngine(gqlRequest, params.OutRequest)
-	//case ReverseProxyTypePreFlight:
-	//	if e.ApiDefinition.GraphQL.ExecutionMode == apidef.GraphQLExecutionModeProxyOnly {
-	//		return nil, false, nil
-	//	}
-	//	return nil, false, errors.New("options passthrough not allowed")
-	case ReverseProxyTypeNone:
-		return nil, false, nil
+	res, err = e.httpClient.Transport.RoundTrip(params.OutRequest)
+	if err != nil {
+		return nil, false, err
 	}
+	return res, false, nil
 
-	e.logger.Error("unknown reverse proxy type", abstractlogger.Int("reverseProxyType", int(reverseProxyType)))
-	return nil, false, ErrUnknownReverseProxyType
+	//e.logger.Error("unknown reverse proxy type", abstractlogger.Int("reverseProxyType", int(reverseProxyType)))
+	//return nil, false, ErrUnknownReverseProxyType
 }
 
 func (e *ProxyOnlyEngine) handoverRequestToGraphQLExecutionEngine(gqlRequest *graphql.Request, outreq *http.Request) (res *http.Response, hijacked bool, err error) {

@@ -13,7 +13,7 @@ import (
 type ContextRetrieveRequestFunc func(r *http.Request) *graphql.Request
 type ContextStoreRequestFunc func(r *http.Request, gqlRequest *graphql.Request)
 
-type tykGqlRequestProcessor struct {
+type proxyOnlyRequestProcessor struct {
 	logger             abstractlogger.Logger
 	schema             *graphql.Schema
 	ctxRetrieveRequest ContextRetrieveRequestFunc
@@ -58,7 +58,7 @@ func (r *reverseProxyPreHandlerV4) PreHandle(params ReverseProxyParams) (reverse
 	return ReverseProxyTypeNone, nil
 }
 
-func (t *tykGqlRequestProcessor) ProcessRequest(ctx context.Context, w http.ResponseWriter, r *http.Request) (error, int) {
+func (t *proxyOnlyRequestProcessor) ProcessRequest(ctx context.Context, w http.ResponseWriter, r *http.Request) (error, int) {
 	if r == nil {
 		t.logger.Error("request is nil")
 		return ProxyingRequestFailedErr, http.StatusInternalServerError
@@ -97,4 +97,4 @@ func (t *tykGqlRequestProcessor) ProcessRequest(ctx context.Context, w http.Resp
 	return nil, http.StatusOK
 }
 
-var _ GraphQLRequestProcessor = (*tykGqlRequestProcessor)(nil)
+var _ GraphQLRequestProcessor = (*proxyOnlyRequestProcessor)(nil)
