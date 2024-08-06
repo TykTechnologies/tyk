@@ -1,0 +1,50 @@
+---
+version: "3"
+
+vars:
+  testArgs: -v
+  coverage: log.cov
+
+tasks:
+  test:
+    desc: "Run tests"
+    cmds:
+      - task: fmt
+      - go test {{.testArgs}} -count=1 -cover -coverprofile={{.coverage}} -coverpkg=./... ./...
+
+  bench:
+    desc: "Run benchmarks"
+    cmds:
+      - task: fmt
+      - go test {{.testArgs}} -count=1 -tags integration -bench=. -benchtime=10s -benchmem ./...
+
+  fmt:
+    internal: true
+    desc: "Invoke fmt"
+    cmds:
+      - goimports -w .
+      - go fmt ./...
+
+  # lint target is run from CI
+  lint:
+    desc: "Ensure linter pass"
+    cmds:
+      - schema-gen extract -o - | schema-gen lint -i -
+
+  cover:
+    desc: "Show source coverage"
+    aliases: [coverage, cov]
+    cmds:
+      - go tool cover -func={{.coverage}}
+
+  uncover:
+    desc: "Show uncovered source"
+    cmds:
+      - uncover {{.coverage}}
+
+  install:uncover:
+    desc: "Install uncover"
+    env:
+      GOBIN: /usr/local/bin
+    cmds:
+      - go install github.com/gregoryv/uncover/...@latest
