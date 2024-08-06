@@ -15,14 +15,14 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-type EngineV4OTelConfig struct {
+type ProxyOnlyEngineOTelConfig struct {
 	Enabled        bool
 	Config         otel.OpenTelemetry
 	TracerProvider otel.TracerProvider
 	Executor       graphqlinternal.TykOtelExecutorI
 }
 
-type EngineV4Injections struct {
+type ProxyOnlyEngineInjections struct {
 	ContextStoreRequest       ContextStoreRequestFunc
 	ContextRetrieveRequest    ContextRetrieveRequestFunc
 	NewReusableBodyReadCloser NewReusableBodyReadCloserFunc
@@ -30,31 +30,34 @@ type EngineV4Injections struct {
 	TykVariableReplacer       TykVariableReplacer
 }
 
-type EngineV4Options struct {
+type ProxyOnlyEngineOptions struct {
 	Logger          *logrus.Logger
 	Schema          *graphql.Schema
 	ApiDefinition   *apidef.APIDefinition
 	HttpClient      *http.Client
 	StreamingClient *http.Client
-	OpenTelemetry   EngineV4OTelConfig
-	Injections      EngineV4Injections
+	OpenTelemetry   ProxyOnlyEngineOTelConfig
+	Injections      ProxyOnlyEngineInjections
 }
 
-type EngineV4 struct {
-	Schema                  *graphql.Schema
-	logger                  abstractlogger.Logger
-	ApiDefinition           *apidef.APIDefinition
-	OpenTelemetry           *EngineV4OTelConfig
-	graphqlRequestProcessor GraphQLRequestProcessor
-	reverseProxyPreHandler  ReverseProxyPreHandler
-	ctxStoreRequestFunc     func(r *http.Request, gqlRequest *graphql.Request)
-	ctxRetrieveRequestFunc  func(r *http.Request) *graphql.Request
-	seekReadCloser          SeekReadCloserFunc
-	context                 context.Context
-	contextCancel           context.CancelFunc
+// ProxyOnlyEngine implements Engine interface and only supports a proxy-only mode.
+type ProxyOnlyEngine struct {
+	Schema                    *graphql.Schema
+	logger                    abstractlogger.Logger
+	ApiDefinition             *apidef.APIDefinition
+	OpenTelemetry             *ProxyOnlyEngineOTelConfig
+	graphqlRequestProcessor   GraphQLRequestProcessor
+	reverseProxyPreHandler    ReverseProxyPreHandler
+	httpClient                *http.Client
+	newReusableBodyReadCloser NewReusableBodyReadCloserFunc
+	ctxStoreRequestFunc       func(r *http.Request, gqlRequest *graphql.Request)
+	ctxRetrieveRequestFunc    func(r *http.Request) *graphql.Request
+	seekReadCloser            SeekReadCloserFunc
+	context                   context.Context
+	contextCancel             context.CancelFunc
 }
 
-func NewEngineV4(options EngineV4Options) *EngineV4 {
+func NewProxyOnlyEngine(options ProxyOnlyEngineOptions) *ProxyOnlyEngine {
 	logger := createAbstractLogrusLogger(options.Logger)
 	ctx, cancel := context.WithCancel(context.Background())
 
@@ -67,40 +70,41 @@ func NewEngineV4(options EngineV4Options) *EngineV4 {
 	reverseProxyPreHdlr := &reverseProxyPreHandlerV4{
 		ctxRetrieveGraphQLRequest: options.Injections.ContextRetrieveRequest,
 		apiDefinition:             options.ApiDefinition,
-		httpClient:                options.HttpClient,
 		newReusableBodyReadCloser: options.Injections.NewReusableBodyReadCloser,
 	}
 
-	return &EngineV4{
-		context:                 ctx,
-		contextCancel:           cancel,
-		Schema:                  options.Schema,
-		logger:                  logger,
-		ApiDefinition:           options.ApiDefinition,
-		OpenTelemetry:           &options.OpenTelemetry,
-		graphqlRequestProcessor: requestProcessor,
-		reverseProxyPreHandler:  reverseProxyPreHdlr,
-		seekReadCloser:          options.Injections.SeekReadCloser,
-		ctxStoreRequestFunc:     options.Injections.ContextStoreRequest,
-		ctxRetrieveRequestFunc:  options.Injections.ContextRetrieveRequest,
+	return &ProxyOnlyEngine{
+		context:                   ctx,
+		contextCancel:             cancel,
+		Schema:                    options.Schema,
+		logger:                    logger,
+		httpClient:                options.HttpClient,
+		ApiDefinition:             options.ApiDefinition,
+		OpenTelemetry:             &options.OpenTelemetry,
+		graphqlRequestProcessor:   requestProcessor,
+		reverseProxyPreHandler:    reverseProxyPreHdlr,
+		newReusableBodyReadCloser: options.Injections.NewReusableBodyReadCloser,
+		seekReadCloser:            options.Injections.SeekReadCloser,
+		ctxStoreRequestFunc:       options.Injections.ContextStoreRequest,
+		ctxRetrieveRequestFunc:    options.Injections.ContextRetrieveRequest,
 	}
 }
 
-func (e *EngineV4) Version() EngineVersion {
+func (e *ProxyOnlyEngine) Version() EngineVersion {
 	return EngineVersionV4
 }
 
-func (e *EngineV4) HasSchema() bool {
+func (e *ProxyOnlyEngine) HasSchema() bool {
 	return e.Schema != nil
 }
 
-func (e *EngineV4) Cancel() {
+func (e *ProxyOnlyEngine) Cancel() {
 	if e.contextCancel != nil {
 		e.contextCancel()
 	}
 }
 
-func (e *EngineV4) ProcessAndStoreGraphQLRequest(w http.ResponseWriter, r *http.Request) (err error, statusCode int) {
+func (e *ProxyOnlyEngine) ProcessAndStoreGraphQLRequest(w http.ResponseWriter, r *http.Request) (err error, statusCode int) {
 	var gqlRequest graphql.Request
 	err = graphql.UnmarshalRequest(r.Body, &gqlRequest)
 	if err != nil {
@@ -118,17 +122,24 @@ func (e *EngineV4) ProcessAndStoreGraphQLRequest(w http.ResponseWriter, r *http.
 	return e.graphqlRequestProcessor.ProcessRequest(r.Context(), w, r)
 }
 
-func (e *EngineV4) ProcessGraphQLComplexity(r *http.Request, accessDefinition *ComplexityAccessDefinition) (err error, statusCode int) {
+func (e *ProxyOnlyEngine) ProcessGraphQLComplexity(r *http.Request, accessDefinition *ComplexityAccessDefinition) (err error, statusCode int) {
 	//TODO implement me
 	panic("implement me")
 }
 
-func (e *EngineV4) ProcessGraphQLGranularAccess(w http.ResponseWriter, r *http.Request, accessDefinition *GranularAccessDefinition) (err error, statusCode int) {
+func (e *ProxyOnlyEngine) ProcessGraphQLGranularAccess(w http.ResponseWriter, r *http.Request, accessDefinition *GranularAccessDefinition) (err error, statusCode int) {
 	//TODO implement me
 	panic("implement me")
 }
 
-func (e *EngineV4) HandleReverseProxy(params ReverseProxyParams) (res *http.Response, hijacked bool, err error) {
+func (e *ProxyOnlyEngine) HandleReverseProxy(params ReverseProxyParams) (res *http.Response, hijacked bool, err error) {
+	e.httpClient.Transport = NewGraphQLEngineTransport(
+		DetermineGraphQLEngineTransportType(e.ApiDefinition),
+		params.RoundTripper,
+		e.newReusableBodyReadCloser,
+		params.HeadersConfig,
+	)
+
 	reverseProxyType, err := e.reverseProxyPreHandler.PreHandle(params)
 	if err != nil {
 		e.logger.Error("error on reverse proxy pre handler", abstractlogger.Error(err))
@@ -158,7 +169,7 @@ func (e *EngineV4) HandleReverseProxy(params ReverseProxyParams) (res *http.Resp
 	return nil, false, ErrUnknownReverseProxyType
 }
 
-func (e *EngineV4) handoverRequestToGraphQLExecutionEngine(gqlRequest *graphql.Request, outreq *http.Request) (res *http.Response, hijacked bool, err error) {
+func (e *ProxyOnlyEngine) handoverRequestToGraphQLExecutionEngine(gqlRequest *graphql.Request, outreq *http.Request) (res *http.Response, hijacked bool, err error) {
 	isProxyOnly := isProxyOnly(e.ApiDefinition)
 	span := otel.SpanFromContext(outreq.Context())
 	reqCtx := otel.ContextWithSpan(context.Background(), span)
@@ -196,7 +207,7 @@ func (e *EngineV4) handoverRequestToGraphQLExecutionEngine(gqlRequest *graphql.R
 	return
 }
 
-func (e *EngineV4) returnErrorsFromUpstream(proxyOnlyCtx *GraphQLProxyOnlyContextValues, resultWriter *graphql.EngineResultWriter, seekReadCloser SeekReadCloserFunc) error {
+func (e *ProxyOnlyEngine) returnErrorsFromUpstream(proxyOnlyCtx *GraphQLProxyOnlyContextValues, resultWriter *graphql.EngineResultWriter, seekReadCloser SeekReadCloserFunc) error {
 	body, err := seekReadCloser(proxyOnlyCtx.upstreamResponse.Body)
 	if body == nil {
 		// Response body already read by graphql-go-tools, and it's not re-readable. Quit silently.
@@ -221,4 +232,4 @@ func (e *EngineV4) returnErrorsFromUpstream(proxyOnlyCtx *GraphQLProxyOnlyContex
 }
 
 // Interface Guard
-var _ Engine = (*EngineV4)(nil)
+var _ Engine = (*ProxyOnlyEngine)(nil)

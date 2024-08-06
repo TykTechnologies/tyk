@@ -22,18 +22,10 @@ type tykGqlRequestProcessor struct {
 type reverseProxyPreHandlerV4 struct {
 	ctxRetrieveGraphQLRequest ContextRetrieveRequestFunc
 	apiDefinition             *apidef.APIDefinition
-	httpClient                *http.Client
 	newReusableBodyReadCloser NewReusableBodyReadCloserFunc
 }
 
 func (r *reverseProxyPreHandlerV4) PreHandle(params ReverseProxyParams) (reverseProxyType ReverseProxyType, err error) {
-	r.httpClient.Transport = NewGraphQLEngineTransport(
-		DetermineGraphQLEngineTransportType(r.apiDefinition),
-		params.RoundTripper,
-		r.newReusableBodyReadCloser,
-		params.HeadersConfig,
-	)
-
 	switch {
 	case params.IsCORSPreflight:
 		return ReverseProxyTypePreFlight, nil

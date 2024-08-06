@@ -56,7 +56,7 @@ func (m *TykGraphQLMiddleware) Init() {
 		log.Errorf("Schema normalization was not successful. Reason: %v", normalizationResult.Errors)
 	}
 
-	m.Spec.GraphEngine = graphengine.NewEngineV4(graphengine.EngineV4Options{
+	m.Spec.GraphEngine = graphengine.NewProxyOnlyEngine(graphengine.ProxyOnlyEngineOptions{
 		Logger:        log,
 		Schema:        schema,
 		ApiDefinition: m.Spec.APIDefinition,
@@ -67,11 +67,11 @@ func (m *TykGraphQLMiddleware) Init() {
 			Timeout:   0,
 			Transport: &http.Transport{TLSClientConfig: tlsClientConfig(m.Spec, nil)},
 		},
-		OpenTelemetry: graphengine.EngineV4OTelConfig{
+		OpenTelemetry: graphengine.ProxyOnlyEngineOTelConfig{
 			Enabled:        m.Gw.GetConfig().OpenTelemetry.Enabled,
 			TracerProvider: m.Gw.TracerProvider,
 		},
-		Injections: graphengine.EngineV4Injections{
+		Injections: graphengine.ProxyOnlyEngineInjections{
 			ContextRetrieveRequest: ctxGetGraphQLRequestV4,
 			ContextStoreRequest:    ctxSetGraphQLRequestV4,
 			SeekReadCloser: func(readCloser io.ReadCloser) (io.ReadCloser, error) {
