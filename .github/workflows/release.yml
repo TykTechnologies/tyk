@@ -142,7 +142,7 @@ jobs:
         with:
           context: "dist"
           platforms: linux/amd64,linux/arm64
-          file: ci/Dockerfile.std
+          file: ci/Dockerfile.distroless
           provenance: mode=max
           sbom: true
           push: true
@@ -164,14 +164,14 @@ jobs:
             type=semver,pattern={{major}}
             type=semver,pattern={{major}}.{{minor}}
             type=semver,pattern={{version}}
-          labels: "org.opencontainers.image.title=tyk-gateway \norg.opencontainers.image.description=Tyk Open Source API Gateway written in Go, supporting REST, GraphQL, TCP and gRPC protocols\norg.opencontainers.image.vendor=tyk.io\norg.opencontainers.image.version=${{ github.ref_name }}\n"
+          labels: "org.opencontainers.image.title=tyk-gateway  (distroless) \norg.opencontainers.image.description=Tyk Open Source API Gateway written in Go, supporting REST, GraphQL, TCP and gRPC protocols\norg.opencontainers.image.vendor=tyk.io\norg.opencontainers.image.version=${{ github.ref_name }}\n"
       - name: build multiarch image
         if: ${{ matrix.golang_cross == '1.21-bullseye' }}
         uses: docker/build-push-action@v5
         with:
           context: "dist"
           platforms: linux/amd64,linux/arm64
-          file: ci/Dockerfile.std
+          file: ci/Dockerfile.distroless
           provenance: mode=max
           sbom: true
           cache-from: type=gha
