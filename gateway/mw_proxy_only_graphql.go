@@ -10,15 +10,15 @@ import (
 	"github.com/TykTechnologies/tyk/internal/graphengine"
 )
 
-type TykGraphQLMiddleware struct {
+type ProxyOnlyGraphQLMiddleware struct {
 	*BaseMiddleware
 }
 
-func (m *TykGraphQLMiddleware) Name() string {
-	return "TykGraphQLMiddleware"
+func (m *ProxyOnlyGraphQLMiddleware) Name() string {
+	return "ProxyOnlyGraphQLMiddleware"
 }
 
-func (m *TykGraphQLMiddleware) EnabledForSpec() bool {
+func (m *ProxyOnlyGraphQLMiddleware) EnabledForSpec() bool {
 	return m.Spec.GraphQL.Enabled
 }
 
@@ -35,8 +35,8 @@ func ctxGetGraphQLRequestV4(r *http.Request) (gqlRequest *gql.Request) {
 	return nil
 }
 
-func (m *TykGraphQLMiddleware) Init() {
-	if m.Spec.GraphQL.Version != apidef.GraphQLConfigVersion4 {
+func (m *ProxyOnlyGraphQLMiddleware) Init() {
+	if m.Spec.GraphQL.Version != apidef.GraphQLConfigVersionProxyOnly {
 		// Nothing to do. Quit now.
 		return
 	}
@@ -89,8 +89,8 @@ func (m *TykGraphQLMiddleware) Init() {
 	})
 }
 
-func (m *TykGraphQLMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
-	if m.Spec.GraphQL.Version != apidef.GraphQLConfigVersion4 {
+func (m *ProxyOnlyGraphQLMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
+	if m.Spec.GraphQL.Version != apidef.GraphQLConfigVersionProxyOnly {
 		// Nothing to do. Quit now.
 		return nil, 0
 	}
@@ -113,4 +113,4 @@ func (m *TykGraphQLMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 }
 
 // Interface guard
-var _ TykMiddleware = (*TykGraphQLMiddleware)(nil)
+var _ TykMiddleware = (*ProxyOnlyGraphQLMiddleware)(nil)

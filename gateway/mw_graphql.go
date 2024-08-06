@@ -161,7 +161,7 @@ func (m *GraphQLMiddleware) Init() {
 			return
 		}
 		m.Spec.GraphEngine = engine
-	} else if m.Spec.GraphQL.Version == apidef.GraphQLConfigVersion4 {
+	} else if m.Spec.GraphQL.Version == apidef.GraphQLConfigVersionProxyOnly {
 		log.Debug("GraphQL config version is 4, passing ", m.Spec.Name)
 	} else {
 		log.Errorf("Could not init GraphQL middleware: invalid config version provided: %s", m.Spec.GraphQL.Version)
@@ -169,7 +169,7 @@ func (m *GraphQLMiddleware) Init() {
 }
 
 func (m *GraphQLMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
-	if m.Spec.GraphQL.Version == apidef.GraphQLConfigVersion4 {
+	if m.Spec.GraphQL.Version == apidef.GraphQLConfigVersionProxyOnly {
 		// This request will be handled by the new GraphQL library.
 		return nil, 0
 	}
