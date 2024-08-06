@@ -67,7 +67,7 @@ func NewProxyOnlyEngine(options ProxyOnlyEngineOptions) *ProxyOnlyEngine {
 		ctxRetrieveRequest: options.Injections.ContextRetrieveRequest,
 	}
 
-	reverseProxyPreHdlr := &reverseProxyPreHandlerV4{
+	reverseProxyPreHdlr := &proxyOnlyReverseProxyPreHandler{
 		ctxRetrieveGraphQLRequest: options.Injections.ContextRetrieveRequest,
 		apiDefinition:             options.ApiDefinition,
 		newReusableBodyReadCloser: options.Injections.NewReusableBodyReadCloser,

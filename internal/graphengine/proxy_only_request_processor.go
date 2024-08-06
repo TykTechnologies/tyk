@@ -19,13 +19,13 @@ type proxyOnlyRequestProcessor struct {
 	ctxRetrieveRequest ContextRetrieveRequestFunc
 }
 
-type reverseProxyPreHandlerV4 struct {
+type proxyOnlyReverseProxyPreHandler struct {
 	ctxRetrieveGraphQLRequest ContextRetrieveRequestFunc
 	apiDefinition             *apidef.APIDefinition
 	newReusableBodyReadCloser NewReusableBodyReadCloserFunc
 }
 
-func (r *reverseProxyPreHandlerV4) PreHandle(params ReverseProxyParams) (reverseProxyType ReverseProxyType, err error) {
+func (r *proxyOnlyReverseProxyPreHandler) PreHandle(params ReverseProxyParams) (reverseProxyType ReverseProxyType, err error) {
 	switch {
 	case params.IsCORSPreflight:
 		return ReverseProxyTypePreFlight, nil
