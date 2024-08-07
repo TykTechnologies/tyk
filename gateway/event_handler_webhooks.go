@@ -71,7 +71,7 @@ func (w *WebHookHandler) Init(handlerConf interface{}) error {
 	}
 
 	w.store, err = storage.NewStorageHandler(
-		storage.REDIS_CLUSTER,
+		storage.GetStorageForModule(storage.DEFAULT_MODULE),
 		storage.WithKeyPrefix("webhook.cache."),
 		storage.WithConnectionHandler(w.Gw.StorageConnectionHandler),
 	)

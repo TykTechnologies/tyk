@@ -20,7 +20,7 @@ func NewSyncForcer(controller *redisCluster.ConnectionHandler, getNodeDataFunc f
 	sf := &SyncronizerForcer{}
 	sf.getNodeDataFunc = getNodeDataFunc
 	store, err := storage.NewStorageHandler(
-		storage.REDIS_CLUSTER,
+		storage.GetStorageForModule(storage.DEFAULT_MODULE),
 		storage.WithConnectionHandler(controller),
 		storage.WithKeyPrefix("synchronizer-group-"),
 	)

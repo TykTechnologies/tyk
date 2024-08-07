@@ -18,7 +18,7 @@ func (gw *Gateway) newRedisHook() *redisChannelHook {
 	hook.formatter = new(logrus.JSONFormatter)
 
 	st, err := storage.NewStorageHandler(
-		storage.REDIS_CLUSTER,
+		storage.GetStorageForModule(storage.DEFAULT_MODULE),
 		storage.WithConnectionHandler(gw.StorageConnectionHandler),
 		storage.WithKeyPrefix("gateway-notifications:"),
 	)

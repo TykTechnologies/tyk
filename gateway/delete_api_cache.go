@@ -8,7 +8,7 @@ import (
 
 func (gw *Gateway) invalidateAPICache(apiID string) bool {
 	store, err := storage.NewStorageHandler(
-		storage.REDIS_CLUSTER,
+		storage.GetStorageForModule(storage.DEFAULT_MODULE),
 		storage.WithConnectionHandler(gw.StorageConnectionHandler),
 		storage.IsCache(true),
 	)

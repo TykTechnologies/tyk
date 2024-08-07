@@ -349,7 +349,7 @@ func (gw *Gateway) setupGlobals() {
 		}
 
 		healthCheckStore, err := storage.NewStorageHandler(
-			storage.REDIS_CLUSTER,
+			storage.GetStorageForModule(storage.DEFAULT_MODULE),
 			storage.WithKeyPrefix("host-checker:"),
 			storage.WithConnectionHandler(gw.StorageConnectionHandler),
 			storage.IsAnalytics(true),
@@ -364,7 +364,7 @@ func (gw *Gateway) setupGlobals() {
 	gw.initHealthCheck(gw.ctx)
 
 	redisStore, err := storage.NewStorageHandler(
-		storage.REDIS_CLUSTER,
+		storage.GetStorageForModule(storage.DEFAULT_MODULE),
 		storage.WithKeyPrefix("apikey-"),
 		storage.WithConnectionHandler(gw.StorageConnectionHandler),
 		storage.WithHashKeys(gwConfig.HashKeys),
@@ -376,7 +376,7 @@ func (gw *Gateway) setupGlobals() {
 	gw.GlobalSessionManager.Init(redisStore)
 
 	versionStore, err := storage.NewStorageHandler(
-		storage.REDIS_CLUSTER,
+		storage.GetStorageForModule(storage.DEFAULT_MODULE),
 		storage.WithKeyPrefix("version-check-"),
 		storage.WithConnectionHandler(gw.StorageConnectionHandler),
 	)
@@ -457,7 +457,7 @@ func (gw *Gateway) setupGlobals() {
 	}
 
 	storeCert, err := storage.NewStorageHandler(
-		storage.REDIS_CLUSTER,
+		storage.GetStorageForModule(storage.DEFAULT_MODULE),
 		storage.WithConnectionHandler(gw.StorageConnectionHandler),
 		storage.WithKeyPrefix("cert-"),
 		storage.WithHashKeys(false),
@@ -788,7 +788,7 @@ func (gw *Gateway) addOAuthHandlers(spec *APISpec, muxer *mux.Router) *OAuthMana
 	storageManager.Connect()
 
 	store, err := storage.NewStorageHandler(
-		storage.REDIS_CLUSTER,
+		storage.GetStorageForModule(storage.DEFAULT_MODULE),
 		storage.WithKeyPrefix(prefix),
 		storage.WithConnectionHandler(gw.StorageConnectionHandler),
 		storage.WithHashKeys(false),
@@ -994,7 +994,7 @@ func (gw *Gateway) createResponseMiddlewareChain(spec *APISpec, responseFuncs []
 
 	keyPrefix := "cache-" + spec.APIID
 	cacheStore, err := storage.NewStorageHandler(
-		storage.REDIS_CLUSTER,
+		storage.GetStorageForModule(storage.DEFAULT_MODULE),
 		storage.WithKeyPrefix(keyPrefix),
 		storage.WithConnectionHandler(gw.StorageConnectionHandler),
 		storage.IsCache(true),
@@ -1625,7 +1625,7 @@ func (gw *Gateway) getHostDetails(file string) {
 }
 
 func (gw *Gateway) getGlobalMDCBStorageHandler(keyPrefix string, hashKeys bool) interfaces.Handler {
-	localStorage, err := storage.NewStorageHandler(storage.REDIS_CLUSTER,
+	localStorage, err := storage.NewStorageHandler(storage.GetStorageForModule(storage.DEFAULT_MODULE),
 		storage.WithKeyPrefix(keyPrefix),
 		storage.WithHashKeys(hashKeys),
 		storage.WithConnectionHandler(gw.StorageConnectionHandler))
@@ -1659,7 +1659,7 @@ func (gw *Gateway) getGlobalStorageHandler(keyPrefix string, hashKeys bool) inte
 		}
 	}
 
-	handler, err := storage.NewStorageHandler(storage.REDIS_CLUSTER,
+	handler, err := storage.NewStorageHandler(storage.GetStorageForModule(storage.DEFAULT_MODULE),
 		storage.WithKeyPrefix(keyPrefix),
 		storage.WithHashKeys(hashKeys),
 		storage.WithConnectionHandler(gw.StorageConnectionHandler))

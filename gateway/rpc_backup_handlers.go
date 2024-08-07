@@ -34,7 +34,7 @@ func (gw *Gateway) LoadDefinitionsFromRPCBackup() ([]*APISpec, error) {
 	checkKey := BackupApiKeyBase + tagList
 
 	store, err := storage.NewStorageHandler(
-		storage.REDIS_CLUSTER,
+		storage.GetStorageForModule(storage.DEFAULT_MODULE),
 		storage.WithConnectionHandler(gw.StorageConnectionHandler),
 		storage.WithKeyPrefix(RPCKeyPrefix),
 	)
@@ -73,7 +73,7 @@ func (gw *Gateway) saveRPCDefinitionsBackup(list string) error {
 	log.Info("--> Connecting to DB")
 
 	store, err := storage.NewStorageHandler(
-		storage.REDIS_CLUSTER,
+		storage.GetStorageForModule(storage.DEFAULT_MODULE),
 		storage.WithConnectionHandler(gw.StorageConnectionHandler),
 		storage.WithKeyPrefix(RPCKeyPrefix),
 	)
@@ -105,7 +105,7 @@ func (gw *Gateway) LoadPoliciesFromRPCBackup() (map[string]user.Policy, error) {
 	checkKey := BackupPolicyKeyBase + tagList
 
 	store, err := storage.NewStorageHandler(
-		storage.REDIS_CLUSTER,
+		storage.GetStorageForModule(storage.DEFAULT_MODULE),
 		storage.WithConnectionHandler(gw.StorageConnectionHandler),
 		storage.WithKeyPrefix(RPCKeyPrefix),
 	)
@@ -150,7 +150,7 @@ func (gw *Gateway) saveRPCPoliciesBackup(list string) error {
 	log.Info("--> Connecting to DB")
 
 	store, err := storage.NewStorageHandler(
-		storage.REDIS_CLUSTER,
+		storage.GetStorageForModule(storage.DEFAULT_MODULE),
 		storage.WithKeyPrefix(RPCKeyPrefix),
 		storage.WithConnectionHandler(gw.StorageConnectionHandler),
 	)

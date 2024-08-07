@@ -44,7 +44,7 @@ type ChainObject struct {
 func (gw *Gateway) prepareStorage() generalStores {
 	var gs generalStores
 	var err error
-	gs.redisStore, err = storage.NewStorageHandler(storage.REDIS_CLUSTER,
+	gs.redisStore, err = storage.NewStorageHandler(storage.GetStorageForModule(storage.DEFAULT_MODULE),
 		storage.WithKeyPrefix("apikey-"),
 		storage.WithHashKeys(gw.GetConfig().HashKeys),
 		storage.WithConnectionHandler(gw.StorageConnectionHandler),
@@ -54,7 +54,7 @@ func (gw *Gateway) prepareStorage() generalStores {
 		log.WithError(err).Fatal("Failed to create redis storage handler")
 	}
 
-	gs.redisOrgStore, err = storage.NewStorageHandler(storage.REDIS_CLUSTER,
+	gs.redisOrgStore, err = storage.NewStorageHandler(storage.GetStorageForModule(storage.DEFAULT_MODULE),
 		storage.WithKeyPrefix("orgkey."),
 		storage.WithHashKeys(gw.GetConfig().HashKeys),
 		storage.WithConnectionHandler(gw.StorageConnectionHandler),
@@ -64,7 +64,7 @@ func (gw *Gateway) prepareStorage() generalStores {
 		log.WithError(err).Fatal("Failed to create redis storage handler")
 	}
 
-	gs.healthStore, err = storage.NewStorageHandler(storage.REDIS_CLUSTER,
+	gs.healthStore, err = storage.NewStorageHandler(storage.GetStorageForModule(storage.DEFAULT_MODULE),
 		storage.WithKeyPrefix("apihealth."),
 		storage.WithHashKeys(gw.GetConfig().HashKeys),
 		storage.WithConnectionHandler(gw.StorageConnectionHandler),
@@ -317,7 +317,7 @@ func (gw *Gateway) processSpec(spec *APISpec, apisByListen map[string]int,
 	}
 
 	keyPrefix := "cache-" + spec.APIID
-	cacheStore, err := storage.NewStorageHandler(storage.REDIS_CLUSTER,
+	cacheStore, err := storage.NewStorageHandler(storage.GetStorageForModule(storage.DEFAULT_MODULE),
 		storage.WithKeyPrefix(keyPrefix),
 		storage.WithConnectionHandler(gw.StorageConnectionHandler),
 		storage.IsCache(true),

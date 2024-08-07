@@ -66,7 +66,7 @@ func (gw *Gateway) gatherHealthChecks() {
 	allInfos := SafeHealthCheck{info: make(map[string]apidef.HealthCheckItem, 3)}
 
 	store, err := storage.NewStorageHandler(
-		storage.REDIS_CLUSTER,
+		storage.GetStorageForModule(storage.DEFAULT_MODULE),
 		storage.WithKeyPrefix("livenesscheck-"),
 		storage.WithConnectionHandler(gw.StorageConnectionHandler))
 

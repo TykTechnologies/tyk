@@ -2236,7 +2236,7 @@ func (gw *Gateway) createOauthClient(w http.ResponseWriter, r *http.Request) {
 					storageManager := gw.getGlobalMDCBStorageHandler(prefix, false)
 					storageManager.Connect()
 
-					store, err := storage.NewStorageHandler(storage.REDIS_CLUSTER,
+					store, err := storage.NewStorageHandler(storage.GetStorageForModule(storage.DEFAULT_MODULE),
 						storage.WithKeyPrefix(prefix),
 						storage.WithHashKeys(false),
 						storage.WithConnectionHandler(gw.StorageConnectionHandler))
@@ -2640,7 +2640,7 @@ func (gw *Gateway) getOauthClientDetails(keyName, apiID string) (interface{}, in
 		storageManager := gw.getGlobalMDCBStorageHandler(prefix, false)
 		storageManager.Connect()
 
-		store, err := storage.NewStorageHandler(storage.REDIS_CLUSTER,
+		store, err := storage.NewStorageHandler(storage.GetStorageForModule(storage.DEFAULT_MODULE),
 			storage.WithKeyPrefix(prefix),
 			storage.WithHashKeys(false),
 			storage.WithConnectionHandler(gw.StorageConnectionHandler))

@@ -25,7 +25,7 @@ func getStorageForPython(ctx context.Context) interfaces.Handler {
 	rc.WaitConnect(ctx)
 
 	store, err := storage.NewStorageHandler(
-		storage.REDIS_CLUSTER,
+		storage.GetStorageForModule(storage.DEFAULT_MODULE),
 		storage.WithKeyPrefix(CoProcessDefaultKeyPrefix),
 		storage.WithConnectionHandler(rc))
 

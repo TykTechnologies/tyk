@@ -294,7 +294,7 @@ func isExpired(claims jwt.MapClaims) bool {
 
 func newIntrospectionCache(gw *Gateway) *introspectionCache {
 	store, err := storage.NewStorageHandler(
-		storage.REDIS_CLUSTER,
+		storage.GetStorageForModule(storage.DEFAULT_MODULE),
 		storage.WithKeyPrefix("introspection-"),
 		storage.WithConnectionHandler(gw.StorageConnectionHandler),
 	)

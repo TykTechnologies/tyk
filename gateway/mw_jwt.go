@@ -581,7 +581,7 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 			storageManager.Connect()
 
 			store, err := storage.NewStorageHandler(
-				storage.REDIS_CLUSTER,
+				storage.GetStorageForModule(storage.DEFAULT_MODULE),
 				storage.WithKeyPrefix(prefix),
 				storage.WithConnectionHandler(k.Gw.StorageConnectionHandler),
 			)

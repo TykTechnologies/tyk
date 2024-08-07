@@ -40,3 +40,13 @@ func NewStorageHandler(name string, opts ...func(interfaces.Handler)) (interface
 
 	return impl, nil
 }
+
+const (
+	DEFAULT_MODULE = "default"
+)
+
+// GetStorageForModule returns the storage type for the given module.
+// Defaults to REDIS_CLUSTER for the initial implementation.
+func GetStorageForModule(module string) string {
+	return REDIS_CLUSTER
+}

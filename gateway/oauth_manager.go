@@ -1194,7 +1194,7 @@ func (gw *Gateway) purgeLapsedOAuthTokens() error {
 	}
 
 	st, err := storage.NewStorageHandler(
-		storage.REDIS_CLUSTER,
+		storage.GetStorageForModule(storage.DEFAULT_MODULE),
 		storage.WithHashKeys(false),
 		storage.WithConnectionHandler(gw.StorageConnectionHandler),
 		storage.WithKeyPrefix(""),
