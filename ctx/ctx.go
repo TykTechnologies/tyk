@@ -6,12 +6,12 @@ import (
 	"net/http"
 
 	"github.com/TykTechnologies/tyk/apidef/oas"
+	"github.com/TykTechnologies/tyk/storage/util"
 
 	"github.com/TykTechnologies/tyk/config"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	logger "github.com/TykTechnologies/tyk/log"
-	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/user"
 )
 
@@ -69,7 +69,7 @@ func ctxSetSession(r *http.Request, s *user.SessionState, scheduleUpdate bool, h
 	}
 
 	if s.KeyHashEmpty() {
-		s.SetKeyHash(storage.HashKey(s.KeyID, hashKey))
+		s.SetKeyHash(util.HashKey(s.KeyID, hashKey))
 	}
 
 	ctx := r.Context()

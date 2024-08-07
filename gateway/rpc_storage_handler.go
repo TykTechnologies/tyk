@@ -8,12 +8,14 @@ import (
 	"time"
 
 	temporalmodel "github.com/TykTechnologies/storage/temporal/model"
+
 	"github.com/TykTechnologies/tyk/internal/cache"
 	"github.com/TykTechnologies/tyk/internal/model"
 	"github.com/TykTechnologies/tyk/rpc"
+	"github.com/TykTechnologies/tyk/storage/shared"
+	"github.com/TykTechnologies/tyk/storage/util"
 
 	"github.com/TykTechnologies/tyk/apidef"
-	"github.com/TykTechnologies/tyk/storage"
 
 	"github.com/sirupsen/logrus"
 )
@@ -220,7 +222,7 @@ func (r *RPCStorageHandler) hashKey(in string) string {
 		// Not hashing? Return the raw key
 		return in
 	}
-	return storage.HashStr(in)
+	return util.HashStr(in)
 }
 
 func (r *RPCStorageHandler) fixKey(keyName string) string {
@@ -270,7 +272,7 @@ func (r *RPCStorageHandler) GetRawKey(keyName string) (string, error) {
 	}
 
 	if rpc.IsEmergencyMode() {
-		return "", storage.ErrMDCBConnectionLost
+		return "", shared.ErrMDCBConnectionLost
 	}
 
 	value, err := rpc.FuncClientSingleton("GetKey", keyName)
@@ -286,9 +288,9 @@ func (r *RPCStorageHandler) GetRawKey(keyName string) (string, error) {
 		}
 		if cacheEnabled {
 			// Errors, and key not found, should be cached for a small amount of time
-			cacheStore.Set(keyName, storage.ErrKeyNotFound, 1)
+			cacheStore.Set(keyName, shared.ErrKeyNotFound, 1)
 		}
-		return "", storage.ErrKeyNotFound
+		return "", shared.ErrKeyNotFound
 	}
 
 	if cacheEnabled {
@@ -331,7 +333,7 @@ func (r *RPCStorageHandler) GetExp(keyName string) (int64, error) {
 			}
 		}
 		log.Error("Error trying to get TTL: ", err)
-		return 0, storage.ErrKeyNotFound
+		return 0, shared.ErrKeyNotFound
 	}
 	return value.(int64), nil
 }
@@ -902,98 +904,6 @@ func (r *RPCStorageHandler) CheckForKeyspaceChanges(orgId string) {
 	}
 }
 
-func (gw *Gateway) getSessionAndCreate(keyName string, r *RPCStorageHandler, isHashed bool, orgId string) {
-
-	key := keyName
-	// avoid double hashing
-	if !isHashed {
-		key = storage.HashKey(keyName, gw.GetConfig().HashKeys)
-	}
-
-	sessionString, err := r.GetRawKey("apikey-" + key)
-	if err != nil {
-		log.Error("Key not found in master - skipping")
-	} else {
-		gw.handleAddKey(key, sessionString, orgId)
-	}
-}
-
-func (gw *Gateway) ProcessSingleOauthClientEvent(apiId, oauthClientId, orgID, event string) {
-	store, _, err := gw.GetStorageForApi(apiId)
-	if err != nil {
-		log.Error("Could not get oauth storage for api")
-		return
-	}
-
-	switch event {
-	case OauthClientAdded:
-		// on add: pull from rpc and save it in local redis
-		client, err := store.GetClient(oauthClientId)
-		if err != nil {
-			log.WithError(err).Error("Could not retrieve new oauth client information")
-			return
-		}
-
-		err = store.SetClient(oauthClientId, orgID, client, false)
-		if err != nil {
-			log.WithError(err).Error("Could not save oauth client.")
-			return
-		}
-
-		log.Info("oauth client created successfully")
-	case OauthClientRemoved:
-		// on remove: remove from local redis
-		err := store.DeleteClient(oauthClientId, orgID, false)
-		if err != nil {
-			log.Errorf("Could not delete oauth client with id: %v", oauthClientId)
-			return
-		}
-		log.Infof("Oauth Client deleted successfully")
-	case OauthClientUpdated:
-		// on update: delete from local redis and pull again from rpc
-		_, err := store.GetClient(oauthClientId)
-		if err != nil {
-			log.WithError(err).Error("Could not retrieve oauth client information")
-			return
-		}
-
-		err = store.DeleteClient(oauthClientId, orgID, false)
-		if err != nil {
-			log.WithError(err).Error("Could not delete oauth client")
-			return
-		}
-
-		client, err := store.GetClient(oauthClientId)
-		if err != nil {
-			log.WithError(err).Error("Could not retrieve oauth client information")
-			return
-		}
-
-		err = store.SetClient(oauthClientId, orgID, client, false)
-		if err != nil {
-			log.WithError(err).Error("Could not save oauth client.")
-			return
-		}
-		log.Info("oauth client updated successfully")
-	default:
-		log.Warningf("Oauth client event not supported:%v", event)
-	}
-}
-
-// ProcessOauthClientsOps performs the appropriate action for the received clients
-// it can be any of the Create,Update and Delete operations
-func (gw *Gateway) ProcessOauthClientsOps(clients map[string]string) {
-	for clientInfo, action := range clients {
-		// clientInfo is: APIID.ClientID.OrgID
-		eventValues := strings.Split(clientInfo, ".")
-		apiId := eventValues[0]
-		oauthClientId := eventValues[1]
-		orgID := eventValues[2]
-
-		gw.ProcessSingleOauthClientEvent(apiId, oauthClientId, orgID, action)
-	}
-}
-
 // ProcessKeySpaceChanges receives an array of keys to be processed, those keys are considered changes in the keyspace in the
 // management layer, they could be: regular keys (hashed, unhashed), revoke oauth client, revoke single oauth token,
 // certificates (added, removed), oauth client (added, updated, removed)
@@ -1112,7 +1022,7 @@ func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string, orgId string) 
 			} else {
 				log.Info("--> removing cached key: ", r.Gw.obfuscateKey(key))
 				// in case it's a username (basic auth) or custom-key then generate the token
-				if storage.TokenOrg(key) == "" {
+				if util.TokenOrg(key) == "" {
 					key = r.Gw.generateToken(orgId, key)
 				}
 				_, status = r.Gw.handleDeleteKey(key, orgId, "-1", resetQuota)
@@ -1153,7 +1063,7 @@ func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string, orgId string) 
 // Function to handle fallback deletion using token ID
 func (r *RPCStorageHandler) deleteUsingTokenID(key, orgId string, resetQuota bool, status int) (int, error) {
 	if status == http.StatusNotFound {
-		id, err := storage.TokenID(key)
+		id, err := util.TokenID(key)
 		if err == nil {
 			_, status = r.Gw.handleDeleteKey(id, orgId, "-1", resetQuota)
 		}
@@ -1196,4 +1106,96 @@ func (r *RPCStorageHandler) GetListRange(keyName string, from, to int64) ([]stri
 func (r *RPCStorageHandler) Exists(keyName string) (bool, error) {
 	log.Error("Not implemented")
 	return false, nil
+}
+
+func (gw *Gateway) getSessionAndCreate(keyName string, r *RPCStorageHandler, isHashed bool, orgId string) {
+
+	key := keyName
+	// avoid double hashing
+	if !isHashed {
+		key = util.HashKey(keyName, gw.GetConfig().HashKeys)
+	}
+
+	sessionString, err := r.GetRawKey("apikey-" + key)
+	if err != nil {
+		log.Error("Key not found in master - skipping")
+	} else {
+		gw.handleAddKey(key, sessionString, orgId)
+	}
+}
+
+func (gw *Gateway) ProcessSingleOauthClientEvent(apiId, oauthClientId, orgID, event string) {
+	store, _, err := gw.GetStorageForApi(apiId)
+	if err != nil {
+		log.Error("Could not get oauth storage for api")
+		return
+	}
+
+	switch event {
+	case OauthClientAdded:
+		// on add: pull from rpc and save it in local redis
+		client, err := store.GetClient(oauthClientId)
+		if err != nil {
+			log.WithError(err).Error("Could not retrieve new oauth client information")
+			return
+		}
+
+		err = store.SetClient(oauthClientId, orgID, client, false)
+		if err != nil {
+			log.WithError(err).Error("Could not save oauth client.")
+			return
+		}
+
+		log.Info("oauth client created successfully")
+	case OauthClientRemoved:
+		// on remove: remove from local redis
+		err := store.DeleteClient(oauthClientId, orgID, false)
+		if err != nil {
+			log.Errorf("Could not delete oauth client with id: %v", oauthClientId)
+			return
+		}
+		log.Infof("Oauth Client deleted successfully")
+	case OauthClientUpdated:
+		// on update: delete from local redis and pull again from rpc
+		_, err := store.GetClient(oauthClientId)
+		if err != nil {
+			log.WithError(err).Error("Could not retrieve oauth client information")
+			return
+		}
+
+		err = store.DeleteClient(oauthClientId, orgID, false)
+		if err != nil {
+			log.WithError(err).Error("Could not delete oauth client")
+			return
+		}
+
+		client, err := store.GetClient(oauthClientId)
+		if err != nil {
+			log.WithError(err).Error("Could not retrieve oauth client information")
+			return
+		}
+
+		err = store.SetClient(oauthClientId, orgID, client, false)
+		if err != nil {
+			log.WithError(err).Error("Could not save oauth client.")
+			return
+		}
+		log.Info("oauth client updated successfully")
+	default:
+		log.Warningf("Oauth client event not supported:%v", event)
+	}
+}
+
+// ProcessOauthClientsOps performs the appropriate action for the received clients
+// it can be any of the Create,Update and Delete operations
+func (gw *Gateway) ProcessOauthClientsOps(clients map[string]string) {
+	for clientInfo, action := range clients {
+		// clientInfo is: APIID.ClientID.OrgID
+		eventValues := strings.Split(clientInfo, ".")
+		apiId := eventValues[0]
+		oauthClientId := eventValues[1]
+		orgID := eventValues[2]
+
+		gw.ProcessSingleOauthClientEvent(apiId, oauthClientId, orgID, action)
+	}
 }

@@ -17,10 +17,10 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/TykTechnologies/tyk/internal/uuid"
+	redisCluster "github.com/TykTechnologies/tyk/storage/redis-cluster"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
-	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/test"
 )
 
@@ -169,7 +169,7 @@ func TestHostChecker(t *testing.T) {
 		t.Error("Should set defaults", ts.Gw.GlobalHostChecker.checker.checkTimeout)
 	}
 
-	redisStore := ts.Gw.GlobalHostChecker.store.(*storage.RedisCluster)
+	redisStore := ts.Gw.GlobalHostChecker.store.(*redisCluster.RedisCluster)
 	if ttl, _ := redisStore.GetKeyTTL(PoolerHostSentinelKeyPrefix + testHttpFailure); int(ttl) != ts.Gw.GlobalHostChecker.checker.checkTimeout*ts.Gw.GlobalHostChecker.checker.sampleTriggerLimit {
 		t.Error("HostDown expiration key should be checkTimeout + 1", ttl)
 	}

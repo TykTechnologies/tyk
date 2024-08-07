@@ -10,10 +10,10 @@ import (
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
-	"github.com/TykTechnologies/tyk/storage"
+	redisCluster "github.com/TykTechnologies/tyk/storage/redis-cluster"
 )
 
-var rc *storage.ConnectionHandler
+var rc *redisCluster.ConnectionHandler
 
 func TestMain(m *testing.M) {
 	conf, err := config.New()
@@ -21,7 +21,7 @@ func TestMain(m *testing.M) {
 		panic(err)
 	}
 
-	rc = storage.NewConnectionHandler(context.Background())
+	rc = redisCluster.NewConnectionHandler(context.Background())
 	go rc.Connect(context.Background(), nil, conf)
 
 	timeout, cancel := context.WithTimeout(context.Background(), time.Second)

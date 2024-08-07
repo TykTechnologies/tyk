@@ -10,19 +10,30 @@ import (
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/interfaces"
 	"github.com/TykTechnologies/tyk/storage"
+	redisCluster "github.com/TykTechnologies/tyk/storage/redis-cluster"
 )
 
 // CoProcessDefaultKeyPrefix is used as a key prefix for this CP.
 const CoProcessDefaultKeyPrefix = "coprocess-data:"
 
-func getStorageForPython(ctx context.Context) storage.RedisCluster {
-	rc := storage.NewConnectionHandler(ctx)
+func getStorageForPython(ctx context.Context) interfaces.Handler {
+	rc := redisCluster.NewConnectionHandler(ctx)
 
 	go rc.Connect(ctx, nil, &config.Config{})
 	rc.WaitConnect(ctx)
 
-	return storage.RedisCluster{KeyPrefix: CoProcessDefaultKeyPrefix, ConnectionHandler: rc}
+	store, err := storage.NewStorageHandler(
+		storage.GetStorageForModule(storage.DEFAULT_MODULE),
+		storage.WithKeyPrefix(CoProcessDefaultKeyPrefix),
+		storage.WithConnectionHandler(rc))
+
+	if err != nil {
+		log.WithError(err).Error("could not create storage handler")
+	}
+
+	return store
 }
 
 // TykStoreData is a CoProcess API function for storing data.

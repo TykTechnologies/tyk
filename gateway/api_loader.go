@@ -15,7 +15,9 @@ import (
 	"sync"
 	texttemplate "text/template"
 
+	"github.com/TykTechnologies/tyk/interfaces"
 	"github.com/TykTechnologies/tyk/rpc"
+	"github.com/TykTechnologies/tyk/storage"
 
 	"github.com/gorilla/mux"
 	"github.com/justinas/alice"
@@ -25,7 +27,6 @@ import (
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/coprocess"
 	"github.com/TykTechnologies/tyk/internal/otel"
-	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/trace"
 )
 
@@ -42,9 +43,38 @@ type ChainObject struct {
 
 func (gw *Gateway) prepareStorage() generalStores {
 	var gs generalStores
-	gs.redisStore = &storage.RedisCluster{KeyPrefix: "apikey-", HashKeys: gw.GetConfig().HashKeys, ConnectionHandler: gw.StorageConnectionHandler}
-	gs.redisOrgStore = &storage.RedisCluster{KeyPrefix: "orgkey.", ConnectionHandler: gw.StorageConnectionHandler}
-	gs.healthStore = &storage.RedisCluster{KeyPrefix: "apihealth.", ConnectionHandler: gw.StorageConnectionHandler}
+	var err error
+	gs.redisStore, err = storage.NewStorageHandler(storage.GetStorageForModule(storage.DEFAULT_MODULE),
+		storage.WithKeyPrefix("apikey-"),
+		storage.WithHashKeys(gw.GetConfig().HashKeys),
+		storage.WithConnectionHandler(gw.StorageConnectionHandler),
+	)
+
+	if err != nil {
+		log.WithError(err).Fatal("Failed to create redis storage handler")
+	}
+
+	gs.redisOrgStore, err = storage.NewStorageHandler(storage.GetStorageForModule(storage.DEFAULT_MODULE),
+		storage.WithKeyPrefix("orgkey."),
+		storage.WithHashKeys(gw.GetConfig().HashKeys),
+		storage.WithConnectionHandler(gw.StorageConnectionHandler),
+	)
+
+	if err != nil {
+		log.WithError(err).Fatal("Failed to create redis storage handler")
+	}
+
+	gs.healthStore, err = storage.NewStorageHandler(storage.GetStorageForModule(storage.DEFAULT_MODULE),
+		storage.WithKeyPrefix("apihealth."),
+		storage.WithHashKeys(gw.GetConfig().HashKeys),
+		storage.WithConnectionHandler(gw.StorageConnectionHandler),
+	)
+
+	if err != nil {
+		log.WithError(err).Fatal("Failed to create redis storage handler")
+	}
+
+	gs.rpcAuthStore = &RPCStorageHandler{KeyPrefix: "apikey-", HashKeys: gw.GetConfig().HashKeys, Gw: gw}
 	gs.rpcAuthStore = &RPCStorageHandler{KeyPrefix: "apikey-", HashKeys: gw.GetConfig().HashKeys, Gw: gw}
 	gs.rpcOrgStore = gw.getGlobalMDCBStorageHandler("orgkey.", false)
 
@@ -287,7 +317,16 @@ func (gw *Gateway) processSpec(spec *APISpec, apisByListen map[string]int,
 	}
 
 	keyPrefix := "cache-" + spec.APIID
-	cacheStore := storage.RedisCluster{KeyPrefix: keyPrefix, IsCache: true, ConnectionHandler: gw.StorageConnectionHandler}
+	cacheStore, err := storage.NewStorageHandler(storage.GetStorageForModule(storage.DEFAULT_MODULE),
+		storage.WithKeyPrefix(keyPrefix),
+		storage.WithConnectionHandler(gw.StorageConnectionHandler),
+		storage.IsCache(true),
+	)
+
+	if err != nil {
+		logger.WithError(err).Error("Failed to create redis storage handler")
+	}
+
 	cacheStore.Connect()
 
 	var chain http.Handler
@@ -441,7 +480,7 @@ func (gw *Gateway) processSpec(spec *APISpec, apisByListen map[string]int,
 	gw.mwAppendEnabled(&chainArray, &TransformMethod{BaseMiddleware: baseMid})
 
 	// Earliest we can respond with cache get 200 ok
-	gw.mwAppendEnabled(&chainArray, &RedisCacheMiddleware{BaseMiddleware: baseMid, store: &cacheStore})
+	gw.mwAppendEnabled(&chainArray, &RedisCacheMiddleware{BaseMiddleware: baseMid, store: cacheStore})
 
 	gw.mwAppendEnabled(&chainArray, &VirtualEndpoint{BaseMiddleware: baseMid})
 	gw.mwAppendEnabled(&chainArray, &RequestSigning{BaseMiddleware: baseMid})
@@ -520,7 +559,7 @@ func (gw *Gateway) processSpec(spec *APISpec, apisByListen map[string]int,
 	return &chainDef
 }
 
-func (gw *Gateway) configureAuthAndOrgStores(gs *generalStores, spec *APISpec) (storage.Handler, storage.Handler, storage.Handler) {
+func (gw *Gateway) configureAuthAndOrgStores(gs *generalStores, spec *APISpec) (interfaces.Handler, interfaces.Handler, interfaces.Handler) {
 	authStore := gs.redisStore
 	orgStore := gs.redisOrgStore
 
@@ -841,7 +880,7 @@ func (gw *Gateway) loadTCPService(spec *APISpec, gs *generalStores, muxer *proxy
 }
 
 type generalStores struct {
-	redisStore, redisOrgStore, healthStore, rpcAuthStore, rpcOrgStore storage.Handler
+	redisStore, redisOrgStore, healthStore, rpcAuthStore, rpcOrgStore interfaces.Handler
 }
 
 var playgroundTemplate *texttemplate.Template

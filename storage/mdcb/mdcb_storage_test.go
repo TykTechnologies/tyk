@@ -1,10 +1,11 @@
-package storage
+package mdcb
 
 import (
 	"context"
 	"io"
 	"testing"
 
+	"github.com/TykTechnologies/tyk/storage/dummy"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 )
@@ -31,13 +32,13 @@ func TestGetResourceType(t *testing.T) {
 }
 
 func TestMdcbStorage_GetMultiKey(t *testing.T) {
-	rpcHandler := NewDummyStorage()
+	rpcHandler := dummy.NewDummyStorage()
 	err := rpcHandler.SetKey("key1", "1", 0)
 	if err != nil {
 		t.Error(err.Error())
 	}
 
-	localHandler := NewDummyStorage()
+	localHandler := dummy.NewDummyStorage()
 	err = localHandler.SetKey("key2", "1", 0)
 	if err != nil {
 		t.Error(err.Error())

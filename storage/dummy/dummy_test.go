@@ -1,4 +1,4 @@
-package storage
+package dummy
 
 import (
 	"reflect"

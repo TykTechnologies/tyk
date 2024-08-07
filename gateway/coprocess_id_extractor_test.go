@@ -11,7 +11,8 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/TykTechnologies/tyk/apidef"
-	"github.com/TykTechnologies/tyk/storage"
+	redisCluster "github.com/TykTechnologies/tyk/storage/redis-cluster"
+	"github.com/TykTechnologies/tyk/storage/util"
 )
 
 const (
@@ -33,9 +34,9 @@ func (ts *Test) createSpecTestFrom(tb testing.TB, def *apidef.APIDefinition) *AP
 	loader := APIDefinitionLoader{Gw: ts.Gw}
 	spec, _ := loader.MakeSpec(&nestedApiDefinition{APIDefinition: def}, nil)
 	tname := tb.Name()
-	redisStore := &storage.RedisCluster{KeyPrefix: tname + "-apikey.", ConnectionHandler: ts.Gw.StorageConnectionHandler}
-	healthStore := &storage.RedisCluster{KeyPrefix: tname + "-apihealth.", ConnectionHandler: ts.Gw.StorageConnectionHandler}
-	orgStore := &storage.RedisCluster{KeyPrefix: tname + "-orgKey.", ConnectionHandler: ts.Gw.StorageConnectionHandler}
+	redisStore := &redisCluster.RedisCluster{KeyPrefix: tname + "-apikey.", ConnectionHandler: ts.Gw.StorageConnectionHandler}
+	healthStore := &redisCluster.RedisCluster{KeyPrefix: tname + "-apihealth.", ConnectionHandler: ts.Gw.StorageConnectionHandler}
+	orgStore := &redisCluster.RedisCluster{KeyPrefix: tname + "-orgKey.", ConnectionHandler: ts.Gw.StorageConnectionHandler}
 	spec.Init(redisStore, redisStore, healthStore, orgStore)
 	return spec
 }
@@ -126,7 +127,7 @@ func TestValueExtractor(t *testing.T) {
 		if sessionID != testSessionID {
 			t.Fatalf("session ID doesn't match, expected %s, got %s", testSessionID, sessionID)
 		}
-		if storage.TokenOrg(sessionID) != spec.OrgID {
+		if util.TokenOrg(sessionID) != spec.OrgID {
 			t.Fatalf("session ID doesn't contain the org ID, got %s", sessionID)
 		}
 		if overrides.ResponseCode != 0 {
@@ -153,7 +154,7 @@ func TestValueExtractor(t *testing.T) {
 		if sessionID != testSessionID {
 			t.Fatalf("session ID doesn't match, expected %s, got %s", testSessionID, sessionID)
 		}
-		if storage.TokenOrg(sessionID) != spec.OrgID {
+		if util.TokenOrg(sessionID) != spec.OrgID {
 			t.Fatalf("session ID doesn't contain the org ID, got %s", sessionID)
 		}
 		if overrides.ResponseCode != 0 {
@@ -190,7 +191,7 @@ func TestRegexExtractor(t *testing.T) {
 		if sessionID != testSessionID {
 			t.Fatalf("session ID doesn't match, expected %s, got %s", testSessionID, sessionID)
 		}
-		if storage.TokenOrg(sessionID) != spec.OrgID {
+		if util.TokenOrg(sessionID) != spec.OrgID {
 			t.Fatalf("session ID doesn't contain the org ID, got %s", sessionID)
 		}
 		if overrides.ResponseCode != 0 {
@@ -219,7 +220,7 @@ func TestRegexExtractor(t *testing.T) {
 		if sessionID != testSessionID {
 			t.Fatalf("session ID doesn't match, expected %s, got %s", testSessionID, sessionID)
 		}
-		if storage.TokenOrg(sessionID) != spec.OrgID {
+		if util.TokenOrg(sessionID) != spec.OrgID {
 			t.Fatalf("session ID doesn't contain the org ID, got %s", sessionID)
 		}
 		if overrides.ResponseCode != 0 {
@@ -249,7 +250,7 @@ func TestRegexExtractor(t *testing.T) {
 		if sessionID != testSessionID {
 			t.Fatalf("session ID doesn't match, expected %s, got %s", testSessionID, sessionID)
 		}
-		if storage.TokenOrg(sessionID) != spec.OrgID {
+		if util.TokenOrg(sessionID) != spec.OrgID {
 			t.Fatalf("session ID doesn't contain the org ID, got %s", sessionID)
 		}
 		if overrides.ResponseCode != 0 {
@@ -285,7 +286,7 @@ func TestXPathExtractor(t *testing.T) {
 		if sessionID != testSessionID {
 			t.Fatalf("session ID doesn't match, expected %s, got %s", testSessionID, sessionID)
 		}
-		if storage.TokenOrg(sessionID) != spec.OrgID {
+		if util.TokenOrg(sessionID) != spec.OrgID {
 			t.Fatalf("session ID doesn't contain the org ID, got %s", sessionID)
 		}
 		if overrides.ResponseCode != 0 {
@@ -313,7 +314,7 @@ func TestXPathExtractor(t *testing.T) {
 		if sessionID != testSessionID {
 			t.Fatalf("session ID doesn't match, expected %s, got %s", testSessionID, sessionID)
 		}
-		if storage.TokenOrg(sessionID) != spec.OrgID {
+		if util.TokenOrg(sessionID) != spec.OrgID {
 			t.Fatalf("session ID doesn't contain the org ID, got %s", sessionID)
 		}
 		if overrides.ResponseCode != 0 {
@@ -342,7 +343,7 @@ func TestXPathExtractor(t *testing.T) {
 		if sessionID != testSessionID {
 			t.Fatalf("session ID doesn't match, expected %s, got %s", testSessionID, sessionID)
 		}
-		if storage.TokenOrg(sessionID) != spec.OrgID {
+		if util.TokenOrg(sessionID) != spec.OrgID {
 			t.Fatalf("session ID doesn't contain the org ID, got %s", sessionID)
 		}
 		if overrides.ResponseCode != 0 {

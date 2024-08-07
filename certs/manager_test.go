@@ -196,7 +196,7 @@ func TestStorageIndex(t *testing.T) {
 	storage, ok := m.storage.(*storage.DummyStorage)
 
 	if !ok {
-		t.Error("cannot make storage.DummyStorage of type storage.Handler")
+		t.Error("cannot make storage.DummyStorage of type interfaces.Handler")
 	}
 
 	if len(storage.IndexList) != 0 {

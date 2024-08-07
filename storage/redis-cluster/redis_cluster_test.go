@@ -1,4 +1,4 @@
-package storage
+package redisCluster
 
 import (
 	"context"
@@ -13,6 +13,7 @@ import (
 	tempmocks "github.com/TykTechnologies/storage/temporal/tempmocks"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/internal/redis"
+	"github.com/TykTechnologies/tyk/storage/shared"
 
 	"github.com/stretchr/testify/mock"
 )
@@ -116,8 +117,8 @@ func TestRedisClusterGetMultiKey(t *testing.T) {
 	r.DeleteAllKeys()
 
 	_, err := r.GetMultiKey(keys)
-	if !errors.Is(err, ErrKeyNotFound) {
-		t.Errorf("expected %v got %v", ErrKeyNotFound, err)
+	if !errors.Is(err, shared.ErrKeyNotFound) {
+		t.Errorf("expected %v got %v", shared.ErrKeyNotFound, err)
 	}
 	err = r.SetKey(keys[0], keys[0], 0)
 	if err != nil {
@@ -408,7 +409,7 @@ func TestGetKey(t *testing.T) {
 
 		val, err := storage.GetKey("key")
 		assert.Error(t, err)
-		assert.Equal(t, ErrKeyNotFound, err)
+		assert.Equal(t, shared.ErrKeyNotFound, err)
 		assert.Equal(t, "", val)
 		mockKv.AssertExpectations(t)
 	})
@@ -458,7 +459,7 @@ func TestGetMultiKey(t *testing.T) {
 
 		val, err := storage.GetMultiKey([]string{"key"})
 		assert.Error(t, err)
-		assert.Equal(t, ErrKeyNotFound, err)
+		assert.Equal(t, shared.ErrKeyNotFound, err)
 		assert.Equal(t, []string(nil), val)
 		mockKv.AssertExpectations(t)
 	})
@@ -503,11 +504,11 @@ func TestGetKeyTTL(t *testing.T) {
 		storage := &RedisCluster{ConnectionHandler: rc}
 		mockKv := tempmocks.NewKeyValue(t)
 		storage.kvStorage = mockKv
-		mockKv.On("TTL", mock.Anything, "key").Return(int64(0), ErrKeyNotFound)
+		mockKv.On("TTL", mock.Anything, "key").Return(int64(0), shared.ErrKeyNotFound)
 
 		val, err := storage.GetKeyTTL("key")
 		assert.Error(t, err)
-		assert.Equal(t, ErrKeyNotFound, err)
+		assert.Equal(t, shared.ErrKeyNotFound, err)
 		assert.Equal(t, int64(0), val)
 		mockKv.AssertExpectations(t)
 	})
@@ -541,11 +542,11 @@ func TestGetRawKey(t *testing.T) {
 		storage := &RedisCluster{ConnectionHandler: rc}
 		mockKv := tempmocks.NewKeyValue(t)
 		storage.kvStorage = mockKv
-		mockKv.On("Get", mock.Anything, "key").Return("", ErrKeyNotFound)
+		mockKv.On("Get", mock.Anything, "key").Return("", shared.ErrKeyNotFound)
 
 		val, err := storage.GetRawKey("key")
 		assert.Error(t, err)
-		assert.Equal(t, ErrKeyNotFound, err)
+		assert.Equal(t, shared.ErrKeyNotFound, err)
 		assert.Equal(t, "", val)
 		mockKv.AssertExpectations(t)
 	})
@@ -590,11 +591,11 @@ func TestGetExp(t *testing.T) {
 		storage := &RedisCluster{ConnectionHandler: rc}
 		mockKv := tempmocks.NewKeyValue(t)
 		storage.kvStorage = mockKv
-		mockKv.On("TTL", mock.Anything, "key").Return(int64(0), ErrKeyNotFound)
+		mockKv.On("TTL", mock.Anything, "key").Return(int64(0), shared.ErrKeyNotFound)
 
 		val, err := storage.GetExp("key")
 		assert.Error(t, err)
-		assert.Equal(t, ErrKeyNotFound, err)
+		assert.Equal(t, shared.ErrKeyNotFound, err)
 		assert.Equal(t, int64(0), val)
 		mockKv.AssertExpectations(t)
 	})
@@ -637,11 +638,11 @@ func TestSetExp(t *testing.T) {
 		storage := &RedisCluster{ConnectionHandler: rc}
 		mockKv := tempmocks.NewKeyValue(t)
 		storage.kvStorage = mockKv
-		mockKv.On("Expire", mock.Anything, "key", time.Duration(-1*time.Second)).Return(ErrKeyNotFound)
+		mockKv.On("Expire", mock.Anything, "key", time.Duration(-1*time.Second)).Return(shared.ErrKeyNotFound)
 
 		err := storage.SetExp("key", -1)
 		assert.Error(t, err)
-		assert.Equal(t, ErrKeyNotFound, err)
+		assert.Equal(t, shared.ErrKeyNotFound, err)
 		mockKv.AssertExpectations(t)
 	})
 }
@@ -683,11 +684,11 @@ func TestSetKey(t *testing.T) {
 		storage := &RedisCluster{ConnectionHandler: rc}
 		mockKv := tempmocks.NewKeyValue(t)
 		storage.kvStorage = mockKv
-		mockKv.On("Set", mock.Anything, "key", "value", time.Duration(-1*time.Second)).Return(ErrKeyNotFound)
+		mockKv.On("Set", mock.Anything, "key", "value", time.Duration(-1*time.Second)).Return(shared.ErrKeyNotFound)
 
 		err := storage.SetKey("key", "value", -1)
 		assert.Error(t, err)
-		assert.Equal(t, ErrKeyNotFound, err)
+		assert.Equal(t, shared.ErrKeyNotFound, err)
 		mockKv.AssertExpectations(t)
 	})
 }
@@ -729,11 +730,11 @@ func TestSetRawKey(t *testing.T) {
 		storage := &RedisCluster{ConnectionHandler: rc}
 		mockKv := tempmocks.NewKeyValue(t)
 		storage.kvStorage = mockKv
-		mockKv.On("Set", mock.Anything, "key", "value", time.Duration(-1*time.Second)).Return(ErrKeyNotFound)
+		mockKv.On("Set", mock.Anything, "key", "value", time.Duration(-1*time.Second)).Return(shared.ErrKeyNotFound)
 
 		err := storage.SetRawKey("key", "value", -1)
 		assert.Error(t, err)
-		assert.Equal(t, ErrKeyNotFound, err)
+		assert.Equal(t, shared.ErrKeyNotFound, err)
 		mockKv.AssertExpectations(t)
 	})
 }
@@ -771,7 +772,7 @@ func TestDecrement(t *testing.T) {
 		storage := &RedisCluster{ConnectionHandler: rc}
 		mockKv := tempmocks.NewKeyValue(t)
 		storage.kvStorage = mockKv
-		mockKv.On("Decrement", mock.Anything, "key").Return(int64(1), ErrKeyNotFound)
+		mockKv.On("Decrement", mock.Anything, "key").Return(int64(1), shared.ErrKeyNotFound)
 
 		storage.Decrement("key")
 		mockKv.AssertExpectations(t)
@@ -837,7 +838,7 @@ func TestIncrememntWithExpire(t *testing.T) {
 		storage := &RedisCluster{ConnectionHandler: rc}
 		mockKv := tempmocks.NewKeyValue(t)
 		storage.kvStorage = mockKv
-		mockKv.On("Increment", mock.Anything, "key").Return(int64(0), ErrKeyNotFound)
+		mockKv.On("Increment", mock.Anything, "key").Return(int64(0), shared.ErrKeyNotFound)
 
 		val := storage.IncrememntWithExpire("key", 0)
 		assert.Equal(t, int64(0), val)
@@ -947,7 +948,7 @@ func TestGetKeysAndValuesWithFilter(t *testing.T) {
 		storage := &RedisCluster{ConnectionHandler: rc}
 		mockKv := tempmocks.NewKeyValue(t)
 		storage.kvStorage = mockKv
-		mockKv.On("GetKeysAndValuesWithFilter", mock.Anything, "test").Return(map[string]interface{}{}, ErrKeyNotFound)
+		mockKv.On("GetKeysAndValuesWithFilter", mock.Anything, "test").Return(map[string]interface{}{}, shared.ErrKeyNotFound)
 
 		res := storage.GetKeysAndValuesWithFilter("test")
 		assert.Equal(t, map[string]string(map[string]string(nil)), res)
@@ -982,7 +983,7 @@ func TestGetKeysAndValues(t *testing.T) {
 		storage := &RedisCluster{ConnectionHandler: rc}
 		mockKv := tempmocks.NewKeyValue(t)
 		storage.kvStorage = mockKv
-		mockKv.On("GetKeysAndValuesWithFilter", mock.Anything, "").Return(map[string]interface{}{}, ErrKeyNotFound)
+		mockKv.On("GetKeysAndValuesWithFilter", mock.Anything, "").Return(map[string]interface{}{}, shared.ErrKeyNotFound)
 
 		res := storage.GetKeysAndValues()
 		assert.Equal(t, map[string]string(map[string]string(nil)), res)
@@ -1121,7 +1122,7 @@ func TestDeleteRawKey(t *testing.T) {
 		storage := &RedisCluster{ConnectionHandler: rc}
 		mockKv := tempmocks.NewKeyValue(t)
 		storage.kvStorage = mockKv
-		mockKv.On("Delete", mock.Anything, "key").Return(ErrKeyNotFound)
+		mockKv.On("Delete", mock.Anything, "key").Return(shared.ErrKeyNotFound)
 
 		deleted := storage.DeleteRawKey("key")
 		assert.False(t, deleted)
@@ -1166,7 +1167,7 @@ func TestDeleteScanMatch(t *testing.T) {
 		storage := &RedisCluster{ConnectionHandler: rc}
 		mockKv := tempmocks.NewKeyValue(t)
 		storage.kvStorage = mockKv
-		mockKv.On("DeleteScanMatch", mock.Anything, "key").Return(int64(0), ErrKeyNotFound)
+		mockKv.On("DeleteScanMatch", mock.Anything, "key").Return(int64(0), shared.ErrKeyNotFound)
 
 		deleted := storage.DeleteScanMatch("key")
 		assert.False(t, deleted)
@@ -1222,7 +1223,7 @@ func TestDeleteKeys(t *testing.T) {
 		storage := &RedisCluster{ConnectionHandler: rc}
 		mockKv := tempmocks.NewKeyValue(t)
 		storage.kvStorage = mockKv
-		mockKv.On("DeleteKeys", mock.Anything, mock.Anything).Return(int64(0), ErrKeyNotFound)
+		mockKv.On("DeleteKeys", mock.Anything, mock.Anything).Return(int64(0), shared.ErrKeyNotFound)
 
 		deleted := storage.DeleteKeys([]string{"key"})
 		assert.False(t, deleted)

@@ -18,6 +18,7 @@ import (
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/header"
+	"github.com/TykTechnologies/tyk/interfaces"
 	"github.com/TykTechnologies/tyk/internal/event"
 	"github.com/TykTechnologies/tyk/storage"
 )
@@ -45,7 +46,7 @@ var (
 type WebHookHandler struct {
 	conf     apidef.WebHookHandlerConf
 	template *htmltemplate.Template // non-nil if Init is run without error
-	store    storage.Handler
+	store    interfaces.Handler
 
 	contentType      string
 	dashboardService DashboardServiceSender
@@ -69,7 +70,18 @@ func (w *WebHookHandler) Init(handlerConf interface{}) error {
 		return ErrEventHandlerDisabled
 	}
 
-	w.store = &storage.RedisCluster{KeyPrefix: "webhook.cache.", ConnectionHandler: w.Gw.StorageConnectionHandler}
+	w.store, err = storage.NewStorageHandler(
+		storage.GetStorageForModule(storage.DEFAULT_MODULE),
+		storage.WithKeyPrefix("webhook.cache."),
+		storage.WithConnectionHandler(w.Gw.StorageConnectionHandler),
+	)
+	if err != nil {
+		log.WithFields(logrus.Fields{
+			"prefix": "webhooks",
+		}).Error("Failed to create storage handler: ", err)
+		return err
+	}
+
 	w.store.Connect()
 
 	// Pre-load template on init

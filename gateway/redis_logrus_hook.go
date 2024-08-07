@@ -3,9 +3,9 @@ package gateway
 import (
 	"time"
 
-	"github.com/sirupsen/logrus"
-
 	"github.com/TykTechnologies/tyk/storage"
+	redisCluster "github.com/TykTechnologies/tyk/storage/redis-cluster"
+	"github.com/sirupsen/logrus"
 )
 
 type redisChannelHook struct {
@@ -16,7 +16,24 @@ type redisChannelHook struct {
 func (gw *Gateway) newRedisHook() *redisChannelHook {
 	hook := &redisChannelHook{}
 	hook.formatter = new(logrus.JSONFormatter)
-	hook.notifier.store = &storage.RedisCluster{KeyPrefix: "gateway-notifications:", ConnectionHandler: gw.StorageConnectionHandler}
+
+	st, err := storage.NewStorageHandler(
+		storage.GetStorageForModule(storage.DEFAULT_MODULE),
+		storage.WithConnectionHandler(gw.StorageConnectionHandler),
+		storage.WithKeyPrefix("gateway-notifications:"),
+	)
+
+	if err != nil {
+		log.WithError(err).Error("could not create storage handler")
+		return nil
+	}
+
+	storage, ok := st.(*redisCluster.RedisCluster)
+	if !ok {
+		log.Fatal("gateway channel hoook requires Redis storage")
+	}
+
+	hook.notifier.store = storage
 	hook.notifier.channel = "dashboard.ui.messages"
 	return hook
 }

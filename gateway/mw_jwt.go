@@ -579,12 +579,22 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 			prefix := generateOAuthPrefix(k.Spec.APIID)
 			storageManager := k.Gw.getGlobalMDCBStorageHandler(prefix, false)
 			storageManager.Connect()
+
+			store, err := storage.NewStorageHandler(
+				storage.GetStorageForModule(storage.DEFAULT_MODULE),
+				storage.WithKeyPrefix(prefix),
+				storage.WithConnectionHandler(k.Gw.StorageConnectionHandler),
+			)
+			if err != nil {
+				return errors.New("failed to create storage handler: " + err.Error()), http.StatusInternalServerError
+			}
+
 			k.Spec.OAuthManager = &OAuthManager{
 				OsinServer: k.Gw.TykOsinNewServer(&osin.ServerConfig{},
 					&RedisOsinStorageInterface{
 						storageManager,
 						k.Gw.GlobalSessionManager,
-						&storage.RedisCluster{KeyPrefix: prefix, HashKeys: false, ConnectionHandler: k.Gw.StorageConnectionHandler},
+						store,
 						k.Spec.OrgID,
 						k.Gw,
 					}),

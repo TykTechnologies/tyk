@@ -13,11 +13,11 @@ import (
 
 	"github.com/TykTechnologies/tyk/certs"
 	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/storage/util"
 
 	"github.com/TykTechnologies/tyk/header"
 
 	"github.com/TykTechnologies/tyk/apidef"
-	"github.com/TykTechnologies/tyk/storage"
 
 	"github.com/TykTechnologies/tyk/test"
 	"github.com/TykTechnologies/tyk/user"
@@ -86,7 +86,7 @@ func TestAuthenticationAfterUpdateKey(t *testing.T) {
 			APIID: api.APIID,
 		}}
 
-		err := ts.Gw.GlobalSessionManager.UpdateSession(storage.HashKey(key, ts.Gw.GetConfig().HashKeys), session, 0, ts.Gw.GetConfig().HashKeys)
+		err := ts.Gw.GlobalSessionManager.UpdateSession(util.HashKey(key, ts.Gw.GetConfig().HashKeys), session, 0, ts.Gw.GetConfig().HashKeys)
 		if err != nil {
 			t.Error("could not update session in Session Manager. " + err.Error())
 		}
@@ -103,7 +103,7 @@ func TestAuthenticationAfterUpdateKey(t *testing.T) {
 			APIID: "dummy",
 		}}
 
-		err = ts.Gw.GlobalSessionManager.UpdateSession(storage.HashKey(key, ts.Gw.GetConfig().HashKeys), session, 0, ts.Gw.GetConfig().HashKeys)
+		err = ts.Gw.GlobalSessionManager.UpdateSession(util.HashKey(key, ts.Gw.GetConfig().HashKeys), session, 0, ts.Gw.GetConfig().HashKeys)
 		if err != nil {
 			t.Error("could not update session in Session Manager. " + err.Error())
 		}
@@ -386,7 +386,7 @@ func TestCustomKeysEdgeGw(t *testing.T) {
 func TestDeleteRawKeysWithAllowanceScope(t *testing.T) {
 	sessionManager := DefaultSessionManager{}
 
-	t.Run("should not panic if storage.Handler is nil", func(t *testing.T) {
+	t.Run("should not panic if interfaces.Handler is nil", func(t *testing.T) {
 		session := &user.SessionState{
 			AccessRights: map[string]user.AccessDefinition{
 				"ar1": {AllowanceScope: "scope1"},

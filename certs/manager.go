@@ -18,9 +18,10 @@ import (
 
 	"github.com/sirupsen/logrus"
 
+	"github.com/TykTechnologies/tyk/interfaces"
 	"github.com/TykTechnologies/tyk/internal/cache"
 	tykcrypto "github.com/TykTechnologies/tyk/internal/crypto"
-	"github.com/TykTechnologies/tyk/storage"
+	"github.com/TykTechnologies/tyk/storage/mdcb"
 )
 
 const (
@@ -52,14 +53,14 @@ type CertificateManager interface {
 }
 
 type certificateManager struct {
-	storage         storage.Handler
+	storage         interfaces.Handler
 	logger          *logrus.Entry
 	cache           cache.Repository
 	secret          string
 	migrateCertList bool
 }
 
-func NewCertificateManager(storage storage.Handler, secret string, logger *logrus.Logger, migrateCertList bool) *certificateManager {
+func NewCertificateManager(storage interfaces.Handler, secret string, logger *logrus.Logger, migrateCertList bool) *certificateManager {
 	if logger == nil {
 		logger = logrus.New()
 	}
@@ -79,7 +80,7 @@ func getOrgFromKeyID(key, certID string) string {
 	return orgId
 }
 
-func NewSlaveCertManager(localStorage, rpcStorage storage.Handler, secret string, logger *logrus.Logger, migrateCertList bool) *certificateManager {
+func NewSlaveCertManager(localStorage, rpcStorage interfaces.Handler, secret string, logger *logrus.Logger, migrateCertList bool) *certificateManager {
 	if logger == nil {
 		logger = logrus.New()
 	}
@@ -101,7 +102,7 @@ func NewSlaveCertManager(localStorage, rpcStorage storage.Handler, secret string
 		return err
 	}
 
-	mdcbStorage := storage.NewMdcbStorage(localStorage, rpcStorage, log)
+	mdcbStorage := mdcb.NewMdcbStorage(localStorage, rpcStorage, log)
 	mdcbStorage.CallbackonPullfromRPC = &callbackOnPullCertFromRPC
 
 	cm.storage = mdcbStorage

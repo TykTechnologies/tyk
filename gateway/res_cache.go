@@ -10,7 +10,7 @@ import (
 
 	"github.com/sirupsen/logrus"
 
-	"github.com/TykTechnologies/tyk/storage"
+	"github.com/TykTechnologies/tyk/interfaces"
 	"github.com/TykTechnologies/tyk/user"
 )
 
@@ -22,7 +22,7 @@ const (
 // ResponseCacheMiddleware is a caching middleware that will pull data from Redis instead of the upstream proxy
 type ResponseCacheMiddleware struct {
 	BaseTykResponseHandler
-	store storage.Handler
+	store interfaces.Handler
 }
 
 func (m *ResponseCacheMiddleware) Base() *BaseTykResponseHandler {

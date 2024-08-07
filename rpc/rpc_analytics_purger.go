@@ -7,10 +7,9 @@ import (
 	"time"
 
 	"github.com/TykTechnologies/tyk-pump/analytics"
+	"github.com/TykTechnologies/tyk/interfaces"
 
 	"github.com/vmihailenco/msgpack"
-
-	"github.com/TykTechnologies/tyk/storage"
 )
 
 const ANALYTICS_KEYNAME = "tyk-system-analytics"
@@ -18,7 +17,7 @@ const ANALYTICS_KEYNAME = "tyk-system-analytics"
 // RPCPurger will purge analytics data into a Mongo database, requires that the Mongo DB string is specified
 // in the Config object
 type Purger struct {
-	Store storage.Handler
+	Store interfaces.Handler
 }
 
 // Connect Connects to RPC

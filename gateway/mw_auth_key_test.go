@@ -17,7 +17,7 @@ import (
 	"github.com/TykTechnologies/tyk/certs"
 	"github.com/TykTechnologies/tyk/config"
 	signaturevalidator "github.com/TykTechnologies/tyk/signature_validator"
-	"github.com/TykTechnologies/tyk/storage"
+	"github.com/TykTechnologies/tyk/storage/util"
 	"github.com/TykTechnologies/tyk/test"
 	"github.com/TykTechnologies/tyk/user"
 
@@ -254,7 +254,7 @@ func TestSignatureValidation(t *testing.T) {
 		}
 
 		// Second request uses token (org ID + key) and token-based signature:
-		token, err := storage.GenerateToken("default", customKey, "murmur64")
+		token, err := util.GenerateToken("default", customKey, "murmur64")
 		if err != nil {
 			t.Fatal(err)
 		}

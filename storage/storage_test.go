@@ -1,6 +1,10 @@
 package storage
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/TykTechnologies/tyk/storage/util"
+)
 
 func Test_TokenOrg(t *testing.T) {
 	tcs := []struct {
@@ -32,7 +36,7 @@ func Test_TokenOrg(t *testing.T) {
 
 	for _, tc := range tcs {
 		t.Run(tc.name, func(t *testing.T) {
-			result := TokenOrg(tc.givenKey)
+			result := util.TokenOrg(tc.givenKey)
 			if result != tc.expectedResult {
 				t.Errorf("Expected %s, got %s", tc.expectedResult, result)
 			}

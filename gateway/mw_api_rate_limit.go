@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/TykTechnologies/tyk/internal/event"
-	"github.com/TykTechnologies/tyk/storage"
+	"github.com/TykTechnologies/tyk/storage/util"
 	"github.com/TykTechnologies/tyk/user"
 )
 
@@ -54,14 +54,14 @@ func (k *RateLimitForAPI) getSession(r *http.Request) *user.SessionState {
 	if ok {
 		if limits := spec.RateLimit; limits.Valid() {
 			// track per-endpoint with a hash of the path
-			keyname := k.keyName + "-" + storage.HashStr(limits.Path)
+			keyname := k.keyName + "-" + util.HashStr(limits.Path)
 
 			session := &user.SessionState{
 				Rate:        limits.Rate,
 				Per:         limits.Per,
 				LastUpdated: k.apiSess.LastUpdated,
 			}
-			session.SetKeyHash(storage.HashKey(keyname, k.Gw.GetConfig().HashKeys))
+			session.SetKeyHash(util.HashKey(keyname, k.Gw.GetConfig().HashKeys))
 
 			return session
 		}
@@ -84,7 +84,7 @@ func (k *RateLimitForAPI) EnabledForSpec() bool {
 		Per:         k.Spec.GlobalRateLimit.Per,
 		LastUpdated: strconv.Itoa(int(time.Now().UnixNano())),
 	}
-	k.apiSess.SetKeyHash(storage.HashKey(k.keyName, k.Gw.GetConfig().HashKeys))
+	k.apiSess.SetKeyHash(util.HashKey(k.keyName, k.Gw.GetConfig().HashKeys))
 
 	return true
 }

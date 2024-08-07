@@ -12,9 +12,10 @@ import (
 	"github.com/TykTechnologies/leakybucket/memorycache"
 
 	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/interfaces"
 	"github.com/TykTechnologies/tyk/internal/rate"
 	"github.com/TykTechnologies/tyk/internal/redis"
-	"github.com/TykTechnologies/tyk/storage"
+	"github.com/TykTechnologies/tyk/storage/util"
 	"github.com/TykTechnologies/tyk/user"
 )
 
@@ -226,7 +227,7 @@ func (sfr sessionFailReason) String() string {
 // sessionFailReason if session limits have been exceeded.
 // Key values to manage rate are Rate and Per, e.g. Rate of 10 messages
 // Per 10 seconds
-func (l *SessionLimiter) ForwardMessage(r *http.Request, session *user.SessionState, rateLimitKey string, quotaKey string, store storage.Handler, enableRL, enableQ bool, api *APISpec, dryRun bool) sessionFailReason {
+func (l *SessionLimiter) ForwardMessage(r *http.Request, session *user.SessionState, rateLimitKey string, quotaKey string, store interfaces.Handler, enableRL, enableQ bool, api *APISpec, dryRun bool) sessionFailReason {
 	// check for limit on API level (set to session by ApplyPolicies)
 	accessDef, allowanceScope, err := GetAccessDefinitionByAPIIDOrSession(session, api)
 	if err != nil {
@@ -309,7 +310,7 @@ func (l *SessionLimiter) ForwardMessage(r *http.Request, session *user.SessionSt
 
 }
 
-func (l *SessionLimiter) RedisQuotaExceeded(r *http.Request, session *user.SessionState, quotaKey, scope string, limit *user.APILimit, store storage.Handler, hashKeys bool) bool {
+func (l *SessionLimiter) RedisQuotaExceeded(r *http.Request, session *user.SessionState, quotaKey, scope string, limit *user.APILimit, store interfaces.Handler, hashKeys bool) bool {
 	// Unlimited?
 	if limit.QuotaMax == -1 || limit.QuotaMax == 0 {
 		// No quota set
@@ -326,7 +327,7 @@ func (l *SessionLimiter) RedisQuotaExceeded(r *http.Request, session *user.Sessi
 	key := session.KeyID
 
 	if hashKeys {
-		key = storage.HashStr(session.KeyID)
+		key = util.HashStr(session.KeyID)
 	}
 
 	if quotaKey != "" {

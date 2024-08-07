@@ -15,6 +15,7 @@ import (
 	"github.com/golang-jwt/jwt/v4"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/interfaces"
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/user"
 
@@ -292,11 +293,21 @@ func isExpired(claims jwt.MapClaims) bool {
 }
 
 func newIntrospectionCache(gw *Gateway) *introspectionCache {
-	return &introspectionCache{RedisCluster: storage.RedisCluster{KeyPrefix: "introspection-", ConnectionHandler: gw.StorageConnectionHandler}}
+	store, err := storage.NewStorageHandler(
+		storage.GetStorageForModule(storage.DEFAULT_MODULE),
+		storage.WithKeyPrefix("introspection-"),
+		storage.WithConnectionHandler(gw.StorageConnectionHandler),
+	)
+
+	if err != nil {
+		log.WithError(err).Error("could not create storage handler")
+	}
+
+	return &introspectionCache{Handler: store}
 }
 
 type introspectionCache struct {
-	storage.RedisCluster
+	interfaces.Handler
 }
 
 func (c *introspectionCache) GetRes(token string) (jwt.MapClaims, bool) {

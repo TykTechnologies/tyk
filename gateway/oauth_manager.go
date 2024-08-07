@@ -18,14 +18,17 @@ import (
 	"github.com/sirupsen/logrus"
 	"golang.org/x/crypto/bcrypt"
 
+	"github.com/TykTechnologies/tyk/interfaces"
 	internalerrors "github.com/TykTechnologies/tyk/internal/errors"
 	"github.com/TykTechnologies/tyk/internal/uuid"
 	"github.com/TykTechnologies/tyk/request"
+	"github.com/TykTechnologies/tyk/storage"
+	redisCluster "github.com/TykTechnologies/tyk/storage/redis-cluster"
+	"github.com/TykTechnologies/tyk/storage/util"
 
 	"strconv"
 
 	"github.com/TykTechnologies/tyk/header"
-	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/user"
 )
 
@@ -403,7 +406,7 @@ func (o *OAuthManager) HandleAccess(r *http.Request) *osin.Response {
 		if ar.Type == osin.PASSWORD {
 			username = r.Form.Get("username")
 			password := r.Form.Get("password")
-			searchKey := "apikey-" + storage.HashKey(o.API.OrgID+username, o.Gw.GetConfig().HashKeys)
+			searchKey := "apikey-" + util.HashKey(o.API.OrgID+username, o.Gw.GetConfig().HashKeys)
 			log.Debug("Getting: ", searchKey)
 
 			var err error
@@ -589,9 +592,9 @@ func (gw *Gateway) TykOsinNewServer(config *osin.ServerConfig, storage ExtendedO
 // TODO: Refactor this to move prefix handling into a checker method, then it can be an unexported setting in the struct.
 // RedisOsinStorageInterface implements osin.Storage interface to use Tyk's own storage mechanism
 type RedisOsinStorageInterface struct {
-	store          storage.Handler
+	store          interfaces.Handler
 	sessionManager SessionHandler
-	redisStore     storage.Handler
+	redisStore     interfaces.Handler
 	orgID          string
 	Gw             *Gateway `json:"-"`
 }
@@ -938,7 +941,7 @@ func (r *RedisOsinStorageInterface) SaveAccess(accessData *osin.AccessData) erro
 	if err != nil {
 		return err
 	}
-	key := prefixAccess + storage.HashKey(accessData.AccessToken, r.Gw.GetConfig().HashKeys)
+	key := prefixAccess + util.HashKey(accessData.AccessToken, r.Gw.GetConfig().HashKeys)
 	log.Debug("Saving ACCESS key: ", key)
 
 	// Overide default ExpiresIn:
@@ -956,7 +959,7 @@ func (r *RedisOsinStorageInterface) SaveAccess(accessData *osin.AccessData) erro
 	log.Debug("Adding ACCESS key to sorted list: ", sortedListKey)
 	r.redisStore.AddToSortedSet(
 		sortedListKey,
-		storage.HashKey(accessData.AccessToken, r.Gw.GetConfig().HashKeys),
+		util.HashKey(accessData.AccessToken, r.Gw.GetConfig().HashKeys),
 		float64(accessData.CreatedAt.Unix()+int64(accessData.ExpiresIn)), // set score as token expire timestamp
 	)
 
@@ -1035,7 +1038,7 @@ func (r *RedisOsinStorageInterface) SaveAccess(accessData *osin.AccessData) erro
 
 // LoadAccess will load access data from redis
 func (r *RedisOsinStorageInterface) LoadAccess(token string) (*osin.AccessData, error) {
-	key := prefixAccess + storage.HashKey(token, r.Gw.GetConfig().HashKeys)
+	key := prefixAccess + util.HashKey(token, r.Gw.GetConfig().HashKeys)
 	log.Debug("Loading ACCESS key: ", key)
 	accessJSON, err := r.store.GetKey(key)
 
@@ -1073,7 +1076,7 @@ func (r *RedisOsinStorageInterface) RemoveAccess(token string) error {
 		log.Warning("Cannot load access token:", token)
 	}
 
-	key := prefixAccess + storage.HashKey(token, r.Gw.GetConfig().HashKeys)
+	key := prefixAccess + util.HashKey(token, r.Gw.GetConfig().HashKeys)
 	r.store.DeleteKey(key)
 	// remove the access token from central storage too
 	r.sessionManager.RemoveSession(r.orgID, token, false)
@@ -1190,9 +1193,24 @@ func (gw *Gateway) purgeLapsedOAuthTokens() error {
 		return nil
 	}
 
-	redisCluster := &storage.RedisCluster{KeyPrefix: "", HashKeys: false, ConnectionHandler: gw.StorageConnectionHandler}
+	st, err := storage.NewStorageHandler(
+		storage.GetStorageForModule(storage.DEFAULT_MODULE),
+		storage.WithHashKeys(false),
+		storage.WithConnectionHandler(gw.StorageConnectionHandler),
+		storage.WithKeyPrefix(""),
+	)
 
-	ok, err := redisCluster.Lock("oauth-purge-lock", time.Minute)
+	storage, ok := st.(*redisCluster.RedisCluster)
+	if !ok {
+		return errors.New("oauth token purge requires Redis storage")
+	}
+
+	if err != nil {
+		log.WithError(err).Error("error creating storage handler")
+		return err
+	}
+
+	ok, err = storage.Lock("oauth-purge-lock", time.Minute)
 	if err != nil {
 		log.WithError(err).Error("error acquiring lock to purge oauth tokens")
 		return err
@@ -1203,7 +1221,7 @@ func (gw *Gateway) purgeLapsedOAuthTokens() error {
 		return nil
 	}
 
-	keys, err := redisCluster.ScanKeys(oAuthClientTokensKeyPattern)
+	keys, err := storage.ScanKeys(oAuthClientTokensKeyPattern)
 
 	if err != nil {
 		log.WithError(err).Error("error while scanning for tokens")
@@ -1221,7 +1239,7 @@ func (gw *Gateway) purgeLapsedOAuthTokens() error {
 		wg.Add(1)
 		go func(k string) {
 			defer wg.Done()
-			if err := redisCluster.RemoveSortedSetRange(k, "-inf", cleanupStartScore); err != nil {
+			if err := storage.RemoveSortedSetRange(k, "-inf", cleanupStartScore); err != nil {
 				errs <- err
 			}
 		}(key)
