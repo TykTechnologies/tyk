@@ -10,6 +10,8 @@ import (
 
 	"github.com/TykTechnologies/tyk/internal/model"
 	"github.com/TykTechnologies/tyk/rpc"
+	"github.com/TykTechnologies/tyk/storage/shared"
+	"github.com/TykTechnologies/tyk/storage/util"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
@@ -18,7 +20,6 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/TykTechnologies/tyk/header"
-	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/test"
 	"github.com/TykTechnologies/tyk/user"
 )
@@ -36,7 +37,7 @@ func buildStringEvent(eventType, token, apiId string) string {
 	switch eventType {
 	case RevokeOauthHashedToken:
 		// string is as= {the-hashed-token}#hashed:{api-id}:oAuthRevokeToken
-		token = storage.HashStr(token)
+		token = util.HashStr(token)
 		return fmt.Sprintf("%s#hashed:%s:oAuthRevokeToken", token, apiId)
 	case RevokeOauthToken:
 		// string is as= {the-token}:{api-id}:oAuthRevokeToken
@@ -621,7 +622,7 @@ func TestGetRawKey(t *testing.T) {
 		}
 
 		_, err := rpcListener.GetRawKey("any-key")
-		assert.Equal(t, storage.ErrMDCBConnectionLost, err)
+		assert.Equal(t, shared.ErrMDCBConnectionLost, err)
 	})
 }
 
@@ -677,7 +678,7 @@ func TestDeleteUsingTokenID(t *testing.T) {
 		assert.Equal(t, http.StatusOK, status)
 		// it should not exist anymore
 		_, err = ts.Gw.GlobalSessionManager.Store().GetKey(customKey)
-		assert.ErrorIs(t, storage.ErrKeyNotFound, err)
+		assert.ErrorIs(t, shared.ErrKeyNotFound, err)
 	})
 
 	t.Run("status not found and TokenID do not exist", func(t *testing.T) {

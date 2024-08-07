@@ -4,19 +4,20 @@ import (
 	"errors"
 
 	"github.com/TykTechnologies/tyk/apidef"
-	"github.com/TykTechnologies/tyk/storage"
+	redisCluster "github.com/TykTechnologies/tyk/storage/redis-cluster"
+	"github.com/TykTechnologies/tyk/storage/shared"
 )
 
 type SyncronizerForcer struct {
-	store           *storage.RedisCluster
+	store           *redisCluster.RedisCluster
 	getNodeDataFunc func() []byte
 }
 
 // NewSyncForcer returns a new syncforcer with a connected redis with a key prefix synchronizer-group- for group synchronization control.
-func NewSyncForcer(controller *storage.ConnectionHandler, getNodeDataFunc func() []byte) *SyncronizerForcer {
+func NewSyncForcer(controller *redisCluster.ConnectionHandler, getNodeDataFunc func() []byte) *SyncronizerForcer {
 	sf := &SyncronizerForcer{}
 	sf.getNodeDataFunc = getNodeDataFunc
-	sf.store = &storage.RedisCluster{KeyPrefix: "synchronizer-group-", ConnectionHandler: controller}
+	sf.store = &redisCluster.RedisCluster{KeyPrefix: "synchronizer-group-", ConnectionHandler: controller}
 	sf.store.Connect()
 
 	return sf
@@ -28,7 +29,7 @@ func (sf *SyncronizerForcer) GroupLoginCallback(userKey string, groupID string) 
 	shouldForce := false
 
 	_, err := sf.store.GetKey(groupID)
-	if err != nil && errors.Is(err, storage.ErrKeyNotFound) {
+	if err != nil && errors.Is(err, shared.ErrKeyNotFound) {
 		shouldForce = true
 
 		err = sf.store.SetKey(groupID, "", 0)

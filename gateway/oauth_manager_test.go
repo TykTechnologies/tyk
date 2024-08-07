@@ -18,7 +18,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/TykTechnologies/tyk/interfaces"
 	"github.com/TykTechnologies/tyk/internal/redis"
+	"github.com/TykTechnologies/tyk/storage/util"
 
 	"github.com/TykTechnologies/tyk/config"
 
@@ -33,7 +35,6 @@ import (
 	"github.com/TykTechnologies/tyk/internal/uuid"
 
 	"github.com/TykTechnologies/tyk/apidef"
-	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/test"
 	"github.com/TykTechnologies/tyk/user"
 )
@@ -910,7 +911,7 @@ func testGetClientTokens(t *testing.T, hashed bool) {
 
 			if hashed {
 				// save tokens for future check
-				tokensID[storage.HashKey(response["access_token"].(string), ts.Gw.GetConfig().HashKeys)] = true
+				tokensID[util.HashKey(response["access_token"].(string), ts.Gw.GetConfig().HashKeys)] = true
 			} else {
 				tokensID[response["access_token"].(string)] = true
 			}
@@ -1315,7 +1316,7 @@ func TestJSONToFormValues(t *testing.T) {
 	})
 }
 
-func assertTokensLen(t *testing.T, storageManager storage.Handler, storageKey string, expectedTokensLen int) {
+func assertTokensLen(t *testing.T, storageManager interfaces.Handler, storageKey string, expectedTokensLen int) {
 	t.Helper()
 	nowTs := time.Now().Unix()
 	startScore := strconv.FormatInt(nowTs, 10)

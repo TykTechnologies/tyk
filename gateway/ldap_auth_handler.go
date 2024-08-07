@@ -7,7 +7,7 @@ import (
 	"github.com/mavricknz/ldap"
 )
 
-// LDAPStorageHandler implements storage.Handler, this is a read-only implementation to access keys from an LDAP service
+// LDAPStorageHandler implements interfaces.Handler, this is a read-only implementation to access keys from an LDAP service
 type LDAPStorageHandler struct {
 	LDAPServer           string
 	LDAPPort             uint16

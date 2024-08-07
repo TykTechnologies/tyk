@@ -26,7 +26,7 @@ import (
 	"github.com/TykTechnologies/tyk-pump/analytics"
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
-	"github.com/TykTechnologies/tyk/storage"
+	redisCluster "github.com/TykTechnologies/tyk/storage/redis-cluster"
 	"github.com/TykTechnologies/tyk/test"
 	"github.com/TykTechnologies/tyk/user"
 )
@@ -939,7 +939,7 @@ func TestGatewayHealthCheck(t *testing.T) {
 func TestCacheAllSafeRequests(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
-	cache := storage.RedisCluster{KeyPrefix: "cache-", ConnectionHandler: ts.Gw.StorageConnectionHandler}
+	cache := redisCluster.RedisCluster{KeyPrefix: "cache-", ConnectionHandler: ts.Gw.StorageConnectionHandler}
 	defer cache.DeleteScanMatch("*")
 
 	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
@@ -965,7 +965,7 @@ func TestCacheAllSafeRequests(t *testing.T) {
 func TestCacheAllSafeRequestsWithCachedHeaders(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
-	cache := storage.RedisCluster{KeyPrefix: "cache-", ConnectionHandler: ts.Gw.StorageConnectionHandler}
+	cache := redisCluster.RedisCluster{KeyPrefix: "cache-", ConnectionHandler: ts.Gw.StorageConnectionHandler}
 	defer cache.DeleteScanMatch("*")
 	authorization := "authorization"
 	tenant := "tenant-id"
@@ -1006,7 +1006,7 @@ func TestCacheAllSafeRequestsWithCachedHeaders(t *testing.T) {
 func TestCacheWithAdvanceUrlRewrite(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
-	cache := storage.RedisCluster{KeyPrefix: "cache-", ConnectionHandler: ts.Gw.StorageConnectionHandler}
+	cache := redisCluster.RedisCluster{KeyPrefix: "cache-", ConnectionHandler: ts.Gw.StorageConnectionHandler}
 	defer cache.DeleteScanMatch("*")
 
 	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
@@ -1061,7 +1061,7 @@ func TestCacheWithAdvanceUrlRewrite(t *testing.T) {
 func TestCachePostRequest(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
-	cache := storage.RedisCluster{KeyPrefix: "cache-", ConnectionHandler: ts.Gw.StorageConnectionHandler}
+	cache := redisCluster.RedisCluster{KeyPrefix: "cache-", ConnectionHandler: ts.Gw.StorageConnectionHandler}
 	defer cache.DeleteScanMatch("*")
 	tenant := "tenant-id"
 
@@ -1103,7 +1103,7 @@ func TestCachePostRequest(t *testing.T) {
 func TestAdvanceCachePutRequest(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
-	cache := storage.RedisCluster{KeyPrefix: "cache-", ConnectionHandler: ts.Gw.StorageConnectionHandler}
+	cache := redisCluster.RedisCluster{KeyPrefix: "cache-", ConnectionHandler: ts.Gw.StorageConnectionHandler}
 	defer cache.DeleteScanMatch("*")
 	tenant := "tenant-id"
 
@@ -1191,7 +1191,7 @@ func TestAdvanceCachePutRequest(t *testing.T) {
 func TestCacheAllSafeRequestsWithAdvancedCacheEndpoint(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
-	cache := storage.RedisCluster{KeyPrefix: "cache-", ConnectionHandler: ts.Gw.StorageConnectionHandler}
+	cache := redisCluster.RedisCluster{KeyPrefix: "cache-", ConnectionHandler: ts.Gw.StorageConnectionHandler}
 	defer cache.DeleteScanMatch("*")
 
 	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
@@ -1226,7 +1226,7 @@ func TestCacheAllSafeRequestsWithAdvancedCacheEndpoint(t *testing.T) {
 func TestCacheEtag(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
-	cache := storage.RedisCluster{KeyPrefix: "cache-", ConnectionHandler: ts.Gw.StorageConnectionHandler}
+	cache := redisCluster.RedisCluster{KeyPrefix: "cache-", ConnectionHandler: ts.Gw.StorageConnectionHandler}
 	defer cache.DeleteScanMatch("*")
 
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -1276,7 +1276,7 @@ func TestOldCachePlugin(t *testing.T) {
 
 	check := func(t *testing.T) {
 		t.Helper()
-		cache := storage.RedisCluster{KeyPrefix: "cache-", ConnectionHandler: ts.Gw.StorageConnectionHandler}
+		cache := redisCluster.RedisCluster{KeyPrefix: "cache-", ConnectionHandler: ts.Gw.StorageConnectionHandler}
 		defer cache.DeleteScanMatch("*")
 
 		ts.Gw.LoadAPI(api)
@@ -1301,7 +1301,7 @@ func TestOldCachePlugin(t *testing.T) {
 func TestAdvanceCacheTimeoutPerEndpoint(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
-	cache := storage.RedisCluster{KeyPrefix: "cache-", ConnectionHandler: ts.Gw.StorageConnectionHandler}
+	cache := redisCluster.RedisCluster{KeyPrefix: "cache-", ConnectionHandler: ts.Gw.StorageConnectionHandler}
 	defer cache.DeleteScanMatch("*")
 
 	extendedPaths := apidef.ExtendedPathsSet{

@@ -30,8 +30,10 @@ import (
 	"github.com/TykTechnologies/tyk/apidef/oas"
 	"github.com/TykTechnologies/tyk/certs"
 	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/interfaces"
 	"github.com/TykTechnologies/tyk/internal/uuid"
-	"github.com/TykTechnologies/tyk/storage"
+	redisCluster "github.com/TykTechnologies/tyk/storage/redis-cluster"
+	"github.com/TykTechnologies/tyk/storage/util"
 	"github.com/TykTechnologies/tyk/test"
 	"github.com/TykTechnologies/tyk/user"
 )
@@ -669,7 +671,7 @@ func TestKeyHandler_DeleteKeyWithQuota(t *testing.T) {
 
 					// we might remove the key, but for rpc sometimes we just remove the key and not the quota
 					// so we can get the updated key and still preserving the quota count
-					_, err := ts.Gw.DefaultQuotaStore.Store().GetRawKey("quota-" + storage.HashKey(key, tc.hashKeys))
+					_, err := ts.Gw.DefaultQuotaStore.Store().GetRawKey("quota-" + util.HashKey(key, tc.hashKeys))
 					found := err == nil
 					assert.Equal(t, quotaTc.quotaFound, found)
 				})
@@ -868,10 +870,10 @@ func TestHashKeyHandler(t *testing.T) {
 		desc             string
 	}{
 		{"", 8, " Legacy tokens, fallback to murmur32"},
-		{storage.HashMurmur32, 8, ""},
-		{storage.HashMurmur64, 16, ""},
-		{storage.HashMurmur128, 32, ""},
-		{storage.HashSha256, 64, ""},
+		{util.HashMurmur32, 8, ""},
+		{util.HashMurmur64, 16, ""},
+		{util.HashMurmur128, 32, ""},
+		{util.HashSha256, 64, ""},
 		{"wrong", 16, " Should fallback to murmur64 if wrong alg"},
 	}
 
@@ -895,7 +897,7 @@ func TestDisableKeyActionsByUserName(t *testing.T) {
 	conf := func(globalConf *config.Config) {
 		globalConf.HashKeys = true
 		globalConf.EnableHashedKeysListing = true
-		globalConf.HashKeyFunction = storage.HashMurmur64
+		globalConf.HashKeyFunction = util.HashMurmur64
 		globalConf.DisableKeyActionsByUsername = true
 	}
 
@@ -1000,7 +1002,7 @@ func TestHashKeyHandlerLegacyWithHashFunc(t *testing.T) {
 	}...)
 
 	// set custom hashing function and check if we still can get BA session with legacy key format
-	globalConf.HashKeyFunction = storage.HashMurmur64
+	globalConf.HashKeyFunction = util.HashMurmur64
 	ts.Gw.SetConfig(globalConf)
 
 	_, _ = ts.Run(t, []test.TestCase{
@@ -1031,7 +1033,7 @@ func (ts *Test) testHashKeyHandlerHelper(t *testing.T, expectedHashSize int) {
 	withAccessJSON := test.MarshalJSON(t)(withAccess)
 
 	myKey := "my_key_id"
-	myKeyHash := storage.HashKey(ts.Gw.generateToken("default", myKey), ts.Gw.GetConfig().HashKeys)
+	myKeyHash := util.HashKey(ts.Gw.generateToken("default", myKey), ts.Gw.GetConfig().HashKeys)
 
 	if len(myKeyHash) != expectedHashSize {
 		t.Errorf("Expected hash size: %d, got %d. Hash: %s. Key: %s", expectedHashSize, len(myKeyHash), myKeyHash, myKey)
@@ -1205,7 +1207,7 @@ func TestHashKeyListingDisabled(t *testing.T) {
 	withAccessJSON := test.MarshalJSON(t)(withAccess)
 
 	myKey := "my_key_id"
-	myKeyHash := storage.HashKey(ts.Gw.generateToken("default", myKey), ts.Gw.GetConfig().HashKeys)
+	myKeyHash := util.HashKey(ts.Gw.generateToken("default", myKey), ts.Gw.GetConfig().HashKeys)
 
 	t.Run("Create, get and delete key with key hashing", func(t *testing.T) {
 		_, _ = ts.Run(t, []test.TestCase{
@@ -1324,7 +1326,7 @@ func TestKeyHandler_HashingDisabled(t *testing.T) {
 
 	myKeyID := "my_key_id"
 	token := ts.Gw.generateToken("default", myKeyID)
-	myKeyHash := storage.HashKey(token, ts.Gw.GetConfig().HashKeys)
+	myKeyHash := util.HashKey(token, ts.Gw.GetConfig().HashKeys)
 
 	t.Run("Create, get and delete key with key hashing", func(t *testing.T) {
 		_, _ = ts.Run(t, []test.TestCase{
@@ -1721,7 +1723,7 @@ func TestGroupResetHandler(t *testing.T) {
 	didSubscribe := make(chan bool, 1)
 	didReload := make(chan bool, tryReloadCount)
 
-	cacheStore := storage.RedisCluster{ConnectionHandler: ts.Gw.StorageConnectionHandler}
+	cacheStore := redisCluster.RedisCluster{ConnectionHandler: ts.Gw.StorageConnectionHandler}
 	cacheStore.Connect()
 
 	// Test usually takes 0.05sec or so, timeout after 1s
@@ -3874,7 +3876,7 @@ func TestPurgeOAuthClientTokensEndpoint(t *testing.T) {
 		}...)
 	})
 
-	assertTokensLen := func(t *testing.T, storageManager storage.Handler, storageKey string, expectedTokensLen int) {
+	assertTokensLen := func(t *testing.T, storageManager interfaces.Handler, storageKey string, expectedTokensLen int) {
 		t.Helper()
 		nowTs := time.Now().Unix()
 		startScore := strconv.FormatInt(nowTs, 10)

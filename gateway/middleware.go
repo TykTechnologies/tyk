@@ -17,6 +17,7 @@ import (
 	"github.com/TykTechnologies/tyk/internal/otel"
 	"github.com/TykTechnologies/tyk/internal/policy"
 	"github.com/TykTechnologies/tyk/rpc"
+	"github.com/TykTechnologies/tyk/storage/util"
 
 	"github.com/TykTechnologies/tyk/header"
 
@@ -29,7 +30,6 @@ import (
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/request"
-	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/trace"
 	"github.com/TykTechnologies/tyk/user"
 )
@@ -284,7 +284,7 @@ func (t *BaseMiddleware) OrgSession(orgID string) (user.SessionState, bool) {
 		t.Gw.ExpiryCache.Set(session.OrgID, session.DataExpires, cache.DefaultExpiration)
 	}
 
-	session.SetKeyHash(storage.HashKey(orgID, t.Gw.GetConfig().HashKeys))
+	session.SetKeyHash(util.HashKey(orgID, t.Gw.GetConfig().HashKeys))
 
 	return session.Clone(), found
 }
@@ -397,7 +397,7 @@ func (t *BaseMiddleware) CheckSessionAndIdentityForValidKey(originalKey string, 
 	keyHash := key
 	cacheKey := key
 	if t.Spec.GlobalConfig.HashKeys {
-		cacheKey = storage.HashStr(key, storage.HashMurmur64) // always hash cache keys with murmur64 to prevent collisions
+		cacheKey = util.HashStr(key, util.HashMurmur64) // always hash cache keys with murmur64 to prevent collisions
 	}
 
 	// Check in-memory cache
@@ -420,7 +420,7 @@ func (t *BaseMiddleware) CheckSessionAndIdentityForValidKey(originalKey string, 
 
 	if found {
 		if t.Spec.GlobalConfig.HashKeys {
-			keyHash = storage.HashStr(session.KeyID)
+			keyHash = util.HashStr(session.KeyID)
 		}
 		session := session.Clone()
 		session.SetKeyHash(keyHash)

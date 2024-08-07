@@ -28,6 +28,7 @@ import (
 	"github.com/getkin/kin-openapi/openapi3"
 
 	"github.com/TykTechnologies/tyk/apidef/oas"
+	"github.com/TykTechnologies/tyk/storage/util"
 
 	"github.com/TykTechnologies/tyk/rpc"
 
@@ -46,7 +47,6 @@ import (
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/cli"
 	"github.com/TykTechnologies/tyk/config"
-	"github.com/TykTechnologies/tyk/storage"
 	_ "github.com/TykTechnologies/tyk/templates" // Don't delete
 	"github.com/TykTechnologies/tyk/test"
 	_ "github.com/TykTechnologies/tyk/testdata" // Don't delete
@@ -832,7 +832,7 @@ func CreateSession(gw *Gateway, sGen ...func(s *user.SessionState)) string {
 	}
 
 	hashKeys := gw.GetConfig().HashKeys
-	hashedKey := storage.HashKey(key, hashKeys)
+	hashedKey := util.HashKey(key, hashKeys)
 	err := gw.GlobalSessionManager.UpdateSession(hashedKey, session, 60, hashKeys)
 	if err != nil {
 		log.WithError(err).Error("updating session.")
@@ -1142,7 +1142,7 @@ func (s *Test) newGateway(genConf func(globalConf *config.Config)) *Gateway {
 
 	gwConfig.AnalyticsConfig.GeoIPDBLocation = filepath.Join(rootPath, "testdata", "MaxMind-DB-test-ipv4-24.mmdb")
 	gwConfig.EnableJSVM = true
-	gwConfig.HashKeyFunction = storage.HashMurmur64
+	gwConfig.HashKeyFunction = util.HashMurmur64
 	gwConfig.Monitor.EnableTriggerMonitors = true
 	gwConfig.AnalyticsConfig.NormaliseUrls.Enabled = true
 	gwConfig.AllowInsecureConfigs = true

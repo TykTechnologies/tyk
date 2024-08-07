@@ -9,7 +9,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/TykTechnologies/tyk/storage"
+	"github.com/TykTechnologies/tyk/storage/util"
 	"github.com/TykTechnologies/tyk/test"
 	"github.com/TykTechnologies/tyk/user"
 )
@@ -122,7 +122,7 @@ func TestBasicAuthLegacyWithHashFunc(t *testing.T) {
 	}...)
 
 	// set custom hashing function and check if we still do BA session auth with legacy key format
-	globalConf.HashKeyFunction = storage.HashMurmur64
+	globalConf.HashKeyFunction = util.HashMurmur64
 	ts.Gw.SetConfig(globalConf)
 
 	ts.Run(t, []test.TestCase{

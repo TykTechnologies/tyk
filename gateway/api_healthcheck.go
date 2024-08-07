@@ -5,7 +5,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/TykTechnologies/tyk/storage"
+	"github.com/TykTechnologies/tyk/interfaces"
 )
 
 type HealthPrefix string
@@ -19,7 +19,7 @@ const (
 )
 
 type HealthChecker interface {
-	Init(storage.Handler)
+	Init(interfaces.Handler)
 	ApiHealthValues() (HealthCheckValues, error)
 	StoreCounterVal(HealthPrefix, string)
 }
@@ -34,11 +34,11 @@ type HealthCheckValues struct {
 
 type DefaultHealthChecker struct {
 	Gw      *Gateway `json:"-"`
-	storage storage.Handler
+	storage interfaces.Handler
 	APIID   string
 }
 
-func (h *DefaultHealthChecker) Init(storeType storage.Handler) {
+func (h *DefaultHealthChecker) Init(storeType interfaces.Handler) {
 	if !h.Gw.GetConfig().HealthCheck.EnableHealthChecks {
 		return
 	}

@@ -16,7 +16,7 @@ import (
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/header"
 	"github.com/TykTechnologies/tyk/regexp"
-	"github.com/TykTechnologies/tyk/storage"
+	"github.com/TykTechnologies/tyk/storage/util"
 	"github.com/TykTechnologies/tyk/user"
 
 	"github.com/TykTechnologies/tyk/internal/cache"
@@ -189,7 +189,7 @@ func (k *BasicAuthKeyIsValid) ProcessRequest(w http.ResponseWriter, r *http.Requ
 		} else { // check for key with legacy format "org_id" + "user_name"
 			logger.Info("Could not find user, falling back to legacy format key.")
 			legacyKeyName := strings.TrimPrefix(username, k.Spec.OrgID)
-			keyName, _ = storage.GenerateToken(k.Spec.OrgID, legacyKeyName, "")
+			keyName, _ = util.GenerateToken(k.Spec.OrgID, legacyKeyName, "")
 			session, keyExists = k.CheckSessionAndIdentityForValidKey(keyName, r)
 			keyName = session.KeyID
 			if !keyExists {
@@ -227,7 +227,7 @@ func (k *BasicAuthKeyIsValid) checkPassword(session *user.SessionState, plainPas
 		hashAlgo := string(session.BasicAuthData.Hash)
 
 		// Checks the storage algo picked
-		hashedPassword := storage.HashStr(plainPassword, hashAlgo)
+		hashedPassword := util.HashStr(plainPassword, hashAlgo)
 		if session.BasicAuthData.Password != hashedPassword {
 			return errUnauthorized
 		}

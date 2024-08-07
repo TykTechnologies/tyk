@@ -15,7 +15,9 @@ import (
 	"sync"
 	texttemplate "text/template"
 
+	"github.com/TykTechnologies/tyk/interfaces"
 	"github.com/TykTechnologies/tyk/rpc"
+	redisCluster "github.com/TykTechnologies/tyk/storage/redis-cluster"
 
 	"github.com/gorilla/mux"
 	"github.com/justinas/alice"
@@ -25,7 +27,6 @@ import (
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/coprocess"
 	"github.com/TykTechnologies/tyk/internal/otel"
-	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/trace"
 )
 
@@ -42,9 +43,9 @@ type ChainObject struct {
 
 func (gw *Gateway) prepareStorage() generalStores {
 	var gs generalStores
-	gs.redisStore = &storage.RedisCluster{KeyPrefix: "apikey-", HashKeys: gw.GetConfig().HashKeys, ConnectionHandler: gw.StorageConnectionHandler}
-	gs.redisOrgStore = &storage.RedisCluster{KeyPrefix: "orgkey.", ConnectionHandler: gw.StorageConnectionHandler}
-	gs.healthStore = &storage.RedisCluster{KeyPrefix: "apihealth.", ConnectionHandler: gw.StorageConnectionHandler}
+	gs.redisStore = &redisCluster.RedisCluster{KeyPrefix: "apikey-", HashKeys: gw.GetConfig().HashKeys, ConnectionHandler: gw.StorageConnectionHandler}
+	gs.redisOrgStore = &redisCluster.RedisCluster{KeyPrefix: "orgkey.", ConnectionHandler: gw.StorageConnectionHandler}
+	gs.healthStore = &redisCluster.RedisCluster{KeyPrefix: "apihealth.", ConnectionHandler: gw.StorageConnectionHandler}
 	gs.rpcAuthStore = &RPCStorageHandler{KeyPrefix: "apikey-", HashKeys: gw.GetConfig().HashKeys, Gw: gw}
 	gs.rpcOrgStore = gw.getGlobalMDCBStorageHandler("orgkey.", false)
 
@@ -287,7 +288,7 @@ func (gw *Gateway) processSpec(spec *APISpec, apisByListen map[string]int,
 	}
 
 	keyPrefix := "cache-" + spec.APIID
-	cacheStore := storage.RedisCluster{KeyPrefix: keyPrefix, IsCache: true, ConnectionHandler: gw.StorageConnectionHandler}
+	cacheStore := redisCluster.RedisCluster{KeyPrefix: keyPrefix, IsCache: true, ConnectionHandler: gw.StorageConnectionHandler}
 	cacheStore.Connect()
 
 	var chain http.Handler
@@ -520,7 +521,7 @@ func (gw *Gateway) processSpec(spec *APISpec, apisByListen map[string]int,
 	return &chainDef
 }
 
-func (gw *Gateway) configureAuthAndOrgStores(gs *generalStores, spec *APISpec) (storage.Handler, storage.Handler, storage.Handler) {
+func (gw *Gateway) configureAuthAndOrgStores(gs *generalStores, spec *APISpec) (interfaces.Handler, interfaces.Handler, interfaces.Handler) {
 	authStore := gs.redisStore
 	orgStore := gs.redisOrgStore
 
@@ -841,7 +842,7 @@ func (gw *Gateway) loadTCPService(spec *APISpec, gs *generalStores, muxer *proxy
 }
 
 type generalStores struct {
-	redisStore, redisOrgStore, healthStore, rpcAuthStore, rpcOrgStore storage.Handler
+	redisStore, redisOrgStore, healthStore, rpcAuthStore, rpcOrgStore interfaces.Handler
 }
 
 var playgroundTemplate *texttemplate.Template

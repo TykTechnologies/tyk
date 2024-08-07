@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/TykTechnologies/tyk/storage"
+	"github.com/TykTechnologies/tyk/interfaces"
 )
 
 // Purger is an interface that will define how the in-memory store will be purged
@@ -16,7 +16,7 @@ type Purger interface {
 }
 
 type RedisPurger struct {
-	Store storage.Handler
+	Store interfaces.Handler
 	Gw    *Gateway `json:"-"`
 }
 

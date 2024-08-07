@@ -1,4 +1,4 @@
-package storage
+package redisCluster
 
 import (
 	"context"
@@ -21,8 +21,11 @@ import (
 	tempset "github.com/TykTechnologies/storage/temporal/set"
 	tempsortedset "github.com/TykTechnologies/storage/temporal/sortedset"
 	redis "github.com/TykTechnologies/tyk/internal/redis"
+	"github.com/TykTechnologies/tyk/storage/shared"
+	"github.com/TykTechnologies/tyk/storage/util"
 
 	"github.com/TykTechnologies/tyk/config"
+	logger "github.com/TykTechnologies/tyk/log"
 )
 
 var (
@@ -31,6 +34,8 @@ var (
 
 	// ErrStorageConn is returned when we can't get a connection from the ConnectionHandler
 	ErrStorageConn = fmt.Errorf("Error trying to get singleton instance: %w", ErrRedisIsDown)
+
+	log = logger.Get()
 )
 
 // RedisCluster is a storage manager that uses the redis database.
@@ -246,7 +251,7 @@ func (r *RedisCluster) hashKey(in string) string {
 		// Not hashing? Return the raw key
 		return in
 	}
-	return HashStr(in)
+	return util.HashStr(in)
 }
 
 func (r *RedisCluster) fixKey(keyName string) string {
@@ -275,7 +280,7 @@ func (r *RedisCluster) GetKey(keyName string) (string, error) {
 	value, err := storage.Get(context.Background(), r.fixKey(keyName))
 	if err != nil {
 		log.Debug("Error trying to get value:", err)
-		return "", ErrKeyNotFound
+		return "", shared.ErrKeyNotFound
 	}
 
 	return value, nil
@@ -298,7 +303,7 @@ func (r *RedisCluster) GetMultiKey(keys []string) ([]string, error) {
 	values, err := storage.GetMulti(context.Background(), keyNames)
 	if err != nil {
 		log.WithError(err).Debug("Error trying to get value")
-		return nil, ErrKeyNotFound
+		return nil, shared.ErrKeyNotFound
 	}
 	result := make([]string, 0)
 	for _, val := range values {
@@ -315,7 +320,7 @@ func (r *RedisCluster) GetMultiKey(keys []string) ([]string, error) {
 		}
 	}
 
-	return nil, ErrKeyNotFound
+	return nil, shared.ErrKeyNotFound
 }
 
 func (r *RedisCluster) GetKeyTTL(keyName string) (ttl int64, err error) {
@@ -338,7 +343,7 @@ func (r *RedisCluster) GetRawKey(keyName string) (string, error) {
 	value, err := storage.Get(context.Background(), keyName)
 	if err != nil {
 		log.Debug("Error trying to get value:", err)
-		return "", ErrKeyNotFound
+		return "", shared.ErrKeyNotFound
 	}
 
 	return value, nil

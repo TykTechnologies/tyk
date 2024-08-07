@@ -48,6 +48,8 @@ import (
 	"github.com/getkin/kin-openapi/openapi3"
 
 	"github.com/TykTechnologies/tyk/config"
+	redisCluster "github.com/TykTechnologies/tyk/storage/redis-cluster"
+	"github.com/TykTechnologies/tyk/storage/util"
 
 	"github.com/TykTechnologies/tyk/internal/otel"
 	"github.com/TykTechnologies/tyk/internal/uuid"
@@ -64,7 +66,6 @@ import (
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/ctx"
 	"github.com/TykTechnologies/tyk/header"
-	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/user"
 
 	gql "github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
@@ -415,7 +416,7 @@ func (gw *Gateway) setBasicAuthSessionPassword(session *user.SessionState) {
 		return
 	}
 
-	session.BasicAuthData.Password = storage.HashStr(session.BasicAuthData.Password, basicAuthHashAlgo)
+	session.BasicAuthData.Password = util.HashStr(session.BasicAuthData.Password, basicAuthHashAlgo)
 	session.BasicAuthData.Hash = user.HashType(basicAuthHashAlgo)
 }
 
@@ -538,7 +539,7 @@ func (gw *Gateway) handleAddOrUpdate(keyName string, r *http.Request, isHashed b
 		newSession.BasicAuthData.Password = originalKey.BasicAuthData.Password
 	}
 
-	if r.Method == http.MethodPost || storage.TokenOrg(keyName) != "" {
+	if r.Method == http.MethodPost || util.TokenOrg(keyName) != "" {
 		// use new key format if key gets created or updating key with new format
 		if err := gw.doAddOrUpdate(keyName, newSession, suppressReset, isHashed); err != nil {
 			return apiError("Failed to create key, ensure security settings are correct."), http.StatusInternalServerError
@@ -586,7 +587,7 @@ func (gw *Gateway) handleAddOrUpdate(keyName string, r *http.Request, isHashed b
 		if isHashed {
 			response.KeyHash = keyName
 		} else {
-			response.KeyHash = storage.HashKey(keyName, gw.GetConfig().HashKeys)
+			response.KeyHash = util.HashKey(keyName, gw.GetConfig().HashKeys)
 		}
 	}
 
@@ -614,7 +615,7 @@ func (gw *Gateway) handleGetDetail(sessionKey, apiID, orgID string, byHash bool)
 	mw.ApplyPolicies(&session)
 
 	if session.QuotaMax != -1 {
-		quotaKey := QuotaKeyPrefix + storage.HashKey(sessionKey, gw.GetConfig().HashKeys)
+		quotaKey := QuotaKeyPrefix + util.HashKey(sessionKey, gw.GetConfig().HashKeys)
 		if byHash {
 			quotaKey = QuotaKeyPrefix + sessionKey
 		}
@@ -649,7 +650,7 @@ func (gw *Gateway) handleGetDetail(sessionKey, apiID, orgID string, byHash bool)
 			quotaScope = access.AllowanceScope + "-"
 		}
 
-		limQuotaKey := QuotaKeyPrefix + quotaScope + storage.HashKey(sessionKey, gw.GetConfig().HashKeys)
+		limQuotaKey := QuotaKeyPrefix + quotaScope + util.HashKey(sessionKey, gw.GetConfig().HashKeys)
 		if byHash {
 			limQuotaKey = QuotaKeyPrefix + quotaScope + sessionKey
 		}
@@ -679,7 +680,7 @@ func (gw *Gateway) handleGetDetail(sessionKey, apiID, orgID string, byHash bool)
 
 	// If it's a basic auth key and a valid Base64 string, use it as the key ID:
 	if session.IsBasicAuth() {
-		if storage.TokenOrg(sessionKey) != "" {
+		if util.TokenOrg(sessionKey) != "" {
 			session.KeyID = sessionKey
 		}
 		session.BasicAuthData.Password = ""
@@ -1794,7 +1795,7 @@ func (gw *Gateway) handleOrgAddOrUpdate(orgID string, r *http.Request) (interfac
 	if r.URL.Query().Get("reset_quota") == "1" {
 		sessionManager.ResetQuota(orgID, newSession, false)
 		newSession.QuotaRenews = time.Now().Unix() + newSession.QuotaRenewalRate
-		rawKey := QuotaKeyPrefix + storage.HashKey(orgID, gw.GetConfig().HashKeys)
+		rawKey := QuotaKeyPrefix + util.HashKey(orgID, gw.GetConfig().HashKeys)
 
 		// manage quotas separately
 		gw.DefaultQuotaStore.RemoveSession(orgID, rawKey, false)
@@ -2062,7 +2063,7 @@ func (gw *Gateway) createKeyHandler(w http.ResponseWriter, r *http.Request) {
 
 	// add key hash to reply
 	if gw.GetConfig().HashKeys {
-		obj.KeyHash = storage.HashKey(newKey, gw.GetConfig().HashKeys)
+		obj.KeyHash = util.HashKey(newKey, gw.GetConfig().HashKeys)
 	}
 
 	gw.FireSystemEvent(EventTokenCreated, EventTokenMeta{
@@ -2241,7 +2242,7 @@ func (gw *Gateway) createOauthClient(w http.ResponseWriter, r *http.Request) {
 							&RedisOsinStorageInterface{
 								storageManager,
 								gw.GlobalSessionManager,
-								&storage.RedisCluster{KeyPrefix: prefix, HashKeys: false, ConnectionHandler: gw.StorageConnectionHandler},
+								&redisCluster.RedisCluster{KeyPrefix: prefix, HashKeys: false, ConnectionHandler: gw.StorageConnectionHandler},
 								apiSpec.OrgID,
 								gw,
 							}),
@@ -2627,7 +2628,7 @@ func (gw *Gateway) getOauthClientDetails(keyName, apiID string) (interface{}, in
 				&RedisOsinStorageInterface{
 					storageManager,
 					gw.GlobalSessionManager,
-					&storage.RedisCluster{KeyPrefix: prefix, HashKeys: false, ConnectionHandler: gw.StorageConnectionHandler},
+					&redisCluster.RedisCluster{KeyPrefix: prefix, HashKeys: false, ConnectionHandler: gw.StorageConnectionHandler},
 					apiSpec.OrgID,
 					gw,
 				}),

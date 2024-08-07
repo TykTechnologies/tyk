@@ -8,17 +8,18 @@ import (
 
 	"github.com/sirupsen/logrus"
 
+	"github.com/TykTechnologies/tyk/interfaces"
 	"github.com/TykTechnologies/tyk/internal/uuid"
+	"github.com/TykTechnologies/tyk/storage/util"
 
-	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/user"
 )
 
 // SessionHandler handles all update/create/access session functions and deals exclusively with
 // user.SessionState objects, not identity
 type SessionHandler interface {
-	Init(store storage.Handler)
-	Store() storage.Handler
+	Init(store interfaces.Handler)
+	Store() interfaces.Handler
 	UpdateSession(keyName string, session *user.SessionState, resetTTLTo int64, hashed bool) error
 	RemoveSession(orgID string, keyName string, hashed bool) bool
 	SessionDetail(orgID string, keyName string, hashed bool) (user.SessionState, bool)
@@ -29,7 +30,7 @@ type SessionHandler interface {
 }
 
 type DefaultSessionManager struct {
-	store storage.Handler
+	store interfaces.Handler
 	orgID string
 	Gw    *Gateway `json:"-"`
 }
@@ -41,7 +42,7 @@ func (b *DefaultSessionManager) ResetQuotaObfuscateKey(keyName string) string {
 	return keyName
 }
 
-func (b *DefaultSessionManager) Init(store storage.Handler) {
+func (b *DefaultSessionManager) Init(store interfaces.Handler) {
 	b.store = store
 	b.store.Connect()
 }
@@ -54,7 +55,7 @@ func (b *DefaultSessionManager) KeyExpired(newSession *user.SessionState) bool {
 	return false
 }
 
-func (b *DefaultSessionManager) Store() storage.Handler {
+func (b *DefaultSessionManager) Store() interfaces.Handler {
 	return b.store
 }
 
@@ -62,7 +63,7 @@ func (b *DefaultSessionManager) ResetQuota(keyName string, session *user.Session
 	origKeyName := keyName
 
 	if !isHashed {
-		keyName = storage.HashKey(keyName, b.Gw.GetConfig().HashKeys)
+		keyName = util.HashKey(keyName, b.Gw.GetConfig().HashKeys)
 	}
 
 	rawKey := QuotaKeyPrefix + keyName
@@ -82,7 +83,7 @@ func (b *DefaultSessionManager) ResetQuota(keyName string, session *user.Session
 	b.deleteRawKeysWithAllowanceScope(b.store, session, keyName)
 }
 
-func (b *DefaultSessionManager) deleteRawKeysWithAllowanceScope(store storage.Handler, session *user.SessionState, keyName string) {
+func (b *DefaultSessionManager) deleteRawKeysWithAllowanceScope(store interfaces.Handler, session *user.SessionState, keyName string) {
 	if store == nil || session == nil {
 		return
 	}
@@ -99,7 +100,7 @@ func (b *DefaultSessionManager) deleteRawKeysWithAllowanceScope(store storage.Ha
 func (b *DefaultSessionManager) clearCacheForKey(keyName string, hashed bool) {
 	cacheKey := keyName
 	if !hashed {
-		cacheKey = storage.HashKey(keyName, b.Gw.GetConfig().HashKeys)
+		cacheKey = util.HashKey(keyName, b.Gw.GetConfig().HashKeys)
 	}
 	// Delete gateway's cache immediately
 	b.Gw.SessionCache.Delete(cacheKey)
@@ -159,7 +160,7 @@ func (b *DefaultSessionManager) SessionDetail(orgID string, keyName string, hash
 	if hashed {
 		jsonKeyVal, err = b.store.GetRawKey(b.store.GetKeyPrefix() + keyName)
 	} else {
-		if storage.TokenOrg(keyName) != orgID {
+		if util.TokenOrg(keyName) != orgID {
 			// try to get legacy and new format key at once
 			toSearchList := []string{}
 			if !b.Gw.GetConfig().DisableKeyActionsByUsername {
@@ -226,7 +227,7 @@ func (gw *Gateway) generateToken(orgID, keyID string, customHashKeyFunction ...s
 		hashKeyFunction = customHashKeyFunction[0]
 	}
 
-	token, err := storage.GenerateToken(orgID, keyID, hashKeyFunction)
+	token, err := util.GenerateToken(orgID, keyID, hashKeyFunction)
 	if err != nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "auth-mgr",

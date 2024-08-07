@@ -9,12 +9,12 @@ import (
 	"time"
 
 	"github.com/TykTechnologies/tyk/rpc"
+	redisCluster "github.com/TykTechnologies/tyk/storage/redis-cluster"
 
 	"github.com/sirupsen/logrus"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/header"
-	"github.com/TykTechnologies/tyk/storage"
 )
 
 func (gw *Gateway) setCurrentHealthCheckInfo(h map[string]apidef.HealthCheckItem) {
@@ -65,7 +65,7 @@ type SafeHealthCheck struct {
 func (gw *Gateway) gatherHealthChecks() {
 	allInfos := SafeHealthCheck{info: make(map[string]apidef.HealthCheckItem, 3)}
 
-	redisStore := storage.RedisCluster{KeyPrefix: "livenesscheck-", ConnectionHandler: gw.StorageConnectionHandler}
+	redisStore := redisCluster.RedisCluster{KeyPrefix: "livenesscheck-", ConnectionHandler: gw.StorageConnectionHandler}
 
 	key := "tyk-liveness-probe"
 

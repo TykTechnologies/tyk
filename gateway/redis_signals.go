@@ -15,7 +15,7 @@ import (
 	temporalmodel "github.com/TykTechnologies/storage/temporal/model"
 
 	"github.com/TykTechnologies/tyk/internal/crypto"
-	"github.com/TykTechnologies/tyk/storage"
+	redisCluster "github.com/TykTechnologies/tyk/storage/redis-cluster"
 )
 
 type NotificationCommand string
@@ -59,7 +59,7 @@ func (n *Notification) Sign() {
 }
 
 func (gw *Gateway) startPubSubLoop() {
-	cacheStore := storage.RedisCluster{ConnectionHandler: gw.StorageConnectionHandler}
+	cacheStore := redisCluster.RedisCluster{ConnectionHandler: gw.StorageConnectionHandler}
 	cacheStore.Connect()
 
 	message := "Connection to Redis failed, reconnect in 10s"
@@ -228,7 +228,7 @@ func isPayloadSignatureValid(notification Notification) bool {
 
 // RedisNotifier will use redis pub/sub channels to send notifications
 type RedisNotifier struct {
-	store   *storage.RedisCluster
+	store   *redisCluster.RedisCluster
 	channel string
 	*Gateway
 }
@@ -251,7 +251,7 @@ func (r *RedisNotifier) Notify(notif interface{}) bool {
 	// pubSubLog.Debug("Sending notification", notif)
 
 	if err := r.store.Publish(r.channel, string(toSend)); err != nil {
-		if !errors.Is(err, storage.ErrRedisIsDown) {
+		if !errors.Is(err, redisCluster.ErrRedisIsDown) {
 			pubSubLog.Error("Could not send notification: ", err)
 		}
 		return false

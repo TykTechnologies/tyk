@@ -18,9 +18,9 @@ import (
 
 	"github.com/TykTechnologies/murmur3"
 	"github.com/TykTechnologies/tyk/header"
+	"github.com/TykTechnologies/tyk/interfaces"
 	"github.com/TykTechnologies/tyk/regexp"
 	"github.com/TykTechnologies/tyk/request"
-	"github.com/TykTechnologies/tyk/storage"
 )
 
 const (
@@ -31,7 +31,7 @@ const (
 type RedisCacheMiddleware struct {
 	*BaseMiddleware
 
-	store storage.Handler
+	store interfaces.Handler
 	sh    SuccessHandler
 }
 

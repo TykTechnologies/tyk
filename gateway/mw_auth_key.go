@@ -8,7 +8,7 @@ import (
 
 	"github.com/TykTechnologies/tyk/internal/crypto"
 	"github.com/TykTechnologies/tyk/internal/otel"
-	"github.com/TykTechnologies/tyk/storage"
+	"github.com/TykTechnologies/tyk/storage/util"
 
 	"github.com/TykTechnologies/tyk/user"
 
@@ -172,7 +172,7 @@ func (k *AuthKey) ProcessRequest(_ http.ResponseWriter, r *http.Request, _ inter
 	}
 
 	// As a second approach, try to use the internal ID that's part of the B64 JSON key:
-	keyID, err := storage.TokenID(key)
+	keyID, err := util.TokenID(key)
 	if err == nil {
 		err, statusCode := k.validateSignature(r, keyID)
 		if err == nil {

@@ -9,11 +9,11 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/TykTechnologies/tyk/internal/redis"
+	redisCluster "github.com/TykTechnologies/tyk/storage/redis-cluster"
 
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/internal/rate"
 	"github.com/TykTechnologies/tyk/internal/uuid"
-	"github.com/TykTechnologies/tyk/storage"
 )
 
 // TestSlidingLog_Do is an integration test that tests counter behaviour.
@@ -25,7 +25,7 @@ func TestSlidingLog_Do(t *testing.T) {
 	conf, err := config.New()
 	assert.NoError(t, err)
 
-	conn, err := storage.NewConnector(storage.DefaultConn, *conf)
+	conn, err := redisCluster.NewConnector(redisCluster.DefaultConn, *conf)
 	assert.Nil(t, err)
 
 	var db redis.UniversalClient
@@ -72,7 +72,7 @@ func TestSlidingLog_GetCount(t *testing.T) {
 	conf, err := config.New()
 	assert.NoError(t, err)
 
-	conn, err := storage.NewConnector(storage.DefaultConn, *conf)
+	conn, err := redisCluster.NewConnector(redisCluster.DefaultConn, *conf)
 	assert.Nil(t, err)
 
 	var db redis.UniversalClient
@@ -93,7 +93,7 @@ func TestSlidingLog_Get(t *testing.T) {
 	conf, err := config.New()
 	assert.NoError(t, err)
 
-	conn, err := storage.NewConnector(storage.DefaultConn, *conf)
+	conn, err := redisCluster.NewConnector(redisCluster.DefaultConn, *conf)
 	assert.Nil(t, err)
 
 	var db redis.UniversalClient
@@ -114,7 +114,7 @@ func TestSlidingLog_pipelinerError(t *testing.T) {
 	conf, err := config.New()
 	assert.NoError(t, err)
 
-	rc := storage.NewConnectionHandler(ctx)
+	rc := redisCluster.NewConnectionHandler(ctx)
 	go rc.Connect(ctx, nil, conf)
 
 	timeout, cancel := context.WithTimeout(ctx, time.Second)
@@ -125,7 +125,7 @@ func TestSlidingLog_pipelinerError(t *testing.T) {
 		panic("can't connect to redis '" + conf.Storage.Host + "', timeout")
 	}
 
-	rl, err := rate.NewSlidingLog(&storage.RedisCluster{KeyPrefix: "test-cluster", ConnectionHandler: rc}, false, nil)
+	rl, err := rate.NewSlidingLog(&redisCluster.RedisCluster{KeyPrefix: "test-cluster", ConnectionHandler: rc}, false, nil)
 	assert.NoError(t, err)
 
 	rl.PipelineFn = func(context.Context, func(redis.Pipeliner) error) error {
@@ -216,7 +216,7 @@ func BenchmarkSlidingLog_New(b *testing.B) {
 	conf, err := config.New()
 	assert.NoError(b, err)
 
-	conn, err := storage.NewConnector(storage.DefaultConn, *conf)
+	conn, err := redisCluster.NewConnector(redisCluster.DefaultConn, *conf)
 	assert.Nil(b, err)
 
 	var db redis.UniversalClient
@@ -237,7 +237,7 @@ func BenchmarkSlidingLog_Count(b *testing.B) {
 	conf, err := config.New()
 	assert.NoError(b, err)
 
-	conn, err := storage.NewConnector(storage.DefaultConn, *conf)
+	conn, err := redisCluster.NewConnector(redisCluster.DefaultConn, *conf)
 	assert.Nil(b, err)
 
 	var db redis.UniversalClient

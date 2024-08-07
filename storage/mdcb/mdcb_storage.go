@@ -1,20 +1,21 @@
-package storage
+package mdcb
 
 import (
 	"errors"
 	"strings"
 
+	"github.com/TykTechnologies/tyk/interfaces"
 	"github.com/sirupsen/logrus"
 )
 
 type MdcbStorage struct {
-	local                 Handler
-	rpc                   Handler
+	local                 interfaces.Handler
+	rpc                   interfaces.Handler
 	logger                *logrus.Entry
 	CallbackonPullfromRPC *func(key string, val string) error
 }
 
-func NewMdcbStorage(local, rpc Handler, log *logrus.Entry) *MdcbStorage {
+func NewMdcbStorage(local, rpc interfaces.Handler, log *logrus.Entry) *MdcbStorage {
 	return &MdcbStorage{
 		local:  local,
 		rpc:    rpc,

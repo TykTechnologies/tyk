@@ -19,6 +19,7 @@ import (
 	texttemplate "text/template"
 	"time"
 
+	"github.com/TykTechnologies/tyk/interfaces"
 	"github.com/TykTechnologies/tyk/storage/kv"
 
 	"github.com/getkin/kin-openapi/routers"
@@ -49,7 +50,6 @@ import (
 	"github.com/TykTechnologies/tyk/header"
 	"github.com/TykTechnologies/tyk/regexp"
 	"github.com/TykTechnologies/tyk/rpc"
-	"github.com/TykTechnologies/tyk/storage"
 )
 
 // const used by cache middleware
@@ -1421,7 +1421,7 @@ func (a APIDefinitionLoader) getExtendedPathSpecs(apiVersionDef apidef.VersionIn
 	return combinedPath, len(whiteListPaths) > 0
 }
 
-func (a *APISpec) Init(authStore, sessionStore, healthStore, orgStore storage.Handler) {
+func (a *APISpec) Init(authStore, sessionStore, healthStore, orgStore interfaces.Handler) {
 	a.AuthManager.Init(authStore)
 	a.Health.Init(healthStore)
 	a.OrgSessionManager.Init(orgStore)

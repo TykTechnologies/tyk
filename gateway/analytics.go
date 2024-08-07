@@ -16,6 +16,7 @@ import (
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/regexp"
 	"github.com/TykTechnologies/tyk/storage"
+	"github.com/TykTechnologies/tyk/storage/util"
 )
 
 const analyticsKeyName = "tyk-system-analytics"
@@ -175,7 +176,7 @@ func (r *RedisAnalyticsHandler) recordWorker() {
 			// we have new record - prepare it and add to buffer
 
 			// If we are obfuscating API Keys, store the hashed representation (config check handled in hashing function)
-			record.APIKey = storage.HashKey(record.APIKey, r.globalConf.HashKeys)
+			record.APIKey = util.HashKey(record.APIKey, r.globalConf.HashKeys)
 
 			if r.globalConf.SlaveOptions.UseRPC {
 				// Extend tag list to include this data so wecan segment by node if necessary

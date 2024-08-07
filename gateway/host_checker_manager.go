@@ -13,16 +13,16 @@ import (
 	"github.com/sirupsen/logrus"
 	msgpack "gopkg.in/vmihailenco/msgpack.v2"
 
+	"github.com/TykTechnologies/tyk/interfaces"
 	"github.com/TykTechnologies/tyk/internal/uuid"
 
 	"github.com/TykTechnologies/tyk/apidef"
-	"github.com/TykTechnologies/tyk/storage"
 )
 
 type HostCheckerManager struct {
 	Gw                *Gateway `json:"-"`
 	Id                string
-	store             storage.Handler
+	store             interfaces.Handler
 	checkerMu         sync.Mutex
 	checker           *HostUptimeChecker
 	stopLoop          bool
@@ -72,7 +72,7 @@ const (
 	UptimeAnalytics_KEYNAME = "tyk-uptime-analytics"
 )
 
-func (hc *HostCheckerManager) Init(store storage.Handler) {
+func (hc *HostCheckerManager) Init(store interfaces.Handler) {
 	hc.store = store
 	hc.unhealthyHostList = new(sync.Map)
 	hc.resetsInitiated = make(map[string]bool)
@@ -534,7 +534,7 @@ func (hc *HostCheckerManager) RecordUptimeAnalytics(report HostHealthReport) err
 	return nil
 }
 
-func (gw *Gateway) InitHostCheckManager(ctx context.Context, store storage.Handler) {
+func (gw *Gateway) InitHostCheckManager(ctx context.Context, store interfaces.Handler) {
 	// Already initialized
 	if gw.GlobalHostChecker.Id != "" {
 		return

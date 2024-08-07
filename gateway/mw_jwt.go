@@ -20,7 +20,7 @@ import (
 	"github.com/lonelycode/osin"
 
 	"github.com/TykTechnologies/tyk/apidef"
-	"github.com/TykTechnologies/tyk/storage"
+	redisCluster "github.com/TykTechnologies/tyk/storage/redis-cluster"
 	"github.com/TykTechnologies/tyk/user"
 
 	"github.com/TykTechnologies/tyk/internal/cache"
@@ -584,7 +584,7 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 					&RedisOsinStorageInterface{
 						storageManager,
 						k.Gw.GlobalSessionManager,
-						&storage.RedisCluster{KeyPrefix: prefix, HashKeys: false, ConnectionHandler: k.Gw.StorageConnectionHandler},
+						&redisCluster.RedisCluster{KeyPrefix: prefix, HashKeys: false, ConnectionHandler: k.Gw.StorageConnectionHandler},
 						k.Spec.OrgID,
 						k.Gw,
 					}),

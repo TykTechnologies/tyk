@@ -23,11 +23,11 @@ import (
 	"go.uber.org/mock/gomock"
 
 	"github.com/TykTechnologies/tyk/certs/mock"
+	"github.com/TykTechnologies/tyk/storage/util"
 
 	"github.com/TykTechnologies/tyk/internal/crypto"
 
 	"github.com/TykTechnologies/tyk/header"
-	"github.com/TykTechnologies/tyk/storage"
 
 	"github.com/TykTechnologies/tyk/user"
 
@@ -1310,7 +1310,7 @@ func TestKeyWithCertificateTLS(t *testing.T) {
 		_, _ = ts.Run(t, test.TestCase{Path: "/", Code: 200, Client: client})
 		session.Certificate = "fooBar"
 		// update redis directly since we have protection not to allow create of a session with wrong certificate
-		err = ts.Gw.GlobalSessionManager.UpdateSession(storage.HashKey(clientCertID, ts.Gw.GetConfig().HashKeys), session, 0, ts.Gw.GetConfig().HashKeys)
+		err = ts.Gw.GlobalSessionManager.UpdateSession(util.HashKey(clientCertID, ts.Gw.GetConfig().HashKeys), session, 0, ts.Gw.GetConfig().HashKeys)
 		if err != nil {
 			t.Error("could not update session in Session Manager. " + err.Error())
 		}
