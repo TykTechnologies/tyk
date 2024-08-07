@@ -25,6 +25,7 @@ vars:
 env:
   PYTHON_VERSION: '{{.python}}'
   CI: 'true'
+  GODEBUG: 'tlsrsakex=1'
 
 tasks:
 
