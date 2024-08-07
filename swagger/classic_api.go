@@ -24,7 +24,7 @@ These methods only work on a single API node. If updating a cluster, it is impor
 
 func APIS(r *openapi3.Reflector) error {
 	addTag(APIsTag, ApiTagDesc, optionalTagParameters{})
-	return addOperations(r, getClassicApiRequest, deleteClassicApiRequest, putClassicApiRequest, getListOfClassicApisRequest, createClassicApiRequest)
+	return addOperations(r, getClassicApiRequest, deleteClassicApiRequest, putClassicApiRequest, getListOfClassicApisRequest, createClassicApiRequest, getApiVersions)
 }
 
 // Done
@@ -146,31 +146,64 @@ func createClassicApiRequest(r *openapi3.Reflector) error {
 	if !ok {
 		return ErrOperationExposer
 	}
+	/*	{
+		"key": "1bd5c61b0e694082902cf15ddcc9e6a7",
+		"status": "ok",
+		"action": "added"
+	}*/
 	o3.Operation().WithParameters(addApiPostQueryParam()...)
 	return r.AddOperation(oc)
 }
 
 // Done
 func getApiVersions(r *openapi3.Reflector) error {
-	oc, err := r.NewOperationContext(http.MethodGet, "/tyk/apis/{apiID}/versions")
+	oc, err := NewOperationWithSafeExample(r, SafeOperation{
+		Method:      http.MethodGet,
+		PathPattern: "/tyk/apis/{apiID}/versions",
+		OperationID: "listApiVersions",
+		Tag:         APIsTag,
+	})
 	if err != nil {
 		return err
 	}
-	o3, ok := oc.(openapi3.OperationExposer)
-	if !ok {
-		return ErrOperationExposer
+	oc.AddPathParameter("apiID", "The API ID", OptionalParameterValues{
+		Example: valueToInterface("keyless"),
+	})
+	oc.AddRefParameters(SearchText)
+	oc.AddRefParameters(AccessType)
+	oc.StatusNotFound("API not found", func(cu *openapi.ContentUnit) {
+		cu.Description = "Api not found"
+	})
+
+	versionMetas := gateway.VersionMetas{
+		Status: "success",
+		Metas: []gateway.VersionMeta{
+			{
+				ID:               "keyless",
+				Name:             "Tyk Test Keyless API",
+				VersionName:      "",
+				Internal:         false,
+				ExpirationDate:   "",
+				IsDefaultVersion: false,
+			},
+			{
+				ID:               "1f20d5d2731d47ac9c79fddf826eda00",
+				Name:             "Version three Api",
+				VersionName:      "v2",
+				Internal:         false,
+				ExpirationDate:   "",
+				IsDefaultVersion: true,
+			},
+		},
 	}
-	oc.AddRespStructure(new(gateway.VersionMetas), func(cu *openapi.ContentUnit) {
+
+	oc.AddRespWithExample(versionMetas, http.StatusOK, func(cu *openapi.ContentUnit) {
 		cu.Description = "API version metas"
 	})
-	statusNotFound(oc, "API not found")
-	forbidden(oc)
-	oc.SetID("listApiVersions")
-	oc.SetTags(APIsTag)
 	oc.SetSummary("Listing versions of an API")
 	oc.SetDescription("Listing versions of an API")
-	o3.Operation().WithParameters(apIIDParameter(), searchTextQuery(), accessTypeQuery())
-	return r.AddOperation(oc)
+
+	return oc.AddOperation()
 }
 
 func apIIDParameter() openapi3.ParameterOrRef {

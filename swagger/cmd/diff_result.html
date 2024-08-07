@@ -1,4 +1,4 @@
-<h3 id="new-endpoints-11">New Endpoints: 11</h3>
+<h3 id="new-endpoints-10">New Endpoints: 10</h3>
 <hr>
 <p>DELETE /tyk/certs/{certID}<br>
 GET /tyk/certs/{certID}<br>
@@ -9,17 +9,14 @@ POST /tyk/keys/preview<br>
 GET /tyk/oauth/clients/apis/{appID}<br>
 PUT /tyk/oauth/clients/{apiID}/{keyName}<br>
 PUT /tyk/oauth/clients/{apiID}/{keyName}/rotate<br>
-DELETE /tyk/oauth/tokens<br>
-GET /tyk/reload</p>
-<h3 id="deleted-endpoints-6">Deleted Endpoints: 6</h3>
+DELETE /tyk/oauth/tokens</p>
+<h3 id="deleted-endpoints-4">Deleted Endpoints: 4</h3>
 <hr>
-<p>GET /tyk/apis/{apiID}/versions<br>
-DELETE /tyk/certs<br>
-POST /tyk/oauth/authorize-client/<br>
+<p>DELETE /tyk/certs<br>
+POST /tyk/oauth/authorize-client<br>
 PUT /tyk/oauth/clients/{apiID}<br>
-GET /tyk/reload/<br>
 POST /{listen_path}/tyk/batch</p>
-<h3 id="modified-endpoints-45">Modified Endpoints: 45</h3>
+<h3 id="modified-endpoints-47">Modified Endpoints: 47</h3>
 <hr>
 <p>GET /tyk/apis</p>
 <ul>
@@ -2461,12 +2458,12 @@ POST /{listen_path}/tyk/batch</p>
 </ul>
 <p>POST /tyk/apis/oas/import</p>
 <ul>
+<li>Deleted query param: apiID</li>
 <li>Modified query param: allowList
 <ul>
 <li>Schema changed
 <ul>
 <li>Type changed from 'string' to 'boolean'</li>
-<li>Deleted enum values: [true false]</li>
 </ul>
 </li>
 </ul>
@@ -2476,7 +2473,6 @@ POST /{listen_path}/tyk/batch</p>
 <li>Schema changed
 <ul>
 <li>Type changed from 'string' to 'boolean'</li>
-<li>Deleted enum values: [true false]</li>
 </ul>
 </li>
 </ul>
@@ -2486,7 +2482,6 @@ POST /{listen_path}/tyk/batch</p>
 <li>Schema changed
 <ul>
 <li>Type changed from 'string' to 'boolean'</li>
-<li>Deleted enum values: [true false]</li>
 </ul>
 </li>
 </ul>
@@ -2496,7 +2491,6 @@ POST /{listen_path}/tyk/batch</p>
 <li>Schema changed
 <ul>
 <li>Type changed from 'string' to 'boolean'</li>
-<li>Deleted enum values: [true false]</li>
 </ul>
 </li>
 </ul>
@@ -2609,7 +2603,6 @@ POST /{listen_path}/tyk/batch</p>
 <li>Schema changed
 <ul>
 <li>Type changed from 'string' to 'boolean'</li>
-<li>Deleted enum values: [true false]</li>
 </ul>
 </li>
 </ul>
@@ -2619,7 +2612,6 @@ POST /{listen_path}/tyk/batch</p>
 <li>Schema changed
 <ul>
 <li>Type changed from 'string' to 'boolean'</li>
-<li>Deleted enum values: [true false]</li>
 </ul>
 </li>
 </ul>
@@ -2629,7 +2621,6 @@ POST /{listen_path}/tyk/batch</p>
 <li>Schema changed
 <ul>
 <li>Type changed from 'string' to 'boolean'</li>
-<li>Deleted enum values: [true false]</li>
 </ul>
 </li>
 </ul>
@@ -2639,13 +2630,13 @@ POST /{listen_path}/tyk/batch</p>
 <li>Schema changed
 <ul>
 <li>Type changed from 'string' to 'boolean'</li>
-<li>Deleted enum values: [true false]</li>
 </ul>
 </li>
 </ul>
 </li>
 <li>Responses changed
 <ul>
+<li>New response: 403</li>
 <li>New response: 404</li>
 </ul>
 </li>
@@ -5103,6 +5094,43 @@ POST /{listen_path}/tyk/batch</p>
 <li>New response: 403</li>
 <li>New response: 404</li>
 <li>New response: 500</li>
+</ul>
+</li>
+</ul>
+<p>GET /tyk/apis/{apiID}/versions</p>
+<ul>
+<li>New path param: apiID</li>
+<li>Responses changed
+<ul>
+<li>New response: 403</li>
+<li>New response: 404</li>
+<li>Modified response: 200
+<ul>
+<li>Content changed
+<ul>
+<li>Modified media type: application/json
+<ul>
+<li>Schema changed
+<ul>
+<li>Type changed from '' to 'object'</li>
+<li>Properties changed
+<ul>
+<li>New property: status</li>
+<li>Modified property: apis
+<ul>
+<li>Nullable changed from false to true</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
 </ul>
 </li>
 </ul>
@@ -8008,6 +8036,14 @@ POST /{listen_path}/tyk/batch</p>
 </li>
 </ul>
 </li>
+<li>Responses changed
+<ul>
+<li>New response: 403</li>
+</ul>
+</li>
+</ul>
+<p>GET /tyk/reload</p>
+<ul>
 <li>Responses changed
 <ul>
 <li>New response: 403</li>

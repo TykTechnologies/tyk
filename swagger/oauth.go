@@ -16,14 +16,52 @@ const (
 `
 )
 
-// OAuthApi is a good thing Keith
 func OAuthApi(r *openapi3.Reflector) error {
 	addTag(OAuthTag, OAuthTagDesc, optionalTagParameters{})
 	return addOperations(r, rotateOauthClientHandler, invalidateOauthRefresh,
-		updateOauthClient, getApisForOauthApp, purgeLapsedOAuthTokens, listOAuthClients,
+		updateOauthClient, getApisForOauthApp, purgeLapsedOAuthTokens,
 		deleteOAuthClient, getSingleOAuthClientDetails, getAuthClientTokens, revokeTokenHandler,
-		createOauthClient, revokeAllTokensHandler,
+		createOauthClient, revokeAllTokensHandler, oAuthClientHandler,
 	)
+}
+
+func updateOAuthClient(r *openapi3.Reflector) error {
+	oc, err := NewOperationWithSafeExample(r, SafeOperation{
+		Method:      http.MethodPut,
+		PathPattern: "/tyk/oauth/clients/{apiID}",
+		OperationID: "updateoAuthClient",
+		Tag:         OAuthTag,
+	})
+	if err != nil {
+		return err
+	}
+
+	return oc.AddOperation()
+}
+
+func oAuthClientHandler(r *openapi3.Reflector) error {
+	oc, err := NewOperationWithSafeExample(r, SafeOperation{
+		Method:      http.MethodGet,
+		PathPattern: "/tyk/oauth/clients/{apiID}",
+		OperationID: "listOAuthClients",
+		Tag:         OAuthTag,
+	})
+	if err != nil {
+		return err
+	}
+	oc.AddResp(nil, http.StatusNotFound, func(cu *openapi.ContentUnit) {
+		cu.Description = "Api no found"
+	})
+	oc.SetSummary("List oAuth clients")
+	oc.SetDescription("OAuth Clients are organised by API ID, and therefore are queried as such.")
+	oc.AddPathParameter("apiID", "The API ID", OptionalParameterValues{
+		Example: valueToInterface("1bd5c61b0e694082902cf15ddcc9e6a7"),
+	})
+	oc.AddRespWithExample(clientItems, http.StatusOK, func(cu *openapi.ContentUnit) {
+		cu.Description = "Get OAuth client details or a list of OAuth clients"
+	})
+
+	return oc.AddOperation()
 }
 
 // Done
@@ -179,32 +217,6 @@ func purgeLapsedOAuthTokens(r *openapi3.Reflector) error {
 	o3.Operation().WithParameters(par...)
 
 	oc.SetTags(OAuthTag)
-	return r.AddOperation(oc)
-}
-
-// Done
-func listOAuthClients(r *openapi3.Reflector) error {
-	oc, err := r.NewOperationContext(http.MethodGet, "/tyk/oauth/clients/{apiID}")
-	if err != nil {
-		return err
-	}
-	oc.SetTags(OAuthTag)
-	// TODO:: ask why 404 returns null
-	oc.AddRespStructure(nil, openapi.WithHTTPStatus(http.StatusNotFound))
-	oc.AddRespStructure(new([]gateway.NewClientRequest), openapi.WithHTTPStatus(http.StatusOK), func(cu *openapi.ContentUnit) {
-		cu.Description = "List of OAuth clients"
-	})
-	forbidden(oc)
-	oc.SetID("listOAuthClients")
-	oc.SetSummary("List oAuth clients for an Api")
-	oc.SetDescription("OAuth Clients are organised by API ID, and therefore are queried as such.")
-	o3, ok := oc.(openapi3.OperationExposer)
-	if !ok {
-		return ErrOperationExposer
-	}
-	par := []openapi3.ParameterOrRef{oauthApiIdParameter()}
-	o3.Operation().WithParameters(par...)
-
 	return r.AddOperation(oc)
 }
 
@@ -376,7 +388,10 @@ func requiredOrgIdForOauth() openapi3.ParameterOrRef {
 }
 
 func forbidden(oc openapi.OperationContext, description ...string) {
-	oc.AddRespStructure(new(apiStatusMessage), openapi.WithHTTPStatus(http.StatusForbidden), func(cu *openapi.ContentUnit) {
+	oc.AddRespStructure(apiStatusMessage{
+		Status:  "error",
+		Message: "Attempted administrative access with invalid or missing key!",
+	}, openapi.WithHTTPStatus(http.StatusForbidden), func(cu *openapi.ContentUnit) {
 		cu.Description = "Attempting to access a protected api with an invalid or a missing X-Tyk-Authorization in the headers"
 		if len(description) != 0 {
 			cu.Description = description[0]
@@ -422,4 +437,16 @@ func statusInternalServerError(oc openapi.OperationContext, description ...strin
 			cu.Description = description[0]
 		}
 	})
+}
+
+var clientItems = []gateway.NewClientRequest{
+	{
+		ClientID:          "2a06b398c17f46908de3dffcb71ef87d",
+		ClientRedirectURI: "https://httpbin.org/ip",
+		ClientSecret:      "MmQwNTI5NGQtYjU0YS00NjMyLWIwZjktNTZjY2M1ZjhjYWY0",
+		MetaData: map[string]interface{}{
+			"user_id": "362b3fb9a1d5e4f00017226f5",
+		},
+		Description: "google client",
+	},
 }

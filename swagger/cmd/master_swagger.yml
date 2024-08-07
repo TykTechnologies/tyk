@@ -882,7 +882,7 @@ paths:
               example:
                 message: cache invalidated
                 status: ok
-  '/tyk/reload/':
+  '/tyk/reload':
     get:
       summary: Hot-reload a single node
       description: Tyk is capable of reloading configurations without having to stop serving requests. This means that API configurations can be added at runtime, or even modified at runtime and those rules applied immediately without any downtime.
@@ -1735,7 +1735,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/apiModifyKeySuccess'
-  '/tyk/oauth/authorize-client/':
+  '/tyk/oauth/authorize-client':
     post:
       description: With the OAuth flow you will need to create authorisation or access tokens for your clients, in order to do this, Tyk provides a private API endpoint for your application to generate these codes and redirect the end-user back to the API Client.
       summary: Authorize client

@@ -64,6 +64,9 @@ tags:
 - description: |
     Sometimes a cache might contain stale data, or it may just need to be cleared because of an invalid configuration. This call will purge all keys associated with a cache on an API-by-API basis.
   name: Cache Invalidation
+- description: Use the endpoints under this tag to manage your certificates. You can
+    add, delete and list certificates using these endpoints.
+  name: Certs
 - description: |
     Force restart of the Gateway or whole cluster
   name: Hot Reload
@@ -305,6 +308,63 @@ paths:
       summary: Updating an API definition with its ID
       tags:
       - APIs
+  /tyk/apis/{apiID}/versions:
+    get:
+      description: Listing versions of an API
+      operationId: listApiVersions
+      parameters:
+      - description: The API ID
+        example: keyless
+        in: path
+        name: apiID
+        required: true
+        schema:
+          type: string
+      - $ref: '#/components/parameters/SearchText'
+      - $ref: '#/components/parameters/AccessType'
+      responses:
+        "200":
+          content:
+            application/json:
+              example:
+                apis:
+                - expirationDate: ""
+                  id: keyless
+                  internal: false
+                  isDefaultVersion: false
+                  name: Tyk Test Keyless API
+                  versionName: ""
+                - expirationDate: ""
+                  id: 1f20d5d2731d47ac9c79fddf826eda00
+                  internal: false
+                  isDefaultVersion: true
+                  name: Version three Api
+                  versionName: v2
+                status: success
+              schema:
+                $ref: '#/components/schemas/VersionMetas'
+          description: API version metas
+        "403":
+          content:
+            application/json:
+              example:
+                message: Attempted administrative access with invalid or missing key!
+                status: error
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Forbidden
+        "404":
+          content:
+            application/json:
+              example:
+                message: API not found
+                status: error
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Api not found
+      summary: Listing versions of an API
+      tags:
+      - APIs
   /tyk/apis/oas:
     get:
       description: List all OAS format APIs, when used without the Tyk Dashboard.
@@ -439,23 +499,25 @@ paths:
             application/json:
               example:
                 message: Malformed API data
-                status: Error
+                status: error
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
           description: Bad Request
         "403":
           content:
             application/json:
+              example:
+                message: Attempted administrative access with invalid or missing key!
+                status: error
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: Attempting to access a protected api with an invalid or a missing
-            X-Tyk-Authorization in the headers
+          description: Forbidden
         "500":
           content:
             application/json:
               example:
                 message: Unexpected error
-                status: Error
+                status: error
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
           description: Internal server error.
@@ -557,23 +619,25 @@ paths:
               example:
                 message: trying to access an API whose definition is in Tyk classic
                   format
-                status: Error
+                status: error
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
           description: Bad Request
         "403":
           content:
             application/json:
+              example:
+                message: Attempted administrative access with invalid or missing key!
+                status: error
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: Attempting to access a protected api with an invalid or a missing
-            X-Tyk-Authorization in the headers
+          description: Forbidden
         "404":
           content:
             application/json:
               example:
                 message: API not found
-                status: Error
+                status: error
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
           description: Not Found
@@ -663,23 +727,25 @@ paths:
             application/json:
               example:
                 message: Malformed request
-                status: Error
+                status: error
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
           description: Bad Request
         "403":
           content:
             application/json:
+              example:
+                message: Attempted administrative access with invalid or missing key!
+                status: error
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: Attempting to access a protected api with an invalid or a missing
-            X-Tyk-Authorization in the headers
+          description: Forbidden
         "404":
           content:
             application/json:
               example:
                 message: API not found
-                status: Error
+                status: error
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
           description: Not Found
@@ -688,7 +754,7 @@ paths:
             application/json:
               example:
                 message: Unexpected error
-                status: Error
+                status: error
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
           description: Internal server error.
@@ -774,23 +840,25 @@ paths:
               example:
                 message: Malformed Request or trying to update api in tyk classic
                   format
-                status: Error
+                status: error
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
           description: Bad Request
         "403":
           content:
             application/json:
+              example:
+                message: Attempted administrative access with invalid or missing key!
+                status: error
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: Attempting to access a protected api with an invalid or a missing
-            X-Tyk-Authorization in the headers
+          description: Forbidden
         "404":
           content:
             application/json:
               example:
                 message: API not found
-                status: Error
+                status: error
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
           description: Not Found
@@ -799,13 +867,85 @@ paths:
             application/json:
               example:
                 message: Unexpected error
-                status: Error
+                status: error
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
           description: Internal server error.
       summary: Update OAS API definition
       tags:
       - OAS APIs
+  /tyk/apis/oas/{apiID}/export:
+    get:
+      description: "Mode of OAS export, by default mode could be empty which means
+        to export OAS spec including OAS Tyk extension. \n  When mode=public, OAS
+        spec excluding Tyk extension is exported"
+      operationId: downloadApiOASPublic
+      parameters:
+      - description: ID of the api you want to fetch
+        example: 4c1c0d8fc885401053ddac4e39ef676b
+        in: path
+        name: apiID
+        required: true
+        schema:
+          type: string
+      - description: "Mode of OAS get, by default mode could be empty which means
+          to get OAS spec including OAS Tyk extension. \n When mode=public, OAS spec
+          excluding Tyk extension will be returned in the response"
+        example: public
+        in: query
+        name: mode
+        required: false
+        schema:
+          enum:
+          - public
+          type: string
+      responses:
+        "200":
+          content:
+            application/octet-stream:
+              schema:
+                format: binary
+                type: string
+          description: Exported API definition file
+        "400":
+          content:
+            application/json:
+              example:
+                message: requesting API definition that is in Tyk classic format
+                status: error
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Bad Request
+        "403":
+          content:
+            application/json:
+              example:
+                message: Attempted administrative access with invalid or missing key!
+                status: error
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Forbidden
+        "404":
+          content:
+            application/json:
+              example:
+                message: API not found
+                status: error
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Not Found
+        "500":
+          content:
+            application/json:
+              example:
+                message: Unexpected error
+                status: error
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Internal server error.
+      summary: Download an OAS format APIs, when used without the Tyk Dashboard.
+      tags:
+      - OASTag
   /tyk/apis/oas/{apiID}/versions:
     get:
       description: Listing versions of an OAS API
@@ -883,16 +1023,18 @@ paths:
         "403":
           content:
             application/json:
+              example:
+                message: Attempted administrative access with invalid or missing key!
+                status: error
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: Attempting to access a protected api with an invalid or a missing
-            X-Tyk-Authorization in the headers
+          description: Forbidden
         "500":
           content:
             application/json:
               example:
                 message: Unexpected error
-                status: Error
+                status: error
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
           description: Internal server error.
@@ -965,23 +1107,25 @@ paths:
             application/json:
               example:
                 message: Malformed request or when the payload contain x-tyk-api-gateway
-                status: Error
+                status: error
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
           description: Bad Request
         "403":
           content:
             application/json:
+              example:
+                message: Attempted administrative access with invalid or missing key!
+                status: error
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: Attempting to access a protected api with an invalid or a missing
-            X-Tyk-Authorization in the headers
+          description: Forbidden
         "500":
           content:
             application/json:
               example:
                 message: Unexpected error
-                status: Error
+                status: error
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
           description: Internal server error.
@@ -994,7 +1138,7 @@ paths:
       operationId: invalidateCache
       parameters:
       - description: The API ID
-        example: keyless
+        example: ae67bb862a3241a49117508e0f9ee839
         in: path
         name: apiID
         required: true
@@ -1004,22 +1148,30 @@ paths:
         "200":
           content:
             application/json:
+              example:
+                message: cache invalidated
+                status: ok
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
           description: cache invalidated
         "403":
           content:
             application/json:
+              example:
+                message: Attempted administrative access with invalid or missing key!
+                status: error
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: Attempting to access a protected api with an invalid or a missing
-            X-Tyk-Authorization in the headers
+          description: Forbidden
         "500":
           content:
             application/json:
+              example:
+                message: Cache invalidation failed
+                status: error
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: when cache invalidation fails
+          description: Internal server error.
       summary: Invalidate cache
       tags:
       - Cache Invalidation
@@ -1071,7 +1223,7 @@ paths:
         example: 5e9d9544a1dcd60001d0ed20
         in: query
         name: org_id
-        required: true
+        required: false
         schema:
           type: string
       requestBody:
@@ -1083,21 +1235,31 @@ paths:
         "200":
           content:
             application/json:
+              example:
+                id: 5e9d9544a1dcd60001d0ed207c440d66ebb0a4629d21329808dce9091acf5f2fde328067a6e60e5347271d90
+                message: Certificate added
+                status: ok
               schema:
                 $ref: '#/components/schemas/APICertificateStatusMessage'
           description: New Certificate added
         "403":
           content:
             application/json:
+              example:
+                message: Certificate with  id already exists
+                status: error
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
           description: When certificates you send already exist in the gateway
         "405":
           content:
             application/json:
+              example:
+                message: Malformed request body
+                status: error
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: When you send a malformed request body
+          description: malformed request body
       summary: Add a certificate
       tags:
       - Certs
@@ -1124,16 +1286,21 @@ paths:
         "200":
           content:
             application/json:
+              example:
+                message: removed
+                status: ok
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
           description: Deleted certificate
         "403":
           content:
             application/json:
+              example:
+                message: Attempted administrative access with invalid or missing key!
+                status: error
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: Attempting to access a protected api with an invalid or a missing
-            X-Tyk-Authorization in the headers
+          description: Forbidden
       summary: Delete Certificate
       tags:
       - Certs
@@ -1154,6 +1321,11 @@ paths:
         "200":
           content:
             application/json:
+              examples:
+                certificateMetaExample:
+                  $ref: '#/components/examples/certificateMetaExample'
+                certificateMetaListExample:
+                  $ref: '#/components/examples/certificateMetaListExample'
               schema:
                 oneOf:
                 - $ref: '#/components/schemas/CertsCertificateMeta'
@@ -1161,24 +1333,29 @@ paths:
                     $ref: '#/components/schemas/CertsCertificateMeta'
                   nullable: true
                   type: array
-          description: Certificates returned successfully
+          description: OK
         "403":
           content:
             application/json:
+              example:
+                message: Attempted administrative access with invalid or missing key!
+                status: error
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: Attempting to access a protected api with an invalid or a missing
-            X-Tyk-Authorization in the headers
+          description: Forbidden
         "404":
           content:
             application/json:
+              example:
+                message: Certificate with given SHA256 fingerprint not found
+                status: error
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: When you send a single certID and it does not exist
+          description: Not Found
       summary: Return one certificate or List multiple Certificates in the Tyk Gateway
         given a comma separated list of certIDs
       tags:
-      - Certs
+      - CertsTag
   /tyk/debug:
     post:
       description: Used to test API definition by sending sample request and analysing
@@ -1687,6 +1864,7 @@ paths:
       operationId: listOAuthClients
       parameters:
       - description: The API ID
+        example: 1bd5c61b0e694082902cf15ddcc9e6a7
         in: path
         name: apiID
         required: true
@@ -1696,21 +1874,30 @@ paths:
         "200":
           content:
             application/json:
+              example:
+              - client_id: 2a06b398c17f46908de3dffcb71ef87d
+                description: google client
+                meta_data:
+                  user_id: 362b3fb9a1d5e4f00017226f5
+                redirect_uri: https://httpbin.org/ip
+                secret: MmQwNTI5NGQtYjU0YS00NjMyLWIwZjktNTZjY2M1ZjhjYWY0
               schema:
                 items:
                   $ref: '#/components/schemas/NewClientRequest'
                 type: array
-          description: List of OAuth clients
+          description: Get OAuth client details or a list of OAuth clients
         "403":
           content:
             application/json:
+              example:
+                message: Attempted administrative access with invalid or missing key!
+                status: error
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: Attempting to access a protected api with an invalid or a missing
-            X-Tyk-Authorization in the headers
+          description: Forbidden
         "404":
-          description: Not Found
-      summary: List oAuth clients for an Api
+          description: Api no found
+      summary: List oAuth clients
       tags:
       - OAuth
   /tyk/oauth/clients/{apiID}/{keyName}:
@@ -2767,6 +2954,218 @@ paths:
       - Schema
 components:
   examples:
+    certificateMetaExample:
+      value:
+        dns_names:
+        - .*tyk.io
+        fingerprint: 7c440d66ebb0a4629d21329808dce9091acf5f2fde328067a6e60e5347271d90
+        has_private: false
+        id: 5e9d9544a1dcd60001d0ed207c440d66ebb0a4629d21329808dce9091acf5f2fde328067a6e60e5347271d90
+        is_ca: false
+        issuer:
+          CommonName: tyk.io
+          Country:
+          - Peachtree
+          ExtraNames: null
+          Locality: null
+          Names:
+          - Type:
+            - 2
+            - 5
+            - 4
+            - 6
+            Value: Peachtree
+          - Type:
+            - 2
+            - 5
+            - 4
+            - 10
+            Value: tyk
+          - Type:
+            - 2
+            - 5
+            - 4
+            - 11
+            Value: tyk
+          - Type:
+            - 2
+            - 5
+            - 4
+            - 3
+            Value: tyk.io
+          - Type:
+            - 1
+            - 2
+            - 840
+            - 113549
+            - 1
+            - 9
+            - 1
+            Value: support@tyk.io
+          Organization:
+          - tyk
+          OrganizationalUnit:
+          - tyk
+          PostalCode: null
+          Province: null
+          SerialNumber: ""
+          StreetAddress: null
+        not_after: "2034-03-26T08:46:37Z"
+        not_before: "2024-03-25T08:46:37Z"
+        subject:
+          CommonName: tyk.io
+          Country:
+          - Peachtree
+          ExtraNames: null
+          Locality: null
+          Names:
+          - Type:
+            - 2
+            - 5
+            - 4
+            - 6
+            Value: Peachtree
+          - Type:
+            - 2
+            - 5
+            - 4
+            - 10
+            Value: tyk
+          - Type:
+            - 2
+            - 5
+            - 4
+            - 11
+            Value: tyk
+          - Type:
+            - 2
+            - 5
+            - 4
+            - 3
+            Value: tyk.io
+          - Type:
+            - 1
+            - 2
+            - 840
+            - 113549
+            - 1
+            - 9
+            - 1
+            Value: support@tyk.io
+          Organization:
+          - tyk
+          OrganizationalUnit:
+          - tyk
+          PostalCode: null
+          Province: null
+          SerialNumber: ""
+          StreetAddress: null
+    certificateMetaListExample:
+      value:
+      - dns_names:
+        - .*tyk.io
+        fingerprint: 7c440d66ebb0a4629d21329808dce9091acf5f2fde328067a6e60e5347271d90
+        has_private: false
+        id: 5e9d9544a1dcd60001d0ed207c440d66ebb0a4629d21329808dce9091acf5f2fde328067a6e60e5347271d90
+        is_ca: false
+        issuer:
+          CommonName: tyk.io
+          Country:
+          - Peachtree
+          ExtraNames: null
+          Locality: null
+          Names:
+          - Type:
+            - 2
+            - 5
+            - 4
+            - 6
+            Value: Peachtree
+          - Type:
+            - 2
+            - 5
+            - 4
+            - 10
+            Value: tyk
+          - Type:
+            - 2
+            - 5
+            - 4
+            - 11
+            Value: tyk
+          - Type:
+            - 2
+            - 5
+            - 4
+            - 3
+            Value: tyk.io
+          - Type:
+            - 1
+            - 2
+            - 840
+            - 113549
+            - 1
+            - 9
+            - 1
+            Value: support@tyk.io
+          Organization:
+          - tyk
+          OrganizationalUnit:
+          - tyk
+          PostalCode: null
+          Province: null
+          SerialNumber: ""
+          StreetAddress: null
+        not_after: "2034-03-26T08:46:37Z"
+        not_before: "2024-03-25T08:46:37Z"
+        subject:
+          CommonName: tyk.io
+          Country:
+          - Peachtree
+          ExtraNames: null
+          Locality: null
+          Names:
+          - Type:
+            - 2
+            - 5
+            - 4
+            - 6
+            Value: Peachtree
+          - Type:
+            - 2
+            - 5
+            - 4
+            - 10
+            Value: tyk
+          - Type:
+            - 2
+            - 5
+            - 4
+            - 11
+            Value: tyk
+          - Type:
+            - 2
+            - 5
+            - 4
+            - 3
+            Value: tyk.io
+          - Type:
+            - 1
+            - 2
+            - 840
+            - 113549
+            - 1
+            - 9
+            - 1
+            Value: support@tyk.io
+          Organization:
+          - tyk
+          OrganizationalUnit:
+          - tyk
+          PostalCode: null
+          Province: null
+          SerialNumber: ""
+          StreetAddress: null
     oasExample:
       value:
         components:
@@ -2814,28 +3213,6 @@ components:
               value: /user-test/
           upstream:
             url: https://localhost:8080
-    stringOasExample:
-      value: "{\n\t\t  \"openapi\": \"3.0.3\",\n\t\t   \"info\": {\n\t\t\t\"title\":
-        \"OAS Sample\",\n\t\t\t\"description\": \"This is a sample OAS.\",\n\t\t\t\"version\":
-        \"1.0.0\"\n\t\t  },\n\t\t  \"servers\": [\n\t\t\t{\n\t\t\t  \"url\": \"https://localhost:8080\"\n\t\t\t}\n\t\t
-        \ ],\n\t\t  \"security\": [\n\t\t\t{\n\t\t\t  \"bearerAuth\": []\n\t\t\t}\n\t\t
-        \ ],\n\t\t  \"paths\": {\n\t\t\t\"/api/sample/users\": {\n\t\t\t  \"get\":
-        {\n\t\t\t\t\"tags\": [\n\t\t\t\t  \"users\"\n\t\t\t\t],\n\t\t\t\t\"summary\":
-        \"Get users\",\n\t\t\t\t\"operationId\": \"getUsers\",\n\t\t\t\t\"responses\":
-        {\n\t\t\t\t  \"200\": {\n\t\t\t\t\t\"description\": \"fetched users\",\n\t\t\t\t\t\"content\":
-        {\n\t\t\t\t\t  \"application/json\": {\n\t\t\t\t\t\t\"schema\": {\n\t\t\t\t\t\t
-        \ \"type\": \"array\",\n\t\t\t\t\t\t  \"items\": {\n\t\t\t\t\t\t\t\"type\":
-        \"object\",\n\t\t\t\t\t\t\t\"properties\": {\n\t\t\t\t\t\t\t  \"name\": {\n\t\t\t\t\t\t\t\t\"type\":
-        \"string\"\n\t\t\t\t\t\t\t  }\n\t\t\t\t\t\t\t}\n\t\t\t\t\t\t  }\n\t\t\t\t\t\t}\n\t\t\t\t\t
-        \ }\n\t\t\t\t\t}\n\t\t\t\t  }\n\t\t\t\t}\n\t\t\t  }\n\t\t\t}\n\t\t  },\n\t\t
-        \  \"components\": {\n\t\t\t\"securitySchemes\": {\n\t\t\t  \"bearerAuth\":
-        {\n\t\t\t\t\"type\": \"http\",\n\t\t\t\t\"scheme\": \"bearer\",\n\t\t\t\t\"description\":
-        \"The API Access Credentials\"\n\t\t\t  }\n\t\t\t}\n\t\t  },\n\t\t\t\"x-tyk-api-gateway\":
-        {\n\t\t\t\t\t\"info\": {\n\t\t\t\t\t\t\"name\": \"user\",\n\t\t\t\t\t\t\"state\":
-        {\n\t\t\t\t\t\t\t\"active\": true\n\t\t\t\t\t\t}\n\t\t\t\t\t},\n\t\t\t\t\t\"upstream\":
-        {\n\t\t\t\t\t\t\"url\": \"https://localhost:8080\"\n\t\t\t\t\t},\n\t\t\t\t\t\"server\":
-        {\n\t\t\t\t\t\t\"listenPath\": {\n\t\t\t\t\t\t\t\"value\": \"/user-test/\",\n\t\t\t\t\t\t\t\"strip\":
-        true\n\t\t\t\t\t\t}\n\t\t\t\t\t}\n\t\t\t\t}\n    }"
   parameters:
     AccessType:
       description: Filter for internal or external API versions
@@ -2892,14 +3269,6 @@ components:
       in: query
       name: searchText
       required: false
-      schema:
-        type: string
-    TemplateID:
-      description: The asset ID of template applied while creating or importing an
-        OAS API.
-      example: my-unique-template-id
-      in: query
-      name: templateID
       schema:
         type: string
     UpstreamURL:

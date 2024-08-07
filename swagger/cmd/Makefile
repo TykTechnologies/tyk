@@ -1,5 +1,5 @@
 generate:
-	rm -f swagger.yml && go run main.go #&&  redocly lint  swagger.yml #--generate-ignore-file
+	rm -f swagger.yml && go run main.go &&  redocly lint  swagger.yml #--generate-ignore-file
 
 
 diff:

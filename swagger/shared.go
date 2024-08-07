@@ -23,6 +23,8 @@ const (
 	applicationOctetStream        = "application/octet-stream"
 	applicationJSON               = "application/json"
 	oasExample                    = "oasExample"
+	certificateMetaExample        = "certificateMetaExample"
+	certificateMetaListExample    = "certificateMetaListExample"
 	stringOasExample              = "stringOasExample"
 	graphResponseExample          = "graphResponseExample"
 	policiesExample               = "policiesExample"
@@ -78,7 +80,9 @@ const (
 
 func RefExamples(r *openapi3.Reflector) {
 	addRefExample(r, oasExample, oasSample(OasSampleString()))
-	addRefExample(r, stringOasExample, OasSampleString())
+	addRefExample(r, certificateMetaExample, certificates[0])
+	addRefExample(r, certificateMetaListExample, certificates)
+	// addRefExample(r, stringOasExample, OasSampleString())
 
 	///addRefExample(r, graphResponseExample, graphDetails())
 	//addRefExample(r, keySingleApiDef, fullApiReturned())
@@ -166,13 +170,13 @@ func RefParameters(r *openapi3.Reflector) {
 		},
 	})
 
-	addRefParameters(r, TemplateID, openapi3.Parameter{
+	/*addRefParameters(r, TemplateID, openapi3.Parameter{
 		Name:        "templateID",
 		Schema:      stringSchema,
 		In:          openapi3.ParameterInQuery,
 		Example:     valueToInterface("my-unique-template-id"),
 		Description: PointerValue("The asset ID of template applied while creating or importing an OAS API."),
-	})
+	})*/
 	addRefParameters(r, SearchText, openapi3.Parameter{
 		Name:        "searchText",
 		Required:    PointerValue(false),
@@ -290,7 +294,7 @@ func NewOperationWithExamples(r *openapi3.Reflector, method, pathPattern, operat
 	op.oc.SetID(operationID)
 	op.oc.SetTags(tag)
 	///op.StatusUnauthorized()
-	forbidden(oc)
+	op.StatusForbidden()
 	return &op, err
 }
 
@@ -333,7 +337,7 @@ func (op *OperationWithExample) AddResponseHeaders(header ResponseHeader) {
 
 func (op *OperationWithExample) AddGenericErrorResponse(httpStatus int, message string, options ...openapi.ContentOption) {
 	errResp := apiStatusMessage{
-		Status:  "Error",
+		Status:  "error",
 		Message: message,
 	}
 	op.AddRespWithExample(errResp, httpStatus, options...)
@@ -424,7 +428,7 @@ func (op *OperationWithExample) StatusUnauthorized() {
 }
 
 func (op *OperationWithExample) StatusForbidden(options ...openapi.ContentOption) {
-	message := fmt.Sprintf("access denied: You do not have permission to access  %s", op.pattern)
+	message := fmt.Sprintf("Attempted administrative access with invalid or missing key!")
 	op.AddGenericErrorResponse(http.StatusForbidden, message, options...)
 }
 
@@ -473,8 +477,9 @@ func AddResponseWithExternalRef() {
 }
 
 func (op *OperationWithExample) AddGenericStatusOk(message string, options ...openapi.ContentOption) {
-	op.AddRespWithExample(apiModifyKeySuccess{
-		Status: "OK",
+	op.AddRespWithExample(apiStatusMessage{
+		Message: message,
+		Status:  "ok",
 	}, http.StatusOK, options...)
 }
 

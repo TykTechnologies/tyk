@@ -205,7 +205,7 @@ func apiOASExportWithIDHandler(r *openapi3.Reflector) error {
 	oc.SetSummary("Download an OAS format APIs, when used without the Tyk Dashboard.")
 	oc.SetDescription("Mode of OAS export, by default mode could be empty which means to export OAS spec including OAS Tyk extension. \n  When mode=public, OAS spec excluding Tyk extension is exported")
 
-	return nil
+	return oc.AddOperation()
 }
 
 func importApiOASPostHandler(r *openapi3.Reflector) error {
