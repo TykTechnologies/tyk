@@ -89,7 +89,7 @@ require (
 	github.com/TykTechnologies/graphql-go-tools/v2 v2.0.0-20240705065952-ae6008677a48
 	github.com/TykTechnologies/kin-openapi v0.90.0
 	github.com/TykTechnologies/opentelemetry v0.0.21
-	github.com/TykTechnologies/tyk-gql v0.0.0-00010101000000-000000000000
+	github.com/TykTechnologies/tyk-gql v0.0.0-20240807102812-f884a22e5abb
 	github.com/alecthomas/kingpin/v2 v2.4.0
 	github.com/go-redis/redismock/v9 v9.2.0
 	github.com/google/go-cmp v0.6.0
@@ -228,4 +228,4 @@ require (
 
 //replace github.com/TykTechnologies/graphql-go-tools/v2 => ../graphql-go-tools/v2
 
-replace github.com/TykTechnologies/tyk-gql => ../tyk-gql
+//replace github.com/TykTechnologies/tyk-gql => ../tyk-gql

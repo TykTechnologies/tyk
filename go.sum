@@ -65,6 +65,8 @@ github.com/TykTechnologies/opentelemetry v0.0.21 h1:/ew4NET0nbLKmsNKmuEavTU+Zp3L
 github.com/TykTechnologies/opentelemetry v0.0.21/go.mod h1:5LkNDN08FYVhSTH0gC3hwk6cH6jP3F8cc5mv2asUHyA=
 github.com/TykTechnologies/storage v1.2.2 h1:NfBIpnMu9cPMrLxFrKIVzQHtTsvXte7/VdmFC0QrSfw=
 github.com/TykTechnologies/storage v1.2.2/go.mod h1:x4/SA+yiTmYkOyhQy18eNLgGJR4G6/kxX6qXBpzFmtw=
+github.com/TykTechnologies/tyk-gql v0.0.0-20240807102812-f884a22e5abb h1:+RVvcmT1xQL2SU5kIfQ/cde4gi/A3OFIjkyMc9M8a0w=
+github.com/TykTechnologies/tyk-gql v0.0.0-20240807102812-f884a22e5abb/go.mod h1:aaC6qtCJ+Y3ppP0TbYLetoqzy0nl6Ip1DAozfI+jHGE=
 github.com/TykTechnologies/tyk-pump v1.10.0 h1:mc2sRUlY6pPN8cdOUzswi8Ukjgtoxo5YMSh1XUTinwQ=
 github.com/TykTechnologies/tyk-pump v1.10.0/go.mod h1:dN4jBt2NlveiWalfTBgmyhkdRFL5kbCA02BwBBvAl2g=
 github.com/agnivade/levenshtein v1.1.1 h1:QY8M92nrzkmr798gCo3kmMyqXFzdQVpxLlGPRBij0P8=

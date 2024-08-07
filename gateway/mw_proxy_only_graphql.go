@@ -22,11 +22,11 @@ func (m *ProxyOnlyGraphQLMiddleware) EnabledForSpec() bool {
 	return m.Spec.GraphQL.Enabled
 }
 
-func ctxSetGraphQLRequestV4(r *http.Request, gqlRequest *gql.Request) {
+func ctxSetGraphQLRequestProxyOnly(r *http.Request, gqlRequest *gql.Request) {
 	setCtxValue(r, ctx.GraphQLRequest, gqlRequest)
 }
 
-func ctxGetGraphQLRequestV4(r *http.Request) (gqlRequest *gql.Request) {
+func ctxGetGraphQLRequestProxyOnly(r *http.Request) (gqlRequest *gql.Request) {
 	if v := r.Context().Value(ctx.GraphQLRequest); v != nil {
 		if gqlRequest, ok := v.(*gql.Request); ok {
 			return gqlRequest
@@ -60,20 +60,10 @@ func (m *ProxyOnlyGraphQLMiddleware) Init() {
 		Logger:        log,
 		Schema:        schema,
 		ApiDefinition: m.Spec.APIDefinition,
-		HttpClient: &http.Client{
-			Transport: &http.Transport{TLSClientConfig: tlsClientConfig(m.Spec, nil)},
-		},
-		StreamingClient: &http.Client{
-			Timeout:   0,
-			Transport: &http.Transport{TLSClientConfig: tlsClientConfig(m.Spec, nil)},
-		},
-		OpenTelemetry: graphengine.ProxyOnlyEngineOTelConfig{
-			Enabled:        m.Gw.GetConfig().OpenTelemetry.Enabled,
-			TracerProvider: m.Gw.TracerProvider,
-		},
+		TLSConfig:     tlsClientConfig(m.Spec, nil),
 		Injections: graphengine.ProxyOnlyEngineInjections{
-			ContextRetrieveRequest: ctxGetGraphQLRequestV4,
-			ContextStoreRequest:    ctxSetGraphQLRequestV4,
+			ContextRetrieveRequest: ctxGetGraphQLRequestProxyOnly,
+			ContextStoreRequest:    ctxSetGraphQLRequestProxyOnly,
 			SeekReadCloser: func(readCloser io.ReadCloser) (io.ReadCloser, error) {
 				body, ok := readCloser.(*nopCloserBuffer)
 				if !ok {

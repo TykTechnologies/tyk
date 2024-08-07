@@ -2,60 +2,19 @@ package graphengine
 
 import (
 	"context"
-	"errors"
-	"github.com/TykTechnologies/tyk/apidef"
 	"net/http"
 
 	"github.com/TykTechnologies/tyk-gql/graphql"
 	"github.com/jensneuse/abstractlogger"
 )
 
-type ContextRetrieveRequestFunc func(r *http.Request) *graphql.Request
-type ContextStoreRequestFunc func(r *http.Request, gqlRequest *graphql.Request)
+type ProxyOnlyContextRetrieveRequestFunc func(r *http.Request) *graphql.Request
+type ProxyOnlyContextStoreRequestFunc func(r *http.Request, gqlRequest *graphql.Request)
 
 type proxyOnlyRequestProcessor struct {
 	logger             abstractlogger.Logger
 	schema             *graphql.Schema
-	ctxRetrieveRequest ContextRetrieveRequestFunc
-}
-
-type proxyOnlyReverseProxyPreHandler struct {
-	ctxRetrieveGraphQLRequest ContextRetrieveRequestFunc
-	apiDefinition             *apidef.APIDefinition
-	newReusableBodyReadCloser NewReusableBodyReadCloserFunc
-}
-
-func (r *proxyOnlyReverseProxyPreHandler) PreHandle(params ReverseProxyParams) (reverseProxyType ReverseProxyType, err error) {
-	switch {
-	case params.IsCORSPreflight:
-		return ReverseProxyTypePreFlight, nil
-	case params.IsWebSocketUpgrade:
-		if params.NeedsEngine {
-			return ReverseProxyTypeWebsocketUpgrade, nil
-		}
-	default:
-		gqlRequest := r.ctxRetrieveGraphQLRequest(params.OutRequest)
-		if gqlRequest == nil {
-			err = errors.New("graphql request is nil")
-			return
-		}
-		gqlRequest.SetHeader(params.OutRequest.Header)
-
-		var isIntrospection bool
-		isIntrospection, err = gqlRequest.IsIntrospectionQuery()
-		if err != nil {
-			return
-		}
-
-		if isIntrospection {
-			return ReverseProxyTypeIntrospection, nil
-		}
-		if params.NeedsEngine {
-			return ReverseProxyTypeGraphEngine, nil
-		}
-	}
-
-	return ReverseProxyTypeNone, nil
+	ctxRetrieveRequest ProxyOnlyContextRetrieveRequestFunc
 }
 
 func (t *proxyOnlyRequestProcessor) ProcessRequest(ctx context.Context, w http.ResponseWriter, r *http.Request) (error, int) {
