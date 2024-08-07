@@ -21,7 +21,7 @@ import (
 	"github.com/TykTechnologies/tyk/user"
 
 	gql "github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
-	gqlV2 "github.com/TykTechnologies/graphql-go-tools/v2/pkg/graphql"
+	gqlv2 "github.com/TykTechnologies/graphql-go-tools/v2/pkg/graphql"
 )
 
 var (
@@ -120,7 +120,7 @@ func (m *GraphQLMiddleware) Init() {
 			},
 		})
 	} else if m.Spec.GraphQL.Version == apidef.GraphQLConfigVersion3Preview {
-		v2Schema, err := gqlV2.NewSchemaFromString(m.Spec.GraphQL.Schema)
+		v2Schema, err := gqlv2.NewSchemaFromString(m.Spec.GraphQL.Schema)
 		if err != nil {
 			log.Errorf("Error while creating schema from API definition: %v", err)
 			return

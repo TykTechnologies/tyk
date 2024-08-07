@@ -5,7 +5,7 @@ import (
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/internal/event"
-	"github.com/TykTechnologies/tyk/internal/reflect"
+	internalreflect "github.com/TykTechnologies/tyk/internal/reflect"
 	"github.com/TykTechnologies/tyk/internal/time"
 )
 
@@ -36,12 +36,12 @@ type EventHandler struct {
 func (e EventHandler) MarshalJSON() ([]byte, error) {
 	type helperEventHandler EventHandler
 	helper := helperEventHandler(e)
-	outMap, err := reflect.Cast[map[string]interface{}](helper)
+	outMap, err := internalreflect.Cast[map[string]interface{}](helper)
 	if err != nil {
 		return nil, err
 	}
 
-	webhookMap, err := reflect.Cast[map[string]interface{}](helper.Webhook)
+	webhookMap, err := internalreflect.Cast[map[string]interface{}](helper.Webhook)
 	if err != nil {
 		return nil, err
 	}
@@ -189,7 +189,7 @@ func (e *EventHandlers) ExtractTo(api *apidef.APIDefinition) {
 		case WebhookKind:
 			handler = event.WebHookHandler
 			whConf := ev.GetWebhookConf()
-			handlerMeta, err = reflect.Cast[map[string]interface{}](whConf)
+			handlerMeta, err = internalreflect.Cast[map[string]interface{}](whConf)
 		default:
 			continue
 		}

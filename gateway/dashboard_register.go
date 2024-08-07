@@ -166,7 +166,7 @@ func (h *HTTPDashboardHandler) NotifyDashboardOfEvent(event interface{}) error {
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		err := fmt.Errorf("Unexpected status code while trying to notify dashboard of a key limit quota trigger.. Got %d", resp.StatusCode)
+		err := fmt.Errorf("unexpected status code while trying to notify dashboard of a key limit quota trigger.. Got %d", resp.StatusCode)
 		log.Error(err)
 		return err
 	}
@@ -319,11 +319,11 @@ func (h *HTTPDashboardHandler) DeRegister() error {
 	resp, err := c.Do(req)
 
 	if err != nil {
-		return fmt.Errorf("deregister request failed with error %v", err)
+		return fmt.Errorf("deregister request failed with error %w", err)
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("deregister request failed with status %v", resp.StatusCode)
+		return fmt.Errorf("deregister request failed with status %d", resp.StatusCode)
 	}
 
 	val := NodeResponseOK{}

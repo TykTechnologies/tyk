@@ -116,7 +116,7 @@ func TestRedisClusterGetMultiKey(t *testing.T) {
 	r.DeleteAllKeys()
 
 	_, err := r.GetMultiKey(keys)
-	if err != ErrKeyNotFound {
+	if !errors.Is(err, ErrKeyNotFound) {
 		t.Errorf("expected %v got %v", ErrKeyNotFound, err)
 	}
 	err = r.SetKey(keys[0], keys[0], 0)

@@ -7,15 +7,15 @@ import (
 	"github.com/jensneuse/abstractlogger"
 	"github.com/sirupsen/logrus"
 
-	"github.com/TykTechnologies/graphql-go-tools/v2/pkg/graphql"
+	graphqlv2 "github.com/TykTechnologies/graphql-go-tools/v2/pkg/graphql"
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/apidef/adapter"
 	graphqlinternal "github.com/TykTechnologies/tyk/internal/graphql"
 )
 
 type EngineV3 struct {
-	engine        *graphql.ExecutionEngineV2
-	schema        *graphql.Schema
+	engine        *graphqlv2.ExecutionEngineV2
+	schema        *graphqlv2.Schema
 	logger        abstractlogger.Logger
 	openTelemetry *EngineV2OTelConfig
 	apiDefinition *apidef.APIDefinition
@@ -35,7 +35,7 @@ type EngineV3 struct {
 }
 
 type EngineV3Injections struct {
-	WebsocketOnBeforeStart    graphql.WebsocketBeforeStartHook
+	WebsocketOnBeforeStart    graphqlv2.WebsocketBeforeStartHook
 	ContextStoreRequest       ContextStoreRequestV2Func
 	ContextRetrieveRequest    ContextRetrieveRequestV2Func
 	NewReusableBodyReadCloser NewReusableBodyReadCloserFunc
@@ -45,7 +45,7 @@ type EngineV3Injections struct {
 
 type EngineV3Options struct {
 	Logger          *logrus.Logger
-	Schema          *graphql.Schema
+	Schema          *graphqlv2.Schema
 	ApiDefinition   *apidef.APIDefinition
 	HttpClient      *http.Client
 	StreamingClient *http.Client
@@ -82,7 +82,7 @@ func NewEngineV3(options EngineV3Options) (*EngineV3, error) {
 	engineConfig.SetWebsocketBeforeStartHook(options.Injections.WebsocketOnBeforeStart)
 	specCtx, cancel := context.WithCancel(context.Background())
 
-	executionEngine, err := graphql.NewExecutionEngineV2(specCtx, logger, *engineConfig)
+	executionEngine, err := graphqlv2.NewExecutionEngineV2(specCtx, logger, *engineConfig)
 	if err != nil {
 		options.Logger.WithError(err).Error("could not create execution engine v2")
 		cancel()
@@ -180,8 +180,8 @@ func (e *EngineV3) Cancel() {
 }
 
 func (e *EngineV3) ProcessAndStoreGraphQLRequest(w http.ResponseWriter, r *http.Request) (err error, statusCode int) {
-	var gqlRequest graphql.Request
-	err = graphql.UnmarshalRequest(r.Body, &gqlRequest)
+	var gqlRequest graphqlv2.Request
+	err = graphqlv2.UnmarshalRequest(r.Body, &gqlRequest)
 	if err != nil {
 		e.logger.Debug("error while unmarshalling GraphQL request", abstractlogger.Error(err))
 		return err, http.StatusBadRequest

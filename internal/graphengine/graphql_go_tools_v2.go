@@ -13,21 +13,21 @@ import (
 	"github.com/buger/jsonparser"
 
 	"github.com/TykTechnologies/graphql-go-tools/v2/pkg/astparser"
-	"github.com/TykTechnologies/graphql-go-tools/v2/pkg/engine/postprocess"
-	"github.com/TykTechnologies/graphql-go-tools/v2/pkg/graphql"
+	postprocessv2 "github.com/TykTechnologies/graphql-go-tools/v2/pkg/engine/postprocess"
+	graphqlv2 "github.com/TykTechnologies/graphql-go-tools/v2/pkg/graphql"
 	"github.com/TykTechnologies/graphql-go-tools/v2/pkg/introspection"
 	"github.com/TykTechnologies/graphql-go-tools/v2/pkg/operationreport"
 
 	"github.com/TykTechnologies/tyk/apidef"
 )
 
-type ContextRetrieveRequestV2Func func(r *http.Request) *graphql.Request
-type ContextStoreRequestV2Func func(r *http.Request, gqlRequest *graphql.Request)
+type ContextRetrieveRequestV2Func func(r *http.Request) *graphqlv2.Request
+type ContextStoreRequestV2Func func(r *http.Request, gqlRequest *graphqlv2.Request)
 
 type graphqlGoToolsV2 struct{}
 
-func (g graphqlGoToolsV2) parseSchema(schema string) (*graphql.Schema, error) {
-	parsed, err := graphql.NewSchemaFromString(schema)
+func (g graphqlGoToolsV2) parseSchema(schema string) (*graphqlv2.Schema, error) {
+	parsed, err := graphqlv2.NewSchemaFromString(schema)
 	if err != nil {
 		return nil, err
 	}
@@ -44,7 +44,7 @@ func (g graphqlGoToolsV2) parseSchema(schema string) (*graphql.Schema, error) {
 	return parsed, nil
 }
 
-func (g graphqlGoToolsV2) handleIntrospection(schema *graphql.Schema) (res *http.Response, hijacked bool, err error) {
+func (g graphqlGoToolsV2) handleIntrospection(schema *graphqlv2.Schema) (res *http.Response, hijacked bool, err error) {
 	var (
 		introspectionData = struct {
 			Data introspection.Data `json:"data"`
@@ -74,7 +74,7 @@ func (g graphqlGoToolsV2) handleIntrospection(schema *graphql.Schema) (res *http
 	return
 }
 
-func (g graphqlGoToolsV2) headerModifier(outreq *http.Request, additionalHeaders http.Header, variableReplacer TykVariableReplacer) postprocess.HeaderModifier {
+func (g graphqlGoToolsV2) headerModifier(outreq *http.Request, additionalHeaders http.Header, variableReplacer TykVariableReplacer) postprocessv2.HeaderModifier {
 	return func(header http.Header) {
 		for key := range additionalHeaders {
 			if header.Get(key) == "" {
@@ -89,7 +89,7 @@ func (g graphqlGoToolsV2) headerModifier(outreq *http.Request, additionalHeaders
 	}
 }
 
-func (g graphqlGoToolsV2) returnErrorsFromUpstream(proxyOnlyCtx *GraphQLProxyOnlyContextValues, resultWriter *graphql.EngineResultWriter, seekReadCloser SeekReadCloserFunc) error {
+func (g graphqlGoToolsV2) returnErrorsFromUpstream(proxyOnlyCtx *GraphQLProxyOnlyContextValues, resultWriter *graphqlv2.EngineResultWriter, seekReadCloser SeekReadCloserFunc) error {
 	body, err := seekReadCloser(proxyOnlyCtx.upstreamResponse.Body)
 	if body == nil {
 		// Response body already read by graphql-go-tools, and it's not re-readable. Quit silently.
@@ -161,7 +161,7 @@ func (r *reverseProxyPreHandlerV2) PreHandle(params ReverseProxyParams) (reverse
 }
 
 type complexityCheckerV2 struct {
-	schema             *graphql.Schema
+	schema             *graphqlv2.Schema
 	logger             abstractlogger.Logger
 	ctxRetrieveRequest ContextRetrieveRequestV2Func
 }
@@ -186,7 +186,7 @@ func (c *complexityCheckerV2) DepthLimitExceeded(r *http.Request, accessDefiniti
 		return ComplexityFailReasonNone
 	}
 
-	complexityRes, err := gqlRequest.CalculateComplexity(graphql.DefaultComplexityCalculator, c.schema)
+	complexityRes, err := gqlRequest.CalculateComplexity(graphqlv2.DefaultComplexityCalculator, c.schema)
 	if err != nil {
 		c.logger.Error("error while calculating complexity of GraphQL request", abstractlogger.Error(err))
 		return ComplexityFailReasonInternalError
@@ -272,7 +272,7 @@ func (c *complexityCheckerV2) depthLimitEnabled(accessDefinition *ComplexityAcce
 
 type granularAccessCheckerV2 struct {
 	logger                    abstractlogger.Logger
-	schema                    *graphql.Schema
+	schema                    *graphqlv2.Schema
 	ctxRetrieveGraphQLRequest ContextRetrieveRequestV2Func
 }
 
@@ -305,16 +305,16 @@ func (g *granularAccessCheckerV2) CheckGraphQLRequestFieldAllowance(w http.Respo
 	}
 
 	if len(accessDefinition.AllowedTypes) != 0 {
-		fieldRestrictionList := graphql.FieldRestrictionList{
-			Kind:  graphql.AllowList,
+		fieldRestrictionList := graphqlv2.FieldRestrictionList{
+			Kind:  graphqlv2.AllowList,
 			Types: g.convertGranularAccessTypeToGraphQLType(accessDefinition.AllowedTypes),
 		}
 		return g.validateFieldRestrictions(gqlRequest, fieldRestrictionList, g.schema)
 	}
 
 	if len(accessDefinition.RestrictedTypes) != 0 {
-		fieldRestrictionList := graphql.FieldRestrictionList{
-			Kind:  graphql.BlockList,
+		fieldRestrictionList := graphqlv2.FieldRestrictionList{
+			Kind:  graphqlv2.BlockList,
 			Types: g.convertGranularAccessTypeToGraphQLType(accessDefinition.RestrictedTypes),
 		}
 		return g.validateFieldRestrictions(gqlRequest, fieldRestrictionList, g.schema)
@@ -324,10 +324,10 @@ func (g *granularAccessCheckerV2) CheckGraphQLRequestFieldAllowance(w http.Respo
 	return GraphQLGranularAccessResult{FailReason: GranularAccessFailReasonNone}
 }
 
-func (g *granularAccessCheckerV2) convertGranularAccessTypeToGraphQLType(accessTypes []GranularAccessType) []graphql.Type {
-	var types []graphql.Type
+func (g *granularAccessCheckerV2) convertGranularAccessTypeToGraphQLType(accessTypes []GranularAccessType) []graphqlv2.Type {
+	var types []graphqlv2.Type
 	for _, accessType := range accessTypes {
-		types = append(types, graphql.Type{
+		types = append(types, graphqlv2.Type{
 			Name:   accessType.Name,
 			Fields: accessType.Fields,
 		})
@@ -335,8 +335,8 @@ func (g *granularAccessCheckerV2) convertGranularAccessTypeToGraphQLType(accessT
 	return types
 }
 
-func (g *granularAccessCheckerV2) validateFieldRestrictions(gqlRequest *graphql.Request, fieldRestrictionList graphql.FieldRestrictionList, schema *graphql.Schema) GraphQLGranularAccessResult {
-	result, err := gqlRequest.ValidateFieldRestrictions(schema, fieldRestrictionList, graphql.DefaultFieldsValidator{})
+func (g *granularAccessCheckerV2) validateFieldRestrictions(gqlRequest *graphqlv2.Request, fieldRestrictionList graphqlv2.FieldRestrictionList, schema *graphqlv2.Schema) GraphQLGranularAccessResult {
+	result, err := gqlRequest.ValidateFieldRestrictions(schema, fieldRestrictionList, graphqlv2.DefaultFieldsValidator{})
 	if err != nil {
 		return GraphQLGranularAccessResult{FailReason: GranularAccessFailReasonInternalError, InternalErr: err}
 	}
@@ -348,5 +348,5 @@ func (g *granularAccessCheckerV2) validateFieldRestrictions(gqlRequest *graphql.
 }
 
 func (g *granularAccessCheckerV2) writeErrorResponse(w io.Writer, providedErr error) (n int, err error) {
-	return graphql.RequestErrorsFromError(providedErr).WriteResponse(w)
+	return graphqlv2.RequestErrorsFromError(providedErr).WriteResponse(w)
 }

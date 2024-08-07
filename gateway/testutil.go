@@ -12,7 +12,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	mathRand "math/rand"
+	mathrand "math/rand"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -237,6 +237,9 @@ func (r *ReloadMachinery) TickOk(t *testing.T) {
 
 func InitTestMain(ctx context.Context, m *testing.M) int {
 	test.InitTestMain(ctx, m)
+
+	bundleBackoffMultiplier = 0
+	bundleMaxBackoffRetries = 0
 
 	if EnableTestDNSMock {
 		var errMock error
@@ -1124,7 +1127,7 @@ func (s *Test) newGateway(genConf func(globalConf *config.Config)) *Gateway {
 	s.MockHandle = MockHandle
 
 	var err error
-	gwConfig.Storage.Database = mathRand.Intn(15)
+	gwConfig.Storage.Database = mathrand.Intn(15)
 	gwConfig.AppPath, err = ioutil.TempDir("", "tyk-test-")
 
 	if err != nil {
@@ -1307,9 +1310,20 @@ func (s *Test) Close() {
 // RemoveApis clean all the apis from a living gw
 func (s *Test) RemoveApis() error {
 	s.Gw.apisMu.Lock()
-	defer s.Gw.apisMu.Unlock()
-	s.Gw.apiSpecs = []*APISpec{}
-	s.Gw.apisByID = map[string]*APISpec{}
+	defer func() {
+		s.Gw.apiSpecs = []*APISpec{}
+		s.Gw.apisByID = map[string]*APISpec{}
+		s.Gw.apisMu.Unlock()
+	}()
+
+	// clear bundle caches
+	for _, spec := range s.Gw.apiSpecs {
+		destPath := s.Gw.getBundleDestPath(spec)
+		if _, err := os.Stat(destPath); err == nil {
+			err = os.RemoveAll(destPath)
+			log.WithError(err).Infof("Clearing bundle cache: %s", destPath)
+		}
+	}
 
 	err := os.RemoveAll(s.Gw.GetConfig().AppPath)
 	if err != nil {
@@ -1936,7 +1950,7 @@ func GenerateTestBinaryData() (buf *bytes.Buffer) {
 		c uint32
 	}
 	for i := 0; i < 10; i++ {
-		s := &testData{mathRand.Float32(), mathRand.Float64(), mathRand.Uint32()}
+		s := &testData{mathrand.Float32(), mathrand.Float64(), mathrand.Uint32()}
 		binary.Write(buf, binary.BigEndian, s)
 	}
 	return buf
@@ -1991,7 +2005,7 @@ func randStringBytes(n int) string {
 	b := make([]byte, n)
 
 	for i := range b {
-		b[i] = letters[mathRand.Intn(len(letters))]
+		b[i] = letters[mathrand.Intn(len(letters))]
 	}
 
 	return string(b)

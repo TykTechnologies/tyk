@@ -3,7 +3,7 @@ package oas
 import (
 	"encoding/json"
 
-	"github.com/TykTechnologies/tyk/internal/reflect"
+	internalreflect "github.com/TykTechnologies/tyk/internal/reflect"
 )
 
 func toStructIfMap(input interface{}, val interface{}) bool {
@@ -26,4 +26,4 @@ func toStructIfMap(input interface{}, val interface{}) bool {
 }
 
 // ShouldOmit is a compatibility alias. It may be removed in the future.
-var ShouldOmit = reflect.IsEmpty
+var ShouldOmit = internalreflect.IsEmpty

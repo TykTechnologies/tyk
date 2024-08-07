@@ -5,8 +5,8 @@ import (
 	"errors"
 	"net/http"
 
-	graphqlDataSource "github.com/TykTechnologies/graphql-go-tools/pkg/engine/datasource/graphql_datasource"
-	restDataSource "github.com/TykTechnologies/graphql-go-tools/pkg/engine/datasource/rest_datasource"
+	graphqldatasource "github.com/TykTechnologies/graphql-go-tools/pkg/engine/datasource/graphql_datasource"
+	restdatasource "github.com/TykTechnologies/graphql-go-tools/pkg/engine/datasource/rest_datasource"
 	"github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
 
 	"github.com/TykTechnologies/tyk/apidef"
@@ -35,9 +35,9 @@ func parseSchema(schemaAsString string) (parsedSchema *graphql.Schema, err error
 }
 
 func graphqlDataSourceWebSocketProtocol(subscriptionType apidef.SubscriptionType) string {
-	wsProtocol := graphqlDataSource.ProtocolGraphQLWS
+	wsProtocol := graphqldatasource.ProtocolGraphQLWS
 	if subscriptionType == apidef.GQLSubscriptionTransportWS {
-		wsProtocol = graphqlDataSource.ProtocolGraphQLTWS
+		wsProtocol = graphqldatasource.ProtocolGraphQLTWS
 	}
 	return wsProtocol
 }
@@ -96,8 +96,8 @@ func generateRestDataSourceFromGraphql(config apidef.GraphQLEngineDataSourceConf
 	if err != nil {
 		return nil, err
 	}
-	customMessage := restDataSource.ConfigJSON(restDataSource.Configuration{
-		Fetch: restDataSource.FetchConfiguration{
+	customMessage := restdatasource.ConfigJSON(restdatasource.Configuration{
+		Fetch: restdatasource.FetchConfiguration{
 			URL:    config.URL,
 			Method: config.Method,
 			Body:   body,
