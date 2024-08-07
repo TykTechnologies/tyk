@@ -12,7 +12,7 @@ import (
 
 	"github.com/sirupsen/logrus"
 
-	redisCluster "github.com/TykTechnologies/tyk/storage/redis-cluster"
+	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/user"
 )
 
@@ -33,7 +33,16 @@ func (gw *Gateway) LoadDefinitionsFromRPCBackup() ([]*APISpec, error) {
 	tagList := getTagListAsString(gw.GetConfig().DBAppConfOptions.Tags)
 	checkKey := BackupApiKeyBase + tagList
 
-	store := redisCluster.RedisCluster{KeyPrefix: RPCKeyPrefix, ConnectionHandler: gw.StorageConnectionHandler}
+	store, err := storage.NewStorageHandler(
+		storage.REDIS_CLUSTER,
+		storage.WithConnectionHandler(gw.StorageConnectionHandler),
+		storage.WithKeyPrefix(RPCKeyPrefix),
+	)
+
+	if err != nil {
+		return nil, errors.New("[RPC] --> RPC Backup recovery failed: " + err.Error())
+	}
+
 	connected := store.Connect()
 	log.Info("[RPC] --> Loading API definitions from backup")
 
@@ -63,7 +72,16 @@ func (gw *Gateway) saveRPCDefinitionsBackup(list string) error {
 
 	log.Info("--> Connecting to DB")
 
-	store := redisCluster.RedisCluster{KeyPrefix: RPCKeyPrefix, ConnectionHandler: gw.StorageConnectionHandler}
+	store, err := storage.NewStorageHandler(
+		storage.REDIS_CLUSTER,
+		storage.WithConnectionHandler(gw.StorageConnectionHandler),
+		storage.WithKeyPrefix(RPCKeyPrefix),
+	)
+
+	if err != nil {
+		return errors.New("--> RPC Backup save failed: " + err.Error())
+	}
+
 	connected := store.Connect()
 
 	log.Info("--> Connected to DB")
@@ -74,7 +92,7 @@ func (gw *Gateway) saveRPCDefinitionsBackup(list string) error {
 
 	secret := rightPad2Len(gw.GetConfig().Secret, "=", 32)
 	cryptoText := encrypt([]byte(secret), list)
-	err := store.SetKey(BackupApiKeyBase+tagList, cryptoText, -1)
+	err = store.SetKey(BackupApiKeyBase+tagList, cryptoText, -1)
 	if err != nil {
 		return errors.New("Failed to store node backup: " + err.Error())
 	}
@@ -86,7 +104,15 @@ func (gw *Gateway) LoadPoliciesFromRPCBackup() (map[string]user.Policy, error) {
 	tagList := getTagListAsString(gw.GetConfig().DBAppConfOptions.Tags)
 	checkKey := BackupPolicyKeyBase + tagList
 
-	store := redisCluster.RedisCluster{KeyPrefix: RPCKeyPrefix, ConnectionHandler: gw.StorageConnectionHandler}
+	store, err := storage.NewStorageHandler(
+		storage.REDIS_CLUSTER,
+		storage.WithConnectionHandler(gw.StorageConnectionHandler),
+		storage.WithKeyPrefix(RPCKeyPrefix),
+	)
+
+	if err != nil {
+		return nil, errors.New("[RPC] --> RPC Policy Backup recovery failed: " + err.Error())
+	}
 
 	connected := store.Connect()
 	log.Info("[RPC] Loading Policies from backup")
@@ -123,9 +149,17 @@ func (gw *Gateway) saveRPCPoliciesBackup(list string) error {
 
 	log.Info("--> Connecting to DB")
 
-	store := redisCluster.RedisCluster{KeyPrefix: RPCKeyPrefix, ConnectionHandler: gw.StorageConnectionHandler}
-	connected := store.Connect()
+	store, err := storage.NewStorageHandler(
+		storage.REDIS_CLUSTER,
+		storage.WithKeyPrefix(RPCKeyPrefix),
+		storage.WithConnectionHandler(gw.StorageConnectionHandler),
+	)
 
+	if err != nil {
+		return errors.New("--> RPC Backup save failed: " + err.Error())
+	}
+
+	connected := store.Connect()
 	log.Info("--> Connected to DB")
 
 	if !connected {
@@ -134,7 +168,7 @@ func (gw *Gateway) saveRPCPoliciesBackup(list string) error {
 
 	secret := rightPad2Len(gw.GetConfig().Secret, "=", 32)
 	cryptoText := encrypt([]byte(secret), list)
-	err := store.SetKey(BackupPolicyKeyBase+tagList, cryptoText, -1)
+	err = store.SetKey(BackupPolicyKeyBase+tagList, cryptoText, -1)
 	if err != nil {
 		return errors.New("Failed to store node backup: " + err.Error())
 	}

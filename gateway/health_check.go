@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/TykTechnologies/tyk/rpc"
-	redisCluster "github.com/TykTechnologies/tyk/storage/redis-cluster"
+	"github.com/TykTechnologies/tyk/storage"
 
 	"github.com/sirupsen/logrus"
 
@@ -65,7 +65,15 @@ type SafeHealthCheck struct {
 func (gw *Gateway) gatherHealthChecks() {
 	allInfos := SafeHealthCheck{info: make(map[string]apidef.HealthCheckItem, 3)}
 
-	redisStore := redisCluster.RedisCluster{KeyPrefix: "livenesscheck-", ConnectionHandler: gw.StorageConnectionHandler}
+	store, err := storage.NewStorageHandler(
+		storage.REDIS_CLUSTER,
+		storage.WithKeyPrefix("livenesscheck-"),
+		storage.WithConnectionHandler(gw.StorageConnectionHandler))
+
+	if err != nil {
+		mainLog.WithField("liveness-check", true).WithError(err).Error("Could not create storage handler")
+		return
+	}
 
 	key := "tyk-liveness-probe"
 
@@ -81,7 +89,7 @@ func (gw *Gateway) gatherHealthChecks() {
 			Time:          time.Now().Format(time.RFC3339),
 		}
 
-		err := redisStore.SetRawKey(key, key, 10)
+		err := store.SetRawKey(key, key, 10)
 		if err != nil {
 			mainLog.WithField("liveness-check", true).WithError(err).Error("Redis health check failed")
 			checkItem.Output = err.Error()

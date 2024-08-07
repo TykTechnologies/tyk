@@ -30,6 +30,7 @@ import (
 	"github.com/TykTechnologies/tyk/internal/httputil"
 	"github.com/TykTechnologies/tyk/internal/otel"
 	"github.com/TykTechnologies/tyk/internal/scheduler"
+	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/test"
 
 	logstashhook "github.com/bshuster-repo/logrus-logstash-hook"
@@ -347,18 +348,44 @@ func (gw *Gateway) setupGlobals() {
 			mainLog.Warn("Running Uptime checks in a management node.")
 		}
 
-		healthCheckStore := redisCluster.RedisCluster{KeyPrefix: "host-checker:", IsAnalytics: true, ConnectionHandler: gw.StorageConnectionHandler}
-		gw.InitHostCheckManager(gw.ctx, &healthCheckStore)
+		healthCheckStore, err := storage.NewStorageHandler(
+			storage.REDIS_CLUSTER,
+			storage.WithKeyPrefix("host-checker:"),
+			storage.WithConnectionHandler(gw.StorageConnectionHandler),
+			storage.IsAnalytics(true),
+		)
+		if err != nil {
+			mainLog.WithError(err).Error("Could not create storage handler")
+		}
+
+		gw.InitHostCheckManager(gw.ctx, healthCheckStore)
 	}
 
 	gw.initHealthCheck(gw.ctx)
 
-	redisStore := redisCluster.RedisCluster{KeyPrefix: "apikey-", HashKeys: gwConfig.HashKeys, ConnectionHandler: gw.StorageConnectionHandler}
-	gw.GlobalSessionManager.Init(&redisStore)
+	redisStore, err := storage.NewStorageHandler(
+		storage.REDIS_CLUSTER,
+		storage.WithKeyPrefix("apikey-"),
+		storage.WithConnectionHandler(gw.StorageConnectionHandler),
+		storage.WithHashKeys(gwConfig.HashKeys),
+	)
+	if err != nil {
+		mainLog.WithError(err).Error("Could not create storage handler")
+	}
 
-	versionStore := redisCluster.RedisCluster{KeyPrefix: "version-check-", ConnectionHandler: gw.StorageConnectionHandler}
+	gw.GlobalSessionManager.Init(redisStore)
+
+	versionStore, err := storage.NewStorageHandler(
+		storage.REDIS_CLUSTER,
+		storage.WithKeyPrefix("version-check-"),
+		storage.WithConnectionHandler(gw.StorageConnectionHandler),
+	)
+	if err != nil {
+		mainLog.WithError(err).Error("Could not create storage handler")
+	}
+
 	versionStore.Connect()
-	err := versionStore.SetKey("gateway", VERSION, 0)
+	err = versionStore.SetKey("gateway", VERSION, 0)
 
 	if err != nil {
 		mainLog.WithError(err).Error("Could not set version in versionStore")
@@ -370,6 +397,7 @@ func (gw *Gateway) setupGlobals() {
 		gw.SetConfig(Conf)
 		mainLog.Debug("Setting up analytics DB connection")
 
+		// TODO: Needs a new interface constructor
 		analyticsStore := redisCluster.RedisCluster{KeyPrefix: "analytics-", IsAnalytics: true, ConnectionHandler: gw.StorageConnectionHandler}
 		gw.Analytics.Store = &analyticsStore
 		gw.Analytics.Init()
@@ -428,7 +456,16 @@ func (gw *Gateway) setupGlobals() {
 		certificateSecret = gw.GetConfig().Security.PrivateCertificateEncodingSecret
 	}
 
-	storeCert := &redisCluster.RedisCluster{KeyPrefix: "cert-", HashKeys: false, ConnectionHandler: gw.StorageConnectionHandler}
+	storeCert, err := storage.NewStorageHandler(
+		storage.REDIS_CLUSTER,
+		storage.WithConnectionHandler(gw.StorageConnectionHandler),
+		storage.WithKeyPrefix("cert-"),
+		storage.WithHashKeys(false),
+	)
+	if err != nil {
+		mainLog.WithError(err).Error("Could not create storage handler")
+	}
+
 	gw.CertificateManager = certs.NewCertificateManager(storeCert, certificateSecret, log, !gw.GetConfig().Cloud)
 	if gw.GetConfig().SlaveOptions.UseRPC {
 		rpcStore := &RPCStorageHandler{
@@ -749,10 +786,22 @@ func (gw *Gateway) addOAuthHandlers(spec *APISpec, muxer *mux.Router) *OAuthMana
 	prefix := generateOAuthPrefix(spec.APIID)
 	storageManager := gw.getGlobalMDCBStorageHandler(prefix, false)
 	storageManager.Connect()
+
+	store, err := storage.NewStorageHandler(
+		storage.REDIS_CLUSTER,
+		storage.WithKeyPrefix(prefix),
+		storage.WithConnectionHandler(gw.StorageConnectionHandler),
+		storage.WithHashKeys(false),
+	)
+
+	if err != nil {
+		mainLog.WithError(err).Error("Could not create storage handler")
+	}
+
 	osinStorage := &RedisOsinStorageInterface{
 		storageManager,
 		gw.GlobalSessionManager,
-		&redisCluster.RedisCluster{KeyPrefix: prefix, HashKeys: false, ConnectionHandler: gw.StorageConnectionHandler},
+		store,
 		spec.OrgID,
 		gw,
 	}
@@ -944,7 +993,16 @@ func (gw *Gateway) createResponseMiddlewareChain(spec *APISpec, responseFuncs []
 	}
 
 	keyPrefix := "cache-" + spec.APIID
-	cacheStore := &redisCluster.RedisCluster{KeyPrefix: keyPrefix, IsCache: true, ConnectionHandler: gw.StorageConnectionHandler}
+	cacheStore, err := storage.NewStorageHandler(
+		storage.REDIS_CLUSTER,
+		storage.WithKeyPrefix(keyPrefix),
+		storage.WithConnectionHandler(gw.StorageConnectionHandler),
+		storage.IsCache(true),
+	)
+
+	if err != nil {
+		mainLog.WithError(err).Error("Could not create storage handler")
+	}
 	cacheStore.Connect()
 
 	// Add cache writer as the final step of the response middleware chain
@@ -1567,7 +1625,15 @@ func (gw *Gateway) getHostDetails(file string) {
 }
 
 func (gw *Gateway) getGlobalMDCBStorageHandler(keyPrefix string, hashKeys bool) interfaces.Handler {
-	localStorage := &redisCluster.RedisCluster{KeyPrefix: keyPrefix, HashKeys: hashKeys, ConnectionHandler: gw.StorageConnectionHandler}
+	localStorage, err := storage.NewStorageHandler(storage.REDIS_CLUSTER,
+		storage.WithKeyPrefix(keyPrefix),
+		storage.WithHashKeys(hashKeys),
+		storage.WithConnectionHandler(gw.StorageConnectionHandler))
+
+	if err != nil {
+		mainLog.Fatalf("Error creating storage handler: %v", err)
+	}
+
 	logger := logrus.New().WithFields(logrus.Fields{"prefix": "mdcb-storage-handler"})
 
 	if gw.GetConfig().SlaveOptions.UseRPC {
@@ -1592,7 +1658,18 @@ func (gw *Gateway) getGlobalStorageHandler(keyPrefix string, hashKeys bool) inte
 			Gw:        gw,
 		}
 	}
-	return &redisCluster.RedisCluster{KeyPrefix: keyPrefix, HashKeys: hashKeys, ConnectionHandler: gw.StorageConnectionHandler}
+
+	handler, err := storage.NewStorageHandler(storage.REDIS_CLUSTER,
+		storage.WithKeyPrefix(keyPrefix),
+		storage.WithHashKeys(hashKeys),
+		storage.WithConnectionHandler(gw.StorageConnectionHandler))
+
+	if err != nil {
+		mainLog.Fatalf("Error creating storage handler: %v", err)
+	}
+
+	return handler
+
 }
 
 func Start() {

@@ -4,12 +4,14 @@ import (
 	"errors"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/interfaces"
+	"github.com/TykTechnologies/tyk/storage"
 	redisCluster "github.com/TykTechnologies/tyk/storage/redis-cluster"
 	"github.com/TykTechnologies/tyk/storage/shared"
 )
 
 type SyncronizerForcer struct {
-	store           *redisCluster.RedisCluster
+	store           interfaces.Handler
 	getNodeDataFunc func() []byte
 }
 
@@ -17,7 +19,18 @@ type SyncronizerForcer struct {
 func NewSyncForcer(controller *redisCluster.ConnectionHandler, getNodeDataFunc func() []byte) *SyncronizerForcer {
 	sf := &SyncronizerForcer{}
 	sf.getNodeDataFunc = getNodeDataFunc
-	sf.store = &redisCluster.RedisCluster{KeyPrefix: "synchronizer-group-", ConnectionHandler: controller}
+	store, err := storage.NewStorageHandler(
+		storage.REDIS_CLUSTER,
+		storage.WithConnectionHandler(controller),
+		storage.WithKeyPrefix("synchronizer-group-"),
+	)
+
+	if err != nil {
+		Log.Error("could not create storage handler")
+		return nil
+	}
+
+	sf.store = store
 	sf.store.Connect()
 
 	return sf

@@ -17,7 +17,7 @@ import (
 
 	"github.com/TykTechnologies/tyk/interfaces"
 	"github.com/TykTechnologies/tyk/rpc"
-	redisCluster "github.com/TykTechnologies/tyk/storage/redis-cluster"
+	"github.com/TykTechnologies/tyk/storage"
 
 	"github.com/gorilla/mux"
 	"github.com/justinas/alice"
@@ -43,9 +43,38 @@ type ChainObject struct {
 
 func (gw *Gateway) prepareStorage() generalStores {
 	var gs generalStores
-	gs.redisStore = &redisCluster.RedisCluster{KeyPrefix: "apikey-", HashKeys: gw.GetConfig().HashKeys, ConnectionHandler: gw.StorageConnectionHandler}
-	gs.redisOrgStore = &redisCluster.RedisCluster{KeyPrefix: "orgkey.", ConnectionHandler: gw.StorageConnectionHandler}
-	gs.healthStore = &redisCluster.RedisCluster{KeyPrefix: "apihealth.", ConnectionHandler: gw.StorageConnectionHandler}
+	var err error
+	gs.redisStore, err = storage.NewStorageHandler(storage.REDIS_CLUSTER,
+		storage.WithKeyPrefix("apikey-"),
+		storage.WithHashKeys(gw.GetConfig().HashKeys),
+		storage.WithConnectionHandler(gw.StorageConnectionHandler),
+	)
+
+	if err != nil {
+		log.WithError(err).Fatal("Failed to create redis storage handler")
+	}
+
+	gs.redisOrgStore, err = storage.NewStorageHandler(storage.REDIS_CLUSTER,
+		storage.WithKeyPrefix("orgkey."),
+		storage.WithHashKeys(gw.GetConfig().HashKeys),
+		storage.WithConnectionHandler(gw.StorageConnectionHandler),
+	)
+
+	if err != nil {
+		log.WithError(err).Fatal("Failed to create redis storage handler")
+	}
+
+	gs.healthStore, err = storage.NewStorageHandler(storage.REDIS_CLUSTER,
+		storage.WithKeyPrefix("apihealth."),
+		storage.WithHashKeys(gw.GetConfig().HashKeys),
+		storage.WithConnectionHandler(gw.StorageConnectionHandler),
+	)
+
+	if err != nil {
+		log.WithError(err).Fatal("Failed to create redis storage handler")
+	}
+
+	gs.rpcAuthStore = &RPCStorageHandler{KeyPrefix: "apikey-", HashKeys: gw.GetConfig().HashKeys, Gw: gw}
 	gs.rpcAuthStore = &RPCStorageHandler{KeyPrefix: "apikey-", HashKeys: gw.GetConfig().HashKeys, Gw: gw}
 	gs.rpcOrgStore = gw.getGlobalMDCBStorageHandler("orgkey.", false)
 
@@ -288,7 +317,16 @@ func (gw *Gateway) processSpec(spec *APISpec, apisByListen map[string]int,
 	}
 
 	keyPrefix := "cache-" + spec.APIID
-	cacheStore := redisCluster.RedisCluster{KeyPrefix: keyPrefix, IsCache: true, ConnectionHandler: gw.StorageConnectionHandler}
+	cacheStore, err := storage.NewStorageHandler(storage.REDIS_CLUSTER,
+		storage.WithKeyPrefix(keyPrefix),
+		storage.WithConnectionHandler(gw.StorageConnectionHandler),
+		storage.IsCache(true),
+	)
+
+	if err != nil {
+		logger.WithError(err).Error("Failed to create redis storage handler")
+	}
+
 	cacheStore.Connect()
 
 	var chain http.Handler
@@ -442,7 +480,7 @@ func (gw *Gateway) processSpec(spec *APISpec, apisByListen map[string]int,
 	gw.mwAppendEnabled(&chainArray, &TransformMethod{BaseMiddleware: baseMid})
 
 	// Earliest we can respond with cache get 200 ok
-	gw.mwAppendEnabled(&chainArray, &RedisCacheMiddleware{BaseMiddleware: baseMid, store: &cacheStore})
+	gw.mwAppendEnabled(&chainArray, &RedisCacheMiddleware{BaseMiddleware: baseMid, store: cacheStore})
 
 	gw.mwAppendEnabled(&chainArray, &VirtualEndpoint{BaseMiddleware: baseMid})
 	gw.mwAppendEnabled(&chainArray, &RequestSigning{BaseMiddleware: baseMid})

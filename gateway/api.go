@@ -48,7 +48,7 @@ import (
 	"github.com/getkin/kin-openapi/openapi3"
 
 	"github.com/TykTechnologies/tyk/config"
-	redisCluster "github.com/TykTechnologies/tyk/storage/redis-cluster"
+	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/storage/util"
 
 	"github.com/TykTechnologies/tyk/internal/otel"
@@ -2236,13 +2236,29 @@ func (gw *Gateway) createOauthClient(w http.ResponseWriter, r *http.Request) {
 					storageManager := gw.getGlobalMDCBStorageHandler(prefix, false)
 					storageManager.Connect()
 
+					store, err := storage.NewStorageHandler(storage.REDIS_CLUSTER,
+						storage.WithKeyPrefix(prefix),
+						storage.WithHashKeys(false),
+						storage.WithConnectionHandler(gw.StorageConnectionHandler))
+
+					if err != nil {
+						log.WithFields(logrus.Fields{
+							"prefix": "api",
+							"apiID":  apiID,
+							"status": "fail",
+							"err":    err,
+						}).Error("Failed to create OAuth client")
+						doJSONWrite(w, http.StatusInternalServerError, apiError("Failure in storing client data."))
+						return
+					}
+
 					apiSpec.OAuthManager = &OAuthManager{
 						OsinServer: gw.TykOsinNewServer(
 							&osin.ServerConfig{},
 							&RedisOsinStorageInterface{
 								storageManager,
 								gw.GlobalSessionManager,
-								&redisCluster.RedisCluster{KeyPrefix: prefix, HashKeys: false, ConnectionHandler: gw.StorageConnectionHandler},
+								store,
 								apiSpec.OrgID,
 								gw,
 							}),
@@ -2623,12 +2639,28 @@ func (gw *Gateway) getOauthClientDetails(keyName, apiID string) (interface{}, in
 		prefix := generateOAuthPrefix(apiSpec.APIID)
 		storageManager := gw.getGlobalMDCBStorageHandler(prefix, false)
 		storageManager.Connect()
+
+		store, err := storage.NewStorageHandler(storage.REDIS_CLUSTER,
+			storage.WithKeyPrefix(prefix),
+			storage.WithHashKeys(false),
+			storage.WithConnectionHandler(gw.StorageConnectionHandler))
+
+		if err != nil {
+			log.WithFields(logrus.Fields{
+				"prefix": "api",
+				"apiID":  apiID,
+				"status": "fail",
+				"err":    err,
+			}).Error("Failed to retrieve OAuth client details")
+			return apiError("OAuth Client ID not found"), http.StatusNotFound
+		}
+
 		apiSpec.OAuthManager = &OAuthManager{
 			OsinServer: gw.TykOsinNewServer(&osin.ServerConfig{},
 				&RedisOsinStorageInterface{
 					storageManager,
 					gw.GlobalSessionManager,
-					&redisCluster.RedisCluster{KeyPrefix: prefix, HashKeys: false, ConnectionHandler: gw.StorageConnectionHandler},
+					store,
 					apiSpec.OrgID,
 					gw,
 				}),

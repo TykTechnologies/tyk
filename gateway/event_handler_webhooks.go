@@ -20,7 +20,7 @@ import (
 	"github.com/TykTechnologies/tyk/header"
 	"github.com/TykTechnologies/tyk/interfaces"
 	"github.com/TykTechnologies/tyk/internal/event"
-	redisCluster "github.com/TykTechnologies/tyk/storage/redis-cluster"
+	"github.com/TykTechnologies/tyk/storage"
 )
 
 type WebHookRequestMethod string
@@ -70,7 +70,18 @@ func (w *WebHookHandler) Init(handlerConf interface{}) error {
 		return ErrEventHandlerDisabled
 	}
 
-	w.store = &redisCluster.RedisCluster{KeyPrefix: "webhook.cache.", ConnectionHandler: w.Gw.StorageConnectionHandler}
+	w.store, err = storage.NewStorageHandler(
+		storage.REDIS_CLUSTER,
+		storage.WithKeyPrefix("webhook.cache."),
+		storage.WithConnectionHandler(w.Gw.StorageConnectionHandler),
+	)
+	if err != nil {
+		log.WithFields(logrus.Fields{
+			"prefix": "webhooks",
+		}).Error("Failed to create storage handler: ", err)
+		return err
+	}
+
 	w.store.Connect()
 
 	// Pre-load template on init

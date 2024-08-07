@@ -59,6 +59,7 @@ func (n *Notification) Sign() {
 }
 
 func (gw *Gateway) startPubSubLoop() {
+	// TODO: Interface this with the new storage handler
 	cacheStore := redisCluster.RedisCluster{ConnectionHandler: gw.StorageConnectionHandler}
 	cacheStore.Connect()
 

@@ -22,6 +22,7 @@ import (
 	internalerrors "github.com/TykTechnologies/tyk/internal/errors"
 	"github.com/TykTechnologies/tyk/internal/uuid"
 	"github.com/TykTechnologies/tyk/request"
+	"github.com/TykTechnologies/tyk/storage"
 	redisCluster "github.com/TykTechnologies/tyk/storage/redis-cluster"
 	"github.com/TykTechnologies/tyk/storage/util"
 
@@ -1192,9 +1193,24 @@ func (gw *Gateway) purgeLapsedOAuthTokens() error {
 		return nil
 	}
 
-	redisCluster := &redisCluster.RedisCluster{KeyPrefix: "", HashKeys: false, ConnectionHandler: gw.StorageConnectionHandler}
+	st, err := storage.NewStorageHandler(
+		storage.REDIS_CLUSTER,
+		storage.WithHashKeys(false),
+		storage.WithConnectionHandler(gw.StorageConnectionHandler),
+		storage.WithKeyPrefix(""),
+	)
 
-	ok, err := redisCluster.Lock("oauth-purge-lock", time.Minute)
+	storage, ok := st.(*redisCluster.RedisCluster)
+	if !ok {
+		return errors.New("oauth token purge requires Redis storage")
+	}
+
+	if err != nil {
+		log.WithError(err).Error("error creating storage handler")
+		return err
+	}
+
+	ok, err = storage.Lock("oauth-purge-lock", time.Minute)
 	if err != nil {
 		log.WithError(err).Error("error acquiring lock to purge oauth tokens")
 		return err
@@ -1205,7 +1221,7 @@ func (gw *Gateway) purgeLapsedOAuthTokens() error {
 		return nil
 	}
 
-	keys, err := redisCluster.ScanKeys(oAuthClientTokensKeyPattern)
+	keys, err := storage.ScanKeys(oAuthClientTokensKeyPattern)
 
 	if err != nil {
 		log.WithError(err).Error("error while scanning for tokens")
@@ -1223,7 +1239,7 @@ func (gw *Gateway) purgeLapsedOAuthTokens() error {
 		wg.Add(1)
 		go func(k string) {
 			defer wg.Done()
-			if err := redisCluster.RemoveSortedSetRange(k, "-inf", cleanupStartScore); err != nil {
+			if err := storage.RemoveSortedSetRange(k, "-inf", cleanupStartScore); err != nil {
 				errs <- err
 			}
 		}(key)

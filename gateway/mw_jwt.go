@@ -20,7 +20,7 @@ import (
 	"github.com/lonelycode/osin"
 
 	"github.com/TykTechnologies/tyk/apidef"
-	redisCluster "github.com/TykTechnologies/tyk/storage/redis-cluster"
+	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/user"
 
 	"github.com/TykTechnologies/tyk/internal/cache"
@@ -579,12 +579,22 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 			prefix := generateOAuthPrefix(k.Spec.APIID)
 			storageManager := k.Gw.getGlobalMDCBStorageHandler(prefix, false)
 			storageManager.Connect()
+
+			store, err := storage.NewStorageHandler(
+				storage.REDIS_CLUSTER,
+				storage.WithKeyPrefix(prefix),
+				storage.WithConnectionHandler(k.Gw.StorageConnectionHandler),
+			)
+			if err != nil {
+				return errors.New("failed to create storage handler: " + err.Error()), http.StatusInternalServerError
+			}
+
 			k.Spec.OAuthManager = &OAuthManager{
 				OsinServer: k.Gw.TykOsinNewServer(&osin.ServerConfig{},
 					&RedisOsinStorageInterface{
 						storageManager,
 						k.Gw.GlobalSessionManager,
-						&redisCluster.RedisCluster{KeyPrefix: prefix, HashKeys: false, ConnectionHandler: k.Gw.StorageConnectionHandler},
+						store,
 						k.Spec.OrgID,
 						k.Gw,
 					}),

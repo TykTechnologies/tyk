@@ -3,10 +3,20 @@ package gateway
 import (
 	"fmt"
 
-	redisCluster "github.com/TykTechnologies/tyk/storage/redis-cluster"
+	"github.com/TykTechnologies/tyk/storage"
 )
 
 func (gw *Gateway) invalidateAPICache(apiID string) bool {
-	store := redisCluster.RedisCluster{IsCache: true, ConnectionHandler: gw.StorageConnectionHandler}
+	store, err := storage.NewStorageHandler(
+		storage.REDIS_CLUSTER,
+		storage.WithConnectionHandler(gw.StorageConnectionHandler),
+		storage.IsCache(true),
+	)
+
+	if err != nil {
+		log.WithError(err).Error("could not create storage handler")
+		return false
+	}
+
 	return store.DeleteScanMatch(fmt.Sprintf("cache-%s*", apiID))
 }
