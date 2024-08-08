@@ -156,6 +156,10 @@ func (m MdcbStorage) Decrement(string) {
 	panic("implement me")
 }
 
+func (m MdcbStorage) IncrementByWithExpire(string, int64, int64) int64 {
+	panic("IncrementByWithExpire not implemented")
+}
+
 func (m MdcbStorage) IncrememntWithExpire(string, int64) int64 {
 	panic("implement me")
 }
