@@ -25,6 +25,8 @@ const (
 	oasExample                    = "oasExample"
 	certificateMetaExample        = "certificateMetaExample"
 	certificateMetaListExample    = "certificateMetaListExample"
+	certIdList                    = "certIdList"
+	certificateBasicList          = "certificateBasicList"
 	stringOasExample              = "stringOasExample"
 	graphResponseExample          = "graphResponseExample"
 	policiesExample               = "policiesExample"
@@ -82,6 +84,8 @@ func RefExamples(r *openapi3.Reflector) {
 	addRefExample(r, oasExample, oasSample(OasSampleString()))
 	addRefExample(r, certificateMetaExample, certificates[0])
 	addRefExample(r, certificateMetaListExample, certificates)
+	addRefExample(r, certIdList, certListId)
+	addRefExample(r, certificateBasicList, certificateBasic)
 	// addRefExample(r, stringOasExample, OasSampleString())
 
 	///addRefExample(r, graphResponseExample, graphDetails())

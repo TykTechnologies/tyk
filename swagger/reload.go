@@ -20,48 +20,51 @@ func ReloadApi(r *openapi3.Reflector) error {
 
 // Done
 func groupReload(r *openapi3.Reflector) error {
-	oc, err := r.NewOperationContext(http.MethodGet, "/tyk/reload/group")
+	op, err := NewOperationWithSafeExample(r, SafeOperation{
+		Method:      http.MethodGet,
+		PathPattern: "/tyk/reload/group",
+		OperationID: "hotReloadGroup",
+		Tag:         reloadTag,
+	})
 	if err != nil {
 		return err
 	}
-	oc.AddRespStructure(new(apiStatusMessage), func(cu *openapi.ContentUnit) {
+	oc := op.oc
+	op.AddRespWithExample(apiStatusMessage{
+		Status: "ok",
+	}, http.StatusOK, func(cu *openapi.ContentUnit) {
 		cu.Description = "Reload the Tyk Gateway"
 	})
-	forbidden(oc)
-	oc.SetTags(reloadTag)
 	oc.SetID("hotReloadGroup")
 	oc.SetSummary("Hot-reload a Tyk group")
 	oc.SetDescription("To reload a whole group of Tyk nodes (without using the Dashboard or host manager). You can send an API request to a single node, this node will then send a notification through the pub/sub infrastructure to all other listening nodes (including the host manager if it is being used to manage NginX) which will then trigger a global reload.")
-	return r.AddOperation(oc)
+	return op.AddOperation()
 }
 
 // Done
 func singleNodeReload(r *openapi3.Reflector) error {
-	oc, err := r.NewOperationContext(http.MethodGet, "/tyk/reload")
+	op, err := NewOperationWithSafeExample(r, SafeOperation{
+		Method:      http.MethodGet,
+		PathPattern: "/tyk/reload",
+		OperationID: "hotReload",
+		Tag:         reloadTag,
+	})
 	if err != nil {
 		return err
 	}
-	oc.SetTags(reloadTag)
+	oc := op.oc
 	oc.SetSummary("Hot-reload a single node")
 	oc.SetDescription("Tyk is capable of reloading configurations without having to stop serving requests. This means that API configurations can be added at runtime, or even modified at runtime and those rules applied immediately without any downtime.")
 	oc.SetID("hotReload")
-	oc.AddRespStructure(new(apiStatusMessage), func(cu *openapi.ContentUnit) {
+	op.AddRespWithExample(apiStatusMessage{
+		Status: "ok",
+	}, http.StatusOK, func(cu *openapi.ContentUnit) {
 		cu.Description = "Reload gateway"
 	})
-	forbidden(oc)
-	o3, ok := oc.(openapi3.OperationExposer)
-	if !ok {
-		return ErrOperationExposer
-	}
-	par := []openapi3.ParameterOrRef{blockQuery()}
-	o3.Operation().WithParameters(par...)
-	return r.AddOperation(oc)
-}
-
-func blockQuery(description ...string) openapi3.ParameterOrRef {
-	desc := "Block a response until the reload is performed. This can be useful in scripting environments like CI/CD workflows"
-	if len(description) != 0 {
-		desc = description[0]
-	}
-	return openapi3.Parameter{In: openapi3.ParameterInQuery, Name: "block", Required: &isOptional, Description: &desc, Schema: blockSchema()}.ToParameterOrRef()
+	op.AddQueryParameter("block", "Block a response until the reload is performed. This can be useful in scripting environments like CI/CD workflows", OptionalParameterValues{
+		Example: valueToInterface(false),
+		Type:    openapi3.SchemaTypeBoolean,
+		Enum:    []interface{}{true, false},
+	})
+	return op.AddOperation()
 }

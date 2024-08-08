@@ -130,48 +130,48 @@ func createCertificate(r *openapi3.Reflector) error {
 // Done
 func getCertsList(r *openapi3.Reflector) error {
 	// TODO::In previous swagger we had a certID query parameter which was wrong.
-	oc, err := r.NewOperationContext(http.MethodGet, "/tyk/certs")
+	op, err := NewOperationWithSafeExample(r, SafeOperation{
+		Method:      http.MethodGet,
+		PathPattern: "/tyk/certs",
+		OperationID: "listCerts",
+		Tag:         CertsTag,
+	})
 	if err != nil {
 		return err
 	}
+	oc := op.oc
+	op.AddRespWithRefExamples(http.StatusOK, jsonschema.OneOf(gateway.APIAllCertificateBasics{}, gateway.APIAllCertificates{}), []multipleExamplesValues{
+		{
+			key:         certIdList,
+			httpStatus:  http.StatusOK,
+			Summary:     "When mode is not detailed",
+			exampleType: Component,
+			ref:         certIdList,
+			hasExample:  true,
+		},
+		{
+			key:         certificateBasicList,
+			httpStatus:  http.StatusOK,
+			Summary:     "When mode is set as detailed",
+			exampleType: Component,
+			ref:         certificateBasicList,
+			hasExample:  true,
+		},
+	})
+
 	oc.AddRespStructure(jsonschema.OneOf(new(gateway.APIAllCertificateBasics), new(gateway.APIAllCertificates)))
 	oc.SetTags(CertsTag)
 	oc.SetID("listCerts")
 	oc.SetSummary("List Certificates")
 	oc.SetDescription("List All Certificates in the Tyk Gateway")
-	forbidden(oc)
-	o3, ok := oc.(openapi3.OperationExposer)
-	if !ok {
-		return ErrOperationExposer
-	}
-	par := []openapi3.ParameterOrRef{orgIDQuery(), certModeQuery()}
-	o3.Operation().WithParameters(par...)
-	return r.AddOperation(oc)
-}
-
-func orgIDQuery(description ...string) openapi3.ParameterOrRef {
-	var example interface{} = "5e9d9544a1dcd60001d0ed20"
-	desc := "Organisation ID to list the certificates"
-	if len(description) != 0 {
-		desc = description[0]
-	}
-	return openapi3.Parameter{In: openapi3.ParameterInQuery, Example: &example, Name: "org_id", Required: &isRequired, Description: &desc, Schema: stringSchema()}.ToParameterOrRef()
-}
-
-func certModeQuery(description ...string) openapi3.ParameterOrRef {
-	stringType := openapi3.SchemaTypeString
-	var example interface{} = "detailed"
-	desc := "Mode to list the certificate details"
-	if len(description) != 0 {
-		desc = description[0]
-	}
-	return openapi3.Parameter{In: openapi3.ParameterInQuery, Name: "mode", Required: &isOptional, Description: &desc, Schema: &openapi3.SchemaOrRef{
-		Schema: &openapi3.Schema{
-			Type:    &stringType,
-			Example: &example,
-			Enum:    []interface{}{"detailed"},
-		},
-	}}.ToParameterOrRef()
+	op.AddQueryParameter("org_id", "Organisation ID to list the certificates", OptionalParameterValues{
+		Example: valueToInterface("5e9d9544a1dcd60001d0ed20"),
+	})
+	op.AddQueryParameter("mode", "Mode to list the certificate details", OptionalParameterValues{
+		Example: valueToInterface("detailed"),
+		Enum:    []interface{}{"detailed"},
+	})
+	return op.AddOperation()
 }
 
 var certificates = []certs.CertificateMeta{
@@ -209,5 +209,37 @@ var certificates = []certs.CertificateMeta{
 		NotAfter:  time.Date(2034, 3, 26, 8, 46, 37, 0, time.UTC),
 		DNSNames:  []string{".*tyk.io"},
 		IsCA:      false,
+	},
+}
+
+var certListId = gateway.APIAllCertificates{
+	CertIDs: []string{
+		"5e9d9544a1dcd60001d0ed20a6ab77653d5da938f452bb8cc9b55b0630a6743dabd8dc92bfb025abb09ce035",
+		"5e9d9544a1dcd60001d0ed207c440d66ebb0a4629d21329808dce9091acf5f2fde328067a6e60e5347271d90",
+	},
+}
+
+var certificateBasic = gateway.APIAllCertificateBasics{
+	Certs: []*certs.CertificateBasics{
+		{
+			ID:            "5e9d9544a1dcd60001d0ed20a6ab77653d5da938f452bb8cc9b55b0630a6743dabd8dc92bfb025abb09ce035",
+			IssuerCN:      "Issuer 1",
+			SubjectCN:     "Subject 1",
+			DNSNames:      []string{"example.com", "www.example.com"},
+			HasPrivateKey: true,
+			NotBefore:     time.Date(2023, time.January, 1, 0, 0, 0, 0, time.UTC),
+			NotAfter:      time.Date(2024, time.January, 1, 0, 0, 0, 0, time.UTC),
+			IsCA:          false,
+		},
+		{
+			ID:            "5e9d9544a1dcd60001d0ed207c440d66ebb0a4629d21329808dce9091acf5f2fde328067a6e60e5347271d90",
+			IssuerCN:      "Issuer 2",
+			SubjectCN:     "Subject 2",
+			DNSNames:      []string{"example.org", "www.example.org"},
+			HasPrivateKey: false,
+			NotBefore:     time.Date(2023, time.February, 1, 0, 0, 0, 0, time.UTC),
+			NotAfter:      time.Date(2024, time.February, 1, 0, 0, 0, 0, time.UTC),
+			IsCA:          true,
+		},
 	},
 }
