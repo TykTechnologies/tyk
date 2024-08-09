@@ -697,9 +697,10 @@ type Config struct {
 	// A policy can be defined in a file (Open Source installations) or from the same database as the Dashboard.
 	Policies PoliciesConfig `json:"policies"`
 
-	// Defines the ports that will be available for the API services to bind to in the following format: `"{“":“”}"`. Remember to escape JSON strings.
-	// This is a map of protocol to PortWhiteList. This allows per protocol
-	// configurations.
+    // Defines the ports that will be available for the API services to bind to in the format 
+    // documented here https://tyk.io/docs/key-concepts/tcp-proxy/#allowing-specific-ports.
+    // Ports can be configured per protocol, e.g. https, tls etc.
+    // If using environment variables then remember to escape JSON strings.
 	PortWhiteList PortsWhiteList `json:"ports_whitelist"`
 
 	// Disable port whilisting, essentially allowing you to use any port for your API.
