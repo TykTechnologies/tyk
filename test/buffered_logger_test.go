@@ -19,11 +19,6 @@ func TestNewBufferingLogger(t *testing.T) {
 			assert.NotNil(t, bl, "Expected NewBufferingLogger to return a non-nil *BufferedLogger")
 		}
 
-		isSingleton = func(bl1 *BufferedLogger) {
-			bl2 := NewBufferingLogger()
-			assert.Equal(t, bl1, bl2, "Expected NewBufferingLogger to exhibit singleton behavior")
-		}
-
 		isBufferingFormatter = func(bl *BufferedLogger) {
 			_, ok := bl.Formatter.(*BufferingFormatter)
 			assert.True(t, ok, "Expected logger.Formatter to be of type *BufferingFormatter")
@@ -43,7 +38,7 @@ func TestNewBufferingLogger(t *testing.T) {
 		{
 			name:   "NewBufferingLogger initialize",
 			before: func(*BufferedLogger) {},
-			checks: check(isNil, isSingleton, isBufferingFormatter, isEmpty),
+			checks: check(isNil, isBufferingFormatter, isEmpty),
 		},
 	}
 	for _, tt := range tests {

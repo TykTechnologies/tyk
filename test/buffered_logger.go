@@ -1,6 +1,7 @@
 package test
 
 import (
+	"fmt"
 	"sync"
 	"time"
 
@@ -15,6 +16,10 @@ type BufferedLog struct {
 	Message string       `json:"message"`
 	Time    time.Time    `json:"time"`
 	Level   logrus.Level `json:"level"`
+}
+
+func (b *BufferedLog) String() string {
+	return fmt.Sprintf("%s: %s", b.Level, b.Message)
 }
 
 // BufferingFormatter is the struct that holds the buffer of the logs.
@@ -66,21 +71,15 @@ func (bl *BufferedLogger) ClearLogs() {
 	bl.bufferingFormatter.buffer = make([]*BufferedLog, 0)
 }
 
-var buflogger *BufferedLogger
-
 // NewBufferingLogger creates a new buffered logger.
 func NewBufferingLogger() *BufferedLogger {
-	if buflogger != nil {
-		return buflogger
-	}
-
 	bufferingFormatter := &BufferingFormatter{buffer: make([]*BufferedLog, 0)}
 	logger := logrus.New()
 	logger.Level = logrus.DebugLevel
 	logger.Formatter = bufferingFormatter
-	buflogger = &BufferedLogger{
+
+	return &BufferedLogger{
 		Logger:             logger,
 		bufferingFormatter: bufferingFormatter,
 	}
-	return buflogger
 }
