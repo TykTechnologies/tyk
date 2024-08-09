@@ -20,7 +20,6 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-
 	"sync/atomic"
 	texttemplate "text/template"
 	"time"
@@ -228,7 +227,7 @@ func NewGateway(config config.Config, ctx context.Context) *Gateway {
 	gw.ExpiryCache = cache.New(600, 10*60)
 	gw.UtilCache = cache.New(3600, 10*60)
 
-	var timeout = int64(config.ServiceDiscovery.DefaultCacheTimeout)
+	timeout := int64(config.ServiceDiscovery.DefaultCacheTimeout)
 	if timeout <= 0 {
 		timeout = 120 // 2 minutes
 	}
@@ -257,6 +256,7 @@ func NewGateway(config config.Config, ctx context.Context) *Gateway {
 func (gw *Gateway) UnmarshalJSON(data []byte) error {
 	return nil
 }
+
 func (gw *Gateway) MarshalJSON() ([]byte, error) {
 	return json.Marshal(struct{}{})
 }
@@ -357,7 +357,6 @@ func (gw *Gateway) setupGlobals() {
 	versionStore := storage.RedisCluster{KeyPrefix: "version-check-", ConnectionHandler: gw.StorageConnectionHandler}
 	versionStore.Connect()
 	err := versionStore.SetKey("gateway", VERSION, 0)
-
 	if err != nil {
 		mainLog.WithError(err).Error("Could not set version in versionStore")
 	}
@@ -389,7 +388,6 @@ func (gw *Gateway) setupGlobals() {
 				purger.Connect()
 				go purger.PurgeLoop(gw.ctx, time.Duration(gw.GetConfig().AnalyticsConfig.PurgeInterval))
 			}
-
 		}
 		go gw.flushNetworkAnalytics(gw.ctx)
 	}
@@ -545,10 +543,9 @@ func (gw *Gateway) syncPolicies() (count int, err error) {
 		}
 		pols, err = gw.LoadPoliciesFromRPC(dataLoader, gw.GetConfig().SlaveOptions.RPCKey, gw.GetConfig().Policies.AllowExplicitPolicyID)
 	default:
-		//if policy path defined we want to allow use of the REST API
+		// if policy path defined we want to allow use of the REST API
 		if gw.GetConfig().Policies.PolicyPath != "" {
 			pols, err = LoadPoliciesFromDir(gw.GetConfig().Policies.PolicyPath)
-
 		} else if gw.GetConfig().Policies.PolicyRecordName == "" {
 			// old way of doing things before REST Api added
 			// this is the only case now where we need a policy record name
@@ -646,6 +643,7 @@ func (gw *Gateway) loadControlAPIEndpoints(muxer *mux.Router) {
 
 	if !gw.isRPCMode() {
 		versionsHandler := NewVersionHandler(gw.getAPIDefinition)
+		r.Use(loggingMiddleware)
 		r.HandleFunc("/org/keys", gw.orgHandler).Methods("GET")
 		r.HandleFunc("/org/keys/{keyName:[^/]*}", gw.orgHandler).Methods("POST", "PUT", "GET", "DELETE")
 		r.HandleFunc("/keys/policy/{keyName}", gw.policyUpdateHandler).Methods("POST")
@@ -724,7 +722,6 @@ func generateOAuthPrefix(apiID string) string {
 
 // Create API-specific OAuth handlers and respective auth servers
 func (gw *Gateway) addOAuthHandlers(spec *APISpec, muxer *mux.Router) *OAuthManager {
-
 	apiAuthorizePath := "/tyk/oauth/authorize-client{_:/?}"
 	clientAuthPath := "/oauth/authorize{_:/?}"
 	clientAccessPath := "/oauth/token{_:/?}"
@@ -879,7 +876,6 @@ func (gw *Gateway) loadCustomMiddleware(spec *APISpec) ([]string, apidef.Middlew
 	}
 
 	return mwPaths, mwAuthCheckFunc, mwPreFuncs, mwPostFuncs, mwPostKeyAuthFuncs, mwResponseFuncs, mwDriver
-
 }
 
 // Create the response processor chain
@@ -922,7 +918,7 @@ func (gw *Gateway) createResponseMiddlewareChain(spec *APISpec, responseFuncs []
 
 	for _, mw := range responseFuncs {
 		var processor TykResponseHandler
-		//is it goplugin or other middleware
+		// is it goplugin or other middleware
 		if strings.HasSuffix(mw.Path, ".so") {
 			processor = gw.responseProcessorByName("goplugin_res_hook", baseHandler)
 		} else {
@@ -1351,11 +1347,11 @@ func (gw *Gateway) SignatureVerifier() (goverify.Verifier, error) {
 }
 
 func writePIDFile(file string) error {
-	if err := os.MkdirAll(filepath.Dir(file), 0755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(file), 0o755); err != nil {
 		return err
 	}
 	pid := strconv.Itoa(os.Getpid())
-	return ioutil.WriteFile(file, []byte(pid), 0600)
+	return ioutil.WriteFile(file, []byte(pid), 0o600)
 }
 
 var readPIDFromFile = func(file string) (int, error) {
@@ -1465,7 +1461,6 @@ func (gw *Gateway) afterConfSetup() {
 }
 
 func (gw *Gateway) kvStore(value string) (string, error) {
-
 	if strings.HasPrefix(value, "secrets://") {
 		key := strings.TrimPrefix(value, "secrets://")
 		log.Debugf("Retrieving %s from secret store in config", key)
@@ -1799,7 +1794,7 @@ func (gw *Gateway) start() {
 	if !conf.SupressDefaultOrgStore {
 		mainLog.Debug("Initialising default org store")
 		gw.DefaultOrgStore.Init(gw.getGlobalStorageHandler("orgkey.", false))
-		//DefaultQuotaStore.Init(getGlobalStorageHandler(CloudHandler, "orgkey.", false))
+		// DefaultQuotaStore.Init(getGlobalStorageHandler(CloudHandler, "orgkey.", false))
 		gw.DefaultQuotaStore.Init(gw.getGlobalStorageHandler("orgkey.", false))
 	}
 
@@ -1962,4 +1957,12 @@ func (gw *Gateway) SetConfig(conf config.Config, skipReload ...bool) {
 	gw.configMu.Lock()
 	gw.config.Store(conf)
 	gw.configMu.Unlock()
+}
+
+func loggingMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		log.Printf("%s%s%s%s", "http://", r.Host, "/tyk", r.URL)
+		log.Println(r.URL)
+		next.ServeHTTP(w, r)
+	})
 }

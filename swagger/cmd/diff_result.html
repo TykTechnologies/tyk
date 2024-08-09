@@ -1,0 +1,8126 @@
+<h3 id="new-endpoints-10">New Endpoints: 10</h3>
+<hr>
+<p>DELETE /tyk/certs/{certID}<br>
+GET /tyk/certs/{certID}<br>
+POST /tyk/debug<br>
+POST /tyk/keys/create<br>
+POST /tyk/keys/policy/{keyID}<br>
+POST /tyk/keys/preview<br>
+GET /tyk/oauth/clients/apis/{appID}<br>
+PUT /tyk/oauth/clients/{apiID}/{keyName}<br>
+PUT /tyk/oauth/clients/{apiID}/{keyName}/rotate<br>
+DELETE /tyk/oauth/tokens</p>
+<h3 id="deleted-endpoints-4">Deleted Endpoints: 4</h3>
+<hr>
+<p>DELETE /tyk/certs<br>
+POST /tyk/oauth/authorize-client<br>
+PUT /tyk/oauth/clients/{apiID}<br>
+POST /{listen_path}/tyk/batch</p>
+<h3 id="modified-endpoints-47">Modified Endpoints: 47</h3>
+<hr>
+<p>GET /tyk/apis</p>
+<ul>
+<li>Responses changed
+<ul>
+<li>New response: 403</li>
+<li>Modified response: 200
+<ul>
+<li>Content changed
+<ul>
+<li>Modified media type: application/json
+<ul>
+<li>Schema changed
+<ul>
+<li>Items changed
+<ul>
+<li>Properties changed
+<ul>
+<li>New property: analytics_plugin</li>
+<li>New property: auth_configs</li>
+<li>New property: certificate_pinning_disabled</li>
+<li>New property: config_data_disabled</li>
+<li>New property: custom_middleware_bundle_disabled</li>
+<li>New property: custom_plugin_auth_enabled</li>
+<li>New property: detailed_tracing</li>
+<li>New property: domain_disabled</li>
+<li>New property: enable_detailed_recording</li>
+<li>New property: enable_proxy_protocol</li>
+<li>New property: expiration</li>
+<li>New property: external_oauth</li>
+<li>New property: graphql</li>
+<li>New property: idp_client_id_mapping_disabled</li>
+<li>New property: is_oas</li>
+<li>New property: jwt_default_policies</li>
+<li>New property: listen_port</li>
+<li>New property: protocol</li>
+<li>New property: request_signing</li>
+<li>New property: scopes</li>
+<li>New property: session_lifetime_respects_key_expiration</li>
+<li>New property: tags_disabled</li>
+<li>New property: upstream_certificates_disabled</li>
+<li>New property: use_go_plugin_auth</li>
+<li>Modified property: CORS
+<ul>
+<li>Properties changed
+<ul>
+<li>Modified property: allowed_headers
+<ul>
+<li>Nullable changed from false to true</li>
+</ul>
+</li>
+<li>Modified property: allowed_methods
+<ul>
+<li>Nullable changed from false to true</li>
+</ul>
+</li>
+<li>Modified property: allowed_origins
+<ul>
+<li>Nullable changed from false to true</li>
+</ul>
+</li>
+<li>Modified property: exposed_headers
+<ul>
+<li>Nullable changed from false to true</li>
+</ul>
+</li>
+<li>Modified property: max_age
+<ul>
+<li>Format changed from 'int64' to ''</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: allowed_ips
+<ul>
+<li>Nullable changed from false to true</li>
+</ul>
+</li>
+<li>Modified property: auth
+<ul>
+<li>Properties changed
+<ul>
+<li>New property: disable_header</li>
+<li>New property: name</li>
+<li>Modified property: signature
+<ul>
+<li>Properties changed
+<ul>
+<li>New property: param_name</li>
+<li>New property: use_param</li>
+<li>Modified property: allowed_clock_skew
+<ul>
+<li>Format changed from 'int64' to ''</li>
+</ul>
+</li>
+<li>Modified property: error_code
+<ul>
+<li>Format changed from 'int64' to ''</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: auth_provider
+<ul>
+<li>Properties changed
+<ul>
+<li>Modified property: meta
+<ul>
+<li>Nullable changed from false to true</li>
+<li>AdditionalProperties changed
+<ul>
+<li>Type changed from 'object' to ''</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: basic_auth
+<ul>
+<li>Properties changed
+<ul>
+<li>Modified property: cache_ttl
+<ul>
+<li>Format changed from 'int64' to ''</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: blacklisted_ips
+<ul>
+<li>Nullable changed from false to true</li>
+</ul>
+</li>
+<li>Modified property: cache_options
+<ul>
+<li>Properties changed
+<ul>
+<li>New property: cache_by_headers</li>
+<li>Modified property: cache_response_codes
+<ul>
+<li>Nullable changed from false to true</li>
+<li>Items changed
+<ul>
+<li>Format changed from 'int64' to ''</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: certificates
+<ul>
+<li>Nullable changed from false to true</li>
+</ul>
+</li>
+<li>Modified property: client_certificates
+<ul>
+<li>Nullable changed from false to true</li>
+</ul>
+</li>
+<li>Modified property: config_data
+<ul>
+<li>Nullable changed from false to true</li>
+<li>AdditionalProperties changed
+<ul>
+<li>Type changed from 'object' to ''</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: custom_middleware
+<ul>
+<li>Properties changed
+<ul>
+<li>Modified property: auth_check
+<ul>
+<li>Properties changed
+<ul>
+<li>New property: disabled</li>
+<li>New property: raw_body_only</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: id_extractor
+<ul>
+<li>Properties changed
+<ul>
+<li>New property: disabled</li>
+<li>Modified property: extractor_config
+<ul>
+<li>Nullable changed from false to true</li>
+<li>AdditionalProperties changed
+<ul>
+<li>Type changed from 'object' to ''</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: post
+<ul>
+<li>Nullable changed from false to true</li>
+<li>Items changed
+<ul>
+<li>Properties changed
+<ul>
+<li>New property: disabled</li>
+<li>New property: raw_body_only</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: post_key_auth
+<ul>
+<li>Nullable changed from false to true</li>
+<li>Items changed
+<ul>
+<li>Properties changed
+<ul>
+<li>New property: disabled</li>
+<li>New property: raw_body_only</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: pre
+<ul>
+<li>Nullable changed from false to true</li>
+<li>Items changed
+<ul>
+<li>Properties changed
+<ul>
+<li>New property: disabled</li>
+<li>New property: raw_body_only</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: response
+<ul>
+<li>Nullable changed from false to true</li>
+<li>Items changed
+<ul>
+<li>Properties changed
+<ul>
+<li>New property: disabled</li>
+<li>New property: raw_body_only</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: definition
+<ul>
+<li>Properties changed
+<ul>
+<li>New property: default</li>
+<li>New property: enabled</li>
+<li>New property: fallback_to_default</li>
+<li>New property: name</li>
+<li>New property: strip_versioning_data</li>
+<li>New property: url_versioning_pattern</li>
+<li>New property: versions</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: event_handlers
+<ul>
+<li>Properties changed
+<ul>
+<li>Modified property: events
+<ul>
+<li>Type changed from '' to 'object'</li>
+<li>Nullable changed from false to true</li>
+<li>AdditionalProperties changed
+<ul>
+<li>Schema added</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: expire_analytics_after
+<ul>
+<li>Format changed from 'int64' to ''</li>
+</ul>
+</li>
+<li>Modified property: global_rate_limit
+<ul>
+<li>Properties changed
+<ul>
+<li>New property: disabled</li>
+<li>Modified property: per
+<ul>
+<li>Format changed from 'double' to ''</li>
+</ul>
+</li>
+<li>Modified property: rate
+<ul>
+<li>Format changed from 'double' to ''</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: hmac_allowed_algorithms
+<ul>
+<li>Nullable changed from false to true</li>
+</ul>
+</li>
+<li>Modified property: hmac_allowed_clock_skew
+<ul>
+<li>Format changed from 'double' to ''</li>
+</ul>
+</li>
+<li>Modified property: jwt_expires_at_validation_skew
+<ul>
+<li>Format changed from 'uint64' to ''</li>
+<li>Min changed from null to 0</li>
+</ul>
+</li>
+<li>Modified property: jwt_issued_at_validation_skew
+<ul>
+<li>Format changed from 'uint64' to ''</li>
+<li>Min changed from null to 0</li>
+</ul>
+</li>
+<li>Modified property: jwt_not_before_validation_skew
+<ul>
+<li>Format changed from 'uint64' to ''</li>
+<li>Min changed from null to 0</li>
+</ul>
+</li>
+<li>Modified property: jwt_scope_to_policy_mapping
+<ul>
+<li>Nullable changed from false to true</li>
+</ul>
+</li>
+<li>Modified property: oauth_meta
+<ul>
+<li>Properties changed
+<ul>
+<li>Modified property: allowed_access_types
+<ul>
+<li>Nullable changed from false to true</li>
+</ul>
+</li>
+<li>Modified property: allowed_authorize_types
+<ul>
+<li>Nullable changed from false to true</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: openid_options
+<ul>
+<li>Properties changed
+<ul>
+<li>Modified property: providers
+<ul>
+<li>Nullable changed from false to true</li>
+<li>Items changed
+<ul>
+<li>Properties changed
+<ul>
+<li>Modified property: client_ids
+<ul>
+<li>Nullable changed from false to true</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: pinned_public_keys
+<ul>
+<li>Nullable changed from false to true</li>
+</ul>
+</li>
+<li>Modified property: proxy
+<ul>
+<li>Properties changed
+<ul>
+<li>Modified property: service_discovery
+<ul>
+<li>Properties changed
+<ul>
+<li>New property: cache_disabled</li>
+<li>Modified property: cache_timeout
+<ul>
+<li>Format changed from 'int64' to ''</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: target_list
+<ul>
+<li>Nullable changed from false to true</li>
+</ul>
+</li>
+<li>Modified property: transport
+<ul>
+<li>Properties changed
+<ul>
+<li>New property: ssl_force_common_name_check</li>
+<li>New property: ssl_max_version</li>
+<li>Modified property: ssl_ciphers
+<ul>
+<li>Nullable changed from false to true</li>
+</ul>
+</li>
+<li>Modified property: ssl_min_version
+<ul>
+<li>Format changed from 'uint16' to ''</li>
+<li>Min changed from null to 0</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: response_processors
+<ul>
+<li>Nullable changed from false to true</li>
+<li>Items changed
+<ul>
+<li>Properties changed
+<ul>
+<li>Modified property: options
+<ul>
+<li>Type changed from 'object' to ''</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: session_lifetime
+<ul>
+<li>Format changed from 'int64' to ''</li>
+</ul>
+</li>
+<li>Modified property: session_provider
+<ul>
+<li>Properties changed
+<ul>
+<li>Modified property: meta
+<ul>
+<li>Nullable changed from false to true</li>
+<li>AdditionalProperties changed
+<ul>
+<li>Type changed from 'object' to ''</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: tag_headers
+<ul>
+<li>Nullable changed from false to true</li>
+</ul>
+</li>
+<li>Modified property: tags
+<ul>
+<li>Nullable changed from false to true</li>
+</ul>
+</li>
+<li>Modified property: upstream_certificates
+<ul>
+<li>Nullable changed from false to true</li>
+</ul>
+</li>
+<li>Modified property: uptime_tests
+<ul>
+<li>Properties changed
+<ul>
+<li>Modified property: check_list
+<ul>
+<li>Nullable changed from false to true</li>
+<li>Items changed
+<ul>
+<li>Properties changed
+<ul>
+<li>New property: commands</li>
+<li>New property: enable_proxy_protocol</li>
+<li>New property: protocol</li>
+<li>New property: timeout</li>
+<li>Modified property: headers
+<ul>
+<li>Nullable changed from false to true</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: config
+<ul>
+<li>Properties changed
+<ul>
+<li>Modified property: expire_utime_after
+<ul>
+<li>Format changed from 'int64' to ''</li>
+</ul>
+</li>
+<li>Modified property: recheck_wait
+<ul>
+<li>Format changed from 'int64' to ''</li>
+</ul>
+</li>
+<li>Modified property: service_discovery
+<ul>
+<li>Properties changed
+<ul>
+<li>New property: cache_disabled</li>
+<li>Modified property: cache_timeout
+<ul>
+<li>Format changed from 'int64' to ''</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: version_data
+<ul>
+<li>Properties changed
+<ul>
+<li>Modified property: versions
+<ul>
+<li>Nullable changed from false to true</li>
+<li>AdditionalProperties changed
+<ul>
+<li>Properties changed
+<ul>
+<li>New property: global_headers_disabled</li>
+<li>New property: global_response_headers</li>
+<li>New property: global_response_headers_disabled</li>
+<li>New property: global_response_headers_remove</li>
+<li>New property: ignore_endpoint_case</li>
+<li>Modified property: extended_paths
+<ul>
+<li>Properties changed
+<ul>
+<li>New property: go_plugin</li>
+<li>New property: mock_response</li>
+<li>New property: persist_graphql</li>
+<li>New property: validate_request</li>
+<li>Modified property: advance_cache_config
+<ul>
+<li>Items changed
+<ul>
+<li>Properties changed
+<ul>
+<li>New property: disabled</li>
+<li>New property: timeout</li>
+<li>Modified property: cache_response_codes
+<ul>
+<li>Nullable changed from false to true</li>
+<li>Items changed
+<ul>
+<li>Format changed from 'int64' to ''</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: black_list
+<ul>
+<li>Items changed
+<ul>
+<li>Properties changed
+<ul>
+<li>New property: disabled</li>
+<li>New property: ignore_case</li>
+<li>New property: method</li>
+<li>Modified property: method_actions
+<ul>
+<li>AdditionalProperties changed
+<ul>
+<li>Properties changed
+<ul>
+<li>Modified property: action
+<ul>
+<li>New enum values: [no_action reply]</li>
+</ul>
+</li>
+<li>Modified property: code
+<ul>
+<li>Format changed from 'int64' to ''</li>
+</ul>
+</li>
+<li>Modified property: headers
+<ul>
+<li>Nullable changed from false to true</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: circuit_breakers
+<ul>
+<li>Items changed
+<ul>
+<li>Properties changed
+<ul>
+<li>New property: disable_half_open_state</li>
+<li>New property: disabled</li>
+<li>Modified property: return_to_service_after
+<ul>
+<li>Format changed from 'int64' to ''</li>
+</ul>
+</li>
+<li>Modified property: threshold_percent
+<ul>
+<li>Format changed from 'double' to ''</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: do_not_track_endpoints
+<ul>
+<li>Items changed
+<ul>
+<li>Properties changed
+<ul>
+<li>New property: disabled</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: hard_timeouts
+<ul>
+<li>Items changed
+<ul>
+<li>Properties changed
+<ul>
+<li>New property: disabled</li>
+<li>Modified property: timeout
+<ul>
+<li>Format changed from 'int64' to ''</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: ignored
+<ul>
+<li>Items changed
+<ul>
+<li>Properties changed
+<ul>
+<li>New property: disabled</li>
+<li>New property: ignore_case</li>
+<li>New property: method</li>
+<li>Modified property: method_actions
+<ul>
+<li>AdditionalProperties changed
+<ul>
+<li>Properties changed
+<ul>
+<li>Modified property: action
+<ul>
+<li>New enum values: [no_action reply]</li>
+</ul>
+</li>
+<li>Modified property: code
+<ul>
+<li>Format changed from 'int64' to ''</li>
+</ul>
+</li>
+<li>Modified property: headers
+<ul>
+<li>Nullable changed from false to true</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: internal
+<ul>
+<li>Items changed
+<ul>
+<li>Properties changed
+<ul>
+<li>New property: disabled</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: method_transforms
+<ul>
+<li>Items changed
+<ul>
+<li>Properties changed
+<ul>
+<li>New property: disabled</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: rate_limit
+<ul>
+<li>Nullable changed from false to true</li>
+<li>Items changed
+<ul>
+<li>Properties changed
+<ul>
+<li>Modified property: per
+<ul>
+<li>Format changed from 'double' to ''</li>
+</ul>
+</li>
+<li>Modified property: rate
+<ul>
+<li>Format changed from 'double' to ''</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: size_limits
+<ul>
+<li>Items changed
+<ul>
+<li>Properties changed
+<ul>
+<li>New property: disabled</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: track_endpoints
+<ul>
+<li>Items changed
+<ul>
+<li>Properties changed
+<ul>
+<li>New property: disabled</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: transform
+<ul>
+<li>Items changed
+<ul>
+<li>Properties changed
+<ul>
+<li>New property: disabled</li>
+<li>Modified property: template_data
+<ul>
+<li>Properties changed
+<ul>
+<li>Modified property: input_type
+<ul>
+<li>New enum values: [json xml]</li>
+</ul>
+</li>
+<li>Modified property: template_mode
+<ul>
+<li>New enum values: [blob file]</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: transform_headers
+<ul>
+<li>Items changed
+<ul>
+<li>Properties changed
+<ul>
+<li>New property: disabled</li>
+<li>Modified property: add_headers
+<ul>
+<li>Nullable changed from false to true</li>
+</ul>
+</li>
+<li>Modified property: delete_headers
+<ul>
+<li>Nullable changed from false to true</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: transform_response
+<ul>
+<li>Items changed
+<ul>
+<li>Properties changed
+<ul>
+<li>New property: disabled</li>
+<li>Modified property: template_data
+<ul>
+<li>Properties changed
+<ul>
+<li>Modified property: input_type
+<ul>
+<li>New enum values: [json xml]</li>
+</ul>
+</li>
+<li>Modified property: template_mode
+<ul>
+<li>New enum values: [blob file]</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: transform_response_headers
+<ul>
+<li>Items changed
+<ul>
+<li>Properties changed
+<ul>
+<li>New property: disabled</li>
+<li>Modified property: add_headers
+<ul>
+<li>Nullable changed from false to true</li>
+</ul>
+</li>
+<li>Modified property: delete_headers
+<ul>
+<li>Nullable changed from false to true</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: url_rewrites
+<ul>
+<li>Items changed
+<ul>
+<li>Properties changed
+<ul>
+<li>New property: disabled</li>
+<li>Deleted property: MatchRegexp</li>
+<li>Modified property: triggers
+<ul>
+<li>Nullable changed from false to true</li>
+<li>Items changed
+<ul>
+<li>Properties changed
+<ul>
+<li>Modified property: on
+<ul>
+<li>New enum values: [all any]</li>
+</ul>
+</li>
+<li>Modified property: options
+<ul>
+<li>Properties changed
+<ul>
+<li>Modified property: header_matches
+<ul>
+<li>Nullable changed from false to true</li>
+</ul>
+</li>
+<li>Modified property: path_part_matches
+<ul>
+<li>Nullable changed from false to true</li>
+</ul>
+</li>
+<li>Modified property: query_val_matches
+<ul>
+<li>Nullable changed from false to true</li>
+</ul>
+</li>
+<li>Modified property: request_context_matches
+<ul>
+<li>Nullable changed from false to true</li>
+</ul>
+</li>
+<li>Modified property: session_meta_matches
+<ul>
+<li>Nullable changed from false to true</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: validate_json
+<ul>
+<li>Items changed
+<ul>
+<li>Properties changed
+<ul>
+<li>New property: disabled</li>
+<li>Modified property: error_response_code
+<ul>
+<li>Format changed from 'int64' to ''</li>
+</ul>
+</li>
+<li>Modified property: schema
+<ul>
+<li>Nullable changed from false to true</li>
+<li>AdditionalProperties changed
+<ul>
+<li>Type changed from 'object' to ''</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: virtual
+<ul>
+<li>Items changed
+<ul>
+<li>Properties changed
+<ul>
+<li>New property: disabled</li>
+<li>Modified property: function_source_type
+<ul>
+<li>New enum values: [blob file]</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: white_list
+<ul>
+<li>Items changed
+<ul>
+<li>Properties changed
+<ul>
+<li>New property: disabled</li>
+<li>New property: ignore_case</li>
+<li>New property: method</li>
+<li>Modified property: method_actions
+<ul>
+<li>AdditionalProperties changed
+<ul>
+<li>Properties changed
+<ul>
+<li>Modified property: action
+<ul>
+<li>New enum values: [no_action reply]</li>
+</ul>
+</li>
+<li>Modified property: code
+<ul>
+<li>Format changed from 'int64' to ''</li>
+</ul>
+</li>
+<li>Modified property: headers
+<ul>
+<li>Nullable changed from false to true</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: global_headers
+<ul>
+<li>Nullable changed from false to true</li>
+</ul>
+</li>
+<li>Modified property: global_headers_remove
+<ul>
+<li>Nullable changed from false to true</li>
+</ul>
+</li>
+<li>Modified property: paths
+<ul>
+<li>Properties changed
+<ul>
+<li>Modified property: black_list
+<ul>
+<li>Nullable changed from false to true</li>
+</ul>
+</li>
+<li>Modified property: ignored
+<ul>
+<li>Nullable changed from false to true</li>
+</ul>
+</li>
+<li>Modified property: white_list
+<ul>
+<li>Nullable changed from false to true</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+<p>POST /tyk/apis</p>
+<ul>
+<li>Request body changed
+<ul>
+<li>Content changed
+<ul>
+<li>Modified media type: application/json
+<ul>
+<li>Schema changed
+<ul>
+<li>Properties changed
+<ul>
+<li>New property: analytics_plugin</li>
+<li>New property: auth_configs</li>
+<li>New property: certificate_pinning_disabled</li>
+<li>New property: config_data_disabled</li>
+<li>New property: custom_middleware_bundle_disabled</li>
+<li>New property: custom_plugin_auth_enabled</li>
+<li>New property: detailed_tracing</li>
+<li>New property: domain_disabled</li>
+<li>New property: enable_detailed_recording</li>
+<li>New property: enable_proxy_protocol</li>
+<li>New property: expiration</li>
+<li>New property: external_oauth</li>
+<li>New property: graphql</li>
+<li>New property: idp_client_id_mapping_disabled</li>
+<li>New property: is_oas</li>
+<li>New property: jwt_default_policies</li>
+<li>New property: listen_port</li>
+<li>New property: protocol</li>
+<li>New property: request_signing</li>
+<li>New property: scopes</li>
+<li>New property: session_lifetime_respects_key_expiration</li>
+<li>New property: tags_disabled</li>
+<li>New property: upstream_certificates_disabled</li>
+<li>New property: use_go_plugin_auth</li>
+<li>Modified property: CORS
+<ul>
+<li>Properties changed
+<ul>
+<li>Modified property: allowed_headers
+<ul>
+<li>Nullable changed from false to true</li>
+</ul>
+</li>
+<li>Modified property: allowed_methods
+<ul>
+<li>Nullable changed from false to true</li>
+</ul>
+</li>
+<li>Modified property: allowed_origins
+<ul>
+<li>Nullable changed from false to true</li>
+</ul>
+</li>
+<li>Modified property: exposed_headers
+<ul>
+<li>Nullable changed from false to true</li>
+</ul>
+</li>
+<li>Modified property: max_age
+<ul>
+<li>Format changed from 'int64' to ''</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: allowed_ips
+<ul>
+<li>Nullable changed from false to true</li>
+</ul>
+</li>
+<li>Modified property: auth
+<ul>
+<li>Properties changed
+<ul>
+<li>New property: disable_header</li>
+<li>New property: name</li>
+<li>Modified property: signature
+<ul>
+<li>Properties changed
+<ul>
+<li>New property: param_name</li>
+<li>New property: use_param</li>
+<li>Modified property: allowed_clock_skew
+<ul>
+<li>Format changed from 'int64' to ''</li>
+</ul>
+</li>
+<li>Modified property: error_code
+<ul>
+<li>Format changed from 'int64' to ''</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: auth_provider
+<ul>
+<li>Properties changed
+<ul>
+<li>Modified property: meta
+<ul>
+<li>Nullable changed from false to true</li>
+<li>AdditionalProperties changed
+<ul>
+<li>Type changed from 'object' to ''</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: basic_auth
+<ul>
+<li>Properties changed
+<ul>
+<li>Modified property: cache_ttl
+<ul>
+<li>Format changed from 'int64' to ''</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: blacklisted_ips
+<ul>
+<li>Nullable changed from false to true</li>
+</ul>
+</li>
+<li>Modified property: cache_options
+<ul>
+<li>Properties changed
+<ul>
+<li>New property: cache_by_headers</li>
+<li>Modified property: cache_response_codes
+<ul>
+<li>Nullable changed from false to true</li>
+<li>Items changed
+<ul>
+<li>Format changed from 'int64' to ''</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: certificates
+<ul>
+<li>Nullable changed from false to true</li>
+</ul>
+</li>
+<li>Modified property: client_certificates
+<ul>
+<li>Nullable changed from false to true</li>
+</ul>
+</li>
+<li>Modified property: config_data
+<ul>
+<li>Nullable changed from false to true</li>
+<li>AdditionalProperties changed
+<ul>
+<li>Type changed from 'object' to ''</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: custom_middleware
+<ul>
+<li>Properties changed
+<ul>
+<li>Modified property: auth_check
+<ul>
+<li>Properties changed
+<ul>
+<li>New property: disabled</li>
+<li>New property: raw_body_only</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: id_extractor
+<ul>
+<li>Properties changed
+<ul>
+<li>New property: disabled</li>
+<li>Modified property: extractor_config
+<ul>
+<li>Nullable changed from false to true</li>
+<li>AdditionalProperties changed
+<ul>
+<li>Type changed from 'object' to ''</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: post
+<ul>
+<li>Nullable changed from false to true</li>
+<li>Items changed
+<ul>
+<li>Properties changed
+<ul>
+<li>New property: disabled</li>
+<li>New property: raw_body_only</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: post_key_auth
+<ul>
+<li>Nullable changed from false to true</li>
+<li>Items changed
+<ul>
+<li>Properties changed
+<ul>
+<li>New property: disabled</li>
+<li>New property: raw_body_only</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: pre
+<ul>
+<li>Nullable changed from false to true</li>
+<li>Items changed
+<ul>
+<li>Properties changed
+<ul>
+<li>New property: disabled</li>
+<li>New property: raw_body_only</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: response
+<ul>
+<li>Nullable changed from false to true</li>
+<li>Items changed
+<ul>
+<li>Properties changed
+<ul>
+<li>New property: disabled</li>
+<li>New property: raw_body_only</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: definition
+<ul>
+<li>Properties changed
+<ul>
+<li>New property: default</li>
+<li>New property: enabled</li>
+<li>New property: fallback_to_default</li>
+<li>New property: name</li>
+<li>New property: strip_versioning_data</li>
+<li>New property: url_versioning_pattern</li>
+<li>New property: versions</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: event_handlers
+<ul>
+<li>Properties changed
+<ul>
+<li>Modified property: events
+<ul>
+<li>Type changed from '' to 'object'</li>
+<li>Nullable changed from false to true</li>
+<li>AdditionalProperties changed
+<ul>
+<li>Schema added</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: expire_analytics_after
+<ul>
+<li>Format changed from 'int64' to ''</li>
+</ul>
+</li>
+<li>Modified property: global_rate_limit
+<ul>
+<li>Properties changed
+<ul>
+<li>New property: disabled</li>
+<li>Modified property: per
+<ul>
+<li>Format changed from 'double' to ''</li>
+</ul>
+</li>
+<li>Modified property: rate
+<ul>
+<li>Format changed from 'double' to ''</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: hmac_allowed_algorithms
+<ul>
+<li>Nullable changed from false to true</li>
+</ul>
+</li>
+<li>Modified property: hmac_allowed_clock_skew
+<ul>
+<li>Format changed from 'double' to ''</li>
+</ul>
+</li>
+<li>Modified property: jwt_expires_at_validation_skew
+<ul>
+<li>Format changed from 'uint64' to ''</li>
+<li>Min changed from null to 0</li>
+</ul>
+</li>
+<li>Modified property: jwt_issued_at_validation_skew
+<ul>
+<li>Format changed from 'uint64' to ''</li>
+<li>Min changed from null to 0</li>
+</ul>
+</li>
+<li>Modified property: jwt_not_before_validation_skew
+<ul>
+<li>Format changed from 'uint64' to ''</li>
+<li>Min changed from null to 0</li>
+</ul>
+</li>
+<li>Modified property: jwt_scope_to_policy_mapping
+<ul>
+<li>Nullable changed from false to true</li>
+</ul>
+</li>
+<li>Modified property: oauth_meta
+<ul>
+<li>Properties changed
+<ul>
+<li>Modified property: allowed_access_types
+<ul>
+<li>Nullable changed from false to true</li>
+</ul>
+</li>
+<li>Modified property: allowed_authorize_types
+<ul>
+<li>Nullable changed from false to true</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: openid_options
+<ul>
+<li>Properties changed
+<ul>
+<li>Modified property: providers
+<ul>
+<li>Nullable changed from false to true</li>
+<li>Items changed
+<ul>
+<li>Properties changed
+<ul>
+<li>Modified property: client_ids
+<ul>
+<li>Nullable changed from false to true</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: pinned_public_keys
+<ul>
+<li>Nullable changed from false to true</li>
+</ul>
+</li>
+<li>Modified property: proxy
+<ul>
+<li>Properties changed
+<ul>
+<li>Modified property: service_discovery
+<ul>
+<li>Properties changed
+<ul>
+<li>New property: cache_disabled</li>
+<li>Modified property: cache_timeout
+<ul>
+<li>Format changed from 'int64' to ''</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: target_list
+<ul>
+<li>Nullable changed from false to true</li>
+</ul>
+</li>
+<li>Modified property: transport
+<ul>
+<li>Properties changed
+<ul>
+<li>New property: ssl_force_common_name_check</li>
+<li>New property: ssl_max_version</li>
+<li>Modified property: ssl_ciphers
+<ul>
+<li>Nullable changed from false to true</li>
+</ul>
+</li>
+<li>Modified property: ssl_min_version
+<ul>
+<li>Format changed from 'uint16' to ''</li>
+<li>Min changed from null to 0</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: response_processors
+<ul>
+<li>Nullable changed from false to true</li>
+<li>Items changed
+<ul>
+<li>Properties changed
+<ul>
+<li>Modified property: options
+<ul>
+<li>Type changed from 'object' to ''</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: session_lifetime
+<ul>
+<li>Format changed from 'int64' to ''</li>
+</ul>
+</li>
+<li>Modified property: session_provider
+<ul>
+<li>Properties changed
+<ul>
+<li>Modified property: meta
+<ul>
+<li>Nullable changed from false to true</li>
+<li>AdditionalProperties changed
+<ul>
+<li>Type changed from 'object' to ''</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: tag_headers
+<ul>
+<li>Nullable changed from false to true</li>
+</ul>
+</li>
+<li>Modified property: tags
+<ul>
+<li>Nullable changed from false to true</li>
+</ul>
+</li>
+<li>Modified property: upstream_certificates
+<ul>
+<li>Nullable changed from false to true</li>
+</ul>
+</li>
+<li>Modified property: uptime_tests
+<ul>
+<li>Properties changed
+<ul>
+<li>Modified property: check_list
+<ul>
+<li>Nullable changed from false to true</li>
+<li>Items changed
+<ul>
+<li>Properties changed
+<ul>
+<li>New property: commands</li>
+<li>New property: enable_proxy_protocol</li>
+<li>New property: protocol</li>
+<li>New property: timeout</li>
+<li>Modified property: headers
+<ul>
+<li>Nullable changed from false to true</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: config
+<ul>
+<li>Properties changed
+<ul>
+<li>Modified property: expire_utime_after
+<ul>
+<li>Format changed from 'int64' to ''</li>
+</ul>
+</li>
+<li>Modified property: recheck_wait
+<ul>
+<li>Format changed from 'int64' to ''</li>
+</ul>
+</li>
+<li>Modified property: service_discovery
+<ul>
+<li>Properties changed
+<ul>
+<li>New property: cache_disabled</li>
+<li>Modified property: cache_timeout
+<ul>
+<li>Format changed from 'int64' to ''</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: version_data
+<ul>
+<li>Properties changed
+<ul>
+<li>Modified property: versions
+<ul>
+<li>Nullable changed from false to true</li>
+<li>AdditionalProperties changed
+<ul>
+<li>Properties changed
+<ul>
+<li>New property: global_headers_disabled</li>
+<li>New property: global_response_headers</li>
+<li>New property: global_response_headers_disabled</li>
+<li>New property: global_response_headers_remove</li>
+<li>New property: ignore_endpoint_case</li>
+<li>Modified property: extended_paths
+<ul>
+<li>Properties changed
+<ul>
+<li>New property: go_plugin</li>
+<li>New property: mock_response</li>
+<li>New property: persist_graphql</li>
+<li>New property: validate_request</li>
+<li>Modified property: advance_cache_config
+<ul>
+<li>Items changed
+<ul>
+<li>Properties changed
+<ul>
+<li>New property: disabled</li>
+<li>New property: timeout</li>
+<li>Modified property: cache_response_codes
+<ul>
+<li>Nullable changed from false to true</li>
+<li>Items changed
+<ul>
+<li>Format changed from 'int64' to ''</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: black_list
+<ul>
+<li>Items changed
+<ul>
+<li>Properties changed
+<ul>
+<li>New property: disabled</li>
+<li>New property: ignore_case</li>
+<li>New property: method</li>
+<li>Modified property: method_actions
+<ul>
+<li>AdditionalProperties changed
+<ul>
+<li>Properties changed
+<ul>
+<li>Modified property: action
+<ul>
+<li>New enum values: [no_action reply]</li>
+</ul>
+</li>
+<li>Modified property: code
+<ul>
+<li>Format changed from 'int64' to ''</li>
+</ul>
+</li>
+<li>Modified property: headers
+<ul>
+<li>Nullable changed from false to true</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: circuit_breakers
+<ul>
+<li>Items changed
+<ul>
+<li>Properties changed
+<ul>
+<li>New property: disable_half_open_state</li>
+<li>New property: disabled</li>
+<li>Modified property: return_to_service_after
+<ul>
+<li>Format changed from 'int64' to ''</li>
+</ul>
+</li>
+<li>Modified property: threshold_percent
+<ul>
+<li>Format changed from 'double' to ''</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: do_not_track_endpoints
+<ul>
+<li>Items changed
+<ul>
+<li>Properties changed
+<ul>
+<li>New property: disabled</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: hard_timeouts
+<ul>
+<li>Items changed
+<ul>
+<li>Properties changed
+<ul>
+<li>New property: disabled</li>
+<li>Modified property: timeout
+<ul>
+<li>Format changed from 'int64' to ''</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: ignored
+<ul>
+<li>Items changed
+<ul>
+<li>Properties changed
+<ul>
+<li>New property: disabled</li>
+<li>New property: ignore_case</li>
+<li>New property: method</li>
+<li>Modified property: method_actions
+<ul>
+<li>AdditionalProperties changed
+<ul>
+<li>Properties changed
+<ul>
+<li>Modified property: action
+<ul>
+<li>New enum values: [no_action reply]</li>
+</ul>
+</li>
+<li>Modified property: code
+<ul>
+<li>Format changed from 'int64' to ''</li>
+</ul>
+</li>
+<li>Modified property: headers
+<ul>
+<li>Nullable changed from false to true</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: internal
+<ul>
+<li>Items changed
+<ul>
+<li>Properties changed
+<ul>
+<li>New property: disabled</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: method_transforms
+<ul>
+<li>Items changed
+<ul>
+<li>Properties changed
+<ul>
+<li>New property: disabled</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: rate_limit
+<ul>
+<li>Nullable changed from false to true</li>
+<li>Items changed
+<ul>
+<li>Properties changed
+<ul>
+<li>Modified property: per
+<ul>
+<li>Format changed from 'double' to ''</li>
+</ul>
+</li>
+<li>Modified property: rate
+<ul>
+<li>Format changed from 'double' to ''</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: size_limits
+<ul>
+<li>Items changed
+<ul>
+<li>Properties changed
+<ul>
+<li>New property: disabled</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: track_endpoints
+<ul>
+<li>Items changed
+<ul>
+<li>Properties changed
+<ul>
+<li>New property: disabled</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: transform
+<ul>
+<li>Items changed
+<ul>
+<li>Properties changed
+<ul>
+<li>New property: disabled</li>
+<li>Modified property: template_data
+<ul>
+<li>Properties changed
+<ul>
+<li>Modified property: input_type
+<ul>
+<li>New enum values: [json xml]</li>
+</ul>
+</li>
+<li>Modified property: template_mode
+<ul>
+<li>New enum values: [blob file]</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: transform_headers
+<ul>
+<li>Items changed
+<ul>
+<li>Properties changed
+<ul>
+<li>New property: disabled</li>
+<li>Modified property: add_headers
+<ul>
+<li>Nullable changed from false to true</li>
+</ul>
+</li>
+<li>Modified property: delete_headers
+<ul>
+<li>Nullable changed from false to true</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: transform_response
+<ul>
+<li>Items changed
+<ul>
+<li>Properties changed
+<ul>
+<li>New property: disabled</li>
+<li>Modified property: template_data
+<ul>
+<li>Properties changed
+<ul>
+<li>Modified property: input_type
+<ul>
+<li>New enum values: [json xml]</li>
+</ul>
+</li>
+<li>Modified property: template_mode
+<ul>
+<li>New enum values: [blob file]</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: transform_response_headers
+<ul>
+<li>Items changed
+<ul>
+<li>Properties changed
+<ul>
+<li>New property: disabled</li>
+<li>Modified property: add_headers
+<ul>
+<li>Nullable changed from false to true</li>
+</ul>
+</li>
+<li>Modified property: delete_headers
+<ul>
+<li>Nullable changed from false to true</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: url_rewrites
+<ul>
+<li>Items changed
+<ul>
+<li>Properties changed
+<ul>
+<li>New property: disabled</li>
+<li>Deleted property: MatchRegexp</li>
+<li>Modified property: triggers
+<ul>
+<li>Nullable changed from false to true</li>
+<li>Items changed
+<ul>
+<li>Properties changed
+<ul>
+<li>Modified property: on
+<ul>
+<li>New enum values: [all any]</li>
+</ul>
+</li>
+<li>Modified property: options
+<ul>
+<li>Properties changed
+<ul>
+<li>Modified property: header_matches
+<ul>
+<li>Nullable changed from false to true</li>
+</ul>
+</li>
+<li>Modified property: path_part_matches
+<ul>
+<li>Nullable changed from false to true</li>
+</ul>
+</li>
+<li>Modified property: query_val_matches
+<ul>
+<li>Nullable changed from false to true</li>
+</ul>
+</li>
+<li>Modified property: request_context_matches
+<ul>
+<li>Nullable changed from false to true</li>
+</ul>
+</li>
+<li>Modified property: session_meta_matches
+<ul>
+<li>Nullable changed from false to true</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: validate_json
+<ul>
+<li>Items changed
+<ul>
+<li>Properties changed
+<ul>
+<li>New property: disabled</li>
+<li>Modified property: error_response_code
+<ul>
+<li>Format changed from 'int64' to ''</li>
+</ul>
+</li>
+<li>Modified property: schema
+<ul>
+<li>Nullable changed from false to true</li>
+<li>AdditionalProperties changed
+<ul>
+<li>Type changed from 'object' to ''</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: virtual
+<ul>
+<li>Items changed
+<ul>
+<li>Properties changed
+<ul>
+<li>New property: disabled</li>
+<li>Modified property: function_source_type
+<ul>
+<li>New enum values: [blob file]</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: white_list
+<ul>
+<li>Items changed
+<ul>
+<li>Properties changed
+<ul>
+<li>New property: disabled</li>
+<li>New property: ignore_case</li>
+<li>New property: method</li>
+<li>Modified property: method_actions
+<ul>
+<li>AdditionalProperties changed
+<ul>
+<li>Properties changed
+<ul>
+<li>Modified property: action
+<ul>
+<li>New enum values: [no_action reply]</li>
+</ul>
+</li>
+<li>Modified property: code
+<ul>
+<li>Format changed from 'int64' to ''</li>
+</ul>
+</li>
+<li>Modified property: headers
+<ul>
+<li>Nullable changed from false to true</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: global_headers
+<ul>
+<li>Nullable changed from false to true</li>
+</ul>
+</li>
+<li>Modified property: global_headers_remove
+<ul>
+<li>Nullable changed from false to true</li>
+</ul>
+</li>
+<li>Modified property: paths
+<ul>
+<li>Properties changed
+<ul>
+<li>Modified property: black_list
+<ul>
+<li>Nullable changed from false to true</li>
+</ul>
+</li>
+<li>Modified property: ignored
+<ul>
+<li>Nullable changed from false to true</li>
+</ul>
+</li>
+<li>Modified property: white_list
+<ul>
+<li>Nullable changed from false to true</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Responses changed
+<ul>
+<li>New response: 403</li>
+<li>New response: 500</li>
+</ul>
+</li>
+</ul>
+<p>GET /tyk/apis/oas</p>
+<ul>
+<li>Modified query param: mode
+<ul>
+<li>Schema changed
+<ul>
+<li>New enum values: [public]</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Responses changed
+<ul>
+<li>New response: 403</li>
+<li>Modified response: 200
+<ul>
+<li>Content changed
+<ul>
+<li>Modified media type: application/json
+<ul>
+<li>Schema changed
+<ul>
+<li>Items changed
+<ul>
+<li>AdditionalProperties changed from null to false</li>
+<li>Required changed
+<ul>
+<li>New required property: info</li>
+<li>New required property: openapi</li>
+<li>New required property: paths</li>
+</ul>
+</li>
+<li>Properties changed
+<ul>
+<li>New property: components</li>
+<li>New property: externalDocs</li>
+<li>New property: info</li>
+<li>New property: openapi</li>
+<li>New property: paths</li>
+<li>New property: security</li>
+<li>New property: servers</li>
+<li>New property: tags</li>
+<li>Deleted property: message</li>
+<li>Deleted property: schema</li>
+<li>Deleted property: status</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+<p>POST /tyk/apis/oas</p>
+<ul>
+<li>Responses changed
+<ul>
+<li>New response: 403</li>
+<li>New response: 500</li>
+</ul>
+</li>
+</ul>
+<p>GET /tyk/apis/oas/export</p>
+<ul>
+<li>Modified query param: mode
+<ul>
+<li>Schema changed
+<ul>
+<li>New enum values: [public]</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Responses changed
+<ul>
+<li>New response: 403</li>
+<li>New response: 500</li>
+<li>Modified response: 200
+<ul>
+<li>Content changed
+<ul>
+<li>New media type: application/octet-stream</li>
+<li>Deleted media type: application/json</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+<p>POST /tyk/apis/oas/import</p>
+<ul>
+<li>Deleted query param: apiID</li>
+<li>Modified query param: allowList
+<ul>
+<li>Schema changed
+<ul>
+<li>Type changed from 'string' to 'boolean'</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified query param: authentication
+<ul>
+<li>Schema changed
+<ul>
+<li>Type changed from 'string' to 'boolean'</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified query param: mockResponse
+<ul>
+<li>Schema changed
+<ul>
+<li>Type changed from 'string' to 'boolean'</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified query param: validateRequest
+<ul>
+<li>Schema changed
+<ul>
+<li>Type changed from 'string' to 'boolean'</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Responses changed
+<ul>
+<li>New response: 403</li>
+</ul>
+</li>
+</ul>
+<p>DELETE /tyk/apis/oas/{apiID}</p>
+<ul>
+<li>New path param: apiID</li>
+<li>Responses changed
+<ul>
+<li>New response: 403</li>
+<li>New response: 404</li>
+<li>New response: 500</li>
+<li>Modified response: 200
+<ul>
+<li>Content changed
+<ul>
+<li>Modified media type: application/json
+<ul>
+<li>Schema changed
+<ul>
+<li>Properties changed
+<ul>
+<li>New property: action</li>
+<li>New property: key</li>
+<li>New property: key_hash</li>
+<li>Deleted property: message</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+<p>GET /tyk/apis/oas/{apiID}</p>
+<ul>
+<li>New path param: apiID</li>
+<li>Modified query param: mode
+<ul>
+<li>Schema changed
+<ul>
+<li>New enum values: [public]</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Responses changed
+<ul>
+<li>New response: 400</li>
+<li>New response: 403</li>
+<li>New response: 404</li>
+<li>Modified response: 200
+<ul>
+<li>Content changed
+<ul>
+<li>Modified media type: application/json
+<ul>
+<li>Schema changed
+<ul>
+<li>AdditionalProperties changed from null to false</li>
+<li>Required changed
+<ul>
+<li>New required property: info</li>
+<li>New required property: openapi</li>
+<li>New required property: paths</li>
+</ul>
+</li>
+<li>Properties changed
+<ul>
+<li>New property: components</li>
+<li>New property: externalDocs</li>
+<li>New property: info</li>
+<li>New property: openapi</li>
+<li>New property: paths</li>
+<li>New property: security</li>
+<li>New property: servers</li>
+<li>New property: tags</li>
+<li>Deleted property: message</li>
+<li>Deleted property: schema</li>
+<li>Deleted property: status</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+<p>PATCH /tyk/apis/oas/{apiID}</p>
+<ul>
+<li>New path param: apiID</li>
+<li>Modified query param: allowList
+<ul>
+<li>Schema changed
+<ul>
+<li>Type changed from 'string' to 'boolean'</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified query param: authentication
+<ul>
+<li>Schema changed
+<ul>
+<li>Type changed from 'string' to 'boolean'</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified query param: mockResponse
+<ul>
+<li>Schema changed
+<ul>
+<li>Type changed from 'string' to 'boolean'</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified query param: validateRequest
+<ul>
+<li>Schema changed
+<ul>
+<li>Type changed from 'string' to 'boolean'</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Responses changed
+<ul>
+<li>New response: 403</li>
+<li>New response: 404</li>
+</ul>
+</li>
+</ul>
+<p>PUT /tyk/apis/oas/{apiID}</p>
+<ul>
+<li>New path param: apiID</li>
+<li>Responses changed
+<ul>
+<li>New response: 403</li>
+<li>New response: 404</li>
+<li>New response: 500</li>
+</ul>
+</li>
+</ul>
+<p>GET /tyk/apis/oas/{apiID}/export</p>
+<ul>
+<li>New path param: apiID</li>
+<li>Modified query param: mode
+<ul>
+<li>Schema changed
+<ul>
+<li>New enum values: [public]</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Responses changed
+<ul>
+<li>New response: 400</li>
+<li>New response: 403</li>
+<li>New response: 404</li>
+<li>New response: 500</li>
+<li>Modified response: 200
+<ul>
+<li>Content changed
+<ul>
+<li>New media type: application/octet-stream</li>
+<li>Deleted media type: application/json</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+<p>GET /tyk/apis/oas/{apiID}/versions</p>
+<ul>
+<li>New path param: apiID</li>
+<li>Responses changed
+<ul>
+<li>New response: 403</li>
+<li>New response: 404</li>
+<li>Modified response: 200
+<ul>
+<li>Content changed
+<ul>
+<li>Modified media type: application/json
+<ul>
+<li>Schema changed
+<ul>
+<li>Type changed from '' to 'object'</li>
+<li>Properties changed
+<ul>
+<li>New property: status</li>
+<li>Modified property: apis
+<ul>
+<li>Nullable changed from false to true</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+<p>DELETE /tyk/apis/{apiID}</p>
+<ul>
+<li>New path param: apiID</li>
+<li>Responses changed
+<ul>
+<li>New response: 403</li>
+<li>New response: 404</li>
+<li>New response: 500</li>
+<li>Deleted response: 400</li>
+<li>Modified response: 200
+<ul>
+<li>Content changed
+<ul>
+<li>Modified media type: application/json
+<ul>
+<li>Schema changed
+<ul>
+<li>Properties changed
+<ul>
+<li>New property: action</li>
+<li>New property: key</li>
+<li>New property: key_hash</li>
+<li>Deleted property: message</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+<p>GET /tyk/apis/{apiID}</p>
+<ul>
+<li>New path param: apiID</li>
+<li>Responses changed
+<ul>
+<li>New response: 403</li>
+<li>New response: 404</li>
+<li>Modified response: 200
+<ul>
+<li>Content changed
+<ul>
+<li>Modified media type: application/json
+<ul>
+<li>Schema changed
+<ul>
+<li>Properties changed
+<ul>
+<li>New property: analytics_plugin</li>
+<li>New property: auth_configs</li>
+<li>New property: certificate_pinning_disabled</li>
+<li>New property: config_data_disabled</li>
+<li>New property: custom_middleware_bundle_disabled</li>
+<li>New property: custom_plugin_auth_enabled</li>
+<li>New property: detailed_tracing</li>
+<li>New property: domain_disabled</li>
+<li>New property: enable_detailed_recording</li>
+<li>New property: enable_proxy_protocol</li>
+<li>New property: expiration</li>
+<li>New property: external_oauth</li>
+<li>New property: graphql</li>
+<li>New property: idp_client_id_mapping_disabled</li>
+<li>New property: is_oas</li>
+<li>New property: jwt_default_policies</li>
+<li>New property: listen_port</li>
+<li>New property: protocol</li>
+<li>New property: request_signing</li>
+<li>New property: scopes</li>
+<li>New property: session_lifetime_respects_key_expiration</li>
+<li>New property: tags_disabled</li>
+<li>New property: upstream_certificates_disabled</li>
+<li>New property: use_go_plugin_auth</li>
+<li>Modified property: CORS
+<ul>
+<li>Properties changed
+<ul>
+<li>Modified property: allowed_headers
+<ul>
+<li>Nullable changed from false to true</li>
+</ul>
+</li>
+<li>Modified property: allowed_methods
+<ul>
+<li>Nullable changed from false to true</li>
+</ul>
+</li>
+<li>Modified property: allowed_origins
+<ul>
+<li>Nullable changed from false to true</li>
+</ul>
+</li>
+<li>Modified property: exposed_headers
+<ul>
+<li>Nullable changed from false to true</li>
+</ul>
+</li>
+<li>Modified property: max_age
+<ul>
+<li>Format changed from 'int64' to ''</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: allowed_ips
+<ul>
+<li>Nullable changed from false to true</li>
+</ul>
+</li>
+<li>Modified property: auth
+<ul>
+<li>Properties changed
+<ul>
+<li>New property: disable_header</li>
+<li>New property: name</li>
+<li>Modified property: signature
+<ul>
+<li>Properties changed
+<ul>
+<li>New property: param_name</li>
+<li>New property: use_param</li>
+<li>Modified property: allowed_clock_skew
+<ul>
+<li>Format changed from 'int64' to ''</li>
+</ul>
+</li>
+<li>Modified property: error_code
+<ul>
+<li>Format changed from 'int64' to ''</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: auth_provider
+<ul>
+<li>Properties changed
+<ul>
+<li>Modified property: meta
+<ul>
+<li>Nullable changed from false to true</li>
+<li>AdditionalProperties changed
+<ul>
+<li>Type changed from 'object' to ''</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: basic_auth
+<ul>
+<li>Properties changed
+<ul>
+<li>Modified property: cache_ttl
+<ul>
+<li>Format changed from 'int64' to ''</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: blacklisted_ips
+<ul>
+<li>Nullable changed from false to true</li>
+</ul>
+</li>
+<li>Modified property: cache_options
+<ul>
+<li>Properties changed
+<ul>
+<li>New property: cache_by_headers</li>
+<li>Modified property: cache_response_codes
+<ul>
+<li>Nullable changed from false to true</li>
+<li>Items changed
+<ul>
+<li>Format changed from 'int64' to ''</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: certificates
+<ul>
+<li>Nullable changed from false to true</li>
+</ul>
+</li>
+<li>Modified property: client_certificates
+<ul>
+<li>Nullable changed from false to true</li>
+</ul>
+</li>
+<li>Modified property: config_data
+<ul>
+<li>Nullable changed from false to true</li>
+<li>AdditionalProperties changed
+<ul>
+<li>Type changed from 'object' to ''</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: custom_middleware
+<ul>
+<li>Properties changed
+<ul>
+<li>Modified property: auth_check
+<ul>
+<li>Properties changed
+<ul>
+<li>New property: disabled</li>
+<li>New property: raw_body_only</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: id_extractor
+<ul>
+<li>Properties changed
+<ul>
+<li>New property: disabled</li>
+<li>Modified property: extractor_config
+<ul>
+<li>Nullable changed from false to true</li>
+<li>AdditionalProperties changed
+<ul>
+<li>Type changed from 'object' to ''</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: post
+<ul>
+<li>Nullable changed from false to true</li>
+<li>Items changed
+<ul>
+<li>Properties changed
+<ul>
+<li>New property: disabled</li>
+<li>New property: raw_body_only</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: post_key_auth
+<ul>
+<li>Nullable changed from false to true</li>
+<li>Items changed
+<ul>
+<li>Properties changed
+<ul>
+<li>New property: disabled</li>
+<li>New property: raw_body_only</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: pre
+<ul>
+<li>Nullable changed from false to true</li>
+<li>Items changed
+<ul>
+<li>Properties changed
+<ul>
+<li>New property: disabled</li>
+<li>New property: raw_body_only</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: response
+<ul>
+<li>Nullable changed from false to true</li>
+<li>Items changed
+<ul>
+<li>Properties changed
+<ul>
+<li>New property: disabled</li>
+<li>New property: raw_body_only</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: definition
+<ul>
+<li>Properties changed
+<ul>
+<li>New property: default</li>
+<li>New property: enabled</li>
+<li>New property: fallback_to_default</li>
+<li>New property: name</li>
+<li>New property: strip_versioning_data</li>
+<li>New property: url_versioning_pattern</li>
+<li>New property: versions</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: event_handlers
+<ul>
+<li>Properties changed
+<ul>
+<li>Modified property: events
+<ul>
+<li>Type changed from '' to 'object'</li>
+<li>Nullable changed from false to true</li>
+<li>AdditionalProperties changed
+<ul>
+<li>Schema added</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: expire_analytics_after
+<ul>
+<li>Format changed from 'int64' to ''</li>
+</ul>
+</li>
+<li>Modified property: global_rate_limit
+<ul>
+<li>Properties changed
+<ul>
+<li>New property: disabled</li>
+<li>Modified property: per
+<ul>
+<li>Format changed from 'double' to ''</li>
+</ul>
+</li>
+<li>Modified property: rate
+<ul>
+<li>Format changed from 'double' to ''</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: hmac_allowed_algorithms
+<ul>
+<li>Nullable changed from false to true</li>
+</ul>
+</li>
+<li>Modified property: hmac_allowed_clock_skew
+<ul>
+<li>Format changed from 'double' to ''</li>
+</ul>
+</li>
+<li>Modified property: jwt_expires_at_validation_skew
+<ul>
+<li>Format changed from 'uint64' to ''</li>
+<li>Min changed from null to 0</li>
+</ul>
+</li>
+<li>Modified property: jwt_issued_at_validation_skew
+<ul>
+<li>Format changed from 'uint64' to ''</li>
+<li>Min changed from null to 0</li>
+</ul>
+</li>
+<li>Modified property: jwt_not_before_validation_skew
+<ul>
+<li>Format changed from 'uint64' to ''</li>
+<li>Min changed from null to 0</li>
+</ul>
+</li>
+<li>Modified property: jwt_scope_to_policy_mapping
+<ul>
+<li>Nullable changed from false to true</li>
+</ul>
+</li>
+<li>Modified property: oauth_meta
+<ul>
+<li>Properties changed
+<ul>
+<li>Modified property: allowed_access_types
+<ul>
+<li>Nullable changed from false to true</li>
+</ul>
+</li>
+<li>Modified property: allowed_authorize_types
+<ul>
+<li>Nullable changed from false to true</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: openid_options
+<ul>
+<li>Properties changed
+<ul>
+<li>Modified property: providers
+<ul>
+<li>Nullable changed from false to true</li>
+<li>Items changed
+<ul>
+<li>Properties changed
+<ul>
+<li>Modified property: client_ids
+<ul>
+<li>Nullable changed from false to true</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: pinned_public_keys
+<ul>
+<li>Nullable changed from false to true</li>
+</ul>
+</li>
+<li>Modified property: proxy
+<ul>
+<li>Properties changed
+<ul>
+<li>Modified property: service_discovery
+<ul>
+<li>Properties changed
+<ul>
+<li>New property: cache_disabled</li>
+<li>Modified property: cache_timeout
+<ul>
+<li>Format changed from 'int64' to ''</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: target_list
+<ul>
+<li>Nullable changed from false to true</li>
+</ul>
+</li>
+<li>Modified property: transport
+<ul>
+<li>Properties changed
+<ul>
+<li>New property: ssl_force_common_name_check</li>
+<li>New property: ssl_max_version</li>
+<li>Modified property: ssl_ciphers
+<ul>
+<li>Nullable changed from false to true</li>
+</ul>
+</li>
+<li>Modified property: ssl_min_version
+<ul>
+<li>Format changed from 'uint16' to ''</li>
+<li>Min changed from null to 0</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: response_processors
+<ul>
+<li>Nullable changed from false to true</li>
+<li>Items changed
+<ul>
+<li>Properties changed
+<ul>
+<li>Modified property: options
+<ul>
+<li>Type changed from 'object' to ''</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: session_lifetime
+<ul>
+<li>Format changed from 'int64' to ''</li>
+</ul>
+</li>
+<li>Modified property: session_provider
+<ul>
+<li>Properties changed
+<ul>
+<li>Modified property: meta
+<ul>
+<li>Nullable changed from false to true</li>
+<li>AdditionalProperties changed
+<ul>
+<li>Type changed from 'object' to ''</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: tag_headers
+<ul>
+<li>Nullable changed from false to true</li>
+</ul>
+</li>
+<li>Modified property: tags
+<ul>
+<li>Nullable changed from false to true</li>
+</ul>
+</li>
+<li>Modified property: upstream_certificates
+<ul>
+<li>Nullable changed from false to true</li>
+</ul>
+</li>
+<li>Modified property: uptime_tests
+<ul>
+<li>Properties changed
+<ul>
+<li>Modified property: check_list
+<ul>
+<li>Nullable changed from false to true</li>
+<li>Items changed
+<ul>
+<li>Properties changed
+<ul>
+<li>New property: commands</li>
+<li>New property: enable_proxy_protocol</li>
+<li>New property: protocol</li>
+<li>New property: timeout</li>
+<li>Modified property: headers
+<ul>
+<li>Nullable changed from false to true</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: config
+<ul>
+<li>Properties changed
+<ul>
+<li>Modified property: expire_utime_after
+<ul>
+<li>Format changed from 'int64' to ''</li>
+</ul>
+</li>
+<li>Modified property: recheck_wait
+<ul>
+<li>Format changed from 'int64' to ''</li>
+</ul>
+</li>
+<li>Modified property: service_discovery
+<ul>
+<li>Properties changed
+<ul>
+<li>New property: cache_disabled</li>
+<li>Modified property: cache_timeout
+<ul>
+<li>Format changed from 'int64' to ''</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: version_data
+<ul>
+<li>Properties changed
+<ul>
+<li>Modified property: versions
+<ul>
+<li>Nullable changed from false to true</li>
+<li>AdditionalProperties changed
+<ul>
+<li>Properties changed
+<ul>
+<li>New property: global_headers_disabled</li>
+<li>New property: global_response_headers</li>
+<li>New property: global_response_headers_disabled</li>
+<li>New property: global_response_headers_remove</li>
+<li>New property: ignore_endpoint_case</li>
+<li>Modified property: extended_paths
+<ul>
+<li>Properties changed
+<ul>
+<li>New property: go_plugin</li>
+<li>New property: mock_response</li>
+<li>New property: persist_graphql</li>
+<li>New property: validate_request</li>
+<li>Modified property: advance_cache_config
+<ul>
+<li>Items changed
+<ul>
+<li>Properties changed
+<ul>
+<li>New property: disabled</li>
+<li>New property: timeout</li>
+<li>Modified property: cache_response_codes
+<ul>
+<li>Nullable changed from false to true</li>
+<li>Items changed
+<ul>
+<li>Format changed from 'int64' to ''</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: black_list
+<ul>
+<li>Items changed
+<ul>
+<li>Properties changed
+<ul>
+<li>New property: disabled</li>
+<li>New property: ignore_case</li>
+<li>New property: method</li>
+<li>Modified property: method_actions
+<ul>
+<li>AdditionalProperties changed
+<ul>
+<li>Properties changed
+<ul>
+<li>Modified property: action
+<ul>
+<li>New enum values: [no_action reply]</li>
+</ul>
+</li>
+<li>Modified property: code
+<ul>
+<li>Format changed from 'int64' to ''</li>
+</ul>
+</li>
+<li>Modified property: headers
+<ul>
+<li>Nullable changed from false to true</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: circuit_breakers
+<ul>
+<li>Items changed
+<ul>
+<li>Properties changed
+<ul>
+<li>New property: disable_half_open_state</li>
+<li>New property: disabled</li>
+<li>Modified property: return_to_service_after
+<ul>
+<li>Format changed from 'int64' to ''</li>
+</ul>
+</li>
+<li>Modified property: threshold_percent
+<ul>
+<li>Format changed from 'double' to ''</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: do_not_track_endpoints
+<ul>
+<li>Items changed
+<ul>
+<li>Properties changed
+<ul>
+<li>New property: disabled</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: hard_timeouts
+<ul>
+<li>Items changed
+<ul>
+<li>Properties changed
+<ul>
+<li>New property: disabled</li>
+<li>Modified property: timeout
+<ul>
+<li>Format changed from 'int64' to ''</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: ignored
+<ul>
+<li>Items changed
+<ul>
+<li>Properties changed
+<ul>
+<li>New property: disabled</li>
+<li>New property: ignore_case</li>
+<li>New property: method</li>
+<li>Modified property: method_actions
+<ul>
+<li>AdditionalProperties changed
+<ul>
+<li>Properties changed
+<ul>
+<li>Modified property: action
+<ul>
+<li>New enum values: [no_action reply]</li>
+</ul>
+</li>
+<li>Modified property: code
+<ul>
+<li>Format changed from 'int64' to ''</li>
+</ul>
+</li>
+<li>Modified property: headers
+<ul>
+<li>Nullable changed from false to true</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: internal
+<ul>
+<li>Items changed
+<ul>
+<li>Properties changed
+<ul>
+<li>New property: disabled</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: method_transforms
+<ul>
+<li>Items changed
+<ul>
+<li>Properties changed
+<ul>
+<li>New property: disabled</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: rate_limit
+<ul>
+<li>Nullable changed from false to true</li>
+<li>Items changed
+<ul>
+<li>Properties changed
+<ul>
+<li>Modified property: per
+<ul>
+<li>Format changed from 'double' to ''</li>
+</ul>
+</li>
+<li>Modified property: rate
+<ul>
+<li>Format changed from 'double' to ''</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: size_limits
+<ul>
+<li>Items changed
+<ul>
+<li>Properties changed
+<ul>
+<li>New property: disabled</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: track_endpoints
+<ul>
+<li>Items changed
+<ul>
+<li>Properties changed
+<ul>
+<li>New property: disabled</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: transform
+<ul>
+<li>Items changed
+<ul>
+<li>Properties changed
+<ul>
+<li>New property: disabled</li>
+<li>Modified property: template_data
+<ul>
+<li>Properties changed
+<ul>
+<li>Modified property: input_type
+<ul>
+<li>New enum values: [json xml]</li>
+</ul>
+</li>
+<li>Modified property: template_mode
+<ul>
+<li>New enum values: [blob file]</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: transform_headers
+<ul>
+<li>Items changed
+<ul>
+<li>Properties changed
+<ul>
+<li>New property: disabled</li>
+<li>Modified property: add_headers
+<ul>
+<li>Nullable changed from false to true</li>
+</ul>
+</li>
+<li>Modified property: delete_headers
+<ul>
+<li>Nullable changed from false to true</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: transform_response
+<ul>
+<li>Items changed
+<ul>
+<li>Properties changed
+<ul>
+<li>New property: disabled</li>
+<li>Modified property: template_data
+<ul>
+<li>Properties changed
+<ul>
+<li>Modified property: input_type
+<ul>
+<li>New enum values: [json xml]</li>
+</ul>
+</li>
+<li>Modified property: template_mode
+<ul>
+<li>New enum values: [blob file]</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: transform_response_headers
+<ul>
+<li>Items changed
+<ul>
+<li>Properties changed
+<ul>
+<li>New property: disabled</li>
+<li>Modified property: add_headers
+<ul>
+<li>Nullable changed from false to true</li>
+</ul>
+</li>
+<li>Modified property: delete_headers
+<ul>
+<li>Nullable changed from false to true</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: url_rewrites
+<ul>
+<li>Items changed
+<ul>
+<li>Properties changed
+<ul>
+<li>New property: disabled</li>
+<li>Deleted property: MatchRegexp</li>
+<li>Modified property: triggers
+<ul>
+<li>Nullable changed from false to true</li>
+<li>Items changed
+<ul>
+<li>Properties changed
+<ul>
+<li>Modified property: on
+<ul>
+<li>New enum values: [all any]</li>
+</ul>
+</li>
+<li>Modified property: options
+<ul>
+<li>Properties changed
+<ul>
+<li>Modified property: header_matches
+<ul>
+<li>Nullable changed from false to true</li>
+</ul>
+</li>
+<li>Modified property: path_part_matches
+<ul>
+<li>Nullable changed from false to true</li>
+</ul>
+</li>
+<li>Modified property: query_val_matches
+<ul>
+<li>Nullable changed from false to true</li>
+</ul>
+</li>
+<li>Modified property: request_context_matches
+<ul>
+<li>Nullable changed from false to true</li>
+</ul>
+</li>
+<li>Modified property: session_meta_matches
+<ul>
+<li>Nullable changed from false to true</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: validate_json
+<ul>
+<li>Items changed
+<ul>
+<li>Properties changed
+<ul>
+<li>New property: disabled</li>
+<li>Modified property: error_response_code
+<ul>
+<li>Format changed from 'int64' to ''</li>
+</ul>
+</li>
+<li>Modified property: schema
+<ul>
+<li>Nullable changed from false to true</li>
+<li>AdditionalProperties changed
+<ul>
+<li>Type changed from 'object' to ''</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: virtual
+<ul>
+<li>Items changed
+<ul>
+<li>Properties changed
+<ul>
+<li>New property: disabled</li>
+<li>Modified property: function_source_type
+<ul>
+<li>New enum values: [blob file]</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: white_list
+<ul>
+<li>Items changed
+<ul>
+<li>Properties changed
+<ul>
+<li>New property: disabled</li>
+<li>New property: ignore_case</li>
+<li>New property: method</li>
+<li>Modified property: method_actions
+<ul>
+<li>AdditionalProperties changed
+<ul>
+<li>Properties changed
+<ul>
+<li>Modified property: action
+<ul>
+<li>New enum values: [no_action reply]</li>
+</ul>
+</li>
+<li>Modified property: code
+<ul>
+<li>Format changed from 'int64' to ''</li>
+</ul>
+</li>
+<li>Modified property: headers
+<ul>
+<li>Nullable changed from false to true</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: global_headers
+<ul>
+<li>Nullable changed from false to true</li>
+</ul>
+</li>
+<li>Modified property: global_headers_remove
+<ul>
+<li>Nullable changed from false to true</li>
+</ul>
+</li>
+<li>Modified property: paths
+<ul>
+<li>Properties changed
+<ul>
+<li>Modified property: black_list
+<ul>
+<li>Nullable changed from false to true</li>
+</ul>
+</li>
+<li>Modified property: ignored
+<ul>
+<li>Nullable changed from false to true</li>
+</ul>
+</li>
+<li>Modified property: white_list
+<ul>
+<li>Nullable changed from false to true</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+<p>PUT /tyk/apis/{apiID}</p>
+<ul>
+<li>New path param: apiID</li>
+<li>Request body changed
+<ul>
+<li>Content changed
+<ul>
+<li>Modified media type: application/json
+<ul>
+<li>Schema changed
+<ul>
+<li>Properties changed
+<ul>
+<li>New property: analytics_plugin</li>
+<li>New property: auth_configs</li>
+<li>New property: certificate_pinning_disabled</li>
+<li>New property: config_data_disabled</li>
+<li>New property: custom_middleware_bundle_disabled</li>
+<li>New property: custom_plugin_auth_enabled</li>
+<li>New property: detailed_tracing</li>
+<li>New property: domain_disabled</li>
+<li>New property: enable_detailed_recording</li>
+<li>New property: enable_proxy_protocol</li>
+<li>New property: expiration</li>
+<li>New property: external_oauth</li>
+<li>New property: graphql</li>
+<li>New property: idp_client_id_mapping_disabled</li>
+<li>New property: is_oas</li>
+<li>New property: jwt_default_policies</li>
+<li>New property: listen_port</li>
+<li>New property: protocol</li>
+<li>New property: request_signing</li>
+<li>New property: scopes</li>
+<li>New property: session_lifetime_respects_key_expiration</li>
+<li>New property: tags_disabled</li>
+<li>New property: upstream_certificates_disabled</li>
+<li>New property: use_go_plugin_auth</li>
+<li>Modified property: CORS
+<ul>
+<li>Properties changed
+<ul>
+<li>Modified property: allowed_headers
+<ul>
+<li>Nullable changed from false to true</li>
+</ul>
+</li>
+<li>Modified property: allowed_methods
+<ul>
+<li>Nullable changed from false to true</li>
+</ul>
+</li>
+<li>Modified property: allowed_origins
+<ul>
+<li>Nullable changed from false to true</li>
+</ul>
+</li>
+<li>Modified property: exposed_headers
+<ul>
+<li>Nullable changed from false to true</li>
+</ul>
+</li>
+<li>Modified property: max_age
+<ul>
+<li>Format changed from 'int64' to ''</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: allowed_ips
+<ul>
+<li>Nullable changed from false to true</li>
+</ul>
+</li>
+<li>Modified property: auth
+<ul>
+<li>Properties changed
+<ul>
+<li>New property: disable_header</li>
+<li>New property: name</li>
+<li>Modified property: signature
+<ul>
+<li>Properties changed
+<ul>
+<li>New property: param_name</li>
+<li>New property: use_param</li>
+<li>Modified property: allowed_clock_skew
+<ul>
+<li>Format changed from 'int64' to ''</li>
+</ul>
+</li>
+<li>Modified property: error_code
+<ul>
+<li>Format changed from 'int64' to ''</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: auth_provider
+<ul>
+<li>Properties changed
+<ul>
+<li>Modified property: meta
+<ul>
+<li>Nullable changed from false to true</li>
+<li>AdditionalProperties changed
+<ul>
+<li>Type changed from 'object' to ''</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: basic_auth
+<ul>
+<li>Properties changed
+<ul>
+<li>Modified property: cache_ttl
+<ul>
+<li>Format changed from 'int64' to ''</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: blacklisted_ips
+<ul>
+<li>Nullable changed from false to true</li>
+</ul>
+</li>
+<li>Modified property: cache_options
+<ul>
+<li>Properties changed
+<ul>
+<li>New property: cache_by_headers</li>
+<li>Modified property: cache_response_codes
+<ul>
+<li>Nullable changed from false to true</li>
+<li>Items changed
+<ul>
+<li>Format changed from 'int64' to ''</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: certificates
+<ul>
+<li>Nullable changed from false to true</li>
+</ul>
+</li>
+<li>Modified property: client_certificates
+<ul>
+<li>Nullable changed from false to true</li>
+</ul>
+</li>
+<li>Modified property: config_data
+<ul>
+<li>Nullable changed from false to true</li>
+<li>AdditionalProperties changed
+<ul>
+<li>Type changed from 'object' to ''</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: custom_middleware
+<ul>
+<li>Properties changed
+<ul>
+<li>Modified property: auth_check
+<ul>
+<li>Properties changed
+<ul>
+<li>New property: disabled</li>
+<li>New property: raw_body_only</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: id_extractor
+<ul>
+<li>Properties changed
+<ul>
+<li>New property: disabled</li>
+<li>Modified property: extractor_config
+<ul>
+<li>Nullable changed from false to true</li>
+<li>AdditionalProperties changed
+<ul>
+<li>Type changed from 'object' to ''</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: post
+<ul>
+<li>Nullable changed from false to true</li>
+<li>Items changed
+<ul>
+<li>Properties changed
+<ul>
+<li>New property: disabled</li>
+<li>New property: raw_body_only</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: post_key_auth
+<ul>
+<li>Nullable changed from false to true</li>
+<li>Items changed
+<ul>
+<li>Properties changed
+<ul>
+<li>New property: disabled</li>
+<li>New property: raw_body_only</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: pre
+<ul>
+<li>Nullable changed from false to true</li>
+<li>Items changed
+<ul>
+<li>Properties changed
+<ul>
+<li>New property: disabled</li>
+<li>New property: raw_body_only</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: response
+<ul>
+<li>Nullable changed from false to true</li>
+<li>Items changed
+<ul>
+<li>Properties changed
+<ul>
+<li>New property: disabled</li>
+<li>New property: raw_body_only</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: definition
+<ul>
+<li>Properties changed
+<ul>
+<li>New property: default</li>
+<li>New property: enabled</li>
+<li>New property: fallback_to_default</li>
+<li>New property: name</li>
+<li>New property: strip_versioning_data</li>
+<li>New property: url_versioning_pattern</li>
+<li>New property: versions</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: event_handlers
+<ul>
+<li>Properties changed
+<ul>
+<li>Modified property: events
+<ul>
+<li>Type changed from '' to 'object'</li>
+<li>Nullable changed from false to true</li>
+<li>AdditionalProperties changed
+<ul>
+<li>Schema added</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: expire_analytics_after
+<ul>
+<li>Format changed from 'int64' to ''</li>
+</ul>
+</li>
+<li>Modified property: global_rate_limit
+<ul>
+<li>Properties changed
+<ul>
+<li>New property: disabled</li>
+<li>Modified property: per
+<ul>
+<li>Format changed from 'double' to ''</li>
+</ul>
+</li>
+<li>Modified property: rate
+<ul>
+<li>Format changed from 'double' to ''</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: hmac_allowed_algorithms
+<ul>
+<li>Nullable changed from false to true</li>
+</ul>
+</li>
+<li>Modified property: hmac_allowed_clock_skew
+<ul>
+<li>Format changed from 'double' to ''</li>
+</ul>
+</li>
+<li>Modified property: jwt_expires_at_validation_skew
+<ul>
+<li>Format changed from 'uint64' to ''</li>
+<li>Min changed from null to 0</li>
+</ul>
+</li>
+<li>Modified property: jwt_issued_at_validation_skew
+<ul>
+<li>Format changed from 'uint64' to ''</li>
+<li>Min changed from null to 0</li>
+</ul>
+</li>
+<li>Modified property: jwt_not_before_validation_skew
+<ul>
+<li>Format changed from 'uint64' to ''</li>
+<li>Min changed from null to 0</li>
+</ul>
+</li>
+<li>Modified property: jwt_scope_to_policy_mapping
+<ul>
+<li>Nullable changed from false to true</li>
+</ul>
+</li>
+<li>Modified property: oauth_meta
+<ul>
+<li>Properties changed
+<ul>
+<li>Modified property: allowed_access_types
+<ul>
+<li>Nullable changed from false to true</li>
+</ul>
+</li>
+<li>Modified property: allowed_authorize_types
+<ul>
+<li>Nullable changed from false to true</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: openid_options
+<ul>
+<li>Properties changed
+<ul>
+<li>Modified property: providers
+<ul>
+<li>Nullable changed from false to true</li>
+<li>Items changed
+<ul>
+<li>Properties changed
+<ul>
+<li>Modified property: client_ids
+<ul>
+<li>Nullable changed from false to true</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: pinned_public_keys
+<ul>
+<li>Nullable changed from false to true</li>
+</ul>
+</li>
+<li>Modified property: proxy
+<ul>
+<li>Properties changed
+<ul>
+<li>Modified property: service_discovery
+<ul>
+<li>Properties changed
+<ul>
+<li>New property: cache_disabled</li>
+<li>Modified property: cache_timeout
+<ul>
+<li>Format changed from 'int64' to ''</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: target_list
+<ul>
+<li>Nullable changed from false to true</li>
+</ul>
+</li>
+<li>Modified property: transport
+<ul>
+<li>Properties changed
+<ul>
+<li>New property: ssl_force_common_name_check</li>
+<li>New property: ssl_max_version</li>
+<li>Modified property: ssl_ciphers
+<ul>
+<li>Nullable changed from false to true</li>
+</ul>
+</li>
+<li>Modified property: ssl_min_version
+<ul>
+<li>Format changed from 'uint16' to ''</li>
+<li>Min changed from null to 0</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: response_processors
+<ul>
+<li>Nullable changed from false to true</li>
+<li>Items changed
+<ul>
+<li>Properties changed
+<ul>
+<li>Modified property: options
+<ul>
+<li>Type changed from 'object' to ''</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: session_lifetime
+<ul>
+<li>Format changed from 'int64' to ''</li>
+</ul>
+</li>
+<li>Modified property: session_provider
+<ul>
+<li>Properties changed
+<ul>
+<li>Modified property: meta
+<ul>
+<li>Nullable changed from false to true</li>
+<li>AdditionalProperties changed
+<ul>
+<li>Type changed from 'object' to ''</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: tag_headers
+<ul>
+<li>Nullable changed from false to true</li>
+</ul>
+</li>
+<li>Modified property: tags
+<ul>
+<li>Nullable changed from false to true</li>
+</ul>
+</li>
+<li>Modified property: upstream_certificates
+<ul>
+<li>Nullable changed from false to true</li>
+</ul>
+</li>
+<li>Modified property: uptime_tests
+<ul>
+<li>Properties changed
+<ul>
+<li>Modified property: check_list
+<ul>
+<li>Nullable changed from false to true</li>
+<li>Items changed
+<ul>
+<li>Properties changed
+<ul>
+<li>New property: commands</li>
+<li>New property: enable_proxy_protocol</li>
+<li>New property: protocol</li>
+<li>New property: timeout</li>
+<li>Modified property: headers
+<ul>
+<li>Nullable changed from false to true</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: config
+<ul>
+<li>Properties changed
+<ul>
+<li>Modified property: expire_utime_after
+<ul>
+<li>Format changed from 'int64' to ''</li>
+</ul>
+</li>
+<li>Modified property: recheck_wait
+<ul>
+<li>Format changed from 'int64' to ''</li>
+</ul>
+</li>
+<li>Modified property: service_discovery
+<ul>
+<li>Properties changed
+<ul>
+<li>New property: cache_disabled</li>
+<li>Modified property: cache_timeout
+<ul>
+<li>Format changed from 'int64' to ''</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: version_data
+<ul>
+<li>Properties changed
+<ul>
+<li>Modified property: versions
+<ul>
+<li>Nullable changed from false to true</li>
+<li>AdditionalProperties changed
+<ul>
+<li>Properties changed
+<ul>
+<li>New property: global_headers_disabled</li>
+<li>New property: global_response_headers</li>
+<li>New property: global_response_headers_disabled</li>
+<li>New property: global_response_headers_remove</li>
+<li>New property: ignore_endpoint_case</li>
+<li>Modified property: extended_paths
+<ul>
+<li>Properties changed
+<ul>
+<li>New property: go_plugin</li>
+<li>New property: mock_response</li>
+<li>New property: persist_graphql</li>
+<li>New property: validate_request</li>
+<li>Modified property: advance_cache_config
+<ul>
+<li>Items changed
+<ul>
+<li>Properties changed
+<ul>
+<li>New property: disabled</li>
+<li>New property: timeout</li>
+<li>Modified property: cache_response_codes
+<ul>
+<li>Nullable changed from false to true</li>
+<li>Items changed
+<ul>
+<li>Format changed from 'int64' to ''</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: black_list
+<ul>
+<li>Items changed
+<ul>
+<li>Properties changed
+<ul>
+<li>New property: disabled</li>
+<li>New property: ignore_case</li>
+<li>New property: method</li>
+<li>Modified property: method_actions
+<ul>
+<li>AdditionalProperties changed
+<ul>
+<li>Properties changed
+<ul>
+<li>Modified property: action
+<ul>
+<li>New enum values: [no_action reply]</li>
+</ul>
+</li>
+<li>Modified property: code
+<ul>
+<li>Format changed from 'int64' to ''</li>
+</ul>
+</li>
+<li>Modified property: headers
+<ul>
+<li>Nullable changed from false to true</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: circuit_breakers
+<ul>
+<li>Items changed
+<ul>
+<li>Properties changed
+<ul>
+<li>New property: disable_half_open_state</li>
+<li>New property: disabled</li>
+<li>Modified property: return_to_service_after
+<ul>
+<li>Format changed from 'int64' to ''</li>
+</ul>
+</li>
+<li>Modified property: threshold_percent
+<ul>
+<li>Format changed from 'double' to ''</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: do_not_track_endpoints
+<ul>
+<li>Items changed
+<ul>
+<li>Properties changed
+<ul>
+<li>New property: disabled</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: hard_timeouts
+<ul>
+<li>Items changed
+<ul>
+<li>Properties changed
+<ul>
+<li>New property: disabled</li>
+<li>Modified property: timeout
+<ul>
+<li>Format changed from 'int64' to ''</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: ignored
+<ul>
+<li>Items changed
+<ul>
+<li>Properties changed
+<ul>
+<li>New property: disabled</li>
+<li>New property: ignore_case</li>
+<li>New property: method</li>
+<li>Modified property: method_actions
+<ul>
+<li>AdditionalProperties changed
+<ul>
+<li>Properties changed
+<ul>
+<li>Modified property: action
+<ul>
+<li>New enum values: [no_action reply]</li>
+</ul>
+</li>
+<li>Modified property: code
+<ul>
+<li>Format changed from 'int64' to ''</li>
+</ul>
+</li>
+<li>Modified property: headers
+<ul>
+<li>Nullable changed from false to true</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: internal
+<ul>
+<li>Items changed
+<ul>
+<li>Properties changed
+<ul>
+<li>New property: disabled</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: method_transforms
+<ul>
+<li>Items changed
+<ul>
+<li>Properties changed
+<ul>
+<li>New property: disabled</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: rate_limit
+<ul>
+<li>Nullable changed from false to true</li>
+<li>Items changed
+<ul>
+<li>Properties changed
+<ul>
+<li>Modified property: per
+<ul>
+<li>Format changed from 'double' to ''</li>
+</ul>
+</li>
+<li>Modified property: rate
+<ul>
+<li>Format changed from 'double' to ''</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: size_limits
+<ul>
+<li>Items changed
+<ul>
+<li>Properties changed
+<ul>
+<li>New property: disabled</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: track_endpoints
+<ul>
+<li>Items changed
+<ul>
+<li>Properties changed
+<ul>
+<li>New property: disabled</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: transform
+<ul>
+<li>Items changed
+<ul>
+<li>Properties changed
+<ul>
+<li>New property: disabled</li>
+<li>Modified property: template_data
+<ul>
+<li>Properties changed
+<ul>
+<li>Modified property: input_type
+<ul>
+<li>New enum values: [json xml]</li>
+</ul>
+</li>
+<li>Modified property: template_mode
+<ul>
+<li>New enum values: [blob file]</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: transform_headers
+<ul>
+<li>Items changed
+<ul>
+<li>Properties changed
+<ul>
+<li>New property: disabled</li>
+<li>Modified property: add_headers
+<ul>
+<li>Nullable changed from false to true</li>
+</ul>
+</li>
+<li>Modified property: delete_headers
+<ul>
+<li>Nullable changed from false to true</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: transform_response
+<ul>
+<li>Items changed
+<ul>
+<li>Properties changed
+<ul>
+<li>New property: disabled</li>
+<li>Modified property: template_data
+<ul>
+<li>Properties changed
+<ul>
+<li>Modified property: input_type
+<ul>
+<li>New enum values: [json xml]</li>
+</ul>
+</li>
+<li>Modified property: template_mode
+<ul>
+<li>New enum values: [blob file]</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: transform_response_headers
+<ul>
+<li>Items changed
+<ul>
+<li>Properties changed
+<ul>
+<li>New property: disabled</li>
+<li>Modified property: add_headers
+<ul>
+<li>Nullable changed from false to true</li>
+</ul>
+</li>
+<li>Modified property: delete_headers
+<ul>
+<li>Nullable changed from false to true</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: url_rewrites
+<ul>
+<li>Items changed
+<ul>
+<li>Properties changed
+<ul>
+<li>New property: disabled</li>
+<li>Deleted property: MatchRegexp</li>
+<li>Modified property: triggers
+<ul>
+<li>Nullable changed from false to true</li>
+<li>Items changed
+<ul>
+<li>Properties changed
+<ul>
+<li>Modified property: on
+<ul>
+<li>New enum values: [all any]</li>
+</ul>
+</li>
+<li>Modified property: options
+<ul>
+<li>Properties changed
+<ul>
+<li>Modified property: header_matches
+<ul>
+<li>Nullable changed from false to true</li>
+</ul>
+</li>
+<li>Modified property: path_part_matches
+<ul>
+<li>Nullable changed from false to true</li>
+</ul>
+</li>
+<li>Modified property: query_val_matches
+<ul>
+<li>Nullable changed from false to true</li>
+</ul>
+</li>
+<li>Modified property: request_context_matches
+<ul>
+<li>Nullable changed from false to true</li>
+</ul>
+</li>
+<li>Modified property: session_meta_matches
+<ul>
+<li>Nullable changed from false to true</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: validate_json
+<ul>
+<li>Items changed
+<ul>
+<li>Properties changed
+<ul>
+<li>New property: disabled</li>
+<li>Modified property: error_response_code
+<ul>
+<li>Format changed from 'int64' to ''</li>
+</ul>
+</li>
+<li>Modified property: schema
+<ul>
+<li>Nullable changed from false to true</li>
+<li>AdditionalProperties changed
+<ul>
+<li>Type changed from 'object' to ''</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: virtual
+<ul>
+<li>Items changed
+<ul>
+<li>Properties changed
+<ul>
+<li>New property: disabled</li>
+<li>Modified property: function_source_type
+<ul>
+<li>New enum values: [blob file]</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: white_list
+<ul>
+<li>Items changed
+<ul>
+<li>Properties changed
+<ul>
+<li>New property: disabled</li>
+<li>New property: ignore_case</li>
+<li>New property: method</li>
+<li>Modified property: method_actions
+<ul>
+<li>AdditionalProperties changed
+<ul>
+<li>Properties changed
+<ul>
+<li>Modified property: action
+<ul>
+<li>New enum values: [no_action reply]</li>
+</ul>
+</li>
+<li>Modified property: code
+<ul>
+<li>Format changed from 'int64' to ''</li>
+</ul>
+</li>
+<li>Modified property: headers
+<ul>
+<li>Nullable changed from false to true</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: global_headers
+<ul>
+<li>Nullable changed from false to true</li>
+</ul>
+</li>
+<li>Modified property: global_headers_remove
+<ul>
+<li>Nullable changed from false to true</li>
+</ul>
+</li>
+<li>Modified property: paths
+<ul>
+<li>Properties changed
+<ul>
+<li>Modified property: black_list
+<ul>
+<li>Nullable changed from false to true</li>
+</ul>
+</li>
+<li>Modified property: ignored
+<ul>
+<li>Nullable changed from false to true</li>
+</ul>
+</li>
+<li>Modified property: white_list
+<ul>
+<li>Nullable changed from false to true</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Responses changed
+<ul>
+<li>New response: 403</li>
+<li>New response: 404</li>
+<li>New response: 500</li>
+</ul>
+</li>
+</ul>
+<p>GET /tyk/apis/{apiID}/versions</p>
+<ul>
+<li>New path param: apiID</li>
+<li>Responses changed
+<ul>
+<li>New response: 403</li>
+<li>New response: 404</li>
+<li>Modified response: 200
+<ul>
+<li>Content changed
+<ul>
+<li>Modified media type: application/json
+<ul>
+<li>Schema changed
+<ul>
+<li>Type changed from '' to 'object'</li>
+<li>Properties changed
+<ul>
+<li>New property: status</li>
+<li>Modified property: apis
+<ul>
+<li>Nullable changed from false to true</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+<p>DELETE /tyk/cache/{apiID}</p>
+<ul>
+<li>New path param: apiID</li>
+<li>Responses changed
+<ul>
+<li>New response: 403</li>
+<li>New response: 500</li>
+</ul>
+</li>
+</ul>
+<p>GET /tyk/certs</p>
+<ul>
+<li>Deleted query param: certID</li>
+<li>Modified query param: mode
+<ul>
+<li>Schema changed
+<ul>
+<li>New enum values: [detailed]</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Responses changed
+<ul>
+<li>New response: 403</li>
+<li>Modified response: 200
+<ul>
+<li>Content changed
+<ul>
+<li>Modified media type: application/json
+<ul>
+<li>Schema changed
+<ul>
+<li>Property 'OneOf' changed
+<ul>
+<li>Schemas deleted: subschema #3</li>
+<li>Modified schema: #/components/schemas/APIAllCertificates
+<ul>
+<li>Properties changed
+<ul>
+<li>Modified property: certs
+<ul>
+<li>Nullable changed from false to true</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified schema: #/components/schemas/APIAllCertificateBasics
+<ul>
+<li>Properties changed
+<ul>
+<li>Modified property: certs
+<ul>
+<li>Nullable changed from false to true</li>
+<li>Items changed
+<ul>
+<li>Properties changed
+<ul>
+<li>Modified property: dns_names
+<ul>
+<li>Nullable changed from false to true</li>
+</ul>
+</li>
+<li>Modified property: has_private
+<ul>
+<li>Type changed from 'string' to 'boolean'</li>
+</ul>
+</li>
+<li>Modified property: not_after
+<ul>
+<li>Format changed from '' to 'date-time'</li>
+</ul>
+</li>
+<li>Modified property: not_before
+<ul>
+<li>Format changed from '' to 'date-time'</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+<p>POST /tyk/certs</p>
+<ul>
+<li>Responses changed
+<ul>
+<li>New response: 405</li>
+</ul>
+</li>
+</ul>
+<p>GET /tyk/hello</p>
+<ul>
+<li>Responses changed
+<ul>
+<li>New response: 405</li>
+<li>Modified response: 200
+<ul>
+<li>Content changed
+<ul>
+<li>New media type: application/json</li>
+<li>Deleted media type: text/html</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+<p>GET /tyk/keys</p>
+<ul>
+<li>New query param: filter</li>
+<li>Responses changed
+<ul>
+<li>New response: 403</li>
+<li>New response: 404</li>
+<li>Modified response: 200
+<ul>
+<li>Content changed
+<ul>
+<li>Modified media type: application/json
+<ul>
+<li>Schema changed
+<ul>
+<li>Properties changed
+<ul>
+<li>Modified property: keys
+<ul>
+<li>Nullable changed from false to true</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+<p>POST /tyk/keys</p>
+<ul>
+<li>New query param: hashed</li>
+<li>Request body changed
+<ul>
+<li>Content changed
+<ul>
+<li>Modified media type: application/json
+<ul>
+<li>Schema changed
+<ul>
+<li>Properties changed
+<ul>
+<li>New property: date_created</li>
+<li>New property: enable_detailed_recording</li>
+<li>New property: enable_http_signature_validation</li>
+<li>New property: max_query_depth</li>
+<li>New property: rsa_certificate_id</li>
+<li>Modified property: access_rights
+<ul>
+<li>Nullable changed from false to true</li>
+<li>AdditionalProperties changed
+<ul>
+<li>Properties changed
+<ul>
+<li>New property: allowance_scope</li>
+<li>New property: allowed_types</li>
+<li>New property: disable_introspection</li>
+<li>New property: field_access_rights</li>
+<li>New property: restricted_types</li>
+<li>Modified property: allowed_urls
+<ul>
+<li>Nullable changed from false to true</li>
+<li>Items changed
+<ul>
+<li>Properties changed
+<ul>
+<li>Modified property: methods
+<ul>
+<li>Nullable changed from false to true</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: limit
+<ul>
+<li>Properties changed
+<ul>
+<li>New property: max_query_depth</li>
+<li>Deleted property: set_by_policy</li>
+<li>Modified property: smoothing
+<ul>
+<li>Properties changed
+<ul>
+<li>Modified property: delay
+<ul>
+<li>Format changed from 'int64' to ''</li>
+<li>Min changed from 1 to null</li>
+</ul>
+</li>
+<li>Modified property: step
+<ul>
+<li>Format changed from 'int64' to ''</li>
+<li>Min changed from 1 to null</li>
+</ul>
+</li>
+<li>Modified property: threshold
+<ul>
+<li>Format changed from 'int64' to ''</li>
+<li>Min changed from 1 to null</li>
+</ul>
+</li>
+<li>Modified property: trigger
+<ul>
+<li>Format changed from 'double' to ''</li>
+<li>ExclusiveMin changed from true to false</li>
+<li>Min changed from 0 to null</li>
+<li>MultipleOf changed from 0.01 to null</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: throttle_retry_limit
+<ul>
+<li>Format changed from 'int64' to ''</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: versions
+<ul>
+<li>Nullable changed from false to true</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: apply_policies
+<ul>
+<li>Nullable changed from false to true</li>
+</ul>
+</li>
+<li>Modified property: apply_policy_id
+<ul>
+<li>Deprecated changed from false to true</li>
+</ul>
+</li>
+<li>Modified property: enable_detail_recording
+<ul>
+<li>Deprecated changed from false to true</li>
+</ul>
+</li>
+<li>Modified property: meta_data
+<ul>
+<li>Nullable changed from false to true</li>
+<li>AdditionalProperties changed
+<ul>
+<li>Type changed from 'object' to ''</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: monitor
+<ul>
+<li>Properties changed
+<ul>
+<li>Modified property: trigger_limits
+<ul>
+<li>Nullable changed from false to true</li>
+<li>Items changed
+<ul>
+<li>Format changed from 'double' to ''</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: oauth_keys
+<ul>
+<li>Nullable changed from false to true</li>
+</ul>
+</li>
+<li>Modified property: smoothing
+<ul>
+<li>Properties changed
+<ul>
+<li>Modified property: delay
+<ul>
+<li>Format changed from 'int64' to ''</li>
+<li>Min changed from 1 to null</li>
+</ul>
+</li>
+<li>Modified property: step
+<ul>
+<li>Format changed from 'int64' to ''</li>
+<li>Min changed from 1 to null</li>
+</ul>
+</li>
+<li>Modified property: threshold
+<ul>
+<li>Format changed from 'int64' to ''</li>
+<li>Min changed from 1 to null</li>
+</ul>
+</li>
+<li>Modified property: trigger
+<ul>
+<li>Format changed from 'double' to ''</li>
+<li>ExclusiveMin changed from true to false</li>
+<li>Min changed from 0 to null</li>
+<li>MultipleOf changed from 0.01 to null</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: tags
+<ul>
+<li>Nullable changed from false to true</li>
+</ul>
+</li>
+<li>Modified property: throttle_retry_limit
+<ul>
+<li>Format changed from 'int64' to ''</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Responses changed
+<ul>
+<li>New response: 403</li>
+<li>New response: 500</li>
+</ul>
+</li>
+</ul>
+<p>DELETE /tyk/keys/{keyID}</p>
+<ul>
+<li>New path param: keyID</li>
+<li>New query param: hashed</li>
+<li>Responses changed
+<ul>
+<li>New response: 400</li>
+<li>New response: 403</li>
+<li>New response: 404</li>
+<li>Modified response: 200
+<ul>
+<li>Content changed
+<ul>
+<li>Modified media type: application/json
+<ul>
+<li>Schema changed
+<ul>
+<li>Properties changed
+<ul>
+<li>New property: action</li>
+<li>New property: key</li>
+<li>New property: key_hash</li>
+<li>Deleted property: message</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+<p>GET /tyk/keys/{keyID}</p>
+<ul>
+<li>New path param: keyID</li>
+<li>New query param: hashed</li>
+<li>Responses changed
+<ul>
+<li>New response: 400</li>
+<li>New response: 403</li>
+<li>New response: 404</li>
+<li>Modified response: 200
+<ul>
+<li>Content changed
+<ul>
+<li>Modified media type: application/json
+<ul>
+<li>Schema changed
+<ul>
+<li>Properties changed
+<ul>
+<li>New property: date_created</li>
+<li>New property: enable_detailed_recording</li>
+<li>New property: enable_http_signature_validation</li>
+<li>New property: max_query_depth</li>
+<li>New property: rsa_certificate_id</li>
+<li>Modified property: access_rights
+<ul>
+<li>Nullable changed from false to true</li>
+<li>AdditionalProperties changed
+<ul>
+<li>Properties changed
+<ul>
+<li>New property: allowance_scope</li>
+<li>New property: allowed_types</li>
+<li>New property: disable_introspection</li>
+<li>New property: field_access_rights</li>
+<li>New property: restricted_types</li>
+<li>Modified property: allowed_urls
+<ul>
+<li>Nullable changed from false to true</li>
+<li>Items changed
+<ul>
+<li>Properties changed
+<ul>
+<li>Modified property: methods
+<ul>
+<li>Nullable changed from false to true</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: limit
+<ul>
+<li>Properties changed
+<ul>
+<li>New property: max_query_depth</li>
+<li>Deleted property: set_by_policy</li>
+<li>Modified property: smoothing
+<ul>
+<li>Properties changed
+<ul>
+<li>Modified property: delay
+<ul>
+<li>Format changed from 'int64' to ''</li>
+<li>Min changed from 1 to null</li>
+</ul>
+</li>
+<li>Modified property: step
+<ul>
+<li>Format changed from 'int64' to ''</li>
+<li>Min changed from 1 to null</li>
+</ul>
+</li>
+<li>Modified property: threshold
+<ul>
+<li>Format changed from 'int64' to ''</li>
+<li>Min changed from 1 to null</li>
+</ul>
+</li>
+<li>Modified property: trigger
+<ul>
+<li>Format changed from 'double' to ''</li>
+<li>ExclusiveMin changed from true to false</li>
+<li>Min changed from 0 to null</li>
+<li>MultipleOf changed from 0.01 to null</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: throttle_retry_limit
+<ul>
+<li>Format changed from 'int64' to ''</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: versions
+<ul>
+<li>Nullable changed from false to true</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: apply_policies
+<ul>
+<li>Nullable changed from false to true</li>
+</ul>
+</li>
+<li>Modified property: apply_policy_id
+<ul>
+<li>Deprecated changed from false to true</li>
+</ul>
+</li>
+<li>Modified property: enable_detail_recording
+<ul>
+<li>Deprecated changed from false to true</li>
+</ul>
+</li>
+<li>Modified property: meta_data
+<ul>
+<li>Nullable changed from false to true</li>
+<li>AdditionalProperties changed
+<ul>
+<li>Type changed from 'object' to ''</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: monitor
+<ul>
+<li>Properties changed
+<ul>
+<li>Modified property: trigger_limits
+<ul>
+<li>Nullable changed from false to true</li>
+<li>Items changed
+<ul>
+<li>Format changed from 'double' to ''</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: oauth_keys
+<ul>
+<li>Nullable changed from false to true</li>
+</ul>
+</li>
+<li>Modified property: smoothing
+<ul>
+<li>Properties changed
+<ul>
+<li>Modified property: delay
+<ul>
+<li>Format changed from 'int64' to ''</li>
+<li>Min changed from 1 to null</li>
+</ul>
+</li>
+<li>Modified property: step
+<ul>
+<li>Format changed from 'int64' to ''</li>
+<li>Min changed from 1 to null</li>
+</ul>
+</li>
+<li>Modified property: threshold
+<ul>
+<li>Format changed from 'int64' to ''</li>
+<li>Min changed from 1 to null</li>
+</ul>
+</li>
+<li>Modified property: trigger
+<ul>
+<li>Format changed from 'double' to ''</li>
+<li>ExclusiveMin changed from true to false</li>
+<li>Min changed from 0 to null</li>
+<li>MultipleOf changed from 0.01 to null</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: tags
+<ul>
+<li>Nullable changed from false to true</li>
+</ul>
+</li>
+<li>Modified property: throttle_retry_limit
+<ul>
+<li>Format changed from 'int64' to ''</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+<p>POST /tyk/keys/{keyID}</p>
+<ul>
+<li>New path param: keyID</li>
+<li>New query param: hashed</li>
+<li>Request body changed
+<ul>
+<li>Content changed
+<ul>
+<li>Modified media type: application/json
+<ul>
+<li>Schema changed
+<ul>
+<li>Properties changed
+<ul>
+<li>New property: date_created</li>
+<li>New property: enable_detailed_recording</li>
+<li>New property: enable_http_signature_validation</li>
+<li>New property: max_query_depth</li>
+<li>New property: rsa_certificate_id</li>
+<li>Modified property: access_rights
+<ul>
+<li>Nullable changed from false to true</li>
+<li>AdditionalProperties changed
+<ul>
+<li>Properties changed
+<ul>
+<li>New property: allowance_scope</li>
+<li>New property: allowed_types</li>
+<li>New property: disable_introspection</li>
+<li>New property: field_access_rights</li>
+<li>New property: restricted_types</li>
+<li>Modified property: allowed_urls
+<ul>
+<li>Nullable changed from false to true</li>
+<li>Items changed
+<ul>
+<li>Properties changed
+<ul>
+<li>Modified property: methods
+<ul>
+<li>Nullable changed from false to true</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: limit
+<ul>
+<li>Properties changed
+<ul>
+<li>New property: max_query_depth</li>
+<li>Deleted property: set_by_policy</li>
+<li>Modified property: smoothing
+<ul>
+<li>Properties changed
+<ul>
+<li>Modified property: delay
+<ul>
+<li>Format changed from 'int64' to ''</li>
+<li>Min changed from 1 to null</li>
+</ul>
+</li>
+<li>Modified property: step
+<ul>
+<li>Format changed from 'int64' to ''</li>
+<li>Min changed from 1 to null</li>
+</ul>
+</li>
+<li>Modified property: threshold
+<ul>
+<li>Format changed from 'int64' to ''</li>
+<li>Min changed from 1 to null</li>
+</ul>
+</li>
+<li>Modified property: trigger
+<ul>
+<li>Format changed from 'double' to ''</li>
+<li>ExclusiveMin changed from true to false</li>
+<li>Min changed from 0 to null</li>
+<li>MultipleOf changed from 0.01 to null</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: throttle_retry_limit
+<ul>
+<li>Format changed from 'int64' to ''</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: versions
+<ul>
+<li>Nullable changed from false to true</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: apply_policies
+<ul>
+<li>Nullable changed from false to true</li>
+</ul>
+</li>
+<li>Modified property: apply_policy_id
+<ul>
+<li>Deprecated changed from false to true</li>
+</ul>
+</li>
+<li>Modified property: enable_detail_recording
+<ul>
+<li>Deprecated changed from false to true</li>
+</ul>
+</li>
+<li>Modified property: meta_data
+<ul>
+<li>Nullable changed from false to true</li>
+<li>AdditionalProperties changed
+<ul>
+<li>Type changed from 'object' to ''</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: monitor
+<ul>
+<li>Properties changed
+<ul>
+<li>Modified property: trigger_limits
+<ul>
+<li>Nullable changed from false to true</li>
+<li>Items changed
+<ul>
+<li>Format changed from 'double' to ''</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: oauth_keys
+<ul>
+<li>Nullable changed from false to true</li>
+</ul>
+</li>
+<li>Modified property: smoothing
+<ul>
+<li>Properties changed
+<ul>
+<li>Modified property: delay
+<ul>
+<li>Format changed from 'int64' to ''</li>
+<li>Min changed from 1 to null</li>
+</ul>
+</li>
+<li>Modified property: step
+<ul>
+<li>Format changed from 'int64' to ''</li>
+<li>Min changed from 1 to null</li>
+</ul>
+</li>
+<li>Modified property: threshold
+<ul>
+<li>Format changed from 'int64' to ''</li>
+<li>Min changed from 1 to null</li>
+</ul>
+</li>
+<li>Modified property: trigger
+<ul>
+<li>Format changed from 'double' to ''</li>
+<li>ExclusiveMin changed from true to false</li>
+<li>Min changed from 0 to null</li>
+<li>MultipleOf changed from 0.01 to null</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: tags
+<ul>
+<li>Nullable changed from false to true</li>
+</ul>
+</li>
+<li>Modified property: throttle_retry_limit
+<ul>
+<li>Format changed from 'int64' to ''</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Responses changed
+<ul>
+<li>New response: 403</li>
+<li>New response: 500</li>
+</ul>
+</li>
+</ul>
+<p>PUT /tyk/keys/{keyID}</p>
+<ul>
+<li>New path param: keyID</li>
+<li>New query param: hashed</li>
+<li>Request body changed
+<ul>
+<li>Content changed
+<ul>
+<li>Modified media type: application/json
+<ul>
+<li>Schema changed
+<ul>
+<li>Properties changed
+<ul>
+<li>New property: date_created</li>
+<li>New property: enable_detailed_recording</li>
+<li>New property: enable_http_signature_validation</li>
+<li>New property: max_query_depth</li>
+<li>New property: rsa_certificate_id</li>
+<li>Modified property: access_rights
+<ul>
+<li>Nullable changed from false to true</li>
+<li>AdditionalProperties changed
+<ul>
+<li>Properties changed
+<ul>
+<li>New property: allowance_scope</li>
+<li>New property: allowed_types</li>
+<li>New property: disable_introspection</li>
+<li>New property: field_access_rights</li>
+<li>New property: restricted_types</li>
+<li>Modified property: allowed_urls
+<ul>
+<li>Nullable changed from false to true</li>
+<li>Items changed
+<ul>
+<li>Properties changed
+<ul>
+<li>Modified property: methods
+<ul>
+<li>Nullable changed from false to true</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: limit
+<ul>
+<li>Properties changed
+<ul>
+<li>New property: max_query_depth</li>
+<li>Deleted property: set_by_policy</li>
+<li>Modified property: smoothing
+<ul>
+<li>Properties changed
+<ul>
+<li>Modified property: delay
+<ul>
+<li>Format changed from 'int64' to ''</li>
+<li>Min changed from 1 to null</li>
+</ul>
+</li>
+<li>Modified property: step
+<ul>
+<li>Format changed from 'int64' to ''</li>
+<li>Min changed from 1 to null</li>
+</ul>
+</li>
+<li>Modified property: threshold
+<ul>
+<li>Format changed from 'int64' to ''</li>
+<li>Min changed from 1 to null</li>
+</ul>
+</li>
+<li>Modified property: trigger
+<ul>
+<li>Format changed from 'double' to ''</li>
+<li>ExclusiveMin changed from true to false</li>
+<li>Min changed from 0 to null</li>
+<li>MultipleOf changed from 0.01 to null</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: throttle_retry_limit
+<ul>
+<li>Format changed from 'int64' to ''</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: versions
+<ul>
+<li>Nullable changed from false to true</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: apply_policies
+<ul>
+<li>Nullable changed from false to true</li>
+</ul>
+</li>
+<li>Modified property: apply_policy_id
+<ul>
+<li>Deprecated changed from false to true</li>
+</ul>
+</li>
+<li>Modified property: enable_detail_recording
+<ul>
+<li>Deprecated changed from false to true</li>
+</ul>
+</li>
+<li>Modified property: meta_data
+<ul>
+<li>Nullable changed from false to true</li>
+<li>AdditionalProperties changed
+<ul>
+<li>Type changed from 'object' to ''</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: monitor
+<ul>
+<li>Properties changed
+<ul>
+<li>Modified property: trigger_limits
+<ul>
+<li>Nullable changed from false to true</li>
+<li>Items changed
+<ul>
+<li>Format changed from 'double' to ''</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: oauth_keys
+<ul>
+<li>Nullable changed from false to true</li>
+</ul>
+</li>
+<li>Modified property: smoothing
+<ul>
+<li>Properties changed
+<ul>
+<li>Modified property: delay
+<ul>
+<li>Format changed from 'int64' to ''</li>
+<li>Min changed from 1 to null</li>
+</ul>
+</li>
+<li>Modified property: step
+<ul>
+<li>Format changed from 'int64' to ''</li>
+<li>Min changed from 1 to null</li>
+</ul>
+</li>
+<li>Modified property: threshold
+<ul>
+<li>Format changed from 'int64' to ''</li>
+<li>Min changed from 1 to null</li>
+</ul>
+</li>
+<li>Modified property: trigger
+<ul>
+<li>Format changed from 'double' to ''</li>
+<li>ExclusiveMin changed from true to false</li>
+<li>Min changed from 0 to null</li>
+<li>MultipleOf changed from 0.01 to null</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: tags
+<ul>
+<li>Nullable changed from false to true</li>
+</ul>
+</li>
+<li>Modified property: throttle_retry_limit
+<ul>
+<li>Format changed from 'int64' to ''</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Responses changed
+<ul>
+<li>New response: 403</li>
+<li>New response: 404</li>
+<li>New response: 500</li>
+</ul>
+</li>
+</ul>
+<p>POST /tyk/oauth/clients/create</p>
+<ul>
+<li>Request body changed
+<ul>
+<li>Content changed
+<ul>
+<li>Modified media type: application/json
+<ul>
+<li>Schema changed
+<ul>
+<li>Properties changed
+<ul>
+<li>Modified property: meta_data
+<ul>
+<li>Type changed from 'object' to ''</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Responses changed
+<ul>
+<li>New response: 400</li>
+<li>New response: 403</li>
+<li>New response: 500</li>
+<li>Modified response: 200
+<ul>
+<li>Content changed
+<ul>
+<li>Modified media type: application/json
+<ul>
+<li>Schema changed
+<ul>
+<li>Properties changed
+<ul>
+<li>Modified property: meta_data
+<ul>
+<li>Type changed from 'object' to ''</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+<p>GET /tyk/oauth/clients/{apiID}</p>
+<ul>
+<li>Responses changed
+<ul>
+<li>New response: 403</li>
+<li>New response: 404</li>
+<li>Modified response: 200
+<ul>
+<li>Content changed
+<ul>
+<li>Modified media type: application/json
+<ul>
+<li>Schema changed
+<ul>
+<li>Items changed
+<ul>
+<li>Properties changed
+<ul>
+<li>Modified property: meta_data
+<ul>
+<li>Type changed from 'object' to ''</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+<p>DELETE /tyk/oauth/clients/{apiID}/{keyName}</p>
+<ul>
+<li>Modified path param: apiID
+<ul>
+<li>Schema changed
+<ul>
+<li>Min changed from 1 to null</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Responses changed
+<ul>
+<li>New response: 403</li>
+<li>New response: 404</li>
+<li>New response: 500</li>
+</ul>
+</li>
+</ul>
+<p>GET /tyk/oauth/clients/{apiID}/{keyName}</p>
+<ul>
+<li>Modified path param: apiID
+<ul>
+<li>Schema changed
+<ul>
+<li>Min changed from 1 to null</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Responses changed
+<ul>
+<li>New response: 403</li>
+<li>New response: 404</li>
+<li>Modified response: 200
+<ul>
+<li>Content changed
+<ul>
+<li>Modified media type: application/json
+<ul>
+<li>Schema changed
+<ul>
+<li>Properties changed
+<ul>
+<li>Modified property: meta_data
+<ul>
+<li>Type changed from 'object' to ''</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+<p>GET /tyk/oauth/clients/{apiID}/{keyName}/tokens</p>
+<ul>
+<li>New query param: page</li>
+<li>Modified path param: apiID
+<ul>
+<li>Schema changed
+<ul>
+<li>Min changed from 1 to null</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Responses changed
+<ul>
+<li>New response: 403</li>
+<li>New response: 404</li>
+<li>New response: 500</li>
+<li>Modified response: 200
+<ul>
+<li>Content changed
+<ul>
+<li>Modified media type: application/json
+<ul>
+<li>Schema changed
+<ul>
+<li>Property 'OneOf' changed
+<ul>
+<li>Schemas added: #/components/schemas/PaginatedOAuthClientTokens, subschema #2</li>
+</ul>
+</li>
+<li>Type changed from 'array' to ''</li>
+<li>Items changed
+<ul>
+<li>Schema deleted</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+<p>DELETE /tyk/oauth/refresh/{keyName}</p>
+<ul>
+<li>Responses changed
+<ul>
+<li>New response: 400</li>
+<li>New response: 403</li>
+<li>New response: 404</li>
+<li>New response: 500</li>
+</ul>
+</li>
+</ul>
+<p>POST /tyk/oauth/revoke</p>
+<ul>
+<li>Request body changed
+<ul>
+<li>Content changed
+<ul>
+<li>Modified media type: application/x-www-form-urlencoded
+<ul>
+<li>Schema changed
+<ul>
+<li>Required changed
+<ul>
+<li>New required property: client_id</li>
+<li>New required property: token</li>
+</ul>
+</li>
+<li>Properties changed
+<ul>
+<li>New property: org_id</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Responses changed
+<ul>
+<li>New response: 400</li>
+<li>New response: 403</li>
+<li>Modified response: 200
+<ul>
+<li>Content changed
+<ul>
+<li>New media type: application/json</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+<p>POST /tyk/oauth/revoke_all</p>
+<ul>
+<li>Request body changed
+<ul>
+<li>Content changed
+<ul>
+<li>Modified media type: application/x-www-form-urlencoded
+<ul>
+<li>Schema changed
+<ul>
+<li>Required changed
+<ul>
+<li>New required property: client_id</li>
+<li>New required property: client_secret</li>
+</ul>
+</li>
+<li>Properties changed
+<ul>
+<li>New property: org_id</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Responses changed
+<ul>
+<li>New response: 401</li>
+<li>New response: 403</li>
+<li>Modified response: 200
+<ul>
+<li>Content changed
+<ul>
+<li>New media type: application/json</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified response: 400
+<ul>
+<li>Content changed
+<ul>
+<li>New media type: application/json</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified response: 404
+<ul>
+<li>Content changed
+<ul>
+<li>New media type: application/json</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+<p>GET /tyk/org/keys</p>
+<ul>
+<li>New query param: filter</li>
+<li>Responses changed
+<ul>
+<li>New response: 404</li>
+<li>Modified response: 200
+<ul>
+<li>Content changed
+<ul>
+<li>Modified media type: application/json
+<ul>
+<li>Schema changed
+<ul>
+<li>Properties changed
+<ul>
+<li>Modified property: keys
+<ul>
+<li>Nullable changed from false to true</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+<p>DELETE /tyk/org/keys/{keyID}</p>
+<ul>
+<li>New path param: keyID</li>
+<li>Responses changed
+<ul>
+<li>New response: 400</li>
+<li>New response: 403</li>
+<li>New response: 404</li>
+<li>Modified response: 200
+<ul>
+<li>Content changed
+<ul>
+<li>Modified media type: application/json
+<ul>
+<li>Schema changed
+<ul>
+<li>Properties changed
+<ul>
+<li>New property: action</li>
+<li>New property: key</li>
+<li>New property: key_hash</li>
+<li>Deleted property: message</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+<p>GET /tyk/org/keys/{keyID}</p>
+<ul>
+<li>New path param: keyID</li>
+<li>Responses changed
+<ul>
+<li>New response: 403</li>
+<li>New response: 404</li>
+<li>Modified response: 200
+<ul>
+<li>Content changed
+<ul>
+<li>Modified media type: application/json
+<ul>
+<li>Schema changed
+<ul>
+<li>Properties changed
+<ul>
+<li>New property: date_created</li>
+<li>New property: enable_detailed_recording</li>
+<li>New property: enable_http_signature_validation</li>
+<li>New property: max_query_depth</li>
+<li>New property: rsa_certificate_id</li>
+<li>Modified property: access_rights
+<ul>
+<li>Nullable changed from false to true</li>
+<li>AdditionalProperties changed
+<ul>
+<li>Properties changed
+<ul>
+<li>New property: allowance_scope</li>
+<li>New property: allowed_types</li>
+<li>New property: disable_introspection</li>
+<li>New property: field_access_rights</li>
+<li>New property: restricted_types</li>
+<li>Modified property: allowed_urls
+<ul>
+<li>Nullable changed from false to true</li>
+<li>Items changed
+<ul>
+<li>Properties changed
+<ul>
+<li>Modified property: methods
+<ul>
+<li>Nullable changed from false to true</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: limit
+<ul>
+<li>Properties changed
+<ul>
+<li>New property: max_query_depth</li>
+<li>Deleted property: set_by_policy</li>
+<li>Modified property: smoothing
+<ul>
+<li>Properties changed
+<ul>
+<li>Modified property: delay
+<ul>
+<li>Format changed from 'int64' to ''</li>
+<li>Min changed from 1 to null</li>
+</ul>
+</li>
+<li>Modified property: step
+<ul>
+<li>Format changed from 'int64' to ''</li>
+<li>Min changed from 1 to null</li>
+</ul>
+</li>
+<li>Modified property: threshold
+<ul>
+<li>Format changed from 'int64' to ''</li>
+<li>Min changed from 1 to null</li>
+</ul>
+</li>
+<li>Modified property: trigger
+<ul>
+<li>Format changed from 'double' to ''</li>
+<li>ExclusiveMin changed from true to false</li>
+<li>Min changed from 0 to null</li>
+<li>MultipleOf changed from 0.01 to null</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: throttle_retry_limit
+<ul>
+<li>Format changed from 'int64' to ''</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: versions
+<ul>
+<li>Nullable changed from false to true</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: apply_policies
+<ul>
+<li>Nullable changed from false to true</li>
+</ul>
+</li>
+<li>Modified property: apply_policy_id
+<ul>
+<li>Deprecated changed from false to true</li>
+</ul>
+</li>
+<li>Modified property: enable_detail_recording
+<ul>
+<li>Deprecated changed from false to true</li>
+</ul>
+</li>
+<li>Modified property: meta_data
+<ul>
+<li>Nullable changed from false to true</li>
+<li>AdditionalProperties changed
+<ul>
+<li>Type changed from 'object' to ''</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: monitor
+<ul>
+<li>Properties changed
+<ul>
+<li>Modified property: trigger_limits
+<ul>
+<li>Nullable changed from false to true</li>
+<li>Items changed
+<ul>
+<li>Format changed from 'double' to ''</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: oauth_keys
+<ul>
+<li>Nullable changed from false to true</li>
+</ul>
+</li>
+<li>Modified property: smoothing
+<ul>
+<li>Properties changed
+<ul>
+<li>Modified property: delay
+<ul>
+<li>Format changed from 'int64' to ''</li>
+<li>Min changed from 1 to null</li>
+</ul>
+</li>
+<li>Modified property: step
+<ul>
+<li>Format changed from 'int64' to ''</li>
+<li>Min changed from 1 to null</li>
+</ul>
+</li>
+<li>Modified property: threshold
+<ul>
+<li>Format changed from 'int64' to ''</li>
+<li>Min changed from 1 to null</li>
+</ul>
+</li>
+<li>Modified property: trigger
+<ul>
+<li>Format changed from 'double' to ''</li>
+<li>ExclusiveMin changed from true to false</li>
+<li>Min changed from 0 to null</li>
+<li>MultipleOf changed from 0.01 to null</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: tags
+<ul>
+<li>Nullable changed from false to true</li>
+</ul>
+</li>
+<li>Modified property: throttle_retry_limit
+<ul>
+<li>Format changed from 'int64' to ''</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+<p>POST /tyk/org/keys/{keyID}</p>
+<ul>
+<li>New path param: keyID</li>
+<li>New query param: reset_quota</li>
+<li>Request body changed
+<ul>
+<li>Content changed
+<ul>
+<li>Modified media type: application/json
+<ul>
+<li>Schema changed
+<ul>
+<li>Properties changed
+<ul>
+<li>New property: date_created</li>
+<li>New property: enable_detailed_recording</li>
+<li>New property: enable_http_signature_validation</li>
+<li>New property: max_query_depth</li>
+<li>New property: rsa_certificate_id</li>
+<li>Modified property: access_rights
+<ul>
+<li>Nullable changed from false to true</li>
+<li>AdditionalProperties changed
+<ul>
+<li>Properties changed
+<ul>
+<li>New property: allowance_scope</li>
+<li>New property: allowed_types</li>
+<li>New property: disable_introspection</li>
+<li>New property: field_access_rights</li>
+<li>New property: restricted_types</li>
+<li>Modified property: allowed_urls
+<ul>
+<li>Nullable changed from false to true</li>
+<li>Items changed
+<ul>
+<li>Properties changed
+<ul>
+<li>Modified property: methods
+<ul>
+<li>Nullable changed from false to true</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: limit
+<ul>
+<li>Properties changed
+<ul>
+<li>New property: max_query_depth</li>
+<li>Deleted property: set_by_policy</li>
+<li>Modified property: smoothing
+<ul>
+<li>Properties changed
+<ul>
+<li>Modified property: delay
+<ul>
+<li>Format changed from 'int64' to ''</li>
+<li>Min changed from 1 to null</li>
+</ul>
+</li>
+<li>Modified property: step
+<ul>
+<li>Format changed from 'int64' to ''</li>
+<li>Min changed from 1 to null</li>
+</ul>
+</li>
+<li>Modified property: threshold
+<ul>
+<li>Format changed from 'int64' to ''</li>
+<li>Min changed from 1 to null</li>
+</ul>
+</li>
+<li>Modified property: trigger
+<ul>
+<li>Format changed from 'double' to ''</li>
+<li>ExclusiveMin changed from true to false</li>
+<li>Min changed from 0 to null</li>
+<li>MultipleOf changed from 0.01 to null</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: throttle_retry_limit
+<ul>
+<li>Format changed from 'int64' to ''</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: versions
+<ul>
+<li>Nullable changed from false to true</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: apply_policies
+<ul>
+<li>Nullable changed from false to true</li>
+</ul>
+</li>
+<li>Modified property: apply_policy_id
+<ul>
+<li>Deprecated changed from false to true</li>
+</ul>
+</li>
+<li>Modified property: enable_detail_recording
+<ul>
+<li>Deprecated changed from false to true</li>
+</ul>
+</li>
+<li>Modified property: meta_data
+<ul>
+<li>Nullable changed from false to true</li>
+<li>AdditionalProperties changed
+<ul>
+<li>Type changed from 'object' to ''</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: monitor
+<ul>
+<li>Properties changed
+<ul>
+<li>Modified property: trigger_limits
+<ul>
+<li>Nullable changed from false to true</li>
+<li>Items changed
+<ul>
+<li>Format changed from 'double' to ''</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: oauth_keys
+<ul>
+<li>Nullable changed from false to true</li>
+</ul>
+</li>
+<li>Modified property: smoothing
+<ul>
+<li>Properties changed
+<ul>
+<li>Modified property: delay
+<ul>
+<li>Format changed from 'int64' to ''</li>
+<li>Min changed from 1 to null</li>
+</ul>
+</li>
+<li>Modified property: step
+<ul>
+<li>Format changed from 'int64' to ''</li>
+<li>Min changed from 1 to null</li>
+</ul>
+</li>
+<li>Modified property: threshold
+<ul>
+<li>Format changed from 'int64' to ''</li>
+<li>Min changed from 1 to null</li>
+</ul>
+</li>
+<li>Modified property: trigger
+<ul>
+<li>Format changed from 'double' to ''</li>
+<li>ExclusiveMin changed from true to false</li>
+<li>Min changed from 0 to null</li>
+<li>MultipleOf changed from 0.01 to null</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: tags
+<ul>
+<li>Nullable changed from false to true</li>
+</ul>
+</li>
+<li>Modified property: throttle_retry_limit
+<ul>
+<li>Format changed from 'int64' to ''</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Responses changed
+<ul>
+<li>New response: 400</li>
+<li>New response: 403</li>
+<li>New response: 404</li>
+<li>New response: 500</li>
+</ul>
+</li>
+</ul>
+<p>PUT /tyk/org/keys/{keyID}</p>
+<ul>
+<li>New path param: keyID</li>
+<li>Request body changed
+<ul>
+<li>Content changed
+<ul>
+<li>Modified media type: application/json
+<ul>
+<li>Schema changed
+<ul>
+<li>Properties changed
+<ul>
+<li>New property: date_created</li>
+<li>New property: enable_detailed_recording</li>
+<li>New property: enable_http_signature_validation</li>
+<li>New property: max_query_depth</li>
+<li>New property: rsa_certificate_id</li>
+<li>Modified property: access_rights
+<ul>
+<li>Nullable changed from false to true</li>
+<li>AdditionalProperties changed
+<ul>
+<li>Properties changed
+<ul>
+<li>New property: allowance_scope</li>
+<li>New property: allowed_types</li>
+<li>New property: disable_introspection</li>
+<li>New property: field_access_rights</li>
+<li>New property: restricted_types</li>
+<li>Modified property: allowed_urls
+<ul>
+<li>Nullable changed from false to true</li>
+<li>Items changed
+<ul>
+<li>Properties changed
+<ul>
+<li>Modified property: methods
+<ul>
+<li>Nullable changed from false to true</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: limit
+<ul>
+<li>Properties changed
+<ul>
+<li>New property: max_query_depth</li>
+<li>Deleted property: set_by_policy</li>
+<li>Modified property: smoothing
+<ul>
+<li>Properties changed
+<ul>
+<li>Modified property: delay
+<ul>
+<li>Format changed from 'int64' to ''</li>
+<li>Min changed from 1 to null</li>
+</ul>
+</li>
+<li>Modified property: step
+<ul>
+<li>Format changed from 'int64' to ''</li>
+<li>Min changed from 1 to null</li>
+</ul>
+</li>
+<li>Modified property: threshold
+<ul>
+<li>Format changed from 'int64' to ''</li>
+<li>Min changed from 1 to null</li>
+</ul>
+</li>
+<li>Modified property: trigger
+<ul>
+<li>Format changed from 'double' to ''</li>
+<li>ExclusiveMin changed from true to false</li>
+<li>Min changed from 0 to null</li>
+<li>MultipleOf changed from 0.01 to null</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: throttle_retry_limit
+<ul>
+<li>Format changed from 'int64' to ''</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: versions
+<ul>
+<li>Nullable changed from false to true</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: apply_policies
+<ul>
+<li>Nullable changed from false to true</li>
+</ul>
+</li>
+<li>Modified property: apply_policy_id
+<ul>
+<li>Deprecated changed from false to true</li>
+</ul>
+</li>
+<li>Modified property: enable_detail_recording
+<ul>
+<li>Deprecated changed from false to true</li>
+</ul>
+</li>
+<li>Modified property: meta_data
+<ul>
+<li>Nullable changed from false to true</li>
+<li>AdditionalProperties changed
+<ul>
+<li>Type changed from 'object' to ''</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: monitor
+<ul>
+<li>Properties changed
+<ul>
+<li>Modified property: trigger_limits
+<ul>
+<li>Nullable changed from false to true</li>
+<li>Items changed
+<ul>
+<li>Format changed from 'double' to ''</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: oauth_keys
+<ul>
+<li>Nullable changed from false to true</li>
+</ul>
+</li>
+<li>Modified property: smoothing
+<ul>
+<li>Properties changed
+<ul>
+<li>Modified property: delay
+<ul>
+<li>Format changed from 'int64' to ''</li>
+<li>Min changed from 1 to null</li>
+</ul>
+</li>
+<li>Modified property: step
+<ul>
+<li>Format changed from 'int64' to ''</li>
+<li>Min changed from 1 to null</li>
+</ul>
+</li>
+<li>Modified property: threshold
+<ul>
+<li>Format changed from 'int64' to ''</li>
+<li>Min changed from 1 to null</li>
+</ul>
+</li>
+<li>Modified property: trigger
+<ul>
+<li>Format changed from 'double' to ''</li>
+<li>ExclusiveMin changed from true to false</li>
+<li>Min changed from 0 to null</li>
+<li>MultipleOf changed from 0.01 to null</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: tags
+<ul>
+<li>Nullable changed from false to true</li>
+</ul>
+</li>
+<li>Modified property: throttle_retry_limit
+<ul>
+<li>Format changed from 'int64' to ''</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Responses changed
+<ul>
+<li>New response: 400</li>
+<li>New response: 403</li>
+<li>New response: 404</li>
+<li>New response: 500</li>
+</ul>
+</li>
+</ul>
+<p>GET /tyk/policies</p>
+<ul>
+<li>Responses changed
+<ul>
+<li>New response: 403</li>
+<li>Modified response: 200
+<ul>
+<li>Content changed
+<ul>
+<li>Modified media type: application/json
+<ul>
+<li>Schema changed
+<ul>
+<li>Items changed
+<ul>
+<li>Properties changed
+<ul>
+<li>Modified property: access_rights
+<ul>
+<li>Nullable changed from false to true</li>
+<li>AdditionalProperties changed
+<ul>
+<li>Properties changed
+<ul>
+<li>New property: allowance_scope</li>
+<li>New property: allowed_types</li>
+<li>New property: disable_introspection</li>
+<li>New property: field_access_rights</li>
+<li>New property: restricted_types</li>
+<li>Modified property: allowed_urls
+<ul>
+<li>Nullable changed from false to true</li>
+<li>Items changed
+<ul>
+<li>Properties changed
+<ul>
+<li>Modified property: methods
+<ul>
+<li>Nullable changed from false to true</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: limit
+<ul>
+<li>Properties changed
+<ul>
+<li>New property: max_query_depth</li>
+<li>Deleted property: set_by_policy</li>
+<li>Modified property: smoothing
+<ul>
+<li>Properties changed
+<ul>
+<li>Modified property: delay
+<ul>
+<li>Format changed from 'int64' to ''</li>
+<li>Min changed from 1 to null</li>
+</ul>
+</li>
+<li>Modified property: step
+<ul>
+<li>Format changed from 'int64' to ''</li>
+<li>Min changed from 1 to null</li>
+</ul>
+</li>
+<li>Modified property: threshold
+<ul>
+<li>Format changed from 'int64' to ''</li>
+<li>Min changed from 1 to null</li>
+</ul>
+</li>
+<li>Modified property: trigger
+<ul>
+<li>Format changed from 'double' to ''</li>
+<li>ExclusiveMin changed from true to false</li>
+<li>Min changed from 0 to null</li>
+<li>MultipleOf changed from 0.01 to null</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: throttle_retry_limit
+<ul>
+<li>Format changed from 'int64' to ''</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: versions
+<ul>
+<li>Nullable changed from false to true</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: graphql_access_rights
+<ul>
+<li>Nullable changed from false to true</li>
+<li>AdditionalProperties changed
+<ul>
+<li>Schema added</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: key_expires_in
+<ul>
+<li>Type changed from 'number' to 'integer'</li>
+</ul>
+</li>
+<li>Modified property: max_query_depth
+<ul>
+<li>Type changed from 'number' to 'integer'</li>
+</ul>
+</li>
+<li>Modified property: meta_data
+<ul>
+<li>Nullable changed from false to true</li>
+<li>AdditionalProperties changed
+<ul>
+<li>Schema added</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: smoothing
+<ul>
+<li>Properties changed
+<ul>
+<li>Modified property: delay
+<ul>
+<li>Format changed from 'int64' to ''</li>
+<li>Min changed from 1 to null</li>
+</ul>
+</li>
+<li>Modified property: step
+<ul>
+<li>Format changed from 'int64' to ''</li>
+<li>Min changed from 1 to null</li>
+</ul>
+</li>
+<li>Modified property: threshold
+<ul>
+<li>Format changed from 'int64' to ''</li>
+<li>Min changed from 1 to null</li>
+</ul>
+</li>
+<li>Modified property: trigger
+<ul>
+<li>Format changed from 'double' to ''</li>
+<li>ExclusiveMin changed from true to false</li>
+<li>Min changed from 0 to null</li>
+<li>MultipleOf changed from 0.01 to null</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: tags
+<ul>
+<li>Nullable changed from false to true</li>
+</ul>
+</li>
+<li>Modified property: throttle_retry_limit
+<ul>
+<li>Type changed from 'number' to 'integer'</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+<p>POST /tyk/policies</p>
+<ul>
+<li>Request body changed
+<ul>
+<li>Content changed
+<ul>
+<li>Modified media type: application/json
+<ul>
+<li>Schema changed
+<ul>
+<li>Properties changed
+<ul>
+<li>Modified property: access_rights
+<ul>
+<li>Nullable changed from false to true</li>
+<li>AdditionalProperties changed
+<ul>
+<li>Properties changed
+<ul>
+<li>New property: allowance_scope</li>
+<li>New property: allowed_types</li>
+<li>New property: disable_introspection</li>
+<li>New property: field_access_rights</li>
+<li>New property: restricted_types</li>
+<li>Modified property: allowed_urls
+<ul>
+<li>Nullable changed from false to true</li>
+<li>Items changed
+<ul>
+<li>Properties changed
+<ul>
+<li>Modified property: methods
+<ul>
+<li>Nullable changed from false to true</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: limit
+<ul>
+<li>Properties changed
+<ul>
+<li>New property: max_query_depth</li>
+<li>Deleted property: set_by_policy</li>
+<li>Modified property: smoothing
+<ul>
+<li>Properties changed
+<ul>
+<li>Modified property: delay
+<ul>
+<li>Format changed from 'int64' to ''</li>
+<li>Min changed from 1 to null</li>
+</ul>
+</li>
+<li>Modified property: step
+<ul>
+<li>Format changed from 'int64' to ''</li>
+<li>Min changed from 1 to null</li>
+</ul>
+</li>
+<li>Modified property: threshold
+<ul>
+<li>Format changed from 'int64' to ''</li>
+<li>Min changed from 1 to null</li>
+</ul>
+</li>
+<li>Modified property: trigger
+<ul>
+<li>Format changed from 'double' to ''</li>
+<li>ExclusiveMin changed from true to false</li>
+<li>Min changed from 0 to null</li>
+<li>MultipleOf changed from 0.01 to null</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: throttle_retry_limit
+<ul>
+<li>Format changed from 'int64' to ''</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: versions
+<ul>
+<li>Nullable changed from false to true</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: graphql_access_rights
+<ul>
+<li>Nullable changed from false to true</li>
+<li>AdditionalProperties changed
+<ul>
+<li>Schema added</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: key_expires_in
+<ul>
+<li>Type changed from 'number' to 'integer'</li>
+</ul>
+</li>
+<li>Modified property: max_query_depth
+<ul>
+<li>Type changed from 'number' to 'integer'</li>
+</ul>
+</li>
+<li>Modified property: meta_data
+<ul>
+<li>Nullable changed from false to true</li>
+<li>AdditionalProperties changed
+<ul>
+<li>Schema added</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: smoothing
+<ul>
+<li>Properties changed
+<ul>
+<li>Modified property: delay
+<ul>
+<li>Format changed from 'int64' to ''</li>
+<li>Min changed from 1 to null</li>
+</ul>
+</li>
+<li>Modified property: step
+<ul>
+<li>Format changed from 'int64' to ''</li>
+<li>Min changed from 1 to null</li>
+</ul>
+</li>
+<li>Modified property: threshold
+<ul>
+<li>Format changed from 'int64' to ''</li>
+<li>Min changed from 1 to null</li>
+</ul>
+</li>
+<li>Modified property: trigger
+<ul>
+<li>Format changed from 'double' to ''</li>
+<li>ExclusiveMin changed from true to false</li>
+<li>Min changed from 0 to null</li>
+<li>MultipleOf changed from 0.01 to null</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: tags
+<ul>
+<li>Nullable changed from false to true</li>
+</ul>
+</li>
+<li>Modified property: throttle_retry_limit
+<ul>
+<li>Type changed from 'number' to 'integer'</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Responses changed
+<ul>
+<li>New response: 403</li>
+</ul>
+</li>
+</ul>
+<p>DELETE /tyk/policies/{polID}</p>
+<ul>
+<li>New path param: polID</li>
+<li>Responses changed
+<ul>
+<li>New response: 400</li>
+<li>New response: 403</li>
+</ul>
+</li>
+</ul>
+<p>GET /tyk/policies/{polID}</p>
+<ul>
+<li>New path param: polID</li>
+<li>Responses changed
+<ul>
+<li>New response: 403</li>
+<li>Modified response: 200
+<ul>
+<li>Content changed
+<ul>
+<li>Modified media type: application/json
+<ul>
+<li>Schema changed
+<ul>
+<li>Properties changed
+<ul>
+<li>Modified property: access_rights
+<ul>
+<li>Nullable changed from false to true</li>
+<li>AdditionalProperties changed
+<ul>
+<li>Properties changed
+<ul>
+<li>New property: allowance_scope</li>
+<li>New property: allowed_types</li>
+<li>New property: disable_introspection</li>
+<li>New property: field_access_rights</li>
+<li>New property: restricted_types</li>
+<li>Modified property: allowed_urls
+<ul>
+<li>Nullable changed from false to true</li>
+<li>Items changed
+<ul>
+<li>Properties changed
+<ul>
+<li>Modified property: methods
+<ul>
+<li>Nullable changed from false to true</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: limit
+<ul>
+<li>Properties changed
+<ul>
+<li>New property: max_query_depth</li>
+<li>Deleted property: set_by_policy</li>
+<li>Modified property: smoothing
+<ul>
+<li>Properties changed
+<ul>
+<li>Modified property: delay
+<ul>
+<li>Format changed from 'int64' to ''</li>
+<li>Min changed from 1 to null</li>
+</ul>
+</li>
+<li>Modified property: step
+<ul>
+<li>Format changed from 'int64' to ''</li>
+<li>Min changed from 1 to null</li>
+</ul>
+</li>
+<li>Modified property: threshold
+<ul>
+<li>Format changed from 'int64' to ''</li>
+<li>Min changed from 1 to null</li>
+</ul>
+</li>
+<li>Modified property: trigger
+<ul>
+<li>Format changed from 'double' to ''</li>
+<li>ExclusiveMin changed from true to false</li>
+<li>Min changed from 0 to null</li>
+<li>MultipleOf changed from 0.01 to null</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: throttle_retry_limit
+<ul>
+<li>Format changed from 'int64' to ''</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: versions
+<ul>
+<li>Nullable changed from false to true</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: graphql_access_rights
+<ul>
+<li>Nullable changed from false to true</li>
+<li>AdditionalProperties changed
+<ul>
+<li>Schema added</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: key_expires_in
+<ul>
+<li>Type changed from 'number' to 'integer'</li>
+</ul>
+</li>
+<li>Modified property: max_query_depth
+<ul>
+<li>Type changed from 'number' to 'integer'</li>
+</ul>
+</li>
+<li>Modified property: meta_data
+<ul>
+<li>Nullable changed from false to true</li>
+<li>AdditionalProperties changed
+<ul>
+<li>Schema added</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: smoothing
+<ul>
+<li>Properties changed
+<ul>
+<li>Modified property: delay
+<ul>
+<li>Format changed from 'int64' to ''</li>
+<li>Min changed from 1 to null</li>
+</ul>
+</li>
+<li>Modified property: step
+<ul>
+<li>Format changed from 'int64' to ''</li>
+<li>Min changed from 1 to null</li>
+</ul>
+</li>
+<li>Modified property: threshold
+<ul>
+<li>Format changed from 'int64' to ''</li>
+<li>Min changed from 1 to null</li>
+</ul>
+</li>
+<li>Modified property: trigger
+<ul>
+<li>Format changed from 'double' to ''</li>
+<li>ExclusiveMin changed from true to false</li>
+<li>Min changed from 0 to null</li>
+<li>MultipleOf changed from 0.01 to null</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: tags
+<ul>
+<li>Nullable changed from false to true</li>
+</ul>
+</li>
+<li>Modified property: throttle_retry_limit
+<ul>
+<li>Type changed from 'number' to 'integer'</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+<p>PUT /tyk/policies/{polID}</p>
+<ul>
+<li>New path param: polID</li>
+<li>Request body changed
+<ul>
+<li>Content changed
+<ul>
+<li>Modified media type: application/json
+<ul>
+<li>Schema changed
+<ul>
+<li>Properties changed
+<ul>
+<li>Modified property: access_rights
+<ul>
+<li>Nullable changed from false to true</li>
+<li>AdditionalProperties changed
+<ul>
+<li>Properties changed
+<ul>
+<li>New property: allowance_scope</li>
+<li>New property: allowed_types</li>
+<li>New property: disable_introspection</li>
+<li>New property: field_access_rights</li>
+<li>New property: restricted_types</li>
+<li>Modified property: allowed_urls
+<ul>
+<li>Nullable changed from false to true</li>
+<li>Items changed
+<ul>
+<li>Properties changed
+<ul>
+<li>Modified property: methods
+<ul>
+<li>Nullable changed from false to true</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: limit
+<ul>
+<li>Properties changed
+<ul>
+<li>New property: max_query_depth</li>
+<li>Deleted property: set_by_policy</li>
+<li>Modified property: smoothing
+<ul>
+<li>Properties changed
+<ul>
+<li>Modified property: delay
+<ul>
+<li>Format changed from 'int64' to ''</li>
+<li>Min changed from 1 to null</li>
+</ul>
+</li>
+<li>Modified property: step
+<ul>
+<li>Format changed from 'int64' to ''</li>
+<li>Min changed from 1 to null</li>
+</ul>
+</li>
+<li>Modified property: threshold
+<ul>
+<li>Format changed from 'int64' to ''</li>
+<li>Min changed from 1 to null</li>
+</ul>
+</li>
+<li>Modified property: trigger
+<ul>
+<li>Format changed from 'double' to ''</li>
+<li>ExclusiveMin changed from true to false</li>
+<li>Min changed from 0 to null</li>
+<li>MultipleOf changed from 0.01 to null</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: throttle_retry_limit
+<ul>
+<li>Format changed from 'int64' to ''</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: versions
+<ul>
+<li>Nullable changed from false to true</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: graphql_access_rights
+<ul>
+<li>Nullable changed from false to true</li>
+<li>AdditionalProperties changed
+<ul>
+<li>Schema added</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: key_expires_in
+<ul>
+<li>Type changed from 'number' to 'integer'</li>
+</ul>
+</li>
+<li>Modified property: max_query_depth
+<ul>
+<li>Type changed from 'number' to 'integer'</li>
+</ul>
+</li>
+<li>Modified property: meta_data
+<ul>
+<li>Nullable changed from false to true</li>
+<li>AdditionalProperties changed
+<ul>
+<li>Schema added</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: smoothing
+<ul>
+<li>Properties changed
+<ul>
+<li>Modified property: delay
+<ul>
+<li>Format changed from 'int64' to ''</li>
+<li>Min changed from 1 to null</li>
+</ul>
+</li>
+<li>Modified property: step
+<ul>
+<li>Format changed from 'int64' to ''</li>
+<li>Min changed from 1 to null</li>
+</ul>
+</li>
+<li>Modified property: threshold
+<ul>
+<li>Format changed from 'int64' to ''</li>
+<li>Min changed from 1 to null</li>
+</ul>
+</li>
+<li>Modified property: trigger
+<ul>
+<li>Format changed from 'double' to ''</li>
+<li>ExclusiveMin changed from true to false</li>
+<li>Min changed from 0 to null</li>
+<li>MultipleOf changed from 0.01 to null</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified property: tags
+<ul>
+<li>Nullable changed from false to true</li>
+</ul>
+</li>
+<li>Modified property: throttle_retry_limit
+<ul>
+<li>Type changed from 'number' to 'integer'</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Responses changed
+<ul>
+<li>New response: 403</li>
+</ul>
+</li>
+</ul>
+<p>GET /tyk/reload</p>
+<ul>
+<li>Responses changed
+<ul>
+<li>New response: 403</li>
+</ul>
+</li>
+</ul>
+<p>GET /tyk/reload/group</p>
+<ul>
+<li>Responses changed
+<ul>
+<li>New response: 403</li>
+</ul>
+</li>
+</ul>
+<p>GET /tyk/schema</p>
+<ul>
+<li>Responses changed
+<ul>
+<li>New response: 403</li>
+<li>Deleted response: 400</li>
+<li>Modified response: 200
+<ul>
+<li>Content changed
+<ul>
+<li>Modified media type: application/json
+<ul>
+<li>Schema changed
+<ul>
+<li>Properties changed
+<ul>
+<li>Modified property: schema
+<ul>
+<li>Type changed from 'string' to ''</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Modified response: 404
+<ul>
+<li>Content changed
+<ul>
+<li>Modified media type: application/json
+<ul>
+<li>Schema changed
+<ul>
+<li>Properties changed
+<ul>
+<li>Modified property: schema
+<ul>
+<li>Type changed from 'string' to ''</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+<p>Servers changed</p>
+<ul>
+<li>New server: https://{tenant}</li>
+<li>Deleted server: http://localhost/</li>
+<li>Deleted server: https://localhost/</li>
+</ul>
+

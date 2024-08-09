@@ -28,9 +28,9 @@ import (
 const ListDetailed = "detailed"
 
 type APICertificateStatusMessage struct {
-	CertID  string `json:"id"`
-	Status  string `json:"status"`
-	Message string `json:"message"`
+	CertID  string `json:"id" example:"5e9d9544a1dcd60001d0ed207c440d66ebb0a4629d21329808dce9091acf5f2fde328067a6e60e5347271d90"`
+	Status  string `json:"status" example:"ok"`
+	Message string `json:"message" example:"Certificate added"`
 }
 
 type APIAllCertificates struct {
@@ -496,7 +496,6 @@ func (gw *Gateway) getTLSConfigForClient(baseConfig *tls.Config, listenPort int)
 		}
 
 		if newConfig.ClientAuth == tls.RequireAndVerifyClientCert && isControlAPI && !gwConfig.Security.ControlAPIUseMutualTLS {
-
 			newConfig.ClientAuth = tls.RequestClientCert
 		}
 
@@ -532,7 +531,7 @@ func (gw *Gateway) certHandler(w http.ResponseWriter, r *http.Request) {
 			mode := r.URL.Query().Get("mode")
 			certIDs := gw.CertificateManager.ListAllIds(orgID)
 			if mode == ListDetailed {
-				var certificateBasics = make([]*certs.CertificateBasics, len(certIDs))
+				certificateBasics := make([]*certs.CertificateBasics, len(certIDs))
 				certificates := gw.CertificateManager.List(certIDs, certs.CertificateAny)
 				for ci, certificate := range certificates {
 					certificateBasics[ci] = certs.ExtractCertificateBasics(certificate, certIDs[ci])
