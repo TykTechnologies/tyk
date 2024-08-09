@@ -1,8 +1,10 @@
 ARG BASE_IMAGE
-FROM ${BASE_IMAGE}
+FROM ${BASE_IMAGE} as tyk
 
-# For Python plugins
-RUN apt-get install -y python3-setuptools libpython3-dev python3-dev python3-grpcio
+FROM debian:bookworm-slim
+RUN apt-get update && apt-get install -y python3-setuptools libpython3-dev python3-dev python3-grpcio
+
+COPY --from=tyk /opt/tyk-gateway/ /opt/tyk-gateway/
 
 EXPOSE 8080 80 443
 
