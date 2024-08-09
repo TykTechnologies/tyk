@@ -1,11 +1,15 @@
 ARG BASE_IMAGE
-FROM ${BASE_IMAGE}
+FROM ${BASE_IMAGE} as tyk
 
-RUN apt-get update && apt-get install -y busybox
+FROM debian:bookworm-slim as build
+
+COPY --from=tyk /opt/tyk-gateway/tyk /opt/tyk-gateway/tyk
 
 WORKDIR /tmp
 
 ADD . .
+
+RUN apt-get update && apt-get install -y busybox
 
 RUN rm -f bundle.zip && /opt/tyk-gateway/tyk bundle build -y
 
