@@ -29,35 +29,31 @@ func APIS(r *openapi3.Reflector) error {
 
 // Done
 func getClassicApiRequest(r *openapi3.Reflector) error {
-	oc, err := r.NewOperationContext(http.MethodGet, "/tyk/apis/{apiID}")
+	op, err := NewOperationWithSafeExample(r, SafeOperation{
+		Method:      http.MethodGet,
+		PathPattern: "/tyk/apis/{apiID}",
+		OperationID: "getApi",
+		Tag:         APIsTag,
+	})
 	if err != nil {
 		return err
 	}
+	oc := op.oc
 	oc.AddRespStructure(new(apidef.APIDefinition), func(cu *openapi.ContentUnit) {
 		cu.Description = "API definition"
 	})
 	statusNotFound(oc, "Api not found")
-	forbidden(oc)
-	oc.SetTags(APIsTag)
-	oc.SetID("getApi")
 	oc.SetSummary("Get API definition with it's ID")
 	oc.SetDescription("Get API definition\nOnly if used without the Tyk Dashboard")
-	o3, ok := oc.(openapi3.OperationExposer)
-	if !ok {
-		return ErrOperationExposer
-	}
-	o3.Operation().WithParameters(apIIDParameter())
-	oc.SetDescription("Get API definition\nOnly if used without the Tyk Dashboard")
-	err = r.AddOperation(oc)
-	if err != nil {
-		return err
-	}
-	addNewResponseHeader(o3, http.StatusOK, HeaderCr{
-		Key:         "x-tyk-base-api-id",
-		Description: "ID of the base API if the requested API is a version.",
-		Type:        openapi3.SchemaTypeString,
+	op.AddPathParameter("apiID", "The API ID", OptionalParameterValues{
+		Example: valueToInterface("keyless"),
 	})
-	return nil
+	op.AddResponseHeaders(ResponseHeader{
+		Name:        "x-tyk-base-api-id",
+		Description: PointerValue("ID of the base API if the requested API is a version."),
+		Type:        PointerValue(openapi3.SchemaTypeString),
+	})
+	return op.AddOperation()
 }
 
 // Done

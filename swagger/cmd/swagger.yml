@@ -240,10 +240,12 @@ paths:
         "403":
           content:
             application/json:
+              example:
+                message: Attempted administrative access with invalid or missing key!
+                status: error
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: Attempting to access a protected api with an invalid or a missing
-            X-Tyk-Authorization in the headers
+          description: Forbidden
         "404":
           content:
             application/json:
@@ -2693,6 +2695,9 @@ paths:
         "200":
           content:
             application/json:
+              examples:
+                policiesExample:
+                  $ref: '#/components/examples/policiesExample'
               schema:
                 items:
                   $ref: '#/components/schemas/Policy'
@@ -2701,10 +2706,12 @@ paths:
         "403":
           content:
             application/json:
+              example:
+                message: Attempted administrative access with invalid or missing key!
+                status: error
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: Attempting to access a protected api with an invalid or a missing
-            X-Tyk-Authorization in the headers
+          description: Forbidden
       summary: List Policies
       tags:
       - Policies
@@ -2714,31 +2721,80 @@ paths:
       requestBody:
         content:
           application/json:
+            example:
+              access_rights:
+                itachi-api:
+                  allowed_urls:
+                  - methods:
+                    - GET
+                    url: /users
+                  api_id: 8ddd91f3cda9453442c477b06c4e2da4
+                  api_name: Itachi api
+                  disable_introspection: false
+                  versions:
+                  - Default
+              active: true
+              hmac_enabled: false
+              id: 5ead7120575961000181867e
+              is_inactive: false
+              key_expires_in: 2.592e+06
+              max_query_depth: -1
+              meta_data:
+                update: sample policy update
+                user_type: mobile_user
+              name: Sample policy
+              partitions:
+                acl: true
+                complexity: false
+                per_api: false
+                quota: true
+                rate_limit: true
+              per: 60
+              quota_max: 10000
+              quota_renewal_rate: 3600
+              rate: 1000
+              tags:
+              - security
+              throttle_interval: 10
+              throttle_retry_limit: 10
             schema:
               $ref: '#/components/schemas/Policy'
       responses:
         "200":
           content:
             application/json:
+              example:
+                action: added
+                key: 5ead7120575961000181867e
+                status: ok
               schema:
                 $ref: '#/components/schemas/ApiModifyKeySuccess'
           description: Policy created
         "400":
           content:
             application/json:
+              example:
+                message: Request malformed
+                status: error
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: Malformed request
+          description: malformed request
         "403":
           content:
             application/json:
+              example:
+                message: Attempted administrative access with invalid or missing key!
+                status: error
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: Attempting to access a protected api with an invalid or a missing
-            X-Tyk-Authorization in the headers
+          description: Forbidden
         "500":
           content:
             application/json:
+              example:
+                message: Due to enabled service policy source, please use the Dashboard
+                  API
+                status: error
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
           description: Internal server error.
@@ -2752,6 +2808,7 @@ paths:
       parameters:
       - description: You can retrieve details of a single policy by ID in your Tyk
           instance.
+        example: 5ead7120575961000181867e
         in: path
         name: polID
         required: true
@@ -2761,28 +2818,40 @@ paths:
         "200":
           content:
             application/json:
+              example:
+                action: deleted
+                key: 5ead7120575961000181867e
+                status: ok
               schema:
                 $ref: '#/components/schemas/ApiModifyKeySuccess'
           description: Deleted policy by ID
         "400":
           content:
             application/json:
+              example:
+                message: Must specify an apiID to update
+                status: error
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: Returned when you fail to specify an polID to delete
+          description: Policy Id not provided
         "403":
           content:
             application/json:
+              example:
+                message: Attempted administrative access with invalid or missing key!
+                status: error
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: Attempting to access a protected api with an invalid or a missing
-            X-Tyk-Authorization in the headers
+          description: Forbidden
         "500":
           content:
             application/json:
+              example:
+                message: Delete failed
+                status: error
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: Internal server error
+          description: Internal server error.
       summary: Delete a Policy
       tags:
       - Policies
@@ -2792,6 +2861,7 @@ paths:
       parameters:
       - description: You can retrieve details of a single policy by ID in your Tyk
           instance.
+        example: 5ead7120575961000181867e
         in: path
         name: polID
         required: true
@@ -2801,19 +2871,60 @@ paths:
         "200":
           content:
             application/json:
+              example:
+                access_rights:
+                  itachi-api:
+                    allowed_urls:
+                    - methods:
+                      - GET
+                      url: /users
+                    api_id: 8ddd91f3cda9453442c477b06c4e2da4
+                    api_name: Itachi api
+                    disable_introspection: false
+                    versions:
+                    - Default
+                active: true
+                hmac_enabled: false
+                id: 5ead7120575961000181867e
+                is_inactive: false
+                key_expires_in: 2.592e+06
+                max_query_depth: -1
+                meta_data:
+                  update: sample policy update
+                  user_type: mobile_user
+                name: Sample policy
+                partitions:
+                  acl: true
+                  complexity: false
+                  per_api: false
+                  quota: true
+                  rate_limit: true
+                per: 60
+                quota_max: 10000
+                quota_renewal_rate: 3600
+                rate: 1000
+                tags:
+                - security
+                throttle_interval: 10
+                throttle_retry_limit: 10
               schema:
                 $ref: '#/components/schemas/Policy'
           description: Get details of a single Policy
         "403":
           content:
             application/json:
+              example:
+                message: Attempted administrative access with invalid or missing key!
+                status: error
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: Attempting to access a protected api with an invalid or a missing
-            X-Tyk-Authorization in the headers
+          description: Forbidden
         "404":
           content:
             application/json:
+              example:
+                message: Policy not found
+                status: error
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
           description: Policy not found
@@ -2826,6 +2937,7 @@ paths:
       parameters:
       - description: You can retrieve details of a single policy by ID in your Tyk
           instance.
+        example: 5ead7120575961000181867e
         in: path
         name: polID
         required: true
@@ -2834,35 +2946,82 @@ paths:
       requestBody:
         content:
           application/json:
+            example:
+              access_rights:
+                itachi-api:
+                  allowed_urls:
+                  - methods:
+                    - GET
+                    url: /users
+                  api_id: 8ddd91f3cda9453442c477b06c4e2da4
+                  api_name: Itachi api
+                  disable_introspection: false
+                  versions:
+                  - Default
+              active: true
+              hmac_enabled: false
+              id: 5ead7120575961000181867e
+              is_inactive: false
+              key_expires_in: 2.592e+06
+              max_query_depth: -1
+              meta_data:
+                update: sample policy update
+                user_type: mobile_user
+              name: update policy sample
+              partitions:
+                acl: true
+                complexity: false
+                per_api: false
+                quota: true
+                rate_limit: true
+              per: 60
+              quota_max: 10000
+              quota_renewal_rate: 3600
+              rate: 1000
+              tags:
+              - security
+              throttle_interval: 10
+              throttle_retry_limit: 10
             schema:
               $ref: '#/components/schemas/Policy'
       responses:
         "200":
           content:
             application/json:
+              example:
+                action: modified
+                key: 5ead7120575961000181867e
+                status: ok
               schema:
                 $ref: '#/components/schemas/ApiModifyKeySuccess'
           description: Policy updated
         "400":
           content:
             application/json:
+              example:
+                message: Request malformed
+                status: error
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: Returned when you fail to specify an polID to update or due
-            to a malformed request body
+          description: malformed request
         "403":
           content:
             application/json:
+              example:
+                message: Attempted administrative access with invalid or missing key!
+                status: error
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: Attempting to access a protected api with an invalid or a missing
-            X-Tyk-Authorization in the headers
+          description: Forbidden
         "500":
           content:
             application/json:
+              example:
+                message: Failed to create file!
+                status: error
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: Internal server error
+          description: Internal server error.
       summary: Update a Policy
       tags:
       - Policies
@@ -3260,6 +3419,73 @@ components:
               value: /user-test/
           upstream:
             url: https://localhost:8080
+    policiesExample:
+      value:
+      - _id: ""
+        access_rights:
+          8ddd91f3cda9453442c477b06c4e2da4:
+            allowance_scope: ""
+            allowed_types: []
+            allowed_urls:
+            - methods:
+              - GET
+              url: /users
+            api_id: 8ddd91f3cda9453442c477b06c4e2da4
+            api_name: Itachi api
+            disable_introspection: false
+            field_access_rights: []
+            limit:
+              max_query_depth: 0
+              per: 0
+              quota_max: 0
+              quota_remaining: 0
+              quota_renewal_rate: 0
+              quota_renews: 0
+              rate: 0
+              smoothing:
+                delay: 30
+                enabled: false
+                step: 100
+                threshold: 500
+                trigger: 0.8
+              throttle_interval: 0
+              throttle_retry_limit: 0
+            restricted_types: []
+            versions:
+            - Default
+        active: true
+        enable_http_signature_validation: false
+        graphql_access_rights: null
+        hmac_enabled: false
+        id: 5ead7120575961000181867e
+        is_inactive: false
+        key_expires_in: 2.592e+06
+        last_updated: "1716980105"
+        max_query_depth: -1
+        meta_data:
+          user_type: mobile_user
+        name: Sample policy
+        org_id: 664a14650619d40001f1f00f
+        partitions:
+          acl: true
+          complexity: false
+          per_api: false
+          quota: true
+          rate_limit: true
+        per: 60
+        quota_max: 10000
+        quota_renewal_rate: 3600
+        rate: 1000
+        smoothing:
+          delay: 30
+          enabled: false
+          step: 100
+          threshold: 500
+          trigger: 0.8
+        tags:
+        - security
+        throttle_interval: 10
+        throttle_retry_limit: 10
   parameters:
     AccessType:
       description: Filter for internal or external API versions

@@ -934,6 +934,7 @@ func (gw *Gateway) handleAddOrUpdatePolicy(polID string, r *http.Request) (inter
 	}
 
 	if err := ioutil.WriteFile(polFilePath, asByte, 0o644); err != nil {
+		log.Println("i am here failure")
 		log.Error("Failed to create file! - ", err)
 		return apiError("Failed to create file!"), http.StatusInternalServerError
 	}

@@ -19,40 +19,26 @@ import (
 var ErrOperationExposer = errors.New("object is not of type openapi3.OperationExposer")
 
 const (
-	applicationForm               = "application/x-www-form-urlencoded"
-	applicationOctetStream        = "application/octet-stream"
-	applicationJSON               = "application/json"
-	oasExample                    = "oasExample"
-	certificateMetaExample        = "certificateMetaExample"
-	certificateMetaListExample    = "certificateMetaListExample"
-	certIdList                    = "certIdList"
-	certificateBasicList          = "certificateBasicList"
-	stringOasExample              = "stringOasExample"
-	graphResponseExample          = "graphResponseExample"
-	policiesExample               = "policiesExample"
-	keyRequestsResponseExampleKey = "keyRequestsResponseExample"
-	keySingleApiDef               = "singleAPIDef"
-	keyPaginatedApiExamples       = "paginatedApiExample"
-	keyAggregateAnalytics         = "aggregateAnalytics"
-	ExternalRefOAS                = "https://raw.githubusercontent.com/OAI/OpenAPI-Specification/main/schemas/v3.0/schema.json"
-	startDate                     = "startDate"
-	endDate                       = "endDate"
-	startDay                      = "startDay"
-	startMonth                    = "startMonth"
-	startYear                     = "startYear"
-	endDay                        = "endDay"
-	endMonth                      = "endMonth"
-	endYear                       = "endYear"
-	UpstreamURL                   = "UpstreamURL"
-	ListenPath                    = "ListenPath"
-	CustomDomain                  = "CustomDomain"
-	AllowList                     = "AllowList"
-	ValidateRequest               = "ValidateRequest"
-	MockResponse                  = "MockResponse"
-	Authentication                = "Authentication"
-	TemplateID                    = "TemplateID"
-	SearchText                    = "SearchText"
-	AccessType                    = "AccessType"
+	applicationForm            = "application/x-www-form-urlencoded"
+	applicationOctetStream     = "application/octet-stream"
+	applicationJSON            = "application/json"
+	oasExample                 = "oasExample"
+	certificateMetaExample     = "certificateMetaExample"
+	certificateMetaListExample = "certificateMetaListExample"
+	certIdList                 = "certIdList"
+	certificateBasicList       = "certificateBasicList"
+	policiesExample            = "policiesExample"
+	UpstreamURL                = "UpstreamURL"
+	ListenPath                 = "ListenPath"
+	CustomDomain               = "CustomDomain"
+	AllowList                  = "AllowList"
+	ValidateRequest            = "ValidateRequest"
+	MockResponse               = "MockResponse"
+	Authentication             = "Authentication"
+	TemplateID                 = "TemplateID"
+	SearchText                 = "SearchText"
+	AccessType                 = "AccessType"
+	policyRequestObject        = "policyRequestObject"
 )
 
 type BinaryExample string
@@ -86,6 +72,8 @@ func RefExamples(r *openapi3.Reflector) {
 	addRefExample(r, certificateMetaListExample, certificates)
 	addRefExample(r, certIdList, certListId)
 	addRefExample(r, certificateBasicList, certificateBasic)
+	addRefExample(r, policiesExample, policies)
+	///addRefExample(r,policyRequestObject,minimalPolicies)
 	// addRefExample(r, stringOasExample, OasSampleString())
 
 	///addRefExample(r, graphResponseExample, graphDetails())
