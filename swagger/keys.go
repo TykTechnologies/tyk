@@ -2,6 +2,7 @@ package swagger
 
 import (
 	"net/http"
+	"time"
 
 	"github.com/swaggest/openapi-go"
 	"github.com/swaggest/openapi-go/openapi3"
@@ -28,29 +29,36 @@ func getKeyWithID(r *openapi3.Reflector) error {
 	// isHashed := r.URL.Query().Get("hashed") != ""
 	// isUserName := r.URL.Query().Get("username") == "true"
 	// orgID := r.URL.Query().Get("org_id")
-	oc, err := r.NewOperationContext(http.MethodGet, "/tyk/keys/{keyID}")
+	op, err := NewOperationWithSafeExample(r, SafeOperation{
+		Method:      http.MethodGet,
+		PathPattern: "/tyk/keys/{keyID}",
+		OperationID: "getKey",
+		Tag:         KeysTag,
+	})
 	if err != nil {
 		return err
 	}
-	oc.AddRespStructure(new(user.SessionState), func(cu *openapi.ContentUnit) {
+	oc := op.oc
+	op.AddResponseWithSeparateExample(new(user.SessionState), http.StatusOK, minimalSessionState[0], func(cu *openapi.ContentUnit) {
 		cu.Description = "Key fetched"
 	})
-	statusNotFound(oc, "Key not found")
-	forbidden(oc)
-	statusBadRequest(oc, "requesting key using a hash when key hashing is not enabled")
-	oc.SetTags(KeysTag)
-	oc.SetID("getKey")
+	op.StatusNotFound("Key not found", func(cu *openapi.ContentUnit) {
+		cu.Description = "Key not found"
+	})
+	op.StatusBadRequest("Key requested by hash but key hashing is not enabled")
 	oc.SetSummary("Get a key with ID")
-	o3, ok := oc.(openapi3.OperationExposer)
-	if !ok {
-		return ErrOperationExposer
-	}
 	//"b13d928b9972bd18"
-	par := []openapi3.ParameterOrRef{keyIDParameter()}
-	par = append(par, hashedQuery())
-	o3.Operation().WithParameters(par...)
 	oc.SetDescription("Get session info about the specified key. Should return up to date rate limit and quota usage numbers.")
-	return r.AddOperation(oc)
+	op.AddQueryParameter("hashed", "Use the hash of the key as input instead of the full key", OptionalParameterValues{
+		Example: valueToInterface(true),
+		Type:    openapi3.SchemaTypeBoolean,
+		Enum:    []interface{}{true, false},
+		Default: nil,
+	})
+	op.AddPathParameter("keyID", "The Key ID", OptionalParameterValues{
+		Example: valueToInterface("5e9d9544a1dcd60001d0ed20e7f75f9e03534825b7aef9df749582e5"),
+	})
+	return op.AddOperation()
 }
 
 func deleteKeyRequest(r *openapi3.Reflector) error {
@@ -60,49 +68,69 @@ func deleteKeyRequest(r *openapi3.Reflector) error {
 	// isHashed := r.URL.Query().Get("hashed") != ""
 	// isUserName := r.URL.Query().Get("username") == "true"
 	// orgID := r.URL.Query().Get("org_id")
-	oc, err := r.NewOperationContext(http.MethodDelete, "/tyk/keys/{keyID}")
+	op, err := NewOperationWithSafeExample(r, SafeOperation{
+		Method:      http.MethodDelete,
+		PathPattern: "/tyk/keys/{keyID}",
+		OperationID: "deleteKey",
+		Tag:         KeysTag,
+	})
 	if err != nil {
 		return err
 	}
-	oc.SetTags(KeysTag)
-	oc.SetID("deleteKey")
-	oc.AddRespStructure(new(apiModifyKeySuccess), func(cu *openapi.ContentUnit) {
+	oc := op.oc
+	op.StatusNotFound("There is no such key found", func(cu *openapi.ContentUnit) {
+		cu.Description = "Key not found"
+	})
+	op.AddRespWithExample(apiModifyKeySuccess{
+		Key:    "5e9d9544a1dcd60001d0ed20e7f75f9e03534825b7aef9df749582e5",
+		Status: "ok",
+		Action: "deleted",
+	}, http.StatusOK, func(cu *openapi.ContentUnit) {
 		cu.Description = "Key deleted"
 	})
-	statusBadRequest(oc, "Failed to remove the key")
-	statusNotFound(oc, "Key not found")
-	forbidden(oc)
+	op.StatusBadRequest("Failed to remove the key")
 	oc.SetSummary("Delete Key")
 	oc.SetDescription("Deleting a key will remove it permanently from the system, however analytics relating to that key will still be available.")
-	o3, ok := oc.(openapi3.OperationExposer)
-	if !ok {
-		return ErrOperationExposer
-	}
-	par := []openapi3.ParameterOrRef{keyIDParameter(), hashedQuery()}
-	o3.Operation().WithParameters(par...)
-	return r.AddOperation(oc)
+	op.AddQueryParameter("hashed", "Use the hash of the key as input instead of the full key", OptionalParameterValues{
+		Example: valueToInterface(true),
+		Type:    openapi3.SchemaTypeBoolean,
+		Enum:    []interface{}{true, false},
+		Default: nil,
+	})
+	op.AddPathParameter("keyID", "The Key ID", OptionalParameterValues{
+		Example: valueToInterface("5e9d9544a1dcd60001d0ed20e7f75f9e03534825b7aef9df749582e5"),
+	})
+	return op.AddOperation()
 }
 
 // Done
 func getListOfKeys(r *openapi3.Reflector) error {
-	oc, err := r.NewOperationContext(http.MethodGet, "/tyk/keys")
+	op, err := NewOperationWithSafeExample(r, SafeOperation{
+		Method:      http.MethodGet,
+		PathPattern: "/tyk/keys",
+		OperationID: "listKeys",
+		Tag:         KeysTag,
+	})
 	if err != nil {
 		return err
 	}
+	oc := op.oc
 	oc.AddRespStructure(new(apiAllKeys), func(cu *openapi.ContentUnit) {
 		cu.Description = "List of all API keys"
 	})
-	forbidden(oc)
-	statusNotFound(oc, "When hash_keys is enabled in gateway config and enable_hashed_keys_listing is disabled")
-	oc.SetID("listKeys")
+	op.AddRespWithExample(apiAllKeys{APIKeys: []string{
+		"5e9d9544a1dcd60001d0ed2008500e44fa644f939b640a4b8b4ea58c",
+	}}, http.StatusOK, func(cu *openapi.ContentUnit) {
+		cu.Description = "List of all API keys"
+	})
+	op.StatusNotFound("Hashed key listing is disabled in config (enable_hashed_keys_listing)", func(cu *openapi.ContentUnit) {
+		cu.Description = " disabled Hashed key listing"
+	})
 	oc.SetDescription("List APIs\n  Only if used without the Tyk Dashboard")
-	oc.SetTags(KeysTag)
 	oc.SetSummary("List Keys")
-	o3, ok := oc.(openapi3.OperationExposer)
-	if !ok {
-		return ErrOperationExposer
-	}
-	o3.Operation().WithParameters(filterKeyQuery())
+	op.AddQueryParameter("filter", "Retrieves all keys starting with the specified filter(filter is a prefix - e.g. default* or default will return all keys starting with default  like defaultbd,defaulttwo etc).We don't use filter for hashed keys", OptionalParameterValues{
+		Example: valueToInterface("default*"),
+	})
 	return r.AddOperation(oc)
 }
 
@@ -140,75 +168,110 @@ func putKeyRequest(r *openapi3.Reflector) error {
 
 func postKeyRequest(r *openapi3.Reflector) error {
 	// TODO::to check if hashed query is part of this request
-	oc, err := r.NewOperationContext(http.MethodPost, "/tyk/keys")
+	op, err := NewOperationWithSafeExample(r, SafeOperation{
+		Method:      http.MethodPost,
+		PathPattern: "/tyk/keys",
+		OperationID: "addKey",
+		Tag:         KeysTag,
+	})
 	if err != nil {
 		return err
 	}
-	oc.SetTags(KeysTag)
-	oc.SetID("addKey")
+	oc := op.oc
 	oc.SetSummary("Create a key")
 	oc.SetDescription("Tyk will generate the access token based on the OrgID specified in the API Definition and a random UUID. This ensures that keys can be \"owned\" by different API Owners should segmentation be needed at an organisational level.\n        <br/><br/>\n        API keys without access_rights data will be written to all APIs on the system (this also means that they will be created across all SessionHandlers and StorageHandlers, it is recommended to always embed access_rights data in a key to ensure that only targeted APIs and their back-ends are written to.")
-	oc.AddReqStructure(new(user.SessionState))
-	oc.AddRespStructure(new(apiModifyKeySuccess), func(cu *openapi.ContentUnit) {
+	op.AddReqWithSeparateExample(new(user.SessionState), minimalSessionState[0])
+
+	op.AddRespWithExample(apiModifyKeySuccess{
+		Key:    "5e9d9544a1dcd60001d0ed20a2290376f89846b798b7e5197584ef6d",
+		Status: "ok",
+		Action: "added",
+	}, http.StatusOK, func(cu *openapi.ContentUnit) {
 		cu.Description = "New Key added"
 	})
-	statusInternalServerError(oc, "Unexpected error")
-	forbidden(oc)
-	statusBadRequest(oc, "Malformed request")
-	o3, ok := oc.(openapi3.OperationExposer)
-	if !ok {
-		return ErrOperationExposer
-	}
+	op.StatusInternalServerError("Failed to create key, ensure security settings are correct.")
+	op.StatusBadRequest("Request malformed")
 
-	o3.Operation().WithParameters(hashedQuery("when set to true the key_hash returned will be similar to the un hashed key name"))
-	return r.AddOperation(oc)
+	op.AddQueryParameter("hashed", "when set to true the key_hash returned will be similar to the un hashed key name", OptionalParameterValues{
+		Example: valueToInterface(true),
+		Type:    openapi3.SchemaTypeBoolean,
+		Enum:    []interface{}{true, false},
+	})
+
+	return op.AddOperation()
 }
 
 func createCustomKeyRequest(r *openapi3.Reflector) error {
-	oc, err := r.NewOperationContext(http.MethodPost, "/tyk/keys/{keyID}")
+	op, err := NewOperationWithSafeExample(r, SafeOperation{
+		Method:      http.MethodPost,
+		PathPattern: "/tyk/keys/{keyID}",
+		OperationID: "createCustomKey",
+		Tag:         KeysTag,
+	})
 	if err != nil {
 		return err
 	}
-	oc.SetTags(KeysTag)
-	oc.SetID("createCustomKey")
+	oc := op.oc
 	oc.SetSummary("Create Custom Key / Import Key")
 	// TODO::Copy the description in previous oas
 	// TODO::check if suppress reset is required.
 	oc.SetDescription("You can use the `POST /tyk/keys/{KEY_ID}` endpoint as defined below to import existing keys into Tyk.\n\n        This example uses standard `authorization` header authentication, and assumes that the Gateway is located at `127.0.0.1:8080` and the Tyk secret is `352d20ee67be67f6340b4c0605b044b7` - update these as necessary to match your environment.\n")
-	oc.AddReqStructure(new(user.SessionState))
-	oc.AddRespStructure(new(apiModifyKeySuccess), func(cu *openapi.ContentUnit) {
+	op.AddReqWithSeparateExample(new(user.SessionState), minimalSessionState[0])
+	op.AddRespWithExample(apiModifyKeySuccess{
+		Key:    "5e9d9544a1dcd60001d0ed20customKey",
+		Status: "ok",
+		Action: "added",
+	}, http.StatusOK, func(cu *openapi.ContentUnit) {
 		cu.Description = "New custom Key added"
 	})
-	statusInternalServerError(oc, "Unexpected error")
-	forbidden(oc)
-	statusBadRequest(oc, "Malformed request")
-	o3, ok := oc.(openapi3.OperationExposer)
-	if !ok {
-		return ErrOperationExposer
-	}
-	par := []openapi3.ParameterOrRef{keyIDParameter(), suppressResetQuery(), hashedQuery("when set to true the key_hash returned will be similar to the un hashed key name")}
-	o3.Operation().WithParameters(par...)
-	return r.AddOperation(oc)
+	op.StatusBadRequest("Request malformed")
+	op.StatusInternalServerError("Failed to create key, ensure security settings are correct.")
+	op.AddQueryParameter("suppress_reset", "Adding the suppress_reset parameter and setting it to 1, will cause Tyk not to reset the quota limit that is in the current live quota manager. By default Tyk will reset the quota in the live quota manager (initialising it) when adding a key. Adding the `suppress_reset` flag to the URL parameters will avoid this behaviour.", OptionalParameterValues{
+		Example: valueToInterface("1"),
+
+		Enum: []interface{}{"1"},
+	})
+	op.AddQueryParameter("hashed", "when set to true the key_hash returned will be similar to the un hashed key name", OptionalParameterValues{
+		Example: valueToInterface(true),
+		Type:    openapi3.SchemaTypeBoolean,
+		Enum:    []interface{}{true, false},
+	})
+	op.AddPathParameter("keyID", "Name to give the custom Key", OptionalParameterValues{
+		Example: valueToInterface("customKey"),
+	})
+
+	return op.AddOperation()
 }
 
 func createKeyRequest(r *openapi3.Reflector) error {
 	// TODO::Inquire why we have two endpoint doing the same thing.
-	oc, err := r.NewOperationContext(http.MethodPost, "/tyk/keys/create")
+	op, err := NewOperationWithSafeExample(r, SafeOperation{
+		Method:      http.MethodPost,
+		PathPattern: "/tyk/keys/create",
+		OperationID: "createKey",
+		Tag:         KeysTag,
+	})
 	if err != nil {
 		return err
 	}
-	oc.SetTags(KeysTag)
-	oc.SetID("createKey")
+	oc := op.oc
 	oc.SetSummary("Create a key")
 	oc.SetDescription("Create a key")
-	oc.AddReqStructure(new(user.SessionState))
-	oc.AddRespStructure(new(apiModifyKeySuccess), func(cu *openapi.ContentUnit) {
+	op.AddReqWithSeparateExample(new(user.SessionState), minimalSessionState[0])
+	op.AddRespWithExample(apiModifyKeySuccess{
+		Key:    "5e9d9544a1dcd60001d0ed207eb558517c3c48fb826c62cc6f6161eb",
+		Status: "ok",
+		Action: "added",
+	}, http.StatusOK, func(cu *openapi.ContentUnit) {
 		cu.Description = "Key created"
 	})
-	statusBadRequest(oc, "keys must have at least one Access Rights record set")
-	statusInternalServerError(oc, "Failed to create key")
-	forbidden(oc)
-	return r.AddOperation(oc)
+	op.AddGenericErrorResponse(http.StatusInternalServerError, "Unmarshalling failed", func(cu *openapi.ContentUnit) {
+		cu.Description = "malformed body"
+	})
+	op.StatusBadRequest("Failed to create key, keys must have at least one Access Rights record set.", func(cu *openapi.ContentUnit) {
+		cu.Description = "no access right"
+	})
+	return op.AddOperation()
 }
 
 func previewKeyRequest(r *openapi3.Reflector) error {
@@ -282,4 +345,114 @@ func filterKeyQuery() openapi3.ParameterOrRef {
 	var example interface{} = "default*"
 	desc := "Retrieves all keys starting with the specified filter(filter is a prefix - e.g. default* or default will return all keys starting with default  like defaultbd,defaulttwo etc).We don't use filter for hashed keys"
 	return openapi3.Parameter{Example: &example, In: openapi3.ParameterInQuery, Name: "filter", Required: &isOptional, Description: &desc, Schema: stringSchema()}.ToParameterOrRef()
+}
+
+var minimalSessionState = []struct {
+	Allowance          int       `json:"allowance"`
+	Rate               int       `json:"rate"`
+	Per                int       `json:"per"`
+	ThrottleInterval   int       `json:"throttle_interval"`
+	ThrottleRetryLimit int       `json:"throttle_retry_limit"`
+	DateCreated        time.Time `json:"date_created"`
+	QuotaMax           int       `json:"quota_max"`
+	QuotaRenews        int64     `json:"quota_renews"`
+	QuotaRenewalRate   int       `json:"quota_renewal_rate"`
+	AccessRights       map[string]struct {
+		APIName     string   `json:"api_name"`
+		APIID       string   `json:"api_id"`
+		Versions    []string `json:"versions"`
+		AllowedURLs []struct {
+			URL     string   `json:"url"`
+			Methods []string `json:"methods"`
+		} `json:"allowed_urls"`
+		Limit struct {
+			Rate               int `json:"rate"`
+			Per                int `json:"per"`
+			ThrottleInterval   int `json:"throttle_interval"`
+			ThrottleRetryLimit int `json:"throttle_retry_limit"`
+			QuotaMax           int `json:"quota_max"`
+			QuotaRemaining     int `json:"quota_remaining"`
+			QuotaRenewalRate   int `json:"quota_renewal_rate"`
+		} `json:"limit"`
+	} `json:"access_rights"`
+	OrgID                   string                 `json:"org_id"`
+	ApplyPolicies           []string               `json:"apply_policies"`
+	EnableDetailedRecording bool                   `json:"enable_detailed_recording"`
+	MetaData                map[string]interface{} `json:"meta_data"`
+	Tags                    []string               `json:"tags"`
+	Alias                   string                 `json:"alias"`
+	LastUpdated             string                 `json:"last_updated"`
+}{
+	{
+		Allowance:          1000,
+		Rate:               1000,
+		Per:                60,
+		ThrottleInterval:   10,
+		ThrottleRetryLimit: 10,
+		DateCreated:        time.Date(2024, 8, 9, 14, 40, 34, 876140000, time.FixedZone("EEST", 3*60*60)),
+		QuotaMax:           10000,
+		QuotaRenews:        1723207234,
+		QuotaRenewalRate:   3600,
+		AccessRights: map[string]struct {
+			APIName     string   `json:"api_name"`
+			APIID       string   `json:"api_id"`
+			Versions    []string `json:"versions"`
+			AllowedURLs []struct {
+				URL     string   `json:"url"`
+				Methods []string `json:"methods"`
+			} `json:"allowed_urls"`
+			Limit struct {
+				Rate               int `json:"rate"`
+				Per                int `json:"per"`
+				ThrottleInterval   int `json:"throttle_interval"`
+				ThrottleRetryLimit int `json:"throttle_retry_limit"`
+				QuotaMax           int `json:"quota_max"`
+				QuotaRemaining     int `json:"quota_remaining"`
+				QuotaRenewalRate   int `json:"quota_renewal_rate"`
+			} `json:"limit"`
+		}{
+			"itachi-api": {
+				APIName:  "Itachi api",
+				APIID:    "8ddd91f3cda9453442c477b06c4e2da4",
+				Versions: []string{"Default"},
+				AllowedURLs: []struct {
+					URL     string   `json:"url"`
+					Methods []string `json:"methods"`
+				}{
+					{
+						URL:     "/users",
+						Methods: []string{"GET"},
+					},
+				},
+				Limit: struct {
+					Rate               int `json:"rate"`
+					Per                int `json:"per"`
+					ThrottleInterval   int `json:"throttle_interval"`
+					ThrottleRetryLimit int `json:"throttle_retry_limit"`
+					QuotaMax           int `json:"quota_max"`
+					QuotaRemaining     int `json:"quota_remaining"`
+					QuotaRenewalRate   int `json:"quota_renewal_rate"`
+				}{
+					Rate:               1000,
+					Per:                60,
+					ThrottleInterval:   10,
+					ThrottleRetryLimit: 10,
+					QuotaMax:           10000,
+					QuotaRemaining:     10000,
+					QuotaRenewalRate:   3600,
+				},
+			},
+		},
+		OrgID:                   "5e9d9544a1dcd60001d0ed20",
+		ApplyPolicies:           []string{"5ead7120575961000181867e"},
+		EnableDetailedRecording: true,
+		MetaData: map[string]interface{}{
+			"tyk_developer_id": "62b3fb9a1d5e4f00017226f5",
+			"update":           "sample policy update",
+			"user_type":        "mobile_user",
+		},
+		Tags:        []string{"security", "edge", "edge-eu"},
+		Alias:       "portal-key",
+		LastUpdated: "1723203634",
+	},
 }

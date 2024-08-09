@@ -1593,7 +1593,6 @@ func (gw *Gateway) keyHandler(w http.ResponseWriter, r *http.Request) {
 	gwConfig := gw.GetConfig()
 
 	if r.Method != http.MethodPost && isUserName && !gwConfig.DisableKeyActionsByUsername {
-		log.Println("here is user name")
 		keyName = gw.generateToken(orgID, keyName)
 	}
 

@@ -1432,16 +1432,6 @@ paths:
         List APIs
           Only if used without the Tyk Dashboard
       operationId: listKeys
-      parameters:
-      - description: Retrieves all keys starting with the specified filter(filter
-          is a prefix - e.g. default* or default will return all keys starting with
-          default  like defaultbd,defaulttwo etc).We don't use filter for hashed keys
-        example: default*
-        in: query
-        name: filter
-        required: false
-        schema:
-          type: string
       responses:
         "200":
           content:
@@ -1454,15 +1444,13 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: Attempting to access a protected api with an invalid or a missing
-            X-Tyk-Authorization in the headers
+          description: Forbidden
         "404":
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: When hash_keys is enabled in gateway config and enable_hashed_keys_listing
-            is disabled
+          description: ' disabled Hashed key listing'
       summary: List Keys
       tags:
       - Keys
@@ -1475,42 +1463,100 @@ paths:
       parameters:
       - description: when set to true the key_hash returned will be similar to the
           un hashed key name
+        example: true
         in: query
         name: hashed
         required: false
         schema:
+          enum:
+          - true
+          - false
           type: boolean
       requestBody:
         content:
           application/json:
+            example:
+              access_rights:
+                itachi-api:
+                  allowed_urls:
+                  - methods:
+                    - GET
+                    url: /users
+                  api_id: 8ddd91f3cda9453442c477b06c4e2da4
+                  api_name: Itachi api
+                  limit:
+                    per: 60
+                    quota_max: 10000
+                    quota_remaining: 10000
+                    quota_renewal_rate: 3600
+                    rate: 1000
+                    throttle_interval: 10
+                    throttle_retry_limit: 10
+                  versions:
+                  - Default
+              alias: portal-key
+              allowance: 1000
+              apply_policies:
+              - 5ead7120575961000181867e
+              date_created: "2024-08-09T14:40:34.87614+03:00"
+              enable_detailed_recording: true
+              last_updated: "1723203634"
+              meta_data:
+                tyk_developer_id: 62b3fb9a1d5e4f00017226f5
+                update: sample policy update
+                user_type: mobile_user
+              org_id: 5e9d9544a1dcd60001d0ed20
+              per: 60
+              quota_max: 10000
+              quota_renewal_rate: 3600
+              quota_renews: 1.723207234e+09
+              rate: 1000
+              tags:
+              - security
+              - edge
+              - edge-eu
+              throttle_interval: 10
+              throttle_retry_limit: 10
             schema:
               $ref: '#/components/schemas/SessionState'
       responses:
         "200":
           content:
             application/json:
+              example:
+                action: added
+                key: 5e9d9544a1dcd60001d0ed20a2290376f89846b798b7e5197584ef6d
+                status: ok
               schema:
                 $ref: '#/components/schemas/ApiModifyKeySuccess'
           description: New Key added
         "400":
           content:
             application/json:
+              example:
+                message: Request malformed
+                status: error
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: Malformed request
+          description: Bad Request
         "403":
           content:
             application/json:
+              example:
+                message: Attempted administrative access with invalid or missing key!
+                status: error
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: Attempting to access a protected api with an invalid or a missing
-            X-Tyk-Authorization in the headers
+          description: Forbidden
         "500":
           content:
             application/json:
+              example:
+                message: Failed to create key, ensure security settings are correct.
+                status: error
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: Unexpected error
+          description: Internal server error.
       summary: Create a key
       tags:
       - Keys
@@ -1520,41 +1566,58 @@ paths:
         analytics relating to that key will still be available.
       operationId: deleteKey
       parameters:
+      - description: Use the hash of the key as input instead of the full key
+        example: true
+        in: query
+        name: hashed
+        required: false
+        schema:
+          enum:
+          - true
+          - false
+          type: boolean
       - description: The Key ID
+        example: 5e9d9544a1dcd60001d0ed20e7f75f9e03534825b7aef9df749582e5
         in: path
         name: keyID
         required: true
         schema:
           type: string
-      - description: Use the hash of the key as input instead of the full key
-        in: query
-        name: hashed
-        required: false
-        schema:
-          type: boolean
       responses:
         "200":
           content:
             application/json:
+              example:
+                action: deleted
+                key: 5e9d9544a1dcd60001d0ed20e7f75f9e03534825b7aef9df749582e5
+                status: ok
               schema:
                 $ref: '#/components/schemas/ApiModifyKeySuccess'
           description: Key deleted
         "400":
           content:
             application/json:
+              example:
+                message: Failed to remove the key
+                status: error
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: Failed to remove the key
+          description: Bad Request
         "403":
           content:
             application/json:
+              example:
+                message: Attempted administrative access with invalid or missing key!
+                status: error
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: Attempting to access a protected api with an invalid or a missing
-            X-Tyk-Authorization in the headers
+          description: Forbidden
         "404":
           content:
             application/json:
+              example:
+                message: There is no such key found
+                status: error
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
           description: Key not found
@@ -1566,41 +1629,96 @@ paths:
         rate limit and quota usage numbers.
       operationId: getKey
       parameters:
+      - description: Use the hash of the key as input instead of the full key
+        example: true
+        in: query
+        name: hashed
+        required: false
+        schema:
+          enum:
+          - true
+          - false
+          type: boolean
       - description: The Key ID
+        example: 5e9d9544a1dcd60001d0ed20e7f75f9e03534825b7aef9df749582e5
         in: path
         name: keyID
         required: true
         schema:
           type: string
-      - description: Use the hash of the key as input instead of the full key
-        in: query
-        name: hashed
-        required: false
-        schema:
-          type: boolean
       responses:
         "200":
           content:
             application/json:
+              example:
+                access_rights:
+                  itachi-api:
+                    allowed_urls:
+                    - methods:
+                      - GET
+                      url: /users
+                    api_id: 8ddd91f3cda9453442c477b06c4e2da4
+                    api_name: Itachi api
+                    limit:
+                      per: 60
+                      quota_max: 10000
+                      quota_remaining: 10000
+                      quota_renewal_rate: 3600
+                      rate: 1000
+                      throttle_interval: 10
+                      throttle_retry_limit: 10
+                    versions:
+                    - Default
+                alias: portal-key
+                allowance: 1000
+                apply_policies:
+                - 5ead7120575961000181867e
+                date_created: "2024-08-09T14:40:34.87614+03:00"
+                enable_detailed_recording: true
+                last_updated: "1723203634"
+                meta_data:
+                  tyk_developer_id: 62b3fb9a1d5e4f00017226f5
+                  update: sample policy update
+                  user_type: mobile_user
+                org_id: 5e9d9544a1dcd60001d0ed20
+                per: 60
+                quota_max: 10000
+                quota_renewal_rate: 3600
+                quota_renews: 1.723207234e+09
+                rate: 1000
+                tags:
+                - security
+                - edge
+                - edge-eu
+                throttle_interval: 10
+                throttle_retry_limit: 10
               schema:
                 $ref: '#/components/schemas/SessionState'
           description: Key fetched
         "400":
           content:
             application/json:
+              example:
+                message: Key requested by hash but key hashing is not enabled
+                status: error
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: requesting key using a hash when key hashing is not enabled
+          description: Bad Request
         "403":
           content:
             application/json:
+              example:
+                message: Attempted administrative access with invalid or missing key!
+                status: error
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: Attempting to access a protected api with an invalid or a missing
-            X-Tyk-Authorization in the headers
+          description: Forbidden
         "404":
           content:
             application/json:
+              example:
+                message: Key not found
+                status: error
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
           description: Key not found
@@ -1614,17 +1732,12 @@ paths:
                 This example uses standard `authorization` header authentication, and assumes that the Gateway is located at `127.0.0.1:8080` and the Tyk secret is `352d20ee67be67f6340b4c0605b044b7` - update these as necessary to match your environment.
       operationId: createCustomKey
       parameters:
-      - description: The Key ID
-        in: path
-        name: keyID
-        required: true
-        schema:
-          type: string
       - description: Adding the suppress_reset parameter and setting it to 1, will
           cause Tyk not to reset the quota limit that is in the current live quota
           manager. By default Tyk will reset the quota in the live quota manager (initialising
           it) when adding a key. Adding the `suppress_reset` flag to the URL parameters
           will avoid this behaviour.
+        example: "1"
         in: query
         name: suppress_reset
         required: false
@@ -1634,42 +1747,107 @@ paths:
           type: string
       - description: when set to true the key_hash returned will be similar to the
           un hashed key name
+        example: true
         in: query
         name: hashed
         required: false
         schema:
+          enum:
+          - true
+          - false
           type: boolean
+      - description: Name to give the custom Key
+        example: customKey
+        in: path
+        name: keyID
+        required: true
+        schema:
+          type: string
       requestBody:
         content:
           application/json:
+            example:
+              access_rights:
+                itachi-api:
+                  allowed_urls:
+                  - methods:
+                    - GET
+                    url: /users
+                  api_id: 8ddd91f3cda9453442c477b06c4e2da4
+                  api_name: Itachi api
+                  limit:
+                    per: 60
+                    quota_max: 10000
+                    quota_remaining: 10000
+                    quota_renewal_rate: 3600
+                    rate: 1000
+                    throttle_interval: 10
+                    throttle_retry_limit: 10
+                  versions:
+                  - Default
+              alias: portal-key
+              allowance: 1000
+              apply_policies:
+              - 5ead7120575961000181867e
+              date_created: "2024-08-09T14:40:34.87614+03:00"
+              enable_detailed_recording: true
+              last_updated: "1723203634"
+              meta_data:
+                tyk_developer_id: 62b3fb9a1d5e4f00017226f5
+                update: sample policy update
+                user_type: mobile_user
+              org_id: 5e9d9544a1dcd60001d0ed20
+              per: 60
+              quota_max: 10000
+              quota_renewal_rate: 3600
+              quota_renews: 1.723207234e+09
+              rate: 1000
+              tags:
+              - security
+              - edge
+              - edge-eu
+              throttle_interval: 10
+              throttle_retry_limit: 10
             schema:
               $ref: '#/components/schemas/SessionState'
       responses:
         "200":
           content:
             application/json:
+              example:
+                action: added
+                key: 5e9d9544a1dcd60001d0ed20customKey
+                status: ok
               schema:
                 $ref: '#/components/schemas/ApiModifyKeySuccess'
           description: New custom Key added
         "400":
           content:
             application/json:
+              example:
+                message: Request malformed
+                status: error
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: Malformed request
+          description: Bad Request
         "403":
           content:
             application/json:
+              example:
+                message: Attempted administrative access with invalid or missing key!
+                status: error
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: Attempting to access a protected api with an invalid or a missing
-            X-Tyk-Authorization in the headers
+          description: Forbidden
         "500":
           content:
             application/json:
+              example:
+                message: Failed to create key, ensure security settings are correct.
+                status: error
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: Unexpected error
+          description: Internal server error.
       summary: Create Custom Key / Import Key
       tags:
       - Keys
@@ -1751,34 +1929,89 @@ paths:
       requestBody:
         content:
           application/json:
+            example:
+              access_rights:
+                itachi-api:
+                  allowed_urls:
+                  - methods:
+                    - GET
+                    url: /users
+                  api_id: 8ddd91f3cda9453442c477b06c4e2da4
+                  api_name: Itachi api
+                  limit:
+                    per: 60
+                    quota_max: 10000
+                    quota_remaining: 10000
+                    quota_renewal_rate: 3600
+                    rate: 1000
+                    throttle_interval: 10
+                    throttle_retry_limit: 10
+                  versions:
+                  - Default
+              alias: portal-key
+              allowance: 1000
+              apply_policies:
+              - 5ead7120575961000181867e
+              date_created: "2024-08-09T14:40:34.87614+03:00"
+              enable_detailed_recording: true
+              last_updated: "1723203634"
+              meta_data:
+                tyk_developer_id: 62b3fb9a1d5e4f00017226f5
+                update: sample policy update
+                user_type: mobile_user
+              org_id: 5e9d9544a1dcd60001d0ed20
+              per: 60
+              quota_max: 10000
+              quota_renewal_rate: 3600
+              quota_renews: 1.723207234e+09
+              rate: 1000
+              tags:
+              - security
+              - edge
+              - edge-eu
+              throttle_interval: 10
+              throttle_retry_limit: 10
             schema:
               $ref: '#/components/schemas/SessionState'
       responses:
         "200":
           content:
             application/json:
+              example:
+                action: added
+                key: 5e9d9544a1dcd60001d0ed207eb558517c3c48fb826c62cc6f6161eb
+                status: ok
               schema:
                 $ref: '#/components/schemas/ApiModifyKeySuccess'
           description: Key created
         "400":
           content:
             application/json:
+              example:
+                message: Failed to create key, keys must have at least one Access
+                  Rights record set.
+                status: error
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: keys must have at least one Access Rights record set
+          description: no access right
         "403":
           content:
             application/json:
+              example:
+                message: Attempted administrative access with invalid or missing key!
+                status: error
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: Attempting to access a protected api with an invalid or a missing
-            X-Tyk-Authorization in the headers
+          description: Forbidden
         "500":
           content:
             application/json:
+              example:
+                message: Unmarshalling failed
+                status: error
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: Failed to create key
+          description: malformed body
       summary: Create a key
       tags:
       - Keys
