@@ -1,6 +1,8 @@
 package gateway
 
 import (
+	"context"
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -12,6 +14,9 @@ import (
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/gorilla/websocket"
 	"gopkg.in/yaml.v2"
+
+	"github.com/IBM/sarama"
+	"github.com/testcontainers/testcontainers-go/modules/kafka"
 
 	"github.com/TykTechnologies/tyk/apidef/oas"
 	"github.com/TykTechnologies/tyk/config"
@@ -179,25 +184,29 @@ streams:
 	}
 }
 
-func TestAsyncAPIHttp(t *testing.T) {
-	// t.SkipNow()
-	tests := []struct {
-		name             string
-		consumerGroup    string
-		expectedMessages int
-	}{
-		{"DynamicConsumerGroup", "$tyk_context.request_id", 2},
-		{"StaticConsumerGroup", "static-group", 1},
-	}
-
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			testAsyncAPIHttp(t, tc.consumerGroup, tc.expectedMessages)
-		})
-	}
+var tests = []struct {
+	name          string
+	consumerGroup string
+	tenantID      string
+	isDynamic     bool
+}{
+	{"StaticGroup", "static-group", "default", false},
+	{"DynamicGroup", "$tyk_context.request_id", "dynamic", true},
 }
 
-func testAsyncAPIHttp(t *testing.T, consumerGroup string, expectedMessages int) {
+func TestAsyncAPIHttp(t *testing.T) {
+	ctx := context.Background()
+	kafkaContainer, err := kafka.Run(ctx, "confluentinc/confluent-local:7.5.0")
+	if err != nil {
+		t.Fatalf("Failed to start Kafka container: %v", err)
+	}
+	defer kafkaContainer.Terminate(ctx)
+
+	brokers, err := kafkaContainer.Brokers(ctx)
+	if err != nil {
+		t.Fatalf("Failed to get Kafka brokers: %v", err)
+	}
+
 	ts := StartTest(func(globalConf *config.Config) {
 		globalConf.Labs = map[string]interface{}{
 			"streaming": map[string]interface{}{
@@ -205,35 +214,46 @@ func testAsyncAPIHttp(t *testing.T, consumerGroup string, expectedMessages int) 
 			},
 		}
 	})
-
 	defer ts.Close()
 
-	const (
-		oasAPIID      = "oas-api-id"
-		messageToSend = "hello websocket"
-	)
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			apiName := setupStreamingAPI(t, ts, tc.consumerGroup, tc.tenantID, brokers[0])
+			testAsyncAPIHttp(t, ts, tc.consumerGroup, tc.isDynamic, tc.tenantID, apiName, brokers[0])
+		})
+	}
+}
 
-	streamingConfigTemplate := `
-logger:
- level: ALL
- format: logfmt
- add_timestamp: true
- static_fields:
-  '@service': benthos
+func setupStreamingAPI(t *testing.T, ts *Test, consumerGroup string, tenantID string, kafkaHost string) string {
+	t.Logf("Setting up streaming API for tenant: %s with consumer group: %s", tenantID, consumerGroup)
 
+	apiName := fmt.Sprintf("streaming-api-%s", tenantID)
+
+	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		spec.Proxy.ListenPath = fmt.Sprintf("/%s", apiName)
+		spec.UseKeylessAccess = true
+		spec.IsOAS = true
+		spec.OAS = setupOASForStreamingAPI(t, consumerGroup, kafkaHost)
+		spec.OAS.Fill(*spec.APIDefinition)
+	})
+
+	return apiName
+}
+
+func setupOASForStreamingAPI(t *testing.T, consumerGroup string, kafkaHost string) oas.OAS {
+	streamingConfig := fmt.Sprintf(`
 streams:
  test:
   input:
-   http_server:
-    path: /post
-    timeout: 1s
+   kafka:
+    addresses: ["%s"]
+    topics: ["test"]
+    consumer_group: "%s"
 
   output:
    http_server:
-    consumer_group: "%s"
-    path: /get`
-
-	streamingConfig := fmt.Sprintf(streamingConfigTemplate, consumerGroup)
+    path: /get
+    ws_path: /get/ws`, kafkaHost, consumerGroup)
 
 	streamingConfigJSON, err := ConvertYAMLToJSON([]byte(streamingConfig))
 	if err != nil {
@@ -260,76 +280,208 @@ streams:
 		ExtensionTykStreaming: parsedStreamingConfig,
 	}
 
-	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
-		spec.Proxy.ListenPath = "/streaming-api"
-		spec.UseKeylessAccess = true
-		spec.IsOAS = true
-		spec.OAS = oasAPI
-		spec.OAS.Fill(*spec.APIDefinition)
-	})
+	return oasAPI
+}
 
-	if globalStreamCounter.Load() != 1 {
-		t.Fatalf("Expected 1 stream, got %d", globalStreamCounter.Load())
+func testAsyncAPIHttp(t *testing.T, ts *Test, consumerGroup string, isDynamic bool, tenantID string, apiName string, kafkaHost string) {
+	const messageToSend = "hello websocket"
+	const numMessages = 2
+	const numClients = 2
+
+	streamCount := globalStreamCounter.Load()
+	t.Logf("Stream count for tenant %s: %d", tenantID, streamCount)
+
+	// Create WebSocket clients
+	wsClients := make([]*websocket.Conn, numClients)
+	for i := 0; i < numClients; i++ {
+		dialer := websocket.Dialer{
+			Proxy:            http.ProxyFromEnvironment,
+			HandshakeTimeout: 45 * time.Second,
+			TLSClientConfig:  &tls.Config{InsecureSkipVerify: true},
+		}
+		wsURL := strings.Replace(ts.URL, "http", "ws", 1) + fmt.Sprintf("/%s/get/ws", apiName)
+		wsConn, resp, err := dialer.Dial(wsURL, nil)
+		if err != nil {
+			t.Fatalf("Failed to connect to WebSocket %d: %v\nResponse: %+v", i+1, err, resp)
+		}
+		defer wsConn.Close()
+		wsClients[i] = wsConn
+		t.Logf("Successfully connected to WebSocket %d. Response: %+v", i+1, resp)
 	}
 
-	time.Sleep(500 * time.Millisecond)
+	// Add a delay to ensure WebSocket connections are fully established
+	time.Sleep(1 * time.Second)
 
-	// Create first websocket client
-	dialer := websocket.Dialer{}
-	wsURL := "ws" + strings.TrimPrefix(ts.URL, "http") + "/streaming-api/get/ws"
-	wsConn1, _, err := dialer.Dial(wsURL, nil)
+	// Send messages to Kafka
+	config := sarama.NewConfig()
+	config.Producer.Return.Successes = true
+	producer, err := sarama.NewSyncProducer([]string{kafkaHost}, config)
 	if err != nil {
-		t.Fatalf("Failed to connect to websocket: %v", err)
+		t.Fatalf("Failed to create Kafka producer: %v", err)
 	}
-	wsConn1.SetReadDeadline(time.Now().Add(500 * time.Millisecond))
-	defer wsConn1.Close()
+	defer producer.Close()
 
-	// Create second websocket client
-	wsConn2, _, err := dialer.Dial(wsURL, nil)
-	if err != nil {
-		t.Fatalf("Failed to connect to websocket: %v", err)
-	}
-	wsConn2.SetReadDeadline(time.Now().Add(500 * time.Millisecond))
-	defer wsConn2.Close()
+	for i := 0; i < numMessages; i++ {
+		msg := &sarama.ProducerMessage{
+			Topic: "test",
+			Value: sarama.StringEncoder(fmt.Sprintf("%s %d", messageToSend, i+1)),
+		}
 
-	// Send message to HTTP input
-	httpClient := &http.Client{}
-	reqBody := strings.NewReader(messageToSend)
-	req, err := http.NewRequest(http.MethodPost, ts.URL+"/streaming-api/post", reqBody)
-	if err != nil {
-		t.Fatalf("Failed to create new HTTP request: %v", err)
+		t.Logf("Sending message to Kafka topic 'test': %s", msg.Value)
+		partition, offset, err := producer.SendMessage(msg)
+		if err != nil {
+			t.Fatalf("Failed to send message to Kafka: %v", err)
+		}
+		t.Logf("Message sent to partition %d at offset %d", partition, offset)
 	}
-	resp, err := httpClient.Do(req)
-	if err != nil {
-		t.Fatalf("Failed to send message to /post: %v", err)
-	}
-	resp.Body.Close()
 
-	if resp.StatusCode != http.StatusOK {
-		t.Fatalf("Expected status code 200, got %d", resp.StatusCode)
+	expectedTotalMessages := numMessages
+	if isDynamic {
+		expectedTotalMessages *= numClients
 	}
 
 	messagesReceived := 0
+	overallTimeout := time.After(10 * time.Second)
+	inactivityTimeout := time.NewTimer(2 * time.Second)
+	done := make(chan bool)
 
-	// Read message from first websocket
-	if _, p1, err := wsConn1.ReadMessage(); err == nil {
-		receivedMessage1 := string(p1)
-		if receivedMessage1 == messageToSend {
-			messagesReceived++
-		}
-	}
+	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				t.Logf("Recovered from panic in WebSocket read goroutine: %v", r)
+				done <- true
+			}
+		}()
 
-	// Read message from second websocket if expected
-	if expectedMessages > 1 {
-		if _, p2, err := wsConn2.ReadMessage(); err == nil {
-			receivedMessage2 := string(p2)
-			if receivedMessage2 == messageToSend {
-				messagesReceived++
+		for {
+			select {
+			case <-overallTimeout:
+				t.Log("Overall timeout reached while waiting for messages")
+				done <- true
+				return
+			case <-inactivityTimeout.C:
+				t.Log("Inactivity timeout reached")
+				done <- true
+				return
+			default:
+				for i, wsConn := range wsClients {
+					wsConn.SetReadDeadline(time.Now().Add(500 * time.Millisecond))
+					_, p, err := wsConn.ReadMessage()
+					if err != nil {
+						if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
+							t.Logf("Unexpected error reading from WebSocket %d: %v", i+1, err)
+						} else if !strings.Contains(err.Error(), "i/o timeout") {
+							t.Logf("Error reading from WebSocket %d: %v", i+1, err)
+						}
+					} else {
+						receivedMessage := string(p)
+						t.Logf("Received message from WebSocket %d: %s", i+1, receivedMessage)
+						if strings.HasPrefix(receivedMessage, messageToSend) {
+							messagesReceived++
+							t.Logf("Message from WebSocket %d matches sent message", i+1)
+							inactivityTimeout.Reset(2 * time.Second)
+						}
+					}
+				}
+
+				if messagesReceived >= expectedTotalMessages {
+					t.Logf("Received all expected messages (%d)", messagesReceived)
+					done <- true
+					return
+				}
+
+				// Add a small sleep to prevent tight loop
+				time.Sleep(100 * time.Millisecond)
 			}
 		}
+	}()
+
+	<-done
+
+	if messagesReceived != expectedTotalMessages {
+		t.Errorf("Expected %d messages, but received %d for tenant %s", expectedTotalMessages, messagesReceived, tenantID)
+	} else {
+		t.Logf("Successfully received %d messages as expected for tenant %s", messagesReceived, tenantID)
+	}
+}
+
+func waitForAPIToBeLoaded(ts *Test) error {
+	maxAttempts := 2
+	for i := 0; i < maxAttempts; i++ {
+		resp, err := http.Get(ts.URL + "/streaming-api-default/metrics")
+		if err == nil && resp.StatusCode == http.StatusOK {
+			resp.Body.Close()
+			return nil
+		}
+		if resp != nil {
+			resp.Body.Close()
+		}
+		time.Sleep(1 * time.Second)
+	}
+	return fmt.Errorf("API failed to load after %d attempts", maxAttempts)
+}
+
+func TestWebSocketConnectionClosedOnAPIReload(t *testing.T) {
+	ctx := context.Background()
+	kafkaContainer, err := kafka.Run(ctx, "confluentinc/confluent-local:7.5.0")
+	if err != nil {
+		t.Fatalf("Failed to start Kafka container: %v", err)
+	}
+	defer kafkaContainer.Terminate(ctx)
+
+	brokers, err := kafkaContainer.Brokers(ctx)
+	if err != nil {
+		t.Fatalf("Failed to get Kafka brokers: %v", err)
 	}
 
-	if messagesReceived != expectedMessages {
-		t.Fatalf("Expected %d messages, but received %d", expectedMessages, messagesReceived)
+	ts := StartTest(func(globalConf *config.Config) {
+		globalConf.Labs = map[string]interface{}{
+			"streaming": map[string]interface{}{
+				"enabled": true,
+			},
+		}
+	})
+	defer ts.Close()
+
+	apiName := setupStreamingAPI(t, ts, "test-group", "default", brokers[0])
+
+	// Connect to WebSocket
+	dialer := websocket.Dialer{
+		Proxy:            http.ProxyFromEnvironment,
+		HandshakeTimeout: 45 * time.Second,
+		TLSClientConfig:  &tls.Config{InsecureSkipVerify: true},
 	}
+	wsURL := strings.Replace(ts.URL, "http", "ws", 1) + fmt.Sprintf("/%s/get/ws", apiName)
+	wsConn, _, err := dialer.Dial(wsURL, nil)
+	if err != nil {
+		t.Fatalf("Failed to connect to WebSocket: %v", err)
+	}
+	defer wsConn.Close()
+
+	// Reload the API by rebuilding and loading it
+	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		spec.Proxy.ListenPath = fmt.Sprintf("/%s", apiName)
+		spec.UseKeylessAccess = true
+		spec.IsOAS = true
+		spec.OAS = setupOASForStreamingAPI(t, "test-group", brokers[0])
+	})
+
+	// Wait for the API to be reloaded
+	err = waitForAPIToBeLoaded(ts)
+	if err != nil {
+		t.Fatalf("API failed to reload: %v", err)
+	}
+
+	// Try to send a message, which should fail if the connection is closed
+	err = wsConn.WriteMessage(websocket.TextMessage, []byte("test message"))
+	if err == nil {
+		t.Fatalf("Expected WebSocket connection to be closed, but write succeeded")
+	}
+
+	// Verify that the error indicates a closed connection
+	if !websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
+		t.Fatalf("Expected WebSocket to be closed with CloseGoingAway or CloseAbnormalClosure, got: %v", err)
+	}
+
+	t.Log("WebSocket connection was successfully closed on API reload")
 }
