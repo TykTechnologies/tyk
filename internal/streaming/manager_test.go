@@ -9,7 +9,7 @@ import (
 )
 
 func TestStreamingServer(t *testing.T) {
-	s := NewStreamManager(nil, nil)
+	s := NewStreamManager(nil)
 	// Do not call Stop because it cause os.Exit(0), instead Reset ensure that streams will be cleaned up in the end of test
 	defer s.Reset()
 
