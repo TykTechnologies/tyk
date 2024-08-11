@@ -1,27 +1,22 @@
 package gateway
 
 import (
-	"bufio"
 	"context"
 	"fmt"
-	"io"
 	"net/http"
-	"net/http/httptest"
-	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
 
 	"github.com/gorilla/mux"
-	"github.com/gorilla/websocket"
 
 	"github.com/TykTechnologies/tyk/internal/streaming"
-	"github.com/TykTechnologies/tyk/internal/uuid"
-	"github.com/TykTechnologies/tyk/storage"
 )
 
 const (
 	ExtensionTykStreaming = "x-tyk-streaming"
+	GCInterval            = 1 * time.Minute
+	ConsumerGroupTimeout  = 30 * time.Second
 )
 
 // Used for testing
@@ -30,19 +25,44 @@ var globalStreamCounter atomic.Int64
 // StreamingMiddleware is a middleware that handles streaming functionality
 type StreamingMiddleware struct {
 	*BaseMiddleware
-	streams         map[string]*streamInfo
-	streamsLock     sync.RWMutex
-	muxer           *mux.Router
-	streamingServer *streaming.StreamManager
-	connections     map[string]map[string]connection
-	connectionsLock sync.RWMutex
-	ctx             context.Context
-	cancel          context.CancelFunc
-	allowedUnsafe   []string
+	consumerGroupManagers sync.Map // Map of consumer group IDs to ConsumerGroupManager
+	connections           sync.Map // Map of streamID to map of connectionID to connection
+	ctx                   context.Context
+	cancel                context.CancelFunc
+	allowedUnsafe         []string
+	gcTicker              *time.Ticker
 }
 
-type streamInfo struct {
-	config map[string]interface{}
+type ConsumerGroupManager struct {
+	streamManager *streaming.StreamManager
+	muxer         *mux.Router
+	mw            *StreamingMiddleware
+	consumerGroup string
+	connections   int64
+	lastAccess    time.Time
+	sync.Mutex
+}
+
+func (cgm *ConsumerGroupManager) initStreams() {
+	// Clear existing routes for this consumer group
+	cgm.muxer = mux.NewRouter()
+
+	specStreams := cgm.mw.getStreams()
+
+	for streamID, streamConfig := range specStreams {
+		if streamMap, ok := streamConfig.(map[string]interface{}); ok {
+			err := cgm.addOrUpdateStream(streamID, streamMap)
+			if err != nil {
+				cgm.mw.Logger().Errorf("Error adding stream %s for consumer group %s: %v", streamID, cgm.consumerGroup, err)
+			}
+		}
+	}
+}
+
+// removeStream removes a stream
+func (cgm *ConsumerGroupManager) removeStream(streamID string) error {
+	streamFullID := fmt.Sprintf("%s_%s_%s", cgm.mw.Spec.APIID, cgm.consumerGroup, streamID)
+	return cgm.streamManager.RemoveStream(streamFullID)
 }
 
 type connection struct {
@@ -55,16 +75,15 @@ func (s *StreamingMiddleware) Name() string {
 }
 
 func (s *StreamingMiddleware) EnabledForSpec() bool {
-	s.Logger().Error("Streams count: ", len(s.getStreams()))
-
-	if len(s.getStreams()) == 0 {
-		return false
-	}
+	s.Logger().Debug("Checking if streaming is enabled")
 
 	labsConfig := s.Gw.GetConfig().Labs
+	s.Logger().Debugf("Labs config: %+v", labsConfig)
 
 	if streamingConfig, ok := labsConfig["streaming"].(map[string]interface{}); ok {
+		s.Logger().Debugf("Streaming config: %+v", streamingConfig)
 		if enabled, ok := streamingConfig["enabled"].(bool); ok && enabled {
+			s.Logger().Debug("Streaming is enabled in the config")
 			if allowUnsafe, ok := streamingConfig["allow_unsafe"].([]interface{}); ok {
 				s.allowedUnsafe = make([]string, len(allowUnsafe))
 				for i, v := range allowUnsafe {
@@ -73,33 +92,84 @@ func (s *StreamingMiddleware) EnabledForSpec() bool {
 					}
 				}
 			}
-			return len(s.getStreams()) > 0
+			s.Logger().Debugf("Allowed unsafe components: %v", s.allowedUnsafe)
+
+			specStreams := s.getStreams()
+			globalStreamCounter.Add(int64(len(specStreams)))
+
+			s.Logger().Debug("Total streams count: ", len(specStreams))
+
+			if len(specStreams) == 0 {
+				return false
+			}
+
+			return true
 		}
 	}
 
-	if len(s.getStreams()) > 0 {
-		s.Logger().Warn("Found Stream but streaming is disabled in gateway config. See https://tyk.io/docs/product-stack/tyk-streaming/getting-started/")
-	}
-
+	s.Logger().Debug("Streaming is not enabled in the config")
 	return false
 }
 
 // Init initializes the middleware
 func (s *StreamingMiddleware) Init() {
-	s.streams = make(map[string]*streamInfo)
-	s.muxer = mux.NewRouter()
-	s.connections = make(map[string]map[string]connection)
+	s.Logger().Debug("Initializing StreamingMiddleware")
 	s.ctx, s.cancel = context.WithCancel(context.Background())
 
-	streamingConn := &storage.RedisCluster{ConnectionHandler: s.Gw.StorageConnectionHandler}
-	client, err := streamingConn.Client()
-	if err != nil {
-		s.Logger().Errorf("Error getting streaming redis client: %v", err)
-		return
+	s.Logger().Debug("Initializing default consumer group")
+	s.getConsumerGroupManager("default")
+
+	s.gcTicker = time.NewTicker(GCInterval)
+	go s.runGC()
+}
+
+func (s *StreamingMiddleware) runGC() {
+	for {
+		select {
+		case <-s.ctx.Done():
+			return
+		case <-s.gcTicker.C:
+			s.cleanupUnusedConsumerGroups()
+		}
+	}
+}
+
+func (s *StreamingMiddleware) cleanupUnusedConsumerGroups() {
+	now := time.Now()
+	s.consumerGroupManagers.Range(func(key, value interface{}) bool {
+		consumerGroup := key.(string)
+		manager := value.(*ConsumerGroupManager)
+		manager.Lock()
+		if manager.connections == 0 && now.Sub(manager.lastAccess) > ConsumerGroupTimeout {
+			s.Logger().Infof("Cleaning up unused consumer group: %s", consumerGroup)
+			manager.streamManager.Reset()
+			s.consumerGroupManagers.Delete(consumerGroup)
+		}
+		manager.Unlock()
+		return true
+	})
+}
+
+func (s *StreamingMiddleware) getConsumerGroupManager(consumerGroup string) *ConsumerGroupManager {
+	if manager, exists := s.consumerGroupManagers.Load(consumerGroup); exists {
+		return manager.(*ConsumerGroupManager)
 	}
 
-	s.streamingServer = streaming.NewStreamManager(client, s.allowedUnsafe)
-	s.updateStreams()
+	s.Logger().Infof("ConsumerGroupManager not found for consumer group %s. Creating a new one.", consumerGroup)
+	streamManager := streaming.NewStreamManager(s.allowedUnsafe)
+	muxer := mux.NewRouter()
+	consumerGroupManager := &ConsumerGroupManager{
+		streamManager: streamManager,
+		muxer:         muxer,
+		mw:            s,
+		consumerGroup: consumerGroup,
+	}
+	s.consumerGroupManagers.Store(consumerGroup, consumerGroupManager)
+
+	// Call updateStreams for the new ConsumerGroupManager
+	consumerGroupManager.initStreams()
+
+	return consumerGroupManager
 }
 
 // getStreams extracts streaming configurations from an API spec if available.
@@ -119,71 +189,41 @@ func (s *StreamingMiddleware) getStreams() map[string]interface{} {
 	return streamConfigs
 }
 
-// updateStreams synchronizes the middleware's streams with the API spec
-func (s *StreamingMiddleware) updateStreams() {
-	s.streamsLock.Lock()
-	defer s.streamsLock.Unlock()
-
-	// Clear existing routes
-	s.muxer = mux.NewRouter()
-
-	specStreams := s.getStreams()
-
-	globalStreamCounter.Add(int64(len(specStreams)))
-
-	// Add or update streams from the spec
-	for streamID, streamConfig := range specStreams {
-		if streamMap, ok := streamConfig.(map[string]interface{}); ok {
-			err := s.addOrUpdateStream(streamID, streamMap)
-			if err != nil {
-				s.Logger().Errorf("Error adding stream %s: %v", streamID, err)
-			}
-		}
-	}
-}
-
 // addOrUpdateStream adds a new stream or updates an existing one
-func (s *StreamingMiddleware) addOrUpdateStream(streamID string, config map[string]interface{}) error {
-	streamFullID := s.Spec.APIID + "_" + streamID
+func (cgm *ConsumerGroupManager) addOrUpdateStream(streamID string, config map[string]interface{}) error {
+	streamFullID := fmt.Sprintf("%s_%s_%s", cgm.mw.Spec.APIID, cgm.consumerGroup, streamID)
+	cgm.mw.Logger().Debugf("Adding/updating stream: %s for consumer group: %s", streamFullID, cgm.consumerGroup)
 
-	s.streams[streamFullID] = &streamInfo{config: config}
-
-	return s.streamingServer.AddStream(streamFullID, config, &handleFuncAdapter{mw: s, streamID: streamFullID})
-}
-
-// removeStream removes a stream
-func (s *StreamingMiddleware) removeStream(streamID string) error {
-	streamFullID := s.Spec.APIID + "_" + streamID
-
-	if _, exists := s.streams[streamFullID]; exists {
-		err := s.streamingServer.RemoveStream(streamFullID)
-		if err != nil {
-			return err
-		}
-		delete(s.streams, streamFullID)
+	err := cgm.streamManager.AddStream(streamFullID, config, &handleFuncAdapter{mw: cgm.mw, streamID: streamFullID, consumerGroup: cgm.consumerGroup, muxer: cgm.muxer, cgm: cgm})
+	if err != nil {
+		cgm.mw.Logger().Errorf("Failed to add stream %s: %v", streamFullID, err)
+	} else {
+		cgm.mw.Logger().Infof("Successfully added/updated stream: %s", streamFullID)
 	}
-	return nil
+
+	cgm.mw.Logger().Debugf("Current streams after add/update: %+v", cgm.streamManager.Streams())
+
+	return err
 }
 
 // ProcessRequest will handle the streaming functionality
 func (s *StreamingMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
-	s.streamsLock.RLock()
-	defer s.streamsLock.RUnlock()
-
 	strippedPath := s.Spec.StripListenPath(r, r.URL.Path)
 
 	s.Logger().Debugf("Processing request: %s, %s", r.URL.Path, strippedPath)
+
+	consumerGroup := s.getConsumerGroup(r)
+	consumerGroupManager := s.getConsumerGroupManager(consumerGroup)
 
 	newRequest := r.Clone(r.Context())
 	newRequest.URL.Path = strippedPath
 
 	var match mux.RouteMatch
-	if s.muxer.Match(newRequest, &match) {
+	if consumerGroupManager.muxer.Match(newRequest, &match) {
 		pathRegexp, _ := match.Route.GetPathRegexp()
 		s.Logger().Debugf("Matched stream: %v", pathRegexp)
 		handler, _ := match.Handler.(http.HandlerFunc)
 		if handler != nil {
-			s.Logger().Debugf("Handling stream: %s", match.Route.GetName())
 			handler.ServeHTTP(w, r)
 			return nil, mwStatusRespond
 		}
@@ -193,186 +233,8 @@ func (s *StreamingMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 	return nil, http.StatusOK
 }
 
-func (s *StreamingMiddleware) handleWebSocket(streamID string) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		upgrader := websocket.Upgrader{
-			ReadBufferSize:  1024,
-			WriteBufferSize: 1024,
-			CheckOrigin:     func(r *http.Request) bool { return true },
-		}
-
-		conn, err := upgrader.Upgrade(w, r, nil)
-		if err != nil {
-			s.Logger().Errorf("Failed to set websocket upgrade: %v", err)
-			return
-		}
-
-		ctx, cancel := context.WithCancel(s.ctx)
-		defer cancel()
-
-		connID := uuid.New()
-		s.addConnection(streamID, connection{id: connID, cancel: cancel})
-		defer s.removeConnection(streamID, connID)
-
-		consumerGroup := s.getConsumerGroup(r, streamID)
-		messageChan, subCancel, err := s.streamingServer.Subscribe(streamID, consumerGroup, 100)
-		if err != nil {
-			s.Logger().Errorf("Failed to subscribe to stream: %v", err)
-			conn.Close()
-			return
-		}
-		defer s.streamingServer.Unsubscribe(streamID, consumerGroup, messageChan, subCancel)
-
-		go s.websocketReadPump(ctx, conn)
-
-		ticker := time.NewTicker(30 * time.Second)
-		defer ticker.Stop()
-
-		s.websocketWritePump(ctx, conn, messageChan, ticker.C)
-	}
-}
-
-func (s *StreamingMiddleware) websocketReadPump(ctx context.Context, conn *websocket.Conn) {
-	defer conn.Close()
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		default:
-			_, _, err := conn.ReadMessage()
-			if err != nil {
-				if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
-					s.Logger().Errorf("WebSocket read error: %v", err)
-				}
-				return
-			}
-		}
-	}
-}
-
-func (s *StreamingMiddleware) websocketWritePump(ctx context.Context, conn *websocket.Conn, messageChan <-chan []byte, ticker <-chan time.Time) {
-	defer conn.Close()
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case <-ticker:
-			if err := conn.WriteMessage(websocket.PingMessage, nil); err != nil {
-				s.Logger().Errorf("Failed to write WebSocket ping message: %v", err)
-				return
-			}
-		case message, ok := <-messageChan:
-			if !ok {
-				err := conn.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, ""))
-				if err != nil {
-					s.Logger().Errorf("Failed to write WebSocket close message: %v", err)
-				}
-				return
-			}
-			if err := conn.WriteMessage(websocket.TextMessage, message); err != nil {
-				s.Logger().Errorf("Failed to write message to WebSocket: %v", err)
-				return
-			}
-		}
-	}
-}
-
-func (s *StreamingMiddleware) handleSSE(streamID string) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		flusher, ok := w.(http.Flusher)
-		if !ok {
-			http.Error(w, "Streaming unsupported!", http.StatusInternalServerError)
-			return
-		}
-
-		w.Header().Set("Content-Type", "text/event-stream")
-		w.Header().Set("Cache-Control", "no-cache")
-		w.Header().Set("Connection", "keep-alive")
-		w.Header().Set("Access-Control-Allow-Origin", "*")
-
-		ctx, cancel := context.WithCancel(s.ctx)
-		defer cancel()
-
-		connID := uuid.New()
-		s.addConnection(streamID, connection{id: connID, cancel: cancel})
-		defer s.removeConnection(streamID, connID)
-
-		consumerGroup := s.getConsumerGroup(r, streamID)
-		messageChan, subCancel, err := s.streamingServer.Subscribe(streamID, consumerGroup, 100)
-		if err != nil {
-			s.Logger().Errorf("Failed to subscribe to SSE stream: %v", err)
-			return
-		}
-		defer s.streamingServer.Unsubscribe(streamID, consumerGroup, messageChan, subCancel)
-
-		go s.sseReadPump(ctx, r)
-
-		ticker := time.NewTicker(30 * time.Second)
-		defer ticker.Stop()
-
-		s.sseWritePump(ctx, w, flusher, messageChan, ticker.C)
-	}
-}
-
-func (s *StreamingMiddleware) sseReadPump(ctx context.Context, r *http.Request) {
-	<-ctx.Done()
-	s.Logger().Debug("SSE context cancelled, closing connection")
-}
-
-func (s *StreamingMiddleware) sseWritePump(ctx context.Context, w http.ResponseWriter, flusher http.Flusher, messageChan <-chan []byte, ticker <-chan time.Time) {
-	for {
-		select {
-		case <-ctx.Done():
-			s.Logger().Debug("SSE context cancelled, stopping write pump")
-			return
-		case <-ticker:
-			if _, err := w.Write([]byte(": ping\n\n")); err != nil {
-				s.Logger().Errorf("Failed to write SSE ping: %v", err)
-				return
-			}
-			flusher.Flush()
-		case message, ok := <-messageChan:
-			if !ok {
-				s.Logger().Debug("SSE message channel closed")
-				return
-			}
-			if _, err := fmt.Fprintf(w, "data: %s\n\n", message); err != nil {
-				s.Logger().Errorf("Failed to write SSE message: %v", err)
-				return
-			}
-			flusher.Flush()
-		}
-	}
-}
-
-func (s *StreamingMiddleware) addConnection(streamID string, conn connection) {
-	s.connectionsLock.Lock()
-	defer s.connectionsLock.Unlock()
-	if _, ok := s.connections[streamID]; !ok {
-		s.connections[streamID] = make(map[string]connection)
-	}
-	s.connections[streamID][conn.id] = conn
-}
-
-func (s *StreamingMiddleware) removeConnection(streamID, connID string) {
-	s.connectionsLock.Lock()
-	defer s.connectionsLock.Unlock()
-
-	if conns, ok := s.connections[streamID]; ok {
-		delete(conns, connID)
-		if len(conns) == 0 {
-			delete(s.connections, streamID)
-		}
-	}
-}
-
-func (s *StreamingMiddleware) getConsumerGroup(r *http.Request, streamID string) string {
+func (s *StreamingMiddleware) getConsumerGroup(r *http.Request) string {
 	consumerGroup := ctxGetAuthToken(r)
-	streamConsumerGroup, _ := s.streamingServer.ConsumerGroup(streamID)
-
-	if streamConsumerGroup != "" {
-		consumerGroup = streamConsumerGroup
-	}
 
 	session := ctxGetSession(r)
 	if session != nil {
@@ -387,129 +249,84 @@ func (s *StreamingMiddleware) getConsumerGroup(r *http.Request, streamID string)
 		consumerGroup = customKeyValue
 	}
 
+	if consumerGroup == "" {
+		consumerGroup = "default"
+	}
+
 	return consumerGroup
 }
 
 func (s *StreamingMiddleware) Unload() {
 	s.Logger().Debugf("Unloading streaming middleware %s", s.Spec.Name)
 
-	globalStreamCounter.Add(-int64(len(s.streams)))
+	totalStreams := 0
+	s.consumerGroupManagers.Range(func(_, value interface{}) bool {
+		manager := value.(*ConsumerGroupManager)
+		totalStreams += len(manager.streamManager.Streams())
+		return true
+	})
+	globalStreamCounter.Add(-int64(totalStreams))
 
-	// Cancel the main context to signal all connec	s.cancel()
 	s.cancel()
+	s.gcTicker.Stop()
 
-	// Close all active connections
-	s.connectionsLock.Lock()
-	s.Logger().Debugf("Closing %d active connections", len(s.connections))
-	for _, conns := range s.connections {
-		for _, conn := range conns {
-			conn.cancel()
+	s.Logger().Debug("Closing active connections")
+	s.connections.Range(func(_, value interface{}) bool {
+		if conns, ok := value.(*sync.Map); ok {
+			conns.Range(func(_, connValue interface{}) bool {
+				if conn, ok := connValue.(connection); ok {
+					conn.cancel()
+				}
+				return true
+			})
 		}
-	}
-	s.connectionsLock.Unlock()
+		return true
+	})
 
-	// Wait for a short period to allow connections to close gracefully
 	time.Sleep(500 * time.Millisecond)
 
-	s.streamingServer.Reset()
+	s.consumerGroupManagers.Range(func(_, value interface{}) bool {
+		manager := value.(*ConsumerGroupManager)
+		manager.Lock()
+		s.Logger().Infof("Consumer Group %s: Closing %d connections, last access: %v", manager.consumerGroup, manager.connections, manager.lastAccess)
+		manager.Unlock()
+		manager.streamManager.Reset()
+		return true
+	})
 
-	// Clear the streams map
-	s.streams = make(map[string]*streamInfo)
-	// Clear the muxer
-	s.muxer = mux.NewRouter()
-	// Clear the connections map
-	s.connections = make(map[string]map[string]connection)
+	s.consumerGroupManagers = sync.Map{}
+	s.connections = sync.Map{}
 
 	s.Logger().Info("All streams successfully removed and connections closed")
 }
 
 type handleFuncAdapter struct {
-	streamID string
-	mw       *StreamingMiddleware
+	streamID      string
+	consumerGroup string
+	mw            *StreamingMiddleware
+	muxer         *mux.Router
+	cgm           *ConsumerGroupManager
 }
 
 func (h *handleFuncAdapter) HandleFunc(path string, f func(http.ResponseWriter, *http.Request)) {
 	log.Debugf("Registering streaming handleFunc for path: %s", path)
 
-	httpOutputConfig, _ := h.mw.streamingServer.GetHTTPPaths("output", h.streamID)
-
-	wrappedFunc := func(w http.ResponseWriter, r *http.Request) {
-		log.Debug("Entering debug for wrapped function on path: ", path)
-
-		var targetFunc func(http.ResponseWriter, *http.Request) = f
-
-		if httpOutputConfig["ws_path"] == path {
-			log.Debug("Handling websocket subscription")
-			targetFunc = h.mw.handleWebSocket(h.streamID)
-
-			// Internal benthos magic, we still need to consumer original handler
-			wsConsumer := consumeWebsocket(f)
-			defer wsConsumer.Close()
-		} else if httpOutputConfig["sse_path"] == path {
-			log.Debug("Handling SSE subscription")
-			targetFunc = h.mw.handleSSE(h.streamID)
-
-			// Internal benthos magic, we still need to consumer original handler
-			sseConsumer := consumeSSE(f)
-			defer sseConsumer.Close()
-		}
-
-		targetFunc(w, r)
-
-		log.Debug("Exiting debug for wrapped function on path: ", path)
+	if h.mw == nil || h.muxer == nil {
+		log.Error("StreamingMiddleware or muxer is nil")
+		return
 	}
 
-	h.mw.muxer.HandleFunc(path, wrappedFunc)
-}
+	h.muxer.HandleFunc(path, func(w http.ResponseWriter, r *http.Request) {
+		h.cgm.Lock()
+		h.cgm.connections++
+		h.cgm.lastAccess = time.Now()
+		h.cgm.Unlock()
 
-func consumeWebsocket(f func(http.ResponseWriter, *http.Request)) *httptest.Server {
-	server := httptest.NewServer(http.HandlerFunc(f))
+		f(w, r)
 
-	go func() {
-		ws, _, err := websocket.DefaultDialer.Dial(strings.Replace(server.URL, "http", "ws", 1), nil)
-		if err != nil {
-			log.Fatal("dial:", err)
-		}
-
-		defer ws.Close()
-
-		for {
-			_, message, err := ws.ReadMessage()
-			if err != nil {
-				log.Println("read:", err)
-				return
-			}
-			log.Printf("recv: %s", message)
-		}
-	}()
-
-	return server
-}
-
-func consumeSSE(f func(http.ResponseWriter, *http.Request)) *httptest.Server {
-	server := httptest.NewServer(http.HandlerFunc(f))
-
-	go func() {
-		resp, err := http.Get(server.URL)
-		if err != nil {
-			log.Fatal("get:", err)
-		}
-		defer resp.Body.Close()
-
-		reader := bufio.NewReader(resp.Body)
-
-		for {
-			line, err := reader.ReadBytes('\n')
-			if err != nil {
-				if err == io.EOF {
-					break
-				}
-				log.Println("read:", err)
-				return
-			}
-			log.Printf("recv: %s", line)
-		}
-	}()
-
-	return server
+		h.cgm.Lock()
+		h.cgm.connections--
+		h.cgm.Unlock()
+	})
+	log.Debugf("Registered handler for path: %s", path)
 }
