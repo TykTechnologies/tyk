@@ -31,6 +31,7 @@ type StreamingMiddleware struct {
 	cancel                context.CancelFunc
 	allowedUnsafe         []string
 	gcTicker              *time.Ticker
+	defaultConsumerGroupManager *ConsumerGroupManager
 }
 
 type ConsumerGroupManager struct {
@@ -117,7 +118,7 @@ func (s *StreamingMiddleware) Init() {
 	s.ctx, s.cancel = context.WithCancel(context.Background())
 
 	s.Logger().Debug("Initializing default consumer group")
-	s.getConsumerGroupManager("default")
+	s.defaultConsumerGroupManager = s.getConsumerGroupManager("default")
 
 	s.gcTicker = time.NewTicker(GCInterval)
 	go s.runGC()
