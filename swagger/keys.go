@@ -330,7 +330,6 @@ func updateKeyPolicy(r *openapi3.Reflector) error {
 	oc.SetSummary("Set policies for a hashed key.")
 	oc.SetDescription("This will set policies  to a hashed key")
 	op.AddReqWithExample(gateway.PolicyUpdateObj{
-
 		ApplyPolicies: []string{"5ead7120575961000181867e"},
 	})
 	op.AddRespWithExample(apiModifyKeySuccess{

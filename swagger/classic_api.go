@@ -39,10 +39,12 @@ func getClassicApiRequest(r *openapi3.Reflector) error {
 		return err
 	}
 	oc := op.oc
-	oc.AddRespStructure(new(apidef.APIDefinition), func(cu *openapi.ContentUnit) {
+	op.AddResponseWithSeparateExample(apidef.APIDefinition{}, http.StatusOK, minimalApis[0], func(cu *openapi.ContentUnit) {
 		cu.Description = "API definition"
 	})
-	statusNotFound(oc, "Api not found")
+	op.StatusNotFound("API not found", func(cu *openapi.ContentUnit) {
+		cu.Description = "API not found"
+	})
 	oc.SetSummary("Get API definition with it's ID")
 	oc.SetDescription("Get API definition\nOnly if used without the Tyk Dashboard")
 	op.AddPathParameter("apiID", "The API ID", OptionalParameterValues{
@@ -58,97 +60,125 @@ func getClassicApiRequest(r *openapi3.Reflector) error {
 
 // Done
 func getListOfClassicApisRequest(r *openapi3.Reflector) error {
-	oc, err := r.NewOperationContext(http.MethodGet, "/tyk/apis")
+	op, err := NewOperationWithSafeExample(r, SafeOperation{
+		Method:      http.MethodGet,
+		PathPattern: "/tyk/apis",
+		OperationID: "listApis",
+		Tag:         APIsTag,
+	})
 	if err != nil {
 		return err
 	}
-	oc.AddRespStructure(new([]apidef.APIDefinition), func(cu *openapi.ContentUnit) {
+	oc := op.oc
+	op.AddResponseWithSeparateExample(new([]apidef.APIDefinition), http.StatusOK, minimalApis, func(cu *openapi.ContentUnit) {
 		cu.Description = "List of API definitions"
 	})
-	oc.SetID("listApis")
 	oc.SetDescription("List APIs\nOnly if used without the Tyk Dashboard")
 	oc.SetSummary("Get list of apis")
-	oc.SetTags(APIsTag)
-	forbidden(oc)
-	return r.AddOperation(oc)
+	return op.AddOperation()
 }
 
 // Done
 func putClassicApiRequest(r *openapi3.Reflector) error {
-	oc, err := r.NewOperationContext(http.MethodPut, "/tyk/apis/{apiID}")
+	op, err := NewOperationWithSafeExample(r, SafeOperation{
+		Method:      http.MethodPut,
+		PathPattern: "/tyk/apis/{apiID}",
+		OperationID: "updateApi",
+		Tag:         APIsTag,
+	})
 	if err != nil {
 		return err
 	}
-	oc.AddReqStructure(new(apidef.APIDefinition))
+	oc := op.oc
+	requestBody := minimalApis[0]
+	requestBody.Name = "Update the api name sample"
+	requestBody.Proxy.TargetURL = "https://tyk.io/api"
+	requestBody.Proxy.ListenPath = "/update-listen-path"
+	op.AddReqWithSeparateExample(new(apidef.APIDefinition), requestBody)
+	op.AddRespWithExample(
+		apiModifyKeySuccess{
+			Status: "ok",
+			Action: "modified",
+			Key:    "1bd5c61b0e694082902cf15ddcc9e6a7",
+		}, http.StatusOK, func(cu *openapi.ContentUnit) {
+			cu.Description = "API updated"
+		})
 	oc.AddRespStructure(new(apiModifyKeySuccess), func(cu *openapi.ContentUnit) {
 		cu.Description = "API updated"
 	})
-	oc.SetID("updateApi")
 	oc.SetSummary("Updating an API definition with its ID")
 	oc.SetDescription("Updating an API definition uses the same signature an object as a `POST`, however it will first ensure that the API ID that is being updated is the same as the one in the object being `PUT`.\n\nUpdating will completely replace the file descriptor and will not change an API Definition that has already been loaded, the hot-reload endpoint will need to be called to push the new definition to live.")
-	oc.SetTags(APIsTag)
-	statusNotFound(oc, "An Api with the specified ApiID was not found.")
-	statusBadRequest(oc, "Bad request.Sending a ApiID for an OAs api or apiID in path does not match the one in the body.")
-	statusInternalServerError(oc, "Unexpected error.")
-	forbidden(oc)
-	o3, ok := oc.(openapi3.OperationExposer)
-	if !ok {
-		return ErrOperationExposer
-	}
-	o3.Operation().WithParameters(apIIDParameter())
-	return r.AddOperation(oc)
+	op.StatusNotFound("API not found", func(cu *openapi.ContentUnit) {
+		cu.Description = "API not found"
+	})
+	op.StatusBadRequest("Request malformed")
+	op.AddPathParameter("apiID", "The API ID", OptionalParameterValues{
+		Example: valueToInterface("1bd5c61b0e694082902cf15ddcc9e6a7"),
+	})
+	op.StatusInternalServerError("file object creation failed, write error")
+
+	return op.AddOperation()
 }
 
 // Done
 func deleteClassicApiRequest(r *openapi3.Reflector) error {
-	oc, err := r.NewOperationContext(http.MethodDelete, "/tyk/apis/{apiID}")
+	op, err := NewOperationWithSafeExample(r, SafeOperation{
+		Method:      http.MethodDelete,
+		PathPattern: "/tyk/apis/{apiID}",
+		OperationID: "deleteApi",
+		Tag:         APIsTag,
+	})
 	if err != nil {
 		return err
 	}
-	oc.SetTags(APIsTag)
-	oc.SetID("deleteApi")
+	oc := op.oc
 	oc.SetDescription("Deleting an API definition will remove the file from the file store, the API definition will NOT be unloaded, a separate reload request will need to be made to disable the API endpoint.")
 	oc.SetSummary("Deleting an API definition with ID")
-	oc.AddRespStructure(new(apiModifyKeySuccess), func(cu *openapi.ContentUnit) {
+	op.AddRespWithExample(apiModifyKeySuccess{
+		Key:    "1bd5c61b0e694082902cf15ddcc9e6a7",
+		Status: "ok",
+		Action: "deleted",
+	}, http.StatusOK, func(cu *openapi.ContentUnit) {
 		cu.Description = "API deleted"
 	})
-	statusNotFound(oc, "An Api with the specified ApiID was not found.")
-	statusInternalServerError(oc, "Unexpected error.")
-	forbidden(oc)
-	o3, ok := oc.(openapi3.OperationExposer)
-	if !ok {
-		return ErrOperationExposer
-	}
-	o3.Operation().WithParameters(apIIDParameter())
-	return r.AddOperation(oc)
+
+	op.StatusNotFound("API not found", func(cu *openapi.ContentUnit) {
+		cu.Description = "API not found"
+	})
+	op.StatusInternalServerError("Delete failed")
+	op.AddPathParameter("apiID", "The API ID", OptionalParameterValues{
+		Example: valueToInterface("1bd5c61b0e694082902cf15ddcc9e6a7"),
+	})
+	return op.AddOperation()
 }
 
 // Done
 func createClassicApiRequest(r *openapi3.Reflector) error {
-	oc, err := r.NewOperationContext(http.MethodPost, "/tyk/apis")
+	op, err := NewOperationWithSafeExample(r, SafeOperation{
+		Method:      http.MethodPost,
+		PathPattern: "/tyk/apis",
+		OperationID: "createApi",
+		Tag:         APIsTag,
+	})
 	if err != nil {
 		return err
 	}
-	oc.SetTags(APIsTag)
-	oc.SetID("createApi")
+	oc := op.oc
 	oc.SetDescription("Create API\n         A single Tyk node can have its API Definitions queried, deleted and updated remotely. This functionality enables you to remotely update your Tyk definitions without having to manage the files manually.")
 	oc.SetSummary("Creat an API")
-	oc.AddReqStructure(new(apidef.APIDefinition))
-	oc.AddRespStructure(new(apiModifyKeySuccess), openapi.WithHTTPStatus(http.StatusOK))
-	statusInternalServerError(oc, "Unexpected error.")
-	forbidden(oc)
-	statusBadRequest(oc, "Returned when you send a malformed body or when the request body fails validation")
-	o3, ok := oc.(openapi3.OperationExposer)
-	if !ok {
-		return ErrOperationExposer
-	}
-	/*	{
-		"key": "1bd5c61b0e694082902cf15ddcc9e6a7",
-		"status": "ok",
-		"action": "added"
-	}*/
-	o3.Operation().WithParameters(addApiPostQueryParam()...)
-	return r.AddOperation(oc)
+	op.AddReqWithSeparateExample(new(apidef.APIDefinition), minimalApis[0])
+	op.StatusInternalServerError("file object creation failed, write error")
+	op.AddRespWithExample(apiModifyKeySuccess{
+		Status: "ok",
+		Action: "added",
+		Key:    "b84fe1a04e5648927971c0557971565c",
+	}, http.StatusOK, func(cu *openapi.ContentUnit) {
+		cu.Description = "api created"
+	})
+
+	op.StatusBadRequest("Request malformed")
+	addApiPostQueryParamv2(op)
+	return op.AddOperation()
 }
 
 // Done
@@ -207,20 +237,6 @@ func apIIDParameter() openapi3.ParameterOrRef {
 	return openapi3.Parameter{Description: StringPointerValue("The API ID"), In: openapi3.ParameterInPath, Example: &example, Name: "apiID", Required: &isRequired, Schema: stringSchema()}.ToParameterOrRef()
 }
 
-func addApiPostQueryParam() []openapi3.ParameterOrRef {
-	baseApiIdDesc := "The base API which the new version will be linked to."
-	baseApiVersionNameDesc := "The version name of the base API while creating the first version. This doesn't have to be sent for the next versions but if it is set, it will override base API version name."
-	newVersionNameDesc := "The version name of the created version."
-	setVersionDesc := "If true, the new version is set as default version."
-	return []openapi3.ParameterOrRef{
-		openapi3.Parameter{In: openapi3.ParameterInQuery, Name: "base_api_id", Schema: stringSchema(), Description: &baseApiIdDesc}.ToParameterOrRef(),
-
-		openapi3.Parameter{In: openapi3.ParameterInQuery, Name: "base_api_version_name", Schema: stringSchema(), Description: &baseApiVersionNameDesc}.ToParameterOrRef(),
-		openapi3.Parameter{In: openapi3.ParameterInQuery, Name: "new_version_name", Schema: stringSchema(), Description: &newVersionNameDesc}.ToParameterOrRef(),
-		openapi3.Parameter{In: openapi3.ParameterInQuery, Name: "set_default", Schema: boolSchema(), Description: &setVersionDesc}.ToParameterOrRef(),
-	}
-}
-
 func addApiPostQueryParamv2(oc *OperationWithExample) {
 	oc.AddQueryParameter("base_api_id", "The base API which the new version will be linked to.", OptionalParameterValues{
 		Example: valueToInterface("663a4ed9b6be920001b191ae"),
@@ -236,4 +252,81 @@ func searchTextQuery() openapi3.ParameterOrRef {
 
 func accessTypeQuery() openapi3.ParameterOrRef {
 	return openapi3.Parameter{Description: StringPointerValue("Filter for internal or external API versions"), In: openapi3.ParameterInQuery, Name: "accessType", Required: &isOptional, Schema: stringEnumSchema("internal", "external")}.ToParameterOrRef()
+}
+
+var minimalApis = []struct {
+	Name       string `json:"name"`
+	APIID      string `json:"api_id"`
+	OrgID      string `json:"org_id"`
+	Definition struct {
+		Location string `json:"location"`
+		Key      string `json:"key"`
+	} `json:"definition"`
+	Auth struct {
+		AuthHeaderName string `json:"auth_header_name"`
+	} `json:"auth"`
+	UseOAuth2   bool `json:"use_oauth2"`
+	VersionData struct {
+		NotVersioned bool `json:"not_versioned"`
+		Versions     struct {
+			Default struct {
+				Name string `json:"name"`
+			} `json:"Default"`
+		} `json:"versions"`
+	} `json:"version_data"`
+	Proxy struct {
+		ListenPath      string `json:"listen_path"`
+		TargetURL       string `json:"target_url"`
+		StripListenPath bool   `json:"strip_listen_path"`
+	} `json:"proxy"`
+}{
+	{
+		Name:  "Tyk Test API",
+		APIID: "b84fe1a04e5648927971c0557971565c",
+		OrgID: "664a14650619d40001f1f00f",
+		Definition: struct {
+			Location string `json:"location"`
+			Key      string `json:"key"`
+		}{
+			Location: "header",
+			Key:      "version",
+		},
+		Auth: struct {
+			AuthHeaderName string `json:"auth_header_name"`
+		}{
+			AuthHeaderName: "authorization",
+		},
+		UseOAuth2: true,
+		VersionData: struct {
+			NotVersioned bool `json:"not_versioned"`
+			Versions     struct {
+				Default struct {
+					Name string `json:"name"`
+				} `json:"Default"`
+			} `json:"versions"`
+		}{
+			NotVersioned: true,
+			Versions: struct {
+				Default struct {
+					Name string `json:"name"`
+				} `json:"Default"`
+			}{
+				Default: struct {
+					Name string `json:"name"`
+				}{
+					Name: "Default",
+				},
+			},
+		},
+		Proxy: struct {
+			ListenPath      string `json:"listen_path"`
+			TargetURL       string `json:"target_url"`
+			StripListenPath bool   `json:"strip_listen_path"`
+		}{
+			ListenPath:      "/tyk-api-test/",
+			TargetURL:       "https://httpbin.org",
+			StripListenPath: true,
+		},
+	},
+	// You can add more elements to the slice by following the same pattern
 }

@@ -90,6 +90,25 @@ paths:
         "200":
           content:
             application/json:
+              example:
+              - api_id: b84fe1a04e5648927971c0557971565c
+                auth:
+                  auth_header_name: authorization
+                definition:
+                  key: version
+                  location: header
+                name: Tyk Test API
+                org_id: 664a14650619d40001f1f00f
+                proxy:
+                  listen_path: /tyk-api-test/
+                  strip_listen_path: true
+                  target_url: https://httpbin.org
+                use_oauth2: true
+                version_data:
+                  not_versioned: true
+                  versions:
+                    Default:
+                      name: Default
               schema:
                 items:
                   $ref: '#/components/schemas/APIDefinition'
@@ -98,10 +117,12 @@ paths:
         "403":
           content:
             application/json:
+              example:
+                message: Attempted administrative access with invalid or missing key!
+                status: error
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: Attempting to access a protected api with an invalid or a missing
-            X-Tyk-Authorization in the headers
+          description: Forbidden
       summary: Get list of apis
       tags:
       - APIs
@@ -112,59 +133,97 @@ paths:
       operationId: createApi
       parameters:
       - description: The base API which the new version will be linked to.
+        example: 663a4ed9b6be920001b191ae
         in: query
         name: base_api_id
+        required: false
         schema:
           type: string
       - description: The version name of the base API while creating the first version.
           This doesn't have to be sent for the next versions but if it is set, it
           will override base API version name.
+        example: Default
         in: query
         name: base_api_version_name
+        required: false
         schema:
           type: string
       - description: The version name of the created version.
+        example: v2
         in: query
         name: new_version_name
+        required: false
         schema:
           type: string
       - description: If true, the new version is set as default version.
+        example: true
         in: query
         name: set_default
+        required: false
         schema:
           type: boolean
       requestBody:
         content:
           application/json:
+            example:
+              api_id: b84fe1a04e5648927971c0557971565c
+              auth:
+                auth_header_name: authorization
+              definition:
+                key: version
+                location: header
+              name: Tyk Test API
+              org_id: 664a14650619d40001f1f00f
+              proxy:
+                listen_path: /tyk-api-test/
+                strip_listen_path: true
+                target_url: https://httpbin.org
+              use_oauth2: true
+              version_data:
+                not_versioned: true
+                versions:
+                  Default:
+                    name: Default
             schema:
               $ref: '#/components/schemas/APIDefinition'
       responses:
         "200":
           content:
             application/json:
+              example:
+                action: added
+                key: b84fe1a04e5648927971c0557971565c
+                status: ok
               schema:
                 $ref: '#/components/schemas/ApiModifyKeySuccess'
-          description: OK
+          description: api created
         "400":
           content:
             application/json:
+              example:
+                message: Request malformed
+                status: error
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: Returned when you send a malformed body or when the request
-            body fails validation
+          description: Bad Request
         "403":
           content:
             application/json:
+              example:
+                message: Attempted administrative access with invalid or missing key!
+                status: error
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: Attempting to access a protected api with an invalid or a missing
-            X-Tyk-Authorization in the headers
+          description: Forbidden
         "500":
           content:
             application/json:
+              example:
+                message: file object creation failed, write error
+                status: error
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: Unexpected error.
+          description: Internal server error.
       summary: Creat an API
       tags:
       - APIs
@@ -176,7 +235,7 @@ paths:
       operationId: deleteApi
       parameters:
       - description: The API ID
-        example: keyless
+        example: 1bd5c61b0e694082902cf15ddcc9e6a7
         in: path
         name: apiID
         required: true
@@ -186,28 +245,40 @@ paths:
         "200":
           content:
             application/json:
+              example:
+                action: deleted
+                key: 1bd5c61b0e694082902cf15ddcc9e6a7
+                status: ok
               schema:
                 $ref: '#/components/schemas/ApiModifyKeySuccess'
           description: API deleted
         "403":
           content:
             application/json:
+              example:
+                message: Attempted administrative access with invalid or missing key!
+                status: error
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: Attempting to access a protected api with an invalid or a missing
-            X-Tyk-Authorization in the headers
+          description: Forbidden
         "404":
           content:
             application/json:
+              example:
+                message: API not found
+                status: error
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: An Api with the specified ApiID was not found.
+          description: API not found
         "500":
           content:
             application/json:
+              example:
+                message: Delete failed
+                status: error
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: Unexpected error.
+          description: Internal server error.
       summary: Deleting an API definition with ID
       tags:
       - APIs
@@ -228,6 +299,25 @@ paths:
         "200":
           content:
             application/json:
+              example:
+                api_id: b84fe1a04e5648927971c0557971565c
+                auth:
+                  auth_header_name: authorization
+                definition:
+                  key: version
+                  location: header
+                name: Tyk Test API
+                org_id: 664a14650619d40001f1f00f
+                proxy:
+                  listen_path: /tyk-api-test/
+                  strip_listen_path: true
+                  target_url: https://httpbin.org
+                use_oauth2: true
+                version_data:
+                  not_versioned: true
+                  versions:
+                    Default:
+                      name: Default
               schema:
                 $ref: '#/components/schemas/APIDefinition'
           description: API definition
@@ -249,9 +339,12 @@ paths:
         "404":
           content:
             application/json:
+              example:
+                message: API not found
+                status: error
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: Api not found
+          description: API not found
       summary: Get API definition with it's ID
       tags:
       - APIs
@@ -263,7 +356,7 @@ paths:
       operationId: updateApi
       parameters:
       - description: The API ID
-        example: keyless
+        example: 1bd5c61b0e694082902cf15ddcc9e6a7
         in: path
         name: apiID
         required: true
@@ -272,41 +365,74 @@ paths:
       requestBody:
         content:
           application/json:
+            example:
+              api_id: b84fe1a04e5648927971c0557971565c
+              auth:
+                auth_header_name: authorization
+              definition:
+                key: version
+                location: header
+              name: Update the api name sample
+              org_id: 664a14650619d40001f1f00f
+              proxy:
+                listen_path: /update-listen-path
+                strip_listen_path: true
+                target_url: https://tyk.io/api
+              use_oauth2: true
+              version_data:
+                not_versioned: true
+                versions:
+                  Default:
+                    name: Default
             schema:
               $ref: '#/components/schemas/APIDefinition'
       responses:
         "200":
           content:
             application/json:
+              example:
+                action: modified
+                key: 1bd5c61b0e694082902cf15ddcc9e6a7
+                status: ok
               schema:
                 $ref: '#/components/schemas/ApiModifyKeySuccess'
           description: API updated
         "400":
           content:
             application/json:
+              example:
+                message: Request malformed
+                status: error
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: Bad request.Sending a ApiID for an OAs api or apiID in path
-            does not match the one in the body.
+          description: Bad Request
         "403":
           content:
             application/json:
+              example:
+                message: Attempted administrative access with invalid or missing key!
+                status: error
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: Attempting to access a protected api with an invalid or a missing
-            X-Tyk-Authorization in the headers
+          description: Forbidden
         "404":
           content:
             application/json:
+              example:
+                message: API not found
+                status: error
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: An Api with the specified ApiID was not found.
+          description: API not found
         "500":
           content:
             application/json:
+              example:
+                message: file object creation failed, write error
+                status: error
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: Unexpected error.
+          description: Internal server error.
       summary: Updating an API definition with its ID
       tags:
       - APIs
