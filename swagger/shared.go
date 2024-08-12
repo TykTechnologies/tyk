@@ -467,9 +467,6 @@ func (op *OperationWithExample) AddBinaryFormatResp(format BinaryFormat) {
 	op.binaryFormat = append(op.binaryFormat, format)
 }
 
-func AddResponseWithExternalRef() {
-}
-
 func (op *OperationWithExample) AddGenericStatusOk(message string, options ...openapi.ContentOption) {
 	op.AddRespWithExample(apiStatusMessage{
 		Message: message,

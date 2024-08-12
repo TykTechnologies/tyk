@@ -3777,6 +3777,7 @@ paths:
       operationId: getSchema
       parameters:
       - description: The OAS version
+        example: 3.0.3
         in: query
         name: oasVersion
         required: false
@@ -3786,22 +3787,30 @@ paths:
         "200":
           content:
             application/json:
+              example:
+                message: ""
+                status: Success
               schema:
                 $ref: '#/components/schemas/OASSchemaResponse'
           description: OAS schema response
         "403":
           content:
             application/json:
+              example:
+                message: Attempted administrative access with invalid or missing key!
+                status: error
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: Attempting to access a protected api with an invalid or a missing
-            X-Tyk-Authorization in the headers
+          description: Forbidden
         "404":
           content:
             application/json:
+              example:
+                message: Schema not found for version "4"
+                status: Failed
               schema:
                 $ref: '#/components/schemas/OASSchemaResponse'
-          description: The response when the requested OAS schema is not found
+          description: Version not found
       summary: Get OAS schema
       tags:
       - Schema
