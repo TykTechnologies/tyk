@@ -238,6 +238,11 @@ func NewConnector(connType string, conf config.Config) (model.Connector, error) 
 	}
 	log.Debug("Creating new " + connType + " Storage connection")
 
+	// we can ignore everything for a local connector
+	if cfg.Type == "local" {
+		return connector.NewConnector(model.LocalType)
+	}
+
 	// poolSize applies per cluster node and not for the whole cluster.
 	poolSize := 500
 	if cfg.MaxActive > 0 {
