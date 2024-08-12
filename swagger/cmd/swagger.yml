@@ -80,6 +80,49 @@ tags:
     Manage OAuth clients, and manage their tokens
   name: OAuth
 paths:
+  /hello:
+    get:
+      description: "From v2.7.5 you can now rename the `/hello`  endpoint by using
+        the `health_check_endpoint_name` option\n        \n        Returns 200 response
+        in case of success"
+      operationId: hello
+      responses:
+        "200":
+          content:
+            application/json:
+              example:
+                description: Tyk GW
+                details:
+                  redis:
+                    componentType: datastore
+                    status: pass
+                    time: "2020-05-19T03:42:55+01:00"
+                status: pass
+                version: v5.5.0-dev
+              schema:
+                $ref: '#/components/schemas/HealthCheckResponse'
+          description: Success
+        "403":
+          content:
+            application/json:
+              example:
+                message: Attempted administrative access with invalid or missing key!
+                status: error
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Forbidden
+        "405":
+          content:
+            application/json:
+              example:
+                message: Method Not Allowed
+                status: error
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Method Not Allowed
+      summary: Check the Health of the Tyk Gateway
+      tags:
+      - Health Checking
   /tyk/apis:
     get:
       description: |-
@@ -513,18 +556,25 @@ paths:
         "200":
           content:
             application/json:
+              examples:
+                oasExampleList:
+                  $ref: '#/components/examples/oasExampleList'
               schema:
                 items:
-                  $ref: https://raw.githubusercontent.com/OAI/OpenAPI-Specification/main/schemas/v3.0/schema.json
+                  allOf:
+                  - $ref: https://raw.githubusercontent.com/OAI/OpenAPI-Specification/main/schemas/v3.0/schema.json
+                  - $ref: '#/components/schemas/XTykAPIGateway'
                 type: array
           description: List of API definitions in OAS format
         "403":
           content:
             application/json:
+              example:
+                message: Attempted administrative access with invalid or missing key!
+                status: error
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: Attempting to access a protected api with an invalid or a missing
-            X-Tyk-Authorization in the headers
+          description: Forbidden
       summary: List all OAS format APIS
       tags:
       - OAS APIs
@@ -614,11 +664,17 @@ paths:
                 upstream:
                   url: https://localhost:8080
             schema:
-              $ref: https://raw.githubusercontent.com/OAI/OpenAPI-Specification/main/schemas/v3.0/schema.json
+              allOf:
+              - $ref: https://raw.githubusercontent.com/OAI/OpenAPI-Specification/main/schemas/v3.0/schema.json
+              - $ref: '#/components/schemas/XTykAPIGateway'
       responses:
         "200":
           content:
             application/json:
+              example:
+                action: added
+                key: e30bee13ad4248c3b529a4c58bb7be4e
+                status: ok
               schema:
                 $ref: '#/components/schemas/ApiModifyKeySuccess'
           description: API created
@@ -626,7 +682,7 @@ paths:
           content:
             application/json:
               example:
-                message: Malformed API data
+                message: the payload should contain x-tyk-api-gateway
                 status: error
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
@@ -644,7 +700,7 @@ paths:
           content:
             application/json:
               example:
-                message: Unexpected error
+                message: file object creation failed, write error
                 status: error
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
@@ -660,7 +716,7 @@ paths:
       operationId: deleteOASApi
       parameters:
       - description: The API ID
-        example: keyless
+        example: 1bd5c61b0e694082902cf15ddcc9e6a7
         in: path
         name: apiID
         required: true
@@ -670,34 +726,49 @@ paths:
         "200":
           content:
             application/json:
+              example:
+                action: deleted
+                key: 1bd5c61b0e694082902cf15ddcc9e6a7
+                status: ok
               schema:
                 $ref: '#/components/schemas/ApiModifyKeySuccess'
           description: API deleted
         "400":
           content:
             application/json:
+              example:
+                message: Must specify an apiID to delete
+                status: error
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: API ID not specified
+          description: Bad Request
         "403":
           content:
             application/json:
+              example:
+                message: Attempted administrative access with invalid or missing key!
+                status: error
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: Attempting to access a protected api with an invalid or a missing
-            X-Tyk-Authorization in the headers
+          description: Forbidden
         "404":
           content:
             application/json:
+              example:
+                message: API not found
+                status: error
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
           description: API not found
         "500":
           content:
             application/json:
+              example:
+                message: Delete failed
+                status: error
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: When delete request is sent while using dashboard app configs
+          description: Internal server error.
       summary: Deleting an OAS API
       tags:
       - OAS APIs
@@ -733,7 +804,9 @@ paths:
                 oasExample:
                   $ref: '#/components/examples/oasExample'
               schema:
-                $ref: https://raw.githubusercontent.com/OAI/OpenAPI-Specification/main/schemas/v3.0/schema.json
+                allOf:
+                - $ref: https://raw.githubusercontent.com/OAI/OpenAPI-Specification/main/schemas/v3.0/schema.json
+                - $ref: '#/components/schemas/XTykAPIGateway'
           description: OK
           headers:
             x-tyk-base-api-id:
@@ -745,8 +818,8 @@ paths:
           content:
             application/json:
               example:
-                message: trying to access an API whose definition is in Tyk classic
-                  format
+                message: the requested API definition is in Tyk classic format, please
+                  use old api endpoint
                 status: error
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
@@ -768,7 +841,7 @@ paths:
                 status: error
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: Not Found
+          description: API not found
       summary: Get OAS Api definition
       tags:
       - OAS APIs
@@ -954,11 +1027,17 @@ paths:
                 upstream:
                   url: https://localhost:8080
             schema:
-              $ref: https://raw.githubusercontent.com/OAI/OpenAPI-Specification/main/schemas/v3.0/schema.json
+              allOf:
+              - $ref: https://raw.githubusercontent.com/OAI/OpenAPI-Specification/main/schemas/v3.0/schema.json
+              - $ref: '#/components/schemas/XTykAPIGateway'
       responses:
         "200":
           content:
             application/json:
+              example:
+                action: modified
+                key: e30bee13ad4248c3b529a4c58bb7be4e
+                status: ok
               schema:
                 $ref: '#/components/schemas/ApiModifyKeySuccess'
           description: API updated
@@ -966,8 +1045,8 @@ paths:
           content:
             application/json:
               example:
-                message: Malformed Request or trying to update api in tyk classic
-                  format
+                message: Request APIID does not match that in Definition! For Update
+                  operations these must match.
                 status: error
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
@@ -989,12 +1068,12 @@ paths:
                 status: error
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: Not Found
+          description: API not found
         "500":
           content:
             application/json:
               example:
-                message: Unexpected error
+                message: file object creation failed, write error
                 status: error
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
@@ -1073,51 +1152,58 @@ paths:
           description: Internal server error.
       summary: Download an OAS format APIs, when used without the Tyk Dashboard.
       tags:
-      - OASTag
+      - OAS APIs
   /tyk/apis/oas/{apiID}/versions:
     get:
       description: Listing versions of an OAS API
       operationId: listOASApiVersions
       parameters:
-      - description: The API ID
-        example: keyless
+      - description: ID of the api you want to fetch
+        example: 4c1c0d8fc885401053ddac4e39ef676b
         in: path
         name: apiID
         required: true
         schema:
           type: string
-      - description: Search for API version name
-        in: query
-        name: searchText
-        required: false
-        schema:
-          type: string
-      - description: Filter for internal or external API versions
-        in: query
-        name: accessType
-        required: false
-        schema:
-          enum:
-          - internal
-          - external
-          type: string
+      - $ref: '#/components/parameters/SearchText'
+      - $ref: '#/components/parameters/AccessType'
       responses:
         "200":
           content:
             application/json:
+              example:
+                apis:
+                - expirationDate: ""
+                  id: keyless
+                  internal: false
+                  isDefaultVersion: false
+                  name: Tyk Test Keyless API
+                  versionName: ""
+                - expirationDate: ""
+                  id: 1f20d5d2731d47ac9c79fddf826eda00
+                  internal: false
+                  isDefaultVersion: true
+                  name: Version three Api
+                  versionName: v2
+                status: success
               schema:
                 $ref: '#/components/schemas/VersionMetas'
           description: API version metas
         "403":
           content:
             application/json:
+              example:
+                message: Attempted administrative access with invalid or missing key!
+                status: error
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: Attempting to access a protected api with an invalid or a missing
-            X-Tyk-Authorization in the headers
+          description: Forbidden
         "404":
           content:
             application/json:
+              example:
+                message: API not found
+                status: error
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
           description: API not found
@@ -1183,6 +1269,36 @@ paths:
       - $ref: '#/components/parameters/ValidateRequest'
       - $ref: '#/components/parameters/MockResponse'
       - $ref: '#/components/parameters/Authentication'
+      - description: The base API which the new version will be linked to.
+        example: 663a4ed9b6be920001b191ae
+        in: query
+        name: base_api_id
+        required: false
+        schema:
+          type: string
+      - description: The version name of the base API while creating the first version.
+          This doesn't have to be sent for the next versions but if it is set, it
+          will override base API version name.
+        example: Default
+        in: query
+        name: base_api_version_name
+        required: false
+        schema:
+          type: string
+      - description: The version name of the created version.
+        example: v2
+        in: query
+        name: new_version_name
+        required: false
+        schema:
+          type: string
+      - description: If true, the new version is set as default version.
+        example: true
+        in: query
+        name: set_default
+        required: false
+        schema:
+          type: boolean
       requestBody:
         content:
           application/json:
@@ -1227,14 +1343,18 @@ paths:
         "200":
           content:
             application/json:
+              example:
+                action: added
+                key: e30bee13ad4248c3b529a4c58bb7be4e
+                status: ok
               schema:
                 $ref: '#/components/schemas/ApiModifyKeySuccess'
-          description: API definition created
+          description: API imported
         "400":
           content:
             application/json:
               example:
-                message: Malformed request or when the payload contain x-tyk-api-gateway
+                message: the import payload should not contain x-tyk-api-gateway
                 status: error
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
@@ -1252,7 +1372,7 @@ paths:
           content:
             application/json:
               example:
-                message: Unexpected error
+                message: file object creation failed, write error
                 status: error
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
@@ -1499,59 +1619,74 @@ paths:
       requestBody:
         content:
           application/json:
+            example:
+              request:
+                method: GET
+                path: /update-listen-path
+              spec:
+                api_id: b84fe1a04e5648927971c0557971565c
+                auth:
+                  auth_header_name: authorization
+                definition:
+                  key: version
+                  location: header
+                name: Tyk Test API
+                org_id: 664a14650619d40001f1f00f
+                proxy:
+                  listen_path: /tyk-api-test/
+                  strip_listen_path: true
+                  target_url: https://httpbin.org
+                use_oauth2: true
+                version_data:
+                  not_versioned: true
+                  versions:
+                    Default:
+                      name: Default
             schema:
               $ref: '#/components/schemas/TraceRequest'
       responses:
         "200":
           content:
             application/json:
+              example:
+                logs: '{"level":"warning","msg":"Legacy path detected! Upgrade to
+                  extended....'
+                message: ok
+                response: "====== Request ======\nGET / HTTP/1.1\r\nHost: httpbin.org\r\n\r\n\n======
+                  Response..."
               schema:
                 $ref: '#/components/schemas/TraceResponse'
           description: Success tracing request
         "400":
           content:
             application/json:
+              example:
+                message: Request malformed
+                status: error
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: Request malformed , missing spec field or missing request field
+          description: Bad Request
         "403":
           content:
             application/json:
+              example:
+                message: Attempted administrative access with invalid or missing key!
+                status: error
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: Attempting to access a protected api with an invalid or a missing
-            X-Tyk-Authorization in the headers
+          description: Forbidden
         "500":
           content:
             application/json:
+              example:
+                message: 'Unexpected failure:'
+                status: error
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: Unexpected failure
+          description: Internal server error.
       summary: Test an an API definition
       tags:
       - Debug
-  /tyk/hello:
-    get:
-      description: "From v2.7.5 you can now rename the `/hello`  endpoint by using
-        the `health_check_endpoint_name` option\n        \n        Returns 200 response
-        in case of success"
-      operationId: hello
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/HealthCheckResponse'
-          description: Success
-        "405":
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiStatusMessage'
-          description: Method Not Allowed
-      summary: Check the Health of the Tyk Gateway
-      tags:
-      - Health Checking
   /tyk/keys:
     get:
       description: |-
@@ -3959,6 +4094,53 @@ components:
               value: /user-test/
           upstream:
             url: https://localhost:8080
+    oasExampleList:
+      value:
+      - components:
+          securitySchemes:
+            bearerAuth:
+              description: The API Access Credentials
+              scheme: bearer
+              type: http
+        info:
+          description: This is a sample OAS.
+          title: OAS Sample
+          version: 1.0.0
+        openapi: 3.0.3
+        paths:
+          /api/sample/users:
+            get:
+              operationId: getUsers
+              responses:
+                "200":
+                  content:
+                    application/json:
+                      schema:
+                        items:
+                          properties:
+                            name:
+                              type: string
+                          type: object
+                        type: array
+                  description: fetched users
+              summary: Get users
+              tags:
+              - users
+        security:
+        - bearerAuth: []
+        servers:
+        - url: https://localhost:8080
+        x-tyk-api-gateway:
+          info:
+            name: user
+            state:
+              active: true
+          server:
+            listenPath:
+              strip: true
+              value: /user-test/
+          upstream:
+            url: https://localhost:8080
     policiesExample:
       value:
       - _id: ""
@@ -4489,6 +4671,13 @@ components:
           example: anything/rate-limit-1-per-5
           type: string
       type: object
+    Allowance:
+      properties:
+        enabled:
+          type: boolean
+        ignoreCase:
+          type: boolean
+      type: object
     AnalyticsPluginConfig:
       properties:
         enable:
@@ -4562,6 +4751,52 @@ components:
         storage_engine:
           type: string
       type: object
+    AuthSource:
+      properties:
+        enabled:
+          type: boolean
+        name:
+          type: string
+      type: object
+    AuthSources:
+      properties:
+        cookie:
+          $ref: '#/components/schemas/AuthSource'
+        header:
+          $ref: '#/components/schemas/AuthSource'
+        query:
+          $ref: '#/components/schemas/AuthSource'
+      type: object
+    Authentication:
+      properties:
+        baseIdentityProvider:
+          type: string
+        custom:
+          $ref: '#/components/schemas/CustomPluginAuthentication'
+        enabled:
+          type: boolean
+        hmac:
+          $ref: '#/components/schemas/HMAC'
+        oidc:
+          $ref: '#/components/schemas/OIDC'
+        securitySchemes:
+          $ref: '#/components/schemas/SecuritySchemes'
+        stripAuthorizationData:
+          type: boolean
+      type: object
+    AuthenticationPlugin:
+      properties:
+        enabled:
+          type: boolean
+        functionName:
+          type: string
+        idExtractor:
+          $ref: '#/components/schemas/IDExtractor'
+        path:
+          type: string
+        rawBodyOnly:
+          type: boolean
+      type: object
     BasicAuthData:
       properties:
         hash_type:
@@ -4575,6 +4810,35 @@ components:
       - false
       example: true
       type: boolean
+    CORS:
+      properties:
+        allowCredentials:
+          type: boolean
+        allowedHeaders:
+          items:
+            type: string
+          type: array
+        allowedMethods:
+          items:
+            type: string
+          type: array
+        allowedOrigins:
+          items:
+            type: string
+          type: array
+        debug:
+          type: boolean
+        enabled:
+          type: boolean
+        exposedHeaders:
+          items:
+            type: string
+          type: array
+        maxAge:
+          type: integer
+        optionsPassthrough:
+          type: boolean
+      type: object
     CORSConfig:
       properties:
         allow_credentials:
@@ -4627,6 +4891,27 @@ components:
           example: false
           type: boolean
       type: object
+    Cache:
+      properties:
+        cacheAllSafeRequests:
+          type: boolean
+        cacheByHeaders:
+          items:
+            type: string
+          type: array
+        cacheResponseCodes:
+          items:
+            type: integer
+          type: array
+        controlTTLHeaderName:
+          type: string
+        enableUpstreamCacheControl:
+          type: boolean
+        enabled:
+          type: boolean
+        timeout:
+          type: integer
+      type: object
     CacheMeta:
       properties:
         cache_key_regex:
@@ -4672,6 +4957,26 @@ components:
           type: boolean
         enable_upstream_cache_control:
           example: false
+          type: boolean
+      type: object
+    CachePlugin:
+      properties:
+        cacheByRegex:
+          type: string
+        cacheResponseCodes:
+          items:
+            type: integer
+          type: array
+        enabled:
+          type: boolean
+        timeout:
+          type: integer
+      type: object
+    CertificatePinning:
+      properties:
+        domainToPublicKeysMapping:
+          $ref: '#/components/schemas/PinnedPublicKeys'
+        enabled:
           type: boolean
       type: object
     CertsCertificateBasics:
@@ -4737,6 +5042,19 @@ components:
         name:
           type: string
       type: object
+    CircuitBreaker:
+      properties:
+        coolDownPeriod:
+          type: integer
+        enabled:
+          type: boolean
+        halfOpenStateEnabled:
+          type: boolean
+        sampleSize:
+          type: integer
+        threshold:
+          type: number
+      type: object
     CircuitBreakerMeta:
       properties:
         disable_half_open_state:
@@ -4755,6 +5073,54 @@ components:
         threshold_percent:
           type: number
       type: object
+    ClientCertificates:
+      properties:
+        allowlist:
+          items:
+            type: string
+          nullable: true
+          type: array
+        enabled:
+          type: boolean
+      type: object
+    ClientToPolicy:
+      properties:
+        clientId:
+          type: string
+        policyId:
+          type: string
+      type: object
+    ContextVariables:
+      properties:
+        enabled:
+          type: boolean
+      type: object
+    CustomPlugin:
+      properties:
+        enabled:
+          type: boolean
+        functionName:
+          type: string
+        path:
+          type: string
+        rawBodyOnly:
+          type: boolean
+        requireSession:
+          type: boolean
+      type: object
+    CustomPluginAuthentication:
+      properties:
+        AuthSources:
+          $ref: '#/components/schemas/AuthSources'
+        config:
+          $ref: '#/components/schemas/AuthenticationPlugin'
+        enabled:
+          type: boolean
+      type: object
+    CustomPlugins:
+      items:
+        $ref: '#/components/schemas/CustomPlugin'
+      type: array
     DatasourceMappingConfiguration:
       properties:
         disabled:
@@ -4777,6 +5143,34 @@ components:
         mapping:
           $ref: '#/components/schemas/DatasourceMappingConfiguration'
         type_name:
+          type: string
+      type: object
+    DetailedActivityLogs:
+      properties:
+        enabled:
+          type: boolean
+      type: object
+    DetailedTracing:
+      properties:
+        enabled:
+          type: boolean
+      type: object
+    Domain:
+      properties:
+        certificates:
+          items:
+            type: string
+          type: array
+        enabled:
+          type: boolean
+        name:
+          type: string
+      type: object
+    DomainToCertificate:
+      properties:
+        certificate:
+          type: string
+        domain:
           type: string
       type: object
     EndPointMeta:
@@ -4811,6 +5205,41 @@ components:
           nullable: true
           type: object
       type: object
+    EndpointPostPlugin:
+      properties:
+        enabled:
+          type: boolean
+        functionName:
+          type: string
+        name:
+          type: string
+        path:
+          type: string
+      type: object
+    EndpointPostPlugins:
+      items:
+        $ref: '#/components/schemas/EndpointPostPlugin'
+      type: array
+    EnforceTimeout:
+      properties:
+        enabled:
+          type: boolean
+        value:
+          type: integer
+      type: object
+    EventHandler:
+      properties:
+        enabled:
+          type: boolean
+        id:
+          type: string
+        name:
+          type: string
+        trigger:
+          type: string
+        type:
+          type: string
+      type: object
     EventHandlerMetaConfig:
       properties:
         events:
@@ -4830,6 +5259,10 @@ components:
         handler_name:
           type: string
       type: object
+    EventHandlers:
+      items:
+        $ref: '#/components/schemas/EventHandler'
+      type: array
     ExtendedPathsSet:
       properties:
         advance_cache_config:
@@ -4962,6 +5395,60 @@ components:
       properties:
         max_query_depth:
           type: integer
+      type: object
+    FromOASExamples:
+      properties:
+        code:
+          type: integer
+        contentType:
+          type: string
+        enabled:
+          type: boolean
+        exampleName:
+          type: string
+      type: object
+    GatewayTags:
+      properties:
+        enabled:
+          type: boolean
+        tags:
+          items:
+            type: string
+          nullable: true
+          type: array
+      type: object
+    Global:
+      properties:
+        cache:
+          $ref: '#/components/schemas/Cache'
+        contextVariables:
+          $ref: '#/components/schemas/ContextVariables'
+        cors:
+          $ref: '#/components/schemas/CORS'
+        pluginConfig:
+          $ref: '#/components/schemas/PluginConfig'
+        postAuthenticationPlugin:
+          $ref: '#/components/schemas/PostAuthenticationPlugin'
+        postAuthenticationPlugins:
+          $ref: '#/components/schemas/CustomPlugins'
+        postPlugin:
+          $ref: '#/components/schemas/PostPlugin'
+        postPlugins:
+          $ref: '#/components/schemas/CustomPlugins'
+        prePlugin:
+          $ref: '#/components/schemas/PrePlugin'
+        prePlugins:
+          $ref: '#/components/schemas/CustomPlugins'
+        responsePlugin:
+          $ref: '#/components/schemas/ResponsePlugin'
+        responsePlugins:
+          $ref: '#/components/schemas/CustomPlugins'
+        trafficLogs:
+          $ref: '#/components/schemas/TrafficLogs'
+        transformRequestHeaders:
+          $ref: '#/components/schemas/TransformHeaders'
+        transformResponseHeaders:
+          $ref: '#/components/schemas/TransformHeaders'
       type: object
     GlobalRateLimit:
       properties:
@@ -5185,6 +5672,19 @@ components:
         name:
           type: string
       type: object
+    HMAC:
+      properties:
+        AuthSources:
+          $ref: '#/components/schemas/AuthSources'
+        allowedAlgorithms:
+          items:
+            type: string
+          type: array
+        allowedClockSkew:
+          type: number
+        enabled:
+          type: boolean
+      type: object
     HardTimeoutMeta:
       properties:
         disabled:
@@ -5195,6 +5695,13 @@ components:
           type: string
         timeout:
           type: integer
+      type: object
+    Header:
+      properties:
+        name:
+          type: string
+        value:
+          type: string
       type: object
     HeaderInjectionMeta:
       properties:
@@ -5217,6 +5724,10 @@ components:
         path:
           type: string
       type: object
+    Headers:
+      items:
+        $ref: '#/components/schemas/Header'
+      type: array
     HealthCheckItem:
       properties:
         componentId:
@@ -5284,6 +5795,52 @@ components:
           type: string
         type: array
       type: object
+    IDExtractor:
+      properties:
+        config:
+          $ref: '#/components/schemas/IDExtractorConfig'
+        enabled:
+          type: boolean
+        source:
+          type: string
+        with:
+          type: string
+      type: object
+    IDExtractorConfig:
+      properties:
+        formParamName:
+          type: string
+        headerName:
+          type: string
+        regexp:
+          type: string
+        regexpMatchIndex:
+          type: integer
+        xPathExp:
+          type: string
+      type: object
+    Info:
+      properties:
+        dbId:
+          type: string
+        expiration:
+          type: string
+        id:
+          type: string
+        name:
+          type: string
+        orgId:
+          type: string
+        state:
+          $ref: '#/components/schemas/State'
+        versioning:
+          $ref: '#/components/schemas/Versioning'
+      type: object
+    Internal:
+      properties:
+        enabled:
+          type: boolean
+      type: object
     InternalMeta:
       properties:
         disabled:
@@ -5341,6 +5898,13 @@ components:
         source:
           type: string
       type: object
+    ListenPath:
+      properties:
+        strip:
+          type: boolean
+        value:
+          type: string
+      type: object
     MethodTransformMeta:
       properties:
         disabled:
@@ -5351,6 +5915,13 @@ components:
           type: string
         to_method:
           type: string
+      type: object
+    Middleware:
+      properties:
+        global:
+          $ref: '#/components/schemas/Global'
+        operations:
+          $ref: '#/components/schemas/Operations'
       type: object
     MiddlewareDefinition:
       properties:
@@ -5410,6 +5981,19 @@ components:
           nullable: true
           type: array
       type: object
+    MockResponse:
+      properties:
+        body:
+          type: string
+        code:
+          type: integer
+        enabled:
+          type: boolean
+        fromOASExamples:
+          $ref: '#/components/schemas/FromOASExamples'
+        headers:
+          $ref: '#/components/schemas/Headers'
+      type: object
     MockResponseMeta:
       properties:
         body:
@@ -5441,6 +6025,16 @@ components:
             type: number
           nullable: true
           type: array
+      type: object
+    MutualTLS:
+      properties:
+        domainToCertificateMapping:
+          items:
+            $ref: '#/components/schemas/DomainToCertificate'
+          nullable: true
+          type: array
+        enabled:
+          type: boolean
       type: object
     NewClientRequest:
       properties:
@@ -5485,6 +6079,21 @@ components:
         expires:
           type: integer
       type: object
+    OIDC:
+      properties:
+        AuthSources:
+          $ref: '#/components/schemas/AuthSources'
+        enabled:
+          type: boolean
+        providers:
+          items:
+            $ref: '#/components/schemas/ProviderType2'
+          type: array
+        scopes:
+          $ref: '#/components/schemas/ScopesType2'
+        segregateByClientId:
+          type: boolean
+      type: object
     OIDProviderConfig:
       properties:
         client_ids:
@@ -5504,6 +6113,55 @@ components:
           type: array
         segregate_by_client:
           type: boolean
+      type: object
+    Operation:
+      properties:
+        allow:
+          $ref: '#/components/schemas/Allowance'
+        block:
+          $ref: '#/components/schemas/Allowance'
+        cache:
+          $ref: '#/components/schemas/CachePlugin'
+        circuitBreaker:
+          $ref: '#/components/schemas/CircuitBreaker'
+        doNotTrackEndpoint:
+          $ref: '#/components/schemas/TrackEndpoint'
+        enforceTimeout:
+          $ref: '#/components/schemas/EnforceTimeout'
+        ignoreAuthentication:
+          $ref: '#/components/schemas/Allowance'
+        internal:
+          $ref: '#/components/schemas/Internal'
+        mockResponse:
+          $ref: '#/components/schemas/MockResponse'
+        postPlugins:
+          $ref: '#/components/schemas/EndpointPostPlugins'
+        rateLimit:
+          $ref: '#/components/schemas/RateLimitEndpoint'
+        requestSizeLimit:
+          $ref: '#/components/schemas/RequestSizeLimit'
+        trackEndpoint:
+          $ref: '#/components/schemas/TrackEndpoint'
+        transformRequestBody:
+          $ref: '#/components/schemas/TransformBody'
+        transformRequestHeaders:
+          $ref: '#/components/schemas/TransformHeaders'
+        transformRequestMethod:
+          $ref: '#/components/schemas/TransformRequestMethod'
+        transformResponseBody:
+          $ref: '#/components/schemas/TransformBody'
+        transformResponseHeaders:
+          $ref: '#/components/schemas/TransformHeaders'
+        urlRewrite:
+          $ref: '#/components/schemas/URLRewrite'
+        validateRequest:
+          $ref: '#/components/schemas/ValidateRequest'
+        virtualEndpoint:
+          $ref: '#/components/schemas/VirtualEndpoint'
+      type: object
+    Operations:
+      additionalProperties:
+        $ref: '#/components/schemas/Operation'
       type: object
     PaginatedOAuthClientTokens:
       properties:
@@ -5537,7 +6195,47 @@ components:
           nullable: true
           type: object
       type: object
+    PinnedPublicKey:
+      properties:
+        domain:
+          type: string
+        publicKeys:
+          items:
+            type: string
+          nullable: true
+          type: array
+      type: object
+    PinnedPublicKeys:
+      items:
+        $ref: '#/components/schemas/PinnedPublicKey'
+      nullable: true
+      type: array
     PkixName:
+      type: object
+    PluginBundle:
+      properties:
+        enabled:
+          type: boolean
+        path:
+          type: string
+      type: object
+    PluginConfig:
+      properties:
+        bundle:
+          $ref: '#/components/schemas/PluginBundle'
+        data:
+          $ref: '#/components/schemas/PluginConfigData'
+        driver:
+          type: string
+      type: object
+    PluginConfigData:
+      properties:
+        enabled:
+          type: boolean
+        value:
+          additionalProperties: {}
+          nullable: true
+          type: object
       type: object
     Policy:
       properties:
@@ -5650,12 +6348,36 @@ components:
         policy:
           type: string
       type: object
+    PostAuthenticationPlugin:
+      properties:
+        plugins:
+          $ref: '#/components/schemas/CustomPlugins'
+      type: object
+    PostPlugin:
+      properties:
+        plugins:
+          $ref: '#/components/schemas/CustomPlugins'
+      type: object
+    PrePlugin:
+      properties:
+        plugins:
+          $ref: '#/components/schemas/CustomPlugins'
+      type: object
     Provider:
       properties:
         introspection:
           $ref: '#/components/schemas/Introspection'
         jwt:
           $ref: '#/components/schemas/JWTValidation'
+      type: object
+    ProviderType2:
+      properties:
+        clientToPolicyMapping:
+          items:
+            $ref: '#/components/schemas/ClientToPolicy'
+          type: array
+        issuer:
+          type: string
       type: object
     ProxyConfig:
       properties:
@@ -5703,6 +6425,24 @@ components:
               minimum: 0
               type: integer
           type: object
+      type: object
+    RateLimit:
+      properties:
+        enabled:
+          type: boolean
+        per:
+          type: integer
+        rate:
+          type: integer
+      type: object
+    RateLimitEndpoint:
+      properties:
+        enabled:
+          type: boolean
+        per:
+          type: integer
+        rate:
+          type: integer
       type: object
     RateLimitMeta:
       properties:
@@ -5757,6 +6497,13 @@ components:
         signature_header:
           type: string
       type: object
+    RequestSizeLimit:
+      properties:
+        enabled:
+          type: boolean
+        value:
+          type: integer
+      type: object
     RequestSizeMeta:
       properties:
         disabled:
@@ -5768,6 +6515,11 @@ components:
         size_limit:
           format: int64
           type: integer
+      type: object
+    ResponsePlugin:
+      properties:
+        plugins:
+          $ref: '#/components/schemas/CustomPlugins'
       type: object
     ResponseProcessor:
       properties:
@@ -5826,12 +6578,82 @@ components:
             type: string
           type: object
       type: object
+    ScopeToPolicy:
+      properties:
+        policyId:
+          type: string
+        scope:
+          type: string
+      type: object
     Scopes:
       properties:
         jwt:
           $ref: '#/components/schemas/ScopeClaim'
         oidc:
           $ref: '#/components/schemas/ScopeClaim'
+      type: object
+    ScopesType2:
+      properties:
+        claimName:
+          type: string
+        scopeToPolicyMapping:
+          items:
+            $ref: '#/components/schemas/ScopeToPolicy'
+          type: array
+      type: object
+    SecuritySchemes:
+      additionalProperties: {}
+      type: object
+    Server:
+      properties:
+        authentication:
+          $ref: '#/components/schemas/Authentication'
+        clientCertificates:
+          $ref: '#/components/schemas/ClientCertificates'
+        customDomain:
+          $ref: '#/components/schemas/Domain'
+        detailedActivityLogs:
+          $ref: '#/components/schemas/DetailedActivityLogs'
+        detailedTracing:
+          $ref: '#/components/schemas/DetailedTracing'
+        eventHandlers:
+          $ref: '#/components/schemas/EventHandlers'
+        gatewayTags:
+          $ref: '#/components/schemas/GatewayTags'
+        listenPath:
+          $ref: '#/components/schemas/ListenPath'
+      type: object
+    ServiceDiscovery:
+      properties:
+        cache:
+          $ref: '#/components/schemas/ServiceDiscoveryCache'
+        cacheTimeout:
+          type: integer
+        dataPath:
+          type: string
+        enabled:
+          type: boolean
+        endpointReturnsList:
+          type: boolean
+        parentDataPath:
+          type: string
+        portDataPath:
+          type: string
+        queryEndpoint:
+          type: string
+        targetPath:
+          type: string
+        useNestedQuery:
+          type: boolean
+        useTargetList:
+          type: boolean
+      type: object
+    ServiceDiscoveryCache:
+      properties:
+        enabled:
+          type: boolean
+        timeout:
+          type: integer
       type: object
     ServiceDiscoveryConfiguration:
       properties:
@@ -6031,6 +6853,13 @@ components:
         use_param:
           type: boolean
       type: object
+    State:
+      properties:
+        active:
+          type: boolean
+        internal:
+          type: boolean
+      type: object
     StringRegexMap:
       properties:
         match_rx:
@@ -6066,6 +6895,11 @@ components:
         template_data:
           $ref: '#/components/schemas/TemplateData'
       type: object
+    Test:
+      properties:
+        serviceDiscovery:
+          $ref: '#/components/schemas/ServiceDiscovery'
+      type: object
     TraceHttpRequest:
       properties:
         body:
@@ -6099,6 +6933,11 @@ components:
             Response..."
           type: string
       type: object
+    TrackEndpoint:
+      properties:
+        enabled:
+          type: boolean
+      type: object
     TrackEndpointMeta:
       properties:
         disabled:
@@ -6107,6 +6946,33 @@ components:
           type: string
         path:
           type: string
+      type: object
+    TrafficLogs:
+      properties:
+        enabled:
+          type: boolean
+      type: object
+    TransformBody:
+      properties:
+        body:
+          type: string
+        enabled:
+          type: boolean
+        format:
+          type: string
+        path:
+          type: string
+      type: object
+    TransformHeaders:
+      properties:
+        add:
+          $ref: '#/components/schemas/Headers'
+        enabled:
+          type: boolean
+        remove:
+          items:
+            type: string
+          type: array
       type: object
     TransformJQMeta:
       properties:
@@ -6117,12 +6983,32 @@ components:
         path:
           type: string
       type: object
+    TransformRequestMethod:
+      properties:
+        enabled:
+          type: boolean
+        toMethod:
+          type: string
+      type: object
     UDGGlobalHeader:
       properties:
         key:
           type: string
         value:
           type: string
+      type: object
+    URLRewrite:
+      properties:
+        enabled:
+          type: boolean
+        pattern:
+          type: string
+        rewriteTo:
+          type: string
+        triggers:
+          items:
+            $ref: '#/components/schemas/URLRewriteTrigger'
+          type: array
       type: object
     URLRewriteMeta:
       properties:
@@ -6141,6 +7027,43 @@ components:
             $ref: '#/components/schemas/RoutingTrigger'
           nullable: true
           type: array
+      type: object
+    URLRewriteRule:
+      properties:
+        in:
+          type: string
+        name:
+          type: string
+        negate:
+          type: boolean
+        pattern:
+          type: string
+      type: object
+    URLRewriteTrigger:
+      properties:
+        condition:
+          type: string
+        rewriteTo:
+          type: string
+        rules:
+          items:
+            $ref: '#/components/schemas/URLRewriteRule'
+          type: array
+      type: object
+    Upstream:
+      properties:
+        certificatePinning:
+          $ref: '#/components/schemas/CertificatePinning'
+        mutualTLS:
+          $ref: '#/components/schemas/MutualTLS'
+        rateLimit:
+          $ref: '#/components/schemas/RateLimit'
+        serviceDiscovery:
+          $ref: '#/components/schemas/ServiceDiscovery'
+        test:
+          $ref: '#/components/schemas/Test'
+        url:
+          type: string
       type: object
     UptimeTests:
       properties:
@@ -6177,6 +7100,13 @@ components:
           type: object
         schema_b64:
           type: string
+      type: object
+    ValidateRequest:
+      properties:
+        enabled:
+          type: boolean
+        errorResponseCode:
+          type: integer
       type: object
     ValidateRequestMeta:
       properties:
@@ -6322,6 +7252,54 @@ components:
           example: success
           type: string
       type: object
+    VersionToID:
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+      type: object
+    Versioning:
+      properties:
+        default:
+          type: string
+        enabled:
+          type: boolean
+        fallbackToDefault:
+          type: boolean
+        key:
+          type: string
+        location:
+          type: string
+        name:
+          type: string
+        stripVersioningData:
+          type: boolean
+        urlVersioningPattern:
+          type: string
+        versions:
+          items:
+            $ref: '#/components/schemas/VersionToID'
+          nullable: true
+          type: array
+      type: object
+    VirtualEndpoint:
+      properties:
+        body:
+          type: string
+        enabled:
+          type: boolean
+        functionName:
+          type: string
+        name:
+          type: string
+        path:
+          type: string
+        proxyOnError:
+          type: boolean
+        requireSession:
+          type: boolean
+      type: object
     VirtualMeta:
       properties:
         disabled:
@@ -6343,6 +7321,17 @@ components:
           type: string
         use_session:
           type: boolean
+      type: object
+    XTykAPIGateway:
+      properties:
+        info:
+          $ref: '#/components/schemas/Info'
+        middleware:
+          $ref: '#/components/schemas/Middleware'
+        server:
+          $ref: '#/components/schemas/Server'
+        upstream:
+          $ref: '#/components/schemas/Upstream'
       type: object
   securitySchemes:
     api_key:

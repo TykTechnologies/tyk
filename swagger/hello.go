@@ -18,17 +18,34 @@ const (
 // Done
 func HealthEndpoint(r *openapi3.Reflector) error {
 	addTag(helloTag, helloTagDesc, optionalTagParameters{})
-	oc, err := r.NewOperationContext(http.MethodGet, "/tyk/hello")
+	op, err := NewOperationWithSafeExample(r, SafeOperation{
+		Method:      http.MethodGet,
+		PathPattern: "/hello",
+		OperationID: "hello",
+		Tag:         helloTag,
+	})
 	if err != nil {
 		return err
 	}
-	oc.SetTags(helloTag)
-	oc.SetID("hello")
+	oc := op.oc
 	oc.SetSummary("Check the Health of the Tyk Gateway")
 	oc.SetDescription("From v2.7.5 you can now rename the `/hello`  endpoint by using the `health_check_endpoint_name` option\n        \n        Returns 200 response in case of success")
-	oc.AddRespStructure(new(apidef.HealthCheckResponse), openapi.WithHTTPStatus(http.StatusOK), func(cu *openapi.ContentUnit) {
+	op.AddRespWithExample(healthCheckResponse, http.StatusOK, func(cu *openapi.ContentUnit) {
 		cu.Description = "Success"
 	})
-	oc.AddRespStructure(new(apiStatusMessage), openapi.WithHTTPStatus(http.StatusMethodNotAllowed))
-	return r.AddOperation(oc)
+	op.AddGenericErrorResponse(http.StatusMethodNotAllowed, "Method Not Allowed")
+	return op.AddOperation()
+}
+
+var healthCheckResponse = apidef.HealthCheckResponse{
+	Status:      apidef.Pass,
+	Version:     "v5.5.0-dev",
+	Description: "Tyk GW",
+	Details: map[string]apidef.HealthCheckItem{
+		"redis": {
+			Status:        apidef.Pass,
+			ComponentType: "datastore",
+			Time:          "2020-05-19T03:42:55+01:00",
+		},
+	},
 }

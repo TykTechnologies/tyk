@@ -23,6 +23,7 @@ const (
 	applicationOctetStream     = "application/octet-stream"
 	applicationJSON            = "application/json"
 	oasExample                 = "oasExample"
+	oasExampleList             = "oasExampleList"
 	certificateMetaExample     = "certificateMetaExample"
 	certificateMetaListExample = "certificateMetaListExample"
 	certIdList                 = "certIdList"
@@ -73,6 +74,7 @@ func RefExamples(r *openapi3.Reflector) {
 	addRefExample(r, certIdList, certListId)
 	addRefExample(r, certificateBasicList, certificateBasic)
 	addRefExample(r, policiesExample, policies)
+	addRefExample(r, oasExampleList, []map[string]interface{}{oasSample(OasSampleString())})
 	///addRefExample(r,policyRequestObject,minimalPolicies)
 	// addRefExample(r, stringOasExample, OasSampleString())
 

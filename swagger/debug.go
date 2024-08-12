@@ -12,23 +12,33 @@ import (
 const debugTag = "Debug"
 
 func DebugApi(r *openapi3.Reflector) error {
-	oc, err := r.NewOperationContext(http.MethodPost, "/tyk/debug")
+	op, err := NewOperationWithSafeExample(r, SafeOperation{
+		Method:      http.MethodPost,
+		PathPattern: "/tyk/debug",
+		OperationID: "debugApiDefinition",
+		Tag:         debugTag,
+	})
 	if err != nil {
 		return err
 	}
-	oc.SetTags(debugTag)
-	oc.SetID("debugApiDefinition")
-	forbidden(oc)
-	statusBadRequest(oc, "Request malformed , missing spec field or missing request field")
-	oc.AddReqStructure(new(traceRequest), func(cu *openapi.ContentUnit) {
-	})
+	oc := op.oc
+	op.StatusBadRequest("Request malformed")
+	op.AddReqWithSeparateExample(new(traceRequest), map[string]interface{}{"spec": minimalApis[0], "request": traceHttpRequest{
+		Method: "GET",
+		Path:   "/update-listen-path",
+	}})
 	oc.SetSummary("Test an an API definition")
 	oc.SetDescription("Used to test API definition by sending sample request and analysing output of both response and logs")
-	statusInternalServerError(oc, "Unexpected failure")
-	oc.AddRespStructure(new(traceResponse), func(cu *openapi.ContentUnit) {
+	op.StatusInternalServerError("Unexpected failure:")
+	op.AddRespWithExample(traceResponse{
+		Message:  "ok",
+		Response: "====== Request ======\nGET / HTTP/1.1\r\nHost: httpbin.org\r\n\r\n\n====== Response...",
+		Logs:     "{\"level\":\"warning\",\"msg\":\"Legacy path detected! Upgrade to extended....",
+	}, http.StatusOK, func(cu *openapi.ContentUnit) {
 		cu.Description = "Success tracing request"
 	})
-	return r.AddOperation(oc)
+
+	return op.AddOperation()
 }
 
 type traceRequest struct {
@@ -39,8 +49,8 @@ type traceRequest struct {
 type traceHttpRequest struct {
 	Method  string      `json:"method" example:"GET"`
 	Path    string      `json:"path" example:"/keyless-test/"`
-	Body    string      `json:"body"`
-	Headers http.Header `json:"headers"`
+	Body    string      `json:"body,omitempty"`
+	Headers http.Header `json:"headers,omitempty"`
 }
 
 type traceResponse struct {

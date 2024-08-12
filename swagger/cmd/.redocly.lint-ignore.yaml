@@ -4,6 +4,8 @@ swagger.yml:
   no-ambiguous-paths:
     - '#/paths/~1tyk~1apis~1oas~1{apiID}'
   no-invalid-media-type-examples:
+    - >-
+      #/paths/~1tyk~1apis~1oas/get/responses/200/content/application~1json/schema
     - '#/paths/~1tyk~1apis~1oas/post/requestBody/content/application~1json/schema'
     - >-
       #/paths/~1tyk~1apis~1oas~1{apiID}/get/responses/200/content/application~1json/schema

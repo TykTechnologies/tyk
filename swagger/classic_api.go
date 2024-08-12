@@ -232,11 +232,6 @@ func getApiVersions(r *openapi3.Reflector) error {
 	return oc.AddOperation()
 }
 
-func apIIDParameter() openapi3.ParameterOrRef {
-	var example interface{} = "keyless"
-	return openapi3.Parameter{Description: StringPointerValue("The API ID"), In: openapi3.ParameterInPath, Example: &example, Name: "apiID", Required: &isRequired, Schema: stringSchema()}.ToParameterOrRef()
-}
-
 func addApiPostQueryParamv2(oc *OperationWithExample) {
 	oc.AddQueryParameter("base_api_id", "The base API which the new version will be linked to.", OptionalParameterValues{
 		Example: valueToInterface("663a4ed9b6be920001b191ae"),
@@ -244,14 +239,6 @@ func addApiPostQueryParamv2(oc *OperationWithExample) {
 	oc.AddQueryParameter("base_api_version_name", "The version name of the base API while creating the first version. This doesn't have to be sent for the next versions but if it is set, it will override base API version name.", OptionalParameterValues{Example: valueToInterface("Default")})
 	oc.AddQueryParameter("new_version_name", "The version name of the created version.", OptionalParameterValues{Example: valueToInterface("v2")})
 	oc.AddQueryParameter("set_default", "If true, the new version is set as default version.", OptionalParameterValues{Type: openapi3.SchemaTypeBoolean, Example: valueToInterface(true)})
-}
-
-func searchTextQuery() openapi3.ParameterOrRef {
-	return openapi3.Parameter{Description: StringPointerValue("Search for API version name"), In: openapi3.ParameterInQuery, Name: "searchText", Required: &isOptional, Schema: stringSchema()}.ToParameterOrRef()
-}
-
-func accessTypeQuery() openapi3.ParameterOrRef {
-	return openapi3.Parameter{Description: StringPointerValue("Filter for internal or external API versions"), In: openapi3.ParameterInQuery, Name: "accessType", Required: &isOptional, Schema: stringEnumSchema("internal", "external")}.ToParameterOrRef()
 }
 
 var minimalApis = []struct {
