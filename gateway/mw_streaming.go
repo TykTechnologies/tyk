@@ -25,12 +25,12 @@ var globalStreamCounter atomic.Int64
 // StreamingMiddleware is a middleware that handles streaming functionality
 type StreamingMiddleware struct {
 	*BaseMiddleware
-	consumerGroupManagers sync.Map // Map of consumer group IDs to ConsumerGroupManager
-	connections           sync.Map // Map of streamID to map of connectionID to connection
-	ctx                   context.Context
-	cancel                context.CancelFunc
-	allowedUnsafe         []string
-	gcTicker              *time.Ticker
+	consumerGroupManagers       sync.Map // Map of consumer group IDs to ConsumerGroupManager
+	connections                 sync.Map // Map of streamID to map of connectionID to connection
+	ctx                         context.Context
+	cancel                      context.CancelFunc
+	allowedUnsafe               []string
+	gcTicker                    *time.Ticker
 	defaultConsumerGroupManager *ConsumerGroupManager
 }
 
@@ -213,18 +213,23 @@ func (s *StreamingMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 
 	s.Logger().Debugf("Processing request: %s, %s", r.URL.Path, strippedPath)
 
-	consumerGroup := s.getConsumerGroup(r)
-	consumerGroupManager := s.getConsumerGroupManager(consumerGroup)
-
 	newRequest := r.Clone(r.Context())
 	newRequest.URL.Path = strippedPath
 
 	var match mux.RouteMatch
-	if consumerGroupManager.muxer.Match(newRequest, &match) {
+	// First do the check if such route is defined by streaming API
+	if s.defaultConsumerGroupManager.muxer.Match(newRequest, &match) {
 		pathRegexp, _ := match.Route.GetPathRegexp()
 		s.Logger().Debugf("Matched stream: %v", pathRegexp)
 		handler, _ := match.Handler.(http.HandlerFunc)
 		if handler != nil {
+			// Now that we know that such streaming endpoint here,
+			// we can actually initializing individual consumer group manager
+			consumerGroup := s.getConsumerGroup(r)
+			consumerGroupManager := s.getConsumerGroupManager(consumerGroup)
+			consumerGroupManager.muxer.Match(newRequest, &match)
+			handler, _ := match.Handler.(http.HandlerFunc)
+
 			handler.ServeHTTP(w, r)
 			return nil, mwStatusRespond
 		}
