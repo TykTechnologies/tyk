@@ -510,7 +510,7 @@ func (c *countingStorageHandler) GetKeysAndValuesWithFilter(s string) map[string
 	return nil
 }
 
-func (c *countingStorageHandler) DeleteKeys(keys []string) bool {
+func (c *countingStorageHandler) DeleteKeys(_ []string) bool {
 	return false
 }
 

@@ -79,8 +79,7 @@ func (b *DefaultSessionManager) ResetQuota(keyName string, session *user.Session
 
 	// Clear the rate limiter and
 	// Fix the raw key
-	keys := make([]string, 0)
-	keys = append(keys, rateLimiterSentinelKey, rawKey)
+	keys := []string{rateLimiterSentinelKey, rawKey}
 	for _, acl := range session.AccessRights {
 		if acl.AllowanceScope == "" {
 			continue
