@@ -92,10 +92,9 @@ func deleteKeyRequest(r *openapi3.Reflector) error {
 	oc.SetSummary("Delete Key")
 	oc.SetDescription("Deleting a key will remove it permanently from the system, however analytics relating to that key will still be available.")
 	op.AddQueryParameter("hashed", "Use the hash of the key as input instead of the full key", OptionalParameterValues{
-		Example: valueToInterface(true),
+		Example: valueToInterface(false),
 		Type:    openapi3.SchemaTypeBoolean,
 		Enum:    []interface{}{true, false},
-		Default: nil,
 	})
 	op.AddPathParameter("keyID", "The Key ID", OptionalParameterValues{
 		Example: valueToInterface("5e9d9544a1dcd60001d0ed20e7f75f9e03534825b7aef9df749582e5"),
@@ -141,29 +140,49 @@ func putKeyRequest(r *openapi3.Reflector) error {
 	// isHashed := r.URL.Query().Get("hashed") != ""
 	// isUserName := r.URL.Query().Get("username") == "true"
 	// orgID := r.URL.Query().Get("org_id")
-	oc, err := r.NewOperationContext(http.MethodPut, "/tyk/keys/{keyID}")
+	op, err := NewOperationWithSafeExample(r, SafeOperation{
+		Method:      http.MethodPut,
+		PathPattern: "/tyk/keys/{keyID}",
+		OperationID: "updateKey",
+		Tag:         KeysTag,
+	})
 	if err != nil {
 		return err
 	}
-	oc.AddReqStructure(new(user.SessionState))
+	oc := op.oc
+	requestBody := minimalSessionState[0]
+	requestBody.Tags = append(requestBody.Tags, "update-sample-tag")
+	requestBody.MetaData["new-update-key-sample"] = "update-key-sample"
+	op.AddReqWithSeparateExample(user.SessionState{}, requestBody)
 	oc.SetSummary("Update Key")
 	oc.SetDescription(" You can also manually add keys to Tyk using your own key-generation algorithm. It is recommended if using this approach to ensure that the OrgID being used in the API Definition and the key data is blank so that Tyk does not try to prepend or manage the key in any way.")
-	oc.AddRespStructure(new(apiModifyKeySuccess), func(cu *openapi.ContentUnit) {
+	op.AddRespWithExample(apiModifyKeySuccess{
+		Key:    "5e9d9544a1dcd60001d0ed20766d9a6ec6b4403b93a554feefef4708",
+		Status: "ok",
+		Action: "modified",
+	}, http.StatusOK, func(cu *openapi.ContentUnit) {
 		cu.Description = "Key updated"
 	})
-	oc.SetID("updateKey")
-	oc.SetTags(KeysTag)
-	statusBadRequest(oc, "Malformed request")
-	statusNotFound(oc, "Key not found")
-	statusInternalServerError(oc, "Unexpected error")
-	forbidden(oc)
-	o3, ok := oc.(openapi3.OperationExposer)
-	if !ok {
-		return ErrOperationExposer
-	}
-	par := []openapi3.ParameterOrRef{keyIDParameter(), suppressResetQuery(), hashedQuery()}
-	o3.Operation().WithParameters(par...)
-	return r.AddOperation(oc)
+	op.StatusBadRequest("Request malformed")
+	op.StatusNotFound("Key is not found", func(cu *openapi.ContentUnit) {
+		cu.Description = "Key not found"
+	})
+	op.StatusInternalServerError("Failed to create key, ensure security settings are correct.")
+
+	op.AddQueryParameter("suppress_reset", "Adding the suppress_reset parameter and setting it to 1, will cause Tyk not to reset the quota limit that is in the current live quota manager. By default Tyk will reset the quota in the live quota manager (initialising it) when adding a key. Adding the `suppress_reset` flag to the URL parameters will avoid this behaviour.", OptionalParameterValues{
+		Example: valueToInterface("1"),
+
+		Enum: []interface{}{"1"},
+	})
+	op.AddQueryParameter("hashed", "when set to true the key_hash returned will be similar to the un hashed key name", OptionalParameterValues{
+		Example: valueToInterface(true),
+		Type:    openapi3.SchemaTypeBoolean,
+		Enum:    []interface{}{true, false},
+	})
+	op.AddPathParameter("keyID", "ID of the key you want to update", OptionalParameterValues{
+		Example: valueToInterface("5e9d9544a1dcd60001d0ed20766d9a6ec6b4403b93a554feefef4708"),
+	})
+	return op.AddOperation()
 }
 
 func postKeyRequest(r *openapi3.Reflector) error {
@@ -276,69 +295,68 @@ func createKeyRequest(r *openapi3.Reflector) error {
 
 func previewKeyRequest(r *openapi3.Reflector) error {
 	// TODO::in the code we do not check for applyPolicies errors
-	oc, err := r.NewOperationContext(http.MethodPost, "/tyk/keys/preview")
+	op, err := NewOperationWithSafeExample(r, SafeOperation{
+		Method:      http.MethodPost,
+		PathPattern: "/tyk/keys/preview",
+		OperationID: "validateAKeyDefinition",
+		Tag:         KeysTag,
+	})
 	if err != nil {
 		return err
 	}
-	oc.SetTags(KeysTag)
-	oc.SetID("validateAKeyDefinition")
+	oc := op.oc
 	oc.SetSummary("This will validate key a definition")
 	oc.SetDescription("This will check if the body of a key definition is valid.And return a response with how the key would look like if you create it")
-	oc.AddReqStructure(new(user.SessionState))
-	oc.AddRespStructure(new(user.SessionState), func(cu *openapi.ContentUnit) {
+	op.AddReqWithSeparateExample(user.SessionState{}, minimalSessionState[0])
+	op.AddResponseWithSeparateExample(user.SessionState{}, http.StatusOK, minimalSessionState[0], func(cu *openapi.ContentUnit) {
 		cu.Description = "Key definition is valid"
 	})
-	statusInternalServerError(oc, "malformed request body")
-	forbidden(oc)
-	// TODO::ask why this return status 500 for wrong body
-	return r.AddOperation(oc)
+	op.StatusInternalServerError("Unmarshalling failed")
+	return op.AddOperation()
 }
 
 // Done
 func updateKeyPolicy(r *openapi3.Reflector) error {
-	oc, err := r.NewOperationContext(http.MethodPost, "/tyk/keys/policy/{keyID}")
+	op, err := NewOperationWithSafeExample(r, SafeOperation{
+		Method:      http.MethodPost,
+		PathPattern: "/tyk/keys/policy/{keyID}",
+		OperationID: "setPoliciesToHashedKey",
+		Tag:         KeysTag,
+	})
 	if err != nil {
 		return err
 	}
-	oc.SetTags(KeysTag)
-	oc.SetID("setPoliciesToHashedKey")
+	oc := op.oc
 	oc.SetSummary("Set policies for a hashed key.")
 	oc.SetDescription("This will set policies  to a hashed key")
-	oc.AddReqStructure(new(gateway.PolicyUpdateObj))
-	oc.AddRespStructure(new(apiModifyKeySuccess), func(cu *openapi.ContentUnit) {
+	op.AddReqWithExample(gateway.PolicyUpdateObj{
+
+		ApplyPolicies: []string{"5ead7120575961000181867e"},
+	})
+	op.AddRespWithExample(apiModifyKeySuccess{
+		Key:    "5e9d9544a1dcd60001d0ed207eb558517c3c48fb826c62cc6f6161eb",
+		Status: "ok",
+		Action: "updated",
+	}, http.StatusOK, func(cu *openapi.ContentUnit) {
 		cu.Description = "Updated hashed key"
 	})
-	statusBadRequest(oc, "malformed request body")
-	forbidden(oc)
-	statusNotFound(oc, "Key not found")
-	statusInternalServerError(oc, "Unexpected error")
-	o3, ok := oc.(openapi3.OperationExposer)
-	if !ok {
-		return ErrOperationExposer
-	}
-	par := []openapi3.ParameterOrRef{keyIDParameter()}
-	o3.Operation().WithParameters(par...)
-	return r.AddOperation(oc)
+	op.StatusBadRequest("Couldn't decode instruction", func(cu *openapi.ContentUnit) {
+		cu.Description = "malformed request body"
+	})
+	op.StatusNotFound("Key not found", func(cu *openapi.ContentUnit) {
+		cu.Description = "Key not found"
+	})
+	op.StatusInternalServerError("Could not write key data")
+	op.AddPathParameter("keyID", "Name to give the custom Key", OptionalParameterValues{
+		Example: valueToInterface("5e9d9544a1dcd60001d0ed207eb558517c3c48fb826c62cc6f6161eb"),
+	})
+	return op.AddOperation()
 }
 
 func keyIDParameter() openapi3.ParameterOrRef {
 	///b13d928b9972bd18
 	desc := "The Key ID"
 	return openapi3.Parameter{In: openapi3.ParameterInPath, Name: "keyID", Required: &isRequired, Description: &desc, Schema: stringSchema()}.ToParameterOrRef()
-}
-
-func hashedQuery(description ...string) openapi3.ParameterOrRef {
-	desc := "Use the hash of the key as input instead of the full key"
-	if len(description) != 0 {
-		desc = description[0]
-	}
-	return openapi3.Parameter{In: openapi3.ParameterInQuery, Name: "hashed", Description: StringPointerValue(desc), Required: &isOptional, Schema: boolSchema()}.ToParameterOrRef()
-}
-
-func suppressResetQuery() openapi3.ParameterOrRef {
-	// TODO::Check if this is a enum instead.
-	desc := "Adding the suppress_reset parameter and setting it to 1, will cause Tyk not to reset the quota limit that is in the current live quota manager. By default Tyk will reset the quota in the live quota manager (initialising it) when adding a key. Adding the `suppress_reset` flag to the URL parameters will avoid this behaviour."
-	return openapi3.Parameter{In: openapi3.ParameterInQuery, Name: "suppress_reset", Required: &isOptional, Description: &desc, Schema: stringEnumSchema("1")}.ToParameterOrRef()
 }
 
 func filterKeyQuery() openapi3.ParameterOrRef {
