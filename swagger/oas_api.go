@@ -83,7 +83,7 @@ func postOAsApi(r *openapi3.Reflector) error {
 	oc.SetDescription("Create API with OAS format\n         A single Tyk node can have its API Definitions queried, deleted and updated remotely. This functionality enables you to remotely update your Tyk definitions without having to manage the files manually.")
 	oc.SetSummary("Create API with OAS format")
 	oc.AddReqWithSeparateExample(responseSchemaWithExtension, oasSample(OasSampleString()))
-	addApiPostQueryParamv2(oc)
+	addApiPostQueryParam(oc)
 	///addExternalRefToRequest(o3)
 	return oc.AddOperation()
 }
@@ -254,7 +254,7 @@ func importApiOASPostHandler(r *openapi3.Reflector) error {
 	oc.StatusInternalServerError("file object creation failed, write error")
 	oc.StatusBadRequest("the import payload should not contain x-tyk-api-gateway")
 	importAndPatchQueryParameters(oc)
-	addApiPostQueryParamv2(oc)
+	addApiPostQueryParam(oc)
 	oc.AddReqWithSeparateExample(responseSchema, oasSample(OasNoXTykSample()))
 	return oc.AddOperation()
 }
@@ -345,6 +345,7 @@ func deleteOASHandler(r *openapi3.Reflector) error {
 }
 
 func apiOASPatchHandler(r *openapi3.Reflector) error {
+	// TODO;//check this quesry parameters
 	oc, err := NewOperationWithSafeExample(r, SafeOperation{
 		Method:      http.MethodPatch,
 		PathPattern: "/tyk/apis/oas/{apiID}",
@@ -354,10 +355,16 @@ func apiOASPatchHandler(r *openapi3.Reflector) error {
 	if err != nil {
 		return err
 	}
-	oc.StatusInternalServerError("Unexpected error")
-	oc.StatusBadRequest("Malformed request")
-	oc.StatusNotFound("API not found")
-	oc.AddResp(apiModifyKeySuccess{}, http.StatusOK, func(cu *openapi.ContentUnit) {
+	oc.StatusInternalServerError("file object creation failed, write error")
+	oc.StatusBadRequest("Must specify an apiID to patch")
+	oc.StatusNotFound("API not found", func(cu *openapi.ContentUnit) {
+		cu.Description = "API not found"
+	})
+	oc.AddResp(apiModifyKeySuccess{
+		Key:    "4c1c0d8fc885401053ddac4e39ef676b",
+		Status: "ok",
+		Action: "modified",
+	}, http.StatusOK, func(cu *openapi.ContentUnit) {
 		cu.Description = "API patched"
 	})
 	oc.SetSummary("Patch API with OAS format.")

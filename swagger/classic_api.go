@@ -177,7 +177,7 @@ func createClassicApiRequest(r *openapi3.Reflector) error {
 	})
 
 	op.StatusBadRequest("Request malformed")
-	addApiPostQueryParamv2(op)
+	addApiPostQueryParam(op)
 	return op.AddOperation()
 }
 
@@ -232,7 +232,7 @@ func getApiVersions(r *openapi3.Reflector) error {
 	return oc.AddOperation()
 }
 
-func addApiPostQueryParamv2(oc *OperationWithExample) {
+func addApiPostQueryParam(oc *OperationWithExample) {
 	oc.AddQueryParameter("base_api_id", "The base API which the new version will be linked to.", OptionalParameterValues{
 		Example: valueToInterface("663a4ed9b6be920001b191ae"),
 	})

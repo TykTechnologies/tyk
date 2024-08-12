@@ -927,7 +927,7 @@ paths:
           content:
             application/json:
               example:
-                message: Malformed request
+                message: Must specify an apiID to patch
                 status: error
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
@@ -949,12 +949,12 @@ paths:
                 status: error
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: Not Found
+          description: API not found
         "500":
           content:
             application/json:
               example:
-                message: Unexpected error
+                message: file object creation failed, write error
                 status: error
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
