@@ -1,6 +1,6 @@
 module github.com/TykTechnologies/tyk
 
-go 1.22.5
+go 1.22.6
 
 require (
 	github.com/Jeffail/tunny v0.1.4
