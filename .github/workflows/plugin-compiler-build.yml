@@ -11,7 +11,7 @@ on:
       - 'v*'
 
 env:
-  GOLANG_CROSS: 1.22-bookworm
+  GOLANG_CROSS: 1.22-bullseye
 
 jobs:
   docker-build:
