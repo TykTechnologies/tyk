@@ -7,12 +7,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/TykTechnologies/tyk/internal/redis"
-
 	"github.com/sirupsen/logrus"
 
+	"github.com/TykTechnologies/tyk/internal/redis"
 	"github.com/TykTechnologies/tyk/internal/uuid"
-
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/user"
 )
@@ -80,12 +78,7 @@ func (b *DefaultSessionManager) ResetQuota(keyName string, session *user.Session
 	// Clear the rate limiter and
 	// Fix the raw key
 	keys := []string{rateLimiterSentinelKey, rawKey}
-	for _, acl := range session.AccessRights {
-		if acl.AllowanceScope == "" {
-			continue
-		}
-		keys = append(keys, QuotaKeyPrefix+acl.AllowanceScope+"-"+keyName)
-	}
+	keys = rawKeysWithAllowanceScope(keyName, session, keys)
 	type clientProvider interface {
 		Client() (redis.UniversalClient, error)
 	}
@@ -103,6 +96,16 @@ func (b *DefaultSessionManager) ResetQuota(keyName string, session *user.Session
 
 	ctx := context.TODO()
 	client.Del(ctx, keys...)
+}
+
+func rawKeysWithAllowanceScope(keyName string, session *user.SessionState, keys []string) []string {
+	for _, acl := range session.AccessRights {
+		if acl.AllowanceScope == "" {
+			continue
+		}
+		keys = append(keys, QuotaKeyPrefix+acl.AllowanceScope+"-"+keyName)
+	}
+	return keys
 }
 
 func (b *DefaultSessionManager) deleteRawKeysWithAllowanceScope(store storage.Handler, session *user.SessionState, keyName string) {

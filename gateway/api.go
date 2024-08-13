@@ -1957,7 +1957,7 @@ func (gw *Gateway) createKeyHandler(w http.ResponseWriter, r *http.Request) {
 			"status": "fail",
 			"err":    err,
 		}).Error("Key creation failed.")
-		doJSONWrite(w, http.StatusInternalServerError, apiError("Unmarshalling faileddd"))
+		doJSONWrite(w, http.StatusInternalServerError, apiError("Unmarshalling failed"))
 		return
 	}
 

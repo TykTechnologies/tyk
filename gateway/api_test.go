@@ -591,9 +591,7 @@ func TestKeyHandler_UpdateKey(t *testing.T) {
 }
 
 func BenchmarkKeyHandler_CreateKeyHandler(b *testing.B) {
-	ts := StartTest(func(globalConf *config.Config) {
-
-	})
+	ts := StartTest(nil)
 
 	defer ts.Close()
 
