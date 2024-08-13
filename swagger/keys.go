@@ -114,9 +114,7 @@ func getListOfKeys(r *openapi3.Reflector) error {
 		return err
 	}
 	oc := op.oc
-	oc.AddRespStructure(new(apiAllKeys), func(cu *openapi.ContentUnit) {
-		cu.Description = "List of all API keys"
-	})
+
 	op.AddRespWithExample(apiAllKeys{APIKeys: []string{
 		"5e9d9544a1dcd60001d0ed2008500e44fa644f939b640a4b8b4ea58c",
 	}}, http.StatusOK, func(cu *openapi.ContentUnit) {
@@ -356,12 +354,6 @@ func keyIDParameter() openapi3.ParameterOrRef {
 	///b13d928b9972bd18
 	desc := "The Key ID"
 	return openapi3.Parameter{In: openapi3.ParameterInPath, Name: "keyID", Required: &isRequired, Description: &desc, Schema: stringSchema()}.ToParameterOrRef()
-}
-
-func filterKeyQuery() openapi3.ParameterOrRef {
-	var example interface{} = "default*"
-	desc := "Retrieves all keys starting with the specified filter(filter is a prefix - e.g. default* or default will return all keys starting with default  like defaultbd,defaulttwo etc).We don't use filter for hashed keys"
-	return openapi3.Parameter{Example: &example, In: openapi3.ParameterInQuery, Name: "filter", Required: &isOptional, Description: &desc, Schema: stringSchema()}.ToParameterOrRef()
 }
 
 var minimalSessionState = []struct {

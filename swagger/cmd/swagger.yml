@@ -3152,12 +3152,27 @@ paths:
         "200":
           content:
             application/json:
+              example:
+                keys:
+                - 5e9d9544a1dcd60001d0ed2008500e44fa644f939b640a4b8b4ea58c
               schema:
                 $ref: '#/components/schemas/ApiAllKeys'
-          description: ' List of all org keys'
+          description: List of all org keys
+        "403":
+          content:
+            application/json:
+              example:
+                message: Attempted administrative access with invalid or missing key!
+                status: error
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Forbidden
         "404":
           content:
             application/json:
+              example:
+                message: ORG not found
+                status: error
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
           description: ORG not found
@@ -3171,6 +3186,7 @@ paths:
       operationId: deleteOrgKey
       parameters:
       - description: The Key ID
+        example: e389ae00a2b145feaf28d6cc11f0f86d
         in: path
         name: keyID
         required: true
@@ -3180,27 +3196,40 @@ paths:
         "200":
           content:
             application/json:
+              example:
+                action: deleted
+                key: e389ae00a2b145feaf28d6cc11f0f86d
+                status: ok
               schema:
                 $ref: '#/components/schemas/ApiModifyKeySuccess'
           description: OK
         "400":
           content:
             application/json:
+              example:
+                message: Failed to remove the key
+                status: error
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
           description: Bad Request
         "403":
           content:
             application/json:
+              example:
+                message: Attempted administrative access with invalid or missing key!
+                status: error
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
           description: Forbidden
         "404":
           content:
             application/json:
+              example:
+                message: Org not found
+                status: error
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: Not Found
+          description: Org not found
       summary: Delete Key
       tags:
       - Organisation Quotas
@@ -3209,7 +3238,15 @@ paths:
         up to date rate limit and quota usage numbers.
       operationId: getOrgKey
       parameters:
+      - description: The Org ID
+        example: 664a14650619d40001f1f00f
+        in: query
+        name: orgID
+        required: false
+        schema:
+          type: string
       - description: The Key ID
+        example: e389ae00a2b145feaf28d6cc11f0f86d
         in: path
         name: keyID
         required: true
@@ -3219,18 +3256,155 @@ paths:
         "200":
           content:
             application/json:
+              example:
+                access_rights:
+                  itachi-api:
+                    allowed_urls:
+                    - methods:
+                      - GET
+                      url: /users
+                    api_id: 8ddd91f3cda9453442c477b06c4e2da4
+                    api_name: Itachi api
+                    limit:
+                      per: 60
+                      quota_max: 10000
+                      quota_remaining: 10000
+                      quota_renewal_rate: 3600
+                      rate: 1000
+                      throttle_interval: 10
+                      throttle_retry_limit: 10
+                    versions:
+                    - Default
+                alias: portal-key
+                allowance: 1000
+                apply_policies:
+                - 5ead7120575961000181867e
+                date_created: "2024-08-09T14:40:34.87614+03:00"
+                enable_detailed_recording: true
+                last_updated: "1723203634"
+                meta_data:
+                  new-update-key-sample: update-key-sample
+                  tyk_developer_id: 62b3fb9a1d5e4f00017226f5
+                  update: sample policy update
+                  user_type: mobile_user
+                org_id: 5e9d9544a1dcd60001d0ed20
+                per: 60
+                quota_max: 10000
+                quota_renewal_rate: 3600
+                quota_renews: 1.723207234e+09
+                rate: 1000
+                tags:
+                - security
+                - edge
+                - edge-eu
+                throttle_interval: 10
+                throttle_retry_limit: 10
               schema:
-                $ref: '#/components/schemas/SessionState'
+                properties:
+                  access_rights:
+                    additionalProperties:
+                      properties:
+                        allowed_urls:
+                          items:
+                            properties:
+                              methods:
+                                items:
+                                  type: string
+                                nullable: true
+                                type: array
+                              url:
+                                type: string
+                            type: object
+                          nullable: true
+                          type: array
+                        api_id:
+                          type: string
+                        api_name:
+                          type: string
+                        limit:
+                          properties:
+                            per:
+                              type: integer
+                            quota_max:
+                              type: integer
+                            quota_remaining:
+                              type: integer
+                            quota_renewal_rate:
+                              type: integer
+                            rate:
+                              type: integer
+                            throttle_interval:
+                              type: integer
+                            throttle_retry_limit:
+                              type: integer
+                          type: object
+                        versions:
+                          items:
+                            type: string
+                          nullable: true
+                          type: array
+                      type: object
+                    nullable: true
+                    type: object
+                  alias:
+                    type: string
+                  allowance:
+                    type: integer
+                  apply_policies:
+                    items:
+                      type: string
+                    nullable: true
+                    type: array
+                  date_created:
+                    format: date-time
+                    type: string
+                  enable_detailed_recording:
+                    type: boolean
+                  last_updated:
+                    type: string
+                  meta_data:
+                    additionalProperties:
+                      type: string
+                    nullable: true
+                    type: object
+                  org_id:
+                    type: string
+                  per:
+                    type: integer
+                  quota_max:
+                    type: integer
+                  quota_renewal_rate:
+                    type: integer
+                  quota_renews:
+                    type: integer
+                  rate:
+                    type: integer
+                  tags:
+                    items:
+                      type: string
+                    nullable: true
+                    type: array
+                  throttle_interval:
+                    type: integer
+                  throttle_retry_limit:
+                    type: integer
+                type: object
           description: OK
         "403":
           content:
             application/json:
+              example:
+                message: Attempted administrative access with invalid or missing key!
+                status: error
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
           description: Forbidden
         "404":
           content:
             application/json:
+              example:
+                message: Org not found
+                status: error
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
           description: Org not found
@@ -3243,6 +3417,7 @@ paths:
       operationId: addOrgKey
       parameters:
       - description: The Key ID
+        example: e389ae00a2b145feaf28d6cc11f0f86d
         in: path
         name: keyID
         required: true
@@ -3252,6 +3427,7 @@ paths:
           Tyk reset the organisations quota in the live quota manager, it is recommended
           to use this mechanism to reset organisation-level access if a monthly subscription
           is in place.
+        example: "1"
         in: query
         name: reset_quota
         required: false
@@ -3262,39 +3438,98 @@ paths:
       requestBody:
         content:
           application/json:
+            example:
+              access_rights:
+                itachi-api:
+                  allowed_urls:
+                  - methods:
+                    - GET
+                    url: /users
+                  api_id: 8ddd91f3cda9453442c477b06c4e2da4
+                  api_name: Itachi api
+                  limit:
+                    per: 60
+                    quota_max: 10000
+                    quota_remaining: 10000
+                    quota_renewal_rate: 3600
+                    rate: 1000
+                    throttle_interval: 10
+                    throttle_retry_limit: 10
+                  versions:
+                  - Default
+              alias: portal-key
+              allowance: 1000
+              apply_policies:
+              - 5ead7120575961000181867e
+              date_created: "2024-08-09T14:40:34.87614+03:00"
+              enable_detailed_recording: true
+              last_updated: "1723203634"
+              meta_data:
+                new-update-key-sample: update-key-sample
+                tyk_developer_id: 62b3fb9a1d5e4f00017226f5
+                update: sample policy update
+                user_type: mobile_user
+              org_id: 5e9d9544a1dcd60001d0ed20
+              per: 60
+              quota_max: 10000
+              quota_renewal_rate: 3600
+              quota_renews: 1.723207234e+09
+              rate: 1000
+              tags:
+              - security
+              - edge
+              - edge-eu
+              throttle_interval: 10
+              throttle_retry_limit: 10
             schema:
               $ref: '#/components/schemas/SessionState'
       responses:
         "200":
           content:
             application/json:
+              example:
+                action: added
+                key: e389ae00a2b145feaf28d6cc11f0f86d
+                status: ok
               schema:
                 $ref: '#/components/schemas/ApiModifyKeySuccess'
           description: OK
         "400":
           content:
             application/json:
+              example:
+                message: Request malformed
+                status: error
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
           description: Bad Request
         "403":
           content:
             application/json:
+              example:
+                message: Attempted administrative access with invalid or missing key!
+                status: error
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
           description: Forbidden
         "404":
           content:
             application/json:
+              example:
+                message: No such organisation found in Active API list
+                status: error
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
           description: Not Found
         "500":
           content:
             application/json:
+              example:
+                message: 'Error writing to key store '
+                status: error
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: Internal Server Error
+          description: Internal server error.
       summary: Create an organisation key
       tags:
       - Organisation Quotas
@@ -3305,16 +3540,11 @@ paths:
         For Gateway v2.6.0 onwards, you can now set rate limits at the organisation level by using the following fields - allowance and rate. These are the number of allowed requests for the specified per value, and need to be set to the same value. If you don't want to have organisation level rate limiting, set `rate` or `per` to zero, or don't add them to your request.
       operationId: updateOrgKey
       parameters:
-      - description: The Key ID
-        in: path
-        name: keyID
-        required: true
-        schema:
-          type: string
       - description: Adding the reset_quota parameter and setting it to 1, will cause
           Tyk reset the organisations quota in the live quota manager, it is recommended
           to use this mechanism to reset organisation-level access if a monthly subscription
           is in place.
+        example: "1"
         in: query
         name: reset_quota
         required: false
@@ -3322,9 +3552,60 @@ paths:
           enum:
           - "1"
           type: string
+      - description: The Key ID
+        example: e389ae00a2b145feaf28d6cc11f0f86d
+        in: path
+        name: keyID
+        required: true
+        schema:
+          type: string
       requestBody:
         content:
           application/json:
+            example:
+              access_rights:
+                itachi-api:
+                  allowed_urls:
+                  - methods:
+                    - GET
+                    url: /users
+                  api_id: 8ddd91f3cda9453442c477b06c4e2da4
+                  api_name: Itachi api
+                  limit:
+                    per: 60
+                    quota_max: 10000
+                    quota_remaining: 10000
+                    quota_renewal_rate: 3600
+                    rate: 1000
+                    throttle_interval: 10
+                    throttle_retry_limit: 10
+                  versions:
+                  - Default
+              alias: portal-key
+              allowance: 1000
+              apply_policies:
+              - 5ead7120575961000181867e
+              date_created: "2024-08-09T14:40:34.87614+03:00"
+              enable_detailed_recording: true
+              last_updated: "1723203634"
+              meta_data:
+                new-update-key-sample: update-key-sample
+                tyk_developer_id: 62b3fb9a1d5e4f00017226f5
+                update: sample policy update
+                user_type: mobile_user
+              org_id: 5e9d9544a1dcd60001d0ed20
+              per: 60
+              quota_max: 10000
+              quota_renewal_rate: 3600
+              quota_renews: 1.723207234e+09
+              rate: 1000
+              tags:
+              - security
+              - edge
+              - edge-eu
+              - update-sample-tag
+              throttle_interval: 10
+              throttle_retry_limit: 10
             schema:
               $ref: '#/components/schemas/SessionState'
       responses:
@@ -3337,27 +3618,39 @@ paths:
         "400":
           content:
             application/json:
+              example:
+                message: Request malformed
+                status: error
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
           description: Bad Request
         "403":
           content:
             application/json:
+              example:
+                message: Attempted administrative access with invalid or missing key!
+                status: error
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
           description: Forbidden
         "404":
           content:
             application/json:
+              example:
+                message: No such organisation found in Active API list
+                status: error
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
           description: Not Found
         "500":
           content:
             application/json:
+              example:
+                message: 'Error writing to key store '
+                status: error
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: Internal Server Error
+          description: Internal server error.
       summary: Update Organisation Key
       tags:
       - Organisation Quotas

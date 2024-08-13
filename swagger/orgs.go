@@ -30,24 +30,30 @@ func OrgsApi(r *openapi3.Reflector) error {
 
 // done
 func getOrgKeys(r *openapi3.Reflector) error {
-	oc, err := r.NewOperationContext(http.MethodGet, "/tyk/org/keys")
+	op, err := NewOperationWithSafeExample(r, SafeOperation{
+		Method:      http.MethodGet,
+		PathPattern: "/tyk/org/keys",
+		OperationID: "listOrgKeys",
+		Tag:         OrgTag,
+	})
 	if err != nil {
 		return err
 	}
-	statusNotFound(oc, "ORG not found")
-	oc.AddRespStructure(new(apiAllKeys), func(cu *openapi.ContentUnit) {
-		cu.Description = " List of all org keys"
+	oc := op.oc
+	op.StatusNotFound("ORG not found", func(cu *openapi.ContentUnit) {
+		cu.Description = "ORG not found"
 	})
-	o3, ok := oc.(openapi3.OperationExposer)
-	if !ok {
-		return ErrOperationExposer
-	}
-	oc.SetID("listOrgKeys")
+	op.AddRespWithExample(apiAllKeys{APIKeys: []string{
+		"5e9d9544a1dcd60001d0ed2008500e44fa644f939b640a4b8b4ea58c",
+	}}, http.StatusOK, func(cu *openapi.ContentUnit) {
+		cu.Description = "List of all org keys"
+	})
 	oc.SetSummary("List Organisation Keys")
-	oc.SetTags(OrgTag)
 	oc.SetDescription("You can now set rate limits at the organisation level by using the following fields - allowance and rate. These are the number of allowed requests for the specified per value, and need to be set to the same value. If you don't want to have organisation level rate limiting, set 'rate' or 'per' to zero, or don't add them to your request.")
-	o3.Operation().WithParameters(filterKeyQuery())
-	return r.AddOperation(oc)
+	op.AddQueryParameter("filter", "Retrieves all keys starting with the specified filter(filter is a prefix - e.g. default* or default will return all keys starting with default  like defaultbd,defaulttwo etc).We don't use filter for hashed keys", OptionalParameterValues{
+		Example: valueToInterface("default*"),
+	})
+	return op.AddOperation()
 }
 
 func getSingleOrgKeyWithID(r *openapi3.Reflector) error {
@@ -57,104 +63,127 @@ func getSingleOrgKeyWithID(r *openapi3.Reflector) error {
 	// isHashed := r.URL.Query().Get("hashed") != ""
 	// isUserName := r.URL.Query().Get("username") == "true"
 	// orgID := r.URL.Query().Get("org_id")
-	oc, err := r.NewOperationContext(http.MethodGet, "/tyk/org/keys/{keyID}")
+
+	op, err := NewOperationWithSafeExample(r, SafeOperation{
+		Method:      http.MethodGet,
+		PathPattern: "/tyk/org/keys/{keyID}",
+		OperationID: "getOrgKey",
+		Tag:         OrgTag,
+	})
 	if err != nil {
 		return err
 	}
-	oc.AddRespStructure(new(user.SessionState))
-	statusNotFound(oc, "Org not found")
-	oc.AddRespStructure(new(apiStatusMessage), openapi.WithHTTPStatus(http.StatusForbidden))
-	oc.SetTags(OrgTag)
-	oc.SetID("getOrgKey")
+	oc := op.oc
+	op.StatusNotFound("Org not found", func(cu *openapi.ContentUnit) {
+		cu.Description = "Org not found"
+	})
+	op.AddRespWithExample(minimalSessionState[0], http.StatusOK, func(cu *openapi.ContentUnit) {
+	})
 	oc.SetSummary("Get an Organisation Key")
 	oc.SetDescription("Get session info about specified organisation key. Should return up to date rate limit and quota usage numbers.")
-	o3, ok := oc.(openapi3.OperationExposer)
-	if !ok {
-		return ErrOperationExposer
-	}
-	par := []openapi3.ParameterOrRef{keyIDParameter()}
-	///par = append(par, getKeyQuery()...)
-	o3.Operation().WithParameters(par...)
-	return r.AddOperation(oc)
+	op.AddQueryParameter("orgID", "The Org ID", OptionalParameterValues{
+		Example: valueToInterface("664a14650619d40001f1f00f"),
+	})
+	op.AddPathParameter("keyID", "The Key ID", OptionalParameterValues{
+		Example: valueToInterface("e389ae00a2b145feaf28d6cc11f0f86d"),
+	})
+	return op.AddOperation()
 }
 
 func deleteOrgKeyRequest(r *openapi3.Reflector) error {
-	oc, err := r.NewOperationContext(http.MethodDelete, "/tyk/org/keys/{keyID}")
+	op, err := NewOperationWithSafeExample(r, SafeOperation{
+		Method:      http.MethodDelete,
+		PathPattern: "/tyk/org/keys/{keyID}",
+		OperationID: "deleteOrgKey",
+		Tag:         OrgTag,
+	})
 	if err != nil {
 		return err
 	}
-	oc.SetTags(OrgTag)
-	oc.SetID("deleteOrgKey")
+	oc := op.oc
+	op.StatusNotFound("Org not found", func(cu *openapi.ContentUnit) {
+		cu.Description = "Org not found"
+	})
+	op.StatusBadRequest("Failed to remove the key")
 	oc.AddRespStructure(new(apiModifyKeySuccess))
-	oc.AddRespStructure(new(apiStatusMessage), openapi.WithHTTPStatus(http.StatusBadRequest))
-	oc.AddRespStructure(new(apiStatusMessage), openapi.WithHTTPStatus(http.StatusNotFound))
-	oc.AddRespStructure(new(apiStatusMessage), openapi.WithHTTPStatus(http.StatusForbidden))
 	oc.SetSummary("Delete Key")
 	oc.SetDescription("Deleting a key will remove all limits from organisation. It does not affects regular keys created within organisation.")
-	o3, ok := oc.(openapi3.OperationExposer)
-	if !ok {
-		return ErrOperationExposer
-	}
-	par := []openapi3.ParameterOrRef{keyIDParameter()}
-	o3.Operation().WithParameters(par...)
-	return r.AddOperation(oc)
+	op.AddRespWithExample(apiModifyKeySuccess{
+		Key:    "e389ae00a2b145feaf28d6cc11f0f86d",
+		Status: "ok",
+		Action: "deleted",
+	}, http.StatusOK, func(cu *openapi.ContentUnit) {
+	})
+	///TODO::check what keyid really is if it is actually orgID
+	op.AddPathParameter("keyID", "The Key ID", OptionalParameterValues{
+		Example: valueToInterface("e389ae00a2b145feaf28d6cc11f0f86d"),
+	})
+	return op.AddOperation()
 }
 
 func createOrgKey(r *openapi3.Reflector) error {
 	///TODO::check query parameter reset_quota in the code
 	///TODO::check if path should be org_Id or key id
-	oc, err := r.NewOperationContext(http.MethodPost, "/tyk/org/keys/{keyID}")
+	op, err := NewOperationWithSafeExample(r, SafeOperation{
+		Method:      http.MethodPost,
+		PathPattern: "/tyk/org/keys/{keyID}",
+		OperationID: "addOrgKey",
+		Tag:         OrgTag,
+	})
 	if err != nil {
 		return err
 	}
-	oc.SetTags(OrgTag)
-	oc.SetID("addOrgKey")
+	oc := op.oc
 	oc.SetSummary("Create an organisation key")
 	oc.SetDescription("This work similar to Keys API except that Key ID is always equals Organisation ID")
-	oc.AddReqStructure(new(user.SessionState))
-	oc.AddRespStructure(new(apiModifyKeySuccess))
-	oc.AddRespStructure(new(apiStatusMessage), openapi.WithHTTPStatus(http.StatusInternalServerError))
-	oc.AddRespStructure(new(apiStatusMessage), openapi.WithHTTPStatus(http.StatusForbidden))
-	oc.AddRespStructure(new(apiStatusMessage), openapi.WithHTTPStatus(http.StatusNotFound))
-	oc.AddRespStructure(new(apiStatusMessage), openapi.WithHTTPStatus(http.StatusBadRequest))
-	o3, ok := oc.(openapi3.OperationExposer)
-	if !ok {
-		return ErrOperationExposer
-	}
-	par := []openapi3.ParameterOrRef{keyIDParameter(), resetQuotaKeyQuery()}
-	o3.Operation().WithParameters(par...)
-	return r.AddOperation(oc)
+	op.AddReqWithSeparateExample(new(user.SessionState), minimalSessionState[0])
+	op.StatusBadRequest("Request malformed")
+	op.StatusNotFound("No such organisation found in Active API list")
+	op.StatusInternalServerError("Error writing to key store ")
+	///TODO::check what keyid really is if it is actually orgID
+	op.AddPathParameter("keyID", "The Key ID", OptionalParameterValues{
+		Example: valueToInterface("e389ae00a2b145feaf28d6cc11f0f86d"),
+	})
+	op.AddRespWithExample(apiModifyKeySuccess{
+		Key:    "e389ae00a2b145feaf28d6cc11f0f86d",
+		Status: "ok",
+		Action: "added",
+	}, http.StatusOK)
+	op.AddQueryParameter("reset_quota", "Adding the reset_quota parameter and setting it to 1, will cause Tyk reset the organisations quota in the live quota manager, it is recommended to use this mechanism to reset organisation-level access if a monthly subscription is in place.", OptionalParameterValues{
+		Example: valueToInterface("1"),
+		Enum:    []interface{}{"1"},
+	})
+	return op.AddOperation()
 }
 
 func UpdateOrgKey(r *openapi3.Reflector) error {
-	oc, err := r.NewOperationContext(http.MethodPut, "/tyk/org/keys/{keyID}")
+	op, err := NewOperationWithSafeExample(r, SafeOperation{
+		Method:      http.MethodPut,
+		PathPattern: "/tyk/org/keys/{keyID}",
+		OperationID: "updateOrgKey",
+		Tag:         OrgTag,
+	})
 	if err != nil {
 		return err
 	}
-	oc.AddReqStructure(new(user.SessionState))
+	oc := op.oc
+	requestBody := minimalSessionState[0]
+	requestBody.Tags = append(requestBody.Tags, "update-sample-tag")
+	requestBody.MetaData["new-update-key-sample"] = "update-key-sample"
+	op.AddReqWithSeparateExample(user.SessionState{}, requestBody)
 	oc.SetSummary("Update Organisation Key")
 	oc.SetDescription("This work similar to Keys API except that Key ID is always equals Organisation ID\n\nFor Gateway v2.6.0 onwards, you can now set rate limits at the organisation level by using the following fields - allowance and rate. These are the number of allowed requests for the specified per value, and need to be set to the same value. If you don't want to have organisation level rate limiting, set `rate` or `per` to zero, or don't add them to your request.")
 	oc.AddRespStructure(new(apiModifyKeySuccess))
-	oc.SetID("updateOrgKey")
-	oc.SetTags(OrgTag)
-	oc.AddRespStructure(new(apiStatusMessage), openapi.WithHTTPStatus(http.StatusBadRequest))
-	oc.AddRespStructure(new(apiStatusMessage), openapi.WithHTTPStatus(http.StatusNotFound))
-	oc.AddRespStructure(new(apiStatusMessage), openapi.WithHTTPStatus(http.StatusInternalServerError))
-	oc.AddRespStructure(new(apiStatusMessage), openapi.WithHTTPStatus(http.StatusForbidden))
-	o3, ok := oc.(openapi3.OperationExposer)
-	if !ok {
-		return ErrOperationExposer
-	}
+	op.StatusBadRequest("Request malformed")
+	op.StatusNotFound("No such organisation found in Active API list")
+	op.StatusInternalServerError("Error writing to key store ")
 	// TODO::Check about reset quota if it is allowed here
-	par := []openapi3.ParameterOrRef{keyIDParameter(), resetQuotaKeyQuery()}
-	o3.Operation().WithParameters(par...)
-	return r.AddOperation(oc)
-}
-
-func resetQuotaKeyQuery() openapi3.ParameterOrRef {
-	isRequired := false
-	///TODO::check query parameter reset_quota in the code and make sure it is accurate also check the description
-	///TODO:: should change this to enum
-	desc := "Adding the reset_quota parameter and setting it to 1, will cause Tyk reset the organisations quota in the live quota manager, it is recommended to use this mechanism to reset organisation-level access if a monthly subscription is in place."
-	return openapi3.Parameter{In: openapi3.ParameterInQuery, Name: "reset_quota", Required: &isRequired, Description: &desc, Schema: resetQuotaSchema()}.ToParameterOrRef()
+	op.AddQueryParameter("reset_quota", "Adding the reset_quota parameter and setting it to 1, will cause Tyk reset the organisations quota in the live quota manager, it is recommended to use this mechanism to reset organisation-level access if a monthly subscription is in place.", OptionalParameterValues{
+		Example: valueToInterface("1"),
+		Enum:    []interface{}{"1"},
+	})
+	op.AddPathParameter("keyID", "The Key ID", OptionalParameterValues{
+		Example: valueToInterface("e389ae00a2b145feaf28d6cc11f0f86d"),
+	})
+	return op.AddOperation()
 }
