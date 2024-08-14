@@ -3,73 +3,33 @@ package httputil
 import (
 	"net/http"
 
+	"github.com/TykTechnologies/tyk/request"
+
 	"github.com/sirupsen/logrus"
 
 	"github.com/TykTechnologies/tyk-pump/analytics"
-	"github.com/TykTechnologies/tyk/request"
 )
 
 // AccessLogRecord is a representation of a transaction log in the Gateway
-type AccessLogRecord struct {
-	APIID    string
-	APIKey   string
-	OrgID    string
-	Latency  *analytics.Latency
-	Request  *http.Request
-	Response *http.Response
-}
+type AccessLogRecord logrus.Fields
 
 // NewAccessLogRecord returns an AccessLogRecord object
 func NewAccessLogRecord(apiID string, apiKey string, orgId string) *AccessLogRecord {
-	return &AccessLogRecord{
-		APIID:  apiID,
-		APIKey: apiKey,
-		OrgID:  orgId,
-	}
-}
-
-// Logger renders a single access log entry
-func (a *AccessLogRecord) Logger(log *logrus.Logger) *logrus.Entry {
-	// Default fields
-	fields := logrus.Fields{
-		"APIID":  a.APIID,
-		"APIKey": a.APIKey,
-		"OrgID":  a.OrgID,
+	r := &AccessLogRecord{
+		"APIID":  apiID,
+		"APIKey": apiKey,
+		"OrgID":  orgId,
 		"prefix": "access-log",
 	}
 
-	// Include latency fields if it exists
-	if a.Latency != nil {
-		fields["TotalLatency"] = a.Latency.Total
-		fields["UpstreamLatency"] = a.Latency.Upstream
-	}
-
-	// Include request fields if it exists
-	if a.Request != nil {
-		fields["ClientIP"] = request.RealIP(a.Request)
-		fields["ClientRemoteAddr"] = a.Request.RemoteAddr
-		fields["Host"] = a.Request.Host
-		fields["Method"] = a.Request.Method
-		fields["Proto"] = a.Request.Proto
-		fields["RequestURI"] = a.Request.RequestURI
-		fields["UpstreamAddress"] = a.Request.URL.Scheme + "://" + a.Request.URL.Host + a.Request.URL.RequestURI()
-		fields["UpstreamPath"] = a.Request.URL.Path
-		fields["UpstreamURI"] = a.Request.URL.RequestURI()
-		fields["UserAgent"] = a.Request.UserAgent()
-	}
-
-	// Include response field if it exists
-	if a.Response != nil {
-		fields["StatusCode"] = a.Response.StatusCode
-	}
-
-	return log.WithFields(fields)
+	return r
 }
 
 // WithLatency sets the latency of the AccessLogRecord
 func (a *AccessLogRecord) WithLatency(latency *analytics.Latency) *AccessLogRecord {
 	if latency != nil {
-		a.Latency = latency
+		(*a)["TotalLatency"] = latency.Total
+		(*a)["UpstreamLatency"] = latency.Upstream
 	}
 	return a
 }
@@ -77,7 +37,16 @@ func (a *AccessLogRecord) WithLatency(latency *analytics.Latency) *AccessLogReco
 // WithRequest sets the request of the AccessLogRecord
 func (a *AccessLogRecord) WithRequest(req *http.Request) *AccessLogRecord {
 	if req != nil {
-		a.Request = req
+		(*a)["ClientIP"] = request.RealIP(req)
+		(*a)["ClientRemoteAddr"] = req.RemoteAddr
+		(*a)["Host"] = req.Host
+		(*a)["Method"] = req.Method
+		(*a)["Proto"] = req.Proto
+		(*a)["RequestURI"] = req.RequestURI
+		(*a)["UpstreamAddress"] = req.URL.Scheme + "://" + req.URL.Host + req.URL.RequestURI()
+		(*a)["UpstreamPath"] = req.URL.Path
+		(*a)["UpstreamURI"] = req.URL.RequestURI()
+		(*a)["UserAgent"] = req.UserAgent()
 	}
 	return a
 }
@@ -85,7 +54,12 @@ func (a *AccessLogRecord) WithRequest(req *http.Request) *AccessLogRecord {
 // WithResponse sets the request of the AccessLogRecord
 func (a *AccessLogRecord) WithResponse(resp *http.Response) *AccessLogRecord {
 	if resp != nil {
-		a.Response = resp
+		(*a)["StatusCode"] = resp.StatusCode
 	}
 	return a
+}
+
+// Fields converts the AccessLogRecord as a logrus.Fields object
+func (a *AccessLogRecord) Fields() logrus.Fields {
+	return logrus.Fields(*a)
 }

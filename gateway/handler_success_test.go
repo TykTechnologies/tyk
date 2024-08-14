@@ -357,6 +357,7 @@ func BenchmarkSuccessLogTransaction(b *testing.B) {
 
 func benchmarkSuccessLogTransaction(b *testing.B, conf func(globalConf *config.Config)) {
 	b.ReportAllocs()
+	b.Helper()
 	b.ResetTimer()
 
 	ts := StartTest(conf)

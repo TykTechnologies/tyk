@@ -10,6 +10,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/sirupsen/logrus"
+
 	"github.com/TykTechnologies/tyk/storage"
 
 	"github.com/TykTechnologies/tyk/internal/graphql"
@@ -120,6 +122,25 @@ func getSessionTags(session *user.SessionState) []string {
 	tags = append(tags, session.Tags...)
 
 	return tags
+}
+
+func (s *SuccessHandler) recordAccessLog(latency analytics.Latency, log *logrus.Logger, req *http.Request, resp *http.Response) {
+	// Don't print the full token, handle as obfuscated key or hashed key for security reasons
+	hashKeys := s.Gw.GetConfig().HashKeys
+	token := ctxGetAuthToken(req)
+
+	if !hashKeys {
+		token = s.Gw.obfuscateKey(token)
+	} else {
+		token = storage.HashKey(token, hashKeys)
+	}
+
+	accessLog := httputil.NewAccessLogRecord(s.Spec.APIID, token, s.Spec.OrgID)
+	accessLog.WithLatency(&latency)
+	accessLog.WithRequest(req)
+	accessLog.WithResponse(resp)
+
+	log.WithFields(accessLog.Fields()).Info()
 }
 
 func recordGraphDetails(rec *analytics.AnalyticsRecord, r *http.Request, resp *http.Response, spec *APISpec) {
@@ -388,23 +409,7 @@ func (s *SuccessHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) *http
 		// Don't print a transaction log there is no "resp", that indicates an error.
 		// In error situations, transaction log is already printed by "handler_error.go"
 		if s.Spec.GlobalConfig.AccessLogs.Enabled {
-			// Don't print the full token, handle as obfuscated key or hashed key for security reasons
-			hashKeys := s.Gw.GetConfig().HashKeys
-			token := ctxGetAuthToken(r)
-
-			if !hashKeys {
-				token = s.Gw.obfuscateKey(token)
-			} else {
-				token = storage.HashKey(token, hashKeys)
-			}
-
-			accessLog := httputil.NewAccessLogRecord(s.Spec.APIID, token, s.Spec.OrgID)
-			accessLog.WithLatency(&latency)
-			accessLog.WithRequest(r)
-			accessLog.WithResponse(resp.Response)
-
-			logger := accessLog.Logger(log)
-			logger.Info()
+			s.recordAccessLog(latency, log, r, resp.Response)
 		}
 	}
 	log.Debug("Done proxy")

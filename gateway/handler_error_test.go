@@ -161,6 +161,8 @@ func BenchmarkErrorLogTransaction(b *testing.B) {
 
 func benchmarkErrorLogTransaction(b *testing.B, conf func(globalConf *config.Config)) {
 	b.ReportAllocs()
+	b.Helper()
+	b.ResetTimer()
 
 	ts := StartTest(conf)
 	defer ts.Close()
