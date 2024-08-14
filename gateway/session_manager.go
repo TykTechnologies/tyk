@@ -4,10 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/TykTechnologies/tyk/regexp"
 	"net/http"
 	"strings"
 	"time"
+
+	"github.com/TykTechnologies/tyk/regexp"
 
 	"github.com/TykTechnologies/drl"
 	"github.com/TykTechnologies/leakybucket"

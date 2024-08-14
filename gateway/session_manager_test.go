@@ -1,9 +1,10 @@
 package gateway
 
 import (
-	"github.com/TykTechnologies/tyk/storage"
 	"net/http"
 	"testing"
+
+	"github.com/TykTechnologies/tyk/storage"
 
 	"github.com/stretchr/testify/assert"
 
