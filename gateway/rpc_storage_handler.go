@@ -537,7 +537,7 @@ func (r *RPCStorageHandler) DeleteKey(keyName string) bool {
 }
 
 func (r *RPCStorageHandler) DeleteRawKeys(keys []string) bool {
-	ok, err := rpc.FuncClientSingleton("DeleteRawKeys", keys)
+	ret, err := rpc.FuncClientSingleton("DeleteRawKeys", keys)
 	if err != nil {
 		rpc.EmitErrorEventKv(
 			rpc.FuncClientSingletonCall,
@@ -552,8 +552,8 @@ func (r *RPCStorageHandler) DeleteRawKeys(keys []string) bool {
 			}
 		}
 	}
-
-	return ok == true
+	success, ok := ret.(bool)
+	return success && ok
 }
 
 func (r *RPCStorageHandler) DeleteAllKeys() bool {
