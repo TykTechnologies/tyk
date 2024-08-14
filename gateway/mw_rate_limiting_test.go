@@ -221,7 +221,7 @@ var rlTestCases = []rlTestCase{
 	},
 }
 
-func rlTestRunnerProvider(t *testing.T, hashKey bool, hashAlgo string, limiter string) (*Test, func()) {
+func rlTestRunnerProvider(t *testing.T, hashKey bool, hashAlgo string, limiter string) *Test {
 	ts := StartTest(func(globalConf *config.Config) {
 		globalConf.HashKeys = hashKey
 		globalConf.HashKeyFunction = hashAlgo
@@ -243,7 +243,7 @@ func rlTestRunnerProvider(t *testing.T, hashKey bool, hashAlgo string, limiter s
 	ok := ts.Gw.GlobalSessionManager.Store().DeleteAllKeys()
 	assert.True(t, ok)
 
-	return ts, ts.Close
+	return ts
 }
 
 func providerCustomRatelimitKey(t *testing.T, limiter string) {
@@ -252,8 +252,8 @@ func providerCustomRatelimitKey(t *testing.T, limiter string) {
 	for _, tc := range rlTestCases {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
-			ts, closer := rlTestRunnerProvider(t, tc.hashKey, tc.hashAlgo, limiter)
-			defer closer()
+			ts := rlTestRunnerProvider(t, tc.hashKey, tc.hashAlgo, limiter)
+			defer ts.Close()
 
 			customRateLimitKey := "portal-developer-1" + tc.hashAlgo + limiter
 
@@ -405,8 +405,8 @@ func endpointRateLimitTestHelper(t *testing.T, limiter string, beforeFn func()) 
 	for _, tc := range rlTestCases {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
-			ts, closer := rlTestRunnerProvider(t, tc.hashKey, tc.hashAlgo, limiter)
-			defer closer()
+			ts := rlTestRunnerProvider(t, tc.hashKey, tc.hashAlgo, limiter)
+			defer ts.Close()
 
 			apis := ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 				spec.UseKeylessAccess = false
