@@ -3124,12 +3124,14 @@ paths:
                   type: string
                 token:
                   description: token to be revoked
+                  example: eyJvcmciOiI1ZTIwOTFjNGQ0YWVmY2U2MGMwNGZiOTIiLCJpZCI6IjIyODQ1NmFjNmJlMjRiMzI5MTIyOTdlODQ5NTc4NjJhIiwiaCI6Im11cm11cjY0In0=
                   type: string
                 token_type_hint:
                   description: type of token to be revoked, if sent then the accepted
                     values are access_token and refresh_token. String value and optional,
                     of not provided then it will attempt to remove access and refresh
                     tokens that matches
+                  example: access_token
                   type: string
               required:
               - token

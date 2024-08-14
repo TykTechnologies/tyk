@@ -391,8 +391,8 @@ func revokeTokenHandler(r *openapi3.Reflector) error {
 	}
 	oc := op.oc
 	oc.AddReqStructure(new(struct {
-		Token         string `json:"token" formData:"token" description:"token to be revoked" required:"true"`
-		TokenTypeHint string `json:"token_type_hint" formData:"token_type_hint" description:"type of token to be revoked, if sent then the accepted values are access_token and refresh_token. String value and optional, of not provided then it will attempt to remove access and refresh tokens that matches"`
+		Token         string `json:"token" formData:"token" description:"token to be revoked" required:"true" example:"eyJvcmciOiI1ZTIwOTFjNGQ0YWVmY2U2MGMwNGZiOTIiLCJpZCI6IjIyODQ1NmFjNmJlMjRiMzI5MTIyOTdlODQ5NTc4NjJhIiwiaCI6Im11cm11cjY0In0="`
+		TokenTypeHint string `json:"token_type_hint" formData:"token_type_hint" description:"type of token to be revoked, if sent then the accepted values are access_token and refresh_token. String value and optional, of not provided then it will attempt to remove access and refresh tokens that matches" example:"access_token"`
 		ClientID      string `json:"client_id" formData:"client_id" description:"id of oauth client" required:"true" example:"2a06b398c17f46908de3dffcb71ef87df"`
 		OrgID         string `json:"org_id" formData:"org_id" example:"6492f66e6ebbc56c6a6bf022"`
 	}), func(cu *openapi.ContentUnit) {
