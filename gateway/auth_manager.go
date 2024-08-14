@@ -1,7 +1,6 @@
 package gateway
 
 import (
-	"context"
 	"encoding/base64"
 	"encoding/json"
 	"strings"
@@ -9,7 +8,6 @@ import (
 
 	"github.com/sirupsen/logrus"
 
-	"github.com/TykTechnologies/tyk/internal/redis"
 	"github.com/TykTechnologies/tyk/internal/uuid"
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/user"
@@ -78,27 +76,12 @@ func (b *DefaultSessionManager) ResetQuota(keyName string, session *user.Session
 	// Clear the rate limiter and
 	// Fix the raw key
 	keys := []string{rateLimiterSentinelKey, rawKey}
-	keys = rawKeysWithAllowanceScope(keyName, session, keys)
-	type clientProvider interface {
-		Client() (redis.UniversalClient, error)
-	}
-
-	clientFactory, ok := b.store.(clientProvider)
-	if !ok {
-		return
-	}
-
-	client, err := clientFactory.Client()
-	if err != nil {
-		log.WithError(err).Error("Error getting client in ResetQuota")
-		return
-	}
-
-	ctx := context.TODO()
-	client.Del(ctx, keys...)
+	keys = append(keys, rawKeysWithAllowanceScope(keyName, session)...)
+	b.store.DeleteRawKeys(keys)
 }
 
-func rawKeysWithAllowanceScope(keyName string, session *user.SessionState, keys []string) []string {
+func rawKeysWithAllowanceScope(keyName string, session *user.SessionState) []string {
+	keys := make([]string, 0)
 	for _, acl := range session.AccessRights {
 		if acl.AllowanceScope == "" {
 			continue
