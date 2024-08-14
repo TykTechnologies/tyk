@@ -53,6 +53,9 @@ var (
 		"DeleteKeys": func(keys []string) (bool, error) {
 			return true, nil
 		},
+		"DeleteRawKeys": func(keys []string) (bool, error) {
+			return true, nil
+		},
 		"Decrement": func(keyName string) error {
 			return nil
 		},
@@ -533,9 +536,24 @@ func (r *RPCStorageHandler) DeleteKey(keyName string) bool {
 	return ok == true
 }
 
-func (r *RPCStorageHandler) DeleteRawKeys([]string) bool {
-	log.Warning("Not implemented")
-	return false
+func (r *RPCStorageHandler) DeleteRawKeys(keys []string) bool {
+	ok, err := rpc.FuncClientSingleton("DeleteRawKeys", keys)
+	if err != nil {
+		rpc.EmitErrorEventKv(
+			rpc.FuncClientSingletonCall,
+			"DeleteKey",
+			err,
+			nil,
+		)
+
+		if r.IsRetriableError(err) {
+			if rpc.Login() {
+				return r.DeleteRawKeys(keys)
+			}
+		}
+	}
+
+	return ok == true
 }
 
 func (r *RPCStorageHandler) DeleteAllKeys() bool {
