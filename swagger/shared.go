@@ -441,7 +441,7 @@ func (op *OperationWithExample) StatusInternalServerError(message string) {
 }
 
 func (op *OperationWithExample) AddPageQueryParameter() {
-	op.AddQueryParameter("p", "Use p query parameter to say which page you want returned.Send number less than 0 to return all items", OptionalParameterValues{
+	op.AddQueryParameter("p", "Use p query parameter to say which page you want returned.", OptionalParameterValues{
 		Example: valueToInterface(1),
 		Type:    openapi3.SchemaTypeInteger,
 	})

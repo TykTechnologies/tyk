@@ -2559,7 +2559,8 @@ paths:
           content:
             application/json:
               example:
-              - client_id: 2a06b398c17f46908de3dffcb71ef87d
+              - api_id: b84fe1a04e5648927971c0557971565c
+                client_id: 2a06b398c17f46908de3dffcb71ef87df
                 description: google client
                 meta_data:
                   user_id: 362b3fb9a1d5e4f00017226f5
@@ -2590,13 +2591,15 @@ paths:
         valid until they expire.
       operationId: deleteOAuthClient
       parameters:
-      - description: The API ID
+      - description: The API id
+        example: b84fe1a04e5648927971c0557971565c
         in: path
         name: apiID
         required: true
         schema:
           type: string
       - description: The Client ID
+        example: 2a06b398c17f46908de3dffcb71ef87df
         in: path
         name: keyName
         required: true
@@ -2606,29 +2609,40 @@ paths:
         "200":
           content:
             application/json:
+              example:
+                action: deleted
+                key: 2a06b398c17f46908de3dffcb71ef87df
+                status: ok
               schema:
                 $ref: '#/components/schemas/ApiModifyKeySuccess'
           description: OAuth client deleted
         "403":
           content:
             application/json:
+              example:
+                message: Attempted administrative access with invalid or missing key!
+                status: error
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: Attempting to access a protected api with an invalid or a missing
-            X-Tyk-Authorization in the headers
+          description: Forbidden
         "404":
           content:
             application/json:
+              example:
+                message: OAuth Client ID not found
+                status: error
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: Returned when the API with the specified apiID or when the
-            client the specified keyName doesn't exist.
+          description: Not found
         "500":
           content:
             application/json:
+              example:
+                message: Delete failed
+                status: error
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: Internal server error
+          description: Internal server error.
       summary: Delete OAuth client
       tags:
       - OAuth
@@ -2636,13 +2650,15 @@ paths:
       description: Get OAuth client details tied to an api
       operationId: getOAuthClient
       parameters:
-      - description: The API ID
+      - description: The API id
+        example: b84fe1a04e5648927971c0557971565c
         in: path
         name: apiID
         required: true
         schema:
           type: string
       - description: The Client ID
+        example: 2a06b398c17f46908de3dffcb71ef87df
         in: path
         name: keyName
         required: true
@@ -2652,23 +2668,34 @@ paths:
         "200":
           content:
             application/json:
+              example:
+                client_id: 2a06b398c17f46908de3dffcb71ef87df
+                description: changed description sample
+                meta_data:
+                  user_id: 362b3fb9a1d5e4f00017226f5
+                redirect_uri: https://httpbin.org/ip
+                secret: MmQwNTI5NGQtYjU0YS00NjMyLWIwZjktNTZjY2M1ZjhjYWY0
               schema:
                 $ref: '#/components/schemas/NewClientRequest'
           description: OAuth client details
         "403":
           content:
             application/json:
+              example:
+                message: Attempted administrative access with invalid or missing key!
+                status: error
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: Attempting to access a protected api with an invalid or a missing
-            X-Tyk-Authorization in the headers
+          description: Forbidden
         "404":
           content:
             application/json:
+              example:
+                message: OAuth Client ID not found
+                status: error
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: Returned when the API with the specified apiID or when the
-            client the specified keyName doesn't exist.
+          description: OAuth Client not found
       summary: Get OAuth client
       tags:
       - OAuth
@@ -2677,57 +2704,84 @@ paths:
         ID for an OAuth client.
       operationId: updateOAuthClient
       parameters:
-      - description: The Client ID
+      - description: The API id
+        example: b84fe1a04e5648927971c0557971565c
         in: path
-        name: keyName
+        name: apiID
         required: true
         schema:
           type: string
-      - description: The API ID
+      - description: The Client ID
+        example: 2a06b398c17f46908de3dffcb71ef87df
         in: path
-        name: apiID
+        name: keyName
         required: true
         schema:
           type: string
       requestBody:
         content:
           application/json:
+            example:
+              api_id: b84fe1a04e5648927971c0557971565c
+              client_id: 2a06b398c17f46908de3dffcb71ef87df
+              description: changed description sample
+              meta_data:
+                user_id: 362b3fb9a1d5e4f00017226f5
+              redirect_uri: https://httpbin.org/ip
+              secret: MmQwNTI5NGQtYjU0YS00NjMyLWIwZjktNTZjY2M1ZjhjYWY0
             schema:
               $ref: '#/components/schemas/NewClientRequest'
       responses:
         "200":
           content:
             application/json:
+              example:
+                client_id: 2a06b398c17f46908de3dffcb71ef87df
+                description: changed description sample
+                meta_data:
+                  user_id: 362b3fb9a1d5e4f00017226f5
+                redirect_uri: https://httpbin.org/ip
+                secret: MmQwNTI5NGQtYjU0YS00NjMyLWIwZjktNTZjY2M1ZjhjYWY0
               schema:
                 $ref: '#/components/schemas/NewClientRequest'
           description: OAuth client updated
         "400":
           content:
             application/json:
+              example:
+                message: Policy access rights doesn't contain API this OAuth client
+                  belongs to
+                status: error
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: Returned when the policy access rights doesn't contain API
-            this OAuth client belongs to
+          description: Bad Request
         "403":
           content:
             application/json:
+              example:
+                message: Attempted administrative access with invalid or missing key!
+                status: error
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: Attempting to access a protected api with an invalid or a missing
-            X-Tyk-Authorization in the headers
+          description: Forbidden
         "404":
           content:
             application/json:
+              example:
+                message: API doesn't exist
+                status: error
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: Returned when api with the api_id sent in the apiID parameter  doesn't
-            exist or when the OAuth Client ID is not found
+          description: Not Found
         "500":
           content:
             application/json:
+              example:
+                message: Unmarshalling failed
+                status: error
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: internal server error
+          description: malformed request body
       summary: Update OAuth metadata,redirecturi,description and Policy ID
       tags:
       - OAuth
@@ -2736,15 +2790,17 @@ paths:
       description: Generate a new secret
       operationId: rotateOauthClient
       parameters:
-      - description: The Client ID
+      - description: The API id
+        example: b84fe1a04e5648927971c0557971565c
         in: path
-        name: keyName
+        name: apiID
         required: true
         schema:
           type: string
-      - description: The API ID
+      - description: The Client ID
+        example: 2a06b398c17f46908de3dffcb71ef87df
         in: path
-        name: apiID
+        name: keyName
         required: true
         schema:
           type: string
@@ -2752,29 +2808,43 @@ paths:
         "200":
           content:
             application/json:
+              example:
+                client_id: 2a06b398c17f46908de3dffcb71ef87df
+                description: google client
+                meta_data:
+                  user_id: 362b3fb9a1d5e4f00017226f5
+                redirect_uri: https://httpbin.org/ip
+                secret: MmQwNTI5NGQtYjU0YS00NjMyLWIwZjktNTZjY2M1ZjhjYWY0
               schema:
                 $ref: '#/components/schemas/NewClientRequest'
           description: New secret has been created
         "403":
           content:
             application/json:
+              example:
+                message: Attempted administrative access with invalid or missing key!
+                status: error
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: Attempting to access a protected api with an invalid or a missing
-            X-Tyk-Authorization in the headers
+          description: Forbidden
         "404":
           content:
             application/json:
+              example:
+                message: API doesn't exist
+                status: error
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: Returned when api with the api_id sent in the apiID parameter  doesn't
-            exist or when the OAuth Client ID is not found
+          description: Not Found
         "500":
           content:
             application/json:
+              example:
+                message: Failure in storing client data
+                status: error
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: internal server error
+          description: Internal server error.
       summary: Rotate the oath client secret
       tags:
       - OAuth
@@ -2787,21 +2857,24 @@ paths:
                 You can control how long you want to store expired tokens in this list using `oauth_token_expired_retain_period` gateway option, which specifies retain period for expired tokens stored in Redis. By default expired token not get removed. See <a href="https://tyk.io/docs/configure/tyk-gateway-configuration-options/#a-name-oauth-token-expired-retain-period-a-oauth-token-expired-retain-period" target="_blank">here</a> for more details.
       operationId: getOAuthClientTokens
       parameters:
-      - description: The API ID
+      - description: The API id
+        example: b84fe1a04e5648927971c0557971565c
         in: path
         name: apiID
         required: true
         schema:
           type: string
       - description: The Client ID
+        example: 2a06b398c17f46908de3dffcb71ef87df
         in: path
         name: keyName
         required: true
         schema:
           type: string
-      - description: The page to return
+      - description: Use p query parameter to say which page you want returned.
+        example: 1
         in: query
-        name: page
+        name: p
         required: false
         schema:
           type: integer
@@ -2820,6 +2893,9 @@ paths:
         "403":
           content:
             application/json:
+              example:
+                message: Attempted administrative access with invalid or missing key!
+                status: error
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
           description: Attempting to access a protected api with an invalid or a missing
@@ -2850,20 +2926,24 @@ paths:
       operationId: getApisForOauthApp
       parameters:
       - description: The Client ID
+        example: 2a06b398c17f46908de3dffcb71ef87df
         in: path
         name: appID
         required: true
         schema:
           type: string
-      - in: query
+      - description: The Org Id
+        in: query
         name: orgID
-        required: true
+        required: false
         schema:
           type: string
       responses:
         "200":
           content:
             application/json:
+              example:
+              - b84fe1a04e5648927971c0557971565c
               schema:
                 items:
                   type: string
@@ -2872,10 +2952,12 @@ paths:
         "403":
           content:
             application/json:
+              example:
+                message: Attempted administrative access with invalid or missing key!
+                status: error
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: Attempting to access a protected api with an invalid or a missing
-            X-Tyk-Authorization in the headers
+          description: Forbidden
       summary: Get API IDs for APIS that use the specified client_id(appID) for OAuth
       tags:
       - OAuth
@@ -2890,34 +2972,57 @@ paths:
       requestBody:
         content:
           application/json:
+            example:
+              api_id: b84fe1a04e5648927971c0557971565c
+              client_id: 2a06b398c17f46908de3dffcb71ef87df
+              description: google client
+              meta_data:
+                user_id: 362b3fb9a1d5e4f00017226f5
+              redirect_uri: https://httpbin.org/ip
+              secret: MmQwNTI5NGQtYjU0YS00NjMyLWIwZjktNTZjY2M1ZjhjYWY0
             schema:
               $ref: '#/components/schemas/NewClientRequest'
       responses:
         "200":
           content:
             application/json:
+              example:
+                client_id: 2a06b398c17f46908de3dffcb71ef87df
+                description: google client
+                meta_data:
+                  user_id: 362b3fb9a1d5e4f00017226f5
+                redirect_uri: https://httpbin.org/ip
+                secret: MmQwNTI5NGQtYjU0YS00NjMyLWIwZjktNTZjY2M1ZjhjYWY0
               schema:
                 $ref: '#/components/schemas/NewClientRequest'
           description: Client created
         "400":
           content:
             application/json:
+              example:
+                message: API doesn't exist
+                status: error
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: Bad request
+          description: Api Not found
         "403":
           content:
             application/json:
+              example:
+                message: Attempted administrative access with invalid or missing key!
+                status: error
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: Attempting to access a protected api with an invalid or a missing
-            X-Tyk-Authorization in the headers
+          description: Forbidden
         "500":
           content:
             application/json:
+              example:
+                message: Unmarshalling failed
+                status: error
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: Internal server error
+          description: Unmarshalling failed
       summary: Create new OAuth client
       tags:
       - OAuth
@@ -2928,12 +3033,14 @@ paths:
       operationId: invalidateOAuthRefresh
       parameters:
       - description: The Client ID
+        example: 2a06b398c17f46908de3dffcb71ef87df
         in: path
         name: keyName
         required: true
         schema:
           type: string
       - description: The API id
+        example: b84fe1a04e5648927971c0557971565c
         in: query
         name: api_id
         required: true
@@ -2943,35 +3050,49 @@ paths:
         "200":
           content:
             application/json:
+              example:
+                action: deleted
+                key: 2a06b398c17f46908de3dffcb71ef87df
+                status: ok
               schema:
                 $ref: '#/components/schemas/ApiModifyKeySuccess'
           description: Deleted
         "400":
           content:
             application/json:
+              example:
+                message: Missing parameter api_id
+                status: error
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: Returned when you fail to send the api_id or when OAuth is
-            not enabled on the API
+          description: missing api_Id query parameter
         "403":
           content:
             application/json:
+              example:
+                message: Attempted administrative access with invalid or missing key!
+                status: error
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: Attempting to access a protected api with an invalid or a missing
-            X-Tyk-Authorization in the headers
+          description: Forbidden
         "404":
           content:
             application/json:
+              example:
+                message: API for this refresh token not found
+                status: error
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: Returned when the API for this refresh token is not found
+          description: Not Found
         "500":
           content:
             application/json:
+              example:
+                message: Failed to invalidate refresh token
+                status: error
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: internal server error
+          description: Internal server error.
       summary: Invalidate OAuth refresh token
       tags:
       - OAuth
@@ -2986,8 +3107,10 @@ paths:
               properties:
                 client_id:
                   description: id of oauth client
+                  example: 2a06b398c17f46908de3dffcb71ef87df
                   type: string
                 org_id:
+                  example: 6492f66e6ebbc56c6a6bf022
                   type: string
                 token:
                   description: token to be revoked
@@ -3007,23 +3130,30 @@ paths:
         "200":
           content:
             application/json:
+              example:
+                message: token revoked successfully
+                status: ok
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: OK
+          description: token revoked
         "400":
           content:
             application/json:
+              example:
+                message: cannot parse form. Form malformed
+                status: error
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: Returned when you send a malformed request or when the oauth
-            client doesn't exist
+          description: malformed form data
         "403":
           content:
             application/json:
+              example:
+                message: Attempted administrative access with invalid or missing key!
+                status: error
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: Attempting to access a protected api with an invalid or a missing
-            X-Tyk-Authorization in the headers
+          description: Forbidden
       summary: revoke token
       tags:
       - OAuth
@@ -3038,11 +3168,14 @@ paths:
               properties:
                 client_id:
                   description: id of oauth client
+                  example: 2a06b398c17f46908de3dffcb71ef87df
                   type: string
                 client_secret:
                   description: OAuth client secret to ensure that its a valid operation
+                  example: MmQwNTI5NGQtYjU0YS00NjMyLWIwZjktNTZjY2M1ZjhjYWY0
                   type: string
                 org_id:
+                  example: 6492f66e6ebbc56c6a6bf022
                   type: string
               required:
               - client_secret
@@ -3052,35 +3185,48 @@ paths:
         "200":
           content:
             application/json:
+              example:
+                message: tokens revoked successfully
+                status: ok
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: tokens revoked successfully
+          description: tokens revoked
         "400":
           content:
             application/json:
+              example:
+                message: cannot parse form. Form malformed
+                status: error
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: Returned when the gateway cannot parse form data sent in request.
+          description: Bad Request
         "401":
           content:
             application/json:
+              example:
+                message: client_id is required
+                status: error
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: Returned when you fail to send a  client secret or client id
-            in you form data
+          description: missing client id
         "403":
           content:
             application/json:
+              example:
+                message: Attempted administrative access with invalid or missing key!
+                status: error
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: Attempting to access a protected api with an invalid or a missing
-            X-Tyk-Authorization in the headers
+          description: Forbidden
         "404":
           content:
             application/json:
+              example:
+                message: oauth client doesn't exist
+                status: error
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: Returned when the sent oauth client doesn't exist
+          description: not found
       summary: Revoke all client's tokens
       tags:
       - OAuth
@@ -3089,7 +3235,9 @@ paths:
       description: Purge all lapsed OAuth token
       operationId: purgeLapsedOAuthTokens
       parameters:
-      - in: query
+      - description: purge lapsed tokens
+        example: lapsed
+        in: query
         name: scope
         required: true
         schema:
@@ -3100,33 +3248,48 @@ paths:
         "200":
           content:
             application/json:
+              example:
+                message: lapsed tokens purged
+                status: ok
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
           description: lapsed tokens purged successfully
         "400":
           content:
             application/json:
+              example:
+                message: unknown scope
+                status: error
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: Returned when the scope query parameter is set to lapsed
+          description: Sending a value other than lapsed in scope query
         "403":
           content:
             application/json:
+              example:
+                message: Attempted administrative access with invalid or missing key!
+                status: error
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
           description: Forbidden
         "422":
           content:
             application/json:
+              example:
+                message: scope parameter is required
+                status: error
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: Returned when you fail to send the scope query parameter
+          description: Missing lapsed query parameter
         "500":
           content:
             application/json:
+              example:
+                message: error purging lapsed tokens
+                status: error
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: internal server error
+          description: Internal server error.
       summary: Purge lapsed OAuth tokens
       tags:
       - OAuth
@@ -6349,7 +6512,11 @@ components:
         description:
           example: google client login
           type: string
-        meta_data: {}
+        meta_data:
+          additionalProperties:
+            type: string
+          nullable: true
+          type: object
         policy_id:
           type: string
         redirect_uri:
