@@ -15,14 +15,14 @@ type AccessLogRecord logrus.Fields
 
 // NewAccessLogRecord returns an AccessLogRecord object
 func NewAccessLogRecord(apiID string, apiKey string, orgId string) *AccessLogRecord {
-	r := &AccessLogRecord{
+	a := &AccessLogRecord{
 		"APIID":  apiID,
 		"APIKey": apiKey,
 		"OrgID":  orgId,
 		"prefix": "access-log",
 	}
 
-	return r
+	return a
 }
 
 // WithLatency sets the latency of the AccessLogRecord
