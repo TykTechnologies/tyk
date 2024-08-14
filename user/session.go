@@ -112,10 +112,48 @@ type AccessDefinition struct {
 	Endpoints []Endpoint `json:"endpoints,omitempty" msg:"endpoints,omitempty"`
 }
 
+// IsEmpty checks if APILimit is empty.
 func (a APILimit) IsEmpty() bool {
-	if a.Rate != 0 || a.Per != 0 || a.ThrottleInterval != 0 || a.ThrottleRetryLimit != 0 || a.MaxQueryDepth != 0 || a.QuotaMax != 0 || a.QuotaRenews != 0 || a.QuotaRemaining != 0 || a.QuotaRenewalRate != 0 || a.SetBy != "" {
+	if a.Rate != 0 {
 		return false
 	}
+
+	if a.Per != 0 {
+		return false
+	}
+
+	if a.ThrottleInterval != 0 {
+		return false
+	}
+
+	if a.ThrottleRetryLimit != 0 {
+		return false
+	}
+
+	if a.MaxQueryDepth != 0 {
+		return false
+	}
+
+	if a.QuotaMax != 0 {
+		return false
+	}
+
+	if a.QuotaRenews != 0 {
+		return false
+	}
+
+	if a.QuotaRemaining != 0 {
+		return false
+	}
+
+	if a.QuotaRenewalRate != 0 {
+		return false
+	}
+
+	if a.SetBy != "" {
+		return false
+	}
+
 	return true
 }
 

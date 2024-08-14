@@ -2,6 +2,8 @@ package user
 
 import (
 	"encoding/json"
+	"github.com/TykTechnologies/tyk/apidef"
+	"reflect"
 	"testing"
 	"time"
 
@@ -167,4 +169,190 @@ func TestAPILimit_Duration(t *testing.T) {
 		expectedDuration := time.Duration(0)
 		assert.Equal(t, expectedDuration, limit.Duration())
 	})
+}
+
+func TestAPILimitIsEmpty(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    APILimit
+		expected bool
+	}{
+		{
+			name: "All fields zero or empty",
+			input: APILimit{
+				Rate:               0,
+				Per:                0,
+				ThrottleInterval:   0,
+				ThrottleRetryLimit: 0,
+				MaxQueryDepth:      0,
+				QuotaMax:           0,
+				QuotaRenews:        0,
+				QuotaRemaining:     0,
+				QuotaRenewalRate:   0,
+				SetBy:              "",
+			},
+			expected: true,
+		},
+		{
+			name: "Rate is non-zero",
+			input: APILimit{
+				Rate: 1,
+			},
+			expected: false,
+		},
+		{
+			name: "Per is non-zero",
+			input: APILimit{
+				Per: 1,
+			},
+			expected: false,
+		},
+		{
+			name: "ThrottleInterval is non-zero",
+			input: APILimit{
+				ThrottleInterval: 1,
+			},
+			expected: false,
+		},
+		{
+			name: "ThrottleRetryLimit is non-zero",
+			input: APILimit{
+				ThrottleRetryLimit: 1,
+			},
+			expected: false,
+		},
+		{
+			name: "MaxQueryDepth is non-zero",
+			input: APILimit{
+				MaxQueryDepth: 1,
+			},
+			expected: false,
+		},
+		{
+			name: "QuotaMax is non-zero",
+			input: APILimit{
+				QuotaMax: 1,
+			},
+			expected: false,
+		},
+		{
+			name: "QuotaRenews is non-zero",
+			input: APILimit{
+				QuotaRenews: 1,
+			},
+			expected: false,
+		},
+		{
+			name: "QuotaRemaining is non-zero",
+			input: APILimit{
+				QuotaRemaining: 1,
+			},
+			expected: false,
+		},
+		{
+			name: "QuotaRenewalRate is non-zero",
+			input: APILimit{
+				QuotaRenewalRate: 1,
+			},
+			expected: false,
+		},
+		{
+			name: "SetBy is non-empty",
+			input: APILimit{
+				SetBy: "admin",
+			},
+			expected: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.expected, tt.input.IsEmpty())
+		})
+	}
+}
+
+func TestAPILimitClone(t *testing.T) {
+	tests := []struct {
+		name  string
+		input APILimit
+	}{
+		{
+			name: "All fields zero or empty",
+			input: APILimit{
+				Rate:               0,
+				Per:                0,
+				ThrottleInterval:   0,
+				ThrottleRetryLimit: 0,
+				MaxQueryDepth:      0,
+				QuotaMax:           0,
+				QuotaRenews:        0,
+				QuotaRemaining:     0,
+				QuotaRenewalRate:   0,
+				SetBy:              "",
+				Smoothing:          nil,
+			},
+		},
+		{
+			name: "All fields set, no smoothing",
+			input: APILimit{
+				Rate:               100,
+				Per:                60,
+				ThrottleInterval:   30,
+				ThrottleRetryLimit: 5,
+				MaxQueryDepth:      10,
+				QuotaMax:           1000,
+				QuotaRenews:        500,
+				QuotaRemaining:     250,
+				QuotaRenewalRate:   120,
+				SetBy:              "user",
+				Smoothing:          nil,
+			},
+		},
+		{
+			name: "All fields set with smoothing",
+			input: APILimit{
+				Rate:               100,
+				Per:                60,
+				ThrottleInterval:   30,
+				ThrottleRetryLimit: 5,
+				MaxQueryDepth:      10,
+				QuotaMax:           1000,
+				QuotaRenews:        500,
+				QuotaRemaining:     250,
+				QuotaRenewalRate:   120,
+				SetBy:              "user",
+				Smoothing: &apidef.RateLimitSmoothing{
+					Enabled:   true,
+					Threshold: 50,
+					Trigger:   80,
+					Step:      10,
+					Delay:     5,
+				},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			clone := tt.input.Clone()
+
+			// Check that the cloned object is equal to the original
+			if !reflect.DeepEqual(tt.input, clone) {
+				t.Errorf("Clone() = %v, want %v", clone, tt.input)
+			}
+
+			// Check that modifying the clone doesn't affect the original
+			clone.Rate = 200
+			assert.NotEqual(t, tt.input, clone)
+
+			clone.SetBy = "modified"
+			assert.NotEqual(t, tt.input, clone)
+
+			if tt.input.Smoothing != nil {
+				clone.Smoothing.Enabled = false
+				assert.NotEqual(t, tt.input, clone)
+			}
+		})
+	}
 }
