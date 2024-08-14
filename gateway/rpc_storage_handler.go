@@ -533,6 +533,11 @@ func (r *RPCStorageHandler) DeleteKey(keyName string) bool {
 	return ok == true
 }
 
+func (r *RPCStorageHandler) DeleteRawKeys([]string) bool {
+	log.Warning("Not implemented")
+	return false
+}
+
 func (r *RPCStorageHandler) DeleteAllKeys() bool {
 	log.Warning("Not implementated")
 	return false

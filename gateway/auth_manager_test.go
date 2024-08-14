@@ -498,6 +498,13 @@ func (c *countingStorageHandler) DeleteRawKey(s string) bool {
 	return true
 }
 
+func (c *countingStorageHandler) DeleteRawKeys(keys []string) bool {
+	c.deleteRawKeyMutex.Lock()
+	defer c.deleteRawKeyMutex.Unlock()
+	c.deleteRawKeyCount += len(keys)
+	return true
+}
+
 func (c *countingStorageHandler) Connect() bool {
 	return false
 }
