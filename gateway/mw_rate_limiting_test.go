@@ -397,34 +397,6 @@ func TestMwRateLimiting_CustomRatelimitKeyNonTransactional(t *testing.T) {
 	providerCustomRatelimitKey(t, "NonTransactional")
 }
 
-type rlTestCase struct {
-	name     string
-	hashKey  bool
-	hashAlgo string
-}
-
-var rlTestCases = []rlTestCase{
-	{
-		name:    "hash_key false",
-		hashKey: false,
-	},
-	{
-		name:     "hash_key true murmur64",
-		hashKey:  true,
-		hashAlgo: "murmur64",
-	},
-	{
-		name:     "hash_key true murmur32",
-		hashKey:  true,
-		hashAlgo: "murmur32",
-	},
-	{
-		name:     "hash_key true sha256",
-		hashKey:  true,
-		hashAlgo: "sha256",
-	},
-}
-
 func rlTestRunnerProvider(t *testing.T, hashKey bool, hashAlgo string, limiter string) *Test {
 	ts := StartTest(func(globalConf *config.Config) {
 		globalConf.HashKeys = hashKey
@@ -451,11 +423,63 @@ func rlTestRunnerProvider(t *testing.T, hashKey bool, hashAlgo string, limiter s
 }
 
 func endpointRateLimitTestHelper(t *testing.T, limiter string, beforeFn func()) {
+	t.Helper()
+	type rlTestCase struct {
+		name     string
+		hashKey  bool
+		hashAlgo string
+	}
+
+	var rlTestCases = []rlTestCase{
+		{
+			name:    "hash_key false",
+			hashKey: false,
+		},
+		{
+			name:     "hash_key true murmur64",
+			hashKey:  true,
+			hashAlgo: "murmur64",
+		},
+		{
+			name:     "hash_key true murmur32",
+			hashKey:  true,
+			hashAlgo: "murmur32",
+		},
+		{
+			name:     "hash_key true sha256",
+			hashKey:  true,
+			hashAlgo: "sha256",
+		},
+	}
+
 	for _, tc := range rlTestCases {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
-			ts := rlTestRunnerProvider(t, tc.hashKey, tc.hashAlgo, limiter)
+			ts := StartTest(nil)
 			defer ts.Close()
+
+			globalConf := ts.Gw.GetConfig()
+
+			globalConf.HashKeys = tc.hashKey
+			globalConf.HashKeyFunction = tc.hashAlgo
+
+			switch limiter {
+			case "Redis":
+				globalConf.RateLimit.EnableRedisRollingLimiter = true
+			case "Sentinel":
+				globalConf.RateLimit.EnableSentinelRateLimiter = true
+			case "DRL":
+				globalConf.RateLimit.DRLEnableSentinelRateLimiter = true
+			case "NonTransactional":
+				globalConf.RateLimit.EnableNonTransactionalRateLimiter = true
+			default:
+				t.Fatal("There is no such a rate limiter:", limiter)
+			}
+
+			ts.Gw.SetConfig(globalConf)
+
+			ok := ts.Gw.GlobalSessionManager.Store().DeleteAllKeys()
+			assert.True(t, ok)
 
 			apis := ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 				spec.UseKeylessAccess = false
