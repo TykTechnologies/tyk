@@ -31,6 +31,9 @@ type DBAccessDefinition struct {
 	DisableIntrospection bool                         `json:"disable_introspection"`
 	FieldAccessRights    []user.FieldAccessDefinition `json:"field_access_rights"`
 	Limit                *user.APILimit               `json:"limit"`
+
+	// Endpoints contains endpoint rate limit settings.
+	Endpoints []user.Endpoint `json:"endpoints,omitempty" msg:"endpoints,omitempty"`
 }
 
 func (d *DBAccessDefinition) ToRegularAD() user.AccessDefinition {
@@ -43,6 +46,7 @@ func (d *DBAccessDefinition) ToRegularAD() user.AccessDefinition {
 		AllowedTypes:         d.AllowedTypes,
 		DisableIntrospection: d.DisableIntrospection,
 		FieldAccessRights:    d.FieldAccessRights,
+		Endpoints:            d.Endpoints,
 	}
 
 	if d.Limit != nil {
