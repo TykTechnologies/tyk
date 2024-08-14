@@ -520,23 +520,21 @@ func endpointRateLimitTestHelper(t *testing.T, limiter string, beforeFn func()) 
 	}
 }
 
-func TestMWRateLimiting_EndpointRL(t *testing.T) {
-	t.Run("Redis Limiter", func(t *testing.T) {
-		endpointRateLimitTestHelper(t, "Redis", nil)
-	})
+func TestMWRateLimiting_EndpointRL_Redis(t *testing.T) {
+	endpointRateLimitTestHelper(t, "Redis", nil)
+}
 
-	t.Run("Sentinel Limiter", func(t *testing.T) {
-		// add a small delay before expecting rate limit exceeded in sentinel rate limiter.
-		endpointRateLimitTestHelper(t, "Sentinel", func() {
-			time.Sleep(time.Millisecond * 5)
-		})
+func TestMWRateLimiting_EndpointRL_Sentinel(t *testing.T) {
+	// add a small delay before expecting rate limit exceeded in sentinel rate limiter.
+	endpointRateLimitTestHelper(t, "Sentinel", func() {
+		time.Sleep(time.Millisecond * 5)
 	})
+}
 
-	t.Run("DRL Limiter", func(t *testing.T) {
-		endpointRateLimitTestHelper(t, "DRL", nil)
-	})
+func TestMWRateLimiting_EndpointRL_DRL(t *testing.T) {
+	endpointRateLimitTestHelper(t, "DRL", nil)
+}
 
-	t.Run("NonTransactional Limiter", func(t *testing.T) {
-		endpointRateLimitTestHelper(t, "NonTransactional", nil)
-	})
+func TestMWRateLimiting_EndpointRL_NonTransactional(t *testing.T) {
+	endpointRateLimitTestHelper(t, "NonTransactional", nil)
 }
