@@ -2851,7 +2851,7 @@ paths:
   /tyk/oauth/clients/{apiID}/{keyName}/tokens:
     get:
       description: |-
-        This endpoint allows you to retrieve a list of all current tokens and their expiry date for a provided API ID and OAuth-client ID in the following format. This endpoint will work only for newly created tokens.
+        This endpoint allows you to retrieve a list of all current tokens and their expiry date for a provided API ID and OAuth-client ID .If page query parameter is sent the tokens will be paginated. This endpoint will work only for newly created tokens.
                 <br/>
                 <br/>
                 You can control how long you want to store expired tokens in this list using `oauth_token_expired_retain_period` gateway option, which specifies retain period for expired tokens stored in Redis. By default expired token not get removed. See <a href="https://tyk.io/docs/configure/tyk-gateway-configuration-options/#a-name-oauth-token-expired-retain-period-a-oauth-token-expired-retain-period" target="_blank">here</a> for more details.
@@ -2871,17 +2871,23 @@ paths:
         required: true
         schema:
           type: string
-      - description: Use p query parameter to say which page you want returned.
+      - description: Use page query parameter to say which page you want returned.
         example: 1
         in: query
-        name: p
+        name: page
         required: false
         schema:
+          default: 1
           type: integer
       responses:
         "200":
           content:
             application/json:
+              examples:
+                paginatedTokenExample:
+                  $ref: '#/components/examples/paginatedTokenExample'
+                tokenListExample:
+                  $ref: '#/components/examples/tokenListExample'
               schema:
                 oneOf:
                 - $ref: '#/components/schemas/PaginatedOAuthClientTokens'
@@ -2889,7 +2895,7 @@ paths:
                     $ref: '#/components/schemas/OAuthClientToken'
                   nullable: true
                   type: array
-          description: Tokens returned successfully
+          description: Tokens returned successfully.
         "403":
           content:
             application/json:
@@ -2898,21 +2904,25 @@ paths:
                 status: error
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: Attempting to access a protected api with an invalid or a missing
-            X-Tyk-Authorization in the headers
+          description: Forbidden
         "404":
           content:
             application/json:
+              example:
+                message: OAuth Client ID not found
+                status: error
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: Returned when the API with the specified apiID or when the
-            client the specified keyName doesn't exist.
+          description: OAuth Client ID not found
         "500":
           content:
             application/json:
+              example:
+                message: Get client tokens failed
+                status: error
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: internal server error
+          description: Internal server error.
       summary: List tokens for a provided API ID and OAuth-client ID
       tags:
       - OAuth
@@ -4606,6 +4616,21 @@ components:
               value: /user-test/
           upstream:
             url: https://localhost:8080
+    paginatedTokenExample:
+      value:
+        Pagination:
+          page_num: 1
+          page_size: 100
+          page_total: 0
+        Tokens:
+        - code: 5a7d110be6355b0c071cc339327563cb45174ae387f52f87a80d2496
+          expires: 1.518158407e+09
+        - code: 5a7d110be6355b0c071cc33988884222b0cf436eba7979c6c51d6dbd
+          expires: 1.518158594e+09
+        - code: 5a7d110be6355b0c071cc33990bac8b5261041c5a7d585bff291fec4
+          expires: 1.518158638e+09
+        - code: 5a7d110be6355b0c071cc339a66afe75521f49388065a106ef45af54
+          expires: 1.518159792e+09
     policiesExample:
       value:
       - _id: ""
@@ -4673,6 +4698,16 @@ components:
         - security
         throttle_interval: 10
         throttle_retry_limit: 10
+    tokenListExample:
+      value:
+      - code: 5a7d110be6355b0c071cc339327563cb45174ae387f52f87a80d2496
+        expires: 1.518158407e+09
+      - code: 5a7d110be6355b0c071cc33988884222b0cf436eba7979c6c51d6dbd
+        expires: 1.518158594e+09
+      - code: 5a7d110be6355b0c071cc33990bac8b5261041c5a7d585bff291fec4
+        expires: 1.518158638e+09
+      - code: 5a7d110be6355b0c071cc339a66afe75521f49388065a106ef45af54
+        expires: 1.518159792e+09
   parameters:
     AccessType:
       description: Filter for internal or external API versions
@@ -6634,9 +6669,9 @@ components:
       type: object
     PaginatedOAuthClientTokens:
       properties:
-        pagination:
+        Pagination:
           $ref: '#/components/schemas/PaginationStatus'
-        tokens:
+        Tokens:
           items:
             $ref: '#/components/schemas/OAuthClientToken'
           nullable: true

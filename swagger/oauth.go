@@ -347,17 +347,33 @@ func getAuthClientTokens(r *openapi3.Reflector) error {
 	op.AddPathParameter("keyName", "The Client ID", OptionalParameterValues{
 		Example: valueToInterface("2a06b398c17f46908de3dffcb71ef87df"),
 	})
-	statusNotFound(oc, "Returned when the API with the specified apiID or when the client the specified keyName doesn't exist.")
-	forbidden(oc)
-	statusInternalServerError(oc, "internal server error")
-	oc.AddRespStructure(new(apiStatusMessage), openapi.WithHTTPStatus(http.StatusInternalServerError))
-	oc.AddRespStructure(jsonschema.OneOf(new(paginatedOAuthClientTokens), new([]gateway.OAuthClientToken)), openapi.WithHTTPStatus(http.StatusOK), func(cu *openapi.ContentUnit) {
-		cu.Description = "Tokens returned successfully"
+	op.StatusNotFound("OAuth Client ID not found", func(cu *openapi.ContentUnit) {
+		cu.Description = "OAuth Client ID not found"
 	})
-	oc.SetTags(OAuthTag)
-	oc.SetID("getOAuthClientTokens")
+	op.StatusInternalServerError("Get client tokens failed")
+	op.AddRespWithRefExamples(http.StatusOK, jsonschema.OneOf(new(paginatedOAuthClientTokens), new([]gateway.OAuthClientToken)), []multipleExamplesValues{
+		{
+			key:         paginatedTokenExample,
+			httpStatus:  200,
+			Summary:     "Paginated tokens when page query parameter is sent",
+			exampleType: Component,
+			ref:         paginatedTokenExample,
+			hasExample:  true,
+		},
+		{
+			key:         tokenListExample,
+			httpStatus:  200,
+			Summary:     "List of tokes",
+			exampleType: Component,
+			ref:         tokenListExample,
+			hasExample:  true,
+		},
+	}, func(cu *openapi.ContentUnit) {
+		cu.Description = "Tokens returned successfully."
+	})
+
 	oc.SetSummary("List tokens for a provided API ID and OAuth-client ID")
-	oc.SetDescription("This endpoint allows you to retrieve a list of all current tokens and their expiry date for a provided API ID and OAuth-client ID in the following format. This endpoint will work only for newly created tokens.\n        <br/>\n        <br/>\n        You can control how long you want to store expired tokens in this list using `oauth_token_expired_retain_period` gateway option, which specifies retain period for expired tokens stored in Redis. By default expired token not get removed. See <a href=\"https://tyk.io/docs/configure/tyk-gateway-configuration-options/#a-name-oauth-token-expired-retain-period-a-oauth-token-expired-retain-period\" target=\"_blank\">here</a> for more details.")
+	oc.SetDescription("This endpoint allows you to retrieve a list of all current tokens and their expiry date for a provided API ID and OAuth-client ID .If page query parameter is sent the tokens will be paginated. This endpoint will work only for newly created tokens.\n        <br/>\n        <br/>\n        You can control how long you want to store expired tokens in this list using `oauth_token_expired_retain_period` gateway option, which specifies retain period for expired tokens stored in Redis. By default expired token not get removed. See <a href=\"https://tyk.io/docs/configure/tyk-gateway-configuration-options/#a-name-oauth-token-expired-retain-period-a-oauth-token-expired-retain-period\" target=\"_blank\">here</a> for more details.")
 	op.AddPageQueryParameter()
 	return op.AddOperation()
 }
@@ -426,34 +442,6 @@ func revokeAllTokensHandler(r *openapi3.Reflector) error {
 	return op.AddOperation()
 }
 
-func forbidden(oc openapi.OperationContext, description ...string) {
-	oc.AddRespStructure(apiStatusMessage{
-		Status:  "error",
-		Message: "Attempted administrative access with invalid or missing key!",
-	}, openapi.WithHTTPStatus(http.StatusForbidden), func(cu *openapi.ContentUnit) {
-		cu.Description = "Attempting to access a protected api with an invalid or a missing X-Tyk-Authorization in the headers"
-		if len(description) != 0 {
-			cu.Description = description[0]
-		}
-	})
-}
-
-func statusNotFound(oc openapi.OperationContext, description ...string) {
-	oc.AddRespStructure(new(apiStatusMessage), openapi.WithHTTPStatus(http.StatusNotFound), func(cu *openapi.ContentUnit) {
-		if len(description) != 0 {
-			cu.Description = description[0]
-		}
-	})
-}
-
-func statusInternalServerError(oc openapi.OperationContext, description ...string) {
-	oc.AddRespStructure(new(apiStatusMessage), openapi.WithHTTPStatus(http.StatusInternalServerError), func(cu *openapi.ContentUnit) {
-		if len(description) != 0 {
-			cu.Description = description[0]
-		}
-	})
-}
-
 var clientItems = []gateway.NewClientRequest{
 	{
 		ClientID:          "2a06b398c17f46908de3dffcb71ef87df",
@@ -464,5 +452,24 @@ var clientItems = []gateway.NewClientRequest{
 		},
 		Description: "google client",
 		APIID:       "b84fe1a04e5648927971c0557971565c",
+	},
+}
+
+var listTokens = []gateway.OAuthClientToken{
+	{
+		Token:   "5a7d110be6355b0c071cc339327563cb45174ae387f52f87a80d2496",
+		Expires: 1518158407,
+	},
+	{
+		Token:   "5a7d110be6355b0c071cc33988884222b0cf436eba7979c6c51d6dbd",
+		Expires: 1518158594,
+	},
+	{
+		Token:   "5a7d110be6355b0c071cc33990bac8b5261041c5a7d585bff291fec4",
+		Expires: 1518158638,
+	},
+	{
+		Token:   "5a7d110be6355b0c071cc339a66afe75521f49388065a106ef45af54",
+		Expires: 1518159792,
 	},
 }

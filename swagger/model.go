@@ -13,8 +13,8 @@ type paginationStatus struct {
 }
 
 type paginatedOAuthClientTokens struct {
-	Pagination paginationStatus           `json:"pagination"`
-	Tokens     []gateway.OAuthClientToken `json:"tokens"`
+	Pagination paginationStatus           `json:"Pagination"`
+	Tokens     []gateway.OAuthClientToken `json:"Tokens"`
 }
 
 type apiModifyKeySuccess struct {

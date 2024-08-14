@@ -40,6 +40,8 @@ const (
 	SearchText                 = "SearchText"
 	AccessType                 = "AccessType"
 	policyRequestObject        = "policyRequestObject"
+	tokenListExample           = "tokenListExample"
+	paginatedTokenExample      = "paginatedTokenExample"
 )
 
 type BinaryExample string
@@ -74,6 +76,15 @@ func RefExamples(r *openapi3.Reflector) {
 	addRefExample(r, certIdList, certListId)
 	addRefExample(r, certificateBasicList, certificateBasic)
 	addRefExample(r, policiesExample, policies)
+	addRefExample(r, tokenListExample, listTokens)
+	addRefExample(r, paginatedTokenExample, paginatedOAuthClientTokens{
+		Pagination: paginationStatus{
+			PageNum:   1,
+			PageTotal: 0,
+			PageSize:  100,
+		},
+		Tokens: listTokens,
+	})
 	addRefExample(r, oasExampleList, []map[string]interface{}{oasSample(OasSampleString())})
 	///addRefExample(r,policyRequestObject,minimalPolicies)
 	// addRefExample(r, stringOasExample, OasSampleString())
@@ -441,9 +452,10 @@ func (op *OperationWithExample) StatusInternalServerError(message string) {
 }
 
 func (op *OperationWithExample) AddPageQueryParameter() {
-	op.AddQueryParameter("p", "Use p query parameter to say which page you want returned.", OptionalParameterValues{
+	op.AddQueryParameter("page", "Use page query parameter to say which page you want returned.", OptionalParameterValues{
 		Example: valueToInterface(1),
 		Type:    openapi3.SchemaTypeInteger,
+		Default: valueToInterface(1),
 	})
 }
 
