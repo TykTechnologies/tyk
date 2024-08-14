@@ -2,10 +2,11 @@ package user
 
 import (
 	"encoding/json"
-	"github.com/TykTechnologies/tyk/apidef"
 	"reflect"
 	"testing"
 	"time"
+
+	"github.com/TykTechnologies/tyk/apidef"
 
 	"github.com/stretchr/testify/assert"
 )
