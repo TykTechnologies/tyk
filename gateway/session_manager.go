@@ -4,7 +4,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/TykTechnologies/tyk/regexp"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/TykTechnologies/drl"
@@ -234,33 +236,53 @@ func (l *SessionLimiter) ForwardMessage(r *http.Request, session *user.SessionSt
 		return sessionFailRateLimit
 	}
 
+	var (
+		apiLimit            = accessDef.Limit.Clone()
+		endpointRLKeySuffix = ""
+	)
+
+	if len(accessDef.Endpoints) > 0 {
+		endpointRLInfo, doEndpointRL := getEndpointRateLimitInfo(r.Method, r.URL.Path, accessDef.Endpoints)
+		if doEndpointRL {
+			apiLimit.Rate = float64(endpointRLInfo.rate)
+			apiLimit.Per = float64(endpointRLInfo.per)
+			endpointRLKeySuffix = endpointRLInfo.keySuffix
+		}
+	}
+
 	// If quotaKey is not set then the default ratelimit keys should be used.
 	useCustomKey := quotaKey != ""
 
 	// If rate is -1 or 0, it means unlimited and no need for rate limiting.
-	if enableRL && accessDef.Limit.Rate > 0 {
+	if enableRL && apiLimit.Rate > 0 {
+		log.Debug("[RATELIMIT] Inbound raw key is: ", rateLimitKey)
+
 		// This limiter key should be used consistently here out.
 		limiterKey := rate.LimiterKey(session, allowanceScope, rateLimitKey, useCustomKey)
 
-		log.Debug("[RATELIMIT] Inbound raw key is: ", rateLimitKey)
+		if endpointRLKeySuffix != "" {
+			log.Debugf("[RATELIMIT] applying endpoint rate limit key suffix: %s: %s", limiterKey, endpointRLKeySuffix)
+			limiterKey = rate.Prefix(limiterKey, endpointRLKeySuffix)
+		}
+
 		log.Debug("[RATELIMIT] Rate limiter key is: ", limiterKey)
 
 		limiter := rate.Limiter(l.config, l.limiterStorage)
 
 		switch {
 		case limiter != nil:
-			err := limiter(r.Context(), limiterKey, accessDef.Limit.Rate, accessDef.Limit.Per)
+			err := limiter(r.Context(), limiterKey, apiLimit.Rate, apiLimit.Per)
 
 			if errors.Is(err, rate.ErrLimitExhausted) {
 				return sessionFailRateLimit
 			}
 
 		case l.config.EnableSentinelRateLimiter:
-			if l.limitSentinel(r, session, limiterKey, &accessDef.Limit, dryRun) {
+			if l.limitSentinel(r, session, limiterKey, &apiLimit, dryRun) {
 				return sessionFailRateLimit
 			}
 		case l.config.EnableRedisRollingLimiter:
-			if l.limitRedis(r, session, limiterKey, &accessDef.Limit, dryRun) {
+			if l.limitRedis(r, session, limiterKey, &apiLimit, dryRun) {
 				return sessionFailRateLimit
 			}
 		default:
@@ -268,7 +290,7 @@ func (l *SessionLimiter) ForwardMessage(r *http.Request, session *user.SessionSt
 			if l.drlManager.Servers != nil {
 				n = float64(l.drlManager.Servers.Count())
 			}
-			cost := accessDef.Limit.Rate / accessDef.Limit.Per
+			cost := apiLimit.Rate / apiLimit.Per
 			c := l.config.DRLThreshold
 			if c == 0 {
 				// defaults to 5
@@ -284,11 +306,11 @@ func (l *SessionLimiter) ForwardMessage(r *http.Request, session *user.SessionSt
 					bucketKey = limiterKey
 				}
 
-				if l.limitDRL(bucketKey, &accessDef.Limit, dryRun) {
+				if l.limitDRL(bucketKey, &apiLimit, dryRun) {
 					return sessionFailRateLimit
 				}
 			} else {
-				if l.limitRedis(r, session, limiterKey, &accessDef.Limit, dryRun) {
+				if l.limitRedis(r, session, limiterKey, &apiLimit, dryRun) {
 					return sessionFailRateLimit
 				}
 			}
@@ -300,7 +322,7 @@ func (l *SessionLimiter) ForwardMessage(r *http.Request, session *user.SessionSt
 			session.Allowance = session.Allowance - 1
 		}
 
-		if l.RedisQuotaExceeded(r, session, quotaKey, allowanceScope, &accessDef.Limit, store, l.config.HashKeys) {
+		if l.RedisQuotaExceeded(r, session, quotaKey, allowanceScope, &apiLimit, store, l.config.HashKeys) {
 			return sessionFailQuota
 		}
 	}
@@ -409,6 +431,7 @@ func GetAccessDefinitionByAPIIDOrSession(session *user.SessionState, api *APISpe
 			accessDef.RestrictedTypes = rights.RestrictedTypes
 			accessDef.AllowedTypes = rights.AllowedTypes
 			accessDef.DisableIntrospection = rights.DisableIntrospection
+			accessDef.Endpoints = rights.Endpoints
 			allowanceScope = rights.AllowanceScope
 		}
 	}
@@ -417,4 +440,34 @@ func GetAccessDefinitionByAPIIDOrSession(session *user.SessionState, api *APISpe
 	}
 
 	return accessDef, allowanceScope, nil
+}
+
+type endpointRateLimitInfo struct {
+	keySuffix string
+	rate      int64
+	per       int64
+}
+
+func getEndpointRateLimitInfo(method string, path string, endpoints []user.Endpoint) (*endpointRateLimitInfo, bool) {
+	for _, endpoint := range endpoints {
+		asRegex, err := regexp.Compile(endpoint.Path)
+		if err != nil {
+			return nil, false
+		}
+
+		match := asRegex.MatchString(path)
+		if match {
+			for _, endpointMethod := range endpoint.Methods {
+				if strings.ToUpper(endpointMethod.Name) == strings.ToUpper(method) {
+					return &endpointRateLimitInfo{
+						keySuffix: storage.HashStr(fmt.Sprintf("%s:%s", endpointMethod.Name, endpoint.Path)),
+						rate:      endpointMethod.Limit.Rate,
+						per:       endpointMethod.Limit.Per,
+					}, true
+				}
+			}
+		}
+	}
+
+	return nil, false
 }

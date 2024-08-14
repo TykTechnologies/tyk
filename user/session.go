@@ -55,13 +55,41 @@ type APILimit struct {
 	Smoothing *apidef.RateLimitSmoothing `json:"smoothing" bson:"smoothing"`
 }
 
+// Clone does a deepcopy of APILimit.
+func (a APILimit) Clone() APILimit {
+	clone := APILimit{
+		Rate:               a.Rate,
+		Per:                a.Per,
+		ThrottleInterval:   a.ThrottleInterval,
+		ThrottleRetryLimit: a.ThrottleRetryLimit,
+		MaxQueryDepth:      a.MaxQueryDepth,
+		QuotaMax:           a.QuotaMax,
+		QuotaRenews:        a.QuotaRenews,
+		QuotaRemaining:     a.QuotaRemaining,
+		QuotaRenewalRate:   a.QuotaRenewalRate,
+		SetBy:              a.SetBy,
+	}
+
+	if a.Smoothing != nil {
+		clone.Smoothing = &apidef.RateLimitSmoothing{
+			Enabled:   a.Smoothing.Enabled,
+			Threshold: a.Smoothing.Threshold,
+			Trigger:   a.Smoothing.Trigger,
+			Step:      a.Smoothing.Step,
+			Delay:     a.Smoothing.Delay,
+		}
+	}
+
+	return clone
+}
+
 // Duration returns the time between two allowed requests at the defined rate.
 // It's used to decide which rate limit has a bigger allowance.
-func (g *APILimit) Duration() time.Duration {
-	if g.Per <= 0 || g.Rate <= 0 {
+func (a *APILimit) Duration() time.Duration {
+	if a.Per <= 0 || a.Rate <= 0 {
 		return 0
 	}
-	return time.Duration(float64(time.Second) * g.Per / g.Rate)
+	return time.Duration(float64(time.Second) * a.Per / a.Rate)
 }
 
 // AccessDefinition defines which versions of an API a key has access to
@@ -80,10 +108,12 @@ type AccessDefinition struct {
 	DisableIntrospection bool                    `json:"disable_introspection" msg:"disable_introspection"`
 
 	AllowanceScope string `json:"allowance_scope" msg:"allowance_scope"`
+
+	Endpoints []Endpoint `json:"endpoints,omitempty" msg:"endpoints,omitempty"`
 }
 
-func (limit APILimit) IsEmpty() bool {
-	if limit.Rate != 0 || limit.Per != 0 || limit.ThrottleInterval != 0 || limit.ThrottleRetryLimit != 0 || limit.MaxQueryDepth != 0 || limit.QuotaMax != 0 || limit.QuotaRenews != 0 || limit.QuotaRemaining != 0 || limit.QuotaRenewalRate != 0 || limit.SetBy != "" {
+func (a APILimit) IsEmpty() bool {
+	if a.Rate != 0 || a.Per != 0 || a.ThrottleInterval != 0 || a.ThrottleRetryLimit != 0 || a.MaxQueryDepth != 0 || a.QuotaMax != 0 || a.QuotaRenews != 0 || a.QuotaRemaining != 0 || a.QuotaRenewalRate != 0 || a.SetBy != "" {
 		return false
 	}
 	return true
@@ -110,6 +140,21 @@ type JWTData struct {
 
 type Monitor struct {
 	TriggerLimits []float64 `json:"trigger_limits" msg:"trigger_limits"`
+}
+
+type Endpoint struct {
+	Path    string           `json:"path,omitempty" msg:"path"`
+	Methods []EndpointMethod `json:"methods,omitempty" msg:"methods"`
+}
+
+type EndpointMethod struct {
+	Name  string                  `json:"name,omitempty" msg:"name,omitempty"`
+	Limit EndpointMethodRateLimit `json:"limit,omitempty" msg:"limit,omitempty"`
+}
+
+type EndpointMethodRateLimit struct {
+	Rate int64 `json:"rate,omitempty" msg:"rate,omitempty"`
+	Per  int64 `json:"per,omitempty" msg:"per,omitempty"`
 }
 
 // SessionState objects represent a current API session, mainly used for rate limiting.
