@@ -115,7 +115,7 @@ type Gateway struct {
 	DefaultQuotaStore    DefaultSessionManager
 	GlobalSessionManager SessionHandler
 	MonitoringHandler    config.TykEventHandler
-	RPCListener          RPCStorageHandler
+	RPCListener          storage.RPCListener
 	DashService          DashboardServiceSender
 	CertificateManager   certs.CertificateManager
 	GlobalHostChecker    HostCheckerManager
@@ -429,11 +429,14 @@ func (gw *Gateway) setupGlobals() {
 	storeCert := &storage.RedisCluster{KeyPrefix: "cert-", HashKeys: false, ConnectionHandler: gw.StorageConnectionHandler}
 	gw.CertificateManager = certs.NewCertificateManager(storeCert, certificateSecret, log, !gw.GetConfig().Cloud)
 	if gw.GetConfig().SlaveOptions.UseRPC {
-		rpcStore := &RPCStorageHandler{
-			KeyPrefix: "cert-",
-			HashKeys:  false,
-			Gw:        gw,
-		}
+		rpcStore := GetRPCBackendHandler(
+			gw.GetConfig().SlaveOptions.RPCType,
+			&rpcInitConfig{
+				KeyPrefix: "cert-",
+				HashKeys:  false,
+				Gw:        gw,
+			},
+		)
 		gw.CertificateManager = certs.NewSlaveCertManager(storeCert, rpcStore, certificateSecret, log, !gw.GetConfig().Cloud)
 	}
 
@@ -477,10 +480,19 @@ func (gw *Gateway) syncAPISpecs() (int, error) {
 	} else if gw.GetConfig().SlaveOptions.UseRPC {
 		mainLog.Debug("Using RPC Configuration")
 
-		dataLoader := &RPCStorageHandler{
+		var dataLoader RPCDataLoader
+		dataLoader = &RPCStorageHandler{
 			Gw:       gw,
 			DoReload: gw.DoReload,
 		}
+
+		if gw.GetConfig().SlaveOptions.RPCType == "grpc" {
+			dataLoader = &GPCStorageHandler{
+				Gw:       gw,
+				DoReload: gw.DoReload,
+			}
+		}
+
 		var err error
 		s, err = loader.FromRPC(dataLoader, gw.GetConfig().SlaveOptions.RPCKey, gw)
 		if err != nil {
@@ -539,9 +551,17 @@ func (gw *Gateway) syncPolicies() (count int, err error) {
 		pols, err = gw.LoadPoliciesFromDashboard(connStr, gw.GetConfig().NodeSecret, gw.GetConfig().Policies.AllowExplicitPolicyID)
 	case "rpc":
 		mainLog.Debug("Using Policies from RPC")
-		dataLoader := &RPCStorageHandler{
+		var dataLoader RPCDataLoader
+		dataLoader = &RPCStorageHandler{
 			Gw:       gw,
 			DoReload: gw.DoReload,
+		}
+
+		if gw.GetConfig().SlaveOptions.RPCType == "grpc" {
+			dataLoader = &GPCStorageHandler{
+				Gw:       gw,
+				DoReload: gw.DoReload,
+			}
 		}
 		pols, err = gw.LoadPoliciesFromRPC(dataLoader, gw.GetConfig().SlaveOptions.RPCKey, gw.GetConfig().Policies.AllowExplicitPolicyID)
 	default:
@@ -1568,14 +1588,17 @@ func (gw *Gateway) getGlobalMDCBStorageHandler(keyPrefix string, hashKeys bool) 
 	localStorage := &storage.RedisCluster{KeyPrefix: keyPrefix, HashKeys: hashKeys, ConnectionHandler: gw.StorageConnectionHandler}
 	logger := logrus.New().WithFields(logrus.Fields{"prefix": "mdcb-storage-handler"})
 
+	mdcbStore := GetRPCBackendHandler(
+		gw.GetConfig().SlaveOptions.RPCType,
+		&rpcInitConfig{
+			KeyPrefix: keyPrefix,
+			HashKeys:  hashKeys,
+			Gw:        gw,
+		})
 	if gw.GetConfig().SlaveOptions.UseRPC {
 		return storage.NewMdcbStorage(
 			localStorage,
-			&RPCStorageHandler{
-				KeyPrefix: keyPrefix,
-				HashKeys:  hashKeys,
-				Gw:        gw,
-			},
+			mdcbStore,
 			logger,
 		)
 	}
@@ -1584,11 +1607,16 @@ func (gw *Gateway) getGlobalMDCBStorageHandler(keyPrefix string, hashKeys bool) 
 
 func (gw *Gateway) getGlobalStorageHandler(keyPrefix string, hashKeys bool) storage.Handler {
 	if gw.GetConfig().SlaveOptions.UseRPC {
-		return &RPCStorageHandler{
-			KeyPrefix: keyPrefix,
-			HashKeys:  hashKeys,
-			Gw:        gw,
-		}
+
+		mdcbStore := GetRPCBackendHandler(
+			gw.GetConfig().SlaveOptions.RPCType,
+			&rpcInitConfig{
+				KeyPrefix: keyPrefix,
+				HashKeys:  hashKeys,
+				Gw:        gw,
+			})
+
+		return mdcbStore
 	}
 	return &storage.RedisCluster{KeyPrefix: keyPrefix, HashKeys: hashKeys, ConnectionHandler: gw.StorageConnectionHandler}
 }
@@ -1632,6 +1660,10 @@ func Start() {
 
 	gw.setupPortsWhitelist()
 	gw.keyGen = DefaultKeyGenerator{Gw: gw}
+
+	if gwConfig.SlaveOptions.UseRPC {
+		rpc.SetRPCType(gwConfig.SlaveOptions.RPCType)
+	}
 
 	onFork := func() {
 		mainLog.Warning("PREPARING TO FORK")
@@ -1816,10 +1848,22 @@ func (gw *Gateway) start() {
 
 	if slaveOptions := conf.SlaveOptions; slaveOptions.UseRPC {
 		mainLog.Debug("Starting RPC reload listener")
-		gw.RPCListener = RPCStorageHandler{
-			KeyPrefix:        "rpc.listener.",
-			SuppressRegister: true,
-			Gw:               gw,
+
+		switch slaveOptions.RPCType {
+		case "grpc":
+			mainLog.Info("grpc server type chosen")
+			gw.RPCListener = &GPCStorageHandler{
+				KeyPrefix:        "rpc.listener.",
+				SuppressRegister: true,
+				Gw:               gw,
+			}
+
+		default:
+			gw.RPCListener = &RPCStorageHandler{
+				KeyPrefix:        "rpc.listener.",
+				SuppressRegister: true,
+				Gw:               gw,
+			}
 		}
 
 		gw.RPCListener.Connect()

@@ -194,8 +194,8 @@ func TestGraphStatsExtractionVisitor_ExtractStats(t *testing.T) {
 			name:    "should get all types for multiple operations",
 			expected: analytics.GraphQLStats{
 				Types: map[string][]string{
-					"Characters": []string{"info"},
-					"Info":       []string{"count"},
+					"Characters": {"info"},
+					"Info":       {"count"},
 				},
 				RootFields:    []string{"characters"},
 				OperationType: analytics.OperationQuery,

@@ -672,7 +672,7 @@ func (a APIDefinitionLoader) FromRPC(store RPCDataLoader, orgId string, gw *Gate
 
 	//store.Disconnect()
 
-	if rpc.LoadCount() > 0 {
+	if rpc.RPC().LoadCount() > 0 {
 		if err := gw.saveRPCDefinitionsBackup(apiCollection); err != nil {
 			log.Error(err)
 		}

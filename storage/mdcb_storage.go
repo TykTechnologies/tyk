@@ -37,7 +37,7 @@ func (m MdcbStorage) GetKey(key string) (string, error) {
 
 		if err != nil {
 			resourceType := getResourceType(key)
-			m.logger.Errorf("cannot retrieve %v from rpc: %v", resourceType, err.Error())
+			m.logger.Errorf("cannot retrieve '%v' from rpc: %v", resourceType, err.Error())
 			return val, err
 		}
 

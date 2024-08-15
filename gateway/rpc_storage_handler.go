@@ -18,6 +18,48 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+type rpcInitConfig struct {
+	KeyPrefix        string
+	HashKeys         bool
+	SuppressRegister bool
+	DoReload         func()
+	Gw               *Gateway `json:"-"`
+}
+
+const (
+	GRPCBackend = "grpc"
+	LegacyRPC   = "rpc"
+)
+
+func GetRPCBackendHandler(name string, cfg *rpcInitConfig) storage.Handler {
+	switch name {
+	case GRPCBackend:
+		return &GPCStorageHandler{
+			KeyPrefix:        cfg.KeyPrefix,
+			HashKeys:         cfg.HashKeys,
+			SuppressRegister: cfg.SuppressRegister,
+			DoReload:         cfg.DoReload,
+			Gw:               cfg.Gw,
+		}
+	case LegacyRPC:
+		return &RPCStorageHandler{
+			KeyPrefix:        cfg.KeyPrefix,
+			HashKeys:         cfg.HashKeys,
+			SuppressRegister: cfg.SuppressRegister,
+			DoReload:         cfg.DoReload,
+			Gw:               cfg.Gw,
+		}
+	default:
+		return &RPCStorageHandler{
+			KeyPrefix:        cfg.KeyPrefix,
+			HashKeys:         cfg.HashKeys,
+			SuppressRegister: cfg.SuppressRegister,
+			DoReload:         cfg.DoReload,
+			Gw:               cfg.Gw,
+		}
+	}
+}
+
 var (
 	dispatcherFuncs = map[string]interface{}{
 		"Login": func(clientAddr, userKey string) bool {
@@ -138,7 +180,7 @@ func (r *RPCStorageHandler) Connect() bool {
 		RPCPoolSize:           slaveOptions.RPCPoolSize,
 	}
 
-	return rpc.Connect(
+	return rpc.RPC().Connect(
 		rpcConfig,
 		r.SuppressRegister,
 		dispatcherFuncs,
@@ -196,7 +238,7 @@ func (r *RPCStorageHandler) Disconnect() error {
 		Node:    r.buildNodeInfo(),
 	}
 
-	_, err := rpc.FuncClientSingleton("Disconnect", request)
+	_, err := rpc.RPC().FuncClientSingleton("Disconnect", request)
 	return err
 }
 
@@ -273,15 +315,15 @@ func (r *RPCStorageHandler) GetRawKey(keyName string) (string, error) {
 		return "", storage.ErrMDCBConnectionLost
 	}
 
-	value, err := rpc.FuncClientSingleton("GetKey", keyName)
+	value, err := rpc.RPC().FuncClientSingleton("GetKey", keyName)
 	if err != nil {
-		rpc.EmitErrorEventKv(
+		rpc.RPC().EmitErrorEventKv(
 			rpc.FuncClientSingletonCall,
 			"GetKey",
 			err,
 			map[string]string{"keyName": keyName},
 		)
-		if r.IsRetriableError(err) && rpc.Login() {
+		if r.IsRetriableError(err) && rpc.RPC().Login() {
 			return r.GetRawKey(keyName)
 		}
 		if cacheEnabled {
@@ -314,9 +356,9 @@ func (r *RPCStorageHandler) GetMultiKey(keyNames []string) ([]string, error) {
 
 func (r *RPCStorageHandler) GetExp(keyName string) (int64, error) {
 	log.Debug("GetExp called")
-	value, err := rpc.FuncClientSingleton("GetExp", r.fixKey(keyName))
+	value, err := rpc.RPC().FuncClientSingleton("GetExp", r.fixKey(keyName))
 	if err != nil {
-		rpc.EmitErrorEventKv(
+		rpc.RPC().EmitErrorEventKv(
 			rpc.FuncClientSingletonCall,
 			"GetExp",
 			err,
@@ -326,7 +368,7 @@ func (r *RPCStorageHandler) GetExp(keyName string) (int64, error) {
 			},
 		)
 		if r.IsRetriableError(err) {
-			if rpc.Login() {
+			if rpc.RPC().Login() {
 				return r.GetExp(keyName)
 			}
 		}
@@ -350,9 +392,9 @@ func (r *RPCStorageHandler) SetKey(keyName, session string, timeout int64) error
 		Timeout:      timeout,
 	}
 
-	_, err := rpc.FuncClientSingleton("SetKey", ibd)
+	_, err := rpc.RPC().FuncClientSingleton("SetKey", ibd)
 	if err != nil {
-		rpc.EmitErrorEventKv(
+		rpc.RPC().EmitErrorEventKv(
 			rpc.FuncClientSingletonCall,
 			"SetKey",
 			err,
@@ -363,7 +405,7 @@ func (r *RPCStorageHandler) SetKey(keyName, session string, timeout int64) error
 		)
 
 		if r.IsRetriableError(err) {
-			if rpc.Login() {
+			if rpc.RPC().Login() {
 				return r.SetKey(keyName, session, timeout)
 			}
 		}
@@ -385,9 +427,9 @@ func (r *RPCStorageHandler) SetRawKey(keyName, session string, timeout int64) er
 // Decrement will decrement a key in redis
 func (r *RPCStorageHandler) Decrement(keyName string) {
 	log.Warning("Decrement called")
-	_, err := rpc.FuncClientSingleton("Decrement", keyName)
+	_, err := rpc.RPC().FuncClientSingleton("Decrement", keyName)
 	if err != nil {
-		rpc.EmitErrorEventKv(
+		rpc.RPC().EmitErrorEventKv(
 			rpc.FuncClientSingletonCall,
 			"Decrement",
 			err,
@@ -397,7 +439,7 @@ func (r *RPCStorageHandler) Decrement(keyName string) {
 		)
 	}
 	if r.IsRetriableError(err) {
-		if rpc.Login() {
+		if rpc.RPC().Login() {
 			r.Decrement(keyName)
 			return
 		}
@@ -412,9 +454,9 @@ func (r *RPCStorageHandler) IncrememntWithExpire(keyName string, expire int64) i
 		Expire:  expire,
 	}
 
-	val, err := rpc.FuncClientSingleton("IncrememntWithExpire", ibd)
+	val, err := rpc.RPC().FuncClientSingleton("IncrememntWithExpire", ibd)
 	if err != nil {
-		rpc.EmitErrorEventKv(
+		rpc.RPC().EmitErrorEventKv(
 			rpc.FuncClientSingletonCall,
 			"IncrememntWithExpire",
 			err,
@@ -424,7 +466,7 @@ func (r *RPCStorageHandler) IncrememntWithExpire(keyName string, expire int64) i
 		)
 	}
 	if r.IsRetriableError(err) {
-		if rpc.Login() {
+		if rpc.RPC().Login() {
 			return r.IncrememntWithExpire(keyName, expire)
 		}
 	}
@@ -450,9 +492,9 @@ func (r *RPCStorageHandler) GetKeysAndValuesWithFilter(filter string) map[string
 	searchStr := r.KeyPrefix + r.hashKey(filter) + "*"
 	log.Debug("[STORE] Getting list by: ", searchStr)
 
-	kvPair, err := rpc.FuncClientSingleton("GetKeysAndValuesWithFilter", searchStr)
+	kvPair, err := rpc.RPC().FuncClientSingleton("GetKeysAndValuesWithFilter", searchStr)
 	if err != nil {
-		rpc.EmitErrorEventKv(
+		rpc.RPC().EmitErrorEventKv(
 			rpc.FuncClientSingletonCall,
 			"GetKeysAndValuesWithFilter",
 			err,
@@ -462,7 +504,7 @@ func (r *RPCStorageHandler) GetKeysAndValuesWithFilter(filter string) map[string
 		)
 
 		if r.IsRetriableError(err) {
-			if rpc.Login() {
+			if rpc.RPC().Login() {
 				return r.GetKeysAndValuesWithFilter(filter)
 			}
 		}
@@ -484,12 +526,12 @@ func (r *RPCStorageHandler) GetKeysAndValues() map[string]string {
 
 	searchStr := r.KeyPrefix + "*"
 
-	kvPair, err := rpc.FuncClientSingleton("GetKeysAndValues", searchStr)
+	kvPair, err := rpc.RPC().FuncClientSingleton("GetKeysAndValues", searchStr)
 	if err != nil {
-		rpc.EmitErrorEvent(rpc.FuncClientSingletonCall, "GetKeysAndValues", err)
+		rpc.RPC().EmitErrorEvent(rpc.FuncClientSingletonCall, "GetKeysAndValues", err)
 
 		if r.IsRetriableError(err) {
-			if rpc.Login() {
+			if rpc.RPC().Login() {
 				return r.GetKeysAndValues()
 			}
 		}
@@ -511,9 +553,9 @@ func (r *RPCStorageHandler) DeleteKey(keyName string) bool {
 
 	log.Debug("DEL Key was: ", r.Gw.obfuscateKey(keyName))
 	log.Debug("DEL Key became: ", r.Gw.obfuscateKey(r.fixKey(keyName)))
-	ok, err := rpc.FuncClientSingleton("DeleteKey", r.fixKey(keyName))
+	ok, err := rpc.RPC().FuncClientSingleton("DeleteKey", r.fixKey(keyName))
 	if err != nil {
-		rpc.EmitErrorEventKv(
+		rpc.RPC().EmitErrorEventKv(
 			rpc.FuncClientSingletonCall,
 			"DeleteKey",
 			err,
@@ -524,7 +566,7 @@ func (r *RPCStorageHandler) DeleteKey(keyName string) bool {
 		)
 
 		if r.IsRetriableError(err) {
-			if rpc.Login() {
+			if rpc.RPC().Login() {
 				return r.DeleteKey(keyName)
 			}
 		}
@@ -540,9 +582,9 @@ func (r *RPCStorageHandler) DeleteAllKeys() bool {
 
 // DeleteKey will remove a key from the database without prefixing, assumes user knows what they are doing
 func (r *RPCStorageHandler) DeleteRawKey(keyName string) bool {
-	ok, err := rpc.FuncClientSingleton("DeleteRawKey", keyName)
+	ok, err := rpc.RPC().FuncClientSingleton("DeleteRawKey", keyName)
 	if err != nil {
-		rpc.EmitErrorEventKv(
+		rpc.RPC().EmitErrorEventKv(
 			rpc.FuncClientSingletonCall,
 			"DeleteRawKey",
 			err,
@@ -552,7 +594,7 @@ func (r *RPCStorageHandler) DeleteRawKey(keyName string) bool {
 		)
 
 		if r.IsRetriableError(err) {
-			if rpc.Login() {
+			if rpc.RPC().Login() {
 				return r.DeleteRawKey(keyName)
 			}
 		}
@@ -570,9 +612,9 @@ func (r *RPCStorageHandler) DeleteKeys(keys []string) bool {
 		}
 
 		log.Debug("Deleting: ", asInterface)
-		ok, err := rpc.FuncClientSingleton("DeleteKeys", asInterface)
+		ok, err := rpc.RPC().FuncClientSingleton("DeleteKeys", asInterface)
 		if err != nil {
-			rpc.EmitErrorEventKv(
+			rpc.RPC().EmitErrorEventKv(
 				rpc.FuncClientSingletonCall,
 				"DeleteKeys",
 				err,
@@ -583,7 +625,7 @@ func (r *RPCStorageHandler) DeleteKeys(keys []string) bool {
 			)
 
 			if r.IsRetriableError(err) {
-				if rpc.Login() {
+				if rpc.RPC().Login() {
 					return r.DeleteKeys(keys)
 				}
 			}
@@ -617,9 +659,9 @@ func (r *RPCStorageHandler) AppendToSet(keyName, value string) {
 		Value:   value,
 	}
 
-	_, err := rpc.FuncClientSingleton("AppendToSet", ibd)
+	_, err := rpc.RPC().FuncClientSingleton("AppendToSet", ibd)
 	if err != nil {
-		rpc.EmitErrorEventKv(
+		rpc.RPC().EmitErrorEventKv(
 			rpc.FuncClientSingletonCall,
 			"AppendToSet",
 			err,
@@ -629,7 +671,7 @@ func (r *RPCStorageHandler) AppendToSet(keyName, value string) {
 		)
 	}
 	if r.IsRetriableError(err) {
-		if rpc.Login() {
+		if rpc.RPC().Login() {
 			r.AppendToSet(keyName, value)
 		}
 	}
@@ -644,9 +686,9 @@ func (r *RPCStorageHandler) SetRollingWindow(keyName string, per int64, val stri
 		Expire:  -1,
 	}
 
-	intVal, err := rpc.FuncClientSingleton("SetRollingWindow", ibd)
+	intVal, err := rpc.RPC().FuncClientSingleton("SetRollingWindow", ibd)
 	if err != nil {
-		rpc.EmitErrorEventKv(
+		rpc.RPC().EmitErrorEventKv(
 			rpc.FuncClientSingletonCall,
 			"SetRollingWindow",
 			err,
@@ -657,7 +699,7 @@ func (r *RPCStorageHandler) SetRollingWindow(keyName string, per int64, val stri
 		)
 
 		if r.IsRetriableError(err) {
-			if rpc.Login() {
+			if rpc.RPC().Login() {
 				return r.SetRollingWindow(keyName, per, val, false)
 			}
 		}
@@ -708,9 +750,9 @@ func (r *RPCStorageHandler) GetApiDefinitions(orgId string, tags []string) strin
 		LoadOAS: true,
 	}
 
-	defString, err := rpc.FuncClientSingleton("GetApiDefinitions", dr)
+	defString, err := rpc.RPC().FuncClientSingleton("GetApiDefinitions", dr)
 	if err != nil {
-		rpc.EmitErrorEventKv(
+		rpc.RPC().EmitErrorEventKv(
 			rpc.FuncClientSingletonCall,
 			"GetApiDefinitions",
 			err,
@@ -721,7 +763,7 @@ func (r *RPCStorageHandler) GetApiDefinitions(orgId string, tags []string) strin
 		)
 
 		if r.IsRetriableError(err) {
-			if rpc.Login() {
+			if rpc.RPC().Login() {
 				return r.GetApiDefinitions(orgId, tags)
 			}
 		}
@@ -739,9 +781,9 @@ func (r *RPCStorageHandler) GetApiDefinitions(orgId string, tags []string) strin
 
 // GetPolicies will pull Policies from the RPC server
 func (r *RPCStorageHandler) GetPolicies(orgId string) string {
-	defString, err := rpc.FuncClientSingleton("GetPolicies", orgId)
+	defString, err := rpc.RPC().FuncClientSingleton("GetPolicies", orgId)
 	if err != nil {
-		rpc.EmitErrorEventKv(
+		rpc.RPC().EmitErrorEventKv(
 			rpc.FuncClientSingletonCall,
 			"GetPolicies",
 			err,
@@ -751,7 +793,7 @@ func (r *RPCStorageHandler) GetPolicies(orgId string) string {
 		)
 
 		if r.IsRetriableError(err) {
-			if rpc.Login() {
+			if rpc.RPC().Login() {
 				return r.GetPolicies(orgId)
 			}
 		}
@@ -774,9 +816,9 @@ func (r *RPCStorageHandler) CheckForReload(orgId string) bool {
 	}
 
 	log.Debug("[RPC STORE] Check Reload called...")
-	reload, err := rpc.FuncClientSingleton("CheckReload", orgId)
+	reload, err := rpc.RPC().FuncClientSingleton("CheckReload", orgId)
 	if err != nil {
-		rpc.EmitErrorEventKv(
+		rpc.RPC().EmitErrorEventKv(
 			rpc.FuncClientSingletonCall,
 			"CheckReload",
 			err,
@@ -786,7 +828,7 @@ func (r *RPCStorageHandler) CheckForReload(orgId string) bool {
 		)
 		if r.IsRetriableError(err) {
 			log.Warning("[RPC STORE] CheckReload: Not logged in")
-			if rpc.Login() {
+			if rpc.RPC().Login() {
 				r.CheckForReload(orgId)
 			}
 		} else if !strings.Contains(err.Error(), "Cannot obtain response during") {
@@ -836,7 +878,7 @@ func (r *RPCStorageHandler) StartRPCKeepaliveWatcher() {
 			}).Warning("Can't connect to RPC layer")
 
 			if r.IsRetriableError(err) {
-				if rpc.Login() {
+				if rpc.RPC().Login() {
 					continue
 				}
 			}
@@ -874,16 +916,16 @@ func (r *RPCStorageHandler) CheckForKeyspaceChanges(orgId string) {
 		reqData["GroupID"] = groupID
 	}
 
-	keys, err = rpc.FuncClientSingleton(funcName, req)
+	keys, err = rpc.RPC().FuncClientSingleton(funcName, req)
 	if err != nil {
-		rpc.EmitErrorEventKv(
+		rpc.RPC().EmitErrorEventKv(
 			rpc.FuncClientSingletonCall,
 			funcName,
 			err,
 			reqData,
 		)
 		if r.IsRetriableError(err) {
-			if rpc.Login() {
+			if rpc.RPC().Login() {
 				r.CheckForKeyspaceChanges(orgId)
 			}
 		}

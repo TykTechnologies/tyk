@@ -137,9 +137,12 @@ func (gw *Gateway) gatherHealthChecks() {
 				Time:          time.Now().Format(time.RFC3339),
 			}
 
-			if !rpc.Login() {
-				checkItem.Output = "Could not connect to RPC"
-				checkItem.Status = apidef.Fail
+			if gw.GetConfig().SlaveOptions.RPCType != "grpc" {
+				// TODO: This needs an answer in GRPC
+				if !rpc.RPC().Login() {
+					checkItem.Output = "Could not connect to RPC"
+					checkItem.Status = apidef.Fail
+				}
 			}
 
 			checkItem.ComponentType = apidef.System

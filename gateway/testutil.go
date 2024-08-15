@@ -1219,7 +1219,7 @@ func (s *Test) newGateway(genConf func(globalConf *config.Config)) *Gateway {
 
 	if slaveOptions := gw.GetConfig().SlaveOptions; slaveOptions.UseRPC {
 		mainLog.Debug("Starting RPC reload listener")
-		gw.RPCListener = RPCStorageHandler{
+		gw.RPCListener = &RPCStorageHandler{
 			KeyPrefix:        "rpc.listener.",
 			SuppressRegister: true,
 			Gw:               gw,
@@ -1430,7 +1430,7 @@ func (s *Test) GetApiById(apiId string) *APISpec {
 }
 
 func (s *Test) StopRPCClient() {
-	rpc.Reset()
+	rpc.RPC().Reset()
 }
 
 func (s *Test) GetPolicyById(policyId string) (user.Policy, bool) {
