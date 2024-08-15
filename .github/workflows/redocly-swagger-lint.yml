@@ -16,6 +16,6 @@ jobs:
       - name: Validate OpenAPI definition with redocly
         run: |
           npm install @redocly/cli -g
-          redocly lint tyk-api-documentation/swagger.yaml --config=tyk-api-documentation/redocly.yml
+          redocly lint tyk-api-documentation/swagger.yml --config=tyk-api-documentation/redocly.yml
 
 
