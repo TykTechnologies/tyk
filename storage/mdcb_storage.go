@@ -136,6 +136,8 @@ func (m MdcbStorage) DeleteRawKey(string) bool {
 	panic("implement me")
 }
 
+func (m MdcbStorage) DeleteRawKeys([]string) bool { panic("implement me") }
+
 func (m MdcbStorage) Connect() bool {
 	return m.local.Connect() && m.rpc.Connect()
 }
