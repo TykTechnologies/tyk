@@ -82,6 +82,9 @@ func (s *DummyStorage) DeleteRawKey(string) bool {
 	panic("implement me")
 }
 
+// DeleteRawKeys removes a set of raw keys from DummyStorage, returning success status; not yet implemented.
+func (s *DummyStorage) DeleteRawKeys([]string) bool { panic("implement me") }
+
 // Connect establishes a connection to the storage backend; not currently implemented.
 func (s *DummyStorage) Connect() bool {
 	return true
