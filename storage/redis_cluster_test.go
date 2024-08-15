@@ -1174,6 +1174,62 @@ func TestDeleteScanMatch(t *testing.T) {
 	})
 }
 
+func TestDeleteRawKeys(t *testing.T) {
+	t.Run("storage disconnected", func(t *testing.T) {
+		storage := &RedisCluster{ConnectionHandler: rc}
+		storage.ConnectionHandler.storageUp.Store(false)
+		mockKv := tempmocks.NewKeyValue(t)
+		storage.kvStorage = mockKv
+		defer storage.ConnectionHandler.storageUp.Store(true)
+
+		deleted := storage.DeleteRawKeys([]string{"key"})
+		assert.False(t, deleted)
+
+		mockKv.AssertExpectations(t)
+	})
+	t.Run("delete ok", func(t *testing.T) {
+		storage := &RedisCluster{ConnectionHandler: rc}
+		mockKv := tempmocks.NewKeyValue(t)
+		storage.kvStorage = mockKv
+		mockKv.On("DeleteKeys", mock.Anything, []string{"key", "key2"}).Return(int64(3), nil)
+
+		deleted := storage.DeleteRawKeys([]string{"key", "key2"})
+		assert.True(t, deleted)
+		mockKv.AssertExpectations(t)
+	})
+	t.Run("delete ok with prefix", func(t *testing.T) {
+		storage := &RedisCluster{ConnectionHandler: rc, KeyPrefix: "prefix:"}
+		mockKv := tempmocks.NewKeyValue(t)
+		storage.kvStorage = mockKv
+		mockKv.On("DeleteKeys", mock.Anything, []string{"key", "key2"}).Return(int64(3), nil)
+
+		deleted := storage.DeleteRawKeys([]string{"key", "key2"})
+		assert.True(t, deleted)
+		mockKv.AssertExpectations(t)
+	})
+
+	t.Run("delete ok - but none deleted", func(t *testing.T) {
+		storage := &RedisCluster{ConnectionHandler: rc, KeyPrefix: "prefix:"}
+		mockKv := tempmocks.NewKeyValue(t)
+		storage.kvStorage = mockKv
+		mockKv.On("DeleteKeys", mock.Anything, []string{"key", "key2"}).Return(int64(0), nil)
+
+		deleted := storage.DeleteRawKeys([]string{"key", "key2"})
+		assert.False(t, deleted)
+		mockKv.AssertExpectations(t)
+	})
+	t.Run("error deleting", func(t *testing.T) {
+		storage := &RedisCluster{ConnectionHandler: rc}
+		mockKv := tempmocks.NewKeyValue(t)
+		storage.kvStorage = mockKv
+		mockKv.On("DeleteKeys", mock.Anything, mock.Anything).Return(int64(0), ErrKeyNotFound)
+
+		deleted := storage.DeleteRawKeys([]string{"key"})
+		assert.False(t, deleted)
+		mockKv.AssertExpectations(t)
+	})
+}
+
 func TestDeleteKeys(t *testing.T) {
 	t.Run("storage disconnected", func(t *testing.T) {
 		storage := &RedisCluster{ConnectionHandler: rc}

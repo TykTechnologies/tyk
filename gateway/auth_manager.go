@@ -9,7 +9,6 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"github.com/TykTechnologies/tyk/internal/uuid"
-
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/user"
 )
@@ -74,12 +73,22 @@ func (b *DefaultSessionManager) ResetQuota(keyName string, session *user.Session
 
 	rateLimiterSentinelKey := RateLimitKeyPrefix + keyName + ".BLOCKED"
 
-	// Clear the rate limiter
-	b.store.DeleteRawKey(rateLimiterSentinelKey)
+	// Clear the rate limiter and
 	// Fix the raw key
-	b.store.DeleteRawKey(rawKey)
+	keys := []string{rateLimiterSentinelKey, rawKey}
+	keys = append(keys, rawKeysWithAllowanceScope(keyName, session)...)
+	b.store.DeleteRawKeys(keys)
+}
 
-	b.deleteRawKeysWithAllowanceScope(b.store, session, keyName)
+func rawKeysWithAllowanceScope(keyName string, session *user.SessionState) []string {
+	keys := make([]string, 0)
+	for _, acl := range session.AccessRights {
+		if acl.AllowanceScope == "" {
+			continue
+		}
+		keys = append(keys, QuotaKeyPrefix+acl.AllowanceScope+"-"+keyName)
+	}
+	return keys
 }
 
 func (b *DefaultSessionManager) deleteRawKeysWithAllowanceScope(store storage.Handler, session *user.SessionState, keyName string) {
