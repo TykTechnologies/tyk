@@ -21,6 +21,11 @@ on:
       - 'v*'
 env:
   GOPRIVATE: github.com/TykTechnologies
+  VARIATION: test
+  DOCKER_BUILD_SUMMARY: false
+  DOCKER_BUILD_RECORD_UPLOAD: false
+  # startsWith covers pull_request_target too
+  BASE_REF: ${{startsWith(github.event_name, 'pull_request') && github.base_ref || github.ref_name}}
 jobs:
   goreleaser:
     name: '${{ matrix.golang_cross }}'
@@ -138,7 +143,7 @@ jobs:
             type=semver,pattern={{version}},prefix=v
       - name: push image to CI
         if: ${{ matrix.golang_cross == '1.21-bullseye' }}
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         with:
           context: "dist"
           platforms: linux/amd64,linux/arm64
@@ -165,9 +170,9 @@ jobs:
             type=semver,pattern={{major}}.{{minor}}
             type=semver,pattern={{version}}
           labels: "org.opencontainers.image.title=tyk-gateway \norg.opencontainers.image.description=Tyk Open Source API Gateway written in Go, supporting REST, GraphQL, TCP and gRPC protocols\norg.opencontainers.image.vendor=tyk.io\norg.opencontainers.image.version=${{ github.ref_name }}\n"
-      - name: build multiarch image
+      - name: push image to prod
         if: ${{ matrix.golang_cross == '1.21-bullseye' }}
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         with:
           context: "dist"
           platforms: linux/amd64,linux/arm64
@@ -179,7 +184,8 @@ jobs:
           push: ${{ startsWith(github.ref, 'refs/tags') }}
           tags: ${{ steps.tag_metadata.outputs.tags }}
           labels: ${{ steps.tag_metadata.outputs.labels }}
-      - uses: actions/upload-artifact@v4
+      - name: save deb
+        uses: actions/upload-artifact@v4
         if: ${{ matrix.golang_cross == '1.21-bullseye' }}
         with:
           name: deb
@@ -187,7 +193,9 @@ jobs:
           path: |
             dist/*.deb
             !dist/*PAYG*.deb
-      - uses: actions/upload-artifact@v4
+            !dist/*fips*.deb
+      - name: save rpm
+        uses: actions/upload-artifact@v4
         if: ${{ matrix.golang_cross == '1.21-bullseye' }}
         with:
           name: rpm
@@ -195,8 +203,10 @@ jobs:
           path: |
             dist/*.rpm
             !dist/*PAYG*.rpm
+            !dist/*fips*.rpm
   test-controller-api:
-    needs: goreleaser
+    needs:
+      - goreleaser
     runs-on: ubuntu-latest
     outputs:
       envfiles: ${{ steps.params.outputs.envfiles }}
@@ -206,30 +216,20 @@ jobs:
       - name: set params
         id: params
         shell: bash
-        env:
-          # Cover pull_request_target too
-          BASE_REF: ${{startsWith(github.event_name, 'pull_request') && github.base_ref || github.ref_name}}
         run: |
           set -eo pipefail
-          endpoint="http://tui.internal.dev.tyk.technology/api/tyk/$BASE_REF/${{ github.event_name}}/api"
-          curl="curl -s --retry 5 --retry-delay 10 --fail-with-body --retry-all-errors"
-          echo "pump<<EOF
-          $($curl ${endpoint}/Pump)
-          EOF
-          sink<<EOF
-          $($curl ${endpoint}/Sink)
-          EOF
-          envfiles<<EOF
-          $($curl ${endpoint}/EnvFiles)
-          EOF" | tee -a "$GITHUB_OUTPUT"
+          curl -s --retry 5 --retry-delay 10 --fail-with-body "http://tui.internal.dev.tyk.technology/v2/$VARIATION/tyk/$BASE_REF/${{ github.event_name}}/api.gho" | tee -a "$GITHUB_OUTPUT"
+          if ! [[ $VARIATION =~ prod ]] ;then
+              echo "::warning file=.github/workflows/release.yml,line=26,col=1,endColumn=8::Using non-prod variation"
+              echo "### :warning: You are using VARIATION=${VARIATION} in test-controller-api" >> $GITHUB_STEP_SUMMARY
+          fi
   api-tests:
     needs:
-      - goreleaser
       - test-controller-api
+      - goreleaser
     runs-on: ubuntu-latest-m-2
     env:
-      METADATA_REPORT_PATH: /tmp/metadata.toml
-      XUNIT_REPORT_PATH: ${{ github.workspace }}/reports/pytest-report.xml
+      XUNIT_REPORT_PATH: ${{ github.workspace}}/test-results.xml
     permissions:
       id-token: write # This is required for requesting the Github JWT
       contents: read # This is required for actions/checkout
@@ -239,9 +239,6 @@ jobs:
         envfiles: ${{ fromJson(needs.test-controller-api.outputs.envfiles) }}
         pump: ${{ fromJson(needs.test-controller-api.outputs.pump) }}
         sink: ${{ fromJson(needs.test-controller-api.outputs.sink) }}
-        include:
-          - db: postgres15
-            markers: "and not sql"
         exclude:
           - pump: tykio/tyk-pump-docker-pub:v1.8
             sink: $ECR/tyk-sink:master
@@ -257,20 +254,20 @@ jobs:
         uses: aws-actions/amazon-ecr-login@v2
         with:
           mask-password: 'true'
-          # Only ${{ github.actor }} has access
-          # See https://github.com/mxschmitt/action-tmate#use-registered-public-ssh-keys
       - name: Setup tmate session only in debug mode
         uses: mxschmitt/action-tmate@v3
         if: runner.debug == '1'
         with:
           detached: true
           limit-access-to-actor: true
-      - name: fetch env from tyk-ci
+          # Only ${{ github.actor }} has access
+          # See https://github.com/mxschmitt/action-tmate#use-registered-public-ssh-keys
+      - name: fetch env from tyk-pro
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release download --repo github.com/TykTechnologies/tyk-ci -p 'ci-env.tgz' -O env.tgz
-          tar xzvf env.tgz
+          gh release download --repo github.com/tyklabs/tyk-pro --archive tar.gz -O env.tgz
+          mkdir auto && tar --strip-components=1 -C auto -xzvf env.tgz
       - name: env up
         shell: bash
         working-directory: auto
@@ -280,57 +277,81 @@ jobs:
           GH_TOKEN: ${{ secrets.ORG_GH_TOKEN }}
           TYK_DB_LICENSEKEY: ${{ secrets.DASH_LICENSE }}
           TYK_MDCB_LICENSE: ${{ secrets.MDCB_LICENSE }}
-          BASE_REF: ${{startsWith(github.event_name, 'pull_request') && github.base_ref || github.ref_name}}
         run: |
-          match_tag=${{steps.ecr.outputs.registry}}/$REPO:$BASE_REF
+          match_tag=${{steps.ecr.outputs.registry}}/tyk:$BASE_REF
           tags=(${{ needs.goreleaser.outputs.tags }})
+          set -eaxo pipefail
           docker run -q --rm -v ~/.docker/config.json:/root/.docker/config.json tykio/gromit policy match ${tags[0]} ${match_tag} 2>versions.env
           echo '# alfa and beta have to come after the override
           tyk_alfa_image=$tyk_image
           tyk_beta_image=$tyk_image
           ECR=${{steps.ecr.outputs.registry}}
           tyk_pump_image=${{matrix.pump}}
+
           tyk_sink_image=${{matrix.sink}}
           confs_dir=./pro-ha
-          env_file=local-${{ matrix.envfiles.db }}.env' >> versions.env
+          env_file=local.env' >> versions.env
+          cat ./confs/${{ matrix.envfiles.config }}.env local-${{ matrix.envfiles.db }}.env > local.env
           echo "::group::versions"
-          cat versions.env
+          cat versions.env local.env
           echo "::endgroup::"
-          # Add Tyk component config variations to $env_file
-          cat confs/${{ matrix.envfiles.config }}.env >> local-${{ matrix.envfiles.db }}.env
           # bring up env, the project name is important
-          docker compose -p auto -f pro-ha.yml -f deps_pro-ha.yml -f ${{ matrix.envfiles.db }}.yml -f ${{ matrix.envfiles.cache }}.yml  --env-file versions.env --profile master-datacenter up --quiet-pull -d
+          docker compose -p auto -f pro-ha.yml -f deps_pro-ha.yml -f ${{ matrix.envfiles.db }}.yml -f ${{ matrix.envfiles.cache }}.yml --env-file versions.env --profile master-datacenter up --quiet-pull -d
           ./dash-bootstrap.sh http://localhost:3000
-          docker compose -p auto -f pro-ha.yml -f deps_pro-ha.yml -f ${{ matrix.envfiles.db }}.yml -f ${{ matrix.envfiles.cache }}.yml  --env-file versions.env --profile slave-datacenter up --quiet-pull -d
-      - name: Run tests
-        working-directory: auto
-        id: test_execution
-        env:
-          # Cover pull_request_target too
-          BASE_REF: ${{startsWith(github.event_name, 'pull_request') && github.base_ref || github.ref_name }}
+          docker compose -p auto -f pro-ha.yml -f deps_pro-ha.yml -f ${{ matrix.envfiles.db }}.yml -f ${{ matrix.envfiles.cache }}.yml --env-file versions.env --profile slave-datacenter up --quiet-pull -d
+          echo "$(cat pytest.env | grep USER_API_SECRET)" >> $GITHUB_OUTPUT
+      - uses: actions/checkout@v4
+        with:
+          repository: TykTechnologies/tyk-analytics
+          path: tyk-analytics
+          token: ${{ secrets.ORG_GH_TOKEN }}
+          fetch-depth: 1
+          sparse-checkout: tests/api
+      - name: Branch for test code
+        id: timestamp
+        working-directory: tyk-analytics/tests/api
         run: |
           # Generate report id
-          echo "id=$(date +%s%N)" >> $GITHUB_OUTPUT
-          # Run tests
-          set -o pipefail
-          echo "### API tests ${{ matrix.envfiles.db }} ${{ matrix.envfiles.conf }}" >> $GITHUB_STEP_SUMMARY
-          if docker run --rm --network auto_default --env-file pytest.env -v ${{ github.workspace }}/reports:/app/reports \
-            ${{ steps.ecr.outputs.registry }}/tyk-automated-tests:$BASE_REF \
-            pytest -c pytest_ci.ini --junitxml=./${XUNIT_REPORT_PATH#"${{ github.workspace }}"} --ci -m "not local and not dind ${{ matrix.markers }}" | tee tests.out; then
-              echo "All tests passed!" >> $GITHUB_STEP_SUMMARY
-          else
-            echo "::error title=API tests ${{ matrix.envfiles.db }} ${{ matrix.envfiles.conf }}::Test execution failed"
-            cat tests.out >> $GITHUB_STEP_SUMMARY
-            exit 1
-          fi
-      - name: Generate metadata
-        if: always() && steps.test_execution.outcome != 'skipped'
+          git fetch --no-tags --depth 1 origin "refs/heads/${BASE_REF}:refs/remotes/origin/${BASE_REF}"
+          git switch $BASE_REF
+          echo "ts=$(date +%s%N)" >> $GITHUB_OUTPUT
+      - uses: actions/setup-python@v5
+        with:
+          cache: 'pip'
+          python-version: '3.10'
+      - name: Run API tests
+        id: test_execution
+        working-directory: tyk-analytics/tests/api
+        run: |
+          pytest="pytest --ci --random-order --maxfail=3 --junitxml=${XUNIT_REPORT_PATH} --cache-clear --log-cli-level=ERROR"
+          pip install -r requirements.txt
+          cat >pytest.env <<-EOF
+          TYK_TEST_BASE_URL=http://localhost:3000/
+          TYK_TEST_GW_URL=https://localhost:8080/
+          TYK_TEST_GW_1_ALFA_URL=https://localhost:8181/
+          TYK_TEST_GW_1_BETA_URL=https://localhost:8182/
+          TYK_TEST_GW_2_ALFA_URL=https://localhost:8281/
+          TYK_TEST_GW_2_BETA_URL=https://localhost:8282/
+          TYK_TEST_MONGODB=localhost:27017
+          TYK_TEST_REDIS=localhost
+          TYK_TEST_DB_ADMIN=12345
+          TYK_TEST_GW_SECRET=352d20ee67be67f6340b4c0605b044b7
+          TYK_TEST_DB_NAME=tyk_analytics
+          TYK_TEST_FEDERATION_HOST=federation
+          TYK_TEST_GRAPHQL_FAKER_HOST=graphql-faker
+          GATEWAY_CONTAINER_NAME=tyk
+          USER_API_SECRET=${{ steps.env_up.outputs.USER_API_SECRET }}
+          EOF
+          env $(cat pytest.env | xargs) $pytest -m "${{ matrix.envfiles.apimarkers }}"
+      - name: Generate metadata and upload test reports
         id: metadata_report
+        if: always() && (steps.test_execution.conclusion != 'skipped')
         env:
-          BASE_REF: ${{startsWith(github.event_name, 'pull_request') && github.base_ref || github.ref}}
-          REPORT_NAME: ${{ github.repository }}_${{ github.run_id }}_${{ github.run_attempt }}-${{steps.test_execution.outputs.id}}
+          REPORT_NAME: ${{ github.repository }}_${{ github.run_id }}_${{ github.run_attempt }}-${{steps.timestamp.outputs.ts}}
+          METADATA_REPORT_PATH: metadata.toml
         run: |
           # Generate metadata report
+          set -eo pipefail
           echo "[metadata]
           repo = ${{ github.repository }}
           branch = ${{ github.ref }}
@@ -343,16 +364,8 @@ jobs:
           cache = ${{ matrix.envfiles.cache }}
           pump_compatibility = ${{ matrix.pump }}
           sink_compatibility = ${{ matrix.sink }}
-          " > ${METADATA_REPORT_PATH}
-          # Print metadata report
-          if [[ "${{ runner.debug }}" == "1" ]]; then
-            echo "::group::metadata report"
-            cat ${METADATA_REPORT_PATH}
-            echo "::endgroup::"
-          fi
-          #Upload xunit report
+          " | tee ${METADATA_REPORT_PATH}
           aws s3 cp ${XUNIT_REPORT_PATH}  s3://assets.dev.tyk.technology/testreports/${REPORT_NAME#*/}.xml
-          #Upload metadata report
           aws s3 cp ${METADATA_REPORT_PATH} s3://assets.dev.tyk.technology/testreports/${REPORT_NAME#*/}.metadata.toml
       - name: Docker logs for all components
         if: failure() && (steps.test_execution.outcome != 'success' || steps.env_up.outcome != 'success')
@@ -364,11 +377,11 @@ jobs:
           TYK_MDCB_LICENSE: ${{ secrets.MDCB_LICENSE }}
           ECR: ${{ steps.ecr.outputs.registry }}
         run: |
-          docker compose -p auto -f pro-ha.yml -f deps_pro-ha.yml -f ${{ matrix.envfiles.db }}.yml -f ${{ matrix.envfiles.cache }}.yml  --env-file versions.env --profile all logs | sort > ${{ github.workspace }}/docker-compose.log
+          docker compose -p auto -f pro-ha.yml -f deps_pro-ha.yml -f ${{ matrix.envfiles.db }}.yml -f ${{ matrix.envfiles.cache }}.yml --env-file versions.env --profile all logs | sort > ${{ github.workspace }}/docker-compose.log
           echo "::group::DockerLogs"
           cat ${{ github.workspace }}/docker-compose.log
           echo "::endgroup::"
-      - name: Upload Artifact
+      - name: Upload compose logs
         uses: actions/upload-artifact@v4
         if: failure() && (steps.test_execution.outcome != 'success' || steps.env_up.outcome != 'success')
         with:
@@ -376,59 +389,59 @@ jobs:
           path: ${{ github.workspace }}/docker-compose.log
           retention-days: 3
           overwrite: true
-      - name: Archive Integration tests report
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: api-test-report-${{ matrix.envfiles.db }}-${{ matrix.envfiles.conf }}-${{ github.run_id }}
-          retention-days: 3
-          path: ${{ github.workspace }}/reports
-          overwrite: true
+  test-controller-distros:
+    needs:
+      - goreleaser
+    runs-on: ubuntu-latest
+    outputs:
+      deb: ${{ steps.params.outputs.deb }}
+      rpm: ${{ steps.params.outputs.rpm }}
+    steps:
+      - name: set params
+        id: params
+        shell: bash
+        env:
+          # startsWith covers pull_request_target too
+          BASE_REF: ${{startsWith(github.event_name, 'pull_request') && github.base_ref || github.ref_name}}
+        run: |
+          set -eo pipefail
+          curl -s --retry 5 --retry-delay 10 --fail-with-body "http://tui.internal.dev.tyk.technology/v2/$VARIATION/tyk/$BASE_REF/${{ github.event_name}}/api/Distros.gho" | tee -a "$GITHUB_OUTPUT"
+          ! [[ $VARIATION =~ prod ]] && echo "::warning file=.github/workflows/release.yml,line=26,col=1,endColumn=8::Using test variation"
   upgrade-deb:
     services:
       httpbin.org:
         image: kennethreitz/httpbin
     runs-on: ubuntu-latest
-    needs: goreleaser
+    needs:
+      - test-controller-distros
     strategy:
-      fail-fast: false
+      fail-fast: true
       matrix:
         arch:
           - amd64
           - arm64
-        distro:
-          - ubuntu:xenial
-          - ubuntu:bionic
-          - ubuntu:focal
-          - ubuntu:jammy
-          - debian:bullseye
-          - debian:bookworm
+        distro: ${{ fromJson(needs.test-controller-distros.outputs.deb) }}
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 1
+          sparse-checkout: ci
       - uses: actions/download-artifact@v4
         with:
           name: deb
       - uses: docker/setup-qemu-action@v3
       - uses: docker/setup-buildx-action@v3
       - name: generate dockerfile
-        run: |
-          echo 'FROM ${{ matrix.distro }}
-          ARG TARGETARCH
-          COPY tyk-gateway*_${TARGETARCH}.deb /tyk-gateway.deb
-          RUN apt-get update && apt-get install -y curl
-          RUN curl -fsSL https://packagecloud.io/install/repositories/tyk/tyk-gateway/script.deb.sh | bash && apt-get install -y tyk-gateway=3.0.8
-          RUN dpkg -i tyk-gateway.deb
-          RUN /opt/tyk-gateway/install/setup.sh --listenport=8080 --redishost=localhost --redisport=6379 --domain=""
-          COPY ci/tests/api-functionality/data/api.json /opt/tyk-gateway/apps/
-          CMD ["/opt/tyk-gateway/tyk", "--conf", "/opt/tyk-gateway/tyk.conf"]
-          ' > Dockerfile
+        run: "echo 'FROM ${{ matrix.distro }}\nARG TARGETARCH\nCOPY tyk-gateway*_${TARGETARCH}.deb /tyk-gateway.deb\nRUN apt-get update && apt-get install -y curl\nRUN curl -fsSL https://packagecloud.io/install/repositories/tyk/tyk-gateway/script.deb.sh | bash && apt-get install -y tyk-gateway=3.0.8\nRUN dpkg -i /tyk-gateway.deb \nRUN /opt/tyk-gateway/install/setup.sh --listenport=8080 --redishost=localhost --redisport=6379 --domain=\"\"\nCOPY ci/tests/api-functionality/data/api.json /opt/tyk-gateway/apps/\nCMD [\"/opt/tyk-gateway/tyk\", \"--conf\", \"/opt/tyk-gateway/tyk.conf\"]\n' | tee Dockerfile\n"
       - name: install on ${{ matrix.distro }}
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         with:
           context: "."
           platforms: linux/${{ matrix.arch }}
+          build-args: |
+            RHELARCH=${{ startsWith(matrix.arch, 'arm64') && 'aarch64' || 'x86_64' }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
           file: Dockerfile
           push: false
           tags: test-${{ matrix.distro }}-${{ matrix.arch }}
@@ -442,52 +455,43 @@ jobs:
     services:
       httpbin.org:
         image: kennethreitz/httpbin
-    needs: goreleaser
     runs-on: ubuntu-latest
+    needs:
+      - test-controller-distros
     strategy:
-      fail-fast: false
+      fail-fast: true
       matrix:
-        distro:
-          - amazonlinux:2023
-          - registry.access.redhat.com/ubi8/ubi
-          - registry.access.redhat.com/ubi9/ubi
-          - amazonlinux:2
-          - registry.access.redhat.com/ubi7/ubi
+        arch:
+          - amd64
+          - arm64
+        distro: ${{ fromJson(needs.test-controller-distros.outputs.rpm) }}
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 1
+          sparse-checkout: ci
       - uses: actions/download-artifact@v4
         with:
           name: rpm
+      - uses: docker/setup-qemu-action@v3
       - uses: docker/setup-buildx-action@v3
       - name: generate dockerfile
-        run: |
-          echo 'FROM ${{ matrix.distro }}
-          COPY tyk-gateway*.x86_64.rpm /tyk-gateway.rpm
-          RUN command -v curl || yum install -y curl
-          RUN command -v useradd || yum install -y shadow-utils
-          RUN curl -fsSL https://packagecloud.io/install/repositories/tyk/tyk-gateway/script.rpm.sh | bash && yum install -y tyk-gateway-3.0.8-1
-          RUN curl https://keyserver.tyk.io/tyk.io.rpm.signing.key.2020 -o tyk-gateway.key && rpm --import tyk-gateway.key
-          RUN rpm --checksig tyk-gateway.rpm
-          RUN rpm -Uvh --force tyk-gateway.rpm
-          RUN /opt/tyk-gateway/install/setup.sh --listenport=8080 --redishost=localhost --redisport=6379 --domain=""
-          COPY ci/tests/api-functionality/data/api.json /opt/tyk-gateway/apps/
-          CMD ["/opt/tyk-gateway/tyk", "--conf", "/opt/tyk-gateway/tyk.conf"]
-          ' > Dockerfile
+        run: "echo 'FROM ${{ matrix.distro }}\nARG RHELARCH\nCOPY tyk-gateway*.${RHELARCH}.rpm /tyk-gateway.rpm\nRUN command -v curl || yum install -y curl\nRUN command -v useradd || yum install -y shadow-utils\nRUN curl -fsSL https://packagecloud.io/install/repositories/tyk/tyk-gateway/script.rpm.sh | bash && yum install -y tyk-gateway-3.0.8-1\nRUN curl https://keyserver.tyk.io/tyk.io.rpm.signing.key.2020 -o tyk-gateway.key && rpm --import tyk-gateway.key\nRUN rpm --checksig /tyk-gateway.rpm\nRUN rpm -Uvh --force /tyk-gateway.rpm \nRUN /opt/tyk-gateway/install/setup.sh --listenport=8080 --redishost=localhost --redisport=6379 --domain=\"\"\nCOPY ci/tests/api-functionality/data/api.json /opt/tyk-gateway/apps/\nCMD [\"/opt/tyk-gateway/tyk\", \"--conf\", \"/opt/tyk-gateway/tyk.conf\"]\n' | tee Dockerfile\n"
       - name: install on ${{ matrix.distro }}
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         with:
           context: "."
+          platforms: linux/${{ matrix.arch }}
+          build-args: |
+            RHELARCH=${{ startsWith(matrix.arch, 'arm64') && 'aarch64' || 'x86_64' }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
           file: Dockerfile
           push: false
-          tags: test # matrix.distro for ubi has invalid chars for a tag
+          tags: test-${{ matrix.distro }}-${{ matrix.arch }}
           load: true
       - name: Test the built container image with api functionality test.
-        run: |
-          docker run -d -p8080:8080 --network ${{ job.container.network }} --rm test
-          sleep 2
-          ./ci/tests/api-functionality/api_test.sh
+        run: "docker run -d -p8080:8080 --network ${{ job.container.network }} --rm test-${{ matrix.distro }}-${{ matrix.arch }}\nsleep 2\n./ci/tests/api-functionality/api_test.sh \n"
   release-tests:
     needs:
       - goreleaser
