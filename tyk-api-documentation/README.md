@@ -13,7 +13,7 @@ Currently, we use redocly for linting the OAS. You can install Redocly from (htt
 ## How the OAS was generated.
 
 We used the golang library [openapi-go](https://github.com/swaggest/openapi-go) because:
-1. It supports producing  OASn for version 3. (Golang doesn't to many libraries to produce OAS three)
+1. It supports producing  OAS for version 3. (Golang doesn't have too many libraries that produce OAS 3)
 2. It is highly customizable, and you can define how you want each field generated.
 3. It allows you to write the generation code as functions which is easier to read and maintain
 
