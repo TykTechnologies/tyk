@@ -3,7 +3,7 @@
 The **Tyk API Documentation** is an open api specification with all the endpoints that you can call on the gateway.
 
 ## Notes
-The current OAS is version 5.3.0 generated from gateway v5.3.0.
+The current OAS is version 5.3.0 generated from gateway v5.5.0.
 
 The version of Open Api specification used is currently 3.0.3
 
