@@ -452,26 +452,31 @@ func endpointRateLimitTestHelper(t *testing.T, limiter string, beforeFn func()) 
 		},
 	}
 
-	for i := range rlTestCases {
-		t.Run(rlTestCases[i].name, func(t *testing.T) {
-			ts := StartTest(func(globalConf *config.Config) {
-				globalConf.HashKeys = rlTestCases[i].hashKey
-				globalConf.HashKeyFunction = rlTestCases[i].hashAlgo
-
-				switch limiter {
-				case "Redis":
-					globalConf.RateLimit.EnableRedisRollingLimiter = true
-				case "Sentinel":
-					globalConf.RateLimit.EnableSentinelRateLimiter = true
-				case "DRL":
-					globalConf.RateLimit.DRLEnableSentinelRateLimiter = true
-				case "NonTransactional":
-					globalConf.RateLimit.EnableNonTransactionalRateLimiter = true
-				default:
-					t.Fatal("There is no such a rate limiter:", limiter)
-				}
-			})
+	for _, tc := range rlTestCases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			ts := StartTest(nil)
 			defer ts.Close()
+
+			globalConf := ts.Gw.GetConfig()
+
+			globalConf.HashKeys = tc.hashKey
+			globalConf.HashKeyFunction = tc.hashAlgo
+
+			switch limiter {
+			case "Redis":
+				globalConf.RateLimit.EnableRedisRollingLimiter = true
+			case "Sentinel":
+				globalConf.RateLimit.EnableSentinelRateLimiter = true
+			case "DRL":
+				globalConf.RateLimit.DRLEnableSentinelRateLimiter = true
+			case "NonTransactional":
+				globalConf.RateLimit.EnableNonTransactionalRateLimiter = true
+			default:
+				t.Fatal("There is no such a rate limiter:", limiter)
+			}
+
+			ts.Gw.SetConfig(globalConf)
 
 			ok := ts.Gw.GlobalSessionManager.Store().DeleteAllKeys()
 			assert.True(t, ok)
