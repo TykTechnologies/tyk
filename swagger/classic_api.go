@@ -14,7 +14,7 @@ const (
 	APIsTag    = "APIs"
 	ApiTagDesc = `**Note: Applies only to Tyk Gateway Community Edition** <br/>
 
-API Management is very simple using the Tyk REST API: each update only affects the underlying file, and this endpoint will only work with disk based installations, not Database-backed ones.<br/>
+API management is very simple using the Tyk Rest API: each update only affects the underlying file, and this endpoint will only work with disk based installations, not database-backed ones.<br/>
 
 APIs that are added this way are flushed to to disk into the app_path folder using the format: *{api-id}.json*. Updating existing APIs that use a different naming convention will cause those APIs to be added, which could subsequently lead to a loading error and crash if they use the same listen_path. <br/>
 
@@ -40,14 +40,14 @@ func getClassicApiRequest(r *openapi3.Reflector) error {
 	}
 	oc := op.oc
 	op.AddResponseWithSeparateExample(apidef.APIDefinition{}, http.StatusOK, minimalApis[0], func(cu *openapi.ContentUnit) {
-		cu.Description = "API definition"
+		cu.Description = "API definition."
 	})
-	op.StatusNotFound("API not found", func(cu *openapi.ContentUnit) {
-		cu.Description = "API not found"
+	op.StatusNotFound("API not found.", func(cu *openapi.ContentUnit) {
+		cu.Description = "API not found."
 	})
-	oc.SetSummary("Get API definition with it's ID")
-	oc.SetDescription("Get API definition\nOnly if used without the Tyk Dashboard")
-	op.AddPathParameter("apiID", "The API ID", OptionalParameterValues{
+	oc.SetSummary("Get API definition with it's ID.")
+	oc.SetDescription("Get API definition from Tyk Gateway.")
+	op.AddPathParameter("apiID", "The API ID.", OptionalParameterValues{
 		Example: valueToInterface("keyless"),
 	})
 	op.AddResponseHeaders(ResponseHeader{
@@ -71,9 +71,9 @@ func getListOfClassicApisRequest(r *openapi3.Reflector) error {
 	}
 	oc := op.oc
 	op.AddResponseWithSeparateExample(new([]apidef.APIDefinition), http.StatusOK, minimalApis, func(cu *openapi.ContentUnit) {
-		cu.Description = "List of API definitions"
+		cu.Description = "List of API definitions."
 	})
-	oc.SetDescription("List APIs\nOnly if used without the Tyk Dashboard")
+	oc.SetDescription("List APIs from Tyk Gateway")
 	oc.SetSummary("Get list of apis")
 	return op.AddOperation()
 }
@@ -91,7 +91,7 @@ func putClassicApiRequest(r *openapi3.Reflector) error {
 	}
 	oc := op.oc
 	requestBody := minimalApis[0]
-	requestBody.Name = "Update the api name sample"
+	requestBody.Name = "Update the API name sample"
 	requestBody.Proxy.TargetURL = "https://tyk.io/api"
 	requestBody.Proxy.ListenPath = "/update-listen-path"
 	op.AddReqWithSeparateExample(new(apidef.APIDefinition), requestBody)
@@ -101,21 +101,18 @@ func putClassicApiRequest(r *openapi3.Reflector) error {
 			Action: "modified",
 			Key:    "1bd5c61b0e694082902cf15ddcc9e6a7",
 		}, http.StatusOK, func(cu *openapi.ContentUnit) {
-			cu.Description = "API updated"
+			cu.Description = "API updated."
 		})
-	oc.AddRespStructure(new(apiModifyKeySuccess), func(cu *openapi.ContentUnit) {
-		cu.Description = "API updated"
-	})
-	oc.SetSummary("Updating an API definition with its ID")
-	oc.SetDescription("Updating an API definition uses the same signature an object as a `POST`, however it will first ensure that the API ID that is being updated is the same as the one in the object being `PUT`.\n\nUpdating will completely replace the file descriptor and will not change an API Definition that has already been loaded, the hot-reload endpoint will need to be called to push the new definition to live.")
+	oc.SetSummary("Updating an API definition with its ID.")
+	oc.SetDescription("Updating an API definition uses the same signature and object as a `POST`, however it will first ensure that the API ID that is being updated is the same as the one in the object being `PUT`.\n\nUpdating will completely replace the file descriptor and will not change an API Definition that has already been loaded, the hot-reload endpoint will need to be called to push the new definition to live.")
 	op.StatusNotFound("API not found", func(cu *openapi.ContentUnit) {
-		cu.Description = "API not found"
+		cu.Description = "API not found."
 	})
 	op.StatusBadRequest("Request malformed")
-	op.AddPathParameter("apiID", "The API ID", OptionalParameterValues{
+	op.AddPathParameter("apiID", "The API ID.", OptionalParameterValues{
 		Example: valueToInterface("1bd5c61b0e694082902cf15ddcc9e6a7"),
 	})
-	op.StatusInternalServerError("file object creation failed, write error")
+	op.StatusInternalServerError("File object creation failed, write error.")
 
 	return op.AddOperation()
 }
@@ -133,20 +130,20 @@ func deleteClassicApiRequest(r *openapi3.Reflector) error {
 	}
 	oc := op.oc
 	oc.SetDescription("Deleting an API definition will remove the file from the file store, the API definition will NOT be unloaded, a separate reload request will need to be made to disable the API endpoint.")
-	oc.SetSummary("Deleting an API definition with ID")
+	oc.SetSummary("Deleting an API definition with ID.")
 	op.AddRespWithExample(apiModifyKeySuccess{
 		Key:    "1bd5c61b0e694082902cf15ddcc9e6a7",
 		Status: "ok",
 		Action: "deleted",
 	}, http.StatusOK, func(cu *openapi.ContentUnit) {
-		cu.Description = "API deleted"
+		cu.Description = "API deleted."
 	})
 
 	op.StatusNotFound("API not found", func(cu *openapi.ContentUnit) {
-		cu.Description = "API not found"
+		cu.Description = "API not found."
 	})
 	op.StatusInternalServerError("Delete failed")
-	op.AddPathParameter("apiID", "The API ID", OptionalParameterValues{
+	op.AddPathParameter("apiID", "The API ID.", OptionalParameterValues{
 		Example: valueToInterface("1bd5c61b0e694082902cf15ddcc9e6a7"),
 	})
 	return op.AddOperation()
@@ -164,7 +161,7 @@ func createClassicApiRequest(r *openapi3.Reflector) error {
 		return err
 	}
 	oc := op.oc
-	oc.SetDescription("Create API\n         A single Tyk node can have its API Definitions queried, deleted and updated remotely. This functionality enables you to remotely update your Tyk definitions without having to manage the files manually.")
+	oc.SetDescription("Create API. A single Tyk node can have its API Definitions queried, deleted and updated remotely. This functionality enables you to remotely update your Tyk definitions without having to manage the files manually.")
 	oc.SetSummary("Creat an API")
 	op.AddReqWithSeparateExample(new(apidef.APIDefinition), minimalApis[0])
 	op.StatusInternalServerError("file object creation failed, write error")
@@ -173,7 +170,7 @@ func createClassicApiRequest(r *openapi3.Reflector) error {
 		Action: "added",
 		Key:    "b84fe1a04e5648927971c0557971565c",
 	}, http.StatusOK, func(cu *openapi.ContentUnit) {
-		cu.Description = "api created"
+		cu.Description = "API created."
 	})
 
 	op.StatusBadRequest("Request malformed")
@@ -192,13 +189,13 @@ func getApiVersions(r *openapi3.Reflector) error {
 	if err != nil {
 		return err
 	}
-	oc.AddPathParameter("apiID", "The API ID", OptionalParameterValues{
+	oc.AddPathParameter("apiID", "The API ID.", OptionalParameterValues{
 		Example: valueToInterface("keyless"),
 	})
 	oc.AddRefParameters(SearchText)
 	oc.AddRefParameters(AccessType)
 	oc.StatusNotFound("API not found", func(cu *openapi.ContentUnit) {
-		cu.Description = "Api not found"
+		cu.Description = "API not found."
 	})
 
 	versionMetas := gateway.VersionMetas{
@@ -224,10 +221,10 @@ func getApiVersions(r *openapi3.Reflector) error {
 	}
 
 	oc.AddRespWithExample(versionMetas, http.StatusOK, func(cu *openapi.ContentUnit) {
-		cu.Description = "API version metas"
+		cu.Description = "API version metas."
 	})
-	oc.SetSummary("Listing versions of an API")
-	oc.SetDescription("Listing versions of an API")
+	oc.SetSummary("Listing versions of an API.")
+	oc.SetDescription("Listing versions of an API.")
 
 	return oc.AddOperation()
 }

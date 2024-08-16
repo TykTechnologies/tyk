@@ -38,15 +38,15 @@ func deleteCertWithID(r *openapi3.Reflector) error {
 	}
 	oc := op.oc
 	oc.SetID("deleteCerts")
-	oc.SetSummary("Delete Certificate")
-	oc.SetDescription("Delete certificate by id")
+	oc.SetSummary("Delete certificate.")
+	oc.SetDescription("Delete certificate by ID.")
 	op.AddGenericStatusOk("removed", func(cu *openapi.ContentUnit) {
-		cu.Description = "Deleted certificate"
+		cu.Description = "Deleted certificate."
 	})
-	op.AddPathParameter("certID", "Certificate ID to be deleted", OptionalParameterValues{
+	op.AddPathParameter("certID", "Certificate ID to be deleted.", OptionalParameterValues{
 		Example: valueToInterface("5e9d9544a1dcd60001d0ed20a6ab77653d5da938f452bb8cc9b55b0630a6743dabd8dc92bfb025abb09ce035"),
 	})
-	op.AddQueryParameter("org_id", "Organisation ID to delete the certificates from", OptionalParameterValues{
+	op.AddQueryParameter("org_id", "Organisation ID to delete the certificates from.", OptionalParameterValues{
 		Example: valueToInterface("5e9d9544a1dcd60001d0ed20"),
 	})
 	return op.AddOperation()
@@ -64,12 +64,12 @@ func getCertsWithIDs(r *openapi3.Reflector) error {
 		return err
 	}
 	oc := op.oc
-	op.StatusNotFound("Certificate with given SHA256 fingerprint not found")
+	op.StatusNotFound("Certificate with given SHA256 fingerprint not found.")
 	op.AddRespWithRefExamples(http.StatusOK, jsonschema.OneOf(new(certs.CertificateMeta), new([]*certs.CertificateMeta)), []multipleExamplesValues{
 		{
 			key:         certificateMetaListExample,
 			httpStatus:  http.StatusOK,
-			Summary:     "When multiple cert ID are sent",
+			Summary:     "When multiple cert ID are sent.",
 			exampleType: Component,
 			ref:         certificateMetaListExample,
 			hasExample:  true,
@@ -77,17 +77,17 @@ func getCertsWithIDs(r *openapi3.Reflector) error {
 		{
 			key:         certificateMetaExample,
 			httpStatus:  http.StatusOK,
-			Summary:     "When a single cert ID is sent",
+			Summary:     "When a single cert ID is sent.",
 			exampleType: Component,
 			ref:         certificateMetaExample,
 			hasExample:  true,
 		},
 	})
-	op.AddPathParameter("certID", "Comma separated list of certificates to list", OptionalParameterValues{
+	op.AddPathParameter("certID", "Comma separated list of certificates to list.", OptionalParameterValues{
 		Example: valueToInterface("e6ce2b49-3e31-44de-95a7-12f054724283,5e9d9544a1dcd60001d0ed20a6ab77653d5da938f452bb8cc9b55b0630a6743dabd8dc92bfb025abb09ce035"),
 	})
-	oc.SetSummary("Return one certificate or List multiple Certificates in the Tyk Gateway given a comma separated list of certIDs")
-	oc.SetDescription("Note that the certID path parameter can take a list of certIDs separated with commas (e.g /tyk/certs/certIDOne,certIDTwo).\n If you send a single certID it will return a single CertificateMeta object otherwise if you send more than two certIDs is will return an array of CertificateMeta objects.")
+	oc.SetSummary("Return one certificate or list multiple certificates in the Tyk Gateway given a comma separated list of cert IDs.")
+	oc.SetDescription("Note that the certID path parameter can take a list of certIDs separated with commas (e.g /tyk/certs/certIDOne,certIDTwo).\n If you send a single certID it will return a single CertificateMeta object otherwise if you send more than two certIDs is will return an array of certificateMeta objects.")
 	return op.AddOperation()
 }
 
@@ -106,22 +106,22 @@ func createCertificate(r *openapi3.Reflector) error {
 	oc := op.oc
 	oc.AddReqStructure(new(string), openapi.WithContentType("text/plain"), func(cu *openapi.ContentUnit) {
 	})
-	oc.SetSummary("Add a certificate")
-	oc.SetDescription("Add a certificate to the Tyk Gateway")
-	op.AddGenericErrorResponse(http.StatusForbidden, "Certificate with  id already exists", func(cu *openapi.ContentUnit) {
-		cu.Description = "When certificates you send already exist in the gateway"
+	oc.SetSummary("Add a certificate.")
+	oc.SetDescription("Add a certificate to the Tyk Gateway.")
+	op.AddGenericErrorResponse(http.StatusForbidden, "Certificate with  ID already exists.", func(cu *openapi.ContentUnit) {
+		cu.Description = "When certificates you send already exist in the gateway."
 	})
 	op.AddGenericErrorResponse(http.StatusMethodNotAllowed, "Malformed request body", func(cu *openapi.ContentUnit) {
-		cu.Description = "malformed request body"
+		cu.Description = "Malformed request body."
 	})
 	op.AddRespWithExample(gateway.APICertificateStatusMessage{
 		CertID:  "5e9d9544a1dcd60001d0ed207c440d66ebb0a4629d21329808dce9091acf5f2fde328067a6e60e5347271d90",
 		Status:  "ok",
 		Message: "Certificate added",
 	}, http.StatusOK, func(cu *openapi.ContentUnit) {
-		cu.Description = "New Certificate added"
+		cu.Description = "New certificate added."
 	})
-	op.AddQueryParameter("org_id", "Organisation ID to add the certificate to", OptionalParameterValues{
+	op.AddQueryParameter("org_id", "Organisation ID to add the certificate to.", OptionalParameterValues{
 		Example: valueToInterface("5e9d9544a1dcd60001d0ed20"),
 	})
 	return op.AddOperation()
@@ -144,7 +144,7 @@ func getCertsList(r *openapi3.Reflector) error {
 		{
 			key:         certIdList,
 			httpStatus:  http.StatusOK,
-			Summary:     "When mode is not detailed",
+			Summary:     "When mode is not detailed.",
 			exampleType: Component,
 			ref:         certIdList,
 			hasExample:  true,
@@ -152,7 +152,7 @@ func getCertsList(r *openapi3.Reflector) error {
 		{
 			key:         certificateBasicList,
 			httpStatus:  http.StatusOK,
-			Summary:     "When mode is set as detailed",
+			Summary:     "When mode is set as detailed.",
 			exampleType: Component,
 			ref:         certificateBasicList,
 			hasExample:  true,
@@ -162,12 +162,12 @@ func getCertsList(r *openapi3.Reflector) error {
 	oc.AddRespStructure(jsonschema.OneOf(new(gateway.APIAllCertificateBasics), new(gateway.APIAllCertificates)))
 	oc.SetTags(CertsTag)
 	oc.SetID("listCerts")
-	oc.SetSummary("List Certificates")
-	oc.SetDescription("List All Certificates in the Tyk Gateway")
-	op.AddQueryParameter("org_id", "Organisation ID to list the certificates", OptionalParameterValues{
+	oc.SetSummary("List certificates.")
+	oc.SetDescription("List all certificates in the Tyk Gateway.")
+	op.AddQueryParameter("org_id", "Organisation ID to list the certificates.", OptionalParameterValues{
 		Example: valueToInterface("5e9d9544a1dcd60001d0ed20"),
 	})
-	op.AddQueryParameter("mode", "Mode to list the certificate details", OptionalParameterValues{
+	op.AddQueryParameter("mode", "Mode to list the certificate details.", OptionalParameterValues{
 		Example: valueToInterface("detailed"),
 		Enum:    []interface{}{"detailed"},
 	})

@@ -31,18 +31,18 @@ func invalidateCache(r *openapi3.Reflector) error {
 		return err
 	}
 	oc := op.oc
-	oc.SetSummary("Invalidate cache")
+	oc.SetSummary("Invalidate cache.")
 
-	oc.SetDescription("Invalidate cache for the given API")
-	op.AddPathParameter("apiID", "The API ID", OptionalParameterValues{
+	oc.SetDescription("Invalidate cache for the given API.")
+	op.AddPathParameter("apiID", "The API ID.", OptionalParameterValues{
 		Example: valueToInterface("ae67bb862a3241a49117508e0f9ee839"),
 	})
 	op.AddRespWithExample(apiStatusMessage{
 		Status:  "ok",
 		Message: "cache invalidated",
 	}, http.StatusOK, func(cu *openapi.ContentUnit) {
-		cu.Description = "cache invalidated"
+		cu.Description = "Cache invalidated."
 	})
-	op.StatusInternalServerError("Cache invalidation failed")
+	op.StatusInternalServerError("Cache invalidation failed.")
 	return op.AddOperation()
 }

@@ -11,7 +11,7 @@ import (
 
 const (
 	helloTag     = "Health Checking"
-	helloTagDesc = `Check health status of the Gateway and loaded APIs
+	helloTagDesc = `Check health status of the Tyk Gateway and loaded APIs.
 `
 )
 
@@ -28,10 +28,10 @@ func HealthEndpoint(r *openapi3.Reflector) error {
 		return err
 	}
 	oc := op.oc
-	oc.SetSummary("Check the Health of the Tyk Gateway")
-	oc.SetDescription("From v2.7.5 you can now rename the `/hello`  endpoint by using the `health_check_endpoint_name` option\n        \n        Returns 200 response in case of success")
+	oc.SetSummary("Check the health of the Tyk Gateway.")
+	oc.SetDescription("From v2.7.5 you can now rename the `/hello`  endpoint by using the `health_check_endpoint_name` option.")
 	op.AddRespWithExample(healthCheckResponse, http.StatusOK, func(cu *openapi.ContentUnit) {
-		cu.Description = "Success"
+		cu.Description = "Success."
 	})
 	op.AddGenericErrorResponse(http.StatusMethodNotAllowed, "Method Not Allowed")
 	return op.AddOperation()

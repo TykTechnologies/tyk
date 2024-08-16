@@ -27,15 +27,15 @@ func DebugApi(r *openapi3.Reflector) error {
 		Method: "GET",
 		Path:   "/update-listen-path",
 	}})
-	oc.SetSummary("Test an an API definition")
-	oc.SetDescription("Used to test API definition by sending sample request and analysing output of both response and logs")
+	oc.SetSummary("Test an an API definition.")
+	oc.SetDescription("Used to test API definition by sending sample request and analysing output of both response and logs.")
 	op.StatusInternalServerError("Unexpected failure:")
 	op.AddRespWithExample(traceResponse{
 		Message:  "ok",
 		Response: "====== Request ======\nGET / HTTP/1.1\r\nHost: httpbin.org\r\n\r\n\n====== Response...",
 		Logs:     "{\"level\":\"warning\",\"msg\":\"Legacy path detected! Upgrade to extended....",
 	}, http.StatusOK, func(cu *openapi.ContentUnit) {
-		cu.Description = "Success tracing request"
+		cu.Description = "Success tracing request."
 	})
 
 	return op.AddOperation()
