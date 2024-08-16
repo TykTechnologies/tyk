@@ -452,7 +452,7 @@ func (op *OperationWithExample) StatusInternalServerError(message string) {
 }
 
 func (op *OperationWithExample) AddPageQueryParameter() {
-	op.AddQueryParameter("page", "Use page query parameter to say which page you want returned.", OptionalParameterValues{
+	op.AddQueryParameter("page", "Use page query parameter to say which page number you want returned.", OptionalParameterValues{
 		Example: valueToInterface(1),
 		Type:    openapi3.SchemaTypeInteger,
 		Default: valueToInterface(1),

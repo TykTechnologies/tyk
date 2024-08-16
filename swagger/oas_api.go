@@ -13,7 +13,10 @@ import (
 	"github.com/TykTechnologies/tyk/gateway"
 )
 
-const OASTag = "OAS APIs"
+const (
+	OASTag   = "OAS APIs"
+	modeDesc = "By default mode is empty which means it will return the OAS spec including the x-tyk-api-gateway part. \n When mode=public, OAS spec will exclude the x-tyk-api-gateway part in the response."
+)
 
 func OasAPIS(r *openapi3.Reflector) error {
 	return addOperations(r, getListOfOASApisRequest, postOAsApi, apiOASExportHandler, getOASApiRequest, apiOASPutHandler, deleteOASHandler, apiOASExportWithIDHandler, importApiOASPostHandler, oasVersionsHandler, apiOASPatchHandler)
@@ -37,25 +40,25 @@ func getListOfOASApisRequest(r *openapi3.Reflector) error {
 	}
 	//TODO
 	///recommended i use external reference just incase it is updated
-	op.AddQueryParameter("mode", "Mode of OAS get, by default mode could be empty which means to get OAS spec including OAS Tyk extension. \n When mode=public, OAS spec excluding Tyk extension will be returned in the response", OptionalParameterValues{
+	op.AddQueryParameter("mode", modeDesc, OptionalParameterValues{
 		Example: valueToInterface("public"),
 		Enum:    []interface{}{"public"},
 	})
 
-	oc.SetSummary("List all OAS format APIS")
-	oc.SetDescription("List all OAS format APIs, when used without the Tyk Dashboard.")
+	oc.SetSummary("List all OAS format APIs.")
+	oc.SetDescription("List all OAS format APIs, from Tyk Gateway.")
 	item := []jsonschema.AllOfExposer{jsonschema.AllOf(responseSchema, oas.XTykAPIGateway{})}
 	op.AddRespWithRefExamples(http.StatusOK, item, []multipleExamplesValues{
 		{
 			key:         oasExampleList,
 			httpStatus:  200,
-			Summary:     "List of API definitions in OAS format",
+			Summary:     "List of API definitions in OAS format.",
 			exampleType: Component,
 			ref:         oasExampleList,
 			hasExample:  true,
 		},
 	}, func(cu *openapi.ContentUnit) {
-		cu.Description = "List of API definitions in OAS format"
+		cu.Description = "List of API definitions in OAS format."
 	})
 	return op.AddOperation()
 }
@@ -78,10 +81,10 @@ func postOAsApi(r *openapi3.Reflector) error {
 		Status: "ok",
 		Action: "added",
 	}, http.StatusOK, func(cu *openapi.ContentUnit) {
-		cu.Description = "API created"
+		cu.Description = "API created."
 	})
-	oc.SetDescription("Create API with OAS format\n         A single Tyk node can have its API Definitions queried, deleted and updated remotely. This functionality enables you to remotely update your Tyk definitions without having to manage the files manually.")
-	oc.SetSummary("Create API with OAS format")
+	oc.SetDescription("Create API with OAS format on the Tyk Gateway.")
+	oc.SetSummary("Create API with OAS format.")
 	oc.AddReqWithSeparateExample(responseSchemaWithExtension, oasSample(OasSampleString()))
 	addApiPostQueryParam(oc)
 	///addExternalRefToRequest(o3)
@@ -98,15 +101,15 @@ func apiOASExportHandler(r *openapi3.Reflector) error {
 	if err != nil {
 		return err
 	}
-	oc.SetSummary("Download all OAS format APIs")
-	oc.SetDescription("Download all OAS format APIs, when used without the Tyk Dashboard.")
+	oc.SetSummary("Download all OAS format APIs.")
+	oc.SetDescription("Download all OAS format APIs, from the Gateway.")
 	oc.AddBinaryFormatResp(BinaryFormat{
 		///example:     BinaryExample(OasSampleString()),
 		httpStatus:  200,
-		description: "Get list of oas API definition",
+		description: "Get list of oas API definition.",
 	})
 	oc.StatusInternalServerError("Unexpected error")
-	oc.AddQueryParameter("mode", "Mode of OAS get, by default mode could be empty which means to get OAS spec including OAS Tyk extension. \n When mode=public, OAS spec excluding Tyk extension will be returned in the response", OptionalParameterValues{
+	oc.AddQueryParameter("mode", modeDesc, OptionalParameterValues{
 		Required: PointerValue(false),
 		Example:  valueToInterface("public"),
 		Type:     openapi3.SchemaTypeString,
@@ -129,23 +132,23 @@ func getOASApiRequest(r *openapi3.Reflector) error {
 		return err
 	}
 	oc.StatusNotFound("API not found", func(cu *openapi.ContentUnit) {
-		cu.Description = "API not found"
+		cu.Description = "API not found."
 	})
-	oc.StatusBadRequest("the requested API definition is in Tyk classic format, please use old api endpoint")
-	oc.SetSummary("Get OAS Api definition")
-	oc.SetDescription("Get OAS Api definition\n  using the api Id")
+	oc.StatusBadRequest("the requested API definition is in Tyk classic format, please use old API endpoint")
+	oc.SetSummary("Get OAS API definition")
+	oc.SetDescription("Get OAS API definition using the API ID.")
 	oc.AddResponseHeaders(ResponseHeader{
 		Name:        "x-tyk-base-api-id",
 		Description: PointerValue("ID of the base API if the requested API is a version."),
 		Type:        PointerValue(openapi3.SchemaTypeString),
 	})
-	oc.AddQueryParameter("mode", "Mode of OAS get, by default mode could be empty which means to get OAS spec including OAS Tyk extension. \n When mode=public, OAS spec excluding Tyk extension will be returned in the response", OptionalParameterValues{
+	oc.AddQueryParameter("mode", modeDesc, OptionalParameterValues{
 		Required: PointerValue(false),
 		Example:  valueToInterface("public"),
 		Type:     openapi3.SchemaTypeString,
 		Enum:     []interface{}{"public"},
 	})
-	oc.AddPathParameter("apiID", "ID of the api you want to fetch", OptionalParameterValues{
+	oc.AddPathParameter("apiID", "ID of the API you want to fetch", OptionalParameterValues{
 		Example: valueToInterface("4c1c0d8fc885401053ddac4e39ef676b"),
 	})
 
@@ -191,7 +194,7 @@ func apiOASPutHandler(r *openapi3.Reflector) error {
 	oc.SetSummary("Update OAS API definition")
 	oc.SetDescription("Updating an API definition uses the same signature an object as a `POST`, however it will first ensure that the API ID that is being updated is the same as the one in the object being `PUT`.\n\n\n        Updating will completely replace the file descriptor and will not change an API Definition that has already been loaded, the hot-reload endpoint will need to be called to push the new definition to live.")
 	oc.AddReqWithSeparateExample(responseSchemaWithExtension, oasSample(OasSampleString()))
-	oc.AddPathParameter("apiID", "ID of the api you want to fetch", OptionalParameterValues{
+	oc.AddPathParameter("apiID", "ID of the API you want to fetch", OptionalParameterValues{
 		Example: valueToInterface("4c1c0d8fc885401053ddac4e39ef676b"),
 	})
 	return oc.AddOperation()
@@ -211,10 +214,10 @@ func apiOASExportWithIDHandler(r *openapi3.Reflector) error {
 	oc.StatusInternalServerError("Unexpected error")
 	oc.StatusBadRequest("requesting API definition that is in Tyk classic format")
 	oc.StatusNotFound("API not found")
-	oc.AddPathParameter("apiID", "ID of the api you want to fetch", OptionalParameterValues{
+	oc.AddPathParameter("apiID", "ID of the API you want to fetch.", OptionalParameterValues{
 		Example: valueToInterface("4c1c0d8fc885401053ddac4e39ef676b"),
 	})
-	oc.AddQueryParameter("mode", "Mode of OAS get, by default mode could be empty which means to get OAS spec including OAS Tyk extension. \n When mode=public, OAS spec excluding Tyk extension will be returned in the response", OptionalParameterValues{
+	oc.AddQueryParameter("mode", modeDesc, OptionalParameterValues{
 		Required: PointerValue(false),
 		Example:  valueToInterface("public"),
 		Type:     openapi3.SchemaTypeString,
@@ -225,8 +228,8 @@ func apiOASExportWithIDHandler(r *openapi3.Reflector) error {
 		httpStatus:  200,
 		description: "Exported API definition file",
 	})
-	oc.SetSummary("Download an OAS format APIs, when used without the Tyk Dashboard.")
-	oc.SetDescription("Mode of OAS export, by default mode could be empty which means to export OAS spec including OAS Tyk extension. \n  When mode=public, OAS spec excluding Tyk extension is exported")
+	oc.SetSummary("Download an OAS format APIs.")
+	oc.SetDescription("Use the mode query parameter to specify if you want the x-tyk-api-gateway stripped out.")
 
 	return oc.AddOperation()
 }
@@ -242,15 +245,15 @@ func importApiOASPostHandler(r *openapi3.Reflector) error {
 	if err != nil {
 		return err
 	}
-	oc.SetSummary("Create a new OAS format API, without x-tyk-gateway")
+	oc.SetSummary("Import an API in OAS format.")
 	oc.AddRespWithExample(apiModifyKeySuccess{
 		Key:    "e30bee13ad4248c3b529a4c58bb7be4e",
 		Status: "ok",
 		Action: "added",
 	}, http.StatusOK, func(cu *openapi.ContentUnit) {
-		cu.Description = "API imported"
+		cu.Description = "API imported."
 	})
-	oc.SetDescription("Create a new OAS format API, without x-tyk-gateway.\n        For use with an existing OAS API that you want to expose via your Tyk Gateway. (New)")
+	oc.SetDescription("Import an OAS format API without x-tyk-gateway.\n For use with an existing OAS API that you want to expose via your Tyk Gateway.")
 	oc.StatusInternalServerError("file object creation failed, write error")
 	oc.StatusBadRequest("the import payload should not contain x-tyk-api-gateway")
 	importAndPatchQueryParameters(oc)
@@ -271,14 +274,14 @@ func oasVersionsHandler(r *openapi3.Reflector) error {
 	if err != nil {
 		return err
 	}
-	op.AddPathParameter("apiID", "ID of the api you want to fetch", OptionalParameterValues{
+	op.AddPathParameter("apiID", "ID of the API you want to fetch.", OptionalParameterValues{
 		Example: valueToInterface("4c1c0d8fc885401053ddac4e39ef676b"),
 	})
 	oc := op.oc
-	op.StatusNotFound("API not found", func(cu *openapi.ContentUnit) {
+	op.StatusNotFound("API not found.", func(cu *openapi.ContentUnit) {
 		cu.Description = "API not found"
 	})
-	oc.SetDescription("Listing versions of an OAS API")
+	oc.SetDescription("Listing versions of an OAS API.")
 
 	versionMetas := gateway.VersionMetas{
 		Status: "success",
@@ -303,9 +306,9 @@ func oasVersionsHandler(r *openapi3.Reflector) error {
 	}
 
 	op.AddRespWithExample(versionMetas, http.StatusOK, func(cu *openapi.ContentUnit) {
-		cu.Description = "API version metas"
+		cu.Description = "API version metas."
 	})
-	oc.SetSummary("Listing versions of an OAS API")
+	oc.SetSummary("Listing versions of an OAS API.")
 	op.AddRefParameters(SearchText)
 	op.AddRefParameters(AccessType)
 
@@ -327,7 +330,7 @@ func deleteOASHandler(r *openapi3.Reflector) error {
 	op.StatusInternalServerError("Delete failed")
 	op.StatusBadRequest("Must specify an apiID to delete")
 	op.StatusNotFound("API not found", func(cu *openapi.ContentUnit) {
-		cu.Description = "API not found"
+		cu.Description = "API not found."
 	})
 	op.AddRespWithExample(apiModifyKeySuccess{
 		Key:    "1bd5c61b0e694082902cf15ddcc9e6a7",
@@ -336,9 +339,9 @@ func deleteOASHandler(r *openapi3.Reflector) error {
 	}, http.StatusOK, func(cu *openapi.ContentUnit) {
 		cu.Description = "API deleted"
 	})
-	oc.SetSummary("Deleting an OAS API")
-	oc.SetDescription("Deleting an API definition will remove the file from the file store, the API definition will NOT be unloaded, a separate reload request will need to be made to disable the API endpoint.")
-	op.AddPathParameter("apiID", "The API ID", OptionalParameterValues{
+	oc.SetSummary("Deleting an OAS API.")
+	oc.SetDescription("Deleting an API definition will remove the file from the file store, the API definition will not be unloaded, a separate reload request will need to be made to disable the API endpoint.")
+	op.AddPathParameter("apiID", "The API ID.", OptionalParameterValues{
 		Example: valueToInterface("1bd5c61b0e694082902cf15ddcc9e6a7"),
 	})
 	return op.AddOperation()
@@ -358,20 +361,20 @@ func apiOASPatchHandler(r *openapi3.Reflector) error {
 	oc.StatusInternalServerError("file object creation failed, write error")
 	oc.StatusBadRequest("Must specify an apiID to patch")
 	oc.StatusNotFound("API not found", func(cu *openapi.ContentUnit) {
-		cu.Description = "API not found"
+		cu.Description = "API not found."
 	})
 	oc.AddResp(apiModifyKeySuccess{
 		Key:    "4c1c0d8fc885401053ddac4e39ef676b",
 		Status: "ok",
 		Action: "modified",
 	}, http.StatusOK, func(cu *openapi.ContentUnit) {
-		cu.Description = "API patched"
+		cu.Description = "API patched."
 	})
-	oc.SetSummary("Patch API with OAS format.")
-	oc.SetDescription("Update API with OAS format. You can use this endpoint to update OAS part of the tyk API definition.\n        This endpoint allows you to configure tyk OAS extension based on query params provided(similar to import)")
+	oc.SetSummary("Patch API in OAS format.")
+	oc.SetDescription("You can use this endpoint to update OAS part of the Tyk API definition.\nThis endpoint allows you to configure Tyk OAS extension based on query params provided(similar to import).")
 	oc.AddReqWithSeparateExample(responseSchema, oasSample(OasSampleString()))
 
-	oc.AddPathParameter("apiID", "ID of the api you want to fetch", OptionalParameterValues{
+	oc.AddPathParameter("apiID", "ID of the API you want to fetch.", OptionalParameterValues{
 		Example: valueToInterface("4c1c0d8fc885401053ddac4e39ef676b"),
 	})
 	importAndPatchQueryParameters(oc)

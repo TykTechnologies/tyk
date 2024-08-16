@@ -35,11 +35,11 @@ func createPolicy(r *openapi3.Reflector) error {
 	}
 	oc := op.oc
 	oc.SetTags(PolicyTag)
-	oc.SetSummary("Create a Policy")
-	oc.SetDescription("You can create a Policy in your Tyk Instance")
-	op.StatusInternalServerError("Due to enabled service policy source, please use the Dashboard API")
+	oc.SetSummary("Create a policy.")
+	oc.SetDescription("Create a policy in your Tyk Instance.")
+	op.StatusInternalServerError("Due to enabled service policy source, please use the Dashboard API.")
 	op.StatusBadRequest("Request malformed", func(cu *openapi.ContentUnit) {
-		cu.Description = "malformed request"
+		cu.Description = "Malformed request."
 	})
 	op.AddReqWithSeparateExample(user.Policy{}, minimalPolicies[0])
 	op.AddRespWithExample(apiModifyKeySuccess{
@@ -47,7 +47,7 @@ func createPolicy(r *openapi3.Reflector) error {
 		Status: "ok",
 		Action: "added",
 	}, http.StatusOK, func(cu *openapi.ContentUnit) {
-		cu.Description = "Policy created"
+		cu.Description = "Policy created."
 	})
 	return op.AddOperation()
 }
@@ -73,10 +73,10 @@ func getListOfPolicies(r *openapi3.Reflector) error {
 			ref:         policiesExample,
 		},
 	}, func(cu *openapi.ContentUnit) {
-		cu.Description = "List of all policies"
+		cu.Description = "List of all policies."
 	})
-	oc.SetSummary("List Policies")
-	oc.SetDescription("You can retrieve all the policies in your Tyk instance. Returns an array policies.")
+	oc.SetSummary("List policies.")
+	oc.SetDescription("Retrieve all the policies in your Tyk instance. Returns an array policies.")
 	return op.AddOperation()
 }
 

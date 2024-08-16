@@ -35,24 +35,6 @@ type apiAllKeys struct {
 	APIKeys []string `json:"keys"`
 }
 
-func stringSchema() *openapi3.SchemaOrRef {
-	stringType := openapi3.SchemaTypeString
-	return &openapi3.SchemaOrRef{
-		Schema: &openapi3.Schema{
-			Type: &stringType,
-		},
-	}
-}
-
-func intSchema() *openapi3.SchemaOrRef {
-	intType := openapi3.SchemaTypeInteger
-	return &openapi3.SchemaOrRef{
-		Schema: &openapi3.Schema{
-			Type: &intType,
-		},
-	}
-}
-
 type ParameterValues struct {
 	Name        string
 	Description string
@@ -60,16 +42,6 @@ type ParameterValues struct {
 	Example     interface{}
 	Required    bool
 	In          openapi3.ParameterIn
-}
-
-func resetQuotaSchema() *openapi3.SchemaOrRef {
-	stringType := openapi3.SchemaTypeString
-	return &openapi3.SchemaOrRef{
-		Schema: &openapi3.Schema{
-			Type: &stringType,
-			Enum: []interface{}{"1"},
-		},
-	}
 }
 
 type HeaderCr struct {

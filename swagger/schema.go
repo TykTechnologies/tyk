@@ -26,10 +26,10 @@ func getSchemaRequest(r *openapi3.Reflector) error {
 		return err
 	}
 	oc := op.oc
-	oc.SetSummary("Get OAS schema")
-	oc.SetDescription("Get OAS schema")
+	oc.SetSummary("Get OAS schema.")
+	oc.SetDescription("Get OAS schema definition using a version.")
 	op.AddRespWithExample(gateway.OASSchemaResponse{Status: "Success"}, http.StatusOK, func(cu *openapi.ContentUnit) {
-		cu.Description = "OAS schema response"
+		cu.Description = "OAS schema response."
 	})
 	op.AddRespWithExample(gateway.OASSchemaResponse{
 		Status:  "Failed",
@@ -38,7 +38,7 @@ func getSchemaRequest(r *openapi3.Reflector) error {
 		cu.Description = "Version not found"
 	})
 
-	op.AddQueryParameter("oasVersion", "The OAS version", OptionalParameterValues{
+	op.AddQueryParameter("oasVersion", "The OAS version to fetch.", OptionalParameterValues{
 		Example: valueToInterface("3.0.3"),
 	})
 	return op.AddOperation()
