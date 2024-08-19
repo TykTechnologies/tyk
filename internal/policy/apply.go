@@ -222,25 +222,7 @@ func (t *Service) Apply(session *user.SessionState) error {
 	}
 
 	// If we have policies defining rules for one single API, update session root vars (legacy)
-	if len(partitionStatus.quota) == 1 && len(partitionStatus.rateLimit) == 1 && len(partitionStatus.complexity) == 1 {
-		for _, v := range rights {
-			if len(partitionStatus.rateLimit) == 1 {
-				session.Rate = v.Limit.Rate
-				session.Per = v.Limit.Per
-				session.Smoothing = v.Limit.Smoothing
-			}
-
-			if len(partitionStatus.quota) == 1 {
-				session.QuotaMax = v.Limit.QuotaMax
-				session.QuotaRenews = v.Limit.QuotaRenews
-				session.QuotaRenewalRate = v.Limit.QuotaRenewalRate
-			}
-
-			if len(partitionStatus.complexity) == 1 {
-				session.MaxQueryDepth = v.Limit.MaxQueryDepth
-			}
-		}
-	}
+	t.updateSessionRootVars(session, rights, partitionStatus)
 
 	// Override session ACL if at least one policy define it
 	if len(partitionStatus.acl) > 0 {
@@ -500,5 +482,27 @@ func (t *Service) applyPartitions(policy user.Policy, session *user.SessionState
 
 	if !session.EnableHTTPSignatureValidation {
 		session.EnableHTTPSignatureValidation = policy.EnableHTTPSignatureValidation
+	}
+}
+
+func (t *Service) updateSessionRootVars(session *user.SessionState, rights map[string]user.AccessDefinition, partitionState applyPartitionStatus) {
+	if len(partitionState.quota) == 1 && len(partitionState.rateLimit) == 1 && len(partitionState.complexity) == 1 {
+		for _, v := range rights {
+			if len(partitionState.rateLimit) == 1 {
+				session.Rate = v.Limit.Rate
+				session.Per = v.Limit.Per
+				session.Smoothing = v.Limit.Smoothing
+			}
+
+			if len(partitionState.quota) == 1 {
+				session.QuotaMax = v.Limit.QuotaMax
+				session.QuotaRenews = v.Limit.QuotaRenews
+				session.QuotaRenewalRate = v.Limit.QuotaRenewalRate
+			}
+
+			if len(partitionState.complexity) == 1 {
+				session.MaxQueryDepth = v.Limit.MaxQueryDepth
+			}
+		}
 	}
 }
