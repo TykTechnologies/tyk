@@ -2415,6 +2415,34 @@ components:
           x-go-name: Smoothing
       type: object
       x-go-package: github.com/TykTechnologies/tyk/user
+    SessionEndpoint:
+      title: SessionEndpoint holds rate limit on endpoint level.
+      type: object
+      properties:
+        path:
+          type: string
+        methods:
+          type: array
+          items:
+            $ref: '#/components/schemas/SessionEndpointMethod'
+    SessionEndpointMethod:
+      title: SessionEndpointMethod holds rate limit on endpoint method level.
+      properties:
+        name:
+          type: string
+        limit:
+          $ref: '#/components/schemas/SessionEndpointRateLimit'
+      type: object
+    SessionEndpointRateLimit:
+      title: SessionEndpointMethod holds rate limit on endpoint method level.
+      type: object
+      properties:
+        per:
+          type: number
+          format: double
+        rate:
+          type: number
+          format: double
     AccessDefinition:
       description: AccessDefinition defines which versions of an API a key has access to
       properties:
@@ -2431,6 +2459,10 @@ components:
           x-go-name: APIName
         limit:
           $ref: '#/components/schemas/APILimit'
+        endpoints:
+          type: array
+          items:
+            $ref: '#/components/schemas/SessionEndpoint'
         versions:
           items:
             type: string
