@@ -279,11 +279,11 @@ func (l *SessionLimiter) ForwardMessage(r *http.Request, session *user.SessionSt
 			}
 
 		case l.config.EnableSentinelRateLimiter:
-			if l.limitSentinel(r, session, limiterKey, &apiLimit, dryRun) {
+			if l.limitSentinel(r, session, limiterKey, apiLimit, dryRun) {
 				return sessionFailRateLimit
 			}
 		case l.config.EnableRedisRollingLimiter:
-			if l.limitRedis(r, session, limiterKey, &apiLimit, dryRun) {
+			if l.limitRedis(r, session, limiterKey, apiLimit, dryRun) {
 				return sessionFailRateLimit
 			}
 		default:
@@ -307,11 +307,11 @@ func (l *SessionLimiter) ForwardMessage(r *http.Request, session *user.SessionSt
 					bucketKey = limiterKey
 				}
 
-				if l.limitDRL(bucketKey, &apiLimit, dryRun) {
+				if l.limitDRL(bucketKey, apiLimit, dryRun) {
 					return sessionFailRateLimit
 				}
 			} else {
-				if l.limitRedis(r, session, limiterKey, &apiLimit, dryRun) {
+				if l.limitRedis(r, session, limiterKey, apiLimit, dryRun) {
 					return sessionFailRateLimit
 				}
 			}
@@ -323,7 +323,7 @@ func (l *SessionLimiter) ForwardMessage(r *http.Request, session *user.SessionSt
 			session.Allowance = session.Allowance - 1
 		}
 
-		if l.RedisQuotaExceeded(r, session, quotaKey, allowanceScope, &apiLimit, store, l.config.HashKeys) {
+		if l.RedisQuotaExceeded(r, session, quotaKey, allowanceScope, apiLimit, store, l.config.HashKeys) {
 			return sessionFailQuota
 		}
 	}

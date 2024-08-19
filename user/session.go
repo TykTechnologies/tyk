@@ -56,8 +56,8 @@ type APILimit struct {
 }
 
 // Clone does a deepcopy of APILimit.
-func (a APILimit) Clone() APILimit {
-	clone := APILimit{
+func (a APILimit) Clone() *APILimit {
+	return &APILimit{
 		Rate:               a.Rate,
 		Per:                a.Per,
 		ThrottleInterval:   a.ThrottleInterval,
@@ -68,19 +68,8 @@ func (a APILimit) Clone() APILimit {
 		QuotaRemaining:     a.QuotaRemaining,
 		QuotaRenewalRate:   a.QuotaRenewalRate,
 		SetBy:              a.SetBy,
+		Smoothing:          a.Smoothing.Clone(),
 	}
-
-	if a.Smoothing != nil {
-		clone.Smoothing = &apidef.RateLimitSmoothing{
-			Enabled:   a.Smoothing.Enabled,
-			Threshold: a.Smoothing.Threshold,
-			Trigger:   a.Smoothing.Trigger,
-			Step:      a.Smoothing.Step,
-			Delay:     a.Smoothing.Delay,
-		}
-	}
-
-	return clone
 }
 
 // Duration returns the time between two allowed requests at the defined rate.

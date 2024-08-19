@@ -115,3 +115,14 @@ func (r *RateLimitSmoothing) Err() error {
 
 	return nil
 }
+
+// Clone does a deepcopy of RateLimitSmoothing.
+func (r RateLimitSmoothing) Clone() *RateLimitSmoothing {
+	return &RateLimitSmoothing{
+		Enabled:   r.Enabled,
+		Threshold: r.Threshold,
+		Trigger:   r.Trigger,
+		Step:      r.Step,
+		Delay:     r.Delay,
+	}
+}
