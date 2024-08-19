@@ -172,7 +172,7 @@ func TestAPILimit_Duration(t *testing.T) {
 	})
 }
 
-func TestAPILimitIsEmpty(t *testing.T) {
+func TestAPILimit_IsEmpty(t *testing.T) {
 	tests := []struct {
 		name     string
 		input    APILimit
@@ -273,7 +273,7 @@ func TestAPILimitIsEmpty(t *testing.T) {
 	}
 }
 
-func TestAPILimitClone(t *testing.T) {
+func TestAPILimit_Clone(t *testing.T) {
 	tests := []struct {
 		name  string
 		input APILimit
