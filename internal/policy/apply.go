@@ -67,14 +67,14 @@ func (t *Service) ClearSession(session *user.SessionState) error {
 	return nil
 }
 
-type applyPartitionStatus struct {
-	quota      map[string]bool
-	rateLimit  map[string]bool
-	acl        map[string]bool
-	complexity map[string]bool
+type applyStatus struct {
+	didQuota      map[string]bool
+	didRateLimit  map[string]bool
+	didAcl        map[string]bool
+	didComplexity map[string]bool
 }
 
-// ApplyPolicies will check if any policies are loaded. If any are, it
+// Apply will check if any policies are loaded. If any are, it
 // will overwrite the session state to use the policy values.
 func (t *Service) Apply(session *user.SessionState) error {
 	rights := make(map[string]user.AccessDefinition)
@@ -87,11 +87,11 @@ func (t *Service) Apply(session *user.SessionState) error {
 		t.logger.WithError(err).Warn("error clearing session")
 	}
 
-	partitionStatus := applyPartitionStatus{
-		quota:      make(map[string]bool),
-		rateLimit:  make(map[string]bool),
-		acl:        make(map[string]bool),
-		complexity: make(map[string]bool),
+	applyState := applyStatus{
+		didQuota:      make(map[string]bool),
+		didRateLimit:  make(map[string]bool),
+		didAcl:        make(map[string]bool),
+		didComplexity: make(map[string]bool),
 	}
 
 	var (
@@ -134,11 +134,11 @@ func (t *Service) Apply(session *user.SessionState) error {
 		}
 
 		if policy.Partitions.PerAPI {
-			if err := t.applyPerAPI(policy, session, rights, &partitionStatus); err != nil {
+			if err := t.applyPerAPI(policy, session, rights, &applyState); err != nil {
 				return err
 			}
 		} else {
-			t.applyPartitions(policy, session, rights, &partitionStatus)
+			t.applyPartitions(policy, session, rights, &applyState)
 		}
 
 		session.IsInactive = session.IsInactive || policy.IsInactive
@@ -186,12 +186,12 @@ func (t *Service) Apply(session *user.SessionState) error {
 
 	// If some APIs had only ACL partitions, inherit rest from session level
 	for k, v := range rights {
-		if !partitionStatus.acl[k] {
+		if !applyState.didAcl[k] {
 			delete(rights, k)
 			continue
 		}
 
-		if !partitionStatus.rateLimit[k] {
+		if !applyState.didRateLimit[k] {
 			v.Limit.Rate = session.Rate
 			v.Limit.Per = session.Per
 			v.Limit.Smoothing = session.Smoothing
@@ -199,11 +199,11 @@ func (t *Service) Apply(session *user.SessionState) error {
 			v.Limit.ThrottleRetryLimit = session.ThrottleRetryLimit
 		}
 
-		if !partitionStatus.complexity[k] {
+		if !applyState.didComplexity[k] {
 			v.Limit.MaxQueryDepth = session.MaxQueryDepth
 		}
 
-		if !partitionStatus.quota[k] {
+		if !applyState.didQuota[k] {
 			v.Limit.QuotaMax = session.QuotaMax
 			v.Limit.QuotaRenewalRate = session.QuotaRenewalRate
 			v.Limit.QuotaRenews = session.QuotaRenews
@@ -222,10 +222,10 @@ func (t *Service) Apply(session *user.SessionState) error {
 	}
 
 	// If we have policies defining rules for one single API, update session root vars (legacy)
-	t.updateSessionRootVars(session, rights, partitionStatus)
+	t.updateSessionRootVars(session, rights, applyState)
 
 	// Override session ACL if at least one policy define it
-	if len(partitionStatus.acl) > 0 {
+	if len(applyState.didAcl) > 0 {
 		session.AccessRights = rights
 	}
 
@@ -278,10 +278,10 @@ func (t *Service) emptyRateLimit(m user.APILimit) bool {
 }
 
 func (t *Service) applyPerAPI(policy user.Policy, session *user.SessionState, rights map[string]user.AccessDefinition,
-	partitionState *applyPartitionStatus) error {
+	applyState *applyStatus) error {
 	for apiID, accessRights := range policy.AccessRights {
 		// new logic when you can specify quota or rate in more than one policy but for different APIs
-		if partitionState.quota[apiID] || partitionState.rateLimit[apiID] || partitionState.acl[apiID] || partitionState.complexity[apiID] { // no other partitions allowed
+		if applyState.didQuota[apiID] || applyState.didRateLimit[apiID] || applyState.didAcl[apiID] || applyState.didComplexity[apiID] { // no other partitions allowed
 			err := fmt.Errorf("cannot apply multiple policies when some have per_api set and some are partitioned")
 			t.logger.Error(err)
 			return err
@@ -313,17 +313,17 @@ func (t *Service) applyPerAPI(policy user.Policy, session *user.SessionState, ri
 		rights[apiID] = accessRights
 
 		// identify that limit for that API is set (to allow set it only once)
-		partitionState.acl[apiID] = true
-		partitionState.quota[apiID] = true
-		partitionState.rateLimit[apiID] = true
-		partitionState.complexity[apiID] = true
+		applyState.didAcl[apiID] = true
+		applyState.didQuota[apiID] = true
+		applyState.didRateLimit[apiID] = true
+		applyState.didComplexity[apiID] = true
 	}
 
 	return nil
 }
 
 func (t *Service) applyPartitions(policy user.Policy, session *user.SessionState, rights map[string]user.AccessDefinition,
-	partitionState *applyPartitionStatus) {
+	applyState *applyStatus) {
 
 	usePartitions := policy.Partitions.Enabled()
 
@@ -331,7 +331,7 @@ func (t *Service) applyPartitions(policy user.Policy, session *user.SessionState
 		ar := v
 
 		if !usePartitions || policy.Partitions.Acl {
-			partitionState.acl[k] = true
+			applyState.didAcl[k] = true
 
 			ar.AllowedURLs = copyAllowedURLs(v.AllowedURLs)
 
@@ -400,7 +400,7 @@ func (t *Service) applyPartitions(policy user.Policy, session *user.SessionState
 		}
 
 		if !usePartitions || policy.Partitions.Quota {
-			partitionState.quota[k] = true
+			applyState.didQuota[k] = true
 			if greaterThanInt64(policy.QuotaMax, ar.Limit.QuotaMax) {
 
 				ar.Limit.QuotaMax = policy.QuotaMax
@@ -418,7 +418,7 @@ func (t *Service) applyPartitions(policy user.Policy, session *user.SessionState
 		}
 
 		if !usePartitions || policy.Partitions.RateLimit {
-			partitionState.rateLimit[k] = true
+			applyState.didRateLimit[k] = true
 
 			t.ApplyRateLimits(session, policy, &ar.Limit)
 
@@ -438,7 +438,7 @@ func (t *Service) applyPartitions(policy user.Policy, session *user.SessionState
 		}
 
 		if !usePartitions || policy.Partitions.Complexity {
-			partitionState.complexity[k] = true
+			applyState.didComplexity[k] = true
 
 			if greaterThanInt(policy.MaxQueryDepth, ar.Limit.MaxQueryDepth) {
 				ar.Limit.MaxQueryDepth = policy.MaxQueryDepth
@@ -485,22 +485,22 @@ func (t *Service) applyPartitions(policy user.Policy, session *user.SessionState
 	}
 }
 
-func (t *Service) updateSessionRootVars(session *user.SessionState, rights map[string]user.AccessDefinition, partitionState applyPartitionStatus) {
-	if len(partitionState.quota) == 1 && len(partitionState.rateLimit) == 1 && len(partitionState.complexity) == 1 {
+func (t *Service) updateSessionRootVars(session *user.SessionState, rights map[string]user.AccessDefinition, applyState applyStatus) {
+	if len(applyState.didQuota) == 1 && len(applyState.didRateLimit) == 1 && len(applyState.didComplexity) == 1 {
 		for _, v := range rights {
-			if len(partitionState.rateLimit) == 1 {
+			if len(applyState.didRateLimit) == 1 {
 				session.Rate = v.Limit.Rate
 				session.Per = v.Limit.Per
 				session.Smoothing = v.Limit.Smoothing
 			}
 
-			if len(partitionState.quota) == 1 {
+			if len(applyState.didQuota) == 1 {
 				session.QuotaMax = v.Limit.QuotaMax
 				session.QuotaRenews = v.Limit.QuotaRenews
 				session.QuotaRenewalRate = v.Limit.QuotaRenewalRate
 			}
 
-			if len(partitionState.complexity) == 1 {
+			if len(applyState.didComplexity) == 1 {
 				session.MaxQueryDepth = v.Limit.MaxQueryDepth
 			}
 		}
