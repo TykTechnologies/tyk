@@ -57,6 +57,12 @@ type APILimit struct {
 
 // Clone does a deepcopy of APILimit.
 func (a APILimit) Clone() *APILimit {
+	var smoothingRef *apidef.RateLimitSmoothing
+	if a.Smoothing != nil {
+		smoothing := *a.Smoothing
+		smoothingRef = &smoothing
+	}
+
 	return &APILimit{
 		Rate:               a.Rate,
 		Per:                a.Per,
@@ -68,7 +74,7 @@ func (a APILimit) Clone() *APILimit {
 		QuotaRemaining:     a.QuotaRemaining,
 		QuotaRenewalRate:   a.QuotaRenewalRate,
 		SetBy:              a.SetBy,
-		Smoothing:          a.Smoothing.Clone(),
+		Smoothing:          smoothingRef,
 	}
 }
 
