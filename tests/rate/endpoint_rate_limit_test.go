@@ -16,7 +16,6 @@ import (
 func rlTestRunnerProvider(t *testing.T, hashKey bool, hashAlgo string, limiter string) *Test {
 	t.Helper()
 	ts := StartTest(nil)
-	defer ts.Close()
 
 	globalConf := ts.Gw.GetConfig()
 
