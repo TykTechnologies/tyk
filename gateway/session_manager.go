@@ -239,13 +239,11 @@ func (l *SessionLimiter) ForwardMessage(r *http.Request, session *user.SessionSt
 		endpointRLKeySuffix = ""
 	)
 
-	if len(accessDef.Endpoints) > 0 {
-		endpointRLInfo, doEndpointRL := accessDef.Endpoints.RateLimitInfo(r.Method, r.URL.Path)
-		if doEndpointRL {
-			apiLimit.Rate = endpointRLInfo.Rate
-			apiLimit.Per = endpointRLInfo.Per
-			endpointRLKeySuffix = endpointRLInfo.KeySuffix
-		}
+	endpointRLInfo, doEndpointRL := accessDef.Endpoints.RateLimitInfo(r.Method, r.URL.Path)
+	if doEndpointRL {
+		apiLimit.Rate = endpointRLInfo.Rate
+		apiLimit.Per = endpointRLInfo.Per
+		endpointRLKeySuffix = endpointRLInfo.KeySuffix
 	}
 
 	// If quotaKey is not set then the default ratelimit keys should be used.

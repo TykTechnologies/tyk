@@ -489,6 +489,10 @@ type EndpointRateLimitInfo struct {
 
 // RateLimitInfo returns EndpointRateLimitInfo for endpoint rate limiting.
 func (es Endpoints) RateLimitInfo(method string, path string) (*EndpointRateLimitInfo, bool) {
+	if len(es) == 0 {
+		return nil, false
+	}
+
 	for _, endpoint := range es {
 		asRegex, err := regexp.Compile(endpoint.Path)
 		if err != nil {

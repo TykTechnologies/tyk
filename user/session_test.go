@@ -469,6 +469,22 @@ func TestEndpoints_RateLimitInfo(t *testing.T) {
 			expected: nil,
 			found:    false,
 		},
+		{
+			name:      "nil endpoints",
+			path:      "/api/v1/users",
+			method:    http.MethodGet,
+			endpoints: nil,
+			expected:  nil,
+			found:     false,
+		},
+		{
+			name:      "empty endpoints",
+			path:      "/api/v1/users",
+			method:    http.MethodGet,
+			endpoints: Endpoints{},
+			expected:  nil,
+			found:     false,
+		},
 	}
 
 	for _, tt := range tests {
