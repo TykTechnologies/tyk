@@ -143,8 +143,10 @@ func Test_calculateLifetime(t *testing.T) {
 func TestAPILimit_Duration(t *testing.T) {
 	t.Run("valid limit", func(t *testing.T) {
 		limit := APILimit{
-			Rate: 1,
-			Per:  2,
+			RateLimit: RateLimit{
+				Rate: 1,
+				Per:  2,
+			},
 		}
 		expectedDuration := 2 * time.Second
 		assert.Equal(t, expectedDuration, limit.Duration())
@@ -152,8 +154,10 @@ func TestAPILimit_Duration(t *testing.T) {
 
 	t.Run("Per is zero", func(t *testing.T) {
 		limit := APILimit{
-			Rate: 1,
-			Per:  0,
+			RateLimit: RateLimit{
+				Rate: 1,
+				Per:  0,
+			},
 		}
 		expectedDuration := time.Duration(0)
 		assert.Equal(t, expectedDuration, limit.Duration())
@@ -161,8 +165,10 @@ func TestAPILimit_Duration(t *testing.T) {
 
 	t.Run("Rate is zero", func(t *testing.T) {
 		limit := APILimit{
-			Rate: 0,
-			Per:  2,
+			RateLimit: RateLimit{
+				Rate: 0,
+				Per:  2,
+			},
 		}
 		expectedDuration := time.Duration(0)
 		assert.Equal(t, expectedDuration, limit.Duration())
