@@ -31,6 +31,8 @@ func rlTestRunnerProvider(t *testing.T, hashKey bool, hashAlgo string, limiter s
 		globalConf.RateLimit.DRLEnableSentinelRateLimiter = true
 	case "NonTransactional":
 		globalConf.RateLimit.EnableNonTransactionalRateLimiter = true
+	case "FixedWindow":
+		globalConf.RateLimit.EnableFixedWindowRateLimiter = true
 	default:
 		t.Fatal("There is no such a rate limiter:", limiter)
 	}
@@ -211,4 +213,8 @@ func TestEndpointRL_Sentinel(t *testing.T) {
 
 func TestEndpointRL_DRL(t *testing.T) {
 	endpointRateLimitTestHelper(t, "DRL", nil)
+}
+
+func TestEndpointRL_FixedWindow(t *testing.T) {
+	endpointRateLimitTestHelper(t, "FixedWindow", nil)
 }
