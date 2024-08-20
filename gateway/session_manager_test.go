@@ -161,7 +161,7 @@ func TestGetEndpointRateLimitInfo(t *testing.T) {
 				{
 					Path: "/api/v1/users",
 					Methods: []user.EndpointMethod{
-						{Name: "GET", Limit: user.EndpointMethodRateLimit{Rate: 100, Per: 60}},
+						{Name: "GET", Limit: user.RateLimit{Rate: 100, Per: 60}},
 					},
 				},
 			},
@@ -180,7 +180,7 @@ func TestGetEndpointRateLimitInfo(t *testing.T) {
 				{
 					Path: "/api/v1/users",
 					Methods: []user.EndpointMethod{
-						{Name: "GET", Limit: user.EndpointMethodRateLimit{Rate: 100, Per: 60}},
+						{Name: "GET", Limit: user.RateLimit{Rate: 100, Per: 60}},
 					},
 				},
 			},
@@ -195,7 +195,7 @@ func TestGetEndpointRateLimitInfo(t *testing.T) {
 				{
 					Path: "/api/v1/users",
 					Methods: []user.EndpointMethod{
-						{Name: "GET", Limit: user.EndpointMethodRateLimit{Rate: 100, Per: 60}},
+						{Name: "GET", Limit: user.RateLimit{Rate: 100, Per: 60}},
 					},
 				},
 			},
@@ -210,7 +210,7 @@ func TestGetEndpointRateLimitInfo(t *testing.T) {
 				{
 					Path: "/api/v1/users/[0-9]+",
 					Methods: []user.EndpointMethod{
-						{Name: "GET", Limit: user.EndpointMethodRateLimit{Rate: 50, Per: 30}},
+						{Name: "GET", Limit: user.RateLimit{Rate: 50, Per: 30}},
 					},
 				},
 			},
@@ -229,7 +229,7 @@ func TestGetEndpointRateLimitInfo(t *testing.T) {
 				{
 					Path: "[invalid regex",
 					Methods: []user.EndpointMethod{
-						{Name: "GET", Limit: user.EndpointMethodRateLimit{Rate: 100, Per: 60}},
+						{Name: "GET", Limit: user.RateLimit{Rate: 100, Per: 60}},
 					},
 				},
 			},

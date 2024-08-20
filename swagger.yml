@@ -2408,11 +2408,6 @@ components:
           format: int64
           type: integer
           x-go-name: ThrottleRetryLimit
-        smoothing:
-          type: object
-          $ref: '#/components/schemas/RateLimitSmoothing'
-          description: Smoothing contains rate limit smoothing settings.
-          x-go-name: Smoothing
       type: object
       x-go-package: github.com/TykTechnologies/tyk/user
     SessionEndpoint:
