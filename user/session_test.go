@@ -355,7 +355,7 @@ func TestAPILimit_Clone(t *testing.T) {
 			clone := tt.input.Clone()
 
 			// Check that the cloned object is equal to the original
-			if !reflect.DeepEqual(tt.input, clone) {
+			if !reflect.DeepEqual(tt.input, *clone) {
 				t.Errorf("Clone() = %v, want %v", clone, tt.input)
 			}
 
