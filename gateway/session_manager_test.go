@@ -58,11 +58,13 @@ func TestGetAccessDefinitionByAPIIDOrSession(t *testing.T) {
 		accessDef, allowanceScope, err := GetAccessDefinitionByAPIIDOrSession(sessionWithoutAPILimits, api)
 		assert.Equal(t, &user.AccessDefinition{
 			Limit: user.APILimit{
-				QuotaMax:           int64(1),
-				QuotaRenewalRate:   int64(1),
-				QuotaRenews:        int64(1),
-				Rate:               1.0,
-				Per:                1.0,
+				QuotaMax:         int64(1),
+				QuotaRenewalRate: int64(1),
+				QuotaRenews:      int64(1),
+				RateLimit: user.RateLimit{
+					Rate: 1.0,
+					Per:  1.0,
+				},
 				ThrottleInterval:   1.0,
 				ThrottleRetryLimit: 1.0,
 				MaxQueryDepth:      1.0,
@@ -95,11 +97,13 @@ func TestGetAccessDefinitionByAPIIDOrSession(t *testing.T) {
 						},
 					},
 					Limit: user.APILimit{
-						QuotaMax:           int64(2),
-						QuotaRenewalRate:   int64(2),
-						QuotaRenews:        int64(2),
-						Rate:               2.0,
-						Per:                2.0,
+						QuotaMax:         int64(2),
+						QuotaRenewalRate: int64(2),
+						QuotaRenews:      int64(2),
+						RateLimit: user.RateLimit{
+							Rate: 2.0,
+							Per:  2.0,
+						},
 						ThrottleInterval:   2.0,
 						ThrottleRetryLimit: 2.0,
 						MaxQueryDepth:      2.0,
@@ -120,11 +124,13 @@ func TestGetAccessDefinitionByAPIIDOrSession(t *testing.T) {
 				},
 			},
 			Limit: user.APILimit{
-				QuotaMax:           int64(2),
-				QuotaRenewalRate:   int64(2),
-				QuotaRenews:        int64(2),
-				Rate:               2.0,
-				Per:                2.0,
+				QuotaMax:         int64(2),
+				QuotaRenewalRate: int64(2),
+				QuotaRenews:      int64(2),
+				RateLimit: user.RateLimit{
+					Rate: 2.0,
+					Per:  2.0,
+				},
 				ThrottleInterval:   2.0,
 				ThrottleRetryLimit: 2.0,
 				MaxQueryDepth:      2.0,

@@ -42,12 +42,14 @@ func (p *Policy) APILimit() APILimit {
 	return APILimit{
 		QuotaMax:           p.QuotaMax,
 		QuotaRenewalRate:   p.QuotaRenewalRate,
-		Rate:               p.Rate,
-		Per:                p.Per,
 		ThrottleInterval:   p.ThrottleInterval,
 		ThrottleRetryLimit: p.ThrottleRetryLimit,
 		MaxQueryDepth:      p.MaxQueryDepth,
-		Smoothing:          p.Smoothing,
+		RateLimit: RateLimit{
+			Rate:      p.Rate,
+			Per:       p.Per,
+			Smoothing: p.Smoothing,
+		},
 	}
 }
 
