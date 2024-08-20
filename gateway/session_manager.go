@@ -245,8 +245,8 @@ func (l *SessionLimiter) ForwardMessage(r *http.Request, session *user.SessionSt
 	if len(accessDef.Endpoints) > 0 {
 		endpointRLInfo, doEndpointRL := getEndpointRateLimitInfo(r.Method, r.URL.Path, accessDef.Endpoints)
 		if doEndpointRL {
-			apiLimit.Rate = float64(endpointRLInfo.rate)
-			apiLimit.Per = float64(endpointRLInfo.per)
+			apiLimit.Rate = endpointRLInfo.rate
+			apiLimit.Per = endpointRLInfo.per
 			endpointRLKeySuffix = endpointRLInfo.keySuffix
 		}
 	}
@@ -445,8 +445,8 @@ func GetAccessDefinitionByAPIIDOrSession(session *user.SessionState, api *APISpe
 
 type endpointRateLimitInfo struct {
 	keySuffix string
-	rate      int64
-	per       int64
+	rate      float64
+	per       float64
 }
 
 func getEndpointRateLimitInfo(method string, path string, endpoints []user.Endpoint) (*endpointRateLimitInfo, bool) {

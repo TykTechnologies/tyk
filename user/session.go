@@ -38,10 +38,17 @@ type AccessSpec struct {
 	Methods []string `json:"methods" msg:"methods"`
 }
 
+type RateLimit struct {
+	Rate float64 `json:"rate" msg:"rate"`
+	Per  float64 `json:"per" msg:"per"`
+
+	// Smoothing contains rate limit smoothing settings.
+	Smoothing *apidef.RateLimitSmoothing `json:"smoothing,omitempty" bson:"smoothing,omitempty"`
+}
+
 // APILimit stores quota and rate limit on ACL level (per API)
 type APILimit struct {
-	Rate               float64 `json:"rate" msg:"rate"`
-	Per                float64 `json:"per" msg:"per"`
+	RateLimit
 	ThrottleInterval   float64 `json:"throttle_interval" msg:"throttle_interval"`
 	ThrottleRetryLimit int     `json:"throttle_retry_limit" msg:"throttle_retry_limit"`
 	MaxQueryDepth      int     `json:"max_query_depth" msg:"max_query_depth"`
@@ -50,9 +57,6 @@ type APILimit struct {
 	QuotaRemaining     int64   `json:"quota_remaining" msg:"quota_remaining"`
 	QuotaRenewalRate   int64   `json:"quota_renewal_rate" msg:"quota_renewal_rate"`
 	SetBy              string  `json:"-" msg:"-"`
-
-	// Smoothing contains rate limit smoothing settings.
-	Smoothing *apidef.RateLimitSmoothing `json:"smoothing" bson:"smoothing"`
 }
 
 // Clone does a deepcopy of APILimit.
@@ -64,8 +68,11 @@ func (a APILimit) Clone() *APILimit {
 	}
 
 	return &APILimit{
-		Rate:               a.Rate,
-		Per:                a.Per,
+		RateLimit: RateLimit{
+			Rate:      a.Rate,
+			Per:       a.Per,
+			Smoothing: smoothingRef,
+		},
 		ThrottleInterval:   a.ThrottleInterval,
 		ThrottleRetryLimit: a.ThrottleRetryLimit,
 		MaxQueryDepth:      a.MaxQueryDepth,
@@ -74,17 +81,16 @@ func (a APILimit) Clone() *APILimit {
 		QuotaRemaining:     a.QuotaRemaining,
 		QuotaRenewalRate:   a.QuotaRenewalRate,
 		SetBy:              a.SetBy,
-		Smoothing:          smoothingRef,
 	}
 }
 
 // Duration returns the time between two allowed requests at the defined rate.
 // It's used to decide which rate limit has a bigger allowance.
-func (a *APILimit) Duration() time.Duration {
-	if a.Per <= 0 || a.Rate <= 0 {
+func (r RateLimit) Duration() time.Duration {
+	if r.Per <= 0 || r.Rate <= 0 {
 		return 0
 	}
-	return time.Duration(float64(time.Second) * a.Per / a.Rate)
+	return time.Duration(float64(time.Second) * r.Per / r.Rate)
 }
 
 // AccessDefinition defines which versions of an API a key has access to
@@ -181,13 +187,8 @@ type Endpoint struct {
 }
 
 type EndpointMethod struct {
-	Name  string                  `json:"name,omitempty" msg:"name,omitempty"`
-	Limit EndpointMethodRateLimit `json:"limit,omitempty" msg:"limit,omitempty"`
-}
-
-type EndpointMethodRateLimit struct {
-	Rate int64 `json:"rate,omitempty" msg:"rate,omitempty"`
-	Per  int64 `json:"per,omitempty" msg:"per,omitempty"`
+	Name  string    `json:"name,omitempty" msg:"name,omitempty"`
+	Limit RateLimit `json:"limit,omitempty" msg:"limit,omitempty"`
 }
 
 // SessionState objects represent a current API session, mainly used for rate limiting.
@@ -254,15 +255,17 @@ func NewSessionState() *SessionState {
 // APILimit returns an user.APILimit from the session data.
 func (s *SessionState) APILimit() APILimit {
 	return APILimit{
+		RateLimit: RateLimit{
+			Rate:      s.Rate,
+			Per:       s.Per,
+			Smoothing: s.Smoothing,
+		},
 		QuotaMax:           s.QuotaMax,
 		QuotaRenewalRate:   s.QuotaRenewalRate,
 		QuotaRenews:        s.QuotaRenews,
-		Rate:               s.Rate,
-		Per:                s.Per,
 		ThrottleInterval:   s.ThrottleInterval,
 		ThrottleRetryLimit: s.ThrottleRetryLimit,
 		MaxQueryDepth:      s.MaxQueryDepth,
-		Smoothing:          s.Smoothing,
 	}
 }
 

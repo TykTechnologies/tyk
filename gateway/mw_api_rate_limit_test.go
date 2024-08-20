@@ -167,8 +167,10 @@ func requestThrottlingTest(limiter string, testLevel string) func(t *testing.T) 
 					} else if testLevel == "APILevel" {
 						a := p.AccessRights[spec.APIID]
 						a.Limit = user.APILimit{
-							Rate: rate,
-							Per:  per,
+							RateLimit: user.RateLimit{
+								Rate: rate,
+								Per:  per,
+							},
 						}
 
 						if requestThrottlingEnabled {
