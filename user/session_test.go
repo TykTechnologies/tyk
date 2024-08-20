@@ -146,8 +146,10 @@ func Test_calculateLifetime(t *testing.T) {
 func TestAPILimit_Duration(t *testing.T) {
 	t.Run("valid limit", func(t *testing.T) {
 		limit := APILimit{
-			Rate: 1,
-			Per:  2,
+			RateLimit: RateLimit{
+				Rate: 1,
+				Per:  2,
+			},
 		}
 		expectedDuration := 2 * time.Second
 		assert.Equal(t, expectedDuration, limit.Duration())
@@ -155,8 +157,10 @@ func TestAPILimit_Duration(t *testing.T) {
 
 	t.Run("Per is zero", func(t *testing.T) {
 		limit := APILimit{
-			Rate: 1,
-			Per:  0,
+			RateLimit: RateLimit{
+				Rate: 1,
+				Per:  0,
+			},
 		}
 		expectedDuration := time.Duration(0)
 		assert.Equal(t, expectedDuration, limit.Duration())
@@ -164,8 +168,10 @@ func TestAPILimit_Duration(t *testing.T) {
 
 	t.Run("Rate is zero", func(t *testing.T) {
 		limit := APILimit{
-			Rate: 0,
-			Per:  2,
+			RateLimit: RateLimit{
+				Rate: 0,
+				Per:  2,
+			},
 		}
 		expectedDuration := time.Duration(0)
 		assert.Equal(t, expectedDuration, limit.Duration())
@@ -181,8 +187,10 @@ func TestAPILimit_IsEmpty(t *testing.T) {
 		{
 			name: "All fields zero or empty",
 			input: APILimit{
-				Rate:               0,
-				Per:                0,
+				RateLimit: RateLimit{
+					Rate: 0,
+					Per:  0,
+				},
 				ThrottleInterval:   0,
 				ThrottleRetryLimit: 0,
 				MaxQueryDepth:      0,
@@ -197,14 +205,18 @@ func TestAPILimit_IsEmpty(t *testing.T) {
 		{
 			name: "Rate is non-zero",
 			input: APILimit{
-				Rate: 1,
+				RateLimit: RateLimit{
+					Rate: 1,
+				},
 			},
 			expected: false,
 		},
 		{
 			name: "Per is non-zero",
 			input: APILimit{
-				Per: 1,
+				RateLimit: RateLimit{
+					Per: 1,
+				},
 			},
 			expected: false,
 		},
@@ -281,8 +293,10 @@ func TestAPILimit_Clone(t *testing.T) {
 		{
 			name: "All fields zero or empty",
 			input: APILimit{
-				Rate:               0,
-				Per:                0,
+				RateLimit: RateLimit{
+					Rate: 0,
+					Per:  0,
+				},
 				ThrottleInterval:   0,
 				ThrottleRetryLimit: 0,
 				MaxQueryDepth:      0,
@@ -291,14 +305,15 @@ func TestAPILimit_Clone(t *testing.T) {
 				QuotaRemaining:     0,
 				QuotaRenewalRate:   0,
 				SetBy:              "",
-				Smoothing:          nil,
 			},
 		},
 		{
 			name: "All fields set, no smoothing",
 			input: APILimit{
-				Rate:               100,
-				Per:                60,
+				RateLimit: RateLimit{
+					Rate: 100,
+					Per:  60,
+				},
 				ThrottleInterval:   30,
 				ThrottleRetryLimit: 5,
 				MaxQueryDepth:      10,
@@ -307,14 +322,22 @@ func TestAPILimit_Clone(t *testing.T) {
 				QuotaRemaining:     250,
 				QuotaRenewalRate:   120,
 				SetBy:              "user",
-				Smoothing:          nil,
 			},
 		},
 		{
 			name: "All fields set with smoothing",
 			input: APILimit{
-				Rate:               100,
-				Per:                60,
+				RateLimit: RateLimit{
+					Rate: 100,
+					Per:  60,
+					Smoothing: &apidef.RateLimitSmoothing{
+						Enabled:   true,
+						Threshold: 50,
+						Trigger:   80,
+						Step:      10,
+						Delay:     5,
+					},
+				},
 				ThrottleInterval:   30,
 				ThrottleRetryLimit: 5,
 				MaxQueryDepth:      10,
@@ -323,13 +346,6 @@ func TestAPILimit_Clone(t *testing.T) {
 				QuotaRemaining:     250,
 				QuotaRenewalRate:   120,
 				SetBy:              "user",
-				Smoothing: &apidef.RateLimitSmoothing{
-					Enabled:   true,
-					Threshold: 50,
-					Trigger:   80,
-					Step:      10,
-					Delay:     5,
-				},
 			},
 		},
 	}
