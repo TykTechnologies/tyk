@@ -496,20 +496,24 @@ func (es Endpoints) RateLimitInfo(method string, path string) (*EndpointRateLimi
 	for _, endpoint := range es {
 		asRegex, err := regexp.Compile(endpoint.Path)
 		if err != nil {
-			return nil, false
+			continue
 		}
 
 		match := asRegex.MatchString(path)
-		if match {
-			for _, endpointMethod := range endpoint.Methods {
-				if strings.ToUpper(endpointMethod.Name) == strings.ToUpper(method) {
-					return &EndpointRateLimitInfo{
-						KeySuffix: storage.HashStr(fmt.Sprintf("%s:%s", endpointMethod.Name, endpoint.Path)),
-						Rate:      endpointMethod.Limit.Rate,
-						Per:       endpointMethod.Limit.Per,
-					}, true
-				}
+		if !match {
+			continue
+		}
+
+		for _, endpointMethod := range endpoint.Methods {
+			if strings.ToUpper(endpointMethod.Name) != strings.ToUpper(method) {
+				continue
 			}
+
+			return &EndpointRateLimitInfo{
+				KeySuffix: storage.HashStr(fmt.Sprintf("%s:%s", endpointMethod.Name, endpoint.Path)),
+				Rate:      endpointMethod.Limit.Rate,
+				Per:       endpointMethod.Limit.Per,
+			}, true
 		}
 	}
 

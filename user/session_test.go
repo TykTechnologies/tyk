@@ -470,6 +470,31 @@ func TestEndpoints_RateLimitInfo(t *testing.T) {
 			found:    false,
 		},
 		{
+			name:   "Invalid regex path and valid url",
+			path:   "/api/v1/users",
+			method: http.MethodGet,
+			endpoints: []Endpoint{
+				{
+					Path: "[invalid regex",
+					Methods: []EndpointMethod{
+						{Name: "GET", Limit: RateLimit{Rate: 100, Per: 60}},
+					},
+				},
+				{
+					Path: "/api/v1/users",
+					Methods: []EndpointMethod{
+						{Name: "GET", Limit: RateLimit{Rate: 100, Per: 60}},
+					},
+				},
+			},
+			expected: &EndpointRateLimitInfo{
+				KeySuffix: storage.HashStr("GET:/api/v1/users"),
+				Rate:      100,
+				Per:       60,
+			},
+			found: true,
+		},
+		{
 			name:      "nil endpoints",
 			path:      "/api/v1/users",
 			method:    http.MethodGet,
