@@ -2434,7 +2434,7 @@ components:
           $ref: '#/components/schemas/SessionEndpointRateLimit'
       type: object
     SessionEndpointRateLimit:
-      title: SessionEndpointMethod holds rate limit on endpoint method level.
+      title: SessionEndpointRateLimit holds rate limit information.
       type: object
       properties:
         per:
