@@ -3,7 +3,11 @@ package user
 import (
 	"crypto/md5"
 	"fmt"
+	"strings"
 	"time"
+
+	"github.com/TykTechnologies/tyk/regexp"
+	"github.com/TykTechnologies/tyk/storage"
 
 	"github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
 
@@ -110,7 +114,7 @@ type AccessDefinition struct {
 
 	AllowanceScope string `json:"allowance_scope" msg:"allowance_scope"`
 
-	Endpoints []Endpoint `json:"endpoints,omitempty" msg:"endpoints,omitempty"`
+	Endpoints Endpoints `json:"endpoints,omitempty" msg:"endpoints,omitempty"`
 }
 
 // IsEmpty checks if APILimit is empty.
@@ -181,11 +185,19 @@ type Monitor struct {
 	TriggerLimits []float64 `json:"trigger_limits" msg:"trigger_limits"`
 }
 
+// Endpoints is a collection of Endpoint.
+type Endpoints []Endpoint
+
+// Endpoint holds the configuration for endpoint rate limiting.
 type Endpoint struct {
-	Path    string           `json:"path,omitempty" msg:"path"`
-	Methods []EndpointMethod `json:"methods,omitempty" msg:"methods"`
+	Path    string          `json:"path,omitempty" msg:"path"`
+	Methods EndpointMethods `json:"methods,omitempty" msg:"methods"`
 }
 
+// EndpointMethods is a collection of EndpointMethod.
+type EndpointMethods []EndpointMethod
+
+// EndpointMethod holds the configuration on endpoint method level.
 type EndpointMethod struct {
 	Name  string    `json:"name,omitempty" msg:"name,omitempty"`
 	Limit RateLimit `json:"limit,omitempty" msg:"limit,omitempty"`
@@ -463,4 +475,39 @@ func (s *SessionState) GetQuotaLimitByAPIID(apiID string) (int64, int64, int64, 
 // IsBasicAuth returns whether the key is basic auth or not.
 func (s *SessionState) IsBasicAuth() bool {
 	return s.BasicAuthData.Password != ""
+}
+
+// EndpointRateLimitInfo holds the information to process endpoint rate limits.
+type EndpointRateLimitInfo struct {
+	// KeySuffix is the suffix to use for the storage key.
+	KeySuffix string
+	// Rate is the allowance.
+	Rate float64
+	// Per is the rate limiting interval.
+	Per float64
+}
+
+// RateLimitInfo returns EndpointRateLimitInfo for endpoint rate limiting.
+func (es Endpoints) RateLimitInfo(method string, path string) (*EndpointRateLimitInfo, bool) {
+	for _, endpoint := range es {
+		asRegex, err := regexp.Compile(endpoint.Path)
+		if err != nil {
+			return nil, false
+		}
+
+		match := asRegex.MatchString(path)
+		if match {
+			for _, endpointMethod := range endpoint.Methods {
+				if strings.ToUpper(endpointMethod.Name) == strings.ToUpper(method) {
+					return &EndpointRateLimitInfo{
+						KeySuffix: storage.HashStr(fmt.Sprintf("%s:%s", endpointMethod.Name, endpoint.Path)),
+						Rate:      endpointMethod.Limit.Rate,
+						Per:       endpointMethod.Limit.Per,
+					}, true
+				}
+			}
+		}
+	}
+
+	return nil, false
 }

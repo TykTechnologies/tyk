@@ -100,8 +100,10 @@ func endpointRateLimitTestHelper(t *testing.T, limiter string, beforeFn func()) 
 						APIID:   api1.APIID,
 						APIName: api1.Name,
 						Limit: user.APILimit{
-							Rate: 3,
-							Per:  1000,
+							RateLimit: user.RateLimit{
+								Rate: 3,
+								Per:  1000,
+							},
 						},
 						Endpoints: []user.Endpoint{
 							{
@@ -109,7 +111,7 @@ func endpointRateLimitTestHelper(t *testing.T, limiter string, beforeFn func()) 
 								Methods: []user.EndpointMethod{
 									{
 										Name: http.MethodGet,
-										Limit: user.EndpointMethodRateLimit{
+										Limit: user.RateLimit{
 											Rate: 5,
 											Per:  1000,
 										},
@@ -121,7 +123,7 @@ func endpointRateLimitTestHelper(t *testing.T, limiter string, beforeFn func()) 
 								Methods: []user.EndpointMethod{
 									{
 										Name: http.MethodPost,
-										Limit: user.EndpointMethodRateLimit{
+										Limit: user.RateLimit{
 											Rate: 4,
 											Per:  1000,
 										},
@@ -134,8 +136,10 @@ func endpointRateLimitTestHelper(t *testing.T, limiter string, beforeFn func()) 
 						APIID:   api2.APIID,
 						APIName: api2.Name,
 						Limit: user.APILimit{
-							Rate: 3,
-							Per:  1000,
+							RateLimit: user.RateLimit{
+								Rate: 3,
+								Per:  1000,
+							},
 						},
 					},
 					api3.APIID: {

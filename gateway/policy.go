@@ -33,7 +33,7 @@ type DBAccessDefinition struct {
 	Limit                *user.APILimit               `json:"limit"`
 
 	// Endpoints contains endpoint rate limit settings.
-	Endpoints []user.Endpoint `json:"endpoints,omitempty"`
+	Endpoints user.Endpoints `json:"endpoints,omitempty"`
 }
 
 func (d *DBAccessDefinition) ToRegularAD() user.AccessDefinition {

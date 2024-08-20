@@ -5,10 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"strings"
 	"time"
-
-	"github.com/TykTechnologies/tyk/regexp"
 
 	"github.com/TykTechnologies/drl"
 	"github.com/TykTechnologies/leakybucket"
@@ -243,11 +240,11 @@ func (l *SessionLimiter) ForwardMessage(r *http.Request, session *user.SessionSt
 	)
 
 	if len(accessDef.Endpoints) > 0 {
-		endpointRLInfo, doEndpointRL := getEndpointRateLimitInfo(r.Method, r.URL.Path, accessDef.Endpoints)
+		endpointRLInfo, doEndpointRL := accessDef.Endpoints.RateLimitInfo(r.Method, r.URL.Path)
 		if doEndpointRL {
-			apiLimit.Rate = endpointRLInfo.rate
-			apiLimit.Per = endpointRLInfo.per
-			endpointRLKeySuffix = endpointRLInfo.keySuffix
+			apiLimit.Rate = endpointRLInfo.Rate
+			apiLimit.Per = endpointRLInfo.Per
+			endpointRLKeySuffix = endpointRLInfo.KeySuffix
 		}
 	}
 
@@ -441,34 +438,4 @@ func GetAccessDefinitionByAPIIDOrSession(session *user.SessionState, api *APISpe
 	}
 
 	return accessDef, allowanceScope, nil
-}
-
-type endpointRateLimitInfo struct {
-	keySuffix string
-	rate      float64
-	per       float64
-}
-
-func getEndpointRateLimitInfo(method string, path string, endpoints []user.Endpoint) (*endpointRateLimitInfo, bool) {
-	for _, endpoint := range endpoints {
-		asRegex, err := regexp.Compile(endpoint.Path)
-		if err != nil {
-			return nil, false
-		}
-
-		match := asRegex.MatchString(path)
-		if match {
-			for _, endpointMethod := range endpoint.Methods {
-				if strings.ToUpper(endpointMethod.Name) == strings.ToUpper(method) {
-					return &endpointRateLimitInfo{
-						keySuffix: storage.HashStr(fmt.Sprintf("%s:%s", endpointMethod.Name, endpoint.Path)),
-						rate:      endpointMethod.Limit.Rate,
-						per:       endpointMethod.Limit.Per,
-					}, true
-				}
-			}
-		}
-	}
-
-	return nil, false
 }
