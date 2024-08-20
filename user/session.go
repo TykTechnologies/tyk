@@ -42,9 +42,12 @@ type AccessSpec struct {
 	Methods []string `json:"methods" msg:"methods"`
 }
 
+// RateLimit holds rate limit configuration.
 type RateLimit struct {
+	// Rate is the allowed number of requests per interval.
 	Rate float64 `json:"rate" msg:"rate"`
-	Per  float64 `json:"per" msg:"per"`
+	// Per is the interval at which rate limit is enforced.
+	Per float64 `json:"per" msg:"per"`
 
 	// Smoothing contains rate limit smoothing settings.
 	Smoothing *apidef.RateLimitSmoothing `json:"smoothing,omitempty" bson:"smoothing,omitempty"`
@@ -505,7 +508,7 @@ func (es Endpoints) RateLimitInfo(method string, path string) (*EndpointRateLimi
 		}
 
 		for _, endpointMethod := range endpoint.Methods {
-			if strings.ToUpper(endpointMethod.Name) != strings.ToUpper(method) {
+			if !strings.EqualFold(endpointMethod.Name, method) {
 				continue
 			}
 
