@@ -307,7 +307,10 @@ func (s *StreamingMiddleware) Unload() {
 	totalStreams := 0
 	s.streamManagers.Range(func(_, value interface{}) bool {
 		manager := value.(*StreamManager)
-		totalStreams += len(manager.streamManager.Streams())
+		manager.streams.Range(func(_, _ interface{}) bool {
+			totalStreams++
+			return true
+		})
 		return true
 	})
 	globalStreamCounter.Add(-int64(totalStreams))
