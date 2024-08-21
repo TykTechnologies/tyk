@@ -36,7 +36,7 @@ type StreamingMiddleware struct {
 }
 
 type StreamManager struct {
-	streamManager *streaming.StreamManager
+	streams       sync.Map
 	muxer         *mux.Router
 	mw            *StreamingMiddleware
 	consumerGroup string
@@ -51,9 +51,9 @@ func (sm *StreamManager) initStreams(specStreams map[string]interface{}) {
 
 	for streamID, streamConfig := range specStreams {
 		if streamMap, ok := streamConfig.(map[string]interface{}); ok {
-			err := sm.addOrUpdateStream(streamID, streamMap)
+			err := sm.createStream(streamID, streamMap)
 			if err != nil {
-				sm.mw.Logger().Errorf("Error adding stream %s for consumer group %s: %v", streamID, sm.consumerGroup, err)
+				sm.mw.Logger().Errorf("Error creating stream %s for consumer group %s: %v", streamID, sm.consumerGroup, err)
 			}
 		}
 	}
@@ -62,7 +62,15 @@ func (sm *StreamManager) initStreams(specStreams map[string]interface{}) {
 // removeStream removes a stream
 func (sm *StreamManager) removeStream(streamID string) error {
 	streamFullID := fmt.Sprintf("%s_%s_%s", sm.mw.Spec.APIID, sm.consumerGroup, streamID)
-	return sm.streamManager.RemoveStream(streamFullID)
+	if streamValue, exists := sm.streams.Load(streamFullID); exists {
+		stream := streamValue.(*streaming.Stream)
+		err := stream.Stop()
+		if err != nil {
+			return err
+		}
+		sm.streams.Delete(streamFullID)
+	}
+	return nil
 }
 
 type connection struct {
@@ -149,7 +157,11 @@ func (s *StreamingMiddleware) cleanupUnusedConsumerGroups() {
 		manager.Lock()
 		if manager.connections == 0 && now.Sub(manager.lastAccess) > ConsumerGroupTimeout {
 			s.Logger().Infof("Cleaning up unused consumer group: %s", consumerGroup)
-			manager.streamManager.Reset()
+			manager.streams.Range(func(_, streamValue interface{}) bool {
+				stream := streamValue.(*streaming.Stream)
+				stream.Stop()
+				return true
+			})
 			s.streamManagers.Delete(consumerGroup)
 		}
 		manager.Unlock()
@@ -158,16 +170,8 @@ func (s *StreamingMiddleware) cleanupUnusedConsumerGroups() {
 }
 
 func (s *StreamingMiddleware) createStreamManager(consumerGroup string, r *http.Request) *StreamManager {
-	// if manager, exists := s.streamManagers.Load(consumerGroup); exists {
-	// 	return manager.(*StreamManager)
-	// }
-
-	// s.Logger().Infof("StreamManager not found for consumer group %s. Creating a new one.", consumerGroup)
-	streamManager := streaming.NewStreamManager(s.allowedUnsafe)
-	muxer := mux.NewRouter()
 	newStreamManager := &StreamManager{
-		streamManager: streamManager,
-		muxer:         muxer,
+		muxer:         mux.NewRouter(),
 		mw:            s,
 		consumerGroup: consumerGroup,
 	}
@@ -224,21 +228,22 @@ func (s *StreamingMiddleware) getStreams(r *http.Request) map[string]interface{}
 	return streamConfigs
 }
 
-// addOrUpdateStream adds a new stream or updates an existing one
-func (sm *StreamManager) addOrUpdateStream(streamID string, config map[string]interface{}) error {
+// createStream creates a new stream
+func (sm *StreamManager) createStream(streamID string, config map[string]interface{}) error {
 	streamFullID := fmt.Sprintf("%s_%s_%s", sm.mw.Spec.APIID, sm.consumerGroup, streamID)
-	sm.mw.Logger().Debugf("Adding/updating stream: %s for consumer group: %s", streamFullID, sm.consumerGroup)
+	sm.mw.Logger().Debugf("Creating stream: %s for consumer group: %s", streamFullID, sm.consumerGroup)
 
-	err := sm.streamManager.AddStream(streamFullID, config, &handleFuncAdapter{mw: sm.mw, streamID: streamFullID, consumerGroup: sm.consumerGroup, muxer: sm.muxer, sm: sm})
+	stream := streaming.NewStream(sm.mw.allowedUnsafe)
+	err := stream.Start(config, &handleFuncAdapter{mw: sm.mw, streamID: streamFullID, consumerGroup: sm.consumerGroup, muxer: sm.muxer, sm: sm})
 	if err != nil {
-		sm.mw.Logger().Errorf("Failed to add stream %s: %v", streamFullID, err)
-	} else {
-		sm.mw.Logger().Infof("Successfully added/updated stream: %s", streamFullID)
+		sm.mw.Logger().Errorf("Failed to start stream %s: %v", streamFullID, err)
+		return err
 	}
 
-	sm.mw.Logger().Debugf("Current streams after add/update: %+v", sm.streamManager.Streams())
+	sm.streams.Store(streamFullID, stream)
+	sm.mw.Logger().Infof("Successfully created stream: %s", streamFullID)
 
-	return err
+	return nil
 }
 
 // ProcessRequest will handle the streaming functionality
