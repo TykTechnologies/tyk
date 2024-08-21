@@ -2408,11 +2408,46 @@ components:
           format: int64
           type: integer
           x-go-name: ThrottleRetryLimit
+      type: object
+      x-go-package: github.com/TykTechnologies/tyk/user
+    SessionEndpoint:
+      title: SessionEndpoint holds rate limit on endpoint level.
+      type: object
+      properties:
+        path:
+          type: string
+          x-go-name: Path
+        methods:
+          type: array
+          x-go-name: Methods
+          items:
+            $ref: '#/components/schemas/SessionEndpointMethod'
+    SessionEndpointMethod:
+      title: SessionEndpointMethod holds rate limit on endpoint method level.
+      type: object
+      properties:
+        name:
+          x-go-name: Name
+          type: string
+        limit:
+          x-go-name: Limit
+          $ref: '#/components/schemas/RateLimit'
+    RateLimit:
+      properties:
+        per:
+          type: number
+          format: double
+          x-go-name: Per
+        rate:
+          type: number
+          format: double
+          x-go-name: Rate
         smoothing:
           type: object
           $ref: '#/components/schemas/RateLimitSmoothing'
           description: Smoothing contains rate limit smoothing settings.
           x-go-name: Smoothing
+      title: ""
       type: object
       x-go-package: github.com/TykTechnologies/tyk/user
     AccessDefinition:
@@ -2431,6 +2466,11 @@ components:
           x-go-name: APIName
         limit:
           $ref: '#/components/schemas/APILimit'
+        endpoints:
+          type: array
+          items:
+            $ref: '#/components/schemas/SessionEndpoint'
+          x-go-name: Endpoints
         versions:
           items:
             type: string

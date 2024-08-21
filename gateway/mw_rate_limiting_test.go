@@ -299,8 +299,10 @@ func providerCustomRatelimitKey(t *testing.T, limiter string) {
 						APIID:   spec.APIID,
 						APIName: spec.Name,
 						Limit: user.APILimit{
-							Rate: 3,
-							Per:  1000,
+							RateLimit: user.RateLimit{
+								Rate: 3,
+								Per:  1000,
+							},
 						},
 					},
 				}
@@ -317,8 +319,10 @@ func providerCustomRatelimitKey(t *testing.T, limiter string) {
 						APIID:   spec.APIID,
 						APIName: spec.Name,
 						Limit: user.APILimit{
-							Rate: 3,
-							Per:  1000,
+							RateLimit: user.RateLimit{
+								Rate: 3,
+								Per:  1000,
+							},
 						},
 					},
 				}
