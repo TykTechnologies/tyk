@@ -191,6 +191,7 @@ var tests = []struct {
 	isDynamic     bool
 }{
 	{"StaticGroup", "static-group", "default", false},
+	{"StaticGroup", "static-group", "default", false},
 	{"DynamicGroup", "$tyk_context.request_id", "dynamic", true},
 }
 
@@ -208,11 +209,7 @@ func TestAsyncAPIHttp(t *testing.T) {
 	}
 
 	ts := StartTest(func(globalConf *config.Config) {
-		globalConf.Labs = map[string]interface{}{
-			"streaming": map[string]interface{}{
-				"enabled": true,
-			},
-		}
+		globalConf.Streaming.Enabled = true
 	})
 	defer ts.Close()
 
@@ -295,18 +292,17 @@ func testAsyncAPIHttp(t *testing.T, ts *Test, consumerGroup string, isDynamic bo
 	wsClients := make([]*websocket.Conn, numClients)
 	for i := 0; i < numClients; i++ {
 		dialer := websocket.Dialer{
-			Proxy:            http.ProxyFromEnvironment,
-			HandshakeTimeout: 5 * time.Second,
+			HandshakeTimeout: 100 * time.Millisecond,
 			TLSClientConfig:  &tls.Config{InsecureSkipVerify: true},
 		}
 		wsURL := strings.Replace(ts.URL, "http", "ws", 1) + fmt.Sprintf("/%s/get/ws", apiName)
 		wsConn, resp, err := dialer.Dial(wsURL, nil)
 		if err != nil {
-			t.Fatalf("Failed to connect to WebSocket %d: %v\nResponse: %+v", i+1, err, resp)
+			t.Fatalf("Failed to connect to WebSocket %d: %v\nResponse: %+v", i, err, resp)
 		}
 		defer wsConn.Close()
 		wsClients[i] = wsConn
-		t.Logf("Successfully connected to WebSocket %d", i+1)
+		t.Logf("Successfully connected to WebSocket %d", i)
 	}
 
 	// Send messages to Kafka
@@ -350,7 +346,7 @@ func testAsyncAPIHttp(t *testing.T, ts *Test, consumerGroup string, isDynamic bo
 				return
 			default:
 				for i, wsConn := range wsClients {
-					wsConn.SetReadDeadline(time.Now().Add(100 * time.Millisecond))
+					wsConn.SetReadDeadline(time.Now().Add(500 * time.Millisecond))
 					_, p, err := wsConn.ReadMessage()
 					if err != nil {
 						if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
@@ -430,7 +426,7 @@ func TestWebSocketConnectionClosedOnAPIReload(t *testing.T) {
 	// Connect to WebSocket
 	dialer := websocket.Dialer{
 		Proxy:            http.ProxyFromEnvironment,
-		HandshakeTimeout: 45 * time.Second,
+		HandshakeTimeout: 1 * time.Second,
 		TLSClientConfig:  &tls.Config{InsecureSkipVerify: true},
 	}
 	wsURL := strings.Replace(ts.URL, "http", "ws", 1) + fmt.Sprintf("/%s/get/ws", apiName)

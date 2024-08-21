@@ -52,6 +52,10 @@ var (
 		LivenessCheck: LivenessCheckConfig{
 			CheckDuration: time.Second * 10,
 		},
+		Streaming: StreamingConfig{
+			Enabled:     false,
+			AllowUnsafe: []string{},
+		},
 	}
 )
 
@@ -663,6 +667,12 @@ func (pwl *PortsWhiteList) Decode(value string) error {
 	return nil
 }
 
+// Add this new struct definition
+type StreamingConfig struct {
+	Enabled     bool     `json:"enabled"`
+	AllowUnsafe []string `json:"allow_unsafe"`
+}
+
 // Config is the configuration object used by Tyk to set up various parameters.
 type Config struct {
 	// Force your Gateway to work only on a specific domain name. Can be overridden by API custom domain.
@@ -1131,6 +1141,8 @@ type Config struct {
 
 	// OAS holds the configuration for various OpenAPI-specific functionalities
 	OAS OASConfig `json:"oas_config"`
+
+	Streaming StreamingConfig `json:"streaming"`
 
 	Labs labsConfig `json:"labs"`
 }
