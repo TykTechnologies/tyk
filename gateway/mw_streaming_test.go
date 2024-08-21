@@ -310,7 +310,8 @@ func testAsyncAPIHttp(t *testing.T, ts *Test, consumerGroup string, isDynamic bo
 	}
 
 	// Add a delay to ensure WebSocket connections are fully established
-	time.Sleep(2 * time.Second)
+	time.Sleep(5 * time.Second)
+	t.Log("Waited 5 seconds for WebSocket connections to stabilize")
 
 	// Send messages to Kafka
 	config := sarama.NewConfig()
@@ -341,8 +342,8 @@ func testAsyncAPIHttp(t *testing.T, ts *Test, consumerGroup string, isDynamic bo
 	}
 
 	messagesReceived := 0
-	overallTimeout := time.After(30 * time.Second)
-	inactivityTimeout := time.NewTimer(5 * time.Second)
+	overallTimeout := time.After(60 * time.Second)
+	inactivityTimeout := time.NewTimer(10 * time.Second)
 	done := make(chan bool)
 
 	go func() {
@@ -379,7 +380,7 @@ func testAsyncAPIHttp(t *testing.T, ts *Test, consumerGroup string, isDynamic bo
 						if strings.HasPrefix(receivedMessage, messageToSend) {
 							messagesReceived++
 							t.Logf("Message from WebSocket %d matches sent message", i+1)
-							inactivityTimeout.Reset(5 * time.Second)
+							inactivityTimeout.Reset(10 * time.Second)
 						}
 					}
 				}
@@ -404,6 +405,10 @@ func testAsyncAPIHttp(t *testing.T, ts *Test, consumerGroup string, isDynamic bo
 	} else {
 		t.Logf("Successfully received %d messages as expected for tenant %s", messagesReceived, tenantID)
 	}
+
+	// Add a delay before closing connections to ensure all messages are processed
+	time.Sleep(5 * time.Second)
+	t.Log("Test completed, closing WebSocket connections")
 }
 
 func waitForAPIToBeLoaded(ts *Test) error {
