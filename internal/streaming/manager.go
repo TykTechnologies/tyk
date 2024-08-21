@@ -18,14 +18,14 @@ import (
 	_ "github.com/TykTechnologies/tyk/internal/portal"
 )
 
-type StreamManager struct {
+type Stream struct {
 	allowedUnsafe []string
-	streamConfigs sync.Map
-	streams       sync.Map
+	streamConfig  string
+	stream        *service.Stream
 	log           *logrus.Logger
 }
 
-func NewStreamManager(allowUnsafe []string) *StreamManager {
+func NewStream(allowUnsafe []string) *Stream {
 	logger := logrus.New()
 	logger.Out = log.Writer()
 	logger.Formatter = &logrus.TextFormatter{
@@ -37,58 +37,40 @@ func NewStreamManager(allowUnsafe []string) *StreamManager {
 		logger.Warnf("Allowing unsafe components: %v", allowUnsafe)
 	}
 
-	return &StreamManager{
+	return &Stream{
 		log:           logger,
 		allowedUnsafe: allowUnsafe,
 	}
 }
 
-func (sm *StreamManager) SetLogger(logger *logrus.Logger) {
+func (s *Stream) SetLogger(logger *logrus.Logger) {
 	if logger != nil {
-		sm.log = logger
+		s.log = logger
 	}
 }
 
-func (sm *StreamManager) AddStream(streamID string, config map[string]interface{}, mux service.HTTPMultiplexer) error {
-	sm.log.Debugf("AddStream called for streamID: %s", streamID)
+func (s *Stream) Start(config map[string]interface{}, mux service.HTTPMultiplexer) error {
+	s.log.Debugf("Starting stream")
 
 	configPayload, err := yaml.Marshal(config)
 	if err != nil {
-		sm.log.Errorf("Failed to marshal config for stream %s: %v", streamID, err)
+		s.log.Errorf("Failed to marshal config: %v", err)
 		return err
 	}
 
-	configPayload = sm.removeUnsafe(configPayload)
-	configPayload, err = sm.removeConsumerGroup(configPayload)
+	configPayload = s.removeUnsafe(configPayload)
+	configPayload, err = s.removeConsumerGroup(configPayload)
 	if err != nil {
-		sm.log.Errorf("Failed to remove consumer_group for stream %s: %v", streamID, err)
+		s.log.Errorf("Failed to remove consumer_group: %v", err)
 		return err
 	}
 
-	if existingConfig, exists := sm.streamConfigs.Load(streamID); exists {
-		sm.log.Debugf("Stream %s already exists, checking config checksum", streamID)
-
-		existingChecksum := fmt.Sprintf("%x", sha256.Sum256([]byte(existingConfig.(string))))
-		newChecksum := fmt.Sprintf("%x", sha256.Sum256(configPayload))
-
-		if existingChecksum == newChecksum {
-			sm.log.Debugf("Stream %s config checksum matches, not removing", streamID)
-			return nil
-		}
-
-		sm.log.Debugf("Stream %s config checksum does not match, removing it first", streamID)
-		if err := sm.RemoveStream(streamID); err != nil {
-			sm.log.Errorf("Failed to remove existing stream %s: %v", streamID, err)
-			return err
-		}
-	}
-
-	sm.log.Debugf("Building new stream for %s", streamID)
+	s.log.Debugf("Building new stream")
 	builder := service.NewStreamBuilder()
 
 	err = builder.SetYAML(string(configPayload))
 	if err != nil {
-		sm.log.Errorf("Failed to set YAML for stream %s: %v", streamID, err)
+		s.log.Errorf("Failed to set YAML: %v", err)
 		return err
 	}
 
@@ -98,70 +80,54 @@ func (sm *StreamManager) AddStream(streamID string, config map[string]interface{
 
 	stream, err := builder.Build()
 	if err != nil {
-		sm.log.Errorf("Failed to build stream %s: %v", streamID, err)
+		s.log.Errorf("Failed to build stream: %v", err)
 		return err
 	}
 
-	sm.streamConfigs.Store(streamID, string(configPayload))
-	sm.streams.Store(streamID, stream)
+	s.streamConfig = string(configPayload)
+	s.stream = stream
 
-	sm.log.Debugf("Stream %s built successfully, starting it", streamID)
+	s.log.Debugf("Stream built successfully, starting it")
 
 	go func() {
-		sm.log.Infof("Starting stream %s", streamID)
+		s.log.Infof("Starting stream")
 
 		if err := stream.Run(context.Background()); err != nil {
-			sm.log.Errorf("Stream %s encountered an error: %v", streamID, err)
+			s.log.Errorf("Stream encountered an error: %v", err)
 		}
 	}()
 
-	sm.log.Debugf("Stream %s added successfully", streamID)
+	s.log.Debugf("Stream started successfully")
 	return nil
 }
 
-func (sm *StreamManager) RemoveStream(streamID string) error {
-	sm.log.Printf("stopping stream %s", streamID)
+func (s *Stream) Stop() error {
+	s.log.Printf("Stopping stream")
 
-	streamValue, exists := sm.streams.Load(streamID)
-	if !exists {
-		return fmt.Errorf("stream not found: %s", streamID)
+	if s.stream == nil {
+		return fmt.Errorf("no active stream to stop")
 	}
 
-	stream := streamValue.(*service.Stream)
-
 	go func() {
-		if err := stream.Stop(context.Background()); err != nil {
-			sm.log.Printf("error stopping stream %s: %v", streamID, err)
+		if err := s.stream.Stop(context.Background()); err != nil {
+			s.log.Printf("Error stopping stream: %v", err)
 		}
 
-		sm.log.Printf("stream %s stopped", streamID)
+		s.log.Printf("Stream stopped")
 	}()
 
-	sm.streamConfigs.Delete(streamID)
-	sm.streams.Delete(streamID)
+	s.streamConfig = ""
+	s.stream = nil
 
 	return nil
 }
 
-func (sm *StreamManager) Streams() map[string]string {
-	streams := make(map[string]string)
-	sm.streamConfigs.Range(func(key, value interface{}) bool {
-		streams[key.(string)] = value.(string)
-		return true
-	})
-	return streams
+func (s *Stream) GetConfig() string {
+	return s.streamConfig
 }
 
-func (sm *StreamManager) Reset() error {
-	sm.streams.Range(func(key, _ interface{}) bool {
-		streamID := key.(string)
-		if err := sm.RemoveStream(streamID); err != nil {
-			sm.log.Printf("error removing stream %s: %v", streamID, err)
-		}
-		return true
-	})
-
-	return nil
+func (s *Stream) Reset() error {
+	return s.Stop()
 }
 
 func (sm *StreamManager) addMetadata(configPayload []byte, key, value string) ([]byte, error) {
