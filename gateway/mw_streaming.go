@@ -16,8 +16,6 @@ import (
 
 const (
 	ExtensionTykStreaming = "x-tyk-streaming"
-	GCInterval            = 1 * time.Minute
-	ConsumerGroupTimeout  = 30 * time.Second
 )
 
 // Used for testing
