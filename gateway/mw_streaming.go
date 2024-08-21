@@ -85,34 +85,24 @@ func (s *StreamingMiddleware) Name() string {
 func (s *StreamingMiddleware) EnabledForSpec() bool {
 	s.Logger().Debug("Checking if streaming is enabled")
 
-	labsConfig := s.Gw.GetConfig().Labs
-	s.Logger().Debugf("Labs config: %+v", labsConfig)
+	streamingConfig := s.Gw.GetConfig().Streaming
+	s.Logger().Debugf("Streaming config: %+v", streamingConfig)
 
-	if streamingConfig, ok := labsConfig["streaming"].(map[string]interface{}); ok {
-		s.Logger().Debugf("Streaming config: %+v", streamingConfig)
-		if enabled, ok := streamingConfig["enabled"].(bool); ok && enabled {
-			s.Logger().Debug("Streaming is enabled in the config")
-			if allowUnsafe, ok := streamingConfig["allow_unsafe"].([]interface{}); ok {
-				s.allowedUnsafe = make([]string, len(allowUnsafe))
-				for i, v := range allowUnsafe {
-					if str, ok := v.(string); ok {
-						s.allowedUnsafe[i] = str
-					}
-				}
-			}
-			s.Logger().Debugf("Allowed unsafe components: %v", s.allowedUnsafe)
+	if streamingConfig.Enabled {
+		s.Logger().Debug("Streaming is enabled in the config")
+		s.allowedUnsafe = streamingConfig.AllowUnsafe
+		s.Logger().Debugf("Allowed unsafe components: %v", s.allowedUnsafe)
 
-			specStreams := s.getStreams(nil)
-			globalStreamCounter.Add(int64(len(specStreams)))
+		specStreams := s.getStreams(nil)
+		globalStreamCounter.Add(int64(len(specStreams)))
 
-			s.Logger().Debug("Total streams count: ", len(specStreams))
+		s.Logger().Debug("Total streams count: ", len(specStreams))
 
-			if len(specStreams) == 0 {
-				return false
-			}
-
-			return true
+		if len(specStreams) == 0 {
+			return false
 		}
+
+		return true
 	}
 
 	s.Logger().Debug("Streaming is not enabled in the config")
