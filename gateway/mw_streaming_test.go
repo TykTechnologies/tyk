@@ -296,7 +296,7 @@ func testAsyncAPIHttp(t *testing.T, ts *Test, consumerGroup string, isDynamic bo
 	for i := 0; i < numClients; i++ {
 		dialer := websocket.Dialer{
 			Proxy:            http.ProxyFromEnvironment,
-			HandshakeTimeout: 45 * time.Second,
+			HandshakeTimeout: 5 * time.Second,
 			TLSClientConfig:  &tls.Config{InsecureSkipVerify: true},
 		}
 		wsURL := strings.Replace(ts.URL, "http", "ws", 1) + fmt.Sprintf("/%s/get/ws", apiName)
@@ -306,12 +306,8 @@ func testAsyncAPIHttp(t *testing.T, ts *Test, consumerGroup string, isDynamic bo
 		}
 		defer wsConn.Close()
 		wsClients[i] = wsConn
-		t.Logf("Successfully connected to WebSocket %d. Response: %+v", i+1, resp)
+		t.Logf("Successfully connected to WebSocket %d", i+1)
 	}
-
-	// Add a delay to ensure WebSocket connections are fully established
-	time.Sleep(10 * time.Second)
-	t.Log("Waited 10 seconds for WebSocket connections to stabilize")
 
 	// Send messages to Kafka
 	config := sarama.NewConfig()
@@ -342,37 +338,23 @@ func testAsyncAPIHttp(t *testing.T, ts *Test, consumerGroup string, isDynamic bo
 	}
 
 	messagesReceived := 0
-	overallTimeout := time.After(120 * time.Second)
-	inactivityTimeout := time.NewTimer(20 * time.Second)
+	overallTimeout := time.After(500 * time.Millisecond)
 	done := make(chan bool)
 
 	go func() {
-		defer func() {
-			if r := recover(); r != nil {
-				t.Logf("Recovered from panic in WebSocket read goroutine: %v", r)
-				done <- true
-			}
-		}()
-
 		for {
 			select {
 			case <-overallTimeout:
 				t.Log("Overall timeout reached while waiting for messages")
 				done <- true
 				return
-			case <-inactivityTimeout.C:
-				t.Log("Inactivity timeout reached")
-				done <- true
-				return
 			default:
 				for i, wsConn := range wsClients {
-					wsConn.SetReadDeadline(time.Now().Add(1 * time.Second))
+					wsConn.SetReadDeadline(time.Now().Add(100 * time.Millisecond))
 					_, p, err := wsConn.ReadMessage()
 					if err != nil {
 						if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
 							t.Logf("Unexpected error reading from WebSocket %d: %v", i+1, err)
-						} else if !strings.Contains(err.Error(), "i/o timeout") {
-							t.Logf("Error reading from WebSocket %d: %v", i+1, err)
 						}
 					} else {
 						receivedMessage := string(p)
@@ -380,7 +362,6 @@ func testAsyncAPIHttp(t *testing.T, ts *Test, consumerGroup string, isDynamic bo
 						if strings.HasPrefix(receivedMessage, messageToSend) {
 							messagesReceived++
 							t.Logf("Message from WebSocket %d matches sent message", i+1)
-							inactivityTimeout.Reset(20 * time.Second)
 						}
 					}
 				}
@@ -390,9 +371,6 @@ func testAsyncAPIHttp(t *testing.T, ts *Test, consumerGroup string, isDynamic bo
 					done <- true
 					return
 				}
-
-				// Add a small sleep to prevent tight loop
-				time.Sleep(500 * time.Millisecond)
 			}
 		}
 	}()
@@ -406,8 +384,6 @@ func testAsyncAPIHttp(t *testing.T, ts *Test, consumerGroup string, isDynamic bo
 		t.Logf("Successfully received %d messages as expected for tenant %s", messagesReceived, tenantID)
 	}
 
-	// Add a delay before closing connections to ensure all messages are processed
-	time.Sleep(10 * time.Second)
 	t.Log("Test completed, closing WebSocket connections")
 }
 
