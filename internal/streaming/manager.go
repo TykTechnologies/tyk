@@ -103,16 +103,28 @@ func (s *Stream) Stop() error {
 	s.log.Printf("Stopping stream")
 
 	if s.stream == nil {
-		return fmt.Errorf("no active stream to stop")
+		s.log.Printf("No active stream to stop")
+		return nil
 	}
 
-	go func() {
-		if err := s.stream.Stop(context.Background()); err != nil {
-			s.log.Printf("Error stopping stream: %v", err)
-		}
+	stopCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
 
-		s.log.Printf("Stream stopped")
+	errChan := make(chan error, 1)
+	go func() {
+		errChan <- s.stream.Stop(stopCtx)
 	}()
+
+	select {
+	case err := <-errChan:
+		if err != nil {
+			s.log.Printf("Error stopping stream: %v", err)
+		} else {
+			s.log.Printf("Stream stopped successfully")
+		}
+	case <-stopCtx.Done():
+		s.log.Printf("Timeout while stopping stream")
+	}
 
 	s.streamConfig = ""
 	s.stream = nil
