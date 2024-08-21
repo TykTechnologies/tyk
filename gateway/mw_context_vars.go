@@ -46,6 +46,13 @@ func (m *MiddlewareContextVars) ProcessRequest(w http.ResponseWriter, r *http.Re
 		contextDataObject[name] = c.Value
 	}
 
+	for key, vals := range r.Form {
+		name := "request_data_" + strings.Replace(key, "-", "_", -1)
+		if len(vals) > 0 {
+			contextDataObject[name] = vals[0]
+		}
+	}
+
 	ctxSetData(r, contextDataObject)
 
 	return nil, http.StatusOK
