@@ -58,7 +58,6 @@ func (s *Stream) Start(config map[string]interface{}, mux service.HTTPMultiplexe
 	}
 
 	configPayload = s.removeUnsafe(configPayload)
-	configPayload, err = s.removeConsumerGroup(configPayload)
 	if err != nil {
 		s.log.Errorf("Failed to remove consumer_group: %v", err)
 		return err
@@ -88,13 +87,21 @@ func (s *Stream) Start(config map[string]interface{}, mux service.HTTPMultiplexe
 
 	s.log.Debugf("Stream built successfully, starting it")
 
+	errChan := make(chan error, 1)
 	go func() {
 		s.log.Infof("Starting stream")
-
-		if err := stream.Run(context.Background()); err != nil {
-			s.log.Errorf("Stream encountered an error: %v", err)
-		}
+		errChan <- stream.Run(context.Background())
 	}()
+
+	select {
+	case err := <-errChan:
+		if err != nil {
+			s.log.Errorf("Stream encountered an error: %v", err)
+			return err
+		}
+	case <-time.After(100 * time.Millisecond):
+		// If no error after a short delay, assume stream started successfully
+	}
 
 	s.log.Debugf("Stream started successfully")
 	return nil
@@ -139,42 +146,6 @@ func (s *Stream) GetConfig() string {
 
 func (s *Stream) Reset() error {
 	return s.Stop()
-}
-
-func (s *Stream) addMetadata(configPayload []byte, key, value string) ([]byte, error) {
-	var parsedConfig map[string]interface{}
-	if err := yaml.Unmarshal(configPayload, &parsedConfig); err != nil {
-		return nil, err
-	}
-
-	newProcessor := map[interface{}]interface{}{
-		"mapping": fmt.Sprintf("meta %s = \"%s\"", key, value),
-	}
-
-	for key, value := range parsedConfig {
-		if key == "input" {
-			inputMap, ok := value.(map[interface{}]interface{})
-			if !ok {
-				s.log.Printf("expected map[interface{}]interface{}, got %T", value)
-				continue
-			}
-
-			if processors, found := inputMap["processors"]; found {
-				if procSlice, ok := processors.([]map[interface{}]interface{}); ok {
-					inputMap["processors"] = append([]map[interface{}]interface{}{newProcessor}, procSlice...)
-				}
-			} else {
-				inputMap["processors"] = []map[interface{}]interface{}{newProcessor}
-			}
-			break
-		}
-	}
-
-	configPayload, err := yaml.Marshal(parsedConfig)
-	if err != nil {
-		return nil, err
-	}
-	return configPayload, nil
 }
 
 func (s *Stream) GetHTTPPaths(component string) (map[string]string, error) {
@@ -262,38 +233,4 @@ func (s *Stream) removeUnsafe(yamlBytes []byte) []byte {
 		}
 	}
 	return []byte(yamlString)
-}
-
-func (s *Stream) removeConsumerGroup(configPayload []byte) ([]byte, error) {
-	var parsedConfig map[interface{}]interface{}
-	if err := yaml.Unmarshal(configPayload, &parsedConfig); err != nil {
-		return nil, err
-	}
-
-	removeFromMap := func(m map[interface{}]interface{}) {
-		if httpServer, ok := m["http_server"].(map[interface{}]interface{}); ok {
-			delete(httpServer, "consumer_group")
-		}
-	}
-
-	if output, ok := parsedConfig["output"].(map[interface{}]interface{}); ok {
-		removeFromMap(output)
-	}
-
-	if broker, ok := parsedConfig["output"].(map[interface{}]interface{})["broker"].(map[interface{}]interface{}); ok {
-		if outputs, ok := broker["outputs"].([]interface{}); ok {
-			for _, output := range outputs {
-				if outputMap, ok := output.(map[interface{}]interface{}); ok {
-					removeFromMap(outputMap)
-				}
-			}
-		}
-	}
-
-	newConfigPayload, err := yaml.Marshal(parsedConfig)
-	if err != nil {
-		return nil, err
-	}
-
-	return newConfigPayload, nil
 }
