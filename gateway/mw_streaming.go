@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"sync"
@@ -25,16 +26,16 @@ var globalStreamCounter atomic.Int64
 // StreamingMiddleware is a middleware that handles streaming functionality
 type StreamingMiddleware struct {
 	*BaseMiddleware
-	consumerGroupManagers       sync.Map // Map of consumer group IDs to ConsumerGroupManager
-	connections                 sync.Map // Map of streamID to map of connectionID to connection
-	ctx                         context.Context
-	cancel                      context.CancelFunc
-	allowedUnsafe               []string
-	gcTicker                    *time.Ticker
-	defaultConsumerGroupManager *ConsumerGroupManager
+	streamManagers       sync.Map // Map of consumer group IDs to StreamManager
+	connections          sync.Map // Map of streamID to map of connectionID to connection
+	ctx                  context.Context
+	cancel               context.CancelFunc
+	allowedUnsafe        []string
+	gcTicker             *time.Ticker
+	defaultStreamManager *StreamManager
 }
 
-type ConsumerGroupManager struct {
+type StreamManager struct {
 	streamManager *streaming.StreamManager
 	muxer         *mux.Router
 	mw            *StreamingMiddleware
@@ -44,26 +45,24 @@ type ConsumerGroupManager struct {
 	sync.Mutex
 }
 
-func (cgm *ConsumerGroupManager) initStreams() {
+func (sm *StreamManager) initStreams(specStreams map[string]interface{}) {
 	// Clear existing routes for this consumer group
-	cgm.muxer = mux.NewRouter()
-
-	specStreams := cgm.mw.getStreams()
+	sm.muxer = mux.NewRouter()
 
 	for streamID, streamConfig := range specStreams {
 		if streamMap, ok := streamConfig.(map[string]interface{}); ok {
-			err := cgm.addOrUpdateStream(streamID, streamMap)
+			err := sm.addOrUpdateStream(streamID, streamMap)
 			if err != nil {
-				cgm.mw.Logger().Errorf("Error adding stream %s for consumer group %s: %v", streamID, cgm.consumerGroup, err)
+				sm.mw.Logger().Errorf("Error adding stream %s for consumer group %s: %v", streamID, sm.consumerGroup, err)
 			}
 		}
 	}
 }
 
 // removeStream removes a stream
-func (cgm *ConsumerGroupManager) removeStream(streamID string) error {
-	streamFullID := fmt.Sprintf("%s_%s_%s", cgm.mw.Spec.APIID, cgm.consumerGroup, streamID)
-	return cgm.streamManager.RemoveStream(streamFullID)
+func (sm *StreamManager) removeStream(streamID string) error {
+	streamFullID := fmt.Sprintf("%s_%s_%s", sm.mw.Spec.APIID, sm.consumerGroup, streamID)
+	return sm.streamManager.RemoveStream(streamFullID)
 }
 
 type connection struct {
@@ -95,7 +94,7 @@ func (s *StreamingMiddleware) EnabledForSpec() bool {
 			}
 			s.Logger().Debugf("Allowed unsafe components: %v", s.allowedUnsafe)
 
-			specStreams := s.getStreams()
+			specStreams := s.getStreams(nil)
 			globalStreamCounter.Add(int64(len(specStreams)))
 
 			s.Logger().Debug("Total streams count: ", len(specStreams))
@@ -117,8 +116,8 @@ func (s *StreamingMiddleware) Init() {
 	s.Logger().Debug("Initializing StreamingMiddleware")
 	s.ctx, s.cancel = context.WithCancel(context.Background())
 
-	s.Logger().Debug("Initializing default consumer group")
-	s.defaultConsumerGroupManager = s.getConsumerGroupManager("default")
+	s.Logger().Debug("Initializing default stream manager")
+	s.defaultStreamManager = s.createStreamManager("default", nil)
 
 	s.gcTicker = time.NewTicker(GCInterval)
 	go s.runGC()
@@ -130,57 +129,92 @@ func (s *StreamingMiddleware) runGC() {
 		case <-s.ctx.Done():
 			return
 		case <-s.gcTicker.C:
-			s.cleanupUnusedConsumerGroups()
+			// s.cleanupUnusedConsumerGroups()
 		}
 	}
 }
 
+// - mapping: >
+//         root = if json().id.string() == "$tyk_context.request_data_report_id" {
+//         deleted() }
+
 func (s *StreamingMiddleware) cleanupUnusedConsumerGroups() {
 	now := time.Now()
-	s.consumerGroupManagers.Range(func(key, value interface{}) bool {
+	s.streamManagers.Range(func(key, value interface{}) bool {
 		consumerGroup := key.(string)
-		manager := value.(*ConsumerGroupManager)
+		if consumerGroup == "default" {
+			return true
+		}
+		manager := value.(*StreamManager)
 		manager.Lock()
 		if manager.connections == 0 && now.Sub(manager.lastAccess) > ConsumerGroupTimeout {
 			s.Logger().Infof("Cleaning up unused consumer group: %s", consumerGroup)
 			manager.streamManager.Reset()
-			s.consumerGroupManagers.Delete(consumerGroup)
+			s.streamManagers.Delete(consumerGroup)
 		}
 		manager.Unlock()
 		return true
 	})
 }
 
-func (s *StreamingMiddleware) getConsumerGroupManager(consumerGroup string) *ConsumerGroupManager {
-	if manager, exists := s.consumerGroupManagers.Load(consumerGroup); exists {
-		return manager.(*ConsumerGroupManager)
-	}
+func (s *StreamingMiddleware) createStreamManager(consumerGroup string, r *http.Request) *StreamManager {
+	// if manager, exists := s.streamManagers.Load(consumerGroup); exists {
+	// 	return manager.(*StreamManager)
+	// }
 
-	s.Logger().Infof("ConsumerGroupManager not found for consumer group %s. Creating a new one.", consumerGroup)
+	// s.Logger().Infof("StreamManager not found for consumer group %s. Creating a new one.", consumerGroup)
 	streamManager := streaming.NewStreamManager(s.allowedUnsafe)
 	muxer := mux.NewRouter()
-	consumerGroupManager := &ConsumerGroupManager{
+	newStreamManager := &StreamManager{
 		streamManager: streamManager,
 		muxer:         muxer,
 		mw:            s,
 		consumerGroup: consumerGroup,
 	}
-	s.consumerGroupManagers.Store(consumerGroup, consumerGroupManager)
+	randomID := fmt.Sprintf("_%d", time.Now().UnixNano())
+	consumerGroupWithID := consumerGroup + randomID
+	s.streamManagers.Store(consumerGroupWithID, newStreamManager)
 
-	// Call updateStreams for the new ConsumerGroupManager
-	consumerGroupManager.initStreams()
+	// Call initStreams for the new StreamManager
+	newStreamManager.initStreams(s.getStreams(r))
 
-	return consumerGroupManager
+	return newStreamManager
 }
 
 // getStreams extracts streaming configurations from an API spec if available.
-func (s *StreamingMiddleware) getStreams() map[string]interface{} {
+func (s *StreamingMiddleware) getStreams(r *http.Request) map[string]interface{} {
 	streamConfigs := make(map[string]interface{})
 	if s.Spec.IsOAS {
 		if ext, ok := s.Spec.OAS.T.Extensions[ExtensionTykStreaming]; ok {
 			if streamsMap, ok := ext.(map[string]interface{}); ok {
 				if streams, ok := streamsMap["streams"].(map[string]interface{}); ok {
 					for streamID, stream := range streams {
+						if r != nil {
+							s.Logger().Debugf("Stream config for %s: %v", streamID, stream)
+
+							marshaledStream, err := json.Marshal(stream)
+							if err != nil {
+								s.Logger().Errorf("Failed to marshal stream config: %v", err)
+								continue
+							}
+							replacedStream := s.Gw.replaceTykVariables(r, string(marshaledStream), true)
+
+							if replacedStream != string(marshaledStream) {
+								s.Logger().Debugf("Stream config changed for %s: %s", streamID, replacedStream)
+							} else {
+								s.Logger().Debugf("Stream config has not changed for %s: %s", streamID, replacedStream)
+							}
+
+							var unmarshaledStream map[string]interface{}
+							err = json.Unmarshal([]byte(replacedStream), &unmarshaledStream)
+							if err != nil {
+								s.Logger().Errorf("Failed to unmarshal replaced stream config: %v", err)
+								continue
+							}
+							stream = unmarshaledStream
+						} else {
+							s.Logger().Debugf("No request available to replace variables in stream config for %s", streamID)
+						}
 						streamConfigs[streamID] = stream
 					}
 				}
@@ -191,18 +225,18 @@ func (s *StreamingMiddleware) getStreams() map[string]interface{} {
 }
 
 // addOrUpdateStream adds a new stream or updates an existing one
-func (cgm *ConsumerGroupManager) addOrUpdateStream(streamID string, config map[string]interface{}) error {
-	streamFullID := fmt.Sprintf("%s_%s_%s", cgm.mw.Spec.APIID, cgm.consumerGroup, streamID)
-	cgm.mw.Logger().Debugf("Adding/updating stream: %s for consumer group: %s", streamFullID, cgm.consumerGroup)
+func (sm *StreamManager) addOrUpdateStream(streamID string, config map[string]interface{}) error {
+	streamFullID := fmt.Sprintf("%s_%s_%s", sm.mw.Spec.APIID, sm.consumerGroup, streamID)
+	sm.mw.Logger().Debugf("Adding/updating stream: %s for consumer group: %s", streamFullID, sm.consumerGroup)
 
-	err := cgm.streamManager.AddStream(streamFullID, config, &handleFuncAdapter{mw: cgm.mw, streamID: streamFullID, consumerGroup: cgm.consumerGroup, muxer: cgm.muxer, cgm: cgm})
+	err := sm.streamManager.AddStream(streamFullID, config, &handleFuncAdapter{mw: sm.mw, streamID: streamFullID, consumerGroup: sm.consumerGroup, muxer: sm.muxer, sm: sm})
 	if err != nil {
-		cgm.mw.Logger().Errorf("Failed to add stream %s: %v", streamFullID, err)
+		sm.mw.Logger().Errorf("Failed to add stream %s: %v", streamFullID, err)
 	} else {
-		cgm.mw.Logger().Infof("Successfully added/updated stream: %s", streamFullID)
+		sm.mw.Logger().Infof("Successfully added/updated stream: %s", streamFullID)
 	}
 
-	cgm.mw.Logger().Debugf("Current streams after add/update: %+v", cgm.streamManager.Streams())
+	sm.mw.Logger().Debugf("Current streams after add/update: %+v", sm.streamManager.Streams())
 
 	return err
 }
@@ -218,16 +252,16 @@ func (s *StreamingMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 
 	var match mux.RouteMatch
 	// First do the check if such route is defined by streaming API
-	if s.defaultConsumerGroupManager.muxer.Match(newRequest, &match) {
+	if s.defaultStreamManager.muxer.Match(newRequest, &match) {
 		pathRegexp, _ := match.Route.GetPathRegexp()
 		s.Logger().Debugf("Matched stream: %v", pathRegexp)
 		handler, _ := match.Handler.(http.HandlerFunc)
 		if handler != nil {
 			// Now that we know that such streaming endpoint here,
-			// we can actually initializing individual consumer group manager
+			// we can actually initialize individual stream manager
 			consumerGroup := s.getConsumerGroup(r)
-			consumerGroupManager := s.getConsumerGroupManager(consumerGroup)
-			consumerGroupManager.muxer.Match(newRequest, &match)
+			streamManager := s.createStreamManager(consumerGroup, r)
+			streamManager.muxer.Match(newRequest, &match)
 			handler, _ := match.Handler.(http.HandlerFunc)
 
 			handler.ServeHTTP(w, r)
@@ -266,8 +300,8 @@ func (s *StreamingMiddleware) Unload() {
 	s.Logger().Debugf("Unloading streaming middleware %s", s.Spec.Name)
 
 	totalStreams := 0
-	s.consumerGroupManagers.Range(func(_, value interface{}) bool {
-		manager := value.(*ConsumerGroupManager)
+	s.streamManagers.Range(func(_, value interface{}) bool {
+		manager := value.(*StreamManager)
 		totalStreams += len(manager.streamManager.Streams())
 		return true
 	})
@@ -291,8 +325,8 @@ func (s *StreamingMiddleware) Unload() {
 
 	time.Sleep(500 * time.Millisecond)
 
-	s.consumerGroupManagers.Range(func(_, value interface{}) bool {
-		manager := value.(*ConsumerGroupManager)
+	s.streamManagers.Range(func(_, value interface{}) bool {
+		manager := value.(*StreamManager)
 		manager.Lock()
 		s.Logger().Infof("Consumer Group %s: Closing %d connections, last access: %v", manager.consumerGroup, manager.connections, manager.lastAccess)
 		manager.Unlock()
@@ -300,7 +334,7 @@ func (s *StreamingMiddleware) Unload() {
 		return true
 	})
 
-	s.consumerGroupManagers = sync.Map{}
+	s.streamManagers = sync.Map{}
 	s.connections = sync.Map{}
 
 	s.Logger().Info("All streams successfully removed and connections closed")
@@ -308,31 +342,31 @@ func (s *StreamingMiddleware) Unload() {
 
 type handleFuncAdapter struct {
 	streamID      string
+	sm            *StreamManager
 	consumerGroup string
 	mw            *StreamingMiddleware
 	muxer         *mux.Router
-	cgm           *ConsumerGroupManager
 }
 
 func (h *handleFuncAdapter) HandleFunc(path string, f func(http.ResponseWriter, *http.Request)) {
-	log.Debugf("Registering streaming handleFunc for path: %s", path)
+	h.mw.Logger().Debugf("Registering streaming handleFunc for path: %s", path)
 
 	if h.mw == nil || h.muxer == nil {
-		log.Error("StreamingMiddleware or muxer is nil")
+		h.mw.Logger().Error("StreamingMiddleware or muxer is nil")
 		return
 	}
 
 	h.muxer.HandleFunc(path, func(w http.ResponseWriter, r *http.Request) {
-		h.cgm.Lock()
-		h.cgm.connections++
-		h.cgm.lastAccess = time.Now()
-		h.cgm.Unlock()
+		h.sm.Lock()
+		h.sm.connections++
+		h.sm.lastAccess = time.Now()
+		h.sm.Unlock()
 
 		f(w, r)
 
-		h.cgm.Lock()
-		h.cgm.connections--
-		h.cgm.Unlock()
+		h.sm.Lock()
+		h.sm.connections--
+		h.sm.Unlock()
 	})
-	log.Debugf("Registered handler for path: %s", path)
+	h.mw.Logger().Debugf("Registered handler for path: %s", path)
 }
