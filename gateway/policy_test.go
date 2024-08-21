@@ -216,8 +216,10 @@ func (s *Test) TestPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesD
 				Limit: user.APILimit{
 					QuotaMax:         1000,
 					QuotaRenewalRate: 3600,
-					Rate:             20,
-					Per:              1,
+					RateLimit: user.RateLimit{
+						Rate: 20,
+						Per:  1,
+					},
 				},
 			}},
 		},
@@ -233,8 +235,10 @@ func (s *Test) TestPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesD
 				Limit: user.APILimit{
 					QuotaMax:         1000,
 					QuotaRenewalRate: 3600,
-					Rate:             20,
-					Per:              1,
+					RateLimit: user.RateLimit{
+						Rate: 20,
+						Per:  1,
+					},
 				},
 			}},
 		},
@@ -251,15 +255,19 @@ func (s *Test) TestPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesD
 					Limit: user.APILimit{
 						QuotaMax:         1000,
 						QuotaRenewalRate: 3600,
-						Rate:             20,
-						Per:              1,
+						RateLimit: user.RateLimit{
+							Rate: 20,
+							Per:  1,
+						},
 					},
 				},
 				"c": {
 					Limit: user.APILimit{
 						QuotaMax: -1,
-						Rate:     2000,
-						Per:      60,
+						RateLimit: user.RateLimit{
+							Rate: 2000,
+							Per:  60,
+						},
 					},
 				},
 			},
@@ -277,8 +285,10 @@ func (s *Test) TestPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesD
 					Limit: user.APILimit{
 						QuotaMax:         5000,
 						QuotaRenewalRate: 3600,
-						Rate:             200,
-						Per:              10,
+						RateLimit: user.RateLimit{
+							Rate: 200,
+							Per:  10,
+						},
 					},
 				},
 			},
@@ -299,8 +309,10 @@ func (s *Test) TestPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesD
 					Limit: user.APILimit{
 						QuotaMax:         5000,
 						QuotaRenewalRate: 3600,
-						Rate:             200,
-						Per:              10,
+						RateLimit: user.RateLimit{
+							Rate: 200,
+							Per:  10,
+						},
 					},
 				},
 				"e": {},
@@ -647,7 +659,7 @@ func (s *Test) TestPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesD
 		{
 			"Acl for a and rate for a,b", []string{"acl1", "rate-for-a-b"},
 			"", func(t *testing.T, s *user.SessionState) {
-				want := map[string]user.AccessDefinition{"a": {Limit: user.APILimit{Rate: 4, Per: 1}}}
+				want := map[string]user.AccessDefinition{"a": {Limit: user.APILimit{RateLimit: user.RateLimit{Rate: 4, Per: 1}}}}
 				assert.Equal(t, want, s.AccessRights)
 			}, nil,
 		},
@@ -655,8 +667,8 @@ func (s *Test) TestPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesD
 			"Acl for a,b and individual rate for a,b", []string{"acl-for-a-b", "rate-for-a", "rate-for-b"},
 			"", func(t *testing.T, s *user.SessionState) {
 				want := map[string]user.AccessDefinition{
-					"a": {Limit: user.APILimit{Rate: 4, Per: 1}},
-					"b": {Limit: user.APILimit{Rate: 2, Per: 1}},
+					"a": {Limit: user.APILimit{RateLimit: user.RateLimit{Rate: 4, Per: 1}}},
+					"b": {Limit: user.APILimit{RateLimit: user.RateLimit{Rate: 2, Per: 1}}},
 				}
 				assert.Equal(t, want, s.AccessRights)
 			}, nil,
@@ -699,16 +711,20 @@ func (s *Test) TestPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesD
 						Limit: user.APILimit{
 							QuotaMax:         1000,
 							QuotaRenewalRate: 3600,
-							Rate:             20,
-							Per:              1,
+							RateLimit: user.RateLimit{
+								Rate: 20,
+								Per:  1,
+							},
 						},
 						AllowanceScope: "d",
 					},
 					"c": {
 						Limit: user.APILimit{
 							QuotaMax: -1,
-							Rate:     2000,
-							Per:      60,
+							RateLimit: user.RateLimit{
+								Rate: 2000,
+								Per:  60,
+							},
 						},
 						AllowanceScope: "c",
 					},
@@ -742,8 +758,10 @@ func (s *Test) TestPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesD
 					"e": {
 						Limit: user.APILimit{
 							QuotaMax: -1,
-							Rate:     300,
-							Per:      1,
+							RateLimit: user.RateLimit{
+								Rate: 300,
+								Per:  1,
+							},
 						},
 						AllowanceScope: "per_api_with_limit_set_from_policy",
 					},
@@ -751,8 +769,10 @@ func (s *Test) TestPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesD
 						Limit: user.APILimit{
 							QuotaMax:         5000,
 							QuotaRenewalRate: 3600,
-							Rate:             200,
-							Per:              10,
+							RateLimit: user.RateLimit{
+								Rate: 200,
+								Per:  10,
+							},
 						},
 						AllowanceScope: "d",
 					},
@@ -996,8 +1016,10 @@ func TestApplyPoliciesQuotaAPILimit(t *testing.T) {
 				Limit: user.APILimit{
 					QuotaMax:         100,
 					QuotaRenewalRate: 3600,
-					Rate:             1000,
-					Per:              1,
+					RateLimit: user.RateLimit{
+						Rate: 1000,
+						Per:  1,
+					},
 				},
 			},
 			"api2": {
@@ -1005,8 +1027,10 @@ func TestApplyPoliciesQuotaAPILimit(t *testing.T) {
 				Limit: user.APILimit{
 					QuotaMax:         200,
 					QuotaRenewalRate: 3600,
-					Rate:             1000,
-					Per:              1,
+					RateLimit: user.RateLimit{
+						Rate: 1000,
+						Per:  1,
+					},
 				},
 			},
 			"api3": {
@@ -1121,8 +1145,10 @@ func TestApplyPoliciesQuotaAPILimit(t *testing.T) {
 						return false
 					}
 					api1LimitExpected := user.APILimit{
-						Rate:             1000,
-						Per:              1,
+						RateLimit: user.RateLimit{
+							Rate: 1000,
+							Per:  1,
+						},
 						QuotaMax:         100,
 						QuotaRenewalRate: 3600,
 						QuotaRenews:      api1Limit.QuotaRenews,
@@ -1138,8 +1164,10 @@ func TestApplyPoliciesQuotaAPILimit(t *testing.T) {
 						return false
 					}
 					api2LimitExpected := user.APILimit{
-						Rate:             1000,
-						Per:              1,
+						RateLimit: user.RateLimit{
+							Rate: 1000,
+							Per:  1,
+						},
 						QuotaMax:         200,
 						QuotaRenewalRate: 3600,
 						QuotaRenews:      api2Limit.QuotaRenews,
@@ -1155,8 +1183,10 @@ func TestApplyPoliciesQuotaAPILimit(t *testing.T) {
 						return false
 					}
 					api3LimitExpected := user.APILimit{
-						Rate:             1000,
-						Per:              1,
+						RateLimit: user.RateLimit{
+							Rate: 1000,
+							Per:  1,
+						},
 						QuotaMax:         50,
 						QuotaRenewalRate: 3600,
 						QuotaRenews:      api3Limit.QuotaRenews,
@@ -1346,8 +1376,10 @@ func TestApplyMultiPolicies(t *testing.T) {
 					json.Unmarshal(data, &sessionData)
 
 					policy1Expected := user.APILimit{
-						Rate:             1000,
-						Per:              1,
+						RateLimit: user.RateLimit{
+							Rate: 1000,
+							Per:  1,
+						},
 						QuotaMax:         50,
 						QuotaRenewalRate: 3600,
 						QuotaRenews:      sessionData.AccessRights["api1"].Limit.QuotaRenews,
@@ -1356,8 +1388,10 @@ func TestApplyMultiPolicies(t *testing.T) {
 					assert.Equal(t, policy1Expected, sessionData.AccessRights["api1"].Limit, "API1 limit do not match")
 
 					policy2Expected := user.APILimit{
-						Rate:             100,
-						Per:              1,
+						RateLimit: user.RateLimit{
+							Rate: 100,
+							Per:  1,
+						},
 						QuotaMax:         100,
 						QuotaRenewalRate: 3600,
 						QuotaRenews:      sessionData.AccessRights["api2"].Limit.QuotaRenews,

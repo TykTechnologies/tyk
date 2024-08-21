@@ -280,6 +280,10 @@ func (r HTTPTestRunner) Run(t testing.TB, testCases ...TestCase) (*http.Response
 	for ti, tc := range testCases {
 		var tc *TestCase = &tc
 
+		if tc.BeforeFn != nil {
+			tc.BeforeFn()
+		}
+
 		req, err := r.RequestBuilder(tc)
 		if err != nil {
 			t.Errorf("[%d] Request build error: %s", ti, err.Error())
