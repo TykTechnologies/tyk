@@ -87,7 +87,10 @@ func (s *Test) testPrepareApplyPolicies(tb testing.TB) (*BaseMiddleware, []testA
 		},
 		Gw: s.Gw,
 	}
-	tests := []testApplyPoliciesData{
+	// splitting tests for readability
+	var tests []testApplyPoliciesData
+
+	nilSessionTCs := []testApplyPoliciesData{
 		{
 			"Empty", nil,
 			"", nil, nil,
@@ -104,6 +107,10 @@ func (s *Test) testPrepareApplyPolicies(tb testing.TB) (*BaseMiddleware, []testA
 			"DiffOrg", []string{"difforg"},
 			"different org", nil, nil,
 		},
+	}
+	tests = append(tests, nilSessionTCs...)
+
+	nonPartitionedTCs := []testApplyPoliciesData{
 		{
 			name:     "MultiNonPart",
 			policies: []string{"nonpart1", "nonpart2", "nonexistent"},
@@ -142,47 +149,10 @@ func (s *Test) testPrepareApplyPolicies(tb testing.TB) (*BaseMiddleware, []testA
 				assert.Equal(t, want, s.AccessRights)
 			},
 		},
-		{
-			"NonpartAndPart", []string{"nonpart1", "quota1"},
-			"", nil, nil,
-		},
-		{
-			"TagMerge", []string{"tags1", "tags2"},
-			"", func(t *testing.T, s *user.SessionState) {
-				want := []string{"key-tag", "tagA", "tagX", "tagY"}
-				sort.Strings(s.Tags)
+	}
+	tests = append(tests, nonPartitionedTCs...)
 
-				assert.Equal(t, want, s.Tags)
-			}, &user.SessionState{
-				Tags: []string{"key-tag"},
-			},
-		},
-		{
-			"InactiveMergeOne", []string{"tags1", "inactive1"},
-			"", func(t *testing.T, s *user.SessionState) {
-				if !s.IsInactive {
-					t.Fatalf("want IsInactive to be true")
-				}
-			}, nil,
-		},
-		{
-			"InactiveMergeAll", []string{"inactive1", "inactive2"},
-			"", func(t *testing.T, s *user.SessionState) {
-				if !s.IsInactive {
-					t.Fatalf("want IsInactive to be true")
-				}
-			}, nil,
-		},
-		{
-			"InactiveWithSession", []string{"tags1", "tags2"},
-			"", func(t *testing.T, s *user.SessionState) {
-				if !s.IsInactive {
-					t.Fatalf("want IsInactive to be true")
-				}
-			}, &user.SessionState{
-				IsInactive: true,
-			},
-		},
+	quotaPartitionTCs := []testApplyPoliciesData{
 		{
 			"QuotaPart with unlimited", []string{"unlimited-quota"},
 			"", func(t *testing.T, s *user.SessionState) {
@@ -233,6 +203,10 @@ func (s *Test) testPrepareApplyPolicies(tb testing.TB) (*BaseMiddleware, []testA
 				assert.Equal(t, want, s.AccessRights)
 			}, nil,
 		},
+	}
+	tests = append(tests, quotaPartitionTCs...)
+
+	rateLimitPartitionTCs := []testApplyPoliciesData{
 		{
 			"RatePart with unlimited", []string{"unlimited-rate"},
 			"", func(t *testing.T, s *user.SessionState) {
@@ -273,6 +247,10 @@ func (s *Test) testPrepareApplyPolicies(tb testing.TB) (*BaseMiddleware, []testA
 				assert.Equal(t, float64(12), s.Rate)
 			}, &user.SessionState{Rate: 20},
 		},
+	}
+	tests = append(tests, rateLimitPartitionTCs...)
+
+	complexityPartitionTCs := []testApplyPoliciesData{
 		{
 			"ComplexityPart with unlimited", []string{"unlimitedComplexity"},
 			"", func(t *testing.T, s *user.SessionState) {
@@ -297,6 +275,10 @@ func (s *Test) testPrepareApplyPolicies(tb testing.TB) (*BaseMiddleware, []testA
 				}
 			}, nil,
 		},
+	}
+	tests = append(tests, complexityPartitionTCs...)
+
+	aclPartitionTCs := []testApplyPoliciesData{
 		{
 			"AclPart", []string{"acl1"},
 			"", func(t *testing.T, s *user.SessionState) {
@@ -346,6 +328,40 @@ func (s *Test) testPrepareApplyPolicies(tb testing.TB) (*BaseMiddleware, []testA
 				assert.Equal(t, newPolicy.AccessRights, ses.AccessRights)
 			}, nil,
 		},
+	}
+	tests = append(tests, aclPartitionTCs...)
+
+	inactiveTCs := []testApplyPoliciesData{
+		{
+			"InactiveMergeOne", []string{"tags1", "inactive1"},
+			"", func(t *testing.T, s *user.SessionState) {
+				if !s.IsInactive {
+					t.Fatalf("want IsInactive to be true")
+				}
+			}, nil,
+		},
+		{
+			"InactiveMergeAll", []string{"inactive1", "inactive2"},
+			"", func(t *testing.T, s *user.SessionState) {
+				if !s.IsInactive {
+					t.Fatalf("want IsInactive to be true")
+				}
+			}, nil,
+		},
+		{
+			"InactiveWithSession", []string{"tags1", "tags2"},
+			"", func(t *testing.T, s *user.SessionState) {
+				if !s.IsInactive {
+					t.Fatalf("want IsInactive to be true")
+				}
+			}, &user.SessionState{
+				IsInactive: true,
+			},
+		},
+	}
+	tests = append(tests, inactiveTCs...)
+
+	perAPITCs := []testApplyPoliciesData{
 		{
 			name:     "Per API is set with other partitions to true",
 			policies: []string{"per_api_and_partitions"},
@@ -437,6 +453,10 @@ func (s *Test) testPrepareApplyPolicies(tb testing.TB) (*BaseMiddleware, []testA
 				assert.Equal(t, want, s.AccessRights)
 			},
 		},
+	}
+	tests = append(tests, perAPITCs...)
+
+	graphQLTCs := []testApplyPoliciesData{
 		{
 			name:     "Merge per path rules for the same API",
 			policies: []string{"per-path2", "per-path1"},
@@ -542,6 +562,10 @@ func (s *Test) testPrepareApplyPolicies(tb testing.TB) (*BaseMiddleware, []testA
 				assert.Equal(t, want, s.AccessRights)
 			},
 		},
+	}
+	tests = append(tests, graphQLTCs...)
+
+	throttleTCs := []testApplyPoliciesData{
 		{
 			"Throttle interval from policy", []string{"throttle1"},
 			"", func(t *testing.T, s *user.SessionState) {
@@ -562,6 +586,29 @@ func (s *Test) testPrepareApplyPolicies(tb testing.TB) (*BaseMiddleware, []testA
 				}
 			},
 			session: nil,
+		},
+	}
+	tests = append(tests, throttleTCs...)
+
+	tagsTCs := []testApplyPoliciesData{
+		{
+			"TagMerge", []string{"tags1", "tags2"},
+			"", func(t *testing.T, s *user.SessionState) {
+				want := []string{"key-tag", "tagA", "tagX", "tagY"}
+				sort.Strings(s.Tags)
+
+				assert.Equal(t, want, s.Tags)
+			}, &user.SessionState{
+				Tags: []string{"key-tag"},
+			},
+		},
+	}
+	tests = append(tests, tagsTCs...)
+
+	partitionTCs := []testApplyPoliciesData{
+		{
+			"NonpartAndPart", []string{"nonpart1", "quota1"},
+			"", nil, nil,
 		},
 		{
 			name:     "inherit quota and rate from partitioned policies",
@@ -598,6 +645,7 @@ func (s *Test) testPrepareApplyPolicies(tb testing.TB) (*BaseMiddleware, []testA
 			},
 		},
 	}
+	tests = append(tests, partitionTCs...)
 
 	return bmid, tests
 }
