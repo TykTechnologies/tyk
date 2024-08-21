@@ -34,10 +34,9 @@ type StreamingMiddleware struct {
 }
 
 type StreamManager struct {
-	streams       sync.Map
-	muxer         *mux.Router
-	mw            *StreamingMiddleware
-	consumerGroup string
+	streams sync.Map
+	muxer   *mux.Router
+	mw      *StreamingMiddleware
 }
 
 func (sm *StreamManager) initStreams(specStreams map[string]interface{}) {
@@ -48,7 +47,7 @@ func (sm *StreamManager) initStreams(specStreams map[string]interface{}) {
 		if streamMap, ok := streamConfig.(map[string]interface{}); ok {
 			err := sm.createStream(streamID, streamMap)
 			if err != nil {
-				sm.mw.Logger().Errorf("Error creating stream %s for consumer group %s: %v", streamID, sm.consumerGroup, err)
+				sm.mw.Logger().WithError(err).Errorf("Error creating stream %s", streamID)
 			}
 		}
 	}
@@ -56,7 +55,8 @@ func (sm *StreamManager) initStreams(specStreams map[string]interface{}) {
 
 // removeStream removes a stream
 func (sm *StreamManager) removeStream(streamID string) error {
-	streamFullID := fmt.Sprintf("%s_%s_%s", sm.mw.Spec.APIID, sm.consumerGroup, streamID)
+	streamFullID := fmt.Sprintf("%s_%s", sm.mw.Spec.APIID, streamID)
+
 	if streamValue, exists := sm.streams.Load(streamFullID); exists {
 		stream := streamValue.(*streaming.Stream)
 		err := stream.Stop()
@@ -64,6 +64,8 @@ func (sm *StreamManager) removeStream(streamID string) error {
 			return err
 		}
 		sm.streams.Delete(streamFullID)
+	} else {
+		return fmt.Errorf("Stream %s does not exist", streamID)
 	}
 	return nil
 }
@@ -88,7 +90,7 @@ func (s *StreamingMiddleware) EnabledForSpec() bool {
 		s.allowedUnsafe = streamingConfig.AllowUnsafe
 		s.Logger().Debugf("Allowed unsafe components: %v", s.allowedUnsafe)
 
-		specStreams := s.getStreams(nil)
+		specStreams := s.getStreamsConfig(nil)
 		globalStreamCounter.Add(int64(len(specStreams)))
 
 		s.Logger().Debug("Total streams count: ", len(specStreams))
@@ -110,27 +112,25 @@ func (s *StreamingMiddleware) Init() {
 	s.ctx, s.cancel = context.WithCancel(context.Background())
 
 	s.Logger().Debug("Initializing default stream manager")
-	s.defaultStreamManager = s.createStreamManager("default", nil)
+	s.defaultStreamManager = s.createStreamManager(nil)
 }
 
-func (s *StreamingMiddleware) createStreamManager(consumerGroup string, r *http.Request) *StreamManager {
+func (s *StreamingMiddleware) createStreamManager(r *http.Request) *StreamManager {
 	newStreamManager := &StreamManager{
-		muxer:         mux.NewRouter(),
-		mw:            s,
-		consumerGroup: consumerGroup,
+		muxer: mux.NewRouter(),
+		mw:    s,
 	}
-	randomID := fmt.Sprintf("_%d", time.Now().UnixNano())
-	consumerGroupWithID := consumerGroup + randomID
-	s.streamManagers.Store(consumerGroupWithID, newStreamManager)
+	streamID := fmt.Sprintf("_%d", time.Now().UnixNano())
+	s.streamManagers.Store(streamID, newStreamManager)
 
 	// Call initStreams for the new StreamManager
-	newStreamManager.initStreams(s.getStreams(r))
+	newStreamManager.initStreams(s.getStreamsConfig(r))
 
 	return newStreamManager
 }
 
-// getStreams extracts streaming configurations from an API spec if available.
-func (s *StreamingMiddleware) getStreams(r *http.Request) map[string]interface{} {
+// getStreamsConfig extracts streaming configurations from an API spec if available.
+func (s *StreamingMiddleware) getStreamsConfig(r *http.Request) map[string]interface{} {
 	streamConfigs := make(map[string]interface{})
 	if s.Spec.IsOAS {
 		if ext, ok := s.Spec.OAS.T.Extensions[ExtensionTykStreaming]; ok {
@@ -174,11 +174,11 @@ func (s *StreamingMiddleware) getStreams(r *http.Request) map[string]interface{}
 
 // createStream creates a new stream
 func (sm *StreamManager) createStream(streamID string, config map[string]interface{}) error {
-	streamFullID := fmt.Sprintf("%s_%s_%s", sm.mw.Spec.APIID, sm.consumerGroup, streamID)
-	sm.mw.Logger().Debugf("Creating stream: %s for consumer group: %s", streamFullID, sm.consumerGroup)
+	streamFullID := fmt.Sprintf("%s_%s", sm.mw.Spec.APIID, streamID)
+	sm.mw.Logger().Debugf("Creating stream: %s", streamFullID)
 
 	stream := streaming.NewStream(sm.mw.allowedUnsafe)
-	err := stream.Start(config, &handleFuncAdapter{mw: sm.mw, streamID: streamFullID, consumerGroup: sm.consumerGroup, muxer: sm.muxer, sm: sm})
+	err := stream.Start(config, &handleFuncAdapter{mw: sm.mw, streamID: streamFullID, muxer: sm.muxer, sm: sm})
 	if err != nil {
 		sm.mw.Logger().Errorf("Failed to start stream %s: %v", streamFullID, err)
 		return err
@@ -201,6 +201,10 @@ func (s *StreamingMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 
 	var match mux.RouteMatch
 	// First do the check if such route is defined by streaming API
+	//
+	// TODO: If we have a multiple streams, right now it will duplicate all this streams for each consumer
+	// If we have background jobs, or other non related streams, it will cause overhead and poential conflicts
+	// We need to meke .mux property of individual Steam object, and intiailize only the matched stream instead of all
 	if s.defaultStreamManager.muxer.Match(newRequest, &match) {
 		pathRegexp, _ := match.Route.GetPathRegexp()
 		s.Logger().Debugf("Matched stream: %v", pathRegexp)
@@ -208,41 +212,30 @@ func (s *StreamingMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 		if handler != nil {
 			// Now that we know that such streaming endpoint here,
 			// we can actually initialize individual stream manager
-			consumerGroup := s.getConsumerGroup(r)
-			streamManager := s.createStreamManager(consumerGroup, r)
+			streamManager := s.createStreamManager(r)
 			streamManager.muxer.Match(newRequest, &match)
+
+			// direct Bento handler
 			handler, _ := match.Handler.(http.HandlerFunc)
 
 			handler.ServeHTTP(w, r)
+
+			// TODO: Implement shadowing
+			//
+			// if stream.Shaddow {
+			// 	go handler.ServeHTTP(w, r)
+			// 	return nil, http.StatusOK
+			// } else {
+			// 	handler.ServeHTTP(w, r)
+			// 	return nil, mwStatusRespond
+			// }
+
 			return nil, mwStatusRespond
 		}
 	}
 
 	// If no stream matches, continue with the next middleware
 	return nil, http.StatusOK
-}
-
-func (s *StreamingMiddleware) getConsumerGroup(r *http.Request) string {
-	consumerGroup := ctxGetAuthToken(r)
-
-	session := ctxGetSession(r)
-	if session != nil {
-		if pattern, found := session.MetaData["consumer_group"]; found {
-			if patternString, ok := pattern.(string); ok && patternString != "" {
-				consumerGroup = patternString
-			}
-		}
-	}
-
-	if customKeyValue := s.Gw.replaceTykVariables(r, consumerGroup, false); customKeyValue != "" {
-		consumerGroup = customKeyValue
-	}
-
-	if consumerGroup == "" {
-		consumerGroup = "default"
-	}
-
-	return consumerGroup
 }
 
 func (s *StreamingMiddleware) Unload() {
@@ -279,11 +272,10 @@ func (s *StreamingMiddleware) Unload() {
 }
 
 type handleFuncAdapter struct {
-	streamID      string
-	sm            *StreamManager
-	consumerGroup string
-	mw            *StreamingMiddleware
-	muxer         *mux.Router
+	streamID string
+	sm       *StreamManager
+	mw       *StreamingMiddleware
+	muxer    *mux.Router
 }
 
 func (h *handleFuncAdapter) HandleFunc(path string, f func(http.ResponseWriter, *http.Request)) {
