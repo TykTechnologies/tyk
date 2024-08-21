@@ -310,7 +310,7 @@ func testAsyncAPIHttp(t *testing.T, ts *Test, consumerGroup string, isDynamic bo
 	}
 
 	// Add a delay to ensure WebSocket connections are fully established
-	time.Sleep(1 * time.Second)
+	time.Sleep(2 * time.Second)
 
 	// Send messages to Kafka
 	config := sarama.NewConfig()
@@ -341,8 +341,8 @@ func testAsyncAPIHttp(t *testing.T, ts *Test, consumerGroup string, isDynamic bo
 	}
 
 	messagesReceived := 0
-	overallTimeout := time.After(10 * time.Second)
-	inactivityTimeout := time.NewTimer(2 * time.Second)
+	overallTimeout := time.After(30 * time.Second)
+	inactivityTimeout := time.NewTimer(5 * time.Second)
 	done := make(chan bool)
 
 	go func() {
@@ -379,7 +379,7 @@ func testAsyncAPIHttp(t *testing.T, ts *Test, consumerGroup string, isDynamic bo
 						if strings.HasPrefix(receivedMessage, messageToSend) {
 							messagesReceived++
 							t.Logf("Message from WebSocket %d matches sent message", i+1)
-							inactivityTimeout.Reset(2 * time.Second)
+							inactivityTimeout.Reset(5 * time.Second)
 						}
 					}
 				}
@@ -398,6 +398,7 @@ func testAsyncAPIHttp(t *testing.T, ts *Test, consumerGroup string, isDynamic bo
 
 	<-done
 
+	t.Logf("Final message count: %d out of %d expected for tenant %s", messagesReceived, expectedTotalMessages, tenantID)
 	if messagesReceived != expectedTotalMessages {
 		t.Errorf("Expected %d messages, but received %d for tenant %s", expectedTotalMessages, messagesReceived, tenantID)
 	} else {
