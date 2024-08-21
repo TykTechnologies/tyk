@@ -3,7 +3,11 @@ package user
 import (
 	"crypto/md5"
 	"fmt"
+	"strings"
 	"time"
+
+	"github.com/TykTechnologies/tyk/regexp"
+	"github.com/TykTechnologies/tyk/storage"
 
 	"github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
 
@@ -38,10 +42,20 @@ type AccessSpec struct {
 	Methods []string `json:"methods" msg:"methods"`
 }
 
+// RateLimit holds rate limit configuration.
+type RateLimit struct {
+	// Rate is the allowed number of requests per interval.
+	Rate float64 `json:"rate" msg:"rate"`
+	// Per is the interval at which rate limit is enforced.
+	Per float64 `json:"per" msg:"per"`
+
+	// Smoothing contains rate limit smoothing settings.
+	Smoothing *apidef.RateLimitSmoothing `json:"smoothing,omitempty" bson:"smoothing,omitempty"`
+}
+
 // APILimit stores quota and rate limit on ACL level (per API)
 type APILimit struct {
-	Rate               float64 `json:"rate" msg:"rate"`
-	Per                float64 `json:"per" msg:"per"`
+	RateLimit
 	ThrottleInterval   float64 `json:"throttle_interval" msg:"throttle_interval"`
 	ThrottleRetryLimit int     `json:"throttle_retry_limit" msg:"throttle_retry_limit"`
 	MaxQueryDepth      int     `json:"max_query_depth" msg:"max_query_depth"`
@@ -50,18 +64,40 @@ type APILimit struct {
 	QuotaRemaining     int64   `json:"quota_remaining" msg:"quota_remaining"`
 	QuotaRenewalRate   int64   `json:"quota_renewal_rate" msg:"quota_renewal_rate"`
 	SetBy              string  `json:"-" msg:"-"`
+}
 
-	// Smoothing contains rate limit smoothing settings.
-	Smoothing *apidef.RateLimitSmoothing `json:"smoothing" bson:"smoothing"`
+// Clone does a deepcopy of APILimit.
+func (a APILimit) Clone() *APILimit {
+	var smoothingRef *apidef.RateLimitSmoothing
+	if a.Smoothing != nil {
+		smoothing := *a.Smoothing
+		smoothingRef = &smoothing
+	}
+
+	return &APILimit{
+		RateLimit: RateLimit{
+			Rate:      a.Rate,
+			Per:       a.Per,
+			Smoothing: smoothingRef,
+		},
+		ThrottleInterval:   a.ThrottleInterval,
+		ThrottleRetryLimit: a.ThrottleRetryLimit,
+		MaxQueryDepth:      a.MaxQueryDepth,
+		QuotaMax:           a.QuotaMax,
+		QuotaRenews:        a.QuotaRenews,
+		QuotaRemaining:     a.QuotaRemaining,
+		QuotaRenewalRate:   a.QuotaRenewalRate,
+		SetBy:              a.SetBy,
+	}
 }
 
 // Duration returns the time between two allowed requests at the defined rate.
 // It's used to decide which rate limit has a bigger allowance.
-func (g *APILimit) Duration() time.Duration {
-	if g.Per <= 0 || g.Rate <= 0 {
+func (r RateLimit) Duration() time.Duration {
+	if r.Per <= 0 || r.Rate <= 0 {
 		return 0
 	}
-	return time.Duration(float64(time.Second) * g.Per / g.Rate)
+	return time.Duration(float64(time.Second) * r.Per / r.Rate)
 }
 
 // AccessDefinition defines which versions of an API a key has access to
@@ -80,12 +116,52 @@ type AccessDefinition struct {
 	DisableIntrospection bool                    `json:"disable_introspection" msg:"disable_introspection"`
 
 	AllowanceScope string `json:"allowance_scope" msg:"allowance_scope"`
+
+	Endpoints Endpoints `json:"endpoints,omitempty" msg:"endpoints,omitempty"`
 }
 
-func (limit APILimit) IsEmpty() bool {
-	if limit.Rate != 0 || limit.Per != 0 || limit.ThrottleInterval != 0 || limit.ThrottleRetryLimit != 0 || limit.MaxQueryDepth != 0 || limit.QuotaMax != 0 || limit.QuotaRenews != 0 || limit.QuotaRemaining != 0 || limit.QuotaRenewalRate != 0 || limit.SetBy != "" {
+// IsEmpty checks if APILimit is empty.
+func (a APILimit) IsEmpty() bool {
+	if a.Rate != 0 {
 		return false
 	}
+
+	if a.Per != 0 {
+		return false
+	}
+
+	if a.ThrottleInterval != 0 {
+		return false
+	}
+
+	if a.ThrottleRetryLimit != 0 {
+		return false
+	}
+
+	if a.MaxQueryDepth != 0 {
+		return false
+	}
+
+	if a.QuotaMax != 0 {
+		return false
+	}
+
+	if a.QuotaRenews != 0 {
+		return false
+	}
+
+	if a.QuotaRemaining != 0 {
+		return false
+	}
+
+	if a.QuotaRenewalRate != 0 {
+		return false
+	}
+
+	if a.SetBy != "" {
+		return false
+	}
+
 	return true
 }
 
@@ -110,6 +186,24 @@ type JWTData struct {
 
 type Monitor struct {
 	TriggerLimits []float64 `json:"trigger_limits" msg:"trigger_limits"`
+}
+
+// Endpoints is a collection of Endpoint.
+type Endpoints []Endpoint
+
+// Endpoint holds the configuration for endpoint rate limiting.
+type Endpoint struct {
+	Path    string          `json:"path,omitempty" msg:"path"`
+	Methods EndpointMethods `json:"methods,omitempty" msg:"methods"`
+}
+
+// EndpointMethods is a collection of EndpointMethod.
+type EndpointMethods []EndpointMethod
+
+// EndpointMethod holds the configuration on endpoint method level.
+type EndpointMethod struct {
+	Name  string    `json:"name,omitempty" msg:"name,omitempty"`
+	Limit RateLimit `json:"limit,omitempty" msg:"limit,omitempty"`
 }
 
 // SessionState objects represent a current API session, mainly used for rate limiting.
@@ -176,15 +270,17 @@ func NewSessionState() *SessionState {
 // APILimit returns an user.APILimit from the session data.
 func (s *SessionState) APILimit() APILimit {
 	return APILimit{
+		RateLimit: RateLimit{
+			Rate:      s.Rate,
+			Per:       s.Per,
+			Smoothing: s.Smoothing,
+		},
 		QuotaMax:           s.QuotaMax,
 		QuotaRenewalRate:   s.QuotaRenewalRate,
 		QuotaRenews:        s.QuotaRenews,
-		Rate:               s.Rate,
-		Per:                s.Per,
 		ThrottleInterval:   s.ThrottleInterval,
 		ThrottleRetryLimit: s.ThrottleRetryLimit,
 		MaxQueryDepth:      s.MaxQueryDepth,
-		Smoothing:          s.Smoothing,
 	}
 }
 
@@ -382,4 +478,47 @@ func (s *SessionState) GetQuotaLimitByAPIID(apiID string) (int64, int64, int64, 
 // IsBasicAuth returns whether the key is basic auth or not.
 func (s *SessionState) IsBasicAuth() bool {
 	return s.BasicAuthData.Password != ""
+}
+
+// EndpointRateLimitInfo holds the information to process endpoint rate limits.
+type EndpointRateLimitInfo struct {
+	// KeySuffix is the suffix to use for the storage key.
+	KeySuffix string
+	// Rate is the allowance.
+	Rate float64
+	// Per is the rate limiting interval.
+	Per float64
+}
+
+// RateLimitInfo returns EndpointRateLimitInfo for endpoint rate limiting.
+func (es Endpoints) RateLimitInfo(method string, path string) (*EndpointRateLimitInfo, bool) {
+	if len(es) == 0 {
+		return nil, false
+	}
+
+	for _, endpoint := range es {
+		asRegex, err := regexp.Compile(endpoint.Path)
+		if err != nil {
+			continue
+		}
+
+		match := asRegex.MatchString(path)
+		if !match {
+			continue
+		}
+
+		for _, endpointMethod := range endpoint.Methods {
+			if !strings.EqualFold(endpointMethod.Name, method) {
+				continue
+			}
+
+			return &EndpointRateLimitInfo{
+				KeySuffix: storage.HashStr(fmt.Sprintf("%s:%s", endpointMethod.Name, endpoint.Path)),
+				Rate:      endpointMethod.Limit.Rate,
+				Per:       endpointMethod.Limit.Per,
+			}, true
+		}
+	}
+
+	return nil, false
 }
