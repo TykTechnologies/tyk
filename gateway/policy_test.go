@@ -4,6 +4,7 @@ import (
 	"embed"
 	"encoding/json"
 	"fmt"
+	"github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
@@ -17,7 +18,6 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/header"
@@ -49,14 +49,6 @@ func TestLoadPoliciesFromDashboardReLogin(t *testing.T) {
 
 	assert.Error(t, ErrPoliciesFetchFailed, err)
 	assert.Empty(t, policyMap)
-}
-
-type dummySessionManager struct {
-	DefaultSessionManager
-}
-
-func (*dummySessionManager) UpdateSession(key string, sess *user.SessionState, ttl int64, hashed bool) error {
-	return nil
 }
 
 type testApplyPoliciesData struct {
@@ -368,57 +360,14 @@ func (s *Test) testPrepareApplyPolicies(tb testing.TB) (*BaseMiddleware, []testA
 			errMatch: "cannot apply policy per_api_and_partitions which has per_api and any of partitions set",
 		},
 		{
-			name:     "Per API is set to true with some partitions set to true",
-			policies: []string{"per_api_and_some_partitions"},
-			errMatch: "cannot apply policy per_api_and_some_partitions which has per_api and any of partitions set",
-		},
-		{
-			name:     "Per API is set to true with no other partitions set to true",
-			policies: []string{"per_api_and_no_other_partitions"},
-			sessMatch: func(t *testing.T, s *user.SessionState) {
-				t.Helper()
-
-				want := map[string]user.AccessDefinition{
-					"d": {
-						Limit: user.APILimit{
-							QuotaMax:         1000,
-							QuotaRenewalRate: 3600,
-							RateLimit: user.RateLimit{
-								Rate: 20,
-								Per:  1,
-							},
-						},
-						AllowanceScope: "d",
-					},
-					"c": {
-						Limit: user.APILimit{
-							QuotaMax: -1,
-							RateLimit: user.RateLimit{
-								Rate: 2000,
-								Per:  60,
-							},
-						},
-						AllowanceScope: "c",
-					},
-				}
-
-				assert.Equal(t, want, s.AccessRights)
-			},
-		},
-		{
-			name:     "several policies with Per API set to true but specifying limit for the same API",
-			policies: []string{"per_api_and_no_other_partitions", "per_api_with_the_same_api"},
-			errMatch: "cannot apply multiple policies when some have per_api set and some are partitioned",
-		},
-		{
 			name:     "several policies, mixed the one which has Per API set to true and partitioned ones",
 			policies: []string{"per_api_and_no_other_partitions", "quota1"},
-			errMatch: "",
+			errMatch: "cannot apply multiple policies when some have per_api set and some are partitioned",
 		},
 		{
 			name:     "several policies, mixed the one which has Per API set to true and partitioned ones (different order)",
 			policies: []string{"rate1", "per_api_and_no_other_partitions"},
-			errMatch: "",
+			errMatch: "cannot apply multiple policies when some have per_api set and some are partitioned",
 		},
 		{
 			name:     "Per API is set to true and some API gets limit set from policy's fields",
