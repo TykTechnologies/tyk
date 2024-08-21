@@ -1,6 +1,7 @@
 package gateway
 
 import (
+	"embed"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -26,6 +27,9 @@ import (
 
 	"github.com/TykTechnologies/tyk/internal/uuid"
 )
+
+//go:embed testdata/*.json
+var testDataFS embed.FS
 
 func TestLoadPoliciesFromDashboardReLogin(t *testing.T) {
 	// Test Dashboard
@@ -63,368 +67,20 @@ type testApplyPoliciesData struct {
 	session   *user.SessionState
 }
 
-func (s *Test) TestPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesData) {
+func (s *Test) testPrepareApplyPolicies(tb testing.TB) (*BaseMiddleware, []testApplyPoliciesData) {
+	tb.Helper()
+
+	f, err := testDataFS.ReadFile("testdata/policies.json")
+	assert.NoError(tb, err)
+
+	var policies = make(map[string]user.Policy)
+	err = json.Unmarshal(f, &policies)
+	assert.NoError(tb, err)
+
 	s.Gw.policiesMu.RLock()
-	s.Gw.policiesByID = map[string]user.Policy{
-		"nonpart1": {
-			ID:           "p1",
-			AccessRights: map[string]user.AccessDefinition{"a": {}},
-		},
-		"nonpart2": {
-			ID:           "p2",
-			AccessRights: map[string]user.AccessDefinition{"b": {}},
-		},
-		"nonpart3": {
-			ID:           "p3",
-			AccessRights: map[string]user.AccessDefinition{"a": {}, "b": {}},
-		},
-		"difforg": {OrgID: "different"},
-		"tags1": {
-			Partitions: user.PolicyPartitions{Quota: true},
-			Tags:       []string{"tagA"},
-		},
-		"tags2": {
-			Partitions: user.PolicyPartitions{RateLimit: true},
-			Tags:       []string{"tagX", "tagY"},
-		},
-		"inactive1": {
-			Partitions: user.PolicyPartitions{RateLimit: true},
-			IsInactive: true,
-		},
-		"inactive2": {
-			Partitions: user.PolicyPartitions{Quota: true},
-			IsInactive: true,
-		},
-		"unlimited-quota": {
-			Partitions:   user.PolicyPartitions{Quota: true},
-			AccessRights: map[string]user.AccessDefinition{"a": {}},
-			QuotaMax:     -1,
-		},
-		"quota1": {
-			Partitions: user.PolicyPartitions{Quota: true},
-			QuotaMax:   2,
-		},
-		"quota2": {
-			Partitions: user.PolicyPartitions{Quota: true},
-			QuotaMax:   3,
-		},
-		"quota3": {
-			QuotaMax:     3,
-			AccessRights: map[string]user.AccessDefinition{"a": {}},
-			Partitions:   user.PolicyPartitions{Quota: true},
-		},
-		"quota4": {
-			QuotaMax:     3,
-			AccessRights: map[string]user.AccessDefinition{"b": {}},
-			Partitions:   user.PolicyPartitions{Quota: true},
-		},
-		"quota5": {
-			QuotaMax:     4,
-			Partitions:   user.PolicyPartitions{Quota: true},
-			AccessRights: map[string]user.AccessDefinition{"b": {}},
-		},
-		"unlimited-rate": {
-			Partitions:   user.PolicyPartitions{RateLimit: true},
-			AccessRights: map[string]user.AccessDefinition{"a": {}},
-			Rate:         -1,
-		},
-		"rate1": {
-			Partitions: user.PolicyPartitions{RateLimit: true},
-			Rate:       3,
-		},
-		"rate2": {
-			Partitions: user.PolicyPartitions{RateLimit: true},
-			Rate:       4,
-		},
-		"rate3": {
-			Partitions: user.PolicyPartitions{RateLimit: true},
-			Rate:       4,
-			Per:        4,
-		},
-		"rate4": {
-			Partitions:   user.PolicyPartitions{RateLimit: true},
-			Rate:         8,
-			Per:          1,
-			AccessRights: map[string]user.AccessDefinition{"a": {}},
-		},
-		"rate5": {
-			Partitions:   user.PolicyPartitions{RateLimit: true},
-			Rate:         10,
-			Per:          1,
-			AccessRights: map[string]user.AccessDefinition{"a": {}},
-		},
-		"rate-for-a": {
-			Partitions:   user.PolicyPartitions{RateLimit: true},
-			AccessRights: map[string]user.AccessDefinition{"a": {}},
-			Rate:         4,
-			Per:          1,
-		},
-		"rate-for-b": {
-			Partitions:   user.PolicyPartitions{RateLimit: true},
-			AccessRights: map[string]user.AccessDefinition{"b": {}},
-			Rate:         2,
-			Per:          1,
-		},
-		"rate-for-a-b": {
-			Partitions:   user.PolicyPartitions{RateLimit: true},
-			AccessRights: map[string]user.AccessDefinition{"a": {}, "b": {}},
-			Rate:         4,
-			Per:          1,
-		},
-		"rate-no-partition": {
-			AccessRights: map[string]user.AccessDefinition{"a": {}},
-			Rate:         12,
-			Per:          1,
-		},
-		"acl1": {
-			Partitions:   user.PolicyPartitions{Acl: true},
-			AccessRights: map[string]user.AccessDefinition{"a": {}},
-		},
-		"acl2": {
-			Partitions:   user.PolicyPartitions{Acl: true},
-			AccessRights: map[string]user.AccessDefinition{"b": {}},
-		},
-		"acl3": {
-			AccessRights: map[string]user.AccessDefinition{"c": {}},
-		},
-		"acl-for-a-b": {
-			Partitions:   user.PolicyPartitions{Acl: true},
-			AccessRights: map[string]user.AccessDefinition{"a": {}, "b": {}},
-		},
-		"unlimitedComplexity": {
-			Partitions:    user.PolicyPartitions{Complexity: true},
-			AccessRights:  map[string]user.AccessDefinition{"a": {}},
-			MaxQueryDepth: -1,
-		},
-		"complexity1": {
-			Partitions:    user.PolicyPartitions{Complexity: true},
-			MaxQueryDepth: 2,
-		},
-		"complexity2": {
-			Partitions:    user.PolicyPartitions{Complexity: true},
-			MaxQueryDepth: 3,
-		},
-		"per_api_and_partitions": {
-			ID: "per_api_and_partitions",
-			Partitions: user.PolicyPartitions{
-				PerAPI:    true,
-				Quota:     true,
-				RateLimit: true,
-				Acl:       true,
-			},
-			AccessRights: map[string]user.AccessDefinition{"d": {
-				Limit: user.APILimit{
-					QuotaMax:         1000,
-					QuotaRenewalRate: 3600,
-					RateLimit: user.RateLimit{
-						Rate: 20,
-						Per:  1,
-					},
-				},
-			}},
-		},
-		"per_api_and_some_partitions": {
-			ID: "per_api_and_some_partitions",
-			Partitions: user.PolicyPartitions{
-				PerAPI:    true,
-				Quota:     false,
-				RateLimit: true,
-				Acl:       false,
-			},
-			AccessRights: map[string]user.AccessDefinition{"d": {
-				Limit: user.APILimit{
-					QuotaMax:         1000,
-					QuotaRenewalRate: 3600,
-					RateLimit: user.RateLimit{
-						Rate: 20,
-						Per:  1,
-					},
-				},
-			}},
-		},
-		"per_api_and_no_other_partitions": {
-			ID: "per_api_and_no_other_partitions",
-			Partitions: user.PolicyPartitions{
-				PerAPI:    true,
-				Quota:     false,
-				RateLimit: false,
-				Acl:       false,
-			},
-			AccessRights: map[string]user.AccessDefinition{
-				"d": {
-					Limit: user.APILimit{
-						QuotaMax:         1000,
-						QuotaRenewalRate: 3600,
-						RateLimit: user.RateLimit{
-							Rate: 20,
-							Per:  1,
-						},
-					},
-				},
-				"c": {
-					Limit: user.APILimit{
-						QuotaMax: -1,
-						RateLimit: user.RateLimit{
-							Rate: 2000,
-							Per:  60,
-						},
-					},
-				},
-			},
-		},
-		"per_api_with_the_same_api": {
-			ID: "per_api_with_the_same_api",
-			Partitions: user.PolicyPartitions{
-				PerAPI:    true,
-				Quota:     false,
-				RateLimit: false,
-				Acl:       false,
-			},
-			AccessRights: map[string]user.AccessDefinition{
-				"d": {
-					Limit: user.APILimit{
-						QuotaMax:         5000,
-						QuotaRenewalRate: 3600,
-						RateLimit: user.RateLimit{
-							Rate: 200,
-							Per:  10,
-						},
-					},
-				},
-			},
-		},
-		"per_api_with_limit_set_from_policy": {
-			ID:       "per_api_with_limit_set_from_policy",
-			QuotaMax: -1,
-			Rate:     300,
-			Per:      1,
-			Partitions: user.PolicyPartitions{
-				PerAPI:    true,
-				Quota:     false,
-				RateLimit: false,
-				Acl:       false,
-			},
-			AccessRights: map[string]user.AccessDefinition{
-				"d": {
-					Limit: user.APILimit{
-						QuotaMax:         5000,
-						QuotaRenewalRate: 3600,
-						RateLimit: user.RateLimit{
-							Rate: 200,
-							Per:  10,
-						},
-					},
-				},
-				"e": {},
-			},
-		},
-		"per-path1": {
-			ID: "per_path_1",
-			AccessRights: map[string]user.AccessDefinition{"a": {
-				AllowedURLs: []user.AccessSpec{
-					{URL: "/user", Methods: []string{"GET", "POST"}},
-				},
-			}, "b": {
-				AllowedURLs: []user.AccessSpec{
-					{URL: "/", Methods: []string{"PUT"}},
-				},
-			}},
-		},
-		"per-path2": {
-			ID: "per_path_2",
-			AccessRights: map[string]user.AccessDefinition{"a": {
-				AllowedURLs: []user.AccessSpec{
-					{URL: "/user", Methods: []string{"GET"}},
-					{URL: "/companies", Methods: []string{"GET", "POST"}},
-				},
-			}},
-		},
-		"restricted-types1": {
-			ID: "restricted_types_1",
-			AccessRights: map[string]user.AccessDefinition{
-				"a": {
-					RestrictedTypes: []graphql.Type{
-						{Name: "Country", Fields: []string{"code", "name"}},
-						{Name: "Person", Fields: []string{"name", "height"}},
-					},
-				}},
-		},
-		"restricted-types2": {
-			ID: "restricted_types_2",
-			AccessRights: map[string]user.AccessDefinition{
-				"a": {
-					RestrictedTypes: []graphql.Type{
-						{Name: "Country", Fields: []string{"code", "phone"}},
-						{Name: "Person", Fields: []string{"name", "mass"}},
-					},
-				}},
-		},
-		"allowed-types1": {
-			ID: "allowed_types_1",
-			AccessRights: map[string]user.AccessDefinition{
-				"a": {
-					AllowedTypes: []graphql.Type{
-						{Name: "Country", Fields: []string{"code", "name"}},
-						{Name: "Person", Fields: []string{"name", "height"}},
-					},
-				}},
-		},
-		"allowed-types2": {
-			ID: "allowed_types_2",
-			AccessRights: map[string]user.AccessDefinition{
-				"a": {
-					AllowedTypes: []graphql.Type{
-						{Name: "Country", Fields: []string{"code", "phone"}},
-						{Name: "Person", Fields: []string{"name", "mass"}},
-					},
-				}},
-		},
-		"introspection-disabled": {
-			ID: "introspection_disabled",
-			AccessRights: map[string]user.AccessDefinition{
-				"a": {
-					DisableIntrospection: true,
-				}},
-		},
-		"introspection-enabled": {
-			ID: "introspection_enabled",
-			AccessRights: map[string]user.AccessDefinition{
-				"a": {
-					DisableIntrospection: false,
-				}},
-		},
-		"field-level-depth-limit1": {
-			ID: "field-level-depth-limit1",
-			AccessRights: map[string]user.AccessDefinition{
-				"graphql-api": {
-					Limit: user.APILimit{},
-					FieldAccessRights: []user.FieldAccessDefinition{
-						{TypeName: "Query", FieldName: "people", Limits: user.FieldLimits{MaxQueryDepth: 4}},
-						{TypeName: "Mutation", FieldName: "putPerson", Limits: user.FieldLimits{MaxQueryDepth: 3}},
-						{TypeName: "Query", FieldName: "countries", Limits: user.FieldLimits{MaxQueryDepth: 3}},
-					},
-				}},
-		},
-		"field-level-depth-limit2": {
-			ID: "field-level-depth-limit2",
-			AccessRights: map[string]user.AccessDefinition{
-				"graphql-api": {
-					Limit: user.APILimit{},
-					FieldAccessRights: []user.FieldAccessDefinition{
-						{TypeName: "Query", FieldName: "people", Limits: user.FieldLimits{MaxQueryDepth: 2}},
-						{TypeName: "Mutation", FieldName: "putPerson", Limits: user.FieldLimits{MaxQueryDepth: -1}},
-						{TypeName: "Query", FieldName: "continents", Limits: user.FieldLimits{MaxQueryDepth: 4}},
-					},
-				}},
-		},
-		"throttle1": {
-			ID:                 "throttle1",
-			ThrottleRetryLimit: 99,
-			ThrottleInterval:   9,
-			AccessRights:       map[string]user.AccessDefinition{"a": {}},
-		},
-	}
+	s.Gw.policiesByID = policies
 	s.Gw.policiesMu.RUnlock()
+
 	bmid := &BaseMiddleware{
 		Spec: &APISpec{
 			APIDefinition: &apidef.APIDefinition{},
@@ -950,7 +606,7 @@ func TestApplyPolicies(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
-	bmid, tests := ts.TestPrepareApplyPolicies()
+	bmid, tests := ts.testPrepareApplyPolicies(t)
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
@@ -981,7 +637,7 @@ func BenchmarkApplyPolicies(b *testing.B) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
-	bmid, tests := ts.TestPrepareApplyPolicies()
+	bmid, tests := ts.testPrepareApplyPolicies(b)
 
 	for i := 0; i < b.N; i++ {
 		for _, tc := range tests {
