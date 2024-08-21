@@ -316,22 +316,8 @@ func (t *Service) applyPerAPI(policy user.Policy, session *user.SessionState, ri
 			}
 		}
 
-		if _, ok := rights[apiID]; ok && accessRights.Limit.Duration() > rights[apiID].Limit.Duration() {
-			accessRights.Limit.Per = rights[apiID].Limit.Per
-			accessRights.Limit.Rate = rights[apiID].Limit.Rate
-			accessRights.Limit.Smoothing = rights[apiID].Limit.Smoothing
-		}
-
-		if greaterThanInt64(rights[apiID].Limit.QuotaMax, accessRights.Limit.QuotaMax) {
-			accessRights.Limit.QuotaMax = rights[apiID].Limit.QuotaMax
-		}
-
-		if greaterThanInt64(rights[apiID].Limit.QuotaRenewalRate, accessRights.Limit.QuotaRenewalRate) {
-			accessRights.Limit.QuotaRenewalRate = rights[apiID].Limit.QuotaRenewalRate
-		}
-
-		if accessRights.Limit.QuotaMax == -1 {
-			accessRights.Limit.QuotaRenewalRate = 0
+		if currAD, ok := rights[apiID]; ok {
+			accessRights = t.applyAPILevelLimits(accessRights, currAD)
 		}
 
 		// overwrite session access right for this API
@@ -543,4 +529,26 @@ func (t *Service) updateSessionRootVars(session *user.SessionState, rights map[s
 			}
 		}
 	}
+}
+
+func (t *Service) applyAPILevelLimits(policyAD user.AccessDefinition, currAD user.AccessDefinition) user.AccessDefinition {
+	if policyAD.Limit.Duration() > currAD.Limit.Duration() {
+		policyAD.Limit.Per = currAD.Limit.Per
+		policyAD.Limit.Rate = currAD.Limit.Rate
+		policyAD.Limit.Smoothing = currAD.Limit.Smoothing
+	}
+
+	if greaterThanInt64(currAD.Limit.QuotaMax, policyAD.Limit.QuotaMax) {
+		policyAD.Limit.QuotaMax = currAD.Limit.QuotaMax
+	}
+
+	if greaterThanInt64(currAD.Limit.QuotaRenewalRate, policyAD.Limit.QuotaRenewalRate) {
+		policyAD.Limit.QuotaRenewalRate = currAD.Limit.QuotaRenewalRate
+	}
+
+	if policyAD.Limit.QuotaMax == -1 {
+		policyAD.Limit.QuotaRenewalRate = 0
+	}
+
+	return policyAD
 }

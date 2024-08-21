@@ -439,7 +439,6 @@ func (s *Test) testPrepareApplyPolicies(tb testing.TB) (*BaseMiddleware, []testA
 			policies: []string{"per_api_with_limit_set_from_policy"},
 			sessMatch: func(t *testing.T, s *user.SessionState) {
 				t.Helper()
-
 				want := map[string]user.AccessDefinition{
 					"e": {
 						Limit: user.APILimit{
@@ -463,7 +462,6 @@ func (s *Test) testPrepareApplyPolicies(tb testing.TB) (*BaseMiddleware, []testA
 						AllowanceScope: "d",
 					},
 				}
-
 				assert.Equal(t, want, s.AccessRights)
 			},
 		},
