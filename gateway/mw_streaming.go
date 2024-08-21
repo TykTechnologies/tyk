@@ -27,11 +27,9 @@ var globalStreamCounter atomic.Int64
 type StreamingMiddleware struct {
 	*BaseMiddleware
 	streamManagers       sync.Map // Map of consumer group IDs to StreamManager
-	connections          sync.Map // Map of streamID to map of connectionID to connection
 	ctx                  context.Context
 	cancel               context.CancelFunc
 	allowedUnsafe        []string
-	gcTicker             *time.Ticker
 	defaultStreamManager *StreamManager
 }
 
@@ -40,9 +38,6 @@ type StreamManager struct {
 	muxer         *mux.Router
 	mw            *StreamingMiddleware
 	consumerGroup string
-	connections   int64
-	lastAccess    time.Time
-	sync.Mutex
 }
 
 func (sm *StreamManager) initStreams(specStreams map[string]interface{}) {
@@ -116,47 +111,6 @@ func (s *StreamingMiddleware) Init() {
 
 	s.Logger().Debug("Initializing default stream manager")
 	s.defaultStreamManager = s.createStreamManager("default", nil)
-
-	s.gcTicker = time.NewTicker(GCInterval)
-	go s.runGC()
-}
-
-func (s *StreamingMiddleware) runGC() {
-	for {
-		select {
-		case <-s.ctx.Done():
-			return
-		case <-s.gcTicker.C:
-			// s.cleanupUnusedConsumerGroups()
-		}
-	}
-}
-
-// - mapping: >
-//         root = if json().id.string() == "$tyk_context.request_data_report_id" {
-//         deleted() }
-
-func (s *StreamingMiddleware) cleanupUnusedConsumerGroups() {
-	now := time.Now()
-	s.streamManagers.Range(func(key, value interface{}) bool {
-		consumerGroup := key.(string)
-		if consumerGroup == "default" {
-			return true
-		}
-		manager := value.(*StreamManager)
-		manager.Lock()
-		if manager.connections == 0 && now.Sub(manager.lastAccess) > ConsumerGroupTimeout {
-			s.Logger().Infof("Cleaning up unused consumer group: %s", consumerGroup)
-			manager.streams.Range(func(_, streamValue interface{}) bool {
-				stream := streamValue.(*streaming.Stream)
-				stream.Stop()
-				return true
-			})
-			s.streamManagers.Delete(consumerGroup)
-		}
-		manager.Unlock()
-		return true
-	})
 }
 
 func (s *StreamingMiddleware) createStreamManager(consumerGroup string, r *http.Request) *StreamManager {
@@ -306,28 +260,10 @@ func (s *StreamingMiddleware) Unload() {
 	globalStreamCounter.Add(-int64(totalStreams))
 
 	s.cancel()
-	s.gcTicker.Stop()
 
-	s.Logger().Debug("Closing active connections")
-	s.connections.Range(func(_, value interface{}) bool {
-		if conns, ok := value.(*sync.Map); ok {
-			conns.Range(func(_, connValue interface{}) bool {
-				if conn, ok := connValue.(connection); ok {
-					conn.cancel()
-				}
-				return true
-			})
-		}
-		return true
-	})
-
-	time.Sleep(500 * time.Millisecond)
-
+	s.Logger().Debug("Closing active streams")
 	s.streamManagers.Range(func(_, value interface{}) bool {
 		manager := value.(*StreamManager)
-		manager.Lock()
-		s.Logger().Infof("Consumer Group %s: Closing %d connections, last access: %v", manager.consumerGroup, manager.connections, manager.lastAccess)
-		manager.Unlock()
 		manager.streams.Range(func(_, streamValue interface{}) bool {
 			if stream, ok := streamValue.(*streaming.Stream); ok {
 				stream.Reset()
@@ -338,9 +274,8 @@ func (s *StreamingMiddleware) Unload() {
 	})
 
 	s.streamManagers = sync.Map{}
-	s.connections = sync.Map{}
 
-	s.Logger().Info("All streams successfully removed and connections closed")
+	s.Logger().Info("All streams successfully removed")
 }
 
 type handleFuncAdapter struct {
@@ -360,16 +295,14 @@ func (h *handleFuncAdapter) HandleFunc(path string, f func(http.ResponseWriter, 
 	}
 
 	h.muxer.HandleFunc(path, func(w http.ResponseWriter, r *http.Request) {
-		h.sm.Lock()
-		h.sm.connections++
-		h.sm.lastAccess = time.Now()
-		h.sm.Unlock()
+		defer func() {
+			// Stop the stream when the HTTP request finishes
+			if err := h.sm.removeStream(h.streamID); err != nil {
+				h.mw.Logger().Errorf("Failed to stop stream %s: %v", h.streamID, err)
+			}
+		}()
 
 		f(w, r)
-
-		h.sm.Lock()
-		h.sm.connections--
-		h.sm.Unlock()
 	})
 	h.mw.Logger().Debugf("Registered handler for path: %s", path)
 }
