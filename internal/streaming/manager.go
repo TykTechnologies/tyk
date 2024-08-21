@@ -2,12 +2,10 @@ package streaming
 
 import (
 	"context"
-	"crypto/sha256"
 	"fmt"
 	"log"
 	"regexp"
 	"strings"
-	"sync"
 
 	"github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v2"
@@ -130,7 +128,7 @@ func (s *Stream) Reset() error {
 	return s.Stop()
 }
 
-func (sm *StreamManager) addMetadata(configPayload []byte, key, value string) ([]byte, error) {
+func (s *Stream) addMetadata(configPayload []byte, key, value string) ([]byte, error) {
 	var parsedConfig map[string]interface{}
 	if err := yaml.Unmarshal(configPayload, &parsedConfig); err != nil {
 		return nil, err
@@ -144,7 +142,7 @@ func (sm *StreamManager) addMetadata(configPayload []byte, key, value string) ([
 		if key == "input" {
 			inputMap, ok := value.(map[interface{}]interface{})
 			if !ok {
-				sm.log.Printf("expected map[interface{}]interface{}, got %T", value)
+				s.log.Printf("expected map[interface{}]interface{}, got %T", value)
 				continue
 			}
 
@@ -166,19 +164,9 @@ func (sm *StreamManager) addMetadata(configPayload []byte, key, value string) ([
 	return configPayload, nil
 }
 
-func (sm *StreamManager) GetHTTPPaths(component, streamID string) (map[string]string, error) {
-	configValue, exists := sm.streamConfigs.Load(streamID)
-	if !exists {
-		return nil, fmt.Errorf("stream not found: %s", streamID)
-	}
-
-	config, ok := configValue.(string)
-	if !ok {
-		return nil, fmt.Errorf("invalid config type for stream: %s", streamID)
-	}
-
+func (s *Stream) GetHTTPPaths(component string) (map[string]string, error) {
 	var parsedConfig map[string]interface{}
-	if err := yaml.Unmarshal([]byte(config), &parsedConfig); err != nil {
+	if err := yaml.Unmarshal([]byte(s.streamConfig), &parsedConfig); err != nil {
 		return nil, err
 	}
 
@@ -233,12 +221,12 @@ var unsafeComponents = []string{
 	"file",
 }
 
-func (sm *StreamManager) removeUnsafe(yamlBytes []byte) []byte {
+func (s *Stream) removeUnsafe(yamlBytes []byte) []byte {
 	filteredUnsafeComponents := []string{}
 
 	for _, component := range unsafeComponents {
 		allowed := false
-		for _, allowedComponent := range sm.allowedUnsafe {
+		for _, allowedComponent := range s.allowedUnsafe {
 			if component == allowedComponent {
 				allowed = true
 				break
@@ -257,13 +245,13 @@ func (sm *StreamManager) removeUnsafe(yamlBytes []byte) []byte {
 			// Remove matched parts
 			yamlString = re.ReplaceAllString(yamlString, "")
 
-			sm.log.Info("Removed unsafe component: ", key)
+			s.log.Info("Removed unsafe component: ", key)
 		}
 	}
 	return []byte(yamlString)
 }
 
-func (sm *StreamManager) removeConsumerGroup(configPayload []byte) ([]byte, error) {
+func (s *Stream) removeConsumerGroup(configPayload []byte) ([]byte, error) {
 	var parsedConfig map[interface{}]interface{}
 	if err := yaml.Unmarshal(configPayload, &parsedConfig); err != nil {
 		return nil, err
