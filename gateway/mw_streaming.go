@@ -335,7 +335,12 @@ func (s *StreamingMiddleware) Unload() {
 		manager.Lock()
 		s.Logger().Infof("Consumer Group %s: Closing %d connections, last access: %v", manager.consumerGroup, manager.connections, manager.lastAccess)
 		manager.Unlock()
-		manager.streamManager.Reset()
+		manager.streams.Range(func(_, streamValue interface{}) bool {
+			if stream, ok := streamValue.(*streaming.Stream); ok {
+				stream.Reset()
+			}
+			return true
+		})
 		return true
 	})
 
