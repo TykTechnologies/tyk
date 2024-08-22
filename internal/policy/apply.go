@@ -9,6 +9,11 @@ import (
 	"github.com/TykTechnologies/tyk/user"
 )
 
+var (
+	// ErrMixedPartitionAndPerAPIPolicies is the error to return when a mix of per api and partitioned policies are to be applied in a session.
+	ErrMixedPartitionAndPerAPIPolicies = errors.New("cannot apply multiple policies when some have per_api set and some are partitioned")
+)
+
 // Repository is a storage encapsulating policy retrieval.
 // Gateway implements this object to decouple this package.
 type Repository interface {
@@ -72,6 +77,8 @@ type applyStatus struct {
 	didRateLimit  map[string]bool
 	didAcl        map[string]bool
 	didComplexity map[string]bool
+	didPerAPI     bool
+	didPartition  bool
 }
 
 // Apply will check if any policies are loaded. If any are, it
@@ -138,7 +145,9 @@ func (t *Service) Apply(session *user.SessionState) error {
 				return err
 			}
 		} else {
-			t.applyPartitions(policy, session, rights, &applyState)
+			if err := t.applyPartitions(policy, session, rights, &applyState); err != nil {
+				return err
+			}
 		}
 
 		session.IsInactive = session.IsInactive || policy.IsInactive
@@ -279,14 +288,13 @@ func (t *Service) emptyRateLimit(m user.APILimit) bool {
 
 func (t *Service) applyPerAPI(policy user.Policy, session *user.SessionState, rights map[string]user.AccessDefinition,
 	applyState *applyStatus) error {
-	for apiID, accessRights := range policy.AccessRights {
-		// new logic when you can specify quota or rate in more than one policy but for different APIs
-		if applyState.didQuota[apiID] || applyState.didRateLimit[apiID] || applyState.didAcl[apiID] || applyState.didComplexity[apiID] { // no other partitions allowed
-			err := fmt.Errorf("cannot apply multiple policies when some have per_api set and some are partitioned")
-			t.logger.Error(err)
-			return err
-		}
 
+	if applyState.didPartition {
+		t.logger.Error(ErrMixedPartitionAndPerAPIPolicies)
+		return ErrMixedPartitionAndPerAPIPolicies
+	}
+
+	for apiID, accessRights := range policy.AccessRights {
 		idForScope := apiID
 		// check if we don't have limit on API level specified when policy was created
 		if accessRights.Limit.IsEmpty() {
@@ -309,6 +317,10 @@ func (t *Service) applyPerAPI(policy user.Policy, session *user.SessionState, ri
 			}
 		}
 
+		if currAD, ok := rights[apiID]; ok {
+			accessRights = t.applyAPILevelLimits(accessRights, currAD)
+		}
+
 		// overwrite session access right for this API
 		rights[apiID] = accessRights
 
@@ -319,13 +331,22 @@ func (t *Service) applyPerAPI(policy user.Policy, session *user.SessionState, ri
 		applyState.didComplexity[apiID] = true
 	}
 
+	if len(policy.AccessRights) > 0 {
+		applyState.didPerAPI = true
+	}
+
 	return nil
 }
 
 func (t *Service) applyPartitions(policy user.Policy, session *user.SessionState, rights map[string]user.AccessDefinition,
-	applyState *applyStatus) {
+	applyState *applyStatus) error {
 
 	usePartitions := policy.Partitions.Enabled()
+
+	if usePartitions && applyState.didPerAPI {
+		t.logger.Error(ErrMixedPartitionAndPerAPIPolicies)
+		return ErrMixedPartitionAndPerAPIPolicies
+	}
 
 	for k, v := range policy.AccessRights {
 		ar := v
@@ -483,6 +504,10 @@ func (t *Service) applyPartitions(policy user.Policy, session *user.SessionState
 	if !session.EnableHTTPSignatureValidation {
 		session.EnableHTTPSignatureValidation = policy.EnableHTTPSignatureValidation
 	}
+
+	applyState.didPartition = usePartitions
+
+	return nil
 }
 
 func (t *Service) updateSessionRootVars(session *user.SessionState, rights map[string]user.AccessDefinition, applyState applyStatus) {
@@ -505,4 +530,26 @@ func (t *Service) updateSessionRootVars(session *user.SessionState, rights map[s
 			}
 		}
 	}
+}
+
+func (t *Service) applyAPILevelLimits(policyAD user.AccessDefinition, currAD user.AccessDefinition) user.AccessDefinition {
+	if currAD.Limit.Duration() > policyAD.Limit.Duration() {
+		policyAD.Limit.Per = currAD.Limit.Per
+		policyAD.Limit.Rate = currAD.Limit.Rate
+		policyAD.Limit.Smoothing = currAD.Limit.Smoothing
+	}
+
+	if greaterThanInt64(currAD.Limit.QuotaMax, policyAD.Limit.QuotaMax) {
+		policyAD.Limit.QuotaMax = currAD.Limit.QuotaMax
+	}
+
+	if greaterThanInt64(currAD.Limit.QuotaRenewalRate, policyAD.Limit.QuotaRenewalRate) {
+		policyAD.Limit.QuotaRenewalRate = currAD.Limit.QuotaRenewalRate
+	}
+
+	if policyAD.Limit.QuotaMax == -1 {
+		policyAD.Limit.QuotaRenewalRate = 0
+	}
+
+	return policyAD
 }

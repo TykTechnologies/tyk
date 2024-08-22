@@ -51,14 +51,6 @@ func TestLoadPoliciesFromDashboardReLogin(t *testing.T) {
 	assert.Empty(t, policyMap)
 }
 
-type dummySessionManager struct {
-	DefaultSessionManager
-}
-
-func (*dummySessionManager) UpdateSession(key string, sess *user.SessionState, ttl int64, hashed bool) error {
-	return nil
-}
-
 type testApplyPoliciesData struct {
 	name      string
 	policies  []string
@@ -379,53 +371,108 @@ func (s *Test) testPrepareApplyPolicies(tb testing.TB) (*BaseMiddleware, []testA
 				t.Helper()
 
 				want := map[string]user.AccessDefinition{
-					"d": {
-						Limit: user.APILimit{
-							QuotaMax:         1000,
-							QuotaRenewalRate: 3600,
-							RateLimit: user.RateLimit{
-								Rate: 20,
-								Per:  1,
-							},
-						},
-						AllowanceScope: "d",
-					},
 					"c": {
 						Limit: user.APILimit{
-							QuotaMax: -1,
 							RateLimit: user.RateLimit{
 								Rate: 2000,
 								Per:  60,
 							},
+							QuotaMax: -1,
 						},
 						AllowanceScope: "c",
 					},
+					"d": {
+						Limit: user.APILimit{
+							RateLimit: user.RateLimit{
+								Rate: 20,
+								Per:  1,
+							},
+							QuotaMax:         1000,
+							QuotaRenewalRate: 3600,
+						},
+						AllowanceScope: "d",
+					},
 				}
-
 				assert.Equal(t, want, s.AccessRights)
 			},
 		},
 		{
-			name:     "several policies with Per API set to true but specifying limit for the same API",
-			policies: []string{"per_api_and_no_other_partitions", "per_api_with_the_same_api"},
-			errMatch: "cannot apply multiple policies when some have per_api set and some are partitioned",
+			name:     "several policies with Per API set to true specifying limit for the same API",
+			policies: []string{"per_api_and_no_other_partitions", "per_api_with_api_d"},
+			sessMatch: func(t *testing.T, s *user.SessionState) {
+				t.Helper()
+				want := map[string]user.AccessDefinition{
+					"c": {
+						Limit: user.APILimit{
+							RateLimit: user.RateLimit{
+								Rate: 2000,
+								Per:  60,
+							},
+							QuotaMax: -1,
+						},
+						AllowanceScope: "c",
+					},
+					"d": {
+						Limit: user.APILimit{
+							RateLimit: user.RateLimit{
+								Rate: 200,
+								Per:  10,
+							},
+							QuotaMax:         5000,
+							QuotaRenewalRate: 3600,
+						},
+						AllowanceScope: "d",
+					},
+				}
+				assert.Equal(t, want, s.AccessRights)
+			},
+		},
+		{
+			name:     "several policies with Per API set to true specifying limit for the same APIs",
+			policies: []string{"per_api_and_no_other_partitions", "per_api_with_api_d", "per_api_with_api_c"},
+			sessMatch: func(t *testing.T, s *user.SessionState) {
+				t.Helper()
+				want := map[string]user.AccessDefinition{
+					"c": {
+						Limit: user.APILimit{
+							RateLimit: user.RateLimit{
+								Rate: 2000,
+								Per:  60,
+							},
+							QuotaMax: -1,
+						},
+						AllowanceScope: "c",
+					},
+					"d": {
+						Limit: user.APILimit{
+							RateLimit: user.RateLimit{
+								Rate: 200,
+								Per:  10,
+							},
+							QuotaMax:         5000,
+							QuotaRenewalRate: 3600,
+						},
+						AllowanceScope: "d",
+					},
+				}
+				assert.Equal(t, want, s.AccessRights)
+			},
 		},
 		{
 			name:     "several policies, mixed the one which has Per API set to true and partitioned ones",
-			policies: []string{"per_api_and_no_other_partitions", "quota1"},
-			errMatch: "",
+			policies: []string{"per_api_with_api_d", "quota1"},
+			errMatch: "cannot apply multiple policies when some have per_api set and some are partitioned",
 		},
 		{
 			name:     "several policies, mixed the one which has Per API set to true and partitioned ones (different order)",
-			policies: []string{"rate1", "per_api_and_no_other_partitions"},
-			errMatch: "",
+			policies: []string{"rate1", "per_api_with_api_d"},
+			errMatch: "cannot apply multiple policies when some have per_api set and some are partitioned",
 		},
 		{
 			name:     "Per API is set to true and some API gets limit set from policy's fields",
 			policies: []string{"per_api_with_limit_set_from_policy"},
 			sessMatch: func(t *testing.T, s *user.SessionState) {
 				t.Helper()
-
 				want := map[string]user.AccessDefinition{
 					"e": {
 						Limit: user.APILimit{
@@ -449,7 +496,41 @@ func (s *Test) testPrepareApplyPolicies(tb testing.TB) (*BaseMiddleware, []testA
 						AllowanceScope: "d",
 					},
 				}
-
+				assert.Equal(t, want, s.AccessRights)
+			},
+		},
+		{
+			name: "Per API with limits override",
+			policies: []string{
+				"per_api_with_limit_set_from_policy",
+				"per_api_with_api_d",
+				"per_api_with_higher_rate_on_api_d",
+			},
+			sessMatch: func(t *testing.T, s *user.SessionState) {
+				t.Helper()
+				want := map[string]user.AccessDefinition{
+					"e": {
+						Limit: user.APILimit{
+							QuotaMax: -1,
+							RateLimit: user.RateLimit{
+								Rate: 300,
+								Per:  1,
+							},
+						},
+						AllowanceScope: "per_api_with_limit_set_from_policy",
+					},
+					"d": {
+						Limit: user.APILimit{
+							QuotaMax:         5000,
+							QuotaRenewalRate: 3600,
+							RateLimit: user.RateLimit{
+								Rate: 400,
+								Per:  25,
+							},
+						},
+						AllowanceScope: "d",
+					},
+				}
 				assert.Equal(t, want, s.AccessRights)
 			},
 		},
