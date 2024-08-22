@@ -35,6 +35,8 @@ func (m *GranularAccessMiddleware) ProcessRequest(w http.ResponseWriter, r *http
 		return nil, http.StatusOK
 	}
 
+	urlPath := m.Spec.StripListenPath(r.URL.Path)
+
 	for _, accessSpec := range sessionVersionData.AllowedURLs {
 		url := accessSpec.URL
 		clean, err := httputil.GetPathRegexp(url)
@@ -49,7 +51,7 @@ func (m *GranularAccessMiddleware) ProcessRequest(w http.ResponseWriter, r *http
 			continue
 		}
 
-		match := asRegex.MatchString(r.URL.Path)
+		match := asRegex.MatchString(urlPath)
 
 		logger.WithField("pattern", url).WithField("match", match).Debug("checking allowed url")
 
