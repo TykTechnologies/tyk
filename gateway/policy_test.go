@@ -728,6 +728,74 @@ func (s *Test) testPrepareApplyPolicies(tb testing.TB) (*BaseMiddleware, []testA
 	}
 	tests = append(tests, partitionTCs...)
 
+	endpointRLTCs := []testApplyPoliciesData{
+		{
+			name:     "Per API and per endpoint policies",
+			policies: []string{"per_api_with_limit_set_from_policy", "per_api_with_endpoint_limits_on_d_and_e"},
+			sessMatch: func(t *testing.T, s *user.SessionState) {
+				t.Helper()
+				endpointsConfig := user.Endpoints{
+					{
+						Path: "/get",
+						Methods: user.EndpointMethods{
+							{
+								Name: "GET",
+								Limit: user.RateLimit{
+									Rate: -1,
+								},
+							},
+						},
+					},
+					{
+						Path: "/post",
+						Methods: user.EndpointMethods{
+							{
+								Name: "POST",
+								Limit: user.RateLimit{
+									Rate: 300,
+									Per:  10,
+								},
+							},
+						},
+					},
+				}
+				want := user.SessionState{
+					Rate:     500,
+					Per:      1,
+					QuotaMax: -1,
+					AccessRights: map[string]user.AccessDefinition{
+						"e": {
+							Limit: user.APILimit{
+								QuotaMax: -1,
+								RateLimit: user.RateLimit{
+									Rate: 500,
+									Per:  1,
+								},
+							},
+							AllowanceScope: "e",
+							Endpoints:      endpointsConfig,
+						},
+						"d": {
+							Limit: user.APILimit{
+								QuotaMax:         5000,
+								QuotaRenewalRate: 3600,
+								RateLimit: user.RateLimit{
+									Rate: 200,
+									Per:  10,
+								},
+							},
+							AllowanceScope: "d",
+							Endpoints:      endpointsConfig,
+						},
+					},
+				}
+				assert.Equal(t, want, *s)
+			},
+		},
+	}
+
+	tests = endpointRLTCs
+
 	return bmid, tests
 }
 

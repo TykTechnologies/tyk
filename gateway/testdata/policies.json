@@ -606,7 +606,7 @@
   },
   "per_api_with_endpoint_limits_on_d_and_e": {
     "id": "per_api_with_endpoint_limits_on_e",
-    "rate": 300,
+    "rate": 500,
     "per": 1,
     "quota_max": -1,
     "access_rights": {
@@ -642,12 +642,6 @@
         ]
       },
       "e": {
-        "limit": {
-          "rate": 200,
-          "per": 10,
-          "quota_max": 5000,
-          "quota_renewal_rate": 3600
-        },
         "endpoints": [
           {
             "path": "/get",
