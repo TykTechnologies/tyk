@@ -24,6 +24,7 @@ import (
 	"github.com/getkin/kin-openapi/routers"
 
 	"github.com/TykTechnologies/tyk/internal/graphengine"
+	"github.com/TykTechnologies/tyk/internal/httputil"
 
 	"github.com/getkin/kin-openapi/routers/gorillamux"
 
@@ -35,7 +36,6 @@ import (
 
 	sprig "github.com/Masterminds/sprig/v3"
 
-	"github.com/gorilla/mux"
 	"github.com/sirupsen/logrus"
 
 	circuit "github.com/TykTechnologies/circuitbreaker"
@@ -1722,7 +1722,7 @@ func (a *APISpec) getVersionFromRequest(r *http.Request) string {
 
 		return vName
 	case apidef.URLLocation:
-		uPath := a.StripListenPath(r, r.URL.Path)
+		uPath := a.StripListenPath(r.URL.Path)
 		uPath = strings.TrimPrefix(uPath, "/"+a.Slug)
 
 		// First non-empty part of the path is the version ID
@@ -1853,8 +1853,8 @@ func (a *APISpec) Version(r *http.Request) (*apidef.VersionInfo, RequestStatus) 
 	return &version, StatusOk
 }
 
-func (a *APISpec) StripListenPath(r *http.Request, path string) string {
-	return stripListenPath(a.Proxy.ListenPath, path)
+func (a *APISpec) StripListenPath(reqPath string) string {
+	return httputil.StripListenPath(a.Proxy.ListenPath, reqPath)
 }
 
 func (a *APISpec) SanitizeProxyPaths(r *http.Request) {
@@ -1864,9 +1864,9 @@ func (a *APISpec) SanitizeProxyPaths(r *http.Request) {
 
 	log.Debug("Stripping proxy listen path: ", a.Proxy.ListenPath)
 
-	r.URL.Path = a.StripListenPath(r, r.URL.Path)
+	r.URL.Path = a.StripListenPath(r.URL.Path)
 	if r.URL.RawPath != "" {
-		r.URL.RawPath = a.StripListenPath(r, r.URL.RawPath)
+		r.URL.RawPath = a.StripListenPath(r.URL.RawPath)
 	}
 
 	log.Debug("Upstream path is: ", r.URL.Path)
@@ -1914,27 +1914,6 @@ func (r *RoundRobin) WithLen(len int) int {
 	// -1 to start at 0, not 1
 	cur := atomic.AddUint32(&r.pos, 1) - 1
 	return int(cur) % len
-}
-
-func stripListenPath(listenPath, path string) (res string) {
-	defer func() {
-		if !strings.HasPrefix(res, "/") {
-			res = "/" + res
-		}
-	}()
-
-	if !strings.Contains(listenPath, "{") {
-		res = strings.TrimPrefix(path, listenPath)
-		return
-	}
-
-	tmp := new(mux.Route).PathPrefix(listenPath)
-	s, err := tmp.GetPathRegexp()
-	if err != nil {
-		return path
-	}
-	reg := regexp.MustCompile(s)
-	return reg.ReplaceAllString(path, "")
 }
 
 func (s *APISpec) hasVirtualEndpoint() bool {
