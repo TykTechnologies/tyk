@@ -4,6 +4,7 @@ import (
 	"errors"
 	"net/http"
 
+	"github.com/TykTechnologies/tyk/internal/httputil"
 	"github.com/TykTechnologies/tyk/regexp"
 )
 
@@ -22,7 +23,7 @@ func (m *GranularAccessMiddleware) ProcessRequest(w http.ResponseWriter, r *http
 		return nil, http.StatusOK
 	}
 
-	logger := m.Logger()
+	logger := m.Logger().WithField("path", r.URL.Path)
 	session := ctxGetSession(r)
 
 	sessionVersionData, foundAPI := session.AccessRights[m.Spec.APIID]
@@ -34,17 +35,29 @@ func (m *GranularAccessMiddleware) ProcessRequest(w http.ResponseWriter, r *http
 		return nil, http.StatusOK
 	}
 
+	urlPath := m.Spec.StripListenPath(r.URL.Path)
+
 	for _, accessSpec := range sessionVersionData.AllowedURLs {
-		logger.Debug("Checking: ", r.URL.Path, " Against:", accessSpec.URL)
-		asRegex, err := regexp.Compile(accessSpec.URL)
+		url := accessSpec.URL
+		clean, err := httputil.GetPathRegexp(url)
 		if err != nil {
-			logger.WithError(err).Error("Regex error")
-			return nil, http.StatusOK
+			logger.WithError(err).Errorf("error getting path regex: %q, skipping", url)
+			continue
 		}
 
-		match := asRegex.MatchString(r.URL.Path)
+		asRegex, err := regexp.Compile(clean)
+		if err != nil {
+			logger.WithError(err).Errorf("error compiling path regex: %q, skipping", url)
+			continue
+		}
+
+		match := asRegex.MatchString(urlPath)
+
+		logger.WithField("pattern", url).WithField("match", match).Debug("checking allowed url")
+
 		if match {
-			logger.Debug("Match!")
+			// if a path is matched, but isn't matched on method,
+			// then we continue onto the next path for evaluation.
 			for _, method := range accessSpec.Methods {
 				if method == r.Method {
 					return nil, http.StatusOK
