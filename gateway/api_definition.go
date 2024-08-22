@@ -24,6 +24,7 @@ import (
 	"github.com/getkin/kin-openapi/routers"
 
 	"github.com/TykTechnologies/tyk/internal/graphengine"
+	"github.com/TykTechnologies/tyk/internal/httputil"
 
 	"github.com/getkin/kin-openapi/routers/gorillamux"
 
@@ -35,7 +36,6 @@ import (
 
 	sprig "github.com/Masterminds/sprig/v3"
 
-	"github.com/gorilla/mux"
 	"github.com/sirupsen/logrus"
 
 	circuit "github.com/TykTechnologies/circuitbreaker"
@@ -1772,7 +1772,7 @@ func (a *APISpec) Version(r *http.Request) (*apidef.VersionInfo, RequestStatus) 
 }
 
 func (a *APISpec) StripListenPath(reqPath string) string {
-	return stripListenPath(a.Proxy.ListenPath, reqPath)
+	return httputil.StripListenPath(a.Proxy.ListenPath, reqPath)
 }
 
 func (a *APISpec) SanitizeProxyPaths(r *http.Request) {
@@ -1832,27 +1832,6 @@ func (r *RoundRobin) WithLen(len int) int {
 	// -1 to start at 0, not 1
 	cur := atomic.AddUint32(&r.pos, 1) - 1
 	return int(cur) % len
-}
-
-func stripListenPath(listenPath, path string) (res string) {
-	defer func() {
-		if !strings.HasPrefix(res, "/") {
-			res = "/" + res
-		}
-	}()
-
-	if !strings.Contains(listenPath, "{") {
-		res = strings.TrimPrefix(path, listenPath)
-		return
-	}
-
-	tmp := new(mux.Route).PathPrefix(listenPath)
-	s, err := tmp.GetPathRegexp()
-	if err != nil {
-		return path
-	}
-	reg := regexp.MustCompile(s)
-	return reg.ReplaceAllString(path, "")
 }
 
 func (s *APISpec) hasVirtualEndpoint() bool {
