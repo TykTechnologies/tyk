@@ -522,3 +522,63 @@ func (es Endpoints) RateLimitInfo(method string, path string) (*EndpointRateLimi
 
 	return nil, false
 }
+
+// Map returns EndpointsMap of Endpoints using the key format [method:path].
+// If duplicate entries are found, it would get overwritten with latest entries Endpoints.
+func (es Endpoints) Map() EndpointsMap {
+	if len(es) == 0 {
+		return nil
+	}
+
+	out := make(EndpointsMap)
+	for _, e := range es {
+		for _, method := range e.Methods {
+			key := fmt.Sprintf("%s:%s", method.Name, e.Path)
+			out[key] = method.Limit
+		}
+	}
+
+	return out
+}
+
+// EndpointsMap is the type to hold endpoint rate limit information as a map.
+type EndpointsMap map[string]RateLimit
+
+// Endpoints coverts EndpointsMap to Endpoints.
+func (em EndpointsMap) Endpoints() Endpoints {
+	if len(em) == 0 {
+		return nil
+	}
+
+	var perPathMethods = make(map[string]EndpointMethods)
+	for key, rateLimit := range em {
+		keyParts := strings.Split(key, ":")
+		if len(keyParts) != 2 {
+			continue
+		}
+
+		method, path := keyParts[0], keyParts[1]
+		epMethod := EndpointMethod{
+			Name:  method,
+			Limit: rateLimit,
+		}
+		if methods, ok := perPathMethods[path]; ok {
+			perPathMethods[path] = append(methods, epMethod)
+			continue
+		}
+
+		perPathMethods[path] = EndpointMethods{
+			epMethod,
+		}
+	}
+
+	var endpoints Endpoints
+	for path, methods := range perPathMethods {
+		endpoints = append(endpoints, Endpoint{
+			Path:    path,
+			Methods: methods,
+		})
+	}
+
+	return endpoints
+}

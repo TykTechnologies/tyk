@@ -520,3 +520,200 @@ func TestEndpoints_RateLimitInfo(t *testing.T) {
 		})
 	}
 }
+
+func TestEndpoints_Map(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    Endpoints
+		expected EndpointsMap
+	}{
+		{
+			name:     "Empty Endpoints",
+			input:    Endpoints{},
+			expected: nil,
+		},
+		{
+			name: "Single Endpoint, Single Method",
+			input: Endpoints{
+				{
+					Path: "/api/v1/users",
+					Methods: EndpointMethods{
+						{Name: "GET", Limit: RateLimit{Rate: 10, Per: 60}},
+					},
+				},
+			},
+			expected: map[string]RateLimit{
+				"GET:/api/v1/users": {Rate: 10, Per: 60},
+			},
+		},
+		{
+			name: "Single Endpoint, Multiple Methods",
+			input: Endpoints{
+				{
+					Path: "/api/v1/posts",
+					Methods: EndpointMethods{
+						{Name: "GET", Limit: RateLimit{Rate: 20, Per: 60}},
+						{Name: "POST", Limit: RateLimit{Rate: 5, Per: 60}},
+					},
+				},
+			},
+			expected: map[string]RateLimit{
+				"GET:/api/v1/posts":  {Rate: 20, Per: 60},
+				"POST:/api/v1/posts": {Rate: 5, Per: 60},
+			},
+		},
+		{
+			name: "Multiple Endpoints, Multiple Methods",
+			input: Endpoints{
+				{
+					Path: "/api/v1/users",
+					Methods: EndpointMethods{
+						{Name: "GET", Limit: RateLimit{Rate: 15, Per: 60}},
+						{Name: "POST", Limit: RateLimit{Rate: 5, Per: 60}},
+					},
+				},
+				{
+					Path: "/api/v1/posts",
+					Methods: EndpointMethods{
+						{Name: "GET", Limit: RateLimit{Rate: 30, Per: 60}},
+						{Name: "PUT", Limit: RateLimit{Rate: 10, Per: 60}},
+					},
+				},
+			},
+			expected: map[string]RateLimit{
+				"GET:/api/v1/users":  {Rate: 15, Per: 60},
+				"POST:/api/v1/users": {Rate: 5, Per: 60},
+				"GET:/api/v1/posts":  {Rate: 30, Per: 60},
+				"PUT:/api/v1/posts":  {Rate: 10, Per: 60},
+			},
+		},
+		{
+			name: "Duplicate Entries (Overwrite)",
+			input: Endpoints{
+				{
+					Path: "/api/v1/users",
+					Methods: EndpointMethods{
+						{Name: "GET", Limit: RateLimit{Rate: 10, Per: 60}},
+					},
+				},
+				{
+					Path: "/api/v1/users",
+					Methods: EndpointMethods{
+						{Name: "GET", Limit: RateLimit{Rate: 20, Per: 60}},
+					},
+				},
+			},
+			expected: map[string]RateLimit{
+				"GET:/api/v1/users": {Rate: 20, Per: 60},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := tt.input.Map()
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestEndpointsMap_Endpoints(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    EndpointsMap
+		expected Endpoints
+	}{
+		{
+			name:     "Empty EndpointsMap",
+			input:    EndpointsMap{},
+			expected: nil,
+		},
+		{
+			name: "Single Path, Single Method",
+			input: EndpointsMap{
+				"GET:/api/v1/users": RateLimit{Rate: 10, Per: 60},
+			},
+			expected: Endpoints{
+				{
+					Path: "/api/v1/users",
+					Methods: EndpointMethods{
+						{Name: "GET", Limit: RateLimit{Rate: 10, Per: 60}},
+					},
+				},
+			},
+		},
+		{
+			name: "Single Path, Multiple Methods",
+			input: EndpointsMap{
+				"GET:/api/v1/posts":  RateLimit{Rate: 20, Per: 60},
+				"POST:/api/v1/posts": RateLimit{Rate: 5, Per: 60},
+			},
+			expected: Endpoints{
+				{
+					Path: "/api/v1/posts",
+					Methods: EndpointMethods{
+						{Name: "GET", Limit: RateLimit{Rate: 20, Per: 60}},
+						{Name: "POST", Limit: RateLimit{Rate: 5, Per: 60}},
+					},
+				},
+			},
+		},
+		{
+			name: "Multiple Paths, Multiple Methods",
+			input: EndpointsMap{
+				"GET:/api/v1/users":  RateLimit{Rate: 15, Per: 60},
+				"POST:/api/v1/users": RateLimit{Rate: 5, Per: 60},
+				"GET:/api/v1/posts":  RateLimit{Rate: 30, Per: 60},
+				"PUT:/api/v1/posts":  RateLimit{Rate: 10, Per: 60},
+			},
+			expected: Endpoints{
+				{
+					Path: "/api/v1/users",
+					Methods: EndpointMethods{
+						{Name: "GET", Limit: RateLimit{Rate: 15, Per: 60}},
+						{Name: "POST", Limit: RateLimit{Rate: 5, Per: 60}},
+					},
+				},
+				{
+					Path: "/api/v1/posts",
+					Methods: EndpointMethods{
+						{Name: "GET", Limit: RateLimit{Rate: 30, Per: 60}},
+						{Name: "PUT", Limit: RateLimit{Rate: 10, Per: 60}},
+					},
+				},
+			},
+		},
+		{
+			name: "Invalid Key Format",
+			input: EndpointsMap{
+				"GET:/api/v1/users":   RateLimit{Rate: 15, Per: 60},
+				"invalid_key":         RateLimit{Rate: 5, Per: 60},
+				"GET:/api/v1/posts":   RateLimit{Rate: 30, Per: 60},
+				"PUT:/api/v1/posts":   RateLimit{Rate: 10, Per: 60},
+				"another:invalid:key": RateLimit{Rate: 20, Per: 60},
+			},
+			expected: Endpoints{
+				{
+					Path: "/api/v1/users",
+					Methods: EndpointMethods{
+						{Name: "GET", Limit: RateLimit{Rate: 15, Per: 60}},
+					},
+				},
+				{
+					Path: "/api/v1/posts",
+					Methods: EndpointMethods{
+						{Name: "GET", Limit: RateLimit{Rate: 30, Per: 60}},
+						{Name: "PUT", Limit: RateLimit{Rate: 10, Per: 60}},
+					},
+				},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := tt.input.Endpoints()
+			assert.ElementsMatch(t, tt.expected, result)
+		})
+	}
+}
