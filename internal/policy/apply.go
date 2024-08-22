@@ -141,11 +141,11 @@ func (t *Service) Apply(session *user.SessionState) error {
 		}
 
 		if policy.Partitions.PerAPI {
-			if err = t.applyPerAPI(policy, session, rights, &applyState); err != nil {
+			if err := t.applyPerAPI(policy, session, rights, &applyState); err != nil {
 				return err
 			}
 		} else {
-			if err = t.applyPartitions(policy, session, rights, &applyState); err != nil {
+			if err := t.applyPartitions(policy, session, rights, &applyState); err != nil {
 				return err
 			}
 		}
