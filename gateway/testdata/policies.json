@@ -338,14 +338,46 @@
       "per_api": true
     }
   },
-  "per_api_with_the_same_api": {
-    "id": "per_api_with_the_same_api",
+  "per_api_with_api_d": {
+    "id": "per_api_with_api_d",
     "access_rights": {
       "d": {
         "limit": {
           "rate": 200,
           "per": 10,
           "quota_max": 5000,
+          "quota_renewal_rate": 3600
+        }
+      }
+    },
+    "partitions": {
+      "per_api": true
+    }
+  },
+  "per_api_with_higher_rate_on_api_d": {
+    "id": "per_api_with_higher_rate_on_api_d",
+    "access_rights": {
+      "d": {
+        "limit": {
+          "rate": 400,
+          "per": 25,
+          "quota_max": 5000,
+          "quota_renewal_rate": 3600
+        }
+      }
+    },
+    "partitions": {
+      "per_api": true
+    }
+  },
+  "per_api_with_api_c": {
+    "id": "per_api_with_api_c",
+    "access_rights": {
+      "c": {
+        "limit": {
+          "rate": 3000,
+          "per": 10,
+          "quota_max": 6000,
           "quota_renewal_rate": 3600
         }
       }
