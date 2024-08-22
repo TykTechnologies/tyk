@@ -1,6 +1,7 @@
 package httputil
 
 import (
+	"regexp"
 	"strings"
 
 	"github.com/gorilla/mux"
@@ -43,4 +44,36 @@ func IsMuxTemplate(pattern string) bool {
 	openBraces := strings.Count(pattern, "{")
 	closeBraces := strings.Count(pattern, "}")
 	return openBraces > 0 && openBraces == closeBraces
+}
+
+// StripListenPath will strip the listenPath from the passed urlPath.
+// If the listenPath contains mux variables, it will trim away the
+// matching pattern with a regular expression that mux provides.
+func StripListenPath(listenPath, urlPath string) (res string) {
+	defer func() {
+		if !strings.HasPrefix(res, "/") {
+			res = "/" + res
+		}
+	}()
+
+	res = urlPath
+
+	// early return on the simple case
+	if strings.HasPrefix(urlPath, listenPath) {
+		res = strings.TrimPrefix(res, listenPath)
+		return res
+	}
+
+	if !IsMuxTemplate(listenPath) {
+		return res
+	}
+
+	tmp := new(mux.Route).PathPrefix(listenPath)
+	s, err := tmp.GetPathRegexp()
+	if err != nil {
+		return res
+	}
+
+	reg := regexp.MustCompile(s)
+	return reg.ReplaceAllString(res, "")
 }

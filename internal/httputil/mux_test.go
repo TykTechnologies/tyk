@@ -45,3 +45,20 @@ func TestGetPathRegexpWithRegexCompile(t *testing.T) {
 	assert.NoError(t, err)
 	assert.True(t, matched, "The URL should match the pattern")
 }
+
+func TestStripListenPath(t *testing.T) {
+	assert.Equal(t, "/get", httputil.StripListenPath("/listen", "/listen/get"))
+	assert.Equal(t, "/get", httputil.StripListenPath("/listen/", "/listen/get"))
+	assert.Equal(t, "/get", httputil.StripListenPath("listen", "listen/get"))
+	assert.Equal(t, "/get", httputil.StripListenPath("listen/", "listen/get"))
+	assert.Equal(t, "/", httputil.StripListenPath("/listen/", "/listen/"))
+	assert.Equal(t, "/", httputil.StripListenPath("/listen", "/listen"))
+	assert.Equal(t, "/", httputil.StripListenPath("listen/", ""))
+
+	assert.Equal(t, "/get", httputil.StripListenPath("/{_:.*}/post/", "/listen/post/get"))
+	assert.Equal(t, "/get", httputil.StripListenPath("/{_:.*}/", "/listen/get"))
+	assert.Equal(t, "/get", httputil.StripListenPath("/pre/{_:.*}/", "/pre/listen/get"))
+	assert.Equal(t, "/", httputil.StripListenPath("/{_:.*}", "/listen"))
+	assert.Equal(t, "/get", httputil.StripListenPath("/{myPattern:foo|bar}", "/foo/get"))
+	assert.Equal(t, "/anything/get", httputil.StripListenPath("/{myPattern:foo|bar}", "/anything/get"))
+}
