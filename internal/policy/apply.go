@@ -533,7 +533,7 @@ func (t *Service) updateSessionRootVars(session *user.SessionState, rights map[s
 }
 
 func (t *Service) applyAPILevelLimits(policyAD user.AccessDefinition, currAD user.AccessDefinition) user.AccessDefinition {
-	if policyAD.Limit.Duration() > currAD.Limit.Duration() {
+	if currAD.Limit.Duration() > policyAD.Limit.Duration() {
 		policyAD.Limit.Per = currAD.Limit.Per
 		policyAD.Limit.Rate = currAD.Limit.Rate
 		policyAD.Limit.Smoothing = currAD.Limit.Smoothing

@@ -436,8 +436,8 @@ func (s *Test) testPrepareApplyPolicies(tb testing.TB) (*BaseMiddleware, []testA
 					"c": {
 						Limit: user.APILimit{
 							RateLimit: user.RateLimit{
-								Rate: 3000,
-								Per:  10,
+								Rate: 2000,
+								Per:  60,
 							},
 							QuotaMax: -1,
 						},
@@ -491,6 +491,41 @@ func (s *Test) testPrepareApplyPolicies(tb testing.TB) (*BaseMiddleware, []testA
 							RateLimit: user.RateLimit{
 								Rate: 200,
 								Per:  10,
+							},
+						},
+						AllowanceScope: "d",
+					},
+				}
+				assert.Equal(t, want, s.AccessRights)
+			},
+		},
+		{
+			name: "Per API with limits override",
+			policies: []string{
+				"per_api_with_limit_set_from_policy",
+				"per_api_with_api_d",
+				"per_api_with_higher_rate_on_api_d",
+			},
+			sessMatch: func(t *testing.T, s *user.SessionState) {
+				t.Helper()
+				want := map[string]user.AccessDefinition{
+					"e": {
+						Limit: user.APILimit{
+							QuotaMax: -1,
+							RateLimit: user.RateLimit{
+								Rate: 300,
+								Per:  1,
+							},
+						},
+						AllowanceScope: "per_api_with_limit_set_from_policy",
+					},
+					"d": {
+						Limit: user.APILimit{
+							QuotaMax:         5000,
+							QuotaRenewalRate: 3600,
+							RateLimit: user.RateLimit{
+								Rate: 400,
+								Per:  25,
 							},
 						},
 						AllowanceScope: "d",
