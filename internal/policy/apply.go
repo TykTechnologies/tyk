@@ -67,7 +67,14 @@ func (t *Service) ClearSession(session *user.SessionState) error {
 	return nil
 }
 
-// ApplyPolicies will check if any policies are loaded. If any are, it
+type applyStatus struct {
+	didQuota      map[string]bool
+	didRateLimit  map[string]bool
+	didAcl        map[string]bool
+	didComplexity map[string]bool
+}
+
+// Apply will check if any policies are loaded. If any are, it
 // will overwrite the session state to use the policy values.
 func (t *Service) Apply(session *user.SessionState) error {
 	rights := make(map[string]user.AccessDefinition)
@@ -80,7 +87,12 @@ func (t *Service) Apply(session *user.SessionState) error {
 		t.logger.WithError(err).Warn("error clearing session")
 	}
 
-	didQuota, didRateLimit, didACL, didComplexity := make(map[string]bool), make(map[string]bool), make(map[string]bool), make(map[string]bool)
+	applyState := applyStatus{
+		didQuota:      make(map[string]bool),
+		didRateLimit:  make(map[string]bool),
+		didAcl:        make(map[string]bool),
+		didComplexity: make(map[string]bool),
+	}
 
 	var (
 		err       error
@@ -115,212 +127,18 @@ func (t *Service) Apply(session *user.SessionState) error {
 			return err
 		}
 
-		if policy.Partitions.PerAPI &&
-			(policy.Partitions.Quota || policy.Partitions.RateLimit || policy.Partitions.Acl || policy.Partitions.Complexity) {
+		if policy.Partitions.PerAPI && policy.Partitions.Enabled() {
 			err := fmt.Errorf("cannot apply policy %s which has per_api and any of partitions set", policy.ID)
 			t.logger.Error(err)
 			return err
 		}
 
 		if policy.Partitions.PerAPI {
-			for apiID, accessRights := range policy.AccessRights {
-				// new logic when you can specify quota or rate in more than one policy but for different APIs
-				if didQuota[apiID] || didRateLimit[apiID] || didACL[apiID] || didComplexity[apiID] { // no other partitions allowed
-					err := fmt.Errorf("cannot apply multiple policies when some have per_api set and some are partitioned")
-					t.logger.Error(err)
-					return err
-				}
-
-				idForScope := apiID
-				// check if we don't have limit on API level specified when policy was created
-				if accessRights.Limit.IsEmpty() {
-					// limit was not specified on API level so we will populate it from policy
-					idForScope = policy.ID
-					accessRights.Limit = policy.APILimit()
-				}
-				accessRights.AllowanceScope = idForScope
-				accessRights.Limit.SetBy = idForScope
-
-				// respect current quota renews (on API limit level)
-				if r, ok := session.AccessRights[apiID]; ok && !r.Limit.IsEmpty() {
-					accessRights.Limit.QuotaRenews = r.Limit.QuotaRenews
-				}
-
-				if r, ok := session.AccessRights[apiID]; ok {
-					// If GQL introspection is disabled, keep that configuration.
-					if r.DisableIntrospection {
-						accessRights.DisableIntrospection = r.DisableIntrospection
-					}
-				}
-
-				// overwrite session access right for this API
-				rights[apiID] = accessRights
-
-				// identify that limit for that API is set (to allow set it only once)
-				didACL[apiID] = true
-				didQuota[apiID] = true
-				didRateLimit[apiID] = true
-				didComplexity[apiID] = true
+			if err := t.applyPerAPI(policy, session, rights, &applyState); err != nil {
+				return err
 			}
 		} else {
-			usePartitions := policy.Partitions.Quota || policy.Partitions.RateLimit || policy.Partitions.Acl || policy.Partitions.Complexity
-
-			for k, v := range policy.AccessRights {
-				ar := v
-
-				if !usePartitions || policy.Partitions.Acl {
-					didACL[k] = true
-
-					ar.AllowedURLs = copyAllowedURLs(v.AllowedURLs)
-
-					// Merge ACLs for the same API
-					if r, ok := rights[k]; ok {
-						// If GQL introspection is disabled, keep that configuration.
-						if v.DisableIntrospection {
-							r.DisableIntrospection = v.DisableIntrospection
-						}
-						r.Versions = appendIfMissing(rights[k].Versions, v.Versions...)
-
-						for _, u := range v.AllowedURLs {
-							found := false
-							for ai, au := range r.AllowedURLs {
-								if u.URL == au.URL {
-									found = true
-									r.AllowedURLs[ai].Methods = appendIfMissing(au.Methods, u.Methods...)
-								}
-							}
-
-							if !found {
-								r.AllowedURLs = append(r.AllowedURLs, v.AllowedURLs...)
-							}
-						}
-
-						for _, t := range v.RestrictedTypes {
-							for ri, rt := range r.RestrictedTypes {
-								if t.Name == rt.Name {
-									r.RestrictedTypes[ri].Fields = intersection(rt.Fields, t.Fields)
-								}
-							}
-						}
-
-						for _, t := range v.AllowedTypes {
-							for ri, rt := range r.AllowedTypes {
-								if t.Name == rt.Name {
-									r.AllowedTypes[ri].Fields = intersection(rt.Fields, t.Fields)
-								}
-							}
-						}
-
-						mergeFieldLimits := func(res *user.FieldLimits, new user.FieldLimits) {
-							if greaterThanInt(new.MaxQueryDepth, res.MaxQueryDepth) {
-								res.MaxQueryDepth = new.MaxQueryDepth
-							}
-						}
-
-						for _, far := range v.FieldAccessRights {
-							exists := false
-							for i, rfar := range r.FieldAccessRights {
-								if far.TypeName == rfar.TypeName && far.FieldName == rfar.FieldName {
-									exists = true
-									mergeFieldLimits(&r.FieldAccessRights[i].Limits, far.Limits)
-								}
-							}
-
-							if !exists {
-								r.FieldAccessRights = append(r.FieldAccessRights, far)
-							}
-						}
-
-						ar = r
-					}
-
-					ar.Limit.SetBy = policy.ID
-				}
-
-				if !usePartitions || policy.Partitions.Quota {
-					didQuota[k] = true
-					if greaterThanInt64(policy.QuotaMax, ar.Limit.QuotaMax) {
-
-						ar.Limit.QuotaMax = policy.QuotaMax
-						if greaterThanInt64(policy.QuotaMax, session.QuotaMax) {
-							session.QuotaMax = policy.QuotaMax
-						}
-					}
-
-					if policy.QuotaRenewalRate > ar.Limit.QuotaRenewalRate {
-						ar.Limit.QuotaRenewalRate = policy.QuotaRenewalRate
-						if policy.QuotaRenewalRate > session.QuotaRenewalRate {
-							session.QuotaRenewalRate = policy.QuotaRenewalRate
-						}
-					}
-				}
-
-				if !usePartitions || policy.Partitions.RateLimit {
-					didRateLimit[k] = true
-
-					t.ApplyRateLimits(session, policy, &ar.Limit)
-
-					if policy.ThrottleRetryLimit > ar.Limit.ThrottleRetryLimit {
-						ar.Limit.ThrottleRetryLimit = policy.ThrottleRetryLimit
-						if policy.ThrottleRetryLimit > session.ThrottleRetryLimit {
-							session.ThrottleRetryLimit = policy.ThrottleRetryLimit
-						}
-					}
-
-					if policy.ThrottleInterval > ar.Limit.ThrottleInterval {
-						ar.Limit.ThrottleInterval = policy.ThrottleInterval
-						if policy.ThrottleInterval > session.ThrottleInterval {
-							session.ThrottleInterval = policy.ThrottleInterval
-						}
-					}
-				}
-
-				if !usePartitions || policy.Partitions.Complexity {
-					didComplexity[k] = true
-
-					if greaterThanInt(policy.MaxQueryDepth, ar.Limit.MaxQueryDepth) {
-						ar.Limit.MaxQueryDepth = policy.MaxQueryDepth
-						if greaterThanInt(policy.MaxQueryDepth, session.MaxQueryDepth) {
-							session.MaxQueryDepth = policy.MaxQueryDepth
-						}
-					}
-				}
-
-				// Respect existing QuotaRenews
-				if r, ok := session.AccessRights[k]; ok && !r.Limit.IsEmpty() {
-					ar.Limit.QuotaRenews = r.Limit.QuotaRenews
-				}
-
-				rights[k] = ar
-			}
-
-			// Master policy case
-			if len(policy.AccessRights) == 0 {
-				if !usePartitions || policy.Partitions.RateLimit {
-					session.Rate = policy.Rate
-					session.Per = policy.Per
-					session.Smoothing = policy.Smoothing
-					session.ThrottleInterval = policy.ThrottleInterval
-					session.ThrottleRetryLimit = policy.ThrottleRetryLimit
-				}
-
-				if !usePartitions || policy.Partitions.Complexity {
-					session.MaxQueryDepth = policy.MaxQueryDepth
-				}
-
-				if !usePartitions || policy.Partitions.Quota {
-					session.QuotaMax = policy.QuotaMax
-					session.QuotaRenewalRate = policy.QuotaRenewalRate
-				}
-			}
-
-			if !session.HMACEnabled {
-				session.HMACEnabled = policy.HMACEnabled
-			}
-
-			if !session.EnableHTTPSignatureValidation {
-				session.EnableHTTPSignatureValidation = policy.EnableHTTPSignatureValidation
-			}
+			t.applyPartitions(policy, session, rights, &applyState)
 		}
 
 		session.IsInactive = session.IsInactive || policy.IsInactive
@@ -368,12 +186,12 @@ func (t *Service) Apply(session *user.SessionState) error {
 
 	// If some APIs had only ACL partitions, inherit rest from session level
 	for k, v := range rights {
-		if !didACL[k] {
+		if !applyState.didAcl[k] {
 			delete(rights, k)
 			continue
 		}
 
-		if !didRateLimit[k] {
+		if !applyState.didRateLimit[k] {
 			v.Limit.Rate = session.Rate
 			v.Limit.Per = session.Per
 			v.Limit.Smoothing = session.Smoothing
@@ -381,11 +199,11 @@ func (t *Service) Apply(session *user.SessionState) error {
 			v.Limit.ThrottleRetryLimit = session.ThrottleRetryLimit
 		}
 
-		if !didComplexity[k] {
+		if !applyState.didComplexity[k] {
 			v.Limit.MaxQueryDepth = session.MaxQueryDepth
 		}
 
-		if !didQuota[k] {
+		if !applyState.didQuota[k] {
 			v.Limit.QuotaMax = session.QuotaMax
 			v.Limit.QuotaRenewalRate = session.QuotaRenewalRate
 			v.Limit.QuotaRenews = session.QuotaRenews
@@ -404,28 +222,10 @@ func (t *Service) Apply(session *user.SessionState) error {
 	}
 
 	// If we have policies defining rules for one single API, update session root vars (legacy)
-	if len(didQuota) == 1 && len(didRateLimit) == 1 && len(didComplexity) == 1 {
-		for _, v := range rights {
-			if len(didRateLimit) == 1 {
-				session.Rate = v.Limit.Rate
-				session.Per = v.Limit.Per
-				session.Smoothing = v.Limit.Smoothing
-			}
-
-			if len(didQuota) == 1 {
-				session.QuotaMax = v.Limit.QuotaMax
-				session.QuotaRenews = v.Limit.QuotaRenews
-				session.QuotaRenewalRate = v.Limit.QuotaRenewalRate
-			}
-
-			if len(didComplexity) == 1 {
-				session.MaxQueryDepth = v.Limit.MaxQueryDepth
-			}
-		}
-	}
+	t.updateSessionRootVars(session, rights, applyState)
 
 	// Override session ACL if at least one policy define it
-	if len(didACL) > 0 {
+	if len(applyState.didAcl) > 0 {
 		session.AccessRights = rights
 	}
 
@@ -475,4 +275,234 @@ func (t *Service) ApplyRateLimits(session *user.SessionState, policy user.Policy
 
 func (t *Service) emptyRateLimit(m user.APILimit) bool {
 	return m.Rate == 0 || m.Per == 0
+}
+
+func (t *Service) applyPerAPI(policy user.Policy, session *user.SessionState, rights map[string]user.AccessDefinition,
+	applyState *applyStatus) error {
+	for apiID, accessRights := range policy.AccessRights {
+		// new logic when you can specify quota or rate in more than one policy but for different APIs
+		if applyState.didQuota[apiID] || applyState.didRateLimit[apiID] || applyState.didAcl[apiID] || applyState.didComplexity[apiID] { // no other partitions allowed
+			err := fmt.Errorf("cannot apply multiple policies when some have per_api set and some are partitioned")
+			t.logger.Error(err)
+			return err
+		}
+
+		idForScope := apiID
+		// check if we don't have limit on API level specified when policy was created
+		if accessRights.Limit.IsEmpty() {
+			// limit was not specified on API level so we will populate it from policy
+			idForScope = policy.ID
+			accessRights.Limit = policy.APILimit()
+		}
+		accessRights.AllowanceScope = idForScope
+		accessRights.Limit.SetBy = idForScope
+
+		// respect current quota renews (on API limit level)
+		if r, ok := session.AccessRights[apiID]; ok && !r.Limit.IsEmpty() {
+			accessRights.Limit.QuotaRenews = r.Limit.QuotaRenews
+		}
+
+		if r, ok := session.AccessRights[apiID]; ok {
+			// If GQL introspection is disabled, keep that configuration.
+			if r.DisableIntrospection {
+				accessRights.DisableIntrospection = r.DisableIntrospection
+			}
+		}
+
+		// overwrite session access right for this API
+		rights[apiID] = accessRights
+
+		// identify that limit for that API is set (to allow set it only once)
+		applyState.didAcl[apiID] = true
+		applyState.didQuota[apiID] = true
+		applyState.didRateLimit[apiID] = true
+		applyState.didComplexity[apiID] = true
+	}
+
+	return nil
+}
+
+func (t *Service) applyPartitions(policy user.Policy, session *user.SessionState, rights map[string]user.AccessDefinition,
+	applyState *applyStatus) {
+
+	usePartitions := policy.Partitions.Enabled()
+
+	for k, v := range policy.AccessRights {
+		ar := v
+
+		if !usePartitions || policy.Partitions.Acl {
+			applyState.didAcl[k] = true
+
+			ar.AllowedURLs = copyAllowedURLs(v.AllowedURLs)
+
+			// Merge ACLs for the same API
+			if r, ok := rights[k]; ok {
+				// If GQL introspection is disabled, keep that configuration.
+				if v.DisableIntrospection {
+					r.DisableIntrospection = v.DisableIntrospection
+				}
+				r.Versions = appendIfMissing(rights[k].Versions, v.Versions...)
+
+				for _, u := range v.AllowedURLs {
+					found := false
+					for ai, au := range r.AllowedURLs {
+						if u.URL == au.URL {
+							found = true
+							r.AllowedURLs[ai].Methods = appendIfMissing(au.Methods, u.Methods...)
+						}
+					}
+
+					if !found {
+						r.AllowedURLs = append(r.AllowedURLs, v.AllowedURLs...)
+					}
+				}
+
+				for _, t := range v.RestrictedTypes {
+					for ri, rt := range r.RestrictedTypes {
+						if t.Name == rt.Name {
+							r.RestrictedTypes[ri].Fields = intersection(rt.Fields, t.Fields)
+						}
+					}
+				}
+
+				for _, t := range v.AllowedTypes {
+					for ri, rt := range r.AllowedTypes {
+						if t.Name == rt.Name {
+							r.AllowedTypes[ri].Fields = intersection(rt.Fields, t.Fields)
+						}
+					}
+				}
+
+				mergeFieldLimits := func(res *user.FieldLimits, new user.FieldLimits) {
+					if greaterThanInt(new.MaxQueryDepth, res.MaxQueryDepth) {
+						res.MaxQueryDepth = new.MaxQueryDepth
+					}
+				}
+
+				for _, far := range v.FieldAccessRights {
+					exists := false
+					for i, rfar := range r.FieldAccessRights {
+						if far.TypeName == rfar.TypeName && far.FieldName == rfar.FieldName {
+							exists = true
+							mergeFieldLimits(&r.FieldAccessRights[i].Limits, far.Limits)
+						}
+					}
+
+					if !exists {
+						r.FieldAccessRights = append(r.FieldAccessRights, far)
+					}
+				}
+
+				ar = r
+			}
+
+			ar.Limit.SetBy = policy.ID
+		}
+
+		if !usePartitions || policy.Partitions.Quota {
+			applyState.didQuota[k] = true
+			if greaterThanInt64(policy.QuotaMax, ar.Limit.QuotaMax) {
+
+				ar.Limit.QuotaMax = policy.QuotaMax
+				if greaterThanInt64(policy.QuotaMax, session.QuotaMax) {
+					session.QuotaMax = policy.QuotaMax
+				}
+			}
+
+			if policy.QuotaRenewalRate > ar.Limit.QuotaRenewalRate {
+				ar.Limit.QuotaRenewalRate = policy.QuotaRenewalRate
+				if policy.QuotaRenewalRate > session.QuotaRenewalRate {
+					session.QuotaRenewalRate = policy.QuotaRenewalRate
+				}
+			}
+		}
+
+		if !usePartitions || policy.Partitions.RateLimit {
+			applyState.didRateLimit[k] = true
+
+			t.ApplyRateLimits(session, policy, &ar.Limit)
+
+			if policy.ThrottleRetryLimit > ar.Limit.ThrottleRetryLimit {
+				ar.Limit.ThrottleRetryLimit = policy.ThrottleRetryLimit
+				if policy.ThrottleRetryLimit > session.ThrottleRetryLimit {
+					session.ThrottleRetryLimit = policy.ThrottleRetryLimit
+				}
+			}
+
+			if policy.ThrottleInterval > ar.Limit.ThrottleInterval {
+				ar.Limit.ThrottleInterval = policy.ThrottleInterval
+				if policy.ThrottleInterval > session.ThrottleInterval {
+					session.ThrottleInterval = policy.ThrottleInterval
+				}
+			}
+		}
+
+		if !usePartitions || policy.Partitions.Complexity {
+			applyState.didComplexity[k] = true
+
+			if greaterThanInt(policy.MaxQueryDepth, ar.Limit.MaxQueryDepth) {
+				ar.Limit.MaxQueryDepth = policy.MaxQueryDepth
+				if greaterThanInt(policy.MaxQueryDepth, session.MaxQueryDepth) {
+					session.MaxQueryDepth = policy.MaxQueryDepth
+				}
+			}
+		}
+
+		// Respect existing QuotaRenews
+		if r, ok := session.AccessRights[k]; ok && !r.Limit.IsEmpty() {
+			ar.Limit.QuotaRenews = r.Limit.QuotaRenews
+		}
+
+		rights[k] = ar
+	}
+
+	// Master policy case
+	if len(policy.AccessRights) == 0 {
+		if !usePartitions || policy.Partitions.RateLimit {
+			session.Rate = policy.Rate
+			session.Per = policy.Per
+			session.Smoothing = policy.Smoothing
+			session.ThrottleInterval = policy.ThrottleInterval
+			session.ThrottleRetryLimit = policy.ThrottleRetryLimit
+		}
+
+		if !usePartitions || policy.Partitions.Complexity {
+			session.MaxQueryDepth = policy.MaxQueryDepth
+		}
+
+		if !usePartitions || policy.Partitions.Quota {
+			session.QuotaMax = policy.QuotaMax
+			session.QuotaRenewalRate = policy.QuotaRenewalRate
+		}
+	}
+
+	if !session.HMACEnabled {
+		session.HMACEnabled = policy.HMACEnabled
+	}
+
+	if !session.EnableHTTPSignatureValidation {
+		session.EnableHTTPSignatureValidation = policy.EnableHTTPSignatureValidation
+	}
+}
+
+func (t *Service) updateSessionRootVars(session *user.SessionState, rights map[string]user.AccessDefinition, applyState applyStatus) {
+	if len(applyState.didQuota) == 1 && len(applyState.didRateLimit) == 1 && len(applyState.didComplexity) == 1 {
+		for _, v := range rights {
+			if len(applyState.didRateLimit) == 1 {
+				session.Rate = v.Limit.Rate
+				session.Per = v.Limit.Per
+				session.Smoothing = v.Limit.Smoothing
+			}
+
+			if len(applyState.didQuota) == 1 {
+				session.QuotaMax = v.Limit.QuotaMax
+				session.QuotaRenews = v.Limit.QuotaRenews
+				session.QuotaRenewalRate = v.Limit.QuotaRenewalRate
+			}
+
+			if len(applyState.didComplexity) == 1 {
+				session.MaxQueryDepth = v.Limit.MaxQueryDepth
+			}
+		}
+	}
 }
