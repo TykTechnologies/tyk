@@ -518,7 +518,7 @@ type CoProcessConfig struct {
 
 type CertificatesConfig struct {
 	API []string `json:"apis"`
-	// Specify upstream mutual TLS certificates at a global level as a map of domain -> certificate id or path
+	// Upstream is used to specify the certificates to be used in mutual TLS connections to upstream services. These are set at gateway level as a map of domain -> certificate id or path.
 	// In tyk.conf, this would be `"security": {"certificates": {"upstream": {"*": "/certs/default.pem", "example.com": "ab23ef123"}}},`; as an environment variable it would be
 	// `*:/certs/default.pem,example.com:ab23ef123`.
 	Upstream map[string]string `json:"upstream"`
