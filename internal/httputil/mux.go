@@ -78,17 +78,17 @@ func StripListenPath(listenPath, urlPath string) (res string) {
 	return reg.ReplaceAllString(res, "")
 }
 
-// MatchEndpoint matches configured endpoint/regexp with request endpoint.
-func MatchEndpoint(configEndpoint string, reqEndpoint string) (bool, error) {
-	if configEndpoint == reqEndpoint {
+// MatchEndpoint matches pattern with request endpoint.
+func MatchEndpoint(pattern string, endpoint string) (bool, error) {
+	if pattern == endpoint {
 		return true, nil
 	}
 
-	if configEndpoint == "" {
+	if pattern == "" {
 		return false, nil
 	}
 
-	clean, err := GetPathRegexp(configEndpoint)
+	clean, err := GetPathRegexp(pattern)
 	if err != nil {
 		return false, err
 	}
@@ -98,5 +98,5 @@ func MatchEndpoint(configEndpoint string, reqEndpoint string) (bool, error) {
 		return false, err
 	}
 
-	return asRegex.MatchString(reqEndpoint), nil
+	return asRegex.MatchString(endpoint), nil
 }
