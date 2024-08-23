@@ -62,3 +62,87 @@ func TestStripListenPath(t *testing.T) {
 	assert.Equal(t, "/get", httputil.StripListenPath("/{myPattern:foo|bar}", "/foo/get"))
 	assert.Equal(t, "/anything/get", httputil.StripListenPath("/{myPattern:foo|bar}", "/anything/get"))
 }
+
+func TestMatchEndpoint(t *testing.T) {
+	tests := []struct {
+		name           string
+		configEndpoint string
+		reqEndpoint    string
+		match          bool
+		isErr          bool
+	}{
+		{
+			name:           "exact endpoints",
+			configEndpoint: "/api/v1/users",
+			reqEndpoint:    "/api/v1/users",
+			match:          true,
+			isErr:          false,
+		},
+		{
+			name:           "non matching concrete endpoints",
+			configEndpoint: "/api/v1/users",
+			reqEndpoint:    "/api/v1/admin",
+			match:          false,
+			isErr:          false,
+		},
+		{
+			name:           "regexp match",
+			configEndpoint: "/api/v1/user/\\d+",
+			reqEndpoint:    "/api/v1/user/123",
+			match:          true,
+			isErr:          false,
+		},
+		{
+			name:           "invalid config regexp",
+			configEndpoint: "/api/v1/[user",
+			reqEndpoint:    "/api/v1/user",
+			match:          false,
+			isErr:          true,
+		},
+		{
+			name:           "wildcard endpoint",
+			configEndpoint: "/api/v1/*",
+			reqEndpoint:    "/api/v1/users",
+			match:          true,
+			isErr:          false,
+		},
+		{
+			name:           "empty config endpoint",
+			configEndpoint: "",
+			reqEndpoint:    "/api/v1/user",
+			match:          false,
+			isErr:          false,
+		},
+		{
+			name:           "empty request endpoint",
+			configEndpoint: "/api/v1/user",
+			reqEndpoint:    "",
+			match:          false,
+			isErr:          false,
+		},
+		{
+			name:           "both empty endpoints",
+			configEndpoint: "",
+			reqEndpoint:    "",
+			match:          true,
+			isErr:          false,
+		},
+		{
+			name:           "/ endpoint",
+			configEndpoint: "/",
+			reqEndpoint:    "/",
+			match:          true,
+			isErr:          false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := httputil.MatchEndpoint(tt.configEndpoint, tt.reqEndpoint)
+			assert.Equal(t, tt.match, result)
+			if tt.isErr {
+				assert.Error(t, err)
+			}
+		})
+	}
+}

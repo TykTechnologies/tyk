@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/TykTechnologies/tyk/internal/httputil"
-	"github.com/TykTechnologies/tyk/regexp"
+
 	"github.com/TykTechnologies/tyk/storage"
 
 	"github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
@@ -498,7 +498,13 @@ func (es Endpoints) RateLimitInfo(method string, reqEndpoint string) (*EndpointR
 	}
 
 	for _, endpoint := range es {
-		if !endpoint.match(reqEndpoint) {
+		url := endpoint.Path
+		match, err := httputil.MatchEndpoint(url, reqEndpoint)
+		if err != nil {
+			log.WithError(err).Errorf("error matching path regex: %q, skipping", url)
+		}
+
+		if !match {
 			continue
 		}
 
@@ -516,21 +522,4 @@ func (es Endpoints) RateLimitInfo(method string, reqEndpoint string) (*EndpointR
 	}
 
 	return nil, false
-}
-
-func (e Endpoint) match(reqEndpoint string) bool {
-	url := e.Path
-	clean, err := httputil.GetPathRegexp(url)
-	if err != nil {
-		log.WithError(err).Errorf("error getting path regex: %q, skipping", url)
-		return false
-	}
-
-	asRegex, err := regexp.Compile(clean)
-	if err != nil {
-		log.WithError(err).Errorf("error compiling path regex: %q, skipping", url)
-		return false
-	}
-
-	return asRegex.MatchString(reqEndpoint)
 }
