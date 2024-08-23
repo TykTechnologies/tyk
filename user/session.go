@@ -198,6 +198,11 @@ type Endpoint struct {
 	Methods EndpointMethods `json:"methods,omitempty" msg:"methods"`
 }
 
+// match matches supplied endpoint with endpoint path.
+func (e Endpoint) match(endpoint string) (bool, error) {
+	return httputil.MatchEndpoint(e.Path, endpoint)
+}
+
 // EndpointMethods is a collection of EndpointMethod.
 type EndpointMethods []EndpointMethod
 
@@ -498,10 +503,9 @@ func (es Endpoints) RateLimitInfo(method string, reqEndpoint string) (*EndpointR
 	}
 
 	for _, endpoint := range es {
-		url := endpoint.Path
-		match, err := httputil.MatchEndpoint(url, reqEndpoint)
+		match, err := endpoint.match(reqEndpoint)
 		if err != nil {
-			log.WithError(err).Errorf("error matching path regex: %q, skipping", url)
+			log.WithError(err).Errorf("error matching path regex: %q, skipping", endpoint.Path)
 		}
 
 		if !match {
