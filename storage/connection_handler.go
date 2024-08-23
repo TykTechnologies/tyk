@@ -279,7 +279,20 @@ func NewConnector(connType string, conf config.Config) (model.Connector, error) 
 		opts = append(opts, model.WithTLS(&tls))
 	}
 
-	return connector.NewConnector(model.RedisV9Type, opts...)
+	switch cfg.Type {
+	case model.LocalType:
+		return connector.NewConnector(model.LocalType, opts...)
+	case model.CRDTType:
+		cfg := model.NewCRDTConfig(
+			model.WithListenAddr("/ip4/0.0.0.0/tcp/7653"),
+			model.WithBootstrapAddr("/ip4/0.0.0.0/tcp/7654/p2p/Qmdk1BsF73TusG2XdhhjAWsyFS1hrPb7C7PC6n1jhECnZZ"),
+			model.WithDBName("gateway-conf-db"),
+			model.WithKeyFromFile("./private.key"),
+		)
+		return connector.NewCRDTConnector(cfg)
+	default:
+		return connector.NewConnector(model.RedisV9Type, opts...)
+	}
 }
 
 // getExponentialBackoff returns a backoff.ExponentialBackOff with the following settings:
