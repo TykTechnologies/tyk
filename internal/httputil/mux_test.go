@@ -93,6 +93,13 @@ func TestMatchEndpoint(t *testing.T) {
 			isErr:    false,
 		},
 		{
+			name:     "regexp non match",
+			pattern:  "/api/v1/user/\\d+",
+			endpoint: "/api/v1/user/abc",
+			match:    false,
+			isErr:    false,
+		},
+		{
 			name:     "mux var match",
 			pattern:  "/api/v1/user/{id}",
 			endpoint: "/api/v1/user/123",
