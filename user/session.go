@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/TykTechnologies/tyk/internal/httputil"
 	"github.com/TykTechnologies/tyk/regexp"
 	"github.com/TykTechnologies/tyk/storage"
 
@@ -491,18 +492,26 @@ type EndpointRateLimitInfo struct {
 }
 
 // RateLimitInfo returns EndpointRateLimitInfo for endpoint rate limiting.
-func (es Endpoints) RateLimitInfo(method string, path string) (*EndpointRateLimitInfo, bool) {
+func (es Endpoints) RateLimitInfo(method string, reqEndpoint string) (*EndpointRateLimitInfo, bool) {
 	if len(es) == 0 {
 		return nil, false
 	}
 
 	for _, endpoint := range es {
-		asRegex, err := regexp.Compile(endpoint.Path)
+		url := endpoint.Path
+		clean, err := httputil.GetPathRegexp(url)
 		if err != nil {
+			log.WithError(err).Errorf("error getting path regex: %q, skipping", url)
 			continue
 		}
 
-		match := asRegex.MatchString(path)
+		asRegex, err := regexp.Compile(clean)
+		if err != nil {
+			log.WithError(err).Errorf("error compiling path regex: %q, skipping", url)
+			continue
+		}
+
+		match := asRegex.MatchString(reqEndpoint)
 		if !match {
 			continue
 		}
