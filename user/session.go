@@ -498,21 +498,7 @@ func (es Endpoints) RateLimitInfo(method string, reqEndpoint string) (*EndpointR
 	}
 
 	for _, endpoint := range es {
-		url := endpoint.Path
-		clean, err := httputil.GetPathRegexp(url)
-		if err != nil {
-			log.WithError(err).Errorf("error getting path regex: %q, skipping", url)
-			continue
-		}
-
-		asRegex, err := regexp.Compile(clean)
-		if err != nil {
-			log.WithError(err).Errorf("error compiling path regex: %q, skipping", url)
-			continue
-		}
-
-		match := asRegex.MatchString(reqEndpoint)
-		if !match {
+		if !endpoint.match(reqEndpoint) {
 			continue
 		}
 
@@ -530,4 +516,21 @@ func (es Endpoints) RateLimitInfo(method string, reqEndpoint string) (*EndpointR
 	}
 
 	return nil, false
+}
+
+func (e Endpoint) match(reqEndpoint string) bool {
+	url := e.Path
+	clean, err := httputil.GetPathRegexp(url)
+	if err != nil {
+		log.WithError(err).Errorf("error getting path regex: %q, skipping", url)
+		return false
+	}
+
+	asRegex, err := regexp.Compile(clean)
+	if err != nil {
+		log.WithError(err).Errorf("error compiling path regex: %q, skipping", url)
+		return false
+	}
+
+	return asRegex.MatchString(reqEndpoint)
 }
