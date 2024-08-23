@@ -154,9 +154,7 @@ func TestMatchEndpoint(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			result, err := httputil.MatchEndpoint(tt.pattern, tt.endpoint)
 			assert.Equal(t, tt.match, result)
-			if tt.isErr {
-				assert.Error(t, err)
-			}
+			assert.Equal(t, tt.isErr, err != nil)
 		})
 	}
 }
