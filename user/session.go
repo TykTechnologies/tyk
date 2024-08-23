@@ -3,6 +3,7 @@ package user
 import (
 	"crypto/md5"
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 
@@ -191,6 +192,21 @@ type Monitor struct {
 // Endpoints is a collection of Endpoint.
 type Endpoints []Endpoint
 
+// Len is used to implement sort interface.
+func (es Endpoints) Len() int {
+	return len(es)
+}
+
+// Less is used to implement sort interface.
+func (es Endpoints) Less(i, j int) bool {
+	return es[i].Path < es[j].Path
+}
+
+// Swap is used to implement sort interface.
+func (es Endpoints) Swap(i, j int) {
+	es[i], es[j] = es[j], es[i]
+}
+
 // Endpoint holds the configuration for endpoint rate limiting.
 type Endpoint struct {
 	Path    string          `json:"path,omitempty" msg:"path"`
@@ -199,6 +215,21 @@ type Endpoint struct {
 
 // EndpointMethods is a collection of EndpointMethod.
 type EndpointMethods []EndpointMethod
+
+// Len is used to implement sort interface.
+func (em EndpointMethods) Len() int {
+	return len(em)
+}
+
+// Less is used to implement sort interface.
+func (em EndpointMethods) Less(i, j int) bool {
+	return strings.ToUpper(em[i].Name) < strings.ToUpper(em[j].Name)
+}
+
+// Swap is used to implement sort interface.
+func (em EndpointMethods) Swap(i, j int) {
+	em[i], em[j] = em[j], em[i]
+}
 
 // EndpointMethod holds the configuration on endpoint method level.
 type EndpointMethod struct {
@@ -574,11 +605,14 @@ func (em EndpointsMap) Endpoints() Endpoints {
 
 	var endpoints Endpoints
 	for path, methods := range perPathMethods {
+		sort.Sort(methods)
 		endpoints = append(endpoints, Endpoint{
 			Path:    path,
 			Methods: methods,
 		})
 	}
+
+	sort.Sort(endpoints)
 
 	return endpoints
 }

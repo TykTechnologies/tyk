@@ -668,17 +668,17 @@ func TestEndpointsMap_Endpoints(t *testing.T) {
 			},
 			expected: Endpoints{
 				{
-					Path: "/api/v1/users",
-					Methods: EndpointMethods{
-						{Name: "GET", Limit: RateLimit{Rate: 15, Per: 60}},
-						{Name: "POST", Limit: RateLimit{Rate: 5, Per: 60}},
-					},
-				},
-				{
 					Path: "/api/v1/posts",
 					Methods: EndpointMethods{
 						{Name: "GET", Limit: RateLimit{Rate: 30, Per: 60}},
 						{Name: "PUT", Limit: RateLimit{Rate: 10, Per: 60}},
+					},
+				},
+				{
+					Path: "/api/v1/users",
+					Methods: EndpointMethods{
+						{Name: "GET", Limit: RateLimit{Rate: 15, Per: 60}},
+						{Name: "POST", Limit: RateLimit{Rate: 5, Per: 60}},
 					},
 				},
 			},
@@ -694,16 +694,16 @@ func TestEndpointsMap_Endpoints(t *testing.T) {
 			},
 			expected: Endpoints{
 				{
-					Path: "/api/v1/users",
-					Methods: EndpointMethods{
-						{Name: "GET", Limit: RateLimit{Rate: 15, Per: 60}},
-					},
-				},
-				{
 					Path: "/api/v1/posts",
 					Methods: EndpointMethods{
 						{Name: "GET", Limit: RateLimit{Rate: 30, Per: 60}},
 						{Name: "PUT", Limit: RateLimit{Rate: 10, Per: 60}},
+					},
+				},
+				{
+					Path: "/api/v1/users",
+					Methods: EndpointMethods{
+						{Name: "GET", Limit: RateLimit{Rate: 15, Per: 60}},
 					},
 				},
 			},
@@ -713,7 +713,7 @@ func TestEndpointsMap_Endpoints(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result := tt.input.Endpoints()
-			assert.ElementsMatch(t, tt.expected, result)
+			assert.Equal(t, tt.expected, result)
 		})
 	}
 }
