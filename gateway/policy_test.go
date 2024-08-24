@@ -728,6 +728,166 @@ func (s *Test) testPrepareApplyPolicies(tb testing.TB) (*BaseMiddleware, []testA
 	}
 	tests = append(tests, partitionTCs...)
 
+	endpointRLTCs := []testApplyPoliciesData{
+		{
+			name:     "Per API and per endpoint policies",
+			policies: []string{"per_api_with_limit_set_from_policy", "per_api_with_endpoint_limits_on_d_and_e"},
+			sessMatch: func(t *testing.T, s *user.SessionState) {
+				t.Helper()
+				endpointsConfig := user.Endpoints{
+					{
+						Path: "/get",
+						Methods: user.EndpointMethods{
+							{
+								Name: "GET",
+								Limit: user.RateLimit{
+									Rate: -1,
+								},
+							},
+						},
+					},
+					{
+						Path: "/post",
+						Methods: user.EndpointMethods{
+							{
+								Name: "POST",
+								Limit: user.RateLimit{
+									Rate: 300,
+									Per:  10,
+								},
+							},
+						},
+					},
+				}
+				want := map[string]user.AccessDefinition{
+					"e": {
+						Limit: user.APILimit{
+							QuotaMax: -1,
+							RateLimit: user.RateLimit{
+								Rate: 300,
+								Per:  1,
+							},
+						},
+						AllowanceScope: "per_api_with_endpoint_limits_on_e",
+						Endpoints:      endpointsConfig,
+					},
+					"d": {
+						Limit: user.APILimit{
+							QuotaMax:         5000,
+							QuotaRenewalRate: 3600,
+							RateLimit: user.RateLimit{
+								Rate: 100,
+								Per:  10,
+							},
+						},
+						AllowanceScope: "d",
+						Endpoints:      endpointsConfig,
+					},
+				}
+				assert.Equal(t, want, s.AccessRights)
+			},
+		},
+		{
+			name: "Endpoint level limits overlapping",
+			policies: []string{
+				"per_api_with_limit_set_from_policy",
+				"per_api_with_endpoint_limits_on_d_and_e",
+				"per_endpoint_limits_different_on_api_d",
+			},
+			sessMatch: func(t *testing.T, s *user.SessionState) {
+				t.Helper()
+				apiEEndpoints := user.Endpoints{
+					{
+						Path: "/get",
+						Methods: user.EndpointMethods{
+							{
+								Name: "GET",
+								Limit: user.RateLimit{
+									Rate: -1,
+								},
+							},
+						},
+					},
+					{
+						Path: "/post",
+						Methods: user.EndpointMethods{
+							{
+								Name: "POST",
+								Limit: user.RateLimit{
+									Rate: 300,
+									Per:  10,
+								},
+							},
+						},
+					},
+				}
+
+				assert.ElementsMatch(t, apiEEndpoints, s.AccessRights["e"].Endpoints)
+
+				apiDEndpoints := user.Endpoints{
+					{
+						Path: "/get",
+						Methods: user.EndpointMethods{
+							{
+								Name: "GET",
+								Limit: user.RateLimit{
+									Rate: -1,
+								},
+							},
+						},
+					},
+					{
+						Path: "/post",
+						Methods: user.EndpointMethods{
+							{
+								Name: "POST",
+								Limit: user.RateLimit{
+									Rate: 300,
+									Per:  10,
+								},
+							},
+						},
+					},
+					{
+						Path: "/anything",
+						Methods: user.EndpointMethods{
+							{
+								Name: "PUT",
+								Limit: user.RateLimit{
+									Rate: 500,
+									Per:  10,
+								},
+							},
+						},
+					},
+				}
+
+				assert.ElementsMatch(t, apiDEndpoints, s.AccessRights["d"].Endpoints)
+
+				apiELimits := user.APILimit{
+					QuotaMax: -1,
+					RateLimit: user.RateLimit{
+						Rate: 300,
+						Per:  1,
+					},
+				}
+				assert.Equal(t, apiELimits, s.AccessRights["e"].Limit)
+
+				apiDLimits := user.APILimit{
+					QuotaMax:         5000,
+					QuotaRenewalRate: 3600,
+					RateLimit: user.RateLimit{
+						Rate: 100,
+						Per:  10,
+					},
+				}
+				assert.Equal(t, apiDLimits, s.AccessRights["d"].Limit)
+			},
+		},
+	}
+
+	tests = append(tests, endpointRLTCs...)
+
 	return bmid, tests
 }
 

@@ -603,5 +603,128 @@
     "partitions": {
       "complexity": true
     }
+  },
+  "per_api_with_endpoint_limits_on_d_and_e": {
+    "id": "per_api_with_endpoint_limits_on_e",
+    "rate": 500,
+    "per": 1,
+    "quota_max": -1,
+    "access_rights": {
+      "d": {
+        "limit": {
+          "rate": 100,
+          "per": 10
+        },
+        "endpoints": [
+          {
+            "path": "/get",
+            "methods": [
+              {
+                "name": "GET",
+                "limit": {
+                  "rate": -1
+                }
+              }
+            ]
+          },
+          {
+            "path": "/post",
+            "methods": [
+              {
+                "name": "POST",
+                "limit": {
+                  "rate": 300,
+                  "per": 10
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "e": {
+        "endpoints": [
+          {
+            "path": "/get",
+            "methods": [
+              {
+                "name": "GET",
+                "limit": {
+                  "rate": -1
+                }
+              }
+            ]
+          },
+          {
+            "path": "/post",
+            "methods": [
+              {
+                "name": "POST",
+                "limit": {
+                  "rate": 300,
+                  "per": 10
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "partitions": {
+      "per_api": true
+    }
+  },
+  "per_endpoint_limits_different_on_api_d": {
+    "id": "per_api_with_endpoint_limits_on_e",
+    "rate": 500,
+    "per": 1,
+    "quota_max": -1,
+    "access_rights": {
+      "d": {
+        "limit": {
+          "rate": 100,
+          "per": 10
+        },
+        "endpoints": [
+          {
+            "path": "/get",
+            "methods": [
+              {
+                "name": "GET",
+                "limit": {
+                  "rate": -1
+                }
+              }
+            ]
+          },
+          {
+            "path": "/post",
+            "methods": [
+              {
+                "name": "POST",
+                "limit": {
+                  "rate": 400,
+                  "per": 11
+                }
+              }
+            ]
+          },
+          {
+            "path": "/anything",
+            "methods": [
+              {
+                "name": "PUT",
+                "limit": {
+                  "rate": 500,
+                  "per": 10
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "partitions": {
+      "per_api": true
+    }
   }
 }
