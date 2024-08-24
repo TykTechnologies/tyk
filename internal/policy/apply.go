@@ -551,5 +551,25 @@ func (t *Service) applyAPILevelLimits(policyAD user.AccessDefinition, currAD use
 		policyAD.Limit.QuotaRenewalRate = 0
 	}
 
+	policyAD.Endpoints = t.applyEndpointLevelLimits(policyAD.Endpoints, currAD.Endpoints)
+
 	return policyAD
+}
+
+func (t *Service) applyEndpointLevelLimits(policyEndpoints user.Endpoints, currEndpoints user.Endpoints) user.Endpoints {
+	currEPMap := currEndpoints.Map()
+	if currEPMap == nil {
+		return policyEndpoints
+	}
+
+	policyEPMap := policyEndpoints.Map()
+	for currEP, currRL := range currEPMap {
+		if policyRL, ok := policyEPMap[currEP]; ok {
+			if currRL.Duration() > policyRL.Duration() {
+				policyEPMap[currEP] = currRL
+			}
+		}
+	}
+
+	return policyEPMap.Endpoints()
 }
