@@ -417,7 +417,7 @@ func (l *SessionLimiter) RedisQuotaExceeded(r *http.Request, session *user.Sessi
 		log.WithFields(logFields).Debug("[QUOTA] Reached set limits")
 
 		if quotaExpired {
-			expireAt = rate.NextWindow(now, limit.QuotaRenewalRate)
+			expireAt = now.Add(quotaRenewalRate)
 
 			update := map[string]any{
 				timeKey: expireAt.Format(time.RFC3339Nano),
@@ -434,15 +434,15 @@ func (l *SessionLimiter) RedisQuotaExceeded(r *http.Request, session *user.Sessi
 				log.WithError(err).Error("can't reset quota, blocking")
 				return block
 			}
-			l.updateSessionQuota(session, scope, quotaMax-count, expireAt)
+			l.updateSessionQuota(session, scope, quotaMax-count, expireAt.Unix())
 			return pass
 		}
 
-		l.updateSessionQuota(session, scope, quotaMax-count, expireAt)
+		l.updateSessionQuota(session, scope, quotaMax-count, expireAt.Unix())
 		return block
 	}
 
-	l.updateSessionQuota(session, scope, quotaMax-count, expireAt)
+	l.updateSessionQuota(session, scope, quotaMax-count, expireAt.Unix())
 	return pass
 }
 
@@ -450,10 +450,11 @@ func (l *SessionLimiter) RedisQuotaExceeded(r *http.Request, session *user.Sessi
 //
 // When limits are defined, QuotaRemaining and QuotaRenews is updated for a matching
 // access rights definition for an api, and the session root.
-func (*SessionLimiter) updateSessionQuota(session *user.SessionState, scope string, remaining int64, quotaRenews time.Time) {
+func (*SessionLimiter) updateSessionQuota(session *user.SessionState, scope string, remaining int64, quotaRenews int64) {
 	if remaining < 0 {
 		remaining = 0
 	}
+
 	for k, v := range session.AccessRights {
 		if v.Limit.IsEmpty() {
 			continue
@@ -461,14 +462,14 @@ func (*SessionLimiter) updateSessionQuota(session *user.SessionState, scope stri
 
 		if v.AllowanceScope == scope {
 			v.Limit.QuotaRemaining = remaining
-			v.Limit.QuotaRenews = quotaRenews.Unix()
+			v.Limit.QuotaRenews = quotaRenews
 		}
 		session.AccessRights[k] = v
 	}
 
 	if scope == "" {
 		session.QuotaRemaining = remaining
-		session.QuotaRenews = quotaRenews.Unix()
+		session.QuotaRenews = quotaRenews
 	}
 
 	session.Touch()
