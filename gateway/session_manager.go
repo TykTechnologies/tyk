@@ -378,11 +378,13 @@ func (l *SessionLimiter) RedisQuotaExceeded(r *http.Request, session *user.Sessi
 	}()
 
 	var expireAt time.Time
+	var expired bool
 	if expire, err := conn.Get(ctx, rawKeyTime).Result(); err == nil || errors.Is(err, redis.Nil) {
 		// the error is swallowed as the zero value is usable
 		expireAt, err = time.Parse(time.RFC3339Nano, expire)
 		if err != nil {
 			expireAt = now.Add(quotaRenewalRate)
+			expired = true
 			conn.Set(ctx, rawKeyTime, expireAt, quotaRenewalRate)
 		}
 	}
@@ -396,18 +398,16 @@ func (l *SessionLimiter) RedisQuotaExceeded(r *http.Request, session *user.Sessi
 	log.Debugf("[QUOTA] Quota limiter key is: %s, TTL %v, %d/%d", rawKey, limit.QuotaRenewalRate, qInt-1, quotaMax)
 
 	if qInt-1 >= quotaMax {
-		quotaExpired := now.After(expireAt)
-
 		logFields := logrus.Fields{
-			"quotaExpired": quotaExpired,
-			"quotaMax":     quotaMax,
-			"count":        qInt - 1,
-			"expireAt":     expireAt,
-			"now":          now,
+			"quota":    qInt - 1,
+			"quotaMax": quotaMax,
+			"expire":   expired,
+			"expireAt": expireAt,
+			"now":      now,
 		}
 		log.WithFields(logFields).Debug("[QUOTA] Reached set limits")
 
-		if quotaExpired {
+		if expired {
 			if quotaRenewalRate <= 0 {
 				return true
 			}
