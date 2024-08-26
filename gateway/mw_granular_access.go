@@ -5,7 +5,6 @@ import (
 	"net/http"
 
 	"github.com/TykTechnologies/tyk/internal/httputil"
-	"github.com/TykTechnologies/tyk/regexp"
 )
 
 // GranularAccessMiddleware will check if a URL is specifically enabled for the key
@@ -39,29 +38,23 @@ func (m *GranularAccessMiddleware) ProcessRequest(w http.ResponseWriter, r *http
 
 	for _, accessSpec := range sessionVersionData.AllowedURLs {
 		url := accessSpec.URL
-		clean, err := httputil.GetPathRegexp(url)
+		match, err := httputil.MatchEndpoint(url, urlPath)
 		if err != nil {
-			logger.WithError(err).Errorf("error getting path regex: %q, skipping", url)
+			logger.WithError(err).Errorf("error matching path regex: %q, skipping", url)
 			continue
 		}
 
-		asRegex, err := regexp.Compile(clean)
-		if err != nil {
-			logger.WithError(err).Errorf("error compiling path regex: %q, skipping", url)
+		if !match {
 			continue
 		}
-
-		match := asRegex.MatchString(urlPath)
 
 		logger.WithField("pattern", url).WithField("match", match).Debug("checking allowed url")
 
-		if match {
-			// if a path is matched, but isn't matched on method,
-			// then we continue onto the next path for evaluation.
-			for _, method := range accessSpec.Methods {
-				if method == r.Method {
-					return nil, http.StatusOK
-				}
+		// if a path is matched, but isn't matched on method,
+		// then we continue onto the next path for evaluation.
+		for _, method := range accessSpec.Methods {
+			if method == r.Method {
+				return nil, http.StatusOK
 			}
 		}
 	}

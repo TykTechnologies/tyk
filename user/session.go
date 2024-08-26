@@ -7,7 +7,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/TykTechnologies/tyk/regexp"
+	"github.com/TykTechnologies/tyk/internal/httputil"
+
 	"github.com/TykTechnologies/tyk/storage"
 
 	"github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
@@ -211,6 +212,11 @@ func (es Endpoints) Swap(i, j int) {
 type Endpoint struct {
 	Path    string          `json:"path,omitempty" msg:"path"`
 	Methods EndpointMethods `json:"methods,omitempty" msg:"methods"`
+}
+
+// match matches supplied endpoint with endpoint path.
+func (e Endpoint) match(endpoint string) (bool, error) {
+	return httputil.MatchEndpoint(e.Path, endpoint)
 }
 
 // EndpointMethods is a collection of EndpointMethod.
@@ -522,18 +528,17 @@ type EndpointRateLimitInfo struct {
 }
 
 // RateLimitInfo returns EndpointRateLimitInfo for endpoint rate limiting.
-func (es Endpoints) RateLimitInfo(method string, path string) (*EndpointRateLimitInfo, bool) {
+func (es Endpoints) RateLimitInfo(method string, reqEndpoint string) (*EndpointRateLimitInfo, bool) {
 	if len(es) == 0 {
 		return nil, false
 	}
 
 	for _, endpoint := range es {
-		asRegex, err := regexp.Compile(endpoint.Path)
+		match, err := endpoint.match(reqEndpoint)
 		if err != nil {
-			continue
+			log.WithError(err).Errorf("error matching path regex: %q, skipping", endpoint.Path)
 		}
 
-		match := asRegex.MatchString(path)
 		if !match {
 			continue
 		}
