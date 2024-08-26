@@ -3,6 +3,7 @@ package user
 import (
 	"crypto/md5"
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 
@@ -192,6 +193,21 @@ type Monitor struct {
 // Endpoints is a collection of Endpoint.
 type Endpoints []Endpoint
 
+// Len is used to implement sort interface.
+func (es Endpoints) Len() int {
+	return len(es)
+}
+
+// Less is used to implement sort interface.
+func (es Endpoints) Less(i, j int) bool {
+	return es[i].Path < es[j].Path
+}
+
+// Swap is used to implement sort interface.
+func (es Endpoints) Swap(i, j int) {
+	es[i], es[j] = es[j], es[i]
+}
+
 // Endpoint holds the configuration for endpoint rate limiting.
 type Endpoint struct {
 	Path    string          `json:"path,omitempty" msg:"path"`
@@ -205,6 +221,21 @@ func (e Endpoint) match(endpoint string) (bool, error) {
 
 // EndpointMethods is a collection of EndpointMethod.
 type EndpointMethods []EndpointMethod
+
+// Len is used to implement sort interface.
+func (em EndpointMethods) Len() int {
+	return len(em)
+}
+
+// Less is used to implement sort interface.
+func (em EndpointMethods) Less(i, j int) bool {
+	return strings.ToUpper(em[i].Name) < strings.ToUpper(em[j].Name)
+}
+
+// Swap is used to implement sort interface.
+func (em EndpointMethods) Swap(i, j int) {
+	em[i], em[j] = em[j], em[i]
+}
 
 // EndpointMethod holds the configuration on endpoint method level.
 type EndpointMethod struct {
@@ -526,4 +557,67 @@ func (es Endpoints) RateLimitInfo(method string, reqEndpoint string) (*EndpointR
 	}
 
 	return nil, false
+}
+
+// Map returns EndpointsMap of Endpoints using the key format [method:path].
+// If duplicate entries are found, it would get overwritten with latest entries Endpoints.
+func (es Endpoints) Map() EndpointsMap {
+	if len(es) == 0 {
+		return nil
+	}
+
+	out := make(EndpointsMap)
+	for _, e := range es {
+		for _, method := range e.Methods {
+			key := fmt.Sprintf("%s:%s", method.Name, e.Path)
+			out[key] = method.Limit
+		}
+	}
+
+	return out
+}
+
+// EndpointsMap is the type to hold endpoint rate limit information as a map.
+type EndpointsMap map[string]RateLimit
+
+// Endpoints coverts EndpointsMap to Endpoints.
+func (em EndpointsMap) Endpoints() Endpoints {
+	if len(em) == 0 {
+		return nil
+	}
+
+	var perPathMethods = make(map[string]EndpointMethods)
+	for key, rateLimit := range em {
+		keyParts := strings.Split(key, ":")
+		if len(keyParts) != 2 {
+			continue
+		}
+
+		method, path := keyParts[0], keyParts[1]
+		epMethod := EndpointMethod{
+			Name:  method,
+			Limit: rateLimit,
+		}
+		if methods, ok := perPathMethods[path]; ok {
+			perPathMethods[path] = append(methods, epMethod)
+			continue
+		}
+
+		perPathMethods[path] = EndpointMethods{
+			epMethod,
+		}
+	}
+
+	var endpoints Endpoints
+	for path, methods := range perPathMethods {
+		sort.Sort(methods)
+		endpoints = append(endpoints, Endpoint{
+			Path:    path,
+			Methods: methods,
+		})
+	}
+
+	sort.Sort(endpoints)
+
+	return endpoints
 }
