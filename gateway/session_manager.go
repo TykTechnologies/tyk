@@ -368,12 +368,12 @@ func (l *SessionLimiter) RedisQuotaExceeded(r *http.Request, session *user.Sessi
 	locker := limiter.NewLimiter(conn).Locker(rawKey)
 
 	if err := locker.Lock(ctx); err != nil {
-		log.WithError(err).Warn("error locking quota key, blocking")
+		log.WithError(err).Error("error locking quota key, blocking")
 		return true
 	}
 	defer func() {
-		if err := locker.Unlock(context.Background()); err != nil {
-			log.WithError(err).Warn("error unlocking quota key, blocking")
+		if err := locker.Unlock(ctx); err != nil {
+			log.WithError(err).Error("error unlocking quota key")
 		}
 	}()
 
@@ -418,8 +418,6 @@ func (l *SessionLimiter) RedisQuotaExceeded(r *http.Request, session *user.Sessi
 			return true
 		}
 	}
-
-	// log.Debugf("[QUOTA] Updating session, quota remaining: %d/%d", qInt, quotaMax)
 
 	l.updateSessionQuota(session, scope, quotaMax-qInt, expireAt.Unix())
 	return false
