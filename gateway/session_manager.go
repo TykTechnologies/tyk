@@ -333,7 +333,7 @@ func (l *SessionLimiter) ForwardMessage(r *http.Request, session *user.SessionSt
 
 // RedisQuotaExceeded returns true if the request should be blocked as over quota.
 func (l *SessionLimiter) RedisQuotaExceeded(r *http.Request, session *user.SessionState, quotaKey, scope string, limit *user.APILimit, store storage.Handler, hashKeys bool) bool {
-	if limit.QuotaMax == -1 || limit.QuotaMax == 0 {
+	if limit.QuotaMax <= 0 {
 		return false
 	}
 
@@ -357,9 +357,12 @@ func (l *SessionLimiter) RedisQuotaExceeded(r *http.Request, session *user.Sessi
 		key = quotaKey
 	}
 
+	now := time.Now()
 	rawKey := QuotaKeyPrefix + quotaScope + key
 	quotaRenewalRate := time.Second * time.Duration(limit.QuotaRenewalRate)
 	quotaMax := limit.QuotaMax
+
+	canRenew := quotaRenewalRate > 0
 
 	// First, ensure a distributed lock
 	conn := l.limiterStorage
@@ -375,28 +378,41 @@ func (l *SessionLimiter) RedisQuotaExceeded(r *http.Request, session *user.Sessi
 		}
 	}()
 
-	timeKey := rawKey + "-time"
+	rawKeyTime := rawKey + "-time"
 
 	var expireAt time.Time
-	if expire, err := conn.Get(ctx, timeKey).Result(); err == nil {
+	if expire, err := conn.Get(ctx, rawKeyTime).Result(); err == nil {
 		// the error is swallowed as the zero value is usable
 		expireAt, _ = time.Parse(time.RFC3339Nano, expire)
+	} else if errors.Is(err, redis.Nil) {
+		expireAt = now.Add(quotaRenewalRate)
+
+		update := map[string]any{
+			rawKeyTime: expireAt.Format(time.RFC3339Nano),
+			rawKey:     0,
+		}
+
+		pipe := conn.TxPipeline()
+		pipe.MSet(ctx, update)
+		pipe.PExpire(ctx, rawKey, quotaRenewalRate)
+		pipe.PExpire(ctx, rawKeyTime, quotaRenewalRate)
+
+		if _, err := pipe.Exec(ctx); err != nil {
+			log.WithError(err).Error("can't provision quota, blocking")
+			return true
+		}
 	}
-
-	// set up decision fields, time, current quota...
-	now := time.Now()
 	quotaExpired := now.After(expireAt)
-	canRenew := quotaRenewalRate > 0
 
-	count, err := conn.Incr(ctx, rawKey).Result()
+	qInt, err := conn.Incr(ctx, rawKey).Result()
 	if err != nil && !errors.Is(err, redis.Nil) {
 		log.WithError(err).Error("can't update quota, blocking")
 		return true
 	}
 
-	log.Debugf("[QUOTA] Quota limiter key is: %s, TTL %v, %d/%d", rawKey, limit.QuotaRenewalRate, count-1, quotaMax)
+	log.Debugf("[QUOTA] Quota limiter key is: %s, TTL %v, %d/%d", rawKey, limit.QuotaRenewalRate, qInt-1, quotaMax)
 
-	if count-1 >= quotaMax {
+	if qInt-1 >= quotaMax {
 		if quotaExpired && !canRenew {
 			return true
 		}
@@ -404,40 +420,23 @@ func (l *SessionLimiter) RedisQuotaExceeded(r *http.Request, session *user.Sessi
 		logFields := logrus.Fields{
 			"quotaExpired": quotaExpired,
 			"quotaMax":     quotaMax,
-			"count":        count - 1,
+			"count":        qInt - 1,
 			"canRenew":     canRenew,
 			"expireAt":     expireAt,
 			"now":          now,
 		}
 		log.WithFields(logFields).Debug("[QUOTA] Reached set limits")
 
-		if quotaExpired {
-			expireAt = now.Add(quotaRenewalRate)
-
-			update := map[string]any{
-				timeKey: expireAt.Format(time.RFC3339Nano),
-				rawKey:  1,
-			}
-			count = 1
-
-			pipe := conn.TxPipeline()
-			pipe.MSet(ctx, update)
-			pipe.PExpire(ctx, rawKey, quotaRenewalRate)
-			pipe.PExpire(ctx, timeKey, quotaRenewalRate)
-
-			if _, err := pipe.Exec(ctx); err != nil {
-				log.WithError(err).Error("can't reset quota, blocking")
-				return true
-			}
-			l.updateSessionQuota(session, scope, quotaMax-count, expireAt.Unix())
+		if quotaExpired && canRenew {
+			store.DeleteRawKeys([]string{rawKey, rawKeyTime})
 			return false
 		}
 
-		l.updateSessionQuota(session, scope, quotaMax-count, expireAt.Unix())
+		l.updateSessionQuota(session, scope, quotaMax-qInt, expireAt.Unix())
 		return true
 	}
 
-	l.updateSessionQuota(session, scope, quotaMax-count, expireAt.Unix())
+	l.updateSessionQuota(session, scope, quotaMax-qInt, expireAt.Unix())
 	return false
 }
 
