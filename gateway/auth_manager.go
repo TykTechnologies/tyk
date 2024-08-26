@@ -75,7 +75,7 @@ func (b *DefaultSessionManager) ResetQuota(keyName string, session *user.Session
 
 	// Clear the rate limiter and
 	// Fix the raw key
-	defaultKeys := []string{rateLimiterSentinelKey, rawKey, rawKey + "-time"}
+	defaultKeys := []string{rateLimiterSentinelKey, rawKey}
 	keys := rawKeysWithAllowanceScope(defaultKeys, keyName, session)
 	b.store.DeleteRawKeys(keys)
 }

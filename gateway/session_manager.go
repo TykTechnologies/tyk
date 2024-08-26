@@ -357,9 +357,8 @@ func (l *SessionLimiter) RedisQuotaExceeded(r *http.Request, session *user.Sessi
 		key = quotaKey
 	}
 
-	now := time.Now()
+	now := time.Now().Truncate(0)
 	rawKey := QuotaKeyPrefix + quotaScope + key
-	rawKeyTime := rawKey + "-time"
 	quotaRenewalRate := time.Second * time.Duration(limit.QuotaRenewalRate)
 	quotaMax := limit.QuotaMax
 
@@ -377,16 +376,20 @@ func (l *SessionLimiter) RedisQuotaExceeded(r *http.Request, session *user.Sessi
 		}
 	}()
 
-	var expireAt time.Time
 	var expired bool
-	if expire, err := conn.Get(ctx, rawKeyTime).Result(); err == nil || errors.Is(err, redis.Nil) {
-		// the error is swallowed as the zero value is usable
-		expireAt, err = time.Parse(time.RFC3339Nano, expire)
-		if err != nil {
-			expireAt = now.Add(quotaRenewalRate)
+	var expiredAt time.Time
+	dur, err := conn.PTTL(ctx, rawKey).Result()
+	if err == nil || errors.Is(err, redis.Nil) {
+		if err == nil {
+			expiredAt = now.Add(dur)
+		} else {
 			expired = true
-			conn.Set(ctx, rawKeyTime, expireAt, quotaRenewalRate)
+			expiredAt = now.Add(quotaRenewalRate)
+			conn.Set(ctx, rawKey, 0, quotaRenewalRate)
 		}
+	} else {
+		log.WithError(err).Warn("error getting key TTL, blocking")
+		return true
 	}
 
 	qInt, err := conn.Incr(ctx, rawKey).Result()
@@ -395,31 +398,31 @@ func (l *SessionLimiter) RedisQuotaExceeded(r *http.Request, session *user.Sessi
 		return true
 	}
 
-	log.Debugf("[QUOTA] Quota limiter key is: %s, TTL %v, %d/%d", rawKey, limit.QuotaRenewalRate, qInt-1, quotaMax)
+	logFields := logrus.Fields{
+		"quota":     qInt - 1,
+		"quotaMax":  quotaMax,
+		"expired":   expired,
+		"expiredAt": expiredAt,
+	}
+
+	log.WithFields(logFields).Debug("[QUOTA] Request")
 
 	if qInt-1 >= quotaMax {
-		logFields := logrus.Fields{
-			"quota":    qInt - 1,
-			"quotaMax": quotaMax,
-			"expire":   expired,
-			"expireAt": expireAt,
-			"now":      now,
-		}
-		log.WithFields(logFields).Debug("[QUOTA] Reached set limits")
+		log.WithFields(logFields).Debug("[QUOTA] Limits reached")
 
 		if expired {
 			if quotaRenewalRate <= 0 {
 				return true
 			}
 
-			go store.DeleteRawKeys([]string{rawKey, rawKeyTime})
+			go store.DeleteRawKey(rawKey)
 			qInt = 1
 		} else {
 			return true
 		}
 	}
 
-	l.updateSessionQuota(session, scope, quotaMax-qInt, expireAt.Unix())
+	l.updateSessionQuota(session, scope, quotaMax-qInt, expiredAt.Unix())
 	return false
 }
 
