@@ -333,14 +333,8 @@ func (l *SessionLimiter) ForwardMessage(r *http.Request, session *user.SessionSt
 
 // RedisQuotaExceeded returns true if the request should be blocked as over quota.
 func (l *SessionLimiter) RedisQuotaExceeded(r *http.Request, session *user.SessionState, quotaKey, scope string, limit *user.APILimit, store storage.Handler, hashKeys bool) bool {
-	var (
-		block = true
-		pass  = false
-		now   = time.Now()
-	)
-
 	if limit.QuotaMax == -1 || limit.QuotaMax == 0 {
-		return pass
+		return false
 	}
 
 	// don't use the requests cancellation context
@@ -373,7 +367,7 @@ func (l *SessionLimiter) RedisQuotaExceeded(r *http.Request, session *user.Sessi
 
 	if err := locker.Lock(ctx); err != nil {
 		log.WithError(err).Warn("error locking quota key, blocking")
-		return block
+		return true
 	}
 	defer func() {
 		if err := locker.Unlock(context.Background()); err != nil {
@@ -390,20 +384,21 @@ func (l *SessionLimiter) RedisQuotaExceeded(r *http.Request, session *user.Sessi
 	}
 
 	// set up decision fields, time, current quota...
+	now := time.Now()
 	quotaExpired := now.After(expireAt)
-	canRenew := limit.QuotaRenewalRate > 0
+	canRenew := quotaRenewalRate > 0
 
 	count, err := conn.Incr(ctx, rawKey).Result()
 	if err != nil && !errors.Is(err, redis.Nil) {
 		log.WithError(err).Error("can't update quota, blocking")
-		return block
+		return true
 	}
 
 	log.Debugf("[QUOTA] Quota limiter key is: %s, TTL %v, %d/%d", rawKey, limit.QuotaRenewalRate, count-1, quotaMax)
 
 	if count-1 >= quotaMax {
 		if quotaExpired && !canRenew {
-			return block
+			return true
 		}
 
 		logFields := logrus.Fields{
@@ -432,18 +427,40 @@ func (l *SessionLimiter) RedisQuotaExceeded(r *http.Request, session *user.Sessi
 
 			if _, err := pipe.Exec(ctx); err != nil {
 				log.WithError(err).Error("can't reset quota, blocking")
-				return block
+				return true
 			}
 			l.updateSessionQuota(session, scope, quotaMax-count, expireAt.Unix())
-			return pass
+			return false
 		}
 
 		l.updateSessionQuota(session, scope, quotaMax-count, expireAt.Unix())
-		return block
+		return true
 	}
 
 	l.updateSessionQuota(session, scope, quotaMax-count, expireAt.Unix())
-	return pass
+	return false
+}
+
+func GetAccessDefinitionByAPIIDOrSession(session *user.SessionState, api *APISpec) (accessDef *user.AccessDefinition, allowanceScope string, err error) {
+	accessDef = &user.AccessDefinition{}
+	if len(session.AccessRights) > 0 {
+		if rights, ok := session.AccessRights[api.APIID]; !ok {
+			return nil, "", errors.New("unexpected apiID")
+		} else {
+			accessDef.Limit = rights.Limit
+			accessDef.FieldAccessRights = rights.FieldAccessRights
+			accessDef.RestrictedTypes = rights.RestrictedTypes
+			accessDef.AllowedTypes = rights.AllowedTypes
+			accessDef.DisableIntrospection = rights.DisableIntrospection
+			accessDef.Endpoints = rights.Endpoints
+			allowanceScope = rights.AllowanceScope
+		}
+	}
+	if accessDef.Limit.IsEmpty() {
+		accessDef.Limit = session.APILimit()
+	}
+
+	return accessDef, allowanceScope, nil
 }
 
 // updateSessionQuota updates session attached access rights.
@@ -473,26 +490,4 @@ func (*SessionLimiter) updateSessionQuota(session *user.SessionState, scope stri
 	}
 
 	session.Touch()
-}
-
-func GetAccessDefinitionByAPIIDOrSession(session *user.SessionState, api *APISpec) (accessDef *user.AccessDefinition, allowanceScope string, err error) {
-	accessDef = &user.AccessDefinition{}
-	if len(session.AccessRights) > 0 {
-		if rights, ok := session.AccessRights[api.APIID]; !ok {
-			return nil, "", errors.New("unexpected apiID")
-		} else {
-			accessDef.Limit = rights.Limit
-			accessDef.FieldAccessRights = rights.FieldAccessRights
-			accessDef.RestrictedTypes = rights.RestrictedTypes
-			accessDef.AllowedTypes = rights.AllowedTypes
-			accessDef.DisableIntrospection = rights.DisableIntrospection
-			accessDef.Endpoints = rights.Endpoints
-			allowanceScope = rights.AllowanceScope
-		}
-	}
-	if accessDef.Limit.IsEmpty() {
-		accessDef.Limit = session.APILimit()
-	}
-
-	return accessDef, allowanceScope, nil
 }
