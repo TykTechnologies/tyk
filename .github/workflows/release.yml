@@ -185,7 +185,6 @@ jobs:
           tags: ${{ steps.tag_metadata.outputs.tags }}
           labels: ${{ steps.tag_metadata.outputs.labels }}
       - uses: actions/upload-artifact@v4
-        if: ${{ matrix.golang_cross == '1.21-bullseye' }}
         with:
           name: deb
           retention-days: 1
@@ -193,7 +192,6 @@ jobs:
             dist/*.deb
             !dist/*PAYG*.deb
       - uses: actions/upload-artifact@v4
-        if: ${{ matrix.golang_cross == '1.21-bullseye' }}
         with:
           name: rpm
           retention-days: 1
