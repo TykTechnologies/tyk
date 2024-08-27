@@ -605,7 +605,7 @@
     }
   },
   "per_api_with_endpoint_limits_on_d_and_e": {
-    "id": "per_api_with_endpoint_limits_on_e",
+    "id": "per_api_with_endpoint_limits_on_d_and_e",
     "rate": 500,
     "per": 1,
     "quota_max": -1,
@@ -674,7 +674,7 @@
     }
   },
   "per_endpoint_limits_different_on_api_d": {
-    "id": "per_api_with_endpoint_limits_on_e",
+    "id": "per_endpoint_limits_different_on_api_d",
     "rate": 500,
     "per": 1,
     "quota_max": -1,
