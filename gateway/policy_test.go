@@ -436,8 +436,8 @@ func (s *Test) testPrepareApplyPolicies(tb testing.TB) (*BaseMiddleware, []testA
 					"c": {
 						Limit: user.APILimit{
 							RateLimit: user.RateLimit{
-								Rate: 2000,
-								Per:  60,
+								Rate: 3000,
+								Per:  10,
 							},
 							QuotaMax: -1,
 						},
@@ -524,8 +524,8 @@ func (s *Test) testPrepareApplyPolicies(tb testing.TB) (*BaseMiddleware, []testA
 							QuotaMax:         5000,
 							QuotaRenewalRate: 3600,
 							RateLimit: user.RateLimit{
-								Rate: 400,
-								Per:  25,
+								Rate: 200,
+								Per:  10,
 							},
 						},
 						AllowanceScope: "d",
@@ -764,11 +764,11 @@ func (s *Test) testPrepareApplyPolicies(tb testing.TB) (*BaseMiddleware, []testA
 						Limit: user.APILimit{
 							QuotaMax: -1,
 							RateLimit: user.RateLimit{
-								Rate: 300,
+								Rate: 500,
 								Per:  1,
 							},
 						},
-						AllowanceScope: "per_api_with_endpoint_limits_on_e",
+						AllowanceScope: "per_api_with_endpoint_limits_on_d_and_e",
 						Endpoints:      endpointsConfig,
 					},
 					"d": {
@@ -776,7 +776,7 @@ func (s *Test) testPrepareApplyPolicies(tb testing.TB) (*BaseMiddleware, []testA
 							QuotaMax:         5000,
 							QuotaRenewalRate: 3600,
 							RateLimit: user.RateLimit{
-								Rate: 100,
+								Rate: 200,
 								Per:  10,
 							},
 						},
@@ -842,8 +842,8 @@ func (s *Test) testPrepareApplyPolicies(tb testing.TB) (*BaseMiddleware, []testA
 							{
 								Name: "POST",
 								Limit: user.RateLimit{
-									Rate: 300,
-									Per:  10,
+									Rate: 400,
+									Per:  11,
 								},
 							},
 						},
@@ -867,7 +867,7 @@ func (s *Test) testPrepareApplyPolicies(tb testing.TB) (*BaseMiddleware, []testA
 				apiELimits := user.APILimit{
 					QuotaMax: -1,
 					RateLimit: user.RateLimit{
-						Rate: 300,
+						Rate: 500,
 						Per:  1,
 					},
 				}
@@ -877,7 +877,7 @@ func (s *Test) testPrepareApplyPolicies(tb testing.TB) (*BaseMiddleware, []testA
 					QuotaMax:         5000,
 					QuotaRenewalRate: 3600,
 					RateLimit: user.RateLimit{
-						Rate: 100,
+						Rate: 200,
 						Per:  10,
 					},
 				}
