@@ -18,8 +18,10 @@ func TestApplyRateLimits_PolicyLimits(t *testing.T) {
 			Per:  10,
 		}
 		apiLimits := user.APILimit{
-			Rate: 10,
-			Per:  10,
+			RateLimit: user.RateLimit{
+				Rate: 10,
+				Per:  10,
+			},
 		}
 		policy := user.Policy{}
 
@@ -35,8 +37,10 @@ func TestApplyRateLimits_PolicyLimits(t *testing.T) {
 			Per:  10,
 		}
 		apiLimits := user.APILimit{
-			Rate: 5,
-			Per:  10,
+			RateLimit: user.RateLimit{
+				Rate: 5,
+				Per:  10,
+			},
 		}
 		policy := user.Policy{
 			Rate: 10,
@@ -58,8 +62,10 @@ func TestApplyRateLimits_PolicyLimits(t *testing.T) {
 			Per:  10,
 		}
 		apiLimits := user.APILimit{
-			Rate: 5,
-			Per:  10,
+			RateLimit: user.RateLimit{
+				Rate: 5,
+				Per:  10,
+			},
 		}
 		policy := user.Policy{
 			Rate: 10,
@@ -80,8 +86,9 @@ func TestApplyRateLimits_PolicyLimits(t *testing.T) {
 			Per:  10,
 		}
 		apiLimits := user.APILimit{
-			Rate: 15,
-			Per:  10,
+			RateLimit: user.RateLimit{Rate: 15,
+				Per: 10,
+			},
 		}
 		policy := user.Policy{
 			Rate: 10,
