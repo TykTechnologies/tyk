@@ -116,7 +116,7 @@ func TestRedisClusterGetMultiKey(t *testing.T) {
 	r.DeleteAllKeys()
 
 	_, err := r.GetMultiKey(keys)
-	if err != ErrKeyNotFound {
+	if !errors.Is(err, ErrKeyNotFound) {
 		t.Errorf("expected %v got %v", ErrKeyNotFound, err)
 	}
 	err = r.SetKey(keys[0], keys[0], 0)
@@ -1174,6 +1174,62 @@ func TestDeleteScanMatch(t *testing.T) {
 	})
 }
 
+func TestDeleteRawKeys(t *testing.T) {
+	t.Run("storage disconnected", func(t *testing.T) {
+		storage := &RedisCluster{ConnectionHandler: rc}
+		storage.ConnectionHandler.storageUp.Store(false)
+		mockKv := tempmocks.NewKeyValue(t)
+		storage.kvStorage = mockKv
+		defer storage.ConnectionHandler.storageUp.Store(true)
+
+		deleted := storage.DeleteRawKeys([]string{"key"})
+		assert.False(t, deleted)
+
+		mockKv.AssertExpectations(t)
+	})
+	t.Run("delete ok", func(t *testing.T) {
+		storage := &RedisCluster{ConnectionHandler: rc}
+		mockKv := tempmocks.NewKeyValue(t)
+		storage.kvStorage = mockKv
+		mockKv.On("DeleteKeys", mock.Anything, []string{"key", "key2"}).Return(int64(3), nil)
+
+		deleted := storage.DeleteRawKeys([]string{"key", "key2"})
+		assert.True(t, deleted)
+		mockKv.AssertExpectations(t)
+	})
+	t.Run("delete ok with prefix", func(t *testing.T) {
+		storage := &RedisCluster{ConnectionHandler: rc, KeyPrefix: "prefix:"}
+		mockKv := tempmocks.NewKeyValue(t)
+		storage.kvStorage = mockKv
+		mockKv.On("DeleteKeys", mock.Anything, []string{"key", "key2"}).Return(int64(3), nil)
+
+		deleted := storage.DeleteRawKeys([]string{"key", "key2"})
+		assert.True(t, deleted)
+		mockKv.AssertExpectations(t)
+	})
+
+	t.Run("delete ok - but none deleted", func(t *testing.T) {
+		storage := &RedisCluster{ConnectionHandler: rc, KeyPrefix: "prefix:"}
+		mockKv := tempmocks.NewKeyValue(t)
+		storage.kvStorage = mockKv
+		mockKv.On("DeleteKeys", mock.Anything, []string{"key", "key2"}).Return(int64(0), nil)
+
+		deleted := storage.DeleteRawKeys([]string{"key", "key2"})
+		assert.False(t, deleted)
+		mockKv.AssertExpectations(t)
+	})
+	t.Run("error deleting", func(t *testing.T) {
+		storage := &RedisCluster{ConnectionHandler: rc}
+		mockKv := tempmocks.NewKeyValue(t)
+		storage.kvStorage = mockKv
+		mockKv.On("DeleteKeys", mock.Anything, mock.Anything).Return(int64(0), ErrKeyNotFound)
+
+		deleted := storage.DeleteRawKeys([]string{"key"})
+		assert.False(t, deleted)
+		mockKv.AssertExpectations(t)
+	})
+}
+
 func TestDeleteKeys(t *testing.T) {
 	t.Run("storage disconnected", func(t *testing.T) {
 		storage := &RedisCluster{ConnectionHandler: rc}
@@ -1996,17 +2052,18 @@ func TestStartPubSubHandler(t *testing.T) {
 		mockQueue.On("Subscribe", mock.Anything, "test-channel").Return(mockedSubscription, nil)
 		defer mockQueue.AssertExpectations(t)
 
-		callbackCalled := false
+		callbackCalled := make(chan bool, 1)
 		callback := func(obj interface{}) {
 			msg, ok := obj.(model.Message)
 			assert.True(t, ok)
 
-			callbackCalled = true
 			msgPayload, err := msg.Payload()
 			assert.NoError(t, err)
 			payload, err := msg.Payload()
 			assert.NoError(t, err)
 			assert.Equal(t, payload, msgPayload)
+
+			callbackCalled <- true
 		}
 
 		go func() {
@@ -2014,8 +2071,15 @@ func TestStartPubSubHandler(t *testing.T) {
 			_ = storage.StartPubSubHandler(context.Background(), "test-channel", callback)
 		}()
 
-		time.Sleep(100 * time.Millisecond) // Allow some time for the goroutine to run
-		assert.True(t, callbackCalled)
+		ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+		defer cancel()
+
+		select {
+		case ok := <-callbackCalled:
+			assert.True(t, ok, "callback was called")
+		case <-ctx.Done():
+			assert.Fail(t, "callback was not called within the timeout period")
+		}
 	})
 
 	t.Run("error on receive", func(t *testing.T) {

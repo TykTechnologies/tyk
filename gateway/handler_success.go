@@ -11,10 +11,8 @@ import (
 	"time"
 
 	"github.com/sirupsen/logrus"
-
 	"github.com/TykTechnologies/tyk/storage"
-
-	"github.com/TykTechnologies/tyk/internal/graphql"
+	graphqlinternal "github.com/TykTechnologies/tyk/internal/graphql"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/internal/httputil"
@@ -176,7 +174,7 @@ func recordGraphDetails(rec *analytics.AnalyticsRecord, r *http.Request, resp *h
 		}
 	}
 
-	extractor := graphql.NewGraphStatsExtractor()
+	extractor := graphqlinternal.NewGraphStatsExtractor()
 	stats, err := extractor.ExtractStats(string(body), string(respBody), spec.GraphQL.Schema)
 	if err != nil {
 		logger.WithError(err).Error("error recording graph analytics")
@@ -352,7 +350,7 @@ func (s *SuccessHandler) RecordHit(r *http.Request, timing analytics.Latency, co
 
 func recordDetail(r *http.Request, spec *APISpec) bool {
 	// when streaming in grpc, we do not record the request
-	if IsGrpcStreaming(r) {
+	if httputil.IsStreamingRequest(r) {
 		return false
 	}
 

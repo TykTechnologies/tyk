@@ -6,13 +6,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	htmlTemplate "html/template"
+	htmltemplate "html/template"
 	"io/ioutil"
 	stdlog "log"
 	"log/syslog"
 	"net"
 	"net/http"
-	pprof_http "net/http/pprof"
+	pprofhttp "net/http/pprof"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -22,7 +22,7 @@ import (
 	"sync"
 
 	"sync/atomic"
-	textTemplate "text/template"
+	texttemplate "text/template"
 	"time"
 
 	"github.com/TykTechnologies/tyk/internal/crypto"
@@ -31,14 +31,14 @@ import (
 	"github.com/TykTechnologies/tyk/internal/scheduler"
 	"github.com/TykTechnologies/tyk/test"
 
-	logstashHook "github.com/bshuster-repo/logrus-logstash-hook"
-	"github.com/evalphobia/logrus_sentry"
-	graylogHook "github.com/gemnasium/logrus-graylog-hook"
+	logstashhook "github.com/bshuster-repo/logrus-logstash-hook"
+	logrussentry "github.com/evalphobia/logrus_sentry"
+	grayloghook "github.com/gemnasium/logrus-graylog-hook"
 	"github.com/gorilla/mux"
 	"github.com/lonelycode/osin"
 	newrelic "github.com/newrelic/go-agent"
 	"github.com/sirupsen/logrus"
-	logrus_syslog "github.com/sirupsen/logrus/hooks/syslog"
+	logrussyslog "github.com/sirupsen/logrus/hooks/syslog"
 
 	"github.com/TykTechnologies/tyk/internal/uuid"
 
@@ -159,7 +159,8 @@ type Gateway struct {
 	consulKVStore kv.Store
 	vaultKVStore  kv.Store
 
-	NotificationVerifier goverify.Verifier
+	// signatureVerifier is used to verify signatures with config.PublicKeyPath.
+	signatureVerifier atomic.Pointer[goverify.Verifier]
 
 	RedisPurgeOnce sync.Once
 	RpcPurgeOnce   sync.Once
@@ -190,8 +191,8 @@ type Gateway struct {
 	TestBundles  map[string]map[string]string
 	TestBundleMu sync.Mutex
 
-	templates    *htmlTemplate.Template
-	templatesRaw *textTemplate.Template
+	templates    *htmltemplate.Template
+	templatesRaw *texttemplate.Template
 
 	// RedisController keeps track of redis connection and singleton
 	StorageConnectionHandler *storage.ConnectionHandler
@@ -309,19 +310,6 @@ func (gw *Gateway) getAPIDefinition(apiID string) (*apidef.APIDefinition, error)
 	return apiSpec.APIDefinition, nil
 }
 
-func (gw *Gateway) getPolicy(polID string) user.Policy {
-	gw.policiesMu.RLock()
-	pol := gw.policiesByID[polID]
-	gw.policiesMu.RUnlock()
-	return pol
-}
-
-func (gw *Gateway) policiesByIDLen() int {
-	gw.policiesMu.RLock()
-	defer gw.policiesMu.RUnlock()
-	return len(gw.policiesByID)
-}
-
 func (gw *Gateway) apisByIDLen() int {
 	gw.apisMu.RLock()
 	defer gw.apisMu.RUnlock()
@@ -407,10 +395,9 @@ func (gw *Gateway) setupGlobals() {
 	}
 
 	// Load all the files that have the "error" prefix.
-	//	gwConfig.TemplatePath = "/Users/sredny/go/src/github.com/TykTechnologies/tyk/templates"
 	templatesDir := filepath.Join(gwConfig.TemplatePath, "error*")
-	gw.templates = htmlTemplate.Must(htmlTemplate.ParseGlob(templatesDir))
-	gw.templatesRaw = textTemplate.Must(textTemplate.ParseGlob(templatesDir))
+	gw.templates = htmltemplate.Must(htmltemplate.ParseGlob(templatesDir))
+	gw.templatesRaw = texttemplate.Must(texttemplate.ParseGlob(templatesDir))
 	gw.CoProcessInit()
 
 	// Get the notifier ready
@@ -645,8 +632,8 @@ func (gw *Gateway) loadControlAPIEndpoints(muxer *mux.Router) {
 	}
 
 	if *cli.HTTPProfile || gw.GetConfig().HTTPProfile {
-		muxer.HandleFunc("/debug/pprof/profile", pprof_http.Profile)
-		muxer.HandleFunc("/debug/pprof/{_:.*}", pprof_http.Index)
+		muxer.HandleFunc("/debug/pprof/profile", pprofhttp.Profile)
+		muxer.HandleFunc("/debug/pprof/{_:.*}", pprofhttp.Index)
 	}
 
 	r.MethodNotAllowedHandler = MethodNotAllowedHandler{}
@@ -1138,7 +1125,7 @@ func (gw *Gateway) setupLogger() {
 			}
 		}
 
-		hook, err := logrus_sentry.NewSentryHook(gwConfig.SentryCode, logLevel)
+		hook, err := logrussentry.NewSentryHook(gwConfig.SentryCode, logLevel)
 
 		if err == nil {
 			hook.Timeout = 0
@@ -1150,7 +1137,7 @@ func (gw *Gateway) setupLogger() {
 
 	if gwConfig.UseSyslog {
 		mainLog.Debug("Enabling Syslog support")
-		hook, err := logrus_syslog.NewSyslogHook(gwConfig.SyslogTransport,
+		hook, err := logrussyslog.NewSyslogHook(gwConfig.SyslogTransport,
 			gwConfig.SyslogNetworkAddr,
 			syslog.LOG_INFO, "")
 
@@ -1163,7 +1150,7 @@ func (gw *Gateway) setupLogger() {
 
 	if gwConfig.UseGraylog {
 		mainLog.Debug("Enabling Graylog support")
-		hook := graylogHook.NewGraylogHook(gwConfig.GraylogNetworkAddr,
+		hook := grayloghook.NewGraylogHook(gwConfig.GraylogNetworkAddr,
 			map[string]interface{}{"tyk-module": "gateway"})
 
 		log.Hooks.Add(hook)
@@ -1189,7 +1176,7 @@ func (gw *Gateway) setupLogger() {
 		if err != nil {
 			log.Errorf("Error making connection for logstash: %v", err)
 		} else {
-			hook = logstashHook.New(conn, logstashHook.DefaultFormatter(logrus.Fields{
+			hook = logstashhook.New(conn, logstashhook.DefaultFormatter(logrus.Fields{
 				"type": appName,
 			}))
 			log.Hooks.Add(hook)
@@ -1336,6 +1323,31 @@ func (gw *Gateway) initialiseSystem() error {
 	// free resources.
 	go cleanIdleMemConnProviders(gw.ctx)
 	return nil
+}
+
+// SignatureVerifier returns a verifier to use for validating signatures.
+// It is configured with the PublicKeyPath value in gateway config.
+func (gw *Gateway) SignatureVerifier() (goverify.Verifier, error) {
+	gwConfig := gw.GetConfig()
+	if gwConfig.PublicKeyPath == "" {
+		return nil, nil
+	}
+
+	cached := gw.signatureVerifier.Load()
+	if cached != nil {
+		return *cached, nil
+	}
+
+	log.Warnf("Creating new NotificationVerifier with pubkey: %q", gwConfig.PublicKeyPath)
+
+	verifier, err := goverify.LoadPublicKeyFromFile(gwConfig.PublicKeyPath)
+	if err != nil {
+		mainLog.WithError(err).Errorf("Failed loading public key from path: %s", err)
+		return nil, err
+	}
+
+	gw.signatureVerifier.Store(&verifier)
+	return verifier, nil
 }
 
 func writePIDFile(file string) error {

@@ -4,7 +4,7 @@ package build
 var (
 	// Version contains the tagged gateway version. It may contain a `rc` suffix,
 	// which may be delimited with `-rc` or any other suffix. Follows Semver+Tag.
-	Version = "v5.3.0-dev"
+	Version = "v5.5.0-dev"
 
 	// BuiltBy contains the environment name from the build (goreleaser).
 	BuiltBy string = "dev"

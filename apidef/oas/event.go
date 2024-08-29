@@ -5,7 +5,7 @@ import (
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/internal/event"
-	"github.com/TykTechnologies/tyk/internal/reflect"
+	internalreflect "github.com/TykTechnologies/tyk/internal/reflect"
 	"github.com/TykTechnologies/tyk/internal/time"
 )
 
@@ -25,9 +25,10 @@ type EventHandler struct {
 	Kind Kind `json:"type" bson:"type"` // json tag is changed as per contract
 	// ID is the ID of event handler in storage.
 	ID string `json:"id,omitempty" bson:"id,omitempty"`
-	// Name is the name of event handler
+	// Name is the name of event handler.
 	Name string `json:"name,omitempty" bson:"name,omitempty"`
 
+	// Webhook contains WebhookEvent configs. Encoding and decoding is handled by the custom marshaller.
 	Webhook WebhookEvent `bson:"-" json:"-"`
 }
 
@@ -35,12 +36,12 @@ type EventHandler struct {
 func (e EventHandler) MarshalJSON() ([]byte, error) {
 	type helperEventHandler EventHandler
 	helper := helperEventHandler(e)
-	outMap, err := reflect.Cast[map[string]interface{}](helper)
+	outMap, err := internalreflect.Cast[map[string]interface{}](helper)
 	if err != nil {
 		return nil, err
 	}
 
-	webhookMap, err := reflect.Cast[map[string]interface{}](helper.Webhook)
+	webhookMap, err := internalreflect.Cast[map[string]interface{}](helper.Webhook)
 	if err != nil {
 		return nil, err
 	}
@@ -94,7 +95,7 @@ type WebhookEvent struct {
 	// An empty value is interpreted as "0s", implying no cool-down.
 	// It's important to format the string correctly, as invalid formats will
 	// be considered as 0s/empty.
-	CoolDownPeriod time.ReadableDuration `json:"cooldownPeriod" bson:"cooldownPeriod"`
+	CoolDownPeriod ReadableDuration `json:"cooldownPeriod" bson:"cooldownPeriod"`
 	// BodyTemplate is the template to be used for request payload.
 	BodyTemplate string `json:"bodyTemplate,omitempty" bson:"bodyTemplate,omitempty"`
 	// Headers are the list of request headers to be used.
@@ -147,7 +148,7 @@ func (e *EventHandlers) Fill(api apidef.APIDefinition) {
 						Method:         whConf.Method,
 						Headers:        NewHeaders(whConf.HeaderList),
 						BodyTemplate:   whConf.TemplatePath,
-						CoolDownPeriod: time.ReadableDuration(time.Duration(whConf.EventTimeout) * time.Second),
+						CoolDownPeriod: ReadableDuration(time.Duration(whConf.EventTimeout) * time.Second),
 					},
 				}
 
@@ -188,7 +189,7 @@ func (e *EventHandlers) ExtractTo(api *apidef.APIDefinition) {
 		case WebhookKind:
 			handler = event.WebHookHandler
 			whConf := ev.GetWebhookConf()
-			handlerMeta, err = reflect.Cast[map[string]interface{}](whConf)
+			handlerMeta, err = internalreflect.Cast[map[string]interface{}](whConf)
 		default:
 			continue
 		}

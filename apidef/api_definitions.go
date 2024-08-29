@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"encoding/xml"
 	"errors"
+	"fmt"
 	"net/http"
 	"text/template"
 	"time"
@@ -213,6 +214,39 @@ type TrackEndpointMeta struct {
 	Method   string `bson:"method" json:"method"`
 }
 
+// RateLimitMeta configures rate limits per API path.
+type RateLimitMeta struct {
+	Disabled bool   `bson:"disabled" json:"disabled"`
+	Path     string `bson:"path" json:"path"`
+	Method   string `bson:"method" json:"method"`
+
+	Rate float64 `bson:"rate" json:"rate"`
+	Per  float64 `bson:"per" json:"per"`
+}
+
+// Valid will return true if the rate limit should be applied.
+func (r *RateLimitMeta) Valid() bool {
+	if err := r.Err(); err != nil {
+		return false
+	}
+	return true
+}
+
+// Err checks the rate limit configuration for validity and returns an error if it is not valid.
+// It checks for a nil value, the enabled flag and valid values for each setting.
+func (r *RateLimitMeta) Err() error {
+	if r == nil || r.Disabled {
+		return errors.New("rate limit disabled")
+	}
+	if r.Per <= 0 {
+		return fmt.Errorf("rate limit disabled: per invalid")
+	}
+	if r.Rate == 0 {
+		return fmt.Errorf("rate limit disabled: rate zero")
+	}
+	return nil
+}
+
 type InternalMeta struct {
 	Disabled bool   `bson:"disabled" json:"disabled"`
 	Path     string `bson:"path" json:"path"`
@@ -362,6 +396,7 @@ type ExtendedPathsSet struct {
 	Internal                []InternalMeta        `bson:"internal" json:"internal,omitempty"`
 	GoPlugin                []GoPluginMeta        `bson:"go_plugin" json:"go_plugin,omitempty"`
 	PersistGraphQL          []PersistGraphQLMeta  `bson:"persist_graphql" json:"persist_graphql"`
+	RateLimit               []RateLimitMeta       `bson:"rate_limit" json:"rate_limit"`
 }
 
 // Clear omits values that have OAS API definition conversions in place.
@@ -375,17 +410,40 @@ func (e *ExtendedPathsSet) Clear() {
 	}
 }
 
+// VersionDefinition is a struct that holds the versioning information for an API.
 type VersionDefinition struct {
-	Enabled             bool              `bson:"enabled" json:"enabled"`
-	Name                string            `bson:"name" json:"name"`
-	Default             string            `bson:"default" json:"default"`
-	Location            string            `bson:"location" json:"location"`
-	Key                 string            `bson:"key" json:"key"`
-	StripPath           bool              `bson:"strip_path" json:"strip_path"` // Deprecated. Use StripVersioningData instead.
-	StripVersioningData bool              `bson:"strip_versioning_data" json:"strip_versioning_data"`
-	FallbackToDefault   bool              `bson:"fallback_to_default" json:"fallback_to_default"`
-	Versions            map[string]string `bson:"versions" json:"versions"`
-	BaseID              string            `bson:"base_id" json:"-"` // json tag is `-` because we want this to be hidden to user
+	// Enabled indicates whether this version is enabled or not.
+	Enabled bool `bson:"enabled" json:"enabled"`
+
+	// Name is the name of this version.
+	Name string `bson:"name" json:"name"`
+
+	// Default is the default version to use if no version is specified in the request.
+	Default string `bson:"default" json:"default"`
+
+	// Location is the location in the request where the version information can be found.
+	Location string `bson:"location" json:"location"`
+
+	// Key is the key to use to extract the version information from the specified location.
+	Key string `bson:"key" json:"key"`
+
+	// StripPath is a deprecated field. Use StripVersioningData instead.
+	StripPath bool `bson:"strip_path" json:"strip_path"` // Deprecated. Use StripVersioningData instead.
+
+	// StripVersioningData indicates whether to strip the versioning data from the request.
+	StripVersioningData bool `bson:"strip_versioning_data" json:"strip_versioning_data"`
+
+	// UrlVersioningPattern is the regex pattern to match in the URL for versioning.
+	UrlVersioningPattern string `bson:"url_versioning_pattern" json:"url_versioning_pattern"`
+
+	// FallbackToDefault indicates whether to fallback to the default version if the version in the request does not exist.
+	FallbackToDefault bool `bson:"fallback_to_default" json:"fallback_to_default"`
+
+	// Versions is a map of version names to version ApiIDs.
+	Versions map[string]string `bson:"versions" json:"versions"`
+
+	// BaseID is a hidden field used internally that represents the ApiID of the base API.
+	BaseID string `bson:"base_id" json:"-"` // json tag is `-` because we want this to be hidden to user
 }
 
 type VersionData struct {

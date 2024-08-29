@@ -72,7 +72,6 @@ linters:
     - testpackage
     - paralleltest
     - ireturn
-    - err113
   enable:
     - govet
     - forbidigo

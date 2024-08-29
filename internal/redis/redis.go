@@ -5,9 +5,9 @@
 package redis
 
 import (
-	"github.com/go-redis/redismock/v9"
-	"github.com/go-redsync/redsync/v4/redis/goredis/v9"
-	"github.com/redis/go-redis/v9"
+	redismock "github.com/go-redis/redismock/v9"
+	goredis "github.com/go-redsync/redsync/v4/redis/goredis/v9"
+	redis "github.com/redis/go-redis/v9"
 )
 
 var (

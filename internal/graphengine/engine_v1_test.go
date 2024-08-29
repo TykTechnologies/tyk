@@ -345,6 +345,8 @@ func withExecutionModeTestEngineV1(executionMode apidef.GraphQLExecutionMode) te
 }
 
 func newTestEngineV1(t *testing.T, options ...testEngineV1Option) (*EngineV1, engineV1Mocks) {
+	t.Helper()
+
 	definedOptions := testEngineV1Options{}
 	for _, option := range options {
 		option(&definedOptions)

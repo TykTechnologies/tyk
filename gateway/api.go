@@ -43,7 +43,7 @@ import (
 	"sync"
 	"time"
 
-	gqlV2 "github.com/TykTechnologies/graphql-go-tools/v2/pkg/graphql"
+	gqlv2 "github.com/TykTechnologies/graphql-go-tools/v2/pkg/graphql"
 
 	"github.com/getkin/kin-openapi/openapi3"
 
@@ -892,7 +892,7 @@ func (gw *Gateway) handleRemoveSortedSetRange(keyName, scoreFrom, scoreTo string
 }
 
 func (gw *Gateway) handleGetPolicy(polID string) (interface{}, int) {
-	if pol := gw.getPolicy(polID); pol.ID != "" {
+	if pol, ok := gw.PolicyByID(polID); ok && pol.ID != "" {
 		return pol, http.StatusOK
 	}
 
@@ -3256,13 +3256,13 @@ func ctxGetGraphQLRequest(r *http.Request) (gqlRequest *gql.Request) {
 	return nil
 }
 
-func ctxSetGraphQLRequestV2(r *http.Request, gqlRequest *gqlV2.Request) {
+func ctxSetGraphQLRequestV2(r *http.Request, gqlRequest *gqlv2.Request) {
 	setCtxValue(r, ctx.GraphQLRequest, gqlRequest)
 }
 
-func ctxGetGraphQLRequestV2(r *http.Request) (gqlRequest *gqlV2.Request) {
+func ctxGetGraphQLRequestV2(r *http.Request) (gqlRequest *gqlv2.Request) {
 	if v := r.Context().Value(ctx.GraphQLRequest); v != nil {
-		if gqlRequest, ok := v.(*gqlV2.Request); ok {
+		if gqlRequest, ok := v.(*gqlv2.Request); ok {
 			return gqlRequest
 		}
 	}

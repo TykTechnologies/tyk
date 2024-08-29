@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	graphqlDataSource "github.com/TykTechnologies/graphql-go-tools/pkg/engine/datasource/graphql_datasource"
+	graphqldatasource "github.com/TykTechnologies/graphql-go-tools/pkg/engine/datasource/graphql_datasource"
 	"github.com/TykTechnologies/graphql-go-tools/pkg/engine/plan"
 
 	"github.com/TykTechnologies/tyk/apidef"
@@ -47,18 +47,18 @@ func TestProxyOnly_EngineConfig(t *testing.T) {
 				},
 			},
 			ChildNodes: []plan.TypeField{},
-			Factory: &graphqlDataSource.Factory{
-				BatchFactory:       graphqlDataSource.NewBatchFactory(),
+			Factory: &graphqldatasource.Factory{
+				BatchFactory:       graphqldatasource.NewBatchFactory(),
 				HTTPClient:         httpClient,
 				StreamingClient:    streamingClient,
 				SubscriptionClient: mockSubscriptionClient,
 			},
-			Custom: graphqlDataSource.ConfigJson(graphqlDataSource.Configuration{
-				Fetch: graphqlDataSource.FetchConfiguration{
+			Custom: graphqldatasource.ConfigJson(graphqldatasource.Configuration{
+				Fetch: graphqldatasource.FetchConfiguration{
 					URL:    "http://localhost:8080",
 					Header: map[string][]string{},
 				},
-				Subscription: graphqlDataSource.SubscriptionConfiguration{
+				Subscription: graphqldatasource.SubscriptionConfiguration{
 					URL:    "http://localhost:8080",
 					UseSSE: true,
 				},
@@ -111,20 +111,20 @@ func TestProxyOnly_EngineConfig(t *testing.T) {
 				},
 			},
 			ChildNodes: []plan.TypeField{},
-			Factory: &graphqlDataSource.Factory{
-				BatchFactory:       graphqlDataSource.NewBatchFactory(),
+			Factory: &graphqldatasource.Factory{
+				BatchFactory:       graphqldatasource.NewBatchFactory(),
 				HTTPClient:         httpClient,
 				StreamingClient:    streamingClient,
 				SubscriptionClient: mockSubscriptionClient,
 			},
-			Custom: graphqlDataSource.ConfigJson(graphqlDataSource.Configuration{
-				Fetch: graphqlDataSource.FetchConfiguration{
+			Custom: graphqldatasource.ConfigJson(graphqldatasource.Configuration{
+				Fetch: graphqldatasource.FetchConfiguration{
 					URL: "http://api-name",
 					Header: http.Header{
 						"X-Tyk-Internal": []string{"true"},
 					},
 				},
-				Subscription: graphqlDataSource.SubscriptionConfiguration{
+				Subscription: graphqldatasource.SubscriptionConfiguration{
 					URL:    "http://api-name",
 					UseSSE: true,
 				},
@@ -186,18 +186,18 @@ func TestProxyOnly_EngineConfig(t *testing.T) {
 					FieldNames: []string{"id", "username"},
 				},
 			},
-			Factory: &graphqlDataSource.Factory{
-				BatchFactory:       graphqlDataSource.NewBatchFactory(),
+			Factory: &graphqldatasource.Factory{
+				BatchFactory:       graphqldatasource.NewBatchFactory(),
 				HTTPClient:         httpClient,
 				StreamingClient:    streamingClient,
 				SubscriptionClient: mockSubscriptionClient,
 			},
-			Custom: graphqlDataSource.ConfigJson(graphqlDataSource.Configuration{
-				Fetch: graphqlDataSource.FetchConfiguration{
+			Custom: graphqldatasource.ConfigJson(graphqldatasource.Configuration{
+				Fetch: graphqldatasource.FetchConfiguration{
 					URL:    "http://localhost:8080",
 					Header: http.Header{},
 				},
-				Subscription: graphqlDataSource.SubscriptionConfiguration{
+				Subscription: graphqldatasource.SubscriptionConfiguration{
 					URL:    "http://localhost:8080",
 					UseSSE: false,
 				},

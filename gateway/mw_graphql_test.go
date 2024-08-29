@@ -305,6 +305,7 @@ func TestGraphQLMiddleware_RequestValidation(t *testing.T) {
 
 func TestGraphQLMiddleware_EngineMode(t *testing.T) {
 	assertReviewsSubgraphResponse := func(t *testing.T) func(bytes []byte) bool {
+		t.Helper()
 		return func(bytes []byte) bool {
 			expected := `{"data":{"_entities":[{"reviews":[{"body":"A highly effective form of birth control."},{"body":"Fedoras are one of the most fashionable hats around and can look great with a variety of outfits."}]}]}}`
 			var body json.RawMessage
@@ -1168,6 +1169,7 @@ func TestGraphQLMiddleware_EngineMode(t *testing.T) {
 				t.Run("should send configured headers upstream", func(t *testing.T) {
 					run := func(apiSpec func(testServerURL string) func(apiSpec *APISpec), requestHeaders, expectedHeaders http.Header) func(t *testing.T) {
 						return func(t *testing.T) {
+							t.Helper()
 							wg := sync.WaitGroup{}
 							wg.Add(2)
 

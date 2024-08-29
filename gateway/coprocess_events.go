@@ -34,7 +34,7 @@ func (l *CoProcessEventHandler) Init(handlerConf interface{}) error {
 
 	gValAsJSON, err := json.Marshal(globalVals)
 	if err != nil {
-		return fmt.Errorf("failed to marshal globals: %v", err)
+		return fmt.Errorf("failed to marshal globals: %w", err)
 	}
 
 	l.SpecJSON = json.RawMessage(gValAsJSON)

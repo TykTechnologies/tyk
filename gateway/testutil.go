@@ -12,7 +12,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	mathRand "math/rand"
+	mathrand "math/rand"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -175,6 +175,7 @@ func (r *ReloadMachinery) Queued() bool {
 // EnsureQueued this will block until any queue happens. It will timeout after
 // 100ms
 func (r *ReloadMachinery) EnsureQueued(t *testing.T) {
+	t.Helper()
 	tick := time.NewTicker(time.Millisecond)
 	defer tick.Stop()
 
@@ -198,6 +199,8 @@ func (r *ReloadMachinery) EnsureQueued(t *testing.T) {
 // EnsureReloaded this will block until any reload happens. It will timeout after
 // 200ms
 func (r *ReloadMachinery) EnsureReloaded(t *testing.T) {
+	t.Helper()
+
 	tick := time.NewTicker(time.Millisecond)
 	defer tick.Stop()
 	for {
@@ -225,6 +228,8 @@ func (r *ReloadMachinery) Tick() {
 // TickOk triggers a reload and ensures a queue happened and a reload cycle
 // happens. This will block until all the cases are met.
 func (r *ReloadMachinery) TickOk(t *testing.T) {
+	t.Helper()
+
 	r.EnsureQueued(t)
 	r.Tick()
 	r.EnsureReloaded(t)
@@ -232,6 +237,9 @@ func (r *ReloadMachinery) TickOk(t *testing.T) {
 
 func InitTestMain(ctx context.Context, m *testing.M) int {
 	test.InitTestMain(ctx, m)
+
+	bundleBackoffMultiplier = 0
+	bundleMaxBackoffRetries = 0
 
 	if EnableTestDNSMock {
 		var errMock error
@@ -1119,7 +1127,7 @@ func (s *Test) newGateway(genConf func(globalConf *config.Config)) *Gateway {
 	s.MockHandle = MockHandle
 
 	var err error
-	gwConfig.Storage.Database = mathRand.Intn(15)
+	gwConfig.Storage.Database = mathrand.Intn(15)
 	gwConfig.AppPath, err = ioutil.TempDir("", "tyk-test-")
 
 	if err != nil {
@@ -1302,9 +1310,20 @@ func (s *Test) Close() {
 // RemoveApis clean all the apis from a living gw
 func (s *Test) RemoveApis() error {
 	s.Gw.apisMu.Lock()
-	defer s.Gw.apisMu.Unlock()
-	s.Gw.apiSpecs = []*APISpec{}
-	s.Gw.apisByID = map[string]*APISpec{}
+	defer func() {
+		s.Gw.apiSpecs = []*APISpec{}
+		s.Gw.apisByID = map[string]*APISpec{}
+		s.Gw.apisMu.Unlock()
+	}()
+
+	// clear bundle caches
+	for _, spec := range s.Gw.apiSpecs {
+		destPath := s.Gw.getBundleDestPath(spec)
+		if _, err := os.Stat(destPath); err == nil {
+			err = os.RemoveAll(destPath)
+			log.WithError(err).Infof("Clearing bundle cache: %s", destPath)
+		}
+	}
 
 	err := os.RemoveAll(s.Gw.GetConfig().AppPath)
 	if err != nil {
@@ -1321,6 +1340,8 @@ func (s *Test) Run(t testing.TB, testCases ...test.TestCase) (*http.Response, er
 
 // TODO:(gernest) when hot reload is supported enable this.
 func (s *Test) RunExt(t testing.TB, testCases ...test.TestCase) {
+	t.Helper()
+
 	s.Run(t, testCases...)
 	var testMatrix = []struct {
 		goagain          bool
@@ -1929,7 +1950,7 @@ func GenerateTestBinaryData() (buf *bytes.Buffer) {
 		c uint32
 	}
 	for i := 0; i < 10; i++ {
-		s := &testData{mathRand.Float32(), mathRand.Float64(), mathRand.Uint32()}
+		s := &testData{mathrand.Float32(), mathrand.Float64(), mathrand.Uint32()}
 		binary.Write(buf, binary.BigEndian, s)
 	}
 	return buf
@@ -1984,7 +2005,7 @@ func randStringBytes(n int) string {
 	b := make([]byte, n)
 
 	for i := range b {
-		b[i] = letters[mathRand.Intn(len(letters))]
+		b[i] = letters[mathrand.Intn(len(letters))]
 	}
 
 	return string(b)
