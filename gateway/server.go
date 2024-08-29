@@ -335,7 +335,7 @@ func (gw *Gateway) setupGlobals() {
 			time.Duration(gwConfig.DnsCache.CheckInterval)*time.Second)
 	}
 
-	if gwConfig.EnableAnalytics && gwConfig.Storage.Type != "redis" {
+	if gwConfig.EnableAnalytics && gwConfig.Storage.Type != "redis" && gwConfig.Storage.Type != "local" {
 		mainLog.Fatal("Analytics requires Redis Storage backend, please enable Redis in the tyk.conf file.")
 	}
 
@@ -1248,8 +1248,8 @@ func (gw *Gateway) initialiseSystem() error {
 		}
 	}
 
-	if gwConfig.Storage.Type != "redis" {
-		mainLog.Fatal("Redis connection details not set, please ensure that the storage type is set to Redis and that the connection parameters are correct.")
+	if gwConfig.Storage.Type != "redis" && gwConfig.Storage.Type != "local" {
+		mainLog.Fatal("storage connection details not set, please ensure that the storage type is set to Redis and that the connection parameters are correct.")
 	}
 
 	// suply rpc client globals to join it main loging and instrumentation sub systems
