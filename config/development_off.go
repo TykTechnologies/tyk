@@ -8,5 +8,9 @@ type DevelopmentConfig struct{}
 
 // GetRateLimiterStorage will return the storage configuration to use for rate limiters.
 func (c *Config) GetRateLimiterStorage() *StorageOptionsConf {
+	if c.EnableSeparateRLStore {
+		return &c.RateLimitStorage
+	}
+
 	return &c.Storage
 }

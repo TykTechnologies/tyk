@@ -74,6 +74,8 @@ func NewSessionLimiter(ctx context.Context, conf *config.Config, drlManager *drl
 	switch storageConf.Type {
 	case "redis":
 		sessionLimiter.limiterStorage = rate.NewStorage(storageConf)
+	default:
+		sessionLimiter.limiterStorage = rate.NewStorage(storageConf)
 	}
 
 	sessionLimiter.smoothing = rate.NewSmoothing(sessionLimiter.limiterStorage)

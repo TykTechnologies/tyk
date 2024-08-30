@@ -46,8 +46,6 @@ github.com/OneOfOne/xxhash v1.2.2 h1:KMrpdQIwFcEqXDklaen+P1axHaj9BSKzvpUUfnHldSE
 github.com/OneOfOne/xxhash v1.2.2/go.mod h1:HSdplMjZKSmBqAxg5vPj2TmRDmfkzw+cTzAElWljhcU=
 github.com/TykTechnologies/again v0.0.0-20190805133618-6ad301e7eaed h1:/h52kySW055ZF4boJc9tcuQhR909ubCiMN64EMBEu8Q=
 github.com/TykTechnologies/again v0.0.0-20190805133618-6ad301e7eaed/go.mod h1:OUrgdjjCoYX2GZY9Vathb4ExCO9WuPtU1piuOpNw19Q=
-github.com/TykTechnologies/cannery/v2 v2.0.0-20240822222831-3be26a04664f h1:0PHzhzndlSHZmfTPHvNlMVsNM+8eW1XDJrsbHYlbkbQ=
-github.com/TykTechnologies/cannery/v2 v2.0.0-20240822222831-3be26a04664f/go.mod h1:X7HjpQszQSUzNVnoy+YH8u66V0ajpcdApvN90iNr0tw=
 github.com/TykTechnologies/circuitbreaker v2.2.2+incompatible h1:UgJdsV/fBL5Ctx43EGKFxkX0W3MqqeRruadDQ1Kzhn4=
 github.com/TykTechnologies/circuitbreaker v2.2.2+incompatible/go.mod h1:f2+J36wN08/zLudMnO+QaqaBhTdQuIqemtaeEQbhMEM=
 github.com/TykTechnologies/drl v0.0.0-20231218155806-88e4363884a2 h1:jsQNOqSUq4nTzqTlZ7pCsn6g1H8ZYFbORhdmkprxx7M=

@@ -105,7 +105,7 @@ require (
 	github.com/Masterminds/semver v1.5.0 // indirect
 	github.com/Masterminds/semver/v3 v3.2.0 // indirect
 	github.com/Masterminds/sprig v2.22.0+incompatible // indirect
-	github.com/TykTechnologies/cannery/v2 v2.0.0-20240822222831-3be26a04664f // indirect
+	github.com/TykTechnologies/cannery/v2 v2.0.0-20240827112314-f808b9c7f5ec // indirect
 	github.com/alecthomas/units v0.0.0-20231202071711-9a357b53e9c9 // indirect
 	github.com/alitto/pond v1.8.3 // indirect
 	github.com/andybalholm/brotli v1.1.0 // indirect
@@ -348,3 +348,5 @@ require (
 
 //replace github.com/TykTechnologies/graphql-go-tools/v2 => ../graphql-go-tools/v2
 replace github.com/TykTechnologies/storage => ../storage
+
+replace github.com/TykTechnologies/cannery/v2 => ../cannery

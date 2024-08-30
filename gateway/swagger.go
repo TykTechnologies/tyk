@@ -11,7 +11,7 @@ type swaggerParameterBodies struct {
 	// in: body
 	APIStatusMessage apiStatusMessage
 	// in: body
-	APIModifyKeySuccess apiModifyKeySuccess
+	APIModifyKeySuccess ApiModifyKeySuccess
 	// in: body
 	NewClientRequest NewClientRequest
 	// in: body
@@ -19,7 +19,7 @@ type swaggerParameterBodies struct {
 	// in: body
 	SessionState user.SessionState
 	// in:body
-	APIAllKeys apiAllKeys
+	APIAllKeys ApiAllKeys
 	// in: body
 	OAuthClientToken OAuthClientToken
 }

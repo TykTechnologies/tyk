@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"fmt"
 
 	"strconv"
 	"strings"
@@ -26,6 +27,7 @@ func (n NotificationCommand) String() string {
 
 const (
 	RedisPubSubChannel = "tyk.cluster.notifications"
+	KeySpaceChannel    = "tyk.cluster.keyspace.ops"
 
 	NoticeApiUpdated             NotificationCommand = "ApiUpdated"
 	NoticeApiRemoved             NotificationCommand = "ApiRemoved"
@@ -64,8 +66,10 @@ func (gw *Gateway) startPubSubLoop() {
 
 	message := "Connection to Redis failed, reconnect in 10s"
 
+	chans := []string{RedisPubSubChannel, KeySpaceChannel}
+
 	for {
-		err := cacheStore.StartPubSubHandler(gw.ctx, RedisPubSubChannel, func(v interface{}) {
+		err := cacheStore.StartPubSubHandler(gw.ctx, chans, func(v interface{}) {
 			gw.handleRedisEvent(v, nil, nil)
 		})
 
@@ -93,6 +97,11 @@ func (gw *Gateway) logPubSubError(err error, message string) bool {
 		return true
 	}
 	return false
+}
+
+type WebhookMeta struct {
+	Event string                 `bson:"event" json:"event"`
+	Data  map[string]interface{} `bson:"data" json:"data"`
 }
 
 func (gw *Gateway) handleRedisEvent(v interface{}, handled func(NotificationCommand), reloaded func()) {
@@ -145,8 +154,22 @@ func (gw *Gateway) handleRedisEvent(v interface{}, handled func(NotificationComm
 		}
 		gw.onServerStatusReceivedHandler(notif.Payload)
 	case NoticeApiUpdated, NoticeApiRemoved, NoticeApiAdded, NoticePolicyChanged, NoticeGroupReload:
+		if len(gw.GetConfig().DBAppConfOptions.Tags) > 0 {
+			// tagged reload
+			for _, t := range gw.GetConfig().DBAppConfOptions.Tags {
+				if strings.Contains(notif.Payload, t) {
+					pubSubLog.Info("Reloading endpoints")
+					gw.reloadURLStructure(reloaded)
+					return
+				}
+			}
+			// no match
+			return
+		}
+		// not using tags
 		pubSubLog.Info("Reloading endpoints")
 		gw.reloadURLStructure(reloaded)
+
 	case KeySpaceUpdateNotification:
 		gw.handleKeySpaceEventCacheFlush(notif.Payload)
 	case OAuthPurgeLapsedTokens:
@@ -158,13 +181,68 @@ func (gw *Gateway) handleRedisEvent(v interface{}, handled func(NotificationComm
 			log.WithError(err).Errorf("cache invalidation failed for: %s", notif.Payload)
 		}
 	default:
-		pubSubLog.Warnf("Unknown notification command: %q", notif.Command)
+		fmt.Println("Event: ", payload)
+		// decode into WebHook to check if it is a webhook
+		var webhookMeta WebhookMeta
+		err := json.Unmarshal([]byte(payload), &webhookMeta)
+		if err != nil {
+			pubSubLog.WithError(err).Error("Error unmarshalling webhook meta")
+			return
+		}
+
+		if webhookMeta.Event != "" {
+			parts := strings.Split(webhookMeta.Event, ".")
+			if len(parts) == 2 {
+				eventType := parts[0]
+				eventArg := parts[1]
+
+				if eventType == "key_event" || eventType == "hashed_key_event" {
+					err = gw.HandleKeyEvents(eventArg, webhookMeta.Data)
+					if err != nil {
+						pubSubLog.WithError(err).Error("error handling key event")
+						return
+					}
+					return
+				}
+			}
+		}
+
+		pubSubLog.Warnf("Unknown notification command: %q", notif.Command, " payload: ", notif.Payload)
 		return
 	}
 	if handled != nil {
 		// went through. all others shoul have returned early.
 		handled(notif.Command)
 	}
+}
+
+func (gw *Gateway) HandleKeyEvents(eventAction string, data map[string]interface{}) error {
+	switch eventAction {
+	case "delete":
+		k, ok := data["Key"]
+		if !ok {
+			return errors.New("key not found")
+		}
+
+		org, ok := data["Org"]
+		if !ok {
+			return errors.New("org not found")
+		}
+
+		kStr, ok := k.(string)
+		if !ok {
+			return errors.New("key not a string")
+		}
+
+		orgStr, ok := org.(string)
+		if !ok {
+			return errors.New("org not a string")
+		}
+
+		gw.HandleDeleteKey(kStr, orgStr, "-1", false)
+	}
+
+	return nil
 }
 
 func (gw *Gateway) handleKeySpaceEventCacheFlush(payload string) {

@@ -597,14 +597,14 @@ func (r *RedisCluster) DeleteKeys(keys []string) bool {
 
 // StartPubSubHandler will listen for a signal and run the callback for
 // every subscription and message event.
-func (r *RedisCluster) StartPubSubHandler(ctx context.Context, channel string, callback func(interface{})) error {
+func (r *RedisCluster) StartPubSubHandler(ctx context.Context, channels []string, callback func(interface{})) error {
 	storage, err := r.queue()
 	if err != nil {
 		log.Error(err)
 		return err
 	}
 
-	pubsub := storage.Subscribe(ctx, channel)
+	pubsub := storage.Subscribe(ctx, channels...)
 	defer pubsub.Close()
 
 	for {

@@ -9,6 +9,12 @@ import (
 
 // Limiter returns the appropriate rate limiter as configured by gateway.
 func Limiter(gwConfig *config.Config, redis redis.UniversalClient) limiter.LimiterFunc {
+	if gwConfig.Storage.Type == "crdt" {
+		// Only one that can handle no redis connection.
+		res := limiter.NewLimiter(nil)
+		return res.LeakyBucket
+	}
+
 	name, ok := LimiterKind(gwConfig)
 	if !ok {
 		return nil

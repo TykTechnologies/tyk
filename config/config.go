@@ -159,6 +159,7 @@ type StorageOptionsConf struct {
 	// Options: ["1.0", "1.1", "1.2", "1.3"].
 	// Defaults to "1.2".
 	TLSMinVersion string `json:"tls_min_version"`
+	BootstrapAddr string `json:"bootstrap_addr"`
 }
 
 type NormalisedURLConfig struct {
@@ -722,6 +723,9 @@ type Config struct {
 
 	// This section defines your Redis configuration.
 	Storage StorageOptionsConf `json:"storage"`
+
+	EnableSeparateRLStore bool               `json:"enable_separate_rl_store"`
+	RateLimitStorage      StorageOptionsConf `json:"rate_limit_data_storage"`
 
 	// Disable the capability of the Gateway to `autodiscover` the Dashboard through heartbeat messages via Redis.
 	// The goal of zeroconf is auto-discovery, so you do not have to specify the Tyk Dashboard address in your Gateway`tyk.conf` file.

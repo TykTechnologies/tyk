@@ -1413,7 +1413,7 @@ func (s *Test) CreateSession(sGen ...func(s *user.SessionState)) (*user.SessionS
 		return nil, ""
 	}
 
-	keySuccess := apiModifyKeySuccess{}
+	keySuccess := ApiModifyKeySuccess{}
 	err = json.NewDecoder(resp.Body).Decode(&keySuccess)
 	if err != nil {
 		log.Fatal("Error while decoding session response:", err)

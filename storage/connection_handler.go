@@ -2,6 +2,7 @@ package storage
 
 import (
 	"context"
+	"fmt"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -45,6 +46,20 @@ func NewConnectionHandler(ctx context.Context) *ConnectionHandler {
 		connections:   make(map[string]model.Connector),
 		connectionsMu: &sync.RWMutex{},
 	}
+}
+
+func NewConnectionHandlerWithSeededConn(ctx context.Context, name string, conn model.Connector) *ConnectionHandler {
+	c := &ConnectionHandler{
+		ctx:           ctx,
+		reconnect:     make(chan struct{}, 1),
+		connections:   map[string]model.Connector{name: conn},
+		connectionsMu: &sync.RWMutex{},
+	}
+
+	// cheating but assuming conn is up before we use it
+	c.storageUp.Store(true)
+
+	return c
 }
 
 // DisableStorage allows to dynamically enable/disable talking with storage
@@ -283,17 +298,48 @@ func NewConnector(connType string, conf config.Config) (model.Connector, error) 
 	case model.LocalType:
 		return connector.NewConnector(model.LocalType, opts...)
 	case model.CRDTType:
-		cfg := model.NewCRDTConfig(
-			model.WithListenAddr("/ip4/0.0.0.0/tcp/7653"),
-			model.WithBootstrapAddr("/ip4/0.0.0.0/tcp/7654/p2p/Qmdk1BsF73TusG2XdhhjAWsyFS1hrPb7C7PC6n1jhECnZZ"),
-			model.WithDBName("gateway-conf-db"),
-			model.WithKeyFromFile("./private.key"),
-		)
-		return connector.NewCRDTConnector(cfg)
+		if crdtSingleton != nil {
+			return crdtSingleton, nil
+		}
+
+		opts := []model.CRDTOption{
+			model.WithConnectOnInstantiate(),
+			model.WithSharedKey("swarm.key"),
+		}
+
+		listenAddrs := cfg.Addrs
+		if len(cfg.Addrs) == 0 {
+			listenAddrs = []string{"/ip4/0.0.0.0/tcp/7654"}
+		}
+		opts = append(opts, model.WithListenAddrs(listenAddrs))
+
+		dbName := "gateway-conf-db"
+		if cfg.Database != 0 {
+			dbName = fmt.Sprintf("gateway-conf-db-%d", cfg.Database)
+		}
+		opts = append(opts, model.WithDBName(dbName))
+
+		keyFile := "./private.key"
+		if cfg.KeyFile != "" {
+			keyFile = cfg.KeyFile
+		}
+		opts = append(opts, model.WithKeyFromFile(keyFile))
+
+		if cfg.BootstrapAddr != "" {
+			bootstrapAddr := cfg.BootstrapAddr
+			opts = append(opts, model.WithBootstrapAddr(bootstrapAddr))
+		}
+
+		cfg := model.NewCRDTConfig(opts...)
+		var err error
+		crdtSingleton, err = connector.NewCRDTConnector(cfg)
+		return crdtSingleton, err
 	default:
 		return connector.NewConnector(model.RedisV9Type, opts...)
 	}
 }
+
+var crdtSingleton model.Connector
 
 // getExponentialBackoff returns a backoff.ExponentialBackOff with the following settings:
 //   - Multiplier: 2

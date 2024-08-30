@@ -78,10 +78,10 @@ var (
 	ErrRequestMalformed = errors.New("request malformed")
 )
 
-// apiModifyKeySuccess represents when a Key modification was successful
+// ApiModifyKeySuccess represents when a Key modification was successful
 //
-// swagger:model apiModifyKeySuccess
-type apiModifyKeySuccess struct {
+// swagger:model ApiModifyKeySuccess
+type ApiModifyKeySuccess struct {
 	// in:body
 	Key     string `json:"key"`
 	Status  string `json:"status"`
@@ -435,7 +435,7 @@ func (gw *Gateway) basicAuthHashAlgo() string {
 	return algo
 }
 
-func (gw *Gateway) handleAddOrUpdate(keyName string, r *http.Request, isHashed bool) (interface{}, int) {
+func (gw *Gateway) HandleAddOrUpdate(keyName string, r *http.Request, isHashed bool) (interface{}, int) {
 	suppressReset := r.URL.Query().Get("suppress_reset") == "1"
 
 	// decode payload
@@ -571,7 +571,7 @@ func (gw *Gateway) handleAddOrUpdate(keyName string, r *http.Request, isHashed b
 		Key:              keyName,
 	})
 
-	response := apiModifyKeySuccess{
+	response := ApiModifyKeySuccess{
 		Key:    keyName,
 		Status: "ok",
 		Action: action,
@@ -593,7 +593,7 @@ func (gw *Gateway) handleAddOrUpdate(keyName string, r *http.Request, isHashed b
 	return response, http.StatusOK
 }
 
-func (gw *Gateway) handleGetDetail(sessionKey, apiID, orgID string, byHash bool) (interface{}, int) {
+func (gw *Gateway) HandleGetDetail(sessionKey, apiID, orgID string, byHash bool) (interface{}, int) {
 	if byHash && !gw.GetConfig().HashKeys {
 		return apiError("Key requested by hash but key hashing is not enabled"), http.StatusBadRequest
 	}
@@ -694,13 +694,13 @@ func (gw *Gateway) handleGetDetail(sessionKey, apiID, orgID string, byHash bool)
 	return session.Clone(), http.StatusOK
 }
 
-// apiAllKeys represents a list of keys in the memory store
+// ApiAllKeys represents a list of keys in the memory store
 // swagger:model
-type apiAllKeys struct {
+type ApiAllKeys struct {
 	APIKeys []string `json:"keys"`
 }
 
-func (gw *Gateway) handleGetAllKeys(filter string) (interface{}, int) {
+func (gw *Gateway) HandleGetAllKeys(filter string) (interface{}, int) {
 	sessions := gw.GlobalSessionManager.Sessions(filter)
 	if filter != "" {
 		filterB64 := base64.StdEncoding.WithPadding(base64.NoPadding).EncodeToString([]byte(fmt.Sprintf(`{"org":"%s"`, filter)))
@@ -717,7 +717,7 @@ func (gw *Gateway) handleGetAllKeys(filter string) (interface{}, int) {
 		}
 	}
 
-	sessionsObj := apiAllKeys{fixedSessions}
+	sessionsObj := ApiAllKeys{fixedSessions}
 
 	log.WithFields(logrus.Fields{
 		"prefix": "api",
@@ -727,7 +727,7 @@ func (gw *Gateway) handleGetAllKeys(filter string) (interface{}, int) {
 	return sessionsObj, http.StatusOK
 }
 
-func (gw *Gateway) handleAddKey(keyName, sessionString, orgId string) {
+func (gw *Gateway) HandleAddKey(keyName, sessionString, orgId string) {
 	sess := &user.SessionState{}
 	json.Unmarshal([]byte(sessionString), sess)
 	sess.LastUpdated = strconv.Itoa(int(time.Now().Unix()))
@@ -754,7 +754,7 @@ func (gw *Gateway) handleAddKey(keyName, sessionString, orgId string) {
 	}).Info("Updated key in slave storage.")
 }
 
-func (gw *Gateway) handleDeleteKey(keyName, orgID, apiID string, resetQuota bool) (interface{}, int) {
+func (gw *Gateway) HandleDeleteKey(keyName, orgID, apiID string, resetQuota bool) (interface{}, int) {
 	session, ok := gw.GlobalSessionManager.SessionDetail(orgID, keyName, false)
 	if !ok {
 		return apiError("There is no such key found"), http.StatusNotFound
@@ -798,7 +798,7 @@ func (gw *Gateway) handleDeleteKey(keyName, orgID, apiID string, resetQuota bool
 		return apiError("Failed to remove the key"), http.StatusBadRequest
 	}
 
-	statusObj := apiModifyKeySuccess{
+	statusObj := ApiModifyKeySuccess{
 		Key:    keyName,
 		Status: "ok",
 		Action: "deleted",
@@ -870,7 +870,7 @@ func (gw *Gateway) handleDeleteHashedKey(keyName, orgID, apiID string, resetQuot
 		gw.GlobalSessionManager.ResetQuota(keyName, &session, true)
 	}
 
-	statusObj := apiModifyKeySuccess{
+	statusObj := ApiModifyKeySuccess{
 		Key:    keyName,
 		Status: "ok",
 		Action: "deleted",
@@ -951,7 +951,7 @@ func (gw *Gateway) handleAddOrUpdatePolicy(polID string, r *http.Request) (inter
 		action = "added"
 	}
 
-	response := apiModifyKeySuccess{
+	response := ApiModifyKeySuccess{
 		Key:    newPol.ID,
 		Status: "ok",
 		Action: action,
@@ -975,7 +975,7 @@ func (gw *Gateway) handleDeletePolicy(polID string) (interface{}, int) {
 		return apiError("Delete failed"), http.StatusInternalServerError
 	}
 
-	response := apiModifyKeySuccess{
+	response := ApiModifyKeySuccess{
 		Key:    polID,
 		Status: "ok",
 		Action: "deleted",
@@ -1157,7 +1157,7 @@ func (gw *Gateway) handleAddApi(r *http.Request, fs afero.Fs, oasEndpoint bool) 
 		}
 	}
 
-	response := apiModifyKeySuccess{
+	response := ApiModifyKeySuccess{
 		Key:    newDef.APIID,
 		Status: "ok",
 		Action: "added",
@@ -1227,7 +1227,7 @@ func (gw *Gateway) handleUpdateApi(apiID string, r *http.Request, fs afero.Fs, o
 		}
 	}
 
-	response := apiModifyKeySuccess{
+	response := ApiModifyKeySuccess{
 		Key:    newDef.APIID,
 		Status: "ok",
 		Action: "modified",
@@ -1344,7 +1344,7 @@ func (gw *Gateway) handleDeleteAPI(apiID string) (interface{}, int) {
 		}
 	}
 
-	response := apiModifyKeySuccess{
+	response := ApiModifyKeySuccess{
 		Key:    apiID,
 		Status: "ok",
 		Action: "deleted",
@@ -1611,20 +1611,20 @@ func (gw *Gateway) keyHandler(w http.ResponseWriter, r *http.Request) {
 
 	switch r.Method {
 	case http.MethodPost:
-		obj, code = gw.handleAddOrUpdate(keyName, r, isHashed)
+		obj, code = gw.HandleAddOrUpdate(keyName, r, isHashed)
 	case http.MethodPut:
-		obj, code = gw.handleAddOrUpdate(keyName, r, isHashed)
+		obj, code = gw.HandleAddOrUpdate(keyName, r, isHashed)
 		if code != http.StatusOK && hashKeyFunction != "" {
 			// try to use legacy key format
-			obj, code = gw.handleAddOrUpdate(origKeyName, r, isHashed)
+			obj, code = gw.HandleAddOrUpdate(origKeyName, r, isHashed)
 		}
 	case http.MethodGet:
 		if keyName != "" {
 			// Return single key detail
-			obj, code = gw.handleGetDetail(keyName, apiID, orgID, isHashed)
+			obj, code = gw.HandleGetDetail(keyName, apiID, orgID, isHashed)
 			if code != http.StatusOK && hashKeyFunction != "" {
 				// try to use legacy key format
-				obj, code = gw.handleGetDetail(origKeyName, apiID, orgID, isHashed)
+				obj, code = gw.HandleGetDetail(origKeyName, apiID, orgID, isHashed)
 			}
 		} else {
 			// Return list of keys
@@ -1640,24 +1640,24 @@ func (gw *Gateway) keyHandler(w http.ResponseWriter, r *http.Request) {
 				}
 
 				// we don't use filter for hashed keys
-				obj, code = gw.handleGetAllKeys("")
+				obj, code = gw.HandleGetAllKeys("")
 			} else {
 				filter := r.URL.Query().Get("filter")
-				obj, code = gw.handleGetAllKeys(filter)
+				obj, code = gw.HandleGetAllKeys(filter)
 			}
 		}
 
 	case http.MethodDelete:
 		// Remove a key
 		if !isHashed {
-			obj, code = gw.handleDeleteKey(keyName, orgID, apiID, true)
+			obj, code = gw.HandleDeleteKey(keyName, orgID, apiID, true)
 		} else {
 			obj, code = gw.handleDeleteHashedKeyWithLogs(keyName, orgID, apiID, true)
 		}
 		if code != http.StatusOK && hashKeyFunction != "" {
 			// try to use legacy key format
 			if !isHashed {
-				obj, code = gw.handleDeleteKey(origKeyName, orgID, apiID, true)
+				obj, code = gw.HandleDeleteKey(origKeyName, orgID, apiID, true)
 			} else {
 				obj, code = gw.handleDeleteHashedKeyWithLogs(origKeyName, orgID, apiID, true)
 			}
@@ -1727,7 +1727,7 @@ func (gw *Gateway) handleUpdateHashedKey(keyName string, applyPolicies []string)
 		return apiError("Could not write key data"), http.StatusInternalServerError
 	}
 
-	statusObj := apiModifyKeySuccess{
+	statusObj := ApiModifyKeySuccess{
 		Key:    keyName,
 		Status: "ok",
 		Action: "updated",
@@ -1824,7 +1824,7 @@ func (gw *Gateway) handleOrgAddOrUpdate(orgID string, r *http.Request) (interfac
 		action = "added"
 	}
 
-	response := apiModifyKeySuccess{
+	response := ApiModifyKeySuccess{
 		Key:    orgID,
 		Status: "ok",
 		Action: action,
@@ -1870,7 +1870,7 @@ func (gw *Gateway) handleGetAllOrgKeys(filter string) (interface{}, int) {
 			fixed_sessions = append(fixed_sessions, s)
 		}
 	}
-	sessionsObj := apiAllKeys{fixed_sessions}
+	sessionsObj := ApiAllKeys{fixed_sessions}
 	return sessionsObj, http.StatusOK
 }
 
@@ -1902,7 +1902,7 @@ func (gw *Gateway) handleDeleteOrgKey(orgID string) (interface{}, int) {
 	spec.OrgHasNoSession = true
 	spec.Unlock()
 
-	statusObj := apiModifyKeySuccess{
+	statusObj := ApiModifyKeySuccess{
 		Key:    orgID,
 		Status: "ok",
 		Action: "deleted",
@@ -2054,7 +2054,7 @@ func (gw *Gateway) createKeyHandler(w http.ResponseWriter, r *http.Request) {
 
 	}
 
-	obj := apiModifyKeySuccess{
+	obj := ApiModifyKeySuccess{
 		Action: "added",
 		Key:    newKey,
 		Status: "ok",
@@ -2469,7 +2469,7 @@ func (gw *Gateway) invalidateOauthRefresh(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	success := apiModifyKeySuccess{
+	success := ApiModifyKeySuccess{
 		Key:    keyName,
 		Status: "ok",
 		Action: "deleted",
@@ -2700,7 +2700,7 @@ func (gw *Gateway) handleDeleteOAuthClient(keyName, apiID string) (interface{}, 
 			return apiError("Delete failed"), http.StatusInternalServerError
 		}
 
-		statusObj := apiModifyKeySuccess{
+		statusObj := ApiModifyKeySuccess{
 			Key:    keyName,
 			Status: "ok",
 			Action: "deleted",

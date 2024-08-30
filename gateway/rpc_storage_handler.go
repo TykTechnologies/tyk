@@ -937,7 +937,7 @@ func (gw *Gateway) getSessionAndCreate(keyName string, r *RPCStorageHandler, isH
 	if err != nil {
 		log.Error("Key not found in master - skipping")
 	} else {
-		gw.handleAddKey(key, sessionString, orgId)
+		gw.HandleAddKey(key, sessionString, orgId)
 	}
 }
 
@@ -1138,7 +1138,7 @@ func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string, orgId string) 
 				if storage.TokenOrg(key) == "" {
 					key = r.Gw.generateToken(orgId, key)
 				}
-				_, status = r.Gw.handleDeleteKey(key, orgId, "-1", resetQuota)
+				_, status = r.Gw.HandleDeleteKey(key, orgId, "-1", resetQuota)
 				// check if we must remove the key by custom key id
 				status, err = r.deleteUsingTokenID(key, orgId, resetQuota, status)
 				if err != nil {
@@ -1178,7 +1178,7 @@ func (r *RPCStorageHandler) deleteUsingTokenID(key, orgId string, resetQuota boo
 	if status == http.StatusNotFound {
 		id, err := storage.TokenID(key)
 		if err == nil {
-			_, status = r.Gw.handleDeleteKey(id, orgId, "-1", resetQuota)
+			_, status = r.Gw.HandleDeleteKey(id, orgId, "-1", resetQuota)
 		}
 	}
 	return status, nil

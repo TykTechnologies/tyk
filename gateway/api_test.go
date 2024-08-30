@@ -718,7 +718,7 @@ func TestKeyHandler_DeleteKeyWithQuota(t *testing.T) {
 					}...)
 
 					// remove the key, but not always the quota key
-					ts.Gw.handleDeleteKey(key, orgId, "-1", quotaTc.resetQuota)
+					ts.Gw.HandleDeleteKey(key, orgId, "-1", quotaTc.resetQuota)
 
 					// we might remove the key, but for rpc sometimes we just remove the key and not the quota
 					// so we can get the updated key and still preserving the quota count
@@ -895,7 +895,7 @@ func TestKeyHandler_CheckKeysNotDuplicateOnUpdate(t *testing.T) {
 
 			requestByte := test.MarshalJSON(t)(session)
 			r := httptest.NewRequest(http.MethodPut, "/tyk/keys/"+keyName, bytes.NewReader(requestByte))
-			ts.Gw.handleAddOrUpdate(keyName, r, tc.HashKeys)
+			ts.Gw.HandleAddOrUpdate(keyName, r, tc.HashKeys)
 
 			sessions := ts.Gw.GlobalSessionManager.Sessions("")
 			if len(sessions) != 1 {
