@@ -238,8 +238,8 @@ func (t *Service) Apply(session *user.SessionState) error {
 		session.AccessRights = rights
 	}
 
-	if len(rights) == 0 {
-		return errors.New("key has no valid policies to be aplied")
+	if len(rights) == 0 && policyIDs != nil {
+		return errors.New("key has no valid policies to be applied")
 	}
 
 	return nil
