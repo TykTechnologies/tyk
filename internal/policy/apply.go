@@ -119,6 +119,11 @@ func (t *Service) Apply(session *user.SessionState) error {
 		policy, ok := storage.PolicyByID(polID)
 		if !ok {
 			err := fmt.Errorf("policy not found: %q", polID)
+
+			if len(policyIDs) > 1 {
+				continue
+			}
+
 			t.Logger().Error(err)
 			return err
 		}
@@ -232,6 +237,10 @@ func (t *Service) Apply(session *user.SessionState) error {
 	// Override session ACL if at least one policy define it
 	if len(applyState.didAcl) > 0 {
 		session.AccessRights = rights
+	}
+
+	if len(rights) == 0 {
+		return errors.New("key has no valid policies to be aplied")
 	}
 
 	return nil
