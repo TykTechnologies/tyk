@@ -45,7 +45,13 @@ func (gw *Gateway) prepareStorage() generalStores {
 	gs.redisStore = &storage.RedisCluster{KeyPrefix: "apikey-", HashKeys: gw.GetConfig().HashKeys, ConnectionHandler: gw.StorageConnectionHandler}
 	gs.redisOrgStore = &storage.RedisCluster{KeyPrefix: "orgkey.", ConnectionHandler: gw.StorageConnectionHandler}
 	gs.healthStore = &storage.RedisCluster{KeyPrefix: "apihealth.", ConnectionHandler: gw.StorageConnectionHandler}
-	gs.rpcAuthStore = &RPCStorageHandler{KeyPrefix: "apikey-", HashKeys: gw.GetConfig().HashKeys, Gw: gw}
+	gs.rpcAuthStore = GetRPCBackendHandler(
+		gw.GetConfig().SlaveOptions.RPCType,
+		&rpcInitConfig{
+			KeyPrefix: "apikey-",
+			HashKeys:  gw.GetConfig().HashKeys,
+			Gw:        gw,
+		})
 	gs.rpcOrgStore = gw.getGlobalMDCBStorageHandler("orgkey.", false)
 
 	gw.GlobalSessionManager.Init(gs.redisStore)

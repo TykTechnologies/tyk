@@ -221,6 +221,8 @@ require (
 	nhooyr.io/websocket v1.8.10 // indirect
 )
 
+// replace github.com/TykTechnologies/storage => ../storage
+
 //replace github.com/TykTechnologies/graphql-go-tools => ../graphql-go-tools
 
 //replace github.com/TykTechnologies/graphql-go-tools/v2 => ../graphql-go-tools/v2

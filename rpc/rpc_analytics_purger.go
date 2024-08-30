@@ -66,7 +66,7 @@ func (r *Purger) PurgeCache() {
 		Log.Error("RPC client is not connected, use Connect method 1st")
 	}
 
-	if _, err := FuncClientSingleton("Ping", nil); err != nil {
+	if _, err := RPC().FuncClientSingleton("Ping", nil); err != nil {
 		Log.WithError(err).Error("Can't purge cache, failed to ping RPC")
 		return
 	}
@@ -95,8 +95,8 @@ func (r *Purger) PurgeCache() {
 		}
 
 		// Send keys to RPC
-		if _, err := FuncClientSingleton("PurgeAnalyticsData", string(data)); err != nil {
-			EmitErrorEvent(FuncClientSingletonCall, "PurgeAnalyticsData", err)
+		if _, err := RPC().FuncClientSingleton("PurgeAnalyticsData", string(data)); err != nil {
+			RPC().EmitErrorEvent(FuncClientSingletonCall, "PurgeAnalyticsData", err)
 			Log.Warn("Failed to call purge, retrying: ", err)
 		}
 

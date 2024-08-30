@@ -10,7 +10,7 @@ func TestRecoveryFromEmregencyMode(t *testing.T) {
 	// group login has the same recovery api so we don't need to test for it.
 	isGroup := func() bool { return false }
 
-	ok := doLoginWithRetries(func() error {
+	ok := goRPCHandler.doLoginWithRetries(func() error {
 		return errLogFailed
 	}, func() error {
 		return errLogFailed
@@ -23,7 +23,7 @@ func TestRecoveryFromEmregencyMode(t *testing.T) {
 	}
 	// Lets succeed after second retry
 	x := 0
-	ok = doLoginWithRetries(func() error {
+	ok = goRPCHandler.doLoginWithRetries(func() error {
 		if x == 0 {
 			x++
 			return errLogFailed

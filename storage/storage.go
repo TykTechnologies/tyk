@@ -64,6 +64,13 @@ type Handler interface {
 	Exists(string) (bool, error)
 }
 
+type RPCListener interface {
+	Connect() bool
+	CheckForReload(orgId string) bool
+	StartRPCKeepaliveWatcher()
+	StartRPCLoopCheck(orgId string)
+}
+
 type AnalyticsHandler interface {
 	Connect() bool
 	AppendToSetPipelined(string, [][]byte)

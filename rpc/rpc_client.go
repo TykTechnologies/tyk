@@ -46,11 +46,47 @@ var (
 
 	rpcConnectMu sync.Mutex
 
+	handlerGetterMu sync.Mutex
+
 	// UseSyncLoginRPC for tests where we dont need to execute as a goroutine
 	UseSyncLoginRPC bool
 
 	AnalyticsSerializers []serializer.AnalyticsSerializer
+	goRPCHandler         *gorpcClientManager
+	grpcHandler          *GRPCConnectionHandler
 )
+
+type IRPCClient interface {
+	Connect(Config, bool, map[string]interface{}, func(string, string) interface{}, func(), func()) bool
+	Disconnect() bool
+	FuncClientSingleton(string, interface{}) (interface{}, error)
+	Login() bool
+	GroupLogin() bool
+	LoadCount() int
+	Reset()
+	EmitErrorEvent(string, string, error)
+	EmitErrorEventKv(string, string, error, map[string]string)
+	CloseConnections()
+}
+
+func RPC() IRPCClient {
+	handlerGetterMu.Lock()
+	defer handlerGetterMu.Unlock()
+
+	if GetRPCType() == "rpc" || GetRPCType() == "" {
+		if goRPCHandler == nil {
+			goRPCHandler = &gorpcClientManager{}
+		}
+		return goRPCHandler
+	}
+
+	if grpcHandler == nil {
+		grpcHandler = &GRPCConnectionHandler{}
+	}
+	return grpcHandler
+}
+
+type gorpcClientManager struct{}
 
 // ErrRPCIsDown this is returned when we can't reach rpc server.
 var ErrRPCIsDown = errors.New("RPCStorageHandler: rpc is either down or was not configured")
@@ -68,6 +104,22 @@ type rpcOpts struct {
 	emergencyModeLoaded atomic.Value
 	config              atomic.Value
 	clientIsConnected   atomic.Value
+	rpcType             atomic.Value
+}
+
+func SetRPCType(rpcType string) {
+	values.rpcType.Store(rpcType)
+}
+
+func GetRPCType() string {
+	if v := values.rpcType.Load(); v != nil {
+		return v.(string)
+	}
+	return "rpc"
+}
+
+func SetConnected(connected bool) {
+	values.clientIsConnected.Store(connected)
 }
 
 func (r rpcOpts) ClientIsConnected() bool {
@@ -156,11 +208,11 @@ func IsEmergencyMode() bool {
 	return values.GetEmergencyMode()
 }
 
-func LoadCount() int {
+func (g *gorpcClientManager) LoadCount() int {
 	return values.GetLoadCounts()
 }
 
-func Reset() {
+func (g *gorpcClientManager) Reset() {
 	clientSingleton.Stop()
 	clientSingleton = nil
 	funcClientSingleton = nil
@@ -172,7 +224,7 @@ func ResetEmergencyMode() {
 	values.SetEmergencyModeLoaded(false)
 }
 
-func EmitErrorEvent(jobName string, funcName string, err error) {
+func (g *gorpcClientManager) EmitErrorEvent(jobName string, funcName string, err error) {
 	if Instrument == nil {
 		return
 	}
@@ -186,7 +238,7 @@ func EmitErrorEvent(jobName string, funcName string, err error) {
 	}
 }
 
-func EmitErrorEventKv(jobName string, funcName string, err error, kv map[string]string) {
+func (g *gorpcClientManager) EmitErrorEventKv(jobName string, funcName string, err error, kv map[string]string) {
 	if Instrument == nil {
 		return
 	}
@@ -202,11 +254,11 @@ func EmitErrorEventKv(jobName string, funcName string, err error, kv map[string]
 }
 
 // Connect will establish a connection to the RPC server specified in connection options
-func Connect(connConfig Config, suppressRegister bool, dispatcherFuncs map[string]interface{},
+func (g *gorpcClientManager) Connect(connConfig Config, suppressRegister bool, dispatcherFuncs map[string]interface{},
 	getGroupLoginFunc func(string, string) interface{},
 	emergencyModeFunc func(),
 	emergencyModeLoadedFunc func()) bool {
-	rpcConnectMu.Lock()
+
 	defer rpcConnectMu.Unlock()
 
 	values.config.Store(connConfig)
@@ -250,7 +302,7 @@ func Connect(connConfig Config, suppressRegister bool, dispatcherFuncs map[strin
 		clientSingleton.LogError = gorpc.NilErrorLogger
 	}
 
-	clientSingleton.OnConnect = onConnectFunc
+	clientSingleton.OnConnect = g.onConnectFunc
 
 	clientSingleton.Conns = values.Config().RPCPoolSize
 	if clientSingleton.Conns == 0 {
@@ -279,7 +331,7 @@ func Connect(connConfig Config, suppressRegister bool, dispatcherFuncs map[strin
 		}
 
 		if err != nil {
-			EmitErrorEventKv(
+			g.EmitErrorEventKv(
 				ClientSingletonCall,
 				"dial",
 				err,
@@ -298,44 +350,44 @@ func Connect(connConfig Config, suppressRegister bool, dispatcherFuncs map[strin
 	}
 	clientSingleton.Start()
 
-	loadDispatcher(dispatcherFuncs)
+	g.loadDispatcher(dispatcherFuncs)
 
 	if funcClientSingleton == nil {
 		funcClientSingleton = dispatcher.NewFuncClient(clientSingleton)
 	}
 
-	handleLogin()
+	g.handleLogin()
 	if !suppressRegister {
-		register()
-		go checkDisconnect()
+		g.register()
+		go g.checkDisconnect()
 	}
 	return true
 }
 
-func handleLogin() {
+func (g *gorpcClientManager) handleLogin() {
 	if UseSyncLoginRPC == true {
-		Login()
+		g.Login()
 		return
 	}
-	go Login()
+	go g.Login()
 }
 
 // Login tries to login to the rpc sever. Returns true if it succeeds and false
 // if it fails.
-func Login() bool {
+func (g *gorpcClientManager) Login() bool {
 	// I know this is extreme but rpc.Login() appears about 17 times and the
 	// methods appears to be sometimes called in goroutines.
 	//
 	// Unless someone audits to ensure all of where this appears the parent calls
 	// are not concurrent, this is a much safer solution.
 	v, _, _ := loginFlight.Do("Login", func() (interface{}, error) {
-		return loginBase(), nil
+		return g.loginBase(), nil
 	})
 	return v.(bool)
 }
 
-func loginBase() bool {
-	if !doLoginWithRetries(login, groupLogin, hasAPIKey, isGroup) {
+func (g *gorpcClientManager) loginBase() bool {
+	if !g.doLoginWithRetries(g.login, g.groupLogin, g.hasAPIKey, g.isGroup) {
 		rpcLoginMu.Lock()
 		if values.GetLoadCounts() == 0 && !values.GetEmergencyModeLoaded() {
 			Log.Warning("[RPC Store] --> Detected cold start, attempting to load from cache")
@@ -351,25 +403,25 @@ func loginBase() bool {
 	return true
 }
 
-func GroupLogin() bool {
-	return doGroupLogin(groupLogin)
+func (g *gorpcClientManager) GroupLogin() bool {
+	return g.doGroupLogin(g.groupLogin)
 }
 
-func doGroupLogin(login func() error) bool {
+func (g *gorpcClientManager) doGroupLogin(login func() error) bool {
 	if getGroupLoginCallback == nil {
 		Log.Error("GroupLogin call back is not set")
 		return false
 	}
 	b := backoff.WithMaxRetries(backoff.NewExponentialBackOff(), 3)
-	return backoff.Retry(recoverOp(login), b) == nil
+	return backoff.Retry(g.recoverOp(login), b) == nil
 }
 
-func groupLogin() error {
+func (g *gorpcClientManager) groupLogin() error {
 	groupLoginData := getGroupLoginCallback(values.Config().APIKey, values.Config().GroupID)
-	ok, err := FuncClientSingleton("LoginWithGroup", groupLoginData)
+	ok, err := g.FuncClientSingleton("LoginWithGroup", groupLoginData)
 	if err != nil {
 		Log.WithError(err).Error("RPC Login failed")
-		EmitErrorEventKv(
+		g.EmitErrorEventKv(
 			FuncClientSingletonCall,
 			"LoginWithGroup",
 			err,
@@ -390,11 +442,11 @@ func groupLogin() error {
 
 var errLogFailed = errors.New("Login incorrect")
 
-func login() error {
-	k, err := FuncClientSingleton("Login", values.Config().APIKey)
+func (g *gorpcClientManager) login() error {
+	k, err := g.FuncClientSingleton("Login", values.Config().APIKey)
 	if err != nil {
 		Log.WithError(err).Error("RPC Login failed")
-		EmitErrorEvent(FuncClientSingletonCall, "Login", err)
+		g.EmitErrorEvent(FuncClientSingletonCall, "Login", err)
 		return err
 	}
 	ok := k.(bool)
@@ -407,11 +459,11 @@ func login() error {
 	return nil
 }
 
-func hasAPIKey() bool {
+func (g *gorpcClientManager) hasAPIKey() bool {
 	return len(values.Config().APIKey) != 0
 }
 
-func isGroup() bool {
+func (g *gorpcClientManager) isGroup() bool {
 	return values.Config().GroupID != ""
 }
 
@@ -423,7 +475,7 @@ func isGroup() bool {
 //
 // isGroup returns true if the config.GroupID is set. If this returns true then
 // we perform group login.
-func doLoginWithRetries(login, group func() error, hasAPIKey, isGroup func() bool) bool {
+func (g *gorpcClientManager) doLoginWithRetries(login, group func() error, hasAPIKey, isGroup func() bool) bool {
 	Log.Debug("[RPC Store] Login initiated")
 
 	if !hasAPIKey() {
@@ -431,13 +483,13 @@ func doLoginWithRetries(login, group func() error, hasAPIKey, isGroup func() boo
 	}
 	// If we have a group ID, lets login as a group
 	if isGroup() {
-		return doGroupLogin(group)
+		return g.doGroupLogin(group)
 	}
 	b := backoff.WithMaxRetries(backoff.NewExponentialBackOff(), 3)
-	return backoff.Retry(recoverOp(login), b) == nil
+	return backoff.Retry(g.recoverOp(login), b) == nil
 }
 
-func recoverOp(fn func() error) func() error {
+func (g *gorpcClientManager) recoverOp(fn func() error) func() error {
 	n := 0
 	return func() error {
 		err := fn()
@@ -464,7 +516,7 @@ func recoverOp(fn func() error) func() error {
 // established RPC connection, in that case we perform a retry with exponential
 // backoff ensuring indeed we can't connect to the rpc, this will eventually
 // fall into emergency mode( That is handled outside of this function call)
-func FuncClientSingleton(funcName string, request interface{}) (result interface{}, err error) {
+func (g *gorpcClientManager) FuncClientSingleton(funcName string, request interface{}) (result interface{}, err error) {
 	be := backoff.Retry(func() error {
 		if !values.ClientIsConnected() {
 			return ErrRPCIsDown
@@ -482,7 +534,7 @@ func FuncClientSingleton(funcName string, request interface{}) (result interface
 
 var rpcConnectionsPool []net.Conn
 
-func onConnectFunc(conn net.Conn) (net.Conn, string, error) {
+func (g *gorpcClientManager) onConnectFunc(conn net.Conn) (net.Conn, string, error) {
 	values.clientIsConnected.Store(true)
 	remoteAddr := conn.RemoteAddr().String()
 	Log.WithField("remoteAddr", remoteAddr).Debug("connected to RPC server")
@@ -490,7 +542,7 @@ func onConnectFunc(conn net.Conn) (net.Conn, string, error) {
 	return conn, remoteAddr, nil
 }
 
-func CloseConnections() {
+func (g *gorpcClientManager) CloseConnections() {
 	for k, v := range rpcConnectionsPool {
 		err := v.Close()
 		if err != nil {
@@ -501,24 +553,24 @@ func CloseConnections() {
 	}
 }
 
-func Disconnect() bool {
+func (g *gorpcClientManager) Disconnect() bool {
 	values.clientIsConnected.Store(false)
 	return true
 }
 
-func register() {
+func (g *gorpcClientManager) register() {
 	id = uuid.New()
 	Log.Debug("RPC Client registered")
 }
 
-func checkDisconnect() {
+func (g *gorpcClientManager) checkDisconnect() {
 	res := <-killChan
 	Log.WithField("res", res).Info("RPC Client disconnecting")
 	killed = true
-	Disconnect()
+	g.Disconnect()
 }
 
-func loadDispatcher(dispatcherFuncs map[string]interface{}) {
+func (g *gorpcClientManager) loadDispatcher(dispatcherFuncs map[string]interface{}) {
 	for funcName, funcBody := range dispatcherFuncs {
 		if addedFuncs[funcName] {
 			continue

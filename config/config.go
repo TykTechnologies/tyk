@@ -310,7 +310,9 @@ type WebHookHandlerConf struct {
 
 type SlaveOptionsConfig struct {
 	// Set to `true` to connect a worker Gateway using RPC.
-	UseRPC bool `json:"use_rpc"`
+	UseRPC        bool   `json:"use_rpc"`
+	RPCType       string `json:"rpc_type"`
+	GRPCForceJSON bool   `json:"grpc_force_json"`
 
 	// Set this option to `true` to use an SSL RPC connection.
 	UseSSL bool `json:"use_ssl"`
