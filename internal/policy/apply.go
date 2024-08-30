@@ -119,12 +119,11 @@ func (t *Service) Apply(session *user.SessionState) error {
 		policy, ok := storage.PolicyByID(polID)
 		if !ok {
 			err := fmt.Errorf("policy not found: %q", polID)
-
+			t.Logger().Error(err)
 			if len(policyIDs) > 1 {
 				continue
 			}
 
-			t.Logger().Error(err)
 			return err
 		}
 		// Check ownership, policy org owner must be the same as API,
