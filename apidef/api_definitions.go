@@ -892,10 +892,11 @@ type GraphQLConfig struct {
 type GraphQLConfigVersion string
 
 const (
-	GraphQLConfigVersionNone     GraphQLConfigVersion = ""
-	GraphQLConfigVersion1        GraphQLConfigVersion = "1"
-	GraphQLConfigVersion2        GraphQLConfigVersion = "2"
-	GraphQLConfigVersion3Preview GraphQLConfigVersion = "3-preview"
+	GraphQLConfigVersionNone      GraphQLConfigVersion = ""
+	GraphQLConfigVersion1         GraphQLConfigVersion = "1"
+	GraphQLConfigVersion2         GraphQLConfigVersion = "2"
+	GraphQLConfigVersion3Preview  GraphQLConfigVersion = "3-preview"
+	GraphQLConfigVersionProxyOnly GraphQLConfigVersion = "proxy-only"
 )
 
 type GraphQLIntrospectionConfig struct {
