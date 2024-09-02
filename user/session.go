@@ -215,8 +215,8 @@ type Endpoint struct {
 }
 
 // match matches supplied endpoint with endpoint path.
-func (e Endpoint) match(endpoint string) (bool, error) {
-	return httputil.MatchEndpoint(e.Path, endpoint)
+func (e Endpoint) match(endpoints []string) (bool, error) {
+	return httputil.MatchEndpoints(e.Path, endpoints)
 }
 
 // EndpointMethods is a collection of EndpointMethod.
@@ -528,13 +528,13 @@ type EndpointRateLimitInfo struct {
 }
 
 // RateLimitInfo returns EndpointRateLimitInfo for endpoint rate limiting.
-func (es Endpoints) RateLimitInfo(method string, reqEndpoint string) (*EndpointRateLimitInfo, bool) {
+func (es Endpoints) RateLimitInfo(method string, urlPaths []string) (*EndpointRateLimitInfo, bool) {
 	if len(es) == 0 {
 		return nil, false
 	}
 
 	for _, endpoint := range es {
-		match, err := endpoint.match(reqEndpoint)
+		match, err := endpoint.match(urlPaths)
 		if err != nil {
 			log.WithError(err).Errorf("error matching path regex: %q, skipping", endpoint.Path)
 		}

@@ -1,6 +1,7 @@
 package httputil
 
 import (
+	"errors"
 	"regexp"
 	"strings"
 
@@ -102,4 +103,24 @@ func MatchEndpoint(pattern string, endpoint string) (bool, error) {
 	}
 
 	return asRegex.MatchString(endpoint), nil
+}
+
+// MatchEndpoints matches pattern with multiple request URLs endpoint paths.
+// It will return true if any of them is correctly matched, with no error.
+// If no matches occur, any errors will be retured joined with errors.Join.
+func MatchEndpoints(pattern string, endpoints []string) (bool, error) {
+	var errs []error
+
+	for _, endpoint := range endpoints {
+		match, err := MatchEndpoint(pattern, endpoint)
+		if err != nil {
+			errs = append(errs, err)
+			continue
+		}
+		if match {
+			return true, nil
+		}
+	}
+
+	return false, errors.Join(errs...)
 }
