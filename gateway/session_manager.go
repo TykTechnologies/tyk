@@ -242,8 +242,12 @@ func (l *SessionLimiter) ForwardMessage(r *http.Request, session *user.SessionSt
 		endpointRLKeySuffix = ""
 	)
 
-	reqEndpoint := api.StripListenPath(r.URL.Path)
-	endpointRLInfo, doEndpointRL := accessDef.Endpoints.RateLimitInfo(r.Method, reqEndpoint)
+	urlPaths := []string{
+		api.StripListenPath(r.URL.Path),
+		r.URL.Path,
+	}
+
+	endpointRLInfo, doEndpointRL := accessDef.Endpoints.RateLimitInfo(r.Method, urlPaths)
 	if doEndpointRL {
 		apiLimit.Rate = endpointRLInfo.Rate
 		apiLimit.Per = endpointRLInfo.Per

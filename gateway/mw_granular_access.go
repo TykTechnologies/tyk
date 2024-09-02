@@ -38,26 +38,18 @@ func (m *GranularAccessMiddleware) ProcessRequest(w http.ResponseWriter, r *http
 		r.URL.Path,
 	}
 
-	logger := m.Logger().WithField("path", r.URL.Path)
+	logger := m.Logger().WithField("paths", urlPaths)
 
 	for _, accessSpec := range sessionVersionData.AllowedURLs {
 		url := accessSpec.URL
 
-		var match bool
-		var err error
-		for _, urlPath := range urlPaths {
-			match, err = httputil.MatchEndpoint(url, urlPath)
-			if err != nil || !match {
-				logger.WithError(err).Errorf("error matching path regex: %q, skipping", url)
-				continue
-			}
-			break
-		}
+		match, err := httputil.MatchEndpoints(url, urlPaths)
 
+		// unconditional log of err/match/url...
+		logger.WithError(err).WithField("pattern", url).WithField("match", match).Debug("checking allowed url")
 		if err != nil || !match {
 			continue
 		}
-		logger.WithField("pattern", url).WithField("match", match).Debug("checking allowed url")
 
 		// if a path is matched, but isn't matched on method,
 		// then we continue onto the next path for evaluation.
@@ -69,7 +61,6 @@ func (m *GranularAccessMiddleware) ProcessRequest(w http.ResponseWriter, r *http
 	}
 
 	logger.Info("Attempted access to unauthorised endpoint (Granular).")
-
 	return errors.New("Access to this resource has been disallowed"), http.StatusForbidden
 
 }
