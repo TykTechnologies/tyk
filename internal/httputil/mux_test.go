@@ -29,6 +29,7 @@ func TestGetPathRegexp(t *testing.T) {
 		"/users$":                              "^/users$",
 		"/users/.*":                            "^/users/.*",
 		"/users/{id}":                          "^/users/(?P<v0>[^/]+)",
+		"/users/{id}$":                         "^/users/(?P<v0>[^/]+)$",
 		"/users/{id}/profile/{type:[a-zA-Z]+}": "^/users/(?P<v0>[^/]+)/profile/(?P<v1>[a-zA-Z]+)",
 		"/static/{path}/assets/{file}":         "^/static/(?P<v0>[^/]+)/assets/(?P<v1>[^/]+)",
 		"/items/{itemID:[0-9]+}/details/{detail}": "^/items/(?P<v0>[0-9]+)/details/(?P<v1>[^/]+)",
@@ -153,7 +154,7 @@ func TestMatchEndpoint(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result, err := httputil.MatchEndpoint(tt.pattern, tt.endpoint)
+			result, err := httputil.MatchEndpoints(tt.pattern, []string{tt.endpoint})
 			assert.Equal(t, tt.match, result)
 			assert.Equal(t, tt.isErr, err != nil)
 		})

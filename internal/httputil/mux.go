@@ -30,6 +30,12 @@ func GetPathRegexp(pattern string) (string, error) {
 			return "", err
 		}
 
+		// mux actually doesn't support ending $
+		// fix it to provide a regexp that's expected
+		if strings.HasSuffix(result, "\\$") {
+			result = result[:len(result)-2] + "$"
+		}
+
 		pathRegexpCache.Set(pattern, result)
 		return result, nil
 	}
