@@ -824,6 +824,9 @@ func (a APIDefinitionLoader) generateRegex(stringSpec string, newSpec *URLSpec, 
 	// replace mux named parameters with regex path match
 	asRegexStr := apiLangIDsRegex.ReplaceAllString(stringSpec, `([^/]+)`)
 
+	// new: use mux to provide a regex path
+	asRegexStr, _ = httputil.GetPathRegexp(stringSpec)
+
 	// Case insensitive match
 	if newSpec.IgnoreCase || conf.IgnoreEndpointCase {
 		asRegexStr = "(?i)" + asRegexStr
