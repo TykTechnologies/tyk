@@ -14,10 +14,10 @@ func (a *APISpec) CheckSpecMatchesStatus(r *http.Request, rxPaths []URLSpec, mod
 		if rxPaths[i].Status != mode {
 			continue
 		}
-		if !rxPaths[i].Spec.MatchString(matchPath) {
+		if !rxPaths[i].matchesMethod(method) {
 			continue
 		}
-		if !rxPaths[i].matchesMethod(method) {
+		if !rxPaths[i].matchesPath(matchPath, a.StripListenPath) {
 			continue
 		}
 
@@ -36,10 +36,10 @@ func (a *APISpec) FindSpecMatchesStatus(r *http.Request, rxPaths []URLSpec, mode
 		if rxPaths[i].Status != mode {
 			continue
 		}
-		if !rxPaths[i].Spec.MatchString(matchPath) {
+		if !rxPaths[i].matchesMethod(method) {
 			continue
 		}
-		if !rxPaths[i].matchesMethod(method) {
+		if !rxPaths[i].matchesPath(matchPath, a.StripListenPath) {
 			continue
 		}
 
@@ -64,7 +64,7 @@ func (a *APISpec) getMatchPathAndMethod(r *http.Request, mode URLStatus) (string
 	}
 
 	if a.Proxy.ListenPath != "/" {
-		matchPath = strings.TrimPrefix(matchPath, a.Proxy.ListenPath)
+		matchPath = a.StripListenPath(matchPath)
 	}
 
 	if !strings.HasPrefix(matchPath, "/") {
@@ -72,4 +72,18 @@ func (a *APISpec) getMatchPathAndMethod(r *http.Request, mode URLStatus) (string
 	}
 
 	return matchPath, method
+}
+
+// matchesPath takes the input string and matches it against an internal regex.
+// it will match the regex against the clean URL with stripped listen path first,
+// then it will match against the full URL including the listen path as provided.
+func (a *URLSpec) matchesPath(reqPath string, stripListenPath func(string) string) bool {
+	clean := stripListenPath(reqPath)
+	if a.spec.MatchString(clean) {
+		return true
+	}
+	if a.spec.MatchString(reqPath) {
+		return true
+	}
+	return false
 }

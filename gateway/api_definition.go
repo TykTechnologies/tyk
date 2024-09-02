@@ -134,7 +134,8 @@ const (
 // path is on any of the white, black or ignored lists. This is generated as part of the
 // configuration init
 type URLSpec struct {
-	Spec                      *regexp.Regexp
+	spec *regexp.Regexp
+
 	Status                    URLStatus
 	MethodActions             map[string]apidef.EndpointMethodMeta
 	Whitelist                 apidef.EndPointMeta
@@ -824,17 +825,24 @@ func (a APIDefinitionLoader) generateRegex(stringSpec string, newSpec *URLSpec, 
 	// replace mux named parameters with regex path match
 	asRegexStr := apiLangIDsRegex.ReplaceAllString(stringSpec, `([^/]+)`)
 
-	// new: use mux to provide a regex path
-	asRegexStr, _ = httputil.GetPathRegexp(stringSpec)
+	// use mux to provide a regex path
+	asRegexStr, err := httputil.GetPathRegexp(stringSpec)
+	if err != nil {
+		// fallback to old behaviour in case of errors
+		// convert regexp params to a path match equivalent
+		asRegexStr = apiLangIDsRegex.ReplaceAllString(stringSpec, `([^/]*)`)
+	}
 
 	// Case insensitive match
 	if newSpec.IgnoreCase || conf.IgnoreEndpointCase {
 		asRegexStr = "(?i)" + asRegexStr
 	}
 
-	asRegex, _ := regexp.Compile(asRegexStr)
+	asRegex, err := regexp.Compile(asRegexStr)
+	log.WithError(err).Debugf("URLSpec: %s => %s type=%d", stringSpec, asRegexStr, specType)
+
 	newSpec.Status = specType
-	newSpec.Spec = asRegex
+	newSpec.spec = asRegex
 }
 
 func (a APIDefinitionLoader) compilePathSpec(paths []string, specType URLStatus, conf config.Config) []URLSpec {
@@ -1496,7 +1504,7 @@ func (a *APISpec) getURLStatus(stat URLStatus) RequestStatus {
 // URLAllowedAndIgnored checks if a url is allowed and ignored.
 func (a *APISpec) URLAllowedAndIgnored(r *http.Request, rxPaths []URLSpec, whiteListStatus bool) (RequestStatus, interface{}) {
 	for i := range rxPaths {
-		if !rxPaths[i].Spec.MatchString(r.URL.Path) {
+		if !rxPaths[i].matchesPath(r.URL.Path, a.StripListenPath) {
 			continue
 		}
 
@@ -1507,7 +1515,7 @@ func (a *APISpec) URLAllowedAndIgnored(r *http.Request, rxPaths []URLSpec, white
 
 	// Check if ignored
 	for i := range rxPaths {
-		if !rxPaths[i].Spec.MatchString(r.URL.Path) {
+		if !rxPaths[i].matchesPath(r.URL.Path, a.StripListenPath) {
 			continue
 		}
 
