@@ -412,8 +412,8 @@ func TestConflictingPaths(t *testing.T) {
 
 	ts.Run(t, []test.TestCase{
 		// Should ignore auth check
-		{Method: "POST", Path: "/customer-servicing/documents/metadata/purge", Code: http.StatusOK},
-		{Method: "GET", Path: "/customer-servicing/documents/metadata/{id}", Code: http.StatusOK},
+		{Method: "POST", Path: "/metadata/purge", Code: http.StatusOK},
+		{Method: "GET", Path: "/metadata/{id}", Code: http.StatusOK},
 	}...)
 }
 
