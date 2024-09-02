@@ -14,25 +14,27 @@ func TestGranularAccessMiddleware_ProcessRequest(t *testing.T) {
 	defer g.Close()
 
 	api := g.Gw.BuildAndLoadAPI(func(spec *APISpec) {
-		spec.Proxy.ListenPath = "/"
+		spec.Proxy.ListenPath = "/test"
 		spec.UseKeylessAccess = false
 	})[0]
+
+	allowedURLs := []user.AccessSpec{
+		{
+			URL:     "/valid_path",
+			Methods: []string{"GET"},
+		},
+		{
+			URL:     "^/test/try_valid_path",
+			Methods: []string{"GET"},
+		},
+	}
 
 	_, directKey := g.CreateSession(func(s *user.SessionState) {
 		s.AccessRights = map[string]user.AccessDefinition{
 			api.APIID: {
-				APIID:   api.APIID,
-				APIName: api.Name,
-				AllowedURLs: []user.AccessSpec{
-					{
-						URL:     "^/*.$",
-						Methods: []string{"GET"},
-					},
-					{
-						URL:     "^/valid_path.*",
-						Methods: []string{"GET"},
-					},
-				},
+				APIID:       api.APIID,
+				APIName:     api.Name,
+				AllowedURLs: allowedURLs,
 			},
 		}
 	})
@@ -40,14 +42,9 @@ func TestGranularAccessMiddleware_ProcessRequest(t *testing.T) {
 	pID := g.CreatePolicy(func(p *user.Policy) {
 		p.AccessRights = map[string]user.AccessDefinition{
 			api.APIID: {
-				APIID:   api.APIID,
-				APIName: api.Name,
-				AllowedURLs: []user.AccessSpec{
-					{
-						URL:     "^/valid_path.*",
-						Methods: []string{"GET"},
-					},
-				},
+				APIID:       api.APIID,
+				APIName:     api.Name,
+				AllowedURLs: allowedURLs,
 			},
 		}
 	})
@@ -61,10 +58,21 @@ func TestGranularAccessMiddleware_ProcessRequest(t *testing.T) {
 			header.Authorization: directKey,
 		}
 
+		t.Run("should return 200 OK on regex matching listen path", func(t *testing.T) {
+			_, _ = g.Run(t, []test.TestCase{
+				{
+					Path:    "/test/try_valid_path",
+					Method:  http.MethodGet,
+					Code:    http.StatusOK,
+					Headers: authHeaderWithDirectKey,
+				},
+			}...)
+		})
+
 		t.Run("should return 200 OK on allowed path with allowed method", func(t *testing.T) {
 			_, _ = g.Run(t, []test.TestCase{
 				{
-					Path:    "/valid_path",
+					Path:    "/test/valid_path",
 					Method:  http.MethodGet,
 					Code:    http.StatusOK,
 					Headers: authHeaderWithDirectKey,
@@ -75,7 +83,7 @@ func TestGranularAccessMiddleware_ProcessRequest(t *testing.T) {
 		t.Run("should return 403 Forbidden on allowed path with disallowed method", func(t *testing.T) {
 			_, _ = g.Run(t, []test.TestCase{
 				{
-					Path:    "/valid_path",
+					Path:    "/test/valid_path",
 					Method:  http.MethodPost,
 					Code:    http.StatusForbidden,
 					Headers: authHeaderWithDirectKey,
@@ -86,7 +94,7 @@ func TestGranularAccessMiddleware_ProcessRequest(t *testing.T) {
 		t.Run("should return 403 Forbidden on disallowed path with allowed method", func(t *testing.T) {
 			_, _ = g.Run(t, []test.TestCase{
 				{
-					Path:    "/invalid_path",
+					Path:    "/test/invalid_path",
 					Method:  http.MethodGet,
 					Code:    http.StatusForbidden,
 					Headers: authHeaderWithDirectKey,
@@ -101,10 +109,21 @@ func TestGranularAccessMiddleware_ProcessRequest(t *testing.T) {
 			header.Authorization: policyAppliedKey,
 		}
 
+		t.Run("should return 200 OK on regex matching listen path", func(t *testing.T) {
+			_, _ = g.Run(t, []test.TestCase{
+				{
+					Path:    "/test/try_valid_path",
+					Method:  http.MethodGet,
+					Code:    http.StatusOK,
+					Headers: authHeaderWithPolicyAppliedKey,
+				},
+			}...)
+		})
+
 		t.Run("should return 200 OK on allowed path with allowed method", func(t *testing.T) {
 			_, _ = g.Run(t, []test.TestCase{
 				{
-					Path:    "/valid_path",
+					Path:    "/test/valid_path",
 					Method:  http.MethodGet,
 					Code:    http.StatusOK,
 					Headers: authHeaderWithPolicyAppliedKey,
@@ -115,7 +134,7 @@ func TestGranularAccessMiddleware_ProcessRequest(t *testing.T) {
 		t.Run("should return 403 Forbidden on allowed path with disallowed method", func(t *testing.T) {
 			_, _ = g.Run(t, []test.TestCase{
 				{
-					Path:    "/valid_path",
+					Path:    "/test/valid_path",
 					Method:  http.MethodPost,
 					Code:    http.StatusForbidden,
 					Headers: authHeaderWithPolicyAppliedKey,
@@ -126,7 +145,7 @@ func TestGranularAccessMiddleware_ProcessRequest(t *testing.T) {
 		t.Run("should return 403 Forbidden on disallowed path with allowed method", func(t *testing.T) {
 			_, _ = g.Run(t, []test.TestCase{
 				{
-					Path:    "/invalid_path",
+					Path:    "/test/invalid_path",
 					Method:  http.MethodGet,
 					Code:    http.StatusForbidden,
 					Headers: authHeaderWithPolicyAppliedKey,

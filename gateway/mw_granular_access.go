@@ -22,7 +22,6 @@ func (m *GranularAccessMiddleware) ProcessRequest(w http.ResponseWriter, r *http
 		return nil, http.StatusOK
 	}
 
-	logger := m.Logger().WithField("path", r.URL.Path)
 	session := ctxGetSession(r)
 
 	sessionVersionData, foundAPI := session.AccessRights[m.Spec.APIID]
@@ -34,20 +33,30 @@ func (m *GranularAccessMiddleware) ProcessRequest(w http.ResponseWriter, r *http
 		return nil, http.StatusOK
 	}
 
-	urlPath := m.Spec.StripListenPath(r.URL.Path)
+	urlPaths := []string{
+		m.Spec.StripListenPath(r.URL.Path),
+		r.URL.Path,
+	}
+
+	logger := m.Logger().WithField("path", r.URL.Path)
 
 	for _, accessSpec := range sessionVersionData.AllowedURLs {
 		url := accessSpec.URL
-		match, err := httputil.MatchEndpoint(url, urlPath)
-		if err != nil {
-			logger.WithError(err).Errorf("error matching path regex: %q, skipping", url)
-			continue
+
+		var match bool
+		var err error
+		for _, urlPath := range urlPaths {
+			match, err = httputil.MatchEndpoint(url, urlPath)
+			if err != nil || !match {
+				logger.WithError(err).Errorf("error matching path regex: %q, skipping", url)
+				continue
+			}
+			break
 		}
 
-		if !match {
+		if err != nil || !match {
 			continue
 		}
-
 		logger.WithField("pattern", url).WithField("match", match).Debug("checking allowed url")
 
 		// if a path is matched, but isn't matched on method,
