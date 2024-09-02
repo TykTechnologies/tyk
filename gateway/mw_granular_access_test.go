@@ -20,7 +20,7 @@ func TestGranularAccessMiddleware_ProcessRequest(t *testing.T) {
 
 	allowedURLs := []user.AccessSpec{
 		{
-			URL:     "/valid_path",
+			URL:     "^/valid_path",
 			Methods: []string{"GET"},
 		},
 		{
