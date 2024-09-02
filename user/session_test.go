@@ -514,7 +514,7 @@ func TestEndpoints_RateLimitInfo(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result, found := tt.endpoints.RateLimitInfo(tt.method, tt.path)
+			result, found := tt.endpoints.RateLimitInfo(tt.method, []string{tt.path})
 			assert.Equal(t, tt.found, found)
 			assert.Equal(t, tt.expected, result)
 		})
