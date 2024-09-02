@@ -36,6 +36,9 @@ func GetPathRegexp(pattern string) (string, error) {
 	if strings.HasPrefix(pattern, "/") {
 		return "^" + pattern, nil
 	}
+	if strings.HasPrefix(pattern, "^") {
+		return pattern, nil
+	}
 	return "^.*" + pattern, nil
 }
 

@@ -25,6 +25,7 @@ func TestGetPathRegexp(t *testing.T) {
 		"/users*.":                             "^/users*.",
 		"/users":                               "^/users",
 		"users":                                "^.*users",
+		"^/test/users":                         "^/test/users",
 		"/users$":                              "^/users$",
 		"/users/.*":                            "^/users/.*",
 		"/users/{id}":                          "^/users/(?P<v0>[^/]+)",
