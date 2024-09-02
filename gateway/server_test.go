@@ -220,7 +220,6 @@ func TestGateway_SyncResourcesWithReload(t *testing.T) {
 		assert.Equal(t, 10, resourceCount)
 		assert.Equal(t, 2, *hitCounter)
 	})
-
 }
 
 type gatewayGetHostDetailsTestCheckFn func(*testing.T, *test.BufferedLogger, *Gateway)
@@ -340,12 +339,13 @@ func TestGatewayGetHostDetails(t *testing.T) {
 		getIpAddress = orig_getIpAddress
 	}()
 
+	// replace functions with mocks
+	mainLog = bl.Logger.WithField("prefix", "test")
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// clear logger mock buffer
 			bl.ClearLogs()
-			// replace functions with mocks
-			mainLog = bl.Logger.WithField("prefix", "test")
 			if tt.readPIDFromFile != nil {
 				readPIDFromFile = tt.readPIDFromFile
 			}
