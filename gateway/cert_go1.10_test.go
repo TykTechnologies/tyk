@@ -12,6 +12,8 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/stretchr/testify/assert"
+
 	"github.com/TykTechnologies/tyk/config"
 	tykcrypto "github.com/TykTechnologies/tyk/internal/crypto"
 
