@@ -18,6 +18,7 @@ func (l *Limiter) LeakyBucket(ctx context.Context, key string, rate float64, per
 		raceCheck  = false
 	)
 
+<<<<<<< HEAD
 	rateLimitPrefix := Prefix(l.prefix, key)
 
 	if l.redis != nil {
@@ -26,6 +27,13 @@ func (l *Limiter) LeakyBucket(ctx context.Context, key string, rate float64, per
 	} else {
 		locker = l.lock
 		storage = limiters.LocalLeakyBucket(rateLimitPrefix)
+=======
+	locker = l.Locker(key)
+	if l.redis != nil {
+		storage = limiters.NewLeakyBucketRedis(l.redis, key, ttl, raceCheck)
+	} else {
+		storage = limiters.LocalLeakyBucket(key)
+>>>>>>> 36509786e... [TT-12452] Clear up quota gated with a distributed redis lock (#6448)
 	}
 
 	limiter := limiters.NewLeakyBucket(capacity, outputRate, locker, storage, l.clock, l.logger)

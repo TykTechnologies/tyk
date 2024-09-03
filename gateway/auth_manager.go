@@ -77,9 +77,25 @@ func (b *DefaultSessionManager) ResetQuota(keyName string, session *user.Session
 	// Clear the rate limiter
 	b.store.DeleteRawKey(rateLimiterSentinelKey)
 	// Fix the raw key
+<<<<<<< HEAD
 	b.store.DeleteRawKey(rawKey)
 
 	b.deleteRawKeysWithAllowanceScope(b.store, session, keyName)
+=======
+	defaultKeys := []string{rateLimiterSentinelKey, rawKey}
+	keys := rawKeysWithAllowanceScope(defaultKeys, keyName, session)
+	b.store.DeleteRawKeys(keys)
+}
+
+func rawKeysWithAllowanceScope(keys []string, keyName string, session *user.SessionState) []string {
+	for _, acl := range session.AccessRights {
+		if acl.AllowanceScope == "" {
+			continue
+		}
+		keys = append(keys, QuotaKeyPrefix+acl.AllowanceScope+"-"+keyName)
+	}
+	return keys
+>>>>>>> 36509786e... [TT-12452] Clear up quota gated with a distributed redis lock (#6448)
 }
 
 func (b *DefaultSessionManager) deleteRawKeysWithAllowanceScope(store storage.Handler, session *user.SessionState, keyName string) {

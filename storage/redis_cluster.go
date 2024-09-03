@@ -274,7 +274,9 @@ func (r *RedisCluster) GetKey(keyName string) (string, error) {
 
 	value, err := storage.Get(context.Background(), r.fixKey(keyName))
 	if err != nil {
-		log.Debug("Error trying to get value:", err)
+		if !errors.Is(err, redis.Nil) {
+			log.Debug("Error trying to get value:", err)
+		}
 		return "", ErrKeyNotFound
 	}
 
@@ -337,7 +339,9 @@ func (r *RedisCluster) GetRawKey(keyName string) (string, error) {
 
 	value, err := storage.Get(context.Background(), keyName)
 	if err != nil {
-		log.Debug("Error trying to get value:", err)
+		if !errors.Is(err, redis.Nil) {
+			log.Debug("Error trying to get value:", err)
+		}
 		return "", ErrKeyNotFound
 	}
 
