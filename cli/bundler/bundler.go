@@ -12,12 +12,15 @@ import (
 	"io"
 	"io/ioutil"
 	"os"
+	"runtime"
+	"strings"
+
+	kingpin "github.com/alecthomas/kingpin/v2"
 
 	"github.com/TykTechnologies/goverify"
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/internal/build"
 	logger "github.com/TykTechnologies/tyk/log"
-
-	kingpin "github.com/alecthomas/kingpin/v2"
 )
 
 const (
@@ -47,6 +50,7 @@ type Bundler struct {
 	bundlePath   *string
 	skipSigning  *bool
 	manifestPath *string
+	autoFill     *bool
 }
 
 // Bundle is the entrypoint function for this subcommand.
@@ -74,6 +78,13 @@ func (b *Bundler) Build(ctx *kingpin.ParseContext) error {
 	bundleBuf := new(bytes.Buffer)
 	for _, file := range manifest.FileList {
 		var data []byte
+
+		if b.autoFill != nil && *b.autoFill {
+			file = strings.ReplaceAll(file, "{version}", build.Version)
+			file = strings.ReplaceAll(file, "{os}", runtime.GOOS)
+			file = strings.ReplaceAll(file, "{arch}", runtime.GOARCH)
+		}
+
 		data, err = ioutil.ReadFile(file)
 		if err != nil {
 			break
@@ -208,6 +219,7 @@ func AddTo(app *kingpin.Application) {
 	cmd := app.Command(cmdName, cmdDesc)
 
 	buildCmd := cmd.Command("build", "Build a new plugin bundle using a manifest file and its specified files")
+	bundler.autoFill = buildCmd.Flag("auto-fill", "Fill {os}, {version} and {arch} in manifest file lists").Bool()
 	bundler.keyPath = buildCmd.Flag("key", "Key for bundle signature").Short('k').String()
 	bundler.bundlePath = buildCmd.Flag("output", "Output file").Short('o').Default(defaultBundlePath).String()
 	bundler.skipSigning = buildCmd.Flag("skip-signing", "Skip bundle signing").Short('y').Bool()
