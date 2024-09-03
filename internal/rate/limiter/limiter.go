@@ -15,25 +15,36 @@ type Limiter struct {
 	prefix string
 	redis  redis.UniversalClient
 
-	lock   limiters.DistLocker
+	locker limiters.DistLocker
 	logger limiters.Logger
 	clock  limiters.Clock
 }
 
 type LimiterFunc func(ctx context.Context, key string, rate float64, per float64) error
 
+<<<<<<< HEAD
 func NewLimiter(prefix string, redis redis.UniversalClient) *Limiter {
+=======
+// NewLimiter creates a new limiter object. It holds the redis client and the
+// default non-distributed locks, logger, and a clock for supporting tests.
+func NewLimiter(redis redis.UniversalClient) *Limiter {
+>>>>>>> 36509786e... [TT-12452] Clear up quota gated with a distributed redis lock (#6448)
 	return &Limiter{
 		prefix: prefix,
 		redis:  redis,
-		lock:   limiters.NewLockNoop(),
+		locker: limiters.NewLockNoop(),
 		logger: limiters.NewStdLogger(),
 		clock:  limiters.NewSystemClock(),
 	}
 }
 
-func (l *Limiter) redisLock(name string) limiters.DistLocker {
-	return limiters.NewLockRedis(redis.NewPool(l.redis), name+"-lock")
+// Locker will ensure a distributed lock with redis, using redsync for a key.
+// If redis is not in use, fallback is done to use the default locker.
+func (l *Limiter) Locker(name string) limiters.DistLocker {
+	if l.redis != nil {
+		return limiters.NewLockRedis(redis.NewPool(l.redis), name+"-lock")
+	}
+	return l.locker
 }
 
 func Prefix(params ...string) string {
