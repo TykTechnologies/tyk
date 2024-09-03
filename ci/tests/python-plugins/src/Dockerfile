@@ -1,7 +1,7 @@
 ARG BASE_IMAGE
 FROM ${BASE_IMAGE} as tyk
 
-FROM debian:bullseye-slim
+FROM debian:bookworm-slim
 
 COPY --from=tyk /opt/tyk-gateway/tyk /opt/tyk-gateway/tyk
 

@@ -1,7 +1,7 @@
 ARG BASE_IMAGE
 FROM ${BASE_IMAGE} as tyk
 
-FROM debian:bullseye-slim
+FROM debian:bookworm-slim
 RUN apt-get update && apt-get install -y python3-setuptools libpython3-dev python3-dev python3-grpcio
 
 COPY --from=tyk /opt/tyk-gateway/ /opt/tyk-gateway/
