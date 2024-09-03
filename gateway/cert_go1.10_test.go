@@ -10,6 +10,7 @@ import (
 	"encoding/pem"
 	"errors"
 	"fmt"
+	"os"
 
 	"github.com/TykTechnologies/tyk/config"
 	tykcrypto "github.com/TykTechnologies/tyk/internal/crypto"
@@ -65,6 +66,27 @@ func newUpstreamSSL(t *testing.T, gw *Gateway, serverCert tls.Certificate, handl
 		upstream.Close()
 		gw.CertificateManager.Delete(pubID, "")
 	}
+}
+
+func setGODEBUG(t *testing.T) {
+	t.Helper()
+	// With go 1.22 a few ciphers have been deprecated by the golang team due to security concerns
+	// To mitigate this, we need to set the GODEBUG environment variable to re-enable the deprecated ciphers
+	// to ensure that our clients can still upgrade to the lastest version of Tyk without any functionality breaking
+	// For more details see: https://github.com/golang/go/issues/63413
+	var goDebugVal string
+	if os.Getenv("GODEBUG") == "" {
+		goDebugVal = "tlsrsakex=1"
+	} else {
+		existingGoDebug := os.Getenv("GODEBUG")
+		if strings.Contains(existingGoDebug, "tlsrsakex=0") {
+			goDebugVal = strings.ReplaceAll(existingGoDebug, "tlsrsakex=0", "tlsrsakex=1")
+		} else {
+			goDebugVal = "tlsrsakex=1," + existingGoDebug
+		}
+	}
+
+	assert.NoError(t, os.Setenv("GODEBUG", goDebugVal))
 }
 
 func TestPublicKeyPinning(t *testing.T) {
@@ -238,6 +260,8 @@ func TestPublicKeyPinning(t *testing.T) {
 }
 
 func TestProxyTransport(t *testing.T) {
+	setGODEBUG(t)
+
 	ts := StartTest(nil)
 	defer ts.Close()
 

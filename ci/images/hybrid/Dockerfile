@@ -1,10 +1,10 @@
-FROM debian:bookworm-slim
+FROM debian:bullseye-slim
 ARG TARGETARCH
 
 LABEL Description="Tyk Hybrid Gateway image" Vendor="Tyk"
 
-RUN echo http://deb.debian.org/debian/ bookworm main >> /etc/apt/sources.list.d/debian.sources && \
-    echo deb http://deb.debian.org/debian/ bookworm-updates main >> /etc/apt/sources.list.d/debian.sources
+RUN echo http://deb.debian.org/debian/ bullseye main >> /etc/apt/sources.list.d/debian.sources && \
+    echo deb http://deb.debian.org/debian/ bullseye-updates main >> /etc/apt/sources.list.d/debian.sources
 
 RUN apt-get update \
  && apt-get dist-upgrade -y --no-install-recommends redis-server nginx \
