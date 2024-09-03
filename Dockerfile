@@ -1,11 +1,11 @@
-FROM debian:bookworm AS assets
+FROM debian:bullseye AS assets
 
 # This Dockerfile facilitates bleeding edge development docker image builds
 # directly from source. To build a development image, run `make docker`.
 # If you need to tweak the environment for testing, you can override the
 # `GO_VERSION` and `PYTHON_VERSION` as docker build arguments.
 
-ARG GO_VERSION=1.21.11
+ARG GO_VERSION=1.22.6
 ARG PYTHON_VERSION=3.11.6
 
 WORKDIR /assets
@@ -14,9 +14,9 @@ RUN	apt update && apt install wget -y && \
  	wget -q https://dl.google.com/go/go${GO_VERSION}.linux-amd64.tar.gz && \
 	wget -q https://www.python.org/ftp/python/${PYTHON_VERSION}/Python-${PYTHON_VERSION}.tar.xz
 
-FROM debian:bookworm
+FROM debian:bullseye
 
-ARG GO_VERSION=1.21.11
+ARG GO_VERSION=1.22.6
 ARG PYTHON_VERSION=3.11.6
 
 COPY --from=assets /assets/ /tmp/

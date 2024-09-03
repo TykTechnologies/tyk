@@ -24,22 +24,22 @@ _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
 _builder.BuildTopDescriptorsAndMessages(DESCRIPTOR, 'coprocess_object_pb2', _globals)
 if not _descriptor._USE_C_DESCRIPTORS:
-  _globals['DESCRIPTOR']._loaded_options = None
-  _globals['DESCRIPTOR']._serialized_options = b'Z\n/coprocess'
-  _globals['_OBJECT_METADATAENTRY']._loaded_options = None
-  _globals['_OBJECT_METADATAENTRY']._serialized_options = b'8\001'
-  _globals['_OBJECT_SPECENTRY']._loaded_options = None
-  _globals['_OBJECT_SPECENTRY']._serialized_options = b'8\001'
-  _globals['_OBJECT']._serialized_start=163
-  _globals['_OBJECT']._serialized_end=552
-  _globals['_OBJECT_METADATAENTRY']._serialized_start=460
-  _globals['_OBJECT_METADATAENTRY']._serialized_end=507
-  _globals['_OBJECT_SPECENTRY']._serialized_start=509
-  _globals['_OBJECT_SPECENTRY']._serialized_end=552
-  _globals['_EVENT']._serialized_start=554
-  _globals['_EVENT']._serialized_end=578
-  _globals['_EVENTREPLY']._serialized_start=580
-  _globals['_EVENTREPLY']._serialized_end=592
-  _globals['_DISPATCHER']._serialized_start=594
-  _globals['_DISPATCHER']._serialized_end=718
+    _globals['DESCRIPTOR']._loaded_options = None
+    _globals['DESCRIPTOR']._serialized_options = b'Z\n/coprocess'
+    _globals['_OBJECT_METADATAENTRY']._loaded_options = None
+    _globals['_OBJECT_METADATAENTRY']._serialized_options = b'8\001'
+    _globals['_OBJECT_SPECENTRY']._loaded_options = None
+    _globals['_OBJECT_SPECENTRY']._serialized_options = b'8\001'
+    _globals['_OBJECT']._serialized_start=163
+    _globals['_OBJECT']._serialized_end=552
+    _globals['_OBJECT_METADATAENTRY']._serialized_start=460
+    _globals['_OBJECT_METADATAENTRY']._serialized_end=507
+    _globals['_OBJECT_SPECENTRY']._serialized_start=509
+    _globals['_OBJECT_SPECENTRY']._serialized_end=552
+    _globals['_EVENT']._serialized_start=554
+    _globals['_EVENT']._serialized_end=578
+    _globals['_EVENTREPLY']._serialized_start=580
+    _globals['_EVENTREPLY']._serialized_end=592
+    _globals['_DISPATCHER']._serialized_start=594
+    _globals['_DISPATCHER']._serialized_end=718
 # @@protoc_insertion_point(module_scope)

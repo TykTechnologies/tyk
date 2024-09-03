@@ -37,9 +37,9 @@ jobs:
       fail-fast: false
       matrix:
         golang_cross:
-          - 1.21-bullseye
+          - 1.22-bullseye
         include:
-          - golang_cross: 1.21-bullseye
+          - golang_cross: 1.22-bullseye
             goreleaser: 'ci/goreleaser/goreleaser.yml'
             cgo: 1
             rpmvers: 'el/7 el/8 el/9 amazon/2 amazon/2023'
@@ -123,12 +123,10 @@ jobs:
           mask-aws-account-id: false
       - uses: aws-actions/amazon-ecr-login@v2
         id: ecr
-        if: ${{ matrix.golang_cross == '1.21-bullseye' }}
         with:
           mask-password: 'true'
       - name: Docker metadata for CI
         id: ci_metadata
-        if: ${{ matrix.golang_cross == '1.21-bullseye' }}
         uses: docker/metadata-action@v5
         with:
           images: ${{ steps.ecr.outputs.registry }}/tyk
@@ -142,7 +140,6 @@ jobs:
             type=semver,pattern={{major}}.{{minor}},prefix=v
             type=semver,pattern={{version}},prefix=v
       - name: push image to CI
-        if: ${{ matrix.golang_cross == '1.21-bullseye' }}
         uses: docker/build-push-action@v6
         with:
           context: "dist"
@@ -171,7 +168,6 @@ jobs:
             type=semver,pattern={{version}}
           labels: "org.opencontainers.image.title=tyk-gateway  (distroless) \norg.opencontainers.image.description=Tyk Open Source API Gateway written in Go, supporting REST, GraphQL, TCP and gRPC protocols\norg.opencontainers.image.vendor=tyk.io\norg.opencontainers.image.version=${{ github.ref_name }}\n"
       - name: push image to prod
-        if: ${{ matrix.golang_cross == '1.21-bullseye' }}
         uses: docker/build-push-action@v6
         with:
           context: "dist"
@@ -186,7 +182,6 @@ jobs:
           labels: ${{ steps.tag_metadata.outputs.labels }}
       - name: save deb
         uses: actions/upload-artifact@v4
-        if: ${{ matrix.golang_cross == '1.21-bullseye' }}
         with:
           name: deb
           retention-days: 1
@@ -196,7 +191,6 @@ jobs:
             !dist/*fips*.deb
       - name: save rpm
         uses: actions/upload-artifact@v4
-        if: ${{ matrix.golang_cross == '1.21-bullseye' }}
         with:
           name: rpm
           retention-days: 1
