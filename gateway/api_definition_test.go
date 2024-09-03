@@ -452,7 +452,6 @@ func TestIgnored(t *testing.T) {
 	})
 
 	t.Run("Simple Paths", func(t *testing.T) {
-
 		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 			UpdateAPIVersion(spec, "v1", func(v *apidef.VersionInfo) {
 				v.Paths.Ignored = []string{"/ignored/literal", "/ignored/{id}/test"}
@@ -468,14 +467,13 @@ func TestIgnored(t *testing.T) {
 			{Path: "/ignored/literal", Code: http.StatusOK},
 			{Path: "/ignored/123/test", Code: http.StatusOK},
 			// All methods ignored
-			{Method: "POST", Path: "/ext/ignored/literal", Code: http.StatusOK},
+			{Method: "POST", Path: "/ext/ignored/literal", Code: 401},
 
 			{Path: "/", Code: 401},
 		}...)
 	})
 
 	t.Run("With URL rewrite", func(t *testing.T) {
-
 		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 			UpdateAPIVersion(spec, "v1", func(v *apidef.VersionInfo) {
 				v.ExtendedPaths.URLRewrite = []apidef.URLRewriteMeta{{
@@ -510,7 +508,6 @@ func TestIgnored(t *testing.T) {
 	})
 
 	t.Run("Case Sensitivity", func(t *testing.T) {
-
 		spec := BuildAPI(func(spec *APISpec) {
 			UpdateAPIVersion(spec, "v1", func(v *apidef.VersionInfo) {
 				v.ExtendedPaths.Ignored = []apidef.EndPointMeta{{Path: "/Foo", IgnoreCase: false}, {Path: "/bar", IgnoreCase: true}}
@@ -1032,8 +1029,8 @@ func (ts *Test) testPrepareDefaultVersion() (string, *APISpec) {
 func TestGetVersionFromRequest(t *testing.T) {
 
 	versionInfo := apidef.VersionInfo{}
-	versionInfo.Paths.WhiteList = []string{"/foo"}
-	versionInfo.Paths.BlackList = []string{"/bar"}
+	versionInfo.Paths.WhiteList = []string{"/foo", "/v1/foo", "/v2/foo", "/v3/foo"}
+	versionInfo.Paths.BlackList = []string{"/bar", "/v1/bar", "/v2/bar", "/v3/bar"}
 
 	t.Run("Header location", func(t *testing.T) {
 		ts := StartTest(nil)
