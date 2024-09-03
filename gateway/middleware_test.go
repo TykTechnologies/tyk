@@ -311,7 +311,7 @@ func TestSessionLimiter_RedisQuotaExceeded_PerAPI(t *testing.T) {
 	assert.Equal(t, session.AccessRights[apis[0].APIID].AllowanceScope, apis[0].APIID)
 	assert.Equal(t, session.AccessRights[apis[1].APIID].AllowanceScope, apis[1].APIID)
 
-	// Check allowcance scope is equal to "" because per api is not enabled for api3
+	// Check allowance scope is equal to "" because per api is not enabled for api3
 	assert.Equal(t, session.AccessRights[apis[2].APIID].AllowanceScope, "")
 
 	sendReqAndCheckQuota := func(t *testing.T, apiID string, expectedQuotaRemaining int64, perAPI bool) {

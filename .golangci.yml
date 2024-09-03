@@ -105,6 +105,8 @@ linters-settings:
         disabled: false
         arguments:
           - allowRegex: "^_"
+      - name: import-shadowing
+        disabled: false
       - name: exported
         disabled: false
 
@@ -123,6 +125,7 @@ linters-settings:
     check-blank: true
     exclude-functions:
       - (*github.com/TykTechnologies/tyk/gateway.Test).Run
+      - time.Parse
 
 issues:
   max-issues-per-linter: 0
