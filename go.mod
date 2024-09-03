@@ -505,4 +505,4 @@ require (
 
 //replace github.com/TykTechnologies/graphql-go-tools/v2 => ../graphql-go-tools/v2
 //
-replace github.com/TykTechnologies/benthos/v4 => ../benthos
+//replace github.com/TykTechnologies/benthos/v4 => ../benthos
