@@ -1504,7 +1504,7 @@ func (a *APISpec) getURLStatus(stat URLStatus) RequestStatus {
 // URLAllowedAndIgnored checks if a url is allowed and ignored.
 func (a *APISpec) URLAllowedAndIgnored(r *http.Request, rxPaths []URLSpec, whiteListStatus bool) (RequestStatus, interface{}) {
 	for i := range rxPaths {
-		if !rxPaths[i].matchesPath(r.URL.Path, a.StripListenPath) {
+		if !rxPaths[i].matchesPath(r.URL.Path, a) {
 			continue
 		}
 
@@ -1515,7 +1515,7 @@ func (a *APISpec) URLAllowedAndIgnored(r *http.Request, rxPaths []URLSpec, white
 
 	// Check if ignored
 	for i := range rxPaths {
-		if !rxPaths[i].matchesPath(r.URL.Path, a.StripListenPath) {
+		if !rxPaths[i].matchesPath(r.URL.Path, a) {
 			continue
 		}
 
@@ -1787,8 +1787,32 @@ func (a *APISpec) Version(r *http.Request) (*apidef.VersionInfo, RequestStatus) 
 	return &version, StatusOk
 }
 
+// StripListenPath will strip the listen path from the URL, keeping version in tact.
 func (a *APISpec) StripListenPath(reqPath string) string {
 	return httputil.StripListenPath(a.Proxy.ListenPath, reqPath)
+}
+
+// StripVersionPath will strip the version from the URL. The input URL
+// should already have listen path stripped.
+func (a *APISpec) StripVersionPath(reqPath string) string {
+	// First part of the url is the version fragment
+	part := strings.Split(strings.Trim(reqPath, "/"), "/")[0]
+
+	matchesUrlVersioningPattern := true
+	if a.VersionDefinition.UrlVersioningPattern != "" {
+		re, err := regexp.Compile(a.VersionDefinition.UrlVersioningPattern)
+		if err != nil {
+			log.Error("Error compiling versioning pattern: ", err)
+		} else {
+			matchesUrlVersioningPattern = re.Match([]byte(part))
+		}
+	}
+
+	if (a.VersionDefinition.StripVersioningData || a.VersionDefinition.StripPath) && matchesUrlVersioningPattern {
+		return strings.Replace(reqPath, "/"+part+"/", "/", 1)
+	}
+
+	return reqPath
 }
 
 func (a *APISpec) SanitizeProxyPaths(r *http.Request) {
