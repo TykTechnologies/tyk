@@ -80,7 +80,8 @@ func (b *Bundler) Build(ctx *kingpin.ParseContext) error {
 		var data []byte
 
 		if b.autoFill != nil && *b.autoFill {
-			file = strings.ReplaceAll(file, "{version}", build.Version)
+			cleanVersion := build.CleanVersion(build.Version)
+			file = strings.ReplaceAll(file, "{version}", cleanVersion)
 			file = strings.ReplaceAll(file, "{os}", runtime.GOOS)
 			file = strings.ReplaceAll(file, "{arch}", runtime.GOARCH)
 		}
