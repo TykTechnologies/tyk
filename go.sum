@@ -161,6 +161,8 @@ github.com/PaesslerAG/jsonpath v0.1.1 h1:c1/AToHQMVsduPAa4Vh6xp2U0evy4t8SWp8imEs
 github.com/PaesslerAG/jsonpath v0.1.1/go.mod h1:lVboNxFGal/VwW6d9JzIy56bUsYAP6tH/x80vjnCseY=
 github.com/TykTechnologies/again v0.0.0-20190805133618-6ad301e7eaed h1:/h52kySW055ZF4boJc9tcuQhR909ubCiMN64EMBEu8Q=
 github.com/TykTechnologies/again v0.0.0-20190805133618-6ad301e7eaed/go.mod h1:OUrgdjjCoYX2GZY9Vathb4ExCO9WuPtU1piuOpNw19Q=
+github.com/TykTechnologies/benthos/v4 v4.27.1 h1:Gh3OvZKbgXHXyeD/F+aLHTJD2E/53Ez4kOwpGpLrB1k=
+github.com/TykTechnologies/benthos/v4 v4.27.1/go.mod h1:tNRmMjnirniQaIcfapI7f1qgDyFkRPgLRwf59h8s74o=
 github.com/TykTechnologies/circuitbreaker v2.2.2+incompatible h1:UgJdsV/fBL5Ctx43EGKFxkX0W3MqqeRruadDQ1Kzhn4=
 github.com/TykTechnologies/circuitbreaker v2.2.2+incompatible/go.mod h1:f2+J36wN08/zLudMnO+QaqaBhTdQuIqemtaeEQbhMEM=
 github.com/TykTechnologies/drl v0.0.0-20231218155806-88e4363884a2 h1:jsQNOqSUq4nTzqTlZ7pCsn6g1H8ZYFbORhdmkprxx7M=
