@@ -1029,8 +1029,8 @@ func (ts *Test) testPrepareDefaultVersion() (string, *APISpec) {
 func TestGetVersionFromRequest(t *testing.T) {
 
 	versionInfo := apidef.VersionInfo{}
-	versionInfo.Paths.WhiteList = []string{"/foo", "/v1/foo", "/v2/foo", "/v3/foo"}
-	versionInfo.Paths.BlackList = []string{"/bar", "/v1/bar", "/v2/bar", "/v3/bar"}
+	versionInfo.Paths.WhiteList = []string{"/foo", "/v3/foo"}
+	versionInfo.Paths.BlackList = []string{"/bar"}
 
 	t.Run("Header location", func(t *testing.T) {
 		ts := StartTest(nil)

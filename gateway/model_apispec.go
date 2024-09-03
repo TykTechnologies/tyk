@@ -17,7 +17,7 @@ func (a *APISpec) CheckSpecMatchesStatus(r *http.Request, rxPaths []URLSpec, mod
 		if !rxPaths[i].matchesMethod(method) {
 			continue
 		}
-		if !rxPaths[i].matchesPath(matchPath, a.StripListenPath) {
+		if !rxPaths[i].matchesPath(matchPath, a) {
 			continue
 		}
 
@@ -39,7 +39,7 @@ func (a *APISpec) FindSpecMatchesStatus(r *http.Request, rxPaths []URLSpec, mode
 		if !rxPaths[i].matchesMethod(method) {
 			continue
 		}
-		if !rxPaths[i].matchesPath(matchPath, a.StripListenPath) {
+		if !rxPaths[i].matchesPath(matchPath, a) {
 			continue
 		}
 
@@ -77,11 +77,19 @@ func (a *APISpec) getMatchPathAndMethod(r *http.Request, mode URLStatus) (string
 // matchesPath takes the input string and matches it against an internal regex.
 // it will match the regex against the clean URL with stripped listen path first,
 // then it will match against the full URL including the listen path as provided.
-func (a *URLSpec) matchesPath(reqPath string, stripListenPath func(string) string) bool {
-	clean := stripListenPath(reqPath)
+// APISpec to provide URL sanitization of the input is passed along.
+func (a *URLSpec) matchesPath(reqPath string, api *APISpec) bool {
+	clean := api.StripListenPath(reqPath)
+	noVersion := api.StripVersionPath(clean)
+	// match /users
+	if noVersion != clean && a.spec.MatchString(noVersion) {
+		return true
+	}
+	// match /v3/users
 	if a.spec.MatchString(clean) {
 		return true
 	}
+	// match /listenpath/v3/users
 	if a.spec.MatchString(reqPath) {
 		return true
 	}
