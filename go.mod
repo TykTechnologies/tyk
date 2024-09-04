@@ -68,7 +68,7 @@ require (
 	golang.org/x/crypto v0.24.0
 	golang.org/x/net v0.26.0
 	golang.org/x/sync v0.7.0
-	google.golang.org/grpc v1.64.0
+	google.golang.org/grpc v1.64.1
 	google.golang.org/grpc/examples v0.0.0-20220317213542-f95b001a48df // test
 	google.golang.org/protobuf v1.34.2
 	gopkg.in/vmihailenco/msgpack.v2 v2.9.2
@@ -93,8 +93,11 @@ require (
 	github.com/go-redis/redismock/v9 v9.2.0
 	github.com/goccy/go-json v0.10.3
 	github.com/google/go-cmp v0.6.0
+	github.com/nats-io/nats.go v1.37.0
 	github.com/newrelic/go-agent v2.13.0+incompatible
+	github.com/testcontainers/testcontainers-go v0.33.0
 	github.com/testcontainers/testcontainers-go/modules/kafka v0.32.0
+	github.com/testcontainers/testcontainers-go/modules/nats v0.33.0
 	go.opentelemetry.io/otel v1.24.0
 	go.opentelemetry.io/otel/trace v1.24.0
 	go.uber.org/mock v0.4.0
@@ -142,7 +145,6 @@ require (
 	github.com/Masterminds/sprig v2.22.0+incompatible // indirect
 	github.com/Masterminds/squirrel v1.5.4 // indirect
 	github.com/Microsoft/go-winio v0.6.2 // indirect
-	github.com/Microsoft/hcsshim v0.11.5 // indirect
 	github.com/OneOfOne/xxhash v1.2.8 // indirect
 	github.com/PaesslerAG/gval v1.2.2 // indirect
 	github.com/PaesslerAG/jsonpath v0.1.1 // indirect
@@ -211,8 +213,8 @@ require (
 	github.com/cockroachdb/apd/v3 v3.2.1 // indirect
 	github.com/colinmarc/hdfs v1.1.3 // indirect
 	github.com/containerd/containerd v1.7.18 // indirect
-	github.com/containerd/errdefs v0.1.0 // indirect
 	github.com/containerd/log v0.1.0 // indirect
+	github.com/containerd/platforms v0.2.1 // indirect
 	github.com/couchbase/gocb/v2 v2.8.0 // indirect
 	github.com/couchbase/gocbcore/v10 v10.4.0 // indirect
 	github.com/couchbase/gocbcoreps v0.1.2 // indirect
@@ -227,7 +229,7 @@ require (
 	github.com/dgryski/go-rendezvous v0.0.0-20200823014737-9f7001d12a5f // indirect
 	github.com/distribution/reference v0.6.0 // indirect
 	github.com/dlclark/regexp2 v1.10.0 // indirect
-	github.com/docker/docker v27.0.3+incompatible // indirect
+	github.com/docker/docker v27.1.1+incompatible // indirect
 	github.com/docker/go-connections v0.5.0 // indirect
 	github.com/docker/go-units v0.5.0 // indirect
 	github.com/dop251/goja v0.0.0-20231014103939-873a1496dc8e // indirect
@@ -366,7 +368,6 @@ require (
 	github.com/mpvl/unique v0.0.0-20150818121801-cbe035fff7de // indirect
 	github.com/mtibben/percent v0.2.1 // indirect
 	github.com/nats-io/jwt/v2 v2.5.7 // indirect
-	github.com/nats-io/nats.go v1.32.0 // indirect
 	github.com/nats-io/nkeys v0.4.7 // indirect
 	github.com/nats-io/nuid v1.0.1 // indirect
 	github.com/nats-io/stan.go v0.10.4 // indirect
@@ -421,7 +422,6 @@ require (
 	github.com/spaolacci/murmur3 v1.1.0 // indirect
 	github.com/spf13/cast v1.6.0 // indirect
 	github.com/stretchr/objx v0.5.2 // indirect
-	github.com/testcontainers/testcontainers-go v0.32.0 // indirect
 	github.com/tetratelabs/wazero v1.6.0 // indirect
 	github.com/tidwall/gjson v1.11.0 // indirect
 	github.com/tidwall/match v1.1.1 // indirect

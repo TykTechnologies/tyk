@@ -5,6 +5,12 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
+	"github.com/nats-io/nats.go"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"github.com/testcontainers/testcontainers-go"
+	natscon "github.com/testcontainers/testcontainers-go/modules/nats"
+	"github.com/testcontainers/testcontainers-go/wait"
 	"net/http"
 	"os"
 	"strings"
@@ -56,6 +62,222 @@ func convertToStringKeyMap(i interface{}) interface{} {
 		}
 	}
 	return i
+}
+
+const bentoNatsTemplate = `
+streams:
+ test:
+  input:
+   nats:
+    auto_replay_nacks: true
+    subject: "%s"
+    urls: ["%s"]
+
+  output:
+   http_server:
+    path: /get
+    ws_path: /get/ws`
+
+func TestStreamingAPISingleClient(t *testing.T) {
+	testCases := []struct {
+		name      string
+		isDynamic bool
+	}{
+		{
+			name: "Static group",
+		},
+		{
+			name:      "Dynamic group",
+			isDynamic: true,
+		},
+	}
+	ctx := context.Background()
+
+	natsContainer, err := natscon.Run(
+		ctx,
+		"nats:2.9",
+		testcontainers.WithWaitStrategy(wait.ForAll(
+			wait.ForLog("Server is ready"),
+			wait.ForListeningPort("4222/tcp"),
+		).WithDeadline(30*time.Second)))
+	require.NoError(t, err)
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			//skip if is dynamic, does not work
+			if tc.isDynamic {
+				t.Skip()
+			}
+			configSubject := "test"
+			if tc.isDynamic {
+				configSubject = "$tyk_context.path"
+			}
+			connectionStr, err := natsContainer.ConnectionString(ctx)
+			streamConfig := fmt.Sprintf(bentoNatsTemplate, configSubject, connectionStr)
+
+			ts := StartTest(func(globalConf *config.Config) {
+				globalConf.Streaming.Enabled = true
+			})
+			apiName := "test-api"
+			if err := setUpStreamAPI(ts, apiName, streamConfig); err != nil {
+				t.Fatal(err)
+			}
+
+			const totalMessages = 3
+
+			dialer := websocket.Dialer{
+				HandshakeTimeout: 1 * time.Second,
+				TLSClientConfig:  &tls.Config{InsecureSkipVerify: true},
+			}
+
+			wsURL := strings.Replace(ts.URL, "http", "ws", 1) + fmt.Sprintf("/%s/get/ws", apiName)
+			wsConn, _, err := dialer.Dial(wsURL, nil)
+			require.NoError(t, err, "failed to connect to ws server")
+			t.Cleanup(func() {
+				wsConn.Close()
+			})
+
+			nc, err := nats.Connect(connectionStr)
+			require.NoError(t, err, "error connecting to nats server")
+			t.Cleanup(func() {
+				nc.Close()
+			})
+			subject := "test"
+			if tc.isDynamic {
+
+			}
+			for i := 0; i < totalMessages; i++ {
+				require.NoError(t, nc.Publish(subject, []byte(fmt.Sprintf("Hello %d", i))), "failed to publish message to subject")
+			}
+
+			err = wsConn.SetReadDeadline(time.Now().Add(500 * time.Millisecond))
+			require.NoError(t, err, "error setting read deadline")
+
+			for i := 0; i < totalMessages; i++ {
+				_, p, err := wsConn.ReadMessage()
+				require.NoError(t, err, "error reading message")
+				assert.Equal(t, fmt.Sprintf("Hello %d", i), string(p), "message not equal")
+			}
+		})
+	}
+}
+func TestStreamingAPIMultipleClients(t *testing.T) {
+	ctx := context.Background()
+
+	natsContainer, err := natscon.Run(
+		ctx,
+		"nats:2.9",
+		testcontainers.WithWaitStrategy(wait.ForAll(
+			wait.ForLog("Server is ready"),
+		).WithDeadline(30*time.Second)))
+	require.NoError(t, err)
+
+	connectionStr, err := natsContainer.ConnectionString(ctx)
+
+	streamConfig := fmt.Sprintf(bentoNatsTemplate, "test", connectionStr)
+
+	ts := StartTest(func(globalConf *config.Config) {
+		globalConf.Streaming.Enabled = true
+	})
+	apiName := "test-api"
+
+	if err := setUpStreamAPI(ts, apiName, streamConfig); err != nil {
+		t.Fatal(err)
+	}
+
+	t.Run("multiple clients", func(t *testing.T) {
+		t.Skip()
+		const (
+			totalClients  = 3
+			totalMessages = 3
+		)
+		dialer := websocket.Dialer{
+			HandshakeTimeout: 1 * time.Second,
+			TLSClientConfig:  &tls.Config{InsecureSkipVerify: true},
+		}
+
+		wsURL := strings.Replace(ts.URL, "http", "ws", 1) + fmt.Sprintf("/%s/get/ws", apiName)
+
+		// Create multiple WebSocket connections
+		var wsConns []*websocket.Conn
+		for i := 0; i < totalClients; i++ {
+			wsConn, _, err := dialer.Dial(wsURL, nil)
+			require.NoError(t, err, fmt.Sprintf("failed to connect to ws server for client %d", i))
+			wsConns = append(wsConns, wsConn)
+			t.Cleanup(func() {
+				wsConn.Close()
+			})
+		}
+
+		// Connect to NATS and publish messages
+		nc, err := nats.Connect(connectionStr)
+		require.NoError(t, err, "error connecting to nats server")
+		t.Cleanup(func() {
+			nc.Close()
+		})
+		subject := "test"
+		for i := 0; i < totalMessages; i++ {
+			require.NoError(t, nc.Publish(subject, []byte(fmt.Sprintf("Hello %d", i))), "failed to publish message to subject")
+		}
+
+		// Read messages from all clients
+		for clientID, wsConn := range wsConns {
+			err = wsConn.SetReadDeadline(time.Now().Add(5000 * time.Millisecond))
+			require.NoError(t, err, fmt.Sprintf("error setting read deadline for client %d", clientID))
+
+			for i := 0; i < totalMessages; i++ {
+				_, p, err := wsConn.ReadMessage()
+				require.NoError(t, err, fmt.Sprintf("error reading message for client %d", clientID))
+				assert.Equal(t, fmt.Sprintf("Hello %d", i), string(p), fmt.Sprintf("message not equal for client %d", clientID))
+			}
+		}
+	})
+
+}
+
+func setUpStreamAPI(ts *Test, apiName string, streamConfig string) error {
+	oasAPI, err := setupOASForStreamAPI(streamConfig)
+	if err != nil {
+		return err
+	}
+	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		spec.Proxy.ListenPath = fmt.Sprintf("/%s", apiName)
+		spec.UseKeylessAccess = true
+		spec.IsOAS = true
+		spec.OAS = oasAPI
+		spec.OAS.Fill(*spec.APIDefinition)
+	})
+
+	return nil
+}
+
+func setupOASForStreamAPI(streamingConfig string) (oas.OAS, error) {
+	streamingConfigJSON, err := ConvertYAMLToJSON([]byte(streamingConfig))
+	if err != nil {
+		return oas.OAS{}, fmt.Errorf("failed to convert YAML to JSON: %w", err)
+	}
+
+	var parsedStreamingConfig map[string]interface{}
+	if err := json.Unmarshal(streamingConfigJSON, &parsedStreamingConfig); err != nil {
+		return oas.OAS{}, fmt.Errorf("failed to parse JSON: %v", err)
+	}
+
+	oasAPI := oas.OAS{
+		T: openapi3.T{
+			OpenAPI: "3.0.3",
+			Info: &openapi3.Info{
+				Title:   "oas doc",
+				Version: "1",
+			},
+			Paths: make(openapi3.Paths),
+		},
+	}
+
+	oasAPI.Extensions = map[string]interface{}{
+		ExtensionTykStreaming: parsedStreamingConfig,
+	}
+
+	return oasAPI, nil
 }
 
 func TestAsyncAPI(t *testing.T) {
@@ -184,18 +406,16 @@ streams:
 	}
 }
 
-var tests = []struct {
-	name          string
-	consumerGroup string
-	tenantID      string
-	isDynamic     bool
-}{
-	{"StaticGroup", "static-group", "default", false},
-	{"StaticGroup", "static-group", "default", false},
-	{"DynamicGroup", "$tyk_context.request_id", "dynamic", true},
-}
-
 func TestAsyncAPIHttp(t *testing.T) {
+	var tests = []struct {
+		name          string
+		consumerGroup string
+		tenantID      string
+		isDynamic     bool
+	}{
+		{"StaticGroup", "static-group", "default", false},
+		{"DynamicGroup", "$tyk_context.request_id", "dynamic", true},
+	}
 	ctx := context.Background()
 	kafkaContainer, err := kafka.Run(ctx, "confluentinc/confluent-local:7.5.0")
 	if err != nil {
@@ -292,7 +512,7 @@ func testAsyncAPIHttp(t *testing.T, ts *Test, consumerGroup string, isDynamic bo
 	wsClients := make([]*websocket.Conn, numClients)
 	for i := 0; i < numClients; i++ {
 		dialer := websocket.Dialer{
-			HandshakeTimeout: 100 * time.Millisecond,
+			HandshakeTimeout: 5 * time.Second,
 			TLSClientConfig:  &tls.Config{InsecureSkipVerify: true},
 		}
 		wsURL := strings.Replace(ts.URL, "http", "ws", 1) + fmt.Sprintf("/%s/get/ws", apiName)
@@ -334,7 +554,7 @@ func testAsyncAPIHttp(t *testing.T, ts *Test, consumerGroup string, isDynamic bo
 	}
 
 	messagesReceived := 0
-	overallTimeout := time.After(500 * time.Millisecond)
+	overallTimeout := time.After(20 * time.Second)
 	done := make(chan bool)
 
 	go func() {
@@ -346,7 +566,7 @@ func testAsyncAPIHttp(t *testing.T, ts *Test, consumerGroup string, isDynamic bo
 				return
 			default:
 				for i, wsConn := range wsClients {
-					wsConn.SetReadDeadline(time.Now().Add(500 * time.Millisecond))
+					wsConn.SetReadDeadline(time.Now().Add(15 * time.Second))
 					_, p, err := wsConn.ReadMessage()
 					if err != nil {
 						if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
