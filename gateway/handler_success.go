@@ -11,8 +11,9 @@ import (
 	"time"
 
 	"github.com/sirupsen/logrus"
-	"github.com/TykTechnologies/tyk/storage"
+
 	graphqlinternal "github.com/TykTechnologies/tyk/internal/graphql"
+	"github.com/TykTechnologies/tyk/storage"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/internal/httputil"

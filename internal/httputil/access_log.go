@@ -2,6 +2,7 @@ package httputil
 
 import (
 	"net/http"
+	"net/url"
 
 	"github.com/TykTechnologies/tyk/request"
 
@@ -43,7 +44,12 @@ func (a *AccessLogRecord) WithRequest(req *http.Request) *AccessLogRecord {
 		(*a)["Method"] = req.Method
 		(*a)["Proto"] = req.Proto
 		(*a)["RequestURI"] = req.RequestURI
-		(*a)["UpstreamAddress"] = req.URL.Scheme + "://" + req.URL.Host + req.URL.RequestURI()
+		(*a)["UpstreamAddress"] = (&url.URL{
+			Scheme:   req.URL.Scheme,
+			Host:     req.URL.Host,
+			Path:     req.URL.Path,
+			RawQuery: req.URL.RawQuery,
+		}).String()
 		(*a)["UpstreamPath"] = req.URL.Path
 		(*a)["UpstreamURI"] = req.URL.RequestURI()
 		(*a)["UserAgent"] = req.UserAgent()
