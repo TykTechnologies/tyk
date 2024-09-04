@@ -330,18 +330,6 @@ func (l *SessionLimiter) ForwardMessage(r *http.Request, currentSession *user.Se
 
 }
 
-<<<<<<< HEAD
-func (l *SessionLimiter) RedisQuotaExceeded(r *http.Request, currentSession *user.SessionState, quotaKey, scope string, limit *user.APILimit, store storage.Handler, hashKeys bool) bool {
-	// Unlimited?
-	if limit.QuotaMax == -1 || limit.QuotaMax == 0 {
-		// No quota set
-		return false
-	}
-
-	defer func() {
-		ctxScheduleSessionUpdate(r)
-	}()
-=======
 // RedisQuotaExceeded returns true if the request should be blocked as over quota.
 func (l *SessionLimiter) RedisQuotaExceeded(r *http.Request, session *user.SessionState, quotaKey, scope string, limit *user.APILimit, store storage.Handler, hashKeys bool) bool {
 	if limit.QuotaMax <= 0 {
@@ -352,17 +340,16 @@ func (l *SessionLimiter) RedisQuotaExceeded(r *http.Request, session *user.Sessi
 	ctx := context.Background()
 
 	session.Touch()
->>>>>>> 36509786e... [TT-12452] Clear up quota gated with a distributed redis lock (#6448)
 
 	quotaScope := ""
 	if scope != "" {
 		quotaScope = scope + "-"
 	}
 
-	key := currentSession.KeyID
+	key := session.KeyID
 
 	if hashKeys {
-		key = storage.HashStr(currentSession.KeyID)
+		key = storage.HashStr(session.KeyID)
 	}
 
 	if quotaKey != "" {
@@ -374,25 +361,9 @@ func (l *SessionLimiter) RedisQuotaExceeded(r *http.Request, session *user.Sessi
 	quotaRenewalRate := time.Second * time.Duration(limit.QuotaRenewalRate)
 	quotaMax := limit.QuotaMax
 
-<<<<<<< HEAD
-	log.Debug("[QUOTA] Quota limiter key is: ", rawKey)
-	log.Debug("Renewing with TTL: ", quotaRenewalRate)
-	// INCR the key (If it equals 1 - set EXPIRE)
-	qInt := store.IncrememntWithExpire(rawKey, quotaRenewalRate)
-	// if the returned val is >= quota: block
-	if qInt-1 >= quotaMax {
-		renewalDate := time.Unix(quotaRenews, 0)
-		log.Debug("Renewal Date is: ", renewalDate)
-		log.Debug("As epoch: ", quotaRenews)
-		log.Debug("Session: ", currentSession)
-		log.Debug("Now:", time.Now())
-		if time.Now().After(renewalDate) {
-			//for renew quota = never, once we get the quota max we must not allow using it again
-=======
 	// First, ensure a distributed lock
 	conn := l.limiterStorage
 	locker := limiter.NewLimiter(conn).Locker(rawKey)
->>>>>>> 36509786e... [TT-12452] Clear up quota gated with a distributed redis lock (#6448)
 
 	if err := locker.Lock(ctx); err != nil {
 		log.WithError(err).Error("error locking quota key, blocking")
@@ -433,23 +404,6 @@ func (l *SessionLimiter) RedisQuotaExceeded(r *http.Request, session *user.Sessi
 		"expiredAt": expiredAt,
 	}
 
-<<<<<<< HEAD
-	for k, v := range currentSession.AccessRights {
-		if v.Limit.IsEmpty() {
-			continue
-		}
-
-		if v.AllowanceScope == scope {
-			v.Limit.QuotaRemaining = remaining
-			v.Limit.QuotaRenews = quotaRenews
-		}
-		currentSession.AccessRights[k] = v
-	}
-
-	if scope == "" {
-		currentSession.QuotaRemaining = remaining
-		currentSession.QuotaRenews = quotaRenews
-=======
 	log.WithFields(logFields).Debug("[QUOTA] Request")
 
 	if qInt-1 >= quotaMax {
@@ -465,7 +419,6 @@ func (l *SessionLimiter) RedisQuotaExceeded(r *http.Request, session *user.Sessi
 		} else {
 			return true
 		}
->>>>>>> 36509786e... [TT-12452] Clear up quota gated with a distributed redis lock (#6448)
 	}
 
 	l.updateSessionQuota(session, scope, quotaMax-qInt, expiredAt.Unix())
