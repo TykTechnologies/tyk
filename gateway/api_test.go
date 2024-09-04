@@ -590,6 +590,59 @@ func TestKeyHandler_UpdateKey(t *testing.T) {
 	})
 }
 
+func BenchmarkKeyHandler_CreateKeyHandler(b *testing.B) {
+	ts := StartTest(nil)
+
+	defer ts.Close()
+
+	apiID := "testAPIID"
+	secondAPIID := "secondAPI"
+	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		spec.APIID = apiID
+		spec.OrgID = "default"
+		spec.Proxy.ListenPath = "/my-api"
+		spec.UseKeylessAccess = false
+	})
+	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		spec.APIID = secondAPIID
+		spec.OrgID = "default"
+		spec.Proxy.ListenPath = "/my-api"
+		spec.UseKeylessAccess = false
+	})
+
+	pid := ts.CreatePolicy(func(p *user.Policy) {
+		p.OrgID = "default"
+		p.QuotaMax = 1
+		p.AccessRights = map[string]user.AccessDefinition{
+			"test": {
+				APIID:          apiID,
+				AllowanceScope: "scope1",
+			},
+			"second": {
+				APIID:          secondAPIID,
+				AllowanceScope: "scope1",
+			},
+		}
+	})
+
+	session := user.SessionState{
+		ApplyPolicies: []string{pid},
+	}
+	jsonData, err := json.Marshal(session)
+	require.NoError(b, err)
+
+	require.NoError(b, err)
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		req, err := http.NewRequest(http.MethodPost, "", bytes.NewBuffer(jsonData))
+		require.NoError(b, err)
+		recorder := httptest.NewRecorder()
+		ts.Gw.createKeyHandler(recorder, req)
+		assert.Equal(b, 200, recorder.Code)
+	}
+}
+
 func TestKeyHandler_DeleteKeyWithQuota(t *testing.T) {
 	const testAPIID = "testAPIID"
 	const orgId = "default"
