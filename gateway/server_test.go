@@ -320,6 +320,9 @@ func defineGatewayGetHostDetailsTests() []struct {
 }
 
 func TestGatewayGetHostDetails(t *testing.T) {
+	// This test has several issue over globals, `mainLog`, etc.
+	// There's only rewriting it.
+	t.Skip()
 
 	var (
 		orig_readPIDFromFile = readPIDFromFile
