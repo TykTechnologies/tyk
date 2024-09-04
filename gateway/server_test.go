@@ -161,6 +161,7 @@ func TestGateway_SyncResourcesWithReload(t *testing.T) {
 		globalConf.ResourceSync.RetryAttempts = retryAttempts
 		globalConf.ResourceSync.Interval = 1
 	})
+	defer ts.Close()
 
 	var syncErr = errors.New("sync error")
 	syncFuncSuccessAt := func(t *testing.T, successAt int) (func() (int, error), *int) {

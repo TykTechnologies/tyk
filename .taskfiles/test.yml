@@ -18,7 +18,7 @@ vars:
   tags: '{{ .tags | default "goplugin dev" }}'
   args: '{{ .args | default "-timeout=15m" }}'
   buildArgs: -cover -tags "{{.tags}}"
-  testArgs: -failfast -coverpkg=./... {{.buildArgs}}
+  testArgs: -coverpkg=github.com/TykTechnologies/tyk/...,./... {{.buildArgs}}
   python:
     sh: python3 -c 'import sys; print("%d.%d" % (sys.version_info[0], sys.version_info[1]))'
 
