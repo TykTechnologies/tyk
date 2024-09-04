@@ -18,7 +18,11 @@ vars:
   tags: '{{ .tags | default "goplugin dev" }}'
   args: '{{ .args | default "-timeout=15m" }}'
   buildArgs: -cover -tags "{{.tags}}"
+<<<<<<< HEAD
   testArgs: -failfast -coverpkg=./... {{.buildArgs}}
+=======
+  testArgs: -coverpkg=github.com/TykTechnologies/tyk/...,./... {{.buildArgs}}
+>>>>>>> a616b24e1... [TT-12975] Fix flaky test caused by missed Close invocation (#6481)
   python:
     sh: python3 -c 'import sys; print("%d.%d" % (sys.version_info[0], sys.version_info[1]))'
 
