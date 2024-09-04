@@ -339,7 +339,9 @@ func (l *SessionLimiter) RedisQuotaExceeded(r *http.Request, session *user.Sessi
 	// don't use the requests cancellation context
 	ctx := context.Background()
 
-	session.Touch()
+	defer func() {
+		ctxScheduleSessionUpdate(r)
+	}()
 
 	quotaScope := ""
 	if scope != "" {
