@@ -2,6 +2,7 @@ package httputil
 
 import (
 	"errors"
+	"fmt"
 	"regexp"
 	"strings"
 
@@ -10,44 +11,9 @@ import (
 	"github.com/TykTechnologies/tyk/internal/maps"
 )
 
-// routeCache holds the raw routes as they are mapped to mux regular expressions.
-// e.g. `/foo` becomes `^/foo$` or similar, and parameters get matched and replaced.
+// routeCache holds the raw routes as they are mapped from mux parameters to regular expressions.
+// e.g. `/foo/{id}` becomes `^/foo/([^/]+)$` or similar.
 var pathRegexpCache = maps.NewStringMap()
-
-// GetPathRegexp will convert a mux route url to a regular expression string.
-// The results for subsequent invocations with the same parameters are cached.
-func GetPathRegexp(pattern string) (string, error) {
-	val, ok := pathRegexpCache.Get(pattern)
-	if ok {
-		return val, nil
-	}
-
-	if IsMuxTemplate(pattern) {
-		dummyRouter := mux.NewRouter()
-		route := dummyRouter.PathPrefix(pattern)
-		result, err := route.GetPathRegexp()
-		if err != nil {
-			return "", err
-		}
-
-		// mux actually doesn't support ending $
-		// fix it to provide a regexp that's expected
-		if strings.HasSuffix(result, "\\$") {
-			result = result[:len(result)-2] + "$"
-		}
-
-		pathRegexpCache.Set(pattern, result)
-		return result, nil
-	}
-
-	if strings.HasPrefix(pattern, "/") {
-		return "^" + pattern, nil
-	}
-	if strings.HasPrefix(pattern, "^") {
-		return pattern, nil
-	}
-	return "^.*" + pattern, nil
-}
 
 // apiLandIDsRegex matches mux-style parameters like `{id}`.
 var apiLangIDsRegex = regexp.MustCompile(`{([^}]+)}`)
@@ -60,6 +26,13 @@ var apiLangIDsRegex = regexp.MustCompile(`{([^}]+)}`)
 // If suffix is true, the returned pattern suffixes a `$` to the regex.
 // If both prefix and suffixes are achieved, an explicit match is made.
 func PreparePathRegexp(pattern string, prefix bool, suffix bool) string {
+	// Construct cache key from pattern and flags
+	key := fmt.Sprintf("%s:%v:%v", pattern, prefix, suffix)
+	val, ok := pathRegexpCache.Get(key)
+	if ok {
+		return val
+	}
+
 	// Replace mux named parameters with regex path match.
 	if IsMuxTemplate(pattern) {
 		pattern = apiLangIDsRegex.ReplaceAllString(pattern, `([^/]+)`)
@@ -82,6 +55,9 @@ func PreparePathRegexp(pattern string, prefix bool, suffix bool) string {
 	if suffix && !strings.HasSuffix(pattern, "$") {
 		pattern = pattern + "$"
 	}
+
+	// Save cache for following invocations.
+	pathRegexpCache.Set(key, pattern)
 
 	return pattern
 }
