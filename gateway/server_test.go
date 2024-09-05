@@ -220,6 +220,7 @@ func TestGateway_SyncResourcesWithReload(t *testing.T) {
 		assert.Equal(t, 10, resourceCount)
 		assert.Equal(t, 2, *hitCounter)
 	})
+
 }
 
 type gatewayGetHostDetailsTestCheckFn func(*testing.T, *test.BufferedLogger, *Gateway)
@@ -316,7 +317,6 @@ func defineGatewayGetHostDetailsTests() []struct {
 			),
 		},
 	}
-
 }
 
 func TestGatewayGetHostDetails(t *testing.T) {
