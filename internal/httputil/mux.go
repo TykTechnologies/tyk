@@ -61,18 +61,26 @@ var apiLangIDsRegex = regexp.MustCompile(`{([^}]+)}`)
 // If both prefix and suffixes are achieved, an explicit match is made.
 func PreparePathRegexp(pattern string, prefix bool, suffix bool) string {
 	// Replace mux named parameters with regex path match.
-	pattern = apiLangIDsRegex.ReplaceAllString(pattern, `([^/]+)`)
+	if IsMuxTemplate(pattern) {
+		pattern = apiLangIDsRegex.ReplaceAllString(pattern, `([^/]+)`)
+	}
+
+	// Replace mux wildcard path with a `.*` (match 0 or more characters)
+	if strings.Contains(pattern, "/*") {
+		pattern = strings.ReplaceAll(pattern, "/*/", "/[^/]+/")
+		pattern = strings.ReplaceAll(pattern, "/*", "/.*")
+	}
 
 	// Pattern `/users` becomes `^/users`.
 	if prefix && strings.HasPrefix(pattern, "/") {
-		pattern = "^"+pattern
+		pattern = "^" + pattern
 	}
 
 	// Append $ if necessary to enforce suffix matching.
 	// Pattern `/users` becomes `/users$`.
 	// Pattern `^/users` becomes `^/users$`.
 	if suffix && !strings.HasSuffix(pattern, "$") {
-		pattern = pattern+"$"
+		pattern = pattern + "$"
 	}
 
 	return pattern
@@ -117,22 +125,16 @@ func StripListenPath(listenPath, urlPath string) (res string) {
 	return reg.ReplaceAllString(res, "")
 }
 
-// MatchEndpoint matches pattern with request endpoint.
-func MatchEndpoint(pattern string, endpoint string) (bool, error) {
-	if pattern == endpoint {
+// MatchPath matches regexp pattern with request endpoint.
+func MatchPath(pattern string, endpoint string) (bool, error) {
+	if strings.Trim(pattern, "^$") == "" || endpoint == "" {
+		return false, nil
+	}
+	if pattern == endpoint || pattern == "^"+endpoint+"$" {
 		return true, nil
 	}
 
-	if pattern == "" {
-		return false, nil
-	}
-
-	clean, err := GetPathRegexp(pattern)
-	if err != nil {
-		return false, err
-	}
-
-	asRegex, err := regexp.Compile(clean)
+	asRegex, err := regexp.Compile(pattern)
 	if err != nil {
 		return false, err
 	}
@@ -140,14 +142,14 @@ func MatchEndpoint(pattern string, endpoint string) (bool, error) {
 	return asRegex.MatchString(endpoint), nil
 }
 
-// MatchEndpoints matches pattern with multiple request URLs endpoint paths.
+// MatchPaths matches regexp pattern with multiple request URLs endpoint paths.
 // It will return true if any of them is correctly matched, with no error.
 // If no matches occur, any errors will be retured joined with errors.Join.
-func MatchEndpoints(pattern string, endpoints []string) (bool, error) {
+func MatchPaths(pattern string, endpoints []string) (bool, error) {
 	var errs []error
 
 	for _, endpoint := range endpoints {
-		match, err := MatchEndpoint(pattern, endpoint)
+		match, err := MatchPath(pattern, endpoint)
 		if err != nil {
 			errs = append(errs, err)
 			continue

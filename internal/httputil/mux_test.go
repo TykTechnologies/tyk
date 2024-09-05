@@ -140,7 +140,7 @@ func TestMatchEndpoint(t *testing.T) {
 			name:     "both empty endpoints",
 			pattern:  "",
 			endpoint: "",
-			match:    true,
+			match:    false,
 			isErr:    false,
 		},
 		{
@@ -154,7 +154,10 @@ func TestMatchEndpoint(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result, err := httputil.MatchEndpoints(tt.pattern, []string{tt.endpoint})
+			// explicit match inputs as `^/path$`
+			pattern := httputil.PreparePathRegexp(tt.pattern, true, true)
+
+			result, err := httputil.MatchPaths(pattern, []string{tt.endpoint})
 			assert.Equal(t, tt.match, result)
 			assert.Equal(t, tt.isErr, err != nil)
 		})
