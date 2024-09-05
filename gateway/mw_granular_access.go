@@ -58,18 +58,18 @@ func (m *GranularAccessMiddleware) ProcessRequest(w http.ResponseWriter, r *http
 			}
 
 			// Append $ if so configured to match end of request path.
-			url := accessSpec.URL
-			if isSuffixMatch && !strings.HasSuffix(url, "$") {
-				url += "$"
+			pattern := accessSpec.URL
+			if isSuffixMatch && !strings.HasSuffix(pattern, "$") {
+				pattern += "$"
 			}
 
-			match, err := httputil.MatchEndpoints(url, urlPaths)
+			match, err := httputil.MatchEndpoints(pattern, urlPaths)
 
 			// unconditional log of err/match/url
 			// if loglevel is set to debug verbosity increases and all requests are logged,
 			// regardless if an error occured or not.
 			if gwConfig.LogLevel == "debug" || err != nil {
-				logger = logger.WithError(err).WithField("pattern", url).WithField("match", match)
+				logger = logger.WithError(err).WithField("pattern", pattern).WithField("match", match)
 				if err != nil {
 					logger.Error("error matching endpoint")
 				} else {
@@ -97,18 +97,18 @@ func (m *GranularAccessMiddleware) ProcessRequest(w http.ResponseWriter, r *http
 			continue
 		}
 
-		url := accessSpec.URL
+		pattern := accessSpec.URL
 
 		// Extends legacy by honoring isSuffixMatch.
 		// Append $ if so configured to match end of request path.
-		if isSuffixMatch && !strings.HasSuffix(url, "$") {
-			url += "$"
+		if isSuffixMatch && !strings.HasSuffix(pattern, "$") {
+			pattern += "$"
 		}
 
-		logger.Debug("Checking: ", urlPath, " Against:", url)
+		logger.Debug("Checking: ", urlPath, " Against:", pattern)
 
 		// Wildcard match (user supplied, as-is)
-		asRegex, err := regexp.Compile(url)
+		asRegex, err := regexp.Compile(pattern)
 		if err != nil {
 			logger.WithError(err).Error("Regex error")
 			continue
