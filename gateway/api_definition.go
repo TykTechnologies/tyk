@@ -822,24 +822,44 @@ func (a APIDefinitionLoader) getPathSpecs(apiVersionDef apidef.VersionInfo, conf
 var apiLangIDsRegex = regexp.MustCompile(`{([^}]+)}`)
 
 func (a APIDefinitionLoader) generateRegex(stringSpec string, newSpec *URLSpec, specType URLStatus, conf config.Config) {
-	// replace mux named parameters with regex path match
-	asRegexStr := apiLangIDsRegex.ReplaceAllString(stringSpec, `([^/]+)`)
+	var (
+		pattern string
+		err     error
+	)
+	// Hook per-api settings here via newSpec *URLSpec
+	isPrefixMatch := conf.HttpServerOptions.EnablePrefixMatching
+	isSuffixMatch := conf.HttpServerOptions.EnableSuffixMatching
+	isIgnoreCase := newSpec.IgnoreCase || conf.IgnoreEndpointCase
 
-	// use mux to provide a regex path
-	asRegexStr, err := httputil.GetPathRegexp(stringSpec)
+	if isPrefixMatch {
+		// use mux to provide a regex path
+		pattern, err = httputil.GetPathRegexp(stringSpec)
+	}
+
 	if err != nil {
-		// fallback to old behaviour in case of errors
-		// convert regexp params to a path match equivalent
-		asRegexStr = apiLangIDsRegex.ReplaceAllString(stringSpec, `([^/]*)`)
+		log.WithError(err).Errorf("Error compiling %q, falling back to legacy", pattern)
+		goto legacy
 	}
 
+	goto common
+
+legacy:
+	// Replace mux named parameters with regex path match
+	pattern = apiLangIDsRegex.ReplaceAllString(stringSpec, `([^/]+)`)
+
+common:
 	// Case insensitive match
-	if newSpec.IgnoreCase || conf.IgnoreEndpointCase {
-		asRegexStr = "(?i)" + asRegexStr
+	if isIgnoreCase {
+		pattern = "(?i)" + pattern
 	}
 
-	asRegex, err := regexp.Compile(asRegexStr)
-	log.WithError(err).Debugf("URLSpec: %s => %s type=%d", stringSpec, asRegexStr, specType)
+	// Append $ if necessary to enforce suffix matching.
+	if isSuffixMatch && !strings.HasSuffix(pattern, "$") {
+		pattern += "$"
+	}
+
+	asRegex, err := regexp.Compile(pattern)
+	log.WithError(err).Debugf("URLSpec: %s => %s type=%d", stringSpec, pattern, specType)
 
 	newSpec.Status = specType
 	newSpec.spec = asRegex
