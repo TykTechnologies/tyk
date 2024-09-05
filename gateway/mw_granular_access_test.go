@@ -4,13 +4,16 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/header"
 	"github.com/TykTechnologies/tyk/test"
 	"github.com/TykTechnologies/tyk/user"
 )
 
 func TestGranularAccessMiddleware_ProcessRequest(t *testing.T) {
-	g := StartTest(nil)
+	g := StartTest(func(c *config.Config) {
+		c.HttpServerOptions.EnablePrefixMatching = true
+	})
 	defer g.Close()
 
 	api := g.Gw.BuildAndLoadAPI(func(spec *APISpec) {
