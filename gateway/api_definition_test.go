@@ -418,7 +418,7 @@ func TestConflictingPaths(t *testing.T) {
 }
 
 func TestIgnored(t *testing.T) {
-	ts := StartTest(func (c *config.Config) {
+	ts := StartTest(func(c *config.Config) {
 		c.HttpServerOptions.EnablePrefixMatching = true
 	})
 	defer ts.Close()

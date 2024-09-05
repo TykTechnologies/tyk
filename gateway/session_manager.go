@@ -228,7 +228,7 @@ func (sfr sessionFailReason) String() string {
 	}
 }
 
-func (l *SessionLimiter) rateLimitInfo(r *http.Request, api *APISpec, endpoints user.Endpoints) (*user.EndpointRateLimitInfo, bool) {
+func (l *SessionLimiter) RateLimitInfo(r *http.Request, api *APISpec, endpoints user.Endpoints) (*user.EndpointRateLimitInfo, bool) {
 	// Hook per-api settings here (m.Spec...)
 	isPrefixMatch := l.config.HttpServerOptions.EnablePrefixMatching
 	isSuffixMatch := l.config.HttpServerOptions.EnableSuffixMatching
@@ -291,7 +291,7 @@ func (l *SessionLimiter) ForwardMessage(r *http.Request, session *user.SessionSt
 		endpointRLKeySuffix = ""
 	)
 
-	endpointRLInfo, doEndpointRL := l.rateLimitInfo(r, api, accessDef.Endpoints)
+	endpointRLInfo, doEndpointRL := l.RateLimitInfo(r, api, accessDef.Endpoints)
 	if doEndpointRL {
 		apiLimit.Rate = endpointRLInfo.Rate
 		apiLimit.Per = endpointRLInfo.Per
