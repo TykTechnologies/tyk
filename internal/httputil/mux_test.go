@@ -93,7 +93,7 @@ func TestStripListenPath(t *testing.T) {
 	assert.Equal(t, "/anything/get", httputil.StripListenPath("/{myPattern:foo|bar}", "/anything/get"))
 }
 
-func TestMatchEndpoint(t *testing.T) {
+func TestMatchPaths(t *testing.T) {
 	tests := []struct {
 		name     string
 		pattern  string
@@ -185,7 +185,7 @@ func TestMatchEndpoint(t *testing.T) {
 			// explicit match inputs as `^/path$`
 			pattern := httputil.PreparePathRegexp(tt.pattern, true, true)
 
-			result, err := httputil.MatchPath(pattern, tt.endpoint)
+			result, err := httputil.MatchPaths(pattern, []string{tt.endpoint})
 			assert.Equal(t, tt.match, result)
 			assert.Equal(t, tt.isErr, err != nil)
 		})
