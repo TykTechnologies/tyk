@@ -817,13 +817,18 @@ func (a APIDefinitionLoader) getPathSpecs(apiVersionDef apidef.VersionInfo, conf
 	return combinedPath, len(whiteListPaths) > 0
 }
 
+// match mux tags, `{id}`.
+var apiLangIDsRegex = regexp.MustCompile(`{([^}]+)}`)
+
 func (a APIDefinitionLoader) generateRegex(stringSpec string, newSpec *URLSpec, specType URLStatus, conf config.Config) {
-	apiLangIDsRegex := regexp.MustCompile(`{([^}]+)}`)
+	// replace mux named parameters with regex path match
 	asRegexStr := apiLangIDsRegex.ReplaceAllString(stringSpec, `([^/]+)`)
+
 	// Case insensitive match
 	if newSpec.IgnoreCase || conf.IgnoreEndpointCase {
 		asRegexStr = "(?i)" + asRegexStr
 	}
+
 	asRegex, _ := regexp.Compile(asRegexStr)
 	newSpec.Status = specType
 	newSpec.Spec = asRegex
