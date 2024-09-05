@@ -410,7 +410,7 @@ type HttpServerOptionsConfig struct {
 
 	// EnablePrefixMatching changes the URL matching from wildcard mode to prefix mode.
 	// For example, `/json` matches `*/json*` by current default behaviour.
-	// If wildcard matching is disabled, the match will be performed as a prefix match (`/json*`).
+	// If prefix matching is enabled, the match will be performed as a prefix match (`/json*`).
 	//
 	// The `/json` url would be matched as `^/json` against the following paths:
 	//
@@ -427,10 +427,13 @@ type HttpServerOptionsConfig struct {
 	// the start of string `^` caret.
 	//
 	// For all other cases, the pattern remains unmodified.
+	//
+	// Combine this option with EnableSuffixMatching to achieve strict
+	// url matching with `/json` being evaluated as `^/json$`.
 	EnablePrefixMatching bool `json:"enable_prefix_matching"`
 
-	// EnableExactMatching changes the URL matching to exact matching.
-	// For example: `/json` is matched as `^/json$` against the following paths:
+	// EnableSuffixMatching changes the URL matching to match as a suffix.
+	// For example: `/json` is matched as `/json$` against the following paths:
 	//
 	// - Full listen path and versioning URL (`/listen-path/v4/json`)
 	// - Stripped listen path URL (`/v4/json`)
@@ -443,7 +446,10 @@ type HttpServerOptionsConfig struct {
 	//
 	// If the input pattern already ends with a `$` (`/json$`) then
 	// the pattern remains unmodified.
-	EnableExactMatching bool `json:"enable_exact_matching"`
+	//
+	// Combine this option with EnablePrefixMatching to achieve strict
+	// url matching with `/json` being evaluated as `^/json$`.
+	EnableSuffixMatching bool `json:"enable_suffix_matching"`
 
 	// Disable TLS verification. Required if you are using self-signed certificates.
 	SSLInsecureSkipVerify bool `json:"ssl_insecure_skip_verify"`
