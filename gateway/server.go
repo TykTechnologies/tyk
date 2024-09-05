@@ -264,7 +264,7 @@ func (gw *Gateway) MarshalJSON() ([]byte, error) {
 	return json.Marshal(struct{}{})
 }
 
-func (gw *Gateway) InitializeRPCCache() {
+func (gw *Gateway) initRPCCache() {
 	conf := gw.GetConfig()
 	gw.RPCGlobalCache = cache.New(int64(conf.SlaveOptions.RPCGlobalCacheExpiration), 15)
 	gw.RPCCertCache = cache.New(int64(conf.SlaveOptions.RPCCertCacheExpiration), 15)
@@ -1211,7 +1211,33 @@ func (gw *Gateway) setupLogger() {
 	}
 }
 
-func (gw *Gateway) initialiseSystem() error {
+func (gw *Gateway) initSystem() error {
+	gwConfig := gw.GetConfig()
+
+	// Initialize the appropriate log formatter
+	if os.Getenv("TYK_LOGFORMAT") == "" && !*cli.DebugMode {
+		log.Formatter = logger.NewFormatter(gwConfig.LogFormat)
+		mainLog.Debugf("Set log format to %q", gwConfig.LogFormat)
+	}
+
+	// if TYK_LOGLEVEL is not set, config will be read here.
+	if os.Getenv("TYK_LOGLEVEL") == "" && !*cli.DebugMode {
+		level := strings.ToLower(gwConfig.LogLevel)
+		switch level {
+		case "", "info":
+			// default, do nothing
+		case "error":
+			log.Level = logrus.ErrorLevel
+		case "warn":
+			log.Level = logrus.WarnLevel
+		case "debug":
+			log.Level = logrus.DebugLevel
+		default:
+			mainLog.Fatalf("Invalid log level %q specified in config, must be error, warn, debug or info. ", level)
+		}
+		mainLog.Debugf("Set log level to %q", log.Level)
+	}
+
 	if gw.isRunningTests() && os.Getenv("TYK_LOGLEVEL") == "" {
 		// `go test` without TYK_LOGLEVEL set defaults to no log
 		// output
@@ -1248,23 +1274,7 @@ func (gw *Gateway) initialiseSystem() error {
 
 	overrideTykErrors(gw)
 
-	gwConfig := gw.GetConfig()
-	if os.Getenv("TYK_LOGLEVEL") == "" && !*cli.DebugMode {
-		level := strings.ToLower(gwConfig.LogLevel)
-		switch level {
-		case "", "info":
-			// default, do nothing
-		case "error":
-			log.Level = logrus.ErrorLevel
-		case "warn":
-			log.Level = logrus.WarnLevel
-		case "debug":
-			log.Level = logrus.DebugLevel
-		default:
-			mainLog.Fatalf("Invalid log level %q specified in config, must be error, warn, debug or info. ", level)
-		}
-	}
-
+	gwConfig = gw.GetConfig()
 	if gwConfig.Storage.Type != "redis" {
 		mainLog.Fatal("Redis connection details not set, please ensure that the storage type is set to Redis and that the connection parameters are correct.")
 	}
@@ -1328,7 +1338,7 @@ func (gw *Gateway) initialiseSystem() error {
 	gw.SetConfig(gwConfig)
 	config.Global = gw.GetConfig
 	gw.getHostDetails(gw.GetConfig().PIDFileLocation)
-	gw.InitializeRPCCache()
+	gw.initRPCCache()
 	gw.setupInstrumentation()
 
 	// cleanIdleMemConnProviders checks memconn.Provider (a part of internal API handling)
@@ -1621,7 +1631,7 @@ func Start() {
 
 	gw := NewGateway(gwConfig, ctx)
 
-	if err := gw.initialiseSystem(); err != nil {
+	if err := gw.initSystem(); err != nil {
 		mainLog.Fatalf("Error initialising system: %v", err)
 	}
 
