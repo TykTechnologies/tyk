@@ -49,6 +49,35 @@ func GetPathRegexp(pattern string) (string, error) {
 	return "^.*" + pattern, nil
 }
 
+// apiLandIDsRegex matches mux-style parameters like `{id}`.
+var apiLangIDsRegex = regexp.MustCompile(`{([^}]+)}`)
+
+// PreparePathRexep will replace mux-style parameters in input with a compatible regular expression.
+// Parameters like `{id}` would be replaced to `([^/]+)`. If the input pattern provides a starting
+// or ending delimiters (`^` or `$`), the pattern is returned.
+// If prefix is true, and pattern starts with /, the returned pattern prefixes a `^` to the regex.
+// No other prefix matches are possible so only `/` to `^/` conversion is considered.
+// If suffix is true, the returned pattern suffixes a `$` to the regex.
+// If both prefix and suffixes are achieved, an explicit match is made.
+func PreparePathRegexp(pattern string, prefix bool, suffix bool) string {
+	// Replace mux named parameters with regex path match.
+	pattern = apiLangIDsRegex.ReplaceAllString(pattern, `([^/]+)`)
+
+	// Pattern `/users` becomes `^/users`.
+	if prefix && strings.HasPrefix(pattern, "/") {
+		pattern = "^"+pattern
+	}
+
+	// Append $ if necessary to enforce suffix matching.
+	// Pattern `/users` becomes `/users$`.
+	// Pattern `^/users` becomes `^/users$`.
+	if suffix && !strings.HasSuffix(pattern, "$") {
+		pattern = pattern+"$"
+	}
+
+	return pattern
+}
+
 // IsMuxTemplate determines if a pattern is a mux template by counting the number of opening and closing braces.
 func IsMuxTemplate(pattern string) bool {
 	openBraces := strings.Count(pattern, "{")
