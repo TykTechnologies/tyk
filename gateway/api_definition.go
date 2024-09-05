@@ -818,9 +818,6 @@ func (a APIDefinitionLoader) getPathSpecs(apiVersionDef apidef.VersionInfo, conf
 	return combinedPath, len(whiteListPaths) > 0
 }
 
-// match mux tags, `{id}`.
-var apiLangIDsRegex = regexp.MustCompile(`{([^}]+)}`)
-
 func (a APIDefinitionLoader) generateRegex(stringSpec string, newSpec *URLSpec, specType URLStatus, conf config.Config) {
 	var (
 		pattern string
@@ -831,31 +828,11 @@ func (a APIDefinitionLoader) generateRegex(stringSpec string, newSpec *URLSpec, 
 	isSuffixMatch := conf.HttpServerOptions.EnableSuffixMatching
 	isIgnoreCase := newSpec.IgnoreCase || conf.IgnoreEndpointCase
 
-	if isPrefixMatch {
-		// use mux to provide a regex path
-		pattern, err = httputil.GetPathRegexp(stringSpec)
-	}
+	pattern = httputil.PreparePathRegexp(stringSpec, isPrefixMatch, isSuffixMatch)
 
-	if err != nil {
-		log.WithError(err).Errorf("Error compiling %q, falling back to legacy", pattern)
-		goto legacy
-	}
-
-	goto common
-
-legacy:
-	// Replace mux named parameters with regex path match
-	pattern = apiLangIDsRegex.ReplaceAllString(stringSpec, `([^/]+)`)
-
-common:
 	// Case insensitive match
 	if isIgnoreCase {
 		pattern = "(?i)" + pattern
-	}
-
-	// Append $ if necessary to enforce suffix matching.
-	if isSuffixMatch && !strings.HasSuffix(pattern, "$") {
-		pattern += "$"
 	}
 
 	asRegex, err := regexp.Compile(pattern)

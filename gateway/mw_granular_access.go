@@ -58,12 +58,12 @@ func (m *GranularAccessMiddleware) ProcessRequest(w http.ResponseWriter, r *http
 			}
 
 			// Append $ if so configured to match end of request path.
-			pattern := accessSpec.URL
+			pattern := httputil.PreparePathRegexp(accessSpec.URL, isPrefixMatch, isSuffixMatch)
 			if isSuffixMatch && !strings.HasSuffix(pattern, "$") {
 				pattern += "$"
 			}
 
-			match, err := httputil.MatchEndpoints(pattern, urlPaths)
+			match, err := httputil.MatchPaths(pattern, urlPaths)
 
 			// unconditional log of err/match/url
 			// if loglevel is set to debug verbosity increases and all requests are logged,
@@ -110,7 +110,7 @@ func (m *GranularAccessMiddleware) ProcessRequest(w http.ResponseWriter, r *http
 		// Wildcard match (user supplied, as-is)
 		asRegex, err := regexp.Compile(pattern)
 		if err != nil {
-			logger.WithError(err).Error("Regex error")
+			logger.WithError(err).Error("error compiling regex")
 			continue
 		}
 
