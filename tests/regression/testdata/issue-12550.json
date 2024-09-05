@@ -1,0 +1,1323 @@
+{
+    "id": "668387685bee2200011d9ab0",
+    "name": "TESTBE",
+    "slug": "testbe",
+    "listen_port": 0,
+    "protocol": "",
+    "enable_proxy_protocol": false,
+    "api_id": "171de9a7251e42f96930c91ee1b4b000",
+    "org_id": "6687ce17d13bcc000159260a",
+    "use_keyless": false,
+    "use_oauth2": false,
+    "external_oauth": {
+        "enabled": false,
+        "providers": []
+    },
+    "use_openid": false,
+    "openid_options": {
+        "providers": [],
+        "segregate_by_client": false
+    },
+    "oauth_meta": {
+        "allowed_access_types": [],
+        "allowed_authorize_types": [],
+        "auth_login_redirect": ""
+    },
+    "auth": {
+        "name": "",
+        "use_param": false,
+        "param_name": "",
+        "use_cookie": false,
+        "cookie_name": "",
+        "disable_header": false,
+        "auth_header_name": "Authorization",
+        "use_certificate": false,
+        "validate_signature": false,
+        "signature": {
+            "algorithm": "",
+            "header": "",
+            "use_param": false,
+            "param_name": "",
+            "secret": "",
+            "allowed_clock_skew": 0,
+            "error_code": 0,
+            "error_message": ""
+        }
+    },
+    "auth_configs": {
+        "authToken": {
+            "name": "",
+            "use_param": false,
+            "param_name": "",
+            "use_cookie": false,
+            "cookie_name": "",
+            "disable_header": false,
+            "auth_header_name": "Authorization",
+            "use_certificate": false,
+            "validate_signature": false,
+            "signature": {
+                "algorithm": "",
+                "header": "",
+                "use_param": false,
+                "param_name": "",
+                "secret": "",
+                "allowed_clock_skew": 0,
+                "error_code": 0,
+                "error_message": ""
+            }
+        },
+        "basic": {
+            "name": "",
+            "use_param": false,
+            "param_name": "",
+            "use_cookie": false,
+            "cookie_name": "",
+            "disable_header": false,
+            "auth_header_name": "Authorization",
+            "use_certificate": false,
+            "validate_signature": false,
+            "signature": {
+                "algorithm": "",
+                "header": "",
+                "use_param": false,
+                "param_name": "",
+                "secret": "",
+                "allowed_clock_skew": 0,
+                "error_code": 0,
+                "error_message": ""
+            }
+        },
+        "coprocess": {
+            "name": "",
+            "use_param": false,
+            "param_name": "",
+            "use_cookie": false,
+            "cookie_name": "",
+            "disable_header": false,
+            "auth_header_name": "Authorization",
+            "use_certificate": false,
+            "validate_signature": false,
+            "signature": {
+                "algorithm": "",
+                "header": "",
+                "use_param": false,
+                "param_name": "",
+                "secret": "",
+                "allowed_clock_skew": 0,
+                "error_code": 0,
+                "error_message": ""
+            }
+        },
+        "hmac": {
+            "name": "",
+            "use_param": false,
+            "param_name": "",
+            "use_cookie": false,
+            "cookie_name": "",
+            "disable_header": false,
+            "auth_header_name": "Authorization",
+            "use_certificate": false,
+            "validate_signature": false,
+            "signature": {
+                "algorithm": "",
+                "header": "",
+                "use_param": false,
+                "param_name": "",
+                "secret": "",
+                "allowed_clock_skew": 0,
+                "error_code": 0,
+                "error_message": ""
+            }
+        },
+        "jwt": {
+            "name": "",
+            "use_param": false,
+            "param_name": "",
+            "use_cookie": false,
+            "cookie_name": "",
+            "disable_header": false,
+            "auth_header_name": "Authorization",
+            "use_certificate": false,
+            "validate_signature": false,
+            "signature": {
+                "algorithm": "",
+                "header": "",
+                "use_param": false,
+                "param_name": "",
+                "secret": "",
+                "allowed_clock_skew": 0,
+                "error_code": 0,
+                "error_message": ""
+            }
+        },
+        "oauth": {
+            "name": "",
+            "use_param": false,
+            "param_name": "",
+            "use_cookie": false,
+            "cookie_name": "",
+            "disable_header": false,
+            "auth_header_name": "Authorization",
+            "use_certificate": false,
+            "validate_signature": false,
+            "signature": {
+                "algorithm": "",
+                "header": "",
+                "use_param": false,
+                "param_name": "",
+                "secret": "",
+                "allowed_clock_skew": 0,
+                "error_code": 0,
+                "error_message": ""
+            }
+        },
+        "oidc": {
+            "name": "",
+            "use_param": false,
+            "param_name": "",
+            "use_cookie": false,
+            "cookie_name": "",
+            "disable_header": false,
+            "auth_header_name": "Authorization",
+            "use_certificate": false,
+            "validate_signature": false,
+            "signature": {
+                "algorithm": "",
+                "header": "",
+                "use_param": false,
+                "param_name": "",
+                "secret": "",
+                "allowed_clock_skew": 0,
+                "error_code": 0,
+                "error_message": ""
+            }
+        }
+    },
+    "use_basic_auth": false,
+    "basic_auth": {
+        "disable_caching": false,
+        "cache_ttl": 0,
+        "extract_from_body": false,
+        "body_user_regexp": "",
+        "body_password_regexp": ""
+    },
+    "use_mutual_tls_auth": false,
+    "client_certificates": [],
+    "upstream_certificates": {},
+    "pinned_public_keys": {},
+    "enable_jwt": false,
+    "use_standard_auth": true,
+    "use_go_plugin_auth": false,
+    "enable_coprocess_auth": false,
+    "custom_plugin_auth_enabled": false,
+    "jwt_signing_method": "rsa",
+    "jwt_source": "aHR0cHM6Ly90eWsuc3QuZ2xvYmFsYmx1ZS5jb20vY2FjaGluZ2FwaWZvcm1pY3Jvc29mdG9ubGluZXB1YmxpY2tleS8=",
+    "jwt_identity_base_field": "sub",
+    "jwt_client_base_field": "",
+    "jwt_policy_field_name": "pol",
+    "jwt_default_policies": [
+        "6622552872cd0c0001fca542"
+    ],
+    "jwt_issued_at_validation_skew": 0,
+    "jwt_expires_at_validation_skew": 0,
+    "jwt_not_before_validation_skew": 0,
+    "jwt_skip_kid": false,
+    "scopes": {
+        "jwt": {
+            "scope_claim_name": "azp",
+            "scope_to_policy": {
+                "029dddf8-4aef-46b1-8095-622faafc6b4a": "668387a35bee2200011d9ab1"
+            }
+        },
+        "oidc": {}
+    },
+    "idp_client_id_mapping_disabled": false,
+    "jwt_scope_to_policy_mapping": {
+        "029dddf8-4aef-46b1-8095-622faafc6b4a": "668387a35bee2200011d9ab1"
+    },
+    "jwt_scope_claim_name": "azp",
+    "notifications": {
+        "shared_secret": "",
+        "oauth_on_keychange_url": ""
+    },
+    "enable_signature_checking": false,
+    "hmac_allowed_clock_skew": -1,
+    "hmac_allowed_algorithms": [],
+    "request_signing": {
+        "is_enabled": false,
+        "secret": "",
+        "key_id": "",
+        "algorithm": "",
+        "header_list": [],
+        "certificate_id": "",
+        "signature_header": ""
+    },
+    "base_identity_provided_by": "",
+    "definition": {
+        "enabled": false,
+        "name": "",
+        "default": "",
+        "location": "header",
+        "key": "x-api-version",
+        "strip_path": false,
+        "strip_versioning_data": false,
+        "versions": {}
+    },
+    "version_data": {
+        "not_versioned": false,
+        "default_version": "1.0.0",
+        "versions": {
+            "1.0.0": {
+                "name": "1.0.0",
+                "expires": "",
+                "paths": {
+                    "ignored": [],
+                    "white_list": [],
+                    "black_list": []
+                },
+                "use_extended_paths": true,
+                "extended_paths": {
+                    "white_list": [
+                        {
+                            "disabled": false,
+                            "path": "/api/v1/users/{userId}/roles",
+                            "method": "",
+                            "ignore_case": false,
+                            "method_actions": {
+                                "GET": {
+                                    "action": "no_action",
+                                    "code": 200,
+                                    "data": "",
+                                    "headers": {}
+                                }
+                            }
+                        },
+                        {
+                            "disabled": false,
+                            "path": "/api/v1/applications/{applicationId}/roles/{roleId}",
+                            "method": "",
+                            "ignore_case": false,
+                            "method_actions": {
+                                "GET": {
+                                    "action": "no_action",
+                                    "code": 200,
+                                    "data": "",
+                                    "headers": {}
+                                },
+                                "PUT": {
+                                    "action": "no_action",
+                                    "code": 200,
+                                    "data": "",
+                                    "headers": {}
+                                }
+                            }
+                        },
+                        {
+                            "disabled": false,
+                            "path": "/api/v1/synchronisation/user",
+                            "method": "",
+                            "ignore_case": false,
+                            "method_actions": {
+                                "POST": {
+                                    "action": "no_action",
+                                    "code": 200,
+                                    "data": "",
+                                    "headers": {}
+                                }
+                            }
+                        },
+                        {
+                            "disabled": false,
+                            "path": "/api/v1/trees",
+                            "method": "",
+                            "ignore_case": false,
+                            "method_actions": {
+                                "GET": {
+                                    "action": "no_action",
+                                    "code": 200,
+                                    "data": "",
+                                    "headers": {}
+                                },
+                                "POST": {
+                                    "action": "no_action",
+                                    "code": 200,
+                                    "data": "",
+                                    "headers": {}
+                                }
+                            }
+                        },
+                        {
+                            "disabled": false,
+                            "path": "/api/v1/edges/trees/{treeId}/aspectedges/{aspectEdgeId}",
+                            "method": "",
+                            "ignore_case": false,
+                            "method_actions": {
+                                "GET": {
+                                    "action": "no_action",
+                                    "code": 200,
+                                    "data": "",
+                                    "headers": {}
+                                }
+                            }
+                        },
+                        {
+                            "disabled": false,
+                            "path": "/api/v1/logevent",
+                            "method": "",
+                            "ignore_case": false,
+                            "method_actions": {
+                                "POST": {
+                                    "action": "no_action",
+                                    "code": 200,
+                                    "data": "",
+                                    "headers": {}
+                                }
+                            }
+                        },
+                        {
+                            "disabled": false,
+                            "path": "/api/v1/edges/trees/{treeId}/edges/{edgeId}",
+                            "method": "",
+                            "ignore_case": false,
+                            "method_actions": {
+                                "DELETE": {
+                                    "action": "no_action",
+                                    "code": 200,
+                                    "data": "",
+                                    "headers": {}
+                                }
+                            }
+                        },
+                        {
+                            "disabled": false,
+                            "path": "/api/v1/endpoints/provider/{providerApplicationId}/reload",
+                            "method": "",
+                            "ignore_case": false,
+                            "method_actions": {
+                                "POST": {
+                                    "action": "no_action",
+                                    "code": 200,
+                                    "data": "",
+                                    "headers": {}
+                                }
+                            }
+                        },
+                        {
+                            "disabled": false,
+                            "path": "/api/v1/aspects",
+                            "method": "",
+                            "ignore_case": false,
+                            "method_actions": {
+                                "GET": {
+                                    "action": "no_action",
+                                    "code": 200,
+                                    "data": "",
+                                    "headers": {}
+                                },
+                                "POST": {
+                                    "action": "no_action",
+                                    "code": 200,
+                                    "data": "",
+                                    "headers": {}
+                                }
+                            }
+                        },
+                        {
+                            "disabled": false,
+                            "path": "/api/v1/synchronisation/selfAdmin",
+                            "method": "",
+                            "ignore_case": false,
+                            "method_actions": {
+                                "POST": {
+                                    "action": "no_action",
+                                    "code": 200,
+                                    "data": "",
+                                    "headers": {}
+                                }
+                            }
+                        },
+                        {
+                            "disabled": false,
+                            "path": "/api/v1/companies",
+                            "method": "",
+                            "ignore_case": false,
+                            "method_actions": {
+                                "GET": {
+                                    "action": "no_action",
+                                    "code": 200,
+                                    "data": "",
+                                    "headers": {}
+                                },
+                                "POST": {
+                                    "action": "no_action",
+                                    "code": 200,
+                                    "data": "",
+                                    "headers": {}
+                                }
+                            }
+                        },
+                        {
+                            "disabled": false,
+                            "path": "/health",
+                            "method": "",
+                            "ignore_case": false,
+                            "method_actions": {
+                                "GET": {
+                                    "action": "no_action",
+                                    "code": 200,
+                                    "data": "",
+                                    "headers": {}
+                                }
+                            }
+                        },
+                        {
+                            "disabled": false,
+                            "path": "/api/v1/edges/trees/{treeId}",
+                            "method": "",
+                            "ignore_case": false,
+                            "method_actions": {
+                                "GET": {
+                                    "action": "no_action",
+                                    "code": 200,
+                                    "data": "",
+                                    "headers": {}
+                                }
+                            }
+                        },
+                        {
+                            "disabled": false,
+                            "path": "/api/v1/edges/trees/{treeId}/edges/{edgeId}/path",
+                            "method": "",
+                            "ignore_case": false,
+                            "method_actions": {
+                                "GET": {
+                                    "action": "no_action",
+                                    "code": 200,
+                                    "data": "",
+                                    "headers": {}
+                                }
+                            }
+                        },
+                        {
+                            "disabled": false,
+                            "path": "/api/v1/integrations",
+                            "method": "",
+                            "ignore_case": false,
+                            "method_actions": {
+                                "GET": {
+                                    "action": "no_action",
+                                    "code": 200,
+                                    "data": "",
+                                    "headers": {}
+                                }
+                            }
+                        },
+                        {
+                            "disabled": false,
+                            "path": "/api/v1/applications/{applicationId}",
+                            "method": "",
+                            "ignore_case": false,
+                            "method_actions": {
+                                "GET": {
+                                    "action": "no_action",
+                                    "code": 200,
+                                    "data": "",
+                                    "headers": {}
+                                },
+                                "PUT": {
+                                    "action": "no_action",
+                                    "code": 200,
+                                    "data": "",
+                                    "headers": {}
+                                }
+                            }
+                        },
+                        {
+                            "disabled": false,
+                            "path": "/api/v1/users/partner",
+                            "method": "",
+                            "ignore_case": false,
+                            "method_actions": {
+                                "GET": {
+                                    "action": "no_action",
+                                    "code": 200,
+                                    "data": "",
+                                    "headers": {}
+                                },
+                                "POST": {
+                                    "action": "no_action",
+                                    "code": 200,
+                                    "data": "",
+                                    "headers": {}
+                                }
+                            }
+                        },
+                        {
+                            "disabled": false,
+                            "path": "/api/v1/aspects/{aspectId}/paths",
+                            "method": "",
+                            "ignore_case": false,
+                            "method_actions": {
+                                "GET": {
+                                    "action": "no_action",
+                                    "code": 200,
+                                    "data": "",
+                                    "headers": {}
+                                }
+                            }
+                        },
+                        {
+                            "disabled": false,
+                            "path": "/api/v1/aspects/{aspectId}",
+                            "method": "",
+                            "ignore_case": false,
+                            "method_actions": {
+                                "DELETE": {
+                                    "action": "no_action",
+                                    "code": 200,
+                                    "data": "",
+                                    "headers": {}
+                                },
+                                "GET": {
+                                    "action": "no_action",
+                                    "code": 200,
+                                    "data": "",
+                                    "headers": {}
+                                },
+                                "PUT": {
+                                    "action": "no_action",
+                                    "code": 200,
+                                    "data": "",
+                                    "headers": {}
+                                }
+                            }
+                        },
+                        {
+                            "disabled": false,
+                            "path": "/api/v1/applications",
+                            "method": "",
+                            "ignore_case": false,
+                            "method_actions": {
+                                "GET": {
+                                    "action": "no_action",
+                                    "code": 200,
+                                    "data": "",
+                                    "headers": {}
+                                },
+                                "POST": {
+                                    "action": "no_action",
+                                    "code": 200,
+                                    "data": "",
+                                    "headers": {}
+                                }
+                            }
+                        },
+                        {
+                            "disabled": false,
+                            "path": "/api/v1/trees/{treeId}",
+                            "method": "",
+                            "ignore_case": false,
+                            "method_actions": {
+                                "GET": {
+                                    "action": "no_action",
+                                    "code": 200,
+                                    "data": "",
+                                    "headers": {}
+                                },
+                                "PUT": {
+                                    "action": "no_action",
+                                    "code": 200,
+                                    "data": "",
+                                    "headers": {}
+                                }
+                            }
+                        },
+                        {
+                            "disabled": false,
+                            "path": "/api/v1/users/{userId}/ecm",
+                            "method": "",
+                            "ignore_case": false,
+                            "method_actions": {
+                                "GET": {
+                                    "action": "no_action",
+                                    "code": 200,
+                                    "data": "",
+                                    "headers": {}
+                                }
+                            }
+                        },
+                        {
+                            "disabled": false,
+                            "path": "/api/v1/users/{userId}",
+                            "method": "",
+                            "ignore_case": false,
+                            "method_actions": {
+                                "GET": {
+                                    "action": "no_action",
+                                    "code": 200,
+                                    "data": "",
+                                    "headers": {}
+                                }
+                            }
+                        },
+                        {
+                            "disabled": false,
+                            "path": "/api/v1/users/byExternalId",
+                            "method": "",
+                            "ignore_case": false,
+                            "method_actions": {
+                                "GET": {
+                                    "action": "no_action",
+                                    "code": 200,
+                                    "data": "",
+                                    "headers": {}
+                                }
+                            }
+                        },
+                        {
+                            "disabled": false,
+                            "path": "/api/v1/users/partner/{userId}/resetpassword",
+                            "method": "",
+                            "ignore_case": false,
+                            "method_actions": {
+                                "POST": {
+                                    "action": "no_action",
+                                    "code": 200,
+                                    "data": "",
+                                    "headers": {}
+                                }
+                            }
+                        },
+                        {
+                            "disabled": false,
+                            "path": "/api/v1/endpoints/provider/{providerApplicationId}/consumer/{consumerApplicationId}",
+                            "method": "",
+                            "ignore_case": false,
+                            "method_actions": {
+                                "GET": {
+                                    "action": "no_action",
+                                    "code": 200,
+                                    "data": "",
+                                    "headers": {}
+                                },
+                                "POST": {
+                                    "action": "no_action",
+                                    "code": 200,
+                                    "data": "",
+                                    "headers": {}
+                                }
+                            }
+                        },
+                        {
+                            "disabled": false,
+                            "path": "/api/v1/users",
+                            "method": "",
+                            "ignore_case": false,
+                            "method_actions": {
+                                "GET": {
+                                    "action": "no_action",
+                                    "code": 200,
+                                    "data": "",
+                                    "headers": {}
+                                }
+                            }
+                        },
+                        {
+                            "disabled": false,
+                            "path": "/api/v1/roleassignments/user/{userExternalId}/application/{applicationExternalId}",
+                            "method": "",
+                            "ignore_case": false,
+                            "method_actions": {
+                                "GET": {
+                                    "action": "no_action",
+                                    "code": 200,
+                                    "data": "",
+                                    "headers": {}
+                                }
+                            }
+                        },
+                        {
+                            "disabled": false,
+                            "path": "/api/v1/users/partner/{userId}",
+                            "method": "",
+                            "ignore_case": false,
+                            "method_actions": {
+                                "DELETE": {
+                                    "action": "no_action",
+                                    "code": 200,
+                                    "data": "",
+                                    "headers": {}
+                                },
+                                "GET": {
+                                    "action": "no_action",
+                                    "code": 200,
+                                    "data": "",
+                                    "headers": {}
+                                },
+                                "PUT": {
+                                    "action": "no_action",
+                                    "code": 200,
+                                    "data": "",
+                                    "headers": {}
+                                }
+                            }
+                        },
+                        {
+                            "disabled": false,
+                            "path": "/api/v1/companies/{companyId}",
+                            "method": "",
+                            "ignore_case": false,
+                            "method_actions": {
+                                "DELETE": {
+                                    "action": "no_action",
+                                    "code": 200,
+                                    "data": "",
+                                    "headers": {}
+                                },
+                                "GET": {
+                                    "action": "no_action",
+                                    "code": 200,
+                                    "data": "",
+                                    "headers": {}
+                                },
+                                "PUT": {
+                                    "action": "no_action",
+                                    "code": 200,
+                                    "data": "",
+                                    "headers": {}
+                                }
+                            }
+                        },
+                        {
+                            "disabled": false,
+                            "path": "/api/v1/edges/trees/{treeId}/edges/{edgeId}/aspect/{aspectId}",
+                            "method": "",
+                            "ignore_case": false,
+                            "method_actions": {
+                                "POST": {
+                                    "action": "no_action",
+                                    "code": 200,
+                                    "data": "",
+                                    "headers": {}
+                                }
+                            }
+                        },
+                        {
+                            "disabled": false,
+                            "path": "/api/v1/synchronisation/status/{identifier}",
+                            "method": "",
+                            "ignore_case": false,
+                            "method_actions": {
+                                "GET": {
+                                    "action": "no_action",
+                                    "code": 200,
+                                    "data": "",
+                                    "headers": {}
+                                }
+                            }
+                        },
+                        {
+                            "disabled": false,
+                            "path": "/api/v1/roleFunctionMatrix",
+                            "method": "",
+                            "ignore_case": false,
+                            "method_actions": {
+                                "GET": {
+                                    "action": "no_action",
+                                    "code": 200,
+                                    "data": "",
+                                    "headers": {}
+                                },
+                                "PUT": {
+                                    "action": "no_action",
+                                    "code": 200,
+                                    "data": "",
+                                    "headers": {}
+                                }
+                            }
+                        },
+                        {
+                            "disabled": false,
+                            "path": "/api/v1/applications/{applicationId}/roles",
+                            "method": "",
+                            "ignore_case": false,
+                            "method_actions": {
+                                "GET": {
+                                    "action": "no_action",
+                                    "code": 200,
+                                    "data": "",
+                                    "headers": {}
+                                },
+                                "POST": {
+                                    "action": "no_action",
+                                    "code": 200,
+                                    "data": "",
+                                    "headers": {}
+                                }
+                            }
+                        },
+                        {
+                            "disabled": false,
+                            "path": "/api/v1/users/{userId}/roles/{roleId}",
+                            "method": "",
+                            "ignore_case": false,
+                            "method_actions": {
+                                "DELETE": {
+                                    "action": "no_action",
+                                    "code": 200,
+                                    "data": "",
+                                    "headers": {}
+                                },
+                                "GET": {
+                                    "action": "no_action",
+                                    "code": 200,
+                                    "data": "",
+                                    "headers": {}
+                                },
+                                "POST": {
+                                    "action": "no_action",
+                                    "code": 200,
+                                    "data": "",
+                                    "headers": {}
+                                },
+                                "PUT": {
+                                    "action": "no_action",
+                                    "code": 200,
+                                    "data": "",
+                                    "headers": {}
+                                }
+                            }
+                        }
+                    ],
+                    "track_endpoints": [
+                        {
+                            "path": "/api/v1/endpoints/provider/{providerApplicationId}/consumer/{consumerApplicationId}",
+                            "method": "POST"
+                        },
+                        {
+                            "path": "/api/v1/endpoints/provider/{providerApplicationId}/consumer/{consumerApplicationId}",
+                            "method": "GET"
+                        },
+                        {
+                            "path": "/api/v1/roleassignments/user/{userExternalId}/application/{applicationExternalId}",
+                            "method": "GET"
+                        },
+                        {
+                            "path": "/api/v1/edges/trees/{treeId}/edges/{edgeId}/aspect/{aspectId}",
+                            "method": "POST"
+                        },
+                        {
+                            "path": "/api/v1/endpoints/provider/{providerApplicationId}/reload",
+                            "method": "POST"
+                        },
+                        {
+                            "path": "/api/v1/edges/trees/{treeId}/aspectedges/{aspectEdgeId}",
+                            "method": "GET"
+                        },
+                        {
+                            "path": "/api/v1/applications/{applicationId}/roles/{roleId}",
+                            "method": "PUT"
+                        },
+                        {
+                            "path": "/api/v1/applications/{applicationId}/roles/{roleId}",
+                            "method": "GET"
+                        },
+                        {
+                            "path": "/api/v1/edges/trees/{treeId}/edges/{edgeId}/path",
+                            "method": "GET"
+                        },
+                        {
+                            "path": "/api/v1/users/partner/{userId}/resetpassword",
+                            "method": "POST"
+                        },
+                        {
+                            "path": "/api/v1/synchronisation/status/{identifier}",
+                            "method": "GET"
+                        },
+                        {
+                            "path": "/api/v1/edges/trees/{treeId}/edges/{edgeId}",
+                            "method": "DELETE"
+                        },
+                        {
+                            "path": "/api/v1/applications/{applicationId}/roles",
+                            "method": "POST"
+                        },
+                        {
+                            "path": "/api/v1/applications/{applicationId}/roles",
+                            "method": "GET"
+                        },
+                        {
+                            "path": "/api/v1/users/{userId}/roles/{roleId}",
+                            "method": "POST"
+                        },
+                        {
+                            "path": "/api/v1/users/{userId}/roles/{roleId}",
+                            "method": "DELETE"
+                        },
+                        {
+                            "path": "/api/v1/users/{userId}/roles/{roleId}",
+                            "method": "PUT"
+                        },
+                        {
+                            "path": "/api/v1/users/{userId}/roles/{roleId}",
+                            "method": "GET"
+                        },
+                        {
+                            "path": "/api/v1/applications/{applicationId}",
+                            "method": "PUT"
+                        },
+                        {
+                            "path": "/api/v1/applications/{applicationId}",
+                            "method": "GET"
+                        },
+                        {
+                            "path": "/api/v1/synchronisation/selfAdmin",
+                            "method": "POST"
+                        },
+                        {
+                            "path": "/api/v1/aspects/{aspectId}/paths",
+                            "method": "GET"
+                        },
+                        {
+                            "path": "/api/v1/users/partner/{userId}",
+                            "method": "PUT"
+                        },
+                        {
+                            "path": "/api/v1/users/partner/{userId}",
+                            "method": "DELETE"
+                        },
+                        {
+                            "path": "/api/v1/users/partner/{userId}",
+                            "method": "GET"
+                        },
+                        {
+                            "path": "/api/v1/companies/{companyId}",
+                            "method": "PUT"
+                        },
+                        {
+                            "path": "/api/v1/companies/{companyId}",
+                            "method": "DELETE"
+                        },
+                        {
+                            "path": "/api/v1/companies/{companyId}",
+                            "method": "GET"
+                        },
+                        {
+                            "path": "/api/v1/users/{userId}/roles",
+                            "method": "GET"
+                        },
+                        {
+                            "path": "/api/v1/synchronisation/user",
+                            "method": "POST"
+                        },
+                        {
+                            "path": "/api/v1/edges/trees/{treeId}",
+                            "method": "GET"
+                        },
+                        {
+                            "path": "/api/v1/users/byExternalId",
+                            "method": "GET"
+                        },
+                        {
+                            "path": "/api/v1/users/{userId}/ecm",
+                            "method": "GET"
+                        },
+                        {
+                            "path": "/api/v1/roleFunctionMatrix",
+                            "method": "PUT"
+                        },
+                        {
+                            "path": "/api/v1/roleFunctionMatrix",
+                            "method": "GET"
+                        },
+                        {
+                            "path": "/api/v1/aspects/{aspectId}",
+                            "method": "PUT"
+                        },
+                        {
+                            "path": "/api/v1/aspects/{aspectId}",
+                            "method": "GET"
+                        },
+                        {
+                            "path": "/api/v1/aspects/{aspectId}",
+                            "method": "DELETE"
+                        },
+                        {
+                            "path": "/api/v1/users/{userId}",
+                            "method": "GET"
+                        },
+                        {
+                            "path": "/api/v1/trees/{treeId}",
+                            "method": "PUT"
+                        },
+                        {
+                            "path": "/api/v1/trees/{treeId}",
+                            "method": "GET"
+                        },
+                        {
+                            "path": "/api/v1/users/partner",
+                            "method": "GET"
+                        },
+                        {
+                            "path": "/api/v1/users/partner",
+                            "method": "POST"
+                        },
+                        {
+                            "path": "/api/v1/integrations",
+                            "method": "GET"
+                        },
+                        {
+                            "path": "/api/v1/applications",
+                            "method": "GET"
+                        },
+                        {
+                            "path": "/api/v1/applications",
+                            "method": "POST"
+                        },
+                        {
+                            "path": "/api/v1/companies",
+                            "method": "GET"
+                        },
+                        {
+                            "path": "/api/v1/companies",
+                            "method": "POST"
+                        },
+                        {
+                            "path": "/api/v1/logevent",
+                            "method": "POST"
+                        },
+                        {
+                            "path": "/api/v1/aspects",
+                            "method": "GET"
+                        },
+                        {
+                            "path": "/api/v1/aspects",
+                            "method": "POST"
+                        },
+                        {
+                            "path": "/api/v1/users",
+                            "method": "GET"
+                        },
+                        {
+                            "path": "/api/v1/trees",
+                            "method": "POST"
+                        },
+                        {
+                            "path": "/api/v1/trees",
+                            "method": "GET"
+                        },
+                        {
+                            "path": "/health",
+                            "method": "GET"
+                        }
+                    ],
+                    "persist_graphql": []
+                },
+                "global_headers": {},
+                "global_headers_remove": [],
+                "global_response_headers": {},
+                "global_response_headers_remove": [],
+                "ignore_endpoint_case": false,
+                "global_size_limit": 0,
+                "override_target": ""
+            },
+            "Default": {
+                "name": "Default",
+                "expires": "",
+                "paths": {
+                    "ignored": [],
+                    "white_list": [],
+                    "black_list": []
+                },
+                "use_extended_paths": true,
+                "extended_paths": {
+                    "persist_graphql": []
+                },
+                "global_headers": {},
+                "global_headers_remove": [],
+                "global_response_headers": {},
+                "global_response_headers_remove": [],
+                "ignore_endpoint_case": false,
+                "global_size_limit": 0,
+                "override_target": ""
+            }
+        }
+    },
+    "uptime_tests": {
+        "check_list": [],
+        "config": {
+            "expire_utime_after": 0,
+            "service_discovery": {
+                "use_discovery_service": false,
+                "query_endpoint": "",
+                "use_nested_query": false,
+                "parent_data_path": "",
+                "data_path": "",
+                "port_data_path": "",
+                "target_path": "",
+                "use_target_list": false,
+                "cache_disabled": false,
+                "cache_timeout": 60,
+                "endpoint_returns_list": false
+            },
+            "recheck_wait": 0
+        }
+    },
+    "proxy": {
+        "preserve_host_header": false,
+        "listen_path": "/testbe/",
+        "target_url": "https://httpbin.org/anything",
+        "disable_strip_slash": true,
+        "strip_listen_path": true,
+        "enable_load_balancing": false,
+        "target_list": [],
+        "check_host_against_uptime_tests": false,
+        "service_discovery": {
+            "use_discovery_service": false,
+            "query_endpoint": "",
+            "use_nested_query": false,
+            "parent_data_path": "",
+            "data_path": "",
+            "port_data_path": "",
+            "target_path": "",
+            "use_target_list": false,
+            "cache_disabled": false,
+            "cache_timeout": 0,
+            "endpoint_returns_list": false
+        },
+        "transport": {
+            "ssl_insecure_skip_verify": false,
+            "ssl_ciphers": [],
+            "ssl_min_version": 0,
+            "ssl_max_version": 0,
+            "ssl_force_common_name_check": false,
+            "proxy_url": ""
+        }
+    },
+    "disable_rate_limit": false,
+    "disable_quota": false,
+    "custom_middleware": {
+        "pre": [],
+        "post": [],
+        "post_key_auth": [],
+        "auth_check": {
+            "disabled": false,
+            "name": "",
+            "path": "",
+            "require_session": false,
+            "raw_body_only": false
+        },
+        "response": [],
+        "driver": "",
+        "id_extractor": {
+            "disabled": false,
+            "extract_from": "",
+            "extract_with": "",
+            "extractor_config": {}
+        }
+    },
+    "custom_middleware_bundle": "",
+    "custom_middleware_bundle_disabled": false,
+    "cache_options": {
+        "cache_timeout": 60,
+        "enable_cache": true,
+        "cache_all_safe_requests": false,
+        "cache_response_codes": [],
+        "enable_upstream_cache_control": false,
+        "cache_control_ttl_header": "",
+        "cache_by_headers": []
+    },
+    "session_lifetime": 0,
+    "active": true,
+    "internal": false,
+    "auth_provider": {
+        "name": "",
+        "storage_engine": "",
+        "meta": {}
+    },
+    "session_provider": {
+        "name": "",
+        "storage_engine": "",
+        "meta": {}
+    },
+    "event_handlers": {
+        "events": {}
+    },
+    "enable_batch_request_support": false,
+    "enable_ip_whitelisting": false,
+    "allowed_ips": [],
+    "enable_ip_blacklisting": false,
+    "blacklisted_ips": [],
+    "dont_set_quota_on_create": false,
+    "expire_analytics_after": 0,
+    "response_processors": [],
+    "CORS": {
+        "enable": false,
+        "allowed_origins": [
+            "*"
+        ],
+        "allowed_methods": [
+            "GET",
+            "POST",
+            "HEAD"
+        ],
+        "allowed_headers": [
+            "Origin",
+            "Accept",
+            "Content-Type",
+            "X-Requested-With",
+            "Authorization"
+        ],
+        "exposed_headers": [],
+        "allow_credentials": false,
+        "max_age": 24,
+        "options_passthrough": false,
+        "debug": false
+    },
+    "domain": "",
+    "certificates": [],
+    "do_not_track": false,
+    "enable_context_vars": false,
+    "config_data": {},
+    "config_data_disabled": false,
+    "tag_headers": [],
+    "global_rate_limit": {
+        "rate": 0,
+        "per": 0
+    },
+    "strip_auth_data": false,
+    "enable_detailed_recording": false,
+    "graphql": {
+        "enabled": false,
+        "execution_mode": "proxyOnly",
+        "version": "2",
+        "schema": "",
+        "type_field_configurations": [],
+        "playground": {
+            "enabled": false,
+            "path": ""
+        },
+        "engine": {
+            "field_configs": [],
+            "data_sources": []
+        },
+        "proxy": {
+            "auth_headers": {},
+            "request_headers": {},
+            "use_response_extensions": {
+                "on_error_forwarding": false
+            }
+        },
+        "subgraph": {
+            "sdl": ""
+        },
+        "supergraph": {
+            "subgraphs": [],
+            "merged_sdl": "",
+            "global_headers": {},
+            "disable_query_batching": false
+        }
+    },
+    "analytics_plugin": {},
+    "tags": []
+}
