@@ -51,7 +51,7 @@ tasks:
       - for: { var: packages, as: package }
         cmd: |-
           gotestsum --no-color=false --hide-summary=skipped --raw-command \
-          go test -p 1 -json {{.testArgs}} {{.args}} -count=1 -v \
+          go test -p 1 -parallel 1 -json {{.testArgs}} {{.args}} -count=1 -v \
           -coverprofile=coverage/{{.package | replace "." "gateway" | replace "/" "-"}}.cov {{.package}} | head -n -2
 
   integration-combined:
@@ -66,7 +66,7 @@ tasks:
       - defer: { task: services:down }
       - defer: { task: report }
       - rm -rf coverage && mkdir -p coverage
-      - go test -p 1 -json {{.testArgs}} {{.args}} -coverprofile=coverage/{{.product}}-all.cov -count=1 -v ./... > coverage/{{.product}}-all.json
+      - go test -p 1 -parallel 1 -json {{.testArgs}} {{.args}} -coverprofile=coverage/{{.product}}-all.cov -count=1 -v ./... > coverage/{{.product}}-all.json
 
   plugin:race:
     dir: '{{.dir}}'

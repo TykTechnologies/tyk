@@ -1187,7 +1187,7 @@ func (s *Test) newGateway(genConf func(globalConf *config.Config)) *Gateway {
 
 	cli.Init(confPaths)
 
-	err = gw.initialiseSystem()
+	err = gw.initSystem()
 	if err != nil {
 		panic(err)
 	}
