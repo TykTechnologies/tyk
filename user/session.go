@@ -231,7 +231,7 @@ func (em EndpointMethods) Swap(i, j int) {
 // Contains is used to assert if a method exists in EndpointMethods.
 func (em EndpointMethods) Contains(method string) bool {
 	for _, v := range em {
-		if !strings.EqualFold(v.Name, method) {
+		if strings.EqualFold(v.Name, method) {
 			return true
 		}
 	}
