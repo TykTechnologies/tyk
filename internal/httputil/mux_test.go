@@ -9,7 +9,7 @@ import (
 	"github.com/TykTechnologies/tyk/internal/httputil"
 )
 
-func testPathRegexp(tb testing.TB, in string, want string) string {
+func pathRegexp(tb testing.TB, in string, want string) string {
 	tb.Helper()
 
 	res, err := httputil.GetPathRegexp(in)
@@ -17,6 +17,14 @@ func testPathRegexp(tb testing.TB, in string, want string) string {
 	if want != "" {
 		assert.Equal(tb, want, res)
 	}
+	return res
+}
+
+func preparePathRegexp(tb testing.TB, in string, want string) string {
+	tb.Helper()
+
+	res := httputil.PreparePathRegexp(in, true, false)
+	assert.Equal(tb, want, res)
 	return res
 }
 
@@ -36,12 +44,32 @@ func TestGetPathRegexp(t *testing.T) {
 	}
 
 	for k, v := range tests {
-		testPathRegexp(t, k, v)
+		pathRegexp(t, k, v)
+	}
+}
+
+func TestPreparePathRegexp(t *testing.T) {
+	tests := map[string]string{
+		"/users*.":                             "^/users*.",
+		"/users":                               "^/users",
+		"users":                                "users",
+		"^/test/users":                         "^/test/users",
+		"/users$":                              "^/users$",
+		"/users/.*":                            "^/users/.*",
+		"/users/{id}":                          "^/users/([^/]+)",
+		"/users/{id}$":                         "^/users/([^/]+)$",
+		"/users/{id}/profile/{type:[a-zA-Z]+}": "^/users/([^/]+)/profile/([^/]+)",
+		"/static/{path}/assets/{file}":         "^/static/([^/]+)/assets/([^/]+)",
+		"/items/{itemID:[0-9]+}/details/{detail}": "^/items/([^/]+)/details/([^/]+)",
+	}
+
+	for k, v := range tests {
+		preparePathRegexp(t, k, v)
 	}
 }
 
 func TestGetPathRegexpWithRegexCompile(t *testing.T) {
-	pattern := testPathRegexp(t, "/api/v1/users/{userId}/roles/{roleId}", "")
+	pattern := pathRegexp(t, "/api/v1/users/{userId}/roles/{roleId}", "")
 
 	matched, err := regexp.MatchString(pattern, "/api/v1/users/10512/roles/32587")
 	assert.NoError(t, err)
