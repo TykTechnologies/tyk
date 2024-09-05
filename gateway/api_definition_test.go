@@ -418,7 +418,9 @@ func TestConflictingPaths(t *testing.T) {
 }
 
 func TestIgnored(t *testing.T) {
-	ts := StartTest(nil)
+	ts := StartTest(func (c *config.Config) {
+		c.HttpServerOptions.EnablePrefixMatching = true
+	})
 	defer ts.Close()
 
 	t.Run("Extended Paths", func(t *testing.T) {
@@ -466,7 +468,7 @@ func TestIgnored(t *testing.T) {
 			// Should ignore auth check
 			{Path: "/ignored/literal", Code: http.StatusOK},
 			{Path: "/ignored/123/test", Code: http.StatusOK},
-			// All methods ignored
+
 			{Method: "POST", Path: "/ext/ignored/literal", Code: http.StatusUnauthorized},
 
 			{Path: "/", Code: http.StatusUnauthorized},
