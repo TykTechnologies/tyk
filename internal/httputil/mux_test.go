@@ -157,7 +157,7 @@ func TestMatchEndpoint(t *testing.T) {
 			// explicit match inputs as `^/path$`
 			pattern := httputil.PreparePathRegexp(tt.pattern, true, true)
 
-			result, err := httputil.MatchPaths(pattern, []string{tt.endpoint})
+			result, err := httputil.MatchPath(pattern, tt.endpoint)
 			assert.Equal(t, tt.match, result)
 			assert.Equal(t, tt.isErr, err != nil)
 		})
