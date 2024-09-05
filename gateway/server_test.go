@@ -316,6 +316,7 @@ func defineGatewayGetHostDetailsTests() []struct {
 			),
 		},
 	}
+
 }
 
 func TestGatewayGetHostDetails(t *testing.T) {
@@ -339,13 +340,12 @@ func TestGatewayGetHostDetails(t *testing.T) {
 		getIpAddress = orig_getIpAddress
 	}()
 
-	// replace functions with mocks
-	mainLog = bl.Logger.WithField("prefix", "test")
-
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// clear logger mock buffer
 			bl.ClearLogs()
+			// replace functions with mocks
+			mainLog = bl.Logger.WithField("prefix", "test")
 			if tt.readPIDFromFile != nil {
 				readPIDFromFile = tt.readPIDFromFile
 			}
