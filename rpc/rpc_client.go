@@ -49,6 +49,7 @@ var (
 	// UseSyncLoginRPC for tests where we dont need to execute as a goroutine
 	UseSyncLoginRPC bool
 
+	connectionDialingWG  sync.WaitGroup
 	AnalyticsSerializers []serializer.AnalyticsSerializer
 )
 
@@ -257,8 +258,13 @@ func Connect(connConfig Config, suppressRegister bool, dispatcherFuncs map[strin
 		clientSingleton.Conns = 5
 	}
 
-	clientSingleton.Dial = func(addr string) (conn net.Conn, err error) {
+	for i := 0; i < clientSingleton.Conns; i++ {
+		connectionDialingWG.Add(1)
+	}
 
+	clientSingleton.Dial = func(addr string) (conn net.Conn, err error) {
+		// on dial <-emit one signal here
+		time.Sleep(5 * time.Second)
 		dialer := &net.Dialer{
 			Timeout:   10 * time.Second,
 			KeepAlive: 30 * time.Second,
@@ -294,8 +300,11 @@ func Connect(connConfig Config, suppressRegister bool, dispatcherFuncs map[strin
 		conn.Write([]byte("proto2"))
 		conn.Write([]byte{byte(len(connID))})
 		conn.Write([]byte(connID))
+		connectionDialingWG.Done()
+		// emitir señal
 		return conn, nil
 	}
+
 	clientSingleton.Start()
 
 	loadDispatcher(dispatcherFuncs)
@@ -304,11 +313,14 @@ func Connect(connConfig Config, suppressRegister bool, dispatcherFuncs map[strin
 		funcClientSingleton = dispatcher.NewFuncClient(clientSingleton)
 	}
 
+	// wait until all the pool connections are dialed so we can call login
+	connectionDialingWG.Wait()
 	handleLogin()
 	if !suppressRegister {
 		register()
 		go checkDisconnect()
 	}
+
 	return true
 }
 
@@ -323,6 +335,7 @@ func handleLogin() {
 // Login tries to login to the rpc sever. Returns true if it succeeds and false
 // if it fails.
 func Login() bool {
+	//time.Sleep(10 * time.Second)
 	// I know this is extreme but rpc.Login() appears about 17 times and the
 	// methods appears to be sometimes called in goroutines.
 	//
