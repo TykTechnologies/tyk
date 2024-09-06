@@ -263,8 +263,6 @@ func Connect(connConfig Config, suppressRegister bool, dispatcherFuncs map[strin
 	}
 
 	clientSingleton.Dial = func(addr string) (conn net.Conn, err error) {
-		// on dial <-emit one signal here
-		time.Sleep(5 * time.Second)
 		dialer := &net.Dialer{
 			Timeout:   10 * time.Second,
 			KeepAlive: 30 * time.Second,
@@ -301,7 +299,6 @@ func Connect(connConfig Config, suppressRegister bool, dispatcherFuncs map[strin
 		conn.Write([]byte{byte(len(connID))})
 		conn.Write([]byte(connID))
 		connectionDialingWG.Done()
-		// emitir señal
 		return conn, nil
 	}
 
@@ -335,7 +332,6 @@ func handleLogin() {
 // Login tries to login to the rpc sever. Returns true if it succeeds and false
 // if it fails.
 func Login() bool {
-	//time.Sleep(10 * time.Second)
 	// I know this is extreme but rpc.Login() appears about 17 times and the
 	// methods appears to be sometimes called in goroutines.
 	//
