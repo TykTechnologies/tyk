@@ -178,6 +178,7 @@ func ProtoSessionState(session *user.SessionState) *coprocess.SessionState {
 		LastUpdated:             session.LastUpdated,
 		IdExtractorDeadline:     session.IdExtractorDeadline,
 		SessionLifetime:         session.SessionLifetime,
+		KeyId:                   session.KeyID,
 	}
 }
 
