@@ -6,6 +6,8 @@ import (
 	"crypto/md5"
 	"errors"
 	"fmt"
+	"github.com/TykTechnologies/tyk-pump/analytics"
+	"github.com/TykTechnologies/tyk/internal/httputil"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -356,6 +358,25 @@ func (t *BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 	}
 	store := policy.New(orgID, t.Gw, log)
 	return store.Apply(session)
+}
+
+func (t *BaseMiddleware) recordAccessLog(latency *analytics.Latency, log *logrus.Logger, req *http.Request, resp *http.Response) {
+	// Don't print the full token, handle as obfuscated key or hashed key for security reasons
+	hashKeys := t.Gw.GetConfig().HashKeys
+	token := ctxGetAuthToken(req)
+
+	if !hashKeys {
+		token = t.Gw.obfuscateKey(token)
+	} else {
+		token = storage.HashKey(token, hashKeys)
+	}
+
+	accessLog := httputil.NewAccessLogRecord(t.Spec.APIID, token, t.Spec.OrgID)
+	accessLog.WithLatency(latency)
+	accessLog.WithRequest(req)
+	accessLog.WithResponse(resp)
+
+	log.WithFields(accessLog.Fields()).Info()
 }
 
 func copyAllowedURLs(input []user.AccessSpec) []user.AccessSpec {

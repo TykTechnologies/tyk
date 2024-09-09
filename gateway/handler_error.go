@@ -12,11 +12,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/sirupsen/logrus"
-
-	"github.com/TykTechnologies/tyk/internal/httputil"
-	"github.com/TykTechnologies/tyk/storage"
-
 	"github.com/TykTechnologies/tyk/apidef"
 
 	"github.com/TykTechnologies/tyk-pump/analytics"
@@ -90,25 +85,6 @@ type ErrorHandler struct {
 // It only switch to text/template (templatesRaw) when contentType is XML related
 type TemplateExecutor interface {
 	Execute(wr io.Writer, data interface{}) error
-}
-
-func (e *ErrorHandler) recordAccessLog(log *logrus.Logger, req *http.Request, resp *http.Response) {
-	// Don't print the full token, handle as obfuscated key or hashed key for security reasons
-	hashKeys := e.Gw.GetConfig().HashKeys
-	token := ctxGetAuthToken(req)
-
-	if !hashKeys {
-		token = e.Gw.obfuscateKey(token)
-	} else {
-		token = storage.HashKey(token, hashKeys)
-	}
-
-	accessLog := httputil.NewAccessLogRecord(e.Spec.APIID, token, e.Spec.OrgID)
-	accessLog.WithLatency(&analytics.Latency{})
-	accessLog.WithRequest(req)
-	accessLog.WithResponse(resp)
-
-	log.WithFields(accessLog.Fields()).Info()
 }
 
 // HandleError is the actual error handler and will store the error details in analytics if analytics processing is enabled.
@@ -339,7 +315,7 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 	// Print the transaction logs for error situations if enabled. Success transaction
 	// logs will be handled by the "handler_success.go"
 	if e.Spec.GlobalConfig.AccessLogs.Enabled {
-		e.recordAccessLog(log, r, response)
+		e.recordAccessLog(nil, log, r, response)
 	}
 
 	// Report in health check
