@@ -263,6 +263,7 @@ func Connect(connConfig Config, suppressRegister bool, dispatcherFuncs map[strin
 	}
 
 	clientSingleton.Dial = func(addr string) (conn net.Conn, err error) {
+		defer connectionDialingWG.Done()
 		dialer := &net.Dialer{
 			Timeout:   10 * time.Second,
 			KeepAlive: 30 * time.Second,
@@ -298,7 +299,7 @@ func Connect(connConfig Config, suppressRegister bool, dispatcherFuncs map[strin
 		conn.Write([]byte("proto2"))
 		conn.Write([]byte{byte(len(connID))})
 		conn.Write([]byte(connID))
-		connectionDialingWG.Done()
+
 		return conn, nil
 	}
 
