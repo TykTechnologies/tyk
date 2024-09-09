@@ -106,7 +106,7 @@ func TestWhitelist(t *testing.T) {
 
 		ts.Run(t, []test.TestCase{
 			// Should mock path
-			{Path: "/reply/", Code: http.StatusOK, BodyMatch: "flump"},
+			{Path: "/reply/", Code: http.StatusForbidden},
 			{Path: "/reply/123", Code: http.StatusOK, BodyMatch: "flump"},
 			// Should get original upstream response
 			{Path: "/get", Code: http.StatusOK, BodyMatch: `"Url":"/get"`},
@@ -147,14 +147,14 @@ func TestWhitelist(t *testing.T) {
 
 		ts.Run(t, []test.TestCase{
 			{Path: "/foo", Code: http.StatusForbidden},
-			{Path: "/foo/", Code: http.StatusOK},
+			{Path: "/foo/", Code: http.StatusForbidden},
 			{Path: "/foo/1", Code: http.StatusOK},
 			{Path: "/foo/1/bar", Code: http.StatusForbidden},
-			{Path: "/foo/1/bar/", Code: http.StatusOK},
+			{Path: "/foo/1/bar/", Code: http.StatusForbidden},
 			{Path: "/foo/1/bar/1", Code: http.StatusOK},
 			{Path: "/", Code: http.StatusForbidden},
 			{Path: "/baz", Code: http.StatusForbidden},
-			{Path: "/baz/", Code: http.StatusOK},
+			{Path: "/baz/", Code: http.StatusForbidden},
 			{Path: "/baz/1", Code: http.StatusOK},
 			{Path: "/baz/1/", Code: http.StatusOK},
 			{Path: "/baz/1/bazz", Code: http.StatusOK},

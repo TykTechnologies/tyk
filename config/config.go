@@ -959,6 +959,10 @@ type Config struct {
 	// If not set or left empty, it will default to `info`.
 	LogLevel string `json:"log_level"`
 
+	// You can now configure the log format to be either the standard or json format
+	// If not set or left empty, it will default to `standard`.
+	LogFormat string `json:"log_format"`
+
 	// You can configure the transaction logs to be turned on
 	// If not set or left empty, it will default to 'false'
 	AccessLogs AccessLogsConfig `json:"access_logs"`
