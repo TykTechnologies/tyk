@@ -752,5 +752,13 @@
     "partitions": {
       "acl": true
     }
+  },
+  "endpoint_rate_limits_on_quota_partition_only": {
+    "id": "endpoint_rate_limits_on_rate_limit_partition_disabled",
+    "quota_max": 1000,
+    "quota_renews":60,
+    "partitions": {
+      "quota": true
+    }
   }
 }
