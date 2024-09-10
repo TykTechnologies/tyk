@@ -444,6 +444,10 @@ func (t *Service) applyPartitions(policy user.Policy, session *user.SessionState
 
 			t.ApplyRateLimits(session, policy, &ar.Limit)
 
+			if rightsAR, ok := rights[k]; ok {
+				ar.Endpoints = t.ApplyEndpointLevelLimits(v.Endpoints, rightsAR.Endpoints)
+			}
+
 			if policy.ThrottleRetryLimit > ar.Limit.ThrottleRetryLimit {
 				ar.Limit.ThrottleRetryLimit = policy.ThrottleRetryLimit
 				if policy.ThrottleRetryLimit > session.ThrottleRetryLimit {
@@ -534,14 +538,17 @@ func (t *Service) updateSessionRootVars(session *user.SessionState, rights map[s
 }
 
 func (t *Service) applyAPILevelLimits(policyAD user.AccessDefinition, currAD user.AccessDefinition) user.AccessDefinition {
+	var updated bool
 	if policyAD.Limit.Duration() > currAD.Limit.Duration() {
 		policyAD.Limit.Per = currAD.Limit.Per
 		policyAD.Limit.Rate = currAD.Limit.Rate
 		policyAD.Limit.Smoothing = currAD.Limit.Smoothing
+		updated = true
 	}
 
-	if greaterThanInt64(currAD.Limit.QuotaMax, policyAD.Limit.QuotaMax) {
+	if currAD.Limit.QuotaMax != policyAD.Limit.QuotaMax && greaterThanInt64(currAD.Limit.QuotaMax, policyAD.Limit.QuotaMax) {
 		policyAD.Limit.QuotaMax = currAD.Limit.QuotaMax
+		updated = true
 	}
 
 	if greaterThanInt64(currAD.Limit.QuotaRenewalRate, policyAD.Limit.QuotaRenewalRate) {
@@ -552,25 +559,50 @@ func (t *Service) applyAPILevelLimits(policyAD user.AccessDefinition, currAD use
 		policyAD.Limit.QuotaRenewalRate = 0
 	}
 
-	policyAD.Endpoints = t.applyEndpointLevelLimits(policyAD.Endpoints, currAD.Endpoints)
+	if updated {
+		policyAD.Limit.SetBy = currAD.Limit.SetBy
+		policyAD.AllowanceScope = currAD.AllowanceScope
+	}
+
+	policyAD.Endpoints = t.ApplyEndpointLevelLimits(policyAD.Endpoints, currAD.Endpoints)
 
 	return policyAD
 }
 
-func (t *Service) applyEndpointLevelLimits(policyEndpoints user.Endpoints, currEndpoints user.Endpoints) user.Endpoints {
+// ApplyEndpointLevelLimits combines policyEndpoints and currEndpoints and returns the combined value.
+// The returned endpoints would have the highest request rate from policyEndpoints and currEndpoints.
+func (t *Service) ApplyEndpointLevelLimits(policyEndpoints user.Endpoints, currEndpoints user.Endpoints) user.Endpoints {
 	currEPMap := currEndpoints.Map()
-	if currEPMap == nil {
+	if len(currEPMap) == 0 {
 		return policyEndpoints
 	}
 
-	policyEPMap := policyEndpoints.Map()
+	result := policyEndpoints.Map()
+	if len(result) == 0 {
+		return currEPMap.Endpoints()
+	}
+
 	for currEP, currRL := range currEPMap {
-		if policyRL, ok := policyEPMap[currEP]; ok {
-			if policyRL.Duration() > currRL.Duration() {
-				policyEPMap[currEP] = currRL
-			}
+		policyRL, ok := result[currEP]
+		if !ok {
+			// merge missing endpoints
+			result[currEP] = currRL
+			continue
+		}
+
+		policyDur, currDur := policyRL.Duration(), currRL.Duration()
+		if policyDur > currDur {
+			result[currEP] = currRL
+			continue
+		}
+
+		// when duration is equal, use higher rate and per
+		// eg. when 10 per 60 and 5 per 30 comes in
+		// Duration would be 6s each, in such a case higher rate of 10 per 60 would be picked up.
+		if policyDur == currDur && currRL.Rate > policyRL.Rate {
+			result[currEP] = currRL
 		}
 	}
 
-	return policyEPMap.Endpoints()
+	return result.Endpoints()
 }
