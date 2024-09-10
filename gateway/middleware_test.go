@@ -331,18 +331,24 @@ func TestSessionLimiter_RedisQuotaExceeded_PerAPI(t *testing.T) {
 		}
 	}
 
-	// for api1 - per api
-	sendReqAndCheckQuota(t, apis[0].APIID, 9, true)
-	sendReqAndCheckQuota(t, apis[0].APIID, 8, true)
-	sendReqAndCheckQuota(t, apis[0].APIID, 7, true)
+	t.Run("For api1 - per api", func(t *testing.T) {
+		sendReqAndCheckQuota(t, apis[0].APIID, 9, true)
+		sendReqAndCheckQuota(t, apis[0].APIID, 8, true)
+		sendReqAndCheckQuota(t, apis[0].APIID, 7, true)
+	})
 
-	// for api2 - per api
-	sendReqAndCheckQuota(t, apis[1].APIID, 1, true)
-	sendReqAndCheckQuota(t, apis[1].APIID, 0, true)
+	t.Run("For api2 - per api", func(t *testing.T) {
+		sendReqAndCheckQuota(t, apis[1].APIID, 1, true)
+		sendReqAndCheckQuota(t, apis[1].APIID, 0, true)
+	})
 
-	// for api3 - global
-	sendReqAndCheckQuota(t, apis[2].APIID, 24, false)
-	sendReqAndCheckQuota(t, apis[2].APIID, 23, false)
+	t.Run("For api3 - global", func(t *testing.T) {
+		sendReqAndCheckQuota(t, apis[2].APIID, 24, false)
+		sendReqAndCheckQuota(t, apis[2].APIID, 23, false)
+		sendReqAndCheckQuota(t, apis[2].APIID, 22, false)
+		sendReqAndCheckQuota(t, apis[2].APIID, 21, false)
+		sendReqAndCheckQuota(t, apis[2].APIID, 20, false)
+	})
 }
 
 func TestCopyAllowedURLs(t *testing.T) {
