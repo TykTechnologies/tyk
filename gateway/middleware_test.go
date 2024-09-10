@@ -12,6 +12,7 @@ import (
 	"github.com/TykTechnologies/tyk/apidef"
 	headers2 "github.com/TykTechnologies/tyk/header"
 	"github.com/TykTechnologies/tyk/internal/cache"
+	"github.com/TykTechnologies/tyk/internal/uuid"
 	"github.com/TykTechnologies/tyk/test"
 
 	"github.com/TykTechnologies/tyk/config"
@@ -264,15 +265,15 @@ func TestSessionLimiter_RedisQuotaExceeded_PerAPI(t *testing.T) {
 	defer g.Gw.GlobalSessionManager.Store().DeleteAllKeys()
 
 	apis := BuildAPI(func(spec *APISpec) {
-		spec.APIID = "api1"
+		spec.APIID = uuid.New()
 		spec.UseKeylessAccess = false
 		spec.Proxy.ListenPath = "/api1/"
 	}, func(spec *APISpec) {
-		spec.APIID = "api2"
+		spec.APIID = uuid.New()
 		spec.UseKeylessAccess = false
 		spec.Proxy.ListenPath = "/api2/"
 	}, func(spec *APISpec) {
-		spec.APIID = "api3"
+		spec.APIID = uuid.New()
 		spec.UseKeylessAccess = false
 		spec.Proxy.ListenPath = "/api3/"
 	})
