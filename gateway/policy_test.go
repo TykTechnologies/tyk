@@ -7,9 +7,9 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"reflect"
+	"slices"
 	"sort"
 	"strconv"
-	"strings"
 	"testing"
 	"time"
 
@@ -57,6 +57,9 @@ type testApplyPoliciesData struct {
 	errMatch  string                               // substring
 	sessMatch func(*testing.T, *user.SessionState) // ignored if nil
 	session   *user.SessionState
+	// reverseOrder executes the tests in reversed order of policies,
+	// in addition to the order specified in policies
+	reverseOrder bool
 }
 
 func (s *Test) testPrepareApplyPolicies(tb testing.TB) (*BaseMiddleware, []testApplyPoliciesData) {
@@ -85,19 +88,19 @@ func (s *Test) testPrepareApplyPolicies(tb testing.TB) (*BaseMiddleware, []testA
 	nilSessionTCs := []testApplyPoliciesData{
 		{
 			"Empty", nil,
-			"", nil, nil,
+			"", nil, nil, false,
 		},
 		{
 			"Single", []string{"nonpart1"},
-			"", nil, nil,
+			"", nil, nil, false,
 		},
 		{
 			"Missing", []string{"nonexistent"},
-			"not found", nil, nil,
+			"not found", nil, nil, false,
 		},
 		{
 			"DiffOrg", []string{"difforg"},
-			"different org", nil, nil,
+			"different org", nil, nil, false,
 		},
 	}
 	tests = append(tests, nilSessionTCs...)
@@ -151,7 +154,7 @@ func (s *Test) testPrepareApplyPolicies(tb testing.TB) (*BaseMiddleware, []testA
 				if s.QuotaMax != -1 {
 					t.Fatalf("want unlimited quota to be -1")
 				}
-			}, nil,
+			}, nil, false,
 		},
 		{
 			"QuotaPart", []string{"quota1"},
@@ -159,7 +162,7 @@ func (s *Test) testPrepareApplyPolicies(tb testing.TB) (*BaseMiddleware, []testA
 				if s.QuotaMax != 2 {
 					t.Fatalf("want QuotaMax to be 2")
 				}
-			}, nil,
+			}, nil, false,
 		},
 		{
 			"QuotaParts", []string{"quota1", "quota2"},
@@ -167,13 +170,13 @@ func (s *Test) testPrepareApplyPolicies(tb testing.TB) (*BaseMiddleware, []testA
 				if s.QuotaMax != 3 {
 					t.Fatalf("Should pick bigger value")
 				}
-			}, nil,
+			}, nil, false,
 		},
 		{
 			"QuotaParts with acl", []string{"quota5", "quota4"},
 			"", func(t *testing.T, s *user.SessionState) {
 				assert.Equal(t, int64(4), s.QuotaMax)
-			}, nil,
+			}, nil, false,
 		},
 		{
 			"QuotaPart with access rights", []string{"quota3"},
@@ -181,7 +184,7 @@ func (s *Test) testPrepareApplyPolicies(tb testing.TB) (*BaseMiddleware, []testA
 				if s.QuotaMax != 3 {
 					t.Fatalf("quota should be the same as policy quota")
 				}
-			}, nil,
+			}, nil, false,
 		},
 		{
 			"QuotaPart with access rights in multi-policy", []string{"quota4", "nonpart1"},
@@ -193,7 +196,7 @@ func (s *Test) testPrepareApplyPolicies(tb testing.TB) (*BaseMiddleware, []testA
 				// Don't apply api 'b' coming from quota4 policy
 				want := map[string]user.AccessDefinition{"a": {Limit: user.APILimit{}}}
 				assert.Equal(t, want, s.AccessRights)
-			}, nil,
+			}, nil, false,
 		},
 	}
 	tests = append(tests, quotaPartitionTCs...)
@@ -203,7 +206,7 @@ func (s *Test) testPrepareApplyPolicies(tb testing.TB) (*BaseMiddleware, []testA
 			"RatePart with unlimited", []string{"unlimited-rate"},
 			"", func(t *testing.T, s *user.SessionState) {
 				assert.True(t, s.Rate <= 0, "want unlimited rate to be <= 0")
-			}, nil,
+			}, nil, false,
 		},
 		{
 			"RatePart", []string{"rate1"},
@@ -211,7 +214,7 @@ func (s *Test) testPrepareApplyPolicies(tb testing.TB) (*BaseMiddleware, []testA
 				if s.Rate != 3 {
 					t.Fatalf("want Rate to be 3")
 				}
-			}, nil,
+			}, nil, false,
 		},
 		{
 			"RateParts", []string{"rate1", "rate2"},
@@ -219,25 +222,25 @@ func (s *Test) testPrepareApplyPolicies(tb testing.TB) (*BaseMiddleware, []testA
 				if s.Rate != 4 {
 					t.Fatalf("Should pick bigger value")
 				}
-			}, nil,
+			}, nil, false,
 		},
 		{
 			"RateParts with acl", []string{"rate5", "rate4"},
 			"", func(t *testing.T, s *user.SessionState) {
 				assert.Equal(t, float64(10), s.Rate)
-			}, nil,
+			}, nil, false,
 		},
 		{
 			"RateParts with acl respected by session", []string{"rate4", "rate5"},
 			"", func(t *testing.T, s *user.SessionState) {
 				assert.Equal(t, float64(10), s.Rate)
-			}, &user.SessionState{Rate: 20},
+			}, &user.SessionState{Rate: 20}, false,
 		},
 		{
 			"Rate with no partition respected by session", []string{"rate-no-partition"},
 			"", func(t *testing.T, s *user.SessionState) {
 				assert.Equal(t, float64(12), s.Rate)
-			}, &user.SessionState{Rate: 20},
+			}, &user.SessionState{Rate: 20}, false,
 		},
 	}
 	tests = append(tests, rateLimitPartitionTCs...)
@@ -249,7 +252,7 @@ func (s *Test) testPrepareApplyPolicies(tb testing.TB) (*BaseMiddleware, []testA
 				if s.MaxQueryDepth != -1 {
 					t.Fatalf("unlimitied query depth should be -1")
 				}
-			}, nil,
+			}, nil, false,
 		},
 		{
 			"ComplexityPart", []string{"complexity1"},
@@ -257,7 +260,7 @@ func (s *Test) testPrepareApplyPolicies(tb testing.TB) (*BaseMiddleware, []testA
 				if s.MaxQueryDepth != 2 {
 					t.Fatalf("want MaxQueryDepth to be 2")
 				}
-			}, nil,
+			}, nil, false,
 		},
 		{
 			"ComplexityParts", []string{"complexity1", "complexity2"},
@@ -265,7 +268,7 @@ func (s *Test) testPrepareApplyPolicies(tb testing.TB) (*BaseMiddleware, []testA
 				if s.MaxQueryDepth != 3 {
 					t.Fatalf("Should pick bigger value")
 				}
-			}, nil,
+			}, nil, false,
 		},
 	}
 	tests = append(tests, complexityPartitionTCs...)
@@ -277,21 +280,21 @@ func (s *Test) testPrepareApplyPolicies(tb testing.TB) (*BaseMiddleware, []testA
 				want := map[string]user.AccessDefinition{"a": {Limit: user.APILimit{}}}
 
 				assert.Equal(t, want, s.AccessRights)
-			}, nil,
+			}, nil, false,
 		},
 		{
 			"AclPart", []string{"acl1", "acl2"},
 			"", func(t *testing.T, s *user.SessionState) {
 				want := map[string]user.AccessDefinition{"a": {Limit: user.APILimit{}}, "b": {Limit: user.APILimit{}}}
 				assert.Equal(t, want, s.AccessRights)
-			}, nil,
+			}, nil, false,
 		},
 		{
 			"Acl for a and rate for a,b", []string{"acl1", "rate-for-a-b"},
 			"", func(t *testing.T, s *user.SessionState) {
 				want := map[string]user.AccessDefinition{"a": {Limit: user.APILimit{RateLimit: user.RateLimit{Rate: 4, Per: 1}}}}
 				assert.Equal(t, want, s.AccessRights)
-			}, nil,
+			}, nil, false,
 		},
 		{
 			"Acl for a,b and individual rate for a,b", []string{"acl-for-a-b", "rate-for-a", "rate-for-b"},
@@ -301,7 +304,7 @@ func (s *Test) testPrepareApplyPolicies(tb testing.TB) (*BaseMiddleware, []testA
 					"b": {Limit: user.APILimit{RateLimit: user.RateLimit{Rate: 2, Per: 1}}},
 				}
 				assert.Equal(t, want, s.AccessRights)
-			}, nil,
+			}, nil, false,
 		},
 		{
 			"RightsUpdate", []string{"acl3"},
@@ -318,7 +321,7 @@ func (s *Test) testPrepareApplyPolicies(tb testing.TB) (*BaseMiddleware, []testA
 					t.Fatalf("couldn't apply policy: %s", err.Error())
 				}
 				assert.Equal(t, newPolicy.AccessRights, ses.AccessRights)
-			}, nil,
+			}, nil, false,
 		},
 	}
 	tests = append(tests, aclPartitionTCs...)
@@ -330,7 +333,7 @@ func (s *Test) testPrepareApplyPolicies(tb testing.TB) (*BaseMiddleware, []testA
 				if !s.IsInactive {
 					t.Fatalf("want IsInactive to be true")
 				}
-			}, nil,
+			}, nil, false,
 		},
 		{
 			"InactiveMergeAll", []string{"inactive1", "inactive2"},
@@ -338,7 +341,7 @@ func (s *Test) testPrepareApplyPolicies(tb testing.TB) (*BaseMiddleware, []testA
 				if !s.IsInactive {
 					t.Fatalf("want IsInactive to be true")
 				}
-			}, nil,
+			}, nil, false,
 		},
 		{
 			"InactiveWithSession", []string{"tags1", "tags2"},
@@ -348,7 +351,7 @@ func (s *Test) testPrepareApplyPolicies(tb testing.TB) (*BaseMiddleware, []testA
 				}
 			}, &user.SessionState{
 				IsInactive: true,
-			},
+			}, false,
 		},
 	}
 	tests = append(tests, inactiveTCs...)
@@ -653,7 +656,7 @@ func (s *Test) testPrepareApplyPolicies(tb testing.TB) (*BaseMiddleware, []testA
 				if s.ThrottleInterval != 9 {
 					t.Fatalf("Throttle interval should be 9 inherited from policy")
 				}
-			}, nil,
+			}, nil, false,
 		},
 		{
 			name:     "Throttle retry limit from policy",
@@ -681,7 +684,7 @@ func (s *Test) testPrepareApplyPolicies(tb testing.TB) (*BaseMiddleware, []testA
 				assert.Equal(t, want, s.Tags)
 			}, &user.SessionState{
 				Tags: []string{"key-tag"},
-			},
+			}, false,
 		},
 	}
 	tests = append(tests, tagsTCs...)
@@ -689,7 +692,7 @@ func (s *Test) testPrepareApplyPolicies(tb testing.TB) (*BaseMiddleware, []testA
 	partitionTCs := []testApplyPoliciesData{
 		{
 			"NonpartAndPart", []string{"nonpart1", "quota1"},
-			"", nil, nil,
+			"", nil, nil, false,
 		},
 		{
 			name:     "inherit quota and rate from partitioned policies",
@@ -786,6 +789,7 @@ func (s *Test) testPrepareApplyPolicies(tb testing.TB) (*BaseMiddleware, []testA
 				}
 				assert.Equal(t, want, s.AccessRights)
 			},
+			reverseOrder: true,
 		},
 		{
 			name: "Endpoint level limits overlapping",
@@ -883,6 +887,7 @@ func (s *Test) testPrepareApplyPolicies(tb testing.TB) (*BaseMiddleware, []testA
 				}
 				assert.Equal(t, apiDLimits, s.AccessRights["d"].Limit)
 			},
+			reverseOrder: true,
 		},
 		{
 			name:     "endpoint_rate_limits_on_acl_partition_only",
@@ -904,10 +909,172 @@ func (s *Test) testPrepareApplyPolicies(tb testing.TB) (*BaseMiddleware, []testA
 				assert.NotEmpty(t, s.AccessRights)
 				assert.Empty(t, s.AccessRights["d"].Endpoints)
 			},
+			reverseOrder: true,
 		},
 	}
 
 	tests = append(tests, endpointRLTCs...)
+
+	combinedEndpointRLTCs := []testApplyPoliciesData{
+		{
+			name: "combine_non_partitioned_policies_with_endpoint_rate_limits_configured_on_api_d",
+			policies: []string{
+				"api_d_get_endpoint_rl_1_configure_on_non_partitioned_policy",
+				"api_d_get_endpoint_rl_2_configure_on_non_partitioned_policy",
+			},
+			sessMatch: func(t *testing.T, s *user.SessionState) {
+				t.Helper()
+				assert.NotEmpty(t, s.AccessRights)
+				apiDEndpoints := user.Endpoints{
+					{
+						Path: "/get",
+						Methods: user.EndpointMethods{
+							{
+								Name: "GET",
+								Limit: user.RateLimit{
+									Rate: 20,
+									Per:  60,
+								},
+							},
+						},
+					},
+				}
+
+				assert.ElementsMatch(t, apiDEndpoints, s.AccessRights["d"].Endpoints)
+			},
+			reverseOrder: true,
+		},
+		{
+			name: "combine_non_partitioned_policies_with_endpoint_rate_limits_no_bound_configured_on_api_d",
+			policies: []string{
+				"api_d_get_endpoint_rl_1_configure_on_non_partitioned_policy",
+				"api_d_get_endpoint_rl_2_configure_on_non_partitioned_policy",
+				"api_d_get_endpoint_rl_3_configure_on_non_partitioned_policy",
+			},
+			sessMatch: func(t *testing.T, s *user.SessionState) {
+				t.Helper()
+				assert.NotEmpty(t, s.AccessRights)
+				apiDEndpoints := user.Endpoints{
+					{
+						Path: "/get",
+						Methods: user.EndpointMethods{
+							{
+								Name: "GET",
+								Limit: user.RateLimit{
+									Rate: -1,
+								},
+							},
+						},
+					},
+				}
+
+				assert.ElementsMatch(t, apiDEndpoints, s.AccessRights["d"].Endpoints)
+			},
+			reverseOrder: true,
+		},
+		{
+			name: "combine_non_partitioned_policies_with_multiple_endpoint_rate_limits_configured_on_api_d",
+			policies: []string{
+				"api_d_get_endpoint_rl_1_configure_on_non_partitioned_policy",
+				"api_d_get_endpoint_rl_2_configure_on_non_partitioned_policy",
+				"api_d_get_endpoint_rl_3_configure_on_non_partitioned_policy",
+				"api_d_post_endpoint_rl_1_configure_on_non_partitioned_policy",
+			},
+			sessMatch: func(t *testing.T, s *user.SessionState) {
+				t.Helper()
+				assert.NotEmpty(t, s.AccessRights)
+				apiDEndpoints := user.Endpoints{
+					{
+						Path: "/get",
+						Methods: user.EndpointMethods{
+							{
+								Name: "GET",
+								Limit: user.RateLimit{
+									Rate: -1,
+								},
+							},
+						},
+					},
+					{
+						Path: "/post",
+						Methods: user.EndpointMethods{
+							{
+								Name: "POST",
+								Limit: user.RateLimit{
+									Rate: 20,
+									Per:  60,
+								},
+							},
+						},
+					},
+				}
+
+				assert.ElementsMatch(t, apiDEndpoints, s.AccessRights["d"].Endpoints)
+			},
+			reverseOrder: true,
+		},
+		{
+			name: "combine_non_partitioned_policies_with_endpoint_rate_limits_configured_on_api_d_and_e",
+			policies: []string{
+				"api_d_get_endpoint_rl_1_configure_on_non_partitioned_policy",
+				"api_d_get_endpoint_rl_2_configure_on_non_partitioned_policy",
+				"api_d_get_endpoint_rl_3_configure_on_non_partitioned_policy",
+				"api_d_post_endpoint_rl_1_configure_on_non_partitioned_policy",
+				"api_e_get_endpoint_rl_1_configure_on_non_partitioned_policy",
+			},
+			sessMatch: func(t *testing.T, s *user.SessionState) {
+				t.Helper()
+				assert.NotEmpty(t, s.AccessRights)
+				apiDEndpoints := user.Endpoints{
+					{
+						Path: "/get",
+						Methods: user.EndpointMethods{
+							{
+								Name: "GET",
+								Limit: user.RateLimit{
+									Rate: -1,
+								},
+							},
+						},
+					},
+					{
+						Path: "/post",
+						Methods: user.EndpointMethods{
+							{
+								Name: "POST",
+								Limit: user.RateLimit{
+									Rate: 20,
+									Per:  60,
+								},
+							},
+						},
+					},
+				}
+
+				assert.ElementsMatch(t, apiDEndpoints, s.AccessRights["d"].Endpoints)
+
+				apiEEndpoints := user.Endpoints{
+					{
+						Path: "/get",
+						Methods: user.EndpointMethods{
+							{
+								Name: "GET",
+								Limit: user.RateLimit{
+									Rate: 100,
+									Per:  60,
+								},
+							},
+						},
+					},
+				}
+
+				assert.ElementsMatch(t, apiEEndpoints, s.AccessRights["e"].Endpoints)
+			},
+			reverseOrder: true,
+		},
+	}
+
+	tests = combinedEndpointRLTCs
 
 	return bmid, tests
 }
@@ -919,26 +1086,36 @@ func TestApplyPolicies(t *testing.T) {
 	bmid, tests := ts.testPrepareApplyPolicies(t)
 
 	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			sess := tc.session
-			if sess == nil {
-				sess = &user.SessionState{}
+		pols := [][]string{tc.policies}
+		if tc.reverseOrder {
+			var copyPols = make([]string, len(tc.policies))
+			copy(copyPols, tc.policies)
+			slices.Reverse(copyPols)
+			pols = append(pols, copyPols)
+		}
+
+		for i, policies := range pols {
+			name := tc.name
+			if i == 1 {
+				name = fmt.Sprintf("%s, reversed=%t", name, tc.reverseOrder)
 			}
-			sess.SetPolicies(tc.policies...)
-			errStr := ""
-			if err := bmid.ApplyPolicies(sess); err != nil {
-				errStr = err.Error()
-			}
-			if tc.errMatch == "" && errStr != "" {
-				t.Fatalf("didn't want err but got %s", errStr)
-			} else if !strings.Contains(errStr, tc.errMatch) {
-				t.Fatalf("error %q doesn't match %q",
-					errStr, tc.errMatch)
-			}
-			if tc.sessMatch != nil {
-				tc.sessMatch(t, sess)
-			}
-		})
+
+			t.Run(name, func(t *testing.T) {
+				sess := tc.session
+				if sess == nil {
+					sess = &user.SessionState{}
+				}
+				sess.SetPolicies(policies...)
+				if err := bmid.ApplyPolicies(sess); err != nil {
+					assert.ErrorContains(t, err, tc.errMatch)
+					return
+				}
+
+				if tc.sessMatch != nil {
+					tc.sessMatch(t, sess)
+				}
+			})
+		}
 	}
 }
 
