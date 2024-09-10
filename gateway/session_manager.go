@@ -397,7 +397,9 @@ func (l *SessionLimiter) RedisQuotaExceeded(r *http.Request, session *user.Sessi
 		var res *redis.IntCmd
 		_, err := conn.Pipelined(ctx, func(pipe redis.Pipeliner) error {
 			res = pipe.Incr(ctx, rawKey)
-			pipe.ExpireNX(ctx, rawKey, quotaRenewalRate)
+			if res.Val() == 1 {
+				pipe.Expire(ctx, rawKey, quotaRenewalRate)
+			}
 			return nil
 		})
 		if err != nil {
