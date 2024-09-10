@@ -315,7 +315,7 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 	// Print the transaction logs for error situations if enabled. Success transaction
 	// logs will be handled by the "handler_success.go"
 	if e.Spec.GlobalConfig.AccessLogs.Enabled {
-		e.recordAccessLog(nil, log, r, response)
+		e.recordAccessLog(r, response, nil)
 	}
 
 	// Report in health check

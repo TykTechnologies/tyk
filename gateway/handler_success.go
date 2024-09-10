@@ -385,7 +385,7 @@ func (s *SuccessHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) *http
 		// Don't print a transaction log there is no "resp", that indicates an error.
 		// In error situations, transaction log is already printed by "handler_error.go"
 		if s.Spec.GlobalConfig.AccessLogs.Enabled {
-			s.recordAccessLog(&latency, log, r, resp.Response)
+			s.recordAccessLog(r, resp.Response, &latency)
 		}
 	}
 	log.Debug("Done proxy")
