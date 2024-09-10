@@ -261,22 +261,15 @@ func TestBaseMiddleware_getAuthToken(t *testing.T) {
 func TestSessionLimiter_RedisQuotaExceeded_PerAPI(t *testing.T) {
 	g := StartTest(nil)
 	defer g.Close()
-	g.Gw.GlobalSessionManager.Store().DeleteAllKeys()
-	defer g.Gw.GlobalSessionManager.Store().DeleteAllKeys()
+	//	g.Gw.GlobalSessionManager.Store().DeleteAllKeys()
+	//	defer g.Gw.GlobalSessionManager.Store().DeleteAllKeys()
 
-	apis := BuildAPI(func(spec *APISpec) {
+	api := func(spec *APISpec) {
 		spec.APIID = uuid.New()
 		spec.UseKeylessAccess = false
-		spec.Proxy.ListenPath = "/api1/"
-	}, func(spec *APISpec) {
-		spec.APIID = uuid.New()
-		spec.UseKeylessAccess = false
-		spec.Proxy.ListenPath = "/api2/"
-	}, func(spec *APISpec) {
-		spec.APIID = uuid.New()
-		spec.UseKeylessAccess = false
-		spec.Proxy.ListenPath = "/api3/"
-	})
+		spec.Proxy.ListenPath = fmt.Sprintf("/%s/", spec.APIID)
+	}
+	apis := BuildAPI(api, api, api)
 
 	g.Gw.LoadAPI(apis...)
 
