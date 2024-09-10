@@ -206,6 +206,7 @@ func (t *Service) Apply(session *user.SessionState) error {
 			v.Limit.Smoothing = session.Smoothing
 			v.Limit.ThrottleInterval = session.ThrottleInterval
 			v.Limit.ThrottleRetryLimit = session.ThrottleRetryLimit
+			v.Endpoints = nil
 		}
 
 		if !applyState.didComplexity[k] {
