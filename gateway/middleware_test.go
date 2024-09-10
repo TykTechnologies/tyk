@@ -259,10 +259,13 @@ func TestBaseMiddleware_getAuthToken(t *testing.T) {
 }
 
 func TestSessionLimiter_RedisQuotaExceeded_PerAPI(t *testing.T) {
+	test.Exclusive(t) // Uses DeleteAllKeys, need to limit parallelism.
+
 	g := StartTest(nil)
 	defer g.Close()
-	//	g.Gw.GlobalSessionManager.Store().DeleteAllKeys()
-	//	defer g.Gw.GlobalSessionManager.Store().DeleteAllKeys()
+
+	g.Gw.GlobalSessionManager.Store().DeleteAllKeys()       // exclusive
+	defer g.Gw.GlobalSessionManager.Store().DeleteAllKeys() // exclusive
 
 	api := func(spec *APISpec) {
 		spec.APIID = uuid.New()
