@@ -726,5 +726,39 @@
     "partitions": {
       "per_api": true
     }
+  },
+  "endpoint_rate_limits_on_acl_partition_only": {
+    "id": "endpoint_rate_limits_on_rate_limit_partition_disabled",
+    "rate": 500,
+    "per": 1,
+    "quota_max": -1,
+    "access_rights": {
+      "d": {
+        "endpoints": [
+          {
+            "path": "/get",
+            "methods": [
+              {
+                "name": "GET",
+                "limit": {
+                  "rate": -1
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "partitions": {
+      "acl": true
+    }
+  },
+  "endpoint_rate_limits_on_quota_partition_only": {
+    "id": "endpoint_rate_limits_on_rate_limit_partition_disabled",
+    "quota_max": 1000,
+    "quota_renews":60,
+    "partitions": {
+      "quota": true
+    }
   }
 }
