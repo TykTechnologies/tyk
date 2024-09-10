@@ -66,6 +66,7 @@ func TestRateLimit_Unlimited(t *testing.T) {
 }
 
 func TestNeverRenewQuota(t *testing.T) {
+	test.Exclusive(t) // Uses quota, need to limit parallelism due to DeleteAllKeys.
 
 	g := StartTest(nil)
 	defer g.Close()

@@ -646,6 +646,8 @@ func BenchmarkKeyHandler_CreateKeyHandler(b *testing.B) {
 }
 
 func TestKeyHandler_DeleteKeyWithQuota(t *testing.T) {
+	test.Exclusive(t) // Uses quota, need to limit parallelism due to DeleteAllKeys.
+
 	const testAPIID = "testAPIID"
 	const orgId = "default"
 
