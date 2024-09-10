@@ -359,7 +359,7 @@ func (l *SessionLimiter) RedisQuotaExceeded(r *http.Request, session *user.Sessi
 		key = quotaKey
 	}
 
-	now := time.Now().Truncate(0)
+	now := time.Now()
 
 	// rawKey is the redis key for quota
 	rawKey := QuotaKeyPrefix + quotaScope + key
@@ -373,8 +373,6 @@ func (l *SessionLimiter) RedisQuotaExceeded(r *http.Request, session *user.Sessi
 
 	var expired, exists bool
 	var expiredAt time.Time
-
-	//logger = logger.WithField("key", rawKey)
 
 	dur, err := conn.PTTL(ctx, rawKey).Result()
 	if err != nil && !errors.Is(err, redis.Nil) {
@@ -393,7 +391,6 @@ func (l *SessionLimiter) RedisQuotaExceeded(r *http.Request, session *user.Sessi
 		"exists":  exists,
 		"expired": expired,
 		"rawKey":  rawKey,
-		//		"expiredAt": expiredAt,
 	})
 
 	increment := func() bool {
