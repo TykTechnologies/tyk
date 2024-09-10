@@ -884,6 +884,27 @@ func (s *Test) testPrepareApplyPolicies(tb testing.TB) (*BaseMiddleware, []testA
 				assert.Equal(t, apiDLimits, s.AccessRights["d"].Limit)
 			},
 		},
+		{
+			name:     "endpoint_rate_limits_on_acl_partition_only",
+			policies: []string{"endpoint_rate_limits_on_acl_partition_only"},
+			sessMatch: func(t *testing.T, s *user.SessionState) {
+				t.Helper()
+				assert.NotEmpty(t, s.AccessRights)
+				assert.Empty(t, s.AccessRights["d"].Endpoints)
+			},
+		},
+		{
+			name: "endpoint_rate_limits_when_acl_and_quota_partitions_combined",
+			policies: []string{
+				"endpoint_rate_limits_on_acl_partition_only",
+				"endpoint_rate_limits_on_quota_partition_only",
+			},
+			sessMatch: func(t *testing.T, s *user.SessionState) {
+				t.Helper()
+				assert.NotEmpty(t, s.AccessRights)
+				assert.Empty(t, s.AccessRights["d"].Endpoints)
+			},
+		},
 	}
 
 	tests = append(tests, endpointRLTCs...)
