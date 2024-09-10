@@ -571,8 +571,6 @@ func (t *Service) applyAPILevelLimits(policyAD user.AccessDefinition, currAD use
 
 // ApplyEndpointLevelLimits combines policyEndpoints and currEndpoints and returns the combined value.
 // The returned endpoints would have the highest request rate from policyEndpoints and currEndpoints.
-// If both policyEndpoints and currEndpoints have an endpoint with same request duration but with different rate and per,
-// the rate limit with higher rate would be picked.
 func (t *Service) ApplyEndpointLevelLimits(policyEndpoints user.Endpoints, currEndpoints user.Endpoints) user.Endpoints {
 	currEPMap := currEndpoints.Map()
 	if len(currEPMap) == 0 {
