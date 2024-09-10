@@ -28,6 +28,7 @@ env:
   BASE_REF: ${{startsWith(github.event_name, 'pull_request') && github.base_ref || github.ref_name}}
 jobs:
   goreleaser:
+    if: github.event.pull_request.draft == false
     name: '${{ matrix.golang_cross }}'
     runs-on: ubuntu-latest-m
     permissions:
@@ -80,9 +81,9 @@ jobs:
           path: |
             ~/.cache/go-build
             ~/go/pkg/mod
-          key: ${{ runner.os }}-${{ matrix.golang_cross }}-go-${{ hashFiles('**/go.sum') }}
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
           restore-keys: |
-            ${{ runner.os }}-${{ matrix.golang_cross }}-go-${{ hashFiles('**/go.sum') }}
+            ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
       - name: Build
         env:
           NFPM_PASSPHRASE: ${{ secrets.SIGNING_KEY_PASSPHRASE }}
@@ -170,9 +171,9 @@ jobs:
             type=semver,pattern={{major}}.{{minor}}
             type=semver,pattern={{version}}
           labels: "org.opencontainers.image.title=tyk-gateway  (distroless) \norg.opencontainers.image.description=Tyk Open Source API Gateway written in Go, supporting REST, GraphQL, TCP and gRPC protocols\norg.opencontainers.image.vendor=tyk.io\norg.opencontainers.image.version=${{ github.ref_name }}\n"
-      - name: build multiarch image
+      - name: push image to prod
         if: ${{ matrix.golang_cross == '1.21-bullseye' }}
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         with:
           context: "dist"
           platforms: linux/amd64,linux/arm64
@@ -184,14 +185,19 @@ jobs:
           push: ${{ startsWith(github.ref, 'refs/tags') }}
           tags: ${{ steps.tag_metadata.outputs.tags }}
           labels: ${{ steps.tag_metadata.outputs.labels }}
-      - uses: actions/upload-artifact@v4
+      - name: save deb
+        uses: actions/upload-artifact@v4
+        if: ${{ matrix.golang_cross == '1.21-bullseye' }}
         with:
           name: deb
           retention-days: 1
           path: |
             dist/*.deb
             !dist/*PAYG*.deb
-      - uses: actions/upload-artifact@v4
+            !dist/*fips*.deb
+      - name: save rpm
+        uses: actions/upload-artifact@v4
+        if: ${{ matrix.golang_cross == '1.21-bullseye' }}
         with:
           name: rpm
           retention-days: 1
@@ -200,6 +206,7 @@ jobs:
             !dist/*PAYG*.rpm
             !dist/*fips*.rpm
   test-controller-api:
+    if: github.event.pull_request.draft == false
     needs:
       - goreleaser
     runs-on: ubuntu-latest
@@ -295,21 +302,15 @@ jobs:
           ./dash-bootstrap.sh http://localhost:3000
           docker compose -p auto -f pro-ha.yml -f deps_pro-ha.yml -f ${{ matrix.envfiles.db }}.yml -f ${{ matrix.envfiles.cache }}.yml --env-file versions.env --profile slave-datacenter up --quiet-pull -d
           echo "$(cat pytest.env | grep USER_API_SECRET)" >> $GITHUB_OUTPUT
+          echo "ts=$(date +%s%N)" >> $GITHUB_OUTPUT
       - uses: actions/checkout@v4
         with:
           repository: TykTechnologies/tyk-analytics
           path: tyk-analytics
           token: ${{ secrets.ORG_GH_TOKEN }}
           fetch-depth: 1
+          ref: $BASE_REF
           sparse-checkout: tests/api
-      - name: Branch for test code
-        id: timestamp
-        working-directory: tyk-analytics/tests/api
-        run: |
-          # Generate report id
-          git fetch --no-tags --depth 1 origin "refs/heads/${BASE_REF}:refs/remotes/origin/${BASE_REF}"
-          git switch $BASE_REF
-          echo "ts=$(date +%s%N)" >> $GITHUB_OUTPUT
       - uses: actions/setup-python@v5
         with:
           cache: 'pip'
@@ -342,7 +343,7 @@ jobs:
         id: metadata_report
         if: always() && (steps.test_execution.conclusion != 'skipped')
         env:
-          REPORT_NAME: ${{ github.repository }}_${{ github.run_id }}_${{ github.run_attempt }}-${{steps.timestamp.outputs.ts}}
+          REPORT_NAME: ${{ github.repository }}_${{ github.run_id }}_${{ github.run_attempt }}-${{steps.env_up.outputs.ts}}
           METADATA_REPORT_PATH: metadata.toml
         run: |
           # Generate metadata report
@@ -385,6 +386,7 @@ jobs:
           retention-days: 3
           overwrite: true
   test-controller-distros:
+    if: github.event.pull_request.draft == false
     needs:
       - goreleaser
     runs-on: ubuntu-latest
