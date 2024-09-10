@@ -6,8 +6,9 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/TykTechnologies/tyk/internal/uuid"
 	"github.com/buger/jsonparser"
+
+	"github.com/TykTechnologies/tyk/internal/uuid"
 )
 
 // `{"` in base64
