@@ -214,6 +214,7 @@ func TestState(t *testing.T) {
 
 // Fill populates the given input with non-default values. Index is where to start incrementing values.
 func Fill(t *testing.T, input interface{}, index int) {
+	t.Helper()
 	v := reflect.ValueOf(input).Elem()
 
 	switch kind := v.Type().Kind(); kind {
@@ -352,6 +353,7 @@ func getNonEmptyFields(data interface{}, prefix string) (fields []string) {
 }
 
 func FillTestAuthConfigs(t *testing.T, index int) map[string]apidef.AuthConfig {
+	t.Helper()
 	authConfigs := make(map[string]apidef.AuthConfig)
 
 	a := apidef.AuthConfig{}
@@ -372,6 +374,7 @@ func FillTestAuthConfigs(t *testing.T, index int) map[string]apidef.AuthConfig {
 }
 
 func FillTestVersionData(t *testing.T, index int) apidef.VersionData {
+	t.Helper()
 	versionInfo := apidef.VersionInfo{}
 	Fill(t, &versionInfo, index)
 

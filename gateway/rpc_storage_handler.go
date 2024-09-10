@@ -7,9 +7,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/TykTechnologies/storage/temporal/model"
+	temporalmodel "github.com/TykTechnologies/storage/temporal/model"
 	"github.com/TykTechnologies/tyk/internal/cache"
-	im "github.com/TykTechnologies/tyk/internal/model"
+	"github.com/TykTechnologies/tyk/internal/model"
 	"github.com/TykTechnologies/tyk/rpc"
 
 	"github.com/TykTechnologies/tyk/apidef"
@@ -51,6 +51,9 @@ var (
 			return nil, nil
 		},
 		"DeleteKeys": func(keys []string) (bool, error) {
+			return true, nil
+		},
+		"DeleteRawKeys": func(keys []string) (bool, error) {
 			return true, nil
 		},
 		"Decrement": func(keyName string) error {
@@ -173,7 +176,7 @@ func (r *RPCStorageHandler) buildNodeInfo() []byte {
 			APIsCount:     r.Gw.apisByIDLen(),
 			PoliciesCount: r.Gw.PolicyCount(),
 		},
-		HostDetails: im.HostDetails{
+		HostDetails: model.HostDetails{
 			Hostname: r.Gw.hostDetails.Hostname,
 			PID:      r.Gw.hostDetails.PID,
 			Address:  r.Gw.hostDetails.Address,
@@ -533,6 +536,26 @@ func (r *RPCStorageHandler) DeleteKey(keyName string) bool {
 	return ok == true
 }
 
+func (r *RPCStorageHandler) DeleteRawKeys(keys []string) bool {
+	ret, err := rpc.FuncClientSingleton("DeleteRawKeys", keys)
+	if err != nil {
+		rpc.EmitErrorEventKv(
+			rpc.FuncClientSingletonCall,
+			"DeleteKey",
+			err,
+			nil,
+		)
+
+		if r.IsRetriableError(err) {
+			if rpc.Login() {
+				return r.DeleteRawKeys(keys)
+			}
+		}
+	}
+	success, ok := ret.(bool)
+	return success && ok
+}
+
 func (r *RPCStorageHandler) DeleteAllKeys() bool {
 	log.Warning("Not implementated")
 	return false
@@ -596,7 +619,7 @@ func (r *RPCStorageHandler) DeleteKeys(keys []string) bool {
 }
 
 // StartPubSubHandler will listen for a signal and run the callback with the message
-func (r *RPCStorageHandler) StartPubSubHandler(_ string, _ func(*model.Message)) error {
+func (r *RPCStorageHandler) StartPubSubHandler(_ string, _ func(*temporalmodel.Message)) error {
 	log.Warning("RPCStorageHandler.StartPubSubHandler - NO PUBSUB DEFINED")
 	return nil
 }

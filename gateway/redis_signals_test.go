@@ -23,6 +23,7 @@ func TestPubSubInternals(t *testing.T) {
 		{
 			name: "test error log, err == nil",
 			testFn: func(t *testing.T) {
+				t.Helper()
 				var err error
 				assert.False(t, g.Gw.logPubSubError(err, message))
 			},
@@ -30,13 +31,15 @@ func TestPubSubInternals(t *testing.T) {
 		{
 			name: "test error log, err != nil",
 			testFn: func(t *testing.T) {
-				var err error = errors.New("test err")
+				t.Helper()
+				var err = errors.New("test err")
 				assert.True(t, g.Gw.logPubSubError(err, message))
 			},
 		},
 		{
 			name: "test add delay",
 			testFn: func(t *testing.T) {
+				t.Helper()
 				g.Gw.addPubSubDelay(time.Microsecond)
 				assert.True(t, true)
 			},

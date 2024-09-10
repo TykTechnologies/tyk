@@ -12,10 +12,12 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/TykTechnologies/graphql-go-tools/v2/pkg/graphql"
+	graphqlv2 "github.com/TykTechnologies/graphql-go-tools/v2/pkg/graphql"
 )
 
 func NewTestEngine(t *testing.T) *EngineV3 {
+	t.Helper()
+
 	gqlTools := graphqlGoToolsV2{}
 	parsedSchema, err := gqlTools.parseSchema(testSchemaEngineV1)
 	require.NoError(t, err)
@@ -38,8 +40,8 @@ func TestEngineV3_ProcessRequest(t *testing.T) {
 
 	t.Run("should return error and 400 when validation fails", func(t *testing.T) {
 		engine := NewTestEngine(t)
-		engine.ctxRetrieveRequestFunc = func(r *http.Request) *graphql.Request {
-			return &graphql.Request{
+		engine.ctxRetrieveRequestFunc = func(r *http.Request) *graphqlv2.Request {
+			return &graphqlv2.Request{
 				Query: "query { goodBye }",
 			}
 		}
@@ -60,8 +62,8 @@ func TestEngineV3_ProcessRequest(t *testing.T) {
 
 	t.Run("should return error and 400 when input validation fails", func(t *testing.T) {
 		engine := NewTestEngine(t)
-		engine.ctxRetrieveRequestFunc = func(r *http.Request) *graphql.Request {
-			return &graphql.Request{
+		engine.ctxRetrieveRequestFunc = func(r *http.Request) *graphqlv2.Request {
+			return &graphqlv2.Request{
 				Query:     "query($name: String!) { helloName(name: $name) }",
 				Variables: json.RawMessage(`{"name": 123}`),
 			}
@@ -83,8 +85,8 @@ func TestEngineV3_ProcessRequest(t *testing.T) {
 
 	t.Run("should return no error and 200 when everything passes", func(t *testing.T) {
 		engine := NewTestEngine(t)
-		engine.ctxRetrieveRequestFunc = func(r *http.Request) *graphql.Request {
-			return &graphql.Request{
+		engine.ctxRetrieveRequestFunc = func(r *http.Request) *graphqlv2.Request {
+			return &graphqlv2.Request{
 				Query:     "query($name: String!) { helloName(name: $name) }",
 				Variables: json.RawMessage(`{"name": "James T. Kirk"}`),
 			}

@@ -2,7 +2,7 @@ package gateway
 
 import (
 	"crypto/hmac"
-	cryptoRand "crypto/rand"
+	cryptorand "crypto/rand"
 	"crypto/rsa"
 	"crypto/sha1"
 	"crypto/sha256"
@@ -125,6 +125,7 @@ func waitTimeout(wg *sync.WaitGroup, timeout time.Duration) bool {
 }
 
 func testPrepareHMACAuthSessionPass(tb testing.TB, ts *Test, hashFn func() hash.Hash, eventWG *sync.WaitGroup, withHeader bool, isBench bool) (string, *APISpec, *http.Request, string) {
+	tb.Helper()
 	spec := ts.Gw.LoadSampleAPI(hmacAuthDef)
 
 	session := createHMACAuthSession()
@@ -182,7 +183,7 @@ func testPrepareHMACAuthSessionPass(tb testing.TB, ts *Test, hashFn func() hash.
 }
 
 func testPrepareRSAAuthSessionPass(tb testing.TB, eventWG *sync.WaitGroup, privateKey *rsa.PrivateKey, pubCertId string, withHeader bool, isBench bool, ts *Test) (string, *APISpec, *http.Request, string) {
-
+	tb.Helper()
 	spec := ts.Gw.LoadSampleAPI(hmacAuthDef)
 	session := createRSAAuthSession(pubCertId)
 
@@ -231,7 +232,7 @@ func testPrepareRSAAuthSessionPass(tb testing.TB, eventWG *sync.WaitGroup, priva
 	h.Write([]byte(signatureString))
 	hashed := h.Sum(nil)
 
-	signature, _ := rsa.SignPKCS1v15(cryptoRand.Reader, privateKey, crypto.SHA256, hashed)
+	signature, _ := rsa.SignPKCS1v15(cryptorand.Reader, privateKey, crypto.SHA256, hashed)
 
 	sigString := base64.StdEncoding.EncodeToString(signature)
 

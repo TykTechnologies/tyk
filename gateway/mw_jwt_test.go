@@ -933,8 +933,10 @@ func TestJWTScopeToPolicyMapping(t *testing.T) {
 		p.AccessRights = map[string]user.AccessDefinition{
 			"base-api": {
 				Limit: user.APILimit{
-					Rate:     111,
-					Per:      3600,
+					RateLimit: user.RateLimit{
+						Rate: 111,
+						Per:  3600,
+					},
 					QuotaMax: -1,
 				},
 			},
@@ -960,8 +962,10 @@ func TestJWTScopeToPolicyMapping(t *testing.T) {
 		p.AccessRights = map[string]user.AccessDefinition{
 			"api1": {
 				Limit: user.APILimit{
-					Rate:     100,
-					Per:      60,
+					RateLimit: user.RateLimit{
+						Rate: 100,
+						Per:  60,
+					},
 					QuotaMax: -1,
 				},
 			},
@@ -976,8 +980,10 @@ func TestJWTScopeToPolicyMapping(t *testing.T) {
 		p.AccessRights = map[string]user.AccessDefinition{
 			"api2": {
 				Limit: user.APILimit{
-					Rate:     500,
-					Per:      30,
+					RateLimit: user.RateLimit{
+						Rate: 500,
+						Per:  30,
+					},
 					QuotaMax: -1,
 				},
 			},
@@ -1191,8 +1197,10 @@ func TestJWTScopeToPolicyMapping(t *testing.T) {
 		p.AccessRights = map[string]user.AccessDefinition{
 			spec3.APIID: {
 				Limit: user.APILimit{
-					Rate:     500,
-					Per:      30,
+					RateLimit: user.RateLimit{
+						Rate: 500,
+						Per:  30,
+					},
 					QuotaMax: -1,
 				},
 			},
@@ -1813,6 +1821,7 @@ func TestJWTDefaultPolicies(t *testing.T) {
 	sessionID := ts.Gw.generateToken(spec.OrgID, keyID)
 
 	assert := func(t *testing.T, expected []string) {
+		t.Helper()
 		session, _ := ts.Gw.GlobalSessionManager.SessionDetail(spec.OrgID, sessionID, false)
 		actual := session.PolicyIDs()
 		if !reflect.DeepEqual(expected, actual) {

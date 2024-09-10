@@ -43,13 +43,14 @@ import (
 	"sync"
 	"time"
 
-	gqlV2 "github.com/TykTechnologies/graphql-go-tools/v2/pkg/graphql"
+	gqlv2 "github.com/TykTechnologies/graphql-go-tools/v2/pkg/graphql"
 
 	"github.com/getkin/kin-openapi/openapi3"
 
 	"github.com/TykTechnologies/tyk/config"
 
 	"github.com/TykTechnologies/tyk/internal/otel"
+	"github.com/TykTechnologies/tyk/internal/redis"
 	"github.com/TykTechnologies/tyk/internal/uuid"
 
 	"github.com/TykTechnologies/tyk/apidef/oas"
@@ -619,7 +620,7 @@ func (gw *Gateway) handleGetDetail(sessionKey, apiID, orgID string, byHash bool)
 			quotaKey = QuotaKeyPrefix + sessionKey
 		}
 
-		if usedQuota, err := gw.GlobalSessionManager.Store().GetRawKey(quotaKey); err == nil {
+		if usedQuota, err := gw.GlobalSessionManager.Store().GetRawKey(quotaKey); err == nil || errors.Is(err, redis.Nil) {
 			qInt, _ := strconv.Atoi(usedQuota)
 			remaining := session.QuotaMax - int64(qInt)
 
@@ -629,11 +630,10 @@ func (gw *Gateway) handleGetDetail(sessionKey, apiID, orgID string, byHash bool)
 				session.QuotaRemaining = remaining
 			}
 		} else {
-			log.WithFields(logrus.Fields{
-				"prefix":  "api",
-				"key":     gw.obfuscateKey(quotaKey),
-				"message": err,
-				"status":  "ok",
+			log.WithError(err).WithFields(logrus.Fields{
+				"prefix": "api",
+				"key":    gw.obfuscateKey(quotaKey),
+				"status": "ok",
 			}).Info("Can't retrieve key quota")
 		}
 	}
@@ -3256,13 +3256,13 @@ func ctxGetGraphQLRequest(r *http.Request) (gqlRequest *gql.Request) {
 	return nil
 }
 
-func ctxSetGraphQLRequestV2(r *http.Request, gqlRequest *gqlV2.Request) {
+func ctxSetGraphQLRequestV2(r *http.Request, gqlRequest *gqlv2.Request) {
 	setCtxValue(r, ctx.GraphQLRequest, gqlRequest)
 }
 
-func ctxGetGraphQLRequestV2(r *http.Request) (gqlRequest *gqlV2.Request) {
+func ctxGetGraphQLRequestV2(r *http.Request) (gqlRequest *gqlv2.Request) {
 	if v := r.Context().Value(ctx.GraphQLRequest); v != nil {
-		if gqlRequest, ok := v.(*gqlV2.Request); ok {
+		if gqlRequest, ok := v.(*gqlv2.Request); ok {
 			return gqlRequest
 		}
 	}

@@ -25,13 +25,12 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/TykTechnologies/storage/temporal/model"
-	"github.com/TykTechnologies/tyk/internal/uuid"
-
+	temporalmodel "github.com/TykTechnologies/storage/temporal/model"
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/apidef/oas"
 	"github.com/TykTechnologies/tyk/certs"
 	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/internal/uuid"
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/test"
 	"github.com/TykTechnologies/tyk/user"
@@ -591,6 +590,59 @@ func TestKeyHandler_UpdateKey(t *testing.T) {
 	})
 }
 
+func BenchmarkKeyHandler_CreateKeyHandler(b *testing.B) {
+	ts := StartTest(nil)
+
+	defer ts.Close()
+
+	apiID := "testAPIID"
+	secondAPIID := "secondAPI"
+	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		spec.APIID = apiID
+		spec.OrgID = "default"
+		spec.Proxy.ListenPath = "/my-api"
+		spec.UseKeylessAccess = false
+	})
+	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		spec.APIID = secondAPIID
+		spec.OrgID = "default"
+		spec.Proxy.ListenPath = "/my-api"
+		spec.UseKeylessAccess = false
+	})
+
+	pid := ts.CreatePolicy(func(p *user.Policy) {
+		p.OrgID = "default"
+		p.QuotaMax = 1
+		p.AccessRights = map[string]user.AccessDefinition{
+			"test": {
+				APIID:          apiID,
+				AllowanceScope: "scope1",
+			},
+			"second": {
+				APIID:          secondAPIID,
+				AllowanceScope: "scope1",
+			},
+		}
+	})
+
+	session := user.SessionState{
+		ApplyPolicies: []string{pid},
+	}
+	jsonData, err := json.Marshal(session)
+	require.NoError(b, err)
+
+	require.NoError(b, err)
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		req, err := http.NewRequest(http.MethodPost, "", bytes.NewBuffer(jsonData))
+		require.NoError(b, err)
+		recorder := httptest.NewRecorder()
+		ts.Gw.createKeyHandler(recorder, req)
+		assert.Equal(b, 200, recorder.Code)
+	}
+}
+
 func TestKeyHandler_DeleteKeyWithQuota(t *testing.T) {
 	const testAPIID = "testAPIID"
 	const orgId = "default"
@@ -1022,7 +1074,7 @@ func TestHashKeyHandlerLegacyWithHashFunc(t *testing.T) {
 }
 
 func (ts *Test) testHashKeyHandlerHelper(t *testing.T, expectedHashSize int) {
-
+	t.Helper()
 	ts.Gw.BuildAndLoadAPI()
 
 	withAccess := CreateStandardSession()
@@ -1146,7 +1198,7 @@ func (ts *Test) testHashKeyHandlerHelper(t *testing.T, expectedHashSize int) {
 }
 
 func (ts *Test) testHashFuncAndBAHelper(t *testing.T) {
-
+	t.Helper()
 	session := ts.testPrepareBasicAuth(false)
 
 	_, _ = ts.Run(t, []test.TestCase{
@@ -1742,14 +1794,14 @@ func TestGroupResetHandler(t *testing.T) {
 		}()
 
 		err := cacheStore.StartPubSubHandler(ctx, RedisPubSubChannel, func(v interface{}) {
-			msg, ok := v.(model.Message)
+			msg, ok := v.(temporalmodel.Message)
 			assert.True(t, ok)
 
 			msgType := msg.Type()
 			switch msgType {
-			case model.MessageTypeSubscription:
+			case temporalmodel.MessageTypeSubscription:
 				didSubscribe <- true
-			case model.MessageTypeMessage:
+			case temporalmodel.MessageTypeMessage:
 				notf := Notification{Gw: ts.Gw}
 				payload, err := msg.Payload()
 				assert.NoError(t, err)
@@ -3543,6 +3595,7 @@ func testGetOldAPI(t *testing.T, d *Test, id, name string) (oldAPI apidef.APIDef
 }
 
 func testPatchOAS(t *testing.T, ts *Test, api oas.OAS, params map[string]string, apiID string) {
+	t.Helper()
 	patchPath := fmt.Sprintf("/tyk/apis/oas/%s", apiID)
 
 	_, _ = ts.Run(t, []test.TestCase{
@@ -3554,6 +3607,7 @@ func testPatchOAS(t *testing.T, ts *Test, api oas.OAS, params map[string]string,
 }
 
 func testImportOAS(t *testing.T, ts *Test, testCase test.TestCase) string {
+	t.Helper()
 	var importResp apiModifyKeySuccess
 
 	testCase.Path = "/tyk/apis/oas/import"
@@ -3874,6 +3928,7 @@ func TestPurgeOAuthClientTokensEndpoint(t *testing.T) {
 	})
 
 	assertTokensLen := func(t *testing.T, storageManager storage.Handler, storageKey string, expectedTokensLen int) {
+		t.Helper()
 		nowTs := time.Now().Unix()
 		startScore := strconv.FormatInt(nowTs, 10)
 		tokens, _, err := storageManager.GetSortedSetRange(storageKey, startScore, "+inf")

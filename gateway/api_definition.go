@@ -16,7 +16,7 @@ import (
 	"strings"
 	"sync"
 	"sync/atomic"
-	textTemplate "text/template"
+	texttemplate "text/template"
 	"time"
 
 	"github.com/TykTechnologies/tyk/storage/kv"
@@ -24,6 +24,7 @@ import (
 	"github.com/getkin/kin-openapi/routers"
 
 	"github.com/TykTechnologies/tyk/internal/graphengine"
+	"github.com/TykTechnologies/tyk/internal/httputil"
 
 	"github.com/getkin/kin-openapi/routers/gorillamux"
 
@@ -33,9 +34,8 @@ import (
 
 	"github.com/cenk/backoff"
 
-	"github.com/Masterminds/sprig/v3"
+	sprig "github.com/Masterminds/sprig/v3"
 
-	"github.com/gorilla/mux"
 	"github.com/sirupsen/logrus"
 
 	circuit "github.com/TykTechnologies/circuitbreaker"
@@ -174,7 +174,7 @@ type EndPointCacheMeta struct {
 
 type TransformSpec struct {
 	apidef.TemplateMeta
-	Template *textTemplate.Template
+	Template *texttemplate.Template
 }
 
 type ExtendedCircuitBreakerMeta struct {
@@ -817,13 +817,18 @@ func (a APIDefinitionLoader) getPathSpecs(apiVersionDef apidef.VersionInfo, conf
 	return combinedPath, len(whiteListPaths) > 0
 }
 
+// match mux tags, `{id}`.
+var apiLangIDsRegex = regexp.MustCompile(`{([^}]+)}`)
+
 func (a APIDefinitionLoader) generateRegex(stringSpec string, newSpec *URLSpec, specType URLStatus, conf config.Config) {
-	apiLangIDsRegex := regexp.MustCompile(`{([^}]*)}`)
-	asRegexStr := apiLangIDsRegex.ReplaceAllString(stringSpec, `([^/]*)`)
+	// replace mux named parameters with regex path match
+	asRegexStr := apiLangIDsRegex.ReplaceAllString(stringSpec, `([^/]+)`)
+
 	// Case insensitive match
 	if newSpec.IgnoreCase || conf.IgnoreEndpointCase {
 		asRegexStr = "(?i)" + asRegexStr
 	}
+
 	asRegex, _ := regexp.Compile(asRegexStr)
 	newSpec.Status = specType
 	newSpec.Spec = asRegex
@@ -924,21 +929,21 @@ func (a APIDefinitionLoader) compileCachedPathSpec(oldpaths []string, newpaths [
 	return urlSpec
 }
 
-func (a APIDefinitionLoader) filterSprigFuncs() textTemplate.FuncMap {
+func (a APIDefinitionLoader) filterSprigFuncs() texttemplate.FuncMap {
 	tmp := sprig.GenericFuncMap()
 	delete(tmp, "env")
 	delete(tmp, "expandenv")
 
-	return textTemplate.FuncMap(tmp)
+	return texttemplate.FuncMap(tmp)
 }
 
-func (a APIDefinitionLoader) loadFileTemplate(path string) (*textTemplate.Template, error) {
+func (a APIDefinitionLoader) loadFileTemplate(path string) (*texttemplate.Template, error) {
 	log.Debug("-- Loading template: ", path)
 	tmpName := filepath.Base(path)
 	return apidef.Template.New(tmpName).Funcs(a.filterSprigFuncs()).ParseFiles(path)
 }
 
-func (a APIDefinitionLoader) loadBlobTemplate(blob string) (*textTemplate.Template, error) {
+func (a APIDefinitionLoader) loadBlobTemplate(blob string) (*texttemplate.Template, error) {
 	log.Debug("-- Loading blob")
 	uDec, err := base64.StdEncoding.DecodeString(blob)
 	if err != nil {
@@ -1629,19 +1634,30 @@ func (a *APISpec) getVersionFromRequest(r *http.Request) string {
 
 		return vName
 	case apidef.URLLocation:
-		uPath := a.StripListenPath(r, r.URL.Path)
+		uPath := a.StripListenPath(r.URL.Path)
 		uPath = strings.TrimPrefix(uPath, "/"+a.Slug)
 
 		// First non-empty part of the path is the version ID
 		for _, part := range strings.Split(uPath, "/") {
 			if part != "" {
-				if a.VersionDefinition.StripVersioningData || a.VersionDefinition.StripPath {
+				matchesUrlVersioningPattern := true
+				if a.VersionDefinition.UrlVersioningPattern != "" {
+					re, err := regexp.Compile(a.VersionDefinition.UrlVersioningPattern)
+					if err != nil {
+						log.Error("Error compiling versioning pattern: ", err)
+					} else {
+						matchesUrlVersioningPattern = re.Match([]byte(part))
+					}
+				}
+
+				if (a.VersionDefinition.StripVersioningData || a.VersionDefinition.StripPath) && matchesUrlVersioningPattern {
 					log.Debug("Stripping version from url: ", part)
 
 					r.URL.Path = strings.Replace(r.URL.Path, part+"/", "", 1)
 					r.URL.RawPath = strings.Replace(r.URL.RawPath, part+"/", "", 1)
 				}
 
+				//never delete this line as there's an easy to miss defer statement above
 				vName = part
 
 				return part
@@ -1760,8 +1776,8 @@ func (a *APISpec) Version(r *http.Request) (*apidef.VersionInfo, RequestStatus) 
 	return &version, StatusOk
 }
 
-func (a *APISpec) StripListenPath(r *http.Request, path string) string {
-	return stripListenPath(a.Proxy.ListenPath, path)
+func (a *APISpec) StripListenPath(reqPath string) string {
+	return httputil.StripListenPath(a.Proxy.ListenPath, reqPath)
 }
 
 func (a *APISpec) SanitizeProxyPaths(r *http.Request) {
@@ -1771,9 +1787,9 @@ func (a *APISpec) SanitizeProxyPaths(r *http.Request) {
 
 	log.Debug("Stripping proxy listen path: ", a.Proxy.ListenPath)
 
-	r.URL.Path = a.StripListenPath(r, r.URL.Path)
+	r.URL.Path = a.StripListenPath(r.URL.Path)
 	if r.URL.RawPath != "" {
-		r.URL.RawPath = a.StripListenPath(r, r.URL.RawPath)
+		r.URL.RawPath = a.StripListenPath(r.URL.RawPath)
 	}
 
 	log.Debug("Upstream path is: ", r.URL.Path)
@@ -1821,27 +1837,6 @@ func (r *RoundRobin) WithLen(len int) int {
 	// -1 to start at 0, not 1
 	cur := atomic.AddUint32(&r.pos, 1) - 1
 	return int(cur) % len
-}
-
-func stripListenPath(listenPath, path string) (res string) {
-	defer func() {
-		if !strings.HasPrefix(res, "/") {
-			res = "/" + res
-		}
-	}()
-
-	if !strings.Contains(listenPath, "{") {
-		res = strings.TrimPrefix(path, listenPath)
-		return
-	}
-
-	tmp := new(mux.Route).PathPrefix(listenPath)
-	s, err := tmp.GetPathRegexp()
-	if err != nil {
-		return path
-	}
-	reg := regexp.MustCompile(s)
-	return reg.ReplaceAllString(path, "")
 }
 
 func (s *APISpec) hasVirtualEndpoint() bool {

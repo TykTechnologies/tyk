@@ -14,7 +14,7 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
-	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -328,8 +328,10 @@ func TestQuota(t *testing.T) {
 
 	var keyID string
 
-	var webhookWG sync.WaitGroup
+	var requestCount int64
 	webhook := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		atomic.AddInt64(&requestCount, 1)
+
 		if r.Header.Get("X-Tyk-Test-Header") != "Tyk v1.BANANA" {
 			t.Error("Custom webhook header not set", r.Header)
 		}
@@ -341,8 +343,6 @@ func TestQuota(t *testing.T) {
 		if data["event"] != "QuotaExceeded" || data["message"] != "Key Quota Limit Exceeded" || data["key"] != keyID {
 			t.Error("Webhook payload not match", data)
 		}
-
-		webhookWG.Done()
 	}))
 	defer webhook.Close()
 
@@ -392,7 +392,6 @@ func TestQuota(t *testing.T) {
 		"authorization": keyID,
 	}
 
-	webhookWG.Add(1)
 	_, _ = ts.Run(t, []test.TestCase{
 		{Path: "/", Headers: authHeaders, Code: 200},
 		// Ignored path should not affect quota
@@ -402,7 +401,9 @@ func TestQuota(t *testing.T) {
 		// Ignored path works without auth
 		{Path: "/get", Code: 200},
 	}...)
-	webhookWG.Wait()
+
+	want := int64(1)
+	assert.Equal(t, want, atomic.LoadInt64(&requestCount))
 }
 
 func TestListener(t *testing.T) {
@@ -1275,6 +1276,7 @@ func TestOldCachePlugin(t *testing.T) {
 	headerCache := map[string]string{"x-tyk-cached-response": "1"}
 
 	check := func(t *testing.T) {
+		t.Helper()
 		cache := storage.RedisCluster{KeyPrefix: "cache-", ConnectionHandler: ts.Gw.StorageConnectionHandler}
 		defer cache.DeleteScanMatch("*")
 

@@ -59,3 +59,4 @@ tyk_linux_*
 *.test
 
 k8s/*Values.yaml
+main

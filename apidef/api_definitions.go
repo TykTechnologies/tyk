@@ -410,17 +410,40 @@ func (e *ExtendedPathsSet) Clear() {
 	}
 }
 
+// VersionDefinition is a struct that holds the versioning information for an API.
 type VersionDefinition struct {
-	Enabled             bool              `bson:"enabled" json:"enabled"`
-	Name                string            `bson:"name" json:"name"`
-	Default             string            `bson:"default" json:"default"`
-	Location            string            `bson:"location" json:"location"`
-	Key                 string            `bson:"key" json:"key"`
-	StripPath           bool              `bson:"strip_path" json:"strip_path"` // Deprecated. Use StripVersioningData instead.
-	StripVersioningData bool              `bson:"strip_versioning_data" json:"strip_versioning_data"`
-	FallbackToDefault   bool              `bson:"fallback_to_default" json:"fallback_to_default"`
-	Versions            map[string]string `bson:"versions" json:"versions"`
-	BaseID              string            `bson:"base_id" json:"-"` // json tag is `-` because we want this to be hidden to user
+	// Enabled indicates whether this version is enabled or not.
+	Enabled bool `bson:"enabled" json:"enabled"`
+
+	// Name is the name of this version.
+	Name string `bson:"name" json:"name"`
+
+	// Default is the default version to use if no version is specified in the request.
+	Default string `bson:"default" json:"default"`
+
+	// Location is the location in the request where the version information can be found.
+	Location string `bson:"location" json:"location"`
+
+	// Key is the key to use to extract the version information from the specified location.
+	Key string `bson:"key" json:"key"`
+
+	// StripPath is a deprecated field. Use StripVersioningData instead.
+	StripPath bool `bson:"strip_path" json:"strip_path"` // Deprecated. Use StripVersioningData instead.
+
+	// StripVersioningData indicates whether to strip the versioning data from the request.
+	StripVersioningData bool `bson:"strip_versioning_data" json:"strip_versioning_data"`
+
+	// UrlVersioningPattern is the regex pattern to match in the URL for versioning.
+	UrlVersioningPattern string `bson:"url_versioning_pattern" json:"url_versioning_pattern"`
+
+	// FallbackToDefault indicates whether to fallback to the default version if the version in the request does not exist.
+	FallbackToDefault bool `bson:"fallback_to_default" json:"fallback_to_default"`
+
+	// Versions is a map of version names to version ApiIDs.
+	Versions map[string]string `bson:"versions" json:"versions"`
+
+	// BaseID is a hidden field used internally that represents the ApiID of the base API.
+	BaseID string `bson:"base_id" json:"-"` // json tag is `-` because we want this to be hidden to user
 }
 
 type VersionData struct {
