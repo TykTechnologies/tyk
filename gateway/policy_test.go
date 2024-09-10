@@ -10,7 +10,6 @@ import (
 	"slices"
 	"sort"
 	"strconv"
-	"strings"
 	"testing"
 	"time"
 
@@ -53,11 +52,13 @@ func TestLoadPoliciesFromDashboardReLogin(t *testing.T) {
 }
 
 type testApplyPoliciesData struct {
-	name         string
-	policies     []string
-	errMatch     string                               // substring
-	sessMatch    func(*testing.T, *user.SessionState) // ignored if nil
-	session      *user.SessionState
+	name      string
+	policies  []string
+	errMatch  string                               // substring
+	sessMatch func(*testing.T, *user.SessionState) // ignored if nil
+	session   *user.SessionState
+	// reverseOrder executes the tests in reversed order of policies,
+	// in addition to the order specified in policies
 	reverseOrder bool
 }
 
@@ -1096,7 +1097,7 @@ func TestApplyPolicies(t *testing.T) {
 		for i, policies := range pols {
 			name := tc.name
 			if i == 1 {
-				name = fmt.Sprintf("%s, reversed=%t", name, true)
+				name = fmt.Sprintf("%s, reversed=%t", name, tc.reverseOrder)
 			}
 
 			t.Run(name, func(t *testing.T) {
@@ -1105,16 +1106,11 @@ func TestApplyPolicies(t *testing.T) {
 					sess = &user.SessionState{}
 				}
 				sess.SetPolicies(policies...)
-				errStr := ""
 				if err := bmid.ApplyPolicies(sess); err != nil {
-					errStr = err.Error()
+					assert.ErrorContains(t, err, tc.errMatch)
+					return
 				}
-				if tc.errMatch == "" && errStr != "" {
-					t.Fatalf("didn't want err but got %s", errStr)
-				} else if !strings.Contains(errStr, tc.errMatch) {
-					t.Fatalf("error %q doesn't match %q",
-						errStr, tc.errMatch)
-				}
+
 				if tc.sessMatch != nil {
 					tc.sessMatch(t, sess)
 				}
