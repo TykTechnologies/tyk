@@ -109,9 +109,10 @@ jobs:
         run: git fetch origin ${{ github.base_ref }}
 
       - name: Print CPU info
-        run: |
-          lshw -c cpu
-          go env
+        run: grep '^model name' /proc/cpuinfo
+
+      - name: Print Go env
+        run: go env
 
       - name: Run Gateway Tests
         id: ci-tests
