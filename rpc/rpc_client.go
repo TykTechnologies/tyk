@@ -4,6 +4,7 @@ import (
 	"crypto/tls"
 	"errors"
 	"net"
+	"os"
 	"strconv"
 	"sync"
 	"sync/atomic"
@@ -202,6 +203,20 @@ func EmitErrorEventKv(jobName string, funcName string, err error, kv map[string]
 	}
 }
 
+func GetEnvInt() int {
+	// Read the environment variable
+	envVarValue := os.Getenv("TYK_SLEEP")
+
+	// Attempt to convert the environment variable to an integer
+	value, err := strconv.Atoi(envVarValue)
+	if err != nil {
+		// If conversion fails, use the default value
+		value = 0
+	}
+
+	return value
+}
+
 // Connect will establish a connection to the RPC server specified in connection options
 func Connect(connConfig Config, suppressRegister bool, dispatcherFuncs map[string]interface{},
 	getGroupLoginFunc func(string, string) interface{},
@@ -263,6 +278,7 @@ func Connect(connConfig Config, suppressRegister bool, dispatcherFuncs map[strin
 	}
 
 	clientSingleton.Dial = func(addr string) (conn net.Conn, err error) {
+		time.Sleep(time.Duration(GetEnvInt()) * time.Second)
 		defer connectionDialingWG.Done()
 		dialer := &net.Dialer{
 			Timeout:   10 * time.Second,
