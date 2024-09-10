@@ -364,7 +364,11 @@ func (l *SessionLimiter) RedisQuotaExceeded(r *http.Request, session *user.Sessi
 	// rawKey is the redis key for quota
 	rawKey := QuotaKeyPrefix + quotaScope + key
 
-	quotaRenewalRate := time.Second * time.Duration(limit.QuotaRenewalRate)
+	var quotaRenewalRate time.Duration
+	if limit.QuotaRenewalRate > 0 {
+		quotaRenewalRate = time.Second * time.Duration(limit.QuotaRenewalRate)
+	}
+
 	conn := l.limiterStorage
 
 	var expired, exists bool
@@ -394,29 +398,24 @@ func (l *SessionLimiter) RedisQuotaExceeded(r *http.Request, session *user.Sessi
 
 	increment := func() bool {
 		var res *redis.IntCmd
-		conn.Pipelined(ctx, func(pipe redis.Pipeliner) error {
+		_, err := conn.Pipelined(ctx, func(pipe redis.Pipeliner) error {
 			res = pipe.Incr(ctx, rawKey)
-			if quotaRenewalRate > 0 {
-				pipe.ExpireNX(ctx, rawKey, quotaRenewalRate)
-			} else {
-				// no expiration time
-				pipe.ExpireNX(ctx, rawKey, 0)
-			}
+			pipe.ExpireNX(ctx, rawKey, quotaRenewalRate)
 			return nil
 		})
-		qInt, err := res.Result()
 		if err != nil {
 			logger.WithError(err).Error("error incrementing quota key")
 			return true
 		}
 
-		blocked := qInt-1 >= limit.QuotaMax
-		remaining := limit.QuotaMax - qInt
+		quota := res.Val()
+		blocked := quota-1 >= limit.QuotaMax
+		remaining := limit.QuotaMax - quota
 		if blocked {
 			remaining = 0
 		}
 
-		logger = logger.WithField("quota", qInt-1)
+		logger = logger.WithField("quota", quota-1)
 		logger = logger.WithField("blocked", blocked)
 		logger = logger.WithField("remaining", remaining)
 		logger.Debug("[QUOTA] Update quota key")
