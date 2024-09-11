@@ -47,6 +47,10 @@ tags:
 
     These methods only work on a single API node. If updating a cluster, it is important to ensure that all nodes are updated before initiating a reload.<br/>
   name: APIs
+- description: |+
+    **Note: Applies only to Tyk Gateway Community Edition** <br/>
+
+  name: Tyk OAS APIs
 - description: |
     All keys that are used to access services via Tyk correspond to a session object that informs Tyk about the context of this particular token, like access rules and rate/quota allowance.
   name: Keys
@@ -57,9 +61,9 @@ tags:
 
     Although the Organisation session-limiter uses the same session object, all other security keys are optional as they are not used. <br />
 
-    <h3>Managing active status.</h3> <br />
+    <h3>Managing active status</h3> <br />
 
-    To disallow access to an entire group of keys without rate limiting the organisation, create a session object with the is_inactive key set to true. This will block access before any other middleware is executed. It is useful when managing subscriptions for an organisation group and access needs to be blocked because of non-payment. <br />
+    To disallow access to an entire group of keys without rate limiting the organisation, create a session object with the "is_inactive" key set to true. This will block access before any other middleware is executed. It is useful when managing subscriptions for an organisation group and access needs to be blocked because of non-payment. <br />
   name: Organisation Quotas
 - description: |
     Sometimes a cache might contain stale data, or it may just need to be cleared because of an invalid configuration. This call will purge all keys associated with a cache on an API-by-API basis.
@@ -572,7 +576,7 @@ paths:
           description: Forbidden
       summary: List all OAS format APIs.
       tags:
-      - OAS APIs
+      - Tyk OAS APIs
     post:
       description: Create API with OAS format on the Tyk Gateway.
       operationId: createApiOAS
@@ -700,7 +704,7 @@ paths:
           description: Internal server error.
       summary: Create API with OAS format.
       tags:
-      - OAS APIs
+      - Tyk OAS APIs
   /tyk/apis/oas/{apiID}:
     delete:
       description: Deleting an API definition will remove the file from the file store,
@@ -762,11 +766,11 @@ paths:
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
           description: Internal server error.
-      summary: Deleting an OAS API.
+      summary: Deleting a Tyk OAS API.
       tags:
-      - OAS APIs
+      - Tyk OAS APIs
     get:
-      description: Get OAS API definition using the API ID.
+      description: Get Tyk OAS API definition using the API ID.
       operationId: getOASApi
       parameters:
       - description: "By default mode is empty which means it will return the OAS
@@ -833,9 +837,9 @@ paths:
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
           description: API not found.
-      summary: Get OAS API definition
+      summary: Get Tyk OAS API definition
       tags:
-      - OAS APIs
+      - Tyk OAS APIs
     patch:
       description: |-
         You can use this endpoint to update OAS part of the Tyk API definition.
@@ -952,7 +956,7 @@ paths:
           description: Internal server error.
       summary: Patch API in OAS format.
       tags:
-      - OAS APIs
+      - Tyk OAS APIs
     put:
       description: |-
         Updating an API definition uses the same signature an object as a `POST`, however it will first ensure that the API ID that is being updated is the same as the one in the object being `PUT`.
@@ -1069,9 +1073,9 @@ paths:
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
           description: Internal server error.
-      summary: Update OAS API definition
+      summary: Update Tyk OAS API definition
       tags:
-      - OAS APIs
+      - Tyk OAS APIs
   /tyk/apis/oas/{apiID}/export:
     get:
       description: Use the mode query parameter to specify if you want the x-tyk-api-gateway
@@ -1142,10 +1146,10 @@ paths:
           description: Internal server error.
       summary: Download an OAS format APIs.
       tags:
-      - OAS APIs
+      - Tyk OAS APIs
   /tyk/apis/oas/{apiID}/versions:
     get:
-      description: Listing versions of an OAS API.
+      description: Listing versions of a Tyk OAS API.
       operationId: listOASApiVersions
       parameters:
       - description: ID of the API you want to fetch.
@@ -1197,9 +1201,9 @@ paths:
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
           description: API not found
-      summary: Listing versions of an OAS API.
+      summary: Listing versions of a Tyk OAS API.
       tags:
-      - OAS APIs
+      - Tyk OAS APIs
   /tyk/apis/oas/export:
     get:
       description: Download all OAS format APIs, from the Gateway.
@@ -1223,7 +1227,7 @@ paths:
               schema:
                 format: binary
                 type: string
-          description: Get list of oas API definition.
+          description: Get list of Tyk Oas APIs definition.
         "403":
           content:
             application/json:
@@ -1244,12 +1248,12 @@ paths:
           description: Internal server error.
       summary: Download all OAS format APIs.
       tags:
-      - OAS APIs
+      - Tyk OAS APIs
   /tyk/apis/oas/import:
     post:
       description: |-
         Import an OAS format API without x-tyk-gateway.
-         For use with an existing OAS API that you want to expose via your Tyk Gateway.
+         For use with an existing Tyk OAS API that you want to expose via your Tyk Gateway.
       operationId: importOAS
       parameters:
       - $ref: '#/components/parameters/UpstreamURL'
@@ -1369,7 +1373,7 @@ paths:
           description: Internal server error.
       summary: Import an API in OAS format.
       tags:
-      - OAS APIs
+      - Tyk OAS APIs
   /tyk/cache/{apiID}:
     delete:
       description: Invalidate cache for the given API.
@@ -3300,10 +3304,9 @@ paths:
         'per' to zero, or don't add them to your request.
       operationId: listOrgKeys
       parameters:
-      - description: Retrieves all keys starting with the specified filter (filter
+      - description: Retrieves all keys starting with the specified filter(filter
           is a prefix - e.g. default* or default will return all keys starting with
-          default  like defaultDB,defaultTwo etc). We don't use filter for hashed
-          keys
+          default  like defaultbd,defaulttwo etc).We don't use filter for hashed keys
         example: default*
         in: query
         name: filter
@@ -3319,7 +3322,7 @@ paths:
                 - 5e9d9544a1dcd60001d0ed2008500e44fa644f939b640a4b8b4ea58c
               schema:
                 $ref: '#/components/schemas/ApiAllKeys'
-          description: List of all org keys.
+          description: List of all org keys
         "403":
           content:
             application/json:
@@ -3337,8 +3340,8 @@ paths:
                 status: error
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: ORG not found.
-      summary: List organisation keys.
+          description: ORG not found
+      summary: List Organisation Keys
       tags:
       - Organisation Quotas
   /tyk/org/keys/{keyID}:
@@ -3347,7 +3350,7 @@ paths:
         not affects regular keys created within organisation.
       operationId: deleteOrgKey
       parameters:
-      - description: The key ID.
+      - description: The Key ID
         example: e389ae00a2b145feaf28d6cc11f0f86d
         in: path
         name: keyID
@@ -3391,8 +3394,8 @@ paths:
                 status: error
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: Org not found.
-      summary: Delete key.
+          description: Org not found
+      summary: Delete Key
       tags:
       - Organisation Quotas
     get:
@@ -3400,14 +3403,14 @@ paths:
         up to date rate limit and quota usage numbers.
       operationId: getOrgKey
       parameters:
-      - description: The Org ID.
+      - description: The Org ID
         example: 664a14650619d40001f1f00f
         in: query
         name: orgID
         required: false
         schema:
           type: string
-      - description: The key ID.
+      - description: The Key ID
         example: e389ae00a2b145feaf28d6cc11f0f86d
         in: path
         name: keyID
@@ -3570,15 +3573,15 @@ paths:
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
           description: Org not found
-      summary: Get a single organisation key.
+      summary: Get an Organisation Key
       tags:
       - Organisation Quotas
     post:
-      description: This work similar to keys API except that key ID is always equals
-        organisation ID.
+      description: This work similar to Keys API except that Key ID is always equals
+        Organisation ID
       operationId: addOrgKey
       parameters:
-      - description: The key ID.
+      - description: The Key ID
         example: e389ae00a2b145feaf28d6cc11f0f86d
         in: path
         name: keyID
@@ -3678,7 +3681,7 @@ paths:
           content:
             application/json:
               example:
-                message: No such organisation found in active API list.
+                message: No such organisation found in Active API list
                 status: error
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
@@ -3687,12 +3690,12 @@ paths:
           content:
             application/json:
               example:
-                message: Error writing to key store
+                message: 'Error writing to key store '
                 status: error
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
           description: Internal server error.
-      summary: Create an organisation key.
+      summary: Create an organisation key
       tags:
       - Organisation Quotas
     put:
@@ -3870,7 +3873,7 @@ paths:
               key_expires_in: 2.592e+06
               max_query_depth: -1
               meta_data:
-                update: Sample policy update
+                update: sample policy update
                 user_type: mobile_user
               name: Sample policy
               partitions:
@@ -3936,7 +3939,8 @@ paths:
       description: Delete a policy by ID in your Tyk instance.
       operationId: deletePolicy
       parameters:
-      - description: ID of the policy you want to delete.
+      - description: You can retrieve details of a single policy by ID in your Tyk
+          instance.
         example: 5ead7120575961000181867e
         in: path
         name: polID
@@ -3953,7 +3957,7 @@ paths:
                 status: ok
               schema:
                 $ref: '#/components/schemas/ApiModifyKeySuccess'
-          description: Deleted policy by ID.
+          description: Deleted policy by ID
         "400":
           content:
             application/json:
@@ -3962,7 +3966,7 @@ paths:
                 status: error
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: Policy ID not provided.
+          description: Policy Id not provided
         "403":
           content:
             application/json:
@@ -3981,14 +3985,15 @@ paths:
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
           description: Internal server error.
-      summary: Delete a policy.
+      summary: Delete a Policy
       tags:
       - Policies
     get:
-      description: Retrieve details of a single policy by ID in your Tyk instance.
+      description: You can retrieve details of a single policy by ID in your Tyk instance.
       operationId: getPolicy
       parameters:
-      - description: The policy ID.
+      - description: You can retrieve details of a single policy by ID in your Tyk
+          instance.
         example: 5ead7120575961000181867e
         in: path
         name: polID
@@ -4018,7 +4023,7 @@ paths:
                 key_expires_in: 2.592e+06
                 max_query_depth: -1
                 meta_data:
-                  update: Sample policy update
+                  update: sample policy update
                   user_type: mobile_user
                 name: Sample policy
                 partitions:
@@ -4037,7 +4042,7 @@ paths:
                 throttle_retry_limit: 10
               schema:
                 $ref: '#/components/schemas/Policy'
-          description: Get details of a single policy.
+          description: Get details of a single Policy
         "403":
           content:
             application/json:
@@ -4055,15 +4060,16 @@ paths:
                 status: error
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: Policy not found.
-      summary: Get a policy.
+          description: Policy not found
+      summary: Get a Policy
       tags:
       - Policies
     put:
-      description: Update a Policy with the policy ID.
+      description: You can update a Policy in your Tyk Instance by ID
       operationId: updatePolicy
       parameters:
-      - description: ID of the policy you want to retrieve.
+      - description: You can retrieve details of a single policy by ID in your Tyk
+          instance.
         example: 5ead7120575961000181867e
         in: path
         name: polID
@@ -4092,9 +4098,9 @@ paths:
               key_expires_in: 2.592e+06
               max_query_depth: -1
               meta_data:
-                update: Sample policy update
+                update: sample policy update
                 user_type: mobile_user
-              name: Update policy sample
+              name: update policy sample
               partitions:
                 acl: true
                 complexity: false
@@ -4121,7 +4127,7 @@ paths:
                 status: ok
               schema:
                 $ref: '#/components/schemas/ApiModifyKeySuccess'
-          description: Policy updated.
+          description: Policy updated
         "400":
           content:
             application/json:
@@ -4130,7 +4136,7 @@ paths:
                 status: error
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
-          description: Malformed request.
+          description: malformed request
         "403":
           content:
             application/json:
@@ -4149,7 +4155,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
           description: Internal server error.
-      summary: Update a policy.
+      summary: Update a Policy
       tags:
       - Policies
   /tyk/reload:
