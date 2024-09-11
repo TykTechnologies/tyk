@@ -1,6 +1,6 @@
 module github.com/TykTechnologies/tyk
 
-go 1.21.11
+go 1.22.6
 
 require (
 	github.com/Jeffail/tunny v0.1.4
@@ -89,6 +89,7 @@ require (
 	github.com/TykTechnologies/opentelemetry v0.0.21
 	github.com/alecthomas/kingpin/v2 v2.4.0
 	github.com/go-redis/redismock/v9 v9.2.0
+	github.com/goccy/go-json v0.10.3
 	github.com/google/go-cmp v0.6.0
 	github.com/newrelic/go-agent v2.13.0+incompatible
 	github.com/swaggest/jsonschema-go v0.3.70

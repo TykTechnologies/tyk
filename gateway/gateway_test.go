@@ -14,7 +14,7 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
-	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -323,13 +323,17 @@ func TestSkipTargetPassEscapingOffWithSkipURLCleaningTrue(t *testing.T) {
 }
 
 func TestQuota(t *testing.T) {
+	test.Exclusive(t) // Uses quota, need to limit parallelism due to DeleteAllKeys.
+
 	ts := StartTest(nil)
 	defer ts.Close()
 
 	var keyID string
 
-	var webhookWG sync.WaitGroup
+	var requestCount int64
 	webhook := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		atomic.AddInt64(&requestCount, 1)
+
 		if r.Header.Get("X-Tyk-Test-Header") != "Tyk v1.BANANA" {
 			t.Error("Custom webhook header not set", r.Header)
 		}
@@ -341,8 +345,6 @@ func TestQuota(t *testing.T) {
 		if data["event"] != "QuotaExceeded" || data["message"] != "Key Quota Limit Exceeded" || data["key"] != keyID {
 			t.Error("Webhook payload not match", data)
 		}
-
-		webhookWG.Done()
 	}))
 	defer webhook.Close()
 
@@ -392,7 +394,6 @@ func TestQuota(t *testing.T) {
 		"authorization": keyID,
 	}
 
-	webhookWG.Add(1)
 	_, _ = ts.Run(t, []test.TestCase{
 		{Path: "/", Headers: authHeaders, Code: 200},
 		// Ignored path should not affect quota
@@ -402,7 +403,9 @@ func TestQuota(t *testing.T) {
 		// Ignored path works without auth
 		{Path: "/get", Code: 200},
 	}...)
-	webhookWG.Wait()
+
+	want := int64(1)
+	assert.Equal(t, want, atomic.LoadInt64(&requestCount))
 }
 
 func TestListener(t *testing.T) {

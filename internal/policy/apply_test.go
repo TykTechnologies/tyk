@@ -1,6 +1,8 @@
 package policy_test
 
 import (
+	"embed"
+	"encoding/json"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -8,6 +10,9 @@ import (
 	"github.com/TykTechnologies/tyk/internal/policy"
 	"github.com/TykTechnologies/tyk/user"
 )
+
+//go:embed testdata/*.json
+var testDataFS embed.FS
 
 func TestApplyRateLimits_PolicyLimits(t *testing.T) {
 	svc := &policy.Service{}
@@ -18,8 +23,10 @@ func TestApplyRateLimits_PolicyLimits(t *testing.T) {
 			Per:  10,
 		}
 		apiLimits := user.APILimit{
-			Rate: 10,
-			Per:  10,
+			RateLimit: user.RateLimit{
+				Rate: 10,
+				Per:  10,
+			},
 		}
 		policy := user.Policy{}
 
@@ -35,8 +42,10 @@ func TestApplyRateLimits_PolicyLimits(t *testing.T) {
 			Per:  10,
 		}
 		apiLimits := user.APILimit{
-			Rate: 5,
-			Per:  10,
+			RateLimit: user.RateLimit{
+				Rate: 5,
+				Per:  10,
+			},
 		}
 		policy := user.Policy{
 			Rate: 10,
@@ -58,8 +67,10 @@ func TestApplyRateLimits_PolicyLimits(t *testing.T) {
 			Per:  10,
 		}
 		apiLimits := user.APILimit{
-			Rate: 5,
-			Per:  10,
+			RateLimit: user.RateLimit{
+				Rate: 5,
+				Per:  10,
+			},
 		}
 		policy := user.Policy{
 			Rate: 10,
@@ -80,8 +91,9 @@ func TestApplyRateLimits_PolicyLimits(t *testing.T) {
 			Per:  10,
 		}
 		apiLimits := user.APILimit{
-			Rate: 15,
-			Per:  10,
+			RateLimit: user.RateLimit{Rate: 15,
+				Per: 10,
+			},
 		}
 		policy := user.Policy{
 			Rate: 10,
@@ -121,4 +133,27 @@ func TestApplyRateLimits_FromCustomPolicies(t *testing.T) {
 
 		assert.Equal(t, 10, int(session.Rate))
 	})
+}
+
+func TestApplyEndpointLevelLimits(t *testing.T) {
+	f, err := testDataFS.ReadFile("testdata/apply_endpoint_rl.json")
+	assert.NoError(t, err)
+
+	var testCases []struct {
+		Name     string         `json:"name"`
+		PolicyEP user.Endpoints `json:"policyEP"`
+		CurrEP   user.Endpoints `json:"currEP"`
+		Expected user.Endpoints `json:"expected"`
+	}
+	err = json.Unmarshal(f, &testCases)
+	assert.NoError(t, err)
+
+	for _, tc := range testCases {
+		t.Run(tc.Name, func(t *testing.T) {
+			service := policy.Service{}
+			result := service.ApplyEndpointLevelLimits(tc.PolicyEP, tc.CurrEP)
+			assert.ElementsMatch(t, tc.Expected, result)
+		})
+	}
+
 }
