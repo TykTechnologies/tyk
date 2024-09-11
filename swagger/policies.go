@@ -95,9 +95,9 @@ func getPolicyWithID(r *openapi3.Reflector) error {
 	}
 	oc := op.oc
 	op.AddResponseWithSeparateExample(new(user.Policy), http.StatusOK, minimalPolicies[0], func(cu *openapi.ContentUnit) {
-		cu.Description = "Get details of a single Policy"
+		cu.Description = "Get details of a single policy."
 	})
-	oc.SetSummary("Get a Policy")
+	oc.SetSummary("Get a policy.")
 	oc.SetDescription("You can retrieve details of a single policy by ID in your Tyk instance.")
 	op.StatusNotFound("Policy not found", func(cu *openapi.ContentUnit) {
 		cu.Description = "Policy not found"
@@ -132,7 +132,7 @@ func deletePolicyWithID(r *openapi3.Reflector) error {
 	}, http.StatusOK, func(cu *openapi.ContentUnit) {
 		cu.Description = "Deleted policy by ID"
 	})
-	oc.SetSummary("Delete a Policy")
+	oc.SetSummary("Delete a policy.")
 	oc.SetDescription("Delete a policy by ID in your Tyk instance.")
 	op.AddPathParameter("polID", "You can retrieve details of a single policy by ID in your Tyk instance.", OptionalParameterValues{
 		Example: valueToInterface("5ead7120575961000181867e"),
@@ -152,8 +152,8 @@ func updatePolicy(r *openapi3.Reflector) error {
 		return err
 	}
 	oc := op.oc
-	oc.SetSummary("Update a Policy")
-	oc.SetDescription("You can update a Policy in your Tyk Instance by ID")
+	oc.SetSummary("Update a policy.")
+	oc.SetDescription("You can update a Policy in your Tyk Instance by ID.")
 	op.StatusInternalServerError("Failed to create file!")
 	op.AddRespWithExample(apiModifyKeySuccess{
 		Key:    "5ead7120575961000181867e",
@@ -295,12 +295,14 @@ var policies = []*user.Policy{
 				AllowedTypes:         []graphql.Type{},
 				DisableIntrospection: false,
 				Limit: user.APILimit{
-					Smoothing: &apidef.RateLimitSmoothing{
-						Enabled:   false,
-						Threshold: 500,
-						Trigger:   0.8,
-						Step:      100,
-						Delay:     30,
+					RateLimit: user.RateLimit{
+						Smoothing: &apidef.RateLimitSmoothing{
+							Enabled:   false,
+							Threshold: 500,
+							Trigger:   0.8,
+							Step:      100,
+							Delay:     30,
+						},
 					},
 				},
 				FieldAccessRights: []user.FieldAccessDefinition{},
