@@ -70,6 +70,8 @@ import (
 )
 
 var (
+	globalMu sync.Mutex
+
 	log       = logger.Get()
 	mainLog   = log.WithField("prefix", "main")
 	pubSubLog = log.WithField("prefix", "pub-sub")
@@ -318,8 +320,8 @@ func (gw *Gateway) apisByIDLen() int {
 
 // Create all globals and init connection handlers
 func (gw *Gateway) setupGlobals() {
-	gw.reloadMu.Lock()
-	defer gw.reloadMu.Unlock()
+	globalMu.Lock()
+	defer globalMu.Unlock()
 
 	defaultTykErrors()
 
@@ -1198,7 +1200,7 @@ func (gw *Gateway) initSystem() error {
 	gwConfig := gw.GetConfig()
 
 	// Initialize the appropriate log formatter
-	if os.Getenv("TYK_LOGFORMAT") == "" && !*cli.DebugMode {
+	if !gw.isRunningTests() && os.Getenv("TYK_LOGFORMAT") == "" && !*cli.DebugMode {
 		log.Formatter = logger.NewFormatter(gwConfig.LogFormat)
 		mainLog.Debugf("Set log format to %q", gwConfig.LogFormat)
 	}
