@@ -5066,40 +5066,24 @@ components:
     APILimit:
       properties:
         max_query_depth:
-          example: -1
           type: integer
         per:
-          example: 5
-          format: double
           type: number
         quota_max:
-          example: 20000
-          format: int64
           type: integer
         quota_remaining:
-          example: 20000
-          format: int64
           type: integer
         quota_renewal_rate:
-          example: 2.592e+06
-          format: int64
           type: integer
         quota_renews:
-          example: 0
-          format: int64
           type: integer
         rate:
-          example: 1
-          format: double
           type: number
         smoothing:
           $ref: '#/components/schemas/RateLimitSmoothing'
         throttle_interval:
-          example: 10
-          format: double
           type: number
         throttle_retry_limit:
-          example: 1000
           type: integer
       type: object
     AccessDefinition:
@@ -5126,6 +5110,8 @@ components:
         disable_introspection:
           example: false
           type: boolean
+        endpoints:
+          $ref: '#/components/schemas/Endpoints'
         field_access_rights:
           items:
             $ref: '#/components/schemas/FieldAccessDefinition'
@@ -5680,6 +5666,20 @@ components:
         path:
           type: string
       type: object
+    Endpoint:
+      properties:
+        methods:
+          $ref: '#/components/schemas/EndpointMethods'
+        path:
+          type: string
+      type: object
+    EndpointMethod:
+      properties:
+        limit:
+          $ref: '#/components/schemas/RateLimitType2'
+        name:
+          type: string
+      type: object
     EndpointMethodMeta:
       properties:
         action:
@@ -5697,6 +5697,10 @@ components:
           nullable: true
           type: object
       type: object
+    EndpointMethods:
+      items:
+        $ref: '#/components/schemas/EndpointMethod'
+      type: array
     EndpointPostPlugin:
       properties:
         enabled:
@@ -5711,6 +5715,10 @@ components:
     EndpointPostPlugins:
       items:
         $ref: '#/components/schemas/EndpointPostPlugin'
+      type: array
+    Endpoints:
+      items:
+        $ref: '#/components/schemas/Endpoint'
       type: array
     EnforceTimeout:
       properties:
@@ -6965,6 +6973,15 @@ components:
           type: integer
         trigger:
           type: number
+      type: object
+    RateLimitType2:
+      properties:
+        per:
+          type: number
+        rate:
+          type: number
+        smoothing:
+          $ref: '#/components/schemas/RateLimitSmoothing'
       type: object
     RequestHeadersRewriteConfig:
       properties:
