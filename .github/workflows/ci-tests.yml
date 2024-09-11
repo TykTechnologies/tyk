@@ -108,6 +108,12 @@ jobs:
         if: ${{ github.event_name == 'pull_request' }}
         run: git fetch origin ${{ github.base_ref }}
 
+      - name: Print CPU info
+        run: grep '^model name' /proc/cpuinfo
+
+      - name: Print Go env
+        run: go env
+
       - name: Run Gateway Tests
         id: ci-tests
         run: |
