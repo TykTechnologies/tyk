@@ -726,5 +726,183 @@
     "partitions": {
       "per_api": true
     }
+  },
+  "endpoint_rate_limits_on_acl_partition_only": {
+    "id": "endpoint_rate_limits_on_rate_limit_partition_disabled",
+    "rate": 500,
+    "per": 1,
+    "quota_max": -1,
+    "access_rights": {
+      "d": {
+        "endpoints": [
+          {
+            "path": "/get",
+            "methods": [
+              {
+                "name": "GET",
+                "limit": {
+                  "rate": -1
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "partitions": {
+      "acl": true
+    }
+  },
+  "endpoint_rate_limits_on_quota_partition_only": {
+    "id": "endpoint_rate_limits_on_quota_partition_only",
+    "quota_max": 1000,
+    "quota_renews":60,
+    "partitions": {
+      "quota": true
+    }
+  },
+  "api_d_get_endpoint_rl_1_configure_on_non_partitioned_policy": {
+    "id": "api_d_get_endpoint_rl_1_configure_on_non_partitioned_policy",
+    "rate": 500,
+    "per": 1,
+    "quota_max": -1,
+    "access_rights": {
+      "d": {
+        "endpoints": [
+          {
+            "path": "/get",
+            "methods": [
+              {
+                "name": "GET",
+                "limit": {
+                  "rate": 10,
+                  "per": 60
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "partitions": {
+      "acl": true,
+      "rate_limit": true,
+      "quota": true
+    }
+  },
+  "api_d_get_endpoint_rl_2_configure_on_non_partitioned_policy": {
+    "id": "api_d_get_endpoint_rl_2_configure_on_non_partitioned_policy",
+    "rate": 500,
+    "per": 1,
+    "quota_max": -1,
+    "access_rights": {
+      "d": {
+        "endpoints": [
+          {
+            "path": "/get",
+            "methods": [
+              {
+                "name": "GET",
+                "limit": {
+                  "rate": 20,
+                  "per": 60
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "partitions": {
+      "acl": true,
+      "rate_limit": true,
+      "quota": true
+    }
+  },
+  "api_d_get_endpoint_rl_3_configure_on_non_partitioned_policy": {
+    "id": "api_d_get_endpoint_rl_3_configure_on_non_partitioned_policy",
+    "rate": 500,
+    "per": 1,
+    "quota_max": -1,
+    "access_rights": {
+      "d": {
+        "endpoints": [
+          {
+            "path": "/get",
+            "methods": [
+              {
+                "name": "GET",
+                "limit": {
+                  "rate": -1
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "partitions": {
+      "acl": true,
+      "rate_limit": true,
+      "quota": true
+    }
+  },
+  "api_d_post_endpoint_rl_1_configure_on_non_partitioned_policy": {
+    "id": "api_d_post_endpoint_rl_1_configure_on_non_partitioned_policy",
+    "rate": 500,
+    "per": 1,
+    "quota_max": -1,
+    "access_rights": {
+      "d": {
+        "endpoints": [
+          {
+            "path": "/post",
+            "methods": [
+              {
+                "name": "POST",
+                "limit": {
+                  "rate": 20,
+                  "per": 60
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "partitions": {
+      "acl": true,
+      "rate_limit": true,
+      "quota": true
+    }
+  },
+  "api_e_get_endpoint_rl_1_configure_on_non_partitioned_policy": {
+    "id": "api_e_get_endpoint_rl_1_configure_on_non_partitioned_policy",
+    "rate": 500,
+    "per": 1,
+    "quota_max": -1,
+    "access_rights": {
+      "e": {
+        "endpoints": [
+          {
+            "path": "/get",
+            "methods": [
+              {
+                "name": "GET",
+                "limit": {
+                  "rate": 100,
+                  "per": 60
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "partitions": {
+      "acl": true,
+      "rate_limit": true,
+      "quota": true
+    }
   }
 }
