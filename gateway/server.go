@@ -68,6 +68,8 @@ import (
 )
 
 var (
+	globalMu sync.Mutex
+
 	log       = logger.Get()
 	mainLog   = log.WithField("prefix", "main")
 	pubSubLog = log.WithField("prefix", "pub-sub")
@@ -334,8 +336,8 @@ func (gw *Gateway) apisByIDLen() int {
 
 // Create all globals and init connection handlers
 func (gw *Gateway) setupGlobals() {
-	gw.reloadMu.Lock()
-	defer gw.reloadMu.Unlock()
+	globalMu.Lock()
+	defer globalMu.Unlock()
 
 	defaultTykErrors()
 
@@ -1211,7 +1213,7 @@ func (gw *Gateway) setupLogger() {
 	}
 }
 
-func (gw *Gateway) initialiseSystem() error {
+func (gw *Gateway) initSystem() error {
 	if gw.isRunningTests() && os.Getenv("TYK_LOGLEVEL") == "" {
 		// `go test` without TYK_LOGLEVEL set defaults to no log
 		// output
@@ -1621,7 +1623,7 @@ func Start() {
 
 	gw := NewGateway(gwConfig, ctx)
 
-	if err := gw.initialiseSystem(); err != nil {
+	if err := gw.initSystem(); err != nil {
 		mainLog.Fatalf("Error initialising system: %v", err)
 	}
 
