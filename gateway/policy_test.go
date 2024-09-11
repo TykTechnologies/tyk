@@ -1,14 +1,15 @@
 package gateway
 
 import (
+	"embed"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
+	"slices"
 	"sort"
 	"strconv"
-	"strings"
 	"testing"
 	"time"
 
@@ -26,6 +27,9 @@ import (
 
 	"github.com/TykTechnologies/tyk/internal/uuid"
 )
+
+//go:embed testdata/*.json
+var testDataFS embed.FS
 
 func TestLoadPoliciesFromDashboardReLogin(t *testing.T) {
 	// Test Dashboard
@@ -47,395 +51,61 @@ func TestLoadPoliciesFromDashboardReLogin(t *testing.T) {
 	assert.Empty(t, policyMap)
 }
 
-type dummySessionManager struct {
-	DefaultSessionManager
-}
-
-func (*dummySessionManager) UpdateSession(key string, sess *user.SessionState, ttl int64, hashed bool) error {
-	return nil
-}
-
 type testApplyPoliciesData struct {
 	name      string
 	policies  []string
 	errMatch  string                               // substring
 	sessMatch func(*testing.T, *user.SessionState) // ignored if nil
 	session   *user.SessionState
+	// reverseOrder executes the tests in reversed order of policies,
+	// in addition to the order specified in policies
+	reverseOrder bool
 }
 
-func (s *Test) TestPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesData) {
+func (s *Test) testPrepareApplyPolicies(tb testing.TB) (*BaseMiddleware, []testApplyPoliciesData) {
+	tb.Helper()
+
+	f, err := testDataFS.ReadFile("testdata/policies.json")
+	assert.NoError(tb, err)
+
+	var policies = make(map[string]user.Policy)
+	err = json.Unmarshal(f, &policies)
+	assert.NoError(tb, err)
+
 	s.Gw.policiesMu.RLock()
-	s.Gw.policiesByID = map[string]user.Policy{
-		"nonpart1": {
-			ID:           "p1",
-			AccessRights: map[string]user.AccessDefinition{"a": {}},
-		},
-		"nonpart2": {
-			ID:           "p2",
-			AccessRights: map[string]user.AccessDefinition{"b": {}},
-		},
-		"nonpart3": {
-			ID:           "p3",
-			AccessRights: map[string]user.AccessDefinition{"a": {}, "b": {}},
-		},
-		"difforg": {OrgID: "different"},
-		"tags1": {
-			Partitions: user.PolicyPartitions{Quota: true},
-			Tags:       []string{"tagA"},
-		},
-		"tags2": {
-			Partitions: user.PolicyPartitions{RateLimit: true},
-			Tags:       []string{"tagX", "tagY"},
-		},
-		"inactive1": {
-			Partitions: user.PolicyPartitions{RateLimit: true},
-			IsInactive: true,
-		},
-		"inactive2": {
-			Partitions: user.PolicyPartitions{Quota: true},
-			IsInactive: true,
-		},
-		"unlimited-quota": {
-			Partitions:   user.PolicyPartitions{Quota: true},
-			AccessRights: map[string]user.AccessDefinition{"a": {}},
-			QuotaMax:     -1,
-		},
-		"quota1": {
-			Partitions: user.PolicyPartitions{Quota: true},
-			QuotaMax:   2,
-		},
-		"quota2": {
-			Partitions: user.PolicyPartitions{Quota: true},
-			QuotaMax:   3,
-		},
-		"quota3": {
-			QuotaMax:     3,
-			AccessRights: map[string]user.AccessDefinition{"a": {}},
-			Partitions:   user.PolicyPartitions{Quota: true},
-		},
-		"quota4": {
-			QuotaMax:     3,
-			AccessRights: map[string]user.AccessDefinition{"b": {}},
-			Partitions:   user.PolicyPartitions{Quota: true},
-		},
-		"quota5": {
-			QuotaMax:     4,
-			Partitions:   user.PolicyPartitions{Quota: true},
-			AccessRights: map[string]user.AccessDefinition{"b": {}},
-		},
-		"unlimited-rate": {
-			Partitions:   user.PolicyPartitions{RateLimit: true},
-			AccessRights: map[string]user.AccessDefinition{"a": {}},
-			Rate:         -1,
-		},
-		"rate1": {
-			Partitions: user.PolicyPartitions{RateLimit: true},
-			Rate:       3,
-		},
-		"rate2": {
-			Partitions: user.PolicyPartitions{RateLimit: true},
-			Rate:       4,
-		},
-		"rate3": {
-			Partitions: user.PolicyPartitions{RateLimit: true},
-			Rate:       4,
-			Per:        4,
-		},
-		"rate4": {
-			Partitions:   user.PolicyPartitions{RateLimit: true},
-			Rate:         8,
-			Per:          1,
-			AccessRights: map[string]user.AccessDefinition{"a": {}},
-		},
-		"rate5": {
-			Partitions:   user.PolicyPartitions{RateLimit: true},
-			Rate:         10,
-			Per:          1,
-			AccessRights: map[string]user.AccessDefinition{"a": {}},
-		},
-		"rate-for-a": {
-			Partitions:   user.PolicyPartitions{RateLimit: true},
-			AccessRights: map[string]user.AccessDefinition{"a": {}},
-			Rate:         4,
-			Per:          1,
-		},
-		"rate-for-b": {
-			Partitions:   user.PolicyPartitions{RateLimit: true},
-			AccessRights: map[string]user.AccessDefinition{"b": {}},
-			Rate:         2,
-			Per:          1,
-		},
-		"rate-for-a-b": {
-			Partitions:   user.PolicyPartitions{RateLimit: true},
-			AccessRights: map[string]user.AccessDefinition{"a": {}, "b": {}},
-			Rate:         4,
-			Per:          1,
-		},
-		"rate-no-partition": {
-			AccessRights: map[string]user.AccessDefinition{"a": {}},
-			Rate:         12,
-			Per:          1,
-		},
-		"acl1": {
-			Partitions:   user.PolicyPartitions{Acl: true},
-			AccessRights: map[string]user.AccessDefinition{"a": {}},
-		},
-		"acl2": {
-			Partitions:   user.PolicyPartitions{Acl: true},
-			AccessRights: map[string]user.AccessDefinition{"b": {}},
-		},
-		"acl3": {
-			AccessRights: map[string]user.AccessDefinition{"c": {}},
-		},
-		"acl-for-a-b": {
-			Partitions:   user.PolicyPartitions{Acl: true},
-			AccessRights: map[string]user.AccessDefinition{"a": {}, "b": {}},
-		},
-		"unlimitedComplexity": {
-			Partitions:    user.PolicyPartitions{Complexity: true},
-			AccessRights:  map[string]user.AccessDefinition{"a": {}},
-			MaxQueryDepth: -1,
-		},
-		"complexity1": {
-			Partitions:    user.PolicyPartitions{Complexity: true},
-			MaxQueryDepth: 2,
-		},
-		"complexity2": {
-			Partitions:    user.PolicyPartitions{Complexity: true},
-			MaxQueryDepth: 3,
-		},
-		"per_api_and_partitions": {
-			ID: "per_api_and_partitions",
-			Partitions: user.PolicyPartitions{
-				PerAPI:    true,
-				Quota:     true,
-				RateLimit: true,
-				Acl:       true,
-			},
-			AccessRights: map[string]user.AccessDefinition{"d": {
-				Limit: user.APILimit{
-					QuotaMax:         1000,
-					QuotaRenewalRate: 3600,
-					Rate:             20,
-					Per:              1,
-				},
-			}},
-		},
-		"per_api_and_some_partitions": {
-			ID: "per_api_and_some_partitions",
-			Partitions: user.PolicyPartitions{
-				PerAPI:    true,
-				Quota:     false,
-				RateLimit: true,
-				Acl:       false,
-			},
-			AccessRights: map[string]user.AccessDefinition{"d": {
-				Limit: user.APILimit{
-					QuotaMax:         1000,
-					QuotaRenewalRate: 3600,
-					Rate:             20,
-					Per:              1,
-				},
-			}},
-		},
-		"per_api_and_no_other_partitions": {
-			ID: "per_api_and_no_other_partitions",
-			Partitions: user.PolicyPartitions{
-				PerAPI:    true,
-				Quota:     false,
-				RateLimit: false,
-				Acl:       false,
-			},
-			AccessRights: map[string]user.AccessDefinition{
-				"d": {
-					Limit: user.APILimit{
-						QuotaMax:         1000,
-						QuotaRenewalRate: 3600,
-						Rate:             20,
-						Per:              1,
-					},
-				},
-				"c": {
-					Limit: user.APILimit{
-						QuotaMax: -1,
-						Rate:     2000,
-						Per:      60,
-					},
-				},
-			},
-		},
-		"per_api_with_the_same_api": {
-			ID: "per_api_with_the_same_api",
-			Partitions: user.PolicyPartitions{
-				PerAPI:    true,
-				Quota:     false,
-				RateLimit: false,
-				Acl:       false,
-			},
-			AccessRights: map[string]user.AccessDefinition{
-				"d": {
-					Limit: user.APILimit{
-						QuotaMax:         5000,
-						QuotaRenewalRate: 3600,
-						Rate:             200,
-						Per:              10,
-					},
-				},
-			},
-		},
-		"per_api_with_limit_set_from_policy": {
-			ID:       "per_api_with_limit_set_from_policy",
-			QuotaMax: -1,
-			Rate:     300,
-			Per:      1,
-			Partitions: user.PolicyPartitions{
-				PerAPI:    true,
-				Quota:     false,
-				RateLimit: false,
-				Acl:       false,
-			},
-			AccessRights: map[string]user.AccessDefinition{
-				"d": {
-					Limit: user.APILimit{
-						QuotaMax:         5000,
-						QuotaRenewalRate: 3600,
-						Rate:             200,
-						Per:              10,
-					},
-				},
-				"e": {},
-			},
-		},
-		"per-path1": {
-			ID: "per_path_1",
-			AccessRights: map[string]user.AccessDefinition{"a": {
-				AllowedURLs: []user.AccessSpec{
-					{URL: "/user", Methods: []string{"GET", "POST"}},
-				},
-			}, "b": {
-				AllowedURLs: []user.AccessSpec{
-					{URL: "/", Methods: []string{"PUT"}},
-				},
-			}},
-		},
-		"per-path2": {
-			ID: "per_path_2",
-			AccessRights: map[string]user.AccessDefinition{"a": {
-				AllowedURLs: []user.AccessSpec{
-					{URL: "/user", Methods: []string{"GET"}},
-					{URL: "/companies", Methods: []string{"GET", "POST"}},
-				},
-			}},
-		},
-		"restricted-types1": {
-			ID: "restricted_types_1",
-			AccessRights: map[string]user.AccessDefinition{
-				"a": {
-					RestrictedTypes: []graphql.Type{
-						{Name: "Country", Fields: []string{"code", "name"}},
-						{Name: "Person", Fields: []string{"name", "height"}},
-					},
-				}},
-		},
-		"restricted-types2": {
-			ID: "restricted_types_2",
-			AccessRights: map[string]user.AccessDefinition{
-				"a": {
-					RestrictedTypes: []graphql.Type{
-						{Name: "Country", Fields: []string{"code", "phone"}},
-						{Name: "Person", Fields: []string{"name", "mass"}},
-					},
-				}},
-		},
-		"allowed-types1": {
-			ID: "allowed_types_1",
-			AccessRights: map[string]user.AccessDefinition{
-				"a": {
-					AllowedTypes: []graphql.Type{
-						{Name: "Country", Fields: []string{"code", "name"}},
-						{Name: "Person", Fields: []string{"name", "height"}},
-					},
-				}},
-		},
-		"allowed-types2": {
-			ID: "allowed_types_2",
-			AccessRights: map[string]user.AccessDefinition{
-				"a": {
-					AllowedTypes: []graphql.Type{
-						{Name: "Country", Fields: []string{"code", "phone"}},
-						{Name: "Person", Fields: []string{"name", "mass"}},
-					},
-				}},
-		},
-		"introspection-disabled": {
-			ID: "introspection_disabled",
-			AccessRights: map[string]user.AccessDefinition{
-				"a": {
-					DisableIntrospection: true,
-				}},
-		},
-		"introspection-enabled": {
-			ID: "introspection_enabled",
-			AccessRights: map[string]user.AccessDefinition{
-				"a": {
-					DisableIntrospection: false,
-				}},
-		},
-		"field-level-depth-limit1": {
-			ID: "field-level-depth-limit1",
-			AccessRights: map[string]user.AccessDefinition{
-				"graphql-api": {
-					Limit: user.APILimit{},
-					FieldAccessRights: []user.FieldAccessDefinition{
-						{TypeName: "Query", FieldName: "people", Limits: user.FieldLimits{MaxQueryDepth: 4}},
-						{TypeName: "Mutation", FieldName: "putPerson", Limits: user.FieldLimits{MaxQueryDepth: 3}},
-						{TypeName: "Query", FieldName: "countries", Limits: user.FieldLimits{MaxQueryDepth: 3}},
-					},
-				}},
-		},
-		"field-level-depth-limit2": {
-			ID: "field-level-depth-limit2",
-			AccessRights: map[string]user.AccessDefinition{
-				"graphql-api": {
-					Limit: user.APILimit{},
-					FieldAccessRights: []user.FieldAccessDefinition{
-						{TypeName: "Query", FieldName: "people", Limits: user.FieldLimits{MaxQueryDepth: 2}},
-						{TypeName: "Mutation", FieldName: "putPerson", Limits: user.FieldLimits{MaxQueryDepth: -1}},
-						{TypeName: "Query", FieldName: "continents", Limits: user.FieldLimits{MaxQueryDepth: 4}},
-					},
-				}},
-		},
-		"throttle1": {
-			ID:                 "throttle1",
-			ThrottleRetryLimit: 99,
-			ThrottleInterval:   9,
-			AccessRights:       map[string]user.AccessDefinition{"a": {}},
-		},
-	}
+	s.Gw.policiesByID = policies
 	s.Gw.policiesMu.RUnlock()
+
 	bmid := &BaseMiddleware{
 		Spec: &APISpec{
 			APIDefinition: &apidef.APIDefinition{},
 		},
 		Gw: s.Gw,
 	}
-	tests := []testApplyPoliciesData{
+	// splitting tests for readability
+	var tests []testApplyPoliciesData
+
+	nilSessionTCs := []testApplyPoliciesData{
 		{
 			"Empty", nil,
-			"", nil, nil,
+			"", nil, nil, false,
 		},
 		{
 			"Single", []string{"nonpart1"},
-			"", nil, nil,
+			"", nil, nil, false,
 		},
 		{
 			"Missing", []string{"nonexistent"},
-			"not found", nil, nil,
+			"not found", nil, nil, false,
 		},
 		{
 			"DiffOrg", []string{"difforg"},
-			"different org", nil, nil,
+			"different org", nil, nil, false,
 		},
+	}
+	tests = append(tests, nilSessionTCs...)
+
+	nonPartitionedTCs := []testApplyPoliciesData{
 		{
 			name:     "MultiNonPart",
 			policies: []string{"nonpart1", "nonpart2", "nonexistent"},
@@ -474,54 +144,17 @@ func (s *Test) TestPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesD
 				assert.Equal(t, want, s.AccessRights)
 			},
 		},
-		{
-			"NonpartAndPart", []string{"nonpart1", "quota1"},
-			"", nil, nil,
-		},
-		{
-			"TagMerge", []string{"tags1", "tags2"},
-			"", func(t *testing.T, s *user.SessionState) {
-				want := []string{"key-tag", "tagA", "tagX", "tagY"}
-				sort.Strings(s.Tags)
+	}
+	tests = append(tests, nonPartitionedTCs...)
 
-				assert.Equal(t, want, s.Tags)
-			}, &user.SessionState{
-				Tags: []string{"key-tag"},
-			},
-		},
-		{
-			"InactiveMergeOne", []string{"tags1", "inactive1"},
-			"", func(t *testing.T, s *user.SessionState) {
-				if !s.IsInactive {
-					t.Fatalf("want IsInactive to be true")
-				}
-			}, nil,
-		},
-		{
-			"InactiveMergeAll", []string{"inactive1", "inactive2"},
-			"", func(t *testing.T, s *user.SessionState) {
-				if !s.IsInactive {
-					t.Fatalf("want IsInactive to be true")
-				}
-			}, nil,
-		},
-		{
-			"InactiveWithSession", []string{"tags1", "tags2"},
-			"", func(t *testing.T, s *user.SessionState) {
-				if !s.IsInactive {
-					t.Fatalf("want IsInactive to be true")
-				}
-			}, &user.SessionState{
-				IsInactive: true,
-			},
-		},
+	quotaPartitionTCs := []testApplyPoliciesData{
 		{
 			"QuotaPart with unlimited", []string{"unlimited-quota"},
 			"", func(t *testing.T, s *user.SessionState) {
 				if s.QuotaMax != -1 {
 					t.Fatalf("want unlimited quota to be -1")
 				}
-			}, nil,
+			}, nil, false,
 		},
 		{
 			"QuotaPart", []string{"quota1"},
@@ -529,7 +162,7 @@ func (s *Test) TestPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesD
 				if s.QuotaMax != 2 {
 					t.Fatalf("want QuotaMax to be 2")
 				}
-			}, nil,
+			}, nil, false,
 		},
 		{
 			"QuotaParts", []string{"quota1", "quota2"},
@@ -537,13 +170,13 @@ func (s *Test) TestPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesD
 				if s.QuotaMax != 3 {
 					t.Fatalf("Should pick bigger value")
 				}
-			}, nil,
+			}, nil, false,
 		},
 		{
 			"QuotaParts with acl", []string{"quota5", "quota4"},
 			"", func(t *testing.T, s *user.SessionState) {
 				assert.Equal(t, int64(4), s.QuotaMax)
-			}, nil,
+			}, nil, false,
 		},
 		{
 			"QuotaPart with access rights", []string{"quota3"},
@@ -551,7 +184,7 @@ func (s *Test) TestPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesD
 				if s.QuotaMax != 3 {
 					t.Fatalf("quota should be the same as policy quota")
 				}
-			}, nil,
+			}, nil, false,
 		},
 		{
 			"QuotaPart with access rights in multi-policy", []string{"quota4", "nonpart1"},
@@ -563,13 +196,17 @@ func (s *Test) TestPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesD
 				// Don't apply api 'b' coming from quota4 policy
 				want := map[string]user.AccessDefinition{"a": {Limit: user.APILimit{}}}
 				assert.Equal(t, want, s.AccessRights)
-			}, nil,
+			}, nil, false,
 		},
+	}
+	tests = append(tests, quotaPartitionTCs...)
+
+	rateLimitPartitionTCs := []testApplyPoliciesData{
 		{
 			"RatePart with unlimited", []string{"unlimited-rate"},
 			"", func(t *testing.T, s *user.SessionState) {
 				assert.True(t, s.Rate <= 0, "want unlimited rate to be <= 0")
-			}, nil,
+			}, nil, false,
 		},
 		{
 			"RatePart", []string{"rate1"},
@@ -577,7 +214,7 @@ func (s *Test) TestPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesD
 				if s.Rate != 3 {
 					t.Fatalf("want Rate to be 3")
 				}
-			}, nil,
+			}, nil, false,
 		},
 		{
 			"RateParts", []string{"rate1", "rate2"},
@@ -585,33 +222,37 @@ func (s *Test) TestPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesD
 				if s.Rate != 4 {
 					t.Fatalf("Should pick bigger value")
 				}
-			}, nil,
+			}, nil, false,
 		},
 		{
 			"RateParts with acl", []string{"rate5", "rate4"},
 			"", func(t *testing.T, s *user.SessionState) {
 				assert.Equal(t, float64(10), s.Rate)
-			}, nil,
+			}, nil, false,
 		},
 		{
 			"RateParts with acl respected by session", []string{"rate4", "rate5"},
 			"", func(t *testing.T, s *user.SessionState) {
 				assert.Equal(t, float64(10), s.Rate)
-			}, &user.SessionState{Rate: 20},
+			}, &user.SessionState{Rate: 20}, false,
 		},
 		{
 			"Rate with no partition respected by session", []string{"rate-no-partition"},
 			"", func(t *testing.T, s *user.SessionState) {
 				assert.Equal(t, float64(12), s.Rate)
-			}, &user.SessionState{Rate: 20},
+			}, &user.SessionState{Rate: 20}, false,
 		},
+	}
+	tests = append(tests, rateLimitPartitionTCs...)
+
+	complexityPartitionTCs := []testApplyPoliciesData{
 		{
 			"ComplexityPart with unlimited", []string{"unlimitedComplexity"},
 			"", func(t *testing.T, s *user.SessionState) {
 				if s.MaxQueryDepth != -1 {
 					t.Fatalf("unlimitied query depth should be -1")
 				}
-			}, nil,
+			}, nil, false,
 		},
 		{
 			"ComplexityPart", []string{"complexity1"},
@@ -619,7 +260,7 @@ func (s *Test) TestPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesD
 				if s.MaxQueryDepth != 2 {
 					t.Fatalf("want MaxQueryDepth to be 2")
 				}
-			}, nil,
+			}, nil, false,
 		},
 		{
 			"ComplexityParts", []string{"complexity1", "complexity2"},
@@ -627,39 +268,43 @@ func (s *Test) TestPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesD
 				if s.MaxQueryDepth != 3 {
 					t.Fatalf("Should pick bigger value")
 				}
-			}, nil,
+			}, nil, false,
 		},
+	}
+	tests = append(tests, complexityPartitionTCs...)
+
+	aclPartitionTCs := []testApplyPoliciesData{
 		{
 			"AclPart", []string{"acl1"},
 			"", func(t *testing.T, s *user.SessionState) {
 				want := map[string]user.AccessDefinition{"a": {Limit: user.APILimit{}}}
 
 				assert.Equal(t, want, s.AccessRights)
-			}, nil,
+			}, nil, false,
 		},
 		{
 			"AclPart", []string{"acl1", "acl2"},
 			"", func(t *testing.T, s *user.SessionState) {
 				want := map[string]user.AccessDefinition{"a": {Limit: user.APILimit{}}, "b": {Limit: user.APILimit{}}}
 				assert.Equal(t, want, s.AccessRights)
-			}, nil,
+			}, nil, false,
 		},
 		{
 			"Acl for a and rate for a,b", []string{"acl1", "rate-for-a-b"},
 			"", func(t *testing.T, s *user.SessionState) {
-				want := map[string]user.AccessDefinition{"a": {Limit: user.APILimit{Rate: 4, Per: 1}}}
+				want := map[string]user.AccessDefinition{"a": {Limit: user.APILimit{RateLimit: user.RateLimit{Rate: 4, Per: 1}}}}
 				assert.Equal(t, want, s.AccessRights)
-			}, nil,
+			}, nil, false,
 		},
 		{
 			"Acl for a,b and individual rate for a,b", []string{"acl-for-a-b", "rate-for-a", "rate-for-b"},
 			"", func(t *testing.T, s *user.SessionState) {
 				want := map[string]user.AccessDefinition{
-					"a": {Limit: user.APILimit{Rate: 4, Per: 1}},
-					"b": {Limit: user.APILimit{Rate: 2, Per: 1}},
+					"a": {Limit: user.APILimit{RateLimit: user.RateLimit{Rate: 4, Per: 1}}},
+					"b": {Limit: user.APILimit{RateLimit: user.RateLimit{Rate: 2, Per: 1}}},
 				}
 				assert.Equal(t, want, s.AccessRights)
-			}, nil,
+			}, nil, false,
 		},
 		{
 			"RightsUpdate", []string{"acl3"},
@@ -676,8 +321,42 @@ func (s *Test) TestPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesD
 					t.Fatalf("couldn't apply policy: %s", err.Error())
 				}
 				assert.Equal(t, newPolicy.AccessRights, ses.AccessRights)
-			}, nil,
+			}, nil, false,
 		},
+	}
+	tests = append(tests, aclPartitionTCs...)
+
+	inactiveTCs := []testApplyPoliciesData{
+		{
+			"InactiveMergeOne", []string{"tags1", "inactive1"},
+			"", func(t *testing.T, s *user.SessionState) {
+				if !s.IsInactive {
+					t.Fatalf("want IsInactive to be true")
+				}
+			}, nil, false,
+		},
+		{
+			"InactiveMergeAll", []string{"inactive1", "inactive2"},
+			"", func(t *testing.T, s *user.SessionState) {
+				if !s.IsInactive {
+					t.Fatalf("want IsInactive to be true")
+				}
+			}, nil, false,
+		},
+		{
+			"InactiveWithSession", []string{"tags1", "tags2"},
+			"", func(t *testing.T, s *user.SessionState) {
+				if !s.IsInactive {
+					t.Fatalf("want IsInactive to be true")
+				}
+			}, &user.SessionState{
+				IsInactive: true,
+			}, false,
+		},
+	}
+	tests = append(tests, inactiveTCs...)
+
+	perAPITCs := []testApplyPoliciesData{
 		{
 			name:     "Per API is set with other partitions to true",
 			policies: []string{"per_api_and_partitions"},
@@ -695,55 +374,116 @@ func (s *Test) TestPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesD
 				t.Helper()
 
 				want := map[string]user.AccessDefinition{
-					"d": {
-						Limit: user.APILimit{
-							QuotaMax:         1000,
-							QuotaRenewalRate: 3600,
-							Rate:             20,
-							Per:              1,
-						},
-						AllowanceScope: "d",
-					},
 					"c": {
 						Limit: user.APILimit{
+							RateLimit: user.RateLimit{
+								Rate: 2000,
+								Per:  60,
+							},
 							QuotaMax: -1,
-							Rate:     2000,
-							Per:      60,
 						},
 						AllowanceScope: "c",
 					},
+					"d": {
+						Limit: user.APILimit{
+							RateLimit: user.RateLimit{
+								Rate: 20,
+								Per:  1,
+							},
+							QuotaMax:         1000,
+							QuotaRenewalRate: 3600,
+						},
+						AllowanceScope: "d",
+					},
 				}
-
 				assert.Equal(t, want, s.AccessRights)
 			},
 		},
 		{
-			name:     "several policies with Per API set to true but specifying limit for the same API",
-			policies: []string{"per_api_and_no_other_partitions", "per_api_with_the_same_api"},
-			errMatch: "cannot apply multiple policies when some have per_api set and some are partitioned",
+			name:     "several policies with Per API set to true specifying limit for the same API",
+			policies: []string{"per_api_and_no_other_partitions", "per_api_with_api_d"},
+			sessMatch: func(t *testing.T, s *user.SessionState) {
+				t.Helper()
+				want := map[string]user.AccessDefinition{
+					"c": {
+						Limit: user.APILimit{
+							RateLimit: user.RateLimit{
+								Rate: 2000,
+								Per:  60,
+							},
+							QuotaMax: -1,
+						},
+						AllowanceScope: "c",
+					},
+					"d": {
+						Limit: user.APILimit{
+							RateLimit: user.RateLimit{
+								Rate: 200,
+								Per:  10,
+							},
+							QuotaMax:         5000,
+							QuotaRenewalRate: 3600,
+						},
+						AllowanceScope: "d",
+					},
+				}
+				assert.Equal(t, want, s.AccessRights)
+			},
+		},
+		{
+			name:     "several policies with Per API set to true specifying limit for the same APIs",
+			policies: []string{"per_api_and_no_other_partitions", "per_api_with_api_d", "per_api_with_api_c"},
+			sessMatch: func(t *testing.T, s *user.SessionState) {
+				t.Helper()
+				want := map[string]user.AccessDefinition{
+					"c": {
+						Limit: user.APILimit{
+							RateLimit: user.RateLimit{
+								Rate: 3000,
+								Per:  10,
+							},
+							QuotaMax: -1,
+						},
+						AllowanceScope: "c",
+					},
+					"d": {
+						Limit: user.APILimit{
+							RateLimit: user.RateLimit{
+								Rate: 200,
+								Per:  10,
+							},
+							QuotaMax:         5000,
+							QuotaRenewalRate: 3600,
+						},
+						AllowanceScope: "d",
+					},
+				}
+				assert.Equal(t, want, s.AccessRights)
+			},
 		},
 		{
 			name:     "several policies, mixed the one which has Per API set to true and partitioned ones",
-			policies: []string{"per_api_and_no_other_partitions", "quota1"},
-			errMatch: "",
+			policies: []string{"per_api_with_api_d", "quota1"},
+			errMatch: "cannot apply multiple policies when some have per_api set and some are partitioned",
 		},
 		{
 			name:     "several policies, mixed the one which has Per API set to true and partitioned ones (different order)",
-			policies: []string{"rate1", "per_api_and_no_other_partitions"},
-			errMatch: "",
+			policies: []string{"rate1", "per_api_with_api_d"},
+			errMatch: "cannot apply multiple policies when some have per_api set and some are partitioned",
 		},
 		{
 			name:     "Per API is set to true and some API gets limit set from policy's fields",
 			policies: []string{"per_api_with_limit_set_from_policy"},
 			sessMatch: func(t *testing.T, s *user.SessionState) {
 				t.Helper()
-
 				want := map[string]user.AccessDefinition{
 					"e": {
 						Limit: user.APILimit{
 							QuotaMax: -1,
-							Rate:     300,
-							Per:      1,
+							RateLimit: user.RateLimit{
+								Rate: 300,
+								Per:  1,
+							},
 						},
 						AllowanceScope: "per_api_with_limit_set_from_policy",
 					},
@@ -751,16 +491,56 @@ func (s *Test) TestPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesD
 						Limit: user.APILimit{
 							QuotaMax:         5000,
 							QuotaRenewalRate: 3600,
-							Rate:             200,
-							Per:              10,
+							RateLimit: user.RateLimit{
+								Rate: 200,
+								Per:  10,
+							},
 						},
 						AllowanceScope: "d",
 					},
 				}
-
 				assert.Equal(t, want, s.AccessRights)
 			},
 		},
+		{
+			name: "Per API with limits override",
+			policies: []string{
+				"per_api_with_limit_set_from_policy",
+				"per_api_with_api_d",
+				"per_api_with_higher_rate_on_api_d",
+			},
+			sessMatch: func(t *testing.T, s *user.SessionState) {
+				t.Helper()
+				want := map[string]user.AccessDefinition{
+					"e": {
+						Limit: user.APILimit{
+							QuotaMax: -1,
+							RateLimit: user.RateLimit{
+								Rate: 300,
+								Per:  1,
+							},
+						},
+						AllowanceScope: "per_api_with_limit_set_from_policy",
+					},
+					"d": {
+						Limit: user.APILimit{
+							QuotaMax:         5000,
+							QuotaRenewalRate: 3600,
+							RateLimit: user.RateLimit{
+								Rate: 200,
+								Per:  10,
+							},
+						},
+						AllowanceScope: "d",
+					},
+				}
+				assert.Equal(t, want, s.AccessRights)
+			},
+		},
+	}
+	tests = append(tests, perAPITCs...)
+
+	graphQLTCs := []testApplyPoliciesData{
 		{
 			name:     "Merge per path rules for the same API",
 			policies: []string{"per-path2", "per-path1"},
@@ -866,13 +646,17 @@ func (s *Test) TestPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesD
 				assert.Equal(t, want, s.AccessRights)
 			},
 		},
+	}
+	tests = append(tests, graphQLTCs...)
+
+	throttleTCs := []testApplyPoliciesData{
 		{
 			"Throttle interval from policy", []string{"throttle1"},
 			"", func(t *testing.T, s *user.SessionState) {
 				if s.ThrottleInterval != 9 {
 					t.Fatalf("Throttle interval should be 9 inherited from policy")
 				}
-			}, nil,
+			}, nil, false,
 		},
 		{
 			name:     "Throttle retry limit from policy",
@@ -886,6 +670,29 @@ func (s *Test) TestPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesD
 				}
 			},
 			session: nil,
+		},
+	}
+	tests = append(tests, throttleTCs...)
+
+	tagsTCs := []testApplyPoliciesData{
+		{
+			"TagMerge", []string{"tags1", "tags2"},
+			"", func(t *testing.T, s *user.SessionState) {
+				want := []string{"key-tag", "tagA", "tagX", "tagY"}
+				sort.Strings(s.Tags)
+
+				assert.Equal(t, want, s.Tags)
+			}, &user.SessionState{
+				Tags: []string{"key-tag"},
+			}, false,
+		},
+	}
+	tests = append(tests, tagsTCs...)
+
+	partitionTCs := []testApplyPoliciesData{
+		{
+			"NonpartAndPart", []string{"nonpart1", "quota1"},
+			"", nil, nil, false,
 		},
 		{
 			name:     "inherit quota and rate from partitioned policies",
@@ -922,6 +729,352 @@ func (s *Test) TestPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesD
 			},
 		},
 	}
+	tests = append(tests, partitionTCs...)
+
+	endpointRLTCs := []testApplyPoliciesData{
+		{
+			name:     "Per API and per endpoint policies",
+			policies: []string{"per_api_with_limit_set_from_policy", "per_api_with_endpoint_limits_on_d_and_e"},
+			sessMatch: func(t *testing.T, s *user.SessionState) {
+				t.Helper()
+				endpointsConfig := user.Endpoints{
+					{
+						Path: "/get",
+						Methods: user.EndpointMethods{
+							{
+								Name: "GET",
+								Limit: user.RateLimit{
+									Rate: -1,
+								},
+							},
+						},
+					},
+					{
+						Path: "/post",
+						Methods: user.EndpointMethods{
+							{
+								Name: "POST",
+								Limit: user.RateLimit{
+									Rate: 300,
+									Per:  10,
+								},
+							},
+						},
+					},
+				}
+				want := map[string]user.AccessDefinition{
+					"e": {
+						Limit: user.APILimit{
+							QuotaMax: -1,
+							RateLimit: user.RateLimit{
+								Rate: 500,
+								Per:  1,
+							},
+						},
+						AllowanceScope: "per_api_with_endpoint_limits_on_d_and_e",
+						Endpoints:      endpointsConfig,
+					},
+					"d": {
+						Limit: user.APILimit{
+							QuotaMax:         5000,
+							QuotaRenewalRate: 3600,
+							RateLimit: user.RateLimit{
+								Rate: 200,
+								Per:  10,
+							},
+						},
+						AllowanceScope: "d",
+						Endpoints:      endpointsConfig,
+					},
+				}
+				assert.Equal(t, want, s.AccessRights)
+			},
+			reverseOrder: true,
+		},
+		{
+			name: "Endpoint level limits overlapping",
+			policies: []string{
+				"per_api_with_limit_set_from_policy",
+				"per_api_with_endpoint_limits_on_d_and_e",
+				"per_endpoint_limits_different_on_api_d",
+			},
+			sessMatch: func(t *testing.T, s *user.SessionState) {
+				t.Helper()
+				apiEEndpoints := user.Endpoints{
+					{
+						Path: "/get",
+						Methods: user.EndpointMethods{
+							{
+								Name: "GET",
+								Limit: user.RateLimit{
+									Rate: -1,
+								},
+							},
+						},
+					},
+					{
+						Path: "/post",
+						Methods: user.EndpointMethods{
+							{
+								Name: "POST",
+								Limit: user.RateLimit{
+									Rate: 300,
+									Per:  10,
+								},
+							},
+						},
+					},
+				}
+
+				assert.ElementsMatch(t, apiEEndpoints, s.AccessRights["e"].Endpoints)
+
+				apiDEndpoints := user.Endpoints{
+					{
+						Path: "/get",
+						Methods: user.EndpointMethods{
+							{
+								Name: "GET",
+								Limit: user.RateLimit{
+									Rate: -1,
+								},
+							},
+						},
+					},
+					{
+						Path: "/post",
+						Methods: user.EndpointMethods{
+							{
+								Name: "POST",
+								Limit: user.RateLimit{
+									Rate: 400,
+									Per:  11,
+								},
+							},
+						},
+					},
+					{
+						Path: "/anything",
+						Methods: user.EndpointMethods{
+							{
+								Name: "PUT",
+								Limit: user.RateLimit{
+									Rate: 500,
+									Per:  10,
+								},
+							},
+						},
+					},
+				}
+
+				assert.ElementsMatch(t, apiDEndpoints, s.AccessRights["d"].Endpoints)
+
+				apiELimits := user.APILimit{
+					QuotaMax: -1,
+					RateLimit: user.RateLimit{
+						Rate: 500,
+						Per:  1,
+					},
+				}
+				assert.Equal(t, apiELimits, s.AccessRights["e"].Limit)
+
+				apiDLimits := user.APILimit{
+					QuotaMax:         5000,
+					QuotaRenewalRate: 3600,
+					RateLimit: user.RateLimit{
+						Rate: 200,
+						Per:  10,
+					},
+				}
+				assert.Equal(t, apiDLimits, s.AccessRights["d"].Limit)
+			},
+			reverseOrder: true,
+		},
+		{
+			name:     "endpoint_rate_limits_on_acl_partition_only",
+			policies: []string{"endpoint_rate_limits_on_acl_partition_only"},
+			sessMatch: func(t *testing.T, s *user.SessionState) {
+				t.Helper()
+				assert.NotEmpty(t, s.AccessRights)
+				assert.Empty(t, s.AccessRights["d"].Endpoints)
+			},
+		},
+		{
+			name: "endpoint_rate_limits_when_acl_and_quota_partitions_combined",
+			policies: []string{
+				"endpoint_rate_limits_on_acl_partition_only",
+				"endpoint_rate_limits_on_quota_partition_only",
+			},
+			sessMatch: func(t *testing.T, s *user.SessionState) {
+				t.Helper()
+				assert.NotEmpty(t, s.AccessRights)
+				assert.Empty(t, s.AccessRights["d"].Endpoints)
+			},
+			reverseOrder: true,
+		},
+	}
+
+	tests = append(tests, endpointRLTCs...)
+
+	combinedEndpointRLTCs := []testApplyPoliciesData{
+		{
+			name: "combine_non_partitioned_policies_with_endpoint_rate_limits_configured_on_api_d",
+			policies: []string{
+				"api_d_get_endpoint_rl_1_configure_on_non_partitioned_policy",
+				"api_d_get_endpoint_rl_2_configure_on_non_partitioned_policy",
+			},
+			sessMatch: func(t *testing.T, s *user.SessionState) {
+				t.Helper()
+				assert.NotEmpty(t, s.AccessRights)
+				apiDEndpoints := user.Endpoints{
+					{
+						Path: "/get",
+						Methods: user.EndpointMethods{
+							{
+								Name: "GET",
+								Limit: user.RateLimit{
+									Rate: 20,
+									Per:  60,
+								},
+							},
+						},
+					},
+				}
+
+				assert.ElementsMatch(t, apiDEndpoints, s.AccessRights["d"].Endpoints)
+			},
+			reverseOrder: true,
+		},
+		{
+			name: "combine_non_partitioned_policies_with_endpoint_rate_limits_no_bound_configured_on_api_d",
+			policies: []string{
+				"api_d_get_endpoint_rl_1_configure_on_non_partitioned_policy",
+				"api_d_get_endpoint_rl_2_configure_on_non_partitioned_policy",
+				"api_d_get_endpoint_rl_3_configure_on_non_partitioned_policy",
+			},
+			sessMatch: func(t *testing.T, s *user.SessionState) {
+				t.Helper()
+				assert.NotEmpty(t, s.AccessRights)
+				apiDEndpoints := user.Endpoints{
+					{
+						Path: "/get",
+						Methods: user.EndpointMethods{
+							{
+								Name: "GET",
+								Limit: user.RateLimit{
+									Rate: -1,
+								},
+							},
+						},
+					},
+				}
+
+				assert.ElementsMatch(t, apiDEndpoints, s.AccessRights["d"].Endpoints)
+			},
+			reverseOrder: true,
+		},
+		{
+			name: "combine_non_partitioned_policies_with_multiple_endpoint_rate_limits_configured_on_api_d",
+			policies: []string{
+				"api_d_get_endpoint_rl_1_configure_on_non_partitioned_policy",
+				"api_d_get_endpoint_rl_2_configure_on_non_partitioned_policy",
+				"api_d_get_endpoint_rl_3_configure_on_non_partitioned_policy",
+				"api_d_post_endpoint_rl_1_configure_on_non_partitioned_policy",
+			},
+			sessMatch: func(t *testing.T, s *user.SessionState) {
+				t.Helper()
+				assert.NotEmpty(t, s.AccessRights)
+				apiDEndpoints := user.Endpoints{
+					{
+						Path: "/get",
+						Methods: user.EndpointMethods{
+							{
+								Name: "GET",
+								Limit: user.RateLimit{
+									Rate: -1,
+								},
+							},
+						},
+					},
+					{
+						Path: "/post",
+						Methods: user.EndpointMethods{
+							{
+								Name: "POST",
+								Limit: user.RateLimit{
+									Rate: 20,
+									Per:  60,
+								},
+							},
+						},
+					},
+				}
+
+				assert.ElementsMatch(t, apiDEndpoints, s.AccessRights["d"].Endpoints)
+			},
+			reverseOrder: true,
+		},
+		{
+			name: "combine_non_partitioned_policies_with_endpoint_rate_limits_configured_on_api_d_and_e",
+			policies: []string{
+				"api_d_get_endpoint_rl_1_configure_on_non_partitioned_policy",
+				"api_d_get_endpoint_rl_2_configure_on_non_partitioned_policy",
+				"api_d_get_endpoint_rl_3_configure_on_non_partitioned_policy",
+				"api_d_post_endpoint_rl_1_configure_on_non_partitioned_policy",
+				"api_e_get_endpoint_rl_1_configure_on_non_partitioned_policy",
+			},
+			sessMatch: func(t *testing.T, s *user.SessionState) {
+				t.Helper()
+				assert.NotEmpty(t, s.AccessRights)
+				apiDEndpoints := user.Endpoints{
+					{
+						Path: "/get",
+						Methods: user.EndpointMethods{
+							{
+								Name: "GET",
+								Limit: user.RateLimit{
+									Rate: -1,
+								},
+							},
+						},
+					},
+					{
+						Path: "/post",
+						Methods: user.EndpointMethods{
+							{
+								Name: "POST",
+								Limit: user.RateLimit{
+									Rate: 20,
+									Per:  60,
+								},
+							},
+						},
+					},
+				}
+
+				assert.ElementsMatch(t, apiDEndpoints, s.AccessRights["d"].Endpoints)
+
+				apiEEndpoints := user.Endpoints{
+					{
+						Path: "/get",
+						Methods: user.EndpointMethods{
+							{
+								Name: "GET",
+								Limit: user.RateLimit{
+									Rate: 100,
+									Per:  60,
+								},
+							},
+						},
+					},
+				}
+
+				assert.ElementsMatch(t, apiEEndpoints, s.AccessRights["e"].Endpoints)
+			},
+			reverseOrder: true,
+		},
+	}
+
+	tests = combinedEndpointRLTCs
 
 	return bmid, tests
 }
@@ -930,29 +1083,39 @@ func TestApplyPolicies(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
-	bmid, tests := ts.TestPrepareApplyPolicies()
+	bmid, tests := ts.testPrepareApplyPolicies(t)
 
 	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			sess := tc.session
-			if sess == nil {
-				sess = &user.SessionState{}
+		pols := [][]string{tc.policies}
+		if tc.reverseOrder {
+			var copyPols = make([]string, len(tc.policies))
+			copy(copyPols, tc.policies)
+			slices.Reverse(copyPols)
+			pols = append(pols, copyPols)
+		}
+
+		for i, policies := range pols {
+			name := tc.name
+			if i == 1 {
+				name = fmt.Sprintf("%s, reversed=%t", name, tc.reverseOrder)
 			}
-			sess.SetPolicies(tc.policies...)
-			errStr := ""
-			if err := bmid.ApplyPolicies(sess); err != nil {
-				errStr = err.Error()
-			}
-			if tc.errMatch == "" && errStr != "" {
-				t.Fatalf("didn't want err but got %s", errStr)
-			} else if !strings.Contains(errStr, tc.errMatch) {
-				t.Fatalf("error %q doesn't match %q",
-					errStr, tc.errMatch)
-			}
-			if tc.sessMatch != nil {
-				tc.sessMatch(t, sess)
-			}
-		})
+
+			t.Run(name, func(t *testing.T) {
+				sess := tc.session
+				if sess == nil {
+					sess = &user.SessionState{}
+				}
+				sess.SetPolicies(policies...)
+				if err := bmid.ApplyPolicies(sess); err != nil {
+					assert.ErrorContains(t, err, tc.errMatch)
+					return
+				}
+
+				if tc.sessMatch != nil {
+					tc.sessMatch(t, sess)
+				}
+			})
+		}
 	}
 }
 
@@ -961,7 +1124,7 @@ func BenchmarkApplyPolicies(b *testing.B) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
-	bmid, tests := ts.TestPrepareApplyPolicies()
+	bmid, tests := ts.testPrepareApplyPolicies(b)
 
 	for i := 0; i < b.N; i++ {
 		for _, tc := range tests {
@@ -996,8 +1159,10 @@ func TestApplyPoliciesQuotaAPILimit(t *testing.T) {
 				Limit: user.APILimit{
 					QuotaMax:         100,
 					QuotaRenewalRate: 3600,
-					Rate:             1000,
-					Per:              1,
+					RateLimit: user.RateLimit{
+						Rate: 1000,
+						Per:  1,
+					},
 				},
 			},
 			"api2": {
@@ -1005,8 +1170,10 @@ func TestApplyPoliciesQuotaAPILimit(t *testing.T) {
 				Limit: user.APILimit{
 					QuotaMax:         200,
 					QuotaRenewalRate: 3600,
-					Rate:             1000,
-					Per:              1,
+					RateLimit: user.RateLimit{
+						Rate: 1000,
+						Per:  1,
+					},
 				},
 			},
 			"api3": {
@@ -1121,8 +1288,10 @@ func TestApplyPoliciesQuotaAPILimit(t *testing.T) {
 						return false
 					}
 					api1LimitExpected := user.APILimit{
-						Rate:             1000,
-						Per:              1,
+						RateLimit: user.RateLimit{
+							Rate: 1000,
+							Per:  1,
+						},
 						QuotaMax:         100,
 						QuotaRenewalRate: 3600,
 						QuotaRenews:      api1Limit.QuotaRenews,
@@ -1138,8 +1307,10 @@ func TestApplyPoliciesQuotaAPILimit(t *testing.T) {
 						return false
 					}
 					api2LimitExpected := user.APILimit{
-						Rate:             1000,
-						Per:              1,
+						RateLimit: user.RateLimit{
+							Rate: 1000,
+							Per:  1,
+						},
 						QuotaMax:         200,
 						QuotaRenewalRate: 3600,
 						QuotaRenews:      api2Limit.QuotaRenews,
@@ -1155,8 +1326,10 @@ func TestApplyPoliciesQuotaAPILimit(t *testing.T) {
 						return false
 					}
 					api3LimitExpected := user.APILimit{
-						Rate:             1000,
-						Per:              1,
+						RateLimit: user.RateLimit{
+							Rate: 1000,
+							Per:  1,
+						},
 						QuotaMax:         50,
 						QuotaRenewalRate: 3600,
 						QuotaRenews:      api3Limit.QuotaRenews,
@@ -1346,8 +1519,10 @@ func TestApplyMultiPolicies(t *testing.T) {
 					json.Unmarshal(data, &sessionData)
 
 					policy1Expected := user.APILimit{
-						Rate:             1000,
-						Per:              1,
+						RateLimit: user.RateLimit{
+							Rate: 1000,
+							Per:  1,
+						},
 						QuotaMax:         50,
 						QuotaRenewalRate: 3600,
 						QuotaRenews:      sessionData.AccessRights["api1"].Limit.QuotaRenews,
@@ -1356,8 +1531,10 @@ func TestApplyMultiPolicies(t *testing.T) {
 					assert.Equal(t, policy1Expected, sessionData.AccessRights["api1"].Limit, "API1 limit do not match")
 
 					policy2Expected := user.APILimit{
-						Rate:             100,
-						Per:              1,
+						RateLimit: user.RateLimit{
+							Rate: 100,
+							Per:  1,
+						},
 						QuotaMax:         100,
 						QuotaRenewalRate: 3600,
 						QuotaRenews:      sessionData.AccessRights["api2"].Limit.QuotaRenews,

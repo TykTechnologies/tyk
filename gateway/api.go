@@ -50,6 +50,7 @@ import (
 	"github.com/TykTechnologies/tyk/config"
 
 	"github.com/TykTechnologies/tyk/internal/otel"
+	"github.com/TykTechnologies/tyk/internal/redis"
 	"github.com/TykTechnologies/tyk/internal/uuid"
 
 	"github.com/TykTechnologies/tyk/apidef/oas"
@@ -619,7 +620,7 @@ func (gw *Gateway) handleGetDetail(sessionKey, apiID, orgID string, byHash bool)
 			quotaKey = QuotaKeyPrefix + sessionKey
 		}
 
-		if usedQuota, err := gw.GlobalSessionManager.Store().GetRawKey(quotaKey); err == nil {
+		if usedQuota, err := gw.GlobalSessionManager.Store().GetRawKey(quotaKey); err == nil || errors.Is(err, redis.Nil) {
 			qInt, _ := strconv.Atoi(usedQuota)
 			remaining := session.QuotaMax - int64(qInt)
 
@@ -629,11 +630,10 @@ func (gw *Gateway) handleGetDetail(sessionKey, apiID, orgID string, byHash bool)
 				session.QuotaRemaining = remaining
 			}
 		} else {
-			log.WithFields(logrus.Fields{
-				"prefix":  "api",
-				"key":     gw.obfuscateKey(quotaKey),
-				"message": err,
-				"status":  "ok",
+			log.WithError(err).WithFields(logrus.Fields{
+				"prefix": "api",
+				"key":    gw.obfuscateKey(quotaKey),
+				"status": "ok",
 			}).Info("Can't retrieve key quota")
 		}
 	}
