@@ -3985,7 +3985,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
           description: Internal server error.
-      summary: Delete a Policy
+      summary: Delete a policy.
       tags:
       - Policies
     get:
@@ -4042,7 +4042,7 @@ paths:
                 throttle_retry_limit: 10
               schema:
                 $ref: '#/components/schemas/Policy'
-          description: Get details of a single Policy
+          description: Get details of a single policy.
         "403":
           content:
             application/json:
@@ -4061,11 +4061,11 @@ paths:
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
           description: Policy not found
-      summary: Get a Policy
+      summary: Get a policy.
       tags:
       - Policies
     put:
-      description: You can update a Policy in your Tyk Instance by ID
+      description: You can update a Policy in your Tyk Instance by ID.
       operationId: updatePolicy
       parameters:
       - description: You can retrieve details of a single policy by ID in your Tyk
@@ -4155,7 +4155,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
           description: Internal server error.
-      summary: Update a Policy
+      summary: Update a policy.
       tags:
       - Policies
   /tyk/reload:
