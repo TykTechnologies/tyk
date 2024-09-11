@@ -190,7 +190,7 @@ func (sm *StreamManager) createStream(streamID string, config map[string]interfa
 
 // ProcessRequest will handle the streaming functionality
 func (s *StreamingMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
-	strippedPath := s.Spec.StripListenPath(r, r.URL.Path)
+	strippedPath := s.Spec.StripListenPath(r.URL.Path)
 
 	s.Logger().Debugf("Processing request: %s, %s", r.URL.Path, strippedPath)
 
