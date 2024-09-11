@@ -638,6 +638,10 @@
       "type": "string",
       "enum": ["", "debug", "info", "warn", "error"]
     },
+    "log_format": {
+      "type": "string",
+      "enum": ["", "standard", "json"]
+    },
     "enable_http_profiler": {
       "type": "boolean"
     },

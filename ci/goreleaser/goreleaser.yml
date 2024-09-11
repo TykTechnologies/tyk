@@ -4,7 +4,7 @@
 # This project needs CGO_ENABLED=1 and the cross-compiler toolchains for
 # - arm64
 # - amd64
-
+version: 2
 builds:
   - id: std
     flags:
@@ -26,7 +26,7 @@ builds:
       - -tags=ignore
       - -trimpath
       - -tags=goplugin
-      - -tags=goplugin,fips,boringcrypto
+      - -tags=fips,boringcrypto
     env:
       - GOEXPERIMENT=boringcrypto
     ldflags:

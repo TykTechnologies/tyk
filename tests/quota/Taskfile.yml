@@ -1,21 +1,28 @@
 ---
 version: "3"
 
+includes:
+  services: ../../docker/services/Taskfile.yml
+
 vars:
+  coverage: quota.cov
   testArgs: -v
 
 tasks:
   test:
     desc: "Run tests (requires redis)"
+    deps: [ services:up ]
     cmds:
+      - defer:
+          task: services:down
       - task: fmt
-      - go test {{.testArgs}} -count=1 -cover -coverprofile=rate.cov -coverpkg=./... ./...
+      - go test {{.testArgs}} -count=1 -cover -coverprofile={{.coverage}} -coverpkg=./... ./...
 
   bench:
     desc: "Run benchmarks"
     cmds:
       - task: fmt
-      - go test {{.testArgs}} -count=1 -tags integration -bench=. -benchtime=10s -benchmem ./...
+      - go test {{.testArgs}} -count=1 -tags integration -run=^$ -bench=. -benchtime=10s -benchmem ./...
 
   fmt:
     internal: true
@@ -28,17 +35,12 @@ tasks:
     desc: "Show source coverage"
     aliases: [coverage, cov]
     cmds:
-      - go tool cover -func=rate.cov
+      - go tool cover -func={{.coverage}}
 
   uncover:
     desc: "Show uncovered source"
     cmds:
-      - uncover rate.cov
-
-  lint:
-    desc: "Lint docs"
-    cmds:
-      - schema-gen extract -o - | schema-gen lint -i -
+      - uncover {{.coverage}}
 
   install:uncover:
     desc: "Install uncover"
