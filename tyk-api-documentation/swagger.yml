@@ -537,12 +537,12 @@ paths:
       - APIs
   /tyk/apis/oas:
     get:
-      description: List all OAS format APIs, from Tyk Gateway.
+      description: List all APIs in Tyk OAS API format, from Tyk Gateway.
       operationId: listApisOAS
       parameters:
-      - description: "By default mode is empty which means it will return the OAS
-          spec including the x-tyk-api-gateway part. \n When mode=public, OAS spec
-          will exclude the x-tyk-api-gateway part in the response."
+      - description: "By default mode is empty which means it will return the Tyk
+          API OAS spec including the x-tyk-api-gateway part. \n When mode=public,
+          the Tyk OAS API spec will exclude the x-tyk-api-gateway part in the response."
         example: public
         in: query
         name: mode
@@ -564,7 +564,7 @@ paths:
                   - $ref: https://raw.githubusercontent.com/OAI/OpenAPI-Specification/main/schemas/v3.0/schema.json
                   - $ref: '#/components/schemas/XTykAPIGateway'
                 type: array
-          description: List of API definitions in OAS format.
+          description: List of API definitions in Tyk OAS format.
         "403":
           content:
             application/json:
@@ -574,11 +574,11 @@ paths:
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
           description: Forbidden
-      summary: List all OAS format APIs.
+      summary: List all APIs in Tyk OAS API format.
       tags:
       - Tyk OAS APIs
     post:
-      description: Create API with OAS format on the Tyk Gateway.
+      description: Create an API with Tyk OAS API format on the Tyk Gateway.
       operationId: createApiOAS
       parameters:
       - description: The base API which the new version will be linked to.
@@ -702,7 +702,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
           description: Internal server error.
-      summary: Create API with OAS format.
+      summary: Create an API with Tyk OAS format.
       tags:
       - Tyk OAS APIs
   /tyk/apis/oas/{apiID}:
@@ -770,12 +770,12 @@ paths:
       tags:
       - Tyk OAS APIs
     get:
-      description: Get Tyk OAS API definition using the API ID.
+      description: Get Tyk OAS API definition using an API ID.
       operationId: getOASApi
       parameters:
-      - description: "By default mode is empty which means it will return the OAS
-          spec including the x-tyk-api-gateway part. \n When mode=public, OAS spec
-          will exclude the x-tyk-api-gateway part in the response."
+      - description: "By default mode is empty which means it will return the Tyk
+          API OAS spec including the x-tyk-api-gateway part. \n When mode=public,
+          the Tyk OAS API spec will exclude the x-tyk-api-gateway part in the response."
         example: public
         in: query
         name: mode
@@ -837,12 +837,12 @@ paths:
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
           description: API not found.
-      summary: Get Tyk OAS API definition
+      summary: Get a Tyk OAS API definition.
       tags:
       - Tyk OAS APIs
     patch:
       description: |-
-        You can use this endpoint to update OAS part of the Tyk API definition.
+        You can use this endpoint to update Tyk OAS part of the Tyk API definition.
         This endpoint allows you to configure Tyk OAS extension based on query params provided(similar to import).
       operationId: patchApiOAS
       parameters:
@@ -954,7 +954,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
           description: Internal server error.
-      summary: Patch API in OAS format.
+      summary: Patch API in Tyk OAS format.
       tags:
       - Tyk OAS APIs
     put:
@@ -962,7 +962,7 @@ paths:
         Updating an API definition uses the same signature an object as a `POST`, however it will first ensure that the API ID that is being updated is the same as the one in the object being `PUT`.
 
 
-                Updating will completely replace the file descriptor and will not change an API Definition that has already been loaded, the hot-reload endpoint will need to be called to push the new definition to live.
+              Updating will completely replace the file descriptor and will not change an API Definition that has already been loaded, the hot-reload endpoint will need to be called to push the new definition to live.
       operationId: updateApiOAS
       parameters:
       - description: ID of the API you want to fetch
@@ -1073,7 +1073,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
           description: Internal server error.
-      summary: Update Tyk OAS API definition
+      summary: Update a Tyk OAS API definition.
       tags:
       - Tyk OAS APIs
   /tyk/apis/oas/{apiID}/export:
@@ -1089,9 +1089,9 @@ paths:
         required: true
         schema:
           type: string
-      - description: "By default mode is empty which means it will return the OAS
-          spec including the x-tyk-api-gateway part. \n When mode=public, OAS spec
-          will exclude the x-tyk-api-gateway part in the response."
+      - description: "By default mode is empty which means it will return the Tyk
+          API OAS spec including the x-tyk-api-gateway part. \n When mode=public,
+          the Tyk OAS API spec will exclude the x-tyk-api-gateway part in the response."
         example: public
         in: query
         name: mode
@@ -1144,7 +1144,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
           description: Internal server error.
-      summary: Download an OAS format APIs.
+      summary: Download a Tyk OAS format API.
       tags:
       - Tyk OAS APIs
   /tyk/apis/oas/{apiID}/versions:
@@ -1206,12 +1206,12 @@ paths:
       - Tyk OAS APIs
   /tyk/apis/oas/export:
     get:
-      description: Download all OAS format APIs, from the Gateway.
+      description: Download all Tyk OAS format APIs, from the Gateway.
       operationId: downloadApisOASPublic
       parameters:
-      - description: "By default mode is empty which means it will return the OAS
-          spec including the x-tyk-api-gateway part. \n When mode=public, OAS spec
-          will exclude the x-tyk-api-gateway part in the response."
+      - description: "By default mode is empty which means it will return the Tyk
+          API OAS spec including the x-tyk-api-gateway part. \n When mode=public,
+          the Tyk OAS API spec will exclude the x-tyk-api-gateway part in the response."
         example: public
         in: query
         name: mode
@@ -1227,7 +1227,7 @@ paths:
               schema:
                 format: binary
                 type: string
-          description: Get list of Tyk Oas APIs definition.
+          description: Get a list of Tyk OAS APIs definitions.
         "403":
           content:
             application/json:
@@ -1246,13 +1246,13 @@ paths:
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
           description: Internal server error.
-      summary: Download all OAS format APIs.
+      summary: Download all Tyk OAS format APIs.
       tags:
       - Tyk OAS APIs
   /tyk/apis/oas/import:
     post:
       description: |-
-        Import an OAS format API without x-tyk-gateway.
+        Import an Tyk OAS format API without x-tyk-gateway.
          For use with an existing Tyk OAS API that you want to expose via your Tyk Gateway.
       operationId: importOAS
       parameters:
@@ -1371,7 +1371,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
           description: Internal server error.
-      summary: Import an API in OAS format.
+      summary: Import an API in Tyk OAS format.
       tags:
       - Tyk OAS APIs
   /tyk/cache/{apiID}:
