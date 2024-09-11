@@ -81,7 +81,7 @@ streams:
       format: logfmt
       add_timestamp: false
       static_fields:
-        '@service': benthos
+        '@service': bento
 `
 
 func TestStreamingAPISingleClient(t *testing.T) {
