@@ -333,14 +333,18 @@ func (l *SessionLimiter) ForwardMessage(r *http.Request, session *user.SessionSt
 
 // RedisQuotaExceeded returns true if the request should be blocked as over quota.
 func (l *SessionLimiter) RedisQuotaExceeded(r *http.Request, session *user.SessionState, quotaKey, scope string, limit *user.APILimit, store storage.Handler, hashKeys bool) bool {
+	logger := log.WithFields(logrus.Fields{
+		"quotaMax":         limit.QuotaMax,
+		"quotaRenewalRate": limit.QuotaRenewalRate,
+	})
+
 	if limit.QuotaMax <= 0 {
+		logger.Error("Quota disabled: quota max <= 0")
 		return false
 	}
 
 	// don't use the requests cancellation context
 	ctx := context.Background()
-
-	session.Touch()
 
 	quotaScope := ""
 	if scope != "" {
@@ -348,82 +352,107 @@ func (l *SessionLimiter) RedisQuotaExceeded(r *http.Request, session *user.Sessi
 	}
 
 	key := session.KeyID
-
 	if hashKeys {
 		key = storage.HashStr(session.KeyID)
 	}
-
 	if quotaKey != "" {
 		key = quotaKey
 	}
 
-	now := time.Now().Truncate(0)
+	now := time.Now()
+
+	// rawKey is the redis key for quota
 	rawKey := QuotaKeyPrefix + quotaScope + key
-	quotaRenewalRate := time.Second * time.Duration(limit.QuotaRenewalRate)
-	quotaMax := limit.QuotaMax
 
-	// First, ensure a distributed lock
+	var quotaRenewalRate time.Duration
+	if limit.QuotaRenewalRate > 0 {
+		quotaRenewalRate = time.Second * time.Duration(limit.QuotaRenewalRate)
+	}
+
 	conn := l.limiterStorage
-	locker := limiter.NewLimiter(conn).Locker(rawKey)
 
-	if err := locker.Lock(ctx); err != nil {
-		log.WithError(err).Error("error locking quota key, blocking")
+	var expired, exists bool
+	var expiredAt time.Time
+
+	dur, err := conn.PTTL(ctx, rawKey).Result()
+	if err != nil && !errors.Is(err, redis.Nil) {
+		logger.WithError(err).Error("error getting key TTL, blocking")
 		return true
 	}
+
+	// The command returns -2 if the key does not exist.
+	// The command returns -1 if the key exists but has no associated expire.
+	expired = dur < 0
+	exists = dur != -2
+
+	expiredAt = now.Add(dur)
+
+	logger = logger.WithFields(logrus.Fields{
+		"exists":  exists,
+		"expired": expired,
+		"rawKey":  rawKey,
+	})
+
+	increment := func() bool {
+		var res *redis.IntCmd
+		_, err := conn.Pipelined(ctx, func(pipe redis.Pipeliner) error {
+			res = pipe.Incr(ctx, rawKey)
+			if res.Val() == 1 && quotaRenewalRate > 0 {
+				pipe.Expire(ctx, rawKey, quotaRenewalRate)
+			}
+			return nil
+		})
+		if err != nil {
+			logger.WithError(err).Error("error incrementing quota key")
+			return true
+		}
+
+		quota := res.Val()
+		blocked := quota-1 >= limit.QuotaMax
+		remaining := limit.QuotaMax - quota
+		if blocked {
+			remaining = 0
+		}
+
+		logger = logger.WithField("quota", quota-1)
+		logger = logger.WithField("blocked", blocked)
+		logger = logger.WithField("remaining", remaining)
+		logger.Debug("[QUOTA] Update quota key")
+
+		l.updateSessionQuota(session, scope, remaining, expiredAt.Unix())
+		return blocked
+	}
+
+	// If exists and not expired, just increment it.
+	if exists && !expired {
+		return increment()
+	}
+
+	// if key is expired and can't renew, update the counter and
+	// block traffic going forward.
+	if limit.QuotaRenewalRate <= 0 {
+		return increment()
+	}
+
+	// First, ensure a distributed lock
+	locker := limiter.NewLimiter(conn).Locker(rawKey)
+
+	// Lock the key
+	if err := locker.Lock(ctx); err != nil {
+		// Increment the key if lock fails
+		return increment()
+	}
+
+	// Unlock the key when done
 	defer func() {
 		if err := locker.Unlock(ctx); err != nil {
-			log.WithError(err).Error("error unlocking quota key")
+			logger.WithError(err).Error("error unlocking quota key")
 		}
 	}()
 
-	var expired bool
-	var expiredAt time.Time
-	dur, err := conn.PTTL(ctx, rawKey).Result()
-	if err == nil || errors.Is(err, redis.Nil) {
-		if err == nil {
-			expiredAt = now.Add(dur)
-		} else {
-			expired = true
-			expiredAt = now.Add(quotaRenewalRate)
-			conn.Set(ctx, rawKey, 0, quotaRenewalRate)
-		}
-	} else {
-		log.WithError(err).Warn("error getting key TTL, blocking")
-		return true
-	}
-
-	qInt, err := conn.Incr(ctx, rawKey).Result()
-	if err != nil && !errors.Is(err, redis.Nil) {
-		log.WithError(err).Error("can't update quota, blocking")
-		return true
-	}
-
-	logFields := logrus.Fields{
-		"quota":     qInt - 1,
-		"quotaMax":  quotaMax,
-		"expired":   expired,
-		"expiredAt": expiredAt,
-	}
-
-	log.WithFields(logFields).Debug("[QUOTA] Request")
-
-	if qInt-1 >= quotaMax {
-		log.WithFields(logFields).Debug("[QUOTA] Limits reached")
-
-		if expired {
-			if quotaRenewalRate <= 0 {
-				return true
-			}
-
-			go store.DeleteRawKey(rawKey)
-			qInt = 1
-		} else {
-			return true
-		}
-	}
-
-	l.updateSessionQuota(session, scope, quotaMax-qInt, expiredAt.Unix())
-	return false
+	// locked: reset quota + increment
+	conn.Set(ctx, rawKey, 0, quotaRenewalRate)
+	return increment()
 }
 
 func GetAccessDefinitionByAPIIDOrSession(session *user.SessionState, api *APISpec) (accessDef *user.AccessDefinition, allowanceScope string, err error) {
@@ -473,4 +502,6 @@ func (*SessionLimiter) updateSessionQuota(session *user.SessionState, scope stri
 		session.QuotaRemaining = remaining
 		session.QuotaRenews = renews
 	}
+
+	session.Touch()
 }
