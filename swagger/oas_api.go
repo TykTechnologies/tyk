@@ -15,7 +15,7 @@ import (
 
 const (
 	OASTag     = "Tyk OAS APIs"
-	modeDesc   = "By default mode is empty which means it will return the OAS spec including the x-tyk-api-gateway part. \n When mode=public, OAS spec will exclude the x-tyk-api-gateway part in the response."
+	modeDesc   = "By default mode is empty which means it will return the Tyk API OAS spec including the x-tyk-api-gateway part. \n When mode=public, the Tyk OAS API spec will exclude the x-tyk-api-gateway part in the response."
 	OASTagDesc = `**Note: Applies only to Tyk Gateway Community Edition** <br/>
 
 `
@@ -49,20 +49,20 @@ func getListOfOASApisRequest(r *openapi3.Reflector) error {
 		Enum:    []interface{}{"public"},
 	})
 
-	oc.SetSummary("List all OAS format APIs.")
-	oc.SetDescription("List all OAS format APIs, from Tyk Gateway.")
+	oc.SetSummary("List all APIs in Tyk OAS API format.")
+	oc.SetDescription("List all APIs in Tyk OAS API format, from Tyk Gateway.")
 	item := []jsonschema.AllOfExposer{jsonschema.AllOf(responseSchema, oas.XTykAPIGateway{})}
 	op.AddRespWithRefExamples(http.StatusOK, item, []multipleExamplesValues{
 		{
 			key:         oasExampleList,
 			httpStatus:  200,
-			Summary:     "List of API definitions in OAS format.",
+			Summary:     "List of API definitions in Tyk OAS format.",
 			exampleType: Component,
 			ref:         oasExampleList,
 			hasExample:  true,
 		},
 	}, func(cu *openapi.ContentUnit) {
-		cu.Description = "List of API definitions in OAS format."
+		cu.Description = "List of API definitions in Tyk OAS format."
 	})
 	return op.AddOperation()
 }
@@ -87,8 +87,8 @@ func postOAsApi(r *openapi3.Reflector) error {
 	}, http.StatusOK, func(cu *openapi.ContentUnit) {
 		cu.Description = "API created."
 	})
-	oc.SetDescription("Create API with OAS format on the Tyk Gateway.")
-	oc.SetSummary("Create API with OAS format.")
+	oc.SetDescription("Create an API with Tyk OAS API format on the Tyk Gateway.")
+	oc.SetSummary("Create an API with Tyk OAS format.")
 	oc.AddReqWithSeparateExample(responseSchemaWithExtension, oasSample(OasSampleString()))
 	addApiPostQueryParam(oc)
 	///addExternalRefToRequest(o3)
@@ -105,12 +105,12 @@ func apiOASExportHandler(r *openapi3.Reflector) error {
 	if err != nil {
 		return err
 	}
-	oc.SetSummary("Download all OAS format APIs.")
-	oc.SetDescription("Download all OAS format APIs, from the Gateway.")
+	oc.SetSummary("Download all Tyk OAS format APIs.")
+	oc.SetDescription("Download all Tyk OAS format APIs, from the Gateway.")
 	oc.AddBinaryFormatResp(BinaryFormat{
 		///example:     BinaryExample(OasSampleString()),
 		httpStatus:  200,
-		description: "Get list of Tyk Oas APIs definition.",
+		description: "Get a list of Tyk OAS APIs definitions.",
 	})
 	oc.StatusInternalServerError("Unexpected error")
 	oc.AddQueryParameter("mode", modeDesc, OptionalParameterValues{
@@ -139,8 +139,8 @@ func getOASApiRequest(r *openapi3.Reflector) error {
 		cu.Description = "API not found."
 	})
 	oc.StatusBadRequest("the requested API definition is in Tyk classic format, please use old API endpoint")
-	oc.SetSummary("Get Tyk OAS API definition")
-	oc.SetDescription("Get Tyk OAS API definition using the API ID.")
+	oc.SetSummary("Get a Tyk OAS API definition.")
+	oc.SetDescription("Get Tyk OAS API definition using an API ID.")
 	oc.AddResponseHeaders(ResponseHeader{
 		Name:        "x-tyk-base-api-id",
 		Description: PointerValue("ID of the base API if the requested API is a version."),
@@ -195,8 +195,8 @@ func apiOASPutHandler(r *openapi3.Reflector) error {
 	}, http.StatusOK, func(cu *openapi.ContentUnit) {
 		cu.Description = "API updated"
 	})
-	oc.SetSummary("Update Tyk OAS API definition")
-	oc.SetDescription("Updating an API definition uses the same signature an object as a `POST`, however it will first ensure that the API ID that is being updated is the same as the one in the object being `PUT`.\n\n\n        Updating will completely replace the file descriptor and will not change an API Definition that has already been loaded, the hot-reload endpoint will need to be called to push the new definition to live.")
+	oc.SetSummary("Update a Tyk OAS API definition.")
+	oc.SetDescription("Updating an API definition uses the same signature an object as a `POST`, however it will first ensure that the API ID that is being updated is the same as the one in the object being `PUT`.\n\n\n      Updating will completely replace the file descriptor and will not change an API Definition that has already been loaded, the hot-reload endpoint will need to be called to push the new definition to live.")
 	oc.AddReqWithSeparateExample(responseSchemaWithExtension, oasSample(OasSampleString()))
 	oc.AddPathParameter("apiID", "ID of the API you want to fetch", OptionalParameterValues{
 		Example: valueToInterface("4c1c0d8fc885401053ddac4e39ef676b"),
@@ -232,7 +232,7 @@ func apiOASExportWithIDHandler(r *openapi3.Reflector) error {
 		httpStatus:  200,
 		description: "Exported API definition file",
 	})
-	oc.SetSummary("Download an OAS format APIs.")
+	oc.SetSummary("Download a Tyk OAS format API.")
 	oc.SetDescription("Use the mode query parameter to specify if you want the x-tyk-api-gateway stripped out.")
 
 	return oc.AddOperation()
@@ -249,7 +249,7 @@ func importApiOASPostHandler(r *openapi3.Reflector) error {
 	if err != nil {
 		return err
 	}
-	oc.SetSummary("Import an API in OAS format.")
+	oc.SetSummary("Import an API in Tyk OAS format.")
 	oc.AddRespWithExample(apiModifyKeySuccess{
 		Key:    "e30bee13ad4248c3b529a4c58bb7be4e",
 		Status: "ok",
@@ -257,7 +257,7 @@ func importApiOASPostHandler(r *openapi3.Reflector) error {
 	}, http.StatusOK, func(cu *openapi.ContentUnit) {
 		cu.Description = "API imported."
 	})
-	oc.SetDescription("Import an OAS format API without x-tyk-gateway.\n For use with an existing Tyk OAS API that you want to expose via your Tyk Gateway.")
+	oc.SetDescription("Import an Tyk OAS format API without x-tyk-gateway.\n For use with an existing Tyk OAS API that you want to expose via your Tyk Gateway.")
 	oc.StatusInternalServerError("file object creation failed, write error")
 	oc.StatusBadRequest("the import payload should not contain x-tyk-api-gateway")
 	importAndPatchQueryParameters(oc)
@@ -374,8 +374,8 @@ func apiOASPatchHandler(r *openapi3.Reflector) error {
 	}, http.StatusOK, func(cu *openapi.ContentUnit) {
 		cu.Description = "API patched."
 	})
-	oc.SetSummary("Patch API in OAS format.")
-	oc.SetDescription("You can use this endpoint to update OAS part of the Tyk API definition.\nThis endpoint allows you to configure Tyk OAS extension based on query params provided(similar to import).")
+	oc.SetSummary("Patch API in Tyk OAS format.")
+	oc.SetDescription("You can use this endpoint to update Tyk OAS part of the Tyk API definition.\nThis endpoint allows you to configure Tyk OAS extension based on query params provided(similar to import).")
 	oc.AddReqWithSeparateExample(responseSchema, oasSample(OasSampleString()))
 
 	oc.AddPathParameter("apiID", "ID of the API you want to fetch.", OptionalParameterValues{
