@@ -295,12 +295,14 @@ var policies = []*user.Policy{
 				AllowedTypes:         []graphql.Type{},
 				DisableIntrospection: false,
 				Limit: user.APILimit{
-					Smoothing: &apidef.RateLimitSmoothing{
-						Enabled:   false,
-						Threshold: 500,
-						Trigger:   0.8,
-						Step:      100,
-						Delay:     30,
+					RateLimit: user.RateLimit{
+						Smoothing: &apidef.RateLimitSmoothing{
+							Enabled:   false,
+							Threshold: 500,
+							Trigger:   0.8,
+							Step:      100,
+							Delay:     30,
+						},
 					},
 				},
 				FieldAccessRights: []user.FieldAccessDefinition{},
