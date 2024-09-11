@@ -59,6 +59,7 @@ func getRefreshToken(td tokenData) string {
 }
 
 func TestProcessKeySpaceChangesForOauth(t *testing.T) {
+	test.Exclusive(t) // Uses DeleteAllKeys, need to limit parallelism.
 
 	cases := []struct {
 		TestName string
@@ -135,7 +136,7 @@ func TestProcessKeySpaceChangesForOauth(t *testing.T) {
 				}
 			} else {
 				getKeyFromStore = ts.Gw.GlobalSessionManager.Store().GetKey
-				ts.Gw.GlobalSessionManager.Store().DeleteAllKeys()
+				ts.Gw.GlobalSessionManager.Store().DeleteAllKeys() // exclusive
 				err := ts.Gw.GlobalSessionManager.Store().SetRawKey(token, token, 100)
 				assert.NoError(t, err)
 				_, err = ts.Gw.GlobalSessionManager.Store().GetRawKey(token)
@@ -155,6 +156,7 @@ func TestProcessKeySpaceChangesForOauth(t *testing.T) {
 }
 
 func TestProcessKeySpaceChanges_ResetQuota(t *testing.T) {
+	test.Exclusive(t) // Uses DeleteAllKeys, need to limit parallelism.
 
 	g := StartTest(nil)
 	defer g.Close()
@@ -166,8 +168,8 @@ func TestProcessKeySpaceChanges_ResetQuota(t *testing.T) {
 		Gw:               g.Gw,
 	}
 
-	g.Gw.GlobalSessionManager.Store().DeleteAllKeys()
-	defer g.Gw.GlobalSessionManager.Store().DeleteAllKeys()
+	g.Gw.GlobalSessionManager.Store().DeleteAllKeys()       // exclusive
+	defer g.Gw.GlobalSessionManager.Store().DeleteAllKeys() // exclusive
 
 	api := g.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 		spec.UseKeylessAccess = false
@@ -217,6 +219,7 @@ func TestProcessKeySpaceChanges_ResetQuota(t *testing.T) {
 
 // TestRPCUpdateKey check that on update key event the key still exist in worker redis
 func TestRPCUpdateKey(t *testing.T) {
+	test.Exclusive(t) // Uses DeleteAllKeys, need to limit parallelism.
 
 	cases := []struct {
 		TestName     string
@@ -248,8 +251,8 @@ func TestRPCUpdateKey(t *testing.T) {
 				Gw:               g.Gw,
 			}
 
-			g.Gw.GlobalSessionManager.Store().DeleteAllKeys()
-			defer g.Gw.GlobalSessionManager.Store().DeleteAllKeys()
+			g.Gw.GlobalSessionManager.Store().DeleteAllKeys()       // exclusive
+			defer g.Gw.GlobalSessionManager.Store().DeleteAllKeys() // exclusive
 
 			api := g.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 				spec.UseKeylessAccess = false
@@ -289,6 +292,8 @@ func TestRPCUpdateKey(t *testing.T) {
 }
 
 func TestGetGroupLoginCallback(t *testing.T) {
+	test.Exclusive(t) // Uses DeleteAllKeys, need to limit parallelism.
+
 	tcs := []struct {
 		testName                 string
 		syncEnabled              bool
@@ -318,7 +323,7 @@ func TestGetGroupLoginCallback(t *testing.T) {
 				globalConf.SlaveOptions.SynchroniserEnabled = tc.syncEnabled
 			})
 			defer ts.Close()
-			defer ts.Gw.GlobalSessionManager.Store().DeleteAllKeys()
+			defer ts.Gw.GlobalSessionManager.Store().DeleteAllKeys() // exclusive
 
 			rpcListener := RPCStorageHandler{
 				KeyPrefix:        "rpc.listener.",
