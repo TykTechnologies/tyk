@@ -3,6 +3,7 @@ package regression
 import (
 	"embed"
 	"encoding/json"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -24,6 +25,9 @@ func loadAPISpec(tb testing.TB, filename string) *gateway.APISpec {
 	apidef := &apidef.APIDefinition{}
 	err := json.Unmarshal(data, apidef)
 	require.NoError(tb, err, "Error decoding API Definition: %s", filename)
+
+	// auto replace from public to private endpoint, part of CI env
+	apidef.Proxy.ListenPath = strings.ReplaceAll(apidef.Proxy.ListenPath, "httpbin.org", "127.0.0.1:3123")
 
 	return &gateway.APISpec{
 		APIDefinition: apidef,
