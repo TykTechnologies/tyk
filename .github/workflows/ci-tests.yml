@@ -117,6 +117,7 @@ jobs:
       - name: Run Gateway Tests
         id: ci-tests
         run: |
+          task --version
           task test:e2e args="-race -timeout=15m"
           task test:coverage
 
