@@ -99,6 +99,8 @@ tasks:
     desc: "Show source coverage"
     aliases: [cov, coverage]
     deps: [cover:merge]
+    status:
+      - test -f coverage/{{.product}}-all.cov
     cmds:
       - go tool cover -func=coverage/{{.product}}-all.cov | summary coverfunc
 
