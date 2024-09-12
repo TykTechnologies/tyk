@@ -94,6 +94,7 @@ jobs:
           pip install google
           pip install 'protobuf==4.24.4'
 
+          task --version
           task lint
 
           git add --all
@@ -125,7 +126,7 @@ jobs:
       - name: Run Gateway Tests
         id: ci-tests
         run: |
-          task test:e2e args="-race -timeout=15m"
+          task test:e2e-combined args="-race -timeout=15m"
           task test:coverage
 
       # golangci-lint actions *require* issues-exit-code=0 to pass data along to sonarcloud
@@ -152,7 +153,7 @@ jobs:
             -Dsonar.coverage.exclusions=**/*_test.go,**/mock/*
             -Dsonar.test.inclusions=**/*_test.go
             -Dsonar.tests=.
-            -Dsonar.go.coverage.reportPaths=coverage/*.cov
+            -Dsonar.go.coverage.reportPaths=coverage/gateway-all.cov
             -Dsonar.go.golangci-lint.reportPaths=golanglint.xml
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
