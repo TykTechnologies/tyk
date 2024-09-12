@@ -12,7 +12,7 @@ import (
 
 func TestGranularAccessMiddleware_ProcessRequest(t *testing.T) {
 	g := StartTest(func(c *config.Config) {
-		c.HttpServerOptions.EnablePrefixMatching = true
+		c.HttpServerOptions.EnablePathPrefixMatching = true
 	})
 	defer g.Close()
 
