@@ -14,10 +14,10 @@ func (a *APISpec) CheckSpecMatchesStatus(r *http.Request, rxPaths []URLSpec, mod
 		if rxPaths[i].Status != mode {
 			continue
 		}
-		if !rxPaths[i].Spec.MatchString(matchPath) {
+		if !rxPaths[i].matchesMethod(method) {
 			continue
 		}
-		if !rxPaths[i].matchesMethod(method) {
+		if !rxPaths[i].matchesPath(matchPath, a) {
 			continue
 		}
 
@@ -36,10 +36,10 @@ func (a *APISpec) FindSpecMatchesStatus(r *http.Request, rxPaths []URLSpec, mode
 		if rxPaths[i].Status != mode {
 			continue
 		}
-		if !rxPaths[i].Spec.MatchString(matchPath) {
+		if !rxPaths[i].matchesMethod(method) {
 			continue
 		}
-		if !rxPaths[i].matchesMethod(method) {
+		if !rxPaths[i].matchesPath(matchPath, a) {
 			continue
 		}
 
@@ -64,7 +64,7 @@ func (a *APISpec) getMatchPathAndMethod(r *http.Request, mode URLStatus) (string
 	}
 
 	if a.Proxy.ListenPath != "/" {
-		matchPath = strings.TrimPrefix(matchPath, a.Proxy.ListenPath)
+		matchPath = a.StripListenPath(matchPath)
 	}
 
 	if !strings.HasPrefix(matchPath, "/") {
