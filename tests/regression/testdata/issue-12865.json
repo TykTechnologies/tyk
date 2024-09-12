@@ -292,7 +292,7 @@
                             "path": "/status",
                             "method": "GET",
                             "match_pattern": "/status/(.*)",
-                            "rewrite_to": "http://google.com",
+                            "rewrite_to": "http://httpbin.org",
                             "triggers": []
                         }
                     ],
