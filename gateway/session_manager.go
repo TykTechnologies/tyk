@@ -230,8 +230,8 @@ func (sfr sessionFailReason) String() string {
 
 func (l *SessionLimiter) RateLimitInfo(r *http.Request, api *APISpec, endpoints user.Endpoints) (*user.EndpointRateLimitInfo, bool) {
 	// Hook per-api settings here (m.Spec...)
-	isPrefixMatch := l.config.HttpServerOptions.EnablePrefixMatching
-	isSuffixMatch := l.config.HttpServerOptions.EnableSuffixMatching
+	isPrefixMatch := l.config.HttpServerOptions.EnablePathPrefixMatching
+	isSuffixMatch := l.config.HttpServerOptions.EnablePathSuffixMatching
 
 	urlPaths := []string{
 		api.StripListenPath(r.URL.Path),

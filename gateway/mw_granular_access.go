@@ -41,8 +41,8 @@ func (m *GranularAccessMiddleware) ProcessRequest(w http.ResponseWriter, r *http
 	gwConfig := m.Gw.GetConfig()
 
 	// Hook per-api settings here (m.Spec...)
-	isPrefixMatch := gwConfig.HttpServerOptions.EnablePrefixMatching
-	isSuffixMatch := gwConfig.HttpServerOptions.EnableSuffixMatching
+	isPrefixMatch := gwConfig.HttpServerOptions.EnablePathPrefixMatching
+	isSuffixMatch := gwConfig.HttpServerOptions.EnablePathSuffixMatching
 
 	if isPrefixMatch {
 		urlPaths := []string{
@@ -97,13 +97,7 @@ func (m *GranularAccessMiddleware) ProcessRequest(w http.ResponseWriter, r *http
 			continue
 		}
 
-		pattern := accessSpec.URL
-
-		// Extends legacy by honoring isSuffixMatch.
-		// Append $ if so configured to match end of request path.
-		if isSuffixMatch && !strings.HasSuffix(pattern, "$") {
-			pattern += "$"
-		}
+		pattern := httputil.PreparePathRegexp(accessSpec.URL, false, isSuffixMatch)
 
 		logger.Debug("Checking: ", urlPath, " Against:", pattern)
 
