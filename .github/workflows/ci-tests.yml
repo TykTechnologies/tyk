@@ -17,6 +17,14 @@ on:
       - master
       - release-**
 
+# Only have one runner per PR, and per merged commit.
+#
+# - As a PR gets new commits, any old run jobs get cancelled (PR number)
+# - As a commit gets merged, it doesn't cancel previous running PR's (github.sha)
+concurrency:
+  group: ${{ github.event.pull_request.number || github.sha }}-ci-tests
+  cancel-in-progress: true
+
 env:
   PYTHON_VERSION: "3.11"
   PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION: python
@@ -86,6 +94,7 @@ jobs:
           pip install google
           pip install 'protobuf==4.24.4'
 
+          task --version
           task lint
 
           git add --all
@@ -144,7 +153,7 @@ jobs:
             -Dsonar.coverage.exclusions=**/*_test.go,**/mock/*
             -Dsonar.test.inclusions=**/*_test.go
             -Dsonar.tests=.
-            -Dsonar.go.coverage.reportPaths=coverage/*.cov
+            -Dsonar.go.coverage.reportPaths=coverage/gateway-all.cov
             -Dsonar.go.golangci-lint.reportPaths=golanglint.xml
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

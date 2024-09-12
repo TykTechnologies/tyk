@@ -544,6 +544,12 @@
         "enable_strict_routes": {
           "type": "boolean"
         },
+        "enable_path_prefix_matching": {
+          "type": "boolean"
+        },
+        "enable_path_suffix_matching": {
+          "type": "boolean"
+        },
         "flush_interval": {
           "type": "integer"
         },
