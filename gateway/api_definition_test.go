@@ -418,7 +418,13 @@ func TestConflictingPaths(t *testing.T) {
 }
 
 func TestIgnored(t *testing.T) {
+<<<<<<< HEAD
 	ts := StartTest(nil)
+=======
+	ts := StartTest(func(c *config.Config) {
+		c.HttpServerOptions.EnablePathPrefixMatching = true
+	})
+>>>>>>> 89bcc579d... WIP [TT-12865] Rename config parameter, update usage, support mux params on legacy (#6506)
 	defer ts.Close()
 
 	t.Run("Extended Paths", func(t *testing.T) {

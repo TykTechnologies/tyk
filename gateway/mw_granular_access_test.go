@@ -10,7 +10,13 @@ import (
 )
 
 func TestGranularAccessMiddleware_ProcessRequest(t *testing.T) {
+<<<<<<< HEAD
 	g := StartTest(nil)
+=======
+	g := StartTest(func(c *config.Config) {
+		c.HttpServerOptions.EnablePathPrefixMatching = true
+	})
+>>>>>>> 89bcc579d... WIP [TT-12865] Rename config parameter, update usage, support mux params on legacy (#6506)
 	defer g.Close()
 
 	api := g.Gw.BuildAndLoadAPI(func(spec *APISpec) {
