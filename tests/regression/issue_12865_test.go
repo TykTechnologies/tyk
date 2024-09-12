@@ -17,10 +17,10 @@ func Test_Issue12865(t *testing.T) {
 			c.HttpServerOptions.EnablePathPrefixMatching = false
 			c.HttpServerOptions.EnablePathSuffixMatching = false
 		})
-		defer ts.Close()
+		t.Cleanup(ts.Close)
 
 		// load api definition from file
-		api := loadAPISpec(t, "testdata/issue-12865.json")
+		api := LoadAPISpec(t, "testdata/issue-12865.json")
 
 		ts.Gw.LoadAPI(api)
 
@@ -56,10 +56,10 @@ func Test_Issue12865(t *testing.T) {
 			c.HttpServerOptions.EnablePathPrefixMatching = true
 			c.HttpServerOptions.EnablePathSuffixMatching = false
 		})
-		defer ts.Close()
+		t.Cleanup(ts.Close)
 
 		// load api definition from file
-		api := loadAPISpec(t, "testdata/issue-12865.json")
+		api := LoadAPISpec(t, "testdata/issue-12865.json")
 
 		ts.Gw.LoadAPI(api)
 
@@ -95,10 +95,10 @@ func Test_Issue12865(t *testing.T) {
 			c.HttpServerOptions.EnablePathPrefixMatching = true
 			c.HttpServerOptions.EnablePathSuffixMatching = true
 		})
-		defer ts.Close()
+		t.Cleanup(ts.Close)
 
 		// load api definition from file
-		api := loadAPISpec(t, "testdata/issue-12865.json")
+		api := LoadAPISpec(t, "testdata/issue-12865.json")
 
 		ts.Gw.LoadAPI(api)
 
@@ -134,10 +134,10 @@ func Test_Issue12865(t *testing.T) {
 			c.HttpServerOptions.EnablePathPrefixMatching = false
 			c.HttpServerOptions.EnablePathSuffixMatching = true
 		})
-		defer ts.Close()
+		t.Cleanup(ts.Close)
 
 		// load api definition from file
-		api := loadAPISpec(t, "testdata/issue-12865.json")
+		api := LoadAPISpec(t, "testdata/issue-12865.json")
 
 		ts.Gw.LoadAPI(api)
 
