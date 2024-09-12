@@ -5,7 +5,7 @@ tasks:
   up:
     desc: "Bring up services"
     cmds:
-      - docker compose up -d --remove-orphans
+      - docker compose up -d --remove-orphans --wait
 
   down:
     desc: "Tear down services"
