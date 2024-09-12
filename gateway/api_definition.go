@@ -134,7 +134,8 @@ const (
 // path is on any of the white, black or ignored lists. This is generated as part of the
 // configuration init
 type URLSpec struct {
-	Spec                      *regexp.Regexp
+	spec *regexp.Regexp
+
 	Status                    URLStatus
 	MethodActions             map[string]apidef.EndpointMethodMeta
 	Whitelist                 apidef.EndPointMeta
@@ -817,21 +818,28 @@ func (a APIDefinitionLoader) getPathSpecs(apiVersionDef apidef.VersionInfo, conf
 	return combinedPath, len(whiteListPaths) > 0
 }
 
-// match mux tags, `{id}`.
-var apiLangIDsRegex = regexp.MustCompile(`{([^}]+)}`)
-
 func (a APIDefinitionLoader) generateRegex(stringSpec string, newSpec *URLSpec, specType URLStatus, conf config.Config) {
-	// replace mux named parameters with regex path match
-	asRegexStr := apiLangIDsRegex.ReplaceAllString(stringSpec, `([^/]+)`)
+	var (
+		pattern string
+		err     error
+	)
+	// Hook per-api settings here via newSpec *URLSpec
+	isPrefixMatch := conf.HttpServerOptions.EnablePrefixMatching
+	isSuffixMatch := conf.HttpServerOptions.EnableSuffixMatching
+	isIgnoreCase := newSpec.IgnoreCase || conf.IgnoreEndpointCase
+
+	pattern = httputil.PreparePathRegexp(stringSpec, isPrefixMatch, isSuffixMatch)
 
 	// Case insensitive match
-	if newSpec.IgnoreCase || conf.IgnoreEndpointCase {
-		asRegexStr = "(?i)" + asRegexStr
+	if isIgnoreCase {
+		pattern = "(?i)" + pattern
 	}
 
-	asRegex, _ := regexp.Compile(asRegexStr)
+	asRegex, err := regexp.Compile(pattern)
+	log.WithError(err).Debugf("URLSpec: %s => %s type=%d", stringSpec, pattern, specType)
+
 	newSpec.Status = specType
-	newSpec.Spec = asRegex
+	newSpec.spec = asRegex
 }
 
 func (a APIDefinitionLoader) compilePathSpec(paths []string, specType URLStatus, conf config.Config) []URLSpec {
@@ -1493,7 +1501,7 @@ func (a *APISpec) getURLStatus(stat URLStatus) RequestStatus {
 // URLAllowedAndIgnored checks if a url is allowed and ignored.
 func (a *APISpec) URLAllowedAndIgnored(r *http.Request, rxPaths []URLSpec, whiteListStatus bool) (RequestStatus, interface{}) {
 	for i := range rxPaths {
-		if !rxPaths[i].Spec.MatchString(r.URL.Path) {
+		if !rxPaths[i].matchesPath(r.URL.Path, a) {
 			continue
 		}
 
@@ -1504,7 +1512,7 @@ func (a *APISpec) URLAllowedAndIgnored(r *http.Request, rxPaths []URLSpec, white
 
 	// Check if ignored
 	for i := range rxPaths {
-		if !rxPaths[i].Spec.MatchString(r.URL.Path) {
+		if !rxPaths[i].matchesPath(r.URL.Path, a) {
 			continue
 		}
 
@@ -1776,8 +1784,32 @@ func (a *APISpec) Version(r *http.Request) (*apidef.VersionInfo, RequestStatus) 
 	return &version, StatusOk
 }
 
+// StripListenPath will strip the listen path from the URL, keeping version in tact.
 func (a *APISpec) StripListenPath(reqPath string) string {
 	return httputil.StripListenPath(a.Proxy.ListenPath, reqPath)
+}
+
+// StripVersionPath will strip the version from the URL. The input URL
+// should already have listen path stripped.
+func (a *APISpec) StripVersionPath(reqPath string) string {
+	// First part of the url is the version fragment
+	part := strings.Split(strings.Trim(reqPath, "/"), "/")[0]
+
+	matchesUrlVersioningPattern := true
+	if a.VersionDefinition.UrlVersioningPattern != "" {
+		re, err := regexp.Compile(a.VersionDefinition.UrlVersioningPattern)
+		if err != nil {
+			log.Error("Error compiling versioning pattern: ", err)
+		} else {
+			matchesUrlVersioningPattern = re.Match([]byte(part))
+		}
+	}
+
+	if (a.VersionDefinition.StripVersioningData || a.VersionDefinition.StripPath) && matchesUrlVersioningPattern {
+		return strings.Replace(reqPath, "/"+part+"/", "/", 1)
+	}
+
+	return reqPath
 }
 
 func (a *APISpec) SanitizeProxyPaths(r *http.Request) {
