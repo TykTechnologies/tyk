@@ -53,6 +53,7 @@ tasks:
           gotestsum --no-color=false --hide-summary=skipped --raw-command \
           go test -p 1 -parallel 1 -json {{.testArgs}} {{.args}} -count=1 -v \
           -coverprofile=coverage/{{.package | replace "." "gateway" | replace "/" "-"}}.cov {{.package}} | head -n -2
+      - task: cover:merge
 
   integration-combined:
     dir: '{{.dir}}'

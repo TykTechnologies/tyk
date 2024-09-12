@@ -247,55 +247,6 @@ func (sfr sessionFailReason) String() string {
 	}
 }
 
-<<<<<<< HEAD
-=======
-func (l *SessionLimiter) RateLimitInfo(r *http.Request, api *APISpec, endpoints user.Endpoints) (*user.EndpointRateLimitInfo, bool) {
-	// Hook per-api settings here (m.Spec...)
-	isPrefixMatch := l.config.HttpServerOptions.EnablePathPrefixMatching
-	isSuffixMatch := l.config.HttpServerOptions.EnablePathSuffixMatching
-
-	urlPaths := []string{
-		api.StripListenPath(r.URL.Path),
-		r.URL.Path,
-	}
-
-	for _, endpoint := range endpoints {
-		if !endpoint.Methods.Contains(r.Method) {
-			continue
-		}
-
-		pattern := httputil.PreparePathRegexp(endpoint.Path, isPrefixMatch, isSuffixMatch)
-
-		asRegex, err := regexp.Compile(pattern)
-		if err != nil {
-			log.WithError(err).Error("endpoint rate limit: error compiling regex")
-			continue
-		}
-
-		for _, urlPath := range urlPaths {
-			match := asRegex.MatchString(urlPath)
-			if !match {
-				break
-			}
-
-			for _, endpointMethod := range endpoint.Methods {
-				if !strings.EqualFold(endpointMethod.Name, r.Method) {
-					continue
-				}
-
-				return &user.EndpointRateLimitInfo{
-					KeySuffix: storage.HashStr(fmt.Sprintf("%s:%s", endpointMethod.Name, endpoint.Path)),
-					Rate:      endpointMethod.Limit.Rate,
-					Per:       endpointMethod.Limit.Per,
-				}, true
-			}
-		}
-	}
-	return nil, false
-
-}
-
->>>>>>> 89bcc579d... WIP [TT-12865] Rename config parameter, update usage, support mux params on legacy (#6506)
 // ForwardMessage will enforce rate limiting, returning a non-zero
 // sessionFailReason if session limits have been exceeded.
 // Key values to manage rate are Rate and Per, e.g. Rate of 10 messages
