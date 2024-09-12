@@ -41,14 +41,13 @@ tasks:
     deps: [ clean, deps, plugin:race, plugin:norace, services:up ]
     silent: true
     vars:
-      packageRoot:
+      package:
         sh: go mod edit -json | jq .Module.Path -r
       packages:
-        sh: go list ./... | sed -e 's|{{.packageRoot}}|.|g' | tail -n +2
+        sh: go list ./... | sed -e 's|{{.package}}|.|g'
     cmds:
       - defer: { task: services:down }
       - rm -rf coverage && mkdir -p coverage
-      - echo "Packages:" && echo "{{.packages}}"
       - for: { var: packages, as: package }
         cmd: |-
           gotestsum --no-color=false --hide-summary=skipped --raw-command \
@@ -99,8 +98,6 @@ tasks:
     desc: "Show source coverage"
     aliases: [cov, coverage]
     deps: [cover:merge]
-    status:
-      - test -f coverage/{{.product}}-all.cov
     cmds:
       - go tool cover -func=coverage/{{.product}}-all.cov | summary coverfunc
 
@@ -113,5 +110,7 @@ tasks:
   cover:merge:
     desc: "Merge coverage from e2e tests"
     internal: true
+    status:
+      - test -f coverage/{{.product}}-all.cov
     cmds:
       - gocovmerge coverage/*.cov > coverage/{{.product}}-all.cov
