@@ -44,7 +44,7 @@ tasks:
       package:
         sh: go mod edit -json | jq .Module.Path -r
       packages:
-        sh: go list ./... | sed -e 's|{{.package}}|.|g'
+        sh: go list ./... | tail -n +2 | sed -e 's|{{.package}}|.|g'
     cmds:
       - defer: { task: services:down }
       - rm -rf coverage && mkdir -p coverage

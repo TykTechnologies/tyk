@@ -14,8 +14,8 @@ import (
 func Test_Issue12865(t *testing.T) {
 	t.Run("Wildcard", func(t *testing.T) {
 		ts := gateway.StartTest(func(c *config.Config) {
-			c.HttpServerOptions.EnablePrefixMatching = false
-			c.HttpServerOptions.EnableSuffixMatching = false
+			c.HttpServerOptions.EnablePathPrefixMatching = false
+			c.HttpServerOptions.EnablePathSuffixMatching = false
 		})
 		defer ts.Close()
 
@@ -53,8 +53,8 @@ func Test_Issue12865(t *testing.T) {
 
 	t.Run("Prefix", func(t *testing.T) {
 		ts := gateway.StartTest(func(c *config.Config) {
-			c.HttpServerOptions.EnablePrefixMatching = true
-			c.HttpServerOptions.EnableSuffixMatching = false
+			c.HttpServerOptions.EnablePathPrefixMatching = true
+			c.HttpServerOptions.EnablePathSuffixMatching = false
 		})
 		defer ts.Close()
 
@@ -92,8 +92,8 @@ func Test_Issue12865(t *testing.T) {
 
 	t.Run("Prefix and Suffix", func(t *testing.T) {
 		ts := gateway.StartTest(func(c *config.Config) {
-			c.HttpServerOptions.EnablePrefixMatching = true
-			c.HttpServerOptions.EnableSuffixMatching = true
+			c.HttpServerOptions.EnablePathPrefixMatching = true
+			c.HttpServerOptions.EnablePathSuffixMatching = true
 		})
 		defer ts.Close()
 
@@ -131,8 +131,8 @@ func Test_Issue12865(t *testing.T) {
 
 	t.Run("Suffix", func(t *testing.T) {
 		ts := gateway.StartTest(func(c *config.Config) {
-			c.HttpServerOptions.EnablePrefixMatching = false
-			c.HttpServerOptions.EnableSuffixMatching = true
+			c.HttpServerOptions.EnablePathPrefixMatching = false
+			c.HttpServerOptions.EnablePathSuffixMatching = true
 		})
 		defer ts.Close()
 

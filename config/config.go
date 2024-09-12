@@ -408,7 +408,7 @@ type HttpServerOptionsConfig struct {
 	// Regular expressions and parameterized routes will be left alone regardless of this setting.
 	EnableStrictRoutes bool `json:"enable_strict_routes"`
 
-	// EnablePrefixMatching changes the URL matching from wildcard mode to prefix mode.
+	// EnablePathPrefixMatching changes the URL matching from wildcard mode to prefix mode.
 	// For example, `/json` matches `*/json*` by current default behaviour.
 	// If prefix matching is enabled, the match will be performed as a prefix match (`/json*`).
 	//
@@ -423,16 +423,16 @@ type HttpServerOptionsConfig struct {
 	// - Full listen path and endpoint (`/listen-path/json`)
 	// - Stripped listen path (`/json`) - match.
 	//
-	// For inputs that start with `/`, a prefix match is ensured by prepending
-	// the start of string `^` caret.
+	// For inputs that start with `/`, a prefix match is ensured by
+	// prepending the start of string `^` caret.
 	//
 	// For all other cases, the pattern remains unmodified.
 	//
-	// Combine this option with EnableSuffixMatching to achieve strict
-	// url matching with `/json` being evaluated as `^/json$`.
-	EnablePrefixMatching bool `json:"enable_prefix_matching"`
+	// Combine this option with `enable_path_suffix_matching` to achieve
+	// exact url matching with `/json` being evaluated as `^/json$`.
+	EnablePathPrefixMatching bool `json:"enable_path_prefix_matching"`
 
-	// EnableSuffixMatching changes the URL matching to match as a suffix.
+	// EnablePathSuffixMatching changes the URL matching to match as a suffix.
 	// For example: `/json` is matched as `/json$` against the following paths:
 	//
 	// - Full listen path and versioning URL (`/listen-path/v4/json`)
@@ -444,12 +444,12 @@ type HttpServerOptionsConfig struct {
 	// - Full listen path and endpoint (`/listen-path/json`)
 	// - Stripped listen path (`/json`) - match.
 	//
-	// If the input pattern already ends with a `$` (`/json$`) then
-	// the pattern remains unmodified.
+	// If the input pattern already ends with a `$` (`/json$`)
+	// then the pattern remains unmodified.
 	//
-	// Combine this option with EnablePrefixMatching to achieve strict
-	// url matching with `/json` being evaluated as `^/json$`.
-	EnableSuffixMatching bool `json:"enable_suffix_matching"`
+	// Combine this option with `enable_path_prefix_matching` to achieve
+	// exact url matching with `/json` being evaluated as `^/json$`.
+	EnablePathSuffixMatching bool `json:"enable_path_suffix_matching"`
 
 	// Disable TLS verification. Required if you are using self-signed certificates.
 	SSLInsecureSkipVerify bool `json:"ssl_insecure_skip_verify"`
