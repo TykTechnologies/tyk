@@ -410,13 +410,15 @@ func TestQuota(t *testing.T) {
 
 func TestListener(t *testing.T) {
 	ts := StartTest(nil)
-	defer ts.Close()
-
 	ts.Gw.ReloadTestCase.Enable()
-	defer ts.Gw.ReloadTestCase.Disable()
-
 	ts.Gw.ReloadTestCase.StartTicker()
-	defer ts.Gw.ReloadTestCase.StopTicker()
+
+	defer func() {
+		ts.Gw.ReloadTestCase.StopTicker()
+		ts.Gw.ReloadTestCase.Disable()
+		ts.Close()
+	}()
+
 	tests := []test.TestCase{
 		// Cleanup before tests
 		{Method: "DELETE", Path: "/tyk/apis/test", AdminAuth: true},
@@ -940,10 +942,14 @@ func TestGatewayHealthCheck(t *testing.T) {
 }
 
 func TestCacheAllSafeRequests(t *testing.T) {
+	test.Exclusive(t) // Need to limit parallelism due to DeleteScanMatch.
+
 	ts := StartTest(nil)
-	defer ts.Close()
 	cache := storage.RedisCluster{KeyPrefix: "cache-", ConnectionHandler: ts.Gw.StorageConnectionHandler}
-	defer cache.DeleteScanMatch("*")
+	t.Cleanup(func() {
+		ts.Close()
+		cache.DeleteScanMatch("*")
+	})
 
 	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 		spec.CacheOptions = apidef.CacheOptions{
@@ -966,10 +972,15 @@ func TestCacheAllSafeRequests(t *testing.T) {
 }
 
 func TestCacheAllSafeRequestsWithCachedHeaders(t *testing.T) {
+	test.Exclusive(t) // Need to limit parallelism due to DeleteScanMatch.
+
 	ts := StartTest(nil)
-	defer ts.Close()
 	cache := storage.RedisCluster{KeyPrefix: "cache-", ConnectionHandler: ts.Gw.StorageConnectionHandler}
-	defer cache.DeleteScanMatch("*")
+	t.Cleanup(func() {
+		ts.Close()
+		cache.DeleteScanMatch("*")
+	})
+
 	authorization := "authorization"
 	tenant := "tenant-id"
 
@@ -1007,10 +1018,14 @@ func TestCacheAllSafeRequestsWithCachedHeaders(t *testing.T) {
 }
 
 func TestCacheWithAdvanceUrlRewrite(t *testing.T) {
+	test.Exclusive(t) // Need to limit parallelism due to DeleteScanMatch.
+
 	ts := StartTest(nil)
-	defer ts.Close()
 	cache := storage.RedisCluster{KeyPrefix: "cache-", ConnectionHandler: ts.Gw.StorageConnectionHandler}
-	defer cache.DeleteScanMatch("*")
+	t.Cleanup(func() {
+		ts.Close()
+		cache.DeleteScanMatch("*")
+	})
 
 	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 		version := spec.VersionData.Versions["v1"]
@@ -1062,10 +1077,15 @@ func TestCacheWithAdvanceUrlRewrite(t *testing.T) {
 }
 
 func TestCachePostRequest(t *testing.T) {
+	test.Exclusive(t) // Need to limit parallelism due to DeleteScanMatch.
+
 	ts := StartTest(nil)
-	defer ts.Close()
 	cache := storage.RedisCluster{KeyPrefix: "cache-", ConnectionHandler: ts.Gw.StorageConnectionHandler}
-	defer cache.DeleteScanMatch("*")
+	t.Cleanup(func() {
+		ts.Close()
+		cache.DeleteScanMatch("*")
+	})
+
 	tenant := "tenant-id"
 
 	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
@@ -1104,10 +1124,15 @@ func TestCachePostRequest(t *testing.T) {
 }
 
 func TestAdvanceCachePutRequest(t *testing.T) {
+	test.Exclusive(t) // Need to limit parallelism due to DeleteScanMatch.
+
 	ts := StartTest(nil)
-	defer ts.Close()
 	cache := storage.RedisCluster{KeyPrefix: "cache-", ConnectionHandler: ts.Gw.StorageConnectionHandler}
-	defer cache.DeleteScanMatch("*")
+	t.Cleanup(func() {
+		ts.Close()
+		cache.DeleteScanMatch("*")
+	})
+
 	tenant := "tenant-id"
 
 	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
@@ -1192,10 +1217,14 @@ func TestAdvanceCachePutRequest(t *testing.T) {
 }
 
 func TestCacheAllSafeRequestsWithAdvancedCacheEndpoint(t *testing.T) {
+	test.Exclusive(t) // Need to limit parallelism due to DeleteScanMatch.
+
 	ts := StartTest(nil)
-	defer ts.Close()
 	cache := storage.RedisCluster{KeyPrefix: "cache-", ConnectionHandler: ts.Gw.StorageConnectionHandler}
-	defer cache.DeleteScanMatch("*")
+	t.Cleanup(func() {
+		ts.Close()
+		cache.DeleteScanMatch("*")
+	})
 
 	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 		spec.CacheOptions = apidef.CacheOptions{
@@ -1227,10 +1256,15 @@ func TestCacheAllSafeRequestsWithAdvancedCacheEndpoint(t *testing.T) {
 }
 
 func TestCacheEtag(t *testing.T) {
+	test.Exclusive(t) // Test is exclusive due to deleting all the cache from redis (interference).
+
 	ts := StartTest(nil)
-	defer ts.Close()
 	cache := storage.RedisCluster{KeyPrefix: "cache-", ConnectionHandler: ts.Gw.StorageConnectionHandler}
-	defer cache.DeleteScanMatch("*")
+
+	t.Cleanup(func() {
+		ts.Close()
+		cache.DeleteScanMatch("*")
+	})
 
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Etag", "12345")
@@ -1261,7 +1295,7 @@ func TestCacheEtag(t *testing.T) {
 
 func TestOldCachePlugin(t *testing.T) {
 	ts := StartTest(nil)
-	defer ts.Close()
+	t.Cleanup(ts.Close)
 
 	api := BuildAPI(func(spec *APISpec) {
 		spec.Proxy.ListenPath = "/"
@@ -1280,7 +1314,9 @@ func TestOldCachePlugin(t *testing.T) {
 	check := func(t *testing.T) {
 		t.Helper()
 		cache := storage.RedisCluster{KeyPrefix: "cache-", ConnectionHandler: ts.Gw.StorageConnectionHandler}
-		defer cache.DeleteScanMatch("*")
+		t.Cleanup(func() {
+			cache.DeleteScanMatch("*")
+		})
 
 		ts.Gw.LoadAPI(api)
 		_, _ = ts.Run(t, []test.TestCase{
@@ -1302,10 +1338,14 @@ func TestOldCachePlugin(t *testing.T) {
 }
 
 func TestAdvanceCacheTimeoutPerEndpoint(t *testing.T) {
+	test.Exclusive(t) // Need to limit parallelism due to DeleteScanMatch.
+
 	ts := StartTest(nil)
-	defer ts.Close()
 	cache := storage.RedisCluster{KeyPrefix: "cache-", ConnectionHandler: ts.Gw.StorageConnectionHandler}
-	defer cache.DeleteScanMatch("*")
+	t.Cleanup(func() {
+		ts.Close()
+		cache.DeleteScanMatch("*")
+	})
 
 	extendedPaths := apidef.ExtendedPathsSet{
 		AdvanceCacheConfig: []apidef.CacheMeta{
