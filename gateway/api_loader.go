@@ -426,8 +426,6 @@ func (gw *Gateway) processSpec(spec *APISpec, apisByListen map[string]int,
 
 	gw.mwAppendEnabled(&chainArray, &RateLimitForAPI{BaseMiddleware: baseMid})
 	gw.mwAppendEnabled(&chainArray, &GraphQLMiddleware{BaseMiddleware: baseMid})
-	gw.mwAppendEnabled(&chainArray, &StreamingMiddleware{BaseMiddleware: baseMid})
-
 	if !spec.UseKeylessAccess {
 		gw.mwAppendEnabled(&chainArray, &GraphQLComplexityMiddleware{BaseMiddleware: baseMid})
 		gw.mwAppendEnabled(&chainArray, &GraphQLGranularAccessMiddleware{BaseMiddleware: baseMid})
@@ -948,6 +946,7 @@ func (gw *Gateway) loadApps(specs []*APISpec) {
 	gw.loadControlAPIEndpoints(router)
 
 	muxer.setRouter(port, "", router, gw.GetConfig())
+
 	gs := gw.prepareStorage()
 	shouldTrace := trace.IsEnabled()
 
@@ -997,15 +996,13 @@ func (gw *Gateway) loadApps(specs []*APISpec) {
 
 	gw.DefaultProxyMux.swap(muxer, gw)
 
-	var specsToUnload []*APISpec
-
+	var specsToRelease []*APISpec
 	gw.apisMu.Lock()
 
 	for _, spec := range specs {
 		curSpec, ok := gw.apisByID[spec.APIID]
 		if ok && curSpec != nil && shouldReloadSpec(curSpec, spec) {
-			mainLog.Debugf("Spec %s has changed and needs to be reloaded", curSpec.APIID)
-			specsToUnload = append(specsToUnload, curSpec)
+			specsToRelease = append(specsToRelease, curSpec)
 		}
 
 		// Bind versions to base APIs again
@@ -1021,9 +1018,8 @@ func (gw *Gateway) loadApps(specs []*APISpec) {
 
 	gw.apisMu.Unlock()
 
-	for _, spec := range specsToUnload {
-		mainLog.Debugf("Unloading spec %s", spec.APIID)
-		spec.Unload()
+	for _, spec := range specsToRelease {
+		spec.Release()
 	}
 
 	mainLog.Debug("Checker host list")

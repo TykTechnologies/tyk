@@ -217,7 +217,6 @@ type APISpec struct {
 	AnalyticsPluginConfig    *GoAnalyticsPlugin
 
 	middlewareChain *ChainObject
-	unloadHooks     []func()
 
 	network analytics.NetworkStats
 
@@ -238,16 +237,8 @@ func (a *APISpec) GetSessionLifetimeRespectsKeyExpiration() bool {
 	return a.SessionLifetimeRespectsKeyExpiration
 }
 
-// AddUnloadHook adds a function to be called when the API spec is unloaded
-func (s *APISpec) AddUnloadHook(hook func()) {
-	s.unloadHooks = append(s.unloadHooks, hook)
-}
-
 // Release releases all resources associated with API spec
-func (s *APISpec) Unload() {
-	s.Lock()
-	defer s.Unlock()
-
+func (s *APISpec) Release() {
 	// release circuit breaker resources
 	for _, path := range s.RxPaths {
 		for _, urlSpec := range path {
@@ -276,11 +267,6 @@ func (s *APISpec) Unload() {
 		s.HTTPTransport.transport.CloseIdleConnections()
 		s.HTTPTransport = nil
 	}
-
-	for _, hook := range s.unloadHooks {
-		hook()
-	}
-	s.unloadHooks = nil
 }
 
 // Validate returns nil if s is a valid spec and an error stating why the spec is not valid.
