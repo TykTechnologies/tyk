@@ -163,9 +163,23 @@
           }
         }
       }
+    },
+    "Streaming": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "allow_unsafe": {
+          "type": "array"
+        }
+      }
     }
   },
   "properties": {
+    "streaming": {
+      "$ref": "#/definitions/Streaming"
+    },
     "allow_insecure_configs": {
       "type": "boolean"
     },
@@ -1203,6 +1217,11 @@
     "oas_config": {
       "validate_examples": false,
       "validate_schema_defaults": false
+    },
+    "labs": {
+      "type": ["object", "null"],
+      "additionalProperties": true,
+      "properties": {}
     }
   }
 }
