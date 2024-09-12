@@ -48,6 +48,7 @@ tasks:
     cmds:
       - defer: { task: services:down }
       - rm -rf coverage && mkdir -p coverage
+      - echo "Packages:" && echo "{{.packages}}"
       - for: { var: packages, as: package }
         cmd: |-
           gotestsum --no-color=false --hide-summary=skipped --raw-command \
