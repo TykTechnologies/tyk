@@ -41,7 +41,7 @@ func testKey(testName string, name string) string {
 
 func TestParambasedAuth(t *testing.T) {
 	ts := StartTest(nil)
-	defer ts.Close()
+	t.Cleanup(ts.Close)
 
 	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 		spec.Auth.UseParam = true
@@ -74,7 +74,7 @@ func TestParambasedAuth(t *testing.T) {
 
 func TestStripPathWithURLRewrite(t *testing.T) {
 	ts := StartTest(nil)
-	defer ts.Close()
+	t.Cleanup(ts.Close)
 
 	t.Run("rewrite URL containing listen path", func(t *testing.T) {
 		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
@@ -104,7 +104,7 @@ func TestStripPathWithURLRewrite(t *testing.T) {
 
 func TestSkipTargetPassEscapingOff(t *testing.T) {
 	ts := StartTest(nil)
-	defer ts.Close()
+	t.Cleanup(ts.Close)
 
 	t.Run("With escaping, default", func(t *testing.T) {
 		globalConf := ts.Gw.GetConfig()
@@ -212,7 +212,7 @@ func TestSkipTargetPassEscapingOffWithSkipURLCleaningTrue(t *testing.T) {
 		c.HttpServerOptions.SkipURLCleaning = true
 	}
 	ts := StartTest(conf)
-	defer ts.Close()
+	t.Cleanup(ts.Close)
 
 	ts.TestServerRouter.SkipClean(true)
 
@@ -324,7 +324,7 @@ func TestSkipTargetPassEscapingOffWithSkipURLCleaningTrue(t *testing.T) {
 
 func TestQuota(t *testing.T) {
 	ts := StartTest(nil)
-	defer ts.Close()
+	t.Cleanup(ts.Close)
 
 	var keyID string
 
@@ -407,13 +407,15 @@ func TestQuota(t *testing.T) {
 
 func TestListener(t *testing.T) {
 	ts := StartTest(nil)
-	defer ts.Close()
-
 	ts.Gw.ReloadTestCase.Enable()
-	defer ts.Gw.ReloadTestCase.Disable()
-
 	ts.Gw.ReloadTestCase.StartTicker()
-	defer ts.Gw.ReloadTestCase.StopTicker()
+
+	t.Cleanup(func() {
+		ts.Gw.ReloadTestCase.StopTicker()
+		ts.Gw.ReloadTestCase.Disable()
+		ts.Close()
+	})
+
 	tests := []test.TestCase{
 		// Cleanup before tests
 		{Method: "DELETE", Path: "/tyk/apis/test", AdminAuth: true},
@@ -446,7 +448,7 @@ func TestListenerWithStrictRoutes(t *testing.T) {
 	ts := StartTest(func(globalConf *config.Config) {
 		globalConf.HttpServerOptions.EnableStrictRoutes = true
 	})
-	defer ts.Close()
+	t.Cleanup(ts.Close)
 
 	ts.Gw.ReloadTestCase.Enable()
 	defer ts.Gw.ReloadTestCase.Disable()
@@ -486,7 +488,7 @@ func TestControlListener(t *testing.T) {
 	ts := StartTest(nil, TestConfig{
 		SeparateControlAPI: true,
 	})
-	defer ts.Close()
+	t.Cleanup(ts.Close)
 
 	tests := []test.TestCase{
 		{Method: "GET", Path: "/", Code: 404},
@@ -523,7 +525,7 @@ func TestHttpPprof(t *testing.T) {
 		ts := StartTest(conf, TestConfig{
 			SeparateControlAPI: true,
 		})
-		defer ts.Close()
+		t.Cleanup(ts.Close)
 
 		_, _ = ts.Run(t, []test.TestCase{
 			{Path: "/debug/pprof/", Code: 404},
@@ -538,7 +540,7 @@ func TestHttpPprof(t *testing.T) {
 		ts := StartTest(conf, TestConfig{
 			SeparateControlAPI: true,
 		})
-		defer ts.Close()
+		t.Cleanup(ts.Close)
 
 		_, _ = ts.Run(t, []test.TestCase{
 			{Path: "/debug/pprof/", Code: 404},
@@ -550,7 +552,7 @@ func TestHttpPprof(t *testing.T) {
 
 func TestManagementNodeRedisEvents(t *testing.T) {
 	ts := StartTest(nil)
-	defer ts.Close()
+	t.Cleanup(ts.Close)
 
 	globalConf := ts.Gw.GetConfig()
 	globalConf.ManagementNode = false
@@ -625,7 +627,7 @@ func TestManagementNodeRedisEvents(t *testing.T) {
 
 func TestListenPathTykPrefix(t *testing.T) {
 	ts := StartTest(nil)
-	defer ts.Close()
+	t.Cleanup(ts.Close)
 
 	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 		spec.Proxy.ListenPath = "/tyk-foo/"
@@ -656,7 +658,7 @@ func TestReloadGoroutineLeakWithTest(t *testing.T) {
 
 func TestReloadGoroutineLeakWithCircuitBreaker(t *testing.T) {
 	ts := StartTest(nil)
-	defer ts.Close()
+	t.Cleanup(ts.Close)
 
 	globalConf := ts.Gw.GetConfig()
 	globalConf.EnableJSVM = false
@@ -718,7 +720,7 @@ func TestProxyProtocol(t *testing.T) {
 	defer l.Close()
 	go listenProxyProto(l)
 	ts := StartTest(nil)
-	defer ts.Close()
+	t.Cleanup(ts.Close)
 	rp, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatal(err)
@@ -762,7 +764,7 @@ func TestProxyProtocol(t *testing.T) {
 
 func TestProxyUserAgent(t *testing.T) {
 	ts := StartTest(nil)
-	defer ts.Close()
+	t.Cleanup(ts.Close)
 
 	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 		spec.Proxy.ListenPath = "/"
@@ -782,7 +784,7 @@ func TestProxyUserAgent(t *testing.T) {
 
 func TestSkipUrlCleaning(t *testing.T) {
 	ts := StartTest(nil)
-	defer ts.Close()
+	t.Cleanup(ts.Close)
 
 	globalConf := ts.Gw.GetConfig()
 	globalConf.HttpServerOptions.OverrideDefaults = true
@@ -806,7 +808,7 @@ func TestSkipUrlCleaning(t *testing.T) {
 
 func TestMultiTargetProxy(t *testing.T) {
 	ts := StartTest(nil)
-	defer ts.Close()
+	t.Cleanup(ts.Close)
 
 	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 		spec.VersionData.NotVersioned = false
@@ -836,7 +838,7 @@ func TestMultiTargetProxy(t *testing.T) {
 
 func TestCustomDomain(t *testing.T) {
 	ts := StartTest(nil)
-	defer ts.Close()
+	t.Cleanup(ts.Close)
 
 	localClient := test.NewClientLocal()
 
@@ -891,7 +893,7 @@ func TestGatewayHealthCheck(t *testing.T) {
 
 	t.Run("control api port == listen port", func(t *testing.T) {
 		ts := StartTest(nil)
-		defer ts.Close()
+		t.Cleanup(ts.Close)
 
 		t.Run("Without APIs", func(t *testing.T) {
 			_, _ = ts.Run(t, []test.TestCase{
@@ -914,7 +916,7 @@ func TestGatewayHealthCheck(t *testing.T) {
 		ts := StartTest(nil, TestConfig{
 			SeparateControlAPI: true,
 		})
-		defer ts.Close()
+		t.Cleanup(ts.Close)
 
 		t.Run("Without APIs", func(t *testing.T) {
 			_, _ = ts.Run(t, []test.TestCase{
@@ -937,10 +939,14 @@ func TestGatewayHealthCheck(t *testing.T) {
 }
 
 func TestCacheAllSafeRequests(t *testing.T) {
+	test.Exclusive(t) // Need to limit parallelism due to DeleteScanMatch.
+
 	ts := StartTest(nil)
-	defer ts.Close()
 	cache := storage.RedisCluster{KeyPrefix: "cache-", ConnectionHandler: ts.Gw.StorageConnectionHandler}
-	defer cache.DeleteScanMatch("*")
+	t.Cleanup(func() {
+		ts.Close()
+		cache.DeleteScanMatch("*")
+	})
 
 	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 		spec.CacheOptions = apidef.CacheOptions{
@@ -963,10 +969,15 @@ func TestCacheAllSafeRequests(t *testing.T) {
 }
 
 func TestCacheAllSafeRequestsWithCachedHeaders(t *testing.T) {
+	test.Exclusive(t) // Need to limit parallelism due to DeleteScanMatch.
+
 	ts := StartTest(nil)
-	defer ts.Close()
 	cache := storage.RedisCluster{KeyPrefix: "cache-", ConnectionHandler: ts.Gw.StorageConnectionHandler}
-	defer cache.DeleteScanMatch("*")
+	t.Cleanup(func() {
+		ts.Close()
+		cache.DeleteScanMatch("*")
+	})
+
 	authorization := "authorization"
 	tenant := "tenant-id"
 
@@ -1004,10 +1015,14 @@ func TestCacheAllSafeRequestsWithCachedHeaders(t *testing.T) {
 }
 
 func TestCacheWithAdvanceUrlRewrite(t *testing.T) {
+	test.Exclusive(t) // Need to limit parallelism due to DeleteScanMatch.
+
 	ts := StartTest(nil)
-	defer ts.Close()
 	cache := storage.RedisCluster{KeyPrefix: "cache-", ConnectionHandler: ts.Gw.StorageConnectionHandler}
-	defer cache.DeleteScanMatch("*")
+	t.Cleanup(func() {
+		ts.Close()
+		cache.DeleteScanMatch("*")
+	})
 
 	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 		version := spec.VersionData.Versions["v1"]
@@ -1059,10 +1074,15 @@ func TestCacheWithAdvanceUrlRewrite(t *testing.T) {
 }
 
 func TestCachePostRequest(t *testing.T) {
+	test.Exclusive(t) // Need to limit parallelism due to DeleteScanMatch.
+
 	ts := StartTest(nil)
-	defer ts.Close()
 	cache := storage.RedisCluster{KeyPrefix: "cache-", ConnectionHandler: ts.Gw.StorageConnectionHandler}
-	defer cache.DeleteScanMatch("*")
+	t.Cleanup(func() {
+		ts.Close()
+		cache.DeleteScanMatch("*")
+	})
+
 	tenant := "tenant-id"
 
 	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
@@ -1101,10 +1121,15 @@ func TestCachePostRequest(t *testing.T) {
 }
 
 func TestAdvanceCachePutRequest(t *testing.T) {
+	test.Exclusive(t) // Need to limit parallelism due to DeleteScanMatch.
+
 	ts := StartTest(nil)
-	defer ts.Close()
 	cache := storage.RedisCluster{KeyPrefix: "cache-", ConnectionHandler: ts.Gw.StorageConnectionHandler}
-	defer cache.DeleteScanMatch("*")
+	t.Cleanup(func() {
+		ts.Close()
+		cache.DeleteScanMatch("*")
+	})
+
 	tenant := "tenant-id"
 
 	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
@@ -1189,10 +1214,14 @@ func TestAdvanceCachePutRequest(t *testing.T) {
 }
 
 func TestCacheAllSafeRequestsWithAdvancedCacheEndpoint(t *testing.T) {
+	test.Exclusive(t) // Need to limit parallelism due to DeleteScanMatch.
+
 	ts := StartTest(nil)
-	defer ts.Close()
 	cache := storage.RedisCluster{KeyPrefix: "cache-", ConnectionHandler: ts.Gw.StorageConnectionHandler}
-	defer cache.DeleteScanMatch("*")
+	t.Cleanup(func() {
+		ts.Close()
+		cache.DeleteScanMatch("*")
+	})
 
 	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 		spec.CacheOptions = apidef.CacheOptions{
@@ -1224,10 +1253,15 @@ func TestCacheAllSafeRequestsWithAdvancedCacheEndpoint(t *testing.T) {
 }
 
 func TestCacheEtag(t *testing.T) {
+	test.Exclusive(t) // Test is exclusive due to deleting all the cache from redis (interference).
+
 	ts := StartTest(nil)
-	defer ts.Close()
 	cache := storage.RedisCluster{KeyPrefix: "cache-", ConnectionHandler: ts.Gw.StorageConnectionHandler}
-	defer cache.DeleteScanMatch("*")
+
+	t.Cleanup(func() {
+		ts.Close()
+		cache.DeleteScanMatch("*")
+	})
 
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Etag", "12345")
@@ -1257,8 +1291,7 @@ func TestCacheEtag(t *testing.T) {
 }
 
 func TestOldCachePlugin(t *testing.T) {
-	ts := StartTest(nil)
-	defer ts.Close()
+	test.Exclusive(t) // Test uses cache-* while other tests delete it.
 
 	api := BuildAPI(func(spec *APISpec) {
 		spec.Proxy.ListenPath = "/"
@@ -1275,8 +1308,14 @@ func TestOldCachePlugin(t *testing.T) {
 	headerCache := map[string]string{"x-tyk-cached-response": "1"}
 
 	check := func(t *testing.T) {
+		t.Helper()
+
+		ts := StartTest(nil)
 		cache := storage.RedisCluster{KeyPrefix: "cache-", ConnectionHandler: ts.Gw.StorageConnectionHandler}
-		defer cache.DeleteScanMatch("*")
+		t.Cleanup(func() {
+			ts.Close()
+			cache.DeleteScanMatch("*")
+		})
 
 		ts.Gw.LoadAPI(api)
 		_, _ = ts.Run(t, []test.TestCase{
@@ -1298,10 +1337,14 @@ func TestOldCachePlugin(t *testing.T) {
 }
 
 func TestAdvanceCacheTimeoutPerEndpoint(t *testing.T) {
+	test.Exclusive(t) // Need to limit parallelism due to DeleteScanMatch.
+
 	ts := StartTest(nil)
-	defer ts.Close()
 	cache := storage.RedisCluster{KeyPrefix: "cache-", ConnectionHandler: ts.Gw.StorageConnectionHandler}
-	defer cache.DeleteScanMatch("*")
+	t.Cleanup(func() {
+		ts.Close()
+		cache.DeleteScanMatch("*")
+	})
 
 	extendedPaths := apidef.ExtendedPathsSet{
 		AdvanceCacheConfig: []apidef.CacheMeta{
@@ -1345,7 +1388,7 @@ func TestAdvanceCacheTimeoutPerEndpoint(t *testing.T) {
 
 func TestWebsocketsSeveralOpenClose(t *testing.T) {
 	ts := StartTest(nil)
-	defer ts.Close()
+	t.Cleanup(ts.Close)
 
 	globalConf := ts.Gw.GetConfig()
 	globalConf.HttpServerOptions.EnableWebSockets = true
@@ -1442,7 +1485,7 @@ func TestWebsocketsSeveralOpenClose(t *testing.T) {
 
 func TestWebsocketsAndHTTPEndpointMatch(t *testing.T) {
 	ts := StartTest(nil)
-	defer ts.Close()
+	t.Cleanup(ts.Close)
 
 	globalConf := ts.Gw.GetConfig()
 	globalConf.HttpServerOptions.EnableWebSockets = true
@@ -1575,7 +1618,7 @@ func createTestUptream(t *testing.T, allowedConns int, readsPerConn int) net.Lis
 
 func TestKeepAliveConns(t *testing.T) {
 	ts := StartTest(nil)
-	defer ts.Close()
+	t.Cleanup(ts.Close)
 
 	t.Run("Should use same connection", func(t *testing.T) {
 		// set keep alive option
@@ -1654,7 +1697,7 @@ func TestKeepAliveConns(t *testing.T) {
 // API's global rate limit.
 func TestRateLimitForAPIAndRateLimitAndQuotaCheck(t *testing.T) {
 	ts := StartTest(nil)
-	defer ts.Close()
+	t.Cleanup(ts.Close)
 
 	globalCfg := ts.Gw.GetConfig()
 	globalCfg.EnableNonTransactionalRateLimiter = false
@@ -1695,7 +1738,7 @@ func TestRateLimitForAPIAndRateLimitAndQuotaCheck(t *testing.T) {
 
 func TestTracing(t *testing.T) {
 	ts := StartTest(nil)
-	defer ts.Close()
+	t.Cleanup(ts.Close)
 
 	ts.Gw.prepareStorage()
 
@@ -1752,7 +1795,7 @@ func TestBrokenClients(t *testing.T) {
 		gwConf.ProxyDefaultTimeout = 1
 	}
 	ts := StartTest(conf)
-	defer ts.Close()
+	t.Cleanup(ts.Close)
 
 	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 		spec.UseKeylessAccess = true
@@ -1798,7 +1841,7 @@ func TestCache_singleErrorResponse(t *testing.T) {
 	}))
 
 	ts := StartTest(nil)
-	defer ts.Close()
+	t.Cleanup(ts.Close)
 
 	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 		spec.UseKeylessAccess = true
@@ -1831,7 +1874,7 @@ func TestCache_singleErrorResponse(t *testing.T) {
 
 func TestOverrideErrors(t *testing.T) {
 	ts := StartTest(nil)
-	defer ts.Close()
+	t.Cleanup(ts.Close)
 
 	defer defaultTykErrors()
 
