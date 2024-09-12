@@ -41,10 +41,10 @@ tasks:
     deps: [ clean, deps, plugin:race, plugin:norace, services:up ]
     silent: true
     vars:
-      package:
+      packageRoot:
         sh: go mod edit -json | jq .Module.Path -r
       packages:
-        sh: go list ./... | tail -n +2 | sed -e 's|{{.package}}|.|g'
+        sh: go list ./... | sed -e 's|{{.packageRoot}}|.|g' | tail -n +2
     cmds:
       - defer: { task: services:down }
       - rm -rf coverage && mkdir -p coverage
