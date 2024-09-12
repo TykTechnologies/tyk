@@ -20,8 +20,8 @@ func Test_Issue11806_DomainRouting(t *testing.T) {
 		conf.EnableCustomDomains = true
 	}
 
-	noDomain := loadAPISpec(t, "testdata/issue-11806-api-no-domain.json")
-	withDomain := loadAPISpec(t, "testdata/issue-11806-api-with-domain.json")
+	noDomain := LoadAPISpec(t, "testdata/issue-11806-api-no-domain.json")
+	withDomain := LoadAPISpec(t, "testdata/issue-11806-api-with-domain.json")
 
 	t.Run("Load listenPath without domain first", func(t *testing.T) {
 		ts := gateway.StartTest(testConfig)
