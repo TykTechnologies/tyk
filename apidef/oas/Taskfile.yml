@@ -18,9 +18,7 @@ tasks:
   lint:
     desc: "Ensure linter pass"
     cmds:
-      - defer: rm -f schema.json
-      - schema-gen extract || true
-      - schema-gen lint --summary || true
+      - schema-gen extract -o - | schema-gen lint --summary -i -
 
   deps:
     desc: "Update deps"
