@@ -1326,7 +1326,6 @@ func (s *Test) RemoveApis() error {
 	}
 
 	err := os.RemoveAll(s.Gw.GetConfig().AppPath)
-
 	if err != nil {
 		log.WithError(err).Error("removing apis from gw")
 	}

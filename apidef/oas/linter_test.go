@@ -78,7 +78,7 @@ func TestXTykGateway_Lint(t *testing.T) {
 			settings.Server.EventHandlers[i].Webhook.CoolDownPeriod = ReadableDuration(time.Second * 20)
 		}
 
-		for idx := range settings.Middleware.Operations {
+		for idx, _ := range settings.Middleware.Operations {
 			settings.Middleware.Operations[idx].CircuitBreaker.Threshold = 0.5
 		}
 
