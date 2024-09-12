@@ -550,6 +550,12 @@
         "enable_strict_routes": {
           "type": "boolean"
         },
+        "enable_prefix_matching": {
+          "type": "boolean"
+        },
+        "enable_suffix_matching": {
+          "type": "boolean"
+        },
         "flush_interval": {
           "type": "integer"
         },
