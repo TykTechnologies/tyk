@@ -544,15 +544,12 @@
         "enable_strict_routes": {
           "type": "boolean"
         },
-<<<<<<< HEAD
-=======
         "enable_path_prefix_matching": {
           "type": "boolean"
         },
         "enable_path_suffix_matching": {
           "type": "boolean"
         },
->>>>>>> 89bcc579d... WIP [TT-12865] Rename config parameter, update usage, support mux params on legacy (#6506)
         "flush_interval": {
           "type": "integer"
         },

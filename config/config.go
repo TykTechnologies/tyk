@@ -403,8 +403,6 @@ type HttpServerOptionsConfig struct {
 	// Regular expressions and parameterized routes will be left alone regardless of this setting.
 	EnableStrictRoutes bool `json:"enable_strict_routes"`
 
-<<<<<<< HEAD
-=======
 	// EnablePathPrefixMatching changes the URL matching from wildcard mode to prefix mode.
 	// For example, `/json` matches `*/json*` by current default behaviour.
 	// If prefix matching is enabled, the match will be performed as a prefix match (`/json*`).
@@ -448,7 +446,6 @@ type HttpServerOptionsConfig struct {
 	// exact url matching with `/json` being evaluated as `^/json$`.
 	EnablePathSuffixMatching bool `json:"enable_path_suffix_matching"`
 
->>>>>>> 89bcc579d... WIP [TT-12865] Rename config parameter, update usage, support mux params on legacy (#6506)
 	// Disable TLS verification. Required if you are using self-signed certificates.
 	SSLInsecureSkipVerify bool `json:"ssl_insecure_skip_verify"`
 
