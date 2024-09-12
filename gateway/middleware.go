@@ -58,10 +58,6 @@ type TykMiddleware interface {
 	ProcessRequest(w http.ResponseWriter, r *http.Request, conf interface{}) (error, int) // Handles request
 	EnabledForSpec() bool
 	Name() string
-
-	GetSpec() *APISpec
-
-	Unload()
 }
 
 type TraceMiddleware struct {
@@ -128,9 +124,6 @@ func (gw *Gateway) createMiddleware(actualMW TykMiddleware) func(http.Handler) h
 	mw.SetName(mw.Name())
 	mw.Logger().Debug("Init")
 
-	spec := mw.GetSpec()
-	spec.AddUnloadHook(actualMW.Unload)
-
 	// Pull the configuration
 	mwConf, err := mw.Config()
 	if err != nil {
@@ -165,7 +158,7 @@ func (gw *Gateway) createMiddleware(actualMW TykMiddleware) func(http.Handler) h
 			}
 
 			startTime := time.Now()
-			mw.Logger().WithField("ts", startTime.UnixNano()).WithField("mw", mw.Name()).Debug("Started")
+			mw.Logger().WithField("ts", startTime.UnixNano()).Debug("Started")
 
 			if mw.Base().Spec.CORS.OptionsPassthrough && r.Method == "OPTIONS" {
 				h.ServeHTTP(w, r)
@@ -173,7 +166,6 @@ func (gw *Gateway) createMiddleware(actualMW TykMiddleware) func(http.Handler) h
 			}
 
 			err, errCode := mw.ProcessRequest(w, r, mwConf)
-
 			if err != nil {
 				writeResponse := true
 				// Prevent double error write
@@ -277,12 +269,6 @@ func (t *BaseMiddleware) EnabledForSpec() bool {
 }
 func (t *BaseMiddleware) Config() (interface{}, error) {
 	return nil, nil
-}
-
-func (t *BaseMiddleware) Unload() {}
-
-func (t *BaseMiddleware) GetSpec() *APISpec {
-	return t.Spec
 }
 
 func (t *BaseMiddleware) OrgSession(orgID string) (user.SessionState, bool) {

@@ -53,11 +53,9 @@ tyk-gateway.pid
 *.go-e
 
 tyk_linux_*
-.aider*
 /dist/
 
 .terraform**
-.terraform.lock.hcl
 .task/
 *.test
 
