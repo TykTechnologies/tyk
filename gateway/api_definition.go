@@ -824,8 +824,8 @@ func (a APIDefinitionLoader) generateRegex(stringSpec string, newSpec *URLSpec, 
 		err     error
 	)
 	// Hook per-api settings here via newSpec *URLSpec
-	isPrefixMatch := conf.HttpServerOptions.EnablePrefixMatching
-	isSuffixMatch := conf.HttpServerOptions.EnableSuffixMatching
+	isPrefixMatch := conf.HttpServerOptions.EnablePathPrefixMatching
+	isSuffixMatch := conf.HttpServerOptions.EnablePathSuffixMatching
 	isIgnoreCase := newSpec.IgnoreCase || conf.IgnoreEndpointCase
 
 	pattern = httputil.PreparePathRegexp(stringSpec, isPrefixMatch, isSuffixMatch)
