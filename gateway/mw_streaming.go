@@ -127,6 +127,67 @@ func (s *StreamingMiddleware) createStreamManager(r *http.Request) *StreamManage
 	return newStreamManager
 }
 
+func HasHttp(config map[string]interface{}) bool {
+	for key := range config {
+		keyConfig := config[key]
+		keyConfigMap, ok := keyConfig.(map[string]interface{})
+		if !ok {
+			continue
+		}
+
+		if _, found := keyConfigMap["http_server"]; found {
+			return true
+		}
+	}
+	return false
+}
+
+func GetHTTPPaths(streamConfig map[string]interface{}) (map[string]string, error) {
+	paths := map[string]string{}
+	defaultPaths := map[string]map[string]string{
+		"output": {
+			"path":        "/get",
+			"stream_path": "/get/stream",
+			"ws_path":     "/get/ws",
+		},
+		"input": {
+			"path":    "/post",
+			"ws_path": "/post/ws",
+		},
+	}
+	for component := range defaultPaths {
+		componentPaths := defaultPaths[component]
+		compConfig, ok := streamConfig[component]
+		if !ok {
+			paths = append(paths, componentPaths...)
+		}
+	}
+
+	paths := defaultPaths[component]
+
+	if compConfig, found := parsedConfig[component]; found {
+		compMap, ok := compConfig.(map[interface{}]interface{})
+		if !ok {
+			return paths, nil
+		}
+
+		if http, found := compMap["http_server"]; found {
+			httpMap, ok := http.(map[interface{}]interface{})
+			if !ok {
+				return paths, nil
+			}
+
+			for key := range paths {
+				if p, found := httpMap[key]; found && p != "" {
+					paths[key], _ = p.(string)
+				}
+			}
+		}
+	}
+
+	return paths, nil
+}
+
 // getStreamsConfig extracts streaming configurations from an API spec if available.
 func (s *StreamingMiddleware) getStreamsConfig(r *http.Request) map[string]interface{} {
 	streamConfigs := make(map[string]interface{})
@@ -176,7 +237,12 @@ func (sm *StreamManager) createStream(streamID string, config map[string]interfa
 	sm.mw.Logger().Debugf("Creating stream: %s", streamFullID)
 
 	stream := streaming.NewStream(sm.mw.allowedUnsafe)
-	err := stream.Start(config, &handleFuncAdapter{mw: sm.mw, streamID: streamFullID, muxer: sm.muxer, sm: sm})
+	err := stream.LoadConfig(config, &handleFuncAdapter{mw: sm.mw, streamID: streamFullID, muxer: sm.muxer, sm: sm})
+	if err != nil {
+		sm.mw.Logger().Error("Failed to load stream config: %v", err)
+	}
+
+	err = stream.Start()
 	if err != nil {
 		sm.mw.Logger().Errorf("Failed to start stream %s: %v", streamFullID, err)
 		return err
