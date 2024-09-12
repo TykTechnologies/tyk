@@ -1296,9 +1296,6 @@ func TestCacheEtag(t *testing.T) {
 func TestOldCachePlugin(t *testing.T) {
 	test.Exclusive(t) // Test uses cache-* while other tests delete it.
 
-	ts := StartTest(nil)
-	t.Cleanup(ts.Close)
-
 	api := BuildAPI(func(spec *APISpec) {
 		spec.Proxy.ListenPath = "/"
 		UpdateAPIVersion(spec, "v1", func(version *apidef.VersionInfo) {
@@ -1315,8 +1312,11 @@ func TestOldCachePlugin(t *testing.T) {
 
 	check := func(t *testing.T) {
 		t.Helper()
+
+		ts := StartTest(nil)
 		cache := storage.RedisCluster{KeyPrefix: "cache-", ConnectionHandler: ts.Gw.StorageConnectionHandler}
 		t.Cleanup(func() {
+			ts.Close()
 			cache.DeleteScanMatch("*")
 		})
 
