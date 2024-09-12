@@ -1294,6 +1294,8 @@ func TestCacheEtag(t *testing.T) {
 }
 
 func TestOldCachePlugin(t *testing.T) {
+	test.Exclusive(t) // Test uses cache-* while other tests delete it.
+
 	ts := StartTest(nil)
 	t.Cleanup(ts.Close)
 
