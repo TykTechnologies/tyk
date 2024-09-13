@@ -29,6 +29,105 @@ import (
 	"github.com/TykTechnologies/tyk/test"
 )
 
+func TestGetHTTPPaths(t *testing.T) {
+	testCases := []struct {
+		name     string
+		config   map[string]interface{}
+		expected []string
+	}{
+		{
+			name: "should get paths",
+			config: map[string]interface{}{
+				"input": map[string]interface{}{
+					"http_server": map[string]interface{}{
+						"path": "/post",
+					},
+					"label": "example_generator_input",
+				},
+				"output": map[string]interface{}{
+					"http_server": map[string]interface{}{
+						"ws_path":     "/subscribe",
+						"stream_path": "/stream",
+					},
+					"label": "example_generator_output",
+				},
+			},
+			expected: []string{"/subscribe", "/post", "/stream"},
+		},
+		{
+			name: "no http_server",
+			config: map[string]interface{}{
+				"input": map[string]interface{}{
+					"kafka": map[string]interface{}{
+						"consumer_group": "test",
+					},
+				},
+				"output": map[string]interface{}{
+					"test": map[string]interface{}{
+						"field": "value",
+					},
+				},
+			},
+			expected: []string{},
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			httpPaths := GetHTTPPaths(tc.config)
+			assert.ElementsMatch(t, tc.expected, httpPaths)
+		})
+	}
+}
+
+func TestHasHttp(t *testing.T) {
+	testCases := []struct {
+		name     string
+		config   map[string]interface{}
+		expected bool
+	}{
+		{
+			name: "should get paths",
+			config: map[string]interface{}{
+				"input": map[string]interface{}{
+					"http_server": map[string]interface{}{
+						"path": "/post",
+					},
+					"label": "example_generator_input",
+				},
+				"output": map[string]interface{}{
+					"http_server": map[string]interface{}{
+						"ws_path":     "/subscribe",
+						"stream_path": "/stream",
+					},
+					"label": "example_generator_output",
+				},
+			},
+			expected: true,
+		},
+		{
+			name: "no http_server",
+			config: map[string]interface{}{
+				"input": map[string]interface{}{
+					"kafka": map[string]interface{}{
+						"consumer_group": "test",
+					},
+				},
+				"output": map[string]interface{}{
+					"test": map[string]interface{}{
+						"field": "value",
+					},
+				},
+			},
+			expected: false,
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			assert.Equal(t, tc.expected, HasHttp(tc.config))
+		})
+	}
+}
+
 // ConvertYAMLToJSON converts a YAML byte slice to a JSON byte slice
 func ConvertYAMLToJSON(yamlData []byte) ([]byte, error) {
 	var rawData interface{}
