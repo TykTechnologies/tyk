@@ -1134,15 +1134,15 @@ type Config struct {
 
 	Streaming StreamingConfig `json:"streaming"`
 
-	Labs labsConfig `json:"labs"`
+	Labs LabsConfig `json:"labs"`
 }
 
-type labsConfig map[string]interface{}
+type LabsConfig map[string]interface{}
 
-func (lc *labsConfig) Decode(value string) error {
+func (lc *LabsConfig) Decode(value string) error {
 	var temp map[string]interface{}
 	if err := json.Unmarshal([]byte(value), &temp); err != nil {
-		log.Error("Error unmarshalling labsConfig: ", err)
+		log.Error("Error unmarshalling LabsConfig: ", err)
 		return err
 	}
 	*lc = temp
