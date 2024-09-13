@@ -11,8 +11,8 @@ import (
 	"github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v2"
 
-	_ "github.com/TykTechnologies/benthos/v4/public/components/all"
-	"github.com/TykTechnologies/benthos/v4/public/service"
+	_ "github.com/warpstreamlabs/bento/public/components/all"
+	"github.com/warpstreamlabs/bento/public/service"
 
 	_ "github.com/TykTechnologies/tyk/internal/portal"
 )
