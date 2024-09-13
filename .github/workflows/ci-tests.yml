@@ -39,6 +39,13 @@ jobs:
         with:
             python-version: ${{ matrix.python-version }}
 
+      - name: Setup CI Tooling
+        uses: shrink/actions-docker-extract@v3
+        with:
+          image: tykio/ci-tools:latest
+          path: /usr/local/bin/task
+          destination: /usr/local/bin
+
       - name: Install Dependencies and basic hygiene test
         id: hygiene
         run: |
@@ -66,11 +73,9 @@ jobs:
       - name: Fetch base branch
         if: ${{ github.event_name == 'pull_request' }}
         run: git fetch origin ${{ github.base_ref }}
-      - name: Start Redis
-        uses: supercharge/redis-github-action@1.2.0
-        with:
-          redis-version: ${{ matrix.redis-version }}
 
+      - name: Start test services
+        run: task services:up
 
       - name: Cache
         uses: actions/cache@v2
@@ -87,6 +92,9 @@ jobs:
           result_code=${PIPESTATUS[0]}
           echo "log=$(sed -ze 's/%/%25/g;s/\n/%0A/g' test.log)" >> $GITHUB_OUTPUT
           exit $result_code
+
+      - name: Stop test services
+        run: task services:down
 
       - name: Notify status
         if: ${{ failure() && github.event.pull_request.number }}

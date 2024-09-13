@@ -2,6 +2,9 @@
 version: "3"
 
 includes:
+  services:
+    taskfile: docker/services/Taskfile.yml
+    dir: docker/services/
   deps: ./.taskfiles/deps/Taskfile.yml
   tracetest: ./.taskfiles/tracetest/Taskfile.yml
 
