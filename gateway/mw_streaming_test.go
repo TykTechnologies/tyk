@@ -244,7 +244,6 @@ func TestStreamingAPISingleClient(t *testing.T) {
 	}
 }
 func TestStreamingAPIMultipleClients(t *testing.T) {
-	t.Skip()
 	ctx := context.Background()
 
 	natsContainer, err := natscon.Run(
@@ -498,7 +497,6 @@ func TestAsyncAPIHttp(t *testing.T) {
 		{"StaticGroup", "static-group", "default", false},
 		{"DynamicGroup", "$tyk_context.request_id", "dynamic", true},
 	}
-	t.Skip()
 	ctx := context.Background()
 	kafkaContainer, err := kafka.Run(ctx, "confluentinc/confluent-local:7.5.0")
 	if err != nil {

@@ -155,69 +155,6 @@ func (s *Stream) Reset() error {
 	return s.Stop()
 }
 
-func (s *Stream) HasHttp(component string) bool {
-	var parsedConfig map[string]interface{}
-	if err := yaml.Unmarshal([]byte(s.streamConfig), &parsedConfig); err != nil {
-		return false
-	}
-
-	componentConfig, ok := parsedConfig[component]
-	if !ok {
-		return false
-	}
-
-	compMap, ok := componentConfig.(map[string]interface{})
-	if !ok {
-		return false
-	}
-
-	fmt.Println(compMap)
-	return false
-}
-
-func (s *Stream) GetHTTPPaths(component string) (map[string]string, error) {
-	var parsedConfig map[string]interface{}
-	if err := yaml.Unmarshal([]byte(s.streamConfig), &parsedConfig); err != nil {
-		return nil, err
-	}
-
-	defaultPaths := map[string]map[string]string{
-		"output": {
-			"path":        "/get",
-			"stream_path": "/get/stream",
-			"ws_path":     "/get/ws",
-		},
-		"input": {
-			"path":    "/post",
-			"ws_path": "/post/ws",
-		},
-	}
-
-	paths := defaultPaths[component]
-
-	if compConfig, found := parsedConfig[component]; found {
-		compMap, ok := compConfig.(map[interface{}]interface{})
-		if !ok {
-			return paths, nil
-		}
-
-		if http, found := compMap["http_server"]; found {
-			httpMap, ok := http.(map[interface{}]interface{})
-			if !ok {
-				return paths, nil
-			}
-
-			for key := range paths {
-				if p, found := httpMap[key]; found && p != "" {
-					paths[key], _ = p.(string)
-				}
-			}
-		}
-	}
-
-	return paths, nil
-}
-
 var unsafeComponents = []string{
 	// Inputs
 	"csv", "dynamic", "file", "inproc", "socket", "socket_server", "stdin", "subprocess",
