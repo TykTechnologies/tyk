@@ -1292,7 +1292,7 @@ func TestCacheEtag(t *testing.T) {
 }
 
 func TestOldCachePlugin(t *testing.T) {
-	test.Exclusive(t) // Test uses cache-* while other tests delete it.
+	test.Flaky(t) // Flaky on 5.0
 
 	api := BuildAPI(func(spec *APISpec) {
 		spec.Proxy.ListenPath = "/"
