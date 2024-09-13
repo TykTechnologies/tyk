@@ -106,7 +106,7 @@ func TestWhitelist(t *testing.T) {
 
 		ts.Run(t, []test.TestCase{
 			// Should mock path
-			{Path: "/reply/", Code: http.StatusOK, BodyMatch: "flump"},
+			{Path: "/reply/", Code: http.StatusForbidden},
 			{Path: "/reply/123", Code: http.StatusOK, BodyMatch: "flump"},
 			// Should get original upstream response
 			{Path: "/get", Code: http.StatusOK, BodyMatch: `"Url":"/get"`},
@@ -147,14 +147,14 @@ func TestWhitelist(t *testing.T) {
 
 		ts.Run(t, []test.TestCase{
 			{Path: "/foo", Code: http.StatusForbidden},
-			{Path: "/foo/", Code: http.StatusOK},
+			{Path: "/foo/", Code: http.StatusForbidden},
 			{Path: "/foo/1", Code: http.StatusOK},
 			{Path: "/foo/1/bar", Code: http.StatusForbidden},
-			{Path: "/foo/1/bar/", Code: http.StatusOK},
+			{Path: "/foo/1/bar/", Code: http.StatusForbidden},
 			{Path: "/foo/1/bar/1", Code: http.StatusOK},
 			{Path: "/", Code: http.StatusForbidden},
 			{Path: "/baz", Code: http.StatusForbidden},
-			{Path: "/baz/", Code: http.StatusOK},
+			{Path: "/baz/", Code: http.StatusForbidden},
 			{Path: "/baz/1", Code: http.StatusOK},
 			{Path: "/baz/1/", Code: http.StatusOK},
 			{Path: "/baz/1/bazz", Code: http.StatusOK},
@@ -412,13 +412,15 @@ func TestConflictingPaths(t *testing.T) {
 
 	ts.Run(t, []test.TestCase{
 		// Should ignore auth check
-		{Method: "POST", Path: "/customer-servicing/documents/metadata/purge", Code: http.StatusOK},
-		{Method: "GET", Path: "/customer-servicing/documents/metadata/{id}", Code: http.StatusOK},
+		{Method: "POST", Path: "/metadata/purge", Code: http.StatusOK},
+		{Method: "GET", Path: "/metadata/{id}", Code: http.StatusOK},
 	}...)
 }
 
 func TestIgnored(t *testing.T) {
-	ts := StartTest(nil)
+	ts := StartTest(func(c *config.Config) {
+		c.HttpServerOptions.EnablePathPrefixMatching = true
+	})
 	defer ts.Close()
 
 	t.Run("Extended Paths", func(t *testing.T) {
@@ -445,14 +447,13 @@ func TestIgnored(t *testing.T) {
 			{Path: "/ignored/literal", Code: http.StatusOK},
 			{Path: "/ignored/123/test", Code: http.StatusOK},
 			// Only GET is ignored
-			{Method: "POST", Path: "/ext/ignored/literal", Code: 401},
+			{Method: "POST", Path: "/ext/ignored/literal", Code: http.StatusUnauthorized},
 
-			{Path: "/", Code: 401},
+			{Path: "/", Code: http.StatusUnauthorized},
 		}...)
 	})
 
 	t.Run("Simple Paths", func(t *testing.T) {
-
 		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 			UpdateAPIVersion(spec, "v1", func(v *apidef.VersionInfo) {
 				v.Paths.Ignored = []string{"/ignored/literal", "/ignored/{id}/test"}
@@ -467,15 +468,14 @@ func TestIgnored(t *testing.T) {
 			// Should ignore auth check
 			{Path: "/ignored/literal", Code: http.StatusOK},
 			{Path: "/ignored/123/test", Code: http.StatusOK},
-			// All methods ignored
-			{Method: "POST", Path: "/ext/ignored/literal", Code: http.StatusOK},
 
-			{Path: "/", Code: 401},
+			{Method: "POST", Path: "/ext/ignored/literal", Code: http.StatusUnauthorized},
+
+			{Path: "/", Code: http.StatusUnauthorized},
 		}...)
 	})
 
 	t.Run("With URL rewrite", func(t *testing.T) {
-
 		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 			UpdateAPIVersion(spec, "v1", func(v *apidef.VersionInfo) {
 				v.ExtendedPaths.URLRewrite = []apidef.URLRewriteMeta{{
@@ -510,7 +510,6 @@ func TestIgnored(t *testing.T) {
 	})
 
 	t.Run("Case Sensitivity", func(t *testing.T) {
-
 		spec := BuildAPI(func(spec *APISpec) {
 			UpdateAPIVersion(spec, "v1", func(v *apidef.VersionInfo) {
 				v.ExtendedPaths.Ignored = []apidef.EndPointMeta{{Path: "/Foo", IgnoreCase: false}, {Path: "/bar", IgnoreCase: true}}
@@ -664,6 +663,7 @@ func TestOldMockResponse(t *testing.T) {
 	}
 
 	check := func(t *testing.T, api *APISpec, tc []test.TestCase) {
+		t.Helper()
 		ts.Gw.LoadAPI(api)
 		_, _ = ts.Run(t, tc...)
 
@@ -1031,7 +1031,7 @@ func (ts *Test) testPrepareDefaultVersion() (string, *APISpec) {
 func TestGetVersionFromRequest(t *testing.T) {
 
 	versionInfo := apidef.VersionInfo{}
-	versionInfo.Paths.WhiteList = []string{"/foo"}
+	versionInfo.Paths.WhiteList = []string{"/foo", "/v3/foo"}
 	versionInfo.Paths.BlackList = []string{"/bar"}
 
 	t.Run("Header location", func(t *testing.T) {
@@ -1336,23 +1336,6 @@ func TestAPIExpiration(t *testing.T) {
 			})
 		})
 	}
-}
-
-func TestStripListenPath(t *testing.T) {
-	assert.Equal(t, "/get", stripListenPath("/listen", "/listen/get"))
-	assert.Equal(t, "/get", stripListenPath("/listen/", "/listen/get"))
-	assert.Equal(t, "/get", stripListenPath("listen", "listen/get"))
-	assert.Equal(t, "/get", stripListenPath("listen/", "listen/get"))
-	assert.Equal(t, "/", stripListenPath("/listen/", "/listen/"))
-	assert.Equal(t, "/", stripListenPath("/listen", "/listen"))
-	assert.Equal(t, "/", stripListenPath("listen/", ""))
-
-	assert.Equal(t, "/get", stripListenPath("/{_:.*}/post/", "/listen/post/get"))
-	assert.Equal(t, "/get", stripListenPath("/{_:.*}/", "/listen/get"))
-	assert.Equal(t, "/get", stripListenPath("/pre/{_:.*}/", "/pre/listen/get"))
-	assert.Equal(t, "/", stripListenPath("/{_:.*}", "/listen"))
-	assert.Equal(t, "/get", stripListenPath("/{myPattern:foo|bar}", "/foo/get"))
-	assert.Equal(t, "/anything/get", stripListenPath("/{myPattern:foo|bar}", "/anything/get"))
 }
 
 func TestAPISpec_SanitizeProxyPaths(t *testing.T) {
