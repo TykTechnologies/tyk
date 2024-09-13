@@ -245,12 +245,7 @@ func (sm *StreamManager) createStream(streamID string, config map[string]interfa
 	sm.mw.Logger().Debugf("Creating stream: %s", streamFullID)
 
 	stream := streaming.NewStream(sm.mw.allowedUnsafe)
-	err := stream.LoadConfig(config, &handleFuncAdapter{mw: sm.mw, streamID: streamFullID, muxer: sm.muxer, sm: sm})
-	if err != nil {
-		sm.mw.Logger().Errorf("Failed to load stream config: %v", err)
-	}
-
-	err = stream.Start()
+	err := stream.Start(config, &handleFuncAdapter{mw: sm.mw, streamID: streamFullID, muxer: sm.muxer, sm: sm})
 	if err != nil {
 		sm.mw.Logger().Errorf("Failed to start stream %s: %v", streamFullID, err)
 		return err
