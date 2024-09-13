@@ -44,7 +44,7 @@ func Test_Issue11585_DeleteAPICacheSignal(t *testing.T) {
 		ts.Gw.MainNotifier.Notify(n)
 
 		time.Sleep(time.Millisecond * 50)
-		scanCacheKeys(t, ts.Gw.StorageConnectionHandler, api.APIID, true)
+		scanCacheKeys(t, ts.Gw.RedisController, api.APIID, true)
 	})
 
 	t.Run("rpc", func(t *testing.T) {
@@ -78,22 +78,22 @@ func Test_Issue11585_DeleteAPICacheSignal(t *testing.T) {
 		}
 
 		t.Run("different api id in event", func(t *testing.T) {
-			scanCacheKeys(t, ts.Gw.StorageConnectionHandler, api.APIID, false)
+			scanCacheKeys(t, ts.Gw.RedisController, api.APIID, false)
 			rpcListener.ProcessKeySpaceChanges([]string{buildStringEvent("non-existing-api-id")}, api.OrgID)
-			scanCacheKeys(t, ts.Gw.StorageConnectionHandler, api.APIID, false)
+			scanCacheKeys(t, ts.Gw.RedisController, api.APIID, false)
 		})
 
 		t.Run("same api id in event", func(t *testing.T) {
-			scanCacheKeys(t, ts.Gw.StorageConnectionHandler, api.APIID, false)
+			scanCacheKeys(t, ts.Gw.RedisController, api.APIID, false)
 			rpcListener.ProcessKeySpaceChanges([]string{buildStringEvent(api.APIID)}, api.OrgID)
-			scanCacheKeys(t, ts.Gw.StorageConnectionHandler, api.APIID, true)
+			scanCacheKeys(t, ts.Gw.RedisController, api.APIID, true)
 		})
 	})
 }
 
-func scanCacheKeys(t *testing.T, storageConnHandler *storage.ConnectionHandler, apiID string, expectEmtpy bool) {
+func scanCacheKeys(t *testing.T, storageConnHandler *storage.RedisController, apiID string, expectEmtpy bool) {
 	t.Helper()
-	store := storage.RedisCluster{IsCache: true, ConnectionHandler: storageConnHandler}
+	store := storage.RedisCluster{IsCache: true, RedisController: storageConnHandler}
 	cacheKeys, err := store.ScanKeys(fmt.Sprintf("cache-%s*", apiID))
 	assert.NoError(t, err)
 	assert.Equal(t, expectEmtpy, len(cacheKeys) == 0)
