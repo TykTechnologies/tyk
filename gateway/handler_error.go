@@ -198,7 +198,7 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 		}
 
 		if e.Spec.Proxy.StripListenPath {
-			r.URL.Path = e.Spec.StripListenPath(r, r.URL.Path)
+			r.URL.Path = e.Spec.StripListenPath(r.URL.Path)
 		}
 
 		oauthClientID := ""

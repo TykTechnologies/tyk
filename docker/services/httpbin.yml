@@ -1,0 +1,17 @@
+---
+services:
+  httpbin:
+    image: tykio/ci-tools:latest
+    networks:
+      - proxy
+    ports:
+      - 3123:3123
+    volumes:
+      - ./logs:/logs:rw
+    entrypoint:
+      - /usr/local/bin/httpbin-logserver
+    command:
+      - '-addr'
+      - ':3123'
+      - '-output'
+      - '/logs/service.json'
