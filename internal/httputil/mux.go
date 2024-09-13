@@ -1,13 +1,13 @@
 package httputil
 
 import (
-	"errors"
 	"fmt"
 	"regexp"
 	"strings"
 
 	"github.com/gorilla/mux"
 
+	"github.com/TykTechnologies/tyk/internal/errors"
 	"github.com/TykTechnologies/tyk/internal/maps"
 )
 
