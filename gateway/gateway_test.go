@@ -1254,7 +1254,7 @@ func TestCacheAllSafeRequestsWithAdvancedCacheEndpoint(t *testing.T) {
 }
 
 func TestCacheEtag(t *testing.T) {
-	test.Exclusive(t) // Test is exclusive due to deleting all the cache from redis (interference).
+	test.Flaky(t) // Flaky on 5.0
 
 	ts := StartTest(nil)
 	cache := storage.RedisCluster{KeyPrefix: "cache-", RedisController: ts.Gw.RedisController}
