@@ -1,10 +1,11 @@
 package streaming
 
 import (
-	"github.com/stretchr/testify/require"
-	"gopkg.in/yaml.v2"
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/require"
+	"gopkg.in/yaml.v2"
 )
 
 func TestStreamStart(t *testing.T) {

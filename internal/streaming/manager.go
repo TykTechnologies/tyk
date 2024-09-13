@@ -42,8 +42,14 @@ func NewStream(allowUnsafe []string) *Stream {
 	}
 }
 
-func (s *Stream) LoadConfig(config map[string]interface{}, mux service.HTTPMultiplexer) error {
-	s.log.Debugf("Loading stream")
+func (s *Stream) SetLogger(logger *logrus.Logger) {
+	if logger != nil {
+		s.log = logger
+	}
+}
+
+func (s *Stream) Start(config map[string]interface{}, mux service.HTTPMultiplexer) error {
+	s.log.Debugf("Starting stream")
 
 	configPayload, err := yaml.Marshal(config)
 	if err != nil {
@@ -80,24 +86,11 @@ func (s *Stream) LoadConfig(config map[string]interface{}, mux service.HTTPMulti
 	s.stream = stream
 
 	s.log.Debugf("Stream built successfully, starting it")
-	return nil
-}
-
-func (s *Stream) SetLogger(logger *logrus.Logger) {
-	if logger != nil {
-		s.log = logger
-	}
-}
-
-func (s *Stream) Start() error {
-	if s.stream == nil {
-		return fmt.Errorf("stream has not been initialized")
-	}
 
 	errChan := make(chan error, 1)
 	go func() {
 		s.log.Infof("Starting stream")
-		errChan <- s.stream.Run(context.Background())
+		errChan <- stream.Run(context.Background())
 	}()
 
 	select {
