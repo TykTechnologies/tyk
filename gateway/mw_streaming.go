@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -32,9 +33,11 @@ type StreamingMiddleware struct {
 }
 
 type StreamManager struct {
-	streams sync.Map
-	muxer   *mux.Router
-	mw      *StreamingMiddleware
+	streams     sync.Map
+	muxer       *mux.Router
+	mw          *StreamingMiddleware
+	dryRun      bool
+	listenPaths []string
 }
 
 func (sm *StreamManager) initStreams(specStreams map[string]interface{}) {
@@ -43,10 +46,22 @@ func (sm *StreamManager) initStreams(specStreams map[string]interface{}) {
 
 	for streamID, streamConfig := range specStreams {
 		if streamMap, ok := streamConfig.(map[string]interface{}); ok {
-			err := sm.createStream(streamID, streamMap)
-			if err != nil {
-				sm.mw.Logger().WithError(err).Errorf("Error creating stream %s", streamID)
+			hasHttp := HasHttp(streamMap)
+			if sm.dryRun {
+				if !hasHttp {
+					err := sm.createStream(streamID, streamMap)
+					if err != nil {
+						sm.mw.Logger().WithError(err).Errorf("Error creating stream %s", streamID)
+					}
+				}
+			} else {
+				err := sm.createStream(streamID, streamMap)
+				if err != nil {
+					sm.mw.Logger().WithError(err).Errorf("Error creating stream %s", streamID)
+				}
 			}
+			sm.listenPaths = GetHTTPPaths(streamMap)
+
 		}
 	}
 }
@@ -115,8 +130,9 @@ func (s *StreamingMiddleware) Init() {
 
 func (s *StreamingMiddleware) createStreamManager(r *http.Request) *StreamManager {
 	newStreamManager := &StreamManager{
-		muxer: mux.NewRouter(),
-		mw:    s,
+		muxer:  mux.NewRouter(),
+		mw:     s,
+		dryRun: r == nil,
 	}
 	streamID := fmt.Sprintf("_%d", time.Now().UnixNano())
 	s.streamManagers.Store(streamID, newStreamManager)
@@ -142,50 +158,42 @@ func HasHttp(config map[string]interface{}) bool {
 	return false
 }
 
-func GetHTTPPaths(streamConfig map[string]interface{}) (map[string]string, error) {
-	paths := map[string]string{}
-	defaultPaths := map[string]map[string]string{
-		"output": {
-			"path":        "/get",
-			"stream_path": "/get/stream",
-			"ws_path":     "/get/ws",
-		},
-		"input": {
-			"path":    "/post",
-			"ws_path": "/post/ws",
-		},
-	}
-	for component := range defaultPaths {
-		componentPaths := defaultPaths[component]
-		compConfig, ok := streamConfig[component]
+func GetHTTPPaths(streamConfig map[string]interface{}) []string {
+	paths := make([]string, 0)
+	pathKeys := []string{"path", "stream_path", "ws_path"}
+	components := []string{"output", "input"}
+
+	for _, component := range components {
+		componentConfig, ok := streamConfig[component]
 		if !ok {
-			paths = append(paths, componentPaths...)
+			continue
 		}
-	}
-
-	paths := defaultPaths[component]
-
-	if compConfig, found := parsedConfig[component]; found {
-		compMap, ok := compConfig.(map[interface{}]interface{})
+		componentConfigMap, ok := componentConfig.(map[string]interface{})
 		if !ok {
-			return paths, nil
+			continue
 		}
 
-		if http, found := compMap["http_server"]; found {
-			httpMap, ok := http.(map[interface{}]interface{})
+		httpPaths, ok := componentConfigMap["http_server"]
+		if !ok {
+			continue
+		}
+		httpPathMap, ok := httpPaths.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		for _, pathItem := range pathKeys {
+			path, ok := httpPathMap[pathItem]
 			if !ok {
-				return paths, nil
+				continue
 			}
 
-			for key := range paths {
-				if p, found := httpMap[key]; found && p != "" {
-					paths[key], _ = p.(string)
-				}
+			if pathString, ok := path.(string); ok {
+				paths = append(paths, pathString)
 			}
 		}
 	}
 
-	return paths, nil
+	return paths
 }
 
 // getStreamsConfig extracts streaming configurations from an API spec if available.
@@ -239,7 +247,7 @@ func (sm *StreamManager) createStream(streamID string, config map[string]interfa
 	stream := streaming.NewStream(sm.mw.allowedUnsafe)
 	err := stream.LoadConfig(config, &handleFuncAdapter{mw: sm.mw, streamID: streamFullID, muxer: sm.muxer, sm: sm})
 	if err != nil {
-		sm.mw.Logger().Error("Failed to load stream config: %v", err)
+		sm.mw.Logger().Errorf("Failed to load stream config: %v", err)
 	}
 
 	err = stream.Start()
@@ -254,9 +262,21 @@ func (sm *StreamManager) createStream(streamID string, config map[string]interfa
 	return nil
 }
 
+func (sm *StreamManager) hasPath(path string) bool {
+	for _, p := range sm.listenPaths {
+		if strings.TrimPrefix(path, "/") == strings.TrimPrefix(p, "/") {
+			return true
+		}
+	}
+	return false
+}
+
 // ProcessRequest will handle the streaming functionality
 func (s *StreamingMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
 	strippedPath := s.Spec.StripListenPath(r.URL.Path)
+	if !s.defaultStreamManager.hasPath(strippedPath) {
+		return nil, http.StatusOK
+	}
 
 	s.Logger().Debugf("Processing request: %s, %s", r.URL.Path, strippedPath)
 
@@ -264,42 +284,15 @@ func (s *StreamingMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 	newRequest.URL.Path = strippedPath
 
 	var match mux.RouteMatch
-	// First do the check if such route is defined by streaming API
-	//
-	// TODO: If we have a multiple streams, right now it will duplicate all this streams for each consumer
-	// If we have background jobs, or other non related streams, it will cause overhead and poential conflicts
-	// We need to meke .mux property of individual Steam object, and intiailize only the matched stream instead of all
-	if s.defaultStreamManager.muxer.Match(newRequest, &match) {
-		pathRegexp, _ := match.Route.GetPathRegexp()
-		s.Logger().Debugf("Matched stream: %v", pathRegexp)
-		handler, _ := match.Handler.(http.HandlerFunc)
-		if handler != nil {
-			// Now that we know that such streaming endpoint here,
-			// we can actually initialize individual stream manager
-			streamManager := s.createStreamManager(r)
-			streamManager.muxer.Match(newRequest, &match)
+	streamManager := s.createStreamManager(r)
+	streamManager.muxer.Match(newRequest, &match)
 
-			// direct Bento handler
-			handler, _ := match.Handler.(http.HandlerFunc)
+	// direct Bento handler
+	handler, _ := match.Handler.(http.HandlerFunc)
 
-			handler.ServeHTTP(w, r)
+	handler.ServeHTTP(w, r)
 
-			// TODO: Implement shadowing
-			//
-			// if stream.Shaddow {
-			// 	go handler.ServeHTTP(w, r)
-			// 	return nil, http.StatusOK
-			// } else {
-			// 	handler.ServeHTTP(w, r)
-			// 	return nil, mwStatusRespond
-			// }
-
-			return nil, mwStatusRespond
-		}
-	}
-
-	// If no stream matches, continue with the next middleware
-	return nil, http.StatusOK
+	return nil, mwStatusRespond
 }
 
 func (s *StreamingMiddleware) Unload() {
