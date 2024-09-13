@@ -24,6 +24,7 @@ import (
 	"github.com/getkin/kin-openapi/routers"
 
 	"github.com/TykTechnologies/tyk/internal/graphengine"
+	"github.com/TykTechnologies/tyk/internal/httputil"
 
 	"github.com/getkin/kin-openapi/routers/gorillamux"
 
@@ -35,7 +36,6 @@ import (
 
 	sprig "github.com/Masterminds/sprig/v3"
 
-	"github.com/gorilla/mux"
 	"github.com/sirupsen/logrus"
 
 	circuit "github.com/TykTechnologies/circuitbreaker"
@@ -134,7 +134,8 @@ const (
 // path is on any of the white, black or ignored lists. This is generated as part of the
 // configuration init
 type URLSpec struct {
-	Spec                      *regexp.Regexp
+	spec *regexp.Regexp
+
 	Status                    URLStatus
 	MethodActions             map[string]apidef.EndpointMethodMeta
 	Whitelist                 apidef.EndPointMeta
@@ -818,15 +819,27 @@ func (a APIDefinitionLoader) getPathSpecs(apiVersionDef apidef.VersionInfo, conf
 }
 
 func (a APIDefinitionLoader) generateRegex(stringSpec string, newSpec *URLSpec, specType URLStatus, conf config.Config) {
-	apiLangIDsRegex := regexp.MustCompile(`{([^}]*)}`)
-	asRegexStr := apiLangIDsRegex.ReplaceAllString(stringSpec, `([^/]*)`)
+	var (
+		pattern string
+		err     error
+	)
+	// Hook per-api settings here via newSpec *URLSpec
+	isPrefixMatch := conf.HttpServerOptions.EnablePathPrefixMatching
+	isSuffixMatch := conf.HttpServerOptions.EnablePathSuffixMatching
+	isIgnoreCase := newSpec.IgnoreCase || conf.IgnoreEndpointCase
+
+	pattern = httputil.PreparePathRegexp(stringSpec, isPrefixMatch, isSuffixMatch)
+
 	// Case insensitive match
-	if newSpec.IgnoreCase || conf.IgnoreEndpointCase {
-		asRegexStr = "(?i)" + asRegexStr
+	if isIgnoreCase {
+		pattern = "(?i)" + pattern
 	}
-	asRegex, _ := regexp.Compile(asRegexStr)
+
+	asRegex, err := regexp.Compile(pattern)
+	log.WithError(err).Debugf("URLSpec: %s => %s type=%d", stringSpec, pattern, specType)
+
 	newSpec.Status = specType
-	newSpec.Spec = asRegex
+	newSpec.spec = asRegex
 }
 
 func (a APIDefinitionLoader) compilePathSpec(paths []string, specType URLStatus, conf config.Config) []URLSpec {
@@ -1488,7 +1501,7 @@ func (a *APISpec) getURLStatus(stat URLStatus) RequestStatus {
 // URLAllowedAndIgnored checks if a url is allowed and ignored.
 func (a *APISpec) URLAllowedAndIgnored(r *http.Request, rxPaths []URLSpec, whiteListStatus bool) (RequestStatus, interface{}) {
 	for i := range rxPaths {
-		if !rxPaths[i].Spec.MatchString(r.URL.Path) {
+		if !rxPaths[i].matchesPath(r.URL.Path, a) {
 			continue
 		}
 
@@ -1499,7 +1512,7 @@ func (a *APISpec) URLAllowedAndIgnored(r *http.Request, rxPaths []URLSpec, white
 
 	// Check if ignored
 	for i := range rxPaths {
-		if !rxPaths[i].Spec.MatchString(r.URL.Path) {
+		if !rxPaths[i].matchesPath(r.URL.Path, a) {
 			continue
 		}
 
@@ -1629,7 +1642,7 @@ func (a *APISpec) getVersionFromRequest(r *http.Request) string {
 
 		return vName
 	case apidef.URLLocation:
-		uPath := a.StripListenPath(r, r.URL.Path)
+		uPath := a.StripListenPath(r.URL.Path)
 		uPath = strings.TrimPrefix(uPath, "/"+a.Slug)
 
 		// First non-empty part of the path is the version ID
@@ -1771,8 +1784,32 @@ func (a *APISpec) Version(r *http.Request) (*apidef.VersionInfo, RequestStatus) 
 	return &version, StatusOk
 }
 
-func (a *APISpec) StripListenPath(r *http.Request, path string) string {
-	return stripListenPath(a.Proxy.ListenPath, path)
+// StripListenPath will strip the listen path from the URL, keeping version in tact.
+func (a *APISpec) StripListenPath(reqPath string) string {
+	return httputil.StripListenPath(a.Proxy.ListenPath, reqPath)
+}
+
+// StripVersionPath will strip the version from the URL. The input URL
+// should already have listen path stripped.
+func (a *APISpec) StripVersionPath(reqPath string) string {
+	// First part of the url is the version fragment
+	part := strings.Split(strings.Trim(reqPath, "/"), "/")[0]
+
+	matchesUrlVersioningPattern := true
+	if a.VersionDefinition.UrlVersioningPattern != "" {
+		re, err := regexp.Compile(a.VersionDefinition.UrlVersioningPattern)
+		if err != nil {
+			log.Error("Error compiling versioning pattern: ", err)
+		} else {
+			matchesUrlVersioningPattern = re.Match([]byte(part))
+		}
+	}
+
+	if (a.VersionDefinition.StripVersioningData || a.VersionDefinition.StripPath) && matchesUrlVersioningPattern {
+		return strings.Replace(reqPath, "/"+part+"/", "/", 1)
+	}
+
+	return reqPath
 }
 
 func (a *APISpec) SanitizeProxyPaths(r *http.Request) {
@@ -1782,9 +1819,9 @@ func (a *APISpec) SanitizeProxyPaths(r *http.Request) {
 
 	log.Debug("Stripping proxy listen path: ", a.Proxy.ListenPath)
 
-	r.URL.Path = a.StripListenPath(r, r.URL.Path)
+	r.URL.Path = a.StripListenPath(r.URL.Path)
 	if r.URL.RawPath != "" {
-		r.URL.RawPath = a.StripListenPath(r, r.URL.RawPath)
+		r.URL.RawPath = a.StripListenPath(r.URL.RawPath)
 	}
 
 	log.Debug("Upstream path is: ", r.URL.Path)
@@ -1832,27 +1869,6 @@ func (r *RoundRobin) WithLen(len int) int {
 	// -1 to start at 0, not 1
 	cur := atomic.AddUint32(&r.pos, 1) - 1
 	return int(cur) % len
-}
-
-func stripListenPath(listenPath, path string) (res string) {
-	defer func() {
-		if !strings.HasPrefix(res, "/") {
-			res = "/" + res
-		}
-	}()
-
-	if !strings.Contains(listenPath, "{") {
-		res = strings.TrimPrefix(path, listenPath)
-		return
-	}
-
-	tmp := new(mux.Route).PathPrefix(listenPath)
-	s, err := tmp.GetPathRegexp()
-	if err != nil {
-		return path
-	}
-	reg := regexp.MustCompile(s)
-	return reg.ReplaceAllString(path, "")
 }
 
 func (s *APISpec) hasVirtualEndpoint() bool {
