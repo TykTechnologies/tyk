@@ -35,8 +35,11 @@ import "C"
 
 import (
 	"errors"
+	"fmt"
 	"sync"
 	"unsafe"
+
+	"github.com/ebitengine/purego"
 )
 
 func open(name string) (*Plugin, error) {
@@ -60,12 +63,13 @@ func open(name string) (*Plugin, error) {
 		<-p.loaded
 		return p, nil
 	}
-	var cErr *C.char
-	h := C.pluginOpen((*C.char)(unsafe.Pointer(&cPath[0])), &cErr)
-	if h == 0 {
+
+	h, err := purego.Dlopen(name, purego.RTLD_NOW|purego.RTLD_GLOBAL)
+	if err != nil {
 		pluginsMu.Unlock()
-		return nil, errors.New(`plugin.Open("` + name + `"): ` + C.GoString(cErr))
+		return nil, fmt.Errorf(`plugin.Open("`+name+`"): %w`, err)
 	}
+
 	// TODO(crawshaw): look for plugin note, confirm it is a Go plugin
 	// and it was built with the correct toolchain.
 	if len(name) > 3 && name[len(name)-3:] == ".so" {
@@ -107,18 +111,18 @@ func open(name string) (*Plugin, error) {
 		cname := make([]byte, len(fullName)+1)
 		copy(cname, fullName)
 
-		p := C.pluginLookup(h, (*C.char)(unsafe.Pointer(&cname[0])), &cErr)
-		if p == nil {
-			return nil, errors.New(`plugin.Open("` + name + `"): could not find symbol ` + symName + `: ` + C.GoString(cErr))
+		p, err := purego.Dlsym(h, fullName)
+		if err != nil {
+			return nil, fmt.Errorf(`plugin.Open("`+name+`"): could not find symbol `+symName+`: %w`, err)
 		}
+
 		valp := (*[2]unsafe.Pointer)(unsafe.Pointer(&sym))
 		if isFunc {
-			(*valp)[1] = unsafe.Pointer(&p)
+			(*valp)[1] = unsafe.Pointer(p)
 		} else {
-			(*valp)[1] = p
+			(*valp)[1] = unsafe.Pointer(p)
 		}
-		// we can't add to syms during iteration as we'll end up processing
-		// some symbols twice with the inability to tell if the symbol is a function
+
 		updatedSyms[symName] = sym
 	}
 	p.syms = updatedSyms
