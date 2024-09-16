@@ -47,7 +47,7 @@ build:
 
 .PHONY: build-linux
 build-linux:
-	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 $(GOBUILD) -tags "$(TAGS)" -o $(BINARY_LINUX) .
+	CGO_ENABLED=1 GOOS=linux GOARCH=amd64 $(GOBUILD) -ldflags '-extldflags "-static"' .
 
 .PHONY: install
 install:

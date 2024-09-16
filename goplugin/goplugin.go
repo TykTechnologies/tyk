@@ -9,6 +9,8 @@ import (
 	"github.com/TykTechnologies/tyk/internal/plugin"
 )
 
+const symbolPrefix = "github.com/TykTechnologies/tyk/test/goplugins."
+
 // GetSymbol only tests plugin loading. Used in tyk plugin cli.
 // Don't encourage internal use.
 func GetSymbol(modulePath string, symbol string) (interface{}, error) {
@@ -35,8 +37,8 @@ func GetHandler(modulePath string, symbol string) (http.HandlerFunc, error) {
 
 	var handler func(http.ResponseWriter, *http.Request)
 
-	if err := loadedPlugin.As(&handler, symbol); err != nil {
-		return nil, errors.Wrap(err, "could not cast function symbol to AnalyticsPlugin function")
+	if err := loadedPlugin.As(&handler, symbolPrefix+symbol); err != nil {
+		return nil, errors.Wrap(err, "could not cast function symbol to http.HandlerFunc function")
 	}
 	return handler, nil
 }
@@ -49,8 +51,8 @@ func GetResponseHandler(modulePath string, symbol string) (func(rw http.Response
 
 	var handler func(rw http.ResponseWriter, res *http.Response, req *http.Request)
 
-	if err := loadedPlugin.As(&handler, symbol); err != nil {
-		return nil, errors.Wrap(err, "could not cast function symbol to AnalyticsPlugin function")
+	if err := loadedPlugin.As(&handler, symbolPrefix+symbol); err != nil {
+		return nil, errors.Wrap(err, "could not cast function symbol to TykResponseHandler function")
 	}
 	return handler, nil
 }
@@ -64,7 +66,7 @@ func GetAnalyticsHandler(name string, symbol string) (func(record *analytics.Ana
 
 	var handler func(record *analytics.AnalyticsRecord)
 
-	if err := loadedPlugin.As(&handler, symbol); err != nil {
+	if err := loadedPlugin.As(&handler, symbolPrefix+symbol); err != nil {
 		return nil, errors.Wrap(err, "could not cast function symbol to AnalyticsPlugin function")
 	}
 	return handler, nil
