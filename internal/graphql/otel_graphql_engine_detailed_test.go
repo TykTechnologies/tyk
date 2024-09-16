@@ -3,6 +3,7 @@ package graphql
 import (
 	"context"
 	"errors"
+	"go.opentelemetry.io/otel/trace/embedded"
 	"os"
 	"testing"
 
