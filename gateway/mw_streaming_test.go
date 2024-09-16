@@ -534,6 +534,7 @@ func setupStreamingAPI(t *testing.T, ts *Test, consumerGroup string, tenantID st
 		spec.IsOAS = true
 		spec.OAS = setupOASForStreamingAPI(t, consumerGroup, kafkaHost)
 		spec.OAS.Fill(*spec.APIDefinition)
+		spec.EnableContextVars = true
 	})
 
 	return apiName
