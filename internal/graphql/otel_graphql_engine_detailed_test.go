@@ -6,6 +6,8 @@ import (
 	"os"
 	"testing"
 
+	"go.opentelemetry.io/otel/trace/embedded"
+
 	log "github.com/sirupsen/logrus"
 
 	semconv "github.com/TykTechnologies/opentelemetry/semconv/v1.0.0"
@@ -418,6 +420,7 @@ func (t *tracerProviderWrapper) Type() string {
 var _ tyktrace.Provider = (*tracerProviderWrapper)(nil)
 
 type tracerWrapper struct {
+	embedded.Tracer
 	tracer         tyktrace.Tracer
 	spanAttributes map[string][]attribute.KeyValue
 }
@@ -434,6 +437,7 @@ func (t *tracerWrapper) Start(ctx context.Context, spanName string, opts ...trac
 var _ tyktrace.Tracer = (*tracerWrapper)(nil)
 
 type spanWrapper struct {
+	embedded.Span
 	name       string
 	span       trace.Span
 	attributes map[string][]attribute.KeyValue
