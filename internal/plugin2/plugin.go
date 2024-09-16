@@ -63,7 +63,7 @@
 // communication (IPC) mechanisms such as sockets, pipes, remote
 // procedure call (RPC), shared memory mappings, or file system
 // operations may be more suitable despite the performance overheads.
-package plugin
+package plugin2
 
 // Plugin is a loaded Go plugin.
 type Plugin struct {

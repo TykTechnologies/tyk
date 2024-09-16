@@ -4,7 +4,7 @@
 
 //go:build (linux && cgo) || (darwin && cgo) || (freebsd && cgo)
 
-package plugin
+package plugin2
 
 /*
 #cgo linux LDFLAGS: -ldl
