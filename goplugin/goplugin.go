@@ -6,12 +6,13 @@ package goplugin
 import (
 	"errors"
 	"net/http"
-	"plugin"
+
+	"github.com/TykTechnologies/tyk/internal/plugin2"
 )
 
 func GetSymbol(modulePath string, symbol string) (interface{}, error) {
 	// try to load plugin
-	loadedPlugin, err := plugin.Open(modulePath)
+	loadedPlugin, err := plugin2.Open(modulePath)
 	if err != nil {
 		return nil, err
 	}
