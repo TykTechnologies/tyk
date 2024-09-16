@@ -1,18 +1,19 @@
-//go:build goplugin
-// +build goplugin
-
 package goplugin
 
 import (
-	"errors"
 	"net/http"
 
-	"github.com/TykTechnologies/tyk/internal/plugin2"
+	"github.com/TykTechnologies/tyk-pump/analytics"
+
+	"github.com/TykTechnologies/tyk/internal/errors"
+	"github.com/TykTechnologies/tyk/internal/plugin"
 )
 
+// GetSymbol only tests plugin loading. Used in tyk plugin cli.
+// Don't encourage internal use.
 func GetSymbol(modulePath string, symbol string) (interface{}, error) {
 	// try to load plugin
-	loadedPlugin, err := plugin2.Open(modulePath)
+	loadedPlugin, err := plugin.Open(modulePath)
 	if err != nil {
 		return nil, err
 	}
@@ -27,31 +28,44 @@ func GetSymbol(modulePath string, symbol string) (interface{}, error) {
 }
 
 func GetHandler(modulePath string, symbol string) (http.HandlerFunc, error) {
-	funcSymbol, err := GetSymbol(modulePath, symbol)
+	loadedPlugin, err := plugin.Open(modulePath)
 	if err != nil {
 		return nil, err
 	}
 
-	// try to cast symbol to real func
-	pluginHandler, ok := funcSymbol.(func(http.ResponseWriter, *http.Request))
-	if !ok {
-		return nil, errors.New("could not cast function symbol to http.HandlerFunc")
-	}
+	var handler func(http.ResponseWriter, *http.Request)
 
-	return pluginHandler, nil
+	if err := loadedPlugin.As(&handler, symbol); err != nil {
+		return nil, errors.Wrap(err, "could not cast function symbol to AnalyticsPlugin function")
+	}
+	return handler, nil
 }
 
 func GetResponseHandler(modulePath string, symbol string) (func(rw http.ResponseWriter, res *http.Response, req *http.Request), error) {
-	funcSymbol, err := GetSymbol(modulePath, symbol)
+	loadedPlugin, err := plugin.Open(modulePath)
 	if err != nil {
 		return nil, err
 	}
 
-	// try to cast symbol to real func
-	respPluginHandler, ok := funcSymbol.(func(rw http.ResponseWriter, res *http.Response, req *http.Request))
-	if !ok {
-		return nil, errors.New("could not cast function symbol to TykResponseHandler")
+	var handler func(rw http.ResponseWriter, res *http.Response, req *http.Request)
+
+	if err := loadedPlugin.As(&handler, symbol); err != nil {
+		return nil, errors.Wrap(err, "could not cast function symbol to AnalyticsPlugin function")
+	}
+	return handler, nil
+}
+
+func GetAnalyticsHandler(name string, symbol string) (func(record *analytics.AnalyticsRecord), error) {
+	// try to load plugin
+	loadedPlugin, err := plugin.Open(name)
+	if err != nil {
+		return nil, err
 	}
 
-	return respPluginHandler, nil
+	var handler func(record *analytics.AnalyticsRecord)
+
+	if err := loadedPlugin.As(&handler, symbol); err != nil {
+		return nil, errors.Wrap(err, "could not cast function symbol to AnalyticsPlugin function")
+	}
+	return handler, nil
 }

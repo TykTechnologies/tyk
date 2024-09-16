@@ -63,21 +63,80 @@
 // communication (IPC) mechanisms such as sockets, pipes, remote
 // procedure call (RPC), shared memory mappings, or file system
 // operations may be more suitable despite the performance overheads.
-package plugin2
+package plugin
+
+import (
+	"errors"
+	"fmt"
+	"sync"
+
+	"github.com/ebitengine/purego"
+)
 
 // Plugin is a loaded Go plugin.
 type Plugin struct {
-	pluginpath string
-	err        string        // set if plugin failed to load
-	loaded     chan struct{} // closed when loaded
-	syms       map[string]any
+	handle uintptr
+	err    string        // set if plugin failed to load
+	loaded chan struct{} // closed when loaded
 }
+
+var (
+	pluginsMu sync.Mutex
+	plugins   map[string]*Plugin
+)
 
 // Open opens a Go plugin.
 // If a path has already been opened, then the existing *[Plugin] is returned.
 // It is safe for concurrent use by multiple goroutines.
-func Open(path string) (*Plugin, error) {
-	return open(path)
+func Open(name string) (*Plugin, error) {
+	filepath, err := realpath(name)
+	if err != nil {
+		return nil, fmt.Errorf(`plugin.Open("`+name+`"): realpath failed: %w`, err)
+	}
+
+	pluginsMu.Lock()
+	if p := plugins[filepath]; p != nil {
+		pluginsMu.Unlock()
+		if p.err != "" {
+			return nil, errors.New(`plugin.Open("` + name + `"): ` + p.err + ` (previous failure)`)
+		}
+		<-p.loaded
+		return p, nil
+	}
+
+	h, err := purego.Dlopen(filepath, purego.RTLD_NOW|purego.RTLD_GLOBAL)
+	if err != nil {
+		pluginsMu.Unlock()
+		return nil, fmt.Errorf(`plugin.Open("`+name+`"): %w`, err)
+	}
+
+	// TODO(crawshaw): look for plugin note, confirm it is a Go plugin
+	// and it was built with the correct toolchain.
+	if len(name) > 3 && name[len(name)-3:] == ".so" {
+		name = name[:len(name)-3]
+	}
+	if plugins == nil {
+		plugins = make(map[string]*Plugin)
+	}
+
+	// This function can be called from the init function of a plugin.
+	// Drop a placeholder in the map so subsequent opens can wait on it.
+	p := &Plugin{
+		handle: h,
+		loaded: make(chan struct{}),
+	}
+	plugins[filepath] = p
+	pluginsMu.Unlock()
+
+	close(p.loaded)
+	return p, nil
+}
+
+// As invokes purego.RegisterFunc to full fptr.
+func (p *Plugin) As(fptr interface{}, name string) error {
+	// panics if not found
+	purego.RegisterLibFunc(fptr, p.handle, name)
+	return nil
 }
 
 // Lookup searches for a symbol named symName in plugin p.
@@ -85,8 +144,13 @@ func Open(path string) (*Plugin, error) {
 // It reports an error if the symbol is not found.
 // It is safe for concurrent use by multiple goroutines.
 func (p *Plugin) Lookup(symName string) (Symbol, error) {
-	return lookup(p, symName)
+	sym, err := purego.Dlsym(p.handle, symName)
+	if err != nil {
+		return 0, err
+	}
+	return Symbol(sym), nil
 }
+
 
 // A Symbol is a pointer to a variable or function.
 //
@@ -117,4 +181,6 @@ func (p *Plugin) Lookup(symName string) (Symbol, error) {
 //	}
 //	*v.(*int) = 7
 //	f.(func())() // prints "Hello, number 7"
-type Symbol any
+type Symbol uintptr
+
+const Empty Symbol = 0

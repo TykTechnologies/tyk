@@ -2,6 +2,7 @@ package errors
 
 import (
 	"errors"
+	"fmt"
 	"strings"
 )
 
@@ -23,4 +24,11 @@ func Formatter(errs []error) string {
 	}
 
 	return result.String()
+}
+
+func Wrap(err error, message string) error {
+	if err == nil {
+		return err
+	}
+	return fmt.Errorf("%s: %w", message, err)
 }
