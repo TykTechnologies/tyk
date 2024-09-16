@@ -56,23 +56,6 @@ builds:
     goarch:
       - arm64
     binary: tyk
-  - id: std-s390x
-    flags:
-      - -tags=ignore
-      - -trimpath
-      - -tags=goplugin
-    ldflags:
-      - -X github.com/TykTechnologies/tyk/internal/build.Version={{.Version}}
-      - -X github.com/TykTechnologies/tyk/internal/build.Commit={{.FullCommit}}
-      - -X github.com/TykTechnologies/tyk/internal/build.BuildDate={{.Date}}
-      - -X github.com/TykTechnologies/tyk/internal/build.BuiltBy=goreleaser
-    env:
-      - CC=s390x-linux-gnu-gcc
-    goos:
-      - linux
-    goarch:
-      - s390x
-    binary: tyk
 nfpms:
   - id: std
     vendor: "Tyk Technologies Ltd"
@@ -84,7 +67,6 @@ nfpms:
     builds:
       - std
       - std-arm64
-      - std-s390x
     formats:
       - deb
       - rpm
