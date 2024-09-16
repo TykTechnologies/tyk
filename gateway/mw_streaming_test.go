@@ -268,52 +268,50 @@ func TestStreamingAPIMultipleClients(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	t.Run("multiple clients", func(t *testing.T) {
-		const (
-			totalClients  = 3
-			totalMessages = 3
-		)
-		dialer := websocket.Dialer{
-			HandshakeTimeout: 1 * time.Second,
-			TLSClientConfig:  &tls.Config{InsecureSkipVerify: true},
-		}
+	const (
+		totalClients  = 3
+		totalMessages = 3
+	)
+	dialer := websocket.Dialer{
+		HandshakeTimeout: 1 * time.Second,
+		TLSClientConfig:  &tls.Config{InsecureSkipVerify: true},
+	}
 
-		wsURL := strings.Replace(ts.URL, "http", "ws", 1) + fmt.Sprintf("/%s/get/ws", apiName)
+	wsURL := strings.Replace(ts.URL, "http", "ws", 1) + fmt.Sprintf("/%s/get/ws", apiName)
 
-		// Create multiple WebSocket connections
-		var wsConns []*websocket.Conn
-		for i := 0; i < totalClients; i++ {
-			wsConn, _, err := dialer.Dial(wsURL, nil)
-			require.NoError(t, err, fmt.Sprintf("failed to connect to ws server for client %d", i))
-			wsConns = append(wsConns, wsConn)
-			t.Cleanup(func() {
-				wsConn.Close()
-			})
-		}
-
-		// Connect to NATS and publish messages
-		nc, err := nats.Connect(connectionStr)
-		require.NoError(t, err, "error connecting to nats server")
+	// Create multiple WebSocket connections
+	var wsConns []*websocket.Conn
+	for i := 0; i < totalClients; i++ {
+		wsConn, _, err := dialer.Dial(wsURL, nil)
+		require.NoError(t, err, fmt.Sprintf("failed to connect to ws server for client %d", i))
+		wsConns = append(wsConns, wsConn)
 		t.Cleanup(func() {
-			nc.Close()
+			wsConn.Close()
 		})
-		subject := "test"
-		for i := 0; i < totalMessages; i++ {
-			require.NoError(t, nc.Publish(subject, []byte(fmt.Sprintf("Hello %d", i))), "failed to publish message to subject")
-		}
+	}
 
-		// Read messages from all clients
-		for clientID, wsConn := range wsConns {
-			err = wsConn.SetReadDeadline(time.Now().Add(5000 * time.Millisecond))
-			require.NoError(t, err, fmt.Sprintf("error setting read deadline for client %d", clientID))
-
-			for i := 0; i < totalMessages; i++ {
-				_, p, err := wsConn.ReadMessage()
-				require.NoError(t, err, fmt.Sprintf("error reading message for client %d, message %d", clientID, i))
-				assert.Equal(t, fmt.Sprintf("Hello %d", i), string(p), fmt.Sprintf("message not equal for client %d", clientID))
-			}
-		}
+	// Connect to NATS and publish messages
+	nc, err := nats.Connect(connectionStr)
+	require.NoError(t, err, "error connecting to nats server")
+	t.Cleanup(func() {
+		nc.Close()
 	})
+	subject := "test"
+	for i := 0; i < totalMessages; i++ {
+		require.NoError(t, nc.Publish(subject, []byte(fmt.Sprintf("Hello %d", i))), "failed to publish message to subject")
+	}
+
+	// Read messages from all clients
+	for clientID, wsConn := range wsConns {
+		err = wsConn.SetReadDeadline(time.Now().Add(5000 * time.Millisecond))
+		require.NoError(t, err, fmt.Sprintf("error setting read deadline for client %d", clientID))
+
+		for i := 0; i < totalMessages; i++ {
+			_, p, err := wsConn.ReadMessage()
+			require.NoError(t, err, fmt.Sprintf("error reading message for client %d, message %d", clientID, i))
+			assert.Equal(t, fmt.Sprintf("Hello %d", i), string(p), fmt.Sprintf("message not equal for client %d", clientID))
+		}
+	}
 
 }
 
