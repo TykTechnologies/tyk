@@ -95,7 +95,7 @@ require (
 	github.com/nats-io/nats.go v1.37.0
 	github.com/newrelic/go-agent v2.13.0+incompatible
 	github.com/testcontainers/testcontainers-go v0.33.0
-	github.com/testcontainers/testcontainers-go/modules/kafka v0.32.0
+	github.com/testcontainers/testcontainers-go/modules/kafka v0.33.0
 	github.com/testcontainers/testcontainers-go/modules/nats v0.33.0
 	go.opentelemetry.io/otel v1.24.0
 	go.opentelemetry.io/otel/trace v1.24.0
