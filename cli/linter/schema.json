@@ -550,6 +550,12 @@
         "enable_strict_routes": {
           "type": "boolean"
         },
+        "enable_path_prefix_matching": {
+          "type": "boolean"
+        },
+        "enable_path_suffix_matching": {
+          "type": "boolean"
+        },
         "flush_interval": {
           "type": "integer"
         },
@@ -641,6 +647,15 @@
     "log_format": {
       "type": "string",
       "enum": ["", "standard", "json"]
+    },
+    "access_logs": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        }
+      }
     },
     "enable_http_profiler": {
       "type": "boolean"

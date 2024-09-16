@@ -9,6 +9,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/TykTechnologies/tyk/config"
+
 	"github.com/TykTechnologies/tyk/header"
 	"github.com/TykTechnologies/tyk/test"
 )
@@ -121,4 +123,53 @@ func TestHandleDefaultErrorJSON(t *testing.T) {
 		},
 	})
 
+}
+
+func BenchmarkErrorLogTransaction(b *testing.B) {
+	b.Run("AccessLogs enabled with Hashkeys set to true", func(b *testing.B) {
+		conf := func(globalConf *config.Config) {
+			globalConf.HashKeys = true
+			globalConf.AccessLogs.Enabled = true
+		}
+		benchmarkErrorLogTransaction(b, conf)
+
+	})
+	b.Run("AccessLogs enabled with Hashkeys set to false", func(b *testing.B) {
+		conf := func(globalConf *config.Config) {
+			globalConf.HashKeys = false
+			globalConf.AccessLogs.Enabled = true
+		}
+		benchmarkErrorLogTransaction(b, conf)
+	})
+
+	b.Run("AccessLogs disabled with Hashkeys set to true", func(b *testing.B) {
+		conf := func(globalConf *config.Config) {
+			globalConf.HashKeys = true
+			globalConf.AccessLogs.Enabled = false
+		}
+		benchmarkErrorLogTransaction(b, conf)
+	})
+
+	b.Run("AccessLogs disabled with Hashkeys set to false", func(b *testing.B) {
+		conf := func(globalConf *config.Config) {
+			globalConf.HashKeys = false
+			globalConf.AccessLogs.Enabled = false
+		}
+		benchmarkErrorLogTransaction(b, conf)
+	})
+}
+
+func benchmarkErrorLogTransaction(b *testing.B, conf func(globalConf *config.Config)) {
+	b.ReportAllocs()
+	b.Helper()
+	b.ResetTimer()
+
+	ts := StartTest(conf)
+	defer ts.Close()
+
+	for i := 0; i < b.N; i++ {
+		ts.Run(b, test.TestCase{
+			Code: http.StatusNotFound,
+		})
+	}
 }
