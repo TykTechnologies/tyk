@@ -1,0 +1,41 @@
+# This file instructs Redocly's linter to ignore the rules contained for specific parts of your API.
+# See https://redoc.ly/docs/cli/ for more information.
+swagger.yml:
+  no-ambiguous-paths:
+    - '#/paths/~1tyk~1apis~1oas~1{apiID}'
+  no-invalid-media-type-examples:
+    - >-
+      #/paths/~1tyk~1apis~1oas/get/responses/200/content/application~1json/schema
+    - '#/paths/~1tyk~1apis~1oas/post/requestBody/content/application~1json/schema'
+    - >-
+      #/paths/~1tyk~1apis~1oas~1{apiID}/get/responses/200/content/application~1json/schema
+    - >-
+      #/paths/~1tyk~1apis~1oas~1{apiID}/put/requestBody/content/application~1json/schema
+    - >-
+      #/paths/~1tyk~1apis~1oas~1{apiID}/patch/requestBody/content/application~1json/schema
+    - >-
+      #/paths/~1tyk~1apis~1oas~1import/post/requestBody/content/application~1json/schema
+https://raw.githubusercontent.com/OAI/OpenAPI-Specification/main/schemas/v3.0/schema.json:
+  spec:
+    - '#/id'
+    - '#/$schema'
+    - '#/patternProperties'
+    - '#/definitions'
+    - '#/definitions/Info/patternProperties'
+    - '#/definitions/Contact/patternProperties'
+    - '#/definitions/License/patternProperties'
+    - '#/definitions/ExternalDocumentation/patternProperties'
+    - '#/definitions/Server/patternProperties'
+    - '#/definitions/ServerVariable/patternProperties'
+    - '#/definitions/Tag/patternProperties'
+    - '#/definitions/Paths/patternProperties'
+    - '#/definitions/Components/patternProperties'
+    - '#/definitions/Components/properties/schemas/patternProperties'
+    - '#/definitions/Components/properties/responses/patternProperties'
+    - '#/definitions/Components/properties/parameters/patternProperties'
+    - '#/definitions/Components/properties/examples/patternProperties'
+    - '#/definitions/Components/properties/requestBodies/patternProperties'
+    - '#/definitions/Components/properties/headers/patternProperties'
+    - '#/definitions/Components/properties/securitySchemes/patternProperties'
+    - '#/definitions/Components/properties/links/patternProperties'
+    - '#/definitions/Components/properties/callbacks/patternProperties'
