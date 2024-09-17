@@ -137,6 +137,9 @@ func (s *StreamingMiddleware) garbageCollect() {
 
 	s.streamManagerCache.Range(func(_, value interface{}) bool {
 		manager := value.(*StreamManager)
+		if manager == s.defaultStreamManager {
+			return true
+		}
 		manager.streams.Range(func(key, streamValue interface{}) bool {
 			streamID := key.(string)
 
