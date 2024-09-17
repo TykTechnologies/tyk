@@ -4,7 +4,7 @@ The **Tyk API Documentation** is an OpenAPI specification that outlines the endp
 
 ## Notes
 
-The current OAS version is **v3.0.3**, generated from gateway **v5.5.0**.
+The current OAS version is **v3.0.3**, generated from gateway **v5.6.0**.
 
 We are currently using OpenAPI Specification version **v3.0.3**.
 
