@@ -218,24 +218,7 @@ tags:
       
       * `cache_options.enable_upstream_cache_control`: Set this to `true` if you want your application to control the cache options for Tyk (TTL and whether to cache or not). See [Caching](/docs/basic-config-and-security/reduce-latency/caching/) for more details.
       
-      * `response_processors`: Response processors need to be specifically defined so they are loaded on API creation, otherwise the middleware will not fire. In order to have the two main response middleware components fire, the following configuration object should be supplied.
-
-      ```{json}
-      "response_processors": [
-        {
-            "name": "header_injector",
-            "options": {
-                "add_headers": {"name": "value"},
-                "remove_headers": ["name"]
-            }
-        },
-        {
-          "name": "response_body_transform",
-          "options": {}
-        }
-      ]
-      ```
-      The options for the `header_injector` are global, and will apply to all outbound requests.
+      * `response_processors`: Response processors need to be specifically defined so they are loaded on API creation, otherwise the middleware will not fire.
 
 
   - name: APIs
