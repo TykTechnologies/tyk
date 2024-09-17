@@ -21,14 +21,14 @@ We used the Go library [openapi-go](https://github.com/swaggest/openapi-go) beca
 
 1. Ensure that Redocly is installed on your system. You can install Redocly from [here](https://github.com/Redocly/redocly-cli).
 2. Clone the gateway repository and check out the branch [generate-swagger](https://github.com/TykTechnologies/tyk/tree/generate-swagger).
-3. Navigate to the directory [swagger/cmd](https://github.com/TykTechnologies/tyk/tree/generate-swagger/swagger/cmd). This directory contains a Makefile with a rule (`generate`) used to generate the swagger.yaml file.
+3. Navigate to the directory [swagger/cmd](https://github.com/TykTechnologies/tyk/tree/generate-swagger/swagger/cmd). This directory contains a Makefile with a rule (`generate`) used to generate the swagger.yml file.
 4. Run the command `make generate` in this directory.
 5. After running this command, a `swagger.yml` file containing all the gateway endpoints will be generated in the same directory.
 6. What the `make generate` command does:
-      - The command is defined as: `rm -f swagger.yaml && go run main.go && redocly lint swagger.yaml`.
-      - It first removes the existing `swagger.yaml` file (if any), generates a new `swagger.yaml` file, and finally lints the file using Redocly.
+      - The command is defined as: `rm -f swagger.yml && go run main.go && redocly lint swagger.yml`.
+      - It first removes the existing `swagger.yml` file (if any), generates a new `swagger.yml` file, and finally lints the file using Redocly.
 
 ## File Structure
 
 1. In the Swagger folder, there is a file for each OAS tag (e.g., cache tag, key tag, etc.). If you want to add a new endpoint, add it to its specific tag.
-2. The `cmd` directory contains the `main.go` file (used to call all the generation functions), a Makefile, and the generated `swagger.yaml` file.
+2. The `cmd` directory contains the `main.go` file (used to call all the generation functions), a Makefile, and the generated `swagger.yml` file.
