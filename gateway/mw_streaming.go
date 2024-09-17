@@ -43,15 +43,16 @@ type StreamManager struct {
 	listenPaths []string
 }
 
-func (sm *StreamManager) initStreams(specStreams map[string]interface{}) {
+func (sm *StreamManager) initStreams(r *http.Request, specStreams map[string]interface{}) {
 	// Clear existing routes for this consumer group
 	sm.muxer = mux.NewRouter()
 
 	for streamID, streamConfig := range specStreams {
 		if streamMap, ok := streamConfig.(map[string]interface{}); ok {
-			hasHttp := HasHttp(streamMap)
+			httpPaths := GetHTTPPaths(streamMap)
+			
 			if sm.dryRun {
-				if !hasHttp {
+				if !len(httpPaths) == 0 {
 					err := sm.createStream(streamID, streamMap)
 					if err != nil {
 						sm.mw.Logger().WithError(err).Errorf("Error creating stream %s", streamID)
@@ -63,8 +64,16 @@ func (sm *StreamManager) initStreams(specStreams map[string]interface{}) {
 					sm.mw.Logger().WithError(err).Errorf("Error creating stream %s", streamID)
 				}
 			}
-			sm.listenPaths = GetHTTPPaths(streamMap)
+			sm.listenPaths = append(sm.listenPaths, httpPaths...)
+		}
+	}
 
+	// If it is default stream manager, init muxer
+	if r == nil {
+		for _, path := range sm.listenPaths {
+			sm.muxer.HandleFunc(path, func(w http.ResponseWriter, r *http.Request) {
+				// Dummy handler
+			})
 		}
 	}
 }
@@ -141,121 +150,46 @@ func (s *StreamingMiddleware) createStreamManager(r *http.Request) *StreamManage
 	s.streamManagers.Store(streamID, newStreamManager)
 
 	// Call initStreams for the new StreamManager
-	newStreamManager.initStreams(s.getStreamsConfig(r))
+	newStreamManager.initStreams(r, s.getStreamsConfig(r))
 
 	return newStreamManager
 }
 
-func HasHttp(config map[string]interface{}) bool {
-    // Define the components to check
-    components := []string{"input", "output"}
-
-    for _, component := range components {
-        componentConfig, exists := config[component]
-        if !exists {
-            continue
-        }
-
-        componentMap, ok := componentConfig.(map[string]interface{})
-        if !ok {
-            continue
-        }
-
-        // Check if 'broker' exists under this component
-        if brokerConfig, found := componentMap["broker"]; found {
-            // 'broker' is expected to be a list of configurations
-            brokerList, ok := brokerConfig.([]interface{})
-            if !ok {
-                continue
-            }
-            for _, brokerItem := range brokerList {
-                brokerItemMap, ok := brokerItem.(map[string]interface{})
-                if !ok {
-                    continue
-                }
-                // Check if 'http_server' exists in the broker item
-                if _, found := brokerItemMap["http_server"]; found {
-                    return true
-                }
-            }
-        } else if _, found := componentMap["http_server"]; found {
-            // Check for 'http_server' directly under input/output
-            return true
-        }
-    }
-
-    return false
+// Helper function to extract HTTP server paths from a given configuration
+func extractHTTPServerPaths(config map[string]interface{}) []string {
+	if httpServerConfig, ok := config["http_server"].(map[string]interface{}); ok {
+		return extractPaths(httpServerConfig)
+	}
+	return nil
 }
 
+// Helper function to handle broker configurations
+func handleBroker(brokerConfig map[string]interface{}) []string {
+	var paths []string
+	for _, ioKey := range []string{"inputs", "outputs"} {
+		if ioList, ok := brokerConfig[ioKey].([]interface{}); ok {
+			for _, ioItem := range ioList {
+				if ioItemMap, ok := ioItem.(map[string]interface{}); ok {
+					paths = append(paths, extractHTTPServerPaths(ioItemMap)...)
+				}
+			}
+		}
+	}
+	return paths
+}
+
+// Main function to get HTTP paths from the stream configuration
 func GetHTTPPaths(streamConfig map[string]interface{}) []string {
-    paths := []string{}
-
-    // Define the path keys and their default values
-    pathKeys := []string{"path", "ws_path", "stream_path"}
-    defaultPaths := map[string]string{
-        "path":        "/post",
-        "ws_path":     "/post/ws",
-        "stream_path": "/get/stream",
-    }
-
-    // Components to process: 'input' and 'output'
-    components := []string{"input", "output"}
-
-    // Helper function to extract paths from an http_server config
-    extractPaths := func(httpConfig map[string]interface{}) {
-        for _, key := range pathKeys {
-            val, exists := httpConfig[key]
-            if !exists {
-                // Use default if key is missing
-                paths = append(paths, defaultPaths[key])
-            } else if pathStr, ok := val.(string); ok {
-                paths = append(paths, pathStr)
-            } else {
-                // Use default if value is not a string
-                paths = append(paths, defaultPaths[key])
-            }
-        }
-    }
-
-    for _, component := range components {
-        componentConfig, exists := streamConfig[component]
-        if !exists {
-            continue
-        }
-
-        componentMap, ok := componentConfig.(map[string]interface{})
-        if !ok {
-            continue
-        }
-
-        // Check if 'broker' exists under this component
-        if brokerConfig, exists := componentMap["broker"]; exists {
-            // 'broker' is a list of configurations
-            brokerList, ok := brokerConfig.([]interface{})
-            if !ok {
-                continue
-            }
-            for _, brokerItem := range brokerList {
-                brokerItemMap, ok := brokerItem.(map[string]interface{})
-                if !ok {
-                    continue
-                }
-                // Check if 'http_server' exists under this broker item
-                if httpServerConfig, exists := brokerItemMap["http_server"]; exists {
-                    if httpConfigMap, ok := httpServerConfig.(map[string]interface{}); ok {
-                        extractPaths(httpConfigMap)
-                    }
-                }
-            }
-        } else if httpServerConfig, exists := componentMap["http_server"]; exists {
-            // 'http_server' directly under component
-            if httpConfigMap, ok := httpServerConfig.(map[string]interface{}); ok {
-                extractPaths(httpConfigMap)
-            }
-        }
-    }
-
-    return paths
+	var paths []string
+	for _, component := range []string{"input", "output"} {
+		if componentMap, ok := streamConfig[component].(map[string]interface{}); ok {
+			paths = append(paths, extractHTTPServerPaths(componentMap)...)
+			if brokerConfig, ok := componentMap["broker"].(map[string]interface{}); ok {
+				paths = append(paths, handleBroker(brokerConfig)...)
+			}
+		}
+	}
+	return paths
 }
 
 // getStreamsConfig extracts streaming configurations from an API spec if available.
@@ -344,8 +278,14 @@ func (s *StreamingMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 
 	s.Logger().Debugf("Processing request: %s, %s", r.URL.Path, strippedPath)
 
-	newRequest := r.Clone(r.Context())
-	newRequest.URL.Path = strippedPath
+	newRequest := &http.Request{
+		Method: r.Method,
+		URL: &url.URL{ Scheme: r.URL.Scheme, Host: r.URL.Host, Path: strippedPath}
+	}
+
+	if !s.defaultStreamManager.muxer.Match(newRequest, &mux.RouteMatch{}) {
+		return nil, http.StatusOK
+	}
 
 	var match mux.RouteMatch
 	streamManager := s.createStreamManager(r)
