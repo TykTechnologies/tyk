@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"context"
+	"crypto/md5"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -10,7 +11,6 @@ import (
 	"strings"
 	"sync"
 	"sync/atomic"
-	"time"
 
 	"github.com/sirupsen/logrus"
 
@@ -38,6 +38,9 @@ var globalStreamCounter atomic.Int64
 // StreamingMiddleware is a middleware that handles streaming functionality
 type StreamingMiddleware struct {
 	*BaseMiddleware
+
+	streamManagerCache sync.Map // Map of payload hash to StreamManager
+
 	streamManagers       sync.Map // Map of consumer group IDs to StreamManager
 	ctx                  context.Context
 	cancel               context.CancelFunc
@@ -153,17 +156,27 @@ func (s *StreamingMiddleware) Init() {
 }
 
 func (s *StreamingMiddleware) createStreamManager(r *http.Request) *StreamManager {
+	streamsConfig := s.getStreamsConfig(r)
+	configJSON, _ := json.Marshal(streamsConfig)
+	cacheKey := fmt.Sprintf("%x", md5.Sum(configJSON))
+
+	s.Logger().Debug("Attempting to load stream manager from cache")
+	s.Logger().Debugf("Cache key: %s", cacheKey)
+	if cachedManager, found := s.streamManagerCache.Load(cacheKey); found {
+		s.Logger().Debug("Found cached stream manager")
+		return cachedManager.(*StreamManager)
+	}
+
 	newStreamManager := &StreamManager{
 		muxer:  mux.NewRouter(),
 		mw:     s,
 		dryRun: r == nil,
 	}
-	streamID := fmt.Sprintf("_%d", time.Now().UnixNano())
-	s.streamManagers.Store(streamID, newStreamManager)
+	newStreamManager.initStreams(r, streamsConfig)
 
-	// Call initStreams for the new StreamManager
-	newStreamManager.initStreams(r, s.getStreamsConfig(r))
-
+	if r != nil {
+		s.streamManagerCache.Store(cacheKey, newStreamManager)
+	}
 	return newStreamManager
 }
 
@@ -372,11 +385,8 @@ func (s *StreamingMiddleware) Unload() {
 	s.cancel()
 
 	s.Logger().Debug("Closing active streams")
-	s.streamManagers.Range(func(_, value interface{}) bool {
-		manager, ok := value.(*StreamManager)
-		if !ok {
-			return true
-		}
+	s.streamManagerCache.Range(func(_, value interface{}) bool {
+		manager := value.(*StreamManager)
 		manager.streams.Range(func(_, streamValue interface{}) bool {
 			if stream, ok := streamValue.(*streaming.Stream); ok {
 				if err := stream.Reset(); err != nil {
@@ -389,6 +399,7 @@ func (s *StreamingMiddleware) Unload() {
 	})
 
 	s.streamManagers = sync.Map{}
+	s.streamManagerCache = sync.Map{}
 
 	s.Logger().Info("All streams successfully removed")
 }
