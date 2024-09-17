@@ -53,8 +53,7 @@ type StreamManager struct {
 	dryRun      bool
 	listenPaths []string
 
-	lastActivity sync.Map // Map of stream IDs to last activity time
-
+	lastActivity atomic.Value // Last activity time for the StreamManager
 }
 
 func (sm *StreamManager) initStreams(r *http.Request, specStreams map[string]interface{}) {
@@ -114,34 +113,44 @@ type connection struct {
 	cancel context.CancelFunc
 }
 
+func (s *StreamingMiddleware) removeStreamManager(cacheKey string) {
+	if manager, ok := s.streamManagerCache.Load(cacheKey); ok {
+		sm := manager.(*StreamManager)
+		sm.streams.Range(func(key, streamValue interface{}) bool {
+			streamID := key.(string)
+			if err := sm.removeStream(streamID); err != nil {
+				s.Logger().Errorf("Error removing stream %s: %v", streamID, err)
+			}
+			return true
+		})
+		s.streamManagerCache.Delete(cacheKey)
+	}
+}
+
 func (s *StreamingMiddleware) garbageCollect() {
-	s.Logger().Debug("Starting garbage collection for inactive streams")
+	s.Logger().Debug("Starting garbage collection for inactive stream managers")
 	now := time.Now()
 
-	s.streamManagerCache.Range(func(_, value interface{}) bool {
+	s.streamManagerCache.Range(func(key, value interface{}) bool {
 		manager := value.(*StreamManager)
 		if manager == s.defaultStreamManager {
 			return true
 		}
-		manager.streams.Range(func(key, streamValue interface{}) bool {
-			streamID := key.(string)
 
-			lastActivityTime, ok := manager.lastActivity.Load(streamID)
-			if !ok {
-				// If no activity recorded, assume it's inactive
-				lastActivityTime = time.Time{}
-			}
-
-			if now.Sub(lastActivityTime.(time.Time)) > StreamInactiveLimit {
-				s.Logger().Infof("Removing inactive stream: %s", streamID)
+		lastActivityTime := manager.lastActivity.Load().(time.Time)
+		if now.Sub(lastActivityTime) > StreamInactiveLimit {
+			s.Logger().Infof("Removing inactive stream manager: %v", key)
+			manager.streams.Range(func(streamKey, streamValue interface{}) bool {
+				streamID := streamKey.(string)
 				err := manager.removeStream(streamID)
 				if err != nil {
 					s.Logger().Errorf("Error removing stream %s: %v", streamID, err)
 				}
-			}
+				return true
+			})
+			s.streamManagerCache.Delete(key)
+		}
 
-			return true
-		})
 		return true
 	})
 }
@@ -214,10 +223,12 @@ func (s *StreamingMiddleware) createStreamManager(r *http.Request) *StreamManage
 	}
 
 	newStreamManager := &StreamManager{
-		muxer:  mux.NewRouter(),
-		mw:     s,
-		dryRun: r == nil,
+		muxer:        mux.NewRouter(),
+		mw:           s,
+		dryRun:       r == nil,
+		lastActivity: atomic.Value{},
 	}
+	newStreamManager.lastActivity.Store(time.Now())
 	newStreamManager.initStreams(r, streamsConfig)
 
 	if r != nil {
@@ -443,9 +454,9 @@ func (h *handleFuncAdapter) HandleFunc(path string, f func(http.ResponseWriter, 
 
 	h.sm.routeLock.Lock()
 	h.muxer.HandleFunc(path, func(w http.ResponseWriter, r *http.Request) {
-		h.sm.lastActivity.Store(h.streamID, time.Now())
+		h.sm.lastActivity.Store(time.Now())
 		f(w, r)
-		h.sm.lastActivity.Store(h.streamID, time.Now())
+		h.sm.lastActivity.Store(time.Now())
 	})
 	h.sm.routeLock.Unlock()
 	h.logger.Debugf("Registered handler for path: %s", path)
