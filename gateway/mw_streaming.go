@@ -3,6 +3,7 @@ package gateway
 import (
 	"crypto/md5"
 	"encoding/json"
+	"time"
 
 	"context"
 	"fmt"
@@ -21,6 +22,8 @@ import (
 
 const (
 	ExtensionTykStreaming = "x-tyk-streaming"
+	StreamGCInterval      = 1 * time.Minute
+	StreamInactiveLimit   = 10 * time.Minute
 )
 
 // Used for testing
@@ -37,6 +40,9 @@ type StreamingMiddleware struct {
 	cancel               context.CancelFunc
 	allowedUnsafe        []string
 	defaultStreamManager *StreamManager
+
+	lastActivity sync.Map // Map of stream IDs to last activity time
+
 }
 
 type StreamManager struct {
@@ -46,6 +52,9 @@ type StreamManager struct {
 	mw          *StreamingMiddleware
 	dryRun      bool
 	listenPaths []string
+
+	lastActivity sync.Map // Map of stream IDs to last activity time
+
 }
 
 func (sm *StreamManager) initStreams(r *http.Request, specStreams map[string]interface{}) {
@@ -105,6 +114,35 @@ type connection struct {
 	cancel context.CancelFunc
 }
 
+func (s *StreamingMiddleware) garbageCollect() {
+	s.Logger().Debug("Starting garbage collection for inactive streams")
+	now := time.Now()
+
+	s.streamManagerCache.Range(func(_, value interface{}) bool {
+		manager := value.(*StreamManager)
+		manager.streams.Range(func(key, streamValue interface{}) bool {
+			streamID := key.(string)
+
+			lastActivityTime, ok := manager.lastActivity.Load(streamID)
+			if !ok {
+				// If no activity recorded, assume it's inactive
+				lastActivityTime = time.Time{}
+			}
+
+			if now.Sub(lastActivityTime.(time.Time)) > StreamInactiveLimit {
+				s.Logger().Infof("Removing inactive stream: %s", streamID)
+				err := manager.removeStream(streamID)
+				if err != nil {
+					s.Logger().Errorf("Error removing stream %s: %v", streamID, err)
+				}
+			}
+
+			return true
+		})
+		return true
+	})
+}
+
 func (s *StreamingMiddleware) Name() string {
 	return "StreamingMiddleware"
 }
@@ -143,6 +181,21 @@ func (s *StreamingMiddleware) Init() {
 
 	s.Logger().Debug("Initializing default stream manager")
 	s.defaultStreamManager = s.createStreamManager(nil)
+
+	// Start garbage collection routine
+	go func() {
+		ticker := time.NewTicker(StreamGCInterval)
+		defer ticker.Stop()
+
+		for {
+			select {
+			case <-ticker.C:
+				s.garbageCollect()
+			case <-s.ctx.Done():
+				return
+			}
+		}
+	}()
 }
 
 func (s *StreamingMiddleware) createStreamManager(r *http.Request) *StreamManager {
@@ -387,14 +440,9 @@ func (h *handleFuncAdapter) HandleFunc(path string, f func(http.ResponseWriter, 
 
 	h.sm.routeLock.Lock()
 	h.muxer.HandleFunc(path, func(w http.ResponseWriter, r *http.Request) {
-		defer func() {
-			// Stop the stream when the HTTP request finishes
-			if err := h.sm.removeStream(h.streamID); err != nil {
-				h.logger.Errorf("Failed to stop stream %s: %v", h.streamID, err)
-			}
-		}()
-
+		h.sm.lastActivity.Store(h.streamID, time.Now())
 		f(w, r)
+		h.sm.lastActivity.Store(h.streamID, time.Now())
 	})
 	h.sm.routeLock.Unlock()
 	h.logger.Debugf("Registered handler for path: %s", path)
