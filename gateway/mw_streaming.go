@@ -1,15 +1,17 @@
 package gateway
 
 import (
-	"context"
+	"crypto/md5"
 	"encoding/json"
+	"time"
+
+	"context"
 	"fmt"
 	"net/http"
 	"net/url"
 	"strings"
 	"sync"
 	"sync/atomic"
-	"time"
 
 	"github.com/sirupsen/logrus"
 
@@ -20,6 +22,8 @@ import (
 
 const (
 	ExtensionTykStreaming = "x-tyk-streaming"
+	StreamGCInterval      = 1 * time.Minute
+	StreamInactiveLimit   = 10 * time.Minute
 )
 
 // Used for testing
@@ -28,11 +32,17 @@ var globalStreamCounter atomic.Int64
 // StreamingMiddleware is a middleware that handles streaming functionality
 type StreamingMiddleware struct {
 	*BaseMiddleware
+
+	streamManagerCache sync.Map // Map of payload hash to StreamManager
+
 	streamManagers       sync.Map // Map of consumer group IDs to StreamManager
 	ctx                  context.Context
 	cancel               context.CancelFunc
 	allowedUnsafe        []string
 	defaultStreamManager *StreamManager
+
+	lastActivity sync.Map // Map of stream IDs to last activity time
+
 }
 
 type StreamManager struct {
@@ -42,6 +52,8 @@ type StreamManager struct {
 	mw          *StreamingMiddleware
 	dryRun      bool
 	listenPaths []string
+
+	lastActivity atomic.Value // Last activity time for the StreamManager
 }
 
 func (sm *StreamManager) initStreams(r *http.Request, specStreams map[string]interface{}) {
@@ -51,7 +63,7 @@ func (sm *StreamManager) initStreams(r *http.Request, specStreams map[string]int
 	for streamID, streamConfig := range specStreams {
 		if streamMap, ok := streamConfig.(map[string]interface{}); ok {
 			httpPaths := GetHTTPPaths(streamMap)
-			
+
 			if sm.dryRun {
 				if len(httpPaths) == 0 {
 					err := sm.createStream(streamID, streamMap)
@@ -101,6 +113,48 @@ type connection struct {
 	cancel context.CancelFunc
 }
 
+func (s *StreamingMiddleware) removeStreamManager(cacheKey string) {
+	if manager, ok := s.streamManagerCache.Load(cacheKey); ok {
+		sm := manager.(*StreamManager)
+		sm.streams.Range(func(key, streamValue interface{}) bool {
+			streamID := key.(string)
+			if err := sm.removeStream(streamID); err != nil {
+				s.Logger().Errorf("Error removing stream %s: %v", streamID, err)
+			}
+			return true
+		})
+		s.streamManagerCache.Delete(cacheKey)
+	}
+}
+
+func (s *StreamingMiddleware) garbageCollect() {
+	s.Logger().Debug("Starting garbage collection for inactive stream managers")
+	now := time.Now()
+
+	s.streamManagerCache.Range(func(key, value interface{}) bool {
+		manager := value.(*StreamManager)
+		if manager == s.defaultStreamManager {
+			return true
+		}
+
+		lastActivityTime := manager.lastActivity.Load().(time.Time)
+		if now.Sub(lastActivityTime) > StreamInactiveLimit {
+			s.Logger().Infof("Removing inactive stream manager: %v", key)
+			manager.streams.Range(func(streamKey, streamValue interface{}) bool {
+				streamID := streamKey.(string)
+				err := manager.removeStream(streamID)
+				if err != nil {
+					s.Logger().Errorf("Error removing stream %s: %v", streamID, err)
+				}
+				return true
+			})
+			s.streamManagerCache.Delete(key)
+		}
+
+		return true
+	})
+}
+
 func (s *StreamingMiddleware) Name() string {
 	return "StreamingMiddleware"
 }
@@ -139,20 +193,47 @@ func (s *StreamingMiddleware) Init() {
 
 	s.Logger().Debug("Initializing default stream manager")
 	s.defaultStreamManager = s.createStreamManager(nil)
+
+	// Start garbage collection routine
+	go func() {
+		ticker := time.NewTicker(StreamGCInterval)
+		defer ticker.Stop()
+
+		for {
+			select {
+			case <-ticker.C:
+				s.garbageCollect()
+			case <-s.ctx.Done():
+				return
+			}
+		}
+	}()
 }
 
 func (s *StreamingMiddleware) createStreamManager(r *http.Request) *StreamManager {
-	newStreamManager := &StreamManager{
-		muxer:  mux.NewRouter(),
-		mw:     s,
-		dryRun: r == nil,
+	streamsConfig := s.getStreamsConfig(r)
+	configJSON, _ := json.Marshal(streamsConfig)
+	cacheKey := fmt.Sprintf("%x", md5.Sum(configJSON))
+
+	s.Logger().Debug("Attempting to load stream manager from cache")
+	s.Logger().Debugf("Cache key: %s", cacheKey)
+	if cachedManager, found := s.streamManagerCache.Load(cacheKey); found {
+		s.Logger().Debug("Found cached stream manager")
+		return cachedManager.(*StreamManager)
 	}
-	streamID := fmt.Sprintf("_%d", time.Now().UnixNano())
-	s.streamManagers.Store(streamID, newStreamManager)
 
-	// Call initStreams for the new StreamManager
-	newStreamManager.initStreams(r, s.getStreamsConfig(r))
+	newStreamManager := &StreamManager{
+		muxer:        mux.NewRouter(),
+		mw:           s,
+		dryRun:       r == nil,
+		lastActivity: atomic.Value{},
+	}
+	newStreamManager.lastActivity.Store(time.Now())
+	newStreamManager.initStreams(r, streamsConfig)
 
+	if r != nil {
+		s.streamManagerCache.Store(cacheKey, newStreamManager)
+	}
 	return newStreamManager
 }
 
@@ -226,6 +307,7 @@ func (s *StreamingMiddleware) getStreamsConfig(r *http.Request) map[string]inter
 							if err != nil {
 								s.Logger().Errorf("Failed to marshal stream config: %v", err)
 								continue
+
 							}
 							replacedStream := s.Gw.replaceTykVariables(r, string(marshaledStream), true)
 
@@ -299,7 +381,7 @@ func (s *StreamingMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 
 	newRequest := &http.Request{
 		Method: r.Method,
-		URL: &url.URL{ Scheme: r.URL.Scheme, Host: r.URL.Host, Path: strippedPath},
+		URL:    &url.URL{Scheme: r.URL.Scheme, Host: r.URL.Host, Path: strippedPath},
 	}
 
 	if !s.defaultStreamManager.muxer.Match(newRequest, &mux.RouteMatch{}) {
@@ -337,7 +419,7 @@ func (s *StreamingMiddleware) Unload() {
 	s.cancel()
 
 	s.Logger().Debug("Closing active streams")
-	s.streamManagers.Range(func(_, value interface{}) bool {
+	s.streamManagerCache.Range(func(_, value interface{}) bool {
 		manager := value.(*StreamManager)
 		manager.streams.Range(func(_, streamValue interface{}) bool {
 			if stream, ok := streamValue.(*streaming.Stream); ok {
@@ -349,6 +431,7 @@ func (s *StreamingMiddleware) Unload() {
 	})
 
 	s.streamManagers = sync.Map{}
+	s.streamManagerCache = sync.Map{}
 
 	s.Logger().Info("All streams successfully removed")
 }
@@ -371,14 +454,9 @@ func (h *handleFuncAdapter) HandleFunc(path string, f func(http.ResponseWriter, 
 
 	h.sm.routeLock.Lock()
 	h.muxer.HandleFunc(path, func(w http.ResponseWriter, r *http.Request) {
-		defer func() {
-			// Stop the stream when the HTTP request finishes
-			if err := h.sm.removeStream(h.streamID); err != nil {
-				h.logger.Errorf("Failed to stop stream %s: %v", h.streamID, err)
-			}
-		}()
-
+		h.sm.lastActivity.Store(time.Now())
 		f(w, r)
+		h.sm.lastActivity.Store(time.Now())
 	})
 	h.sm.routeLock.Unlock()
 	h.logger.Debugf("Registered handler for path: %s", path)
