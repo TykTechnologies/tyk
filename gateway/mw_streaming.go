@@ -26,7 +26,7 @@ type StreamsConfig struct {
 	Info struct {
 		Version string `json:"version"`
 	} `json:"info"`
-	Streams map[string]interface{} `json:"streams"`
+	Streams map[string]any `json:"streams"`
 }
 
 // StreamingMiddleware is a middleware that handles streaming functionality
@@ -52,7 +52,7 @@ func (sm *StreamManager) initStreams(config *StreamsConfig) {
 	sm.muxer = mux.NewRouter()
 
 	for streamID, streamConfig := range config.Streams {
-		if streamMap, ok := streamConfig.(map[string]interface{}); ok {
+		if streamMap, ok := streamConfig.(map[string]any); ok {
 			hasHttp := HasHttp(streamMap)
 			if sm.dryRun {
 				if !hasHttp {
@@ -164,7 +164,7 @@ func HasHttp(config map[string]interface{}) bool {
 	return false
 }
 
-func GetHTTPPaths(streamConfig map[string]interface{}) []string {
+func GetHTTPPaths(streamConfig map[string]any) []string {
 	paths := make([]string, 0)
 	pathKeys := []string{"path", "stream_path", "ws_path"}
 	components := []string{"output", "input"}
@@ -256,7 +256,7 @@ func (s *StreamingMiddleware) getStreamsConfig(r *http.Request) *StreamsConfig {
 }
 
 // createStream creates a new stream
-func (sm *StreamManager) createStream(streamID string, config map[string]interface{}) error {
+func (sm *StreamManager) createStream(streamID string, config map[string]any) error {
 	streamFullID := fmt.Sprintf("%s_%s", sm.mw.Spec.APIID, streamID)
 	sm.mw.Logger().Debugf("Creating stream: %s", streamFullID)
 
