@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"strings"
 	"testing"
-	textTemplate "text/template"
+	texttemplate "text/template"
 
 	"github.com/TykTechnologies/tyk/test"
 
@@ -22,7 +22,7 @@ func testPrepareTransformNonAscii() (*TransformSpec, string) {
 	tmpl := `[{{range $x, $s := .names.name}}"{{$s}}"{{if not $x}}, {{end}}{{end}}]`
 	tmeta := &TransformSpec{}
 	tmeta.TemplateData.Input = apidef.RequestXML
-	tmeta.Template = textTemplate.Must(textTemplate.New("blob").Parse(tmpl))
+	tmeta.Template = texttemplate.Must(texttemplate.New("blob").Parse(tmpl))
 	return tmeta, in
 }
 
@@ -85,7 +85,7 @@ func TestTransformXMLCrash(t *testing.T) {
 	r := TestReq(t, "GET", "/", in)
 	tmeta := &TransformSpec{}
 	tmeta.TemplateData.Input = apidef.RequestXML
-	tmeta.Template = textTemplate.Must(apidef.Template.New("").Parse(""))
+	tmeta.Template = texttemplate.Must(apidef.Template.New("").Parse(""))
 
 	ts := StartTest(nil)
 	defer ts.Close()
@@ -105,7 +105,7 @@ func testPrepareTransformJSONMarshal(inputType string) (tmeta *TransformSpec, in
 	tmeta = &TransformSpec{}
 	tmpl := `[{{range $x, $s := .names.name}}{{$s | jsonMarshal}}{{if not $x}}, {{end}}{{end}}]`
 	tmeta.TemplateData.Input = apidef.RequestXML
-	tmeta.Template = textTemplate.Must(apidef.Template.New("").Parse(tmpl))
+	tmeta.Template = texttemplate.Must(apidef.Template.New("").Parse(tmpl))
 
 	switch inputType {
 	case "json":
@@ -124,7 +124,7 @@ func testPrepareTransformJSONMarshal(inputType string) (tmeta *TransformSpec, in
 
 func testPrepareTransformXMLMarshal(tmpl string, inputType apidef.RequestInputType) (tmeta *TransformSpec) {
 	tmeta = &TransformSpec{}
-	tmeta.Template = textTemplate.Must(apidef.Template.New("").Parse(tmpl))
+	tmeta.Template = texttemplate.Must(apidef.Template.New("").Parse(tmpl))
 
 	switch inputType {
 	case apidef.RequestJSON:
@@ -194,7 +194,7 @@ func testPrepareTransformJSONMarshalArray(tb testing.TB) (tmeta *TransformSpec, 
 	tmeta = &TransformSpec{}
 	tmpl := `[{{ range $key, $value := .array }}{{ if $key }},{{ end }}{{ .abc }}{{ end }}]`
 	tmeta.TemplateData.Input = apidef.RequestXML
-	tmeta.Template = textTemplate.Must(apidef.Template.New("").Parse(tmpl))
+	tmeta.Template = texttemplate.Must(apidef.Template.New("").Parse(tmpl))
 
 	tmeta.TemplateData.Input = apidef.RequestJSON
 	in = `[{"abc": 123}, {"abc": 456}]`
@@ -251,6 +251,7 @@ func BenchmarkTransformJSONMarshal(b *testing.B) {
 
 func TestTransformXMLMarshal(t *testing.T) {
 	assert := func(t *testing.T, input string, tmpl string, output string, inputType apidef.RequestInputType) {
+		t.Helper()
 		tmeta := testPrepareTransformXMLMarshal(tmpl, inputType)
 		r := TestReq(t, "GET", "/", input)
 

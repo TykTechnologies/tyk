@@ -29,6 +29,7 @@ func TestMiddleware(t *testing.T) {
 				Path:         "/path",
 			},
 		}
+
 		var pluginMW = Middleware{
 			Global: &Global{
 				PrePlugin: &PrePlugin{
@@ -69,6 +70,61 @@ func TestMiddleware(t *testing.T) {
 				ResponsePlugins:           customPlugins,
 			},
 		}
+		assert.Equal(t, expectedMW, resultMiddleware)
+	})
+
+	t.Run("response plugins", func(t *testing.T) {
+		customPlugins := CustomPlugins{
+			CustomPlugin{
+				Enabled:      true,
+				FunctionName: "func1",
+				Path:         "/path1",
+			},
+		}
+
+		responsePlugins := CustomPlugins{
+			CustomPlugin{
+				Enabled:      true,
+				FunctionName: "func2",
+				Path:         "/path2",
+			},
+			CustomPlugin{
+				Enabled:      true,
+				FunctionName: "func3",
+				Path:         "/path3",
+			},
+		}
+
+		var pluginMW = Middleware{
+			Global: &Global{
+				ResponsePlugin: &ResponsePlugin{
+					Plugins: customPlugins,
+				},
+				ResponsePlugins: responsePlugins,
+			},
+		}
+
+		var convertedAPI apidef.APIDefinition
+		convertedAPI.SetDisabledFlags()
+
+		pluginMW.ExtractTo(&convertedAPI)
+
+		// regression  https://tyktech.atlassian.net/browse/TT-12762
+		assert.Equal(t, len(responsePlugins), len(convertedAPI.CustomMiddleware.Response))
+
+		var resultMiddleware = Middleware{
+			Global: &Global{
+				ResponsePlugin: &ResponsePlugin{},
+			},
+		}
+		resultMiddleware.Fill(convertedAPI)
+
+		expectedMW := Middleware{
+			Global: &Global{
+				ResponsePlugins: responsePlugins,
+			},
+		}
+
 		assert.Equal(t, expectedMW, resultMiddleware)
 	})
 }
@@ -912,4 +968,75 @@ func TestTransformHeaders(t *testing.T) {
 	resultTransformHeaders.Fill(converted)
 
 	assert.Equal(t, emptyTransformHeaders, resultTransformHeaders)
+}
+
+func TestContextVariables(t *testing.T) {
+	t.Parallel()
+	t.Run("fill", func(t *testing.T) {
+		t.Parallel()
+		testcases := []struct {
+			title    string
+			input    apidef.APIDefinition
+			expected *ContextVariables
+		}{
+			{
+				"enabled",
+				apidef.APIDefinition{EnableContextVars: true},
+				&ContextVariables{Enabled: true},
+			},
+			{
+				"disabled",
+				apidef.APIDefinition{EnableContextVars: false},
+				nil,
+			},
+		}
+
+		for _, tc := range testcases {
+			tc := tc
+			t.Run(tc.title, func(t *testing.T) {
+				t.Parallel()
+
+				g := new(Global)
+				g.Fill(tc.input)
+
+				assert.Equal(t, tc.expected, g.ContextVariables)
+			})
+		}
+	})
+
+	t.Run("extractTo", func(t *testing.T) {
+		t.Parallel()
+
+		testcases := []struct {
+			title    string
+			input    *ContextVariables
+			expected bool
+		}{
+			{
+				"enabled",
+				&ContextVariables{Enabled: true},
+				true,
+			},
+			{
+				"disabled",
+				nil,
+				false,
+			},
+		}
+
+		for _, tc := range testcases {
+			tc := tc // Creating a new 'tc' scoped to the loop
+			t.Run(tc.title, func(t *testing.T) {
+				t.Parallel()
+
+				g := new(Global)
+				g.ContextVariables = tc.input
+
+				var apiDef apidef.APIDefinition
+				g.ExtractTo(&apiDef)
+
+				assert.Equal(t, tc.expected, apiDef.EnableContextVars)
+			})
+		}
+	})
 }

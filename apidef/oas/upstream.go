@@ -3,9 +3,9 @@ package oas
 import (
 	"sort"
 	"strings"
-	"time"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/internal/time"
 )
 
 // Upstream holds configuration for the upstream server to which Tyk should proxy requests.
@@ -496,27 +496,36 @@ type RateLimit struct {
 	// be considered as 0s/empty.
 	//
 	// Tyk classic API definition: `global_rate_limit.per`.
-	Per string `json:"per" bson:"per"`
+	Per ReadableDuration `json:"per" bson:"per"`
 }
 
 // Fill fills *RateLimit from apidef.APIDefinition.
 func (r *RateLimit) Fill(api apidef.APIDefinition) {
 	r.Enabled = !api.GlobalRateLimit.Disabled
 	r.Rate = int(api.GlobalRateLimit.Rate)
-	if per := api.GlobalRateLimit.Per; per != 0 {
-		perDuration := time.Duration(per) * time.Second
-		r.Per = perDuration.String()
-	}
+	r.Per = ReadableDuration(time.Duration(api.GlobalRateLimit.Per) * time.Second)
 }
 
 // ExtractTo extracts *Ratelimit into *apidef.APIDefinition.
 func (r *RateLimit) ExtractTo(api *apidef.APIDefinition) {
 	api.GlobalRateLimit.Disabled = !r.Enabled
 	api.GlobalRateLimit.Rate = float64(r.Rate)
-	perDuration, err := time.ParseDuration(r.Per)
-	if err != nil {
-		perDuration = 0
-	}
+	api.GlobalRateLimit.Per = r.Per.Seconds()
+}
 
-	api.GlobalRateLimit.Per = perDuration.Seconds()
+// RateLimitEndpoint carries same settings as RateLimit but for endpoints.
+type RateLimitEndpoint RateLimit
+
+// Fill fills *RateLimit from apidef.RateLimitMeta.
+func (r *RateLimitEndpoint) Fill(api apidef.RateLimitMeta) {
+	r.Enabled = !api.Disabled
+	r.Rate = int(api.Rate)
+	r.Per = ReadableDuration(time.Duration(api.Per) * time.Second)
+}
+
+// ExtractTo extracts *Ratelimit into *apidef.RateLimitMeta.
+func (r *RateLimitEndpoint) ExtractTo(meta *apidef.RateLimitMeta) {
+	meta.Disabled = !r.Enabled
+	meta.Rate = float64(r.Rate)
+	meta.Per = r.Per.Seconds()
 }

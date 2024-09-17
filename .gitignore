@@ -1,7 +1,9 @@
 .DS_Store
 .idea/
 .vagrant/
+.venv/
 .vscode/
+coverage/
 temp/
 /middleware/bundles
 testapps/
@@ -54,3 +56,6 @@ tyk_linux_*
 
 .terraform**
 .task/
+*.test
+
+main

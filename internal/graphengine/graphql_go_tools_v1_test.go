@@ -912,6 +912,8 @@ func TestReverseProxyPreHandlerV1_PreHandle(t *testing.T) {
 }
 
 func newTestGraphqlRequestProcessorV1(t *testing.T) *graphqlRequestProcessorV1 {
+	t.Helper()
+
 	gqlTools := graphqlGoToolsV1{}
 	parsedSchema, err := gqlTools.parseSchema(testSchemaEngineV1)
 	require.NoError(t, err)
@@ -924,6 +926,8 @@ func newTestGraphqlRequestProcessorV1(t *testing.T) *graphqlRequestProcessorV1 {
 }
 
 func newTestGraphqlRequestProcessorWithOtelV1(t *testing.T) *graphqlRequestProcessorWithOTelV1 {
+	t.Helper()
+
 	gqlTools := graphqlGoToolsV1{}
 	parsedSchema, err := gqlTools.parseSchema(testSchemaEngineV1)
 	require.NoError(t, err)
@@ -958,6 +962,8 @@ func withTestComplexityCheckerV1Schema(schema string) testComplexityCheckerV1Opt
 }
 
 func newTestComplexityCheckerV1(t *testing.T, options ...testComplexityCheckerV1Option) *complexityCheckerV1 {
+	t.Helper()
+
 	opts := &testComplexityCheckerV1Options{
 		schema: testSchemaEngineV1,
 	}
@@ -978,6 +984,8 @@ func newTestComplexityCheckerV1(t *testing.T, options ...testComplexityCheckerV1
 }
 
 func newTestGranularAccessCheckerV1(t *testing.T) *granularAccessCheckerV1 {
+	t.Helper()
+
 	gqlTools := graphqlGoToolsV1{}
 	parsedSchema, err := gqlTools.parseSchema(testSchemaEngineV1)
 	require.NoError(t, err)

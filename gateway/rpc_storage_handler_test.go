@@ -4,9 +4,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"testing"
 
+	"github.com/TykTechnologies/tyk/internal/model"
 	"github.com/TykTechnologies/tyk/rpc"
 
 	"github.com/TykTechnologies/tyk/apidef"
@@ -58,6 +60,7 @@ func getRefreshToken(td tokenData) string {
 }
 
 func TestProcessKeySpaceChangesForOauth(t *testing.T) {
+	test.Exclusive(t) // Uses DeleteAllKeys, need to limit parallelism.
 
 	cases := []struct {
 		TestName string
@@ -134,7 +137,7 @@ func TestProcessKeySpaceChangesForOauth(t *testing.T) {
 				}
 			} else {
 				getKeyFromStore = ts.Gw.GlobalSessionManager.Store().GetKey
-				ts.Gw.GlobalSessionManager.Store().DeleteAllKeys()
+				ts.Gw.GlobalSessionManager.Store().DeleteAllKeys() // exclusive
 				err := ts.Gw.GlobalSessionManager.Store().SetRawKey(token, token, 100)
 				assert.NoError(t, err)
 				_, err = ts.Gw.GlobalSessionManager.Store().GetRawKey(token)
@@ -154,6 +157,7 @@ func TestProcessKeySpaceChangesForOauth(t *testing.T) {
 }
 
 func TestProcessKeySpaceChanges_ResetQuota(t *testing.T) {
+	test.Exclusive(t) // Uses DeleteAllKeys, need to limit parallelism.
 
 	g := StartTest(nil)
 	defer g.Close()
@@ -165,8 +169,8 @@ func TestProcessKeySpaceChanges_ResetQuota(t *testing.T) {
 		Gw:               g.Gw,
 	}
 
-	g.Gw.GlobalSessionManager.Store().DeleteAllKeys()
-	defer g.Gw.GlobalSessionManager.Store().DeleteAllKeys()
+	g.Gw.GlobalSessionManager.Store().DeleteAllKeys()       // exclusive
+	defer g.Gw.GlobalSessionManager.Store().DeleteAllKeys() // exclusive
 
 	api := g.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 		spec.UseKeylessAccess = false
@@ -216,6 +220,7 @@ func TestProcessKeySpaceChanges_ResetQuota(t *testing.T) {
 
 // TestRPCUpdateKey check that on update key event the key still exist in worker redis
 func TestRPCUpdateKey(t *testing.T) {
+	test.Exclusive(t) // Uses DeleteAllKeys, need to limit parallelism.
 
 	cases := []struct {
 		TestName     string
@@ -247,8 +252,8 @@ func TestRPCUpdateKey(t *testing.T) {
 				Gw:               g.Gw,
 			}
 
-			g.Gw.GlobalSessionManager.Store().DeleteAllKeys()
-			defer g.Gw.GlobalSessionManager.Store().DeleteAllKeys()
+			g.Gw.GlobalSessionManager.Store().DeleteAllKeys()       // exclusive
+			defer g.Gw.GlobalSessionManager.Store().DeleteAllKeys() // exclusive
 
 			api := g.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 				spec.UseKeylessAccess = false
@@ -288,6 +293,8 @@ func TestRPCUpdateKey(t *testing.T) {
 }
 
 func TestGetGroupLoginCallback(t *testing.T) {
+	test.Exclusive(t) // Uses DeleteAllKeys, need to limit parallelism.
+
 	tcs := []struct {
 		testName                 string
 		syncEnabled              bool
@@ -317,7 +324,7 @@ func TestGetGroupLoginCallback(t *testing.T) {
 				globalConf.SlaveOptions.SynchroniserEnabled = tc.syncEnabled
 			})
 			defer ts.Close()
-			defer ts.Gw.GlobalSessionManager.Store().DeleteAllKeys()
+			defer ts.Gw.GlobalSessionManager.Store().DeleteAllKeys() // exclusive
 
 			rpcListener := RPCStorageHandler{
 				KeyPrefix:        "rpc.listener.",
@@ -336,6 +343,11 @@ func TestGetGroupLoginCallback(t *testing.T) {
 				Stats: apidef.GWStats{
 					APIsCount:     0,
 					PoliciesCount: 0,
+				},
+				HostDetails: model.HostDetails{
+					Hostname: ts.Gw.hostDetails.Hostname,
+					PID:      ts.Gw.hostDetails.PID,
+					Address:  ts.Gw.hostDetails.Address,
 				},
 			}
 
@@ -503,6 +515,14 @@ func TestRPCStorageHandler_BuildNodeInfo(t *testing.T) {
 				tc.expectedNodeInfo.NodeID = ts.Gw.GetNodeID()
 			}
 
+			if tc.expectedNodeInfo.HostDetails.Hostname == "" {
+				tc.expectedNodeInfo.HostDetails = model.HostDetails{
+					Hostname: ts.Gw.hostDetails.Hostname,
+					PID:      ts.Gw.hostDetails.PID,
+					Address:  ts.Gw.hostDetails.Address,
+				}
+			}
+
 			expected, err := json.Marshal(tc.expectedNodeInfo)
 			assert.Nil(t, err)
 
@@ -607,5 +627,67 @@ func TestGetRawKey(t *testing.T) {
 
 		_, err := rpcListener.GetRawKey("any-key")
 		assert.Equal(t, storage.ErrMDCBConnectionLost, err)
+	})
+}
+
+func TestDeleteUsingTokenID(t *testing.T) {
+	ts := StartTest(func(globalConf *config.Config) {
+		globalConf.SlaveOptions.EnableRPCCache = true
+	})
+	defer ts.Close()
+
+	rpcListener := RPCStorageHandler{
+		KeyPrefix:        "rpc.listener.",
+		SuppressRegister: true,
+		Gw:               ts.Gw,
+	}
+
+	t.Run("key could not be removed by base64 key ID but exist by custom key ID", func(t *testing.T) {
+		// create a custom key
+		const customKey = "my-custom-key"
+		orgId := "default"
+		session := CreateStandardSession()
+		session.AccessRights = map[string]user.AccessDefinition{"test": {
+			APIID: "test", Versions: []string{"v1"},
+		}}
+		client := GetTLSClient(nil, nil)
+
+		// creates a key and rename it
+		resp, err := ts.Run(t, test.TestCase{AdminAuth: true, Method: http.MethodPost, Path: "/tyk/keys/" + customKey,
+			Data: session, Client: client, Code: http.StatusOK})
+		assert.Nil(t, err)
+		defer func() {
+			err = resp.Body.Close()
+			assert.Nil(t, err)
+		}()
+		body, err := io.ReadAll(resp.Body)
+		assert.Nil(t, err)
+		keyResp := apiModifyKeySuccess{}
+
+		err = json.Unmarshal(body, &keyResp)
+		assert.NoError(t, err)
+
+		// trick to change key name from base64 to custom (emulates keys as apikey-mycustomkey)
+		val, err := ts.Gw.GlobalSessionManager.Store().GetRawKey("apikey-" + keyResp.Key)
+		assert.Nil(t, err)
+		err = ts.Gw.GlobalSessionManager.Store().SetKey(customKey, val, -1)
+		assert.Nil(t, err)
+
+		removed := ts.Gw.GlobalSessionManager.Store().DeleteRawKey("apikey-" + keyResp.Key)
+		assert.True(t, removed)
+
+		status, err := rpcListener.deleteUsingTokenID(keyResp.Key, orgId, false, 404)
+		assert.Nil(t, err)
+		// it was found
+		assert.Equal(t, http.StatusOK, status)
+		// it should not exist anymore
+		_, err = ts.Gw.GlobalSessionManager.Store().GetKey(customKey)
+		assert.ErrorIs(t, storage.ErrKeyNotFound, err)
+	})
+
+	t.Run("status not found and TokenID do not exist", func(t *testing.T) {
+		status, err := rpcListener.deleteUsingTokenID("custom-key", "orgID", false, 404)
+		assert.Nil(t, err)
+		assert.Equal(t, 404, status)
 	})
 }

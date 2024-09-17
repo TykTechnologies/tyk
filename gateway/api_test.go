@@ -25,13 +25,12 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/TykTechnologies/storage/temporal/model"
-	"github.com/TykTechnologies/tyk/internal/uuid"
-
+	temporalmodel "github.com/TykTechnologies/storage/temporal/model"
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/apidef/oas"
 	"github.com/TykTechnologies/tyk/certs"
 	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/internal/uuid"
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/test"
 	"github.com/TykTechnologies/tyk/user"
@@ -220,6 +219,8 @@ func TestApiHandlerPostDupPath(t *testing.T) {
 }
 
 func TestKeyHandler(t *testing.T) {
+	test.Exclusive(t) // Uses DeleteAllKeys, need to limit parallelism.
+
 	ts := StartTest(nil)
 	defer ts.Close()
 
@@ -339,7 +340,7 @@ func TestKeyHandler(t *testing.T) {
 			},
 		}...)
 
-		ts.Gw.GlobalSessionManager.Store().DeleteAllKeys()
+		ts.Gw.GlobalSessionManager.Store().DeleteAllKeys() // exclusive
 	})
 
 	_, knownKey := ts.CreateSession(func(s *user.SessionState) {
@@ -591,7 +592,62 @@ func TestKeyHandler_UpdateKey(t *testing.T) {
 	})
 }
 
+func BenchmarkKeyHandler_CreateKeyHandler(b *testing.B) {
+	ts := StartTest(nil)
+
+	defer ts.Close()
+
+	apiID := "testAPIID"
+	secondAPIID := "secondAPI"
+	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		spec.APIID = apiID
+		spec.OrgID = "default"
+		spec.Proxy.ListenPath = "/my-api"
+		spec.UseKeylessAccess = false
+	})
+	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		spec.APIID = secondAPIID
+		spec.OrgID = "default"
+		spec.Proxy.ListenPath = "/my-api"
+		spec.UseKeylessAccess = false
+	})
+
+	pid := ts.CreatePolicy(func(p *user.Policy) {
+		p.OrgID = "default"
+		p.QuotaMax = 1
+		p.AccessRights = map[string]user.AccessDefinition{
+			"test": {
+				APIID:          apiID,
+				AllowanceScope: "scope1",
+			},
+			"second": {
+				APIID:          secondAPIID,
+				AllowanceScope: "scope1",
+			},
+		}
+	})
+
+	session := user.SessionState{
+		ApplyPolicies: []string{pid},
+	}
+	jsonData, err := json.Marshal(session)
+	require.NoError(b, err)
+
+	require.NoError(b, err)
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		req, err := http.NewRequest(http.MethodPost, "", bytes.NewBuffer(jsonData))
+		require.NoError(b, err)
+		recorder := httptest.NewRecorder()
+		ts.Gw.createKeyHandler(recorder, req)
+		assert.Equal(b, 200, recorder.Code)
+	}
+}
+
 func TestKeyHandler_DeleteKeyWithQuota(t *testing.T) {
+	test.Exclusive(t) // Uses quota, need to limit parallelism due to DeleteAllKeys.
+
 	const testAPIID = "testAPIID"
 	const orgId = "default"
 
@@ -774,6 +830,8 @@ func TestUpdateKeyWithCert(t *testing.T) {
 }
 
 func TestKeyHandler_CheckKeysNotDuplicateOnUpdate(t *testing.T) {
+	test.Exclusive(t) // Uses DeleteAllKeys, need to limit parallelism.
+
 	ts := StartTest(nil)
 	defer ts.Close()
 
@@ -826,7 +884,7 @@ func TestKeyHandler_CheckKeysNotDuplicateOnUpdate(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.Name, func(t *testing.T) {
-			ts.Gw.GlobalSessionManager.Store().DeleteAllKeys()
+			ts.Gw.GlobalSessionManager.Store().DeleteAllKeys() // exclusive
 			session := CreateStandardSession()
 			session.AccessRights = map[string]user.AccessDefinition{"test": {
 				APIID: "test", Versions: []string{"v1"},
@@ -854,6 +912,8 @@ func TestKeyHandler_CheckKeysNotDuplicateOnUpdate(t *testing.T) {
 }
 
 func TestHashKeyHandler(t *testing.T) {
+	test.Exclusive(t) // Uses DeleteAllKeys, need to limit parallelism.
+
 	conf := func(globalConf *config.Config) {
 		// make it to use hashes for Redis keys
 		globalConf.HashKeys = true
@@ -880,7 +940,7 @@ func TestHashKeyHandler(t *testing.T) {
 		gwConf := ts.Gw.GetConfig()
 		gwConf.HashKeyFunction = tc.hashFunction
 		ts.Gw.SetConfig(gwConf)
-		ok := ts.Gw.GlobalSessionManager.Store().DeleteAllKeys()
+		ok := ts.Gw.GlobalSessionManager.Store().DeleteAllKeys() // exclusive
 		assert.True(t, ok)
 
 		t.Run(fmt.Sprintf("%sHash fn: %s", tc.desc, tc.hashFunction), func(t *testing.T) {
@@ -1022,7 +1082,7 @@ func TestHashKeyHandlerLegacyWithHashFunc(t *testing.T) {
 }
 
 func (ts *Test) testHashKeyHandlerHelper(t *testing.T, expectedHashSize int) {
-
+	t.Helper()
 	ts.Gw.BuildAndLoadAPI()
 
 	withAccess := CreateStandardSession()
@@ -1146,7 +1206,7 @@ func (ts *Test) testHashKeyHandlerHelper(t *testing.T, expectedHashSize int) {
 }
 
 func (ts *Test) testHashFuncAndBAHelper(t *testing.T) {
-
+	t.Helper()
 	session := ts.testPrepareBasicAuth(false)
 
 	_, _ = ts.Run(t, []test.TestCase{
@@ -1742,14 +1802,14 @@ func TestGroupResetHandler(t *testing.T) {
 		}()
 
 		err := cacheStore.StartPubSubHandler(ctx, RedisPubSubChannel, func(v interface{}) {
-			msg, ok := v.(model.Message)
+			msg, ok := v.(temporalmodel.Message)
 			assert.True(t, ok)
 
 			msgType := msg.Type()
 			switch msgType {
-			case model.MessageTypeSubscription:
+			case temporalmodel.MessageTypeSubscription:
 				didSubscribe <- true
-			case model.MessageTypeMessage:
+			case temporalmodel.MessageTypeMessage:
 				notf := Notification{Gw: ts.Gw}
 				payload, err := msg.Payload()
 				assert.NoError(t, err)
@@ -1907,56 +1967,6 @@ func TestContextSession(t *testing.T) {
 		}
 	}()
 	ctxSetSession(r, nil, false, false)
-}
-
-func TestApiLoaderLongestPathFirst(t *testing.T) {
-	ts := StartTest(func(globalConf *config.Config) {
-		globalConf.EnableCustomDomains = true
-	})
-	defer ts.Close()
-
-	type hostAndPath struct {
-		host, path string
-	}
-
-	inputs := map[hostAndPath]bool{}
-	hosts := []string{"host1.local", "host2.local", "host3.local"}
-	paths := []string{"a", "ab", "a/b/c", "ab/c", "abc", "a/b/c"}
-	// Use a map so that we get a somewhat random order when
-	// iterating. Would be better to use math/rand.Shuffle once we
-	// need only support Go 1.10 and later.
-	for _, host := range hosts {
-		for _, path := range paths {
-			inputs[hostAndPath{host, path}] = true
-		}
-	}
-
-	var apis []*APISpec
-
-	for hp := range inputs {
-		apis = append(apis, BuildAPI(func(spec *APISpec) {
-			spec.APIID = uuid.New()
-
-			spec.Domain = hp.host
-			spec.Proxy.ListenPath = "/" + hp.path
-		})[0])
-	}
-
-	ts.Gw.LoadAPI(apis...)
-
-	var testCases []test.TestCase
-
-	for hp := range inputs {
-		testCases = append(testCases, test.TestCase{
-			Client:    test.NewClientLocal(),
-			Path:      "/" + hp.path,
-			Domain:    hp.host,
-			Code:      200,
-			BodyMatch: `"Url":"/` + hp.path + `"`,
-		})
-	}
-
-	_, _ = ts.Run(t, testCases...)
 }
 
 func TestRotateClientSecretHandler(t *testing.T) {
@@ -3519,6 +3529,10 @@ func TestOAS(t *testing.T) {
 			importT := testGetOASAPI(t, ts, importedOASAPIID, "example oas doc", "example oas doc")
 			importedOAS := oas.OAS{T: importT}
 			assert.True(t, importedOAS.GetTykExtension().Server.ListenPath.Strip)
+			// ensure context variables are enabled by default in import
+			assert.True(t, importedOAS.GetTykMiddleware().Global.ContextVariables.Enabled)
+			// ensure traffic logs are enabled by default in import
+			assert.True(t, importedOAS.GetTykMiddleware().Global.TrafficLogs.Enabled)
 		})
 
 		t.Run("block when dashboard app config set to true", func(t *testing.T) {
@@ -3589,6 +3603,7 @@ func testGetOldAPI(t *testing.T, d *Test, id, name string) (oldAPI apidef.APIDef
 }
 
 func testPatchOAS(t *testing.T, ts *Test, api oas.OAS, params map[string]string, apiID string) {
+	t.Helper()
 	patchPath := fmt.Sprintf("/tyk/apis/oas/%s", apiID)
 
 	_, _ = ts.Run(t, []test.TestCase{
@@ -3600,6 +3615,7 @@ func testPatchOAS(t *testing.T, ts *Test, api oas.OAS, params map[string]string,
 }
 
 func testImportOAS(t *testing.T, ts *Test, testCase test.TestCase) string {
+	t.Helper()
 	var importResp apiModifyKeySuccess
 
 	testCase.Path = "/tyk/apis/oas/import"
@@ -3920,6 +3936,7 @@ func TestPurgeOAuthClientTokensEndpoint(t *testing.T) {
 	})
 
 	assertTokensLen := func(t *testing.T, storageManager storage.Handler, storageKey string, expectedTokensLen int) {
+		t.Helper()
 		nowTs := time.Now().Unix()
 		startScore := strconv.FormatInt(nowTs, 10)
 		tokens, _, err := storageManager.GetSortedSetRange(storageKey, startScore, "+inf")

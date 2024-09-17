@@ -7,6 +7,7 @@ import (
 
 	"github.com/sirupsen/logrus"
 
+	"github.com/TykTechnologies/tyk/internal/event"
 	"github.com/TykTechnologies/tyk/request"
 )
 
@@ -22,23 +23,6 @@ func (k *RateLimitAndQuotaCheck) Name() string {
 
 func (k *RateLimitAndQuotaCheck) EnabledForSpec() bool {
 	return !k.Spec.DisableRateLimit || !k.Spec.DisableQuota
-}
-
-func (k *RateLimitAndQuotaCheck) handleRateLimitFailure(r *http.Request, token string) (error, int) {
-	k.Logger().WithField("key", k.Gw.obfuscateKey(token)).Info("Key rate limit exceeded.")
-
-	// Fire a rate limit exceeded event
-	k.FireEvent(EventRateLimitExceeded, EventKeyFailureMeta{
-		EventMetaDefault: EventMetaDefault{Message: "Key Rate Limit Exceeded", OriginatingRequest: EncodeRequestToEvent(r)},
-		Path:             r.URL.Path,
-		Origin:           request.RealIP(r),
-		Key:              token,
-	})
-
-	// Report in health check
-	reportHealthValue(k.Spec, Throttle, "-1")
-
-	return errors.New("Rate limit exceeded"), http.StatusTooManyRequests
 }
 
 func (k *RateLimitAndQuotaCheck) handleQuotaFailure(r *http.Request, token string) (error, int) {
@@ -91,7 +75,6 @@ func (k *RateLimitAndQuotaCheck) ProcessRequest(w http.ResponseWriter, r *http.R
 		storeRef,
 		!k.Spec.DisableRateLimit,
 		!k.Spec.DisableQuota,
-		&k.Spec.GlobalConfig,
 		k.Spec,
 		false,
 	)
@@ -108,10 +91,12 @@ func (k *RateLimitAndQuotaCheck) ProcessRequest(w http.ResponseWriter, r *http.R
 		}
 	}
 
+	k.emitRateLimitEvents(r, rateLimitKey)
+
 	switch reason {
 	case sessionFailNone:
 	case sessionFailRateLimit:
-		err, errCode := k.handleRateLimitFailure(r, rateLimitKey)
+		err, errCode := k.handleRateLimitFailure(r, event.RateLimitExceeded, "Rate Limit Exceeded", rateLimitKey)
 		if throttleRetryLimit > 0 {
 			for {
 				ctxIncThrottleLevel(r, throttleRetryLimit)
@@ -125,7 +110,6 @@ func (k *RateLimitAndQuotaCheck) ProcessRequest(w http.ResponseWriter, r *http.R
 					storeRef,
 					!k.Spec.DisableRateLimit,
 					!k.Spec.DisableQuota,
-					&k.Spec.GlobalConfig,
 					k.Spec,
 					true,
 				)

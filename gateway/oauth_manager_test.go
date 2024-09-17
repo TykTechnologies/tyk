@@ -705,6 +705,7 @@ func TestAPIClientAuthorizeTokenWithPolicy(t *testing.T) {
 }
 
 func getAuthCode(t *testing.T, ts *Test) map[string]string {
+	t.Helper()
 	param := make(url.Values)
 	param.Set("response_type", "code")
 	param.Set("redirect_uri", authRedirectUri)
@@ -857,7 +858,7 @@ func TestGetClientTokens(t *testing.T) {
 
 func testGetClientTokens(t *testing.T, hashed bool) {
 	test.Flaky(t) // TODO: TT-5253
-
+	t.Helper()
 	conf := func(globalConf *config.Config) {
 		// set tokens to be expired after 1 second
 		globalConf.OauthTokenExpire = 1
@@ -976,6 +977,7 @@ type tokenData struct {
 }
 
 func getToken(t *testing.T, ts *Test) tokenData {
+	t.Helper()
 	authData := getAuthCode(t, ts)
 
 	param := make(url.Values)

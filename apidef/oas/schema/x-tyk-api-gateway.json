@@ -571,6 +571,12 @@
         },
         "transformResponseHeaders": {
           "$ref": "#/definitions/X-Tyk-TransformHeaders"
+        },
+        "contextVariables": {
+          "$ref": "#/definitions/X-Tyk-ContextVariables"
+        },
+        "trafficLogs": {
+          "$ref": "#/definitions/X-Tyk-TrafficLogs"
         }
       }
     },
@@ -1053,6 +1059,9 @@
         },
         "requestSizeLimit": {
           "$ref": "#/definitions/X-Tyk-RequestSizeLimit"
+        },
+        "rateLimit": {
+          "$ref": "#/definitions/X-Tyk-RateLimit"
         }
       }
     },
@@ -1274,6 +1283,17 @@
         },
         "detailedTracing": {
           "$ref": "#/definitions/X-Tyk-DetailedTracing"
+        },
+        "eventHandlers": {
+          "type": "array",
+          "items": [
+            {
+              "$ref": "#/definitions/X-Tyk-EventHandlers"
+            }
+          ]
+        },
+        "contextVariables": {
+          "$ref": "#/definitions/X-Tyk-ContextVariables"
         }
       },
       "required": [
@@ -1385,6 +1405,9 @@
         },
         "fallbackToDefault": {
           "type": "boolean"
+        },
+        "urlVersioningPattern": {
+          "type": "string"
         }
       },
       "required": [
@@ -1878,6 +1901,154 @@
     "X-Tyk-DetailedTracing": {
       "type": "object",
       "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "enabled"
+      ]
+    },
+    "X-Tyk-EventHandlers": {
+      "type": "object",
+      "anyOf": [
+        {
+          "$ref": "#/definitions/X-Tyk-Webhook-With-ID"
+        },
+        {
+          "$ref": "#/definitions/X-Tyk-Webhook-Without-ID"
+        }
+      ]
+    },
+    "X-Tyk-Webhook-With-ID": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "trigger": {
+          "$ref": "#/definitions/X-Tyk-EventTrigger"
+        },
+        "type": {
+          "method": {
+            "$ref": "#/definitions/X-Tyk-EventType"
+          }
+        },
+        "id": {
+          "type": "string"
+        },
+        "cooldownPeriod": {
+          "type": "string",
+          "pattern": "^(\\d+h)?(\\d+m)?(\\d+s)?$"
+        }
+      },
+      "required": [
+        "enabled",
+        "type",
+        "trigger",
+        "id",
+        "cooldownPeriod"
+      ]
+    },
+    "X-Tyk-Webhook-Without-ID": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "trigger": {
+          "$ref": "#/definitions/X-Tyk-EventTrigger"
+        },
+        "type": {
+          "$ref": "#/definitions/X-Tyk-EventType"
+        },
+        "name": {
+          "type": "string"
+        },
+        "url": {
+          "type": "string",
+          "format": "uri-reference"
+        },
+        "method": {
+          "type": "string",
+          "enum": [
+            "GET",
+            "PUT",
+            "POST",
+            "DELETE",
+            "PATCH"
+          ]
+        },
+        "cooldownPeriod": {
+          "type": "string",
+          "pattern": "^(\\d+h)?(\\d+m)?(\\d+s)?$"
+        },
+        "bodyTemplate": {
+          "type": "string"
+        },
+        "headers": {
+          "type": "array",
+          "items": [
+            {
+              "$ref": "#/definitions/X-Tyk-Header"
+            }
+          ]
+        }
+      },
+      "required": [
+        "enabled",
+        "type",
+        "trigger",
+        "url",
+        "method",
+        "cooldownPeriod",
+        "bodyTemplate"
+      ]
+    },
+    "X-Tyk-EventType": {
+      "type": "string",
+      "enum": [
+        "webhook"
+      ]
+    },
+    "X-Tyk-EventTrigger": {
+      "type": "string",
+      "enum": [
+        "QuotaExceeded",
+        "RatelimitExceeded",
+        "RateLimitSmoothingUp",
+        "RateLimitSmoothingDown",
+        "AuthFailure",
+        "KeyExpired",
+        "VersionFailure",
+        "OrgQuotaExceeded",
+        "OrgRateLimitExceeded",
+        "TriggerExceeded",
+        "BreakerTriggered",
+        "BreakerTripped",
+        "BreakerReset",
+        "HostDown",
+        "HostUp",
+        "TokenCreated",
+        "TokenUpdated",
+        "TokenDeleted"
+      ]
+    },
+    "X-Tyk-ContextVariables": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "enabled"
+      ]
+    },
+    "X-Tyk-TrafficLogs": {
+      "type": "object",
       "properties": {
         "enabled": {
           "type": "boolean"

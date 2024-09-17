@@ -641,9 +641,32 @@ const Schema = `{
                 "proxy": {
                     "type": ["object", "null"],
                     "properties": {
+						"features": {
+							"type": ["object", "null"],
+							"properties": {
+								"use_immutable_headers": {
+									"type": "boolean"
+								}
+							}
+						},
                         "auth_headers": {
                             "type": ["object", "null"]
-                        }
+                        },
+						"request_headers_rewrite": {
+        					"type": ["object", "null"],
+        					"additionalProperties": {
+          						"type": "object",
+          						"properties": {
+            						"value": {
+										"type": "string"
+            						},
+            						"remove": {
+              							"type": "boolean"
+            						}
+          						},
+          						"required": ["value", "remove"]
+        					}
+      					}
                     }
                 },
                 "subgraph": {

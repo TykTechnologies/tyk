@@ -13,7 +13,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-	textTemplate "text/template"
+	texttemplate "text/template"
 
 	"github.com/TykTechnologies/tyk/rpc"
 
@@ -89,13 +89,12 @@ func countApisByListenHash(specs []*APISpec) map[string]int {
 		domain := spec.GetAPIDomain()
 		domainHash := generateDomainPath(domain, spec.Proxy.ListenPath)
 		if count[domainHash] == 0 {
-			dN := domain
-			if dN == "" {
-				dN = "(no host)"
+			if domain == "" {
+				domain = "(no host)"
 			}
 			mainLog.WithFields(logrus.Fields{
 				"api_name": spec.Name,
-				"domain":   dN,
+				"domain":   domain,
 			}).Info("Tracking hostname")
 		}
 		count[domainHash]++
@@ -792,7 +791,7 @@ func (gw *Gateway) loadHTTPService(spec *APISpec, apisByListen map[string]int, g
 		spec.Proxy.ListenPath,
 	}
 
-	// Register routes for each prefixe
+	// Register routes for each prefix
 	for _, prefix := range prefixes {
 		subrouter := router.PathPrefix(prefix).Subrouter()
 
@@ -845,7 +844,7 @@ type generalStores struct {
 	redisStore, redisOrgStore, healthStore, rpcAuthStore, rpcOrgStore storage.Handler
 }
 
-var playgroundTemplate *textTemplate.Template
+var playgroundTemplate *texttemplate.Template
 
 func (gw *Gateway) readGraphqlPlaygroundTemplate() {
 	playgroundPath := filepath.Join(gw.GetConfig().TemplatePath, "playground")
@@ -861,7 +860,7 @@ func (gw *Gateway) readGraphqlPlaygroundTemplate() {
 		paths = append(paths, filepath.Join(playgroundPath, file.Name()))
 	}
 
-	playgroundTemplate, err = textTemplate.ParseFiles(paths...)
+	playgroundTemplate, err = texttemplate.ParseFiles(paths...)
 	if err != nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "playground",
@@ -904,8 +903,8 @@ func (gw *Gateway) loadGraphQLPlayground(spec *APISpec, subrouter *mux.Router) {
 		}
 
 		err := playgroundTemplate.ExecuteTemplate(rw, playgroundHTMLTemplateName, struct {
-			Url, Schema, PathPrefix string
-		}{endpoint, strconv.Quote(spec.GraphQL.Schema), path.Join(endpoint, playgroundPath)})
+			Url, PathPrefix string
+		}{endpoint, path.Join(endpoint, playgroundPath)})
 
 		if err != nil {
 			rw.WriteHeader(http.StatusInternalServerError)
@@ -923,6 +922,9 @@ func (gw *Gateway) loadApps(specs []*APISpec) {
 	// sort by listen path from longer to shorter, so that /foo
 	// doesn't break /foo-bar
 	sort.Slice(specs, func(i, j int) bool {
+		if specs[i].Domain != specs[j].Domain {
+			return len(specs[i].Domain) > len(specs[j].Domain)
+		}
 		return len(specs[i].Proxy.ListenPath) > len(specs[j].Proxy.ListenPath)
 	})
 

@@ -395,9 +395,11 @@ func (s *OAS) ReplaceServers(apiURLs, oldAPIURLs []string) {
 	s.Servers = append(newServers, userAddedServers...)
 }
 
-// APIDef is struct to hold both OAS and Classic forms of an API definition.
+// APIDef holds both OAS and Classic forms of an API definition.
 type APIDef struct {
-	OAS     *OAS
+	// OAS contains the OAS API definition.
+	OAS *OAS
+	// Classic contains the Classic API definition.
 	Classic *apidef.APIDefinition
 }
 
@@ -430,7 +432,6 @@ func MigrateAndFillOAS(api *apidef.APIDefinition) (APIDef, []APIDef, error) {
 
 func newOASFromClassicAPIDefinition(api *apidef.APIDefinition) (*OAS, error) {
 	api.IsOAS = true
-	api.EnableContextVars = true
 	var oas OAS
 	oas.Fill(*api)
 	oas.setRequiredFields(api.Name, api.VersionName)

@@ -15,7 +15,7 @@ import (
 )
 
 func (ts *Test) testPrepareProcessRequestQuotaLimit(tb testing.TB, data map[string]interface{}) {
-
+	tb.Helper()
 	// load API
 	orgID := "test-org-" + uuid.New()
 

@@ -7,8 +7,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/TykTechnologies/storage/temporal/model"
+	temporalmodel "github.com/TykTechnologies/storage/temporal/model"
 	"github.com/TykTechnologies/tyk/internal/cache"
+	"github.com/TykTechnologies/tyk/internal/model"
 	"github.com/TykTechnologies/tyk/rpc"
 
 	"github.com/TykTechnologies/tyk/apidef"
@@ -50,6 +51,9 @@ var (
 			return nil, nil
 		},
 		"DeleteKeys": func(keys []string) (bool, error) {
+			return true, nil
+		},
+		"DeleteRawKeys": func(keys []string) (bool, error) {
 			return true, nil
 		},
 		"Decrement": func(keyName string) error {
@@ -158,6 +162,7 @@ func (r *RPCStorageHandler) buildNodeInfo() []byte {
 		intCheckDuration = int64(checkDuration / time.Second)
 	}
 
+	r.Gw.getHostDetails(r.Gw.GetConfig().PIDFileLocation)
 	node := apidef.NodeData{
 		NodeID:          r.Gw.GetNodeID(),
 		GroupID:         config.SlaveOptions.GroupID,
@@ -169,7 +174,12 @@ func (r *RPCStorageHandler) buildNodeInfo() []byte {
 		Health:          r.Gw.getHealthCheckInfo(),
 		Stats: apidef.GWStats{
 			APIsCount:     r.Gw.apisByIDLen(),
-			PoliciesCount: r.Gw.policiesByIDLen(),
+			PoliciesCount: r.Gw.PolicyCount(),
+		},
+		HostDetails: model.HostDetails{
+			Hostname: r.Gw.hostDetails.Hostname,
+			PID:      r.Gw.hostDetails.PID,
+			Address:  r.Gw.hostDetails.Address,
 		},
 	}
 
@@ -526,6 +536,26 @@ func (r *RPCStorageHandler) DeleteKey(keyName string) bool {
 	return ok == true
 }
 
+func (r *RPCStorageHandler) DeleteRawKeys(keys []string) bool {
+	ret, err := rpc.FuncClientSingleton("DeleteRawKeys", keys)
+	if err != nil {
+		rpc.EmitErrorEventKv(
+			rpc.FuncClientSingletonCall,
+			"DeleteKey",
+			err,
+			nil,
+		)
+
+		if r.IsRetriableError(err) {
+			if rpc.Login() {
+				return r.DeleteRawKeys(keys)
+			}
+		}
+	}
+	success, ok := ret.(bool)
+	return success && ok
+}
+
 func (r *RPCStorageHandler) DeleteAllKeys() bool {
 	log.Warning("Not implementated")
 	return false
@@ -589,7 +619,7 @@ func (r *RPCStorageHandler) DeleteKeys(keys []string) bool {
 }
 
 // StartPubSubHandler will listen for a signal and run the callback with the message
-func (r *RPCStorageHandler) StartPubSubHandler(_ string, _ func(*model.Message)) error {
+func (r *RPCStorageHandler) StartPubSubHandler(_ string, _ func(*temporalmodel.Message)) error {
 	log.Warning("RPCStorageHandler.StartPubSubHandler - NO PUBSUB DEFINED")
 	return nil
 }
@@ -1097,17 +1127,23 @@ func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string, orgId string) 
 
 			isHashed := len(splitKeys) > 1 && splitKeys[1] == "hashed"
 			var status int
+			var err error
 			if isHashed {
 				log.Info("--> removing cached (hashed) key: ", splitKeys[0])
 				key = splitKeys[0]
 				_, status = r.Gw.handleDeleteHashedKey(key, orgId, "", resetQuota)
 			} else {
 				log.Info("--> removing cached key: ", r.Gw.obfuscateKey(key))
-				// in case it's an username (basic auth) or custom-key then generate the token
+				// in case it's a username (basic auth) or custom-key then generate the token
 				if storage.TokenOrg(key) == "" {
 					key = r.Gw.generateToken(orgId, key)
 				}
 				_, status = r.Gw.handleDeleteKey(key, orgId, "-1", resetQuota)
+				// check if we must remove the key by custom key id
+				status, err = r.deleteUsingTokenID(key, orgId, resetQuota, status)
+				if err != nil {
+					log.Debugf("cannot remove key:%v status: %v", key, status)
+				}
 			}
 
 			// if key not found locally and synchroniser disabled then we should not pull it from management layer
@@ -1135,6 +1171,17 @@ func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string, orgId string) 
 		Gw:      r.Gw,
 	}
 	r.Gw.MainNotifier.Notify(n)
+}
+
+// Function to handle fallback deletion using token ID
+func (r *RPCStorageHandler) deleteUsingTokenID(key, orgId string, resetQuota bool, status int) (int, error) {
+	if status == http.StatusNotFound {
+		id, err := storage.TokenID(key)
+		if err == nil {
+			_, status = r.Gw.handleDeleteKey(id, orgId, "-1", resetQuota)
+		}
+	}
+	return status, nil
 }
 
 func (r *RPCStorageHandler) DeleteScanMatch(pattern string) bool {

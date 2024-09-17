@@ -4,15 +4,44 @@ package coprocess;
 
 option go_package = "/coprocess";
 
+ 
+// HookType is an enumeration that identifies the type of plugin.
 enum HookType {
+  
+  // Unknown is used for error checking and handling of an unrecognised hook type.
   Unknown = 0;
+  
+  // Pre is executed before request sent to upstream target and before any
+  // authentication information is extracted from the header or
+  // parameter list of the request. Applies to both keyless and protected
+  // APIs.
   Pre = 1;
+
+  // Post is executed after authentication, validation, throttling and quota-limiting
+  // middleware has been executed, just before the request is proxied upstream. Use this
+  // to post-process a request before sending it to upstream API. This is only called
+  // when using protected APIs.
 	Post = 2;
+
+  // PostKeyAuth is executed after authentication, validation, throttling, and quota-limiting
+  // middleware has been executed, just before the request is proxied upstream. Use this
+  // to post-process a request before sending it to upstream API. This is only called
+  // when using protected APIs.
 	PostKeyAuth = 3;
-	CustomKeyCheck  = 4;
+	
+  // CustomKeyCheck is executed for performing customised authentication.
+  CustomKeyCheck  = 4;
+
+  // Response is executed after the upstream API replies. The arguments passed to this hook include
+  // both the request and response data. Use this to modify the HTTP response before it’s
+  // sent to the client. This hook also receives the request object, the session object,
+  // the metadata and API definition associated with the request.
   Response = 5;
 }
 
+// StringSlice is a list of strings.
 message StringSlice {
+
+  // Items is a list of string items.
   repeated string items = 1;
 }

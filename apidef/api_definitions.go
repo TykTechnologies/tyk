@@ -5,21 +5,24 @@ import (
 	"encoding/json"
 	"encoding/xml"
 	"errors"
+	"fmt"
 	"net/http"
 	"text/template"
 	"time"
 
-	"github.com/TykTechnologies/storage/persistent/model"
-
 	"github.com/clbanning/mxj"
 	"github.com/lonelycode/osin"
 
+	"github.com/TykTechnologies/storage/persistent/model"
+
+	"github.com/TykTechnologies/tyk/internal/event"
+
 	"github.com/TykTechnologies/tyk/internal/reflect"
 
-	"github.com/TykTechnologies/graphql-go-tools/pkg/engine/datasource/kafka_datasource"
 	"github.com/TykTechnologies/graphql-go-tools/pkg/execution/datasource"
 
 	"github.com/TykTechnologies/gojsonschema"
+
 	"github.com/TykTechnologies/tyk/regexp"
 
 	"github.com/TykTechnologies/tyk/internal/uuid"
@@ -28,8 +31,12 @@ import (
 type AuthProviderCode string
 type SessionProviderCode string
 type StorageEngineCode string
-type TykEvent string            // A type so we can ENUM event types easily, e.g. EventQuotaExceeded
-type TykEventHandlerName string // A type for handler codes in API definitions
+
+// TykEvent is an alias maintained for backwards compatibility.
+type TykEvent = event.Event
+
+// TykEventHandlerName is an alias maintained for backwards compatibility.
+type TykEventHandlerName = event.HandlerName
 
 type EndpointMethodAction string
 type SourceMode string
@@ -207,6 +214,39 @@ type TrackEndpointMeta struct {
 	Method   string `bson:"method" json:"method"`
 }
 
+// RateLimitMeta configures rate limits per API path.
+type RateLimitMeta struct {
+	Disabled bool   `bson:"disabled" json:"disabled"`
+	Path     string `bson:"path" json:"path"`
+	Method   string `bson:"method" json:"method"`
+
+	Rate float64 `bson:"rate" json:"rate"`
+	Per  float64 `bson:"per" json:"per"`
+}
+
+// Valid will return true if the rate limit should be applied.
+func (r *RateLimitMeta) Valid() bool {
+	if err := r.Err(); err != nil {
+		return false
+	}
+	return true
+}
+
+// Err checks the rate limit configuration for validity and returns an error if it is not valid.
+// It checks for a nil value, the enabled flag and valid values for each setting.
+func (r *RateLimitMeta) Err() error {
+	if r == nil || r.Disabled {
+		return errors.New("rate limit disabled")
+	}
+	if r.Per <= 0 {
+		return fmt.Errorf("rate limit disabled: per invalid")
+	}
+	if r.Rate == 0 {
+		return fmt.Errorf("rate limit disabled: rate zero")
+	}
+	return nil
+}
+
 type InternalMeta struct {
 	Disabled bool   `bson:"disabled" json:"disabled"`
 	Path     string `bson:"path" json:"path"`
@@ -356,6 +396,7 @@ type ExtendedPathsSet struct {
 	Internal                []InternalMeta        `bson:"internal" json:"internal,omitempty"`
 	GoPlugin                []GoPluginMeta        `bson:"go_plugin" json:"go_plugin,omitempty"`
 	PersistGraphQL          []PersistGraphQLMeta  `bson:"persist_graphql" json:"persist_graphql"`
+	RateLimit               []RateLimitMeta       `bson:"rate_limit" json:"rate_limit"`
 }
 
 // Clear omits values that have OAS API definition conversions in place.
@@ -369,17 +410,40 @@ func (e *ExtendedPathsSet) Clear() {
 	}
 }
 
+// VersionDefinition is a struct that holds the versioning information for an API.
 type VersionDefinition struct {
-	Enabled             bool              `bson:"enabled" json:"enabled"`
-	Name                string            `bson:"name" json:"name"`
-	Default             string            `bson:"default" json:"default"`
-	Location            string            `bson:"location" json:"location"`
-	Key                 string            `bson:"key" json:"key"`
-	StripPath           bool              `bson:"strip_path" json:"strip_path"` // Deprecated. Use StripVersioningData instead.
-	StripVersioningData bool              `bson:"strip_versioning_data" json:"strip_versioning_data"`
-	FallbackToDefault   bool              `bson:"fallback_to_default" json:"fallback_to_default"`
-	Versions            map[string]string `bson:"versions" json:"versions"`
-	BaseID              string            `bson:"base_id" json:"-"` // json tag is `-` because we want this to be hidden to user
+	// Enabled indicates whether this version is enabled or not.
+	Enabled bool `bson:"enabled" json:"enabled"`
+
+	// Name is the name of this version.
+	Name string `bson:"name" json:"name"`
+
+	// Default is the default version to use if no version is specified in the request.
+	Default string `bson:"default" json:"default"`
+
+	// Location is the location in the request where the version information can be found.
+	Location string `bson:"location" json:"location"`
+
+	// Key is the key to use to extract the version information from the specified location.
+	Key string `bson:"key" json:"key"`
+
+	// StripPath is a deprecated field. Use StripVersioningData instead.
+	StripPath bool `bson:"strip_path" json:"strip_path"` // Deprecated. Use StripVersioningData instead.
+
+	// StripVersioningData indicates whether to strip the versioning data from the request.
+	StripVersioningData bool `bson:"strip_versioning_data" json:"strip_versioning_data"`
+
+	// UrlVersioningPattern is the regex pattern to match in the URL for versioning.
+	UrlVersioningPattern string `bson:"url_versioning_pattern" json:"url_versioning_pattern"`
+
+	// FallbackToDefault indicates whether to fallback to the default version if the version in the request does not exist.
+	FallbackToDefault bool `bson:"fallback_to_default" json:"fallback_to_default"`
+
+	// Versions is a map of version names to version ApiIDs.
+	Versions map[string]string `bson:"versions" json:"versions"`
+
+	// BaseID is a hidden field used internally that represents the ApiID of the base API.
+	BaseID string `bson:"base_id" json:"-"` // json tag is `-` because we want this to be hidden to user
 }
 
 type VersionData struct {
@@ -828,9 +892,10 @@ type GraphQLConfig struct {
 type GraphQLConfigVersion string
 
 const (
-	GraphQLConfigVersionNone GraphQLConfigVersion = ""
-	GraphQLConfigVersion1    GraphQLConfigVersion = "1"
-	GraphQLConfigVersion2    GraphQLConfigVersion = "2"
+	GraphQLConfigVersionNone     GraphQLConfigVersion = ""
+	GraphQLConfigVersion1        GraphQLConfigVersion = "1"
+	GraphQLConfigVersion2        GraphQLConfigVersion = "2"
+	GraphQLConfigVersion3Preview GraphQLConfigVersion = "3-preview"
 )
 
 type GraphQLIntrospectionConfig struct {
@@ -842,10 +907,21 @@ type GraphQLResponseExtensions struct {
 }
 
 type GraphQLProxyConfig struct {
-	AuthHeaders           map[string]string         `bson:"auth_headers" json:"auth_headers"`
-	SubscriptionType      SubscriptionType          `bson:"subscription_type" json:"subscription_type,omitempty"`
-	RequestHeaders        map[string]string         `bson:"request_headers" json:"request_headers"`
-	UseResponseExtensions GraphQLResponseExtensions `bson:"use_response_extensions" json:"use_response_extensions"`
+	Features              GraphQLProxyFeaturesConfig             `bson:"features" json:"features"`
+	AuthHeaders           map[string]string                      `bson:"auth_headers" json:"auth_headers"`
+	SubscriptionType      SubscriptionType                       `bson:"subscription_type" json:"subscription_type,omitempty"`
+	RequestHeaders        map[string]string                      `bson:"request_headers" json:"request_headers"`
+	UseResponseExtensions GraphQLResponseExtensions              `bson:"use_response_extensions" json:"use_response_extensions"`
+	RequestHeadersRewrite map[string]RequestHeadersRewriteConfig `json:"request_headers_rewrite" bson:"request_headers_rewrite"`
+}
+
+type GraphQLProxyFeaturesConfig struct {
+	UseImmutableHeaders bool `bson:"use_immutable_headers" json:"use_immutable_headers"`
+}
+
+type RequestHeadersRewriteConfig struct {
+	Value  string `json:"value" bson:"value"`
+	Remove bool   `json:"remove" bson:"remove"`
 }
 
 type GraphQLSubgraphConfig struct {
@@ -928,15 +1004,21 @@ type GraphQLEngineDataSourceConfigGraphQL struct {
 }
 
 type GraphQLEngineDataSourceConfigKafka struct {
-	BrokerAddresses      []string              `bson:"broker_addresses" json:"broker_addresses"`
-	Topics               []string              `bson:"topics" json:"topics"`
-	GroupID              string                `bson:"group_id" json:"group_id"`
-	ClientID             string                `bson:"client_id" json:"client_id"`
-	KafkaVersion         string                `bson:"kafka_version" json:"kafka_version"`
-	StartConsumingLatest bool                  `json:"start_consuming_latest"`
-	BalanceStrategy      string                `json:"balance_strategy"`
-	IsolationLevel       string                `json:"isolation_level"`
-	SASL                 kafka_datasource.SASL `json:"sasl"`
+	BrokerAddresses      []string               `bson:"broker_addresses" json:"broker_addresses"`
+	Topics               []string               `bson:"topics" json:"topics"`
+	GroupID              string                 `bson:"group_id" json:"group_id"`
+	ClientID             string                 `bson:"client_id" json:"client_id"`
+	KafkaVersion         string                 `bson:"kafka_version" json:"kafka_version"`
+	StartConsumingLatest bool                   `json:"start_consuming_latest"`
+	BalanceStrategy      string                 `json:"balance_strategy"`
+	IsolationLevel       string                 `json:"isolation_level"`
+	SASL                 GraphQLEngineKafkaSASL `json:"sasl"`
+}
+
+type GraphQLEngineKafkaSASL struct {
+	Enable   bool   `json:"enable"`
+	User     string `json:"user"`
+	Password string `json:"password"`
 }
 
 type QueryVariable struct {
@@ -1277,6 +1359,9 @@ func DummyAPI() APIDefinition {
 		Version:          GraphQLConfigVersion2,
 		LastSchemaUpdate: nil,
 		Proxy: GraphQLProxyConfig{
+			Features: GraphQLProxyFeaturesConfig{
+				UseImmutableHeaders: true,
+			},
 			AuthHeaders: map[string]string{},
 		},
 	}
@@ -1400,4 +1485,35 @@ type Introspection struct {
 type IntrospectionCache struct {
 	Enabled bool  `bson:"enabled" json:"enabled"`
 	Timeout int64 `bson:"timeout" json:"timeout"`
+}
+
+// WebHookHandlerConf holds configuration related to webhook event handler.
+type WebHookHandlerConf struct {
+	// Disabled enables/disables this webhook.
+	Disabled bool `bson:"disabled" json:"disabled"`
+	// ID optional ID of the webhook, to be used in pro mode.
+	ID string `bson:"id" json:"id"`
+	// Name is the name of webhook.
+	Name string `bson:"name" json:"name"`
+	// The method to use for the webhook.
+	Method string `bson:"method" json:"method"`
+	// The target path on which to send the request.
+	TargetPath string `bson:"target_path" json:"target_path"`
+	// The template to load in order to format the request.
+	TemplatePath string `bson:"template_path" json:"template_path"`
+	// Headers to set when firing the webhook.
+	HeaderList map[string]string `bson:"header_map" json:"header_map"`
+	// The cool-down for the event so it does not trigger again (in seconds).
+	EventTimeout int64 `bson:"event_timeout" json:"event_timeout"`
+}
+
+// Scan scans WebHookHandlerConf from `any` in.
+func (w *WebHookHandlerConf) Scan(in any) error {
+	conf, err := reflect.Cast[WebHookHandlerConf](in)
+	if err != nil {
+		return err
+	}
+
+	*w = *conf
+	return nil
 }
