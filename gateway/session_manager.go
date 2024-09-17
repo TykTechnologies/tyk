@@ -387,7 +387,6 @@ func (l *SessionLimiter) RedisQuotaExceeded(r *http.Request, session *user.Sessi
 	})
 
 	if limit.QuotaMax <= 0 {
-		logger.Error("Quota disabled: quota max <= 0")
 		return false
 	}
 
