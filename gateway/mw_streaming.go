@@ -162,41 +162,74 @@ func HasHttp(config map[string]interface{}) bool {
 }
 
 func GetHTTPPaths(streamConfig map[string]interface{}) []string {
-	paths := make([]string, 0)
-	pathKeys := []string{"path", "stream_path", "ws_path"}
-	components := []string{"output", "input"}
+    paths := []string{}
 
-	for _, component := range components {
-		componentConfig, ok := streamConfig[component]
-		if !ok {
-			continue
-		}
-		componentConfigMap, ok := componentConfig.(map[string]interface{})
-		if !ok {
-			continue
-		}
+    // Define the path keys and their default values
+    pathKeys := []string{"path", "ws_path", "stream_path"}
+    defaultPaths := map[string]string{
+        "path":        "/post",
+        "ws_path":     "/post/ws",
+        "stream_path": "/get/stream",
+    }
 
-		httpPaths, ok := componentConfigMap["http_server"]
-		if !ok {
-			continue
-		}
-		httpPathMap, ok := httpPaths.(map[string]interface{})
-		if !ok {
-			continue
-		}
-		for _, pathItem := range pathKeys {
-			path, ok := httpPathMap[pathItem]
-			if !ok {
-				continue
-			}
+    // Components to process: 'input' and 'output'
+    components := []string{"input", "output"}
 
-			if pathString, ok := path.(string); ok {
-				paths = append(paths, pathString)
-			}
-		}
-	}
+    // Helper function to extract paths from an http_server config
+    extractPaths := func(httpConfig map[string]interface{}) {
+        for _, key := range pathKeys {
+            val, exists := httpConfig[key]
+            if !exists {
+                // Use default if key is missing
+                paths = append(paths, defaultPaths[key])
+            } else if pathStr, ok := val.(string); ok {
+                paths = append(paths, pathStr)
+            } else {
+                // Use default if value is not a string
+                paths = append(paths, defaultPaths[key])
+            }
+        }
+    }
 
-	return paths
+    for _, component := range components {
+        componentConfig, exists := streamConfig[component]
+        if !exists {
+            continue
+        }
+
+        componentMap, ok := componentConfig.(map[string]interface{})
+        if !ok {
+            continue
+        }
+
+        // Check if 'broker' exists under this component
+        if brokerConfig, exists := componentMap["broker"]; exists {
+            // 'broker' is a list of configurations
+            brokerList, ok := brokerConfig.([]interface{})
+            if !ok {
+                continue
+            }
+            for _, brokerItem := range brokerList {
+                brokerItemMap, ok := brokerItem.(map[string]interface{})
+                if !ok {
+                    continue
+                }
+                // Check if 'http_server' exists under this broker item
+                if httpServerConfig, exists := brokerItemMap["http_server"]; exists {
+                    if httpConfigMap, ok := httpServerConfig.(map[string]interface{}); ok {
+                        extractPaths(httpConfigMap)
+                    }
+                }
+            }
+        } else if httpServerConfig, exists := componentMap["http_server"]; exists {
+            // 'http_server' directly under component
+            if httpConfigMap, ok := httpServerConfig.(map[string]interface{}); ok {
+                extractPaths(httpConfigMap)
+            }
+        }
+    }
+
+    return paths
 }
 
 // getStreamsConfig extracts streaming configurations from an API spec if available.
