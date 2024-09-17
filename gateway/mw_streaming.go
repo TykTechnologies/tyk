@@ -10,6 +10,8 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/sirupsen/logrus"
+
 	"github.com/gorilla/mux"
 
 	"github.com/TykTechnologies/tyk/internal/streaming"
@@ -41,6 +43,7 @@ type StreamingMiddleware struct {
 
 type StreamManager struct {
 	streams     sync.Map
+	routeLock   sync.Mutex
 	muxer       *mux.Router
 	mw          *StreamingMiddleware
 	dryRun      bool
@@ -261,7 +264,14 @@ func (sm *StreamManager) createStream(streamID string, config map[string]interfa
 	sm.mw.Logger().Debugf("Creating stream: %s", streamFullID)
 
 	stream := streaming.NewStream(sm.mw.allowedUnsafe)
-	err := stream.Start(config, &handleFuncAdapter{mw: sm.mw, streamID: streamFullID, muxer: sm.muxer, sm: sm})
+	err := stream.Start(config, &handleFuncAdapter{
+		mw:       sm.mw,
+		streamID: streamFullID,
+		muxer:    sm.muxer,
+		sm:       sm,
+		// child logger is necessary to prevent race condition
+		logger: sm.mw.Logger().WithField("stream", streamFullID),
+	})
 	if err != nil {
 		sm.mw.Logger().Errorf("Failed to start stream %s: %v", streamFullID, err)
 		return err
@@ -296,7 +306,9 @@ func (s *StreamingMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 
 	var match mux.RouteMatch
 	streamManager := s.createStreamManager(r)
+	streamManager.routeLock.Lock()
 	streamManager.muxer.Match(newRequest, &match)
+	streamManager.routeLock.Unlock()
 
 	// direct Bento handler
 	handler, _ := match.Handler.(http.HandlerFunc)
@@ -344,25 +356,28 @@ type handleFuncAdapter struct {
 	sm       *StreamManager
 	mw       *StreamingMiddleware
 	muxer    *mux.Router
+	logger   *logrus.Entry
 }
 
 func (h *handleFuncAdapter) HandleFunc(path string, f func(http.ResponseWriter, *http.Request)) {
-	h.mw.Logger().Debugf("Registering streaming handleFunc for path: %s", path)
+	h.logger.Debugf("Registering streaming handleFunc for path: %s", path)
 
 	if h.mw == nil || h.muxer == nil {
-		h.mw.Logger().Error("StreamingMiddleware or muxer is nil")
+		h.logger.Error("StreamingMiddleware or muxer is nil")
 		return
 	}
 
+	h.sm.routeLock.Lock()
 	h.muxer.HandleFunc(path, func(w http.ResponseWriter, r *http.Request) {
 		defer func() {
 			// Stop the stream when the HTTP request finishes
 			if err := h.sm.removeStream(h.streamID); err != nil {
-				h.mw.Logger().Errorf("Failed to stop stream %s: %v", h.streamID, err)
+				h.logger.Errorf("Failed to stop stream %s: %v", h.streamID, err)
 			}
 		}()
 
 		f(w, r)
 	})
-	h.mw.Logger().Debugf("Registered handler for path: %s", path)
+	h.sm.routeLock.Unlock()
+	h.logger.Debugf("Registered handler for path: %s", path)
 }
