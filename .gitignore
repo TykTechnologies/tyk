@@ -50,7 +50,6 @@ session_state_gen_test.go
 __pycache__/
 tyk.test
 tyk-gateway.pid
-*.go-e
 
 tyk_linux_*
 /dist/
