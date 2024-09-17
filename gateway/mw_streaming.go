@@ -147,18 +147,44 @@ func (s *StreamingMiddleware) createStreamManager(r *http.Request) *StreamManage
 }
 
 func HasHttp(config map[string]interface{}) bool {
-	for key := range config {
-		keyConfig := config[key]
-		keyConfigMap, ok := keyConfig.(map[string]interface{})
-		if !ok {
-			continue
-		}
+    // Define the components to check
+    components := []string{"input", "output"}
 
-		if _, found := keyConfigMap["http_server"]; found {
-			return true
-		}
-	}
-	return false
+    for _, component := range components {
+        componentConfig, exists := config[component]
+        if !exists {
+            continue
+        }
+
+        componentMap, ok := componentConfig.(map[string]interface{})
+        if !ok {
+            continue
+        }
+
+        // Check if 'broker' exists under this component
+        if brokerConfig, found := componentMap["broker"]; found {
+            // 'broker' is expected to be a list of configurations
+            brokerList, ok := brokerConfig.([]interface{})
+            if !ok {
+                continue
+            }
+            for _, brokerItem := range brokerList {
+                brokerItemMap, ok := brokerItem.(map[string]interface{})
+                if !ok {
+                    continue
+                }
+                // Check if 'http_server' exists in the broker item
+                if _, found := brokerItemMap["http_server"]; found {
+                    return true
+                }
+            }
+        } else if _, found := componentMap["http_server"]; found {
+            // Check for 'http_server' directly under input/output
+            return true
+        }
+    }
+
+    return false
 }
 
 func GetHTTPPaths(streamConfig map[string]interface{}) []string {
