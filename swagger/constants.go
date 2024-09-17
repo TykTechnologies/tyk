@@ -6,6 +6,8 @@ const TykDesc = `The Tyk Gateway API is the primary means for integrating your a
 
 **Warning: Under no circumstances should outside parties be granted access to this API.**
 
+The Tyk Gateway API is capable of:
+
 * Managing session objects (key generation).
 * Managing and listing policies.
 * Managing and listing API Definitions (only when not using the Tyk Dashboard).

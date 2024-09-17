@@ -9,6 +9,8 @@ info:
 
     **Warning: Under no circumstances should outside parties be granted access to this API.**
 
+    The Tyk Gateway API is capable of:
+
     * Managing session objects (key generation).
     * Managing and listing policies.
     * Managing and listing API Definitions (only when not using the Tyk Dashboard).
@@ -28,7 +30,7 @@ info:
     name: Mozilla Public License Version 2.0
     url: https://github.com/TykTechnologies/tyk/blob/master/LICENSE.md
   title: Tyk Gateway API
-  version: 5.2.3
+  version: 5.6.0
 servers:
 - url: https://{tenant}
   variables:
