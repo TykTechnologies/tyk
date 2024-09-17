@@ -10,10 +10,10 @@ import (
 
 func Test_Issue10104(t *testing.T) {
 	ts := gateway.StartTest(nil)
-	defer ts.Close()
+	t.Cleanup(ts.Close)
 
 	// load api definition from file
-	ts.Gw.LoadAPI(loadAPISpec(t, "testdata/issue-10104-apidef.json"))
+	ts.Gw.LoadAPI(LoadAPISpec(t, "testdata/issue-10104-apidef.json"))
 
 	// issue request against /test to trigger panic
 	ts.Run(t, []test.TestCase{

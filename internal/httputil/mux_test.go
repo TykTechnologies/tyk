@@ -9,37 +9,36 @@ import (
 	"github.com/TykTechnologies/tyk/internal/httputil"
 )
 
-func testPathRegexp(tb testing.TB, in string, want string) string {
+func pathRegexp(tb testing.TB, in string, want string) string {
 	tb.Helper()
 
-	res, err := httputil.GetPathRegexp(in)
-	assert.NoError(tb, err)
-	if want != "" {
-		assert.Equal(tb, want, res)
-	}
+	res := httputil.PreparePathRegexp(in, true, false)
+	assert.Equal(tb, want, res)
 	return res
 }
 
-func TestGetPathRegexp(t *testing.T) {
+func TestPreparePathRegexp(t *testing.T) {
 	tests := map[string]string{
 		"/users*.":                             "^/users*.",
 		"/users":                               "^/users",
-		"users":                                "^.*users",
+		"users":                                "users",
+		"^/test/users":                         "^/test/users",
 		"/users$":                              "^/users$",
 		"/users/.*":                            "^/users/.*",
-		"/users/{id}":                          "^/users/(?P<v0>[^/]+)",
-		"/users/{id}/profile/{type:[a-zA-Z]+}": "^/users/(?P<v0>[^/]+)/profile/(?P<v1>[a-zA-Z]+)",
-		"/static/{path}/assets/{file}":         "^/static/(?P<v0>[^/]+)/assets/(?P<v1>[^/]+)",
-		"/items/{itemID:[0-9]+}/details/{detail}": "^/items/(?P<v0>[0-9]+)/details/(?P<v1>[^/]+)",
+		"/users/{id}":                          "^/users/([^/]+)",
+		"/users/{id}$":                         "^/users/([^/]+)$",
+		"/users/{id}/profile/{type:[a-zA-Z]+}": "^/users/([^/]+)/profile/([^/]+)",
+		"/static/{path}/assets/{file}":         "^/static/([^/]+)/assets/([^/]+)",
+		"/items/{itemID:[0-9]+}/details/{detail}": "^/items/([^/]+)/details/([^/]+)",
 	}
 
 	for k, v := range tests {
-		testPathRegexp(t, k, v)
+		pathRegexp(t, k, v)
 	}
 }
 
 func TestGetPathRegexpWithRegexCompile(t *testing.T) {
-	pattern := testPathRegexp(t, "/api/v1/users/{userId}/roles/{roleId}", "")
+	pattern := pathRegexp(t, "/api/v1/users/{userId}/roles/{roleId}", "^/api/v1/users/([^/]+)/roles/([^/]+)")
 
 	matched, err := regexp.MatchString(pattern, "/api/v1/users/10512/roles/32587")
 	assert.NoError(t, err)
@@ -63,7 +62,7 @@ func TestStripListenPath(t *testing.T) {
 	assert.Equal(t, "/anything/get", httputil.StripListenPath("/{myPattern:foo|bar}", "/anything/get"))
 }
 
-func TestMatchEndpoint(t *testing.T) {
+func TestMatchPaths(t *testing.T) {
 	tests := []struct {
 		name     string
 		pattern  string
@@ -138,7 +137,7 @@ func TestMatchEndpoint(t *testing.T) {
 			name:     "both empty endpoints",
 			pattern:  "",
 			endpoint: "",
-			match:    true,
+			match:    false,
 			isErr:    false,
 		},
 		{
@@ -152,7 +151,10 @@ func TestMatchEndpoint(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result, err := httputil.MatchEndpoint(tt.pattern, tt.endpoint)
+			// explicit match inputs as `^/path$`
+			pattern := httputil.PreparePathRegexp(tt.pattern, true, true)
+
+			result, err := httputil.MatchPaths(pattern, []string{tt.endpoint})
 			assert.Equal(t, tt.match, result)
 			assert.Equal(t, tt.isErr, err != nil)
 		})
