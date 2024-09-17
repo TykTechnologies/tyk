@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -52,7 +53,7 @@ func (sm *StreamManager) initStreams(r *http.Request, specStreams map[string]int
 			httpPaths := GetHTTPPaths(streamMap)
 			
 			if sm.dryRun {
-				if !len(httpPaths) == 0 {
+				if len(httpPaths) == 0 {
 					err := sm.createStream(streamID, streamMap)
 					if err != nil {
 						sm.mw.Logger().WithError(err).Errorf("Error creating stream %s", streamID)
@@ -153,6 +154,24 @@ func (s *StreamingMiddleware) createStreamManager(r *http.Request) *StreamManage
 	newStreamManager.initStreams(r, s.getStreamsConfig(r))
 
 	return newStreamManager
+}
+
+// Helper function to extract paths from an http_server configuration
+func extractPaths(httpConfig map[string]interface{}) []string {
+	var paths []string
+	defaultPaths := map[string]string{
+		"path":        "/post",
+		"ws_path":     "/post/ws",
+		"stream_path": "/get/stream",
+	}
+	for key, defaultValue := range defaultPaths {
+		if val, ok := httpConfig[key].(string); ok {
+			paths = append(paths, val)
+		} else {
+			paths = append(paths, defaultValue)
+		}
+	}
+	return paths
 }
 
 // Helper function to extract HTTP server paths from a given configuration
