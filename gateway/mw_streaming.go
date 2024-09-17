@@ -297,7 +297,7 @@ func (s *StreamingMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 
 	newRequest := &http.Request{
 		Method: r.Method,
-		URL: &url.URL{ Scheme: r.URL.Scheme, Host: r.URL.Host, Path: strippedPath}
+		URL: &url.URL{ Scheme: r.URL.Scheme, Host: r.URL.Host, Path: strippedPath},
 	}
 
 	if !s.defaultStreamManager.muxer.Match(newRequest, &mux.RouteMatch{}) {
