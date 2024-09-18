@@ -534,6 +534,14 @@ jobs:
           load: true
       - name: Test the built container image with api functionality test.
         run: "docker run -d -p8080:8080 --network ${{ job.container.network }} --rm test-${{ matrix.distro }}-${{ matrix.arch }}\nsleep 2\n./ci/tests/api-functionality/api_test.sh  \n"
+  release-tests:
+    needs:
+      - goreleaser
+    permissions:
+      id-token: write # This is required for requesting the JWT
+      contents: read # This is required for actions/checkout
+    uses: ./.github/workflows/release-tests.yml
+    secrets: inherit
   sbom:
     needs: goreleaser
     uses: TykTechnologies/github-actions/.github/workflows/sbom.yaml@main
