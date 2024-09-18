@@ -8,8 +8,8 @@ import (
 	"net/http"
 	"strings"
 
-	_ "github.com/TykTechnologies/benthos/v4/public/components/pure"
-	"github.com/TykTechnologies/benthos/v4/public/service"
+	_ "github.com/warpstreamlabs/bento/public/components/pure"
+	"github.com/warpstreamlabs/bento/public/service"
 )
 
 type portalOutputConfig struct {
