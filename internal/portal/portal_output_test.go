@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/TykTechnologies/benthos/v4/public/service"
+	"github.com/warpstreamlabs/bento/public/service"
 )
 
 // Unit test for portal webhook output plugin
