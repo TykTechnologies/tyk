@@ -9,7 +9,6 @@ builds:
   - id: std
     flags:
       - -tags=ignore
-      - -trimpath
       - -tags=goplugin
     ldflags:
       - -X github.com/TykTechnologies/tyk/internal/build.Version={{.Version}}
@@ -24,7 +23,6 @@ builds:
   - id: fips
     flags:
       - -tags=ignore
-      - -trimpath
       - -tags=goplugin
       - -tags=fips,boringcrypto
     env:
@@ -42,7 +40,6 @@ builds:
   - id: std-arm64
     flags:
       - -tags=ignore
-      - -trimpath
       - -tags=goplugin
     ldflags:
       - -X github.com/TykTechnologies/tyk/internal/build.Version={{.Version}}
