@@ -206,6 +206,10 @@ func TestStreamingAPISingleClient(t *testing.T) {
 	ts := StartTest(func(globalConf *config.Config) {
 		globalConf.Streaming.Enabled = true
 	})
+	t.Cleanup(func() {
+		ts.Close()
+	})
+	//t.Cleanup(func() { ts.Close() })
 	apiName := "test-api"
 	if err := setUpStreamAPI(ts, apiName, streamConfig); err != nil {
 		t.Fatal(err)
@@ -261,6 +265,9 @@ func TestStreamingAPIMultipleClients(t *testing.T) {
 
 	ts := StartTest(func(globalConf *config.Config) {
 		globalConf.Streaming.Enabled = true
+	})
+	t.Cleanup(func() {
+		ts.Close()
 	})
 	apiName := "test-api"
 
