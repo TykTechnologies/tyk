@@ -403,47 +403,43 @@ type HttpServerOptionsConfig struct {
 	// Regular expressions and parameterized routes will be left alone regardless of this setting.
 	EnableStrictRoutes bool `json:"enable_strict_routes"`
 
-	// EnablePathPrefixMatching changes the URL matching from wildcard mode to prefix mode.
-	// For example, `/json` matches `*/json*` by current default behaviour.
-	// If prefix matching is enabled, the match will be performed as a prefix match (`/json*`).
-	//
-	// The `/json` url would be matched as `^/json` against the following paths:
-	//
-	// - Full listen path and versioning URL (`/listen-path/v4/json`)
-	// - Stripped listen path URL (`/v4/json`)
-	// - Stripped version information (`/json`) - match.
-	//
-	// If versioning is disabled then the following URLs are considered:
-	//
-	// - Full listen path and endpoint (`/listen-path/json`)
-	// - Stripped listen path (`/json`) - match.
-	//
-	// For inputs that start with `/`, a prefix match is ensured by
-	// prepending the start of string `^` caret.
-	//
-	// For all other cases, the pattern remains unmodified.
-	//
-	// Combine this option with `enable_path_suffix_matching` to achieve
-	// exact url matching with `/json` being evaluated as `^/json$`.
+	// EnablePathPrefixMatching changes how the gateway matches incoming URL paths against routes (patterns) defined in the API definition.
+	// By default, the gateway uses wildcard matching. When EnablePathPrefixMatching is enabled, it switches to prefix matching. For example, a defined path such as `/json` will only match request URLs that begin with `/json`, rather than matching any URL containing `/json`.
+
+	// The gateway checks the request URL against several variations depending on whether path versioning is enabled:
+	// - Full path (listen path + version + endpoint): `/listen-path/v4/json`
+	// - Non-versioned full path (listen path + endpoint): `/listen-path/json`
+	// - Path without version (endpoint only): `/json`
+
+	// For patterns that start with `/`, the gateway prepends `^` before performing the check, ensuring a true prefix match.
+	// For patterns that start with `^`, the gateway will already perform prefix matching so EnablePathPrefixMatching will have no impact.
+	// This option allows for more specific and controlled routing of API requests, potentially reducing unintended matches. Note that you may need to adjust existing route definitions when enabling this option.
+
+	// Example:
+
+	// With wildcard matching, `/json` might match `/api/v1/data/json`.
+	// With prefix matching, `/json` would not match `/api/v1/data/json`, but would match `/json/data`.
+
+	// Combining EnablePathPrefixMatching with EnablePathSuffixMatching will result in exact URL matching, with `/json` being evaluated as `^/json$`.
 	EnablePathPrefixMatching bool `json:"enable_path_prefix_matching"`
 
-	// EnablePathSuffixMatching changes the URL matching to match as a suffix.
-	// For example: `/json` is matched as `/json$` against the following paths:
-	//
-	// - Full listen path and versioning URL (`/listen-path/v4/json`)
-	// - Stripped listen path URL (`/v4/json`)
-	// - Stripped version information (`/json`) - match.
-	//
-	// If versioning is disabled then the following URLs are considered:
-	//
-	// - Full listen path and endpoint (`/listen-path/json`)
-	// - Stripped listen path (`/json`) - match.
-	//
-	// If the input pattern already ends with a `$` (`/json$`)
-	// then the pattern remains unmodified.
-	//
-	// Combine this option with `enable_path_prefix_matching` to achieve
-	// exact url matching with `/json` being evaluated as `^/json$`.
+	// EnablePathSuffixMatching changes how the gateway matches incoming URL paths against routes (patterns) defined in the API definition.
+	// By default, the gateway uses wildcard matching. When EnablePathSuffixMatching is enabled, it switches to suffix matching. For example, a defined path such as `/json` will only match request URLs that end with `/json`, rather than matching any URL containing `/json`.
+
+	// The gateway checks the request URL against several variations depending on whether path versioning is enabled:
+	// - Full path (listen path + version + endpoint): `/listen-path/v4/json`
+	// - Non-versioned full path (listen path + endpoint): `/listen-path/json`
+	// - Path without version (endpoint only): `/json`
+
+	// For patterns that already end with `$`, the gateway will already perform suffix matching so EnablePathSuffixMatching will have no impact. For all other patterns, the gateway appends `$` before performing the check, ensuring a true suffix match.
+	// This option allows for more specific and controlled routing of API requests, potentially reducing unintended matches. Note that you may need to adjust existing route definitions when enabling this option.
+
+	// Example:
+
+	// With wildcard matching, `/json` might match `/api/v1/json/data`.
+	// With suffix matching, `/json` would not match `/api/v1/json/data`, but would match `/api/v1/json`.
+
+	// Combining EnablePathSuffixMatching with EnablePathPrefixMatching will result in exact URL matching, with `/json` being evaluated as `^/json$`.
 	EnablePathSuffixMatching bool `json:"enable_path_suffix_matching"`
 
 	// Disable TLS verification. Required if you are using self-signed certificates.
