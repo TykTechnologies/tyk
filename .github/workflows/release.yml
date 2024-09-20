@@ -8,6 +8,11 @@
 # - Cloudsmith
 
 name: Release
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 on:
   # Trigger release every monday at midnight for master CI images
   schedule:
