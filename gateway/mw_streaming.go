@@ -229,7 +229,7 @@ func GetHTTPPaths(streamConfig map[string]interface{}) []string {
 
 func (s *StreamingMiddleware) getStreamsConfig(r *http.Request) *StreamsConfig {
 	config := &StreamsConfig{Streams: make(map[string]any)}
-	if s.Spec.IsOAS {
+	if !s.Spec.IsOAS {
 		return nil
 	}
 
