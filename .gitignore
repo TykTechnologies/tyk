@@ -58,4 +58,5 @@ tyk_linux_*
 .task/
 *.test
 
+k8s/*Values.yaml
 main
