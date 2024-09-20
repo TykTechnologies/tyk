@@ -32,99 +32,63 @@ import (
 
 func TestGetHTTPPaths(t *testing.T) {
 	testCases := []struct {
-		name     string
-		config   map[string]interface{}
-		expected []string
+		name       string
+		configYaml string
+		expected   []string
 	}{
 		{
 			name: "should get paths",
-			config: map[string]interface{}{
-				"input": map[string]interface{}{
-					"http_server": map[string]interface{}{
-						"path": "/post",
-					},
-					"label": "example_generator_input",
-				},
-				"output": map[string]interface{}{
-					"http_server": map[string]interface{}{
-						"ws_path":     "/subscribe",
-						"stream_path": "/stream",
-					},
-					"label": "example_generator_output",
-				},
-			},
-			expected: []string{"/subscribe", "/post", "/stream"},
+			configYaml: `
+input:
+  http_server:
+    path: /post
+  label: example_generator_input
+
+output:
+  http_server:
+    ws_path: /subscribe
+    stream_path: /stream
+  label: example_generator_output
+`,
+			expected: []string{"/subscribe", "/post", "/stream", "/post/ws", "/get/stream"},
+		}, {
+			name: "should get paths with broker",
+			configYaml: `
+input:
+  broker:
+    inputs:
+      - http_server:
+          path: /post
+
+output:
+  http_server:
+    ws_path: /subscribe
+    stream_path: /stream
+  label: example_generator_output
+
+`,
+			expected: []string{"/subscribe", "/post", "/stream", "/post/ws", "/get/stream"},
 		},
 		{
 			name: "no http_server",
-			config: map[string]interface{}{
-				"input": map[string]interface{}{
-					"kafka": map[string]interface{}{
-						"consumer_group": "test",
-					},
-				},
-				"output": map[string]interface{}{
-					"test": map[string]interface{}{
-						"field": "value",
-					},
-				},
-			},
+			configYaml: `
+input:
+  kafka:
+    consumer_group: test
+
+output:
+  test:
+    field: value
+`,
 			expected: []string{},
 		},
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			httpPaths := GetHTTPPaths(tc.config)
+			config, err := yamlConfigToMap(tc.configYaml)
+			require.NoError(t, err)
+			httpPaths := GetHTTPPaths(config)
 			assert.ElementsMatch(t, tc.expected, httpPaths)
-		})
-	}
-}
-
-func TestHasHttp(t *testing.T) {
-	testCases := []struct {
-		name     string
-		config   map[string]interface{}
-		expected bool
-	}{
-		{
-			name: "should get paths",
-			config: map[string]interface{}{
-				"input": map[string]interface{}{
-					"http_server": map[string]interface{}{
-						"path": "/post",
-					},
-					"label": "example_generator_input",
-				},
-				"output": map[string]interface{}{
-					"http_server": map[string]interface{}{
-						"ws_path":     "/subscribe",
-						"stream_path": "/stream",
-					},
-					"label": "example_generator_output",
-				},
-			},
-			expected: true,
-		},
-		{
-			name: "no http_server",
-			config: map[string]interface{}{
-				"input": map[string]interface{}{
-					"kafka": map[string]interface{}{
-						"consumer_group": "test",
-					},
-				},
-				"output": map[string]interface{}{
-					"test": map[string]interface{}{
-						"field": "value",
-					},
-				},
-			},
-			expected: false,
-		},
-	}
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			assert.Equal(t, tc.expected, HasHttp(tc.config))
 		})
 	}
 }
@@ -339,14 +303,9 @@ func setUpStreamAPI(ts *Test, apiName string, streamConfig string) error {
 }
 
 func setupOASForStreamAPI(streamingConfig string) (oas.OAS, error) {
-	streamingConfigJSON, err := ConvertYAMLToJSON([]byte(streamingConfig))
+	parsedStreamingConfig, err := yamlConfigToMap(streamingConfig)
 	if err != nil {
-		return oas.OAS{}, fmt.Errorf("failed to convert YAML to JSON: %w", err)
-	}
-
-	var parsedStreamingConfig map[string]interface{}
-	if err := json.Unmarshal(streamingConfigJSON, &parsedStreamingConfig); err != nil {
-		return oas.OAS{}, fmt.Errorf("failed to parse JSON: %v", err)
+		return oas.OAS{}, err
 	}
 
 	oasAPI := oas.OAS{
@@ -365,6 +324,19 @@ func setupOASForStreamAPI(streamingConfig string) (oas.OAS, error) {
 	}
 
 	return oasAPI, nil
+}
+
+func yamlConfigToMap(streamingConfig string) (map[string]interface{}, error) {
+	streamingConfigJSON, err := ConvertYAMLToJSON([]byte(streamingConfig))
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert YAML to JSON: %w", err)
+	}
+
+	var parsedStreamingConfig map[string]interface{}
+	if err := json.Unmarshal(streamingConfigJSON, &parsedStreamingConfig); err != nil {
+		return nil, fmt.Errorf("failed to parse JSON: %v", err)
+	}
+	return parsedStreamingConfig, nil
 }
 
 func TestAsyncAPI(t *testing.T) {
