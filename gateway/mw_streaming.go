@@ -230,12 +230,12 @@ func GetHTTPPaths(streamConfig map[string]interface{}) []string {
 func (s *StreamingMiddleware) getStreamsConfig(r *http.Request) *StreamsConfig {
 	config := &StreamsConfig{Streams: make(map[string]any)}
 	if !s.Spec.IsOAS {
-		return nil
+		return config
 	}
 
 	extension, ok := s.Spec.OAS.T.Extensions[ExtensionTykStreaming]
 	if !ok {
-		return nil
+		return config
 	}
 
 	if streamsMap, ok := extension.(map[string]any); ok {
@@ -243,30 +243,29 @@ func (s *StreamingMiddleware) getStreamsConfig(r *http.Request) *StreamsConfig {
 			for streamID, stream := range streams {
 				if r == nil {
 					s.Logger().Debugf("No request available to replace variables in stream config for %s", streamID)
-					continue
-				}
-
-				s.Logger().Debugf("Stream config for %s: %v", streamID, stream)
-				marshaledStream, err := json.Marshal(stream)
-				if err != nil {
-					s.Logger().Errorf("Failed to marshal stream config: %v", err)
-					continue
-				}
-				replacedStream := s.Gw.replaceTykVariables(r, string(marshaledStream), true)
-
-				if replacedStream != string(marshaledStream) {
-					s.Logger().Debugf("Stream config changed for %s: %s", streamID, replacedStream)
 				} else {
-					s.Logger().Debugf("Stream config has not changed for %s: %s", streamID, replacedStream)
-				}
+					s.Logger().Debugf("Stream config for %s: %v", streamID, stream)
+					marshaledStream, err := json.Marshal(stream)
+					if err != nil {
+						s.Logger().Errorf("Failed to marshal stream config: %v", err)
+						continue
+					}
+					replacedStream := s.Gw.replaceTykVariables(r, string(marshaledStream), true)
 
-				var unmarshaledStream map[string]interface{}
-				err = json.Unmarshal([]byte(replacedStream), &unmarshaledStream)
-				if err != nil {
-					s.Logger().Errorf("Failed to unmarshal replaced stream config: %v", err)
-					continue
+					if replacedStream != string(marshaledStream) {
+						s.Logger().Debugf("Stream config changed for %s: %s", streamID, replacedStream)
+					} else {
+						s.Logger().Debugf("Stream config has not changed for %s: %s", streamID, replacedStream)
+					}
+
+					var unmarshaledStream map[string]interface{}
+					err = json.Unmarshal([]byte(replacedStream), &unmarshaledStream)
+					if err != nil {
+						s.Logger().Errorf("Failed to unmarshal replaced stream config: %v", err)
+						continue
+					}
+					stream = unmarshaledStream
 				}
-				stream = unmarshaledStream
 				config.Streams[streamID] = stream
 			}
 		}
