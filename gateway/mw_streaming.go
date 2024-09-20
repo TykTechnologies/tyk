@@ -51,11 +51,11 @@ type StreamManager struct {
 	listenPaths []string
 }
 
-func (sm *StreamManager) initStreams(r *http.Request, specStreams map[string]interface{}) {
+func (sm *StreamManager) initStreams(r *http.Request, config *StreamsConfig) {
 	// Clear existing routes for this consumer group
 	sm.muxer = mux.NewRouter()
 
-	for streamID, streamConfig := range specStreams {
+	for streamID, streamConfig := range config.Streams {
 		if streamMap, ok := streamConfig.(map[string]interface{}); ok {
 			httpPaths := GetHTTPPaths(streamMap)
 
@@ -123,12 +123,12 @@ func (s *StreamingMiddleware) EnabledForSpec() bool {
 		s.allowedUnsafe = streamingConfig.AllowUnsafe
 		s.Logger().Debugf("Allowed unsafe components: %v", s.allowedUnsafe)
 
-		specStreams := s.getStreamsConfig(nil)
-		globalStreamCounter.Add(int64(len(specStreams)))
+		config := s.getStreamsConfig(nil)
+		globalStreamCounter.Add(int64(len(config.Streams)))
 
-		s.Logger().Debug("Total streams count: ", len(specStreams))
+		s.Logger().Debug("Total streams count: ", len(config.Streams))
 
-		if len(specStreams) == 0 {
+		if len(config.Streams) == 0 {
 			return false
 		}
 
@@ -227,46 +227,52 @@ func GetHTTPPaths(streamConfig map[string]interface{}) []string {
 	return deduplicated
 }
 
-func (s *StreamingMiddleware) getStreamsConfig(r *http.Request) map[string]interface{} {
-	streamConfigs := make(map[string]interface{})
+func (s *StreamingMiddleware) getStreamsConfig(r *http.Request) *StreamsConfig {
+	config := &StreamsConfig{Streams: make(map[string]any)}
 	if s.Spec.IsOAS {
-		if ext, ok := s.Spec.OAS.T.Extensions[ExtensionTykStreaming]; ok {
-			if streamsMap, ok := ext.(map[string]interface{}); ok {
-				if streams, ok := streamsMap["streams"].(map[string]interface{}); ok {
-					for streamID, stream := range streams {
-						if r != nil {
-							s.Logger().Debugf("Stream config for %s: %v", streamID, stream)
+		return nil
+	}
 
-							marshaledStream, err := json.Marshal(stream)
-							if err != nil {
-								s.Logger().Errorf("Failed to marshal stream config: %v", err)
-								continue
-							}
-							replacedStream := s.Gw.replaceTykVariables(r, string(marshaledStream), true)
+	extension, ok := s.Spec.OAS.T.Extensions[ExtensionTykStreaming]
+	if !ok {
+		return nil
+	}
 
-							if replacedStream != string(marshaledStream) {
-								s.Logger().Debugf("Stream config changed for %s: %s", streamID, replacedStream)
-							} else {
-								s.Logger().Debugf("Stream config has not changed for %s: %s", streamID, replacedStream)
-							}
-
-							var unmarshaledStream map[string]interface{}
-							err = json.Unmarshal([]byte(replacedStream), &unmarshaledStream)
-							if err != nil {
-								s.Logger().Errorf("Failed to unmarshal replaced stream config: %v", err)
-								continue
-							}
-							stream = unmarshaledStream
-						} else {
-							s.Logger().Debugf("No request available to replace variables in stream config for %s", streamID)
-						}
-						streamConfigs[streamID] = stream
-					}
+	if streamsMap, ok := extension.(map[string]any); ok {
+		if streams, ok := streamsMap["streams"].(map[string]any); ok {
+			for streamID, stream := range streams {
+				if r == nil {
+					s.Logger().Debugf("No request available to replace variables in stream config for %s", streamID)
+					continue
 				}
+
+				s.Logger().Debugf("Stream config for %s: %v", streamID, stream)
+				marshaledStream, err := json.Marshal(stream)
+				if err != nil {
+					s.Logger().Errorf("Failed to marshal stream config: %v", err)
+					continue
+				}
+				replacedStream := s.Gw.replaceTykVariables(r, string(marshaledStream), true)
+
+				if replacedStream != string(marshaledStream) {
+					s.Logger().Debugf("Stream config changed for %s: %s", streamID, replacedStream)
+				} else {
+					s.Logger().Debugf("Stream config has not changed for %s: %s", streamID, replacedStream)
+				}
+
+				var unmarshaledStream map[string]interface{}
+				err = json.Unmarshal([]byte(replacedStream), &unmarshaledStream)
+				if err != nil {
+					s.Logger().Errorf("Failed to unmarshal replaced stream config: %v", err)
+					continue
+				}
+				stream = unmarshaledStream
+				config.Streams[streamID] = stream
 			}
 		}
 	}
-	return streamConfigs
+
+	return config
 }
 
 // createStream creates a new stream
