@@ -40,6 +40,7 @@ type Handler interface {
 	DeleteKey(string) bool
 	DeleteAllKeys() bool
 	DeleteRawKey(string) bool
+	DeleteRawKeys([]string) bool
 	Connect() bool
 	GetKeysAndValues() map[string]string
 	GetKeysAndValuesWithFilter(string) map[string]string

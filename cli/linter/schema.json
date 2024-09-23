@@ -553,6 +553,12 @@
         "enable_strict_routes": {
           "type": "boolean"
         },
+        "enable_path_prefix_matching": {
+          "type": "boolean"
+        },
+        "enable_path_suffix_matching": {
+          "type": "boolean"
+        },
         "flush_interval": {
           "type": "integer"
         },
@@ -640,6 +646,10 @@
     "log_level": {
       "type": "string",
       "enum": ["", "debug", "info", "warn", "error"]
+    },
+    "log_format": {
+      "type": "string",
+      "enum": ["", "standard", "json"]
     },
     "enable_http_profiler": {
       "type": "boolean"
