@@ -30,6 +30,11 @@
   "policies": {
     "policy_source": "file"
   },
+  "http_server_options": {
+    "enable_strict_routes": true,
+    "enable_path_prefix_matching": true,
+    "enable_path_suffix_matching": true
+  },
   "hash_keys": true,
   "hash_key_function": "murmur64",
   "suppress_redis_signal_reload": false,
