@@ -17,6 +17,7 @@ import (
 	_ "github.com/TykTechnologies/tyk/internal/portal"
 )
 
+// Stream is a wrapper around benthos stream
 type Stream struct {
 	allowedUnsafe []string
 	streamConfig  string
@@ -24,6 +25,7 @@ type Stream struct {
 	log           *logrus.Logger
 }
 
+// NewStream creates a new stream without initializing it
 func NewStream(allowUnsafe []string) *Stream {
 	logger := logrus.New()
 	logger.Out = log.Writer()
@@ -42,12 +44,14 @@ func NewStream(allowUnsafe []string) *Stream {
 	}
 }
 
+// SetLogger to be used by the stream
 func (s *Stream) SetLogger(logger *logrus.Logger) {
 	if logger != nil {
 		s.log = logger
 	}
 }
 
+// Start loads up the configuration and starts the benthos stream. Non blocking
 func (s *Stream) Start(config map[string]interface{}, mux service.HTTPMultiplexer) error {
 	s.log.Debugf("Starting stream")
 
@@ -58,10 +62,6 @@ func (s *Stream) Start(config map[string]interface{}, mux service.HTTPMultiplexe
 	}
 
 	configPayload = s.removeUnsafe(configPayload)
-	if err != nil {
-		s.log.Errorf("Failed to remove consumer_group: %v", err)
-		return err
-	}
 
 	s.log.Debugf("Building new stream")
 	builder := service.NewStreamBuilder()
@@ -107,6 +107,7 @@ func (s *Stream) Start(config map[string]interface{}, mux service.HTTPMultiplexe
 	return nil
 }
 
+// Stop cleans up the benthos stream
 func (s *Stream) Stop() error {
 	s.log.Printf("Stopping stream")
 
@@ -140,10 +141,12 @@ func (s *Stream) Stop() error {
 	return nil
 }
 
+// GetConfig returns the benthos configuration of the stream
 func (s *Stream) GetConfig() string {
 	return s.streamConfig
 }
 
+// Reset stops the stream
 func (s *Stream) Reset() error {
 	return s.Stop()
 }

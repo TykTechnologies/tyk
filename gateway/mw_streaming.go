@@ -3,6 +3,7 @@ package gateway
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -19,9 +20,11 @@ import (
 )
 
 const (
+	// ExtensionTykStreaming is the oas extension for tyk streaming
 	ExtensionTykStreaming = "x-tyk-streaming"
 )
 
+// StreamsConfig represents a stream configuration
 type StreamsConfig struct {
 	Info struct {
 		Version string `json:"version"`
@@ -42,6 +45,7 @@ type StreamingMiddleware struct {
 	defaultStreamManager *StreamManager
 }
 
+// StreamManager is responsible for creating a single stream
 type StreamManager struct {
 	streams     sync.Map
 	routeLock   sync.Mutex
@@ -79,7 +83,7 @@ func (sm *StreamManager) initStreams(r *http.Request, config *StreamsConfig) {
 	// If it is default stream manager, init muxer
 	if r == nil {
 		for _, path := range sm.listenPaths {
-			sm.muxer.HandleFunc(path, func(w http.ResponseWriter, r *http.Request) {
+			sm.muxer.HandleFunc(path, func(_ http.ResponseWriter, _ *http.Request) {
 				// Dummy handler
 			})
 		}
@@ -91,27 +95,27 @@ func (sm *StreamManager) removeStream(streamID string) error {
 	streamFullID := fmt.Sprintf("%s_%s", sm.mw.Spec.APIID, streamID)
 
 	if streamValue, exists := sm.streams.Load(streamFullID); exists {
-		stream := streamValue.(*streaming.Stream)
+		stream, ok := streamValue.(*streaming.Stream)
+		if !ok {
+			return fmt.Errorf("stream %s is not a valid stream", streamID)
+		}
 		err := stream.Stop()
 		if err != nil {
 			return err
 		}
 		sm.streams.Delete(streamFullID)
 	} else {
-		return fmt.Errorf("Stream %s does not exist", streamID)
+		return fmt.Errorf("stream %s does not exist", streamID)
 	}
 	return nil
 }
 
-type connection struct {
-	id     string
-	cancel context.CancelFunc
-}
-
+// Name is StreamingMiddleware
 func (s *StreamingMiddleware) Name() string {
 	return "StreamingMiddleware"
 }
 
+// EnabledForSpec checks if streaming is enabled on the config
 func (s *StreamingMiddleware) EnabledForSpec() bool {
 	s.Logger().Debug("Checking if streaming is enabled")
 
@@ -128,11 +132,7 @@ func (s *StreamingMiddleware) EnabledForSpec() bool {
 
 		s.Logger().Debug("Total streams count: ", len(config.Streams))
 
-		if len(config.Streams) == 0 {
-			return false
-		}
-
-		return true
+		return len(config.Streams) != 0
 	}
 
 	s.Logger().Debug("Streaming is not enabled in the config")
@@ -204,7 +204,7 @@ func handleBroker(brokerConfig map[string]interface{}) []string {
 	return paths
 }
 
-// Main function to get HTTP paths from the stream configuration
+// GetHTTPPaths is the ain function to get HTTP paths from the stream configuration
 func GetHTTPPaths(streamConfig map[string]interface{}) []string {
 	var paths []string
 	for _, component := range []string{"input", "output"} {
@@ -333,19 +333,26 @@ func (s *StreamingMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 	streamManager.routeLock.Unlock()
 
 	// direct Bento handler
-	handler, _ := match.Handler.(http.HandlerFunc)
+	handler, ok := match.Handler.(http.HandlerFunc)
+	if !ok {
+		return errors.New("invalid route handler"), http.StatusInternalServerError
+	}
 
 	handler.ServeHTTP(w, r)
 
 	return nil, mwStatusRespond
 }
 
+// Unload closes and remove active streams
 func (s *StreamingMiddleware) Unload() {
 	s.Logger().Debugf("Unloading streaming middleware %s", s.Spec.Name)
 
 	totalStreams := 0
 	s.streamManagers.Range(func(_, value interface{}) bool {
-		manager := value.(*StreamManager)
+		manager, ok := value.(*StreamManager)
+		if !ok {
+			return true
+		}
 		manager.streams.Range(func(_, _ interface{}) bool {
 			totalStreams++
 			return true
@@ -358,10 +365,15 @@ func (s *StreamingMiddleware) Unload() {
 
 	s.Logger().Debug("Closing active streams")
 	s.streamManagers.Range(func(_, value interface{}) bool {
-		manager := value.(*StreamManager)
+		manager, ok := value.(*StreamManager)
+		if !ok {
+			return true
+		}
 		manager.streams.Range(func(_, streamValue interface{}) bool {
 			if stream, ok := streamValue.(*streaming.Stream); ok {
-				stream.Reset()
+				if err := stream.Reset(); err != nil {
+					return true
+				}
 			}
 			return true
 		})

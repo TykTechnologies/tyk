@@ -657,7 +657,6 @@ func (pwl *PortsWhiteList) Decode(value string) error {
 	return nil
 }
 
-// Add this new struct definition
 type StreamingConfig struct {
 	Enabled     bool     `json:"enabled"`
 	AllowUnsafe []string `json:"allow_unsafe"`

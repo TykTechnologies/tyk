@@ -276,6 +276,7 @@ func (t *BaseMiddleware) Config() (interface{}, error) {
 	return nil, nil
 }
 
+// Unload unloads the middleware and frees resources
 func (t *BaseMiddleware) Unload() {}
 
 func (t *BaseMiddleware) GetSpec() *APISpec {

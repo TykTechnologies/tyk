@@ -165,6 +165,7 @@ func TestStreamingAPISingleClient(t *testing.T) {
 	configSubject := "test"
 
 	connectionStr, err := natsContainer.ConnectionString(ctx)
+	assert.NoError(t, err)
 	streamConfig := fmt.Sprintf(bentoNatsTemplate, configSubject, connectionStr)
 
 	ts := StartTest(func(globalConf *config.Config) {
@@ -190,7 +191,9 @@ func TestStreamingAPISingleClient(t *testing.T) {
 	wsConn, _, err := dialer.Dial(wsURL, nil)
 	require.NoError(t, err, "failed to connect to ws server")
 	t.Cleanup(func() {
-		wsConn.Close()
+		if err := wsConn.Close(); err != nil {
+			t.Logf("failed to close ws connection: %v", err)
+		}
 	})
 
 	nc, err := nats.Connect(connectionStr)
@@ -224,6 +227,7 @@ func TestStreamingAPIMultipleClients(t *testing.T) {
 	require.NoError(t, err)
 
 	connectionStr, err := natsContainer.ConnectionString(ctx)
+	require.NoError(t, err)
 
 	streamConfig := fmt.Sprintf(bentoNatsTemplate, "test", connectionStr)
 
@@ -257,7 +261,9 @@ func TestStreamingAPIMultipleClients(t *testing.T) {
 		require.NoError(t, err, fmt.Sprintf("failed to connect to ws server for client %d", i))
 		wsConns = append(wsConns, wsConn)
 		t.Cleanup(func() {
-			wsConn.Close()
+			if err := wsConn.Close(); err != nil {
+				t.Logf("failed to close ws connection: %v", err)
+			}
 		})
 	}
 
@@ -334,7 +340,7 @@ func yamlConfigToMap(streamingConfig string) (map[string]interface{}, error) {
 
 	var parsedStreamingConfig map[string]interface{}
 	if err := json.Unmarshal(streamingConfigJSON, &parsedStreamingConfig); err != nil {
-		return nil, fmt.Errorf("failed to parse JSON: %v", err)
+		return nil, fmt.Errorf("failed to parse JSON: %w", err)
 	}
 	return parsedStreamingConfig, nil
 }
@@ -360,18 +366,16 @@ func TestAsyncAPI(t *testing.T) {
 
 	defer ts.Close()
 
-	const (
-		oldAPIID    = "old-api-id"
-		oasAPIID    = "oas-api-id"
-		oasBasePath = "/tyk/apis/oas"
-	)
-
 	tempFile, err := os.CreateTemp("", "test-output-*.txt")
 	if err != nil {
 		t.Fatalf("Failed to create temporary file: %v", err)
 	}
-	tempFile.Close()
-	defer os.Remove(tempFile.Name()) // clean up
+	require.NoError(t, tempFile.Close())
+	t.Cleanup(func() {
+		if err := os.Remove(tempFile.Name()); err != nil {
+			t.Logf("Failed to remove temporary file: %v", err)
+		}
+	})
 	tempFilePath := tempFile.Name()
 
 	streamingConfig := `
@@ -480,7 +484,11 @@ func TestAsyncAPIHttp(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to start Kafka container: %v", err)
 	}
-	defer kafkaContainer.Terminate(ctx)
+	t.Cleanup(func() {
+		if err := kafkaContainer.Terminate(ctx); err != nil {
+			t.Logf("Failed to terminate Kafka container: %v", err)
+		}
+	})
 
 	brokers, err := kafkaContainer.Brokers(ctx)
 	if err != nil {
@@ -495,12 +503,13 @@ func TestAsyncAPIHttp(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			apiName := setupStreamingAPI(t, ts, tc.consumerGroup, tc.tenantID, brokers[0])
-			testAsyncAPIHttp(t, ts, tc.consumerGroup, tc.isDynamic, tc.tenantID, apiName, brokers[0])
+			testAsyncAPIHttp(t, ts, tc.isDynamic, tc.tenantID, apiName, brokers[0])
 		})
 	}
 }
 
 func setupStreamingAPI(t *testing.T, ts *Test, consumerGroup string, tenantID string, kafkaHost string) string {
+	t.Helper()
 	t.Logf("Setting up streaming API for tenant: %s with consumer group: %s", tenantID, consumerGroup)
 
 	apiName := fmt.Sprintf("streaming-api-%s", tenantID)
@@ -518,6 +527,7 @@ func setupStreamingAPI(t *testing.T, ts *Test, consumerGroup string, tenantID st
 }
 
 func setupOASForStreamingAPI(t *testing.T, consumerGroup string, kafkaHost string) oas.OAS {
+	t.Helper()
 	streamingConfig := fmt.Sprintf(`
 streams:
  test:
@@ -560,7 +570,8 @@ streams:
 	return oasAPI
 }
 
-func testAsyncAPIHttp(t *testing.T, ts *Test, consumerGroup string, isDynamic bool, tenantID string, apiName string, kafkaHost string) {
+func testAsyncAPIHttp(t *testing.T, ts *Test, isDynamic bool, tenantID string, apiName string, kafkaHost string) {
+	t.Helper()
 	const messageToSend = "hello websocket"
 	const numMessages = 2
 	const numClients = 2
@@ -580,19 +591,27 @@ func testAsyncAPIHttp(t *testing.T, ts *Test, consumerGroup string, isDynamic bo
 		if err != nil {
 			t.Fatalf("Failed to connect to WebSocket %d: %v\nResponse: %+v", i, err, resp)
 		}
-		defer wsConn.Close()
+		t.Cleanup(func() {
+			if err := wsConn.Close(); err != nil {
+				t.Logf("Failed to close WebSocket %d: %v", i, err)
+			}
+		})
 		wsClients[i] = wsConn
 		t.Logf("Successfully connected to WebSocket %d", i)
 	}
 
 	// Send messages to Kafka
-	config := sarama.NewConfig()
-	config.Producer.Return.Successes = true
-	producer, err := sarama.NewSyncProducer([]string{kafkaHost}, config)
+	saramaCfg := sarama.NewConfig()
+	saramaCfg.Producer.Return.Successes = true
+	producer, err := sarama.NewSyncProducer([]string{kafkaHost}, saramaCfg)
 	if err != nil {
 		t.Fatalf("Failed to create Kafka producer: %v", err)
 	}
-	defer producer.Close()
+	defer func() {
+		if err := producer.Close(); err != nil {
+			t.Logf("Failed to close Kafka producer: %v", err)
+		}
+	}()
 
 	for i := 0; i < numMessages; i++ {
 		msg := &sarama.ProducerMessage{
@@ -626,7 +645,9 @@ func testAsyncAPIHttp(t *testing.T, ts *Test, consumerGroup string, isDynamic bo
 				return
 			default:
 				for i, wsConn := range wsClients {
-					wsConn.SetReadDeadline(time.Now().Add(15 * time.Second))
+					if err = wsConn.SetReadDeadline(time.Now().Add(15 * time.Second)); err != nil {
+						t.Error(err)
+					}
 					_, p, err := wsConn.ReadMessage()
 					if err != nil {
 						if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
@@ -686,7 +707,11 @@ func TestWebSocketConnectionClosedOnAPIReload(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to start Kafka container: %v", err)
 	}
-	defer kafkaContainer.Terminate(ctx)
+	t.Cleanup(func() {
+		if err := kafkaContainer.Terminate(ctx); err != nil {
+			t.Logf("Failed to terminate Kafka container: %v", err)
+		}
+	})
 
 	brokers, err := kafkaContainer.Brokers(ctx)
 	if err != nil {
@@ -715,7 +740,11 @@ func TestWebSocketConnectionClosedOnAPIReload(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to connect to WebSocket: %v", err)
 	}
-	defer wsConn.Close()
+	t.Cleanup(func() {
+		if err := wsConn.Close(); err != nil {
+			t.Logf("error closing WebSocket connection: %v", err)
+		}
+	})
 
 	// Reload the API by rebuilding and loading it
 	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
