@@ -3,8 +3,9 @@ package portal
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
+	"io"
+	"log"
 	"net/http"
 	"strings"
 
@@ -25,25 +26,25 @@ func newPortalOutputConfig() *portalOutputConfig {
 
 type portalOutput struct {
 	conf         *portalOutputConfig
-	portalClient *PortalClient
+	portalClient *Client
 }
 
-func newPortalOutput(conf *portalOutputConfig, mgr *service.Resources) *portalOutput {
-	client := NewPortalClient(conf.PortalURL, conf.Secret)
+func newPortalOutput(conf *portalOutputConfig, _ *service.Resources) *portalOutput {
+	client := NewClient(conf.PortalURL, conf.Secret)
 	return &portalOutput{conf: conf, portalClient: client}
 }
 
-func (p *portalOutput) Connect(ctx context.Context) error {
-	fmt.Println("Connecting to Portal API")
+func (p *portalOutput) Connect(_ context.Context) error {
+	log.Println("Connecting to Portal API")
 	// Connection logic here if necessary, e.g., test connection or fetch token.
 	// For simplicity, consider the portal client already prepared for requests.
 	return nil
 }
 
-func (p *portalOutput) Write(ctx context.Context, msg *service.Message) error {
+func (p *portalOutput) Write(_ context.Context, msg *service.Message) error {
 	webhooks, err := p.portalClient.ListWebhookCredentials()
 	if err != nil {
-		return fmt.Errorf("failed to list webhook credentials: %v", err)
+		return fmt.Errorf("failed to list webhook credentials: %w", err)
 	}
 
 	content, err := msg.AsBytes()
@@ -55,7 +56,7 @@ func (p *portalOutput) Write(ctx context.Context, msg *service.Message) error {
 		if strings.Contains(webhook.WebhookEventTypes, p.conf.EventType) {
 			go func(webhookURL string, content []byte) {
 				if err := p.sendToWebhook(webhookURL, content); err != nil {
-					fmt.Printf("failed to send event to webhook URL %s: %v\n", webhookURL, err)
+					log.Printf("failed to send event to webhook URL %s: %v", webhookURL, err)
 				}
 			}(webhook.WebhookURL, content)
 		}
@@ -65,7 +66,7 @@ func (p *portalOutput) Write(ctx context.Context, msg *service.Message) error {
 }
 
 func (p *portalOutput) sendToWebhook(url string, data []byte) error {
-	req, err := http.NewRequest("POST", url, bytes.NewBuffer(data))
+	req, err := http.NewRequestWithContext(context.Background(), "POST", url, bytes.NewBuffer(data))
 	if err != nil {
 		return err
 	}
@@ -80,19 +81,25 @@ func (p *portalOutput) sendToWebhook(url string, data []byte) error {
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			log.Printf("Error closing response body: %v", err)
+		}
+	}()
 
 	if resp.StatusCode >= 300 {
-		var respBody []byte
-		respBody, _ = json.Marshal(resp.Body)
+		respBody, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return fmt.Errorf("failed to read response body: %w", err)
+		}
 		return fmt.Errorf("received non-success code from webhook: %s, response: %s", resp.Status, string(respBody))
 	}
 
 	return nil
 }
 
-func (p *portalOutput) Close(ctx context.Context) error {
-	fmt.Println("Closing Portal Output")
+func (p *portalOutput) Close(_ context.Context) error {
+	log.Println("Closing Portal Output")
 	// Cleanup resources here if necessary
 	return nil
 }
@@ -113,10 +120,23 @@ func init() {
 	err := service.RegisterOutput("portal_webhook", portalOutputConfigSpec(),
 		func(conf *service.ParsedConfig, mgr *service.Resources) (service.Output, int, error) {
 			config := newPortalOutputConfig()
-			config.EventType, _ = conf.FieldString("event_type")
-			config.Secret, _ = conf.FieldString("secret")
-			config.PortalURL, _ = conf.FieldString("portal_url")
-			config.Headers, _ = conf.FieldStringMap("headers")
+			var err error
+			config.EventType, err = conf.FieldString("event_type")
+			if err != nil {
+				return nil, 0, err
+			}
+			config.Secret, err = conf.FieldString("secret")
+			if err != nil {
+				return nil, 0, err
+			}
+			config.PortalURL, err = conf.FieldString("portal_url")
+			if err != nil {
+				return nil, 0, err
+			}
+			config.Headers, err = conf.FieldStringMap("headers")
+			if err != nil {
+				return nil, 0, err
+			}
 
 			return newPortalOutput(config, mgr), 1, nil
 		},

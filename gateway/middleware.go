@@ -277,8 +277,11 @@ func (t *BaseMiddleware) Config() (interface{}, error) {
 }
 
 // Unload unloads the middleware and frees resources
-func (t *BaseMiddleware) Unload() {}
+func (t *BaseMiddleware) Unload() {
+	// methos created to satisfy middleware contract
+}
 
+// GetSpec returns the spec of the middleware
 func (t *BaseMiddleware) GetSpec() *APISpec {
 	return t.Spec
 }

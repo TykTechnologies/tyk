@@ -60,24 +60,7 @@ func (sm *StreamManager) initStreams(r *http.Request, config *StreamsConfig) {
 	sm.muxer = mux.NewRouter()
 
 	for streamID, streamConfig := range config.Streams {
-		if streamMap, ok := streamConfig.(map[string]interface{}); ok {
-			httpPaths := GetHTTPPaths(streamMap)
-
-			if sm.dryRun {
-				if len(httpPaths) == 0 {
-					err := sm.createStream(streamID, streamMap)
-					if err != nil {
-						sm.mw.Logger().WithError(err).Errorf("Error creating stream %s", streamID)
-					}
-				}
-			} else {
-				err := sm.createStream(streamID, streamMap)
-				if err != nil {
-					sm.mw.Logger().WithError(err).Errorf("Error creating stream %s", streamID)
-				}
-			}
-			sm.listenPaths = append(sm.listenPaths, httpPaths...)
-		}
+		sm.setUpOrDryRunStream(streamConfig, streamID)
 	}
 
 	// If it is default stream manager, init muxer
@@ -87,6 +70,27 @@ func (sm *StreamManager) initStreams(r *http.Request, config *StreamsConfig) {
 				// Dummy handler
 			})
 		}
+	}
+}
+
+func (sm *StreamManager) setUpOrDryRunStream(streamConfig any, streamID string) {
+	if streamMap, ok := streamConfig.(map[string]interface{}); ok {
+		httpPaths := GetHTTPPaths(streamMap)
+
+		if sm.dryRun {
+			if len(httpPaths) == 0 {
+				err := sm.createStream(streamID, streamMap)
+				if err != nil {
+					sm.mw.Logger().WithError(err).Errorf("Error creating stream %s", streamID)
+				}
+			}
+		} else {
+			err := sm.createStream(streamID, streamMap)
+			if err != nil {
+				sm.mw.Logger().WithError(err).Errorf("Error creating stream %s", streamID)
+			}
+		}
+		sm.listenPaths = append(sm.listenPaths, httpPaths...)
 	}
 }
 
@@ -240,38 +244,42 @@ func (s *StreamingMiddleware) getStreamsConfig(r *http.Request) *StreamsConfig {
 
 	if streamsMap, ok := extension.(map[string]any); ok {
 		if streams, ok := streamsMap["streams"].(map[string]any); ok {
-			for streamID, stream := range streams {
-				if r == nil {
-					s.Logger().Debugf("No request available to replace variables in stream config for %s", streamID)
-				} else {
-					s.Logger().Debugf("Stream config for %s: %v", streamID, stream)
-					marshaledStream, err := json.Marshal(stream)
-					if err != nil {
-						s.Logger().Errorf("Failed to marshal stream config: %v", err)
-						continue
-					}
-					replacedStream := s.Gw.replaceTykVariables(r, string(marshaledStream), true)
-
-					if replacedStream != string(marshaledStream) {
-						s.Logger().Debugf("Stream config changed for %s: %s", streamID, replacedStream)
-					} else {
-						s.Logger().Debugf("Stream config has not changed for %s: %s", streamID, replacedStream)
-					}
-
-					var unmarshaledStream map[string]interface{}
-					err = json.Unmarshal([]byte(replacedStream), &unmarshaledStream)
-					if err != nil {
-						s.Logger().Errorf("Failed to unmarshal replaced stream config: %v", err)
-						continue
-					}
-					stream = unmarshaledStream
-				}
-				config.Streams[streamID] = stream
-			}
+			s.processStreamsConfig(r, streams, config)
 		}
 	}
 
 	return config
+}
+
+func (s *StreamingMiddleware) processStreamsConfig(r *http.Request, streams map[string]any, config *StreamsConfig) {
+	for streamID, stream := range streams {
+		if r == nil {
+			s.Logger().Debugf("No request available to replace variables in stream config for %s", streamID)
+		} else {
+			s.Logger().Debugf("Stream config for %s: %v", streamID, stream)
+			marshaledStream, err := json.Marshal(stream)
+			if err != nil {
+				s.Logger().Errorf("Failed to marshal stream config: %v", err)
+				continue
+			}
+			replacedStream := s.Gw.replaceTykVariables(r, string(marshaledStream), true)
+
+			if replacedStream != string(marshaledStream) {
+				s.Logger().Debugf("Stream config changed for %s: %s", streamID, replacedStream)
+			} else {
+				s.Logger().Debugf("Stream config has not changed for %s: %s", streamID, replacedStream)
+			}
+
+			var unmarshaledStream map[string]interface{}
+			err = json.Unmarshal([]byte(replacedStream), &unmarshaledStream)
+			if err != nil {
+				s.Logger().Errorf("Failed to unmarshal replaced stream config: %v", err)
+				continue
+			}
+			stream = unmarshaledStream
+		}
+		config.Streams[streamID] = stream
+	}
 }
 
 // createStream creates a new stream

@@ -12,16 +12,28 @@ func portalMockHandlerGenerator(serverURL string, customHandler http.HandlerFunc
 		switch r.URL.Path {
 		case "/portal-api/apps":
 			// Mock response for list of apps with IDs 1, 2, and 3
-			fmt.Fprintf(w, `[{"ID":1,"Name":"Test App 1"},{"ID":2,"Name":"Test App 2"},{"ID":3,"Name":"Test App 3"}]`)
+			if _, err := fmt.Fprintf(w, `[{"ID":1,"Name":"Test App 1"},{"ID":2,"Name":"Test App 2"},{"ID":3,"Name":"Test App 3"}]`); err != nil {
+				http.Error(w, "Failed to write response", http.StatusInternalServerError)
+				return
+			}
 		case "/portal-api/apps/1":
 			// Mock response for app 1 detail with webhook credentials
-			fmt.Fprintf(w, `{"ID": 1, "AccessRequests": [{"WebhookEventTypes": "abc,bar,foo", "WebhookSecret": "test", "WebhookURL": "%s/test-webhook-1"}]}`, serverURL)
+			if _, err := fmt.Fprintf(w, `{"ID": 1, "AccessRequests": [{"WebhookEventTypes": "abc,bar,foo", "WebhookSecret": "test", "WebhookURL": "%s/test-webhook-1"}]}`, serverURL); err != nil {
+				http.Error(w, "Failed to write response", http.StatusInternalServerError)
+				return
+			}
 		case "/portal-api/apps/2":
 			// App 2 detail without webhook (empty array or null could represent no webhooks)
-			fmt.Fprintf(w, `{"ID": 2, "AccessRequests": []}`)
+			if _, err := fmt.Fprintf(w, `{"ID": 2, "AccessRequests": []}`); err != nil {
+				http.Error(w, "Failed to write response", http.StatusInternalServerError)
+				return
+			}
 		case "/portal-api/apps/3":
 			// Mock response for app 3 detail with webhook credentials
-			fmt.Fprintf(w, `{"ID": 3, "AccessRequests": [{"WebhookEventTypes": "abc,xyz", "WebhookSecret": "secret", "WebhookURL": "%s/test-webhook-2"}]}`, serverURL)
+			if _, err := fmt.Fprintf(w, `{"ID": 3, "AccessRequests": [{"WebhookEventTypes": "abc,xyz", "WebhookSecret": "secret", "WebhookURL": "%s/test-webhook-2"}]}`, serverURL); err != nil {
+				http.Error(w, "Failed to write response", http.StatusInternalServerError)
+				return
+			}
 		default:
 			if customHandler != nil {
 				customHandler(w, r)
@@ -39,7 +51,7 @@ func TestListWebhookCredentialsMultipleApps(t *testing.T) {
 
 	defer mockServer.Close()
 
-	client := NewPortalClient(mockServer.URL, "test-token")
+	client := NewClient(mockServer.URL, "test-token")
 
 	expected := []WebhookCredential{
 		{

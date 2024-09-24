@@ -11,7 +11,7 @@ import (
 	"github.com/warpstreamlabs/bento/public/service"
 )
 
-// Unit test for portal webhook output plugin
+// TestPortalWebhookOutput is a unit test for portal webhook output plugin
 func TestPortalWebhookOutput(t *testing.T) {
 	mockServer := httptest.NewServer(nil)
 	var wg sync.WaitGroup
@@ -51,7 +51,7 @@ output:
 		t.Fatalf("Failed to build stream: %v", err)
 	}
 
-	// Except webhook be called 2 times
+	// Expect webhook to be called 2 times
 	wg.Add(2)
 
 	if err := stream.Run(context.Background()); err != nil {
@@ -70,5 +70,4 @@ output:
 	case <-time.After(1 * time.Second):
 		t.Fatal("Timeout waiting for webhook calls")
 	}
-
 }

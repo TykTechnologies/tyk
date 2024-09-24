@@ -176,7 +176,7 @@ func TestStreamingAPISingleClient(t *testing.T) {
 	})
 	//t.Cleanup(func() { ts.Close() })
 	apiName := "test-api"
-	if err := setUpStreamAPI(ts, apiName, streamConfig); err != nil {
+	if err = setUpStreamAPI(ts, apiName, streamConfig); err != nil {
 		t.Fatal(err)
 	}
 
@@ -191,7 +191,7 @@ func TestStreamingAPISingleClient(t *testing.T) {
 	wsConn, _, err := dialer.Dial(wsURL, nil)
 	require.NoError(t, err, "failed to connect to ws server")
 	t.Cleanup(func() {
-		if err := wsConn.Close(); err != nil {
+		if err = wsConn.Close(); err != nil {
 			t.Logf("failed to close ws connection: %v", err)
 		}
 	})
@@ -239,7 +239,7 @@ func TestStreamingAPIMultipleClients(t *testing.T) {
 	})
 	apiName := "test-api"
 
-	if err := setUpStreamAPI(ts, apiName, streamConfig); err != nil {
+	if err = setUpStreamAPI(ts, apiName, streamConfig); err != nil {
 		t.Fatal(err)
 	}
 
@@ -372,7 +372,7 @@ func TestAsyncAPI(t *testing.T) {
 	}
 	require.NoError(t, tempFile.Close())
 	t.Cleanup(func() {
-		if err := os.Remove(tempFile.Name()); err != nil {
+		if err = os.Remove(tempFile.Name()); err != nil {
 			t.Logf("Failed to remove temporary file: %v", err)
 		}
 	})
@@ -402,7 +402,7 @@ streams:
 	}
 
 	var parsedStreamingConfig map[string]interface{}
-	if err := json.Unmarshal(streamingConfigJSON, &parsedStreamingConfig); err != nil {
+	if err = json.Unmarshal(streamingConfigJSON, &parsedStreamingConfig); err != nil {
 		t.Fatalf("Failed to parse JSON: %v", err)
 	}
 
@@ -485,7 +485,7 @@ func TestAsyncAPIHttp(t *testing.T) {
 		t.Fatalf("Failed to start Kafka container: %v", err)
 	}
 	t.Cleanup(func() {
-		if err := kafkaContainer.Terminate(ctx); err != nil {
+		if err = kafkaContainer.Terminate(ctx); err != nil {
 			t.Logf("Failed to terminate Kafka container: %v", err)
 		}
 	})
@@ -608,7 +608,7 @@ func testAsyncAPIHttp(t *testing.T, ts *Test, isDynamic bool, tenantID string, a
 		t.Fatalf("Failed to create Kafka producer: %v", err)
 	}
 	defer func() {
-		if err := producer.Close(); err != nil {
+		if err = producer.Close(); err != nil {
 			t.Logf("Failed to close Kafka producer: %v", err)
 		}
 	}()
@@ -687,13 +687,21 @@ func testAsyncAPIHttp(t *testing.T, ts *Test, isDynamic bool, tenantID string, a
 func waitForAPIToBeLoaded(ts *Test) error {
 	maxAttempts := 2
 	for i := 0; i < maxAttempts; i++ {
-		resp, err := http.Get(ts.URL + "/streaming-api-default/metrics")
+		req, err := http.NewRequestWithContext(context.Background(), "GET", ts.URL+"/streaming-api-default/metrics", nil)
+		if err != nil {
+			return err
+		}
+		resp, err := http.DefaultClient.Do(req)
 		if err == nil && resp.StatusCode == http.StatusOK {
-			resp.Body.Close()
+			if err = resp.Body.Close(); err != nil {
+				log.Printf("Failed to close response body: %v", err)
+			}
 			return nil
 		}
 		if resp != nil {
-			resp.Body.Close()
+			if err = resp.Body.Close(); err != nil {
+				log.Printf("Failed to close response body: %v", err)
+			}
 		}
 		time.Sleep(1 * time.Second)
 	}
@@ -708,7 +716,7 @@ func TestWebSocketConnectionClosedOnAPIReload(t *testing.T) {
 		t.Fatalf("Failed to start Kafka container: %v", err)
 	}
 	t.Cleanup(func() {
-		if err := kafkaContainer.Terminate(ctx); err != nil {
+		if err = kafkaContainer.Terminate(ctx); err != nil {
 			t.Logf("Failed to terminate Kafka container: %v", err)
 		}
 	})
@@ -741,7 +749,7 @@ func TestWebSocketConnectionClosedOnAPIReload(t *testing.T) {
 		t.Fatalf("Failed to connect to WebSocket: %v", err)
 	}
 	t.Cleanup(func() {
-		if err := wsConn.Close(); err != nil {
+		if err = wsConn.Close(); err != nil {
 			t.Logf("error closing WebSocket connection: %v", err)
 		}
 	})

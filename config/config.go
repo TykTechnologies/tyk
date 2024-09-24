@@ -657,6 +657,7 @@ func (pwl *PortsWhiteList) Decode(value string) error {
 	return nil
 }
 
+// StreamingConfig is for configuring tyk streaming
 type StreamingConfig struct {
 	Enabled     bool     `json:"enabled"`
 	AllowUnsafe []string `json:"allow_unsafe"`
@@ -1132,8 +1133,10 @@ type Config struct {
 	Labs LabsConfig `json:"labs"`
 }
 
+// LabsConfig include config for streaming
 type LabsConfig map[string]interface{}
 
+// Decode unmarshals json config into the Labs config
 func (lc *LabsConfig) Decode(value string) error {
 	var temp map[string]interface{}
 	if err := json.Unmarshal([]byte(value), &temp); err != nil {

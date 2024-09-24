@@ -1,13 +1,19 @@
 package portal
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"strings"
+
+	log "github.com/sirupsen/logrus"
 )
 
-type PortalClient struct {
+const applicationJSON = "application/json"
+
+// Client is a client application for the portal API
+type Client struct {
 	Secret  string
 	BaseURL string
 }
@@ -41,7 +47,8 @@ type WebhookCredential struct {
 	WebhookURL        string
 }
 
-func NewPortalClient(baseURL, secret string) *PortalClient {
+// NewClient creates a new Client for interacting with the portal API
+func NewClient(baseURL, secret string) *Client {
 	if !strings.HasSuffix(baseURL, "/") {
 		baseURL += "/"
 	}
@@ -50,11 +57,11 @@ func NewPortalClient(baseURL, secret string) *PortalClient {
 	}
 	baseURL = strings.TrimSuffix(baseURL, "/")
 
-	return &PortalClient{Secret: secret, BaseURL: baseURL}
+	return &Client{Secret: secret, BaseURL: baseURL}
 }
 
 // ListWebhookCredentials retrieves a list of apps and filters out their webhook credentials
-func (client *PortalClient) ListWebhookCredentials() ([]WebhookCredential, error) {
+func (client *Client) ListWebhookCredentials() ([]WebhookCredential, error) {
 	var allApps []App
 	for page := 1; ; page++ {
 		apps, err := client.fetchApps(page)
@@ -92,22 +99,27 @@ func (client *PortalClient) ListWebhookCredentials() ([]WebhookCredential, error
 	return webhookCredentials, nil
 }
 
-func (client *PortalClient) fetchApps(page int) ([]App, error) {
+func (client *Client) fetchApps(page int) ([]App, error) {
 	url := fmt.Sprintf("%s/apps?page=%d&per_page=10", client.BaseURL, page)
 
-	request, err := http.NewRequest("GET", url, nil)
+	ctx := context.Background()
+	request, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return nil, err
 	}
 	request.Header.Set("Authorization", client.Secret)
-	request.Header.Set("Content-Type", "application/json")
-	request.Header.Set("Accept", "application/json")
+	request.Header.Set("Content-Type", applicationJSON)
+	request.Header.Set("Accept", applicationJSON)
 
 	resp, err := http.DefaultClient.Do(request)
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if closeErr := resp.Body.Close(); closeErr != nil {
+			log.Error(err)
+		}
+	}()
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("failed to fetch apps, status code: %d", resp.StatusCode)
@@ -122,21 +134,27 @@ func (client *PortalClient) fetchApps(page int) ([]App, error) {
 	return apps, nil
 }
 
-func (client *PortalClient) fetchAppDetail(appID int) (*AppDetail, error) {
+func (client *Client) fetchAppDetail(appID int) (*AppDetail, error) {
 	url := fmt.Sprintf("%s/apps/%d", client.BaseURL, appID)
-	request, err := http.NewRequest("GET", url, nil)
+
+	ctx := context.Background()
+	request, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return nil, err
 	}
 	request.Header.Set("Authorization", client.Secret)
-	request.Header.Set("Content-Type", "application/json")
-	request.Header.Set("Accept", "application/json")
+	request.Header.Set("Content-Type", applicationJSON)
+	request.Header.Set("Accept", applicationJSON)
 
 	resp, err := http.DefaultClient.Do(request)
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if closeErr := resp.Body.Close(); closeErr != nil {
+			log.Error(err)
+		}
+	}()
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("failed to fetch app detail, status code: %d", resp.StatusCode)
