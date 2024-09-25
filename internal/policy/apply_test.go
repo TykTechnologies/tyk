@@ -1169,71 +1169,34 @@ func testPrepareApplyPolicies(tb testing.TB) (*policy.Service, []testApplyPolici
 
 	tests = append(tests, combinedEndpointRLTCs...)
 
-	//combineAllowedURLWithRL := []testApplyPoliciesData{
-	//	{
-	//		name: "combine_allowed_urls_acl_with_rate_limit_partition",
-	//		policies: []string{
-	//			"acl_with_allowed_url",
-	//			"rate_limit",
-	//		},
-	//		sessMatch: func(t *testing.T, state *user.SessionState) {
-	//			t.Helper()
-	//			assert.NotEmpty(t, state.AccessRights["d"].AllowedURLs)
-	//		},
-	//	},
-	//}
-	//
-	//tests = combineAllowedURLWithRL
+	combineAllowedURLWithRL := []testApplyPoliciesData{
+		{
+			name: "combine_allowed_urls_acl_with_rate_limit_partition",
+			policies: []string{
+				"acl_with_allowed_url",
+				"rate_limit",
+			},
+			sessMatch: func(t *testing.T, state *user.SessionState) {
+				t.Helper()
+				assert.NotEmpty(t, state.AccessRights["d"].AllowedURLs)
+			},
+		},
+	}
+
+	tests = append(tests, combineAllowedURLWithRL...)
 
 	return service, tests
 }
-
-//
-//func TestApplyPolicies(t *testing.T) {
-//	service, tests := testPrepareApplyPolicies(t)
-//	for _, tc := range tests {
-//		pols := [][]string{tc.policies}
-//		//var copyPols = make([]string, len(tc.policies))
-//		//copy(copyPols, tc.policies)
-//		//slices.Reverse(copyPols)
-//		//pols = append(pols, copyPols)
-//
-//		for i, policies := range pols {
-//			name := tc.name
-//			if i == 1 {
-//				name = fmt.Sprintf("%s, reversed=%t", name, true)
-//			}
-//
-//			t.Run(name, func(t *testing.T) {
-//				sess := tc.session
-//				if sess == nil {
-//					sess = &user.SessionState{}
-//				}
-//				sess.SetPolicies(policies...)
-//				if err := service.Apply(sess); err != nil {
-//					assert.ErrorContains(t, err, tc.errMatch)
-//					return
-//				}
-//
-//				if tc.sessMatch != nil {
-//					tc.sessMatch(t, sess)
-//				}
-//			})
-//		}
-//	}
-//}
 
 func TestApplyPolicies(t *testing.T) {
 	service, tests := testPrepareApplyPolicies(t)
 
 	for _, tc := range tests {
 		pols := [][]string{tc.policies}
-		if tc.reverseOrder {
-			var copyPols = make([]string, len(tc.policies))
-			copy(copyPols, tc.policies)
-			slices.Reverse(copyPols)
-			pols = append(pols, copyPols)
-		}
+		var copyPols = make([]string, len(tc.policies))
+		copy(copyPols, tc.policies)
+		slices.Reverse(copyPols)
+		pols = append(pols, copyPols)
 
 		for i, policies := range pols {
 			name := tc.name
