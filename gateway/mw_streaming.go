@@ -12,11 +12,14 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/TykTechnologies/tyk-pump/analytics"
 	"github.com/sirupsen/logrus"
 
 	"github.com/gorilla/mux"
 
+	"github.com/TykTechnologies/tyk/header"
 	"github.com/TykTechnologies/tyk/internal/streaming"
+	"github.com/TykTechnologies/tyk/request"
 )
 
 const (
@@ -60,7 +63,7 @@ func (sm *StreamManager) initStreams(r *http.Request, config *StreamsConfig) {
 	sm.muxer = mux.NewRouter()
 
 	for streamID, streamConfig := range config.Streams {
-		sm.setUpOrDryRunStream(streamConfig, streamID)
+		sm.setUpOrDryRunStream(r, streamConfig, streamID)
 	}
 
 	// If it is default stream manager, init muxer
@@ -73,19 +76,19 @@ func (sm *StreamManager) initStreams(r *http.Request, config *StreamsConfig) {
 	}
 }
 
-func (sm *StreamManager) setUpOrDryRunStream(streamConfig any, streamID string) {
+func (sm *StreamManager) setUpOrDryRunStream(r *http.Request, streamConfig any, streamID string) {
 	if streamMap, ok := streamConfig.(map[string]interface{}); ok {
 		httpPaths := GetHTTPPaths(streamMap)
 
 		if sm.dryRun {
 			if len(httpPaths) == 0 {
-				err := sm.createStream(streamID, streamMap)
+				err := sm.createStream(r, streamID, streamMap)
 				if err != nil {
 					sm.mw.Logger().WithError(err).Errorf("Error creating stream %s", streamID)
 				}
 			}
 		} else {
-			err := sm.createStream(streamID, streamMap)
+			err := sm.createStream(r, streamID, streamMap)
 			if err != nil {
 				sm.mw.Logger().WithError(err).Errorf("Error creating stream %s", streamID)
 			}
@@ -283,7 +286,7 @@ func (s *StreamingMiddleware) processStreamsConfig(r *http.Request, streams map[
 }
 
 // createStream creates a new stream
-func (sm *StreamManager) createStream(streamID string, config map[string]interface{}) error {
+func (sm *StreamManager) createStream(r *http.Request, streamID string, config map[string]interface{}) error {
 	streamFullID := fmt.Sprintf("%s_%s", sm.mw.Spec.APIID, streamID)
 	sm.mw.Logger().Debugf("Creating stream: %s", streamFullID)
 
@@ -304,7 +307,79 @@ func (sm *StreamManager) createStream(streamID string, config map[string]interfa
 	sm.streams.Store(streamFullID, stream)
 	sm.mw.Logger().Infof("Successfully created stream: %s", streamFullID)
 
+	// Store record
+	err = sm.mw.Gw.Analytics.RecordHit(sm.createAnalyticsRecord(r))
+	if err != nil {
+		log.WithError(err).Error("could not store analytic record")
+	} else {
+		log.Info("successfully stored stream analytics record")
+	}
+
 	return nil
+}
+
+func (sm *StreamManager) createAnalyticsRecord(r *http.Request) *analytics.AnalyticsRecord {
+	// Pre-stuff for analytics record
+	alias := ""
+	oauthClientID := ""
+	session := ctxGetSession(r)
+	tags := make([]string, 0, estimateTagsCapacity(session, sm.mw.Spec))
+
+	if session != nil {
+		oauthClientID = session.OauthClientID
+		alias = session.Alias
+		tags = append(tags, getSessionTags(session)...)
+	}
+
+	if len(sm.mw.Spec.TagHeaders) > 0 {
+		tags = tagHeaders(r, sm.mw.Spec.TagHeaders, tags)
+	}
+
+	if len(sm.mw.Spec.Tags) > 0 {
+		tags = append(tags, sm.mw.Spec.Tags...)
+	}
+
+	trackEP := false
+	trackedPath := r.URL.Path
+
+	if p := ctxGetTrackedPath(r); p != "" {
+		trackEP = true
+		trackedPath = p
+	}
+
+	// Create record for started stream
+	t := time.Now()
+	return &analytics.AnalyticsRecord{
+		Method:        r.Method,
+		Host:          r.URL.Host,
+		Path:          trackedPath,
+		RawPath:       r.URL.Path,
+		ContentLength: r.ContentLength,
+		UserAgent:     r.Header.Get(header.UserAgent),
+		Day:           t.Day(),
+		Month:         t.Month(),
+		Year:          t.Year(),
+		Hour:          t.Hour(),
+		ResponseCode:  http.StatusOK, // Consider to use 101 Switching Protocols but those will not be shown in Dashboard UI
+		APIKey:        ctxGetAuthToken(r),
+		TimeStamp:     t,
+		APIVersion:    sm.mw.Spec.getVersionFromRequest(r),
+		APIName:       sm.mw.Spec.Name,
+		APIID:         sm.mw.Spec.APIID,
+		OrgID:         sm.mw.Spec.OrgID,
+		OauthID:       oauthClientID,
+		RequestTime:   0,
+		Latency:       analytics.Latency{},
+		IPAddress:     request.RealIP(r),
+		Geo:           analytics.GeoData{},
+		Network:       analytics.NetworkStats{},
+		Tags:          tags,
+		Alias:         alias,
+		TrackPath:     trackEP,
+		ExpireAt:      t,
+	}
+
+	// TODO: add detailed recording
 }
 
 func (sm *StreamManager) hasPath(path string) bool {

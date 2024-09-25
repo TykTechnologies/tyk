@@ -379,7 +379,7 @@ require (
 	github.com/opencontainers/image-spec v1.1.0 // indirect
 	github.com/opensearch-project/opensearch-go/v3 v3.0.0 // indirect
 	github.com/oschwald/geoip2-golang v1.9.0 // indirect
-	github.com/parquet-go/parquet-go v0.20.0 // indirect
+	github.com/parquet-go/parquet-go v0.23.0 // indirect
 	github.com/paulmach/orb v0.11.1 // indirect
 	github.com/pebbe/zmq4 v1.2.10 // indirect
 	github.com/perimeterx/marshmallow v1.1.5 // indirect
@@ -404,13 +404,13 @@ require (
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
 	github.com/rickb777/period v1.0.5 // indirect
 	github.com/rickb777/plural v1.4.2 // indirect
-	github.com/rivo/uniseg v0.4.4 // indirect
+	github.com/rivo/uniseg v0.4.7 // indirect
 	github.com/robfig/cron/v3 v3.0.1 // indirect
 	github.com/russross/blackfriday/v2 v2.1.0 // indirect
 	github.com/ryanuber/go-glob v1.0.0 // indirect
 	github.com/santhosh-tekuri/jsonschema/v5 v5.3.0 // indirect
 	github.com/segmentio/asm v1.2.0 // indirect
-	github.com/segmentio/encoding v0.3.6 // indirect
+	github.com/segmentio/encoding v0.4.0 // indirect
 	github.com/segmentio/ksuid v1.0.4 // indirect
 	github.com/shirou/gopsutil/v3 v3.23.12 // indirect
 	github.com/shoenig/go-m1cpu v0.1.6 // indirect
@@ -511,3 +511,4 @@ require (
 //replace github.com/TykTechnologies/graphql-go-tools/v2 => ../graphql-go-tools/v2
 //
 //replace github.com/warpstreamlabs/bento => ../benthos
+replace inet.af/peercred => github.com/tailscale/peercred v0.0.0-20240214030740-b535050b2aa4
