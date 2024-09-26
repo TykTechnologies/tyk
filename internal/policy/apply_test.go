@@ -263,6 +263,7 @@ func testPrepareApplyPolicies(tb testing.TB) (*policy.Service, []testApplyPolici
 		{
 			"QuotaPart with unlimited", []string{"unlimited-quota"},
 			"", func(t *testing.T, s *user.SessionState) {
+				t.Helper()
 				if s.QuotaMax != -1 {
 					t.Fatalf("want unlimited quota to be -1")
 				}
@@ -271,6 +272,7 @@ func testPrepareApplyPolicies(tb testing.TB) (*policy.Service, []testApplyPolici
 		{
 			"QuotaPart", []string{"quota1"},
 			"", func(t *testing.T, s *user.SessionState) {
+				t.Helper()
 				if s.QuotaMax != 2 {
 					t.Fatalf("want QuotaMax to be 2")
 				}
@@ -279,6 +281,7 @@ func testPrepareApplyPolicies(tb testing.TB) (*policy.Service, []testApplyPolici
 		{
 			"QuotaParts", []string{"quota1", "quota2"},
 			"", func(t *testing.T, s *user.SessionState) {
+				t.Helper()
 				if s.QuotaMax != 3 {
 					t.Fatalf("Should pick bigger value")
 				}
@@ -287,12 +290,14 @@ func testPrepareApplyPolicies(tb testing.TB) (*policy.Service, []testApplyPolici
 		{
 			"QuotaParts with acl", []string{"quota5", "quota4"},
 			"", func(t *testing.T, s *user.SessionState) {
+				t.Helper()
 				assert.Equal(t, int64(4), s.QuotaMax)
 			}, nil, false,
 		},
 		{
 			"QuotaPart with access rights", []string{"quota3"},
 			"", func(t *testing.T, s *user.SessionState) {
+				t.Helper()
 				if s.QuotaMax != 3 {
 					t.Fatalf("quota should be the same as policy quota")
 				}
@@ -301,6 +306,7 @@ func testPrepareApplyPolicies(tb testing.TB) (*policy.Service, []testApplyPolici
 		{
 			"QuotaPart with access rights in multi-policy", []string{"quota4", "nonpart1"},
 			"", func(t *testing.T, s *user.SessionState) {
+				t.Helper()
 				if s.QuotaMax != 3 {
 					t.Fatalf("quota should be the same as policy quota")
 				}
@@ -317,12 +323,14 @@ func testPrepareApplyPolicies(tb testing.TB) (*policy.Service, []testApplyPolici
 		{
 			"RatePart with unlimited", []string{"unlimited-rate"},
 			"", func(t *testing.T, s *user.SessionState) {
+				t.Helper()
 				assert.True(t, s.Rate <= 0, "want unlimited rate to be <= 0")
 			}, nil, false,
 		},
 		{
 			"RatePart", []string{"rate1"},
 			"", func(t *testing.T, s *user.SessionState) {
+				t.Helper()
 				if s.Rate != 3 {
 					t.Fatalf("want Rate to be 3")
 				}
@@ -331,6 +339,7 @@ func testPrepareApplyPolicies(tb testing.TB) (*policy.Service, []testApplyPolici
 		{
 			"RateParts", []string{"rate1", "rate2"},
 			"", func(t *testing.T, s *user.SessionState) {
+				t.Helper()
 				if s.Rate != 4 {
 					t.Fatalf("Should pick bigger value")
 				}
@@ -339,18 +348,21 @@ func testPrepareApplyPolicies(tb testing.TB) (*policy.Service, []testApplyPolici
 		{
 			"RateParts with acl", []string{"rate5", "rate4"},
 			"", func(t *testing.T, s *user.SessionState) {
+				t.Helper()
 				assert.Equal(t, float64(10), s.Rate)
 			}, nil, false,
 		},
 		{
 			"RateParts with acl respected by session", []string{"rate4", "rate5"},
 			"", func(t *testing.T, s *user.SessionState) {
+				t.Helper()
 				assert.Equal(t, float64(10), s.Rate)
 			}, &user.SessionState{Rate: 20}, false,
 		},
 		{
 			"Rate with no partition respected by session", []string{"rate-no-partition"},
 			"", func(t *testing.T, s *user.SessionState) {
+				t.Helper()
 				assert.Equal(t, float64(12), s.Rate)
 			}, &user.SessionState{Rate: 20}, false,
 		},
@@ -361,6 +373,7 @@ func testPrepareApplyPolicies(tb testing.TB) (*policy.Service, []testApplyPolici
 		{
 			"ComplexityPart with unlimited", []string{"unlimitedComplexity"},
 			"", func(t *testing.T, s *user.SessionState) {
+				t.Helper()
 				if s.MaxQueryDepth != -1 {
 					t.Fatalf("unlimitied query depth should be -1")
 				}
@@ -369,6 +382,7 @@ func testPrepareApplyPolicies(tb testing.TB) (*policy.Service, []testApplyPolici
 		{
 			"ComplexityPart", []string{"complexity1"},
 			"", func(t *testing.T, s *user.SessionState) {
+				t.Helper()
 				if s.MaxQueryDepth != 2 {
 					t.Fatalf("want MaxQueryDepth to be 2")
 				}
@@ -377,6 +391,7 @@ func testPrepareApplyPolicies(tb testing.TB) (*policy.Service, []testApplyPolici
 		{
 			"ComplexityParts", []string{"complexity1", "complexity2"},
 			"", func(t *testing.T, s *user.SessionState) {
+				t.Helper()
 				if s.MaxQueryDepth != 3 {
 					t.Fatalf("Should pick bigger value")
 				}
@@ -389,6 +404,7 @@ func testPrepareApplyPolicies(tb testing.TB) (*policy.Service, []testApplyPolici
 		{
 			"AclPart", []string{"acl1"},
 			"", func(t *testing.T, s *user.SessionState) {
+				t.Helper()
 				want := map[string]user.AccessDefinition{"a": {Limit: user.APILimit{}}}
 
 				assert.Equal(t, want, s.AccessRights)
@@ -397,6 +413,7 @@ func testPrepareApplyPolicies(tb testing.TB) (*policy.Service, []testApplyPolici
 		{
 			"AclPart", []string{"acl1", "acl2"},
 			"", func(t *testing.T, s *user.SessionState) {
+				t.Helper()
 				want := map[string]user.AccessDefinition{"a": {Limit: user.APILimit{}}, "b": {Limit: user.APILimit{}}}
 				assert.Equal(t, want, s.AccessRights)
 			}, nil, false,
@@ -404,6 +421,7 @@ func testPrepareApplyPolicies(tb testing.TB) (*policy.Service, []testApplyPolici
 		{
 			"Acl for a and rate for a,b", []string{"acl1", "rate-for-a-b"},
 			"", func(t *testing.T, s *user.SessionState) {
+				t.Helper()
 				want := map[string]user.AccessDefinition{"a": {Limit: user.APILimit{RateLimit: user.RateLimit{Rate: 4, Per: 1}}}}
 				assert.Equal(t, want, s.AccessRights)
 			}, nil, false,
@@ -411,6 +429,7 @@ func testPrepareApplyPolicies(tb testing.TB) (*policy.Service, []testApplyPolici
 		{
 			"Acl for a,b and individual rate for a,b", []string{"acl-for-a-b", "rate-for-a", "rate-for-b"},
 			"", func(t *testing.T, s *user.SessionState) {
+				t.Helper()
 				want := map[string]user.AccessDefinition{
 					"a": {Limit: user.APILimit{RateLimit: user.RateLimit{Rate: 4, Per: 1}}},
 					"b": {Limit: user.APILimit{RateLimit: user.RateLimit{Rate: 2, Per: 1}}},
@@ -421,6 +440,7 @@ func testPrepareApplyPolicies(tb testing.TB) (*policy.Service, []testApplyPolici
 		{
 			"RightsUpdate", []string{"acl-for-a-b"},
 			"", func(t *testing.T, ses *user.SessionState) {
+				t.Helper()
 				expectedAccessRights := map[string]user.AccessDefinition{"a": {Limit: user.APILimit{}}, "b": {Limit: user.APILimit{}}}
 				assert.Equal(t, expectedAccessRights, ses.AccessRights)
 			}, &user.SessionState{
@@ -436,6 +456,7 @@ func testPrepareApplyPolicies(tb testing.TB) (*policy.Service, []testApplyPolici
 		{
 			"InactiveMergeOne", []string{"tags1", "inactive1"},
 			"", func(t *testing.T, s *user.SessionState) {
+				t.Helper()
 				if !s.IsInactive {
 					t.Fatalf("want IsInactive to be true")
 				}
@@ -444,6 +465,7 @@ func testPrepareApplyPolicies(tb testing.TB) (*policy.Service, []testApplyPolici
 		{
 			"InactiveMergeAll", []string{"inactive1", "inactive2"},
 			"", func(t *testing.T, s *user.SessionState) {
+				t.Helper()
 				if !s.IsInactive {
 					t.Fatalf("want IsInactive to be true")
 				}
@@ -452,6 +474,7 @@ func testPrepareApplyPolicies(tb testing.TB) (*policy.Service, []testApplyPolici
 		{
 			"InactiveWithSession", []string{"tags1", "tags2"},
 			"", func(t *testing.T, s *user.SessionState) {
+				t.Helper()
 				if !s.IsInactive {
 					t.Fatalf("want IsInactive to be true")
 				}
@@ -651,6 +674,7 @@ func testPrepareApplyPolicies(tb testing.TB) (*policy.Service, []testApplyPolici
 			name:     "Merge per path rules for the same API",
 			policies: []string{"per-path2", "per-path1"},
 			sessMatch: func(t *testing.T, sess *user.SessionState) {
+				t.Helper()
 				want := map[string]user.AccessDefinition{
 					"a": {
 						AllowedURLs: []user.AccessSpec{
@@ -759,6 +783,7 @@ func testPrepareApplyPolicies(tb testing.TB) (*policy.Service, []testApplyPolici
 		{
 			"Throttle interval from policy", []string{"throttle1"},
 			"", func(t *testing.T, s *user.SessionState) {
+				t.Helper()
 				if s.ThrottleInterval != 9 {
 					t.Fatalf("Throttle interval should be 9 inherited from policy")
 				}
@@ -784,6 +809,7 @@ func testPrepareApplyPolicies(tb testing.TB) (*policy.Service, []testApplyPolici
 		{
 			"TagMerge", []string{"tags1", "tags2"},
 			"", func(t *testing.T, s *user.SessionState) {
+				t.Helper()
 				want := []string{"key-tag", "tagA", "tagX", "tagY"}
 				sort.Strings(s.Tags)
 
