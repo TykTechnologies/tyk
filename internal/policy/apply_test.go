@@ -1169,26 +1169,10 @@ func testPrepareApplyPolicies(tb testing.TB) (*policy.Service, []testApplyPolici
 
 	tests = append(tests, combinedEndpointRLTCs...)
 
-	//combineAllowedURLWithRL := []testApplyPoliciesData{
-	//	{
-	//		name: "combine_allowed_urls_acl_with_rate_limit_partition",
-	//		policies: []string{
-	//			"acl_with_allowed_url",
-	//			"rate_limit",
-	//		},
-	//		sessMatch: func(t *testing.T, state *user.SessionState) {
-	//			t.Helper()
-	//			assert.NotEmpty(t, state.AccessRights["d"].AllowedURLs)
-	//		},
-	//	},
-	//}
-	//
-	//tests = append(tests, combineAllowedURLWithRL...)
-
 	return service, tests
 }
 
-func TestApplyPolicies(t *testing.T) {
+func TestService_Apply(t *testing.T) {
 	service, tests := testPrepareApplyPolicies(t)
 
 	for _, tc := range tests {
@@ -1225,7 +1209,7 @@ func TestApplyPolicies(t *testing.T) {
 	}
 }
 
-func BenchmarkApplyPolicies(b *testing.B) {
+func BenchmarkService_Apply(b *testing.B) {
 	b.ReportAllocs()
 
 	service, tests := testPrepareApplyPolicies(b)
