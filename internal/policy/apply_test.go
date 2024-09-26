@@ -416,6 +416,17 @@ func testPrepareApplyPolicies(tb testing.TB) (*policy.Service, []testApplyPolici
 				assert.Equal(t, want, s.AccessRights)
 			}, nil, false,
 		},
+		{
+			"RightsUpdate", []string{"acl-for-a-b"},
+			"", func(t *testing.T, ses *user.SessionState) {
+				expectedAccessRights := map[string]user.AccessDefinition{"a": {Limit: user.APILimit{}}, "b": {Limit: user.APILimit{}}}
+				assert.Equal(t, expectedAccessRights, ses.AccessRights)
+			}, &user.SessionState{
+				AccessRights: map[string]user.AccessDefinition{
+					"c": {Limit: user.APILimit{}},
+				},
+			}, false,
+		},
 	}
 	tests = append(tests, aclPartitionTCs...)
 
