@@ -191,8 +191,8 @@ github.com/TykTechnologies/gorpc v0.0.0-20210624160652-fe65bda0ccb9 h1:fbxHiuw/2
 github.com/TykTechnologies/gorpc v0.0.0-20210624160652-fe65bda0ccb9/go.mod h1:v6v7Mlj08+EmEcXOfpuTxGt2qYU9yhqqtv4QF9Wf50E=
 github.com/TykTechnologies/goverify v0.0.0-20220808203004-1486f89e7708 h1:cmXjlMzcexhc/Cg+QB/c2CPUVs1ux9xn6162qaf/LC4=
 github.com/TykTechnologies/goverify v0.0.0-20220808203004-1486f89e7708/go.mod h1:mkS8jKcz8otdfEXhJs1QQ/DKoIY1NFFsRPKS0RwQENI=
-github.com/TykTechnologies/graphql-go-tools v1.6.2-0.20240705065952-ae6008677a48 h1:dtK8xAF/inLBkjKRsHG+zwW5czgwRKidiTfToDxDvcQ=
-github.com/TykTechnologies/graphql-go-tools v1.6.2-0.20240705065952-ae6008677a48/go.mod h1:DCYkq1ZoUZ/pGESE+j3C7wuyDPSt1Mlu0jVgIoDABJY=
+github.com/TykTechnologies/graphql-go-tools v1.6.2-0.20240926103032-6eca9f4b5e30 h1:SxmD3nMD7AyhJGcOBG4QHwslMFvwLM0e3jH1enmWxZk=
+github.com/TykTechnologies/graphql-go-tools v1.6.2-0.20240926103032-6eca9f4b5e30/go.mod h1:NE9MYGcB5eWKW0OefGOjZZEPv6S20AQ0OTsO+npGR8I=
 github.com/TykTechnologies/graphql-go-tools/v2 v2.0.0-20240509085643-e95cdc317e1d h1:ntmDECMD7475TK/cxshJ1b8KJvUM1wppohd0qZjqUqI=
 github.com/TykTechnologies/graphql-go-tools/v2 v2.0.0-20240509085643-e95cdc317e1d/go.mod h1:eOt2cxB9sZ80mz4q1UKzzk9CE4QZaS6jP20X2LwPwy8=
 github.com/TykTechnologies/graphql-translator v0.0.0-20240319092712-4ba87e4c06ff h1:kFA240S1Y4snsEL4Ng4Ch1Ib2N04A15Y+9KYumK6uCg=
@@ -420,6 +420,8 @@ github.com/cockroachdb/apd v1.1.0 h1:3LFP3629v+1aKXU5Q37mxmRxX/pIu1nijXydLShEq5I
 github.com/cockroachdb/apd v1.1.0/go.mod h1:8Sl8LxpKi29FqWXR16WEFZRNSz3SoPzUzeMeY4+DwBQ=
 github.com/cockroachdb/apd/v3 v3.2.1 h1:U+8j7t0axsIgvQUqthuNm82HIrYXodOV2iWLWtEaIwg=
 github.com/cockroachdb/apd/v3 v3.2.1/go.mod h1:klXJcjp+FffLTHlhIG69tezTDvdP065naDsHzKhYSqc=
+github.com/coder/websocket v1.8.12 h1:5bUXkEPPIbewrnkU8LTCLVaxi4N4J8ahufH2vlo4NAo=
+github.com/coder/websocket v1.8.12/go.mod h1:LNVeNrXQZfe5qhS9ALED3uA+l5pPqvwXg3CKoDBB2gs=
 github.com/colinmarc/hdfs v1.1.3 h1:662salalXLFmp+ctD+x0aG+xOg62lnVnOJHksXYpFBw=
 github.com/colinmarc/hdfs v1.1.3/go.mod h1:0DumPviB681UcSuJErAbDIOx6SIaJWj463TymfZG02I=
 github.com/colinmarc/hdfs/v2 v2.1.1/go.mod h1:M3x+k8UKKmxtFu++uAZ0OtDU8jR3jnaZIAc6yK4Ue0c=
