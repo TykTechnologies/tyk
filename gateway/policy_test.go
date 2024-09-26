@@ -1,7 +1,6 @@
 package gateway
 
 import (
-	"embed"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -23,9 +22,6 @@ import (
 
 	"github.com/TykTechnologies/tyk/internal/uuid"
 )
-
-//go:embed testdata/*.json
-var testDataFS embed.FS
 
 func TestLoadPoliciesFromDashboardReLogin(t *testing.T) {
 	// Test Dashboard
