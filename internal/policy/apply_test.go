@@ -4,11 +4,13 @@ import (
 	"embed"
 	"encoding/json"
 	"fmt"
-	"github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
-	"github.com/sirupsen/logrus"
 	"slices"
 	"sort"
 	"testing"
+
+	"github.com/sirupsen/logrus"
+
+	"github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
 
 	"github.com/stretchr/testify/assert"
 
