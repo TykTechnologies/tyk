@@ -12,7 +12,7 @@ require (
 	github.com/TykTechnologies/gojsonschema v0.0.0-20170222154038-dcb3e4bb7990
 	github.com/TykTechnologies/gorpc v0.0.0-20210624160652-fe65bda0ccb9
 	github.com/TykTechnologies/goverify v0.0.0-20220808203004-1486f89e7708
-	github.com/TykTechnologies/graphql-go-tools v1.6.2-0.20240705065952-ae6008677a48
+	github.com/TykTechnologies/graphql-go-tools v1.6.2-0.20240926103032-6eca9f4b5e30
 	github.com/TykTechnologies/graphql-translator v0.0.0-20240319092712-4ba87e4c06ff
 	github.com/TykTechnologies/leakybucket v0.0.0-20170301023702-71692c943e3c
 	github.com/TykTechnologies/murmur3 v0.0.0-20230310161213-aad17efd5632
@@ -113,6 +113,26 @@ require (
 	github.com/asyncapi/spec-json-schemas/v2 v2.14.0 // indirect
 	github.com/certifi/gocertifi v0.0.0-20210507211836-431795d63e8d // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
+<<<<<<< HEAD
+=======
+	github.com/clbanning/mxj/v2 v2.7.0 // indirect
+	github.com/cockroachdb/apd/v3 v3.2.1 // indirect
+	github.com/coder/websocket v1.8.12 // indirect
+	github.com/colinmarc/hdfs v1.1.3 // indirect
+	github.com/containerd/containerd v1.7.18 // indirect
+	github.com/containerd/log v0.1.0 // indirect
+	github.com/containerd/platforms v0.2.1 // indirect
+	github.com/coreos/go-semver v0.3.0 // indirect
+	github.com/coreos/go-systemd/v22 v22.5.0 // indirect
+	github.com/couchbase/gocb/v2 v2.9.1 // indirect
+	github.com/couchbase/gocbcore/v10 v10.5.1 // indirect
+	github.com/couchbase/gocbcoreps v0.1.3 // indirect
+	github.com/couchbase/goprotostellar v1.0.2 // indirect
+	github.com/couchbaselabs/gocbconnstr/v2 v2.0.0-20240607131231-fb385523de28 // indirect
+	github.com/cpuguy83/dockercfg v0.3.1 // indirect
+	github.com/cpuguy83/go-md2man/v2 v2.0.2 // indirect
+	github.com/danieljoos/wincred v1.2.0 // indirect
+>>>>>>> 685c35fc9... [TT-13176]: update graqhql go tools (#6586)
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/dgryski/go-rendezvous v0.0.0-20200823014737-9f7001d12a5f // indirect
 	github.com/eapache/go-resiliency v1.6.0 // indirect
