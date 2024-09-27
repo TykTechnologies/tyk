@@ -4,19 +4,16 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/TykTechnologies/tyk/internal/errors"
 	"net/http"
 	"net/url"
-	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
 
-	"github.com/sirupsen/logrus"
-
-	"github.com/gorilla/mux"
-
+	"github.com/TykTechnologies/tyk/internal/errors"
 	"github.com/TykTechnologies/tyk/internal/streaming"
+	"github.com/gorilla/mux"
+	"github.com/sirupsen/logrus"
 )
 
 const (
@@ -49,12 +46,10 @@ type StreamingMiddleware struct {
 
 // StreamManager is responsible for creating a single stream
 type StreamManager struct {
-	streams     sync.Map
-	routeLock   sync.Mutex
-	muxer       *mux.Router
-	mw          *StreamingMiddleware
-	dryRun      bool
-	listenPaths []string
+	streams   sync.Map
+	routeLock sync.Mutex
+	muxer     *mux.Router
+	mw        *StreamingMiddleware
 }
 
 func (sm *StreamManager) initStreams(r *http.Request, config *StreamsConfig) {
@@ -62,37 +57,12 @@ func (sm *StreamManager) initStreams(r *http.Request, config *StreamsConfig) {
 	sm.muxer = mux.NewRouter()
 
 	for streamID, streamConfig := range config.Streams {
-		sm.setUpOrDryRunStream(streamConfig, streamID)
-	}
-
-	// If it is default stream manager, init muxer
-	if r == nil {
-		for _, path := range sm.listenPaths {
-			sm.muxer.HandleFunc(path, func(_ http.ResponseWriter, _ *http.Request) {
-				// Dummy handler
-			})
-		}
-	}
-}
-
-func (sm *StreamManager) setUpOrDryRunStream(streamConfig any, streamID string) {
-	if streamMap, ok := streamConfig.(map[string]interface{}); ok {
-		httpPaths := GetHTTPPaths(streamMap)
-
-		if sm.dryRun {
-			if len(httpPaths) == 0 {
-				err := sm.createStream(streamID, streamMap)
-				if err != nil {
-					sm.mw.Logger().WithError(err).Errorf("Error creating stream %s", streamID)
-				}
-			}
-		} else {
+		if streamMap, ok := streamConfig.(map[string]interface{}); ok {
 			err := sm.createStream(streamID, streamMap)
 			if err != nil {
 				sm.mw.Logger().WithError(err).Errorf("Error creating stream %s", streamID)
 			}
 		}
-		sm.listenPaths = append(sm.listenPaths, httpPaths...)
 	}
 }
 
@@ -146,16 +116,17 @@ func (s *StreamingMiddleware) EnabledForSpec() bool {
 }
 
 func (s *StreamingMiddleware) registerHandlers(config *StreamsConfig) {
-	var httpPaths []string
-	for _, streamConfig := range config.Streams {
-		httpPaths = append(httpPaths, GetHTTPPaths(streamConfig.(map[string]interface{}))...)
-	}
-	for _, path := range httpPaths {
-		if path == "/post" {
-			s.router.HandleFunc(path, s.inputHttpServerPublishHandler)
-		} else {
-			s.router.HandleFunc(path, s.subscriptionHandler)
+	for streamId, rawConfig := range config.Streams {
+		streamConfig := rawConfig.(map[string]interface{})
+		httpServerInputPath := findHTTPServerInputPath(streamConfig)
+		for _, path := range GetHTTPPaths(streamConfig) {
+			if path == httpServerInputPath {
+				s.router.HandleFunc(path, s.inputHttpServerPublishHandler)
+			} else {
+				s.router.HandleFunc(path, s.subscriptionHandler)
+			}
 		}
+		s.Logger().Debugf("Tyk Stream handlers have been registered for stream: %s", streamId)
 	}
 }
 
@@ -170,9 +141,8 @@ func (s *StreamingMiddleware) Init() {
 
 func (s *StreamingMiddleware) createStreamManager(r *http.Request) *StreamManager {
 	newStreamManager := &StreamManager{
-		muxer:  mux.NewRouter(),
-		mw:     s,
-		dryRun: r == nil,
+		muxer: mux.NewRouter(),
+		mw:    s,
 	}
 	streamID := fmt.Sprintf("_%d", time.Now().UnixNano())
 	s.streamManagers.Store(streamID, newStreamManager)
@@ -183,7 +153,7 @@ func (s *StreamingMiddleware) createStreamManager(r *http.Request) *StreamManage
 	return newStreamManager
 }
 
-// Helper function to extract paths from an http_server configuration
+// Helper function to extract paths from a http_server configuration
 func extractPaths(httpConfig map[string]interface{}) []string {
 	var paths []string
 	defaultPaths := map[string]string{
@@ -222,6 +192,17 @@ func handleBroker(brokerConfig map[string]interface{}) []string {
 		}
 	}
 	return paths
+}
+
+func findHTTPServerInputPath(streamConfig map[string]interface{}) string {
+	if componentMap, ok := streamConfig["input"].(map[string]interface{}); ok {
+		if httpServerConfig, ok := componentMap["http_server"].(map[string]interface{}); ok {
+			if val, ok := httpServerConfig["path"].(string); ok {
+				return val
+			}
+		}
+	}
+	return ""
 }
 
 // GetHTTPPaths is the ain function to get HTTP paths from the stream configuration
@@ -310,7 +291,8 @@ func (sm *StreamManager) createStream(streamID string, config map[string]interfa
 		muxer:    sm.muxer,
 		sm:       sm,
 		// child logger is necessary to prevent race condition
-		logger: sm.mw.Logger().WithField("stream", streamFullID),
+		logger:              sm.mw.Logger().WithField("stream", streamFullID),
+		httpServerInputPath: findHTTPServerInputPath(config),
 	})
 	if err != nil {
 		sm.mw.Logger().Errorf("Failed to start stream %s: %v", streamFullID, err)
@@ -321,15 +303,6 @@ func (sm *StreamManager) createStream(streamID string, config map[string]interfa
 	sm.mw.Logger().Infof("Successfully created stream: %s", streamFullID)
 
 	return nil
-}
-
-func (sm *StreamManager) hasPath(path string) bool {
-	for _, p := range sm.listenPaths {
-		if strings.TrimPrefix(path, "/") == strings.TrimPrefix(p, "/") {
-			return true
-		}
-	}
-	return false
 }
 
 // ProcessRequest will handle the streaming functionality
@@ -467,11 +440,12 @@ func (s *StreamingMiddleware) Unload() {
 }
 
 type handleFuncAdapter struct {
-	streamID string
-	sm       *StreamManager
-	mw       *StreamingMiddleware
-	muxer    *mux.Router
-	logger   *logrus.Entry
+	streamID            string
+	sm                  *StreamManager
+	mw                  *StreamingMiddleware
+	muxer               *mux.Router
+	logger              *logrus.Entry
+	httpServerInputPath string
 }
 
 func (h *handleFuncAdapter) HandleFunc(path string, f func(http.ResponseWriter, *http.Request)) {
@@ -485,9 +459,11 @@ func (h *handleFuncAdapter) HandleFunc(path string, f func(http.ResponseWriter, 
 	h.sm.routeLock.Lock()
 	h.muxer.HandleFunc(path, func(w http.ResponseWriter, r *http.Request) {
 		defer func() {
-			// Stop the stream when the HTTP request finishes
-			if err := h.sm.removeStream(h.streamID); err != nil {
-				h.logger.Errorf("Failed to stop stream %s: %v", h.streamID, err)
+			if h.httpServerInputPath != path {
+				// Stop the stream when the HTTP request finishes
+				if err := h.sm.removeStream(h.streamID); err != nil {
+					h.logger.Errorf("Failed to stop stream %s: %v", h.streamID, err)
+				}
 			}
 		}()
 
