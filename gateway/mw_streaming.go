@@ -143,17 +143,9 @@ func (s *StreamingMiddleware) EnabledForSpec() bool {
 	return false
 }
 
-// Init initializes the middleware
-func (s *StreamingMiddleware) Init() {
-	s.Logger().Debug("Initializing StreamingMiddleware")
-	s.ctx, s.cancel = context.WithCancel(context.Background())
-
-	s.Logger().Debug("Initializing default stream manager")
-
-	s.router = mux.NewRouter()
-	streamsConfig := s.getStreamsConfig(nil)
+func (s *StreamingMiddleware) registerHandlers(config *StreamsConfig) {
 	var httpPaths []string
-	for _, streamConfig := range streamsConfig.Streams {
+	for _, streamConfig := range config.Streams {
 		httpPaths = append(httpPaths, GetHTTPPaths(streamConfig.(map[string]interface{}))...)
 	}
 	for _, path := range httpPaths {
@@ -163,6 +155,15 @@ func (s *StreamingMiddleware) Init() {
 			s.router.HandleFunc(path, s.subscriptionHandler)
 		}
 	}
+}
+
+// Init initializes the middleware
+func (s *StreamingMiddleware) Init() {
+	s.Logger().Debug("Initializing StreamingMiddleware")
+	s.ctx, s.cancel = context.WithCancel(context.Background())
+	s.router = mux.NewRouter()
+
+	s.registerHandlers(s.getStreamsConfig(nil))
 }
 
 func (s *StreamingMiddleware) createStreamManager(r *http.Request) *StreamManager {
