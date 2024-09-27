@@ -457,6 +457,8 @@ func (h *handleFuncAdapter) HandleFunc(path string, f func(http.ResponseWriter, 
 	}
 
 	h.sm.routeLock.Lock()
+	defer h.sm.routeLock.Unlock()
+
 	h.muxer.HandleFunc(path, func(w http.ResponseWriter, r *http.Request) {
 		defer func() {
 			if h.httpServerInputPath != path {
@@ -469,6 +471,6 @@ func (h *handleFuncAdapter) HandleFunc(path string, f func(http.ResponseWriter, 
 
 		f(w, r)
 	})
-	h.sm.routeLock.Unlock()
+
 	h.logger.Debugf("Registered handler for path: %s", path)
 }
