@@ -3,7 +3,6 @@ package gateway
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -43,6 +42,7 @@ type StreamingMiddleware struct {
 	cancel               context.CancelFunc
 	allowedUnsafe        []string
 	defaultStreamManager *StreamManager
+	router               *mux.Router
 }
 
 // StreamManager is responsible for creating a single stream
@@ -149,7 +149,20 @@ func (s *StreamingMiddleware) Init() {
 	s.ctx, s.cancel = context.WithCancel(context.Background())
 
 	s.Logger().Debug("Initializing default stream manager")
-	s.defaultStreamManager = s.createStreamManager(nil)
+
+	s.router = mux.NewRouter()
+	streamsConfig := s.getStreamsConfig(nil)
+	var httpPaths []string
+	for _, streamConfig := range streamsConfig.Streams {
+		httpPaths = append(httpPaths, GetHTTPPaths(streamConfig.(map[string]interface{}))...)
+	}
+	for _, path := range httpPaths {
+		if path == "/post" {
+			s.router.HandleFunc(path, s.inputHttpServerPublishHandler)
+		} else {
+			s.router.HandleFunc(path, s.subscriptionHandler)
+		}
+	}
 }
 
 func (s *StreamingMiddleware) createStreamManager(r *http.Request) *StreamManager {
@@ -319,9 +332,6 @@ func (sm *StreamManager) hasPath(path string) bool {
 // ProcessRequest will handle the streaming functionality
 func (s *StreamingMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
 	strippedPath := s.Spec.StripListenPath(r.URL.Path)
-	if !s.defaultStreamManager.hasPath(strippedPath) {
-		return nil, http.StatusOK
-	}
 
 	s.Logger().Debugf("Processing request: %s, %s", r.URL.Path, strippedPath)
 
@@ -330,25 +340,53 @@ func (s *StreamingMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 		URL:    &url.URL{Scheme: r.URL.Scheme, Host: r.URL.Host, Path: strippedPath},
 	}
 
-	if !s.defaultStreamManager.muxer.Match(newRequest, &mux.RouteMatch{}) {
+	routeMatch := &mux.RouteMatch{}
+	if !s.router.Match(newRequest, routeMatch) {
 		return nil, http.StatusOK
 	}
 
+	routeMatch.Handler.ServeHTTP(w, r)
+	return nil, mwStatusRespond
+}
+
+func (s *StreamingMiddleware) inputHttpServerPublishHandler(w http.ResponseWriter, r *http.Request) {
+	strippedPath := s.Spec.StripListenPath(r.URL.Path)
+	newRequest := &http.Request{
+		Method: r.Method,
+		URL:    &url.URL{Scheme: r.URL.Scheme, Host: r.URL.Host, Path: strippedPath},
+	}
+	s.streamManagers.Range(func(_, value interface{}) bool {
+		manager := value.(*StreamManager)
+		s.handOverRequestToBento(manager, w, newRequest, r)
+		return true // continue
+	})
+}
+
+func (s *StreamingMiddleware) subscriptionHandler(w http.ResponseWriter, r *http.Request) {
+	strippedPath := s.Spec.StripListenPath(r.URL.Path)
+	newRequest := &http.Request{
+		Method: r.Method,
+		URL:    &url.URL{Scheme: r.URL.Scheme, Host: r.URL.Host, Path: strippedPath},
+	}
+	manager := s.createStreamManager(r)
+	s.handOverRequestToBento(manager, w, newRequest, r)
+}
+
+func (s *StreamingMiddleware) handOverRequestToBento(manager *StreamManager, w http.ResponseWriter, newRequest, r *http.Request) {
 	var match mux.RouteMatch
-	streamManager := s.createStreamManager(r)
-	streamManager.routeLock.Lock()
-	streamManager.muxer.Match(newRequest, &match)
-	streamManager.routeLock.Unlock()
+	manager.routeLock.Lock()
+	manager.muxer.Match(newRequest, &match)
+	manager.routeLock.Unlock()
 
 	// direct Bento handler
 	handler, ok := match.Handler.(http.HandlerFunc)
 	if !ok {
-		return errors.New("invalid route handler"), http.StatusInternalServerError
+		doJSONWrite(w, http.StatusInternalServerError, apiError("invalid route handler"))
+		return
 	}
 
+	// Wait until the subscription has killed by one of the parties.
 	handler.ServeHTTP(w, r)
-
-	return nil, mwStatusRespond
 }
 
 // Unload closes and remove active streams
