@@ -370,6 +370,7 @@ func (s *StreamingMiddleware) inputHttpServerPublishHandler(w http.ResponseWrite
 
 	if err != nil {
 		doJSONWrite(w, http.StatusInternalServerError, err.Error())
+		return
 	}
 	// Message received
 	w.WriteHeader(http.StatusOK)
