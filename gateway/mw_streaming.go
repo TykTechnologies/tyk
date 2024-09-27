@@ -11,10 +11,11 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/TykTechnologies/tyk/internal/errors"
-	"github.com/TykTechnologies/tyk/internal/streaming"
 	"github.com/gorilla/mux"
 	"github.com/sirupsen/logrus"
+
+	"github.com/TykTechnologies/tyk/internal/errors"
+	"github.com/TykTechnologies/tyk/internal/streaming"
 )
 
 const (
