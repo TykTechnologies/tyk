@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"sync"
@@ -350,11 +351,28 @@ func (s *StreamingMiddleware) inputHttpServerPublishHandler(w http.ResponseWrite
 	// It simply iterates over the existing streams and hands over the request to Bento.
 	//
 	// TODO: We may implement a queue or buffer here to store or distribute messages in a different way.
+
+	var err error
 	s.streamManagers.Range(func(_, value interface{}) bool {
 		manager := value.(*StreamManager)
-		s.handOverRequestToBento(manager, w, r)
+		dummyResponse := &dummyResponseWriter{}
+
+		var body io.ReadCloser
+		body, err = copyBody(r.Body, true)
+		if err != nil {
+			return false // break
+		}
+		clonedRequest := r.Clone(r.Context())
+		clonedRequest.Body = body
+		s.handOverRequestToBento(manager, dummyResponse, clonedRequest)
 		return true // continue
 	})
+
+	if err != nil {
+		doJSONWrite(w, http.StatusInternalServerError, err.Error())
+	}
+	// Message received
+	w.WriteHeader(http.StatusOK)
 }
 
 func (s *StreamingMiddleware) subscriptionHandler(w http.ResponseWriter, r *http.Request) {
@@ -496,3 +514,20 @@ func (h *handleFuncAdapter) HandleFunc(path string, f func(http.ResponseWriter, 
 
 	h.logger.Debugf("Registered handler for path: %s", path)
 }
+
+type dummyResponseWriter struct {
+}
+
+func (m dummyResponseWriter) Header() http.Header {
+	return http.Header{}
+}
+
+func (m dummyResponseWriter) Write(bytes []byte) (int, error) {
+	return len(bytes), nil
+}
+
+func (m dummyResponseWriter) WriteHeader(statusCode int) {
+	return
+}
+
+var _ http.ResponseWriter = (*dummyResponseWriter)(nil)
