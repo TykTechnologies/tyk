@@ -20,6 +20,8 @@ import (
 )
 
 const (
+	strippedRequestKey     = "stripped-request-key"
+	tykStreamsVariablesKey = "tyk-streams-variables-key"
 	// ExtensionTykStreaming is the oas extension for tyk streaming
 	ExtensionTykStreaming = "x-tyk-streaming"
 )
@@ -38,12 +40,11 @@ var globalStreamCounter atomic.Int64
 // StreamingMiddleware is a middleware that handles streaming functionality
 type StreamingMiddleware struct {
 	*BaseMiddleware
-	streamManagers       sync.Map // Map of consumer group IDs to StreamManager
-	ctx                  context.Context
-	cancel               context.CancelFunc
-	allowedUnsafe        []string
-	defaultStreamManager *StreamManager
-	router               *mux.Router
+	streamManagers sync.Map // Map of consumer group IDs to StreamManager
+	ctx            context.Context
+	cancel         context.CancelFunc
+	allowedUnsafe  []string
+	router         *mux.Router
 }
 
 // StreamManager is responsible for creating a single stream
@@ -337,41 +338,35 @@ func (s *StreamingMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 
 	s.Logger().Debugf("Processing request: %s, %s", r.URL.Path, strippedPath)
 
-	newRequest := &http.Request{
-		Method: r.Method,
-		URL:    &url.URL{Scheme: r.URL.Scheme, Host: r.URL.Host, Path: strippedPath},
+	variables := make(map[string]any)
+	clonedRequest := r.Clone(context.WithValue(r.Context(), tykStreamsVariablesKey, variables))
+
+	strippedPathRequest := &http.Request{
+		Method: clonedRequest.Method,
+		URL:    &url.URL{Scheme: clonedRequest.URL.Scheme, Host: clonedRequest.URL.Host, Path: strippedPath},
 	}
+	variables[strippedRequestKey] = strippedPathRequest
 
 	routeMatch := &mux.RouteMatch{}
-	if !s.router.Match(newRequest, routeMatch) {
+	if !s.router.Match(strippedPathRequest, routeMatch) {
 		return nil, http.StatusOK
 	}
 
-	routeMatch.Handler.ServeHTTP(w, r)
+	routeMatch.Handler.ServeHTTP(w, clonedRequest)
 	return nil, mwStatusRespond
 }
 
 func (s *StreamingMiddleware) inputHttpServerPublishHandler(w http.ResponseWriter, r *http.Request) {
-	strippedPath := s.Spec.StripListenPath(r.URL.Path)
-	newRequest := &http.Request{
-		Method: r.Method,
-		URL:    &url.URL{Scheme: r.URL.Scheme, Host: r.URL.Host, Path: strippedPath},
-	}
 	s.streamManagers.Range(func(_, value interface{}) bool {
 		manager := value.(*StreamManager)
-		s.handOverRequestToBento(manager, w, newRequest, r)
+		s.handOverRequestToBento(manager, w, r)
 		return true // continue
 	})
 }
 
 func (s *StreamingMiddleware) subscriptionHandler(w http.ResponseWriter, r *http.Request) {
-	strippedPath := s.Spec.StripListenPath(r.URL.Path)
-	newRequest := &http.Request{
-		Method: r.Method,
-		URL:    &url.URL{Scheme: r.URL.Scheme, Host: r.URL.Host, Path: strippedPath},
-	}
 	manager := s.createStreamManager(r)
-	s.handOverRequestToBento(manager, w, newRequest, r)
+	s.handOverRequestToBento(manager, w, r)
 }
 
 func (s *StreamingMiddleware) getRouteMatch(manager *StreamManager, r *http.Request) (*mux.RouteMatch, error) {
@@ -389,8 +384,26 @@ func (s *StreamingMiddleware) getRouteMatch(manager *StreamManager, r *http.Requ
 	return &match, nil
 }
 
-func (s *StreamingMiddleware) handOverRequestToBento(manager *StreamManager, w http.ResponseWriter, newRequest, r *http.Request) {
-	match, err := s.getRouteMatch(manager, newRequest)
+func getStrippedRequest(r *http.Request) (*http.Request, error) {
+	variables, ok := r.Context().Value(tykStreamsVariablesKey).(map[string]any)
+	if !ok {
+		return nil, fmt.Errorf("%s could not be found in request context", tykStreamsVariablesKey)
+	}
+	strippedRequest, ok := variables[strippedRequestKey].(*http.Request)
+	if !ok {
+		return nil, fmt.Errorf("%s could not be found in request variables", strippedRequestKey)
+	}
+	return strippedRequest, nil
+}
+
+func (s *StreamingMiddleware) handOverRequestToBento(manager *StreamManager, w http.ResponseWriter, r *http.Request) {
+	strippedRequest, err := getStrippedRequest(r)
+	if err != nil {
+		doJSONWrite(w, http.StatusInternalServerError, apiError(err.Error()))
+		return
+	}
+
+	match, err := s.getRouteMatch(manager, strippedRequest)
 	if err != nil {
 		var code int = http.StatusInternalServerError
 		if errors.Is(err, mux.ErrNotFound) {
