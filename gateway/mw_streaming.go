@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/TykTechnologies/tyk/internal/errors"
 	"net/http"
 	"net/url"
 	"strings"
@@ -373,11 +374,31 @@ func (s *StreamingMiddleware) subscriptionHandler(w http.ResponseWriter, r *http
 	s.handOverRequestToBento(manager, w, newRequest, r)
 }
 
-func (s *StreamingMiddleware) handOverRequestToBento(manager *StreamManager, w http.ResponseWriter, newRequest, r *http.Request) {
-	var match mux.RouteMatch
+func (s *StreamingMiddleware) getRouteMatch(manager *StreamManager, r *http.Request) (*mux.RouteMatch, error) {
 	manager.routeLock.Lock()
-	manager.muxer.Match(newRequest, &match)
-	manager.routeLock.Unlock()
+	defer manager.routeLock.Unlock()
+
+	var match mux.RouteMatch
+	if !manager.muxer.Match(r, &match) {
+		// request does not match any of this router's or its subrouters' routes then this function returns false.
+		return nil, mux.ErrNotFound
+	}
+	if match.MatchErr != nil {
+		return nil, match.MatchErr
+	}
+	return &match, nil
+}
+
+func (s *StreamingMiddleware) handOverRequestToBento(manager *StreamManager, w http.ResponseWriter, newRequest, r *http.Request) {
+	match, err := s.getRouteMatch(manager, newRequest)
+	if err != nil {
+		var code int = http.StatusInternalServerError
+		if errors.Is(err, mux.ErrNotFound) {
+			code = http.StatusNotFound
+		}
+		doJSONWrite(w, code, apiError(err.Error()))
+		return
+	}
 
 	// direct Bento handler
 	handler, ok := match.Handler.(http.HandlerFunc)
