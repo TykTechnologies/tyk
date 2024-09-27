@@ -118,11 +118,22 @@ func (s *StreamingMiddleware) EnabledForSpec() bool {
 func (s *StreamingMiddleware) registerHandlers(config *StreamsConfig) {
 	for streamId, rawConfig := range config.Streams {
 		streamConfig := rawConfig.(map[string]interface{})
+
 		httpServerInputPath := findHTTPServerInputPath(streamConfig)
 		for _, path := range GetHTTPPaths(streamConfig) {
 			if path == httpServerInputPath {
+				// We only use this handler to receive messages from the HTTP endpoint
+				// Consider this:
+				//     input:
+				//      http_server:
+				//        path: /post
+				//        timeout: 1s
+				//    output:
+				//      http_server:
+				//        ws_path: /subscribe
 				s.router.HandleFunc(path, s.inputHttpServerPublishHandler)
 			} else {
+				// Subscription handler responds to WebSocket requests and hands over the request to Bento
 				s.router.HandleFunc(path, s.subscriptionHandler)
 			}
 		}
@@ -133,6 +144,7 @@ func (s *StreamingMiddleware) registerHandlers(config *StreamsConfig) {
 // Init initializes the middleware
 func (s *StreamingMiddleware) Init() {
 	s.Logger().Debug("Initializing StreamingMiddleware")
+
 	s.ctx, s.cancel = context.WithCancel(context.Background())
 	s.router = mux.NewRouter()
 
@@ -312,6 +324,7 @@ func (s *StreamingMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 	s.Logger().Debugf("Processing request: %s, %s", r.URL.Path, strippedPath)
 
 	variables := make(map[string]any)
+	// Clone the request here to transfer some variables to the underlying components such as Bento
 	clonedRequest := r.Clone(context.WithValue(r.Context(), tykStreamsVariablesKey, variables))
 
 	strippedPathRequest := &http.Request{
@@ -320,6 +333,7 @@ func (s *StreamingMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 	}
 	variables[strippedRequestKey] = strippedPathRequest
 
+	// Use the muxer to find a matched route for the request.
 	routeMatch := &mux.RouteMatch{}
 	if !s.router.Match(strippedPathRequest, routeMatch) {
 		return nil, http.StatusOK
@@ -330,6 +344,12 @@ func (s *StreamingMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 }
 
 func (s *StreamingMiddleware) inputHttpServerPublishHandler(w http.ResponseWriter, r *http.Request) {
+	// This method handles publishing messages via an HTTP endpoint without creating a new
+	// Bento stream for every HTTP request.
+	//
+	// It simply iterates over the existing streams and hands over the request to Bento.
+	//
+	// TODO: We may implement a queue or buffer here to store or distribute messages in a different way.
 	s.streamManagers.Range(func(_, value interface{}) bool {
 		manager := value.(*StreamManager)
 		s.handOverRequestToBento(manager, w, r)
@@ -461,6 +481,8 @@ func (h *handleFuncAdapter) HandleFunc(path string, f func(http.ResponseWriter, 
 
 	h.muxer.HandleFunc(path, func(w http.ResponseWriter, r *http.Request) {
 		defer func() {
+			// If this handler handles a request that publishes a message via HTTP, we don't need to
+			// remove the stream. It was just an HTTP request that handled by Bento
 			if h.httpServerInputPath != path {
 				// Stop the stream when the HTTP request finishes
 				if err := h.sm.removeStream(h.streamID); err != nil {
