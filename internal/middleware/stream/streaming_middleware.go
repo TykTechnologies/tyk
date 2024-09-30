@@ -63,7 +63,7 @@ type StreamsConfig struct {
 }
 
 // Used for testing
-var globalStreamCounter atomic.Int64
+var GlobalStreamCounter atomic.Int64
 
 // StreamingMiddleware is a middleware that handles streaming functionality
 type StreamingMiddleware struct {
@@ -162,7 +162,7 @@ func (s *StreamingMiddleware) EnabledForSpec() bool {
 		s.Logger().Debugf("Allowed unsafe components: %v", s.allowedUnsafe)
 
 		config := s.getStreamsConfig(nil)
-		globalStreamCounter.Add(int64(len(config.Streams)))
+		GlobalStreamCounter.Add(int64(len(config.Streams)))
 
 		s.Logger().Debug("Total streams count: ", len(config.Streams))
 
@@ -409,7 +409,7 @@ func (s *StreamingMiddleware) Unload() {
 		})
 		return true
 	})
-	globalStreamCounter.Add(-int64(totalStreams))
+	GlobalStreamCounter.Add(-int64(totalStreams))
 
 	s.cancel()
 

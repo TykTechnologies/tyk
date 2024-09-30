@@ -28,6 +28,7 @@ import (
 
 	"github.com/TykTechnologies/tyk/apidef/oas"
 	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/internal/middleware/stream"
 	"github.com/TykTechnologies/tyk/test"
 )
 
@@ -88,7 +89,7 @@ output:
 		t.Run(tc.name, func(t *testing.T) {
 			config, err := yamlConfigToMap(tc.configYaml)
 			require.NoError(t, err)
-			httpPaths := GetHTTPPaths(config)
+			httpPaths := stream.GetHTTPPaths(config)
 			assert.ElementsMatch(t, tc.expected, httpPaths)
 		})
 	}
@@ -354,7 +355,7 @@ func setupOASForStreamAPI(streamingConfig string) (oas.OAS, error) {
 	}
 
 	oasAPI.Extensions = map[string]interface{}{
-		ExtensionTykStreaming: parsedStreamingConfig,
+		stream.ExtensionTykStreaming: parsedStreamingConfig,
 	}
 
 	return oasAPI, nil
@@ -446,7 +447,7 @@ streams:
 	}
 
 	oasAPI.Extensions = map[string]interface{}{
-		ExtensionTykStreaming: parsedStreamingConfig,
+		stream.ExtensionTykStreaming: parsedStreamingConfig,
 		// oas.ExtensionTykAPIGateway: tykExtension,
 	}
 
@@ -468,8 +469,8 @@ streams:
 	// Check that standard API still works
 	_, _ = ts.Run(t, test.TestCase{Code: http.StatusOK, Method: http.MethodGet, Path: "/test"})
 
-	if globalStreamCounter.Load() != 1 {
-		t.Fatalf("Expected 1 stream, got %d", globalStreamCounter.Load())
+	if stream.GlobalStreamCounter.Load() != 1 {
+		t.Fatalf("Expected 1 stream, got %d", stream.GlobalStreamCounter.Load())
 	}
 
 	time.Sleep(500 * time.Millisecond)
@@ -592,7 +593,7 @@ streams:
 	}
 
 	oasAPI.Extensions = map[string]interface{}{
-		ExtensionTykStreaming: parsedStreamingConfig,
+		stream.ExtensionTykStreaming: parsedStreamingConfig,
 	}
 
 	return oasAPI
@@ -604,7 +605,7 @@ func testAsyncAPIHttp(t *testing.T, ts *Test, isDynamic bool, tenantID string, a
 	const numMessages = 2
 	const numClients = 2
 
-	streamCount := globalStreamCounter.Load()
+	streamCount := stream.GlobalStreamCounter.Load()
 	t.Logf("Stream count for tenant %s: %d", tenantID, streamCount)
 
 	// Create WebSocket clients
