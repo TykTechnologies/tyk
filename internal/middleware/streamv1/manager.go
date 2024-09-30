@@ -1,4 +1,4 @@
-package stream
+package streamv1
 
 import (
 	"fmt"
@@ -17,14 +17,14 @@ type Manager struct {
 	streams     sync.Map
 	routeLock   sync.Mutex
 	muxer       *mux.Router
-	mw          *StreamingMiddleware
+	mw          *Middleware
 	dryRun      bool
 	listenPaths []string
 }
 
 // NewManager creates a new Manager from a request. If request is
 // nil, the stream manager runs with "dry run" enabled.
-func NewManager(s *StreamingMiddleware, r *http.Request) *Manager {
+func NewManager(s *Middleware, r *http.Request) *Manager {
 	newManager := &Manager{
 		muxer:  mux.NewRouter(),
 		mw:     s,
