@@ -15,6 +15,8 @@ import (
 
 	"github.com/TykTechnologies/tyk/header"
 	"github.com/TykTechnologies/tyk/storage"
+
+	"github.com/TykTechnologies/tyk/internal/model"
 )
 
 func (gw *Gateway) setCurrentHealthCheckInfo(h map[string]model.HealthCheckItem) {

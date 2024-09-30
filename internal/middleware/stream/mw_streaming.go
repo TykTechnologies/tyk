@@ -1,22 +1,21 @@
-package gateway
+package stream
 
 import (
 	"context"
 	"crypto/sha256"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"net/http"
 	"net/url"
-	"strings"
 	"sync"
 	"sync/atomic"
-	"time"
-
-	"github.com/sirupsen/logrus"
 
 	"github.com/gorilla/mux"
+	"github.com/sirupsen/logrus"
 
+	"github.com/TykTechnologies/tyk/apidef/oas"
+	"github.com/TykTechnologies/tyk/internal/middleware"
+	"github.com/TykTechnologies/tyk/internal/model"
 	"github.com/TykTechnologies/tyk/internal/streaming"
 )
 
@@ -25,6 +24,35 @@ const (
 	ExtensionTykStreaming = "x-tyk-streaming"
 	StreamGCInterval      = 1 * time.Minute
 )
+
+type BaseMiddleware interface {
+	model.LoggerProvider
+}
+
+type Gateway interface {
+	model.ConfigProvider
+	model.ReplaceTykVariables
+}
+
+// APISpec is a subset of gateway.APISpec for the values the middleware consumes.
+type APISpec struct {
+	APIID string
+	Name  string
+	IsOAS bool
+	OAS   oas.OAS
+
+	StripListenPath model.StripListenPathFunc
+}
+
+func NewAPISpec(id string, name string, isOasDef bool, oasDef oas.OAS, stripListenPath model.StripListenPathFunc) *APISpec {
+	return &APISpec{
+		APIID:           id,
+		Name:            name,
+		IsOAS:           isOasDef,
+		OAS:             oasDef,
+		StripListenPath: stripListenPath,
+	}
+}
 
 // StreamsConfig represents a stream configuration
 type StreamsConfig struct {
@@ -39,6 +67,7 @@ var globalStreamCounter atomic.Int64
 
 // StreamingMiddleware is a middleware that handles streaming functionality
 type StreamingMiddleware struct {
+<<<<<<< HEAD:gateway/mw_streaming.go
 	*BaseMiddleware
 
 	createStreamManagerLock sync.Mutex
@@ -60,64 +89,33 @@ type StreamManager struct {
 
 	activityCounter atomic.Int32 // Counts active subscriptions, requests.
 }
+=======
+	Spec *APISpec
+	Gw   Gateway
 
-func (sm *StreamManager) initStreams(r *http.Request, config *StreamsConfig) {
-	// Clear existing routes for this consumer group
-	sm.muxer = mux.NewRouter()
+	base BaseMiddleware
 
-	for streamID, streamConfig := range config.Streams {
-		sm.setUpOrDryRunStream(streamConfig, streamID)
-	}
+	streamManagers sync.Map // Map of consumer group IDs to Manager
 
-	// If it is default stream manager, init muxer
-	if r == nil {
-		for _, path := range sm.listenPaths {
-			sm.muxer.HandleFunc(path, func(_ http.ResponseWriter, _ *http.Request) {
-				// Dummy handler
-			})
-		}
+	ctx            context.Context
+	cancel         context.CancelFunc
+	allowedUnsafe  []string
+	defaultManager *Manager
+}
+
+var _ model.Middleware = &StreamingMiddleware{}
+>>>>>>> fb9b35ec7 (Move streams middleware to internal/middleware/streams):internal/middleware/stream/mw_streaming.go
+
+func NewStreamingMiddleware(gw Gateway, mw BaseMiddleware, spec *APISpec) *StreamingMiddleware {
+	return &StreamingMiddleware{
+		base: mw,
+		Gw:   gw,
+		Spec: spec,
 	}
 }
 
-func (sm *StreamManager) setUpOrDryRunStream(streamConfig any, streamID string) {
-	if streamMap, ok := streamConfig.(map[string]interface{}); ok {
-		httpPaths := GetHTTPPaths(streamMap)
-
-		if sm.dryRun {
-			if len(httpPaths) == 0 {
-				err := sm.createStream(streamID, streamMap)
-				if err != nil {
-					sm.mw.Logger().WithError(err).Errorf("Error creating stream %s", streamID)
-				}
-			}
-		} else {
-			err := sm.createStream(streamID, streamMap)
-			if err != nil {
-				sm.mw.Logger().WithError(err).Errorf("Error creating stream %s", streamID)
-			}
-		}
-		sm.listenPaths = append(sm.listenPaths, httpPaths...)
-	}
-}
-
-// removeStream removes a stream
-func (sm *StreamManager) removeStream(streamID string) error {
-	streamFullID := fmt.Sprintf("%s_%s", sm.mw.Spec.APIID, streamID)
-
-	if streamValue, exists := sm.streams.Load(streamFullID); exists {
-		stream, ok := streamValue.(*streaming.Stream)
-		if !ok {
-			return fmt.Errorf("stream %s is not a valid stream", streamID)
-		}
-		err := stream.Stop()
-		if err != nil {
-			return err
-		}
-		sm.streams.Delete(streamFullID)
-	} else {
-		return fmt.Errorf("stream %s does not exist", streamID)
-	}
-	return nil
+func (s *StreamingMiddleware) Logger() *logrus.Entry {
+	return s.base.Logger().WithField("mw", s.Name())
 }
 
 func (s *StreamingMiddleware) garbageCollect() {
@@ -181,6 +179,7 @@ func (s *StreamingMiddleware) Init() {
 	s.ctx, s.cancel = context.WithCancel(context.Background())
 
 	s.Logger().Debug("Initializing default stream manager")
+<<<<<<< HEAD:gateway/mw_streaming.go
 	s.defaultStreamManager = s.createStreamManager(nil)
 
 	// Start garbage collection routine
@@ -232,6 +231,9 @@ func (s *StreamingMiddleware) createStreamManager(r *http.Request) *StreamManage
 		s.streamManagerCache.Store(cacheKey, newStreamManager)
 	}
 	return newStreamManager
+=======
+	s.defaultManager = NewManager(s, nil)
+>>>>>>> fb9b35ec7 (Move streams middleware to internal/middleware/streams):internal/middleware/stream/mw_streaming.go
 }
 
 // Helper function to extract paths from an http_server configuration
@@ -329,7 +331,7 @@ func (s *StreamingMiddleware) processStreamsConfig(r *http.Request, streams map[
 				s.Logger().Errorf("Failed to marshal stream config: %v", err)
 				continue
 			}
-			replacedStream := s.Gw.replaceTykVariables(r, string(marshaledStream), true)
+			replacedStream := s.Gw.ReplaceTykVariables(r, string(marshaledStream), true)
 
 			if replacedStream != string(marshaledStream) {
 				s.Logger().Debugf("Stream config changed for %s: %s", streamID, replacedStream)
@@ -349,44 +351,10 @@ func (s *StreamingMiddleware) processStreamsConfig(r *http.Request, streams map[
 	}
 }
 
-// createStream creates a new stream
-func (sm *StreamManager) createStream(streamID string, config map[string]interface{}) error {
-	streamFullID := fmt.Sprintf("%s_%s", sm.mw.Spec.APIID, streamID)
-	sm.mw.Logger().Debugf("Creating stream: %s", streamFullID)
-
-	stream := streaming.NewStream(sm.mw.allowedUnsafe)
-	err := stream.Start(config, &handleFuncAdapter{
-		mw:       sm.mw,
-		streamID: streamFullID,
-		muxer:    sm.muxer,
-		sm:       sm,
-		// child logger is necessary to prevent race condition
-		logger: sm.mw.Logger().WithField("stream", streamFullID),
-	})
-	if err != nil {
-		sm.mw.Logger().Errorf("Failed to start stream %s: %v", streamFullID, err)
-		return err
-	}
-
-	sm.streams.Store(streamFullID, stream)
-	sm.mw.Logger().Infof("Successfully created stream: %s", streamFullID)
-
-	return nil
-}
-
-func (sm *StreamManager) hasPath(path string) bool {
-	for _, p := range sm.listenPaths {
-		if strings.TrimPrefix(path, "/") == strings.TrimPrefix(p, "/") {
-			return true
-		}
-	}
-	return false
-}
-
 // ProcessRequest will handle the streaming functionality
 func (s *StreamingMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
 	strippedPath := s.Spec.StripListenPath(r.URL.Path)
-	if !s.defaultStreamManager.hasPath(strippedPath) {
+	if !s.defaultManager.hasPath(strippedPath) {
 		return nil, http.StatusOK
 	}
 
@@ -397,12 +365,12 @@ func (s *StreamingMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 		URL:    &url.URL{Scheme: r.URL.Scheme, Host: r.URL.Host, Path: strippedPath},
 	}
 
-	if !s.defaultStreamManager.muxer.Match(newRequest, &mux.RouteMatch{}) {
+	if !s.defaultManager.muxer.Match(newRequest, &mux.RouteMatch{}) {
 		return nil, http.StatusOK
 	}
 
 	var match mux.RouteMatch
-	streamManager := s.createStreamManager(r)
+	streamManager := NewManager(s, r)
 	streamManager.routeLock.Lock()
 	streamManager.muxer.Match(newRequest, &match)
 	streamManager.routeLock.Unlock()
@@ -415,7 +383,7 @@ func (s *StreamingMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 
 	handler.ServeHTTP(w, r)
 
-	return nil, mwStatusRespond
+	return nil, middleware.StatusRespond
 }
 
 // Unload closes and remove active streams
@@ -423,11 +391,35 @@ func (s *StreamingMiddleware) Unload() {
 	s.Logger().Debugf("Unloading streaming middleware %s", s.Spec.Name)
 
 	totalStreams := 0
+<<<<<<< HEAD:gateway/mw_streaming.go
 	s.cancel()
 
 	s.Logger().Debug("Closing active streams")
 	s.streamManagerCache.Range(func(_, value interface{}) bool {
 		manager := value.(*StreamManager)
+=======
+	s.streamManagers.Range(func(_, value interface{}) bool {
+		manager, ok := value.(*Manager)
+		if !ok {
+			return true
+		}
+		manager.streams.Range(func(_, _ interface{}) bool {
+			totalStreams++
+			return true
+		})
+		return true
+	})
+	globalStreamCounter.Add(-int64(totalStreams))
+
+	s.cancel()
+
+	s.Logger().Debug("Closing active streams")
+	s.streamManagers.Range(func(_, value interface{}) bool {
+		manager, ok := value.(*Manager)
+		if !ok {
+			return true
+		}
+>>>>>>> fb9b35ec7 (Move streams middleware to internal/middleware/streams):internal/middleware/stream/mw_streaming.go
 		manager.streams.Range(func(_, streamValue interface{}) bool {
 			totalStreams++
 			if stream, ok := streamValue.(*streaming.Stream); ok {
@@ -448,7 +440,7 @@ func (s *StreamingMiddleware) Unload() {
 
 type handleFuncAdapter struct {
 	streamID string
-	sm       *StreamManager
+	sm       *Manager
 	mw       *StreamingMiddleware
 	muxer    *mux.Router
 	logger   *logrus.Entry

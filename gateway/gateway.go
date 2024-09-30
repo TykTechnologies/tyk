@@ -1,17 +1,12 @@
 package gateway
 
 import (
-	"github.com/TykTechnologies/tyk/internal/policy"
+	"github.com/TykTechnologies/tyk/internal/model"
 	"github.com/TykTechnologies/tyk/user"
 )
 
-// Repository is a description of our Gateway API promises.
-type Repository interface {
-	policy.Repository
-}
-
 // Gateway implements the Repository interface.
-var _ Repository = &Gateway{}
+var _ model.Gateway = &Gateway{}
 
 // PolicyIDs returns a list of IDs for each policy loaded in the gateway.
 func (gw *Gateway) PolicyIDs() []string {
