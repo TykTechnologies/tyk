@@ -60,6 +60,12 @@ func (sm *StreamManager) initStreams(r *http.Request, config *StreamsConfig) {
 
 	for streamID, streamConfig := range config.Streams {
 		if streamMap, ok := streamConfig.(map[string]interface{}); ok {
+			httpPaths := GetHTTPPaths(streamMap)
+			if r == nil && len(httpPaths) > 0 {
+				// If r is nil that means a default stream manager is being created for background jobs.
+				// If httpPaths is not an empty slice, we do not need any background job for this stream.
+				continue
+			}
 			err := sm.createStream(streamID, streamMap)
 			if err != nil {
 				sm.mw.Logger().WithError(err).Errorf("Error creating stream %s", streamID)
@@ -150,6 +156,7 @@ func (s *StreamingMiddleware) Init() {
 	s.ctx, s.cancel = context.WithCancel(context.Background())
 	s.router = mux.NewRouter()
 
+	s.createStreamManager(nil) // create a default stream manager here for background jobs.
 	s.registerHandlers(s.getStreamsConfig(nil))
 }
 
