@@ -1,0 +1,33 @@
+# yamllint disable rule:truthy
+---
+name: CI lint
+
+on:
+  pull_request:
+    branches:
+      - master
+      - release-**
+  push:
+    branches:
+      - master
+      - release-**
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  godoc:
+    if: ${{ !github.event.pull_request.draft }}
+    uses: TykTechnologies/github-actions/.github/workflows/godoc.yml@main
+    secrets:
+      ORG_GH_TOKEN: ${{ secrets.ORG_GH_TOKEN }}
+    with:
+      go-version: stable
+
+  jira:
+    if: ${{ !github.event.pull_request.draft }}
+    uses: TykTechnologies/github-actions/.github/workflows/jira-lint.yaml@main
+    secrets:
+      JIRA_TOKEN: ${{ secrets.JIRA_TOKEN }}
+      ORG_GH_TOKEN: ${{ secrets.ORG_GH_TOKEN }}
