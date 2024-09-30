@@ -29,14 +29,14 @@ type Middleware interface {
 	EnabledForSpec() bool
 }
 
-// Logger returns a new *logrus.Entry for the request.
+// LoggerProvider returns a new *logrus.Entry for the request.
 // It's implemented by gateway and middleware. Middleware typically
 // adds the `mw` field with the middleware name.
 type LoggerProvider interface {
 	Logger() *logrus.Entry
 }
 
-// GetConfig provides a typical config getter signature.
+// ConfigProvider provides a typical config getter signature.
 type ConfigProvider interface {
 	GetConfig() config.Config
 }

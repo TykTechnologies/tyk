@@ -3,6 +3,6 @@
 // Provides getStreamingMiddleware
 package gateway
 
-func getStreamingMiddleware(baseMid *BaseMiddleware) TykMiddleware {
+func getStreamingMiddleware(_ *BaseMiddleware) TykMiddleware {
 	return nil
 }

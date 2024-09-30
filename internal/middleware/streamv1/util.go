@@ -79,7 +79,7 @@ func handleBroker(brokerConfig map[string]interface{}) []string {
 	return paths
 }
 
-// GetHTTPPaths is the ain function to get HTTP paths from the stream configuration.
+// GetHTTPPaths is the main function to get HTTP paths from the stream configuration.
 func GetHTTPPaths(streamConfig map[string]interface{}) []string {
 	var paths []string
 	for _, component := range []string{"input", "output"} {

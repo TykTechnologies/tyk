@@ -15,6 +15,7 @@ var (
 	ErrMixedPartitionAndPerAPIPolicies = errors.New("cannot apply multiple policies when some have per_api set and some are partitioned")
 )
 
+// Service represents the implementation for apply policies logic.
 type Service struct {
 	storage model.PolicyProvider
 	logger  *logrus.Logger
@@ -23,6 +24,7 @@ type Service struct {
 	orgID *string
 }
 
+// New creates a new policy.Service.
 func New(orgID *string, storage model.PolicyProvider, logger *logrus.Logger) *Service {
 	return &Service{
 		orgID:   orgID,

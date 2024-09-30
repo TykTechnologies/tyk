@@ -15,6 +15,9 @@ type wrapMiddleware struct {
 
 var _ TykMiddleware = &wrapMiddleware{}
 
+// WrapMiddleware returns a new TykMiddleware with the provided base middleware,
+// and the smaller model.Middleware interface. It allows to implement model.Middleware,
+// and use it as a TykMiddleware.
 func WrapMiddleware(base *BaseMiddleware, in model.Middleware) TykMiddleware {
 	return &wrapMiddleware{
 		BaseMiddleware: base,
