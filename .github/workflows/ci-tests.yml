@@ -17,13 +17,9 @@ on:
       - master
       - release-**
 
-# Only have one runner per PR, and per merged commit.
-#
-# - As a PR gets new commits, any old run jobs get cancelled (PR number)
-# - As a commit gets merged, it doesn't cancel previous running PR's (github.sha)
 concurrency:
-  group: ${{ github.event.pull_request.number || github.sha }}-ci-tests
-  cancel-in-progress: true
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
   PYTHON_VERSION: "3.11"
