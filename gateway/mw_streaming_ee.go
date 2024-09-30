@@ -1,5 +1,4 @@
-//go:build ee
-// +build ee
+//go:build ee || dev
 
 // Provides StreamingMiddleware
 package gateway
