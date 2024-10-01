@@ -102,15 +102,21 @@ you're able to use `go mod tidy` in the plugins folder.
 
 ```
 task: [test] cd tyk-release-5.3.6 && go build -tags=goplugin -trimpath -race .
-task: [test] cd plugins && go build -trimpath -race -buildmode=plugin .
+task: [test] cd plugins           && go build -trimpath -race -buildmode=plugin .
+```
+
+The above few steps build gateway, and the plugin.
+
+```
 task: [test] ./tyk-release-5.3.6/tyk plugin load -f plugins/testplugin.so -s AuthCheck
 time="Oct 01 21:29:24" level=info msg="--- Go custom plugin init success! ---- "
 [file=plugins/testplugin.so, symbol=AuthCheck] loaded ok, got 0x7fdcd650f980
 ```
 
-In this step we build the gateway, the plugin, and test plugin loading
-without invoking the plugin symbol like a request would. However, as
-demonstrated, the plugins `init` function is invoked, printing to the log.
+We can use the built gateway binary to test plugin loading without
+invoking the plugin symbol like a request would. However, as
+demonstrated, the plugins `init` function is invoked, printing to the
+log.
 
 ### 5. Summary
 
