@@ -1349,6 +1349,9 @@
         },
         "rateLimit": {
           "$ref": "#/definitions/X-Tyk-RateLimit"
+        },
+        "authentication": {
+          "$ref": "#/definitions/X-Tyk-UpstreamAuthentication"
         }
       },
       "required": [
@@ -2065,6 +2068,40 @@
     "X-Tyk-DomainDef": {
       "type": "string",
       "pattern": "^([*a-zA-Z0-9-]+(\\.[*a-zA-Z0-9-]+)*)(:\\d+)?$"
+    },
+    "X-Tyk-UpstreamAuthentication": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "basicAuth": {
+          "$ref": "#/definitions/X-Tyk-UpstreamBasicAuthentication"
+        }
+      },
+      "required": [
+        "enabled"
+      ]
+    },
+    "X-Tyk-UpstreamBasicAuthentication": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "headerName": {
+          "type": "string"
+        },
+        "userName": {
+          "type": "string"
+        },
+        "password": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "enabled"
+      ]
     }
   }
 }

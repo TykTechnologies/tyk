@@ -594,8 +594,8 @@ type UpstreamBasicAuth struct {
 	// HeaderName is the custom header name to be used for upstream basic authentication.
 	// Defaults to `Authorization`.
 	HeaderName string `bson:"headerName" json:"headerName"`
-	// Username is the username to be used for upstream basic authentication.
-	Username string `bson:"username" json:"username"`
+	// UserName is the username to be used for upstream basic authentication.
+	UserName string `bson:"userName" json:"userName"`
 	// Password is the password to be used for upstream basic authentication.
 	Password string `bson:"password" json:"password"`
 }
@@ -604,7 +604,7 @@ type UpstreamBasicAuth struct {
 func (u *UpstreamBasicAuth) Fill(api apidef.UpstreamBasicAuth) {
 	u.Enabled = api.Enabled
 	u.HeaderName = api.HeaderName
-	u.Username = api.Username
+	u.UserName = api.UserName
 	u.Password = api.Password
 }
 
@@ -613,6 +613,6 @@ func (u *UpstreamBasicAuth) ExtractTo(api *apidef.UpstreamBasicAuth) {
 	api.Enabled = u.Enabled
 	api.Enabled = u.Enabled
 	api.HeaderName = u.HeaderName
-	api.Username = u.Username
+	api.UserName = u.UserName
 	api.Password = u.Password
 }
