@@ -29,6 +29,9 @@ type Upstream struct {
 
 	// RateLimit contains the configuration related to API level rate limit.
 	RateLimit *RateLimit `bson:"rateLimit,omitempty" json:"rateLimit,omitempty"`
+
+	// Authentication contains the configuration related to upstream authentication.
+	Authentication *UpstreamAuth `bson:"authentication,omitempty" json:"authentication,omitempty"`
 }
 
 // Fill fills *Upstream from apidef.APIDefinition.
@@ -78,6 +81,15 @@ func (u *Upstream) Fill(api apidef.APIDefinition) {
 	u.RateLimit.Fill(api)
 	if ShouldOmit(u.RateLimit) {
 		u.RateLimit = nil
+	}
+
+	if u.Authentication == nil {
+		u.Authentication = &UpstreamAuth{}
+	}
+
+	u.Authentication.Fill(api.UpstreamAuth)
+	if ShouldOmit(u.Authentication) {
+		u.Authentication = nil
 	}
 }
 
@@ -129,6 +141,15 @@ func (u *Upstream) ExtractTo(api *apidef.APIDefinition) {
 	}
 
 	u.RateLimit.ExtractTo(api)
+
+	if u.Authentication == nil {
+		u.Authentication = &UpstreamAuth{}
+		defer func() {
+			u.Authentication = nil
+		}()
+	}
+
+	u.Authentication.ExtractTo(&api.UpstreamAuth)
 }
 
 // ServiceDiscovery holds configuration required for service discovery.
@@ -528,4 +549,61 @@ func (r *RateLimitEndpoint) ExtractTo(meta *apidef.RateLimitMeta) {
 	meta.Disabled = !r.Enabled
 	meta.Rate = float64(r.Rate)
 	meta.Per = r.Per.Seconds()
+}
+
+type UpstreamAuth struct {
+	Enabled   bool               `bson:"enabled" json:"enabled"`
+	BasicAuth *UpstreamBasicAuth `bson:"basicAuth,omitempty" json:"basicAuth,omitempty"`
+}
+
+// Fill fills *UpstreamAuth from apidef.UpstreamAuth.
+func (u *UpstreamAuth) Fill(api apidef.UpstreamAuth) {
+	u.Enabled = api.Enabled
+
+	if u.BasicAuth == nil {
+		u.BasicAuth = &UpstreamBasicAuth{}
+	}
+
+	u.BasicAuth.Fill(api.BasicAuth)
+	if ShouldOmit(u.BasicAuth) {
+		u.BasicAuth = nil
+	}
+}
+
+// ExtractTo extracts *UpstreamAuth into *apidef.UpstreamAuth.
+func (u *UpstreamAuth) ExtractTo(api *apidef.UpstreamAuth) {
+	api.Enabled = u.Enabled
+
+	if u.BasicAuth == nil {
+		u.BasicAuth = &UpstreamBasicAuth{}
+		defer func() {
+			u.BasicAuth = nil
+		}()
+	}
+
+	u.BasicAuth.ExtractTo(&api.BasicAuth)
+}
+
+type UpstreamBasicAuth struct {
+	Enabled    bool   `bson:"enabled" json:"enabled"`
+	HeaderName string `bson:"headerName" json:"headerName"`
+	Username   string `bson:"username" json:"username"`
+	Password   string `bson:"password" json:"password"`
+}
+
+// Fill fills *UpstreamBasicAuth from apidef.UpstreamBasicAuth.
+func (u *UpstreamBasicAuth) Fill(api apidef.UpstreamBasicAuth) {
+	u.Enabled = api.Enabled
+	u.HeaderName = api.HeaderName
+	u.Username = api.Username
+	u.Password = api.Password
+}
+
+// ExtractTo extracts *UpstreamBasicAuth into *apidef.UpstreamBasicAuth.
+func (u *UpstreamBasicAuth) ExtractTo(api *apidef.UpstreamBasicAuth) {
+	api.Enabled = u.Enabled
+	api.Enabled = u.Enabled
+	api.HeaderName = u.HeaderName
+	api.Username = u.Username
+	api.Password = u.Password
 }
