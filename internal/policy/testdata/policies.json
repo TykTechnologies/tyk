@@ -904,5 +904,42 @@
       "rate_limit": true,
       "quota": true
     }
+  },
+  "acl_with_allowed_url": {
+    "id": "acl_with_allowed_url",
+    "rate": 500,
+    "per": 1,
+    "quota_max": -1,
+    "access_rights": {
+      "d": {
+        "allowed_urls": [
+          {
+            "url": "/anything",
+            "methods": [
+              "GET",
+              "POST"
+            ]
+          }
+        ]
+      }
+    },
+    "partitions": {
+      "acl": true
+    }
+  },
+  "rate_limit": {
+    "id": "rate_limit",
+    "rate": 1000,
+    "per": 1,
+    "quota_max": -1,
+    "access_rights": {
+      "d": {
+        "api_name": "d",
+        "api_id": "d"
+      }
+    },
+    "partitions": {
+      "rate_limit": true
+    }
   }
 }
