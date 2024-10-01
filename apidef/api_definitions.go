@@ -762,6 +762,25 @@ type APIDefinition struct {
 	VersionName string `bson:"-" json:"-"`
 
 	DetailedTracing bool `bson:"detailed_tracing" json:"detailed_tracing"`
+
+	// UpstreamAuth stores information about authenticating against upstream.
+	UpstreamAuth UpstreamAuth `bson:"upstream_auth" json:"upstream_auth"`
+}
+
+type UpstreamAuth struct {
+	Enabled   bool              `bson:"enabled" json:"enabled"`
+	BasicAuth UpstreamBasicAuth `bson:"basic_auth" json:"basic_auth"`
+}
+
+func (u *UpstreamAuth) IsEnabled() bool {
+	return u.Enabled && u.BasicAuth.Enabled
+}
+
+type UpstreamBasicAuth struct {
+	Enabled    bool   `bson:"enabled" json:"enabled,omitempty"`
+	Username   string `bson:"username" json:"username"`
+	Password   string `bson:"password" json:"password"`
+	HeaderName string `bson:"auth_header_name" json:"authHeaderName"`
 }
 
 type AnalyticsPluginConfig struct {
