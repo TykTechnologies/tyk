@@ -51,6 +51,11 @@ const (
 	// CacheOptions holds cache options required for cache writer middleware.
 	CacheOptions
 	OASDefinition
+
+	// UpstreamAuthHeader sets the header name to be used for upstream authentication.
+	UpstreamAuthHeader
+	// UpstreamAuthValue sets the value for upstream authentication.
+	UpstreamAuthValue
 )
 
 func setContext(r *http.Request, ctx context.Context) {
@@ -157,4 +162,34 @@ func GetOASDefinition(r *http.Request) *oas.OAS {
 	}
 
 	return ret
+}
+
+// SetUpstreamAuthHeader sets the header name to be used for upstream authentication.
+func SetUpstreamAuthHeader(r *http.Request, name string) {
+	ctx := r.Context()
+	ctx = context.WithValue(ctx, UpstreamAuthHeader, name)
+	setContext(r, ctx)
+}
+
+// GetUpstreamAuthHeader returns the header name to be used for upstream authentication.
+func GetUpstreamAuthHeader(r *http.Request) string {
+	if v := r.Context().Value(UpstreamAuthHeader); v != nil {
+		return v.(string)
+	}
+	return ""
+}
+
+// SetUpstreamAuthValue sets the auth header value to be used for upstream authentication.
+func SetUpstreamAuthValue(r *http.Request, name string) {
+	ctx := r.Context()
+	ctx = context.WithValue(ctx, UpstreamAuthValue, name)
+	setContext(r, ctx)
+}
+
+// GetUpstreamAuthValue gets the auth header value to be used for upstream authentication.
+func GetUpstreamAuthValue(r *http.Request) string {
+	if v := r.Context().Value(UpstreamAuthValue); v != nil {
+		return v.(string)
+	}
+	return ""
 }
