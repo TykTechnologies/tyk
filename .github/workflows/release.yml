@@ -310,7 +310,7 @@ jobs:
           repository: TykTechnologies/tyk-analytics
           path: tyk-analytics
           token: ${{ secrets.ORG_GH_TOKEN }}
-          fetch-depth: 1
+          fetch-depth: 0
           sparse-checkout: tests/api
       - name: Choosing test code branch
         working-directory: tyk-analytics/tests/api
