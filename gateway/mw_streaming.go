@@ -380,8 +380,9 @@ func (s *StreamingMiddleware) inputHttpServerPublishHandler(w http.ResponseWrite
 		doJSONWrite(w, http.StatusInternalServerError, err.Error())
 		return
 	}
+
 	// Message received
-	w.WriteHeader(http.StatusOK)
+	w.WriteHeader(http.StatusAccepted)
 }
 
 func (s *StreamingMiddleware) subscriptionHandler(w http.ResponseWriter, r *http.Request) {
