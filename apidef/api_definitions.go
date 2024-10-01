@@ -790,7 +790,7 @@ type UpstreamBasicAuth struct {
 	Password string `bson:"password" json:"password"`
 	// HeaderName is the custom header name to be used for upstream basic authentication.
 	// Defaults to `Authorization`.
-	HeaderName string `bson:"auth_header_name" json:"authHeaderName"`
+	HeaderName string `bson:"header_name" json:"header_name"`
 }
 
 type AnalyticsPluginConfig struct {
