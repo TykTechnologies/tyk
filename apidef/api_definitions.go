@@ -767,19 +767,29 @@ type APIDefinition struct {
 	UpstreamAuth UpstreamAuth `bson:"upstream_auth" json:"upstream_auth"`
 }
 
+// UpstreamAuth holds the configurations related to upstream API authentication.
 type UpstreamAuth struct {
-	Enabled   bool              `bson:"enabled" json:"enabled"`
+	// Enabled enables upstream API authentication.
+	Enabled bool `bson:"enabled" json:"enabled"`
+	// BasicAuth holds the basic authentication configuration for upstream API authentication.
 	BasicAuth UpstreamBasicAuth `bson:"basic_auth" json:"basic_auth"`
 }
 
+// IsEnabled checks if UpstreamAuthentication is enabled for the API.
 func (u *UpstreamAuth) IsEnabled() bool {
 	return u.Enabled && u.BasicAuth.Enabled
 }
 
+// UpstreamBasicAuth holds upstream basic authentication configuration.
 type UpstreamBasicAuth struct {
-	Enabled    bool   `bson:"enabled" json:"enabled,omitempty"`
-	Username   string `bson:"username" json:"username"`
-	Password   string `bson:"password" json:"password"`
+	// Enabled enables upstream basic authentication.
+	Enabled bool `bson:"enabled" json:"enabled,omitempty"`
+	// Username is the username to be used for upstream basic authentication.
+	Username string `bson:"username" json:"username"`
+	// Password is the password to be used for upstream basic authentication.
+	Password string `bson:"password" json:"password"`
+	// HeaderName is the custom header name to be used for upstream basic authentication.
+	// Defaults to `Authorization`.
 	HeaderName string `bson:"auth_header_name" json:"authHeaderName"`
 }
 
