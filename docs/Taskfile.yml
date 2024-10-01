@@ -1,0 +1,8 @@
+---
+version: "3"
+
+tasks:
+  default:
+    desc: "Run mdox to format markdowns"
+    cmds:
+      - mdox fmt --soft-wraps $(find -name '*.md')
