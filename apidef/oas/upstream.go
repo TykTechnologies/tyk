@@ -551,8 +551,11 @@ func (r *RateLimitEndpoint) ExtractTo(meta *apidef.RateLimitMeta) {
 	meta.Per = r.Per.Seconds()
 }
 
+// UpstreamAuth holds the configurations related to upstream API authentication.
 type UpstreamAuth struct {
-	Enabled   bool               `bson:"enabled" json:"enabled"`
+	// Enabled enables upstream API authentication.
+	Enabled bool `bson:"enabled" json:"enabled"`
+	// BasicAuth holds the basic authentication configuration for upstream API authentication.
 	BasicAuth *UpstreamBasicAuth `bson:"basicAuth,omitempty" json:"basicAuth,omitempty"`
 }
 
@@ -584,11 +587,17 @@ func (u *UpstreamAuth) ExtractTo(api *apidef.UpstreamAuth) {
 	u.BasicAuth.ExtractTo(&api.BasicAuth)
 }
 
+// UpstreamBasicAuth holds upstream basic authentication configuration.
 type UpstreamBasicAuth struct {
-	Enabled    bool   `bson:"enabled" json:"enabled"`
+	// Enabled enables upstream basic authentication.v
+	Enabled bool `bson:"enabled" json:"enabled"`
+	// Username is the username to be used for upstream basic authentication.
 	HeaderName string `bson:"headerName" json:"headerName"`
-	Username   string `bson:"username" json:"username"`
-	Password   string `bson:"password" json:"password"`
+	// Password is the password to be used for upstream basic authentication.
+	Username string `bson:"username" json:"username"`
+	// HeaderName is the custom header name to be used for upstream basic authentication.
+	// Defaults to `Authorization`.
+	Password string `bson:"password" json:"password"`
 }
 
 // Fill fills *UpstreamBasicAuth from apidef.UpstreamBasicAuth.
