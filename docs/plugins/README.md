@@ -122,7 +122,19 @@ Compatibility in general is a big concern around plugins; since the
 plugins are tightly coupled to gateway, they need to be built with some
 consideration to the restrictions around them.
 
+Continue with [Loading Go Plugins into Tyk](https://tyk.io/docs/product-stack/tyk-gateway/advanced-configurations/plugins/golang/loading-go-plugins/).
+
 ## Common issues
+
+### Plugin compiler
+
+We provide a plugin build environment to manage compatibility restrictions
+for plugins. The plugin compiler ensures compatibility between the system
+architecture and the go version for your target environment.
+
+The plugin compiler also provides cross-compilation support.
+
+Continue with [Go Plugin Compiler](https://tyk.io/docs/product-stack/tyk-gateway/advanced-configurations/plugins/golang/go-plugin-compiler/).
 
 ### Build flag restrictions
 
