@@ -589,14 +589,14 @@ func (u *UpstreamAuth) ExtractTo(api *apidef.UpstreamAuth) {
 
 // UpstreamBasicAuth holds upstream basic authentication configuration.
 type UpstreamBasicAuth struct {
-	// Enabled enables upstream basic authentication.v
+	// Enabled enables upstream basic authentication.
 	Enabled bool `bson:"enabled" json:"enabled"`
-	// Username is the username to be used for upstream basic authentication.
-	HeaderName string `bson:"headerName" json:"headerName"`
-	// Password is the password to be used for upstream basic authentication.
-	Username string `bson:"username" json:"username"`
 	// HeaderName is the custom header name to be used for upstream basic authentication.
 	// Defaults to `Authorization`.
+	HeaderName string `bson:"headerName" json:"headerName"`
+	// Username is the username to be used for upstream basic authentication.
+	Username string `bson:"username" json:"username"`
+	// Password is the password to be used for upstream basic authentication.
 	Password string `bson:"password" json:"password"`
 }
 
