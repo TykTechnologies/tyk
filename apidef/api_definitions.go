@@ -784,8 +784,8 @@ func (u *UpstreamAuth) IsEnabled() bool {
 type UpstreamBasicAuth struct {
 	// Enabled enables upstream basic authentication.
 	Enabled bool `bson:"enabled" json:"enabled,omitempty"`
-	// Username is the username to be used for upstream basic authentication.
-	Username string `bson:"username" json:"username"`
+	// UserName is the username to be used for upstream basic authentication.
+	UserName string `bson:"user_name" json:"user_name"`
 	// Password is the password to be used for upstream basic authentication.
 	Password string `bson:"password" json:"password"`
 	// HeaderName is the custom header name to be used for upstream basic authentication.
