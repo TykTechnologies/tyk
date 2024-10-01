@@ -2092,7 +2092,7 @@
         "headerName": {
           "type": "string"
         },
-        "userName": {
+        "username": {
           "type": "string"
         },
         "password": {
