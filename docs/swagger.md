@@ -25,8 +25,8 @@ We used the Go library [openapi-go](https://github.com/swaggest/openapi-go) beca
 4. Run the command `make generate` in this directory.
 5. After running this command, a `swagger.yml` file containing all the gateway endpoints will be generated in the same directory.
 6. What the `make generate` command does:
-      - The command is defined as: `rm -f swagger.yml && go run main.go && redocly lint swagger.yml`.
-      - It first removes the existing `swagger.yml` file (if any), generates a new `swagger.yml` file, and finally lints the file using Redocly.
+   - The command is defined as: `rm -f swagger.yml && go run main.go && redocly lint swagger.yml`.
+   - It first removes the existing `swagger.yml` file (if any), generates a new `swagger.yml` file, and finally lints the file using Redocly.
 
 ## File Structure
 
