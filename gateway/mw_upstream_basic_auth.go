@@ -15,10 +15,12 @@ type UpstreamBasicAuth struct {
 	*BaseMiddleware
 }
 
+// Name returns the name of middleware.
 func (t *UpstreamBasicAuth) Name() string {
 	return "UpstreamBasicAuth"
 }
 
+// EnabledForSpec returns true if the middleware is enabled based on API Spec.
 func (t *UpstreamBasicAuth) EnabledForSpec() bool {
 	if !t.Spec.UpstreamAuth.Enabled {
 		return false
