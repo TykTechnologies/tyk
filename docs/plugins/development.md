@@ -65,7 +65,7 @@ task: [workspace:plugins] wget -q https://raw.githubusercontent.com/TykTechnolog
 
 The following snippets provide you with a way to:
 
-- `go mod edit -json go.mod | jq -r .Go` - get the go version from the gateway go.mod file
+- `go mod edit -json go.mod | jq -r .Go` - get the go version from the gateway [go.mod](https://github.com/TykTechnologies/tyk/blob/release-5.3.6/go.mod#L3) file
 - `git rev-parse HEAD` - get the commit hash so the exact commit can be used with `go get`
 
 This should be used to ensure the matching between gateway and the plugin. The commit is used to `go get` the dependency in later steps.
