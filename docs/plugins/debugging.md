@@ -8,7 +8,7 @@ The [plugin package - Warnings](https://pkg.go.dev/plugin#hdr-Warnings) section 
 
 > Runtime crashes are likely to occur unless all parts of the program (the application and all its plugins) are compiled using exactly the same version of the toolchain, the same build tags, and the same values of certain flags and environment variables.
 
-We provide a [Plugin Compiler](#) docker image, which should be used to build plugins compatible with the official gateway releases and their architectures. It provides the cross compilation toolchain, Go version used to build the release, and ensure compatible flags are used when compiling plugins, like `-trimpath`, `CC`, `CGO_ENABLED`, `GOOS`, `GOARCH`.
+We provide a Plugin Compiler docker image, which should be used to build plugins compatible with the official gateway releases and their architectures. It provides the cross compilation toolchain, Go version used to build the release, and ensure compatible flags are used when compiling plugins, like `-trimpath`, `CC`, `CGO_ENABLED`, `GOOS`, `GOARCH`.
 
 The plugin compiler also works around known Go issues.
 
@@ -16,6 +16,8 @@ The plugin compiler also works around known Go issues.
 - https://www.reddit.com/r/golang/comments/qxghjv/plugin_already_loaded_when_a_plugin_is_loaded/
 
 The argument plugin_id ensures the same plugin can be rebuilt. The plugin compiler does this by replacing the plugin go.mod module path.
+
+Continue with [Go Plugin Compiler](https://tyk.io/docs/product-stack/tyk-gateway/advanced-configurations/plugins/golang/go-plugin-compiler/).
 
 ### Examples
 
