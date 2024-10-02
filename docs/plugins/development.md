@@ -5,8 +5,6 @@ For effectively developing go plugins, absorb the following:
 - [The official plugin package documentation - Warnings](https://pkg.go.dev/plugin)
 - [Tutorial: Getting started with multi-module workspaces](https://go.dev/doc/tutorial/workspaces)
 
-<TOC>
-
 ## Setting up your environment
 
 To develop plugins, you'll need:
@@ -15,12 +13,16 @@ To develop plugins, you'll need:
 - Git to check out gateway source code
 - A folder with plugins to build
 
-Set up a workspace, which is going to look like:
+Set up a workspace, which, at the end, is going to look like:
 
-- `/tyk` - the checkout
+- `/tyk-release-5.3.6` - the checkout
 - `/plugins` - the plugins
+- `/go.work` - the go workspace file
+- `/go.work.sum` - workspace package checksums
 
-A sample [Taskfile.yml](Taskfile.yml) is provided here.
+Using the workspace ensures build compatibility, matching plugin restrictions.
+
+A sample [tests/Taskfile.yml](Taskfile.yml) is provided here to automatically set up, build, and load the plugin with gateway.
 
 ```
 task: Available tasks for this project:
@@ -48,7 +50,7 @@ The plugin workspace can be very simple. Generally you would:
 1. create a .go file with code for your plugin
 2. create a go.mod for the plugin
 3. ensure the correct go version is in use
-4. use the exact commit hash from the plugin
+4. add gateway dependency with `go get`, using the commit hash
 
 For implementation examples, see [CustomGoPlugin.go](https://github.com/TykTechnologies/custom-go-plugin/blob/master/go/src/CustomGoPlugin.go). We'll be using this as the source for our plugin as shown:
 
@@ -65,6 +67,8 @@ The following snippets provide you with a way to:
 
 - `go mod edit -json go.mod | jq -r .Go` - get the go version from the gateway go.mod file
 - `git rev-parse HEAD` - get the commit hash so the exact commit can be used with `go get`
+
+This should be used to ensure the matching between gateway and the plugin. The commit is used to `go get` the dependency in later steps.
 
 The internal `workspace:plugins` step ensures a few things:
 
