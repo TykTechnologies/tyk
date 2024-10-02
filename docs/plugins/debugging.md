@@ -1,48 +1,27 @@
 # Debugging
 
-Plugins are native go code compiled to a binary shared object file. The
-code may depend on CGO and require libraries like libc provided by the
-runtime environment. The following are some debugging steps for
-diagnosing issues arising from using plugins.
+Plugins are native go code compiled to a binary shared object file. The code may depend on CGO and require libraries like libc provided by the runtime environment. The following are some debugging steps for diagnosing issues arising from using plugins.
 
 ## Warnings
 
-The [plugin package - Warnings](https://pkg.go.dev/plugin#hdr-Warnings)
-section outlines several requirements which can't be ignored. The most
-important restriction is the following:
+The [plugin package - Warnings](https://pkg.go.dev/plugin#hdr-Warnings) section outlines several requirements which can't be ignored. The most important restriction is the following:
 
-> Runtime crashes are likely to occur unless all parts of the program
-> (the application and all its plugins) are compiled using exactly the same
-> version of the toolchain, the same build tags, and the same values of
-> certain flags and environment variables.
+> Runtime crashes are likely to occur unless all parts of the program (the application and all its plugins) are compiled using exactly the same version of the toolchain, the same build tags, and the same values of certain flags and environment variables.
 
-We provide a [Plugin Compiler](#) docker image, which should be used to
-build plugins compatible with the official gateway releases and their
-architectures. It provides the cross compilation toolchain, Go version
-used to build the release, and ensure compatible flags are used when
-compiling plugins, like `-trimpath`, `CC`, `CGO_ENABLED`, `GOOS`,
-`GOARCH`.
+We provide a [Plugin Compiler](#) docker image, which should be used to build plugins compatible with the official gateway releases and their architectures. It provides the cross compilation toolchain, Go version used to build the release, and ensure compatible flags are used when compiling plugins, like `-trimpath`, `CC`, `CGO_ENABLED`, `GOOS`, `GOARCH`.
 
 The plugin compiler also works around known Go issues.
 
 - https://github.com/golang/go/issues/19004
 - https://www.reddit.com/r/golang/comments/qxghjv/plugin_already_loaded_when_a_plugin_is_loaded/
 
-The argument plugin_id ensures the same plugin can be rebuilt. The plugin
-compiler does this by replacing the plugin go.mod module path.
+The argument plugin_id ensures the same plugin can be rebuilt. The plugin compiler does this by replacing the plugin go.mod module path.
 
 ### Examples
 
-When working with Go plugins, it's easy to miss the restriction that
-the plugin at the very least requires to be built with the same Go version,
-and the same flags, notably `-trimpath`, which is part of the Gateway
-official release.
+When working with Go plugins, it's easy to miss the restriction that the plugin at the very least requires to be built with the same Go version, and the same flags, notably `-trimpath`, which is part of the Gateway official release.
 
-If you miss an argument like forgetting `-trimpath` for the plugin build,
-you'll get a load error like the one below. Usually when the error hints
-at a standard library package, the build flags between the binaries don't
-match. For example, if gateway is compiled with `-race`, the plugin needs
-to be compiled with the flag as well to be compatible.
+If you miss an argument like forgetting `-trimpath` for the plugin build, you'll get a load error like the one below. Usually when the error hints at a standard library package, the build flags between the binaries don't match. For example, if gateway is compiled with `-race`, the plugin needs to be compiled with the flag as well to be compatible.
 
 ```
 task: [test] cd tyk-release-5.3.6 && go build -tags=goplugin -trimpath .
@@ -51,9 +30,7 @@ task: [test] ./tyk-release-5.3.6/tyk plugin load -f plugins/testplugin.so -s Aut
 tyk: error: unexpected error: plugin.Open("plugins/testplugin"): plugin was built with a different version of package internal/goarch, try --help
 ```
 
-Other error messages may occur, depending on what triggered the issue.
-For example, if you omitted `-race` in the plugin but the gateway was
-built with `-race`, the error reported is:
+Other error messages may occur, depending on what triggered the issue. For example, if you omitted `-race` in the plugin but the gateway was built with `-race`, the error reported is:
 
 ```
 plugin was built with a different version of package runtime/internal/sys, try --help
@@ -66,10 +43,7 @@ Stricly speaking:
 - cross compilation means using the same `CC` value for the build (CGO)
 - matching `CGO_ENABLED=1`, `GOOS`, `GOARCH` with runtime
 
-When something is off, proofing these can be done with `go version -m
-tyk` and `go version -m plugin.so` for the plugin, inspecting and
-comparing the output of `build` tokens usually yields the difference that
-caused the compatibility issue.
+When something is off, proofing these can be done with `go version -m tyk` and `go version -m plugin.so` for the plugin, inspecting and comparing the output of `build` tokens usually yields the difference that caused the compatibility issue.
 
 ## Plugin compatibility issues
 
@@ -102,14 +76,11 @@ Case 3:
 - It's likely using a major release with `/v4` or similar works like a charm (new package)
 - Expectation: If it's just a different version of the same package, loading the plugin will fail
 
-It's definitely recommended that all dependencies would follow go package
-metaversion, however the reality is most gateway dependencies follow a
-basic v1 semver which doesn't break import paths for every release.
+It's definitely recommended that all dependencies would follow go package metaversion, however the reality is most gateway dependencies follow a basic v1 semver which doesn't break import paths for every release.
 
 ## List plugin symbols
 
-Sometimes it's useful to list symbols from a plugin. For example, we can
-list the symbols as they are compiled into our testplugin:
+Sometimes it's useful to list symbols from a plugin. For example, we can list the symbols as they are compiled into our testplugin:
 
 ```
 # nm -gD testplugin.so | grep testplugin
@@ -130,13 +101,9 @@ list the symbols as they are compiled into our testplugin:
 0000000001310c40 T testplugin.MakeOutboundCall.deferwrap1
 ```
 
-The command prints other symbols that are part of the binary. In the
-worst case, a build compatibility issue may cause a crash in the gateway
-due to an unrecoverable error and this can be used to further debug the
-binaries produced.
+The command prints other symbols that are part of the binary. In the worst case, a build compatibility issue may cause a crash in the gateway due to an unrecoverable error and this can be used to further debug the binaries produced.
 
-A very basic check to ensure gateway/plugin compatibility is using
-the built in `go version -m <file>`:
+A very basic check to ensure gateway/plugin compatibility is using the built in `go version -m <file>`:
 
 ```
 [output truncated]
@@ -155,5 +122,4 @@ the built in `go version -m <file>`:
 	build	vcs.modified=false
 ```
 
-It's typical that these options should match between the gateway binary
-and the plugin, and you can use the command for both binaries.
+It's typical that these options should match between the gateway binary and the plugin, and you can use the command for both binaries.
