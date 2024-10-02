@@ -43,6 +43,15 @@ The example checkout uses a particular `release-5.3.6` branch, to match a releas
 
 ### 2. Preparing the workspace - plugins
 
+The plugin workspace can be very simple. Generally you would:
+
+1. create a .go file with code for your plugin
+2. create a go.mod for the plugin
+3. ensure the correct go version is in use
+4. use the exact commit hash from the plugin
+
+For implementation examples, see [CustomGoPlugin.go](https://github.com/TykTechnologies/custom-go-plugin/blob/master/go/src/CustomGoPlugin.go). We'll be using this as the source for our plugin as shown:
+
 ```
 task: [workspace] mkdir -p plugins
 task: [workspace:plugins] rm -f go.mod go.sum
@@ -52,15 +61,20 @@ task: [workspace:plugins] go mod edit -go "1.22.6"
 task: [workspace:plugins] wget -q https://raw.githubusercontent.com/TykTechnologies/custom-go-plugin/refs/heads/master/go/src/CustomGoPlugin.go
 ```
 
+The following snippets provide you with a way to:
+
+- `go mod edit -json go.mod | jq -r .Go` - get the go version from the gateway go.mod file
+- `git rev-parse HEAD` - get the commit hash so the exact commit can be used with `go get`
+
 The internal `workspace:plugins` step ensures a few things:
 
 1. create a plugin, create go.mod,
 2. set go.mod go version to what's set in gateway,
 3. have some code to compile in the folder
 
-At this point, we don't have a workspace yet.
+At this point, we don't have a workspace yet. In order to share the gateway dependency across go modules we'll create a Go workspace next.
 
-### 3. Creating the workspace
+### 3. Creating the Go workspace
 
 ```
 task: [workspace] go work init ./tyk-release-5.3.6
