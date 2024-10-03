@@ -126,25 +126,6 @@ func (sm *StreamManager) removeStream(streamID string) error {
 	return nil
 }
 
-type connection struct {
-	id     string
-	cancel context.CancelFunc
-}
-
-func (s *StreamingMiddleware) removeStreamManager(cacheKey string) {
-	if manager, ok := s.streamManagerCache.Load(cacheKey); ok {
-		sm := manager.(*StreamManager)
-		sm.streams.Range(func(key, streamValue interface{}) bool {
-			streamID := key.(string)
-			if err := sm.removeStream(streamID); err != nil {
-				s.Logger().Errorf("Error removing stream %s: %v", streamID, err)
-			}
-			return true
-		})
-		s.streamManagerCache.Delete(cacheKey)
-	}
-}
-
 func (s *StreamingMiddleware) garbageCollect() {
 	s.Logger().Debug("Starting garbage collection for inactive stream managers")
 	now := time.Now()
