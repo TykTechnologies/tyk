@@ -20,7 +20,7 @@ const (
 	TykHookshot     	= "Tyk-Hookshot"
 	ApplicationJSON 	= "application/json"
 	ApplicationXML  	= "application/xml"
-	ApplicationSoapXML  = "application/soap+xml"
+	ApplicationSoapXML 	= "application/soap+xml"
 	TextXML         	= "text/xml"
 )
 
