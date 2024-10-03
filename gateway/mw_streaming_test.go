@@ -1,6 +1,7 @@
 package gateway
 
 import (
+	"bytes"
 	"context"
 	"crypto/tls"
 	"encoding/json"
@@ -146,6 +147,17 @@ streams:
       add_timestamp: false
       static_fields:
         '@service': benthos
+`
+const bentoHTTPServerTemplate = `
+streams:
+  test:
+    input:
+      http_server:
+        path: /post
+        timeout: 1s
+    output:
+      http_server:
+        ws_path: /subscribe
 `
 
 func TestStreamingAPISingleClient(t *testing.T) {
@@ -780,4 +792,123 @@ func TestWebSocketConnectionClosedOnAPIReload(t *testing.T) {
 	}
 
 	t.Log("WebSocket connection was successfully closed on API reload")
+}
+
+func TestStreamingAPISingleClient_Input_HTTPServer(t *testing.T) {
+	ts := StartTest(func(globalConf *config.Config) {
+		globalConf.Streaming.Enabled = true
+	})
+	t.Cleanup(func() {
+		ts.Close()
+	})
+
+	apiName := "test-api"
+	if err := setUpStreamAPI(ts, apiName, bentoHTTPServerTemplate); err != nil {
+		t.Fatal(err)
+	}
+
+	const totalMessages = 3
+
+	dialer := websocket.Dialer{
+		HandshakeTimeout: 1 * time.Second,
+		TLSClientConfig:  &tls.Config{InsecureSkipVerify: true},
+	}
+
+	wsURL := strings.Replace(ts.URL, "http", "ws", 1) + fmt.Sprintf("/%s/subscribe", apiName)
+	wsConn, _, err := dialer.Dial(wsURL, nil)
+	require.NoError(t, err, "failed to connect to ws server")
+	t.Cleanup(func() {
+		if err = wsConn.Close(); err != nil {
+			t.Logf("failed to close ws connection: %v", err)
+		}
+	})
+
+	publishURL := fmt.Sprintf("%s/%s/post", ts.URL, apiName)
+	for i := 0; i < totalMessages; i++ {
+		data := []byte(fmt.Sprintf("{\"test\": \"message %d\"}", i))
+		resp, err := http.Post(publishURL, "application/json", bytes.NewReader(data))
+		require.NoError(t, err)
+		_ = resp.Body.Close()
+	}
+
+	err = wsConn.SetReadDeadline(time.Now().Add(500 * time.Millisecond))
+	require.NoError(t, err, "error setting read deadline")
+
+	for i := 0; i < totalMessages; i++ {
+		_, p, err := wsConn.ReadMessage()
+		require.NoError(t, err, "error reading message")
+		assert.Equal(t, fmt.Sprintf("{\"test\": \"message %d\"}", i), string(p), "message not equal")
+	}
+}
+
+func TestStreamingAPIMultipleClients_Input_HTTPServer(t *testing.T) {
+	ts := StartTest(func(globalConf *config.Config) {
+		globalConf.Streaming.Enabled = true
+	})
+	t.Cleanup(func() {
+		ts.Close()
+	})
+
+	apiName := "test-api"
+	if err := setUpStreamAPI(ts, apiName, bentoHTTPServerTemplate); err != nil {
+		t.Fatal(err)
+	}
+
+	const (
+		totalSubscribers = 3
+		totalMessages    = 10
+	)
+	dialer := websocket.Dialer{
+		HandshakeTimeout: 1 * time.Second,
+		TLSClientConfig:  &tls.Config{InsecureSkipVerify: true},
+	}
+
+	wsURL := strings.Replace(ts.URL, "http", "ws", 1) + fmt.Sprintf("/%s/subscribe", apiName)
+
+	// Create multiple WebSocket connections
+	var wsConns []*websocket.Conn
+	for i := 0; i < totalSubscribers; i++ {
+		wsConn, _, err := dialer.Dial(wsURL, nil)
+		require.NoError(t, err, fmt.Sprintf("failed to connect to ws server for client %d", i))
+		wsConns = append(wsConns, wsConn)
+		t.Cleanup(func() {
+			if err := wsConn.Close(); err != nil {
+				t.Logf("failed to close ws connection: %v", err)
+			}
+		})
+	}
+
+	messages := make(map[string]struct{})
+	publishURL := fmt.Sprintf("%s/%s/post", ts.URL, apiName)
+	for i := 0; i < totalMessages; i++ {
+		message := fmt.Sprintf("{\"test\": \"message %d\"}", i)
+		messages[message] = struct{}{}
+
+		data := []byte(message)
+		resp, err := http.Post(publishURL, "application/json", bytes.NewReader(data))
+		require.NoError(t, err)
+		_ = resp.Body.Close()
+	}
+
+	// Read messages from all clients
+	var readMessages int
+	for readMessages < totalMessages {
+		for clientID, wsConn := range wsConns {
+			err := wsConn.SetReadDeadline(time.Now().Add(100 * time.Millisecond))
+			require.NoError(t, err, fmt.Sprintf("error while setting read deadline for client %d", clientID))
+
+			_, data, err := wsConn.ReadMessage()
+			if os.IsTimeout(err) {
+				continue
+			}
+			require.NoError(t, err, fmt.Sprintf("error while reading message %d", clientID))
+
+			message := string(data)
+			_, ok := messages[message]
+			require.True(t, ok, fmt.Sprintf("message is unknown or consumed before %s", message))
+			delete(messages, message)
+			readMessages++
+		}
+	}
+	require.Empty(t, messages)
 }
