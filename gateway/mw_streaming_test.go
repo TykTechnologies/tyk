@@ -842,6 +842,9 @@ func TestStreamingAPISingleClient_Input_HTTPServer(t *testing.T) {
 }
 
 func TestStreamingAPIMultipleClients_Input_HTTPServer(t *testing.T) {
+	// Testing input http -> output http (3 output instances and 10 messages)
+	// Messages are distributed in a round-robin fashion.
+
 	ts := StartTest(func(globalConf *config.Config) {
 		globalConf.Streaming.Enabled = true
 	})
@@ -878,6 +881,7 @@ func TestStreamingAPIMultipleClients_Input_HTTPServer(t *testing.T) {
 		})
 	}
 
+	// Publish 10 messages
 	messages := make(map[string]struct{})
 	publishURL := fmt.Sprintf("%s/%s/post", ts.URL, apiName)
 	for i := 0; i < totalMessages; i++ {
@@ -890,10 +894,12 @@ func TestStreamingAPIMultipleClients_Input_HTTPServer(t *testing.T) {
 		_ = resp.Body.Close()
 	}
 
-	// Read messages from all clients
+	// Read messages from all subscribers
+	// Messages are distributed in a round-robin fashion, count the number of messages and check the messages individually.
 	var readMessages int
 	for readMessages < totalMessages {
 		for clientID, wsConn := range wsConns {
+			// We need to stop waiting for a message if the subscriber is consumed all of its received messages.
 			err := wsConn.SetReadDeadline(time.Now().Add(100 * time.Millisecond))
 			require.NoError(t, err, fmt.Sprintf("error while setting read deadline for client %d", clientID))
 
