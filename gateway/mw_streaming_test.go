@@ -285,23 +285,39 @@ func TestStreamingAPIMultipleClients(t *testing.T) {
 	t.Cleanup(func() {
 		nc.Close()
 	})
+
 	subject := "test"
+	messages := make(map[string]struct{})
 	for i := 0; i < totalMessages; i++ {
-		require.NoError(t, nc.Publish(subject, []byte(fmt.Sprintf("Hello %d", i))), "failed to publish message to subject")
+		message := fmt.Sprintf("Hello %d", i)
+		messages[message] = struct{}{}
+		require.NoError(t, nc.Publish(subject, []byte(message)), "failed to publish message to subject")
 	}
 
-	// Read messages from all clients
-	for clientID, wsConn := range wsConns {
-		err = wsConn.SetReadDeadline(time.Now().Add(5000 * time.Millisecond))
-		require.NoError(t, err, fmt.Sprintf("error setting read deadline for client %d", clientID))
+	// Read messages from all subscribers
+	// Messages are distributed in a round-robin fashion, count the number of messages and check the messages individually.
+	var readMessages int
+	for readMessages < totalMessages {
+		for clientID, wsConn := range wsConns {
+			// We need to stop waiting for a message if the subscriber is consumed all of its received messages.
+			err = wsConn.SetReadDeadline(time.Now().Add(100 * time.Millisecond))
+			require.NoError(t, err, fmt.Sprintf("error setting read deadline for client %d", clientID))
 
-		for i := 0; i < totalMessages; i++ {
-			_, p, err := wsConn.ReadMessage()
-			require.NoError(t, err, fmt.Sprintf("error reading message for client %d, message %d", clientID, i))
-			assert.Equal(t, fmt.Sprintf("Hello %d", i), string(p), fmt.Sprintf("message not equal for client %d", clientID))
+			_, data, err := wsConn.ReadMessage()
+			if os.IsTimeout(err) {
+				continue
+			}
+			require.NoError(t, err, fmt.Sprintf("error reading message for client %d", clientID))
+
+			message := string(data)
+			_, ok := messages[message]
+			require.True(t, ok, fmt.Sprintf("message is unknown or consumed before %s", message))
+			delete(messages, message)
+			readMessages++
 		}
 	}
-
+	// Consumed all messages
+	require.Empty(t, messages)
 }
 
 func setUpStreamAPI(ts *Test, apiName string, streamConfig string) error {
