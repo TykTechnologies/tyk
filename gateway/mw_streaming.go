@@ -42,7 +42,8 @@ var globalStreamCounter atomic.Int64
 type StreamingMiddleware struct {
 	*BaseMiddleware
 
-	streamManagerCache sync.Map // Map of payload hash to StreamManager
+	createStreamManagerLock sync.Mutex
+	streamManagerCache      sync.Map // Map of payload hash to StreamManager
 
 	streamManagers       sync.Map // Map of consumer group IDs to StreamManager
 	ctx                  context.Context
@@ -229,6 +230,15 @@ func (s *StreamingMiddleware) createStreamManager(r *http.Request) *StreamManage
 	streamsConfig := s.getStreamsConfig(r)
 	configJSON, _ := json.Marshal(streamsConfig)
 	cacheKey := fmt.Sprintf("%x", md5.Sum(configJSON))
+
+	// Critical section starts here
+	// This section is called by ProcessRequest method of the middleware implementation
+	// Concurrent requests can call this method at the same time and those requests
+	// creates new StreamManagers and store them concurrently, as a result
+	// the returned stream manager has overwritten by a different one by leaking
+	// the previously stored StreamManager.
+	s.createStreamManagerLock.Lock()
+	defer s.createStreamManagerLock.Unlock()
 
 	s.Logger().Debug("Attempting to load stream manager from cache")
 	s.Logger().Debugf("Cache key: %s", cacheKey)
