@@ -2,7 +2,7 @@ package gateway
 
 import (
 	"context"
-	"crypto/md5"
+	"crypto/sha256"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -210,7 +210,7 @@ func (s *StreamingMiddleware) Init() {
 func (s *StreamingMiddleware) createStreamManager(r *http.Request) *StreamManager {
 	streamsConfig := s.getStreamsConfig(r)
 	configJSON, _ := json.Marshal(streamsConfig)
-	cacheKey := fmt.Sprintf("%x", md5.Sum(configJSON))
+	cacheKey := fmt.Sprintf("%x", sha256.Sum256(configJSON))
 
 	// Critical section starts here
 	// This section is called by ProcessRequest method of the middleware implementation
