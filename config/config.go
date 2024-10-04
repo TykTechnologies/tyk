@@ -1092,19 +1092,20 @@ type Config struct {
 	// file using the secrets://KEY notation. For Gateway versions prior to 5.3.0 only the
 	// listen path and target URL fields can use this notation.
 	//
-	// Syntax: TYK_GW_SECRETS=key1:/value1,key2:/value2
-	// Example: TYK_GW_SECRETS=api-listen-path:/secret,api-auth-key:/another-secret
+	// Syntax: TYK_GW_SECRETS=key1:value1,key2:value2
+	// Example: TYK_GW_SECRETS=api-listen-path:secret,api-auth-key:another-secret
 	//
-	// In this example, api-listen-path is set to /secret and api-auth-key is set to
-	// /another-secret. If the listen path in an API Definition has value secrets://api-listen-path,
-	// then Tyk Gateway will replace it with the value of the api-listen-path key, i.e. /secret.
+	// In this example, api-listen-path is set to "secret" and api-auth-key is set to
+	// "another-secret". If the listen path in an API Definition has value secrets://api-listen-path,
+	// then Tyk Gateway will replace it with the value of the api-listen-path key, i.e. "secret".
 	//
 	// As another example, if you create a Key-Value pair in the secrets section of the tyk.conf file
 	// with the Key auth_header_name:
 	//
 	// {
-	//   "secrets": {
-	//   "auth_header_name": "Authorization"
+	// 	 "secrets": {
+	// 	   "auth_header_name": "Authorization"
+	// 	 }
 	// }
 	//
 	// Then within your API definition you could use the Value for the authentication header name as follows:
