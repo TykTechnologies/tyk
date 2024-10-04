@@ -306,7 +306,7 @@ func TestCustomCertsDataDecoder(t *testing.T) {
 // list of keys and values, additionally separated by `:` (colon).
 func TestSecretsDecoder(t *testing.T) {
 	var c Config
-	t.Setenv("TYK_GW_SECRETS", "key:value,key2:value2")
+	t.Setenv("TYK_GW_SECRETS", "key:value,key2:/value2")
 	err := envconfig.Process("TYK_GW", &c)
 	if err != nil {
 		t.Fatal(err)
@@ -314,7 +314,7 @@ func TestSecretsDecoder(t *testing.T) {
 
 	want := map[string]string{
 		"key":  "value",
-		"key2": "value2",
+		"key2": "/value2",
 	}
 
 	assert.Equal(t, want, c.Secrets)
