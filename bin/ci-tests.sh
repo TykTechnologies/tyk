@@ -1,5 +1,8 @@
 #!/bin/bash
 
+## Unused but left around until we decide to do a major cleanup.
+## The up to date way is `task test:e2e` from the root of the project.
+
 TEST_TIMEOUT=15m
 
 PKGS="$(go list ./...)"
@@ -17,7 +20,7 @@ set -e
 
 # set tags for the CI tests run / plugin builds
 
-tags="goplugin dev"
+tags="dev"
 
 # build Go-plugin used in tests
 echo "Building go plugin"

@@ -1,5 +1,5 @@
-//go:build goplugin
-// +build goplugin
+//go:build cgo
+// +build cgo
 
 package goplugin_test
 

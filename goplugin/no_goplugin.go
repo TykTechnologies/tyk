@@ -1,5 +1,5 @@
-//go:build !goplugin
-// +build !goplugin
+//go:build !cgo
+// +build !cgo
 
 package goplugin
 
@@ -9,7 +9,7 @@ import (
 )
 
 const (
-	errNotImplemented = "goplugin.%s is disabled, use -tags=goplugin to enable"
+	errNotImplemented = "goplugin.%s is disabled, build gateway with CGO_ENABLED=1"
 )
 
 func GetSymbol(modulePath string, symbol string) (interface{}, error) {

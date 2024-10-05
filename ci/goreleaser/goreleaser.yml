@@ -10,7 +10,6 @@ builds:
     flags:
       - -tags=ignore
       - -trimpath
-      - -tags=goplugin
     ldflags:
       - -X github.com/TykTechnologies/tyk/internal/build.Version={{.Version}}
       - -X github.com/TykTechnologies/tyk/internal/build.Commit={{.FullCommit}}
@@ -25,7 +24,6 @@ builds:
     flags:
       - -tags=ignore
       - -trimpath
-      - -tags=goplugin
       - -tags=fips,boringcrypto
     env:
       - GOEXPERIMENT=boringcrypto
@@ -43,7 +41,6 @@ builds:
     flags:
       - -tags=ignore
       - -trimpath
-      - -tags=goplugin
     ldflags:
       - -X github.com/TykTechnologies/tyk/internal/build.Version={{.Version}}
       - -X github.com/TykTechnologies/tyk/internal/build.Commit={{.FullCommit}}
@@ -60,7 +57,6 @@ builds:
     flags:
       - -tags=ignore
       - -trimpath
-      - -tags=goplugin
     ldflags:
       - -X github.com/TykTechnologies/tyk/internal/build.Version={{.Version}}
       - -X github.com/TykTechnologies/tyk/internal/build.Commit={{.FullCommit}}

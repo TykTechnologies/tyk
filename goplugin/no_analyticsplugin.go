@@ -1,5 +1,5 @@
-//go:build !goplugin
-// +build !goplugin
+//go:build !cgo
+// +build !cgo
 
 package goplugin
 
@@ -11,5 +11,4 @@ import (
 
 func GetAnalyticsHandler(path string, symbol string) (func(record *analytics.AnalyticsRecord), error) {
 	return nil, fmt.Errorf("goplugin.GetAnalyticsHandler is disabled, please disable build flag 'nogoplugin'")
-
 }
