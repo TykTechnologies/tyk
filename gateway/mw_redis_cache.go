@@ -24,7 +24,7 @@ import (
 )
 
 const (
-	cachedResponseHeader = "x-tyk-cached-response"
+	CachedResponseHeader = "x-tyk-cached-response"
 )
 
 // RedisCacheMiddleware is a caching middleware that will pull data from Redis instead of the upstream proxy
@@ -255,7 +255,7 @@ func (m *RedisCacheMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 		newRes.Header.Set(header.XRateLimitRemaining, strconv.Itoa(int(quotaRemaining)))
 		newRes.Header.Set(header.XRateLimitReset, strconv.Itoa(int(quotaRenews)))
 	}
-	newRes.Header.Set(cachedResponseHeader, "1")
+	newRes.Header.Set(CachedResponseHeader, "1")
 
 	copyHeader(w.Header(), newRes.Header, m.Gw.GetConfig().IgnoreCanonicalMIMEHeaderKey)
 

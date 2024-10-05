@@ -1,4 +1,4 @@
-package gateway
+package gateway_test
 
 import (
 	"io"
@@ -11,34 +11,14 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 
-	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/test"
 )
-
-func (ts *Test) testPrepareContextVarsMiddleware() {
-
-	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
-		spec.Proxy.ListenPath = "/"
-		spec.EnableContextVars = true
-		spec.VersionData.Versions = map[string]apidef.VersionInfo{
-			"v1": {
-				UseExtendedPaths: true,
-				GlobalHeaders: map[string]string{
-					"X-Static":      "foo",
-					"X-Request-ID":  "$tyk_context.request_id",
-					"X-Path":        "$tyk_context.path",
-					"X-Remote-Addr": "$tyk_context.remote_addr",
-				},
-			},
-		}
-	})
-}
 
 func TestContextVarsMiddleware(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
-	ts.testPrepareContextVarsMiddleware()
+	ts.TestPrepareContextVarsMiddleware()
 
 	ts.Run(t, []test.TestCase{
 		{Path: "/test/path", Code: 200, BodyMatch: `"X-Remote-Addr":"127.0.0.1"`},
@@ -54,7 +34,7 @@ func BenchmarkContextVarsMiddleware(b *testing.B) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
-	ts.testPrepareContextVarsMiddleware()
+	ts.TestPrepareContextVarsMiddleware()
 
 	for i := 0; i < b.N; i++ {
 		ts.Run(b, []test.TestCase{

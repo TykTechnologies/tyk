@@ -9,7 +9,7 @@ import (
 	"github.com/TykTechnologies/tyk/user"
 )
 
-func (ts *Test) testPrepareBasicAuth(cacheDisabled bool) *user.SessionState {
+func (ts *Test) TestPrepareBasicAuth(cacheDisabled bool) *user.SessionState {
 	session := CreateStandardSession()
 	session.BasicAuthData.Password = "password"
 	session.AccessRights = map[string]user.AccessDefinition{"test": {APIID: "test", Versions: []string{"v1"}}}
@@ -26,7 +26,25 @@ func (ts *Test) testPrepareBasicAuth(cacheDisabled bool) *user.SessionState {
 	return session
 }
 
-func (ts *Test) testPrepareVirtualEndpoint(js, method, path string, proxyOnError, keyless, cacheEnabled, disabled bool) {
+func (ts *Test) TestPrepareContextVarsMiddleware() {
+	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		spec.Proxy.ListenPath = "/"
+		spec.EnableContextVars = true
+		spec.VersionData.Versions = map[string]apidef.VersionInfo{
+			"v1": {
+				UseExtendedPaths: true,
+				GlobalHeaders: map[string]string{
+					"X-Static":      "foo",
+					"X-Request-ID":  "$tyk_context.request_id",
+					"X-Path":        "$tyk_context.path",
+					"X-Remote-Addr": "$tyk_context.remote_addr",
+				},
+			},
+		}
+	})
+}
+
+func (ts *Test) TestPrepareVirtualEndpoint(js, method, path string, proxyOnError, keyless, cacheEnabled, disabled bool) {
 	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 		spec.APIID = "test"
 		spec.Proxy.ListenPath = "/"

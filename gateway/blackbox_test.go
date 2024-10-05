@@ -1,6 +1,9 @@
 package gateway_test
 
 import (
+	"net/http"
+
+	"github.com/TykTechnologies/tyk/ctx"
 	"github.com/TykTechnologies/tyk/gateway"
 )
 
@@ -20,6 +23,8 @@ type (
 	ResponseGoPluginMiddleware  = gateway.ResponseGoPluginMiddleware
 	IPWhiteListMiddleware       = gateway.IPWhiteListMiddleware
 	IPBlackListMiddleware       = gateway.IPBlackListMiddleware
+	// Slight naming violation
+	MiddlewareContextVars = gateway.MiddlewareContextVars
 
 	// Tests leakage.
 	Test             = gateway.Test
@@ -39,6 +44,8 @@ type (
 	HeaderTransform        = gateway.HeaderTransform
 	HeaderTransformOptions = gateway.HeaderTransformOptions
 	VersionMetas           = gateway.VersionMetas
+	HeaderInjector         = gateway.HeaderInjector
+	TransformHeaders       = gateway.TransformHeaders
 
 	// Interfaces (data model).
 	IdExtractor            = gateway.IdExtractor
@@ -53,7 +60,8 @@ const (
 	EH_LogHandler = gateway.EH_LogHandler
 	EH_WebHook    = gateway.EH_WebHook
 
-	NoticeGroupReload = gateway.NoticeGroupReload
+	NoticeGroupReload    = gateway.NoticeGroupReload
+	CachedResponseHeader = gateway.CachedResponseHeader
 )
 
 // Global functions are a coupling.
@@ -73,3 +81,21 @@ var (
 	TransformBody    = gateway.TransformBody
 	TestReq          = gateway.TestReq
 )
+
+// Alas, we have some internals.
+var (
+	proxyOnErrorEnabled = true
+	keylessAuthEnabled  = true
+	cacheEnabled        = true
+
+	proxyOnErrorDisabled = false
+	keylessAuthDisabled  = false
+	cacheDisabled        = false
+)
+
+func ctxGetData(r *http.Request) map[string]interface{} {
+	if v := r.Context().Value(ctx.ContextData); v != nil {
+		return v.(map[string]interface{})
+	}
+	return nil
+}

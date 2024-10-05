@@ -936,7 +936,7 @@ func TestRewriterTriggers(t *testing.T) {
 			hOpt := apidef.StringRegexMap{MatchPattern: "bar"}
 			hOpt.Init()
 
-			ctxSetSession(r, &user.SessionState{
+			ctx.SetSession(r, &user.SessionState{
 				MetaData: map[string]interface{}{
 					"rewrite": "bar-baz",
 				},
@@ -965,7 +965,7 @@ func TestRewriterTriggers(t *testing.T) {
 			hOpt := apidef.StringRegexMap{MatchPattern: "bar-(\\w+)"}
 			hOpt.Init()
 
-			ctxSetSession(r, &user.SessionState{
+			ctx.SetSession(r, &user.SessionState{
 				MetaData: map[string]interface{}{
 					"rewrite": "bar-baz",
 				},
@@ -994,7 +994,7 @@ func TestRewriterTriggers(t *testing.T) {
 			hOpt := apidef.StringRegexMap{MatchPattern: "bar"}
 			hOpt.Init()
 
-			ctxSetSession(r, &user.SessionState{
+			ctx.SetSession(r, &user.SessionState{
 				MetaData: map[string]interface{}{
 					"rewrite": "bar-baz",
 					"somevar": "someval",
@@ -1051,7 +1051,7 @@ func TestRewriterTriggers(t *testing.T) {
 			hOpt := apidef.StringRegexMap{MatchPattern: "foo"}
 			hOpt.Init()
 
-			ctxSetSession(r, &user.SessionState{
+			ctx.SetSession(r, &user.SessionState{
 				MetaData: map[string]interface{}{
 					"rewrite": "bar-baz",
 				},
