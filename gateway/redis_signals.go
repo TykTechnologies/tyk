@@ -77,13 +77,9 @@ func (gw *Gateway) startPubSubLoop() {
 		}
 
 		gw.logPubSubError(err, message)
-		gw.addPubSubDelay(10 * time.Second)
-	}
-}
 
-// addPubSubDelay sleeps for duration
-func (gw *Gateway) addPubSubDelay(dur time.Duration) {
-	time.Sleep(dur)
+		time.Sleep(10 * time.Second)
+	}
 }
 
 // isPubSubError returns true if err != nil, logs error

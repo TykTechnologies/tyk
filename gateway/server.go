@@ -446,7 +446,7 @@ func (gw *Gateway) setupGlobals() {
 	gw.readGraphqlPlaygroundTemplate()
 }
 
-func (gw *Gateway) buildDashboardConnStr(resource string) string {
+func (gw *Gateway) BuildDashboardConnStr(resource string) string {
 	if gw.GetConfig().DBAppConfOptions.ConnectionString == "" && gw.GetConfig().DisableDashboardZeroConf {
 		mainLog.Fatal("Connection string is empty, failing.")
 	}
@@ -466,7 +466,7 @@ func (gw *Gateway) syncAPISpecs() (int, error) {
 
 	var s []*APISpec
 	if gw.GetConfig().UseDBAppConfigs {
-		connStr := gw.buildDashboardConnStr("/system/apis")
+		connStr := gw.BuildDashboardConnStr("/system/apis")
 		tmpSpecs, err := loader.FromDashboardService(connStr)
 		if err != nil {
 			log.Error("failed to load API specs: ", err)

@@ -16,6 +16,10 @@ type (
 	BaseMiddleware              = gateway.BaseMiddleware
 	TransformMiddleware         = gateway.TransformMiddleware
 	ResponseTransformMiddleware = gateway.ResponseTransformMiddleware
+	ResponseCacheMiddleware     = gateway.ResponseCacheMiddleware
+	ResponseGoPluginMiddleware  = gateway.ResponseGoPluginMiddleware
+	IPWhiteListMiddleware       = gateway.IPWhiteListMiddleware
+	IPBlackListMiddleware       = gateway.IPBlackListMiddleware
 
 	// Tests leakage.
 	Test             = gateway.Test
@@ -34,7 +38,7 @@ type (
 	OASSchemaResponse      = gateway.OASSchemaResponse
 	HeaderTransform        = gateway.HeaderTransform
 	HeaderTransformOptions = gateway.HeaderTransformOptions
-	VersionMetas = gateway.VersionMetas
+	VersionMetas           = gateway.VersionMetas
 
 	// Interfaces (data model).
 	IdExtractor            = gateway.IdExtractor
@@ -54,18 +58,18 @@ const (
 
 // Global functions are a coupling.
 var (
-	BuildAPI              = gateway.BuildAPI
-	BuildOASAPI              = gateway.BuildOASAPI
+	BuildAPI    = gateway.BuildAPI
+	BuildOASAPI = gateway.BuildOASAPI
 
-	StartTest             = gateway.StartTest
-	InitTestMain          = gateway.InitTestMain
+	StartTest    = gateway.StartTest
+	InitTestMain = gateway.InitTestMain
 
 	CreateSession         = gateway.CreateSession
 	CreateStandardSession = gateway.CreateStandardSession
 
-	GetTLSClient          = gateway.GetTLSClient
-	MockOrgID             = gateway.MockOrgID
-	UpdateAPIVersion      = gateway.UpdateAPIVersion
-	TransformBody         = gateway.TransformBody
-	TestReq               = gateway.TestReq
+	GetTLSClient     = gateway.GetTLSClient
+	MockOrgID        = gateway.MockOrgID
+	UpdateAPIVersion = gateway.UpdateAPIVersion
+	TransformBody    = gateway.TransformBody
+	TestReq          = gateway.TestReq
 )

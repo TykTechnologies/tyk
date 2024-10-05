@@ -2,6 +2,8 @@ package gateway
 
 import (
 	"encoding/base64"
+	"encoding/json"
+	"fmt"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/user"
@@ -62,5 +64,45 @@ func (ts *Test) testPrepareVirtualEndpoint(js, method, path string, proxyOnError
 			CacheTimeout:               60,
 			CacheAllSafeRequests:       true,
 		}
+	})
+}
+
+var testJsonSchema = `{
+    "title": "Person",
+    "type": "object",
+    "properties": {
+        "firstName": {
+            "type": "string"
+        },
+        "lastName": {
+            "type": "string"
+        },
+        "age": {
+            "description": "Age in years",
+            "type": "integer",
+            "minimum": 0
+        },
+		"objs":{
+			"enum":["a","b","c"],
+			"type":"string"
+		}
+    },
+    "required": ["firstName", "lastName"]
+}`
+
+func (ts *Test) TestPrepareValidateJSONSchema(enabled bool) {
+	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		UpdateAPIVersion(spec, "v1", func(v *apidef.VersionInfo) {
+			json.Unmarshal([]byte(`[
+				{
+					"disabled": `+fmt.Sprintf("%v,", !enabled)+`
+					"path": "/v",
+					"method": "POST",
+					"schema": `+testJsonSchema+`
+				}
+			]`), &v.ExtendedPaths.ValidateJSON)
+		})
+
+		spec.Proxy.ListenPath = "/"
 	})
 }
