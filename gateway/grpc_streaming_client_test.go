@@ -20,7 +20,7 @@
 // to perform unary, client streaming, server streaming and full duplex RPCs.
 //
 // It interacts with the route guide service whose definition can be found in routeguide/route_guide.proto.
-package gateway
+package gateway_test
 
 import (
 	"context"

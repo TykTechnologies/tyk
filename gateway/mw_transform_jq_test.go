@@ -1,7 +1,7 @@
 //go:build jq
 // +build jq
 
-package gateway
+package gateway_test
 
 import (
 	"testing"

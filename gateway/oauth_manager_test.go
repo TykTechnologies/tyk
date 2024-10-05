@@ -8,31 +8,24 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
+	"net/http"
 	"net/url"
 	"path"
 	"reflect"
 	"strconv"
 	"strings"
 	"testing"
-
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
-
-	"github.com/TykTechnologies/tyk/internal/redis"
-
-	"github.com/TykTechnologies/tyk/config"
-
-	"fmt"
-
-	"net/http"
-
 	"time"
 
 	"github.com/lonelycode/osin"
-
-	"github.com/TykTechnologies/tyk/internal/uuid"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/internal/redis"
+	"github.com/TykTechnologies/tyk/internal/uuid"
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/test"
 	"github.com/TykTechnologies/tyk/user"

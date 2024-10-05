@@ -1,4 +1,4 @@
-package gateway
+package gateway_test
 
 import (
 	"bytes"
@@ -13,7 +13,8 @@ import (
 	"github.com/TykTechnologies/tyk/test"
 )
 
-func (s *Test) TestHandleError_text_xml(t *testing.T) {
+// Unused
+func testHandleErrorTextXML(t *testing.T, s *Test) {
 	file := filepath.Join(s.Gw.GetConfig().TemplatePath, "error_500.xml")
 	xml := `<?xml version = "1.0" encoding = "UTF-8"?>
 <error>

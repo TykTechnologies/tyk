@@ -1,4 +1,4 @@
-package gateway
+package gateway_test
 
 import (
 	"io/ioutil"
@@ -15,9 +15,9 @@ func TestTraceHttpRequest_toRequest(t *testing.T) {
 	const body = `{"foo":"bar"}`
 	header := http.Header{}
 	header.Add("key", "value")
-	tr := &traceHttpRequest{Path: "", Method: http.MethodPost, Body: body, Headers: header}
+	tr := &TraceHttpRequest{Path: "", Method: http.MethodPost, Body: body, Headers: header}
 
-	request, err := tr.toRequest(ts.Gw.GetConfig().IgnoreCanonicalMIMEHeaderKey)
+	request, err := tr.ToRequest(ts.Gw.GetConfig().IgnoreCanonicalMIMEHeaderKey)
 	bodyInBytes, _ := ioutil.ReadAll(request.Body)
 
 	assert.NoError(t, err)

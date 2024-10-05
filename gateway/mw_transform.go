@@ -51,6 +51,10 @@ func (t *TransformMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 	return nil, http.StatusOK
 }
 
+func TransformBody(r *http.Request, tmeta *TransformSpec, t *TransformMiddleware) error {
+	return transformBody(r, tmeta, t)
+}
+
 func transformBody(r *http.Request, tmeta *TransformSpec, t *TransformMiddleware) error {
 	body, _ := ioutil.ReadAll(r.Body)
 	defer r.Body.Close()

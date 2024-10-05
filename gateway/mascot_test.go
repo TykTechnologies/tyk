@@ -5,12 +5,11 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/TykTechnologies/tyk/gateway"
 	"github.com/TykTechnologies/tyk/test"
 )
 
 func TestMascotShowsUpOnceOnly(t *testing.T) {
-	ts := gateway.StartTest(nil)
+	ts := StartTest(nil)
 	defer ts.Close()
 
 	for i := 0; i < 7; i++ {

@@ -1,4 +1,4 @@
-package gateway
+package gateway_test
 
 import (
 	"context"
@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"log"
 	"net"
 	"net/http"
 	"net/http/httptest"

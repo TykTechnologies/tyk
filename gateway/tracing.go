@@ -14,14 +14,14 @@ import (
 	"github.com/TykTechnologies/tyk/internal/httputil"
 )
 
-type traceHttpRequest struct {
+type TraceHttpRequest struct {
 	Method  string      `json:"method"`
 	Path    string      `json:"path"`
 	Body    string      `json:"body"`
 	Headers http.Header `json:"headers"`
 }
 
-func (tr *traceHttpRequest) toRequest(ignoreCanonicalMIMEHeaderKey bool) (*http.Request, error) {
+func (tr *TraceHttpRequest) ToRequest(ignoreCanonicalMIMEHeaderKey bool) (*http.Request, error) {
 	r, err := http.NewRequest(tr.Method, tr.Path, strings.NewReader(tr.Body))
 	if err != nil {
 		return nil, err
@@ -39,7 +39,7 @@ func (tr *traceHttpRequest) toRequest(ignoreCanonicalMIMEHeaderKey bool) (*http.
 // TraceRequest is for tracing an HTTP request
 // swagger:model TraceRequest
 type traceRequest struct {
-	Request *traceHttpRequest     `json:"request"`
+	Request *TraceHttpRequest     `json:"request"`
 	Spec    *apidef.APIDefinition `json:"spec"`
 }
 
@@ -135,7 +135,7 @@ func (gw *Gateway) traceHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	wr := httptest.NewRecorder()
-	tr, err := traceReq.Request.toRequest(gw.GetConfig().IgnoreCanonicalMIMEHeaderKey)
+	tr, err := traceReq.Request.ToRequest(gw.GetConfig().IgnoreCanonicalMIMEHeaderKey)
 	if err != nil {
 		doJSONWrite(w, http.StatusInternalServerError, apiError("Unexpected failure: "+err.Error()))
 		return

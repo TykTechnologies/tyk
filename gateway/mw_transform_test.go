@@ -1,4 +1,4 @@
-package gateway
+package gateway_test
 
 import (
 	"encoding/base64"
@@ -44,7 +44,7 @@ func TestTransformNonAscii(t *testing.T) {
 	base.Spec.EnableContextVars = false
 	transform := TransformMiddleware{base}
 
-	if err := transformBody(r, tmeta, &transform); err != nil {
+	if err := TransformBody(r, tmeta, &transform); err != nil {
 		t.Fatalf("wanted nil error, got %v", err)
 	}
 	gotBs, err := ioutil.ReadAll(r.Body)
@@ -72,7 +72,7 @@ func BenchmarkTransformNonAscii(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		r := TestReq(b, "GET", "/", in)
 
-		if err := transformBody(r, tmeta, &transform); err != nil {
+		if err := TransformBody(r, tmeta, &transform); err != nil {
 			b.Fatalf("wanted nil error, got %v", err)
 		}
 	}
@@ -96,7 +96,7 @@ func TestTransformXMLCrash(t *testing.T) {
 	base.Spec.EnableContextVars = false
 	transform := TransformMiddleware{base}
 
-	if err := transformBody(r, tmeta, &transform); err == nil {
+	if err := TransformBody(r, tmeta, &transform); err == nil {
 		t.Fatalf("wanted error, got nil")
 	}
 }
@@ -151,7 +151,7 @@ func TestTransformJSONMarshalXMLInput(t *testing.T) {
 	base.Spec.EnableContextVars = false
 	transform := TransformMiddleware{base}
 
-	if err := transformBody(r, tmeta, &transform); err != nil {
+	if err := TransformBody(r, tmeta, &transform); err != nil {
 		t.Fatalf("wanted nil error, got %v", err)
 	}
 	gotBs, err := ioutil.ReadAll(r.Body)
@@ -178,7 +178,7 @@ func TestTransformJSONMarshalJSONInput(t *testing.T) {
 	base.Spec.EnableContextVars = false
 	transform := TransformMiddleware{base}
 
-	if err := transformBody(r, tmeta, &transform); err != nil {
+	if err := TransformBody(r, tmeta, &transform); err != nil {
 		t.Fatalf("wanted nil error, got %v", err)
 	}
 	gotBs, err := ioutil.ReadAll(r.Body)
@@ -217,7 +217,7 @@ func TestTransformJSONMarshalJSONArrayInput(t *testing.T) {
 	base.Spec.EnableContextVars = false
 	transform := TransformMiddleware{base}
 
-	if err := transformBody(r, tmeta, &transform); err != nil {
+	if err := TransformBody(r, tmeta, &transform); err != nil {
 		t.Fatalf("wanted nil error, got %v", err)
 	}
 	gotBs, err := ioutil.ReadAll(r.Body)
@@ -243,7 +243,7 @@ func BenchmarkTransformJSONMarshal(b *testing.B) {
 
 	for i := 0; i < b.N; i++ {
 		r := TestReq(b, "GET", "/", in)
-		if err := transformBody(r, tmeta, &transform); err != nil {
+		if err := TransformBody(r, tmeta, &transform); err != nil {
 			b.Fatalf("wanted nil error, got %v", err)
 		}
 	}
@@ -264,7 +264,7 @@ func TestTransformXMLMarshal(t *testing.T) {
 		base.Spec.EnableContextVars = false
 		transform := TransformMiddleware{base}
 
-		if err := transformBody(r, tmeta, &transform); err != nil {
+		if err := TransformBody(r, tmeta, &transform); err != nil {
 			t.Fatalf("wanted nil error, got %v", err)
 		}
 		gotBs, err := ioutil.ReadAll(r.Body)

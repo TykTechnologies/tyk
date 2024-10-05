@@ -23,6 +23,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/TykTechnologies/tyk/internal/httputil"
 	"github.com/TykTechnologies/tyk/user"
 
 	"github.com/TykTechnologies/tyk/header"
@@ -48,7 +49,7 @@ func TestCopyHeader_NoDuplicateCORSHeaders(t *testing.T) {
 		h.Set("Location", "https://tyk.io")
 
 		if withCORS {
-			for _, v := range corsHeaders {
+			for _, v := range httputil.CORSHeaders {
 				h.Set(v, "tyk.io")
 			}
 		}
@@ -67,7 +68,7 @@ func TestCopyHeader_NoDuplicateCORSHeaders(t *testing.T) {
 	for _, v := range tests {
 		copyHeader(v.dst, v.src, false)
 
-		for _, vv := range corsHeaders {
+		for _, vv := range httputil.CORSHeaders {
 			val := v.dst[vv]
 			if n := len(val); n != 1 {
 				t.Fatalf("%s found %d times", vv, n)

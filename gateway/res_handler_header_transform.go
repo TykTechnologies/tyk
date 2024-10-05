@@ -21,7 +21,7 @@ type HeaderTransformOptions struct {
 
 type HeaderTransform struct {
 	BaseTykResponseHandler
-	config HeaderTransformOptions
+	Config HeaderTransformOptions
 }
 
 func (h *HeaderTransform) Base() *BaseTykResponseHandler {
@@ -33,7 +33,7 @@ func (h *HeaderTransform) Name() string {
 }
 
 func (h *HeaderTransform) Init(c interface{}, spec *APISpec) error {
-	if err := mapstructure.Decode(c, &h.config); err != nil {
+	if err := mapstructure.Decode(c, &h.Config); err != nil {
 		return err
 	}
 	h.Spec = spec
@@ -47,12 +47,12 @@ func (h *HeaderTransform) HandleResponse(rw http.ResponseWriter,
 	res *http.Response, req *http.Request, ses *user.SessionState) error {
 
 	// Parse target_host parameter from configuration
-	target_url, err := url.Parse(h.config.RevProxyTransform.Target_host)
+	target_url, err := url.Parse(h.Config.RevProxyTransform.Target_host)
 	if err != nil {
 		return err
 	}
 	ignoreCanonical := h.Gw.GetConfig().IgnoreCanonicalMIMEHeaderKey
-	for _, name := range h.config.RevProxyTransform.Headers {
+	for _, name := range h.Config.RevProxyTransform.Headers {
 		// check if header is present and its value is not empty
 		val := res.Header.Get(name)
 		if val == "" {

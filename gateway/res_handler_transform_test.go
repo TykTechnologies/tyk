@@ -1,4 +1,4 @@
-package gateway
+package gateway_test
 
 import (
 	"encoding/base64"
@@ -282,7 +282,7 @@ func TestHeaderTransformBase(t *testing.T) {
 		BaseTykResponseHandler: BaseTykResponseHandler{
 			// You can populate fields if needed
 		},
-		config: HeaderTransformOptions{
+		Config: HeaderTransformOptions{
 			// You can populate fields if needed
 		},
 	}

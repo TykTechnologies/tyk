@@ -20,24 +20,6 @@ func genAuthHeader(username, password string) string {
 	return fmt.Sprintf("Basic %s", encodedPass)
 }
 
-func (ts *Test) testPrepareBasicAuth(cacheDisabled bool) *user.SessionState {
-
-	session := CreateStandardSession()
-	session.BasicAuthData.Password = "password"
-	session.AccessRights = map[string]user.AccessDefinition{"test": {APIID: "test", Versions: []string{"v1"}}}
-	session.OrgID = "default"
-
-	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
-		spec.UseBasicAuth = true
-		spec.BasicAuth.DisableCaching = cacheDisabled
-		spec.UseKeylessAccess = false
-		spec.Proxy.ListenPath = "/"
-		spec.OrgID = "default"
-	})
-
-	return session
-}
-
 func TestBasicAuth(t *testing.T) {
 	test.Flaky(t) // TODO: TT-5223
 

@@ -1,13 +1,11 @@
 package gateway
 
 import (
-	"encoding/base64"
 	"net/http"
 	"testing"
 
 	"github.com/TykTechnologies/tyk/user"
 
-	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/test"
 )
 
@@ -36,48 +34,6 @@ var (
 	keylessAuthDisabled  = false
 	cacheDisabled        = false
 )
-
-func (ts *Test) testPrepareVirtualEndpoint(js, method, path string, proxyOnError, keyless, cacheEnabled, disabled bool) {
-
-	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
-		spec.APIID = "test"
-		spec.Proxy.ListenPath = "/"
-		spec.UseKeylessAccess = keyless
-		spec.Auth = apidef.AuthConfig{AuthHeaderName: "Authorization"}
-		virtualMeta := apidef.VirtualMeta{
-			Disabled:             disabled,
-			ResponseFunctionName: "testVirtData",
-			FunctionSourceType:   apidef.UseBlob,
-			FunctionSourceURI:    base64.StdEncoding.EncodeToString([]byte(js)),
-			Path:                 path,
-			Method:               method,
-			ProxyOnError:         proxyOnError,
-		}
-		if !keyless {
-			virtualMeta.UseSession = true
-		}
-		v := spec.VersionData.Versions["v1"]
-		v.UseExtendedPaths = true
-		v.ExtendedPaths = apidef.ExtendedPathsSet{
-			Virtual: []apidef.VirtualMeta{virtualMeta},
-		}
-		spec.VersionData.Versions["v1"] = v
-
-		spec.ConfigData = map[string]interface{}{
-			"foo": "x",
-			"bar": map[string]interface{}{"y": 3},
-		}
-
-		// Address https://github.com/TykTechnologies/tyk/issues/1356
-		// VP should work with cache enabled
-		spec.CacheOptions = apidef.CacheOptions{
-			EnableCache:                cacheEnabled,
-			EnableUpstreamCacheControl: true,
-			CacheTimeout:               60,
-			CacheAllSafeRequests:       true,
-		}
-	})
-}
 
 func TestVirtualEndpoint(t *testing.T) {
 	ts := StartTest(nil)
