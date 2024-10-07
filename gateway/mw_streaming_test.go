@@ -934,3 +934,57 @@ func TestStreamingAPIMultipleClients_Input_HTTPServer(t *testing.T) {
 	}
 	require.Empty(t, messages)
 }
+
+func TestStreamingAPIGarbageCollection(t *testing.T) {
+	ts := StartTest(func(globalConf *config.Config) {
+		globalConf.Streaming.Enabled = true
+	})
+	t.Cleanup(func() {
+		ts.Close()
+	})
+
+	oasAPI, err := setupOASForStreamAPI(bentoHTTPServerTemplate)
+	require.NoError(t, err)
+
+	apiName := "test-api"
+
+	specs := ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		spec.Proxy.ListenPath = fmt.Sprintf("/%s", apiName)
+		spec.UseKeylessAccess = true
+		spec.IsOAS = true
+		spec.OAS = oasAPI
+		spec.OAS.Fill(*spec.APIDefinition)
+	})
+
+	baseMiddleware := &BaseMiddleware{Gw: ts.Gw, Spec: specs[0]}
+	s := StreamingMiddleware{BaseMiddleware: baseMiddleware}
+
+	if err := setUpStreamAPI(ts, apiName, bentoHTTPServerTemplate); err != nil {
+		t.Fatal(err)
+	}
+
+	// Dummy request to create a stream manager
+	publishURL := fmt.Sprintf("%s/%s/post", ts.URL, apiName)
+	r, err := http.NewRequest("POST", publishURL, nil)
+	require.NoError(t, err)
+
+	s.createStreamManager(r)
+
+	// We should have a Stream manager in the cache.
+	var streamManagersBeforeGC int
+	s.streamManagerCache.Range(func(k, v interface{}) bool {
+		streamManagersBeforeGC++
+		return true
+	})
+	require.Equal(t, 1, streamManagersBeforeGC)
+
+	s.garbageCollect()
+
+	// Garbage collection removed the stream manager because the activity counter is zero.
+	var streamManagersAfterGC int
+	s.streamManagerCache.Range(func(k, v interface{}) bool {
+		streamManagersAfterGC++
+		return true
+	})
+	require.Equal(t, 0, streamManagersAfterGC)
+}

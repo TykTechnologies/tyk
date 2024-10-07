@@ -24,7 +24,6 @@ const (
 	// ExtensionTykStreaming is the oas extension for tyk streaming
 	ExtensionTykStreaming = "x-tyk-streaming"
 	StreamGCInterval      = 1 * time.Minute
-	StreamInactiveLimit   = 10 * time.Minute
 )
 
 // StreamsConfig represents a stream configuration
@@ -50,9 +49,6 @@ type StreamingMiddleware struct {
 	cancel               context.CancelFunc
 	allowedUnsafe        []string
 	defaultStreamManager *StreamManager
-
-	lastActivity sync.Map // Map of stream IDs to last activity time
-
 }
 
 // StreamManager is responsible for creating a single stream
@@ -64,7 +60,7 @@ type StreamManager struct {
 	dryRun      bool
 	listenPaths []string
 
-	lastActivity atomic.Value // Last activity time for the StreamManager
+	activityCounter atomic.Int32 // Counts active subscriptions, requests.
 }
 
 func (sm *StreamManager) initStreams(r *http.Request, config *StreamsConfig) {
@@ -128,7 +124,6 @@ func (sm *StreamManager) removeStream(streamID string) error {
 
 func (s *StreamingMiddleware) garbageCollect() {
 	s.Logger().Debug("Starting garbage collection for inactive stream managers")
-	now := time.Now()
 
 	s.streamManagerCache.Range(func(key, value interface{}) bool {
 		manager := value.(*StreamManager)
@@ -136,8 +131,7 @@ func (s *StreamingMiddleware) garbageCollect() {
 			return true
 		}
 
-		lastActivityTime := manager.lastActivity.Load().(time.Time)
-		if now.Sub(lastActivityTime) > StreamInactiveLimit {
+		if manager.activityCounter.Load() <= 0 {
 			s.Logger().Infof("Removing inactive stream manager: %v", key)
 			manager.streams.Range(func(streamKey, streamValue interface{}) bool {
 				streamID := streamKey.(string)
@@ -229,12 +223,11 @@ func (s *StreamingMiddleware) createStreamManager(r *http.Request) *StreamManage
 	}
 
 	newStreamManager := &StreamManager{
-		muxer:        mux.NewRouter(),
-		mw:           s,
-		dryRun:       r == nil,
-		lastActivity: atomic.Value{},
+		muxer:           mux.NewRouter(),
+		mw:              s,
+		dryRun:          r == nil,
+		activityCounter: atomic.Int32{},
 	}
-	newStreamManager.lastActivity.Store(time.Now())
 	newStreamManager.initStreams(r, streamsConfig)
 
 	if r != nil {
@@ -485,9 +478,9 @@ func (h *handleFuncAdapter) HandleFunc(path string, f func(http.ResponseWriter, 
 
 	h.sm.routeLock.Lock()
 	h.muxer.HandleFunc(path, func(w http.ResponseWriter, r *http.Request) {
-		h.sm.lastActivity.Store(time.Now())
+		h.sm.activityCounter.Add(1)
 		f(w, r)
-		h.sm.lastActivity.Store(time.Now())
+		h.sm.activityCounter.Add(-1)
 	})
 	h.sm.routeLock.Unlock()
 	h.logger.Debugf("Registered handler for path: %s", path)
