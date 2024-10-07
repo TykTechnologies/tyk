@@ -45,7 +45,8 @@ func (t *UpstreamBasicAuth) ProcessRequest(_ http.ResponseWriter, r *http.Reques
 
 	payload := base64.StdEncoding.EncodeToString([]byte(fmt.Sprintf("%s:%s", basicAuthConfig.Username, basicAuthConfig.Password)))
 
-	ctx.SetUpstreamAuthValue(r, payload)
+	headerValue := fmt.Sprintf("Basic %s", payload)
+	ctx.SetUpstreamAuthValue(r, headerValue)
 
 	return nil, http.StatusOK
 }
