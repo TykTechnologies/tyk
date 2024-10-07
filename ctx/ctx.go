@@ -56,6 +56,10 @@ const (
 	UpstreamAuthHeader
 	// UpstreamAuthValue sets the value for upstream authentication.
 	UpstreamAuthValue
+	// UpstreamOAuthRetriedRequest is used to mark a request as retried after an upstream OAuth token refresh.
+	UpstreamOAuthRetriedRequest
+	// UpstreamAuthShouldRefreshToken is used to mark a request as needing an upstream OAuth token refresh.
+	UpstreamAuthShouldRefreshToken
 )
 
 func setContext(r *http.Request, ctx context.Context) {
@@ -192,4 +196,30 @@ func GetUpstreamAuthValue(r *http.Request) string {
 		return v.(string)
 	}
 	return ""
+}
+
+func SetUpstreamOAuthRetriedRequest(r *http.Request) {
+	ctx := r.Context()
+	ctx = context.WithValue(ctx, UpstreamOAuthRetriedRequest, true)
+	setContext(r, ctx)
+}
+
+func IsUpstreamOAuthRetriedRequest(r *http.Request) bool {
+	if v := r.Context().Value(UpstreamOAuthRetriedRequest); v != nil {
+		return v.(bool)
+	}
+	return false
+}
+
+func SetShouldRefreshUpstreamOAuthToken(r *http.Request) {
+	ctx := r.Context()
+	ctx = context.WithValue(ctx, UpstreamAuthShouldRefreshToken, true)
+	setContext(r, ctx)
+}
+
+func ShouldRefreshUpstreamOAuthToken(r *http.Request) bool {
+	if v := r.Context().Value(UpstreamAuthShouldRefreshToken); v != nil {
+		return v.(bool)
+	}
+	return false
 }

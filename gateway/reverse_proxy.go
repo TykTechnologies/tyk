@@ -1298,6 +1298,13 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 		return ProxyResponse{UpstreamLatency: upstreamLatency}
 	}
 
+	if p.TykAPISpec.UpstreamAuth.OAuth.IsEnabled() && res.StatusCode == http.StatusUnauthorized && !ctx.IsUpstreamOAuthRetriedRequest(req) {
+		//retry request one more time
+		ctx.SetUpstreamOAuthRetriedRequest(req)
+		ctx.SetShouldRefreshUpstreamOAuthToken(req)
+		return p.WrappedServeHTTP(rw, req, withCache)
+	}
+
 	_, upgrade := p.IsUpgrade(req)
 	// Deal with 101 Switching Protocols responses: (WebSocket, h2c, etc)
 	if upgrade && res.StatusCode == 101 {
