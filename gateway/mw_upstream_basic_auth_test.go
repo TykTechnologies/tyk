@@ -15,7 +15,6 @@ import (
 )
 
 func TestUpstreamBasicAuthentication(t *testing.T) {
-
 	ts := StartTest(nil)
 	t.Cleanup(func() {
 		ts.Close()
@@ -74,7 +73,7 @@ func TestUpstreamBasicAuthentication(t *testing.T) {
 		},
 	)
 
-	_, _ = ts.Run(t, test.TestCases{
+	ts.Run(t, test.TestCases{
 		{
 			Path: "/upstream-basic-auth-enabled/",
 			Code: http.StatusOK,

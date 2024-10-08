@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"net/http"
 
+	"github.com/TykTechnologies/tyk/internal/httputil"
+
 	"github.com/TykTechnologies/tyk/apidef/oas"
 
 	"github.com/TykTechnologies/tyk/config"
@@ -58,11 +60,6 @@ const (
 	UpstreamAuthValue
 )
 
-func setContext(r *http.Request, ctx context.Context) {
-	r2 := r.WithContext(ctx)
-	*r = *r2
-}
-
 func ctxSetSession(r *http.Request, s *user.SessionState, scheduleUpdate bool, hashKey bool) {
 
 	if s == nil {
@@ -86,7 +83,7 @@ func ctxSetSession(r *http.Request, s *user.SessionState, scheduleUpdate bool, h
 		s.Touch()
 	}
 
-	setContext(r, ctx)
+	httputil.SetContext(r, ctx)
 }
 
 func GetAuthToken(r *http.Request) string {
@@ -124,7 +121,7 @@ func SetSession(r *http.Request, s *user.SessionState, scheduleUpdate bool, hash
 func SetDefinition(r *http.Request, s *apidef.APIDefinition) {
 	ctx := r.Context()
 	ctx = context.WithValue(ctx, Definition, s)
-	setContext(r, ctx)
+	httputil.SetContext(r, ctx)
 }
 
 func GetDefinition(r *http.Request) *apidef.APIDefinition {
