@@ -1860,11 +1860,7 @@ func (p *ReverseProxy) addAuthInfo(outReq, req *http.Request) {
 		return
 	}
 
-	authHeaderName := ctx.GetUpstreamAuthHeader(req)
-	if authHeaderName == "" {
-		return
+	if authProvider := httputil.GetUpstreamAuth(req); authProvider != nil {
+		authProvider.Fill(outReq)
 	}
-
-	authHeaderValue := ctx.GetUpstreamAuthValue(req)
-	outReq.Header.Add(authHeaderName, authHeaderValue)
 }
