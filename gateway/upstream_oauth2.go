@@ -92,6 +92,7 @@ func (p *perAPIOAuthProvider) getOAuthHeaderValue(r *http.Request, spec *APISpec
 
 	oauthToken, err := provider.Token()
 	if err != nil {
+		spec.emitUpstreamOAuthEvent(r, "UpstreamOAuthError", err.Error(), "obtainToken")
 		return "", err
 	}
 
@@ -139,6 +140,7 @@ func (cache *upstreamOauthCache) getToken(r *http.Request, spec *APISpec) (strin
 
 	token, err := cache.retryGetKeyAndLock(cacheKey)
 	if err != nil {
+		spec.emitUpstreamOAuthEvent(r, "UpstreamOAuthError", err.Error(), "obtainToken")
 		return "", err
 	}
 
@@ -149,6 +151,7 @@ func (cache *upstreamOauthCache) getToken(r *http.Request, spec *APISpec) (strin
 
 	token, err = cache.obtainToken(context.Background(), spec)
 	if err != nil {
+		spec.emitUpstreamOAuthEvent(r, "UpstreamOAuthError", err.Error(), "obtainNewToken")
 		return "", err
 	}
 
