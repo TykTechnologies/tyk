@@ -809,10 +809,10 @@ type UpstreamOAuth struct {
 	ClientCredentials ClientCredentials `bson:"client_credentials" json:"client_credentials"`
 	// HeaderName is the custom header name to be used for upstream basic authentication.
 	// Defaults to `Authorization`.
-	HeaderName string `bson:"header_name" json:"header_name"`
+	HeaderName string `bson:"header_name" json:"header_name,omitempty"`
 	// DistributedToken indicates whether the token is distributed all gateways.
 	// Defaults to false (each gateway will get its own token).
-	DistributedToken bool `bson:"distributed_token" json:"distributed_token"`
+	DistributedToken bool `bson:"distributed_token" json:"distributed_token,omitempty"`
 }
 
 type ClientCredentials struct {
@@ -824,15 +824,15 @@ type ClientCredentials struct {
 	// URL. This is a constant specific to each server.
 	TokenURL string `bson:"token_url" json:"token_url"`
 	// Scope specifies optional requested permissions.
-	Scopes []string `bson:"scopes" json:"scopes"`
+	Scopes []string `bson:"scopes" json:"scopes,omitempty"`
 	// EndpointParams specifies additional parameters for requests to the token endpoint.
-	EndpointParams url.Values `bson:"endpoint_params" json:"endpoint_params"`
+	EndpointParams url.Values `bson:"endpoint_params" json:"endpoint_params,omitempty"`
 	// AuthStyle optionally specifies how the endpoint wants the
 	// client ID & client secret sent. The zero value means to
 	// auto-detect.
-	AuthStyle int `bson:"auth_style" json:"auth_style"`
+	AuthStyle int `bson:"auth_style" json:"auth_style,omitempty"`
 
-	TokenProvider oauth2.TokenSource
+	TokenProvider oauth2.TokenSource `bson:"-" json:"-"`
 }
 
 type AnalyticsPluginConfig struct {

@@ -645,7 +645,7 @@ type UpstreamOAuth struct {
 	HeaderName string `bson:"headerName" json:"headerName"`
 	// DistributedToken indicates whether the token is distributed all gateways.
 	// Defaults to false (each gateway will get its own token).
-	DistributedToken bool `bson:"distributedToken" json:"distributedToken"`
+	DistributedToken bool `bson:"distributedToken" json:"distributedToken,omitempty"`
 }
 
 type ClientCredentials struct {
@@ -667,6 +667,10 @@ type ClientCredentials struct {
 }
 
 func (u *UpstreamOAuth) Fill(api apidef.UpstreamOAuth) {
+	u.Enabled = api.Enabled
+	u.HeaderName = api.HeaderName
+	u.DistributedToken = api.DistributedToken
+
 	u.ClientCredentials.ClientID = api.ClientCredentials.ClientID
 	u.ClientCredentials.ClientSecret = api.ClientCredentials.ClientSecret
 	u.ClientCredentials.TokenURL = api.ClientCredentials.TokenURL
@@ -676,6 +680,10 @@ func (u *UpstreamOAuth) Fill(api apidef.UpstreamOAuth) {
 }
 
 func (u *UpstreamOAuth) ExtractTo(api *apidef.UpstreamOAuth) {
+	api.Enabled = u.Enabled
+	api.HeaderName = u.HeaderName
+	api.DistributedToken = u.DistributedToken
+
 	api.ClientCredentials.ClientID = u.ClientCredentials.ClientID
 	api.ClientCredentials.ClientSecret = u.ClientCredentials.ClientSecret
 	api.ClientCredentials.TokenURL = u.ClientCredentials.TokenURL
