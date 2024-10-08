@@ -56,7 +56,7 @@ func TestSetContext(t *testing.T) {
 		req := createReq(t)
 
 		// Create a new context with a key-value pair
-		ctx := context.WithValue(context.Background(), "key", "value")
+		ctx := context.WithValue(context.Background(), httputil.ContextKey("key"), "value")
 
 		// Call SetContext to update the request's context
 		httputil.SetContext(req, ctx)
