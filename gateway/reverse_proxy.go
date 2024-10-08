@@ -1220,13 +1220,17 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 	}
 
 	p.addAuthInfo(outreq, req)
+	err := p.addUpstreamOAuthInfo(outreq, req)
+	if err != nil {
+		p.ErrorHandler.HandleError(rw, logreq, err.Error(), 500, true)
+		return ProxyResponse{}
+	}
 
 	// do request round trip
 	var (
 		res             *http.Response
 		isHijacked      bool
 		upstreamLatency time.Duration
-		err             error
 	)
 
 	if breakerEnforced {
@@ -1245,6 +1249,15 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 		}
 	} else {
 		res, isHijacked, upstreamLatency, err = p.handleOutboundRequest(roundTripper, outreq, rw)
+		if p.TykAPISpec.UpstreamAuth.OAuth.IsEnabled() && res.StatusCode == http.StatusUnauthorized {
+			//retry request one more time with new token time if upstream returns 401
+			err := p.addUpstreamOAuthInfo(outreq, req)
+			if err != nil {
+				p.ErrorHandler.HandleError(rw, logreq, err.Error(), 500, true)
+				return ProxyResponse{}
+			}
+			res, isHijacked, upstreamLatency, err = p.handleOutboundRequest(roundTripper, outreq, rw)
+		}
 	}
 
 	if err != nil {
@@ -1296,13 +1309,6 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 
 	if isHijacked {
 		return ProxyResponse{UpstreamLatency: upstreamLatency}
-	}
-
-	if p.TykAPISpec.UpstreamAuth.OAuth.IsEnabled() && res.StatusCode == http.StatusUnauthorized && !ctx.IsUpstreamOAuthRetriedRequest(req) {
-		//retry request one more time
-		ctx.SetUpstreamOAuthRetriedRequest(req)
-		ctx.SetShouldRefreshUpstreamOAuthToken(req)
-		return p.WrappedServeHTTP(rw, req, withCache)
 	}
 
 	_, upgrade := p.IsUpgrade(req)
@@ -1867,4 +1873,18 @@ func (p *ReverseProxy) addAuthInfo(outReq, req *http.Request) {
 
 	authHeaderValue := ctx.GetUpstreamAuthValue(req)
 	outReq.Header.Add(authHeaderName, authHeaderValue)
+}
+
+func (p *ReverseProxy) addUpstreamOAuthInfo(outReq, req *http.Request) error {
+	if !p.TykAPISpec.UpstreamAuth.OAuth.IsEnabled() {
+		return nil
+	}
+
+	oauthHeader, err := getUpstreamOAuth(req, p.TykAPISpec, p.Gw)
+	if err != nil {
+		return err
+	}
+
+	outReq.Header.Add(oauthHeader.name, oauthHeader.value)
+	return nil
 }
