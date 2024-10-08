@@ -20,10 +20,8 @@ import (
 
 	"github.com/TykTechnologies/tyk/internal/reflect"
 
-	"github.com/TykTechnologies/graphql-go-tools/pkg/execution/datasource"
-	"golang.org/x/oauth2"
-
 	"github.com/TykTechnologies/gojsonschema"
+	"github.com/TykTechnologies/graphql-go-tools/pkg/execution/datasource"
 
 	"github.com/TykTechnologies/tyk/regexp"
 
@@ -831,8 +829,6 @@ type ClientCredentials struct {
 	// client ID & client secret sent. The zero value means to
 	// auto-detect.
 	AuthStyle int `bson:"auth_style" json:"auth_style,omitempty"`
-
-	TokenProvider oauth2.TokenSource `bson:"-" json:"-"`
 }
 
 type AnalyticsPluginConfig struct {
