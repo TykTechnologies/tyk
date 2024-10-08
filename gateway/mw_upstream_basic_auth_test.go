@@ -3,6 +3,7 @@ package gateway
 import (
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"testing"
 
@@ -21,7 +22,7 @@ func TestUpstreamBasicAuthentication(t *testing.T) {
 	})
 
 	userName, password, customAuthHeader := "user", "password", "Custom-Auth"
-	expectedAuth := base64.StdEncoding.EncodeToString([]byte(userName + ":" + password))
+	expectedAuth := fmt.Sprintf("Basic %s", base64.StdEncoding.EncodeToString([]byte(userName+":"+password)))
 
 	ts.Gw.BuildAndLoadAPI(
 		func(spec *APISpec) {
