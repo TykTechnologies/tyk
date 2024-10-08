@@ -3,8 +3,9 @@ package gateway
 import (
 	"encoding/base64"
 	"fmt"
-	"github.com/TykTechnologies/tyk/internal/ctxutil"
 	"net/http"
+
+	"github.com/TykTechnologies/tyk/internal/ctxutil"
 
 	"github.com/TykTechnologies/tyk/header"
 )

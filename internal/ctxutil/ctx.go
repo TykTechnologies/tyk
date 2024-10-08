@@ -2,12 +2,15 @@ package ctxutil
 
 import (
 	"context"
-	"github.com/TykTechnologies/tyk/internal/proxy"
 	"net/http"
+
+	"github.com/TykTechnologies/tyk/internal/model"
 )
 
+type ContextKey string
+
 const (
-	upstreamAuth = "upstream-auth"
+	upstreamAuth = ContextKey("upstream-auth")
 )
 
 func SetContext(r *http.Request, ctx context.Context) {
@@ -16,20 +19,20 @@ func SetContext(r *http.Request, ctx context.Context) {
 }
 
 // SetUpstreamAuth sets the header name to be used for upstream authentication.
-func SetUpstreamAuth(r *http.Request, auth proxy.UpstreamAuthProvider) {
+func SetUpstreamAuth(r *http.Request, auth model.UpstreamAuthProvider) {
 	ctx := r.Context()
 	ctx = context.WithValue(ctx, upstreamAuth, auth)
 	SetContext(r, ctx)
 }
 
 // GetUpstreamAuth returns the header name to be used for upstream authentication.
-func GetUpstreamAuth(r *http.Request) proxy.UpstreamAuthProvider {
+func GetUpstreamAuth(r *http.Request) model.UpstreamAuthProvider {
 	auth := r.Context().Value(upstreamAuth)
 	if auth == nil {
 		return nil
 	}
 
-	provider, ok := auth.(proxy.UpstreamAuthProvider)
+	provider, ok := auth.(model.UpstreamAuthProvider)
 	if !ok {
 		return nil
 	}

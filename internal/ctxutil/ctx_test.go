@@ -2,9 +2,11 @@ package ctxutil_test
 
 import (
 	"context"
-	"github.com/TykTechnologies/tyk/internal/ctxutil"
 	"net/http"
 	"testing"
+
+	"github.com/TykTechnologies/tyk/internal/ctxutil"
+	"github.com/TykTechnologies/tyk/internal/model"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -16,14 +18,9 @@ func createReq(tb testing.TB) *http.Request {
 	return req
 }
 
-type mockUpstreamAuthProvider struct{}
-
-// Fill is the mock implementation for upstream auth provider.
-func (m *mockUpstreamAuthProvider) Fill(r *http.Request) {}
-
 func TestUpstreamAuth(t *testing.T) {
 	t.Run("valid auth provider", func(t *testing.T) {
-		mockAuthProvider := &mockUpstreamAuthProvider{}
+		mockAuthProvider := &model.MockUpstreamAuthProvider{}
 		req := createReq(t)
 
 		ctxutil.SetUpstreamAuth(req, mockAuthProvider)
@@ -45,7 +42,7 @@ func TestUpstreamAuth(t *testing.T) {
 		req := createReq(t)
 
 		// Set a context with a value that is not of type proxy.UpstreamAuthProvider
-		ctx := context.WithValue(req.Context(), "upstream-auth", "invalid-type")
+		ctx := context.WithValue(req.Context(), ctxutil.ContextKey("upstream-auth"), "invalid-type")
 		ctxutil.SetContext(req, ctx)
 
 		retrievedAuth := ctxutil.GetUpstreamAuth(req)

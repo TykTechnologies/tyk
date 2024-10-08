@@ -3,8 +3,9 @@ package ctx
 import (
 	"context"
 	"encoding/json"
-	"github.com/TykTechnologies/tyk/internal/ctxutil"
 	"net/http"
+
+	"github.com/TykTechnologies/tyk/internal/ctxutil"
 
 	"github.com/TykTechnologies/tyk/apidef/oas"
 
