@@ -18,6 +18,7 @@ concurrency:
 jobs:
   analyze:
     name: Analyze
+    if: ${{ !github.event.pull_request.draft }}
     runs-on: ubuntu-latest
 
     strategy:
