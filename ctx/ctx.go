@@ -53,11 +53,6 @@ const (
 	// CacheOptions holds cache options required for cache writer middleware.
 	CacheOptions
 	OASDefinition
-
-	// UpstreamAuthHeader sets the header name to be used for upstream authentication.
-	UpstreamAuthHeader
-	// UpstreamAuthValue sets the value for upstream authentication.
-	UpstreamAuthValue
 )
 
 func ctxSetSession(r *http.Request, s *user.SessionState, scheduleUpdate bool, hashKey bool) {
