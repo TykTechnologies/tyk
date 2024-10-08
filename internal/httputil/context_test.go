@@ -62,7 +62,7 @@ func TestSetContext(t *testing.T) {
 		httputil.SetContext(req, ctx)
 
 		// Verify that the request's context has been updated
-		retrievedValue := req.Context().Value("key")
+		retrievedValue := req.Context().Value(httputil.ContextKey("key"))
 		assert.Equal(t, "value", retrievedValue)
 	})
 
