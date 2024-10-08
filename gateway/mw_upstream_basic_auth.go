@@ -1,8 +1,7 @@
 package gateway
 
 import (
-	"encoding/base64"
-	"fmt"
+	"github.com/TykTechnologies/tyk/internal/httputil"
 	"net/http"
 
 	"github.com/TykTechnologies/tyk/internal/ctxutil"
@@ -46,9 +45,7 @@ func (t *UpstreamBasicAuth) ProcessRequest(_ http.ResponseWriter, r *http.Reques
 		upstreamBasicAuthProvider.HeaderName = basicAuthConfig.HeaderName
 	}
 
-	payload := base64.StdEncoding.EncodeToString([]byte(fmt.Sprintf("%s:%s", basicAuthConfig.Username, basicAuthConfig.Password)))
-
-	upstreamBasicAuthProvider.AuthValue = fmt.Sprintf("Basic %s", payload)
+	upstreamBasicAuthProvider.AuthValue = httputil.AuthHeader(basicAuthConfig.Username, basicAuthConfig.Password)
 
 	ctxutil.SetUpstreamAuth(r, upstreamBasicAuthProvider)
 	return nil, http.StatusOK
