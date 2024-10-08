@@ -639,7 +639,7 @@ type UpstreamOAuth struct {
 	// Enabled activates upstream OAuth2 authentication.
 	Enabled bool `bson:"enabled" json:"enabled"`
 	// ClientCredentials holds the configuration for OAuth2 Client Credentials flow.
-	ClientCredentials ClientCredentials `bson:"clientCredentials,omitempty" json:"clientCredentials,omitempty"`
+	ClientCredentials *ClientCredentials `bson:"clientCredentials,omitempty" json:"clientCredentials,omitempty"`
 	// HeaderName is the custom header name to be used for upstream basic authentication.
 	// Defaults to `Authorization`.
 	HeaderName string `bson:"headerName" json:"headerName"`
@@ -666,17 +666,36 @@ type ClientCredentials struct {
 	AuthStyle int `bson:"authStyle,omitempty" json:"authStyle,omitempty"`
 }
 
+func (c *ClientCredentials) Fill(api apidef.ClientCredentials) {
+	c.ClientID = api.ClientID
+	c.ClientSecret = api.ClientSecret
+	c.TokenURL = api.TokenURL
+	c.Scopes = api.Scopes
+	c.EndpointParams = api.EndpointParams
+	c.AuthStyle = api.AuthStyle
+}
+
 func (u *UpstreamOAuth) Fill(api apidef.UpstreamOAuth) {
 	u.Enabled = api.Enabled
 	u.HeaderName = api.HeaderName
 	u.DistributedToken = api.DistributedToken
 
-	u.ClientCredentials.ClientID = api.ClientCredentials.ClientID
-	u.ClientCredentials.ClientSecret = api.ClientCredentials.ClientSecret
-	u.ClientCredentials.TokenURL = api.ClientCredentials.TokenURL
-	u.ClientCredentials.Scopes = api.ClientCredentials.Scopes
-	u.ClientCredentials.EndpointParams = api.ClientCredentials.EndpointParams
-	u.ClientCredentials.AuthStyle = api.ClientCredentials.AuthStyle
+	if u.ClientCredentials == nil {
+		u.ClientCredentials = &ClientCredentials{}
+	}
+	u.ClientCredentials.Fill(api.ClientCredentials)
+	if ShouldOmit(u.ClientCredentials) {
+		u.ClientCredentials = nil
+	}
+}
+
+func (c *ClientCredentials) ExtractTo(api *apidef.ClientCredentials) {
+	api.ClientID = c.ClientID
+	api.ClientSecret = c.ClientSecret
+	api.TokenURL = c.TokenURL
+	api.Scopes = c.Scopes
+	api.EndpointParams = c.EndpointParams
+	api.AuthStyle = c.AuthStyle
 }
 
 func (u *UpstreamOAuth) ExtractTo(api *apidef.UpstreamOAuth) {
@@ -684,10 +703,11 @@ func (u *UpstreamOAuth) ExtractTo(api *apidef.UpstreamOAuth) {
 	api.HeaderName = u.HeaderName
 	api.DistributedToken = u.DistributedToken
 
-	api.ClientCredentials.ClientID = u.ClientCredentials.ClientID
-	api.ClientCredentials.ClientSecret = u.ClientCredentials.ClientSecret
-	api.ClientCredentials.TokenURL = u.ClientCredentials.TokenURL
-	api.ClientCredentials.Scopes = u.ClientCredentials.Scopes
-	api.ClientCredentials.EndpointParams = u.ClientCredentials.EndpointParams
-	api.ClientCredentials.AuthStyle = u.ClientCredentials.AuthStyle
+	if u.ClientCredentials == nil {
+		u.ClientCredentials = &ClientCredentials{}
+		defer func() {
+			u.ClientCredentials = nil
+		}()
+	}
+	u.ClientCredentials.ExtractTo(&api.ClientCredentials)
 }

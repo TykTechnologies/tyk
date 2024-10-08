@@ -534,17 +534,17 @@ func (t *BaseMiddleware) emitRateLimitEvent(r *http.Request, e event.Event, mess
 }
 
 // emitUpstreamOAuthEvent emits an upstream OAuth event with an optional custom message.
-func (t *BaseMiddleware) emitUpstreamOAuthEvent(r *http.Request, e event.Event, message string, apiId string, phase string) {
+func (s *APISpec) emitUpstreamOAuthEvent(r *http.Request, e event.Event, message string, phase string) {
 	if message == "" {
 		message = event.String(e)
 	}
 
-	t.FireEvent(e, EventUpstreamOAuthMeta{
+	s.FireEvent(e, EventUpstreamOAuthMeta{
 		EventMetaDefault: EventMetaDefault{
 			Message:            message,
 			OriginatingRequest: EncodeRequestToEvent(r),
 		},
-		APIID: apiId,
+		APIID: s.APIID,
 		Phase: phase,
 	})
 }
