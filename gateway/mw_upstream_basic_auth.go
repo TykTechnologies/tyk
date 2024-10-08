@@ -1,10 +1,9 @@
 package gateway
 
 import (
-	"github.com/TykTechnologies/tyk/internal/httputil"
 	"net/http"
 
-	"github.com/TykTechnologies/tyk/internal/ctxutil"
+	"github.com/TykTechnologies/tyk/internal/httputil"
 
 	"github.com/TykTechnologies/tyk/header"
 )
@@ -47,7 +46,7 @@ func (t *UpstreamBasicAuth) ProcessRequest(_ http.ResponseWriter, r *http.Reques
 
 	upstreamBasicAuthProvider.AuthValue = httputil.AuthHeader(basicAuthConfig.Username, basicAuthConfig.Password)
 
-	ctxutil.SetUpstreamAuth(r, upstreamBasicAuthProvider)
+	httputil.SetUpstreamAuth(r, upstreamBasicAuthProvider)
 	return nil, http.StatusOK
 }
 

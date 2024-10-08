@@ -1,11 +1,12 @@
-package ctxutil_test
+package httputil_test
 
 import (
 	"context"
 	"net/http"
 	"testing"
 
-	"github.com/TykTechnologies/tyk/internal/ctxutil"
+	"github.com/TykTechnologies/tyk/internal/httputil"
+
 	"github.com/TykTechnologies/tyk/internal/model"
 
 	"github.com/stretchr/testify/assert"
@@ -23,10 +24,10 @@ func TestUpstreamAuth(t *testing.T) {
 		mockAuthProvider := &model.MockUpstreamAuthProvider{}
 		req := createReq(t)
 
-		ctxutil.SetUpstreamAuth(req, mockAuthProvider)
+		httputil.SetUpstreamAuth(req, mockAuthProvider)
 
 		// Retrieve the auth provider from the request's context to verify it was set
-		retrievedAuth := ctxutil.GetUpstreamAuth(req)
+		retrievedAuth := httputil.GetUpstreamAuth(req)
 		assert.NotNil(t, retrievedAuth)
 		assert.Equal(t, mockAuthProvider, retrievedAuth)
 	})
@@ -34,7 +35,7 @@ func TestUpstreamAuth(t *testing.T) {
 	t.Run("no auth provider", func(t *testing.T) {
 		req := createReq(t)
 
-		retrievedAuth := ctxutil.GetUpstreamAuth(req)
+		retrievedAuth := httputil.GetUpstreamAuth(req)
 		assert.Nil(t, retrievedAuth)
 	})
 
@@ -42,10 +43,10 @@ func TestUpstreamAuth(t *testing.T) {
 		req := createReq(t)
 
 		// Set a context with a value that is not of type proxy.UpstreamAuthProvider
-		ctx := context.WithValue(req.Context(), ctxutil.ContextKey("upstream-auth"), "invalid-type")
-		ctxutil.SetContext(req, ctx)
+		ctx := context.WithValue(req.Context(), httputil.ContextKey("upstream-auth"), "invalid-type")
+		httputil.SetContext(req, ctx)
 
-		retrievedAuth := ctxutil.GetUpstreamAuth(req)
+		retrievedAuth := httputil.GetUpstreamAuth(req)
 		assert.Nil(t, retrievedAuth)
 	})
 }
@@ -58,7 +59,7 @@ func TestSetContext(t *testing.T) {
 		ctx := context.WithValue(context.Background(), "key", "value")
 
 		// Call SetContext to update the request's context
-		ctxutil.SetContext(req, ctx)
+		httputil.SetContext(req, ctx)
 
 		// Verify that the request's context has been updated
 		retrievedValue := req.Context().Value("key")
@@ -75,7 +76,7 @@ func TestSetContext(t *testing.T) {
 		newCtx := context.WithValue(context.Background(), "newKey", "newValue")
 
 		// Call SetContext to update the request's context with the new context
-		ctxutil.SetContext(req, newCtx)
+		httputil.SetContext(req, newCtx)
 
 		assert.Nil(t, req.Context().Value("existingKey"))
 		assert.Equal(t, "newValue", req.Context().Value("newKey"))
@@ -86,7 +87,7 @@ func TestSetContext(t *testing.T) {
 
 		emptyCtx := context.Background()
 
-		ctxutil.SetContext(req, emptyCtx)
+		httputil.SetContext(req, emptyCtx)
 
 		assert.Equal(t, emptyCtx, req.Context())
 	})

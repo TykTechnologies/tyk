@@ -29,8 +29,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/TykTechnologies/tyk/internal/ctxutil"
-
 	"github.com/akutz/memconn"
 	"github.com/gorilla/websocket"
 	"github.com/opentracing/opentracing-go"
@@ -1855,7 +1853,7 @@ func (p *ReverseProxy) addAuthInfo(outReq, req *http.Request) {
 		return
 	}
 
-	if authProvider := ctxutil.GetUpstreamAuth(req); authProvider != nil {
+	if authProvider := httputil.GetUpstreamAuth(req); authProvider != nil {
 		authProvider.Fill(outReq)
 	}
 }
