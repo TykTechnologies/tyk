@@ -557,10 +557,10 @@ type UpstreamAuth struct {
 	// Enabled enables upstream API authentication.
 	Enabled bool `bson:"enabled" json:"enabled"`
 	// BasicAuth holds the basic authentication configuration for upstream API authentication.
-	BasicAuth *UpstreamBasicAuth `bson:"basicAuth,omitempty" json:"basicAuth,omitempty"`
+	BasicAuth *UpstreamBasicAuth `bson:"basicAuth" json:"basicAuth"`
 
 	// Oauth2 contains the configuration for OAuth2 Client Credentials flow.
-	Oauth *UpstreamOAuth `bson:"oauth,omitempty" json:"oauth,omitempty"`
+	Oauth *UpstreamOAuth `bson:"oauth" json:"oauth"`
 }
 
 // Fill fills *UpstreamAuth from apidef.UpstreamAuth.
@@ -645,7 +645,7 @@ type UpstreamOAuth struct {
 	HeaderName string `bson:"headerName" json:"headerName"`
 	// DistributedToken indicates whether the token is distributed all gateways.
 	// Defaults to false (each gateway will get its own token).
-	DistributedToken bool `bson:"distributed_token" json:"distributed_token"`
+	DistributedToken bool `bson:"distributedToken" json:"distributedToken"`
 }
 
 type ClientCredentials struct {

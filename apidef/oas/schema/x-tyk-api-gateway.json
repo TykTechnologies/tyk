@@ -2077,6 +2077,9 @@
         },
         "basicAuth": {
           "$ref": "#/definitions/X-Tyk-UpstreamBasicAuthentication"
+        },
+        "oauth": {
+          "$ref": "#/definitions/X-Tyk-UpstreamOAuth"
         }
       },
       "required": [
@@ -2102,6 +2105,40 @@
       "required": [
         "enabled"
       ]
+    },
+    "X-Tyk-UpstreamOAuth": {
+      "type":"object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "clientCredentials": {
+          "type": "object",
+          "properties": {
+            "clientId": {
+              "type": "string"
+            },
+            "clientSecret": {
+              "type": "string"
+            },
+            "tokenUrl": {
+              "type": "string"
+            },
+            "scopes":{
+              "type": ["array", "null"]
+            },
+            "endpointParams": {
+              "type": ["object", "null"]
+            }
+          }
+        },
+        "headerName": {
+          "type": "string"
+        },
+        "distributedToken": {
+          "type": "boolean"
+        }
+      }
     }
   }
 }
