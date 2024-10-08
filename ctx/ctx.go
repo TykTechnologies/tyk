@@ -53,6 +53,15 @@ const (
 	// CacheOptions holds cache options required for cache writer middleware.
 	CacheOptions
 	OASDefinition
+
+	// UpstreamAuthHeader sets the header name to be used for upstream authentication.
+	UpstreamAuthHeader
+	// UpstreamAuthValue sets the value for upstream authentication.
+	UpstreamAuthValue
+	// UpstreamOAuthRetriedRequest is used to mark a request as retried after an upstream OAuth token refresh.
+	UpstreamOAuthRetriedRequest
+	// UpstreamAuthShouldRefreshToken is used to mark a request as needing an upstream OAuth token refresh.
+	UpstreamAuthShouldRefreshToken
 )
 
 func ctxSetSession(r *http.Request, s *user.SessionState, scheduleUpdate bool, hashKey bool) {
@@ -154,4 +163,60 @@ func GetOASDefinition(r *http.Request) *oas.OAS {
 	}
 
 	return ret
+}
+
+// SetUpstreamAuthHeader sets the header name to be used for upstream authentication.
+func SetUpstreamAuthHeader(r *http.Request, name string) {
+	ctx := r.Context()
+	ctx = context.WithValue(ctx, UpstreamAuthHeader, name)
+	setContext(r, ctx)
+}
+
+// GetUpstreamAuthHeader returns the header name to be used for upstream authentication.
+func GetUpstreamAuthHeader(r *http.Request) string {
+	if v := r.Context().Value(UpstreamAuthHeader); v != nil {
+		return v.(string)
+	}
+	return ""
+}
+
+// SetUpstreamAuthValue sets the auth header value to be used for upstream authentication.
+func SetUpstreamAuthValue(r *http.Request, name string) {
+	ctx := r.Context()
+	ctx = context.WithValue(ctx, UpstreamAuthValue, name)
+	setContext(r, ctx)
+}
+
+// GetUpstreamAuthValue gets the auth header value to be used for upstream authentication.
+func GetUpstreamAuthValue(r *http.Request) string {
+	if v := r.Context().Value(UpstreamAuthValue); v != nil {
+		return v.(string)
+	}
+	return ""
+}
+
+func SetUpstreamOAuthRetriedRequest(r *http.Request) {
+	ctx := r.Context()
+	ctx = context.WithValue(ctx, UpstreamOAuthRetriedRequest, true)
+	setContext(r, ctx)
+}
+
+func IsUpstreamOAuthRetriedRequest(r *http.Request) bool {
+	if v := r.Context().Value(UpstreamOAuthRetriedRequest); v != nil {
+		return v.(bool)
+	}
+	return false
+}
+
+func SetShouldRefreshUpstreamOAuthToken(r *http.Request) {
+	ctx := r.Context()
+	ctx = context.WithValue(ctx, UpstreamAuthShouldRefreshToken, true)
+	setContext(r, ctx)
+}
+
+func ShouldRefreshUpstreamOAuthToken(r *http.Request) bool {
+	if v := r.Context().Value(UpstreamAuthShouldRefreshToken); v != nil {
+		return v.(bool)
+	}
+	return false
 }

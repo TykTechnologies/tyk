@@ -784,6 +784,40 @@ const Schema = `{
 							"type": "string"
 						}
 					}
+				},
+				"oauth": {
+					"type":"object",
+					"properties": {
+						"enabled": {
+							"type": "boolean"
+						},
+						"client_credentials": {
+							"type": "object",
+							"properties": {
+								"client_id": {
+									"type": "string"
+								},
+								"client_secret": {
+									"type": "string"
+								},
+								"token_url": {
+									"type": "string"
+								},
+								"scopes":{
+									"type": ["array", "null"]
+								},
+								"endpoint_params": {
+									"type": ["object", "null"]
+								}	
+							}
+						},
+						"header_name": {
+							"type": "string"		
+						},
+						"distributed_token": {
+							"type": "boolean"
+						}
+					}
 				}
 			}
     	}

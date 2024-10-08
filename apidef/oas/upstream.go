@@ -1,6 +1,7 @@
 package oas
 
 import (
+	"net/url"
 	"sort"
 	"strings"
 
@@ -556,7 +557,10 @@ type UpstreamAuth struct {
 	// Enabled enables upstream API authentication.
 	Enabled bool `bson:"enabled" json:"enabled"`
 	// BasicAuth holds the basic authentication configuration for upstream API authentication.
-	BasicAuth *UpstreamBasicAuth `bson:"basicAuth,omitempty" json:"basicAuth,omitempty"`
+	BasicAuth *UpstreamBasicAuth `bson:"basicAuth" json:"basicAuth"`
+
+	// Oauth2 contains the configuration for OAuth2 Client Credentials flow.
+	Oauth *UpstreamOAuth `bson:"oauth" json:"oauth"`
 }
 
 // Fill fills *UpstreamAuth from apidef.UpstreamAuth.
@@ -566,10 +570,17 @@ func (u *UpstreamAuth) Fill(api apidef.UpstreamAuth) {
 	if u.BasicAuth == nil {
 		u.BasicAuth = &UpstreamBasicAuth{}
 	}
-
 	u.BasicAuth.Fill(api.BasicAuth)
 	if ShouldOmit(u.BasicAuth) {
 		u.BasicAuth = nil
+	}
+
+	if u.Oauth == nil {
+		u.Oauth = &UpstreamOAuth{}
+	}
+	u.Oauth.Fill(api.OAuth)
+	if ShouldOmit(u.Oauth) {
+		u.Oauth = nil
 	}
 }
 
@@ -583,8 +594,15 @@ func (u *UpstreamAuth) ExtractTo(api *apidef.UpstreamAuth) {
 			u.BasicAuth = nil
 		}()
 	}
-
 	u.BasicAuth.ExtractTo(&api.BasicAuth)
+
+	if u.Oauth == nil {
+		u.Oauth = &UpstreamOAuth{}
+		defer func() {
+			u.Oauth = nil
+		}()
+	}
+	u.Oauth.ExtractTo(&api.OAuth)
 }
 
 // UpstreamBasicAuth holds upstream basic authentication configuration.
@@ -615,4 +633,61 @@ func (u *UpstreamBasicAuth) ExtractTo(api *apidef.UpstreamBasicAuth) {
 	api.HeaderName = u.HeaderName
 	api.Username = u.Username
 	api.Password = u.Password
+}
+
+type UpstreamOAuth struct {
+	// Enabled activates upstream OAuth2 authentication.
+	Enabled bool `bson:"enabled" json:"enabled"`
+	// ClientCredentials holds the configuration for OAuth2 Client Credentials flow.
+	ClientCredentials ClientCredentials `bson:"clientCredentials,omitempty" json:"clientCredentials,omitempty"`
+	// HeaderName is the custom header name to be used for upstream basic authentication.
+	// Defaults to `Authorization`.
+	HeaderName string `bson:"headerName" json:"headerName"`
+	// DistributedToken indicates whether the token is distributed all gateways.
+	// Defaults to false (each gateway will get its own token).
+	DistributedToken bool `bson:"distributedToken" json:"distributedToken,omitempty"`
+}
+
+type ClientCredentials struct {
+	// ClientID is the application's ID.
+	ClientID string `bson:"clientID" json:"clientID"`
+	// ClientSecret is the application's secret.
+	ClientSecret string `bson:"clientSecret" json:"clientSecret"`
+	// TokenURL is the resource server's token endpoint
+	// URL. This is a constant specific to each server.
+	TokenURL string `bson:"tokenURL" json:"tokenURL"`
+	// Scope specifies optional requested permissions.
+	Scopes []string `bson:"scopes,omitempty" json:"scopes,omitempty"`
+	// EndpointParams specifies additional parameters for requests to the token endpoint.
+	EndpointParams url.Values `bson:"endpointParams,omitempty" json:"endpointParams,omitempty"`
+	// AuthStyle optionally specifies how the endpoint wants the
+	// client ID & client secret sent. The zero value means to
+	// auto-detect.
+	AuthStyle int `bson:"authStyle,omitempty" json:"authStyle,omitempty"`
+}
+
+func (u *UpstreamOAuth) Fill(api apidef.UpstreamOAuth) {
+	u.Enabled = api.Enabled
+	u.HeaderName = api.HeaderName
+	u.DistributedToken = api.DistributedToken
+
+	u.ClientCredentials.ClientID = api.ClientCredentials.ClientID
+	u.ClientCredentials.ClientSecret = api.ClientCredentials.ClientSecret
+	u.ClientCredentials.TokenURL = api.ClientCredentials.TokenURL
+	u.ClientCredentials.Scopes = api.ClientCredentials.Scopes
+	u.ClientCredentials.EndpointParams = api.ClientCredentials.EndpointParams
+	u.ClientCredentials.AuthStyle = api.ClientCredentials.AuthStyle
+}
+
+func (u *UpstreamOAuth) ExtractTo(api *apidef.UpstreamOAuth) {
+	api.Enabled = u.Enabled
+	api.HeaderName = u.HeaderName
+	api.DistributedToken = u.DistributedToken
+
+	api.ClientCredentials.ClientID = u.ClientCredentials.ClientID
+	api.ClientCredentials.ClientSecret = u.ClientCredentials.ClientSecret
+	api.ClientCredentials.TokenURL = u.ClientCredentials.TokenURL
+	api.ClientCredentials.Scopes = u.ClientCredentials.Scopes
+	api.ClientCredentials.EndpointParams = u.ClientCredentials.EndpointParams
+	api.ClientCredentials.AuthStyle = u.ClientCredentials.AuthStyle
 }
