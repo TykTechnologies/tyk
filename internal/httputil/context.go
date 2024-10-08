@@ -7,12 +7,14 @@ import (
 	"github.com/TykTechnologies/tyk/internal/model"
 )
 
+// ContextKey is the key type to be used for context interactions.
 type ContextKey string
 
 const (
 	upstreamAuth = ContextKey("upstream-auth")
 )
 
+// SetContext updates the context of a request.
 func SetContext(r *http.Request, ctx context.Context) {
 	r2 := r.WithContext(ctx)
 	*r = *r2

@@ -11,4 +11,6 @@ type UpstreamAuthProvider interface {
 type MockUpstreamAuthProvider struct{}
 
 // Fill is a mock implementation to be used in tests.
-func (m *MockUpstreamAuthProvider) Fill(r *http.Request) {}
+func (m *MockUpstreamAuthProvider) Fill(_ *http.Request) {
+	// empty mock implementation.
+}

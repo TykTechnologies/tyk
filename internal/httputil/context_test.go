@@ -14,7 +14,7 @@ import (
 
 func createReq(tb testing.TB) *http.Request {
 	tb.Helper()
-	req, err := http.NewRequest(http.MethodGet, "http://example.com", nil)
+	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, "http://example.com", nil)
 	assert.NoError(tb, err)
 	return req
 }
@@ -69,17 +69,17 @@ func TestSetContext(t *testing.T) {
 	t.Run("override key", func(t *testing.T) {
 
 		req := createReq(t)
-		existingCtx := context.WithValue(context.Background(), "existingKey", "existingValue")
+		existingCtx := context.WithValue(context.Background(), httputil.ContextKey("existingKey"), "existingValue")
 		req = req.WithContext(existingCtx)
 
 		// Create a new context to override the existing context
-		newCtx := context.WithValue(context.Background(), "newKey", "newValue")
+		newCtx := context.WithValue(context.Background(), httputil.ContextKey("newKey"), "newValue")
 
 		// Call SetContext to update the request's context with the new context
 		httputil.SetContext(req, newCtx)
 
-		assert.Nil(t, req.Context().Value("existingKey"))
-		assert.Equal(t, "newValue", req.Context().Value("newKey"))
+		assert.Nil(t, req.Context().Value(httputil.ContextKey("existingKey")))
+		assert.Equal(t, "newValue", req.Context().Value(httputil.ContextKey("newKey")))
 	})
 
 	t.Run("empty context", func(t *testing.T) {

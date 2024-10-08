@@ -50,12 +50,15 @@ func (t *UpstreamBasicAuth) ProcessRequest(_ http.ResponseWriter, r *http.Reques
 	return nil, http.StatusOK
 }
 
-// UpstreamBasicAuthProvider implements auth provider
+// UpstreamBasicAuthProvider implements upstream auth provider.
 type UpstreamBasicAuthProvider struct {
+	// HeaderName is the header name to be used to fill upstream auth with.
 	HeaderName string
-	AuthValue  string
+	// AuthValue is the value of auth header.
+	AuthValue string
 }
 
+// Fill sets the request's HeaderName with AuthValue
 func (u UpstreamBasicAuthProvider) Fill(r *http.Request) {
 	r.Header.Add(u.HeaderName, u.AuthValue)
 }
