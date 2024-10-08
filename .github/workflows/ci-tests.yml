@@ -26,8 +26,9 @@ env:
   PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION: python
 
 jobs:
-  golangci-lint:
+  lint:
     runs-on: ubuntu-latest
+    if: ${{ !github.event.pull_request.draft }}
     steps:
       - name: "Checkout repository"
         uses: TykTechnologies/github-actions/.github/actions/checkout-pr@main
@@ -56,9 +57,7 @@ jobs:
           path: /usr/local/bin/golangci-lint
           destination: /usr/local/bin
 
-      - run: golangci-lint version
-      - run: golangci-lint cache status
-      - run: go mod download -x
+      - run: golangci-lint version && golangci-lint cache status
 
       - name: golangci-lint
         if: ${{ github.event_name == 'pull_request' }}
@@ -80,7 +79,8 @@ jobs:
 
   test:
     name: Go ${{ matrix.go-version }} Redis ${{ matrix.redis-version }}
-    needs: golangci-lint
+    if: ${{ !github.event.pull_request.draft }}
+    needs: lint
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -166,8 +166,10 @@ jobs:
 
   sonar-cloud-analysis:
     runs-on: ubuntu-latest
-    if: ${{ always() }}
-    needs: [test, golangci-lint]
+    if: |
+      (needs.test.result == 'failure' || needs.lint.result == 'failure' || needs.test.result == 'success' || needs.lint.result == 'success') &&
+      github.event.pull_request.draft == false
+    needs: [test, lint]
     steps:
       - name: "Checkout repository"
         uses: TykTechnologies/github-actions/.github/actions/checkout-pr@main
