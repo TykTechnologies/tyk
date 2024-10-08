@@ -3,9 +3,9 @@ package gateway
 import (
 	"encoding/base64"
 	"fmt"
+	"github.com/TykTechnologies/tyk/internal/ctxutil"
 	"net/http"
 
-	"github.com/TykTechnologies/tyk/ctx"
 	"github.com/TykTechnologies/tyk/header"
 )
 
@@ -37,16 +37,28 @@ func (t *UpstreamBasicAuth) EnabledForSpec() bool {
 func (t *UpstreamBasicAuth) ProcessRequest(_ http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
 	basicAuthConfig := t.Spec.UpstreamAuth.BasicAuth
 
-	authHeaderName := header.Authorization
-	if basicAuthConfig.HeaderName != "" {
-		authHeaderName = basicAuthConfig.HeaderName
+	upstreamBasicAuthProvider := UpstreamBasicAuthProvider{
+		HeaderName: header.Authorization,
 	}
-	ctx.SetUpstreamAuthHeader(r, authHeaderName)
+
+	if basicAuthConfig.HeaderName != "" {
+		upstreamBasicAuthProvider.HeaderName = basicAuthConfig.HeaderName
+	}
 
 	payload := base64.StdEncoding.EncodeToString([]byte(fmt.Sprintf("%s:%s", basicAuthConfig.Username, basicAuthConfig.Password)))
 
-	headerValue := fmt.Sprintf("Basic %s", payload)
-	ctx.SetUpstreamAuthValue(r, headerValue)
+	upstreamBasicAuthProvider.AuthValue = fmt.Sprintf("Basic %s", payload)
 
+	ctxutil.SetUpstreamAuth(r, upstreamBasicAuthProvider)
 	return nil, http.StatusOK
+}
+
+// UpstreamBasicAuthProvider implements auth provider
+type UpstreamBasicAuthProvider struct {
+	HeaderName string
+	AuthValue  string
+}
+
+func (u UpstreamBasicAuthProvider) Fill(r *http.Request) {
+	r.Header.Add(u.HeaderName, u.AuthValue)
 }

@@ -18,6 +18,7 @@ import (
 	"crypto/x509"
 	"errors"
 	"fmt"
+	"github.com/TykTechnologies/tyk/internal/ctxutil"
 	"io"
 	"io/ioutil"
 	"net"
@@ -1853,11 +1854,6 @@ func (p *ReverseProxy) addAuthInfo(outReq, req *http.Request) {
 		return
 	}
 
-	authHeaderName := ctx.GetUpstreamAuthHeader(req)
-	if authHeaderName == "" {
-		return
-	}
-
-	authHeaderValue := ctx.GetUpstreamAuthValue(req)
-	outReq.Header.Add(authHeaderName, authHeaderValue)
+	authProvider := ctxutil.GetUpstreamAuth(req)
+	authProvider.Fill(outReq)
 }

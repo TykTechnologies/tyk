@@ -3,6 +3,7 @@ package ctx
 import (
 	"context"
 	"encoding/json"
+	"github.com/TykTechnologies/tyk/internal/ctxutil"
 	"net/http"
 
 	"github.com/TykTechnologies/tyk/apidef/oas"
@@ -51,17 +52,7 @@ const (
 	// CacheOptions holds cache options required for cache writer middleware.
 	CacheOptions
 	OASDefinition
-
-	// UpstreamAuthHeader sets the header name to be used for upstream authentication.
-	UpstreamAuthHeader
-	// UpstreamAuthValue sets the value for upstream authentication.
-	UpstreamAuthValue
 )
-
-func setContext(r *http.Request, ctx context.Context) {
-	r2 := r.WithContext(ctx)
-	*r = *r2
-}
 
 func ctxSetSession(r *http.Request, s *user.SessionState, scheduleUpdate bool, hashKey bool) {
 
@@ -86,7 +77,7 @@ func ctxSetSession(r *http.Request, s *user.SessionState, scheduleUpdate bool, h
 		s.Touch()
 	}
 
-	setContext(r, ctx)
+	ctxutil.SetContext(r, ctx)
 }
 
 func GetAuthToken(r *http.Request) string {
@@ -124,7 +115,7 @@ func SetSession(r *http.Request, s *user.SessionState, scheduleUpdate bool, hash
 func SetDefinition(r *http.Request, s *apidef.APIDefinition) {
 	ctx := r.Context()
 	ctx = context.WithValue(ctx, Definition, s)
-	setContext(r, ctx)
+	ctxutil.SetContext(r, ctx)
 }
 
 func GetDefinition(r *http.Request) *apidef.APIDefinition {
@@ -162,34 +153,4 @@ func GetOASDefinition(r *http.Request) *oas.OAS {
 	}
 
 	return ret
-}
-
-// SetUpstreamAuthHeader sets the header name to be used for upstream authentication.
-func SetUpstreamAuthHeader(r *http.Request, name string) {
-	ctx := r.Context()
-	ctx = context.WithValue(ctx, UpstreamAuthHeader, name)
-	setContext(r, ctx)
-}
-
-// GetUpstreamAuthHeader returns the header name to be used for upstream authentication.
-func GetUpstreamAuthHeader(r *http.Request) string {
-	if v := r.Context().Value(UpstreamAuthHeader); v != nil {
-		return v.(string)
-	}
-	return ""
-}
-
-// SetUpstreamAuthValue sets the auth header value to be used for upstream authentication.
-func SetUpstreamAuthValue(r *http.Request, name string) {
-	ctx := r.Context()
-	ctx = context.WithValue(ctx, UpstreamAuthValue, name)
-	setContext(r, ctx)
-}
-
-// GetUpstreamAuthValue gets the auth header value to be used for upstream authentication.
-func GetUpstreamAuthValue(r *http.Request) string {
-	if v := r.Context().Value(UpstreamAuthValue); v != nil {
-		return v.(string)
-	}
-	return ""
 }
