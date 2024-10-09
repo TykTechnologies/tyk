@@ -1032,7 +1032,7 @@ func TestOAS_BuildDefaultTykExtension(t *testing.T) {
 						},
 					}
 
-					t.Run("enabled", func(t *testing.T) {
+					t.Run("import=true,validateRequest=enabled", func(t *testing.T) {
 						tykExtensionConfigParams := TykExtensionConfigParams{
 							ValidateRequest: &trueVal,
 						}
@@ -1046,7 +1046,7 @@ func TestOAS_BuildDefaultTykExtension(t *testing.T) {
 						assert.Equal(t, expectedOperations, oasDef.GetTykExtension().Middleware.Operations)
 					})
 
-					t.Run("disabled", func(t *testing.T) {
+					t.Run("import=true,validateRequest=disabled", func(t *testing.T) {
 						tykExtensionConfigParams := TykExtensionConfigParams{
 							ValidateRequest: &falseVal,
 						}
@@ -1060,6 +1060,33 @@ func TestOAS_BuildDefaultTykExtension(t *testing.T) {
 						assert.Equal(t, expectedOperations, oasDef.GetTykExtension().Middleware.Operations)
 					})
 
+					t.Run("import=false,validateRequest=enabled", func(t *testing.T) {
+						tykExtensionConfigParams := TykExtensionConfigParams{
+							ValidateRequest: &trueVal,
+						}
+
+						err := oasDef.BuildDefaultTykExtension(tykExtensionConfigParams, false)
+
+						assert.NoError(t, err)
+
+						expectedOperations := getExpectedOperations(true, true, middlewareValidateRequest)
+						expectedOperations[oasGetOperationID] = expectedOperations[oasPostOperationID]
+						assert.Equal(t, expectedOperations, oasDef.GetTykExtension().Middleware.Operations)
+					})
+
+					t.Run("import=false,validateRequest=disabled", func(t *testing.T) {
+						tykExtensionConfigParams := TykExtensionConfigParams{
+							ValidateRequest: &falseVal,
+						}
+
+						err := oasDef.BuildDefaultTykExtension(tykExtensionConfigParams, false)
+
+						assert.NoError(t, err)
+
+						expectedOperations := getExpectedOperations(false, true, middlewareValidateRequest)
+						expectedOperations[oasGetOperationID] = expectedOperations[oasPostOperationID]
+						assert.Equal(t, expectedOperations, oasDef.GetTykExtension().Middleware.Operations)
+					})
 				})
 		})
 
