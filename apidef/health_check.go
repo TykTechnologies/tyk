@@ -1,4 +1,4 @@
-package model
+package apidef
 
 type (
 	HealthCheckStatus string
