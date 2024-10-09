@@ -1219,6 +1219,8 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 
 	}
 
+	p.addAuthInfo(outreq, req)
+
 	// do request round trip
 	var (
 		res             *http.Response
@@ -1844,4 +1846,14 @@ func (p *ReverseProxy) IsUpgrade(req *http.Request) (string, bool) {
 	}
 
 	return httputil.IsUpgrade(req)
+}
+
+func (p *ReverseProxy) addAuthInfo(outReq, req *http.Request) {
+	if !p.TykAPISpec.UpstreamAuth.IsEnabled() {
+		return
+	}
+
+	if authProvider := httputil.GetUpstreamAuth(req); authProvider != nil {
+		authProvider.Fill(outReq)
+	}
 }
