@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"context"
+	"crypto/sha256"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -22,6 +23,7 @@ import (
 const (
 	// ExtensionTykStreaming is the oas extension for tyk streaming
 	ExtensionTykStreaming = "x-tyk-streaming"
+	StreamGCInterval      = 1 * time.Minute
 )
 
 // StreamsConfig represents a stream configuration
@@ -38,11 +40,13 @@ var globalStreamCounter atomic.Int64
 // StreamingMiddleware is a middleware that handles streaming functionality
 type StreamingMiddleware struct {
 	*BaseMiddleware
-	streamManagers       sync.Map // Map of consumer group IDs to StreamManager
-	ctx                  context.Context
-	cancel               context.CancelFunc
-	allowedUnsafe        []string
-	defaultStreamManager *StreamManager
+
+	createStreamManagerLock sync.Mutex
+	streamManagerCache      sync.Map // Map of payload hash to StreamManager
+	ctx                     context.Context
+	cancel                  context.CancelFunc
+	allowedUnsafe           []string
+	defaultStreamManager    *StreamManager
 }
 
 // StreamManager is responsible for creating a single stream
@@ -53,6 +57,8 @@ type StreamManager struct {
 	mw          *StreamingMiddleware
 	dryRun      bool
 	listenPaths []string
+
+	activityCounter atomic.Int32 // Counts active subscriptions, requests.
 }
 
 func (sm *StreamManager) initStreams(r *http.Request, config *StreamsConfig) {
@@ -114,6 +120,32 @@ func (sm *StreamManager) removeStream(streamID string) error {
 	return nil
 }
 
+func (s *StreamingMiddleware) garbageCollect() {
+	s.Logger().Debug("Starting garbage collection for inactive stream managers")
+
+	s.streamManagerCache.Range(func(key, value interface{}) bool {
+		manager := value.(*StreamManager)
+		if manager == s.defaultStreamManager {
+			return true
+		}
+
+		if manager.activityCounter.Load() <= 0 {
+			s.Logger().Infof("Removing inactive stream manager: %v", key)
+			manager.streams.Range(func(streamKey, streamValue interface{}) bool {
+				streamID := streamKey.(string)
+				err := manager.removeStream(streamID)
+				if err != nil {
+					s.Logger().Errorf("Error removing stream %s: %v", streamID, err)
+				}
+				return true
+			})
+			s.streamManagerCache.Delete(key)
+		}
+
+		return true
+	})
+}
+
 // Name is StreamingMiddleware
 func (s *StreamingMiddleware) Name() string {
 	return "StreamingMiddleware"
@@ -150,20 +182,55 @@ func (s *StreamingMiddleware) Init() {
 
 	s.Logger().Debug("Initializing default stream manager")
 	s.defaultStreamManager = s.createStreamManager(nil)
+
+	// Start garbage collection routine
+	go func() {
+		ticker := time.NewTicker(StreamGCInterval)
+		defer ticker.Stop()
+
+		for {
+			select {
+			case <-ticker.C:
+				s.garbageCollect()
+			case <-s.ctx.Done():
+				return
+			}
+		}
+	}()
 }
 
 func (s *StreamingMiddleware) createStreamManager(r *http.Request) *StreamManager {
-	newStreamManager := &StreamManager{
-		muxer:  mux.NewRouter(),
-		mw:     s,
-		dryRun: r == nil,
+	streamsConfig := s.getStreamsConfig(r)
+	configJSON, _ := json.Marshal(streamsConfig)
+	cacheKey := fmt.Sprintf("%x", sha256.Sum256(configJSON))
+
+	// Critical section starts here
+	// This section is called by ProcessRequest method of the middleware implementation
+	// Concurrent requests can call this method at the same time and those requests
+	// creates new StreamManagers and store them concurrently, as a result
+	// the returned stream manager has overwritten by a different one by leaking
+	// the previously stored StreamManager.
+	s.createStreamManagerLock.Lock()
+	defer s.createStreamManagerLock.Unlock()
+
+	s.Logger().Debug("Attempting to load stream manager from cache")
+	s.Logger().Debugf("Cache key: %s", cacheKey)
+	if cachedManager, found := s.streamManagerCache.Load(cacheKey); found {
+		s.Logger().Debug("Found cached stream manager")
+		return cachedManager.(*StreamManager)
 	}
-	streamID := fmt.Sprintf("_%d", time.Now().UnixNano())
-	s.streamManagers.Store(streamID, newStreamManager)
 
-	// Call initStreams for the new StreamManager
-	newStreamManager.initStreams(r, s.getStreamsConfig(r))
+	newStreamManager := &StreamManager{
+		muxer:           mux.NewRouter(),
+		mw:              s,
+		dryRun:          r == nil,
+		activityCounter: atomic.Int32{},
+	}
+	newStreamManager.initStreams(r, streamsConfig)
 
+	if r != nil {
+		s.streamManagerCache.Store(cacheKey, newStreamManager)
+	}
 	return newStreamManager
 }
 
@@ -356,28 +423,13 @@ func (s *StreamingMiddleware) Unload() {
 	s.Logger().Debugf("Unloading streaming middleware %s", s.Spec.Name)
 
 	totalStreams := 0
-	s.streamManagers.Range(func(_, value interface{}) bool {
-		manager, ok := value.(*StreamManager)
-		if !ok {
-			return true
-		}
-		manager.streams.Range(func(_, _ interface{}) bool {
-			totalStreams++
-			return true
-		})
-		return true
-	})
-	globalStreamCounter.Add(-int64(totalStreams))
-
 	s.cancel()
 
 	s.Logger().Debug("Closing active streams")
-	s.streamManagers.Range(func(_, value interface{}) bool {
-		manager, ok := value.(*StreamManager)
-		if !ok {
-			return true
-		}
+	s.streamManagerCache.Range(func(_, value interface{}) bool {
+		manager := value.(*StreamManager)
 		manager.streams.Range(func(_, streamValue interface{}) bool {
+			totalStreams++
 			if stream, ok := streamValue.(*streaming.Stream); ok {
 				if err := stream.Reset(); err != nil {
 					return true
@@ -388,7 +440,8 @@ func (s *StreamingMiddleware) Unload() {
 		return true
 	})
 
-	s.streamManagers = sync.Map{}
+	globalStreamCounter.Add(-int64(totalStreams))
+	s.streamManagerCache = sync.Map{}
 
 	s.Logger().Info("All streams successfully removed")
 }
@@ -411,14 +464,9 @@ func (h *handleFuncAdapter) HandleFunc(path string, f func(http.ResponseWriter, 
 
 	h.sm.routeLock.Lock()
 	h.muxer.HandleFunc(path, func(w http.ResponseWriter, r *http.Request) {
-		defer func() {
-			// Stop the stream when the HTTP request finishes
-			if err := h.sm.removeStream(h.streamID); err != nil {
-				h.logger.Errorf("Failed to stop stream %s: %v", h.streamID, err)
-			}
-		}()
-
+		h.sm.activityCounter.Add(1)
 		f(w, r)
+		h.sm.activityCounter.Add(-1)
 	})
 	h.sm.routeLock.Unlock()
 	h.logger.Debugf("Registered handler for path: %s", path)

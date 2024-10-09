@@ -20,6 +20,7 @@ import (
 	"github.com/TykTechnologies/tyk/test"
 	"github.com/TykTechnologies/tyk/user"
 
+	"github.com/TykTechnologies/tyk/internal/model"
 	"github.com/TykTechnologies/tyk/internal/uuid"
 )
 
@@ -724,7 +725,7 @@ func TestParsePoliciesFromRPC(t *testing.T) {
 type RPCDataLoaderMock struct {
 	ShouldConnect bool
 	Policies      []user.Policy
-	Apis          []nestedApiDefinition
+	Apis          []model.MergedAPI
 }
 
 func (s *RPCDataLoaderMock) Connect() bool {

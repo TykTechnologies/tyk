@@ -1,6 +1,7 @@
 package gateway
 
 import (
+	"bytes"
 	"context"
 	"crypto/tls"
 	"encoding/json"
@@ -147,6 +148,17 @@ streams:
       static_fields:
         '@service': benthos
 `
+const bentoHTTPServerTemplate = `
+streams:
+  test:
+    input:
+      http_server:
+        path: /post
+        timeout: 1s
+    output:
+      http_server:
+        ws_path: /subscribe
+`
 
 func TestStreamingAPISingleClient(t *testing.T) {
 	ctx := context.Background()
@@ -273,23 +285,39 @@ func TestStreamingAPIMultipleClients(t *testing.T) {
 	t.Cleanup(func() {
 		nc.Close()
 	})
+
 	subject := "test"
+	messages := make(map[string]struct{})
 	for i := 0; i < totalMessages; i++ {
-		require.NoError(t, nc.Publish(subject, []byte(fmt.Sprintf("Hello %d", i))), "failed to publish message to subject")
+		message := fmt.Sprintf("Hello %d", i)
+		messages[message] = struct{}{}
+		require.NoError(t, nc.Publish(subject, []byte(message)), "failed to publish message to subject")
 	}
 
-	// Read messages from all clients
-	for clientID, wsConn := range wsConns {
-		err = wsConn.SetReadDeadline(time.Now().Add(5000 * time.Millisecond))
-		require.NoError(t, err, fmt.Sprintf("error setting read deadline for client %d", clientID))
+	// Read messages from all subscribers
+	// Messages are distributed in a round-robin fashion, count the number of messages and check the messages individually.
+	var readMessages int
+	for readMessages < totalMessages {
+		for clientID, wsConn := range wsConns {
+			// We need to stop waiting for a message if the subscriber is consumed all of its received messages.
+			err = wsConn.SetReadDeadline(time.Now().Add(100 * time.Millisecond))
+			require.NoError(t, err, fmt.Sprintf("error setting read deadline for client %d", clientID))
 
-		for i := 0; i < totalMessages; i++ {
-			_, p, err := wsConn.ReadMessage()
-			require.NoError(t, err, fmt.Sprintf("error reading message for client %d, message %d", clientID, i))
-			assert.Equal(t, fmt.Sprintf("Hello %d", i), string(p), fmt.Sprintf("message not equal for client %d", clientID))
+			_, data, err := wsConn.ReadMessage()
+			if os.IsTimeout(err) {
+				continue
+			}
+			require.NoError(t, err, fmt.Sprintf("error reading message for client %d", clientID))
+
+			message := string(data)
+			_, ok := messages[message]
+			require.True(t, ok, fmt.Sprintf("message is unknown or consumed before %s", message))
+			delete(messages, message)
+			readMessages++
 		}
 	}
-
+	// Consumed all messages
+	require.Empty(t, messages)
 }
 
 func setUpStreamAPI(ts *Test, apiName string, streamConfig string) error {
@@ -780,4 +808,183 @@ func TestWebSocketConnectionClosedOnAPIReload(t *testing.T) {
 	}
 
 	t.Log("WebSocket connection was successfully closed on API reload")
+}
+
+func TestStreamingAPISingleClient_Input_HTTPServer(t *testing.T) {
+	ts := StartTest(func(globalConf *config.Config) {
+		globalConf.Streaming.Enabled = true
+	})
+	t.Cleanup(func() {
+		ts.Close()
+	})
+
+	apiName := "test-api"
+	if err := setUpStreamAPI(ts, apiName, bentoHTTPServerTemplate); err != nil {
+		t.Fatal(err)
+	}
+
+	const totalMessages = 3
+
+	dialer := websocket.Dialer{
+		HandshakeTimeout: 1 * time.Second,
+		TLSClientConfig:  &tls.Config{InsecureSkipVerify: true},
+	}
+
+	wsURL := strings.Replace(ts.URL, "http", "ws", 1) + fmt.Sprintf("/%s/subscribe", apiName)
+	wsConn, _, err := dialer.Dial(wsURL, nil)
+	require.NoError(t, err, "failed to connect to ws server")
+	t.Cleanup(func() {
+		if err = wsConn.Close(); err != nil {
+			t.Logf("failed to close ws connection: %v", err)
+		}
+	})
+
+	publishURL := fmt.Sprintf("%s/%s/post", ts.URL, apiName)
+	for i := 0; i < totalMessages; i++ {
+		data := []byte(fmt.Sprintf("{\"test\": \"message %d\"}", i))
+		resp, err := http.Post(publishURL, "application/json", bytes.NewReader(data))
+		require.NoError(t, err)
+		_ = resp.Body.Close()
+	}
+
+	err = wsConn.SetReadDeadline(time.Now().Add(500 * time.Millisecond))
+	require.NoError(t, err, "error setting read deadline")
+
+	for i := 0; i < totalMessages; i++ {
+		_, p, err := wsConn.ReadMessage()
+		require.NoError(t, err, "error reading message")
+		assert.Equal(t, fmt.Sprintf("{\"test\": \"message %d\"}", i), string(p), "message not equal")
+	}
+}
+
+func TestStreamingAPIMultipleClients_Input_HTTPServer(t *testing.T) {
+	// Testing input http -> output http (3 output instances and 10 messages)
+	// Messages are distributed in a round-robin fashion.
+
+	ts := StartTest(func(globalConf *config.Config) {
+		globalConf.Streaming.Enabled = true
+	})
+	t.Cleanup(func() {
+		ts.Close()
+	})
+
+	apiName := "test-api"
+	if err := setUpStreamAPI(ts, apiName, bentoHTTPServerTemplate); err != nil {
+		t.Fatal(err)
+	}
+
+	const (
+		totalSubscribers = 3
+		totalMessages    = 10
+	)
+	dialer := websocket.Dialer{
+		HandshakeTimeout: 1 * time.Second,
+		TLSClientConfig:  &tls.Config{InsecureSkipVerify: true},
+	}
+
+	wsURL := strings.Replace(ts.URL, "http", "ws", 1) + fmt.Sprintf("/%s/subscribe", apiName)
+
+	// Create multiple WebSocket connections
+	var wsConns []*websocket.Conn
+	for i := 0; i < totalSubscribers; i++ {
+		wsConn, _, err := dialer.Dial(wsURL, nil)
+		require.NoError(t, err, fmt.Sprintf("failed to connect to ws server for client %d", i))
+		wsConns = append(wsConns, wsConn)
+		t.Cleanup(func() {
+			if err := wsConn.Close(); err != nil {
+				t.Logf("failed to close ws connection: %v", err)
+			}
+		})
+	}
+
+	// Publish 10 messages
+	messages := make(map[string]struct{})
+	publishURL := fmt.Sprintf("%s/%s/post", ts.URL, apiName)
+	for i := 0; i < totalMessages; i++ {
+		message := fmt.Sprintf("{\"test\": \"message %d\"}", i)
+		messages[message] = struct{}{}
+
+		data := []byte(message)
+		resp, err := http.Post(publishURL, "application/json", bytes.NewReader(data))
+		require.NoError(t, err)
+		_ = resp.Body.Close()
+	}
+
+	// Read messages from all subscribers
+	// Messages are distributed in a round-robin fashion, count the number of messages and check the messages individually.
+	var readMessages int
+	for readMessages < totalMessages {
+		for clientID, wsConn := range wsConns {
+			// We need to stop waiting for a message if the subscriber is consumed all of its received messages.
+			err := wsConn.SetReadDeadline(time.Now().Add(100 * time.Millisecond))
+			require.NoError(t, err, fmt.Sprintf("error while setting read deadline for client %d", clientID))
+
+			_, data, err := wsConn.ReadMessage()
+			if os.IsTimeout(err) {
+				continue
+			}
+			require.NoError(t, err, fmt.Sprintf("error while reading message %d", clientID))
+
+			message := string(data)
+			_, ok := messages[message]
+			require.True(t, ok, fmt.Sprintf("message is unknown or consumed before %s", message))
+			delete(messages, message)
+			readMessages++
+		}
+	}
+	require.Empty(t, messages)
+}
+
+func TestStreamingAPIGarbageCollection(t *testing.T) {
+	ts := StartTest(func(globalConf *config.Config) {
+		globalConf.Streaming.Enabled = true
+	})
+	t.Cleanup(func() {
+		ts.Close()
+	})
+
+	oasAPI, err := setupOASForStreamAPI(bentoHTTPServerTemplate)
+	require.NoError(t, err)
+
+	apiName := "test-api"
+
+	specs := ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		spec.Proxy.ListenPath = fmt.Sprintf("/%s", apiName)
+		spec.UseKeylessAccess = true
+		spec.IsOAS = true
+		spec.OAS = oasAPI
+		spec.OAS.Fill(*spec.APIDefinition)
+	})
+
+	baseMiddleware := &BaseMiddleware{Gw: ts.Gw, Spec: specs[0]}
+	s := StreamingMiddleware{BaseMiddleware: baseMiddleware}
+
+	if err := setUpStreamAPI(ts, apiName, bentoHTTPServerTemplate); err != nil {
+		t.Fatal(err)
+	}
+
+	// Dummy request to create a stream manager
+	publishURL := fmt.Sprintf("%s/%s/post", ts.URL, apiName)
+	r, err := http.NewRequest("POST", publishURL, nil)
+	require.NoError(t, err)
+
+	s.createStreamManager(r)
+
+	// We should have a Stream manager in the cache.
+	var streamManagersBeforeGC int
+	s.streamManagerCache.Range(func(k, v interface{}) bool {
+		streamManagersBeforeGC++
+		return true
+	})
+	require.Equal(t, 1, streamManagersBeforeGC)
+
+	s.garbageCollect()
+
+	// Garbage collection removed the stream manager because the activity counter is zero.
+	var streamManagersAfterGC int
+	s.streamManagerCache.Range(func(k, v interface{}) bool {
+		streamManagersAfterGC++
+		return true
+	})
+	require.Equal(t, 0, streamManagersAfterGC)
 }
