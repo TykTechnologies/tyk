@@ -1486,6 +1486,60 @@ func TestWebsocketsSeveralOpenClose(t *testing.T) {
 	conn3.Close()
 }
 
+func TestWebsocketsWithConnectionKeepAlive(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	globalConf := ts.Gw.GetConfig()
+	globalConf.HttpServerOptions.EnableWebSockets = true
+	ts.Gw.SetConfig(globalConf)
+
+	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		spec.Proxy.ListenPath = "/"
+	})
+
+	baseURL := strings.Replace(ts.URL, "http://", "ws://", -1)
+	url, err := url.Parse(baseURL)
+	if err != nil {
+		t.Fatalf("cannot parse url: %v", err)
+	}
+
+	conn, err := net.Dial("tcp", url.Host)
+	if err != nil {
+		t.Fatalf("cannot make connection: %v", err)
+	}
+	defer conn.Close()
+
+	req := fmt.Sprintf(`GET %s/ws HTTP/1.1
+Host: %s
+Accept-Encoding: gzip, deflate, br, zstd
+Sec-WebSocket-Version: 13
+Sec-WebSocket-Extensions: permessage-deflate
+Sec-WebSocket-Key: X62lCXELOHFcBBG72P2S2Q==
+Connection: Upgrade, keep-alive
+Upgrade: websocket
+
+`, baseURL, url.Host)
+	req = strings.Replace(req, "\n", "\r\n", -1)
+	_, err = conn.Write([]byte(req))
+	if err != nil {
+		t.Fatalf("cannot write request: %v", err)
+	}
+	buf, err := bufio.NewReader(conn).ReadString('\n')
+	if err != nil {
+		t.Fatalf("cannot read response: %v", err)
+	}
+	if !strings.Contains(buf, "HTTP/1.1 101 Switching Protocols") {
+		t.Error("Unexpected response:", buf)
+	}
+
+	_, _ = ts.Run(t, test.TestCase{
+		Method: "GET",
+		Path:   "/abc",
+		Code:   http.StatusOK,
+	})
+}
+
 func TestWebsocketsAndHTTPEndpointMatch(t *testing.T) {
 	ts := StartTest(nil)
 	t.Cleanup(ts.Close)
