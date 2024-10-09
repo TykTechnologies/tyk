@@ -59,6 +59,8 @@ type TykExtensionConfigParams struct {
 	ValidateRequest *bool
 	// MockResponse is true if a mocked response is configured.
 	MockResponse *bool
+
+	pathItemHasParameters bool
 }
 
 // BuildDefaultTykExtension builds a default tyk extension in *OAS based on function arguments.
@@ -218,6 +220,7 @@ func (s *OAS) importMiddlewares(overRideValues TykExtensionConfigParams) {
 	}
 
 	for path, pathItem := range s.Paths {
+		overRideValues.pathItemHasParameters = pathItem.Parameters != nil && len(pathItem.Parameters) > 0
 		for _, method := range allowedMethods {
 			if operation := pathItem.GetOperation(method); operation != nil {
 				tykOperation := s.getTykOperation(method, path)
