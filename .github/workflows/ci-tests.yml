@@ -164,6 +164,12 @@ jobs:
           task test:e2e-combined args="-race -timeout=15m"
           task test:coverage
 
+      - uses: actions/upload-artifact@v3
+        with:
+          name: coverage
+          retention-days: 1
+          path: coverage/gateway-all.cov
+
   sonar-cloud-analysis:
     runs-on: ubuntu-latest
     if: ${{ !github.event.pull_request.draft }}
@@ -175,12 +181,12 @@ jobs:
           token: ${{ secrets.ORG_GH_TOKEN }}
 
       - name: Download coverage artifacts
-        uses: actions/download-artifact@v2
+        uses: actions/download-artifact@v4
         with:
           name: coverage
 
       - name: Download golangcilint artifacts
-        uses: actions/download-artifact@v2
+        uses: actions/download-artifact@v4
         with:
           name: golangcilint
 
