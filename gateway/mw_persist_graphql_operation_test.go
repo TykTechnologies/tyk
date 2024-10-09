@@ -1,4 +1,4 @@
-package gateway
+package gateway_test
 
 import (
 	"bytes"

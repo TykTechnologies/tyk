@@ -1,42 +1,17 @@
 package gateway
 
 import (
-	"encoding/base64"
 	"fmt"
 	"net/http"
-	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 
+	"github.com/TykTechnologies/tyk/internal/httputil"
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/test"
 	"github.com/TykTechnologies/tyk/user"
 )
-
-func genAuthHeader(username, password string) string {
-	toEncode := strings.Join([]string{username, password}, ":")
-	encodedPass := base64.StdEncoding.EncodeToString([]byte(toEncode))
-	return fmt.Sprintf("Basic %s", encodedPass)
-}
-
-func (ts *Test) testPrepareBasicAuth(cacheDisabled bool) *user.SessionState {
-
-	session := CreateStandardSession()
-	session.BasicAuthData.Password = "password"
-	session.AccessRights = map[string]user.AccessDefinition{"test": {APIID: "test", Versions: []string{"v1"}}}
-	session.OrgID = "default"
-
-	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
-		spec.UseBasicAuth = true
-		spec.BasicAuth.DisableCaching = cacheDisabled
-		spec.UseKeylessAccess = false
-		spec.Proxy.ListenPath = "/"
-		spec.OrgID = "default"
-	})
-
-	return session
-}
 
 func TestBasicAuth(t *testing.T) {
 	test.Flaky(t) // TODO: TT-5223
@@ -44,11 +19,11 @@ func TestBasicAuth(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
-	session := ts.testPrepareBasicAuth(false)
+	session := ts.TestPrepareBasicAuth(false)
 
-	validPassword := map[string]string{"Authorization": genAuthHeader("user", "password")}
-	wrongPassword := map[string]string{"Authorization": genAuthHeader("user", "wrong")}
-	wrongFormat := map[string]string{"Authorization": genAuthHeader("user", "password:more")}
+	validPassword := map[string]string{"Authorization": httputil.AuthHeader("user", "password")}
+	wrongPassword := map[string]string{"Authorization": httputil.AuthHeader("user", "wrong")}
+	wrongFormat := map[string]string{"Authorization": httputil.AuthHeader("user", "password:more")}
 	malformed := map[string]string{"Authorization": "not base64"}
 
 	ts.Run(t, []test.TestCase{
@@ -111,9 +86,9 @@ func TestBasicAuthLegacyWithHashFunc(t *testing.T) {
 	ts.Gw.SetConfig(globalConf)
 
 	// create session with legacy key format
-	session := ts.testPrepareBasicAuth(false)
+	session := ts.TestPrepareBasicAuth(false)
 
-	validPassword := map[string]string{"Authorization": genAuthHeader("user", "password")}
+	validPassword := map[string]string{"Authorization": httputil.AuthHeader("user", "password")}
 
 	ts.Run(t, []test.TestCase{
 		// Create base auth based key
@@ -161,7 +136,7 @@ func TestBasicAuthHashKeyFunc(t *testing.T) {
 			globalConf.BasicAuthHashKeyFunction = hashKeyFunc.in
 			ts.Gw.SetConfig(globalConf)
 
-			session := ts.testPrepareBasicAuth(false)
+			session := ts.TestPrepareBasicAuth(false)
 			ts.Gw.setBasicAuthSessionPassword(session)
 
 			assert.Equal(t, hashKeyFunc.out, string(session.BasicAuthData.Hash))
@@ -191,17 +166,17 @@ func TestBasicAuthCachedUserCollision(t *testing.T) {
 	globalConf.HashKeyFunction = "murmur64"
 	ts.Gw.SetConfig(globalConf)
 
-	session := ts.testPrepareBasicAuth(false)
+	session := ts.TestPrepareBasicAuth(false)
 
-	correct := map[string]string{"Authorization": genAuthHeader("bellbell1", "password")}
-	remove1 := map[string]string{"Authorization": genAuthHeader("bellbell", "password")}
-	remove2 := map[string]string{"Authorization": genAuthHeader("bellbel", "password")}
-	remove3 := map[string]string{"Authorization": genAuthHeader("bellbe", "password")}
-	remove4 := map[string]string{"Authorization": genAuthHeader("bellb", "password")}
-	remove5 := map[string]string{"Authorization": genAuthHeader("bell", "password")}
-	add1 := map[string]string{"Authorization": genAuthHeader("bellbell11", "password")}
-	add2 := map[string]string{"Authorization": genAuthHeader("bellbell12", "password")}
-	add3 := map[string]string{"Authorization": genAuthHeader("bellbell13", "password")}
+	correct := map[string]string{"Authorization": httputil.AuthHeader("bellbell1", "password")}
+	remove1 := map[string]string{"Authorization": httputil.AuthHeader("bellbell", "password")}
+	remove2 := map[string]string{"Authorization": httputil.AuthHeader("bellbel", "password")}
+	remove3 := map[string]string{"Authorization": httputil.AuthHeader("bellbe", "password")}
+	remove4 := map[string]string{"Authorization": httputil.AuthHeader("bellb", "password")}
+	remove5 := map[string]string{"Authorization": httputil.AuthHeader("bell", "password")}
+	add1 := map[string]string{"Authorization": httputil.AuthHeader("bellbell11", "password")}
+	add2 := map[string]string{"Authorization": httputil.AuthHeader("bellbell12", "password")}
+	add3 := map[string]string{"Authorization": httputil.AuthHeader("bellbell13", "password")}
 
 	ts.Run(t, []test.TestCase{
 		// Create base auth based key
@@ -224,18 +199,18 @@ func TestBasicAuthCachedPasswordCollision(t *testing.T) {
 	defer ts.Close()
 
 	for _, useCache := range []bool{true, false} {
-		correct := map[string]string{"Authorization": genAuthHeader("bellbell1", "password")}
-		remove1 := map[string]string{"Authorization": genAuthHeader("bellbell1", "passwor")}
-		remove2 := map[string]string{"Authorization": genAuthHeader("bellbell1", "passwo")}
-		remove3 := map[string]string{"Authorization": genAuthHeader("bellbell1", "passw")}
-		remove4 := map[string]string{"Authorization": genAuthHeader("bellbell1", "pass")}
-		remove5 := map[string]string{"Authorization": genAuthHeader("bellbell1", "pas")}
-		add1 := map[string]string{"Authorization": genAuthHeader("bellbell1", "password1")}
-		add2 := map[string]string{"Authorization": genAuthHeader("bellbell1", "password22")}
-		add3 := map[string]string{"Authorization": genAuthHeader("bellbell1", "password333")}
+		correct := map[string]string{"Authorization": httputil.AuthHeader("bellbell1", "password")}
+		remove1 := map[string]string{"Authorization": httputil.AuthHeader("bellbell1", "passwor")}
+		remove2 := map[string]string{"Authorization": httputil.AuthHeader("bellbell1", "passwo")}
+		remove3 := map[string]string{"Authorization": httputil.AuthHeader("bellbell1", "passw")}
+		remove4 := map[string]string{"Authorization": httputil.AuthHeader("bellbell1", "pass")}
+		remove5 := map[string]string{"Authorization": httputil.AuthHeader("bellbell1", "pas")}
+		add1 := map[string]string{"Authorization": httputil.AuthHeader("bellbell1", "password1")}
+		add2 := map[string]string{"Authorization": httputil.AuthHeader("bellbell1", "password22")}
+		add3 := map[string]string{"Authorization": httputil.AuthHeader("bellbell1", "password333")}
 
 		t.Run(fmt.Sprintf("Cache disabled:%v", useCache), func(t *testing.T) {
-			session := ts.testPrepareBasicAuth(useCache)
+			session := ts.TestPrepareBasicAuth(useCache)
 
 			ts.Run(t, []test.TestCase{
 				// Create base auth based key
@@ -261,11 +236,11 @@ func BenchmarkBasicAuth(b *testing.B) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
-	session := ts.testPrepareBasicAuth(false)
+	session := ts.TestPrepareBasicAuth(false)
 
-	validPassword := map[string]string{"Authorization": genAuthHeader("user", "password")}
-	wrongPassword := map[string]string{"Authorization": genAuthHeader("user", "wrong")}
-	wrongFormat := map[string]string{"Authorization": genAuthHeader("user", "password:more")}
+	validPassword := map[string]string{"Authorization": httputil.AuthHeader("user", "password")}
+	wrongPassword := map[string]string{"Authorization": httputil.AuthHeader("user", "wrong")}
+	wrongFormat := map[string]string{"Authorization": httputil.AuthHeader("user", "password:more")}
 	malformed := map[string]string{"Authorization": "not base64"}
 
 	// Create base auth based key
@@ -294,9 +269,9 @@ func BenchmarkBasicAuth_CacheEnabled(b *testing.B) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
-	session := ts.testPrepareBasicAuth(false)
+	session := ts.TestPrepareBasicAuth(false)
 
-	validPassword := map[string]string{"Authorization": genAuthHeader("user", "password")}
+	validPassword := map[string]string{"Authorization": httputil.AuthHeader("user", "password")}
 
 	// Create base auth based key
 	ts.Run(b, test.TestCase{
@@ -320,9 +295,9 @@ func BenchmarkBasicAuth_CacheDisabled(b *testing.B) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
-	session := ts.testPrepareBasicAuth(true)
+	session := ts.TestPrepareBasicAuth(true)
 
-	validPassword := map[string]string{"Authorization": genAuthHeader("user", "password")}
+	validPassword := map[string]string{"Authorization": httputil.AuthHeader("user", "password")}
 
 	// Create base auth based key
 	ts.Run(b, test.TestCase{

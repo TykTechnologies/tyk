@@ -66,7 +66,7 @@ func (gw *Gateway) startPubSubLoop() {
 
 	for {
 		err := cacheStore.StartPubSubHandler(gw.ctx, RedisPubSubChannel, func(v interface{}) {
-			gw.handleRedisEvent(v, nil, nil)
+			gw.HandleRedisEvent(v, nil, nil)
 		})
 
 		select {
@@ -77,13 +77,9 @@ func (gw *Gateway) startPubSubLoop() {
 		}
 
 		gw.logPubSubError(err, message)
-		gw.addPubSubDelay(10 * time.Second)
-	}
-}
 
-// addPubSubDelay sleeps for duration
-func (gw *Gateway) addPubSubDelay(dur time.Duration) {
-	time.Sleep(dur)
+		time.Sleep(10 * time.Second)
+	}
 }
 
 // isPubSubError returns true if err != nil, logs error
@@ -95,7 +91,8 @@ func (gw *Gateway) logPubSubError(err error, message string) bool {
 	return false
 }
 
-func (gw *Gateway) handleRedisEvent(v interface{}, handled func(NotificationCommand), reloaded func()) {
+// HandleRedisEvent is exported for test usage.
+func (gw *Gateway) HandleRedisEvent(v interface{}, handled func(NotificationCommand), reloaded func()) {
 	message, ok := v.(temporalmodel.Message)
 	if !ok {
 		return

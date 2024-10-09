@@ -13,6 +13,7 @@ import (
 
 	"github.com/TykTechnologies/tyk/certs"
 	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/internal/httputil"
 
 	"github.com/TykTechnologies/tyk/header"
 
@@ -221,7 +222,7 @@ func TestHashKeyFunctionChanged(t *testing.T) {
 			Code:      http.StatusOK,
 		})
 
-		authHeader := map[string]string{"Authorization": genAuthHeader("user", "password")}
+		authHeader := map[string]string{"Authorization": httputil.AuthHeader("user", "password")}
 
 		testChangeHashFunc(t, authHeader, client, http.StatusUnauthorized)
 

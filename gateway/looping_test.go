@@ -187,7 +187,7 @@ func TestLooping(t *testing.T) {
 	t.Run("VirtualEndpoint or plugins", func(t *testing.T) {
 		test.Flaky(t) // TT-10511
 
-		ts.testPrepareVirtualEndpoint(`
+		ts.TestPrepareVirtualEndpoint(`
             function testVirtData(request, session, config) {
                 var loopLocation = "/default"
 

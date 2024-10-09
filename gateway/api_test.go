@@ -30,6 +30,7 @@ import (
 	"github.com/TykTechnologies/tyk/apidef/oas"
 	"github.com/TykTechnologies/tyk/certs"
 	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/ctx"
 	"github.com/TykTechnologies/tyk/internal/uuid"
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/test"
@@ -963,7 +964,7 @@ func TestDisableKeyActionsByUserName(t *testing.T) {
 	ts := StartTest(conf)
 	defer ts.Close()
 
-	session := ts.testPrepareBasicAuth(false)
+	session := ts.TestPrepareBasicAuth(false)
 	userName := "defaultuser1"
 	res, _ := ts.Run(t, []test.TestCase{
 		{
@@ -1042,7 +1043,7 @@ func TestHashKeyHandlerLegacyWithHashFunc(t *testing.T) {
 	ts.Gw.SetConfig(globalConf)
 
 	// create session with legacy key format
-	session := ts.testPrepareBasicAuth(false)
+	session := ts.TestPrepareBasicAuth(false)
 
 	_, _ = ts.Run(t, []test.TestCase{
 		{
@@ -1207,7 +1208,7 @@ func (ts *Test) testHashKeyHandlerHelper(t *testing.T, expectedHashSize int) {
 
 func (ts *Test) testHashFuncAndBAHelper(t *testing.T) {
 	t.Helper()
-	session := ts.testPrepareBasicAuth(false)
+	session := ts.TestPrepareBasicAuth(false)
 
 	_, _ = ts.Run(t, []test.TestCase{
 		{
@@ -1953,7 +1954,7 @@ func TestContextSession(t *testing.T) {
 		t.Fatal("expected ctxGetSession to return nil")
 	}
 
-	ctxSetSession(r,
+	ctx.SetSession(r,
 		&user.SessionState{},
 		false,
 		false)
@@ -1963,10 +1964,10 @@ func TestContextSession(t *testing.T) {
 	}
 	defer func() {
 		if r := recover(); r == nil {
-			t.Fatal("expected ctxSetSession of zero val to panic")
+			t.Fatal("expected ctx.SetSession of zero val to panic")
 		}
 	}()
-	ctxSetSession(r, nil, false, false)
+	ctx.SetSession(r, nil, false, false)
 }
 
 func TestRotateClientSecretHandler(t *testing.T) {

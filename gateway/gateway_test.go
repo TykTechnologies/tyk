@@ -19,13 +19,13 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
-	proxyproto "github.com/pires/go-proxyproto"
 	"github.com/stretchr/testify/assert"
 	msgpack "gopkg.in/vmihailenco/msgpack.v2"
 
 	"github.com/TykTechnologies/tyk-pump/analytics"
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/internal/httputil"
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/test"
 	"github.com/TykTechnologies/tyk/user"
@@ -573,7 +573,7 @@ func TestManagementNodeRedisEvents(t *testing.T) {
 				t.Fatalf("want %q, got %q", want, got)
 			}
 		}
-		ts.Gw.handleRedisEvent(&msg, shouldHandle, nil)
+		ts.Gw.HandleRedisEvent(&msg, shouldHandle, nil)
 		if !callbackRun {
 			t.Fatalf("Should run callback")
 		}
@@ -582,7 +582,7 @@ func TestManagementNodeRedisEvents(t *testing.T) {
 		notHandle := func(got NotificationCommand) {
 			t.Fatalf("should have not handled redis event")
 		}
-		ts.Gw.handleRedisEvent(msg, notHandle, nil)
+		ts.Gw.HandleRedisEvent(msg, notHandle, nil)
 	})
 
 	t.Run("With signature", func(t *testing.T) {
@@ -608,7 +608,7 @@ func TestManagementNodeRedisEvents(t *testing.T) {
 			}
 		}
 
-		ts.Gw.handleRedisEvent(&msg, shouldHandle, nil)
+		ts.Gw.HandleRedisEvent(&msg, shouldHandle, nil)
 		if !callbackRun {
 			t.Fatalf("Should run callback")
 		}
@@ -621,7 +621,7 @@ func TestManagementNodeRedisEvents(t *testing.T) {
 		shouldFail := func(got NotificationCommand) {
 			valid = true
 		}
-		ts.Gw.handleRedisEvent(&msg, shouldFail, nil)
+		ts.Gw.HandleRedisEvent(&msg, shouldFail, nil)
 		if valid {
 			t.Fatalf("Should fail validation")
 		}
@@ -697,31 +697,13 @@ func TestReloadGoroutineLeakWithCircuitBreaker(t *testing.T) {
 	}
 }
 
-func listenProxyProto(ls net.Listener) error {
-	pl := &proxyproto.Listener{Listener: ls}
-	for {
-		conn, err := pl.Accept()
-		if err != nil {
-			return err
-		}
-		recv := make([]byte, 4)
-		_, err = conn.Read(recv)
-		if err != nil {
-			return err
-		}
-		if _, err := conn.Write([]byte("pong")); err != nil {
-			return err
-		}
-	}
-}
-
 func TestProxyProtocol(t *testing.T) {
 	l, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer l.Close()
-	go listenProxyProto(l)
+	go httputil.TestListenProxyProto(l)
 	ts := StartTest(nil)
 	t.Cleanup(ts.Close)
 	rp, err := net.Listen("tcp", "127.0.0.1:0")
@@ -1769,9 +1751,9 @@ func TestTracing(t *testing.T) {
 		{Method: "POST", Path: "/tyk/debug", Data: `{}`, AdminAuth: true, Code: 400, BodyMatch: "Spec field is missing"},
 		{Method: "POST", Path: "/tyk/debug", Data: `{"Spec": {}}`, AdminAuth: true, Code: 400, BodyMatch: "Request field is missing"},
 		{Method: "POST", Path: "/tyk/debug", Data: `{"Spec": {}, "Request": {}}`, AdminAuth: true, Code: 400, BodyMatch: "Spec not valid, skipped!"},
-		{Method: "POST", Path: "/tyk/debug", Data: traceRequest{Spec: spec.APIDefinition, Request: &traceHttpRequest{Method: "GET", Path: "/"}}, AdminAuth: true, Code: 200, BodyMatch: `401 Unauthorized`},
-		{Method: "POST", Path: "/tyk/debug", Data: traceRequest{Spec: apiDefWithBundle, Request: &traceHttpRequest{Method: "GET", Path: "/", Headers: authHeaders}}, AdminAuth: true, Code: http.StatusBadRequest, BodyMatch: `Couldn't load bundle`},
-		{Method: "POST", Path: "/tyk/debug", Data: traceRequest{Spec: spec.APIDefinition, Request: &traceHttpRequest{Path: "/", Headers: authHeaders}}, AdminAuth: true, Code: 200, BodyMatch: `200 OK`},
+		{Method: "POST", Path: "/tyk/debug", Data: traceRequest{Spec: spec.APIDefinition, Request: &TraceHttpRequest{Method: "GET", Path: "/"}}, AdminAuth: true, Code: 200, BodyMatch: `401 Unauthorized`},
+		{Method: "POST", Path: "/tyk/debug", Data: traceRequest{Spec: apiDefWithBundle, Request: &TraceHttpRequest{Method: "GET", Path: "/", Headers: authHeaders}}, AdminAuth: true, Code: http.StatusBadRequest, BodyMatch: `Couldn't load bundle`},
+		{Method: "POST", Path: "/tyk/debug", Data: traceRequest{Spec: spec.APIDefinition, Request: &TraceHttpRequest{Path: "/", Headers: authHeaders}}, AdminAuth: true, Code: 200, BodyMatch: `200 OK`},
 	}...)
 
 	t.Run("Custom auth header", func(t *testing.T) {
@@ -1785,9 +1767,9 @@ func TestTracing(t *testing.T) {
 
 		_, _ = ts.Run(t, []test.TestCase{
 			{Method: http.MethodPost, Path: "/tyk/debug", Data: traceRequest{Spec: spec.APIDefinition,
-				Request: &traceHttpRequest{Path: "/", Headers: authHeaders}}, AdminAuth: true, Code: 200, BodyMatch: `401 Unauthorized`},
+				Request: &TraceHttpRequest{Path: "/", Headers: authHeaders}}, AdminAuth: true, Code: 200, BodyMatch: `401 Unauthorized`},
 			{Method: http.MethodPost, Path: "/tyk/debug", Data: traceRequest{Spec: spec.APIDefinition,
-				Request: &traceHttpRequest{Path: "/", Headers: customAuthHeaders}}, AdminAuth: true, Code: 200, BodyMatch: `200 OK`},
+				Request: &TraceHttpRequest{Path: "/", Headers: customAuthHeaders}}, AdminAuth: true, Code: 200, BodyMatch: `200 OK`},
 		}...)
 	})
 }

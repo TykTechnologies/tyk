@@ -1,4 +1,4 @@
-package gateway
+package gateway_test
 
 import (
 	"testing"
@@ -24,29 +24,7 @@ func Test_BuildDashboardConnStr(t *testing.T) {
 		ts.Gw.SetConfig(cfg)
 	}()
 
-	connStr := ts.Gw.buildDashboardConnStr("/test")
+	connStr := ts.Gw.BuildDashboardConnStr("/test")
 
 	assert.Equal(t, connStr, "http://localhost/test")
-}
-
-func Test_DashboardLifecycle(t *testing.T) {
-	var handler HTTPDashboardHandler
-
-	handler = HTTPDashboardHandler{
-		heartBeatStopSentinel: HeartBeatStarted,
-	}
-	assert.False(t, handler.isHeartBeatStopped())
-
-	handler = HTTPDashboardHandler{
-		heartBeatStopSentinel: HeartBeatStopped,
-	}
-
-	assert.True(t, handler.isHeartBeatStopped())
-
-	handler = HTTPDashboardHandler{
-		heartBeatStopSentinel: HeartBeatStarted,
-	}
-
-	handler.StopBeating()
-	assert.True(t, handler.isHeartBeatStopped())
 }

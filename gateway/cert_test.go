@@ -22,19 +22,16 @@ import (
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
 
-	"github.com/TykTechnologies/tyk/certs/mock"
-
-	"github.com/TykTechnologies/tyk/internal/crypto"
-
-	"github.com/TykTechnologies/tyk/header"
-	"github.com/TykTechnologies/tyk/storage"
-
-	"github.com/TykTechnologies/tyk/user"
-
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/certs"
+	"github.com/TykTechnologies/tyk/certs/mock"
 	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/header"
+	"github.com/TykTechnologies/tyk/internal/crypto"
+	"github.com/TykTechnologies/tyk/internal/httputil"
+	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/test"
+	"github.com/TykTechnologies/tyk/user"
 )
 
 const (
@@ -1585,7 +1582,7 @@ func TestUpstreamCertificates_WithProtocolTCP(t *testing.T) {
 	assert.NoError(t, err)
 	defer ls.Close()
 
-	go listenProxyProto(ls)
+	go httputil.TestListenProxyProto(ls)
 
 	certID, err := ts.Gw.CertificateManager.Add(combinedUpstreamCertPEM, "")
 	defer ts.Gw.CertificateManager.Delete(certID, "")
@@ -1641,7 +1638,7 @@ func TestClientCertificates_WithProtocolTLS(t *testing.T) {
 	assert.NoError(t, err)
 	defer upstream.Close()
 
-	go listenProxyProto(upstream)
+	go httputil.TestListenProxyProto(upstream)
 
 	// tyk
 	_, _, tykServerCombinedPEM, _ := crypto.GenServerCertificate()

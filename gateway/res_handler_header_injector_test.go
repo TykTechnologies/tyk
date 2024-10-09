@@ -1,4 +1,4 @@
-package gateway
+package gateway_test
 
 import (
 	"encoding/json"
@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/internal/build"
 	"github.com/TykTechnologies/tyk/test"
 )
 
@@ -95,18 +96,18 @@ func TestResponseHeaderInjection(t *testing.T) {
 	}
 	addHeadersCached := map[string]string{
 		"X-Test":             "test",
-		cachedResponseHeader: "1",
+		CachedResponseHeader: "1",
 	}
 
 	deleteHeaders := map[string]string{
 		"X-Tyk-Test":         "1",
-		cachedResponseHeader: "1",
+		CachedResponseHeader: "1",
 	}
 	deleteHeadersCached := map[string]string{
 		"X-Tyk-Test": "1",
 	}
 
-	userAgent := fmt.Sprintf("\"User-Agent\":\"Tyk/%v\"", VERSION)
+	userAgent := fmt.Sprintf("\"User-Agent\":\"Tyk/%v\"", build.Version)
 
 	_, _ = ts.Run(t, []test.TestCase{
 		// Create base auth based key
@@ -132,18 +133,18 @@ func BenchmarkResponseHeaderInjection(b *testing.B) {
 	}
 	addHeadersCached := map[string]string{
 		"X-Test":             "test",
-		cachedResponseHeader: "1",
+		CachedResponseHeader: "1",
 	}
 
 	deleteHeaders := map[string]string{
 		"X-Tyk-Test":         "1",
-		cachedResponseHeader: "1",
+		CachedResponseHeader: "1",
 	}
 	deleteHeadersCached := map[string]string{
 		"X-Tyk-Test": "1",
 	}
 
-	userAgent := fmt.Sprintf("\"User-Agent\":\"Tyk/%v\"", VERSION)
+	userAgent := fmt.Sprintf("\"User-Agent\":\"Tyk/%v\"", build.Version)
 
 	for i := 0; i < b.N; i++ {
 		_, _ = ts.Run(b, []test.TestCase{
