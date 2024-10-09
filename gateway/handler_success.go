@@ -10,9 +10,8 @@ import (
 	"strings"
 	"time"
 
-	graphqlinternal "github.com/TykTechnologies/tyk/internal/graphql"
-
 	"github.com/TykTechnologies/tyk/apidef"
+	graphqlinternal "github.com/TykTechnologies/tyk/internal/graphql"
 	"github.com/TykTechnologies/tyk/internal/httputil"
 
 	"github.com/TykTechnologies/tyk-pump/analytics"
@@ -382,8 +381,15 @@ func (s *SuccessHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) *http
 			Upstream: int64(DurationToMillisecond(resp.UpstreamLatency)),
 		}
 		s.RecordHit(r, latency, resp.Response.StatusCode, resp.Response, false)
+
+		// Don't print a transaction log there is no "resp", that indicates an error.
+		// In error situations, transaction log is already printed by "handler_error.go"
+		if s.Spec.GlobalConfig.AccessLogs.Enabled {
+			s.recordAccessLog(r, resp.Response, &latency)
+		}
 	}
 	log.Debug("Done proxy")
+
 	return nil
 }
 

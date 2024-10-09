@@ -12,8 +12,11 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/TykTechnologies/tyk-pump/analytics"
+
 	"github.com/TykTechnologies/tyk/internal/cache"
 	"github.com/TykTechnologies/tyk/internal/event"
+	"github.com/TykTechnologies/tyk/internal/httputil/accesslog"
 	"github.com/TykTechnologies/tyk/internal/otel"
 	"github.com/TykTechnologies/tyk/internal/policy"
 	"github.com/TykTechnologies/tyk/rpc"
@@ -374,6 +377,19 @@ func (t *BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 	}
 	store := policy.New(orgID, t.Gw, log)
 	return store.Apply(session)
+}
+
+// recordAccessLog is only used for Success/Error handler
+func (t *BaseMiddleware) recordAccessLog(req *http.Request, resp *http.Response, latency *analytics.Latency) {
+	hashKeys := t.Gw.GetConfig().HashKeys
+
+	accessLog := accesslog.NewRecord(t.Spec.APIID, t.Spec.OrgID)
+	accessLog.WithAuthToken(req, hashKeys, t.Gw.obfuscateKey)
+	accessLog.WithLatency(latency)
+	accessLog.WithRequest(req)
+	accessLog.WithResponse(resp)
+
+	t.Logger().WithFields(accessLog.Fields()).Info()
 }
 
 func copyAllowedURLs(input []user.AccessSpec) []user.AccessSpec {
