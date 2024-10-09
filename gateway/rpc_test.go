@@ -10,8 +10,8 @@ import (
 	"time"
 
 	"github.com/TykTechnologies/gorpc"
-	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/internal/model"
 	"github.com/TykTechnologies/tyk/rpc"
 	"github.com/TykTechnologies/tyk/test"
 )
@@ -134,7 +134,7 @@ func TestSyncAPISpecsRPCFailure_CheckGlobals(t *testing.T) {
 		}
 	}()
 	dispatcher := gorpc.NewDispatcher()
-	dispatcher.AddFunc("GetApiDefinitions", func(clientAddr string, dr *apidef.DefRequest) (string, error) {
+	dispatcher.AddFunc("GetApiDefinitions", func(clientAddr string, dr *model.DefRequest) (string, error) {
 		// the first time called is when we start the slave gateway
 		return a()
 	})
@@ -170,7 +170,7 @@ func TestSyncAPISpecsRPCSuccess(t *testing.T) {
 	rpc.UseSyncLoginRPC = true
 	var GetKeyCounter int
 	dispatcher := gorpc.NewDispatcher()
-	dispatcher.AddFunc("GetApiDefinitions", func(clientAddr string, dr *apidef.DefRequest) (string, error) {
+	dispatcher.AddFunc("GetApiDefinitions", func(clientAddr string, dr *model.DefRequest) (string, error) {
 		return jsonMarshalString(BuildAPI(func(spec *APISpec) {
 			spec.UseKeylessAccess = false
 		})), nil
@@ -260,7 +260,7 @@ func TestSyncAPISpecsRPCSuccess(t *testing.T) {
 		rpc.ResetEmergencyMode()
 
 		dispatcher := gorpc.NewDispatcher()
-		dispatcher.AddFunc("GetApiDefinitions", func(clientAddr string, dr *apidef.DefRequest) (string, error) {
+		dispatcher.AddFunc("GetApiDefinitions", func(clientAddr string, dr *model.DefRequest) (string, error) {
 			return jsonMarshalString(BuildAPI(
 				func(spec *APISpec) { spec.UseKeylessAccess = false },
 				func(spec *APISpec) { spec.UseKeylessAccess = false },
@@ -346,7 +346,7 @@ func TestSyncAPISpecsRPCSuccess(t *testing.T) {
 
 func TestSyncAPISpecsRPC_redis_failure(t *testing.T) {
 	dispatcher := gorpc.NewDispatcher()
-	dispatcher.AddFunc("GetApiDefinitions", func(clientAddr string, dr *apidef.DefRequest) (string, error) {
+	dispatcher.AddFunc("GetApiDefinitions", func(clientAddr string, dr *model.DefRequest) (string, error) {
 		return jsonMarshalString(BuildAPI(func(spec *APISpec) {
 			spec.UseKeylessAccess = false
 		})), nil

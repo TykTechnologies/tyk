@@ -97,6 +97,9 @@ jobs:
       REDIS_IMAGE: redis:${{ matrix.redis-version }}
 
     steps:
+      - name: "Reclaim some runner space"
+        run: sudo rm -rf /usr/local/bin/* /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
+
       - name: Checkout Tyk
         uses: actions/checkout@v4
         with:
