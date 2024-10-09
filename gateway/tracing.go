@@ -12,6 +12,7 @@ import (
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/internal/httputil"
+	"github.com/TykTechnologies/tyk/internal/model"
 )
 
 type traceHttpRequest struct {
@@ -117,7 +118,7 @@ func (gw *Gateway) traceHandler(w http.ResponseWriter, r *http.Request) {
 
 	loader := &APIDefinitionLoader{Gw: gw}
 
-	spec, err := loader.MakeSpec(&nestedApiDefinition{APIDefinition: traceReq.Spec}, logrus.NewEntry(logger))
+	spec, err := loader.MakeSpec(&model.MergedAPI{APIDefinition: traceReq.Spec}, logrus.NewEntry(logger))
 	if err != nil {
 		doJSONWrite(w, http.StatusBadRequest, traceResponse{Message: "error", Logs: logStorage.String()})
 		return
