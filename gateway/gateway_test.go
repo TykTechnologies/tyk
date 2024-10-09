@@ -1,6 +1,7 @@
 package gateway
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -21,6 +22,7 @@ import (
 	"github.com/gorilla/websocket"
 	proxyproto "github.com/pires/go-proxyproto"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	msgpack "gopkg.in/vmihailenco/msgpack.v2"
 
 	"github.com/TykTechnologies/tyk-pump/analytics"
@@ -1500,14 +1502,10 @@ func TestWebsocketsWithConnectionKeepAlive(t *testing.T) {
 
 	baseURL := strings.Replace(ts.URL, "http://", "ws://", -1)
 	url, err := url.Parse(baseURL)
-	if err != nil {
-		t.Fatalf("cannot parse url: %v", err)
-	}
+	require.NoError(t, err)
 
 	conn, err := net.Dial("tcp", url.Host)
-	if err != nil {
-		t.Fatalf("cannot make connection: %v", err)
-	}
+	require.NoError(t, err)
 	defer conn.Close()
 
 	req := fmt.Sprintf(`GET %s/ws HTTP/1.1
@@ -1522,16 +1520,10 @@ Upgrade: websocket
 `, baseURL, url.Host)
 	req = strings.Replace(req, "\n", "\r\n", -1)
 	_, err = conn.Write([]byte(req))
-	if err != nil {
-		t.Fatalf("cannot write request: %v", err)
-	}
+	require.NoError(t, err)
 	buf, err := bufio.NewReader(conn).ReadString('\n')
-	if err != nil {
-		t.Fatalf("cannot read response: %v", err)
-	}
-	if !strings.Contains(buf, "HTTP/1.1 101 Switching Protocols") {
-		t.Error("Unexpected response:", buf)
-	}
+	require.NoError(t, err)
+	assert.Contains(t, buf, "HTTP/1.1 101 Switching Protocols")
 
 	_, _ = ts.Run(t, test.TestCase{
 		Method: "GET",
