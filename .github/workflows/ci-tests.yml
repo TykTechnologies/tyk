@@ -35,6 +35,9 @@ jobs:
         with:
           token: ${{ secrets.ORG_GH_TOKEN }}
 
+      - name: "Reclaim some runner space"
+        run: sudo rm -rf /usr/local/bin/* /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
+
       - name: Setup Golang
         uses: actions/setup-go@v5
         with:
