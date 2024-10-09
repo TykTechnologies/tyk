@@ -16,6 +16,7 @@ env:
 jobs:
   docker-build:
     runs-on: ubuntu-latest
+    if: ${{ !github.event.pull_request.draft }}
     permissions:
       id-token: write
     steps:

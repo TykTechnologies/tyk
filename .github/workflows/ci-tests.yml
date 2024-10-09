@@ -30,19 +30,64 @@ env:
   PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION: python
 
 jobs:
+  lint:
+    runs-on: ubuntu-latest
+    if: ${{ !github.event.pull_request.draft }}
+    steps:
+      - name: "Checkout repository"
+        uses: TykTechnologies/github-actions/.github/actions/checkout-pr@main
+        with:
+          token: ${{ secrets.ORG_GH_TOKEN }}
+
+      - name: Setup Golang
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
+
+      - name: Cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/golangci-lint
+          key: 'golangci-lint-${{ runner.os }}-${{ hashFiles(''**/go.sum'') }}'
+          restore-keys: |
+            golangci-lint-${{ runner.os }}-
+
+      - name: Setup CI Tooling
+        uses: shrink/actions-docker-extract@v3
+        with:
+          image: tykio/ci-tools:latest
+          path: /usr/local/bin/golangci-lint
+          destination: /usr/local/bin
+
+      - run: golangci-lint version && golangci-lint cache status
+
+      - name: golangci-lint
+        if: ${{ github.event_name == 'pull_request' }}
+        run: |
+          golangci-lint run --out-format checkstyle --issues-exit-code=0 --new-from-rev=${{ github.base_ref }} -v ./... > golanglint.xml
+
+      - name: golangci-lint-on-push
+        if: ${{ github.event_name == 'push' }}
+        run: |
+          golangci-lint run --out-format checkstyle --issues-exit-code=0 -v ./... > golanglint.xml
+
+      - uses: actions/upload-artifact@v4
+        if: ${{ always() }}
+        with:
+          name: golangcilint
+          retention-days: 1
+          path: |
+            golanglint.xml
+
   test:
     name: Go ${{ matrix.go-version }} Redis ${{ matrix.redis-version }}
+    if: ${{ !github.event.pull_request.draft }}
+    needs: lint
     runs-on: ubuntu-latest
     strategy:
-      fail-fast: true
-      # This workflow isn't designed to be run as a pipeline, several issues:
-      #
-      # - contains golangci-lint jobs, sonarcloud (would duplicate)
-      # - cache config not suitable for multiple pipelines
-      # - python tests should be separate job, or no job
-      #
-      # Keep it to a single job run from the matrix as configured
-      # until we get a chance to redesign the pipeline properly.
+      fail-fast: false
       matrix:
         redis-version: [7]
         python-version: ["3.11"]
@@ -58,7 +103,7 @@ jobs:
           ref: ${{ github.event.pull_request.head.ref }}
 
       - name: Setup Golang
-        uses: actions/setup-go@v2
+        uses: actions/setup-go@v5
         with:
           go-version: ${{ matrix.go-version }}
 
@@ -117,29 +162,48 @@ jobs:
         if: ${{ github.event_name == 'pull_request' }}
         run: git fetch origin ${{ github.base_ref }}
 
-      - name: Print CPU info
-        run: grep '^model name' /proc/cpuinfo
-
-      - name: Print Go env
-        run: go env
-
       - name: Run Gateway Tests
         id: ci-tests
         run: |
           task test:e2e-combined args="-race -timeout=15m"
           task test:coverage
 
-      # golangci-lint actions *require* issues-exit-code=0 to pass data along to sonarcloud
-      # rather than erroring out on github issues directly with out-format github.
-      - name: golangci-lint
-        if: ${{ github.event_name == 'pull_request' }}
-        run: |
-          golangci-lint run --out-format checkstyle --issues-exit-code=0 --new-from-rev=origin/${{ github.base_ref }} ./... > golanglint.xml
+      - uses: actions/upload-artifact@v4
+        with:
+          name: coverage
+          retention-days: 1
+          path: coverage/gateway-all.cov
 
-      - name: golangci-lint-on-push
-        if: ${{ github.event_name == 'push' }}
-        run: |
-          golangci-lint run --out-format checkstyle --issues-exit-code=0 ./... > golanglint.xml
+  sonar-cloud-analysis:
+    runs-on: ubuntu-latest
+    if: ${{ !github.event.pull_request.draft }}
+    needs: [test, lint]
+    steps:
+      - name: "Checkout repository"
+        uses: TykTechnologies/github-actions/.github/actions/checkout-pr@main
+        with:
+          token: ${{ secrets.ORG_GH_TOKEN }}
+
+      - name: Download coverage artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: coverage
+
+      - name: Download golangcilint artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: golangcilint
+
+      - name: Check reports existence
+        id: check_files
+        uses: andstor/file-existence-action@v1
+        with:
+          files: 'coverage/gateway-all.cov, golanglint.xml'
+
+      - name: Install Dependencies
+        env:
+          TOKEN: '${{ secrets.ORG_GH_TOKEN }}'
+        run: git config --global url."https://${TOKEN}@github.com".insteadOf "https://github.com"
 
       - name: SonarCloud Scan
         if: always()
@@ -149,7 +213,7 @@ jobs:
             -Dsonar.organization=tyktechnologies
             -Dsonar.projectKey=TykTechnologies_tyk
             -Dsonar.sources=.
-            -Dsonar.exclusions=**/testdata/*,test/**,coprocess/**/*,ci/**,smoke-tests/**,apidef/oas/schema/schema.gen.go
+            -Dsonar.exclusions=**/testdata/*,test/**,coprocess/**/*,ci/**,smoke-tests/**,apidef/oas/schema/schema.gen.go,templates/**
             -Dsonar.coverage.exclusions=**/*_test.go,**/mock/*
             -Dsonar.test.inclusions=**/*_test.go
             -Dsonar.tests=.

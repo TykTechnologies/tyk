@@ -14,6 +14,7 @@ on:
 jobs:
   analyze:
     name: Analyze
+    if: ${{ !github.event.pull_request.draft }}
     runs-on: ubuntu-latest
 
     strategy:
@@ -39,7 +40,7 @@ jobs:
       if: ${{ github.event_name == 'pull_request' }}
 
     - name: Install Go
-      uses: actions/setup-go@v4
+      uses: actions/setup-go@v5
       with:
         go-version-file: go.mod
 
