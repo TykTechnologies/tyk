@@ -49,7 +49,6 @@ var (
 	// UseSyncLoginRPC for tests where we dont need to execute as a goroutine
 	UseSyncLoginRPC bool
 
-	connectionDialingWG  sync.WaitGroup
 	AnalyticsSerializers []serializer.AnalyticsSerializer
 )
 
@@ -254,13 +253,12 @@ func Connect(connConfig Config, suppressRegister bool, dispatcherFuncs map[strin
 	clientSingleton.OnConnect = onConnectFunc
 
 	clientSingleton.Conns = values.Config().RPCPoolSize
-	if clientSingleton.Conns == 0 {
+	if clientSingleton.Conns <= 0 {
 		clientSingleton.Conns = 5
 	}
 
-	for i := 0; i < clientSingleton.Conns; i++ {
-		connectionDialingWG.Add(1)
-	}
+	var connectionDialingWG sync.WaitGroup
+	connectionDialingWG.Add(clientSingleton.Conns)
 
 	clientSingleton.Dial = func(addr string) (conn net.Conn, err error) {
 		dialer := &net.Dialer{
