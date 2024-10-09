@@ -3,7 +3,7 @@ package rpc
 import (
 	"errors"
 
-	"github.com/TykTechnologies/tyk/internal/model"
+	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/storage"
 )
 
@@ -38,7 +38,7 @@ func (sf *SyncronizerForcer) GroupLoginCallback(userKey string, groupID string) 
 		Log.Info("Forcing MDCB synchronization for group:", groupID)
 	}
 
-	return model.GroupLoginRequest{
+	return apidef.GroupLoginRequest{
 		UserKey:   userKey,
 		GroupID:   groupID,
 		Node:      sf.getNodeDataFunc(),
