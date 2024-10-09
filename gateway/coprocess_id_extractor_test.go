@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/internal/model"
 	"github.com/TykTechnologies/tyk/storage"
 )
 
@@ -31,7 +32,7 @@ const (
 func (ts *Test) createSpecTestFrom(tb testing.TB, def *apidef.APIDefinition) *APISpec {
 	tb.Helper()
 	loader := APIDefinitionLoader{Gw: ts.Gw}
-	spec, _ := loader.MakeSpec(&nestedApiDefinition{APIDefinition: def}, nil)
+	spec, _ := loader.MakeSpec(&model.MergedAPI{APIDefinition: def}, nil)
 	tname := tb.Name()
 	redisStore := &storage.RedisCluster{KeyPrefix: tname + "-apikey.", ConnectionHandler: ts.Gw.StorageConnectionHandler}
 	healthStore := &storage.RedisCluster{KeyPrefix: tname + "-apihealth.", ConnectionHandler: ts.Gw.StorageConnectionHandler}
