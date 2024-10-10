@@ -34,10 +34,29 @@ type Policy struct {
 	GraphQL                       map[string]GraphAccessDefinition `bson:"graphql_access_rights" json:"graphql_access_rights"`
 }
 
+func (p *Policy) APILimit() APILimit {
+	return APILimit{
+		QuotaMax:           p.QuotaMax,
+		QuotaRenewalRate:   p.QuotaRenewalRate,
+		ThrottleInterval:   p.ThrottleInterval,
+		ThrottleRetryLimit: p.ThrottleRetryLimit,
+		MaxQueryDepth:      p.MaxQueryDepth,
+		RateLimit: RateLimit{
+			Rate: p.Rate,
+			Per:  p.Per,
+		},
+	}
+}
+
 type PolicyPartitions struct {
 	Quota      bool `bson:"quota" json:"quota"`
 	RateLimit  bool `bson:"rate_limit" json:"rate_limit"`
 	Complexity bool `bson:"complexity" json:"complexity"`
 	Acl        bool `bson:"acl" json:"acl"`
 	PerAPI     bool `bson:"per_api" json:"per_api"`
+}
+
+// Enabled reports if partitioning is enabled.
+func (p PolicyPartitions) Enabled() bool {
+	return p.Quota || p.RateLimit || p.Acl || p.Complexity
 }

@@ -37,10 +37,17 @@ type AccessSpec struct {
 	Methods []string `json:"methods" msg:"methods"`
 }
 
+// RateLimit holds rate limit configuration.
+type RateLimit struct {
+	// Rate is the allowed number of requests per interval.
+	Rate float64 `json:"rate" msg:"rate"`
+	// Per is the interval at which rate limit is enforced.
+	Per float64 `json:"per" msg:"per"`
+}
+
 // APILimit stores quota and rate limit on ACL level (per API)
 type APILimit struct {
-	Rate               float64 `json:"rate" msg:"rate"`
-	Per                float64 `json:"per" msg:"per"`
+	RateLimit
 	ThrottleInterval   float64 `json:"throttle_interval" msg:"throttle_interval"`
 	ThrottleRetryLimit int     `json:"throttle_retry_limit" msg:"throttle_retry_limit"`
 	MaxQueryDepth      int     `json:"max_query_depth" msg:"max_query_depth"`
@@ -49,6 +56,33 @@ type APILimit struct {
 	QuotaRemaining     int64   `json:"quota_remaining" msg:"quota_remaining"`
 	QuotaRenewalRate   int64   `json:"quota_renewal_rate" msg:"quota_renewal_rate"`
 	SetBy              string  `json:"-" msg:"-"`
+}
+
+// Clone does a deepcopy of APILimit.
+func (a APILimit) Clone() *APILimit {
+	return &APILimit{
+		RateLimit: RateLimit{
+			Rate: a.Rate,
+			Per:  a.Per,
+		},
+		ThrottleInterval:   a.ThrottleInterval,
+		ThrottleRetryLimit: a.ThrottleRetryLimit,
+		MaxQueryDepth:      a.MaxQueryDepth,
+		QuotaMax:           a.QuotaMax,
+		QuotaRenews:        a.QuotaRenews,
+		QuotaRemaining:     a.QuotaRemaining,
+		QuotaRenewalRate:   a.QuotaRenewalRate,
+		SetBy:              a.SetBy,
+	}
+}
+
+// Duration returns the time between two allowed requests at the defined rate.
+// It's used to decide which rate limit has a bigger allowance.
+func (r RateLimit) Duration() time.Duration {
+	if r.Per <= 0 || r.Rate <= 0 {
+		return 0
+	}
+	return time.Duration(float64(time.Second) * r.Per / r.Rate)
 }
 
 // AccessDefinition defines which versions of an API a key has access to
@@ -69,10 +103,48 @@ type AccessDefinition struct {
 	AllowanceScope string `json:"allowance_scope" msg:"allowance_scope"`
 }
 
-func (limit APILimit) IsEmpty() bool {
-	if limit.Rate != 0 || limit.Per != 0 || limit.ThrottleInterval != 0 || limit.ThrottleRetryLimit != 0 || limit.MaxQueryDepth != 0 || limit.QuotaMax != 0 || limit.QuotaRenews != 0 || limit.QuotaRemaining != 0 || limit.QuotaRenewalRate != 0 || limit.SetBy != "" {
+// IsEmpty checks if APILimit is empty.
+func (a APILimit) IsEmpty() bool {
+	if a.Rate != 0 {
 		return false
 	}
+
+	if a.Per != 0 {
+		return false
+	}
+
+	if a.ThrottleInterval != 0 {
+		return false
+	}
+
+	if a.ThrottleRetryLimit != 0 {
+		return false
+	}
+
+	if a.MaxQueryDepth != 0 {
+		return false
+	}
+
+	if a.QuotaMax != 0 {
+		return false
+	}
+
+	if a.QuotaRenews != 0 {
+		return false
+	}
+
+	if a.QuotaRemaining != 0 {
+		return false
+	}
+
+	if a.QuotaRenewalRate != 0 {
+		return false
+	}
+
+	if a.SetBy != "" {
+		return false
+	}
+
 	return true
 }
 
@@ -147,10 +219,45 @@ type SessionState struct {
 	// Used to store token hash
 	keyHash string
 	KeyID   string `json:"-"`
+
+	// modified holds the hint if a session has been modified for update.
+	// use Touch() to set it, and IsModified() to get it.
+	modified bool
 }
 
 func NewSessionState() *SessionState {
 	return &SessionState{}
+}
+
+// APILimit returns an user.APILimit from the session data.
+func (s *SessionState) APILimit() APILimit {
+	return APILimit{
+		RateLimit: RateLimit{
+			Rate: s.Rate,
+			Per:  s.Per,
+		},
+		QuotaMax:           s.QuotaMax,
+		QuotaRenewalRate:   s.QuotaRenewalRate,
+		QuotaRenews:        s.QuotaRenews,
+		ThrottleInterval:   s.ThrottleInterval,
+		ThrottleRetryLimit: s.ThrottleRetryLimit,
+		MaxQueryDepth:      s.MaxQueryDepth,
+	}
+}
+
+// Touch marks the session as modified, indicating that it should be updated.
+func (s *SessionState) Touch() {
+	s.modified = true
+}
+
+// Reset marks the session as not modified, skipping related updates.
+func (s *SessionState) Reset() {
+	s.modified = false
+}
+
+// IsModified will return true if session has been modified to trigger an update.
+func (s *SessionState) IsModified() bool {
+	return s.modified
 }
 
 // Clone  returns a fresh copy of s
