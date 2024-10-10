@@ -81,6 +81,9 @@ jobs:
     name: Go ${{ matrix.go-version }} Redis ${{ matrix.redis-version }}
     if: ${{ !github.event.pull_request.draft }}
     needs: lint
+    # Runs on is pinned to a version that provides python 3.12.
+    # See: https://github.com/actions/runner-images?tab=readme-ov-file#available-images
+    # Avoid using ubuntu-latest as it would upgrade python unattended.
     runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
@@ -100,11 +103,6 @@ jobs:
         uses: actions/checkout@v4
         with:
           ref: ${{ github.event.pull_request.head.ref }}
-
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: ${{ matrix.python-version }}
 
       - name: Print runtime python version
         run: python3 -c 'import sys; print("%d.%d" % (sys.version_info[0], sys.version_info[1]))'
