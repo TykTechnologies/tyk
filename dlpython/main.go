@@ -18,7 +18,6 @@ import (
 	"regexp"
 	"runtime"
 	"sort"
-	"strconv"
 	"strings"
 	"unsafe"
 
@@ -51,7 +50,7 @@ func FindPythonConfig(customVersion string) (selectedVersion string, err error) 
 	}
 
 	// Scan python-config binaries:
-	pythonConfigBinaries := map[float64]string{}
+	pythonConfigBinaries := map[string]string{}
 
 	for _, p := range strings.Split(paths, ":") {
 		if !strings.HasSuffix(p, "/bin") {
@@ -72,16 +71,15 @@ func FindPythonConfig(customVersion string) (selectedVersion string, err error) 
 			minorVersion := matches[0][3]
 			pyMallocBuild := matches[0][4]
 			isConfig := matches[0][5]
-			versionStr := "3"
+			version := "3"
 			if minorVersion != "" {
-				versionStr += "." + minorVersion
+				version += "." + minorVersion
 			}
 			if pyMallocBuild != "" {
-				versionStr += pyMallocBuild
+				version += pyMallocBuild
 			}
 
-			version, err := strconv.ParseFloat(versionStr, 64)
-			if err != nil || isConfig == "" {
+			if isConfig == "" {
 				continue
 			}
 
@@ -96,25 +94,30 @@ func FindPythonConfig(customVersion string) (selectedVersion string, err error) 
 	}
 
 	for ver, binPath := range pythonConfigBinaries {
-		logger.Debugf("Found python-config binary: %.1f (%s)", ver, binPath)
+		logger.Debugf("Found python-config binary: %s (%s)", ver, binPath)
 	}
 
 	if customVersion == "" {
-		var availableVersions []float64
-		for v := range pythonConfigBinaries {
-			availableVersions = append(availableVersions, v)
+		if len(pythonConfigBinaries) == 1 {
+			for k, v := range pythonConfigBinaries {
+				pythonConfigPath = v
+				selectedVersion = k
+			}
+		} else {
+			var availableVersions []string
+			for k := range pythonConfigBinaries {
+				availableVersions = append(availableVersions, k)
+			}
+			sort.Strings(availableVersions)
+
+			lastVersion := availableVersions[len(availableVersions)-1]
+
+			pythonConfigPath = pythonConfigBinaries[lastVersion]
+			selectedVersion = lastVersion
 		}
-		sort.Float64s(availableVersions)
-		lastVersion := availableVersions[len(availableVersions)-1]
-		pythonConfigPath = pythonConfigBinaries[lastVersion]
-		selectedVersion = strconv.FormatFloat(lastVersion, 'f', -1, 64)
-		logger.Debug("Using latest Python version")
+		logger.Debug("Using Python version", selectedVersion)
 	} else {
-		prefixF, err := strconv.ParseFloat(customVersion, 64)
-		if err != nil {
-			return selectedVersion, errors.New("Couldn't parse Python version")
-		}
-		cfgPath, ok := pythonConfigBinaries[prefixF]
+		cfgPath, ok := pythonConfigBinaries[customVersion]
 		if !ok {
 			return selectedVersion, errors.New("No python-config was found for the specified version")
 		}
