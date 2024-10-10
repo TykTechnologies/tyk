@@ -32,9 +32,6 @@ env:
 jobs:
   test:
     name: Go ${{ matrix.go-version }} Redis ${{ matrix.redis-version }}
-    # Runs on is pinned to a version that provides python 3.10.
-￼   # See: https://github.com/actions/runner-images?tab=readme-ov-file#available-images
-￼   # Avoid using ubuntu-latest as it would upgrade python unattended.
     runs-on: ubuntu-22.04
     strategy:
       fail-fast: true
