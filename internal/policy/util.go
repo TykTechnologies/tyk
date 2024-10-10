@@ -1,42 +1,62 @@
 package policy
 
 import (
+	"slices"
+
 	"github.com/TykTechnologies/tyk/user"
 )
 
-// appendIfMissing ensures dest slice is unique with new items.
-func appendIfMissing(src []string, in ...string) []string {
-	// Use map for uniqueness
-	srcMap := map[string]bool{}
-	for _, v := range src {
-		srcMap[v] = true
-	}
-	for _, v := range in {
-		srcMap[v] = true
-	}
+// MergeAllowedURLs will merge s1 and s2 to produce a merged result.
+// It maintains order of keys in s1 and s2 as they are seen.
+// If the result is an empty set, nil is returned.
+func MergeAllowedURLs(s1, s2 []user.AccessSpec) []user.AccessSpec {
+	order := []string{}
+	merged := map[string][]string{}
 
-	// Produce unique []string, maintain sort order
-	uniqueSorted := func(src []string, keys map[string]bool) []string {
-		result := make([]string, 0, len(keys))
-		for _, v := range src {
-			// append missing value
-			if val := keys[v]; val {
-				result = append(result, v)
-				delete(keys, v)
+	// Loop input sets and merge through a map.
+	for _, src := range [][]user.AccessSpec{s1, s2} {
+		for _, r := range src {
+			url := r.URL
+			v, ok := merged[url]
+			if !ok {
+				// First time we see the spec
+				merged[url] = r.Methods
+
+				// Maintain order
+				order = append(order, url)
+
+				continue
 			}
+			merged[url] = appendIfMissing(v, r.Methods...)
 		}
-		return result
 	}
 
-	// no new items from `in`
-	if len(srcMap) == len(src) {
-		return src
+	// Early exit without allocating.
+	if len(order) == 0 {
+		return nil
 	}
 
-	src = uniqueSorted(src, srcMap)
-	in = uniqueSorted(in, srcMap)
+	// Provide results in desired order.
+	result := make([]user.AccessSpec, 0, len(order))
+	for _, key := range order {
+		spec := user.AccessSpec{
+			Methods: merged[key],
+			URL:     key,
+		}
+		result = append(result, spec)
+	}
+	return result
+}
 
-	return append(src, in...)
+// appendIfMissing ensures dest slice is unique with new items.
+func appendIfMissing(dest []string, in ...string) []string {
+	for _, v := range in {
+		if slices.Contains(dest, v) {
+			continue
+		}
+		dest = append(dest, v)
+	}
+	return dest
 }
 
 // intersection gets intersection of the given two slices.
@@ -54,30 +74,6 @@ func intersection(a []string, b []string) (inter []string) {
 	}
 
 	return
-}
-
-// contains checks whether the given slice contains the given item.
-func contains(s []string, i string) bool {
-	for _, a := range s {
-		if a == i {
-			return true
-		}
-	}
-	return false
-}
-
-// greaterThanFloat64 checks whether first float64 value is bigger than second float64 value.
-// -1 means infinite and the biggest value.
-func greaterThanFloat64(first, second float64) bool {
-	if first == -1 {
-		return true
-	}
-
-	if second == -1 {
-		return false
-	}
-
-	return first > second
 }
 
 // greaterThanInt64 checks whether first int64 value is bigger than second int64 value.
@@ -106,24 +102,4 @@ func greaterThanInt(first, second int) bool {
 	}
 
 	return first > second
-}
-
-func copyAllowedURLs(input []user.AccessSpec) []user.AccessSpec {
-	if input == nil {
-		return nil
-	}
-
-	copied := make([]user.AccessSpec, len(input))
-
-	for i, as := range input {
-		copied[i] = user.AccessSpec{
-			URL: as.URL,
-		}
-		if as.Methods != nil {
-			copied[i].Methods = make([]string, len(as.Methods))
-			copy(copied[i].Methods, as.Methods)
-		}
-	}
-
-	return copied
 }
