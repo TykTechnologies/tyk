@@ -81,12 +81,14 @@ jobs:
     name: Go ${{ matrix.go-version }} Redis ${{ matrix.redis-version }}
     if: ${{ !github.event.pull_request.draft }}
     needs: lint
-    runs-on: ubuntu-latest
+    # Runs on is pinned to a version that provides python 3.10.
+    # See: https://github.com/actions/runner-images?tab=readme-ov-file#available-images
+    # Avoid using ubuntu-latest as it would upgrade python unattended.
+    runs-on: ubuntu-22.04
     strategy:
       fail-fast: false
       matrix:
         redis-version: [7]
-        python-version: ["3.11"]
         go-version: [1.22.x]
 
     env:
@@ -101,15 +103,18 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.ref }}
 
-      - name: Setup Golang
-        uses: actions/setup-go@v5
-        with:
-          go-version: ${{ matrix.go-version }}
-
+      # Regardless that the base image provides a python release, we need
+      # setup-python so it properly configures the python3-venv.
       - name: Setup Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
-          python-version: ${{ matrix.python-version }}
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Print runtime python version
+        run: python3 -c 'import sys; print("%d.%d" % (sys.version_info[0], sys.version_info[1]))'
+
+      - name: Print runtime pip version
+        run: pip -V && pip3 -V
 
       - name: Setup CI Tooling
         uses: shrink/actions-docker-extract@v3
@@ -118,7 +123,13 @@ jobs:
           path: /usr/local/bin/.
           destination: /usr/local/bin
 
-      - name: Cache
+      - name: Setup Golang
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
+
+      - name: Restore Golang Cache
         uses: actions/cache@v4
         with:
           path: |
@@ -160,6 +171,13 @@ jobs:
       - name: Fetch base branch
         if: ${{ github.event_name == 'pull_request' }}
         run: git fetch origin ${{ github.base_ref }}
+
+      - name: Bring up test services
+        run: task services:up
+
+      - name: Preflight Python tests
+        if: runner.debug == '1'
+        run: TYK_LOGLEVEL=debug go test -p 1 -parallel 1 -race -v ./dlpython ./coprocess/...
 
       - name: Run Gateway Tests
         id: ci-tests
