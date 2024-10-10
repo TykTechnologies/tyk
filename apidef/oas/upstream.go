@@ -559,7 +559,7 @@ type UpstreamAuth struct {
 	// BasicAuth holds the basic authentication configuration for upstream API authentication.
 	BasicAuth *UpstreamBasicAuth `bson:"basicAuth" json:"basicAuth"`
 
-	// Oauth2 contains the configuration for OAuth2 Client Credentials flow.
+	// OAuth contains the configuration for OAuth2 Client Credentials flow.
 	OAuth *UpstreamOAuth `bson:"oauth" json:"oauth"`
 }
 
