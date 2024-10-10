@@ -109,7 +109,7 @@ jobs:
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
-          python-version: '${{ matrix.python-version }}'
+          python-version: ${{ matrix.python-version }}
 
       - name: Setup CI Tooling
         uses: shrink/actions-docker-extract@v3
@@ -160,6 +160,12 @@ jobs:
       - name: Fetch base branch
         if: ${{ github.event_name == 'pull_request' }}
         run: git fetch origin ${{ github.base_ref }}
+
+      - name: Bring up test services
+        run: task services:up
+
+      - name: Preflight Python tests
+        run: TYK_LOGLEVEL=debug go test -v ./coprocess/...
 
       - name: Run Gateway Tests
         id: ci-tests
