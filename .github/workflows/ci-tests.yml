@@ -96,6 +96,9 @@ jobs:
       - name: "Reclaim some runner space"
         run: sudo rm -rf /usr/local/bin/* /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
 
+      - name: "Delete bundled python"
+        run: sudo rm -rf /usr/lib/python3* /usr/bin/python3*
+
       - name: Checkout Tyk
         uses: actions/checkout@v4
         with:
@@ -171,7 +174,7 @@ jobs:
         run: task services:up
 
       - name: Preflight Python tests
-        run: TYK_LOGLEVEL=debug go test -v ./dlpython ./coprocess/...
+        run: TYK_LOGLEVEL=debug go test -p 1 -parallel 1 -race -v ./dlpython ./coprocess/...
 
       - name: Run Gateway Tests
         id: ci-tests
