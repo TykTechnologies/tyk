@@ -6,11 +6,13 @@ runs:
   using: "composite"
   steps:
     - name: Check preinstalled Python versions
+      shell: bash
       run: |
         echo "Checking preinstalled Python versions..."
         ls -l /usr/bin/python*
 
     - name: Uninstall preinstalled Python versions
+      shell: bash
       run: |
         echo "Removing preinstalled Python versions..."
         
@@ -24,6 +26,7 @@ runs:
         done
 
     - name: Verify Python removal
+      shell: bash
       run: |
         echo "Verifying Python versions removal..."
         ls -l /usr/bin/python* || echo "All Python versions removed!"
