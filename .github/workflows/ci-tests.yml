@@ -173,6 +173,12 @@ jobs:
           retention-days: 1
           path: coverage/gateway-all.cov
 
+      - uses: actions/upload-artifact@v4
+        with:
+          name: testjson
+          retention-days: 1
+          path: coverage/gateway-all.json
+
   sonar-cloud-analysis:
     runs-on: ubuntu-latest
     if: ${{ !github.event.pull_request.draft }}
