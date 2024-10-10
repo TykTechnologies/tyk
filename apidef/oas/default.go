@@ -60,6 +60,7 @@ type TykExtensionConfigParams struct {
 	// MockResponse is true if a mocked response is configured.
 	MockResponse *bool
 
+	// pathItemHasParameters is set to true when parameters are defined the same level as of operations within path.
 	pathItemHasParameters bool
 }
 
