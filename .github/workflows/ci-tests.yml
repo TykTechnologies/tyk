@@ -22,12 +22,12 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
-  PYTHON_VERSION: "3.12"
+  PYTHON_VERSION: "3.11"
   PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION: python
 
 jobs:
   lint:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     if: ${{ !github.event.pull_request.draft }}
     steps:
       - name: "Checkout repository"
