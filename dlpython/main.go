@@ -98,23 +98,17 @@ func FindPythonConfig(customVersion string) (selectedVersion string, err error) 
 	}
 
 	if customVersion == "" {
-		if len(pythonConfigBinaries) == 1 {
-			for k, v := range pythonConfigBinaries {
-				pythonConfigPath = v
-				selectedVersion = k
-			}
-		} else {
-			var availableVersions []string
-			for k := range pythonConfigBinaries {
-				availableVersions = append(availableVersions, k)
-			}
-			sort.Strings(availableVersions)
-
-			lastVersion := availableVersions[len(availableVersions)-1]
-
-			pythonConfigPath = pythonConfigBinaries[lastVersion]
-			selectedVersion = lastVersion
+		var availableVersions []string
+		for k := range pythonConfigBinaries {
+			availableVersions = append(availableVersions, k)
 		}
+		sort.Strings(availableVersions)
+
+		lastVersion := availableVersions[len(availableVersions)-1]
+
+		pythonConfigPath = pythonConfigBinaries[lastVersion]
+		selectedVersion = lastVersion
+
 		logger.Debug("Using Python version", selectedVersion)
 	} else {
 		cfgPath, ok := pythonConfigBinaries[customVersion]
