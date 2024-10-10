@@ -7,4 +7,4 @@ runs:
   steps:
     - name: Uninstall preinstalled Python version
       shell: bash
-      run: sudo apt-get remove python3 --purge -y
+      run: sudo dpkg --remove --force-depends python3
