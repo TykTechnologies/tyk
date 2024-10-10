@@ -11,7 +11,7 @@ import (
 // UpstreamBasicAuth is a middleware that will do basic authentication for upstream connections.
 // UpstreamBasicAuth middleware is only supported in Tyk OAS API definitions.
 type UpstreamBasicAuth struct {
-	*BaseMiddleware
+	BaseMiddleware
 }
 
 // Name returns the name of middleware.

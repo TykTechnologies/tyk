@@ -91,7 +91,7 @@ func (w *customResponseWriter) getHttpResponse(r *http.Request) *http.Response {
 
 // GoPluginMiddleware is a generic middleware that will execute Go-plugin code before continuing
 type GoPluginMiddleware struct {
-	*BaseMiddleware
+	BaseMiddleware
 
 	Path           string // path to .so file
 	SymbolName     string // function symbol to look up
@@ -165,7 +165,7 @@ func (m *GoPluginMiddleware) loadPlugin() bool {
 	}
 
 	// to record 2XX hits in analytics
-	m.successHandler = &SuccessHandler{BaseMiddleware: m.BaseMiddleware}
+	m.successHandler = &SuccessHandler{BaseMiddleware: &m.BaseMiddleware}
 	return true
 }
 
@@ -189,7 +189,7 @@ func (m *GoPluginMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reque
 		if pluginMw, found := m.goPluginFromRequest(r); found {
 			logger = pluginMw.logger
 			handler = pluginMw.handler
-			successHandler = &SuccessHandler{BaseMiddleware: m.BaseMiddleware}
+			successHandler = &SuccessHandler{BaseMiddleware: &m.BaseMiddleware}
 		} else {
 			return nil, http.StatusOK // next middleware
 		}

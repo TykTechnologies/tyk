@@ -672,7 +672,7 @@ func TestGRPCAuthHook(t *testing.T) {
 
 	t.Run("id extractor enabled", func(t *testing.T) {
 		path := "/grpc-auth-hook-test-api-1/"
-		baseMW := &gateway.BaseMiddleware{
+		baseMW := gateway.BaseMiddleware{
 			Gw: ts.Gw,
 			Spec: &gateway.APISpec{
 				APIDefinition: &apidef.APIDefinition{
@@ -682,7 +682,7 @@ func TestGRPCAuthHook(t *testing.T) {
 		baseExtractor := gateway.BaseExtractor{
 			BaseMiddleware: baseMW,
 		}
-		expectedSessionID := baseExtractor.GenerateSessionID("abc", baseMW)
+		expectedSessionID := baseExtractor.GenerateSessionID("abc", &baseMW)
 		_, _ = ts.Run(t, []test.TestCase{
 			{Method: http.MethodGet, Path: path, Headers: map[string]string{"Authorization": "abc"}, Code: http.StatusOK},
 			{Method: http.MethodGet, Path: fmt.Sprintf("/tyk/keys/%s", expectedSessionID), AdminAuth: true, Code: http.StatusOK},
