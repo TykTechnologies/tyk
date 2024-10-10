@@ -109,7 +109,7 @@ jobs:
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
-          python-version: ${{ matrix.python-version }}
+          python-version: '${{ matrix.python-version }}'
 
       - name: Setup CI Tooling
         uses: shrink/actions-docker-extract@v3
