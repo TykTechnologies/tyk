@@ -22,7 +22,7 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
-  PYTHON_VERSION: '3.11'
+  PYTHON_VERSION: "3.11"
   PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION: python
 
 jobs:
@@ -107,7 +107,7 @@ jobs:
           python-version: ${{ matrix.python-version }}
 
       - name: Print runtime python version
-        uses: python3 -c 'import sys; print("%d.%d" % (sys.version_info[0], sys.version_info[1]))'
+        run: python3 -c 'import sys; print("%d.%d" % (sys.version_info[0], sys.version_info[1]))'
 
       - name: Setup CI Tooling
         uses: shrink/actions-docker-extract@v3
