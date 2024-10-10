@@ -21,7 +21,7 @@ var (
 )
 
 type oAuthHeaderProvider interface {
-	getOAuthHeaderValue(r *http.Request, spec *APISpec, gateway *Gateway) (string, error)
+	getOAuthHeaderValue(r *http.Request, spec *APISpec, storageConnectionGH *storage.ConnectionHandler) (string, error)
 	invalidateTokenCache(spec *APISpec)
 }
 
@@ -50,7 +50,7 @@ func InvalidateUpstreamOAuthCache(spec *APISpec) {
 }
 
 // ProcessRequest will inject basic auth info into request context so that it can be used during reverse proxy.
-func getUpstreamOAuth(r *http.Request, spec *APISpec, gateway *Gateway) (upstreamOAuthHeader, error) {
+func getUpstreamOAuth(r *http.Request, spec *APISpec, storageConnectionHandler *storage.ConnectionHandler) (upstreamOAuthHeader, error) {
 	oauthConfig := spec.UpstreamAuth.OAuth
 
 	var upstreamOAuthHeaderValue upstreamOAuthHeader
@@ -61,7 +61,7 @@ func getUpstreamOAuth(r *http.Request, spec *APISpec, gateway *Gateway) (upstrea
 
 	var err error
 	provider := getOAuthHeaderProvider(oauthConfig)
-	upstreamOAuthHeaderValue.value, err = provider.getOAuthHeaderValue(r, spec, gateway)
+	upstreamOAuthHeaderValue.value, err = provider.getOAuthHeaderValue(r, spec, storageConnectionHandler)
 	if err != nil {
 		return upstreamOAuthHeader{}, fmt.Errorf("failed to get OAuth token: %v", err)
 	}
@@ -76,7 +76,7 @@ func getOAuthHeaderProvider(oauthConfig apidef.UpstreamOAuth) oAuthHeaderProvide
 	return &perAPIOAuthProvider{}
 }
 
-func (p *perAPIOAuthProvider) getOAuthHeaderValue(r *http.Request, spec *APISpec, gateway *Gateway) (string, error) {
+func (p *perAPIOAuthProvider) getOAuthHeaderValue(r *http.Request, spec *APISpec, storageConnectionGH *storage.ConnectionHandler) (string, error) {
 	oauthConfig := spec.UpstreamAuth.OAuth
 
 	providerKey := generateCacheKey(oauthConfig, spec.APIID)
@@ -100,9 +100,9 @@ func (p *perAPIOAuthProvider) getOAuthHeaderValue(r *http.Request, spec *APISpec
 	return payload, nil
 }
 
-func (p *distributedCacheOAuthProvider) getOAuthHeaderValue(r *http.Request, spec *APISpec, gateway *Gateway) (string, error) {
+func (p *distributedCacheOAuthProvider) getOAuthHeaderValue(r *http.Request, spec *APISpec, storageConnectionHandler *storage.ConnectionHandler) (string, error) {
 	if oAuthUpstreamCache == nil {
-		oAuthUpstreamCache = newUpstreamOauthCache(gateway)
+		oAuthUpstreamCache = newUpstreamOauthCache(storageConnectionHandler)
 	}
 
 	token, err := oAuthUpstreamCache.getToken(r, spec)
@@ -114,8 +114,8 @@ func (p *distributedCacheOAuthProvider) getOAuthHeaderValue(r *http.Request, spe
 	return payload, nil
 }
 
-func newUpstreamOauthCache(gw *Gateway) *upstreamOauthCache {
-	return &upstreamOauthCache{RedisCluster: storage.RedisCluster{KeyPrefix: "upstreamOAuth-", ConnectionHandler: gw.StorageConnectionHandler}}
+func newUpstreamOauthCache(storageConnectionHandler *storage.ConnectionHandler) *upstreamOauthCache {
+	return &upstreamOauthCache{RedisCluster: storage.RedisCluster{KeyPrefix: "upstreamOAuth-", ConnectionHandler: storageConnectionHandler}}
 }
 
 type upstreamOauthCache struct {

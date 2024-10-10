@@ -1876,7 +1876,7 @@ func (p *ReverseProxy) addUpstreamOAuthInfo(outReq, req *http.Request) error {
 		return nil
 	}
 
-	oauthHeader, err := getUpstreamOAuth(req, p.TykAPISpec, p.Gw)
+	oauthHeader, err := getUpstreamOAuth(req, p.TykAPISpec, p.Gw.StorageConnectionHandler)
 	if err != nil {
 		return err
 	}
