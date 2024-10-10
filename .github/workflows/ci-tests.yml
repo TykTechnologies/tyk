@@ -101,15 +101,13 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.ref }}
 
-      - name: Setup Golang
-        uses: actions/setup-go@v5
-        with:
-          go-version: ${{ matrix.go-version }}
-
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
+
+      - name: Print runtime python version
+        uses: python3 -c 'import sys; print("%d.%d" % (sys.version_info[0], sys.version_info[1]))'
 
       - name: Setup CI Tooling
         uses: shrink/actions-docker-extract@v3
@@ -118,7 +116,12 @@ jobs:
           path: /usr/local/bin/.
           destination: /usr/local/bin
 
-      - name: Cache
+      - name: Setup Golang
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ matrix.go-version }}
+
+      - name: Restore Golang Cache
         uses: actions/cache@v4
         with:
           path: |
