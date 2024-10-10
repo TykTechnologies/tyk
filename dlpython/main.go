@@ -17,7 +17,6 @@ import (
 	"path/filepath"
 	"regexp"
 	"runtime"
-	"sort"
 	"strings"
 	"unsafe"
 
@@ -102,9 +101,7 @@ func FindPythonConfig(customVersion string) (selectedVersion string, err error) 
 		for k := range pythonConfigBinaries {
 			availableVersions = append(availableVersions, k)
 		}
-		sort.Strings(availableVersions)
-
-		lastVersion := availableVersions[len(availableVersions)-1]
+		lastVersion := selectLatestVersion(availableVersions)
 
 		pythonConfigPath = pythonConfigBinaries[lastVersion]
 		selectedVersion = lastVersion
