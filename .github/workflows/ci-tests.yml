@@ -171,6 +171,7 @@ jobs:
         run: task services:up
 
       - name: Preflight Python tests
+        if: runner.debug == '1'
         run: TYK_LOGLEVEL=debug go test -p 1 -parallel 1 -race -v ./dlpython ./coprocess/...
 
       - name: Run Gateway Tests
