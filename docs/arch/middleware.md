@@ -6,6 +6,11 @@ object. Middlewares rely on a copy of BaseMiddleware, to provide
 middleware specific loggers, with the `mw` field being set for each
 middleware.
 
+Known design requirements of BaseMiddleware:
+
+> Logger is middleware scoped with the new allocation/copy of *logrus.Entry in BaseMiddleware.
+> This is facilitated by a shallow copy of the BaseMiddleware object when creating middleware.
+
 BaseMiddleware bundles several APIs, that don't necessarily rely on
 needing a copy of this value. For example, two key objects:
 
