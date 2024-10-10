@@ -808,7 +808,11 @@ const Schema = `{
 								},
 								"endpoint_params": {
 									"type": ["object", "null"]
-								}	
+								},
+								"auth_style":{
+									"type": "integer",
+									"enum": [0,1,2],
+								}
 							}
 						},
 						"header_name": {
