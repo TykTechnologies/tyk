@@ -79,13 +79,13 @@ func getOAuthHeaderProvider(oauthConfig apidef.UpstreamOAuth) oAuthHeaderProvide
 func (p *perAPIOAuthProvider) getOAuthHeaderValue(r *http.Request, spec *APISpec, gateway *Gateway) (string, error) {
 	oauthConfig := spec.UpstreamAuth.OAuth
 
-	mapHash := generateCacheKey(oauthConfig, spec.APIID)
-	if _, ok := oAuthTokenProviders[mapHash]; !ok {
+	providerKey := generateCacheKey(oauthConfig, spec.APIID)
+	if _, ok := oAuthTokenProviders[providerKey]; !ok {
 		cfg := newOAuth2ClientCredentialsConfig(spec)
-		oAuthTokenProviders[mapHash] = cfg.TokenSource(context.Background())
+		oAuthTokenProviders[providerKey] = cfg.TokenSource(context.Background())
 	}
 
-	provider, ok := oAuthTokenProviders[mapHash]
+	provider, ok := oAuthTokenProviders[providerKey]
 	if !ok {
 		return "", fmt.Errorf("failed to get OAuth token provider")
 	}
