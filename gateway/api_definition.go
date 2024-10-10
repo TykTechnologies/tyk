@@ -25,7 +25,6 @@ import (
 
 	"github.com/TykTechnologies/tyk/internal/graphengine"
 	"github.com/TykTechnologies/tyk/internal/httputil"
-	"github.com/TykTechnologies/tyk/internal/model"
 
 	"github.com/getkin/kin-openapi/routers/gorillamux"
 
@@ -48,6 +47,7 @@ import (
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/header"
+	"github.com/TykTechnologies/tyk/internal/model"
 	"github.com/TykTechnologies/tyk/regexp"
 	"github.com/TykTechnologies/tyk/rpc"
 	"github.com/TykTechnologies/tyk/storage"
@@ -477,7 +477,7 @@ func (a APIDefinitionLoader) FromDashboardService(endpoint string) ([]*APISpec, 
 	}
 
 	// Extract tagged APIs#
-	list := &model.MergedAPIList{}
+	list := model.NewMergedAPIList()
 	inBytes, err := io.ReadAll(resp.Body)
 	if err != nil {
 		log.Error("Couldn't read api definition list")
@@ -635,15 +635,12 @@ func (a APIDefinitionLoader) FromRPC(store RPCDataLoader, orgId string, gw *Gate
 }
 
 func (a APIDefinitionLoader) processRPCDefinitions(apiCollection string, gw *Gateway) ([]*APISpec, error) {
-
 	var payload []model.MergedAPI
 	if err := json.Unmarshal([]byte(apiCollection), &payload); err != nil {
 		return nil, err
 	}
 
-	list := &model.MergedAPIList{
-		Message: payload,
-	}
+	list := model.NewMergedAPIList(payload...)
 
 	gwConfig := a.Gw.GetConfig()
 

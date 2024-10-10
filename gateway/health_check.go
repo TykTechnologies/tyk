@@ -8,29 +8,42 @@ import (
 	"sync"
 	"time"
 
-	"github.com/TykTechnologies/tyk/internal/model"
-	"github.com/TykTechnologies/tyk/rpc"
-
 	"github.com/sirupsen/logrus"
 
 	"github.com/TykTechnologies/tyk/header"
+	"github.com/TykTechnologies/tyk/internal/model"
+	"github.com/TykTechnologies/tyk/rpc"
 	"github.com/TykTechnologies/tyk/storage"
+)
+
+type (
+	HealthCheckItem     = model.HealthCheckItem
+	HealthCheckStatus   = model.HealthCheckStatus
+	HealthCheckResponse = model.HealthCheckResponse
+)
+
+const (
+	Pass      = model.Pass
+	Fail      = model.Fail
+	Warn      = model.Warn
+	Datastore = model.Datastore
+	System    = model.System
 )
 
 func (gw *Gateway) setCurrentHealthCheckInfo(h map[string]model.HealthCheckItem) {
 	gw.healthCheckInfo.Store(h)
 }
 
-func (gw *Gateway) getHealthCheckInfo() map[string]model.HealthCheckItem {
-	ret, ok := gw.healthCheckInfo.Load().(map[string]model.HealthCheckItem)
+func (gw *Gateway) getHealthCheckInfo() map[string]HealthCheckItem {
+	ret, ok := gw.healthCheckInfo.Load().(map[string]HealthCheckItem)
 	if !ok {
-		return make(map[string]model.HealthCheckItem, 0)
+		return make(map[string]HealthCheckItem, 0)
 	}
 	return ret
 }
 
 func (gw *Gateway) initHealthCheck(ctx context.Context) {
-	gw.setCurrentHealthCheckInfo(make(map[string]model.HealthCheckItem, 3))
+	gw.setCurrentHealthCheckInfo(make(map[string]HealthCheckItem, 3))
 
 	go func(ctx context.Context) {
 		var n = gw.GetConfig().LivenessCheck.CheckDuration
@@ -59,12 +72,12 @@ func (gw *Gateway) initHealthCheck(ctx context.Context) {
 }
 
 type SafeHealthCheck struct {
-	info map[string]model.HealthCheckItem
+	info map[string]HealthCheckItem
 	mux  sync.Mutex
 }
 
 func (gw *Gateway) gatherHealthChecks() {
-	allInfos := SafeHealthCheck{info: make(map[string]model.HealthCheckItem, 3)}
+	allInfos := SafeHealthCheck{info: make(map[string]HealthCheckItem, 3)}
 
 	redisStore := storage.RedisCluster{KeyPrefix: "livenesscheck-", ConnectionHandler: gw.StorageConnectionHandler}
 
@@ -76,9 +89,9 @@ func (gw *Gateway) gatherHealthChecks() {
 	go func() {
 		defer wg.Done()
 
-		var checkItem = model.HealthCheckItem{
-			Status:        model.Pass,
-			ComponentType: model.Datastore,
+		var checkItem = HealthCheckItem{
+			Status:        Pass,
+			ComponentType: Datastore,
 			Time:          time.Now().Format(time.RFC3339),
 		}
 
@@ -86,7 +99,7 @@ func (gw *Gateway) gatherHealthChecks() {
 		if err != nil {
 			mainLog.WithField("liveness-check", true).WithError(err).Error("Redis health check failed")
 			checkItem.Output = err.Error()
-			checkItem.Status = model.Fail
+			checkItem.Status = Fail
 		}
 
 		allInfos.mux.Lock()
@@ -100,9 +113,9 @@ func (gw *Gateway) gatherHealthChecks() {
 		go func() {
 			defer wg.Done()
 
-			var checkItem = model.HealthCheckItem{
-				Status:        model.Pass,
-				ComponentType: model.Datastore,
+			var checkItem = HealthCheckItem{
+				Status:        Pass,
+				ComponentType: Datastore,
 				Time:          time.Now().Format(time.RFC3339),
 			}
 
@@ -110,14 +123,14 @@ func (gw *Gateway) gatherHealthChecks() {
 				err := errors.New("Dashboard service not initialized")
 				mainLog.WithField("liveness-check", true).Error(err)
 				checkItem.Output = err.Error()
-				checkItem.Status = model.Fail
+				checkItem.Status = Fail
 			} else if err := gw.DashService.Ping(); err != nil {
 				mainLog.WithField("liveness-check", true).Error(err)
 				checkItem.Output = err.Error()
-				checkItem.Status = model.Fail
+				checkItem.Status = Fail
 			}
 
-			checkItem.ComponentType = model.System
+			checkItem.ComponentType = System
 
 			allInfos.mux.Lock()
 			allInfos.info["dashboard"] = checkItem
@@ -132,18 +145,18 @@ func (gw *Gateway) gatherHealthChecks() {
 		go func() {
 			defer wg.Done()
 
-			var checkItem = model.HealthCheckItem{
-				Status:        model.Pass,
-				ComponentType: model.Datastore,
+			var checkItem = HealthCheckItem{
+				Status:        Pass,
+				ComponentType: Datastore,
 				Time:          time.Now().Format(time.RFC3339),
 			}
 
 			if !rpc.Login() {
 				checkItem.Output = "Could not connect to RPC"
-				checkItem.Status = model.Fail
+				checkItem.Status = Fail
 			}
 
-			checkItem.ComponentType = model.System
+			checkItem.ComponentType = System
 
 			allInfos.mux.Lock()
 			allInfos.info["rpc"] = checkItem
@@ -166,8 +179,8 @@ func (gw *Gateway) liveCheckHandler(w http.ResponseWriter, r *http.Request) {
 
 	checks := gw.getHealthCheckInfo()
 
-	res := model.HealthCheckResponse{
-		Status:      model.Pass,
+	res := HealthCheckResponse{
+		Status:      Pass,
 		Version:     VERSION,
 		Description: "Tyk GW",
 		Details:     checks,
@@ -176,22 +189,22 @@ func (gw *Gateway) liveCheckHandler(w http.ResponseWriter, r *http.Request) {
 	var failCount int
 
 	for _, v := range checks {
-		if v.Status == model.Fail {
+		if v.Status == Fail {
 			failCount++
 		}
 	}
 
-	var status model.HealthCheckStatus
+	var status HealthCheckStatus
 
 	switch failCount {
 	case 0:
-		status = model.Pass
+		status = Pass
 
 	case len(checks):
-		status = model.Fail
+		status = Fail
 
 	default:
-		status = model.Warn
+		status = Warn
 	}
 
 	res.Status = status
