@@ -104,6 +104,13 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.ref }}
 
+      # Regardless that the base image provides a python release, we need
+      # setup-python so it properly configures the python3-venv.
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
       - name: Print runtime python version
         run: python3 -c 'import sys; print("%d.%d" % (sys.version_info[0], sys.version_info[1]))'
 
