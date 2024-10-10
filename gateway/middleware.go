@@ -14,6 +14,7 @@ import (
 
 	"github.com/TykTechnologies/tyk/internal/cache"
 	"github.com/TykTechnologies/tyk/internal/otel"
+	"github.com/TykTechnologies/tyk/internal/policy"
 	"github.com/TykTechnologies/tyk/rpc"
 
 	"github.com/TykTechnologies/tyk/header"
@@ -494,7 +495,7 @@ func (t *BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 				if !usePartitions || policy.Partitions.Acl {
 					didACL[k] = true
 
-					ar.AllowedURLs = copyAllowedURLs(v.AllowedURLs)
+					ar.AllowedURLs = mergeAllowedURLs(ar.AllowedURLs, v.AllowedURLs)
 
 					// Merge ACLs for the same API
 					if r, ok := rights[k]; ok {
@@ -504,19 +505,7 @@ func (t *BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 						}
 						r.Versions = appendIfMissing(rights[k].Versions, v.Versions...)
 
-						for _, u := range v.AllowedURLs {
-							found := false
-							for ai, au := range r.AllowedURLs {
-								if u.URL == au.URL {
-									found = true
-									r.AllowedURLs[ai].Methods = appendIfMissing(au.Methods, u.Methods...)
-								}
-							}
-
-							if !found {
-								r.AllowedURLs = append(r.AllowedURLs, v.AllowedURLs...)
-							}
-						}
+						r.AllowedURLs = mergeAllowedURLs(r.AllowedURLs, v.AllowedURLs)
 
 						for _, t := range v.RestrictedTypes {
 							for ri, rt := range r.RestrictedTypes {
@@ -764,25 +753,7 @@ func (t *BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 	return nil
 }
 
-func copyAllowedURLs(input []user.AccessSpec) []user.AccessSpec {
-	if input == nil {
-		return nil
-	}
-
-	copied := make([]user.AccessSpec, len(input))
-
-	for i, as := range input {
-		copied[i] = user.AccessSpec{
-			URL: as.URL,
-		}
-		if as.Methods != nil {
-			copied[i].Methods = make([]string, len(as.Methods))
-			copy(copied[i].Methods, as.Methods)
-		}
-	}
-
-	return copied
-}
+var mergeAllowedURLs = policy.MergeAllowedURLs
 
 // CheckSessionAndIdentityForValidKey will check first the Session store for a valid key, if not found, it will try
 // the Auth Handler, if not found it will fail

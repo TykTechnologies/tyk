@@ -32,7 +32,7 @@ env:
 jobs:
   test:
     name: Go ${{ matrix.go-version }} Redis ${{ matrix.redis-version }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     strategy:
       fail-fast: true
       # This workflow isn't designed to be run as a pipeline, several issues:
