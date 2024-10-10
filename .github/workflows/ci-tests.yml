@@ -109,6 +109,9 @@ jobs:
       - name: Print runtime python version
         run: python3 -c 'import sys; print("%d.%d" % (sys.version_info[0], sys.version_info[1]))'
 
+      - name: Print runtime pip version
+        run: pip -V && pip3 -V
+
       - name: Setup CI Tooling
         uses: shrink/actions-docker-extract@v3
         with:
