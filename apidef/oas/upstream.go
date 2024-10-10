@@ -560,7 +560,7 @@ type UpstreamAuth struct {
 	BasicAuth *UpstreamBasicAuth `bson:"basicAuth" json:"basicAuth"`
 
 	// Oauth2 contains the configuration for OAuth2 Client Credentials flow.
-	Oauth *UpstreamOAuth `bson:"oauth" json:"oauth"`
+	OAuth *UpstreamOAuth `bson:"oauth" json:"oauth"`
 }
 
 // Fill fills *UpstreamAuth from apidef.UpstreamAuth.
