@@ -956,7 +956,7 @@ func TestStreamingAPIGarbageCollection(t *testing.T) {
 		spec.OAS.Fill(*spec.APIDefinition)
 	})
 
-	baseMiddleware := &BaseMiddleware{Gw: ts.Gw, Spec: specs[0]}
+	baseMiddleware := BaseMiddleware{Gw: ts.Gw, Spec: specs[0]}
 	s := StreamingMiddleware{BaseMiddleware: baseMiddleware}
 
 	if err := setUpStreamAPI(ts, apiName, bentoHTTPServerTemplate); err != nil {

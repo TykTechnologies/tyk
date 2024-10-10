@@ -39,7 +39,7 @@ func (ts *Test) getRLOpenChain(spec *APISpec) http.Handler {
 	remote, _ := url.Parse(spec.Proxy.TargetURL)
 	proxy := ts.Gw.TykNewSingleHostReverseProxy(remote, spec, nil)
 	proxyHandler := ProxyHandler(proxy, spec)
-	baseMid := &BaseMiddleware{Spec: spec, Proxy: proxy, Gw: ts.Gw}
+	baseMid := BaseMiddleware{Spec: spec, Proxy: proxy, Gw: ts.Gw}
 	chain := alice.New(ts.Gw.mwList(
 		&IPWhiteListMiddleware{baseMid},
 		&IPBlackListMiddleware{BaseMiddleware: baseMid},
@@ -54,7 +54,7 @@ func (ts *Test) getGlobalRLAuthKeyChain(spec *APISpec) http.Handler {
 	remote, _ := url.Parse(spec.Proxy.TargetURL)
 	proxy := ts.Gw.TykNewSingleHostReverseProxy(remote, spec, nil)
 	proxyHandler := ProxyHandler(proxy, spec)
-	baseMid := &BaseMiddleware{Spec: spec, Proxy: proxy, Gw: ts.Gw}
+	baseMid := BaseMiddleware{Spec: spec, Proxy: proxy, Gw: ts.Gw}
 	chain := alice.New(ts.Gw.mwList(
 		&IPWhiteListMiddleware{baseMid},
 		&IPBlackListMiddleware{BaseMiddleware: baseMid},
@@ -71,7 +71,7 @@ func (ts *Test) getGlobalRLAuthKeyChain(spec *APISpec) http.Handler {
 func TestRateLimitForAPI_EnabledForSpec(t *testing.T) {
 	apiSpecDisabled := APISpec{APIDefinition: &apidef.APIDefinition{GlobalRateLimit: apidef.GlobalRateLimit{Disabled: true, Rate: 2, Per: 1}}}
 
-	rlDisabled := &RateLimitForAPI{BaseMiddleware: &BaseMiddleware{Spec: &apiSpecDisabled}}
+	rlDisabled := &RateLimitForAPI{BaseMiddleware: BaseMiddleware{Spec: &apiSpecDisabled}}
 	assert.False(t, rlDisabled.EnabledForSpec())
 }
 

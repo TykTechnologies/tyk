@@ -363,7 +363,7 @@ func recordDetail(r *http.Request, spec *APISpec) bool {
 // Spec states the path is Ignored
 func (s *SuccessHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) *http.Response {
 	log.Debug("Started proxy")
-	defer s.Base().UpdateRequestSession(r)
+	defer s.BaseMiddleware.UpdateRequestSession(r)
 
 	// Make sure we get the correct target URL
 	s.Spec.SanitizeProxyPaths(r)

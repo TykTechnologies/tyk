@@ -275,7 +275,9 @@ func (gw *Gateway) processSpec(spec *APISpec, apisByListen map[string]int,
 	// Create the response processors, pass all the loaded custom middleware response functions:
 	gw.createResponseMiddlewareChain(spec, mwResponseFuncs)
 
-	baseMid := &BaseMiddleware{Spec: spec, Proxy: proxy, logger: logger, Gw: gw}
+	// BaseMiddleware gets copied for each middleware. This allows for unique
+	// loggers which are configured in `createMiddleware`.
+	baseMid := BaseMiddleware{Spec: spec, Proxy: proxy, logger: logger, Gw: gw}
 
 	for _, v := range baseMid.Spec.VersionData.Versions {
 		if len(v.ExtendedPaths.CircuitBreaker) > 0 {
@@ -470,7 +472,7 @@ func (gw *Gateway) processSpec(spec *APISpec, apisByListen map[string]int,
 
 	gw.mwAppendEnabled(&chainArray, &UpstreamBasicAuth{BaseMiddleware: baseMid})
 
-	chain = alice.New(chainArray...).Then(&DummyProxyHandler{SH: SuccessHandler{baseMid}, Gw: gw})
+	chain = alice.New(chainArray...).Then(&DummyProxyHandler{SH: SuccessHandler{&baseMid}, Gw: gw})
 
 	if !spec.UseKeylessAccess {
 		var simpleArray []alice.Constructor

@@ -28,7 +28,7 @@ func TestRedisCacheMiddlewareUnit(t *testing.T) {
 			Name: "isTimeStampExpired",
 			Fn: func(t *testing.T) {
 				t.Helper()
-				mw := &RedisCacheMiddleware{BaseMiddleware: &BaseMiddleware{}}
+				mw := &RedisCacheMiddleware{BaseMiddleware: BaseMiddleware{}}
 
 				assert.True(t, mw.isTimeStampExpired("invalid"))
 				assert.True(t, mw.isTimeStampExpired("1"))
@@ -40,7 +40,7 @@ func TestRedisCacheMiddlewareUnit(t *testing.T) {
 			Name: "decodePayload",
 			Fn: func(t *testing.T) {
 				t.Helper()
-				mw := &RedisCacheMiddleware{BaseMiddleware: &BaseMiddleware{}}
+				mw := &RedisCacheMiddleware{BaseMiddleware: BaseMiddleware{}}
 
 				if data, expire, err := mw.decodePayload("dGVzdGluZwo=|123"); true {
 					assert.Equal(t, "testing\n", data)

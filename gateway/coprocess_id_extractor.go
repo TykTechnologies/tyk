@@ -27,7 +27,7 @@ type IdExtractor interface {
 type BaseExtractor struct {
 	Config            *apidef.MiddlewareIdExtractor
 	IDExtractorConfig apidef.IDExtractorConfig
-	*BaseMiddleware
+	BaseMiddleware
 
 	Spec *APISpec
 }
@@ -118,7 +118,7 @@ func (e *ValueExtractor) ExtractAndCheck(r *http.Request) (sessionID string, ret
 		return sessionID, returnOverrides
 	}
 
-	sessionID = e.GenerateSessionID(extractorOutput, e.BaseMiddleware)
+	sessionID = e.GenerateSessionID(extractorOutput, &e.BaseMiddleware)
 	previousSession, keyExists := e.CheckSessionAndIdentityForValidKey(sessionID, r)
 	sessionID = previousSession.KeyID
 
@@ -174,7 +174,7 @@ func (e *RegexExtractor) ExtractAndCheck(r *http.Request) (SessionID string, ret
 		return SessionID, returnOverrides
 	}
 
-	SessionID = e.GenerateSessionID(regexOutput[e.IDExtractorConfig.RegexMatchIndex], e.BaseMiddleware)
+	SessionID = e.GenerateSessionID(regexOutput[e.IDExtractorConfig.RegexMatchIndex], &e.BaseMiddleware)
 	previousSession, keyExists := e.BaseMiddleware.CheckSessionAndIdentityForValidKey(SessionID, r)
 	SessionID = previousSession.KeyID
 
@@ -237,7 +237,7 @@ func (e *XPathExtractor) ExtractAndCheck(r *http.Request) (SessionID string, ret
 		return SessionID, returnOverrides
 	}
 
-	SessionID = e.GenerateSessionID(output, e.BaseMiddleware)
+	SessionID = e.GenerateSessionID(output, &e.BaseMiddleware)
 	previousSession, keyExists := e.BaseMiddleware.CheckSessionAndIdentityForValidKey(SessionID, r)
 	SessionID = previousSession.KeyID
 
@@ -254,7 +254,7 @@ func (e *XPathExtractor) ExtractAndCheck(r *http.Request) (SessionID string, ret
 }
 
 // newExtractor is called from the CP middleware for every API that specifies extractor settings.
-func newExtractor(referenceSpec *APISpec, mw *BaseMiddleware) {
+func newExtractor(referenceSpec *APISpec, mw BaseMiddleware) {
 	if referenceSpec.CustomMiddleware.IdExtractor.Disabled {
 		return
 	}

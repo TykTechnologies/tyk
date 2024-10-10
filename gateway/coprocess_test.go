@@ -245,11 +245,17 @@ func equalHeaders(h1, h2 []*coprocess.Header) bool {
 
 func TestCoProcessMiddlewareName(t *testing.T) {
 	// Initialize the CoProcessMiddleware
-	m := &CoProcessMiddleware{BaseMiddleware: &BaseMiddleware{}}
+	m := &CoProcessMiddleware{}
 
 	// Get the name using the method
 	name := m.Name()
 
 	// Check that the returned name is "CoProcessMiddleware"
 	require.Equal(t, "CoProcessMiddleware", name, "Name method did not return the expected value")
+
+	// Get the logger
+	entry := m.Logger()
+
+	// Check that `mw` is in the Data.
+	require.Equal(t, "CoProcessMiddleware", entry.Data["mw"], "Logger fault")
 }

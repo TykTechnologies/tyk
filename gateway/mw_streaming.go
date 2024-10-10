@@ -39,7 +39,7 @@ var globalStreamCounter atomic.Int64
 
 // StreamingMiddleware is a middleware that handles streaming functionality
 type StreamingMiddleware struct {
-	*BaseMiddleware
+	BaseMiddleware
 
 	createStreamManagerLock sync.Mutex
 	streamManagerCache      sync.Map // Map of payload hash to StreamManager

@@ -14,7 +14,7 @@ import (
 
 // GranularAccessMiddleware will check if a URL is specifically enabled for the key
 type GranularAccessMiddleware struct {
-	*BaseMiddleware
+	BaseMiddleware
 }
 
 func (m *GranularAccessMiddleware) Name() string {

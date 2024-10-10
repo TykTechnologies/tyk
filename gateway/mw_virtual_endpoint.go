@@ -50,7 +50,7 @@ type VMResponseObject struct {
 
 // DynamicMiddleware is a generic middleware that will execute JS code before continuing
 type VirtualEndpoint struct {
-	*BaseMiddleware
+	BaseMiddleware
 
 	sh SuccessHandler
 }
@@ -95,7 +95,7 @@ func (gw *Gateway) preLoadVirtualMetaCode(meta *apidef.VirtualMeta, j *JSVM) {
 }
 
 func (d *VirtualEndpoint) Init() {
-	d.sh = SuccessHandler{d.BaseMiddleware}
+	d.sh = SuccessHandler{&d.BaseMiddleware}
 }
 
 func (d *VirtualEndpoint) EnabledForSpec() bool {

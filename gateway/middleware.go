@@ -104,7 +104,7 @@ func (tr TraceMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request,
 	return tr.TykMiddleware.ProcessRequest(w, r, conf)
 }
 
-func (gw *Gateway) createDynamicMiddleware(name string, isPre, useSession bool, baseMid *BaseMiddleware) func(http.Handler) http.Handler {
+func (gw *Gateway) createDynamicMiddleware(name string, isPre, useSession bool, baseMid BaseMiddleware) func(http.Handler) http.Handler {
 	dMiddleware := &DynamicMiddleware{
 		BaseMiddleware:      baseMid,
 		MiddlewareClassName: name,

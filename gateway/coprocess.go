@@ -29,7 +29,7 @@ var (
 
 // CoProcessMiddleware is the basic CP middleware struct.
 type CoProcessMiddleware struct {
-	*BaseMiddleware
+	BaseMiddleware
 
 	HookType         coprocess.HookType
 	HookName         string
@@ -44,13 +44,13 @@ func (m *CoProcessMiddleware) Name() string {
 }
 
 // CreateCoProcessMiddleware initializes a new CP middleware, takes hook type (pre, post, etc.), hook name ("my_hook") and driver ("python").
-func CreateCoProcessMiddleware(hookName string, hookType coprocess.HookType, mwDriver apidef.MiddlewareDriver, baseMid *BaseMiddleware) func(http.Handler) http.Handler {
+func CreateCoProcessMiddleware(hookName string, hookType coprocess.HookType, mwDriver apidef.MiddlewareDriver, baseMid BaseMiddleware) func(http.Handler) http.Handler {
 	dMiddleware := &CoProcessMiddleware{
 		BaseMiddleware:   baseMid,
 		HookType:         hookType,
 		HookName:         hookName,
 		MiddlewareDriver: mwDriver,
-		successHandler:   &SuccessHandler{baseMid},
+		successHandler:   &SuccessHandler{&baseMid},
 	}
 
 	return baseMid.Gw.createMiddleware(dMiddleware)
@@ -308,7 +308,7 @@ func (m *CoProcessMiddleware) EnabledForSpec() bool {
 	log.WithFields(logrus.Fields{
 		"prefix": "coprocess",
 	}).Debug("Enabling CP middleware.")
-	m.successHandler = &SuccessHandler{m.BaseMiddleware}
+	m.successHandler = &SuccessHandler{&m.BaseMiddleware}
 	return true
 }
 
@@ -525,7 +525,7 @@ func (h *CustomMiddlewareResponseHook) Init(mwDef interface{}, spec *APISpec) er
 	mwDefinition := mwDef.(apidef.MiddlewareDefinition)
 
 	h.mw = &CoProcessMiddleware{
-		BaseMiddleware: &BaseMiddleware{
+		BaseMiddleware: BaseMiddleware{
 			Spec: spec,
 			Gw:   h.Gw,
 		},
@@ -547,7 +547,7 @@ func (h *CustomMiddlewareResponseHook) Name() string {
 }
 
 func (h *CustomMiddlewareResponseHook) HandleError(rw http.ResponseWriter, req *http.Request) {
-	handler := ErrorHandler{h.mw.BaseMiddleware}
+	handler := ErrorHandler{&h.mw.BaseMiddleware}
 	handler.HandleError(rw, req, "Middleware error", http.StatusInternalServerError, true)
 }
 

@@ -14,7 +14,7 @@ import (
 // RateLimitAndQuotaCheck will check the incoming request and key whether it is within it's quota and
 // within it's rate limit, it makes use of the SessionLimiter object to do this
 type RateLimitForAPI struct {
-	*BaseMiddleware
+	BaseMiddleware
 
 	keyName string
 	apiSess *user.SessionState
