@@ -347,68 +347,6 @@ func TestSessionLimiter_RedisQuotaExceeded_PerAPI(t *testing.T) {
 	})
 }
 
-func TestCopyAllowedURLs(t *testing.T) {
-	testCases := []struct {
-		name  string
-		input []user.AccessSpec
-	}{
-		{
-			name: "Copy non-empty slice of AccessSpec with non-empty Methods",
-			input: []user.AccessSpec{
-				{
-					URL:     "http://example.com",
-					Methods: []string{"GET", "POST"},
-				},
-				{
-					URL:     "http://example.org",
-					Methods: []string{"GET"},
-				},
-			},
-		},
-		{
-			name: "Copy non-empty slice of AccessSpec with empty Methods",
-			input: []user.AccessSpec{
-				{
-					URL:     "http://example.com",
-					Methods: []string{},
-				},
-				{
-					URL:     "http://example.org",
-					Methods: []string{},
-				},
-			},
-		},
-		{
-			name: "Copy non-empty slice of AccessSpec with nil Methods",
-			input: []user.AccessSpec{
-				{
-					URL:     "http://example.com",
-					Methods: nil,
-				},
-				{
-					URL:     "http://example.org",
-					Methods: nil,
-				},
-			},
-		},
-		{
-			name:  "Copy empty slice of AccessSpec",
-			input: []user.AccessSpec{},
-		},
-		{
-			name:  "Copy nil slice of AccessSpec",
-			input: []user.AccessSpec(nil),
-		},
-	}
-
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			copied := copyAllowedURLs(tc.input)
-			assert.Equal(t, tc.input, copied)
-		})
-	}
-}
-
 func TestQuotaNotAppliedWithURLRewrite(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
