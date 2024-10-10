@@ -14,7 +14,13 @@ tasks:
     desc: "Build plugin compiler"
     dir: '{{.root}}'
     cmds:
-      - docker build --no-cache --progress=plain --build-arg GO_VERSION=1.22 --build-arg GITHUB_TAG={{.tag}} --build-arg GITHUB_SHA={{.sha}} --platform=linux/amd64 --rm -t {{.image}} -f ci/images/plugin-compiler/Dockerfile .
+      - docker build --build-arg GITHUB_TAG={{.tag}} --build-arg GITHUB_SHA={{.sha}} --platform=linux/amd64 --rm -t {{.image}} -f ci/images/plugin-compiler/Dockerfile .
+
+  build-nocache:
+    desc: "Build plugin compiler"
+    dir: '{{.root}}'
+    cmds:
+      - docker build --no-cache --progress=plain --build-arg GITHUB_TAG={{.tag}} --build-arg GITHUB_SHA={{.sha}} --platform=linux/amd64 --rm -t {{.image}} -f ci/images/plugin-compiler/Dockerfile .
 
   test:
     desc: "Run test docker image"
