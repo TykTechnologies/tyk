@@ -9,11 +9,9 @@ import (
 	"testing"
 
 	"github.com/sirupsen/logrus"
-
-	"github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
-
 	"github.com/stretchr/testify/assert"
 
+	"github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
 	"github.com/TykTechnologies/tyk/internal/policy"
 	"github.com/TykTechnologies/tyk/user"
 )
@@ -22,9 +20,9 @@ import (
 var testDataFS embed.FS
 
 func TestApplyRateLimits_PolicyLimits(t *testing.T) {
-	svc := &policy.Service{}
-
 	t.Run("policy limits unset", func(t *testing.T) {
+		svc := &policy.Service{}
+
 		session := &user.SessionState{
 			Rate: 5,
 			Per:  10,
@@ -44,6 +42,8 @@ func TestApplyRateLimits_PolicyLimits(t *testing.T) {
 	})
 
 	t.Run("policy limits apply all", func(t *testing.T) {
+		svc := &policy.Service{}
+
 		session := &user.SessionState{
 			Rate: 5,
 			Per:  10,
@@ -69,6 +69,8 @@ func TestApplyRateLimits_PolicyLimits(t *testing.T) {
 	// changes are applied to api limits, but skipped on
 	// the session as the session has a higher allowance.
 	t.Run("policy limits apply per-api", func(t *testing.T) {
+		svc := &policy.Service{}
+
 		session := &user.SessionState{
 			Rate: 15,
 			Per:  10,
@@ -93,6 +95,8 @@ func TestApplyRateLimits_PolicyLimits(t *testing.T) {
 	// As the policy defined a lower rate than apiLimits,
 	// no changes to api limits are applied.
 	t.Run("policy limits skip", func(t *testing.T) {
+		svc := &policy.Service{}
+
 		session := &user.SessionState{
 			Rate: 5,
 			Per:  10,
@@ -117,29 +121,26 @@ func TestApplyRateLimits_PolicyLimits(t *testing.T) {
 func TestApplyRateLimits_FromCustomPolicies(t *testing.T) {
 	svc := &policy.Service{}
 
-	t.Run("Custom policies", func(t *testing.T) {
-		session := &user.SessionState{}
-		session.SetCustomPolicies([]user.Policy{
-			{
-				ID:           "pol1",
-				Partitions:   user.PolicyPartitions{RateLimit: true},
-				Rate:         8,
-				Per:          1,
-				AccessRights: map[string]user.AccessDefinition{"a": {}},
-			},
-			{
-				ID:           "pol2",
-				Partitions:   user.PolicyPartitions{RateLimit: true},
-				Rate:         10,
-				Per:          1,
-				AccessRights: map[string]user.AccessDefinition{"a": {}},
-			},
-		})
-
-		svc.Apply(session)
-
-		assert.Equal(t, 10, int(session.Rate))
+	session := &user.SessionState{}
+	session.SetCustomPolicies([]user.Policy{
+		{
+			ID:           "pol1",
+			Partitions:   user.PolicyPartitions{RateLimit: true},
+			Rate:         8,
+			Per:          1,
+			AccessRights: map[string]user.AccessDefinition{"a": {}},
+		},
+		{
+			ID:           "pol2",
+			Partitions:   user.PolicyPartitions{RateLimit: true},
+			Rate:         10,
+			Per:          1,
+			AccessRights: map[string]user.AccessDefinition{"a": {}},
+		},
 	})
+
+	assert.NoError(t, svc.Apply(session))
+	assert.Equal(t, 10, int(session.Rate))
 }
 
 func TestApplyEndpointLevelLimits(t *testing.T) {
@@ -190,7 +191,7 @@ func testPrepareApplyPolicies(tb testing.TB) (*policy.Service, []testApplyPolici
 	err = json.Unmarshal(f, &repoPols)
 	assert.NoError(tb, err)
 
-	store := policy.NewStore(repoPols)
+	store := policy.NewStoreMap(repoPols)
 	orgID := ""
 	service := policy.New(&orgID, store, logrus.StandardLogger())
 

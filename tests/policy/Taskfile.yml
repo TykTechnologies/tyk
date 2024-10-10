@@ -7,7 +7,7 @@ includes:
     dir: ../../docker/services
 
 vars:
-  coverage: quota.cov
+  coverage: policy.cov
   testArgs: -v
 
 tasks:
