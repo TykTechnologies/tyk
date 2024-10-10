@@ -20,7 +20,6 @@ import (
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/header"
-	"github.com/TykTechnologies/tyk/rpc"
 	"github.com/TykTechnologies/tyk/test"
 	"github.com/TykTechnologies/tyk/user"
 
@@ -1596,6 +1595,7 @@ func TestParsePoliciesFromRPC(t *testing.T) {
 	}
 
 }
+<<<<<<< HEAD
 
 type RPCDataLoaderMock struct {
 	ShouldConnect bool
@@ -1666,3 +1666,5 @@ func Test_LoadPoliciesFromRPC(t *testing.T) {
 		assert.Equal(t, 1, len(polMap), "expected 0 policies to be loaded from RPC")
 	})
 }
+=======
+>>>>>>> e31a08f08... [TT-12897] Merge path based permissions when combining policies (#6597)

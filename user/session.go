@@ -7,10 +7,12 @@ import (
 
 	"github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
 
+<<<<<<< HEAD
 	logger "github.com/TykTechnologies/tyk/log"
+=======
+	"github.com/TykTechnologies/tyk/apidef"
+>>>>>>> e31a08f08... [TT-12897] Merge path based permissions when combining policies (#6597)
 )
-
-var log = logger.Get()
 
 type HashType string
 
