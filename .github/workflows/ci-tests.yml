@@ -101,6 +101,9 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.ref }}
 
+      - name: Clean Python
+        uses: ./.github/actions/cleanup-python
+
       - name: Setup Python
         uses: actions/setup-python@v5
         with:

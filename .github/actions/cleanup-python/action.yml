@@ -1,0 +1,29 @@
+---
+name: "Cleanup Python"
+description: "A composite action to remove preinstalled Python versions in a GitHub runner."
+
+runs:
+  using: "composite"
+  steps:
+    - name: Check preinstalled Python versions
+      run: |
+        echo "Checking preinstalled Python versions..."
+        ls -l /usr/bin/python*
+
+    - name: Uninstall preinstalled Python versions
+      run: |
+        echo "Removing preinstalled Python versions..."
+        
+        # List all python binaries
+        PYTHON_BINARIES=$(ls /usr/bin/python* | grep -E 'python[0-9]+\.[0-9]+$')
+        
+        # Uninstall each Python version
+        for python_binary in $PYTHON_BINARIES; do
+          echo "Removing $python_binary"
+          sudo apt-get remove --purge -y $(basename $python_binary)
+        done
+
+    - name: Verify Python removal
+      run: |
+        echo "Verifying Python versions removal..."
+        ls -l /usr/bin/python* || echo "All Python versions removed!"
