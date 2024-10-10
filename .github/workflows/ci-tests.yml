@@ -22,7 +22,7 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
-  PYTHON_VERSION: "3.11"
+  PYTHON_VERSION: "3.12"
   PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION: python
 
 jobs:
@@ -81,12 +81,12 @@ jobs:
     name: Go ${{ matrix.go-version }} Redis ${{ matrix.redis-version }}
     if: ${{ !github.event.pull_request.draft }}
     needs: lint
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
       matrix:
         redis-version: [7]
-        python-version: ["3.11"]
+        python-version: ["3.12"]
         go-version: [1.22.x]
 
     env:
@@ -95,9 +95,6 @@ jobs:
     steps:
       - name: "Reclaim some runner space"
         run: sudo rm -rf /usr/local/bin/* /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
-
-      - name: "Delete bundled python"
-        run: sudo rm -rf /usr/lib/python3* /usr/bin/python3*
 
       - name: Checkout Tyk
         uses: actions/checkout@v4
