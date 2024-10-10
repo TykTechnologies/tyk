@@ -24,8 +24,13 @@ jobs:
     permissions:
       id-token: write
     steps:
+      - name: "Reclaim some runner space"
+        run: sudo rm -rf /usr/local/bin/* /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
+
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
 
       - name: Configure AWS Credentials
         id: configure-aws
