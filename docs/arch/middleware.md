@@ -48,3 +48,17 @@ The cognitive and behavioral complexities of shallow copies make this an
 area of maintenance. While all the inner values are pointers, the only
 requirement of the copy is to provide a middleware-scoped logger, rather
 than an apispec scoped one.
+
+This is the key internal detail:
+
+```
+func (t *BaseMiddleware) SetName(name string) {
+	t.logger = t.Logger().WithField("mw", name)
+}
+
+func (t *BaseMiddleware) SetRequestLogger(r *http.Request) {
+	t.logger = t.Gw.getLogEntryForRequest(t.Logger(), r, ctxGetAuthToken(r), nil)
+}
+```
+
+This is what requires the per-middleware logger scope.
