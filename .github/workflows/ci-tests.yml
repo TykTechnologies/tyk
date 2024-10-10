@@ -165,7 +165,7 @@ jobs:
         run: task services:up
 
       - name: Preflight Python tests
-        run: TYK_LOGLEVEL=debug go test -v ./coprocess/...
+        run: TYK_LOGLEVEL=debug go test -v ./dlpython
 
       - name: Run Gateway Tests
         id: ci-tests
