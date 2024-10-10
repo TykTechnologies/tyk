@@ -22,7 +22,7 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
-  PYTHON_VERSION: "3.11"
+  PYTHON_VERSION: '3.11'
   PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION: python
 
 jobs:
