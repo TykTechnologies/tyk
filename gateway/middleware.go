@@ -533,6 +533,22 @@ func (t *BaseMiddleware) emitRateLimitEvent(r *http.Request, e event.Event, mess
 	})
 }
 
+// emitUpstreamOAuthEvent emits an upstream OAuth event with an optional custom message.
+func (s *APISpec) emitUpstreamOAuthEvent(r *http.Request, e event.Event, message string, phase string) {
+	if message == "" {
+		message = event.String(e)
+	}
+
+	s.FireEvent(e, EventUpstreamOAuthMeta{
+		EventMetaDefault: EventMetaDefault{
+			Message:            message,
+			OriginatingRequest: EncodeRequestToEvent(r),
+		},
+		APIID: s.APIID,
+		Phase: phase,
+	})
+}
+
 // handleRateLimitFailure handles the actions to be taken when a rate limit failure occurs.
 func (t *BaseMiddleware) handleRateLimitFailure(r *http.Request, e event.Event, message string, rateLimitKey string) (error, int) {
 	t.emitRateLimitEvent(r, e, message, rateLimitKey)

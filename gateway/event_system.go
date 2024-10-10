@@ -71,6 +71,13 @@ type EventHostStatusMeta struct {
 	HostInfo HostHealthReport
 }
 
+// EventUpstreamOAuthMeta is the metadata structure for an upstream OAuth event
+type EventUpstreamOAuthMeta struct {
+	EventMetaDefault
+	APIID string
+	Phase string
+}
+
 // EventKeyFailureMeta is the metadata structure for any failure related
 // to a key, such as quota or auth failures.
 type EventKeyFailureMeta struct {
