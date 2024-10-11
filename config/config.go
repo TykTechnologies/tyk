@@ -457,6 +457,8 @@ type HttpServerOptionsConfig struct {
 	// Enabled WebSockets and server side events support
 	EnableWebSockets bool `json:"enable_websockets"`
 
+	EnableWebSocketRateLimiting bool `json:"enable_websockets_rate_limiting"`
+
 	// Deprecated. SSL certificates used by Gateway server.
 	Certificates CertsData `json:"certificates"`
 
