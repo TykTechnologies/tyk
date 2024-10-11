@@ -1,8 +1,9 @@
 package gateway
 
 import (
-	"github.com/sirupsen/logrus"
 	"net/http"
+
+	"github.com/sirupsen/logrus"
 
 	"github.com/TykTechnologies/tyk/internal/httputil"
 
