@@ -3,6 +3,8 @@ package gateway
 import (
 	"net/http"
 
+	"github.com/sirupsen/logrus"
+
 	"github.com/TykTechnologies/tyk/internal/httputil"
 
 	"github.com/TykTechnologies/tyk/header"
@@ -60,5 +62,10 @@ type UpstreamBasicAuthProvider struct {
 
 // Fill sets the request's HeaderName with AuthValue
 func (u UpstreamBasicAuthProvider) Fill(r *http.Request) {
-	r.Header.Add(u.HeaderName, u.AuthValue)
+	if r.Header.Get(u.HeaderName) != "" {
+		log.WithFields(logrus.Fields{
+			"header": u.HeaderName,
+		}).Info("Authorization header conflict detected: Client header overwritten by Gateway upstream authentication header.")
+	}
+	r.Header.Set(u.HeaderName, u.AuthValue)
 }
