@@ -1,13 +1,13 @@
 package gateway
 
 import (
+	"fmt"
 	"net/http"
 
 	"github.com/sirupsen/logrus"
 
-	"github.com/TykTechnologies/tyk/internal/httputil"
-
 	"github.com/TykTechnologies/tyk/header"
+	"github.com/TykTechnologies/tyk/internal/httputil"
 )
 
 // UpstreamBasicAuth is a middleware that will do basic authentication for upstream connections.
@@ -65,7 +65,7 @@ func (u UpstreamBasicAuthProvider) Fill(r *http.Request) {
 	if r.Header.Get(u.HeaderName) != "" {
 		log.WithFields(logrus.Fields{
 			"header": u.HeaderName,
-		}).Info("Authorization header conflict detected: Client header overwritten by Gateway upstream authentication header.")
+		}).Warn(fmt.Sprintf("%s header conflict detected: client header overwritten by Gateway upstream authentication header", u.HeaderName))
 	}
 	r.Header.Set(u.HeaderName, u.AuthValue)
 }
