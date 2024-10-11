@@ -1,11 +1,20 @@
-# Go plugin development flow
+---
+title: Custom Go plugin development flow
+tags:
+    - custom plugin
+    - golang
+    - go plugin
+    - middleware
+description: Development flow working with Go Plugins
+date: "2024-10-11"
+---
 
 For effectively developing go plugins, familiarize yourself with the following:
 
 - [The official plugin package documentation - Warnings](https://pkg.go.dev/plugin)
 - [Tutorial: Getting started with multi-module workspaces](https://go.dev/doc/tutorial/workspaces)
 
-Plugins are native code. For best results, knowing the restrictions of plugins is recommended. For maximum compatibility, Go workspaces are recommended, as shown below.
+Plugins need to be compiled to native shared object code, which are then loaded by Gateway. For best results, knowing the restrictions of plugins is recommended. For maximum compatibility, Go workspaces are recommended, as shown below.
 
 ## Setting up your environment
 
@@ -24,23 +33,10 @@ Set up a workspace, which, at the end, is going to look like:
 
 Using the workspace ensures build compatibility, matching plugin restrictions.
 
-A sample [tests/Taskfile.yml](Taskfile.yml) is provided here to automatically set up, build, and load the plugin with gateway.
-
-```
-task: Available tasks for this project:
-* all:             Do everything
-* checkout:        Checking out tyk
-* workspace:       Create workspace
-* test:            Test plugin build
-* clean:           Clean workspace
-```
-
-Let's break down the individual steps from a run of `task all`.
-
 ### 1. Checking out tyk
 
 ```
-task: [checkout] git clone --branch release-5.3.6 https://github.com/TykTechnologies/tyk.git tyk-release-5.3.6 || true
+# git clone --branch release-5.3.6 https://github.com/TykTechnologies/tyk.git tyk-release-5.3.6 || true
 ```
 
 The example checkout uses a particular `release-5.3.6` branch, to match a release. With newer `git` version, you may pass `--branch v5.3.6` and it would use the tag. In case you want to use the tag it's also possible to navigate into the folder and issue `git checkout tags/v5.3.6`.
@@ -57,12 +53,12 @@ The plugin workspace can be very simple. Generally you would:
 For implementation examples, see [CustomGoPlugin.go](https://github.com/TykTechnologies/custom-go-plugin/blob/master/go/src/CustomGoPlugin.go). We'll be using this as the source for our plugin as shown:
 
 ```
-task: [workspace] mkdir -p plugins
-task: [workspace:plugins] rm -f go.mod go.sum
-task: [workspace:plugins] go mod init testplugin
+# mkdir -p plugins
+# rm -f go.mod go.sum
+# go mod init testplugin
 go: creating new go.mod: module testplugin
-task: [workspace:plugins] go mod edit -go "1.22.6"
-task: [workspace:plugins] wget -q https://raw.githubusercontent.com/TykTechnologies/custom-go-plugin/refs/heads/master/go/src/CustomGoPlugin.go
+# go mod edit -go "1.22.6"
+# wget -q https://raw.githubusercontent.com/TykTechnologies/custom-go-plugin/refs/heads/master/go/src/CustomGoPlugin.go
 ```
 
 The following snippets provide you with a way to:
@@ -83,45 +79,24 @@ At this point, we don't have a workspace yet. In order to share the gateway depe
 ### 3. Creating the Go workspace
 
 ```
-task: [workspace] go work init ./tyk-release-5.3.6
-task: [workspace] go work use ./plugins
-task: [workspace] cd plugins && go get github.com/TykTechnologies/tyk@c808608b9a3c44b2ef0e060f8d3f3d2269582a1c
+# go work init ./tyk-release-5.3.6
+# go work use ./plugins
+# cd plugins && go get github.com/TykTechnologies/tyk@c808608b9a3c44b2ef0e060f8d3f3d2269582a1c
 ```
 
-These are the final steps on how to create the workspace. The last step is used to update go.mod with the gateway commit corresponding to the checkout. The Taskfile wires some automation to achieve this:
-
-```
-workspace:
-  desc: "Create workspace"
-  vars:
-    release: tyk-release-5.3.6
-    commit:
-      sh: git rev-parse HEAD
-    go:
-      sh: go mod edit -json ./{{.release}}/go.mod | jq .Go -r
-  cmds:
-    - mkdir -p plugins
-    - task: workspace:plugins
-      vars:
-        go: '{{.go}}'
-    - go work init ./{{.release}}
-    - go work use ./plugins
-    - cd plugins && go get github.com/TykTechnologies/tyk@{{.commit}}
-```
-
-When creating the workspace, the `commit` and `go` variables are populated directly from the checked out repository. After this step you're able to use `go mod tidy` in the plugins folder.
+These are the final steps on how to create the workspace. The last step is used to update go.mod with the gateway commit corresponding to the checkout. After this step you're able to use `go mod tidy` in the plugins folder.
 
 ### 4. Testing out the plugin
 
 ```
-task: [test] cd tyk-release-5.3.6 && go build -tags=goplugin -trimpath -race .
-task: [test] cd plugins           && go build -trimpath -race -buildmode=plugin .
+# cd tyk-release-5.3.6 && go build -tags=goplugin -trimpath -race .
+# cd plugins           && go build -trimpath -race -buildmode=plugin .
 ```
 
 The above few steps build gateway, and the plugin.
 
 ```
-task: [test] ./tyk-release-5.3.6/tyk plugin load -f plugins/testplugin.so -s AuthCheck
+# ./tyk-release-5.3.6/tyk plugin load -f plugins/testplugin.so -s AuthCheck
 time="Oct 01 21:29:24" level=info msg="--- Go custom plugin init success! ---- "
 [file=plugins/testplugin.so, symbol=AuthCheck] loaded ok, got 0x7fdcd650f980
 ```
@@ -156,4 +131,4 @@ It's a requirement that build flags for gateway match build flags for the plugin
 
 The Gateway uses `-trimpath` to clear local build environment details from the binary, and it must in turn be used for the plugin build as well. The use of the flag increases compatibility for plugins.
 
-For more detailed restrictions, please see [debugging.md](debugging.md).
+For more detailed restrictions, please see [Debuggin Go Plugins](debugging-go-plugins.md).
