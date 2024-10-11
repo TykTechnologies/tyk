@@ -60,5 +60,5 @@ type UpstreamBasicAuthProvider struct {
 
 // Fill sets the request's HeaderName with AuthValue
 func (u UpstreamBasicAuthProvider) Fill(r *http.Request) {
-	r.Header.Add(u.HeaderName, u.AuthValue)
+	r.Header.Set(u.HeaderName, u.AuthValue)
 }
