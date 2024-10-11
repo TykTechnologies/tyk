@@ -1,4 +1,13 @@
-# Debugging Go Plugins
+---
+title: Debugging Go plugins
+tags:
+    - custom plugin
+    - golang
+    - go plugin
+    - middleware
+description: Debugging guide for Go plugins
+date: "2024-10-11"
+---
 
 Plugins are native go code compiled to a binary shared object file. The code may depend on CGO and require libraries like libc provided by the runtime environment. The following are some debugging steps for diagnosing issues arising from using plugins.
 
