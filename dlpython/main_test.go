@@ -20,7 +20,8 @@ func TestFindPythonConfig(t *testing.T) {
 	if err == nil {
 		t.Fatal("Should fail when loading a nonexistent Python version")
 	}
-	_, err = FindPythonConfig(testVersion)
+	pythonVersion, err := FindPythonConfig(testVersion)
+	t.Logf("Version is %s", pythonVersion)
 	t.Logf("Library path is %s", pythonLibraryPath)
 	if err != nil {
 		t.Fatalf("Couldn't find Python %s", testVersion)
