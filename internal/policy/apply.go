@@ -22,6 +22,7 @@ type Repository interface {
 	PolicyByID(string) (user.Policy, bool)
 }
 
+// Service represents the policy service for gateway.
 type Service struct {
 	storage Repository
 	logger  *logrus.Logger
@@ -30,6 +31,7 @@ type Service struct {
 	orgID *string
 }
 
+// New creates a new policy.Service object.
 func New(orgID *string, storage Repository, logger *logrus.Logger) *Service {
 	return &Service{
 		orgID:   orgID,
@@ -107,7 +109,8 @@ func (t *Service) Apply(session *user.SessionState) error {
 	)
 
 	storage := t.storage
-	customPolicies, err := session.CustomPolicies()
+
+	customPolicies, err := session.GetCustomPolicies()
 	if err != nil {
 		policyIDs = session.PolicyIDs()
 	} else {
@@ -242,8 +245,9 @@ func (t *Service) Apply(session *user.SessionState) error {
 	return nil
 }
 
-func (t *Service) Logger() *logrus.Logger {
-	return t.logger
+// Logger implements a typical logger signature with service context.
+func (t *Service) Logger() *logrus.Entry {
+	return logrus.NewEntry(t.logger)
 }
 
 // ApplyRateLimits will write policy limits to session and apiLimits.
@@ -355,7 +359,7 @@ func (t *Service) applyPartitions(policy user.Policy, session *user.SessionState
 		if !usePartitions || policy.Partitions.Acl {
 			applyState.didAcl[k] = true
 
-			ar.AllowedURLs = copyAllowedURLs(v.AllowedURLs)
+			ar.AllowedURLs = MergeAllowedURLs(ar.AllowedURLs, v.AllowedURLs)
 
 			// Merge ACLs for the same API
 			if r, ok := rights[k]; ok {
@@ -365,19 +369,7 @@ func (t *Service) applyPartitions(policy user.Policy, session *user.SessionState
 				}
 				r.Versions = appendIfMissing(rights[k].Versions, v.Versions...)
 
-				for _, u := range v.AllowedURLs {
-					found := false
-					for ai, au := range r.AllowedURLs {
-						if u.URL == au.URL {
-							found = true
-							r.AllowedURLs[ai].Methods = appendIfMissing(au.Methods, u.Methods...)
-						}
-					}
-
-					if !found {
-						r.AllowedURLs = append(r.AllowedURLs, v.AllowedURLs...)
-					}
-				}
+				r.AllowedURLs = MergeAllowedURLs(r.AllowedURLs, v.AllowedURLs)
 
 				for _, t := range v.RestrictedTypes {
 					for ri, rt := range r.RestrictedTypes {
