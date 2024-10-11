@@ -131,4 +131,4 @@ It's a requirement that build flags for gateway match build flags for the plugin
 
 The Gateway uses `-trimpath` to clear local build environment details from the binary, and it must in turn be used for the plugin build as well. The use of the flag increases compatibility for plugins.
 
-For more detailed restrictions, please see [Debuggin Go Plugins](debugging-go-plugins.md).
+For more detailed restrictions, please see [Debugging Go Plugins](debugging-go-plugins.md).
