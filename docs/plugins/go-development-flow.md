@@ -1,9 +1,11 @@
-# Go plugin development
+# Go plugin development flow
 
-For effectively developing go plugins, absorb the following:
+For effectively developing go plugins, familiarize yourself with the following:
 
 - [The official plugin package documentation - Warnings](https://pkg.go.dev/plugin)
 - [Tutorial: Getting started with multi-module workspaces](https://go.dev/doc/tutorial/workspaces)
+
+Plugins are native code. For best results, knowing the restrictions of plugins is recommended. For maximum compatibility, Go workspaces are recommended, as shown below.
 
 ## Setting up your environment
 
