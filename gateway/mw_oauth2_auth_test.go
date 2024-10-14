@@ -18,9 +18,7 @@ import (
 func TestUpstreamOauth2(t *testing.T) {
 
 	tst := StartTest(nil)
-	t.Cleanup(func() {
-		tst.Close()
-	})
+	t.Cleanup(tst.Close)
 
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.String() != "/token" {

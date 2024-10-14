@@ -557,10 +557,10 @@ type UpstreamAuth struct {
 	// Enabled enables upstream API authentication.
 	Enabled bool `bson:"enabled" json:"enabled"`
 	// BasicAuth holds the basic authentication configuration for upstream API authentication.
-	BasicAuth *UpstreamBasicAuth `bson:"basicAuth" json:"basicAuth"`
+	BasicAuth *UpstreamBasicAuth `bson:"basicAuth,omitempty" json:"basicAuth,omitempty"`
 
 	// OAuth contains the configuration for OAuth2 Client Credentials flow.
-	OAuth *UpstreamOAuth `bson:"oauth" json:"oauth"`
+	OAuth *UpstreamOAuth `bson:"oauth,omitempty" json:"oauth,omitempty"`
 }
 
 // Fill fills *UpstreamAuth from apidef.UpstreamAuth.
@@ -635,6 +635,7 @@ func (u *UpstreamBasicAuth) ExtractTo(api *apidef.UpstreamBasicAuth) {
 	api.Password = u.Password
 }
 
+// UpstreamOAuth holds the configuration for OAuth2 Client Credentials flow.
 type UpstreamOAuth struct {
 	// Enabled activates upstream OAuth2 authentication.
 	Enabled bool `bson:"enabled" json:"enabled"`
@@ -648,6 +649,7 @@ type UpstreamOAuth struct {
 	DistributedToken bool `bson:"distributedToken" json:"distributedToken,omitempty"`
 }
 
+// ClientCredentials holds the configuration for OAuth2 Client Credentials flow.
 type ClientCredentials struct {
 	// ClientID is the application's ID.
 	ClientID string `bson:"clientID" json:"clientID"`
