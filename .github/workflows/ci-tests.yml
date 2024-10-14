@@ -26,7 +26,7 @@ env:
   PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION: python
 
 jobs:
-  lint:
+  golangci-lint:
     runs-on: ubuntu-latest
     if: ${{ !github.event.pull_request.draft }}
     steps:
@@ -67,7 +67,7 @@ jobs:
       - name: golangci-lint
         if: ${{ github.event_name == 'pull_request' }}
         run: |
-          golangci-lint run --out-format github-actions,checkstyle:golangci-lint-report.json --issues-exit-code=0 --new-from-rev=$(git rev-parse origin/${{ github.base_ref }}) -v ./...
+          golangci-lint run --out-format colored-line-number,checkstyle:golangci-lint-report.json --issues-exit-code=0 --new-from-rev=origin/${{ github.base_ref }} -v ./...
 
       - name: golangci-lint-on-push
         if: ${{ github.event_name == 'push' }}
@@ -85,7 +85,7 @@ jobs:
   test:
     name: Go ${{ matrix.go-version }} Redis ${{ matrix.redis-version }}
     if: ${{ !github.event.pull_request.draft }}
-    needs: lint
+    needs: golangci-lint
     # Runs on is pinned to a version that provides python 3.10.
     # See: https://github.com/actions/runner-images?tab=readme-ov-file#available-images
     # Avoid using ubuntu-latest as it would upgrade python unattended.
@@ -203,7 +203,7 @@ jobs:
   sonar-cloud-analysis:
     runs-on: ubuntu-latest
     if: ${{ !github.event.pull_request.draft }}
-    needs: [test, lint]
+    needs: [test, golangci-lint]
     steps:
       - name: "Checkout repository"
         uses: TykTechnologies/github-actions/.github/actions/checkout-pr@main
