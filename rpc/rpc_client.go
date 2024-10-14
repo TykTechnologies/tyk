@@ -258,13 +258,6 @@ func Connect(connConfig Config, suppressRegister bool, dispatcherFuncs map[strin
 		clientSingleton.Conns = 5
 	}
 
-<<<<<<< HEAD
-	for i := 0; i < clientSingleton.Conns; i++ {
-		connectionDialingWG.Add(1)
-	}
-
-=======
->>>>>>> 6b687a223... TT-13130 updated version of gorpc library and prevent panic on start edge (#6629)
 	clientSingleton.Dial = func(addr string) (conn net.Conn, err error) {
 		dialer := &net.Dialer{
 			Timeout:   10 * time.Second,
