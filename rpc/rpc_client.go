@@ -258,10 +258,13 @@ func Connect(connConfig Config, suppressRegister bool, dispatcherFuncs map[strin
 		clientSingleton.Conns = 5
 	}
 
+<<<<<<< HEAD
 	for i := 0; i < clientSingleton.Conns; i++ {
 		connectionDialingWG.Add(1)
 	}
 
+=======
+>>>>>>> 6b687a223... TT-13130 updated version of gorpc library and prevent panic on start edge (#6629)
 	clientSingleton.Dial = func(addr string) (conn net.Conn, err error) {
 		dialer := &net.Dialer{
 			Timeout:   10 * time.Second,
@@ -298,8 +301,6 @@ func Connect(connConfig Config, suppressRegister bool, dispatcherFuncs map[strin
 		conn.Write([]byte("proto2"))
 		conn.Write([]byte{byte(len(connID))})
 		conn.Write([]byte(connID))
-		// only mark as done is connection is established
-		connectionDialingWG.Done()
 
 		return conn, nil
 	}
@@ -311,9 +312,8 @@ func Connect(connConfig Config, suppressRegister bool, dispatcherFuncs map[strin
 	if funcClientSingleton == nil {
 		funcClientSingleton = dispatcher.NewFuncClient(clientSingleton)
 	}
-
 	// wait until all the pool connections are dialed so we can call login
-	connectionDialingWG.Wait()
+	clientSingleton.ConnectionDialingWG.Wait()
 	handleLogin()
 	if !suppressRegister {
 		register()
