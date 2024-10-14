@@ -257,7 +257,7 @@ func TestGraphQLComplexityMiddleware_ProcessRequest_GraphqlLimits(t *testing.T) 
 		spec.GraphQL.Schema = gqlCountriesSchema
 	})[0]
 	m := GraphQLComplexityMiddleware{
-		&BaseMiddleware{
+		BaseMiddleware{
 			Spec: apiSpec,
 		},
 	}
