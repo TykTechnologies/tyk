@@ -802,6 +802,7 @@ type UpstreamBasicAuth struct {
 	HeaderName string `bson:"header_name" json:"header_name"`
 }
 
+// UpstreamOAuth holds upstream OAuth2 authentication configuration.
 type UpstreamOAuth struct {
 	// Enabled enables upstream OAuth2 authentication.
 	Enabled bool `bson:"enabled" json:"enabled"`
@@ -815,6 +816,7 @@ type UpstreamOAuth struct {
 	DistributedToken bool `bson:"distributed_token" json:"distributed_token,omitempty"`
 }
 
+// ClientCredentials holds the client credentials for upstream OAuth2 authentication.
 type ClientCredentials struct {
 	// ClientID is the application's ID.
 	ClientID string `bson:"client_id" json:"client_id"`
@@ -823,7 +825,7 @@ type ClientCredentials struct {
 	// TokenURL is the resource server's token endpoint
 	// URL. This is a constant specific to each server.
 	TokenURL string `bson:"token_url" json:"token_url"`
-	// Scope specifies optional requested permissions.
+	// Scopes specifies optional requested permissions.
 	Scopes []string `bson:"scopes" json:"scopes,omitempty"`
 	// EndpointParams specifies additional parameters for requests to the token endpoint.
 	EndpointParams url.Values `bson:"endpoint_params" json:"endpoint_params,omitempty"`
