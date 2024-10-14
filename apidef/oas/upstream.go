@@ -559,8 +559,8 @@ type UpstreamAuth struct {
 	// BasicAuth holds the basic authentication configuration for upstream API authentication.
 	BasicAuth *UpstreamBasicAuth `bson:"basicAuth" json:"basicAuth"`
 
-	// Oauth2 contains the configuration for OAuth2 Client Credentials flow.
-	Oauth *UpstreamOAuth `bson:"oauth" json:"oauth"`
+	// OAuth2 contains the configuration for OAuth2 Client Credentials flow.
+	OAuth *UpstreamOAuth `bson:"oauth" json:"oauth"`
 }
 
 // Fill fills *UpstreamAuth from apidef.UpstreamAuth.
@@ -575,12 +575,12 @@ func (u *UpstreamAuth) Fill(api apidef.UpstreamAuth) {
 		u.BasicAuth = nil
 	}
 
-	if u.Oauth == nil {
-		u.Oauth = &UpstreamOAuth{}
+	if u.OAuth == nil {
+		u.OAuth = &UpstreamOAuth{}
 	}
-	u.Oauth.Fill(api.OAuth)
-	if ShouldOmit(u.Oauth) {
-		u.Oauth = nil
+	u.OAuth.Fill(api.OAuth)
+	if ShouldOmit(u.OAuth) {
+		u.OAuth = nil
 	}
 }
 
@@ -596,13 +596,13 @@ func (u *UpstreamAuth) ExtractTo(api *apidef.UpstreamAuth) {
 	}
 	u.BasicAuth.ExtractTo(&api.BasicAuth)
 
-	if u.Oauth == nil {
-		u.Oauth = &UpstreamOAuth{}
+	if u.OAuth == nil {
+		u.OAuth = &UpstreamOAuth{}
 		defer func() {
-			u.Oauth = nil
+			u.OAuth = nil
 		}()
 	}
-	u.Oauth.ExtractTo(&api.OAuth)
+	u.OAuth.ExtractTo(&api.OAuth)
 }
 
 // UpstreamBasicAuth holds upstream basic authentication configuration.
