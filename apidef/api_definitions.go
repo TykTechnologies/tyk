@@ -1079,6 +1079,8 @@ type GraphQLPlayground struct {
 	Enabled bool `bson:"enabled" json:"enabled"`
 	// Path sets the path on which the playground will be hosted if enabled.
 	Path string `bson:"path" json:"path"`
+	// Tags is the tags of the edge gateway(s) associated with this playground
+	Tags []string `bson:"tags" json:"tags"`
 }
 
 // EncodeForDB will encode map[string]struct variables for saving in URL format
