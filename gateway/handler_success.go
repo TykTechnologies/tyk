@@ -163,6 +163,7 @@ func recordGraphDetails(rec *analytics.AnalyticsRecord, r *http.Request, resp *h
 }
 
 func (s *SuccessHandler) RecordHit(r *http.Request, timing analytics.Latency, code int, responseCopy *http.Response, cached bool) {
+	log.Debug("Recording analytics hit")
 
 	if s.Spec.DoNotTrack || ctxGetDoNotTrack(r) {
 		return
@@ -320,6 +321,8 @@ func (s *SuccessHandler) RecordHit(r *http.Request, timing analytics.Latency, co
 		err := s.Gw.Analytics.RecordHit(&record)
 		if err != nil {
 			log.WithError(err).Error("could not store analytic record")
+		} else {
+			log.Debug("Succesfully recorded analytics")
 		}
 	}
 
