@@ -40,6 +40,7 @@ import (
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"
 
+	"github.com/TykTechnologies/tyk-pump/analytics"
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/ctx"
 	"github.com/TykTechnologies/tyk/header"
@@ -1701,6 +1702,31 @@ func (t *tap) processData(data []byte, action string) error {
 
 		// Log the message
 		log.Printf("%s message: Opcode=%d, Payload=%s", cases.Title(language.English).String(action), opcode, string(payload))
+
+		handler := SuccessHandler{&BaseMiddleware{Spec: t.spec, Gw: t.gw}}
+		latency := analytics.Latency{
+			Total:    0, // We don't have timing information in this context
+			Upstream: 0, // We don't have upstream latency information in this context
+		}
+		reqCopy := t.req.Clone(t.req.Context())
+		respCopy := &http.Response{
+			StatusCode: 200,
+			Header:     make(http.Header),
+		}
+
+		if t.isClient {
+			reqCopy.Header.Set("X-Streaming-Direction", "in")
+			reqCopy.Body = io.NopCloser(bytes.NewBuffer(payload))
+			reqCopy.ContentLength = int64(len(payload))
+			reqCopy.Header.Set("Content-Length", strconv.FormatInt(int64(len(payload)), 10))
+		} else {
+			reqCopy.Header.Set("X-Streaming-Direction", "out")
+			respCopy.Body = io.NopCloser(bytes.NewBuffer(payload))
+			respCopy.ContentLength = int64(len(payload))
+			respCopy.Header.Set("Content-Length", strconv.FormatInt(int64(len(payload)), 10))
+		}
+
+		handler.RecordHit(reqCopy, latency, 200, respCopy, false)
 
 		// Apply rate limiting only for incoming messages
 		if t.isClient {
