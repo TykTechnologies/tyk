@@ -658,7 +658,7 @@ type ClientCredentials struct {
 	// TokenURL is the resource server's token endpoint
 	// URL. This is a constant specific to each server.
 	TokenURL string `bson:"tokenURL" json:"tokenURL"`
-	// Scope specifies optional requested permissions.
+	// Scopes specifies optional requested permissions.
 	Scopes []string `bson:"scopes,omitempty" json:"scopes,omitempty"`
 	// EndpointParams specifies additional parameters for requests to the token endpoint.
 	EndpointParams url.Values `bson:"endpointParams,omitempty" json:"endpointParams,omitempty"`
