@@ -30,10 +30,15 @@ jobs:
     runs-on: ubuntu-latest
     if: ${{ !github.event.pull_request.draft }}
     steps:
-      - name: "Checkout repository"
+      - name: "Checkout PR"
         uses: TykTechnologies/github-actions/.github/actions/checkout-pr@main
         with:
           token: ${{ secrets.ORG_GH_TOKEN }}
+
+      - name: "Get base ref"
+        run: |
+          git fetch origin ${{ github.base_ref }}
+          git rev-parse origin/${{ github.base_ref }}
 
       - name: Setup Golang
         uses: actions/setup-go@v5
@@ -62,12 +67,12 @@ jobs:
       - name: golangci-lint
         if: ${{ github.event_name == 'pull_request' }}
         run: |
-          golangci-lint run --out-format checkstyle --issues-exit-code=0 --new-from-rev=${{ github.base_ref }} -v ./... > golanglint.xml
+          golangci-lint run --out-format github-actions,checkstyle:golangci-lint-report.json --issues-exit-code=0 --new-from-rev=$(git rev-parse origin/${{ github.base_ref }}) -v ./...
 
       - name: golangci-lint-on-push
         if: ${{ github.event_name == 'push' }}
         run: |
-          golangci-lint run --out-format checkstyle --issues-exit-code=0 -v ./... > golanglint.xml
+          golangci-lint run --out-format github-actions,checkstyle:golangci-lint-report.json --issues-exit-code=0 -v ./...
 
       - uses: actions/upload-artifact@v4
         if: ${{ always() }}
@@ -75,7 +80,7 @@ jobs:
           name: golangcilint
           retention-days: 1
           path: |
-            golanglint.xml
+            golangci-lint-report.json
 
   test:
     name: Go ${{ matrix.go-version }} Redis ${{ matrix.redis-version }}
@@ -168,10 +173,6 @@ jobs:
             exit 1
           fi
 
-      - name: Fetch base branch
-        if: ${{ github.event_name == 'pull_request' }}
-        run: git fetch origin ${{ github.base_ref }}
-
       - name: Bring up test services
         run: task services:up
 
@@ -223,7 +224,7 @@ jobs:
         id: check_files
         uses: andstor/file-existence-action@v1
         with:
-          files: 'coverage/gateway-all.cov, golanglint.xml'
+          files: 'coverage/gateway-all.cov, golangci-lint-report.json'
 
       - name: Install Dependencies
         env:
@@ -243,7 +244,7 @@ jobs:
             -Dsonar.test.inclusions=**/*_test.go
             -Dsonar.tests=.
             -Dsonar.go.coverage.reportPaths=coverage/gateway-all.cov
-            -Dsonar.go.golangci-lint.reportPaths=golanglint.xml
+            -Dsonar.go.golangci-lint.reportPaths=golangci-lint-report.json
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
