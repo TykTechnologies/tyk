@@ -5,16 +5,18 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
+	"net/http"
+	"strings"
+	"time"
+
+	"github.com/sirupsen/logrus"
+	"golang.org/x/oauth2"
+	oauth2clientcredentials "golang.org/x/oauth2/clientcredentials"
+
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/header"
 	"github.com/TykTechnologies/tyk/internal/httputil"
 	"github.com/TykTechnologies/tyk/storage"
-	"github.com/sirupsen/logrus"
-	"golang.org/x/oauth2"
-	oauth2clientcredentials "golang.org/x/oauth2/clientcredentials"
-	"net/http"
-	"strings"
-	"time"
 )
 
 const (

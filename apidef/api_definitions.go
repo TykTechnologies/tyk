@@ -20,8 +20,9 @@ import (
 
 	"github.com/TykTechnologies/tyk/internal/reflect"
 
-	"github.com/TykTechnologies/graphql-go-tools/pkg/execution/datasource"
 	"golang.org/x/oauth2"
+
+	"github.com/TykTechnologies/graphql-go-tools/pkg/execution/datasource"
 
 	"github.com/TykTechnologies/gojsonschema"
 
