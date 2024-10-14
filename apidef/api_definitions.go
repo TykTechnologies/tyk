@@ -775,7 +775,7 @@ type UpstreamAuth struct {
 	Enabled bool `bson:"enabled" json:"enabled"`
 	// BasicAuth holds the basic authentication configuration for upstream API authentication.
 	BasicAuth UpstreamBasicAuth `bson:"basic_auth" json:"basic_auth"`
-	// OAuth2 holds the OAuth2 configuration for the upstream client credentials API authentication.
+	// OAuth holds the OAuth2 configuration for the upstream client credentials API authentication.
 	OAuth UpstreamOAuth `bson:"oauth" json:"oauth"`
 }
 
