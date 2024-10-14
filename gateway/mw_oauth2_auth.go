@@ -17,8 +17,9 @@ import (
 	"time"
 )
 
-var (
-	oAuthUpstreamCache *upstreamOauthCache
+const (
+	UpstreamOAuthErrorEventName = "UpstreamOAuthError"
+	UpstreamOAuthMiddlewareName = "UpstreamOAuth"
 )
 
 type OAuthHeaderProvider interface {
@@ -37,7 +38,7 @@ type UpstreamOAuth struct {
 
 // Name returns the name of middleware.
 func (OAuthSpec *UpstreamOAuth) Name() string {
-	return "UpstreamOAuth"
+	return UpstreamOAuthMiddlewareName
 }
 
 // EnabledForSpec returns true if the middleware is enabled based on API Spec.
@@ -105,16 +106,16 @@ func (p *PerAPIOAuthProvider) getOAuthHeaderValue(r *http.Request, OAuthSpec *Up
 }
 
 func handleOAuthError(r *http.Request, OAuthSpec *UpstreamOAuth, err error) (string, error) {
-	OAuthSpec.emitUpstreamOAuthEvent(r, "UpstreamOAuthError", err.Error(), OAuthSpec.Spec.APIID)
+	OAuthSpec.emitUpstreamOAuthEvent(r, UpstreamOAuthErrorEventName, err.Error(), OAuthSpec.Spec.APIID)
 	return "", err
 }
 
 func (p *DistributedCacheOAuthProvider) getOAuthHeaderValue(r *http.Request, OAuthSpec *UpstreamOAuth) (string, error) {
-	if oAuthUpstreamCache == nil {
-		oAuthUpstreamCache = newUpstreamOauthCache(OAuthSpec.Gw.StorageConnectionHandler)
+	if OAuthSpec.Gw.UpstreamOAuthCache == nil {
+		OAuthSpec.Gw.UpstreamOAuthCache = newUpstreamOAuthCache(OAuthSpec.Gw.StorageConnectionHandler)
 	}
 
-	token, err := oAuthUpstreamCache.getToken(r, OAuthSpec)
+	token, err := OAuthSpec.Gw.UpstreamOAuthCache.getToken(r, OAuthSpec)
 	if err != nil {
 		return handleOAuthError(r, OAuthSpec, err)
 	}
@@ -123,11 +124,11 @@ func (p *DistributedCacheOAuthProvider) getOAuthHeaderValue(r *http.Request, OAu
 	return payload, nil
 }
 
-func newUpstreamOauthCache(connectionHandler *storage.ConnectionHandler) *upstreamOauthCache {
-	return &upstreamOauthCache{RedisCluster: storage.RedisCluster{KeyPrefix: "upstreamOAuth-", ConnectionHandler: connectionHandler}}
+func newUpstreamOAuthCache(connectionHandler *storage.ConnectionHandler) *upstreamOAuthCache {
+	return &upstreamOAuthCache{RedisCluster: storage.RedisCluster{KeyPrefix: "upstreamOAuth-", ConnectionHandler: connectionHandler}}
 }
 
-type upstreamOauthCache struct {
+type upstreamOAuthCache struct {
 	storage.RedisCluster
 }
 
@@ -144,7 +145,7 @@ func generateCacheKey(config apidef.UpstreamOAuth, apiId string) string {
 	return hex.EncodeToString(hash.Sum(nil))
 }
 
-func (cache *upstreamOauthCache) getToken(r *http.Request, OAuthSpec *UpstreamOAuth) (string, error) {
+func (cache *upstreamOAuthCache) getToken(r *http.Request, OAuthSpec *UpstreamOAuth) (string, error) {
 	cacheKey := generateCacheKey(OAuthSpec.Spec.UpstreamAuth.OAuth, OAuthSpec.Spec.APIID)
 
 	token, err := cache.retryGetKeyAndLock(cacheKey)
@@ -171,7 +172,7 @@ func (cache *upstreamOauthCache) getToken(r *http.Request, OAuthSpec *UpstreamOA
 	return token, nil
 }
 
-func (cache *upstreamOauthCache) retryGetKeyAndLock(cacheKey string) (string, error) {
+func (cache *upstreamOAuthCache) retryGetKeyAndLock(cacheKey string) (string, error) {
 	const maxRetries = 10
 	const retryDelay = 100 * time.Millisecond
 
@@ -207,7 +208,7 @@ func newOAuth2ClientCredentialsConfig(OAuthSpec *UpstreamOAuth) oauth2clientcred
 	}
 }
 
-func (cache *upstreamOauthCache) obtainToken(ctx context.Context, OAuthSpec *UpstreamOAuth) (string, error) {
+func (cache *upstreamOAuthCache) obtainToken(ctx context.Context, OAuthSpec *UpstreamOAuth) (string, error) {
 	cfg := newOAuth2ClientCredentialsConfig(OAuthSpec)
 
 	tokenSource := cfg.TokenSource(ctx)
@@ -219,7 +220,7 @@ func (cache *upstreamOauthCache) obtainToken(ctx context.Context, OAuthSpec *Ups
 	return oauthToken.AccessToken, nil
 }
 
-func (cache *upstreamOauthCache) setTokenInCache(cacheKey, token string) error {
+func (cache *upstreamOAuthCache) setTokenInCache(cacheKey, token string) error {
 	oauthTokenExpiry := time.Now().Add(time.Hour)
 	return cache.SetKey(cacheKey, token, int64(oauthTokenExpiry.Sub(time.Now()).Seconds()))
 }
