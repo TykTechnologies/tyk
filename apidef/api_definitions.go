@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"net/url"
 	"text/template"
 	"time"
 
@@ -812,9 +811,6 @@ type UpstreamOAuth struct {
 	// HeaderName is the custom header name to be used for upstream basic authentication.
 	// Defaults to `Authorization`.
 	HeaderName string `bson:"header_name" json:"header_name,omitempty"`
-	// DistributedToken indicates whether the token is distributed all gateways.
-	// Defaults to false (each gateway will get its own token).
-	DistributedToken bool `bson:"distributed_token" json:"distributed_token,omitempty"`
 }
 
 // ClientCredentials holds the client credentials for upstream OAuth2 authentication.
@@ -828,12 +824,6 @@ type ClientCredentials struct {
 	TokenURL string `bson:"token_url" json:"token_url"`
 	// Scopes specifies optional requested permissions.
 	Scopes []string `bson:"scopes" json:"scopes,omitempty"`
-	// EndpointParams specifies additional parameters for requests to the token endpoint.
-	EndpointParams url.Values `bson:"endpoint_params" json:"endpoint_params,omitempty"`
-	// AuthStyle optionally specifies how the endpoint wants the
-	// client ID & client secret sent. The zero value means to
-	// auto-detect.
-	AuthStyle int `bson:"auth_style" json:"auth_style,omitempty"`
 
 	TokenProvider oauth2.TokenSource `bson:"-" json:"-"`
 }

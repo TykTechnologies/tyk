@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/sirupsen/logrus"
-	"golang.org/x/oauth2"
 	oauth2clientcredentials "golang.org/x/oauth2/clientcredentials"
 
 	"github.com/TykTechnologies/tyk/apidef"
@@ -82,10 +81,7 @@ func (OAuthSpec *UpstreamOAuth) ProcessRequest(_ http.ResponseWriter, r *http.Re
 }
 
 func getOAuthHeaderProvider(oauthConfig apidef.UpstreamOAuth) OAuthHeaderProvider {
-	if oauthConfig.DistributedToken {
-		return &DistributedCacheOAuthProvider{}
-	}
-	return &PerAPIOAuthProvider{}
+	return &DistributedCacheOAuthProvider{}
 }
 
 func (p *PerAPIOAuthProvider) getOAuthHeaderValue(r *http.Request, OAuthSpec *UpstreamOAuth) (string, error) {
@@ -201,12 +197,10 @@ func (cache *upstreamOAuthCache) retryGetKeyAndLock(cacheKey string) (string, er
 
 func newOAuth2ClientCredentialsConfig(OAuthSpec *UpstreamOAuth) oauth2clientcredentials.Config {
 	return oauth2clientcredentials.Config{
-		ClientID:       OAuthSpec.Spec.UpstreamAuth.OAuth.ClientCredentials.ClientID,
-		ClientSecret:   OAuthSpec.Spec.UpstreamAuth.OAuth.ClientCredentials.ClientSecret,
-		TokenURL:       OAuthSpec.Spec.UpstreamAuth.OAuth.ClientCredentials.TokenURL,
-		Scopes:         OAuthSpec.Spec.UpstreamAuth.OAuth.ClientCredentials.Scopes,
-		EndpointParams: OAuthSpec.Spec.UpstreamAuth.OAuth.ClientCredentials.EndpointParams,
-		AuthStyle:      oauth2.AuthStyle(OAuthSpec.Spec.UpstreamAuth.OAuth.ClientCredentials.AuthStyle),
+		ClientID:     OAuthSpec.Spec.UpstreamAuth.OAuth.ClientCredentials.ClientID,
+		ClientSecret: OAuthSpec.Spec.UpstreamAuth.OAuth.ClientCredentials.ClientSecret,
+		TokenURL:     OAuthSpec.Spec.UpstreamAuth.OAuth.ClientCredentials.TokenURL,
+		Scopes:       OAuthSpec.Spec.UpstreamAuth.OAuth.ClientCredentials.Scopes,
 	}
 }
 

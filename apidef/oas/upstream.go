@@ -1,7 +1,6 @@
 package oas
 
 import (
-	"net/url"
 	"sort"
 	"strings"
 
@@ -558,7 +557,6 @@ type UpstreamAuth struct {
 	Enabled bool `bson:"enabled" json:"enabled"`
 	// BasicAuth holds the basic authentication configuration for upstream API authentication.
 	BasicAuth *UpstreamBasicAuth `bson:"basicAuth,omitempty" json:"basicAuth,omitempty"`
-
 	// OAuth contains the configuration for OAuth2 Client Credentials flow.
 	OAuth *UpstreamOAuth `bson:"oauth,omitempty" json:"oauth,omitempty"`
 }
@@ -644,9 +642,6 @@ type UpstreamOAuth struct {
 	// HeaderName is the custom header name to be used for upstream basic authentication.
 	// Defaults to `Authorization`.
 	HeaderName string `bson:"headerName" json:"headerName"`
-	// DistributedToken indicates whether the token is distributed all gateways.
-	// Defaults to false (each gateway will get its own token).
-	DistributedToken bool `bson:"distributedToken" json:"distributedToken,omitempty"`
 }
 
 // ClientCredentials holds the configuration for OAuth2 Client Credentials flow.
@@ -660,12 +655,6 @@ type ClientCredentials struct {
 	TokenURL string `bson:"tokenURL" json:"tokenURL"`
 	// Scopes specifies optional requested permissions.
 	Scopes []string `bson:"scopes,omitempty" json:"scopes,omitempty"`
-	// EndpointParams specifies additional parameters for requests to the token endpoint.
-	EndpointParams url.Values `bson:"endpointParams,omitempty" json:"endpointParams,omitempty"`
-	// AuthStyle optionally specifies how the endpoint wants the
-	// client ID & client secret sent. The zero value means to
-	// auto-detect.
-	AuthStyle int `bson:"authStyle,omitempty" json:"authStyle,omitempty"`
 }
 
 func (c *ClientCredentials) Fill(api apidef.ClientCredentials) {
@@ -673,14 +662,11 @@ func (c *ClientCredentials) Fill(api apidef.ClientCredentials) {
 	c.ClientSecret = api.ClientSecret
 	c.TokenURL = api.TokenURL
 	c.Scopes = api.Scopes
-	c.EndpointParams = api.EndpointParams
-	c.AuthStyle = api.AuthStyle
 }
 
 func (u *UpstreamOAuth) Fill(api apidef.UpstreamOAuth) {
 	u.Enabled = api.Enabled
 	u.HeaderName = api.HeaderName
-	u.DistributedToken = api.DistributedToken
 
 	if u.ClientCredentials == nil {
 		u.ClientCredentials = &ClientCredentials{}
@@ -696,14 +682,11 @@ func (c *ClientCredentials) ExtractTo(api *apidef.ClientCredentials) {
 	api.ClientSecret = c.ClientSecret
 	api.TokenURL = c.TokenURL
 	api.Scopes = c.Scopes
-	api.EndpointParams = c.EndpointParams
-	api.AuthStyle = c.AuthStyle
 }
 
 func (u *UpstreamOAuth) ExtractTo(api *apidef.UpstreamOAuth) {
 	api.Enabled = u.Enabled
 	api.HeaderName = u.HeaderName
-	api.DistributedToken = u.DistributedToken
 
 	if u.ClientCredentials == nil {
 		u.ClientCredentials = &ClientCredentials{}

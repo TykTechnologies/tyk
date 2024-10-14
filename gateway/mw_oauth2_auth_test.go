@@ -5,7 +5,6 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
-	"net/url"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -38,7 +37,7 @@ func TestUpstreamOauth2(t *testing.T) {
 		if err != nil {
 			t.Errorf("failed reading request body: %s.", err)
 		}
-		if string(body) != "audience=audience1&grant_type=client_credentials&scope=scope1+scope2" {
+		if string(body) != "grant_type=client_credentials&scope=scope1+scope2" {
 			t.Errorf("payload = %q; want %q", string(body), "grant_type=client_credentials&scope=scope1+scope2")
 		}
 		w.Header().Set("Content-Type", "application/x-www-form-urlencoded")
@@ -47,28 +46,13 @@ func TestUpstreamOauth2(t *testing.T) {
 	defer ts.Close()
 
 	cfg := apidef.ClientCredentials{
-		ClientID:       "CLIENT_ID",
-		ClientSecret:   "CLIENT_SECRET",
-		TokenURL:       ts.URL + "/token",
-		Scopes:         []string{"scope1", "scope2"},
-		EndpointParams: url.Values{"audience": {"audience1"}},
+		ClientID:     "CLIENT_ID",
+		ClientSecret: "CLIENT_SECRET",
+		TokenURL:     ts.URL + "/token",
+		Scopes:       []string{"scope1", "scope2"},
 	}
 
 	tst.Gw.BuildAndLoadAPI(
-		func(spec *APISpec) {
-			spec.Proxy.ListenPath = "/upstream-oauth-non-distributed/"
-			spec.UseKeylessAccess = true
-			spec.UpstreamAuth = apidef.UpstreamAuth{
-				Enabled: true,
-				OAuth: apidef.UpstreamOAuth{
-					Enabled:           true,
-					ClientCredentials: cfg,
-					HeaderName:        "",
-					DistributedToken:  false,
-				},
-			}
-			spec.Proxy.StripListenPath = true
-		},
 		func(spec *APISpec) {
 			spec.Proxy.ListenPath = "/upstream-oauth-distributed/"
 			spec.UseKeylessAccess = true
@@ -78,7 +62,6 @@ func TestUpstreamOauth2(t *testing.T) {
 					Enabled:           true,
 					ClientCredentials: cfg,
 					HeaderName:        "",
-					DistributedToken:  true,
 				},
 			}
 			spec.Proxy.StripListenPath = true
@@ -86,23 +69,6 @@ func TestUpstreamOauth2(t *testing.T) {
 	)
 
 	_, _ = tst.Run(t, test.TestCases{
-		{
-			Path: "/upstream-oauth-non-distributed/",
-			Code: http.StatusOK,
-			BodyMatchFunc: func(body []byte) bool {
-				resp := struct {
-					Headers map[string]string `json:"headers"`
-				}{}
-				err := json.Unmarshal(body, &resp)
-				assert.NoError(t, err)
-
-				assert.Contains(t, resp.Headers, header.Authorization)
-				assert.NotEmpty(t, resp.Headers[header.Authorization])
-				assert.Equal(t, "Bearer 90d64460d14870c08c81352a05dedd3465940a7c", resp.Headers[header.Authorization])
-
-				return true
-			},
-		},
 		{
 			Path: "/upstream-oauth-distributed/",
 			Code: http.StatusOK,
