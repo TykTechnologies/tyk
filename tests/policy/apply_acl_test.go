@@ -3,9 +3,10 @@ package policy
 import (
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/user"
-	"github.com/stretchr/testify/assert"
 )
 
 type ApplyPolicyFunc func(*user.SessionState) error
