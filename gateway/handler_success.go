@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/base64"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"strconv"
 	"strings"
@@ -171,7 +170,6 @@ func (s *SuccessHandler) RecordHit(r *http.Request, timing analytics.Latency, co
 
 	ip := request.RealIP(r)
 	if s.Spec.GlobalConfig.StoreAnalytics(ip) {
-
 		t := time.Now()
 
 		// Track the key ID if it exists
@@ -225,18 +223,20 @@ func (s *SuccessHandler) RecordHit(r *http.Request, timing analytics.Latency, co
 				// we need to delete the chunked transfer encoding header to avoid malformed body in our rawResponse
 				httputil.RemoveResponseTransferEncoding(responseCopy, "chunked")
 
-				responseContent, err := io.ReadAll(responseCopy.Body)
-				if err != nil {
-					log.Error("Couldn't read response body", err)
+				if responseCopy.Body != nil {
+					responseContent, err := io.ReadAll(responseCopy.Body)
+					if err != nil {
+						log.Error("Couldn't read response body", err)
+					} else {
+						responseCopy.Body = respBodyReader(r, responseCopy)
+
+						// Get the wire format representation
+						var wireFormatRes bytes.Buffer
+						responseCopy.Write(&wireFormatRes)
+						responseCopy.Body = io.NopCloser(bytes.NewBuffer(responseContent))
+						rawResponse = base64.StdEncoding.EncodeToString(wireFormatRes.Bytes())
+					}
 				}
-
-				responseCopy.Body = respBodyReader(r, responseCopy)
-
-				// Get the wire format representation
-				var wireFormatRes bytes.Buffer
-				responseCopy.Write(&wireFormatRes)
-				responseCopy.Body = ioutil.NopCloser(bytes.NewBuffer(responseContent))
-				rawResponse = base64.StdEncoding.EncodeToString(wireFormatRes.Bytes())
 			}
 		}
 
