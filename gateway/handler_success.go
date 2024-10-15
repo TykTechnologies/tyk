@@ -232,8 +232,8 @@ func (s *SuccessHandler) RecordHit(r *http.Request, timing analytics.Latency, co
 
 						// Get the wire format representation
 						var wireFormatRes bytes.Buffer
-						responseCopy.Write(&wireFormatRes)
 						responseCopy.Body = io.NopCloser(bytes.NewBuffer(responseContent))
+						responseCopy.Write(&wireFormatRes)
 						rawResponse = base64.StdEncoding.EncodeToString(wireFormatRes.Bytes())
 					}
 				}
