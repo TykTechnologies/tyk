@@ -4,22 +4,18 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/TykTechnologies/tyk/request"
+
 	"github.com/stretchr/testify/assert"
 
 	"github.com/TykTechnologies/tyk-pump/analytics"
-	"github.com/TykTechnologies/tyk/request"
 )
 
 func TestNewRecord(t *testing.T) {
-	apiID := "api_id"
-	orgID := "org_id"
+	record := NewRecord().Fields()
 
-	record := NewRecord(apiID, orgID).Fields()
-
-	assert.Equal(t, apiID, record["APIID"])
-	assert.Equal(t, orgID, record["OrgID"])
-	assert.NotNil(t, record["APIID"])
-	assert.NotNil(t, record["OrgID"])
+	assert.Equal(t, "access-log", record["prefix"])
+	assert.NotNil(t, record["prefix"])
 }
 
 func TestNewRecordWithLatency(t *testing.T) {
@@ -28,29 +24,23 @@ func TestNewRecordWithLatency(t *testing.T) {
 		Upstream: 101,
 	}
 
-	record := NewRecord("api_id", "org_id").WithLatency(latency).Fields()
+	record := NewRecord().WithLatency(latency).Fields()
 
-	assert.Equal(t, latency.Total, record["TotalLatency"])
-	assert.Equal(t, latency.Upstream, record["UpstreamLatency"])
-	assert.NotNil(t, record["TotalLatency"])
-	assert.NotNil(t, record["UpstreamLatency"])
+	assert.Equal(t, latency.Total, record["total_latency"])
+	assert.Equal(t, latency.Upstream, record["upstream_latency"])
+	assert.NotNil(t, record["total_latency"])
+	assert.NotNil(t, record["upstream_latency"])
 }
 
 func TestNewRecordWithRequest(t *testing.T) {
 	req, _ := http.NewRequest(http.MethodGet, "/", nil)
 
-	record := NewRecord("api_id", "org_id").WithRequest(req).Fields()
+	record := NewRecord().WithRequest(req).Fields()
 
-	assert.Equal(t, request.RealIP(req), record["ClientIP"])
-	assert.Equal(t, req.RemoteAddr, record["ClientRemoteAddr"])
-	assert.Equal(t, req.Host, record["Host"])
-	assert.Equal(t, req.Method, record["Method"])
-	assert.Equal(t, req.Proto, record["Proto"])
-	assert.Equal(t, req.RequestURI, record["RequestURI"])
-	assert.Equal(t, req.URL.Path, record["UpstreamAddress"])
-	assert.Equal(t, req.URL.Path, record["UpstreamPath"])
-	assert.Equal(t, req.URL.RequestURI(), record["UpstreamURI"])
-	assert.Equal(t, req.UserAgent(), record["UserAgent"])
+	assert.Equal(t, req.Host, record["host"])
+	assert.Equal(t, req.Method, record["method"])
+	assert.Equal(t, req.Proto, record["protocol"])
+	assert.Equal(t, req.UserAgent(), record["user_agent"])
 }
 
 func TestNewRecordWithResponse(t *testing.T) {
@@ -58,10 +48,10 @@ func TestNewRecordWithResponse(t *testing.T) {
 		StatusCode: http.StatusOK,
 	}
 
-	record := NewRecord("api_id", "org_id").WithResponse(resp).Fields()
+	record := NewRecord().WithResponse(resp).Fields()
 
-	assert.Equal(t, resp.StatusCode, record["StatusCode"])
-	assert.NotNil(t, record["StatusCode"])
+	assert.Equal(t, resp.StatusCode, record["status_code"])
+	assert.NotNil(t, record["status_code"])
 }
 
 func TestNewRecordField(t *testing.T) {
@@ -78,22 +68,33 @@ func TestNewRecordField(t *testing.T) {
 		StatusCode: http.StatusOK,
 	}
 
-	record := NewRecord("api_id", "org_id").WithLatency(latency).WithRequest(req).WithResponse(resp).Fields()
+	record := NewRecord().WithClientIP(req).WithLatency(latency).WithRequest(req).WithRequestURI(req).WithResponse(resp).WithUpstreamAddress(req).WithUpstreamURI(req).Fields()
 
-	assert.Equal(t, "api_id", record["APIID"])
-	assert.Equal(t, "org_id", record["OrgID"])
 	assert.Equal(t, "access-log", record["prefix"])
-	assert.Equal(t, int64(99), record["TotalLatency"])
-	assert.Equal(t, int64(101), record["UpstreamLatency"])
-	assert.Equal(t, request.RealIP(req), record["ClientIP"])
-	assert.Equal(t, "0.0.0.0", record["ClientRemoteAddr"])
-	assert.Equal(t, "example.com", record["Host"])
-	assert.Equal(t, http.MethodGet, record["Method"])
-	assert.Equal(t, "HTTP/1.1", record["Proto"])
-	assert.Equal(t, "", record["RequestURI"])
-	assert.Equal(t, "http://example.com/path?userid=1", record["UpstreamAddress"])
-	assert.Equal(t, "/path", record["UpstreamPath"])
-	assert.Equal(t, "/path?userid=1", record["UpstreamURI"])
-	assert.Equal(t, "user-agent", record["UserAgent"])
-	assert.Equal(t, http.StatusOK, record["StatusCode"])
+
+	// WithClientIP
+	assert.Equal(t, request.RealIP(req), record["client_ip"])
+	assert.Equal(t, "0.0.0.0", record["client_remote_addr"])
+
+	// WithLatency
+	assert.Equal(t, int64(99), record["total_latency"])
+	assert.Equal(t, int64(101), record["upstream_latency"])
+
+	// WithRequest
+	assert.Equal(t, "example.com", record["host"])
+	assert.Equal(t, http.MethodGet, record["method"])
+	assert.Equal(t, "HTTP/1.1", record["protocol"])
+	assert.Equal(t, "user-agent", record["user_agent"])
+
+	// WithRequest URI
+	assert.Equal(t, "", record["request_uri"])
+
+	// WithResponse
+	assert.Equal(t, http.StatusOK, record["status_code"])
+
+	// WithUpstreamAddress
+	assert.Equal(t, "http://example.com/path", record["upstream_address"])
+
+	// WithUpstreamURI
+	assert.Equal(t, "/path?userid=1", record["upstream_uri"])
 }
