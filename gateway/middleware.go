@@ -438,7 +438,7 @@ func (t *BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 func (t *BaseMiddleware) recordAccessLog(req *http.Request, resp *http.Response, latency *analytics.Latency) {
 	hashKeys := t.Gw.GetConfig().HashKeys
 
-	accessLog := accesslog.NewRecord(t.Spec.APIID, t.Spec.OrgID)
+	accessLog := accesslog.NewRecord()
 	accessLog.WithAuthToken(req, hashKeys, t.Gw.obfuscateKey)
 	accessLog.WithLatency(latency)
 	accessLog.WithRequest(req)

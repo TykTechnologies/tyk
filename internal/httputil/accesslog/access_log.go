@@ -6,10 +6,11 @@ import (
 
 	"github.com/sirupsen/logrus"
 
-	"github.com/TykTechnologies/tyk-pump/analytics"
 	"github.com/TykTechnologies/tyk/ctx"
 	"github.com/TykTechnologies/tyk/internal/crypto"
 	"github.com/TykTechnologies/tyk/request"
+
+	"github.com/TykTechnologies/tyk-pump/analytics"
 )
 
 // Record is a representation of a transaction log in the Gateway.
@@ -17,25 +18,14 @@ type Record struct {
 	fields logrus.Fields
 }
 
-// NewRecord returns an Record object.
-func NewRecord(apiID string, orgId string) *Record {
+// NewRecord returns a Record object.
+func NewRecord() *Record {
 	fields := logrus.Fields{
-		"APIID":  apiID,
-		"OrgID":  orgId,
 		"prefix": "access-log",
 	}
 	return &Record{
 		fields: fields,
 	}
-}
-
-// WithLatency sets the latency of the Record.
-func (a *Record) WithLatency(latency *analytics.Latency) *Record {
-	if latency != nil {
-		a.fields["TotalLatency"] = latency.Total
-		a.fields["UpstreamLatency"] = latency.Upstream
-	}
-	return a
 }
 
 // WithAuthToken sets the access token from the request under APIKey.
@@ -44,41 +34,80 @@ func (a *Record) WithAuthToken(req *http.Request, hashKeys bool, obfuscate func(
 	if req != nil {
 		token := ctx.GetAuthToken(req)
 		if !hashKeys {
-			a.fields["APIKey"] = obfuscate(token)
+			a.fields["api_key"] = obfuscate(token)
 		} else {
-			a.fields["APIKey"] = crypto.HashKey(token, hashKeys)
+			a.fields["api_key"] = crypto.HashKey(token, hashKeys)
 		}
 	}
 	return a
 }
 
-// WithRequest sets the request of the Record.
+// WithClientIP sets the client address of the Record.
+func (a *Record) WithClientIP(req *http.Request) *Record {
+	if req != nil {
+		a.fields["client_ip"] = request.RealIP(req)
+		a.fields["client_remote_addr"] = req.RemoteAddr
+	}
+	return a
+}
+
+// WithLatency sets the latency data of the Record.
+func (a *Record) WithLatency(latency *analytics.Latency) *Record {
+	if latency != nil {
+		a.fields["total_latency"] = latency.Total
+		a.fields["upstream_latency"] = latency.Upstream
+	}
+	return a
+}
+
+// WithRequest sets the default request of the Record.
 func (a *Record) WithRequest(req *http.Request) *Record {
 	if req != nil {
-		upstreamAddress := &url.URL{
-			Scheme:   req.URL.Scheme,
-			Host:     req.URL.Host,
-			Path:     req.URL.Path,
-			RawQuery: req.URL.RawQuery,
-		}
-		a.fields["ClientIP"] = request.RealIP(req)
-		a.fields["ClientRemoteAddr"] = req.RemoteAddr
-		a.fields["Host"] = req.Host
-		a.fields["Method"] = req.Method
-		a.fields["Proto"] = req.Proto
-		a.fields["RequestURI"] = req.RequestURI
-		a.fields["UpstreamAddress"] = upstreamAddress.String()
-		a.fields["UpstreamPath"] = req.URL.Path
-		a.fields["UpstreamURI"] = req.URL.RequestURI()
-		a.fields["UserAgent"] = req.UserAgent()
+		a.fields["host"] = req.Host
+		a.fields["method"] = req.Method
+		a.fields["protocol"] = req.Proto
+		a.fields["user_agent"] = req.UserAgent()
 	}
 	return a
 }
 
-// WithResponse sets the request of the Record.
+// WithRequestURI sets the request URI of the Record. May contain sensitive data such as
+// query parameters etc.
+func (a *Record) WithRequestURI(req *http.Request) *Record {
+	if req != nil {
+		a.fields["request_uri"] = req.RequestURI
+	}
+	return a
+}
+
+// WithResponse sets the response data of the Record.
 func (a *Record) WithResponse(resp *http.Response) *Record {
 	if resp != nil {
-		a.fields["StatusCode"] = resp.StatusCode
+		a.fields["status_code"] = resp.StatusCode
+	}
+	return a
+}
+
+// WithUpstreamAddress sets the upstream address of the Record.
+func (a *Record) WithUpstreamAddress(req *http.Request) *Record {
+	if req != nil {
+		// Default upstream address
+		upstreamAddress := &url.URL{
+			Scheme: req.URL.Scheme,
+			Host:   req.URL.Host,
+			Path:   req.URL.Path,
+		}
+
+		a.fields["upstream_address"] = upstreamAddress.String()
+	}
+	return a
+}
+
+// WithUpstreamURI sets the upstream URI of the Record. May contain sensitive data such as
+// query parameters etc.
+func (a *Record) WithUpstreamURI(req *http.Request) *Record {
+	if req != nil {
+		a.fields["upstream_uri"] = req.URL.RequestURI()
 	}
 	return a
 }
