@@ -1689,7 +1689,7 @@ func (t *tap) Write(p []byte) (int, error) {
 func (t *tap) processData(data []byte, action string) error {
 	t.buffer = append(t.buffer, data...)
 	for {
-		_, payload, rest, err := parseFrame(t.buffer, t.isClient)
+		opcode, payload, rest, err := parseFrame(t.buffer, t.isClient)
 		if err != nil {
 			if err == errIncompleteFrame {
 				// Not enough data to parse a full frame, wait for more data
@@ -1698,6 +1698,9 @@ func (t *tap) processData(data []byte, action string) error {
 			log.Printf("Error parsing frame: %v", err)
 			return err
 		}
+
+		// Log opcode and string payload
+		log.Info("WebSocket frame - Opcode:", opcode, "Payload:", string(payload))
 
 		if t.gw.GetConfig().Streaming.EnableWebSocketDetailedRecording {
 			handler := SuccessHandler{&BaseMiddleware{Spec: t.spec, Gw: t.gw}}
