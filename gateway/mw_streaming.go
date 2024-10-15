@@ -13,11 +13,14 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/TykTechnologies/tyk-pump/analytics"
 	"github.com/sirupsen/logrus"
 
 	"github.com/gorilla/mux"
 
+	"github.com/TykTechnologies/tyk/header"
 	"github.com/TykTechnologies/tyk/internal/streaming"
+	"github.com/TykTechnologies/tyk/request"
 )
 
 const (
@@ -66,7 +69,7 @@ func (sm *StreamManager) initStreams(r *http.Request, config *StreamsConfig) {
 	sm.muxer = mux.NewRouter()
 
 	for streamID, streamConfig := range config.Streams {
-		sm.setUpOrDryRunStream(streamConfig, streamID)
+		sm.setUpOrDryRunStream(streamConfig, streamID, r)
 	}
 
 	// If it is default stream manager, init muxer
@@ -79,19 +82,19 @@ func (sm *StreamManager) initStreams(r *http.Request, config *StreamsConfig) {
 	}
 }
 
-func (sm *StreamManager) setUpOrDryRunStream(streamConfig any, streamID string) {
+func (sm *StreamManager) setUpOrDryRunStream(streamConfig any, streamID string, r *http.Request) {
 	if streamMap, ok := streamConfig.(map[string]interface{}); ok {
 		httpPaths := GetHTTPPaths(streamMap)
 
 		if sm.dryRun {
 			if len(httpPaths) == 0 {
-				err := sm.createStream(streamID, streamMap)
+				err := sm.createStream(streamID, streamMap, r)
 				if err != nil {
 					sm.mw.Logger().WithError(err).Errorf("Error creating stream %s", streamID)
 				}
 			}
 		} else {
-			err := sm.createStream(streamID, streamMap)
+			err := sm.createStream(streamID, streamMap, r)
 			if err != nil {
 				sm.mw.Logger().WithError(err).Errorf("Error creating stream %s", streamID)
 			}
@@ -350,9 +353,11 @@ func (s *StreamingMiddleware) processStreamsConfig(r *http.Request, streams map[
 }
 
 // createStream creates a new stream
-func (sm *StreamManager) createStream(streamID string, config map[string]interface{}) error {
+func (sm *StreamManager) createStream(streamID string, config map[string]interface{}, r *http.Request) error {
 	streamFullID := fmt.Sprintf("%s_%s", sm.mw.Spec.APIID, streamID)
 	sm.mw.Logger().Debugf("Creating stream: %s", streamFullID)
+
+	analyticsRecorder := initStreamAnalyticsRecorder(sm.mw.Gw, sm.mw.Spec, r)
 
 	stream := streaming.NewStream(sm.mw.allowedUnsafe)
 	err := stream.Start(config, &handleFuncAdapter{
@@ -370,6 +375,12 @@ func (sm *StreamManager) createStream(streamID string, config map[string]interfa
 
 	sm.streams.Store(streamFullID, stream)
 	sm.mw.Logger().Infof("Successfully created stream: %s", streamFullID)
+
+	record := analyticsRecorder.CreateRecord(r)
+	err = analyticsRecorder.RecordHit(record, http.StatusSwitchingProtocols)
+	if err != nil {
+		sm.mw.Logger().Errorf("Failed to record analytics for stream %s: %v", streamFullID, err)
+	}
 
 	return nil
 }
@@ -470,4 +481,121 @@ func (h *handleFuncAdapter) HandleFunc(path string, f func(http.ResponseWriter, 
 	})
 	h.sm.routeLock.Unlock()
 	h.logger.Debugf("Registered handler for path: %s", path)
+}
+
+func initStreamAnalyticsRecorder(gw *Gateway, spec *APISpec, r *http.Request) StreamAnalyticsRecorder {
+	if recordDetail(r, spec) {
+		return NewDetailedStreamAnalyticsRecorder(gw, spec)
+	}
+	return NewSimpleStreamAnalyticsRecorder(gw, spec)
+}
+
+func streamRecordHit(gw *Gateway, record *analytics.AnalyticsRecord, statusCode int) error {
+	record.ResponseCode = statusCode
+	return gw.Analytics.RecordHit(record)
+}
+
+type StreamAnalyticsRecorder interface {
+	CreateRecord(r *http.Request) *analytics.AnalyticsRecord
+	RecordHit(record *analytics.AnalyticsRecord, statusCode int) error
+}
+
+type SimpleStreamAnalyticsRecorder struct {
+	Gw   *Gateway
+	Spec *APISpec
+}
+
+func NewSimpleStreamAnalyticsRecorder(gw *Gateway, spec *APISpec) *SimpleStreamAnalyticsRecorder {
+	return &SimpleStreamAnalyticsRecorder{
+		Gw:   gw,
+		Spec: spec,
+	}
+}
+
+func (s *SimpleStreamAnalyticsRecorder) CreateRecord(r *http.Request) *analytics.AnalyticsRecord {
+	// Preparation for analytics record
+	alias := ""
+	oauthClientID := ""
+	session := ctxGetSession(r)
+	tags := make([]string, 0, estimateTagsCapacity(session, s.Spec))
+
+	if session != nil {
+		oauthClientID = session.OauthClientID
+		alias = session.Alias
+		tags = append(tags, getSessionTags(session)...)
+	}
+
+	if len(s.Spec.TagHeaders) > 0 {
+		tags = tagHeaders(r, s.Spec.TagHeaders, tags)
+	}
+
+	if len(s.Spec.Tags) > 0 {
+		tags = append(tags, s.Spec.Tags...)
+	}
+
+	trackEP := false
+	trackedPath := r.URL.Path
+
+	if p := ctxGetTrackedPath(r); p != "" {
+		trackEP = true
+		trackedPath = p
+	}
+
+	// Create record for started stream
+	t := time.Now()
+	return &analytics.AnalyticsRecord{
+		Method:        r.Method,
+		Host:          r.URL.Host,
+		Path:          trackedPath,
+		RawPath:       r.URL.Path,
+		ContentLength: r.ContentLength,
+		UserAgent:     r.Header.Get(header.UserAgent),
+		Day:           t.Day(),
+		Month:         t.Month(),
+		Year:          t.Year(),
+		Hour:          t.Hour(),
+		ResponseCode:  http.StatusSwitchingProtocols,
+		APIKey:        ctxGetAuthToken(r),
+		TimeStamp:     t,
+		APIVersion:    s.Spec.getVersionFromRequest(r),
+		APIName:       s.Spec.Name,
+		APIID:         s.Spec.APIID,
+		OrgID:         s.Spec.OrgID,
+		OauthID:       oauthClientID,
+		RequestTime:   0,
+		Latency:       analytics.Latency{},
+		IPAddress:     request.RealIP(r),
+		Geo:           analytics.GeoData{},
+		Network:       analytics.NetworkStats{},
+		Tags:          tags,
+		Alias:         alias,
+		TrackPath:     trackEP,
+		ExpireAt:      t,
+	}
+}
+
+func (s *SimpleStreamAnalyticsRecorder) RecordHit(record *analytics.AnalyticsRecord, statusCode int) error {
+	return streamRecordHit(s.Gw, record, statusCode)
+}
+
+type DetailedStreamAnalyticsRecorder struct {
+	Gw                            *Gateway
+	Spec                          *APISpec
+	simpleStreamAnalyticsRecorder *SimpleStreamAnalyticsRecorder
+}
+
+func NewDetailedStreamAnalyticsRecorder(gw *Gateway, spec *APISpec) *DetailedStreamAnalyticsRecorder {
+	return &DetailedStreamAnalyticsRecorder{
+		Gw:                            gw,
+		Spec:                          spec,
+		simpleStreamAnalyticsRecorder: NewSimpleStreamAnalyticsRecorder(gw, spec),
+	}
+}
+
+func (d *DetailedStreamAnalyticsRecorder) CreateRecord(r *http.Request) *analytics.AnalyticsRecord {
+	return d.simpleStreamAnalyticsRecorder.CreateRecord(r) // TODO: Detailed recording still needs to be implemented.
+}
+
+func (d *DetailedStreamAnalyticsRecorder) RecordHit(record *analytics.AnalyticsRecord, statusCode int) error {
+	return d.simpleStreamAnalyticsRecorder.RecordHit(record, statusCode)
 }
