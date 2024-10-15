@@ -489,13 +489,20 @@ func (t *BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 		} else {
 			usePartitions := policy.Partitions.Quota || policy.Partitions.RateLimit || policy.Partitions.Acl || policy.Partitions.Complexity
 
+			// Ensure `rights` is filled with known APIs to ensure that
+			// a policy with acl rights gets honored even if not first.
+			for k := range policy.AccessRights {
+				if _, ok := rights[k]; ok {
+					continue
+				}
+				rights[k] = user.AccessDefinition{}
+			}
+
 			for k, v := range policy.AccessRights {
-				ar := v
+				ar := rights[k]
 
 				if !usePartitions || policy.Partitions.Acl {
 					didACL[k] = true
-
-					ar.AllowedURLs = mergeAllowedURLs(ar.AllowedURLs, v.AllowedURLs)
 
 					// Merge ACLs for the same API
 					if r, ok := rights[k]; ok {
@@ -507,18 +514,26 @@ func (t *BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 
 						r.AllowedURLs = mergeAllowedURLs(r.AllowedURLs, v.AllowedURLs)
 
-						for _, t := range v.RestrictedTypes {
-							for ri, rt := range r.RestrictedTypes {
-								if t.Name == rt.Name {
-									r.RestrictedTypes[ri].Fields = intersection(rt.Fields, t.Fields)
+						if len(r.RestrictedTypes) == 0 {
+							r.RestrictedTypes = v.RestrictedTypes
+						} else {
+							for _, t := range v.RestrictedTypes {
+								for ri, rt := range r.RestrictedTypes {
+									if t.Name == rt.Name {
+										r.RestrictedTypes[ri].Fields = intersection(rt.Fields, t.Fields)
+									}
 								}
 							}
 						}
 
-						for _, t := range v.AllowedTypes {
-							for ri, rt := range r.AllowedTypes {
-								if t.Name == rt.Name {
-									r.AllowedTypes[ri].Fields = intersection(rt.Fields, t.Fields)
+						if len(r.AllowedTypes) == 0 {
+							r.AllowedTypes = v.AllowedTypes
+						} else {
+							for _, t := range v.AllowedTypes {
+								for ri, rt := range r.AllowedTypes {
+									if t.Name == rt.Name {
+										r.AllowedTypes[ri].Fields = intersection(rt.Fields, t.Fields)
+									}
 								}
 							}
 						}
@@ -529,17 +544,21 @@ func (t *BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 							}
 						}
 
-						for _, far := range v.FieldAccessRights {
-							exists := false
-							for i, rfar := range r.FieldAccessRights {
-								if far.TypeName == rfar.TypeName && far.FieldName == rfar.FieldName {
-									exists = true
-									mergeFieldLimits(&r.FieldAccessRights[i].Limits, far.Limits)
+						if len(r.FieldAccessRights) == 0 {
+							r.FieldAccessRights = v.FieldAccessRights
+						} else {
+							for _, far := range v.FieldAccessRights {
+								exists := false
+								for i, rfar := range r.FieldAccessRights {
+									if far.TypeName == rfar.TypeName && far.FieldName == rfar.FieldName {
+										exists = true
+										mergeFieldLimits(&r.FieldAccessRights[i].Limits, far.Limits)
+									}
 								}
-							}
 
-							if !exists {
-								r.FieldAccessRights = append(r.FieldAccessRights, far)
+								if !exists {
+									r.FieldAccessRights = append(r.FieldAccessRights, far)
+								}
 							}
 						}
 
@@ -551,8 +570,8 @@ func (t *BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 
 				if !usePartitions || policy.Partitions.Quota {
 					didQuota[k] = true
-					if greaterThanInt64(policy.QuotaMax, ar.Limit.QuotaMax) {
 
+					if greaterThanInt64(policy.QuotaMax, ar.Limit.QuotaMax) {
 						ar.Limit.QuotaMax = policy.QuotaMax
 						if greaterThanInt64(policy.QuotaMax, session.QuotaMax) {
 							session.QuotaMax = policy.QuotaMax
