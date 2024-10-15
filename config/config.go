@@ -660,7 +660,7 @@ func (pwl *PortsWhiteList) Decode(value string) error {
 // StreamingConfig is for configuring tyk streaming
 type StreamingConfig struct {
 	EnableWebSocketRateLimiting      bool `json:"enable_websockets_rate_limiting"`
-	EnableWebSocketDetailedRecording bool `json:"enable_websockets_detailed_recording`
+	EnableWebSocketDetailedRecording bool `json:"enable_websockets_detailed_recording"`
 
 	Enabled     bool     `json:"enabled"`
 	AllowUnsafe []string `json:"allow_unsafe"`
