@@ -2,12 +2,14 @@ package gateway
 
 import (
 	"encoding/base64"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/gorilla/websocket"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/TykTechnologies/tyk-pump/analytics"
@@ -543,6 +545,130 @@ func TestGeoIPLookup(t *testing.T) {
 		case !tc.wantErr && err != nil:
 			t.Errorf("geoIPLookup(%q) errored", tc.in)
 		}
+	}
+}
+
+func TestWebsocketAnalytics(t *testing.T) {
+	ts := StartTest(nil)
+	t.Cleanup(ts.Close)
+
+	globalConf := ts.Gw.GetConfig()
+	globalConf.HttpServerOptions.EnableWebSockets = true
+	globalConf.Streaming.EnableWebSocketDetailedRecording = true
+	globalConf.AnalyticsConfig.EnableDetailedRecording = true
+	ts.Gw.SetConfig(globalConf)
+
+	// Create a session with a rate limit of 5 requests per second
+	session := CreateSession(ts.Gw, func(s *user.SessionState) {
+		s.Rate = 5
+		s.Per = 1
+		s.QuotaMax = -1
+	})
+
+	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		spec.Proxy.ListenPath = "/"
+		spec.UseKeylessAccess = false
+	})
+
+	baseURL := strings.Replace(ts.URL, "http://", "ws://", -1)
+
+	// Function to create a new WebSocket connection
+	dialWS := func() (*websocket.Conn, *http.Response, error) {
+		headers := http.Header{"Authorization": {session}}
+		return websocket.DefaultDialer.Dial(baseURL+"/ws", headers)
+	}
+
+	// Cleanup before the test
+	ts.Gw.Analytics.Store.GetAndDeleteSet(analyticsKeyName)
+
+	// Connect and send messages
+	conn, _, err := dialWS()
+	if err != nil {
+		t.Fatalf("cannot make websocket connection: %v", err)
+	}
+
+	// Send and receive 3 messages
+	for i := 0; i < 3; i++ {
+		err = conn.WriteMessage(websocket.TextMessage, []byte(fmt.Sprintf("test message %d", i+1)))
+		if err != nil {
+			t.Fatalf("cannot write message: %v", err)
+		}
+
+		_, _, err := conn.ReadMessage()
+		if err != nil {
+			t.Fatalf("cannot read message: %v", err)
+		}
+	}
+
+	conn.Close()
+
+	time.Sleep(100 * time.Millisecond)
+
+	// Flush analytics
+	ts.Gw.Analytics.Flush()
+
+	time.Sleep(100 * time.Millisecond)
+
+	// Retrieve analytics records
+	analyticsRecords := ts.Gw.Analytics.Store.GetAndDeleteSet(analyticsKeyName)
+
+	// We expect 1 record for the initial handshake, and 3 records each for requests and responses
+	expectedRecords := 7
+	if len(analyticsRecords) != expectedRecords {
+		t.Errorf("Expected %d analytics records, got %d", expectedRecords, len(analyticsRecords))
+	}
+
+	// Verify the content of the analytics records
+	var handshakeFound bool
+	var requestCount, responseCount int
+
+	for _, record := range analyticsRecords {
+		var analyticRecord analytics.AnalyticsRecord
+		err := ts.Gw.Analytics.analyticsSerializer.Decode([]byte(record.(string)), &analyticRecord)
+		if err != nil {
+			t.Errorf("Error decoding analytics record: %v", err)
+			continue
+		}
+
+		// Check for handshake record
+		if analyticRecord.Path == "/ws" && analyticRecord.Method == "GET" {
+			handshakeFound = true
+		}
+
+		// Check for WebSocket message records
+		if strings.Contains(analyticRecord.Path, "/ws") {
+			if strings.HasSuffix(analyticRecord.Path, "/in") {
+				requestCount++
+				if analyticRecord.RawRequest == "" {
+					t.Errorf("Request body is empty for request record: %+v", analyticRecord)
+				}
+				rawResponse, _ := base64.StdEncoding.DecodeString(analyticRecord.RawResponse)
+				if !strings.Contains(string(rawResponse), "Content-Length: 0") {
+					t.Errorf("Response should contain Content-Length header for request record. Got: %s", rawResponse)
+				}
+			} else if strings.HasSuffix(analyticRecord.Path, "/out") {
+				responseCount++
+				if analyticRecord.RawResponse == "" {
+					t.Errorf("Response body is empty for response record: %+v", analyticRecord)
+				}
+				rawRequest, _ := base64.StdEncoding.DecodeString(analyticRecord.RawRequest)
+				if strings.Contains(string(rawRequest), "Content-Length") {
+					t.Errorf("Request should  notcontain Content-Length header for response record. Got: %s", rawRequest)
+				}
+			}
+		}
+	}
+
+	if !handshakeFound {
+		t.Error("Handshake record not found in analytics")
+	}
+
+	if requestCount != 3 {
+		t.Errorf("Expected 3 WebSocket request records, got %d", requestCount)
+	}
+
+	if responseCount != 3 {
+		t.Errorf("Expected 3 WebSocket response records, got %d", responseCount)
 	}
 }
 

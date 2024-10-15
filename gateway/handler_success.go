@@ -206,10 +206,6 @@ func (s *SuccessHandler) RecordHit(r *http.Request, timing analytics.Latency, co
 			tags = append(tags, "cached-response")
 		}
 
-		if streamValue := r.Header.Get("X-Streaming-Direction"); streamValue != "" {
-			tags = append(tags, "stream-"+streamValue)
-		}
-
 		rawRequest := ""
 		rawResponse := ""
 
@@ -336,7 +332,7 @@ func (s *SuccessHandler) RecordHit(r *http.Request, timing analytics.Latency, co
 
 func recordDetail(r *http.Request, spec *APISpec) bool {
 	// when streaming in grpc, we do not record the request
-	if httputil.IsStreamingRequest(r) {
+	if spec.GlobalConfig.Streaming.EnableWebSocketDetailedRecording != true && httputil.IsStreamingRequest(r) {
 		return false
 	}
 

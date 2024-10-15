@@ -457,8 +457,6 @@ type HttpServerOptionsConfig struct {
 	// Enabled WebSockets and server side events support
 	EnableWebSockets bool `json:"enable_websockets"`
 
-	EnableWebSocketRateLimiting bool `json:"enable_websockets_rate_limiting"`
-
 	// Deprecated. SSL certificates used by Gateway server.
 	Certificates CertsData `json:"certificates"`
 
@@ -661,6 +659,9 @@ func (pwl *PortsWhiteList) Decode(value string) error {
 
 // StreamingConfig is for configuring tyk streaming
 type StreamingConfig struct {
+	EnableWebSocketRateLimiting      bool `json:"enable_websockets_rate_limiting"`
+	EnableWebSocketDetailedRecording bool `json:"enable_websockets_detailed_recording`
+
 	Enabled     bool     `json:"enabled"`
 	AllowUnsafe []string `json:"allow_unsafe"`
 }
