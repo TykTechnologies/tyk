@@ -1615,6 +1615,11 @@ type tap struct {
 	rateLimitKey string
 	quotaKey     string
 	buffer       []byte
+
+	// New fields for handling fragmentation
+	fragmentedPayload []byte // Accumulates payloads for fragmented messages
+	fragmentedOpcode  byte   // Stores the opcode of the fragmented message
+	isFragmented      bool   // Indicates if we are currently processing a fragmented message
 }
 
 func NewTap(reader io.Reader, writer io.Writer, isClient bool, req *http.Request, gw *Gateway, spec *APISpec) (*tap, error) {
@@ -1689,7 +1694,7 @@ func (t *tap) Write(p []byte) (int, error) {
 func (t *tap) processData(data []byte, action string) error {
 	t.buffer = append(t.buffer, data...)
 	for {
-		opcode, payload, rest, err := parseFrame(t.buffer, t.isClient)
+		opcode, payload, fin, rest, err := parseFrame(t.buffer, t.isClient)
 		if err != nil {
 			if err == errIncompleteFrame {
 				// Not enough data to parse a full frame, wait for more data
@@ -1699,50 +1704,53 @@ func (t *tap) processData(data []byte, action string) error {
 			return err
 		}
 
-		// Log opcode and string payload
-		log.Info("WebSocket frame - Opcode:", opcode, "Payload:", string(payload))
-
-		if t.gw.GetConfig().Streaming.EnableWebSocketDetailedRecording {
-			handler := SuccessHandler{&BaseMiddleware{Spec: t.spec, Gw: t.gw}}
-			latency := analytics.Latency{
-				Total:    0, // We don't have timing information in this context
-				Upstream: 0, // We don't have upstream latency information in this context
-			}
-			reqCopy := t.req.Clone(t.req.Context())
-			respCopy := &http.Response{
-				StatusCode: 200,
-				Header:     make(http.Header),
-			}
-
-			if t.isClient {
-				reqCopy.URL.Path = path.Join(reqCopy.URL.Path, "in")
-				reqCopy.Body = io.NopCloser(bytes.NewBuffer(payload))
-				reqCopy.ContentLength = int64(len(payload))
-				reqCopy.Header.Set("Content-Length", strconv.FormatInt(int64(len(payload)), 10))
-
-				respCopy.Header.Set("Content-Length", strconv.FormatInt(0, 10))
-				respCopy.Body = io.NopCloser(strings.NewReader(""))
-				respCopy.ContentLength = 0
-			} else {
-				reqCopy.URL.Path = path.Join(reqCopy.URL.Path, "out")
-				respCopy.Body = io.NopCloser(bytes.NewBuffer(payload))
-				respCopy.ContentLength = int64(len(payload))
-				respCopy.Header.Set("Content-Length", strconv.FormatInt(int64(len(payload)), 10))
-
-				reqCopy.Header.Set("Content-Length", strconv.FormatInt(0, 10))
-				reqCopy.Body = io.NopCloser(strings.NewReader(""))
-				reqCopy.ContentLength = 0
-			}
-
-			handler.RecordHit(reqCopy, latency, 200, respCopy, false)
+		if opcode == 0x8 { // Close frame
+			return io.EOF
 		}
 
-		// Apply rate limiting only for incoming messages
-		if t.isClient && t.gw.GetConfig().Streaming.EnableWebSocketRateLimiting {
-			err = t.applyRateLimiting()
-			if err != nil {
-				// Return rate limiting error
-				return err
+		if opcode == 0x9 || opcode == 0xA { // Ping/Pong frames
+			// Handle control frames if necessary
+			// For now, we can skip processing these frames
+		} else {
+			if t.isFragmented {
+				if opcode != 0x0 {
+					// Unexpected new message while processing fragmented message
+					log.Printf("Received new message opcode %d while processing fragmented message", opcode)
+					return fmt.Errorf("unexpected new message during fragmented message")
+				}
+				// Continuation frame
+				t.fragmentedPayload = append(t.fragmentedPayload, payload...)
+			} else {
+				if opcode == 0x0 {
+					// Unexpected continuation frame without starting fragmentation
+					log.Printf("Received continuation frame without starting fragmented message")
+					return fmt.Errorf("unexpected continuation frame")
+				}
+				if fin {
+					// Single-frame message
+					if err := t.handleMessage(opcode, payload); err != nil {
+						return err
+					}
+				} else {
+					// Start of a fragmented message
+					t.isFragmented = true
+					t.fragmentedOpcode = opcode
+					t.fragmentedPayload = append(t.fragmentedPayload, payload...)
+				}
+			}
+
+			if fin {
+				if t.isFragmented {
+					// End of fragmented message
+					if err := t.handleMessage(t.fragmentedOpcode, t.fragmentedPayload); err != nil {
+						return err
+					}
+					// Reset fragmentation state
+					t.isFragmented = false
+					t.fragmentedOpcode = 0
+					t.fragmentedPayload = nil
+				}
+				// else: fin is true for a single-frame message, already handled above
 			}
 		}
 
@@ -1753,6 +1761,58 @@ func (t *tap) processData(data []byte, action string) error {
 			break
 		}
 	}
+	return nil
+}
+
+func (t *tap) handleMessage(opcode byte, payload []byte) error {
+	// Log the complete message
+	log.Infof("WebSocket complete message - Opcode: %d Payload: %s", opcode, string(payload))
+
+	// Apply rate limiting or other processing as needed
+	if t.isClient && t.gw.GetConfig().Streaming.EnableWebSocketRateLimiting {
+		err := t.applyRateLimiting()
+		if err != nil {
+			// Return rate limiting error
+			return err
+		}
+	}
+
+	// If detailed recording is enabled, record the message
+	if t.gw.GetConfig().Streaming.EnableWebSocketDetailedRecording {
+		handler := SuccessHandler{&BaseMiddleware{Spec: t.spec, Gw: t.gw}}
+		latency := analytics.Latency{
+			Total:    0, // We don't have timing information in this context
+			Upstream: 0, // We don't have upstream latency information in this context
+		}
+		reqCopy := t.req.Clone(t.req.Context())
+		respCopy := &http.Response{
+			StatusCode: 200,
+			Header:     make(http.Header),
+		}
+
+		if t.isClient {
+			reqCopy.URL.Path = path.Join(reqCopy.URL.Path, "in")
+			reqCopy.Body = io.NopCloser(bytes.NewBuffer(payload))
+			reqCopy.ContentLength = int64(len(payload))
+			reqCopy.Header.Set("Content-Length", strconv.FormatInt(int64(len(payload)), 10))
+
+			respCopy.Header.Set("Content-Length", strconv.FormatInt(0, 10))
+			respCopy.Body = io.NopCloser(strings.NewReader(""))
+			respCopy.ContentLength = 0
+		} else {
+			reqCopy.URL.Path = path.Join(reqCopy.URL.Path, "out")
+			respCopy.Body = io.NopCloser(bytes.NewBuffer(payload))
+			respCopy.ContentLength = int64(len(payload))
+			respCopy.Header.Set("Content-Length", strconv.FormatInt(int64(len(payload)), 10))
+
+			reqCopy.Header.Set("Content-Length", strconv.FormatInt(0, 10))
+			reqCopy.Body = io.NopCloser(strings.NewReader(""))
+			reqCopy.ContentLength = 0
+		}
+
+		handler.RecordHit(reqCopy, latency, 200, respCopy, false)
+	}
+
 	return nil
 }
 
@@ -1822,14 +1882,13 @@ func (t *tap) sendCloseFrame() {
 	}
 }
 
-// parseFrame parses a WebSocket frame from the data buffer
-func parseFrame(data []byte, isClient bool) (opcode byte, payload, rest []byte, err error) {
+func parseFrame(data []byte, isClient bool) (opcode byte, payload []byte, fin bool, rest []byte, err error) {
 	// Ensure we have enough data for the header
 	if len(data) < 2 {
-		return 0, nil, data, errIncompleteFrame
+		return 0, nil, false, data, errIncompleteFrame
 	}
 
-	fin := data[0]&0x80 != 0
+	fin = data[0]&0x80 != 0
 	opcode = data[0] & 0x0F
 	masked := data[1]&0x80 != 0
 	payloadLen := int(data[1] & 0x7F)
@@ -1838,13 +1897,13 @@ func parseFrame(data []byte, isClient bool) (opcode byte, payload, rest []byte, 
 
 	if payloadLen == 126 {
 		if len(data) < offset+2 {
-			return 0, nil, data, errIncompleteFrame
+			return 0, nil, false, data, errIncompleteFrame
 		}
 		payloadLen = int(binary.BigEndian.Uint16(data[offset : offset+2]))
 		offset += 2
 	} else if payloadLen == 127 {
 		if len(data) < offset+8 {
-			return 0, nil, data, errIncompleteFrame
+			return 0, nil, false, data, errIncompleteFrame
 		}
 		payloadLen = int(binary.BigEndian.Uint64(data[offset : offset+8]))
 		offset += 8
@@ -1853,14 +1912,14 @@ func parseFrame(data []byte, isClient bool) (opcode byte, payload, rest []byte, 
 	var maskingKey []byte
 	if masked {
 		if len(data) < offset+4 {
-			return 0, nil, data, errIncompleteFrame
+			return 0, nil, false, data, errIncompleteFrame
 		}
 		maskingKey = data[offset : offset+4]
 		offset += 4
 	}
 
 	if len(data) < offset+payloadLen {
-		return 0, nil, data, errIncompleteFrame
+		return 0, nil, false, data, errIncompleteFrame
 	}
 
 	payload = data[offset : offset+payloadLen]
@@ -1874,13 +1933,7 @@ func parseFrame(data []byte, isClient bool) (opcode byte, payload, rest []byte, 
 
 	rest = data[offset+payloadLen:]
 
-	// Handle fragmentation if needed
-	if !fin {
-		// Handle fragmented frames if necessary
-		// For simplicity, we assume messages are not fragmented
-	}
-
-	return opcode, payload, rest, nil
+	return opcode, payload, fin, rest, nil
 }
 
 // RateLimitError represents an error due to rate limiting
