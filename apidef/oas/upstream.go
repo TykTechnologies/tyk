@@ -1,6 +1,7 @@
 package oas
 
 import (
+	"golang.org/x/oauth2"
 	"sort"
 	"strings"
 
@@ -639,17 +640,39 @@ type UpstreamOAuth struct {
 	Enabled bool `bson:"enabled" json:"enabled"`
 	// ClientCredentials holds the configuration for OAuth2 Client Credentials flow.
 	ClientCredentials *ClientCredentials `bson:"clientCredentials,omitempty" json:"clientCredentials,omitempty"`
+	// PasswordAuthentication holds the configuration for upstream OAauth password authentication flow.
+	PasswordAuthentication *PasswordAuthentication `bson:"passwordAuthentication,omitempty" json:"passwordAuthentication,omitempty"`
 	// HeaderName is the custom header name to be used for upstream basic authentication.
 	// Defaults to `Authorization`.
 	HeaderName string `bson:"headerName" json:"headerName"`
 }
 
-// ClientCredentials holds the configuration for OAuth2 Client Credentials flow.
-type ClientCredentials struct {
+// PasswordAuthentication holds the configuration for upstream OAuth2 password authentication flow.
+type PasswordAuthentication struct {
+	ClientAuthData
+	// Enabled activates upstream OAuth2 password authentication.
+	Enabled bool `bson:"enabled" json:"enabled"`
+	// Username is the username to be used for upstream OAuth2 password authentication.
+	Username string `bson:"username" json:"username"`
+	// Password is the password to be used for upstream OAuth2 password authentication.
+	Password string `bson:"password" json:"password"`
+	// TokenURL is the resource server's token endpoint
+	// URL. This is a constant specific to each server.
+	TokenURL string `bson:"tokenURL" json:"tokenURL"`
+
+	Token *oauth2.Token `bson:"-" json:"-"`
+}
+
+type ClientAuthData struct {
 	// ClientID is the application's ID.
-	ClientID string `bson:"clientID" json:"clientID"`
+	ClientID string `bson:"clientId" json:"clientId"`
 	// ClientSecret is the application's secret.
 	ClientSecret string `bson:"clientSecret" json:"clientSecret"`
+}
+
+// ClientCredentials holds the configuration for OAuth2 Client Credentials flow.
+type ClientCredentials struct {
+	ClientAuthData
 	// TokenURL is the resource server's token endpoint
 	// URL. This is a constant specific to each server.
 	TokenURL string `bson:"tokenURL" json:"tokenURL"`
