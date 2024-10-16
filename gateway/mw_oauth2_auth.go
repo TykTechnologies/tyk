@@ -156,11 +156,11 @@ func getOAuthHeaderProvider(oauthConfig apidef.UpstreamOAuth) (OAuthHeaderProvid
 	}
 
 	switch {
-	case oauthConfig.ClientCredentials != nil && oauthConfig.PasswordAuthentication != nil:
+	case oauthConfig.ClientCredentials.ClientID != "" && oauthConfig.PasswordAuthentication.ClientID != "":
 		return nil, fmt.Errorf("both client credentials and password authentication are provided")
-	case oauthConfig.ClientCredentials != nil:
+	case oauthConfig.ClientCredentials.ClientID != "":
 		return &ClientCredentialsOAuthProvider{}, nil
-	case oauthConfig.PasswordAuthentication != nil:
+	case oauthConfig.PasswordAuthentication.ClientID != "":
 		return &PasswordOAuthProvider{}, nil
 	default:
 		return nil, fmt.Errorf("no valid OAuth configuration provided")
