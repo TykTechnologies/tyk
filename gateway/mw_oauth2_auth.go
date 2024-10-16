@@ -5,10 +5,11 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
-	"golang.org/x/oauth2"
 	"net/http"
 	"strings"
 	"time"
+
+	"golang.org/x/oauth2"
 
 	"github.com/sirupsen/logrus"
 	oauth2clientcredentials "golang.org/x/oauth2/clientcredentials"
@@ -25,6 +26,7 @@ const (
 )
 
 type OAuthHeaderProvider interface {
+	// getOAuthToken returns the OAuth token for the request.
 	getOAuthToken(r *http.Request, OAuthSpec *UpstreamOAuth) (string, error)
 }
 
@@ -90,7 +92,9 @@ func (cache *upstreamOAuthPasswordCache) obtainToken(ctx context.Context, OAuthS
 }
 
 type UpstreamOAuthCache interface {
+	// getToken returns the token from cache or issues a request to obtain it from the OAuth provider.
 	getToken(r *http.Request, OAuthSpec *UpstreamOAuth) (string, error)
+	// obtainToken issues a request to obtain the token from the OAuth provider.
 	obtainToken(ctx context.Context, OAuthSpec *UpstreamOAuth) (*oauth2.Token, error)
 }
 
@@ -132,12 +136,12 @@ func (OAuthSpec *UpstreamOAuth) ProcessRequest(_ http.ResponseWriter, r *http.Re
 
 	provider, err := getOAuthHeaderProvider(oauthConfig)
 	if err != nil {
-		return fmt.Errorf("failed to get OAuth header provider: %v", err), http.StatusInternalServerError
+		return fmt.Errorf("failed to get OAuth header provider: %w", err), http.StatusInternalServerError
 	}
 
 	payload, err := provider.getOAuthToken(r, OAuthSpec)
 	if err != nil {
-		return fmt.Errorf("failed to get OAuth token: %v", err), http.StatusInternalServerError
+		return fmt.Errorf("failed to get OAuth token: %w", err), http.StatusInternalServerError
 	}
 
 	upstreamOAuthProvider.AuthValue = payload
@@ -260,7 +264,7 @@ func (cache *upstreamOAuthClientCredentialsCache) getToken(r *http.Request, OAut
 
 	encryptedToken := encrypt(getPaddedSecret(OAuthSpec.Gw), token.AccessToken)
 
-	ttl := time.Duration(token.Expiry.Sub(time.Now()).Seconds()) * time.Second
+	ttl := time.Until(token.Expiry)
 	if err := setTokenInCache(cacheKey, encryptedToken, ttl, &cache.RedisCluster); err != nil {
 		return "", err
 	}

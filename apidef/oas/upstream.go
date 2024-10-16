@@ -704,7 +704,7 @@ func (u *UpstreamOAuth) Fill(api apidef.UpstreamOAuth) {
 	if u.ClientCredentials == nil {
 		u.ClientCredentials = &ClientCredentials{}
 	}
-	u.ClientCredentials.Fill(*api.ClientCredentials)
+	u.ClientCredentials.Fill(api.ClientCredentials)
 	if ShouldOmit(u.ClientCredentials) {
 		u.ClientCredentials = nil
 	}
@@ -712,7 +712,7 @@ func (u *UpstreamOAuth) Fill(api apidef.UpstreamOAuth) {
 	if u.PasswordAuthentication == nil {
 		u.PasswordAuthentication = &PasswordAuthentication{}
 	}
-	u.PasswordAuthentication.Fill(*api.PasswordAuthentication)
+	u.PasswordAuthentication.Fill(api.PasswordAuthentication)
 	if ShouldOmit(u.PasswordAuthentication) {
 		u.PasswordAuthentication = nil
 	}
@@ -743,7 +743,7 @@ func (u *UpstreamOAuth) ExtractTo(api *apidef.UpstreamOAuth) {
 			u.ClientCredentials = nil
 		}()
 	}
-	u.ClientCredentials.ExtractTo(api.ClientCredentials)
+	u.ClientCredentials.ExtractTo(&api.ClientCredentials)
 
 	if u.PasswordAuthentication == nil {
 		u.PasswordAuthentication = &PasswordAuthentication{}
@@ -751,5 +751,5 @@ func (u *UpstreamOAuth) ExtractTo(api *apidef.UpstreamOAuth) {
 			u.PasswordAuthentication = nil
 		}()
 	}
-	u.PasswordAuthentication.ExtractTo(api.PasswordAuthentication)
+	u.PasswordAuthentication.ExtractTo(&api.PasswordAuthentication)
 }

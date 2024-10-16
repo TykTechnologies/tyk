@@ -807,9 +807,9 @@ type UpstreamOAuth struct {
 	// Enabled enables upstream OAuth2 authentication.
 	Enabled bool `bson:"enabled" json:"enabled"`
 	// ClientCredentials holds the client credentials for upstream OAuth2 authentication.
-	ClientCredentials *ClientCredentials `bson:"client_credentials" json:"client_credentials"`
+	ClientCredentials ClientCredentials `bson:"client_credentials" json:"client_credentials"`
 	// PasswordAuthentication holds the configuration for upstream OAauth password authentication flow.
-	PasswordAuthentication *PasswordAuthentication `bson:"password_authentication,omitempty" json:"passwordAuthentication,omitempty"`
+	PasswordAuthentication PasswordAuthentication `bson:"password_authentication,omitempty" json:"passwordAuthentication,omitempty"`
 	// HeaderName is the custom header name to be used for upstream basic authentication.
 	// Defaults to `Authorization`.
 	HeaderName string `bson:"header_name" json:"header_name,omitempty"`
