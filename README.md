@@ -1,4 +1,10 @@
 ![tyk-github-header](https://github.com/TykTechnologies/tyk/assets/8012032/02b3fbae-80ed-4d1f-be87-016326f82ece)
+This project contains both open source and commercially licensed components.
+
+The code in the root directory and all subdirectories except the 'ee' folder is licensed under the terms of the Mozilla Public License 2.0 (MPL 2.0) (see below).
+
+The code in the 'ee' folder is subject to a commercial license. See the LICENSE-EE file in the 'ee' folder for details.
+
 ![License: MPL 2.0](https://img.shields.io/badge/License-MPL%202.0-brightgreen.svg?style=flat_card&color=8836FB)
 [![FOSSA Status](https://app.fossa.io/api/projects/git%2Bgithub.com%2FTykTechnologies%2Ftyk.svg?type=shield)](https://app.fossa.io/projects/git%2Bgithub.com%2FTykTechnologies%2Ftyk?ref=badge_shield)
 
@@ -166,9 +172,13 @@ All the documentation for Tyk Gateway and other OSS-related topics can be found 
 * [Newsletters ](https://pages.tyk.io/newsletter)- Subscribe to our GraphQL & API newsletters
 * If you are using Tyk give us a star ⭐️
 
-## Open Source License
+## Licensing
 
-Tyk is released under the MPL v2.0; please see [LICENSE.md](https://github.com/TykTechnologies/tyk/blob/master/LICENSE.md) for a full version of the license.
+Tyk is dual-licensed:
+
+1. Open Source License: The code in the root directory and all subdirectories except the 'ee' folder is released under the MPL v2.0. Please see [LICENSE](https://github.com/TykTechnologies/tyk/blob/master/LICENSE) for the full version of the open source license.
+
+2. Commercial License: The code in the 'ee' folder is subject to a commercial license. For more information about obtaining a commercial license, please contact our sales team at sales@tyk.io.
 
 ![FOSSA Status](https://app.fossa.io/api/projects/git%2Bgithub.com%2FTykTechnologies%2Ftyk.svg?type=large)
 
