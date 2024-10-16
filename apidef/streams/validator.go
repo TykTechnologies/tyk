@@ -15,7 +15,6 @@ import (
 	"github.com/xeipuuv/gojsonschema"
 
 	tykerrors "github.com/TykTechnologies/tyk/internal/errors"
-	logger "github.com/TykTechnologies/tyk/log"
 )
 
 //go:embed schema/*
@@ -34,8 +33,6 @@ const (
 )
 
 var (
-	log = logger.Get()
-
 	schemaOnce sync.Once
 
 	oasJSONSchemas map[string][]byte
@@ -126,7 +123,7 @@ func validateJSON(schema, document []byte) error {
 
 }
 
-// ValidateOASObject validates an Tyk Streams OAS document against a particular OAS version.
+// ValidateOASObject validates a Tyk Streams document against a particular OAS version.
 func ValidateOASObject(documentBody []byte, oasVersion string) error {
 	oasSchema, err := GetOASSchema(oasVersion)
 	if err != nil {

@@ -1,7 +1,10 @@
 package streams
 
-import "github.com/TykTechnologies/tyk/apidef/oas"
+import (
+	"github.com/TykTechnologies/tyk/apidef/oas"
+)
 
+// XTykStreaming represents the structure for Tyk streaming configurations.
 type XTykStreaming struct {
 	// Info contains the main metadata for the API definition.
 	Info oas.Info `bson:"info" json:"info"` // required

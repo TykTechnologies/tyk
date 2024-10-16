@@ -3,12 +3,12 @@ package streams
 import (
 	"embed"
 	"fmt"
-	"github.com/TykTechnologies/tyk/apidef/oas"
-	"github.com/getkin/kin-openapi/openapi3"
 	"strings"
 	"testing"
 
+	"github.com/TykTechnologies/tyk/apidef/oas"
 	"github.com/buger/jsonparser"
+	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -16,21 +16,14 @@ import (
 //go:embed testdata/*-oas-template.json
 var oasTemplateFS embed.FS
 
-func getStrPointer(str string) *string {
-	return &str
-}
-
-func getBoolPointer(b bool) *bool {
-	return &b
-}
-
-func TestValidateOASObject(t *testing.T) {
+func TestValidateTykStreamsOASObject(t *testing.T) {
 	t.Parallel()
 	validOASObject := oas.OAS{
 		T: openapi3.T{
-			OpenAPI: "3.0.3",
-			Info:    &openapi3.Info{},
-			Paths:   map[string]*openapi3.PathItem{},
+			OpenAPI:    "3.0.3",
+			Info:       &openapi3.Info{},
+			Paths:      map[string]*openapi3.PathItem{},
+			Extensions: map[string]interface{}{},
 		},
 	}
 
@@ -49,7 +42,7 @@ func TestValidateOASObject(t *testing.T) {
 		Streams: map[string]interface{}{},
 	}
 
-	validOASObject.SetTykStreamingExtension(&validXTykAPIStreaming)
+	validOASObject.Extensions[ExtensionTykStreaming] = &validXTykAPIStreaming
 
 	validOAS3Definition, _ := validOASObject.MarshalJSON()
 
@@ -63,112 +56,46 @@ func TestValidateOASObject(t *testing.T) {
 	invalidXTykAPIGateway := validXTykAPIStreaming
 	invalidXTykAPIGateway.Info = oas.Info{}
 	invalidXTykAPIGateway.Server.GatewayTags = &oas.GatewayTags{Enabled: true, Tags: []string{}}
-	invalidOASObject.SetTykStreamingExtension(&invalidXTykAPIGateway)
-
-	//invalidOASObject.Paths["/pets"].Get.Responses["200"].Value.Description = nil
-
+	invalidOASObject.Extensions[ExtensionTykStreaming] = &invalidXTykAPIGateway
 	invalidOAS3Definition, _ := invalidOASObject.MarshalJSON()
 
 	t.Run("invalid OAS object", func(t *testing.T) {
 		t.Parallel()
 		err := ValidateOASObject(invalidOAS3Definition, "3.0.3")
 		expectedErrs := []string{
-			`x-tyk-api-gateway.info.name: Does not match pattern '\S+'`,
-			"paths./pets.get.responses.200: Must validate one and only one schema (oneOf)",
-			"paths./pets.get.responses.200: description is required",
+			`x-tyk-streaming.info.name: Does not match pattern '\S+'`,
 		}
 		actualErrs := strings.Split(err.Error(), "\n")
 		assert.ElementsMatch(t, expectedErrs, actualErrs)
 	})
 
 	var wrongTypedOASDefinition = []byte(`{
-	"openapi": "3.0.0",
-	"info": {
-	"version": "1.0.0",
-	"title": "Swagger Petstore",
-	"license": {
-	  "name": "MIT"
-	}
-	},
-	"servers": [
-	{
-	  "url": "http://petstore.swagger.io/v1"
-	}
-	],
-	"paths": {
-	"/pets": {
-	  "get": {
-		"summary": "List all pets",
-		"operationId": "listPets",
-		"tags": "pets",
-		"parameters": [
-		  {
-			"name": "limit",
-			"in": "query",
-			"description": "How many items to return at one time (max 100)",
-			"required": false,
-			"schema": {
-			  "type": "integer",
-			  "format": "int32"
-			}
-		  }
-		]
-	  }
-	}
-	},
-	"components": {
-	"schemas": {
-	  "Pet": {
-		"type": "object",
-		"required": [
-		  "id",
-		  "name"
-		],
-		"properties": {
-		  "id": {
-			"type": "integer",
-			"format": "int64"
-		  },
-		  "name": {
-			"type": "string"
-		  },
-		  "tag": {
-			"type": "string"
-		  }
-		}
-	  },
-	  "Pets": {
-		"type": "array",
-		"items": {
-		  "$ref": "#/components/schemas/Pet"
-		}
-	  },
-	  "Error": {
-		"type": "object",
-		"required": [
-		  "code",
-		  "message"
-		],
-		"properties": {
-		  "code": {
-			"type": "integer",
-			"format": "int32"
-		  },
-		  "message": {
-			"type": "string"
-		  }
-		}
-	  }
-	}
-	}
-	}`)
+    "openapi": "3.0.0",
+    "info": {
+        "version": "1.0.0",
+        "title": "Tyk Streams Example",
+        "license": {
+            "name": "MIT"
+        }
+    },
+    "servers": [
+        {
+            "url": "http://tyk-gateway:8081/test-streams"
+        }
+    ],
+    "paths": {},
+    "x-tyk-streaming": {
+        
+    }
+}`)
 
 	t.Run("wrong typed OAS object", func(t *testing.T) {
 		t.Parallel()
 		err := ValidateOASObject(wrongTypedOASDefinition, "3.0.3")
-		expectedErr := fmt.Sprintf("%s\n%s",
-			"paths./pets.get: responses is required",
-			"paths./pets.get.tags: Invalid type. Expected: array, given: string")
+		expectedErr := fmt.Sprintf("%s\n%s\n%s",
+			"x-tyk-streaming: info is required",
+			"x-tyk-streaming: streams is required",
+			"x-tyk-streaming: server is required")
 		assert.Equal(t, expectedErr, err.Error())
 	})
 
