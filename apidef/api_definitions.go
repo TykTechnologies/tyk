@@ -830,6 +830,7 @@ type PasswordAuthentication struct {
 	// Scopes specifies optional requested permissions.
 	Scopes []string `bson:"scopes" json:"scopes,omitempty"`
 
+	// TokenProvider is the OAuth2 password authentication flow token for internal use.
 	Token *oauth2.Token `bson:"-" json:"-"`
 }
 

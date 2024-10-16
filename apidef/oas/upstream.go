@@ -1,9 +1,10 @@
 package oas
 
 import (
-	"golang.org/x/oauth2"
 	"sort"
 	"strings"
+
+	"golang.org/x/oauth2"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/internal/time"
@@ -665,6 +666,7 @@ type PasswordAuthentication struct {
 	Token *oauth2.Token `bson:"-" json:"-"`
 }
 
+// ClientAuthData holds the client ID and secret for OAuth2 authentication.
 type ClientAuthData struct {
 	// ClientID is the application's ID.
 	ClientID string `bson:"clientId" json:"clientId"`
