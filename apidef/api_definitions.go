@@ -807,18 +807,22 @@ type UpstreamOAuth struct {
 	// Enabled enables upstream OAuth2 authentication.
 	Enabled bool `bson:"enabled" json:"enabled"`
 	// ClientCredentials holds the client credentials for upstream OAuth2 authentication.
-	ClientCredentials ClientCredentials `bson:"client_credentials" json:"client_credentials"`
+	ClientCredentials *ClientCredentials `bson:"client_credentials" json:"client_credentials"`
 	// HeaderName is the custom header name to be used for upstream basic authentication.
 	// Defaults to `Authorization`.
 	HeaderName string `bson:"header_name" json:"header_name,omitempty"`
 }
 
-// ClientCredentials holds the client credentials for upstream OAuth2 authentication.
-type ClientCredentials struct {
+type ClientAuthData struct {
 	// ClientID is the application's ID.
 	ClientID string `bson:"client_id" json:"client_id"`
 	// ClientSecret is the application's secret.
 	ClientSecret string `bson:"client_secret" json:"client_secret"`
+}
+
+// ClientCredentials holds the client credentials for upstream OAuth2 authentication.
+type ClientCredentials struct {
+	ClientAuthData
 	// TokenURL is the resource server's token endpoint
 	// URL. This is a constant specific to each server.
 	TokenURL string `bson:"token_url" json:"token_url"`
