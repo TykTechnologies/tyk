@@ -36,3 +36,22 @@ func (gw *Gateway) PolicyCount() int {
 
 	return len(gw.policiesByID)
 }
+
+// SetPolicies updates the internal policy map with a new policy map.
+func (gw *Gateway) SetPolicies(pols map[string]user.Policy) {
+	gw.policiesMu.Lock()
+	defer gw.policiesMu.Unlock()
+
+	gw.policiesByID = pols
+}
+
+// SetPoliciesByID will update the internal policiesByID map with new policies.
+// The key used will be the policy ID.
+func (gw *Gateway) SetPoliciesByID(pols ...user.Policy) {
+	gw.policiesMu.Lock()
+	defer gw.policiesMu.Unlock()
+
+	for _, pol := range pols {
+		gw.policiesByID[pol.ID] = pol
+	}
+}

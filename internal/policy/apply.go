@@ -15,6 +15,7 @@ var (
 	ErrMixedPartitionAndPerAPIPolicies = errors.New("cannot apply multiple policies when some have per_api set and some are partitioned")
 )
 
+
 // Service represents the implementation for apply policies logic.
 type Service struct {
 	storage model.PolicyProvider
@@ -24,7 +25,6 @@ type Service struct {
 	orgID *string
 }
 
-// New creates a new policy.Service.
 func New(orgID *string, storage model.PolicyProvider, logger *logrus.Logger) *Service {
 	return &Service{
 		orgID:   orgID,
@@ -102,7 +102,8 @@ func (t *Service) Apply(session *user.SessionState) error {
 	)
 
 	storage := t.storage
-	customPolicies, err := session.CustomPolicies()
+
+	customPolicies, err := session.GetCustomPolicies()
 	if err != nil {
 		policyIDs = session.PolicyIDs()
 	} else {
@@ -237,8 +238,9 @@ func (t *Service) Apply(session *user.SessionState) error {
 	return nil
 }
 
-func (t *Service) Logger() *logrus.Logger {
-	return t.logger
+// Logger implements a typical logger signature with service context.
+func (t *Service) Logger() *logrus.Entry {
+	return logrus.NewEntry(t.logger)
 }
 
 // ApplyRateLimits will write policy limits to session and apiLimits.
@@ -344,13 +346,21 @@ func (t *Service) applyPartitions(policy user.Policy, session *user.SessionState
 		return ErrMixedPartitionAndPerAPIPolicies
 	}
 
+	// Ensure `rights` is filled with known APIs to ensure that
+	// a policy with acl rights gets honored even if not first.
+	for k := range policy.AccessRights {
+		if _, ok := rights[k]; ok {
+			continue
+		}
+		rights[k] = user.AccessDefinition{}
+	}
+
 	for k, v := range policy.AccessRights {
-		ar := v
+		// Use rights[k], which holds previously seen/merged policy access rights.
+		ar := rights[k]
 
 		if !usePartitions || policy.Partitions.Acl {
 			applyState.didAcl[k] = true
-
-			ar.AllowedURLs = copyAllowedURLs(v.AllowedURLs)
 
 			// Merge ACLs for the same API
 			if r, ok := rights[k]; ok {
@@ -360,32 +370,28 @@ func (t *Service) applyPartitions(policy user.Policy, session *user.SessionState
 				}
 				r.Versions = appendIfMissing(rights[k].Versions, v.Versions...)
 
-				for _, u := range v.AllowedURLs {
-					found := false
-					for ai, au := range r.AllowedURLs {
-						if u.URL == au.URL {
-							found = true
-							r.AllowedURLs[ai].Methods = appendIfMissing(au.Methods, u.Methods...)
-						}
-					}
+				r.AllowedURLs = MergeAllowedURLs(r.AllowedURLs, v.AllowedURLs)
 
-					if !found {
-						r.AllowedURLs = append(r.AllowedURLs, v.AllowedURLs...)
-					}
-				}
-
-				for _, t := range v.RestrictedTypes {
-					for ri, rt := range r.RestrictedTypes {
-						if t.Name == rt.Name {
-							r.RestrictedTypes[ri].Fields = intersection(rt.Fields, t.Fields)
+				if len(r.RestrictedTypes) == 0 {
+					r.RestrictedTypes = v.RestrictedTypes
+				} else {
+					for _, t := range v.RestrictedTypes {
+						for ri, rt := range r.RestrictedTypes {
+							if t.Name == rt.Name {
+								r.RestrictedTypes[ri].Fields = intersection(rt.Fields, t.Fields)
+							}
 						}
 					}
 				}
 
-				for _, t := range v.AllowedTypes {
-					for ri, rt := range r.AllowedTypes {
-						if t.Name == rt.Name {
-							r.AllowedTypes[ri].Fields = intersection(rt.Fields, t.Fields)
+				if len(r.AllowedTypes) == 0 {
+					r.AllowedTypes = v.AllowedTypes
+				} else {
+					for _, t := range v.AllowedTypes {
+						for ri, rt := range r.AllowedTypes {
+							if t.Name == rt.Name {
+								r.AllowedTypes[ri].Fields = intersection(rt.Fields, t.Fields)
+							}
 						}
 					}
 				}
@@ -396,17 +402,21 @@ func (t *Service) applyPartitions(policy user.Policy, session *user.SessionState
 					}
 				}
 
-				for _, far := range v.FieldAccessRights {
-					exists := false
-					for i, rfar := range r.FieldAccessRights {
-						if far.TypeName == rfar.TypeName && far.FieldName == rfar.FieldName {
-							exists = true
-							mergeFieldLimits(&r.FieldAccessRights[i].Limits, far.Limits)
+				if len(r.FieldAccessRights) == 0 {
+					r.FieldAccessRights = v.FieldAccessRights
+				} else {
+					for _, far := range v.FieldAccessRights {
+						exists := false
+						for i, rfar := range r.FieldAccessRights {
+							if far.TypeName == rfar.TypeName && far.FieldName == rfar.FieldName {
+								exists = true
+								mergeFieldLimits(&r.FieldAccessRights[i].Limits, far.Limits)
+							}
 						}
-					}
 
-					if !exists {
-						r.FieldAccessRights = append(r.FieldAccessRights, far)
+						if !exists {
+							r.FieldAccessRights = append(r.FieldAccessRights, far)
+						}
 					}
 				}
 
@@ -418,8 +428,8 @@ func (t *Service) applyPartitions(policy user.Policy, session *user.SessionState
 
 		if !usePartitions || policy.Partitions.Quota {
 			applyState.didQuota[k] = true
-			if greaterThanInt64(policy.QuotaMax, ar.Limit.QuotaMax) {
 
+			if greaterThanInt64(policy.QuotaMax, ar.Limit.QuotaMax) {
 				ar.Limit.QuotaMax = policy.QuotaMax
 				if greaterThanInt64(policy.QuotaMax, session.QuotaMax) {
 					session.QuotaMax = policy.QuotaMax

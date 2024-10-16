@@ -22,6 +22,7 @@ import (
 	"github.com/TykTechnologies/tyk/apidef/oas"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/internal/model"
+	"github.com/TykTechnologies/tyk/internal/policy"
 	"github.com/TykTechnologies/tyk/rpc"
 	"github.com/TykTechnologies/tyk/test"
 	"github.com/TykTechnologies/tyk/user"
@@ -1449,7 +1450,7 @@ func Test_LoadAPIsFromRPC(t *testing.T) {
 	loader := APIDefinitionLoader{Gw: ts.Gw}
 
 	t.Run("load APIs from RPC - success", func(t *testing.T) {
-		mockedStorage := &RPCDataLoaderMock{
+		mockedStorage := &policy.RPCDataLoaderMock{
 			ShouldConnect: true,
 			Apis: []model.MergedAPI{
 				{APIDefinition: &apidef.APIDefinition{Id: objectID, OrgID: "org1", APIID: "api1"}},
@@ -1463,7 +1464,7 @@ func Test_LoadAPIsFromRPC(t *testing.T) {
 	})
 
 	t.Run("load APIs from RPC - success - then fail", func(t *testing.T) {
-		mockedStorage := &RPCDataLoaderMock{
+		mockedStorage := &policy.RPCDataLoaderMock{
 			ShouldConnect: true,
 			Apis: []model.MergedAPI{
 				{APIDefinition: &apidef.APIDefinition{Id: objectID, OrgID: "org1", APIID: "api1"}},
