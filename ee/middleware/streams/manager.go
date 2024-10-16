@@ -8,8 +8,6 @@ import (
 	"time"
 
 	"github.com/gorilla/mux"
-
-	"github.com/TykTechnologies/tyk/internal/streaming"
 )
 
 // Manager is responsible for creating a single stream.
@@ -83,7 +81,7 @@ func (sm *Manager) removeStream(streamID string) error {
 	streamFullID := fmt.Sprintf("%s_%s", sm.mw.Spec.APIID, streamID)
 
 	if streamValue, exists := sm.streams.Load(streamFullID); exists {
-		stream, ok := streamValue.(*streaming.Stream)
+		stream, ok := streamValue.(*Stream)
 		if !ok {
 			return fmt.Errorf("stream %s is not a valid stream", streamID)
 		}
@@ -103,7 +101,7 @@ func (sm *Manager) createStream(streamID string, config map[string]interface{}) 
 	streamFullID := fmt.Sprintf("%s_%s", sm.mw.Spec.APIID, streamID)
 	sm.mw.Logger().Debugf("Creating stream: %s", streamFullID)
 
-	stream := streaming.NewStream(sm.mw.allowedUnsafe)
+	stream := NewStream(sm.mw.allowedUnsafe)
 	err := stream.Start(config, &handleFuncAdapter{
 		mw:       sm.mw,
 		streamID: streamFullID,

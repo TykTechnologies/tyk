@@ -13,7 +13,6 @@ import (
 
 	"github.com/TykTechnologies/tyk/internal/middleware"
 	"github.com/TykTechnologies/tyk/internal/model"
-	"github.com/TykTechnologies/tyk/internal/streaming"
 )
 
 // Middleware implements a streaming middleware.
@@ -199,7 +198,7 @@ func (s *Middleware) Unload() {
 			return true
 		}
 		manager.streams.Range(func(_, streamValue interface{}) bool {
-			if stream, ok := streamValue.(*streaming.Stream); ok {
+			if stream, ok := streamValue.(*Stream); ok {
 				if err := stream.Reset(); err != nil {
 					return true
 				}

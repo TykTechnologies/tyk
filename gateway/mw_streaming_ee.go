@@ -4,7 +4,7 @@
 package gateway
 
 import (
-	"github.com/TykTechnologies/tyk/ee/internal/middleware/streams"
+	"github.com/TykTechnologies/tyk/ee/middleware/streams"
 )
 
 func getStreamingMiddleware(baseMid *BaseMiddleware) TykMiddleware {
