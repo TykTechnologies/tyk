@@ -657,7 +657,7 @@ type ClientCredentials struct {
 	Scopes []string `bson:"scopes,omitempty" json:"scopes,omitempty"`
 }
 
-func (c *ClientCredentials) Fill(api apidef.ClientCredentials) {
+func (c *ClientCredentials) Fill(api *apidef.ClientCredentials) {
 	c.ClientID = api.ClientID
 	c.ClientSecret = api.ClientSecret
 	c.TokenURL = api.TokenURL
@@ -671,7 +671,7 @@ func (u *UpstreamOAuth) Fill(api apidef.UpstreamOAuth) {
 	if u.ClientCredentials == nil {
 		u.ClientCredentials = &ClientCredentials{}
 	}
-	u.ClientCredentials.Fill(*api.ClientCredentials)
+	u.ClientCredentials.Fill(api.ClientCredentials)
 	if ShouldOmit(u.ClientCredentials) {
 		u.ClientCredentials = nil
 	}

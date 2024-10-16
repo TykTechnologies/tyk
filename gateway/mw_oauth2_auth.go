@@ -25,6 +25,7 @@ const (
 )
 
 type OAuthHeaderProvider interface {
+	// getOAuthToken returns the OAuth token for the request.
 	getOAuthToken(r *http.Request, OAuthSpec *UpstreamOAuth) (string, error)
 }
 
@@ -41,7 +42,9 @@ type upstreamOAuthClientCredentialsCache struct {
 }
 
 type UpstreamOAuthCache interface {
+	// getToken returns the token from cache or issues a request to obtain it from the OAuth provider.
 	getToken(r *http.Request, OAuthSpec *UpstreamOAuth) (string, error)
+	// obtainToken issues a request to obtain the token from the OAuth provider.
 	obtainToken(ctx context.Context, OAuthSpec *UpstreamOAuth) (*oauth2.Token, error)
 }
 
