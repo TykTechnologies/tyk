@@ -30,7 +30,7 @@ import (
 
 	"github.com/TykTechnologies/tyk/apidef/oas"
 	"github.com/TykTechnologies/tyk/config"
-	"github.com/TykTechnologies/tyk/internal/middleware/streamv1"
+	"github.com/TykTechnologies/tyk/ee/internal/middleware/streams"
 	"github.com/TykTechnologies/tyk/test"
 )
 
@@ -91,7 +91,7 @@ output:
 		t.Run(tc.name, func(t *testing.T) {
 			config, err := yamlConfigToMap(tc.configYaml)
 			require.NoError(t, err)
-			httpPaths := streamv1.GetHTTPPaths(config)
+			httpPaths := streams.GetHTTPPaths(config)
 			assert.ElementsMatch(t, tc.expected, httpPaths)
 		})
 	}
@@ -357,7 +357,7 @@ func setupOASForStreamAPI(streamingConfig string) (oas.OAS, error) {
 	}
 
 	oasAPI.Extensions = map[string]interface{}{
-		streamv1.ExtensionTykStreaming: parsedStreamingConfig,
+		streams.ExtensionTykStreaming: parsedStreamingConfig,
 	}
 
 	return oasAPI, nil
@@ -449,7 +449,7 @@ streams:
 	}
 
 	oasAPI.Extensions = map[string]interface{}{
-		streamv1.ExtensionTykStreaming: parsedStreamingConfig,
+		streams.ExtensionTykStreaming: parsedStreamingConfig,
 		// oas.ExtensionTykAPIGateway: tykExtension,
 	}
 
@@ -471,8 +471,8 @@ streams:
 	// Check that standard API still works
 	_, _ = ts.Run(t, test.TestCase{Code: http.StatusOK, Method: http.MethodGet, Path: "/test"})
 
-	if streamv1.GlobalStreamCounter.Load() != 1 {
-		t.Fatalf("Expected 1 stream, got %d", streamv1.GlobalStreamCounter.Load())
+	if streams.GlobalStreamCounter.Load() != 1 {
+		t.Fatalf("Expected 1 stream, got %d", streams.GlobalStreamCounter.Load())
 	}
 
 	time.Sleep(500 * time.Millisecond)
@@ -595,7 +595,7 @@ streams:
 	}
 
 	oasAPI.Extensions = map[string]interface{}{
-		streamv1.ExtensionTykStreaming: parsedStreamingConfig,
+		streams.ExtensionTykStreaming: parsedStreamingConfig,
 	}
 
 	return oasAPI
@@ -607,7 +607,7 @@ func testAsyncAPIHttp(t *testing.T, ts *Test, isDynamic bool, tenantID string, a
 	const numMessages = 2
 	const numClients = 2
 
-	streamCount := streamv1.GlobalStreamCounter.Load()
+	streamCount := streams.GlobalStreamCounter.Load()
 	t.Logf("Stream count for tenant %s: %d", tenantID, streamCount)
 
 	// Create WebSocket clients

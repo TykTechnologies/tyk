@@ -4,12 +4,12 @@
 package gateway
 
 import (
-	"github.com/TykTechnologies/tyk/internal/middleware/streamv1"
+	"github.com/TykTechnologies/tyk/ee/internal/middleware/streams"
 )
 
 func getStreamingMiddleware(baseMid *BaseMiddleware) TykMiddleware {
 	spec := baseMid.Spec
-	streamSpec := streamv1.NewAPISpec(spec.APIID, spec.Name, spec.IsOAS, spec.OAS, spec.StripListenPath)
-	streamMw := streamv1.NewMiddleware(baseMid.Gw, baseMid, streamSpec)
+	streamSpec := streams.NewAPISpec(spec.APIID, spec.Name, spec.IsOAS, spec.OAS, spec.StripListenPath)
+	streamMw := streams.NewMiddleware(baseMid.Gw, baseMid, streamSpec)
 	return WrapMiddleware(baseMid, streamMw)
 }

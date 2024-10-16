@@ -1,10 +1,4 @@
 ![tyk-github-header](https://github.com/TykTechnologies/tyk/assets/8012032/02b3fbae-80ed-4d1f-be87-016326f82ece)
-This project contains both open source and commercially licensed components.
-
-The code in the root directory and all subdirectories except the 'ee' folder is licensed under the terms of the Mozilla Public License 2.0 (MPL 2.0) (see below).
-
-The code in the 'ee' folder is subject to a commercial license. See the LICENSE-EE file in the 'ee' folder for details.
-
 ![License: MPL 2.0](https://img.shields.io/badge/License-MPL%202.0-brightgreen.svg?style=flat_card&color=8836FB)
 [![FOSSA Status](https://app.fossa.io/api/projects/git%2Bgithub.com%2FTykTechnologies%2Ftyk.svg?type=shield)](https://app.fossa.io/projects/git%2Bgithub.com%2FTykTechnologies%2Ftyk?ref=badge_shield)
 
@@ -51,7 +45,7 @@ Tyk runs natively on _Kubernetes_, if you prefer, thanks to the _[Tyk Kubernetes
      <center>
        <a href="https://tyk.io/docs/tyk-cloud"> <img src="https://raw.githubusercontent.com/TykTechnologies/tyk-docs/master/tyk-docs/assets/img/logos/tyk-logo-cloud.png" width="20%"></a>
      </center>
-     </br>The Enterprise API Management platform SaaS: Management Control Plane, Dashboard GUI & Developer Portal. 
+     </br>The Enterprise API Management platform SaaS: Management Control Plane, Dashboard GUI & Developer Portal.
      </br><a href="https://tyk.io/docs/deployment-and-operations/tyk-cloud-platform/quick-start">Deploy Tyk Cloud </a>
    </td>
   </tr>
@@ -88,7 +82,7 @@ Your Tyk Gateway is now configured and ready to use. Confirm this by checking ag
 ```console
 curl localhost:8080/hello
 ```
-Output:  
+Output:
 ```json
 {"status": "pass", "version": "v3.2.1", "description": "Tyk GW"}
 ```
@@ -179,8 +173,6 @@ Tyk is dual-licensed:
 1. Open Source License: The code in the root directory and all subdirectories except the 'ee' folder is released under the MPL v2.0. Please see [LICENSE](https://github.com/TykTechnologies/tyk/blob/master/LICENSE) for the full version of the open source license.
 
 2. Commercial License: The code in the 'ee' folder is subject to a commercial license. For more information about obtaining a commercial license, please contact our sales team at sales@tyk.io.
-
-![FOSSA Status](https://app.fossa.io/api/projects/git%2Bgithub.com%2FTykTechnologies%2Ftyk.svg?type=large)
 
 ## Compiling Tyk Gateway
 

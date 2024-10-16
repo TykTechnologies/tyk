@@ -1,4 +1,4 @@
-package streamv1
+package streams
 
 import (
 	"fmt"
