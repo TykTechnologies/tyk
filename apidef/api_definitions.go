@@ -827,6 +827,8 @@ type PasswordAuthentication struct {
 	// TokenURL is the resource server's token endpoint
 	// URL. This is a constant specific to each server.
 	TokenURL string `bson:"token_url" json:"token_url"`
+	// Scopes specifies optional requested permissions.
+	Scopes []string `bson:"scopes" json:"scopes,omitempty"`
 
 	Token *oauth2.Token `bson:"-" json:"-"`
 }

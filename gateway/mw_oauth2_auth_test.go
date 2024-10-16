@@ -91,3 +91,85 @@ func TestUpstreamOauth2(t *testing.T) {
 	}...)
 
 }
+
+func TestPasswordCredentialsTokenRequest(t *testing.T) {
+	tst := StartTest(nil)
+	t.Cleanup(tst.Close)
+
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		defer r.Body.Close()
+		expected := "/token"
+		if r.URL.String() != expected {
+			t.Errorf("URL = %q; want %q", r.URL, expected)
+		}
+		headerAuth := r.Header.Get("Authorization")
+		expected = "Basic Q0xJRU5UX0lEOkNMSUVOVF9TRUNSRVQ="
+		if headerAuth != expected {
+			t.Errorf("Authorization header = %q; want %q", headerAuth, expected)
+		}
+		headerContentType := r.Header.Get("Content-Type")
+		expected = "application/x-www-form-urlencoded"
+		if headerContentType != expected {
+			t.Errorf("Content-Type header = %q; want %q", headerContentType, expected)
+		}
+		body, err := io.ReadAll(r.Body)
+		if err != nil {
+			t.Errorf("Failed reading request body: %s.", err)
+		}
+		expected = "grant_type=password&password=password1&scope=scope1+scope2&username=user1"
+		if string(body) != expected {
+			t.Errorf("res.Body = %q; want %q", string(body), expected)
+		}
+		w.Header().Set("Content-Type", "application/x-www-form-urlencoded")
+		w.Write([]byte("access_token=90d64460d14870c08c81352a05dedd3465940a7c&scope=user&token_type=bearer"))
+	}))
+	defer ts.Close()
+
+	cfg := apidef.PasswordAuthentication{
+		Enabled: true,
+		ClientAuthData: apidef.ClientAuthData{
+			ClientID:     "CLIENT_ID",
+			ClientSecret: "CLIENT_SECRET",
+		},
+		Username: "user1",
+		Password: "password1",
+		TokenURL: ts.URL + "/token",
+		Scopes:   []string{"scope1", "scope2"},
+	}
+
+	tst.Gw.BuildAndLoadAPI(
+		func(spec *APISpec) {
+			spec.Proxy.ListenPath = "/upstream-oauth-password/"
+			spec.UseKeylessAccess = true
+			spec.UpstreamAuth = apidef.UpstreamAuth{
+				Enabled: true,
+				OAuth: apidef.UpstreamOAuth{
+					Enabled:                true,
+					PasswordAuthentication: &cfg,
+					HeaderName:             "",
+				},
+			}
+			spec.Proxy.StripListenPath = true
+		},
+	)
+
+	_, _ = tst.Run(t, test.TestCases{
+		{
+			Path: "/upstream-oauth-password/",
+			Code: http.StatusOK,
+			BodyMatchFunc: func(body []byte) bool {
+				resp := struct {
+					Headers map[string]string `json:"headers"`
+				}{}
+				err := json.Unmarshal(body, &resp)
+				assert.NoError(t, err)
+
+				assert.Contains(t, resp.Headers, header.Authorization)
+				assert.NotEmpty(t, resp.Headers[header.Authorization])
+				assert.Equal(t, "Bearer 90d64460d14870c08c81352a05dedd3465940a7c", resp.Headers[header.Authorization])
+
+				return true
+			},
+		},
+	}...)
+}

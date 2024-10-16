@@ -659,6 +659,8 @@ type PasswordAuthentication struct {
 	// TokenURL is the resource server's token endpoint
 	// URL. This is a constant specific to each server.
 	TokenURL string `bson:"tokenURL" json:"tokenURL"`
+	// Scopes specifies optional requested permissions.
+	Scopes []string `bson:"scopes" json:"scopes,omitempty"`
 
 	Token *oauth2.Token `bson:"-" json:"-"`
 }
@@ -687,6 +689,14 @@ func (c *ClientCredentials) Fill(api apidef.ClientCredentials) {
 	c.Scopes = api.Scopes
 }
 
+func (p *PasswordAuthentication) Fill(api apidef.PasswordAuthentication) {
+	p.Enabled = api.Enabled
+	p.Username = api.Username
+	p.Password = api.Password
+	p.TokenURL = api.TokenURL
+	p.Scopes = api.Scopes
+}
+
 func (u *UpstreamOAuth) Fill(api apidef.UpstreamOAuth) {
 	u.Enabled = api.Enabled
 	u.HeaderName = api.HeaderName
@@ -698,6 +708,14 @@ func (u *UpstreamOAuth) Fill(api apidef.UpstreamOAuth) {
 	if ShouldOmit(u.ClientCredentials) {
 		u.ClientCredentials = nil
 	}
+
+	if u.PasswordAuthentication == nil {
+		u.PasswordAuthentication = &PasswordAuthentication{}
+	}
+	u.PasswordAuthentication.Fill(*api.PasswordAuthentication)
+	if ShouldOmit(u.PasswordAuthentication) {
+		u.PasswordAuthentication = nil
+	}
 }
 
 func (c *ClientCredentials) ExtractTo(api *apidef.ClientCredentials) {
@@ -705,6 +723,14 @@ func (c *ClientCredentials) ExtractTo(api *apidef.ClientCredentials) {
 	api.ClientSecret = c.ClientSecret
 	api.TokenURL = c.TokenURL
 	api.Scopes = c.Scopes
+}
+
+func (p *PasswordAuthentication) ExtractTo(api *apidef.PasswordAuthentication) {
+	api.Enabled = p.Enabled
+	api.Username = p.Username
+	api.Password = p.Password
+	api.TokenURL = p.TokenURL
+	api.Scopes = p.Scopes
 }
 
 func (u *UpstreamOAuth) ExtractTo(api *apidef.UpstreamOAuth) {
@@ -718,4 +744,12 @@ func (u *UpstreamOAuth) ExtractTo(api *apidef.UpstreamOAuth) {
 		}()
 	}
 	u.ClientCredentials.ExtractTo(api.ClientCredentials)
+
+	if u.PasswordAuthentication == nil {
+		u.PasswordAuthentication = &PasswordAuthentication{}
+		defer func() {
+			u.PasswordAuthentication = nil
+		}()
+	}
+	u.PasswordAuthentication.ExtractTo(api.PasswordAuthentication)
 }

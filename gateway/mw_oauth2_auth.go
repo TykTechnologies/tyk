@@ -216,11 +216,11 @@ func (p *PasswordOAuthProvider) getOAuthToken(r *http.Request, OAuthSpec *Upstre
 
 func generatePasswordOAuthCacheKey(config apidef.UpstreamOAuth, apiId string) string {
 	key := fmt.Sprintf(
-		"%s|%s|%s",
+		"%s|%s|%s|%s",
 		apiId,
 		config.PasswordAuthentication.ClientID,
 		config.PasswordAuthentication.ClientSecret,
-	)
+		strings.Join(config.PasswordAuthentication.Scopes, ","))
 
 	hash := sha256.New()
 	hash.Write([]byte(key))
@@ -309,6 +309,7 @@ func newOAuth2PasswordConfig(OAuthSpec *UpstreamOAuth) oauth2.Config {
 		Endpoint: oauth2.Endpoint{
 			TokenURL: OAuthSpec.Spec.UpstreamAuth.OAuth.PasswordAuthentication.TokenURL,
 		},
+		Scopes: OAuthSpec.Spec.UpstreamAuth.OAuth.PasswordAuthentication.Scopes,
 	}
 }
 
