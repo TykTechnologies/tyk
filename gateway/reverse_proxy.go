@@ -1564,11 +1564,11 @@ func (p *ReverseProxy) handleUpgradeResponse(rw http.ResponseWriter, req *http.R
 	// Start copying data between user and backend
 	errc := make(chan error, 2)
 	go func() {
-		_, err := io.Copy(backConn, userTap)
+		_, err := io.Copy(backendTap, userTap)
 		errc <- err
 	}()
 	go func() {
-		_, err := io.Copy(conn, backendTap)
+		_, err := io.Copy(userTap, backendTap)
 		errc <- err
 	}()
 
@@ -1615,6 +1615,8 @@ type tap struct {
 	rateLimitKey string
 	quotaKey     string
 	buffer       []byte
+
+	shouldDiscardMessage bool
 
 	// New fields for handling fragmentation
 	fragmentedPayload []byte // Accumulates payloads for fragmented messages
@@ -1688,6 +1690,10 @@ func (t *tap) Write(p []byte) (int, error) {
 		}
 	}
 
+	if t.shouldDiscardMessage {
+		return len(p), nil
+	}
+
 	return t.writer.Write(p)
 }
 
@@ -1728,9 +1734,17 @@ func (t *tap) processData(data []byte, action string) error {
 				}
 				if fin {
 					// Single-frame message
-					if err := t.handleMessage(opcode, payload); err != nil {
+					shouldForward, err := t.handleMessage(opcode, payload, action)
+					if err != nil {
 						return err
 					}
+					if !shouldForward {
+						// Do not forward the message
+						// Remove the message data from the buffer
+						t.buffer = rest
+						continue
+					}
+					// else, proceed to forwarding
 				} else {
 					// Start of a fragmented message
 					t.isFragmented = true
@@ -1742,8 +1756,18 @@ func (t *tap) processData(data []byte, action string) error {
 			if fin {
 				if t.isFragmented {
 					// End of fragmented message
-					if err := t.handleMessage(t.fragmentedOpcode, t.fragmentedPayload); err != nil {
+					shouldForward, err := t.handleMessage(t.fragmentedOpcode, t.fragmentedPayload, action)
+					if err != nil {
 						return err
+					}
+					if !shouldForward {
+						// Do not forward the message
+						// Remove the message data from the buffer
+						t.isFragmented = false
+						t.fragmentedOpcode = 0
+						t.fragmentedPayload = nil
+						t.buffer = rest
+						continue
 					}
 					// Reset fragmentation state
 					t.isFragmented = false
@@ -1764,16 +1788,29 @@ func (t *tap) processData(data []byte, action string) error {
 	return nil
 }
 
-func (t *tap) handleMessage(opcode byte, payload []byte) error {
-	// Log the complete message
-	log.Infof("WebSocket complete message - Opcode: %d Payload: %s", opcode, string(payload))
-
+func (t *tap) handleMessage(opcode byte, payload []byte, action string) (bool, error) {
 	// Apply rate limiting or other processing as needed
-	if t.isClient && t.gw.GetConfig().Streaming.EnableWebSocketRateLimiting {
+	if t.isClient && action == "write" && t.gw.GetConfig().Streaming.EnableWebSocketRateLimiting {
 		err := t.applyRateLimiting()
 		if err != nil {
-			// Return rate limiting error
-			return err
+			if rateErr, ok := err.(*RateLimitError); ok {
+				t.shouldDiscardMessage = true
+				if t.gw.GetConfig().Streaming.EnableWebSocketCloseOnRateLimit {
+					// Return the error to terminate the connection
+					return false, rateErr
+				} else {
+					// Write error message back to the user
+					t.writeErrorMessage(`{"error": "` + rateErr.Error() + `"}`)
+					// Do not forward the message to the backend
+					// Return false to indicate that the message should not be forwarded
+					return false, nil
+				}
+			} else {
+				// Return other errors
+				return false, err
+			}
+		} else {
+			t.shouldDiscardMessage = false
 		}
 	}
 
@@ -1791,7 +1828,7 @@ func (t *tap) handleMessage(opcode byte, payload []byte) error {
 		}
 
 		if t.isClient {
-			reqCopy.URL.Path = path.Join(reqCopy.URL.Path, "in")
+			reqCopy.URL.Path = path.Join(reqCopy.URL.Path, "sent")
 			reqCopy.Body = io.NopCloser(bytes.NewBuffer(payload))
 			reqCopy.ContentLength = int64(len(payload))
 			reqCopy.Header.Set("Content-Length", strconv.FormatInt(int64(len(payload)), 10))
@@ -1800,7 +1837,7 @@ func (t *tap) handleMessage(opcode byte, payload []byte) error {
 			respCopy.Body = io.NopCloser(strings.NewReader(""))
 			respCopy.ContentLength = 0
 		} else {
-			reqCopy.URL.Path = path.Join(reqCopy.URL.Path, "out")
+			reqCopy.URL.Path = path.Join(reqCopy.URL.Path, "received")
 			respCopy.Body = io.NopCloser(bytes.NewBuffer(payload))
 			respCopy.ContentLength = int64(len(payload))
 			respCopy.Header.Set("Content-Length", strconv.FormatInt(int64(len(payload)), 10))
@@ -1813,7 +1850,37 @@ func (t *tap) handleMessage(opcode byte, payload []byte) error {
 		handler.RecordHit(reqCopy, latency, 200, respCopy, false)
 	}
 
-	return nil
+	// Return true to indicate that the message should be forwarded
+	return true, nil
+}
+
+// Implement the writeErrorMessage method in the tap struct:
+func (t *tap) writeErrorMessage(msg string) {
+	opcode := byte(0x1) // Text frame
+	fin := byte(0x80)
+	payload := []byte(msg)
+	header := []byte{fin | opcode}
+
+	payloadLen := len(payload)
+	if payloadLen <= 125 {
+		header = append(header, byte(payloadLen))
+	} else if payloadLen <= 65535 {
+		header = append(header, 126)
+		extendedPayloadLen := make([]byte, 2)
+		binary.BigEndian.PutUint16(extendedPayloadLen, uint16(payloadLen))
+		header = append(header, extendedPayloadLen...)
+	} else {
+		header = append(header, 127)
+		extendedPayloadLen := make([]byte, 8)
+		binary.BigEndian.PutUint64(extendedPayloadLen, uint64(payloadLen))
+		header = append(header, extendedPayloadLen...)
+	}
+	frame := append(header, payload...)
+
+	// Write the error message frame to the client
+	if t.writer != nil {
+		t.writer.Write(frame)
+	}
 }
 
 func (t *tap) applyRateLimiting() error {

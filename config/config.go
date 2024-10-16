@@ -661,6 +661,7 @@ func (pwl *PortsWhiteList) Decode(value string) error {
 type StreamingConfig struct {
 	EnableWebSocketRateLimiting      bool `json:"enable_websockets_rate_limiting"`
 	EnableWebSocketDetailedRecording bool `json:"enable_websockets_detailed_recording"`
+	EnableWebSocketCloseOnRateLimit  bool `json:"enable_websocket_close_on_rate_limit"`
 
 	Enabled     bool     `json:"enabled"`
 	AllowUnsafe []string `json:"allow_unsafe"`
