@@ -10,7 +10,7 @@ require (
 	github.com/TykTechnologies/drl v0.0.0-20231218155806-88e4363884a2
 	github.com/TykTechnologies/goautosocket v0.0.0-20190430121222-97bfa5e7e481
 	github.com/TykTechnologies/gojsonschema v0.0.0-20170222154038-dcb3e4bb7990
-	github.com/TykTechnologies/gorpc v0.0.0-20241011145745-39f660923858
+	github.com/TykTechnologies/gorpc v0.0.0-20241016124253-606484472fbb
 	github.com/TykTechnologies/goverify v0.0.0-20220808203004-1486f89e7708
 	github.com/TykTechnologies/graphql-go-tools v1.6.2-0.20240926103032-6eca9f4b5e30
 	github.com/TykTechnologies/graphql-translator v0.0.0-20240319092712-4ba87e4c06ff
