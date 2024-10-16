@@ -313,7 +313,7 @@ func Connect(connConfig Config, suppressRegister bool, dispatcherFuncs map[strin
 	}
 
 	// wait until all the pool connections are dialed so we can call login
-	connectionDialingWG.Wait()
+	clientSingleton.WaitForConnection()
 	handleLogin()
 	if !suppressRegister {
 		register()
