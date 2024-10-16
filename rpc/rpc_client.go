@@ -313,11 +313,7 @@ func Connect(connConfig Config, suppressRegister bool, dispatcherFuncs map[strin
 	}
 
 	// wait until all the pool connections are dialed so we can call login
-<<<<<<< HEAD
-	connectionDialingWG.Wait()
-=======
 	clientSingleton.WaitForConnection()
->>>>>>> 8f37f4bc9... TT-13130 update gorpc version (#6644)
 	handleLogin()
 	if !suppressRegister {
 		register()
