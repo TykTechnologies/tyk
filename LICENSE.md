@@ -2,7 +2,7 @@ The code in the root directory and all subdirectories, except for the 'ee' folde
 is licensed under the Mozilla Public License Version 2.0 (the "MPL"), as detailed below.
 
 The code in the 'ee' folder is subject to a separate commercial license.
-See the [LICENSE-EE](ee/LICENSE-EE) file in the 'ee' folder for details on the Enterprise Edition license.
+See the [LICENSE-EE](ee/LICENSE-EE.md) file in the 'ee' folder for details on the Enterprise Edition license.
 
 For the open source components:
 -------------------------------
