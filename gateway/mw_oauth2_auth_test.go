@@ -62,7 +62,7 @@ func TestUpstreamOauth2(t *testing.T) {
 				Enabled: true,
 				OAuth: apidef.UpstreamOAuth{
 					Enabled:           true,
-					ClientCredentials: &cfg,
+					ClientCredentials: cfg,
 					HeaderName:        "",
 				},
 			}

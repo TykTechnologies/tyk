@@ -657,7 +657,7 @@ type ClientCredentials struct {
 	Scopes []string `bson:"scopes,omitempty" json:"scopes,omitempty"`
 }
 
-func (c *ClientCredentials) Fill(api *apidef.ClientCredentials) {
+func (c *ClientCredentials) Fill(api apidef.ClientCredentials) {
 	c.ClientID = api.ClientID
 	c.ClientSecret = api.ClientSecret
 	c.TokenURL = api.TokenURL
@@ -694,5 +694,5 @@ func (u *UpstreamOAuth) ExtractTo(api *apidef.UpstreamOAuth) {
 			u.ClientCredentials = nil
 		}()
 	}
-	u.ClientCredentials.ExtractTo(api.ClientCredentials)
+	u.ClientCredentials.ExtractTo(&api.ClientCredentials)
 }
