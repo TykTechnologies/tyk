@@ -145,7 +145,7 @@ func TestPasswordCredentialsTokenRequest(t *testing.T) {
 				Enabled: true,
 				OAuth: apidef.UpstreamOAuth{
 					Enabled:                true,
-					PasswordAuthentication: &cfg,
+					PasswordAuthentication: cfg,
 					HeaderName:             "",
 				},
 			}
