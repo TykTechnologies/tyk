@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/TykTechnologies/tyk/apidef/streams"
 	"strings"
 
 	"github.com/TykTechnologies/tyk/config"
@@ -114,6 +115,15 @@ func (s *OAS) SetTykExtension(xTykAPIGateway *XTykAPIGateway) {
 	}
 
 	s.Extensions[ExtensionTykAPIGateway] = xTykAPIGateway
+}
+
+// SetTykStreamingExtension populates our Tyk Streaming OAS schema extension inside *OAS.
+func (s *OAS) SetTykStreamingExtension(xTykStreaming *streams.XTykStreaming) {
+	if s.Extensions == nil {
+		s.Extensions = make(map[string]interface{})
+	}
+
+	s.Extensions[streams.ExtensionTykStreaming] = xTykStreaming
 }
 
 // GetTykExtension returns our OAS schema extension from inside *OAS.
