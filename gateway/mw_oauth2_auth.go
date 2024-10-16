@@ -86,12 +86,12 @@ func (OAuthSpec *UpstreamOAuth) ProcessRequest(_ http.ResponseWriter, r *http.Re
 
 	provider, err := getOAuthHeaderProvider(oauthConfig)
 	if err != nil {
-		return fmt.Errorf("failed to get OAuth header provider: %v", err), http.StatusInternalServerError
+		return fmt.Errorf("failed to get OAuth header provider: %w", err), http.StatusInternalServerError
 	}
 
 	payload, err := provider.getOAuthToken(r, OAuthSpec)
 	if err != nil {
-		return fmt.Errorf("failed to get OAuth token: %v", err), http.StatusInternalServerError
+		return fmt.Errorf("failed to get OAuth token: %w", err), http.StatusInternalServerError
 	}
 
 	upstreamOAuthProvider.AuthValue = payload
@@ -175,7 +175,7 @@ func (cache *upstreamOAuthClientCredentialsCache) getToken(r *http.Request, OAut
 
 	encryptedToken := encrypt(getPaddedSecret(OAuthSpec.Gw), token.AccessToken)
 
-	ttl := time.Duration(token.Expiry.Sub(time.Now()).Seconds()) * time.Second
+	ttl := time.Until(token.Expiry)
 	if err := setTokenInCache(cacheKey, encryptedToken, ttl, &cache.RedisCluster); err != nil {
 		return "", err
 	}
@@ -230,7 +230,7 @@ func (cache *upstreamOAuthClientCredentialsCache) obtainToken(ctx context.Contex
 }
 
 func setTokenInCache(cacheKey string, token string, ttl time.Duration, cache *storage.RedisCluster) error {
-	oauthTokenExpiry := time.Now().Add(time.Hour)
+	oauthTokenExpiry := time.Now().Add(ttl)
 	return cache.SetKey(cacheKey, token, int64(oauthTokenExpiry.Sub(time.Now()).Seconds()))
 }
 
