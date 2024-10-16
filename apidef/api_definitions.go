@@ -833,6 +833,7 @@ type PasswordAuthentication struct {
 	Token *oauth2.Token `bson:"-" json:"-"`
 }
 
+// ClientAuthData holds the client ID and secret for upstream OAuth2 authentication.
 type ClientAuthData struct {
 	// ClientID is the application's ID.
 	ClientID string `bson:"client_id" json:"client_id"`
@@ -849,6 +850,7 @@ type ClientCredentials struct {
 	// Scopes specifies optional requested permissions.
 	Scopes []string `bson:"scopes" json:"scopes,omitempty"`
 
+	// TokenProvider is the OAuth2 token provider for internal use.
 	TokenProvider oauth2.TokenSource `bson:"-" json:"-"`
 }
 
