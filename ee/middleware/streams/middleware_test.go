@@ -1,6 +1,4 @@
-//go:build ee || dev
-
-package gateway
+package streams
 
 import (
 	"bytes"
@@ -8,6 +6,7 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"os"
 	"strings"
@@ -30,7 +29,7 @@ import (
 
 	"github.com/TykTechnologies/tyk/apidef/oas"
 	"github.com/TykTechnologies/tyk/config"
-	"github.com/TykTechnologies/tyk/ee/internal/middleware/streams"
+	"github.com/TykTechnologies/tyk/gateway"
 	"github.com/TykTechnologies/tyk/test"
 )
 
@@ -91,7 +90,7 @@ output:
 		t.Run(tc.name, func(t *testing.T) {
 			config, err := yamlConfigToMap(tc.configYaml)
 			require.NoError(t, err)
-			httpPaths := streams.GetHTTPPaths(config)
+			httpPaths := GetHTTPPaths(config)
 			assert.ElementsMatch(t, tc.expected, httpPaths)
 		})
 	}
@@ -183,7 +182,7 @@ func TestStreamingAPISingleClient(t *testing.T) {
 	assert.NoError(t, err)
 	streamConfig := fmt.Sprintf(bentoNatsTemplate, configSubject, connectionStr)
 
-	ts := StartTest(func(globalConf *config.Config) {
+	ts := gateway.StartTest(func(globalConf *config.Config) {
 		globalConf.Streaming.Enabled = true
 	})
 	t.Cleanup(func() {
@@ -203,6 +202,9 @@ func TestStreamingAPISingleClient(t *testing.T) {
 	}
 
 	wsURL := strings.Replace(ts.URL, "http", "ws", 1) + fmt.Sprintf("/%s/get/ws", apiName)
+
+	println("wsURL:", wsURL)
+
 	wsConn, _, err := dialer.Dial(wsURL, nil)
 	require.NoError(t, err, "failed to connect to ws server")
 	t.Cleanup(func() {
@@ -246,7 +248,7 @@ func TestStreamingAPIMultipleClients(t *testing.T) {
 
 	streamConfig := fmt.Sprintf(bentoNatsTemplate, "test", connectionStr)
 
-	ts := StartTest(func(globalConf *config.Config) {
+	ts := gateway.StartTest(func(globalConf *config.Config) {
 		globalConf.Streaming.Enabled = true
 	})
 	t.Cleanup(func() {
@@ -323,7 +325,7 @@ func TestStreamingAPIMultipleClients(t *testing.T) {
 	require.Empty(t, messages)
 }
 
-func setUpStreamAPI(ts *Test, apiName string, streamConfig string) error {
+func setUpStreamAPI(ts *gateway.Test, apiName string, streamConfig string) error {
 	oasAPI, err := setupOASForStreamAPI(streamConfig)
 	if err != nil {
 		return err
@@ -357,7 +359,7 @@ func setupOASForStreamAPI(streamingConfig string) (oas.OAS, error) {
 	}
 
 	oasAPI.Extensions = map[string]interface{}{
-		streams.ExtensionTykStreaming: parsedStreamingConfig,
+		ExtensionTykStreaming: parsedStreamingConfig,
 	}
 
 	return oasAPI, nil
@@ -379,12 +381,8 @@ func yamlConfigToMap(streamingConfig string) (map[string]interface{}, error) {
 func TestAsyncAPI(t *testing.T) {
 	t.SkipNow()
 
-	ts := StartTest(func(globalConf *config.Config) {
-		globalConf.Labs = map[string]interface{}{
-			"streaming": map[string]interface{}{
-				"enabled": true,
-			},
-		}
+	ts := gateway.StartTest(func(globalConf *config.Config) {
+		globalConf.Streaming.Enabled = true
 	})
 
 	ts.Gw.BuildAndLoadAPI(func(spec *gateway.APISpec) {
@@ -449,7 +447,7 @@ streams:
 	}
 
 	oasAPI.Extensions = map[string]interface{}{
-		streams.ExtensionTykStreaming: parsedStreamingConfig,
+		ExtensionTykStreaming: parsedStreamingConfig,
 		// oas.ExtensionTykAPIGateway: tykExtension,
 	}
 
@@ -471,8 +469,8 @@ streams:
 	// Check that standard API still works
 	_, _ = ts.Run(t, test.TestCase{Code: http.StatusOK, Method: http.MethodGet, Path: "/test"})
 
-	if streams.GlobalStreamCounter.Load() != 1 {
-		t.Fatalf("Expected 1 stream, got %d", streams.GlobalStreamCounter.Load())
+	if GlobalStreamCounter.Load() != 1 {
+		t.Fatalf("Expected 1 stream, got %d", GlobalStreamCounter.Load())
 	}
 
 	time.Sleep(500 * time.Millisecond)
@@ -526,7 +524,7 @@ func TestAsyncAPIHttp(t *testing.T) {
 		t.Fatalf("Failed to get Kafka brokers: %v", err)
 	}
 
-	ts := StartTest(func(globalConf *config.Config) {
+	ts := gateway.StartTest(func(globalConf *config.Config) {
 		globalConf.Streaming.Enabled = true
 	})
 	defer ts.Close()
@@ -539,7 +537,7 @@ func TestAsyncAPIHttp(t *testing.T) {
 	}
 }
 
-func setupStreamingAPI(t *testing.T, ts *Test, consumerGroup string, tenantID string, kafkaHost string) string {
+func setupStreamingAPI(t *testing.T, ts *gateway.Test, consumerGroup string, tenantID string, kafkaHost string) string {
 	t.Helper()
 	t.Logf("Setting up streaming API for tenant: %s with consumer group: %s", tenantID, consumerGroup)
 
@@ -595,19 +593,19 @@ streams:
 	}
 
 	oasAPI.Extensions = map[string]interface{}{
-		streams.ExtensionTykStreaming: parsedStreamingConfig,
+		ExtensionTykStreaming: parsedStreamingConfig,
 	}
 
 	return oasAPI
 }
 
-func testAsyncAPIHttp(t *testing.T, ts *Test, isDynamic bool, tenantID string, apiName string, kafkaHost string) {
+func testAsyncAPIHttp(t *testing.T, ts *gateway.Test, isDynamic bool, tenantID string, apiName string, kafkaHost string) {
 	t.Helper()
 	const messageToSend = "hello websocket"
 	const numMessages = 2
 	const numClients = 2
 
-	streamCount := streams.GlobalStreamCounter.Load()
+	streamCount := GlobalStreamCounter.Load()
 	t.Logf("Stream count for tenant %s: %d", tenantID, streamCount)
 
 	// Create WebSocket clients
@@ -715,7 +713,7 @@ func testAsyncAPIHttp(t *testing.T, ts *Test, isDynamic bool, tenantID string, a
 	t.Log("Test completed, closing WebSocket connections")
 }
 
-func waitForAPIToBeLoaded(ts *Test) error {
+func waitForAPIToBeLoaded(ts *gateway.Test) error {
 	maxAttempts := 2
 	for i := 0; i < maxAttempts; i++ {
 		req, err := http.NewRequestWithContext(context.Background(), "GET", ts.URL+"/streaming-api-default/metrics", nil)
@@ -757,12 +755,8 @@ func TestWebSocketConnectionClosedOnAPIReload(t *testing.T) {
 		t.Fatalf("Failed to get Kafka brokers: %v", err)
 	}
 
-	ts := StartTest(func(globalConf *config.Config) {
-		globalConf.Labs = map[string]interface{}{
-			"streaming": map[string]interface{}{
-				"enabled": true,
-			},
-		}
+	ts := gateway.StartTest(func(globalConf *config.Config) {
+		globalConf.Streaming.Enabled = true
 	})
 	defer ts.Close()
 
@@ -814,7 +808,7 @@ func TestWebSocketConnectionClosedOnAPIReload(t *testing.T) {
 }
 
 func TestStreamingAPISingleClient_Input_HTTPServer(t *testing.T) {
-	ts := StartTest(func(globalConf *config.Config) {
+	ts := gateway.StartTest(func(globalConf *config.Config) {
 		globalConf.Streaming.Enabled = true
 	})
 	t.Cleanup(func() {
@@ -854,6 +848,7 @@ func TestStreamingAPISingleClient_Input_HTTPServer(t *testing.T) {
 	require.NoError(t, err, "error setting read deadline")
 
 	for i := 0; i < totalMessages; i++ {
+		println("reading message", i)
 		_, p, err := wsConn.ReadMessage()
 		require.NoError(t, err, "error reading message")
 		assert.Equal(t, fmt.Sprintf("{\"test\": \"message %d\"}", i), string(p), "message not equal")
@@ -864,7 +859,7 @@ func TestStreamingAPIMultipleClients_Input_HTTPServer(t *testing.T) {
 	// Testing input http -> output http (3 output instances and 10 messages)
 	// Messages are distributed in a round-robin fashion.
 
-	ts := StartTest(func(globalConf *config.Config) {
+	ts := gateway.StartTest(func(globalConf *config.Config) {
 		globalConf.Streaming.Enabled = true
 	})
 	t.Cleanup(func() {
@@ -943,7 +938,7 @@ func TestStreamingAPIMultipleClients_Input_HTTPServer(t *testing.T) {
 Test seems defunct, needs a rewrite.
 
 func TestStreamingAPIGarbageCollection(t *testing.T) {
-	ts := StartTest(func(globalConf *config.Config) {
+	ts := gateway.StartTest(func(globalConf *config.Config) {
 		globalConf.Streaming.Enabled = true
 	})
 	t.Cleanup(func() {
