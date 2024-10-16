@@ -5,10 +5,11 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
-	"golang.org/x/oauth2"
 	"net/http"
 	"strings"
 	"time"
+
+	"golang.org/x/oauth2"
 
 	"github.com/sirupsen/logrus"
 	oauth2clientcredentials "golang.org/x/oauth2/clientcredentials"
