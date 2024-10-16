@@ -2,14 +2,16 @@ package streams
 
 import (
 	"sync/atomic"
+	"time"
 
 	"github.com/TykTechnologies/tyk/apidef/oas"
 	"github.com/TykTechnologies/tyk/internal/model"
 )
 
 const (
-	// ExtensionTykStreaming is the oas extension for tyk streaming.
+	// ExtensionTykStreaming is the OAS extension for Tyk streaming.
 	ExtensionTykStreaming = "x-tyk-streaming"
+	StreamGCInterval      = 1 * time.Minute
 )
 
 // BaseMiddleware is the subset of BaseMiddleware APIs that the middleware uses.

@@ -2,11 +2,15 @@ package streams
 
 import (
 	"context"
+	"crypto/sha256"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/url"
 	"sync"
+	"sync/atomic"
+	"time"
 
 	"github.com/gorilla/mux"
 	"github.com/sirupsen/logrus"
@@ -22,7 +26,8 @@ type Middleware struct {
 
 	base BaseMiddleware
 
-	streamManagers sync.Map // Map of consumer group IDs to Manager
+	createStreamManagerLock sync.Mutex
+	streamManagerCache      sync.Map // Map of payload hash to Manager
 
 	ctx            context.Context
 	cancel         context.CancelFunc
@@ -49,7 +54,7 @@ func (s *Middleware) Logger() *logrus.Entry {
 
 // Name returns the name for the middleware.
 func (s *Middleware) Name() string {
-	return "Middleware"
+	return "StreamingMiddleware"
 }
 
 // EnabledForSpec checks if streaming is enabled on the config.
@@ -82,7 +87,79 @@ func (s *Middleware) Init() {
 	s.ctx, s.cancel = context.WithCancel(context.Background())
 
 	s.Logger().Debug("Initializing default stream manager")
-	s.defaultManager = NewManager(s, nil)
+	s.defaultManager = s.createStreamManager(nil)
+
+	// Start garbage collection routine
+	go func() {
+		ticker := time.NewTicker(StreamGCInterval)
+		defer ticker.Stop()
+
+		for {
+			select {
+			case <-ticker.C:
+				s.garbageCollect()
+			case <-s.ctx.Done():
+				return
+			}
+		}
+	}()
+}
+
+// createStreamManager creates or retrieves a stream manager based on the request.
+func (s *Middleware) createStreamManager(r *http.Request) *Manager {
+	streamsConfig := s.getStreamsConfig(r)
+	configJSON, _ := json.Marshal(streamsConfig)
+	cacheKey := fmt.Sprintf("%x", sha256.Sum256(configJSON))
+
+	s.createStreamManagerLock.Lock()
+	defer s.createStreamManagerLock.Unlock()
+
+	s.Logger().Debug("Attempting to load stream manager from cache")
+	s.Logger().Debugf("Cache key: %s", cacheKey)
+	if cachedManager, found := s.streamManagerCache.Load(cacheKey); found {
+		s.Logger().Debug("Found cached stream manager")
+		return cachedManager.(*Manager)
+	}
+
+	newManager := &Manager{
+		muxer:           mux.NewRouter(),
+		mw:              s,
+		dryRun:          r == nil,
+		activityCounter: atomic.Int32{},
+	}
+	newManager.initStreams(r, streamsConfig)
+
+	if r != nil {
+		s.streamManagerCache.Store(cacheKey, newManager)
+	}
+	return newManager
+}
+
+// garbageCollect removes inactive stream managers.
+func (s *Middleware) garbageCollect() {
+	s.Logger().Debug("Starting garbage collection for inactive stream managers")
+
+	s.streamManagerCache.Range(func(key, value interface{}) bool {
+		manager := value.(*Manager)
+		if manager == s.defaultManager {
+			return true
+		}
+
+		if manager.activityCounter.Load() <= 0 {
+			s.Logger().Infof("Removing inactive stream manager: %v", key)
+			manager.streams.Range(func(streamKey, streamValue interface{}) bool {
+				streamID := streamKey.(string)
+				err := manager.removeStream(streamID)
+				if err != nil {
+					s.Logger().WithError(err).Errorf("Error removing stream %s", streamID)
+				}
+				return true
+			})
+			s.streamManagerCache.Delete(key)
+		}
+
+		return true
+	})
 }
 
 func (s *Middleware) getStreamsConfig(r *http.Request) *StreamsConfig {
@@ -155,7 +232,7 @@ func (s *Middleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _ in
 	}
 
 	var match mux.RouteMatch
-	streamManager := NewManager(s, r)
+	streamManager := s.createStreamManager(r)
 	streamManager.routeLock.Lock()
 	streamManager.muxer.Match(newRequest, &match)
 	streamManager.routeLock.Unlock()
@@ -165,6 +242,9 @@ func (s *Middleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _ in
 	if !ok {
 		return errors.New("invalid route handler"), http.StatusInternalServerError
 	}
+
+	streamManager.activityCounter.Add(1)
+	defer streamManager.activityCounter.Add(-1)
 
 	handler.ServeHTTP(w, r)
 
@@ -176,31 +256,18 @@ func (s *Middleware) Unload() {
 	s.Logger().Debugf("Unloading streaming middleware %s", s.Spec.Name)
 
 	totalStreams := 0
-	s.streamManagers.Range(func(_, value interface{}) bool {
-		manager, ok := value.(*Manager)
-		if !ok {
-			return true
-		}
-		manager.streams.Range(func(_, _ interface{}) bool {
-			totalStreams++
-			return true
-		})
-		return true
-	})
-	GlobalStreamCounter.Add(-int64(totalStreams))
-
 	s.cancel()
 
-	s.Logger().Debug("Closing active streams")
-	s.streamManagers.Range(func(_, value interface{}) bool {
+	s.streamManagerCache.Range(func(_, value interface{}) bool {
 		manager, ok := value.(*Manager)
 		if !ok {
 			return true
 		}
 		manager.streams.Range(func(_, streamValue interface{}) bool {
+			totalStreams++
 			if stream, ok := streamValue.(*Stream); ok {
 				if err := stream.Reset(); err != nil {
-					return true
+					s.Logger().WithError(err).Error("Failed to reset stream")
 				}
 			}
 			return true
@@ -208,7 +275,7 @@ func (s *Middleware) Unload() {
 		return true
 	})
 
-	s.streamManagers = sync.Map{}
-
+	GlobalStreamCounter.Add(-int64(totalStreams))
+	s.streamManagerCache = sync.Map{}
 	s.Logger().Info("All streams successfully removed")
 }

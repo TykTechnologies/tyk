@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/nats-io/nats.go"
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/testcontainers/testcontainers-go"
@@ -30,6 +31,7 @@ import (
 	"github.com/TykTechnologies/tyk/apidef/oas"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/gateway"
+	"github.com/TykTechnologies/tyk/internal/model"
 	"github.com/TykTechnologies/tyk/test"
 )
 
@@ -933,9 +935,13 @@ func TestStreamingAPIMultipleClients_Input_HTTPServer(t *testing.T) {
 	require.Empty(t, messages)
 }
 
-/*
+type DummyBase struct {
+	model.LoggerProvider
+}
 
-Test seems defunct, needs a rewrite.
+func (d *DummyBase) Logger() *logrus.Entry {
+	return logrus.NewEntry(logrus.New())
+}
 
 func TestStreamingAPIGarbageCollection(t *testing.T) {
 	ts := gateway.StartTest(func(globalConf *config.Config) {
@@ -958,9 +964,9 @@ func TestStreamingAPIGarbageCollection(t *testing.T) {
 		spec.OAS.Fill(*spec.APIDefinition)
 	})
 
-	baseMiddleware := &BaseMiddleware{Gw: ts.Gw, Spec: specs[0]}
+	apiSpec := NewAPISpec(specs[0].APIID, specs[0].Name, specs[0].IsOAS, specs[0].OAS, specs[0].StripListenPath)
 
-	s := getStreamingMiddleware(baseMiddleware)
+	s := Middleware{Gw: ts.Gw, Spec: apiSpec, base: &DummyBase{}}
 
 	if err := setUpStreamAPI(ts, apiName, bentoHTTPServerTemplate); err != nil {
 		t.Fatal(err)
@@ -991,4 +997,3 @@ func TestStreamingAPIGarbageCollection(t *testing.T) {
 	})
 	require.Equal(t, 0, streamManagersAfterGC)
 }
-*/

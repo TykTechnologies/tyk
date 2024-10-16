@@ -25,13 +25,8 @@ func (h *handleFuncAdapter) HandleFunc(path string, f func(http.ResponseWriter, 
 
 	h.sm.routeLock.Lock()
 	h.muxer.HandleFunc(path, func(w http.ResponseWriter, r *http.Request) {
-		defer func() {
-			// Stop the stream when the HTTP request finishes
-			if err := h.sm.removeStream(h.streamID); err != nil {
-				h.logger.Errorf("Failed to stop stream %s: %v", h.streamID, err)
-			}
-		}()
-
+		h.sm.activityCounter.Add(1)
+		defer h.sm.activityCounter.Add(-1)
 		f(w, r)
 	})
 	h.sm.routeLock.Unlock()

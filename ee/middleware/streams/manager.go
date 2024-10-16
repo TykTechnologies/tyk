@@ -5,36 +5,20 @@ import (
 	"net/http"
 	"strings"
 	"sync"
-	"time"
+	"sync/atomic"
 
 	"github.com/gorilla/mux"
 )
 
 // Manager is responsible for creating a single stream.
 type Manager struct {
-	streams     sync.Map
-	routeLock   sync.Mutex
-	muxer       *mux.Router
-	mw          *Middleware
-	dryRun      bool
-	listenPaths []string
-}
-
-// NewManager creates a new Manager from a request. If request is
-// nil, the stream manager runs with "dry run" enabled.
-func NewManager(s *Middleware, r *http.Request) *Manager {
-	newManager := &Manager{
-		muxer:  mux.NewRouter(),
-		mw:     s,
-		dryRun: r == nil,
-	}
-	streamID := fmt.Sprintf("_%d", time.Now().UnixNano())
-	s.streamManagers.Store(streamID, newManager)
-
-	// Call initStreams for the new Manager
-	newManager.initStreams(r, s.getStreamsConfig(r))
-
-	return newManager
+	streams         sync.Map
+	routeLock       sync.Mutex
+	muxer           *mux.Router
+	mw              *Middleware
+	dryRun          bool
+	listenPaths     []string
+	activityCounter atomic.Int32 // Counts active subscriptions, requests.
 }
 
 func (sm *Manager) initStreams(r *http.Request, config *StreamsConfig) {
