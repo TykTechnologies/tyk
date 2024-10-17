@@ -29,14 +29,14 @@ func TestValidateTykStreamsOASObject(t *testing.T) {
 
 	validXTykAPIStreaming := XTykStreaming{
 		Info: oas.Info{
-			Name: "oas-api",
+			Name: "test-streams",
 			State: oas.State{
 				Active: true,
 			},
 		},
 		Server: oas.Server{
 			ListenPath: oas.ListenPath{
-				Value: "/oas-api",
+				Value: "/test-streams",
 			},
 		},
 		Streams: map[string]interface{}{},
@@ -46,7 +46,7 @@ func TestValidateTykStreamsOASObject(t *testing.T) {
 
 	validOAS3Definition, _ := validOASObject.MarshalJSON()
 
-	t.Run("valid OAS object", func(t *testing.T) {
+	t.Run("valid Tyk Streaming Extension", func(t *testing.T) {
 		t.Parallel()
 		err := ValidateOASObject(validOAS3Definition, "3.0.3")
 		assert.Nil(t, err)
