@@ -82,7 +82,7 @@ jobs:
             GITHUB_TAG=${{ github.ref_name }}
 
       - name: Set docker metadata EE
-        id: set-metadata
+        id: set-metadata-ee
         uses: docker/metadata-action@v4
         with:
           images: |
@@ -105,8 +105,8 @@ jobs:
           file: ci/images/plugin-compiler/Dockerfile
           platforms: linux/amd64
           push: true
-          labels: ${{ steps.set-metadata.outputs.labels }}
-          tags: ${{ steps.set-metadata.outputs.tags }}
+          labels: ${{ steps.set-metadata-ee.outputs.labels }}
+          tags: ${{ steps.set-metadata-ee.outputs.tags }}
           build-args: |
             BASE-IMAGE=tykio/golang-cross:${{ env.GOLANG_CROSS }}
             GITHUB_SHA=${{ github.sha }}
