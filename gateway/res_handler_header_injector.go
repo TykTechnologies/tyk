@@ -62,7 +62,7 @@ func (h *HeaderInjector) HandleResponse(rw http.ResponseWriter, res *http.Respon
 			res.Header.Del(dKey)
 		}
 		for nKey, nVal := range hmeta.AddHeaders {
-			setCustomHeader(res.Header, nKey, h.Gw.replaceTykVariables(req, nVal, false), ignoreCanonical)
+			setCustomHeader(res.Header, nKey, h.Gw.ReplaceTykVariables(req, nVal, false), ignoreCanonical)
 		}
 	}
 
@@ -75,7 +75,7 @@ func (h *HeaderInjector) HandleResponse(rw http.ResponseWriter, res *http.Respon
 
 		for key, val := range vInfo.GlobalResponseHeaders {
 			log.Debug("Adding: ", key)
-			setCustomHeader(res.Header, key, h.Gw.replaceTykVariables(req, val, false), ignoreCanonical)
+			setCustomHeader(res.Header, key, h.Gw.ReplaceTykVariables(req, val, false), ignoreCanonical)
 		}
 
 		// Manage global response header options with response_processors
@@ -83,7 +83,7 @@ func (h *HeaderInjector) HandleResponse(rw http.ResponseWriter, res *http.Respon
 			res.Header.Del(n)
 		}
 		for header, v := range h.config.AddHeaders {
-			setCustomHeader(res.Header, header, h.Gw.replaceTykVariables(req, v, false), ignoreCanonical)
+			setCustomHeader(res.Header, header, h.Gw.ReplaceTykVariables(req, v, false), ignoreCanonical)
 		}
 	}
 
