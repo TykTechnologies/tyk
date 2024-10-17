@@ -27,7 +27,7 @@ type Middleware struct {
 	base BaseMiddleware
 
 	createStreamManagerLock sync.Mutex
-	streamManagerCache      sync.Map // Map of payload hash to Manager
+	StreamManagerCache      sync.Map // Map of payload hash to Manager
 
 	ctx            context.Context
 	cancel         context.CancelFunc
@@ -87,7 +87,7 @@ func (s *Middleware) Init() {
 	s.ctx, s.cancel = context.WithCancel(context.Background())
 
 	s.Logger().Debug("Initializing default stream manager")
-	s.defaultManager = s.createStreamManager(nil)
+	s.defaultManager = s.CreateStreamManager(nil)
 
 	// Start garbage collection routine
 	go func() {
@@ -97,7 +97,7 @@ func (s *Middleware) Init() {
 		for {
 			select {
 			case <-ticker.C:
-				s.garbageCollect()
+				s.GC()
 			case <-s.ctx.Done():
 				return
 			}
@@ -105,8 +105,8 @@ func (s *Middleware) Init() {
 	}()
 }
 
-// createStreamManager creates or retrieves a stream manager based on the request.
-func (s *Middleware) createStreamManager(r *http.Request) *Manager {
+// CreateStreamManager creates or retrieves a stream manager based on the request.
+func (s *Middleware) CreateStreamManager(r *http.Request) *Manager {
 	streamsConfig := s.getStreamsConfig(r)
 	configJSON, _ := json.Marshal(streamsConfig)
 	cacheKey := fmt.Sprintf("%x", sha256.Sum256(configJSON))
@@ -116,7 +116,7 @@ func (s *Middleware) createStreamManager(r *http.Request) *Manager {
 
 	s.Logger().Debug("Attempting to load stream manager from cache")
 	s.Logger().Debugf("Cache key: %s", cacheKey)
-	if cachedManager, found := s.streamManagerCache.Load(cacheKey); found {
+	if cachedManager, found := s.StreamManagerCache.Load(cacheKey); found {
 		s.Logger().Debug("Found cached stream manager")
 		return cachedManager.(*Manager)
 	}
@@ -130,16 +130,16 @@ func (s *Middleware) createStreamManager(r *http.Request) *Manager {
 	newManager.initStreams(r, streamsConfig)
 
 	if r != nil {
-		s.streamManagerCache.Store(cacheKey, newManager)
+		s.StreamManagerCache.Store(cacheKey, newManager)
 	}
 	return newManager
 }
 
-// garbageCollect removes inactive stream managers.
-func (s *Middleware) garbageCollect() {
+// GC removes inactive stream managers.
+func (s *Middleware) GC() {
 	s.Logger().Debug("Starting garbage collection for inactive stream managers")
 
-	s.streamManagerCache.Range(func(key, value interface{}) bool {
+	s.StreamManagerCache.Range(func(key, value interface{}) bool {
 		manager := value.(*Manager)
 		if manager == s.defaultManager {
 			return true
@@ -155,7 +155,7 @@ func (s *Middleware) garbageCollect() {
 				}
 				return true
 			})
-			s.streamManagerCache.Delete(key)
+			s.StreamManagerCache.Delete(key)
 		}
 
 		return true
@@ -232,7 +232,7 @@ func (s *Middleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _ in
 	}
 
 	var match mux.RouteMatch
-	streamManager := s.createStreamManager(r)
+	streamManager := s.CreateStreamManager(r)
 	streamManager.routeLock.Lock()
 	streamManager.muxer.Match(newRequest, &match)
 	streamManager.routeLock.Unlock()
@@ -258,7 +258,7 @@ func (s *Middleware) Unload() {
 	totalStreams := 0
 	s.cancel()
 
-	s.streamManagerCache.Range(func(_, value interface{}) bool {
+	s.StreamManagerCache.Range(func(_, value interface{}) bool {
 		manager, ok := value.(*Manager)
 		if !ok {
 			return true
@@ -276,6 +276,6 @@ func (s *Middleware) Unload() {
 	})
 
 	GlobalStreamCounter.Add(-int64(totalStreams))
-	s.streamManagerCache = sync.Map{}
+	s.StreamManagerCache = sync.Map{}
 	s.Logger().Info("All streams successfully removed")
 }
