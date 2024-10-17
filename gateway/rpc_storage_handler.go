@@ -798,6 +798,8 @@ func (r *RPCStorageHandler) CheckForReload(orgId string) bool {
 	log.Debug("[RPC STORE] Check Reload called...")
 	reload, err := rpc.FuncClientSingleton("CheckReload", orgId)
 	if err != nil {
+		forcer := rpc.NewSyncForcer(r.Gw.StorageConnectionHandler, r.buildNodeInfo)
+		forcer.SetFirstConnection(true)
 		rpc.EmitErrorEventKv(
 			rpc.FuncClientSingletonCall,
 			"CheckReload",
