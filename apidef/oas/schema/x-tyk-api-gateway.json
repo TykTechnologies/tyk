@@ -2054,17 +2054,11 @@
             },
             "scopes":{
               "type": ["array", "null"]
-            },
-            "endpointParams": {
-              "type": ["object", "null"]
             }
           }
         },
         "headerName": {
           "type": "string"
-        },
-        "distributedToken": {
-          "type": "boolean"
         }
       }
     }

@@ -46,10 +46,12 @@ func TestUpstreamOauth2(t *testing.T) {
 	defer ts.Close()
 
 	cfg := apidef.ClientCredentials{
-		ClientID:     "CLIENT_ID",
-		ClientSecret: "CLIENT_SECRET",
-		TokenURL:     ts.URL + "/token",
-		Scopes:       []string{"scope1", "scope2"},
+		ClientAuthData: apidef.ClientAuthData{
+			ClientID:     "CLIENT_ID",
+			ClientSecret: "CLIENT_SECRET",
+		},
+		TokenURL: ts.URL + "/token",
+		Scopes:   []string{"scope1", "scope2"},
 	}
 
 	tst.Gw.BuildAndLoadAPI(
