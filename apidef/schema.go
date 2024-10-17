@@ -805,17 +805,11 @@ const Schema = `{
 								},
 								"scopes":{
 									"type": ["array", "null"]
-								},
-								"endpoint_params": {
-									"type": ["object", "null"]
 								}	
 							}
 						},
 						"header_name": {
 							"type": "string"		
-						},
-						"distributed_token": {
-							"type": "boolean"
 						}
 					}
 				}
