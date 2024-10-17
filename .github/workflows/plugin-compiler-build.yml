@@ -8,7 +8,7 @@ on:
       - master
       - release-**
     tags:
-      - 'v*'
+      - "v*"
 
 env:
   GOLANG_CROSS: 1.22-bullseye
@@ -80,3 +80,35 @@ jobs:
             BASE-IMAGE=tykio/golang-cross:${{ env.GOLANG_CROSS }}
             GITHUB_SHA=${{ github.sha }}
             GITHUB_TAG=${{ github.ref_name }}
+
+      - name: Set docker metadata EE
+        id: set-metadata
+        uses: docker/metadata-action@v4
+        with:
+          images: |
+            tykio/tyk-plugin-compiler-ee,enable=${{ startsWith(github.ref, 'refs/tags') }}
+            ${{ steps.login-ecr.outputs.registry }}/tyk-plugin-compiler-ee
+          labels: |
+            org.opencontainers.image.title=tyk-plugin-compiler-ee
+            org.opencontainers.image.description=Plugin compiler for the Tyk API Gateway Enterprise Edition
+          tags: |
+            type=ref,event=pr
+            type=semver,pattern=v{{version}}
+            type=semver,pattern=v{{major}}.{{minor}}
+            type=semver,pattern={{raw}}
+            type=sha,format=long
+
+      - name: Build and push to dockerhub/ECR EE
+        uses: docker/build-push-action@v4
+        with:
+          context: .
+          file: ci/images/plugin-compiler/Dockerfile
+          platforms: linux/amd64
+          push: true
+          labels: ${{ steps.set-metadata.outputs.labels }}
+          tags: ${{ steps.set-metadata.outputs.tags }}
+          build-args: |
+            BASE-IMAGE=tykio/golang-cross:${{ env.GOLANG_CROSS }}
+            GITHUB_SHA=${{ github.sha }}
+            GITHUB_TAG=${{ github.ref_name }}
+            BUILD_TAG=ee
