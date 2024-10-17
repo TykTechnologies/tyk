@@ -2,9 +2,10 @@ package rate_test
 
 import (
 	"encoding/json"
-	"github.com/TykTechnologies/tyk/apidef"
 	"net/http"
 	"testing"
+
+	"github.com/TykTechnologies/tyk/apidef"
 
 	"github.com/stretchr/testify/assert"
 
