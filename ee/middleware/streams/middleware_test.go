@@ -149,8 +149,6 @@ streams:
       level: DEBUG
       format: logfmt
       add_timestamp: false
-      static_fields:
-        '@service': benthos
 `
 const bentoHTTPServerTemplate = `
 streams:

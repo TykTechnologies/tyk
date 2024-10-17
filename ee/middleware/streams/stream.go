@@ -17,7 +17,7 @@ import (
 	_ "github.com/TykTechnologies/tyk/internal/portal"
 )
 
-// Stream is a wrapper around benthos stream
+// Stream is a wrapper around stream
 type Stream struct {
 	allowedUnsafe []string
 	streamConfig  string
@@ -51,7 +51,7 @@ func (s *Stream) SetLogger(logger *logrus.Logger) {
 	}
 }
 
-// Start loads up the configuration and starts the benthos stream. Non blocking
+// Start loads up the configuration and starts the stream. Non blocking
 func (s *Stream) Start(config map[string]interface{}, mux service.HTTPMultiplexer) error {
 	s.log.Debugf("Starting stream")
 
@@ -107,7 +107,7 @@ func (s *Stream) Start(config map[string]interface{}, mux service.HTTPMultiplexe
 	return nil
 }
 
-// Stop cleans up the benthos stream
+// Stop cleans up the stream
 func (s *Stream) Stop() error {
 	s.log.Printf("Stopping stream")
 
@@ -141,7 +141,7 @@ func (s *Stream) Stop() error {
 	return nil
 }
 
-// GetConfig returns the benthos configuration of the stream
+// GetConfig returns the configuration of the stream
 func (s *Stream) GetConfig() string {
 	return s.streamConfig
 }
