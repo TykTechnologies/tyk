@@ -376,7 +376,6 @@ jobs:
           token: ${{ secrets.ORG_GH_TOKEN }}
           fetch-depth: 1
           ref: ${{ env.BASE_REF }}
-          ref: $BASE_REF
           sparse-checkout: tests/api
       - uses: actions/setup-python@v5
         with:
