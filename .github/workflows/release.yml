@@ -131,7 +131,7 @@ jobs:
         with:
           mask-password: 'true'
       - name: Docker metadata for CI
-        id: ci_metadata
+        id: ci_metadata_
         if: ${{ matrix.golang_cross == '1.22-bullseye' }}
         uses: docker/metadata-action@v5
         with:
@@ -157,10 +157,43 @@ jobs:
           push: true
           cache-from: type=gha
           cache-to: type=gha,mode=max
-          tags: ${{ steps.ci_metadata.outputs.tags }}
+          tags: ${{ steps.ci_metadata_.outputs.tags }}
           labels: ${{ steps.tag_metadata.outputs.labels }}
+          build-args: |
+            EDITION=
+      - name: Docker metadata for CI ee
+        id: ci_metadata_ee
+        if: ${{ matrix.golang_cross == '1.22-bullseye' }}
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ steps.ecr.outputs.registry }}/tyk-ee
+          flavor: |
+            latest=false
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=sha,format=long
+            type=semver,pattern={{major}},prefix=v
+            type=semver,pattern={{major}}.{{minor}},prefix=v
+            type=semver,pattern={{version}},prefix=v
+      - name: push image to CI ee
+        if: ${{ matrix.golang_cross == '1.22-bullseye' }}
+        uses: docker/build-push-action@v6
+        with:
+          context: "dist"
+          platforms: linux/amd64,linux/arm64
+          file: ci/Dockerfile.distroless
+          provenance: mode=max
+          sbom: true
+          push: true
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          tags: ${{ steps.ci_metadata_ee.outputs.tags }}
+          labels: ${{ steps.tag_metadata.outputs.labels }}
+          build-args: |
+            EDITION=-ee
       - name: Docker metadata for tag push
-        id: tag_metadata
+        id: tag_metadata_
         uses: docker/metadata-action@v5
         with:
           images: |
@@ -185,8 +218,39 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
           push: ${{ startsWith(github.ref, 'refs/tags') }}
-          tags: ${{ steps.tag_metadata.outputs.tags }}
-          labels: ${{ steps.tag_metadata.outputs.labels }}
+          tags: ${{ steps.tag_metadata_.outputs.tags }}
+          labels: ${{ steps.tag_metadata_.outputs.labels }}
+          build-args: |
+            EDITION=
+      - name: Docker metadata for tag push ee
+        id: tag_metadata_ee
+        uses: docker/metadata-action@v5
+        with:
+          images: |
+            tykio/tyk-gateway-ee
+          flavor: |
+            latest=false
+            prefix=v
+          tags: |
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{version}}
+          labels: "org.opencontainers.image.title=tyk-gateway Enterprise Edition  (distroless) \norg.opencontainers.image.description=Tyk Open Source API Gateway written in Go, supporting REST, GraphQL, TCP and gRPC protocols\norg.opencontainers.image.vendor=tyk.io\norg.opencontainers.image.version=${{ github.ref_name }}\n"
+      - name: push image to prod ee
+        if: ${{ matrix.golang_cross == '1.22-bullseye' }}
+        uses: docker/build-push-action@v6
+        with:
+          context: "dist"
+          platforms: linux/amd64,linux/arm64
+          file: ci/Dockerfile.distroless
+          provenance: mode=max
+          sbom: true
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          push: ${{ startsWith(github.ref, 'refs/tags') }}
+          tags: ${{ steps.tag_metadata_ee.outputs.tags }}
+          labels: ${{ steps.tag_metadata_ee.outputs.labels }}
+          build-args: |
+            EDITION=-ee
       - name: save deb
         uses: actions/upload-artifact@v4
         if: ${{ matrix.golang_cross == '1.22-bullseye' }}
@@ -310,37 +374,10 @@ jobs:
           repository: TykTechnologies/tyk-analytics
           path: tyk-analytics
           token: ${{ secrets.ORG_GH_TOKEN }}
-          fetch-depth: 0
+          fetch-depth: 1
+          ref: ${{ env.BASE_REF }}
+          ref: $BASE_REF
           sparse-checkout: tests/api
-      - name: Choosing test code branch
-        working-directory: tyk-analytics/tests/api
-        run: |
-          if [[ ${{ github.event_name }} == "release" ]]; then
-            echo "Checking out release tag..."
-            TAG_NAME=${{ github.event.release.tag_name }}
-            git checkout "$TAG_NAME"
-          fi
-          if [[ ${{ github.event_name }} == "pull_request" ]]; then
-            PR_BRANCH=${{ github.event.pull_request.head.ref }}
-            TARGET_BRANCH=${{ github.event.pull_request.base.ref }}
-            echo "Looking for PR_BRANCH:$PR_BRANCH or TARGET_BRANCH:$TARGET_BRANCH..."
-            if git rev-parse --verify "origin/$PR_BRANCH" >/dev/null 2>&1; then
-              echo "PR branch $PR_BRANCH exists. Checking out..."
-              git checkout "$PR_BRANCH"
-            elif git rev-parse --verify "origin/$TARGET_BRANCH" >/dev/null 2>&1; then
-              echo "Target branch $TARGET_BRANCH exists. Checking out..."
-              git checkout "$TARGET_BRANCH"
-            fi
-          fi
-          if [[ ${{ github.event_name }} == "push" ]]; then
-            PUSH_BRANCH=${{ github.ref_name }}
-            echo "Looking for PUSH_BRANCH:$PUSH_BRANCH..."
-            if git rev-parse --verify "origin/$PUSH_BRANCH" >/dev/null 2>&1; then
-              echo "Push branch $PUSH_BRANCH exists. Checking out..."
-              git checkout "$PUSH_BRANCH"
-            fi
-          fi
-          echo "Current commit: $(git rev-parse HEAD)"
       - uses: actions/setup-python@v5
         with:
           cache: 'pip'
@@ -369,6 +406,20 @@ jobs:
           USER_API_SECRET=${{ steps.env_up.outputs.USER_API_SECRET }}
           EOF
           env $(cat pytest.env | xargs) $pytest -m "${{ matrix.envfiles.apimarkers }}"
+      - name: Upload Playwright Test Report to S3
+        if: failure() && steps.test_execution.outcome != 'success' && steps.env_up.outcome == 'success'
+        run: npm run upload_report_to_s3
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.UI_AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.UI_AWS_SECRET_ACCESS_KEY }}
+          RUN_ID: 'tyk-analytics/${{ github.run_id }}'
+        working-directory: tyk-analytics/tests/ui
+      - name: Share S3 report link into summary
+        if: failure() && steps.test_execution.outcome != 'success' && steps.env_up.outcome == 'success'
+        run: |
+          echo "# :clipboard: S3 UI Test REPORT: ${{ matrix.envfiles.db }}-${{ matrix.envfiles.conf }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Status: ${{ steps.test_execution.outcome == 'success' && ':white_check_mark:' || ':no_entry_sign:' }}" >> $GITHUB_STEP_SUMMARY
+          echo "- [Link to report](https://tyk-qa-reports.s3.eu-central-1.amazonaws.com/tyk-analytics/${{ github.run_id }}/index.html)" >> $GITHUB_STEP_SUMMARY
       - name: Generate metadata and upload test reports
         id: metadata_report
         if: always() && (steps.test_execution.conclusion != 'skipped')
