@@ -31,12 +31,27 @@ import (
 
 	"github.com/TykTechnologies/tyk/apidef/oas"
 	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/ee/license"
 	"github.com/TykTechnologies/tyk/ee/middleware/streams"
 	"github.com/TykTechnologies/tyk/internal/model"
 	"github.com/TykTechnologies/tyk/test"
 )
 
+func setupStreamingTest(t *testing.T) {
+    t.Helper()
+    license.EnableTestMode()
+    license.AddFeature("streams")
+}
+
+ func cleanupStreamingTest(t *testing.T) {
+    t.Helper()
+    license.DisableTestMode()
+}
+
 func TestGetHTTPPaths(t *testing.T) {
+	setupStreamingTest(t)
+	defer cleanupStreamingTest(t)
+
 	testCases := []struct {
 		name       string
 		configYaml string
@@ -164,6 +179,9 @@ streams:
 `
 
 func TestStreamingAPISingleClient(t *testing.T) {
+	setupStreamingTest(t)
+	defer cleanupStreamingTest(t)
+
 	ctx := context.Background()
 
 	natsContainer, err := natscon.Run(
@@ -234,6 +252,9 @@ func TestStreamingAPISingleClient(t *testing.T) {
 	}
 }
 func TestStreamingAPIMultipleClients(t *testing.T) {
+	setupStreamingTest(t)
+	defer cleanupStreamingTest(t)
+
 	ctx := context.Background()
 
 	natsContainer, err := natscon.Run(
@@ -380,6 +401,9 @@ func yamlConfigToMap(streamingConfig string) (map[string]interface{}, error) {
 }
 
 func TestAsyncAPI(t *testing.T) {
+	setupStreamingTest(t)
+	defer cleanupStreamingTest(t)
+
 	t.SkipNow()
 
 	ts := StartTest(func(globalConf *config.Config) {
@@ -500,6 +524,9 @@ streams:
 }
 
 func TestAsyncAPIHttp(t *testing.T) {
+	setupStreamingTest(t)
+	defer cleanupStreamingTest(t)
+
 	var tests = []struct {
 		name          string
 		consumerGroup string
@@ -739,6 +766,9 @@ func waitForAPIToBeLoaded(ts *Test) error {
 }
 
 func TestWebSocketConnectionClosedOnAPIReload(t *testing.T) {
+	setupStreamingTest(t)
+	defer cleanupStreamingTest(t)
+
 	t.Skip()
 	ctx := context.Background()
 	kafkaContainer, err := kafka.Run(ctx, "confluentinc/confluent-local:7.5.0")
@@ -809,6 +839,9 @@ func TestWebSocketConnectionClosedOnAPIReload(t *testing.T) {
 }
 
 func TestStreamingAPISingleClient_Input_HTTPServer(t *testing.T) {
+	setupStreamingTest(t)
+	defer cleanupStreamingTest(t)
+
 	ts := StartTest(func(globalConf *config.Config) {
 		globalConf.Streaming.Enabled = true
 	})
@@ -857,6 +890,9 @@ func TestStreamingAPISingleClient_Input_HTTPServer(t *testing.T) {
 }
 
 func TestStreamingAPIMultipleClients_Input_HTTPServer(t *testing.T) {
+	setupStreamingTest(t)
+	defer cleanupStreamingTest(t)
+
 	// Testing input http -> output http (3 output instances and 10 messages)
 	// Messages are distributed in a round-robin fashion.
 
@@ -943,6 +979,9 @@ func (d *DummyBase) Logger() *logrus.Entry {
 }
 
 func TestStreamingAPIGarbageCollection(t *testing.T) {
+	setupStreamingTest(t)
+	defer cleanupStreamingTest(t)
+
 	ts := StartTest(func(globalConf *config.Config) {
 		globalConf.Streaming.Enabled = true
 	})

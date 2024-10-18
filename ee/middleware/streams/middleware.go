@@ -15,6 +15,7 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/sirupsen/logrus"
 
+	"github.com/TykTechnologies/tyk/ee/license"
 	"github.com/TykTechnologies/tyk/internal/middleware"
 	"github.com/TykTechnologies/tyk/internal/model"
 )
@@ -65,6 +66,11 @@ func (s *Middleware) EnabledForSpec() bool {
 	s.Logger().Debugf("Streaming config: %+v", streamingConfig)
 
 	if streamingConfig.Enabled {
+		if !license.HasFeature("streams") {
+			s.Logger().Debug("Streaming feature is not enabled in the license. Contact Sales team to enable it.")
+			return false
+		}
+
 		s.Logger().Debug("Streaming is enabled in the config")
 		s.allowedUnsafe = streamingConfig.AllowUnsafe
 		s.Logger().Debugf("Allowed unsafe components: %v", s.allowedUnsafe)
