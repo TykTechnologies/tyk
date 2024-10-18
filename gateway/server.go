@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/TykTechnologies/structviewer"
 	htmltemplate "html/template"
 	"io/ioutil"
 	stdlog "log"
@@ -1940,6 +1941,9 @@ func (gw *Gateway) startServer() {
 	muxer := &proxyMux{}
 
 	router := mux.NewRouter()
+
+	gw.loadConfigurationAPI()
+
 	gw.loadControlAPIEndpoints(router)
 
 	muxer.setRouter(gw.GetConfig().ControlAPIPort, "", router, gw.GetConfig())
@@ -1976,4 +1980,82 @@ func (gw *Gateway) SetConfig(conf config.Config, skipReload ...bool) {
 	gw.configMu.Lock()
 	gw.config.Store(conf)
 	gw.configMu.Unlock()
+}
+
+func (gw *Gateway) loadConfigurationAPI() error {
+
+	config := gw.GetConfig()
+
+	// Check if enabled
+	if config.ConfigurationReporting.Enable != true {
+		mainLog.Info("configuration Reporting API is disabled in the configuration. Please enable it if you need to use it")
+	}
+	mainLog.Info("configuration Reporting API is enabled")
+
+	port := strconv.Itoa(config.ConfigurationReporting.APIPort)
+	// Check the port
+	if port == "" {
+		return fmt.Errorf("configuration Reporting API port is not set. Please set it in order to use it")
+	}
+	mainLog.Info("configuration Reporting API Port is set to", port)
+
+	// Check the API key
+	if config.ConfigurationReporting.APIKey == "" {
+		return fmt.Errorf("configuration Reporting API port is not set. Please set it in order to use it")
+	}
+
+	var structviewerCfg = &structviewer.Config{
+		Object:        config,
+		ParseComments: false,
+	}
+	const GW_ENV_PREFIX = "TYK_GW_"
+	v, err := structviewer.New(structviewerCfg, GW_ENV_PREFIX)
+	if err != nil {
+		return err
+	}
+
+	// Create a new router for the Configuration reporting API server
+	router := mux.NewRouter()
+
+	// Define routes and middleware specific to the Config API
+	router.Handle("/config", authConfigurationAPI(http.HandlerFunc(v.ConfigHandler), config.ConfigurationReporting.APIKey))
+	router.Handle("/env", authConfigurationAPI(http.HandlerFunc(v.EnvsHandler), config.ConfigurationReporting.APIKey))
+
+	//	muxer := &proxyMux{}
+	//	muxer.setRouter(apiPort, "", router, gw.GetConfig())
+
+	log.Printf("Starting Configuration Reporting API on addr=%q", config.ConfigurationReporting.APIPort)
+
+	var apiPort = ":" + port
+	if err := http.ListenAndServe(apiPort, router); err != nil {
+		fmt.Println("Error starting server:", err)
+	}
+	mainLog.Info("--> Configuration Reporting API is on - Listening on port: ", apiPort)
+
+	return nil
+}
+
+// authConfigurationAPI will ensure that the accessor of the HTTP API has the
+// correct security credentials - this is a shared secret between the
+// client and the owner and is set in the settings. This should
+// never be made public!
+func authConfigurationAPI(next http.Handler, apiKey string) http.Handler {
+
+	authorizationHeader := "X-Tyk-Authorization"
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		tykAuthKey := r.Header.Get(authorizationHeader)
+		if tykAuthKey != apiKey {
+			log.Warning("Attempted administrative access with invalid or missing key!")
+
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusUnauthorized)
+			err := json.NewEncoder(w).Encode(map[string]string{"error": "Attempted administrative access with invalid or missing key!"})
+			if err != nil {
+				log.WithError(err).Error("Failed to write error response in authAdminMiddleware middleware")
+			}
+
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
 }

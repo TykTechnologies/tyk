@@ -587,6 +587,28 @@ type SecurityConfig struct {
 	Certificates CertificatesConfig `json:"certificates"`
 }
 
+type ConfigurationReportingCfg struct {
+
+	// Enable controls the availability of HTTP endpoints for monitoring and debugging Tyk Gateway.
+	// These endpoints provide critical system information and are disabled by default for security reasons.
+	// Access to these endpoints requires a secret, defined in the `security.secret` configuration field.
+	// Available endpoints include:
+	// * /config - a read-only HTTP endpoint that returns the current config keys and values in JSON notation.
+	// * /env    - a read-only HTTP endpoint that returns the current config keys and values in an environment variable
+	//   format
+	Enable bool `json:"enable"`
+
+	// Ensure the Gateway configuration port is set
+	// The Configuration API runs on a separate port, so you can secure this port behind a firewall.
+	APIPort int `json:"api_port"`
+
+	// This should be changed as soon as Tyk is installed on your system.
+	// This value is used in when using Tyk Gateway Config APIs. It should be passed along as the X-Tyk-Authorization
+	// header in any requests made. Tyk assumes that you are sensible enough not to expose the management endpoints
+	// publicly and to keep this configuration value to yourself.
+	APIKey string `json:"api_key" structviewer:"obfuscate"`
+}
+
 type NewRelicConfig struct {
 	// New Relic Application name
 	AppName string `json:"app_name"`
@@ -679,6 +701,8 @@ type Config struct {
 
 	// Set to run your Gateway Control API on a separate port, and protect it behind a firewall if needed. Please make sure you follow this guide when setting the control port https://tyk.io/docs/planning-for-production/#change-your-control-port.
 	ControlAPIPort int `json:"control_api_port"`
+
+	ConfigurationReporting ConfigurationReportingCfg `json:"configuration_reporting"`
 
 	// This should be changed as soon as Tyk is installed on your system.
 	// This value is used in every interaction with the Tyk Gateway API. It should be passed along as the X-Tyk-Authorization header in any requests made.
