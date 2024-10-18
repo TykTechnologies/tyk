@@ -23,6 +23,7 @@ import (
 	python "github.com/TykTechnologies/tyk/dlpython"
 )
 import (
+	"context"
 	"os"
 	"sync"
 )
@@ -39,7 +40,7 @@ type PythonDispatcher struct {
 }
 
 // Dispatch takes a CoProcessMessage and sends it to the CP.
-func (d *PythonDispatcher) Dispatch(object *coprocess.Object) (*coprocess.Object, error) {
+func (d *PythonDispatcher) Dispatch(ctx context.Context, object *coprocess.Object) (*coprocess.Object, error) {
 	// Prepare the PB object:
 	objectMsg, err := proto.Marshal(object)
 	if err != nil {

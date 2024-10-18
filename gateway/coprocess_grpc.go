@@ -46,8 +46,8 @@ func (gw *Gateway) dialer(addr string, timeout time.Duration) (net.Conn, error) 
 }
 
 // Dispatch takes a CoProcessMessage and sends it to the CP.
-func (d *GRPCDispatcher) Dispatch(object *coprocess.Object) (*coprocess.Object, error) {
-	return grpcClient.Dispatch(context.Background(), object)
+func (d *GRPCDispatcher) Dispatch(ctx context.Context, object *coprocess.Object) (*coprocess.Object, error) {
+	return grpcClient.Dispatch(ctx, object)
 }
 
 // DispatchEvent dispatches a Tyk event.
