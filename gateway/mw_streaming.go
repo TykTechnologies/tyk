@@ -1,11 +1,13 @@
 package gateway
 
 import (
+	"bufio"
 	"context"
 	"crypto/sha256"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net"
 	"net/http"
 	"net/url"
 	"strings"
@@ -29,6 +31,10 @@ const (
 	StreamGCInterval      = 1 * time.Minute
 )
 
+var (
+	ErrResponseWriterNotHijackable = errors.New("ResponseWriter is not hijackable")
+)
+
 // StreamsConfig represents a stream configuration
 type StreamsConfig struct {
 	Info struct {
@@ -50,16 +56,18 @@ type StreamingMiddleware struct {
 	cancel                  context.CancelFunc
 	allowedUnsafe           []string
 	defaultStreamManager    *StreamManager
+	analyticsFactory        StreamAnalyticsFactory
 }
 
 // StreamManager is responsible for creating a single stream
 type StreamManager struct {
-	streams     sync.Map
-	routeLock   sync.Mutex
-	muxer       *mux.Router
-	mw          *StreamingMiddleware
-	dryRun      bool
-	listenPaths []string
+	streams          sync.Map
+	routeLock        sync.Mutex
+	muxer            *mux.Router
+	mw               *StreamingMiddleware
+	dryRun           bool
+	listenPaths      []string
+	analyticsFactory StreamAnalyticsFactory
 
 	activityCounter atomic.Int32 // Counts active subscriptions, requests.
 }
@@ -69,7 +77,7 @@ func (sm *StreamManager) initStreams(r *http.Request, config *StreamsConfig) {
 	sm.muxer = mux.NewRouter()
 
 	for streamID, streamConfig := range config.Streams {
-		sm.setUpOrDryRunStream(streamConfig, streamID, r)
+		sm.setUpOrDryRunStream(streamConfig, streamID)
 	}
 
 	// If it is default stream manager, init muxer
@@ -82,19 +90,19 @@ func (sm *StreamManager) initStreams(r *http.Request, config *StreamsConfig) {
 	}
 }
 
-func (sm *StreamManager) setUpOrDryRunStream(streamConfig any, streamID string, r *http.Request) {
+func (sm *StreamManager) setUpOrDryRunStream(streamConfig any, streamID string) {
 	if streamMap, ok := streamConfig.(map[string]interface{}); ok {
 		httpPaths := GetHTTPPaths(streamMap)
 
 		if sm.dryRun {
 			if len(httpPaths) == 0 {
-				err := sm.createStream(streamID, streamMap, r)
+				err := sm.createStream(streamID, streamMap)
 				if err != nil {
 					sm.mw.Logger().WithError(err).Errorf("Error creating stream %s", streamID)
 				}
 			}
 		} else {
-			err := sm.createStream(streamID, streamMap, r)
+			err := sm.createStream(streamID, streamMap)
 			if err != nil {
 				sm.mw.Logger().WithError(err).Errorf("Error creating stream %s", streamID)
 			}
@@ -121,6 +129,12 @@ func (sm *StreamManager) removeStream(streamID string) error {
 		return fmt.Errorf("stream %s does not exist", streamID)
 	}
 	return nil
+}
+
+// setAnalyticsFactory sets the StreamAnalyticsFactory of the StreamManager.
+// It defaults to NoopStreamAnalyticsFactory.
+func (sm *StreamManager) setAnalyticsFactory(factory StreamAnalyticsFactory) {
+	sm.analyticsFactory = factory
 }
 
 func (s *StreamingMiddleware) garbageCollect() {
@@ -183,8 +197,12 @@ func (s *StreamingMiddleware) Init() {
 	s.Logger().Debug("Initializing StreamingMiddleware")
 	s.ctx, s.cancel = context.WithCancel(context.Background())
 
+	s.Logger().Debug("Initializing default stream analytics factory")
+	s.analyticsFactory = NewStreamAnalyticsFactory(s.logger.Dup(), s.Gw, s.Spec)
+
 	s.Logger().Debug("Initializing default stream manager")
 	s.defaultStreamManager = s.createStreamManager(nil)
+	s.defaultStreamManager.setAnalyticsFactory(s.analyticsFactory)
 
 	// Start garbage collection routine
 	go func() {
@@ -224,10 +242,11 @@ func (s *StreamingMiddleware) createStreamManager(r *http.Request) *StreamManage
 	}
 
 	newStreamManager := &StreamManager{
-		muxer:           mux.NewRouter(),
-		mw:              s,
-		dryRun:          r == nil,
-		activityCounter: atomic.Int32{},
+		muxer:            mux.NewRouter(),
+		mw:               s,
+		dryRun:           r == nil,
+		activityCounter:  atomic.Int32{},
+		analyticsFactory: &NoopStreamAnalyticsFactory{},
 	}
 	newStreamManager.initStreams(r, streamsConfig)
 
@@ -353,11 +372,9 @@ func (s *StreamingMiddleware) processStreamsConfig(r *http.Request, streams map[
 }
 
 // createStream creates a new stream
-func (sm *StreamManager) createStream(streamID string, config map[string]interface{}, r *http.Request) error {
+func (sm *StreamManager) createStream(streamID string, config map[string]interface{}) error {
 	streamFullID := fmt.Sprintf("%s_%s", sm.mw.Spec.APIID, streamID)
 	sm.mw.Logger().Debugf("Creating stream: %s", streamFullID)
-
-	analyticsRecorder := initStreamAnalyticsRecorder(sm.mw.Gw, sm.mw.Spec, r)
 
 	stream := streaming.NewStream(sm.mw.allowedUnsafe)
 	err := stream.Start(config, &handleFuncAdapter{
@@ -375,12 +392,6 @@ func (sm *StreamManager) createStream(streamID string, config map[string]interfa
 
 	sm.streams.Store(streamFullID, stream)
 	sm.mw.Logger().Infof("Successfully created stream: %s", streamFullID)
-
-	record := analyticsRecorder.CreateRecord(r)
-	err = analyticsRecorder.RecordHit(record, http.StatusSwitchingProtocols)
-	if err != nil {
-		sm.mw.Logger().Errorf("Failed to record analytics for stream %s: %v", streamFullID, err)
-	}
 
 	return nil
 }
@@ -414,6 +425,7 @@ func (s *StreamingMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 
 	var match mux.RouteMatch
 	streamManager := s.createStreamManager(r)
+	streamManager.setAnalyticsFactory(s.analyticsFactory)
 	streamManager.routeLock.Lock()
 	streamManager.muxer.Match(newRequest, &match)
 	streamManager.routeLock.Unlock()
@@ -475,19 +487,19 @@ func (h *handleFuncAdapter) HandleFunc(path string, f func(http.ResponseWriter, 
 
 	h.sm.routeLock.Lock()
 	h.muxer.HandleFunc(path, func(w http.ResponseWriter, r *http.Request) {
+		recorder := h.sm.analyticsFactory.CreateRecorder(r)
+		analyticsResponseWriter := h.sm.analyticsFactory.CreateResponseWriter(w, r, h.streamID, recorder)
+
 		h.sm.activityCounter.Add(1)
-		f(w, r)
+		f(analyticsResponseWriter, r)
 		h.sm.activityCounter.Add(-1)
 	})
 	h.sm.routeLock.Unlock()
 	h.logger.Debugf("Registered handler for path: %s", path)
 }
 
-func initStreamAnalyticsRecorder(gw *Gateway, spec *APISpec, r *http.Request) StreamAnalyticsRecorder {
-	if recordDetail(r, spec) {
-		return NewDetailedStreamAnalyticsRecorder(gw, spec)
-	}
-	return NewSimpleStreamAnalyticsRecorder(gw, spec)
+func isWebsocketUpgrade(r *http.Request) bool {
+	return strings.ToLower(r.Header.Get("Connection")) == "upgrade" && strings.ToLower(r.Header.Get("Upgrade")) == "websocket"
 }
 
 func streamRecordHit(gw *Gateway, record *analytics.AnalyticsRecord, statusCode int) error {
@@ -495,24 +507,72 @@ func streamRecordHit(gw *Gateway, record *analytics.AnalyticsRecord, statusCode 
 	return gw.Analytics.RecordHit(record)
 }
 
+type StreamAnalyticsFactory interface {
+	CreateRecorder(r *http.Request) StreamAnalyticsRecorder
+	CreateResponseWriter(w http.ResponseWriter, r *http.Request, streamID string, recorder StreamAnalyticsRecorder) http.ResponseWriter
+}
+
+type DefaultStreamAnalyticsFactory struct {
+	Logger *logrus.Entry
+	Gw     *Gateway
+	Spec   *APISpec
+}
+
+func NewStreamAnalyticsFactory(logger *logrus.Entry, gw *Gateway, spec *APISpec) StreamAnalyticsFactory {
+	return &DefaultStreamAnalyticsFactory{
+		Logger: logger,
+		Gw:     gw,
+		Spec:   spec,
+	}
+}
+
+func (d *DefaultStreamAnalyticsFactory) CreateRecorder(r *http.Request) StreamAnalyticsRecorder {
+	detailed := false
+	if recordDetail(r, d.Spec) {
+		detailed = true
+	}
+
+	if isWebsocketUpgrade(r) {
+		return NewWebSocketStreamAnalyticsRecorder(d.Gw, d.Spec, detailed)
+	}
+
+	return NewDefaultStreamAnalyticsRecorder(d.Gw, d.Spec, detailed)
+}
+
+func (d *DefaultStreamAnalyticsFactory) CreateResponseWriter(w http.ResponseWriter, r *http.Request, streamID string, recorder StreamAnalyticsRecorder) http.ResponseWriter {
+	return NewStreamAnalyticsResponseWriter(d.Logger, w, r, streamID, recorder)
+}
+
+type NoopStreamAnalyticsFactory struct{}
+
+func (n *NoopStreamAnalyticsFactory) CreateRecorder(r *http.Request) StreamAnalyticsRecorder {
+	return &NoopStreamAnalyticsRecorder{}
+}
+
+func (n *NoopStreamAnalyticsFactory) CreateResponseWriter(w http.ResponseWriter, r *http.Request, streamID string, recorder StreamAnalyticsRecorder) http.ResponseWriter {
+	return w
+}
+
 type StreamAnalyticsRecorder interface {
 	CreateRecord(r *http.Request) *analytics.AnalyticsRecord
 	RecordHit(record *analytics.AnalyticsRecord, statusCode int) error
 }
 
-type SimpleStreamAnalyticsRecorder struct {
-	Gw   *Gateway
-	Spec *APISpec
+type DefaultStreamAnalyticsRecorder struct {
+	Gw       *Gateway
+	Spec     *APISpec
+	Detailed bool
 }
 
-func NewSimpleStreamAnalyticsRecorder(gw *Gateway, spec *APISpec) *SimpleStreamAnalyticsRecorder {
-	return &SimpleStreamAnalyticsRecorder{
-		Gw:   gw,
-		Spec: spec,
+func NewDefaultStreamAnalyticsRecorder(gw *Gateway, spec *APISpec, detailed bool) *DefaultStreamAnalyticsRecorder {
+	return &DefaultStreamAnalyticsRecorder{
+		Gw:       gw,
+		Spec:     spec,
+		Detailed: detailed,
 	}
 }
 
-func (s *SimpleStreamAnalyticsRecorder) CreateRecord(r *http.Request) *analytics.AnalyticsRecord {
+func (s *DefaultStreamAnalyticsRecorder) CreateRecord(r *http.Request) *analytics.AnalyticsRecord {
 	// Preparation for analytics record
 	alias := ""
 	oauthClientID := ""
@@ -574,28 +634,108 @@ func (s *SimpleStreamAnalyticsRecorder) CreateRecord(r *http.Request) *analytics
 	}
 }
 
-func (s *SimpleStreamAnalyticsRecorder) RecordHit(record *analytics.AnalyticsRecord, statusCode int) error {
+func (s *DefaultStreamAnalyticsRecorder) RecordHit(record *analytics.AnalyticsRecord, statusCode int) error {
 	return streamRecordHit(s.Gw, record, statusCode)
 }
 
-type DetailedStreamAnalyticsRecorder struct {
+type WebSocketStreamAnalyticsRecorder struct {
 	Gw                            *Gateway
 	Spec                          *APISpec
-	simpleStreamAnalyticsRecorder *SimpleStreamAnalyticsRecorder
+	Detailed                      bool
+	simpleStreamAnalyticsRecorder *DefaultStreamAnalyticsRecorder
 }
 
-func NewDetailedStreamAnalyticsRecorder(gw *Gateway, spec *APISpec) *DetailedStreamAnalyticsRecorder {
-	return &DetailedStreamAnalyticsRecorder{
+func NewWebSocketStreamAnalyticsRecorder(gw *Gateway, spec *APISpec, detailed bool) *WebSocketStreamAnalyticsRecorder {
+	return &WebSocketStreamAnalyticsRecorder{
 		Gw:                            gw,
 		Spec:                          spec,
-		simpleStreamAnalyticsRecorder: NewSimpleStreamAnalyticsRecorder(gw, spec),
+		Detailed:                      detailed,
+		simpleStreamAnalyticsRecorder: NewDefaultStreamAnalyticsRecorder(gw, spec, detailed),
 	}
 }
 
-func (d *DetailedStreamAnalyticsRecorder) CreateRecord(r *http.Request) *analytics.AnalyticsRecord {
-	return d.simpleStreamAnalyticsRecorder.CreateRecord(r) // TODO: Detailed recording still needs to be implemented.
+func (d *WebSocketStreamAnalyticsRecorder) CreateRecord(r *http.Request) *analytics.AnalyticsRecord {
+	return d.simpleStreamAnalyticsRecorder.CreateRecord(r)
 }
 
-func (d *DetailedStreamAnalyticsRecorder) RecordHit(record *analytics.AnalyticsRecord, statusCode int) error {
+func (d *WebSocketStreamAnalyticsRecorder) RecordHit(record *analytics.AnalyticsRecord, statusCode int) error {
 	return d.simpleStreamAnalyticsRecorder.RecordHit(record, statusCode)
+}
+
+type NoopStreamAnalyticsRecorder struct{}
+
+func (n *NoopStreamAnalyticsRecorder) CreateRecord(r *http.Request) *analytics.AnalyticsRecord {
+	return &analytics.AnalyticsRecord{}
+}
+
+func (n *NoopStreamAnalyticsRecorder) RecordHit(record *analytics.AnalyticsRecord, statusCode int) error {
+	return nil
+}
+
+type StreamAnalyticsResponseWriter struct {
+	logger            *logrus.Entry
+	w                 http.ResponseWriter
+	r                 *http.Request
+	streamID          string
+	recorder          StreamAnalyticsRecorder
+	writtenStatusCode int
+}
+
+func NewStreamAnalyticsResponseWriter(logger *logrus.Entry, w http.ResponseWriter, r *http.Request, streamID string, recorder StreamAnalyticsRecorder) *StreamAnalyticsResponseWriter {
+	return &StreamAnalyticsResponseWriter{
+		logger:            logger,
+		w:                 w,
+		r:                 r,
+		streamID:          streamID,
+		recorder:          recorder,
+		writtenStatusCode: http.StatusOK, // implicit status code from ResponseWriter.Write
+	}
+}
+
+func (s *StreamAnalyticsResponseWriter) SetStreamID(streamID string) {
+	s.streamID = streamID
+}
+
+func (s *StreamAnalyticsResponseWriter) Header() http.Header {
+	return s.w.Header()
+}
+
+func (s *StreamAnalyticsResponseWriter) Write(bytes []byte) (int, error) {
+	n, err := s.w.Write(bytes)
+	if err != nil {
+		return n, err
+	}
+
+	record := s.recorder.CreateRecord(s.r)
+	recorderErr := s.recorder.RecordHit(record, s.writtenStatusCode)
+	if recorderErr != nil {
+		s.logger.Errorf("Failed to record analytics for stream on path '%s %s', %v", s.r.Method, s.r.URL.Path, recorderErr)
+	}
+	return n, nil
+}
+
+func (s *StreamAnalyticsResponseWriter) WriteHeader(statusCode int) {
+	s.writtenStatusCode = statusCode
+	s.w.WriteHeader(statusCode)
+}
+
+func (s *StreamAnalyticsResponseWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {
+	hijackableWriter, ok := s.w.(http.Hijacker)
+	if !ok {
+		return nil, nil, ErrResponseWriterNotHijackable
+	}
+
+	record := s.recorder.CreateRecord(s.r)
+	recorderErr := s.recorder.RecordHit(record, http.StatusSwitchingProtocols)
+	if recorderErr != nil {
+		s.logger.Errorf("Failed to record analytics for connection upgrade on path 'UPGRADE %s', %v", s.r.URL.Path, recorderErr)
+	}
+
+	return hijackableWriter.Hijack()
+}
+
+func (s *StreamAnalyticsResponseWriter) Flush() {
+	if flusher, ok := s.w.(http.Flusher); ok {
+		flusher.Flush()
+	}
 }
