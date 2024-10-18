@@ -126,7 +126,7 @@ type Gateway struct {
 	HostCheckerClient    *http.Client
 	TracerProvider       otel.TracerProvider
 	// UpstreamOAuthCache is used to cache upstream OAuth tokens
-	UpstreamOAuthCache *upstreamOAuthCache
+	UpstreamOAuthCache UpstreamOAuthCache
 
 	keyGen DefaultKeyGenerator
 
