@@ -36,6 +36,9 @@ ARG GITHUB_TAG
 ENV GITHUB_SHA=${GITHUB_SHA}
 ENV GITHUB_TAG=${GITHUB_TAG}
 
+ARG BUILD_TAG
+ENV BUILD_TAG=${BUILD_TAG}
+
 COPY ci/images/plugin-compiler/data/build.sh /build.sh
 RUN chmod +x /build.sh
 

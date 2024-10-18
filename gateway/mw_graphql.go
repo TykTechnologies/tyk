@@ -116,7 +116,7 @@ func (m *GraphQLMiddleware) Init() {
 					}
 					return body, nil
 				},
-				TykVariableReplacer: m.Gw.replaceTykVariables,
+				TykVariableReplacer: m.Gw.ReplaceTykVariables,
 			},
 		})
 	} else if m.Spec.GraphQL.Version == apidef.GraphQLConfigVersion3Preview {
@@ -153,7 +153,7 @@ func (m *GraphQLMiddleware) Init() {
 					}
 					return body, nil
 				},
-				TykVariableReplacer: m.Gw.replaceTykVariables,
+				TykVariableReplacer: m.Gw.ReplaceTykVariables,
 			},
 		})
 		if err != nil {

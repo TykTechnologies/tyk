@@ -506,9 +506,3 @@ require (
 	modernc.org/token v1.1.0 // indirect
 	nhooyr.io/websocket v1.8.10 // indirect
 )
-
-//replace github.com/TykTechnologies/graphql-go-tools => ../graphql-go-tools
-
-//replace github.com/TykTechnologies/graphql-go-tools/v2 => ../graphql-go-tools/v2
-//
-//replace github.com/warpstreamlabs/bento => ../benthos

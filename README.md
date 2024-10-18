@@ -45,7 +45,7 @@ Tyk runs natively on _Kubernetes_, if you prefer, thanks to the _[Tyk Kubernetes
      <center>
        <a href="https://tyk.io/docs/tyk-cloud"> <img src="https://raw.githubusercontent.com/TykTechnologies/tyk-docs/master/tyk-docs/assets/img/logos/tyk-logo-cloud.png" width="20%"></a>
      </center>
-     </br>The Enterprise API Management platform SaaS: Management Control Plane, Dashboard GUI & Developer Portal. 
+     </br>The Enterprise API Management platform SaaS: Management Control Plane, Dashboard GUI & Developer Portal.
      </br><a href="https://tyk.io/docs/deployment-and-operations/tyk-cloud-platform/quick-start">Deploy Tyk Cloud </a>
    </td>
   </tr>
@@ -82,7 +82,7 @@ Your Tyk Gateway is now configured and ready to use. Confirm this by checking ag
 ```console
 curl localhost:8080/hello
 ```
-Output:  
+Output:
 ```json
 {"status": "pass", "version": "v3.2.1", "description": "Tyk GW"}
 ```
@@ -166,11 +166,13 @@ All the documentation for Tyk Gateway and other OSS-related topics can be found 
 * [Newsletters ](https://pages.tyk.io/newsletter)- Subscribe to our GraphQL & API newsletters
 * If you are using Tyk give us a star ⭐️
 
-## Open Source License
+## Licensing
 
-Tyk is released under the MPL v2.0; please see [LICENSE.md](https://github.com/TykTechnologies/tyk/blob/master/LICENSE.md) for a full version of the license.
+Tyk is dual-licensed:
 
-![FOSSA Status](https://app.fossa.io/api/projects/git%2Bgithub.com%2FTykTechnologies%2Ftyk.svg?type=large)
+1. Open Source License: The code in the root directory and all subdirectories except the 'ee' folder is released under the MPL v2.0. Please see [LICENSE](https://github.com/TykTechnologies/tyk/blob/master/LICENSE) for the full version of the open source license.
+
+2. Commercial License: The code in the 'ee' folder is subject to a commercial license. For more information about obtaining a commercial license, please contact our sales team at sales@tyk.io.
 
 ## Compiling Tyk Gateway
 

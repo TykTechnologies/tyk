@@ -16,7 +16,7 @@ GATEWAY_VERSION=$(echo $GITHUB_TAG | perl -n -e'/v(\d+).(\d+).(\d+)/'' && print 
 #
 # If GOOS and GOARCH are not set, it will build `{plugin_name}`.
 #
-# Example command: ./build.sh 
+# Example command: ./build.sh
 # Example output: tyk-extras_5.0.0_linux_amd64.so
 
 plugin_name=$1
@@ -145,7 +145,11 @@ if [[ "$DEBUG" == "1" ]] ; then
 	git diff --cached
 fi
 
-CC=$CC CGO_ENABLED=1 GOOS=$GOOS GOARCH=$GOARCH go build -buildmode=plugin -trimpath -o $plugin_name
+if [ -n "$BUILD_TAG" ]; then
+    CC=$CC CGO_ENABLED=1 GOOS=$GOOS GOARCH=$GOARCH go build -buildmode=plugin -trimpath -tags=$BUILD_TAG -o $plugin_name
+else
+    CC=$CC CGO_ENABLED=1 GOOS=$GOOS GOARCH=$GOARCH go build -buildmode=plugin -trimpath -o $plugin_name
+fi
 
 set +x
 

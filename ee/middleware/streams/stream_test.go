@@ -1,4 +1,4 @@
-package streaming
+package streams
 
 import (
 	"strings"
