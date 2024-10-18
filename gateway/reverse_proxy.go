@@ -515,7 +515,7 @@ func (p *ReverseProxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) Prox
 	startTime := time.Now()
 	p.logger.WithField("ts", startTime.UnixNano()).Debug("Started")
 
-	resp := p.WrappedServeHTTP(rw, req, true)
+	resp := p.WrappedServeHTTP(rw, req, recordDetail(req, p.TykAPISpec))
 
 	finishTime := time.Since(startTime)
 	p.logger.WithField("ns", finishTime.Nanoseconds()).Debug("Finished")
