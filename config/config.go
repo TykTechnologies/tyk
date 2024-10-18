@@ -665,6 +665,7 @@ type StreamingConfig struct {
 
 // Config is the configuration object used by Tyk to set up various parameters.
 type Config struct {
+	LicenseKey string `json:"license_key"`
 	// Force your Gateway to work only on a specific domain name. Can be overridden by API custom domain.
 	HostName string `json:"hostname"`
 

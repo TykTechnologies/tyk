@@ -1644,6 +1644,10 @@ func Start() {
 		mainLog.Warn("The control_api_port should be changed for production")
 	}
 
+	if err := checkLicense(gwConfig); err != nil {
+		mainLog.Fatalf("Error checking license: %v", err)
+	}
+
 	gw.setupPortsWhitelist()
 	gw.keyGen = DefaultKeyGenerator{Gw: gw}
 
