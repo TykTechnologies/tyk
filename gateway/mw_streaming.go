@@ -1,11 +1,16 @@
 package gateway
 
 import (
+	"bufio"
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
+	"io/ioutil"
+	"net"
 	"net/http"
 	"net/url"
 	"strings"
@@ -16,6 +21,7 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"github.com/gorilla/mux"
+	"github.com/gorilla/websocket"
 
 	"github.com/TykTechnologies/tyk/internal/streaming"
 )
@@ -235,8 +241,8 @@ func (s *StreamingMiddleware) createStreamManager(r *http.Request) *StreamManage
 }
 
 // Helper function to extract paths from an http_server configuration
-func extractPaths(httpConfig map[string]interface{}) []string {
-	var paths []string
+func extractPaths(httpConfig map[string]interface{}) map[string]string {
+	paths := make(map[string]string)
 	defaultPaths := map[string]string{
 		"path":        "/post",
 		"ws_path":     "/post/ws",
@@ -244,16 +250,16 @@ func extractPaths(httpConfig map[string]interface{}) []string {
 	}
 	for key, defaultValue := range defaultPaths {
 		if val, ok := httpConfig[key].(string); ok {
-			paths = append(paths, val)
+			paths[key] = val
 		} else {
-			paths = append(paths, defaultValue)
+			paths[key] = defaultValue
 		}
 	}
 	return paths
 }
 
 // Helper function to extract HTTP server paths from a given configuration
-func extractHTTPServerPaths(config map[string]interface{}) []string {
+func extractHTTPServerPaths(config map[string]interface{}) map[string]string {
 	if httpServerConfig, ok := config["http_server"].(map[string]interface{}); ok {
 		return extractPaths(httpServerConfig)
 	}
@@ -261,13 +267,15 @@ func extractHTTPServerPaths(config map[string]interface{}) []string {
 }
 
 // Helper function to handle broker configurations
-func handleBroker(brokerConfig map[string]interface{}) []string {
-	var paths []string
+func handleBroker(brokerConfig map[string]interface{}) map[string]string {
+	paths := make(map[string]string)
 	for _, ioKey := range []string{"inputs", "outputs"} {
 		if ioList, ok := brokerConfig[ioKey].([]interface{}); ok {
 			for _, ioItem := range ioList {
 				if ioItemMap, ok := ioItem.(map[string]interface{}); ok {
-					paths = append(paths, extractHTTPServerPaths(ioItemMap)...)
+					for k, v := range extractHTTPServerPaths(ioItemMap) {
+						paths[k] = v
+					}
 				}
 			}
 		}
@@ -275,20 +283,24 @@ func handleBroker(brokerConfig map[string]interface{}) []string {
 	return paths
 }
 
-// GetHTTPPaths is the ain function to get HTTP paths from the stream configuration
+// GetHTTPPaths is the main function to get HTTP paths from the stream configuration
 func GetHTTPPaths(streamConfig map[string]interface{}) []string {
-	var paths []string
+	paths := make(map[string]string)
 	for _, component := range []string{"input", "output"} {
 		if componentMap, ok := streamConfig[component].(map[string]interface{}); ok {
-			paths = append(paths, extractHTTPServerPaths(componentMap)...)
+			for k, v := range extractHTTPServerPaths(componentMap) {
+				paths[k] = v
+			}
 			if brokerConfig, ok := componentMap["broker"].(map[string]interface{}); ok {
-				paths = append(paths, handleBroker(brokerConfig)...)
+				for k, v := range handleBroker(brokerConfig) {
+					paths[k] = v
+				}
 			}
 		}
 	}
-	// remove duplicates
+	// Convert map to slice of paths
 	var deduplicated []string
-	exists := map[string]struct{}{}
+	exists := make(map[string]struct{})
 	for _, item := range paths {
 		if _, ok := exists[item]; !ok {
 			deduplicated = append(deduplicated, item)
@@ -296,6 +308,29 @@ func GetHTTPPaths(streamConfig map[string]interface{}) []string {
 		}
 	}
 	return deduplicated
+}
+
+// GetPathType returns whether a given path is for input or output, along with the path key
+func GetPathType(streamConfig map[string]interface{}, path string) (string, string) {
+	for _, component := range []string{"input", "output"} {
+		if componentMap, ok := streamConfig[component].(map[string]interface{}); ok {
+			paths := extractHTTPServerPaths(componentMap)
+			for key, p := range paths {
+				if p == path {
+					return component, key
+				}
+			}
+			if brokerConfig, ok := componentMap["broker"].(map[string]interface{}); ok {
+				brokerPaths := handleBroker(brokerConfig)
+				for key, p := range brokerPaths {
+					if p == path {
+						return component, key
+					}
+				}
+			}
+		}
+	}
+	return "", ""
 }
 
 func (s *StreamingMiddleware) getStreamsConfig(r *http.Request) *StreamsConfig {
@@ -358,7 +393,7 @@ func (sm *StreamManager) createStream(streamID string, config map[string]interfa
 	err := stream.Start(config, &handleFuncAdapter{
 		mw:       sm.mw,
 		streamID: streamFullID,
-		muxer:    sm.muxer,
+		config:   config,
 		sm:       sm,
 		// child logger is necessary to prevent race condition
 		logger: sm.mw.Logger().WithField("stream", streamFullID),
@@ -450,24 +485,542 @@ type handleFuncAdapter struct {
 	streamID string
 	sm       *StreamManager
 	mw       *StreamingMiddleware
-	muxer    *mux.Router
 	logger   *logrus.Entry
+	config   map[string]interface{}
+
+	inputHandlers  map[string]func(http.ResponseWriter, *http.Request)
+	outputHandlers map[string]func(http.ResponseWriter, *http.Request)
 }
 
 func (h *handleFuncAdapter) HandleFunc(path string, f func(http.ResponseWriter, *http.Request)) {
-	h.logger.Debugf("Registering streaming handleFunc for path: %s", path)
+	h.sm.routeLock.Lock()
+	defer h.sm.routeLock.Unlock()
 
-	if h.mw == nil || h.muxer == nil {
+	h.logger.Debugf("Registering streaming handleFunc for path: %s. Stream ID: %s", path, h.streamID)
+
+	if h.mw == nil || h.sm.muxer == nil {
 		h.logger.Error("StreamingMiddleware or muxer is nil")
 		return
 	}
 
-	h.sm.routeLock.Lock()
-	h.muxer.HandleFunc(path, func(w http.ResponseWriter, r *http.Request) {
+	if h.inputHandlers == nil {
+		h.inputHandlers = make(map[string]func(http.ResponseWriter, *http.Request))
+	}
+	if h.outputHandlers == nil {
+		h.outputHandlers = make(map[string]func(http.ResponseWriter, *http.Request))
+	}
+
+	componentType, pathKey := GetPathType(h.config, path)
+	if componentType == "input" {
+		h.inputHandlers[path] = f
+	} else {
+		h.outputHandlers[path] = f
+	}
+
+	var match mux.RouteMatch
+	newRequest := &http.Request{
+		Method: http.MethodGet,
+		URL:    &url.URL{Path: path},
+	}
+	h.sm.muxer.Match(newRequest, &match)
+
+	existingHandler, ok := match.Handler.(http.HandlerFunc)
+	if !ok {
+		// h.logger.Errorf("Invalid route handler for path: %s", path)
+	} else {
+		// If the existing handler is for input, assign the output handler, and vice versa
+		if componentType == "input" {
+			h.outputHandlers[path] = existingHandler
+		} else {
+			h.inputHandlers[path] = existingHandler
+		}
+
+		h.logger.Debugf("Handler already exists for path: %s. Assigning reverse handler.", path)
+		h.logger.Debugf("Input handler for path %s: %v", path, h.inputHandlers)
+		h.logger.Debugf("Output handler for path %s: %v", path, h.outputHandlers)
+
+		h.sm.muxer = cloneRouter(h.sm.muxer, path)
+	}
+
+	h.sm.muxer.HandleFunc(path, func(w http.ResponseWriter, r *http.Request) {
 		h.sm.activityCounter.Add(1)
-		f(w, r)
-		h.sm.activityCounter.Add(-1)
+		defer h.sm.activityCounter.Add(-1)
+
+		hasInput := h.inputHandlers[path] != nil
+		hasOutput := h.inputHandlers[path] != nil
+
+		if !hasInput || !hasOutput {
+			h.logger.Debugf("Only output handler found for path: %s, executing directly", path)
+			f(w, r)
+			return
+		}
+
+		switch {
+		case pathKey == "path":
+			var handler func(http.ResponseWriter, *http.Request)
+			var handlerType string
+			handler = f
+
+			if r.Method == http.MethodGet {
+				handler, _ = h.outputHandlers[path]
+				handlerType = "output"
+			} else if r.Method == http.MethodPost {
+				handler, _ = h.inputHandlers[path]
+				handlerType = "input"
+			}
+
+			if handlerType != "" {
+				h.logger.Debugf("Handling %s request for path: %s", handlerType, path)
+			} else {
+				h.logger.Debugf("No handler found for %s request for path: %s", r.Method, path)
+			}
+
+			handler(w, r)
+		case pathKey == "ws_path" && websocket.IsWebSocketUpgrade(r):
+			h.handleWebSocket(f, w, r, path)
+		default:
+			h.logger.Debugf("Using default handler for path: %s", path)
+			f(w, r)
+		}
 	})
-	h.sm.routeLock.Unlock()
+
 	h.logger.Debugf("Registered handler for path: %s", path)
+}
+
+func (h *handleFuncAdapter) handleWebSocket(f func(w http.ResponseWriter, r *http.Request), w http.ResponseWriter, r *http.Request, path string) {
+	if h.inputHandlers[path] == nil || h.outputHandlers[path] == nil {
+		h.logger.Debugf("Executing directly", path)
+		f(w, r)
+		return
+	}
+
+	// Upgrade the client connection to WebSocket
+	upgrader := websocket.Upgrader{}
+	clientConn, err := upgrader.Upgrade(w, r, nil)
+	if err != nil {
+		h.logger.Errorf("Failed to upgrade client connection to WebSocket: %v", err)
+		return
+	}
+	defer clientConn.Close()
+
+	h.logger.Debugf("Upgraded client connection to WebSocket for path: %s", path)
+
+	// Create net.Conn pairs for input and output handlers
+	inputServerConn, inputClientConn := net.Pipe()
+	outputServerConn, outputClientConn := net.Pipe()
+
+	h.logger.Debugf("[WS] Input handler for path %s: %v", path, h.inputHandlers)
+	h.logger.Debugf("[WS] Output handler for path %s: %v", path, h.outputHandlers)
+
+	// Start HTTP servers for input and output handlers over their respective server conns
+	go h.serveHandlerOverConn(inputServerConn, h.inputHandlers[path])
+	go h.serveHandlerOverConn(outputServerConn, h.outputHandlers[path])
+
+	// Perform client-side WebSocket handshakes over the client conns
+	inputWsConn, err := h.performClientWebSocketHandshake(inputClientConn)
+	if err != nil {
+		h.logger.Errorf("Input handler handshake error: %v", err)
+		return
+	}
+	defer inputWsConn.Close()
+
+	outputWsConn, err := h.performClientWebSocketHandshake(outputClientConn)
+	if err != nil {
+		h.logger.Errorf("Output handler handshake error: %v", err)
+		return
+	}
+	defer outputWsConn.Close()
+
+	// Forward messages from client to input handler
+	clientToInputErr := make(chan error, 1)
+	go func() {
+		for {
+			mt, msg, err := clientConn.ReadMessage()
+			if err != nil {
+				clientToInputErr <- err
+				return
+			}
+			err = inputWsConn.WriteMessage(mt, msg)
+			if err != nil {
+				clientToInputErr <- err
+				return
+			}
+		}
+	}()
+
+	// Forward messages from output handler to client
+	outputToClientErr := make(chan error, 1)
+	go func() {
+		for {
+			mt, msg, err := outputWsConn.ReadMessage()
+			if err != nil {
+				outputToClientErr <- err
+				return
+			}
+			err = clientConn.WriteMessage(mt, msg)
+			if err != nil {
+				outputToClientErr <- err
+				return
+			}
+		}
+	}()
+
+	// Wait for any of the connections to error out
+	select {
+	case err := <-clientToInputErr:
+		h.logger.Debugf("Client to input handler error: %v", err)
+	case err := <-outputToClientErr:
+		h.logger.Debugf("Output handler to client error: %v", err)
+	}
+}
+
+func (h *handleFuncAdapter) serveHandlerOverConn(conn net.Conn, handlerFunc http.HandlerFunc) {
+	if handlerFunc == nil {
+		h.logger.Errorf("Handler function is nil for connection: %v", conn)
+		conn.Close()
+		return
+	}
+	listener := newOneConnListener(conn)
+	server := &http.Server{
+		Handler: handlerFunc,
+	}
+	server.Serve(listener)
+}
+
+func (h *handleFuncAdapter) performClientWebSocketHandshake(conn net.Conn) (*websocket.Conn, error) {
+	// Use websocket.Dialer with a custom NetDial function
+	d := websocket.Dialer{
+		NetDial: func(network, addr string) (net.Conn, error) {
+			return conn, nil
+		},
+	}
+
+	// Since we're dialing over an existing connection, the URL and headers can be placeholders
+	wsConn, _, err := d.Dial("ws://localhost/", nil)
+	if err != nil {
+		return nil, fmt.Errorf("dial error: %v", err)
+	}
+	return wsConn, nil
+}
+
+// oneConnListener is a net.Listener that returns a single net.Conn
+type oneConnListener struct {
+	conn net.Conn
+	once sync.Once
+	ch   chan net.Conn
+}
+
+func newOneConnListener(conn net.Conn) *oneConnListener {
+	l := &oneConnListener{
+		conn: conn,
+		ch:   make(chan net.Conn, 1),
+	}
+	l.once.Do(func() {
+		l.ch <- conn
+	})
+	return l
+}
+
+func (l *oneConnListener) Accept() (net.Conn, error) {
+	conn, ok := <-l.ch
+	if !ok {
+		return nil, errors.New("listener closed")
+	}
+	return conn, nil
+}
+
+func (l *oneConnListener) Close() error {
+	close(l.ch)
+	return nil
+}
+
+func (l *oneConnListener) Addr() net.Addr {
+	return dummyAddr("pipe")
+}
+
+type dummyAddr string
+
+func (a dummyAddr) Network() string { return string(a) }
+func (a dummyAddr) String() string  { return string(a) }
+
+func cloneRouter(r *mux.Router, excludePaths ...string) *mux.Router {
+	newRouter := mux.NewRouter()
+
+	err := r.Walk(func(route *mux.Route, router *mux.Router, ancestors []*mux.Route) error {
+		path, _ := route.GetPathTemplate()
+
+		// Check if the current path should be excluded
+		for _, excludePath := range excludePaths {
+			if strings.HasPrefix(path, excludePath) {
+				return nil // Skip this route
+			}
+		}
+
+		// Clone the current route
+		newRoute := newRouter.NewRoute()
+
+		// Copy path
+		newRoute.Path(path)
+
+		// Copy methods
+		if methods, err := route.GetMethods(); err == nil {
+			newRoute.Methods(methods...)
+		}
+
+		// Copy handler
+		if handler := route.GetHandler(); handler != nil {
+			newRoute.Handler(handler)
+		}
+
+		// Copy queries
+		if queries, err := route.GetQueriesTemplates(); err == nil {
+			for i := 0; i < len(queries); i += 2 {
+				newRoute.Queries(queries[i], queries[i+1])
+			}
+		}
+
+		// Copy host
+		if host, err := route.GetHostTemplate(); err == nil {
+			newRoute.Host(host)
+		}
+
+		// Copy name
+		if name := route.GetName(); name != "" {
+			newRoute.Name(name)
+		}
+
+		// Handle subrouters
+		if len(ancestors) > 0 {
+			parent := ancestors[len(ancestors)-1]
+			if parentPath, err := parent.GetPathTemplate(); err == nil {
+				// Check if the parent path should be excluded
+				shouldExclude := false
+				for _, excludePath := range excludePaths {
+					if strings.HasPrefix(parentPath, excludePath) {
+						shouldExclude = true
+						break
+					}
+				}
+				if !shouldExclude {
+					// Find or create the corresponding subrouter in the new router
+					subRouter := newRouter.PathPrefix(parentPath).Subrouter()
+					subRouter.Handle(path, route.GetHandler())
+				}
+			}
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		log.Printf("Error cloning router: %v", err)
+		return r
+	}
+
+	return newRouter
+}
+
+// Custom Reader that reads from a WebSocket connection
+type websocketReader struct {
+	conn *websocket.Conn
+}
+
+func (r *websocketReader) Read(p []byte) (n int, err error) {
+	_, message, err := r.conn.ReadMessage()
+	if err != nil {
+		return 0, err
+	}
+	copy(p, message)
+	return len(message), nil
+}
+
+// Custom Writer that writes to a WebSocket connection
+type websocketWriter struct {
+	conn *websocket.Conn
+	mu   sync.Mutex
+}
+
+func (w *websocketWriter) Write(p []byte) (n int, err error) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	err = w.conn.WriteMessage(websocket.BinaryMessage, p)
+	if err != nil {
+		return 0, err
+	}
+	return len(p), nil
+}
+
+type wsResponseWriter struct {
+	header http.Header
+	conn   *websocket.Conn
+}
+
+func (w *wsResponseWriter) Header() http.Header {
+	return w.header
+}
+
+func (w *wsResponseWriter) Write(data []byte) (int, error) {
+	err := w.conn.WriteMessage(websocket.BinaryMessage, data)
+	if err != nil {
+		return 0, err
+	}
+	return len(data), nil
+}
+
+func (w *wsResponseWriter) WriteHeader(statusCode int) {
+	// No-op or handle as needed
+}
+
+// Implement http.Hijacker
+func (w *wsResponseWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {
+	netConn := newWsNetConn(w.conn)
+	rw := bufio.NewReadWriter(bufio.NewReader(netConn), bufio.NewWriter(netConn))
+	return netConn, rw, nil
+}
+
+// dummyResponseWriter is a no-op ResponseWriter for the Benthos input handler
+type dummyResponseWriter struct {
+	header http.Header
+}
+
+func (w *dummyResponseWriter) Header() http.Header {
+	return w.header
+}
+
+func (w *dummyResponseWriter) Write(data []byte) (int, error) {
+	// Benthos input handler shouldn't write data, so we discard it
+	return len(data), nil
+}
+
+func (w *dummyResponseWriter) WriteHeader(statusCode int) {
+	// No-op
+}
+
+func (w *dummyResponseWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {
+	dummyConn := &net.TCPConn{}
+	reader := bufio.NewReader(strings.NewReader(""))
+	writer := bufio.NewWriter(ioutil.Discard)
+	return dummyConn, bufio.NewReadWriter(reader, writer), nil
+}
+
+func getHijackableResponseWriter(w http.ResponseWriter) (http.ResponseWriter, error) {
+	type hijacker interface {
+		http.ResponseWriter
+		http.Hijacker
+	}
+
+	if _, ok := w.(hijacker); ok {
+		return w, nil
+	}
+
+	// Unwrapping loop
+	for {
+		switch v := w.(type) {
+		case interface{ Unwrap() http.ResponseWriter }:
+			w = v.Unwrap()
+		case interface{ Delegate() http.ResponseWriter }:
+			w = v.Delegate()
+		case interface{ UnderlyingResponseWriter() http.ResponseWriter }:
+			w = v.UnderlyingResponseWriter()
+		default:
+			// Log the type of w for debugging purposes
+			fmt.Printf("getHijackableResponseWriter: final type of w is %T\n", w)
+			return nil, fmt.Errorf("ResponseWriter does not implement http.Hijacker")
+		}
+
+		if _, ok := w.(hijacker); ok {
+			return w, nil
+		}
+	}
+}
+
+// wsNetConn implements net.Conn over a *websocket.Conn
+type wsNetConn struct {
+	wsConn     *websocket.Conn
+	readBuffer bytes.Buffer
+	readMutex  sync.Mutex
+	writeMutex sync.Mutex
+	closed     chan struct{}
+}
+
+func newWsNetConn(wsConn *websocket.Conn) *wsNetConn {
+	return &wsNetConn{
+		wsConn: wsConn,
+		closed: make(chan struct{}),
+	}
+}
+
+// Read implements the net.Conn Read method
+func (c *wsNetConn) Read(b []byte) (n int, err error) {
+	c.readMutex.Lock()
+	defer c.readMutex.Unlock()
+
+	for {
+		if c.readBuffer.Len() > 0 {
+			return c.readBuffer.Read(b)
+		}
+
+		// Check if the connection is closed
+		select {
+		case <-c.closed:
+			return 0, io.EOF
+		default:
+			// Read a new message from the WebSocket
+			_, message, err := c.wsConn.ReadMessage()
+			if err != nil {
+				return 0, err
+			}
+
+			// Write the message to the buffer
+			c.readBuffer.Write(message)
+		}
+	}
+}
+
+// Write implements the net.Conn Write method
+func (c *wsNetConn) Write(b []byte) (n int, err error) {
+	c.writeMutex.Lock()
+	defer c.writeMutex.Unlock()
+
+	// Write the data as a single WebSocket message
+	err = c.wsConn.WriteMessage(websocket.BinaryMessage, b)
+	if err != nil {
+		return 0, err
+	}
+	return len(b), nil
+}
+
+// Close implements the net.Conn Close method
+func (c *wsNetConn) Close() error {
+	close(c.closed)
+	return c.wsConn.Close()
+}
+
+// LocalAddr returns the local network address
+func (c *wsNetConn) LocalAddr() net.Addr {
+	return c.wsConn.LocalAddr()
+}
+
+// RemoteAddr returns the remote network address
+func (c *wsNetConn) RemoteAddr() net.Addr {
+	return c.wsConn.RemoteAddr()
+}
+
+// SetDeadline sets the read and write deadlines
+func (c *wsNetConn) SetDeadline(t time.Time) error {
+	err := c.wsConn.SetReadDeadline(t)
+	if err != nil {
+		return err
+	}
+	return c.wsConn.SetWriteDeadline(t)
+}
+
+// SetReadDeadline sets the deadline for future Read calls
+func (c *wsNetConn) SetReadDeadline(t time.Time) error {
+	return c.wsConn.SetReadDeadline(t)
+}
+
+// SetWriteDeadline sets the deadline for future Write calls
+func (c *wsNetConn) SetWriteDeadline(t time.Time) error {
+	return c.wsConn.SetWriteDeadline(t)
 }
