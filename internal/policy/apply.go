@@ -6,6 +6,7 @@ import (
 
 	"github.com/sirupsen/logrus"
 
+	"github.com/TykTechnologies/tyk/internal/model"
 	"github.com/TykTechnologies/tyk/user"
 )
 
@@ -14,25 +15,16 @@ var (
 	ErrMixedPartitionAndPerAPIPolicies = errors.New("cannot apply multiple policies when some have per_api set and some are partitioned")
 )
 
-// Repository is a storage encapsulating policy retrieval.
-// Gateway implements this object to decouple this package.
-type Repository interface {
-	PolicyCount() int
-	PolicyIDs() []string
-	PolicyByID(string) (user.Policy, bool)
-}
-
-// Service represents the policy service for gateway.
+// Service represents the implementation for apply policies logic.
 type Service struct {
-	storage Repository
+	storage model.PolicyProvider
 	logger  *logrus.Logger
 
 	// used for validation if not empty
 	orgID *string
 }
 
-// New creates a new policy.Service object.
-func New(orgID *string, storage Repository, logger *logrus.Logger) *Service {
+func New(orgID *string, storage model.PolicyProvider, logger *logrus.Logger) *Service {
 	return &Service{
 		orgID:   orgID,
 		storage: storage,
