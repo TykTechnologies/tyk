@@ -576,7 +576,7 @@ type CertificatesConfig struct {
 
 type SecurityConfig struct {
 	// Set the AES256 secret which is used to encode certificate private keys when they uploaded via certificate storage
-	PrivateCertificateEncodingSecret string `json:"private_certificate_encoding_secret"`
+	PrivateCertificateEncodingSecret string `json:"private_certificate_encoding_secret" structviewer:"obfuscate"`
 
 	// Enable Gateway Control API to use Mutual TLS. Certificates can be set via `security.certificates.control_api` section
 	ControlAPIUseMutualTLS bool `json:"control_api_use_mutual_tls"`
@@ -702,15 +702,15 @@ type Config struct {
 	// Set to run your Gateway Control API on a separate port, and protect it behind a firewall if needed. Please make sure you follow this guide when setting the control port https://tyk.io/docs/planning-for-production/#change-your-control-port.
 	ControlAPIPort int `json:"control_api_port"`
 
-	ConfigurationInspection ConfigurationInspectionCfg `json:"configuration_inspection"`
+	ConfigurationReflection ConfigurationInspectionCfg `json:"configuration_inspection"`
 
 	// This should be changed as soon as Tyk is installed on your system.
 	// This value is used in every interaction with the Tyk Gateway API. It should be passed along as the X-Tyk-Authorization header in any requests made.
 	// Tyk assumes that you are sensible enough not to expose the management endpoints publicly and to keep this configuration value to yourself.
-	Secret string `json:"secret"`
+	Secret string `json:"secret" structviewer:"obfuscate"`
 
 	// The shared secret between the Gateway and the Dashboard to ensure that API Definition downloads, heartbeat and Policy loads are from a valid source.
-	NodeSecret string `json:"node_secret"`
+	NodeSecret string `json:"node_secret" structviewer:"obfuscate"`
 
 	// Linux PID file location. Do not change unless you know what you are doing. Default: /var/run/tyk/tyk-gateway.pid
 	PIDFileLocation string `json:"pid_file_location"`
@@ -1108,7 +1108,7 @@ type Config struct {
 	} `json:"kv"`
 
 	// Secrets are key-value pairs that can be accessed in the dashboard via "secrets://"
-	Secrets map[string]string `json:"secrets"`
+	Secrets map[string]string `json:"secrets" structviewer:"obfuscate"`
 
 	// Override the default error code and or message returned by middleware.
 	// The following message IDs can be used to override the message and error codes:

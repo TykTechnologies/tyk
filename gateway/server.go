@@ -1987,22 +1987,22 @@ func (gw *Gateway) loadConfigurationAPI() error {
 	config := gw.GetConfig()
 
 	// Check if enabled
-	if config.ConfigurationInspection.Enable != true {
-		mainLog.Info("configuration Reporting API is disabled in the configuration. Please enable it if you need to use it")
+	if config.ConfigurationReflection.Enable != true {
+		mainLog.Info("configuration reflection API is disabled in the configuration. Please enable it if you need to use it")
 		return nil
 	}
-	mainLog.Info("configuration Reporting API is enabled")
+	mainLog.Info("configuration reflection API is enabled")
 
-	port := strconv.Itoa(config.ConfigurationInspection.APIPort)
+	port := strconv.Itoa(config.ConfigurationReflection.APIPort)
 	// Check the port
 	if port == "" {
-		return fmt.Errorf("configuration Reporting API port is not set. Please set it in order to use it")
+		return fmt.Errorf("configuration reflection API port is not set. Please set it in order to use it")
 	}
-	mainLog.Info("configuration Reporting API Port is set to", port)
+	mainLog.Info("configuration reflection API Port is set to", port)
 
 	// Check the API key
-	if config.ConfigurationInspection.APIKey == "" {
-		return fmt.Errorf("configuration Reporting API port is not set. Please set it in order to use it")
+	if config.ConfigurationReflection.APIKey == "" {
+		return fmt.Errorf("configuration reflection API port is not set. Please set it in order to use it")
 	}
 
 	var structviewerCfg = &structviewer.Config{
@@ -2018,20 +2018,16 @@ func (gw *Gateway) loadConfigurationAPI() error {
 	// Create a new router for the Configuration reporting API server
 	router := mux.NewRouter()
 
+	// TODO: Update swagger.yaml of the gateway
 	// Define routes and middleware specific to the Config API
-	router.Handle("/config", authConfigurationAPI(http.HandlerFunc(v.ConfigHandler), config.ConfigurationInspection.APIKey))
-	router.Handle("/env", authConfigurationAPI(http.HandlerFunc(v.EnvsHandler), config.ConfigurationInspection.APIKey))
-
-	//	muxer := &proxyMux{}
-	//	muxer.setRouter(apiPort, "", router, gw.GetConfig())
-
-	log.Printf("Starting Configuration Reporting API on addr=%d", config.ConfigurationInspection.APIPort)
+	router.Handle("/config", authConfigurationAPI(http.HandlerFunc(v.ConfigHandler), config.ConfigurationReflection.APIKey))
+	router.Handle("/env", authConfigurationAPI(http.HandlerFunc(v.EnvsHandler), config.ConfigurationReflection.APIKey))
 
 	var apiPort = ":" + port
 	if err := http.ListenAndServe(apiPort, router); err != nil {
 		fmt.Println("Error starting server:", err)
 	}
-	mainLog.Info("--> Configuration Reporting API is on - Listening on port: ", apiPort)
+	mainLog.Info("--> Configuration reflection API is on - Listening on port  ", apiPort)
 
 	return nil
 }
