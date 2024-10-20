@@ -587,7 +587,7 @@ type SecurityConfig struct {
 	Certificates CertificatesConfig `json:"certificates"`
 }
 
-type ConfigurationReportingCfg struct {
+type ConfigurationInspectionCfg struct {
 
 	// Enable controls the availability of HTTP endpoints for monitoring and debugging Tyk Gateway.
 	// These endpoints provide critical system information and are disabled by default for security reasons.
@@ -702,7 +702,7 @@ type Config struct {
 	// Set to run your Gateway Control API on a separate port, and protect it behind a firewall if needed. Please make sure you follow this guide when setting the control port https://tyk.io/docs/planning-for-production/#change-your-control-port.
 	ControlAPIPort int `json:"control_api_port"`
 
-	ConfigurationReporting ConfigurationReportingCfg `json:"configuration_reporting"`
+	ConfigurationInspection ConfigurationInspectionCfg `json:"configuration_inspection"`
 
 	// This should be changed as soon as Tyk is installed on your system.
 	// This value is used in every interaction with the Tyk Gateway API. It should be passed along as the X-Tyk-Authorization header in any requests made.

@@ -1987,12 +1987,13 @@ func (gw *Gateway) loadConfigurationAPI() error {
 	config := gw.GetConfig()
 
 	// Check if enabled
-	if config.ConfigurationReporting.Enable != true {
+	if config.ConfigurationInspection.Enable != true {
 		mainLog.Info("configuration Reporting API is disabled in the configuration. Please enable it if you need to use it")
+		return nil
 	}
 	mainLog.Info("configuration Reporting API is enabled")
 
-	port := strconv.Itoa(config.ConfigurationReporting.APIPort)
+	port := strconv.Itoa(config.ConfigurationInspection.APIPort)
 	// Check the port
 	if port == "" {
 		return fmt.Errorf("configuration Reporting API port is not set. Please set it in order to use it")
@@ -2000,7 +2001,7 @@ func (gw *Gateway) loadConfigurationAPI() error {
 	mainLog.Info("configuration Reporting API Port is set to", port)
 
 	// Check the API key
-	if config.ConfigurationReporting.APIKey == "" {
+	if config.ConfigurationInspection.APIKey == "" {
 		return fmt.Errorf("configuration Reporting API port is not set. Please set it in order to use it")
 	}
 
@@ -2018,13 +2019,13 @@ func (gw *Gateway) loadConfigurationAPI() error {
 	router := mux.NewRouter()
 
 	// Define routes and middleware specific to the Config API
-	router.Handle("/config", authConfigurationAPI(http.HandlerFunc(v.ConfigHandler), config.ConfigurationReporting.APIKey))
-	router.Handle("/env", authConfigurationAPI(http.HandlerFunc(v.EnvsHandler), config.ConfigurationReporting.APIKey))
+	router.Handle("/config", authConfigurationAPI(http.HandlerFunc(v.ConfigHandler), config.ConfigurationInspection.APIKey))
+	router.Handle("/env", authConfigurationAPI(http.HandlerFunc(v.EnvsHandler), config.ConfigurationInspection.APIKey))
 
 	//	muxer := &proxyMux{}
 	//	muxer.setRouter(apiPort, "", router, gw.GetConfig())
 
-	log.Printf("Starting Configuration Reporting API on addr=%q", config.ConfigurationReporting.APIPort)
+	log.Printf("Starting Configuration Reporting API on addr=%d", config.ConfigurationInspection.APIPort)
 
 	var apiPort = ":" + port
 	if err := http.ListenAndServe(apiPort, router); err != nil {
