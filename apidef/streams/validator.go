@@ -9,6 +9,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/TykTechnologies/tyk/apidef/streams/bento"
 	"github.com/buger/jsonparser"
 	"github.com/hashicorp/go-multierror"
 	pkgver "github.com/hashicorp/go-version"
@@ -123,14 +124,19 @@ func validateJSON(schema, document []byte) error {
 
 }
 
-// ValidateOASObject validates a Tyk Streams document against a particular OAS version.
-func ValidateOASObject(documentBody []byte, oasVersion string) error {
+// ValidateOASObjectWithBentoConfigValidator validates a Tyk Streams document against a particular OAS version and takes an optional ConfigValidator
+func ValidateOASObjectWithBentoConfigValidator(documentBody []byte, oasVersion string, bentoValidator bento.ConfigValidator) error {
 	oasSchema, err := GetOASSchema(oasVersion)
 	if err != nil {
 		return err
 	}
 
 	return validateJSON(oasSchema, documentBody)
+}
+
+// ValidateOASObject validates a Tyk Streams document against a particular OAS version.
+func ValidateOASObject(documentBody []byte, oasVersion string) error {
+	return ValidateOASObjectWithBentoConfigValidator(documentBody, oasVersion, nil)
 }
 
 // ValidateOASTemplate checks a Tyk Streams OAS API template for necessary fields,
