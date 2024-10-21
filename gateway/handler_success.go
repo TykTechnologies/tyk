@@ -345,7 +345,7 @@ func recordDetail(r *http.Request, spec *APISpec) bool {
 
 	// Are we even checking?
 	if !spec.GlobalConfig.EnforceOrgDataDetailLogging {
-		return spec.GlobalConfig.AnalyticsConfig.EnableDetailedRecording
+		return spec.GraphQL.Enabled || spec.GlobalConfig.AnalyticsConfig.EnableDetailedRecording
 	}
 
 	// We are, so get session data
