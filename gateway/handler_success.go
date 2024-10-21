@@ -16,6 +16,7 @@ import (
 	"github.com/TykTechnologies/tyk/internal/httputil"
 
 	"github.com/TykTechnologies/tyk-pump/analytics"
+
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/ctx"
 	"github.com/TykTechnologies/tyk/header"
@@ -333,6 +334,14 @@ func recordDetail(r *http.Request, spec *APISpec) bool {
 		return false
 	}
 
+	// It is safe to use recordDetailUnsafe from now on.
+	return recordDetailUnsafe(r, spec)
+}
+
+// recordDetailUnsafe will check if detailed recording is enabled but does not check
+// for specific cases where it should skip evaluation and return false (e.g. grpc streaming).
+// Use recordDetail instead.
+func recordDetailUnsafe(r *http.Request, spec *APISpec) bool {
 	if spec.EnableDetailedRecording {
 		return true
 	}

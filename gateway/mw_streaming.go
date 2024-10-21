@@ -528,7 +528,7 @@ func NewStreamAnalyticsFactory(logger *logrus.Entry, gw *Gateway, spec *APISpec)
 
 func (d *DefaultStreamAnalyticsFactory) CreateRecorder(r *http.Request) StreamAnalyticsRecorder {
 	detailed := false
-	if recordDetail(r, d.Spec) {
+	if recordDetailUnsafe(r, d.Spec) {
 		detailed = true
 	}
 
