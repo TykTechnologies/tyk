@@ -18,7 +18,7 @@ type ConfigValidator interface {
 }
 
 const (
-	DefaultBentoConfiguration = "default-bento-configuration"
+	DefaultBentoConfigSchema = "default-bento-config-schema"
 )
 
 var (
@@ -49,15 +49,15 @@ func loadBentoSchemas() error {
 				continue
 			}
 
-			// Load DefaultBentoConfiguration schema
-			defaultBentoConfigurationSchemaFileName := DefaultBentoConfiguration + ".json"
-			if fileName == defaultBentoConfigurationSchemaFileName {
+			// Load DefaultBentoConfigSchema schema
+			defaultBentoConfigSchemaFileName := DefaultBentoConfigSchema + ".json"
+			if fileName == defaultBentoConfigSchemaFileName {
 				var data []byte
-				data, err = schemaDir.ReadFile(filepath.Join("schema/", defaultBentoConfigurationSchemaFileName))
+				data, err = schemaDir.ReadFile(filepath.Join("schema/", defaultBentoConfigSchemaFileName))
 				if err != nil {
 					return err
 				}
-				bentoSchemas[DefaultBentoConfiguration] = data
+				bentoSchemas[DefaultBentoConfigSchema] = data
 			}
 		}
 		return nil
@@ -80,7 +80,7 @@ func NewDefaultBentoConfigValidator() (*DefaultBentoConfigValidator, error) {
 		return nil, err
 	}
 
-	schema := bentoSchemas[DefaultBentoConfiguration]
+	schema := bentoSchemas[DefaultBentoConfigSchema]
 	return &DefaultBentoConfigValidator{
 		schemaLoader: gojsonschema.NewBytesLoader(schema),
 	}, nil

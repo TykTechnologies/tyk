@@ -38,6 +38,8 @@ var (
 
 	oasJSONSchemas map[string][]byte
 
+	bentoValidators map[string]bento.ConfigValidator
+
 	defaultVersion string
 )
 
@@ -96,6 +98,16 @@ func loadOASSchema() error {
 	var err error
 	schemaOnce.Do(func() {
 		err = load()
+		if err != nil {
+			return
+		}
+
+		bentoValidators = make(map[string]bento.ConfigValidator)
+		defaultValidator, err := bento.NewDefaultBentoConfigValidator()
+		if err != nil {
+			return
+		}
+		bentoValidators[bento.DefaultBentoConfigSchema] = defaultValidator
 	})
 	return err
 }
@@ -136,7 +148,8 @@ func ValidateOASObjectWithBentoConfigValidator(documentBody []byte, oasVersion s
 
 // ValidateOASObject validates a Tyk Streams document against a particular OAS version.
 func ValidateOASObject(documentBody []byte, oasVersion string) error {
-	return ValidateOASObjectWithBentoConfigValidator(documentBody, oasVersion, nil)
+	defaultBentoValidator := bentoValidators[bento.DefaultBentoConfigSchema]
+	return ValidateOASObjectWithBentoConfigValidator(documentBody, oasVersion, defaultBentoValidator)
 }
 
 // ValidateOASTemplate checks a Tyk Streams OAS API template for necessary fields,
