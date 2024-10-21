@@ -38,6 +38,10 @@ func (sf *SyncronizerForcer) SetFirstConnection(isFirstConnection bool) {
 	sf.isFirstConnection = isFirstConnection
 }
 
+func (sf *SyncronizerForcer) GetIsFirstConnection() bool {
+	return sf.isFirstConnection
+}
+
 // GroupLoginCallback checks if the groupID key exists in the storage to turn on/off ForceSync param.
 // If the the key doesn't exists in the storage, it creates it and set ForceSync to true
 func (sf *SyncronizerForcer) GroupLoginCallback(userKey string, groupID string) interface{} {
