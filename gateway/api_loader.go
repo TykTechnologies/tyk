@@ -15,8 +15,6 @@ import (
 	"sync"
 	texttemplate "text/template"
 
-	"github.com/TykTechnologies/tyk/rpc"
-
 	"github.com/gorilla/mux"
 	"github.com/justinas/alice"
 	"github.com/rs/cors"
@@ -24,9 +22,11 @@ import (
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/coprocess"
-	"github.com/TykTechnologies/tyk/internal/otel"
+	"github.com/TykTechnologies/tyk/rpc"
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/trace"
+
+	"github.com/TykTechnologies/tyk/internal/otel"
 )
 
 const (
@@ -426,7 +426,10 @@ func (gw *Gateway) processSpec(spec *APISpec, apisByListen map[string]int,
 
 	gw.mwAppendEnabled(&chainArray, &RateLimitForAPI{BaseMiddleware: baseMid})
 	gw.mwAppendEnabled(&chainArray, &GraphQLMiddleware{BaseMiddleware: baseMid})
-	gw.mwAppendEnabled(&chainArray, &StreamingMiddleware{BaseMiddleware: baseMid})
+
+	if streamMw := getStreamingMiddleware(baseMid); streamMw != nil {
+		gw.mwAppendEnabled(&chainArray, streamMw)
+	}
 
 	if !spec.UseKeylessAccess {
 		gw.mwAppendEnabled(&chainArray, &GraphQLComplexityMiddleware{BaseMiddleware: baseMid})

@@ -1,3 +1,5 @@
+//go:build ee || dev
+
 package gateway
 
 import (
@@ -13,6 +15,7 @@ import (
 	"time"
 
 	"github.com/nats-io/nats.go"
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/testcontainers/testcontainers-go"
@@ -28,6 +31,8 @@ import (
 
 	"github.com/TykTechnologies/tyk/apidef/oas"
 	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/ee/middleware/streams"
+	"github.com/TykTechnologies/tyk/internal/model"
 	"github.com/TykTechnologies/tyk/test"
 )
 
@@ -88,7 +93,7 @@ output:
 		t.Run(tc.name, func(t *testing.T) {
 			config, err := yamlConfigToMap(tc.configYaml)
 			require.NoError(t, err)
-			httpPaths := GetHTTPPaths(config)
+			httpPaths := streams.GetHTTPPaths(config)
 			assert.ElementsMatch(t, tc.expected, httpPaths)
 		})
 	}
@@ -145,8 +150,6 @@ streams:
       level: DEBUG
       format: logfmt
       add_timestamp: false
-      static_fields:
-        '@service': benthos
 `
 const bentoHTTPServerTemplate = `
 streams:
@@ -200,6 +203,9 @@ func TestStreamingAPISingleClient(t *testing.T) {
 	}
 
 	wsURL := strings.Replace(ts.URL, "http", "ws", 1) + fmt.Sprintf("/%s/get/ws", apiName)
+
+	println("wsURL:", wsURL)
+
 	wsConn, _, err := dialer.Dial(wsURL, nil)
 	require.NoError(t, err, "failed to connect to ws server")
 	t.Cleanup(func() {
@@ -354,7 +360,7 @@ func setupOASForStreamAPI(streamingConfig string) (oas.OAS, error) {
 	}
 
 	oasAPI.Extensions = map[string]interface{}{
-		ExtensionTykStreaming: parsedStreamingConfig,
+		streams.ExtensionTykStreaming: parsedStreamingConfig,
 	}
 
 	return oasAPI, nil
@@ -377,11 +383,7 @@ func TestAsyncAPI(t *testing.T) {
 	t.SkipNow()
 
 	ts := StartTest(func(globalConf *config.Config) {
-		globalConf.Labs = map[string]interface{}{
-			"streaming": map[string]interface{}{
-				"enabled": true,
-			},
-		}
+		globalConf.Streaming.Enabled = true
 	})
 
 	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
@@ -446,7 +448,7 @@ streams:
 	}
 
 	oasAPI.Extensions = map[string]interface{}{
-		ExtensionTykStreaming: parsedStreamingConfig,
+		streams.ExtensionTykStreaming: parsedStreamingConfig,
 		// oas.ExtensionTykAPIGateway: tykExtension,
 	}
 
@@ -468,8 +470,8 @@ streams:
 	// Check that standard API still works
 	_, _ = ts.Run(t, test.TestCase{Code: http.StatusOK, Method: http.MethodGet, Path: "/test"})
 
-	if globalStreamCounter.Load() != 1 {
-		t.Fatalf("Expected 1 stream, got %d", globalStreamCounter.Load())
+	if streams.GlobalStreamCounter.Load() != 1 {
+		t.Fatalf("Expected 1 stream, got %d", streams.GlobalStreamCounter.Load())
 	}
 
 	time.Sleep(500 * time.Millisecond)
@@ -592,7 +594,7 @@ streams:
 	}
 
 	oasAPI.Extensions = map[string]interface{}{
-		ExtensionTykStreaming: parsedStreamingConfig,
+		streams.ExtensionTykStreaming: parsedStreamingConfig,
 	}
 
 	return oasAPI
@@ -604,7 +606,7 @@ func testAsyncAPIHttp(t *testing.T, ts *Test, isDynamic bool, tenantID string, a
 	const numMessages = 2
 	const numClients = 2
 
-	streamCount := globalStreamCounter.Load()
+	streamCount := streams.GlobalStreamCounter.Load()
 	t.Logf("Stream count for tenant %s: %d", tenantID, streamCount)
 
 	// Create WebSocket clients
@@ -755,11 +757,7 @@ func TestWebSocketConnectionClosedOnAPIReload(t *testing.T) {
 	}
 
 	ts := StartTest(func(globalConf *config.Config) {
-		globalConf.Labs = map[string]interface{}{
-			"streaming": map[string]interface{}{
-				"enabled": true,
-			},
-		}
+		globalConf.Streaming.Enabled = true
 	})
 	defer ts.Close()
 
@@ -851,6 +849,7 @@ func TestStreamingAPISingleClient_Input_HTTPServer(t *testing.T) {
 	require.NoError(t, err, "error setting read deadline")
 
 	for i := 0; i < totalMessages; i++ {
+		println("reading message", i)
 		_, p, err := wsConn.ReadMessage()
 		require.NoError(t, err, "error reading message")
 		assert.Equal(t, fmt.Sprintf("{\"test\": \"message %d\"}", i), string(p), "message not equal")
@@ -935,6 +934,14 @@ func TestStreamingAPIMultipleClients_Input_HTTPServer(t *testing.T) {
 	require.Empty(t, messages)
 }
 
+type DummyBase struct {
+	model.LoggerProvider
+}
+
+func (d *DummyBase) Logger() *logrus.Entry {
+	return logrus.NewEntry(logrus.New())
+}
+
 func TestStreamingAPIGarbageCollection(t *testing.T) {
 	ts := StartTest(func(globalConf *config.Config) {
 		globalConf.Streaming.Enabled = true
@@ -956,8 +963,9 @@ func TestStreamingAPIGarbageCollection(t *testing.T) {
 		spec.OAS.Fill(*spec.APIDefinition)
 	})
 
-	baseMiddleware := &BaseMiddleware{Gw: ts.Gw, Spec: specs[0]}
-	s := StreamingMiddleware{BaseMiddleware: baseMiddleware}
+	apiSpec := streams.NewAPISpec(specs[0].APIID, specs[0].Name, specs[0].IsOAS, specs[0].OAS, specs[0].StripListenPath)
+
+	s := streams.NewMiddleware(ts.Gw, &DummyBase{}, apiSpec)
 
 	if err := setUpStreamAPI(ts, apiName, bentoHTTPServerTemplate); err != nil {
 		t.Fatal(err)
@@ -968,21 +976,21 @@ func TestStreamingAPIGarbageCollection(t *testing.T) {
 	r, err := http.NewRequest("POST", publishURL, nil)
 	require.NoError(t, err)
 
-	s.createStreamManager(r)
+	s.CreateStreamManager(r)
 
 	// We should have a Stream manager in the cache.
 	var streamManagersBeforeGC int
-	s.streamManagerCache.Range(func(k, v interface{}) bool {
+	s.StreamManagerCache.Range(func(k, v interface{}) bool {
 		streamManagersBeforeGC++
 		return true
 	})
 	require.Equal(t, 1, streamManagersBeforeGC)
 
-	s.garbageCollect()
+	s.GC()
 
 	// Garbage collection removed the stream manager because the activity counter is zero.
 	var streamManagersAfterGC int
-	s.streamManagerCache.Range(func(k, v interface{}) bool {
+	s.StreamManagerCache.Range(func(k, v interface{}) bool {
 		streamManagersAfterGC++
 		return true
 	})
