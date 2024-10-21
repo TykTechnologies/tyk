@@ -640,6 +640,7 @@ func (gw *Gateway) loadControlAPIEndpoints(muxer *mux.Router) {
 		muxer.HandleFunc("/debug/pprof/profile", pprofhttp.Profile)
 		muxer.HandleFunc("/debug/pprof/{_:.*}", pprofhttp.Index)
 	}
+	gw.loadConfigurationAPI(muxer)
 
 	r.MethodNotAllowedHandler = MethodNotAllowedHandler{}
 
@@ -1942,8 +1943,6 @@ func (gw *Gateway) startServer() {
 
 	router := mux.NewRouter()
 
-	gw.loadConfigurationAPI()
-
 	gw.loadControlAPIEndpoints(router)
 
 	muxer.setRouter(gw.GetConfig().ControlAPIPort, "", router, gw.GetConfig())
@@ -1982,7 +1981,7 @@ func (gw *Gateway) SetConfig(conf config.Config, skipReload ...bool) {
 	gw.configMu.Unlock()
 }
 
-func (gw *Gateway) loadConfigurationAPI() error {
+func (gw *Gateway) loadConfigurationAPI(muxer *mux.Router) error {
 
 	config := gw.GetConfig()
 
@@ -1991,14 +1990,22 @@ func (gw *Gateway) loadConfigurationAPI() error {
 		mainLog.Info("configuration reflection API is disabled in the configuration. Please enable it if you need to use it")
 		return nil
 	}
-	mainLog.Info("configuration reflection API is enabled")
+	mainLog.Debug("configuration reflection API is enabled")
 
-	port := strconv.Itoa(config.ConfigurationReflection.APIPort)
-	// Check the port
-	if port == "" {
-		return fmt.Errorf("configuration reflection API port is not set. Please set it in order to use it")
+	if config.ControlAPIPort == 0 {
+		return fmt.Errorf("configuration reflection API requires a dedicated control port. Please set `control_api_port` in order to use it")
 	}
-	mainLog.Info("configuration reflection API Port is set to", port)
+	/*
+		port := config.ControlAPIPort
+		if port == 0 {
+			port = config.ConfigurationReflection.APIPort
+		}
+		// Check the port
+		if port == 0 {
+			return fmt.Errorf("configuration reflection API requires a separate port. Please set it in order to use it")
+		}
+		mainLog.Info("configuration reflection API Port is set to %d", port)
+	*/
 
 	// Check the API key
 	if config.ConfigurationReflection.APIKey == "" {
@@ -2015,19 +2022,12 @@ func (gw *Gateway) loadConfigurationAPI() error {
 		return err
 	}
 
-	// Create a new router for the Configuration reporting API server
-	router := mux.NewRouter()
-
 	// TODO: Update swagger.yaml of the gateway
 	// Define routes and middleware specific to the Config API
-	router.Handle("/config", authConfigurationAPI(http.HandlerFunc(v.ConfigHandler), config.ConfigurationReflection.APIKey))
-	router.Handle("/env", authConfigurationAPI(http.HandlerFunc(v.EnvsHandler), config.ConfigurationReflection.APIKey))
+	muxer.Handle("/config", authConfigurationAPI(http.HandlerFunc(v.ConfigHandler), config.ConfigurationReflection.APIKey))
+	muxer.Handle("/env", authConfigurationAPI(http.HandlerFunc(v.EnvsHandler), config.ConfigurationReflection.APIKey))
 
-	var apiPort = ":" + port
-	if err := http.ListenAndServe(apiPort, router); err != nil {
-		fmt.Println("Error starting server:", err)
-	}
-	mainLog.Info("--> Configuration reflection API is on - Listening on port  ", apiPort)
+	mainLog.Info("--> Configuration reflection API is available on control port")
 
 	return nil
 }
@@ -2037,20 +2037,12 @@ func (gw *Gateway) loadConfigurationAPI() error {
 // client and the owner and is set in the settings. This should
 // never be made public!
 func authConfigurationAPI(next http.Handler, apiKey string) http.Handler {
-
-	authorizationHeader := "X-Tyk-Authorization"
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		tykAuthKey := r.Header.Get(authorizationHeader)
+		tykAuthKey := r.Header.Get(header.XTykAuthorization)
 		if tykAuthKey != apiKey {
-			log.Warning("Attempted administrative access with invalid or missing key!")
-
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(http.StatusUnauthorized)
-			err := json.NewEncoder(w).Encode(map[string]string{"error": "Attempted administrative access with invalid or missing key!"})
-			if err != nil {
-				log.WithError(err).Error("Failed to write error response in authAdminMiddleware middleware")
-			}
-
+			errMsg := "Attempted administrative access to cnfiguration reflection with invalid or missing key!"
+			mainLog.Error(errMsg)
+			doJSONWrite(w, http.StatusUnauthorized, apiError(errMsg))
 			return
 		}
 		next.ServeHTTP(w, r)
