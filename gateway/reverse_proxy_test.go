@@ -2026,7 +2026,7 @@ func TestQuotaResponseHeaders(t *testing.T) {
 }
 
 func BenchmarkLargeResponsePayload(b *testing.B) {
-	ts := StartTest(func(globalConf *config.Config) {})
+	ts := StartTest(func(_ *config.Config) {})
 	b.Cleanup(func() {
 		ts.Close()
 	})
@@ -2035,13 +2035,13 @@ func BenchmarkLargeResponsePayload(b *testing.B) {
 	payloadSize := 500 * 1024 * 1024 // 500 MB in bytes
 	largePayload := bytes.Repeat([]byte("x"), payloadSize)
 
-	largePayloadHandler := func(w http.ResponseWriter, r *http.Request) {
+	largePayloadHandler := func(w http.ResponseWriter, _ *http.Request) {
 
 		// Write the payload to the response writer
 		w.Header().Set("Content-Type", "application/octet-stream")
 		w.Header().Set("Content-Length", strconv.Itoa(payloadSize))
 		w.WriteHeader(http.StatusOK)
-		w.Write(largePayload)
+		_, _ = w.Write(largePayload)
 	}
 
 	// Create a test server with the largePayloadHandler
