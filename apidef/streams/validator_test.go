@@ -130,7 +130,7 @@ func Test_loadOASSchema(t *testing.T) {
 	t.Parallel()
 	t.Run("load Tyk Streams OAS", func(t *testing.T) {
 		t.Parallel()
-		err := loadOASSchema()
+		err := loadSchemas()
 		assert.Nil(t, err)
 		assert.NotNil(t, oasJSONSchemas)
 		for oasVersion := range oasJSONSchemas {
@@ -162,7 +162,7 @@ func Test_findDefaultVersion(t *testing.T) {
 }
 
 func Test_setDefaultVersion(t *testing.T) {
-	err := loadOASSchema()
+	err := loadSchemas()
 	assert.NoError(t, err)
 
 	setDefaultVersion()
@@ -170,7 +170,7 @@ func Test_setDefaultVersion(t *testing.T) {
 }
 
 func TestGetOASSchema(t *testing.T) {
-	err := loadOASSchema()
+	err := loadSchemas()
 	assert.NoError(t, err)
 
 	t.Run("return default version when req version is empty", func(t *testing.T) {

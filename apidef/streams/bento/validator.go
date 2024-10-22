@@ -20,8 +20,8 @@ type ConfigValidator interface {
 type ValidatorKind string
 
 const (
-	DefaultBentoConfigSchemaName string        = "default-bento-config-schema.json"
-	DefaultValidator             ValidatorKind = "default-bento-config-schema"
+	DefaultBentoConfigSchemaName string        = "bento-v1.2.0-supported-schema.json"
+	DefaultValidator             ValidatorKind = "default-validator"
 )
 
 var (

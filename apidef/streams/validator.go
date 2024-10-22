@@ -44,8 +44,8 @@ var (
 	defaultVersion string
 )
 
-func loadOASSchema() error {
-	load := func() error {
+func loadSchemas() error {
+	loadOAS := func() error {
 		xTykStreamingSchema, err := schemaDir.ReadFile(fmt.Sprintf("schema/%s.json", ExtensionTykStreaming))
 		if err != nil {
 			return fmt.Errorf("%s loading failed: %w", ExtensionTykStreaming, err)
@@ -96,19 +96,23 @@ func loadOASSchema() error {
 		return nil
 	}
 
-	var err error
-	schemaOnce.Do(func() {
-		err = load()
-		if err != nil {
-			return
-		}
-
+	loadBento := func() error {
 		bentoValidators = make(map[bento.ValidatorKind]bento.ConfigValidator)
 		defaultValidator, err := bento.NewDefaultConfigValidator()
 		if err != nil {
-			return
+			return err
 		}
 		bentoValidators[bento.DefaultValidator] = defaultValidator
+		return nil
+	}
+
+	var err error
+	schemaOnce.Do(func() {
+		err = loadOAS()
+		if err != nil {
+			return
+		}
+		err = loadBento()
 	})
 	return err
 }
@@ -215,8 +219,8 @@ func ValidateOASTemplateWithBentoValidator(documentBody []byte, oasVersion strin
 
 // GetOASSchema returns an oas schema for a particular version.
 func GetOASSchema(version string) ([]byte, error) {
-	if err := loadOASSchema(); err != nil {
-		return nil, fmt.Errorf("loadOASSchema failed: %w", err)
+	if err := loadSchemas(); err != nil {
+		return nil, fmt.Errorf("loadSchemas failed: %w", err)
 	}
 
 	if version == "" {
