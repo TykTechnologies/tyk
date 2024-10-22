@@ -17,14 +17,17 @@ type ConfigValidator interface {
 	Validate(document []byte) error
 }
 
+type ValidatorKind string
+
 const (
-	DefaultBentoConfigSchema = "default-bento-config-schema"
+	DefaultBentoConfigSchemaName string        = "default-bento-config-schema.json"
+	DefaultValidator             ValidatorKind = "default-bento-config-schema"
 )
 
 var (
 	schemaOnce sync.Once
 
-	bentoSchemas = map[string][]byte{}
+	bentoSchemas = map[ValidatorKind][]byte{}
 )
 
 //go:embed schema/*
@@ -37,7 +40,7 @@ func loadBentoSchemas() error {
 			return fmt.Errorf("listing Bento schemas failed %w", err)
 		}
 
-		bentoSchemas = make(map[string][]byte)
+		bentoSchemas = make(map[ValidatorKind][]byte)
 		for _, member := range members {
 			if member.IsDir() {
 				continue
@@ -49,15 +52,14 @@ func loadBentoSchemas() error {
 				continue
 			}
 
-			// Load DefaultBentoConfigSchema schema
-			defaultBentoConfigSchemaFileName := DefaultBentoConfigSchema + ".json"
-			if fileName == defaultBentoConfigSchemaFileName {
+			// Load default Bento configuration schema
+			if fileName == DefaultBentoConfigSchemaName {
 				var data []byte
-				data, err = schemaDir.ReadFile(filepath.Join("schema/", defaultBentoConfigSchemaFileName))
+				data, err = schemaDir.ReadFile(filepath.Join("schema/", DefaultBentoConfigSchemaName))
 				if err != nil {
 					return err
 				}
-				bentoSchemas[DefaultBentoConfigSchema] = data
+				bentoSchemas[DefaultValidator] = data
 			}
 		}
 		return nil
@@ -70,23 +72,23 @@ func loadBentoSchemas() error {
 	return err
 }
 
-type DefaultBentoConfigValidator struct {
+type DefaultConfigValidator struct {
 	schemaLoader gojsonschema.JSONLoader
 }
 
-func NewDefaultBentoConfigValidator() (*DefaultBentoConfigValidator, error) {
+func NewDefaultConfigValidator() (*DefaultConfigValidator, error) {
 	err := loadBentoSchemas() // loads the schemas only one time
 	if err != nil {
 		return nil, err
 	}
 
-	schema := bentoSchemas[DefaultBentoConfigSchema]
-	return &DefaultBentoConfigValidator{
+	schema := bentoSchemas[DefaultValidator]
+	return &DefaultConfigValidator{
 		schemaLoader: gojsonschema.NewBytesLoader(schema),
 	}, nil
 }
 
-func (v *DefaultBentoConfigValidator) Validate(document []byte) error {
+func (v *DefaultConfigValidator) Validate(document []byte) error {
 	documentLoader := gojsonschema.NewBytesLoader(document)
 	result, err := gojsonschema.Validate(v.schemaLoader, documentLoader)
 	if err != nil {

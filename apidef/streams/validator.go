@@ -27,6 +27,7 @@ const (
 )
 
 const (
+	keyStreams                  = "streams"
 	keyDefinitions              = "definitions"
 	keyProperties               = "properties"
 	keyRequired                 = "required"
@@ -38,7 +39,7 @@ var (
 
 	oasJSONSchemas map[string][]byte
 
-	bentoValidators map[string]bento.ConfigValidator
+	bentoValidators map[bento.ValidatorKind]bento.ConfigValidator
 
 	defaultVersion string
 )
@@ -102,17 +103,38 @@ func loadOASSchema() error {
 			return
 		}
 
-		bentoValidators = make(map[string]bento.ConfigValidator)
-		defaultValidator, err := bento.NewDefaultBentoConfigValidator()
+		bentoValidators = make(map[bento.ValidatorKind]bento.ConfigValidator)
+		defaultValidator, err := bento.NewDefaultConfigValidator()
 		if err != nil {
 			return
 		}
-		bentoValidators[bento.DefaultBentoConfigSchema] = defaultValidator
+		bentoValidators[bento.DefaultValidator] = defaultValidator
 	})
 	return err
 }
 
-func validateJSON(schema, document []byte) error {
+func validateBentoConfiguration(document []byte, bentoValidatorKind bento.ValidatorKind) error {
+	streams, _, _, err := jsonparser.Get(document, ExtensionTykStreaming, keyStreams)
+	if errors.Is(err, jsonparser.KeyPathNotFoundError) {
+		// no streams found
+		return nil
+	}
+	if err != nil {
+		return fmt.Errorf("failed getting streams configuration: %w", err)
+	}
+
+	bentoValidator := bentoValidators[bentoValidatorKind]
+	return jsonparser.ObjectEach(streams, func(stream []byte, bentoConfiguration []byte, dataType jsonparser.ValueType, offset int) error {
+		err = bentoValidator.Validate(bentoConfiguration)
+		if err != nil {
+			return fmt.Errorf("%s: %w", stream, err)
+		}
+		// Validated
+		return nil
+	})
+}
+
+func validateJSON(schema, document []byte, bentoValidatorKind bento.ValidatorKind) error {
 	schemaLoader := gojsonschema.NewBytesLoader(schema)
 	documentLoader := gojsonschema.NewBytesLoader(document)
 	result, err := gojsonschema.Validate(schemaLoader, documentLoader)
@@ -122,7 +144,9 @@ func validateJSON(schema, document []byte) error {
 	}
 
 	if result.Valid() {
-		return nil
+		// Tyk Streams OAS schema is valid.
+		// Validate the Bento configuration here.
+		return validateBentoConfiguration(document, bentoValidatorKind)
 	}
 
 	combinedErr := &multierror.Error{}
@@ -137,24 +161,26 @@ func validateJSON(schema, document []byte) error {
 }
 
 // ValidateOASObjectWithBentoConfigValidator validates a Tyk Streams document against a particular OAS version and takes an optional ConfigValidator
-func ValidateOASObjectWithBentoConfigValidator(documentBody []byte, oasVersion string, bentoValidator bento.ConfigValidator) error {
+func ValidateOASObjectWithBentoConfigValidator(documentBody []byte, oasVersion string, bentoValidatorKind bento.ValidatorKind) error {
 	oasSchema, err := GetOASSchema(oasVersion)
 	if err != nil {
 		return err
 	}
-
-	return validateJSON(oasSchema, documentBody)
+	return validateJSON(oasSchema, documentBody, bentoValidatorKind)
 }
 
 // ValidateOASObject validates a Tyk Streams document against a particular OAS version.
 func ValidateOASObject(documentBody []byte, oasVersion string) error {
-	defaultBentoValidator := bentoValidators[bento.DefaultBentoConfigSchema]
-	return ValidateOASObjectWithBentoConfigValidator(documentBody, oasVersion, defaultBentoValidator)
+	return ValidateOASObjectWithBentoConfigValidator(documentBody, oasVersion, bento.DefaultValidator)
 }
 
 // ValidateOASTemplate checks a Tyk Streams OAS API template for necessary fields,
 // acknowledging that some standard Tyk OAS API fields are optional in templates.
 func ValidateOASTemplate(documentBody []byte, oasVersion string) error {
+	return ValidateOASTemplateWithBentoValidator(documentBody, oasVersion, bento.DefaultValidator)
+}
+
+func ValidateOASTemplateWithBentoValidator(documentBody []byte, oasVersion string, bentoValidatorKind bento.ValidatorKind) error {
 	oasSchema, err := GetOASSchema(oasVersion)
 	if err != nil {
 		return err
@@ -184,7 +210,7 @@ func ValidateOASTemplate(documentBody []byte, oasVersion string) error {
 		return err
 	}
 
-	return validateJSON(oasSchema, documentBody)
+	return validateJSON(oasSchema, documentBody, bentoValidatorKind)
 }
 
 // GetOASSchema returns an oas schema for a particular version.

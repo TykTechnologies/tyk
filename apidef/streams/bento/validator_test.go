@@ -7,7 +7,7 @@ import (
 )
 
 func TestValidateBentoConfiguration(t *testing.T) {
-	validator, err := NewDefaultBentoConfigValidator()
+	validator, err := NewDefaultConfigValidator()
 	require.NoError(t, err)
 
 	t.Run("Valid Bento Configuration", func(t *testing.T) {
