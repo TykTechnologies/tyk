@@ -206,7 +206,7 @@ func TestGetOASSchema(t *testing.T) {
 	})
 }
 
-func TestValidateTykStreamsOASObject_Validate_Bento_Configuration(t *testing.T) {
+func TestValidateTykStreams_BentoConfigValidation(t *testing.T) {
 	var document = []byte(`{
     "info": {
         "title": "",
@@ -247,7 +247,7 @@ func TestValidateTykStreamsOASObject_Validate_Bento_Configuration(t *testing.T) 
 	require.NoError(t, err)
 }
 
-func TestValidateTykStreamsOASObject_Validate_Bento_Configurations(t *testing.T) {
+func TestValidateTykStreams_BentoConfigValidation_Invalid_Config(t *testing.T) {
 	var document = []byte(`{
     "info": {
         "title": "",
@@ -286,4 +286,88 @@ func TestValidateTykStreamsOASObject_Validate_Bento_Configurations(t *testing.T)
 }`)
 	err := ValidateOASObject(document, "3.0.3")
 	require.ErrorContains(t, err, "test-kafka-stream: input.kafka.auto_replay_nacks: Invalid type. Expected: boolean, given: string")
+}
+
+func TestValidateTykStreams_BentoConfigValidation_Additional_Properties(t *testing.T) {
+	// Currently, we only support Kafka as input. The following document includes unsupported input & output methods,
+	// but it doesn't break the validation process.
+	var document = []byte(`{
+    "info": {
+        "title": "",
+        "version": ""
+    },
+    "openapi": "3.0.3",
+    "paths": {},
+    "x-tyk-streaming": {
+        "info": {
+            "name": "test-streams",
+            "state": {
+                "active": true
+            }
+        },
+        "server": {
+            "listenPath": {
+                "value": "/test-streams"
+            }
+        },
+        "streams": {
+            "test-kafka-stream": {
+                "input": {
+                    "label": "",
+                    "kafka": {
+                        "addresses": [],
+                        "topics": [],
+                        "target_version": "2.1.0",
+                        "consumer_group": "",
+                        "checkpoint_limit": 1024,
+                        "auto_replay_nacks": true
+                    }
+                }
+            },
+            "test-mongodb-stream": {
+                "input": {
+                    "label": "",
+                    "mongodb": {
+                        "url": "mongodb://localhost:27017",
+                        "database": "",
+                        "username": "",
+                        "password": "",
+                        "collection": "",
+                        "query": "  root.from = {\"$lte\": timestamp_unix()}\n  root.to = {\"$gte\": timestamp_unix()}\n",
+                        "auto_replay_nacks": true,
+                        "batch_size": 1000,
+                        "sort": {},
+                        "limit": 0
+                    }
+                },
+                "output": {
+                    "label": "",
+                    "redis_streams": {
+                        "url": "redis://:6397",
+                        "stream": "",
+                        "body_key": "body",
+                        "max_length": 0,
+                        "max_in_flight": 64,
+                        "metadata": {
+                            "exclude_prefixes": []
+                        },
+                        "batching": {
+                            "count": 0,
+                            "byte_size": 0,
+                            "period": "",
+                            "check": ""
+                        }
+                    }
+                }
+            },
+            "some-stream": {
+                "input": {
+                    "some-key": "some-value"
+                }
+            }
+        }
+    }
+}`)
+	err := ValidateOASObject(document, "3.0.3")
+	require.NoError(t, err)
 }
