@@ -44,7 +44,7 @@ func (t *TransformHeaders) ProcessRequest(w http.ResponseWriter, r *http.Request
 		// Add
 		for nKey, nVal := range vInfo.GlobalHeaders {
 			t.Logger().Debug("Adding: ", nKey)
-			setCustomHeader(r.Header, nKey, t.Gw.replaceTykVariables(r, nVal, false), ignoreCanonical)
+			setCustomHeader(r.Header, nKey, t.Gw.ReplaceTykVariables(r, nVal, false), ignoreCanonical)
 		}
 	}
 
@@ -56,7 +56,7 @@ func (t *TransformHeaders) ProcessRequest(w http.ResponseWriter, r *http.Request
 			r.Header.Del(dKey)
 		}
 		for nKey, nVal := range hmeta.AddHeaders {
-			setCustomHeader(r.Header, nKey, t.Gw.replaceTykVariables(r, nVal, false), ignoreCanonical)
+			setCustomHeader(r.Header, nKey, t.Gw.ReplaceTykVariables(r, nVal, false), ignoreCanonical)
 		}
 	}
 
