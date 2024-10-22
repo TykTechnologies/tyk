@@ -2027,28 +2027,23 @@ func TestQuotaResponseHeaders(t *testing.T) {
 
 func BenchmarkLargeResponsePayload(b *testing.B) {
 	ts := StartTest(func(_ *config.Config) {})
-	b.Cleanup(func() {
-		ts.Close()
-	})
+	b.Cleanup(ts.Close)
 
 	// Create a 500 MB payload of zeros
 	payloadSize := 500 * 1024 * 1024 // 500 MB in bytes
 	largePayload := bytes.Repeat([]byte("x"), payloadSize)
 
 	largePayloadHandler := func(w http.ResponseWriter, _ *http.Request) {
-
-		// Write the payload to the response writer
 		w.Header().Set("Content-Type", "application/octet-stream")
 		w.Header().Set("Content-Length", strconv.Itoa(payloadSize))
 		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write(largePayload)
+		_, err := w.Write(largePayload)
+		assert.NoError(b, err)
 	}
 
 	// Create a test server with the largePayloadHandler
 	testServer := httptest.NewServer(http.HandlerFunc(largePayloadHandler))
-	b.Cleanup(func() {
-		testServer.Close()
-	})
+	b.Cleanup(testServer.Close)
 
 	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 		spec.UseKeylessAccess = true
