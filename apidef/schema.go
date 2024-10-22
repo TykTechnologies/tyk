@@ -808,6 +808,33 @@ const Schema = `{
 								}	
 							}
 						},
+						"password_authentication": {
+						  "type": "object",
+						  "properties": {
+								"client_id": {
+								  "type": "string"
+								},
+								"client_secret": {
+								  "type": "string"
+								},
+								"enabled": {
+								  "type": "boolean"
+								},
+								"username": {
+								  "type": "string"
+								},
+								"password": {
+								  "type": "string"
+								},
+								"token_url": {
+								  "type": "string"
+								},
+								"scopes": {
+								  "type": ["array", "null"]
+								}
+							}
+						  }
+						},
 						"header_name": {
 							"type": "string"		
 						}

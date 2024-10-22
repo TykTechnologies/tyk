@@ -2035,7 +2035,7 @@
       ]
     },
     "X-Tyk-UpstreamOAuth": {
-      "type":"object",
+      "type": "object",
       "properties": {
         "enabled": {
           "type": "boolean"
@@ -2052,13 +2052,42 @@
             "tokenUrl": {
               "type": "string"
             },
-            "scopes":{
-              "type": ["array", "null"]
+            "scopes": {
+              "type": [
+                "array",
+                "null"
+              ]
             }
           }
         },
-        "headerName": {
-          "type": "string"
+        "passwordAuthentication": {
+          "type": "object",
+          "properties": {
+            "clientId": {
+              "type": "string"
+            },
+            "clientSecret": {
+              "type": "string"
+            },
+            "tokenUrl": {
+              "type": "string"
+            },
+            "scopes": {
+              "type": [
+                "array",
+                "null"
+              ]
+            },
+            "username": {
+              "type": "string"
+            },
+            "password": {
+              "type": "string"
+            }
+          },
+          "headerName": {
+            "type": "string"
+          }
         }
       }
     }

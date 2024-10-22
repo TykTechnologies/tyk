@@ -4,8 +4,6 @@ import (
 	"sort"
 	"strings"
 
-	"golang.org/x/oauth2"
-
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/internal/time"
 )
@@ -662,8 +660,6 @@ type PasswordAuthentication struct {
 	TokenURL string `bson:"tokenURL" json:"tokenURL"`
 	// Scopes specifies optional requested permissions.
 	Scopes []string `bson:"scopes" json:"scopes,omitempty"`
-
-	Token *oauth2.Token `bson:"-" json:"-"`
 }
 
 // ClientAuthData holds the client ID and secret for OAuth2 authentication.

@@ -61,7 +61,7 @@ func (cache *upstreamOAuthPasswordCache) getToken(r *http.Request, OAuthSpec *Up
 	}
 
 	if tokenString != "" {
-		decryptedToken := decrypt(getPaddedSecret(OAuthSpec.Gw), tokenString)
+		decryptedToken := decrypt(getPaddedSecret(OAuthSpec.Gw.GetConfig().Secret), tokenString)
 		return decryptedToken, nil
 	}
 
@@ -70,7 +70,7 @@ func (cache *upstreamOAuthPasswordCache) getToken(r *http.Request, OAuthSpec *Up
 		return "", err
 	}
 
-	encryptedToken := encrypt(getPaddedSecret(OAuthSpec.Gw), token.AccessToken)
+	encryptedToken := encrypt(getPaddedSecret(OAuthSpec.Gw.GetConfig().Secret), token.AccessToken)
 
 	ttl := time.Until(token.Expiry)
 	if err := setTokenInCache(cacheKey, encryptedToken, ttl, &cache.RedisCluster); err != nil {
@@ -253,7 +253,7 @@ func (cache *upstreamOAuthClientCredentialsCache) getToken(r *http.Request, OAut
 	}
 
 	if tokenString != "" {
-		decryptedToken := decrypt(getPaddedSecret(OAuthSpec.Gw), tokenString)
+		decryptedToken := decrypt(getPaddedSecret(OAuthSpec.Gw.GetConfig().Secret), tokenString)
 		return decryptedToken, nil
 	}
 
@@ -262,7 +262,7 @@ func (cache *upstreamOAuthClientCredentialsCache) getToken(r *http.Request, OAut
 		return "", err
 	}
 
-	encryptedToken := encrypt(getPaddedSecret(OAuthSpec.Gw), token.AccessToken)
+	encryptedToken := encrypt(getPaddedSecret(OAuthSpec.Gw.GetConfig().Secret), token.AccessToken)
 
 	ttl := time.Until(token.Expiry)
 	if err := setTokenInCache(cacheKey, encryptedToken, ttl, &cache.RedisCluster); err != nil {
