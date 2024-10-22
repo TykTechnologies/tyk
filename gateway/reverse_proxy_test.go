@@ -14,6 +14,7 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"reflect"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -2022,4 +2023,46 @@ func TestQuotaResponseHeaders(t *testing.T) {
 		assertQuota(t, ts, policyKey)
 	})
 
+}
+
+func BenchmarkLargeResponsePayload(b *testing.B) {
+	ts := StartTest(func(globalConf *config.Config) {})
+	b.Cleanup(func() {
+		ts.Close()
+	})
+
+	// Create a 500 MB payload of zeros
+	payloadSize := 500 * 1024 * 1024 // 500 MB in bytes
+	largePayload := bytes.Repeat([]byte("x"), payloadSize)
+
+	largePayloadHandler := func(w http.ResponseWriter, r *http.Request) {
+
+		// Write the payload to the response writer
+		w.Header().Set("Content-Type", "application/octet-stream")
+		w.Header().Set("Content-Length", strconv.Itoa(payloadSize))
+		w.WriteHeader(http.StatusOK)
+		w.Write(largePayload)
+	}
+
+	// Create a test server with the largePayloadHandler
+	testServer := httptest.NewServer(http.HandlerFunc(largePayloadHandler))
+	b.Cleanup(func() {
+		testServer.Close()
+	})
+
+	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		spec.UseKeylessAccess = true
+		spec.Proxy.ListenPath = "/"
+		spec.Proxy.TargetURL = testServer.URL
+	})
+
+	b.ReportAllocs()
+
+	for i := 0; i < b.N; i++ {
+		ts.Run(b, test.TestCase{
+			Method: http.MethodGet,
+			Path:   "/",
+			Code:   http.StatusOK,
+		})
+	}
 }
