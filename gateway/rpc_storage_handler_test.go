@@ -11,7 +11,6 @@ import (
 	"github.com/lonelycode/osin"
 	"github.com/stretchr/testify/assert"
 
-	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/header"
 	"github.com/TykTechnologies/tyk/internal/model"
@@ -298,21 +297,21 @@ func TestGetGroupLoginCallback(t *testing.T) {
 		syncEnabled              bool
 		givenKey                 string
 		givenGroup               string
-		expectedCallbackResponse apidef.GroupLoginRequest
+		expectedCallbackResponse model.GroupLoginRequest
 	}{
 		{
 			testName:                 "sync disabled",
 			syncEnabled:              false,
 			givenKey:                 "key",
 			givenGroup:               "group",
-			expectedCallbackResponse: apidef.GroupLoginRequest{UserKey: "key", GroupID: "group"},
+			expectedCallbackResponse: model.GroupLoginRequest{UserKey: "key", GroupID: "group"},
 		},
 		{
 			testName:                 "sync enabled",
 			syncEnabled:              true,
 			givenKey:                 "key",
 			givenGroup:               "group",
-			expectedCallbackResponse: apidef.GroupLoginRequest{UserKey: "key", GroupID: "group", ForceSync: true},
+			expectedCallbackResponse: model.GroupLoginRequest{UserKey: "key", GroupID: "group", ForceSync: true},
 		},
 	}
 
@@ -330,7 +329,7 @@ func TestGetGroupLoginCallback(t *testing.T) {
 				Gw:               ts.Gw,
 			}
 
-			expectedNodeInfo := apidef.NodeData{
+			expectedNodeInfo := model.NodeData{
 				NodeID:      ts.Gw.GetNodeID(),
 				GroupID:     "",
 				APIKey:      "",
@@ -338,7 +337,7 @@ func TestGetGroupLoginCallback(t *testing.T) {
 				Tags:        nil,
 				NodeVersion: VERSION,
 				Health:      ts.Gw.getHealthCheckInfo(),
-				Stats: apidef.GWStats{
+				Stats: model.GWStats{
 					APIsCount:     0,
 					PoliciesCount: 0,
 				},
@@ -355,7 +354,7 @@ func TestGetGroupLoginCallback(t *testing.T) {
 			tc.expectedCallbackResponse.Node = nodeData
 
 			fn := rpcListener.getGroupLoginCallback(tc.syncEnabled)
-			groupLogin, ok := fn(tc.givenKey, tc.givenGroup).(apidef.GroupLoginRequest)
+			groupLogin, ok := fn(tc.givenKey, tc.givenGroup).(model.GroupLoginRequest)
 			assert.True(t, ok)
 			assert.Equal(t, tc.expectedCallbackResponse, groupLogin)
 		})
@@ -367,7 +366,7 @@ func TestRPCStorageHandler_BuildNodeInfo(t *testing.T) {
 	tcs := []struct {
 		testName         string
 		givenTs          func() *Test
-		expectedNodeInfo apidef.NodeData
+		expectedNodeInfo model.NodeData
 	}{
 		{
 			testName: "base",
@@ -376,13 +375,13 @@ func TestRPCStorageHandler_BuildNodeInfo(t *testing.T) {
 				})
 				return ts
 			},
-			expectedNodeInfo: apidef.NodeData{
+			expectedNodeInfo: model.NodeData{
 				GroupID:     "",
 				APIKey:      "",
 				TTL:         10,
 				Tags:        nil,
 				NodeVersion: VERSION,
-				Stats: apidef.GWStats{
+				Stats: model.GWStats{
 					APIsCount:     0,
 					PoliciesCount: 0,
 				},
@@ -400,13 +399,13 @@ func TestRPCStorageHandler_BuildNodeInfo(t *testing.T) {
 
 				return ts
 			},
-			expectedNodeInfo: apidef.NodeData{
+			expectedNodeInfo: model.NodeData{
 				GroupID:     "group",
 				APIKey:      "apikey-test",
 				TTL:         1,
 				Tags:        []string{"tag1"},
 				NodeVersion: VERSION,
-				Stats: apidef.GWStats{
+				Stats: model.GWStats{
 					APIsCount:     0,
 					PoliciesCount: 0,
 				},
@@ -437,12 +436,12 @@ func TestRPCStorageHandler_BuildNodeInfo(t *testing.T) {
 				})
 				return ts
 			},
-			expectedNodeInfo: apidef.NodeData{
+			expectedNodeInfo: model.NodeData{
 				GroupID:     "group",
 				TTL:         1,
 				Tags:        []string{"tag1"},
 				NodeVersion: VERSION,
-				Stats: apidef.GWStats{
+				Stats: model.GWStats{
 					APIsCount:     1,
 					PoliciesCount: 1,
 				},
@@ -460,13 +459,13 @@ func TestRPCStorageHandler_BuildNodeInfo(t *testing.T) {
 				ts.Gw.SetNodeID("test-node-id")
 				return ts
 			},
-			expectedNodeInfo: apidef.NodeData{
+			expectedNodeInfo: model.NodeData{
 				NodeID:      "test-node-id",
 				GroupID:     "group",
 				TTL:         1,
 				Tags:        []string{"tag1", "tag2"},
 				NodeVersion: VERSION,
-				Stats: apidef.GWStats{
+				Stats: model.GWStats{
 					APIsCount:     0,
 					PoliciesCount: 0,
 				},
@@ -485,14 +484,14 @@ func TestRPCStorageHandler_BuildNodeInfo(t *testing.T) {
 				ts.Gw.SetNodeID("test-node-id")
 				return ts
 			},
-			expectedNodeInfo: apidef.NodeData{
+			expectedNodeInfo: model.NodeData{
 				NodeID:          "test-node-id",
 				GroupID:         "group",
 				TTL:             1,
 				Tags:            []string{"tag1", "tag2"},
 				NodeIsSegmented: true,
 				NodeVersion:     VERSION,
-				Stats: apidef.GWStats{
+				Stats: model.GWStats{
 					APIsCount:     0,
 					PoliciesCount: 0,
 				},

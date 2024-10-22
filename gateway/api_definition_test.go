@@ -21,6 +21,8 @@ import (
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/apidef/oas"
 	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/internal/model"
+	"github.com/TykTechnologies/tyk/internal/policy"
 	"github.com/TykTechnologies/tyk/rpc"
 	"github.com/TykTechnologies/tyk/test"
 	"github.com/TykTechnologies/tyk/user"
@@ -235,8 +237,8 @@ func TestGatewayTagsFilter(t *testing.T) {
 		}
 	}
 
-	data := &nestedApiDefinitionList{}
-	data.set([]*apidef.APIDefinition{
+	data := &model.MergedAPIList{}
+	data.SetClassic([]*apidef.APIDefinition{
 		newApiWithTags(false, []string{}),
 		newApiWithTags(true, []string{}),
 		newApiWithTags(true, []string{"a", "b", "c"}),
@@ -249,27 +251,27 @@ func TestGatewayTagsFilter(t *testing.T) {
 	// Test NodeIsSegmented=false
 	{
 		enabled := false
-		assert.Len(t, data.filter(enabled), 5)
-		assert.Len(t, data.filter(enabled, "a"), 5)
-		assert.Len(t, data.filter(enabled, "b"), 5)
-		assert.Len(t, data.filter(enabled, "c"), 5)
+		assert.Len(t, data.Filter(enabled), 5)
+		assert.Len(t, data.Filter(enabled, "a"), 5)
+		assert.Len(t, data.Filter(enabled, "b"), 5)
+		assert.Len(t, data.Filter(enabled, "c"), 5)
 	}
 
 	// Test NodeIsSegmented=true
 	{
 		enabled := true
-		assert.Len(t, data.filter(enabled), 0)
-		assert.Len(t, data.filter(enabled, "a"), 3)
-		assert.Len(t, data.filter(enabled, "b"), 2)
-		assert.Len(t, data.filter(enabled, "c"), 1)
+		assert.Len(t, data.Filter(enabled), 0)
+		assert.Len(t, data.Filter(enabled, "a"), 3)
+		assert.Len(t, data.Filter(enabled, "b"), 2)
+		assert.Len(t, data.Filter(enabled, "c"), 1)
 	}
 
 	// Test NodeIsSegmented=true, multiple gw tags
 	{
 		enabled := true
-		assert.Len(t, data.filter(enabled), 0)
-		assert.Len(t, data.filter(enabled, "a", "b"), 3)
-		assert.Len(t, data.filter(enabled, "b", "c"), 2)
+		assert.Len(t, data.Filter(enabled), 0)
+		assert.Len(t, data.Filter(enabled, "a", "b"), 3)
+		assert.Len(t, data.Filter(enabled, "b", "c"), 2)
 	}
 }
 
@@ -1448,9 +1450,9 @@ func Test_LoadAPIsFromRPC(t *testing.T) {
 	loader := APIDefinitionLoader{Gw: ts.Gw}
 
 	t.Run("load APIs from RPC - success", func(t *testing.T) {
-		mockedStorage := &RPCDataLoaderMock{
+		mockedStorage := &policy.RPCDataLoaderMock{
 			ShouldConnect: true,
-			Apis: []nestedApiDefinition{
+			Apis: []model.MergedAPI{
 				{APIDefinition: &apidef.APIDefinition{Id: objectID, OrgID: "org1", APIID: "api1"}},
 			},
 		}
@@ -1462,9 +1464,9 @@ func Test_LoadAPIsFromRPC(t *testing.T) {
 	})
 
 	t.Run("load APIs from RPC - success - then fail", func(t *testing.T) {
-		mockedStorage := &RPCDataLoaderMock{
+		mockedStorage := &policy.RPCDataLoaderMock{
 			ShouldConnect: true,
-			Apis: []nestedApiDefinition{
+			Apis: []model.MergedAPI{
 				{APIDefinition: &apidef.APIDefinition{Id: objectID, OrgID: "org1", APIID: "api1"}},
 			},
 		}

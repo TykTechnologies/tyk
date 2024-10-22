@@ -29,6 +29,9 @@ type Upstream struct {
 
 	// RateLimit contains the configuration related to API level rate limit.
 	RateLimit *RateLimit `bson:"rateLimit,omitempty" json:"rateLimit,omitempty"`
+
+	// Authentication contains the configuration related to upstream authentication.
+	Authentication *UpstreamAuth `bson:"authentication,omitempty" json:"authentication,omitempty"`
 }
 
 // Fill fills *Upstream from apidef.APIDefinition.
@@ -78,6 +81,15 @@ func (u *Upstream) Fill(api apidef.APIDefinition) {
 	u.RateLimit.Fill(api)
 	if ShouldOmit(u.RateLimit) {
 		u.RateLimit = nil
+	}
+
+	if u.Authentication == nil {
+		u.Authentication = &UpstreamAuth{}
+	}
+
+	u.Authentication.Fill(api.UpstreamAuth)
+	if ShouldOmit(u.Authentication) {
+		u.Authentication = nil
 	}
 }
 
@@ -129,6 +141,15 @@ func (u *Upstream) ExtractTo(api *apidef.APIDefinition) {
 	}
 
 	u.RateLimit.ExtractTo(api)
+
+	if u.Authentication == nil {
+		u.Authentication = &UpstreamAuth{}
+		defer func() {
+			u.Authentication = nil
+		}()
+	}
+
+	u.Authentication.ExtractTo(&api.UpstreamAuth)
 }
 
 // ServiceDiscovery holds configuration required for service discovery.
@@ -528,4 +549,150 @@ func (r *RateLimitEndpoint) ExtractTo(meta *apidef.RateLimitMeta) {
 	meta.Disabled = !r.Enabled
 	meta.Rate = float64(r.Rate)
 	meta.Per = r.Per.Seconds()
+}
+
+// UpstreamAuth holds the configurations related to upstream API authentication.
+type UpstreamAuth struct {
+	// Enabled enables upstream API authentication.
+	Enabled bool `bson:"enabled" json:"enabled"`
+	// BasicAuth holds the basic authentication configuration for upstream API authentication.
+	BasicAuth *UpstreamBasicAuth `bson:"basicAuth,omitempty" json:"basicAuth,omitempty"`
+	// OAuth contains the configuration for OAuth2 Client Credentials flow.
+	OAuth *UpstreamOAuth `bson:"oauth,omitempty" json:"oauth,omitempty"`
+}
+
+// Fill fills *UpstreamAuth from apidef.UpstreamAuth.
+func (u *UpstreamAuth) Fill(api apidef.UpstreamAuth) {
+	u.Enabled = api.Enabled
+
+	if u.BasicAuth == nil {
+		u.BasicAuth = &UpstreamBasicAuth{}
+	}
+	u.BasicAuth.Fill(api.BasicAuth)
+	if ShouldOmit(u.BasicAuth) {
+		u.BasicAuth = nil
+	}
+
+	if u.OAuth == nil {
+		u.OAuth = &UpstreamOAuth{}
+	}
+	u.OAuth.Fill(api.OAuth)
+	if ShouldOmit(u.OAuth) {
+		u.OAuth = nil
+	}
+}
+
+// ExtractTo extracts *UpstreamAuth into *apidef.UpstreamAuth.
+func (u *UpstreamAuth) ExtractTo(api *apidef.UpstreamAuth) {
+	api.Enabled = u.Enabled
+
+	if u.BasicAuth == nil {
+		u.BasicAuth = &UpstreamBasicAuth{}
+		defer func() {
+			u.BasicAuth = nil
+		}()
+	}
+	u.BasicAuth.ExtractTo(&api.BasicAuth)
+
+	if u.OAuth == nil {
+		u.OAuth = &UpstreamOAuth{}
+		defer func() {
+			u.OAuth = nil
+		}()
+	}
+	u.OAuth.ExtractTo(&api.OAuth)
+}
+
+// UpstreamBasicAuth holds upstream basic authentication configuration.
+type UpstreamBasicAuth struct {
+	// Enabled enables upstream basic authentication.
+	Enabled bool `bson:"enabled" json:"enabled"`
+	// HeaderName is the custom header name to be used for upstream basic authentication.
+	// Defaults to `Authorization`.
+	HeaderName string `bson:"headerName" json:"headerName"`
+	// Username is the username to be used for upstream basic authentication.
+	Username string `bson:"username" json:"username"`
+	// Password is the password to be used for upstream basic authentication.
+	Password string `bson:"password" json:"password"`
+}
+
+// Fill fills *UpstreamBasicAuth from apidef.UpstreamBasicAuth.
+func (u *UpstreamBasicAuth) Fill(api apidef.UpstreamBasicAuth) {
+	u.Enabled = api.Enabled
+	u.HeaderName = api.HeaderName
+	u.Username = api.Username
+	u.Password = api.Password
+}
+
+// ExtractTo extracts *UpstreamBasicAuth into *apidef.UpstreamBasicAuth.
+func (u *UpstreamBasicAuth) ExtractTo(api *apidef.UpstreamBasicAuth) {
+	api.Enabled = u.Enabled
+	api.Enabled = u.Enabled
+	api.HeaderName = u.HeaderName
+	api.Username = u.Username
+	api.Password = u.Password
+}
+
+// UpstreamOAuth holds the configuration for OAuth2 Client Credentials flow.
+type UpstreamOAuth struct {
+	// Enabled activates upstream OAuth2 authentication.
+	Enabled bool `bson:"enabled" json:"enabled"`
+	// ClientCredentials holds the configuration for OAuth2 Client Credentials flow.
+	ClientCredentials *ClientCredentials `bson:"clientCredentials,omitempty" json:"clientCredentials,omitempty"`
+	// HeaderName is the custom header name to be used for upstream basic authentication.
+	// Defaults to `Authorization`.
+	HeaderName string `bson:"headerName" json:"headerName"`
+}
+
+// ClientCredentials holds the configuration for OAuth2 Client Credentials flow.
+type ClientCredentials struct {
+	// ClientID is the application's ID.
+	ClientID string `bson:"clientID" json:"clientID"`
+	// ClientSecret is the application's secret.
+	ClientSecret string `bson:"clientSecret" json:"clientSecret"`
+	// TokenURL is the resource server's token endpoint
+	// URL. This is a constant specific to each server.
+	TokenURL string `bson:"tokenURL" json:"tokenURL"`
+	// Scopes specifies optional requested permissions.
+	Scopes []string `bson:"scopes,omitempty" json:"scopes,omitempty"`
+}
+
+func (c *ClientCredentials) Fill(api apidef.ClientCredentials) {
+	c.ClientID = api.ClientID
+	c.ClientSecret = api.ClientSecret
+	c.TokenURL = api.TokenURL
+	c.Scopes = api.Scopes
+}
+
+func (u *UpstreamOAuth) Fill(api apidef.UpstreamOAuth) {
+	u.Enabled = api.Enabled
+	u.HeaderName = api.HeaderName
+
+	if u.ClientCredentials == nil {
+		u.ClientCredentials = &ClientCredentials{}
+	}
+	u.ClientCredentials.Fill(api.ClientCredentials)
+	if ShouldOmit(u.ClientCredentials) {
+		u.ClientCredentials = nil
+	}
+}
+
+func (c *ClientCredentials) ExtractTo(api *apidef.ClientCredentials) {
+	api.ClientID = c.ClientID
+	api.ClientSecret = c.ClientSecret
+	api.TokenURL = c.TokenURL
+	api.Scopes = c.Scopes
+}
+
+func (u *UpstreamOAuth) ExtractTo(api *apidef.UpstreamOAuth) {
+	api.Enabled = u.Enabled
+	api.HeaderName = u.HeaderName
+
+	if u.ClientCredentials == nil {
+		u.ClientCredentials = &ClientCredentials{}
+		defer func() {
+			u.ClientCredentials = nil
+		}()
+	}
+	u.ClientCredentials.ExtractTo(&api.ClientCredentials)
 }

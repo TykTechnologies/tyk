@@ -49,7 +49,6 @@ var (
 	// UseSyncLoginRPC for tests where we dont need to execute as a goroutine
 	UseSyncLoginRPC bool
 
-	connectionDialingWG  sync.WaitGroup
 	AnalyticsSerializers []serializer.AnalyticsSerializer
 )
 
@@ -254,12 +253,8 @@ func Connect(connConfig Config, suppressRegister bool, dispatcherFuncs map[strin
 	clientSingleton.OnConnect = onConnectFunc
 
 	clientSingleton.Conns = values.Config().RPCPoolSize
-	if clientSingleton.Conns == 0 {
+	if clientSingleton.Conns <= 0 {
 		clientSingleton.Conns = 5
-	}
-
-	for i := 0; i < clientSingleton.Conns; i++ {
-		connectionDialingWG.Add(1)
 	}
 
 	clientSingleton.Dial = func(addr string) (conn net.Conn, err error) {
@@ -298,8 +293,6 @@ func Connect(connConfig Config, suppressRegister bool, dispatcherFuncs map[strin
 		conn.Write([]byte("proto2"))
 		conn.Write([]byte{byte(len(connID))})
 		conn.Write([]byte(connID))
-		// only mark as done is connection is established
-		connectionDialingWG.Done()
 
 		return conn, nil
 	}
@@ -311,9 +304,8 @@ func Connect(connConfig Config, suppressRegister bool, dispatcherFuncs map[strin
 	if funcClientSingleton == nil {
 		funcClientSingleton = dispatcher.NewFuncClient(clientSingleton)
 	}
-
 	// wait until all the pool connections are dialed so we can call login
-	connectionDialingWG.Wait()
+	clientSingleton.WaitForConnection()
 	handleLogin()
 	if !suppressRegister {
 		register()

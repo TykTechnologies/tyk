@@ -242,7 +242,7 @@ func (k *AuthKey) validateSignature(r *http.Request, key string) (error, int) {
 		return errors.New(errorMessage), errorCode
 	}
 
-	secret := k.Gw.replaceTykVariables(r, authConfig.Signature.Secret, false)
+	secret := k.Gw.ReplaceTykVariables(r, authConfig.Signature.Secret, false)
 
 	if secret == "" {
 		logger.Info("Request signature secret not found or empty")

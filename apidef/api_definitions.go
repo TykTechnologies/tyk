@@ -19,6 +19,8 @@ import (
 
 	"github.com/TykTechnologies/tyk/internal/reflect"
 
+	"golang.org/x/oauth2"
+
 	"github.com/TykTechnologies/graphql-go-tools/pkg/execution/datasource"
 
 	"github.com/TykTechnologies/gojsonschema"
@@ -762,6 +764,74 @@ type APIDefinition struct {
 	VersionName string `bson:"-" json:"-"`
 
 	DetailedTracing bool `bson:"detailed_tracing" json:"detailed_tracing"`
+
+	// UpstreamAuth stores information about authenticating against upstream.
+	UpstreamAuth UpstreamAuth `bson:"upstream_auth" json:"upstream_auth"`
+}
+
+// UpstreamAuth holds the configurations related to upstream API authentication.
+type UpstreamAuth struct {
+	// Enabled enables upstream API authentication.
+	Enabled bool `bson:"enabled" json:"enabled"`
+	// BasicAuth holds the basic authentication configuration for upstream API authentication.
+	BasicAuth UpstreamBasicAuth `bson:"basic_auth" json:"basic_auth"`
+	// OAuth holds the OAuth2 configuration for the upstream client credentials API authentication.
+	OAuth UpstreamOAuth `bson:"oauth" json:"oauth"`
+}
+
+// IsEnabled checks if UpstreamAuthentication is enabled for the API.
+func (u *UpstreamAuth) IsEnabled() bool {
+	return u.Enabled && (u.BasicAuth.Enabled || u.OAuth.Enabled)
+}
+
+// IsEnabled checks if UpstreamOAuth is enabled for the API.
+func (u UpstreamOAuth) IsEnabled() bool {
+	return u.Enabled
+}
+
+// UpstreamBasicAuth holds upstream basic authentication configuration.
+type UpstreamBasicAuth struct {
+	// Enabled enables upstream basic authentication.
+	Enabled bool `bson:"enabled" json:"enabled,omitempty"`
+	// Username is the username to be used for upstream basic authentication.
+	Username string `bson:"username" json:"username"`
+	// Password is the password to be used for upstream basic authentication.
+	Password string `bson:"password" json:"password"`
+	// HeaderName is the custom header name to be used for upstream basic authentication.
+	// Defaults to `Authorization`.
+	HeaderName string `bson:"header_name" json:"header_name"`
+}
+
+// UpstreamOAuth holds upstream OAuth2 authentication configuration.
+type UpstreamOAuth struct {
+	// Enabled enables upstream OAuth2 authentication.
+	Enabled bool `bson:"enabled" json:"enabled"`
+	// ClientCredentials holds the client credentials for upstream OAuth2 authentication.
+	ClientCredentials ClientCredentials `bson:"client_credentials" json:"client_credentials"`
+	// HeaderName is the custom header name to be used for upstream basic authentication.
+	// Defaults to `Authorization`.
+	HeaderName string `bson:"header_name" json:"header_name,omitempty"`
+}
+
+// ClientAuthData holds the client ID and secret for upstream OAuth2 authentication.
+type ClientAuthData struct {
+	// ClientID is the application's ID.
+	ClientID string `bson:"client_id" json:"client_id"`
+	// ClientSecret is the application's secret.
+	ClientSecret string `bson:"client_secret" json:"client_secret"`
+}
+
+// ClientCredentials holds the client credentials for upstream OAuth2 authentication.
+type ClientCredentials struct {
+	ClientAuthData
+	// TokenURL is the resource server's token endpoint
+	// URL. This is a constant specific to each server.
+	TokenURL string `bson:"token_url" json:"token_url"`
+	// Scopes specifies optional requested permissions.
+	Scopes []string `bson:"scopes" json:"scopes,omitempty"`
+
+	// TokenProvider is the OAuth2 token provider for internal use.
+	TokenProvider oauth2.TokenSource `bson:"-" json:"-"`
 }
 
 type AnalyticsPluginConfig struct {

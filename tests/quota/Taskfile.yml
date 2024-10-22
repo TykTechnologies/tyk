@@ -2,7 +2,9 @@
 version: "3"
 
 includes:
-  services: ../../docker/services/Taskfile.yml
+  services:
+    taskfile: ../../docker/services/Taskfile.yml
+    dir: ../../docker/services
 
 vars:
   coverage: quota.cov

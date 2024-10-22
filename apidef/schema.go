@@ -761,7 +761,60 @@ const Schema = `{
 		},
         "detailed_tracing": {
             "type": "boolean"
-        }
+        },
+		"upstream_auth": {
+			"type": "object",
+			"properties": {
+				"enabled": {
+					"type": "boolean"
+				},
+				"basic_auth": {
+					"type": "object",
+					"properties": {
+						"enabled": {
+							"type": "boolean"
+						},
+						"username": {
+							"type": "string"
+						},
+						"password": {
+							"type": "string"
+						},
+						"header_name": {
+							"type": "string"
+						}
+					}
+				},
+				"oauth": {
+					"type":"object",
+					"properties": {
+						"enabled": {
+							"type": "boolean"
+						},
+						"client_credentials": {
+							"type": "object",
+							"properties": {
+								"client_id": {
+									"type": "string"
+								},
+								"client_secret": {
+									"type": "string"
+								},
+								"token_url": {
+									"type": "string"
+								},
+								"scopes":{
+									"type": ["array", "null"]
+								}	
+							}
+						},
+						"header_name": {
+							"type": "string"		
+						}
+					}
+				}
+			}
+    	}
     },
     "required": [
         "name",
