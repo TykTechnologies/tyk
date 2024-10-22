@@ -8,9 +8,10 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/hashicorp/go-multierror"
+
 	"github.com/TykTechnologies/gojsonschema"
 	tykerrors "github.com/TykTechnologies/tyk/internal/errors"
-	"github.com/hashicorp/go-multierror"
 )
 
 type ConfigValidator interface {
