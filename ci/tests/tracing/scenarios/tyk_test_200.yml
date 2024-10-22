@@ -10,6 +10,8 @@ spec:
       headers:
       - key: Content-Type
         value: application/json
+  - key: User-Agent
+    value: Go-http-client/1.1
   specs:
   - selector: span[tracetest.span.type="http" name="GET /test/ip" http.method="GET"]
     name: Test main span attributes
