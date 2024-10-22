@@ -2043,6 +2043,9 @@
         "clientCredentials": {
           "type": "object",
           "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
             "clientId": {
               "type": "string"
             },
@@ -2063,6 +2066,9 @@
         "passwordAuthentication": {
           "type": "object",
           "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
             "clientId": {
               "type": "string"
             },

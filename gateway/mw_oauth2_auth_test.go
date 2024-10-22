@@ -46,6 +46,7 @@ func TestUpstreamOauth2(t *testing.T) {
 	defer t.Cleanup(func() { ts.Close() })
 
 	cfg := apidef.ClientCredentials{
+		Enabled: true,
 		ClientAuthData: apidef.ClientAuthData{
 			ClientID:     "CLIENT_ID",
 			ClientSecret: "CLIENT_SECRET",

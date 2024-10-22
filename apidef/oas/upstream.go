@@ -673,6 +673,8 @@ type ClientAuthData struct {
 // ClientCredentials holds the configuration for OAuth2 Client Credentials flow.
 type ClientCredentials struct {
 	ClientAuthData
+	// Enabled activates upstream OAuth2 client credentials authentication.
+	Enabled bool `bson:"enabled" json:"enabled"`
 	// TokenURL is the resource server's token endpoint
 	// URL. This is a constant specific to each server.
 	TokenURL string `bson:"tokenURL" json:"tokenURL"`
@@ -681,6 +683,7 @@ type ClientCredentials struct {
 }
 
 func (c *ClientCredentials) Fill(api apidef.ClientCredentials) {
+	c.Enabled = api.Enabled
 	c.ClientID = api.ClientID
 	c.ClientSecret = api.ClientSecret
 	c.TokenURL = api.TokenURL
@@ -717,6 +720,7 @@ func (u *UpstreamOAuth) Fill(api apidef.UpstreamOAuth) {
 }
 
 func (c *ClientCredentials) ExtractTo(api *apidef.ClientCredentials) {
+	api.Enabled = c.Enabled
 	api.ClientID = c.ClientID
 	api.ClientSecret = c.ClientSecret
 	api.TokenURL = c.TokenURL

@@ -794,6 +794,9 @@ const Schema = `{
 						"client_credentials": {
 							"type": "object",
 							"properties": {
+								"enabled": {
+									"type": "boolean"
+								},
 								"client_id": {
 									"type": "string"
 								},
@@ -811,14 +814,14 @@ const Schema = `{
 						"password_authentication": {
 						  "type": "object",
 						  "properties": {
+								"enabled": {
+								  "type": "boolean"
+								},
 								"client_id": {
 								  "type": "string"
 								},
 								"client_secret": {
 								  "type": "string"
-								},
-								"enabled": {
-								  "type": "boolean"
 								},
 								"username": {
 								  "type": "string"
