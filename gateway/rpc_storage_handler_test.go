@@ -692,31 +692,15 @@ func TestDeleteUsingTokenID(t *testing.T) {
 	})
 }
 
-func addFuncs(dispatcher *gorpc.Dispatcher) {
-	dispatcher.AddFunc("GetApiDefinitions", func(clientAddr string, dr *model.DefRequest) (string, error) {
-		// the first time called is when we start the slave gateway
-		return apiDefListTest, nil
-	})
-	dispatcher.AddFunc("Login", func(clientAddr, userKey string) bool {
-		return true
-	})
-	dispatcher.AddFunc("GetPolicies", func(orgId string) (string, error) {
-		return `[]`, nil
-	})
-}
 func TestCheckForReload(t *testing.T) {
+	dispatcher := gorpc.NewDispatcher()
+	rpcMock, connectionString := startRPCMock(dispatcher)
+	defer stopRPCMock(rpcMock)
 
 	t.Run("reload needed", func(t *testing.T) {
-		dispatcher := gorpc.NewDispatcher()
-
 		dispatcher.AddFunc("CheckReload", func(clientAddr string, orgId string) (bool, error) {
 			return true, nil
 		})
-
-		addFuncs(dispatcher)
-
-		rpcMock, connectionString := startRPCMock(dispatcher)
-		defer stopRPCMock(rpcMock)
 
 		ts := StartSlaveGw(connectionString, "")
 		defer ts.Close()
@@ -728,38 +712,11 @@ func TestCheckForReload(t *testing.T) {
 		assert.True(t, shouldReload)
 	})
 
-	t.Run("reload is false due to context cancellation", func(t *testing.T) {
-		dispatcher := gorpc.NewDispatcher()
-		addFuncs(dispatcher)
-		dispatcher.AddFunc("CheckReload", func(clientAddr string, orgId string) (bool, error) {
-			return false, nil
-		})
-
-		rpcMock, connectionString := startRPCMock(dispatcher)
-		defer stopRPCMock(rpcMock)
-
-		ts := StartSlaveGw(connectionString, "")
-		defer ts.Close()
-
-		store := RPCStorageHandler{Gw: ts.Gw}
-		store.Connect()
-
-		ts.cancel()
-
-		shouldReload := store.CheckForReload("test-org")
-		assert.False(t, shouldReload)
-	})
-
 	t.Run("checking forcer", func(t *testing.T) {
-		dispatcher := gorpc.NewDispatcher()
-		addFuncs(dispatcher)
 		dispatcher.AddFunc("CheckReload", func(clientAddr string, orgId string) (bool, error) {
 			fmt.Println("CheckReload executed")
 			return false, errors.New("Cannot decode response")
 		})
-
-		rpcMock, connectionString := startRPCMock(dispatcher)
-		defer stopRPCMock(rpcMock)
 
 		ts := StartSlaveGw(connectionString, "")
 		defer ts.Close()
@@ -775,5 +732,21 @@ func TestCheckForReload(t *testing.T) {
 
 		store.CheckForReload("test-org")
 		assert.True(t, forcer.GetIsFirstConnection())
+	})
+	t.Run("reload is false due to context cancellation", func(t *testing.T) {
+		dispatcher.AddFunc("CheckReload", func(clientAddr string, orgId string) (bool, error) {
+			return false, nil
+		})
+
+		ts := StartSlaveGw(connectionString, "")
+		defer ts.Close()
+
+		store := RPCStorageHandler{Gw: ts.Gw}
+		store.Connect()
+
+		ts.cancel()
+
+		shouldReload := store.CheckForReload("test-org")
+		assert.False(t, shouldReload)
 	})
 }
