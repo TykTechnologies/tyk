@@ -2035,7 +2035,7 @@
       ]
     },
     "X-Tyk-UpstreamOAuth": {
-      "type": "object",
+      "type":"object",
       "properties": {
         "enabled": {
           "type": "boolean"

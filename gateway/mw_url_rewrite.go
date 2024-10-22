@@ -205,12 +205,16 @@ func (gw *Gateway) urlRewrite(meta *apidef.URLRewriteMeta, r *http.Request) (str
 		ctxSetUrlRewritePath(r, meta.Path)
 	}
 
-	newpath = gw.replaceTykVariables(r, newpath, true)
+	newpath = gw.ReplaceTykVariables(r, newpath, true)
 
 	return newpath, nil
 }
 
-func (gw *Gateway) replaceTykVariables(r *http.Request, in string, escape bool) string {
+// ReplaceTykVariables implements a variable replacement hook. It will replace
+// the template `in`. If `escape` is true, the values get escaped as a query
+// parameter for a HTTP request would. If no replacement has been made, `in`
+// is returned without modification.
+func (gw *Gateway) ReplaceTykVariables(r *http.Request, in string, escape bool) string {
 
 	if strings.Contains(in, secretsConfLabel) {
 		contextData := ctxGetData(r)
