@@ -23,13 +23,17 @@ var (
 func NewSyncForcer(controller *storage.ConnectionHandler, getNodeDataFunc func() []byte) *SyncronizerForcer {
 	syncForcerOnce.Do(func() {
 		sf := &SyncronizerForcer{}
-		sf.getNodeDataFunc = getNodeDataFunc
 		sf.store = &storage.RedisCluster{KeyPrefix: "synchronizer-group-", ConnectionHandler: controller}
 		sf.store.Connect()
+		sf.getNodeDataFunc = getNodeDataFunc
 		sf.isFirstConnection = true
 
 		syncForcerInstance = sf
 	})
+
+	if syncForcerInstance != nil {
+		syncForcerInstance.getNodeDataFunc = getNodeDataFunc
+	}
 
 	return syncForcerInstance
 }
