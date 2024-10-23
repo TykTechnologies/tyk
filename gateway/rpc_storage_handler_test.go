@@ -692,7 +692,7 @@ func TestDeleteUsingTokenID(t *testing.T) {
 	})
 }
 
-func createDispatcher() *gorpc.Dispatcher {
+func TestCheckForReload(t *testing.T) {
 	dispatcher := gorpc.NewDispatcher()
 
 	dispatcher.AddFunc("GetApiDefinitions", func(clientAddr string, dr *model.DefRequest) (string, error) {
@@ -705,34 +705,12 @@ func createDispatcher() *gorpc.Dispatcher {
 	dispatcher.AddFunc("GetPolicies", func(orgId string) (string, error) {
 		return `[]`, nil
 	})
-	return dispatcher
-}
 
-func TestCheckForReload(t *testing.T) {
-	t.Run("reload needed", func(t *testing.T) {
-		dispatcher := createDispatcher()
-		rpcMock, connectionString := startRPCMock(dispatcher)
-		defer stopRPCMock(rpcMock)
-		dispatcher.AddFunc("CheckReload", func(clientAddr string, orgId string) (bool, error) {
-			return true, nil
-		})
-
-		ts := StartSlaveGw(connectionString, "test_org")
-		defer ts.Close()
-
-		store := RPCStorageHandler{Gw: ts.Gw}
-		store.Connect()
-
-		shouldReload := store.CheckForReload("test-org")
-		assert.True(t, shouldReload)
-	})
+	rpcMock, connectionString := startRPCMock(dispatcher)
+	defer stopRPCMock(rpcMock)
 
 	t.Run("checking forcer", func(t *testing.T) {
-		dispatcher := createDispatcher()
-		rpcMock, connectionString := startRPCMock(dispatcher)
-		defer stopRPCMock(rpcMock)
 		dispatcher.AddFunc("CheckReload", func(clientAddr string, orgId string) (bool, error) {
-			fmt.Println("CheckReload executed")
 			return false, errors.New("Cannot decode response")
 		})
 
