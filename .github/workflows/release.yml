@@ -348,6 +348,7 @@ jobs:
         run: |
           match_tag=${{steps.ecr.outputs.registry}}/tyk:$BASE_REF
           tags=(${{ needs.goreleaser.outputs.tags }})
+          echo "match_tag: ${{ match_tag }}, tags: ${{ tags }}"
           set -eaxo pipefail
           docker run -q --rm -v ~/.docker/config.json:/root/.docker/config.json tykio/gromit policy match ${tags[0]} ${match_tag} 2>versions.env
           echo '# alfa and beta have to come after the override
