@@ -641,8 +641,6 @@ type UpstreamOAuth struct {
 	ClientCredentials *ClientCredentials `bson:"clientCredentials,omitempty" json:"clientCredentials,omitempty"`
 	// PasswordAuthentication holds the configuration for upstream OAauth password authentication flow.
 	PasswordAuthentication *PasswordAuthentication `bson:"passwordAuthentication,omitempty" json:"passwordAuthentication,omitempty"`
-	// ExtraMetadata holds the keys that we want to extract from the token and pass to the upstream.
-	ExtraMetadata []string `bson:"extraMetadata" json:"extraMetadata,omitempty"`
 }
 
 // PasswordAuthentication holds the configuration for upstream OAuth2 password authentication flow.
@@ -662,6 +660,8 @@ type PasswordAuthentication struct {
 	// HeaderName is the custom header name to be used for OAuth password authentication flow.
 	// Defaults to `Authorization`.
 	HeaderName string `bson:"headerName" json:"headerName"`
+	// ExtraMetadata holds the keys that we want to extract from the token and pass to the upstream.
+	ExtraMetadata []string `bson:"extraMetadata" json:"extraMetadata,omitempty"`
 }
 
 // ClientAuthData holds the client ID and secret for OAuth2 authentication.
@@ -685,6 +685,8 @@ type ClientCredentials struct {
 	// HeaderName is the custom header name to be used for OAuth client credential flow authentication.
 	// Defaults to `Authorization`.
 	HeaderName string `bson:"headerName" json:"headerName"`
+	// ExtraMetadata holds the keys that we want to extract from the token and pass to the upstream.
+	ExtraMetadata []string `bson:"extraMetadata" json:"extraMetadata,omitempty"`
 }
 
 func (c *ClientCredentials) Fill(api apidef.ClientCredentials) {

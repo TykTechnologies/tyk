@@ -810,8 +810,6 @@ type UpstreamOAuth struct {
 	ClientCredentials ClientCredentials `bson:"client_credentials" json:"client_credentials"`
 	// PasswordAuthentication holds the configuration for upstream OAauth password authentication flow.
 	PasswordAuthentication PasswordAuthentication `bson:"password_authentication,omitempty" json:"passwordAuthentication,omitempty"`
-	// ExtraMetadata holds the keys that we want to extract from the token and pass to the upstream.
-	ExtraMetadata []string `bson:"extra_metadata" json:"extra_metadata,omitempty"`
 }
 
 // PasswordAuthentication holds the configuration for upstream OAuth2 password authentication flow.
@@ -831,6 +829,8 @@ type PasswordAuthentication struct {
 	// HeaderName is the custom header name to be used for OAuth password authentication flow.
 	// Defaults to `Authorization`.
 	HeaderName string `bson:"header_name" json:"header_name"`
+	// ExtraMetadata holds the keys that we want to extract from the token and pass to the upstream.
+	ExtraMetadata []string `bson:"extra_metadata" json:"extra_metadata,omitempty"`
 
 	// TokenProvider is the OAuth2 password authentication flow token for internal use.
 	Token *oauth2.Token `bson:"-" json:"-"`
@@ -857,6 +857,8 @@ type ClientCredentials struct {
 	// HeaderName is the custom header name to be used for OAuth client credential flow authentication.
 	// Defaults to `Authorization`.
 	HeaderName string `bson:"header_name" json:"header_name"`
+	// ExtraMetadata holds the keys that we want to extract from the token and pass to the upstream.
+	ExtraMetadata []string `bson:"extra_metadata" json:"extra_metadata,omitempty"`
 
 	// TokenProvider is the OAuth2 token provider for internal use.
 	TokenProvider oauth2.TokenSource `bson:"-" json:"-"`

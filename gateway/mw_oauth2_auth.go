@@ -72,7 +72,7 @@ func (cache *upstreamOAuthPasswordCache) getToken(r *http.Request, OAuthSpec *Up
 	}
 
 	encryptedToken := encrypt(getPaddedSecret(OAuthSpec.Gw.GetConfig().Secret), token.AccessToken)
-	setExtraMetadata(r, OAuthSpec, token)
+	setExtraMetadata(r, OAuthSpec.Spec.UpstreamAuth.OAuth.PasswordAuthentication.ExtraMetadata, token)
 
 	ttl := time.Until(token.Expiry)
 	if err := setTokenInCache(cacheKey, encryptedToken, ttl, &cache.RedisCluster); err != nil {
@@ -272,7 +272,7 @@ func (cache *upstreamOAuthClientCredentialsCache) getToken(r *http.Request, OAut
 	}
 
 	encryptedToken := encrypt(getPaddedSecret(OAuthSpec.Gw.GetConfig().Secret), token.AccessToken)
-	setExtraMetadata(r, OAuthSpec, token)
+	setExtraMetadata(r, OAuthSpec.Spec.UpstreamAuth.OAuth.ClientCredentials.ExtraMetadata, token)
 
 	ttl := time.Until(token.Expiry)
 	if err := setTokenInCache(cacheKey, encryptedToken, ttl, &cache.RedisCluster); err != nil {
@@ -282,10 +282,12 @@ func (cache *upstreamOAuthClientCredentialsCache) getToken(r *http.Request, OAut
 	return token.AccessToken, nil
 }
 
-func setExtraMetadata(r *http.Request, OAuthSpec *UpstreamOAuth, token *oauth2.Token) {
+func setExtraMetadata(r *http.Request, keyList []string, token *oauth2.Token) {
 	contextDataObject := ctxGetData(r)
-	//todo check this works
-	for _, key := range OAuthSpec.Spec.UpstreamAuth.OAuth.ExtraMetadata {
+	if contextDataObject == nil {
+		contextDataObject = make(map[string]interface{})
+	}
+	for _, key := range keyList {
 		val := token.Extra(key)
 		if val != "" {
 			contextDataObject[key] = val
