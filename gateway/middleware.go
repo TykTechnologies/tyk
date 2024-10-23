@@ -12,14 +12,6 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/TykTechnologies/tyk/internal/cache"
-	"github.com/TykTechnologies/tyk/internal/event"
-	"github.com/TykTechnologies/tyk/internal/otel"
-	"github.com/TykTechnologies/tyk/internal/policy"
-	"github.com/TykTechnologies/tyk/rpc"
-
-	"github.com/TykTechnologies/tyk/header"
-
 	"github.com/gocraft/health"
 	"github.com/justinas/alice"
 	newrelic "github.com/newrelic/go-agent"
@@ -28,14 +20,21 @@ import (
 	"golang.org/x/sync/singleflight"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/header"
+	"github.com/TykTechnologies/tyk/internal/cache"
+	"github.com/TykTechnologies/tyk/internal/event"
+	"github.com/TykTechnologies/tyk/internal/middleware"
+	"github.com/TykTechnologies/tyk/internal/otel"
+	"github.com/TykTechnologies/tyk/internal/policy"
 	"github.com/TykTechnologies/tyk/request"
+	"github.com/TykTechnologies/tyk/rpc"
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/trace"
 	"github.com/TykTechnologies/tyk/user"
 )
 
 const (
-	mwStatusRespond                = 666
+	mwStatusRespond                = middleware.StatusRespond
 	DEFAULT_ORG_SESSION_EXPIRATION = int64(604800)
 )
 
@@ -45,9 +44,10 @@ var (
 )
 
 type TykMiddleware interface {
-	Init()
 	Base() *BaseMiddleware
+	GetSpec() *APISpec
 
+	Init()
 	SetName(string)
 	SetRequestLogger(*http.Request)
 	Logger() *logrus.Entry
@@ -55,8 +55,6 @@ type TykMiddleware interface {
 	ProcessRequest(w http.ResponseWriter, r *http.Request, conf interface{}) (error, int) // Handles request
 	EnabledForSpec() bool
 	Name() string
-
-	GetSpec() *APISpec
 
 	Unload()
 }
@@ -530,6 +528,21 @@ func (t *BaseMiddleware) emitRateLimitEvent(r *http.Request, e event.Event, mess
 		Path:   r.URL.Path,
 		Origin: request.RealIP(r),
 		Key:    rateLimitKey,
+	})
+}
+
+// emitUpstreamOAuthEvent emits an upstream OAuth event with an optional custom message.
+func (t *BaseMiddleware) emitUpstreamOAuthEvent(r *http.Request, e event.Event, message string, apiId string) {
+	if message == "" {
+		message = event.String(e)
+	}
+
+	t.FireEvent(e, EventUpstreamOAuthMeta{
+		EventMetaDefault: EventMetaDefault{
+			Message:            message,
+			OriginatingRequest: EncodeRequestToEvent(r),
+		},
+		APIID: apiId,
 	})
 }
 

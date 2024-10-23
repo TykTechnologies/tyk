@@ -47,6 +47,7 @@ import (
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/header"
+	"github.com/TykTechnologies/tyk/internal/model"
 	"github.com/TykTechnologies/tyk/regexp"
 	"github.com/TykTechnologies/tyk/rpc"
 	"github.com/TykTechnologies/tyk/storage"
@@ -321,7 +322,7 @@ type APIDefinitionLoader struct {
 
 // MakeSpec will generate a flattened URLSpec from and APIDefinitions' VersionInfo data. paths are
 // keyed to the Api version name, which is determined during routing to speed up lookups
-func (a APIDefinitionLoader) MakeSpec(def *nestedApiDefinition, logger *logrus.Entry) (*APISpec, error) {
+func (a APIDefinitionLoader) MakeSpec(def *model.MergedAPI, logger *logrus.Entry) (*APISpec, error) {
 	spec := &APISpec{}
 	apiString, err := json.Marshal(def)
 	if err != nil {
@@ -454,52 +455,6 @@ func (a APIDefinitionLoader) MakeSpec(def *nestedApiDefinition, logger *logrus.E
 	return spec, nil
 }
 
-// nestedApiDefinitionList is the response body for FromDashboardService
-type nestedApiDefinitionList struct {
-	Message []nestedApiDefinition
-	Nonce   string
-}
-
-type nestedApiDefinition struct {
-	*apidef.APIDefinition `json:"api_definition,inline"`
-	OAS                   *oas.OAS `json:"oas"`
-}
-
-func (f *nestedApiDefinitionList) set(defs []*apidef.APIDefinition) {
-	for _, def := range defs {
-		f.Message = append(f.Message, nestedApiDefinition{APIDefinition: def})
-	}
-}
-
-func (f *nestedApiDefinitionList) filter(enabled bool, tags ...string) []nestedApiDefinition {
-	if !enabled {
-		return f.Message
-	}
-
-	if len(tags) == 0 {
-		return nil
-	}
-
-	tagMap := map[string]bool{}
-	for _, tag := range tags {
-		tagMap[tag] = true
-	}
-
-	result := make([]nestedApiDefinition, 0, len(f.Message))
-	for _, v := range f.Message {
-		if v.TagsDisabled {
-			continue
-		}
-		for _, tag := range v.Tags {
-			if ok := tagMap[tag]; ok {
-				result = append(result, nestedApiDefinition{v.APIDefinition, v.OAS})
-				break
-			}
-		}
-	}
-	return result
-}
-
 // FromDashboardService will connect and download ApiDefintions from a Tyk Dashboard instance.
 func (a APIDefinitionLoader) FromDashboardService(endpoint string) ([]*APISpec, error) {
 	// Get the definitions
@@ -539,7 +494,7 @@ func (a APIDefinitionLoader) FromDashboardService(endpoint string) ([]*APISpec, 
 	}
 
 	// Extract tagged APIs#
-	list := &nestedApiDefinitionList{}
+	list := model.NewMergedAPIList()
 	inBytes, err := io.ReadAll(resp.Body)
 	if err != nil {
 		log.Error("Couldn't read api definition list")
@@ -555,7 +510,7 @@ func (a APIDefinitionLoader) FromDashboardService(endpoint string) ([]*APISpec, 
 	}
 
 	// Extract tagged entries only
-	apiDefs := list.filter(gwConfig.DBAppConfOptions.NodeIsSegmented, gwConfig.DBAppConfOptions.Tags...)
+	apiDefs := list.Filter(gwConfig.DBAppConfOptions.NodeIsSegmented, gwConfig.DBAppConfOptions.Tags...)
 
 	// Process
 	specs := a.prepareSpecs(apiDefs, gwConfig, false)
@@ -697,27 +652,24 @@ func (a APIDefinitionLoader) FromRPC(store RPCDataLoader, orgId string, gw *Gate
 }
 
 func (a APIDefinitionLoader) processRPCDefinitions(apiCollection string, gw *Gateway) ([]*APISpec, error) {
-
-	var payload []nestedApiDefinition
+	var payload []model.MergedAPI
 	if err := json.Unmarshal([]byte(apiCollection), &payload); err != nil {
 		return nil, err
 	}
 
-	list := &nestedApiDefinitionList{
-		Message: payload,
-	}
+	list := model.NewMergedAPIList(payload...)
 
 	gwConfig := a.Gw.GetConfig()
 
 	// Extract tagged entries only
-	apiDefs := list.filter(gwConfig.DBAppConfOptions.NodeIsSegmented, gwConfig.DBAppConfOptions.Tags...)
+	apiDefs := list.Filter(gwConfig.DBAppConfOptions.NodeIsSegmented, gwConfig.DBAppConfOptions.Tags...)
 
 	specs := a.prepareSpecs(apiDefs, gwConfig, true)
 
 	return specs, nil
 }
 
-func (a APIDefinitionLoader) prepareSpecs(apiDefs []nestedApiDefinition, gwConfig config.Config, fromRPC bool) []*APISpec {
+func (a APIDefinitionLoader) prepareSpecs(apiDefs []model.MergedAPI, gwConfig config.Config, fromRPC bool) []*APISpec {
 	var specs []*APISpec
 
 	for _, def := range apiDefs {
@@ -805,7 +757,7 @@ func (a APIDefinitionLoader) loadDefFromFilePath(filePath string) (*APISpec, err
 		return nil, err
 	}
 
-	nestDef := nestedApiDefinition{APIDefinition: &def}
+	nestDef := model.MergedAPI{APIDefinition: &def}
 	if def.IsOAS {
 		loader := openapi3.NewLoader()
 		// use openapi3.ReadFromFile as ReadFromURIFunc since the default implementation cache spec based on file path.

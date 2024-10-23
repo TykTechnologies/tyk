@@ -10,10 +10,7 @@ import (
 	"github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
 
 	"github.com/TykTechnologies/tyk/apidef"
-	logger "github.com/TykTechnologies/tyk/log"
 )
-
-var log = logger.Get()
 
 type HashType string
 
