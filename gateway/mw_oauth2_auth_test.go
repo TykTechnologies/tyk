@@ -41,7 +41,7 @@ func TestUpstreamOauth2(t *testing.T) {
 			assert.Fail(t, "payload = %q; want %q", string(body), "grant_type=client_credentials&scope=scope1+scope2")
 		}
 		w.Header().Set("Content-Type", "application/x-www-form-urlencoded")
-		w.Write([]byte("access_token=90d64460d14870c08c81352a05dedd3465940a7c&token_type=bearer"))
+		w.Write([]byte("access_token=90d64460d14870c08c81352a05dedd3465940a7c&token_type=bearer&instance_url=https://tykxample.com"))
 	}))
 	defer t.Cleanup(func() { ts.Close() })
 
@@ -65,6 +65,7 @@ func TestUpstreamOauth2(t *testing.T) {
 					Enabled:           true,
 					ClientCredentials: cfg,
 					HeaderName:        "",
+					ExtraMetadata:     []string{"instance_url"},
 				},
 			}
 			spec.Proxy.StripListenPath = true
@@ -122,7 +123,7 @@ func TestPasswordCredentialsTokenRequest(t *testing.T) {
 			assert.Fail(t, "payload = %q; want %q", string(body), expected)
 		}
 		w.Header().Set("Content-Type", "application/x-www-form-urlencoded")
-		w.Write([]byte("access_token=90d64460d14870c08c81352a05dedd3465940a7c&scope=user&token_type=bearer"))
+		w.Write([]byte("access_token=90d64460d14870c08c81352a05dedd3465940a7c&scope=user&token_type=bearer&instance_url=https://tykxample.com"))
 	}))
 	defer t.Cleanup(func() { ts.Close() })
 
@@ -148,6 +149,7 @@ func TestPasswordCredentialsTokenRequest(t *testing.T) {
 					Enabled:                true,
 					PasswordAuthentication: cfg,
 					HeaderName:             "",
+					ExtraMetadata:          []string{"instance_url"},
 				},
 			}
 			spec.Proxy.StripListenPath = true

@@ -813,6 +813,8 @@ type UpstreamOAuth struct {
 	// HeaderName is the custom header name to be used for upstream basic authentication.
 	// Defaults to `Authorization`.
 	HeaderName string `bson:"header_name" json:"header_name,omitempty"`
+	// ExtraMetadata holds the keys that we want to extract from the token and pass to the upstream.
+	ExtraMetadata []string `bson:"extra_metadata" json:"extra_metadata,omitempty"`
 }
 
 // PasswordAuthentication holds the configuration for upstream OAuth2 password authentication flow.
