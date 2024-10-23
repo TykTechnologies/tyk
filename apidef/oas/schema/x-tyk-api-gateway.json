@@ -2060,6 +2060,9 @@
                 "array",
                 "null"
               ]
+            },
+            "headerName": {
+              "type": "string"
             }
           }
         },
@@ -2089,10 +2092,10 @@
             },
             "password": {
               "type": "string"
+            },
+            "headerName": {
+              "type": "string"
             }
-          },
-          "headerName": {
-            "type": "string"
           }
         }
       }
