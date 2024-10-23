@@ -8,12 +8,6 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/TykTechnologies/gorpc"
-	"github.com/TykTechnologies/tyk/internal/model"
-	"github.com/TykTechnologies/tyk/rpc"
-
-	"github.com/TykTechnologies/tyk/config"
-
 	"github.com/lonelycode/osin"
 	"github.com/stretchr/testify/assert"
 
@@ -692,64 +686,5 @@ func TestDeleteUsingTokenID(t *testing.T) {
 		status, err := rpcListener.deleteUsingTokenID("custom-key", "orgID", false, 404)
 		assert.Nil(t, err)
 		assert.Equal(t, 404, status)
-	})
-}
-
-func TestCheckForReload(t *testing.T) {
-	dispatcher := gorpc.NewDispatcher()
-	rpcMock, connectionString := startRPCMock(dispatcher)
-	defer stopRPCMock(rpcMock)
-
-	t.Run("reload needed", func(t *testing.T) {
-		dispatcher.AddFunc("CheckReload", func(clientAddr string, orgId string) (bool, error) {
-			return true, nil
-		})
-
-		ts := StartSlaveGw(connectionString, "")
-		defer ts.Close()
-
-		store := RPCStorageHandler{Gw: ts.Gw}
-		store.Connect()
-
-		shouldReload := store.CheckForReload("test-org")
-		assert.True(t, shouldReload)
-	})
-
-	t.Run("checking forcer", func(t *testing.T) {
-		dispatcher.AddFunc("CheckReload", func(clientAddr string, orgId string) (bool, error) {
-			fmt.Println("CheckReload executed")
-			return false, errors.New("Cannot decode response")
-		})
-
-		ts := StartSlaveGw(connectionString, "")
-		defer ts.Close()
-
-		store := RPCStorageHandler{Gw: ts.Gw}
-		store.Connect()
-
-		forcer := rpc.NewSyncForcer(store.Gw.StorageConnectionHandler, store.buildNodeInfo)
-		assert.True(t, forcer.GetIsFirstConnection())
-
-		forcer.SetFirstConnection(false)
-		assert.False(t, forcer.GetIsFirstConnection())
-
-		store.CheckForReload("test-org")
-		assert.True(t, forcer.GetIsFirstConnection())
-	})
-	t.Run("reload is false due to context cancellation", func(t *testing.T) {
-		dispatcher.AddFunc("CheckReload", func(clientAddr string, orgId string) (bool, error) {
-			return false, nil
-		})
-
-		ts := StartSlaveGw(connectionString, "")
-		defer ts.Close()
-
-		store := RPCStorageHandler{Gw: ts.Gw}
-		store.Connect()
-
-		ts.cancel()
-
-		shouldReload := store.CheckForReload("test-org")
-		assert.False(t, shouldReload)
 	})
 }

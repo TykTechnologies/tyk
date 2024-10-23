@@ -1053,7 +1053,6 @@ func (s *Test) start(genConf func(globalConf *config.Config)) *Gateway {
 	gw.setupPortsWhitelist()
 	gw.startServer()
 	gw.setupGlobals()
-	gw.ctx = ctx
 
 	// Set up a default org manager so we can traverse non-live paths
 	if !gw.GetConfig().SupressDefaultOrgStore {
