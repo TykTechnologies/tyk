@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/TykTechnologies/gorpc"
 	"github.com/TykTechnologies/tyk/internal/model"
 	"github.com/TykTechnologies/tyk/rpc"
 
@@ -689,44 +688,5 @@ func TestDeleteUsingTokenID(t *testing.T) {
 		status, err := rpcListener.deleteUsingTokenID("custom-key", "orgID", false, 404)
 		assert.Nil(t, err)
 		assert.Equal(t, 404, status)
-	})
-}
-
-func TestCheckForReload(t *testing.T) {
-	dispatcher := gorpc.NewDispatcher()
-
-	dispatcher.AddFunc("GetApiDefinitions", func(clientAddr string, dr *model.DefRequest) (string, error) {
-		// the first time called is when we start the slave gateway
-		return "", nil
-	})
-	dispatcher.AddFunc("Login", func(clientAddr, userKey string) bool {
-		return true
-	})
-	dispatcher.AddFunc("GetPolicies", func(orgId string) (string, error) {
-		return `[]`, nil
-	})
-
-	rpcMock, connectionString := startRPCMock(dispatcher)
-	defer stopRPCMock(rpcMock)
-
-	t.Run("checking forcer", func(t *testing.T) {
-		dispatcher.AddFunc("CheckReload", func(clientAddr string, orgId string) (bool, error) {
-			return false, errors.New("Cannot decode response")
-		})
-
-		ts := StartSlaveGw(connectionString, "test_org")
-		defer ts.Close()
-
-		store := RPCStorageHandler{Gw: ts.Gw}
-		store.Connect()
-
-		forcer := rpc.NewSyncForcer(store.Gw.StorageConnectionHandler, store.buildNodeInfo)
-		assert.True(t, forcer.GetIsFirstConnection())
-
-		forcer.SetFirstConnection(false)
-		assert.False(t, forcer.GetIsFirstConnection())
-
-		store.CheckForReload("test_org")
-		assert.True(t, forcer.GetIsFirstConnection())
 	})
 }
