@@ -797,9 +797,31 @@ type UpstreamBasicAuth struct {
 	Username string `bson:"username" json:"username"`
 	// Password is the password to be used for upstream basic authentication.
 	Password string `bson:"password" json:"password"`
-	// HeaderName is the custom header name to be used for upstream basic authentication.
+	// Header holds the configuration for custom header name to be used for upstream basic authentication.
 	// Defaults to `Authorization`.
-	HeaderName string `bson:"header_name" json:"header_name"`
+	Header AuthSource `bson:"header" json:"header"`
+}
+
+// AuthSource is a common type to be used for auth configurations.
+type AuthSource struct {
+	// Enabled enables the auth source.
+	Enabled bool `bson:"enabled" json:"enabled"`
+	// Name specifies the key to be used in the auth source.
+	Name string `bson:"name" json:"name"`
+}
+
+// IsEnabled returns the enabled status of the auth source.
+func (a AuthSource) IsEnabled() bool {
+	return a.Enabled
+}
+
+// AuthKeyName returns the key name to be used for the auth source.
+func (a AuthSource) AuthKeyName() string {
+	if !a.IsEnabled() {
+		return ""
+	}
+
+	return a.Name
 }
 
 // UpstreamOAuth holds upstream OAuth2 authentication configuration.
