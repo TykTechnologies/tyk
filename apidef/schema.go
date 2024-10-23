@@ -808,7 +808,10 @@ const Schema = `{
 								},
 								"scopes":{
 									"type": ["array", "null"]
-								}	
+								},
+								"header_name": {
+									"type": "string"
+								}
 							}
 						},
 						"password_authentication": {
@@ -834,12 +837,12 @@ const Schema = `{
 								},
 								"scopes": {
 								  "type": ["array", "null"]
+								},
+								"header_name": {
+								  "type": "string"
 								}
 							}
 						  }
-						},
-						"header_name": {
-							"type": "string"		
 						}
 					}
 				}

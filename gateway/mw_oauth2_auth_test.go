@@ -51,8 +51,9 @@ func TestUpstreamOauth2(t *testing.T) {
 			ClientID:     "CLIENT_ID",
 			ClientSecret: "CLIENT_SECRET",
 		},
-		TokenURL: ts.URL + "/token",
-		Scopes:   []string{"scope1", "scope2"},
+		TokenURL:   ts.URL + "/token",
+		Scopes:     []string{"scope1", "scope2"},
+		HeaderName: "",
 	}
 
 	tst.Gw.BuildAndLoadAPI(
@@ -64,7 +65,6 @@ func TestUpstreamOauth2(t *testing.T) {
 				OAuth: apidef.UpstreamOAuth{
 					Enabled:           true,
 					ClientCredentials: cfg,
-					HeaderName:        "",
 					ExtraMetadata:     []string{"instance_url"},
 				},
 			}
@@ -133,10 +133,11 @@ func TestPasswordCredentialsTokenRequest(t *testing.T) {
 			ClientID:     "CLIENT_ID",
 			ClientSecret: "CLIENT_SECRET",
 		},
-		Username: "user1",
-		Password: "password1",
-		TokenURL: ts.URL + "/token",
-		Scopes:   []string{"scope1", "scope2"},
+		Username:   "user1",
+		Password:   "password1",
+		TokenURL:   ts.URL + "/token",
+		Scopes:     []string{"scope1", "scope2"},
+		HeaderName: "",
 	}
 
 	tst.Gw.BuildAndLoadAPI(
@@ -148,7 +149,6 @@ func TestPasswordCredentialsTokenRequest(t *testing.T) {
 				OAuth: apidef.UpstreamOAuth{
 					Enabled:                true,
 					PasswordAuthentication: cfg,
-					HeaderName:             "",
 					ExtraMetadata:          []string{"instance_url"},
 				},
 			}

@@ -28,6 +28,7 @@ const (
 type OAuthHeaderProvider interface {
 	// getOAuthToken returns the OAuth token for the request.
 	getOAuthToken(r *http.Request, OAuthSpec *UpstreamOAuth) (string, error)
+	getHeaderName(OAuthSpec *UpstreamOAuth) string
 }
 
 type ClientCredentialsOAuthProvider struct{}
@@ -131,10 +132,6 @@ func (OAuthSpec *UpstreamOAuth) ProcessRequest(_ http.ResponseWriter, r *http.Re
 		HeaderName: header.Authorization,
 	}
 
-	if oauthConfig.HeaderName != "" {
-		upstreamOAuthProvider.HeaderName = oauthConfig.HeaderName
-	}
-
 	provider, err := getOAuthHeaderProvider(oauthConfig)
 	if err != nil {
 		return fmt.Errorf("failed to get OAuth header provider: %w", err), http.StatusInternalServerError
@@ -146,6 +143,10 @@ func (OAuthSpec *UpstreamOAuth) ProcessRequest(_ http.ResponseWriter, r *http.Re
 	}
 
 	upstreamOAuthProvider.AuthValue = payload
+	headerName := provider.getHeaderName(OAuthSpec)
+	if headerName != "" {
+		upstreamOAuthProvider.HeaderName = headerName
+	}
 
 	httputil.SetUpstreamAuth(r, upstreamOAuthProvider)
 	return nil, http.StatusOK
@@ -205,6 +206,10 @@ func (p *ClientCredentialsOAuthProvider) getOAuthToken(r *http.Request, OAuthSpe
 	return fmt.Sprintf("Bearer %s", token), nil
 }
 
+func (p *ClientCredentialsOAuthProvider) getHeaderName(OAuthSpec *UpstreamOAuth) string {
+	return OAuthSpec.Spec.UpstreamAuth.OAuth.ClientCredentials.HeaderName
+}
+
 func (p *PasswordOAuthProvider) getOAuthToken(r *http.Request, OAuthSpec *UpstreamOAuth) (string, error) {
 	if OAuthSpec.Gw.UpstreamOAuthCache == nil {
 		OAuthSpec.Gw.UpstreamOAuthCache = newUpstreamOAuthPasswordCache(OAuthSpec.Gw.StorageConnectionHandler)
@@ -216,7 +221,10 @@ func (p *PasswordOAuthProvider) getOAuthToken(r *http.Request, OAuthSpec *Upstre
 	}
 
 	return fmt.Sprintf("Bearer %s", token), nil
+}
 
+func (p *PasswordOAuthProvider) getHeaderName(OAuthSpec *UpstreamOAuth) string {
+	return OAuthSpec.Spec.UpstreamAuth.OAuth.PasswordAuthentication.HeaderName
 }
 
 func generatePasswordOAuthCacheKey(config apidef.UpstreamOAuth, apiId string) string {
