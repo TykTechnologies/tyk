@@ -8,13 +8,16 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/TykTechnologies/gorpc"
+	"github.com/TykTechnologies/tyk/internal/model"
+	"github.com/TykTechnologies/tyk/rpc"
+
+	"github.com/TykTechnologies/tyk/config"
+
 	"github.com/lonelycode/osin"
 	"github.com/stretchr/testify/assert"
 
-	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/header"
-	"github.com/TykTechnologies/tyk/internal/model"
-	"github.com/TykTechnologies/tyk/rpc"
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/test"
 	"github.com/TykTechnologies/tyk/user"
@@ -686,5 +689,66 @@ func TestDeleteUsingTokenID(t *testing.T) {
 		status, err := rpcListener.deleteUsingTokenID("custom-key", "orgID", false, 404)
 		assert.Nil(t, err)
 		assert.Equal(t, 404, status)
+	})
+}
+
+func createDispatcher() *gorpc.Dispatcher {
+	dispatcher := gorpc.NewDispatcher()
+
+	dispatcher.AddFunc("GetApiDefinitions", func(clientAddr string, dr *model.DefRequest) (string, error) {
+		// the first time called is when we start the slave gateway
+		return "", nil
+	})
+	dispatcher.AddFunc("Login", func(clientAddr, userKey string) bool {
+		return true
+	})
+	dispatcher.AddFunc("GetPolicies", func(orgId string) (string, error) {
+		return `[]`, nil
+	})
+	return dispatcher
+}
+
+func TestCheckForReload(t *testing.T) {
+	t.Run("reload needed", func(t *testing.T) {
+		dispatcher := createDispatcher()
+		rpcMock, connectionString := startRPCMock(dispatcher)
+		defer stopRPCMock(rpcMock)
+		dispatcher.AddFunc("CheckReload", func(clientAddr string, orgId string) (bool, error) {
+			return true, nil
+		})
+
+		ts := StartSlaveGw(connectionString, "test_org")
+		defer ts.Close()
+
+		store := RPCStorageHandler{Gw: ts.Gw}
+		store.Connect()
+
+		shouldReload := store.CheckForReload("test-org")
+		assert.True(t, shouldReload)
+	})
+
+	t.Run("checking forcer", func(t *testing.T) {
+		dispatcher := createDispatcher()
+		rpcMock, connectionString := startRPCMock(dispatcher)
+		defer stopRPCMock(rpcMock)
+		dispatcher.AddFunc("CheckReload", func(clientAddr string, orgId string) (bool, error) {
+			fmt.Println("CheckReload executed")
+			return false, errors.New("Cannot decode response")
+		})
+
+		ts := StartSlaveGw(connectionString, "test_org")
+		defer ts.Close()
+
+		store := RPCStorageHandler{Gw: ts.Gw}
+		store.Connect()
+
+		forcer := rpc.NewSyncForcer(store.Gw.StorageConnectionHandler, store.buildNodeInfo)
+		assert.True(t, forcer.GetIsFirstConnection())
+
+		forcer.SetFirstConnection(false)
+		assert.False(t, forcer.GetIsFirstConnection())
+
+		store.CheckForReload("test_org")
+		assert.True(t, forcer.GetIsFirstConnection())
 	})
 }
