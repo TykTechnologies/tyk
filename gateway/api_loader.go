@@ -1052,3 +1052,54 @@ func (gw *Gateway) allApisAreMTLS() bool {
 
 	return true
 }
+
+func (gw *Gateway) handleMultiAuthSetup(spec *APISpec) []alice.Constructor {
+    var authHandlers []AuthenticationHandler
+    
+    // Get authentication config from OAS
+    auth := spec.OAS.GetTykExtension().Server.Authentication
+    if auth == nil {
+        return nil
+    }
+    
+    // Create handlers for each security requirement
+    for _, securityReq := range spec.OAS.Security {
+        for name, scopes := range securityReq {
+            handler := gw.createAuthHandler(name, scopes, spec)
+            if handler != nil {
+                authHandlers = append(authHandlers, handler)
+            }
+        }
+    }
+    
+    if len(authHandlers) == 0 {
+        return nil
+    }
+    
+    // Create the multi-auth middleware
+    multiAuth := &MultiAuthMiddleware{
+        BaseMiddleware: &BaseMiddleware{Spec: spec, Gw: gw},
+        handlers:      authHandlers,
+    }
+    
+    return []alice.Constructor{gw.createMiddleware(multiAuth)}
+}
+
+func (gw *Gateway) createAuthHandler(name string, scopes []string, spec *APISpec) AuthenticationHandler {
+    scheme := spec.OAS.Components.SecuritySchemes[name]
+    if scheme == nil {
+        return nil
+    }
+    
+    switch {
+    case scheme.Value.Type == "http" && scheme.Value.Scheme == "bearer" && scheme.Value.BearerFormat == "JWT":
+        return &JWTMiddleware{BaseMiddleware: &BaseMiddleware{Spec: spec, Gw: gw}}
+    case scheme.Value.Type == "http" && scheme.Value.Scheme == "basic":
+        return &BasicAuthKeyIsValid{BaseMiddleware: &BaseMiddleware{Spec: spec, Gw: gw}}
+    case scheme.Value.Type == "oauth2":
+        return &Oauth2KeyExists{BaseMiddleware: &BaseMiddleware{Spec: spec, Gw: gw}}
+    // ... add other auth types as needed
+    }
+    
+    return nil
+}

@@ -1740,6 +1740,11 @@ func getSampleOASAPI() oas.OAS {
 				Version: "1",
 			},
 			Paths: make(openapi3.Paths),
+			Security: []openapi3.SecurityRequirement{
+				{
+					"jwt": []string{},
+				},
+			},
 		}}
 
 	oasAPI.SetTykExtension(tykExtension)

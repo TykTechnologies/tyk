@@ -57,6 +57,29 @@ type Authentication struct {
 
 	// SecuritySchemes contains security schemes definitions.
 	SecuritySchemes SecuritySchemes `bson:"securitySchemes,omitempty" json:"securitySchemes,omitempty"`
+
+	// MultiSchemeEnabled indicates if multiple authentication schemes should be processed in OR fashion
+    MultiSchemeEnabled bool `bson:"multiSchemeEnabled,omitempty" json:"multiSchemeEnabled,omitempty"`
+    
+    // AuthenticationStrategies defines how multiple auth schemes should be combined
+    // Values: "any" (OR), "all" (AND) - default is "any"
+    Strategy string `bson:"strategy,omitempty" json:"strategy,omitempty"`
+}
+
+const (
+    AuthStrategyAny = "any"  // OR logic
+    AuthStrategyAll = "all"  // AND logic
+)
+
+// ValidateStrategy ensures the strategy is valid
+func (a *Authentication) ValidateStrategy() {
+    if a.Strategy == "" {
+        a.Strategy = AuthStrategyAny
+    }
+    
+    if a.Strategy != AuthStrategyAny && a.Strategy != AuthStrategyAll {
+        a.Strategy = AuthStrategyAny
+    }
 }
 
 // Fill fills *Authentication from apidef.APIDefinition.

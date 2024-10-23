@@ -167,6 +167,8 @@ func (s *OAS) importAuthentication(enable bool) error {
 	}
 
 	authentication.Enabled = enable
+    authentication.MultiSchemeEnabled = len(s.Security) > 1
+    authentication.ValidateStrategy()
 
 	tykSecuritySchemes := authentication.SecuritySchemes
 	if tykSecuritySchemes == nil {
@@ -174,15 +176,16 @@ func (s *OAS) importAuthentication(enable bool) error {
 		authentication.SecuritySchemes = tykSecuritySchemes
 	}
 
-	for name := range securityReq {
-		securityScheme := s.Components.SecuritySchemes[name]
-		err := tykSecuritySchemes.Import(name, securityScheme.Value, enable)
-		if err != nil {
-			log.WithError(err).Errorf("Error while importing security scheme: %s", name)
-		}
-	}
-
-	authentication.BaseIdentityProvider = tykSecuritySchemes.GetBaseIdentityProvider()
+    // Import all security schemes
+    for _, securityReq := range s.Security {
+		for name := range securityReq {
+            securityScheme := s.Components.SecuritySchemes[name]
+            err := tykSecuritySchemes.Import(name, securityScheme.Value, enable)
+            if err != nil {
+                log.WithError(err).Errorf("Error while importing security scheme: %s", name)
+            }
+        }
+    }
 
 	return nil
 }
