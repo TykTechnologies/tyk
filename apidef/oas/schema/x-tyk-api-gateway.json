@@ -2063,6 +2063,9 @@
             },
             "headerName": {
               "type": "string"
+            },
+            "extra_metadata": {
+              "type": "array"
             }
           }
         },
@@ -2095,6 +2098,9 @@
             },
             "headerName": {
               "type": "string"
+            },
+            "extra_metadata": {
+              "type": "array"
             }
           }
         }

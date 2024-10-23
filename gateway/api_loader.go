@@ -436,6 +436,9 @@ func (gw *Gateway) processSpec(spec *APISpec, apisByListen map[string]int,
 		gw.mwAppendEnabled(&chainArray, &GraphQLGranularAccessMiddleware{BaseMiddleware: baseMid})
 	}
 
+	gw.mwAppendEnabled(&chainArray, &UpstreamBasicAuth{BaseMiddleware: baseMid})
+	gw.mwAppendEnabled(&chainArray, &UpstreamOAuth{BaseMiddleware: baseMid})
+
 	gw.mwAppendEnabled(&chainArray, &ValidateJSON{BaseMiddleware: baseMid})
 	gw.mwAppendEnabled(&chainArray, &ValidateRequest{BaseMiddleware: baseMid})
 	gw.mwAppendEnabled(&chainArray, &PersistGraphQLOperationMiddleware{BaseMiddleware: baseMid})
@@ -470,10 +473,6 @@ func (gw *Gateway) processSpec(spec *APISpec, apisByListen map[string]int,
 			chainArray = append(chainArray, gw.createDynamicMiddleware(obj.Name, false, obj.RequireSession, baseMid))
 		}
 	}
-
-	gw.mwAppendEnabled(&chainArray, &UpstreamBasicAuth{BaseMiddleware: baseMid})
-	gw.mwAppendEnabled(&chainArray, &UpstreamOAuth{BaseMiddleware: baseMid})
-
 	chain = alice.New(chainArray...).Then(&DummyProxyHandler{SH: SuccessHandler{baseMid}, Gw: gw})
 
 	if !spec.UseKeylessAccess {

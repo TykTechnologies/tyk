@@ -811,6 +811,9 @@ const Schema = `{
 								},
 								"header_name": {
 									"type": "string"
+								},
+								"extra_metadata" :{
+									"type": ["array", "null"]	
 								}
 							}
 						},
@@ -840,6 +843,9 @@ const Schema = `{
 								},
 								"header_name": {
 								  "type": "string"
+								},
+								"extra_metadata" :{
+								  "type": ["array", "null"]	
 								}
 							}
 						  }
