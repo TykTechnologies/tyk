@@ -131,7 +131,7 @@ jobs:
         with:
           mask-password: 'true'
       - name: Docker metadata for CI
-        id: ci_metadata_
+        id: ci_metadata
         if: ${{ matrix.golang_cross == '1.22-bullseye' }}
         uses: docker/metadata-action@v5
         with:
