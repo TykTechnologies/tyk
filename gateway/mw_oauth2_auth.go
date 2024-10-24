@@ -163,7 +163,7 @@ func getOAuthHeaderProvider(oauthConfig apidef.UpstreamOAuth) (OAuthHeaderProvid
 	}
 
 	switch {
-	case len(oauthConfig.AllowedAuthorizeTypes) > 2:
+	case len(oauthConfig.AllowedAuthorizeTypes) > 1:
 		return nil, fmt.Errorf("both client credentials and password authentication are provided")
 	case oauthConfig.AllowedAuthorizeTypes[0] == ClientCredentialsAuthorizeType:
 		return &ClientCredentialsOAuthProvider{}, nil
