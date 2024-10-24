@@ -813,6 +813,8 @@ func (r *RPCStorageHandler) CheckForReload(orgId string) bool {
 				r.CheckForReload(orgId)
 			}
 		} else if !strings.Contains(err.Error(), "Cannot obtain response during") {
+			forcer := rpc.NewSyncForcer(r.Gw.StorageConnectionHandler, r.buildNodeInfo)
+			forcer.SetFirstConnection(true)
 			log.Warning("[RPC STORE] RPC Reload Checker encountered unexpected error: ", err)
 		}
 
