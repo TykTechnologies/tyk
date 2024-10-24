@@ -1,8 +1,9 @@
 package upstreambasicauth
 
 import (
-	"github.com/TykTechnologies/tyk/apidef"
 	"time"
+
+	"github.com/TykTechnologies/tyk/apidef"
 
 	"github.com/TykTechnologies/tyk/apidef/oas"
 	"github.com/TykTechnologies/tyk/internal/model"

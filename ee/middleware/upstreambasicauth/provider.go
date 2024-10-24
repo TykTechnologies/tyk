@@ -1,8 +1,9 @@
 package upstreambasicauth
 
 import (
-	"github.com/sirupsen/logrus"
 	"net/http"
+
+	"github.com/sirupsen/logrus"
 )
 
 // Provider implements upstream auth provider.
