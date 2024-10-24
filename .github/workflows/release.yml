@@ -131,7 +131,7 @@ jobs:
         with:
           mask-password: 'true'
       - name: Docker metadata for CI
-        id: ci_metadata
+        id: ci_metadata_
         if: ${{ matrix.golang_cross == '1.22-bullseye' }}
         uses: docker/metadata-action@v5
         with:
@@ -157,10 +157,12 @@ jobs:
           push: true
           cache-from: type=gha
           cache-to: type=gha,mode=max
-          tags: ${{ steps.ci_metadata.outputs.tags }}
+          tags: ${{ steps.ci_metadata_.outputs.tags }}
           labels: ${{ steps.tag_metadata.outputs.labels }}
+          build-args: |
+            EDITION=
       - name: Docker metadata for tag push
-        id: tag_metadata
+        id: tag_metadata_
         uses: docker/metadata-action@v5
         with:
           images: |
@@ -185,8 +187,10 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
           push: ${{ startsWith(github.ref, 'refs/tags') }}
-          tags: ${{ steps.tag_metadata.outputs.tags }}
-          labels: ${{ steps.tag_metadata.outputs.labels }}
+          tags: ${{ steps.tag_metadata_.outputs.tags }}
+          labels: ${{ steps.tag_metadata_.outputs.labels }}
+          build-args: |
+            EDITION=
       - name: save deb
         uses: actions/upload-artifact@v4
         if: ${{ matrix.golang_cross == '1.22-bullseye' }}
@@ -311,32 +315,8 @@ jobs:
           path: tyk-analytics
           token: ${{ secrets.ORG_GH_TOKEN }}
           fetch-depth: 1
+          ref: ${{ env.BASE_REF }}
           sparse-checkout: tests/api
-      - name: Choosing test code branch
-        run: |
-          if [[ ${{ github.event_name }} == "release" ]]; then
-            TAG_NAME=${{ github.event.release.tag_name }}
-            git checkout "$TAG_NAME"
-          fi
-          if [[ ${{ github.event_name }} == "pull_request" ]]; then
-            PR_BRANCH=${{ github.event.pull_request.head.ref }}
-            TARGET_BRANCH=${{ github.event.pull_request.base.ref }}
-            if git rev-parse "origin/$PR_BRANCH" >/dev/null 2>&1; then
-              echo "PR branch $PR_BRANCH exists. Checking out..."
-              git checkout "$PR_BRANCH"
-            elif git rev-parse "origin/$TARGET_BRANCH" >/dev/null 2>&1; then
-              echo "Target branch $TARGET_BRANCH exists. Checking out..."
-              git checkout "$TARGET_BRANCH"
-            fi
-          fi
-          if [[ ${{ github.event_name }} == "push" ]]; then
-            PUSH_BRANCH=${{ github.ref_name }}
-            if git rev-parse "origin/$PUSH_BRANCH" >/dev/null 2>&1; then
-              echo "Push branch $PUSH_BRANCH exists. Checking out..."
-              git checkout "$PUSH_BRANCH"
-            fi
-          fi
-          echo "Current commit: $(git rev-parse HEAD)"
       - uses: actions/setup-python@v5
         with:
           cache: 'pip'
@@ -365,6 +345,20 @@ jobs:
           USER_API_SECRET=${{ steps.env_up.outputs.USER_API_SECRET }}
           EOF
           env $(cat pytest.env | xargs) $pytest -m "${{ matrix.envfiles.apimarkers }}"
+      - name: Upload Playwright Test Report to S3
+        if: failure() && steps.test_execution.outcome != 'success' && steps.env_up.outcome == 'success'
+        run: npm run upload_report_to_s3
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.UI_AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.UI_AWS_SECRET_ACCESS_KEY }}
+          RUN_ID: 'tyk-analytics/${{ github.run_id }}'
+        working-directory: tyk-analytics/tests/ui
+      - name: Share S3 report link into summary
+        if: failure() && steps.test_execution.outcome != 'success' && steps.env_up.outcome == 'success'
+        run: |
+          echo "# :clipboard: S3 UI Test REPORT: ${{ matrix.envfiles.db }}-${{ matrix.envfiles.conf }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Status: ${{ steps.test_execution.outcome == 'success' && ':white_check_mark:' || ':no_entry_sign:' }}" >> $GITHUB_STEP_SUMMARY
+          echo "- [Link to report](https://tyk-qa-reports.s3.eu-central-1.amazonaws.com/tyk-analytics/${{ github.run_id }}/index.html)" >> $GITHUB_STEP_SUMMARY
       - name: Generate metadata and upload test reports
         id: metadata_report
         if: always() && (steps.test_execution.conclusion != 'skipped')
