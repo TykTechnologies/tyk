@@ -1053,7 +1053,13 @@ const Schema = `{
                     }
                   }
                 }
-              }
+              },
+              "required": [
+                "enabled",
+                "client_id",
+                "client_secret",
+                "token_url"
+              ]
             },
             "password_authentication": {
               "type": "object",
@@ -1093,7 +1099,15 @@ const Schema = `{
                     }
                   }
                 }
-              }
+              },
+              "required": [
+                "enabled",
+                "client_id",
+                "client_secret",
+                "token_url",
+                "username",
+                "password"
+              ]
             }
           }
         }
