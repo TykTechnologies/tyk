@@ -2035,10 +2035,20 @@
       ]
     },
     "X-Tyk-UpstreamOAuth": {
-      "type":"object",
+      "type": "object",
       "properties": {
         "enabled": {
           "type": "boolean"
+        },
+        "allowedAuthorizeTypes": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "clientCredentials",
+              "password"
+            ]
+          }
         },
         "clientCredentials": {
           "type": "object",
@@ -2061,10 +2071,24 @@
                 "null"
               ]
             },
-            "headerName": {
-              "type": "string"
+            "header": {
+              "type": "object",
+              "properties": {
+                "enabled": {
+                  "type": "boolean"
+                },
+                "name": {
+                  "type": "string"
+                }
+              }
             }
-          }
+          },
+          "required": [
+            "enabled",
+            "clientId",
+            "clientSecret",
+            "tokenUrl"
+          ]
         },
         "passwordAuthentication": {
           "type": "object",
@@ -2096,7 +2120,15 @@
             "headerName": {
               "type": "string"
             }
-          }
+          },
+          "required": [
+            "enabled",
+            "clientId",
+            "clientSecret",
+            "tokenUrl",
+            "username",
+            "password"
+          ]
         }
       }
     }

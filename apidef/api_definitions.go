@@ -806,6 +806,8 @@ type UpstreamBasicAuth struct {
 type UpstreamOAuth struct {
 	// Enabled enables upstream OAuth2 authentication.
 	Enabled bool `bson:"enabled" json:"enabled"`
+	// AllowedAuthorizeTypes
+	AllowedAuthorizeTypes []string `bson:"allowed_authorize_types" json:"allowed_authorize_types"`
 	// ClientCredentials holds the client credentials for upstream OAuth2 authentication.
 	ClientCredentials ClientCredentials `bson:"client_credentials" json:"client_credentials"`
 	// PasswordAuthentication holds the configuration for upstream OAauth password authentication flow.
@@ -815,8 +817,8 @@ type UpstreamOAuth struct {
 // PasswordAuthentication holds the configuration for upstream OAuth2 password authentication flow.
 type PasswordAuthentication struct {
 	ClientAuthData
-	// Enabled activates upstream OAuth2 password authentication.
-	Enabled bool `bson:"enabled" json:"enabled"`
+	// Header holds the configuration for the custom header to be used for OAuth authentication.
+	Header HeaderData `bson:"header" json:"header"`
 	// Username is the username to be used for upstream OAuth2 password authentication.
 	Username string `bson:"username" json:"username"`
 	// Password is the password to be used for upstream OAuth2 password authentication.
@@ -826,9 +828,6 @@ type PasswordAuthentication struct {
 	TokenURL string `bson:"token_url" json:"token_url"`
 	// Scopes specifies optional requested permissions.
 	Scopes []string `bson:"scopes" json:"scopes,omitempty"`
-	// HeaderName is the custom header name to be used for OAuth password authentication flow.
-	// Defaults to `Authorization`.
-	HeaderName string `bson:"header_name" json:"header_name"`
 
 	// TokenProvider is the OAuth2 password authentication flow token for internal use.
 	Token *oauth2.Token `bson:"-" json:"-"`
@@ -842,9 +841,19 @@ type ClientAuthData struct {
 	ClientSecret string `bson:"client_secret" json:"client_secret"`
 }
 
+// HeaderData holds the configuration for the custom header to be used for OAuth authentication.
+type HeaderData struct {
+	Enabled bool `bson:"enabled" json:"enabled"`
+	// Name is the custom header name to be used for OAuth client credential flow authentication.
+	// Defaults to `Authorization`.
+	Name string `bson:"name" json:"name"`
+}
+
 // ClientCredentials holds the client credentials for upstream OAuth2 authentication.
 type ClientCredentials struct {
 	ClientAuthData
+	// Header holds the configuration for the custom header to be used for OAuth authentication.
+	Header HeaderData `bson:"header" json:"header"`
 	// Enabled activates upstream OAuth2 client credentials authentication.
 	Enabled bool `bson:"enabled" json:"enabled"`
 	// TokenURL is the resource server's token endpoint
@@ -852,9 +861,6 @@ type ClientCredentials struct {
 	TokenURL string `bson:"token_url" json:"token_url"`
 	// Scopes specifies optional requested permissions.
 	Scopes []string `bson:"scopes" json:"scopes,omitempty"`
-	// HeaderName is the custom header name to be used for OAuth client credential flow authentication.
-	// Defaults to `Authorization`.
-	HeaderName string `bson:"header_name" json:"header_name"`
 
 	// TokenProvider is the OAuth2 token provider for internal use.
 	TokenProvider oauth2.TokenSource `bson:"-" json:"-"`
