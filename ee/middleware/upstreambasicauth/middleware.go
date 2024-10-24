@@ -1,11 +1,13 @@
 package upstreambasicauth
 
 import (
+	"net/http"
+
+	"github.com/sirupsen/logrus"
+
 	"github.com/TykTechnologies/tyk/header"
 	"github.com/TykTechnologies/tyk/internal/httputil"
 	"github.com/TykTechnologies/tyk/internal/model"
-	"github.com/sirupsen/logrus"
-	"net/http"
 )
 
 // Middleware implements upstream basic auth middleware.
