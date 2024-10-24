@@ -1,0 +1,19 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "",
+    "version": ""
+  },
+  "paths": {},
+  "x-tyk-streaming": {
+    "info": {
+      "name": "oas-api",
+      "state": {}
+    },
+    "streams": {},
+    "server": {
+      "listenPath": {
+      }
+    }
+  }
+}
