@@ -1634,6 +1634,7 @@
     },
     "X-Tyk-ExternalOAuth": {
       "type": "object",
+      "description": "Support for external OAuth Middleware will be deprecated starting from 5.7.0. To avoid any disruptions, we recommend that you use JSON Web Token (JWT) instead, as explained in https://tyk.io/docs/basic-config-and-security/security/authentication-authorization/ext-oauth-middleware/",
       "properties": {
         "enabled": {
           "type": "boolean"
@@ -2043,6 +2044,9 @@
         "clientCredentials": {
           "type": "object",
           "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
             "clientId": {
               "type": "string"
             },
@@ -2052,13 +2056,48 @@
             "tokenUrl": {
               "type": "string"
             },
-            "scopes":{
-              "type": ["array", "null"]
+            "scopes": {
+              "type": [
+                "array",
+                "null"
+              ]
+            },
+            "headerName": {
+              "type": "string"
             }
           }
         },
-        "headerName": {
-          "type": "string"
+        "passwordAuthentication": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "clientId": {
+              "type": "string"
+            },
+            "clientSecret": {
+              "type": "string"
+            },
+            "tokenUrl": {
+              "type": "string"
+            },
+            "scopes": {
+              "type": [
+                "array",
+                "null"
+              ]
+            },
+            "username": {
+              "type": "string"
+            },
+            "password": {
+              "type": "string"
+            },
+            "headerName": {
+              "type": "string"
+            }
+          }
         }
       }
     }
