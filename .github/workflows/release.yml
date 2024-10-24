@@ -49,7 +49,7 @@ jobs:
             rpmvers: 'el/7 el/8 el/9 amazon/2 amazon/2023'
             debvers: 'ubuntu/xenial ubuntu/bionic ubuntu/focal ubuntu/jammy debian/jessie debian/buster debian/bullseye debian/bookworm'
     outputs:
-      tags: ${{ steps.ci_metadata.outputs.tags }}
+      tags: ${{ steps.ci_metadata_ee.outputs.tags }}
       commit_author: ${{ steps.set_outputs.outputs.commit_author}}
     steps:
       - name: Checkout of tyk
@@ -334,7 +334,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release download --repo github.com/tyklabs/tyk-pro --archive tar.gz -O env.tgz
+          gh release download --repo github.com/TykTechnologies/tyk-pro --archive tar.gz -O env.tgz
           mkdir auto && tar --strip-components=1 -C auto -xzvf env.tgz
       - name: env up
         shell: bash
