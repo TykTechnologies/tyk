@@ -8,9 +8,15 @@ import (
 	"net/http"
 	"testing"
 
+<<<<<<< HEAD
 	"github.com/TykTechnologies/tyk/rpc"
 
 	"github.com/TykTechnologies/tyk/apidef"
+=======
+	"github.com/TykTechnologies/tyk/internal/model"
+	"github.com/TykTechnologies/tyk/rpc"
+
+>>>>>>> cea1df441... [TT-12417] Do not delete keys on synchronization (#6642)
 	"github.com/TykTechnologies/tyk/config"
 
 	"github.com/lonelycode/osin"
