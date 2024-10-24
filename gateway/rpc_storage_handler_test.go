@@ -11,7 +11,6 @@ import (
 	"github.com/TykTechnologies/tyk/rpc"
 
 	"github.com/TykTechnologies/tyk/apidef"
-
 	"github.com/TykTechnologies/tyk/config"
 
 	"github.com/lonelycode/osin"
