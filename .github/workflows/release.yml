@@ -131,7 +131,7 @@ jobs:
         with:
           mask-password: 'true'
       - name: Docker metadata for CI
-        id: ci_metadata
+        id: ci_metadata_
         if: ${{ matrix.golang_cross == '1.22-bullseye' }}
         uses: docker/metadata-action@v5
         with:
@@ -157,10 +157,12 @@ jobs:
           push: true
           cache-from: type=gha
           cache-to: type=gha,mode=max
-          tags: ${{ steps.ci_metadata.outputs.tags }}
+          tags: ${{ steps.ci_metadata_.outputs.tags }}
           labels: ${{ steps.tag_metadata.outputs.labels }}
+          build-args: |
+            EDITION=
       - name: Docker metadata for tag push
-        id: tag_metadata
+        id: tag_metadata_
         uses: docker/metadata-action@v5
         with:
           images: |
@@ -185,8 +187,10 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
           push: ${{ startsWith(github.ref, 'refs/tags') }}
-          tags: ${{ steps.tag_metadata.outputs.tags }}
-          labels: ${{ steps.tag_metadata.outputs.labels }}
+          tags: ${{ steps.tag_metadata_.outputs.tags }}
+          labels: ${{ steps.tag_metadata_.outputs.labels }}
+          build-args: |
+            EDITION=
       - name: save deb
         uses: actions/upload-artifact@v4
         if: ${{ matrix.golang_cross == '1.22-bullseye' }}
