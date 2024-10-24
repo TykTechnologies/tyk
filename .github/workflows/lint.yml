@@ -2,15 +2,11 @@
 ---
 name: CI lint
 
+# API Changes (godoc) and JIRA validation only apply to PRs.
+# Branches are not important, supports chaining PRs.
+
 on:
   pull_request:
-    branches:
-      - master
-      - release-**
-  push:
-    branches:
-      - master
-      - release-**
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}

@@ -794,6 +794,9 @@ const Schema = `{
 						"client_credentials": {
 							"type": "object",
 							"properties": {
+								"enabled": {
+									"type": "boolean"
+								},
 								"client_id": {
 									"type": "string"
 								},
@@ -805,11 +808,41 @@ const Schema = `{
 								},
 								"scopes":{
 									"type": ["array", "null"]
-								}	
+								},
+								"header_name": {
+									"type": "string"
+								}
 							}
 						},
-						"header_name": {
-							"type": "string"		
+						"password_authentication": {
+						  "type": "object",
+						  "properties": {
+								"enabled": {
+								  "type": "boolean"
+								},
+								"client_id": {
+								  "type": "string"
+								},
+								"client_secret": {
+								  "type": "string"
+								},
+								"username": {
+								  "type": "string"
+								},
+								"password": {
+								  "type": "string"
+								},
+								"token_url": {
+								  "type": "string"
+								},
+								"scopes": {
+								  "type": ["array", "null"]
+								},
+								"header_name": {
+								  "type": "string"
+								}
+							}
+						  }
 						}
 					}
 				}

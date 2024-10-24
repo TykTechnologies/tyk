@@ -808,9 +808,30 @@ type UpstreamOAuth struct {
 	Enabled bool `bson:"enabled" json:"enabled"`
 	// ClientCredentials holds the client credentials for upstream OAuth2 authentication.
 	ClientCredentials ClientCredentials `bson:"client_credentials" json:"client_credentials"`
-	// HeaderName is the custom header name to be used for upstream basic authentication.
+	// PasswordAuthentication holds the configuration for upstream OAauth password authentication flow.
+	PasswordAuthentication PasswordAuthentication `bson:"password_authentication,omitempty" json:"passwordAuthentication,omitempty"`
+}
+
+// PasswordAuthentication holds the configuration for upstream OAuth2 password authentication flow.
+type PasswordAuthentication struct {
+	ClientAuthData
+	// Enabled activates upstream OAuth2 password authentication.
+	Enabled bool `bson:"enabled" json:"enabled"`
+	// Username is the username to be used for upstream OAuth2 password authentication.
+	Username string `bson:"username" json:"username"`
+	// Password is the password to be used for upstream OAuth2 password authentication.
+	Password string `bson:"password" json:"password"`
+	// TokenURL is the resource server's token endpoint
+	// URL. This is a constant specific to each server.
+	TokenURL string `bson:"token_url" json:"token_url"`
+	// Scopes specifies optional requested permissions.
+	Scopes []string `bson:"scopes" json:"scopes,omitempty"`
+	// HeaderName is the custom header name to be used for OAuth password authentication flow.
 	// Defaults to `Authorization`.
-	HeaderName string `bson:"header_name" json:"header_name,omitempty"`
+	HeaderName string `bson:"header_name" json:"header_name"`
+
+	// TokenProvider is the OAuth2 password authentication flow token for internal use.
+	Token *oauth2.Token `bson:"-" json:"-"`
 }
 
 // ClientAuthData holds the client ID and secret for upstream OAuth2 authentication.
@@ -824,11 +845,16 @@ type ClientAuthData struct {
 // ClientCredentials holds the client credentials for upstream OAuth2 authentication.
 type ClientCredentials struct {
 	ClientAuthData
+	// Enabled activates upstream OAuth2 client credentials authentication.
+	Enabled bool `bson:"enabled" json:"enabled"`
 	// TokenURL is the resource server's token endpoint
 	// URL. This is a constant specific to each server.
 	TokenURL string `bson:"token_url" json:"token_url"`
 	// Scopes specifies optional requested permissions.
 	Scopes []string `bson:"scopes" json:"scopes,omitempty"`
+	// HeaderName is the custom header name to be used for OAuth client credential flow authentication.
+	// Defaults to `Authorization`.
+	HeaderName string `bson:"header_name" json:"header_name"`
 
 	// TokenProvider is the OAuth2 token provider for internal use.
 	TokenProvider oauth2.TokenSource `bson:"-" json:"-"`
@@ -1523,6 +1549,9 @@ var Template = template.New("").Funcs(map[string]interface{}{
 	},
 })
 
+// ExternalOAuth support will be deprecated starting from 5.7.0.
+// To avoid any disruptions, we recommend that you use JSON Web Token (JWT) instead,
+// as explained in https://tyk.io/docs/basic-config-and-security/security/authentication-authorization/ext-oauth-middleware/.
 type ExternalOAuth struct {
 	Enabled   bool       `bson:"enabled" json:"enabled"`
 	Providers []Provider `bson:"providers" json:"providers"`
