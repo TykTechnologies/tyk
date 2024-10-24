@@ -85,6 +85,16 @@ func (sm *Manager) createStream(streamID string, config map[string]interface{}) 
 	streamFullID := fmt.Sprintf("%s_%s", sm.mw.Spec.APIID, streamID)
 	sm.mw.Logger().Debugf("Creating stream: %s", streamFullID)
 
+	// add logger to config
+	config["logger"] = map[string]interface{}{
+		"level":         "INFO",
+		"format":        "json",
+		"add_timestamp": true,
+		"static_fields": map[string]interface{}{
+			"stream": streamID,
+		},
+	}
+
 	stream := NewStream(sm.mw.allowedUnsafe)
 	err := stream.Start(config, &handleFuncAdapter{
 		mw:       sm.mw,
