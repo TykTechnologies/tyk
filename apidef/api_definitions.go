@@ -1555,6 +1555,9 @@ var Template = template.New("").Funcs(map[string]interface{}{
 	},
 })
 
+// ExternalOAuth support will be deprecated starting from 5.7.0.
+// To avoid any disruptions, we recommend that you use JSON Web Token (JWT) instead,
+// as explained in https://tyk.io/docs/basic-config-and-security/security/authentication-authorization/ext-oauth-middleware/.
 type ExternalOAuth struct {
 	Enabled   bool       `bson:"enabled" json:"enabled"`
 	Providers []Provider `bson:"providers" json:"providers"`

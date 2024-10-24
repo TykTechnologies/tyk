@@ -61,3 +61,5 @@ tyk_linux_*
 *.test
 
 main
+
+/coprocess/*.pb.go-e
