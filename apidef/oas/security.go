@@ -582,6 +582,9 @@ func (c *IntrospectionCache) ExtractTo(cache *apidef.IntrospectionCache) {
 }
 
 // ExternalOAuth holds configuration for an external OAuth provider.
+// ExternalOAuth support will be deprecated starting from 5.7.0.
+// To avoid any disruptions, we recommend that you use JSON Web Token (JWT) instead,
+// as explained in https://tyk.io/docs/basic-config-and-security/security/authentication-authorization/ext-oauth-middleware/.
 type ExternalOAuth struct {
 	// Enabled activates external oauth functionality.
 	Enabled bool `bson:"enabled" json:"enabled"` // required
