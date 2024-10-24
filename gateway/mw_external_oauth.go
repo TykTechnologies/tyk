@@ -38,6 +38,10 @@ func (k *ExternalOAuthMiddleware) Name() string {
 }
 
 func (k *ExternalOAuthMiddleware) EnabledForSpec() bool {
+	if k.Spec.ExternalOAuth.Enabled {
+		log.Warn("Support for external OAuth Middleware will be deprecated starting from 5.7.0. To avoid any disruptions, we recommend that you use JSON Web Token (JWT) instead, as explained in https://tyk.io/docs/basic-config-and-security/security/authentication-authorization/ext-oauth-middleware/")
+	}
+
 	return k.Spec.ExternalOAuth.Enabled
 }
 
