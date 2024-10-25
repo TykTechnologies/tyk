@@ -9,8 +9,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/TykTechnologies/tyk-pump/analytics"
 	"github.com/sirupsen/logrus"
+
+	"github.com/TykTechnologies/tyk-pump/analytics"
 
 	"github.com/TykTechnologies/tyk/ee/middleware/streams"
 	"github.com/TykTechnologies/tyk/header"
