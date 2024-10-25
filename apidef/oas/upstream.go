@@ -681,11 +681,6 @@ type ClientCredentials struct {
 	Scopes []string `bson:"scopes,omitempty" json:"scopes,omitempty"`
 }
 
-//func (h *HeaderData) Fill(api apidef.HeaderData) {
-//	h.Enabled = api.Enabled
-//	h.Name = api.Name
-//}
-
 func (c *ClientCredentials) Fill(api apidef.ClientCredentials) {
 	c.ClientID = api.ClientID
 	c.ClientSecret = api.ClientSecret
@@ -749,11 +744,6 @@ func (c *ClientCredentials) ExtractTo(api *apidef.ClientCredentials) {
 	}
 	c.Header.ExtractTo(&api.Header.Enabled, &api.Header.Name)
 }
-
-//func (h *HeaderData) ExtractTo(api *apidef.HeaderData) {
-//	api.Enabled = h.Enabled
-//	api.Name = h.Name
-//}
 
 func (p *PasswordAuthentication) ExtractTo(api *apidef.PasswordAuthentication) {
 	api.Username = p.Username
