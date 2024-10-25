@@ -51,9 +51,9 @@ func TestUpstreamOauth2(t *testing.T) {
 			ClientID:     "CLIENT_ID",
 			ClientSecret: "CLIENT_SECRET",
 		},
-		TokenURL:   ts.URL + "/token",
-		Scopes:     []string{"scope1", "scope2"},
-		HeaderName: "",
+		TokenURL: ts.URL + "/token",
+		Scopes:   []string{"scope1", "scope2"},
+		Header:   apidef.AuthSource{Enabled: true, Name: "Authorization"},
 	}
 
 	tst.Gw.BuildAndLoadAPI(
@@ -63,8 +63,9 @@ func TestUpstreamOauth2(t *testing.T) {
 			spec.UpstreamAuth = apidef.UpstreamAuth{
 				Enabled: true,
 				OAuth: apidef.UpstreamOAuth{
-					Enabled:           true,
-					ClientCredentials: cfg,
+					Enabled:               true,
+					ClientCredentials:     cfg,
+					AllowedAuthorizeTypes: []string{ClientCredentialsAuthorizeType},
 				},
 			}
 			spec.Proxy.StripListenPath = true
@@ -127,16 +128,15 @@ func TestPasswordCredentialsTokenRequest(t *testing.T) {
 	defer t.Cleanup(func() { ts.Close() })
 
 	cfg := apidef.PasswordAuthentication{
-		Enabled: true,
 		ClientAuthData: apidef.ClientAuthData{
 			ClientID:     "CLIENT_ID",
 			ClientSecret: "CLIENT_SECRET",
 		},
-		Username:   "user1",
-		Password:   "password1",
-		TokenURL:   ts.URL + "/token",
-		Scopes:     []string{"scope1", "scope2"},
-		HeaderName: "",
+		Username: "user1",
+		Password: "password1",
+		TokenURL: ts.URL + "/token",
+		Scopes:   []string{"scope1", "scope2"},
+		Header:   apidef.AuthSource{Enabled: true, Name: "Authorization"},
 	}
 
 	tst.Gw.BuildAndLoadAPI(
@@ -148,6 +148,7 @@ func TestPasswordCredentialsTokenRequest(t *testing.T) {
 				OAuth: apidef.UpstreamOAuth{
 					Enabled:                true,
 					PasswordAuthentication: cfg,
+					AllowedAuthorizeTypes:  []string{PasswordAuthorizeType},
 				},
 			}
 			spec.Proxy.StripListenPath = true
