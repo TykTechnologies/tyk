@@ -51,9 +51,9 @@ func TestUpstreamOauth2(t *testing.T) {
 			ClientID:     "CLIENT_ID",
 			ClientSecret: "CLIENT_SECRET",
 		},
-		TokenURL: ts.URL + "/token",
-		Scopes:   []string{"scope1", "scope2"},
-		Header:   apidef.AuthSource{Enabled: true, Name: "Authorization"},
+		TokenURL:      ts.URL + "/token",
+		Scopes:        []string{"scope1", "scope2"},
+		Header:        apidef.AuthSource{Enabled: true, Name: "Authorization"},
 		ExtraMetadata: []string{"instance_url"},
 	}
 
