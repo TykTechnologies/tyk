@@ -58,8 +58,8 @@ func (m *Middleware) Init() {
 	m.Logger().Debug("Initializing Upstream basic auth Middleware")
 }
 
-// ProcessRequest will handle the streaming functionality.
-func (m *Middleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
+// ProcessRequest will handle upstream basic auth.
+func (m *Middleware) ProcessRequest(_ http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
 	basicAuthConfig := m.Spec.UpstreamAuth.BasicAuth
 
 	upstreamBasicAuthProvider := Provider{
