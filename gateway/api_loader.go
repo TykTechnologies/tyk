@@ -26,6 +26,7 @@ import (
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/trace"
 
+	"github.com/TykTechnologies/tyk/internal/middleware"
 	"github.com/TykTechnologies/tyk/internal/otel"
 )
 
@@ -427,8 +428,11 @@ func (gw *Gateway) processSpec(spec *APISpec, apisByListen map[string]int,
 	gw.mwAppendEnabled(&chainArray, &RateLimitForAPI{BaseMiddleware: baseMid})
 	gw.mwAppendEnabled(&chainArray, &GraphQLMiddleware{BaseMiddleware: baseMid})
 
-	if streamMw := getStreamingMiddleware(baseMid); streamMw != nil {
-		gw.mwAppendEnabled(&chainArray, streamMw)
+	if streamMw := middleware.Get("ee:middleware:streaming"); len(streamMw) > 0 {
+		for _, createMw := range streamMw {
+			mw := WrapMiddleware(baseMid, createMw(baseMid.Gw, baseMid, spec.MergedAPI()))
+			gw.mwAppendEnabled(&chainArray, mw)
+		}
 	}
 
 	if !spec.UseKeylessAccess {

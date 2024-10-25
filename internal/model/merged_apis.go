@@ -23,6 +23,11 @@ type MergedAPI struct {
 	OAS                   *oas.OAS `json:"oas"`
 }
 
+// NewMergedAPI exists due to embedding.
+func NewMergedAPI(classic *apidef.APIDefinition, oas *oas.OAS) MergedAPI {
+	return MergedAPI{classic, oas}
+}
+
 // Set sets the available classic API definitions to the MergedAPIList.
 func (f *MergedAPIList) SetClassic(defs []*apidef.APIDefinition) {
 	for _, def := range defs {

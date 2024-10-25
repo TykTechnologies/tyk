@@ -16,7 +16,7 @@ import (
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/header"
-	"github.com/TykTechnologies/tyk/internal/httputil"
+	"github.com/TykTechnologies/tyk/internal/repository"
 	"github.com/TykTechnologies/tyk/storage"
 )
 
@@ -158,7 +158,8 @@ func (OAuthSpec *UpstreamOAuth) ProcessRequest(_ http.ResponseWriter, r *http.Re
 		}
 	}
 
-	httputil.SetUpstreamAuth(r, upstreamOAuthProvider)
+	repository.SetUpstreamAuth(r, upstreamOAuthProvider)
+
 	return nil, http.StatusOK
 }
 

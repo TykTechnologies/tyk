@@ -43,6 +43,7 @@ import (
 	"github.com/TykTechnologies/tyk/internal/graphengine"
 	"github.com/TykTechnologies/tyk/internal/httputil"
 	"github.com/TykTechnologies/tyk/internal/otel"
+	"github.com/TykTechnologies/tyk/internal/repository"
 	"github.com/TykTechnologies/tyk/regexp"
 	"github.com/TykTechnologies/tyk/trace"
 	"github.com/TykTechnologies/tyk/user"
@@ -1853,7 +1854,7 @@ func (p *ReverseProxy) addAuthInfo(outReq, req *http.Request) {
 		return
 	}
 
-	if authProvider := httputil.GetUpstreamAuth(req); authProvider != nil {
+	if authProvider := repository.GetUpstreamAuth(req); authProvider != nil {
 		authProvider.Fill(outReq)
 	}
 }

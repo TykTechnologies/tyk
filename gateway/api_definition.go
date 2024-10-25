@@ -1750,11 +1750,6 @@ func (a *APISpec) Version(r *http.Request) (*apidef.VersionInfo, RequestStatus) 
 	return &version, StatusOk
 }
 
-// StripListenPath will strip the listen path from the URL, keeping version in tact.
-func (a *APISpec) StripListenPath(reqPath string) string {
-	return httputil.StripListenPath(a.Proxy.ListenPath, reqPath)
-}
-
 // StripVersionPath will strip the version from the URL. The input URL
 // should already have listen path stripped.
 func (a *APISpec) StripVersionPath(reqPath string) string {

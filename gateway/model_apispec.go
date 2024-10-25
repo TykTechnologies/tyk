@@ -3,6 +3,8 @@ package gateway
 import (
 	"net/http"
 	"strings"
+
+	"github.com/TykTechnologies/tyk/internal/model"
 )
 
 // CheckSpecMatchesStatus checks if a URL spec has a specific status.
@@ -72,4 +74,9 @@ func (a *APISpec) getMatchPathAndMethod(r *http.Request, mode URLStatus) (string
 	}
 
 	return matchPath, method
+}
+
+// MergedAPI provides a model.MergedAPI from an APISpec.
+func (a *APISpec) MergedAPI() model.MergedAPI {
+	return model.NewMergedAPI(a.APIDefinition, &a.OAS)
 }

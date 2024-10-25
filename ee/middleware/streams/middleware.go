@@ -21,10 +21,9 @@ import (
 
 // Middleware implements a streaming middleware.
 type Middleware struct {
-	Spec *APISpec
-	Gw   Gateway
-
-	base BaseMiddleware
+	Spec     model.MergedAPI
+	Gw       Gateway
+	logEntry *logrus.Entry
 
 	createStreamManagerLock sync.Mutex
 	StreamManagerCache      sync.Map // Map of payload hash to Manager
@@ -35,26 +34,29 @@ type Middleware struct {
 	defaultManager *Manager
 }
 
+// Name holds the middleware name as a constant.
+const Name = "StreamingMiddleware"
+
 // Middleware implements model.Middleware.
 var _ model.Middleware = &Middleware{}
 
 // NewMiddleware returns a new instance of Middleware.
-func NewMiddleware(gw Gateway, mw BaseMiddleware, spec *APISpec) *Middleware {
+func NewMiddleware(gw Gateway, logger *logrus.Entry, spec model.MergedAPI) *Middleware {
 	return &Middleware{
-		base: mw,
-		Gw:   gw,
-		Spec: spec,
+		Gw:       gw,
+		Spec:     spec,
+		logEntry: logger.WithField("mw", Name),
 	}
 }
 
 // Logger returns a logger with middleware filled out.
 func (s *Middleware) Logger() *logrus.Entry {
-	return s.base.Logger().WithField("mw", s.Name())
+	return s.logEntry
 }
 
 // Name returns the name for the middleware.
 func (s *Middleware) Name() string {
-	return "StreamingMiddleware"
+	return Name
 }
 
 // EnabledForSpec checks if streaming is enabled on the config.

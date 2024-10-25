@@ -5,16 +5,14 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/TykTechnologies/tyk/internal/httputil"
-
-	"github.com/TykTechnologies/tyk/apidef/oas"
-
-	"github.com/TykTechnologies/tyk/config"
-
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/apidef/oas"
+	"github.com/TykTechnologies/tyk/config"
 	logger "github.com/TykTechnologies/tyk/log"
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/user"
+
+	"github.com/TykTechnologies/tyk/internal/repository"
 )
 
 type Key uint
@@ -78,7 +76,7 @@ func ctxSetSession(r *http.Request, s *user.SessionState, scheduleUpdate bool, h
 		s.Touch()
 	}
 
-	httputil.SetContext(r, ctx)
+	repository.SetContext(r, ctx)
 }
 
 func GetAuthToken(r *http.Request) string {
@@ -116,7 +114,7 @@ func SetSession(r *http.Request, s *user.SessionState, scheduleUpdate bool, hash
 func SetDefinition(r *http.Request, s *apidef.APIDefinition) {
 	ctx := r.Context()
 	ctx = context.WithValue(ctx, Definition, s)
-	httputil.SetContext(r, ctx)
+	repository.SetContext(r, ctx)
 }
 
 func GetDefinition(r *http.Request) *apidef.APIDefinition {

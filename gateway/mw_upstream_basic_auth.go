@@ -6,6 +6,7 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"github.com/TykTechnologies/tyk/internal/httputil"
+	"github.com/TykTechnologies/tyk/internal/repository"
 
 	"github.com/TykTechnologies/tyk/header"
 )
@@ -48,7 +49,7 @@ func (t *UpstreamBasicAuth) ProcessRequest(_ http.ResponseWriter, r *http.Reques
 
 	upstreamBasicAuthProvider.AuthValue = httputil.AuthHeader(basicAuthConfig.Username, basicAuthConfig.Password)
 
-	httputil.SetUpstreamAuth(r, upstreamBasicAuthProvider)
+	repository.SetUpstreamAuth(r, upstreamBasicAuthProvider)
 	return nil, http.StatusOK
 }
 
