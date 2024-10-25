@@ -44,10 +44,13 @@ func TestUpstreamBasicAuthentication(t *testing.T) {
 			spec.UpstreamAuth = apidef.UpstreamAuth{
 				Enabled: true,
 				BasicAuth: apidef.UpstreamBasicAuth{
-					Enabled:    true,
-					Username:   userName,
-					Password:   password,
-					HeaderName: customAuthHeader,
+					Enabled:  true,
+					Username: userName,
+					Password: password,
+					Header: apidef.AuthSource{
+						Enabled: true,
+						Name:    customAuthHeader,
+					},
 				},
 			}
 			spec.Proxy.StripListenPath = true
