@@ -841,14 +841,6 @@ type ClientAuthData struct {
 	ClientSecret string `bson:"client_secret" json:"client_secret"`
 }
 
-// HeaderData holds the configuration for the custom header to be used for OAuth authentication.
-type HeaderData struct {
-	Enabled bool `bson:"enabled" json:"enabled"`
-	// Name is the custom header name to be used for OAuth client credential flow authentication.
-	// Defaults to `Authorization`.
-	Name string `bson:"name" json:"name"`
-}
-
 // ClientCredentials holds the client credentials for upstream OAuth2 authentication.
 type ClientCredentials struct {
 	ClientAuthData
