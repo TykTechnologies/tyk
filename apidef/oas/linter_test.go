@@ -85,7 +85,7 @@ func TestXTykGateway_Lint(t *testing.T) {
 		settings.Upstream.RateLimit.Per = ReadableDuration(10 * time.Second)
 
 		settings.Upstream.Authentication = &UpstreamAuth{
-			Enabled:   true,
+			Enabled:   false,
 			BasicAuth: nil,
 			OAuth:     nil,
 		}
