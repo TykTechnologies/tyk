@@ -41,7 +41,7 @@ func TestUpstreamOauth2(t *testing.T) {
 			assert.Fail(t, "payload = %q; want %q", string(body), "grant_type=client_credentials&scope=scope1+scope2")
 		}
 		w.Header().Set("Content-Type", "application/x-www-form-urlencoded")
-		w.Write([]byte("access_token=90d64460d14870c08c81352a05dedd3465940a7c&token_type=bearer"))
+		w.Write([]byte("access_token=90d64460d14870c08c81352a05dedd3465940a7c&token_type=bearer&instance_url=https://tykxample.com"))
 	}))
 	defer t.Cleanup(func() { ts.Close() })
 
@@ -51,9 +51,10 @@ func TestUpstreamOauth2(t *testing.T) {
 			ClientID:     "CLIENT_ID",
 			ClientSecret: "CLIENT_SECRET",
 		},
-		TokenURL: ts.URL + "/token",
-		Scopes:   []string{"scope1", "scope2"},
-		Header:   apidef.AuthSource{Enabled: true, Name: "Authorization"},
+		TokenURL:      ts.URL + "/token",
+		Scopes:        []string{"scope1", "scope2"},
+		Header:        apidef.AuthSource{Enabled: true, Name: "Authorization"},
+		ExtraMetadata: []string{"instance_url"},
 	}
 
 	tst.Gw.BuildAndLoadAPI(
@@ -123,7 +124,7 @@ func TestPasswordCredentialsTokenRequest(t *testing.T) {
 			assert.Fail(t, "payload = %q; want %q", string(body), expected)
 		}
 		w.Header().Set("Content-Type", "application/x-www-form-urlencoded")
-		w.Write([]byte("access_token=90d64460d14870c08c81352a05dedd3465940a7c&scope=user&token_type=bearer"))
+		w.Write([]byte("access_token=90d64460d14870c08c81352a05dedd3465940a7c&scope=user&token_type=bearer&instance_url=https://tykxample.com"))
 	}))
 	defer t.Cleanup(func() { ts.Close() })
 
@@ -132,11 +133,12 @@ func TestPasswordCredentialsTokenRequest(t *testing.T) {
 			ClientID:     "CLIENT_ID",
 			ClientSecret: "CLIENT_SECRET",
 		},
-		Username: "user1",
-		Password: "password1",
-		TokenURL: ts.URL + "/token",
-		Scopes:   []string{"scope1", "scope2"},
-		Header:   apidef.AuthSource{Enabled: true, Name: "Authorization"},
+		Username:      "user1",
+		Password:      "password1",
+		TokenURL:      ts.URL + "/token",
+		Scopes:        []string{"scope1", "scope2"},
+		Header:        apidef.AuthSource{Enabled: true, Name: "Authorization"},
+		ExtraMetadata: []string{"instance_url"},
 	}
 
 	tst.Gw.BuildAndLoadAPI(

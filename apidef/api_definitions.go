@@ -828,6 +828,8 @@ type PasswordAuthentication struct {
 	TokenURL string `bson:"token_url" json:"token_url"`
 	// Scopes specifies optional requested permissions.
 	Scopes []string `bson:"scopes" json:"scopes,omitempty"`
+	// ExtraMetadata holds the keys that we want to extract from the token and pass to the upstream.
+	ExtraMetadata []string `bson:"extra_metadata" json:"extra_metadata,omitempty"`
 
 	// TokenProvider is the OAuth2 password authentication flow token for internal use.
 	Token *oauth2.Token `bson:"-" json:"-"`
@@ -853,6 +855,8 @@ type ClientCredentials struct {
 	TokenURL string `bson:"token_url" json:"token_url"`
 	// Scopes specifies optional requested permissions.
 	Scopes []string `bson:"scopes" json:"scopes,omitempty"`
+	// ExtraMetadata holds the keys that we want to extract from the token and pass to the upstream.
+	ExtraMetadata []string `bson:"extra_metadata" json:"extra_metadata,omitempty"`
 
 	// TokenProvider is the OAuth2 token provider for internal use.
 	TokenProvider oauth2.TokenSource `bson:"-" json:"-"`
