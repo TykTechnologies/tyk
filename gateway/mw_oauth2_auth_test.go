@@ -53,7 +53,7 @@ func TestUpstreamOauth2(t *testing.T) {
 		},
 		TokenURL: ts.URL + "/token",
 		Scopes:   []string{"scope1", "scope2"},
-		Header:   apidef.HeaderData{Enabled: true, Name: "Authorization"},
+		Header:   apidef.AuthSource{Enabled: true, Name: "Authorization"},
 	}
 
 	tst.Gw.BuildAndLoadAPI(
@@ -136,7 +136,7 @@ func TestPasswordCredentialsTokenRequest(t *testing.T) {
 		Password: "password1",
 		TokenURL: ts.URL + "/token",
 		Scopes:   []string{"scope1", "scope2"},
-		Header:   apidef.HeaderData{Enabled: true, Name: "Authorization"},
+		Header:   apidef.AuthSource{Enabled: true, Name: "Authorization"},
 	}
 
 	tst.Gw.BuildAndLoadAPI(

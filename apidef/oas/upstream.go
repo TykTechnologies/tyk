@@ -649,7 +649,7 @@ type UpstreamOAuth struct {
 type PasswordAuthentication struct {
 	ClientAuthData
 	// Header holds the configuration for the custom header to be used for OAuth authentication.
-	Header *HeaderData `bson:"header" json:"header"`
+	Header *AuthSource `bson:"header" json:"header"`
 	// Username is the username to be used for upstream OAuth2 password authentication.
 	Username string `bson:"username" json:"username"`
 	// Password is the password to be used for upstream OAuth2 password authentication.
@@ -673,7 +673,7 @@ type ClientAuthData struct {
 type ClientCredentials struct {
 	ClientAuthData
 	// Header holds the configuration for the custom header to be used for OAuth authentication.
-	Header *HeaderData `bson:"header" json:"header"`
+	Header *AuthSource `bson:"header" json:"header"`
 	// TokenURL is the resource server's token endpoint
 	// URL. This is a constant specific to each server.
 	TokenURL string `bson:"tokenUrl" json:"tokenUrl"`
@@ -681,18 +681,10 @@ type ClientCredentials struct {
 	Scopes []string `bson:"scopes,omitempty" json:"scopes,omitempty"`
 }
 
-// HeaderData holds the configuration for the custom header to be used for OAuth authentication.
-type HeaderData struct {
-	Enabled bool `bson:"enabled" json:"enabled"`
-	// Name is the custom header name to be used for OAuth client credential flow authentication.
-	// Defaults to `Authorization`.
-	Name string `bson:"name" json:"name"`
-}
-
-func (h *HeaderData) Fill(api apidef.HeaderData) {
-	h.Enabled = api.Enabled
-	h.Name = api.Name
-}
+//func (h *HeaderData) Fill(api apidef.HeaderData) {
+//	h.Enabled = api.Enabled
+//	h.Name = api.Name
+//}
 
 func (c *ClientCredentials) Fill(api apidef.ClientCredentials) {
 	c.ClientID = api.ClientID
@@ -701,9 +693,9 @@ func (c *ClientCredentials) Fill(api apidef.ClientCredentials) {
 	c.Scopes = api.Scopes
 
 	if c.Header == nil {
-		c.Header = &HeaderData{}
+		c.Header = &AuthSource{}
 	}
-	c.Header.Fill(api.Header)
+	c.Header.Fill(api.Header.Enabled, api.Header.Name)
 	if ShouldOmit(c.Header) {
 		c.Header = nil
 	}
@@ -715,9 +707,9 @@ func (p *PasswordAuthentication) Fill(api apidef.PasswordAuthentication) {
 	p.TokenURL = api.TokenURL
 	p.Scopes = api.Scopes
 	if p.Header == nil {
-		p.Header = &HeaderData{}
+		p.Header = &AuthSource{}
 	}
-	p.Header.Fill(api.Header)
+	p.Header.Fill(api.Header.Enabled, api.Header.Name)
 	if ShouldOmit(p.Header) {
 		p.Header = nil
 	}
@@ -750,18 +742,18 @@ func (c *ClientCredentials) ExtractTo(api *apidef.ClientCredentials) {
 	api.Scopes = c.Scopes
 
 	if c.Header == nil {
-		c.Header = &HeaderData{}
+		c.Header = &AuthSource{}
 		defer func() {
 			c.Header = nil
 		}()
 	}
-	c.Header.ExtractTo(&api.Header)
+	c.Header.ExtractTo(&api.Header.Enabled, &api.Header.Name)
 }
 
-func (h *HeaderData) ExtractTo(api *apidef.HeaderData) {
-	api.Enabled = h.Enabled
-	api.Name = h.Name
-}
+//func (h *HeaderData) ExtractTo(api *apidef.HeaderData) {
+//	api.Enabled = h.Enabled
+//	api.Name = h.Name
+//}
 
 func (p *PasswordAuthentication) ExtractTo(api *apidef.PasswordAuthentication) {
 	api.Username = p.Username

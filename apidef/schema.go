@@ -1051,7 +1051,10 @@ const Schema = `{
                     "name": {
                       "type": "string"
                     }
-                  }
+                  },
+                  "required": [
+                    "enabled"
+                  ]
                 }
               },
               "required": [
@@ -1097,7 +1100,10 @@ const Schema = `{
                     "name": {
                       "type": "string"
                     }
-                  }
+                  },
+                  "required": [
+                    "enabled"
+                  ]
                 }
               },
               "required": [

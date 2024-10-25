@@ -818,7 +818,7 @@ type UpstreamOAuth struct {
 type PasswordAuthentication struct {
 	ClientAuthData
 	// Header holds the configuration for the custom header to be used for OAuth authentication.
-	Header HeaderData `bson:"header" json:"header"`
+	Header AuthSource `bson:"header" json:"header"`
 	// Username is the username to be used for upstream OAuth2 password authentication.
 	Username string `bson:"username" json:"username"`
 	// Password is the password to be used for upstream OAuth2 password authentication.
@@ -853,7 +853,7 @@ type HeaderData struct {
 type ClientCredentials struct {
 	ClientAuthData
 	// Header holds the configuration for the custom header to be used for OAuth authentication.
-	Header HeaderData `bson:"header" json:"header"`
+	Header AuthSource `bson:"header" json:"header"`
 	// Enabled activates upstream OAuth2 client credentials authentication.
 	Enabled bool `bson:"enabled" json:"enabled"`
 	// TokenURL is the resource server's token endpoint
@@ -864,6 +864,28 @@ type ClientCredentials struct {
 
 	// TokenProvider is the OAuth2 token provider for internal use.
 	TokenProvider oauth2.TokenSource `bson:"-" json:"-"`
+}
+
+// AuthSource is a common type to be used for auth configurations.
+type AuthSource struct {
+	// Enabled enables the auth source.
+	Enabled bool `bson:"enabled" json:"enabled"`
+	// Name specifies the key to be used in the auth source.
+	Name string `bson:"name" json:"name"`
+}
+
+// IsEnabled returns the enabled status of the auth source.
+func (a AuthSource) IsEnabled() bool {
+	return a.Enabled
+}
+
+// AuthKeyName returns the key name to be used for the auth source.
+func (a AuthSource) AuthKeyName() string {
+	if !a.IsEnabled() {
+		return ""
+	}
+
+	return a.Name
 }
 
 type AnalyticsPluginConfig struct {
