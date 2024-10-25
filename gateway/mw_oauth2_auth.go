@@ -21,14 +21,17 @@ import (
 )
 
 const (
-	UpstreamOAuthErrorEventName = "UpstreamOAuthError"
-	UpstreamOAuthMiddlewareName = "UpstreamOAuth"
+	UpstreamOAuthErrorEventName    = "UpstreamOAuthError"
+	UpstreamOAuthMiddlewareName    = "UpstreamOAuth"
+	ClientCredentialsAuthorizeType = "clientCredentials"
+	PasswordAuthorizeType          = "password"
 )
 
 type OAuthHeaderProvider interface {
 	// getOAuthToken returns the OAuth token for the request.
 	getOAuthToken(r *http.Request, OAuthSpec *UpstreamOAuth) (string, error)
 	getHeaderName(OAuthSpec *UpstreamOAuth) string
+	headerEnabled(OAuthSpec *UpstreamOAuth) bool
 }
 
 type ClientCredentialsOAuthProvider struct{}
@@ -148,6 +151,13 @@ func (OAuthSpec *UpstreamOAuth) ProcessRequest(_ http.ResponseWriter, r *http.Re
 		upstreamOAuthProvider.HeaderName = headerName
 	}
 
+	if provider.headerEnabled(OAuthSpec) {
+		headerName := provider.getHeaderName(OAuthSpec)
+		if headerName != "" {
+			upstreamOAuthProvider.HeaderName = headerName
+		}
+	}
+
 	httputil.SetUpstreamAuth(r, upstreamOAuthProvider)
 	return nil, http.StatusOK
 }
@@ -158,11 +168,11 @@ func getOAuthHeaderProvider(oauthConfig apidef.UpstreamOAuth) (OAuthHeaderProvid
 	}
 
 	switch {
-	case oauthConfig.ClientCredentials.Enabled && oauthConfig.PasswordAuthentication.Enabled:
+	case len(oauthConfig.AllowedAuthorizeTypes) > 1:
 		return nil, fmt.Errorf("both client credentials and password authentication are provided")
-	case oauthConfig.ClientCredentials.Enabled:
+	case oauthConfig.AllowedAuthorizeTypes[0] == ClientCredentialsAuthorizeType:
 		return &ClientCredentialsOAuthProvider{}, nil
-	case oauthConfig.PasswordAuthentication.Enabled:
+	case oauthConfig.AllowedAuthorizeTypes[0] == PasswordAuthorizeType:
 		return &PasswordOAuthProvider{}, nil
 	default:
 		return nil, fmt.Errorf("no valid OAuth configuration provided")
@@ -206,8 +216,12 @@ func (p *ClientCredentialsOAuthProvider) getOAuthToken(r *http.Request, OAuthSpe
 	return fmt.Sprintf("Bearer %s", token), nil
 }
 
+func (p *ClientCredentialsOAuthProvider) headerEnabled(OAuthSpec *UpstreamOAuth) bool {
+	return OAuthSpec.Spec.UpstreamAuth.OAuth.ClientCredentials.Header.Enabled
+}
+
 func (p *ClientCredentialsOAuthProvider) getHeaderName(OAuthSpec *UpstreamOAuth) string {
-	return OAuthSpec.Spec.UpstreamAuth.OAuth.ClientCredentials.HeaderName
+	return OAuthSpec.Spec.UpstreamAuth.OAuth.ClientCredentials.Header.Name
 }
 
 func (p *PasswordOAuthProvider) getOAuthToken(r *http.Request, OAuthSpec *UpstreamOAuth) (string, error) {
@@ -224,7 +238,11 @@ func (p *PasswordOAuthProvider) getOAuthToken(r *http.Request, OAuthSpec *Upstre
 }
 
 func (p *PasswordOAuthProvider) getHeaderName(OAuthSpec *UpstreamOAuth) string {
-	return OAuthSpec.Spec.UpstreamAuth.OAuth.PasswordAuthentication.HeaderName
+	return OAuthSpec.Spec.UpstreamAuth.OAuth.PasswordAuthentication.Header.Name
+}
+
+func (p *PasswordOAuthProvider) headerEnabled(OAuthSpec *UpstreamOAuth) bool {
+	return OAuthSpec.Spec.UpstreamAuth.OAuth.PasswordAuthentication.Header.Enabled
 }
 
 func generatePasswordOAuthCacheKey(config apidef.UpstreamOAuth, apiId string) string {

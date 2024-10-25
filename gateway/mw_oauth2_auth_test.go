@@ -51,9 +51,9 @@ func TestUpstreamOauth2(t *testing.T) {
 			ClientID:     "CLIENT_ID",
 			ClientSecret: "CLIENT_SECRET",
 		},
-		TokenURL:      ts.URL + "/token",
-		Scopes:        []string{"scope1", "scope2"},
-		HeaderName:    "",
+		TokenURL: ts.URL + "/token",
+		Scopes:   []string{"scope1", "scope2"},
+		Header:   apidef.AuthSource{Enabled: true, Name: "Authorization"},
 		ExtraMetadata: []string{"instance_url"},
 	}
 
@@ -64,8 +64,9 @@ func TestUpstreamOauth2(t *testing.T) {
 			spec.UpstreamAuth = apidef.UpstreamAuth{
 				Enabled: true,
 				OAuth: apidef.UpstreamOAuth{
-					Enabled:           true,
-					ClientCredentials: cfg,
+					Enabled:               true,
+					ClientCredentials:     cfg,
+					AllowedAuthorizeTypes: []string{ClientCredentialsAuthorizeType},
 				},
 			}
 			spec.Proxy.StripListenPath = true
@@ -74,7 +75,7 @@ func TestUpstreamOauth2(t *testing.T) {
 
 	_, _ = tst.Run(t, test.TestCases{
 		{
-			Path: "/upstream-oauth-distributed/",
+			Path: "/upstream-oauth-password/",
 			Code: http.StatusOK,
 			BodyMatchFunc: func(body []byte) bool {
 				resp := struct {
@@ -123,22 +124,20 @@ func TestPasswordCredentialsTokenRequest(t *testing.T) {
 			assert.Fail(t, "payload = %q; want %q", string(body), expected)
 		}
 		w.Header().Set("Content-Type", "application/x-www-form-urlencoded")
-		w.Write([]byte("access_token=90d64460d14870c08c81352a05dedd3465940a7c&scope=user&token_type=bearer&instance_url=https://tykxample.com"))
+		w.Write([]byte("access_token=90d64460d14870c08c81352a05dedd3465940a7c&scope=user&token_type=bearer"))
 	}))
 	defer t.Cleanup(func() { ts.Close() })
 
 	cfg := apidef.PasswordAuthentication{
-		Enabled: true,
 		ClientAuthData: apidef.ClientAuthData{
 			ClientID:     "CLIENT_ID",
 			ClientSecret: "CLIENT_SECRET",
 		},
-		Username:      "user1",
-		Password:      "password1",
-		TokenURL:      ts.URL + "/token",
-		Scopes:        []string{"scope1", "scope2"},
-		HeaderName:    "",
-		ExtraMetadata: []string{"instance_url"},
+		Username: "user1",
+		Password: "password1",
+		TokenURL: ts.URL + "/token",
+		Scopes:   []string{"scope1", "scope2"},
+		Header:   apidef.AuthSource{Enabled: true, Name: "Authorization"},
 	}
 
 	tst.Gw.BuildAndLoadAPI(
@@ -150,6 +149,7 @@ func TestPasswordCredentialsTokenRequest(t *testing.T) {
 				OAuth: apidef.UpstreamOAuth{
 					Enabled:                true,
 					PasswordAuthentication: cfg,
+					AllowedAuthorizeTypes:  []string{PasswordAuthorizeType},
 				},
 			}
 			spec.Proxy.StripListenPath = true

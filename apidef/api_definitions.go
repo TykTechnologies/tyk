@@ -806,6 +806,8 @@ type UpstreamBasicAuth struct {
 type UpstreamOAuth struct {
 	// Enabled enables upstream OAuth2 authentication.
 	Enabled bool `bson:"enabled" json:"enabled"`
+	// AllowedAuthorizeTypes specifies the allowed authorization types for upstream OAuth2 authentication.
+	AllowedAuthorizeTypes []string `bson:"allowed_authorize_types" json:"allowed_authorize_types"`
 	// ClientCredentials holds the client credentials for upstream OAuth2 authentication.
 	ClientCredentials ClientCredentials `bson:"client_credentials" json:"client_credentials"`
 	// PasswordAuthentication holds the configuration for upstream OAauth password authentication flow.
@@ -815,8 +817,8 @@ type UpstreamOAuth struct {
 // PasswordAuthentication holds the configuration for upstream OAuth2 password authentication flow.
 type PasswordAuthentication struct {
 	ClientAuthData
-	// Enabled activates upstream OAuth2 password authentication.
-	Enabled bool `bson:"enabled" json:"enabled"`
+	// Header holds the configuration for the custom header to be used for OAuth authentication.
+	Header AuthSource `bson:"header" json:"header"`
 	// Username is the username to be used for upstream OAuth2 password authentication.
 	Username string `bson:"username" json:"username"`
 	// Password is the password to be used for upstream OAuth2 password authentication.
@@ -826,9 +828,6 @@ type PasswordAuthentication struct {
 	TokenURL string `bson:"token_url" json:"token_url"`
 	// Scopes specifies optional requested permissions.
 	Scopes []string `bson:"scopes" json:"scopes,omitempty"`
-	// HeaderName is the custom header name to be used for OAuth password authentication flow.
-	// Defaults to `Authorization`.
-	HeaderName string `bson:"header_name" json:"header_name"`
 	// ExtraMetadata holds the keys that we want to extract from the token and pass to the upstream.
 	ExtraMetadata []string `bson:"extra_metadata" json:"extra_metadata,omitempty"`
 
@@ -847,6 +846,8 @@ type ClientAuthData struct {
 // ClientCredentials holds the client credentials for upstream OAuth2 authentication.
 type ClientCredentials struct {
 	ClientAuthData
+	// Header holds the configuration for the custom header to be used for OAuth authentication.
+	Header AuthSource `bson:"header" json:"header"`
 	// Enabled activates upstream OAuth2 client credentials authentication.
 	Enabled bool `bson:"enabled" json:"enabled"`
 	// TokenURL is the resource server's token endpoint
@@ -854,14 +855,33 @@ type ClientCredentials struct {
 	TokenURL string `bson:"token_url" json:"token_url"`
 	// Scopes specifies optional requested permissions.
 	Scopes []string `bson:"scopes" json:"scopes,omitempty"`
-	// HeaderName is the custom header name to be used for OAuth client credential flow authentication.
-	// Defaults to `Authorization`.
-	HeaderName string `bson:"header_name" json:"header_name"`
 	// ExtraMetadata holds the keys that we want to extract from the token and pass to the upstream.
 	ExtraMetadata []string `bson:"extra_metadata" json:"extra_metadata,omitempty"`
 
 	// TokenProvider is the OAuth2 token provider for internal use.
 	TokenProvider oauth2.TokenSource `bson:"-" json:"-"`
+}
+
+// AuthSource is a common type to be used for auth configurations.
+type AuthSource struct {
+	// Enabled enables the auth source.
+	Enabled bool `bson:"enabled" json:"enabled"`
+	// Name specifies the key to be used in the auth source.
+	Name string `bson:"name" json:"name"`
+}
+
+// IsEnabled returns the enabled status of the auth source.
+func (a AuthSource) IsEnabled() bool {
+	return a.Enabled
+}
+
+// AuthKeyName returns the key name to be used for the auth source.
+func (a AuthSource) AuthKeyName() string {
+	if !a.IsEnabled() {
+		return ""
+	}
+
+	return a.Name
 }
 
 type AnalyticsPluginConfig struct {
@@ -1553,6 +1573,9 @@ var Template = template.New("").Funcs(map[string]interface{}{
 	},
 })
 
+// ExternalOAuth support will be deprecated starting from 5.7.0.
+// To avoid any disruptions, we recommend that you use JSON Web Token (JWT) instead,
+// as explained in https://tyk.io/docs/basic-config-and-security/security/authentication-authorization/ext-oauth-middleware/.
 type ExternalOAuth struct {
 	Enabled   bool       `bson:"enabled" json:"enabled"`
 	Providers []Provider `bson:"providers" json:"providers"`
