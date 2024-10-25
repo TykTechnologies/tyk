@@ -21,25 +21,78 @@ import (
 )
 
 const (
-	UpstreamOAuthErrorEventName = "UpstreamOAuthError"
-	UpstreamOAuthMiddlewareName = "UpstreamOAuth"
+	UpstreamOAuthErrorEventName    = "UpstreamOAuthError"
+	UpstreamOAuthMiddlewareName    = "UpstreamOAuth"
+	ClientCredentialsAuthorizeType = "clientCredentials"
+	PasswordAuthorizeType          = "password"
 )
 
 type OAuthHeaderProvider interface {
 	// getOAuthToken returns the OAuth token for the request.
 	getOAuthToken(r *http.Request, OAuthSpec *UpstreamOAuth) (string, error)
+	getHeaderName(OAuthSpec *UpstreamOAuth) string
+	headerEnabled(OAuthSpec *UpstreamOAuth) bool
 }
 
 type ClientCredentialsOAuthProvider struct{}
 
 type PerAPIClientCredentialsOAuthProvider struct{}
 
-func newUpstreamOAuthClientCredentialsCache(connectionHandler *storage.ConnectionHandler) *upstreamOAuthClientCredentialsCache {
+type PasswordOAuthProvider struct{}
+
+func newUpstreamOAuthClientCredentialsCache(connectionHandler *storage.ConnectionHandler) UpstreamOAuthCache {
 	return &upstreamOAuthClientCredentialsCache{RedisCluster: storage.RedisCluster{KeyPrefix: "upstreamOAuthCC-", ConnectionHandler: connectionHandler}}
+}
+
+func newUpstreamOAuthPasswordCache(connectionHandler *storage.ConnectionHandler) UpstreamOAuthCache {
+	return &upstreamOAuthPasswordCache{RedisCluster: storage.RedisCluster{KeyPrefix: "upstreamOAuthPW-", ConnectionHandler: connectionHandler}}
 }
 
 type upstreamOAuthClientCredentialsCache struct {
 	storage.RedisCluster
+}
+
+type upstreamOAuthPasswordCache struct {
+	storage.RedisCluster
+}
+
+func (cache *upstreamOAuthPasswordCache) getToken(r *http.Request, OAuthSpec *UpstreamOAuth) (string, error) {
+	cacheKey := generatePasswordOAuthCacheKey(OAuthSpec.Spec.UpstreamAuth.OAuth, OAuthSpec.Spec.APIID)
+
+	tokenString, err := retryGetKeyAndLock(cacheKey, &cache.RedisCluster)
+	if err != nil {
+		return "", err
+	}
+
+	if tokenString != "" {
+		decryptedToken := decrypt(getPaddedSecret(OAuthSpec.Gw.GetConfig().Secret), tokenString)
+		return decryptedToken, nil
+	}
+
+	token, err := cache.obtainToken(r.Context(), OAuthSpec)
+	if err != nil {
+		return "", err
+	}
+
+	encryptedToken := encrypt(getPaddedSecret(OAuthSpec.Gw.GetConfig().Secret), token.AccessToken)
+
+	ttl := time.Until(token.Expiry)
+	if err := setTokenInCache(cacheKey, encryptedToken, ttl, &cache.RedisCluster); err != nil {
+		return "", err
+	}
+
+	return token.AccessToken, nil
+}
+
+func (cache *upstreamOAuthPasswordCache) obtainToken(ctx context.Context, OAuthSpec *UpstreamOAuth) (*oauth2.Token, error) {
+	cfg := newOAuth2PasswordConfig(OAuthSpec)
+
+	token, err := cfg.PasswordCredentialsToken(ctx, OAuthSpec.Spec.UpstreamAuth.OAuth.PasswordAuthentication.Username, OAuthSpec.Spec.UpstreamAuth.OAuth.PasswordAuthentication.Password)
+	if err != nil {
+		return &oauth2.Token{}, err
+	}
+
+	return token, nil
 }
 
 type UpstreamOAuthCache interface {
@@ -81,10 +134,6 @@ func (OAuthSpec *UpstreamOAuth) ProcessRequest(_ http.ResponseWriter, r *http.Re
 		HeaderName: header.Authorization,
 	}
 
-	if oauthConfig.HeaderName != "" {
-		upstreamOAuthProvider.HeaderName = oauthConfig.HeaderName
-	}
-
 	provider, err := getOAuthHeaderProvider(oauthConfig)
 	if err != nil {
 		return fmt.Errorf("failed to get OAuth header provider: %w", err), http.StatusInternalServerError
@@ -97,13 +146,32 @@ func (OAuthSpec *UpstreamOAuth) ProcessRequest(_ http.ResponseWriter, r *http.Re
 
 	upstreamOAuthProvider.AuthValue = payload
 
+	if provider.headerEnabled(OAuthSpec) {
+		headerName := provider.getHeaderName(OAuthSpec)
+		if headerName != "" {
+			upstreamOAuthProvider.HeaderName = headerName
+		}
+	}
+
 	httputil.SetUpstreamAuth(r, upstreamOAuthProvider)
 	return nil, http.StatusOK
 }
 
 func getOAuthHeaderProvider(oauthConfig apidef.UpstreamOAuth) (OAuthHeaderProvider, error) {
-	// to be extended when PasswordAuth is implemented
-	return &ClientCredentialsOAuthProvider{}, nil
+	if !oauthConfig.IsEnabled() {
+		return nil, fmt.Errorf("upstream OAuth is not enabled")
+	}
+
+	switch {
+	case len(oauthConfig.AllowedAuthorizeTypes) > 1:
+		return nil, fmt.Errorf("both client credentials and password authentication are provided")
+	case oauthConfig.AllowedAuthorizeTypes[0] == ClientCredentialsAuthorizeType:
+		return &ClientCredentialsOAuthProvider{}, nil
+	case oauthConfig.AllowedAuthorizeTypes[0] == PasswordAuthorizeType:
+		return &PasswordOAuthProvider{}, nil
+	default:
+		return nil, fmt.Errorf("no valid OAuth configuration provided")
+	}
 }
 
 func (p *PerAPIClientCredentialsOAuthProvider) getOAuthHeaderValue(r *http.Request, OAuthSpec *UpstreamOAuth) (string, error) {
@@ -143,7 +211,49 @@ func (p *ClientCredentialsOAuthProvider) getOAuthToken(r *http.Request, OAuthSpe
 	return fmt.Sprintf("Bearer %s", token), nil
 }
 
-func generateCacheKey(config apidef.UpstreamOAuth, apiId string) string {
+func (p *ClientCredentialsOAuthProvider) headerEnabled(OAuthSpec *UpstreamOAuth) bool {
+	return OAuthSpec.Spec.UpstreamAuth.OAuth.ClientCredentials.Header.Enabled
+}
+
+func (p *ClientCredentialsOAuthProvider) getHeaderName(OAuthSpec *UpstreamOAuth) string {
+	return OAuthSpec.Spec.UpstreamAuth.OAuth.ClientCredentials.Header.Name
+}
+
+func (p *PasswordOAuthProvider) getOAuthToken(r *http.Request, OAuthSpec *UpstreamOAuth) (string, error) {
+	if OAuthSpec.Gw.UpstreamOAuthCache == nil {
+		OAuthSpec.Gw.UpstreamOAuthCache = newUpstreamOAuthPasswordCache(OAuthSpec.Gw.StorageConnectionHandler)
+	}
+
+	token, err := OAuthSpec.Gw.UpstreamOAuthCache.getToken(r, OAuthSpec)
+	if err != nil {
+		return handleOAuthError(r, OAuthSpec, err)
+	}
+
+	return fmt.Sprintf("Bearer %s", token), nil
+}
+
+func (p *PasswordOAuthProvider) getHeaderName(OAuthSpec *UpstreamOAuth) string {
+	return OAuthSpec.Spec.UpstreamAuth.OAuth.PasswordAuthentication.Header.Name
+}
+
+func (p *PasswordOAuthProvider) headerEnabled(OAuthSpec *UpstreamOAuth) bool {
+	return OAuthSpec.Spec.UpstreamAuth.OAuth.PasswordAuthentication.Header.Enabled
+}
+
+func generatePasswordOAuthCacheKey(config apidef.UpstreamOAuth, apiId string) string {
+	key := fmt.Sprintf(
+		"%s|%s|%s|%s",
+		apiId,
+		config.PasswordAuthentication.ClientID,
+		config.PasswordAuthentication.ClientSecret,
+		strings.Join(config.PasswordAuthentication.Scopes, ","))
+
+	hash := sha256.New()
+	hash.Write([]byte(key))
+	return hex.EncodeToString(hash.Sum(nil))
+}
+
+func generateClientCredentialsCacheKey(config apidef.UpstreamOAuth, apiId string) string {
 	key := fmt.Sprintf(
 		"%s|%s|%s|%s",
 		apiId,
@@ -157,7 +267,7 @@ func generateCacheKey(config apidef.UpstreamOAuth, apiId string) string {
 }
 
 func (cache *upstreamOAuthClientCredentialsCache) getToken(r *http.Request, OAuthSpec *UpstreamOAuth) (string, error) {
-	cacheKey := generateCacheKey(OAuthSpec.Spec.UpstreamAuth.OAuth, OAuthSpec.Spec.APIID)
+	cacheKey := generateClientCredentialsCacheKey(OAuthSpec.Spec.UpstreamAuth.OAuth, OAuthSpec.Spec.APIID)
 
 	tokenString, err := retryGetKeyAndLock(cacheKey, &cache.RedisCluster)
 	if err != nil {
@@ -165,7 +275,7 @@ func (cache *upstreamOAuthClientCredentialsCache) getToken(r *http.Request, OAut
 	}
 
 	if tokenString != "" {
-		decryptedToken := decrypt(getPaddedSecret(OAuthSpec.Gw), tokenString)
+		decryptedToken := decrypt(getPaddedSecret(OAuthSpec.Gw.GetConfig().Secret), tokenString)
 		return decryptedToken, nil
 	}
 
@@ -174,7 +284,7 @@ func (cache *upstreamOAuthClientCredentialsCache) getToken(r *http.Request, OAut
 		return "", err
 	}
 
-	encryptedToken := encrypt(getPaddedSecret(OAuthSpec.Gw), token.AccessToken)
+	encryptedToken := encrypt(getPaddedSecret(OAuthSpec.Gw.GetConfig().Secret), token.AccessToken)
 
 	ttl := time.Until(token.Expiry)
 	if err := setTokenInCache(cacheKey, encryptedToken, ttl, &cache.RedisCluster); err != nil {
@@ -215,6 +325,17 @@ func newOAuth2ClientCredentialsConfig(OAuthSpec *UpstreamOAuth) oauth2clientcred
 		ClientSecret: OAuthSpec.Spec.UpstreamAuth.OAuth.ClientCredentials.ClientSecret,
 		TokenURL:     OAuthSpec.Spec.UpstreamAuth.OAuth.ClientCredentials.TokenURL,
 		Scopes:       OAuthSpec.Spec.UpstreamAuth.OAuth.ClientCredentials.Scopes,
+	}
+}
+
+func newOAuth2PasswordConfig(OAuthSpec *UpstreamOAuth) oauth2.Config {
+	return oauth2.Config{
+		ClientID:     OAuthSpec.Spec.UpstreamAuth.OAuth.PasswordAuthentication.ClientID,
+		ClientSecret: OAuthSpec.Spec.UpstreamAuth.OAuth.PasswordAuthentication.ClientSecret,
+		Endpoint: oauth2.Endpoint{
+			TokenURL: OAuthSpec.Spec.UpstreamAuth.OAuth.PasswordAuthentication.TokenURL,
+		},
+		Scopes: OAuthSpec.Spec.UpstreamAuth.OAuth.PasswordAuthentication.Scopes,
 	}
 }
 
