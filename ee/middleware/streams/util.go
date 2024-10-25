@@ -7,30 +7,33 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-type handleFuncAdapter struct {
-	streamID string
-	sm       *Manager
-	mw       *Middleware
-	muxer    *mux.Router
-	logger   *logrus.Entry
+type HandleFuncAdapter struct {
+	StreamID         string
+	StreamManager    *Manager
+	StreamMiddleware *Middleware
+	Muxer            *mux.Router
+	Logger           *logrus.Entry
 }
 
-func (h *handleFuncAdapter) HandleFunc(path string, f func(http.ResponseWriter, *http.Request)) {
-	h.logger.Debugf("Registering streaming handleFunc for path: %s", path)
+func (h *HandleFuncAdapter) HandleFunc(path string, f func(http.ResponseWriter, *http.Request)) {
+	h.Logger.Debugf("Registering streaming handleFunc for path: %s", path)
 
-	if h.mw == nil || h.muxer == nil {
-		h.logger.Error("Middleware or muxer is nil")
+	if h.StreamMiddleware == nil || h.Muxer == nil {
+		h.Logger.Error("Middleware or muxer is nil")
 		return
 	}
 
-	h.sm.routeLock.Lock()
-	h.muxer.HandleFunc(path, func(w http.ResponseWriter, r *http.Request) {
-		h.sm.activityCounter.Add(1)
-		defer h.sm.activityCounter.Add(-1)
-		f(w, r)
+	h.StreamManager.routeLock.Lock()
+	h.Muxer.HandleFunc(path, func(w http.ResponseWriter, r *http.Request) {
+		recorder := h.StreamManager.analyticsFactory.CreateRecorder(r)
+		analyticsResponseWriter := h.StreamManager.analyticsFactory.CreateResponseWriter(w, r, h.StreamID, recorder)
+
+		h.StreamManager.activityCounter.Add(1)
+		defer h.StreamManager.activityCounter.Add(-1)
+		f(analyticsResponseWriter, r)
 	})
-	h.sm.routeLock.Unlock()
-	h.logger.Debugf("Registered handler for path: %s", path)
+	h.StreamManager.routeLock.Unlock()
+	h.Logger.Debugf("Registered handler for path: %s", path)
 }
 
 // Helper function to extract paths from an http_server configuration

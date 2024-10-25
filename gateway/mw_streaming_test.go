@@ -965,7 +965,7 @@ func TestStreamingAPIGarbageCollection(t *testing.T) {
 
 	apiSpec := streams.NewAPISpec(specs[0].APIID, specs[0].Name, specs[0].IsOAS, specs[0].OAS, specs[0].StripListenPath)
 
-	s := streams.NewMiddleware(ts.Gw, &DummyBase{}, apiSpec)
+	s := streams.NewMiddleware(ts.Gw, &DummyBase{}, apiSpec, nil)
 
 	if err := setUpStreamAPI(ts, apiName, bentoHTTPServerTemplate); err != nil {
 		t.Fatal(err)
