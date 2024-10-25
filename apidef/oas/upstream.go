@@ -637,7 +637,7 @@ func (u *UpstreamBasicAuth) ExtractTo(api *apidef.UpstreamBasicAuth) {
 type UpstreamOAuth struct {
 	// Enabled activates upstream OAuth2 authentication.
 	Enabled bool `bson:"enabled" json:"enabled"`
-	// AllowedAuthorizeTypes
+	// AllowedAuthorizeTypes specifies the allowed authorization types for upstream OAuth2 authentication.
 	AllowedAuthorizeTypes []string `bson:"allowedAuthorizeTypes" json:"allowedAuthorizeTypes"`
 	// ClientCredentials holds the configuration for OAuth2 Client Credentials flow.
 	ClientCredentials *ClientCredentials `bson:"clientCredentials,omitempty" json:"clientCredentials,omitempty"`

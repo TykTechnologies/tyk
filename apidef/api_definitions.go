@@ -806,7 +806,7 @@ type UpstreamBasicAuth struct {
 type UpstreamOAuth struct {
 	// Enabled enables upstream OAuth2 authentication.
 	Enabled bool `bson:"enabled" json:"enabled"`
-	// AllowedAuthorizeTypes
+	// AllowedAuthorizeTypes specifies the allowed authorization types for upstream OAuth2 authentication.
 	AllowedAuthorizeTypes []string `bson:"allowed_authorize_types" json:"allowed_authorize_types"`
 	// ClientCredentials holds the client credentials for upstream OAuth2 authentication.
 	ClientCredentials ClientCredentials `bson:"client_credentials" json:"client_credentials"`

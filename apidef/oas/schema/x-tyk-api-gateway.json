@@ -2042,14 +2042,15 @@
           "type": "boolean"
         },
         "allowedAuthorizeTypes": {
-          "type": "array",
+          "type": ["array", "null"],
           "items": {
             "type": "string",
             "enum": [
               "clientCredentials",
               "password"
             ]
-          }
+          },
+          "minItems": 0
         },
         "clientCredentials": {
           "type": "object",
