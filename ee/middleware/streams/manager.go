@@ -12,13 +12,14 @@ import (
 
 // Manager is responsible for creating a single stream.
 type Manager struct {
-	streams         sync.Map
-	routeLock       sync.Mutex
-	muxer           *mux.Router
-	mw              *Middleware
-	dryRun          bool
-	listenPaths     []string
-	activityCounter atomic.Int32 // Counts active subscriptions, requests.
+	streams          sync.Map
+	routeLock        sync.Mutex
+	muxer            *mux.Router
+	mw               *Middleware
+	dryRun           bool
+	listenPaths      []string
+	activityCounter  atomic.Int32 // Counts active subscriptions, requests.
+	analyticsFactory StreamAnalyticsFactory
 }
 
 func (sm *Manager) initStreams(r *http.Request, config *StreamsConfig) {
@@ -86,13 +87,13 @@ func (sm *Manager) createStream(streamID string, config map[string]interface{}) 
 	sm.mw.Logger().Debugf("Creating stream: %s", streamFullID)
 
 	stream := NewStream(sm.mw.allowedUnsafe)
-	err := stream.Start(config, &handleFuncAdapter{
-		mw:       sm.mw,
-		streamID: streamFullID,
-		muxer:    sm.muxer,
-		sm:       sm,
+	err := stream.Start(config, &HandleFuncAdapter{
+		StreamMiddleware: sm.mw,
+		StreamID:         streamFullID,
+		Muxer:            sm.muxer,
+		StreamManager:    sm,
 		// child logger is necessary to prevent race condition
-		logger: sm.mw.Logger().WithField("stream", streamFullID),
+		Logger: sm.mw.Logger().WithField("stream", streamFullID),
 	})
 	if err != nil {
 		sm.mw.Logger().Errorf("Failed to start stream %s: %v", streamFullID, err)
@@ -112,4 +113,11 @@ func (sm *Manager) hasPath(path string) bool {
 		}
 	}
 	return false
+}
+
+func (sm *Manager) SetAnalyticsFactory(factory StreamAnalyticsFactory) {
+	if factory == nil {
+		factory = &NoopStreamAnalyticsFactory{}
+	}
+	sm.analyticsFactory = factory
 }
