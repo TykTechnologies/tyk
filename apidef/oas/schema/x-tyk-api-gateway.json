@@ -2122,7 +2122,11 @@
             "password"
           ]
         }
-      }
+      },
+      "required": [
+        "enabled",
+        "allowedAuthorizeTypes"
+      ]
     }
   }
 }
