@@ -436,7 +436,10 @@ func (gw *Gateway) processSpec(spec *APISpec, apisByListen map[string]int,
 		gw.mwAppendEnabled(&chainArray, &GraphQLGranularAccessMiddleware{BaseMiddleware: baseMid})
 	}
 
-	gw.mwAppendEnabled(&chainArray, &UpstreamBasicAuth{BaseMiddleware: baseMid})
+	if upstreamBasicAuthMw := getUpstreamBasicAuthMw(baseMid); upstreamBasicAuthMw != nil {
+		gw.mwAppendEnabled(&chainArray, upstreamBasicAuthMw)
+	}
+
 	gw.mwAppendEnabled(&chainArray, &UpstreamOAuth{BaseMiddleware: baseMid})
 
 	gw.mwAppendEnabled(&chainArray, &ValidateJSON{BaseMiddleware: baseMid})
