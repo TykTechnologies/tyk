@@ -797,9 +797,9 @@ type UpstreamBasicAuth struct {
 	Username string `bson:"username" json:"username"`
 	// Password is the password to be used for upstream basic authentication.
 	Password string `bson:"password" json:"password"`
-	// HeaderName is the custom header name to be used for upstream basic authentication.
+	// Header holds the configuration for custom header name to be used for upstream basic authentication.
 	// Defaults to `Authorization`.
-	HeaderName string `bson:"header_name" json:"header_name"`
+	Header AuthSource `bson:"header" json:"header"`
 }
 
 // UpstreamOAuth holds upstream OAuth2 authentication configuration.
