@@ -732,6 +732,7 @@ func (p *PasswordAuthentication) Fill(api apidef.PasswordAuthentication) {
 
 func (u *UpstreamOAuth) Fill(api apidef.UpstreamOAuth) {
 	u.Enabled = api.Enabled
+	u.AllowedAuthorizeTypes = api.AllowedAuthorizeTypes
 
 	if u.ClientCredentials == nil {
 		u.ClientCredentials = &ClientCredentials{}
@@ -774,7 +775,7 @@ func (p *PasswordAuthentication) ExtractTo(api *apidef.PasswordAuthentication) {
 
 func (u *UpstreamOAuth) ExtractTo(api *apidef.UpstreamOAuth) {
 	api.Enabled = u.Enabled
-
+	api.AllowedAuthorizeTypes = u.AllowedAuthorizeTypes
 	if u.ClientCredentials == nil {
 		u.ClientCredentials = &ClientCredentials{}
 		defer func() {
