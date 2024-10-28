@@ -65,7 +65,6 @@ var (
 	// Used to store the test bundles:
 	testMiddlewarePath, _ = ioutil.TempDir("", "tyk-middleware-path")
 
-	defaultTestConfig config.Config
 	EnableTestDNSMock = false
 	MockHandle        *test.DnsMockHandle
 )
@@ -262,11 +261,6 @@ func InitTestMain(ctx context.Context, m *testing.M) int {
 // TestSkipTargetPassEscapingOffWithSkipURLCleaningTrue
 // TestBrokenClients
 // TestGRPC_TokenBasedAuthentication
-
-// ResetTestConfig resets the config for the global gateway
-func (s *Test) ResetTestConfig() {
-	s.Gw.SetConfig(defaultTestConfig)
-}
 
 // simulate reloads in the background, i.e. writes to
 // global variables that should not be accessed in a
@@ -1195,7 +1189,6 @@ func (s *Test) newGateway(genConf func(globalConf *config.Config)) *Gateway {
 	gw.CoProcessInit()
 	gw.afterConfSetup()
 
-	defaultTestConfig = gwConfig
 	gw.SetConfig(gwConfig)
 
 	cli.Init(confPaths)
@@ -1913,7 +1906,6 @@ func (p *httpProxyHandler) handleHTTP(w http.ResponseWriter, req *http.Request) 
 }
 
 func (p *httpProxyHandler) Stop(s *Test) error {
-	s.ResetTestConfig()
 	return p.server.Close()
 }
 
