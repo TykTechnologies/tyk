@@ -1941,6 +1941,10 @@ func TestQuotaResponseHeaders(t *testing.T) {
 				Headers: authorization,
 				Path:    "/quota-headers-test/abc",
 				Code:    http.StatusForbidden,
+				HeadersMatch: map[string]string{
+					header.XRateLimitLimit:     fmt.Sprintf("%d", quotaMax),
+					header.XRateLimitRemaining: "0",
+				},
 			},
 		}...)
 	}
