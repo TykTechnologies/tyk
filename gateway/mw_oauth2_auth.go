@@ -75,6 +75,7 @@ func (cache *upstreamOAuthPasswordCache) getToken(r *http.Request, OAuthSpec *Up
 	}
 
 	encryptedToken := encrypt(getPaddedSecret(OAuthSpec.Gw.GetConfig().Secret), token.AccessToken)
+	setExtraMetadata(r, OAuthSpec.Spec.UpstreamAuth.OAuth.PasswordAuthentication.ExtraMetadata, token)
 
 	ttl := time.Until(token.Expiry)
 	if err := setTokenInCache(cacheKey, encryptedToken, ttl, &cache.RedisCluster); err != nil {
@@ -145,6 +146,10 @@ func (OAuthSpec *UpstreamOAuth) ProcessRequest(_ http.ResponseWriter, r *http.Re
 	}
 
 	upstreamOAuthProvider.AuthValue = payload
+	headerName := provider.getHeaderName(OAuthSpec)
+	if headerName != "" {
+		upstreamOAuthProvider.HeaderName = headerName
+	}
 
 	if provider.headerEnabled(OAuthSpec) {
 		headerName := provider.getHeaderName(OAuthSpec)
@@ -285,6 +290,7 @@ func (cache *upstreamOAuthClientCredentialsCache) getToken(r *http.Request, OAut
 	}
 
 	encryptedToken := encrypt(getPaddedSecret(OAuthSpec.Gw.GetConfig().Secret), token.AccessToken)
+	setExtraMetadata(r, OAuthSpec.Spec.UpstreamAuth.OAuth.ClientCredentials.ExtraMetadata, token)
 
 	ttl := time.Until(token.Expiry)
 	if err := setTokenInCache(cacheKey, encryptedToken, ttl, &cache.RedisCluster); err != nil {
@@ -292,6 +298,20 @@ func (cache *upstreamOAuthClientCredentialsCache) getToken(r *http.Request, OAut
 	}
 
 	return token.AccessToken, nil
+}
+
+func setExtraMetadata(r *http.Request, keyList []string, token *oauth2.Token) {
+	contextDataObject := ctxGetData(r)
+	if contextDataObject == nil {
+		contextDataObject = make(map[string]interface{})
+	}
+	for _, key := range keyList {
+		val := token.Extra(key)
+		if val != "" {
+			contextDataObject[key] = val
+		}
+	}
+	ctxSetData(r, contextDataObject)
 }
 
 func retryGetKeyAndLock(cacheKey string, cache *storage.RedisCluster) (string, error) {

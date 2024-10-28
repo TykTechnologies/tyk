@@ -2055,9 +2055,6 @@
         "clientCredentials": {
           "type": "object",
           "properties": {
-            "enabled": {
-              "type": "boolean"
-            },
             "clientId": {
               "type": "string"
             },
@@ -2075,10 +2072,12 @@
             },
             "header": {
               "$ref": "#/definitions/X-Tyk-AuthSource"
+            },
+            "extra_metadata": {
+              "type": "array"
             }
           },
           "required": [
-            "enabled",
             "clientId",
             "clientSecret",
             "tokenUrl"
@@ -2087,9 +2086,6 @@
         "passwordAuthentication": {
           "type": "object",
           "properties": {
-            "enabled": {
-              "type": "boolean"
-            },
             "clientId": {
               "type": "string"
             },
@@ -2113,10 +2109,12 @@
             },
             "header": {
               "$ref": "#/definitions/X-Tyk-AuthSource"
+            },
+            "extra_metadata": {
+              "type": "array"
             }
           },
           "required": [
-            "enabled",
             "clientId",
             "clientSecret",
             "tokenUrl",

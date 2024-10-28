@@ -607,9 +607,8 @@ func (u *UpstreamAuth) ExtractTo(api *apidef.UpstreamAuth) {
 type UpstreamBasicAuth struct {
 	// Enabled enables upstream basic authentication.
 	Enabled bool `bson:"enabled" json:"enabled"`
-	// HeaderName is the custom header name to be used for upstream basic authentication.
-	// Defaults to `Authorization`.
-	HeaderName string `bson:"headerName" json:"headerName"`
+	// Header contains configurations for the header value.
+	Header *AuthSource `bson:"header,omitempty" json:"header,omitempty"`
 	// Username is the username to be used for upstream basic authentication.
 	Username string `bson:"username" json:"username"`
 	// Password is the password to be used for upstream basic authentication.
@@ -619,18 +618,32 @@ type UpstreamBasicAuth struct {
 // Fill fills *UpstreamBasicAuth from apidef.UpstreamBasicAuth.
 func (u *UpstreamBasicAuth) Fill(api apidef.UpstreamBasicAuth) {
 	u.Enabled = api.Enabled
-	u.HeaderName = api.HeaderName
 	u.Username = api.Username
 	u.Password = api.Password
+
+	if u.Header == nil {
+		u.Header = &AuthSource{}
+	}
+	u.Header.Fill(api.Header.Enabled, api.Header.Name)
+	if ShouldOmit(u.Header) {
+		u.Header = nil
+	}
 }
 
 // ExtractTo extracts *UpstreamBasicAuth into *apidef.UpstreamBasicAuth.
 func (u *UpstreamBasicAuth) ExtractTo(api *apidef.UpstreamBasicAuth) {
 	api.Enabled = u.Enabled
 	api.Enabled = u.Enabled
-	api.HeaderName = u.HeaderName
 	api.Username = u.Username
 	api.Password = u.Password
+
+	if u.Header == nil {
+		u.Header = &AuthSource{}
+		defer func() {
+			u.Header = nil
+		}()
+	}
+	u.Header.ExtractTo(&api.Header.Enabled, &api.Header.Name)
 }
 
 // UpstreamOAuth holds the configuration for OAuth2 Client Credentials flow.
@@ -659,6 +672,8 @@ type PasswordAuthentication struct {
 	TokenURL string `bson:"tokenUrl" json:"tokenUrl"`
 	// Scopes specifies optional requested permissions.
 	Scopes []string `bson:"scopes" json:"scopes,omitempty"`
+	// ExtraMetadata holds the keys that we want to extract from the token and pass to the upstream.
+	ExtraMetadata []string `bson:"extraMetadata" json:"extraMetadata,omitempty"`
 }
 
 // ClientAuthData holds the client ID and secret for OAuth2 authentication.
@@ -679,6 +694,11 @@ type ClientCredentials struct {
 	TokenURL string `bson:"tokenUrl" json:"tokenUrl"`
 	// Scopes specifies optional requested permissions.
 	Scopes []string `bson:"scopes,omitempty" json:"scopes,omitempty"`
+	// HeaderName is the custom header name to be used for OAuth client credential flow authentication.
+	// Defaults to `Authorization`.
+	HeaderName string `bson:"headerName" json:"headerName"`
+	// ExtraMetadata holds the keys that we want to extract from the token and pass to the upstream.
+	ExtraMetadata []string `bson:"extraMetadata" json:"extraMetadata,omitempty"`
 }
 
 func (c *ClientCredentials) Fill(api apidef.ClientCredentials) {

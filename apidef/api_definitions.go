@@ -797,9 +797,9 @@ type UpstreamBasicAuth struct {
 	Username string `bson:"username" json:"username"`
 	// Password is the password to be used for upstream basic authentication.
 	Password string `bson:"password" json:"password"`
-	// HeaderName is the custom header name to be used for upstream basic authentication.
+	// Header holds the configuration for custom header name to be used for upstream basic authentication.
 	// Defaults to `Authorization`.
-	HeaderName string `bson:"header_name" json:"header_name"`
+	Header AuthSource `bson:"header" json:"header"`
 }
 
 // UpstreamOAuth holds upstream OAuth2 authentication configuration.
@@ -828,6 +828,8 @@ type PasswordAuthentication struct {
 	TokenURL string `bson:"token_url" json:"token_url"`
 	// Scopes specifies optional requested permissions.
 	Scopes []string `bson:"scopes" json:"scopes,omitempty"`
+	// ExtraMetadata holds the keys that we want to extract from the token and pass to the upstream.
+	ExtraMetadata []string `bson:"extra_metadata" json:"extra_metadata,omitempty"`
 
 	// TokenProvider is the OAuth2 password authentication flow token for internal use.
 	Token *oauth2.Token `bson:"-" json:"-"`
@@ -853,6 +855,8 @@ type ClientCredentials struct {
 	TokenURL string `bson:"token_url" json:"token_url"`
 	// Scopes specifies optional requested permissions.
 	Scopes []string `bson:"scopes" json:"scopes,omitempty"`
+	// ExtraMetadata holds the keys that we want to extract from the token and pass to the upstream.
+	ExtraMetadata []string `bson:"extra_metadata" json:"extra_metadata,omitempty"`
 
 	// TokenProvider is the OAuth2 token provider for internal use.
 	TokenProvider oauth2.TokenSource `bson:"-" json:"-"`
