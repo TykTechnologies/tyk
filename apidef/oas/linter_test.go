@@ -83,6 +83,12 @@ func TestXTykGateway_Lint(t *testing.T) {
 		}
 
 		settings.Upstream.RateLimit.Per = ReadableDuration(10 * time.Second)
+
+		settings.Upstream.Authentication = &UpstreamAuth{
+			Enabled:   false,
+			BasicAuth: nil,
+			OAuth:     nil,
+		}
 	}
 
 	// Encode data to json
