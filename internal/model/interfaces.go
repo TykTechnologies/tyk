@@ -1,6 +1,7 @@
 package model
 
 import (
+	"github.com/TykTechnologies/tyk/storage"
 	"net/http"
 
 	"github.com/sirupsen/logrus"
@@ -39,6 +40,11 @@ type LoggerProvider interface {
 // ConfigProvider provides a typical config getter signature.
 type ConfigProvider interface {
 	GetConfig() config.Config
+}
+
+type UpstreamOAuthCacheProvider interface {
+	GetUpstreamOAuthCacheCC() *storage.RedisCluster
+	GetUpstreamOAuthCachePW() *storage.RedisCluster
 }
 
 // PolicyProvider is a storage interface encapsulating policy retrieval.

@@ -125,8 +125,10 @@ type Gateway struct {
 	HostCheckTicker      chan struct{}
 	HostCheckerClient    *http.Client
 	TracerProvider       otel.TracerProvider
-	// UpstreamOAuthCache is used to cache upstream OAuth tokens
-	UpstreamOAuthCache UpstreamOAuthCache
+	// UpstreamOAuthCacheCC is used to cache upstream OAuth tokens for client credentials
+	UpstreamOAuthCacheCC storage.RedisCluster
+	// UpstreamOAuthCachePW is used to cache upstream OAuth tokens for password grant
+	UpstreamOAuthCachePW storage.RedisCluster
 
 	keyGen DefaultKeyGenerator
 
@@ -205,6 +207,14 @@ type Gateway struct {
 	healthCheckInfo atomic.Value
 
 	dialCtxFn test.DialContext
+}
+
+func (gw *Gateway) GetUpstreamOAuthCacheCC() *storage.RedisCluster {
+	return &gw.UpstreamOAuthCacheCC
+}
+
+func (gw *Gateway) GetUpstreamOAuthCachePW() *storage.RedisCluster {
+	return &gw.UpstreamOAuthCachePW
 }
 
 func NewGateway(config config.Config, ctx context.Context) *Gateway {
@@ -1332,11 +1342,28 @@ func (gw *Gateway) initSystem() error {
 	gw.initRPCCache()
 	gw.setupInstrumentation()
 
+	//init here
+	gw.initUpstreamOAuthCache()
+	//
+
 	// cleanIdleMemConnProviders checks memconn.Provider (a part of internal API handling)
 	// instances periodically and deletes idle items, closes net.Listener instances to
 	// free resources.
 	go cleanIdleMemConnProviders(gw.ctx)
 	return nil
+}
+
+func newUpstreamOAuthClientCredentialsCache(connectionHandler *storage.ConnectionHandler) storage.RedisCluster {
+	return storage.RedisCluster{KeyPrefix: "upstreamOAuthCC-", ConnectionHandler: connectionHandler}
+}
+
+func newUpstreamOAuthPasswordCache(connectionHandler *storage.ConnectionHandler) storage.RedisCluster {
+	return storage.RedisCluster{KeyPrefix: "upstreamOAuthPW-", ConnectionHandler: connectionHandler}
+}
+
+func (gw *Gateway) initUpstreamOAuthCache() {
+	gw.UpstreamOAuthCacheCC = newUpstreamOAuthClientCredentialsCache(gw.StorageConnectionHandler)
+	gw.UpstreamOAuthCachePW = newUpstreamOAuthPasswordCache(gw.StorageConnectionHandler)
 }
 
 // SignatureVerifier returns a verifier to use for validating signatures.

@@ -3076,14 +3076,14 @@ func setCtxValue(r *http.Request, key, val interface{}) {
 	setContext(r, context.WithValue(r.Context(), key, val))
 }
 
-func ctxGetData(r *http.Request) map[string]interface{} {
+func CtxGetData(r *http.Request) map[string]interface{} {
 	if v := r.Context().Value(ctx.ContextData); v != nil {
 		return v.(map[string]interface{})
 	}
 	return nil
 }
 
-func ctxSetData(r *http.Request, m map[string]interface{}) {
+func CtxSetData(r *http.Request, m map[string]interface{}) {
 	if m == nil {
 		panic("setting a nil context ContextData")
 	}

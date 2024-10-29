@@ -98,7 +98,7 @@ func transformBody(r *http.Request, tmeta *TransformSpec, t *TransformMiddleware
 	}
 
 	if t.Spec.EnableContextVars {
-		bodyData["_tyk_context"] = ctxGetData(r)
+		bodyData["_tyk_context"] = CtxGetData(r)
 	}
 
 	// Apply to template

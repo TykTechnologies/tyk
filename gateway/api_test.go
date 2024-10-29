@@ -1929,11 +1929,11 @@ func BenchmarkApiReload(b *testing.B) {
 
 func TestContextData(t *testing.T) {
 	r := new(http.Request)
-	if ctxGetData(r) != nil {
+	if CtxGetData(r) != nil {
 		t.Fatal("expected ctxGetData to return nil")
 	}
-	ctxSetData(r, map[string]interface{}{"foo": "bar"})
-	if ctxGetData(r) == nil {
+	CtxSetData(r, map[string]interface{}{"foo": "bar"})
+	if CtxGetData(r) == nil {
 		t.Fatal("expected ctxGetData to return non-nil")
 	}
 	defer func() {
@@ -1941,7 +1941,7 @@ func TestContextData(t *testing.T) {
 			t.Fatal("expected ctxSetData of zero val to panic")
 		}
 	}()
-	ctxSetData(r, nil)
+	CtxSetData(r, nil)
 }
 
 func TestContextSession(t *testing.T) {

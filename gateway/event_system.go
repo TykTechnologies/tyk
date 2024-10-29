@@ -71,12 +71,6 @@ type EventHostStatusMeta struct {
 	HostInfo HostHealthReport
 }
 
-// EventUpstreamOAuthMeta is the metadata structure for an upstream OAuth event
-type EventUpstreamOAuthMeta struct {
-	EventMetaDefault
-	APIID string
-}
-
 // EventKeyFailureMeta is the metadata structure for any failure related
 // to a key, such as quota or auth failures.
 type EventKeyFailureMeta struct {
@@ -165,7 +159,7 @@ func (gw *Gateway) EventHandlerByName(handlerConf apidef.EventHandlerTriggerConf
 	return nil, errors.New("Handler not found")
 }
 
-func fireEvent(name apidef.TykEvent, meta interface{}, handlers map[apidef.TykEvent][]config.TykEventHandler) {
+func FireEvent(name apidef.TykEvent, meta interface{}, handlers map[apidef.TykEvent][]config.TykEventHandler) {
 	log.Debug("EVENT FIRED: ", name)
 	if handlers, e := handlers[name]; e {
 		log.Debugf("FOUND %d EVENT HANDLERS", len(handlers))
@@ -182,11 +176,11 @@ func fireEvent(name apidef.TykEvent, meta interface{}, handlers map[apidef.TykEv
 }
 
 func (s *APISpec) FireEvent(name apidef.TykEvent, meta interface{}) {
-	fireEvent(name, meta, s.EventPaths)
+	FireEvent(name, meta, s.EventPaths)
 }
 
 func (gw *Gateway) FireSystemEvent(name apidef.TykEvent, meta interface{}) {
-	fireEvent(name, meta, gw.GetConfig().GetEventTriggers())
+	FireEvent(name, meta, gw.GetConfig().GetEventTriggers())
 }
 
 // LogMessageEventHandler is a sample Event Handler

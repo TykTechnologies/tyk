@@ -81,7 +81,7 @@ func (t *TransformJQMiddleware) transformJQBody(r *http.Request, ts *TransformJQ
 
 	jqObj := map[string]interface{}{
 		"body":         bodyObj,
-		"_tyk_context": ctxGetData(r),
+		"_tyk_context": CtxGetData(r),
 	}
 
 	jqResult, err := lockedJQTransform(t.Spec, ts, jqObj)
@@ -102,11 +102,11 @@ func (t *TransformJQMiddleware) transformJQBody(r *http.Request, ts *TransformJQ
 
 	if t.Spec.EnableContextVars {
 		// Set variables in context vars
-		contextDataObject := ctxGetData(r)
+		contextDataObject := CtxGetData(r)
 		for k, v := range jqResult.TykContext {
 			contextDataObject[k] = v
 		}
-		ctxSetData(r, contextDataObject)
+		CtxSetData(r, contextDataObject)
 	}
 
 	return nil

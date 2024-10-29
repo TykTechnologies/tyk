@@ -47,7 +47,7 @@ func (gw *Gateway) LoadDefinitionsFromRPCBackup() ([]*APISpec, error) {
 		return nil, errors.New("[RPC] --> Failed to get node backup (" + checkKey + "): " + err.Error())
 	}
 
-	apiListAsString := decrypt([]byte(secret), cryptoText)
+	apiListAsString := Decrypt([]byte(secret), cryptoText)
 
 	a := APIDefinitionLoader{Gw: gw}
 	return a.processRPCDefinitions(apiListAsString, gw)
@@ -73,7 +73,7 @@ func (gw *Gateway) saveRPCDefinitionsBackup(list string) error {
 	}
 
 	secret := rightPad2Len(gw.GetConfig().Secret, "=", 32)
-	cryptoText := encrypt([]byte(secret), list)
+	cryptoText := Encrypt([]byte(secret), list)
 	err := store.SetKey(BackupApiKeyBase+tagList, cryptoText, -1)
 	if err != nil {
 		return errors.New("Failed to store node backup: " + err.Error())
@@ -97,7 +97,7 @@ func (gw *Gateway) LoadPoliciesFromRPCBackup() (map[string]user.Policy, error) {
 
 	secret := rightPad2Len(gw.GetConfig().Secret, "=", 32)
 	cryptoText, err := store.GetKey(checkKey)
-	listAsString := decrypt([]byte(secret), cryptoText)
+	listAsString := Decrypt([]byte(secret), cryptoText)
 
 	if err != nil {
 		return nil, errors.New("[RPC] --> Failed to get node policy backup (" + checkKey + "): " + err.Error())
@@ -113,7 +113,7 @@ func (gw *Gateway) LoadPoliciesFromRPCBackup() (map[string]user.Policy, error) {
 	}
 }
 
-func getPaddedSecret(secret string) []byte {
+func GetPaddedSecret(secret string) []byte {
 	return []byte(rightPad2Len(secret, "=", 32))
 }
 
@@ -136,7 +136,7 @@ func (gw *Gateway) saveRPCPoliciesBackup(list string) error {
 		return errors.New("--> RPC Backup save failed: redis connection failed")
 	}
 
-	cryptoText := encrypt(getPaddedSecret(gw.GetConfig().Secret), list)
+	cryptoText := Encrypt(GetPaddedSecret(gw.GetConfig().Secret), list)
 	err := store.SetKey(BackupPolicyKeyBase+tagList, cryptoText, -1)
 	if err != nil {
 		return errors.New("Failed to store node backup: " + err.Error())
@@ -146,7 +146,7 @@ func (gw *Gateway) saveRPCPoliciesBackup(list string) error {
 }
 
 // encrypt string to base64 crypto using AES
-func encrypt(key []byte, text string) string {
+func Encrypt(key []byte, text string) string {
 	plaintext := []byte(text)
 
 	block, err := aes.NewCipher(key)
@@ -171,8 +171,8 @@ func encrypt(key []byte, text string) string {
 	return base64.URLEncoding.EncodeToString(ciphertext)
 }
 
-// decrypt from base64 to decrypted string
-func decrypt(key []byte, cryptoText string) string {
+// Decrypt from base64 to decrypted string
+func Decrypt(key []byte, cryptoText string) string {
 	ciphertext, _ := base64.URLEncoding.DecodeString(cryptoText)
 
 	block, err := aes.NewCipher(key)

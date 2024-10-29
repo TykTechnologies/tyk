@@ -763,7 +763,7 @@ func ctxSetJWTContextVars(s *APISpec, r *http.Request, token *jwt.Token) {
 	if !s.EnableContextVars {
 		return
 	}
-	if cnt := ctxGetData(r); cnt != nil {
+	if cnt := CtxGetData(r); cnt != nil {
 		claimPrefix := "jwt_claims_"
 
 		for claimName, claimValue := range token.Header {
@@ -779,7 +779,7 @@ func ctxSetJWTContextVars(s *APISpec, r *http.Request, token *jwt.Token) {
 		// Key data
 		cnt["token"] = ctxGetAuthToken(r)
 
-		ctxSetData(r, cnt)
+		CtxSetData(r, cnt)
 	}
 }
 

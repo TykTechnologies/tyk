@@ -53,7 +53,7 @@ func (m *MiddlewareContextVars) ProcessRequest(w http.ResponseWriter, r *http.Re
 		}
 	}
 
-	ctxSetData(r, contextDataObject)
+	CtxSetData(r, contextDataObject)
 
 	return nil, http.StatusOK
 }

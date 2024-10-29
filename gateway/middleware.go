@@ -496,7 +496,7 @@ func (t *BaseMiddleware) CheckSessionAndIdentityForValidKey(originalKey string, 
 
 // FireEvent is added to the BaseMiddleware object so it is available across the entire stack
 func (t *BaseMiddleware) FireEvent(name apidef.TykEvent, meta interface{}) {
-	fireEvent(name, meta, t.Spec.EventPaths)
+	FireEvent(name, meta, t.Spec.EventPaths)
 }
 
 // emitRateLimitEvents emits rate limit related events based on the request context.
@@ -528,21 +528,6 @@ func (t *BaseMiddleware) emitRateLimitEvent(r *http.Request, e event.Event, mess
 		Path:   r.URL.Path,
 		Origin: request.RealIP(r),
 		Key:    rateLimitKey,
-	})
-}
-
-// emitUpstreamOAuthEvent emits an upstream OAuth event with an optional custom message.
-func (t *BaseMiddleware) emitUpstreamOAuthEvent(r *http.Request, e event.Event, message string, apiId string) {
-	if message == "" {
-		message = event.String(e)
-	}
-
-	t.FireEvent(e, EventUpstreamOAuthMeta{
-		EventMetaDefault: EventMetaDefault{
-			Message:            message,
-			OriginatingRequest: EncodeRequestToEvent(r),
-		},
-		APIID: apiId,
 	})
 }
 

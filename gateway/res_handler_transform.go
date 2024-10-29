@@ -157,7 +157,7 @@ func (r *ResponseTransformMiddleware) HandleResponse(rw http.ResponseWriter, res
 	}
 
 	if r.Spec.EnableContextVars {
-		bodyData["_tyk_context"] = ctxGetData(req)
+		bodyData["_tyk_context"] = CtxGetData(req)
 	}
 
 	if tmeta.TemplateData.EnableSession {

@@ -236,10 +236,10 @@ func (hm *HTTPSignatureValidationMiddleware) setContextVars(r *http.Request, tok
 		return
 	}
 	// Flatten claims and add to context
-	if cnt := ctxGetData(r); cnt != nil {
+	if cnt := CtxGetData(r); cnt != nil {
 		// Key data
 		cnt["token"] = token
-		ctxSetData(r, cnt)
+		CtxSetData(r, cnt)
 	}
 }
 
