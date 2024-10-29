@@ -120,8 +120,10 @@ const (
 	ExternalOAuthType = "externalOAuth"
 	OIDCType          = "oidc"
 
+	// OAuthAuthorizationTypeClientCredentials is the authorization type for client credentials flow.
 	OAuthAuthorizationTypeClientCredentials = "clientCredentials"
-	OAuthAuthorizationTypePassword          = "password"
+	// OAuthAuthorizationTypePassword is the authorization type for password flow.
+	OAuthAuthorizationTypePassword = "password"
 )
 
 var (
