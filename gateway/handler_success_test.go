@@ -102,6 +102,13 @@ func TestRecordDetail(t *testing.T) {
 			},
 			expect: true,
 		},
+		{
+			title: "graphql request",
+			spec: testAPISpec(func(spec *APISpec) {
+				spec.GraphQL.Enabled = true
+			}),
+			expect: true,
+		},
 	}
 
 	for _, tc := range testcases {
