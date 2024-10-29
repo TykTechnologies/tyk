@@ -346,7 +346,7 @@ jobs:
           TYK_DB_LICENSEKEY: ${{ secrets.DASH_LICENSE }}
           TYK_MDCB_LICENSE: ${{ secrets.MDCB_LICENSE }}
         run: |
-          match_tag=${{steps.ecr.outputs.registry}}/tyk:$BASE_REF
+          match_tag=${{steps.ecr.outputs.registry}}/tyk-ee:$BASE_REF
           tags=(${{ needs.goreleaser.outputs.tags }})
           set -eaxo pipefail
           docker run -q --rm -v ~/.docker/config.json:/root/.docker/config.json tykio/gromit policy match ${tags[0]} ${match_tag} 2>versions.env
