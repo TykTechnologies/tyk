@@ -30,7 +30,7 @@ func TestValidateTykStreamsOASObject(t *testing.T) {
 		},
 	}
 
-	validXTykAPIStreaming := XTykStreaming{
+	validXTykAPIStreaming := oas.XTykStreaming{
 		Info: oas.Info{
 			Name: "test-streams",
 			State: oas.State{
@@ -45,7 +45,7 @@ func TestValidateTykStreamsOASObject(t *testing.T) {
 		Streams: map[string]interface{}{},
 	}
 
-	validOASObject.Extensions[ExtensionTykStreaming] = &validXTykAPIStreaming
+	validOASObject.Extensions[oas.ExtensionTykStreaming] = &validXTykAPIStreaming
 
 	validOAS3Definition, _ := validOASObject.MarshalJSON()
 
@@ -59,7 +59,7 @@ func TestValidateTykStreamsOASObject(t *testing.T) {
 	invalidXTykAPIGateway := validXTykAPIStreaming
 	invalidXTykAPIGateway.Info = oas.Info{}
 	invalidXTykAPIGateway.Server.GatewayTags = &oas.GatewayTags{Enabled: true, Tags: []string{}}
-	invalidOASObject.Extensions[ExtensionTykStreaming] = &invalidXTykAPIGateway
+	invalidOASObject.Extensions[oas.ExtensionTykStreaming] = &invalidXTykAPIGateway
 	invalidOAS3Definition, _ := invalidOASObject.MarshalJSON()
 
 	t.Run("invalid OAS object", func(t *testing.T) {
@@ -136,7 +136,7 @@ func Test_loadOASSchema(t *testing.T) {
 		assert.NotNil(t, oasJSONSchemas)
 		for oasVersion := range oasJSONSchemas {
 			var xTykStreaming, xTykStreams []byte
-			xTykStreaming, _, _, err = jsonparser.Get(oasJSONSchemas[oasVersion], keyProperties, ExtensionTykStreaming)
+			xTykStreaming, _, _, err = jsonparser.Get(oasJSONSchemas[oasVersion], keyProperties, oas.ExtensionTykStreaming)
 			assert.NoError(t, err)
 			assert.NotNil(t, xTykStreaming)
 

@@ -8,6 +8,18 @@ import (
 	"github.com/TykTechnologies/tyk/apidef"
 )
 
+// XTykStreaming represents the structure for Tyk streaming configurations.
+type XTykStreaming struct {
+	// Info contains the main metadata for the API definition.
+	Info Info `bson:"info" json:"info"` // required
+	// Server contains the configurations related to the server.
+	Server Server `bson:"server" json:"server"` // required
+	// Streams contains the configurations related to Tyk Streams
+	Streams map[string]interface{} `bson:"streams" json:"streams"` // required
+	// Middleware contains the configurations related to the Tyk middleware.
+	Middleware *Middleware `bson:"middleware,omitempty" json:"middleware,omitempty"`
+}
+
 // XTykAPIGateway contains custom Tyk API extensions for the OpenAPI definition.
 // The values for the extensions are stored inside the OpenAPI document, under
 // the key `x-tyk-api-gateway`.

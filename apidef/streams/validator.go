@@ -4,6 +4,7 @@ import (
 	"embed"
 	"errors"
 	"fmt"
+	"github.com/TykTechnologies/tyk/apidef/oas"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -21,11 +22,6 @@ import (
 
 //go:embed schema/*
 var schemaDir embed.FS
-
-const (
-	// ExtensionTykStreaming is the OAS schema key for the Tyk Streams extension.
-	ExtensionTykStreaming = "x-tyk-streaming"
-)
 
 const (
 	keyStreams                  = "streams"
@@ -47,9 +43,9 @@ var (
 
 func loadSchemas() error {
 	loadOAS := func() error {
-		xTykStreamingSchema, err := schemaDir.ReadFile(fmt.Sprintf("schema/%s.json", ExtensionTykStreaming))
+		xTykStreamingSchema, err := schemaDir.ReadFile(fmt.Sprintf("schema/%s.json", oas.ExtensionTykStreaming))
 		if err != nil {
-			return fmt.Errorf("%s loading failed: %w", ExtensionTykStreaming, err)
+			return fmt.Errorf("%s loading failed: %w", oas.ExtensionTykStreaming, err)
 		}
 
 		xTykStreamingSchemaWithoutDefs := jsonparser.Delete(xTykStreamingSchema, keyDefinitions)
@@ -65,7 +61,7 @@ func loadSchemas() error {
 				continue
 			}
 
-			if strings.HasSuffix(fileName, fmt.Sprintf("%s.json", ExtensionTykStreaming)) {
+			if strings.HasSuffix(fileName, fmt.Sprintf("%s.json", oas.ExtensionTykStreaming)) {
 				continue
 			}
 
@@ -75,7 +71,7 @@ func loadSchemas() error {
 				return err
 			}
 
-			data, err = jsonparser.Set(data, xTykStreamingSchemaWithoutDefs, keyProperties, ExtensionTykStreaming)
+			data, err = jsonparser.Set(data, xTykStreamingSchemaWithoutDefs, keyProperties, oas.ExtensionTykStreaming)
 			if err != nil {
 				return err
 			}
@@ -119,7 +115,7 @@ func loadSchemas() error {
 }
 
 func validateBentoConfiguration(document []byte, bentoValidatorKind bento.ValidatorKind) error {
-	streams, _, _, err := jsonparser.Get(document, ExtensionTykStreaming, keyStreams)
+	streams, _, _, err := jsonparser.Get(document, oas.ExtensionTykStreaming, keyStreams)
 	if errors.Is(err, jsonparser.KeyPathNotFoundError) {
 		// no streams found
 		return nil
@@ -191,7 +187,7 @@ func ValidateOASTemplateWithBentoValidator(documentBody []byte, oasVersion strin
 		return err
 	}
 
-	oasSchema = jsonparser.Delete(oasSchema, keyProperties, ExtensionTykStreaming, keyRequired)
+	oasSchema = jsonparser.Delete(oasSchema, keyProperties, oas.ExtensionTykStreaming, keyRequired)
 
 	definitions, _, _, err := jsonparser.Get(oasSchema, keyDefinitions)
 	if err != nil {
