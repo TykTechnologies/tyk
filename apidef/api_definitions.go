@@ -119,6 +119,9 @@ const (
 	OAuthType         = "oauth"
 	ExternalOAuthType = "externalOAuth"
 	OIDCType          = "oidc"
+
+	OAuthAuthorizationTypeClientCredentials = "clientCredentials"
+	OAuthAuthorizationTypePassword          = "password"
 )
 
 var (
