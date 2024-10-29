@@ -22,6 +22,7 @@ type HealthCheckResponse struct {
 	Output      string                     `json:"output,omitempty"`
 	Description string                     `json:"description,omitempty"`
 	Details     map[string]HealthCheckItem `json:"details,omitempty"`
+	Edition     string                     `json:"edition,omitempty"`
 }
 
 type HealthCheckItem struct {
