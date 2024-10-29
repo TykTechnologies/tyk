@@ -5,6 +5,9 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/TykTechnologies/tyk/internal/event"
+	"github.com/TykTechnologies/tyk/internal/model"
+
 	"github.com/getkin/kin-openapi/routers"
 
 	"github.com/TykTechnologies/tyk/apidef"
@@ -119,9 +122,9 @@ outside:
 	if !requestValid {
 		// Fire a versioning failure event
 		v.FireEvent(EventVersionFailure, EventVersionFailureMeta{
-			EventMetaDefault: EventMetaDefault{
+			EventMetaDefault: model.EventMetaDefault{
 				Message:            "Attempted access to disallowed version / path.",
-				OriginatingRequest: EncodeRequestToEvent(r),
+				OriginatingRequest: event.EncodeRequestToEvent(r),
 			},
 			Path:   r.URL.Path,
 			Origin: request.RealIP(r),

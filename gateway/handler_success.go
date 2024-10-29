@@ -17,7 +17,6 @@ import (
 
 	"github.com/TykTechnologies/tyk-pump/analytics"
 	"github.com/TykTechnologies/tyk/config"
-	"github.com/TykTechnologies/tyk/ctx"
 	"github.com/TykTechnologies/tyk/header"
 	"github.com/TykTechnologies/tyk/request"
 	"github.com/TykTechnologies/tyk/user"
@@ -345,7 +344,7 @@ func recordDetail(r *http.Request, spec *APISpec) bool {
 
 	// decide based on org session.
 	if spec.GlobalConfig.EnforceOrgDataDetailLogging {
-		session, ok := r.Context().Value(ctx.OrgSessionContext).(*user.SessionState)
+		session, ok := r.Context().Value(httputil.OrgSessionContext).(*user.SessionState)
 		if ok && session != nil {
 			return session.EnableDetailedRecording || session.EnableDetailRecording // nolint:staticcheck // Deprecated DetailRecording
 		}

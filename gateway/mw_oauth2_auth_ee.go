@@ -2,11 +2,28 @@
 
 package gateway
 
-import "github.com/TykTechnologies/tyk/ee/middleware/upstreamoauth"
+import (
+	"github.com/TykTechnologies/tyk/ee/middleware/upstreamoauth"
+	"github.com/TykTechnologies/tyk/internal/model"
+	"github.com/TykTechnologies/tyk/storage"
+)
 
 func getUpstreamOAuthMw(base *BaseMiddleware) TykMiddleware {
-	spec := base.Spec
-	mwSpec := upstreamoauth.NewAPISpec(spec.APIID, spec.Name, spec.IsOAS, spec.OAS, spec.UpstreamAuth)
-	upstreamOAuthMw := upstreamoauth.NewMiddleware(base.Gw, base, mwSpec)
+	mwSpec := model.MergedAPI{APIDefinition: base.Spec.APIDefinition}
+	upstreamOAuthMw := upstreamoauth.NewMiddleware(
+		base.Gw,
+		base,
+		mwSpec,
+		getClientCredentialsStorageHandler(base),
+		getPasswordStorageHandler(base))
+
 	return WrapMiddleware(base, upstreamOAuthMw)
+}
+
+func getClientCredentialsStorageHandler(base *BaseMiddleware) *storage.RedisCluster {
+	return &storage.RedisCluster{KeyPrefix: "upstreamOAuthCC-", ConnectionHandler: base.Gw.GetConnHandler()}
+}
+
+func getPasswordStorageHandler(base *BaseMiddleware) *storage.RedisCluster {
+	return &storage.RedisCluster{KeyPrefix: "upstreamOAuthPW-", ConnectionHandler: base.Gw.GetConnHandler()}
 }

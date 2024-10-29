@@ -1,12 +1,11 @@
 package gateway
 
 import (
-	"bytes"
-	"encoding/base64"
 	"errors"
 	"fmt"
-	"net/http"
 	"time"
+
+	"github.com/TykTechnologies/tyk/internal/model"
 
 	"github.com/sirupsen/logrus"
 
@@ -59,22 +58,15 @@ const (
 	EventTokenDeleted = event.TokenDeleted
 )
 
-// EventMetaDefault is a standard embedded struct to be used with custom event metadata types, gives an interface for
-// easily extending event metadata objects
-type EventMetaDefault struct {
-	Message            string
-	OriginatingRequest string
-}
-
 type EventHostStatusMeta struct {
-	EventMetaDefault
+	model.EventMetaDefault
 	HostInfo HostHealthReport
 }
 
 // EventKeyFailureMeta is the metadata structure for any failure related
 // to a key, such as quota or auth failures.
 type EventKeyFailureMeta struct {
-	EventMetaDefault
+	model.EventMetaDefault
 	Path   string
 	Origin string
 	Key    string
@@ -82,7 +74,7 @@ type EventKeyFailureMeta struct {
 
 // EventCurcuitBreakerMeta is the event status for a circuit breaker tripping
 type EventCurcuitBreakerMeta struct {
-	EventMetaDefault
+	model.EventMetaDefault
 	Path         string
 	APIID        string
 	CircuitEvent circuit.BreakerEvent
@@ -90,7 +82,7 @@ type EventCurcuitBreakerMeta struct {
 
 // EventVersionFailureMeta is the metadata structure for an auth failure (EventKeyExpired)
 type EventVersionFailureMeta struct {
-	EventMetaDefault
+	model.EventMetaDefault
 	Path   string
 	Origin string
 	Key    string
@@ -98,7 +90,7 @@ type EventVersionFailureMeta struct {
 }
 
 type EventTriggerExceededMeta struct {
-	EventMetaDefault
+	model.EventMetaDefault
 	OrgID           string `json:"org_id"`
 	Key             string `json:"key"`
 	TriggerLimit    int64  `json:"trigger_limit"`
@@ -106,18 +98,9 @@ type EventTriggerExceededMeta struct {
 }
 
 type EventTokenMeta struct {
-	EventMetaDefault
+	model.EventMetaDefault
 	Org string
 	Key string
-}
-
-// EncodeRequestToEvent will write the request out in wire protocol and
-// encode it to base64 and store it in an Event object
-func EncodeRequestToEvent(r *http.Request) string {
-	var asBytes bytes.Buffer
-	r.Write(&asBytes)
-
-	return base64.StdEncoding.EncodeToString(asBytes.Bytes())
 }
 
 // EventHandlerByName is a convenience function to get event handler instances from an API Definition

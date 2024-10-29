@@ -8,6 +8,8 @@ import (
 	"io/ioutil"
 	"net/http"
 
+	"github.com/TykTechnologies/tyk/internal/httputil"
+
 	"github.com/clbanning/mxj"
 	"golang.org/x/net/html/charset"
 
@@ -98,7 +100,7 @@ func transformBody(r *http.Request, tmeta *TransformSpec, t *TransformMiddleware
 	}
 
 	if t.Spec.EnableContextVars {
-		bodyData["_tyk_context"] = CtxGetData(r)
+		bodyData["_tyk_context"] = httputil.CtxGetData(r)
 	}
 
 	// Apply to template

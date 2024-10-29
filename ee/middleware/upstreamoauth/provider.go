@@ -5,16 +5,20 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
-	"github.com/TykTechnologies/tyk/apidef"
-	"github.com/TykTechnologies/tyk/gateway"
-	"github.com/TykTechnologies/tyk/internal/event"
-	"github.com/TykTechnologies/tyk/storage"
-	"github.com/sirupsen/logrus"
-	"golang.org/x/oauth2"
-	oauth2clientcredentials "golang.org/x/oauth2/clientcredentials"
 	"net/http"
 	"strings"
 	"time"
+
+	"github.com/sirupsen/logrus"
+	"golang.org/x/oauth2"
+	oauth2clientcredentials "golang.org/x/oauth2/clientcredentials"
+
+	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/internal/crypto"
+	"github.com/TykTechnologies/tyk/internal/event"
+	"github.com/TykTechnologies/tyk/internal/httputil"
+	"github.com/TykTechnologies/tyk/internal/model"
+	"github.com/TykTechnologies/tyk/storage"
 )
 
 // Provider implements upstream auth provider.
@@ -40,7 +44,9 @@ func (u Provider) Fill(r *http.Request) {
 type OAuthHeaderProvider interface {
 	// getOAuthToken returns the OAuth token for the request.
 	getOAuthToken(r *http.Request, OAuthSpec *Middleware) (string, error)
+	// getHeaderName returns the header name for the OAuth token.
 	getHeaderName(OAuthSpec *Middleware) string
+	//
 	headerEnabled(OAuthSpec *Middleware) bool
 }
 
@@ -63,10 +69,8 @@ func getOAuthHeaderProvider(oauthConfig apidef.UpstreamOAuth) (OAuthHeaderProvid
 	}
 }
 
-//
-
 func (p *ClientCredentialsOAuthProvider) getOAuthToken(r *http.Request, mw *Middleware) (string, error) {
-	client := UpstreamOAuthClientCredentialsClient{RedisCluster: mw.Gw.GetUpstreamOAuthCacheCC()}
+	client := UpstreamOAuthClientCredentialsClient{mw.clientCredentialsStorageHandler}
 	token, err := client.GetToken(r, mw)
 	if err != nil {
 		return handleOAuthError(r, mw, err)
@@ -76,7 +80,7 @@ func (p *ClientCredentialsOAuthProvider) getOAuthToken(r *http.Request, mw *Midd
 }
 
 func handleOAuthError(r *http.Request, mw *Middleware, err error) (string, error) {
-	EmitUpstreamOAuthEvent(r, UpstreamOAuthErrorEventName, err.Error(), mw.Spec.APIID)
+	EmitUpstreamOAuthEvent(r, ErrorEventName, err.Error(), mw.Spec.APIID, mw)
 	return "", err
 }
 
@@ -104,7 +108,7 @@ func (cache *UpstreamOAuthClientCredentialsClient) GetToken(r *http.Request, OAu
 	}
 
 	if tokenString != "" {
-		decryptedToken := gateway.Decrypt(gateway.GetPaddedSecret(OAuthSpec.Gw.GetConfig().Secret), tokenString)
+		decryptedToken := crypto.Decrypt(crypto.GetPaddedString(OAuthSpec.Gw.GetConfig().Secret), tokenString)
 		return decryptedToken, nil
 	}
 
@@ -113,7 +117,7 @@ func (cache *UpstreamOAuthClientCredentialsClient) GetToken(r *http.Request, OAu
 		return "", err
 	}
 
-	encryptedToken := gateway.Encrypt(gateway.GetPaddedSecret(OAuthSpec.Gw.GetConfig().Secret), token.AccessToken)
+	encryptedToken := crypto.Encrypt(crypto.GetPaddedString(OAuthSpec.Gw.GetConfig().Secret), token.AccessToken)
 	setExtraMetadata(r, OAuthSpec.Spec.UpstreamAuth.OAuth.ClientCredentials.ExtraMetadata, token)
 
 	ttl := time.Until(token.Expiry)
@@ -219,7 +223,7 @@ func retryGetKeyAndLock(cacheKey string, cache *storage.RedisCluster) (string, e
 }
 
 func setExtraMetadata(r *http.Request, keyList []string, token *oauth2.Token) {
-	contextDataObject := gateway.CtxGetData(r)
+	contextDataObject := httputil.CtxGetData(r)
 	if contextDataObject == nil {
 		contextDataObject = make(map[string]interface{})
 	}
@@ -229,32 +233,31 @@ func setExtraMetadata(r *http.Request, keyList []string, token *oauth2.Token) {
 			contextDataObject[key] = val
 		}
 	}
-	gateway.CtxSetData(r, contextDataObject)
+	httputil.CtxSetData(r, contextDataObject)
 }
 
 // EmitUpstreamOAuthEvent emits an upstream OAuth event with an optional custom message.
-func EmitUpstreamOAuthEvent(r *http.Request, e event.Event, message string, apiId string) {
+func EmitUpstreamOAuthEvent(r *http.Request, e event.Event, message string, apiId string, mw *Middleware) {
 	if message == "" {
 		message = event.String(e)
 	}
-
-	gateway.FireEvent(e, EventUpstreamOAuthMeta{
-		EventMetaDefault: gateway.EventMetaDefault{
+	mw.Base.FireEvent(e, EventUpstreamOAuthMeta{
+		EventMetaDefault: model.EventMetaDefault{
 			Message:            message,
-			OriginatingRequest: gateway.EncodeRequestToEvent(r),
+			OriginatingRequest: event.EncodeRequestToEvent(r),
 		},
 		APIID: apiId,
-	}, nil)
+	})
 }
 
 // EventUpstreamOAuthMeta is the metadata structure for an upstream OAuth event
 type EventUpstreamOAuthMeta struct {
-	gateway.EventMetaDefault
+	model.EventMetaDefault
 	APIID string
 }
 
 func (p *PasswordOAuthProvider) getOAuthToken(r *http.Request, mw *Middleware) (string, error) {
-	client := UpstreamOAuthPasswordClient{RedisCluster: mw.Gw.GetUpstreamOAuthCachePW()}
+	client := UpstreamOAuthPasswordClient{RedisCluster: mw.passwordStorageHandler}
 	token, err := client.GetToken(r, mw)
 	if err != nil {
 		return handleOAuthError(r, mw, err)
@@ -280,7 +283,7 @@ func (cache *UpstreamOAuthPasswordClient) GetToken(r *http.Request, mw *Middlewa
 	}
 
 	if tokenString != "" {
-		decryptedToken := gateway.Decrypt(gateway.GetPaddedSecret(mw.Gw.GetConfig().Secret), tokenString)
+		decryptedToken := crypto.Decrypt(crypto.GetPaddedString(mw.Gw.GetConfig().Secret), tokenString)
 		return decryptedToken, nil
 	}
 
@@ -289,7 +292,7 @@ func (cache *UpstreamOAuthPasswordClient) GetToken(r *http.Request, mw *Middlewa
 		return "", err
 	}
 
-	encryptedToken := gateway.Encrypt(gateway.GetPaddedSecret(mw.Gw.GetConfig().Secret), token.AccessToken)
+	encryptedToken := crypto.Encrypt(crypto.GetPaddedString(mw.Gw.GetConfig().Secret), token.AccessToken)
 	setExtraMetadata(r, mw.Spec.UpstreamAuth.OAuth.PasswordAuthentication.ExtraMetadata, token)
 
 	ttl := time.Until(token.Expiry)

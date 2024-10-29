@@ -15,6 +15,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/TykTechnologies/tyk/internal/httputil"
+
 	"github.com/go-jose/go-jose/v3"
 	"github.com/golang-jwt/jwt/v4"
 	"github.com/lonelycode/osin"
@@ -763,7 +765,7 @@ func ctxSetJWTContextVars(s *APISpec, r *http.Request, token *jwt.Token) {
 	if !s.EnableContextVars {
 		return
 	}
-	if cnt := CtxGetData(r); cnt != nil {
+	if cnt := httputil.CtxGetData(r); cnt != nil {
 		claimPrefix := "jwt_claims_"
 
 		for claimName, claimValue := range token.Header {
@@ -779,7 +781,7 @@ func ctxSetJWTContextVars(s *APISpec, r *http.Request, token *jwt.Token) {
 		// Key data
 		cnt["token"] = ctxGetAuthToken(r)
 
-		CtxSetData(r, cnt)
+		httputil.CtxSetData(r, cnt)
 	}
 }
 

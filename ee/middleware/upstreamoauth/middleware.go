@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/TykTechnologies/tyk/storage"
+
 	"github.com/sirupsen/logrus"
 
 	"github.com/TykTechnologies/tyk/header"
@@ -13,32 +15,36 @@ import (
 
 // Middleware implements upstream basic auth middleware.
 type Middleware struct {
-	Spec *APISpec
+	Spec model.MergedAPI
 	Gw   Gateway
 
-	base BaseMiddleware
+	Base                            BaseMiddleware
+	clientCredentialsStorageHandler *storage.RedisCluster
+	passwordStorageHandler          *storage.RedisCluster
 }
 
 // Middleware implements model.Middleware.
 var _ model.Middleware = &Middleware{}
 
 // NewMiddleware returns a new instance of Middleware.
-func NewMiddleware(gw Gateway, mw BaseMiddleware, spec *APISpec) *Middleware {
+func NewMiddleware(gw Gateway, mw BaseMiddleware, spec model.MergedAPI, ccStorageHandler *storage.RedisCluster, pwStorageHandler *storage.RedisCluster) *Middleware {
 	return &Middleware{
-		base: mw,
-		Gw:   gw,
-		Spec: spec,
+		Base:                            mw,
+		Gw:                              gw,
+		Spec:                            spec,
+		clientCredentialsStorageHandler: ccStorageHandler,
+		passwordStorageHandler:          pwStorageHandler,
 	}
 }
 
 // Logger returns a logger with middleware filled out.
 func (m *Middleware) Logger() *logrus.Entry {
-	return m.base.Logger().WithField("mw", m.Name())
+	return m.Base.Logger().WithField("mw", m.Name())
 }
 
 // Name returns the name for the middleware.
 func (m *Middleware) Name() string {
-	return "UpstreamOAuthMiddleware"
+	return MiddlewareName
 }
 
 // EnabledForSpec checks if streaming is enabled on the config.

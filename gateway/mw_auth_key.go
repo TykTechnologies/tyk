@@ -6,6 +6,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/TykTechnologies/tyk/internal/event"
+	"github.com/TykTechnologies/tyk/internal/httputil"
+	"github.com/TykTechnologies/tyk/internal/model"
+
 	"github.com/TykTechnologies/tyk/internal/crypto"
 	"github.com/TykTechnologies/tyk/internal/otel"
 	"github.com/TykTechnologies/tyk/storage"
@@ -77,10 +81,10 @@ func (k *AuthKey) setContextVars(r *http.Request, token string) {
 	if !k.Spec.EnableContextVars {
 		return
 	}
-	if cnt := CtxGetData(r); cnt != nil {
+	if cnt := httputil.CtxGetData(r); cnt != nil {
 		// Key data
 		cnt["token"] = token
-		CtxSetData(r, cnt)
+		httputil.CtxSetData(r, cnt)
 	}
 }
 
@@ -267,7 +271,7 @@ func stripBearer(token string) string {
 // TODO: move this method to base middleware?
 func AuthFailed(m TykMiddleware, r *http.Request, token string) {
 	m.Base().FireEvent(EventAuthFailure, EventKeyFailureMeta{
-		EventMetaDefault: EventMetaDefault{Message: "Auth Failure", OriginatingRequest: EncodeRequestToEvent(r)},
+		EventMetaDefault: model.EventMetaDefault{Message: "Auth Failure", OriginatingRequest: event.EncodeRequestToEvent(r)},
 		Path:             r.URL.Path,
 		Origin:           request.RealIP(r),
 		Key:              token,

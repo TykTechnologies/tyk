@@ -6,6 +6,8 @@ import (
 	"io"
 	"net/http"
 
+	"github.com/TykTechnologies/tyk/internal/httputil"
+
 	"github.com/gorilla/websocket"
 	"github.com/sirupsen/logrus"
 
@@ -16,7 +18,6 @@ import (
 	"github.com/TykTechnologies/tyk/internal/graphengine"
 
 	"github.com/TykTechnologies/tyk/apidef"
-	"github.com/TykTechnologies/tyk/ctx"
 	"github.com/TykTechnologies/tyk/header"
 	"github.com/TykTechnologies/tyk/user"
 
@@ -236,7 +237,7 @@ func (m *GraphQLMiddleware) OnBeforeStart(reqCtx context.Context, operation *gql
 		return err
 	}
 
-	v := reqCtx.Value(ctx.SessionData)
+	v := reqCtx.Value(httputil.SessionData)
 	if v == nil {
 		m.Logger().Error("failed to get session in OnBeforeStart hook")
 		return errors.New("empty session")

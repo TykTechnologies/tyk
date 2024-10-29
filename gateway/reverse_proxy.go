@@ -38,7 +38,6 @@ import (
 	"golang.org/x/net/http2"
 
 	"github.com/TykTechnologies/tyk/apidef"
-	"github.com/TykTechnologies/tyk/ctx"
 	"github.com/TykTechnologies/tyk/header"
 	"github.com/TykTechnologies/tyk/internal/graphengine"
 	"github.com/TykTechnologies/tyk/internal/httputil"
@@ -265,7 +264,7 @@ func (gw *Gateway) TykNewSingleHostReverseProxy(target *url.URL, spec *APISpec, 
 
 		targetToUse := target
 
-		if spec.URLRewriteEnabled && req.Context().Value(ctx.RetainHost) == true {
+		if spec.URLRewriteEnabled && req.Context().Value(httputil.RetainHost) == true {
 			logger.Debug("Detected host rewrite, overriding target")
 			tmpTarget, err := url.Parse(req.URL.String())
 			if err != nil {
@@ -1079,22 +1078,22 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 	*outreq = *req // includes shallow copies of maps, but okay
 	*logreq = *req
 	// remove context data from the copies
-	setContext(outreq, context.Background())
-	setContext(logreq, context.Background())
+	httputil.SetContext(outreq, context.Background())
+	httputil.SetContext(logreq, context.Background())
 
 	p.logger.Debug("Upstream request URL: ", req.URL)
 
 	// We need to double set the context for the outbound request to reprocess the target
-	if p.TykAPISpec.URLRewriteEnabled && req.Context().Value(ctx.RetainHost) == true {
+	if p.TykAPISpec.URLRewriteEnabled && req.Context().Value(httputil.RetainHost) == true {
 		p.logger.Debug("Detected host rewrite, notifying director")
-		setCtxValue(outreq, ctx.RetainHost, true)
+		httputil.SetCtxValue(outreq, httputil.RetainHost, true)
 	}
 
 	if req.ContentLength == 0 {
 		outreq.Body = nil // Issue 16036: nil Body for http.Transport retries
 	}
 	outreq = outreq.WithContext(reqCtx)
-	setContext(logreq, outreq.Context())
+	httputil.SetContext(logreq, outreq.Context())
 
 	outreq.Header = cloneHeader(req.Header)
 	if trace.IsEnabled() {

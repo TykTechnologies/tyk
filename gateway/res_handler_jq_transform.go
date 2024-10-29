@@ -10,6 +10,8 @@ import (
 	"net/http"
 	"strconv"
 
+	"github.com/TykTechnologies/tyk/internal/httputil"
+
 	"github.com/TykTechnologies/tyk/user"
 )
 
@@ -46,7 +48,7 @@ func (h *ResponseTransformJQMiddleware) HandleResponse(rw http.ResponseWriter, r
 	}
 	jqObj := map[string]interface{}{
 		"body":                  bodyObj,
-		"_tyk_context":          CtxGetData(req),
+		"_tyk_context":          httputil.CtxGetData(req),
 		"_tyk_response_headers": res.Header,
 	}
 

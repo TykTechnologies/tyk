@@ -6,6 +6,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/TykTechnologies/tyk/internal/model"
+
 	"github.com/stretchr/testify/assert"
 
 	"github.com/TykTechnologies/tyk/config"
@@ -188,7 +190,7 @@ func TestGet(t *testing.T) {
 	eventMessage := config.EventMessage{
 		Type: EventKeyExpired,
 		Meta: EventKeyFailureMeta{
-			EventMetaDefault: EventMetaDefault{Message: "THIS IS A TEST"},
+			EventMetaDefault: model.EventMetaDefault{Message: "THIS IS A TEST"},
 			Path:             "/banana",
 			Origin:           "tyk.io",
 			Key:              "123456789",
@@ -227,7 +229,7 @@ func TestPost(t *testing.T) {
 	eventMessage := config.EventMessage{
 		Type: EventKeyExpired,
 		Meta: EventKeyFailureMeta{
-			EventMetaDefault: EventMetaDefault{Message: "THIS IS A TEST"},
+			EventMetaDefault: model.EventMetaDefault{Message: "THIS IS A TEST"},
 			Path:             "/banana",
 			Origin:           "tyk.io",
 			Key:              "123456789",

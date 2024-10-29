@@ -5,6 +5,8 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/TykTechnologies/tyk/internal/httputil"
+
 	"github.com/TykTechnologies/graphql-go-tools/pkg/engine/datasource/httpclient"
 
 	"github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
@@ -15,7 +17,6 @@ import (
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
-	ctxpkg "github.com/TykTechnologies/tyk/ctx"
 	"github.com/TykTechnologies/tyk/user"
 )
 
@@ -77,7 +78,7 @@ func TestRecordDetail(t *testing.T) {
 				session := &user.SessionState{
 					EnableDetailedRecording: true,
 				}
-				return context.WithValue(ctx, ctxpkg.SessionData, session)
+				return context.WithValue(ctx, httputil.SessionData, session)
 			},
 			expect: true,
 		},
@@ -98,7 +99,7 @@ func TestRecordDetail(t *testing.T) {
 				session := &user.SessionState{
 					EnableDetailedRecording: true,
 				}
-				return context.WithValue(ctx, ctxpkg.OrgSessionContext, session)
+				return context.WithValue(ctx, httputil.OrgSessionContext, session)
 			},
 			expect: true,
 		},

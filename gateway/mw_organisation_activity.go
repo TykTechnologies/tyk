@@ -5,7 +5,10 @@ import (
 	"net/http"
 	"sync"
 
-	"github.com/TykTechnologies/tyk/ctx"
+	"github.com/TykTechnologies/tyk/internal/event"
+	"github.com/TykTechnologies/tyk/internal/httputil"
+	"github.com/TykTechnologies/tyk/internal/model"
+
 	"github.com/TykTechnologies/tyk/request"
 	"github.com/TykTechnologies/tyk/user"
 )
@@ -138,9 +141,9 @@ func (k *OrganizationMonitor) ProcessRequestLive(r *http.Request, orgSession *us
 		k.FireEvent(
 			EventOrgQuotaExceeded,
 			EventKeyFailureMeta{
-				EventMetaDefault: EventMetaDefault{
+				EventMetaDefault: model.EventMetaDefault{
 					Message:            "Organisation quota has been exceeded",
-					OriginatingRequest: EncodeRequestToEvent(r),
+					OriginatingRequest: event.EncodeRequestToEvent(r),
 				},
 				Path:   r.URL.Path,
 				Origin: request.RealIP(r),
@@ -155,9 +158,9 @@ func (k *OrganizationMonitor) ProcessRequestLive(r *http.Request, orgSession *us
 		k.FireEvent(
 			EventOrgRateLimitExceeded,
 			EventKeyFailureMeta{
-				EventMetaDefault: EventMetaDefault{
+				EventMetaDefault: model.EventMetaDefault{
 					Message:            "Organisation rate limit has been exceeded",
-					OriginatingRequest: EncodeRequestToEvent(r),
+					OriginatingRequest: event.EncodeRequestToEvent(r),
 				},
 				Path:   r.URL.Path,
 				Origin: request.RealIP(r),
@@ -173,7 +176,7 @@ func (k *OrganizationMonitor) ProcessRequestLive(r *http.Request, orgSession *us
 	}
 
 	// Lets keep a reference of the org
-	setCtxValue(r, ctx.OrgSessionContext, orgSession)
+	httputil.SetCtxValue(r, httputil.OrgSessionContext, orgSession)
 
 	// Request is valid, carry on
 	return nil, http.StatusOK
@@ -201,7 +204,7 @@ func (k *OrganizationMonitor) ProcessRequestOffThread(r *http.Request, orgSessio
 	// session might be updated by go-routine AllowAccessNext and we loose those changes here
 	// but it is OK as we need it in context for detailed org logging
 	clone := orgSession.Clone()
-	setCtxValue(r, ctx.OrgSessionContext, &clone)
+	httputil.SetCtxValue(r, httputil.OrgSessionContext, &clone)
 
 	orgSessionCopy := orgSession.Clone()
 	go k.AllowAccessNext(
@@ -275,7 +278,7 @@ func (k *OrganizationMonitor) AllowAccessNext(
 		k.FireEvent(
 			EventOrgQuotaExceeded,
 			EventKeyFailureMeta{
-				EventMetaDefault: EventMetaDefault{
+				EventMetaDefault: model.EventMetaDefault{
 					Message: "Organisation quota has been exceeded",
 				},
 				Path:   path,
@@ -292,7 +295,7 @@ func (k *OrganizationMonitor) AllowAccessNext(
 		k.FireEvent(
 			EventOrgRateLimitExceeded,
 			EventKeyFailureMeta{
-				EventMetaDefault: EventMetaDefault{
+				EventMetaDefault: model.EventMetaDefault{
 					Message: "Organisation rate limit has been exceeded",
 				},
 				Path:   path,

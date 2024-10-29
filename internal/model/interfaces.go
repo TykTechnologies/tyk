@@ -1,8 +1,9 @@
 package model
 
 import (
-	"github.com/TykTechnologies/tyk/storage"
 	"net/http"
+
+	"github.com/TykTechnologies/tyk/storage"
 
 	"github.com/sirupsen/logrus"
 
@@ -42,9 +43,8 @@ type ConfigProvider interface {
 	GetConfig() config.Config
 }
 
-type UpstreamOAuthCacheProvider interface {
-	GetUpstreamOAuthCacheCC() *storage.RedisCluster
-	GetUpstreamOAuthCachePW() *storage.RedisCluster
+type ConnectionHandlerProvider interface {
+	GetConnHandler() *storage.ConnectionHandler
 }
 
 // PolicyProvider is a storage interface encapsulating policy retrieval.

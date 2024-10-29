@@ -209,12 +209,8 @@ type Gateway struct {
 	dialCtxFn test.DialContext
 }
 
-func (gw *Gateway) GetUpstreamOAuthCacheCC() *storage.RedisCluster {
-	return &gw.UpstreamOAuthCacheCC
-}
-
-func (gw *Gateway) GetUpstreamOAuthCachePW() *storage.RedisCluster {
-	return &gw.UpstreamOAuthCachePW
+func (gw *Gateway) GetConnHandler() *storage.ConnectionHandler {
+	return gw.StorageConnectionHandler
 }
 
 func NewGateway(config config.Config, ctx context.Context) *Gateway {
@@ -1997,6 +1993,10 @@ func (gw *Gateway) startServer() {
 
 func (gw *Gateway) GetConfig() config.Config {
 	return gw.config.Load().(config.Config)
+}
+
+func (gw *Gateway) GetConnectionHandler() *storage.ConnectionHandler {
+	return gw.StorageConnectionHandler
 }
 
 func (gw *Gateway) SetConfig(conf config.Config, skipReload ...bool) {

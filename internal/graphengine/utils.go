@@ -5,6 +5,8 @@ import (
 	"net"
 	"net/http"
 
+	"github.com/TykTechnologies/tyk/internal/httputil"
+
 	"github.com/jensneuse/abstractlogger"
 	"github.com/sirupsen/logrus"
 
@@ -12,7 +14,6 @@ import (
 	graphqlv2 "github.com/TykTechnologies/graphql-go-tools/v2/pkg/graphql"
 
 	"github.com/TykTechnologies/tyk/apidef"
-	"github.com/TykTechnologies/tyk/ctx"
 	"github.com/TykTechnologies/tyk/header"
 )
 
@@ -152,7 +153,7 @@ func headerStructToHeaderMap(headers []apidef.UDGGlobalHeader) map[string]string
 }
 
 func ctxGetData(r *http.Request) map[string]interface{} {
-	if v := r.Context().Value(ctx.ContextData); v != nil {
+	if v := r.Context().Value(httputil.ContextData); v != nil {
 		return v.(map[string]interface{})
 	}
 	return nil

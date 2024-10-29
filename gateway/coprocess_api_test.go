@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/TykTechnologies/tyk/internal/model"
+
 	"github.com/stretchr/testify/assert"
 
 	"github.com/TykTechnologies/tyk/apidef"
@@ -40,7 +42,7 @@ func TestCoprocessSystemEvent(t *testing.T) {
 	GatewayFireSystemEvent = func(name apidef.TykEvent, meta interface{}) {
 		invoked = true
 
-		metaVal, ok := meta.(EventMetaDefault)
+		metaVal, ok := meta.(model.EventMetaDefault)
 
 		assert.True(t, ok)
 		assert.Equal(t, "test-event", string(name))

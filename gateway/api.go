@@ -27,7 +27,6 @@ package gateway
 
 import (
 	"bytes"
-	"context"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
@@ -42,6 +41,9 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/TykTechnologies/tyk/internal/httputil"
+	"github.com/TykTechnologies/tyk/internal/model"
 
 	gqlv2 "github.com/TykTechnologies/graphql-go-tools/v2/pkg/graphql"
 
@@ -567,7 +569,7 @@ func (gw *Gateway) handleAddOrUpdate(keyName string, r *http.Request, isHashed b
 		event = EventTokenCreated
 	}
 	gw.FireSystemEvent(event, EventTokenMeta{
-		EventMetaDefault: EventMetaDefault{Message: "Key modified."},
+		EventMetaDefault: model.EventMetaDefault{Message: "Key modified."},
 		Org:              newSession.OrgID,
 		Key:              keyName,
 	})
@@ -805,7 +807,7 @@ func (gw *Gateway) handleDeleteKey(keyName, orgID, apiID string, resetQuota bool
 	}
 
 	gw.FireSystemEvent(EventTokenDeleted, EventTokenMeta{
-		EventMetaDefault: EventMetaDefault{Message: "Key deleted."},
+		EventMetaDefault: model.EventMetaDefault{Message: "Key deleted."},
 		Org:              orgID,
 		Key:              keyName,
 	})
@@ -2066,7 +2068,7 @@ func (gw *Gateway) createKeyHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	gw.FireSystemEvent(EventTokenCreated, EventTokenMeta{
-		EventMetaDefault: EventMetaDefault{Message: "Key generated."},
+		EventMetaDefault: model.EventMetaDefault{Message: "Key generated."},
 		Org:              newSession.OrgID,
 		Key:              newKey,
 	})
@@ -3062,42 +3064,14 @@ func (gw *Gateway) makeImportedOASTykAPI(next http.HandlerFunc) http.HandlerFunc
 	}
 }
 
-// TODO: Don't modify http.Request values in-place. We must right now
-// because our middleware design doesn't pass around http.Request
-// pointers, so we have no way to modify the pointer in a middleware.
-//
-// If we ever redesign middlewares - or if we find another workaround -
-// revisit this.
-func setContext(r *http.Request, ctx context.Context) {
-	r2 := r.WithContext(ctx)
-	*r = *r2
-}
-func setCtxValue(r *http.Request, key, val interface{}) {
-	setContext(r, context.WithValue(r.Context(), key, val))
-}
-
-func CtxGetData(r *http.Request) map[string]interface{} {
-	if v := r.Context().Value(ctx.ContextData); v != nil {
-		return v.(map[string]interface{})
-	}
-	return nil
-}
-
-func CtxSetData(r *http.Request, m map[string]interface{}) {
-	if m == nil {
-		panic("setting a nil context ContextData")
-	}
-	setCtxValue(r, ctx.ContextData, m)
-}
-
 // ctxSetCacheOptions sets a cache key to use for the http request
 func ctxSetCacheOptions(r *http.Request, options *cacheOptions) {
-	setCtxValue(r, ctx.CacheOptions, options)
+	httputil.SetCtxValue(r, httputil.CacheOptions, options)
 }
 
 // ctxGetCacheOptions returns a cache key if we need to cache request
 func ctxGetCacheOptions(r *http.Request) *cacheOptions {
-	key, _ := r.Context().Value(ctx.CacheOptions).(*cacheOptions)
+	key, _ := r.Context().Value(httputil.CacheOptions).(*cacheOptions)
 	return key
 }
 
@@ -3114,7 +3088,7 @@ func ctxGetAuthToken(r *http.Request) string {
 }
 
 func ctxGetTrackedPath(r *http.Request) string {
-	if v := r.Context().Value(ctx.TrackThisEndpoint); v != nil {
+	if v := r.Context().Value(httputil.TrackThisEndpoint); v != nil {
 		return v.(string)
 	}
 	return ""
@@ -3124,30 +3098,30 @@ func ctxSetTrackedPath(r *http.Request, p string) {
 	if p == "" {
 		panic("setting a nil context TrackThisEndpoint")
 	}
-	setCtxValue(r, ctx.TrackThisEndpoint, p)
+	httputil.SetCtxValue(r, httputil.TrackThisEndpoint, p)
 }
 
 func ctxGetDoNotTrack(r *http.Request) bool {
-	return r.Context().Value(ctx.DoNotTrackThisEndpoint) == true
+	return r.Context().Value(httputil.DoNotTrackThisEndpoint) == true
 }
 
 func ctxSetDoNotTrack(r *http.Request, b bool) {
-	setCtxValue(r, ctx.DoNotTrackThisEndpoint, b)
+	httputil.SetCtxValue(r, httputil.DoNotTrackThisEndpoint, b)
 }
 
 func ctxGetVersionInfo(r *http.Request) *apidef.VersionInfo {
-	if v := r.Context().Value(ctx.VersionData); v != nil {
+	if v := r.Context().Value(httputil.VersionData); v != nil {
 		return v.(*apidef.VersionInfo)
 	}
 	return nil
 }
 
 func ctxSetVersionInfo(r *http.Request, v *apidef.VersionInfo) {
-	setCtxValue(r, ctx.VersionData, v)
+	httputil.SetCtxValue(r, httputil.VersionData, v)
 }
 
 func ctxGetVersionName(r *http.Request) *string {
-	if v := r.Context().Value(ctx.VersionName); v != nil {
+	if v := r.Context().Value(httputil.VersionName); v != nil {
 		return v.(*string)
 	}
 
@@ -3155,15 +3129,15 @@ func ctxGetVersionName(r *http.Request) *string {
 }
 
 func ctxSetVersionName(r *http.Request, vName *string) {
-	setCtxValue(r, ctx.VersionName, vName)
+	httputil.SetCtxValue(r, httputil.VersionName, vName)
 }
 
 func ctxSetOrigRequestURL(r *http.Request, url *url.URL) {
-	setCtxValue(r, ctx.OrigRequestURL, url)
+	httputil.SetCtxValue(r, httputil.OrigRequestURL, url)
 }
 
 func ctxGetOrigRequestURL(r *http.Request) *url.URL {
-	if v := r.Context().Value(ctx.OrigRequestURL); v != nil {
+	if v := r.Context().Value(httputil.OrigRequestURL); v != nil {
 		if urlVal, ok := v.(*url.URL); ok {
 			return urlVal
 		}
@@ -3173,11 +3147,11 @@ func ctxGetOrigRequestURL(r *http.Request) *url.URL {
 }
 
 func ctxSetURLRewriteTarget(r *http.Request, url *url.URL) {
-	setCtxValue(r, ctx.UrlRewriteTarget, url)
+	httputil.SetCtxValue(r, httputil.UrlRewriteTarget, url)
 }
 
 func ctxGetURLRewriteTarget(r *http.Request) *url.URL {
-	if v := r.Context().Value(ctx.UrlRewriteTarget); v != nil {
+	if v := r.Context().Value(httputil.UrlRewriteTarget); v != nil {
 		if urlVal, ok := v.(*url.URL); ok {
 			return urlVal
 		}
@@ -3187,11 +3161,11 @@ func ctxGetURLRewriteTarget(r *http.Request) *url.URL {
 }
 
 func ctxSetUrlRewritePath(r *http.Request, path string) {
-	setCtxValue(r, ctx.UrlRewritePath, path)
+	httputil.SetCtxValue(r, httputil.UrlRewritePath, path)
 }
 
 func ctxGetUrlRewritePath(r *http.Request) string {
-	if v := r.Context().Value(ctx.UrlRewritePath); v != nil {
+	if v := r.Context().Value(httputil.UrlRewritePath); v != nil {
 		if strVal, ok := v.(string); ok {
 			return strVal
 		}
@@ -3200,7 +3174,7 @@ func ctxGetUrlRewritePath(r *http.Request) string {
 }
 
 func ctxSetCheckLoopLimits(r *http.Request, b bool) {
-	setCtxValue(r, ctx.CheckLoopLimits, b)
+	httputil.SetCtxValue(r, httputil.CheckLoopLimits, b)
 }
 
 // Should we check Rate limits and Quotas?
@@ -3210,7 +3184,7 @@ func ctxCheckLimits(r *http.Request) bool {
 		return true
 	}
 
-	if v := r.Context().Value(ctx.CheckLoopLimits); v != nil {
+	if v := r.Context().Value(httputil.CheckLoopLimits); v != nil {
 		return v.(bool)
 	}
 
@@ -3218,11 +3192,11 @@ func ctxCheckLimits(r *http.Request) bool {
 }
 
 func ctxSetRequestMethod(r *http.Request, path string) {
-	setCtxValue(r, ctx.RequestMethod, path)
+	httputil.SetCtxValue(r, httputil.RequestMethod, path)
 }
 
 func ctxGetRequestMethod(r *http.Request) string {
-	if v := r.Context().Value(ctx.RequestMethod); v != nil {
+	if v := r.Context().Value(httputil.RequestMethod); v != nil {
 		if strVal, ok := v.(string); ok {
 			return strVal
 		}
@@ -3231,11 +3205,11 @@ func ctxGetRequestMethod(r *http.Request) string {
 }
 
 func ctxSetTransformRequestMethod(r *http.Request, path string) {
-	setCtxValue(r, ctx.TransformedRequestMethod, path)
+	httputil.SetCtxValue(r, httputil.TransformedRequestMethod, path)
 }
 
 func ctxGetTransformRequestMethod(r *http.Request) string {
-	if v := r.Context().Value(ctx.TransformedRequestMethod); v != nil {
+	if v := r.Context().Value(httputil.TransformedRequestMethod); v != nil {
 		if strVal, ok := v.(string); ok {
 			return strVal
 		}
@@ -3244,11 +3218,11 @@ func ctxGetTransformRequestMethod(r *http.Request) string {
 }
 
 func ctxSetGraphQLRequest(r *http.Request, gqlRequest *gql.Request) {
-	setCtxValue(r, ctx.GraphQLRequest, gqlRequest)
+	httputil.SetCtxValue(r, httputil.GraphQLRequest, gqlRequest)
 }
 
 func ctxGetGraphQLRequest(r *http.Request) (gqlRequest *gql.Request) {
-	if v := r.Context().Value(ctx.GraphQLRequest); v != nil {
+	if v := r.Context().Value(httputil.GraphQLRequest); v != nil {
 		if gqlRequest, ok := v.(*gql.Request); ok {
 			return gqlRequest
 		}
@@ -3257,11 +3231,11 @@ func ctxGetGraphQLRequest(r *http.Request) (gqlRequest *gql.Request) {
 }
 
 func ctxSetGraphQLRequestV2(r *http.Request, gqlRequest *gqlv2.Request) {
-	setCtxValue(r, ctx.GraphQLRequest, gqlRequest)
+	httputil.SetCtxValue(r, httputil.GraphQLRequest, gqlRequest)
 }
 
 func ctxGetGraphQLRequestV2(r *http.Request) (gqlRequest *gqlv2.Request) {
-	if v := r.Context().Value(ctx.GraphQLRequest); v != nil {
+	if v := r.Context().Value(httputil.GraphQLRequest); v != nil {
 		if gqlRequest, ok := v.(*gqlv2.Request); ok {
 			return gqlRequest
 		}
@@ -3270,11 +3244,11 @@ func ctxGetGraphQLRequestV2(r *http.Request) (gqlRequest *gqlv2.Request) {
 }
 
 func ctxSetGraphQLIsWebSocketUpgrade(r *http.Request, isWebSocketUpgrade bool) {
-	setCtxValue(r, ctx.GraphQLIsWebSocketUpgrade, isWebSocketUpgrade)
+	httputil.SetCtxValue(r, httputil.GraphQLIsWebSocketUpgrade, isWebSocketUpgrade)
 }
 
 func ctxGetGraphQLIsWebSocketUpgrade(r *http.Request) (isWebSocketUpgrade bool) {
-	if v := r.Context().Value(ctx.GraphQLIsWebSocketUpgrade); v != nil {
+	if v := r.Context().Value(httputil.GraphQLIsWebSocketUpgrade); v != nil {
 		if isWebSocketUpgrade, ok := v.(bool); ok {
 			return isWebSocketUpgrade
 		}
@@ -3284,11 +3258,11 @@ func ctxGetGraphQLIsWebSocketUpgrade(r *http.Request) (isWebSocketUpgrade bool) 
 }
 
 func ctxGetDefaultVersion(r *http.Request) bool {
-	return r.Context().Value(ctx.VersionDefault) != nil
+	return r.Context().Value(httputil.VersionDefault) != nil
 }
 
 func ctxSetDefaultVersion(r *http.Request) {
-	setCtxValue(r, ctx.VersionDefault, true)
+	httputil.SetCtxValue(r, httputil.VersionDefault, true)
 }
 
 func ctxLoopingEnabled(r *http.Request) bool {
@@ -3296,7 +3270,7 @@ func ctxLoopingEnabled(r *http.Request) bool {
 }
 
 func ctxLoopLevel(r *http.Request) int {
-	if v := r.Context().Value(ctx.LoopLevel); v != nil {
+	if v := r.Context().Value(httputil.LoopLevel); v != nil {
 		if intVal, ok := v.(int); ok {
 			return intVal
 		}
@@ -3306,7 +3280,7 @@ func ctxLoopLevel(r *http.Request) int {
 }
 
 func ctxSetLoopLevel(r *http.Request, value int) {
-	setCtxValue(r, ctx.LoopLevel, value)
+	httputil.SetCtxValue(r, httputil.LoopLevel, value)
 }
 
 func ctxIncLoopLevel(r *http.Request, loopLimit int) {
@@ -3315,7 +3289,7 @@ func ctxIncLoopLevel(r *http.Request, loopLimit int) {
 }
 
 func ctxLoopLevelLimit(r *http.Request) int {
-	if v := r.Context().Value(ctx.LoopLevelLimit); v != nil {
+	if v := r.Context().Value(httputil.LoopLevelLimit); v != nil {
 		if intVal, ok := v.(int); ok {
 			return intVal
 		}
@@ -3327,12 +3301,12 @@ func ctxLoopLevelLimit(r *http.Request) int {
 func ctxSetLoopLimit(r *http.Request, limit int) {
 	// Can be set only one time per request
 	if ctxLoopLevelLimit(r) == 0 && limit > 0 {
-		setCtxValue(r, ctx.LoopLevelLimit, limit)
+		httputil.SetCtxValue(r, httputil.LoopLevelLimit, limit)
 	}
 }
 
 func ctxThrottleLevelLimit(r *http.Request) int {
-	if v := r.Context().Value(ctx.ThrottleLevelLimit); v != nil {
+	if v := r.Context().Value(httputil.ThrottleLevelLimit); v != nil {
 		if intVal, ok := v.(int); ok {
 			return intVal
 		}
@@ -3342,7 +3316,7 @@ func ctxThrottleLevelLimit(r *http.Request) int {
 }
 
 func ctxThrottleLevel(r *http.Request) int {
-	if v := r.Context().Value(ctx.ThrottleLevel); v != nil {
+	if v := r.Context().Value(httputil.ThrottleLevel); v != nil {
 		if intVal, ok := v.(int); ok {
 			return intVal
 		}
@@ -3354,12 +3328,12 @@ func ctxThrottleLevel(r *http.Request) int {
 func ctxSetThrottleLimit(r *http.Request, limit int) {
 	// Can be set only one time per request
 	if ctxThrottleLevelLimit(r) == 0 && limit > 0 {
-		setCtxValue(r, ctx.ThrottleLevelLimit, limit)
+		httputil.SetCtxValue(r, httputil.ThrottleLevelLimit, limit)
 	}
 }
 
 func ctxSetThrottleLevel(r *http.Request, value int) {
-	setCtxValue(r, ctx.ThrottleLevel, value)
+	httputil.SetCtxValue(r, httputil.ThrottleLevel, value)
 }
 
 func ctxIncThrottleLevel(r *http.Request, throttleLimit int) {
@@ -3368,16 +3342,16 @@ func ctxIncThrottleLevel(r *http.Request, throttleLimit int) {
 }
 
 func ctxTraceEnabled(r *http.Request) bool {
-	return r.Context().Value(ctx.Trace) != nil
+	return r.Context().Value(httputil.Trace) != nil
 }
 
 func ctxSetTrace(r *http.Request) {
-	setCtxValue(r, ctx.Trace, true)
+	httputil.SetCtxValue(r, httputil.Trace, true)
 }
 
 func ctxSetSpanAttributes(r *http.Request, mwName string, attrs ...otel.SpanAttribute) {
 	if len(attrs) > 0 {
-		setCtxValue(r, mwName, attrs)
+		httputil.SetCtxValue(r, mwName, attrs)
 	}
 }
 
@@ -3392,22 +3366,22 @@ func ctxGetSpanAttributes(r *http.Request, mwName string) (attrs []otel.SpanAttr
 }
 
 func ctxSetRequestStatus(r *http.Request, stat RequestStatus) {
-	setCtxValue(r, ctx.RequestStatus, stat)
+	httputil.SetCtxValue(r, httputil.RequestStatus, stat)
 }
 
 func ctxGetRequestStatus(r *http.Request) (stat RequestStatus) {
-	if v := r.Context().Value(ctx.RequestStatus); v != nil {
+	if v := r.Context().Value(httputil.RequestStatus); v != nil {
 		stat = v.(RequestStatus)
 	}
 	return
 }
 
 func ctxSetOperation(r *http.Request, op *Operation) {
-	setCtxValue(r, ctx.OASOperation, op)
+	httputil.SetCtxValue(r, httputil.OASOperation, op)
 }
 
 func ctxGetOperation(r *http.Request) (op *Operation) {
-	if v := r.Context().Value(ctx.OASOperation); v != nil {
+	if v := r.Context().Value(httputil.OASOperation); v != nil {
 		op = v.(*Operation)
 	}
 	return

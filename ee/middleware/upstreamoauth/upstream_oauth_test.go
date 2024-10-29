@@ -1,4 +1,4 @@
-package gateway
+package upstreamoauth_test
 
 import (
 	"encoding/json"
@@ -6,6 +6,9 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+
+	"github.com/TykTechnologies/tyk/ee/middleware/upstreamoauth"
+	"github.com/TykTechnologies/tyk/gateway"
 
 	"github.com/stretchr/testify/assert"
 
@@ -15,8 +18,7 @@ import (
 )
 
 func TestUpstreamOauth2(t *testing.T) {
-
-	tst := StartTest(nil)
+	tst := gateway.StartTest(nil)
 	t.Cleanup(tst.Close)
 
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -58,7 +60,7 @@ func TestUpstreamOauth2(t *testing.T) {
 	}
 
 	tst.Gw.BuildAndLoadAPI(
-		func(spec *APISpec) {
+		func(spec *gateway.APISpec) {
 			spec.Proxy.ListenPath = "/upstream-oauth-distributed/"
 			spec.UseKeylessAccess = true
 			spec.UpstreamAuth = apidef.UpstreamAuth{
@@ -66,7 +68,7 @@ func TestUpstreamOauth2(t *testing.T) {
 				OAuth: apidef.UpstreamOAuth{
 					Enabled:               true,
 					ClientCredentials:     cfg,
-					AllowedAuthorizeTypes: []string{ClientCredentialsAuthorizeType},
+					AllowedAuthorizeTypes: []string{upstreamoauth.ClientCredentialsAuthorizeType},
 				},
 			}
 			spec.Proxy.StripListenPath = true
@@ -96,7 +98,7 @@ func TestUpstreamOauth2(t *testing.T) {
 }
 
 func TestPasswordCredentialsTokenRequest(t *testing.T) {
-	tst := StartTest(nil)
+	tst := gateway.StartTest(nil)
 	t.Cleanup(tst.Close)
 
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -142,7 +144,7 @@ func TestPasswordCredentialsTokenRequest(t *testing.T) {
 	}
 
 	tst.Gw.BuildAndLoadAPI(
-		func(spec *APISpec) {
+		func(spec *gateway.APISpec) {
 			spec.Proxy.ListenPath = "/upstream-oauth-password/"
 			spec.UseKeylessAccess = true
 			spec.UpstreamAuth = apidef.UpstreamAuth{
@@ -150,7 +152,7 @@ func TestPasswordCredentialsTokenRequest(t *testing.T) {
 				OAuth: apidef.UpstreamOAuth{
 					Enabled:                true,
 					PasswordAuthentication: cfg,
-					AllowedAuthorizeTypes:  []string{PasswordAuthorizeType},
+					AllowedAuthorizeTypes:  []string{upstreamoauth.PasswordAuthorizeType},
 				},
 			}
 			spec.Proxy.StripListenPath = true

@@ -3,6 +3,8 @@ package gateway
 import (
 	"time"
 
+	"github.com/TykTechnologies/tyk/internal/model"
+
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/user"
 )
@@ -19,7 +21,7 @@ func (m Monitor) Fire(sessionData *user.SessionState, key string, triggerLimit, 
 	em := config.EventMessage{
 		Type: EventTriggerExceeded,
 		Meta: EventTriggerExceededMeta{
-			EventMetaDefault: EventMetaDefault{Message: "Quota trigger reached"},
+			EventMetaDefault: model.EventMetaDefault{Message: "Quota trigger reached"},
 			OrgID:            sessionData.OrgID,
 			Key:              key,
 			TriggerLimit:     int64(triggerLimit),

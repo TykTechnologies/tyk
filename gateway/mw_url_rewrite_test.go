@@ -6,9 +6,9 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/TykTechnologies/tyk/internal/httputil"
 
-	"github.com/TykTechnologies/tyk/ctx"
+	"github.com/stretchr/testify/assert"
 
 	"github.com/TykTechnologies/tyk/test"
 
@@ -1024,7 +1024,7 @@ func TestRewriterTriggers(t *testing.T) {
 			hOpt := apidef.StringRegexMap{MatchPattern: "bar"}
 			hOpt.Init()
 
-			CtxSetData(r, map[string]interface{}{
+			httputil.CtxSetData(r, map[string]interface{}{
 				"rewrite": "bar-baz",
 			})
 
@@ -1380,7 +1380,7 @@ func TestURLRewriteMiddleware_CheckHostRewrite(t *testing.T) {
 			r := &http.Request{}
 			err := m.CheckHostRewrite(tt.args.oldPath, tt.args.newTarget, r)
 			assert.Equal(t, tt.errExpected, err != nil)
-			assert.Equal(t, tt.retainHostVal, r.Context().Value(ctx.RetainHost))
+			assert.Equal(t, tt.retainHostVal, r.Context().Value(httputil.RetainHost))
 		})
 	}
 }

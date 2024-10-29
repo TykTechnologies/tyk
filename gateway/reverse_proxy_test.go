@@ -21,6 +21,8 @@ import (
 	texttemplate "text/template"
 	"time"
 
+	"github.com/TykTechnologies/tyk/internal/httputil"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -33,7 +35,6 @@ import (
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
-	"github.com/TykTechnologies/tyk/ctx"
 	"github.com/TykTechnologies/tyk/dnscache"
 	"github.com/TykTechnologies/tyk/request"
 	"github.com/TykTechnologies/tyk/test"
@@ -119,7 +120,7 @@ func TestReverseProxyRetainHost(t *testing.T) {
 			req := TestReq(t, http.MethodGet, tc.inURL, nil)
 			req.URL.Path = tc.inPath
 			if tc.retainHost {
-				setCtxValue(req, ctx.RetainHost, true)
+				httputil.SetCtxValue(req, httputil.RetainHost, true)
 			}
 
 			proxy := ts.Gw.TykNewSingleHostReverseProxy(target, spec, nil)

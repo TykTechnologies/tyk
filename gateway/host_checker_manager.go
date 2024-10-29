@@ -10,6 +10,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/TykTechnologies/tyk/internal/model"
+
 	"github.com/sirupsen/logrus"
 	msgpack "gopkg.in/vmihailenco/msgpack.v2"
 
@@ -249,7 +251,7 @@ func (hc *HostCheckerManager) OnHostDown(ctx context.Context, report HostHealthR
 	}
 
 	spec.FireEvent(EventHOSTDOWN, EventHostStatusMeta{
-		EventMetaDefault: EventMetaDefault{Message: "Uptime test failed"},
+		EventMetaDefault: model.EventMetaDefault{Message: "Uptime test failed"},
 		HostInfo:         report,
 	})
 
@@ -292,7 +294,7 @@ func (hc *HostCheckerManager) OnHostBackUp(ctx context.Context, report HostHealt
 		return
 	}
 	spec.FireEvent(EventHOSTUP, EventHostStatusMeta{
-		EventMetaDefault: EventMetaDefault{Message: "Uptime test succeeded"},
+		EventMetaDefault: model.EventMetaDefault{Message: "Uptime test succeeded"},
 		HostInfo:         report,
 	})
 

@@ -41,3 +41,59 @@ func GetUpstreamAuth(r *http.Request) model.UpstreamAuthProvider {
 
 	return provider
 }
+
+func CtxGetData(r *http.Request) map[string]interface{} {
+	if v := r.Context().Value(ContextData); v != nil {
+		return v.(map[string]interface{})
+	}
+	return nil
+}
+
+func CtxSetData(r *http.Request, m map[string]interface{}) {
+	if m == nil {
+		panic("setting a nil context ContextData")
+	}
+	SetCtxValue(r, ContextData, m)
+}
+
+func SetCtxValue(r *http.Request, key, val interface{}) {
+	SetContext(r, context.WithValue(r.Context(), key, val))
+}
+
+const (
+	SessionData Key = iota
+	// Deprecated: UpdateSession was used to trigger a session update, use *SessionData.Touch instead.
+	UpdateSession
+	AuthToken
+	HashedAuthToken
+	VersionData
+	VersionName
+	VersionDefault
+	OrgSessionContext
+	ContextData
+	RetainHost
+	TrackThisEndpoint
+	DoNotTrackThisEndpoint
+	UrlRewritePath
+	RequestMethod
+	OrigRequestURL
+	LoopLevel
+	LoopLevelLimit
+	ThrottleLevel
+	ThrottleLevelLimit
+	Trace
+	CheckLoopLimits
+	UrlRewriteTarget
+	TransformedRequestMethod
+	Definition
+	RequestStatus
+	GraphQLRequest
+	GraphQLIsWebSocketUpgrade
+	OASOperation
+
+	// CacheOptions holds cache options required for cache writer middleware.
+	CacheOptions
+	OASDefinition
+)
+
+type Key uint
