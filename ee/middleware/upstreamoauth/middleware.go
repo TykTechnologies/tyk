@@ -4,8 +4,6 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/TykTechnologies/tyk/storage"
-
 	"github.com/sirupsen/logrus"
 
 	"github.com/TykTechnologies/tyk/header"
@@ -19,16 +17,17 @@ type Middleware struct {
 	Spec model.MergedAPI
 	Gw   Gateway
 
-	Base                            BaseMiddleware
-	clientCredentialsStorageHandler *storage.RedisCluster
-	passwordStorageHandler          *storage.RedisCluster
+	Base BaseMiddleware
+
+	clientCredentialsStorageHandler Storage
+	passwordStorageHandler          Storage
 }
 
 // Middleware implements model.Middleware.
 var _ model.Middleware = &Middleware{}
 
 // NewMiddleware returns a new instance of Middleware.
-func NewMiddleware(gw Gateway, mw BaseMiddleware, spec model.MergedAPI, ccStorageHandler *storage.RedisCluster, pwStorageHandler *storage.RedisCluster) *Middleware {
+func NewMiddleware(gw Gateway, mw BaseMiddleware, spec model.MergedAPI, ccStorageHandler Storage, pwStorageHandler Storage) *Middleware {
 	return &Middleware{
 		Base:                            mw,
 		Gw:                              gw,
