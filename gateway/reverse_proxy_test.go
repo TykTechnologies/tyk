@@ -32,7 +32,6 @@ import (
 	"github.com/TykTechnologies/tyk/ctx"
 	"github.com/TykTechnologies/tyk/dnscache"
 	"github.com/TykTechnologies/tyk/header"
-	"github.com/TykTechnologies/tyk/internal/httpctx"
 	"github.com/TykTechnologies/tyk/request"
 	"github.com/TykTechnologies/tyk/test"
 	"github.com/TykTechnologies/tyk/user"
@@ -118,8 +117,7 @@ func TestReverseProxyRetainHost(t *testing.T) {
 			req := TestReq(t, http.MethodGet, tc.inURL, nil)
 			req.URL.Path = tc.inPath
 			if tc.retainHost {
-				ctxvalue := httpctx.NewValue[bool](ctx.RetainHost)
-				ctxvalue.Set(req, true)
+				setCtxValue(req, ctx.RetainHost, true)
 			}
 
 			proxy := ts.Gw.TykNewSingleHostReverseProxy(target, spec, nil)

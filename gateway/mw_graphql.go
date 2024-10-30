@@ -6,8 +6,6 @@ import (
 	"io"
 	"net/http"
 
-	"github.com/TykTechnologies/tyk/ctx"
-
 	"github.com/gorilla/websocket"
 	"github.com/sirupsen/logrus"
 
@@ -18,6 +16,7 @@ import (
 	"github.com/TykTechnologies/tyk/internal/graphengine"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/ctx"
 	"github.com/TykTechnologies/tyk/header"
 	"github.com/TykTechnologies/tyk/user"
 

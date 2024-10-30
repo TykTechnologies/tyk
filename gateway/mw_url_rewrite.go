@@ -11,11 +11,10 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/TykTechnologies/tyk/ctx"
-
 	"github.com/sirupsen/logrus"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/ctx"
 	"github.com/TykTechnologies/tyk/regexp"
 	"github.com/TykTechnologies/tyk/user"
 )

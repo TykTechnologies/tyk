@@ -6,7 +6,6 @@ import (
 	"sync"
 
 	"github.com/TykTechnologies/tyk/ctx"
-
 	"github.com/TykTechnologies/tyk/request"
 	"github.com/TykTechnologies/tyk/user"
 )
