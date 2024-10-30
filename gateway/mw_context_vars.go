@@ -4,8 +4,6 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/TykTechnologies/tyk/ctx"
-
 	"github.com/TykTechnologies/tyk/internal/uuid"
 
 	"github.com/TykTechnologies/tyk/request"
@@ -55,7 +53,7 @@ func (m *MiddlewareContextVars) ProcessRequest(w http.ResponseWriter, r *http.Re
 		}
 	}
 
-	ctx.CtxSetData(r, contextDataObject)
+	ctxSetData(r, contextDataObject)
 
 	return nil, http.StatusOK
 }

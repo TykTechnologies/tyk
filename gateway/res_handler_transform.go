@@ -10,8 +10,6 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/TykTechnologies/tyk/ctx"
-
 	"github.com/clbanning/mxj"
 	"github.com/sirupsen/logrus"
 
@@ -159,7 +157,7 @@ func (r *ResponseTransformMiddleware) HandleResponse(rw http.ResponseWriter, res
 	}
 
 	if r.Spec.EnableContextVars {
-		bodyData["_tyk_context"] = ctx.CtxGetData(req)
+		bodyData["_tyk_context"] = ctxGetData(req)
 	}
 
 	if tmeta.TemplateData.EnableSession {
