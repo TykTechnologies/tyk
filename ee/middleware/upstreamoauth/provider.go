@@ -142,7 +142,7 @@ func (cache *ClientCredentialsClient) ObtainToken(ctx context.Context, OAuthSpec
 	return oauthToken, nil
 }
 
-func (cache *UpstreamOAuthPasswordClient) ObtainToken(ctx context.Context, OAuthSpec *Middleware) (*oauth2.Token, error) {
+func (cache *PasswordClient) ObtainToken(ctx context.Context, OAuthSpec *Middleware) (*oauth2.Token, error) {
 	cfg := newOAuth2PasswordConfig(OAuthSpec)
 
 	token, err := cfg.PasswordCredentialsToken(ctx, OAuthSpec.Spec.UpstreamAuth.OAuth.PasswordAuthentication.Username, OAuthSpec.Spec.UpstreamAuth.OAuth.PasswordAuthentication.Password)
@@ -177,7 +177,7 @@ type ClientCredentialsClient struct {
 	Storage
 }
 
-type UpstreamOAuthPasswordClient struct {
+type PasswordClient struct {
 	Storage
 }
 
@@ -240,7 +240,7 @@ type EventUpstreamOAuthMeta struct {
 }
 
 func (p *PasswordOAuthProvider) getOAuthToken(r *http.Request, mw *Middleware) (string, error) {
-	client := UpstreamOAuthPasswordClient{Storage: mw.passwordStorageHandler}
+	client := PasswordClient{Storage: mw.passwordStorageHandler}
 	token, err := client.GetToken(r, mw)
 	if err != nil {
 		return handleOAuthError(r, mw, err)
@@ -257,7 +257,7 @@ func (p *PasswordOAuthProvider) headerEnabled(OAuthSpec *Middleware) bool {
 	return OAuthSpec.Spec.UpstreamAuth.OAuth.PasswordAuthentication.Header.Enabled
 }
 
-func (cache *UpstreamOAuthPasswordClient) GetToken(r *http.Request, mw *Middleware) (string, error) {
+func (cache *PasswordClient) GetToken(r *http.Request, mw *Middleware) (string, error) {
 	cacheKey := generatePasswordOAuthCacheKey(mw.Spec.UpstreamAuth.OAuth, mw.Spec.APIID)
 
 	tokenString, err := retryGetKeyAndLock(cacheKey, cache.Storage)
