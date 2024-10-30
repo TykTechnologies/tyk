@@ -98,8 +98,8 @@ func (m *Middleware) ProcessRequest(_ http.ResponseWriter, r *http.Request, _ in
 	return nil, http.StatusOK
 }
 
-// EmitUpstreamOAuthEvent emits an upstream OAuth event with an optional custom message.
-func (mw *Middleware) EmitUpstreamOAuthEvent(r *http.Request, e event.Event, message string, apiId string) {
+// FireEvent emits an upstream OAuth event with an optional custom message.
+func (mw *Middleware) FireEvent(r *http.Request, e event.Event, message string, apiId string) {
 	if message == "" {
 		message = event.String(e)
 	}

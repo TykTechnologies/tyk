@@ -77,7 +77,7 @@ func (p *ClientCredentialsOAuthProvider) getOAuthToken(r *http.Request, mw *Midd
 }
 
 func handleOAuthError(r *http.Request, mw *Middleware, err error) (string, error) {
-	mw.EmitUpstreamOAuthEvent(r, ErrorEventName, err.Error(), mw.Spec.APIID)
+	mw.FireEvent(r, ErrorEventName, err.Error(), mw.Spec.APIID)
 	return "", err
 }
 
