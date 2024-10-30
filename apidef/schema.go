@@ -1063,7 +1063,7 @@ const Schema = `{
                 "token_url"
               ]
             },
-            "password_authentication": {
+            "password": {
               "type": "object",
               "properties": {
                 "client_id": {

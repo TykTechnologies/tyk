@@ -2073,7 +2073,7 @@
             "header": {
               "$ref": "#/definitions/X-Tyk-AuthSource"
             },
-            "extra_metadata": {
+            "extraMetadata": {
               "type": "array"
             }
           },
@@ -2083,7 +2083,7 @@
             "tokenUrl"
           ]
         },
-        "passwordAuthentication": {
+        "password": {
           "type": "object",
           "properties": {
             "clientId": {
@@ -2110,7 +2110,7 @@
             "header": {
               "$ref": "#/definitions/X-Tyk-AuthSource"
             },
-            "extra_metadata": {
+            "extraMetadata": {
               "type": "array"
             }
           },
