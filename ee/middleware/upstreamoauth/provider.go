@@ -67,7 +67,7 @@ func getOAuthHeaderProvider(oauthConfig apidef.UpstreamOAuth) (OAuthHeaderProvid
 }
 
 func (p *ClientCredentialsOAuthProvider) getOAuthToken(r *http.Request, mw *Middleware) (string, error) {
-	client := UpstreamOAuthClientCredentialsClient{mw.clientCredentialsStorageHandler}
+	client := ClientCredentialsClient{mw.clientCredentialsStorageHandler}
 	token, err := client.GetToken(r, mw)
 	if err != nil {
 		return handleOAuthError(r, mw, err)
@@ -89,14 +89,14 @@ func (p *ClientCredentialsOAuthProvider) headerEnabled(OAuthSpec *Middleware) bo
 	return OAuthSpec.Spec.UpstreamAuth.OAuth.ClientCredentials.Header.Enabled
 }
 
-type UpstreamOAuthCache interface {
+type Cache interface {
 	// GetToken returns the token from cache or issues a request to obtain it from the OAuth provider.
 	GetToken(r *http.Request, OAuthSpec *Middleware) (string, error)
 	// ObtainToken issues a request to obtain the token from the OAuth provider.
 	ObtainToken(ctx context.Context, OAuthSpec *Middleware) (*oauth2.Token, error)
 }
 
-func (cache *UpstreamOAuthClientCredentialsClient) GetToken(r *http.Request, OAuthSpec *Middleware) (string, error) {
+func (cache *ClientCredentialsClient) GetToken(r *http.Request, OAuthSpec *Middleware) (string, error) {
 	cacheKey := generateClientCredentialsCacheKey(OAuthSpec.Spec.UpstreamAuth.OAuth, OAuthSpec.Spec.APIID)
 
 	tokenString, err := retryGetKeyAndLock(cacheKey, cache.Storage)
@@ -130,7 +130,7 @@ func setTokenInCache(cacheKey string, token string, ttl time.Duration, cache Sto
 	return cache.SetKey(cacheKey, token, int64(oauthTokenExpiry.Sub(time.Now()).Seconds()))
 }
 
-func (cache *UpstreamOAuthClientCredentialsClient) ObtainToken(ctx context.Context, OAuthSpec *Middleware) (*oauth2.Token, error) {
+func (cache *ClientCredentialsClient) ObtainToken(ctx context.Context, OAuthSpec *Middleware) (*oauth2.Token, error) {
 	cfg := newOAuth2ClientCredentialsConfig(OAuthSpec)
 
 	tokenSource := cfg.TokenSource(ctx)
@@ -173,7 +173,7 @@ func newOAuth2PasswordConfig(OAuthSpec *Middleware) oauth2.Config {
 	}
 }
 
-type UpstreamOAuthClientCredentialsClient struct {
+type ClientCredentialsClient struct {
 	Storage
 }
 
