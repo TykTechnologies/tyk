@@ -118,7 +118,7 @@ type PasswordClient struct {
 
 func generateClientCredentialsCacheKey(config apidef.UpstreamOAuth, apiId string) string {
 	key := fmt.Sprintf(
-		"%s|%s|%s|%s",
+		"cc-%s|%s|%s|%s",
 		apiId,
 		config.ClientCredentials.ClientID,
 		config.ClientCredentials.TokenURL,
@@ -223,7 +223,7 @@ func (cache *PasswordClient) GetToken(r *http.Request, mw *Middleware) (string, 
 
 func generatePasswordOAuthCacheKey(config apidef.UpstreamOAuth, apiId string) string {
 	key := fmt.Sprintf(
-		"%s|%s|%s|%s",
+		"pw-%s|%s|%s|%s",
 		apiId,
 		config.PasswordAuthentication.ClientID,
 		config.PasswordAuthentication.ClientSecret,
