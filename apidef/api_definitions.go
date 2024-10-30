@@ -853,8 +853,6 @@ type ClientCredentials struct {
 	ClientAuthData
 	// Header holds the configuration for the custom header to be used for OAuth authentication.
 	Header AuthSource `bson:"header" json:"header"`
-	// Enabled activates upstream OAuth2 client credentials authentication.
-	Enabled bool `bson:"enabled" json:"enabled"`
 	// TokenURL is the resource server's token endpoint
 	// URL. This is a constant specific to each server.
 	TokenURL string `bson:"token_url" json:"token_url"`
