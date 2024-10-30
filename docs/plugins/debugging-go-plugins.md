@@ -9,30 +9,30 @@ description: Debugging guide for Go plugins
 date: "2024-10-11"
 ---
 
-Plugins are native go code compiled to a binary shared object file. The code may depend on CGO and require libraries like libc provided by the runtime environment. The following are some debugging steps for diagnosing issues arising from using plugins.
+Plugins are native Go code compiled to a binary shared object file. The code may depend on `cgo` and require libraries like `libc` provided by the runtime environment. The following are some debugging steps for diagnosing issues arising from using plugins.
 
 ## Warnings
 
-The [plugin package - Warnings](https://pkg.go.dev/plugin#hdr-Warnings) section outlines several requirements which can't be ignored. The most important restriction is the following:
+The [Plugin package - Warnings](https://pkg.go.dev/plugin#hdr-Warnings) section in the Go documentation outlines several requirements which can't be ignored when working with plugins. The most important restriction is the following:
 
 > Runtime crashes are likely to occur unless all parts of the program (the application and all its plugins) are compiled using exactly the same version of the toolchain, the same build tags, and the same values of certain flags and environment variables.
 
-We provide a Plugin Compiler docker image, which should be used to build plugins compatible with the official gateway releases and their architectures. It provides the cross compilation toolchain, Go version used to build the release, and ensure compatible flags are used when compiling plugins, like `-trimpath`, `CC`, `CGO_ENABLED`, `GOOS`, `GOARCH`.
+We provide the *Tyk Plugin Compiler* docker image, which we strongly recommend is used to build plugins compatible with the official Gateway releases. This tool provides the cross compilation toolchain, Go version used to build the release, and ensures that compatible flags are used when compiling plugins, like `-trimpath`, `CC`, `CGO_ENABLED`, `GOOS`, `GOARCH`.
 
-The plugin compiler also works around known Go issues.
+The *Plugin Compiler* also works around known Go issues such as:
 
 - https://github.com/golang/go/issues/19004
 - https://www.reddit.com/r/golang/comments/qxghjv/plugin_already_loaded_when_a_plugin_is_loaded/
 
-The argument plugin_id ensures the same plugin can be rebuilt. The plugin compiler does this by replacing the plugin go.mod module path.
+Supplying the argument `build_id` to the *Plugin Compiler* ensures the same plugin can be rebuilt. The *Plugin Compiler* does this by replacing the plugin `go.mod` module path.
 
-Continue with [Go Plugin Compiler](https://tyk.io/docs/product-stack/tyk-gateway/advanced-configurations/plugins/golang/go-plugin-compiler/).
+Continue with [Tyk Plugin Compiler](https://tyk.io/docs/product-stack/tyk-gateway/advanced-configurations/plugins/golang/go-plugin-compiler/).
 
 ### Examples
 
-When working with Go plugins, it's easy to miss the restriction that the plugin at the very least requires to be built with the same Go version, and the same flags, notably `-trimpath`, which is part of the Gateway official release.
+When working with Go plugins, it's easy to miss the restriction that the plugin at the very least must be built with the same Go version, and the same flags (notably `-trimpath`) as the Tyk Gateway on which it is to be used.
 
-If you miss an argument like forgetting `-trimpath` for the plugin build, you'll get a load error like the one below. Usually when the error hints at a standard library package, the build flags between the binaries don't match. For example, if gateway is compiled with `-race`, the plugin needs to be compiled with the flag as well to be compatible.
+If you miss an argument (for example `-trimpath`) when building the plugin, the Gateway will report an error when your API attempts to load the plugin, for example:
 
 ```
 task: [test] cd tyk-release-5.3.6 && go build -tags=goplugin -trimpath .
@@ -41,53 +41,55 @@ task: [test] ./tyk-release-5.3.6/tyk plugin load -f plugins/testplugin.so -s Aut
 tyk: error: unexpected error: plugin.Open("plugins/testplugin"): plugin was built with a different version of package internal/goarch, try --help
 ```
 
-Other error messages may occur, depending on what triggered the issue. For example, if you omitted `-race` in the plugin but the gateway was built with `-race`, the error reported is:
+Usually when the error hints at a standard library package, the build flags between the Gateway and plugin binaries don't match.
+
+Other error messages may be reported, depending on what triggered the issue. For example, if you omitted `-race` in the plugin but the gateway was built with `-race`, the following error will be reported:
 
 ```
 plugin was built with a different version of package runtime/internal/sys, try --help
 ```
 
-Stricly speaking:
+Strictly speaking:
 
-- build flags like `-trimpath`, `-race` need to match
-- go toolchain / build env needs to be exactly the same
-- cross compilation means using the same `CC` value for the build (CGO)
-- matching `CGO_ENABLED=1`, `GOOS`, `GOARCH` with runtime
+- Build flags like `-trimpath`, `-race` need to match.
+- Go toolchain / build env needs to be exactly the same.
+- For cross compilation you must use the same `CC` value for the build (CGO).
+- `CGO_ENABLED=1`, `GOOS`, `GOARCH` must match with runtime.
 
-When something is off, proofing these can be done with `go version -m tyk` and `go version -m plugin.so` for the plugin, inspecting and comparing the output of `build` tokens usually yields the difference that caused the compatibility issue.
+When something is off, you can check what is different by using the `go version -m` command for the Gateway (`go version -m tyk`) and plugin (`go version -m plugin.so`). Inspecting and comparing the output of `build` tokens usually yields the difference that caused the compatibility issue.
 
 ## Plugin compatibility issues
 
 This is a short list of cases when dependencies may be causing problems.
 
-- A gateway dependency does not have a go.mod and plugin wants to use it,
-- A gateway dependency has a shared dependency, same version must be used,
-- A plugin wants to use a different dependency version
+- A Gateway dependency does not have a `go.mod` and the plugin wants to use it.
+- Gateway and plugin have a shared dependency: the same version must be used by the plugin.
+- A plugin wants to use a different dependency version.
 
 The cases need to be expanded, but the process for each is:
 
-Case 1:
+**Case 1:**
 
-- Plugin uses gateway as a dependency but wants to use A
-- A does not have a go.mod, so a pseudo version is generated on both ends of the build
-- Expect: build success, error when loading plugin due to a version mismatch
+- Plugin uses Gateway as a dependency but wants to use *A*
+- *A* does not have a `go.mod`, so a pseudo version is generated on both ends of the build
+- Result: build success, error when loading plugin due to a version mismatch
 
-Fix: update to remove dependency A, or use a version with go.mod;
+Fix: update to remove dependency *A*, or use a version with `go.mod`
 
-Case 2:
+**Case 2:**
 
-- Plugin uses gateway as a dependency and wants to use a shared dependency
-- As the dependency has go.mod, the version matches
-- Dependency is promoted to direct in go.mod
-- Expect: user has to keep dependency in sync with gateway
+- Plugin uses Gateway as a dependency and wants to use a shared dependency
+- As the dependency has `go.mod`, the version matches
+- Dependency is promoted to *direct* in `go.mod`
+- Expect: you have to keep the dependency in sync with Gateway
 
-Case 3:
+**Case 3:**
 
-- Plugin uses gateway as a dependency but wants to use a different version of a dependency
+- Plugin uses Gateway as a dependency but wants to use a different version of a shared dependency
 - It's likely using a major release with `/v4` or similar works like a charm (new package)
 - Expectation: If it's just a different version of the same package, loading the plugin will fail
 
-It's definitely recommended that all dependencies would follow go package metaversion, however the reality is most gateway dependencies follow a basic v1 semver which doesn't break import paths for every release.
+We recommend that all dependencies should follow Go package metaversion, however the reality is most Gateway dependencies follow a basic v1 semver which doesn't break import paths for every release.
 
 ## List plugin symbols
 
@@ -112,9 +114,9 @@ Sometimes it's useful to list symbols from a plugin. For example, we can list th
 0000000001310c40 T testplugin.MakeOutboundCall.deferwrap1
 ```
 
-The command prints other symbols that are part of the binary. In the worst case, a build compatibility issue may cause a crash in the gateway due to an unrecoverable error and this can be used to further debug the binaries produced.
+This command prints other symbols that are part of the binary. In the worst case, a build compatibility issue may cause a crash in the Gateway due to an unrecoverable error and this can be used to further debug the binaries produced.
 
-A very basic check to ensure gateway/plugin compatibility is using the built in `go version -m <file>`:
+A very basic check to ensure Gateway/plugin compatibility is using the built in `go version -m <file>`:
 
 ```
 [output truncated]
@@ -133,4 +135,4 @@ A very basic check to ensure gateway/plugin compatibility is using the built in 
 	build	vcs.modified=false
 ```
 
-It's typical that these options should match between the gateway binary and the plugin, and you can use the command for both binaries.
+These options should match between the Gateway binary and the plugin. You can use the command for both binaries and then compare the outputs.
