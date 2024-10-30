@@ -38,7 +38,7 @@ func (gw *Gateway) LoadDefinitionsFromRPCBackup() ([]*APISpec, error) {
 		return nil, errors.New("[RPC] --> RPC Backup recovery failed: redis connection failed")
 	}
 
-	secret := crypto.RightPad2Len(gw.GetConfig().Secret, "=", 32)
+	secret := crypto.GetPaddedString(gw.GetConfig().Secret)
 	cryptoText, err := store.GetKey(checkKey)
 	if err != nil {
 		return nil, errors.New("[RPC] --> Failed to get node backup (" + checkKey + "): " + err.Error())
@@ -69,7 +69,7 @@ func (gw *Gateway) saveRPCDefinitionsBackup(list string) error {
 		return errors.New("--> RPC Backup save failed: redis connection failed")
 	}
 
-	secret := crypto.RightPad2Len(gw.GetConfig().Secret, "=", 32)
+	secret := crypto.GetPaddedString(gw.GetConfig().Secret)
 	cryptoText := crypto.Encrypt([]byte(secret), list)
 	err := store.SetKey(BackupApiKeyBase+tagList, cryptoText, -1)
 	if err != nil {
@@ -92,7 +92,7 @@ func (gw *Gateway) LoadPoliciesFromRPCBackup() (map[string]user.Policy, error) {
 		return nil, errors.New("[RPC] --> RPC Policy Backup recovery failed: redis connection failed")
 	}
 
-	secret := crypto.RightPad2Len(gw.GetConfig().Secret, "=", 32)
+	secret := crypto.GetPaddedString(gw.GetConfig().Secret)
 	cryptoText, err := store.GetKey(checkKey)
 	listAsString := crypto.Decrypt([]byte(secret), cryptoText)
 
