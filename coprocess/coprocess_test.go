@@ -12,8 +12,6 @@ import (
 	"os"
 	"testing"
 
-	"github.com/TykTechnologies/tyk/internal/model"
-
 	"github.com/golang/protobuf/proto"
 	"github.com/justinas/alice"
 
@@ -64,7 +62,7 @@ func TestCoProcessDispatchEvent(t *testing.T) {
 	baseMid := gateway.BaseMiddleware{Spec: spec, Proxy: proxy, Gw: ts.Gw}
 
 	meta := gateway.EventKeyFailureMeta{
-		EventMetaDefault: model.EventMetaDefault{Message: "Auth Failure"},
+		EventMetaDefault: EventMetaDefault{Message: "Auth Failure"},
 		Path:             "/",
 		Origin:           "127.0.0.1",
 		Key:              "abc",
