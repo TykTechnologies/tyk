@@ -17,7 +17,7 @@ import (
 	"github.com/TykTechnologies/tyk/test"
 )
 
-func TestUpstreamOauth2(t *testing.T) {
+func TestProvider_UpstreamOAuth2(t *testing.T) {
 	tst := gateway.StartTest(nil)
 	t.Cleanup(tst.Close)
 
@@ -97,7 +97,7 @@ func TestUpstreamOauth2(t *testing.T) {
 
 }
 
-func TestPasswordCredentialsTokenRequest(t *testing.T) {
+func TestProvider_PasswordCredentialsTokenRequest(t *testing.T) {
 	tst := gateway.StartTest(nil)
 	t.Cleanup(tst.Close)
 

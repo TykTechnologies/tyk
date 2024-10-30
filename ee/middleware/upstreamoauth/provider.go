@@ -1,7 +1,6 @@
 package upstreamoauth
 
 import (
-	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
@@ -47,7 +46,7 @@ type OAuthHeaderProvider interface {
 	headerEnabled(OAuthSpec *Middleware) bool
 }
 
-func getOAuthHeaderProvider(oauthConfig apidef.UpstreamOAuth) (OAuthHeaderProvider, error) {
+func NewOAuthHeaderProvider(oauthConfig apidef.UpstreamOAuth) (OAuthHeaderProvider, error) {
 	if !oauthConfig.IsEnabled() {
 		return nil, fmt.Errorf("upstream OAuth is not enabled")
 	}
@@ -87,70 +86,6 @@ func (p *ClientCredentialsOAuthProvider) getHeaderName(OAuthSpec *Middleware) st
 
 func (p *ClientCredentialsOAuthProvider) headerEnabled(OAuthSpec *Middleware) bool {
 	return OAuthSpec.Spec.UpstreamAuth.OAuth.ClientCredentials.Header.Enabled
-}
-
-type Cache interface {
-	// GetToken returns the token from cache or issues a request to obtain it from the OAuth provider.
-	GetToken(r *http.Request, OAuthSpec *Middleware) (string, error)
-	// ObtainToken issues a request to obtain the token from the OAuth provider.
-	ObtainToken(ctx context.Context, OAuthSpec *Middleware) (*oauth2.Token, error)
-}
-
-func (cache *ClientCredentialsClient) GetToken(r *http.Request, OAuthSpec *Middleware) (string, error) {
-	cacheKey := generateClientCredentialsCacheKey(OAuthSpec.Spec.UpstreamAuth.OAuth, OAuthSpec.Spec.APIID)
-
-	tokenString, err := retryGetKeyAndLock(cacheKey, cache.Storage)
-	if err != nil {
-		return "", err
-	}
-
-	if tokenString != "" {
-		decryptedToken := crypto.Decrypt(crypto.GetPaddedString(OAuthSpec.Gw.GetConfig().Secret), tokenString)
-		return decryptedToken, nil
-	}
-
-	token, err := cache.ObtainToken(r.Context(), OAuthSpec)
-	if err != nil {
-		return "", err
-	}
-
-	encryptedToken := crypto.Encrypt(crypto.GetPaddedString(OAuthSpec.Gw.GetConfig().Secret), token.AccessToken)
-	setExtraMetadata(r, OAuthSpec.Spec.UpstreamAuth.OAuth.ClientCredentials.ExtraMetadata, token)
-
-	ttl := time.Until(token.Expiry)
-	if err := setTokenInCache(cacheKey, encryptedToken, ttl, cache.Storage); err != nil {
-		return "", err
-	}
-
-	return token.AccessToken, nil
-}
-
-func setTokenInCache(cacheKey string, token string, ttl time.Duration, cache Storage) error {
-	oauthTokenExpiry := time.Now().Add(ttl)
-	return cache.SetKey(cacheKey, token, int64(oauthTokenExpiry.Sub(time.Now()).Seconds()))
-}
-
-func (cache *ClientCredentialsClient) ObtainToken(ctx context.Context, OAuthSpec *Middleware) (*oauth2.Token, error) {
-	cfg := newOAuth2ClientCredentialsConfig(OAuthSpec)
-
-	tokenSource := cfg.TokenSource(ctx)
-	oauthToken, err := tokenSource.Token()
-	if err != nil {
-		return &oauth2.Token{}, err
-	}
-
-	return oauthToken, nil
-}
-
-func (cache *PasswordClient) ObtainToken(ctx context.Context, OAuthSpec *Middleware) (*oauth2.Token, error) {
-	cfg := newOAuth2PasswordConfig(OAuthSpec)
-
-	token, err := cfg.PasswordCredentialsToken(ctx, OAuthSpec.Spec.UpstreamAuth.OAuth.PasswordAuthentication.Username, OAuthSpec.Spec.UpstreamAuth.OAuth.PasswordAuthentication.Password)
-	if err != nil {
-		return &oauth2.Token{}, err
-	}
-
-	return token, nil
 }
 
 func newOAuth2ClientCredentialsConfig(OAuthSpec *Middleware) oauth2clientcredentials.Config {
@@ -279,7 +214,7 @@ func (cache *PasswordClient) GetToken(r *http.Request, mw *Middleware) (string, 
 	setExtraMetadata(r, mw.Spec.UpstreamAuth.OAuth.PasswordAuthentication.ExtraMetadata, token)
 
 	ttl := time.Until(token.Expiry)
-	if err := setTokenInCache(cacheKey, encryptedToken, ttl, cache.Storage); err != nil {
+	if err := setTokenInCache(cache.Storage, cacheKey, encryptedToken, ttl); err != nil {
 		return "", err
 	}
 
