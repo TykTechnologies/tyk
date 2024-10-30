@@ -66,7 +66,7 @@ func TestUpstreamOauth2(t *testing.T) {
 				OAuth: apidef.UpstreamOAuth{
 					Enabled:               true,
 					ClientCredentials:     cfg,
-					AllowedAuthorizeTypes: []string{ClientCredentialsAuthorizeType},
+					AllowedAuthorizeTypes: []string{apidef.OAuthAuthorizationTypeClientCredentials},
 				},
 			}
 			spec.Proxy.StripListenPath = true
@@ -150,7 +150,7 @@ func TestPasswordCredentialsTokenRequest(t *testing.T) {
 				OAuth: apidef.UpstreamOAuth{
 					Enabled:                true,
 					PasswordAuthentication: cfg,
-					AllowedAuthorizeTypes:  []string{PasswordAuthorizeType},
+					AllowedAuthorizeTypes:  []string{apidef.OAuthAuthorizationTypePassword},
 				},
 			}
 			spec.Proxy.StripListenPath = true
