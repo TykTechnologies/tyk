@@ -47,8 +47,14 @@ func loadSchemas() error {
 		if err != nil {
 			return fmt.Errorf("%s loading failed: %w", oas.ExtensionTykStreaming, err)
 		}
-
 		xTykStreamingSchemaWithoutDefs := jsonparser.Delete(xTykStreamingSchema, keyDefinitions)
+
+		xTykApiGatewaySchema, err := schemaDir.ReadFile(fmt.Sprintf("schema/%s.json", oas.ExtensionTykAPIGateway))
+		if err != nil {
+			return fmt.Errorf("%s loading failed: %w", oas.ExtensionTykAPIGateway, err)
+		}
+		xTykApiGatewaySchemaWithoutDefs := jsonparser.Delete(xTykApiGatewaySchema, keyDefinitions)
+
 		oasJSONSchemas = make(map[string][]byte)
 		members, err := schemaDir.ReadDir("schema")
 		for _, member := range members {
@@ -65,6 +71,10 @@ func loadSchemas() error {
 				continue
 			}
 
+			if strings.HasSuffix(fileName, fmt.Sprintf("%s.json", oas.ExtensionTykAPIGateway)) {
+				continue
+			}
+
 			var data []byte
 			data, err = schemaDir.ReadFile(filepath.Join("schema/", fileName))
 			if err != nil {
@@ -76,7 +86,20 @@ func loadSchemas() error {
 				return err
 			}
 
+			data, err = jsonparser.Set(data, xTykApiGatewaySchemaWithoutDefs, keyProperties, oas.ExtensionTykAPIGateway)
+			if err != nil {
+				return err
+			}
+
 			err = jsonparser.ObjectEach(xTykStreamingSchema, func(key []byte, value []byte, dataType jsonparser.ValueType, offset int) error {
+				data, err = jsonparser.Set(data, value, keyDefinitions, string(key))
+				return err
+			}, keyDefinitions)
+			if err != nil {
+				return err
+			}
+
+			err = jsonparser.ObjectEach(xTykApiGatewaySchema, func(key []byte, value []byte, dataType jsonparser.ValueType, offset int) error {
 				data, err = jsonparser.Set(data, value, keyDefinitions, string(key))
 				return err
 			}, keyDefinitions)
@@ -188,6 +211,7 @@ func ValidateOASTemplateWithBentoValidator(documentBody []byte, oasVersion strin
 	}
 
 	oasSchema = jsonparser.Delete(oasSchema, keyProperties, oas.ExtensionTykStreaming, keyRequired)
+	oasSchema = jsonparser.Delete(oasSchema, keyProperties, oas.ExtensionTykAPIGateway, keyRequired)
 
 	definitions, _, _, err := jsonparser.Get(oasSchema, keyDefinitions)
 	if err != nil {

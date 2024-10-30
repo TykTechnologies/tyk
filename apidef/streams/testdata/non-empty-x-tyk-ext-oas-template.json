@@ -6,11 +6,13 @@
   },
   "paths": {},
   "x-tyk-streaming": {
+    "streams": {}
+  },
+  "x-tyk-api-gateway": {
     "info": {
       "name": "oas-api",
       "state": {}
     },
-    "streams": {},
     "server": {
       "listenPath": {
       }

@@ -5,5 +5,6 @@
     "version": ""
   },
   "paths": {},
-  "x-tyk-streams": {}
+  "x-tyk-streams": {},
+  "x-tyk-api-gateway": {}
 }

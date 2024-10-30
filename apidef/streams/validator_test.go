@@ -3,6 +3,7 @@ package streams
 import (
 	"embed"
 	"fmt"
+	"sort"
 	"strings"
 	"testing"
 
@@ -30,7 +31,7 @@ func TestValidateTykStreamsOASObject(t *testing.T) {
 		},
 	}
 
-	validXTykAPIStreaming := oas.XTykStreaming{
+	validXTykApiGateway := oas.XTykAPIGateway{
 		Info: oas.Info{
 			Name: "test-streams",
 			State: oas.State{
@@ -42,31 +43,35 @@ func TestValidateTykStreamsOASObject(t *testing.T) {
 				Value: "/test-streams",
 			},
 		},
+	}
+
+	validXTykAPIStreaming := oas.XTykStreaming{
 		Streams: map[string]interface{}{},
 	}
 
 	validOASObject.Extensions[oas.ExtensionTykStreaming] = &validXTykAPIStreaming
+	validOASObject.Extensions[oas.ExtensionTykAPIGateway] = &validXTykApiGateway
 
 	validOAS3Definition, _ := validOASObject.MarshalJSON()
 
-	t.Run("valid Tyk Streaming Extension", func(t *testing.T) {
+	t.Run("Valid Tyk Streams Definition", func(t *testing.T) {
 		t.Parallel()
 		err := ValidateOASObject(validOAS3Definition, "3.0.3")
 		assert.Nil(t, err)
 	})
 
 	invalidOASObject := validOASObject
-	invalidXTykAPIGateway := validXTykAPIStreaming
+	invalidXTykAPIGateway := validXTykApiGateway
 	invalidXTykAPIGateway.Info = oas.Info{}
 	invalidXTykAPIGateway.Server.GatewayTags = &oas.GatewayTags{Enabled: true, Tags: []string{}}
-	invalidOASObject.Extensions[oas.ExtensionTykStreaming] = &invalidXTykAPIGateway
+	invalidOASObject.Extensions[oas.ExtensionTykAPIGateway] = &invalidXTykAPIGateway
 	invalidOAS3Definition, _ := invalidOASObject.MarshalJSON()
 
 	t.Run("invalid OAS object", func(t *testing.T) {
 		t.Parallel()
 		err := ValidateOASObject(invalidOAS3Definition, "3.0.3")
 		expectedErrs := []string{
-			`x-tyk-streaming.info.name: Does not match pattern '\S+'`,
+			`x-tyk-api-gateway.info.name: Does not match pattern '\S+'`,
 		}
 		actualErrs := strings.Split(err.Error(), "\n")
 		assert.ElementsMatch(t, expectedErrs, actualErrs)
@@ -89,17 +94,25 @@ func TestValidateTykStreamsOASObject(t *testing.T) {
     "paths": {},
     "x-tyk-streaming": {
         
+    },
+    "x-tyk-api-gateway": {
+        
     }
 }`)
 
 	t.Run("wrong typed OAS object", func(t *testing.T) {
 		t.Parallel()
 		err := ValidateOASObject(wrongTypedOASDefinition, "3.0.3")
-		expectedErr := fmt.Sprintf("%s\n%s\n%s",
-			"x-tyk-streaming: info is required",
+		expectedErr := []string{
+			"x-tyk-api-gateway: info is required",
+			"x-tyk-api-gateway: server is required",
 			"x-tyk-streaming: streams is required",
-			"x-tyk-streaming: server is required")
-		assert.Equal(t, expectedErr, err.Error())
+		}
+		// errors are returned in a random order. Sort the array and check the equality.
+		listOfErrors := strings.Split(err.Error(), "\n")
+		sort.Strings(expectedErr)
+		sort.Strings(listOfErrors)
+		assert.Equal(t, expectedErr, listOfErrors)
 	})
 
 	t.Run("should error when requested oas schema not found", func(t *testing.T) {
@@ -210,23 +223,12 @@ func TestGetOASSchema(t *testing.T) {
 func TestValidateTykStreams_BentoConfigValidation(t *testing.T) {
 	var document = []byte(`{
     "info": {
-        "title": "",
-        "version": ""
+        "title": "test streams",
+        "version": "1.0.0"
     },
     "openapi": "3.0.3",
     "paths": {},
     "x-tyk-streaming": {
-        "info": {
-            "name": "test-streams",
-            "state": {
-                "active": true
-            }
-        },
-        "server": {
-            "listenPath": {
-                "value": "/test-streams"
-            }
-        },
         "streams": {
             "test-kafka-stream": {
                 "input": {
@@ -242,21 +244,8 @@ func TestValidateTykStreams_BentoConfigValidation(t *testing.T) {
                 }
             }
         }
-    }
-}`)
-	err := ValidateOASObject(document, "3.0.3")
-	require.NoError(t, err)
-}
-
-func TestValidateTykStreams_BentoConfigValidation_Invalid_Config(t *testing.T) {
-	var document = []byte(`{
-    "info": {
-        "title": "",
-        "version": ""
     },
-    "openapi": "3.0.3",
-    "paths": {},
-    "x-tyk-streaming": {
+    "x-tyk-api-gateway": {
         "info": {
             "name": "test-streams",
             "state": {
@@ -267,7 +256,22 @@ func TestValidateTykStreams_BentoConfigValidation_Invalid_Config(t *testing.T) {
             "listenPath": {
                 "value": "/test-streams"
             }
-        },
+        }
+    }
+}`)
+	err := ValidateOASObject(document, "3.0.3")
+	require.NoError(t, err)
+}
+
+func TestValidateTykStreams_BentoConfigValidation_Invalid_Config(t *testing.T) {
+	var document = []byte(`{
+    "info": {
+        "title": "test-streams",
+        "version": "1.0.0"
+    },
+    "openapi": "3.0.3",
+    "paths": {},
+    "x-tyk-streaming": {
         "streams": {
             "test-kafka-stream": {
                 "input": {
@@ -283,6 +287,19 @@ func TestValidateTykStreams_BentoConfigValidation_Invalid_Config(t *testing.T) {
                 }
             }
         }
+    },
+    "x-tyk-api-gateway": {
+        "info": {
+            "name": "test-streams",
+            "state": {
+                "active": true
+            }
+        },
+        "server": {
+            "listenPath": {
+                "value": "/test-streams"
+            }
+        }
     }
 }`)
 	err := ValidateOASObject(document, "3.0.3")
@@ -294,23 +311,12 @@ func TestValidateTykStreams_BentoConfigValidation_Additional_Properties(t *testi
 	// but it doesn't break the validation process.
 	var document = []byte(`{
     "info": {
-        "title": "",
-        "version": ""
+        "title": "test-streams",
+        "version": "1.0.0"
     },
     "openapi": "3.0.3",
     "paths": {},
     "x-tyk-streaming": {
-        "info": {
-            "name": "test-streams",
-            "state": {
-                "active": true
-            }
-        },
-        "server": {
-            "listenPath": {
-                "value": "/test-streams"
-            }
-        },
         "streams": {
             "test-kafka-stream": {
                 "input": {
@@ -365,6 +371,19 @@ func TestValidateTykStreams_BentoConfigValidation_Additional_Properties(t *testi
                 "input": {
                     "some-key": "some-value"
                 }
+            }
+        }
+    },
+    "x-tyk-api-gateway": {
+        "info": {
+            "name": "test-streams",
+            "state": {
+                "active": true
+            }
+        },
+        "server": {
+            "listenPath": {
+                "value": "/test-streams"
             }
         }
     }
