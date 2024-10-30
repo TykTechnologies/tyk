@@ -11,8 +11,6 @@ import (
 	"io/ioutil"
 	"net/http"
 
-	"github.com/TykTechnologies/tyk/internal/httputil"
-
 	"github.com/sirupsen/logrus"
 
 	"github.com/TykTechnologies/tyk/apidef"
@@ -83,7 +81,7 @@ func (t *TransformJQMiddleware) transformJQBody(r *http.Request, ts *TransformJQ
 
 	jqObj := map[string]interface{}{
 		"body":         bodyObj,
-		"_tyk_context": httputil.CtxGetData(r),
+		"_tyk_context": ctxGetData(r),
 	}
 
 	jqResult, err := lockedJQTransform(t.Spec, ts, jqObj)
@@ -104,11 +102,11 @@ func (t *TransformJQMiddleware) transformJQBody(r *http.Request, ts *TransformJQ
 
 	if t.Spec.EnableContextVars {
 		// Set variables in context vars
-		contextDataObject := httputil.CtxGetData(r)
+		contextDataObject := ctxGetData(r)
 		for k, v := range jqResult.TykContext {
 			contextDataObject[k] = v
 		}
-		httputil.CtxSetData(r, contextDataObject)
+		ctxSetData(r, contextDataObject)
 	}
 
 	return nil

@@ -2,9 +2,10 @@ package graphengine
 
 import (
 	"errors"
-	"github.com/TykTechnologies/tyk/ctx"
 	"net"
 	"net/http"
+
+	"github.com/TykTechnologies/tyk/ctx"
 
 	"github.com/jensneuse/abstractlogger"
 	"github.com/sirupsen/logrus"

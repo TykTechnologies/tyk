@@ -41,21 +41,3 @@ func GetUpstreamAuth(r *http.Request) model.UpstreamAuthProvider {
 
 	return provider
 }
-
-//func CtxGetData(r *http.Request) map[string]interface{} {
-//	if v := r.Context().Value(ctx.ContextData); v != nil {
-//		return v.(map[string]interface{})
-//	}
-//	return nil
-//}
-//
-//func CtxSetData(r *http.Request, m map[string]interface{}) {
-//	if m == nil {
-//		panic("setting a nil context ContextData")
-//	}
-//	SetCtxValue(r, ctx.ContextData, m)
-//}
-//
-//func SetCtxValue(r *http.Request, key, val interface{}) {
-//	SetContext(r, context.WithValue(r.Context(), key, val))
-//}

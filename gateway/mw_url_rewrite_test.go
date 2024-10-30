@@ -1024,7 +1024,7 @@ func TestRewriterTriggers(t *testing.T) {
 			hOpt := apidef.StringRegexMap{MatchPattern: "bar"}
 			hOpt.Init()
 
-			httputil.CtxSetData(r, map[string]interface{}{
+			ctxSetData(r, map[string]interface{}{
 				"rewrite": "bar-baz",
 			})
 

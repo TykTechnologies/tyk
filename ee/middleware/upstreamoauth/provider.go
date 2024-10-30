@@ -5,10 +5,11 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
-	"github.com/TykTechnologies/tyk/ctx"
 	"net/http"
 	"strings"
 	"time"
+
+	"github.com/TykTechnologies/tyk/ctx"
 
 	"github.com/sirupsen/logrus"
 	"golang.org/x/oauth2"

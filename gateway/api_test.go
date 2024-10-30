@@ -20,8 +20,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/TykTechnologies/tyk/internal/httputil"
-
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
@@ -1931,11 +1929,11 @@ func BenchmarkApiReload(b *testing.B) {
 
 func TestContextData(t *testing.T) {
 	r := new(http.Request)
-	if httputil.CtxGetData(r) != nil {
+	if ctxGetData(r) != nil {
 		t.Fatal("expected ctxGetData to return nil")
 	}
-	httputil.CtxSetData(r, map[string]interface{}{"foo": "bar"})
-	if httputil.CtxGetData(r) == nil {
+	ctxSetData(r, map[string]interface{}{"foo": "bar"})
+	if ctxGetData(r) == nil {
 		t.Fatal("expected ctxGetData to return non-nil")
 	}
 	defer func() {
@@ -1943,7 +1941,7 @@ func TestContextData(t *testing.T) {
 			t.Fatal("expected ctxSetData of zero val to panic")
 		}
 	}()
-	httputil.CtxSetData(r, nil)
+	ctxSetData(r, nil)
 }
 
 func TestContextSession(t *testing.T) {

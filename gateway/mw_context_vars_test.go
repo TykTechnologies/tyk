@@ -9,8 +9,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/TykTechnologies/tyk/internal/httputil"
-
 	"github.com/google/go-cmp/cmp"
 
 	"github.com/TykTechnologies/tyk/apidef"
@@ -214,7 +212,7 @@ func TestContextVarsMiddlewareProcessRequest(t *testing.T) {
 				t.Errorf("Wrong response code: %d Eexpected 200.", code)
 			}
 
-			ctxDataObject := httputil.CtxGetData(req)
+			ctxDataObject := ctxGetData(req)
 
 			// check request_id
 			if _, ok := ctxDataObject["request_id"].(string); !ok {
