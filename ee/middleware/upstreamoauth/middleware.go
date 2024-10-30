@@ -104,10 +104,7 @@ func (mw *Middleware) FireEvent(r *http.Request, e event.Event, message string, 
 		message = event.String(e)
 	}
 	mw.Base.FireEvent(e, EventUpstreamOAuthMeta{
-		EventMetaDefault: model.EventMetaDefault{
-			Message:            message,
-			OriginatingRequest: event.EncodeRequestToEvent(r),
-		},
-		APIID: apiId,
+		EventMetaDefault: model.NewEventMetaDefault(r, message),
+		APIID:            apiId,
 	})
 }

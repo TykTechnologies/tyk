@@ -191,8 +191,8 @@ func GetPaddedString(str string) []byte {
 }
 
 // encrypt string to base64 crypto using AES
-func Encrypt(key []byte, text string) string {
-	plaintext := []byte(text)
+func Encrypt(key []byte, str string) string {
+	plaintext := []byte(str)
 
 	block, err := aes.NewCipher(key)
 	if err != nil {
@@ -200,7 +200,7 @@ func Encrypt(key []byte, text string) string {
 		return ""
 	}
 
-	// The IV needs to be unique, but not secure. Therefore it's common to
+	// The IV needs to be unique, but not secure. Therefore, it's common to
 	// include it at the beginning of the ciphertext.
 	ciphertext := make([]byte, aes.BlockSize+len(plaintext))
 	iv := ciphertext[:aes.BlockSize]
