@@ -12,7 +12,7 @@ import (
 	"github.com/TykTechnologies/tyk/internal/model"
 )
 
-// Middleware implements upstream basic auth middleware.
+// Middleware implements upstream OAuth middleware.
 type Middleware struct {
 	Spec model.MergedAPI
 	Gw   Gateway
