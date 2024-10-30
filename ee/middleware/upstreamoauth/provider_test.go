@@ -17,13 +17,12 @@ import (
 	"github.com/TykTechnologies/tyk/test"
 )
 
-var (
-	StartTest = gateway.StartTest
-)
+var StartTest = gateway.StartTest
 
-type (
-	APISpec = gateway.APISpec
-)
+type APISpec = gateway.APISpec
+
+const ClientCredentialsAuthorizeType = upstreamoauth.ClientCredentialsAuthorizeType
+const PasswordAuthorizeType = upstreamoauth.PasswordAuthorizeType
 
 func TestProvider_UpstreamOAuth2(t *testing.T) {
 	tst := StartTest(nil)
@@ -76,7 +75,7 @@ func TestProvider_UpstreamOAuth2(t *testing.T) {
 				OAuth: apidef.UpstreamOAuth{
 					Enabled:               true,
 					ClientCredentials:     cfg,
-					AllowedAuthorizeTypes: []string{upstreamoauth.ClientCredentialsAuthorizeType},
+					AllowedAuthorizeTypes: []string{ClientCredentialsAuthorizeType},
 				},
 			}
 			spec.Proxy.StripListenPath = true
@@ -160,7 +159,7 @@ func TestProvider_PasswordCredentialsTokenRequest(t *testing.T) {
 				OAuth: apidef.UpstreamOAuth{
 					Enabled:                true,
 					PasswordAuthentication: cfg,
-					AllowedAuthorizeTypes:  []string{upstreamoauth.PasswordAuthorizeType},
+					AllowedAuthorizeTypes:  []string{PasswordAuthorizeType},
 				},
 			}
 			spec.Proxy.StripListenPath = true
