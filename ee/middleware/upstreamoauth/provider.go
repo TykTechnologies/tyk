@@ -16,7 +16,6 @@ import (
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/internal/crypto"
 	"github.com/TykTechnologies/tyk/internal/model"
-	"github.com/TykTechnologies/tyk/storage"
 )
 
 // Provider implements upstream auth provider.
@@ -100,7 +99,7 @@ type UpstreamOAuthCache interface {
 func (cache *UpstreamOAuthClientCredentialsClient) GetToken(r *http.Request, OAuthSpec *Middleware) (string, error) {
 	cacheKey := generateClientCredentialsCacheKey(OAuthSpec.Spec.UpstreamAuth.OAuth, OAuthSpec.Spec.APIID)
 
-	tokenString, err := retryGetKeyAndLock(cacheKey, cache.RedisCluster)
+	tokenString, err := retryGetKeyAndLock(cacheKey, cache.Storage)
 	if err != nil {
 		return "", err
 	}
@@ -119,14 +118,14 @@ func (cache *UpstreamOAuthClientCredentialsClient) GetToken(r *http.Request, OAu
 	setExtraMetadata(r, OAuthSpec.Spec.UpstreamAuth.OAuth.ClientCredentials.ExtraMetadata, token)
 
 	ttl := time.Until(token.Expiry)
-	if err := setTokenInCache(cacheKey, encryptedToken, ttl, cache.RedisCluster); err != nil {
+	if err := setTokenInCache(cacheKey, encryptedToken, ttl, cache.Storage); err != nil {
 		return "", err
 	}
 
 	return token.AccessToken, nil
 }
 
-func setTokenInCache(cacheKey string, token string, ttl time.Duration, cache *storage.RedisCluster) error {
+func setTokenInCache(cacheKey string, token string, ttl time.Duration, cache Storage) error {
 	oauthTokenExpiry := time.Now().Add(ttl)
 	return cache.SetKey(cacheKey, token, int64(oauthTokenExpiry.Sub(time.Now()).Seconds()))
 }
@@ -175,11 +174,11 @@ func newOAuth2PasswordConfig(OAuthSpec *Middleware) oauth2.Config {
 }
 
 type UpstreamOAuthClientCredentialsClient struct {
-	*storage.RedisCluster
+	Storage
 }
 
 type UpstreamOAuthPasswordClient struct {
-	*storage.RedisCluster
+	Storage
 }
 
 func generateClientCredentialsCacheKey(config apidef.UpstreamOAuth, apiId string) string {
@@ -195,7 +194,7 @@ func generateClientCredentialsCacheKey(config apidef.UpstreamOAuth, apiId string
 	return hex.EncodeToString(hash.Sum(nil))
 }
 
-func retryGetKeyAndLock(cacheKey string, cache *storage.RedisCluster) (string, error) {
+func retryGetKeyAndLock(cacheKey string, cache Storage) (string, error) {
 	const maxRetries = 10
 	const retryDelay = 100 * time.Millisecond
 
@@ -241,7 +240,7 @@ type EventUpstreamOAuthMeta struct {
 }
 
 func (p *PasswordOAuthProvider) getOAuthToken(r *http.Request, mw *Middleware) (string, error) {
-	client := UpstreamOAuthPasswordClient{RedisCluster: mw.passwordStorageHandler}
+	client := UpstreamOAuthPasswordClient{Storage: mw.passwordStorageHandler}
 	token, err := client.GetToken(r, mw)
 	if err != nil {
 		return handleOAuthError(r, mw, err)
@@ -261,7 +260,7 @@ func (p *PasswordOAuthProvider) headerEnabled(OAuthSpec *Middleware) bool {
 func (cache *UpstreamOAuthPasswordClient) GetToken(r *http.Request, mw *Middleware) (string, error) {
 	cacheKey := generatePasswordOAuthCacheKey(mw.Spec.UpstreamAuth.OAuth, mw.Spec.APIID)
 
-	tokenString, err := retryGetKeyAndLock(cacheKey, cache.RedisCluster)
+	tokenString, err := retryGetKeyAndLock(cacheKey, cache.Storage)
 	if err != nil {
 		return "", err
 	}
@@ -280,7 +279,7 @@ func (cache *UpstreamOAuthPasswordClient) GetToken(r *http.Request, mw *Middlewa
 	setExtraMetadata(r, mw.Spec.UpstreamAuth.OAuth.PasswordAuthentication.ExtraMetadata, token)
 
 	ttl := time.Until(token.Expiry)
-	if err := setTokenInCache(cacheKey, encryptedToken, ttl, cache.RedisCluster); err != nil {
+	if err := setTokenInCache(cacheKey, encryptedToken, ttl, cache.Storage); err != nil {
 		return "", err
 	}
 

@@ -1,6 +1,8 @@
 package upstreamoauth
 
 import (
+	"time"
+
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/ctx"
 	"github.com/TykTechnologies/tyk/internal/httpctx"
@@ -23,6 +25,13 @@ type BaseMiddleware interface {
 // Gateway is the subset of Gateway APIs that the middleware uses.
 type Gateway interface {
 	model.ConfigProvider
+}
+
+// Type Storage is a subset of storage.RedisCluster
+type Storage interface {
+	GetKey(key string) (string, error)
+	SetKey(string, string, int64) error
+	Lock(key string, timeout time.Duration) (bool, error)
 }
 
 type ClientCredentialsOAuthProvider struct{}
