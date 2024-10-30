@@ -5,8 +5,6 @@ import (
 	"net"
 	"net/http"
 
-	"github.com/TykTechnologies/tyk/ctx"
-
 	"github.com/jensneuse/abstractlogger"
 	"github.com/sirupsen/logrus"
 
@@ -14,6 +12,7 @@ import (
 	graphqlv2 "github.com/TykTechnologies/graphql-go-tools/v2/pkg/graphql"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/ctx"
 	"github.com/TykTechnologies/tyk/header"
 )
 
