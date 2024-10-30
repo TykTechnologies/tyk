@@ -24,7 +24,7 @@ type APISpec = gateway.APISpec
 const ClientCredentialsAuthorizeType = upstreamoauth.ClientCredentialsAuthorizeType
 const PasswordAuthorizeType = upstreamoauth.PasswordAuthorizeType
 
-func TestProvider_UpstreamOAuth2(t *testing.T) {
+func TestProvider_ClientCredentialsAuthorizeType(t *testing.T) {
 	tst := StartTest(nil)
 	t.Cleanup(tst.Close)
 
@@ -104,7 +104,7 @@ func TestProvider_UpstreamOAuth2(t *testing.T) {
 
 }
 
-func TestProvider_PasswordCredentialsTokenRequest(t *testing.T) {
+func TestProvider_PasswordAuthorizeType(t *testing.T) {
 	tst := StartTest(nil)
 	t.Cleanup(tst.Close)
 
