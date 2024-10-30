@@ -29,8 +29,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/TykTechnologies/tyk/ctx"
-
 	"github.com/akutz/memconn"
 	"github.com/gorilla/websocket"
 	"github.com/opentracing/opentracing-go"
@@ -40,6 +38,7 @@ import (
 	"golang.org/x/net/http2"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/ctx"
 	"github.com/TykTechnologies/tyk/header"
 	"github.com/TykTechnologies/tyk/internal/graphengine"
 	"github.com/TykTechnologies/tyk/internal/httputil"
