@@ -174,7 +174,7 @@ func (k *OrganizationMonitor) ProcessRequestLive(r *http.Request, orgSession *us
 	}
 
 	// Lets keep a reference of the org
-	ctx.SetCtxValue(r, ctx.OrgSessionContext, orgSession)
+	setCtxValue(r, ctx.OrgSessionContext, orgSession)
 
 	// Request is valid, carry on
 	return nil, http.StatusOK
@@ -202,7 +202,7 @@ func (k *OrganizationMonitor) ProcessRequestOffThread(r *http.Request, orgSessio
 	// session might be updated by go-routine AllowAccessNext and we loose those changes here
 	// but it is OK as we need it in context for detailed org logging
 	clone := orgSession.Clone()
-	ctx.SetCtxValue(r, ctx.OrgSessionContext, &clone)
+	setCtxValue(r, ctx.OrgSessionContext, &clone)
 
 	orgSessionCopy := orgSession.Clone()
 	go k.AllowAccessNext(

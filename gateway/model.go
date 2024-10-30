@@ -1,6 +1,8 @@
 package gateway
 
 import (
+	"net/http"
+
 	"github.com/TykTechnologies/tyk/ctx"
 	"github.com/TykTechnologies/tyk/internal/event"
 	"github.com/TykTechnologies/tyk/internal/httpctx"
@@ -14,6 +16,12 @@ var (
 
 	ctxGetData = ctxData.Get
 	ctxSetData = ctxData.Set
+
+	// how is type safety avoided: exhibit A, old school generics
+	setCtxValue = func(h *http.Request, key, value any) {
+		ctxvalue := httpctx.NewValue[any](key)
+		ctxvalue.Set(h, value)
+	}
 
 	EncodeRequestToEvent = event.EncodeRequestToEvent
 )

@@ -467,7 +467,7 @@ func (m *URLRewriteMiddleware) CheckHostRewrite(oldPath, newTarget string, r *ht
 
 	if shouldRewriteHost(oldAsURL, newAsURL) {
 		log.Debug("Detected a host rewrite in pattern!")
-		ctx.SetCtxValue(r, ctx.RetainHost, true)
+		setCtxValue(r, ctx.RetainHost, true)
 	}
 
 	return nil

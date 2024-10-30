@@ -3063,7 +3063,7 @@ func (gw *Gateway) makeImportedOASTykAPI(next http.HandlerFunc) http.HandlerFunc
 
 // ctxSetCacheOptions sets a cache key to use for the http request
 func ctxSetCacheOptions(r *http.Request, options *cacheOptions) {
-	ctx.SetCtxValue(r, ctx.CacheOptions, options)
+	setCtxValue(r, ctx.CacheOptions, options)
 }
 
 // ctxGetCacheOptions returns a cache key if we need to cache request
@@ -3095,7 +3095,7 @@ func ctxSetTrackedPath(r *http.Request, p string) {
 	if p == "" {
 		panic("setting a nil context TrackThisEndpoint")
 	}
-	ctx.SetCtxValue(r, ctx.TrackThisEndpoint, p)
+	setCtxValue(r, ctx.TrackThisEndpoint, p)
 }
 
 func ctxGetDoNotTrack(r *http.Request) bool {
@@ -3103,7 +3103,7 @@ func ctxGetDoNotTrack(r *http.Request) bool {
 }
 
 func ctxSetDoNotTrack(r *http.Request, b bool) {
-	ctx.SetCtxValue(r, ctx.DoNotTrackThisEndpoint, b)
+	setCtxValue(r, ctx.DoNotTrackThisEndpoint, b)
 }
 
 func ctxGetVersionInfo(r *http.Request) *apidef.VersionInfo {
@@ -3114,7 +3114,7 @@ func ctxGetVersionInfo(r *http.Request) *apidef.VersionInfo {
 }
 
 func ctxSetVersionInfo(r *http.Request, v *apidef.VersionInfo) {
-	ctx.SetCtxValue(r, ctx.VersionData, v)
+	setCtxValue(r, ctx.VersionData, v)
 }
 
 func ctxGetVersionName(r *http.Request) *string {
@@ -3126,11 +3126,11 @@ func ctxGetVersionName(r *http.Request) *string {
 }
 
 func ctxSetVersionName(r *http.Request, vName *string) {
-	ctx.SetCtxValue(r, ctx.VersionName, vName)
+	setCtxValue(r, ctx.VersionName, vName)
 }
 
 func ctxSetOrigRequestURL(r *http.Request, url *url.URL) {
-	ctx.SetCtxValue(r, ctx.OrigRequestURL, url)
+	setCtxValue(r, ctx.OrigRequestURL, url)
 }
 
 func ctxGetOrigRequestURL(r *http.Request) *url.URL {
@@ -3144,7 +3144,7 @@ func ctxGetOrigRequestURL(r *http.Request) *url.URL {
 }
 
 func ctxSetURLRewriteTarget(r *http.Request, url *url.URL) {
-	ctx.SetCtxValue(r, ctx.UrlRewriteTarget, url)
+	setCtxValue(r, ctx.UrlRewriteTarget, url)
 }
 
 func ctxGetURLRewriteTarget(r *http.Request) *url.URL {
@@ -3158,7 +3158,7 @@ func ctxGetURLRewriteTarget(r *http.Request) *url.URL {
 }
 
 func ctxSetUrlRewritePath(r *http.Request, path string) {
-	ctx.SetCtxValue(r, ctx.UrlRewritePath, path)
+	setCtxValue(r, ctx.UrlRewritePath, path)
 }
 
 func ctxGetUrlRewritePath(r *http.Request) string {
@@ -3171,7 +3171,7 @@ func ctxGetUrlRewritePath(r *http.Request) string {
 }
 
 func ctxSetCheckLoopLimits(r *http.Request, b bool) {
-	ctx.SetCtxValue(r, ctx.CheckLoopLimits, b)
+	setCtxValue(r, ctx.CheckLoopLimits, b)
 }
 
 // Should we check Rate limits and Quotas?
@@ -3189,7 +3189,7 @@ func ctxCheckLimits(r *http.Request) bool {
 }
 
 func ctxSetRequestMethod(r *http.Request, path string) {
-	ctx.SetCtxValue(r, ctx.RequestMethod, path)
+	setCtxValue(r, ctx.RequestMethod, path)
 }
 
 func ctxGetRequestMethod(r *http.Request) string {
@@ -3202,7 +3202,7 @@ func ctxGetRequestMethod(r *http.Request) string {
 }
 
 func ctxSetTransformRequestMethod(r *http.Request, path string) {
-	ctx.SetCtxValue(r, ctx.TransformedRequestMethod, path)
+	setCtxValue(r, ctx.TransformedRequestMethod, path)
 }
 
 func ctxGetTransformRequestMethod(r *http.Request) string {
@@ -3215,7 +3215,7 @@ func ctxGetTransformRequestMethod(r *http.Request) string {
 }
 
 func ctxSetGraphQLRequest(r *http.Request, gqlRequest *gql.Request) {
-	ctx.SetCtxValue(r, ctx.GraphQLRequest, gqlRequest)
+	setCtxValue(r, ctx.GraphQLRequest, gqlRequest)
 }
 
 func ctxGetGraphQLRequest(r *http.Request) (gqlRequest *gql.Request) {
@@ -3228,7 +3228,7 @@ func ctxGetGraphQLRequest(r *http.Request) (gqlRequest *gql.Request) {
 }
 
 func ctxSetGraphQLRequestV2(r *http.Request, gqlRequest *gqlv2.Request) {
-	ctx.SetCtxValue(r, ctx.GraphQLRequest, gqlRequest)
+	setCtxValue(r, ctx.GraphQLRequest, gqlRequest)
 }
 
 func ctxGetGraphQLRequestV2(r *http.Request) (gqlRequest *gqlv2.Request) {
@@ -3241,7 +3241,7 @@ func ctxGetGraphQLRequestV2(r *http.Request) (gqlRequest *gqlv2.Request) {
 }
 
 func ctxSetGraphQLIsWebSocketUpgrade(r *http.Request, isWebSocketUpgrade bool) {
-	ctx.SetCtxValue(r, ctx.GraphQLIsWebSocketUpgrade, isWebSocketUpgrade)
+	setCtxValue(r, ctx.GraphQLIsWebSocketUpgrade, isWebSocketUpgrade)
 }
 
 func ctxGetGraphQLIsWebSocketUpgrade(r *http.Request) (isWebSocketUpgrade bool) {
@@ -3259,7 +3259,7 @@ func ctxGetDefaultVersion(r *http.Request) bool {
 }
 
 func ctxSetDefaultVersion(r *http.Request) {
-	ctx.SetCtxValue(r, ctx.VersionDefault, true)
+	setCtxValue(r, ctx.VersionDefault, true)
 }
 
 func ctxLoopingEnabled(r *http.Request) bool {
@@ -3277,7 +3277,7 @@ func ctxLoopLevel(r *http.Request) int {
 }
 
 func ctxSetLoopLevel(r *http.Request, value int) {
-	ctx.SetCtxValue(r, ctx.LoopLevel, value)
+	setCtxValue(r, ctx.LoopLevel, value)
 }
 
 func ctxIncLoopLevel(r *http.Request, loopLimit int) {
@@ -3298,7 +3298,7 @@ func ctxLoopLevelLimit(r *http.Request) int {
 func ctxSetLoopLimit(r *http.Request, limit int) {
 	// Can be set only one time per request
 	if ctxLoopLevelLimit(r) == 0 && limit > 0 {
-		ctx.SetCtxValue(r, ctx.LoopLevelLimit, limit)
+		setCtxValue(r, ctx.LoopLevelLimit, limit)
 	}
 }
 
@@ -3325,12 +3325,12 @@ func ctxThrottleLevel(r *http.Request) int {
 func ctxSetThrottleLimit(r *http.Request, limit int) {
 	// Can be set only one time per request
 	if ctxThrottleLevelLimit(r) == 0 && limit > 0 {
-		ctx.SetCtxValue(r, ctx.ThrottleLevelLimit, limit)
+		setCtxValue(r, ctx.ThrottleLevelLimit, limit)
 	}
 }
 
 func ctxSetThrottleLevel(r *http.Request, value int) {
-	ctx.SetCtxValue(r, ctx.ThrottleLevel, value)
+	setCtxValue(r, ctx.ThrottleLevel, value)
 }
 
 func ctxIncThrottleLevel(r *http.Request, throttleLimit int) {
@@ -3343,12 +3343,12 @@ func ctxTraceEnabled(r *http.Request) bool {
 }
 
 func ctxSetTrace(r *http.Request) {
-	ctx.SetCtxValue(r, ctx.Trace, true)
+	setCtxValue(r, ctx.Trace, true)
 }
 
 func ctxSetSpanAttributes(r *http.Request, mwName string, attrs ...otel.SpanAttribute) {
 	if len(attrs) > 0 {
-		ctx.SetCtxValue(r, mwName, attrs)
+		setCtxValue(r, mwName, attrs)
 	}
 }
 
@@ -3363,7 +3363,7 @@ func ctxGetSpanAttributes(r *http.Request, mwName string) (attrs []otel.SpanAttr
 }
 
 func ctxSetRequestStatus(r *http.Request, stat RequestStatus) {
-	ctx.SetCtxValue(r, ctx.RequestStatus, stat)
+	setCtxValue(r, ctx.RequestStatus, stat)
 }
 
 func ctxGetRequestStatus(r *http.Request) (stat RequestStatus) {
@@ -3374,7 +3374,7 @@ func ctxGetRequestStatus(r *http.Request) (stat RequestStatus) {
 }
 
 func ctxSetOperation(r *http.Request, op *Operation) {
-	ctx.SetCtxValue(r, ctx.OASOperation, op)
+	setCtxValue(r, ctx.OASOperation, op)
 }
 
 func ctxGetOperation(r *http.Request) (op *Operation) {
