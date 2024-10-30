@@ -17,8 +17,16 @@ import (
 	"github.com/TykTechnologies/tyk/test"
 )
 
+var (
+	StartTest = gateway.StartTest
+)
+
+type (
+	APISpec = gateway.APISpec
+)
+
 func TestProvider_UpstreamOAuth2(t *testing.T) {
-	tst := gateway.StartTest(nil)
+	tst := StartTest(nil)
 	t.Cleanup(tst.Close)
 
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -60,7 +68,7 @@ func TestProvider_UpstreamOAuth2(t *testing.T) {
 	}
 
 	tst.Gw.BuildAndLoadAPI(
-		func(spec *gateway.APISpec) {
+		func(spec *APISpec) {
 			spec.Proxy.ListenPath = "/upstream-oauth-distributed/"
 			spec.UseKeylessAccess = true
 			spec.UpstreamAuth = apidef.UpstreamAuth{
@@ -98,7 +106,7 @@ func TestProvider_UpstreamOAuth2(t *testing.T) {
 }
 
 func TestProvider_PasswordCredentialsTokenRequest(t *testing.T) {
-	tst := gateway.StartTest(nil)
+	tst := StartTest(nil)
 	t.Cleanup(tst.Close)
 
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -144,7 +152,7 @@ func TestProvider_PasswordCredentialsTokenRequest(t *testing.T) {
 	}
 
 	tst.Gw.BuildAndLoadAPI(
-		func(spec *gateway.APISpec) {
+		func(spec *APISpec) {
 			spec.Proxy.ListenPath = "/upstream-oauth-password/"
 			spec.UseKeylessAccess = true
 			spec.UpstreamAuth = apidef.UpstreamAuth{
