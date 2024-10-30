@@ -13,9 +13,9 @@ func NewValue[T any](key any) *Value[T] {
 	return &Value[T]{Key: key}
 }
 
-func (v *Value[T]) Get(r *http.Request) (res T, ok bool) {
+func (v *Value[T]) Get(r *http.Request) (res T) {
 	if val := r.Context().Value(v.Key); val != nil {
-		res, ok = val.(T)
+		res, _ = val.(T)
 	}
 	return
 }

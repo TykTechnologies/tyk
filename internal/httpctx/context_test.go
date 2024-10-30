@@ -27,8 +27,7 @@ func TestValue_SetAndGet(t *testing.T) {
 	req = value.Set(req, expectedData)
 
 	// Retrieve the value from the context
-	retrievedData, ok := value.Get(req)
-	assert.True(t, ok, "Expected to retrieve data from context, but got none")
+	retrievedData := value.Get(req)
 	assert.Equal(t, expectedData, retrievedData, "Retrieved data does not match expected data")
 }
 
@@ -41,10 +40,9 @@ func TestValue_GetWithMissingKey(t *testing.T) {
 	req := httptest.NewRequest("GET", "/", nil)
 
 	// Try to retrieve the value from the context
-	retrievedData, ok := value.Get(req)
+	retrievedData := value.Get(req)
 
 	// Expect not to find any data
-	assert.False(t, ok, "Expected no data in context, but some data was found")
 	assert.Nil(t, retrievedData, "Expected retrieved data to be nil for a missing key")
 }
 
@@ -61,7 +59,6 @@ func TestValue_SetDifferentTypes(t *testing.T) {
 	req = intValue.Set(req, expectedInt)
 
 	// Retrieve the int value from the context
-	retrievedInt, ok := intValue.Get(req)
-	assert.True(t, ok, "Expected to retrieve int data from context, but got none")
+	retrievedInt := intValue.Get(req)
 	assert.Equal(t, expectedInt, retrievedInt, "Retrieved int value does not match expected value")
 }
