@@ -655,7 +655,7 @@ type UpstreamOAuth struct {
 	// ClientCredentials holds the configuration for OAuth2 Client Credentials flow.
 	ClientCredentials *ClientCredentials `bson:"clientCredentials,omitempty" json:"clientCredentials,omitempty"`
 	// PasswordAuthentication holds the configuration for upstream OAauth password authentication flow.
-	PasswordAuthentication *PasswordAuthentication `bson:"passwordAuthentication,omitempty" json:"passwordAuthentication,omitempty"`
+	PasswordAuthentication *PasswordAuthentication `bson:"password,omitempty" json:"password,omitempty"`
 }
 
 // PasswordAuthentication holds the configuration for upstream OAuth2 password authentication flow.

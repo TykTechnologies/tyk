@@ -2083,7 +2083,7 @@
             "tokenUrl"
           ]
         },
-        "passwordAuthentication": {
+        "password": {
           "type": "object",
           "properties": {
             "clientId": {
