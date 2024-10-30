@@ -3,8 +3,6 @@ package model
 import (
 	"net/http"
 
-	"github.com/TykTechnologies/tyk/storage"
-
 	"github.com/sirupsen/logrus"
 
 	"github.com/TykTechnologies/tyk/config"
@@ -41,10 +39,6 @@ type LoggerProvider interface {
 // ConfigProvider provides a typical config getter signature.
 type ConfigProvider interface {
 	GetConfig() config.Config
-}
-
-type ConnectionHandlerProvider interface {
-	GetConnHandler() *storage.ConnectionHandler
 }
 
 // PolicyProvider is a storage interface encapsulating policy retrieval.
