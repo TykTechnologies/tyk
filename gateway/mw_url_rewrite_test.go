@@ -6,13 +6,11 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/TykTechnologies/tyk/internal/httputil"
-
 	"github.com/stretchr/testify/assert"
 
-	"github.com/TykTechnologies/tyk/test"
-
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/ctx"
+	"github.com/TykTechnologies/tyk/test"
 	"github.com/TykTechnologies/tyk/user"
 )
 
@@ -1380,7 +1378,7 @@ func TestURLRewriteMiddleware_CheckHostRewrite(t *testing.T) {
 			r := &http.Request{}
 			err := m.CheckHostRewrite(tt.args.oldPath, tt.args.newTarget, r)
 			assert.Equal(t, tt.errExpected, err != nil)
-			assert.Equal(t, tt.retainHostVal, r.Context().Value(httputil.RetainHost))
+			assert.Equal(t, tt.retainHostVal, r.Context().Value(ctx.RetainHost))
 		})
 	}
 }

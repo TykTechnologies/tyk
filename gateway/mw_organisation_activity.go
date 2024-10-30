@@ -6,7 +6,6 @@ import (
 	"sync"
 
 	"github.com/TykTechnologies/tyk/ctx"
-	"github.com/TykTechnologies/tyk/internal/event"
 
 	"github.com/TykTechnologies/tyk/request"
 	"github.com/TykTechnologies/tyk/user"
@@ -142,7 +141,7 @@ func (k *OrganizationMonitor) ProcessRequestLive(r *http.Request, orgSession *us
 			EventKeyFailureMeta{
 				EventMetaDefault: EventMetaDefault{
 					Message:            "Organisation quota has been exceeded",
-					OriginatingRequest: event.EncodeRequestToEvent(r),
+					OriginatingRequest: EncodeRequestToEvent(r),
 				},
 				Path:   r.URL.Path,
 				Origin: request.RealIP(r),
@@ -159,7 +158,7 @@ func (k *OrganizationMonitor) ProcessRequestLive(r *http.Request, orgSession *us
 			EventKeyFailureMeta{
 				EventMetaDefault: EventMetaDefault{
 					Message:            "Organisation rate limit has been exceeded",
-					OriginatingRequest: event.EncodeRequestToEvent(r),
+					OriginatingRequest: EncodeRequestToEvent(r),
 				},
 				Path:   r.URL.Path,
 				Origin: request.RealIP(r),

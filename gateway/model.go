@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"github.com/TykTechnologies/tyk/ctx"
+	"github.com/TykTechnologies/tyk/internal/event"
 	"github.com/TykTechnologies/tyk/internal/httpctx"
 	"github.com/TykTechnologies/tyk/internal/model"
 )
@@ -13,4 +14,6 @@ var (
 
 	ctxGetData = ctxData.Get
 	ctxSetData = ctxData.Set
+
+	EncodeRequestToEvent = event.EncodeRequestToEvent
 )

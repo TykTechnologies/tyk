@@ -21,23 +21,21 @@ import (
 	texttemplate "text/template"
 	"time"
 
-	"github.com/TykTechnologies/tyk/internal/httputil"
-
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
-	"github.com/TykTechnologies/tyk/user"
-
-	"github.com/TykTechnologies/tyk/header"
 
 	"github.com/TykTechnologies/graphql-go-tools/pkg/execution/datasource"
 	"github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/ctx"
 	"github.com/TykTechnologies/tyk/dnscache"
+	"github.com/TykTechnologies/tyk/header"
+	"github.com/TykTechnologies/tyk/internal/httpctx"
 	"github.com/TykTechnologies/tyk/request"
 	"github.com/TykTechnologies/tyk/test"
+	"github.com/TykTechnologies/tyk/user"
 )
 
 func TestCopyHeader_NoDuplicateCORSHeaders(t *testing.T) {
@@ -120,7 +118,8 @@ func TestReverseProxyRetainHost(t *testing.T) {
 			req := TestReq(t, http.MethodGet, tc.inURL, nil)
 			req.URL.Path = tc.inPath
 			if tc.retainHost {
-				httputil.SetCtxValue(req, httputil.RetainHost, true)
+				ctxvalue := httpctx.NewValue[bool](ctx.RetainHost)
+				ctxvalue.Set(req, true)
 			}
 
 			proxy := ts.Gw.TykNewSingleHostReverseProxy(target, spec, nil)

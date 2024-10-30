@@ -525,7 +525,7 @@ func (t *BaseMiddleware) emitRateLimitEvent(r *http.Request, e event.Event, mess
 	t.FireEvent(e, EventKeyFailureMeta{
 		EventMetaDefault: EventMetaDefault{
 			Message:            message,
-			OriginatingRequest: event.EncodeRequestToEvent(r),
+			OriginatingRequest: EncodeRequestToEvent(r),
 		},
 		Path:   r.URL.Path,
 		Origin: request.RealIP(r),
