@@ -3,6 +3,8 @@ package gateway
 import (
 	"bytes"
 	"encoding/base64"
+	"github.com/TykTechnologies/tyk/ctx"
+	"github.com/TykTechnologies/tyk/internal/httputil"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -12,10 +14,8 @@ import (
 
 	graphqlinternal "github.com/TykTechnologies/tyk/internal/graphql"
 
-	"github.com/TykTechnologies/tyk/apidef"
-	"github.com/TykTechnologies/tyk/internal/httputil"
-
 	"github.com/TykTechnologies/tyk-pump/analytics"
+	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/header"
 	"github.com/TykTechnologies/tyk/request"
@@ -344,7 +344,7 @@ func recordDetail(r *http.Request, spec *APISpec) bool {
 
 	// decide based on org session.
 	if spec.GlobalConfig.EnforceOrgDataDetailLogging {
-		session, ok := r.Context().Value(httputil.OrgSessionContext).(*user.SessionState)
+		session, ok := r.Context().Value(ctx.OrgSessionContext).(*user.SessionState)
 		if ok && session != nil {
 			return session.EnableDetailedRecording || session.EnableDetailRecording // nolint:staticcheck // Deprecated DetailRecording
 		}

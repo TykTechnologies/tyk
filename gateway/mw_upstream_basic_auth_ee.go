@@ -9,8 +9,6 @@ import (
 func getUpstreamBasicAuthMw(base *BaseMiddleware) TykMiddleware {
 	spec := base.Spec
 	mwSpec := upstreambasicauth.NewAPISpec(spec.APIID, spec.Name, spec.IsOAS, spec.OAS, spec.UpstreamAuth)
-	//extend storage here
-
 	upstreamBasicAuthMw := upstreambasicauth.NewMiddleware(
 		base.Gw,
 		base,

@@ -1,10 +1,9 @@
 package gateway
 
 import (
+	"github.com/TykTechnologies/tyk/ctx"
 	"net/http"
 	"strings"
-
-	"github.com/TykTechnologies/tyk/internal/httputil"
 
 	"github.com/TykTechnologies/tyk/internal/uuid"
 
@@ -55,7 +54,7 @@ func (m *MiddlewareContextVars) ProcessRequest(w http.ResponseWriter, r *http.Re
 		}
 	}
 
-	httputil.CtxSetData(r, contextDataObject)
+	ctx.CtxSetData(r, contextDataObject)
 
 	return nil, http.StatusOK
 }

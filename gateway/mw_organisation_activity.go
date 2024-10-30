@@ -5,8 +5,8 @@ import (
 	"net/http"
 	"sync"
 
+	"github.com/TykTechnologies/tyk/ctx"
 	"github.com/TykTechnologies/tyk/internal/event"
-	"github.com/TykTechnologies/tyk/internal/httputil"
 	"github.com/TykTechnologies/tyk/internal/model"
 
 	"github.com/TykTechnologies/tyk/request"
@@ -176,7 +176,7 @@ func (k *OrganizationMonitor) ProcessRequestLive(r *http.Request, orgSession *us
 	}
 
 	// Lets keep a reference of the org
-	httputil.SetCtxValue(r, httputil.OrgSessionContext, orgSession)
+	ctx.SetCtxValue(r, ctx.OrgSessionContext, orgSession)
 
 	// Request is valid, carry on
 	return nil, http.StatusOK
@@ -204,7 +204,7 @@ func (k *OrganizationMonitor) ProcessRequestOffThread(r *http.Request, orgSessio
 	// session might be updated by go-routine AllowAccessNext and we loose those changes here
 	// but it is OK as we need it in context for detailed org logging
 	clone := orgSession.Clone()
-	httputil.SetCtxValue(r, httputil.OrgSessionContext, &clone)
+	ctx.SetCtxValue(r, ctx.OrgSessionContext, &clone)
 
 	orgSessionCopy := orgSession.Clone()
 	go k.AllowAccessNext(

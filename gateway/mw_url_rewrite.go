@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"fmt"
+	"github.com/TykTechnologies/tyk/ctx"
 	"io/ioutil"
 	"net/http"
 	"net/textproto"
@@ -10,8 +11,6 @@ import (
 	"reflect"
 	"strconv"
 	"strings"
-
-	"github.com/TykTechnologies/tyk/internal/httputil"
 
 	"github.com/sirupsen/logrus"
 
@@ -59,10 +58,10 @@ func (gw *Gateway) urlRewrite(meta *apidef.URLRewriteMeta, r *http.Request) (str
 	if len(meta.Triggers) > 0 {
 
 		// This feature uses context, we must force it if it doesn't exist
-		contextData := httputil.CtxGetData(r)
+		contextData := ctx.CtxGetData(r)
 		if contextData == nil {
 			contextDataObject := make(map[string]interface{})
-			httputil.CtxSetData(r, contextDataObject)
+			ctx.CtxSetData(r, contextDataObject)
 		}
 
 		for tn, triggerOpts := range meta.Triggers {
@@ -218,31 +217,31 @@ func (gw *Gateway) urlRewrite(meta *apidef.URLRewriteMeta, r *http.Request) (str
 func (gw *Gateway) ReplaceTykVariables(r *http.Request, in string, escape bool) string {
 
 	if strings.Contains(in, secretsConfLabel) {
-		contextData := httputil.CtxGetData(r)
+		contextData := ctx.CtxGetData(r)
 		vars := secretsConfMatch.FindAllString(in, -1)
 		in = gw.replaceVariables(in, vars, contextData, secretsConfLabel, escape)
 	}
 
 	if strings.Contains(in, envLabel) {
-		contextData := httputil.CtxGetData(r)
+		contextData := ctx.CtxGetData(r)
 		vars := envValueMatch.FindAllString(in, -1)
 		in = gw.replaceVariables(in, vars, contextData, envLabel, escape)
 	}
 
 	if strings.Contains(in, vaultLabel) {
-		contextData := httputil.CtxGetData(r)
+		contextData := ctx.CtxGetData(r)
 		vars := vaultMatch.FindAllString(in, -1)
 		in = gw.replaceVariables(in, vars, contextData, vaultLabel, escape)
 	}
 
 	if strings.Contains(in, consulLabel) {
-		contextData := httputil.CtxGetData(r)
+		contextData := ctx.CtxGetData(r)
 		vars := consulMatch.FindAllString(in, -1)
 		in = gw.replaceVariables(in, vars, contextData, consulLabel, escape)
 	}
 
 	if strings.Contains(in, contextLabel) {
-		contextData := httputil.CtxGetData(r)
+		contextData := ctx.CtxGetData(r)
 		vars := contextMatch.FindAllString(in, -1)
 		in = gw.replaceVariables(in, vars, contextData, contextLabel, escape)
 	}
@@ -467,7 +466,7 @@ func (m *URLRewriteMiddleware) CheckHostRewrite(oldPath, newTarget string, r *ht
 
 	if shouldRewriteHost(oldAsURL, newAsURL) {
 		log.Debug("Detected a host rewrite in pattern!")
-		httputil.SetCtxValue(r, httputil.RetainHost, true)
+		ctx.SetCtxValue(r, ctx.RetainHost, true)
 	}
 
 	return nil
@@ -551,7 +550,7 @@ func (m *URLRewriteMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 }
 
 func checkHeaderTrigger(r *http.Request, options map[string]apidef.StringRegexMap, any bool, triggernum int) bool {
-	contextData := httputil.CtxGetData(r)
+	contextData := ctx.CtxGetData(r)
 	fCount := 0
 	for mh, mr := range options {
 		mhCN := textproto.CanonicalMIMEHeaderKey(mh)
@@ -568,7 +567,7 @@ func checkHeaderTrigger(r *http.Request, options map[string]apidef.StringRegexMa
 	}
 
 	if fCount > 0 {
-		httputil.CtxSetData(r, contextData)
+		ctx.CtxSetData(r, contextData)
 		if any {
 			return true
 		}
@@ -580,7 +579,7 @@ func checkHeaderTrigger(r *http.Request, options map[string]apidef.StringRegexMa
 }
 
 func checkQueryString(r *http.Request, options map[string]apidef.StringRegexMap, any bool, triggernum int) bool {
-	contextData := httputil.CtxGetData(r)
+	contextData := ctx.CtxGetData(r)
 	fCount := 0
 	for mv, mr := range options {
 		qvals := r.URL.Query()
@@ -597,7 +596,7 @@ func checkQueryString(r *http.Request, options map[string]apidef.StringRegexMap,
 	}
 
 	if fCount > 0 {
-		httputil.CtxSetData(r, contextData)
+		ctx.CtxSetData(r, contextData)
 		if any {
 			return true
 		}
@@ -609,7 +608,7 @@ func checkQueryString(r *http.Request, options map[string]apidef.StringRegexMap,
 }
 
 func checkPathParts(r *http.Request, options map[string]apidef.StringRegexMap, any bool, triggernum int) bool {
-	contextData := httputil.CtxGetData(r)
+	contextData := ctx.CtxGetData(r)
 	fCount := 0
 	for mv, mr := range options {
 		pathParts := strings.Split(r.URL.Path, "/")
@@ -624,7 +623,7 @@ func checkPathParts(r *http.Request, options map[string]apidef.StringRegexMap, a
 	}
 
 	if fCount > 0 {
-		httputil.CtxSetData(r, contextData)
+		ctx.CtxSetData(r, contextData)
 		if any {
 			return true
 		}
@@ -636,7 +635,7 @@ func checkPathParts(r *http.Request, options map[string]apidef.StringRegexMap, a
 }
 
 func checkSessionTrigger(r *http.Request, sess *user.SessionState, options map[string]apidef.StringRegexMap, any bool, triggernum int) bool {
-	contextData := httputil.CtxGetData(r)
+	contextData := ctx.CtxGetData(r)
 	fCount := 0
 	for mh, mr := range options {
 		rawVal, ok := sess.MetaData[mh]
@@ -653,7 +652,7 @@ func checkSessionTrigger(r *http.Request, sess *user.SessionState, options map[s
 	}
 
 	if fCount > 0 {
-		httputil.CtxSetData(r, contextData)
+		ctx.CtxSetData(r, contextData)
 		if any {
 			return true
 		}
@@ -665,7 +664,7 @@ func checkSessionTrigger(r *http.Request, sess *user.SessionState, options map[s
 }
 
 func checkContextTrigger(r *http.Request, options map[string]apidef.StringRegexMap, any bool, triggernum int) bool {
-	contextData := httputil.CtxGetData(r)
+	contextData := ctx.CtxGetData(r)
 	fCount := 0
 
 	for mh, mr := range options {
@@ -684,7 +683,7 @@ func checkContextTrigger(r *http.Request, options map[string]apidef.StringRegexM
 	}
 
 	if fCount > 0 {
-		httputil.CtxSetData(r, contextData)
+		ctx.CtxSetData(r, contextData)
 		if any {
 			return true
 		}
@@ -696,7 +695,7 @@ func checkContextTrigger(r *http.Request, options map[string]apidef.StringRegexM
 }
 
 func checkPayload(r *http.Request, options apidef.StringRegexMap, triggernum int) bool {
-	contextData := httputil.CtxGetData(r)
+	contextData := ctx.CtxGetData(r)
 	bodyBytes, _ := ioutil.ReadAll(r.Body)
 
 	matched, matches := options.FindAllStringSubmatch(string(bodyBytes), -1)

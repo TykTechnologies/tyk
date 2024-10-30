@@ -18,6 +18,7 @@ import (
 	"crypto/x509"
 	"errors"
 	"fmt"
+	"github.com/TykTechnologies/tyk/ctx"
 	"io"
 	"io/ioutil"
 	"net"
@@ -264,7 +265,7 @@ func (gw *Gateway) TykNewSingleHostReverseProxy(target *url.URL, spec *APISpec, 
 
 		targetToUse := target
 
-		if spec.URLRewriteEnabled && req.Context().Value(httputil.RetainHost) == true {
+		if spec.URLRewriteEnabled && req.Context().Value(ctx.RetainHost) == true {
 			logger.Debug("Detected host rewrite, overriding target")
 			tmpTarget, err := url.Parse(req.URL.String())
 			if err != nil {
@@ -1084,9 +1085,9 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 	p.logger.Debug("Upstream request URL: ", req.URL)
 
 	// We need to double set the context for the outbound request to reprocess the target
-	if p.TykAPISpec.URLRewriteEnabled && req.Context().Value(httputil.RetainHost) == true {
+	if p.TykAPISpec.URLRewriteEnabled && req.Context().Value(ctx.RetainHost) == true {
 		p.logger.Debug("Detected host rewrite, notifying director")
-		httputil.SetCtxValue(outreq, httputil.RetainHost, true)
+		ctx.SetCtxValue(outreq, ctx.RetainHost, true)
 	}
 
 	if req.ContentLength == 0 {

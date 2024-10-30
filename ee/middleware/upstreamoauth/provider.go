@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
+	"github.com/TykTechnologies/tyk/ctx"
 	"net/http"
 	"strings"
 	"time"
@@ -16,7 +17,6 @@ import (
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/internal/crypto"
 	"github.com/TykTechnologies/tyk/internal/event"
-	"github.com/TykTechnologies/tyk/internal/httputil"
 	"github.com/TykTechnologies/tyk/internal/model"
 	"github.com/TykTechnologies/tyk/storage"
 )
@@ -223,7 +223,7 @@ func retryGetKeyAndLock(cacheKey string, cache *storage.RedisCluster) (string, e
 }
 
 func setExtraMetadata(r *http.Request, keyList []string, token *oauth2.Token) {
-	contextDataObject := httputil.CtxGetData(r)
+	contextDataObject := ctx.CtxGetData(r)
 	if contextDataObject == nil {
 		contextDataObject = make(map[string]interface{})
 	}
@@ -233,7 +233,7 @@ func setExtraMetadata(r *http.Request, keyList []string, token *oauth2.Token) {
 			contextDataObject[key] = val
 		}
 	}
-	httputil.CtxSetData(r, contextDataObject)
+	ctx.CtxSetData(r, contextDataObject)
 }
 
 // EmitUpstreamOAuthEvent emits an upstream OAuth event with an optional custom message.

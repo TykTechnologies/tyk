@@ -6,8 +6,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/TykTechnologies/tyk/ctx"
 	"github.com/TykTechnologies/tyk/internal/event"
-	"github.com/TykTechnologies/tyk/internal/httputil"
 	"github.com/TykTechnologies/tyk/internal/model"
 
 	"github.com/TykTechnologies/tyk/internal/crypto"
@@ -81,10 +81,10 @@ func (k *AuthKey) setContextVars(r *http.Request, token string) {
 	if !k.Spec.EnableContextVars {
 		return
 	}
-	if cnt := httputil.CtxGetData(r); cnt != nil {
+	if cnt := ctx.CtxGetData(r); cnt != nil {
 		// Key data
 		cnt["token"] = token
-		httputil.CtxSetData(r, cnt)
+		ctx.CtxSetData(r, cnt)
 	}
 }
 

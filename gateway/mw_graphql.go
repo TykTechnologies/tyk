@@ -3,10 +3,9 @@ package gateway
 import (
 	"context"
 	"errors"
+	"github.com/TykTechnologies/tyk/ctx"
 	"io"
 	"net/http"
-
-	"github.com/TykTechnologies/tyk/internal/httputil"
 
 	"github.com/gorilla/websocket"
 	"github.com/sirupsen/logrus"
@@ -237,7 +236,7 @@ func (m *GraphQLMiddleware) OnBeforeStart(reqCtx context.Context, operation *gql
 		return err
 	}
 
-	v := reqCtx.Value(httputil.SessionData)
+	v := reqCtx.Value(ctx.SessionData)
 	if v == nil {
 		m.Logger().Error("failed to get session in OnBeforeStart hook")
 		return errors.New("empty session")

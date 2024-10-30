@@ -281,6 +281,6 @@ func (m *GoPluginMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reque
 
 func setOASDefinition(r *http.Request, s *oas.OAS) {
 	cntx := r.Context()
-	cntx = context.WithValue(cntx, httputil.OASDefinition, s)
+	cntx = context.WithValue(cntx, ctx.OASDefinition, s)
 	httputil.SetContext(r, cntx)
 }

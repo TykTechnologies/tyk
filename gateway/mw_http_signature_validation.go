@@ -17,7 +17,7 @@ import (
 	"text/scanner"
 	"time"
 
-	"github.com/TykTechnologies/tyk/internal/httputil"
+	"github.com/TykTechnologies/tyk/ctx"
 
 	"github.com/sirupsen/logrus"
 
@@ -238,10 +238,10 @@ func (hm *HTTPSignatureValidationMiddleware) setContextVars(r *http.Request, tok
 		return
 	}
 	// Flatten claims and add to context
-	if cnt := httputil.CtxGetData(r); cnt != nil {
+	if cnt := ctx.CtxGetData(r); cnt != nil {
 		// Key data
 		cnt["token"] = token
-		httputil.CtxSetData(r, cnt)
+		ctx.CtxSetData(r, cnt)
 	}
 }
 

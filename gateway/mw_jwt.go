@@ -10,12 +10,11 @@ import (
 	"encoding/pem"
 	"errors"
 	"fmt"
+	"github.com/TykTechnologies/tyk/ctx"
 	"io"
 	"net/http"
 	"strings"
 	"time"
-
-	"github.com/TykTechnologies/tyk/internal/httputil"
 
 	"github.com/go-jose/go-jose/v3"
 	"github.com/golang-jwt/jwt/v4"
@@ -765,7 +764,7 @@ func ctxSetJWTContextVars(s *APISpec, r *http.Request, token *jwt.Token) {
 	if !s.EnableContextVars {
 		return
 	}
-	if cnt := httputil.CtxGetData(r); cnt != nil {
+	if cnt := ctx.CtxGetData(r); cnt != nil {
 		claimPrefix := "jwt_claims_"
 
 		for claimName, claimValue := range token.Header {
@@ -781,7 +780,7 @@ func ctxSetJWTContextVars(s *APISpec, r *http.Request, token *jwt.Token) {
 		// Key data
 		cnt["token"] = ctxGetAuthToken(r)
 
-		httputil.CtxSetData(r, cnt)
+		ctx.CtxSetData(r, cnt)
 	}
 }
 

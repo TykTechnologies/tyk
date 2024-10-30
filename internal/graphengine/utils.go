@@ -2,10 +2,9 @@ package graphengine
 
 import (
 	"errors"
+	"github.com/TykTechnologies/tyk/ctx"
 	"net"
 	"net/http"
-
-	"github.com/TykTechnologies/tyk/internal/httputil"
 
 	"github.com/jensneuse/abstractlogger"
 	"github.com/sirupsen/logrus"
@@ -153,7 +152,7 @@ func headerStructToHeaderMap(headers []apidef.UDGGlobalHeader) map[string]string
 }
 
 func ctxGetData(r *http.Request) map[string]interface{} {
-	if v := r.Context().Value(httputil.ContextData); v != nil {
+	if v := r.Context().Value(ctx.ContextData); v != nil {
 		return v.(map[string]interface{})
 	}
 	return nil

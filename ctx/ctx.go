@@ -17,6 +17,44 @@ import (
 	"github.com/TykTechnologies/tyk/user"
 )
 
+type Key uint
+
+const (
+	SessionData Key = iota
+	// Deprecated: UpdateSession was used to trigger a session update, use *SessionData.Touch instead.
+	UpdateSession
+	AuthToken
+	HashedAuthToken
+	VersionData
+	VersionName
+	VersionDefault
+	OrgSessionContext
+	ContextData
+	RetainHost
+	TrackThisEndpoint
+	DoNotTrackThisEndpoint
+	UrlRewritePath
+	RequestMethod
+	OrigRequestURL
+	LoopLevel
+	LoopLevelLimit
+	ThrottleLevel
+	ThrottleLevelLimit
+	Trace
+	CheckLoopLimits
+	UrlRewriteTarget
+	TransformedRequestMethod
+	Definition
+	RequestStatus
+	GraphQLRequest
+	GraphQLIsWebSocketUpgrade
+	OASOperation
+
+	// CacheOptions holds cache options required for cache writer middleware.
+	CacheOptions
+	OASDefinition
+)
+
 func ctxSetSession(r *http.Request, s *user.SessionState, scheduleUpdate bool, hashKey bool) {
 
 	if s == nil {
@@ -32,9 +70,9 @@ func ctxSetSession(r *http.Request, s *user.SessionState, scheduleUpdate bool, h
 	}
 
 	ctx := r.Context()
-	ctx = context.WithValue(ctx, httputil.SessionData, s)
+	ctx = context.WithValue(ctx, SessionData, s)
 
-	ctx = context.WithValue(ctx, httputil.AuthToken, s.KeyID)
+	ctx = context.WithValue(ctx, AuthToken, s.KeyID)
 
 	if scheduleUpdate {
 		s.Touch()
@@ -44,14 +82,14 @@ func ctxSetSession(r *http.Request, s *user.SessionState, scheduleUpdate bool, h
 }
 
 func GetAuthToken(r *http.Request) string {
-	if v := r.Context().Value(httputil.AuthToken); v != nil {
+	if v := r.Context().Value(AuthToken); v != nil {
 		return v.(string)
 	}
 	return ""
 }
 
 func GetSession(r *http.Request) *user.SessionState {
-	if v := r.Context().Value(httputil.SessionData); v != nil {
+	if v := r.Context().Value(SessionData); v != nil {
 		if val, ok := v.(*user.SessionState); ok {
 			return val
 		} else {
@@ -77,12 +115,12 @@ func SetSession(r *http.Request, s *user.SessionState, scheduleUpdate bool, hash
 
 func SetDefinition(r *http.Request, s *apidef.APIDefinition) {
 	ctx := r.Context()
-	ctx = context.WithValue(ctx, httputil.Definition, s)
+	ctx = context.WithValue(ctx, Definition, s)
 	httputil.SetContext(r, ctx)
 }
 
 func GetDefinition(r *http.Request) *apidef.APIDefinition {
-	if v := r.Context().Value(httputil.Definition); v != nil {
+	if v := r.Context().Value(Definition); v != nil {
 		if val, ok := v.(*apidef.APIDefinition); ok {
 			return val
 		} else {
@@ -100,7 +138,7 @@ func GetDefinition(r *http.Request) *apidef.APIDefinition {
 
 // GetOASDefinition returns a deep copy of the OAS definition of the called API.
 func GetOASDefinition(r *http.Request) *oas.OAS {
-	v := r.Context().Value(httputil.OASDefinition)
+	v := r.Context().Value(OASDefinition)
 	if v == nil {
 		return nil
 	}
@@ -116,4 +154,22 @@ func GetOASDefinition(r *http.Request) *oas.OAS {
 	}
 
 	return ret
+}
+
+func CtxGetData(r *http.Request) map[string]interface{} {
+	if v := r.Context().Value(ContextData); v != nil {
+		return v.(map[string]interface{})
+	}
+	return nil
+}
+
+func CtxSetData(r *http.Request, m map[string]interface{}) {
+	if m == nil {
+		panic("setting a nil context ContextData")
+	}
+	SetCtxValue(r, ContextData, m)
+}
+
+func SetCtxValue(r *http.Request, key, val interface{}) {
+	httputil.SetContext(r, context.WithValue(r.Context(), key, val))
 }
