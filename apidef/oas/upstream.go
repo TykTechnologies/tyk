@@ -779,6 +779,14 @@ func (p *PasswordAuthentication) ExtractTo(api *apidef.PasswordAuthentication) {
 	api.TokenURL = p.TokenURL
 	api.Scopes = p.Scopes
 	api.ExtraMetadata = p.ExtraMetadata
+
+	if p.Header == nil {
+		p.Header = &AuthSource{}
+		defer func() {
+			p.Header = nil
+		}()
+	}
+	p.Header.ExtractTo(&api.Header.Enabled, &api.Header.Name)
 }
 
 func (u *UpstreamOAuth) ExtractTo(api *apidef.UpstreamOAuth) {
