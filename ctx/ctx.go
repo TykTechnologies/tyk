@@ -155,21 +155,3 @@ func GetOASDefinition(r *http.Request) *oas.OAS {
 
 	return ret
 }
-
-func CtxGetData(r *http.Request) map[string]interface{} {
-	if v := r.Context().Value(ContextData); v != nil {
-		return v.(map[string]interface{})
-	}
-	return nil
-}
-
-func CtxSetData(r *http.Request, m map[string]interface{}) {
-	if m == nil {
-		panic("setting a nil context ContextData")
-	}
-	SetCtxValue(r, ContextData, m)
-}
-
-func SetCtxValue(r *http.Request, key, val interface{}) {
-	httputil.SetContext(r, context.WithValue(r.Context(), key, val))
-}
