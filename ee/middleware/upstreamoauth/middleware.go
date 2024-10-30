@@ -67,13 +67,7 @@ func (m *Middleware) Init() {
 
 // ProcessRequest will handle upstream basic auth.
 func (m *Middleware) ProcessRequest(_ http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
-	oauthConfig := m.Spec.UpstreamAuth.OAuth
-
-	upstreamOAuthProvider := Provider{
-		HeaderName: header.Authorization,
-	}
-
-	provider, err := getOAuthHeaderProvider(oauthConfig)
+	provider, err := getOAuthHeaderProvider(m.Spec.UpstreamAuth.OAuth)
 	if err != nil {
 		return fmt.Errorf("failed to get OAuth header provider: %w", err), http.StatusInternalServerError
 	}
@@ -83,7 +77,11 @@ func (m *Middleware) ProcessRequest(_ http.ResponseWriter, r *http.Request, _ in
 		return fmt.Errorf("failed to get OAuth token: %w", err), http.StatusInternalServerError
 	}
 
-	upstreamOAuthProvider.AuthValue = payload
+	upstreamOAuthProvider := Provider{
+		HeaderName: header.Authorization,
+		AuthValue:  payload,
+	}
+
 	headerName := provider.getHeaderName(m)
 	if headerName != "" {
 		upstreamOAuthProvider.HeaderName = headerName
