@@ -140,7 +140,7 @@ func (gw *Gateway) EventHandlerByName(handlerConf apidef.EventHandlerTriggerConf
 	return nil, errors.New("Handler not found")
 }
 
-func FireEvent(name apidef.TykEvent, meta interface{}, handlers map[apidef.TykEvent][]config.TykEventHandler) {
+func fireEvent(name apidef.TykEvent, meta interface{}, handlers map[apidef.TykEvent][]config.TykEventHandler) {
 	log.Debug("EVENT FIRED: ", name)
 	if handlers, e := handlers[name]; e {
 		log.Debugf("FOUND %d EVENT HANDLERS", len(handlers))
@@ -157,11 +157,11 @@ func FireEvent(name apidef.TykEvent, meta interface{}, handlers map[apidef.TykEv
 }
 
 func (s *APISpec) FireEvent(name apidef.TykEvent, meta interface{}) {
-	FireEvent(name, meta, s.EventPaths)
+	fireEvent(name, meta, s.EventPaths)
 }
 
 func (gw *Gateway) FireSystemEvent(name apidef.TykEvent, meta interface{}) {
-	FireEvent(name, meta, gw.GetConfig().GetEventTriggers())
+	fireEvent(name, meta, gw.GetConfig().GetEventTriggers())
 }
 
 // LogMessageEventHandler is a sample Event Handler

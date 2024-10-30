@@ -498,7 +498,7 @@ func (t *BaseMiddleware) CheckSessionAndIdentityForValidKey(originalKey string, 
 
 // FireEvent is added to the BaseMiddleware object so it is available across the entire stack
 func (t *BaseMiddleware) FireEvent(name apidef.TykEvent, meta interface{}) {
-	FireEvent(name, meta, t.Spec.EventPaths)
+	fireEvent(name, meta, t.Spec.EventPaths)
 }
 
 // emitRateLimitEvents emits rate limit related events based on the request context.
