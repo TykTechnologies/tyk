@@ -9,8 +9,6 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/TykTechnologies/tyk/internal/httputil"
-
 	"github.com/TykTechnologies/tyk/apidef/oas"
 
 	"github.com/TykTechnologies/tyk/ctx"
@@ -280,5 +278,5 @@ func (m *GoPluginMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reque
 func setOASDefinition(r *http.Request, s *oas.OAS) {
 	cntx := r.Context()
 	cntx = context.WithValue(cntx, ctx.OASDefinition, s)
-	httputil.SetContext(r, cntx)
+	setContext(r, cntx)
 }

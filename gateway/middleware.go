@@ -12,8 +12,6 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/TykTechnologies/tyk/internal/httputil"
-
 	"github.com/gocraft/health"
 	"github.com/justinas/alice"
 	newrelic "github.com/newrelic/go-agent"
@@ -71,7 +69,7 @@ func (tr TraceMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request,
 			tr.Name(),
 		)
 		defer span.Finish()
-		httputil.SetContext(r, ctx)
+		setContext(r, ctx)
 		return tr.TykMiddleware.ProcessRequest(w, r, conf)
 	} else if baseMw := tr.Base(); baseMw != nil {
 		cfg := baseMw.Gw.GetConfig()
@@ -82,7 +80,7 @@ func (tr TraceMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request,
 				var ctx context.Context
 				ctx, span = baseMw.Gw.TracerProvider.Tracer().Start(r.Context(), tr.Name())
 				defer span.End()
-				httputil.SetContext(r, ctx)
+				setContext(r, ctx)
 			} else {
 				span = otel.SpanFromContext(r.Context())
 			}
@@ -645,7 +643,7 @@ func handleResponseChain(chain []TykResponseHandler, rw http.ResponseWriter, res
 
 	if res.Request != nil {
 		// res.Request context contains otel information from the otel roundtripper
-		httputil.SetContext(req, res.Request.Context())
+		setContext(req, res.Request.Context())
 	}
 
 	traceIsEnabled := trace.IsEnabled()
@@ -691,7 +689,7 @@ func handleOtelTracedResponse(rh TykResponseHandler, rw http.ResponseWriter, res
 		if baseMw.Spec.DetailedTracing {
 			ctx, span = baseMw.Gw.TracerProvider.Tracer().Start(ctx, rh.Name())
 			defer span.End()
-			httputil.SetContext(req, ctx)
+			setContext(req, ctx)
 		} else {
 			span = otel.SpanFromContext(ctx)
 		}

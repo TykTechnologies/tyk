@@ -1080,8 +1080,8 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 	*outreq = *req // includes shallow copies of maps, but okay
 	*logreq = *req
 	// remove context data from the copies
-	httputil.SetContext(outreq, context.Background())
-	httputil.SetContext(logreq, context.Background())
+	setContext(outreq, context.Background())
+	setContext(logreq, context.Background())
 
 	p.logger.Debug("Upstream request URL: ", req.URL)
 
@@ -1095,7 +1095,7 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 		outreq.Body = nil // Issue 16036: nil Body for http.Transport retries
 	}
 	outreq = outreq.WithContext(reqCtx)
-	httputil.SetContext(logreq, outreq.Context())
+	setContext(logreq, outreq.Context())
 
 	outreq.Header = cloneHeader(req.Header)
 	if trace.IsEnabled() {
