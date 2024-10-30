@@ -15,7 +15,7 @@ type noopUpstreamOAuth struct {
 }
 
 // ProcessRequest is noop implementation for upstream OAuth mw.
-func (d *noopUpstreamOAuth) ProcessRequest(_ http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
+func (d *noopUpstreamOAuth) ProcessRequest(_ http.ResponseWriter, _ *http.Request, _ interface{}) (error, int) {
 	return nil, http.StatusOK
 }
 

@@ -13,7 +13,6 @@ import (
 	oauth2clientcredentials "golang.org/x/oauth2/clientcredentials"
 
 	"github.com/TykTechnologies/tyk/apidef"
-	"github.com/TykTechnologies/tyk/internal/crypto"
 	"github.com/TykTechnologies/tyk/internal/model"
 )
 
@@ -151,7 +150,7 @@ func retryGetKeyAndLock(cacheKey string, cache Storage) (string, error) {
 		time.Sleep(retryDelay)
 	}
 
-	return "", fmt.Errorf("failed to acquire lock after retries: %v", err)
+	return "", fmt.Errorf("failed to acquire lock after retries: %w", err)
 }
 
 func setExtraMetadata(r *http.Request, keyList []string, token *oauth2.Token) {
@@ -190,35 +189,6 @@ func (p *PasswordOAuthProvider) getHeaderName(OAuthSpec *Middleware) string {
 
 func (p *PasswordOAuthProvider) headerEnabled(OAuthSpec *Middleware) bool {
 	return OAuthSpec.Spec.UpstreamAuth.OAuth.PasswordAuthentication.Header.Enabled
-}
-
-func (cache *PasswordClient) GetToken(r *http.Request, mw *Middleware) (string, error) {
-	cacheKey := generatePasswordOAuthCacheKey(mw.Spec.UpstreamAuth.OAuth, mw.Spec.APIID)
-
-	tokenString, err := retryGetKeyAndLock(cacheKey, cache.Storage)
-	if err != nil {
-		return "", err
-	}
-
-	if tokenString != "" {
-		decryptedToken := crypto.Decrypt(crypto.GetPaddedString(mw.Gw.GetConfig().Secret), tokenString)
-		return decryptedToken, nil
-	}
-
-	token, err := cache.ObtainToken(r.Context(), mw)
-	if err != nil {
-		return "", err
-	}
-
-	encryptedToken := crypto.Encrypt(crypto.GetPaddedString(mw.Gw.GetConfig().Secret), token.AccessToken)
-	setExtraMetadata(r, mw.Spec.UpstreamAuth.OAuth.PasswordAuthentication.ExtraMetadata, token)
-
-	ttl := time.Until(token.Expiry)
-	if err := setTokenInCache(cache.Storage, cacheKey, encryptedToken, ttl); err != nil {
-		return "", err
-	}
-
-	return token.AccessToken, nil
 }
 
 func generatePasswordOAuthCacheKey(config apidef.UpstreamOAuth, apiId string) string {

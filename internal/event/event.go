@@ -129,7 +129,10 @@ func Get(ctx context.Context) []Event {
 // encode it to base64 and store it in an Event object
 func EncodeRequestToEvent(r *http.Request) string {
 	var asBytes bytes.Buffer
-	r.Write(&asBytes)
+	err := r.Write(&asBytes)
+	if err != nil {
+		return ""
+	}
 
 	return base64.StdEncoding.EncodeToString(asBytes.Bytes())
 }

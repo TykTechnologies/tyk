@@ -218,7 +218,11 @@ func Encrypt(key []byte, text string) string {
 
 // Decrypt from base64 to decrypted string
 func Decrypt(key []byte, cryptoText string) string {
-	ciphertext, _ := base64.URLEncoding.DecodeString(cryptoText)
+	ciphertext, err := base64.URLEncoding.DecodeString(cryptoText)
+	if err != nil {
+		logrus.Error(err)
+		return ""
+	}
 
 	block, err := aes.NewCipher(key)
 	if err != nil {
