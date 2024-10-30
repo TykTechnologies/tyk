@@ -9,6 +9,7 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"github.com/TykTechnologies/tyk/header"
+	"github.com/TykTechnologies/tyk/internal/event"
 	"github.com/TykTechnologies/tyk/internal/httputil"
 	"github.com/TykTechnologies/tyk/internal/model"
 )
@@ -98,4 +99,18 @@ func (m *Middleware) ProcessRequest(_ http.ResponseWriter, r *http.Request, _ in
 
 	httputil.SetUpstreamAuth(r, upstreamOAuthProvider)
 	return nil, http.StatusOK
+}
+
+// EmitUpstreamOAuthEvent emits an upstream OAuth event with an optional custom message.
+func (mw *Middleware) EmitUpstreamOAuthEvent(r *http.Request, e event.Event, message string, apiId string) {
+	if message == "" {
+		message = event.String(e)
+	}
+	mw.Base.FireEvent(e, EventUpstreamOAuthMeta{
+		EventMetaDefault: model.EventMetaDefault{
+			Message:            message,
+			OriginatingRequest: event.EncodeRequestToEvent(r),
+		},
+		APIID: apiId,
+	})
 }

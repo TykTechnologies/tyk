@@ -2,7 +2,8 @@ package upstreamoauth
 
 import (
 	"github.com/TykTechnologies/tyk/apidef"
-	"github.com/TykTechnologies/tyk/apidef/oas"
+	"github.com/TykTechnologies/tyk/ctx"
+	"github.com/TykTechnologies/tyk/internal/httpctx"
 	"github.com/TykTechnologies/tyk/internal/model"
 )
 
@@ -24,18 +25,15 @@ type Gateway interface {
 	model.ConfigProvider
 }
 
-// APISpec is a subset of gateway.APISpec for the values the middleware consumes.
-type APISpec struct {
-	APIID string
-	Name  string
-	IsOAS bool
-	OAS   oas.OAS
-
-	UpstreamAuth apidef.UpstreamAuth
-}
-
 type ClientCredentialsOAuthProvider struct{}
 
 type PerAPIClientCredentialsOAuthProvider struct{}
 
 type PasswordOAuthProvider struct{}
+
+var (
+	ctxData = httpctx.NewValue[map[string]any](ctx.ContextData)
+
+	ctxGetData = ctxData.Get
+	ctxSetData = ctxData.Set
+)

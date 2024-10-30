@@ -9,15 +9,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/TykTechnologies/tyk/ctx"
-
 	"github.com/sirupsen/logrus"
 	"golang.org/x/oauth2"
 	oauth2clientcredentials "golang.org/x/oauth2/clientcredentials"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/internal/crypto"
-	"github.com/TykTechnologies/tyk/internal/event"
 	"github.com/TykTechnologies/tyk/internal/model"
 	"github.com/TykTechnologies/tyk/storage"
 )
@@ -81,7 +78,7 @@ func (p *ClientCredentialsOAuthProvider) getOAuthToken(r *http.Request, mw *Midd
 }
 
 func handleOAuthError(r *http.Request, mw *Middleware, err error) (string, error) {
-	EmitUpstreamOAuthEvent(r, ErrorEventName, err.Error(), mw.Spec.APIID, mw)
+	mw.EmitUpstreamOAuthEvent(r, ErrorEventName, err.Error(), mw.Spec.APIID)
 	return "", err
 }
 
@@ -224,7 +221,7 @@ func retryGetKeyAndLock(cacheKey string, cache *storage.RedisCluster) (string, e
 }
 
 func setExtraMetadata(r *http.Request, keyList []string, token *oauth2.Token) {
-	contextDataObject := ctx.CtxGetData(r)
+	contextDataObject := ctxGetData(r)
 	if contextDataObject == nil {
 		contextDataObject = make(map[string]interface{})
 	}
@@ -234,21 +231,7 @@ func setExtraMetadata(r *http.Request, keyList []string, token *oauth2.Token) {
 			contextDataObject[key] = val
 		}
 	}
-	ctx.CtxSetData(r, contextDataObject)
-}
-
-// EmitUpstreamOAuthEvent emits an upstream OAuth event with an optional custom message.
-func EmitUpstreamOAuthEvent(r *http.Request, e event.Event, message string, apiId string, mw *Middleware) {
-	if message == "" {
-		message = event.String(e)
-	}
-	mw.Base.FireEvent(e, EventUpstreamOAuthMeta{
-		EventMetaDefault: model.EventMetaDefault{
-			Message:            message,
-			OriginatingRequest: event.EncodeRequestToEvent(r),
-		},
-		APIID: apiId,
-	})
+	ctxSetData(r, contextDataObject)
 }
 
 // EventUpstreamOAuthMeta is the metadata structure for an upstream OAuth event
