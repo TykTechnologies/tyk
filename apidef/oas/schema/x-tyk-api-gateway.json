@@ -2073,7 +2073,7 @@
             "header": {
               "$ref": "#/definitions/X-Tyk-AuthSource"
             },
-            "extra_metadata": {
+            "extraMetadata": {
               "type": "array"
             }
           },
@@ -2110,7 +2110,7 @@
             "header": {
               "$ref": "#/definitions/X-Tyk-AuthSource"
             },
-            "extra_metadata": {
+            "extraMetadata": {
               "type": "array"
             }
           },
