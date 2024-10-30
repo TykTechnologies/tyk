@@ -3,9 +3,10 @@ package gateway
 import (
 	"context"
 	"errors"
-	"github.com/TykTechnologies/tyk/ctx"
 	"io"
 	"net/http"
+
+	"github.com/TykTechnologies/tyk/ctx"
 
 	"github.com/gorilla/websocket"
 	"github.com/sirupsen/logrus"

@@ -11,7 +11,6 @@ import (
 
 	"github.com/TykTechnologies/tyk/internal/event"
 	"github.com/TykTechnologies/tyk/internal/httputil"
-	"github.com/TykTechnologies/tyk/internal/model"
 
 	"github.com/TykTechnologies/tyk/apidef/oas"
 
@@ -254,7 +253,7 @@ func (m *GoPluginMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reque
 		case rw.statusCodeSent == http.StatusForbidden:
 			logger.WithError(err).Error("Authentication error in Go-plugin middleware func")
 			m.Base().FireEvent(EventAuthFailure, EventKeyFailureMeta{
-				EventMetaDefault: model.EventMetaDefault{Message: "Auth Failure", OriginatingRequest: event.EncodeRequestToEvent(r)},
+				EventMetaDefault: EventMetaDefault{Message: "Auth Failure", OriginatingRequest: event.EncodeRequestToEvent(r)},
 				Path:             r.URL.Path,
 				Origin:           request.RealIP(r),
 				Key:              "n/a",

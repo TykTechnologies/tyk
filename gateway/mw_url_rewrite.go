@@ -2,7 +2,6 @@ package gateway
 
 import (
 	"fmt"
-	"github.com/TykTechnologies/tyk/ctx"
 	"io/ioutil"
 	"net/http"
 	"net/textproto"
@@ -11,6 +10,8 @@ import (
 	"reflect"
 	"strconv"
 	"strings"
+
+	"github.com/TykTechnologies/tyk/ctx"
 
 	"github.com/sirupsen/logrus"
 

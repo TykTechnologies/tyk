@@ -7,7 +7,6 @@ import (
 
 	"github.com/TykTechnologies/tyk/ctx"
 	"github.com/TykTechnologies/tyk/internal/event"
-	"github.com/TykTechnologies/tyk/internal/model"
 
 	"github.com/TykTechnologies/tyk/request"
 	"github.com/TykTechnologies/tyk/user"
@@ -141,7 +140,7 @@ func (k *OrganizationMonitor) ProcessRequestLive(r *http.Request, orgSession *us
 		k.FireEvent(
 			EventOrgQuotaExceeded,
 			EventKeyFailureMeta{
-				EventMetaDefault: model.EventMetaDefault{
+				EventMetaDefault: EventMetaDefault{
 					Message:            "Organisation quota has been exceeded",
 					OriginatingRequest: event.EncodeRequestToEvent(r),
 				},
@@ -158,7 +157,7 @@ func (k *OrganizationMonitor) ProcessRequestLive(r *http.Request, orgSession *us
 		k.FireEvent(
 			EventOrgRateLimitExceeded,
 			EventKeyFailureMeta{
-				EventMetaDefault: model.EventMetaDefault{
+				EventMetaDefault: EventMetaDefault{
 					Message:            "Organisation rate limit has been exceeded",
 					OriginatingRequest: event.EncodeRequestToEvent(r),
 				},
@@ -278,7 +277,7 @@ func (k *OrganizationMonitor) AllowAccessNext(
 		k.FireEvent(
 			EventOrgQuotaExceeded,
 			EventKeyFailureMeta{
-				EventMetaDefault: model.EventMetaDefault{
+				EventMetaDefault: EventMetaDefault{
 					Message: "Organisation quota has been exceeded",
 				},
 				Path:   path,
@@ -295,7 +294,7 @@ func (k *OrganizationMonitor) AllowAccessNext(
 		k.FireEvent(
 			EventOrgRateLimitExceeded,
 			EventKeyFailureMeta{
-				EventMetaDefault: model.EventMetaDefault{
+				EventMetaDefault: EventMetaDefault{
 					Message: "Organisation rate limit has been exceeded",
 				},
 				Path:   path,

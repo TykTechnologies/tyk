@@ -42,8 +42,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/TykTechnologies/tyk/internal/model"
-
 	gqlv2 "github.com/TykTechnologies/graphql-go-tools/v2/pkg/graphql"
 
 	"github.com/getkin/kin-openapi/openapi3"
@@ -568,7 +566,7 @@ func (gw *Gateway) handleAddOrUpdate(keyName string, r *http.Request, isHashed b
 		event = EventTokenCreated
 	}
 	gw.FireSystemEvent(event, EventTokenMeta{
-		EventMetaDefault: model.EventMetaDefault{Message: "Key modified."},
+		EventMetaDefault: EventMetaDefault{Message: "Key modified."},
 		Org:              newSession.OrgID,
 		Key:              keyName,
 	})
@@ -806,7 +804,7 @@ func (gw *Gateway) handleDeleteKey(keyName, orgID, apiID string, resetQuota bool
 	}
 
 	gw.FireSystemEvent(EventTokenDeleted, EventTokenMeta{
-		EventMetaDefault: model.EventMetaDefault{Message: "Key deleted."},
+		EventMetaDefault: EventMetaDefault{Message: "Key deleted."},
 		Org:              orgID,
 		Key:              keyName,
 	})
@@ -2067,7 +2065,7 @@ func (gw *Gateway) createKeyHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	gw.FireSystemEvent(EventTokenCreated, EventTokenMeta{
-		EventMetaDefault: model.EventMetaDefault{Message: "Key generated."},
+		EventMetaDefault: EventMetaDefault{Message: "Key generated."},
 		Org:              newSession.OrgID,
 		Key:              newKey,
 	})

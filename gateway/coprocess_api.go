@@ -6,8 +6,6 @@ import (
 	"context"
 	"time"
 
-	"github.com/TykTechnologies/tyk/internal/model"
-
 	"github.com/sirupsen/logrus"
 
 	"github.com/TykTechnologies/tyk/apidef"
@@ -77,7 +75,7 @@ func TykTriggerEvent(CEventName, CPayload *C.char) {
 	eventName := C.GoString(CEventName)
 	payload := C.GoString(CPayload)
 
-	GatewayFireSystemEvent(apidef.TykEvent(eventName), model.EventMetaDefault{
+	GatewayFireSystemEvent(apidef.TykEvent(eventName), EventMetaDefault{
 		Message: payload,
 	})
 }

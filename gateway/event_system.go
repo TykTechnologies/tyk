@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/TykTechnologies/tyk/internal/model"
-
 	"github.com/sirupsen/logrus"
 
 	"github.com/TykTechnologies/tyk/internal/event"
@@ -59,14 +57,14 @@ const (
 )
 
 type EventHostStatusMeta struct {
-	model.EventMetaDefault
+	EventMetaDefault
 	HostInfo HostHealthReport
 }
 
 // EventKeyFailureMeta is the metadata structure for any failure related
 // to a key, such as quota or auth failures.
 type EventKeyFailureMeta struct {
-	model.EventMetaDefault
+	EventMetaDefault
 	Path   string
 	Origin string
 	Key    string
@@ -74,7 +72,7 @@ type EventKeyFailureMeta struct {
 
 // EventCurcuitBreakerMeta is the event status for a circuit breaker tripping
 type EventCurcuitBreakerMeta struct {
-	model.EventMetaDefault
+	EventMetaDefault
 	Path         string
 	APIID        string
 	CircuitEvent circuit.BreakerEvent
@@ -82,7 +80,7 @@ type EventCurcuitBreakerMeta struct {
 
 // EventVersionFailureMeta is the metadata structure for an auth failure (EventKeyExpired)
 type EventVersionFailureMeta struct {
-	model.EventMetaDefault
+	EventMetaDefault
 	Path   string
 	Origin string
 	Key    string
@@ -90,7 +88,7 @@ type EventVersionFailureMeta struct {
 }
 
 type EventTriggerExceededMeta struct {
-	model.EventMetaDefault
+	EventMetaDefault
 	OrgID           string `json:"org_id"`
 	Key             string `json:"key"`
 	TriggerLimit    int64  `json:"trigger_limit"`
@@ -98,7 +96,7 @@ type EventTriggerExceededMeta struct {
 }
 
 type EventTokenMeta struct {
-	model.EventMetaDefault
+	EventMetaDefault
 	Org string
 	Key string
 }

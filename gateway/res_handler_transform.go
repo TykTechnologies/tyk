@@ -5,11 +5,12 @@ import (
 	"compress/flate"
 	"compress/gzip"
 	"encoding/json"
-	"github.com/TykTechnologies/tyk/ctx"
 	"io"
 	"io/ioutil"
 	"net/http"
 	"strconv"
+
+	"github.com/TykTechnologies/tyk/ctx"
 
 	"github.com/clbanning/mxj"
 	"github.com/sirupsen/logrus"

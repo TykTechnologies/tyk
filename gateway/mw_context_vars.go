@@ -1,9 +1,10 @@
 package gateway
 
 import (
-	"github.com/TykTechnologies/tyk/ctx"
 	"net/http"
 	"strings"
+
+	"github.com/TykTechnologies/tyk/ctx"
 
 	"github.com/TykTechnologies/tyk/internal/uuid"
 

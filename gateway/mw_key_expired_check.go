@@ -5,7 +5,6 @@ import (
 	"net/http"
 
 	"github.com/TykTechnologies/tyk/internal/event"
-	"github.com/TykTechnologies/tyk/internal/model"
 
 	"github.com/TykTechnologies/tyk/request"
 )
@@ -36,7 +35,7 @@ func (k *KeyExpired) ProcessRequest(w http.ResponseWriter, r *http.Request, _ in
 		logger.Info("Attempted access from inactive key.")
 		// Fire a key expired event
 		k.FireEvent(EventKeyExpired, EventKeyFailureMeta{
-			EventMetaDefault: model.EventMetaDefault{Message: "Attempted access from inactive key.", OriginatingRequest: event.EncodeRequestToEvent(r)},
+			EventMetaDefault: EventMetaDefault{Message: "Attempted access from inactive key.", OriginatingRequest: event.EncodeRequestToEvent(r)},
 			Path:             r.URL.Path,
 			Origin:           request.RealIP(r),
 			Key:              token,
@@ -54,7 +53,7 @@ func (k *KeyExpired) ProcessRequest(w http.ResponseWriter, r *http.Request, _ in
 	logger.Info("Attempted access from expired key.")
 
 	k.FireEvent(EventKeyExpired, EventKeyFailureMeta{
-		EventMetaDefault: model.EventMetaDefault{Message: "Attempted access from expired key.", OriginatingRequest: event.EncodeRequestToEvent(r)},
+		EventMetaDefault: EventMetaDefault{Message: "Attempted access from expired key.", OriginatingRequest: event.EncodeRequestToEvent(r)},
 		Path:             r.URL.Path,
 		Origin:           request.RealIP(r),
 		Key:              token,

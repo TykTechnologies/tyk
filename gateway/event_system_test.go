@@ -6,8 +6,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/TykTechnologies/tyk/internal/model"
-
 	"github.com/sirupsen/logrus"
 
 	"github.com/TykTechnologies/tyk/apidef"
@@ -132,7 +130,7 @@ func TestLogMessageEventHandler(t *testing.T) {
 	em := config.EventMessage{
 		Type: EventAuthFailure,
 		Meta: EventKeyFailureMeta{
-			EventMetaDefault: model.EventMetaDefault{Message: "Auth Failure"},
+			EventMetaDefault: EventMetaDefault{Message: "Auth Failure"},
 			Path:             "/",
 			Origin:           "127.0.0.1",
 			Key:              "abc",

@@ -13,7 +13,6 @@ import (
 	"time"
 
 	"github.com/TykTechnologies/tyk/internal/httputil"
-	"github.com/TykTechnologies/tyk/internal/model"
 
 	"github.com/gocraft/health"
 	"github.com/justinas/alice"
@@ -524,7 +523,7 @@ func (t *BaseMiddleware) emitRateLimitEvent(r *http.Request, e event.Event, mess
 	t.Logger().WithField("key", t.Gw.obfuscateKey(rateLimitKey)).Info(message)
 
 	t.FireEvent(e, EventKeyFailureMeta{
-		EventMetaDefault: model.EventMetaDefault{
+		EventMetaDefault: EventMetaDefault{
 			Message:            message,
 			OriginatingRequest: event.EncodeRequestToEvent(r),
 		},

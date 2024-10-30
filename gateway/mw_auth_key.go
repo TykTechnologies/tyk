@@ -8,7 +8,6 @@ import (
 
 	"github.com/TykTechnologies/tyk/ctx"
 	"github.com/TykTechnologies/tyk/internal/event"
-	"github.com/TykTechnologies/tyk/internal/model"
 
 	"github.com/TykTechnologies/tyk/internal/crypto"
 	"github.com/TykTechnologies/tyk/internal/otel"
@@ -271,7 +270,7 @@ func stripBearer(token string) string {
 // TODO: move this method to base middleware?
 func AuthFailed(m TykMiddleware, r *http.Request, token string) {
 	m.Base().FireEvent(EventAuthFailure, EventKeyFailureMeta{
-		EventMetaDefault: model.EventMetaDefault{Message: "Auth Failure", OriginatingRequest: event.EncodeRequestToEvent(r)},
+		EventMetaDefault: EventMetaDefault{Message: "Auth Failure", OriginatingRequest: event.EncodeRequestToEvent(r)},
 		Path:             r.URL.Path,
 		Origin:           request.RealIP(r),
 		Key:              token,

@@ -18,7 +18,6 @@ import (
 	"crypto/x509"
 	"errors"
 	"fmt"
-	"github.com/TykTechnologies/tyk/ctx"
 	"io"
 	"io/ioutil"
 	"net"
@@ -29,6 +28,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/TykTechnologies/tyk/ctx"
 
 	"github.com/akutz/memconn"
 	"github.com/gorilla/websocket"

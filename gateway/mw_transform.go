@@ -4,10 +4,11 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"github.com/TykTechnologies/tyk/ctx"
 	"io"
 	"io/ioutil"
 	"net/http"
+
+	"github.com/TykTechnologies/tyk/ctx"
 
 	"github.com/clbanning/mxj"
 	"golang.org/x/net/html/charset"

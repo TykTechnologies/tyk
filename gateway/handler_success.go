@@ -3,14 +3,15 @@ package gateway
 import (
 	"bytes"
 	"encoding/base64"
-	"github.com/TykTechnologies/tyk/ctx"
-	"github.com/TykTechnologies/tyk/internal/httputil"
 	"io"
 	"io/ioutil"
 	"net/http"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/TykTechnologies/tyk/ctx"
+	"github.com/TykTechnologies/tyk/internal/httputil"
 
 	graphqlinternal "github.com/TykTechnologies/tyk/internal/graphql"
 
