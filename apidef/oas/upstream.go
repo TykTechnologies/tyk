@@ -706,6 +706,7 @@ func (c *ClientCredentials) Fill(api apidef.ClientCredentials) {
 	c.ClientSecret = api.ClientSecret
 	c.TokenURL = api.TokenURL
 	c.Scopes = api.Scopes
+	c.ExtraMetadata = api.ExtraMetadata
 
 	if c.Header == nil {
 		c.Header = &AuthSource{}
@@ -717,10 +718,13 @@ func (c *ClientCredentials) Fill(api apidef.ClientCredentials) {
 }
 
 func (p *PasswordAuthentication) Fill(api apidef.PasswordAuthentication) {
+	p.ClientID = api.ClientID
+	p.ClientSecret = api.ClientSecret
 	p.Username = api.Username
 	p.Password = api.Password
 	p.TokenURL = api.TokenURL
 	p.Scopes = api.Scopes
+	p.ExtraMetadata = api.ExtraMetadata
 	if p.Header == nil {
 		p.Header = &AuthSource{}
 	}
@@ -732,6 +736,7 @@ func (p *PasswordAuthentication) Fill(api apidef.PasswordAuthentication) {
 
 func (u *UpstreamOAuth) Fill(api apidef.UpstreamOAuth) {
 	u.Enabled = api.Enabled
+	u.AllowedAuthorizeTypes = api.AllowedAuthorizeTypes
 
 	if u.ClientCredentials == nil {
 		u.ClientCredentials = &ClientCredentials{}
@@ -755,6 +760,7 @@ func (c *ClientCredentials) ExtractTo(api *apidef.ClientCredentials) {
 	api.ClientSecret = c.ClientSecret
 	api.TokenURL = c.TokenURL
 	api.Scopes = c.Scopes
+	api.ExtraMetadata = c.ExtraMetadata
 
 	if c.Header == nil {
 		c.Header = &AuthSource{}
@@ -766,15 +772,18 @@ func (c *ClientCredentials) ExtractTo(api *apidef.ClientCredentials) {
 }
 
 func (p *PasswordAuthentication) ExtractTo(api *apidef.PasswordAuthentication) {
+	api.ClientID = p.ClientID
+	api.ClientSecret = p.ClientSecret
 	api.Username = p.Username
 	api.Password = p.Password
 	api.TokenURL = p.TokenURL
 	api.Scopes = p.Scopes
+	api.ExtraMetadata = p.ExtraMetadata
 }
 
 func (u *UpstreamOAuth) ExtractTo(api *apidef.UpstreamOAuth) {
 	api.Enabled = u.Enabled
-
+	api.AllowedAuthorizeTypes = u.AllowedAuthorizeTypes
 	if u.ClientCredentials == nil {
 		u.ClientCredentials = &ClientCredentials{}
 		defer func() {

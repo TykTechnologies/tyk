@@ -312,12 +312,9 @@ func TestOAS_ExtractTo_ResetAPIDefinition(t *testing.T) {
 		"APIDefinition.AnalyticsPlugin.Enabled",
 		"APIDefinition.AnalyticsPlugin.PluginPath",
 		"APIDefinition.AnalyticsPlugin.FuncName",
-		"APIDefinition.UpstreamAuth.OAuth.AllowedAuthorizeTypes[0]",
 		"APIDefinition.UpstreamAuth.OAuth.ClientCredentials.Enabled",
-		"APIDefinition.UpstreamAuth.OAuth.ClientCredentials.ExtraMetadata[0]",
 		"APIDefinition.UpstreamAuth.OAuth.PasswordAuthentication.Header.Enabled",
 		"APIDefinition.UpstreamAuth.OAuth.PasswordAuthentication.Header.Name",
-		"APIDefinition.UpstreamAuth.OAuth.PasswordAuthentication.ExtraMetadata[0]",
 	}
 
 	assert.Equal(t, expectedFields, noOASSupportFields)

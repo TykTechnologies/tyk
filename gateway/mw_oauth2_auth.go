@@ -21,10 +21,8 @@ import (
 )
 
 const (
-	UpstreamOAuthErrorEventName    = "UpstreamOAuthError"
-	UpstreamOAuthMiddlewareName    = "UpstreamOAuth"
-	ClientCredentialsAuthorizeType = "clientCredentials"
-	PasswordAuthorizeType          = "password"
+	UpstreamOAuthErrorEventName = "UpstreamOAuthError"
+	UpstreamOAuthMiddlewareName = "UpstreamOAuth"
 )
 
 type OAuthHeaderProvider interface {
@@ -168,11 +166,13 @@ func getOAuthHeaderProvider(oauthConfig apidef.UpstreamOAuth) (OAuthHeaderProvid
 	}
 
 	switch {
+	case len(oauthConfig.AllowedAuthorizeTypes) == 0:
+		return nil, fmt.Errorf("no OAuth configuration selected")
 	case len(oauthConfig.AllowedAuthorizeTypes) > 1:
 		return nil, fmt.Errorf("both client credentials and password authentication are provided")
-	case oauthConfig.AllowedAuthorizeTypes[0] == ClientCredentialsAuthorizeType:
+	case oauthConfig.AllowedAuthorizeTypes[0] == apidef.OAuthAuthorizationTypeClientCredentials:
 		return &ClientCredentialsOAuthProvider{}, nil
-	case oauthConfig.AllowedAuthorizeTypes[0] == PasswordAuthorizeType:
+	case oauthConfig.AllowedAuthorizeTypes[0] == apidef.OAuthAuthorizationTypePassword:
 		return &PasswordOAuthProvider{}, nil
 	default:
 		return nil, fmt.Errorf("no valid OAuth configuration provided")
