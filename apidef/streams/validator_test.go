@@ -49,8 +49,8 @@ func TestValidateTykStreamsOASObject(t *testing.T) {
 		Streams: map[string]interface{}{},
 	}
 
-	validOASObject.Extensions[oas.ExtensionTykStreaming] = &validXTykAPIStreaming
-	validOASObject.Extensions[oas.ExtensionTykAPIGateway] = &validXTykApiGateway
+	validOASObject.SetTykExtension(&validXTykApiGateway)
+	validOASObject.SetTykStreamingExtension(&validXTykAPIStreaming)
 
 	validOAS3Definition, _ := validOASObject.MarshalJSON()
 
