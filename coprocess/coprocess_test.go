@@ -62,7 +62,7 @@ func TestCoProcessDispatchEvent(t *testing.T) {
 	baseMid := gateway.BaseMiddleware{Spec: spec, Proxy: proxy, Gw: ts.Gw}
 
 	meta := gateway.EventKeyFailureMeta{
-		EventMetaDefault: EventMetaDefault{Message: "Auth Failure"},
+		EventMetaDefault: gateway.EventMetaDefault{Message: "Auth Failure"},
 		Path:             "/",
 		Origin:           "127.0.0.1",
 		Key:              "abc",
