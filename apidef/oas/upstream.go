@@ -655,7 +655,7 @@ type UpstreamOAuth struct {
 	// ClientCredentials holds the configuration for OAuth2 Client Credentials flow.
 	ClientCredentials *ClientCredentials `bson:"clientCredentials,omitempty" json:"clientCredentials,omitempty"`
 	// PasswordAuthentication holds the configuration for upstream OAauth password authentication flow.
-	PasswordAuthentication *PasswordAuthentication `bson:"passwordAuthentication,omitempty" json:"passwordAuthentication,omitempty"`
+	PasswordAuthentication *PasswordAuthentication `bson:"password,omitempty" json:"password,omitempty"`
 }
 
 // PasswordAuthentication holds the configuration for upstream OAuth2 password authentication flow.
@@ -779,6 +779,14 @@ func (p *PasswordAuthentication) ExtractTo(api *apidef.PasswordAuthentication) {
 	api.TokenURL = p.TokenURL
 	api.Scopes = p.Scopes
 	api.ExtraMetadata = p.ExtraMetadata
+
+	if p.Header == nil {
+		p.Header = &AuthSource{}
+		defer func() {
+			p.Header = nil
+		}()
+	}
+	p.Header.ExtractTo(&api.Header.Enabled, &api.Header.Name)
 }
 
 func (u *UpstreamOAuth) ExtractTo(api *apidef.UpstreamOAuth) {
