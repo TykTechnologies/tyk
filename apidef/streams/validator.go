@@ -4,11 +4,12 @@ import (
 	"embed"
 	"errors"
 	"fmt"
-	"github.com/TykTechnologies/tyk/apidef/oas"
 	"path/filepath"
 	"sort"
 	"strings"
 	"sync"
+
+	"github.com/TykTechnologies/tyk/apidef/oas"
 
 	"github.com/buger/jsonparser"
 	"github.com/hashicorp/go-multierror"
