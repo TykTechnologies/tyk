@@ -23,7 +23,7 @@ var (
 	// how is type safety avoided: exhibit A, old school generics
 	setCtxValue = func(h *http.Request, key, value any) {
 		ctxvalue := httpctx.NewValue[any](key)
-		ctxvalue.Set(h, value)
+		h = ctxvalue.Set(h, value)
 	}
 
 	EncodeRequestToEvent = event.EncodeRequestToEvent

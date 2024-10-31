@@ -15,14 +15,14 @@ func NewValue[T any](key any) *Value[T] {
 
 func (v *Value[T]) Get(r *http.Request) (res T) {
 	if val := r.Context().Value(v.Key); val != nil {
-		if typedVal, ok := val.(T); ok {
-			res = typedVal
-		}
+		res, _ = val.(T)
 	}
 	return
 }
 
 func (v *Value[T]) Set(r *http.Request, val T) *http.Request {
 	ctx := context.WithValue(r.Context(), v.Key, val)
-	return r.WithContext(ctx)
+	h := r.WithContext(ctx)
+	*r = *h
+	return h
 }
