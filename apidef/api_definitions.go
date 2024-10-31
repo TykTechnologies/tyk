@@ -817,7 +817,7 @@ type UpstreamOAuth struct {
 	// ClientCredentials holds the client credentials for upstream OAuth2 authentication.
 	ClientCredentials ClientCredentials `bson:"client_credentials" json:"client_credentials"`
 	// PasswordAuthentication holds the configuration for upstream OAauth password authentication flow.
-	PasswordAuthentication PasswordAuthentication `bson:"password_authentication,omitempty" json:"passwordAuthentication,omitempty"`
+	PasswordAuthentication PasswordAuthentication `bson:"password,omitempty" json:"password,omitempty"`
 }
 
 // PasswordAuthentication holds the configuration for upstream OAuth2 password authentication flow.
@@ -854,8 +854,6 @@ type ClientCredentials struct {
 	ClientAuthData
 	// Header holds the configuration for the custom header to be used for OAuth authentication.
 	Header AuthSource `bson:"header" json:"header"`
-	// Enabled activates upstream OAuth2 client credentials authentication.
-	Enabled bool `bson:"enabled" json:"enabled"`
 	// TokenURL is the resource server's token endpoint
 	// URL. This is a constant specific to each server.
 	TokenURL string `bson:"token_url" json:"token_url"`
