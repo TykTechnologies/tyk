@@ -495,6 +495,9 @@ func (h *HMAC) ExtractTo(api *apidef.APIDefinition) {
 }
 
 // OIDC contains configuration for the OIDC authentication mode.
+// OIDC support will be deprecated starting from 5.7.0.
+// To avoid any disruptions, we recommend that you use JSON Web Token (JWT) instead,
+// as explained in https://tyk.io/docs/basic-config-and-security/security/authentication-authorization/openid-connect/.
 type OIDC struct {
 	// Enabled activates the OIDC authentication mode.
 	//
