@@ -24,6 +24,7 @@ import (
 	"github.com/TykTechnologies/tyk/internal/cache"
 	"github.com/TykTechnologies/tyk/internal/event"
 	"github.com/TykTechnologies/tyk/internal/middleware"
+	"github.com/TykTechnologies/tyk/internal/model"
 	"github.com/TykTechnologies/tyk/internal/otel"
 	"github.com/TykTechnologies/tyk/internal/policy"
 	"github.com/TykTechnologies/tyk/request"
@@ -55,6 +56,7 @@ type TykMiddleware interface {
 	ProcessRequest(w http.ResponseWriter, r *http.Request, conf interface{}) (error, int) // Handles request
 	EnabledForSpec() bool
 	Name() string
+	Kind() model.MiddlewareKind
 
 	Unload()
 }
@@ -169,6 +171,14 @@ func (gw *Gateway) createMiddleware(actualMW TykMiddleware) func(http.Handler) h
 
 			err, errCode := mw.ProcessRequest(w, r, mwConf)
 
+			// TODO: Make configurable and read from middleware spec
+			multiAuth := true
+
+			if multiAuth && mw.Kind() == model.MiddlewareKindAuth {
+				err = nil
+				errCode = 0
+			}
+
 			if err != nil {
 				writeResponse := true
 				// Prevent double error write
@@ -269,6 +279,9 @@ func (t *BaseMiddleware) SetRequestLogger(r *http.Request) {
 func (t *BaseMiddleware) Init() {}
 func (t *BaseMiddleware) EnabledForSpec() bool {
 	return true
+}
+func (t *BaseMiddleware) Kind() model.MiddlewareKind {
+	return model.MiddlewareKindRequest
 }
 func (t *BaseMiddleware) Config() (interface{}, error) {
 	return nil, nil

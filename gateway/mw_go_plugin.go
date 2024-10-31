@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/TykTechnologies/tyk/apidef/oas"
+	"github.com/TykTechnologies/tyk/internal/model"
 
 	"github.com/TykTechnologies/tyk/ctx"
 
@@ -104,6 +105,11 @@ type GoPluginMiddleware struct {
 
 func (m *GoPluginMiddleware) Name() string {
 	return "GoPluginMiddleware: " + m.Path + ":" + m.SymbolName
+}
+
+// TODO: dynamically determine if it is auth or request mw
+func (m *GoPluginMiddleware) Kind() model.MiddlewareKind {
+	return model.MiddlewareKindRequest
 }
 
 func (m *GoPluginMiddleware) EnabledForSpec() bool {

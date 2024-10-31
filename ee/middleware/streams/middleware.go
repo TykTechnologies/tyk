@@ -57,6 +57,11 @@ func (s *Middleware) Name() string {
 	return "StreamingMiddleware"
 }
 
+// Name returns the name for the middleware.
+func (s *Middleware) Kind() model.MiddlewareKind {
+	return model.MiddlewareKindRequest
+}
+
 // EnabledForSpec checks if streaming is enabled on the config.
 func (s *Middleware) EnabledForSpec() bool {
 	s.Logger().Debug("Checking if streaming is enabled")

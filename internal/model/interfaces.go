@@ -19,6 +19,13 @@ type Gateway interface {
 	ReplaceTykVariables
 }
 
+type MiddlewareKind string
+
+const (
+	MiddlewareKindAuth    MiddlewareKind = "auth"
+	MiddlewareKindRequest MiddlewareKind = "request"
+)
+
 // Middleware is a subset of the gateway.Middleware interface, that can be
 // implemented outside of gateway scope.
 type Middleware interface {
@@ -27,6 +34,7 @@ type Middleware interface {
 	Logger() *logrus.Entry
 	ProcessRequest(w http.ResponseWriter, r *http.Request, conf interface{}) (error, int) // Handles request
 	EnabledForSpec() bool
+	Kind() MiddlewareKind
 }
 
 // LoggerProvider returns a new *logrus.Entry for the request.

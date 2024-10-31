@@ -24,6 +24,7 @@ import (
 	"github.com/TykTechnologies/tyk/user"
 
 	"github.com/TykTechnologies/tyk/internal/cache"
+	"github.com/TykTechnologies/tyk/internal/model"
 )
 
 type JWTMiddleware struct {
@@ -54,6 +55,10 @@ var (
 
 func (k *JWTMiddleware) Name() string {
 	return "JWTMiddleware"
+}
+
+func (k *JWTMiddleware) Kind() model.MiddlewareKind {
+	return model.MiddlewareKindAuth
 }
 
 func (k *JWTMiddleware) EnabledForSpec() bool {
