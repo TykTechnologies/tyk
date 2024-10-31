@@ -634,6 +634,9 @@ type OIDProviderConfig struct {
 	ClientIDs map[string]string `bson:"client_ids" json:"client_ids"`
 }
 
+// OpenID Connect middleware support will be deprecated starting from 5.7.0.
+// To avoid any disruptions, we recommend that you use JSON Web Token (JWT) instead,
+// as explained in https://tyk.io/docs/basic-config-and-security/security/authentication-authorization/openid-connect/.
 type OpenIDOptions struct {
 	Providers         []OIDProviderConfig `bson:"providers" json:"providers"`
 	SegregateByClient bool                `bson:"segregate_by_client" json:"segregate_by_client"`
