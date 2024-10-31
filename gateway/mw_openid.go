@@ -31,6 +31,10 @@ func (k *OpenIDMW) Name() string {
 }
 
 func (k *OpenIDMW) EnabledForSpec() bool {
+	if k.Spec.UseOpenID {
+		log.Warn("Support for OpenID Connect Middleware will be deprecated starting from 5.7.0. To avoid any disruptions, we recommend that you use JSON Web Token (JWT) instead, as explained in https://tyk.io/docs/basic-config-and-security/security/authentication-authorization/openid-connect/")
+	}
+
 	return k.Spec.UseOpenID
 }
 
