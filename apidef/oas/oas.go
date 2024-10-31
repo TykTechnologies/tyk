@@ -17,6 +17,9 @@ const (
 	// ExtensionTykAPIGateway is the OAS schema key for the Tyk extension.
 	ExtensionTykAPIGateway = "x-tyk-api-gateway"
 
+	// ExtensionTykStreaming is the OAS schema key for the Tyk Streams extension.
+	ExtensionTykStreaming = "x-tyk-streaming"
+
 	// Main holds the default version value (empty).
 	Main = ""
 
@@ -105,6 +108,51 @@ func (s *OAS) ExtractTo(api *apidef.APIDefinition) {
 	vInfo.UseExtendedPaths = true
 	s.extractPathsAndOperations(&vInfo.ExtendedPaths)
 	api.VersionData.Versions[Main] = vInfo
+}
+
+func (s *OAS) SetTykStreamingExtension(xTykStreaming *XTykStreaming) {
+	if s.Extensions == nil {
+		s.Extensions = make(map[string]interface{})
+	}
+
+	s.Extensions[ExtensionTykStreaming] = xTykStreaming
+}
+
+func (s *OAS) GetTykStreamingExtension() *XTykStreaming {
+	if s.Extensions == nil {
+		return nil
+	}
+
+	if ext := s.Extensions[ExtensionTykStreaming]; ext != nil {
+		rawTykStreaming, ok := ext.(json.RawMessage)
+		if ok {
+			var xTykStreaming XTykStreaming
+			_ = json.Unmarshal(rawTykStreaming, &xTykStreaming)
+			s.Extensions[ExtensionTykStreaming] = &xTykStreaming
+			return &xTykStreaming
+		}
+
+		mapTykAPIGateway, ok := ext.(map[string]interface{})
+		if ok {
+			var xTykStreaming XTykStreaming
+			dbByte, _ := json.Marshal(mapTykAPIGateway)
+			_ = json.Unmarshal(dbByte, &xTykStreaming)
+			s.Extensions[ExtensionTykStreaming] = &xTykStreaming
+			return &xTykStreaming
+		}
+
+		return ext.(*XTykStreaming)
+	}
+
+	return nil
+}
+
+func (s *OAS) RemoveTykStreamingExtension() {
+	if s.Extensions == nil {
+		return
+	}
+
+	delete(s.Extensions, ExtensionTykStreaming)
 }
 
 // SetTykExtension populates our OAS schema extension inside *OAS.
