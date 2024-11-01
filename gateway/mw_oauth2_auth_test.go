@@ -19,7 +19,13 @@ func TestUpstreamOauth2(t *testing.T) {
 	tst := StartTest(nil)
 	t.Cleanup(tst.Close)
 
+	var requestCount int
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		defer r.Body.Close()
+		if requestCount > 0 {
+			assert.Fail(t, "Unexpected request received.")
+		}
+		requestCount++
 		if r.URL.String() != "/token" {
 			assert.Fail(t, "authenticate client request URL = %q; want %q", r.URL, "/token")
 		}
@@ -90,6 +96,23 @@ func TestUpstreamOauth2(t *testing.T) {
 				return true
 			},
 		},
+		{
+			Path: "/upstream-oauth-distributed/",
+			Code: http.StatusOK,
+			BodyMatchFunc: func(body []byte) bool {
+				resp := struct {
+					Headers map[string]string `json:"headers"`
+				}{}
+				err := json.Unmarshal(body, &resp)
+				assert.NoError(t, err)
+
+				assert.Contains(t, resp.Headers, header.Authorization)
+				assert.NotEmpty(t, resp.Headers[header.Authorization])
+				assert.Equal(t, "Bearer 90d64460d14870c08c81352a05dedd3465940a7c", resp.Headers[header.Authorization])
+
+				return true
+			},
+		},
 	}...)
 
 }
@@ -98,8 +121,13 @@ func TestPasswordCredentialsTokenRequest(t *testing.T) {
 	tst := StartTest(nil)
 	t.Cleanup(tst.Close)
 
+	var requestCount int
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		defer r.Body.Close()
+		if requestCount > 0 {
+			assert.Fail(t, "Unexpected request received.")
+		}
+		requestCount++
 		expected := "/token"
 		if r.URL.String() != expected {
 			assert.Fail(t, "URL = %q; want %q", r.URL, expected)
@@ -157,6 +185,23 @@ func TestPasswordCredentialsTokenRequest(t *testing.T) {
 	)
 
 	_, _ = tst.Run(t, test.TestCases{
+		{
+			Path: "/upstream-oauth-password/",
+			Code: http.StatusOK,
+			BodyMatchFunc: func(body []byte) bool {
+				resp := struct {
+					Headers map[string]string `json:"headers"`
+				}{}
+				err := json.Unmarshal(body, &resp)
+				assert.NoError(t, err)
+
+				assert.Contains(t, resp.Headers, header.Authorization)
+				assert.NotEmpty(t, resp.Headers[header.Authorization])
+				assert.Equal(t, "Bearer 90d64460d14870c08c81352a05dedd3465940a7c", resp.Headers[header.Authorization])
+
+				return true
+			},
+		},
 		{
 			Path: "/upstream-oauth-password/",
 			Code: http.StatusOK,
