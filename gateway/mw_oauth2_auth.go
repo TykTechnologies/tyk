@@ -346,7 +346,7 @@ func unmarshalTokenData(tokenData string) (TokenData, error) {
 func buildMetadataMap(token *oauth2.Token, extraMetadataKeys []string) map[string]interface{} {
 	metadataMap := make(map[string]interface{})
 	for _, key := range extraMetadataKeys {
-		if val := token.Extra(key); val != "" {
+		if val := token.Extra(key); val != "" && val != nil {
 			metadataMap[key] = val
 		}
 	}
