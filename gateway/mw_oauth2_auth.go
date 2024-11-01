@@ -64,15 +64,13 @@ func (cache *upstreamOAuthPasswordCache) getToken(r *http.Request, OAuthSpec *Up
 	}
 
 	if tokenData != "" {
-		if tokenData != "" {
-			tokenContents, err := unmarshalTokenData(tokenData)
-			if err != nil {
-				return "", err
-			}
-			decryptedToken := decrypt(getPaddedSecret(OAuthSpec.Gw.GetConfig().Secret), tokenContents.Token)
-			setExtraMetadata(r, OAuthSpec.Spec.UpstreamAuth.OAuth.PasswordAuthentication.ExtraMetadata, tokenContents.ExtraMetadata)
-			return decryptedToken, nil
+		tokenContents, err := unmarshalTokenData(tokenData)
+		if err != nil {
+			return "", err
 		}
+		decryptedToken := decrypt(getPaddedSecret(OAuthSpec.Gw.GetConfig().Secret), tokenContents.Token)
+		setExtraMetadata(r, OAuthSpec.Spec.UpstreamAuth.OAuth.PasswordAuthentication.ExtraMetadata, tokenContents.ExtraMetadata)
+		return decryptedToken, nil
 	}
 
 	token, err := cache.obtainToken(r.Context(), OAuthSpec)
@@ -354,20 +352,6 @@ func buildMetadataMap(token *oauth2.Token, extraMetadataKeys []string) map[strin
 	}
 	return metadataMap
 }
-
-//func setExtraMetadata(r *http.Request, keyList []string, token *oauth2.Token) {
-//	contextDataObject := ctxGetData(r)
-//	if contextDataObject == nil {
-//		contextDataObject = make(map[string]interface{})
-//	}
-//	for _, key := range keyList {
-//		val := token.Extra(key)
-//		if val != "" {
-//			contextDataObject[key] = val
-//		}
-//	}
-//	ctxSetData(r, contextDataObject)
-//}
 
 func setExtraMetadata(r *http.Request, keyList []string, token map[string]interface{}) {
 	contextDataObject := ctxGetData(r)
