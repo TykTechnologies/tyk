@@ -106,9 +106,8 @@ func TestDefaultStreamAnalyticsFactory_CreateRecorder(t *testing.T) {
 				factory := NewStreamAnalyticsFactory(nil, nil, spec)
 				recorder := factory.CreateRecorder(req)
 
-				defaultRecorder, ok := recorder.(*DefaultStreamAnalyticsRecorder)
+				_, ok := recorder.(*DefaultStreamAnalyticsRecorder)
 				assert.True(t, ok)
-				assert.Equal(t, tc.expectedDetailedRecording, defaultRecorder.Detailed)
 			})
 		}
 	})
@@ -150,17 +149,18 @@ func TestDefaultStreamAnalyticsFactory_CreateRecorder(t *testing.T) {
 	})
 }
 
-func TestDefaultStreamAnalyticsRecorder_CreateRecord(t *testing.T) {
-	t.Run("should create non-detailed record", func(t *testing.T) {
+func TestDefaultStreamAnalyticsRecorder_PrepareRecord(t *testing.T) {
+	t.Run("should prepare non-detailed record", func(t *testing.T) {
 		req, err := http.NewRequest(http.MethodPost, "http://localhost:8080/path", nil)
 		require.NoError(t, err)
 
-		recorder := NewDefaultStreamAnalyticsRecorder(nil, &APISpec{APIDefinition: &apidef.APIDefinition{}}, false)
-		record := recorder.CreateRecord(req)
+		recorder := NewDefaultStreamAnalyticsRecorder(nil, &APISpec{APIDefinition: &apidef.APIDefinition{}})
+		recorder.PrepareRecord(req)
 
-		assert.Equal(t, "localhost:8080", record.Host)
-		assert.Equal(t, "/path", record.Path)
-		assert.Equal(t, http.MethodPost, record.Method)
+		assert.NotNil(t, recorder.respCopy)
+		assert.NotNil(t, recorder.reqCopy)
+		assert.Equal(t, "/path", recorder.reqCopy.URL.Path)
+		assert.Equal(t, http.MethodPost, recorder.reqCopy.Method)
 	})
 }
 
@@ -278,16 +278,16 @@ type testStreamAnalyticsRecorder struct {
 	actualRecord *analytics.AnalyticsRecord
 }
 
-func (t *testStreamAnalyticsRecorder) CreateRecord(r *http.Request) *analytics.AnalyticsRecord {
+func (t *testStreamAnalyticsRecorder) PrepareRecord(r *http.Request) {
 	t.actualRecord = &analytics.AnalyticsRecord{
 		Method: r.Method,
 		Host:   r.Host,
 		Path:   r.URL.Path,
 	}
-	return t.actualRecord
+	return
 }
 
-func (t *testStreamAnalyticsRecorder) RecordHit(record *analytics.AnalyticsRecord, statusCode int) error {
+func (t *testStreamAnalyticsRecorder) RecordHit(statusCode int, latency analytics.Latency) error {
 	t.actualRecord.ResponseCode = statusCode
 	return nil
 }

@@ -27,16 +27,15 @@ func (n *NoopStreamAnalyticsFactory) CreateResponseWriter(w http.ResponseWriter,
 }
 
 type StreamAnalyticsRecorder interface {
-	CreateRecord(r *http.Request) *analytics.AnalyticsRecord
-	RecordHit(record *analytics.AnalyticsRecord, statusCode int) error
+	PrepareRecord(r *http.Request)
+	RecordHit(statusCode int, latency analytics.Latency) error
 }
 
 type NoopStreamAnalyticsRecorder struct{}
 
-func (n *NoopStreamAnalyticsRecorder) CreateRecord(r *http.Request) *analytics.AnalyticsRecord {
-	return &analytics.AnalyticsRecord{}
+func (n *NoopStreamAnalyticsRecorder) PrepareRecord(r *http.Request) {
 }
 
-func (n *NoopStreamAnalyticsRecorder) RecordHit(record *analytics.AnalyticsRecord, statusCode int) error {
+func (n *NoopStreamAnalyticsRecorder) RecordHit(statusCode int, latency analytics.Latency) error {
 	return nil
 }

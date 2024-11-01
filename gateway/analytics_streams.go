@@ -4,8 +4,10 @@ package gateway
 
 import (
 	"bufio"
+	"io"
 	"net"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -14,8 +16,6 @@ import (
 	"github.com/TykTechnologies/tyk-pump/analytics"
 
 	"github.com/TykTechnologies/tyk/ee/middleware/streams"
-	"github.com/TykTechnologies/tyk/header"
-	"github.com/TykTechnologies/tyk/request"
 )
 
 type DefaultStreamAnalyticsFactory struct {
@@ -42,7 +42,7 @@ func (d *DefaultStreamAnalyticsFactory) CreateRecorder(r *http.Request) streams.
 		return NewWebSocketStreamAnalyticsRecorder(d.Gw, d.Spec, detailed)
 	}
 
-	return NewDefaultStreamAnalyticsRecorder(d.Gw, d.Spec, detailed)
+	return NewDefaultStreamAnalyticsRecorder(d.Gw, d.Spec)
 }
 
 func (d *DefaultStreamAnalyticsFactory) CreateResponseWriter(w http.ResponseWriter, r *http.Request, streamID string, recorder streams.StreamAnalyticsRecorder) http.ResponseWriter {
@@ -52,81 +52,41 @@ func (d *DefaultStreamAnalyticsFactory) CreateResponseWriter(w http.ResponseWrit
 type DefaultStreamAnalyticsRecorder struct {
 	Gw       *Gateway
 	Spec     *APISpec
-	Detailed bool
+	reqCopy  *http.Request
+	respCopy *http.Response
 }
 
-func NewDefaultStreamAnalyticsRecorder(gw *Gateway, spec *APISpec, detailed bool) *DefaultStreamAnalyticsRecorder {
+func NewDefaultStreamAnalyticsRecorder(gw *Gateway, spec *APISpec) *DefaultStreamAnalyticsRecorder {
 	return &DefaultStreamAnalyticsRecorder{
-		Gw:       gw,
-		Spec:     spec,
-		Detailed: detailed,
+		Gw:   gw,
+		Spec: spec,
 	}
 }
 
-func (s *DefaultStreamAnalyticsRecorder) CreateRecord(r *http.Request) *analytics.AnalyticsRecord {
-	// Preparation for analytics record
-	alias := ""
-	oauthClientID := ""
-	session := ctxGetSession(r)
-	tags := make([]string, 0, estimateTagsCapacity(session, s.Spec))
-
-	if session != nil {
-		oauthClientID = session.OauthClientID
-		alias = session.Alias
-		tags = append(tags, getSessionTags(session)...)
+func (s *DefaultStreamAnalyticsRecorder) PrepareRecord(r *http.Request) {
+	s.reqCopy = r.Clone(r.Context())
+	s.respCopy = &http.Response{
+		StatusCode: 200,
+		Header:     make(http.Header),
 	}
 
-	if len(s.Spec.TagHeaders) > 0 {
-		tags = tagHeaders(r, s.Spec.TagHeaders, tags)
-	}
-
-	if len(s.Spec.Tags) > 0 {
-		tags = append(tags, s.Spec.Tags...)
-	}
-
-	trackEP := false
-	trackedPath := r.URL.Path
-
-	if p := ctxGetTrackedPath(r); p != "" {
-		trackEP = true
-		trackedPath = p
-	}
-
-	// Create record for started stream
-	t := time.Now()
-	return &analytics.AnalyticsRecord{
-		Method:        r.Method,
-		Host:          r.URL.Host,
-		Path:          trackedPath,
-		RawPath:       r.URL.Path,
-		ContentLength: r.ContentLength,
-		UserAgent:     r.Header.Get(header.UserAgent),
-		Day:           t.Day(),
-		Month:         t.Month(),
-		Year:          t.Year(),
-		Hour:          t.Hour(),
-		ResponseCode:  http.StatusSwitchingProtocols,
-		APIKey:        ctxGetAuthToken(r),
-		TimeStamp:     t,
-		APIVersion:    s.Spec.getVersionFromRequest(r),
-		APIName:       s.Spec.Name,
-		APIID:         s.Spec.APIID,
-		OrgID:         s.Spec.OrgID,
-		OauthID:       oauthClientID,
-		RequestTime:   0,
-		Latency:       analytics.Latency{},
-		IPAddress:     request.RealIP(r),
-		Geo:           analytics.GeoData{},
-		Network:       analytics.NetworkStats{},
-		Tags:          tags,
-		Alias:         alias,
-		TrackPath:     trackEP,
-		ExpireAt:      t,
-	}
+	s.respCopy.Header.Set("Content-Length", strconv.FormatInt(0, 10))
+	s.respCopy.Body = io.NopCloser(strings.NewReader(""))
+	s.respCopy.ContentLength = 0
 }
 
-func (s *DefaultStreamAnalyticsRecorder) RecordHit(record *analytics.AnalyticsRecord, statusCode int) error {
-	return streamRecordHit(s.Gw, record, statusCode)
+func (s *DefaultStreamAnalyticsRecorder) RecordHit(statusCode int, latency analytics.Latency) error {
+	s.respCopy.StatusCode = statusCode
+
+	handler := SuccessHandler{
+		&BaseMiddleware{
+			Spec: s.Spec,
+			Gw:   s.Gw,
+		},
+	}
+
+	handler.RecordHit(s.reqCopy, latency, statusCode, s.respCopy, false)
+	return nil
 }
 
 type WebSocketStreamAnalyticsRecorder struct {
@@ -141,16 +101,16 @@ func NewWebSocketStreamAnalyticsRecorder(gw *Gateway, spec *APISpec, detailed bo
 		Gw:                            gw,
 		Spec:                          spec,
 		Detailed:                      detailed,
-		simpleStreamAnalyticsRecorder: NewDefaultStreamAnalyticsRecorder(gw, spec, detailed),
+		simpleStreamAnalyticsRecorder: NewDefaultStreamAnalyticsRecorder(gw, spec),
 	}
 }
 
-func (d *WebSocketStreamAnalyticsRecorder) CreateRecord(r *http.Request) *analytics.AnalyticsRecord {
-	return d.simpleStreamAnalyticsRecorder.CreateRecord(r)
+func (d *WebSocketStreamAnalyticsRecorder) PrepareRecord(r *http.Request) {
+	d.simpleStreamAnalyticsRecorder.PrepareRecord(r)
 }
 
-func (d *WebSocketStreamAnalyticsRecorder) RecordHit(record *analytics.AnalyticsRecord, statusCode int) error {
-	return d.simpleStreamAnalyticsRecorder.RecordHit(record, statusCode)
+func (d *WebSocketStreamAnalyticsRecorder) RecordHit(statusCode int, latency analytics.Latency) error {
+	return d.simpleStreamAnalyticsRecorder.RecordHit(statusCode, latency)
 }
 
 type StreamAnalyticsResponseWriter struct {
@@ -182,13 +142,20 @@ func (s *StreamAnalyticsResponseWriter) Header() http.Header {
 }
 
 func (s *StreamAnalyticsResponseWriter) Write(bytes []byte) (int, error) {
+	now := time.Now()
 	n, err := s.w.Write(bytes)
 	if err != nil {
 		return n, err
 	}
 
-	record := s.recorder.CreateRecord(s.r)
-	recorderErr := s.recorder.RecordHit(record, s.writtenStatusCode)
+	totalMillisecond := DurationToMillisecond(time.Since(now))
+	latency := analytics.Latency{
+		Total:    int64(totalMillisecond),
+		Upstream: int64(totalMillisecond),
+	}
+
+	s.recorder.PrepareRecord(s.r)
+	recorderErr := s.recorder.RecordHit(s.writtenStatusCode, latency)
 	if recorderErr != nil {
 		s.logger.Errorf("Failed to record analytics for stream on path '%s %s', %v", s.r.Method, s.r.URL.Path, recorderErr)
 	}
@@ -206,8 +173,8 @@ func (s *StreamAnalyticsResponseWriter) Hijack() (net.Conn, *bufio.ReadWriter, e
 		return nil, nil, streams.ErrResponseWriterNotHijackable
 	}
 
-	record := s.recorder.CreateRecord(s.r)
-	recorderErr := s.recorder.RecordHit(record, http.StatusSwitchingProtocols)
+	s.recorder.PrepareRecord(s.r)
+	recorderErr := s.recorder.RecordHit(http.StatusSwitchingProtocols, analytics.Latency{})
 	if recorderErr != nil {
 		s.logger.Errorf("Failed to record analytics for connection upgrade on path 'UPGRADE %s', %v", s.r.URL.Path, recorderErr)
 	}
@@ -219,11 +186,6 @@ func (s *StreamAnalyticsResponseWriter) Flush() {
 	if flusher, ok := s.w.(http.Flusher); ok {
 		flusher.Flush()
 	}
-}
-
-func streamRecordHit(gw *Gateway, record *analytics.AnalyticsRecord, statusCode int) error {
-	record.ResponseCode = statusCode
-	return gw.Analytics.RecordHit(record)
 }
 
 func isWebsocketUpgrade(r *http.Request) bool {
