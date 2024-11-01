@@ -2,12 +2,13 @@ package gateway
 
 import (
 	"encoding/json"
-	"golang.org/x/oauth2"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 	"time"
+
+	"golang.org/x/oauth2"
 
 	"github.com/stretchr/testify/assert"
 
