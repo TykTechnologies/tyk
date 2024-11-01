@@ -128,14 +128,15 @@ const (
 
 var (
 	// Deprecated: Use ErrClassicAPIExpected instead.
-	ErrAPIMigrated                = errors.New("the supplied API definition is in Tyk classic format, please use OAS format for this API")
-	ErrClassicAPIExpected         = errors.New("this API endpoint only supports Tyk Classic APIs; please use the appropriate Tyk OAS API endpoint")
-	ErrAPINotMigrated             = errors.New("the supplied API definition is in OAS format, please use the Tyk classic format for this API")
-	ErrOASGetForOldAPI            = errors.New("the requested API definition is in Tyk classic format, please use old api endpoint")
-	ErrImportWithTykExtension     = errors.New("the import payload should not contain x-tyk-api-gateway")
-	ErrPayloadWithoutTykExtension = errors.New("the payload should contain x-tyk-api-gateway")
-	ErrAPINotFound                = errors.New("API not found")
-	ErrMissingAPIID               = errors.New("missing API ID")
+	ErrAPIMigrated                         = errors.New("the supplied API definition is in Tyk classic format, please use OAS format for this API")
+	ErrClassicAPIExpected                  = errors.New("this API endpoint only supports Tyk Classic APIs; please use the appropriate Tyk OAS API endpoint")
+	ErrAPINotMigrated                      = errors.New("the supplied API definition is in OAS format, please use the Tyk classic format for this API")
+	ErrOASGetForOldAPI                     = errors.New("the requested API definition is in Tyk classic format, please use old api endpoint")
+	ErrImportWithTykExtension              = errors.New("the import payload should not contain x-tyk-api-gateway")
+	ErrPayloadWithoutTykExtension          = errors.New("the payload should contain x-tyk-api-gateway")
+	ErrPayloadWithoutTykStreamingExtension = errors.New("the payload should contain x-tyk-streaming")
+	ErrAPINotFound                         = errors.New("API not found")
+	ErrMissingAPIID                        = errors.New("missing API ID")
 )
 
 type EndpointMethodMeta struct {
@@ -633,6 +634,9 @@ type OIDProviderConfig struct {
 	ClientIDs map[string]string `bson:"client_ids" json:"client_ids"`
 }
 
+// OpenID Connect middleware support will be deprecated starting from 5.7.0.
+// To avoid any disruptions, we recommend that you use JSON Web Token (JWT) instead,
+// as explained in https://tyk.io/docs/basic-config-and-security/security/authentication-authorization/openid-connect/.
 type OpenIDOptions struct {
 	Providers         []OIDProviderConfig `bson:"providers" json:"providers"`
 	SegregateByClient bool                `bson:"segregate_by_client" json:"segregate_by_client"`
@@ -816,7 +820,7 @@ type UpstreamOAuth struct {
 	// ClientCredentials holds the client credentials for upstream OAuth2 authentication.
 	ClientCredentials ClientCredentials `bson:"client_credentials" json:"client_credentials"`
 	// PasswordAuthentication holds the configuration for upstream OAauth password authentication flow.
-	PasswordAuthentication PasswordAuthentication `bson:"password_authentication,omitempty" json:"passwordAuthentication,omitempty"`
+	PasswordAuthentication PasswordAuthentication `bson:"password,omitempty" json:"password,omitempty"`
 }
 
 // PasswordAuthentication holds the configuration for upstream OAuth2 password authentication flow.
@@ -853,8 +857,6 @@ type ClientCredentials struct {
 	ClientAuthData
 	// Header holds the configuration for the custom header to be used for OAuth authentication.
 	Header AuthSource `bson:"header" json:"header"`
-	// Enabled activates upstream OAuth2 client credentials authentication.
-	Enabled bool `bson:"enabled" json:"enabled"`
 	// TokenURL is the resource server's token endpoint
 	// URL. This is a constant specific to each server.
 	TokenURL string `bson:"token_url" json:"token_url"`
