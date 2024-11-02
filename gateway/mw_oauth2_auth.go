@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"strings"
@@ -57,13 +58,18 @@ type upstreamOAuthPasswordCache struct {
 func (cache *upstreamOAuthPasswordCache) getToken(r *http.Request, OAuthSpec *UpstreamOAuth) (string, error) {
 	cacheKey := generatePasswordOAuthCacheKey(OAuthSpec.Spec.UpstreamAuth.OAuth, OAuthSpec.Spec.APIID)
 
-	tokenString, err := retryGetKeyAndLock(cacheKey, &cache.RedisCluster)
+	tokenData, err := retryGetKeyAndLock(cacheKey, &cache.RedisCluster)
 	if err != nil {
 		return "", err
 	}
 
-	if tokenString != "" {
-		decryptedToken := decrypt(getPaddedSecret(OAuthSpec.Gw.GetConfig().Secret), tokenString)
+	if tokenData != "" {
+		tokenContents, err := unmarshalTokenData(tokenData)
+		if err != nil {
+			return "", err
+		}
+		decryptedToken := decrypt(getPaddedSecret(OAuthSpec.Gw.GetConfig().Secret), tokenContents.Token)
+		setExtraMetadata(r, OAuthSpec.Spec.UpstreamAuth.OAuth.PasswordAuthentication.ExtraMetadata, tokenContents.ExtraMetadata)
 		return decryptedToken, nil
 	}
 
@@ -73,10 +79,15 @@ func (cache *upstreamOAuthPasswordCache) getToken(r *http.Request, OAuthSpec *Up
 	}
 
 	encryptedToken := encrypt(getPaddedSecret(OAuthSpec.Gw.GetConfig().Secret), token.AccessToken)
-	setExtraMetadata(r, OAuthSpec.Spec.UpstreamAuth.OAuth.PasswordAuthentication.ExtraMetadata, token)
+	tokenDataBytes, err := createTokenDataBytes(encryptedToken, token, OAuthSpec.Spec.UpstreamAuth.OAuth.PasswordAuthentication.ExtraMetadata)
+	if err != nil {
+		return "", err
+	}
+	metadataMap := buildMetadataMap(token, OAuthSpec.Spec.UpstreamAuth.OAuth.PasswordAuthentication.ExtraMetadata)
+	setExtraMetadata(r, OAuthSpec.Spec.UpstreamAuth.OAuth.PasswordAuthentication.ExtraMetadata, metadataMap)
 
 	ttl := time.Until(token.Expiry)
-	if err := setTokenInCache(cacheKey, encryptedToken, ttl, &cache.RedisCluster); err != nil {
+	if err := setTokenInCache(cacheKey, string(tokenDataBytes), ttl, &cache.RedisCluster); err != nil {
 		return "", err
 	}
 
@@ -271,16 +282,26 @@ func generateClientCredentialsCacheKey(config apidef.UpstreamOAuth, apiId string
 	return hex.EncodeToString(hash.Sum(nil))
 }
 
+type TokenData struct {
+	Token         string                 `json:"token"`
+	ExtraMetadata map[string]interface{} `json:"extra_metadata"`
+}
+
 func (cache *upstreamOAuthClientCredentialsCache) getToken(r *http.Request, OAuthSpec *UpstreamOAuth) (string, error) {
 	cacheKey := generateClientCredentialsCacheKey(OAuthSpec.Spec.UpstreamAuth.OAuth, OAuthSpec.Spec.APIID)
 
-	tokenString, err := retryGetKeyAndLock(cacheKey, &cache.RedisCluster)
+	tokenData, err := retryGetKeyAndLock(cacheKey, &cache.RedisCluster)
 	if err != nil {
 		return "", err
 	}
 
-	if tokenString != "" {
-		decryptedToken := decrypt(getPaddedSecret(OAuthSpec.Gw.GetConfig().Secret), tokenString)
+	if tokenData != "" {
+		tokenContents, err := unmarshalTokenData(tokenData)
+		if err != nil {
+			return "", err
+		}
+		decryptedToken := decrypt(getPaddedSecret(OAuthSpec.Gw.GetConfig().Secret), tokenContents.Token)
+		setExtraMetadata(r, OAuthSpec.Spec.UpstreamAuth.OAuth.ClientCredentials.ExtraMetadata, tokenContents.ExtraMetadata)
 		return decryptedToken, nil
 	}
 
@@ -290,24 +311,55 @@ func (cache *upstreamOAuthClientCredentialsCache) getToken(r *http.Request, OAut
 	}
 
 	encryptedToken := encrypt(getPaddedSecret(OAuthSpec.Gw.GetConfig().Secret), token.AccessToken)
-	setExtraMetadata(r, OAuthSpec.Spec.UpstreamAuth.OAuth.ClientCredentials.ExtraMetadata, token)
+	tokenDataBytes, err := createTokenDataBytes(encryptedToken, token, OAuthSpec.Spec.UpstreamAuth.OAuth.ClientCredentials.ExtraMetadata)
+	if err != nil {
+		return "", err
+	}
+	metadataMap := buildMetadataMap(token, OAuthSpec.Spec.UpstreamAuth.OAuth.ClientCredentials.ExtraMetadata)
+	setExtraMetadata(r, OAuthSpec.Spec.UpstreamAuth.OAuth.ClientCredentials.ExtraMetadata, metadataMap)
 
 	ttl := time.Until(token.Expiry)
-	if err := setTokenInCache(cacheKey, encryptedToken, ttl, &cache.RedisCluster); err != nil {
+	if err := setTokenInCache(cacheKey, string(tokenDataBytes), ttl, &cache.RedisCluster); err != nil {
 		return "", err
 	}
 
 	return token.AccessToken, nil
 }
 
-func setExtraMetadata(r *http.Request, keyList []string, token *oauth2.Token) {
+func createTokenDataBytes(encryptedToken string, token *oauth2.Token, extraMetadataKeys []string) ([]byte, error) {
+	td := TokenData{
+		Token:         encryptedToken,
+		ExtraMetadata: buildMetadataMap(token, extraMetadataKeys),
+	}
+	return json.Marshal(td)
+}
+
+func unmarshalTokenData(tokenData string) (TokenData, error) {
+	var tokenContents TokenData
+	err := json.Unmarshal([]byte(tokenData), &tokenContents)
+	if err != nil {
+		return TokenData{}, fmt.Errorf("failed to unmarshal token data: %w", err)
+	}
+	return tokenContents, nil
+}
+
+func buildMetadataMap(token *oauth2.Token, extraMetadataKeys []string) map[string]interface{} {
+	metadataMap := make(map[string]interface{})
+	for _, key := range extraMetadataKeys {
+		if val := token.Extra(key); val != "" && val != nil {
+			metadataMap[key] = val
+		}
+	}
+	return metadataMap
+}
+
+func setExtraMetadata(r *http.Request, keyList []string, token map[string]interface{}) {
 	contextDataObject := ctxGetData(r)
 	if contextDataObject == nil {
 		contextDataObject = make(map[string]interface{})
 	}
 	for _, key := range keyList {
-		val := token.Extra(key)
-		if val != "" {
+		if val, ok := token[key]; ok && val != "" {
 			contextDataObject[key] = val
 		}
 	}
@@ -318,13 +370,13 @@ func retryGetKeyAndLock(cacheKey string, cache *storage.RedisCluster) (string, e
 	const maxRetries = 10
 	const retryDelay = 100 * time.Millisecond
 
-	var token string
+	var tokenData string
 	var err error
 
 	for i := 0; i < maxRetries; i++ {
-		token, err = cache.GetKey(cacheKey)
+		tokenData, err = cache.GetKey(cacheKey)
 		if err == nil {
-			return token, nil
+			return tokenData, nil
 		}
 
 		lockKey := cacheKey + ":lock"
