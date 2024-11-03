@@ -132,13 +132,13 @@ func retryGetKeyAndLock(cacheKey string, cache Storage) (string, error) {
 	const maxRetries = 10
 	const retryDelay = 100 * time.Millisecond
 
-	var token string
+	var tokenData string
 	var err error
 
 	for i := 0; i < maxRetries; i++ {
-		token, err = cache.GetKey(cacheKey)
+		tokenData, err = cache.GetKey(cacheKey)
 		if err == nil {
-			return token, nil
+			return tokenData, nil
 		}
 
 		lockKey := cacheKey + ":lock"
@@ -153,18 +153,17 @@ func retryGetKeyAndLock(cacheKey string, cache Storage) (string, error) {
 	return "", fmt.Errorf("failed to acquire lock after retries: %w", err)
 }
 
-func setExtraMetadata(r *http.Request, keyList []string, token *oauth2.Token) {
-	contextDataObject := ctxGetData(r)
+func SetExtraMetadata(r *http.Request, keyList []string, metadata map[string]interface{}) {
+	contextDataObject := CtxGetData(r)
 	if contextDataObject == nil {
 		contextDataObject = make(map[string]interface{})
 	}
 	for _, key := range keyList {
-		val := token.Extra(key)
-		if val != "" {
+		if val, ok := metadata[key]; ok && val != "" {
 			contextDataObject[key] = val
 		}
 	}
-	ctxSetData(r, contextDataObject)
+	CtxSetData(r, contextDataObject)
 }
 
 // EventUpstreamOAuthMeta is the metadata structure for an upstream OAuth event

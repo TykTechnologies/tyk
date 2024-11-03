@@ -2,6 +2,8 @@ package upstreamoauth
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 	"net/http"
 	"time"
 
@@ -18,13 +20,18 @@ type Cache interface {
 }
 
 func getToken(r *http.Request, cacheKey string, obtainTokenFunc func(context.Context) (*oauth2.Token, error), secret string, extraMetadata []string, cache Storage) (string, error) {
-	tokenString, err := retryGetKeyAndLock(cacheKey, cache)
+	tokenData, err := retryGetKeyAndLock(cacheKey, cache)
 	if err != nil {
 		return "", err
 	}
 
-	if tokenString != "" {
-		decryptedToken := crypto.Decrypt(crypto.GetPaddedString(secret), tokenString)
+	if tokenData != "" {
+		tokenContents, err := UnmarshalTokenData(tokenData)
+		if err != nil {
+			return "", err
+		}
+		decryptedToken := crypto.Decrypt(crypto.GetPaddedString(secret), tokenContents.Token)
+		SetExtraMetadata(r, extraMetadata, tokenContents.ExtraMetadata)
 		return decryptedToken, nil
 	}
 
@@ -34,10 +41,15 @@ func getToken(r *http.Request, cacheKey string, obtainTokenFunc func(context.Con
 	}
 
 	encryptedToken := crypto.Encrypt(crypto.GetPaddedString(secret), token.AccessToken)
-	setExtraMetadata(r, extraMetadata, token)
+	tokenDataBytes, err := CreateTokenDataBytes(encryptedToken, token, extraMetadata)
+	if err != nil {
+		return "", err
+	}
+	metadataMap := BuildMetadataMap(token, extraMetadata)
+	SetExtraMetadata(r, extraMetadata, metadataMap)
 
 	ttl := time.Until(token.Expiry)
-	if err := setTokenInCache(cache, cacheKey, encryptedToken, ttl); err != nil {
+	if err := setTokenInCache(cache, cacheKey, string(tokenDataBytes), ttl); err != nil {
 		return "", err
 	}
 
@@ -94,4 +106,31 @@ func (cache *PasswordClient) ObtainToken(ctx context.Context, OAuthSpec *Middlew
 	}
 
 	return token, nil
+}
+
+func CreateTokenDataBytes(encryptedToken string, token *oauth2.Token, extraMetadataKeys []string) ([]byte, error) {
+	td := TokenData{
+		Token:         encryptedToken,
+		ExtraMetadata: BuildMetadataMap(token, extraMetadataKeys),
+	}
+	return json.Marshal(td)
+}
+
+func UnmarshalTokenData(tokenData string) (TokenData, error) {
+	var tokenContents TokenData
+	err := json.Unmarshal([]byte(tokenData), &tokenContents)
+	if err != nil {
+		return TokenData{}, fmt.Errorf("failed to unmarshal token data: %w", err)
+	}
+	return tokenContents, nil
+}
+
+func BuildMetadataMap(token *oauth2.Token, extraMetadataKeys []string) map[string]interface{} {
+	metadataMap := make(map[string]interface{})
+	for _, key := range extraMetadataKeys {
+		if val := token.Extra(key); val != "" && val != nil {
+			metadataMap[key] = val
+		}
+	}
+	return metadataMap
 }

@@ -244,9 +244,9 @@ func TestSetExtraMetadata(t *testing.T) {
 		"key3": "value3",
 	}
 
-	setExtraMetadata(req, keyList, token)
+	upstreamoauth.SetExtraMetadata(req, keyList, token)
 
-	contextData := ctxGetData(req)
+	contextData := upstreamoauth.CtxGetData(req)
 
 	assert.Equal(t, "value1", contextData["key1"])
 	assert.Equal(t, "value2", contextData["key2"])
@@ -266,7 +266,7 @@ func TestBuildMetadataMap(t *testing.T) {
 	})
 	extraMetadataKeys := []string{"key1", "key2", "key3", "key4"}
 
-	metadataMap := buildMetadataMap(token, extraMetadataKeys)
+	metadataMap := upstreamoauth.BuildMetadataMap(token, extraMetadataKeys)
 
 	assert.Equal(t, "value1", metadataMap["key1"])
 	assert.Equal(t, "value2", metadataMap["key2"])
@@ -289,11 +289,11 @@ func TestCreateTokenDataBytes(t *testing.T) {
 	extraMetadataKeys := []string{"key1", "key2", "key3", "key4"}
 
 	encryptedToken := "encrypted_tyk_upstream_oauth_access_token"
-	tokenDataBytes, err := createTokenDataBytes(encryptedToken, token, extraMetadataKeys)
+	tokenDataBytes, err := upstreamoauth.CreateTokenDataBytes(encryptedToken, token, extraMetadataKeys)
 
 	assert.NoError(t, err)
 
-	var tokenData TokenData
+	var tokenData upstreamoauth.TokenData
 	err = json.Unmarshal(tokenDataBytes, &tokenData)
 	assert.NoError(t, err)
 
@@ -305,7 +305,7 @@ func TestCreateTokenDataBytes(t *testing.T) {
 }
 
 func TestUnmarshalTokenData(t *testing.T) {
-	tokenData := TokenData{
+	tokenData := upstreamoauth.TokenData{
 		Token: "tyk_upstream_oauth_access_token",
 		ExtraMetadata: map[string]interface{}{
 			"key1": "value1",
@@ -316,7 +316,7 @@ func TestUnmarshalTokenData(t *testing.T) {
 	tokenDataBytes, err := json.Marshal(tokenData)
 	assert.NoError(t, err)
 
-	result, err := unmarshalTokenData(string(tokenDataBytes))
+	result, err := upstreamoauth.UnmarshalTokenData(string(tokenDataBytes))
 
 	assert.NoError(t, err)
 

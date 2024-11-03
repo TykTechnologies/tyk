@@ -41,9 +41,14 @@ type PerAPIClientCredentialsOAuthProvider struct{}
 
 type PasswordOAuthProvider struct{}
 
+type TokenData struct {
+	Token         string                 `json:"token"`
+	ExtraMetadata map[string]interface{} `json:"extra_metadata"`
+}
+
 var (
 	ctxData = httpctx.NewValue[map[string]any](ctx.ContextData)
 
-	ctxGetData = ctxData.Get
-	ctxSetData = ctxData.Set
+	CtxGetData = ctxData.Get
+	CtxSetData = ctxData.Set
 )
