@@ -6,6 +6,9 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
+
+	"golang.org/x/oauth2"
 
 	"github.com/TykTechnologies/tyk/ee/middleware/upstreamoauth"
 	"github.com/TykTechnologies/tyk/gateway"
@@ -28,7 +31,13 @@ func TestProvider_ClientCredentialsAuthorizeType(t *testing.T) {
 	tst := StartTest(nil)
 	t.Cleanup(tst.Close)
 
+	var requestCount int
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		defer r.Body.Close()
+		if requestCount > 0 {
+			assert.Fail(t, "Unexpected request received.")
+		}
+		requestCount++
 		if r.URL.String() != "/token" {
 			assert.Fail(t, "authenticate client request URL = %q; want %q", r.URL, "/token")
 		}
@@ -99,6 +108,23 @@ func TestProvider_ClientCredentialsAuthorizeType(t *testing.T) {
 				return true
 			},
 		},
+		{
+			Path: "/upstream-oauth-distributed/",
+			Code: http.StatusOK,
+			BodyMatchFunc: func(body []byte) bool {
+				resp := struct {
+					Headers map[string]string `json:"headers"`
+				}{}
+				err := json.Unmarshal(body, &resp)
+				assert.NoError(t, err)
+
+				assert.Contains(t, resp.Headers, header.Authorization)
+				assert.NotEmpty(t, resp.Headers[header.Authorization])
+				assert.Equal(t, "Bearer 90d64460d14870c08c81352a05dedd3465940a7c", resp.Headers[header.Authorization])
+
+				return true
+			},
+		},
 	}...)
 
 }
@@ -107,8 +133,13 @@ func TestProvider_PasswordAuthorizeType(t *testing.T) {
 	tst := StartTest(nil)
 	t.Cleanup(tst.Close)
 
+	var requestCount int
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		defer r.Body.Close()
+		if requestCount > 0 {
+			assert.Fail(t, "Unexpected request received.")
+		}
+		requestCount++
 		expected := "/token"
 		if r.URL.String() != expected {
 			assert.Fail(t, "URL = %q; want %q", r.URL, expected)
@@ -183,5 +214,112 @@ func TestProvider_PasswordAuthorizeType(t *testing.T) {
 				return true
 			},
 		},
+		{
+			Path: "/upstream-oauth-password/",
+			Code: http.StatusOK,
+			BodyMatchFunc: func(body []byte) bool {
+				resp := struct {
+					Headers map[string]string `json:"headers"`
+				}{}
+				err := json.Unmarshal(body, &resp)
+				assert.NoError(t, err)
+
+				assert.Contains(t, resp.Headers, header.Authorization)
+				assert.NotEmpty(t, resp.Headers[header.Authorization])
+				assert.Equal(t, "Bearer 90d64460d14870c08c81352a05dedd3465940a7c", resp.Headers[header.Authorization])
+
+				return true
+			},
+		},
 	}...)
+}
+
+func TestSetExtraMetadata(t *testing.T) {
+	req := httptest.NewRequest(http.MethodGet, "http://tykxample.com", nil)
+
+	keyList := []string{"key1", "key2"}
+	token := map[string]interface{}{
+		"key1": "value1",
+		"key2": "value2",
+		"key3": "value3",
+	}
+
+	setExtraMetadata(req, keyList, token)
+
+	contextData := ctxGetData(req)
+
+	assert.Equal(t, "value1", contextData["key1"])
+	assert.Equal(t, "value2", contextData["key2"])
+	assert.NotContains(t, contextData, "key3")
+}
+
+func TestBuildMetadataMap(t *testing.T) {
+	token := &oauth2.Token{
+		AccessToken: "tyk_upstream_oauth_access_token",
+		TokenType:   "Bearer",
+		Expiry:      time.Now().Add(time.Hour),
+	}
+	token = token.WithExtra(map[string]interface{}{
+		"key1": "value1",
+		"key2": "value2",
+		"key3": "",
+	})
+	extraMetadataKeys := []string{"key1", "key2", "key3", "key4"}
+
+	metadataMap := buildMetadataMap(token, extraMetadataKeys)
+
+	assert.Equal(t, "value1", metadataMap["key1"])
+	assert.Equal(t, "value2", metadataMap["key2"])
+	assert.NotContains(t, metadataMap, "key3")
+	assert.NotContains(t, metadataMap, "key4")
+}
+
+func TestCreateTokenDataBytes(t *testing.T) {
+	token := &oauth2.Token{
+		AccessToken: "tyk_upstream_oauth_access_token",
+		TokenType:   "Bearer",
+		Expiry:      time.Now().Add(time.Hour),
+	}
+	token = token.WithExtra(map[string]interface{}{
+		"key1": "value1",
+		"key2": "value2",
+		"key3": "",
+	})
+
+	extraMetadataKeys := []string{"key1", "key2", "key3", "key4"}
+
+	encryptedToken := "encrypted_tyk_upstream_oauth_access_token"
+	tokenDataBytes, err := createTokenDataBytes(encryptedToken, token, extraMetadataKeys)
+
+	assert.NoError(t, err)
+
+	var tokenData TokenData
+	err = json.Unmarshal(tokenDataBytes, &tokenData)
+	assert.NoError(t, err)
+
+	assert.Equal(t, encryptedToken, tokenData.Token)
+	assert.Equal(t, "value1", tokenData.ExtraMetadata["key1"])
+	assert.Equal(t, "value2", tokenData.ExtraMetadata["key2"])
+	assert.NotContains(t, tokenData.ExtraMetadata, "key3")
+	assert.NotContains(t, tokenData.ExtraMetadata, "key4")
+}
+
+func TestUnmarshalTokenData(t *testing.T) {
+	tokenData := TokenData{
+		Token: "tyk_upstream_oauth_access_token",
+		ExtraMetadata: map[string]interface{}{
+			"key1": "value1",
+			"key2": "value2",
+		},
+	}
+
+	tokenDataBytes, err := json.Marshal(tokenData)
+	assert.NoError(t, err)
+
+	result, err := unmarshalTokenData(string(tokenDataBytes))
+
+	assert.NoError(t, err)
+
+	assert.Equal(t, tokenData.Token, result.Token)
+	assert.Equal(t, tokenData.ExtraMetadata, result.ExtraMetadata)
 }
