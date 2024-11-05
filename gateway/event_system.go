@@ -1,11 +1,8 @@
 package gateway
 
 import (
-	"bytes"
-	"encoding/base64"
 	"errors"
 	"fmt"
-	"net/http"
 	"time"
 
 	"github.com/sirupsen/logrus"
@@ -59,22 +56,9 @@ const (
 	EventTokenDeleted = event.TokenDeleted
 )
 
-// EventMetaDefault is a standard embedded struct to be used with custom event metadata types, gives an interface for
-// easily extending event metadata objects
-type EventMetaDefault struct {
-	Message            string
-	OriginatingRequest string
-}
-
 type EventHostStatusMeta struct {
 	EventMetaDefault
 	HostInfo HostHealthReport
-}
-
-// EventUpstreamOAuthMeta is the metadata structure for an upstream OAuth event
-type EventUpstreamOAuthMeta struct {
-	EventMetaDefault
-	APIID string
 }
 
 // EventKeyFailureMeta is the metadata structure for any failure related
@@ -115,15 +99,6 @@ type EventTokenMeta struct {
 	EventMetaDefault
 	Org string
 	Key string
-}
-
-// EncodeRequestToEvent will write the request out in wire protocol and
-// encode it to base64 and store it in an Event object
-func EncodeRequestToEvent(r *http.Request) string {
-	var asBytes bytes.Buffer
-	r.Write(&asBytes)
-
-	return base64.StdEncoding.EncodeToString(asBytes.Bytes())
 }
 
 // EventHandlerByName is a convenience function to get event handler instances from an API Definition
