@@ -209,6 +209,21 @@ func saveFile(outputPath string) {
 }
 
 func main() {
+	/*
+			How to add a new Input/Output source
+			1- Import the related component for its side effects, for example if you want to produce a JSON schema that supports redis component,
+			   you can import it like the following:
+
+		       _ "github.com/warpstreamlabs/bento/public/components/redis"
+
+			2- Add its name to `supportedItems` slice. You should know that some components exposes different input/output sources
+			   For example, components/kafka exposes `kafka` and `kafka_franz`. You need to dig into the Bento's codebase to understand
+		       which input/output is exposed by a component.
+	*/
+
+	// Importing a small number of components was preferred instead of importing `components/all` because importing all components
+	// results in a huge `definitions/processor` object and there is no way to know which processor are used by the components we support.
+
 	var outputPath string
 	flag.StringVar(&outputPath, "output-path", defaultOutput, "Path to save the output")
 	flag.Parse()
