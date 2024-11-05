@@ -175,6 +175,17 @@ func (gw *Gateway) createMiddleware(actualMW TykMiddleware) func(http.Handler) h
 			multiAuth := true
 
 			if multiAuth && mw.Kind() == model.MiddlewareKindAuth {
+				if err != nil {
+					// TODO: Properly add as constant, or method to ctx
+					authInfo := r.Context().Value("authSuccess")
+					currAuthMw := []string{mw.Name()}
+					if authInfo != nil {
+						if currMwList, ok := authInfo.([]string); ok {
+							currAuthMw = append(currMwList, mw.Name())
+						}
+					}
+					r = r.WithContext(context.WithValue(r.Context(), "authSuccess", currAuthMw))
+				}
 				err = nil
 				errCode = 0
 			}

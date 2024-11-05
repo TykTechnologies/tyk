@@ -18,13 +18,40 @@ func (k *MultiAuth) EnabledForSpec() bool {
 }
 
 func (k *MultiAuth) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
-	session := ctxGetSession(r)
+	// TODO: Read from API definition
+	allowedAuths := [][]string{{"Basic", "AuthToken"}, {"Basic2", "AuthToken2"}}
 
-	// TODO: Extend the error message
-	if session == nil {
-		// None of middlewares were able to auth the user
+	authInfo := r.Context().Value("authSuccess")
+	if authInfo == nil {
+		// No auth middleware was executed yet
 		return nil, http.StatusUnauthorized
 	}
 
-	return nil, http.StatusOK
+	currAuthMw, ok := authInfo.([]string)
+	if !ok {
+		// Invalid auth info type
+		return nil, http.StatusUnauthorized
+	}
+
+	// Check if current auth middleware combination matches any allowed combination
+	for _, allowedCombination := range allowedAuths {
+		if len(currAuthMw) != len(allowedCombination) {
+			continue
+		}
+
+		matches := true
+		for i, auth := range allowedCombination {
+			if currAuthMw[i] != auth {
+				matches = false
+				break
+			}
+		}
+
+		if matches {
+			return nil, http.StatusOK
+		}
+	}
+
+	// No valid auth combination found
+	return nil, http.StatusUnauthorized
 }
