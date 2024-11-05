@@ -2,8 +2,9 @@ package upstreamoauth
 
 import (
 	"context"
-	"golang.org/x/oauth2"
 	"net/http"
+
+	"golang.org/x/oauth2"
 )
 
 func (cache *PasswordClient) ObtainToken(ctx context.Context) (*oauth2.Token, error) {
