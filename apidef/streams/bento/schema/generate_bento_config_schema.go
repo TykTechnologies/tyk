@@ -34,7 +34,7 @@ var definitions = []string{
 	"scanner",
 }
 
-var inputs = []string{
+var supportedItems = []string{
 	"broker",
 	"http_client",
 	"http_server",
@@ -124,10 +124,10 @@ func scanDefinitions(data []byte) error {
 
 func insertDefinitionKind(kind string, anyOfItems []byte) error {
 	_, err := jsonparser.ArrayEach(anyOfItems, func(value []byte, dataType jsonparser.ValueType, offset int, err error) {
-		for _, inputItem := range inputs {
+		for _, item := range supportedItems {
 			var data []byte
 			var jsonErr error
-			data, _, _, jsonErr = jsonparser.Get(value, "properties", inputItem)
+			data, _, _, jsonErr = jsonparser.Get(value, "properties", item)
 			if errors.Is(jsonErr, jsonparser.KeyPathNotFoundError) {
 				continue
 			}
@@ -136,7 +136,7 @@ func insertDefinitionKind(kind string, anyOfItems []byte) error {
 				return
 			}
 
-			result, jsonErr = jsonparser.Set(result, data, "definitions", kind, "properties", inputItem)
+			result, jsonErr = jsonparser.Set(result, data, "definitions", kind, "properties", item)
 			if jsonErr != nil {
 				err = jsonErr
 				return
