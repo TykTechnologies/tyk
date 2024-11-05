@@ -208,6 +208,18 @@ func saveFile(outputPath string) {
 	fmt.Printf("Bento schema generated in '%s'\n", file.Name())
 }
 
+/*
+How to use this program?
+
+generate_bento_config_schema generates a JSON schema for the Input/Output resources we support.
+
+Simply,
+
+go run generate_bento_config.go
+
+It'll generate a `bento-config-schema.json` file in the current working folder. You can also set
+an output path via -output-path <string> parameter.
+*/
 func main() {
 	/*
 			How to add a new Input/Output source
