@@ -27,7 +27,6 @@ package gateway
 
 import (
 	"bytes"
-	"context"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
@@ -3060,34 +3059,6 @@ func (gw *Gateway) makeImportedOASTykAPI(next http.HandlerFunc) http.HandlerFunc
 		r.Body = ioutil.NopCloser(bytes.NewReader(apiInBytes))
 		next.ServeHTTP(w, r)
 	}
-}
-
-// TODO: Don't modify http.Request values in-place. We must right now
-// because our middleware design doesn't pass around http.Request
-// pointers, so we have no way to modify the pointer in a middleware.
-//
-// If we ever redesign middlewares - or if we find another workaround -
-// revisit this.
-func setContext(r *http.Request, ctx context.Context) {
-	r2 := r.WithContext(ctx)
-	*r = *r2
-}
-func setCtxValue(r *http.Request, key, val interface{}) {
-	setContext(r, context.WithValue(r.Context(), key, val))
-}
-
-func ctxGetData(r *http.Request) map[string]interface{} {
-	if v := r.Context().Value(ctx.ContextData); v != nil {
-		return v.(map[string]interface{})
-	}
-	return nil
-}
-
-func ctxSetData(r *http.Request, m map[string]interface{}) {
-	if m == nil {
-		panic("setting a nil context ContextData")
-	}
-	setCtxValue(r, ctx.ContextData, m)
 }
 
 // ctxSetCacheOptions sets a cache key to use for the http request

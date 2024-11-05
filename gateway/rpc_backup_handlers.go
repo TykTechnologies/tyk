@@ -1,14 +1,11 @@
 package gateway
 
 import (
-	"crypto/aes"
-	"crypto/cipher"
-	cryptorand "crypto/rand"
-	"encoding/base64"
 	"encoding/json"
 	"errors"
-	"io"
 	"strings"
+
+	"github.com/TykTechnologies/tyk/internal/crypto"
 
 	"github.com/sirupsen/logrus"
 
@@ -41,13 +38,13 @@ func (gw *Gateway) LoadDefinitionsFromRPCBackup() ([]*APISpec, error) {
 		return nil, errors.New("[RPC] --> RPC Backup recovery failed: redis connection failed")
 	}
 
-	secret := rightPad2Len(gw.GetConfig().Secret, "=", 32)
+	secret := crypto.GetPaddedString(gw.GetConfig().Secret)
 	cryptoText, err := store.GetKey(checkKey)
 	if err != nil {
 		return nil, errors.New("[RPC] --> Failed to get node backup (" + checkKey + "): " + err.Error())
 	}
 
-	apiListAsString := decrypt([]byte(secret), cryptoText)
+	apiListAsString := crypto.Decrypt([]byte(secret), cryptoText)
 
 	a := APIDefinitionLoader{Gw: gw}
 	return a.processRPCDefinitions(apiListAsString, gw)
@@ -72,8 +69,8 @@ func (gw *Gateway) saveRPCDefinitionsBackup(list string) error {
 		return errors.New("--> RPC Backup save failed: redis connection failed")
 	}
 
-	secret := rightPad2Len(gw.GetConfig().Secret, "=", 32)
-	cryptoText := encrypt([]byte(secret), list)
+	secret := crypto.GetPaddedString(gw.GetConfig().Secret)
+	cryptoText := crypto.Encrypt([]byte(secret), list)
 	err := store.SetKey(BackupApiKeyBase+tagList, cryptoText, -1)
 	if err != nil {
 		return errors.New("Failed to store node backup: " + err.Error())
@@ -95,9 +92,9 @@ func (gw *Gateway) LoadPoliciesFromRPCBackup() (map[string]user.Policy, error) {
 		return nil, errors.New("[RPC] --> RPC Policy Backup recovery failed: redis connection failed")
 	}
 
-	secret := rightPad2Len(gw.GetConfig().Secret, "=", 32)
+	secret := crypto.GetPaddedString(gw.GetConfig().Secret)
 	cryptoText, err := store.GetKey(checkKey)
-	listAsString := decrypt([]byte(secret), cryptoText)
+	listAsString := crypto.Decrypt([]byte(secret), cryptoText)
 
 	if err != nil {
 		return nil, errors.New("[RPC] --> Failed to get node policy backup (" + checkKey + "): " + err.Error())
@@ -111,10 +108,6 @@ func (gw *Gateway) LoadPoliciesFromRPCBackup() (map[string]user.Policy, error) {
 	} else {
 		return policies, nil
 	}
-}
-
-func getPaddedSecret(secret string) []byte {
-	return []byte(rightPad2Len(secret, "=", 32))
 }
 
 func (gw *Gateway) saveRPCPoliciesBackup(list string) error {
@@ -136,70 +129,11 @@ func (gw *Gateway) saveRPCPoliciesBackup(list string) error {
 		return errors.New("--> RPC Backup save failed: redis connection failed")
 	}
 
-	cryptoText := encrypt(getPaddedSecret(gw.GetConfig().Secret), list)
+	cryptoText := crypto.Encrypt(crypto.GetPaddedString(gw.GetConfig().Secret), list)
 	err := store.SetKey(BackupPolicyKeyBase+tagList, cryptoText, -1)
 	if err != nil {
 		return errors.New("Failed to store node backup: " + err.Error())
 	}
 
 	return nil
-}
-
-// encrypt string to base64 crypto using AES
-func encrypt(key []byte, text string) string {
-	plaintext := []byte(text)
-
-	block, err := aes.NewCipher(key)
-	if err != nil {
-		log.Error(err)
-		return ""
-	}
-
-	// The IV needs to be unique, but not secure. Therefore it's common to
-	// include it at the beginning of the ciphertext.
-	ciphertext := make([]byte, aes.BlockSize+len(plaintext))
-	iv := ciphertext[:aes.BlockSize]
-	if _, err := io.ReadFull(cryptorand.Reader, iv); err != nil {
-		log.Error(err)
-		return ""
-	}
-
-	stream := cipher.NewCFBEncrypter(block, iv)
-	stream.XORKeyStream(ciphertext[aes.BlockSize:], plaintext)
-
-	// convert to base64
-	return base64.URLEncoding.EncodeToString(ciphertext)
-}
-
-// decrypt from base64 to decrypted string
-func decrypt(key []byte, cryptoText string) string {
-	ciphertext, _ := base64.URLEncoding.DecodeString(cryptoText)
-
-	block, err := aes.NewCipher(key)
-	if err != nil {
-		log.Error(err)
-		return ""
-	}
-
-	// The IV needs to be unique, but not secure. Therefore it's common to
-	// include it at the beginning of the ciphertext.
-	if len(ciphertext) < aes.BlockSize {
-		log.Error("ciphertext too short")
-		return ""
-	}
-	iv := ciphertext[:aes.BlockSize]
-	ciphertext = ciphertext[aes.BlockSize:]
-
-	stream := cipher.NewCFBDecrypter(block, iv)
-
-	// XORKeyStream can work in-place if the two arguments are the same.
-	stream.XORKeyStream(ciphertext, ciphertext)
-
-	return string(ciphertext)
-}
-
-func rightPad2Len(s, padStr string, overallLen int) string {
-	padCountInt := 1 + (overallLen-len(padStr))/len(padStr)
-	retStr := s + strings.Repeat(padStr, padCountInt)
-	return retStr[:overallLen]
 }

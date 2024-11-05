@@ -1936,12 +1936,6 @@ func TestContextData(t *testing.T) {
 	if ctxGetData(r) == nil {
 		t.Fatal("expected ctxGetData to return non-nil")
 	}
-	defer func() {
-		if r := recover(); r == nil {
-			t.Fatal("expected ctxSetData of zero val to panic")
-		}
-	}()
-	ctxSetData(r, nil)
 }
 
 func TestContextSession(t *testing.T) {
