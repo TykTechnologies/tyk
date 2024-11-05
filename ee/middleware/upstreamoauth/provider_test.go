@@ -1,4 +1,4 @@
-package gateway
+package upstreamoauth_test
 
 import (
 	"encoding/json"
@@ -10,6 +10,9 @@ import (
 
 	"golang.org/x/oauth2"
 
+	"github.com/TykTechnologies/tyk/ee/middleware/upstreamoauth"
+	"github.com/TykTechnologies/tyk/gateway"
+
 	"github.com/stretchr/testify/assert"
 
 	"github.com/TykTechnologies/tyk/apidef"
@@ -17,8 +20,14 @@ import (
 	"github.com/TykTechnologies/tyk/test"
 )
 
-func TestUpstreamOauth2(t *testing.T) {
+var StartTest = gateway.StartTest
 
+type APISpec = gateway.APISpec
+
+const ClientCredentialsAuthorizeType = upstreamoauth.ClientCredentialsAuthorizeType
+const PasswordAuthorizeType = upstreamoauth.PasswordAuthorizeType
+
+func TestProvider_ClientCredentialsAuthorizeType(t *testing.T) {
 	tst := StartTest(nil)
 	t.Cleanup(tst.Close)
 
@@ -120,7 +129,7 @@ func TestUpstreamOauth2(t *testing.T) {
 
 }
 
-func TestPasswordCredentialsTokenRequest(t *testing.T) {
+func TestProvider_PasswordAuthorizeType(t *testing.T) {
 	tst := StartTest(nil)
 	t.Cleanup(tst.Close)
 
@@ -235,9 +244,9 @@ func TestSetExtraMetadata(t *testing.T) {
 		"key3": "value3",
 	}
 
-	setExtraMetadata(req, keyList, token)
+	upstreamoauth.SetExtraMetadata(req, keyList, token)
 
-	contextData := ctxGetData(req)
+	contextData := upstreamoauth.CtxGetData(req)
 
 	assert.Equal(t, "value1", contextData["key1"])
 	assert.Equal(t, "value2", contextData["key2"])
@@ -257,7 +266,7 @@ func TestBuildMetadataMap(t *testing.T) {
 	})
 	extraMetadataKeys := []string{"key1", "key2", "key3", "key4"}
 
-	metadataMap := buildMetadataMap(token, extraMetadataKeys)
+	metadataMap := upstreamoauth.BuildMetadataMap(token, extraMetadataKeys)
 
 	assert.Equal(t, "value1", metadataMap["key1"])
 	assert.Equal(t, "value2", metadataMap["key2"])
@@ -280,11 +289,11 @@ func TestCreateTokenDataBytes(t *testing.T) {
 	extraMetadataKeys := []string{"key1", "key2", "key3", "key4"}
 
 	encryptedToken := "encrypted_tyk_upstream_oauth_access_token"
-	tokenDataBytes, err := createTokenDataBytes(encryptedToken, token, extraMetadataKeys)
+	tokenDataBytes, err := upstreamoauth.CreateTokenDataBytes(encryptedToken, token, extraMetadataKeys)
 
 	assert.NoError(t, err)
 
-	var tokenData TokenData
+	var tokenData upstreamoauth.TokenData
 	err = json.Unmarshal(tokenDataBytes, &tokenData)
 	assert.NoError(t, err)
 
@@ -296,7 +305,7 @@ func TestCreateTokenDataBytes(t *testing.T) {
 }
 
 func TestUnmarshalTokenData(t *testing.T) {
-	tokenData := TokenData{
+	tokenData := upstreamoauth.TokenData{
 		Token: "tyk_upstream_oauth_access_token",
 		ExtraMetadata: map[string]interface{}{
 			"key1": "value1",
@@ -307,7 +316,7 @@ func TestUnmarshalTokenData(t *testing.T) {
 	tokenDataBytes, err := json.Marshal(tokenData)
 	assert.NoError(t, err)
 
-	result, err := unmarshalTokenData(string(tokenDataBytes))
+	result, err := upstreamoauth.UnmarshalTokenData(string(tokenDataBytes))
 
 	assert.NoError(t, err)
 

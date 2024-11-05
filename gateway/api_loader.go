@@ -440,7 +440,9 @@ func (gw *Gateway) processSpec(spec *APISpec, apisByListen map[string]int,
 		gw.mwAppendEnabled(&chainArray, upstreamBasicAuthMw)
 	}
 
-	gw.mwAppendEnabled(&chainArray, &UpstreamOAuth{BaseMiddleware: baseMid})
+	if upstreamOAuthMw := getUpstreamOAuthMw(baseMid); upstreamOAuthMw != nil {
+		gw.mwAppendEnabled(&chainArray, upstreamOAuthMw)
+	}
 
 	gw.mwAppendEnabled(&chainArray, &ValidateJSON{BaseMiddleware: baseMid})
 	gw.mwAppendEnabled(&chainArray, &ValidateRequest{BaseMiddleware: baseMid})
