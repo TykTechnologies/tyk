@@ -38,11 +38,11 @@ func (u Provider) Fill(r *http.Request) {
 
 type OAuthHeaderProvider interface {
 	// getOAuthToken returns the OAuth token for the request.
-	getOAuthToken(r *http.Request, OAuthSpec *Middleware) (string, error)
+	getOAuthToken(r *http.Request, mw *Middleware) (string, error)
 	// getHeaderName returns the header name for the OAuth token.
-	getHeaderName(OAuthSpec *Middleware) string
+	getHeaderName(mw *Middleware) string
 	//
-	headerEnabled(OAuthSpec *Middleware) bool
+	headerEnabled(mw *Middleware) bool
 }
 
 func NewOAuthHeaderProvider(oauthConfig apidef.UpstreamOAuth) (OAuthHeaderProvider, error) {
@@ -65,8 +65,8 @@ func NewOAuthHeaderProvider(oauthConfig apidef.UpstreamOAuth) (OAuthHeaderProvid
 }
 
 func (p *ClientCredentialsOAuthProvider) getOAuthToken(r *http.Request, mw *Middleware) (string, error) {
-	client := ClientCredentialsClient{mw.clientCredentialsStorageHandler}
-	token, err := client.GetToken(r, mw)
+	client := ClientCredentialsClient{mw}
+	token, err := client.GetToken(r)
 	if err != nil {
 		return handleOAuthError(r, mw, err)
 	}
@@ -108,11 +108,11 @@ func newOAuth2PasswordConfig(OAuthSpec *Middleware) oauth2.Config {
 }
 
 type ClientCredentialsClient struct {
-	Storage
+	mw *Middleware
 }
 
 type PasswordClient struct {
-	Storage
+	mw *Middleware
 }
 
 func generateClientCredentialsCacheKey(config apidef.UpstreamOAuth, apiId string) string {
@@ -173,8 +173,8 @@ type EventUpstreamOAuthMeta struct {
 }
 
 func (p *PasswordOAuthProvider) getOAuthToken(r *http.Request, mw *Middleware) (string, error) {
-	client := PasswordClient{Storage: mw.passwordStorageHandler}
-	token, err := client.GetToken(r, mw)
+	client := PasswordClient{mw}
+	token, err := client.GetToken(r)
 	if err != nil {
 		return handleOAuthError(r, mw, err)
 	}
