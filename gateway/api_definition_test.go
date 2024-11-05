@@ -15,12 +15,15 @@ import (
 	texttemplate "text/template"
 	"time"
 
+	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/stretchr/testify/assert"
 
 	persistentmodel "github.com/TykTechnologies/storage/persistent/model"
+
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/apidef/oas"
 	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/ee/middleware/streams"
 	"github.com/TykTechnologies/tyk/internal/model"
 	"github.com/TykTechnologies/tyk/internal/policy"
 	"github.com/TykTechnologies/tyk/rpc"
@@ -1532,6 +1535,54 @@ func TestAPISpec_setHasMock(t *testing.T) {
 	mock.Enabled = true
 	s.setHasMock()
 	assert.True(t, s.HasMock)
+}
+
+func TestAPISpec_isStreamingAPI(t *testing.T) {
+	type testCase struct {
+		name           string
+		inputOAS       oas.OAS
+		expectedResult bool
+	}
+
+	testCases := []testCase{
+		{
+			name:           "should return false if oas is set to default",
+			inputOAS:       oas.OAS{},
+			expectedResult: false,
+		},
+		{
+			name: "should return false if streaming section is missing",
+			inputOAS: oas.OAS{
+				T: openapi3.T{
+					Extensions: map[string]any{
+						"x-tyk-api-gateway": nil,
+					},
+				},
+			},
+			expectedResult: false,
+		},
+		{
+			name: "should return true if streaming section is present",
+			inputOAS: oas.OAS{
+				T: openapi3.T{
+					Extensions: map[string]any{
+						streams.ExtensionTykStreaming: nil,
+						"x-tyk-api-gateway":           nil,
+					},
+				},
+			},
+			expectedResult: true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			apiSpec := &APISpec{
+				OAS: tc.inputOAS,
+			}
+			assert.Equal(t, tc.expectedResult, apiSpec.isStreamingAPI())
+		})
+	}
 }
 
 func TestReplaceSecrets(t *testing.T) {
