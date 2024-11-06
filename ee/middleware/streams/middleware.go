@@ -29,21 +29,23 @@ type Middleware struct {
 	createStreamManagerLock sync.Mutex
 	StreamManagerCache      sync.Map // Map of payload hash to Manager
 
-	ctx            context.Context
-	cancel         context.CancelFunc
-	allowedUnsafe  []string
-	defaultManager *Manager
+	ctx              context.Context
+	cancel           context.CancelFunc
+	allowedUnsafe    []string
+	defaultManager   *Manager
+	analyticsFactory StreamAnalyticsFactory
 }
 
 // Middleware implements model.Middleware.
 var _ model.Middleware = &Middleware{}
 
 // NewMiddleware returns a new instance of Middleware.
-func NewMiddleware(gw Gateway, mw BaseMiddleware, spec *APISpec) *Middleware {
+func NewMiddleware(gw Gateway, mw BaseMiddleware, spec *APISpec, analyticsFactory StreamAnalyticsFactory) *Middleware {
 	return &Middleware{
-		base: mw,
-		Gw:   gw,
-		Spec: spec,
+		base:             mw,
+		Gw:               gw,
+		Spec:             spec,
+		analyticsFactory: analyticsFactory,
 	}
 }
 
@@ -89,6 +91,13 @@ func (s *Middleware) Init() {
 	s.Logger().Debug("Initializing default stream manager")
 	s.defaultManager = s.CreateStreamManager(nil)
 
+	s.Logger().Debug("Initializing stream analytics factory")
+	if s.analyticsFactory == nil {
+		s.SetAnalyticsFactory(&NoopStreamAnalyticsFactory{})
+	} else {
+		s.SetAnalyticsFactory(s.analyticsFactory)
+	}
+
 	// Start garbage collection routine
 	go func() {
 		ticker := time.NewTicker(StreamGCInterval)
@@ -122,10 +131,11 @@ func (s *Middleware) CreateStreamManager(r *http.Request) *Manager {
 	}
 
 	newManager := &Manager{
-		muxer:           mux.NewRouter(),
-		mw:              s,
-		dryRun:          r == nil,
-		activityCounter: atomic.Int32{},
+		muxer:            mux.NewRouter(),
+		mw:               s,
+		dryRun:           r == nil,
+		activityCounter:  atomic.Int32{},
+		analyticsFactory: &NoopStreamAnalyticsFactory{},
 	}
 	newManager.initStreams(r, streamsConfig)
 
@@ -233,6 +243,7 @@ func (s *Middleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _ in
 
 	var match mux.RouteMatch
 	streamManager := s.CreateStreamManager(r)
+	streamManager.SetAnalyticsFactory(s.analyticsFactory)
 	streamManager.routeLock.Lock()
 	streamManager.muxer.Match(newRequest, &match)
 	streamManager.routeLock.Unlock()
@@ -278,4 +289,16 @@ func (s *Middleware) Unload() {
 	GlobalStreamCounter.Add(-int64(totalStreams))
 	s.StreamManagerCache = sync.Map{}
 	s.Logger().Info("All streams successfully removed")
+}
+
+func (s *Middleware) SetAnalyticsFactory(factory StreamAnalyticsFactory) {
+	if factory == nil {
+		factory = &NoopStreamAnalyticsFactory{}
+	}
+	s.analyticsFactory = factory
+	s.defaultManager.SetAnalyticsFactory(factory)
+}
+
+func (s *Middleware) GetStreamManager() *Manager {
+	return s.defaultManager
 }
