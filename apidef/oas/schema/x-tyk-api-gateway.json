@@ -2022,8 +2022,8 @@
         "enabled": {
           "type": "boolean"
         },
-        "headerName": {
-          "type": "string"
+        "header": {
+          "$ref": "#/definitions/X-Tyk-AuthSource"
         },
         "username": {
           "type": "string"
@@ -2033,7 +2033,9 @@
         }
       },
       "required": [
-        "enabled"
+        "enabled",
+        "username",
+        "password"
       ]
     },
     "X-Tyk-UpstreamOAuth": {
@@ -2043,7 +2045,10 @@
           "type": "boolean"
         },
         "allowedAuthorizeTypes": {
-          "type": ["array", "null"],
+          "type": [
+            "array",
+            "null"
+          ],
           "items": {
             "type": "string",
             "enum": [
@@ -2075,7 +2080,10 @@
               "$ref": "#/definitions/X-Tyk-AuthSource"
             },
             "extraMetadata": {
-              "type": "array"
+              "type": [
+                "array",
+                "null"
+              ]
             }
           },
           "required": [
@@ -2112,7 +2120,10 @@
               "$ref": "#/definitions/X-Tyk-AuthSource"
             },
             "extraMetadata": {
-              "type": "array"
+              "type": [
+                "array",
+                "null"
+              ]
             }
           },
           "required": [
@@ -2123,7 +2134,12 @@
             "password"
           ]
         }
-      }
+      },
+      "required": [
+        "enabled",
+        "allowedAuthorizeTypes"
+      ]
     }
+    
   }
 }
