@@ -19,6 +19,7 @@ import (
 	texttemplate "text/template"
 	"time"
 
+	"github.com/TykTechnologies/tyk/ee/middleware/streams"
 	"github.com/TykTechnologies/tyk/storage/kv"
 
 	"github.com/getkin/kin-openapi/routers"
@@ -34,7 +35,7 @@ import (
 
 	"github.com/cenk/backoff"
 
-	sprig "github.com/Masterminds/sprig/v3"
+	"github.com/Masterminds/sprig/v3"
 
 	"github.com/sirupsen/logrus"
 
@@ -312,6 +313,15 @@ func (s *APISpec) validateTCP() error {
 func (s *APISpec) validateHTTP() error {
 	// NOOP
 	return nil
+}
+
+func (s *APISpec) isStreamingAPI() bool {
+	if s.OAS.T.Extensions == nil {
+		return false
+	}
+
+	_, ok := s.OAS.T.Extensions[streams.ExtensionTykStreaming]
+	return ok
 }
 
 // APIDefinitionLoader will load an Api definition from a storage
