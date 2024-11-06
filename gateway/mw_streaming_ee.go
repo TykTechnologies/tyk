@@ -10,6 +10,8 @@ import (
 func getStreamingMiddleware(baseMid *BaseMiddleware) TykMiddleware {
 	spec := baseMid.Spec
 	streamSpec := streams.NewAPISpec(spec.APIID, spec.Name, spec.IsOAS, spec.OAS, spec.StripListenPath)
-	streamMw := streams.NewMiddleware(baseMid.Gw, baseMid, streamSpec)
+
+	streamAnalyticsFactory := NewStreamAnalyticsFactory(baseMid.logger.Dup(), baseMid.Gw, spec)
+	streamMw := streams.NewMiddleware(baseMid.Gw, baseMid, streamSpec, streamAnalyticsFactory)
 	return WrapMiddleware(baseMid, streamMw)
 }

@@ -10,14 +10,15 @@ import (
 	"strings"
 	"time"
 
-	"github.com/TykTechnologies/tyk/ctx"
-	"github.com/TykTechnologies/tyk/internal/httputil"
-
 	graphqlinternal "github.com/TykTechnologies/tyk/internal/graphql"
 
 	"github.com/TykTechnologies/tyk-pump/analytics"
+
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/internal/httputil"
+
 	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/ctx"
 	"github.com/TykTechnologies/tyk/header"
 	"github.com/TykTechnologies/tyk/request"
 	"github.com/TykTechnologies/tyk/user"
@@ -333,6 +334,10 @@ func recordDetail(r *http.Request, spec *APISpec) bool {
 		return false
 	}
 
+	return recordDetailUnsafe(r, spec)
+}
+
+func recordDetailUnsafe(r *http.Request, spec *APISpec) bool {
 	if spec.EnableDetailedRecording {
 		return true
 	}
