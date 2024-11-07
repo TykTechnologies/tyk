@@ -11,7 +11,7 @@ import (
 const (
 	// ExtensionTykStreaming is the OAS extension for Tyk streaming.
 	ExtensionTykStreaming = "x-tyk-streaming"
-	StreamGCInterval      = 1 * time.Minute
+	StreamGCInterval      = 5 * time.Second
 )
 
 // BaseMiddleware is the subset of BaseMiddleware APIs that the middleware uses.
