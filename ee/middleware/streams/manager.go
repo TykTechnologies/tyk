@@ -63,9 +63,7 @@ func (sm *Manager) setUpOrDryRunStream(streamConfig any, streamID string) {
 
 // removeStream removes a stream
 func (sm *Manager) removeStream(streamID string) error {
-	streamFullID := streamID //fmt.Sprintf("%s_%s", sm.mw.Spec.APIID, streamID)
-
-	if streamValue, exists := sm.streams.Load(streamFullID); exists {
+	if streamValue, exists := sm.streams.Load(streamID); exists {
 		stream, ok := streamValue.(*Stream)
 		if !ok {
 			return fmt.Errorf("stream %s is not a valid stream", streamID)
@@ -74,7 +72,7 @@ func (sm *Manager) removeStream(streamID string) error {
 		if err != nil {
 			return err
 		}
-		sm.streams.Delete(streamFullID)
+		sm.streams.Delete(streamID)
 	} else {
 		return fmt.Errorf("stream %s does not exist", streamID)
 	}
