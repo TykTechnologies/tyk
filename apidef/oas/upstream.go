@@ -694,9 +694,6 @@ type ClientCredentials struct {
 	TokenURL string `bson:"tokenUrl" json:"tokenUrl"`
 	// Scopes specifies optional requested permissions.
 	Scopes []string `bson:"scopes,omitempty" json:"scopes,omitempty"`
-	// HeaderName is the custom header name to be used for OAuth client credential flow authentication.
-	// Defaults to `Authorization`.
-	HeaderName string `bson:"headerName" json:"headerName"`
 	// ExtraMetadata holds the keys that we want to extract from the token and pass to the upstream.
 	ExtraMetadata []string `bson:"extraMetadata" json:"extraMetadata,omitempty"`
 }
