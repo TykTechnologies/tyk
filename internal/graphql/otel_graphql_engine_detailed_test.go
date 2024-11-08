@@ -444,7 +444,7 @@ type spanWrapper struct {
 }
 
 func (s *spanWrapper) AddLink(link trace.Link) {
-	s.span.AddLink(link)
+	//s.span.AddLink(link)
 }
 
 func (s *spanWrapper) End(options ...trace.SpanEndOption) {
