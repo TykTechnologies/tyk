@@ -2128,7 +2128,6 @@
           },
           "required": [
             "clientId",
-            "clientSecret",
             "tokenUrl",
             "username",
             "password"
