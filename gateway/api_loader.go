@@ -935,7 +935,7 @@ func (gw *Gateway) loadApps(specs []*APISpec) {
 	// doesn't break /foo-bar
 	sort.Slice(specs, func(i, j int) bool {
 		if specs[i].Domain != specs[j].Domain {
-			return len(specs[i].Domain) > len(specs[j].Domain)
+			return specs[i].Domain > specs[j].Domain
 		}
 		return len(specs[i].Proxy.ListenPath) > len(specs[j].Proxy.ListenPath)
 	})
