@@ -96,7 +96,7 @@
           "type": "boolean"
         },
         "name": {
-          "$ref": "#/definitions/X-Tyk-NonEmptyString"
+          "type": "string"
         }
       },
       "required": [
@@ -2026,10 +2026,10 @@
           "$ref": "#/definitions/X-Tyk-AuthSource"
         },
         "username": {
-          "$ref": "#/definitions/X-Tyk-NonEmptyString"
+          "type": "string"
         },
         "password": {
-          "$ref": "#/definitions/X-Tyk-NonEmptyString"
+          "type": "string"
         }
       },
       "required": [
@@ -2062,13 +2062,13 @@
           "type": "object",
           "properties": {
             "clientId": {
-              "$ref": "#/definitions/X-Tyk-NonEmptyString"
+              "type": "string"
             },
             "clientSecret": {
-              "$ref": "#/definitions/X-Tyk-NonEmptyString"
+              "type": "string"
             },
             "tokenUrl": {
-              "$ref": "#/definitions/X-Tyk-NonEmptyString"
+              "type": "string"
             },
             "scopes": {
               "type": [
@@ -2096,13 +2096,13 @@
           "type": "object",
           "properties": {
             "clientId": {
-              "$ref": "#/definitions/X-Tyk-NonEmptyString"
+              "type": "string"
             },
             "clientSecret": {
-              "$ref": "#/definitions/X-Tyk-NonEmptyString"
+              "type": "string"
             },
             "tokenUrl": {
-              "$ref": "#/definitions/X-Tyk-NonEmptyString"
+              "type": "string"
             },
             "scopes": {
               "type": [
@@ -2111,10 +2111,10 @@
               ]
             },
             "username": {
-              "$ref": "#/definitions/X-Tyk-NonEmptyString"
+              "type": "string"
             },
             "password": {
-              "$ref": "#/definitions/X-Tyk-NonEmptyString"
+              "type": "string"
             },
             "header": {
               "$ref": "#/definitions/X-Tyk-AuthSource"
@@ -2138,10 +2138,7 @@
         "enabled",
         "allowedAuthorizeTypes"
       ]
-    },
-    "X-Tyk-NonEmptyString": {
-      "type": "string",
-      "pattern": "\\S+"
     }
+    
   }
 }
