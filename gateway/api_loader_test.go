@@ -604,3 +604,314 @@ func TestConfigureAuthAndOrgStores(t *testing.T) {
 		})
 	}
 }
+
+func TestSortAPISpecs(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    []*APISpec
+		expected []*APISpec
+	}{
+		{
+			name: "APIs should be sorted by listen path, however if the domain is empty they should sit at the end",
+			input: []*APISpec{
+				{APIDefinition: &apidef.APIDefinition{Domain: "{domains:tyk.io}", Proxy: apidef.ProxyConfig{ListenPath: "/path-longer"}}},
+				{APIDefinition: &apidef.APIDefinition{Domain: "tyk.io", Proxy: apidef.ProxyConfig{ListenPath: "/path-longer"}}},
+				{APIDefinition: &apidef.APIDefinition{Domain: "tyk.io", Proxy: apidef.ProxyConfig{ListenPath: "/a"}}},
+				{APIDefinition: &apidef.APIDefinition{Domain: "abc.def.ghi", Proxy: apidef.ProxyConfig{ListenPath: "/b"}}},
+				{APIDefinition: &apidef.APIDefinition{Domain: "tyk.io", Proxy: apidef.ProxyConfig{ListenPath: "/longerpath"}}},
+				{APIDefinition: &apidef.APIDefinition{Domain: "tyk.io", Proxy: apidef.ProxyConfig{ListenPath: "/short"}}},
+				{APIDefinition: &apidef.APIDefinition{Domain: "samelength1.com", Proxy: apidef.ProxyConfig{ListenPath: "/a"}}},
+				{APIDefinition: &apidef.APIDefinition{Domain: "samelength2.com", Proxy: apidef.ProxyConfig{ListenPath: "/b"}}},
+				{APIDefinition: &apidef.APIDefinition{Domain: "tyk.io", Proxy: apidef.ProxyConfig{ListenPath: "/path"}}},
+				{APIDefinition: &apidef.APIDefinition{Domain: "", Proxy: apidef.ProxyConfig{ListenPath: "/aaaaaaaaaaaaaaaaaaaa"}}},
+				{APIDefinition: &apidef.APIDefinition{Domain: "tyk.io", Proxy: apidef.ProxyConfig{ListenPath: "/b"}}},
+				{APIDefinition: &apidef.APIDefinition{Domain: "{domains:tyk.io}", Proxy: apidef.ProxyConfig{ListenPath: "/path"}}},
+				{APIDefinition: &apidef.APIDefinition{Domain: "{domains:tyk.io|abc.def.ghi}", Proxy: apidef.ProxyConfig{ListenPath: "/path"}}},
+			},
+			expected: []*APISpec{
+				{APIDefinition: &apidef.APIDefinition{Domain: "tyk.io", Proxy: apidef.ProxyConfig{ListenPath: "/path-longer"}}},
+				{APIDefinition: &apidef.APIDefinition{Domain: "{domains:tyk.io}", Proxy: apidef.ProxyConfig{ListenPath: "/path-longer"}}},
+				{APIDefinition: &apidef.APIDefinition{Domain: "tyk.io", Proxy: apidef.ProxyConfig{ListenPath: "/longerpath"}}},
+				{APIDefinition: &apidef.APIDefinition{Domain: "tyk.io", Proxy: apidef.ProxyConfig{ListenPath: "/short"}}},
+				{APIDefinition: &apidef.APIDefinition{Domain: "tyk.io", Proxy: apidef.ProxyConfig{ListenPath: "/path"}}},
+				{APIDefinition: &apidef.APIDefinition{Domain: "{domains:tyk.io|abc.def.ghi}", Proxy: apidef.ProxyConfig{ListenPath: "/path"}}},
+				{APIDefinition: &apidef.APIDefinition{Domain: "{domains:tyk.io}", Proxy: apidef.ProxyConfig{ListenPath: "/path"}}},
+				{APIDefinition: &apidef.APIDefinition{Domain: "samelength1.com", Proxy: apidef.ProxyConfig{ListenPath: "/a"}}},
+				{APIDefinition: &apidef.APIDefinition{Domain: "samelength2.com", Proxy: apidef.ProxyConfig{ListenPath: "/b"}}},
+				{APIDefinition: &apidef.APIDefinition{Domain: "tyk.io", Proxy: apidef.ProxyConfig{ListenPath: "/b"}}},
+				{APIDefinition: &apidef.APIDefinition{Domain: "abc.def.ghi", Proxy: apidef.ProxyConfig{ListenPath: "/b"}}},
+				{APIDefinition: &apidef.APIDefinition{Domain: "tyk.io", Proxy: apidef.ProxyConfig{ListenPath: "/a"}}},
+				{APIDefinition: &apidef.APIDefinition{Domain: "", Proxy: apidef.ProxyConfig{ListenPath: "/aaaaaaaaaaaaaaaaaaaa"}}},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			sortSpecsByListenPath(tt.input)
+			for i, spec := range tt.input {
+				if spec.Domain != tt.expected[i].Domain {
+					t.Errorf("expected %v, got %v", tt.expected[i].Domain, spec.Domain)
+				}
+				if spec.Proxy.ListenPath != tt.expected[i].Proxy.ListenPath {
+					t.Errorf("expected %v, got %v", tt.expected[i].Proxy.ListenPath, spec.Proxy.ListenPath)
+				}
+
+			}
+		})
+
+	}
+}
+
+func TestIdenticalDomains(t *testing.T) {
+	ts := StartTest(nil)
+	t.Cleanup(ts.Close)
+
+	localClient := test.NewClientLocal()
+
+	mockServerA := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{"match":"serverA"}`))
+	}))
+	defer mockServerA.Close()
+
+	mockServerB := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{"match":"serverB"}`))
+	}))
+	defer mockServerB.Close()
+
+	t.Run("With custom domain support", func(t *testing.T) {
+		globalConf := ts.Gw.GetConfig()
+		globalConf.EnableCustomDomains = true
+		ts.Gw.SetConfig(globalConf)
+		defer ts.ResetTestConfig()
+
+		ts.Gw.BuildAndLoadAPI(
+			func(spec *APISpec) {
+				spec.APIID = "api-a"
+				spec.Proxy.ListenPath = "/test-classic"
+				spec.Proxy.TargetURL = mockServerA.URL
+				spec.Domain = "tyktest.io"
+				spec.Proxy.DisableStripSlash = true
+				spec.Proxy.StripListenPath = true
+			},
+			func(spec *APISpec) {
+				spec.APIID = "api-b"
+				spec.Proxy.ListenPath = "/test-classic-extended"
+				spec.Proxy.PreserveHostHeader = true
+				spec.Proxy.TargetURL = mockServerB.URL
+				spec.Domain = "tyktest.io"
+				spec.Proxy.DisableStripSlash = true
+				spec.Proxy.StripListenPath = true
+			},
+		)
+
+		_, _ = ts.Run(t, []test.TestCase{
+			{Client: localClient, Code: 200, Path: "/test-classic", Domain: "tyktest.io", BodyMatch: `{"match":"serverA"}`},
+			{Client: localClient, Code: 200, Path: "/test-classic-extended", Domain: "tyktest.io", BodyMatch: `{"match":"serverB"}`},
+		}...)
+	})
+}
+
+func TestDifferentDomainsIdenticalListenPaths(t *testing.T) {
+	ts := StartTest(nil)
+	t.Cleanup(ts.Close)
+
+	localClient := test.NewClientLocal()
+
+	mockServerA := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{"match":"serverA"}`))
+	}))
+	defer mockServerA.Close()
+
+	mockServerB := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{"match":"serverB"}`))
+	}))
+	defer mockServerB.Close()
+
+	t.Run("With custom domain support", func(t *testing.T) {
+		globalConf := ts.Gw.GetConfig()
+		globalConf.EnableCustomDomains = true
+		ts.Gw.SetConfig(globalConf)
+		defer ts.ResetTestConfig()
+
+		ts.Gw.BuildAndLoadAPI(
+			func(spec *APISpec) {
+				spec.APIID = "api-a"
+				spec.Proxy.ListenPath = "/test-classic"
+				spec.Proxy.TargetURL = mockServerA.URL
+				spec.Domain = "tyktest.io"
+				spec.Proxy.DisableStripSlash = true
+				spec.Proxy.StripListenPath = true
+			},
+			func(spec *APISpec) {
+				spec.APIID = "api-b"
+				spec.Proxy.ListenPath = "/test-classic"
+				spec.Proxy.PreserveHostHeader = true
+				spec.Proxy.TargetURL = mockServerB.URL
+				spec.Domain = "tyktyktest.io"
+				spec.Proxy.DisableStripSlash = true
+				spec.Proxy.StripListenPath = true
+			},
+		)
+
+		_, _ = ts.Run(t, []test.TestCase{
+			{Client: localClient, Code: 200, Path: "/test-classic", Domain: "tyktest.io", BodyMatch: `{"match":"serverA"}`},
+			{Client: localClient, Code: 200, Path: "/test-classic", Domain: "tyktyktest.io", BodyMatch: `{"match":"serverB"}`},
+		}...)
+	})
+}
+
+func TestDifferentDomainsWithOneListenPathBeingASubstringOfTheOther(t *testing.T) {
+	ts := StartTest(nil)
+	t.Cleanup(ts.Close)
+
+	localClient := test.NewClientLocal()
+
+	mockServerA := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{"match":"serverA"}`))
+	}))
+	defer mockServerA.Close()
+
+	mockServerB := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{"match":"serverB"}`))
+	}))
+	defer mockServerB.Close()
+
+	t.Run("With custom domain support", func(t *testing.T) {
+		globalConf := ts.Gw.GetConfig()
+		globalConf.EnableCustomDomains = true
+		ts.Gw.SetConfig(globalConf)
+		defer ts.ResetTestConfig()
+
+		ts.Gw.BuildAndLoadAPI(
+			func(spec *APISpec) {
+				spec.APIID = "api-a"
+				spec.Proxy.ListenPath = "/test-classic"
+				spec.Proxy.TargetURL = mockServerA.URL
+				spec.Domain = "tyktest.io"
+				spec.Proxy.DisableStripSlash = true
+				spec.Proxy.StripListenPath = true
+			},
+			func(spec *APISpec) {
+				spec.APIID = "api-b"
+				spec.Proxy.ListenPath = "/test-classic-extended"
+				spec.Proxy.PreserveHostHeader = true
+				spec.Proxy.TargetURL = mockServerB.URL
+				spec.Domain = "tyktyktest.io"
+				spec.Proxy.DisableStripSlash = true
+				spec.Proxy.StripListenPath = true
+			},
+		)
+
+		_, _ = ts.Run(t, []test.TestCase{
+			{Client: localClient, Code: 200, Path: "/test-classic", Domain: "tyktest.io", BodyMatch: `{"match":"serverA"}`},
+			{Client: localClient, Code: 200, Path: "/test-classic-extended", Domain: "tyktyktest.io", BodyMatch: `{"match":"serverB"}`},
+		}...)
+	})
+}
+
+func TestAPIsHavingShorterSubstringListenPathButLongerCustomDomain(t *testing.T) { //the case that triggered the critical from TT-12873
+	ts := StartTest(nil)
+	t.Cleanup(ts.Close)
+
+	localClient := test.NewClientLocal()
+
+	mockServerA := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{"match":"serverA"}`))
+	}))
+	defer mockServerA.Close()
+
+	mockServerB := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{"match":"serverB"}`))
+	}))
+	defer mockServerB.Close()
+
+	t.Run("With custom domain support", func(t *testing.T) {
+		globalConf := ts.Gw.GetConfig()
+		globalConf.EnableCustomDomains = true
+		ts.Gw.SetConfig(globalConf)
+		defer ts.ResetTestConfig()
+
+		ts.Gw.BuildAndLoadAPI(
+			func(spec *APISpec) {
+				spec.APIID = "api-a"
+				spec.Proxy.ListenPath = "/test-classic"
+				spec.Proxy.TargetURL = mockServerA.URL
+				spec.Domain = "{subdomain:tyktest.io|abc.def.ghi}"
+				spec.Proxy.DisableStripSlash = true
+				spec.Proxy.StripListenPath = true
+			},
+			func(spec *APISpec) {
+				spec.APIID = "api-b"
+				spec.Proxy.ListenPath = "/test-classic-extended"
+				spec.Proxy.TargetURL = mockServerB.URL
+				spec.Domain = "{subdomain:tyktest.io}"
+				spec.Proxy.DisableStripSlash = true
+				spec.Proxy.StripListenPath = true
+			},
+		)
+
+		_, _ = ts.Run(t, []test.TestCase{
+			{Client: localClient, Code: 200, Path: "/test-classic", Domain: "tyktest.io", BodyMatch: `{"match":"serverA"}`},
+			{Client: localClient, Code: 200, Path: "/test-classic-extended", Domain: "tyktest.io", BodyMatch: `{"match":"serverB"}`},
+		}...)
+	})
+}
+
+func TestLongerListenPathHasLongerDomainThanSubstringListenPath(t *testing.T) { //the case that triggered the critical from TT-12873
+	ts := StartTest(nil)
+	t.Cleanup(ts.Close)
+
+	localClient := test.NewClientLocal()
+
+	mockServerA := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{"match":"serverA"}`))
+	}))
+	defer mockServerA.Close()
+
+	mockServerB := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{"match":"serverB"}`))
+	}))
+	defer mockServerB.Close()
+
+	t.Run("With custom domain support", func(t *testing.T) {
+		globalConf := ts.Gw.GetConfig()
+		globalConf.EnableCustomDomains = true
+		ts.Gw.SetConfig(globalConf)
+		defer ts.ResetTestConfig()
+
+		ts.Gw.BuildAndLoadAPI(
+			func(spec *APISpec) {
+				spec.APIID = "api-a"
+				spec.Proxy.ListenPath = "/test-classic"
+				spec.Proxy.TargetURL = mockServerA.URL
+				spec.Domain = "{subdomain:tyktest.io}"
+				spec.Proxy.DisableStripSlash = true
+				spec.Proxy.StripListenPath = true
+			},
+			func(spec *APISpec) {
+				spec.APIID = "api-b"
+				spec.Proxy.ListenPath = "/test-classic-extended"
+				spec.Proxy.TargetURL = mockServerB.URL
+				spec.Domain = "{subdomain:tyktest.io|abc.def.ghi}"
+				spec.Proxy.DisableStripSlash = true
+				spec.Proxy.StripListenPath = true
+			},
+		)
+
+		_, _ = ts.Run(t, []test.TestCase{
+			{Client: localClient, Code: 200, Path: "/test-classic", Domain: "tyktest.io", BodyMatch: `{"match":"serverA"}`},
+			{Client: localClient, Code: 200, Path: "/test-classic-extended", Domain: "tyktest.io", BodyMatch: `{"match":"serverB"}`},
+		}...)
+	})
+}
