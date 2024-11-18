@@ -1107,7 +1107,6 @@ const Schema = `{
               },
               "required": [
                 "client_id",
-                "client_secret",
                 "token_url",
                 "username",
                 "password"
