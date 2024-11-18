@@ -849,7 +849,7 @@ type ClientAuthData struct {
 	// ClientID is the application's ID.
 	ClientID string `bson:"client_id" json:"client_id"`
 	// ClientSecret is the application's secret.
-	ClientSecret string `bson:"client_secret" json:"client_secret"`
+	ClientSecret string `bson:"client_secret,omitempty" json:"client_secret,omitempty"` // client secret is optional for password flow
 }
 
 // ClientCredentials holds the client credentials for upstream OAuth2 authentication.
