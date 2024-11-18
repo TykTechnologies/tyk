@@ -1527,17 +1527,6 @@ func DummyAPI() APIDefinition {
 		CORS:    defaultCORSConfig,
 		Tags:    []string{},
 		GraphQL: graphql,
-		UpstreamAuth: UpstreamAuth{
-			Enabled: true,
-			OAuth: UpstreamOAuth{
-				Enabled: true,
-				ClientCredentials: ClientCredentials{
-					ClientAuthData: ClientAuthData{
-						ClientSecret: "dummy", // workaround to fix schema error
-					},
-				},
-			},
-		},
 	}
 }
 
