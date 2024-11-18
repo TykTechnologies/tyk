@@ -866,7 +866,7 @@ func TestAPIsHavingShorterSubstringListenPathButLongerCustomDomain(t *testing.T)
 	})
 }
 
-func TestLongerListenPathHasLongerDomainThanSubstringListenPath(t *testing.T) { //the case that triggered the critical from TT-12873
+func TestLongerListenPathHasLongerDomainThanSubstringListenPath(t *testing.T) {
 	ts := StartTest(nil)
 	t.Cleanup(ts.Close)
 
