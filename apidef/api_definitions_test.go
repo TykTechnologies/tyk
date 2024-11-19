@@ -15,17 +15,6 @@ func TestSchema(t *testing.T) {
 	schemaLoader := schema.NewBytesLoader([]byte(Schema))
 
 	spec := DummyAPI()
-	spec.UpstreamAuth = UpstreamAuth{
-		Enabled: true,
-		OAuth: UpstreamOAuth{
-			Enabled: true,
-			ClientCredentials: ClientCredentials{
-				ClientAuthData: ClientAuthData{
-					ClientSecret: "dummy", // workaround to fix schema error
-				},
-			},
-		},
-	}
 	goLoader := schema.NewGoLoader(spec)
 	result, err := schema.Validate(schemaLoader, goLoader)
 	if err != nil {
@@ -111,17 +100,6 @@ func TestSchemaGraphqlConfig(t *testing.T) {
 	schemaLoader := schema.NewBytesLoader([]byte(Schema))
 
 	spec := DummyAPI()
-	spec.UpstreamAuth = UpstreamAuth{
-		Enabled: true,
-		OAuth: UpstreamOAuth{
-			Enabled: true,
-			ClientCredentials: ClientCredentials{
-				ClientAuthData: ClientAuthData{
-					ClientSecret: "dummy", // workaround to fix schema error
-				},
-			},
-		},
-	}
 	spec.GraphQL.ExecutionMode = ""
 
 	goLoader := schema.NewGoLoader(spec)
