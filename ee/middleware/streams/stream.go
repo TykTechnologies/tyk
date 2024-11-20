@@ -11,7 +11,9 @@ import (
 	"github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v2"
 
-	_ "github.com/warpstreamlabs/bento/public/components/all"
+	_ "github.com/warpstreamlabs/bento/public/components/io"
+	_ "github.com/warpstreamlabs/bento/public/components/kafka"
+	_ "github.com/warpstreamlabs/bento/public/components/nats"
 	"github.com/warpstreamlabs/bento/public/service"
 
 	_ "github.com/TykTechnologies/tyk/internal/portal"
