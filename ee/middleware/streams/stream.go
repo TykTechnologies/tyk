@@ -13,6 +13,7 @@ import (
 
 	_ "github.com/warpstreamlabs/bento/public/components/io"
 	_ "github.com/warpstreamlabs/bento/public/components/kafka"
+	_ "github.com/warpstreamlabs/bento/public/components/nats"
 	"github.com/warpstreamlabs/bento/public/service"
 
 	_ "github.com/TykTechnologies/tyk/internal/portal"
