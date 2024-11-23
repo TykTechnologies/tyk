@@ -5,12 +5,14 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/TykTechnologies/tyk/header"
 	"io/ioutil"
 	"math/rand"
 	"mime/multipart"
 	"net"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -567,6 +569,9 @@ func TestGRPCDispatch(t *testing.T) {
 			Code:      http.StatusOK,
 			Headers:   headers,
 			BodyMatch: "newbody",
+			HeadersMatch: map[string]string{
+				header.ContentLength: strconv.Itoa(len("newbody")),
+			},
 		})
 	})
 
