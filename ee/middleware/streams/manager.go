@@ -129,3 +129,13 @@ func (sm *Manager) SetAnalyticsFactory(factory StreamAnalyticsFactory) {
 	}
 	sm.analyticsFactory = factory
 }
+
+func (sm *Manager) GetStream(streamID string) (*Stream, bool) {
+	streamFullID := fmt.Sprintf("%s_%s", sm.mw.Spec.APIID, streamID)
+	streamValue, exists := sm.streams.Load(streamFullID)
+	if !exists {
+		return nil, false
+	}
+	stream, ok := streamValue.(*Stream)
+	return stream, ok
+}

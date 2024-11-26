@@ -52,3 +52,7 @@ func (w *wrapMiddleware) EnabledForSpec() bool {
 func (w *wrapMiddleware) ProcessRequest(rw http.ResponseWriter, r *http.Request, data interface{}) (error, int) {
 	return w.mw.ProcessRequest(rw, r, data)
 }
+
+func (w *wrapMiddleware) Unwrap() model.Middleware {
+	return w.mw
+}

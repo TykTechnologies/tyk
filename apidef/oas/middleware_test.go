@@ -1040,3 +1040,40 @@ func TestContextVariables(t *testing.T) {
 		}
 	})
 }
+
+func TestStreamShadow(t *testing.T) {
+	t.Run("empty", func(t *testing.T) {
+		var emptyStreamShadow StreamShadow
+
+		meta := apidef.StreamShadowMeta{}
+		emptyStreamShadow.ExtractTo(&meta)
+
+		var resultStreamShadow StreamShadow
+		resultStreamShadow.Fill(meta)
+
+		assert.Equal(t, emptyStreamShadow, resultStreamShadow)
+	})
+
+	t.Run("filled", func(t *testing.T) {
+		streamShadow := StreamShadow{
+			Enabled:        true,
+			StreamingApiId: "123",
+			StreamID:       "stream1",
+		}
+
+		meta := apidef.StreamShadowMeta{
+			Path:   "/test",
+			Method: "GET",
+		}
+
+		streamShadow.ExtractTo(&meta)
+
+		assert.Equal(t, "123", meta.StreamingApiId)
+		assert.Equal(t, "stream1", meta.StreamId)
+
+		var resultStreamShadow StreamShadow
+		resultStreamShadow.Fill(meta)
+
+		assert.Equal(t, streamShadow, resultStreamShadow)
+	})
+}

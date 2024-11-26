@@ -303,6 +303,10 @@ func (gw *Gateway) getApiSpec(apiID string) *APISpec {
 	return spec
 }
 
+func (gw *Gateway) GetApiSpec(apiID string) interface{} {
+	return gw.getApiSpec(apiID)
+}
+
 func (gw *Gateway) getAPIDefinition(apiID string) (*apidef.APIDefinition, error) {
 	apiSpec := gw.getApiSpec(apiID)
 	if apiSpec == nil {
@@ -885,12 +889,15 @@ func (gw *Gateway) loadCustomMiddleware(spec *APISpec) ([]string, apidef.Middlew
 }
 
 // Create the response processor chain
-func (gw *Gateway) createResponseMiddlewareChain(spec *APISpec, responseFuncs []apidef.MiddlewareDefinition) {
+func (gw *Gateway) createResponseMiddlewareChain(spec *APISpec, responseFuncs []apidef.MiddlewareDefinition, logger *logrus.Entry) {
 	var (
 		responseMWChain []TykResponseHandler
 		baseHandler     = BaseTykResponseHandler{Spec: spec, Gw: gw}
 	)
 	gw.responseMWAppendEnabled(&responseMWChain, &ResponseTransformMiddleware{BaseTykResponseHandler: baseHandler})
+
+	// Always add StreamShadow middleware
+	responseMWChain = append(responseMWChain, getStreamShadowMiddleware(&baseHandler, logger))
 
 	headerInjector := &HeaderInjector{BaseTykResponseHandler: baseHandler}
 	headerInjectorAdded := gw.responseMWAppendEnabled(&responseMWChain, headerInjector)
@@ -1247,7 +1254,13 @@ func (gw *Gateway) initSystem() error {
 	if !gw.isRunningTests() {
 		gwConfig := config.Config{}
 		if err := config.Load(confPaths, &gwConfig); err != nil {
-			return err
+			mainLog.Errorf("Error loading config, using defaults: %v", err)
+
+			defaultConfig, err := config.NewDefaultWithEnv()
+			if err != nil {
+				mainLog.Fatalf("Error falling back to default config with env: %v", err)
+			}
+			gwConfig = *defaultConfig
 		}
 
 		if gwConfig.PIDFileLocation == "" {
@@ -1312,7 +1325,7 @@ func (gw *Gateway) initSystem() error {
 		gwConfig.HttpServerOptions.MaxVersion = gwConfig.HttpServerOptions.MinVersion
 	}
 
-	if gwConfig.UseDBAppConfigs && gwConfig.Policies.PolicySource != config.DefaultDashPolicySource {
+	if gwConfig.UseDBAppConfigs && gw.GetConfig().Policies.PolicySource != config.DefaultDashPolicySource {
 		gwConfig.Policies.PolicySource = config.DefaultDashPolicySource
 		gwConfig.Policies.PolicyConnectionString = gwConfig.DBAppConfOptions.ConnectionString
 		if gwConfig.Policies.PolicyRecordName == "" {

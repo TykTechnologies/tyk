@@ -63,73 +63,74 @@ const (
 )
 
 // URLStatus is a custom enum type to avoid collisions
-type URLStatus int
+type URLStatus = apidef.URLStatus
 
 // Enums representing the various statuses for a VersionInfo Path match during a
 // proxy request
 const (
-	_ URLStatus = iota
-	Ignored
-	WhiteList
-	BlackList
-	MockResponse
-	Cached
-	Transformed
-	TransformedJQ
-	HeaderInjected
-	HeaderInjectedResponse
-	TransformedResponse
-	TransformedJQResponse
-	HardTimeout
-	CircuitBreaker
-	URLRewrite
-	VirtualPath
-	RequestSizeLimit
-	MethodTransformed
-	RequestTracked
-	RequestNotTracked
-	ValidateJSONRequest
-	Internal
-	GoPlugin
-	PersistGraphQL
-	RateLimit
+	Ignored                = apidef.Ignored
+	WhiteList              = apidef.WhiteList
+	BlackList              = apidef.BlackList
+	MockResponse           = apidef.MockResponse
+	Cached                 = apidef.Cached
+	Transformed            = apidef.Transformed
+	TransformedJQ          = apidef.TransformedJQ
+	HeaderInjected         = apidef.HeaderInjected
+	HeaderInjectedResponse = apidef.HeaderInjectedResponse
+	TransformedResponse    = apidef.TransformedResponse
+	TransformedJQResponse  = apidef.TransformedJQResponse
+	HardTimeout            = apidef.HardTimeout
+	CircuitBreaker         = apidef.CircuitBreaker
+	URLRewrite             = apidef.URLRewrite
+	VirtualPath            = apidef.VirtualPath
+	RequestSizeLimit       = apidef.RequestSizeLimit
+	MethodTransformed      = apidef.MethodTransformed
+	RequestTracked         = apidef.RequestTracked
+	RequestNotTracked      = apidef.RequestNotTracked
+	ValidateJSONRequest    = apidef.ValidateJSONRequest
+	Internal               = apidef.Internal
+	GoPlugin               = apidef.GoPlugin
+	PersistGraphQL         = apidef.PersistGraphQL
+	RateLimit              = apidef.RateLimit
+	StreamShadow           = apidef.StreamShadow
 )
 
 // RequestStatus is a custom type to avoid collisions
-type RequestStatus string
+type RequestStatus = apidef.RequestStatus
 
 // Statuses of the request, all are false-y except StatusOk and StatusOkAndIgnore
 const (
-	VersionNotFound                RequestStatus = "Version information not found"
-	VersionDoesNotExist            RequestStatus = "This API version does not seem to exist"
-	VersionWhiteListStatusNotFound RequestStatus = "WhiteListStatus for path not found"
-	VersionExpired                 RequestStatus = "Api Version has expired, please check documentation or contact administrator"
-	APIExpired                     RequestStatus = "API has expired, please check documentation or contact administrator"
-	EndPointNotAllowed             RequestStatus = "Requested endpoint is forbidden"
-	StatusOkAndIgnore              RequestStatus = "Everything OK, passing and not filtering"
-	StatusOk                       RequestStatus = "Everything OK, passing"
-	StatusCached                   RequestStatus = "Cached path"
-	StatusTransform                RequestStatus = "Transformed path"
-	StatusTransformResponse        RequestStatus = "Transformed response"
-	StatusTransformJQ              RequestStatus = "Transformed path with JQ"
-	StatusTransformJQResponse      RequestStatus = "Transformed response with JQ"
-	StatusHeaderInjected           RequestStatus = "Header injected"
-	StatusMethodTransformed        RequestStatus = "Method Transformed"
-	StatusHeaderInjectedResponse   RequestStatus = "Header injected on response"
-	StatusRedirectFlowByReply      RequestStatus = "Exceptional action requested, redirecting flow!"
-	StatusHardTimeout              RequestStatus = "Hard Timeout enforced on path"
-	StatusCircuitBreaker           RequestStatus = "Circuit breaker enforced"
-	StatusURLRewrite               RequestStatus = "URL Rewritten"
-	StatusVirtualPath              RequestStatus = "Virtual Endpoint"
-	StatusRequestSizeControlled    RequestStatus = "Request Size Limited"
-	StatusRequestTracked           RequestStatus = "Request Tracked"
-	StatusRequestNotTracked        RequestStatus = "Request Not Tracked"
-	StatusValidateJSON             RequestStatus = "Validate JSON"
-	StatusValidateRequest          RequestStatus = "Validate Request"
-	StatusInternal                 RequestStatus = "Internal path"
-	StatusGoPlugin                 RequestStatus = "Go plugin"
-	StatusPersistGraphQL           RequestStatus = "Persist GraphQL"
-	StatusRateLimit                RequestStatus = "Rate Limited"
+	VersionNotFound                = apidef.VersionNotFound
+	VersionDoesNotExist            = apidef.VersionDoesNotExist
+	VersionWhiteListStatusNotFound = apidef.VersionWhiteListStatusNotFound
+	VersionExpired                 = apidef.VersionExpired
+	APIExpired                     = apidef.APIExpired
+	EndPointNotAllowed             = apidef.EndPointNotAllowed
+	StatusOkAndIgnore              = apidef.StatusOkAndIgnore
+	StatusOk                       = apidef.StatusOk
+	StatusCached                   = apidef.StatusCached
+	StatusTransform                = apidef.StatusTransform
+	StatusTransformResponse        = apidef.StatusTransformResponse
+	StatusTransformJQ              = apidef.StatusTransformJQ
+	StatusTransformJQResponse      = apidef.StatusTransformJQResponse
+	StatusHeaderInjected           = apidef.StatusHeaderInjected
+	StatusMethodTransformed        = apidef.StatusMethodTransformed
+	StatusHeaderInjectedResponse   = apidef.StatusHeaderInjectedResponse
+	StatusRedirectFlowByReply      = apidef.StatusRedirectFlowByReply
+	StatusHardTimeout              = apidef.StatusHardTimeout
+	StatusCircuitBreaker           = apidef.StatusCircuitBreaker
+	StatusURLRewrite               = apidef.StatusURLRewrite
+	StatusVirtualPath              = apidef.StatusVirtualPath
+	StatusRequestSizeControlled    = apidef.StatusRequestSizeControlled
+	StatusRequestTracked           = apidef.StatusRequestTracked
+	StatusRequestNotTracked        = apidef.StatusRequestNotTracked
+	StatusValidateJSON             = apidef.StatusValidateJSON
+	StatusValidateRequest          = apidef.StatusValidateRequest
+	StatusInternal                 = apidef.StatusInternal
+	StatusGoPlugin                 = apidef.StatusGoPlugin
+	StatusPersistGraphQL           = apidef.StatusPersistGraphQL
+	StatusRateLimit                = apidef.StatusRateLimit
+	StatusStreamShadow             = apidef.StatusStreamShadow
 )
 
 // URLSpec represents a flattened specification for URLs, used to check if a proxy URL
@@ -164,6 +165,7 @@ type URLSpec struct {
 	GoPluginMeta              GoPluginMiddleware
 	PersistGraphQL            apidef.PersistGraphQLMeta
 	RateLimit                 apidef.RateLimitMeta
+	StreamShadow              apidef.StreamShadowMeta
 
 	IgnoreCase bool
 }
@@ -217,6 +219,7 @@ type APISpec struct {
 	GlobalConfig             config.Config
 	OrgHasNoSession          bool
 	AnalyticsPluginConfig    *GoAnalyticsPlugin
+	StreamingMW              TykMiddleware
 
 	middlewareChain *ChainObject
 	unloadHooks     []func()
@@ -228,6 +231,10 @@ type APISpec struct {
 	HasMock            bool
 	HasValidateRequest bool
 	OASRouter          routers.Router
+}
+
+func (spec *APISpec) GetStreamingMW() model.Middleware {
+	return spec.StreamingMW.(*wrapMiddleware).Unwrap()
 }
 
 // GetSessionLifetimeRespectsKeyExpiration returns a boolean to tell whether session lifetime should respect to key expiration or not.
@@ -1353,6 +1360,19 @@ func (a APIDefinitionLoader) compileRateLimitPathsSpec(paths []apidef.RateLimitM
 	return urlSpec
 }
 
+func (a APIDefinitionLoader) compileStreamShadowPathsSpec(paths []apidef.StreamShadowMeta, stat URLStatus, conf config.Config) []URLSpec {
+	urlSpec := []URLSpec{}
+
+	for _, stringSpec := range paths {
+		newSpec := URLSpec{}
+		a.generateRegex(stringSpec.Path, &newSpec, stat, conf)
+		newSpec.StreamShadow = stringSpec
+		urlSpec = append(urlSpec, newSpec)
+	}
+
+	return urlSpec
+}
+
 func (a APIDefinitionLoader) getExtendedPathSpecs(apiVersionDef apidef.VersionInfo, apiSpec *APISpec, conf config.Config) ([]URLSpec, bool) {
 	// TODO: New compiler here, needs to put data into a different structure
 
@@ -1380,6 +1400,7 @@ func (a APIDefinitionLoader) getExtendedPathSpecs(apiVersionDef apidef.VersionIn
 	goPlugins := a.compileGopluginPathsSpec(apiVersionDef.ExtendedPaths.GoPlugin, GoPlugin, apiSpec, conf)
 	persistGraphQL := a.compilePersistGraphQLPathSpec(apiVersionDef.ExtendedPaths.PersistGraphQL, PersistGraphQL, apiSpec, conf)
 	rateLimitPaths := a.compileRateLimitPathsSpec(apiVersionDef.ExtendedPaths.RateLimit, RateLimit, conf)
+	streamShadow := a.compileStreamShadowPathsSpec(apiVersionDef.ExtendedPaths.StreamShadow, StreamShadow, conf)
 
 	combinedPath := []URLSpec{}
 	combinedPath = append(combinedPath, mockResponsePaths...)
@@ -1406,6 +1427,7 @@ func (a APIDefinitionLoader) getExtendedPathSpecs(apiVersionDef apidef.VersionIn
 	combinedPath = append(combinedPath, validateJSON...)
 	combinedPath = append(combinedPath, internalPaths...)
 	combinedPath = append(combinedPath, rateLimitPaths...)
+	combinedPath = append(combinedPath, streamShadow...)
 
 	return combinedPath, len(whiteListPaths) > 0
 }
@@ -1468,6 +1490,8 @@ func (a *APISpec) getURLStatus(stat URLStatus) RequestStatus {
 		return StatusPersistGraphQL
 	case RateLimit:
 		return StatusRateLimit
+	case StreamShadow:
+		return StatusStreamShadow
 	default:
 		log.Error("URL Status was not one of Ignored, Blacklist or WhiteList! Blocking.")
 		return EndPointNotAllowed

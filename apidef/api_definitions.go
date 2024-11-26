@@ -126,6 +126,78 @@ const (
 	OAuthAuthorizationTypePassword = "password"
 )
 
+// URLStatus is a custom enum type to avoid collisions
+type URLStatus int
+
+// Enums representing the various statuses for a VersionInfo Path match during a
+// proxy request
+const (
+	_ URLStatus = iota
+	Ignored
+	WhiteList
+	BlackList
+	MockResponse
+	Cached
+	Transformed
+	TransformedJQ
+	HeaderInjected
+	HeaderInjectedResponse
+	TransformedResponse
+	TransformedJQResponse
+	HardTimeout
+	CircuitBreaker
+	URLRewrite
+	VirtualPath
+	RequestSizeLimit
+	MethodTransformed
+	RequestTracked
+	RequestNotTracked
+	ValidateJSONRequest
+	Internal
+	GoPlugin
+	PersistGraphQL
+	RateLimit
+	StreamShadow
+)
+
+// RequestStatus is a custom type to avoid collisions
+type RequestStatus string
+
+// Statuses of the request, all are false-y except StatusOk and StatusOkAndIgnore
+const (
+	VersionNotFound                RequestStatus = "Version information not found"
+	VersionDoesNotExist            RequestStatus = "This API version does not seem to exist"
+	VersionWhiteListStatusNotFound RequestStatus = "WhiteListStatus for path not found"
+	VersionExpired                 RequestStatus = "Api Version has expired, please check documentation or contact administrator"
+	APIExpired                     RequestStatus = "API has expired, please check documentation or contact administrator"
+	EndPointNotAllowed             RequestStatus = "Requested endpoint is forbidden"
+	StatusOkAndIgnore              RequestStatus = "Everything OK, passing and not filtering"
+	StatusOk                       RequestStatus = "Everything OK, passing"
+	StatusCached                   RequestStatus = "Cached path"
+	StatusTransform                RequestStatus = "Transformed path"
+	StatusTransformResponse        RequestStatus = "Transformed response"
+	StatusTransformJQ              RequestStatus = "Transformed path with JQ"
+	StatusTransformJQResponse      RequestStatus = "Transformed response with JQ"
+	StatusHeaderInjected           RequestStatus = "Header injected"
+	StatusMethodTransformed        RequestStatus = "Method Transformed"
+	StatusHeaderInjectedResponse   RequestStatus = "Header injected on response"
+	StatusRedirectFlowByReply      RequestStatus = "Exceptional action requested, redirecting flow!"
+	StatusHardTimeout              RequestStatus = "Hard Timeout enforced on path"
+	StatusCircuitBreaker           RequestStatus = "Circuit breaker enforced"
+	StatusURLRewrite               RequestStatus = "URL Rewritten"
+	StatusVirtualPath              RequestStatus = "Virtual Endpoint"
+	StatusRequestSizeControlled    RequestStatus = "Request Size Limited"
+	StatusRequestTracked           RequestStatus = "Request Tracked"
+	StatusRequestNotTracked        RequestStatus = "Request Not Tracked"
+	StatusValidateJSON             RequestStatus = "Validate JSON"
+	StatusValidateRequest          RequestStatus = "Validate Request"
+	StatusInternal                 RequestStatus = "Internal path"
+	StatusGoPlugin                 RequestStatus = "Go plugin"
+	StatusPersistGraphQL           RequestStatus = "Persist GraphQL"
+	StatusRateLimit                RequestStatus = "Rate Limited"
+	StatusStreamShadow             RequestStatus = "Stream Shadow"
+)
+
 var (
 	// Deprecated: Use ErrClassicAPIExpected instead.
 	ErrAPIMigrated                         = errors.New("the supplied API definition is in Tyk classic format, please use OAS format for this API")
@@ -398,13 +470,14 @@ type ExtendedPathsSet struct {
 	SizeLimit               []RequestSizeMeta     `bson:"size_limits" json:"size_limits,omitempty"`
 	MethodTransforms        []MethodTransformMeta `bson:"method_transforms" json:"method_transforms,omitempty"`
 	TrackEndpoints          []TrackEndpointMeta   `bson:"track_endpoints" json:"track_endpoints,omitempty"`
-	DoNotTrackEndpoints     []TrackEndpointMeta   `bson:"do_not_track_endpoints" json:"do_not_track_endpoints,omitempty"`
+	DoNotTrackEndpoints     []TrackEndpointMeta   `bson:"do_not_track_endpoints" json:"do_not_track_endpoints"`
 	ValidateJSON            []ValidatePathMeta    `bson:"validate_json" json:"validate_json,omitempty"`
 	ValidateRequest         []ValidateRequestMeta `bson:"validate_request" json:"validate_request,omitempty"`
 	Internal                []InternalMeta        `bson:"internal" json:"internal,omitempty"`
 	GoPlugin                []GoPluginMeta        `bson:"go_plugin" json:"go_plugin,omitempty"`
 	PersistGraphQL          []PersistGraphQLMeta  `bson:"persist_graphql" json:"persist_graphql"`
 	RateLimit               []RateLimitMeta       `bson:"rate_limit" json:"rate_limit"`
+	StreamShadow            []StreamShadowMeta    `bson:"stream_shadow" json:"stream_shadow"`
 }
 
 // Clear omits values that have OAS API definition conversions in place.
@@ -776,6 +849,21 @@ type APIDefinition struct {
 
 	// UpstreamAuth stores information about authenticating against upstream.
 	UpstreamAuth UpstreamAuth `bson:"upstream_auth" json:"upstream_auth"`
+}
+
+// StreamShadowMeta holds configuration for stream shadowing.
+type StreamShadowMeta struct {
+	// Path is the path to shadow
+	Path string `bson:"path" json:"path"`
+
+	// Method is the method to shadow
+	Method string `bson:"method" json:"method"`
+
+	// StreamingApiId is the API ID to shadow to
+	StreamingApiId string `bson:"streamingApiId" json:"streamingApiId"`
+
+	// StreamId is the stream ID to use
+	StreamId string `bson:"streamId" json:"streamId"`
 }
 
 // UpstreamAuth holds the configurations related to upstream API authentication.

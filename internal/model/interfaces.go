@@ -5,6 +5,7 @@ import (
 
 	"github.com/sirupsen/logrus"
 
+	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/user"
 )
@@ -27,6 +28,31 @@ type Middleware interface {
 	Logger() *logrus.Entry
 	ProcessRequest(w http.ResponseWriter, r *http.Request, conf interface{}) (error, int) // Handles request
 	EnabledForSpec() bool
+}
+
+type ResponseMiddleware interface {
+	Init(i interface{}, spec *apidef.APIDefinition) error
+	Name() string
+	// Logger() *logrus.Entry
+	HandleResponse(w http.ResponseWriter, res *http.Response, req *http.Request, ses *user.SessionState) error // Handles response
+	Enabled() bool
+	HandleError(w http.ResponseWriter, req *http.Request)
+}
+
+type StreamingMiddlewareWrapper interface {
+	Unwrap() StreamingMiddleware
+}
+
+type StreamingMiddleware interface {
+	CreateStreamManager(r *http.Request) StreamManager
+}
+
+type StreamManager interface {
+	GetStream(streamID string) (*Stream, bool)
+}
+
+type Stream interface {
+	Produce([]byte) error
 }
 
 // LoggerProvider returns a new *logrus.Entry for the request.

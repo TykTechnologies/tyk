@@ -3,7 +3,17 @@ package gateway
 import (
 	"net/http"
 	"strings"
+
+	"github.com/TykTechnologies/tyk/apidef"
 )
+
+func (a *APISpec) GetMiddlewareMetadata(r *http.Request, mode apidef.URLStatus) (interface{}, bool) {
+	vInfo, _ := a.Version(r)
+	versionPaths := a.RxPaths[vInfo.Name]
+	found, meta := a.CheckSpecMatchesStatus(r, versionPaths, mode)
+
+	return meta, found
+}
 
 // CheckSpecMatchesStatus checks if a URL spec has a specific status.
 // Deprecated: The function doesn't follow go return conventions (T, ok); use FindSpecMatchesStatus;
@@ -17,6 +27,7 @@ func (a *APISpec) CheckSpecMatchesStatus(r *http.Request, rxPaths []URLSpec, mod
 		if !rxPaths[i].matchesMethod(method) {
 			continue
 		}
+
 		if !rxPaths[i].matchesPath(matchPath, a) {
 			continue
 		}
@@ -39,12 +50,14 @@ func (a *APISpec) FindSpecMatchesStatus(r *http.Request, rxPaths []URLSpec, mode
 		if !rxPaths[i].matchesMethod(method) {
 			continue
 		}
+
 		if !rxPaths[i].matchesPath(matchPath, a) {
 			continue
 		}
 
 		return &rxPaths[i], true
 	}
+
 	return nil, false
 }
 

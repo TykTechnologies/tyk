@@ -676,6 +676,24 @@
         "enabled"
       ]
     },
+    "X-Tyk-StreamShadow": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "streamingApiId": {
+          "type": "string"
+        },
+        "streamId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "enabled"
+      ]
+    },
     "X-Tyk-EnforceTimeout": {
       "type": "object",
       "properties": {
@@ -1004,6 +1022,9 @@
         },
         "cache": {
           "$ref": "#/definitions/X-Tyk-CachePlugin"
+        },
+        "streamShadow": {
+          "$ref": "#/definitions/X-Tyk-StreamShadow"
         },
         "enforceTimeout": {
           "$ref": "#/definitions/X-Tyk-EnforceTimeout"

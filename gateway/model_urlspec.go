@@ -44,6 +44,8 @@ func (u *URLSpec) modeSpecificSpec(mode URLStatus) (interface{}, bool) {
 		return &u.GoPluginMeta, true
 	case PersistGraphQL:
 		return &u.PersistGraphQL, true
+	case StreamShadow:
+		return &u.StreamShadow, true
 	default:
 		return nil, false
 	}
@@ -94,6 +96,8 @@ func (u *URLSpec) matchesMethod(method string) bool {
 		return method == u.PersistGraphQL.Method
 	case RateLimit:
 		return method == u.RateLimit.Method
+	case StreamShadow:
+		return method == u.StreamShadow.Method
 	default:
 		return false
 	}

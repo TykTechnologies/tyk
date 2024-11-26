@@ -25,6 +25,7 @@ type Stream struct {
 	streamConfig  string
 	stream        *service.Stream
 	log           *logrus.Logger
+	producerFunc  service.MessageHandlerFunc
 }
 
 // NewStream creates a new stream without initializing it
@@ -76,6 +77,15 @@ func (s *Stream) Start(config map[string]interface{}, mux service.HTTPMultiplexe
 
 	if mux != nil {
 		builder.SetHTTPMux(mux)
+	}
+
+	if strings.Contains(string(configPayload), "stream_shadow") {
+		pFn, err := builder.AddProducerFunc()
+		if err != nil {
+			s.log.Errorf("Failed to add producer function: %v", err)
+			return err
+		}
+		s.producerFunc = pFn
 	}
 
 	stream, err := builder.Build()
@@ -139,6 +149,7 @@ func (s *Stream) Stop() error {
 
 	s.streamConfig = ""
 	s.stream = nil
+	s.producerFunc = nil
 
 	return nil
 }
@@ -151,6 +162,14 @@ func (s *Stream) GetConfig() string {
 // Reset stops the stream
 func (s *Stream) Reset() error {
 	return s.Stop()
+}
+
+// Produce sends a message to the stream
+func (s *Stream) Produce(ctx context.Context, data []byte) error {
+	if s.producerFunc == nil {
+		return fmt.Errorf("producer function not initialized")
+	}
+	return s.producerFunc(ctx, service.NewMessage(data))
 }
 
 var unsafeComponents = []string{

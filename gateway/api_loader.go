@@ -273,7 +273,7 @@ func (gw *Gateway) processSpec(spec *APISpec, apisByListen map[string]int,
 	}
 
 	// Create the response processors, pass all the loaded custom middleware response functions:
-	gw.createResponseMiddlewareChain(spec, mwResponseFuncs)
+	gw.createResponseMiddlewareChain(spec, mwResponseFuncs, logger)
 
 	baseMid := &BaseMiddleware{Spec: spec, Proxy: proxy, logger: logger, Gw: gw}
 
@@ -429,6 +429,7 @@ func (gw *Gateway) processSpec(spec *APISpec, apisByListen map[string]int,
 
 	if streamMw := getStreamingMiddleware(baseMid); streamMw != nil {
 		gw.mwAppendEnabled(&chainArray, streamMw)
+		spec.StreamingMW = streamMw
 	}
 
 	if !spec.UseKeylessAccess {

@@ -1366,7 +1366,8 @@ type VirtualEndpoint struct {
 	Body string `bson:"body,omitempty" json:"body,omitempty"`
 	// ProxyOnError proxies if virtual endpoint errors out.
 	ProxyOnError bool `bson:"proxyOnError,omitempty" json:"proxyOnError,omitempty"`
-	// RequireSession if enabled passes session to virtual endpoint.
+	// RequireSession if enabled passes down the session information for plugins after authentication.
+	// RequireSession is used only with JSVM custom middleware.
 	RequireSession bool `bson:"requireSession,omitempty" json:"requireSession,omitempty"`
 }
 
@@ -1580,4 +1581,34 @@ func (c *ContextVariables) Fill(api apidef.APIDefinition) {
 // ExtractTo extracts *ContextVariables into *apidef.APIDefinition.
 func (c *ContextVariables) ExtractTo(api *apidef.APIDefinition) {
 	api.EnableContextVars = c.Enabled
+}
+
+// StreamShadow holds configuration for stream shadowing functionality.
+type StreamShadow struct {
+	// Enabled enables stream shadowing for this API.
+	Enabled bool `bson:"enabled" json:"enabled"`
+
+	// StreamingApiId is the ID of the API to shadow to.
+	StreamingApiId string `bson:"streamingApiId,omitempty" json:"streamingApiId,omitempty"`
+
+	// StreamID is the stream ID to use.
+	StreamID string `bson:"streamId,omitempty" json:"streamId,omitempty"`
+}
+
+// Fill fills *StreamShadow from apidef.StreamShadowMeta.
+func (s *StreamShadow) Fill(meta apidef.StreamShadowMeta) {
+	// Only enable if we have either StreamingApiId or StreamId
+	s.Enabled = meta.StreamingApiId != "" || meta.StreamId != ""
+	s.StreamingApiId = meta.StreamingApiId
+	s.StreamID = meta.StreamId
+}
+
+// ExtractTo extracts *StreamShadow into *apidef.StreamShadowMeta.
+func (s *StreamShadow) ExtractTo(meta *apidef.StreamShadowMeta) {
+	if !s.Enabled {
+		return
+	}
+
+	meta.StreamingApiId = s.StreamingApiId
+	meta.StreamId = s.StreamID
 }

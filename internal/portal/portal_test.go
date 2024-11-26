@@ -1,88 +1,108 @@
 package portal
 
 import (
-	"fmt"
+	"context"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
-func portalMockHandlerGenerator(serverURL string, customHandler http.HandlerFunc) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		switch r.URL.Path {
-		case "/portal-api/apps":
-			// Mock response for list of apps with IDs 1, 2, and 3
-			if _, err := fmt.Fprintf(w, `[{"ID":1,"Name":"Test App 1"},{"ID":2,"Name":"Test App 2"},{"ID":3,"Name":"Test App 3"}]`); err != nil {
-				http.Error(w, "Failed to write response", http.StatusInternalServerError)
-				return
-			}
-		case "/portal-api/apps/1":
-			// Mock response for app 1 detail with webhook credentials
-			if _, err := fmt.Fprintf(w, `{"ID": 1, "AccessRequests": [{"WebhookEventTypes": "abc,bar,foo", "WebhookSecret": "test", "WebhookURL": "%s/test-webhook-1"}]}`, serverURL); err != nil {
-				http.Error(w, "Failed to write response", http.StatusInternalServerError)
-				return
-			}
-		case "/portal-api/apps/2":
-			// App 2 detail without webhook (empty array or null could represent no webhooks)
-			if _, err := fmt.Fprintf(w, `{"ID": 2, "AccessRequests": []}`); err != nil {
-				http.Error(w, "Failed to write response", http.StatusInternalServerError)
-				return
-			}
-		case "/portal-api/apps/3":
-			// Mock response for app 3 detail with webhook credentials
-			if _, err := fmt.Fprintf(w, `{"ID": 3, "AccessRequests": [{"WebhookEventTypes": "abc,xyz", "WebhookSecret": "secret", "WebhookURL": "%s/test-webhook-2"}]}`, serverURL); err != nil {
-				http.Error(w, "Failed to write response", http.StatusInternalServerError)
-				return
-			}
-		default:
-			if customHandler != nil {
-				customHandler(w, r)
-				return
-			}
-			w.WriteHeader(http.StatusNotFound)
+type mockServer struct {
+	*httptest.Server
+}
+
+func newMockServer() *mockServer {
+	ms := &mockServer{}
+	ms.Server = httptest.NewServer(http.HandlerFunc(mockHandler))
+	return ms
+}
+
+func mockHandler(w http.ResponseWriter, r *http.Request) {
+	switch r.URL.Path {
+	case "/api/portal/webhooks":
+		response := struct {
+			Apps []struct {
+				Name            string          `json:"name"`
+				AccessRequests  []AccessRequest `json:"access_requests"`
+				UserID          int            `json:"user_id"`
+			} `json:"apps"`
+		}{
+			Apps: []struct {
+				Name            string          `json:"name"`
+				AccessRequests  []AccessRequest `json:"access_requests"`
+				UserID          int            `json:"user_id"`
+			}{
+				{
+					Name: "Webhook",
+					AccessRequests: []AccessRequest{
+						{
+							ID:                5,
+							Status:            "approved",
+							WebhookURL:        "http://test1.com",
+							WebhookEventTypes: "event1",
+							WebhookSecret:     "secret1",
+							Credentials: []Credential{
+								{
+									ID:             5,
+									Credential:     "cred1",
+									CredentialHash: "hash1",
+								},
+							},
+						},
+					},
+					UserID: 1,
+				},
+				{
+					Name: "Webhook2",
+					AccessRequests: []AccessRequest{
+						{
+							ID:                6,
+							Status:            "approved",
+							WebhookURL:        "http://test2.com",
+							WebhookEventTypes: "event2",
+							WebhookSecret:     "secret2",
+							Credentials: []Credential{
+								{
+									ID:             6,
+									Credential:     "cred2",
+									CredentialHash: "hash2",
+								},
+							},
+						},
+					},
+					UserID: 2,
+				},
+			},
 		}
+
+		json.NewEncoder(w).Encode(response)
+	default:
+		w.WriteHeader(http.StatusNotFound)
 	}
 }
 
-func TestListWebhookCredentialsMultipleApps(t *testing.T) {
-	// Mock server to return a list of multiple apps and details for individual apps
-	mockServer := httptest.NewServer(nil)
-	mockServer.Config.Handler = portalMockHandlerGenerator(mockServer.URL, nil)
+func TestPortalClientListWebhookCredentials(t *testing.T) {
+	server := newMockServer()
+	defer server.Close()
 
-	defer mockServer.Close()
+	client := NewClient(server.URL, "test-secret")
+	webhooks, err := client.ListWebhookCredentials(context.Background())
+	require.NoError(t, err)
+	require.Len(t, webhooks, 2)
 
-	client := NewClient(mockServer.URL, "test-token")
+	assert.Equal(t, "http://test1.com", webhooks[0].WebhookURL)
+	assert.Equal(t, "event1", webhooks[0].WebhookEventTypes)
+	assert.Equal(t, "secret1", webhooks[0].WebhookSecret)
+	assert.Equal(t, "cred1", webhooks[0].Credential)
+	assert.Equal(t, "hash1", webhooks[0].CredentialHash)
 
-	expected := []WebhookCredential{
-		{
-			AppID:             1,
-			AppName:           "Test App 1",
-			WebhookEventTypes: "abc,bar,foo",
-			WebhookSecret:     "test",
-			WebhookURL:        mockServer.URL + "/test-webhook-1",
-		},
-		{
-			AppID:             3,
-			AppName:           "Test App 3",
-			WebhookEventTypes: "abc,xyz",
-			WebhookSecret:     "secret",
-			WebhookURL:        mockServer.URL + "/test-webhook-2",
-		},
-	}
-
-	webhookCredentials, err := client.ListWebhookCredentials()
-	if err != nil {
-		t.Fatalf("Expected no error, got %s", err)
-	}
-
-	if len(webhookCredentials) != len(expected) {
-		t.Fatalf("Expected %d webhook credentials, got %d", len(expected), len(webhookCredentials))
-	}
-
-	for i, wc := range webhookCredentials {
-		exp := expected[i]
-		if wc.WebhookURL != exp.WebhookURL || wc.WebhookEventTypes != exp.WebhookEventTypes {
-			t.Errorf("Expected webhook credential %v, got %v", exp, wc)
-		}
-	}
+	assert.Equal(t, "http://test2.com", webhooks[1].WebhookURL)
+	assert.Equal(t, "event2", webhooks[1].WebhookEventTypes)
+	assert.Equal(t, "secret2", webhooks[1].WebhookSecret)
+	assert.Equal(t, "cred2", webhooks[1].Credential)
+	assert.Equal(t, "hash2", webhooks[1].CredentialHash)
 }

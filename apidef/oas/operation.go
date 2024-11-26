@@ -81,6 +81,9 @@ type Operation struct {
 
 	// RateLimit contains endpoint level rate limit configuration.
 	RateLimit *RateLimitEndpoint `bson:"rateLimit,omitempty" json:"rateLimit,omitempty"`
+
+	// StreamShadow contains configuration for stream shadowing functionality.
+	StreamShadow *StreamShadow `bson:"streamShadow,omitempty" json:"streamShadow,omitempty"`
 }
 
 // AllowanceType holds the valid allowance types values.
@@ -163,6 +166,7 @@ func (s *OAS) fillPathsAndOperations(ep apidef.ExtendedPathsSet) {
 	s.fillDoNotTrackEndpoint(ep.DoNotTrackEndpoints)
 	s.fillRequestSizeLimit(ep.SizeLimit)
 	s.fillRateLimitEndpoints(ep.RateLimit)
+	s.fillStreamShadow(ep.StreamShadow)
 }
 
 func (s *OAS) extractPathsAndOperations(ep *apidef.ExtendedPathsSet) {
@@ -197,9 +201,35 @@ func (s *OAS) extractPathsAndOperations(ep *apidef.ExtendedPathsSet) {
 					tykOp.extractDoNotTrackEndpointTo(ep, path, method)
 					tykOp.extractRequestSizeLimitTo(ep, path, method)
 					tykOp.extractRateLimitEndpointTo(ep, path, method)
+					tykOp.extractStreamShadowTo(ep, path, method)
 					break
 				}
 			}
+		}
+	}
+}
+
+func (o *Operation) extractStreamShadowTo(ep *apidef.ExtendedPathsSet, path string, method string) {
+	if o.StreamShadow == nil {
+		return
+	}
+
+	meta := apidef.StreamShadowMeta{Path: path, Method: method}
+	o.StreamShadow.ExtractTo(&meta)
+	ep.StreamShadow = append(ep.StreamShadow, meta)
+}
+
+func (s *OAS) fillStreamShadow(metas []apidef.StreamShadowMeta) {
+	for _, meta := range metas {
+		operationID := s.getOperationID(meta.Path, meta.Method)
+		operation := s.GetTykExtension().getOperation(operationID)
+		if operation.StreamShadow == nil {
+			operation.StreamShadow = &StreamShadow{}
+		}
+
+		operation.StreamShadow.Fill(meta)
+		if ShouldOmit(operation.StreamShadow) {
+			operation.StreamShadow = nil
 		}
 	}
 }
