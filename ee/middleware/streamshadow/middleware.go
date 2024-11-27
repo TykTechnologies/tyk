@@ -41,6 +41,7 @@ type GetStreamingMW interface {
 // NewMiddleware returns a new instance of Middleware.
 func NewMiddleware(gw streams.Gateway, mwGetter MiddlewareMetadataGetter, spec *apidef.APIDefinition, logger *logrus.Entry) *Middleware {
 	return &Middleware{
+		Spec:     spec,
 		Gw:       gw,
 		mwGetter: mwGetter,
 		logger:   logger,
@@ -69,6 +70,10 @@ func (h *Middleware) Init(config interface{}, spec *apidef.APIDefinition) error 
 // HandleResponse logs request and response JSON payloads.
 func (h *Middleware) HandleResponse(w http.ResponseWriter, res *http.Response, req *http.Request, ses *user.SessionState) error {
 	meta, found := h.mwGetter.GetMiddlewareMetadata(req, apidef.StreamShadow)
+	h.logger.WithFields(logrus.Fields{
+		"middleware": "StreamShadowResponseMiddleware",
+		"found":      found,
+	}).Debug("Handling response")
 
 	if !found {
 		return nil
@@ -90,18 +95,41 @@ func (h *Middleware) HandleResponse(w http.ResponseWriter, res *http.Response, r
 
 	var stream *streams.Stream
 	if apiSpecGetter, ok := h.Gw.(ApiSpecGetter); ok {
+		h.logger.Debug("ApiSpecGetter interface implemented")
 		if apiSpec := apiSpecGetter.GetApiSpec(config.StreamingApiId); apiSpec != nil {
+			h.logger.WithField("streamingApiId", config.StreamingApiId).Debug("API spec found")
 			if streamingMWGetter, ok := apiSpec.(GetStreamingMW); ok {
+				h.logger.Debugf("GetStreamingMW interface implemented %v", streamingMWGetter)
 				if streamingMW := streamingMWGetter.GetStreamingMW(); streamingMW != nil {
+					h.logger.Debug("Streaming middleware retrieved")
 					if streamingMW, ok := streamingMW.(*streams.Middleware); ok {
+						h.logger.Debug("Streaming middleware type assertion successful")
 						streamManager := streamingMW.CreateStreamManager(req)
 						if streamManager != nil {
+							h.logger.Debug("Stream manager created")
 							stream, _ = streamManager.GetStream(config.StreamId)
+							if stream != nil {
+								h.logger.WithField("streamId", config.StreamId).Debug("Stream found")
+							} else {
+								h.logger.WithField("streamId", config.StreamId).Debug("Stream not found")
+							}
+						} else {
+							h.logger.Debug("Failed to create stream manager")
 						}
+					} else {
+						h.logger.Debug("Streaming middleware type assertion failed")
 					}
+				} else {
+					h.logger.Debug("Failed to get streaming middleware")
 				}
+			} else {
+				h.logger.Debug("GetStreamingMW interface not implemented")
 			}
+		} else {
+			h.logger.WithField("streamingApiId", config.StreamingApiId).Debug("API spec not found")
 		}
+	} else {
+		h.logger.Debug("ApiSpecGetter interface not implemented")
 	}
 
 	if stream == nil {
@@ -180,11 +208,15 @@ func (h *Middleware) HandleError(rw http.ResponseWriter, req *http.Request) {
 
 // Enabled checks if the middleware is enabled.
 func (h *Middleware) Enabled() bool {
+	h.logger.Debug("Checking if middleware is enabled")
+
 	for _, version := range h.Spec.VersionData.Versions {
 		if len(version.ExtendedPaths.StreamShadow) > 0 {
+			h.logger.Debug("Shadow stream Middleware is enabled")
 			return true
 		}
 	}
+	h.logger.Debug("Shadow stream Middleware is disabled")
 	return false
 }
 

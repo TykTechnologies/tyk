@@ -99,3 +99,12 @@ func GetHTTPPaths(streamConfig map[string]interface{}) []string {
 	}
 	return deduplicated
 }
+
+// HasStreamShadow checks if the stream configuration contains a stream_shadow input
+func HasStreamShadow(streamConfig map[string]interface{}) bool {
+	if input, ok := streamConfig["input"].(map[string]interface{}); ok {
+		_, exists := input["stream_shadow"]
+		return exists
+	}
+	return false
+}

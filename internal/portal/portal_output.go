@@ -3,7 +3,6 @@ package portal
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -66,86 +65,73 @@ func (p *portalOutput) Connect(ctx context.Context) error {
 // It first checks if the message matches configured filters,
 // then sends the message to all matching webhook endpoints.
 func (p *portalOutput) Write(ctx context.Context, msg *service.Message) error {
-	if !p.shouldProcess(*msg) {
-		return nil
-	}
-
-	data, err := json.Marshal(msg)
+	// Fetch webhook credentials from the portal API
+	webhooks, err := p.portalClient.ListWebhookCredentials(ctx)
 	if err != nil {
-		return fmt.Errorf("failed to marshal message: %w", err)
+		return fmt.Errorf("failed to list webhook credentials: %w", err)
 	}
 
-	return p.sendToWebhook(ctx, p.config.PortalURL, data)
+	data, _ := msg.AsBytes()
+
+	// Track any errors that occur when sending to webhooks
+	var sendErrors []error
+
+	// Iterate through webhooks and send to each matching one
+	for _, webhook := range webhooks {
+		if !p.webhookMatchesFilters(webhook) {
+			continue
+		}
+
+		// Send message to this webhook
+		if err := p.sendToWebhook(ctx, webhook.WebhookURL, data); err != nil {
+			sendErrors = append(sendErrors, fmt.Errorf("failed to send to webhook %s: %w", webhook.WebhookURL, err))
+		}
+	}
+
+	// If any sends failed, return combined error
+	if len(sendErrors) > 0 {
+		return fmt.Errorf("failed to send to some webhooks: %v", sendErrors)
+	}
+
+	return nil
 }
 
-// shouldProcess determines if a message should be processed based on configured filters.
-// It checks webhook credentials against configured filters for:
-// - Event type
-// - Credential
-// - Credential hash
-// Returns true if the message matches all specified filters.
-func (p *portalOutput) shouldProcess(msg service.Message) bool {
-	// Fetch webhook credentials from the portal API
-	webhooks, err := p.portalClient.ListWebhookCredentials(context.Background())
-	if err != nil {
-		// If there's an error fetching credentials, skip processing this message
+// webhookMatchesFilters checks if a webhook matches all configured filters
+func (p *portalOutput) webhookMatchesFilters(webhook WebhookCredential) bool {
+	// Check event type filter
+	if p.config.EventType != "" {
+		eventTypes := strings.Split(webhook.WebhookEventTypes, ",")
+		matched := false
+		for _, et := range eventTypes {
+			if strings.TrimSpace(et) == p.config.EventType {
+				matched = true
+				break
+			}
+		}
+		if !matched {
+			return false
+		}
+	}
+
+	// Check credential filter
+	if p.config.Credential != "" && webhook.Credential != p.config.Credential {
 		return false
 	}
 
-	// Iterate over the fetched webhooks and check if any match the configured filters
-	for _, webhook := range webhooks {
-		// Check event type filter
-		if p.config.EventType != "" {
-			// Split the webhook's event types into a slice for easier comparison
-			eventTypes := strings.Split(webhook.WebhookEventTypes, ",")
-			// Check if the configured event type matches any of the webhook's event types
-			eventTypeMatch := false
-			for _, et := range eventTypes {
-				if strings.TrimSpace(et) == p.config.EventType {
-					eventTypeMatch = true
-					break
-				}
-			}
-			// If the event type doesn't match, skip this webhook
-			if !eventTypeMatch {
-				continue
-			}
-		}
-
-		// Check credential filter
-		if p.config.Credential != "" {
-			// If the webhook's credential doesn't match the configured credential, skip this webhook
-			if webhook.Credential != p.config.Credential {
-				continue
-			}
-		}
-
-		// Check credential hash filter
-		if p.config.CredentialHash != "" {
-			// If the webhook's credential hash doesn't match the configured credential hash, skip this webhook
-			if webhook.CredentialHash != p.config.CredentialHash {
-				continue
-			}
-		}
-
-		// Check developer ID filter
-		if p.config.DeveloperID != "" {
-			devID, err := strconv.Atoi(p.config.DeveloperID)
-			if err != nil {
-				// If developer ID is not a valid number, skip this webhook
-				return false
-			}
-			if webhook.UserID != devID {
-				continue
-			}
-		}
-
-		// If we've reached this point, all filters match, so return true
-		return true
+	// Check credential hash filter
+	if p.config.CredentialHash != "" && webhook.CredentialHash != p.config.CredentialHash {
+		return false
 	}
 
-	// If we've iterated over all webhooks and none match, return false
-	return false
+	// Check developer ID filter
+	if p.config.DeveloperID != "" {
+		devID, err := strconv.Atoi(p.config.DeveloperID)
+		if err != nil || webhook.UserID != devID {
+			return false
+		}
+	}
+
+	return true
 }
 
 // sendToWebhook sends a message to a webhook endpoint.
@@ -154,8 +140,10 @@ func (p *portalOutput) sendToWebhook(ctx context.Context, url string, data []byt
 	// Create a new HTTP request with the message data
 	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewReader(data))
 	if err != nil {
+		fmt.Printf("Failed to create webhook request for URL %s: %v\n", url, err)
 		return fmt.Errorf("failed to create webhook request: %w", err)
 	}
+	fmt.Printf("Successfully created webhook request for URL %s\n", url)
 
 	// Set the Content-Type header to application/json
 	req.Header.Set("Content-Type", "application/json")

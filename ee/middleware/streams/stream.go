@@ -167,9 +167,15 @@ func (s *Stream) Reset() error {
 // Produce sends a message to the stream
 func (s *Stream) Produce(ctx context.Context, data []byte) error {
 	if s.producerFunc == nil {
+		s.log.Error("Producer function not initialized")
 		return fmt.Errorf("producer function not initialized")
 	}
-	return s.producerFunc(ctx, service.NewMessage(data))
+	s.log.Debugf("Producing message with %d bytes", len(data))
+	err := s.producerFunc(ctx, service.NewMessage(data))
+	if err != nil {
+		s.log.Errorf("Failed to produce message: %v", err)
+	}
+	return err
 }
 
 var unsafeComponents = []string{

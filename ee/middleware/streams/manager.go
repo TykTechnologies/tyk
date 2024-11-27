@@ -44,8 +44,9 @@ func (sm *Manager) setUpOrDryRunStream(streamConfig any, streamID string) {
 	if streamMap, ok := streamConfig.(map[string]interface{}); ok {
 		httpPaths := GetHTTPPaths(streamMap)
 
+		// When we create default stream manager, without request, we don't want to pre-create dynamic streams, like with http_output
 		if sm.dryRun {
-			if len(httpPaths) == 0 {
+			if len(httpPaths) == 0 && !HasStreamShadow(streamMap) {
 				err := sm.createStream(streamID, streamMap)
 				if err != nil {
 					sm.mw.Logger().WithError(err).Errorf("Error creating stream %s", streamID)

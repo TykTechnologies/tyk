@@ -9,15 +9,17 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/apidef/oas"
+	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/ee/middleware/streams"
 	"github.com/TykTechnologies/tyk/test"
 	"github.com/getkin/kin-openapi/openapi3"
 )
 
 func TestStreamShadowMiddlewareWithAPI(t *testing.T) {
-	ts := StartTest(nil)
+	ts := StartTest(func(globalConf *config.Config) {
+		globalConf.Streaming.Enabled = true
+	})
 	defer ts.Close()
 
 	// Create an HTTP test server with an empty handler and a WaitGroup
@@ -35,17 +37,45 @@ func TestStreamShadowMiddlewareWithAPI(t *testing.T) {
 		spec.Proxy.ListenPath = "/test-api/"
 		spec.UseKeylessAccess = true
 
-		// Configure stream shadow middleware for specific endpoint
-		UpdateAPIVersion(spec, "v1", func(v *apidef.VersionInfo) {
-			v.ExtendedPaths.StreamShadow = []apidef.StreamShadowMeta{
-				{
-					Path:           "/test",
-					Method:         http.MethodPost,
-					StreamingApiId: "shadow-api",
-					StreamId:       "test-stream",
+		spec.IsOAS = true
+		spec.OAS = oas.OAS{
+			T: openapi3.T{
+				OpenAPI: "3.0.3",
+				Info: &openapi3.Info{
+					Title:   "Shadow API",
+					Version: "1.0.0",
 				},
-			}
-		})
+				Paths: openapi3.Paths{
+					"/test": {
+						Post: &openapi3.Operation{
+							OperationID: "test",
+							Responses:   openapi3.NewResponses(),
+						},
+					},
+				},
+			},
+		}
+
+		spec.OAS.Fill(*spec.APIDefinition)
+
+		xTykAPIGateway := oas.XTykAPIGateway{
+			Middleware: &oas.Middleware{
+				Operations: map[string]*oas.Operation{
+					"test": {
+						StreamShadow: &oas.StreamShadow{
+							Enabled:        true,
+							StreamID:       "test-stream",
+							StreamingApiId: "shadow-api",
+						},
+						Allow: &oas.Allowance{
+							Enabled: true,
+						},
+					},
+				},
+			},
+		}
+
+		spec.OAS.SetTykExtension(&xTykAPIGateway)
 	}, func(spec *APISpec) {
 		spec.APIID = "shadow-api"
 		spec.Name = "Shadow API"
@@ -62,6 +92,7 @@ func TestStreamShadowMiddlewareWithAPI(t *testing.T) {
 				Paths: make(openapi3.Paths),
 			},
 		}
+
 		spec.OAS.Extensions = map[string]interface{}{
 			streams.ExtensionTykStreaming: map[string]interface{}{
 				"streams": map[string]interface{}{
@@ -78,6 +109,7 @@ func TestStreamShadowMiddlewareWithAPI(t *testing.T) {
 				},
 			},
 		}
+
 		spec.OAS.Fill(*spec.APIDefinition)
 	})
 

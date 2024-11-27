@@ -304,7 +304,18 @@ func (gw *Gateway) getApiSpec(apiID string) *APISpec {
 }
 
 func (gw *Gateway) GetApiSpec(apiID string) interface{} {
-	return gw.getApiSpec(apiID)
+	spec := gw.getApiSpec(apiID)
+	if spec == nil {
+		log.WithFields(logrus.Fields{
+			"apiID": apiID,
+		}).Debug("API spec not found")
+	} else {
+		log.WithFields(logrus.Fields{
+			"apiID": apiID,
+			"name":  spec.Name,
+		}).Debug("API spec found")
+	}
+	return spec
 }
 
 func (gw *Gateway) getAPIDefinition(apiID string) (*apidef.APIDefinition, error) {
@@ -895,9 +906,7 @@ func (gw *Gateway) createResponseMiddlewareChain(spec *APISpec, responseFuncs []
 		baseHandler     = BaseTykResponseHandler{Spec: spec, Gw: gw}
 	)
 	gw.responseMWAppendEnabled(&responseMWChain, &ResponseTransformMiddleware{BaseTykResponseHandler: baseHandler})
-
-	// Always add StreamShadow middleware
-	responseMWChain = append(responseMWChain, getStreamShadowMiddleware(&baseHandler, logger))
+	gw.responseMWAppendEnabled(&responseMWChain, getStreamShadowMiddleware(&baseHandler, logger))
 
 	headerInjector := &HeaderInjector{BaseTykResponseHandler: baseHandler}
 	headerInjectorAdded := gw.responseMWAppendEnabled(&responseMWChain, headerInjector)

@@ -140,6 +140,8 @@ func (o *Operation) Import(oasOperation *openapi3.Operation, overRideValues TykE
 }
 
 func (s *OAS) fillPathsAndOperations(ep apidef.ExtendedPathsSet) {
+	log.Debug("Filling paths and operations")
+
 	// Regardless if `ep` is a zero value, we need a non-nil paths
 	// to produce a valid OAS document
 	if s.Paths == nil {
@@ -170,9 +172,12 @@ func (s *OAS) fillPathsAndOperations(ep apidef.ExtendedPathsSet) {
 }
 
 func (s *OAS) extractPathsAndOperations(ep *apidef.ExtendedPathsSet) {
+	log.Debug("Extracting paths and operations")
+
 	ep.Clear()
 
 	tykOperations := s.getTykOperations()
+
 	if len(tykOperations) == 0 {
 		return
 	}
@@ -210,6 +215,8 @@ func (s *OAS) extractPathsAndOperations(ep *apidef.ExtendedPathsSet) {
 }
 
 func (o *Operation) extractStreamShadowTo(ep *apidef.ExtendedPathsSet, path string, method string) {
+	log.Debug("Extracting stream shadow configuration")
+
 	if o.StreamShadow == nil {
 		return
 	}
@@ -390,6 +397,8 @@ func (s *OAS) fillRequestSizeLimit(metas []apidef.RequestSizeMeta) {
 }
 
 func (o *Operation) extractAllowanceTo(ep *apidef.ExtendedPathsSet, path string, method string, typ AllowanceType) {
+	log.Debug("Extracting allowance configuration")
+
 	allowance := o.Allow
 	endpointMetas := &ep.WhiteList
 

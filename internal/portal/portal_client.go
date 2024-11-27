@@ -4,8 +4,14 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
+	"strings"
+
+	log "github.com/sirupsen/logrus"
 )
+
+const applicationJSON = "application/json"
 
 // Client defines the interface for interacting with the Portal API.
 // It provides methods to manage webhook credentials, allowing the system
@@ -17,15 +23,23 @@ type Client interface {
 // portalClient implements the Client interface for the Portal API.
 // It handles authentication and communication with the API endpoints.
 type portalClient struct {
-	baseURL    string        // Base URL of the Portal API
-	secret     string        // Authentication secret for API requests
-	httpClient *http.Client  // HTTP client for making API requests
+	baseURL    string
+	secret     string
+	httpClient *http.Client
 }
 
 // NewClient creates a new Portal API client with the specified base URL and secret.
 // It returns an interface to allow for easy mocking in tests and flexibility
 // in implementation.
 func NewClient(baseURL, secret string) Client {
+	if !strings.HasSuffix(baseURL, "/") {
+		baseURL += "/"
+	}
+	if !strings.HasSuffix(baseURL, "portal-api/") {
+		baseURL += "portal-api/"
+	}
+	baseURL = strings.TrimSuffix(baseURL, "/")
+
 	return &portalClient{
 		baseURL:    baseURL,
 		secret:     secret,
@@ -33,61 +47,115 @@ func NewClient(baseURL, secret string) Client {
 	}
 }
 
+// App represents the structure of an application from the developer portal
+type App struct {
+	ID          int    `json:"id"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	UserID      int    `json:"user_id"`
+}
+
+// AppDetail includes detailed information about an application, including webhooks
+type AppDetail struct {
+	AccessRequests []struct {
+		ActiveSubscription bool     `json:"ActiveSubscription"`
+		AuthType           string   `json:"AuthType"`
+		AuthTypes          []string `json:"AuthTypes"`
+		Catalogue          string   `json:"Catalogue"`
+		CertificateID      int      `json:"CertificateID"`
+		Client             string   `json:"Client"`
+		Credentials        []struct {
+			AccessRequest              string `json:"AccessRequest"`
+			Credential                 string `json:"Credential"`
+			CredentialHash             string `json:"CredentialHash"`
+			DCRRegistrationAccessToken string `json:"DCRRegistrationAccessToken"`
+			DCRRegistrationClientURI   string `json:"DCRRegistrationClientURI"`
+			DCRResponse                string `json:"DCRResponse"`
+			Expires                    string `json:"Expires"`
+			GrantType                  string `json:"GrantType"`
+			ID                         int    `json:"ID"`
+			JWKSURI                    string `json:"JWKSURI"`
+			OAuthClientID              string `json:"OAuthClientID"`
+			OAuthClientSecret          string `json:"OAuthClientSecret"`
+			RedirectURI                string `json:"RedirectURI"`
+			ResponseType               string `json:"ResponseType"`
+			Scope                      string `json:"Scope"`
+			TokenEndpoints             string `json:"TokenEndpoints"`
+		} `json:"Credentials"`
+		DCREnabled           bool        `json:"DCREnabled"`
+		DCRTemplateID        int         `json:"DCRTemplateID"`
+		ID                   int         `json:"ID"`
+		Plan                 string      `json:"Plan"`
+		PolicyService        []string    `json:"PolicyService"`
+		Products             interface{} `json:"Products"`
+		ProviderID           int         `json:"ProviderID"`
+		ProvisionImmediately bool        `json:"ProvisionImmediately"`
+		Status               string      `json:"Status"`
+		User                 string      `json:"User"`
+		WebhookEventTypes    string      `json:"WebhookEventTypes"`
+		WebhookSecret        string      `json:"WebhookSecret"`
+		WebhookURL           string      `json:"WebhookURL"`
+	} `json:"AccessRequests"`
+	CreatedAt    string `json:"CreatedAt"`
+	Description  string `json:"Description"`
+	ID           int    `json:"ID"`
+	Name         string `json:"Name"`
+	RedirectURLs string `json:"RedirectURLs"`
+	UserID       int    `json:"UserID"`
+}
+
+// WebhookCredential represents a complete webhook configuration.
+// It combines webhook details with a specific credential for event delivery.
+type WebhookCredential struct {
+	WebhookURL        string `json:"webhook_url"`
+	WebhookEventTypes string `json:"webhook_event_types"`
+	WebhookSecret     string `json:"webhook_secret"`
+	Credential        string `json:"credential"`
+	CredentialHash    string `json:"credential_hash"`
+	UserID            int    `json:"user_id"`
+}
+
 // ListWebhookCredentials retrieves all webhook credentials from the Portal API.
 // It fetches the list of apps and their associated access requests, then extracts
 // webhook credentials from approved access requests.
 func (c *portalClient) ListWebhookCredentials(ctx context.Context) ([]WebhookCredential, error) {
-	// Construct the API URL for webhook listing
-	url := fmt.Sprintf("%s/api/portal/webhooks", c.baseURL)
-	
-	// Create a new request with context
-	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
-	if err != nil {
-		return nil, fmt.Errorf("creating request: %w", err)
+	var allApps []App
+	for page := 1; ; page++ {
+		apps, err := c.fetchApps(ctx, page)
+		if err != nil {
+			log.Errorf("Error fetching apps on page %d: %v", page, err)
+			return nil, err
+		}
+
+		log.Infof("Fetched %d apps from page %d", len(apps), page)
+		allApps = append(allApps, apps...)
+
+		if len(apps) < 10 {
+			log.Infof("Finished fetching apps, total: %d", len(allApps))
+			break
+		}
 	}
 
-	// Add authentication header
-	req.Header.Set("Authorization", c.secret)
+	log.Infof("Total number of apps fetched: %d", len(allApps))
 
-	// Make the API request
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("making request: %w", err)
-	}
-	defer resp.Body.Close()
+	var webhookCredentials []WebhookCredential
+	for _, app := range allApps {
+		log.Infof("Processing app ID %d", app.ID)
 
-	// Check for successful response
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
-	}
+		detail, err := c.fetchAppDetail(ctx, app.ID)
+		if err != nil {
+			log.Errorf("Error fetching app detail for app ID %d: %v", app.ID, err)
+			return nil, err
+		}
+		log.Infof("Successfully fetched app detail for app ID %d", app.ID)
+		log.Infof("App detail for ID %d: %+v", app.ID, detail)
 
-	// Parse the API response
-	var response struct {
-		Apps []struct {
-			AccessRequests []AccessRequest `json:"access_requests"`
-			UserID        int             `json:"user_id"`
-			Name          string          `json:"name"`
-			Description   string          `json:"description"`
-			CreatedAt     string          `json:"created_at"`
-			ID            int             `json:"id"`
-		} `json:"apps"`
-	}
-
-	if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
-		return nil, fmt.Errorf("decoding response: %w", err)
-	}
-
-	// Extract webhook credentials from approved access requests
-	var webhooks []WebhookCredential
-	for _, app := range response.Apps {
-		for _, ar := range app.AccessRequests {
-			// Skip non-approved access requests
-			if ar.Status != "approved" {
+		for _, ar := range detail.AccessRequests {
+			if ar.Status != "approved" || ar.WebhookURL == "" {
 				continue
 			}
-			// Create webhook credentials for each credential in the access request
 			for _, cred := range ar.Credentials {
-				webhooks = append(webhooks, WebhookCredential{
+				webhookCredentials = append(webhookCredentials, WebhookCredential{
 					WebhookURL:        ar.WebhookURL,
 					WebhookEventTypes: ar.WebhookEventTypes,
 					WebhookSecret:     ar.WebhookSecret,
@@ -99,35 +167,78 @@ func (c *portalClient) ListWebhookCredentials(ctx context.Context) ([]WebhookCre
 		}
 	}
 
-	return webhooks, nil
+	return webhookCredentials, nil
 }
 
-// AccessRequest represents an access request in the Portal API.
-// It contains information about webhook configuration and associated credentials.
-type AccessRequest struct {
-	ID                int          `json:"id"`              // Unique identifier for the access request
-	Status            string       `json:"status"`          // Status of the access request (e.g., "approved")
-	WebhookURL        string       `json:"webhook_url"`     // URL where webhook events will be sent
-	WebhookEventTypes string       `json:"webhook_event_types"` // Comma-separated list of event types
-	WebhookSecret     string       `json:"webhook_secret"`  // Secret for webhook authentication
-	Credentials       []Credential `json:"credentials"`     // List of associated credentials
+func (c *portalClient) fetchApps(ctx context.Context, page int) ([]App, error) {
+	url := fmt.Sprintf("%s/apps?page=%d&per_page=10", c.baseURL, page)
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return nil, fmt.Errorf("creating request: %w", err)
+	}
+	req.Header.Set("Authorization", c.secret)
+	req.Header.Set("Content-Type", applicationJSON)
+	req.Header.Set("Accept", applicationJSON)
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("making request: %w", err)
+	}
+	defer func() {
+		if closeErr := resp.Body.Close(); closeErr != nil {
+			log.Error(closeErr)
+		}
+	}()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
+	}
+
+	var apps []App
+	if err := json.NewDecoder(resp.Body).Decode(&apps); err != nil {
+		return nil, fmt.Errorf("decoding response: %w", err)
+	}
+
+	return apps, nil
 }
 
-// Credential represents a credential in the Portal API.
-// Each credential can be associated with one or more webhooks.
-type Credential struct {
-	ID             int    `json:"id"`              // Unique identifier for the credential
-	Credential     string `json:"credential"`      // The actual credential value
-	CredentialHash string `json:"credential_hash"` // Hash of the credential for verification
-}
+func (c *portalClient) fetchAppDetail(ctx context.Context, appID int) (*AppDetail, error) {
+	url := fmt.Sprintf("%s/apps/%d", c.baseURL, appID)
 
-// WebhookCredential represents a complete webhook configuration.
-// It combines webhook details with a specific credential for event delivery.
-type WebhookCredential struct {
-	WebhookURL        string `json:"webhook_url"`         // URL where events will be sent
-	WebhookEventTypes string `json:"webhook_event_types"` // Event types this webhook handles
-	WebhookSecret     string `json:"webhook_secret"`      // Secret for webhook authentication
-	Credential        string `json:"credential"`          // Associated credential
-	CredentialHash    string `json:"credential_hash"`     // Hash of the credential
-	UserID            int    `json:"user_id"`             // User ID associated with the webhook credential
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return nil, fmt.Errorf("creating request: %w", err)
+	}
+	req.Header.Set("Authorization", c.secret)
+	req.Header.Set("Content-Type", applicationJSON)
+	req.Header.Set("Accept", applicationJSON)
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("making request: %w", err)
+	}
+	defer func() {
+		if closeErr := resp.Body.Close(); closeErr != nil {
+			log.Error(closeErr)
+		}
+	}()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
+	}
+	bodyBytes, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("reading response body: %w", err)
+	}
+	log.Printf("Raw response body: %s", string(bodyBytes))
+
+	var detail AppDetail
+	if err := json.Unmarshal(bodyBytes, &detail); err != nil {
+		return nil, fmt.Errorf("decoding response: %w", err)
+	}
+
+	log.Infof("App detail for ID %d: %+v", appID, detail)
+
+	return &detail, nil
 }
