@@ -80,6 +80,7 @@ func (m *Middleware) ProcessRequest(_ http.ResponseWriter, r *http.Request, _ in
 	upstreamOAuthProvider := Provider{
 		HeaderName: header.Authorization,
 		AuthValue:  payload,
+		Logger:     m.Logger(),
 	}
 
 	headerName := provider.getHeaderName(m)
