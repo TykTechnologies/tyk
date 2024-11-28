@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/TykTechnologies/tyk/header"
 	"io/ioutil"
 	"math/rand"
 	"mime/multipart"
@@ -16,6 +15,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/TykTechnologies/tyk/header"
 
 	"github.com/stretchr/testify/assert"
 
