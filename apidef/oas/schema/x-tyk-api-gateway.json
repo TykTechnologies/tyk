@@ -2023,13 +2023,13 @@
           "type": "boolean"
         },
         "header": {
-          "$ref": "#/definitions/X-Tyk-AuthSource"
+          "$ref": "#/definitions/X-Tyk-UpstreamAuthSource"
         },
         "username": {
-          "type": "string"
+          "$ref": "#/definitions/X-Tyk-NonEmptyString"
         },
         "password": {
-          "type": "string"
+          "$ref": "#/definitions/X-Tyk-NonEmptyString"
         }
       },
       "required": [
@@ -2062,13 +2062,13 @@
           "type": "object",
           "properties": {
             "clientId": {
-              "type": "string"
+              "$ref": "#/definitions/X-Tyk-NonEmptyString"
             },
             "clientSecret": {
-              "type": "string"
+              "$ref": "#/definitions/X-Tyk-NonEmptyString"
             },
             "tokenUrl": {
-              "type": "string"
+              "$ref": "#/definitions/X-Tyk-NonEmptyString"
             },
             "scopes": {
               "type": [
@@ -2077,7 +2077,7 @@
               ]
             },
             "header": {
-              "$ref": "#/definitions/X-Tyk-AuthSource"
+              "$ref": "#/definitions/X-Tyk-UpstreamAuthSource"
             },
             "extraMetadata": {
               "type": [
@@ -2096,13 +2096,13 @@
           "type": "object",
           "properties": {
             "clientId": {
-              "type": "string"
+              "$ref": "#/definitions/X-Tyk-NonEmptyString"
             },
             "clientSecret": {
-              "type": "string"
+              "$ref": "#/definitions/X-Tyk-NonEmptyString"
             },
             "tokenUrl": {
-              "type": "string"
+              "$ref": "#/definitions/X-Tyk-NonEmptyString"
             },
             "scopes": {
               "type": [
@@ -2111,13 +2111,13 @@
               ]
             },
             "username": {
-              "type": "string"
+              "$ref": "#/definitions/X-Tyk-NonEmptyString"
             },
             "password": {
-              "type": "string"
+              "$ref": "#/definitions/X-Tyk-NonEmptyString"
             },
             "header": {
-              "$ref": "#/definitions/X-Tyk-AuthSource"
+              "$ref": "#/definitions/X-Tyk-UpstreamAuthSource"
             },
             "extraMetadata": {
               "type": [
@@ -2128,7 +2128,6 @@
           },
           "required": [
             "clientId",
-            "clientSecret",
             "tokenUrl",
             "username",
             "password"
@@ -2139,7 +2138,21 @@
         "enabled",
         "allowedAuthorizeTypes"
       ]
+    },
+    "X-Tyk-NonEmptyString": {
+      "type": "string",
+      "pattern": "\\S+"
+    },
+    "X-Tyk-UpstreamAuthSource": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "name": {
+          "type": "string"
+        }
+      }
     }
-    
   }
 }
