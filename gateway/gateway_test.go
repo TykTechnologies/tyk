@@ -840,16 +840,13 @@ func TestMultiTargetProxy(t *testing.T) {
 }
 
 func TestCustomDomain(t *testing.T) {
-	ts := StartTest(nil)
-	t.Cleanup(ts.Close)
-
 	localClient := test.NewClientLocal()
 
 	t.Run("With custom domain support", func(t *testing.T) {
-		globalConf := ts.Gw.GetConfig()
-		globalConf.EnableCustomDomains = true
-		ts.Gw.SetConfig(globalConf)
-		defer ts.ResetTestConfig()
+		ts := StartTest(func(conf *config.Config) {
+			conf.EnableCustomDomains = true
+		})
+		t.Cleanup(ts.Close)
 
 		ts.Gw.BuildAndLoadAPI(
 			func(spec *APISpec) {
@@ -871,6 +868,8 @@ func TestCustomDomain(t *testing.T) {
 	})
 
 	t.Run("Without custom domain support", func(t *testing.T) {
+		ts := StartTest(nil)
+		t.Cleanup(ts.Close)
 
 		ts.Gw.BuildAndLoadAPI(
 			func(spec *APISpec) {

@@ -276,8 +276,6 @@ func TestProxyTransport(t *testing.T) {
 
 	defer upstream.Close()
 
-	defer ts.ResetTestConfig()
-
 	//matching ciphers
 	t.Run("Global: Cipher match", func(t *testing.T) {
 		globalConf := ts.Gw.GetConfig()

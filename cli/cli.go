@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"sync"
 
 	kingpin "github.com/alecthomas/kingpin/v2"
 
@@ -51,8 +52,18 @@ var (
 	log = logger.Get()
 )
 
+var initOnce sync.Once
+
 // Init sets all flags and subcommands.
+// It's only run once to avoid races over the globals.
+// The arguments are ignored for subsequent runs.
 func Init(confPaths []string) {
+	initOnce.Do(func() {
+		setup(confPaths)
+	})
+}
+
+func setup(confPaths []string) {
 	app = kingpin.New(appName, appDesc)
 	app.HelpFlag.Short('h')
 	app.Version(build.Version)
