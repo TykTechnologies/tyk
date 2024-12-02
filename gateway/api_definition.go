@@ -132,42 +132,6 @@ const (
 	StatusRateLimit                RequestStatus = "Rate Limited"
 )
 
-// URLSpec represents a flattened specification for URLs, used to check if a proxy URL
-// path is on any of the white, black or ignored lists. This is generated as part of the
-// configuration init
-type URLSpec struct {
-	spec *regexp.Regexp
-
-	Status                    URLStatus
-	MethodActions             map[string]apidef.EndpointMethodMeta
-	Whitelist                 apidef.EndPointMeta
-	Blacklist                 apidef.EndPointMeta
-	Ignored                   apidef.EndPointMeta
-	MockResponse              apidef.MockResponseMeta
-	CacheConfig               EndPointCacheMeta
-	TransformAction           TransformSpec
-	TransformResponseAction   TransformSpec
-	TransformJQAction         TransformJQSpec
-	TransformJQResponseAction TransformJQSpec
-	InjectHeaders             apidef.HeaderInjectionMeta
-	InjectHeadersResponse     apidef.HeaderInjectionMeta
-	HardTimeout               apidef.HardTimeoutMeta
-	CircuitBreaker            ExtendedCircuitBreakerMeta
-	URLRewrite                *apidef.URLRewriteMeta
-	VirtualPathSpec           apidef.VirtualMeta
-	RequestSize               apidef.RequestSizeMeta
-	MethodTransform           apidef.MethodTransformMeta
-	TrackEndpoint             apidef.TrackEndpointMeta
-	DoNotTrackEndpoint        apidef.TrackEndpointMeta
-	ValidatePathMeta          apidef.ValidatePathMeta
-	Internal                  apidef.InternalMeta
-	GoPluginMeta              GoPluginMiddleware
-	PersistGraphQL            apidef.PersistGraphQLMeta
-	RateLimit                 apidef.RateLimitMeta
-
-	IgnoreCase bool
-}
-
 type EndPointCacheMeta struct {
 	Method                 string
 	CacheKeyRegex          string
@@ -185,11 +149,16 @@ type ExtendedCircuitBreakerMeta struct {
 	CB *circuit.Breaker `json:"-"`
 }
 
+type OAuthManagerInterface interface {
+	Storage() ExtendedOsinStorageInterface
+}
+
 // APISpec represents a path specification for an API, to avoid enumerating multiple nested lists, a single
 // flattened URL list is checked for matching paths and then it's status evaluated if found.
 type APISpec struct {
 	*apidef.APIDefinition
 	OAS oas.OAS
+
 	sync.RWMutex
 
 	Checksum                 string
@@ -197,7 +166,9 @@ type APISpec struct {
 	WhiteListEnabled         map[string]bool
 	target                   *url.URL
 	AuthManager              SessionHandler
-	OAuthManager             *OAuthManager
+
+	OAuthManager             OAuthManagerInterface
+
 	OrgSessionManager        SessionHandler
 	EventPaths               map[apidef.TykEvent][]config.TykEventHandler
 	Health                   HealthChecker
