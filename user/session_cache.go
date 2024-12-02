@@ -1,7 +1,7 @@
 package user
 
 import (
-	"encoding/json"
+	clone "github.com/huandu/go-clone"
 
 	"github.com/TykTechnologies/tyk/internal/cache"
 )
@@ -36,29 +36,22 @@ func (s *sessionCache) Get(key string) (*SessionState, bool) {
 		return nil, false
 	}
 
-	dataBytes, ok := data.([]byte)
+	sess, ok := data.(SessionState)
 	if !ok {
 		return nil, false
 	}
 
-	sess := &SessionState{}
-	err := json.Unmarshal(dataBytes, sess)
-	if err != nil {
+	cloned, ok := clone.Clone(sess).(SessionState)
+	if !ok {
 		return nil, false
 	}
-
-	return sess, true
+	return &cloned, true
 }
 
-// Set will encode the *SessionState and store it in the cache.
-// The ttl value for the object is passed in seconds.
+// Set stores provided SessionState into cache with respective ttl, in seconds.
+// If the TTL is 0 or below, the default TTL will be used, see internal/cache.
 func (s *sessionCache) Set(key string, sess SessionState, ttl int64) {
-	data, err := json.Marshal(sess)
-	if err != nil {
-		return
-	}
-
-	s.cache.Set(key, data, ttl)
+	s.cache.Set(key, sess, ttl)
 }
 
 // Delete deletes a key from the cache.
