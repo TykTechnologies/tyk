@@ -2184,7 +2184,7 @@ func (gw *Gateway) createOauthClient(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		err := apiSpec.OAuthManager.OsinServer.Storage.SetClient(storageID, apiSpec.OrgID, &newClient, true)
+		err := apiSpec.OAuthManager.Storage().SetClient(storageID, apiSpec.OrgID, &newClient, true)
 		if err != nil {
 			log.WithFields(logrus.Fields{
 				"prefix": "api",
@@ -2246,7 +2246,7 @@ func (gw *Gateway) createOauthClient(w http.ResponseWriter, r *http.Request) {
 							}),
 					}
 				}
-				err := apiSpec.OAuthManager.OsinServer.Storage.SetClient(storageID, apiSpec.APIDefinition.OrgID, &newClient, true)
+				err := apiSpec.OAuthManager.Storage().SetClient(storageID, apiSpec.APIDefinition.OrgID, &newClient, true)
 				if err != nil {
 					log.WithFields(logrus.Fields{
 						"prefix": "api",
@@ -2298,7 +2298,7 @@ func (gw *Gateway) rotateOauthClient(keyName, apiID string) (interface{}, int) {
 
 	// get existing version of oauth-client
 	storageID := oauthClientStorageID(keyName)
-	client, err := apiSpec.OAuthManager.OsinServer.Storage.GetExtendedClientNoPrefix(storageID)
+	client, err := apiSpec.OAuthManager.Storage().GetExtendedClientNoPrefix(storageID)
 	if err != nil {
 		return apiError("OAuth Client ID not found"), http.StatusNotFound
 	}
@@ -2313,7 +2313,7 @@ func (gw *Gateway) rotateOauthClient(keyName, apiID string) (interface{}, int) {
 		Description:       client.GetDescription(),
 	}
 
-	err = apiSpec.OAuthManager.OsinServer.Storage.SetClient(storageID, apiSpec.OrgID, &updatedClient, true)
+	err = apiSpec.OAuthManager.Storage().SetClient(storageID, apiSpec.OrgID, &updatedClient, true)
 	if err != nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "api",
@@ -2375,7 +2375,7 @@ func (gw *Gateway) updateOauthClient(keyName, apiID string, r *http.Request) (in
 
 	// get existing version of oauth-client
 	storageID := oauthClientStorageID(keyName)
-	client, err := apiSpec.OAuthManager.OsinServer.Storage.GetExtendedClientNoPrefix(storageID)
+	client, err := apiSpec.OAuthManager.Storage().GetExtendedClientNoPrefix(storageID)
 	if err != nil {
 		return apiError("OAuth Client ID not found"), http.StatusNotFound
 	}
@@ -2390,7 +2390,7 @@ func (gw *Gateway) updateOauthClient(keyName, apiID string, r *http.Request) (in
 		Description:       updateClientData.Description,       // update
 	}
 
-	err = apiSpec.OAuthManager.OsinServer.Storage.SetClient(storageID, apiSpec.OrgID, &updatedClient, true)
+	err = apiSpec.OAuthManager.Storage().SetClient(storageID, apiSpec.OrgID, &updatedClient, true)
 	if err != nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "api",
@@ -2455,7 +2455,7 @@ func (gw *Gateway) invalidateOauthRefresh(w http.ResponseWriter, r *http.Request
 	}
 
 	keyName := mux.Vars(r)["keyName"]
-	err := apiSpec.OAuthManager.OsinServer.Storage.RemoveRefresh(keyName)
+	err := apiSpec.OAuthManager.Storage().RemoveRefresh(keyName)
 	if err != nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "api",
@@ -2575,7 +2575,7 @@ func (gw *Gateway) oAuthClientTokensHandler(w http.ResponseWriter, r *http.Reque
 			page = 1
 		}
 
-		tokens, totalPages, err := apiSpec.OAuthManager.OsinServer.Storage.GetPaginatedClientTokens(keyName, page)
+		tokens, totalPages, err := apiSpec.OAuthManager.Storage().GetPaginatedClientTokens(keyName, page)
 		if err != nil {
 			doJSONWrite(w, http.StatusInternalServerError, apiError("Get client tokens failed"))
 			return
@@ -2593,7 +2593,7 @@ func (gw *Gateway) oAuthClientTokensHandler(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	tokens, err := apiSpec.OAuthManager.OsinServer.Storage.GetClientTokens(keyName)
+	tokens, err := apiSpec.OAuthManager.Storage().GetClientTokens(keyName)
 	if err != nil {
 		doJSONWrite(w, http.StatusInternalServerError, apiError("Get client tokens failed"))
 		return
@@ -2633,7 +2633,7 @@ func (gw *Gateway) getOauthClientDetails(keyName, apiID string) (interface{}, in
 		}
 	}
 
-	clientData, err := apiSpec.OAuthManager.OsinServer.Storage.GetExtendedClientNoPrefix(storageID)
+	clientData, err := apiSpec.OAuthManager.Storage().GetExtendedClientNoPrefix(storageID)
 	if err != nil {
 		return apiError("OAuth Client ID not found"), http.StatusNotFound
 	}
@@ -2694,7 +2694,7 @@ func (gw *Gateway) handleDeleteOAuthClient(keyName, apiID string) (interface{}, 
 	}
 
 	if apiSpec.OAuthManager != nil {
-		err := apiSpec.OAuthManager.OsinServer.Storage.DeleteClient(storageID, apiSpec.OrgID, true)
+		err := apiSpec.OAuthManager.Storage().DeleteClient(storageID, apiSpec.OrgID, true)
 		if err != nil {
 			return apiError("Delete failed"), http.StatusInternalServerError
 		}
@@ -2742,7 +2742,7 @@ func (gw *Gateway) getApiClients(apiID string) ([]ExtendedOsinClientInterface, a
 
 	clientData := []ExtendedOsinClientInterface{}
 	if apiSpec.UseOauth2 {
-		clientData, err = apiSpec.OAuthManager.OsinServer.Storage.GetClients(filterID, apiSpec.OrgID, true)
+		clientData, err = apiSpec.OAuthManager.Storage().GetClients(filterID, apiSpec.OrgID, true)
 		if err != nil {
 			log.WithFields(logrus.Fields{
 				"prefix": "api",
@@ -2933,7 +2933,7 @@ func (gw *Gateway) GetStorageForApi(apiID string) (ExtendedOsinStorageInterface,
 		return nil, http.StatusNotFound, errors.New(oAuthNotPropagatedErr)
 	}
 
-	return apiSpec.OAuthManager.OsinServer.Storage, http.StatusOK, nil
+	return apiSpec.OAuthManager.Storage(), http.StatusOK, nil
 }
 
 func (gw *Gateway) RevokeAllTokensHandler(w http.ResponseWriter, r *http.Request) {
@@ -3390,16 +3390,15 @@ var createOauthClientSecret = func() string {
 }
 
 // invalidate tokens if we had a new policy
-func invalidateTokens(prevClient ExtendedOsinClientInterface, updatedClient OAuthClient, oauthManager *OAuthManager) {
-
+func invalidateTokens(prevClient ExtendedOsinClientInterface, updatedClient OAuthClient, oauthManager OAuthManagerInterface) {
 	if prevPolicy := prevClient.GetPolicyID(); prevPolicy != "" && prevPolicy != updatedClient.PolicyID {
-		tokenList, err := oauthManager.OsinServer.Storage.GetClientTokens(updatedClient.ClientID)
+		tokenList, err := oauthManager.Storage().GetClientTokens(updatedClient.ClientID)
 		if err != nil {
 			log.WithError(err).Warning("Could not get list of tokens for updated OAuth client")
 		}
 
 		for _, token := range tokenList {
-			if err := oauthManager.OsinServer.Storage.RemoveAccess(token.Token); err != nil {
+			if err := oauthManager.Storage().RemoveAccess(token.Token); err != nil {
 				log.WithError(err).Warning("Could not remove token for updated OAuth client policy")
 			}
 		}
