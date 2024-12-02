@@ -152,7 +152,7 @@ func (ts *Test) createTestOAuthClient(spec *APISpec, clientID string) OAuthClien
 		PolicyID:          pID,
 		MetaData:          map[string]interface{}{"foo": "bar", "client": "meta"},
 	}
-	spec.OAuthManager.OsinServer.Storage.SetClient(testClient.ClientID, "org-id-1", &testClient, false)
+	spec.OAuthManager.Storage().SetClient(testClient.ClientID, "org-id-1", &testClient, false)
 	return testClient
 }
 
@@ -232,8 +232,8 @@ func TestOauthMultipleAPIs(t *testing.T) {
 		ClientRedirectURI: authRedirectUri,
 		PolicyID:          pID,
 	}
-	spec.OAuthManager.OsinServer.Storage.SetClient(testClient.ClientID, spec.OrgID, &testClient, false)
-	spec2.OAuthManager.OsinServer.Storage.SetClient(testClient.ClientID, spec2.OrgID, &testClient, false)
+	spec.OAuthManager.Storage().SetClient(testClient.ClientID, spec.OrgID, &testClient, false)
+	spec2.OAuthManager.Storage().SetClient(testClient.ClientID, spec2.OrgID, &testClient, false)
 
 	param := make(url.Values)
 	param.Set("response_type", "token")
@@ -314,7 +314,7 @@ func TestOAuthTokenExpiration(t *testing.T) {
 		ClientRedirectURI: authRedirectUri,
 		PolicyID:          pID,
 	}
-	err := spec.OAuthManager.OsinServer.Storage.SetClient(testClient.ClientID, spec.OrgID, &testClient, false)
+	err := spec.OAuthManager.Storage().SetClient(testClient.ClientID, spec.OrgID, &testClient, false)
 	assert.NoError(t, err)
 
 	param := make(url.Values)
