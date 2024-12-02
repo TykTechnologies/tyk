@@ -3,6 +3,7 @@ version: "3"
 
 includes:
   test: .taskfiles/test.yml
+  lint: .taskfiles/lint.yml
   deps: .taskfiles/deps/Taskfile.yml
   opentelemetry:
     taskfile: ci/tests/tracing/Taskfile.yml
@@ -122,10 +123,10 @@ tasks:
     desc: "Run pre-push hooks"
     cmds:
       - task: lint:tidy
-      - task: vet
-      - task: golangci-lint
+      - task: lint:vet
+      - task: lint:golangci-lint
         vars:
           args: "{{.golangci}} --new-from-rev=origin/master"
-      - task: x-tyk-gateway
+      - task: lint:x-tyk-gateway
       - task: simple-build
       - task: compile-tests
