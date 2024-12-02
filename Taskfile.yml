@@ -115,15 +115,13 @@ tasks:
   pre-commit:
     desc: "Run pre-commit hooks"
     cmds:
-      - echo "running pre-commit hooks"
-      - task: gofmt
-      - task: goimports
+      - task: lint:tidy
       - task: compile-tests
 
   pre-push:
     desc: "Run pre-push hooks"
     cmds:
-      - echo "running pre-push hooks"
+      - task: lint:tidy
       - task: vet
       - task: golangci-lint
         vars:
