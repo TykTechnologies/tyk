@@ -161,13 +161,12 @@ type APISpec struct {
 
 	sync.RWMutex
 
-	Checksum                 string
-	RxPaths                  map[string][]URLSpec
-	WhiteListEnabled         map[string]bool
-	target                   *url.URL
-	AuthManager              SessionHandler
-
-	OAuthManager             OAuthManagerInterface
+	Checksum         string
+	RxPaths          map[string][]URLSpec
+	WhiteListEnabled map[string]bool
+	target           *url.URL
+	AuthManager      SessionHandler
+	OAuthManager     OAuthManagerInterface
 
 	OrgSessionManager        SessionHandler
 	EventPaths               map[apidef.TykEvent][]config.TykEventHandler
