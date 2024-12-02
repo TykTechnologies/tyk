@@ -51,4 +51,23 @@ func TestRequestSizeLimit(t *testing.T) {
 			}...)
 		})
 	})
+
+	t.Run("should not break the request if Content-Length is not present", func(t *testing.T) {
+		methods := []string{
+			http.MethodGet,
+			http.MethodDelete,
+			http.MethodConnect,
+			http.MethodHead,
+			http.MethodTrace,
+			http.MethodOptions,
+			http.MethodPut,
+			http.MethodPost,
+			http.MethodPatch,
+		}
+		for _, method := range methods {
+			_, _ = ts.Run(t, []test.TestCase{
+				{Method: method, Path: "/sample/", Code: http.StatusOK},
+			}...)
+		}
+	})
 }

@@ -35,7 +35,7 @@ func (t *RequestSizeLimitMiddleware) EnabledForSpec() bool {
 func (t *RequestSizeLimitMiddleware) checkRequestLimit(r *http.Request, sizeLimit int64) (error, int) {
 	statedCL := r.Header.Get(header.ContentLength)
 	if statedCL == "" {
-		return errors.New("Content length is required for this request"), 411
+		statedCL = "0"
 	}
 
 	size, err := strconv.ParseInt(statedCL, 0, 64)
