@@ -9,30 +9,27 @@ import (
 )
 
 func TestSessionCache(t *testing.T) {
-	// Create a new session cache
-	cache := NewSessionCache()
-
-	// Test data
 	testData := SessionState{
 		OrgID: "Tyk",
 	}
-
-	// Test key
 	testKey := "testKey"
 
-	// Test Set method
+	// Create a new session cache, set value for testKey
+	cache := NewSessionCache()
 	cache.Set(testKey, testData, 0)
 
-	// Test Get method
+	// Test Get
 	retrievedData, ok := cache.Get(testKey)
+	assert.True(t, ok)
+	assert.Equal(t, retrievedData.OrgID, testData.OrgID)
 
+	retrievedData, ok = cache.Get(testKey)
 	assert.True(t, ok)
 	assert.Equal(t, retrievedData.OrgID, testData.OrgID)
 
 	// Test non-existent key
 	nonExistentKey := "nonExistentKey"
 	retrievedData, ok = cache.Get(nonExistentKey)
-
 	assert.Nil(t, retrievedData)
 	assert.False(t, ok)
 }
@@ -40,7 +37,6 @@ func TestSessionCache(t *testing.T) {
 func TestSessionCache_leaks(t *testing.T) {
 	before := runtime.NumGoroutine()
 
-	// Test data
 	testData := SessionState{
 		OrgID: "Tyk",
 	}
@@ -61,5 +57,40 @@ func TestSessionCache_leaks(t *testing.T) {
 
 	if before < after {
 		t.Errorf("Goroutine leak, was: %d, after reload: %d", before, after)
+	}
+}
+
+func BenchmarkSessionState_Get(b *testing.B) {
+	testData := SessionState{
+		OrgID: "Tyk",
+	}
+	testKey := "testKey"
+
+	cache := NewSessionCache()
+	cache.Set(testKey, testData, 60)
+
+	b.ResetTimer()
+
+	// Test Get method
+	for i := 0; i < b.N; i++ {
+		r, ok := cache.Get(testKey)
+		assert.True(b, ok)
+		assert.Equal(b, testData.OrgID, r.OrgID)
+	}
+}
+
+func BenchmarkSessionState_Set(b *testing.B) {
+	testData := SessionState{
+		OrgID: "Tyk",
+	}
+	testKey := "testKey"
+
+	cache := NewSessionCache()
+
+	b.ResetTimer()
+
+	// Test Set method
+	for i := 0; i < b.N; i++ {
+		cache.Set(testKey, testData, 0)
 	}
 }

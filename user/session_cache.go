@@ -51,6 +51,7 @@ func (s *sessionCache) Get(key string) (*SessionState, bool) {
 }
 
 // Set will encode the *SessionState and store it in the cache.
+// The ttl value for the object is passed in seconds.
 func (s *sessionCache) Set(key string, sess SessionState, ttl int64) {
 	data, err := json.Marshal(sess)
 	if err != nil {
