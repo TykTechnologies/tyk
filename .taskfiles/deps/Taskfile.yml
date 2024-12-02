@@ -52,7 +52,7 @@ tasks:
     internal: true
     desc: 'Install lefthook'
     status:
-      - type lefthoo
+      - type lefthook
     cmds:
       - go install github.com/evilmartians/lefthook@latest
 
