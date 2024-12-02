@@ -9,7 +9,7 @@ tasks:
       - golangci-lint
       - faillint
       - mockgen
-      - setup_hooks
+      - lefthook
     cmds:
       - for: ['go-fsck', 'schema-gen', 'summary']
         task: exp
@@ -48,6 +48,14 @@ tasks:
     cmds:
       - go install github.com/fatih/faillint@latest
 
+  lefthook:
+    internal: true
+    desc: 'Install lefthook'
+    status:
+      - type lefthoo
+    cmds:
+      - go install github.com/evilmartians/lefthook@latest
+
   exp:
     desc: 'Install exp/cmd'
     requires:
@@ -56,11 +64,3 @@ tasks:
       - type {{.name}}
     cmds:
       - go install github.com/TykTechnologies/exp/cmd/{{.name}}@main
-
-  setup_hooks:
-    desc: Sets up the pre commit hooks
-    cmds:
-      - mkdir -p .git/hooks
-      - cp scripts/pre-commit.sh .git/hooks/pre-commit
-      - chmod +x .git/hooks/pre-commit
-      - echo "Pre-commit hook has been set up."

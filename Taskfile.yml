@@ -97,7 +97,37 @@ tasks:
       - go test -count 1 -v -run=TestXTykGateway_Lint ./apidef/oas/
 
   setup:
-    desc: "Setup the project including dependencies and pre-commit hooks"
+    desc: "Setup the project including dependencies and git hooks using lefthooks"
     cmds:
       - task: deps:default
-      - task: deps:setup_hooks
+      - lefthook install
+
+  simple-build:
+    desc: "Run go build for sanity check"
+    cmds:
+      - go build .
+
+  compile-tests:
+    desc: "Compile go tests for sanity check"
+    cmds:
+      - cd gateway && go test -c .
+
+  pre-commit:
+    desc: "Run pre-commit hooks"
+    cmds:
+      - echo "running pre-commit hooks"
+      - task: gofmt
+      - task: goimports
+      - task: compile-tests
+
+  pre-push:
+    desc: "Run pre-push hooks"
+    cmds:
+      - echo "running pre-push hooks"
+      - task: vet
+      - task: golangci-lint
+        vars:
+          args: "{{.golangci}} --new-from-rev=origin/master"
+      - task: x-tyk-gateway
+      - task: simple-build
+      - task: compile-tests

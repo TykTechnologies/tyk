@@ -1,0 +1,4 @@
+pre-commit:
+  commands:
+    pre-commit:
+      run: task pre-commit
