@@ -7,12 +7,13 @@ import (
 	"sync"
 	"time"
 
+	"github.com/getkin/kin-openapi/routers"
+
 	"github.com/TykTechnologies/tyk-pump/analytics"
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/apidef/oas"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/internal/graphengine"
-	"github.com/getkin/kin-openapi/routers"
 )
 
 // APISpec represents a path specification for an API, to avoid enumerating multiple nested lists, a single
