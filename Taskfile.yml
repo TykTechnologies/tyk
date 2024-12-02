@@ -95,3 +95,9 @@ tasks:
     internal: true
     cmds:
       - go test -count 1 -v -run=TestXTykGateway_Lint ./apidef/oas/
+
+  setup:
+    desc: "Setup the project including dependencies and pre-commit hooks"
+    cmds:
+      - task: deps:default
+      - task: deps:setup_hooks

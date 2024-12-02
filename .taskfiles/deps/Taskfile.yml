@@ -9,6 +9,7 @@ tasks:
       - golangci-lint
       - faillint
       - mockgen
+      - setup_hooks
     cmds:
       - for: ['go-fsck', 'schema-gen', 'summary']
         task: exp
@@ -55,3 +56,11 @@ tasks:
       - type {{.name}}
     cmds:
       - go install github.com/TykTechnologies/exp/cmd/{{.name}}@main
+
+  setup_hooks:
+    desc: Sets up the pre commit hooks
+    cmds:
+      - mkdir -p .git/hooks
+      - cp scripts/pre-commit.sh .git/hooks/pre-commit
+      - chmod +x .git/hooks/pre-commit
+      - echo "Pre-commit hook has been set up."
