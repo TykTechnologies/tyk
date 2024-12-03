@@ -37,6 +37,7 @@ import (
 	"github.com/gorilla/websocket"
 
 	"github.com/TykTechnologies/tyk/internal/httputil"
+	"github.com/TykTechnologies/tyk/internal/model"
 	"github.com/TykTechnologies/tyk/internal/otel"
 	"github.com/TykTechnologies/tyk/internal/uuid"
 
@@ -971,7 +972,7 @@ func TestReq(t testing.TB, method, urlStr string, body interface{}) *http.Reques
 func (gw *Gateway) CreateDefinitionFromString(defStr string) *APISpec {
 	loader := APIDefinitionLoader{Gw: gw}
 	def := loader.ParseDefinition(strings.NewReader(defStr))
-	spec, _ := loader.MakeSpec(&nestedApiDefinition{APIDefinition: &def}, nil)
+	spec, _ := loader.MakeSpec(&model.MergedAPI{APIDefinition: &def}, nil)
 	return spec
 }
 
@@ -1187,7 +1188,7 @@ func (s *Test) newGateway(genConf func(globalConf *config.Config)) *Gateway {
 
 	cli.Init(confPaths)
 
-	err = gw.initialiseSystem()
+	err = gw.initSystem()
 	if err != nil {
 		panic(err)
 	}
@@ -1326,6 +1327,7 @@ func (s *Test) RemoveApis() error {
 	}
 
 	err := os.RemoveAll(s.Gw.GetConfig().AppPath)
+
 	if err != nil {
 		log.WithError(err).Error("removing apis from gw")
 	}

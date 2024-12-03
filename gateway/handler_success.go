@@ -12,10 +12,11 @@ import (
 
 	graphqlinternal "github.com/TykTechnologies/tyk/internal/graphql"
 
+	"github.com/TykTechnologies/tyk-pump/analytics"
+
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/internal/httputil"
 
-	"github.com/TykTechnologies/tyk-pump/analytics"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/ctx"
 	"github.com/TykTechnologies/tyk/header"
@@ -333,6 +334,10 @@ func recordDetail(r *http.Request, spec *APISpec) bool {
 		return false
 	}
 
+	return recordDetailUnsafe(r, spec)
+}
+
+func recordDetailUnsafe(r *http.Request, spec *APISpec) bool {
 	if spec.EnableDetailedRecording {
 		return true
 	}
@@ -343,19 +348,16 @@ func recordDetail(r *http.Request, spec *APISpec) bool {
 		}
 	}
 
-	// Are we even checking?
-	if !spec.GlobalConfig.EnforceOrgDataDetailLogging {
-		return spec.GlobalConfig.AnalyticsConfig.EnableDetailedRecording
+	// decide based on org session.
+	if spec.GlobalConfig.EnforceOrgDataDetailLogging {
+		session, ok := r.Context().Value(ctx.OrgSessionContext).(*user.SessionState)
+		if ok && session != nil {
+			return session.EnableDetailedRecording || session.EnableDetailRecording // nolint:staticcheck // Deprecated DetailRecording
+		}
 	}
 
-	// We are, so get session data
-	session, ok := r.Context().Value(ctx.OrgSessionContext).(*user.SessionState)
-	if ok && session != nil {
-		return session.EnableDetailedRecording || session.EnableDetailRecording // nolint:staticcheck // Deprecated DetailRecording
-	}
-
-	// no session found, use global config
-	return spec.GlobalConfig.AnalyticsConfig.EnableDetailedRecording
+	// no org session found, use global config
+	return spec.GraphQL.Enabled || spec.GlobalConfig.AnalyticsConfig.EnableDetailedRecording
 }
 
 // ServeHTTP will store the request details in the analytics store if necessary and proxy the request to it's

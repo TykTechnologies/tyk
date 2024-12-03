@@ -78,11 +78,17 @@ func TestXTykGateway_Lint(t *testing.T) {
 			settings.Server.EventHandlers[i].Webhook.CoolDownPeriod = ReadableDuration(time.Second * 20)
 		}
 
-		for idx, _ := range settings.Middleware.Operations {
+		for idx := range settings.Middleware.Operations {
 			settings.Middleware.Operations[idx].CircuitBreaker.Threshold = 0.5
 		}
 
 		settings.Upstream.RateLimit.Per = ReadableDuration(10 * time.Second)
+
+		settings.Upstream.Authentication = &UpstreamAuth{
+			Enabled:   false,
+			BasicAuth: nil,
+			OAuth:     nil,
+		}
 	}
 
 	// Encode data to json

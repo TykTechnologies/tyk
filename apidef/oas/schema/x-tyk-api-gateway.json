@@ -15,7 +15,6 @@
       "$ref": "#/definitions/X-Tyk-Middleware"
     }
   },
-  "additionalProperties": false,
   "required": [
     "info",
     "upstream",
@@ -24,7 +23,6 @@
   "definitions": {
     "X-Tyk-ServiceDiscovery": {
       "type": "object",
-      "additionalProperties": false,
       "properties": {
         "enabled": {
           "type": "boolean"
@@ -67,7 +65,6 @@
     },
     "X-Tyk-ServiceDiscoveryCache": {
       "type": "object",
-      "additionalProperties": false,
       "properties": {
         "enabled": {
           "type": "boolean"
@@ -83,7 +80,6 @@
     },
     "X-Tyk-DetailedActivityLogs": {
       "type": "object",
-      "additionalProperties": false,
       "properties": {
         "enabled": {
           "type": "boolean"
@@ -95,7 +91,6 @@
     },
     "X-Tyk-AuthSource": {
       "type": "object",
-      "additionalProperties": false,
       "properties": {
         "enabled": {
           "type": "boolean"
@@ -110,7 +105,6 @@
     },
     "X-Tyk-MutualTLS": {
       "type": "object",
-      "additionalProperties": false,
       "properties": {
         "enabled": {
           "type": "boolean"
@@ -131,7 +125,6 @@
     },
     "X-Tyk-DomainToCertificate": {
       "type": "object",
-      "additionalProperties": false,
       "properties": {
         "domain": {
           "$ref": "#/definitions/X-Tyk-DomainDef"
@@ -147,7 +140,6 @@
     },
     "X-Tyk-CertificatePinning": {
       "type": "object",
-      "additionalProperties": false,
       "properties": {
         "enabled": {
           "type": "boolean"
@@ -168,7 +160,6 @@
     },
     "X-Tyk-PinnedPublicKeys": {
       "type": "object",
-      "additionalProperties": false,
       "properties": {
         "domain": {
           "$ref": "#/definitions/X-Tyk-DomainDef"
@@ -185,7 +176,6 @@
     },
     "X-Tyk-ClientToPolicy": {
       "type": "object",
-      "additionalProperties": false,
       "properties": {
         "clientId": {
           "type": "string"
@@ -197,7 +187,6 @@
     },
     "X-Tyk-Provider": {
       "type": "object",
-      "additionalProperties": false,
       "properties": {
         "issuer": {
           "type": "string"
@@ -214,7 +203,6 @@
     },
     "X-Tyk-ScopeToPolicy": {
       "type": "object",
-      "additionalProperties": false,
       "properties": {
         "scope": {
           "type": "string"
@@ -226,7 +214,6 @@
     },
     "X-Tyk-Scopes": {
       "type": "object",
-      "additionalProperties": false,
       "properties": {
         "claimName": {
           "type": "string"
@@ -243,7 +230,6 @@
     },
     "X-Tyk-ClientCertificates": {
       "type": "object",
-      "additionalProperties": false,
       "properties": {
         "enabled": {
           "type": "boolean"
@@ -260,7 +246,6 @@
     },
     "X-Tyk-PluginConfig": {
       "type": "object",
-      "additionalProperties": false,
       "properties": {
         "driver": {
           "type": "string",
@@ -282,7 +267,6 @@
     },
     "X-Tyk-PluginConfigData": {
       "type": "object",
-      "additionalProperties": false,
       "properties": {
         "enabled": {
           "type": "boolean"
@@ -298,7 +282,6 @@
     },
     "X-Tyk-CustomPluginConfig": {
       "type": "object",
-      "additionalProperties": false,
       "properties": {
         "plugins": {
           "$ref": "#/definitions/X-Tyk-CustomPlugins"
@@ -315,7 +298,6 @@
       "minItems": 1
     },
     "X-Tyk-CustomPluginDefinition": {
-      "additionalProperties": false,
       "properties": {
         "enabled": {
           "type": "boolean"
@@ -340,7 +322,6 @@
     },
     "X-Tyk-IDExtractorConfig": {
       "type": "object",
-      "additionalProperties": false,
       "properties": {
         "headerName": {
           "type": "string"
@@ -361,7 +342,6 @@
     },
     "X-Tyk-IDExtractor": {
       "type": "object",
-      "additionalProperties": false,
       "properties": {
         "enabled": {
           "type": "boolean"
@@ -395,7 +375,6 @@
     },
     "X-Tyk-AuthenticationPlugin": {
       "type": "object",
-      "additionalProperties": false,
       "properties": {
         "enabled": {
           "type": "boolean"
@@ -420,7 +399,6 @@
     },
     "X-Tyk-PluginBundle": {
       "type": "object",
-      "additionalProperties": false,
       "properties": {
         "enabled": {
           "type": "boolean"
@@ -437,7 +415,6 @@
     },
     "X-Tyk-CORS": {
       "type": "object",
-      "additionalProperties": false,
       "properties": {
         "enabled": {
           "type": "boolean"
@@ -493,7 +470,6 @@
     },
     "X-Tyk-Cache": {
       "type": "object",
-      "additionalProperties": false,
       "properties": {
         "enabled": {
           "type": "boolean"
@@ -531,7 +507,6 @@
     },
     "X-Tyk-Global": {
       "type": "object",
-      "additionalProperties": false,
       "properties": {
         "pluginConfig": {
           "$ref": "#/definitions/X-Tyk-PluginConfig"
@@ -582,7 +557,6 @@
     },
     "X-Tyk-Allowance": {
       "type": "object",
-      "additionalProperties": false,
       "properties": {
         "enabled": {
           "type": "boolean"
@@ -597,7 +571,6 @@
     },
     "X-Tyk-TransformRequestMethod": {
       "type": "object",
-      "additionalProperties": false,
       "properties": {
         "enabled": {
           "type": "boolean"
@@ -613,7 +586,6 @@
     },
     "X-Tyk-TransformBody": {
       "type": "object",
-      "additionalProperties": false,
       "properties": {
         "enabled": {
           "type": "boolean"
@@ -652,7 +624,6 @@
     },
     "X-Tyk-TransformHeaders": {
       "type": "object",
-      "additionalProperties": false,
       "properties": {
         "enabled": {
           "type": "boolean"
@@ -680,7 +651,6 @@
     },
     "X-Tyk-CachePlugin": {
       "type": "object",
-      "additionalProperties": false,
       "properties": {
         "enabled": {
           "type": "boolean"
@@ -708,7 +678,6 @@
     },
     "X-Tyk-EnforceTimeout": {
       "type": "object",
-      "additionalProperties": false,
       "properties": {
         "enabled": {
           "type": "boolean"
@@ -725,7 +694,6 @@
     },
     "X-Tyk-ValidateRequest": {
       "type": "object",
-      "additionalProperties": false,
       "properties": {
         "enabled": {
           "type": "boolean"
@@ -740,7 +708,6 @@
     },
     "X-Tyk-MockResponse": {
       "type": "object",
-      "additionalProperties": false,
       "properties": {
         "enabled": {
           "type": "boolean"
@@ -785,7 +752,6 @@
     },
     "X-Tyk-RequestSizeLimit": {
       "type": "object",
-      "additionalProperties": false,
       "properties": {
         "enabled": {
           "type": "boolean"
@@ -802,7 +768,6 @@
     },
     "X-Tyk-VirtualEndpoint": {
       "type": "object",
-      "additionalProperties": false,
       "properties": {
         "enabled": {
           "type": "boolean"
@@ -833,7 +798,6 @@
     },
     "X-Tyk-URLRewrite": {
       "type": "object",
-      "additionalProperties": false,
       "properties": {
         "enabled": {
           "type": "boolean"
@@ -861,7 +825,6 @@
     },
     "X-Tyk-TrackEndpoint": {
       "type": "object",
-      "additionalProperties": false,
       "properties": {
         "enabled": {
           "type": "boolean"
@@ -873,7 +836,6 @@
     },
     "X-Tyk-URLRewriteTrigger": {
       "type": "object",
-      "additionalProperties": false,
       "properties": {
         "condition": {
           "enum": [
@@ -905,7 +867,6 @@
     },
     "X-Tyk-URLRewriteRuleForRequestBody": {
       "type": "object",
-      "additionalProperties": false,
       "properties": {
         "in": {
           "enum": [
@@ -929,7 +890,6 @@
     },
     "X-Tyk-URLRewriteRule": {
       "type": "object",
-      "additionalProperties": false,
       "properties": {
         "in": {
           "enum": [
@@ -958,7 +918,6 @@
     },
     "X-Tyk-EndpointPostPlugin": {
       "type": "object",
-      "additionalProperties": false,
       "properties": {
         "enabled": {
           "type": "boolean"
@@ -981,7 +940,6 @@
     },
     "X-Tyk-Internal": {
       "type": "object",
-      "additionalProperties": false,
       "properties": {
         "enabled": {
           "type": "boolean"
@@ -993,7 +951,6 @@
     },
     "X-Tyk-Operation": {
       "type": "object",
-      "additionalProperties": false,
       "properties": {
         "allow": {
           "$ref": "#/definitions/X-Tyk-Allowance"
@@ -1071,12 +1028,10 @@
         "\\S+": {
           "$ref": "#/definitions/X-Tyk-Operation"
         }
-      },
-      "additionalProperties": false
+      }
     },
     "X-Tyk-Middleware": {
       "type": "object",
-      "additionalProperties": false,
       "properties": {
         "global": {
           "$ref": "#/definitions/X-Tyk-Global"
@@ -1088,7 +1043,6 @@
     },
     "X-Tyk-ListenPath": {
       "type": "object",
-      "additionalProperties": false,
       "properties": {
         "value": {
           "type": "string",
@@ -1104,7 +1058,6 @@
     },
     "X-Tyk-HMAC": {
       "type": "object",
-      "additionalProperties": false,
       "properties": {
         "enabled": {
           "type": "boolean"
@@ -1137,7 +1090,7 @@
     },
     "X-Tyk-OIDC": {
       "type": "object",
-      "additionalProperties": false,
+      "description": "Support for external OAuth Middleware will be deprecated starting from 5.7.0. To avoid any disruptions, we recommend that you use JSON Web Token (JWT) instead, as explained in https://tyk.io/docs/basic-config-and-security/security/authentication-authorization/openid-connect/",
       "properties": {
         "enabled": {
           "type": "boolean"
@@ -1172,7 +1125,6 @@
     },
     "X-Tyk-CustomPluginAuthentication": {
       "type": "object",
-      "additionalProperties": false,
       "properties": {
         "enabled": {
           "type": "boolean"
@@ -1196,7 +1148,6 @@
     },
     "X-Tyk-Authentication": {
       "type": "object",
-      "additionalProperties": false,
       "properties": {
         "enabled": {
           "type": "boolean"
@@ -1257,7 +1208,6 @@
     },
     "X-Tyk-Server": {
       "type": "object",
-      "additionalProperties": false,
       "properties": {
         "listenPath": {
           "$ref": "#/definitions/X-Tyk-ListenPath"
@@ -1302,7 +1252,6 @@
     },
     "X-Tyk-GatewayTags": {
       "type": "object",
-      "additionalProperties": false,
       "properties": {
         "enabled": {
           "type": "boolean"
@@ -1324,7 +1273,6 @@
     },
     "X-Tyk-Upstream": {
       "type": "object",
-      "additionalProperties": false,
       "properties": {
         "url": {
           "type": "string",
@@ -1349,6 +1297,9 @@
         },
         "rateLimit": {
           "$ref": "#/definitions/X-Tyk-RateLimit"
+        },
+        "authentication": {
+          "$ref": "#/definitions/X-Tyk-UpstreamAuthentication"
         }
       },
       "required": [
@@ -1357,7 +1308,6 @@
     },
     "X-Tyk-State": {
       "type": "object",
-      "additionalProperties": false,
       "properties": {
         "active": {
           "type": "boolean"
@@ -1372,7 +1322,6 @@
     },
     "X-Tyk-Versioning": {
       "type": "object",
-      "additionalProperties": false,
       "properties": {
         "enabled": {
           "type": "boolean"
@@ -1419,7 +1368,6 @@
     },
     "X-Tyk-VersionToID": {
       "type": "object",
-      "additionalProperties": false,
       "properties": {
         "name": {
           "type": "string",
@@ -1437,7 +1385,6 @@
     },
     "X-Tyk-Info": {
       "type": "object",
-      "additionalProperties": false,
       "properties": {
         "id": {
           "type": "string"
@@ -1469,7 +1416,6 @@
     },
     "X-Tyk-ExtractCredentialsFromBody": {
       "type": "object",
-      "additionalProperties": false,
       "properties": {
         "enabled": {
           "type": "boolean"
@@ -1487,7 +1433,6 @@
     },
     "X-Tyk-Notifications": {
       "type": "object",
-      "additionalProperties": false,
       "properties": {
         "sharedSecret": {
           "type": "string"
@@ -1499,7 +1444,6 @@
     },
     "X-Tyk-Signature": {
       "type": "object",
-      "additionalProperties": false,
       "properties": {
         "enabled": {
           "type": "boolean"
@@ -1530,7 +1474,6 @@
     },
     "X-Tyk-Token": {
       "type": "object",
-      "additionalProperties": false,
       "properties": {
         "enabled": {
           "type": "boolean"
@@ -1557,7 +1500,6 @@
     },
     "X-Tyk-JWT": {
       "type": "object",
-      "additionalProperties": false,
       "properties": {
         "enabled": {
           "type": "boolean"
@@ -1625,7 +1567,6 @@
     },
     "X-Tyk-Basic": {
       "type": "object",
-      "additionalProperties": false,
       "properties": {
         "enabled": {
           "type": "boolean"
@@ -1655,7 +1596,6 @@
     },
     "X-Tyk-OAuth": {
       "type": "object",
-      "additionalProperties": false,
       "properties": {
         "enabled": {
           "type": "boolean"
@@ -1695,7 +1635,7 @@
     },
     "X-Tyk-ExternalOAuth": {
       "type": "object",
-      "additionalProperties": false,
+      "description": "Support for external OAuth Middleware will be deprecated starting from 5.7.0. To avoid any disruptions, we recommend that you use JSON Web Token (JWT) instead, as explained in https://tyk.io/docs/basic-config-and-security/security/authentication-authorization/ext-oauth-middleware/",
       "properties": {
         "enabled": {
           "type": "boolean"
@@ -1724,7 +1664,6 @@
     },
     "X-Tyk-OAuthProvider": {
       "type": "object",
-      "additionalProperties": false,
       "properties": {
         "jwt": {
           "$ref": "#/definitions/X-Tyk-JWTValidation"
@@ -1736,7 +1675,6 @@
     },
     "X-Tyk-JWTValidation": {
       "type": "object",
-      "additionalProperties": false,
       "properties": {
         "enabled": {
           "type": "boolean"
@@ -1768,7 +1706,6 @@
     },
     "X-Tyk-Introspection": {
       "type": "object",
-      "additionalProperties": false,
       "properties": {
         "enabled": {
           "type": "boolean"
@@ -1808,7 +1745,6 @@
     },
     "X-Tyk-CustomDomain": {
       "type": "object",
-      "additionalProperties": false,
       "properties": {
         "enabled": {
           "type": "boolean"
@@ -1832,7 +1768,6 @@
     },
     "X-Tyk-Header": {
       "type": "object",
-      "additionalProperties": false,
       "properties": {
         "name": {
           "type": "string"
@@ -1900,7 +1835,6 @@
     },
     "X-Tyk-DetailedTracing": {
       "type": "object",
-      "additionalProperties": false,
       "properties": {
         "enabled": {
           "type": "boolean"
@@ -1953,7 +1887,6 @@
     },
     "X-Tyk-Webhook-Without-ID": {
       "type": "object",
-      "additionalProperties": false,
       "properties": {
         "enabled": {
           "type": "boolean"
@@ -2065,6 +1998,161 @@
     "X-Tyk-DomainDef": {
       "type": "string",
       "pattern": "^([*a-zA-Z0-9-]+(\\.[*a-zA-Z0-9-]+)*)(:\\d+)?$"
+    },
+    "X-Tyk-UpstreamAuthentication": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "basicAuth": {
+          "$ref": "#/definitions/X-Tyk-UpstreamBasicAuthentication"
+        },
+        "oauth": {
+          "$ref": "#/definitions/X-Tyk-UpstreamOAuth"
+        }
+      },
+      "required": [
+        "enabled"
+      ]
+    },
+    "X-Tyk-UpstreamBasicAuthentication": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "header": {
+          "$ref": "#/definitions/X-Tyk-UpstreamAuthSource"
+        },
+        "username": {
+          "$ref": "#/definitions/X-Tyk-NonEmptyString"
+        },
+        "password": {
+          "$ref": "#/definitions/X-Tyk-NonEmptyString"
+        }
+      },
+      "required": [
+        "enabled",
+        "username",
+        "password"
+      ]
+    },
+    "X-Tyk-UpstreamOAuth": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "allowedAuthorizeTypes": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string",
+            "enum": [
+              "clientCredentials",
+              "password"
+            ]
+          },
+          "minItems": 0
+        },
+        "clientCredentials": {
+          "type": "object",
+          "properties": {
+            "clientId": {
+              "$ref": "#/definitions/X-Tyk-NonEmptyString"
+            },
+            "clientSecret": {
+              "$ref": "#/definitions/X-Tyk-NonEmptyString"
+            },
+            "tokenUrl": {
+              "$ref": "#/definitions/X-Tyk-NonEmptyString"
+            },
+            "scopes": {
+              "type": [
+                "array",
+                "null"
+              ]
+            },
+            "header": {
+              "$ref": "#/definitions/X-Tyk-UpstreamAuthSource"
+            },
+            "extraMetadata": {
+              "type": [
+                "array",
+                "null"
+              ]
+            }
+          },
+          "required": [
+            "clientId",
+            "clientSecret",
+            "tokenUrl"
+          ]
+        },
+        "password": {
+          "type": "object",
+          "properties": {
+            "clientId": {
+              "$ref": "#/definitions/X-Tyk-NonEmptyString"
+            },
+            "clientSecret": {
+              "$ref": "#/definitions/X-Tyk-NonEmptyString"
+            },
+            "tokenUrl": {
+              "$ref": "#/definitions/X-Tyk-NonEmptyString"
+            },
+            "scopes": {
+              "type": [
+                "array",
+                "null"
+              ]
+            },
+            "username": {
+              "$ref": "#/definitions/X-Tyk-NonEmptyString"
+            },
+            "password": {
+              "$ref": "#/definitions/X-Tyk-NonEmptyString"
+            },
+            "header": {
+              "$ref": "#/definitions/X-Tyk-UpstreamAuthSource"
+            },
+            "extraMetadata": {
+              "type": [
+                "array",
+                "null"
+              ]
+            }
+          },
+          "required": [
+            "clientId",
+            "tokenUrl",
+            "username",
+            "password"
+          ]
+        }
+      },
+      "required": [
+        "enabled",
+        "allowedAuthorizeTypes"
+      ]
+    },
+    "X-Tyk-NonEmptyString": {
+      "type": "string",
+      "pattern": "\\S+"
+    },
+    "X-Tyk-UpstreamAuthSource": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "name": {
+          "type": "string"
+        }
+      }
     }
   }
 }

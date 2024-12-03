@@ -163,9 +163,23 @@
           }
         }
       }
+    },
+    "Streaming": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "allow_unsafe": {
+          "type": "array"
+        }
+      }
     }
   },
   "properties": {
+    "streaming": {
+      "$ref": "#/definitions/Streaming"
+    },
     "allow_insecure_configs": {
       "type": "boolean"
     },
@@ -550,6 +564,12 @@
         "enable_strict_routes": {
           "type": "boolean"
         },
+        "enable_path_prefix_matching": {
+          "type": "boolean"
+        },
+        "enable_path_suffix_matching": {
+          "type": "boolean"
+        },
         "flush_interval": {
           "type": "integer"
         },
@@ -637,6 +657,10 @@
     "log_level": {
       "type": "string",
       "enum": ["", "debug", "info", "warn", "error"]
+    },
+    "log_format": {
+      "type": "string",
+      "enum": ["", "standard", "json"]
     },
     "enable_http_profiler": {
       "type": "boolean"
@@ -1184,6 +1208,11 @@
     "oas_config": {
       "validate_examples": false,
       "validate_schema_defaults": false
+    },
+    "labs": {
+      "type": ["object", "null"],
+      "additionalProperties": true,
+      "properties": {}
     }
   }
 }

@@ -52,6 +52,10 @@ var (
 		LivenessCheck: LivenessCheckConfig{
 			CheckDuration: time.Second * 10,
 		},
+		Streaming: StreamingConfig{
+			Enabled:     false,
+			AllowUnsafe: []string{},
+		},
 	}
 )
 
@@ -408,6 +412,45 @@ type HttpServerOptionsConfig struct {
 	// Regular expressions and parameterized routes will be left alone regardless of this setting.
 	EnableStrictRoutes bool `json:"enable_strict_routes"`
 
+	// EnablePathPrefixMatching changes how the gateway matches incoming URL paths against routes (patterns) defined in the API definition.
+	// By default, the gateway uses wildcard matching. When EnablePathPrefixMatching is enabled, it switches to prefix matching. For example, a defined path such as `/json` will only match request URLs that begin with `/json`, rather than matching any URL containing `/json`.
+	//
+	// The gateway checks the request URL against several variations depending on whether path versioning is enabled:
+	// - Full path (listen path + version + endpoint): `/listen-path/v4/json`
+	// - Non-versioned full path (listen path + endpoint): `/listen-path/json`
+	// - Path without version (endpoint only): `/json`
+	//
+	// For patterns that start with `/`, the gateway prepends `^` before performing the check, ensuring a true prefix match.
+	// For patterns that start with `^`, the gateway will already perform prefix matching so EnablePathPrefixMatching will have no impact.
+	// This option allows for more specific and controlled routing of API requests, potentially reducing unintended matches. Note that you may need to adjust existing route definitions when enabling this option.
+	//
+	// Example:
+	//
+	// With wildcard matching, `/json` might match `/api/v1/data/json`.
+	// With prefix matching, `/json` would not match `/api/v1/data/json`, but would match `/json/data`.
+	//
+	// Combining EnablePathPrefixMatching with EnablePathSuffixMatching will result in exact URL matching, with `/json` being evaluated as `^/json$`.
+	EnablePathPrefixMatching bool `json:"enable_path_prefix_matching"`
+
+	// EnablePathSuffixMatching changes how the gateway matches incoming URL paths against routes (patterns) defined in the API definition.
+	// By default, the gateway uses wildcard matching. When EnablePathSuffixMatching is enabled, it switches to suffix matching. For example, a defined path such as `/json` will only match request URLs that end with `/json`, rather than matching any URL containing `/json`.
+	//
+	// The gateway checks the request URL against several variations depending on whether path versioning is enabled:
+	// - Full path (listen path + version + endpoint): `/listen-path/v4/json`
+	// - Non-versioned full path (listen path + endpoint): `/listen-path/json`
+	// - Path without version (endpoint only): `/json`
+	//
+	// For patterns that already end with `$`, the gateway will already perform suffix matching so EnablePathSuffixMatching will have no impact. For all other patterns, the gateway appends `$` before performing the check, ensuring a true suffix match.
+	// This option allows for more specific and controlled routing of API requests, potentially reducing unintended matches. Note that you may need to adjust existing route definitions when enabling this option.
+	//
+	// Example:
+	//
+	// With wildcard matching, `/json` might match `/api/v1/json/data`.
+	// With suffix matching, `/json` would not match `/api/v1/json/data`, but would match `/api/v1/json`.
+	//
+	// Combining EnablePathSuffixMatching with EnablePathPrefixMatching will result in exact URL matching, with `/json` being evaluated as `^/json$`.
+	EnablePathSuffixMatching bool `json:"enable_path_suffix_matching"`
+
 	// Disable TLS verification. Required if you are using self-signed certificates.
 	SSLInsecureSkipVerify bool `json:"ssl_insecure_skip_verify"`
 
@@ -518,7 +561,10 @@ type CoProcessConfig struct {
 
 type CertificatesConfig struct {
 	API []string `json:"apis"`
-	// Specify upstream mutual TLS certificates at a global level in the following format: `{ "<host>": "<cert>" }``
+	// Upstream is used to specify the certificates to be used in mutual TLS connections to upstream services. These are set at gateway level as a map of domain -> certificate id or path.
+	// For example if you want Tyk to use the certificate `ab23ef123` for requests to the `example.com` upstream and `/certs/default.pem` for all other upstreams then:
+	// In `tyk.conf` you would configure `"security": {"certificates": {"upstream": {"*": "/certs/default.pem", "example.com": "ab23ef123"}}}`
+	// And if using environment variables you would set this to `*:/certs/default.pem,example.com:ab23ef123`.
 	Upstream map[string]string `json:"upstream"`
 	// Certificates used for Control API Mutual TLS
 	ControlAPI []string `json:"control_api"`
@@ -609,6 +655,12 @@ func (pwl *PortsWhiteList) Decode(value string) error {
 	}
 
 	return nil
+}
+
+// StreamingConfig is for configuring tyk streaming
+type StreamingConfig struct {
+	Enabled     bool     `json:"enabled"`
+	AllowUnsafe []string `json:"allow_unsafe"`
 }
 
 // Config is the configuration object used by Tyk to set up various parameters.
@@ -953,6 +1005,10 @@ type Config struct {
 	// If not set or left empty, it will default to `info`.
 	LogLevel string `json:"log_level"`
 
+	// You can now configure the log format to be either the standard or json format
+	// If not set or left empty, it will default to `standard`.
+	LogFormat string `json:"log_format"`
+
 	// Section for configuring OpenTracing support
 	// Deprecated: use OpenTelemetry instead.
 	Tracer Tracer `json:"tracing"`
@@ -1071,6 +1127,24 @@ type Config struct {
 
 	// OAS holds the configuration for various OpenAPI-specific functionalities
 	OAS OASConfig `json:"oas_config"`
+
+	Streaming StreamingConfig `json:"streaming"`
+
+	Labs LabsConfig `json:"labs"`
+}
+
+// LabsConfig include config for streaming
+type LabsConfig map[string]interface{}
+
+// Decode unmarshals json config into the Labs config
+func (lc *LabsConfig) Decode(value string) error {
+	var temp map[string]interface{}
+	if err := json.Unmarshal([]byte(value), &temp); err != nil {
+		log.Error("Error unmarshalling LabsConfig: ", err)
+		return err
+	}
+	*lc = temp
+	return nil
 }
 
 // OASConfig holds the configuration for various OpenAPI-specific functionalities

@@ -15,8 +15,6 @@ import (
 	"sync"
 	texttemplate "text/template"
 
-	"github.com/TykTechnologies/tyk/rpc"
-
 	"github.com/gorilla/mux"
 	"github.com/justinas/alice"
 	"github.com/rs/cors"
@@ -24,9 +22,11 @@ import (
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/coprocess"
-	"github.com/TykTechnologies/tyk/internal/otel"
+	"github.com/TykTechnologies/tyk/rpc"
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/trace"
+
+	"github.com/TykTechnologies/tyk/internal/otel"
 )
 
 const (
@@ -426,9 +426,22 @@ func (gw *Gateway) processSpec(spec *APISpec, apisByListen map[string]int,
 
 	gw.mwAppendEnabled(&chainArray, &RateLimitForAPI{BaseMiddleware: baseMid})
 	gw.mwAppendEnabled(&chainArray, &GraphQLMiddleware{BaseMiddleware: baseMid})
+
+	if streamMw := getStreamingMiddleware(baseMid); streamMw != nil {
+		gw.mwAppendEnabled(&chainArray, streamMw)
+	}
+
 	if !spec.UseKeylessAccess {
 		gw.mwAppendEnabled(&chainArray, &GraphQLComplexityMiddleware{BaseMiddleware: baseMid})
 		gw.mwAppendEnabled(&chainArray, &GraphQLGranularAccessMiddleware{BaseMiddleware: baseMid})
+	}
+
+	if upstreamBasicAuthMw := getUpstreamBasicAuthMw(baseMid); upstreamBasicAuthMw != nil {
+		gw.mwAppendEnabled(&chainArray, upstreamBasicAuthMw)
+	}
+
+	if upstreamOAuthMw := getUpstreamOAuthMw(baseMid); upstreamOAuthMw != nil {
+		gw.mwAppendEnabled(&chainArray, upstreamOAuthMw)
 	}
 
 	gw.mwAppendEnabled(&chainArray, &ValidateJSON{BaseMiddleware: baseMid})
@@ -465,7 +478,6 @@ func (gw *Gateway) processSpec(spec *APISpec, apisByListen map[string]int,
 			chainArray = append(chainArray, gw.createDynamicMiddleware(obj.Name, false, obj.RequireSession, baseMid))
 		}
 	}
-
 	chain = alice.New(chainArray...).Then(&DummyProxyHandler{SH: SuccessHandler{baseMid}, Gw: gw})
 
 	if !spec.UseKeylessAccess {
@@ -912,6 +924,20 @@ func (gw *Gateway) loadGraphQLPlayground(spec *APISpec, subrouter *mux.Router) {
 	})
 }
 
+func sortSpecsByListenPath(specs []*APISpec) {
+	// sort by listen path from longer to shorter, so that /foo
+	// doesn't break /foo-bar
+	sort.Slice(specs, func(i, j int) bool {
+		// we sort by the following rules:
+		// - decreasing order of listen path length
+		// - if a domain is empty it should be at the end
+		if (specs[i].Domain == "") != (specs[j].Domain == "") {
+			return specs[i].Domain != ""
+		}
+		return len(specs[i].Proxy.ListenPath) > len(specs[j].Proxy.ListenPath)
+	})
+}
+
 // Create the individual API (app) specs based on live configurations and assign middleware
 func (gw *Gateway) loadApps(specs []*APISpec) {
 	mainLog.Info("Loading API configurations.")
@@ -919,14 +945,7 @@ func (gw *Gateway) loadApps(specs []*APISpec) {
 	tmpSpecRegister := make(map[string]*APISpec)
 	tmpSpecHandles := new(sync.Map)
 
-	// sort by listen path from longer to shorter, so that /foo
-	// doesn't break /foo-bar
-	sort.Slice(specs, func(i, j int) bool {
-		if specs[i].Domain != specs[j].Domain {
-			return len(specs[i].Domain) > len(specs[j].Domain)
-		}
-		return len(specs[i].Proxy.ListenPath) > len(specs[j].Proxy.ListenPath)
-	})
+	sortSpecsByListenPath(specs)
 
 	// Create a new handler for each API spec
 	apisByListen := countApisByListenHash(specs)
@@ -946,7 +965,6 @@ func (gw *Gateway) loadApps(specs []*APISpec) {
 	gw.loadControlAPIEndpoints(router)
 
 	muxer.setRouter(port, "", router, gw.GetConfig())
-
 	gs := gw.prepareStorage()
 	shouldTrace := trace.IsEnabled()
 
@@ -996,13 +1014,15 @@ func (gw *Gateway) loadApps(specs []*APISpec) {
 
 	gw.DefaultProxyMux.swap(muxer, gw)
 
-	var specsToRelease []*APISpec
+	var specsToUnload []*APISpec
+
 	gw.apisMu.Lock()
 
 	for _, spec := range specs {
 		curSpec, ok := gw.apisByID[spec.APIID]
 		if ok && curSpec != nil && shouldReloadSpec(curSpec, spec) {
-			specsToRelease = append(specsToRelease, curSpec)
+			mainLog.Debugf("Spec %s has changed and needs to be reloaded", curSpec.APIID)
+			specsToUnload = append(specsToUnload, curSpec)
 		}
 
 		// Bind versions to base APIs again
@@ -1018,8 +1038,9 @@ func (gw *Gateway) loadApps(specs []*APISpec) {
 
 	gw.apisMu.Unlock()
 
-	for _, spec := range specsToRelease {
-		spec.Release()
+	for _, spec := range specsToUnload {
+		mainLog.Debugf("Unloading spec %s", spec.APIID)
+		spec.Unload()
 	}
 
 	mainLog.Debug("Checker host list")

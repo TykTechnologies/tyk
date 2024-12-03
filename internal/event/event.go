@@ -1,7 +1,9 @@
 package event
 
 import (
+	"bytes"
 	"context"
+	"encoding/base64"
 	"net/http"
 )
 
@@ -121,4 +123,16 @@ func Get(ctx context.Context) []Event {
 		return v
 	}
 	return nil
+}
+
+// EncodeRequestToEvent will write the request out in wire protocol and
+// encode it to base64 and store it in an Event object
+func EncodeRequestToEvent(r *http.Request) string {
+	var asBytes bytes.Buffer
+	err := r.Write(&asBytes)
+	if err != nil {
+		return ""
+	}
+
+	return base64.StdEncoding.EncodeToString(asBytes.Bytes())
 }

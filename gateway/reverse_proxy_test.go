@@ -14,6 +14,7 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"reflect"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -23,10 +24,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/TykTechnologies/tyk/user"
-
-	"github.com/TykTechnologies/tyk/header"
-
 	"github.com/TykTechnologies/graphql-go-tools/pkg/execution/datasource"
 	"github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
 
@@ -34,8 +31,10 @@ import (
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/ctx"
 	"github.com/TykTechnologies/tyk/dnscache"
+	"github.com/TykTechnologies/tyk/header"
 	"github.com/TykTechnologies/tyk/request"
 	"github.com/TykTechnologies/tyk/test"
+	"github.com/TykTechnologies/tyk/user"
 )
 
 func TestCopyHeader_NoDuplicateCORSHeaders(t *testing.T) {
@@ -2022,4 +2021,41 @@ func TestQuotaResponseHeaders(t *testing.T) {
 		assertQuota(t, ts, policyKey)
 	})
 
+}
+
+func BenchmarkLargeResponsePayload(b *testing.B) {
+	ts := StartTest(func(_ *config.Config) {})
+	b.Cleanup(ts.Close)
+
+	// Create a 500 MB payload of zeros
+	payloadSize := 500 * 1024 * 1024 // 500 MB in bytes
+	largePayload := bytes.Repeat([]byte("x"), payloadSize)
+
+	largePayloadHandler := func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/octet-stream")
+		w.Header().Set("Content-Length", strconv.Itoa(payloadSize))
+		w.WriteHeader(http.StatusOK)
+		_, err := w.Write(largePayload)
+		assert.NoError(b, err)
+	}
+
+	// Create a test server with the largePayloadHandler
+	testServer := httptest.NewServer(http.HandlerFunc(largePayloadHandler))
+	b.Cleanup(testServer.Close)
+
+	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		spec.UseKeylessAccess = true
+		spec.Proxy.ListenPath = "/"
+		spec.Proxy.TargetURL = testServer.URL
+	})
+
+	b.ReportAllocs()
+
+	for i := 0; i < b.N; i++ {
+		ts.Run(b, test.TestCase{
+			Method: http.MethodGet,
+			Path:   "/",
+			Code:   http.StatusOK,
+		})
+	}
 }

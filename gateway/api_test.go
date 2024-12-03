@@ -219,6 +219,8 @@ func TestApiHandlerPostDupPath(t *testing.T) {
 }
 
 func TestKeyHandler(t *testing.T) {
+	test.Exclusive(t) // Uses DeleteAllKeys, need to limit parallelism.
+
 	ts := StartTest(nil)
 	defer ts.Close()
 
@@ -338,7 +340,7 @@ func TestKeyHandler(t *testing.T) {
 			},
 		}...)
 
-		ts.Gw.GlobalSessionManager.Store().DeleteAllKeys()
+		ts.Gw.GlobalSessionManager.Store().DeleteAllKeys() // exclusive
 	})
 
 	_, knownKey := ts.CreateSession(func(s *user.SessionState) {
@@ -644,6 +646,8 @@ func BenchmarkKeyHandler_CreateKeyHandler(b *testing.B) {
 }
 
 func TestKeyHandler_DeleteKeyWithQuota(t *testing.T) {
+	test.Exclusive(t) // Uses quota, need to limit parallelism due to DeleteAllKeys.
+
 	const testAPIID = "testAPIID"
 	const orgId = "default"
 
@@ -826,6 +830,8 @@ func TestUpdateKeyWithCert(t *testing.T) {
 }
 
 func TestKeyHandler_CheckKeysNotDuplicateOnUpdate(t *testing.T) {
+	test.Exclusive(t) // Uses DeleteAllKeys, need to limit parallelism.
+
 	ts := StartTest(nil)
 	defer ts.Close()
 
@@ -878,7 +884,7 @@ func TestKeyHandler_CheckKeysNotDuplicateOnUpdate(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.Name, func(t *testing.T) {
-			ts.Gw.GlobalSessionManager.Store().DeleteAllKeys()
+			ts.Gw.GlobalSessionManager.Store().DeleteAllKeys() // exclusive
 			session := CreateStandardSession()
 			session.AccessRights = map[string]user.AccessDefinition{"test": {
 				APIID: "test", Versions: []string{"v1"},
@@ -906,6 +912,8 @@ func TestKeyHandler_CheckKeysNotDuplicateOnUpdate(t *testing.T) {
 }
 
 func TestHashKeyHandler(t *testing.T) {
+	test.Exclusive(t) // Uses DeleteAllKeys, need to limit parallelism.
+
 	conf := func(globalConf *config.Config) {
 		// make it to use hashes for Redis keys
 		globalConf.HashKeys = true
@@ -932,7 +940,7 @@ func TestHashKeyHandler(t *testing.T) {
 		gwConf := ts.Gw.GetConfig()
 		gwConf.HashKeyFunction = tc.hashFunction
 		ts.Gw.SetConfig(gwConf)
-		ok := ts.Gw.GlobalSessionManager.Store().DeleteAllKeys()
+		ok := ts.Gw.GlobalSessionManager.Store().DeleteAllKeys() // exclusive
 		assert.True(t, ok)
 
 		t.Run(fmt.Sprintf("%sHash fn: %s", tc.desc, tc.hashFunction), func(t *testing.T) {
@@ -1928,12 +1936,6 @@ func TestContextData(t *testing.T) {
 	if ctxGetData(r) == nil {
 		t.Fatal("expected ctxGetData to return non-nil")
 	}
-	defer func() {
-		if r := recover(); r == nil {
-			t.Fatal("expected ctxSetData of zero val to panic")
-		}
-	}()
-	ctxSetData(r, nil)
 }
 
 func TestContextSession(t *testing.T) {

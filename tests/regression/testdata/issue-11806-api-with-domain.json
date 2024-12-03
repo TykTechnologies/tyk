@@ -4,12 +4,12 @@
   "auth": {
     "auth_header_name": "Authorization"
   },
-  "domain": "customer.mydomain.com",
+  "domain": "example.com",
   "name": "api3",
   "proxy": {
     "listen_path": "/test/",
     "strip_listen_path": true,
-    "target_url": "http://httpbin.org/anything/api3/customer.mydomain.com"
+    "target_url": "http://httpbin.org/anything/api3/example.com"
   },
   "use_keyless": true,
   "version_data": {

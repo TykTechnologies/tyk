@@ -5,15 +5,21 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
+
+	"github.com/sirupsen/logrus"
 
 	"github.com/TykTechnologies/drl"
 	"github.com/TykTechnologies/leakybucket"
 	"github.com/TykTechnologies/leakybucket/memorycache"
 
 	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/internal/httputil"
 	"github.com/TykTechnologies/tyk/internal/rate"
+	"github.com/TykTechnologies/tyk/internal/rate/limiter"
 	"github.com/TykTechnologies/tyk/internal/redis"
+	"github.com/TykTechnologies/tyk/regexp"
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/user"
 )
@@ -222,6 +228,52 @@ func (sfr sessionFailReason) String() string {
 	}
 }
 
+func (l *SessionLimiter) RateLimitInfo(r *http.Request, api *APISpec, endpoints user.Endpoints) (*user.EndpointRateLimitInfo, bool) {
+	// Hook per-api settings here (m.Spec...)
+	isPrefixMatch := l.config.HttpServerOptions.EnablePathPrefixMatching
+	isSuffixMatch := l.config.HttpServerOptions.EnablePathSuffixMatching
+
+	urlPaths := []string{
+		api.StripListenPath(r.URL.Path),
+		r.URL.Path,
+	}
+
+	for _, endpoint := range endpoints {
+		if !endpoint.Methods.Contains(r.Method) {
+			continue
+		}
+
+		pattern := httputil.PreparePathRegexp(endpoint.Path, isPrefixMatch, isSuffixMatch)
+
+		asRegex, err := regexp.Compile(pattern)
+		if err != nil {
+			log.WithError(err).Error("endpoint rate limit: error compiling regex")
+			continue
+		}
+
+		for _, urlPath := range urlPaths {
+			match := asRegex.MatchString(urlPath)
+			if !match {
+				break
+			}
+
+			for _, endpointMethod := range endpoint.Methods {
+				if !strings.EqualFold(endpointMethod.Name, r.Method) {
+					continue
+				}
+
+				return &user.EndpointRateLimitInfo{
+					KeySuffix: storage.HashStr(fmt.Sprintf("%s:%s", endpointMethod.Name, endpoint.Path)),
+					Rate:      endpointMethod.Limit.Rate,
+					Per:       endpointMethod.Limit.Per,
+				}, true
+			}
+		}
+	}
+	return nil, false
+
+}
+
 // ForwardMessage will enforce rate limiting, returning a non-zero
 // sessionFailReason if session limits have been exceeded.
 // Key values to manage rate are Rate and Per, e.g. Rate of 10 messages
@@ -239,8 +291,7 @@ func (l *SessionLimiter) ForwardMessage(r *http.Request, session *user.SessionSt
 		endpointRLKeySuffix = ""
 	)
 
-	reqEndpoint := api.StripListenPath(r.URL.Path)
-	endpointRLInfo, doEndpointRL := accessDef.Endpoints.RateLimitInfo(r.Method, reqEndpoint)
+	endpointRLInfo, doEndpointRL := l.RateLimitInfo(r, api, accessDef.Endpoints)
 	if doEndpointRL {
 		apiLimit.Rate = endpointRLInfo.Rate
 		apiLimit.Per = endpointRLInfo.Per
@@ -328,14 +379,19 @@ func (l *SessionLimiter) ForwardMessage(r *http.Request, session *user.SessionSt
 
 }
 
+// RedisQuotaExceeded returns true if the request should be blocked as over quota.
 func (l *SessionLimiter) RedisQuotaExceeded(r *http.Request, session *user.SessionState, quotaKey, scope string, limit *user.APILimit, store storage.Handler, hashKeys bool) bool {
-	// Unlimited?
-	if limit.QuotaMax == -1 || limit.QuotaMax == 0 {
-		// No quota set
+	logger := log.WithFields(logrus.Fields{
+		"quotaMax":         limit.QuotaMax,
+		"quotaRenewalRate": limit.QuotaRenewalRate,
+	})
+
+	if limit.QuotaMax <= 0 {
 		return false
 	}
 
-	session.Touch()
+	// don't use the requests cancellation context
+	ctx := context.Background()
 
 	quotaScope := ""
 	if scope != "" {
@@ -343,78 +399,107 @@ func (l *SessionLimiter) RedisQuotaExceeded(r *http.Request, session *user.Sessi
 	}
 
 	key := session.KeyID
-
 	if hashKeys {
 		key = storage.HashStr(session.KeyID)
 	}
-
 	if quotaKey != "" {
 		key = quotaKey
 	}
 
+	now := time.Now()
+
+	// rawKey is the redis key for quota
 	rawKey := QuotaKeyPrefix + quotaScope + key
-	quotaRenewalRate := limit.QuotaRenewalRate
-	quotaRenews := limit.QuotaRenews
-	quotaMax := limit.QuotaMax
 
-	log.Debug("[QUOTA] Quota limiter key is: ", rawKey)
-	log.Debug("Renewing with TTL: ", quotaRenewalRate)
-	// INCR the key (If it equals 1 - set EXPIRE)
-	qInt := store.IncrememntWithExpire(rawKey, quotaRenewalRate)
-	// if the returned val is >= quota: block
-	if qInt-1 >= quotaMax {
-		renewalDate := time.Unix(quotaRenews, 0)
-		log.Debug("Renewal Date is: ", renewalDate)
-		log.Debug("As epoch: ", quotaRenews)
-		log.Debug("Session: ", session)
-		log.Debug("Now:", time.Now())
-		if time.Now().After(renewalDate) {
-			//for renew quota = never, once we get the quota max we must not allow using it again
+	var quotaRenewalRate time.Duration
+	if limit.QuotaRenewalRate > 0 {
+		quotaRenewalRate = time.Second * time.Duration(limit.QuotaRenewalRate)
+	}
 
-			if quotaRenewalRate <= 0 {
-				return true
+	conn := l.limiterStorage
+
+	var expired, exists bool
+	var expiredAt time.Time
+
+	dur, err := conn.PTTL(ctx, rawKey).Result()
+	if err != nil && !errors.Is(err, redis.Nil) {
+		logger.WithError(err).Error("error getting key TTL, blocking")
+		return true
+	}
+
+	// The command returns -2 if the key does not exist.
+	// The command returns -1 if the key exists but has no associated expire.
+	expired = dur < 0
+	exists = dur != -2
+
+	expiredAt = now.Add(dur)
+
+	logger = logger.WithFields(logrus.Fields{
+		"exists":  exists,
+		"expired": expired,
+		"rawKey":  rawKey,
+	})
+
+	increment := func() bool {
+		var res *redis.IntCmd
+		_, err := conn.Pipelined(ctx, func(pipe redis.Pipeliner) error {
+			res = pipe.Incr(ctx, rawKey)
+			if res.Val() == 1 && quotaRenewalRate > 0 {
+				pipe.Expire(ctx, rawKey, quotaRenewalRate)
 			}
-			// The renewal date is in the past, we should update the quota!
-			// Also, this fixes legacy issues where there is no TTL on quota buckets
-			log.Debug("Incorrect key expiry setting detected, correcting")
-			go store.DeleteRawKey(rawKey)
-			qInt = 1
-		} else {
-			// Renewal date is in the future and the quota is exceeded
+			return nil
+		})
+		if err != nil {
+			logger.WithError(err).Error("error incrementing quota key")
 			return true
 		}
 
-	}
-
-	// If this is a new Quota period, ensure we let the end user know
-	if qInt == 1 {
-		quotaRenews = time.Now().Unix() + quotaRenewalRate
-	}
-
-	// If not, pass and set the values of the session to quotamax - counter
-	remaining := quotaMax - qInt
-	if remaining < 0 {
-		remaining = 0
-	}
-
-	for k, v := range session.AccessRights {
-		if v.Limit.IsEmpty() {
-			continue
+		quota := res.Val()
+		blocked := quota-1 >= limit.QuotaMax
+		remaining := limit.QuotaMax - quota
+		if blocked {
+			remaining = 0
 		}
 
-		if v.AllowanceScope == scope {
-			v.Limit.QuotaRemaining = remaining
-			v.Limit.QuotaRenews = quotaRenews
+		logger = logger.WithField("quota", quota-1)
+		logger = logger.WithField("blocked", blocked)
+		logger = logger.WithField("remaining", remaining)
+		logger.Debug("[QUOTA] Update quota key")
+
+		l.updateSessionQuota(session, scope, remaining, expiredAt.Unix())
+		return blocked
+	}
+
+	// If exists and not expired, just increment it.
+	if exists && !expired {
+		return increment()
+	}
+
+	// if key is expired and can't renew, update the counter and
+	// block traffic going forward.
+	if limit.QuotaRenewalRate <= 0 {
+		return increment()
+	}
+
+	// First, ensure a distributed lock
+	locker := limiter.NewLimiter(conn).Locker(rawKey)
+
+	// Lock the key
+	if err := locker.Lock(ctx); err != nil {
+		// Increment the key if lock fails
+		return increment()
+	}
+
+	// Unlock the key when done
+	defer func() {
+		if err := locker.Unlock(ctx); err != nil {
+			logger.WithError(err).Error("error unlocking quota key")
 		}
-		session.AccessRights[k] = v
-	}
+	}()
 
-	if scope == "" {
-		session.QuotaRemaining = remaining
-		session.QuotaRenews = quotaRenews
-	}
-
-	return false
+	// locked: reset quota + increment
+	conn.Set(ctx, rawKey, 0, quotaRenewalRate)
+	return increment()
 }
 
 func GetAccessDefinitionByAPIIDOrSession(session *user.SessionState, api *APISpec) (accessDef *user.AccessDefinition, allowanceScope string, err error) {
@@ -437,4 +522,33 @@ func GetAccessDefinitionByAPIIDOrSession(session *user.SessionState, api *APISpe
 	}
 
 	return accessDef, allowanceScope, nil
+}
+
+// updateSessionQuota updates session attached access rights.
+//
+// When limits are defined, QuotaRemaining and QuotaRenews is updated for a matching
+// access rights definition for an api, and the session root.
+func (*SessionLimiter) updateSessionQuota(session *user.SessionState, scope string, remaining int64, renews int64) {
+	if remaining < 0 {
+		remaining = 0
+	}
+
+	for k, v := range session.AccessRights {
+		if v.Limit.IsEmpty() {
+			continue
+		}
+
+		if v.AllowanceScope == scope {
+			v.Limit.QuotaRemaining = remaining
+			v.Limit.QuotaRenews = renews
+		}
+		session.AccessRights[k] = v
+	}
+
+	if scope == "" {
+		session.QuotaRemaining = remaining
+		session.QuotaRenews = renews
+	}
+
+	session.Touch()
 }

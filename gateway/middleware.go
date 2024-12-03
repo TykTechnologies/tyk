@@ -12,14 +12,6 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/TykTechnologies/tyk/internal/cache"
-	"github.com/TykTechnologies/tyk/internal/event"
-	"github.com/TykTechnologies/tyk/internal/otel"
-	"github.com/TykTechnologies/tyk/internal/policy"
-	"github.com/TykTechnologies/tyk/rpc"
-
-	"github.com/TykTechnologies/tyk/header"
-
 	"github.com/gocraft/health"
 	"github.com/justinas/alice"
 	newrelic "github.com/newrelic/go-agent"
@@ -28,14 +20,21 @@ import (
 	"golang.org/x/sync/singleflight"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/header"
+	"github.com/TykTechnologies/tyk/internal/cache"
+	"github.com/TykTechnologies/tyk/internal/event"
+	"github.com/TykTechnologies/tyk/internal/middleware"
+	"github.com/TykTechnologies/tyk/internal/otel"
+	"github.com/TykTechnologies/tyk/internal/policy"
 	"github.com/TykTechnologies/tyk/request"
+	"github.com/TykTechnologies/tyk/rpc"
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/trace"
 	"github.com/TykTechnologies/tyk/user"
 )
 
 const (
-	mwStatusRespond                = 666
+	mwStatusRespond                = middleware.StatusRespond
 	DEFAULT_ORG_SESSION_EXPIRATION = int64(604800)
 )
 
@@ -45,9 +44,10 @@ var (
 )
 
 type TykMiddleware interface {
-	Init()
 	Base() *BaseMiddleware
+	GetSpec() *APISpec
 
+	Init()
 	SetName(string)
 	SetRequestLogger(*http.Request)
 	Logger() *logrus.Entry
@@ -55,6 +55,8 @@ type TykMiddleware interface {
 	ProcessRequest(w http.ResponseWriter, r *http.Request, conf interface{}) (error, int) // Handles request
 	EnabledForSpec() bool
 	Name() string
+
+	Unload()
 }
 
 type TraceMiddleware struct {
@@ -121,6 +123,9 @@ func (gw *Gateway) createMiddleware(actualMW TykMiddleware) func(http.Handler) h
 	mw.SetName(mw.Name())
 	mw.Logger().Debug("Init")
 
+	spec := mw.GetSpec()
+	spec.AddUnloadHook(actualMW.Unload)
+
 	// Pull the configuration
 	mwConf, err := mw.Config()
 	if err != nil {
@@ -155,7 +160,7 @@ func (gw *Gateway) createMiddleware(actualMW TykMiddleware) func(http.Handler) h
 			}
 
 			startTime := time.Now()
-			mw.Logger().WithField("ts", startTime.UnixNano()).Debug("Started")
+			mw.Logger().WithField("ts", startTime.UnixNano()).WithField("mw", mw.Name()).Debug("Started")
 
 			if mw.Base().Spec.CORS.OptionsPassthrough && r.Method == "OPTIONS" {
 				h.ServeHTTP(w, r)
@@ -163,6 +168,7 @@ func (gw *Gateway) createMiddleware(actualMW TykMiddleware) func(http.Handler) h
 			}
 
 			err, errCode := mw.ProcessRequest(w, r, mwConf)
+
 			if err != nil {
 				writeResponse := true
 				// Prevent double error write
@@ -266,6 +272,16 @@ func (t *BaseMiddleware) EnabledForSpec() bool {
 }
 func (t *BaseMiddleware) Config() (interface{}, error) {
 	return nil, nil
+}
+
+// Unload unloads the middleware and frees resources
+func (t *BaseMiddleware) Unload() {
+	// methos created to satisfy middleware contract
+}
+
+// GetSpec returns the spec of the middleware
+func (t *BaseMiddleware) GetSpec() *APISpec {
+	return t.Spec
 }
 
 func (t *BaseMiddleware) OrgSession(orgID string) (user.SessionState, bool) {

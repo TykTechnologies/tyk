@@ -6,6 +6,7 @@ import (
 
 	"github.com/sirupsen/logrus"
 
+	"github.com/TykTechnologies/tyk/internal/model"
 	"github.com/TykTechnologies/tyk/user"
 )
 
@@ -14,23 +15,16 @@ var (
 	ErrMixedPartitionAndPerAPIPolicies = errors.New("cannot apply multiple policies when some have per_api set and some are partitioned")
 )
 
-// Repository is a storage encapsulating policy retrieval.
-// Gateway implements this object to decouple this package.
-type Repository interface {
-	PolicyCount() int
-	PolicyIDs() []string
-	PolicyByID(string) (user.Policy, bool)
-}
-
+// Service represents the implementation for apply policies logic.
 type Service struct {
-	storage Repository
+	storage model.PolicyProvider
 	logger  *logrus.Logger
 
 	// used for validation if not empty
 	orgID *string
 }
 
-func New(orgID *string, storage Repository, logger *logrus.Logger) *Service {
+func New(orgID *string, storage model.PolicyProvider, logger *logrus.Logger) *Service {
 	return &Service{
 		orgID:   orgID,
 		storage: storage,
@@ -107,7 +101,8 @@ func (t *Service) Apply(session *user.SessionState) error {
 	)
 
 	storage := t.storage
-	customPolicies, err := session.CustomPolicies()
+
+	customPolicies, err := session.GetCustomPolicies()
 	if err != nil {
 		policyIDs = session.PolicyIDs()
 	} else {
@@ -206,6 +201,7 @@ func (t *Service) Apply(session *user.SessionState) error {
 			v.Limit.Smoothing = session.Smoothing
 			v.Limit.ThrottleInterval = session.ThrottleInterval
 			v.Limit.ThrottleRetryLimit = session.ThrottleRetryLimit
+			v.Endpoints = nil
 		}
 
 		if !applyState.didComplexity[k] {
@@ -245,8 +241,9 @@ func (t *Service) Apply(session *user.SessionState) error {
 	return nil
 }
 
-func (t *Service) Logger() *logrus.Logger {
-	return t.logger
+// Logger implements a typical logger signature with service context.
+func (t *Service) Logger() *logrus.Entry {
+	return logrus.NewEntry(t.logger)
 }
 
 // ApplyRateLimits will write policy limits to session and apiLimits.
@@ -352,13 +349,21 @@ func (t *Service) applyPartitions(policy user.Policy, session *user.SessionState
 		return ErrMixedPartitionAndPerAPIPolicies
 	}
 
+	// Ensure `rights` is filled with known APIs to ensure that
+	// a policy with acl rights gets honored even if not first.
+	for k := range policy.AccessRights {
+		if _, ok := rights[k]; ok {
+			continue
+		}
+		rights[k] = user.AccessDefinition{}
+	}
+
 	for k, v := range policy.AccessRights {
-		ar := v
+		// Use rights[k], which holds previously seen/merged policy access rights.
+		ar := rights[k]
 
 		if !usePartitions || policy.Partitions.Acl {
 			applyState.didAcl[k] = true
-
-			ar.AllowedURLs = copyAllowedURLs(v.AllowedURLs)
 
 			// Merge ACLs for the same API
 			if r, ok := rights[k]; ok {
@@ -368,32 +373,28 @@ func (t *Service) applyPartitions(policy user.Policy, session *user.SessionState
 				}
 				r.Versions = appendIfMissing(rights[k].Versions, v.Versions...)
 
-				for _, u := range v.AllowedURLs {
-					found := false
-					for ai, au := range r.AllowedURLs {
-						if u.URL == au.URL {
-							found = true
-							r.AllowedURLs[ai].Methods = appendIfMissing(au.Methods, u.Methods...)
-						}
-					}
+				r.AllowedURLs = MergeAllowedURLs(r.AllowedURLs, v.AllowedURLs)
 
-					if !found {
-						r.AllowedURLs = append(r.AllowedURLs, v.AllowedURLs...)
-					}
-				}
-
-				for _, t := range v.RestrictedTypes {
-					for ri, rt := range r.RestrictedTypes {
-						if t.Name == rt.Name {
-							r.RestrictedTypes[ri].Fields = intersection(rt.Fields, t.Fields)
+				if len(r.RestrictedTypes) == 0 {
+					r.RestrictedTypes = v.RestrictedTypes
+				} else {
+					for _, t := range v.RestrictedTypes {
+						for ri, rt := range r.RestrictedTypes {
+							if t.Name == rt.Name {
+								r.RestrictedTypes[ri].Fields = intersection(rt.Fields, t.Fields)
+							}
 						}
 					}
 				}
 
-				for _, t := range v.AllowedTypes {
-					for ri, rt := range r.AllowedTypes {
-						if t.Name == rt.Name {
-							r.AllowedTypes[ri].Fields = intersection(rt.Fields, t.Fields)
+				if len(r.AllowedTypes) == 0 {
+					r.AllowedTypes = v.AllowedTypes
+				} else {
+					for _, t := range v.AllowedTypes {
+						for ri, rt := range r.AllowedTypes {
+							if t.Name == rt.Name {
+								r.AllowedTypes[ri].Fields = intersection(rt.Fields, t.Fields)
+							}
 						}
 					}
 				}
@@ -404,17 +405,21 @@ func (t *Service) applyPartitions(policy user.Policy, session *user.SessionState
 					}
 				}
 
-				for _, far := range v.FieldAccessRights {
-					exists := false
-					for i, rfar := range r.FieldAccessRights {
-						if far.TypeName == rfar.TypeName && far.FieldName == rfar.FieldName {
-							exists = true
-							mergeFieldLimits(&r.FieldAccessRights[i].Limits, far.Limits)
+				if len(r.FieldAccessRights) == 0 {
+					r.FieldAccessRights = v.FieldAccessRights
+				} else {
+					for _, far := range v.FieldAccessRights {
+						exists := false
+						for i, rfar := range r.FieldAccessRights {
+							if far.TypeName == rfar.TypeName && far.FieldName == rfar.FieldName {
+								exists = true
+								mergeFieldLimits(&r.FieldAccessRights[i].Limits, far.Limits)
+							}
 						}
-					}
 
-					if !exists {
-						r.FieldAccessRights = append(r.FieldAccessRights, far)
+						if !exists {
+							r.FieldAccessRights = append(r.FieldAccessRights, far)
+						}
 					}
 				}
 
@@ -426,8 +431,8 @@ func (t *Service) applyPartitions(policy user.Policy, session *user.SessionState
 
 		if !usePartitions || policy.Partitions.Quota {
 			applyState.didQuota[k] = true
-			if greaterThanInt64(policy.QuotaMax, ar.Limit.QuotaMax) {
 
+			if greaterThanInt64(policy.QuotaMax, ar.Limit.QuotaMax) {
 				ar.Limit.QuotaMax = policy.QuotaMax
 				if greaterThanInt64(policy.QuotaMax, session.QuotaMax) {
 					session.QuotaMax = policy.QuotaMax
@@ -446,6 +451,10 @@ func (t *Service) applyPartitions(policy user.Policy, session *user.SessionState
 			applyState.didRateLimit[k] = true
 
 			t.ApplyRateLimits(session, policy, &ar.Limit)
+
+			if rightsAR, ok := rights[k]; ok {
+				ar.Endpoints = t.ApplyEndpointLevelLimits(v.Endpoints, rightsAR.Endpoints)
+			}
 
 			if policy.ThrottleRetryLimit > ar.Limit.ThrottleRetryLimit {
 				ar.Limit.ThrottleRetryLimit = policy.ThrottleRetryLimit
@@ -537,14 +546,17 @@ func (t *Service) updateSessionRootVars(session *user.SessionState, rights map[s
 }
 
 func (t *Service) applyAPILevelLimits(policyAD user.AccessDefinition, currAD user.AccessDefinition) user.AccessDefinition {
+	var updated bool
 	if policyAD.Limit.Duration() > currAD.Limit.Duration() {
 		policyAD.Limit.Per = currAD.Limit.Per
 		policyAD.Limit.Rate = currAD.Limit.Rate
 		policyAD.Limit.Smoothing = currAD.Limit.Smoothing
+		updated = true
 	}
 
-	if greaterThanInt64(currAD.Limit.QuotaMax, policyAD.Limit.QuotaMax) {
+	if currAD.Limit.QuotaMax != policyAD.Limit.QuotaMax && greaterThanInt64(currAD.Limit.QuotaMax, policyAD.Limit.QuotaMax) {
 		policyAD.Limit.QuotaMax = currAD.Limit.QuotaMax
+		updated = true
 	}
 
 	if greaterThanInt64(currAD.Limit.QuotaRenewalRate, policyAD.Limit.QuotaRenewalRate) {
@@ -555,25 +567,50 @@ func (t *Service) applyAPILevelLimits(policyAD user.AccessDefinition, currAD use
 		policyAD.Limit.QuotaRenewalRate = 0
 	}
 
-	policyAD.Endpoints = t.applyEndpointLevelLimits(policyAD.Endpoints, currAD.Endpoints)
+	if updated {
+		policyAD.Limit.SetBy = currAD.Limit.SetBy
+		policyAD.AllowanceScope = currAD.AllowanceScope
+	}
+
+	policyAD.Endpoints = t.ApplyEndpointLevelLimits(policyAD.Endpoints, currAD.Endpoints)
 
 	return policyAD
 }
 
-func (t *Service) applyEndpointLevelLimits(policyEndpoints user.Endpoints, currEndpoints user.Endpoints) user.Endpoints {
+// ApplyEndpointLevelLimits combines policyEndpoints and currEndpoints and returns the combined value.
+// The returned endpoints would have the highest request rate from policyEndpoints and currEndpoints.
+func (t *Service) ApplyEndpointLevelLimits(policyEndpoints user.Endpoints, currEndpoints user.Endpoints) user.Endpoints {
 	currEPMap := currEndpoints.Map()
-	if currEPMap == nil {
+	if len(currEPMap) == 0 {
 		return policyEndpoints
 	}
 
-	policyEPMap := policyEndpoints.Map()
+	result := policyEndpoints.Map()
+	if len(result) == 0 {
+		return currEPMap.Endpoints()
+	}
+
 	for currEP, currRL := range currEPMap {
-		if policyRL, ok := policyEPMap[currEP]; ok {
-			if policyRL.Duration() > currRL.Duration() {
-				policyEPMap[currEP] = currRL
-			}
+		policyRL, ok := result[currEP]
+		if !ok {
+			// merge missing endpoints
+			result[currEP] = currRL
+			continue
+		}
+
+		policyDur, currDur := policyRL.Duration(), currRL.Duration()
+		if policyDur > currDur {
+			result[currEP] = currRL
+			continue
+		}
+
+		// when duration is equal, use higher rate and per
+		// eg. when 10 per 60 and 5 per 30 comes in
+		// Duration would be 6s each, in such a case higher rate of 10 per 60 would be picked up.
+		if policyDur == currDur && currRL.Rate > policyRL.Rate {
+			result[currEP] = currRL
 		}
 	}
 
-	return policyEPMap.Endpoints()
+	return result.Endpoints()
 }

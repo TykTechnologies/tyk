@@ -17,7 +17,7 @@ spec:
       name: Should return 404 for upstream
       assertions:
         - attr:http.status_code  =   404
-        - attr:http.url  =     "https://httpbin.com"
+        - attr:http.url  =     "http://httpbin:80/status/404"
     - selector: span[tracetest.span.type = "general" name = "GraphqlMiddleware Validation"] span[tracetest.span.type="general" name="GraphqlEngine"]
       name: Make sure Graphql Engine is a child of GraphqlMiddleware Validation
       assertions:

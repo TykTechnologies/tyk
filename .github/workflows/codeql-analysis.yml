@@ -11,9 +11,14 @@ on:
   schedule:
     - cron: '0 18 * * 4'
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   analyze:
     name: Analyze
+    if: ${{ !github.event.pull_request.draft }}
     runs-on: ubuntu-latest
 
     strategy:
@@ -27,7 +32,7 @@ jobs:
 
     steps:
     - name: Checkout repository
-      uses: actions/checkout@v2
+      uses: actions/checkout@v4
       with:
         # We must fetch at least the immediate parents so that if this is
         # a pull request then we can checkout the head.
@@ -39,7 +44,7 @@ jobs:
       if: ${{ github.event_name == 'pull_request' }}
 
     - name: Install Go
-      uses: actions/setup-go@v4
+      uses: actions/setup-go@v5
       with:
         go-version-file: go.mod
 

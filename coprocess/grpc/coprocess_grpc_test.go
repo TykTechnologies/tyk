@@ -11,9 +11,12 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/TykTechnologies/tyk/header"
 
 	"github.com/stretchr/testify/assert"
 
@@ -567,6 +570,9 @@ func TestGRPCDispatch(t *testing.T) {
 			Code:      http.StatusOK,
 			Headers:   headers,
 			BodyMatch: "newbody",
+			HeadersMatch: map[string]string{
+				header.ContentLength: strconv.Itoa(len("newbody")),
+			},
 		})
 	})
 
