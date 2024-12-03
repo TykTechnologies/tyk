@@ -118,7 +118,7 @@ func TestProcessKeySpaceChangesForOauth(t *testing.T) {
 				client.PolicyID = oauthClient.PolicyID
 				client.ClientRedirectURI = oauthClient.ClientRedirectURI
 
-				storage := myApi.OAuthManager.OsinServer.Storage
+				storage := myApi.OAuthManager.Storage()
 				ret := &osin.AccessData{
 					AccessToken:  tokenData.AccessToken,
 					RefreshToken: tokenData.RefreshToken,
