@@ -2,6 +2,7 @@
 
 FROM debian:bookworm-slim
 ARG TARGETARCH
+ARG BUILD_PACKAGE_NAME
 
 ENV DEBIAN_FRONTEND=noninteractive
 
@@ -20,8 +21,8 @@ RUN rm -rf /root/.cache \
     && find /usr/lib -type f -name '*.a' -o -name '*.o' -delete
 
 # Comment this to test in dev
-COPY *${TARGETARCH}.deb /
-RUN rm -f /*fips*.deb && dpkg -i /tyk-gateway*${TARGETARCH}.deb && rm /*.deb
+COPY ${BUILD_PACKAGE_NAME}*${TARGETARCH}.deb /
+RUN dpkg -i /${BUILD_PACKAGE_NAME}*${TARGETARCH}.deb && rm /*.deb
 
 ARG PORTS
 

@@ -8,13 +8,11 @@ name: Release
 # - docker hub
 # - devenv ECR
 # - Cloudsmith
-concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+# concurrency:
+#   group: ${{ github.workflow }}-${{ github.ref }}
+#   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 on:
-  # Trigger release every monday at midnight for master CI images
-  schedule:
-    - cron: "0 0 * * 1"
   pull_request:
   push:
     branches:
@@ -24,7 +22,7 @@ on:
       - 'v*'
 env:
   GOPRIVATE: github.com/TykTechnologies
-  VARIATION: inverted
+  VARIATION: prod-variation
   DOCKER_BUILD_SUMMARY: false
   DOCKER_BUILD_RECORD_UPLOAD: false
   # startsWith covers pull_request_target too
@@ -49,7 +47,7 @@ jobs:
             rpmvers: 'el/7 el/8 el/9 amazon/2 amazon/2023'
             debvers: 'ubuntu/xenial ubuntu/bionic ubuntu/focal ubuntu/jammy debian/jessie debian/buster debian/bullseye debian/bookworm'
     outputs:
-      tags: ${{ steps.ci_metadata_ee.outputs.tags }}
+      tags: ${{ steps.ci_metadata.outputs.tags }}
       commit_author: ${{ steps.set_outputs.outputs.commit_author}}
     steps:
       - name: Checkout of tyk
@@ -130,43 +128,13 @@ jobs:
         if: ${{ matrix.golang_cross == '1.22-bullseye' }}
         with:
           mask-password: 'true'
-      - name: Docker metadata for CI
-        id: ci_metadata_
-        if: ${{ matrix.golang_cross == '1.22-bullseye' }}
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ steps.ecr.outputs.registry }}/tyk
-          flavor: |
-            latest=false
-          tags: |
-            type=ref,event=branch
-            type=ref,event=pr
-            type=sha,format=long
-            type=semver,pattern={{major}},prefix=v
-            type=semver,pattern={{major}}.{{minor}},prefix=v
-            type=semver,pattern={{version}},prefix=v
-      - name: push image to CI
-        if: ${{ matrix.golang_cross == '1.22-bullseye' }}
-        uses: docker/build-push-action@v6
-        with:
-          context: "dist"
-          platforms: linux/amd64,linux/arm64
-          file: ci/Dockerfile.distroless
-          provenance: mode=max
-          sbom: true
-          push: true
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-          tags: ${{ steps.ci_metadata_.outputs.tags }}
-          labels: ${{ steps.tag_metadata.outputs.labels }}
-          build-args: |
-            EDITION=
-      - name: Docker metadata for CI ee
+      - name: Docker metadata for ee CI
         id: ci_metadata_ee
         if: ${{ matrix.golang_cross == '1.22-bullseye' }}
         uses: docker/metadata-action@v5
         with:
-          images: ${{ steps.ecr.outputs.registry }}/tyk-ee
+          images: |
+            ${{ steps.ecr.outputs.registry }}/tyk-ee
           flavor: |
             latest=false
           tags: |
@@ -176,12 +144,12 @@ jobs:
             type=semver,pattern={{major}},prefix=v
             type=semver,pattern={{major}}.{{minor}},prefix=v
             type=semver,pattern={{version}},prefix=v
-      - name: push image to CI ee
+      - name: push ee image to CI
         if: ${{ matrix.golang_cross == '1.22-bullseye' }}
         uses: docker/build-push-action@v6
         with:
           context: "dist"
-          platforms: linux/amd64,linux/arm64
+          platforms: linux/amd64,linux/arm64,linux/s390x
           file: ci/Dockerfile.distroless
           provenance: mode=max
           sbom: true
@@ -189,44 +157,18 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
           tags: ${{ steps.ci_metadata_ee.outputs.tags }}
-          labels: ${{ steps.tag_metadata.outputs.labels }}
+          labels: ${{ steps.ci_metadata_ee.outputs.labels }}
           build-args: |
-            EDITION=-ee
+            BUILD_PACKAGE_NAME=tyk-gateway-ee
       - name: Docker metadata for tag push
-        id: tag_metadata_
-        uses: docker/metadata-action@v5
-        with:
-          images: |
-            tykio/tyk-gateway
-            docker.tyk.io/tyk-gateway/tyk-gateway
-          flavor: |
-            latest=false
-            prefix=v
-          tags: |
-            type=semver,pattern={{major}}.{{minor}}
-            type=semver,pattern={{version}}
-          labels: "org.opencontainers.image.title=tyk-gateway  (distroless) \norg.opencontainers.image.description=Tyk Open Source API Gateway written in Go, supporting REST, GraphQL, TCP and gRPC protocols\norg.opencontainers.image.vendor=tyk.io\norg.opencontainers.image.version=${{ github.ref_name }}\n"
-      - name: push image to prod
-        if: ${{ matrix.golang_cross == '1.22-bullseye' }}
-        uses: docker/build-push-action@v6
-        with:
-          context: "dist"
-          platforms: linux/amd64,linux/arm64
-          file: ci/Dockerfile.distroless
-          provenance: mode=max
-          sbom: true
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-          push: ${{ startsWith(github.ref, 'refs/tags') }}
-          tags: ${{ steps.tag_metadata_.outputs.tags }}
-          labels: ${{ steps.tag_metadata_.outputs.labels }}
-          build-args: |
-            EDITION=
-      - name: Docker metadata for tag push ee
         id: tag_metadata_ee
         uses: docker/metadata-action@v5
         with:
           images: |
+            docker.tyk.io/tyk-gateway/tyk-gateway
+
+            tykio/tyk-gateway
+
             tykio/tyk-gateway-ee
           flavor: |
             latest=false
@@ -234,13 +176,17 @@ jobs:
           tags: |
             type=semver,pattern={{major}}.{{minor}}
             type=semver,pattern={{version}}
-          labels: "org.opencontainers.image.title=tyk-gateway Enterprise Edition  (distroless) \norg.opencontainers.image.description=Tyk Open Source API Gateway written in Go, supporting REST, GraphQL, TCP and gRPC protocols\norg.opencontainers.image.vendor=tyk.io\norg.opencontainers.image.version=${{ github.ref_name }}\n"
-      - name: push image to prod ee
+          labels: |
+            org.opencontainers.image.title=Tyk Gateway Enterprise Edition
+            org.opencontainers.image.description=Tyk API Gateway Enterprise Edition written in Go, supporting REST, GraphQL, TCP and gRPC protocols
+            org.opencontainers.image.vendor=tyk.io
+            org.opencontainers.image.version=${{ github.ref_name }}
+      - name: push ee image to prod
         if: ${{ matrix.golang_cross == '1.22-bullseye' }}
         uses: docker/build-push-action@v6
         with:
           context: "dist"
-          platforms: linux/amd64,linux/arm64
+          platforms: linux/amd64,linux/arm64,linux/s390x
           file: ci/Dockerfile.distroless
           provenance: mode=max
           sbom: true
@@ -250,7 +196,76 @@ jobs:
           tags: ${{ steps.tag_metadata_ee.outputs.tags }}
           labels: ${{ steps.tag_metadata_ee.outputs.labels }}
           build-args: |
-            EDITION=-ee
+            BUILD_PACKAGE_NAME=tyk-gateway-ee
+      - name: Docker metadata for std CI
+        id: ci_metadata_std
+        if: ${{ matrix.golang_cross == '1.22-bullseye' }}
+        uses: docker/metadata-action@v5
+        with:
+          images: |
+            ${{ steps.ecr.outputs.registry }}/tyk
+          flavor: |
+            latest=false
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=sha,format=long
+            type=semver,pattern={{major}},prefix=v
+            type=semver,pattern={{major}}.{{minor}},prefix=v
+            type=semver,pattern={{version}},prefix=v
+      - name: push std image to CI
+        if: ${{ matrix.golang_cross == '1.22-bullseye' }}
+        uses: docker/build-push-action@v6
+        with:
+          context: "dist"
+          platforms: linux/amd64,linux/arm64,linux/s390x
+          file: ci/Dockerfile.distroless
+          provenance: mode=max
+          sbom: true
+          push: true
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          tags: ${{ steps.ci_metadata_std.outputs.tags }}
+          labels: ${{ steps.ci_metadata_std.outputs.labels }}
+          build-args: |
+            BUILD_PACKAGE_NAME=tyk-gateway
+      - name: Docker metadata for tag push
+        id: tag_metadata_std
+        uses: docker/metadata-action@v5
+        with:
+          images: |
+            docker.tyk.io/tyk-gateway/tyk-gateway
+
+            tykio/tyk-gateway
+
+            tykio/tyk-gateway-ee
+          flavor: |
+            latest=false
+            prefix=v
+          tags: |
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{version}}
+          labels: |
+            org.opencontainers.image.title=Tyk Gateway
+            org.opencontainers.image.description=Tyk Open Source API Gateway written in Go, supporting REST, GraphQL, TCP and gRPC protocols
+            org.opencontainers.image.vendor=tyk.io
+            org.opencontainers.image.version=${{ github.ref_name }}
+      - name: push std image to prod
+        if: ${{ matrix.golang_cross == '1.22-bullseye' }}
+        uses: docker/build-push-action@v6
+        with:
+          context: "dist"
+          platforms: linux/amd64,linux/arm64,linux/s390x
+          file: ci/Dockerfile.distroless
+          provenance: mode=max
+          sbom: true
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          push: ${{ startsWith(github.ref, 'refs/tags') }}
+          tags: ${{ steps.tag_metadata_std.outputs.tags }}
+          labels: ${{ steps.tag_metadata_std.outputs.labels }}
+          build-args: |
+            BUILD_PACKAGE_NAME=tyk-gateway
       - name: save deb
         uses: actions/upload-artifact@v4
         if: ${{ matrix.golang_cross == '1.22-bullseye' }}
@@ -351,6 +366,7 @@ jobs:
           set -eaxo pipefail
           docker run -q --rm -v ~/.docker/config.json:/root/.docker/config.json tykio/gromit policy match ${tags[0]} ${match_tag} 2>versions.env
           echo '# alfa and beta have to come after the override
+
           tyk_alfa_image=$tyk_image
           tyk_beta_image=$tyk_image
           ECR=${{steps.ecr.outputs.registry}}
@@ -374,9 +390,37 @@ jobs:
           repository: TykTechnologies/tyk-analytics
           path: tyk-analytics
           token: ${{ secrets.ORG_GH_TOKEN }}
-          fetch-depth: 1
-          ref: ${{ env.BASE_REF }}
+          fetch-depth: 0
           sparse-checkout: tests/api
+      - name: Choosing test code branch
+        working-directory: tyk-analytics/tests/api
+        run: |
+          if [[ ${{ github.event_name }} == "release" ]]; then
+            echo "Checking out release tag..."
+            TAG_NAME=${{ github.event.release.tag_name }}
+            git checkout "$TAG_NAME"
+          fi
+          if [[ ${{ github.event_name }} == "pull_request" ]]; then
+            PR_BRANCH=${{ github.event.pull_request.head.ref }}
+            TARGET_BRANCH=${{ github.event.pull_request.base.ref }}
+            echo "Looking for PR_BRANCH:$PR_BRANCH or TARGET_BRANCH:$TARGET_BRANCH..."
+            if git rev-parse --verify "origin/$PR_BRANCH" >/dev/null 2>&1; then
+              echo "PR branch $PR_BRANCH exists. Checking out..."
+              git checkout "$PR_BRANCH"
+            elif git rev-parse --verify "origin/$TARGET_BRANCH" >/dev/null 2>&1; then
+              echo "Target branch $TARGET_BRANCH exists. Checking out..."
+              git checkout "$TARGET_BRANCH"
+            fi
+          fi
+          if [[ ${{ github.event_name }} == "push" ]]; then
+            PUSH_BRANCH=${{ github.ref_name }}
+            echo "Looking for PUSH_BRANCH:$PUSH_BRANCH..."
+            if git rev-parse --verify "origin/$PUSH_BRANCH" >/dev/null 2>&1; then
+              echo "Push branch $PUSH_BRANCH exists. Checking out..."
+              git checkout "$PUSH_BRANCH"
+            fi
+          fi
+          echo "Current commit: $(git rev-parse HEAD)"
       - uses: actions/setup-python@v5
         with:
           cache: 'pip'
@@ -405,20 +449,6 @@ jobs:
           USER_API_SECRET=${{ steps.env_up.outputs.USER_API_SECRET }}
           EOF
           env $(cat pytest.env | xargs) $pytest -m "${{ matrix.envfiles.apimarkers }}"
-      - name: Upload Playwright Test Report to S3
-        if: failure() && steps.test_execution.outcome != 'success' && steps.env_up.outcome == 'success'
-        run: npm run upload_report_to_s3
-        env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.UI_AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.UI_AWS_SECRET_ACCESS_KEY }}
-          RUN_ID: 'tyk-analytics/${{ github.run_id }}'
-        working-directory: tyk-analytics/tests/ui
-      - name: Share S3 report link into summary
-        if: failure() && steps.test_execution.outcome != 'success' && steps.env_up.outcome == 'success'
-        run: |
-          echo "# :clipboard: S3 UI Test REPORT: ${{ matrix.envfiles.db }}-${{ matrix.envfiles.conf }}" >> $GITHUB_STEP_SUMMARY
-          echo "- Status: ${{ steps.test_execution.outcome == 'success' && ':white_check_mark:' || ':no_entry_sign:' }}" >> $GITHUB_STEP_SUMMARY
-          echo "- [Link to report](https://tyk-qa-reports.s3.eu-central-1.amazonaws.com/tyk-analytics/${{ github.run_id }}/index.html)" >> $GITHUB_STEP_SUMMARY
       - name: Generate metadata and upload test reports
         id: metadata_report
         if: always() && (steps.test_execution.conclusion != 'skipped')
@@ -538,9 +568,11 @@ jobs:
           load: true
       - name: Test the built container image with api functionality test.
         run: |
-          docker run -d -p8080:8080 --network ${{ job.container.network }} --rm test-${{ matrix.distro }}-${{ matrix.arch }}
+          docker run -d -p8080:8080 --name=test --network ${{ job.container.network }} --rm test-${{ matrix.distro }}-${{ matrix.arch }}
           sleep 2
           ./ci/tests/api-functionality/api_test.sh
+          sleep 2
+          docker stop test || true
   upgrade-rpm:
     services:
       httpbin.org:
@@ -595,7 +627,7 @@ jobs:
           tags: test-${{ matrix.distro }}-${{ matrix.arch }}
           load: true
       - name: Test the built container image with api functionality test.
-        run: "docker run -d -p8080:8080 --network ${{ job.container.network }} --rm test-${{ matrix.distro }}-${{ matrix.arch }}\nsleep 2\n./ci/tests/api-functionality/api_test.sh \n"
+        run: "docker run -d -p8080:8080 --name=test --network ${{ job.container.network }} --rm test-${{ matrix.distro }}-${{ matrix.arch }}\nsleep 2\n./ci/tests/api-functionality/api_test.sh\nsleep 2\ndocker stop test || true \n"
   release-tests:
     needs:
       - goreleaser
