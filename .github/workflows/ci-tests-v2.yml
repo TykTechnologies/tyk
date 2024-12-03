@@ -1,0 +1,131 @@
+# yamllint disable rule:line-length rule:truthy
+---
+name: CI tests V2
+
+on:
+  pull_request:
+    branches:
+      - master
+      - release-**
+    types:
+      - opened
+      - reopened
+      - synchronize
+      - ready_for_review
+  push:
+    branches:
+      - master
+      - release-**
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  PYTHON_VERSION: "3.11"
+  PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION: python
+
+jobs:
+  lint:
+    name: Lint
+    if: ${{ github.event.pull_request.draft }}
+    runs-on: ubuntu-latest
+
+    # TODO: golangci-lint output to pipe into sonar.
+    # TODO: sonar.
+
+    steps:
+      - name: Checkout Tyk
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          ref: ${{ github.event.pull_request.head.ref }}
+
+      - name: Setup CI Tooling
+        uses: shrink/actions-docker-extract@v3
+        with:
+          image: tykio/ci-tools:latest
+          path: /usr/local/bin/.
+          destination: /usr/local/bin
+
+      - name: Setup Golang
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
+
+      - name: Run task ${{ matrix.suite }}
+        run: |
+          task lint
+
+  test:
+    name: Test (${{ matrix.suite }})
+    if: ${{ github.event.pull_request.draft }}
+
+    # Runs on is pinned to a version that provides python 3.10.
+    # See: https://github.com/actions/runner-images?tab=readme-ov-file#available-images
+    # Avoid using ubuntu-latest as it would upgrade python unattended.
+    runs-on: ubuntu-22.04
+
+    strategy:
+      fail-fast: false
+      matrix:
+        suite: ["gateway:shard shard=1", "gateway:shard shard=2", "other"]
+
+    env:
+      REDIS_IMAGE: redis:7
+
+    steps:
+      - name: Checkout Tyk
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          ref: ${{ github.event.pull_request.head.ref }}
+
+      # Regardless that the base image provides a python release, we need
+      # setup-python so it properly configures the python3-venv.
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Print runtime python version
+        if: runner.debug == '1'
+        run: python3 -c 'import sys; print("%d.%d" % (sys.version_info[0], sys.version_info[1]))'
+
+      - name: Print runtime pip version
+        if: runner.debug == '1'
+        run: pip -V && pip3 -V
+
+      - name: Setup CI Tooling
+        uses: shrink/actions-docker-extract@v3
+        with:
+          image: tykio/ci-tools:latest
+          path: /usr/local/bin/.
+          destination: /usr/local/bin
+
+      - name: Setup Golang
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
+
+      - name: Install Dependencies and basic hygiene test
+        run: |
+          sudo apt-get install -qq libluajit-5.1-dev
+
+          python -m pip install --upgrade pip
+          pip install setuptools
+          pip install google
+          pip install 'protobuf==4.24.4'
+
+      - name: Preflight Python tests
+        if: runner.debug == '1'
+        run: TYK_LOGLEVEL=debug go test -p 1 -parallel 1 -race -v ./dlpython ./coprocess/...
+
+      - name: Run Tests
+        working-directory: tests
+        run: |
+          task -x setup
+          task -x test:gateway:shards:setup
+          task -x test:${{ matrix.suite }}

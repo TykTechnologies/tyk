@@ -1,0 +1,113 @@
+---
+version: "3"
+
+# The intent of this Taskfile is to provide targets for testing, namely:
+#
+# - test:gateway (integration)
+# - test:integration
+# - test:unit
+#
+# Integration tests require redis.
+# Parallelization should be done in CI.
+#
+# Requires PYTHON_VERSION and CI set in env.
+
+vars:
+  testOptions: ''
+  testArgs: -tags dev {{.testOptions}}
+  root:
+    sh: git rev-parse --show-toplevel
+
+tasks:
+  default:
+    desc: "List tasks"
+    silent: true
+    cmds:
+      - |
+        echo -e "Environment:\nPYTHON_VERSION=$PYTHON_VERSION, CI=$CI (set env vars if empty)"
+      - task -l
+
+  all:
+    desc: "Run all tests"
+    cmds:
+      - task: test:gateway
+      - task: test:unit
+      - task: test:integration
+
+  setup:
+    desc: "Get go module list"
+    dir: '{{.root}}'
+    status:
+      - test -f tests/pkgs.unit
+      - test -f tests/pkgs.integration
+      - test -f tests/pkgs.all
+    cmds:
+      - go list ./... | sort > tests/pkgs.all
+      - go list ./gateway/... ./goplugin/... ./ee/... ./rpc/... ./internal/rate/... ./dlpython/... ./signature_validator/... ./storage/... ./coprocess/... ./tests/... | sort > tests/pkgs.integration
+      - comm -23 tests/pkgs.all tests/pkgs.integration > tests/pkgs.unit
+
+  test:gateway:
+    desc: "Run gateway tests"
+    deps: [setup]
+    cmds:
+      - task: test:gateway:shards:setup
+      - task: test:gateway:shards:run
+
+  test:gateway:shards:setup:
+    desc: "Build tests and setup test functions for sharding"
+    dir: '{{.root}}'
+    silent: true
+    cmds:
+      - cd gateway && go test {{.testArgs}} -c . && cd -
+      - ./gateway/gateway.test -test.list ^Test | sort > /tmp/functions.test.log   # don't use `shuf`, this runs in each pipeline
+
+  test:gateway:shards:run:
+    cmds:
+      - task: test:gateway:shard
+        vars:
+          shard: '2'
+      - task: test:gateway:shard
+        vars:
+          shard: '1'
+
+  test:gateway:shard:
+    requires:
+      vars: [shard]
+    desc: "Run test shard {{.shard}}"
+    dir: '{{.root}}'
+    vars:
+      funcs:
+        sh: split --number=l/{{.shard}}/2 /tmp/functions.test.log | shuf | xargs | sed 's/ /|/g'
+    cmds:
+      - task services:up
+      - defer: task services:down
+      - defer: gotestsum --no-color=false --hide-summary=skipped --raw-command cat /tmp/{{.shard}}.test.log
+      - defer: gotestsum tool slowest --jsonfile /tmp/{{.shard}}.test.log --num 10
+      - defer: grep 'util.go:' /tmp/{{.shard}}.test.log
+      - |
+        set -eo pipefail
+        cd gateway
+        ./gateway.test '-test.run=({{.funcs}})' -test.count 1 -test.v | go tool test2json -t > /tmp/{{.shard}}.test.log  # -test.parallel 1
+        cd -
+
+  test:unit:
+    desc: "Run unit tests"
+    deps: [setup]
+    dir: '{{.root}}'
+    cmds:
+      - go test $(cat tests/pkgs.unit) {{.testArgs}} -count=1
+
+  test:integration:
+    desc: "Run integration tests"
+    deps: [setup]
+    dir: '{{.root}}'
+    cmds:
+      - task services:up
+      - defer: task services:down
+      - defer: gotestsum --no-color=false --hide-summary=skipped --raw-command cat /tmp/integration.test.log
+      - defer: gotestsum tool slowest --jsonfile /tmp/integration.test.log --num 10
+      - go test $(cat tests/pkgs.integration | grep -v /gateway) {{.testArgs}} -p 1 -count=1 -json > /tmp/integration.test.log  # -p 1 runs one test binary at a time
+
+  test:other:
+    desc: "Run tests other than gateway, parallel"
+    deps: [test:unit, test:integration]
