@@ -1541,17 +1541,14 @@ func (gw *Gateway) getHostDetails(file string) {
 func (gw *Gateway) getGlobalMDCBStorageHandler(keyPrefix string, hashKeys bool) storage.Handler {
 	localStorage := &storage.RedisCluster{KeyPrefix: keyPrefix, HashKeys: hashKeys, ConnectionHandler: gw.StorageConnectionHandler}
 	logger := logrus.New().WithFields(logrus.Fields{"prefix": "mdcb-storage-handler"})
+	rpcHandler := &RPCStorageHandler{
+		KeyPrefix: keyPrefix,
+		HashKeys:  hashKeys,
+		Gw:        gw,
+	}
 
 	if gw.GetConfig().SlaveOptions.UseRPC {
-		return storage.NewMdcbStorage(
-			localStorage,
-			&RPCStorageHandler{
-				KeyPrefix: keyPrefix,
-				HashKeys:  hashKeys,
-				Gw:        gw,
-			},
-			logger,
-		)
+		return storage.NewMdcbStorage(localStorage, rpcHandler, logger)
 	}
 	return localStorage
 }

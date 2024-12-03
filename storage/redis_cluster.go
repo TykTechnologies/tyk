@@ -360,6 +360,10 @@ func (r *RedisCluster) SetExp(keyName string, timeout int64) error {
 
 // SetKey will create (or update) a key value in the store
 func (r *RedisCluster) SetKey(keyName, session string, timeout int64) error {
+	if strings.Contains(keyName, "oauth") {
+		fmt.Printf("\n---------- Redis cluster KeyPrefix: %v  Gonna set key: %v\n", r.KeyPrefix, r.fixKey(keyName))
+	}
+
 	return r.SetRawKey(r.fixKey(keyName), session, timeout)
 }
 

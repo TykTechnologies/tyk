@@ -7,11 +7,19 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+const (
+	oauthClient = "Oauth Client"
+	certificate = "Certificate"
+	apiKey      = "ApiKey"
+	Key         = "Key"
+)
+
 type MdcbStorage struct {
-	local                 Handler
-	rpc                   Handler
-	logger                *logrus.Entry
-	CallbackonPullfromRPC *func(key string, val string) error
+	local                            Handler
+	rpc                              Handler
+	logger                           *logrus.Entry
+	CallbackonPullCertificatefromRPC *func(key string, val string) error
+	CallbackOnPullOauthFromRPC       *func(key string, val string) error
 }
 
 func NewMdcbStorage(local, rpc Handler, log *logrus.Entry) *MdcbStorage {
@@ -22,46 +30,76 @@ func NewMdcbStorage(local, rpc Handler, log *logrus.Entry) *MdcbStorage {
 	}
 }
 
-func (m MdcbStorage) GetKey(key string) (string, error) {
-	var val string
-	var err error
-
-	if m.local == nil {
-		return m.rpc.GetKey(key)
-	}
-
-	val, err = m.local.GetKey(key)
-	if err != nil {
-		m.logger.Infof("Retrieving key from rpc.")
-		val, err = m.rpc.GetKey(key)
-
+func (m MdcbStorage) cacheCertificate(key, val string) {
+	if m.CallbackonPullCertificatefromRPC != nil {
+		err := (*m.CallbackonPullCertificatefromRPC)(key, val)
 		if err != nil {
-			resourceType := getResourceType(key)
-			m.logger.Errorf("cannot retrieve %v from rpc: %v", resourceType, err.Error())
-			return val, err
-		}
-
-		if m.CallbackonPullfromRPC != nil {
-			err := (*m.CallbackonPullfromRPC)(key, val)
-			if err != nil {
-				m.logger.Error(err)
-			}
+			m.logger.WithError(err).Error("cannot save locally certificate")
 		}
 	}
+}
 
-	return val, err
+func (m MdcbStorage) cacheOAuthClient(key, val string) {
+	m.logger.Infof("Key Prefix: %v", m.local.GetKeyPrefix())
+	err := m.local.SetKey(key, val, 0)
+	if err != nil {
+		m.logger.WithError(err).Errorf("Cannot save locally oauth client: %v", key)
+	}
+}
+
+// processResourceByType based on the type of key it will trigger the proper
+// caching mechanism
+func (m MdcbStorage) processResourceByType(key, val string) {
+	resourceType := getResourceType(key)
+	switch resourceType {
+	case oauthClient:
+		m.cacheOAuthClient(key, val)
+	case certificate:
+		m.cacheCertificate(key, val)
+	}
+}
+
+// getFromRPCAndCache pulls a resource from rpc and stores it in local redis for caching
+func (m MdcbStorage) getFromRPCAndCache(key string) (string, error) {
+	val, err := m.rpc.GetKey(key)
+	if err != nil {
+		resourceType := getResourceType(key)
+		m.logger.Errorf("cannot retrieve %v from rpc: %v... Key: %v", resourceType, err.Error(), key)
+		return "", err
+	}
+
+	m.processResourceByType(key, val)
+	return val, nil
+}
+
+func (m MdcbStorage) getFromLocal(key string) (string, error) {
+	return m.local.GetKey(key)
+}
+
+func (m MdcbStorage) GetKey(key string) (string, error) {
+	m.logger.Infof("Pulling key: %v", key)
+
+	if m.local != nil {
+		val, err := m.getFromLocal(key)
+		if err == nil {
+			return val, nil
+		}
+		m.logger.Debugf("Key not present locally, pulling from rpc layer: %v", err)
+	}
+
+	return m.getFromRPCAndCache(key)
 }
 
 func getResourceType(key string) string {
 	switch {
 	case strings.Contains(key, "oauth-clientid."):
-		return "Oauth Client"
+		return oauthClient
 	case strings.HasPrefix(key, "cert"):
-		return "certificate"
+		return certificate
 	case strings.HasPrefix(key, "apikey"):
-		return "api key"
+		return apiKey
 	default:
-		return "key"
+		return Key
 	}
 }
 

@@ -210,8 +210,8 @@ func (r *RPCStorageHandler) hashKey(in string) string {
 
 func (r *RPCStorageHandler) fixKey(keyName string) string {
 	setKeyName := r.KeyPrefix + r.hashKey(keyName)
-
-	log.Debug("Input key was: ", r.Gw.obfuscateKey(setKeyName))
+	log.Infof("The prefix: %v", r.KeyPrefix)
+	log.Info("Input key was: ", setKeyName)
 
 	return setKeyName
 }
@@ -897,7 +897,7 @@ func (gw *Gateway) getSessionAndCreate(keyName string, r *RPCStorageHandler, isH
 
 	sessionString, err := r.GetRawKey("apikey-" + key)
 	if err != nil {
-		log.Error("Key not found in master - skipping")
+		log.Error("Key not found in master - skipping..." + key)
 	} else {
 		gw.handleAddKey(key, sessionString, orgId)
 	}
