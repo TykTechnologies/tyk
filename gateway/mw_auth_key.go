@@ -78,7 +78,7 @@ func (k *AuthKey) setContextVars(r *http.Request, token string) {
 		return
 	}
 	if cnt := ctxGetData(r); cnt != nil {
-		// Key data
+		// resourceKey data
 		cnt["token"] = token
 		ctxSetData(r, cnt)
 	}

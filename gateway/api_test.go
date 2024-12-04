@@ -656,11 +656,11 @@ func TestKeyHandler_DeleteKeyWithQuota(t *testing.T) {
 		hashKeys bool
 	}{
 		{
-			name:     "Key Hashing disabled",
+			name:     "resourceKey Hashing disabled",
 			hashKeys: false,
 		},
 		{
-			name:     "Key hashing enabled",
+			name:     "resourceKey hashing enabled",
 			hashKeys: true,
 		},
 	}
@@ -1095,7 +1095,7 @@ func (ts *Test) testHashKeyHandlerHelper(t *testing.T, expectedHashSize int) {
 	myKeyHash := storage.HashKey(ts.Gw.generateToken("default", myKey), ts.Gw.GetConfig().HashKeys)
 
 	if len(myKeyHash) != expectedHashSize {
-		t.Errorf("Expected hash size: %d, got %d. Hash: %s. Key: %s", expectedHashSize, len(myKeyHash), myKeyHash, myKey)
+		t.Errorf("Expected hash size: %d, got %d. Hash: %s. resourceKey: %s", expectedHashSize, len(myKeyHash), myKeyHash, myKey)
 	}
 
 	t.Run("Create, get and delete key with key hashing", func(t *testing.T) {

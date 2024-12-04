@@ -512,8 +512,8 @@ func (r *RPCStorageHandler) GetKeysAndValues() map[string]string {
 // DeleteKey will remove a key from the database
 func (r *RPCStorageHandler) DeleteKey(keyName string) bool {
 
-	log.Debug("DEL Key was: ", r.Gw.obfuscateKey(keyName))
-	log.Debug("DEL Key became: ", r.Gw.obfuscateKey(r.fixKey(keyName)))
+	log.Debug("DEL resourceKey was: ", r.Gw.obfuscateKey(keyName))
+	log.Debug("DEL resourceKey became: ", r.Gw.obfuscateKey(r.fixKey(keyName)))
 	ok, err := rpc.FuncClientSingleton("DeleteKey", r.fixKey(keyName))
 	if err != nil {
 		rpc.EmitErrorEventKv(
@@ -937,7 +937,7 @@ func (gw *Gateway) getSessionAndCreate(keyName string, r *RPCStorageHandler, isH
 
 	sessionString, err := r.GetRawKey("apikey-" + key)
 	if err != nil {
-		log.Error("Key not found in master - skipping")
+		log.Error("resourceKey not found in master - skipping")
 	} else {
 		gw.handleAddKey(key, sessionString, orgId)
 	}

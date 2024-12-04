@@ -126,7 +126,7 @@ func (w *WebHookHandler) Init(handlerConf interface{}) error {
 // hookFired checks if an event has been fired within the EventTimeout setting
 func (w *WebHookHandler) WasHookFired(checksum string) bool {
 	if _, err := w.store.GetKey(checksum); err != nil {
-		// Key not found, so hook is in limit
+		// resourceKey not found, so hook is in limit
 		log.WithFields(logrus.Fields{
 			"prefix": "webhooks",
 		}).Debug("Event can fire, no duplicates found")

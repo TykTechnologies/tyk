@@ -315,7 +315,7 @@ func createAuthKeyAuthSession(isBench bool) *user.SessionState {
 		session.QuotaRemaining = 10
 		session.QuotaMax = 10
 	}
-	session.AccessRights = map[string]user.AccessDefinition{"31": {APIName: "Tyk Auth Key Test", APIID: "31", Versions: []string{"default"}}}
+	session.AccessRights = map[string]user.AccessDefinition{"31": {APIName: "Tyk Auth resourceKey Test", APIID: "31", Versions: []string{"default"}}}
 	return session
 }
 

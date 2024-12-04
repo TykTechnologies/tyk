@@ -339,7 +339,7 @@ func TestOAuthTokenExpiration(t *testing.T) {
 	assert.True(t, globalConf.LocalSessionCache.DisableCacheSessionState) // to fixate that the cache is disabled
 	_, _ = ts.Run(t, []test.TestCase{
 		{Path: "/listen/get", Headers: authHeader, Method: http.MethodGet, Code: http.StatusOK, Delay: time.Second},
-		{Path: "/listen/get", Headers: authHeader, Method: http.MethodGet, BodyMatch: "Key has expired, please renew",
+		{Path: "/listen/get", Headers: authHeader, Method: http.MethodGet, BodyMatch: "resourceKey has expired, please renew",
 			Code: http.StatusUnauthorized},
 	}...)
 }
@@ -544,7 +544,7 @@ func TestAPIClientAuthorizeToken(t *testing.T) {
 		}
 		session, ok := spec.AuthManager.SessionDetail("", token, false)
 		if !ok {
-			t.Error("Key was not created (Can't find it)!")
+			t.Error("resourceKey was not created (Can't find it)!")
 		}
 		if session.MetaData == nil {
 			t.Fatal("Session metadata is nil")
@@ -695,7 +695,7 @@ func TestAPIClientAuthorizeTokenWithPolicy(t *testing.T) {
 		// Verify the token is correct
 		session, ok := spec.AuthManager.SessionDetail("", token, false)
 		if !ok {
-			t.Error("Key was not created (Can't find it)!")
+			t.Error("resourceKey was not created (Can't find it)!")
 		}
 
 		if !reflect.DeepEqual(session.PolicyIDs(), []string{"TEST-4321"}) {

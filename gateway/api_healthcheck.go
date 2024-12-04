@@ -49,7 +49,7 @@ func (h *DefaultHealthChecker) Init(storeType storage.Handler) {
 }
 
 func (h *DefaultHealthChecker) CreateKeyName(subKey HealthPrefix) string {
-	// Key should be API-ID.SubKey.123456789
+	// resourceKey should be API-ID.SubKey.123456789
 	return h.APIID + "." + string(subKey)
 }
 
