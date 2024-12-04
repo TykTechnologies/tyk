@@ -130,6 +130,23 @@ func TestBundleLoader(t *testing.T) {
 		assert.NoError(t, err)
 	})
 
+	t.Run("load bundle should not load bundle nor error when the gateway instance is a management node", func(t *testing.T) {
+		customTs := StartTest(func(globalConf *config.Config) {
+			globalConf.ManagementNode = true
+		})
+
+		t.Cleanup(customTs.Close)
+		spec := &APISpec{
+			APIDefinition: &apidef.APIDefinition{
+				CustomMiddlewareBundle:         "some-bundle",
+				CustomMiddlewareBundleDisabled: false,
+			},
+		}
+		err := customTs.Gw.loadBundle(spec)
+		assert.Empty(t, spec.CustomMiddleware)
+		assert.NoError(t, err)
+	})
+
 	t.Run("Load bundle fails if public key path is set but no signature is provided", func(t *testing.T) {
 		cfg := ts.Gw.GetConfig()
 		cfg.PublicKeyPath = "random/path/to/public.key"
