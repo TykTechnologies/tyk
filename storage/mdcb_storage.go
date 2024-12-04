@@ -6,7 +6,6 @@ import (
 	"strings"
 
 	"github.com/sirupsen/logrus"
-	"crypto/sha256"
 )
 
 type MdcbStorage struct {
@@ -284,8 +283,6 @@ func (m MdcbStorage) processResourceByType(key, val string) error {
 func (m MdcbStorage) getFromRPCAndCache(key string) (string, error) {
 	val, err := m.rpc.GetKey(key)
 	if err != nil {
-		resourceType := getResourceType(key)
-		m.logger.Errorf("cannot retrieve %v from rpc: %v... Key: %v", resourceType, err.Error(), obfuscateKey(key))
 		return "", err
 	}
 
@@ -296,9 +293,4 @@ func (m MdcbStorage) getFromRPCAndCache(key string) (string, error) {
 // getFromLocal get a key from local storage
 func (m MdcbStorage) getFromLocal(key string) (string, error) {
 	return m.local.GetKey(key)
-}
-
-func obfuscateKey(key string) string {
-	hash := sha256.Sum256([]byte(key))
-	return fmt.Sprintf("%x", hash[:])
 }
