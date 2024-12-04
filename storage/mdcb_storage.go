@@ -2,7 +2,6 @@ package storage
 
 import (
 	"errors"
-	"fmt"
 	"strings"
 
 	"github.com/sirupsen/logrus"
@@ -271,7 +270,6 @@ func (m MdcbStorage) processResourceByType(key, val string) error {
 	resourceType := getResourceType(key)
 	switch resourceType {
 	case resourceOauthClient:
-		fmt.Println("Will attend oauth lcient")
 		return m.cacheOAuthClient(key, val)
 	case resourceCertificate:
 		return m.cacheCertificate(key, val)
