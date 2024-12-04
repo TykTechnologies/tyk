@@ -3,11 +3,12 @@ package storage
 import (
 	"context"
 	"errors"
-	"github.com/TykTechnologies/tyk/storage/mock"
-	"go.uber.org/mock/gomock"
 	"io"
 	"strings"
 	"testing"
+
+	"github.com/TykTechnologies/tyk/storage/mock"
+	"go.uber.org/mock/gomock"
 
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
@@ -177,11 +178,12 @@ func TestGetFromRPCAndCache(t *testing.T) {
 	setup.Local.EXPECT().SetKey(oauthClientKey, gomock.Any(), gomock.Any()).Times(1)
 	rpcVal, err = m.getFromRPCAndCache(oauthClientKey)
 	assert.Equal(t, "value", rpcVal)
+	assert.Nil(t, err)
 
 	// test certs keys
 	// for certs we do not call directly the set key func, but the callback
 	count := 0
-	mockSaveCert := func(key, val string) error {
+	mockSaveCert := func(_, _ string) error {
 		count++
 		return nil
 	}
@@ -192,6 +194,7 @@ func TestGetFromRPCAndCache(t *testing.T) {
 	rpcVal, err = m.getFromRPCAndCache(certKey)
 	assert.Equal(t, "value", rpcVal)
 	assert.Equal(t, 1, count)
+	assert.Nil(t, err)
 }
 
 func TestProcessResourceByType(t *testing.T) {
@@ -267,7 +270,7 @@ func TestProcessResourceByType(t *testing.T) {
 
 			// If testing certificate caching, setup the callback
 			if strings.HasPrefix(tc.key, "cert:") {
-				f := func(key, val string) error {
+				f := func(key, _ string) error {
 					if key == "cert:failCert" {
 						return errors.New("certificate caching failed")
 					}
