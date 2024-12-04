@@ -480,6 +480,10 @@ func (s *spanWrapper) TracerProvider() trace.TracerProvider {
 	return s.span.TracerProvider()
 }
 
+func (s *spanWrapper) AddLink(link trace.Link) {
+	s.span.AddLink(link)
+}
+
 var _ trace.Span = (*spanWrapper)(nil)
 
 var testSchema = `directive @cacheControl(maxAge: Int, scope: CacheControlScope) on FIELD_DEFINITION | OBJECT | INTERFACE
