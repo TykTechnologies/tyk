@@ -246,8 +246,45 @@ type BaseMiddleware struct {
 	Gw     *Gateway `json:"-"`
 }
 
-func (t BaseMiddleware) Base() *BaseMiddleware {
-	return &t
+// NewBaseMiddleware creates a new *BaseMiddleware.
+// The passed logrus.Entry is duplicated.
+// BaseMiddleware keeps the pointer to *Gateway and *APISpec, as well as Proxy.
+// The logger duplication is used so that basemiddleware copies can be created for different middleware.
+func NewBaseMiddleware(gw *Gateway, spec *APISpec, proxy ReturningHttpHandler, logger *logrus.Entry) *BaseMiddleware {
+	baseMid := &BaseMiddleware{
+		Spec:   spec,
+		Proxy:  proxy,
+		logger: logger.Dup(),
+		Gw:     gw,
+	}
+
+	for _, v := range baseMid.Spec.VersionData.Versions {
+		if len(v.ExtendedPaths.CircuitBreaker) > 0 {
+			baseMid.Spec.CircuitBreakerEnabled = true
+		}
+		if len(v.ExtendedPaths.HardTimeouts) > 0 {
+			baseMid.Spec.EnforcedTimeoutEnabled = true
+		}
+	}
+
+	return baseMid
+}
+
+// Copy provides a new BaseMiddleware with it's own logger scope (copy).
+// The Spec, Proxy and Gw values are not copied.
+func (m *BaseMiddleware) Copy() *BaseMiddleware {
+	return &BaseMiddleware{
+		logger: m.logger.Dup(),
+		Spec:   m.Spec,
+		Proxy:  m.Proxy,
+		Gw:     m.Gw,
+	}
+}
+
+// Base serves to provide the full BaseMiddleware API. It's part of the TykMiddleware interface.
+// It escapes to a wider API surface than TykMiddleware, used by middlewares, etc.
+func (t *BaseMiddleware) Base() *BaseMiddleware {
+	return t
 }
 
 func (t *BaseMiddleware) Logger() (logger *logrus.Entry) {
