@@ -342,7 +342,7 @@ func TestQuota(t *testing.T) {
 		body, _ := ioutil.ReadAll(r.Body)
 		json.Unmarshal(body, &data)
 
-		if data["event"] != "QuotaExceeded" || data["message"] != "resourceKey Quota Limit Exceeded" || data["key"] != keyID {
+		if data["event"] != "QuotaExceeded" || data["message"] != "Key Quota Limit Exceeded" || data["key"] != keyID {
 			t.Error("Webhook payload not match", data)
 		}
 	}))

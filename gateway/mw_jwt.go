@@ -382,7 +382,7 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 	foundPolicy := false
 	if !exists {
 		// Create it
-		k.Logger().Debug("resourceKey does not exist, creating")
+		k.Logger().Debug("Key does not exist, creating")
 
 		// We need a base policy as a template, either get it from the token itself OR a proxy client ID within Tyk
 		basePolicyID, foundPolicy = k.getBasePolicyID(r, claims)
@@ -612,7 +612,7 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 
 	// ensure to set the sessionID
 	session.KeyID = sessionID
-	k.Logger().Debug("resourceKey found")
+	k.Logger().Debug("Key found")
 	switch k.Spec.BaseIdentityProvidedBy {
 	case apidef.JWTClaim, apidef.UnsetAuth:
 		ctxSetSession(r, &session, updateSession, k.Gw.GetConfig().HashKeys)
@@ -647,7 +647,7 @@ func (k *JWTMiddleware) processOneToOneTokenMap(r *http.Request, token *jwt.Toke
 
 	if !exists {
 		k.reportLoginFailure(tykId, r)
-		return errors.New("resourceKey not authorized"), http.StatusForbidden
+		return errors.New("Key not authorized"), http.StatusForbidden
 	}
 
 	k.Logger().Debug("Raw key ID found.")
@@ -707,7 +707,7 @@ func (k *JWTMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _
 
 	if err == nil && token.Valid {
 		if jwtErr := k.timeValidateJWTClaims(token.Claims.(jwt.MapClaims)); jwtErr != nil {
-			return errors.New("resourceKey not authorized: " + jwtErr.Error()), http.StatusUnauthorized
+			return errors.New("Key not authorized: " + jwtErr.Error()), http.StatusUnauthorized
 		}
 
 		// Token is valid - let's move on
@@ -730,7 +730,7 @@ func (k *JWTMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _
 			return errors.New(MsgKeyNotAuthorizedUnexpectedSigningMethod), http.StatusForbidden
 		}
 	}
-	return errors.New("resourceKey not authorized"), http.StatusForbidden
+	return errors.New("Key not authorized"), http.StatusForbidden
 }
 
 func ParseRSAPublicKey(data []byte) (interface{}, error) {
@@ -776,7 +776,7 @@ func ctxSetJWTContextVars(s *APISpec, r *http.Request, token *jwt.Token) {
 			cnt[claim] = claimValue
 		}
 
-		// resourceKey data
+		// Key data
 		cnt["token"] = ctxGetAuthToken(r)
 
 		ctxSetData(r, cnt)
@@ -798,7 +798,7 @@ func (gw *Gateway) generateSessionFromPolicy(policyID, orgID string, enforceOrg 
 	if enforceOrg {
 		if policy.OrgID != orgID {
 			log.Error("Attempting to apply policy from different organisation to key, skipping")
-			return session.Clone(), errors.New("resourceKey not authorized: no matching policy")
+			return session.Clone(), errors.New("Key not authorized: no matching policy")
 		}
 	} else {
 		// Org isn;t enforced, so lets use the policy baseline

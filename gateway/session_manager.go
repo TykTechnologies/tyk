@@ -276,7 +276,7 @@ func (l *SessionLimiter) RateLimitInfo(r *http.Request, api *APISpec, endpoints 
 
 // ForwardMessage will enforce rate limiting, returning a non-zero
 // sessionFailReason if session limits have been exceeded.
-// resourceKey values to manage rate are Rate and Per, e.g. Rate of 10 messages
+// Key values to manage rate are Rate and Per, e.g. Rate of 10 messages
 // Per 10 seconds
 func (l *SessionLimiter) ForwardMessage(r *http.Request, session *user.SessionState, rateLimitKey string, quotaKey string, store storage.Handler, enableRL, enableQ bool, api *APISpec, dryRun bool) sessionFailReason {
 	// check for limit on API level (set to session by ApplyPolicies)

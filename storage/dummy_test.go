@@ -69,13 +69,13 @@ func TestDummyStorage_GetRawKey(t *testing.T) {
 		wantErr bool
 	}{
 		{
-			name:    "resourceKey exists",
+			name:    "Key exists",
 			key:     "key1",
 			want:    "value1",
 			wantErr: false,
 		},
 		{
-			name:    "resourceKey does not exist",
+			name:    "Key does not exist",
 			key:     "key2",
 			want:    "",
 			wantErr: true,
@@ -271,14 +271,14 @@ func TestDummyStorage_GetKey(t *testing.T) {
 		errMsg  string
 	}{
 		{
-			name:    "resourceKey exists",
+			name:    "Key exists",
 			key:     "existingKey",
 			want:    "value1",
 			wantErr: false,
 			errMsg:  "",
 		},
 		{
-			name:    "resourceKey does not exist",
+			name:    "Key does not exist",
 			key:     "nonExistingKey",
 			want:    "",
 			wantErr: true,
@@ -444,7 +444,7 @@ func TestDummyStorage_RemoveFromList(t *testing.T) {
 			name:     "Remove from non-existing key",
 			keyName:  "nonExistingKey",
 			value:    "value1",
-			wantList: nil, // resourceKey does not exist
+			wantList: nil, // Key does not exist
 			wantErr:  false,
 		},
 	}
@@ -522,25 +522,25 @@ func TestDummyStorage_Exists(t *testing.T) {
 		wantErr bool
 	}{
 		{
-			name:    "resourceKey exists in Data",
+			name:    "Key exists in Data",
 			keyName: "dataKey",
 			want:    true,
 			wantErr: false,
 		},
 		{
-			name:    "resourceKey exists in IndexList",
+			name:    "Key exists in IndexList",
 			keyName: "indexKey",
 			want:    true,
 			wantErr: false,
 		},
 		{
-			name:    "resourceKey exists in both Data and IndexList",
+			name:    "Key exists in both Data and IndexList",
 			keyName: "sharedKey",
 			want:    true,
 			wantErr: false,
 		},
 		{
-			name:    "resourceKey does not exist",
+			name:    "Key does not exist",
 			keyName: "nonExistingKey",
 			want:    false,
 			wantErr: false,

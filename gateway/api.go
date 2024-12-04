@@ -390,7 +390,7 @@ func (gw *Gateway) doAddOrUpdate(keyName string, newSession *user.SessionState, 
 		}
 	}
 
-	logger.Info("resourceKey added or updated.")
+	logger.Info("Key added or updated.")
 	return nil
 }
 
@@ -461,22 +461,22 @@ func (gw *Gateway) handleAddOrUpdate(keyName string, r *http.Request, isHashed b
 		keyName = key.KeyID
 		if !found {
 			log.Error("Could not find key when updating")
-			return apiError("resourceKey is not found"), http.StatusNotFound
+			return apiError("Key is not found"), http.StatusNotFound
 		}
 		originalKey = key.Clone()
 
 		isCertificateChanged := newSession.Certificate != originalKey.Certificate
 		if isCertificateChanged {
 			if newSession.Certificate == "" {
-				log.Error("resourceKey must contain a certificate")
-				return apiError("resourceKey cannot be used without a certificate"), http.StatusBadRequest
+				log.Error("Key must contain a certificate")
+				return apiError("Key cannot be used without a certificate"), http.StatusBadRequest
 			}
 
 			// check that the certificate exists in the system
 			_, err := gw.CertificateManager.GetRaw(newSession.Certificate)
 			if err != nil {
-				log.Error("resourceKey must contain an existing certificate")
-				return apiError("resourceKey must be used with an existent certificate"), http.StatusBadRequest
+				log.Error("Key must contain an existing certificate")
+				return apiError("Key must be used with an existent certificate"), http.StatusBadRequest
 			}
 		}
 
@@ -566,7 +566,7 @@ func (gw *Gateway) handleAddOrUpdate(keyName string, r *http.Request, isHashed b
 		event = EventTokenCreated
 	}
 	gw.FireSystemEvent(event, EventTokenMeta{
-		EventMetaDefault: EventMetaDefault{Message: "resourceKey modified."},
+		EventMetaDefault: EventMetaDefault{Message: "Key modified."},
 		Org:              newSession.OrgID,
 		Key:              keyName,
 	})
@@ -595,7 +595,7 @@ func (gw *Gateway) handleAddOrUpdate(keyName string, r *http.Request, isHashed b
 
 func (gw *Gateway) handleGetDetail(sessionKey, apiID, orgID string, byHash bool) (interface{}, int) {
 	if byHash && !gw.GetConfig().HashKeys {
-		return apiError("resourceKey requested by hash but key hashing is not enabled"), http.StatusBadRequest
+		return apiError("Key requested by hash but key hashing is not enabled"), http.StatusBadRequest
 	}
 
 	spec := gw.getApiSpec(apiID)
@@ -606,7 +606,7 @@ func (gw *Gateway) handleGetDetail(sessionKey, apiID, orgID string, byHash bool)
 	session, ok := gw.GlobalSessionManager.SessionDetail(orgID, sessionKey, byHash)
 	sessionKey = session.KeyID
 	if !ok {
-		return apiError("resourceKey not found"), http.StatusNotFound
+		return apiError("Key not found"), http.StatusNotFound
 	}
 
 	mw := &BaseMiddleware{Spec: spec, Gw: gw}
@@ -804,7 +804,7 @@ func (gw *Gateway) handleDeleteKey(keyName, orgID, apiID string, resetQuota bool
 	}
 
 	gw.FireSystemEvent(EventTokenDeleted, EventTokenMeta{
-		EventMetaDefault: EventMetaDefault{Message: "resourceKey deleted."},
+		EventMetaDefault: EventMetaDefault{Message: "Key deleted."},
 		Org:              orgID,
 		Key:              keyName,
 	})
@@ -1707,7 +1707,7 @@ func (gw *Gateway) handleUpdateHashedKey(keyName string, applyPolicies []string)
 			"status": "fail",
 		}).Error("Failed to update hashed key.")
 
-		return apiError("resourceKey not found"), http.StatusNotFound
+		return apiError("Key not found"), http.StatusNotFound
 	}
 
 	// Set the policy
@@ -1955,7 +1955,7 @@ func (gw *Gateway) createKeyHandler(w http.ResponseWriter, r *http.Request) {
 			"prefix": "api",
 			"status": "fail",
 			"err":    err,
-		}).Error("resourceKey creation failed.")
+		}).Error("Key creation failed.")
 		doJSONWrite(w, http.StatusInternalServerError, apiError("Unmarshalling failed"))
 		return
 	}
@@ -1969,7 +1969,7 @@ func (gw *Gateway) createKeyHandler(w http.ResponseWriter, r *http.Request) {
 		newKey = gw.generateToken(newSession.OrgID, newSession.Certificate)
 		_, ok := gw.GlobalSessionManager.SessionDetail(newSession.OrgID, newKey, false)
 		if ok {
-			doJSONWrite(w, http.StatusInternalServerError, apiError("Failed to create key - resourceKey with given certificate already found:"+newKey))
+			doJSONWrite(w, http.StatusInternalServerError, apiError("Failed to create key - Key with given certificate already found:"+newKey))
 			return
 		}
 	}
@@ -2065,7 +2065,7 @@ func (gw *Gateway) createKeyHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	gw.FireSystemEvent(EventTokenCreated, EventTokenMeta{
-		EventMetaDefault: EventMetaDefault{Message: "resourceKey generated."},
+		EventMetaDefault: EventMetaDefault{Message: "Key generated."},
 		Org:              newSession.OrgID,
 		Key:              newKey,
 	})
@@ -2093,7 +2093,7 @@ func (gw *Gateway) previewKeyHandler(w http.ResponseWriter, r *http.Request) {
 			"prefix": "api",
 			"status": "fail",
 			"err":    err,
-		}).Error("resourceKey creation failed.")
+		}).Error("Key creation failed.")
 		doJSONWrite(w, http.StatusInternalServerError, apiError("Unmarshalling failed"))
 		return
 	}

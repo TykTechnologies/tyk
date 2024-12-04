@@ -18,7 +18,7 @@ const (
 	resourceOauthClient = "Oauth Client"
 	resourceCertificate = "Certificate"
 	resourceApiKey      = "ApiKey"
-	resourceKey         = "resourceKey"
+	resourceKey         = "Key"
 )
 
 func NewMdcbStorage(local, rpc Handler, log *logrus.Entry) *MdcbStorage {
@@ -35,7 +35,7 @@ func (m MdcbStorage) GetKey(key string) (string, error) {
 		if err == nil {
 			return val, nil
 		}
-		m.logger.Debugf("resourceKey not present locally, pulling from rpc layer: %v", err)
+		m.logger.Debugf("Key not present locally, pulling from rpc layer: %v", err)
 	}
 
 	return m.getFromRPCAndCache(key)
@@ -286,7 +286,7 @@ func (m MdcbStorage) getFromRPCAndCache(key string) (string, error) {
 	val, err := m.rpc.GetKey(key)
 	if err != nil {
 		resourceType := getResourceType(key)
-		m.logger.Errorf("cannot retrieve %v from rpc: %v... resourceKey: %v", resourceType, err.Error(), key)
+		m.logger.Errorf("cannot retrieve %v from rpc: %v... Key: %v", resourceType, err.Error(), key)
 		return "", err
 	}
 

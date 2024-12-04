@@ -311,7 +311,7 @@ func (hc *HostCheckerManager) HostDown(urlStr string) bool {
 
 	log.WithFields(logrus.Fields{
 		"prefix": "host-check-mgr",
-	}).Debug("resourceKey is: ", PoolerHostSentinelKeyPrefix+u.Host)
+	}).Debug("Key is: ", PoolerHostSentinelKeyPrefix+u.Host)
 
 	key := PoolerHostSentinelKeyPrefix + u.Host
 	// If the node doesn't perform any uptime checks, query the storage:

@@ -420,7 +420,7 @@ func (t *BaseMiddleware) CheckSessionAndIdentityForValidKey(originalKey string, 
 	if !t.Spec.GlobalConfig.LocalSessionCache.DisableCacheSessionState {
 		cachedVal, found := t.Gw.SessionCache.Get(cacheKey)
 		if found {
-			t.Logger().Debug("--> resourceKey found in local cache")
+			t.Logger().Debug("--> Key found in local cache")
 			session := cachedVal.(user.SessionState).Clone()
 			if err := t.ApplyPolicies(&session); err != nil {
 				t.Logger().Error(err)

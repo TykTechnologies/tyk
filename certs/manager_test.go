@@ -184,7 +184,7 @@ func TestCertificateStorage(t *testing.T) {
 			t.Error("Should return only private certificate")
 		}
 
-		if leafSubjectName(certs[0]) != ("Public resourceKey: " + publicKeyID) {
+		if leafSubjectName(certs[0]) != ("Public Key: " + publicKeyID) {
 			t.Error("Wrong cert", leafSubjectName(certs[0]))
 		}
 	})

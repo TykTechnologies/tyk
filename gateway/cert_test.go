@@ -1277,7 +1277,7 @@ func TestKeyWithCertificateTLS(t *testing.T) {
 	})
 
 	// check that key has been updated with wrong certificate
-	t.Run("resourceKey has been updated with wrong certificate key", func(t *testing.T) {
+	t.Run("Key has been updated with wrong certificate key", func(t *testing.T) {
 		clientPEM, _, _, clientCert := crypto.GenCertificate(&x509.Certificate{}, false)
 		clientCertID, err := ts.Gw.CertificateManager.Add(clientPEM, orgId)
 
