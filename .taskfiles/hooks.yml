@@ -1,0 +1,23 @@
+version: "3"
+
+includes:
+  lint_dep: lint.yml
+
+tasks:
+  pre-commit:
+    desc: "Run pre-commit hooks"
+    cmds:
+      - task: :lint:tidy
+      - task: lint_dep:compile-tests
+
+  pre-push:
+    desc: "Run pre-push hooks"
+    cmds:
+      - task: :lint:tidy
+      - task: lint_dep:vet
+      - task: lint_dep:golangci-lint
+        vars:
+          args: "{{.golangci}} --new-from-rev=origin/master"
+      - task: :lint:x-tyk-gateway
+      - task: lint_dep:compile-tests
+      - task: lint_dep:simple-build
