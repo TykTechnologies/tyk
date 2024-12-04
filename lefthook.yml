@@ -1,8 +1,8 @@
 pre-commit:
   commands:
     task:
-      run: task pre-commit
+      run: task hooks:pre-commit
 pre-push:
   commands:
     task:
-      run: task pre-push
+      run: task hooks:pre-push

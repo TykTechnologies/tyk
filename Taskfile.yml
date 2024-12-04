@@ -3,8 +3,8 @@ version: "3"
 
 includes:
   test: .taskfiles/test.yml
-  lint: .taskfiles/lint.yml
   deps: .taskfiles/deps/Taskfile.yml
+  hooks: .taskfiles/hooks.yml
   opentelemetry:
     taskfile: ci/tests/tracing/Taskfile.yml
     dir: ci/tests/tracing/
@@ -74,7 +74,6 @@ tasks:
       - go mod tidy
 
   lint:all:
-    internal: true
     deps:
       - lint:config
       - lint:imports
@@ -112,21 +111,3 @@ tasks:
     desc: "Compile go tests for sanity check"
     cmds:
       - cd gateway && go test -c .
-
-  pre-commit:
-    desc: "Run pre-commit hooks"
-    cmds:
-      - task: lint:tidy
-      - task: compile-tests
-
-  pre-push:
-    desc: "Run pre-push hooks"
-    cmds:
-      - task: lint:tidy
-      - task: lint:vet
-      - task: lint:golangci-lint
-        vars:
-          args: "{{.golangci}} --new-from-rev=origin/master"
-      - task: lint:x-tyk-gateway
-      - task: simple-build
-      - task: compile-tests
