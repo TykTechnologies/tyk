@@ -7,8 +7,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/TykTechnologies/tyk/storage/mock"
 	"go.uber.org/mock/gomock"
+
+	"github.com/TykTechnologies/tyk/storage/mock"
 
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
