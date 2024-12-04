@@ -5,6 +5,7 @@
 //
 //	mockgen -destination=./mock/storage.go -package mock . Handler
 //
+
 // Package mock is a generated GoMock package.
 package mock
 
