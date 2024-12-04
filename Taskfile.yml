@@ -101,13 +101,3 @@ tasks:
     cmds:
       - task: deps:default
       - lefthook install
-
-  simple-build:
-    desc: "Run go build for sanity check"
-    cmds:
-      - go build .
-
-  compile-tests:
-    desc: "Compile go tests for sanity check"
-    cmds:
-      - cd gateway && go test -c .

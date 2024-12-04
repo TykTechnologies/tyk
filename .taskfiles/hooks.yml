@@ -8,7 +8,7 @@ tasks:
     desc: "Run pre-commit hooks"
     cmds:
       - task: :lint:tidy
-      - task: :compile-tests
+      - task: lint_dep:compile-tests
 
   pre-push:
     desc: "Run pre-push hooks"
@@ -19,5 +19,5 @@ tasks:
         vars:
           args: "{{.golangci}} --new-from-rev=origin/master"
       - task: :lint:x-tyk-gateway
-      - task: :simple-build
-      - task: :compile-tests
+      - task: lint_dep:compile-tests
+      - task: lint_dep:simple-build
