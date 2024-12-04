@@ -355,6 +355,10 @@ func (gw *Gateway) getHashedBundleName(bundleName string) (string, error) {
 
 // loadBundle wraps the load and save steps, it will return if an error occurs at any point.
 func (gw *Gateway) loadBundle(spec *APISpec) error {
+	if gw.GetConfig().ManagementNode {
+		return nil
+	}
+
 	// Skip if no custom middleware bundle name is set.
 	if spec.CustomMiddlewareBundleDisabled || spec.CustomMiddlewareBundle == "" {
 		return nil
