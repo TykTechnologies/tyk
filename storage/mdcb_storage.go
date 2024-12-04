@@ -2,6 +2,7 @@ package storage
 
 import (
 	"errors"
+	"fmt"
 	"strings"
 
 	"github.com/sirupsen/logrus"
@@ -260,25 +261,22 @@ func (m MdcbStorage) cacheCertificate(key, val string) error {
 
 // cacheOAuthClient saved oauth data in local storage after pull from rpc
 func (m MdcbStorage) cacheOAuthClient(key, val string) error {
-	err := m.local.SetKey(key, val, 0)
-	if err != nil {
-		m.logger.WithError(err).Errorf("Cannot save locally oauth client: %v", key)
-	}
-	return err
+	return m.local.SetKey(key, val, 0)
 }
 
 // processResourceByType based on the type of key it will trigger the proper
 // caching mechanism
 func (m MdcbStorage) processResourceByType(key, val string) error {
-	var err error
+
 	resourceType := getResourceType(key)
 	switch resourceType {
 	case resourceOauthClient:
-		err = m.cacheOAuthClient(key, val)
+		fmt.Println("Will attend oauth lcient")
+		return m.cacheOAuthClient(key, val)
 	case resourceCertificate:
-		err = m.cacheCertificate(key, val)
+		return m.cacheCertificate(key, val)
 	}
-	return err
+	return nil
 }
 
 // getFromRPCAndCache pulls a resource from rpc and stores it in local redis for caching

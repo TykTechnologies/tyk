@@ -25,12 +25,16 @@ type testSetup struct {
 
 var notFoundKeyErr = errors.New("key not found")
 
-func setupTest(t *testing.T) *testSetup {
-	t.Helper() // Marks this function as a test helper
-
+func getTestLogger() *logrus.Entry {
 	logger := logrus.New()
 	logger.Out = io.Discard
 	log := logger.WithContext(context.Background())
+	return log
+}
+
+func setupTest(t *testing.T) *testSetup {
+	t.Helper() // Marks this function as a test helper
+	log := getTestLogger()
 
 	ctrlLocal := gomock.NewController(t)
 	local := mock.NewMockHandler(ctrlLocal)
@@ -200,48 +204,39 @@ func TestGetFromRPCAndCache(t *testing.T) {
 
 func TestProcessResourceByType(t *testing.T) {
 	// Setup
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
 
-	mockLocal := mock.NewMockHandler(ctrl)
-	mockRemote := mock.NewMockHandler(ctrl)
-
-	m := &MdcbStorage{
-		local: mockLocal,
-		rpc:   mockRemote,
-	}
-
+	errCachingFailed := errors.New("caching failed")
 	// Test cases
 	testCases := []struct {
 		name          string
 		key           string
 		val           string
-		setupMocks    func()
+		setupMocks    func(handler *mock.MockHandler)
 		expectedError error
 	}{
 		{
 			name: "Successful OAuth client caching",
-			key:  "oauth:client1",
+			key:  "oauth-clientid.client1",
 			val:  "clientdata1",
-			setupMocks: func() {
-				mockLocal.EXPECT().SetKey("oauth:client1", "clientdata1", gomock.Any()).Return(nil)
+			setupMocks: func(mockLocal *mock.MockHandler) {
+				mockLocal.EXPECT().SetKey("oauth-clientid.client1", "clientdata1", gomock.Any()).Return(nil)
 			},
 			expectedError: nil,
 		},
 		{
 			name: "Failed OAuth client caching",
-			key:  "oauth:failOAuth",
+			key:  "oauth-clientid.failClient2",
 			val:  "clientdata2",
-			setupMocks: func() {
-				mockLocal.EXPECT().SetKey("oauth:failOAuth", "clientdata2", gomock.Any()).Return(errors.New("oauth caching failed"))
+			setupMocks: func(mockLocal *mock.MockHandler) {
+				mockLocal.EXPECT().SetKey("oauth-clientid.failClient2", "clientdata2", gomock.Any()).Return(errCachingFailed)
 			},
-			expectedError: errors.New("oauth caching failed"),
+			expectedError: errCachingFailed,
 		},
 		{
 			name: "Successful Certificate caching",
 			key:  "cert:cert1",
 			val:  "certdata1",
-			setupMocks: func() {
+			setupMocks: func(_ *mock.MockHandler) {
 				// Setup expectations for certificate caching if needed
 			},
 			expectedError: nil,
@@ -250,43 +245,44 @@ func TestProcessResourceByType(t *testing.T) {
 			name: "Failed Certificate caching",
 			key:  "cert:failCert",
 			val:  "certdata2",
-			setupMocks: func() {
+			setupMocks: func(_ *mock.MockHandler) {
 				// Setup expectations for failed certificate caching if needed
 			},
-			expectedError: errors.New("certificate caching failed"),
+			expectedError: errCachingFailed,
 		},
 		{
 			name:          "Unknown resource type",
 			key:           "unknown:resource1",
 			val:           "data1",
-			setupMocks:    func() {},
+			setupMocks:    func(_ *mock.MockHandler) {},
 			expectedError: nil,
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			// Setup mocks
-			tc.setupMocks()
+			setup := setupTest(t)
+			defer setup.CleanUp()
+
+			m := setup.MdcbStorage
+			tc.setupMocks(setup.Local)
 
 			// If testing certificate caching, setup the callback
 			if strings.HasPrefix(tc.key, "cert:") {
 				f := func(key, _ string) error {
 					if key == "cert:failCert" {
-						return errors.New("certificate caching failed")
+						return errCachingFailed
 					}
 					return nil
 				}
 				m.CallbackOnPullCertificateFromRPC = &f
-			} else {
-				m.CallbackOnPullCertificateFromRPC = nil
 			}
 
 			err := m.processResourceByType(tc.key, tc.val)
 
 			if tc.expectedError != nil {
 				assert.Error(t, err)
-				assert.Equal(t, tc.expectedError.Error(), err.Error())
+				assert.ErrorIs(t, err, tc.expectedError)
 			} else {
 				assert.NoError(t, err)
 			}
