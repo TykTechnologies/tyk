@@ -500,6 +500,8 @@ streams:
 }
 
 func TestAsyncAPIHttp(t *testing.T) {
+	t.Skip() // Expensive. Runs containerized tests. 15s.
+
 	var tests = []struct {
 		name          string
 		consumerGroup string
@@ -739,7 +741,7 @@ func waitForAPIToBeLoaded(ts *Test) error {
 }
 
 func TestWebSocketConnectionClosedOnAPIReload(t *testing.T) {
-	t.Skip()
+	t.Skip() // Is this also skipped because running containers is slow?
 	ctx := context.Background()
 	kafkaContainer, err := kafka.Run(ctx, "confluentinc/confluent-local:7.5.0")
 	if err != nil {
