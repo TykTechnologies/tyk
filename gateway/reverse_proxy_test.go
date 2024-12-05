@@ -17,6 +17,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	texttemplate "text/template"
 	"time"
@@ -30,6 +31,7 @@ import (
 
 	"github.com/TykTechnologies/graphql-go-tools/pkg/execution/datasource"
 	"github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
+	"github.com/TykTechnologies/tyk-pump/analytics"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
@@ -1752,18 +1754,7 @@ func TestReverseProxyWebSocketCancelation(t *testing.T) {
 }
 
 func TestSSE(t *testing.T) {
-	sseServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "text/event-stream")
-		w.Header().Set("Connection", "keep-alive")
-
-		flusher, _ := w.(http.Flusher)
-		for i := 0; i < 5; i++ {
-			fmt.Fprintf(w, "data: %d\n", i)
-			flusher.Flush()
-			time.Sleep(50 * time.Millisecond)
-		}
-	}))
-
+	sseServer := TestHelperSSEServer(t)
 	conf := func(globalConf *config.Config) {
 		globalConf.HttpServerOptions.EnableWebSockets = false
 	}
@@ -1775,62 +1766,39 @@ func TestSSE(t *testing.T) {
 		spec.Proxy.ListenPath = "/"
 	})
 
-	req, _ := http.NewRequest(http.MethodGet, ts.URL, nil)
-	req.Header.Set("Accept", "text/event-stream")
-
-	client := http.Client{}
-
-	stream := func(enableWebSockets bool) error {
-		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
-		defer cancel()
-
-		globalConf := ts.Gw.GetConfig()
-		globalConf.HttpServerOptions.EnableWebSockets = enableWebSockets
-		ts.Gw.SetConfig(globalConf)
-
-		res, err := client.Do(req)
-		assert.NoError(t, err)
-
-		reader := bufio.NewReader(res.Body)
-		defer res.Body.Close()
-
-		i := 0
-		okChan := make(chan error)
-
-		go func() {
-			for {
-				line, err := reader.ReadBytes('\n')
-				if err != nil && errors.Is(err, io.EOF) {
-					err = nil
-				}
-
-				assert.NoError(t, err)
-
-				if len(line) == 0 {
-					break
-				}
-
-				assert.Equal(t, fmt.Sprintf("data: %v\n", i), string(line))
-				i++
-			}
-			close(okChan)
-		}()
-
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		case <-okChan:
-		}
-		assert.Equal(t, i, 5)
-		return nil
-	}
-
 	t.Run("websockets disabled", func(t *testing.T) {
-		assert.NoError(t, stream(false))
+		assert.NoError(t, TestHelperSSEStreamClient(t, ts, false))
 	})
 
 	t.Run("websockets enabled", func(t *testing.T) {
-		assert.NoError(t, stream(true))
+		assert.NoError(t, TestHelperSSEStreamClient(t, ts, true))
+	})
+
+	t.Run("sse streaming with detailed recording enabled", func(t *testing.T) {
+		sseServer := TestHelperSSEServer(t)
+		ts := StartTest(func(c *config.Config) {
+			c.AnalyticsConfig.EnableDetailedRecording = true
+		})
+
+		t.Cleanup(ts.Close)
+		ts.Gw.Analytics.Flush()
+
+		var activityCounter atomic.Int32
+
+		ts.Gw.Analytics.mockEnabled = true
+		ts.Gw.Analytics.mockRecordHit = func(record *analytics.AnalyticsRecord) {
+			activityCounter.Add(1)
+		}
+
+		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+			spec.Proxy.TargetURL = sseServer.URL
+			spec.Proxy.ListenPath = "/"
+			spec.EnableDetailedRecording = true
+			spec.UseKeylessAccess = true
+		})
+
+		require.NoError(t, TestHelperSSEStreamClient(t, ts, false))
+		assert.Equal(t, int32(1), activityCounter.Load())
 	})
 }
 
