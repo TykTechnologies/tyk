@@ -10,6 +10,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"strconv"
+	"sync"
 	"time"
 
 	"github.com/gocraft/health"
@@ -49,7 +50,6 @@ type TykMiddleware interface {
 
 	Init()
 	SetName(string)
-	SetRequestLogger(*http.Request)
 	Logger() *logrus.Entry
 	Config() (interface{}, error)
 	ProcessRequest(w http.ResponseWriter, r *http.Request, conf interface{}) (error, int) // Handles request
@@ -134,7 +134,7 @@ func (gw *Gateway) createMiddleware(actualMW TykMiddleware) func(http.Handler) h
 
 	return func(h http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			mw.SetRequestLogger(r)
+			logger := mw.Base().SetRequestLogger(r)
 
 			if gw.GetConfig().NewRelic.AppName != "" {
 				if txn, ok := w.(newrelic.Transaction); ok {
@@ -160,7 +160,7 @@ func (gw *Gateway) createMiddleware(actualMW TykMiddleware) func(http.Handler) h
 			}
 
 			startTime := time.Now()
-			mw.Logger().WithField("ts", startTime.UnixNano()).WithField("mw", mw.Name()).Debug("Started")
+			logger.WithField("ts", startTime.UnixNano()).WithField("mw", mw.Name()).Debug("Started")
 
 			if mw.Base().Spec.CORS.OptionsPassthrough && r.Method == "OPTIONS" {
 				h.ServeHTTP(w, r)
@@ -188,7 +188,7 @@ func (gw *Gateway) createMiddleware(actualMW TykMiddleware) func(http.Handler) h
 					job.TimingKv(eventName+".exec_time", finishTime.Nanoseconds(), meta)
 				}
 
-				mw.Logger().WithError(err).WithField("code", errCode).WithField("ns", finishTime.Nanoseconds()).Debug("Finished")
+				logger.WithError(err).WithField("code", errCode).WithField("ns", finishTime.Nanoseconds()).Debug("Finished")
 				return
 			}
 
@@ -199,7 +199,7 @@ func (gw *Gateway) createMiddleware(actualMW TykMiddleware) func(http.Handler) h
 				job.TimingKv(eventName+".exec_time", finishTime.Nanoseconds(), meta)
 			}
 
-			mw.Logger().WithField("code", errCode).WithField("ns", finishTime.Nanoseconds()).Debug("Finished")
+			logger.WithField("code", errCode).WithField("ns", finishTime.Nanoseconds()).Debug("Finished")
 
 			mw.Base().UpdateRequestSession(r)
 			// Special code, bypasses all other execution
@@ -240,10 +240,12 @@ func (gw *Gateway) mwList(mws ...TykMiddleware) []alice.Constructor {
 // BaseMiddleware wraps up the ApiSpec and Proxy objects to be included in a
 // middleware handler, this can probably be handled better.
 type BaseMiddleware struct {
-	Spec   *APISpec
-	Proxy  ReturningHttpHandler
-	logger *logrus.Entry
-	Gw     *Gateway `json:"-"`
+	Spec  *APISpec
+	Proxy ReturningHttpHandler
+	Gw    *Gateway `json:"-"`
+
+	loggerMu sync.RWMutex
+	logger   *logrus.Entry
 }
 
 // NewBaseMiddleware creates a new *BaseMiddleware.
@@ -251,6 +253,9 @@ type BaseMiddleware struct {
 // BaseMiddleware keeps the pointer to *Gateway and *APISpec, as well as Proxy.
 // The logger duplication is used so that basemiddleware copies can be created for different middleware.
 func NewBaseMiddleware(gw *Gateway, spec *APISpec, proxy ReturningHttpHandler, logger *logrus.Entry) *BaseMiddleware {
+	if logger == nil {
+		logger = logrus.NewEntry(log)
+	}
 	baseMid := &BaseMiddleware{
 		Spec:   spec,
 		Proxy:  proxy,
@@ -287,20 +292,24 @@ func (t *BaseMiddleware) Base() *BaseMiddleware {
 	return t
 }
 
+func (t *BaseMiddleware) SetName(name string) {
+	t.logger = t.logger.WithField("mw", name)
+}
+
+// Logger is used by middleware process functions.
 func (t *BaseMiddleware) Logger() (logger *logrus.Entry) {
-	if t.logger == nil {
-		t.logger = logrus.NewEntry(log)
-	}
+	t.loggerMu.RLock()
+	defer t.loggerMu.RUnlock()
 
 	return t.logger
 }
 
-func (t *BaseMiddleware) SetName(name string) {
-	t.logger = t.Logger().WithField("mw", name)
-}
+func (t *BaseMiddleware) SetRequestLogger(r *http.Request) *logrus.Entry {
+	t.loggerMu.Lock()
+	defer t.loggerMu.Unlock()
 
-func (t *BaseMiddleware) SetRequestLogger(r *http.Request) {
 	t.logger = t.Gw.getLogEntryForRequest(t.Logger(), r, ctxGetAuthToken(r), nil)
+	return t.logger
 }
 
 func (t *BaseMiddleware) Init() {}
