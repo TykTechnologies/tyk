@@ -2036,7 +2036,7 @@ func (m *testMessageAdapter) Payload() (string, error) {
 
 func TestHelperSSEServer(tb testing.TB) *httptest.Server {
 	tb.Helper()
-	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "text/event-stream")
 		w.Header().Set("Connection", "keep-alive")
 
