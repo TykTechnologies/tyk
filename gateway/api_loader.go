@@ -979,9 +979,7 @@ func (gw *Gateway) loadApps(specs []*APISpec) {
 	}
 
 	for _, spec := range specs {
-		spec := spec // silences loopclosure
-
-		go func() {
+		go func(spec *APISpec) {
 			defer wg.Done()
 			defer func() {
 				// recover from panic if one occurred. Set err to nil otherwise.
@@ -1022,7 +1020,7 @@ func (gw *Gateway) loadApps(specs []*APISpec) {
 
 			// Set versions free to update links below
 			spec.VersionDefinition.BaseID = ""
-		}()
+		}(spec)
 	}
 
 	wg.Wait()
