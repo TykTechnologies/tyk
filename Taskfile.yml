@@ -4,6 +4,7 @@ version: "3"
 includes:
   test: .taskfiles/test.yml
   deps: .taskfiles/deps/Taskfile.yml
+  hooks: .taskfiles/hooks.yml
   opentelemetry:
     taskfile: ci/tests/tracing/Taskfile.yml
     dir: ci/tests/tracing/
@@ -95,3 +96,9 @@ tasks:
     internal: true
     cmds:
       - go test -count 1 -run=TestXTykGateway_Lint ./apidef/oas/
+
+  setup:
+    desc: "Setup the project including dependencies and git hooks using lefthooks"
+    cmds:
+      - task: deps:default
+      - lefthook install
