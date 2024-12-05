@@ -1589,6 +1589,7 @@ func (gw *Gateway) getGlobalMDCBStorageHandler(keyPrefix string, hashKeys bool) 
 				Gw:        gw,
 			},
 			logger,
+			nil,
 		)
 	}
 	return localStorage

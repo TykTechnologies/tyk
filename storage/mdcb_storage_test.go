@@ -42,7 +42,7 @@ func setupTest(t *testing.T) *testSetup {
 	ctrlRemote := gomock.NewController(t)
 	remote := mock.NewMockHandler(ctrlRemote)
 
-	mdcbStorage := NewMdcbStorage(local, remote, log)
+	mdcbStorage := NewMdcbStorage(local, remote, log, nil)
 
 	cleanup := func() {
 		ctrlLocal.Finish()
@@ -100,7 +100,7 @@ func TestMdcbStorage_GetMultiKey(t *testing.T) {
 	logger.Out = io.Discard
 	log := logger.WithContext(context.Background())
 
-	mdcb := NewMdcbStorage(localHandler, rpcHandler, log)
+	mdcb := NewMdcbStorage(localHandler, rpcHandler, log, nil)
 
 	testsCases := []struct {
 		name     string
@@ -192,7 +192,7 @@ func TestGetFromRPCAndCache(t *testing.T) {
 		count++
 		return nil
 	}
-	m.CallbackOnPullCertificateFromRPC = &mockSaveCert
+	m.OnRPCCertPull = mockSaveCert
 
 	certKey := "cert-my-cert-id"
 	rpcHandler.EXPECT().GetKey(certKey).Return("value", nil)
@@ -269,13 +269,12 @@ func TestProcessResourceByType(t *testing.T) {
 
 			// If testing certificate caching, setup the callback
 			if strings.HasPrefix(tc.key, "cert:") {
-				f := func(key, _ string) error {
+				m.OnRPCCertPull = func(key, _ string) error {
 					if key == "cert:failCert" {
 						return errCachingFailed
 					}
 					return nil
 				}
-				m.CallbackOnPullCertificateFromRPC = &f
 			}
 
 			err := m.processResourceByType(tc.key, tc.val)
@@ -388,7 +387,7 @@ func TestCacheCertificate(t *testing.T) {
 			}
 
 			if tc.shouldUseCallback {
-				m.CallbackOnPullCertificateFromRPC = &mockCallback
+				m.OnRPCCertPull = mockCallback
 			}
 
 			// Call the method

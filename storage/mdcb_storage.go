@@ -8,24 +8,25 @@ import (
 )
 
 type MdcbStorage struct {
-	local                            Handler
-	rpc                              Handler
-	logger                           *logrus.Entry
-	CallbackOnPullCertificateFromRPC *func(key string, val string) error
+	local         Handler
+	rpc           Handler
+	logger        *logrus.Entry
+	OnRPCCertPull func(key string, val string) error
 }
 
 const (
-	resourceOauthClient = "Oauth Client"
+	resourceOauthClient = "OauthClient"
 	resourceCertificate = "Certificate"
 	resourceApiKey      = "ApiKey"
 	resourceKey         = "Key"
 )
 
-func NewMdcbStorage(local, rpc Handler, log *logrus.Entry) *MdcbStorage {
+func NewMdcbStorage(local, rpc Handler, log *logrus.Entry, OnRPCCertPull func(key string, val string) error) *MdcbStorage {
 	return &MdcbStorage{
-		local:  local,
-		rpc:    rpc,
-		logger: log,
+		local:         local,
+		rpc:           rpc,
+		logger:        log,
+		OnRPCCertPull: OnRPCCertPull,
 	}
 }
 
@@ -248,14 +249,10 @@ func (m MdcbStorage) Exists(key string) (bool, error) {
 
 // cacheCertificate saves locally resourceCertificate after pull from rpc
 func (m MdcbStorage) cacheCertificate(key, val string) error {
-	var err error
-	if m.CallbackOnPullCertificateFromRPC != nil {
-		err = (*m.CallbackOnPullCertificateFromRPC)(key, val)
-		if err != nil {
-			m.logger.WithError(err).Error("cannot save resourceCertificate locally")
-		}
+	if m.OnRPCCertPull == nil {
+		return nil
 	}
-	return err
+	return m.OnRPCCertPull(key, val)
 }
 
 // cacheOAuthClient saved oauth data in local storage after pull from rpc
