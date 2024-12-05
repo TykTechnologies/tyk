@@ -387,7 +387,7 @@ func (gw *Gateway) processSpec(spec *APISpec, apisByListen map[string]int,
 		if gw.GetConfig().SlaveOptions.UseRPC {
 			// if not in emergency so load from backup is not blocked
 			if !rpc.IsEmergencyMode() {
-				baseMid.Copy().OrgSessionExpiry(spec.OrgID)
+				baseMid.OrgSessionExpiry(spec.OrgID)
 			}
 		}
 
