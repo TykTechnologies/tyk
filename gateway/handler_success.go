@@ -216,7 +216,7 @@ func (s *SuccessHandler) RecordHit(r *http.Request, timing analytics.Latency, co
 			// TODO: pass a copy of the cached response in
 			// mw_redis_cache instead? is there a reason not
 			// to include that in the analytics?
-			if responseCopy != nil {
+			if responseCopy != nil && responseCopy.Body != nil {
 				// we need to delete the chunked transfer encoding header to avoid malformed body in our rawResponse
 				httputil.RemoveResponseTransferEncoding(responseCopy, "chunked")
 

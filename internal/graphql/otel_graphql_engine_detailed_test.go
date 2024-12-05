@@ -439,6 +439,9 @@ type spanWrapper struct {
 	attributes map[string][]attribute.KeyValue
 }
 
+func (s *spanWrapper) AddLink(link trace.Link) {
+	s.span.AddLink(link)
+}
 func (s *spanWrapper) End(options ...trace.SpanEndOption) {
 	s.span.End(options...)
 }
