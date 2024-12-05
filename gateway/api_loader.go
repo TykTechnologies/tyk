@@ -979,6 +979,8 @@ func (gw *Gateway) loadApps(specs []*APISpec) {
 	}
 
 	for _, spec := range specs {
+		spec := spec // silences loopclosure
+
 		go func() {
 			defer wg.Done()
 			defer func() {
