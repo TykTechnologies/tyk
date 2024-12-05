@@ -968,8 +968,19 @@ func (gw *Gateway) loadApps(specs []*APISpec) {
 	gs := gw.prepareStorage()
 	shouldTrace := trace.IsEnabled()
 
+	var wg sync.WaitGroup
+	wg.Add(len(specs))
+
+	var writeSpecMu sync.Mutex
+	writeSpec := func(apiID string, spec *APISpec) {
+		writeSpecMu.Lock()
+		defer writeSpecMu.Unlock()
+		tmpSpecRegister[apiID] = spec
+	}
+
 	for _, spec := range specs {
-		func() {
+		go func(spec *APISpec) {
+			defer wg.Done()
 			defer func() {
 				// recover from panic if one occurred. Set err to nil otherwise.
 				if err := recover(); err != nil {
@@ -986,9 +997,9 @@ func (gw *Gateway) loadApps(specs []*APISpec) {
 			}
 
 			if currSpec := gw.getApiSpec(spec.APIID); !shouldReloadSpec(currSpec, spec) {
-				tmpSpecRegister[spec.APIID] = currSpec
+				writeSpec(spec.APIID, currSpec)
 			} else {
-				tmpSpecRegister[spec.APIID] = spec
+				writeSpec(spec.APIID, spec)
 			}
 
 			switch spec.Protocol {
@@ -1009,8 +1020,10 @@ func (gw *Gateway) loadApps(specs []*APISpec) {
 
 			// Set versions free to update links below
 			spec.VersionDefinition.BaseID = ""
-		}()
+		}(spec)
 	}
+
+	wg.Wait()
 
 	gw.DefaultProxyMux.swap(muxer, gw)
 
