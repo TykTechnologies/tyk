@@ -1,8 +1,6 @@
 ARG BASE_IMAGE
 FROM ${BASE_IMAGE} AS base
 
-# Alias for gateway release.
-
 FROM python:3.11-bookworm
 COPY --from=base /opt/tyk-gateway/ /opt/tyk-gateway/
 RUN pip install setuptools && pip install google && pip install 'protobuf==4.24.4'
