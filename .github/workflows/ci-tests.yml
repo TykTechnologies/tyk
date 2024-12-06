@@ -134,16 +134,6 @@ jobs:
           go-version-file: go.mod
           cache-dependency-path: go.sum
 
-      - name: Restore Golang Cache
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.cache/go-build
-            ~/go/pkg/mod
-          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
-          restore-keys: |
-            ${{ runner.os }}-${{ hashFiles('**/go.sum') }}
-
       - name: Install Dependencies and basic hygiene test
         id: hygiene
         run: |
