@@ -11,6 +11,7 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/apidef/oas"
 	"github.com/TykTechnologies/tyk/internal/httputil"
 	"github.com/TykTechnologies/tyk/internal/model"
 )
@@ -42,6 +43,7 @@ func (tr *traceHttpRequest) toRequest(ignoreCanonicalMIMEHeaderKey bool) (*http.
 type traceRequest struct {
 	Request *traceHttpRequest     `json:"request"`
 	Spec    *apidef.APIDefinition `json:"spec"`
+	OAS     *oas.OAS              `json:"oas"`
 }
 
 // TraceResponse is for tracing an HTTP response
@@ -90,12 +92,16 @@ func (gw *Gateway) traceHandler(w http.ResponseWriter, r *http.Request) {
 	var traceReq traceRequest
 	if err := json.NewDecoder(r.Body).Decode(&traceReq); err != nil {
 		log.Error("Couldn't decode trace request: ", err)
-
 		doJSONWrite(w, http.StatusBadRequest, apiError("Request malformed"))
 		return
 	}
 
-	if traceReq.Spec == nil {
+	if traceReq.OAS != nil {
+		var newDef apidef.APIDefinition
+		traceReq.OAS.ExtractTo(&newDef)
+		log.Infof("OAS extracted definition: %+v", newDef)
+		traceReq.Spec = &newDef
+	} else if traceReq.Spec == nil {
 		log.Error("Spec field is missing")
 		doJSONWrite(w, http.StatusBadRequest, apiError("Spec field is missing"))
 		return
