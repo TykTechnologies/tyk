@@ -3911,6 +3911,72 @@ func TestOrgKeyHandler_LastUpdated(t *testing.T) {
 	}...)
 }
 
+func TestDeletionOfPoliciesThatFromAKeyDoesNotMakeTheAPIKeyless(t *testing.T) {
+	test.Exclusive(t)
+	const testAPIID = "testAPIID"
+
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	apiID1 := testAPIID + "1"
+	apiID2 := testAPIID + "2"
+
+	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		spec.APIID = apiID1
+		spec.UseKeylessAccess = false
+		spec.OrgID = "default"
+		spec.Proxy.ListenPath = "/api1"
+	}, func(spec *APISpec) {
+		spec.APIID = apiID2
+		spec.UseKeylessAccess = false
+		spec.OrgID = "default"
+		spec.Proxy.ListenPath = "/api2"
+	})
+
+	policyForApi1 := ts.CreatePolicy(func(p *user.Policy) {
+		p.AccessRights = map[string]user.AccessDefinition{apiID1: {
+			APIID: apiID1,
+		}}
+	})
+
+	policyForApi2 := ts.CreatePolicy(func(p *user.Policy) {
+		p.AccessRights = map[string]user.AccessDefinition{apiID2: {
+			APIID: apiID2,
+		}}
+	})
+
+	_, key := ts.CreateSession(func(s *user.SessionState) {
+		s.ApplyPolicies = []string{policyForApi1, policyForApi2}
+	})
+
+	authHeaders := map[string]string{
+		"authorization": key,
+	}
+
+	res, err := ts.Run(t, []test.TestCase{
+		{Method: "GET", Path: "/api1", Headers: authHeaders, Code: 200},
+		{Method: "GET", Path: "/api2", Headers: authHeaders, Code: 200},
+	}...)
+	assert.NotNil(t, res)
+	assert.Nil(t, err)
+
+	ts.DeletePolicy(policyForApi2)
+	res, err = ts.Run(t, []test.TestCase{
+		{Method: "GET", Path: "/api1", Headers: authHeaders, Code: 200},
+		{Method: "GET", Path: "/api2", Headers: authHeaders, Code: 403},
+	}...)
+	assert.NotNil(t, res)
+	assert.Nil(t, err)
+
+	ts.DeletePolicy(policyForApi1)
+	res, err = ts.Run(t, []test.TestCase{
+		{Method: "GET", Path: "/api1", Headers: authHeaders, Code: 403},
+		{Method: "GET", Path: "/api2", Headers: authHeaders, Code: 403},
+	}...)
+	assert.NotNil(t, res)
+	assert.Nil(t, err)
+}
+
 func TestPurgeOAuthClientTokensEndpoint(t *testing.T) {
 	conf := func(globalConf *config.Config) {
 		// set tokens to be expired after 1 second

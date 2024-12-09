@@ -888,6 +888,12 @@ func (s *Test) CreatePolicy(pGen ...func(p *user.Policy)) string {
 	return pol.ID
 }
 
+func (s *Test) DeletePolicy(policyID string) {
+	s.Gw.policiesMu.Lock()
+	delete(s.Gw.policiesByID, policyID)
+	s.Gw.policiesMu.Unlock()
+}
+
 func CreateJWKToken(jGen ...func(*jwt.Token)) string {
 	// Create the token
 	token := jwt.New(jwt.GetSigningMethod("RS512"))
