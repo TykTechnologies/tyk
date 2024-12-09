@@ -81,9 +81,9 @@ func TestRequestSizeLimit(t *testing.T) {
 		}
 		reqSizeLimitMiddleware := &RequestSizeLimitMiddleware{baseMid}
 
-		body := bytes.NewBufferString(strings.Repeat("a", 3))
 		for _, method := range []string{http.MethodPost, http.MethodPut, http.MethodPatch} {
 			// Content-Length is missing in this request.
+			body := bytes.NewBufferString(strings.Repeat("a", 3))
 			r, err := http.NewRequest(method, "/sample", body)
 			require.NoError(t, err)
 
