@@ -3914,7 +3914,6 @@ func TestOrgKeyHandler_LastUpdated(t *testing.T) {
 }
 
 func TestDeletionOfPoliciesThatFromAKeyDoesNotMakeTheAPIKeyless(t *testing.T) {
-	test.Exclusive(t)
 	const testAPIID = "testAPIID"
 
 	ts := StartTest(nil)
