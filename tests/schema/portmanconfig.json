@@ -1,0 +1,668 @@
+{
+  "version": 1.0,
+  "$schema": "https://raw.githubusercontent.com/apideck-libraries/portman/main/src/utils/portman-config-schema.json",
+  "tests": {
+    "contractTests": [
+      {
+        "openApiOperation": "*::/*",
+        "excludeForOperations": [],
+        "statusSuccess": {
+          "enabled": true
+        }
+      },
+      {
+        "openApiOperation": "*::/*",
+        "excludeForOperations": [],
+        "responseTime": {
+          "enabled": false,
+          "maxMs": 300
+        }
+      },
+      {
+        "openApiOperation": "*::/*",
+        "excludeForOperations": [],
+        "contentType": {
+          "enabled": true
+        }
+      },
+      {
+        "openApiOperation": "*::/*",
+        "excludeForOperations": [],
+        "jsonBody": {
+          "enabled": true
+        }
+      },
+      {
+        "openApiOperation": "*::/*",
+        "excludeForOperations": ["listCertificates"],
+        "schemaValidation": {
+          "enabled": true
+        }
+      },
+      {
+        "openApiOperation": "*::/*",
+        "excludeForOperations": [],
+        "headersPresent": {
+          "enabled": true
+        }
+      }
+    ],
+    "contentTests": [],
+    "extendTests": [],
+    "variationTests": []
+  },
+  "assignVariables": [
+    {
+      "openApiOperationId": "createStreamsApi",
+      "collectionVariables": [
+        {
+          "responseBodyProp": "ID",
+          "name": "createStreamsApi.ID"
+        }
+      ]
+    },
+    {
+      "openApiOperationIds": ["createApiOAS"],
+      "collectionVariables": [
+        {
+          "responseBodyProp": "ID",
+          "name": "createApiOAS.id"
+        }
+      ]
+    },
+    {
+      "openApiOperationIds": ["createCertificates"],
+      "collectionVariables": [
+        {
+          "responseBodyProp": "id",
+          "name": "createCertificates.id"
+        }
+      ]
+    },
+    {
+      "openApiOperationIds": ["createNewClientApp"],
+      "collectionVariables": [
+        {
+          "responseBodyProp": "client_id",
+          "name": "createNewClientApp.client_id"
+        }
+      ]
+    },
+    {
+      "openApiOperationId": "createCustomKey",
+      "collectionVariables": [
+        {
+          "responseBodyProp": "key_id",
+          "name": "createCustomKey.key_id"
+        },
+        {
+          "requestBodyProp": "key_hash",
+          "name": "createCustomKey.key_hash"
+        }
+      ]
+    },
+    {
+      "openApiOperationId": "addKey",
+      "collectionVariables": [
+        {
+          "responseBodyProp": "key_id",
+          "name": "key.key_id"
+        },
+        {
+          "requestBodyProp": "key_hash",
+          "name": "key.key_hash"
+        }
+      ]
+    },
+    {
+      "openApiOperationIds": [
+        "postApis"
+      ],
+      "collectionVariables": [
+        {
+          "responseBodyProp": "ID",
+          "name": "postApis.id"
+        },
+        {
+          "requestBodyProp": "api_definition.name",
+          "name": "postApis.name"
+        }
+      ]
+    },
+    {
+      "openApiOperationIds": [
+        "getUser"
+      ],
+      "collectionVariables": [
+        {
+          "responseBodyProp": "access_key",
+          "name": "getUser.access_key"
+        },
+        {
+          "responseBodyProp": "email_address",
+          "name": "getUser.email"
+        },
+        {
+          "responseBodyProp": "org_id",
+          "name": "getUser.org_id"
+        }
+      ]
+    },
+    {
+      "openApiOperationIds": [
+        "addAsset"
+      ],
+      "collectionVariables": [
+        {
+          "responseBodyProp": "ID",
+          "name": "addAsset.id"
+        }
+      ]
+    },
+    {
+      "openApiOperationId": "postPolicies",
+      "collectionVariables": [
+        {
+          "responseBodyProp": "Message",
+          "name": "postPolicies.id"
+        },
+        {
+          "requestBodyProp": "name",
+          "name": "postPolicies.name"
+        }
+      ]
+    },
+    {
+      "openApiOperationIds": [
+        "addUser"
+      ],
+      "collectionVariables": [
+        {
+          "responseBodyProp": "Meta",
+          "name": "addUser.id"
+        }
+      ]
+    },
+    {
+      "openApiOperationId": "createUserGroup",
+      "collectionVariables": [
+        {
+          "responseBodyProp": "Meta",
+          "name": "createUserGroup.id"
+        }
+      ]
+    }
+  ],
+  "operationPreRequestScripts": [
+    {
+      "openApiOperationId": "createCertificates",
+      "scripts": [
+        "const body = { mode: 'formdata', formdata: [{ key: 'file', type: 'file', src: 'certs.pem' }]}; pm.request.body.update(body);"
+      ]
+    }
+
+  ],
+  "overwrites": [
+    {
+      "openApiOperationIds": ["searchApis"],
+      "overwriteRequestQueryParams": [
+        {
+          "key": "q",
+          "value": "{{postApis.name}}"
+        }
+      ]
+    },
+    {
+      "openApiOperationIds": ["deleteStreamsApi","getStreamsAPIDetails","patchApiStreams","updateStreamsApi"],
+      "overwriteRequestPathVariables": [
+        {
+          "key": "apiId",
+          "value": "{{createStreamsApi.ID}}",
+          "overwrite": true
+        }
+      ]
+    },
+    {
+      "openApiOperationIds": ["patchApiOAS","deleteOASApi","updateApiCategories","updateApiOAS","getOASAPIDetails","getApiCategories","downloadApiOASPublic","listOASApiVersions"],
+      "overwriteRequestPathVariables": [
+        {
+          "key": "apiId",
+          "overwrite": true,
+          "value": "{{createApiOAS.id}}"
+        }
+      ]
+    },
+    {
+      "openApiOperationIds": ["deleteCertificates","getCertificate"," deleteCertificateDependencies","getCertificateDependencies"],
+      "overwriteRequestPathVariables": [
+        {
+          "key": "certId",
+          "overwrite": true,
+          "value": "{{createCertificates.id}}"
+        }
+      ]
+    },
+    {
+      "openApiOperationIds": ["getOAuthClientDetail","getClientTokens", "deleteOathClient"],
+      "overwriteRequestPathVariables": [
+        {
+          "key": "clientId",
+          "overwrite": true,
+          "value": "{{createNewClientApp.client_id}}"
+        }
+      ]
+    },
+    {
+      "openApiOperationIds": ["createNewClientApp","getOathClientsList","getOAuthClientDetail","getClientTokens", "deleteOathClient"],
+      "overwriteRequestPathVariables": [
+        {
+          "key": "apiId",
+          "overwrite": true,
+          "value": "a12b34c56d78e90f1234567890abcdef"
+        }
+      ]
+    },
+    {
+      "openApiOperationIds": ["deleteApiKeyDetail"],
+      "overwriteRequestPathVariables": [
+        {
+          "key": "keyID",
+          "overwrite": true,
+          "value": "{{createCustomKey.key_id}}"
+        }
+      ]
+    },
+    {
+      "openApiOperationIds": ["getKeyDetail","updateKeyDetail","deleteKey"],
+      "overwriteRequestPathVariables": [
+        {
+          "key": "keyId",
+          "overwrite": true,
+          "value": "{{key.key_id}}"
+        }
+      ]
+    },
+    {
+      "openApiOperationIds": ["getApiKeyDetail","updateApiKeyDetail"],
+      "overwriteRequestPathVariables": [
+        {
+          "key": "keyID",
+          "overwrite": true,
+          "value": "{{key.key_id}}"
+        }
+      ]
+    },
+    {
+      "openApiOperationIds": [
+        "updateApiAccessRights",
+        "getApiAccessRights"
+      ],
+      "overwriteRequestPathVariables": [
+        {
+          "key": "apiID",
+          "overwrite": true,
+          "value": "{{postApis.id}}"
+        }
+      ]
+    },
+    {
+      "openApiOperationId": "getSchema",
+      "overwriteRequestQueryParams": [
+        {
+          "key": "oasVersion",
+          "value": "3.0.3",
+          "overwrite": true,
+          "disable": false
+        }
+      ]
+    },
+    {
+      "openApiOperationIds": [
+        "putApi",
+        "getApi",
+        "getApiUrl",
+        "deleteApi"
+      ],
+      "overwriteRequestPathVariables": [
+        {
+          "key": "apiId",
+          "overwrite": true,
+          "value": "{{postApis.id}}"
+        }
+      ]
+    },
+    {
+      "openApiOperationIds": [
+        "createNewClientApp"
+      ],
+      "overwriteRequestBody": [
+        {
+          "key": "policy_id",
+          "remove": true
+        }
+      ]
+    },
+    {
+      "openApiOperationId": "dryRunApiOAS",
+      "overwriteRequestBody": [
+        {
+          "key": "tyk_oas",
+          "remove": true
+        }
+      ]
+    },
+    {
+      "openApiOperationIds": ["patchApiOAS","importOAS"],
+      "overwriteRequestBody": [
+        {
+          "key": "url",
+          "overwrite": true,
+          "value": "https://raw.githubusercontent.com/TykTechnologies/gists/refs/heads/main/sample_oas.json"
+        }
+      ]
+    },
+    {
+      "openApiOperationIds": [
+        "putApi"
+      ],
+      "overwriteRequestBody": [
+        {
+          "key": "api_definition.api_id",
+          "overwrite": true,
+          "value": "{{postApis.id}}"
+        }
+      ]
+    },
+    {
+      "openApiOperationIds": [
+        "postApis"
+      ],
+      "overwriteRequestBody": [
+        {
+          "key": "api_definition.api_id",
+          "value": "{{$timestamp}}",
+          "overwrite": true
+        }
+      ]
+    },
+    {
+      "openApiOperationIds": [
+        "postApis",
+        "putApi"
+      ],
+      "overwriteRequestBody": [
+        {
+          "key": "categories",
+          "value": [
+            "itachi",
+            "sasuke"
+          ],
+          "overwrite": true
+        }
+      ]
+    },
+    {
+      "openApiOperationIds": [
+        "updateAsset"
+      ],
+      "overwriteRequestBody": [
+        {
+          "key": "id",
+          "value": "{{addAsset.id}}",
+          "overwrite": true
+        }
+      ]
+    },
+    {
+      "openApiOperationIds": [
+        "updateAsset",
+        "deleteAsset",
+        "getAsset"
+      ],
+      "overwriteRequestPathVariables": [
+        {
+          "key": "assetID",
+          "value": "{{addAsset.id}}",
+          "overwrite": true
+        }
+      ]
+    },
+    {
+      "openApiOperationIds": [
+        "createWebhook",
+        "updateWebhook"
+      ],
+      "overwriteRequestBody": [
+        {
+          "key": "webhook_id",
+          "value": "{{reGuid}}",
+          "insert": true,
+          "overwrite": true
+        }
+      ]
+    },
+    {
+      "openApiOperationIds": [
+        "addUser"
+      ],
+      "overwriteRequestBody": [
+        {
+          "key": "email_address",
+          "value": "{{$randomEmail}}",
+          "overwrite": true
+        }
+      ]
+    },
+    {
+      "openApiOperationIds": [
+        "currentUserDetail"
+      ],
+      "overwriteRequestHeaders": [
+        {
+          "key": "Cookie",
+          "value": "authorisation={{getUser.access_key}}"
+        }
+      ]
+    },
+    {
+      "openApiOperationIds": [
+        "setUserPassword",
+        "getUser",
+        "deleteUser",
+        "updateUser",
+        "revokeUser",
+        "resetUserKey"
+      ],
+      "overwriteRequestPathVariables": [
+        {
+          "key": "userId",
+          "value": "{{addUser.id}}",
+          "overwrite": true
+        }
+      ]
+    },
+    {
+      "openApiOperationIds": [
+        "updateWebhook",
+        "getWebhookDetail",
+        "deleteWebhook"
+      ],
+      "overwriteRequestPathVariables": [
+        {
+          "key": "hookId",
+          "value": "{{reGuid}}",
+          "overwrite": true
+        }
+      ]
+    },
+    {
+      "openApiOperationIds": [
+        "searchPolicies"
+      ],
+      "overwriteRequestQueryParams": [
+        {
+          "key": "policy_ids",
+          "value": "{{postPolicies.id}}",
+          "overwrite": true
+        }
+      ]
+    },
+    {
+      "openApiOperationIds": [
+        "searchUser"
+      ],
+      "overwriteRequestBody": [
+        {
+          "key": "filters.query",
+          "value": "{{getUser.email}}",
+          "overwrite": true
+        }
+      ]
+    },
+    {
+      "openApiOperationIds": [
+        "searchUserGet"
+      ],
+      "overwriteRequestQueryParams": [
+        {
+          "key": "q",
+          "value": "{{getUser.email}}",
+          "overwrite": true
+        }
+      ]
+    },
+    {
+      "openApiOperationIds": [
+        "addAsset"
+      ],
+      "overwriteRequestBody": [
+        {
+          "key": "id",
+          "value": "{{$timestamp}}",
+          "overwrite": true
+        }
+      ]
+    },
+    {
+      "openApiOperationIds": [
+        "updateUser"
+      ],
+      "overwriteRequestBody": [
+        {
+          "key": "email_address",
+          "value": "{{getUser.email}}",
+          "overwrite": true
+        }
+      ]
+    },
+    {
+      "openApiOperationIds": [
+        "putPolicies"
+      ],
+      "overwriteRequestBody": [
+        {
+          "key": "_id",
+          "value": "{{postPolicies.id}}",
+          "overwrite": true
+        }
+      ]
+    },
+    {
+      "openApiOperationIds": [
+        "putPolicies",
+        "postPolicies"
+      ],
+      "overwriteRequestBody": [
+        {
+          "key": "name",
+          "value": "{{$randomFullName}}",
+          "overwrite": true
+        }
+      ]
+    },
+    {
+      "openApiOperationIds": [
+        "getPolicy",
+        "deletePolicy",
+        "putPolicies"
+      ],
+      "overwriteRequestPathVariables": [
+        {
+          "key": "id",
+          "value": "{{postPolicies.id}}",
+          "overwrite": true
+        }
+      ]
+    },
+    {
+      "openApiOperationIds": [
+        "deleteUserGroup",
+        "getUserGroup",
+        "updateUserGroup"
+      ],
+      "overwriteRequestPathVariables": [
+        {
+          "key": "groupId",
+          "value": "{{createUserGroup.id}}",
+          "overwrite": true
+        }
+      ]
+    },
+    {
+      "openApiOperationIds": [
+        "generateAuthToken"
+      ],
+      "overwriteRequestBody": [
+        {
+          "key": "OrgID",
+          "value": "{{getUser.org_id}}",
+          "overwrite": true
+        },
+        {
+          "key": "EmailAddress",
+          "overwrite": true,
+          "value": "{{$randomEmail}}"
+        }
+      ]
+    },
+    {
+      "openApiOperationIds": [
+        "addKey","createCustomKey","createBasicAuthUser","updateApiKeyDetail","updateKeyDetail"
+      ],
+      "overwriteRequestBody": [
+        {
+          "key": "apply_policies",
+          "value": ["66d9121d5715ec0715608640"],
+          "overwrite": true
+        }
+      ]
+    }
+  ],
+  "globals": {
+    "collectionVariables": {
+      "reGuid": "2176445a129546e9beec656e1b63595c"
+    },
+    "collectionPreRequestScripts": [],
+    "keyValueReplacements": {},
+    "valueReplacements": {},
+    "rawReplacements": [],
+    "orderOfOperations": [
+      "PUT::/api/org/opa",
+      "GET::/api/org/opa",
+      "POST::/api/apis",
+      "PUT::/api/apis/{apiId}",
+      "PUT::/api/apis/{apiID}/access",
+      "GET::/api/apis/{apiID}/access",
+      "POST::/api/portal/policies/*",
+      "PUT::/api/portal/policies/*",
+      "GET::/api/portal/policies/*",
+      "POST::/api/portal/policies/*",
+      "POST::/*",
+      "GET::/*",
+      "PUT::/*",
+      "PATCH::/*",
+      "DELETE::/api/portal/policies/{id}",
+      "DELETE::/*"
+    ]
+  }
+}
