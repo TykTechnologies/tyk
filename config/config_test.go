@@ -67,7 +67,7 @@ func TestDefaultValueAndWriteDefaultConf(t *testing.T) {
 				t.Fatalf("Expected %v to be set to its default %v, but got %v", tc.FieldName, tc.defaultValue, tc.FieldGetter(conf))
 			}
 			expectedValue := fmt.Sprint(tc.expectedValue)
-			os.Setenv(tc.EnvVarName, expectedValue)
+			t.Setenv(tc.EnvVarName, expectedValue)
 			defer func() {
 				os.Unsetenv(tc.EnvVarName)
 			}()
@@ -254,7 +254,7 @@ func TestLoad_tracing(t *testing.T) {
 		for _, v := range sample {
 			t.Run(v.file, func(t *testing.T) {
 				for _, e := range v.env {
-					os.Setenv(e.name, e.value)
+					t.Setenv(e.name, e.value)
 				}
 				defer func() {
 					for _, e := range v.env {
@@ -291,7 +291,7 @@ func TestLoad_tracing(t *testing.T) {
 
 func TestCustomCertsDataDecoder(t *testing.T) {
 	var c Config
-	os.Setenv("TYK_GW_HTTPSERVEROPTIONS_CERTIFICATES", "[{\"domain_name\":\"testCerts\"}]")
+	t.Setenv("TYK_GW_HTTPSERVEROPTIONS_CERTIFICATES", "[{\"domain_name\":\"testCerts\"}]")
 	err := envconfig.Process("TYK_GW", &c)
 	if err != nil {
 		t.Fatal(err)
@@ -299,15 +299,32 @@ func TestCustomCertsDataDecoder(t *testing.T) {
 
 	assert.Len(t, c.HttpServerOptions.Certificates, 1, "TYK_GW_HTTPSERVEROPTIONS_CERTIFICATES should have len 1")
 	assert.Equal(t, "testCerts", c.HttpServerOptions.Certificates[0].Name, "TYK_GW_HTTPSERVEROPTIONS_CERTIFICATES domain_name should be equals to testCerts")
+}
 
+// TestSecretsDecoder tests env variable decoding for TYK_GW_SECRETS.
+// It confirms that key pairs should be provided as a comma separated
+// list of keys and values, additionally separated by `:` (colon).
+func TestSecretsDecoder(t *testing.T) {
+	var c Config
+	t.Setenv("TYK_GW_SECRETS", "key:value,key2:/value2")
+	err := envconfig.Process("TYK_GW", &c)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	want := map[string]string{
+		"key":  "value",
+		"key2": "/value2",
+	}
+
+	assert.Equal(t, want, c.Secrets)
 }
 
 func TestPortsWhiteListDecoder(t *testing.T) {
 	var c Config
 
 	//testing invalid value
-	err := os.Setenv("TYK_GW_PORTWHITELIST", "invalid-value")
-	assert.NoError(t, err)
+	t.Setenv("TYK_GW_PORTWHITELIST", "invalid-value")
 
 	httpWhiteList, ok := c.PortWhiteList["http"]
 	assert.False(t, ok)
@@ -318,8 +335,7 @@ func TestPortsWhiteListDecoder(t *testing.T) {
 	assert.Empty(t, tlsWhiteList)
 
 	//testing empty value
-	err = os.Setenv("TYK_GW_PORTWHITELIST", "")
-	assert.NoError(t, err)
+	t.Setenv("TYK_GW_PORTWHITELIST", "")
 
 	httpWhiteList, ok = c.PortWhiteList["http"]
 	assert.False(t, ok)
@@ -330,10 +346,9 @@ func TestPortsWhiteListDecoder(t *testing.T) {
 	assert.Empty(t, tlsWhiteList)
 
 	//testing real value
-	err = os.Setenv("TYK_GW_PORTWHITELIST", "{\"http\":{\"ranges\":[{\"from\":8000,\"to\":9000}]},\"tls\":{\"ports\":[6000,6015]}}")
-	assert.NoError(t, err)
+	t.Setenv("TYK_GW_PORTWHITELIST", "{\"http\":{\"ranges\":[{\"from\":8000,\"to\":9000}]},\"tls\":{\"ports\":[6000,6015]}}")
 
-	err = envconfig.Process("TYK_GW", &c)
+	err := envconfig.Process("TYK_GW", &c)
 	assert.NoError(t, err)
 
 	httpWhiteList, ok = c.PortWhiteList["http"]

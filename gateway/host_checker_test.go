@@ -68,7 +68,6 @@ func (w *testEventHandler) HandleEvent(em config.EventMessage) {
 	w.cb(em)
 }
 
-// // ToDo check why it blocks
 func TestHostChecker(t *testing.T) {
 	ts := StartTest(func(globalConf *config.Config) {
 		globalConf.UptimeTests.PollerGroup = uuid.New()
