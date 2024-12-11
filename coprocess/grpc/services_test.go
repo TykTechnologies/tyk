@@ -2,10 +2,8 @@ package grpc
 
 import (
 	"net"
-	"strings"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
 
@@ -23,17 +21,16 @@ func newTestGRPCServer() (s *grpc.Server) {
 	return s
 }
 
-func startTestServices(t testing.TB) (*gateway.Test, func()) {
-	// attempt auto closing grpc server listen addr
-	listener, err := net.Listen("tcp", ":0")
-	require.NoError(t, err)
+func startTestServices(tb testing.TB) (*gateway.Test, func()) {
+	tb.Helper()
 
-	assert.NoError(t, err)
+	listener, err := net.Listen("tcp", ":0")
+	require.NoError(tb, err)
 
 	grpcServer := newTestGRPCServer()
 	go func() {
 		err := grpcServer.Serve(listener)
-		require.NoError(t, err)
+		require.NoError(tb, err)
 	}()
 
 	conf := config.CoProcessConfig{
@@ -52,7 +49,7 @@ func startTestServices(t testing.TB) (*gateway.Test, func()) {
 
 	shutdown := stopTestServices(ts, grpcServer, listener)
 
-	t.Logf("Started with conf.CoProcessGRPCServer %q", conf.CoProcessGRPCServer)
+	tb.Logf("Started with conf.CoProcessGRPCServer %q", conf.CoProcessGRPCServer)
 
 	return ts, shutdown
 }
@@ -60,9 +57,6 @@ func startTestServices(t testing.TB) (*gateway.Test, func()) {
 func grpcServerAddress(l net.Listener) string {
 	addr := l.Addr()
 	target := addr.String()
-	// we need a routable address
-	target = strings.ReplaceAll(target, "[::]", "localhost")
-
 	return addr.Network() + "://" + target
 }
 

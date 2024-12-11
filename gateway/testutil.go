@@ -1274,7 +1274,10 @@ func (s *Test) Do(tc test.TestCase) (*http.Response, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(timeout)*time.Second)
 	defer cancel()
 
-	req, _ := s.testRunner.RequestBuilder(ctx, &tc)
+	req, err := s.testRunner.RequestBuilder(ctx, &tc)
+	if err != nil {
+		return nil, err
+	}
 	return s.testRunner.Do(req, &tc)
 }
 

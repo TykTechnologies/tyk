@@ -17,7 +17,7 @@ func (d *dispatcher) grpcError(object *coprocess.Object, errorMsg string) (*copr
 	return object, nil
 }
 
-func (d *dispatcher) Dispatch(ctx context.Context, object *coprocess.Object) (*coprocess.Object, error) {
+func (d *dispatcher) Dispatch(_ context.Context, object *coprocess.Object) (*coprocess.Object, error) {
 	switch object.HookName {
 	case "testPreHook1":
 		object.Request.SetHeaders = map[string]string{
@@ -122,6 +122,6 @@ func (d *dispatcher) Dispatch(ctx context.Context, object *coprocess.Object) (*c
 	return object, nil
 }
 
-func (d *dispatcher) DispatchEvent(ctx context.Context, event *coprocess.Event) (*coprocess.EventReply, error) {
+func (d *dispatcher) DispatchEvent(_ context.Context, _ *coprocess.Event) (*coprocess.EventReply, error) {
 	return &coprocess.EventReply{}, nil
 }
