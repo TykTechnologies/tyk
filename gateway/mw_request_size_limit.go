@@ -68,6 +68,8 @@ func (t *RequestSizeLimitMiddleware) checkRequestLimit(r *http.Request, sizeLimi
 		return errors.New("Request is too large"), http.StatusBadRequest
 	}
 
+	nopCloseRequestBody(r)
+
 	return nil, http.StatusOK
 }
 

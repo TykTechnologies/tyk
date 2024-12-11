@@ -63,38 +63,6 @@ func (h *handleWrapper) handleRequestLimits(w http.ResponseWriter, r *http.Reque
 }
 
 func (h *handleWrapper) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	if r.Body != nil {
-		if !h.handleRequestLimits(w, r) {
-			return
-		}
-	}
-
-	if h.maxRequestBodySize > 0 {
-		// this greedily reads in the request body and
-		// make request body to be nopCloser and re-readable
-		// before serve it through chain of middlewares
-		if err := nopCloseRequestBodyErr(r); err != nil {
-			if err.Error() == "http: request body too large" {
-				httputil.EntityTooLarge(w, r)
-				return
-			}
-
-			httputil.InternalServerError(w, r)
-			return
-		}
-	} else {
-		// this leaves the body on lazy read as before
-		if _, err := copyRequest(r); err != nil {
-			log.WithError(err).Error("Error reading request body")
-			httputil.InternalServerError(w, r)
-		}
-	}
-
-	// Test don't provide a router
-	if h.router == nil {
-		return
-	}
-
 	if NewRelicApplication != nil {
 		txn := NewRelicApplication.StartTransaction(r.URL.Path, w, r)
 		defer txn.End()
