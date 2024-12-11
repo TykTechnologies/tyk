@@ -50,7 +50,7 @@ func CreateCoProcessMiddleware(hookName string, hookType coprocess.HookType, mwD
 		HookType:         hookType,
 		HookName:         hookName,
 		MiddlewareDriver: mwDriver,
-		successHandler:   &SuccessHandler{baseMid},
+		successHandler:   &SuccessHandler{baseMid.Copy()},
 	}
 
 	return baseMid.Gw.createMiddleware(dMiddleware)
@@ -308,7 +308,7 @@ func (m *CoProcessMiddleware) EnabledForSpec() bool {
 	log.WithFields(logrus.Fields{
 		"prefix": "coprocess",
 	}).Debug("Enabling CP middleware.")
-	m.successHandler = &SuccessHandler{m.BaseMiddleware}
+	m.successHandler = &SuccessHandler{m.BaseMiddleware.Copy()}
 	return true
 }
 
@@ -547,7 +547,7 @@ func (h *CustomMiddlewareResponseHook) Name() string {
 }
 
 func (h *CustomMiddlewareResponseHook) HandleError(rw http.ResponseWriter, req *http.Request) {
-	handler := ErrorHandler{h.mw.BaseMiddleware}
+	handler := ErrorHandler{h.mw.BaseMiddleware.Copy()}
 	handler.HandleError(rw, req, "Middleware error", http.StatusInternalServerError, true)
 }
 

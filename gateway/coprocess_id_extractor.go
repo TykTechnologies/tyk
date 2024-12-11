@@ -273,7 +273,7 @@ func newExtractor(referenceSpec *APISpec, mw *BaseMiddleware) {
 	baseExtractor := BaseExtractor{
 		Config:            &referenceSpec.CustomMiddleware.IdExtractor,
 		IDExtractorConfig: idExtractorConfig,
-		BaseMiddleware:    mw,
+		BaseMiddleware:    mw, // Already a Copy from api_loader.go
 		Spec:              referenceSpec,
 	}
 

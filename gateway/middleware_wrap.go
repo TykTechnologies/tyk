@@ -20,7 +20,7 @@ var _ TykMiddleware = &wrapMiddleware{}
 // and use it as a TykMiddleware.
 func WrapMiddleware(base *BaseMiddleware, in model.Middleware) TykMiddleware {
 	return &wrapMiddleware{
-		BaseMiddleware: base,
+		BaseMiddleware: base.Copy(),
 		mw:             in,
 	}
 }
