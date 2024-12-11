@@ -2,6 +2,7 @@ package test
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -11,6 +12,7 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"regexp"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -153,10 +155,17 @@ func NewRequest(tc *TestCase) (req *http.Request, err error) {
 		uri = strings.Replace(uri, "[::]", tc.Domain, 1)
 		uri = strings.Replace(uri, "127.0.0.1", tc.Domain, 1)
 
-		req, err = http.NewRequest(tc.Method, uri, ReqBodyReader(tc.Data))
+		// no cleanup
+		ctx := context.Background()
+		ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+
+		req, err = http.NewRequestWithContext(ctx, tc.Method, uri, ReqBodyReader(tc.Data))
 		if err != nil {
 			return
 		}
+		runtime.SetFinalizer(req, func(_ *http.Request) {
+			cancel()
+		})
 	} else {
 		req = httptest.NewRequest(tc.Method, uri, ReqBodyReader(tc.Data))
 	}
