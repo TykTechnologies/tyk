@@ -13,12 +13,10 @@ import (
 	"strconv"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/TykTechnologies/tyk/header"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/gateway"
@@ -339,43 +337,31 @@ func TestGRPCDispatch(t *testing.T) {
 	headers := map[string]string{"authorization": keyID}
 
 	t.Run("Pre Hook with SetHeaders", func(t *testing.T) {
-		// Create a context with a 5-second timeout
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		t.Cleanup(cancel)
-
-		// Create a new HTTP GET request with the context
-		req, err := http.NewRequestWithContext(ctx, http.MethodGet, ts.URL+"/grpc-test-api/", nil)
-		assert.NoError(t, err, "Failed to create request")
-
-		// Set the headers for the request
-		for key, value := range headers {
-			req.Header.Set(key, value)
+		res, err := ts.Run(t, test.TestCase{
+			Path:    "/grpc-test-api/",
+			Method:  http.MethodGet,
+			Code:    http.StatusOK,
+			Headers: headers,
+		})
+		if err != nil {
+			t.Fatalf("Request failed: %s", err.Error())
 		}
-
-		// Initialize the HTTP client
-		client := &http.Client{}
-
-		// Perform the HTTP request
-		res, err := client.Do(req)
-		require.NoError(t, err, "Request failed")
-		defer res.Body.Close()
-
-		// Check if the status code matches the expected status code
-		assert.Equal(t, http.StatusOK, res.StatusCode, "Unexpected status code")
-
-		// Read the response body
 		data, err := ioutil.ReadAll(res.Body)
-		assert.NoError(t, err, "Couldn't read response body")
-
-		// Unmarshal the JSON response
+		if err != nil {
+			t.Fatalf("Couldn't read response body: %s", err.Error())
+		}
 		var testResponse gateway.TestHttpResponse
 		err = json.Unmarshal(data, &testResponse)
-		assert.NoError(t, err, "Couldn't unmarshal test response JSON")
-
-		// Verify the specific header in the response
+		if err != nil {
+			t.Fatalf("Couldn't unmarshal test response JSON: %s", err.Error())
+		}
 		value, ok := testResponse.Headers[testHeaderName]
-		assert.True(t, ok, "Header not found, expecting %s", testHeaderName)
-		assert.Equal(t, testHeaderValue, value, "Header value isn't %s", testHeaderValue)
+		if !ok {
+			t.Fatalf("Header not found, expecting %s", testHeaderName)
+		}
+		if value != testHeaderValue {
+			t.Fatalf("Header value isn't %s", testHeaderValue)
+		}
 	})
 
 	t.Run("Pre Hook with UTF-8/non-UTF-8 request data", func(t *testing.T) {
