@@ -8,7 +8,6 @@ import (
 	"io/ioutil"
 	"math/rand"
 	"mime/multipart"
-	"net"
 	"net/http"
 	"os"
 	"strconv"
@@ -19,152 +18,21 @@ import (
 	"github.com/TykTechnologies/tyk/header"
 
 	"github.com/stretchr/testify/assert"
-
-	"google.golang.org/grpc"
+	"github.com/stretchr/testify/require"
 
 	"github.com/TykTechnologies/tyk/apidef"
-	"github.com/TykTechnologies/tyk/config"
-	"github.com/TykTechnologies/tyk/coprocess"
 	"github.com/TykTechnologies/tyk/gateway"
 	"github.com/TykTechnologies/tyk/test"
 	"github.com/TykTechnologies/tyk/user"
 )
 
 const (
-	grpcListenAddr  = ":9999"
-	grpcListenPath  = "tcp://127.0.0.1:9999"
-	grpcTestMaxSize = 100000000
+	grpcTestMaxSize = 10000000
 	grpcAuthority   = "localhost"
 
 	testHeaderName  = "Testheader"
 	testHeaderValue = "testvalue"
 )
-
-type dispatcher struct{}
-
-func (d *dispatcher) grpcError(object *coprocess.Object, errorMsg string) (*coprocess.Object, error) {
-	object.Request.ReturnOverrides.ResponseError = errorMsg
-	object.Request.ReturnOverrides.ResponseCode = 400
-	return object, nil
-}
-
-func (d *dispatcher) Dispatch(ctx context.Context, object *coprocess.Object) (*coprocess.Object, error) {
-	switch object.HookName {
-	case "testPreHook1":
-		object.Request.SetHeaders = map[string]string{
-			testHeaderName: testHeaderValue,
-		}
-	case "testPreHook2":
-		contentType, found := object.Request.Headers["Content-Type"]
-		if !found {
-			return d.grpcError(object, "Content Type field not found")
-		}
-		if strings.Contains(contentType, "json") {
-			if len(object.Request.Body) == 0 {
-				return d.grpcError(object, "Body field is empty")
-			}
-			if len(object.Request.RawBody) == 0 {
-				return d.grpcError(object, "Raw body field is empty")
-			}
-			if strings.Compare(object.Request.Body, string(object.Request.Body)) != 0 {
-				return d.grpcError(object, "Raw body and body fields don't match")
-			}
-		} else if strings.Contains(contentType, "multipart") {
-			if len(object.Request.Body) != 0 {
-				return d.grpcError(object, "Body field isn't empty")
-			}
-			if len(object.Request.RawBody) == 0 {
-				return d.grpcError(object, "Raw body field is empty")
-			}
-		} else {
-			return d.grpcError(object, "Request content type should be either JSON or multipart")
-		}
-	case "testPostHook1":
-		testKeyValue, ok := object.Session.Metadata["testkey"]
-		if !ok {
-			return d.grpcError(object, "'testkey' not found in session metadata")
-		}
-		jsonObject := make(map[string]string)
-		if err := json.Unmarshal([]byte(testKeyValue), &jsonObject); err != nil {
-			return d.grpcError(object, "couldn't decode 'testkey' nested value")
-		}
-		nestedKeyValue, ok := jsonObject["nestedkey"]
-		if !ok {
-			return d.grpcError(object, "'nestedkey' not found in JSON object")
-		}
-		if nestedKeyValue != "nestedvalue" {
-			return d.grpcError(object, "'nestedvalue' value doesn't match")
-		}
-		testKey2Value, ok := object.Session.Metadata["testkey2"]
-		if !ok {
-			return d.grpcError(object, "'testkey' not found in session metadata")
-		}
-		if testKey2Value != "testvalue" {
-			return d.grpcError(object, "'testkey2' value doesn't match")
-		}
-
-		// Check for compatibility (object.Metadata should contain the same keys as object.Session.Metadata)
-		for k, v := range object.Metadata {
-			sessionKeyValue, ok := object.Session.Metadata[k]
-			if !ok {
-				return d.grpcError(object, k+" not found in object.Session.Metadata")
-			}
-			if strings.Compare(sessionKeyValue, v) != 0 {
-				return d.grpcError(object, k+" doesn't match value in object.Session.Metadata")
-			}
-		}
-	case "testResponseHook":
-		object.Response.RawBody = []byte("newbody")
-	case "testConfigDataResponseHook":
-		if _, ok := object.Spec["config_data"]; ok {
-			object.Response.Headers["x-config-data"] = "true"
-			object.Response.MultivalueHeaders = append(object.Response.MultivalueHeaders, &coprocess.Header{
-				Key:    "x-config-data",
-				Values: []string{"true"},
-			})
-		} else {
-			object.Response.Headers["x-config-data"] = "false"
-			object.Response.MultivalueHeaders = append(object.Response.MultivalueHeaders, &coprocess.Header{
-				Key:    "x-config-data",
-				Values: []string{"false"},
-			})
-		}
-	case "testAuthHook1":
-		req := object.Request
-		token := req.Headers["Authorization"]
-		if object.Metadata == nil {
-			object.Metadata = map[string]string{}
-		}
-		object.Metadata["token"] = token
-		if token != "abc" {
-			return d.grpcError(object, "invalid token")
-		}
-
-		session := coprocess.SessionState{
-			Rate:                100,
-			IdExtractorDeadline: time.Now().Add(2 * time.Second).Unix(),
-			Metadata: map[string]string{
-				"sessionMetaKey": "customAuthSessionMetaValue",
-			},
-		}
-
-		object.Session = &session
-	}
-	return object, nil
-}
-
-func (d *dispatcher) DispatchEvent(ctx context.Context, event *coprocess.Event) (*coprocess.EventReply, error) {
-	return &coprocess.EventReply{}, nil
-}
-
-func newTestGRPCServer() (s *grpc.Server) {
-	s = grpc.NewServer(
-		grpc.MaxRecvMsgSize(grpcTestMaxSize),
-		grpc.MaxSendMsgSize(grpcTestMaxSize),
-	)
-	coprocess.RegisterDispatcherServer(s, &dispatcher{})
-	return s
-}
 
 func loadTestGRPCAPIs(s *gateway.Test) {
 	s.Gw.BuildAndLoadAPI(func(spec *gateway.APISpec) {
@@ -454,38 +322,13 @@ func loadTestGRPCAPIs(s *gateway.Test) {
 	)
 }
 
-func startTykWithGRPC() (*gateway.Test, *grpc.Server) {
-	// Setup the gRPC server:
-	listener, _ := net.Listen("tcp", grpcListenAddr)
-	grpcServer := newTestGRPCServer()
-	go grpcServer.Serve(listener)
-
-	// Setup Tyk:
-	cfg := config.CoProcessConfig{
-		EnableCoProcess:     true,
-		CoProcessGRPCServer: grpcListenPath,
-		GRPCRecvMaxSize:     grpcTestMaxSize,
-		GRPCSendMaxSize:     grpcTestMaxSize,
-		GRPCAuthority:       grpcAuthority,
-	}
-	ts := gateway.StartTest(nil, gateway.TestConfig{
-		CoprocessConfig:   cfg,
-		EnableTestDNSMock: false,
-	})
-
-	// Load test APIs:
-	loadTestGRPCAPIs(ts)
-	return ts, grpcServer
-}
-
 func TestMain(m *testing.M) {
 	os.Exit(gateway.InitTestMain(context.Background(), m))
 }
 
 func TestGRPCDispatch(t *testing.T) {
-	ts, grpcServer := startTykWithGRPC()
-	defer ts.Close()
-	defer grpcServer.Stop()
+	ts, cleanupFn := startTestServices(t)
+	t.Cleanup(cleanupFn)
 
 	keyID := gateway.CreateSession(ts.Gw, func(s *user.SessionState) {
 		s.MetaData = map[string]interface{}{
@@ -496,31 +339,43 @@ func TestGRPCDispatch(t *testing.T) {
 	headers := map[string]string{"authorization": keyID}
 
 	t.Run("Pre Hook with SetHeaders", func(t *testing.T) {
-		res, err := ts.Run(t, test.TestCase{
-			Path:    "/grpc-test-api/",
-			Method:  http.MethodGet,
-			Code:    http.StatusOK,
-			Headers: headers,
-		})
-		if err != nil {
-			t.Fatalf("Request failed: %s", err.Error())
+		// Create a context with a 5-second timeout
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		t.Cleanup(cancel)
+
+		// Create a new HTTP GET request with the context
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, ts.URL+"/grpc-test-api/", nil)
+		assert.NoError(t, err, "Failed to create request")
+
+		// Set the headers for the request
+		for key, value := range headers {
+			req.Header.Set(key, value)
 		}
+
+		// Initialize the HTTP client
+		client := &http.Client{}
+
+		// Perform the HTTP request
+		res, err := client.Do(req)
+		require.NoError(t, err, "Request failed")
+		defer res.Body.Close()
+
+		// Check if the status code matches the expected status code
+		assert.Equal(t, http.StatusOK, res.StatusCode, "Unexpected status code")
+
+		// Read the response body
 		data, err := ioutil.ReadAll(res.Body)
-		if err != nil {
-			t.Fatalf("Couldn't read response body: %s", err.Error())
-		}
+		assert.NoError(t, err, "Couldn't read response body")
+
+		// Unmarshal the JSON response
 		var testResponse gateway.TestHttpResponse
 		err = json.Unmarshal(data, &testResponse)
-		if err != nil {
-			t.Fatalf("Couldn't unmarshal test response JSON: %s", err.Error())
-		}
+		assert.NoError(t, err, "Couldn't unmarshal test response JSON")
+
+		// Verify the specific header in the response
 		value, ok := testResponse.Headers[testHeaderName]
-		if !ok {
-			t.Fatalf("Header not found, expecting %s", testHeaderName)
-		}
-		if value != testHeaderValue {
-			t.Fatalf("Header value isn't %s", testHeaderValue)
-		}
+		assert.True(t, ok, "Header not found, expecting %s", testHeaderName)
+		assert.Equal(t, testHeaderValue, value, "Header value isn't %s", testHeaderValue)
 	})
 
 	t.Run("Pre Hook with UTF-8/non-UTF-8 request data", func(t *testing.T) {
@@ -604,19 +459,18 @@ func TestGRPCDispatch(t *testing.T) {
 }
 
 func BenchmarkGRPCDispatch(b *testing.B) {
-	ts, grpcServer := startTykWithGRPC()
-	defer ts.Close()
-	defer grpcServer.Stop()
+	ts, cleanupFn := startTestServices(b)
+	b.Cleanup(cleanupFn)
 
 	keyID := gateway.CreateSession(ts.Gw)
 	headers := map[string]string{"authorization": keyID}
 
 	b.Run("Pre Hook with SetHeaders", func(b *testing.B) {
-		path := "/grpc-test-api/"
+		basepath := "/grpc-test-api/"
 		b.ReportAllocs()
 		for i := 0; i < b.N; i++ {
 			ts.Run(b, test.TestCase{
-				Path:    path,
+				Path:    basepath,
 				Method:  http.MethodGet,
 				Code:    http.StatusOK,
 				Headers: headers,
@@ -632,15 +486,14 @@ func randStringBytes(n int) string {
 }
 
 func TestGRPCIgnore(t *testing.T) {
-	ts, grpcServer := startTykWithGRPC()
-	defer ts.Close()
-	defer grpcServer.Stop()
+	ts, cleanupFn := startTestServices(t)
+	t.Cleanup(cleanupFn)
 
-	path := "/grpc-test-api-ignore/"
+	basepath := "/grpc-test-api-ignore/"
 
 	// no header
 	ts.Run(t, test.TestCase{
-		Path:   path + "something",
+		Path:   basepath + "something",
 		Method: http.MethodGet,
 		Code:   http.StatusBadRequest,
 		BodyMatchFunc: func(b []byte) bool {
@@ -649,7 +502,7 @@ func TestGRPCIgnore(t *testing.T) {
 	})
 
 	ts.Run(t, test.TestCase{
-		Path:   path + "anything",
+		Path:   basepath + "anything",
 		Method: http.MethodGet,
 		Code:   http.StatusOK,
 	})
@@ -657,14 +510,14 @@ func TestGRPCIgnore(t *testing.T) {
 	// bad header
 	headers := map[string]string{"authorization": "bad"}
 	ts.Run(t, test.TestCase{
-		Path:    path + "something",
+		Path:    basepath + "something",
 		Method:  http.MethodGet,
 		Code:    http.StatusForbidden,
 		Headers: headers,
 	})
 
 	ts.Run(t, test.TestCase{
-		Path:    path + "anything",
+		Path:    basepath + "anything",
 		Method:  http.MethodGet,
 		Code:    http.StatusOK,
 		Headers: headers,
@@ -672,43 +525,40 @@ func TestGRPCIgnore(t *testing.T) {
 }
 
 func TestGRPCAuthHook(t *testing.T) {
-	ts, grpcServer := startTykWithGRPC()
-	defer ts.Close()
-	defer grpcServer.Stop()
+	ts, cleanupFn := startTestServices(t)
+	t.Cleanup(cleanupFn)
 
 	t.Run("id extractor enabled", func(t *testing.T) {
-		path := "/grpc-auth-hook-test-api-1/"
-		baseMW := &gateway.BaseMiddleware{
-			Gw: ts.Gw,
-			Spec: &gateway.APISpec{
-				APIDefinition: &apidef.APIDefinition{
-					OrgID: "default",
-				},
-			}}
+		basepath := "/grpc-auth-hook-test-api-1/"
+		spec := &gateway.APISpec{
+			APIDefinition: &apidef.APIDefinition{
+				OrgID: "default",
+			},
+		}
+		baseMW := gateway.NewBaseMiddleware(ts.Gw, spec, nil, nil)
 		baseExtractor := gateway.BaseExtractor{
 			BaseMiddleware: baseMW,
 		}
 		expectedSessionID := baseExtractor.GenerateSessionID("abc", baseMW)
 		_, _ = ts.Run(t, []test.TestCase{
-			{Method: http.MethodGet, Path: path, Headers: map[string]string{"Authorization": "abc"}, Code: http.StatusOK},
+			{Method: http.MethodGet, Path: basepath, Headers: map[string]string{"Authorization": "abc"}, Code: http.StatusOK},
 			{Method: http.MethodGet, Path: fmt.Sprintf("/tyk/keys/%s", expectedSessionID), AdminAuth: true, Code: http.StatusOK},
 		}...)
 	})
 
 	// won't extract id and a session with sessionID as token is created
 	t.Run("id extractor disabled", func(t *testing.T) {
-		path := "/grpc-auth-hook-test-api-2/"
+		basepath := "/grpc-auth-hook-test-api-2/"
 		_, _ = ts.Run(t, []test.TestCase{
-			{Method: http.MethodGet, Path: path, Headers: map[string]string{"Authorization": "abc"}, Code: http.StatusOK},
+			{Method: http.MethodGet, Path: basepath, Headers: map[string]string{"Authorization": "abc"}, Code: http.StatusOK},
 			{Method: http.MethodGet, Path: "/tyk/keys/abc", AdminAuth: true, Code: http.StatusOK},
 		}...)
 	})
 }
 
 func TestGRPC_MultiAuthentication(t *testing.T) {
-	ts, grpcServer := startTykWithGRPC()
-	defer ts.Close()
-	defer grpcServer.Stop()
+	ts, cleanupFn := startTestServices(t)
+	t.Cleanup(cleanupFn)
 
 	const (
 		apiID          = "my-api-id"
@@ -780,23 +630,22 @@ func TestGRPC_MultiAuthentication(t *testing.T) {
 }
 
 func TestGRPCConfigData(t *testing.T) {
-	ts, grpcServer := startTykWithGRPC()
-	defer ts.Close()
-	defer grpcServer.Stop()
+	ts, cleanupFn := startTestServices(t)
+	t.Cleanup(cleanupFn)
 
 	t.Run("config data disabled", func(t *testing.T) {
-		path := "/grpc-config-data-1/"
+		basepath := "/grpc-config-data-1/"
 		_, _ = ts.Run(t, []test.TestCase{
-			{Method: http.MethodGet, Path: path, Code: http.StatusOK,
+			{Method: http.MethodGet, Path: basepath, Code: http.StatusOK,
 				HeadersMatch: map[string]string{"x-config-data": "true"},
 			},
 		}...)
 	})
 
 	t.Run("config data disabled", func(t *testing.T) {
-		path := "/grpc-config-data-2/"
+		basepath := "/grpc-config-data-2/"
 		_, _ = ts.Run(t, []test.TestCase{
-			{Method: http.MethodGet, Path: path, Code: http.StatusOK,
+			{Method: http.MethodGet, Path: basepath, Code: http.StatusOK,
 				HeadersMatch: map[string]string{"x-config-data": "false"},
 			},
 		}...)
