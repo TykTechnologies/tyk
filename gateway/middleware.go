@@ -70,7 +70,9 @@ func (tr TraceMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request,
 		defer span.Finish()
 		setContext(r, ctx)
 		return tr.TykMiddleware.ProcessRequest(w, r, conf)
-	} else if baseMw := tr.Base(); baseMw != nil {
+	}
+
+	if baseMw := tr.Base(); baseMw != nil {
 		cfg := baseMw.Gw.GetConfig()
 		if cfg.OpenTelemetry.Enabled {
 			otel.AddTraceID(r.Context(), w)
@@ -287,8 +289,8 @@ func (m *BaseMiddleware) Copy() *BaseMiddleware {
 
 // Base serves to provide the full BaseMiddleware API. It's part of the TykMiddleware interface.
 // It escapes to a wider API surface than TykMiddleware, used by middlewares, etc.
-func (t BaseMiddleware) Base() *BaseMiddleware {
-	return &t
+func (t *BaseMiddleware) Base() *BaseMiddleware {
+	return t
 }
 
 func (t *BaseMiddleware) SetName(name string) {
