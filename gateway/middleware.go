@@ -288,11 +288,17 @@ func (m *BaseMiddleware) Copy() *BaseMiddleware {
 
 // Base serves to provide the full BaseMiddleware API. It's part of the TykMiddleware interface.
 // It escapes to a wider API surface than TykMiddleware, used by middlewares, etc.
-func (t *BaseMiddleware) Base() *BaseMiddleware {
-	return t
+func (t BaseMiddleware) Base() *BaseMiddleware {
+	return &t
 }
 
 func (t *BaseMiddleware) SetName(name string) {
+	t.loggerMu.Lock()
+	defer t.loggerMu.Unlock()
+
+	if t.logger == nil {
+		t.logger = logrus.NewEntry(log)
+	}
 	t.logger = t.logger.WithField("mw", name)
 }
 
