@@ -49,7 +49,6 @@ type TykMiddleware interface {
 	GetSpec() *APISpec
 
 	Init()
-	SetName(string)
 	Logger() *logrus.Entry
 	Config() (interface{}, error)
 	ProcessRequest(w http.ResponseWriter, r *http.Request, conf interface{}) (error, int) // Handles request
@@ -120,7 +119,7 @@ func (gw *Gateway) createMiddleware(actualMW TykMiddleware) func(http.Handler) h
 	}
 	// construct a new instance
 	mw.Init()
-	mw.SetName(mw.Name())
+	mw.Base().SetName(mw.Name())
 	mw.Logger().Debug("Init")
 
 	spec := mw.GetSpec()
