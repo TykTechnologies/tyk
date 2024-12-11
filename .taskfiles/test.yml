@@ -50,9 +50,9 @@ tasks:
       - rm -rf coverage && mkdir -p coverage
       - for: { var: packages, as: package }
         cmd: |-
-          gotestsum --jsonfile coverage/{{.product}}-{{.package | replace "." "gateway" | replace "/" "-"}}.json \
-          --no-color=false --hide-summary=skipped --raw-command \
-          go test -p 1 -parallel 1 -json {{.testArgs}} {{.args}} -count=1 -v \
+          gotestsum --no-color=false --hide-summary=skipped \
+          --jsonfile coverage/{{.product}}-{{.package | replace "." "gateway" | replace "/" "-"}}.json \
+          --raw-command go test -p 1 -parallel 1 -json {{.testArgs}} {{.args}} -count=1 -v \
           -coverprofile=coverage/{{.package | replace "." "gateway" | replace "/" "-"}}.cov {{.package}} | head -n -2
 
   integration-combined:
