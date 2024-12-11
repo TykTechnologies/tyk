@@ -2,7 +2,6 @@ package test
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -25,7 +24,6 @@ type TestCase struct {
 	BaseURL string `json:",omitempty"`
 	Domain  string `json:",omitempty"`
 	Proto   string `json:",omitempty"`
-	Timeout int64  `json:",omitempty"`
 
 	// Code is the expected HTTP response status code.
 	Code int `json:",omitempty"`
@@ -130,7 +128,7 @@ func ReqBodyReader(body interface{}) io.Reader {
 	}
 }
 
-func NewRequest(ctx context.Context, tc *TestCase) (req *http.Request, err error) {
+func NewRequest(tc *TestCase) (req *http.Request, err error) {
 	if tc.Method == "" {
 		tc.Method = "GET"
 	}
@@ -155,7 +153,7 @@ func NewRequest(ctx context.Context, tc *TestCase) (req *http.Request, err error
 		uri = strings.Replace(uri, "[::]", tc.Domain, 1)
 		uri = strings.Replace(uri, "127.0.0.1", tc.Domain, 1)
 
-		req, err = http.NewRequestWithContext(ctx, tc.Method, uri, ReqBodyReader(tc.Data))
+		req, err = http.NewRequest(tc.Method, uri, ReqBodyReader(tc.Data))
 		if err != nil {
 			return
 		}
@@ -243,7 +241,7 @@ func copyResponse(r *http.Response) *http.Response {
 type HTTPTestRunner struct {
 	Do             func(*http.Request, *TestCase) (*http.Response, error)
 	Assert         func(*http.Response, *TestCase) error
-	RequestBuilder func(context.Context, *TestCase) (*http.Request, error)
+	RequestBuilder func(*TestCase) (*http.Request, error)
 }
 
 const maxRetryCount = 2
@@ -287,15 +285,7 @@ func (r HTTPTestRunner) Run(t testing.TB, testCases ...TestCase) (*http.Response
 			tc.BeforeFn()
 		}
 
-		timeout := tc.Timeout
-		if timeout == 0 {
-			timeout = 5
-		}
-
-		ctx, cancel := context.WithTimeout(context.Background(), time.Duration(timeout)*time.Second)
-		defer cancel()
-
-		req, err := r.RequestBuilder(ctx, tc)
+		req, err := r.RequestBuilder(tc)
 		if err != nil {
 			t.Errorf("[%d] Request build error: %s", ti, err.Error())
 			continue
@@ -358,24 +348,16 @@ func TestHttpHandler(t testing.TB, handle http.HandlerFunc, testCases ...TestCas
 	runner.Run(t, testCases...)
 }
 
-func HttpServerRequestBuilder(baseURL string) func(context.Context, *TestCase) (*http.Request, error) {
-	return func(ctx context.Context, tc *TestCase) (*http.Request, error) {
+func HttpServerRequestBuilder(baseURL string) func(tc *TestCase) (*http.Request, error) {
+	return func(tc *TestCase) (*http.Request, error) {
 		tc.BaseURL = baseURL
-		return NewRequest(ctx, tc)
+		return NewRequest(tc)
 	}
 }
 
 func HttpServerRunner() func(*http.Request, *TestCase) (*http.Response, error) {
 	return func(r *http.Request, tc *TestCase) (*http.Response, error) {
-		timeout := tc.Timeout
-		if timeout == 0 {
-			timeout = 5
-		}
-
-		ctx, cancel := context.WithTimeout(r.Context(), time.Duration(timeout)*time.Second)
-		defer cancel()
-
-		return tc.Client.Do(r.WithContext(ctx))
+		return tc.Client.Do(r)
 	}
 }
 
