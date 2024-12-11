@@ -301,3 +301,5 @@ require (
 	gorm.io/gorm v1.21.16 // indirect
 	nhooyr.io/websocket v1.8.10 // indirect
 )
+
+replace go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.54.0 => go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.49.0
