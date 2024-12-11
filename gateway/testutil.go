@@ -1078,7 +1078,7 @@ func (s *Test) start(genConf func(globalConf *config.Config)) *Gateway {
 	s.URL = scheme + gw.DefaultProxyMux.getProxy(gw.GetConfig().ListenPort, gw.GetConfig()).listener.Addr().String()
 
 	s.testRunner = &test.HTTPTestRunner{
-		RequestBuilder: func(tc *test.TestCase) (*http.Request, error) {
+		RequestBuilder: func(ctx context.Context, tc *test.TestCase) (*http.Request, error) {
 			tc.BaseURL = s.URL
 			if tc.ControlRequest {
 				if s.config.SeparateControlAPI {
@@ -1087,7 +1087,7 @@ func (s *Test) start(genConf func(globalConf *config.Config)) *Gateway {
 					tc.Domain = s.GlobalConfig.ControlAPIHostname
 				}
 			}
-			r, err := test.NewRequest(tc)
+			r, err := test.NewRequest(ctx, tc)
 
 			if tc.AdminAuth {
 				r = s.withAuth(r)
@@ -1266,7 +1266,15 @@ func (s *Test) newGateway(genConf func(globalConf *config.Config)) *Gateway {
 }
 
 func (s *Test) Do(tc test.TestCase) (*http.Response, error) {
-	req, _ := s.testRunner.RequestBuilder(&tc)
+	timeout := tc.Timeout
+	if timeout == 0 {
+		timeout = 5
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(timeout)*time.Second)
+	defer cancel()
+
+	req, _ := s.testRunner.RequestBuilder(ctx, &tc)
 	return s.testRunner.Do(req, &tc)
 }
 
