@@ -27,7 +27,7 @@ import (
 )
 
 const (
-	grpcTestMaxSize = 10000000
+	grpcTestMaxSize = 100000000
 	grpcAuthority   = "localhost"
 
 	testHeaderName  = "Testheader"

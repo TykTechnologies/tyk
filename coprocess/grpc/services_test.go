@@ -2,6 +2,7 @@ package grpc
 
 import (
 	"net"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -58,7 +59,11 @@ func startTestServices(t testing.TB) (*gateway.Test, func()) {
 
 func grpcServerAddress(l net.Listener) string {
 	addr := l.Addr()
-	return addr.Network() + "://" + addr.String()
+	target := addr.String()
+	// we need a routable address
+	target = strings.ReplaceAll(target, "[::]", "localhost")
+
+	return addr.Network() + "://" + target
 }
 
 func stopTestServices(ts *gateway.Test, grpcServer *grpc.Server, listener net.Listener) func() {

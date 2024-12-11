@@ -21,7 +21,7 @@ tasks:
     cmds:
       - defer: { task: services:down }
       - go fmt ./...
-      - go test -p 1 -parallel 1 -count=1 -json ./... | gotestsum
+      - go test -p 1 -parallel 1 -count=1 -json ./... | gotestsum --format testname --hide-summary=all
 
 
   # lint target is run from CI
