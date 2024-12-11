@@ -104,7 +104,7 @@ func (tr TraceMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request,
 
 func (gw *Gateway) createDynamicMiddleware(name string, isPre, useSession bool, baseMid *BaseMiddleware) func(http.Handler) http.Handler {
 	dMiddleware := &DynamicMiddleware{
-		BaseMiddleware:      baseMid,
+		BaseMiddleware:      baseMid, // already a Copy from api_loader.
 		MiddlewareClassName: name,
 		Pre:                 isPre,
 		UseSession:          useSession,
@@ -244,7 +244,7 @@ type BaseMiddleware struct {
 	Proxy ReturningHttpHandler
 	Gw    *Gateway `json:"-"`
 
-	loggerMu sync.RWMutex
+	loggerMu sync.Mutex
 	logger   *logrus.Entry
 }
 
@@ -298,9 +298,12 @@ func (t *BaseMiddleware) SetName(name string) {
 
 // Logger is used by middleware process functions.
 func (t *BaseMiddleware) Logger() (logger *logrus.Entry) {
-	t.loggerMu.RLock()
-	defer t.loggerMu.RUnlock()
+	t.loggerMu.Lock()
+	defer t.loggerMu.Unlock()
 
+	if t.logger == nil {
+		t.logger = logrus.NewEntry(log)
+	}
 	return t.logger
 }
 
@@ -308,7 +311,10 @@ func (t *BaseMiddleware) SetRequestLogger(r *http.Request) *logrus.Entry {
 	t.loggerMu.Lock()
 	defer t.loggerMu.Unlock()
 
-	t.logger = t.Gw.getLogEntryForRequest(t.Logger(), r, ctxGetAuthToken(r), nil)
+	if t.logger == nil {
+		t.logger = logrus.NewEntry(log)
+	}
+	t.logger = t.Gw.getLogEntryForRequest(t.logger, r, ctxGetAuthToken(r), nil)
 	return t.logger
 }
 
