@@ -165,7 +165,7 @@ func (m *GoPluginMiddleware) loadPlugin() bool {
 	}
 
 	// to record 2XX hits in analytics
-	m.successHandler = &SuccessHandler{BaseMiddleware: m.BaseMiddleware}
+	m.successHandler = &SuccessHandler{BaseMiddleware: m.BaseMiddleware.Copy()}
 	return true
 }
 
@@ -189,7 +189,7 @@ func (m *GoPluginMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reque
 		if pluginMw, found := m.goPluginFromRequest(r); found {
 			logger = pluginMw.logger
 			handler = pluginMw.handler
-			successHandler = &SuccessHandler{BaseMiddleware: m.BaseMiddleware}
+			successHandler = &SuccessHandler{BaseMiddleware: m.BaseMiddleware.Copy()}
 		} else {
 			return nil, http.StatusOK // next middleware
 		}

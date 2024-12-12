@@ -1727,9 +1727,13 @@ func BuildAPI(apiGens ...func(spec *APISpec)) (specs []*APISpec) {
 }
 
 func (gw *Gateway) LoadAPI(specs ...*APISpec) (out []*APISpec) {
+	var err error
 	gwConf := gw.GetConfig()
 	oldPath := gwConf.AppPath
-	gwConf.AppPath, _ = ioutil.TempDir("", "apps")
+	gwConf.AppPath, err = ioutil.TempDir("", "apps")
+	if err != nil {
+		log.WithError(err).Errorf("loadapi: failed to create temp dir")
+	}
 	gw.SetConfig(gwConf, true)
 	defer func() {
 		globalConf := gw.GetConfig()
