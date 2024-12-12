@@ -2052,17 +2052,18 @@ func TestStartPubSubHandler(t *testing.T) {
 		mockQueue.On("Subscribe", mock.Anything, "test-channel").Return(mockedSubscription, nil)
 		defer mockQueue.AssertExpectations(t)
 
-		callbackCalled := false
+		callbackCalled := make(chan bool, 1)
 		callback := func(obj interface{}) {
 			msg, ok := obj.(model.Message)
 			assert.True(t, ok)
 
-			callbackCalled = true
 			msgPayload, err := msg.Payload()
 			assert.NoError(t, err)
 			payload, err := msg.Payload()
 			assert.NoError(t, err)
 			assert.Equal(t, payload, msgPayload)
+
+			callbackCalled <- true
 		}
 
 		go func() {
@@ -2070,8 +2071,15 @@ func TestStartPubSubHandler(t *testing.T) {
 			_ = storage.StartPubSubHandler(context.Background(), "test-channel", callback)
 		}()
 
-		time.Sleep(100 * time.Millisecond) // Allow some time for the goroutine to run
-		assert.True(t, callbackCalled)
+		ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+		defer cancel()
+
+		select {
+		case ok := <-callbackCalled:
+			assert.True(t, ok, "callback was called")
+		case <-ctx.Done():
+			assert.Fail(t, "callback was not called within the timeout period")
+		}
 	})
 
 	t.Run("error on receive", func(t *testing.T) {
