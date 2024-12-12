@@ -12,12 +12,8 @@ require (
 	github.com/TykTechnologies/gojsonschema v0.0.0-20170222154038-dcb3e4bb7990
 	github.com/TykTechnologies/gorpc v0.0.0-20241016124253-606484472fbb
 	github.com/TykTechnologies/goverify v0.0.0-20220808203004-1486f89e7708
-<<<<<<< HEAD
-	github.com/TykTechnologies/graphql-go-tools v1.6.2-0.20240514110121-f9fa4a18e042
-=======
 	github.com/TykTechnologies/graphql-go-tools v1.6.2-0.20241212110213-7724a3b64bb2
 	github.com/TykTechnologies/graphql-translator v0.0.0-20240319092712-4ba87e4c06ff
->>>>>>> f48eb9802... [TT-13608] Issues with custom scalar in query variable (#6766)
 	github.com/TykTechnologies/leakybucket v0.0.0-20170301023702-71692c943e3c
 	github.com/TykTechnologies/murmur3 v0.0.0-20230310161213-aad17efd5632
 	github.com/TykTechnologies/openid2go v0.1.2
@@ -88,7 +84,6 @@ require (
 require (
 	github.com/Jeffail/gabs/v2 v2.7.0
 	github.com/TykTechnologies/graphql-go-tools/v2 v2.0.0-20240131151522-40a1ee2bbfc3
-	github.com/TykTechnologies/graphql-translator v0.0.0-20240319092712-4ba87e4c06ff
 	github.com/TykTechnologies/kin-openapi v0.90.0
 	github.com/TykTechnologies/opentelemetry v0.0.22
 	github.com/alecthomas/kingpin/v2 v2.4.0
@@ -117,6 +112,7 @@ require (
 	github.com/asyncapi/spec-json-schemas/v2 v2.14.0 // indirect
 	github.com/certifi/gocertifi v0.0.0-20210507211836-431795d63e8d // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
+	github.com/coder/websocket v1.8.12 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/dgryski/go-rendezvous v0.0.0-20200823014737-9f7001d12a5f // indirect
 	github.com/docker/cli v25.0.3+incompatible // indirect
