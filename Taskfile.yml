@@ -74,6 +74,7 @@ tasks:
       - go mod tidy
 
   lint:all:
+    desc: "Run more specific linters"
     deps:
       - lint:config
       - lint:imports
@@ -89,12 +90,12 @@ tasks:
   lint:config:
     internal: true
     cmds:
-      - go test -count 1 -v ./cli/linter/...
+      - go test -count 1 ./cli/linter/...
 
   lint:x-tyk-gateway:
     internal: true
     cmds:
-      - go test -count 1 -v -run=TestXTykGateway_Lint ./apidef/oas/
+      - go test -count 1 -run=TestXTykGateway_Lint ./apidef/oas/
 
   setup:
     desc: "Setup the project including dependencies and git hooks using lefthooks"
