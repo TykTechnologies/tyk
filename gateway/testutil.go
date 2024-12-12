@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"archive/zip"
+	"bufio"
 	"bytes"
 	"compress/gzip"
 	"context"
@@ -26,6 +27,7 @@ import (
 	"time"
 
 	"github.com/getkin/kin-openapi/openapi3"
+	"github.com/stretchr/testify/assert"
 
 	"github.com/TykTechnologies/tyk/apidef/oas"
 
@@ -1965,4 +1967,70 @@ func (m *testMessageAdapter) Channel() (string, error) {
 // Payload returns the message payload.
 func (m *testMessageAdapter) Payload() (string, error) {
 	return m.Msg, nil
+}
+
+func TestHelperSSEServer(tb testing.TB) *httptest.Server {
+	tb.Helper()
+	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "text/event-stream")
+		w.Header().Set("Connection", "keep-alive")
+
+		flusher, ok := w.(http.Flusher)
+		assert.True(tb, ok)
+		for i := 0; i < 5; i++ {
+			fmt.Fprintf(w, "data: %d\n", i)
+			flusher.Flush()
+			time.Sleep(50 * time.Millisecond)
+		}
+	}))
+}
+func TestHelperSSEStreamClient(tb testing.TB, ts *Test, enableWebSockets bool) error {
+	tb.Helper()
+
+	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, ts.URL, nil)
+	assert.NoError(tb, err)
+	req.Header.Set("Accept", "text/event-stream")
+	client := http.Client{}
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+
+	globalConf := ts.Gw.GetConfig()
+	globalConf.HttpServerOptions.EnableWebSockets = enableWebSockets
+	ts.Gw.SetConfig(globalConf)
+
+	res, err := client.Do(req)
+	assert.NoError(tb, err)
+
+	reader := bufio.NewReader(res.Body)
+	defer res.Body.Close()
+
+	i := 0
+	okChan := make(chan error)
+
+	go func() {
+		for {
+			line, err := reader.ReadBytes('\n')
+			if err != nil && assert.ErrorContains(tb, err, io.EOF.Error()) {
+				err = nil
+			}
+
+			assert.NoError(tb, err)
+
+			if len(line) == 0 {
+				break
+			}
+
+			assert.Equal(tb, fmt.Sprintf("data: %v\n", i), string(line))
+			i++
+		}
+		close(okChan)
+	}()
+
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-okChan:
+	}
+	assert.Equal(tb, i, 5)
+	return nil
 }
