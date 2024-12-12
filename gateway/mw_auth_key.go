@@ -102,7 +102,7 @@ func (k *AuthKey) ProcessRequest(_ http.ResponseWriter, r *http.Request, _ inter
 	updateSession := false
 	if key != "" {
 		key = stripBearer(key)
-	} else if authConfig.UseCertificate && key == "" && r.TLS != nil && len(r.TLS.PeerCertificates) > 0 {
+	} else if authConfig.UseCertificate && r.TLS != nil && len(r.TLS.PeerCertificates) > 0 {
 		log.Debug("Trying to find key by client certificate")
 		certHash = k.Spec.OrgID + crypto.HexSHA256(r.TLS.PeerCertificates[0].Raw)
 		if time.Now().After(r.TLS.PeerCertificates[0].NotAfter) {
