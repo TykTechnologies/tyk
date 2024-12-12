@@ -415,39 +415,12 @@ func (gw *Gateway) processSpec(spec *APISpec, apisByListen map[string]int,
 		gw.mwAppendEnabled(&chainArray, &RateLimitAndQuotaCheck{baseMid.Copy()})
 	}
 
-<<<<<<< HEAD
-	gw.mwAppendEnabled(&chainArray, &RateLimitForAPI{BaseMiddleware: baseMid})
-	gw.mwAppendEnabled(&chainArray, &GraphQLMiddleware{BaseMiddleware: baseMid})
-=======
 	gw.mwAppendEnabled(&chainArray, &RateLimitForAPI{BaseMiddleware: baseMid.Copy()})
 	gw.mwAppendEnabled(&chainArray, &GraphQLMiddleware{BaseMiddleware: baseMid.Copy()})
 
-	if streamMw := getStreamingMiddleware(baseMid); streamMw != nil {
-		gw.mwAppendEnabled(&chainArray, streamMw)
-	}
-
->>>>>>> 9916296e5... [TT-13155] Explicitly copy BaseMiddleware for each middleware that takes it (#6744)
 	if !spec.UseKeylessAccess {
 		gw.mwAppendEnabled(&chainArray, &GraphQLComplexityMiddleware{BaseMiddleware: baseMid.Copy()})
 		gw.mwAppendEnabled(&chainArray, &GraphQLGranularAccessMiddleware{BaseMiddleware: baseMid.Copy()})
-	}
-
-<<<<<<< HEAD
-	gw.mwAppendEnabled(&chainArray, &ValidateJSON{BaseMiddleware: baseMid})
-	gw.mwAppendEnabled(&chainArray, &ValidateRequest{BaseMiddleware: baseMid})
-	gw.mwAppendEnabled(&chainArray, &PersistGraphQLOperationMiddleware{BaseMiddleware: baseMid})
-	gw.mwAppendEnabled(&chainArray, &TransformMiddleware{baseMid})
-	gw.mwAppendEnabled(&chainArray, &TransformJQMiddleware{baseMid})
-	gw.mwAppendEnabled(&chainArray, &TransformHeaders{BaseMiddleware: baseMid})
-	gw.mwAppendEnabled(&chainArray, &URLRewriteMiddleware{BaseMiddleware: baseMid})
-	gw.mwAppendEnabled(&chainArray, &TransformMethod{BaseMiddleware: baseMid})
-=======
-	if upstreamBasicAuthMw := getUpstreamBasicAuthMw(baseMid); upstreamBasicAuthMw != nil {
-		gw.mwAppendEnabled(&chainArray, upstreamBasicAuthMw)
-	}
-
-	if upstreamOAuthMw := getUpstreamOAuthMw(baseMid); upstreamOAuthMw != nil {
-		gw.mwAppendEnabled(&chainArray, upstreamOAuthMw)
 	}
 
 	gw.mwAppendEnabled(&chainArray, &ValidateJSON{BaseMiddleware: baseMid.Copy()})
@@ -458,7 +431,6 @@ func (gw *Gateway) processSpec(spec *APISpec, apisByListen map[string]int,
 	gw.mwAppendEnabled(&chainArray, &TransformHeaders{BaseMiddleware: baseMid.Copy()})
 	gw.mwAppendEnabled(&chainArray, &URLRewriteMiddleware{BaseMiddleware: baseMid.Copy()})
 	gw.mwAppendEnabled(&chainArray, &TransformMethod{BaseMiddleware: baseMid.Copy()})
->>>>>>> 9916296e5... [TT-13155] Explicitly copy BaseMiddleware for each middleware that takes it (#6744)
 
 	// Earliest we can respond with cache get 200 ok
 	gw.mwAppendEnabled(&chainArray, &RedisCacheMiddleware{BaseMiddleware: baseMid.Copy(), store: &cacheStore})
@@ -485,12 +457,8 @@ func (gw *Gateway) processSpec(spec *APISpec, apisByListen map[string]int,
 			chainArray = append(chainArray, gw.createDynamicMiddleware(obj.Name, false, obj.RequireSession, baseMid.Copy()))
 		}
 	}
-<<<<<<< HEAD
 
-	chain = alice.New(chainArray...).Then(&DummyProxyHandler{SH: SuccessHandler{baseMid}, Gw: gw})
-=======
 	chain = alice.New(chainArray...).Then(&DummyProxyHandler{SH: SuccessHandler{baseMid.Copy()}, Gw: gw})
->>>>>>> 9916296e5... [TT-13155] Explicitly copy BaseMiddleware for each middleware that takes it (#6744)
 
 	if !spec.UseKeylessAccess {
 		var simpleArray []alice.Constructor

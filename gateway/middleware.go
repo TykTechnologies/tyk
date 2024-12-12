@@ -45,15 +45,9 @@ var (
 )
 
 type TykMiddleware interface {
-	Init()
 	Base() *BaseMiddleware
 
-<<<<<<< HEAD
-	SetName(string)
-	SetRequestLogger(*http.Request)
-=======
 	Init()
->>>>>>> 9916296e5... [TT-13155] Explicitly copy BaseMiddleware for each middleware that takes it (#6744)
 	Logger() *logrus.Entry
 	Config() (interface{}, error)
 	ProcessRequest(w http.ResponseWriter, r *http.Request, conf interface{}) (error, int) // Handles request
@@ -161,11 +155,7 @@ func (gw *Gateway) createMiddleware(actualMW TykMiddleware) func(http.Handler) h
 			}
 
 			startTime := time.Now()
-<<<<<<< HEAD
-			mw.Logger().WithField("ts", startTime.UnixNano()).Debug("Started")
-=======
 			logger.WithField("ts", startTime.UnixNano()).WithField("mw", mw.Name()).Debug("Started")
->>>>>>> 9916296e5... [TT-13155] Explicitly copy BaseMiddleware for each middleware that takes it (#6744)
 
 			if mw.Base().Spec.CORS.OptionsPassthrough && r.Method == "OPTIONS" {
 				h.ServeHTTP(w, r)

@@ -1294,11 +1294,7 @@ func TestCacheEtag(t *testing.T) {
 }
 
 func TestOldCachePlugin(t *testing.T) {
-<<<<<<< HEAD
-	test.Exclusive(t) // Test uses cache-* while other tests delete it.
-=======
 	t.Skip() // DeleteScanMatch interferes with other tests.
->>>>>>> 9916296e5... [TT-13155] Explicitly copy BaseMiddleware for each middleware that takes it (#6744)
 
 	api := BuildAPI(func(spec *APISpec) {
 		spec.Proxy.ListenPath = "/"
