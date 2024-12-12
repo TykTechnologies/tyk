@@ -16,10 +16,13 @@ tasks:
   test:
     desc: "Run tests"
     deps: [ services:up ]
+    env:
+      GOTESTSUM_FORMAT: testname
     cmds:
       - defer: { task: services:down }
       - go fmt ./...
-      - go test -count=1 ./...
+      - go test -p 1 -parallel 1 -count=1 -json ./... | gotestsum --format testname --hide-summary=all
+
 
   # lint target is run from CI
   lint:
