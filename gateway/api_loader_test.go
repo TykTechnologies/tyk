@@ -9497,24 +9497,13 @@ func TestAPILoaderValidation(t *testing.T) {
 	t.Cleanup(ts.Close)
 
 	t.Run("invalid regexps", func(t *testing.T) {
-		globalConf := ts.Gw.GetConfig()
-		globalConf.EnableCustomDomains = true
-
-		globalConf.HttpServerOptions.EnableStrictRoutes = false
-		globalConf.HttpServerOptions.EnablePathSuffixMatching = false
-		globalConf.HttpServerOptions.EnablePathPrefixMatching = false
-
-		ts.Gw.SetConfig(globalConf)
-		defer ts.ResetTestConfig()
-
 		cleanup := func() {
 			if e := recover(); e != nil {
 				t.Logf("Caught panic, shouldn't have: %+v", e)
 				t.Fail()
 			}
 		}
-		_ = cleanup
-		//defer cleanup()
+		defer cleanup()
 
 		ts.Gw.BuildAndLoadAPI(
 			func(spec *APISpec) {
