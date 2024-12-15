@@ -4,6 +4,7 @@ version: "3"
 includes:
   test: .taskfiles/test.yml
   deps: .taskfiles/deps/Taskfile.yml
+  hooks: .taskfiles/hooks.yml
   opentelemetry:
     taskfile: ci/tests/tracing/Taskfile.yml
     dir: ci/tests/tracing/
@@ -73,7 +74,7 @@ tasks:
       - go mod tidy
 
   lint:all:
-    internal: true
+    desc: "Run more specific linters"
     deps:
       - lint:config
       - lint:imports
@@ -89,9 +90,15 @@ tasks:
   lint:config:
     internal: true
     cmds:
-      - go test -count 1 -v ./cli/linter/...
+      - go test -count 1 ./cli/linter/...
 
   lint:x-tyk-gateway:
     internal: true
     cmds:
-      - go test -count 1 -v -run=TestXTykGateway_Lint ./apidef/oas/
+      - go test -count 1 -run=TestXTykGateway_Lint ./apidef/oas/
+
+  setup:
+    desc: "Setup the project including dependencies and git hooks using lefthooks"
+    cmds:
+      - task: deps:default
+      - lefthook install

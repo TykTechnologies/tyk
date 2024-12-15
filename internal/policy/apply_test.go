@@ -124,8 +124,11 @@ func TestApplyRateLimits_FromCustomPolicies(t *testing.T) {
 	session := &user.SessionState{}
 	session.SetCustomPolicies([]user.Policy{
 		{
-			ID:           "pol1",
-			Partitions:   user.PolicyPartitions{RateLimit: true},
+			ID: "pol1",
+			Partitions: user.PolicyPartitions{
+				RateLimit: true,
+				Acl:       true,
+			},
 			Rate:         8,
 			Per:          1,
 			AccessRights: map[string]user.AccessDefinition{"a": {}},

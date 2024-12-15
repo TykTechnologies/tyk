@@ -9,6 +9,7 @@ tasks:
       - golangci-lint
       - faillint
       - mockgen
+      - lefthook
     cmds:
       - for: ['go-fsck', 'schema-gen', 'summary']
         task: exp
@@ -46,6 +47,14 @@ tasks:
       - type faillint
     cmds:
       - go install github.com/fatih/faillint@latest
+
+  lefthook:
+    internal: true
+    desc: 'Install lefthook'
+    status:
+      - type lefthook
+    cmds:
+      - go install github.com/evilmartians/lefthook@latest
 
   exp:
     desc: 'Install exp/cmd'
