@@ -2,7 +2,7 @@ package gateway
 
 import (
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/textproto"
 	"net/url"
@@ -696,22 +696,38 @@ func checkContextTrigger(r *http.Request, options map[string]apidef.StringRegexM
 
 func checkPayload(r *http.Request, options apidef.StringRegexMap, triggernum int) bool {
 	contextData := ctxGetData(r)
-	bodyBytes, _ := ioutil.ReadAll(r.Body)
 
+	nopCloseRequestBody(r)
+	// Read the entire request body
+	bodyBytes, err := io.ReadAll(r.Body)
+	if err != nil {
+		log.WithError(err).Error("error reading request body")
+		return false
+	}
+
+	// Perform regex matching on the request body
 	matched, matches := options.FindAllStringSubmatch(string(bodyBytes), -1)
 
 	if matched {
 		kn := buildTriggerKey(triggernum, "payload")
+
 		if len(matches) == 0 {
+			// If there are no matches, simply return true
 			return true
 		}
+
+		// Store the first match in the context data
 		contextData[kn] = matches[0][0]
 
+		// Iterate over all matches and add them to the context data
 		for i, match := range matches {
 			if len(match) > 0 {
 				addMatchToContextData(contextData, match, triggernum, "payload", i)
 			}
 		}
+
+		// Update the context data with the modified map
+		ctxSetData(r, contextData)
 		return true
 	}
 
