@@ -1,9 +1,27 @@
 package model
 
 import (
+	"github.com/sirupsen/logrus"
+
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/apidef/oas"
 )
+
+// MergedAPI combines the embeds the classic and adds the OAS API definition as a field.
+type MergedAPI struct {
+	*apidef.APIDefinition `json:"api_definition,inline"`
+	OAS                   *oas.OAS `json:"oas"`
+}
+
+// Logger returns API detail fields for logging.
+func (m *MergedAPI) LogFields() logrus.Fields {
+	return logrus.Fields{
+		"api_id": m.APIID,
+		"org_id": m.OrgID,
+		"name":   m.Name,
+		"path":   m.Proxy.ListenPath,
+	}
+}
 
 // MergedAPIList is the response body for FromDashboardService.
 type MergedAPIList struct {
@@ -15,12 +33,6 @@ func NewMergedAPIList(apis ...MergedAPI) *MergedAPIList {
 	return &MergedAPIList{
 		Message: apis,
 	}
-}
-
-// MergedAPI combines the embeds the classic and adds the OAS API definition as a field.
-type MergedAPI struct {
-	*apidef.APIDefinition `json:"api_definition,inline"`
-	OAS                   *oas.OAS `json:"oas"`
 }
 
 // Set sets the available classic API definitions to the MergedAPIList.
