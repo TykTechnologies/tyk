@@ -62,6 +62,13 @@ func PreparePathRegexp(pattern string, prefix bool, suffix bool) string {
 	return pattern
 }
 
+// ValidatePath validates if the path is valid. Returns an error.
+func ValidatePath(in string) error {
+	router := mux.NewRouter()
+	route := router.PathPrefix(in)
+	return route.GetError()
+}
+
 // IsMuxTemplate determines if a pattern is a mux template by counting the number of opening and closing braces.
 func IsMuxTemplate(pattern string) bool {
 	openBraces := strings.Count(pattern, "{")

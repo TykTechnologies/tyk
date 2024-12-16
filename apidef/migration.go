@@ -69,7 +69,16 @@ func (a *APIDefinition) MigrateVersioning() (versions []APIDefinition, err error
 			newAPI.Id = ""
 			newAPI.Name += "-" + url.QueryEscape(vName)
 			newAPI.Internal = true
-			newAPI.Proxy.ListenPath = strings.TrimSuffix(newAPI.Proxy.ListenPath, "/") + "-" + url.QueryEscape(vName) + "/"
+
+			listenPathClean := strings.TrimSuffix(newAPI.Proxy.ListenPath, "/")
+			if listenPathClean == "" {
+				listenPathClean = "/" + url.QueryEscape(vName) + "/"
+			} else {
+				listenPathClean += "-" + url.QueryEscape(vName) + "/"
+			}
+
+			newAPI.Proxy.ListenPath = listenPathClean
+
 			newAPI.VersionDefinition = VersionDefinition{BaseID: a.APIID}
 			newAPI.VersionName = vName
 
