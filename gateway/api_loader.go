@@ -753,13 +753,9 @@ func explicitRouteSubpaths(prefix string, handler http.Handler, enabled bool) ht
 // - register gorilla/mux routing handless with proxyMux directly (wrapped),
 // - return a raw http.Handler for tyk://ID urls.
 func (gw *Gateway) loadHTTPService(spec *APISpec, apisByListen map[string]int, gs *generalStores, muxer *proxyMux) (*ChainObject, error) {
-	var (
-		listenPath = spec.Proxy.ListenPath
-	)
-
 	// MakeSpec validates listenpath, but we can't be sure that it's in all the invocation paths.
 	// Since the check is relatively inexpensive, do it here to prevent issues in uncovered paths.
-	if err := httputil.ValidatePath(listenPath); err != nil {
+	if err := httputil.ValidatePath(spec.Proxy.ListenPath); err != nil {
 		return nil, fmt.Errorf("invalid listen path while loading api: %w", err)
 	}
 
@@ -802,7 +798,7 @@ func (gw *Gateway) loadHTTPService(spec *APISpec, apisByListen map[string]int, g
 		// API definition UUID
 		"/" + spec.APIID + "/",
 		// User defined listen path
-		listenPath,
+		spec.Proxy.ListenPath,
 	}
 
 	// Register routes for each prefix
