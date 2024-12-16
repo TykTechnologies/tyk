@@ -53,6 +53,7 @@ const (
 	// CacheOptions holds cache options required for cache writer middleware.
 	CacheOptions
 	OASDefinition
+	SelfLooping
 )
 
 func ctxSetSession(r *http.Request, s *user.SessionState, scheduleUpdate bool, hashKey bool) {
