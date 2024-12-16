@@ -304,11 +304,23 @@ type APIDefinitionLoader struct {
 
 // MakeSpec will generate a flattened URLSpec from and APIDefinitions' VersionInfo data. paths are
 // keyed to the Api version name, which is determined during routing to speed up lookups
+<<<<<<< HEAD
 func (a APIDefinitionLoader) MakeSpec(def *nestedApiDefinition, logger *logrus.Entry) (*APISpec, error) {
+=======
+func (a APIDefinitionLoader) MakeSpec(def *model.MergedAPI, logger *logrus.Entry) (*APISpec, error) {
+	if logger == nil {
+		logger = logrus.NewEntry(log).WithFields(logrus.Fields{
+			"api_id": def.APIID,
+			"org_id": def.OrgID,
+			"name":   def.Name,
+		})
+	}
+
+>>>>>>> 2887a4aa6... [TT-11711] Fix listenpath validation (#6772)
 	spec := &APISpec{}
 	apiString, err := json.Marshal(def)
 	if err != nil {
-		logger.WithError(err).WithField("name", def.Name).Error("Failed to JSON marshal API definition")
+		logger.WithError(err).Error("Failed to JSON marshal API definition")
 		return nil, err
 	}
 
@@ -322,15 +334,10 @@ func (a APIDefinitionLoader) MakeSpec(def *nestedApiDefinition, logger *logrus.E
 		return currSpec, nil
 	}
 
-	if logger == nil {
-		logger = logrus.NewEntry(log)
-	}
-
 	// new expiration feature
 	if def.Expiration != "" {
 		if t, err := time.Parse(apidef.ExpirationTimeFormat, def.Expiration); err != nil {
-			logger.WithError(err).WithField("name", def.Name).WithField("Expiration", def.Expiration).
-				Error("Could not parse expiration date for API")
+			logger.WithError(err).WithField("Expiration", def.Expiration).Error("Could not parse expiration date for API")
 		} else {
 			def.ExpirationTs = t
 		}
@@ -344,7 +351,7 @@ func (a APIDefinitionLoader) MakeSpec(def *nestedApiDefinition, logger *logrus.E
 		}
 		// calculate the time
 		if t, err := time.Parse(apidef.ExpirationTimeFormat, ver.Expires); err != nil {
-			logger.WithError(err).WithField("Expires", ver.Expires).Error("Could not parse expiry date for API")
+			logger.WithError(err).WithField("expires", ver.Expires).Error("Could not parse expiry date for API")
 		} else {
 			ver.ExpiresTs = t
 			def.VersionData.Versions[key] = ver
@@ -416,10 +423,15 @@ func (a APIDefinitionLoader) MakeSpec(def *nestedApiDefinition, logger *logrus.E
 	if spec.IsOAS && def.OAS != nil {
 		loader := openapi3.NewLoader()
 		if err := loader.ResolveRefsIn(&def.OAS.T, nil); err != nil {
-			log.WithError(err).Errorf("Dashboard loaded API's OAS reference resolve failed: %s", def.APIID)
+			logger.WithError(err).Errorf("Dashboard loaded API's OAS reference resolve failed: %s", def.APIID)
 		}
 
 		spec.OAS = *def.OAS
+	}
+
+	if err := httputil.ValidatePath(spec.Proxy.ListenPath); err != nil {
+		logger.WithError(err).Error("Invalid listen path when creating router")
+		return nil, err
 	}
 
 	oasSpec := spec.OAS.T
@@ -429,7 +441,7 @@ func (a APIDefinitionLoader) MakeSpec(def *nestedApiDefinition, logger *logrus.E
 
 	spec.OASRouter, err = gorillamux.NewRouter(&oasSpec)
 	if err != nil {
-		log.WithError(err).Error("Could not create OAS router")
+		logger.WithError(err).Error("Could not create OAS router")
 	}
 
 	spec.setHasMock()
