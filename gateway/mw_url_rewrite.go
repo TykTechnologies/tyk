@@ -3,7 +3,7 @@ package gateway
 import (
 	"bytes"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/textproto"
 	"net/url"
@@ -699,14 +699,14 @@ func checkPayload(r *http.Request, options apidef.StringRegexMap, triggernum int
 	contextData := ctxGetData(r)
 
 	// Read the entire request body
-	bodyBytes, err := ioutil.ReadAll(r.Body)
+	bodyBytes, err := io.ReadAll(r.Body)
 	if err != nil {
-		log.Error("Error reading request body:", err)
+		log.WithError(err).Error("error reading request body")
 		return false
 	}
 
 	// Reset the request body so that downstream handlers can read it
-	r.Body = ioutil.NopCloser(bytes.NewBuffer(bodyBytes))
+	r.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
 
 	// Perform regex matching on the request body
 	matched, matches := options.FindAllStringSubmatch(string(bodyBytes), -1)

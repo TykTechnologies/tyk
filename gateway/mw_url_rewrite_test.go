@@ -1151,7 +1151,7 @@ func TestRewriterTriggers(t *testing.T) {
 			if tc.payloadTrigger {
 				body, err := io.ReadAll(tc.req.Body)
 				assert.NotEqual(t, "", string(body))
-				assert.Nil(t, err)
+				assert.NoError(t, err)
 			}
 
 			if got != tc.want {
