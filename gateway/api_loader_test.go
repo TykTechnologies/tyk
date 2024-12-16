@@ -1115,7 +1115,7 @@ func TestLongerListenPathHasLongerDomainThanSubstringListenPath(t *testing.T) {
 		}...)
 	})
 
-	t.Run("strict and suffix  false", func(t *testing.T) {
+	t.Run("strict and suffix match false", func(t *testing.T) {
 		globalConf := ts.Gw.GetConfig()
 		globalConf.EnableCustomDomains = true
 
@@ -1151,7 +1151,7 @@ func TestLongerListenPathHasLongerDomainThanSubstringListenPath(t *testing.T) {
 		}...)
 	})
 
-	t.Run("strict and prefix  false", func(t *testing.T) {
+	t.Run("strict and prefix match false", func(t *testing.T) {
 		globalConf := ts.Gw.GetConfig()
 		globalConf.EnableCustomDomains = true
 
@@ -9490,4 +9490,30 @@ func TestSortAPISpecs(t *testing.T) {
 		})
 
 	}
+}
+
+func TestAPILoaderValidation(t *testing.T) {
+	ts := StartTest(nil)
+	t.Cleanup(ts.Close)
+
+	t.Run("invalid regexps", func(t *testing.T) {
+		cleanup := func() {
+			if e := recover(); e != nil {
+				t.Logf("Caught panic, shouldn't have: %+v", e)
+				t.Fail()
+			}
+		}
+		defer cleanup()
+
+		ts.Gw.BuildAndLoadAPI(
+			func(spec *APISpec) {
+				spec.APIID = "api-a"
+				spec.Proxy.ListenPath = "{/test-classic}"
+				spec.Proxy.TargetURL = "http://httpbin"
+				spec.Domain = "{subdomain:tyktest.io}"
+				spec.Proxy.DisableStripSlash = true
+				spec.Proxy.StripListenPath = true
+			},
+		)
+	})
 }
