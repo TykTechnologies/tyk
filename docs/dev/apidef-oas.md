@@ -18,6 +18,14 @@ For fields that are required:
 
  2. Do not use pointer types for required fields.
 
+ 3. Add a comment `// required` towards the end of a required field so that automation generates docs accordingly. 
+
+ 4. As a convention, we also try to add the corresponding classic API definition fields in godoc in the following format
+    ```
+    // Tyk classic API definition: `!use_keyless`.
+    ```
+    This might not be perfect at this moment, but we aim to keep this link so that customers find it easier to follow the docs.
+
 ## Handle Optional Fields
 
 For optional fields:
