@@ -304,10 +304,7 @@ type APIDefinitionLoader struct {
 
 // MakeSpec will generate a flattened URLSpec from and APIDefinitions' VersionInfo data. paths are
 // keyed to the Api version name, which is determined during routing to speed up lookups
-<<<<<<< HEAD
 func (a APIDefinitionLoader) MakeSpec(def *nestedApiDefinition, logger *logrus.Entry) (*APISpec, error) {
-=======
-func (a APIDefinitionLoader) MakeSpec(def *model.MergedAPI, logger *logrus.Entry) (*APISpec, error) {
 	if logger == nil {
 		logger = logrus.NewEntry(log).WithFields(logrus.Fields{
 			"api_id": def.APIID,
@@ -316,7 +313,6 @@ func (a APIDefinitionLoader) MakeSpec(def *model.MergedAPI, logger *logrus.Entry
 		})
 	}
 
->>>>>>> 2887a4aa6... [TT-11711] Fix listenpath validation (#6772)
 	spec := &APISpec{}
 	apiString, err := json.Marshal(def)
 	if err != nil {
