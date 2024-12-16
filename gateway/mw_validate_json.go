@@ -1,7 +1,6 @@
 package gateway
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
 	"io"
@@ -49,13 +48,13 @@ func (k *ValidateJSON) ProcessRequest(w http.ResponseWriter, r *http.Request, _ 
 		}
 	}
 
+	nopCloseRequestBody(r)
 	// Load input body into gojsonschema
 	bodyBytes, err := io.ReadAll(r.Body)
 	if err != nil {
 		return err, http.StatusBadRequest
 	}
 	defer r.Body.Close()
-	r.Body = io.NopCloser(bytes.NewReader(bodyBytes))
 	inputLoader := gojsonschema.NewBytesLoader(bodyBytes)
 
 	// Perform validation

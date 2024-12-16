@@ -1,7 +1,6 @@
 package gateway
 
 import (
-	"bytes"
 	"fmt"
 	"io"
 	"net/http"
@@ -698,15 +697,13 @@ func checkContextTrigger(r *http.Request, options map[string]apidef.StringRegexM
 func checkPayload(r *http.Request, options apidef.StringRegexMap, triggernum int) bool {
 	contextData := ctxGetData(r)
 
+	nopCloseRequestBody(r)
 	// Read the entire request body
 	bodyBytes, err := io.ReadAll(r.Body)
 	if err != nil {
 		log.WithError(err).Error("error reading request body")
 		return false
 	}
-
-	// Reset the request body so that downstream handlers can read it
-	r.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
 
 	// Perform regex matching on the request body
 	matched, matches := options.FindAllStringSubmatch(string(bodyBytes), -1)
