@@ -15,15 +15,16 @@ Ensure OAS fields follow `camelCase` notation for `json` and `bson` tags.
 For fields that are required:
 
 3.1. Remove `omitempty` from struct tags.
+
 3.2. Avoid using pointer types for required fields.
 
 ## Step 4: Handle Optional Fields
 
 For optional fields:
 
-### 4.1. Add the `omitempty` tag.
+4.1. Add the `omitempty` tag.
 
-### 4.2. Use pointer types for structs.
+4.2. Use pointer types for structs.
 
 ## Step 5: Add Go Doc Comments
 
