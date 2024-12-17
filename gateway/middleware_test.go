@@ -8,10 +8,12 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	headers2 "github.com/TykTechnologies/tyk/header"
 	"github.com/TykTechnologies/tyk/internal/cache"
+	"github.com/TykTechnologies/tyk/internal/model"
 	"github.com/TykTechnologies/tyk/internal/uuid"
 	"github.com/TykTechnologies/tyk/test"
 
@@ -414,10 +416,11 @@ func TestQuotaNotAppliedWithURLRewrite(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
-	spec := ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+	preSpec := ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 		spec.Proxy.ListenPath = "/quota-test"
 		spec.UseKeylessAccess = false
 		UpdateAPIVersion(spec, "Default", func(v *apidef.VersionInfo) {
+			v.UseExtendedPaths = true
 			v.ExtendedPaths.URLRewrite = []apidef.URLRewriteMeta{{
 				Path:         "/abc",
 				Method:       http.MethodGet,
@@ -426,6 +429,9 @@ func TestQuotaNotAppliedWithURLRewrite(t *testing.T) {
 			}}
 		})
 	})[0]
+	loader := APIDefinitionLoader{Gw: ts.Gw}
+	spec, err := loader.MakeSpec(&model.MergedAPI{APIDefinition: preSpec.APIDefinition}, nil)
+	require.NoError(t, err)
 
 	_, authKey := ts.CreateSession(func(s *user.SessionState) {
 		s.AccessRights = map[string]user.AccessDefinition{
