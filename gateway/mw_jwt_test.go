@@ -542,8 +542,9 @@ func BenchmarkJWTSessionRSAWithRawSourceOnWithClientID(b *testing.B) {
 // JWTSessionRSAWithRawSource
 
 func (ts *Test) prepareJWTSessionRSAWithRawSource() string {
-
+	const testApiID = "test-api-id"
 	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		spec.APIID = testApiID
 		spec.UseKeylessAccess = false
 		spec.EnableJWT = true
 		spec.JWTSigningMethod = RSASign
@@ -553,7 +554,13 @@ func (ts *Test) prepareJWTSessionRSAWithRawSource() string {
 		spec.Proxy.ListenPath = "/"
 	})
 
-	pID := ts.CreatePolicy()
+	pID := ts.CreatePolicy(func(p *user.Policy) {
+		p.AccessRights = map[string]user.AccessDefinition{
+			testApiID: {
+				APIName: "test-api-name",
+			},
+		}
+	})
 
 	jwtToken := CreateJWKToken(func(t *jwt.Token) {
 		t.Header["kid"] = "12345"
@@ -641,7 +648,16 @@ func TestJWTSessionExpiresAtValidationConfigs(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
-	pID := ts.CreatePolicy()
+	const testAPIID = "test-api-id"
+
+	pID := ts.CreatePolicy(func(p *user.Policy) {
+		p.AccessRights = map[string]user.AccessDefinition{
+			testAPIID: {
+				APIName: "test-api-name",
+			},
+		}
+	})
+
 	jwtAuthHeaderGen := func(skew time.Duration) map[string]string {
 		jwtToken := CreateJWKToken(func(t *jwt.Token) {
 			t.Claims.(jwt.MapClaims)["policy_id"] = pID
@@ -653,6 +669,7 @@ func TestJWTSessionExpiresAtValidationConfigs(t *testing.T) {
 	}
 
 	spec := BuildAPI(func(spec *APISpec) {
+		spec.APIID = testAPIID
 		spec.UseKeylessAccess = false
 		spec.EnableJWT = true
 		spec.JWTSigningMethod = RSASign
@@ -716,7 +733,16 @@ func TestJWTSessionIssueAtValidationConfigs(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
-	pID := ts.CreatePolicy()
+	const testAPIID = "test-api-id"
+
+	pID := ts.CreatePolicy(func(p *user.Policy) {
+		p.AccessRights = map[string]user.AccessDefinition{
+			testAPIID: {
+				APIName: "test-api-name",
+			},
+		}
+	})
+
 	jwtAuthHeaderGen := func(skew time.Duration) map[string]string {
 		jwtToken := CreateJWKToken(func(t *jwt.Token) {
 			t.Claims.(jwt.MapClaims)["policy_id"] = pID
@@ -729,6 +755,7 @@ func TestJWTSessionIssueAtValidationConfigs(t *testing.T) {
 
 	spec := BuildAPI(func(spec *APISpec) {
 		spec.UseKeylessAccess = false
+		spec.APIID = testAPIID
 		spec.EnableJWT = true
 		spec.JWTSigningMethod = "rsa"
 		spec.JWTSource = base64.StdEncoding.EncodeToString([]byte(jwtRSAPubKey))
@@ -807,7 +834,16 @@ func TestJWTSessionNotBeforeValidationConfigs(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
-	pID := ts.CreatePolicy()
+	const testAPIID = "test-api-id"
+
+	pID := ts.CreatePolicy(func(p *user.Policy) {
+		p.AccessRights = map[string]user.AccessDefinition{
+			testAPIID: {
+				APIName: "test-api-name",
+			},
+		}
+	})
+
 	jwtAuthHeaderGen := func(skew time.Duration) map[string]string {
 		jwtToken := CreateJWKToken(func(t *jwt.Token) {
 			t.Claims.(jwt.MapClaims)["policy_id"] = pID
@@ -819,6 +855,7 @@ func TestJWTSessionNotBeforeValidationConfigs(t *testing.T) {
 
 	spec := BuildAPI(func(spec *APISpec) {
 		spec.UseKeylessAccess = false
+		spec.APIID = testAPIID
 		spec.EnableJWT = true
 		spec.Proxy.ListenPath = "/"
 		spec.JWTSigningMethod = "rsa"
@@ -875,7 +912,18 @@ func TestJWTExistingSessionRSAWithRawSourceInvalidPolicyID(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
+	const testAPIID = "test-api-id"
+
+	p1ID := ts.CreatePolicy(func(p *user.Policy) {
+		p.AccessRights = map[string]user.AccessDefinition{
+			testAPIID: {
+				APIName: "test-api-name",
+			},
+		}
+	})
+
 	spec := BuildAPI(func(spec *APISpec) {
+		spec.APIID = testAPIID
 		spec.UseKeylessAccess = false
 		spec.EnableJWT = true
 		spec.JWTSigningMethod = RSASign
@@ -887,7 +935,6 @@ func TestJWTExistingSessionRSAWithRawSourceInvalidPolicyID(t *testing.T) {
 
 	ts.Gw.LoadAPI(spec)
 
-	p1ID := ts.CreatePolicy()
 	user_id := uuid.New()
 
 	jwtToken := CreateJWKToken(func(t *jwt.Token) {
@@ -1352,8 +1399,11 @@ func TestJWTExistingSessionRSAWithRawSourcePolicyIDChanged(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
+	const testAPIID = "test-api-id"
+
 	spec := BuildAPI(func(spec *APISpec) {
 		spec.UseKeylessAccess = false
+		spec.APIID = testAPIID
 		spec.EnableJWT = true
 		spec.JWTSigningMethod = RSASign
 		spec.JWTSource = base64.StdEncoding.EncodeToString([]byte(jwtRSAPubKey))
@@ -1367,9 +1417,19 @@ func TestJWTExistingSessionRSAWithRawSourcePolicyIDChanged(t *testing.T) {
 
 	p1ID := ts.CreatePolicy(func(p *user.Policy) {
 		p.QuotaMax = 111
+		p.AccessRights = map[string]user.AccessDefinition{
+			testAPIID: {
+				APIName: "test-api-name",
+			},
+		}
 	})
 	p2ID := ts.CreatePolicy(func(p *user.Policy) {
 		p.QuotaMax = 999
+		p.AccessRights = map[string]user.AccessDefinition{
+			testAPIID: {
+				APIName: "test-api-name",
+			},
+		}
 	})
 	user_id := uuid.New()
 
@@ -1432,7 +1492,10 @@ func TestJWTExistingSessionRSAWithRawSourcePolicyIDChanged(t *testing.T) {
 
 func (ts *Test) prepareJWTSessionRSAWithJWK() string {
 
+	const testAPIID = "test-api-id"
+
 	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		spec.APIID = testAPIID
 		spec.UseKeylessAccess = false
 		spec.EnableJWT = true
 		spec.JWTSigningMethod = RSASign
@@ -1442,7 +1505,14 @@ func (ts *Test) prepareJWTSessionRSAWithJWK() string {
 		spec.Proxy.ListenPath = "/"
 	})
 
-	pID := ts.CreatePolicy()
+	pID := ts.CreatePolicy(func(p *user.Policy) {
+		p.AccessRights = map[string]user.AccessDefinition{
+			testAPIID: {
+				APIName: "test-api-name",
+			},
+		}
+	})
+
 	jwtToken := CreateJWKToken(func(t *jwt.Token) {
 		t.Header["kid"] = "12345"
 		t.Claims.(jwt.MapClaims)["foo"] = "bar"
@@ -1492,8 +1562,10 @@ func BenchmarkJWTSessionRSAWithJWK(b *testing.B) {
 
 func (ts *Test) prepareJWTSessionRSAWithEncodedJWK() (*APISpec, string) {
 
+	const testAPIID = "test-api-id"
 	spec := BuildAPI(func(spec *APISpec) {
 		spec.UseKeylessAccess = false
+		spec.APIID = testAPIID
 		spec.EnableJWT = true
 		spec.JWTSigningMethod = RSASign
 		spec.JWTIdentityBaseField = "user_id"
@@ -1501,7 +1573,14 @@ func (ts *Test) prepareJWTSessionRSAWithEncodedJWK() (*APISpec, string) {
 		spec.Proxy.ListenPath = "/"
 	})[0]
 
-	pID := ts.CreatePolicy()
+	pID := ts.CreatePolicy(func(p *user.Policy) {
+		p.AccessRights = map[string]user.AccessDefinition{
+			testAPIID: {
+				APIName: "test-api-name",
+			},
+		}
+	})
+
 	jwtToken := CreateJWKToken(func(t *jwt.Token) {
 		t.Header["kid"] = "12345"
 		// Set some claims
@@ -1618,8 +1697,11 @@ func TestJWTRSAIdInClaimsWithBaseField(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
+	const testAPIID = "test-api-id"
+
 	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 		spec.UseKeylessAccess = false
+		spec.APIID = testAPIID
 		spec.EnableJWT = true
 		spec.JWTSigningMethod = RSASign
 		spec.JWTSource = base64.StdEncoding.EncodeToString([]byte(jwtRSAPubKey))
@@ -1628,8 +1710,13 @@ func TestJWTRSAIdInClaimsWithBaseField(t *testing.T) {
 		spec.Proxy.ListenPath = "/"
 	})
 
-	pID := ts.CreatePolicy()
-
+	pID := ts.CreatePolicy(func(p *user.Policy) {
+		p.AccessRights = map[string]user.AccessDefinition{
+			testAPIID: {
+				APIName: "test-api-name",
+			},
+		}
+	})
 	//First test - user id in the configured base field 'user_id'
 	jwtToken := CreateJWKToken(func(t *jwt.Token) {
 		t.Header["kid"] = "12345"
@@ -1715,8 +1802,11 @@ func TestJWTRSAIdInClaimsWithoutBaseField(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
+	const testAPIID = "test-api-id"
+
 	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 		spec.UseKeylessAccess = false
+		spec.APIID = testAPIID
 		spec.EnableJWT = true
 		spec.JWTSigningMethod = RSASign
 		spec.JWTSource = base64.StdEncoding.EncodeToString([]byte(jwtRSAPubKey))
@@ -1725,7 +1815,13 @@ func TestJWTRSAIdInClaimsWithoutBaseField(t *testing.T) {
 		spec.Proxy.ListenPath = "/"
 	})
 
-	pID := ts.CreatePolicy()
+	pID := ts.CreatePolicy(func(p *user.Policy) {
+		p.AccessRights = map[string]user.AccessDefinition{
+			testAPIID: {
+				APIName: "test-api-name",
+			},
+		}
+	})
 
 	jwtToken := CreateJWKToken(func(t *jwt.Token) {
 		t.Header["kid"] = "12345"
@@ -1773,6 +1869,7 @@ func TestJWTDefaultPolicies(t *testing.T) {
 		}
 		p.Partitions = user.PolicyPartitions{
 			Quota: true,
+			Acl:   true,
 		}
 	})
 
@@ -2065,8 +2162,11 @@ func TestJWTExpOverride(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
+	const testAPIID = "test-api-id"
+
 	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 		spec.UseKeylessAccess = false
+		spec.APIID = testAPIID
 		spec.EnableJWT = true
 		spec.JWTSigningMethod = RSASign
 		spec.JWTSource = base64.StdEncoding.EncodeToString([]byte(jwtRSAPubKey))
@@ -2078,6 +2178,11 @@ func TestJWTExpOverride(t *testing.T) {
 		//create policy which sets keys to have expiry in one second
 		pID := ts.CreatePolicy(func(p *user.Policy) {
 			p.KeyExpiresIn = 1
+			p.AccessRights = map[string]user.AccessDefinition{
+				testAPIID: {
+					APIName: "test-api-name",
+				},
+			}
 		})
 
 		jwtToken := CreateJWKToken(func(t *jwt.Token) {
@@ -2098,6 +2203,11 @@ func TestJWTExpOverride(t *testing.T) {
 	t.Run("JWT expiration smaller then policy", func(t *testing.T) {
 		pID := ts.CreatePolicy(func(p *user.Policy) {
 			p.KeyExpiresIn = 5
+			p.AccessRights = map[string]user.AccessDefinition{
+				testAPIID: {
+					APIName: "test-api-name",
+				},
+			}
 		})
 
 		jwtToken := CreateJWKToken(func(t *jwt.Token) {
@@ -2117,6 +2227,11 @@ func TestJWTExpOverride(t *testing.T) {
 	t.Run("JWT expired but renewed, policy without expiration", func(t *testing.T) {
 		pID := ts.CreatePolicy(func(p *user.Policy) {
 			p.KeyExpiresIn = 0
+			p.AccessRights = map[string]user.AccessDefinition{
+				testAPIID: {
+					APIName: "test-api-name",
+				},
+			}
 		})
 
 		userID := uuid.New()
@@ -2325,8 +2440,11 @@ func TestJWT_ExtractOAuthClientIDForDCR(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
+	const testAPIID = "test-api-id"
+
 	api := ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 		spec.UseKeylessAccess = false
+		spec.APIID = testAPIID
 		spec.EnableJWT = true
 		spec.JWTSigningMethod = RSASign
 		spec.JWTSource = base64.StdEncoding.EncodeToString([]byte(jwtRSAPubKey))
@@ -2335,7 +2453,14 @@ func TestJWT_ExtractOAuthClientIDForDCR(t *testing.T) {
 		spec.Proxy.ListenPath = "/"
 	})[0]
 
-	pID := ts.CreatePolicy()
+	pID := ts.CreatePolicy(func(p *user.Policy) {
+		p.AccessRights = map[string]user.AccessDefinition{
+			testAPIID: {
+				APIName: "test-api-name",
+			},
+		}
+	})
+
 	userID := uuid.New()
 	const myOKTAClientID = "myOKTAClientID"
 

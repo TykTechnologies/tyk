@@ -455,16 +455,24 @@ func TestKeyHandler_UpdateKey(t *testing.T) {
 		}
 	})
 
+	pIdAccess := ts.CreatePolicy(func(p *user.Policy) {
+		p.Partitions.Acl = true
+		p.AccessRights = map[string]user.AccessDefinition{testAPIID: {
+			APIID: testAPIID, Versions: []string{"v1"},
+		}}
+		p.Tags = []string{"p3-tag"}
+		p.MetaData = map[string]interface{}{
+			"p3-meta": "p3-value",
+		}
+	})
+
 	session, key := ts.CreateSession(func(s *user.SessionState) {
-		s.ApplyPolicies = []string{pID}
+		s.ApplyPolicies = []string{pIdAccess, pID}
 		s.Tags = []string{"key-tag1", "key-tag2"}
 		s.MetaData = map[string]interface{}{
 			"key-meta1": "key-value1",
 			"key-meta2": "key-value2",
 		}
-		s.AccessRights = map[string]user.AccessDefinition{testAPIID: {
-			APIID: testAPIID, Versions: []string{"v1"},
-		}}
 	})
 
 	t.Run("Add policy not enforcing acl", func(t *testing.T) {
@@ -477,8 +485,8 @@ func TestKeyHandler_UpdateKey(t *testing.T) {
 		}...)
 
 		sessionState, found := ts.Gw.GlobalSessionManager.SessionDetail("default", key, false)
-		if !found || sessionState.AccessRights[testAPIID].APIID != testAPIID || len(sessionState.ApplyPolicies) != 2 {
-
+		_, exists := sessionState.AccessRights[testAPIID]
+		if !found || !exists || len(sessionState.ApplyPolicies) != 3 {
 			t.Fatal("Adding policy to the list failed")
 		}
 	})
@@ -493,7 +501,8 @@ func TestKeyHandler_UpdateKey(t *testing.T) {
 		}...)
 
 		sessionState, found := ts.Gw.GlobalSessionManager.SessionDetail("default", key, false)
-		if !found || sessionState.AccessRights[testAPIID].APIID != testAPIID || len(sessionState.ApplyPolicies) != 0 {
+		_, exists := sessionState.AccessRights[testAPIID]
+		if !found || !exists || len(sessionState.ApplyPolicies) != 0 {
 			t.Fatal("Removing policy from the list failed")
 		}
 	})
@@ -518,21 +527,21 @@ func TestKeyHandler_UpdateKey(t *testing.T) {
 		}
 
 		t.Run("Add", func(t *testing.T) {
-			expected := []string{"p1-tag", "p2-tag", "key-tag1", "key-tag2"}
-			session.ApplyPolicies = []string{pID, pID2}
+			expected := []string{"p1-tag", "p2-tag", "p3-tag", "key-tag1", "key-tag2"}
+			session.ApplyPolicies = []string{pID, pID2, pIdAccess}
 			assertTags(session, expected)
 		})
 
 		t.Run("Make unique", func(t *testing.T) {
-			expected := []string{"p1-tag", "p2-tag", "key-tag1", "key-tag2"}
-			session.ApplyPolicies = []string{pID, pID2}
+			expected := []string{"p1-tag", "p2-tag", "p3-tag", "key-tag1", "key-tag2"}
+			session.ApplyPolicies = []string{pID, pID2, pIdAccess}
 			session.Tags = append(session.Tags, "p1-tag", "key-tag1")
 			assertTags(session, expected)
 		})
 
 		t.Run("Remove", func(t *testing.T) {
-			expected := []string{"p1-tag", "p2-tag", "key-tag2"}
-			session.ApplyPolicies = []string{pID, pID2}
+			expected := []string{"p1-tag", "p2-tag", "p3-tag", "key-tag2"}
+			session.ApplyPolicies = []string{pID, pID2, pIdAccess}
 			session.Tags = []string{"key-tag2"}
 			assertTags(session, expected)
 		})
@@ -559,10 +568,11 @@ func TestKeyHandler_UpdateKey(t *testing.T) {
 			expected := map[string]interface{}{
 				"p1-meta":   "p1-value",
 				"p2-meta":   "p2-value",
+				"p3-meta":   "p3-value",
 				"key-meta1": "key-value1",
 				"key-meta2": "key-value2",
 			}
-			session.ApplyPolicies = []string{pID, pID2}
+			session.ApplyPolicies = []string{pID, pID2, pIdAccess}
 			assertMetaData(session, expected)
 		})
 
@@ -570,10 +580,11 @@ func TestKeyHandler_UpdateKey(t *testing.T) {
 			expected := map[string]interface{}{
 				"p1-meta":   "p1-value",
 				"p2-meta":   "p2-value",
+				"p3-meta":   "p3-value",
 				"key-meta1": "key-value1",
 				"key-meta2": "key-value2",
 			}
-			session.ApplyPolicies = []string{pID, pID2}
+			session.ApplyPolicies = []string{pID, pID2, pIdAccess}
 			assertMetaData(session, expected)
 		})
 
@@ -581,9 +592,10 @@ func TestKeyHandler_UpdateKey(t *testing.T) {
 			expected := map[string]interface{}{
 				"p1-meta":   "p1-value",
 				"p2-meta":   "p2-value",
+				"p3-meta":   "p3-value",
 				"key-meta2": "key-value2",
 			}
-			session.ApplyPolicies = []string{pID, pID2}
+			session.ApplyPolicies = []string{pID, pID2, pIdAccess}
 			session.MetaData = map[string]interface{}{
 				"key-meta2": "key-value2",
 			}
@@ -701,13 +713,14 @@ func TestKeyHandler_DeleteKeyWithQuota(t *testing.T) {
 
 					pID := ts.CreatePolicy(func(p *user.Policy) {
 						p.QuotaMax = 1
+						p.AccessRights = map[string]user.AccessDefinition{testAPIID: {
+							APIID: testAPIID,
+						}}
 					})
 
 					_, key := ts.CreateSession(func(s *user.SessionState) {
 						s.ApplyPolicies = []string{pID}
-						s.AccessRights = map[string]user.AccessDefinition{testAPIID: {
-							APIID: testAPIID,
-						}}
+
 					})
 
 					authHeaders := map[string]string{
@@ -741,7 +754,11 @@ func TestUpdateKeyWithCert(t *testing.T) {
 	defer ts.Close()
 
 	apiId := "MTLSApi"
-	pID := ts.CreatePolicy(func(p *user.Policy) {})
+	pID := ts.CreatePolicy(func(p *user.Policy) {
+		p.AccessRights = map[string]user.AccessDefinition{apiId: {
+			APIID: apiId, Versions: []string{"v1"},
+		}}
+	})
 
 	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 		spec.APIID = apiId
@@ -768,9 +785,6 @@ func TestUpdateKeyWithCert(t *testing.T) {
 		// create session base and set cert
 		session, key := ts.CreateSession(func(s *user.SessionState) {
 			s.ApplyPolicies = []string{pID}
-			s.AccessRights = map[string]user.AccessDefinition{apiId: {
-				APIID: apiId, Versions: []string{"v1"},
-			}}
 			s.Certificate = certID
 		})
 
@@ -813,9 +827,6 @@ func TestUpdateKeyWithCert(t *testing.T) {
 		// create session base and set cert
 		session, key := ts.CreateSession(func(s *user.SessionState) {
 			s.ApplyPolicies = []string{pID}
-			s.AccessRights = map[string]user.AccessDefinition{apiId: {
-				APIID: apiId, Versions: []string{"v1"},
-			}}
 			s.Certificate = certID
 		})
 
@@ -3900,6 +3911,71 @@ func TestOrgKeyHandler_LastUpdated(t *testing.T) {
 			return true
 		}},
 	}...)
+}
+
+func TestDeletionOfPoliciesThatFromAKeyDoesNotMakeTheAPIKeyless(t *testing.T) {
+	const testAPIID = "testAPIID"
+
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	apiID1 := testAPIID + "1"
+	apiID2 := testAPIID + "2"
+
+	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		spec.APIID = apiID1
+		spec.UseKeylessAccess = false
+		spec.OrgID = "default"
+		spec.Proxy.ListenPath = "/api1"
+	}, func(spec *APISpec) {
+		spec.APIID = apiID2
+		spec.UseKeylessAccess = false
+		spec.OrgID = "default"
+		spec.Proxy.ListenPath = "/api2"
+	})
+
+	policyForApi1 := ts.CreatePolicy(func(p *user.Policy) {
+		p.AccessRights = map[string]user.AccessDefinition{apiID1: {
+			APIID: apiID1,
+		}}
+	})
+
+	policyForApi2 := ts.CreatePolicy(func(p *user.Policy) {
+		p.AccessRights = map[string]user.AccessDefinition{apiID2: {
+			APIID: apiID2,
+		}}
+	})
+
+	_, key := ts.CreateSession(func(s *user.SessionState) {
+		s.ApplyPolicies = []string{policyForApi1, policyForApi2}
+	})
+
+	authHeaders := map[string]string{
+		"authorization": key,
+	}
+
+	res, err := ts.Run(t, []test.TestCase{
+		{Method: "GET", Path: "/api1", Headers: authHeaders, Code: 200},
+		{Method: "GET", Path: "/api2", Headers: authHeaders, Code: 200},
+	}...)
+	assert.NotNil(t, res)
+	assert.Nil(t, err)
+
+	ts.DeletePolicy(policyForApi2)
+	res, err = ts.Run(t, []test.TestCase{
+		{Method: "GET", Path: "/api1", Headers: authHeaders, Code: 200},
+		{Method: "GET", Path: "/api2", Headers: authHeaders, Code: 403},
+	}...)
+	assert.NotNil(t, res)
+	assert.Nil(t, err)
+
+	ts.DeletePolicy(policyForApi1)
+	res, err = ts.Run(t, []test.TestCase{
+		{Method: "GET", Path: "/api1", Headers: authHeaders, Code: 403},
+		{Method: "GET", Path: "/api2", Headers: authHeaders, Code: 403},
+	}...)
+	assert.NotNil(t, res)
+	assert.Nil(t, err)
 }
 
 func TestPurgeOAuthClientTokensEndpoint(t *testing.T) {
