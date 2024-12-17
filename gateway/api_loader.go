@@ -26,6 +26,7 @@ import (
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/trace"
 
+	"github.com/TykTechnologies/tyk/internal/httputil"
 	"github.com/TykTechnologies/tyk/internal/otel"
 )
 
@@ -752,7 +753,13 @@ func explicitRouteSubpaths(prefix string, handler http.Handler, enabled bool) ht
 //
 // - register gorilla/mux routing handless with proxyMux directly (wrapped),
 // - return a raw http.Handler for tyk://ID urls.
-func (gw *Gateway) loadHTTPService(spec *APISpec, apisByListen map[string]int, gs *generalStores, muxer *proxyMux) *ChainObject {
+func (gw *Gateway) loadHTTPService(spec *APISpec, apisByListen map[string]int, gs *generalStores, muxer *proxyMux) (*ChainObject, error) {
+	// MakeSpec validates listenpath, but we can't be sure that it's in all the invocation paths.
+	// Since the check is relatively inexpensive, do it here to prevent issues in uncovered paths.
+	if err := httputil.ValidatePath(spec.Proxy.ListenPath); err != nil {
+		return nil, fmt.Errorf("invalid listen path while loading api: %w", err)
+	}
+
 	gwConfig := gw.GetConfig()
 	port := gwConfig.ListenPort
 	if spec.ListenPort != 0 {
@@ -784,7 +791,7 @@ func (gw *Gateway) loadHTTPService(spec *APISpec, apisByListen map[string]int, g
 	}
 
 	if chainObj.Skip {
-		return chainObj
+		return chainObj, nil
 	}
 
 	// Prefixes are multiple paths that the API endpoints are listening on.
@@ -811,7 +818,7 @@ func (gw *Gateway) loadHTTPService(spec *APISpec, apisByListen map[string]int, g
 		subrouter.NewRoute().Handler(httpHandler)
 	}
 
-	return chainObj
+	return chainObj, nil
 }
 
 func (gw *Gateway) loadTCPService(spec *APISpec, gs *generalStores, muxer *proxyMux) {
@@ -994,7 +1001,12 @@ func (gw *Gateway) loadApps(specs []*APISpec) {
 						mainLog.Infof("Intialized tracer  api_name=%q", spec.Name)
 					}
 				}
-				tmpSpecHandles.Store(spec.APIID, gw.loadHTTPService(spec, apisByListen, &gs, muxer))
+				tmpSpecHandle, err := gw.loadHTTPService(spec, apisByListen, &gs, muxer)
+				if err != nil {
+					log.WithError(err).Errorf("error loading API")
+					return
+				}
+				tmpSpecHandles.Store(spec.APIID, tmpSpecHandle)
 			case "tcp", "tls":
 				gw.loadTCPService(spec, &gs, muxer)
 			}
