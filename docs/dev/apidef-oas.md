@@ -6,6 +6,18 @@ To ensure feature parity between Tyk OAS APIs and Tyk classic API definitions, f
 
 Define the necessary structs or add the necessary fields in the `apidef/oas` package.
 
+If an `enabled` flag is specified in the OAS contract, make sure a corresponding `disabled` or `enabled` flag is added in the classic API definition.
+
+Also make sure that `disabled`/`enabled` flag toggles the feature on or off. 
+
+### Why `disabled` or `enabled` in classic API definition?
+
+Historically, almost every feature/middleware in Tyk is considered enabled by default when value for feature controls are non zero values.
+It is disabled when the feature controls are having zero values.
+For this reason, whenever an existing feature is migrated to OAS, and OAS has an `enabled` flag then a `disabled` flag is added to give explicit control to turn off the feature.
+
+Please also make sure that the disabled flags are set to true in `APIDefinition.SetDisabledFlags()`, so that it is not enabled in OAS by default.
+
 ## Use camelCase Notation
 
 Ensure OAS fields follow `camelCase` notation for `json` and `bson` tags.
