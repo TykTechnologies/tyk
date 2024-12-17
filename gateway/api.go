@@ -3182,7 +3182,7 @@ func ctxCheckLimits(r *http.Request) bool {
 	}
 
 	// If looping disabled, allow all
-	if !ctxLoopingEnabled(r) {
+	if ctxLoopingEnabled(r) {
 		return true
 	}
 
