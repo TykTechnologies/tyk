@@ -328,11 +328,11 @@ func TestLooping(t *testing.T) {
 
 	t.Run("Looping to another api with auth tokens", func(t *testing.T) {
 		specs := ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
-			spec.APIID = "apia"
-			spec.Name = "ApiA"
-			spec.Proxy.ListenPath = "/apia"
-			spec.UseKeylessAccess = false
-			spec.AuthConfigs = map[string]apidef.AuthConfig{
+			spec.APIDefinition.APIID = "apia"
+			spec.APIDefinition.Name = "ApiA"
+			spec.APIDefinition.Proxy.ListenPath = "/apia"
+			spec.APIDefinition.UseKeylessAccess = false
+			spec.APIDefinition.AuthConfigs = map[string]apidef.AuthConfig{
 				"authToken": {
 					AuthHeaderName: "Authorization",
 				},
@@ -347,11 +347,11 @@ func TestLooping(t *testing.T) {
 				}}
 			})
 		}, func(spec *APISpec) {
-			spec.APIID = "apib"
-			spec.Name = "ApiB"
-			spec.Proxy.ListenPath = "/apib"
-			spec.UseKeylessAccess = false
-			spec.AuthConfigs = map[string]apidef.AuthConfig{
+			spec.APIDefinition.APIID = "apib"
+			spec.APIDefinition.Name = "ApiB"
+			spec.APIDefinition.Proxy.ListenPath = "/apib"
+			spec.APIDefinition.UseKeylessAccess = false
+			spec.APIDefinition.AuthConfigs = map[string]apidef.AuthConfig{
 				"authToken": {
 					AuthHeaderName: "X-Api-Key",
 				},
@@ -362,26 +362,26 @@ func TestLooping(t *testing.T) {
 
 		_, authKeyForApiA := ts.CreateSession(func(s *user.SessionState) {
 			s.AccessRights = map[string]user.AccessDefinition{
-				specApiA.APIID: {
-					APIName:        specApiA.Name,
-					APIID:          specApiA.APIID,
+				specApiA.APIDefinition.APIID: {
+					APIName:        specApiA.APIDefinition.Name,
+					APIID:          specApiA.APIDefinition.APIID,
 					Versions:       []string{"default"},
-					AllowanceScope: specApiA.APIID,
+					AllowanceScope: specApiA.APIDefinition.APIID,
 				},
 			}
-			s.OrgID = specApiA.OrgID
+			s.OrgID = specApiA.APIDefinition.OrgID
 		})
 
 		_, authKeyForApiB := ts.CreateSession(func(s *user.SessionState) {
 			s.AccessRights = map[string]user.AccessDefinition{
-				specApiB.APIID: {
-					APIName:        specApiB.Name,
-					APIID:          specApiB.APIID,
+				specApiB.APIDefinition.APIID: {
+					APIName:        specApiB.APIDefinition.Name,
+					APIID:          specApiB.APIDefinition.APIID,
 					Versions:       []string{"default"},
-					AllowanceScope: specApiB.APIID,
+					AllowanceScope: specApiB.APIDefinition.APIID,
 				},
 			}
-			s.OrgID = specApiB.OrgID
+			s.OrgID = specApiB.APIDefinition.OrgID
 		})
 
 		headersWithApiBToken := map[string]string{
