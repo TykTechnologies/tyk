@@ -1,6 +1,7 @@
 package graphql
 
 import (
+	"errors"
 	"strings"
 
 	"github.com/TykTechnologies/graphql-go-tools/pkg/astparser"
@@ -29,11 +30,11 @@ func NewGraphStatsExtractor() *GraphStatsExtractionVisitor {
 }
 
 func (g *GraphStatsExtractionVisitor) GraphErrors(response []byte) ([]string, error) {
-	errors := make([]string, 0)
+	errs := make([]string, 0)
 	errBytes, t, _, err := jsonparser.Get(response, "errors")
 	// check if the errors key exists in the response
 	if err != nil {
-		if err == jsonparser.KeyPathNotFoundError {
+		if errors.Is(err, jsonparser.KeyPathNotFoundError) {
 			return nil, nil
 		}
 		return nil, err
@@ -44,12 +45,12 @@ func (g *GraphStatsExtractionVisitor) GraphErrors(response []byte) ([]string, er
 			if err != nil {
 				return
 			}
-			errors = append(errors, message)
+			errs = append(errs, message)
 		}); err != nil {
 			return nil, err
 		}
 	}
-	return errors, nil
+	return errs, nil
 }
 
 func (g *GraphStatsExtractionVisitor) ExtractStats(rawRequest, response, schema string) (analytics.GraphQLStats, error) {
@@ -87,7 +88,7 @@ func (g *GraphStatsExtractionVisitor) ExtractStats(rawRequest, response, schema 
 		if t == string(g.schema.Index.QueryTypeName) || t == string(g.schema.Index.MutationTypeName) || t == string(g.schema.Index.SubscriptionTypeName) {
 			isRootOperationType = true
 		}
-		for field, _ := range fields {
+		for field := range fields {
 			if isRootOperationType {
 				rootFields = append(rootFields, field)
 			} else {

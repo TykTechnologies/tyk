@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"archive/zip"
+	"bufio"
 	"bytes"
 	"compress/gzip"
 	"context"
@@ -12,7 +13,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	mathRand "math/rand"
+	mathrand "math/rand"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -26,6 +27,7 @@ import (
 	"time"
 
 	"github.com/getkin/kin-openapi/openapi3"
+	"github.com/stretchr/testify/assert"
 
 	"github.com/TykTechnologies/tyk/apidef/oas"
 
@@ -37,6 +39,7 @@ import (
 	"github.com/gorilla/websocket"
 
 	"github.com/TykTechnologies/tyk/internal/httputil"
+	"github.com/TykTechnologies/tyk/internal/model"
 	"github.com/TykTechnologies/tyk/internal/otel"
 	"github.com/TykTechnologies/tyk/internal/uuid"
 
@@ -175,6 +178,7 @@ func (r *ReloadMachinery) Queued() bool {
 // EnsureQueued this will block until any queue happens. It will timeout after
 // 100ms
 func (r *ReloadMachinery) EnsureQueued(t *testing.T) {
+	t.Helper()
 	tick := time.NewTicker(time.Millisecond)
 	defer tick.Stop()
 
@@ -198,6 +202,8 @@ func (r *ReloadMachinery) EnsureQueued(t *testing.T) {
 // EnsureReloaded this will block until any reload happens. It will timeout after
 // 200ms
 func (r *ReloadMachinery) EnsureReloaded(t *testing.T) {
+	t.Helper()
+
 	tick := time.NewTicker(time.Millisecond)
 	defer tick.Stop()
 	for {
@@ -225,6 +231,8 @@ func (r *ReloadMachinery) Tick() {
 // TickOk triggers a reload and ensures a queue happened and a reload cycle
 // happens. This will block until all the cases are met.
 func (r *ReloadMachinery) TickOk(t *testing.T) {
+	t.Helper()
+
 	r.EnsureQueued(t)
 	r.Tick()
 	r.EnsureReloaded(t)
@@ -232,6 +240,9 @@ func (r *ReloadMachinery) TickOk(t *testing.T) {
 
 func InitTestMain(ctx context.Context, m *testing.M) int {
 	test.InitTestMain(ctx, m)
+
+	bundleBackoffMultiplier = 0
+	bundleMaxBackoffRetries = 0
 
 	if EnableTestDNSMock {
 		var errMock error
@@ -963,7 +974,7 @@ func TestReq(t testing.TB, method, urlStr string, body interface{}) *http.Reques
 func (gw *Gateway) CreateDefinitionFromString(defStr string) *APISpec {
 	loader := APIDefinitionLoader{Gw: gw}
 	def := loader.ParseDefinition(strings.NewReader(defStr))
-	spec, _ := loader.MakeSpec(&nestedApiDefinition{APIDefinition: &def}, nil)
+	spec, _ := loader.MakeSpec(&model.MergedAPI{APIDefinition: &def}, nil)
 	return spec
 }
 
@@ -1119,7 +1130,7 @@ func (s *Test) newGateway(genConf func(globalConf *config.Config)) *Gateway {
 	s.MockHandle = MockHandle
 
 	var err error
-	gwConfig.Storage.Database = mathRand.Intn(15)
+	gwConfig.Storage.Database = mathrand.Intn(15)
 	gwConfig.AppPath, err = ioutil.TempDir("", "tyk-test-")
 
 	if err != nil {
@@ -1179,7 +1190,7 @@ func (s *Test) newGateway(genConf func(globalConf *config.Config)) *Gateway {
 
 	cli.Init(confPaths)
 
-	err = gw.initialiseSystem()
+	err = gw.initSystem()
 	if err != nil {
 		panic(err)
 	}
@@ -1302,11 +1313,23 @@ func (s *Test) Close() {
 // RemoveApis clean all the apis from a living gw
 func (s *Test) RemoveApis() error {
 	s.Gw.apisMu.Lock()
-	defer s.Gw.apisMu.Unlock()
-	s.Gw.apiSpecs = []*APISpec{}
-	s.Gw.apisByID = map[string]*APISpec{}
+	defer func() {
+		s.Gw.apiSpecs = []*APISpec{}
+		s.Gw.apisByID = map[string]*APISpec{}
+		s.Gw.apisMu.Unlock()
+	}()
+
+	// clear bundle caches
+	for _, spec := range s.Gw.apiSpecs {
+		destPath := s.Gw.getBundleDestPath(spec)
+		if _, err := os.Stat(destPath); err == nil {
+			err = os.RemoveAll(destPath)
+			log.WithError(err).Infof("Clearing bundle cache: %s", destPath)
+		}
+	}
 
 	err := os.RemoveAll(s.Gw.GetConfig().AppPath)
+
 	if err != nil {
 		log.WithError(err).Error("removing apis from gw")
 	}
@@ -1321,6 +1344,8 @@ func (s *Test) Run(t testing.TB, testCases ...test.TestCase) (*http.Response, er
 
 // TODO:(gernest) when hot reload is supported enable this.
 func (s *Test) RunExt(t testing.TB, testCases ...test.TestCase) {
+	t.Helper()
+
 	s.Run(t, testCases...)
 	var testMatrix = []struct {
 		goagain          bool
@@ -1929,7 +1954,7 @@ func GenerateTestBinaryData() (buf *bytes.Buffer) {
 		c uint32
 	}
 	for i := 0; i < 10; i++ {
-		s := &testData{mathRand.Float32(), mathRand.Float64(), mathRand.Uint32()}
+		s := &testData{mathrand.Float32(), mathrand.Float64(), mathrand.Uint32()}
 		binary.Write(buf, binary.BigEndian, s)
 	}
 	return buf
@@ -1984,7 +2009,7 @@ func randStringBytes(n int) string {
 	b := make([]byte, n)
 
 	for i := range b {
-		b[i] = letters[mathRand.Intn(len(letters))]
+		b[i] = letters[mathrand.Intn(len(letters))]
 	}
 
 	return string(b)
@@ -2007,4 +2032,70 @@ func (m *testMessageAdapter) Channel() (string, error) {
 // Payload returns the message payload.
 func (m *testMessageAdapter) Payload() (string, error) {
 	return m.Msg, nil
+}
+
+func TestHelperSSEServer(tb testing.TB) *httptest.Server {
+	tb.Helper()
+	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "text/event-stream")
+		w.Header().Set("Connection", "keep-alive")
+
+		flusher, ok := w.(http.Flusher)
+		assert.True(tb, ok)
+		for i := 0; i < 5; i++ {
+			fmt.Fprintf(w, "data: %d\n", i)
+			flusher.Flush()
+			time.Sleep(50 * time.Millisecond)
+		}
+	}))
+}
+func TestHelperSSEStreamClient(tb testing.TB, ts *Test, enableWebSockets bool) error {
+	tb.Helper()
+
+	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, ts.URL, nil)
+	assert.NoError(tb, err)
+	req.Header.Set("Accept", "text/event-stream")
+	client := http.Client{}
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+
+	globalConf := ts.Gw.GetConfig()
+	globalConf.HttpServerOptions.EnableWebSockets = enableWebSockets
+	ts.Gw.SetConfig(globalConf)
+
+	res, err := client.Do(req)
+	assert.NoError(tb, err)
+
+	reader := bufio.NewReader(res.Body)
+	defer res.Body.Close()
+
+	i := 0
+	okChan := make(chan error)
+
+	go func() {
+		for {
+			line, err := reader.ReadBytes('\n')
+			if err != nil && assert.ErrorContains(tb, err, io.EOF.Error()) {
+				err = nil
+			}
+
+			assert.NoError(tb, err)
+
+			if len(line) == 0 {
+				break
+			}
+
+			assert.Equal(tb, fmt.Sprintf("data: %v\n", i), string(line))
+			i++
+		}
+		close(okChan)
+	}()
+
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-okChan:
+	}
+	assert.Equal(tb, i, 5)
+	return nil
 }

@@ -42,12 +42,14 @@ func (p *Policy) APILimit() APILimit {
 	return APILimit{
 		QuotaMax:           p.QuotaMax,
 		QuotaRenewalRate:   p.QuotaRenewalRate,
-		Rate:               p.Rate,
-		Per:                p.Per,
 		ThrottleInterval:   p.ThrottleInterval,
 		ThrottleRetryLimit: p.ThrottleRetryLimit,
 		MaxQueryDepth:      p.MaxQueryDepth,
-		Smoothing:          p.Smoothing,
+		RateLimit: RateLimit{
+			Rate:      p.Rate,
+			Per:       p.Per,
+			Smoothing: p.Smoothing,
+		},
 	}
 }
 
@@ -57,4 +59,9 @@ type PolicyPartitions struct {
 	Complexity bool `bson:"complexity" json:"complexity"`
 	Acl        bool `bson:"acl" json:"acl"`
 	PerAPI     bool `bson:"per_api" json:"per_api"`
+}
+
+// Enabled reports if partitioning is enabled.
+func (p PolicyPartitions) Enabled() bool {
+	return p.Quota || p.RateLimit || p.Acl || p.Complexity
 }

@@ -5,17 +5,17 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/TykTechnologies/graphql-go-tools/pkg/engine/datasource/httpclient"
-
-	"github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
-	"github.com/TykTechnologies/tyk-pump/analytics"
-	"github.com/TykTechnologies/tyk/test"
-
 	"github.com/stretchr/testify/assert"
+
+	"github.com/TykTechnologies/graphql-go-tools/pkg/engine/datasource/httpclient"
+	"github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
+
+	"github.com/TykTechnologies/tyk-pump/analytics"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
 	ctxpkg "github.com/TykTechnologies/tyk/ctx"
+	"github.com/TykTechnologies/tyk/test"
 	"github.com/TykTechnologies/tyk/user"
 )
 
@@ -102,6 +102,13 @@ func TestRecordDetail(t *testing.T) {
 			},
 			expect: true,
 		},
+		{
+			title: "graphql request",
+			spec: testAPISpec(func(spec *APISpec) {
+				spec.GraphQL.Enabled = true
+			}),
+			expect: true,
+		},
 	}
 
 	for _, tc := range testcases {
@@ -142,6 +149,7 @@ func TestAnalyticRecord_GraphStats(t *testing.T) {
 				Query: `{ hello(name: "World") httpMethod }`,
 			},
 			checkFunc: func(t *testing.T, record *analytics.AnalyticsRecord) {
+				t.Helper()
 				assert.True(t, record.GraphQLStats.IsGraphQL)
 				assert.False(t, record.GraphQLStats.HasErrors)
 				assert.ElementsMatch(t, []string{"hello", "httpMethod"}, record.GraphQLStats.RootFields)
@@ -157,6 +165,7 @@ func TestAnalyticRecord_GraphStats(t *testing.T) {
 				Variables: []byte(`{"in":"hello"}`),
 			},
 			checkFunc: func(t *testing.T, record *analytics.AnalyticsRecord) {
+				t.Helper()
 				assert.True(t, record.GraphQLStats.IsGraphQL)
 				assert.False(t, record.GraphQLStats.HasErrors)
 				assert.ElementsMatch(t, []string{"httpMethod", "hello"}, record.GraphQLStats.RootFields)
@@ -177,6 +186,7 @@ func TestAnalyticRecord_GraphStats(t *testing.T) {
 				spec.EnableDetailedRecording = true
 			},
 			checkFunc: func(t *testing.T, record *analytics.AnalyticsRecord) {
+				t.Helper()
 				assert.True(t, record.GraphQLStats.IsGraphQL)
 				assert.True(t, record.GraphQLStats.HasErrors)
 				assert.ElementsMatch(t, []string{"hello", "httpMethod"}, record.GraphQLStats.RootFields)
@@ -199,6 +209,7 @@ func TestAnalyticRecord_GraphStats(t *testing.T) {
 				spec.Proxy.TargetURL = testGraphQLProxyUpstreamError
 			},
 			checkFunc: func(t *testing.T, record *analytics.AnalyticsRecord) {
+				t.Helper()
 				assert.True(t, record.GraphQLStats.IsGraphQL)
 				assert.True(t, record.GraphQLStats.HasErrors)
 				assert.ElementsMatch(t, []string{"hello", "httpMethod"}, record.GraphQLStats.RootFields)

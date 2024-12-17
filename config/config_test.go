@@ -149,7 +149,8 @@ func TestConfigFiles(t *testing.T) {
 
 func TestConfig_GetEventTriggers(t *testing.T) {
 
-	assert := func(t *testing.T, config string, expected string) {
+	assertFunc := func(t *testing.T, config string, expected string) {
+		t.Helper()
 		conf := &Config{}
 
 		f, err := ioutil.TempFile("", "tyk.conf")
@@ -178,17 +179,17 @@ func TestConfig_GetEventTriggers(t *testing.T) {
 
 	t.Run("Deprecated configuration", func(t *testing.T) {
 		deprecated := `{"event_trigers_defunct": {"deprecated": []}}`
-		assert(t, deprecated, "deprecated")
+		assertFunc(t, deprecated, "deprecated")
 	})
 
 	t.Run("Current configuration", func(t *testing.T) {
 		current := `{"event_triggers_defunct": {"current": []}}`
-		assert(t, current, "current")
+		assertFunc(t, current, "current")
 	})
 
 	t.Run("Both configured", func(t *testing.T) {
 		both := `{"event_trigers_defunct": {"deprecated": []}, "event_triggers_defunct": {"current": []}}`
-		assert(t, both, "current")
+		assertFunc(t, both, "current")
 	})
 
 }

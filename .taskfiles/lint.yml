@@ -29,26 +29,41 @@ tasks:
 
   x-tyk-gateway:
     desc: "Lint x-tyk-gateway schema"
+    dir: '{{.root}}'
     cmds:
       - go test -run=TestXTykGateway_Lint -v ./apidef/oas/
 
   vet:
     desc: "Run go vet"
+    dir: '{{.root}}'
     cmds:
       - go vet ./...
 
   golangci-lint:
     desc: "Run golangci-lint"
+    dir: '{{.root}}'
     require: [args]
     cmds:
       - golangci-lint run {{.args}} -v ./...
 
   goimports:
     desc: "Run goimports"
+    dir: '{{.root}}'
     cmds:
       - goimports -local {{.package | dir}},{{.package}}/internal -w .
 
   gofmt:
     desc: "Run gofmt"
+    dir: '{{.root}}'
     cmds:
       - gofmt -w .
+
+  simple-build:
+    desc: "Run go build for sanity check"
+    cmds:
+      - go build .
+
+  compile-tests:
+    desc: "Compile go tests for sanity check"
+    cmds:
+      - cd gateway && go test -c .

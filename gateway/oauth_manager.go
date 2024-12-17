@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math"
 	"net/http"
@@ -17,7 +18,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"golang.org/x/crypto/bcrypt"
 
-	"github.com/TykTechnologies/tyk/internal/errors"
+	internalerrors "github.com/TykTechnologies/tyk/internal/errors"
 	"github.com/TykTechnologies/tyk/internal/uuid"
 	"github.com/TykTechnologies/tyk/request"
 
@@ -339,6 +340,10 @@ type OAuthManager struct {
 	API        *APISpec
 	OsinServer *TykOsinServer
 	Gw         *Gateway `json:"-"`
+}
+
+func (o *OAuthManager) Storage() ExtendedOsinStorageInterface {
+	return o.OsinServer.Storage
 }
 
 // HandleAuthorisation creates the authorisation data for the request
@@ -1231,7 +1236,7 @@ func (gw *Gateway) purgeLapsedOAuthTokens() error {
 	close(errs)
 
 	combinedErr := &multierror.Error{
-		ErrorFormat: errors.Formatter,
+		ErrorFormat: internalerrors.Formatter,
 	}
 
 	for err := range errs {

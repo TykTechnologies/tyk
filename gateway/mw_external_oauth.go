@@ -38,6 +38,10 @@ func (k *ExternalOAuthMiddleware) Name() string {
 }
 
 func (k *ExternalOAuthMiddleware) EnabledForSpec() bool {
+	if k.Spec.ExternalOAuth.Enabled {
+		log.Warn("Support for external OAuth Middleware will be deprecated starting from 5.7.0. To avoid any disruptions, we recommend that you use JSON Web Token (JWT) instead, as explained in https://tyk.io/docs/basic-config-and-security/security/authentication-authorization/ext-oauth-middleware/")
+	}
+
 	return k.Spec.ExternalOAuth.Enabled
 }
 
@@ -229,7 +233,7 @@ func (k *ExternalOAuthMiddleware) introspection(accessToken string) (bool, strin
 		log.WithError(err).Debug("Doing OAuth introspection call")
 		claims, err = introspect(opts, accessToken)
 		if err != nil {
-			return false, "", fmt.Errorf("introspection err: %s", err)
+			return false, "", fmt.Errorf("introspection err: %w", err)
 		}
 
 		if opts.Cache.Enabled {
@@ -331,20 +335,20 @@ func introspect(opts apidef.Introspection, accessToken string) (jwt.MapClaims, e
 
 	res, err := http.Post(opts.URL, "application/x-www-form-urlencoded", strings.NewReader(body.Encode()))
 	if err != nil {
-		return nil, fmt.Errorf("error happened during the introspection call: %s", err)
+		return nil, fmt.Errorf("error happened during the introspection call: %w", err)
 	}
 
 	defer res.Body.Close()
 
 	bodyInBytes, err := io.ReadAll(res.Body)
 	if err != nil {
-		return nil, fmt.Errorf("couldn't read the introspection call response: %s", err)
+		return nil, fmt.Errorf("couldn't read the introspection call response: %w", err)
 	}
 
 	var claims jwt.MapClaims
 	err = json.Unmarshal(bodyInBytes, &claims)
 	if err != nil {
-		return nil, fmt.Errorf("couldn't unmarshal the introspection call response: %s", err)
+		return nil, fmt.Errorf("couldn't unmarshal the introspection call response: %w", err)
 	}
 
 	if res.StatusCode != http.StatusOK {

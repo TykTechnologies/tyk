@@ -5,7 +5,7 @@ FROM debian:bookworm AS assets
 # If you need to tweak the environment for testing, you can override the
 # `GO_VERSION` and `PYTHON_VERSION` as docker build arguments.
 
-ARG GO_VERSION=1.21.4
+ARG GO_VERSION=1.22.6
 ARG PYTHON_VERSION=3.11.6
 
 WORKDIR /assets
@@ -16,7 +16,7 @@ RUN	apt update && apt install wget -y && \
 
 FROM debian:bookworm
 
-ARG GO_VERSION=1.21.4
+ARG GO_VERSION=1.22.6
 ARG PYTHON_VERSION=3.11.6
 
 COPY --from=assets /assets/ /tmp/

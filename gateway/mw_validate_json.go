@@ -59,7 +59,7 @@ func (k *ValidateJSON) ProcessRequest(w http.ResponseWriter, r *http.Request, _ 
 	// Perform validation
 	result, err := gojsonschema.Validate(vPathMeta.SchemaCache, inputLoader)
 	if err != nil {
-		return fmt.Errorf("JSON parsing error: %v", err), http.StatusBadRequest
+		return fmt.Errorf("JSON parsing error: %w", err), http.StatusBadRequest
 	}
 
 	// Handle Failure

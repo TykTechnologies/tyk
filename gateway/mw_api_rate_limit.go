@@ -1,6 +1,7 @@
 package gateway
 
 import (
+	"fmt"
 	"net/http"
 
 	"strconv"
@@ -24,8 +25,54 @@ func (k *RateLimitForAPI) Name() string {
 	return "RateLimitForAPI"
 }
 
+func (k *RateLimitForAPI) shouldEnable() bool {
+	if k.Spec.DisableRateLimit {
+		return false
+	}
+
+	// per endpoint rate limits
+	for _, version := range k.Spec.VersionData.Versions {
+		for _, v := range version.ExtendedPaths.RateLimit {
+			if !v.Disabled {
+				return true
+			}
+		}
+	}
+
+	// global api rate limit
+	if k.Spec.GlobalRateLimit.Rate == 0 || k.Spec.GlobalRateLimit.Disabled {
+		return false
+	}
+
+	return true
+}
+
+func (k *RateLimitForAPI) getSession(r *http.Request) *user.SessionState {
+	versionInfo, _ := k.Spec.Version(r)
+	versionPaths := k.Spec.RxPaths[versionInfo.Name]
+
+	spec, ok := k.Spec.FindSpecMatchesStatus(r, versionPaths, RateLimit)
+	if ok {
+		if limits := spec.RateLimit; limits.Valid() {
+			// track per-endpoint with a hash of the path
+			keyname := k.keyName + "-" + storage.HashStr(fmt.Sprintf("%s:%s", limits.Method, limits.Path))
+
+			session := &user.SessionState{
+				Rate:        limits.Rate,
+				Per:         limits.Per,
+				LastUpdated: k.apiSess.LastUpdated,
+			}
+			session.SetKeyHash(storage.HashKey(keyname, k.Gw.GetConfig().HashKeys))
+
+			return session
+		}
+	}
+
+	return k.apiSess
+}
+
 func (k *RateLimitForAPI) EnabledForSpec() bool {
-	if k.Spec.DisableRateLimit || k.Spec.GlobalRateLimit.Rate == 0 || k.Spec.GlobalRateLimit.Disabled {
+	if !k.shouldEnable() {
 		return false
 	}
 
@@ -55,7 +102,7 @@ func (k *RateLimitForAPI) ProcessRequest(w http.ResponseWriter, r *http.Request,
 
 	reason := k.Gw.SessionLimiter.ForwardMessage(
 		r,
-		k.apiSess,
+		k.getSession(r),
 		k.keyName,
 		customQuotaKey,
 		storeRef,

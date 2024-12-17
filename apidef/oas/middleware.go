@@ -63,7 +63,7 @@ type Global struct {
 	// Deprecated: Use PostAuthenticationPlugins instead.
 	PostAuthenticationPlugin *PostAuthenticationPlugin `bson:"postAuthenticationPlugin,omitempty" json:"postAuthenticationPlugin,omitempty"`
 
-	// PostAuthenticationPlugin contains configuration related to the custom plugin that is run immediately after authentication.
+	// PostAuthenticationPlugins contains configuration related to the custom plugin that is run immediately after authentication.
 	// Tyk classic API definition: `custom_middleware.post_key_auth`.
 	PostAuthenticationPlugins CustomPlugins `bson:"postAuthenticationPlugins,omitempty" json:"postAuthenticationPlugins,omitempty"`
 
@@ -75,7 +75,7 @@ type Global struct {
 	// Tyk classic API definition: `custom_middleware.post`.
 	PostPlugins CustomPlugins `bson:"postPlugins,omitempty" json:"postPlugins,omitempty"`
 
-	// Deprecated: ResponsePlugin contains configuration related to the custom plugin that is run during processing of the response from the upstream service.
+	// ResponsePlugin contains configuration related to the custom plugin that is run during processing of the response from the upstream service.
 	// Deprecated: Use ResponsePlugins instead.
 	ResponsePlugin *ResponsePlugin `bson:"responsePlugin,omitempty" json:"responsePlugin,omitempty"`
 
@@ -414,6 +414,7 @@ func (g *Global) extractResponsePluginsTo(api *apidef.APIDefinition) {
 	if g.ResponsePlugins != nil {
 		api.CustomMiddleware.Response = make([]apidef.MiddlewareDefinition, len(g.ResponsePlugins))
 		g.ResponsePlugins.ExtractTo(api.CustomMiddleware.Response)
+		return
 	}
 
 	if g.ResponsePlugin == nil {
@@ -796,14 +797,23 @@ func (ps Paths) ExtractTo(ep *apidef.ExtendedPathsSet) {
 
 // Path holds plugin configurations for HTTP method verbs.
 type Path struct {
-	Delete  *Plugins `bson:"DELETE,omitempty" json:"DELETE,omitempty"`
-	Get     *Plugins `bson:"GET,omitempty" json:"GET,omitempty"`
-	Head    *Plugins `bson:"HEAD,omitempty" json:"HEAD,omitempty"`
+	// Delete holds plugin configuration for DELETE requests.
+	Delete *Plugins `bson:"DELETE,omitempty" json:"DELETE,omitempty"`
+	// Get holds plugin configuration for GET requests.
+	Get *Plugins `bson:"GET,omitempty" json:"GET,omitempty"`
+	// Head holds plugin configuration for HEAD requests.
+	Head *Plugins `bson:"HEAD,omitempty" json:"HEAD,omitempty"`
+	// Options holds plugin configuration for OPTIONS requests.
 	Options *Plugins `bson:"OPTIONS,omitempty" json:"OPTIONS,omitempty"`
-	Patch   *Plugins `bson:"PATCH,omitempty" json:"PATCH,omitempty"`
-	Post    *Plugins `bson:"POST,omitempty" json:"POST,omitempty"`
-	Put     *Plugins `bson:"PUT,omitempty" json:"PUT,omitempty"`
-	Trace   *Plugins `bson:"TRACE,omitempty" json:"TRACE,omitempty"`
+	// Patch holds plugin configuration for PATCH requests.
+	Patch *Plugins `bson:"PATCH,omitempty" json:"PATCH,omitempty"`
+	// Post holds plugin configuration for POST requests.
+	Post *Plugins `bson:"POST,omitempty" json:"POST,omitempty"`
+	// Put holds plugin configuration for PUT requests.
+	Put *Plugins `bson:"PUT,omitempty" json:"PUT,omitempty"`
+	// Trace holds plugin configuration for TRACE requests.
+	Trace *Plugins `bson:"TRACE,omitempty" json:"TRACE,omitempty"`
+	// Connect holds plugin configuration for CONNECT requests.
 	Connect *Plugins `bson:"CONNECT,omitempty" json:"CONNECT,omitempty"`
 }
 
@@ -919,7 +929,7 @@ type Plugins struct {
 	// Block request by allowance.
 	Block *Allowance `bson:"block,omitempty" json:"block,omitempty"`
 
-	// Ignore authentication on request by allowance.
+	// IgnoreAuthentication ignores authentication on request by allowance.
 	IgnoreAuthentication *Allowance `bson:"ignoreAuthentication,omitempty" json:"ignoreAuthentication,omitempty"`
 
 	// TransformRequestMethod allows you to transform the method of a request.
@@ -1416,6 +1426,7 @@ func (v *VirtualEndpoint) ExtractTo(meta *apidef.VirtualMeta) {
 	}
 }
 
+// EndpointPostPlugins is a list of EndpointPostPlugins. It's used where multiple plugins can be run.
 type EndpointPostPlugins []EndpointPostPlugin
 
 // EndpointPostPlugin contains endpoint level post plugin configuration.

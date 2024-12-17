@@ -59,7 +59,7 @@ func (k *RateLimitAndQuotaCheck) ProcessRequest(w http.ResponseWriter, r *http.R
 
 	if pattern, found := session.MetaData["rate_limit_pattern"]; found {
 		if patternString, ok := pattern.(string); ok && patternString != "" {
-			if customKeyValue := k.Gw.replaceTykVariables(r, patternString, false); customKeyValue != "" {
+			if customKeyValue := k.Gw.ReplaceTykVariables(r, patternString, false); customKeyValue != "" {
 				rateLimitKey = customKeyValue
 				quotaKey = customKeyValue
 			}
@@ -96,7 +96,7 @@ func (k *RateLimitAndQuotaCheck) ProcessRequest(w http.ResponseWriter, r *http.R
 	switch reason {
 	case sessionFailNone:
 	case sessionFailRateLimit:
-		err, errCode := k.handleRateLimitFailure(r, event.RateLimitExceeded, "", rateLimitKey)
+		err, errCode := k.handleRateLimitFailure(r, event.RateLimitExceeded, "Rate Limit Exceeded", rateLimitKey)
 		if throttleRetryLimit > 0 {
 			for {
 				ctxIncThrottleLevel(r, throttleRetryLimit)

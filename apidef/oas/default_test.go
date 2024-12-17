@@ -1013,6 +1013,81 @@ func TestOAS_BuildDefaultTykExtension(t *testing.T) {
 						Operations: Operations{},
 					}, oasDef.GetTykExtension().Middleware)
 				})
+
+			t.Run("configure validateRequest when OAS request parameters are configured on path level",
+				func(t *testing.T) {
+					oasDef := getOASDef(true, false)
+					petsPathItem := oasDef.Paths.Find("/pets")
+					petsPathItem.Parameters = openapi3.Parameters{
+						{
+							Value: &openapi3.Parameter{
+								Name: "auth",
+								In:   header,
+								Schema: &openapi3.SchemaRef{
+									Value: &openapi3.Schema{
+										Type: "string",
+									},
+								},
+							},
+						},
+					}
+
+					t.Run("import=true,validateRequest=enabled", func(t *testing.T) {
+						tykExtensionConfigParams := TykExtensionConfigParams{
+							ValidateRequest: &trueVal,
+						}
+
+						err := oasDef.BuildDefaultTykExtension(tykExtensionConfigParams, true)
+
+						assert.NoError(t, err)
+
+						expectedOperations := getExpectedOperations(true, true, middlewareValidateRequest)
+						expectedOperations[oasGetOperationID] = expectedOperations[oasPostOperationID]
+						assert.Equal(t, expectedOperations, oasDef.GetTykExtension().Middleware.Operations)
+					})
+
+					t.Run("import=true,validateRequest=disabled", func(t *testing.T) {
+						tykExtensionConfigParams := TykExtensionConfigParams{
+							ValidateRequest: &falseVal,
+						}
+
+						err := oasDef.BuildDefaultTykExtension(tykExtensionConfigParams, true)
+
+						assert.NoError(t, err)
+
+						expectedOperations := getExpectedOperations(false, true, middlewareValidateRequest)
+						expectedOperations[oasGetOperationID] = expectedOperations[oasPostOperationID]
+						assert.Equal(t, expectedOperations, oasDef.GetTykExtension().Middleware.Operations)
+					})
+
+					t.Run("import=false,validateRequest=enabled", func(t *testing.T) {
+						tykExtensionConfigParams := TykExtensionConfigParams{
+							ValidateRequest: &trueVal,
+						}
+
+						err := oasDef.BuildDefaultTykExtension(tykExtensionConfigParams, false)
+
+						assert.NoError(t, err)
+
+						expectedOperations := getExpectedOperations(true, true, middlewareValidateRequest)
+						expectedOperations[oasGetOperationID] = expectedOperations[oasPostOperationID]
+						assert.Equal(t, expectedOperations, oasDef.GetTykExtension().Middleware.Operations)
+					})
+
+					t.Run("import=false,validateRequest=disabled", func(t *testing.T) {
+						tykExtensionConfigParams := TykExtensionConfigParams{
+							ValidateRequest: &falseVal,
+						}
+
+						err := oasDef.BuildDefaultTykExtension(tykExtensionConfigParams, false)
+
+						assert.NoError(t, err)
+
+						expectedOperations := getExpectedOperations(false, true, middlewareValidateRequest)
+						expectedOperations[oasGetOperationID] = expectedOperations[oasPostOperationID]
+						assert.Equal(t, expectedOperations, oasDef.GetTykExtension().Middleware.Operations)
+					})
+				})
 		})
 
 		t.Run("mockResponse", func(t *testing.T) {
@@ -1546,6 +1621,7 @@ func TestOAS_importAuthentication(t *testing.T) {
 
 	t.Run("add first authentication in case of OR condition", func(t *testing.T) {
 		check := func(t *testing.T, enable bool) {
+			t.Helper()
 			oas := OAS{}
 			oas.Security = openapi3.SecurityRequirements{
 				{testSecurityNameToken: []string{}},
@@ -1672,6 +1748,7 @@ func TestOAS_importAuthentication(t *testing.T) {
 
 	t.Run("add multiple authentication with AND condition", func(t *testing.T) {
 		check := func(t *testing.T, enable bool) {
+			t.Helper()
 			oas := OAS{}
 			oas.Security = openapi3.SecurityRequirements{
 				{testSecurityNameToken: []string{}, testSecurityNameJWT: []string{}},
@@ -1754,6 +1831,7 @@ func TestSecuritySchemes_Import(t *testing.T) {
 
 	t.Run("token", func(t *testing.T) {
 		check := func(t *testing.T, enable bool) {
+			t.Helper()
 			securitySchemes := SecuritySchemes{}
 			nativeSecurityScheme := &openapi3.SecurityScheme{
 				Type: typeAPIKey,

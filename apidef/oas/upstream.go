@@ -29,6 +29,9 @@ type Upstream struct {
 
 	// RateLimit contains the configuration related to API level rate limit.
 	RateLimit *RateLimit `bson:"rateLimit,omitempty" json:"rateLimit,omitempty"`
+
+	// Authentication contains the configuration related to upstream authentication.
+	Authentication *UpstreamAuth `bson:"authentication,omitempty" json:"authentication,omitempty"`
 }
 
 // Fill fills *Upstream from apidef.APIDefinition.
@@ -78,6 +81,15 @@ func (u *Upstream) Fill(api apidef.APIDefinition) {
 	u.RateLimit.Fill(api)
 	if ShouldOmit(u.RateLimit) {
 		u.RateLimit = nil
+	}
+
+	if u.Authentication == nil {
+		u.Authentication = &UpstreamAuth{}
+	}
+
+	u.Authentication.Fill(api.UpstreamAuth)
+	if ShouldOmit(u.Authentication) {
+		u.Authentication = nil
 	}
 }
 
@@ -129,6 +141,15 @@ func (u *Upstream) ExtractTo(api *apidef.APIDefinition) {
 	}
 
 	u.RateLimit.ExtractTo(api)
+
+	if u.Authentication == nil {
+		u.Authentication = &UpstreamAuth{}
+		defer func() {
+			u.Authentication = nil
+		}()
+	}
+
+	u.Authentication.ExtractTo(&api.UpstreamAuth)
 }
 
 // ServiceDiscovery holds configuration required for service discovery.
@@ -496,14 +517,14 @@ type RateLimit struct {
 	// be considered as 0s/empty.
 	//
 	// Tyk classic API definition: `global_rate_limit.per`.
-	Per time.ReadableDuration `json:"per" bson:"per"`
+	Per ReadableDuration `json:"per" bson:"per"`
 }
 
 // Fill fills *RateLimit from apidef.APIDefinition.
 func (r *RateLimit) Fill(api apidef.APIDefinition) {
 	r.Enabled = !api.GlobalRateLimit.Disabled
 	r.Rate = int(api.GlobalRateLimit.Rate)
-	r.Per = time.ReadableDuration(time.Duration(api.GlobalRateLimit.Per) * time.Second)
+	r.Per = ReadableDuration(time.Duration(api.GlobalRateLimit.Per) * time.Second)
 }
 
 // ExtractTo extracts *Ratelimit into *apidef.APIDefinition.
@@ -511,4 +532,276 @@ func (r *RateLimit) ExtractTo(api *apidef.APIDefinition) {
 	api.GlobalRateLimit.Disabled = !r.Enabled
 	api.GlobalRateLimit.Rate = float64(r.Rate)
 	api.GlobalRateLimit.Per = r.Per.Seconds()
+}
+
+// RateLimitEndpoint carries same settings as RateLimit but for endpoints.
+type RateLimitEndpoint RateLimit
+
+// Fill fills *RateLimit from apidef.RateLimitMeta.
+func (r *RateLimitEndpoint) Fill(api apidef.RateLimitMeta) {
+	r.Enabled = !api.Disabled
+	r.Rate = int(api.Rate)
+	r.Per = ReadableDuration(time.Duration(api.Per) * time.Second)
+}
+
+// ExtractTo extracts *Ratelimit into *apidef.RateLimitMeta.
+func (r *RateLimitEndpoint) ExtractTo(meta *apidef.RateLimitMeta) {
+	meta.Disabled = !r.Enabled
+	meta.Rate = float64(r.Rate)
+	meta.Per = r.Per.Seconds()
+}
+
+// UpstreamAuth holds the configurations related to upstream API authentication.
+type UpstreamAuth struct {
+	// Enabled enables upstream API authentication.
+	Enabled bool `bson:"enabled" json:"enabled"`
+	// BasicAuth holds the basic authentication configuration for upstream API authentication.
+	BasicAuth *UpstreamBasicAuth `bson:"basicAuth,omitempty" json:"basicAuth,omitempty"`
+	// OAuth contains the configuration for OAuth2 Client Credentials flow.
+	OAuth *UpstreamOAuth `bson:"oauth,omitempty" json:"oauth,omitempty"`
+}
+
+// Fill fills *UpstreamAuth from apidef.UpstreamAuth.
+func (u *UpstreamAuth) Fill(api apidef.UpstreamAuth) {
+	u.Enabled = api.Enabled
+
+	if u.BasicAuth == nil {
+		u.BasicAuth = &UpstreamBasicAuth{}
+	}
+	u.BasicAuth.Fill(api.BasicAuth)
+	if ShouldOmit(u.BasicAuth) {
+		u.BasicAuth = nil
+	}
+
+	if u.OAuth == nil {
+		u.OAuth = &UpstreamOAuth{}
+	}
+	u.OAuth.Fill(api.OAuth)
+	if ShouldOmit(u.OAuth) {
+		u.OAuth = nil
+	}
+}
+
+// ExtractTo extracts *UpstreamAuth into *apidef.UpstreamAuth.
+func (u *UpstreamAuth) ExtractTo(api *apidef.UpstreamAuth) {
+	api.Enabled = u.Enabled
+
+	if u.BasicAuth == nil {
+		u.BasicAuth = &UpstreamBasicAuth{}
+		defer func() {
+			u.BasicAuth = nil
+		}()
+	}
+	u.BasicAuth.ExtractTo(&api.BasicAuth)
+
+	if u.OAuth == nil {
+		u.OAuth = &UpstreamOAuth{}
+		defer func() {
+			u.OAuth = nil
+		}()
+	}
+	u.OAuth.ExtractTo(&api.OAuth)
+}
+
+// UpstreamBasicAuth holds upstream basic authentication configuration.
+type UpstreamBasicAuth struct {
+	// Enabled enables upstream basic authentication.
+	Enabled bool `bson:"enabled" json:"enabled"`
+	// Header contains configurations for the header value.
+	Header *AuthSource `bson:"header,omitempty" json:"header,omitempty"`
+	// Username is the username to be used for upstream basic authentication.
+	Username string `bson:"username" json:"username"`
+	// Password is the password to be used for upstream basic authentication.
+	Password string `bson:"password" json:"password"`
+}
+
+// Fill fills *UpstreamBasicAuth from apidef.UpstreamBasicAuth.
+func (u *UpstreamBasicAuth) Fill(api apidef.UpstreamBasicAuth) {
+	u.Enabled = api.Enabled
+	u.Username = api.Username
+	u.Password = api.Password
+
+	if u.Header == nil {
+		u.Header = &AuthSource{}
+	}
+	u.Header.Fill(api.Header.Enabled, api.Header.Name)
+	if ShouldOmit(u.Header) {
+		u.Header = nil
+	}
+}
+
+// ExtractTo extracts *UpstreamBasicAuth into *apidef.UpstreamBasicAuth.
+func (u *UpstreamBasicAuth) ExtractTo(api *apidef.UpstreamBasicAuth) {
+	api.Enabled = u.Enabled
+	api.Enabled = u.Enabled
+	api.Username = u.Username
+	api.Password = u.Password
+
+	if u.Header == nil {
+		u.Header = &AuthSource{}
+		defer func() {
+			u.Header = nil
+		}()
+	}
+	u.Header.ExtractTo(&api.Header.Enabled, &api.Header.Name)
+}
+
+// UpstreamOAuth holds the configuration for OAuth2 Client Credentials flow.
+type UpstreamOAuth struct {
+	// Enabled activates upstream OAuth2 authentication.
+	Enabled bool `bson:"enabled" json:"enabled"`
+	// AllowedAuthorizeTypes specifies the allowed authorization types for upstream OAuth2 authentication.
+	AllowedAuthorizeTypes []string `bson:"allowedAuthorizeTypes" json:"allowedAuthorizeTypes"`
+	// ClientCredentials holds the configuration for OAuth2 Client Credentials flow.
+	ClientCredentials *ClientCredentials `bson:"clientCredentials,omitempty" json:"clientCredentials,omitempty"`
+	// PasswordAuthentication holds the configuration for upstream OAauth password authentication flow.
+	PasswordAuthentication *PasswordAuthentication `bson:"password,omitempty" json:"password,omitempty"`
+}
+
+// PasswordAuthentication holds the configuration for upstream OAuth2 password authentication flow.
+type PasswordAuthentication struct {
+	ClientAuthData
+	// Header holds the configuration for the custom header to be used for OAuth authentication.
+	Header *AuthSource `bson:"header" json:"header"`
+	// Username is the username to be used for upstream OAuth2 password authentication.
+	Username string `bson:"username" json:"username"`
+	// Password is the password to be used for upstream OAuth2 password authentication.
+	Password string `bson:"password" json:"password"`
+	// TokenURL is the resource server's token endpoint
+	// URL. This is a constant specific to each server.
+	TokenURL string `bson:"tokenUrl" json:"tokenUrl"`
+	// Scopes specifies optional requested permissions.
+	Scopes []string `bson:"scopes" json:"scopes,omitempty"`
+	// ExtraMetadata holds the keys that we want to extract from the token and pass to the upstream.
+	ExtraMetadata []string `bson:"extraMetadata" json:"extraMetadata,omitempty"`
+}
+
+// ClientAuthData holds the client ID and secret for OAuth2 authentication.
+type ClientAuthData struct {
+	// ClientID is the application's ID.
+	ClientID string `bson:"clientId" json:"clientId"`
+	// ClientSecret is the application's secret.
+	ClientSecret string `bson:"clientSecret,omitempty" json:"clientSecret,omitempty"` // client secret is optional for password flow
+}
+
+// ClientCredentials holds the configuration for OAuth2 Client Credentials flow.
+type ClientCredentials struct {
+	ClientAuthData
+	// Header holds the configuration for the custom header to be used for OAuth authentication.
+	Header *AuthSource `bson:"header" json:"header"`
+	// TokenURL is the resource server's token endpoint
+	// URL. This is a constant specific to each server.
+	TokenURL string `bson:"tokenUrl" json:"tokenUrl"`
+	// Scopes specifies optional requested permissions.
+	Scopes []string `bson:"scopes,omitempty" json:"scopes,omitempty"`
+	// ExtraMetadata holds the keys that we want to extract from the token and pass to the upstream.
+	ExtraMetadata []string `bson:"extraMetadata" json:"extraMetadata,omitempty"`
+}
+
+func (c *ClientCredentials) Fill(api apidef.ClientCredentials) {
+	c.ClientID = api.ClientID
+	c.ClientSecret = api.ClientSecret
+	c.TokenURL = api.TokenURL
+	c.Scopes = api.Scopes
+	c.ExtraMetadata = api.ExtraMetadata
+
+	if c.Header == nil {
+		c.Header = &AuthSource{}
+	}
+	c.Header.Fill(api.Header.Enabled, api.Header.Name)
+	if ShouldOmit(c.Header) {
+		c.Header = nil
+	}
+}
+
+func (p *PasswordAuthentication) Fill(api apidef.PasswordAuthentication) {
+	p.ClientID = api.ClientID
+	p.ClientSecret = api.ClientSecret
+	p.Username = api.Username
+	p.Password = api.Password
+	p.TokenURL = api.TokenURL
+	p.Scopes = api.Scopes
+	p.ExtraMetadata = api.ExtraMetadata
+	if p.Header == nil {
+		p.Header = &AuthSource{}
+	}
+	p.Header.Fill(api.Header.Enabled, api.Header.Name)
+	if ShouldOmit(p.Header) {
+		p.Header = nil
+	}
+}
+
+func (u *UpstreamOAuth) Fill(api apidef.UpstreamOAuth) {
+	u.Enabled = api.Enabled
+	u.AllowedAuthorizeTypes = api.AllowedAuthorizeTypes
+
+	if u.ClientCredentials == nil {
+		u.ClientCredentials = &ClientCredentials{}
+	}
+	u.ClientCredentials.Fill(api.ClientCredentials)
+	if ShouldOmit(u.ClientCredentials) {
+		u.ClientCredentials = nil
+	}
+
+	if u.PasswordAuthentication == nil {
+		u.PasswordAuthentication = &PasswordAuthentication{}
+	}
+	u.PasswordAuthentication.Fill(api.PasswordAuthentication)
+	if ShouldOmit(u.PasswordAuthentication) {
+		u.PasswordAuthentication = nil
+	}
+}
+
+func (c *ClientCredentials) ExtractTo(api *apidef.ClientCredentials) {
+	api.ClientID = c.ClientID
+	api.ClientSecret = c.ClientSecret
+	api.TokenURL = c.TokenURL
+	api.Scopes = c.Scopes
+	api.ExtraMetadata = c.ExtraMetadata
+
+	if c.Header == nil {
+		c.Header = &AuthSource{}
+		defer func() {
+			c.Header = nil
+		}()
+	}
+	c.Header.ExtractTo(&api.Header.Enabled, &api.Header.Name)
+}
+
+func (p *PasswordAuthentication) ExtractTo(api *apidef.PasswordAuthentication) {
+	api.ClientID = p.ClientID
+	api.ClientSecret = p.ClientSecret
+	api.Username = p.Username
+	api.Password = p.Password
+	api.TokenURL = p.TokenURL
+	api.Scopes = p.Scopes
+	api.ExtraMetadata = p.ExtraMetadata
+
+	if p.Header == nil {
+		p.Header = &AuthSource{}
+		defer func() {
+			p.Header = nil
+		}()
+	}
+	p.Header.ExtractTo(&api.Header.Enabled, &api.Header.Name)
+}
+
+func (u *UpstreamOAuth) ExtractTo(api *apidef.UpstreamOAuth) {
+	api.Enabled = u.Enabled
+	api.AllowedAuthorizeTypes = u.AllowedAuthorizeTypes
+	if u.ClientCredentials == nil {
+		u.ClientCredentials = &ClientCredentials{}
+		defer func() {
+			u.ClientCredentials = nil
+		}()
+	}
+	u.ClientCredentials.ExtractTo(&api.ClientCredentials)
+
+	if u.PasswordAuthentication == nil {
+		u.PasswordAuthentication = &PasswordAuthentication{}
+		defer func() {
+			u.PasswordAuthentication = nil
+		}()
+	}
+	u.PasswordAuthentication.ExtractTo(&api.PasswordAuthentication)
 }

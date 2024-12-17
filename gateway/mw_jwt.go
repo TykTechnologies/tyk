@@ -592,7 +592,7 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 		}
 
 		// Retrieve OAuth client data from storage and inject developer ID into the session object:
-		client, err := k.Spec.OAuthManager.OsinServer.Storage.GetClient(oauthClientID)
+		client, err := k.Spec.OAuthManager.Storage().GetClient(oauthClientID)
 		if err == nil {
 			userData := client.GetUserData()
 			if userData != nil {
