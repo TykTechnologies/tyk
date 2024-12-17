@@ -80,38 +80,44 @@ func (s *Test) TestPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesD
 		},
 		"difforg": {OrgID: "different"},
 		"tags1": {
-			Partitions: user.PolicyPartitions{Quota: true},
-			Tags:       []string{"tagA"},
+			Partitions:   user.PolicyPartitions{Quota: true, Acl: true},
+			Tags:         []string{"tagA"},
+			AccessRights: map[string]user.AccessDefinition{"a": {}},
 		},
 		"tags2": {
-			Partitions: user.PolicyPartitions{RateLimit: true},
-			Tags:       []string{"tagX", "tagY"},
+			Partitions:   user.PolicyPartitions{RateLimit: true, Acl: true},
+			Tags:         []string{"tagX", "tagY"},
+			AccessRights: map[string]user.AccessDefinition{"b": {}},
 		},
 		"inactive1": {
-			Partitions: user.PolicyPartitions{RateLimit: true},
-			IsInactive: true,
+			Partitions:   user.PolicyPartitions{RateLimit: true, Acl: true},
+			IsInactive:   true,
+			AccessRights: map[string]user.AccessDefinition{"a": {}},
 		},
 		"inactive2": {
-			Partitions: user.PolicyPartitions{Quota: true},
-			IsInactive: true,
+			Partitions:   user.PolicyPartitions{Quota: true, Acl: true},
+			IsInactive:   true,
+			AccessRights: map[string]user.AccessDefinition{"b": {}},
 		},
 		"unlimited-quota": {
-			Partitions:   user.PolicyPartitions{Quota: true},
+			Partitions:   user.PolicyPartitions{Quota: true, Acl: true},
 			AccessRights: map[string]user.AccessDefinition{"a": {}},
 			QuotaMax:     -1,
 		},
 		"quota1": {
-			Partitions: user.PolicyPartitions{Quota: true},
-			QuotaMax:   2,
+			Partitions:   user.PolicyPartitions{Quota: true, Acl: true},
+			QuotaMax:     2,
+			AccessRights: map[string]user.AccessDefinition{"a": {}},
 		},
 		"quota2": {
-			Partitions: user.PolicyPartitions{Quota: true},
-			QuotaMax:   3,
+			Partitions:   user.PolicyPartitions{Quota: true, Acl: true},
+			QuotaMax:     3,
+			AccessRights: map[string]user.AccessDefinition{"b": {}},
 		},
 		"quota3": {
 			QuotaMax:     3,
 			AccessRights: map[string]user.AccessDefinition{"a": {}},
-			Partitions:   user.PolicyPartitions{Quota: true},
+			Partitions:   user.PolicyPartitions{Quota: true, Acl: true},
 		},
 		"quota4": {
 			QuotaMax:     3,
@@ -120,49 +126,52 @@ func (s *Test) TestPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesD
 		},
 		"quota5": {
 			QuotaMax:     4,
-			Partitions:   user.PolicyPartitions{Quota: true},
+			Partitions:   user.PolicyPartitions{Quota: true, Acl: true},
 			AccessRights: map[string]user.AccessDefinition{"b": {}},
 		},
 		"unlimited-rate": {
-			Partitions:   user.PolicyPartitions{RateLimit: true},
+			Partitions:   user.PolicyPartitions{RateLimit: true, Acl: true},
 			AccessRights: map[string]user.AccessDefinition{"a": {}},
 			Rate:         -1,
 		},
 		"rate1": {
-			Partitions: user.PolicyPartitions{RateLimit: true},
-			Rate:       3,
+			Partitions:   user.PolicyPartitions{RateLimit: true, Acl: true},
+			AccessRights: map[string]user.AccessDefinition{"a": {}},
+			Rate:         3,
 		},
 		"rate2": {
-			Partitions: user.PolicyPartitions{RateLimit: true},
-			Rate:       4,
+			Partitions:   user.PolicyPartitions{RateLimit: true, Acl: true},
+			AccessRights: map[string]user.AccessDefinition{"b": {}},
+			Rate:         4,
 		},
 		"rate3": {
-			Partitions: user.PolicyPartitions{RateLimit: true},
-			Rate:       4,
-			Per:        4,
+			Partitions:   user.PolicyPartitions{RateLimit: true, Acl: true},
+			Rate:         4,
+			Per:          4,
+			AccessRights: map[string]user.AccessDefinition{"a": {}},
 		},
 		"rate4": {
-			Partitions:   user.PolicyPartitions{RateLimit: true},
+			Partitions:   user.PolicyPartitions{RateLimit: true, Acl: true},
 			Rate:         8,
 			AccessRights: map[string]user.AccessDefinition{"a": {}},
 		},
 		"rate5": {
-			Partitions:   user.PolicyPartitions{RateLimit: true},
+			Partitions:   user.PolicyPartitions{RateLimit: true, Acl: true},
 			Rate:         10,
 			AccessRights: map[string]user.AccessDefinition{"a": {}},
 		},
 		"rate-for-a": {
-			Partitions:   user.PolicyPartitions{RateLimit: true},
+			Partitions:   user.PolicyPartitions{RateLimit: true, Acl: true},
 			AccessRights: map[string]user.AccessDefinition{"a": {}},
 			Rate:         4,
 		},
 		"rate-for-b": {
-			Partitions:   user.PolicyPartitions{RateLimit: true},
+			Partitions:   user.PolicyPartitions{RateLimit: true, Acl: true},
 			AccessRights: map[string]user.AccessDefinition{"b": {}},
 			Rate:         2,
 		},
 		"rate-for-a-b": {
-			Partitions:   user.PolicyPartitions{RateLimit: true},
+			Partitions:   user.PolicyPartitions{RateLimit: true, Acl: true},
 			AccessRights: map[string]user.AccessDefinition{"a": {}, "b": {}},
 			Rate:         4,
 		},
@@ -186,16 +195,18 @@ func (s *Test) TestPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesD
 			AccessRights: map[string]user.AccessDefinition{"a": {}, "b": {}},
 		},
 		"unlimitedComplexity": {
-			Partitions:    user.PolicyPartitions{Complexity: true},
+			Partitions:    user.PolicyPartitions{Complexity: true, Acl: true},
 			AccessRights:  map[string]user.AccessDefinition{"a": {}},
 			MaxQueryDepth: -1,
 		},
 		"complexity1": {
-			Partitions:    user.PolicyPartitions{Complexity: true},
+			Partitions:    user.PolicyPartitions{Complexity: true, Acl: true},
+			AccessRights:  map[string]user.AccessDefinition{"a": {}},
 			MaxQueryDepth: 2,
 		},
 		"complexity2": {
-			Partitions:    user.PolicyPartitions{Complexity: true},
+			Partitions:    user.PolicyPartitions{Complexity: true, Acl: true},
+			AccessRights:  map[string]user.AccessDefinition{"b": {}},
 			MaxQueryDepth: 3,
 		},
 		"per_api_and_partitions": {
@@ -639,7 +650,7 @@ func (s *Test) TestPrepareApplyPolicies() (*BaseMiddleware, []testApplyPoliciesD
 		{
 			"Acl for a and rate for a,b", []string{"acl1", "rate-for-a-b"},
 			"", func(t *testing.T, s *user.SessionState) {
-				want := map[string]user.AccessDefinition{"a": {Limit: user.APILimit{Rate: 4}}}
+				want := map[string]user.AccessDefinition{"a": {Limit: user.APILimit{Rate: 4}}, "b": {Limit: user.APILimit{Rate: 4}}}
 				assert.Equal(t, want, s.AccessRights)
 			}, nil,
 		},
