@@ -1571,9 +1571,7 @@ func TestParseRSAKeyFromJWK(t *testing.T) {
 		t.Error("expected an error")
 	}
 	_, err = ParseRSAPublicKey(b)
-	if err != nil {
-		t.Error("decoding as default ", err)
-	}
+	assert.NoError(t, err)
 }
 
 func TestParseRSAPubKeyFromJWK(t *testing.T) {
@@ -1588,9 +1586,7 @@ mwIDAQAB
 -----END PUBLIC KEY-----`
 
 	_, err := ParseRSAPublicKey([]byte(sample))
-	if err != nil {
-		t.Error("decoding as default ", err)
-	}
+	assert.NoError(t, err)
 }
 
 func TestAssertPS512JWT(t *testing.T) {
@@ -1620,9 +1616,8 @@ mwIDAQAB
 		return parseJWTKey(signingMethod, pubKey)
 	})
 
-	if err != nil {
-		t.Error("Could not validate RS256 key")
-	}
+	// Should be able to validate RS256
+	assert.NoError(t, err)
 }
 
 func TestAssertNegativePS512JWT(t *testing.T) {
@@ -1652,9 +1647,7 @@ mwIDAQAB
 		return parseJWTKey(signingMethod, pubKey)
 	})
 
-	if err == nil {
-		t.Error("Expected an error!")
-	}
+	assert.Error(t, err)
 }
 
 func TestAssertRS256JWT(t *testing.T) {
@@ -1684,9 +1677,8 @@ mwIDAQAB
 		return parseJWTKey(signingMethod, pubKey)
 	})
 
-	if err != nil {
-		t.Error("Could not validate RS256 key")
-	}
+	// Should be able to validate the RS256 key.
+	assert.NoError(t, err)
 }
 
 func BenchmarkJWTSessionRSAWithEncodedJWK(b *testing.B) {
