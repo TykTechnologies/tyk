@@ -108,8 +108,11 @@ func TestMurmur3CharBug(t *testing.T) {
 }
 
 func TestSignatureValidation(t *testing.T) {
+	test.Flaky(t) // Test uses StorageConnectionHandler (singleton).
+
 	ts := StartTest(nil)
-	defer ts.Close()
+	t.Cleanup(ts.Close)
+
 	api := BuildAPI(func(spec *APISpec) {
 		spec.UseKeylessAccess = false
 		spec.Proxy.ListenPath = "/"

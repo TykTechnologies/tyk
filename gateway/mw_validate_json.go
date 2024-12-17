@@ -3,7 +3,7 @@ package gateway
 import (
 	"errors"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 
 	"github.com/TykTechnologies/gojsonschema"
@@ -48,8 +48,9 @@ func (k *ValidateJSON) ProcessRequest(w http.ResponseWriter, r *http.Request, _ 
 		}
 	}
 
+	nopCloseRequestBody(r)
 	// Load input body into gojsonschema
-	bodyBytes, err := ioutil.ReadAll(r.Body)
+	bodyBytes, err := io.ReadAll(r.Body)
 	if err != nil {
 		return err, http.StatusBadRequest
 	}

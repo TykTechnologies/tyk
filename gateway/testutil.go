@@ -890,6 +890,12 @@ func (s *Test) CreatePolicy(pGen ...func(p *user.Policy)) string {
 	return pol.ID
 }
 
+func (s *Test) DeletePolicy(policyID string) {
+	s.Gw.policiesMu.Lock()
+	delete(s.Gw.policiesByID, policyID)
+	s.Gw.policiesMu.Unlock()
+}
+
 func CreateJWKToken(jGen ...func(*jwt.Token)) string {
 	// Create the token
 	token := jwt.New(jwt.GetSigningMethod("RS512"))
@@ -1792,9 +1798,13 @@ func BuildAPI(apiGens ...func(spec *APISpec)) (specs []*APISpec) {
 }
 
 func (gw *Gateway) LoadAPI(specs ...*APISpec) (out []*APISpec) {
+	var err error
 	gwConf := gw.GetConfig()
 	oldPath := gwConf.AppPath
-	gwConf.AppPath, _ = ioutil.TempDir("", "apps")
+	gwConf.AppPath, err = ioutil.TempDir("", "apps")
+	if err != nil {
+		log.WithError(err).Errorf("loadapi: failed to create temp dir")
+	}
 	gw.SetConfig(gwConf, true)
 	defer func() {
 		globalConf := gw.GetConfig()

@@ -26,6 +26,7 @@ import (
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/trace"
 
+	"github.com/TykTechnologies/tyk/internal/httputil"
 	"github.com/TykTechnologies/tyk/internal/otel"
 )
 
@@ -275,16 +276,7 @@ func (gw *Gateway) processSpec(spec *APISpec, apisByListen map[string]int,
 	// Create the response processors, pass all the loaded custom middleware response functions:
 	gw.createResponseMiddlewareChain(spec, mwResponseFuncs)
 
-	baseMid := &BaseMiddleware{Spec: spec, Proxy: proxy, logger: logger, Gw: gw}
-
-	for _, v := range baseMid.Spec.VersionData.Versions {
-		if len(v.ExtendedPaths.CircuitBreaker) > 0 {
-			baseMid.Spec.CircuitBreakerEnabled = true
-		}
-		if len(v.ExtendedPaths.HardTimeouts) > 0 {
-			baseMid.Spec.EnforcedTimeoutEnabled = true
-		}
-	}
+	baseMid := NewBaseMiddleware(gw, spec, proxy, logger)
 
 	keyPrefix := "cache-" + spec.APIID
 	cacheStore := storage.RedisCluster{KeyPrefix: keyPrefix, IsCache: true, ConnectionHandler: gw.StorageConnectionHandler}
@@ -299,14 +291,14 @@ func (gw *Gateway) processSpec(spec *APISpec, apisByListen map[string]int,
 		logger.Info("Checking security policy: Open")
 	}
 
-	gw.mwAppendEnabled(&chainArray, &VersionCheck{BaseMiddleware: baseMid})
+	gw.mwAppendEnabled(&chainArray, &VersionCheck{BaseMiddleware: baseMid.Copy()})
 
 	for _, obj := range mwPreFuncs {
 		if mwDriver == apidef.GoPluginDriver {
 			gw.mwAppendEnabled(
 				&chainArray,
 				&GoPluginMiddleware{
-					BaseMiddleware: baseMid,
+					BaseMiddleware: baseMid.Copy(),
 					Path:           obj.Path,
 					SymbolName:     obj.Name,
 					APILevel:       true,
@@ -314,44 +306,44 @@ func (gw *Gateway) processSpec(spec *APISpec, apisByListen map[string]int,
 			)
 		} else if mwDriver != apidef.OttoDriver {
 			coprocessLog.Debug("Registering coprocess middleware, hook name: ", obj.Name, "hook type: Pre", ", driver: ", mwDriver)
-			gw.mwAppendEnabled(&chainArray, &CoProcessMiddleware{baseMid, coprocess.HookType_Pre, obj.Name, mwDriver, obj.RawBodyOnly, nil})
+			gw.mwAppendEnabled(&chainArray, &CoProcessMiddleware{baseMid.Copy(), coprocess.HookType_Pre, obj.Name, mwDriver, obj.RawBodyOnly, nil})
 		} else {
-			chainArray = append(chainArray, gw.createDynamicMiddleware(obj.Name, true, obj.RequireSession, baseMid))
+			chainArray = append(chainArray, gw.createDynamicMiddleware(obj.Name, true, obj.RequireSession, baseMid.Copy()))
 		}
 	}
 
-	gw.mwAppendEnabled(&chainArray, &RateCheckMW{BaseMiddleware: baseMid})
-	gw.mwAppendEnabled(&chainArray, &IPWhiteListMiddleware{BaseMiddleware: baseMid})
-	gw.mwAppendEnabled(&chainArray, &IPBlackListMiddleware{BaseMiddleware: baseMid})
-	gw.mwAppendEnabled(&chainArray, &CertificateCheckMW{BaseMiddleware: baseMid})
-	gw.mwAppendEnabled(&chainArray, &OrganizationMonitor{BaseMiddleware: baseMid, mon: Monitor{Gw: gw}})
-	gw.mwAppendEnabled(&chainArray, &RequestSizeLimitMiddleware{baseMid})
-	gw.mwAppendEnabled(&chainArray, &MiddlewareContextVars{BaseMiddleware: baseMid})
-	gw.mwAppendEnabled(&chainArray, &TrackEndpointMiddleware{baseMid})
+	gw.mwAppendEnabled(&chainArray, &RateCheckMW{BaseMiddleware: baseMid.Copy()})
+	gw.mwAppendEnabled(&chainArray, &IPWhiteListMiddleware{BaseMiddleware: baseMid.Copy()})
+	gw.mwAppendEnabled(&chainArray, &IPBlackListMiddleware{BaseMiddleware: baseMid.Copy()})
+	gw.mwAppendEnabled(&chainArray, &CertificateCheckMW{BaseMiddleware: baseMid.Copy()})
+	gw.mwAppendEnabled(&chainArray, &OrganizationMonitor{BaseMiddleware: baseMid.Copy(), mon: Monitor{Gw: gw}})
+	gw.mwAppendEnabled(&chainArray, &RequestSizeLimitMiddleware{baseMid.Copy()})
+	gw.mwAppendEnabled(&chainArray, &MiddlewareContextVars{BaseMiddleware: baseMid.Copy()})
+	gw.mwAppendEnabled(&chainArray, &TrackEndpointMiddleware{baseMid.Copy()})
 
 	if !spec.UseKeylessAccess {
 		// Select the keying method to use for setting session states
-		if gw.mwAppendEnabled(&authArray, &Oauth2KeyExists{baseMid}) {
+		if gw.mwAppendEnabled(&authArray, &Oauth2KeyExists{baseMid.Copy()}) {
 			logger.Info("Checking security policy: OAuth")
 		}
 
-		if gw.mwAppendEnabled(&authArray, &ExternalOAuthMiddleware{baseMid}) {
+		if gw.mwAppendEnabled(&authArray, &ExternalOAuthMiddleware{baseMid.Copy()}) {
 			logger.Info("Checking security policy: External OAuth")
 		}
 
-		if gw.mwAppendEnabled(&authArray, &BasicAuthKeyIsValid{baseMid, nil, nil}) {
+		if gw.mwAppendEnabled(&authArray, &BasicAuthKeyIsValid{baseMid.Copy(), nil, nil}) {
 			logger.Info("Checking security policy: Basic")
 		}
 
-		if gw.mwAppendEnabled(&authArray, &HTTPSignatureValidationMiddleware{BaseMiddleware: baseMid}) {
+		if gw.mwAppendEnabled(&authArray, &HTTPSignatureValidationMiddleware{BaseMiddleware: baseMid.Copy()}) {
 			logger.Info("Checking security policy: HMAC")
 		}
 
-		if gw.mwAppendEnabled(&authArray, &JWTMiddleware{baseMid}) {
+		if gw.mwAppendEnabled(&authArray, &JWTMiddleware{baseMid.Copy()}) {
 			logger.Info("Checking security policy: JWT")
 		}
 
-		if gw.mwAppendEnabled(&authArray, &OpenIDMW{BaseMiddleware: baseMid}) {
+		if gw.mwAppendEnabled(&authArray, &OpenIDMW{BaseMiddleware: baseMid.Copy()}) {
 			logger.Info("Checking security policy: OpenID")
 		}
 
@@ -362,7 +354,7 @@ func (gw *Gateway) processSpec(spec *APISpec, apisByListen map[string]int,
 			case apidef.OttoDriver:
 				logger.Info("----> Checking security policy: JS Plugin")
 				authArray = append(authArray, gw.createMiddleware(&DynamicMiddleware{
-					BaseMiddleware:      baseMid,
+					BaseMiddleware:      baseMid.Copy(),
 					MiddlewareClassName: mwAuthCheckFunc.Name,
 					Pre:                 true,
 					Auth:                true,
@@ -371,7 +363,7 @@ func (gw *Gateway) processSpec(spec *APISpec, apisByListen map[string]int,
 				gw.mwAppendEnabled(
 					&authArray,
 					&GoPluginMiddleware{
-						BaseMiddleware: baseMid,
+						BaseMiddleware: baseMid.Copy(),
 						Path:           mwAuthCheckFunc.Path,
 						SymbolName:     mwAuthCheckFunc.Name,
 						APILevel:       true,
@@ -380,14 +372,14 @@ func (gw *Gateway) processSpec(spec *APISpec, apisByListen map[string]int,
 			default:
 				coprocessLog.Debug("Registering coprocess middleware, hook name: ", mwAuthCheckFunc.Name, "hook type: CustomKeyCheck", ", driver: ", mwDriver)
 
-				newExtractor(spec, baseMid)
-				gw.mwAppendEnabled(&authArray, &CoProcessMiddleware{baseMid, coprocess.HookType_CustomKeyCheck, mwAuthCheckFunc.Name, mwDriver, mwAuthCheckFunc.RawBodyOnly, nil})
+				newExtractor(spec, baseMid.Copy())
+				gw.mwAppendEnabled(&authArray, &CoProcessMiddleware{baseMid.Copy(), coprocess.HookType_CustomKeyCheck, mwAuthCheckFunc.Name, mwDriver, mwAuthCheckFunc.RawBodyOnly, nil})
 			}
 		}
 
 		if spec.UseStandardAuth || len(authArray) == 0 {
 			logger.Info("Checking security policy: Token")
-			authArray = append(authArray, gw.createMiddleware(&AuthKey{baseMid}))
+			authArray = append(authArray, gw.createMiddleware(&AuthKey{baseMid.Copy()}))
 		}
 
 		chainArray = append(chainArray, authArray...)
@@ -405,7 +397,7 @@ func (gw *Gateway) processSpec(spec *APISpec, apisByListen map[string]int,
 				gw.mwAppendEnabled(
 					&chainArray,
 					&GoPluginMiddleware{
-						BaseMiddleware: baseMid,
+						BaseMiddleware: baseMid.Copy(),
 						Path:           obj.Path,
 						SymbolName:     obj.Name,
 						APILevel:       true,
@@ -413,27 +405,27 @@ func (gw *Gateway) processSpec(spec *APISpec, apisByListen map[string]int,
 				)
 			} else {
 				coprocessLog.Debug("Registering coprocess middleware, hook name: ", obj.Name, "hook type: Pre", ", driver: ", mwDriver)
-				gw.mwAppendEnabled(&chainArray, &CoProcessMiddleware{baseMid, coprocess.HookType_PostKeyAuth, obj.Name, mwDriver, obj.RawBodyOnly, nil})
+				gw.mwAppendEnabled(&chainArray, &CoProcessMiddleware{baseMid.Copy(), coprocess.HookType_PostKeyAuth, obj.Name, mwDriver, obj.RawBodyOnly, nil})
 			}
 		}
 
-		gw.mwAppendEnabled(&chainArray, &StripAuth{baseMid})
-		gw.mwAppendEnabled(&chainArray, &KeyExpired{baseMid})
-		gw.mwAppendEnabled(&chainArray, &AccessRightsCheck{baseMid})
-		gw.mwAppendEnabled(&chainArray, &GranularAccessMiddleware{baseMid})
-		gw.mwAppendEnabled(&chainArray, &RateLimitAndQuotaCheck{baseMid})
+		gw.mwAppendEnabled(&chainArray, &StripAuth{baseMid.Copy()})
+		gw.mwAppendEnabled(&chainArray, &KeyExpired{baseMid.Copy()})
+		gw.mwAppendEnabled(&chainArray, &AccessRightsCheck{baseMid.Copy()})
+		gw.mwAppendEnabled(&chainArray, &GranularAccessMiddleware{baseMid.Copy()})
+		gw.mwAppendEnabled(&chainArray, &RateLimitAndQuotaCheck{baseMid.Copy()})
 	}
 
-	gw.mwAppendEnabled(&chainArray, &RateLimitForAPI{BaseMiddleware: baseMid})
-	gw.mwAppendEnabled(&chainArray, &GraphQLMiddleware{BaseMiddleware: baseMid})
+	gw.mwAppendEnabled(&chainArray, &RateLimitForAPI{BaseMiddleware: baseMid.Copy()})
+	gw.mwAppendEnabled(&chainArray, &GraphQLMiddleware{BaseMiddleware: baseMid.Copy()})
 
 	if streamMw := getStreamingMiddleware(baseMid); streamMw != nil {
 		gw.mwAppendEnabled(&chainArray, streamMw)
 	}
 
 	if !spec.UseKeylessAccess {
-		gw.mwAppendEnabled(&chainArray, &GraphQLComplexityMiddleware{BaseMiddleware: baseMid})
-		gw.mwAppendEnabled(&chainArray, &GraphQLGranularAccessMiddleware{BaseMiddleware: baseMid})
+		gw.mwAppendEnabled(&chainArray, &GraphQLComplexityMiddleware{BaseMiddleware: baseMid.Copy()})
+		gw.mwAppendEnabled(&chainArray, &GraphQLGranularAccessMiddleware{BaseMiddleware: baseMid.Copy()})
 	}
 
 	if upstreamBasicAuthMw := getUpstreamBasicAuthMw(baseMid); upstreamBasicAuthMw != nil {
@@ -444,28 +436,28 @@ func (gw *Gateway) processSpec(spec *APISpec, apisByListen map[string]int,
 		gw.mwAppendEnabled(&chainArray, upstreamOAuthMw)
 	}
 
-	gw.mwAppendEnabled(&chainArray, &ValidateJSON{BaseMiddleware: baseMid})
-	gw.mwAppendEnabled(&chainArray, &ValidateRequest{BaseMiddleware: baseMid})
-	gw.mwAppendEnabled(&chainArray, &PersistGraphQLOperationMiddleware{BaseMiddleware: baseMid})
-	gw.mwAppendEnabled(&chainArray, &TransformMiddleware{baseMid})
-	gw.mwAppendEnabled(&chainArray, &TransformJQMiddleware{baseMid})
-	gw.mwAppendEnabled(&chainArray, &TransformHeaders{BaseMiddleware: baseMid})
-	gw.mwAppendEnabled(&chainArray, &URLRewriteMiddleware{BaseMiddleware: baseMid})
-	gw.mwAppendEnabled(&chainArray, &TransformMethod{BaseMiddleware: baseMid})
+	gw.mwAppendEnabled(&chainArray, &ValidateJSON{BaseMiddleware: baseMid.Copy()})
+	gw.mwAppendEnabled(&chainArray, &ValidateRequest{BaseMiddleware: baseMid.Copy()})
+	gw.mwAppendEnabled(&chainArray, &PersistGraphQLOperationMiddleware{BaseMiddleware: baseMid.Copy()})
+	gw.mwAppendEnabled(&chainArray, &TransformMiddleware{baseMid.Copy()})
+	gw.mwAppendEnabled(&chainArray, &TransformJQMiddleware{baseMid.Copy()})
+	gw.mwAppendEnabled(&chainArray, &TransformHeaders{BaseMiddleware: baseMid.Copy()})
+	gw.mwAppendEnabled(&chainArray, &URLRewriteMiddleware{BaseMiddleware: baseMid.Copy()})
+	gw.mwAppendEnabled(&chainArray, &TransformMethod{BaseMiddleware: baseMid.Copy()})
 
 	// Earliest we can respond with cache get 200 ok
-	gw.mwAppendEnabled(&chainArray, &RedisCacheMiddleware{BaseMiddleware: baseMid, store: &cacheStore})
+	gw.mwAppendEnabled(&chainArray, &RedisCacheMiddleware{BaseMiddleware: baseMid.Copy(), store: &cacheStore})
 
-	gw.mwAppendEnabled(&chainArray, &VirtualEndpoint{BaseMiddleware: baseMid})
-	gw.mwAppendEnabled(&chainArray, &RequestSigning{BaseMiddleware: baseMid})
-	gw.mwAppendEnabled(&chainArray, &GoPluginMiddleware{BaseMiddleware: baseMid})
+	gw.mwAppendEnabled(&chainArray, &VirtualEndpoint{BaseMiddleware: baseMid.Copy()})
+	gw.mwAppendEnabled(&chainArray, &RequestSigning{BaseMiddleware: baseMid.Copy()})
+	gw.mwAppendEnabled(&chainArray, &GoPluginMiddleware{BaseMiddleware: baseMid.Copy()})
 
 	for _, obj := range mwPostFuncs {
 		if mwDriver == apidef.GoPluginDriver {
 			gw.mwAppendEnabled(
 				&chainArray,
 				&GoPluginMiddleware{
-					BaseMiddleware: baseMid,
+					BaseMiddleware: baseMid.Copy(),
 					Path:           obj.Path,
 					SymbolName:     obj.Name,
 					APILevel:       true,
@@ -473,22 +465,22 @@ func (gw *Gateway) processSpec(spec *APISpec, apisByListen map[string]int,
 			)
 		} else if mwDriver != apidef.OttoDriver {
 			coprocessLog.Debug("Registering coprocess middleware, hook name: ", obj.Name, "hook type: Post", ", driver: ", mwDriver)
-			gw.mwAppendEnabled(&chainArray, &CoProcessMiddleware{baseMid, coprocess.HookType_Post, obj.Name, mwDriver, obj.RawBodyOnly, nil})
+			gw.mwAppendEnabled(&chainArray, &CoProcessMiddleware{baseMid.Copy(), coprocess.HookType_Post, obj.Name, mwDriver, obj.RawBodyOnly, nil})
 		} else {
-			chainArray = append(chainArray, gw.createDynamicMiddleware(obj.Name, false, obj.RequireSession, baseMid))
+			chainArray = append(chainArray, gw.createDynamicMiddleware(obj.Name, false, obj.RequireSession, baseMid.Copy()))
 		}
 	}
-	chain = alice.New(chainArray...).Then(&DummyProxyHandler{SH: SuccessHandler{baseMid}, Gw: gw})
+	chain = alice.New(chainArray...).Then(&DummyProxyHandler{SH: SuccessHandler{baseMid.Copy()}, Gw: gw})
 
 	if !spec.UseKeylessAccess {
 		var simpleArray []alice.Constructor
-		gw.mwAppendEnabled(&simpleArray, &IPWhiteListMiddleware{baseMid})
-		gw.mwAppendEnabled(&simpleArray, &IPBlackListMiddleware{BaseMiddleware: baseMid})
-		gw.mwAppendEnabled(&simpleArray, &OrganizationMonitor{BaseMiddleware: baseMid, mon: Monitor{Gw: gw}})
-		gw.mwAppendEnabled(&simpleArray, &VersionCheck{BaseMiddleware: baseMid})
+		gw.mwAppendEnabled(&simpleArray, &IPWhiteListMiddleware{baseMid.Copy()})
+		gw.mwAppendEnabled(&simpleArray, &IPBlackListMiddleware{BaseMiddleware: baseMid.Copy()})
+		gw.mwAppendEnabled(&simpleArray, &OrganizationMonitor{BaseMiddleware: baseMid.Copy(), mon: Monitor{Gw: gw}})
+		gw.mwAppendEnabled(&simpleArray, &VersionCheck{BaseMiddleware: baseMid.Copy()})
 		simpleArray = append(simpleArray, authArray...)
-		gw.mwAppendEnabled(&simpleArray, &KeyExpired{baseMid})
-		gw.mwAppendEnabled(&simpleArray, &AccessRightsCheck{baseMid})
+		gw.mwAppendEnabled(&simpleArray, &KeyExpired{baseMid.Copy()})
+		gw.mwAppendEnabled(&simpleArray, &AccessRightsCheck{baseMid.Copy()})
 
 		rateLimitPath := path.Join(spec.Proxy.ListenPath, rateLimitEndpoint)
 		logger.Debug("Rate limit endpoint is: ", rateLimitPath)
@@ -760,7 +752,13 @@ func explicitRouteSubpaths(prefix string, handler http.Handler, enabled bool) ht
 //
 // - register gorilla/mux routing handless with proxyMux directly (wrapped),
 // - return a raw http.Handler for tyk://ID urls.
-func (gw *Gateway) loadHTTPService(spec *APISpec, apisByListen map[string]int, gs *generalStores, muxer *proxyMux) *ChainObject {
+func (gw *Gateway) loadHTTPService(spec *APISpec, apisByListen map[string]int, gs *generalStores, muxer *proxyMux) (*ChainObject, error) {
+	// MakeSpec validates listenpath, but we can't be sure that it's in all the invocation paths.
+	// Since the check is relatively inexpensive, do it here to prevent issues in uncovered paths.
+	if err := httputil.ValidatePath(spec.Proxy.ListenPath); err != nil {
+		return nil, fmt.Errorf("invalid listen path while loading api: %w", err)
+	}
+
 	gwConfig := gw.GetConfig()
 	port := gwConfig.ListenPort
 	if spec.ListenPort != 0 {
@@ -792,7 +790,7 @@ func (gw *Gateway) loadHTTPService(spec *APISpec, apisByListen map[string]int, g
 	}
 
 	if chainObj.Skip {
-		return chainObj
+		return chainObj, nil
 	}
 
 	// Prefixes are multiple paths that the API endpoints are listening on.
@@ -819,7 +817,7 @@ func (gw *Gateway) loadHTTPService(spec *APISpec, apisByListen map[string]int, g
 		subrouter.NewRoute().Handler(httpHandler)
 	}
 
-	return chainObj
+	return chainObj, nil
 }
 
 func (gw *Gateway) loadTCPService(spec *APISpec, gs *generalStores, muxer *proxyMux) {
@@ -1002,7 +1000,12 @@ func (gw *Gateway) loadApps(specs []*APISpec) {
 						mainLog.Infof("Intialized tracer  api_name=%q", spec.Name)
 					}
 				}
-				tmpSpecHandles.Store(spec.APIID, gw.loadHTTPService(spec, apisByListen, &gs, muxer))
+				tmpSpecHandle, err := gw.loadHTTPService(spec, apisByListen, &gs, muxer)
+				if err != nil {
+					log.WithError(err).Errorf("error loading API")
+					return
+				}
+				tmpSpecHandles.Store(spec.APIID, tmpSpecHandle)
 			case "tcp", "tls":
 				gw.loadTCPService(spec, &gs, muxer)
 			}
