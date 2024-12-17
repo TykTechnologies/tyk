@@ -6,6 +6,7 @@ package gateway
 
 import (
 	"encoding/json"
+	"net/http"
 	"sync"
 	"testing"
 
@@ -322,6 +323,96 @@ func TestLooping(t *testing.T) {
 
 		_, _ = ts.Run(t, []test.TestCase{
 			{Path: "/external/", Code: 200},
+		}...)
+	})
+
+	t.Run("Looping to another api with auth tokens", func(t *testing.T) {
+		specs := ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+			spec.APIID = "apia"
+			spec.Name = "ApiA"
+			spec.Proxy.ListenPath = "/apia"
+			spec.UseKeylessAccess = false
+			spec.AuthConfigs = map[string]apidef.AuthConfig{
+				"authToken": {
+					AuthHeaderName: "Authorization",
+				},
+			}
+			UpdateAPIVersion(spec, "Default", func(v *apidef.VersionInfo) {
+				v.UseExtendedPaths = true
+				v.ExtendedPaths.URLRewrite = []apidef.URLRewriteMeta{{
+					Path:         "/",
+					Method:       http.MethodGet,
+					MatchPattern: ".*",
+					RewriteTo:    "tyk://apib",
+				}}
+			})
+		}, func(spec *APISpec) {
+			spec.APIID = "apib"
+			spec.Name = "ApiB"
+			spec.Proxy.ListenPath = "/apib"
+			spec.UseKeylessAccess = false
+			spec.AuthConfigs = map[string]apidef.AuthConfig{
+				"authToken": {
+					AuthHeaderName: "X-Api-Key",
+				},
+			}
+		})
+		specApiA := specs[0]
+		specApiB := specs[1]
+
+		_, authKeyForApiA := ts.CreateSession(func(s *user.SessionState) {
+			s.AccessRights = map[string]user.AccessDefinition{
+				specApiA.APIID: {
+					APIName:        specApiA.Name,
+					APIID:          specApiA.APIID,
+					Versions:       []string{"default"},
+					AllowanceScope: specApiA.APIID,
+				},
+			}
+			s.OrgID = specApiA.OrgID
+		})
+
+		_, authKeyForApiB := ts.CreateSession(func(s *user.SessionState) {
+			s.AccessRights = map[string]user.AccessDefinition{
+				specApiB.APIID: {
+					APIName:        specApiB.Name,
+					APIID:          specApiB.APIID,
+					Versions:       []string{"default"},
+					AllowanceScope: specApiB.APIID,
+				},
+			}
+			s.OrgID = specApiB.OrgID
+		})
+
+		headersWithApiBToken := map[string]string{
+			"Authorization": authKeyForApiA,
+			"X-Api-Key":     authKeyForApiB,
+		}
+		headersWithoutApiBToken := map[string]string{
+			"Authorization": authKeyForApiA,
+			"X-Api-Key":     "some-string",
+		}
+		headersWithOnlyApiAToken := map[string]string{
+			"Authorization": authKeyForApiA,
+		}
+		_, _ = ts.Run(t, []test.TestCase{
+			{
+				Headers: headersWithApiBToken,
+				Path:    "/apia",
+				Code:    http.StatusOK,
+			},
+			{
+				Headers:   headersWithoutApiBToken,
+				Path:      "/apia",
+				Code:      http.StatusForbidden,
+				BodyMatch: "Access to this API has been disallowed",
+			},
+			{
+				Headers:   headersWithOnlyApiAToken,
+				Path:      "/apia",
+				Code:      http.StatusUnauthorized,
+				BodyMatch: "Authorization field missing",
+			},
 		}...)
 	})
 

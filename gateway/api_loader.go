@@ -15,6 +15,8 @@ import (
 	"sync"
 	texttemplate "text/template"
 
+	"github.com/TykTechnologies/tyk/internal/httpctx"
+
 	"github.com/gorilla/mux"
 	"github.com/justinas/alice"
 	"github.com/rs/cors"
@@ -599,7 +601,7 @@ func (d *DummyProxyHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 		var handler http.Handler
 		if r.URL.Hostname() == "self" {
-			ctxSetSelfLooping(r, true)
+			httpctx.SetSelfLooping(r, true)
 			if h, found := d.Gw.apisHandlesByID.Load(d.SH.Spec.APIID); found {
 				if chain, ok := h.(*ChainObject); ok {
 					handler = chain.ThisHandler

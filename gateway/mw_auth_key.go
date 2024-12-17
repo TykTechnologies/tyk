@@ -6,6 +6,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/TykTechnologies/tyk/internal/httpctx"
+
 	"github.com/TykTechnologies/tyk/internal/crypto"
 	"github.com/TykTechnologies/tyk/internal/otel"
 	"github.com/TykTechnologies/tyk/storage"
@@ -95,7 +97,7 @@ func (k *AuthKey) ProcessRequest(_ http.ResponseWriter, r *http.Request, _ inter
 	}
 
 	// skip auth key check if the request is looped.
-	if ses := ctxGetSession(r); ses != nil && ctxSelfLooping(r) {
+	if ses := ctxGetSession(r); ses != nil && httpctx.IsSelfLooping(r) {
 		return nil, http.StatusOK
 	}
 

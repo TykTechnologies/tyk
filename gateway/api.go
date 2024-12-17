@@ -42,6 +42,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/TykTechnologies/tyk/internal/httpctx"
+
 	gqlv2 "github.com/TykTechnologies/graphql-go-tools/v2/pkg/graphql"
 
 	"github.com/getkin/kin-openapi/openapi3"
@@ -3177,7 +3179,7 @@ func ctxSetCheckLoopLimits(r *http.Request, b bool) {
 // Should we check Rate limits and Quotas?
 func ctxCheckLimits(r *http.Request) bool {
 	// If this is a self loop, do not need to check the limits and quotas.
-	if ctxSelfLooping(r) {
+	if httpctx.IsSelfLooping(r) {
 		return false
 	}
 
@@ -3265,20 +3267,6 @@ func ctxGetDefaultVersion(r *http.Request) bool {
 
 func ctxSetDefaultVersion(r *http.Request) {
 	setCtxValue(r, ctx.VersionDefault, true)
-}
-
-func ctxSetSelfLooping(r *http.Request, value bool) {
-	setCtxValue(r, ctx.SelfLooping, value)
-}
-
-func ctxSelfLooping(r *http.Request) bool {
-	if v := r.Context().Value(ctx.SelfLooping); v != nil {
-		if boolVal, ok := v.(bool); ok {
-			return boolVal
-		}
-	}
-
-	return false
 }
 
 func ctxLoopingEnabled(r *http.Request) bool {
