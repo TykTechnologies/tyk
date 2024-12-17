@@ -3181,8 +3181,8 @@ func ctxCheckLimits(r *http.Request) bool {
 		return false
 	}
 
-	// If looping disabled, allow all
-	if ctxLoopingEnabled(r) {
+	// If looping disabled, check all
+	if !ctxLoopingEnabled(r) {
 		return true
 	}
 
