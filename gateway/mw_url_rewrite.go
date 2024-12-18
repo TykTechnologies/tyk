@@ -448,8 +448,10 @@ func (m *URLRewriteMiddleware) InitTriggerRx() (enabled bool) {
 func (m *URLRewriteMiddleware) EnabledForSpec() bool {
 	if m.InitTriggerRx() {
 		m.Spec.URLRewriteEnabled = true
+		m.Logger().Debug("URLRewrite: enabled")
 		return true
 	}
+	m.Logger().Debug("URLRewrite: disabled")
 	return false
 }
 
