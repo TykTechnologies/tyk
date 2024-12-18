@@ -64,21 +64,10 @@ func TestValue_SetDifferentTypes(t *testing.T) {
 }
 
 func TestSetSelfLooping(t *testing.T) {
-	// Create a new HTTP request using httptest
 	req := httptest.NewRequest("GET", "/", nil)
+	assert.False(t, httpctx.IsSelfLooping(req)
 	httpctx.SetSelfLooping(req, true)
-
-	// Expected value from the context is true
-	expectedBool := httpctx.IsSelfLooping(req)
-	assert.True(t, expectedBool)
-}
-
-func TestIsSelfLooping(t *testing.T) {
-	// Create a new HTTP request using httptest
-	req := httptest.NewRequest("GET", "/", nil)
-
-	// Expected value from the context is false because we didn't call
-	// SetSelfLooping before.
-	expectedBool := httpctx.IsSelfLooping(req)
-	assert.False(t, expectedBool)
+	assert.True(t, httpctx.IsSelfLooping(req)
+	httpctx.SetSelfLooping(req, false)
+	assert.False(t, httpctx.IsSelfLooping(req)
 }
