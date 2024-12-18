@@ -342,6 +342,10 @@ func TestLooping_AnotherAPIWithAuthTokens(t *testing.T) {
 				AuthHeaderName: "Authorization",
 			},
 		}
+
+		// Delete the predefined version here to prevent flakiness.
+		delete(spec.VersionData.Versions, "v1")
+
 		UpdateAPIVersion(spec, "Default", func(v *apidef.VersionInfo) {
 			v.UseExtendedPaths = true
 			v.ExtendedPaths.URLRewrite = []apidef.URLRewriteMeta{{
