@@ -1,6 +1,7 @@
 package gateway
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"net/http"
@@ -700,6 +701,7 @@ func checkPayload(r *http.Request, options apidef.StringRegexMap, triggernum int
 		log.WithError(err).Error("error reading request body")
 		return false
 	}
+	r.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
 
 	// Perform regex matching on the request body
 	matched, matches := options.FindAllStringSubmatch(string(bodyBytes), -1)
