@@ -62,3 +62,23 @@ func TestValue_SetDifferentTypes(t *testing.T) {
 	retrievedInt := intValue.Get(req)
 	assert.Equal(t, expectedInt, retrievedInt, "Retrieved int value does not match expected value")
 }
+
+func TestSetSelfLooping(t *testing.T) {
+	// Create a new HTTP request using httptest
+	req := httptest.NewRequest("GET", "/", nil)
+	httpctx.SetSelfLooping(req, true)
+
+	// Expected value from the context is true
+	expectedBool := httpctx.IsSelfLooping(req)
+	assert.True(t, expectedBool)
+}
+
+func TestIsSelfLooping(t *testing.T) {
+	// Create a new HTTP request using httptest
+	req := httptest.NewRequest("GET", "/", nil)
+
+	// Expected value from the context is false because we didn't call
+	// SetSelfLooping before.
+	expectedBool := httpctx.IsSelfLooping(req)
+	assert.False(t, expectedBool)
+}
