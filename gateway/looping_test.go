@@ -359,6 +359,9 @@ func TestLooping_AnotherAPIWithAuthTokens(t *testing.T) {
 					AuthHeaderName: "Authorization",
 				},
 			}
+
+			spec.VersionData.Versions = map[string]apidef.VersionInfo{}
+
 			UpdateAPIVersion(spec, "Default", func(v *apidef.VersionInfo) {
 				v.UseExtendedPaths = true
 				v.ExtendedPaths.URLRewrite = []apidef.URLRewriteMeta{{
