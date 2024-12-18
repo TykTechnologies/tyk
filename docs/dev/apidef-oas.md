@@ -48,7 +48,7 @@ For optional fields:
 
 ## Add Go Doc Comments
 
-Add comments in Go doc format for each field to enable automated documentation generation.
+Add comments in Go doc format for each field to enable automated documentation generation (this is validated by linter).
 
 ## Implement Fill and ExtractTo Methods
 
