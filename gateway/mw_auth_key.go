@@ -6,9 +6,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/TykTechnologies/tyk/internal/httpctx"
-
 	"github.com/TykTechnologies/tyk/internal/crypto"
+	"github.com/TykTechnologies/tyk/internal/httpctx"
 	"github.com/TykTechnologies/tyk/internal/otel"
 	"github.com/TykTechnologies/tyk/storage"
 
@@ -96,8 +95,23 @@ func (k *AuthKey) ProcessRequest(_ http.ResponseWriter, r *http.Request, _ inter
 		return nil, http.StatusOK
 	}
 
+	isLoop := func(r *http.Request) (bool, error) {
+		isLoop := httpctx.IsSelfLooping(r)
+		return isLoop, nil
+	}
+
+	if ok, err := isLoop(r); ok {
+		k.Logger().Info("loop check: detected loop request")
+		return nil, http.StatusOK
+	} else {
+		k.Logger().Info("loop check: not a loop request")
+		if err != nil {
+			k.Logger().WithError(err).Error("loop check: unexpected error")
+		}
+	}
+
 	// skip auth key check if the request is looped.
-	if ses := ctxGetSession(r); ses != nil && httpctx.IsSelfLooping(r) {
+	if ses := ctxGetSession(r); ses != nil && ctxCheckLimits(r) {
 		return nil, http.StatusOK
 	}
 

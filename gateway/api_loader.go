@@ -969,9 +969,15 @@ func (gw *Gateway) loadApps(specs []*APISpec) {
 	gs := gw.prepareStorage()
 	shouldTrace := trace.IsEnabled()
 
+	// Note that this is a deadlock if specs loading hangs.
+	var wg sync.WaitGroup
+	wg.Add(len(specs))
+
 	for _, spec := range specs {
 		func() {
 			defer func() {
+				wg.Done()
+
 				// recover from panic if one occurred. Set err to nil otherwise.
 				if err := recover(); err != nil {
 					log.Errorf("Panic while loading an API: %v, panic: %v, stacktrace: %v", spec.APIDefinition, err, string(debug.Stack()))
@@ -1017,6 +1023,8 @@ func (gw *Gateway) loadApps(specs []*APISpec) {
 			spec.VersionDefinition.BaseID = ""
 		}()
 	}
+
+	wg.Wait()
 
 	gw.DefaultProxyMux.swap(muxer, gw)
 

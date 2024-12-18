@@ -11,9 +11,11 @@ import (
 	"testing"
 
 	"github.com/getkin/kin-openapi/openapi3"
+	"github.com/stretchr/testify/require"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/apidef/oas"
+	"github.com/TykTechnologies/tyk/internal/uuid"
 	"github.com/TykTechnologies/tyk/test"
 	"github.com/TykTechnologies/tyk/user"
 )
@@ -329,41 +331,47 @@ func TestLooping(t *testing.T) {
 
 func TestLooping_AnotherAPIWithAuthTokens(t *testing.T) {
 	ts := StartTest(nil)
-	defer ts.Close()
+	t.Cleanup(ts.Close)
+
+	apiAID := uuid.New()
+	apiBID := uuid.New()
 
 	// Looping to another api with auth tokens
-	specs := ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
-		spec.APIDefinition.APIID = "apia"
-		spec.APIDefinition.Name = "ApiA"
-		spec.APIDefinition.Proxy.ListenPath = "/apia"
-		spec.APIDefinition.UseKeylessAccess = false
-		spec.APIDefinition.AuthConfigs = map[string]apidef.AuthConfig{
-			"authToken": {
-				AuthHeaderName: "Authorization",
-			},
-		}
-		UpdateAPIVersion(spec, "Default", func(v *apidef.VersionInfo) {
-			v.UseExtendedPaths = true
-			v.ExtendedPaths.URLRewrite = []apidef.URLRewriteMeta{{
-				Path:         "/",
-				Method:       http.MethodGet,
-				MatchPattern: ".*",
-				RewriteTo:    "tyk://apib",
-			}}
-		})
-	}, func(spec *APISpec) {
-		spec.APIDefinition.APIID = "apib"
-		spec.APIDefinition.Name = "ApiB"
-		spec.APIDefinition.Proxy.ListenPath = "/apib"
-		spec.APIDefinition.UseKeylessAccess = false
-		spec.APIDefinition.AuthConfigs = map[string]apidef.AuthConfig{
-			"authToken": {
-				AuthHeaderName: "X-Api-Key",
-			},
-		}
-	})
-	specApiA := specs[0]
-	specApiB := specs[1]
+	specs := ts.Gw.BuildAndLoadAPI(
+		func(spec *APISpec) {
+			spec.APIDefinition.APIID = apiBID
+			spec.APIDefinition.Name = "ApiB"
+			spec.APIDefinition.Proxy.ListenPath = "/apib"
+			spec.APIDefinition.UseKeylessAccess = false
+			spec.APIDefinition.AuthConfigs = map[string]apidef.AuthConfig{
+				"authToken": {
+					AuthHeaderName: "X-Api-Key",
+				},
+			}
+		},
+		func(spec *APISpec) {
+			spec.APIDefinition.APIID = apiAID
+			spec.APIDefinition.Name = "ApiA"
+			spec.APIDefinition.Proxy.ListenPath = "/apia"
+			spec.APIDefinition.UseKeylessAccess = false
+			spec.APIDefinition.AuthConfigs = map[string]apidef.AuthConfig{
+				"authToken": {
+					AuthHeaderName: "Authorization",
+				},
+			}
+			UpdateAPIVersion(spec, "Default", func(v *apidef.VersionInfo) {
+				v.UseExtendedPaths = true
+				v.ExtendedPaths.URLRewrite = []apidef.URLRewriteMeta{{
+					Path:         "/",
+					Method:       http.MethodGet,
+					MatchPattern: ".*",
+					RewriteTo:    "tyk://" + apiBID,
+				}}
+			})
+		},
+	)
+	specApiA := specs[1]
+	specApiB := specs[0]
 
 	_, authKeyForApiA := ts.CreateSession(func(s *user.SessionState) {
 		s.AccessRights = map[string]user.AccessDefinition{
@@ -388,6 +396,9 @@ func TestLooping_AnotherAPIWithAuthTokens(t *testing.T) {
 		}
 		s.OrgID = specApiB.APIDefinition.OrgID
 	})
+
+	require.NotEqual(t, "", authKeyForApiA, "Error creating authkey A")
+	require.NotEqual(t, "", authKeyForApiB, "Error creating authkey B")
 
 	headersWithApiBToken := map[string]string{
 		"Authorization": authKeyForApiA,
