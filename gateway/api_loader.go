@@ -15,8 +15,6 @@ import (
 	"sync"
 	texttemplate "text/template"
 
-	"github.com/TykTechnologies/tyk/internal/httpctx"
-
 	"github.com/gorilla/mux"
 	"github.com/justinas/alice"
 	"github.com/rs/cors"
@@ -28,6 +26,7 @@ import (
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/trace"
 
+	"github.com/TykTechnologies/tyk/internal/httpctx"
 	"github.com/TykTechnologies/tyk/internal/httputil"
 	"github.com/TykTechnologies/tyk/internal/otel"
 )

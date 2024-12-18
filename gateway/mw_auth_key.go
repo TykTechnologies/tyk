@@ -6,18 +6,15 @@ import (
 	"strings"
 	"time"
 
-	"github.com/TykTechnologies/tyk/internal/httpctx"
-
-	"github.com/TykTechnologies/tyk/internal/crypto"
-	"github.com/TykTechnologies/tyk/internal/otel"
-	"github.com/TykTechnologies/tyk/storage"
-
-	"github.com/TykTechnologies/tyk/user"
-
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/internal/crypto"
+	"github.com/TykTechnologies/tyk/internal/httpctx"
+	"github.com/TykTechnologies/tyk/internal/otel"
 	"github.com/TykTechnologies/tyk/request"
 	signaturevalidator "github.com/TykTechnologies/tyk/signature_validator"
+	"github.com/TykTechnologies/tyk/storage"
+	"github.com/TykTechnologies/tyk/user"
 )
 
 const (
