@@ -111,7 +111,7 @@ func (k *AuthKey) ProcessRequest(_ http.ResponseWriter, r *http.Request, _ inter
 	}
 
 	// skip auth key check if the request is looped.
-	if ses := ctxGetSession(r); ses != nil && ctxCheckLimits(r) {
+	if ses := ctxGetSession(r); ses != nil && !ctxCheckLimits(r) {
 		return nil, http.StatusOK
 	}
 
