@@ -746,7 +746,7 @@ paths:
               schema:
                 items:
                   allOf:
-                  - $ref: https://raw.githubusercontent.com/OAI/OpenAPI-Specification/main/schemas/v3.0/schema.json
+                  - $ref: https://raw.githubusercontent.com/TykTechnologies/tyk/refs/heads/master/apidef/oas/schema/3.0.json
                   - $ref: '#/components/schemas/XTykAPIGateway'
                 type: array
           description: List of API definitions in Tyk OAS format.
@@ -847,7 +847,7 @@ paths:
                   url: https://localhost:8080
             schema:
               allOf:
-              - $ref: https://raw.githubusercontent.com/OAI/OpenAPI-Specification/main/schemas/v3.0/schema.json
+              - $ref: https://raw.githubusercontent.com/TykTechnologies/tyk/refs/heads/master/apidef/oas/schema/3.0.json
               - $ref: '#/components/schemas/XTykAPIGateway'
       responses:
         "200":
@@ -985,7 +985,7 @@ paths:
                   $ref: '#/components/examples/oasExample'
               schema:
                 allOf:
-                - $ref: https://raw.githubusercontent.com/OAI/OpenAPI-Specification/main/schemas/v3.0/schema.json
+                - $ref: https://raw.githubusercontent.com/TykTechnologies/tyk/refs/heads/master/apidef/oas/schema/3.0.json
                 - $ref: '#/components/schemas/XTykAPIGateway'
           description: OK
           headers:
@@ -1095,7 +1095,7 @@ paths:
                 upstream:
                   url: https://localhost:8080
             schema:
-              $ref: https://raw.githubusercontent.com/OAI/OpenAPI-Specification/main/schemas/v3.0/schema.json
+              $ref: https://raw.githubusercontent.com/TykTechnologies/tyk/refs/heads/master/apidef/oas/schema/3.0.json
       responses:
         "200":
           content:
@@ -1208,7 +1208,7 @@ paths:
                   url: https://localhost:8080
             schema:
               allOf:
-              - $ref: https://raw.githubusercontent.com/OAI/OpenAPI-Specification/main/schemas/v3.0/schema.json
+              - $ref: https://raw.githubusercontent.com/TykTechnologies/tyk/refs/heads/master/apidef/oas/schema/3.0.json
               - $ref: '#/components/schemas/XTykAPIGateway'
       responses:
         "200":
@@ -1517,7 +1517,7 @@ paths:
               servers:
               - url: https://localhost:8080
             schema:
-              $ref: https://raw.githubusercontent.com/OAI/OpenAPI-Specification/main/schemas/v3.0/schema.json
+              $ref: https://raw.githubusercontent.com/TykTechnologies/tyk/refs/heads/master/apidef/oas/schema/3.0.json
       responses:
         "200":
           content:
