@@ -85,6 +85,156 @@ tags:
 - description: |
     Manage OAuth clients, and manage their tokens
   name: OAuth
+- description: |
+    Tyk supports batch requests, so a client makes a single request to the API but gets a compound response object back.
+    
+    This is especially handy if clients have complex requests that have multiple synchronous dependencies and do not wish to have the entire request / response cycle running for each event.
+    
+    To enable batch request support, set the `enable_batch_request_support` value to `true`
+    
+    This is especially handy if clients have complex requests that have multiple synchronous dependencies and do not wish to have the entire request / response cycle running for each event.
+    
+    Batch requests that come into Tyk are *run through the whole Tyk machinery* and *use a relative path to prevent spamming*. This means that a batch request to Tyk for three resources with the same API key will have three requests applied to their session quota and request limiting could become active if they are being throttled.
+    
+    Tyk reconstructs the API request based on the data in the batch request. This is to ensure that Tyk is not being used to proxy requests to other hosts outside of the upstream API being accessed.
+    
+    Batch requests are created by POSTing to the `/{listen_path}/tyk/batch/` endpoint. These requests **do not require a valid key**, but their request list does.
+    
+    <h3>Sample Request</h3>
+    
+        ```{json}
+        {
+          "requests": [
+            {
+              "method": "GET",
+              "headers": {
+                "x-tyk-test": "1",
+                "x-tyk-version": "1.2",
+                "authorization": "1dbc83b9c431649d7698faa9797e2900f"
+              },
+              "body": "",
+              "relative_url": "get"
+          },
+          {
+            "method": "GET",
+            "headers": {
+              "x-tyk-test": "2",
+              "x-tyk-version": "1.2",
+              "authorization": "1dbc83b9c431649d7698faa9797e2900f"
+            },
+            "body": "",
+            "relative_url": "get"
+            }
+          ],
+          "suppress_parallel_execution": false
+        }
+        ```
+    
+    The response will will be a structured reply that encapsulates the responses for each of the outbound requests. If `suppress_parallel_execution` is set to `true`, requests will be made synchronously. If set to `false` then they will run in parallel and the response order is not guaranteed.
+    
+    <h3>Sample Response</h3>
+    
+      ```
+      [
+        {
+          "relative_url": "get",
+          "code": 200,
+          "headers": {
+            "Access-Control-Allow-Credentials": [
+              "true"
+            ],
+            "Access-Control-Allow-Origin": [
+              "*"
+            ],
+            "Content-Length": [
+              "497"
+            ],
+            "Content-Type": [
+              "application/json"
+            ],
+            "Date": [
+              "Wed, 12 Nov 2014 15:32:43 GMT"
+            ],
+            "Server": [
+              "gunicorn/18.0"
+            ],
+            "Via": [
+              "1.1 vegur"
+            ]
+          },
+          "body": "{
+        "args": {},
+        "headers": {
+          "Accept-Encoding": "gzip",
+          "Authorization": "1dbc83b9c431649d7698faa9797e2900f",
+          "Connect-Time": "2",
+          "Connection": "close",
+          "Host": "httpbin.org",
+          "Total-Route-Time": "0",
+          "User-Agent": "Go 1.1 package http",
+          "Via": "1.1 vegur",
+          "X-Request-Id": "6a22499a-2776-4aa1-80c0-686581a8be4d",
+          "X-Tyk-Test": "2",
+          "X-Tyk-Version": "1.2"
+        },
+        "origin": "127.0.0.1, 62.232.114.250",
+        "url": "http://httpbin.org/get"
+      }"
+          },
+          {
+            "relative_url": "get",
+            "code": 200,
+            "headers": {
+              "Access-Control-Allow-Credentials": [
+                "true"
+              ],
+              "Access-Control-Allow-Origin": [
+                "*"
+              ],
+              "Content-Length": [
+                "497"
+              ],
+              "Content-Type": [
+                "application/json"
+              ],
+              "Date": [
+                "Wed, 12 Nov 2014 15:32:43 GMT"
+              ],
+              "Server": [
+                "gunicorn/18.0"
+              ],
+              "Via": [
+                "1.1 vegur"
+              ]
+            },
+            "body": "{
+        "args": {},
+        "headers": {
+          "Accept-Encoding": "gzip",
+          "Authorization": "1dbc83b9c431649d7698faa9797e2900f",
+          "Connect-Time": "7",
+          "Connection": "close",
+          "Host": "httpbin.org",
+          "Total-Route-Time": "0",
+          "User-Agent": "Go 1.1 package http",
+          "Via": "1.1 vegur",
+          "X-Request-Id": "1ab61f50-51ff-4828-a7e2-17240385a6d2",
+          "X-Tyk-Test": "1",
+          "X-Tyk-Version": "1.2"
+        },
+        "origin": "127.0.0.1, 62.232.114.250",
+        "url": "http://httpbin.org/get"
+      }"
+          }
+      ]
+      ```
+    With the body for each request string encoded in the `body` field.
+    
+
+    
+
+  name: "Batch requests"
+
 paths:
   /hello:
     get:
@@ -4231,6 +4381,26 @@ paths:
       summary: Hot-reload a group of Tyk nodes.
       tags:
       - Hot Reload
+  /{listen_path}/tyk/batch:
+    parameters:
+      - name: listen_path
+        in: path
+        required: true
+        description: "API listen path"
+        schema:
+          type: string
+    post:
+      summary: Run batch request
+      tags:
+        - Batch requests
+      operationId: batch
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
   /tyk/schema:
     get:
       description: Get OAS schema definition using a version.
