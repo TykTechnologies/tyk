@@ -43,13 +43,8 @@ import (
 	"sync"
 	"time"
 
-<<<<<<< HEAD
-=======
 	"github.com/TykTechnologies/tyk/internal/httpctx"
-
-	gqlv2 "github.com/TykTechnologies/graphql-go-tools/v2/pkg/graphql"
-
->>>>>>> d59ae8ceb... [TT-12741] Looped ap is wrongfully inherit the caller's authentication key when using url rewrite (#6778)
+	
 	"github.com/getkin/kin-openapi/openapi3"
 
 	"github.com/TykTechnologies/tyk/config"
