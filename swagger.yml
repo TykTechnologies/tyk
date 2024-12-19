@@ -92,8 +92,6 @@ tags:
     
     To enable batch request support, set the `enable_batch_request_support` value to `true`
     
-    This is especially handy if clients have complex requests that have multiple synchronous dependencies and do not wish to have the entire request / response cycle running for each event.
-    
     Batch requests that come into Tyk are *run through the whole Tyk machinery* and *use a relative path to prevent spamming*. This means that a batch request to Tyk for three resources with the same API key will have three requests applied to their session quota and request limiting could become active if they are being throttled.
     
     Tyk reconstructs the API request based on the data in the batch request. This is to ensure that Tyk is not being used to proxy requests to other hosts outside of the upstream API being accessed.
@@ -130,7 +128,7 @@ tags:
         }
         ```
     
-    The response will will be a structured reply that encapsulates the responses for each of the outbound requests. If `suppress_parallel_execution` is set to `true`, requests will be made synchronously. If set to `false` then they will run in parallel and the response order is not guaranteed.
+    The response will be a structured reply that encapsulates the responses for each of the outbound requests. If `suppress_parallel_execution` is set to `true`, requests will be made synchronously. If set to `false` then they will run in parallel and the response order is not guaranteed.
     
     <h3>Sample Response</h3>
     
