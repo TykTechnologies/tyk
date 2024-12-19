@@ -6,16 +6,15 @@ import (
 	"strings"
 	"time"
 
-	"github.com/TykTechnologies/tyk/internal/crypto"
-	"github.com/TykTechnologies/tyk/internal/otel"
-	"github.com/TykTechnologies/tyk/storage"
-
-	"github.com/TykTechnologies/tyk/user"
-
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/internal/crypto"
+	"github.com/TykTechnologies/tyk/internal/httpctx"
+	"github.com/TykTechnologies/tyk/internal/otel"
 	"github.com/TykTechnologies/tyk/request"
 	signaturevalidator "github.com/TykTechnologies/tyk/signature_validator"
+	"github.com/TykTechnologies/tyk/storage"
+	"github.com/TykTechnologies/tyk/user"
 )
 
 const (
@@ -95,7 +94,7 @@ func (k *AuthKey) ProcessRequest(_ http.ResponseWriter, r *http.Request, _ inter
 	}
 
 	// skip auth key check if the request is looped.
-	if ses := ctxGetSession(r); ses != nil && !ctxCheckLimits(r) {
+	if ses := ctxGetSession(r); ses != nil && httpctx.IsSelfLooping(r) {
 		return nil, http.StatusOK
 	}
 
@@ -242,7 +241,7 @@ func (k *AuthKey) validateSignature(r *http.Request, key string) (error, int) {
 		return errors.New(errorMessage), errorCode
 	}
 
-	secret := k.Gw.replaceTykVariables(r, authConfig.Signature.Secret, false)
+	secret := k.Gw.ReplaceTykVariables(r, authConfig.Signature.Secret, false)
 
 	if secret == "" {
 		logger.Info("Request signature secret not found or empty")

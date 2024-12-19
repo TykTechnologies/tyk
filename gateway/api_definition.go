@@ -10,20 +10,16 @@ import (
 	"io"
 	"io/ioutil"
 	"net/http"
-	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
-	"sync"
 	"sync/atomic"
 	texttemplate "text/template"
 	"time"
 
+	"github.com/TykTechnologies/tyk/ee/middleware/streams"
 	"github.com/TykTechnologies/tyk/storage/kv"
 
-	"github.com/getkin/kin-openapi/routers"
-
-	"github.com/TykTechnologies/tyk/internal/graphengine"
 	"github.com/TykTechnologies/tyk/internal/httputil"
 
 	"github.com/getkin/kin-openapi/routers/gorillamux"
@@ -34,7 +30,7 @@ import (
 
 	"github.com/cenk/backoff"
 
-	sprig "github.com/Masterminds/sprig/v3"
+	"github.com/Masterminds/sprig/v3"
 
 	"github.com/sirupsen/logrus"
 
@@ -42,11 +38,10 @@ import (
 
 	"github.com/TykTechnologies/gojsonschema"
 
-	"github.com/TykTechnologies/tyk-pump/analytics"
-
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/header"
+	"github.com/TykTechnologies/tyk/internal/model"
 	"github.com/TykTechnologies/tyk/regexp"
 	"github.com/TykTechnologies/tyk/rpc"
 	"github.com/TykTechnologies/tyk/storage"
@@ -130,42 +125,6 @@ const (
 	StatusRateLimit                RequestStatus = "Rate Limited"
 )
 
-// URLSpec represents a flattened specification for URLs, used to check if a proxy URL
-// path is on any of the white, black or ignored lists. This is generated as part of the
-// configuration init
-type URLSpec struct {
-	spec *regexp.Regexp
-
-	Status                    URLStatus
-	MethodActions             map[string]apidef.EndpointMethodMeta
-	Whitelist                 apidef.EndPointMeta
-	Blacklist                 apidef.EndPointMeta
-	Ignored                   apidef.EndPointMeta
-	MockResponse              apidef.MockResponseMeta
-	CacheConfig               EndPointCacheMeta
-	TransformAction           TransformSpec
-	TransformResponseAction   TransformSpec
-	TransformJQAction         TransformJQSpec
-	TransformJQResponseAction TransformJQSpec
-	InjectHeaders             apidef.HeaderInjectionMeta
-	InjectHeadersResponse     apidef.HeaderInjectionMeta
-	HardTimeout               apidef.HardTimeoutMeta
-	CircuitBreaker            ExtendedCircuitBreakerMeta
-	URLRewrite                *apidef.URLRewriteMeta
-	VirtualPathSpec           apidef.VirtualMeta
-	RequestSize               apidef.RequestSizeMeta
-	MethodTransform           apidef.MethodTransformMeta
-	TrackEndpoint             apidef.TrackEndpointMeta
-	DoNotTrackEndpoint        apidef.TrackEndpointMeta
-	ValidatePathMeta          apidef.ValidatePathMeta
-	Internal                  apidef.InternalMeta
-	GoPluginMeta              GoPluginMiddleware
-	PersistGraphQL            apidef.PersistGraphQLMeta
-	RateLimit                 apidef.RateLimitMeta
-
-	IgnoreCase bool
-}
-
 type EndPointCacheMeta struct {
 	Method                 string
 	CacheKeyRegex          string
@@ -183,48 +142,8 @@ type ExtendedCircuitBreakerMeta struct {
 	CB *circuit.Breaker `json:"-"`
 }
 
-// APISpec represents a path specification for an API, to avoid enumerating multiple nested lists, a single
-// flattened URL list is checked for matching paths and then it's status evaluated if found.
-type APISpec struct {
-	*apidef.APIDefinition
-	OAS oas.OAS
-	sync.RWMutex
-
-	Checksum                 string
-	RxPaths                  map[string][]URLSpec
-	WhiteListEnabled         map[string]bool
-	target                   *url.URL
-	AuthManager              SessionHandler
-	OAuthManager             *OAuthManager
-	OrgSessionManager        SessionHandler
-	EventPaths               map[apidef.TykEvent][]config.TykEventHandler
-	Health                   HealthChecker
-	JSVM                     JSVM
-	ResponseChain            []TykResponseHandler
-	RoundRobin               RoundRobin
-	URLRewriteEnabled        bool
-	CircuitBreakerEnabled    bool
-	EnforcedTimeoutEnabled   bool
-	LastGoodHostList         *apidef.HostList
-	HasRun                   bool
-	ServiceRefreshInProgress bool
-	HTTPTransport            *TykRoundTripper
-	HTTPTransportCreated     time.Time
-	WSTransport              http.RoundTripper
-	WSTransportCreated       time.Time
-	GlobalConfig             config.Config
-	OrgHasNoSession          bool
-	AnalyticsPluginConfig    *GoAnalyticsPlugin
-
-	middlewareChain *ChainObject
-
-	network analytics.NetworkStats
-
-	GraphEngine graphengine.Engine
-
-	HasMock            bool
-	HasValidateRequest bool
-	OASRouter          routers.Router
+type OAuthManagerInterface interface {
+	Storage() ExtendedOsinStorageInterface
 }
 
 // GetSessionLifetimeRespectsKeyExpiration returns a boolean to tell whether session lifetime should respect to key expiration or not.
@@ -237,8 +156,16 @@ func (a *APISpec) GetSessionLifetimeRespectsKeyExpiration() bool {
 	return a.SessionLifetimeRespectsKeyExpiration
 }
 
+// AddUnloadHook adds a function to be called when the API spec is unloaded
+func (s *APISpec) AddUnloadHook(hook func()) {
+	s.unloadHooks = append(s.unloadHooks, hook)
+}
+
 // Release releases all resources associated with API spec
-func (s *APISpec) Release() {
+func (s *APISpec) Unload() {
+	s.Lock()
+	defer s.Unlock()
+
 	// release circuit breaker resources
 	for _, path := range s.RxPaths {
 		for _, urlSpec := range path {
@@ -267,6 +194,11 @@ func (s *APISpec) Release() {
 		s.HTTPTransport.transport.CloseIdleConnections()
 		s.HTTPTransport = nil
 	}
+
+	for _, hook := range s.unloadHooks {
+		hook()
+	}
+	s.unloadHooks = nil
 }
 
 // Validate returns nil if s is a valid spec and an error stating why the spec is not valid.
@@ -299,6 +231,15 @@ func (s *APISpec) validateHTTP() error {
 	return nil
 }
 
+func (s *APISpec) isStreamingAPI() bool {
+	if s.OAS.T.Extensions == nil {
+		return false
+	}
+
+	_, ok := s.OAS.T.Extensions[streams.ExtensionTykStreaming]
+	return ok
+}
+
 // APIDefinitionLoader will load an Api definition from a storage
 // system.
 type APIDefinitionLoader struct {
@@ -307,11 +248,19 @@ type APIDefinitionLoader struct {
 
 // MakeSpec will generate a flattened URLSpec from and APIDefinitions' VersionInfo data. paths are
 // keyed to the Api version name, which is determined during routing to speed up lookups
-func (a APIDefinitionLoader) MakeSpec(def *nestedApiDefinition, logger *logrus.Entry) (*APISpec, error) {
+func (a APIDefinitionLoader) MakeSpec(def *model.MergedAPI, logger *logrus.Entry) (*APISpec, error) {
+	if logger == nil {
+		logger = logrus.NewEntry(log).WithFields(logrus.Fields{
+			"api_id": def.APIID,
+			"org_id": def.OrgID,
+			"name":   def.Name,
+		})
+	}
+
 	spec := &APISpec{}
 	apiString, err := json.Marshal(def)
 	if err != nil {
-		logger.WithError(err).WithField("name", def.Name).Error("Failed to JSON marshal API definition")
+		logger.WithError(err).Error("Failed to JSON marshal API definition")
 		return nil, err
 	}
 
@@ -325,15 +274,10 @@ func (a APIDefinitionLoader) MakeSpec(def *nestedApiDefinition, logger *logrus.E
 		return currSpec, nil
 	}
 
-	if logger == nil {
-		logger = logrus.NewEntry(log)
-	}
-
 	// new expiration feature
 	if def.Expiration != "" {
 		if t, err := time.Parse(apidef.ExpirationTimeFormat, def.Expiration); err != nil {
-			logger.WithError(err).WithField("name", def.Name).WithField("Expiration", def.Expiration).
-				Error("Could not parse expiration date for API")
+			logger.WithError(err).WithField("Expiration", def.Expiration).Error("Could not parse expiration date for API")
 		} else {
 			def.ExpirationTs = t
 		}
@@ -347,7 +291,7 @@ func (a APIDefinitionLoader) MakeSpec(def *nestedApiDefinition, logger *logrus.E
 		}
 		// calculate the time
 		if t, err := time.Parse(apidef.ExpirationTimeFormat, ver.Expires); err != nil {
-			logger.WithError(err).WithField("Expires", ver.Expires).Error("Could not parse expiry date for API")
+			logger.WithError(err).WithField("expires", ver.Expires).Error("Could not parse expiry date for API")
 		} else {
 			ver.ExpiresTs = t
 			def.VersionData.Versions[key] = ver
@@ -419,10 +363,15 @@ func (a APIDefinitionLoader) MakeSpec(def *nestedApiDefinition, logger *logrus.E
 	if spec.IsOAS && def.OAS != nil {
 		loader := openapi3.NewLoader()
 		if err := loader.ResolveRefsIn(&def.OAS.T, nil); err != nil {
-			log.WithError(err).Errorf("Dashboard loaded API's OAS reference resolve failed: %s", def.APIID)
+			logger.WithError(err).Errorf("Dashboard loaded API's OAS reference resolve failed: %s", def.APIID)
 		}
 
 		spec.OAS = *def.OAS
+	}
+
+	if err := httputil.ValidatePath(spec.Proxy.ListenPath); err != nil {
+		logger.WithError(err).Error("Invalid listen path when creating router")
+		return nil, err
 	}
 
 	oasSpec := spec.OAS.T
@@ -432,58 +381,12 @@ func (a APIDefinitionLoader) MakeSpec(def *nestedApiDefinition, logger *logrus.E
 
 	spec.OASRouter, err = gorillamux.NewRouter(&oasSpec)
 	if err != nil {
-		log.WithError(err).Error("Could not create OAS router")
+		logger.WithError(err).Error("Could not create OAS router")
 	}
 
 	spec.setHasMock()
 
 	return spec, nil
-}
-
-// nestedApiDefinitionList is the response body for FromDashboardService
-type nestedApiDefinitionList struct {
-	Message []nestedApiDefinition
-	Nonce   string
-}
-
-type nestedApiDefinition struct {
-	*apidef.APIDefinition `json:"api_definition,inline"`
-	OAS                   *oas.OAS `json:"oas"`
-}
-
-func (f *nestedApiDefinitionList) set(defs []*apidef.APIDefinition) {
-	for _, def := range defs {
-		f.Message = append(f.Message, nestedApiDefinition{APIDefinition: def})
-	}
-}
-
-func (f *nestedApiDefinitionList) filter(enabled bool, tags ...string) []nestedApiDefinition {
-	if !enabled {
-		return f.Message
-	}
-
-	if len(tags) == 0 {
-		return nil
-	}
-
-	tagMap := map[string]bool{}
-	for _, tag := range tags {
-		tagMap[tag] = true
-	}
-
-	result := make([]nestedApiDefinition, 0, len(f.Message))
-	for _, v := range f.Message {
-		if v.TagsDisabled {
-			continue
-		}
-		for _, tag := range v.Tags {
-			if ok := tagMap[tag]; ok {
-				result = append(result, nestedApiDefinition{v.APIDefinition, v.OAS})
-				break
-			}
-		}
-	}
-	return result
 }
 
 // FromDashboardService will connect and download ApiDefintions from a Tyk Dashboard instance.
@@ -525,7 +428,7 @@ func (a APIDefinitionLoader) FromDashboardService(endpoint string) ([]*APISpec, 
 	}
 
 	// Extract tagged APIs#
-	list := &nestedApiDefinitionList{}
+	list := model.NewMergedAPIList()
 	inBytes, err := io.ReadAll(resp.Body)
 	if err != nil {
 		log.Error("Couldn't read api definition list")
@@ -541,7 +444,7 @@ func (a APIDefinitionLoader) FromDashboardService(endpoint string) ([]*APISpec, 
 	}
 
 	// Extract tagged entries only
-	apiDefs := list.filter(gwConfig.DBAppConfOptions.NodeIsSegmented, gwConfig.DBAppConfOptions.Tags...)
+	apiDefs := list.Filter(gwConfig.DBAppConfOptions.NodeIsSegmented, gwConfig.DBAppConfOptions.Tags...)
 
 	// Process
 	specs := a.prepareSpecs(apiDefs, gwConfig, false)
@@ -683,27 +586,24 @@ func (a APIDefinitionLoader) FromRPC(store RPCDataLoader, orgId string, gw *Gate
 }
 
 func (a APIDefinitionLoader) processRPCDefinitions(apiCollection string, gw *Gateway) ([]*APISpec, error) {
-
-	var payload []nestedApiDefinition
+	var payload []model.MergedAPI
 	if err := json.Unmarshal([]byte(apiCollection), &payload); err != nil {
 		return nil, err
 	}
 
-	list := &nestedApiDefinitionList{
-		Message: payload,
-	}
+	list := model.NewMergedAPIList(payload...)
 
 	gwConfig := a.Gw.GetConfig()
 
 	// Extract tagged entries only
-	apiDefs := list.filter(gwConfig.DBAppConfOptions.NodeIsSegmented, gwConfig.DBAppConfOptions.Tags...)
+	apiDefs := list.Filter(gwConfig.DBAppConfOptions.NodeIsSegmented, gwConfig.DBAppConfOptions.Tags...)
 
 	specs := a.prepareSpecs(apiDefs, gwConfig, true)
 
 	return specs, nil
 }
 
-func (a APIDefinitionLoader) prepareSpecs(apiDefs []nestedApiDefinition, gwConfig config.Config, fromRPC bool) []*APISpec {
+func (a APIDefinitionLoader) prepareSpecs(apiDefs []model.MergedAPI, gwConfig config.Config, fromRPC bool) []*APISpec {
 	var specs []*APISpec
 
 	for _, def := range apiDefs {
@@ -791,7 +691,7 @@ func (a APIDefinitionLoader) loadDefFromFilePath(filePath string) (*APISpec, err
 		return nil, err
 	}
 
-	nestDef := nestedApiDefinition{APIDefinition: &def}
+	nestDef := model.MergedAPI{APIDefinition: &def}
 	if def.IsOAS {
 		loader := openapi3.NewLoader()
 		// use openapi3.ReadFromFile as ReadFromURIFunc since the default implementation cache spec based on file path.

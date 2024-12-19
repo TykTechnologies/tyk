@@ -592,7 +592,7 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 		}
 
 		// Retrieve OAuth client data from storage and inject developer ID into the session object:
-		client, err := k.Spec.OAuthManager.OsinServer.Storage.GetClient(oauthClientID)
+		client, err := k.Spec.OAuthManager.Storage().GetClient(oauthClientID)
 		if err == nil {
 			userData := client.GetUserData()
 			if userData != nil {
@@ -838,9 +838,12 @@ func assertSigningMethod(signingMethod string, token *jwt.Token) error {
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 			return fmt.Errorf("%v: %v and not HMAC signature", UnexpectedSigningMethod, token.Header["alg"])
 		}
+	// Supports both RSA + RSAPSS Signing.
 	case RSASign:
 		if _, ok := token.Method.(*jwt.SigningMethodRSA); !ok {
-			return fmt.Errorf("%v: %v and not RSA signature", UnexpectedSigningMethod, token.Header["alg"])
+			if _, ok := token.Method.(*jwt.SigningMethodRSAPSS); !ok {
+				return fmt.Errorf("%v: %v and not RSA or RSAPSS signature", UnexpectedSigningMethod, token.Header["alg"])
+			}
 		}
 	case ECDSASign:
 		if _, ok := token.Method.(*jwt.SigningMethodECDSA); !ok {

@@ -52,6 +52,10 @@ var (
 		LivenessCheck: LivenessCheckConfig{
 			CheckDuration: time.Second * 10,
 		},
+		Streaming: StreamingConfig{
+			Enabled:     false,
+			AllowUnsafe: []string{},
+		},
 	}
 )
 
@@ -408,47 +412,43 @@ type HttpServerOptionsConfig struct {
 	// Regular expressions and parameterized routes will be left alone regardless of this setting.
 	EnableStrictRoutes bool `json:"enable_strict_routes"`
 
-	// EnablePathPrefixMatching changes the URL matching from wildcard mode to prefix mode.
-	// For example, `/json` matches `*/json*` by current default behaviour.
-	// If prefix matching is enabled, the match will be performed as a prefix match (`/json*`).
+	// EnablePathPrefixMatching changes how the gateway matches incoming URL paths against routes (patterns) defined in the API definition.
+	// By default, the gateway uses wildcard matching. When EnablePathPrefixMatching is enabled, it switches to prefix matching. For example, a defined path such as `/json` will only match request URLs that begin with `/json`, rather than matching any URL containing `/json`.
 	//
-	// The `/json` url would be matched as `^/json` against the following paths:
+	// The gateway checks the request URL against several variations depending on whether path versioning is enabled:
+	// - Full path (listen path + version + endpoint): `/listen-path/v4/json`
+	// - Non-versioned full path (listen path + endpoint): `/listen-path/json`
+	// - Path without version (endpoint only): `/json`
 	//
-	// - Full listen path and versioning URL (`/listen-path/v4/json`)
-	// - Stripped listen path URL (`/v4/json`)
-	// - Stripped version information (`/json`) - match.
+	// For patterns that start with `/`, the gateway prepends `^` before performing the check, ensuring a true prefix match.
+	// For patterns that start with `^`, the gateway will already perform prefix matching so EnablePathPrefixMatching will have no impact.
+	// This option allows for more specific and controlled routing of API requests, potentially reducing unintended matches. Note that you may need to adjust existing route definitions when enabling this option.
 	//
-	// If versioning is disabled then the following URLs are considered:
+	// Example:
 	//
-	// - Full listen path and endpoint (`/listen-path/json`)
-	// - Stripped listen path (`/json`) - match.
+	// With wildcard matching, `/json` might match `/api/v1/data/json`.
+	// With prefix matching, `/json` would not match `/api/v1/data/json`, but would match `/json/data`.
 	//
-	// For inputs that start with `/`, a prefix match is ensured by
-	// prepending the start of string `^` caret.
-	//
-	// For all other cases, the pattern remains unmodified.
-	//
-	// Combine this option with `enable_path_suffix_matching` to achieve
-	// exact url matching with `/json` being evaluated as `^/json$`.
+	// Combining EnablePathPrefixMatching with EnablePathSuffixMatching will result in exact URL matching, with `/json` being evaluated as `^/json$`.
 	EnablePathPrefixMatching bool `json:"enable_path_prefix_matching"`
 
-	// EnablePathSuffixMatching changes the URL matching to match as a suffix.
-	// For example: `/json` is matched as `/json$` against the following paths:
+	// EnablePathSuffixMatching changes how the gateway matches incoming URL paths against routes (patterns) defined in the API definition.
+	// By default, the gateway uses wildcard matching. When EnablePathSuffixMatching is enabled, it switches to suffix matching. For example, a defined path such as `/json` will only match request URLs that end with `/json`, rather than matching any URL containing `/json`.
 	//
-	// - Full listen path and versioning URL (`/listen-path/v4/json`)
-	// - Stripped listen path URL (`/v4/json`)
-	// - Stripped version information (`/json`) - match.
+	// The gateway checks the request URL against several variations depending on whether path versioning is enabled:
+	// - Full path (listen path + version + endpoint): `/listen-path/v4/json`
+	// - Non-versioned full path (listen path + endpoint): `/listen-path/json`
+	// - Path without version (endpoint only): `/json`
 	//
-	// If versioning is disabled then the following URLs are considered:
+	// For patterns that already end with `$`, the gateway will already perform suffix matching so EnablePathSuffixMatching will have no impact. For all other patterns, the gateway appends `$` before performing the check, ensuring a true suffix match.
+	// This option allows for more specific and controlled routing of API requests, potentially reducing unintended matches. Note that you may need to adjust existing route definitions when enabling this option.
 	//
-	// - Full listen path and endpoint (`/listen-path/json`)
-	// - Stripped listen path (`/json`) - match.
+	// Example:
 	//
-	// If the input pattern already ends with a `$` (`/json$`)
-	// then the pattern remains unmodified.
+	// With wildcard matching, `/json` might match `/api/v1/json/data`.
+	// With suffix matching, `/json` would not match `/api/v1/json/data`, but would match `/api/v1/json`.
 	//
-	// Combine this option with `enable_path_prefix_matching` to achieve
-	// exact url matching with `/json` being evaluated as `^/json$`.
+	// Combining EnablePathSuffixMatching with EnablePathPrefixMatching will result in exact URL matching, with `/json` being evaluated as `^/json$`.
 	EnablePathSuffixMatching bool `json:"enable_path_suffix_matching"`
 
 	// Disable TLS verification. Required if you are using self-signed certificates.
@@ -657,6 +657,12 @@ func (pwl *PortsWhiteList) Decode(value string) error {
 	return nil
 }
 
+// StreamingConfig is for configuring tyk streaming
+type StreamingConfig struct {
+	Enabled     bool     `json:"enabled"`
+	AllowUnsafe []string `json:"allow_unsafe"`
+}
+
 // Config is the configuration object used by Tyk to set up various parameters.
 type Config struct {
 	// Force your Gateway to work only on a specific domain name. Can be overridden by API custom domain.
@@ -783,6 +789,9 @@ type Config struct {
 	// Note:
 	//   If you set `db_app_conf_options.node_is_segmented` to `true` for multiple Gateway nodes, you should ensure that `management_node` is set to `false`.
 	//   This is to ensure visibility for the management node across all APIs.
+	//
+	//   For pro installations, `management_node` is not a valid configuration option.
+	//   Always set `management_node` to `false` in pro environments.
 	ManagementNode bool `json:"management_node"`
 
 	// This is used as part of the RPC / Hybrid back-end configuration in a Tyk Enterprise installation and isn’t used anywhere else.
@@ -1077,7 +1086,17 @@ type Config struct {
 		Vault  VaultConfig  `json:"vault"`
 	} `json:"kv"`
 
-	// Secrets are key-value pairs that can be accessed in the dashboard via "secrets://"
+	// Secrets configures a list of key/value pairs for the gateway.
+	// When configuring it via environment variable, the expected value
+	// is a comma separated list of key-value pairs delimited with a colon.
+	//
+	// Example: `TYK_GW_SECRETS=key1:value1,key2:/value2`
+	// Produces: `{"key1": "value1", "key2": "/value2"}`
+	//
+	// The secret value may be used as `secrets://key1` from the API definition.
+	// In versions before gateway 5.3, only `listen_path` and `target_url` fields
+	// have had the secrets replaced.
+	// See more details https://tyk.io/docs/tyk-configuration-reference/kv-store/#how-to-access-the-externally-stored-data
 	Secrets map[string]string `json:"secrets"`
 
 	// Override the default error code and or message returned by middleware.
@@ -1121,6 +1140,24 @@ type Config struct {
 
 	// OAS holds the configuration for various OpenAPI-specific functionalities
 	OAS OASConfig `json:"oas_config"`
+
+	Streaming StreamingConfig `json:"streaming"`
+
+	Labs LabsConfig `json:"labs"`
+}
+
+// LabsConfig include config for streaming
+type LabsConfig map[string]interface{}
+
+// Decode unmarshals json config into the Labs config
+func (lc *LabsConfig) Decode(value string) error {
+	var temp map[string]interface{}
+	if err := json.Unmarshal([]byte(value), &temp); err != nil {
+		log.Error("Error unmarshalling LabsConfig: ", err)
+		return err
+	}
+	*lc = temp
+	return nil
 }
 
 // OASConfig holds the configuration for various OpenAPI-specific functionalities

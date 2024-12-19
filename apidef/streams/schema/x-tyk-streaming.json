@@ -1,0 +1,19 @@
+{
+  "$schema": "http://json-schema.org/draft-04/schema#",
+  "type": "object",
+  "properties": {
+    "streams": {
+      "$ref": "#/definitions/X-Tyk-Streams"
+    }
+  },
+  "additionalProperties": false,
+  "required": [
+    "streams"
+  ],
+  "definitions": {
+    "X-Tyk-Streams": {
+      "type": "object",
+      "additionalProperties": true
+    }
+  }
+}

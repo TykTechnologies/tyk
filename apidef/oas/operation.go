@@ -117,7 +117,7 @@ func (o *Operation) Import(oasOperation *openapi3.Operation, overRideValues TykE
 			validate = &ValidateRequest{}
 		}
 
-		if ok := validate.shouldImport(oasOperation); ok {
+		if ok := validate.shouldImport(oasOperation); ok || overRideValues.pathItemHasParameters {
 			validate.Import(*overRideValues.ValidateRequest)
 			o.ValidateRequest = validate
 		}
