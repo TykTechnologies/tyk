@@ -98,7 +98,7 @@ tags:
     
     Tyk reconstructs the API request based on the data in the batch request. This is to ensure that Tyk is not being used to proxy requests to other hosts outside of the upstream API being accessed.
     
-    Batch requests are created by POSTing to the `/{listen_path}/tyk/batch/` endpoint. These requests **do not require a valid key**, but their request list does.
+    Batch requests are created by POSTING to the `/{listen_path}/tyk/batch/` endpoint. These requests **do not require a valid key**, but their request list does.
     
     <h3>Sample Request</h3>
     
@@ -4415,25 +4415,78 @@ paths:
       tags:
       - Hot Reload
   /{listen_path}/tyk/batch:
-    parameters:
-      - name: listen_path
-        in: path
-        required: true
-        description: "API listen path"
-        schema:
-          type: string
     post:
-      summary: Run batch request
-      tags:
-        - Batch requests
+      description: Endpoint to run batch request.
       operationId: batch
+      parameters:
+        - description: API listen path
+          example: get
+          in: path
+          name: listen_path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            example:
+              requests:
+                - body: ""
+                  headers:
+                    authorization: 1dbc83b9c431649d7698faa9797e2900f
+                    x-tyk-test: "1"
+                    x-tyk-version: "1.2"
+                  method: GET
+                  relative_url: get
+                - body: ""
+                  headers:
+                    authorization: 1dbc83b9c431649d7698faa9797e2900f
+                    x-tyk-test: "2"
+                    x-tyk-version: "1.2"
+                  method: GET
+                  relative_url: get
+              suppress_parallel_execution: false
+            schema:
+              $ref: '#/components/schemas/BatchRequestStructure'
       responses:
-        '200':
-          description: Success
+        "200":
           content:
             application/json:
+              example:
+                - body: '{"message": "success"}'
+                  code: 200
+                  headers:
+                    Access-Control-Allow-Credentials:
+                      - "true"
+                    Content-Type:
+                      - application/json
+                  relative_url: get
+              schema:
+                items:
+                  $ref: '#/components/schemas/BatchReplyUnit'
+                type: array
+          description: Success.
+        "400":
+          content:
+            application/json:
+              example:
+                message: Batch request malformed
+                status: error
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
+          description: Bad Request
+        "403":
+          content:
+            application/json:
+              example:
+                message: Attempted administrative access with invalid or missing key!
+                status: error
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Forbidden
+      summary: Run batch request.
+      tags:
+        - Batch requests
   /tyk/schema:
     get:
       description: Get OAS schema definition using a version.
@@ -5485,6 +5538,41 @@ components:
         hash_type:
           type: string
         password:
+          type: string
+      type: object
+    BatchReplyUnit:
+      properties:
+        body:
+          type: string
+        code:
+          type: integer
+        headers:
+          $ref: '#/components/schemas/HttpHeader'
+        relative_url:
+          type: string
+      type: object
+    BatchRequestStructure:
+      properties:
+        requests:
+          items:
+            $ref: '#/components/schemas/RequestDefinition'
+          nullable: true
+          type: array
+        suppress_parallel_execution:
+          type: boolean
+      type: object
+    RequestDefinition:
+      properties:
+        body:
+          type: string
+        headers:
+          additionalProperties:
+            type: string
+          nullable: true
+          type: object
+        method:
+          type: string
+        relative_url:
           type: string
       type: object
     BooleanQueryParam:
