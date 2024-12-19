@@ -28,9 +28,7 @@ const (
 	cacheCleanInterval = 600 // 10 minutes.
 )
 
-var (
-	CertManagerLogPrefix = "cert_storage"
-)
+var CertManagerLogPrefix = "cert_storage"
 
 var (
 	GenCertificate       = tykcrypto.GenCertificate
@@ -286,14 +284,14 @@ func ExtractCertificateBasics(cert *tls.Certificate, certID string) *Certificate
 }
 
 type CertificateMeta struct {
-	ID            string    `json:"id"`
-	Fingerprint   string    `json:"fingerprint"`
-	HasPrivateKey bool      `json:"has_private"`
+	ID            string    `json:"id" example:"5e9d9544a1dcd60001d0ed207c440d66ebb0a4629d21329808dce9091acf5f2fde328067a6e60e5347271d90"`
+	Fingerprint   string    `json:"fingerprint" example:"7c440d66ebb0a4629d21329808dce9091acf5f2fde328067a6e60e5347271d90"`
+	HasPrivateKey bool      `json:"has_private" example:"false"`
 	Issuer        pkix.Name `json:"issuer,omitempty"`
 	Subject       pkix.Name `json:"subject,omitempty"`
-	NotBefore     time.Time `json:"not_before,omitempty"`
-	NotAfter      time.Time `json:"not_after,omitempty"`
-	DNSNames      []string  `json:"dns_names,omitempty"`
+	NotBefore     time.Time `json:"not_before,omitempty" example:"2024-03-25T08:46:37Z"`
+	NotAfter      time.Time `json:"not_after,omitempty" example:"2034-03-26T08:46:37Z"`
+	DNSNames      []string  `json:"dns_names,omitempty" example:"[.*tyk.io]"`
 	IsCA          bool      `json:"is_ca"`
 }
 
@@ -559,7 +557,6 @@ func (c *certificateManager) GetRaw(certID string) (string, error) {
 }
 
 func (c *certificateManager) Add(certData []byte, orgID string) (string, error) {
-
 	certID, certChainPEM, err := GetCertIDAndChainPEM(certData, c.secret)
 	if err != nil {
 		c.logger.Error(err)
@@ -584,7 +581,6 @@ func (c *certificateManager) Add(certData []byte, orgID string) (string, error) 
 }
 
 func (c *certificateManager) Delete(certID string, orgID string) {
-
 	if orgID != "" {
 		c.storage.RemoveFromList(orgID+"-index", "raw-"+certID)
 	}
