@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/base64"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"strconv"
 	"strings"
@@ -164,6 +163,7 @@ func recordGraphDetails(rec *analytics.AnalyticsRecord, r *http.Request, resp *h
 }
 
 func (s *SuccessHandler) RecordHit(r *http.Request, timing analytics.Latency, code int, responseCopy *http.Response, cached bool) {
+	log.Debug("Recording analytics hit")
 
 	if s.Spec.DoNotTrack || ctxGetDoNotTrack(r) {
 		return
@@ -171,7 +171,6 @@ func (s *SuccessHandler) RecordHit(r *http.Request, timing analytics.Latency, co
 
 	ip := request.RealIP(r)
 	if s.Spec.GlobalConfig.StoreAnalytics(ip) {
-
 		t := time.Now()
 
 		// Track the key ID if it exists
@@ -225,18 +224,20 @@ func (s *SuccessHandler) RecordHit(r *http.Request, timing analytics.Latency, co
 				// we need to delete the chunked transfer encoding header to avoid malformed body in our rawResponse
 				httputil.RemoveResponseTransferEncoding(responseCopy, "chunked")
 
-				responseContent, err := io.ReadAll(responseCopy.Body)
-				if err != nil {
-					log.Error("Couldn't read response body", err)
+				if responseCopy.Body != nil {
+					responseContent, err := io.ReadAll(responseCopy.Body)
+					if err != nil {
+						log.Error("Couldn't read response body", err)
+					} else {
+						responseCopy.Body = respBodyReader(r, responseCopy)
+
+						// Get the wire format representation
+						var wireFormatRes bytes.Buffer
+						responseCopy.Body = io.NopCloser(bytes.NewBuffer(responseContent))
+						responseCopy.Write(&wireFormatRes)
+						rawResponse = base64.StdEncoding.EncodeToString(wireFormatRes.Bytes())
+					}
 				}
-
-				responseCopy.Body = respBodyReader(r, responseCopy)
-
-				// Get the wire format representation
-				var wireFormatRes bytes.Buffer
-				responseCopy.Write(&wireFormatRes)
-				responseCopy.Body = ioutil.NopCloser(bytes.NewBuffer(responseContent))
-				rawResponse = base64.StdEncoding.EncodeToString(wireFormatRes.Bytes())
 			}
 		}
 
@@ -321,6 +322,8 @@ func (s *SuccessHandler) RecordHit(r *http.Request, timing analytics.Latency, co
 		err := s.Gw.Analytics.RecordHit(&record)
 		if err != nil {
 			log.WithError(err).Error("could not store analytic record")
+		} else {
+			log.Debug("Succesfully recorded analytics")
 		}
 	}
 
@@ -330,7 +333,7 @@ func (s *SuccessHandler) RecordHit(r *http.Request, timing analytics.Latency, co
 
 func recordDetail(r *http.Request, spec *APISpec) bool {
 	// when streaming in grpc, we do not record the request
-	if httputil.IsStreamingRequest(r) {
+	if spec.GlobalConfig.Streaming.EnableWebSocketDetailedRecording != true && httputil.IsStreamingRequest(r) {
 		return false
 	}
 
