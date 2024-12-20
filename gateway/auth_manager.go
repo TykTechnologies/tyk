@@ -123,7 +123,8 @@ func (b *DefaultSessionManager) clearCacheForKey(keyName string, hashed bool) {
 
 // UpdateSession updates the session state in the storage engine
 func (b *DefaultSessionManager) UpdateSession(keyName string, session *user.SessionState,
-	resetTTLTo int64, hashed bool) error {
+	resetTTLTo int64, hashed bool,
+) error {
 	defer b.clearCacheForKey(keyName, hashed)
 
 	v, err := json.Marshal(session)
@@ -233,7 +234,7 @@ func (gw *Gateway) generateToken(orgID, keyID string, customHashKeyFunction ...s
 	if len(customHashKeyFunction) > 0 {
 		hashKeyFunction = customHashKeyFunction[0]
 	}
-
+	log.Println(hashKeyFunction)
 	token, err := storage.GenerateToken(orgID, keyID, hashKeyFunction)
 	if err != nil {
 		log.WithFields(logrus.Fields{
@@ -241,7 +242,7 @@ func (gw *Gateway) generateToken(orgID, keyID string, customHashKeyFunction ...s
 			"orgID":  orgID,
 		}).WithError(err).Warning("Issue during token generation")
 	}
-
+	log.Println("token is", token)
 	return token
 }
 

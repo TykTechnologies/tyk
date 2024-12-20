@@ -93,6 +93,7 @@ require (
 	github.com/google/go-cmp v0.6.0
 	github.com/nats-io/nats.go v1.38.0
 	github.com/newrelic/go-agent v2.13.0+incompatible
+
 	github.com/testcontainers/testcontainers-go v0.34.0
 	github.com/testcontainers/testcontainers-go/modules/kafka v0.33.0
 	github.com/testcontainers/testcontainers-go/modules/nats v0.33.0
@@ -253,6 +254,7 @@ require (
 	github.com/shopspring/decimal v1.4.0 // indirect
 	github.com/spf13/cast v1.7.0 // indirect
 	github.com/stretchr/objx v0.5.2 // indirect
+	github.com/swaggest/refl v1.3.0 // indirect
 	github.com/tidwall/gjson v1.11.0 // indirect
 	github.com/tidwall/match v1.1.1 // indirect
 	github.com/tidwall/pretty v1.2.0 // indirect
