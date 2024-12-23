@@ -23,7 +23,6 @@ import (
 	"github.com/TykTechnologies/tyk/header"
 	"github.com/TykTechnologies/tyk/internal/cache"
 	"github.com/TykTechnologies/tyk/internal/event"
-	"github.com/TykTechnologies/tyk/internal/httpctx"
 	"github.com/TykTechnologies/tyk/internal/middleware"
 	"github.com/TykTechnologies/tyk/internal/otel"
 	"github.com/TykTechnologies/tyk/internal/policy"
@@ -139,8 +138,7 @@ func (gw *Gateway) createMiddleware(actualMW TykMiddleware) func(http.Handler) h
 			logger := mw.Base().SetRequestLogger(r)
 
 			if gw.GetConfig().NewRelic.AppName != "" {
-				ctxtxn := httpctx.NewValue[*newrelic.Transaction]("internal:new-relic-transaction")
-				if txn := ctxtxn.Get(r); txn != nil {
+				if txn := newrelic.Context.Get(r); txn != nil {
 					defer txn.StartSegment(mw.Name()).End()
 				}
 			}

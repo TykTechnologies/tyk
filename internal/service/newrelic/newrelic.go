@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strconv"
 
+	"github.com/TykTechnologies/tyk/internal/httpctx"
 	"github.com/newrelic/go-agent/v3/integrations/nrgorilla"
 	"github.com/newrelic/go-agent/v3/newrelic"
 
@@ -20,6 +21,8 @@ type (
 
 var (
 	NewApplication = newrelic.NewApplication
+
+	Context = httpctx.NewValue[*Transaction]("internal:new-relic-transaction")
 
 	ConfigLogger                   = newrelic.ConfigLogger
 	ConfigEnabled                  = newrelic.ConfigEnabled
