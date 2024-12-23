@@ -4,13 +4,14 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/TykTechnologies/tyk/internal/httpctx"
 	"github.com/newrelic/go-agent/v3/integrations/nrgorilla"
 	"github.com/newrelic/go-agent/v3/newrelic"
 
 	"github.com/gocraft/health"
 	"github.com/gorilla/mux"
 	"github.com/sirupsen/logrus"
+
+	"github.com/TykTechnologies/tyk/internal/httpctx"
 )
 
 type (
@@ -33,7 +34,7 @@ var (
 
 // AddNewRelicInstrumentation adds NewRelic instrumentation to the router
 func AddNewRelicInstrumentation(app *newrelic.Application, r *mux.Router) {
-	nrgorilla.InstrumentRoutes(r, app)
+	r.Use(nrgorilla.Middleware(app))
 }
 
 type Logger struct{ *logrus.Entry }
