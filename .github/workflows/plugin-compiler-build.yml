@@ -11,7 +11,7 @@ on:
       - "v*"
 
 env:
-  GOLANG_CROSS: 1.22-bullseye
+  GOLANG_CROSS: 1.23-bullseye
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -77,7 +77,7 @@ jobs:
           labels: ${{ steps.set-metadata.outputs.labels }}
           tags: ${{ steps.set-metadata.outputs.tags }}
           build-args: |
-            BASE-IMAGE=tykio/golang-cross:${{ env.GOLANG_CROSS }}
+            BASE_IMAGE=tykio/golang-cross:${{ env.GOLANG_CROSS }}
             GITHUB_SHA=${{ github.sha }}
             GITHUB_TAG=${{ github.ref_name }}
 
@@ -108,7 +108,7 @@ jobs:
           labels: ${{ steps.set-metadata-ee.outputs.labels }}
           tags: ${{ steps.set-metadata-ee.outputs.tags }}
           build-args: |
-            BASE-IMAGE=tykio/golang-cross:${{ env.GOLANG_CROSS }}
+            BASE_IMAGE=tykio/golang-cross:${{ env.GOLANG_CROSS }}
             GITHUB_SHA=${{ github.sha }}
             GITHUB_TAG=${{ github.ref_name }}
             BUILD_TAG=ee
