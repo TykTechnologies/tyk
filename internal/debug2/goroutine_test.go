@@ -8,8 +8,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/TykTechnologies/tyk/internal/debug2"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/TykTechnologies/tyk/internal/debug2"
 )
 
 func TestNewRecordWithGoroutines(t *testing.T) {
