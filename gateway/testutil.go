@@ -1161,7 +1161,9 @@ func (s *Test) newGateway(genConf func(globalConf *config.Config)) *Gateway {
 	gwConfig.BundleBaseURL = testHttpBundles
 	gwConfig.MiddlewarePath = testMiddlewarePath
 
-	config.FillEnv(&gwConfig)
+	if err := config.FillEnv(&gwConfig); err != nil {
+		log.WithError(err).Error("error filling test config from env")
+	}
 
 	// force ipv4 for now, to work around the docker bug affecting
 	// Go 1.8 and earlier
