@@ -79,11 +79,11 @@ func (s *Sink) EmitEventErr(job string, event string, err error, kvs map[string]
 }
 
 func (s *Sink) EmitTiming(job string, event string, nanoseconds int64, kvs map[string]string) {
-	s.relic.RecordCustomEvent(job+":"+event+":dur(ns):"+strconv.FormatInt(nanoseconds, 10), makeParams(kvs))
+	s.relic.RecordCustomEvent(job+":"+event+":duration_ns:"+strconv.FormatInt(nanoseconds, 10), makeParams(kvs))
 }
 
 func (s *Sink) EmitComplete(job string, status health.CompletionStatus, nanoseconds int64, kvs map[string]string) {
-	s.relic.RecordCustomEvent(job+":health:"+status.String()+":dur(ns):"+strconv.FormatInt(nanoseconds, 10), makeParams(kvs))
+	s.relic.RecordCustomEvent(job+":health:"+status.String()+":duration_ns:"+strconv.FormatInt(nanoseconds, 10), makeParams(kvs))
 }
 
 func (s *Sink) EmitGauge(job string, event string, value float64, kvs map[string]string) {

@@ -264,7 +264,6 @@ func (gw *Gateway) SetupNewRelic() (app *newrelic.Application) {
 	)
 
 	log := log.WithFields(logrus.Fields{"prefix": "newrelic"})
-	log.Info("Initializing NewRelic...")
 
 	cfg := []newrelic.ConfigOption{
 		newrelic.ConfigAppName(gwConfig.NewRelic.AppName),
@@ -280,7 +279,6 @@ func (gw *Gateway) SetupNewRelic() (app *newrelic.Application) {
 	}
 
 	instrument.AddSink(newrelic.NewSink(app))
-	log.Info("NewRelic initialized")
 
 	return
 }

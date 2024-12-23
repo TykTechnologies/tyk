@@ -1161,6 +1161,8 @@ func (s *Test) newGateway(genConf func(globalConf *config.Config)) *Gateway {
 	gwConfig.BundleBaseURL = testHttpBundles
 	gwConfig.MiddlewarePath = testMiddlewarePath
 
+	config.FillEnv(&gwConfig)
+
 	// force ipv4 for now, to work around the docker bug affecting
 	// Go 1.8 and earlier
 	gwConfig.ListenAddress = "127.0.0.1"
