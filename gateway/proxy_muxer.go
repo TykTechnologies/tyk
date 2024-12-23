@@ -20,7 +20,9 @@ import (
 
 	"github.com/TykTechnologies/again"
 	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/internal/httpctx"
 	"github.com/TykTechnologies/tyk/internal/httputil"
+	"github.com/TykTechnologies/tyk/internal/service/newrelic"
 	"github.com/TykTechnologies/tyk/tcp"
 
 	"github.com/gorilla/mux"
@@ -96,9 +98,14 @@ func (h *handleWrapper) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if NewRelicApplication != nil {
-		txn := NewRelicApplication.StartTransaction(r.URL.Path, w, r)
+		txn := NewRelicApplication.StartTransaction(r.URL.Path)
+		w = txn.SetWebResponse(w)
+
+		ctxtxn := httpctx.NewValue[*newrelic.Transaction]("internal:new-relic-transaction")
+		ctxtxn.Set(r, txn)
+
 		defer txn.End()
-		h.router.ServeHTTP(txn, r)
+		h.router.ServeHTTP(w, r)
 		return
 	}
 	h.router.ServeHTTP(w, r)
