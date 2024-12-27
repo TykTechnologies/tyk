@@ -21,6 +21,7 @@ import (
 	"github.com/gorilla/websocket"
 	proxyproto "github.com/pires/go-proxyproto"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	msgpack "gopkg.in/vmihailenco/msgpack.v2"
 
 	"github.com/TykTechnologies/tyk-pump/analytics"
@@ -658,6 +659,7 @@ func TestReloadGoroutineLeakWithTest(t *testing.T) {
 	}
 
 	before := newRecord()
+	require.Less(t, before.Count(), 100, "before count over a 100, leak: %s", before)
 
 	ts := StartTest(nil)
 	ts.Close()
