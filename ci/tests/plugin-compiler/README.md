@@ -38,6 +38,12 @@ The following variables are set as defaults:
 
 Use `task -l` to list available targets, or read on.
 
+Example: Run a plugin subtest against a release image.
+
+```
+task test:qa-plugin image=tykio/tyk-plugin-compiler:v5.3.9-rc4
+```
+
 ## Building and testing plugin compiler locally
 
 In order to build the plugin compiler images locally from source,
