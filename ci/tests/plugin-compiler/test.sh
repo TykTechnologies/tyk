@@ -22,6 +22,9 @@ rm -fv $PLUGIN_SOURCE_PATH/*.so || true
 docker run --rm -v $PLUGIN_SOURCE_PATH:/plugin-source $PLUGIN_COMPILER_IMAGE plugin.so
 cp $PLUGIN_SOURCE_PATH/*.so $PLUGIN_SOURCE_PATH/plugin.so 
 
+# Cross compile to arm64
+docker run --rm -e GOARCH=arm64 -v $PLUGIN_SOURCE_PATH:/plugin-source $PLUGIN_COMPILER_IMAGE plugin.so
+
 docker compose up -d --wait --force-recreate || { docker compose logs gw; exit 1; }
 
 curl http://localhost:8080/goplugin/headers | jq -e '.headers.Foo == "Bar"' || { docker compose logs gw; exit 1; }
