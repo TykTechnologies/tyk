@@ -1,10 +1,11 @@
 package main
 
 import (
+	"net/http"
+
 	"github.com/TykTechnologies/tyk/ctx"
 	"github.com/TykTechnologies/tyk/log"
 	"github.com/TykTechnologies/tyk/user"
-	"net/http"
 )
 
 var logger = log.Get()
