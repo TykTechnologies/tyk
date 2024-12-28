@@ -97,7 +97,7 @@ tasks:
       - strings {{.plugin_path}}/plugin.so | grep test_goplugin.go
 
   test:qa-plugin:
-    desc: "Test plugin compiler (qa-plugin)"
+    desc: "Test plugin compiler (qa-plugin) amd64 e2e + arm64 build"
     vars:
       plugin_path: '{{.root}}/ci/tests/plugin-compiler/testdata/qa-plugin'
       symbol: AuthCheck
