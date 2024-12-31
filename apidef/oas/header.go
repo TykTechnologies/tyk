@@ -5,9 +5,9 @@ import "sort"
 // Header holds a header name and value pair.
 type Header struct {
 	// Name is the name of the header.
-	Name string `bson:"name" json:"name"`
+	Name string `bson:"name" json:"name" yaml:"name"`
 	// Value is the value of the header.
-	Value string `bson:"value" json:"value"`
+	Value string `bson:"value" json:"value" yaml:"value"`
 }
 
 // Headers is an array of Header.

@@ -12,26 +12,26 @@ import (
 type Upstream struct {
 	// URL defines the upstream address (or target URL) to which requests should be proxied.
 	// Tyk classic API definition: `proxy.target_url`
-	URL string `bson:"url" json:"url"` // required
+	URL string `bson:"url" json:"url" yaml:"url"` // required
 
 	// ServiceDiscovery contains the configuration related to Service Discovery.
 	// Tyk classic API definition: `proxy.service_discovery`
-	ServiceDiscovery *ServiceDiscovery `bson:"serviceDiscovery,omitempty" json:"serviceDiscovery,omitempty"`
+	ServiceDiscovery *ServiceDiscovery `bson:"serviceDiscovery,omitempty" json:"serviceDiscovery,omitempty" yaml:"serviceDiscovery,omitempty"`
 
 	// Test contains the configuration related to uptime tests.
-	Test *Test `bson:"test,omitempty" json:"test,omitempty"`
+	Test *Test `bson:"test,omitempty" json:"test,omitempty" yaml:"test,omitempty"`
 
 	// MutualTLS contains the configuration for establishing a mutual TLS connection between Tyk and the upstream server.
-	MutualTLS *MutualTLS `bson:"mutualTLS,omitempty" json:"mutualTLS,omitempty"`
+	MutualTLS *MutualTLS `bson:"mutualTLS,omitempty" json:"mutualTLS,omitempty" yaml:"mutualTLS,omitempty"`
 
 	// CertificatePinning contains the configuration related to certificate pinning.
-	CertificatePinning *CertificatePinning `bson:"certificatePinning,omitempty" json:"certificatePinning,omitempty"`
+	CertificatePinning *CertificatePinning `bson:"certificatePinning,omitempty" json:"certificatePinning,omitempty" yaml:"certificatePinning,omitempty"`
 
 	// RateLimit contains the configuration related to API level rate limit.
-	RateLimit *RateLimit `bson:"rateLimit,omitempty" json:"rateLimit,omitempty"`
+	RateLimit *RateLimit `bson:"rateLimit,omitempty" json:"rateLimit,omitempty" yaml:"rateLimit,omitempty"`
 
 	// Authentication contains the configuration related to upstream authentication.
-	Authentication *UpstreamAuth `bson:"authentication,omitempty" json:"authentication,omitempty"`
+	Authentication *UpstreamAuth `bson:"authentication,omitempty" json:"authentication,omitempty" yaml:"authentication,omitempty"`
 }
 
 // Fill fills *Upstream from apidef.APIDefinition.
@@ -157,11 +157,11 @@ type ServiceDiscovery struct {
 	// Enabled activates Service Discovery.
 	//
 	// Tyk classic API definition: `service_discovery.use_discovery_service`
-	Enabled bool `bson:"enabled" json:"enabled"` // required
+	Enabled bool `bson:"enabled" json:"enabled" yaml:"enabled"` // required
 
 	// QueryEndpoint is the endpoint to call, this would usually be Consul, etcd or Eureka K/V store.
 	// Tyk classic API definition: `service_discovery.query_endpoint`
-	QueryEndpoint string `bson:"queryEndpoint,omitempty" json:"queryEndpoint,omitempty"`
+	QueryEndpoint string `bson:"queryEndpoint,omitempty" json:"queryEndpoint,omitempty" yaml:"queryEndpoint,omitempty"`
 
 	// DataPath is the namespace of the data path - where exactly in your service response the namespace can be found.
 	// For example, if your service responds with:
@@ -181,7 +181,7 @@ type ServiceDiscovery struct {
 	// then your namespace would be `node.value`.
 	//
 	// Tyk classic API definition: `service_discovery.data_path`
-	DataPath string `bson:"dataPath,omitempty" json:"dataPath,omitempty"`
+	DataPath string `bson:"dataPath,omitempty" json:"dataPath,omitempty" yaml:"dataPath,omitempty"`
 
 	// UseNestedQuery enables the use of a combination of `dataPath` and `parentDataPath`.
 	// It is necessary when the data lives within this string-encoded JSON object.
@@ -199,7 +199,7 @@ type ServiceDiscovery struct {
 	// ```
 	//
 	// Tyk classic API definition: `service_discovery.use_nested_query`
-	UseNestedQuery bool `bson:"useNestedQuery,omitempty" json:"useNestedQuery,omitempty"`
+	UseNestedQuery bool `bson:"useNestedQuery,omitempty" json:"useNestedQuery,omitempty" yaml:"useNestedQuery,omitempty"`
 
 	// ParentDataPath is the namespace of the where to find the nested
 	// value if `useNestedQuery` is `true`. In the above example, it
@@ -210,7 +210,7 @@ type ServiceDiscovery struct {
 	// will try to deserialize it.
 	//
 	// Tyk classic API definition: `service_discovery.parent_data_path`
-	ParentDataPath string `bson:"parentDataPath,omitempty" json:"parentDataPath,omitempty"`
+	ParentDataPath string `bson:"parentDataPath,omitempty" json:"parentDataPath,omitempty" yaml:"parentDataPath,omitempty"`
 
 	// PortDataPath is the port of the data path. In the above nested example, we can see that there is a separate `port` value
 	// for the service in the nested JSON. In this case, you can set the `portDataPath` value and Tyk will treat `dataPath` as
@@ -218,13 +218,13 @@ type ServiceDiscovery struct {
 	// such as `/widgets/`). In the above example, the `portDataPath` would be `port`.
 	//
 	// Tyk classic API definition: `service_discovery.port_data_path`
-	PortDataPath string `bson:"portDataPath,omitempty" json:"portDataPath,omitempty"`
+	PortDataPath string `bson:"portDataPath,omitempty" json:"portDataPath,omitempty" yaml:"portDataPath,omitempty"`
 
 	// UseTargetList should be set to `true` if you are using load balancing. Tyk will treat the data path as a list and
 	// inject it into the target list of your API definition.
 	//
 	// Tyk classic API definition: `service_discovery.use_target_list`
-	UseTargetList bool `bson:"useTargetList,omitempty" json:"useTargetList,omitempty"`
+	UseTargetList bool `bson:"useTargetList,omitempty" json:"useTargetList,omitempty" yaml:"useTargetList,omitempty"`
 
 	// CacheTimeout is the timeout of a cache value when a new data is loaded from a discovery service.
 	// Setting it too low will cause Tyk to call the SD service too often, setting it too high could mean that
@@ -233,14 +233,14 @@ type ServiceDiscovery struct {
 	// Deprecated: The field is deprecated. Use `service_discovery` to configure service discovery cache options.
 	//
 	// Tyk classic API definition: `service_discovery.cache_timeout`
-	CacheTimeout int64 `bson:"cacheTimeout,omitempty" json:"cacheTimeout,omitempty"`
+	CacheTimeout int64 `bson:"cacheTimeout,omitempty" json:"cacheTimeout,omitempty" yaml:"cacheTimeout,omitempty"`
 
 	// Cache holds cache related flags.
 	//
 	// Tyk classic API definition:
 	// - `service_discovery.cache_disabled`
 	// - `service_discovery.cache_timeout`
-	Cache *ServiceDiscoveryCache `bson:"cache,omitempty" json:"cache,omitempty"`
+	Cache *ServiceDiscoveryCache `bson:"cache,omitempty" json:"cache,omitempty" yaml:"cache,omitempty"`
 
 	// TargetPath is used to set a target path that will be appended to the
 	// discovered endpoint, since many service discovery services only provide
@@ -248,12 +248,12 @@ type ServiceDiscovery struct {
 	// resource on that host. Setting this value will enable that.
 	//
 	// Tyk classic API definition: `service_discovery.target_path`
-	TargetPath string `bson:"targetPath,omitempty" json:"targetPath,omitempty"`
+	TargetPath string `bson:"targetPath,omitempty" json:"targetPath,omitempty" yaml:"targetPath,omitempty"`
 
 	// EndpointReturnsList is set `true` when the response type is a list instead of an object.
 	//
 	// Tyk classic API definition: `service_discovery.endpoint_returns_list`
-	EndpointReturnsList bool `bson:"endpointReturnsList,omitempty" json:"endpointReturnsList,omitempty"`
+	EndpointReturnsList bool `bson:"endpointReturnsList,omitempty" json:"endpointReturnsList,omitempty" yaml:"endpointReturnsList,omitempty"`
 }
 
 // ServiceDiscoveryCache holds configuration for caching ServiceDiscovery data.
@@ -261,12 +261,12 @@ type ServiceDiscoveryCache struct {
 	// Enabled turns service discovery cache on or off.
 	//
 	// Tyk classic API definition: `service_discovery.cache_disabled`
-	Enabled bool `bson:"enabled" json:"enabled"` // required
+	Enabled bool `bson:"enabled" json:"enabled" yaml:"enabled"` // required
 
 	// Timeout is the TTL for a cached object in seconds.
 	//
 	// Tyk classic API definition: `service_discovery.cache_timeout`
-	Timeout int64 `bson:"timeout,omitempty" json:"timeout,omitempty"`
+	Timeout int64 `bson:"timeout,omitempty" json:"timeout,omitempty" yaml:"timeout,omitempty"`
 }
 
 // CacheOptions returns the timeout value in effect and a bool if cache is enabled.
@@ -324,7 +324,7 @@ func (sd *ServiceDiscovery) ExtractTo(serviceDiscovery *apidef.ServiceDiscoveryC
 type Test struct {
 	// ServiceDiscovery contains the configuration related to test Service Discovery.
 	// Tyk classic API definition: `proxy.service_discovery`
-	ServiceDiscovery *ServiceDiscovery `bson:"serviceDiscovery,omitempty" json:"serviceDiscovery,omitempty"`
+	ServiceDiscovery *ServiceDiscovery `bson:"serviceDiscovery,omitempty" json:"serviceDiscovery,omitempty" yaml:"serviceDiscovery,omitempty"`
 }
 
 // Fill fills *Test from apidef.UptimeTests.
@@ -355,20 +355,20 @@ func (t *Test) ExtractTo(uptimeTests *apidef.UptimeTests) {
 type MutualTLS struct {
 	// Enabled activates upstream mutual TLS for the API.
 	// Tyk classic API definition: `upstream_certificates_disabled`
-	Enabled bool `bson:"enabled" json:"enabled"`
+	Enabled bool `bson:"enabled" json:"enabled" yaml:"enabled"`
 
 	// DomainToCertificates maintains the mapping of domain to certificate.
 	// Tyk classic API definition: `upstream_certificates`
-	DomainToCertificates []DomainToCertificate `bson:"domainToCertificateMapping" json:"domainToCertificateMapping"`
+	DomainToCertificates []DomainToCertificate `bson:"domainToCertificateMapping" json:"domainToCertificateMapping" yaml:"domainToCertificateMapping"`
 }
 
 // DomainToCertificate holds a single mapping of domain name into a certificate.
 type DomainToCertificate struct {
 	// Domain contains the domain name.
-	Domain string `bson:"domain" json:"domain"`
+	Domain string `bson:"domain" json:"domain" yaml:"domain"`
 
 	// Certificate contains the certificate mapped to the domain.
-	Certificate string `bson:"certificate" json:"certificate"`
+	Certificate string `bson:"certificate" json:"certificate" yaml:"certificate"`
 }
 
 // Fill fills *MutualTLS from apidef.APIDefinition.
@@ -405,10 +405,10 @@ func (m *MutualTLS) ExtractTo(api *apidef.APIDefinition) {
 // PinnedPublicKey contains a mapping from the domain name into a list of public keys.
 type PinnedPublicKey struct {
 	// Domain contains the domain name.
-	Domain string `bson:"domain" json:"domain"`
+	Domain string `bson:"domain" json:"domain" yaml:"domain"`
 
 	// PublicKeys contains a list of the public keys pinned to the domain name.
-	PublicKeys []string `bson:"publicKeys" json:"publicKeys"`
+	PublicKeys []string `bson:"publicKeys" json:"publicKeys" yaml:"publicKeys"`
 }
 
 // PinnedPublicKeys is a list of domains and pinned public keys for them.
@@ -447,12 +447,12 @@ type CertificatePinning struct {
 	// Enabled is a boolean flag, if set to `true`, it enables certificate pinning for the API.
 	//
 	// Tyk classic API definition: `certificate_pinning_disabled`
-	Enabled bool `bson:"enabled" json:"enabled"`
+	Enabled bool `bson:"enabled" json:"enabled" yaml:"enabled"`
 
 	// DomainToPublicKeysMapping maintains the mapping of domain to pinned public keys.
 	//
 	// Tyk classic API definition: `pinned_public_keys`
-	DomainToPublicKeysMapping PinnedPublicKeys `bson:"domainToPublicKeysMapping" json:"domainToPublicKeysMapping"`
+	DomainToPublicKeysMapping PinnedPublicKeys `bson:"domainToPublicKeysMapping" json:"domainToPublicKeysMapping" yaml:"domainToPublicKeysMapping"`
 }
 
 // Fill fills *CertificatePinning from apidef.APIDefinition.
@@ -489,7 +489,7 @@ type RateLimit struct {
 	// Enabled activates API level rate limiting for this API.
 	//
 	// Tyk classic API definition: `!disable_rate_limit`.
-	Enabled bool `json:"enabled" bson:"enabled"`
+	Enabled bool `json:"enabled" bson:"enabled" yaml:"enabled"`
 	// Rate specifies the number of requests that can be passed to the upstream in each time interval (`per`).
 	// This field sets the limit on the frequency of requests to ensure controlled
 	// resource access or to prevent abuse. The rate is defined as an integer value.
@@ -499,7 +499,7 @@ type RateLimit struct {
 	// means up to 100 requests can be made per minute.
 	//
 	// Tyk classic API definition: `global_rate_limit.rate`.
-	Rate int `json:"rate" bson:"rate"`
+	Rate int `json:"rate" bson:"rate" yaml:"rate"`
 	// Per defines the time interval for rate limiting using shorthand notation.
 	// The value of Per is a string that specifies the interval in a compact form,
 	// where hours, minutes and seconds are denoted by 'h', 'm' and 's' respectively.
@@ -517,7 +517,7 @@ type RateLimit struct {
 	// be considered as 0s/empty.
 	//
 	// Tyk classic API definition: `global_rate_limit.per`.
-	Per ReadableDuration `json:"per" bson:"per"`
+	Per ReadableDuration `json:"per" bson:"per" yaml:"per"`
 }
 
 // Fill fills *RateLimit from apidef.APIDefinition.
@@ -554,11 +554,11 @@ func (r *RateLimitEndpoint) ExtractTo(meta *apidef.RateLimitMeta) {
 // UpstreamAuth holds the configurations related to upstream API authentication.
 type UpstreamAuth struct {
 	// Enabled enables upstream API authentication.
-	Enabled bool `bson:"enabled" json:"enabled"`
+	Enabled bool `bson:"enabled" json:"enabled" yaml:"enabled"`
 	// BasicAuth holds the basic authentication configuration for upstream API authentication.
-	BasicAuth *UpstreamBasicAuth `bson:"basicAuth,omitempty" json:"basicAuth,omitempty"`
+	BasicAuth *UpstreamBasicAuth `bson:"basicAuth,omitempty" json:"basicAuth,omitempty" yaml:"basicAuth,omitempty"`
 	// OAuth contains the configuration for OAuth2 Client Credentials flow.
-	OAuth *UpstreamOAuth `bson:"oauth,omitempty" json:"oauth,omitempty"`
+	OAuth *UpstreamOAuth `bson:"oauth,omitempty" json:"oauth,omitempty" yaml:"oauth,omitempty"`
 }
 
 // Fill fills *UpstreamAuth from apidef.UpstreamAuth.
@@ -606,13 +606,13 @@ func (u *UpstreamAuth) ExtractTo(api *apidef.UpstreamAuth) {
 // UpstreamBasicAuth holds upstream basic authentication configuration.
 type UpstreamBasicAuth struct {
 	// Enabled enables upstream basic authentication.
-	Enabled bool `bson:"enabled" json:"enabled"`
+	Enabled bool `bson:"enabled" json:"enabled" yaml:"enabled"`
 	// Header contains configurations for the header value.
-	Header *AuthSource `bson:"header,omitempty" json:"header,omitempty"`
+	Header *AuthSource `bson:"header,omitempty" json:"header,omitempty" yaml:"header,omitempty"`
 	// Username is the username to be used for upstream basic authentication.
-	Username string `bson:"username" json:"username"`
+	Username string `bson:"username" json:"username" yaml:"username"`
 	// Password is the password to be used for upstream basic authentication.
-	Password string `bson:"password" json:"password"`
+	Password string `bson:"password" json:"password" yaml:"password"`
 }
 
 // Fill fills *UpstreamBasicAuth from apidef.UpstreamBasicAuth.
@@ -649,53 +649,53 @@ func (u *UpstreamBasicAuth) ExtractTo(api *apidef.UpstreamBasicAuth) {
 // UpstreamOAuth holds the configuration for OAuth2 Client Credentials flow.
 type UpstreamOAuth struct {
 	// Enabled activates upstream OAuth2 authentication.
-	Enabled bool `bson:"enabled" json:"enabled"`
+	Enabled bool `bson:"enabled" json:"enabled" yaml:"enabled"`
 	// AllowedAuthorizeTypes specifies the allowed authorization types for upstream OAuth2 authentication.
-	AllowedAuthorizeTypes []string `bson:"allowedAuthorizeTypes" json:"allowedAuthorizeTypes"`
+	AllowedAuthorizeTypes []string `bson:"allowedAuthorizeTypes" json:"allowedAuthorizeTypes" yaml:"allowedAuthorizeTypes"`
 	// ClientCredentials holds the configuration for OAuth2 Client Credentials flow.
-	ClientCredentials *ClientCredentials `bson:"clientCredentials,omitempty" json:"clientCredentials,omitempty"`
+	ClientCredentials *ClientCredentials `bson:"clientCredentials,omitempty" json:"clientCredentials,omitempty" yaml:"clientCredentials,omitempty"`
 	// PasswordAuthentication holds the configuration for upstream OAauth password authentication flow.
-	PasswordAuthentication *PasswordAuthentication `bson:"password,omitempty" json:"password,omitempty"`
+	PasswordAuthentication *PasswordAuthentication `bson:"password,omitempty" json:"password,omitempty" yaml:"password,omitempty"`
 }
 
 // PasswordAuthentication holds the configuration for upstream OAuth2 password authentication flow.
 type PasswordAuthentication struct {
 	ClientAuthData
 	// Header holds the configuration for the custom header to be used for OAuth authentication.
-	Header *AuthSource `bson:"header" json:"header"`
+	Header *AuthSource `bson:"header" json:"header" yaml:"header"`
 	// Username is the username to be used for upstream OAuth2 password authentication.
-	Username string `bson:"username" json:"username"`
+	Username string `bson:"username" json:"username" yaml:"username"`
 	// Password is the password to be used for upstream OAuth2 password authentication.
-	Password string `bson:"password" json:"password"`
+	Password string `bson:"password" json:"password" yaml:"password"`
 	// TokenURL is the resource server's token endpoint
 	// URL. This is a constant specific to each server.
-	TokenURL string `bson:"tokenUrl" json:"tokenUrl"`
+	TokenURL string `bson:"tokenUrl" json:"tokenUrl" yaml:"tokenUrl"`
 	// Scopes specifies optional requested permissions.
-	Scopes []string `bson:"scopes" json:"scopes,omitempty"`
+	Scopes []string `bson:"scopes" json:"scopes,omitempty" yaml:"scopes,omitempty"`
 	// ExtraMetadata holds the keys that we want to extract from the token and pass to the upstream.
-	ExtraMetadata []string `bson:"extraMetadata" json:"extraMetadata,omitempty"`
+	ExtraMetadata []string `bson:"extraMetadata" json:"extraMetadata,omitempty" yaml:"extraMetadata,omitempty"`
 }
 
 // ClientAuthData holds the client ID and secret for OAuth2 authentication.
 type ClientAuthData struct {
 	// ClientID is the application's ID.
-	ClientID string `bson:"clientId" json:"clientId"`
+	ClientID string `bson:"clientId" json:"clientId" yaml:"clientId"`
 	// ClientSecret is the application's secret.
-	ClientSecret string `bson:"clientSecret,omitempty" json:"clientSecret,omitempty"` // client secret is optional for password flow
+	ClientSecret string `bson:"clientSecret,omitempty" json:"clientSecret,omitempty" yaml:"clientSecret,omitempty"` // client secret is optional for password flow
 }
 
 // ClientCredentials holds the configuration for OAuth2 Client Credentials flow.
 type ClientCredentials struct {
 	ClientAuthData
 	// Header holds the configuration for the custom header to be used for OAuth authentication.
-	Header *AuthSource `bson:"header" json:"header"`
+	Header *AuthSource `bson:"header" json:"header" yaml:"header"`
 	// TokenURL is the resource server's token endpoint
 	// URL. This is a constant specific to each server.
-	TokenURL string `bson:"tokenUrl" json:"tokenUrl"`
+	TokenURL string `bson:"tokenUrl" json:"tokenUrl" yaml:"tokenUrl"`
 	// Scopes specifies optional requested permissions.
-	Scopes []string `bson:"scopes,omitempty" json:"scopes,omitempty"`
+	Scopes []string `bson:"scopes,omitempty" json:"scopes,omitempty" yaml:"scopes,omitempty"`
 	// ExtraMetadata holds the keys that we want to extract from the token and pass to the upstream.
-	ExtraMetadata []string `bson:"extraMetadata" json:"extraMetadata,omitempty"`
+	ExtraMetadata []string `bson:"extraMetadata" json:"extraMetadata,omitempty" yaml:"extraMetadata,omitempty"`
 }
 
 func (c *ClientCredentials) Fill(api apidef.ClientCredentials) {

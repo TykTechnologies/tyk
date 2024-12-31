@@ -18,69 +18,69 @@ type Operations map[string]*Operation
 // Operation holds a request operation configuration, allowances, tranformations, caching, timeouts and validation.
 type Operation struct {
 	// Allow request by allowance.
-	Allow *Allowance `bson:"allow,omitempty" json:"allow,omitempty"`
+	Allow *Allowance `bson:"allow,omitempty" json:"allow,omitempty" yaml:"allow,omitempty"`
 
 	// Block request by allowance.
-	Block *Allowance `bson:"block,omitempty" json:"block,omitempty"`
+	Block *Allowance `bson:"block,omitempty" json:"block,omitempty" yaml:"block,omitempty"`
 
 	// IgnoreAuthentication ignores authentication on request by allowance.
-	IgnoreAuthentication *Allowance `bson:"ignoreAuthentication,omitempty" json:"ignoreAuthentication,omitempty"`
+	IgnoreAuthentication *Allowance `bson:"ignoreAuthentication,omitempty" json:"ignoreAuthentication,omitempty" yaml:"ignoreAuthentication,omitempty"`
 
 	// Internal makes the endpoint only respond to internal requests.
-	Internal *Internal `bson:"internal,omitempty" json:"internal,omitempty"`
+	Internal *Internal `bson:"internal,omitempty" json:"internal,omitempty" yaml:"internal,omitempty"`
 
 	// TransformRequestMethod allows you to transform the method of a request.
-	TransformRequestMethod *TransformRequestMethod `bson:"transformRequestMethod,omitempty" json:"transformRequestMethod,omitempty"`
+	TransformRequestMethod *TransformRequestMethod `bson:"transformRequestMethod,omitempty" json:"transformRequestMethod,omitempty" yaml:"transformRequestMethod,omitempty"`
 
 	// TransformRequestBody allows you to transform request body.
 	// When both `path` and `body` are provided, body would take precedence.
-	TransformRequestBody *TransformBody `bson:"transformRequestBody,omitempty" json:"transformRequestBody,omitempty"`
+	TransformRequestBody *TransformBody `bson:"transformRequestBody,omitempty" json:"transformRequestBody,omitempty" yaml:"transformRequestBody,omitempty"`
 
 	// TransformResponseBody allows you to transform response body.
 	// When both `path` and `body` are provided, body would take precedence.
-	TransformResponseBody *TransformBody `bson:"transformResponseBody,omitempty" json:"transformResponseBody,omitempty"`
+	TransformResponseBody *TransformBody `bson:"transformResponseBody,omitempty" json:"transformResponseBody,omitempty" yaml:"transformResponseBody,omitempty"`
 
 	// TransformRequestHeaders allows you to transform request headers.
-	TransformRequestHeaders *TransformHeaders `bson:"transformRequestHeaders,omitempty" json:"transformRequestHeaders,omitempty"`
+	TransformRequestHeaders *TransformHeaders `bson:"transformRequestHeaders,omitempty" json:"transformRequestHeaders,omitempty" yaml:"transformRequestHeaders,omitempty"`
 
 	// TransformResponseHeaders allows you to transform response headers.
-	TransformResponseHeaders *TransformHeaders `bson:"transformResponseHeaders,omitempty" json:"transformResponseHeaders,omitempty"`
+	TransformResponseHeaders *TransformHeaders `bson:"transformResponseHeaders,omitempty" json:"transformResponseHeaders,omitempty" yaml:"transformResponseHeaders,omitempty"`
 
 	// URLRewrite contains the URL rewriting configuration.
-	URLRewrite *URLRewrite `bson:"urlRewrite,omitempty" json:"urlRewrite,omitempty"`
+	URLRewrite *URLRewrite `bson:"urlRewrite,omitempty" json:"urlRewrite,omitempty" yaml:"urlRewrite,omitempty"`
 
 	// Cache contains the caching plugin configuration.
-	Cache *CachePlugin `bson:"cache,omitempty" json:"cache,omitempty"`
+	Cache *CachePlugin `bson:"cache,omitempty" json:"cache,omitempty" yaml:"cache,omitempty"`
 
 	// EnforceTimeout contains the request timeout configuration.
-	EnforceTimeout *EnforceTimeout `bson:"enforceTimeout,omitempty" json:"enforceTimeout,omitempty"`
+	EnforceTimeout *EnforceTimeout `bson:"enforceTimeout,omitempty" json:"enforceTimeout,omitempty" yaml:"enforceTimeout,omitempty"`
 
 	// ValidateRequest contains the request validation configuration.
-	ValidateRequest *ValidateRequest `bson:"validateRequest,omitempty" json:"validateRequest,omitempty"`
+	ValidateRequest *ValidateRequest `bson:"validateRequest,omitempty" json:"validateRequest,omitempty" yaml:"validateRequest,omitempty"`
 
 	// MockResponse contains the mock response configuration.
-	MockResponse *MockResponse `bson:"mockResponse,omitempty" json:"mockResponse,omitempty"`
+	MockResponse *MockResponse `bson:"mockResponse,omitempty" json:"mockResponse,omitempty" yaml:"mockResponse,omitempty"`
 
 	// VirtualEndpoint contains virtual endpoint configuration.
-	VirtualEndpoint *VirtualEndpoint `bson:"virtualEndpoint,omitempty" json:"virtualEndpoint,omitempty"`
+	VirtualEndpoint *VirtualEndpoint `bson:"virtualEndpoint,omitempty" json:"virtualEndpoint,omitempty" yaml:"virtualEndpoint,omitempty"`
 
 	// PostPlugins contains endpoint level post plugins configuration.
-	PostPlugins EndpointPostPlugins `bson:"postPlugins,omitempty" json:"postPlugins,omitempty"`
+	PostPlugins EndpointPostPlugins `bson:"postPlugins,omitempty" json:"postPlugins,omitempty" yaml:"postPlugins,omitempty"`
 
 	// CircuitBreaker contains the configuration for the circuit breaker functionality.
-	CircuitBreaker *CircuitBreaker `bson:"circuitBreaker,omitempty" json:"circuitBreaker,omitempty"`
+	CircuitBreaker *CircuitBreaker `bson:"circuitBreaker,omitempty" json:"circuitBreaker,omitempty" yaml:"circuitBreaker,omitempty"`
 
 	// TrackEndpoint contains the configuration for enabling analytics and logs.
-	TrackEndpoint *TrackEndpoint `bson:"trackEndpoint,omitempty" json:"trackEndpoint,omitempty"`
+	TrackEndpoint *TrackEndpoint `bson:"trackEndpoint,omitempty" json:"trackEndpoint,omitempty" yaml:"trackEndpoint,omitempty"`
 
 	// DoNotTrackEndpoint contains the configuration for disabling analytics and logs.
-	DoNotTrackEndpoint *TrackEndpoint `bson:"doNotTrackEndpoint,omitempty" json:"doNotTrackEndpoint,omitempty"`
+	DoNotTrackEndpoint *TrackEndpoint `bson:"doNotTrackEndpoint,omitempty" json:"doNotTrackEndpoint,omitempty" yaml:"doNotTrackEndpoint,omitempty"`
 
 	// RequestSizeLimit limits the maximum allowed size of the request body in bytes.
-	RequestSizeLimit *RequestSizeLimit `bson:"requestSizeLimit,omitempty" json:"requestSizeLimit,omitempty"`
+	RequestSizeLimit *RequestSizeLimit `bson:"requestSizeLimit,omitempty" json:"requestSizeLimit,omitempty" yaml:"requestSizeLimit,omitempty"`
 
 	// RateLimit contains endpoint level rate limit configuration.
-	RateLimit *RateLimitEndpoint `bson:"rateLimit,omitempty" json:"rateLimit,omitempty"`
+	RateLimit *RateLimitEndpoint `bson:"rateLimit,omitempty" json:"rateLimit,omitempty" yaml:"rateLimit,omitempty"`
 }
 
 // AllowanceType holds the valid allowance types values.
@@ -625,11 +625,11 @@ func (x *XTykAPIGateway) getOperation(operationID string) *Operation {
 // ValidateRequest holds configuration required for validating requests.
 type ValidateRequest struct {
 	// Enabled is a boolean flag, if set to `true`, it enables request validation.
-	Enabled bool `bson:"enabled" json:"enabled"`
+	Enabled bool `bson:"enabled" json:"enabled" yaml:"enabled"`
 
 	// ErrorResponseCode is the error code emitted when the request fails validation.
 	// If unset or zero, the response will returned with http status 422 Unprocessable Entity.
-	ErrorResponseCode int `bson:"errorResponseCode,omitempty" json:"errorResponseCode,omitempty"`
+	ErrorResponseCode int `bson:"errorResponseCode,omitempty" json:"errorResponseCode,omitempty" yaml:"errorResponseCode,omitempty"`
 }
 
 // Fill fills *ValidateRequest receiver from apidef.ValidateRequestMeta.
@@ -718,27 +718,27 @@ func (s *OAS) fillOASValidateRequest(metas []apidef.ValidatePathMeta) {
 // MockResponse configures the mock responses.
 type MockResponse struct {
 	// Enabled activates the mock response middleware.
-	Enabled bool `bson:"enabled" json:"enabled"`
+	Enabled bool `bson:"enabled" json:"enabled" yaml:"enabled"`
 	// Code is the HTTP response code that will be returned.
-	Code int `bson:"code,omitempty" json:"code,omitempty"`
+	Code int `bson:"code,omitempty" json:"code,omitempty" yaml:"code,omitempty"`
 	// Body is the HTTP response body that will be returned.
-	Body string `bson:"body,omitempty" json:"body,omitempty"`
+	Body string `bson:"body,omitempty" json:"body,omitempty" yaml:"body,omitempty"`
 	// Headers are the HTTP response headers that will be returned.
-	Headers Headers `bson:"headers,omitempty" json:"headers,omitempty"`
+	Headers Headers `bson:"headers,omitempty" json:"headers,omitempty" yaml:"headers,omitempty"`
 	// FromOASExamples is the configuration to extract a mock response from OAS documentation.
-	FromOASExamples *FromOASExamples `bson:"fromOASExamples,omitempty" json:"fromOASExamples,omitempty"`
+	FromOASExamples *FromOASExamples `bson:"fromOASExamples,omitempty" json:"fromOASExamples,omitempty" yaml:"fromOASExamples,omitempty"`
 }
 
 // FromOASExamples configures mock responses that should be returned from OAS example responses.
 type FromOASExamples struct {
 	// Enabled activates getting a mock response from OAS examples or schemas documented in OAS.
-	Enabled bool `bson:"enabled" json:"enabled"`
+	Enabled bool `bson:"enabled" json:"enabled" yaml:"enabled"`
 	// Code is the default HTTP response code that the gateway reads from the path responses documented in OAS.
-	Code int `bson:"code,omitempty" json:"code,omitempty"`
+	Code int `bson:"code,omitempty" json:"code,omitempty" yaml:"code,omitempty"`
 	// ContentType is the default HTTP response body type that the gateway reads from the path responses documented in OAS.
-	ContentType string `bson:"contentType,omitempty" json:"contentType,omitempty"`
+	ContentType string `bson:"contentType,omitempty" json:"contentType,omitempty" yaml:"contentType,omitempty"`
 	// ExampleName is the default example name among multiple path response examples documented in OAS.
-	ExampleName string `bson:"exampleName,omitempty" json:"exampleName,omitempty"`
+	ExampleName string `bson:"exampleName,omitempty" json:"exampleName,omitempty" yaml:"exampleName,omitempty"`
 }
 
 func (*MockResponse) shouldImport(operation *openapi3.Operation) bool {

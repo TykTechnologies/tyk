@@ -27,20 +27,20 @@ type Token struct {
 	// Enabled activates the token based authentication mode.
 	//
 	// Tyk classic API definition: `auth_configs["authToken"].use_standard_auth`
-	Enabled bool `bson:"enabled" json:"enabled"` // required
+	Enabled bool `bson:"enabled" json:"enabled" yaml:"enabled"` // required
 
 	// AuthSources contains the configuration for authentication sources.
-	AuthSources `bson:",inline" json:",inline"`
+	AuthSources `bson:",inline" json:",inline" yaml:",inline"`
 
 	// EnableClientCertificate allows to create dynamic keys based on certificates.
 	//
 	// Tyk classic API definition: `auth_configs["authToken"].use_certificate`
-	EnableClientCertificate bool `bson:"enableClientCertificate,omitempty" json:"enableClientCertificate,omitempty"`
+	EnableClientCertificate bool `bson:"enableClientCertificate,omitempty" json:"enableClientCertificate,omitempty" yaml:"enableClientCertificate,omitempty"`
 
 	// Signature holds the configuration for verifying the signature of the token.
 	//
 	// Tyk classic API definition: `auth_configs["authToken"].use_certificate`
-	Signature *Signature `bson:"signatureValidation,omitempty" json:"signatureValidation,omitempty"`
+	Signature *Signature `bson:"signatureValidation,omitempty" json:"signatureValidation,omitempty" yaml:"signatureValidation,omitempty"`
 }
 
 // Import populates *Token from argument values.
@@ -98,67 +98,67 @@ type JWT struct {
 	// Enabled activates the basic authentication mode.
 	//
 	// Tyk classic API definition: `enable_jwt`
-	Enabled bool `bson:"enabled" json:"enabled"` // required
+	Enabled bool `bson:"enabled" json:"enabled" yaml:"enabled"` // required
 
 	// AuthSources configures the source for the JWT.
-	AuthSources `bson:",inline" json:",inline"`
+	AuthSources `bson:",inline" json:",inline" yaml:",inline"`
 
 	// Source contains the source for the JWT.
 	//
 	// Tyk classic API definition: `jwt_source`
-	Source string `bson:"source,omitempty" json:"source,omitempty"`
+	Source string `bson:"source,omitempty" json:"source,omitempty" yaml:"source,omitempty"`
 
 	// SigningMethod contains the signing method to use for the JWT.
 	//
 	// Tyk classic API definition: `jwt_signing_method`
-	SigningMethod string `bson:"signingMethod,omitempty" json:"signingMethod,omitempty"`
+	SigningMethod string `bson:"signingMethod,omitempty" json:"signingMethod,omitempty" yaml:"signingMethod,omitempty"`
 
 	// IdentityBaseField specifies the claim name uniquely identifying the subject of the JWT.
 	// The identity fields that are checked in order are: `kid`, IdentityBaseField, `sub`.
 	//
 	// Tyk classic API definition: `jwt_identity_base_field`
-	IdentityBaseField string `bson:"identityBaseField,omitempty" json:"identityBaseField,omitempty"`
+	IdentityBaseField string `bson:"identityBaseField,omitempty" json:"identityBaseField,omitempty" yaml:"identityBaseField,omitempty"`
 
 	// SkipKid controls skipping using the `kid` claim from a JWT (default behaviour).
 	// When this is true, the field configured in IdentityBaseField is checked first.
 	//
 	// Tyk classic API definition: `jwt_skip_kid`
-	SkipKid bool `bson:"skipKid,omitempty" json:"skipKid,omitempty"`
+	SkipKid bool `bson:"skipKid,omitempty" json:"skipKid,omitempty" yaml:"skipKid,omitempty"`
 
 	// PolicyFieldName is a configurable claim name from which a policy ID is extracted.
 	// The policy is applied to the session as a base policy.
 	//
 	// Tyk classic API definition: `jwt_policy_field_name`
-	PolicyFieldName string `bson:"policyFieldName,omitempty" json:"policyFieldName,omitempty"`
+	PolicyFieldName string `bson:"policyFieldName,omitempty" json:"policyFieldName,omitempty" yaml:"policyFieldName,omitempty"`
 
 	// ClientBaseField is used when PolicyFieldName is not provided. It will get
 	// a session key and use the policies from that. The field ensures that requests
 	// use the same session.
 	//
 	// Tyk classic API definition: `jwt_client_base_field`
-	ClientBaseField string `bson:"clientBaseField,omitempty" json:"clientBaseField,omitempty"`
+	ClientBaseField string `bson:"clientBaseField,omitempty" json:"clientBaseField,omitempty" yaml:"clientBaseField,omitempty"`
 
 	// Scopes holds the scope to policy mappings for a claim name.
-	Scopes *Scopes `bson:"scopes,omitempty" json:"scopes,omitempty"`
+	Scopes *Scopes `bson:"scopes,omitempty" json:"scopes,omitempty" yaml:"scopes,omitempty"`
 
 	// DefaultPolicies is a list of policy IDs that apply to the session.
 	//
 	// Tyk classic API definition: `jwt_default_policies`
-	DefaultPolicies []string `bson:"defaultPolicies,omitempty" json:"defaultPolicies,omitempty"`
+	DefaultPolicies []string `bson:"defaultPolicies,omitempty" json:"defaultPolicies,omitempty" yaml:"defaultPolicies,omitempty"`
 
 	// IssuedAtValidationSkew contains the duration in seconds for which token issuance can predate the current time during the request.
-	IssuedAtValidationSkew uint64 `bson:"issuedAtValidationSkew,omitempty" json:"issuedAtValidationSkew,omitempty"`
+	IssuedAtValidationSkew uint64 `bson:"issuedAtValidationSkew,omitempty" json:"issuedAtValidationSkew,omitempty" yaml:"issuedAtValidationSkew,omitempty"`
 
 	// NotBeforeValidationSkew contains the duration in seconds for which token validity can predate the current time during the request.
-	NotBeforeValidationSkew uint64 `bson:"notBeforeValidationSkew,omitempty" json:"notBeforeValidationSkew,omitempty"`
+	NotBeforeValidationSkew uint64 `bson:"notBeforeValidationSkew,omitempty" json:"notBeforeValidationSkew,omitempty" yaml:"notBeforeValidationSkew,omitempty"`
 
 	// ExpiresAtValidationSkew contains the duration in seconds for which the token can be expired before we consider it expired.
-	ExpiresAtValidationSkew uint64 `bson:"expiresAtValidationSkew,omitempty" json:"expiresAtValidationSkew,omitempty"`
+	ExpiresAtValidationSkew uint64 `bson:"expiresAtValidationSkew,omitempty" json:"expiresAtValidationSkew,omitempty" yaml:"expiresAtValidationSkew,omitempty"`
 
 	// IDPClientIDMappingDisabled prevents Tyk from automatically detecting the use of certain IDPs based on standard claims
 	// that they include in the JWT: `client_id`, `cid`, `clientId`. Setting this flag to `true` disables the mapping and avoids
 	// accidentally misidentifying the use of one of these IDPs if one of their standard values is configured in your JWT.
-	IDPClientIDMappingDisabled bool `bson:"idpClientIdMappingDisabled,omitempty" json:"idpClientIdMappingDisabled,omitempty"`
+	IDPClientIDMappingDisabled bool `bson:"idpClientIdMappingDisabled,omitempty" json:"idpClientIdMappingDisabled,omitempty" yaml:"idpClientIdMappingDisabled,omitempty"`
 }
 
 // Import populates *JWT based on arguments.
@@ -256,18 +256,18 @@ func (s *OAS) extractJWTTo(api *apidef.APIDefinition, name string) {
 type Basic struct {
 	// Enabled activates the basic authentication mode.
 	// Tyk classic API definition: `use_basic_auth`
-	Enabled bool `bson:"enabled" json:"enabled"` // required
+	Enabled bool `bson:"enabled" json:"enabled" yaml:"enabled"` // required
 	// AuthSources contains the source for HTTP Basic Auth credentials.
-	AuthSources `bson:",inline" json:",inline"`
+	AuthSources `bson:",inline" json:",inline" yaml:",inline"`
 	// DisableCaching disables the caching of basic authentication key.
 	// Tyk classic API definition: `basic_auth.disable_caching`
-	DisableCaching bool `bson:"disableCaching,omitempty" json:"disableCaching,omitempty"`
+	DisableCaching bool `bson:"disableCaching,omitempty" json:"disableCaching,omitempty" yaml:"disableCaching,omitempty"`
 	// CacheTTL is the TTL for a cached basic authentication key in seconds.
 	// Tyk classic API definition: `basic_auth.cache_ttl`
-	CacheTTL int `bson:"cacheTTL,omitempty" json:"cacheTTL,omitempty"`
+	CacheTTL int `bson:"cacheTTL,omitempty" json:"cacheTTL,omitempty" yaml:"cacheTTL,omitempty"`
 	// ExtractCredentialsFromBody helps to extract username and password from body. In some cases, like dealing with SOAP,
 	// user credentials can be passed via request body.
-	ExtractCredentialsFromBody *ExtractCredentialsFromBody `bson:"extractCredentialsFromBody,omitempty" json:"extractCredentialsFromBody,omitempty"`
+	ExtractCredentialsFromBody *ExtractCredentialsFromBody `bson:"extractCredentialsFromBody,omitempty" json:"extractCredentialsFromBody,omitempty" yaml:"extractCredentialsFromBody,omitempty"`
 }
 
 // Import populates *Basic from it's arguments.
@@ -346,13 +346,13 @@ func (s *OAS) extractBasicTo(api *apidef.APIDefinition, name string) {
 type ExtractCredentialsFromBody struct {
 	// Enabled activates extracting credentials from body.
 	// Tyk classic API definition: `basic_auth.extract_from_body`
-	Enabled bool `bson:"enabled" json:"enabled"` // required
+	Enabled bool `bson:"enabled" json:"enabled" yaml:"enabled"` // required
 	// UserRegexp is the regex for username e.g. `<User>(.*)</User>`.
 	// Tyk classic API definition: `basic_auth.userRegexp`
-	UserRegexp string `bson:"userRegexp,omitempty" json:"userRegexp,omitempty"`
+	UserRegexp string `bson:"userRegexp,omitempty" json:"userRegexp,omitempty" yaml:"userRegexp,omitempty"`
 	// PasswordRegexp is the regex for password e.g. `<Password>(.*)</Password>`.
 	// Tyk classic API definition: `basic_auth.passwordRegexp`
-	PasswordRegexp string `bson:"passwordRegexp,omitempty" json:"passwordRegexp,omitempty"`
+	PasswordRegexp string `bson:"passwordRegexp,omitempty" json:"passwordRegexp,omitempty" yaml:"passwordRegexp,omitempty"`
 }
 
 // Fill fills *ExtractCredentialsFromBody from apidef.APIDefinition.
@@ -372,22 +372,22 @@ func (e *ExtractCredentialsFromBody) ExtractTo(api *apidef.APIDefinition) {
 // OAuth configures the OAuth middleware.
 type OAuth struct {
 	// Enabled activates the OAuth middleware.
-	Enabled bool `bson:"enabled" json:"enabled"` // required
+	Enabled bool `bson:"enabled" json:"enabled" yaml:"enabled"` // required
 
 	// AuthSources configures the sources for OAuth credentials.
-	AuthSources `bson:",inline" json:",inline"`
+	AuthSources `bson:",inline" json:",inline" yaml:",inline"`
 
 	// AllowedAuthorizeTypes is an array of OAuth authorization types.
-	AllowedAuthorizeTypes []osin.AuthorizeRequestType `bson:"allowedAuthorizeTypes,omitempty" json:"allowedAuthorizeTypes,omitempty"`
+	AllowedAuthorizeTypes []osin.AuthorizeRequestType `bson:"allowedAuthorizeTypes,omitempty" json:"allowedAuthorizeTypes,omitempty" yaml:"allowedAuthorizeTypes,omitempty"`
 
 	// RefreshToken enables clients using a refresh token to get a new bearer access token.
-	RefreshToken bool `bson:"refreshToken,omitempty" json:"refreshToken,omitempty"`
+	RefreshToken bool `bson:"refreshToken,omitempty" json:"refreshToken,omitempty" yaml:"refreshToken,omitempty"`
 
 	// AuthLoginRedirect configures a URL to redirect to after a successful login.
-	AuthLoginRedirect string `bson:"authLoginRedirect,omitempty" json:"authLoginRedirect,omitempty"`
+	AuthLoginRedirect string `bson:"authLoginRedirect,omitempty" json:"authLoginRedirect,omitempty" yaml:"authLoginRedirect,omitempty"`
 
 	// Notifications configures a URL trigger on key changes.
-	Notifications *Notifications `bson:"notifications,omitempty" json:"notifications,omitempty"`
+	Notifications *Notifications `bson:"notifications,omitempty" json:"notifications,omitempty" yaml:"notifications,omitempty"`
 }
 
 // Import populates *OAuth from it's arguments.
@@ -463,38 +463,38 @@ func (s *OAS) extractOAuthTo(api *apidef.APIDefinition, name string) {
 // OAuthProvider holds the configuration for validation and introspection of OAuth tokens.
 type OAuthProvider struct {
 	// JWT configures JWT validation.
-	JWT *JWTValidation `bson:"jwt,omitempty" json:"jwt,omitempty"`
+	JWT *JWTValidation `bson:"jwt,omitempty" json:"jwt,omitempty" yaml:"jwt,omitempty"`
 	// Introspection configures token introspection.
-	Introspection *Introspection `bson:"introspection,omitempty" json:"introspection,omitempty"`
+	Introspection *Introspection `bson:"introspection,omitempty" json:"introspection,omitempty" yaml:"introspection,omitempty"`
 }
 
 // JWTValidation holds configuration for validating access tokens by inspecing them
 // against a third party API, usually one provided by the IDP.
 type JWTValidation struct {
 	// Enabled activates OAuth access token validation.
-	Enabled bool `bson:"enabled" json:"enabled"`
+	Enabled bool `bson:"enabled" json:"enabled" yaml:"enabled"`
 
 	// SigningMethod to verify signing method used in jwt - allowed values HMAC/RSA/ECDSA.
-	SigningMethod string `bson:"signingMethod" json:"signingMethod"`
+	SigningMethod string `bson:"signingMethod" json:"signingMethod" yaml:"signingMethod"`
 
 	// Source is the secret to verify signature. Valid values are:
 	//
 	// - a base64 encoded static secret,
 	// - a valid JWK URL in plain text,
 	// - a valid JWK URL in base64 encoded format.
-	Source string `bson:"source" json:"source"`
+	Source string `bson:"source" json:"source" yaml:"source"`
 
 	// IdentityBaseField is the identity claim name.
-	IdentityBaseField string `bson:"identityBaseField,omitempty" json:"identityBaseField,omitempty"`
+	IdentityBaseField string `bson:"identityBaseField,omitempty" json:"identityBaseField,omitempty" yaml:"identityBaseField,omitempty"`
 
 	// IssuedAtValidationSkew is the clock skew to be considered while validating the iat claim.
-	IssuedAtValidationSkew uint64 `bson:"issuedAtValidationSkew,omitempty" json:"issuedAtValidationSkew,omitempty"`
+	IssuedAtValidationSkew uint64 `bson:"issuedAtValidationSkew,omitempty" json:"issuedAtValidationSkew,omitempty" yaml:"issuedAtValidationSkew,omitempty"`
 
 	// NotBeforeValidationSkew is the clock skew to be considered while validating the nbf claim.
-	NotBeforeValidationSkew uint64 `bson:"notBeforeValidationSkew,omitempty" json:"notBeforeValidationSkew,omitempty"`
+	NotBeforeValidationSkew uint64 `bson:"notBeforeValidationSkew,omitempty" json:"notBeforeValidationSkew,omitempty" yaml:"notBeforeValidationSkew,omitempty"`
 
 	// ExpiresAtValidationSkew is the clock skew to be considered while validating the exp claim.
-	ExpiresAtValidationSkew uint64 `bson:"expiresAtValidationSkew,omitempty" json:"expiresAtValidationSkew,omitempty"`
+	ExpiresAtValidationSkew uint64 `bson:"expiresAtValidationSkew,omitempty" json:"expiresAtValidationSkew,omitempty" yaml:"expiresAtValidationSkew,omitempty"`
 }
 
 func (j *JWTValidation) Fill(jwt apidef.JWTValidation) {
@@ -520,17 +520,17 @@ func (j *JWTValidation) ExtractTo(jwt *apidef.JWTValidation) {
 // Introspection holds configuration for OAuth token introspection.
 type Introspection struct {
 	// Enabled activates OAuth access token validation by introspection to a third party.
-	Enabled bool `bson:"enabled" json:"enabled"`
+	Enabled bool `bson:"enabled" json:"enabled" yaml:"enabled"`
 	// URL is the URL of the third party provider's introspection endpoint.
-	URL string `bson:"url" json:"url"`
+	URL string `bson:"url" json:"url" yaml:"url"`
 	// ClientID is the public identifier for the client, acquired from the third party.
-	ClientID string `bson:"clientId" json:"clientId"`
+	ClientID string `bson:"clientId" json:"clientId" yaml:"clientId"`
 	// ClientSecret is a secret known only to the client and the authorisation server, acquired from the third party.
-	ClientSecret string `bson:"clientSecret" json:"clientSecret"`
+	ClientSecret string `bson:"clientSecret" json:"clientSecret" yaml:"clientSecret"`
 	// IdentityBaseField is the key showing where to find the user id in the claims. If it is empty, the `sub` key is looked at.
-	IdentityBaseField string `bson:"identityBaseField,omitempty" json:"identityBaseField,omitempty"`
+	IdentityBaseField string `bson:"identityBaseField,omitempty" json:"identityBaseField,omitempty" yaml:"identityBaseField,omitempty"`
 	// Cache is the caching mechanism for introspection responses.
-	Cache *IntrospectionCache `bson:"cache,omitempty" json:"cache,omitempty"`
+	Cache *IntrospectionCache `bson:"cache,omitempty" json:"cache,omitempty" yaml:"cache,omitempty"`
 }
 
 func (i *Introspection) Fill(intros apidef.Introspection) {
@@ -565,10 +565,10 @@ func (i *Introspection) ExtractTo(intros *apidef.Introspection) {
 // IntrospectionCache holds configuration for caching introspection requests.
 type IntrospectionCache struct {
 	// Enabled activates the caching mechanism for introspection responses.
-	Enabled bool `bson:"enabled" json:"enabled"`
+	Enabled bool `bson:"enabled" json:"enabled" yaml:"enabled"`
 	// Timeout is the duration in seconds of how long the cached value stays.
 	// For introspection caching, it is suggested to use a short interval.
-	Timeout int64 `bson:"timeout" json:"timeout"`
+	Timeout int64 `bson:"timeout" json:"timeout" yaml:"timeout"`
 }
 
 func (c *IntrospectionCache) Fill(cache apidef.IntrospectionCache) {
@@ -587,13 +587,13 @@ func (c *IntrospectionCache) ExtractTo(cache *apidef.IntrospectionCache) {
 // as explained in https://tyk.io/docs/basic-config-and-security/security/authentication-authorization/ext-oauth-middleware/.
 type ExternalOAuth struct {
 	// Enabled activates external oauth functionality.
-	Enabled bool `bson:"enabled" json:"enabled"` // required
+	Enabled bool `bson:"enabled" json:"enabled" yaml:"enabled"` // required
 
 	// AuthSources configures the source for the authentication token.
-	AuthSources `bson:",inline" json:",inline"`
+	AuthSources `bson:",inline" json:",inline" yaml:",inline"`
 
 	// Providers is used to configure OAuth providers.
-	Providers []OAuthProvider `bson:"providers" json:"providers"` // required
+	Providers []OAuthProvider `bson:"providers" json:"providers" yaml:"providers"` // required
 }
 
 func (s *OAS) fillExternalOAuth(api apidef.APIDefinition) {
@@ -671,9 +671,9 @@ func (s *OAS) extractExternalOAuthTo(api *apidef.APIDefinition, name string) {
 // Notifications holds configuration for updates to keys.
 type Notifications struct {
 	// SharedSecret is the shared secret used in the notification request.
-	SharedSecret string `bson:"sharedSecret,omitempty" json:"sharedSecret,omitempty"`
+	SharedSecret string `bson:"sharedSecret,omitempty" json:"sharedSecret,omitempty" yaml:"sharedSecret,omitempty"`
 	// OnKeyChangeURL is the URL a request will be triggered against.
-	OnKeyChangeURL string `bson:"onKeyChangeUrl,omitempty" json:"onKeyChangeUrl,omitempty"`
+	OnKeyChangeURL string `bson:"onKeyChangeUrl,omitempty" json:"onKeyChangeUrl,omitempty" yaml:"onKeyChangeUrl,omitempty"`
 }
 
 // Fill fills *Notifications from apidef.NotificationsManager.

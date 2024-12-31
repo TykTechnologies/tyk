@@ -18,18 +18,18 @@ const WebhookKind = event.WebhookKind
 // EventHandler holds information about individual event to be configured on the API.
 type EventHandler struct {
 	// Enabled enables the event handler.
-	Enabled bool `json:"enabled" bson:"enabled"`
+	Enabled bool `json:"enabled" bson:"enabled" yaml:"enabled"`
 	// Trigger specifies the TykEvent that should trigger the event handler.
-	Trigger event.Event `json:"trigger" bson:"trigger"`
+	Trigger event.Event `json:"trigger" bson:"trigger" yaml:"trigger"`
 	// Kind specifies the action to be taken on the event trigger.
-	Kind Kind `json:"type" bson:"type"` // json tag is changed as per contract
+	Kind Kind `json:"type" bson:"type" yaml:"type"` // json tag is changed as per contract
 	// ID is the ID of event handler in storage.
-	ID string `json:"id,omitempty" bson:"id,omitempty"`
+	ID string `json:"id,omitempty" bson:"id,omitempty" yaml:"id,omitempty"`
 	// Name is the name of event handler.
-	Name string `json:"name,omitempty" bson:"name,omitempty"`
+	Name string `json:"name,omitempty" bson:"name,omitempty" yaml:"name,omitempty"`
 
 	// Webhook contains WebhookEvent configs. Encoding and decoding is handled by the custom marshaller.
-	Webhook WebhookEvent `bson:"-" json:"-"`
+	Webhook WebhookEvent `bson:"-" json:"-" yaml:"-"`
 }
 
 // MarshalJSON marshals EventHandler as per Tyk OAS API definition contract.
@@ -76,9 +76,9 @@ func (e *EventHandler) UnmarshalJSON(in []byte) error {
 // WebhookEvent stores the core information about a webhook event.
 type WebhookEvent struct {
 	// URL is the target URL for the webhook.
-	URL string `json:"url" bson:"url"`
+	URL string `json:"url" bson:"url" yaml:"url"`
 	// Method is the HTTP method for the webhook.
-	Method string `json:"method" bson:"method"`
+	Method string `json:"method" bson:"method" yaml:"method"`
 	// CoolDownPeriod defines cool-down for the event, so it does not trigger again.
 	// It uses shorthand notation.
 	// The value of CoolDownPeriod is a string that specifies the interval in a compact form,
@@ -95,11 +95,11 @@ type WebhookEvent struct {
 	// An empty value is interpreted as "0s", implying no cool-down.
 	// It's important to format the string correctly, as invalid formats will
 	// be considered as 0s/empty.
-	CoolDownPeriod ReadableDuration `json:"cooldownPeriod" bson:"cooldownPeriod"`
+	CoolDownPeriod ReadableDuration `json:"cooldownPeriod" bson:"cooldownPeriod" yaml:"cooldownPeriod"`
 	// BodyTemplate is the template to be used for request payload.
-	BodyTemplate string `json:"bodyTemplate,omitempty" bson:"bodyTemplate,omitempty"`
+	BodyTemplate string `json:"bodyTemplate,omitempty" bson:"bodyTemplate,omitempty" yaml:"bodyTemplate,omitempty"`
 	// Headers are the list of request headers to be used.
-	Headers Headers `json:"headers,omitempty" bson:"headers,omitempty"`
+	Headers Headers `json:"headers,omitempty" bson:"headers,omitempty" yaml:"headers,omitempty"`
 }
 
 // GetWebhookConf converts EventHandler.WebhookEvent apidef.WebHookHandlerConf.

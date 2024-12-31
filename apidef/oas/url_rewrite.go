@@ -11,18 +11,18 @@ import (
 // Tyk classic API definition: `version_data.versions[].extended_paths.url_rewrite`.
 type URLRewrite struct {
 	// Enabled activates URL rewriting if set to true.
-	Enabled bool `bson:"enabled" json:"enabled"`
+	Enabled bool `bson:"enabled" json:"enabled" yaml:"enabled"`
 
 	// Pattern is the regular expression against which the request URL is compared for the primary rewrite check.
 	// If this matches the defined pattern, the primary URL rewrite is triggered.
-	Pattern string `bson:"pattern,omitempty" json:"pattern,omitempty"`
+	Pattern string `bson:"pattern,omitempty" json:"pattern,omitempty" yaml:"pattern,omitempty"`
 
 	// RewriteTo specifies the URL to which the request shall be rewritten if the primary URL rewrite is triggered.
-	RewriteTo string `bson:"rewriteTo,omitempty" json:"rewriteTo,omitempty"`
+	RewriteTo string `bson:"rewriteTo,omitempty" json:"rewriteTo,omitempty" yaml:"rewriteTo,omitempty"`
 
 	// Triggers contain advanced additional triggers for the URL rewrite.
 	// The triggers are processed only if the requested URL matches the pattern above.
-	Triggers []*URLRewriteTrigger `bson:"triggers,omitempty" json:"triggers,omitempty"`
+	Triggers []*URLRewriteTrigger `bson:"triggers,omitempty" json:"triggers,omitempty" yaml:"triggers,omitempty"`
 }
 
 // URLRewriteInput defines the input for an URL rewrite rule.
@@ -80,22 +80,22 @@ var (
 // URLRewriteTrigger represents a set of matching rules for a rewrite.
 type URLRewriteTrigger struct {
 	// Condition indicates the logical combination that will be applied to the rules for an advanced trigger.
-	Condition URLRewriteCondition `bson:"condition" json:"condition"`
+	Condition URLRewriteCondition `bson:"condition" json:"condition" yaml:"condition"`
 
 	// Rules contain individual checks that are combined according to the
 	// `condition` to determine if the URL rewrite will be triggered.
 	// If empty, the trigger is ignored.
-	Rules []*URLRewriteRule `bson:"rules,omitempty" json:"rules,omitempty"`
+	Rules []*URLRewriteRule `bson:"rules,omitempty" json:"rules,omitempty" yaml:"rules,omitempty"`
 
 	// RewriteTo specifies the URL to which the request shall be rewritten
 	// if indicated by the combination of `condition` and `rules`.
-	RewriteTo string `bson:"rewriteTo" json:"rewriteTo"`
+	RewriteTo string `bson:"rewriteTo" json:"rewriteTo" yaml:"rewriteTo"`
 }
 
 // URLRewriteRule represents a rewrite matching rules.
 type URLRewriteRule struct {
 	// In specifies one of the valid inputs for URL rewriting.
-	In URLRewriteInput `bson:"in" json:"in"`
+	In URLRewriteInput `bson:"in" json:"in" yaml:"in"`
 
 	// Name is the index in the value declared inside `in`.
 	//
@@ -104,15 +104,15 @@ type URLRewriteRule struct {
 	//
 	// The value of name is unused when `in` is set to `requestBody`,
 	// as the request body is a single value and not a set of values.
-	Name string `bson:"name,omitempty" json:"name,omitempty"`
+	Name string `bson:"name,omitempty" json:"name,omitempty" yaml:"name,omitempty"`
 
 	// Pattern is the regular expression against which the `in` values are compared for this rule check.
 	// If the value matches the defined `pattern`, the URL rewrite is triggered for this rule.
-	Pattern string `bson:"pattern" json:"pattern"`
+	Pattern string `bson:"pattern" json:"pattern" yaml:"pattern"`
 
 	// Negate is a boolean negation operator. Setting it to true inverts the matching behaviour
 	// such that the rewrite will be triggered if the value does not match the `pattern` for this rule.
-	Negate bool `bson:"negate,omitempty" json:"negate,omitempty"`
+	Negate bool `bson:"negate,omitempty" json:"negate,omitempty" yaml:"negate,omitempty"`
 }
 
 // Fill fills *URLRewrite receiver from apidef.URLRewriteMeta.
