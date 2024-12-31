@@ -9,7 +9,7 @@ import (
 type TrackEndpoint struct {
 	// Enabled if set to true enables or disables tracking for an endpoint depending
 	// if it's used in `trackEndpoint` or `doNotTrackEndpoint`.
-	Enabled bool `bson:"enabled" json:"enabled"`
+	Enabled bool `bson:"enabled" json:"enabled" yaml:"enabled"`
 }
 
 // Fill fills *TrackEndpoint receiver with data from apidef.TrackEndpointMeta.

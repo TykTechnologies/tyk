@@ -10,34 +10,34 @@ type Server struct {
 	// be sent. Tyk listens for any requests coming into the host at this
 	// path, on the port that Tyk is configured to run on and processes these
 	// accordingly.
-	ListenPath ListenPath `bson:"listenPath" json:"listenPath"` // required
+	ListenPath ListenPath `bson:"listenPath" json:"listenPath" yaml:"listenPath"` // required
 
 	// Authentication contains the configurations that manage how clients can authenticate with Tyk to access the API.
-	Authentication *Authentication `bson:"authentication,omitempty" json:"authentication,omitempty"`
+	Authentication *Authentication `bson:"authentication,omitempty" json:"authentication,omitempty" yaml:"authentication,omitempty"`
 
 	// ClientCertificates contains the configurations related to establishing static mutual TLS between the client and Tyk.
-	ClientCertificates *ClientCertificates `bson:"clientCertificates,omitempty" json:"clientCertificates,omitempty"`
+	ClientCertificates *ClientCertificates `bson:"clientCertificates,omitempty" json:"clientCertificates,omitempty" yaml:"clientCertificates,omitempty"`
 
 	// GatewayTags contain segment tags to indicate which Gateways your upstream service is connected to (and hence where to deploy the API).
-	GatewayTags *GatewayTags `bson:"gatewayTags,omitempty" json:"gatewayTags,omitempty"`
+	GatewayTags *GatewayTags `bson:"gatewayTags,omitempty" json:"gatewayTags,omitempty" yaml:"gatewayTags,omitempty"`
 
 	// CustomDomain is the domain to bind this API to. This enforces domain matching for client requests.
 	//
 	// Tyk classic API definition: `domain`
-	CustomDomain *Domain `bson:"customDomain,omitempty" json:"customDomain,omitempty"`
+	CustomDomain *Domain `bson:"customDomain,omitempty" json:"customDomain,omitempty" yaml:"customDomain,omitempty"`
 
 	// DetailedActivityLogs configures detailed analytics recording.
-	DetailedActivityLogs *DetailedActivityLogs `bson:"detailedActivityLogs,omitempty" json:"detailedActivityLogs,omitempty"`
+	DetailedActivityLogs *DetailedActivityLogs `bson:"detailedActivityLogs,omitempty" json:"detailedActivityLogs,omitempty" yaml:"detailedActivityLogs,omitempty"`
 
 	// DetailedTracing enables OpenTelemetry's detailed tracing for this API.
 	//
 	// Tyk classic API definition: `detailed_tracing`
-	DetailedTracing *DetailedTracing `bson:"detailedTracing,omitempty" json:"detailedTracing,omitempty"`
+	DetailedTracing *DetailedTracing `bson:"detailedTracing,omitempty" json:"detailedTracing,omitempty" yaml:"detailedTracing,omitempty"`
 
 	// EventHandlers contains the configuration related to Tyk Events.
 	//
 	// Tyk classic API definition: `event_handlers`
-	EventHandlers EventHandlers `bson:"eventHandlers,omitempty" json:"eventHandlers,omitempty"`
+	EventHandlers EventHandlers `bson:"eventHandlers,omitempty" json:"eventHandlers,omitempty" yaml:"eventHandlers,omitempty"`
 }
 
 // Fill fills *Server from apidef.APIDefinition.
@@ -162,7 +162,7 @@ func (s *Server) ExtractTo(api *apidef.APIDefinition) {
 type ListenPath struct {
 	// Value is the value of the listen path e.g. `/api/` or `/` or `/httpbin/`.
 	// Tyk classic API definition: `proxy.listen_path`
-	Value string `bson:"value" json:"value"` // required
+	Value string `bson:"value" json:"value" yaml:"value"` // required
 
 	// Strip removes the inbound listen path (as accessed by the client) when generating the outbound request for the upstream service.
 	//
@@ -172,7 +172,7 @@ type ListenPath struct {
 	// - If stripListenPath is set to `true`, the `example` listen path is removed and the request would be proxied to `http://httpbin.org/get`.
 	//
 	// Tyk classic API definition: `proxy.strip_listen_path`
-	Strip bool `bson:"strip,omitempty" json:"strip,omitempty"`
+	Strip bool `bson:"strip,omitempty" json:"strip,omitempty" yaml:"strip,omitempty"`
 }
 
 // Fill fills *ListenPath from apidef.APIDefinition.
@@ -190,9 +190,9 @@ func (lp *ListenPath) ExtractTo(api *apidef.APIDefinition) {
 // ClientCertificates contains the configurations related to establishing static mutual TLS between the client and Tyk.
 type ClientCertificates struct {
 	// Enabled activates static mTLS for the API.
-	Enabled bool `bson:"enabled" json:"enabled"`
+	Enabled bool `bson:"enabled" json:"enabled" yaml:"enabled"`
 	// Allowlist is the list of client certificates which are allowed.
-	Allowlist []string `bson:"allowlist" json:"allowlist"`
+	Allowlist []string `bson:"allowlist" json:"allowlist" yaml:"allowlist"`
 }
 
 // Fill fills *ClientCertificates from apidef.APIDefinition.
@@ -210,9 +210,9 @@ func (cc *ClientCertificates) ExtractTo(api *apidef.APIDefinition) {
 // GatewayTags holds a list of segment tags that should apply for a gateway.
 type GatewayTags struct {
 	// Enabled activates use of segment tags.
-	Enabled bool `bson:"enabled" json:"enabled"`
+	Enabled bool `bson:"enabled" json:"enabled" yaml:"enabled"`
 	// Tags contains a list of segment tags.
-	Tags []string `bson:"tags" json:"tags"`
+	Tags []string `bson:"tags" json:"tags" yaml:"tags"`
 }
 
 // Fill fills *GatewayTags from apidef.APIDefinition.
@@ -230,14 +230,14 @@ func (gt *GatewayTags) ExtractTo(api *apidef.APIDefinition) {
 // Domain holds the configuration of the domain name the server should listen on.
 type Domain struct {
 	// Enabled allow/disallow the usage of the domain.
-	Enabled bool `bson:"enabled" json:"enabled"`
+	Enabled bool `bson:"enabled" json:"enabled" yaml:"enabled"`
 	// Name is the name of the domain.
-	Name string `bson:"name" json:"name"`
+	Name string `bson:"name" json:"name" yaml:"name"`
 	// Certificates defines a field for specifying certificate IDs or file paths
 	// that the Gateway can utilise to dynamically load certificates for your custom domain.
 	//
 	// Tyk classic API definition: `certificates`
-	Certificates []string `bson:"certificates,omitempty" json:"certificates,omitempty"`
+	Certificates []string `bson:"certificates,omitempty" json:"certificates,omitempty" yaml:"certificates,omitempty"`
 }
 
 // ExtractTo extracts *Domain into *apidef.APIDefinition.
@@ -259,7 +259,7 @@ type DetailedActivityLogs struct {
 	// Enabled activates detailed activity logs.
 	//
 	// Tyk classic API definition: `enable_detailed_recording`
-	Enabled bool `bson:"enabled" json:"enabled"`
+	Enabled bool `bson:"enabled" json:"enabled" yaml:"enabled"`
 }
 
 // ExtractTo extracts *DetailedActivityLogs into *apidef.APIDefinition.
@@ -275,7 +275,7 @@ func (d *DetailedActivityLogs) Fill(api apidef.APIDefinition) {
 // DetailedTracing holds the configuration of the detailed tracing.
 type DetailedTracing struct {
 	// Enabled activates detailed tracing.
-	Enabled bool `bson:"enabled" json:"enabled"`
+	Enabled bool `bson:"enabled" json:"enabled" yaml:"enabled"`
 }
 
 // Fill fills *DetailedTracing from apidef.APIDefinition.

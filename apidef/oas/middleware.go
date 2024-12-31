@@ -12,10 +12,10 @@ import (
 // Middleware holds configuration for Tyk's native middleware.
 type Middleware struct {
 	// Global contains configuration for middleware that affects the whole API (all endpoints).
-	Global *Global `bson:"global,omitempty" json:"global,omitempty"`
+	Global *Global `bson:"global,omitempty" json:"global,omitempty" yaml:"global,omitempty"`
 
 	// Operations contains configuration for middleware that can be applied to individual endpoints within the API (per-endpoint).
-	Operations Operations `bson:"operations,omitempty" json:"operations,omitempty"`
+	Operations Operations `bson:"operations,omitempty" json:"operations,omitempty" yaml:"operations,omitempty"`
 }
 
 // Fill fills *Middleware from apidef.APIDefinition.
@@ -45,62 +45,62 @@ func (m *Middleware) ExtractTo(api *apidef.APIDefinition) {
 // Global contains configuration that affects the whole API (all endpoints).
 type Global struct {
 	// PluginConfig contains the common configuration for custom plugins.
-	PluginConfig *PluginConfig `bson:"pluginConfig,omitempty" json:"pluginConfig,omitempty"`
+	PluginConfig *PluginConfig `bson:"pluginConfig,omitempty" json:"pluginConfig,omitempty" yaml:"pluginConfig,omitempty"`
 
 	// CORS contains the configuration related to Cross Origin Resource Sharing.
 	// Tyk classic API definition: `CORS`.
-	CORS *CORS `bson:"cors,omitempty" json:"cors,omitempty"`
+	CORS *CORS `bson:"cors,omitempty" json:"cors,omitempty" yaml:"cors,omitempty"`
 
 	// PrePlugin contains configuration related to the custom plugin that is run before authentication.
 	// Deprecated: Use PrePlugins instead.
-	PrePlugin *PrePlugin `bson:"prePlugin,omitempty" json:"prePlugin,omitempty"`
+	PrePlugin *PrePlugin `bson:"prePlugin,omitempty" json:"prePlugin,omitempty" yaml:"prePlugin,omitempty"`
 
 	// PrePlugins contains configuration related to the custom plugin that is run before authentication.
 	// Tyk classic API definition: `custom_middleware.pre`.
-	PrePlugins CustomPlugins `bson:"prePlugins,omitempty" json:"prePlugins,omitempty"`
+	PrePlugins CustomPlugins `bson:"prePlugins,omitempty" json:"prePlugins,omitempty" yaml:"prePlugins,omitempty"`
 
 	// PostAuthenticationPlugin contains configuration related to the custom plugin that is run immediately after authentication.
 	// Deprecated: Use PostAuthenticationPlugins instead.
-	PostAuthenticationPlugin *PostAuthenticationPlugin `bson:"postAuthenticationPlugin,omitempty" json:"postAuthenticationPlugin,omitempty"`
+	PostAuthenticationPlugin *PostAuthenticationPlugin `bson:"postAuthenticationPlugin,omitempty" json:"postAuthenticationPlugin,omitempty" yaml:"postAuthenticationPlugin,omitempty"`
 
 	// PostAuthenticationPlugins contains configuration related to the custom plugin that is run immediately after authentication.
 	// Tyk classic API definition: `custom_middleware.post_key_auth`.
-	PostAuthenticationPlugins CustomPlugins `bson:"postAuthenticationPlugins,omitempty" json:"postAuthenticationPlugins,omitempty"`
+	PostAuthenticationPlugins CustomPlugins `bson:"postAuthenticationPlugins,omitempty" json:"postAuthenticationPlugins,omitempty" yaml:"postAuthenticationPlugins,omitempty"`
 
 	// PostPlugin contains configuration related to the custom plugin that is run immediately prior to proxying the request to the upstream.
 	// Deprecated: Use PostPlugins instead.
-	PostPlugin *PostPlugin `bson:"postPlugin,omitempty" json:"postPlugin,omitempty"`
+	PostPlugin *PostPlugin `bson:"postPlugin,omitempty" json:"postPlugin,omitempty" yaml:"postPlugin,omitempty"`
 
 	// PostPlugins contains configuration related to the custom plugin that is run immediately prior to proxying the request to the upstream.
 	// Tyk classic API definition: `custom_middleware.post`.
-	PostPlugins CustomPlugins `bson:"postPlugins,omitempty" json:"postPlugins,omitempty"`
+	PostPlugins CustomPlugins `bson:"postPlugins,omitempty" json:"postPlugins,omitempty" yaml:"postPlugins,omitempty"`
 
 	// ResponsePlugin contains configuration related to the custom plugin that is run during processing of the response from the upstream service.
 	// Deprecated: Use ResponsePlugins instead.
-	ResponsePlugin *ResponsePlugin `bson:"responsePlugin,omitempty" json:"responsePlugin,omitempty"`
+	ResponsePlugin *ResponsePlugin `bson:"responsePlugin,omitempty" json:"responsePlugin,omitempty" yaml:"responsePlugin,omitempty"`
 
 	// ResponsePlugins contains configuration related to the custom plugin that is run during processing of the response from the upstream service.
 	//
 	// Tyk classic API definition: `custom_middleware.response`.
-	ResponsePlugins CustomPlugins `bson:"responsePlugins,omitempty" json:"responsePlugins,omitempty"`
+	ResponsePlugins CustomPlugins `bson:"responsePlugins,omitempty" json:"responsePlugins,omitempty" yaml:"responsePlugins,omitempty"`
 
 	// Cache contains the configurations related to caching.
 	// Tyk classic API definition: `cache_options`.
-	Cache *Cache `bson:"cache,omitempty" json:"cache,omitempty"`
+	Cache *Cache `bson:"cache,omitempty" json:"cache,omitempty" yaml:"cache,omitempty"`
 
 	// TransformRequestHeaders contains the configurations related to API level request header transformation.
 	// Tyk classic API definition: `global_headers`/`global_headers_remove`.
-	TransformRequestHeaders *TransformHeaders `bson:"transformRequestHeaders,omitempty" json:"transformRequestHeaders,omitempty"`
+	TransformRequestHeaders *TransformHeaders `bson:"transformRequestHeaders,omitempty" json:"transformRequestHeaders,omitempty" yaml:"transformRequestHeaders,omitempty"`
 
 	// TransformResponseHeaders contains the configurations related to API level response header transformation.
 	// Tyk classic API definition: `global_response_headers`/`global_response_headers_remove`.
-	TransformResponseHeaders *TransformHeaders `bson:"transformResponseHeaders,omitempty" json:"transformResponseHeaders,omitempty"`
+	TransformResponseHeaders *TransformHeaders `bson:"transformResponseHeaders,omitempty" json:"transformResponseHeaders,omitempty" yaml:"transformResponseHeaders,omitempty"`
 
 	// ContextVariables contains the configuration related to Tyk context variables.
-	ContextVariables *ContextVariables `bson:"contextVariables,omitempty" json:"contextVariables,omitempty"`
+	ContextVariables *ContextVariables `bson:"contextVariables,omitempty" json:"contextVariables,omitempty" yaml:"contextVariables,omitempty"`
 
 	// TrafficLogs contains the configurations related to API level log analytics.
-	TrafficLogs *TrafficLogs `bson:"trafficLogs,omitempty" json:"trafficLogs,omitempty"`
+	TrafficLogs *TrafficLogs `bson:"trafficLogs,omitempty" json:"trafficLogs,omitempty" yaml:"trafficLogs,omitempty"`
 }
 
 // MarshalJSON is a custom JSON marshaler for the Global struct. It is implemented
@@ -427,10 +427,10 @@ func (g *Global) extractResponsePluginsTo(api *apidef.APIDefinition) {
 // PluginConfigData configures config data for custom plugins.
 type PluginConfigData struct {
 	// Enabled activates custom plugin config data.
-	Enabled bool `bson:"enabled" json:"enabled"` // required.
+	Enabled bool `bson:"enabled" json:"enabled" yaml:"enabled"` // required.
 
 	// Value is the value of custom plugin config data.
-	Value map[string]interface{} `bson:"value" json:"value"` // required.
+	Value map[string]interface{} `bson:"value" json:"value" yaml:"value"` // required.
 }
 
 // Fill fills PluginConfigData from apidef.
@@ -457,13 +457,13 @@ type PluginConfig struct {
 	// - `goplugin`.
 	//
 	// Tyk classic API definition: `custom_middleware.driver`.
-	Driver apidef.MiddlewareDriver `bson:"driver,omitempty" json:"driver,omitempty"`
+	Driver apidef.MiddlewareDriver `bson:"driver,omitempty" json:"driver,omitempty" yaml:"driver,omitempty"`
 
 	// Bundle configures custom plugin bundles.
-	Bundle *PluginBundle `bson:"bundle,omitempty" json:"bundle,omitempty"`
+	Bundle *PluginBundle `bson:"bundle,omitempty" json:"bundle,omitempty" yaml:"bundle,omitempty"`
 
 	// Data configures custom plugin data.
-	Data *PluginConfigData `bson:"data,omitempty" json:"data,omitempty"`
+	Data *PluginConfigData `bson:"data,omitempty" json:"data,omitempty" yaml:"data,omitempty"`
 }
 
 // Fill fills PluginConfig from apidef.
@@ -517,10 +517,10 @@ type PluginBundle struct {
 	// Enabled activates the custom plugin bundles.
 	//
 	// Tyk classic API definition: `custom_middleware_bundle_disabled`
-	Enabled bool `bson:"enabled" json:"enabled"` // required.
+	Enabled bool `bson:"enabled" json:"enabled" yaml:"enabled"` // required.
 	// Path is the path suffix to construct the URL to fetch plugin bundle from.
 	// Path will be suffixed to `bundle_base_url` in gateway config.
-	Path string `bson:"path" json:"path"` // required.
+	Path string `bson:"path" json:"path" yaml:"path"` // required.
 }
 
 // Fill fills PluginBundle from apidef.
@@ -540,28 +540,28 @@ type CORS struct {
 	// Enabled is a boolean flag, if set to `true`, this option enables CORS processing.
 	//
 	// Tyk classic API definition: `CORS.enable`.
-	Enabled bool `bson:"enabled" json:"enabled"` // required
+	Enabled bool `bson:"enabled" json:"enabled" yaml:"enabled"` // required
 
 	// MaxAge indicates how long (in seconds) the results of a preflight request can be cached. The default is 0 which stands for no max age.
 	//
 	// Tyk classic API definition: `CORS.max_age`.
-	MaxAge int `bson:"maxAge,omitempty" json:"maxAge,omitempty"`
+	MaxAge int `bson:"maxAge,omitempty" json:"maxAge,omitempty" yaml:"maxAge,omitempty"`
 
 	// AllowCredentials indicates if the request can include user credentials like cookies,
 	// HTTP authentication or client side SSL certificates.
 	//
 	// Tyk classic API definition: `CORS.allow_credentials`.
-	AllowCredentials bool `bson:"allowCredentials,omitempty" json:"allowCredentials,omitempty"`
+	AllowCredentials bool `bson:"allowCredentials,omitempty" json:"allowCredentials,omitempty" yaml:"allowCredentials,omitempty"`
 
 	// ExposedHeaders indicates which headers are safe to expose to the API of a CORS API specification.
 	//
 	// Tyk classic API definition: `CORS.exposed_headers`.
-	ExposedHeaders []string `bson:"exposedHeaders,omitempty" json:"exposedHeaders,omitempty"`
+	ExposedHeaders []string `bson:"exposedHeaders,omitempty" json:"exposedHeaders,omitempty" yaml:"exposedHeaders,omitempty"`
 
 	// AllowedHeaders holds a list of non simple headers the client is allowed to use with cross-domain requests.
 	//
 	// Tyk classic API definition: `CORS.allowed_headers`.
-	AllowedHeaders []string `bson:"allowedHeaders,omitempty" json:"allowedHeaders,omitempty"`
+	AllowedHeaders []string `bson:"allowedHeaders,omitempty" json:"allowedHeaders,omitempty" yaml:"allowedHeaders,omitempty"`
 
 	// OptionsPassthrough is a boolean flag. If set to `true`, it will proxy the CORS OPTIONS pre-flight
 	// request directly to upstream, without authentication and any CORS checks. This means that pre-flight
@@ -571,22 +571,22 @@ type CORS struct {
 	// If your service handles CORS natively, then enable this option.
 	//
 	// Tyk classic API definition: `CORS.options_passthrough`.
-	OptionsPassthrough bool `bson:"optionsPassthrough,omitempty" json:"optionsPassthrough,omitempty"`
+	OptionsPassthrough bool `bson:"optionsPassthrough,omitempty" json:"optionsPassthrough,omitempty" yaml:"optionsPassthrough,omitempty"`
 
 	// Debug is a boolean flag, If set to `true`, this option produces log files for the CORS middleware.
 	//
 	// Tyk classic API definition: `CORS.debug`.
-	Debug bool `bson:"debug,omitempty" json:"debug,omitempty"`
+	Debug bool `bson:"debug,omitempty" json:"debug,omitempty" yaml:"debug,omitempty"`
 
 	// AllowedOrigins holds a list of origin domains to allow access from. Wildcards are also supported, e.g. `http://*.foo.com`
 	//
 	// Tyk classic API definition: `CORS.allowed_origins`.
-	AllowedOrigins []string `bson:"allowedOrigins,omitempty" json:"allowedOrigins,omitempty"`
+	AllowedOrigins []string `bson:"allowedOrigins,omitempty" json:"allowedOrigins,omitempty" yaml:"allowedOrigins,omitempty"`
 
 	// AllowedMethods holds a list of methods to allow access via.
 	//
 	// Tyk classic API definition: `CORS.allowed_methods`.
-	AllowedMethods []string `bson:"allowedMethods,omitempty" json:"allowedMethods,omitempty"`
+	AllowedMethods []string `bson:"allowedMethods,omitempty" json:"allowedMethods,omitempty" yaml:"allowedMethods,omitempty"`
 }
 
 // Fill fills *CORS from apidef.CORSConfig.
@@ -621,38 +621,38 @@ type Cache struct {
 	// by explicitly setting the endpoint cache middleware.
 	//
 	// Tyk classic API definition: `cache_options.enable_cache`
-	Enabled bool `bson:"enabled" json:"enabled"` // required
+	Enabled bool `bson:"enabled" json:"enabled" yaml:"enabled"` // required
 
 	// Timeout is the TTL for a cached object in seconds.
 	//
 	// Tyk classic API definition: `cache_options.cache_timeout`
-	Timeout int64 `bson:"timeout,omitempty" json:"timeout,omitempty"`
+	Timeout int64 `bson:"timeout,omitempty" json:"timeout,omitempty" yaml:"timeout,omitempty"`
 
 	// CacheAllSafeRequests caches responses to (`GET`, `HEAD`, `OPTIONS`) requests overrides per-path cache settings in versions,
 	// applies across versions.
 	//
 	// Tyk classic API definition: `cache_options.cache_all_safe_requests`
-	CacheAllSafeRequests bool `bson:"cacheAllSafeRequests,omitempty" json:"cacheAllSafeRequests,omitempty"`
+	CacheAllSafeRequests bool `bson:"cacheAllSafeRequests,omitempty" json:"cacheAllSafeRequests,omitempty" yaml:"cacheAllSafeRequests,omitempty"`
 
 	// CacheResponseCodes is an array of response codes which are safe to cache e.g. `404`.
 	//
 	// Tyk classic API definition: `cache_options.cache_response_codes`
-	CacheResponseCodes []int `bson:"cacheResponseCodes,omitempty" json:"cacheResponseCodes,omitempty"`
+	CacheResponseCodes []int `bson:"cacheResponseCodes,omitempty" json:"cacheResponseCodes,omitempty" yaml:"cacheResponseCodes,omitempty"`
 
 	// CacheByHeaders allows header values to be used as part of the cache key.
 	//
 	// Tyk classic API definition: `cache_options.cache_by_headers`
-	CacheByHeaders []string `bson:"cacheByHeaders,omitempty" json:"cacheByHeaders,omitempty"`
+	CacheByHeaders []string `bson:"cacheByHeaders,omitempty" json:"cacheByHeaders,omitempty" yaml:"cacheByHeaders,omitempty"`
 
 	// EnableUpstreamCacheControl instructs Tyk Cache to respect upstream cache control headers.
 	//
 	// Tyk classic API definition: `cache_options.enable_upstream_cache_control`
-	EnableUpstreamCacheControl bool `bson:"enableUpstreamCacheControl,omitempty" json:"enableUpstreamCacheControl,omitempty"`
+	EnableUpstreamCacheControl bool `bson:"enableUpstreamCacheControl,omitempty" json:"enableUpstreamCacheControl,omitempty" yaml:"enableUpstreamCacheControl,omitempty"`
 
 	// ControlTTLHeaderName is the response header which tells Tyk how long it is safe to cache the response for.
 	//
 	// Tyk classic API definition: `cache_options.cache_control_ttl_header`
-	ControlTTLHeaderName string `bson:"controlTTLHeaderName,omitempty" json:"controlTTLHeaderName,omitempty"`
+	ControlTTLHeaderName string `bson:"controlTTLHeaderName,omitempty" json:"controlTTLHeaderName,omitempty" yaml:"controlTTLHeaderName,omitempty"`
 }
 
 // Fill fills *Cache from apidef.CacheOptions.
@@ -798,23 +798,23 @@ func (ps Paths) ExtractTo(ep *apidef.ExtendedPathsSet) {
 // Path holds plugin configurations for HTTP method verbs.
 type Path struct {
 	// Delete holds plugin configuration for DELETE requests.
-	Delete *Plugins `bson:"DELETE,omitempty" json:"DELETE,omitempty"`
+	Delete *Plugins `bson:"DELETE,omitempty" json:"DELETE,omitempty" yaml:"DELETE,omitempty"`
 	// Get holds plugin configuration for GET requests.
-	Get *Plugins `bson:"GET,omitempty" json:"GET,omitempty"`
+	Get *Plugins `bson:"GET,omitempty" json:"GET,omitempty" yaml:"GET,omitempty"`
 	// Head holds plugin configuration for HEAD requests.
-	Head *Plugins `bson:"HEAD,omitempty" json:"HEAD,omitempty"`
+	Head *Plugins `bson:"HEAD,omitempty" json:"HEAD,omitempty" yaml:"HEAD,omitempty"`
 	// Options holds plugin configuration for OPTIONS requests.
-	Options *Plugins `bson:"OPTIONS,omitempty" json:"OPTIONS,omitempty"`
+	Options *Plugins `bson:"OPTIONS,omitempty" json:"OPTIONS,omitempty" yaml:"OPTIONS,omitempty"`
 	// Patch holds plugin configuration for PATCH requests.
-	Patch *Plugins `bson:"PATCH,omitempty" json:"PATCH,omitempty"`
+	Patch *Plugins `bson:"PATCH,omitempty" json:"PATCH,omitempty" yaml:"PATCH,omitempty"`
 	// Post holds plugin configuration for POST requests.
-	Post *Plugins `bson:"POST,omitempty" json:"POST,omitempty"`
+	Post *Plugins `bson:"POST,omitempty" json:"POST,omitempty" yaml:"POST,omitempty"`
 	// Put holds plugin configuration for PUT requests.
-	Put *Plugins `bson:"PUT,omitempty" json:"PUT,omitempty"`
+	Put *Plugins `bson:"PUT,omitempty" json:"PUT,omitempty" yaml:"PUT,omitempty"`
 	// Trace holds plugin configuration for TRACE requests.
-	Trace *Plugins `bson:"TRACE,omitempty" json:"TRACE,omitempty"`
+	Trace *Plugins `bson:"TRACE,omitempty" json:"TRACE,omitempty" yaml:"TRACE,omitempty"`
 	// Connect holds plugin configuration for CONNECT requests.
-	Connect *Plugins `bson:"CONNECT,omitempty" json:"CONNECT,omitempty"`
+	Connect *Plugins `bson:"CONNECT,omitempty" json:"CONNECT,omitempty" yaml:"CONNECT,omitempty"`
 }
 
 // ExtractTo extracts *Path into *apidef.ExtendedPathSet.
@@ -924,22 +924,22 @@ func (p *Path) getMethod(name string) *Plugins {
 // Plugins configures common settings for each plugin, allowances, transforms, caching and timeouts.
 type Plugins struct {
 	// Allow request by allowance.
-	Allow *Allowance `bson:"allow,omitempty" json:"allow,omitempty"`
+	Allow *Allowance `bson:"allow,omitempty" json:"allow,omitempty" yaml:"allow,omitempty"`
 
 	// Block request by allowance.
-	Block *Allowance `bson:"block,omitempty" json:"block,omitempty"`
+	Block *Allowance `bson:"block,omitempty" json:"block,omitempty" yaml:"block,omitempty"`
 
 	// IgnoreAuthentication ignores authentication on request by allowance.
-	IgnoreAuthentication *Allowance `bson:"ignoreAuthentication,omitempty" json:"ignoreAuthentication,omitempty"`
+	IgnoreAuthentication *Allowance `bson:"ignoreAuthentication,omitempty" json:"ignoreAuthentication,omitempty" yaml:"ignoreAuthentication,omitempty"`
 
 	// TransformRequestMethod allows you to transform the method of a request.
-	TransformRequestMethod *TransformRequestMethod `bson:"transformRequestMethod,omitempty" json:"transformRequestMethod,omitempty"`
+	TransformRequestMethod *TransformRequestMethod `bson:"transformRequestMethod,omitempty" json:"transformRequestMethod,omitempty" yaml:"transformRequestMethod,omitempty"`
 
 	// Cache allows you to cache the server side response.
-	Cache *CachePlugin `bson:"cache,omitempty" json:"cache,omitempty"`
+	Cache *CachePlugin `bson:"cache,omitempty" json:"cache,omitempty" yaml:"cache,omitempty"`
 
 	// EnforceTimeout allows you to configure a request timeout.
-	EnforceTimeout *EnforceTimeout `bson:"enforcedTimeout,omitempty" json:"enforcedTimeout,omitempty"`
+	EnforceTimeout *EnforceTimeout `bson:"enforcedTimeout,omitempty" json:"enforcedTimeout,omitempty" yaml:"enforcedTimeout,omitempty"`
 }
 
 // ExtractTo extracts *Plugins into *apidef.ExtendedPathsSet.
@@ -1010,10 +1010,10 @@ func (p *Plugins) extractEnforcedTimeoutTo(ep *apidef.ExtendedPathsSet, path str
 // Allowance describes allowance actions and behaviour.
 type Allowance struct {
 	// Enabled is a boolean flag, if set to `true`, then individual allowances (allow, block, ignore) will be enforced.
-	Enabled bool `bson:"enabled" json:"enabled"`
+	Enabled bool `bson:"enabled" json:"enabled" yaml:"enabled"`
 
 	// IgnoreCase is a boolean flag, If set to `true`, checks for requests allowance will be case insensitive.
-	IgnoreCase bool `bson:"ignoreCase,omitempty" json:"ignoreCase,omitempty"`
+	IgnoreCase bool `bson:"ignoreCase,omitempty" json:"ignoreCase,omitempty" yaml:"ignoreCase,omitempty"`
 }
 
 // Fill fills *Allowance from apidef.EndPointMeta.
@@ -1036,9 +1036,9 @@ func (a *Allowance) Import(enabled bool) {
 // TransformRequestMethod holds configuration for rewriting request methods.
 type TransformRequestMethod struct {
 	// Enabled activates Method Transform for the given path and method.
-	Enabled bool `bson:"enabled" json:"enabled"`
+	Enabled bool `bson:"enabled" json:"enabled" yaml:"enabled"`
 	// ToMethod is the http method value to which the method of an incoming request will be transformed.
-	ToMethod string `bson:"toMethod" json:"toMethod"`
+	ToMethod string `bson:"toMethod" json:"toMethod" yaml:"toMethod"`
 }
 
 // Fill fills *TransformRequestMethod from apidef.MethodTransformMeta.
@@ -1056,13 +1056,13 @@ func (tm *TransformRequestMethod) ExtractTo(meta *apidef.MethodTransformMeta) {
 // TransformBody holds configuration about request/response body transformations.
 type TransformBody struct {
 	// Enabled activates transform request/request body middleware.
-	Enabled bool `bson:"enabled" json:"enabled"`
+	Enabled bool `bson:"enabled" json:"enabled" yaml:"enabled"`
 	// Format of the request/response body, xml or json.
-	Format apidef.RequestInputType `bson:"format" json:"format"`
+	Format apidef.RequestInputType `bson:"format" json:"format" yaml:"format"`
 	// Path file path for the template.
-	Path string `bson:"path,omitempty" json:"path,omitempty"`
+	Path string `bson:"path,omitempty" json:"path,omitempty" yaml:"path,omitempty"`
 	// Body base64 encoded representation of the template.
-	Body string `bson:"body,omitempty" json:"body,omitempty"`
+	Body string `bson:"body,omitempty" json:"body,omitempty" yaml:"body,omitempty"`
 }
 
 // Fill fills *TransformBody from apidef.TemplateMeta.
@@ -1093,11 +1093,11 @@ func (tr *TransformBody) ExtractTo(meta *apidef.TemplateMeta) {
 // TransformHeaders holds configuration about request/response header transformations.
 type TransformHeaders struct {
 	// Enabled activates Header Transform for the given path and method.
-	Enabled bool `bson:"enabled" json:"enabled"`
+	Enabled bool `bson:"enabled" json:"enabled" yaml:"enabled"`
 	// Remove specifies header names to be removed from the request/response.
-	Remove []string `bson:"remove,omitempty" json:"remove,omitempty"`
+	Remove []string `bson:"remove,omitempty" json:"remove,omitempty" yaml:"remove,omitempty"`
 	// Add specifies headers to be added to the request/response.
-	Add Headers `bson:"add,omitempty" json:"add,omitempty"`
+	Add Headers `bson:"add,omitempty" json:"add,omitempty" yaml:"add,omitempty"`
 }
 
 // Fill fills *TransformHeaders from apidef.HeaderInjectionMeta.
@@ -1125,18 +1125,18 @@ func (th *TransformHeaders) ExtractTo(meta *apidef.HeaderInjectionMeta) {
 // CachePlugin holds the configuration for the cache plugins.
 type CachePlugin struct {
 	// Enabled is a boolean flag. If set to `true`, the advanced caching plugin will be enabled.
-	Enabled bool `bson:"enabled" json:"enabled"`
+	Enabled bool `bson:"enabled" json:"enabled" yaml:"enabled"`
 
 	// CacheByRegex defines a regular expression used against the request body to produce a cache key.
 	//
 	// Example value: `\"id\":[^,]*` (quoted json value).
-	CacheByRegex string `bson:"cacheByRegex,omitempty" json:"cacheByRegex,omitempty"`
+	CacheByRegex string `bson:"cacheByRegex,omitempty" json:"cacheByRegex,omitempty" yaml:"cacheByRegex,omitempty"`
 
 	// CacheResponseCodes contains a list of valid response codes for responses that are okay to add to the cache.
-	CacheResponseCodes []int `bson:"cacheResponseCodes,omitempty" json:"cacheResponseCodes,omitempty"`
+	CacheResponseCodes []int `bson:"cacheResponseCodes,omitempty" json:"cacheResponseCodes,omitempty" yaml:"cacheResponseCodes,omitempty"`
 
 	// Timeout is the TTL for the endpoint level caching in seconds. 0 means no caching.
-	Timeout int64 `bson:"timeout,omitempty" json:"timeout,omitempty"`
+	Timeout int64 `bson:"timeout,omitempty" json:"timeout,omitempty" yaml:"timeout,omitempty"`
 }
 
 // Fill fills *CachePlugin from apidef.CacheMeta.
@@ -1158,10 +1158,10 @@ func (a *CachePlugin) ExtractTo(cm *apidef.CacheMeta) {
 // EnforceTimeout holds the configuration for enforcing request timeouts.
 type EnforceTimeout struct {
 	// Enabled is a boolean flag. If set to `true`, requests will enforce a configured timeout.
-	Enabled bool `bson:"enabled" json:"enabled"`
+	Enabled bool `bson:"enabled" json:"enabled" yaml:"enabled"`
 
 	// Value is the configured timeout in seconds.
-	Value int `bson:"value" json:"value"`
+	Value int `bson:"value" json:"value" yaml:"value"`
 }
 
 // Fill fills *EnforceTimeout from apidef.HardTimeoutMeta.
@@ -1179,16 +1179,16 @@ func (et *EnforceTimeout) ExtractTo(meta *apidef.HardTimeoutMeta) {
 // CustomPlugin configures custom plugin.
 type CustomPlugin struct {
 	// Enabled activates the custom pre plugin.
-	Enabled bool `bson:"enabled" json:"enabled"` // required.
+	Enabled bool `bson:"enabled" json:"enabled" yaml:"enabled"` // required.
 	// FunctionName is the name of authentication method.
-	FunctionName string `bson:"functionName" json:"functionName"` // required.
+	FunctionName string `bson:"functionName" json:"functionName" yaml:"functionName"` // required.
 	// Path is the path to shared object file in case of goplugin mode or path to JS code in case of otto auth plugin.
-	Path string `bson:"path" json:"path"`
+	Path string `bson:"path" json:"path" yaml:"path"`
 	// RawBodyOnly if set to true, do not fill body in request or response object.
-	RawBodyOnly bool `bson:"rawBodyOnly,omitempty" json:"rawBodyOnly,omitempty"`
+	RawBodyOnly bool `bson:"rawBodyOnly,omitempty" json:"rawBodyOnly,omitempty" yaml:"rawBodyOnly,omitempty"`
 	// RequireSession if set to true passes down the session information for plugins after authentication.
 	// RequireSession is used only with JSVM custom middleware.
-	RequireSession bool `bson:"requireSession,omitempty" json:"requireSession,omitempty"`
+	RequireSession bool `bson:"requireSession,omitempty" json:"requireSession,omitempty" yaml:"requireSession,omitempty"`
 }
 
 // CustomPlugins is a list of CustomPlugin objects.
@@ -1239,7 +1239,7 @@ func (c *CustomPlugins) ExtractTo(mwDefs []apidef.MiddlewareDefinition) {
 type PrePlugin struct {
 	// Plugins configures custom plugins to be run on pre authentication stage.
 	// The plugins would be executed in the order of configuration in the list.
-	Plugins CustomPlugins `bson:"plugins,omitempty" json:"plugins,omitempty"`
+	Plugins CustomPlugins `bson:"plugins,omitempty" json:"plugins,omitempty" yaml:"plugins,omitempty"`
 }
 
 // Fill fills PrePlugin from supplied Tyk classic api definition.
@@ -1268,7 +1268,7 @@ func (p *PrePlugin) ExtractTo(api *apidef.APIDefinition) {
 type PostAuthenticationPlugin struct {
 	// Plugins configures custom plugins to be run on pre authentication stage.
 	// The plugins would be executed in the order of configuration in the list.
-	Plugins CustomPlugins `bson:"plugins,omitempty" json:"plugins,omitempty"`
+	Plugins CustomPlugins `bson:"plugins,omitempty" json:"plugins,omitempty" yaml:"plugins,omitempty"`
 }
 
 // Fill fills PostAuthenticationPlugin from supplied Tyk classic api definition.
@@ -1297,7 +1297,7 @@ func (p *PostAuthenticationPlugin) ExtractTo(api *apidef.APIDefinition) {
 type PostPlugin struct {
 	// Plugins configures custom plugins to be run on post stage.
 	// The plugins would be executed in the order of configuration in the list.
-	Plugins CustomPlugins `bson:"plugins,omitempty" json:"plugins,omitempty"`
+	Plugins CustomPlugins `bson:"plugins,omitempty" json:"plugins,omitempty" yaml:"plugins,omitempty"`
 }
 
 // Fill fills PostPlugin from supplied Tyk classic api definition.
@@ -1326,7 +1326,7 @@ func (p *PostPlugin) ExtractTo(api *apidef.APIDefinition) {
 type ResponsePlugin struct {
 	// Plugins configures custom plugins to be run on post stage.
 	// The plugins would be executed in the order of configuration in the list.
-	Plugins CustomPlugins `bson:"plugins,omitempty" json:"plugins,omitempty"`
+	Plugins CustomPlugins `bson:"plugins,omitempty" json:"plugins,omitempty" yaml:"plugins,omitempty"`
 }
 
 // Fill fills ResponsePlugin from supplied Tyk classic api definition.
@@ -1354,20 +1354,20 @@ func (p *ResponsePlugin) ExtractTo(api *apidef.APIDefinition) {
 // VirtualEndpoint contains virtual endpoint configuration.
 type VirtualEndpoint struct {
 	// Enabled activates virtual endpoint.
-	Enabled bool `bson:"enabled" json:"enabled"` // required.
+	Enabled bool `bson:"enabled" json:"enabled" yaml:"enabled"` // required.
 	// Name is the name of plugin function to be executed.
 	// Deprecated: Use FunctionName instead.
-	Name string `bson:"name,omitempty" json:"name,omitempty"`
+	Name string `bson:"name,omitempty" json:"name,omitempty" yaml:"name,omitempty"`
 	// FunctionName is the name of plugin function to be executed.
-	FunctionName string `bson:"functionName" json:"functionName"` // required.
+	FunctionName string `bson:"functionName" json:"functionName" yaml:"functionName"` // required.
 	// Path is the path to JS file.
-	Path string `bson:"path,omitempty" json:"path,omitempty"`
+	Path string `bson:"path,omitempty" json:"path,omitempty" yaml:"path,omitempty"`
 	// Body is the JS function to execute encoded in base64 format.
-	Body string `bson:"body,omitempty" json:"body,omitempty"`
+	Body string `bson:"body,omitempty" json:"body,omitempty" yaml:"body,omitempty"`
 	// ProxyOnError proxies if virtual endpoint errors out.
-	ProxyOnError bool `bson:"proxyOnError,omitempty" json:"proxyOnError,omitempty"`
+	ProxyOnError bool `bson:"proxyOnError,omitempty" json:"proxyOnError,omitempty" yaml:"proxyOnError,omitempty"`
 	// RequireSession if enabled passes session to virtual endpoint.
-	RequireSession bool `bson:"requireSession,omitempty" json:"requireSession,omitempty"`
+	RequireSession bool `bson:"requireSession,omitempty" json:"requireSession,omitempty" yaml:"requireSession,omitempty"`
 }
 
 // MarshalJSON is a custom JSON marshaler for the VirtualEndpoint struct. It is implemented
@@ -1432,14 +1432,14 @@ type EndpointPostPlugins []EndpointPostPlugin
 // EndpointPostPlugin contains endpoint level post plugin configuration.
 type EndpointPostPlugin struct {
 	// Enabled activates post plugin.
-	Enabled bool `bson:"enabled" json:"enabled"` // required.
+	Enabled bool `bson:"enabled" json:"enabled" yaml:"enabled"` // required.
 	// Name is the name of plugin function to be executed.
 	// Deprecated: Use FunctionName instead.
-	Name string `bson:"name,omitempty" json:"name,omitempty"`
+	Name string `bson:"name,omitempty" json:"name,omitempty" yaml:"name,omitempty"`
 	// FunctionName is the name of plugin function to be executed.
-	FunctionName string `bson:"functionName" json:"functionName"` // required.
+	FunctionName string `bson:"functionName" json:"functionName" yaml:"functionName"` // required.
 	// Path is the path to plugin.
-	Path string `bson:"path" json:"path"` // required.
+	Path string `bson:"path" json:"path" yaml:"path"` // required.
 }
 
 // MarshalJSON is a custom JSON marshaler for the EndpointPostPlugin struct. It is implemented
@@ -1495,19 +1495,19 @@ func (e EndpointPostPlugins) ExtractTo(meta *apidef.GoPluginMeta) {
 type CircuitBreaker struct {
 	// Enabled activates the Circuit Breaker functionality.
 	// Tyk classic API definition: `version_data.versions..extended_paths.circuit_breakers[*].disabled`.
-	Enabled bool `bson:"enabled" json:"enabled"`
+	Enabled bool `bson:"enabled" json:"enabled" yaml:"enabled"`
 	// Threshold is the proportion from each `sampleSize` requests that must fail for the breaker to be tripped. This must be a value between 0.0 and 1.0. If `sampleSize` is 100 then a threshold of 0.4 means that the breaker will be tripped if 40 out of every 100 requests fails.
 	// Tyk classic API definition: `version_data.versions..extended_paths.circuit_breakers[*].threshold_percent`.
-	Threshold float64 `bson:"threshold" json:"threshold"`
+	Threshold float64 `bson:"threshold" json:"threshold" yaml:"threshold"`
 	// SampleSize is the size of the circuit breaker sampling window. Combining this with `threshold` gives the failure rate required to trip the circuit breaker.
 	// Tyk classic API definition: `version_data.versions..extended_paths.circuit_breakers[*].samples`.
-	SampleSize int `bson:"sampleSize" json:"sampleSize"`
+	SampleSize int `bson:"sampleSize" json:"sampleSize" yaml:"sampleSize"`
 	// CoolDownPeriod is the period of time (in seconds) for which the circuit breaker will remain open before returning to service.
 	// Tyk classic API definition: `version_data.versions..extended_paths.circuit_breakers[*].return_to_service_after`.
-	CoolDownPeriod int `bson:"coolDownPeriod" json:"coolDownPeriod"`
+	CoolDownPeriod int `bson:"coolDownPeriod" json:"coolDownPeriod" yaml:"coolDownPeriod"`
 	// HalfOpenStateEnabled , if enabled, allows some requests to pass through the circuit breaker during the cool down period. If Tyk detects that the path is now working, the circuit breaker will be automatically reset and traffic will be resumed to the upstream.
 	// Tyk classic API definition: `version_data.versions..extended_paths.circuit_breakers[*].disable_half_open_state`.
-	HalfOpenStateEnabled bool `bson:"halfOpenStateEnabled" json:"halfOpenStateEnabled"`
+	HalfOpenStateEnabled bool `bson:"halfOpenStateEnabled" json:"halfOpenStateEnabled" yaml:"halfOpenStateEnabled"`
 }
 
 // Fill fills *CircuitBreaker from apidef.CircuitBreakerMeta.
@@ -1531,9 +1531,9 @@ func (cb *CircuitBreaker) ExtractTo(circuitBreaker *apidef.CircuitBreakerMeta) {
 // RequestSizeLimit limits the maximum allowed size of the request body in bytes.
 type RequestSizeLimit struct {
 	// Enabled activates the Request Size Limit functionality.
-	Enabled bool `bson:"enabled" json:"enabled"`
+	Enabled bool `bson:"enabled" json:"enabled" yaml:"enabled"`
 	// Value is the maximum allowed size of the request body in bytes.
-	Value int64 `bson:"value" json:"value"`
+	Value int64 `bson:"value" json:"value" yaml:"value"`
 }
 
 // Fill fills *RequestSizeLimit from apidef.RequestSizeMeta.
@@ -1552,7 +1552,7 @@ func (r *RequestSizeLimit) ExtractTo(meta *apidef.RequestSizeMeta) {
 type TrafficLogs struct {
 	// Enabled enables traffic log analytics for the API.
 	// Tyk classic API definition: `do_not_track`.
-	Enabled bool `bson:"enabled" json:"enabled"`
+	Enabled bool `bson:"enabled" json:"enabled" yaml:"enabled"`
 }
 
 // Fill fills *TrafficLogs from apidef.APIDefinition.
@@ -1569,7 +1569,7 @@ func (t *TrafficLogs) ExtractTo(api *apidef.APIDefinition) {
 type ContextVariables struct {
 	// Enabled enables context variables to be passed to Tyk middlewares.
 	// Tyk classic API definition: `enable_context_vars`.
-	Enabled bool `json:"enabled" bson:"enabled"`
+	Enabled bool `json:"enabled" bson:"enabled" yaml:"enabled"`
 }
 
 // Fill fills *ContextVariables from apidef.APIDefinition.

@@ -13,13 +13,13 @@ import (
 // the key `x-tyk-api-gateway`.
 type XTykAPIGateway struct {
 	// Info contains the main metadata for the API definition.
-	Info Info `bson:"info" json:"info"` // required
+	Info Info `bson:"info" json:"info" yaml:"info"` // required
 	// Upstream contains the configurations related to the upstream.
-	Upstream Upstream `bson:"upstream" json:"upstream"` // required
+	Upstream Upstream `bson:"upstream" json:"upstream" yaml:"upstream"` // required
 	// Server contains the configurations related to the server.
-	Server Server `bson:"server" json:"server"` // required
+	Server Server `bson:"server" json:"server" yaml:"server"` // required
 	// Middleware contains the configurations related to the Tyk middleware.
-	Middleware *Middleware `bson:"middleware,omitempty" json:"middleware,omitempty"`
+	Middleware *Middleware `bson:"middleware,omitempty" json:"middleware,omitempty" yaml:"middleware,omitempty"`
 }
 
 // Fill fills *XTykAPIGateway from apidef.APIDefinition.
@@ -60,22 +60,22 @@ func (x *XTykAPIGateway) ExtractTo(api *apidef.APIDefinition) {
 type Info struct {
 	// ID is the unique identifier of the API within Tyk.
 	// Tyk classic API definition: `api_id`
-	ID string `bson:"id" json:"id,omitempty"`
+	ID string `bson:"id" json:"id,omitempty" yaml:"id,omitempty"`
 	// DBID is the unique identifier of the API within the Tyk database.
 	// Tyk classic API definition: `id`
-	DBID model.ObjectID `bson:"dbId" json:"dbId,omitempty"`
+	DBID model.ObjectID `bson:"dbId" json:"dbId,omitempty" yaml:"dbId,omitempty"`
 	// OrgID is the ID of the organisation which the API belongs to.
 	// Tyk classic API definition: `org_id`
-	OrgID string `bson:"orgId" json:"orgId,omitempty"`
+	OrgID string `bson:"orgId" json:"orgId,omitempty" yaml:"orgId,omitempty"`
 	// Name is the name of the API.
 	// Tyk classic API definition: `name`
-	Name string `bson:"name" json:"name"` // required
+	Name string `bson:"name" json:"name" yaml:"name"` // required
 	// Expiration date.
-	Expiration string `bson:"expiration,omitempty" json:"expiration,omitempty"`
+	Expiration string `bson:"expiration,omitempty" json:"expiration,omitempty" yaml:"expiration,omitempty"`
 	// State holds configuration for API definition states (active, internal).
-	State State `bson:"state" json:"state"` // required
+	State State `bson:"state" json:"state" yaml:"state"` // required
 	// Versioning holds configuration for API versioning.
-	Versioning *Versioning `bson:"versioning,omitempty" json:"versioning,omitempty"`
+	Versioning *Versioning `bson:"versioning,omitempty" json:"versioning,omitempty" yaml:"versioning,omitempty"`
 }
 
 // Fill fills *Info from apidef.APIDefinition.
@@ -129,10 +129,10 @@ func (i *Info) ExtractTo(api *apidef.APIDefinition) {
 type State struct {
 	// Active enables the API so that Tyk will listen for and process requests made to the listenPath.
 	// Tyk classic API definition: `active`
-	Active bool `bson:"active" json:"active"` // required
+	Active bool `bson:"active" json:"active" yaml:"active"` // required
 	// Internal makes the API accessible only internally.
 	// Tyk classic API definition: `internal`
-	Internal bool `bson:"internal,omitempty" json:"internal,omitempty"`
+	Internal bool `bson:"internal,omitempty" json:"internal,omitempty" yaml:"internal,omitempty"`
 }
 
 // Fill fills *State from apidef.APIDefinition.
@@ -152,29 +152,29 @@ func (s *State) ExtractTo(api *apidef.APIDefinition) {
 // Tyk classic API definition: `version_data`.
 type Versioning struct {
 	// Enabled is a boolean flag, if set to `true` it will enable versioning of the API.
-	Enabled bool `bson:"enabled" json:"enabled"` // required
+	Enabled bool `bson:"enabled" json:"enabled" yaml:"enabled"` // required
 	// Name contains the name of the version as entered by the user ("v1" or similar).
-	Name string `bson:"name,omitempty" json:"name,omitempty"`
+	Name string `bson:"name,omitempty" json:"name,omitempty" yaml:"name,omitempty"`
 	// Default contains the default version name if a request is issued without a version.
-	Default string `bson:"default" json:"default"` // required
+	Default string `bson:"default" json:"default" yaml:"default"` // required
 	// Location contains versioning location information. It can be one of the following:
 	//
 	// - `header`,
 	// - `url-param`,
 	// - `url`.
-	Location string `bson:"location" json:"location"` // required
+	Location string `bson:"location" json:"location" yaml:"location"` // required
 	// Key contains the name of the key to check for versioning information.
-	Key string `bson:"key" json:"key"` // required
+	Key string `bson:"key" json:"key" yaml:"key"` // required
 	// Versions contains a list of versions that map to individual API IDs.
-	Versions []VersionToID `bson:"versions" json:"versions"` // required
+	Versions []VersionToID `bson:"versions" json:"versions" yaml:"versions"` // required
 	// StripVersioningData is a boolean flag, if set to `true`, the API responses will be stripped of versioning data.
-	StripVersioningData bool `bson:"stripVersioningData,omitempty" json:"stripVersioningData,omitempty"`
+	StripVersioningData bool `bson:"stripVersioningData,omitempty" json:"stripVersioningData,omitempty" yaml:"stripVersioningData,omitempty"`
 	// UrlVersioningPattern is a string that contains the pattern that if matched will remove the version from the URL.
-	UrlVersioningPattern string `bson:"urlVersioningPattern,omitempty" json:"urlVersioningPattern,omitempty"`
+	UrlVersioningPattern string `bson:"urlVersioningPattern,omitempty" json:"urlVersioningPattern,omitempty" yaml:"urlVersioningPattern,omitempty"`
 	// FallbackToDefault controls the behaviour of Tyk when a versioned API is called with a nonexistent version name.
 	// If set to `true` then the default API version will be invoked; if set to `false` Tyk will return an HTTP 404
 	// `This API version does not seem to exist` error in this scenario.
-	FallbackToDefault bool `bson:"fallbackToDefault,omitempty" json:"fallbackToDefault,omitempty"`
+	FallbackToDefault bool `bson:"fallbackToDefault,omitempty" json:"fallbackToDefault,omitempty" yaml:"fallbackToDefault,omitempty"`
 }
 
 // Fill fills *Versioning from apidef.APIDefinition.
@@ -227,9 +227,9 @@ func (v *Versioning) ExtractTo(api *apidef.APIDefinition) {
 // VersionToID contains a single mapping from a version name into an API ID.
 type VersionToID struct {
 	// Name contains the user chosen version name, e.g. `v1` or similar.
-	Name string `bson:"name" json:"name"`
+	Name string `bson:"name" json:"name" yaml:"name"`
 	// ID is the API ID for the version set in Name.
-	ID string `bson:"id" json:"id"`
+	ID string `bson:"id" json:"id" yaml:"id"`
 }
 
 // enableContextVariablesIfEmpty enables context variables in middleware.global.contextVariables.

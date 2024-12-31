@@ -6,7 +6,7 @@ import "github.com/TykTechnologies/tyk/apidef"
 // Tyk classic API definition: `version_data.versions...extended_paths.internal[*]`.
 type Internal struct {
 	// Enabled if set to true makes the endpoint available only for internal requests.
-	Enabled bool `bson:"enabled" json:"enabled"`
+	Enabled bool `bson:"enabled" json:"enabled" yaml:"enabled"`
 }
 
 // Fill fills *Internal receiver with data from apidef.InternalMeta.
