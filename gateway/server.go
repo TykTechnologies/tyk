@@ -36,7 +36,6 @@ import (
 	grayloghook "github.com/gemnasium/logrus-graylog-hook"
 	"github.com/gorilla/mux"
 	"github.com/lonelycode/osin"
-	newrelic "github.com/newrelic/go-agent"
 	"github.com/sirupsen/logrus"
 	logrussyslog "github.com/sirupsen/logrus/hooks/syslog"
 
@@ -67,6 +66,7 @@ import (
 	"github.com/TykTechnologies/tyk/internal/cache"
 	"github.com/TykTechnologies/tyk/internal/model"
 	"github.com/TykTechnologies/tyk/internal/netutil"
+	"github.com/TykTechnologies/tyk/internal/service/newrelic"
 )
 
 var (
@@ -77,8 +77,7 @@ var (
 	pubSubLog = log.WithField("prefix", "pub-sub")
 	rawLog    = logger.GetRaw()
 
-	memProfFile         *os.File
-	NewRelicApplication newrelic.Application
+	memProfFile *os.File
 
 	// confPaths is the series of paths to try to use as config files. The
 	// first one to exist will be used. If none exists, a default config
@@ -125,6 +124,7 @@ type Gateway struct {
 	HostCheckTicker      chan struct{}
 	HostCheckerClient    *http.Client
 	TracerProvider       otel.TracerProvider
+	NewRelicApplication  *newrelic.Application
 
 	keyGen DefaultKeyGenerator
 
@@ -254,6 +254,33 @@ func NewGateway(config config.Config, ctx context.Context) *Gateway {
 	gw.SessionID = uuid.New()
 
 	return gw
+}
+
+// SetupNewRelic creates new newrelic.Application instance.
+func (gw *Gateway) SetupNewRelic() (app *newrelic.Application) {
+	var (
+		err      error
+		gwConfig = gw.GetConfig()
+	)
+
+	log := log.WithFields(logrus.Fields{"prefix": "newrelic"})
+
+	cfg := []newrelic.ConfigOption{
+		newrelic.ConfigAppName(gwConfig.NewRelic.AppName),
+		newrelic.ConfigLicense(gwConfig.NewRelic.LicenseKey),
+		newrelic.ConfigEnabled(gwConfig.NewRelic.AppName != ""),
+		newrelic.ConfigDistributedTracerEnabled(gwConfig.NewRelic.EnableDistributedTracing),
+		newrelic.ConfigLogger(newrelic.NewLogger(log)),
+	}
+
+	if app, err = newrelic.NewApplication(cfg...); err != nil {
+		log.Warn("Error initializing NewRelic, skipping... ", err)
+		return
+	}
+
+	instrument.AddSink(newrelic.NewSink(app))
+
+	return
 }
 
 func (gw *Gateway) UnmarshalJSON(data []byte) error {
@@ -440,7 +467,7 @@ func (gw *Gateway) setupGlobals() {
 	}
 
 	if gw.GetConfig().NewRelic.AppName != "" {
-		NewRelicApplication = gw.SetupNewRelic()
+		gw.NewRelicApplication = gw.SetupNewRelic()
 	}
 
 	gw.readGraphqlPlaygroundTemplate()
