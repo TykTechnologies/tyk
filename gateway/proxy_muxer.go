@@ -95,12 +95,6 @@ func (h *handleWrapper) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if NewRelicApplication != nil {
-		txn := NewRelicApplication.StartTransaction(r.URL.Path, w, r)
-		defer txn.End()
-		h.router.ServeHTTP(txn, r)
-		return
-	}
 	h.router.ServeHTTP(w, r)
 }
 
