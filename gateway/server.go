@@ -375,16 +375,21 @@ func (gw *Gateway) setupGlobals() {
 		}
 
 		healthCheckStore := storage.RedisCluster{KeyPrefix: "host-checker:", IsAnalytics: true, ConnectionHandler: gw.StorageConnectionHandler}
+		healthCheckStore.Connect()
+
 		gw.InitHostCheckManager(gw.ctx, &healthCheckStore)
 	}
 
 	gw.initHealthCheck(gw.ctx)
 
 	redisStore := storage.RedisCluster{KeyPrefix: "apikey-", HashKeys: gwConfig.HashKeys, ConnectionHandler: gw.StorageConnectionHandler}
+	redisStore.Connect()
+
 	gw.GlobalSessionManager.Init(&redisStore)
 
 	versionStore := storage.RedisCluster{KeyPrefix: "version-check-", ConnectionHandler: gw.StorageConnectionHandler}
 	versionStore.Connect()
+
 	err := versionStore.SetKey("gateway", VERSION, 0)
 
 	if err != nil {
@@ -398,10 +403,14 @@ func (gw *Gateway) setupGlobals() {
 		mainLog.Debug("Setting up analytics DB connection")
 
 		analyticsStore := storage.RedisCluster{KeyPrefix: "analytics-", IsAnalytics: true, ConnectionHandler: gw.StorageConnectionHandler}
+		analyticsStore.Connect()
+
 		gw.Analytics.Store = &analyticsStore
 		gw.Analytics.Init()
 
 		store := storage.RedisCluster{KeyPrefix: "analytics-", IsAnalytics: true, ConnectionHandler: gw.StorageConnectionHandler}
+		store.Connect()
+
 		redisPurger := RedisPurger{Store: &store, Gw: gw}
 		go redisPurger.PurgeLoop(gw.ctx)
 
@@ -412,6 +421,8 @@ func (gw *Gateway) setupGlobals() {
 				mainLog.Debug("Using RPC cache purge")
 
 				store := storage.RedisCluster{KeyPrefix: "analytics-", IsAnalytics: true, ConnectionHandler: gw.StorageConnectionHandler}
+				store.Connect()
+
 				purger := rpc.Purger{
 					Store: &store,
 				}
@@ -456,6 +467,7 @@ func (gw *Gateway) setupGlobals() {
 	}
 
 	storeCert := &storage.RedisCluster{KeyPrefix: "cert-", HashKeys: false, ConnectionHandler: gw.StorageConnectionHandler}
+	storeCert.Connect()
 	gw.CertificateManager = certs.NewCertificateManager(storeCert, certificateSecret, log, !gw.GetConfig().Cloud)
 	if gw.GetConfig().SlaveOptions.UseRPC {
 		rpcStore := &RPCStorageHandler{
@@ -774,10 +786,14 @@ func (gw *Gateway) addOAuthHandlers(spec *APISpec, muxer *mux.Router) *OAuthMana
 	prefix := generateOAuthPrefix(spec.APIID)
 	storageManager := gw.getGlobalMDCBStorageHandler(prefix, false)
 	storageManager.Connect()
+
+	storage := &storage.RedisCluster{KeyPrefix: prefix, HashKeys: false, ConnectionHandler: gw.StorageConnectionHandler}
+	storage.Connect()
+
 	osinStorage := &RedisOsinStorageInterface{
 		storageManager,
 		gw.GlobalSessionManager,
-		&storage.RedisCluster{KeyPrefix: prefix, HashKeys: false, ConnectionHandler: gw.StorageConnectionHandler},
+		storage,
 		spec.OrgID,
 		gw,
 	}
@@ -1285,11 +1301,26 @@ func (gw *Gateway) initSystem() error {
 		mainLog.Fatal("Redis connection details not set, please ensure that the storage type is set to Redis and that the connection parameters are correct.")
 	}
 
+	go gw.StorageConnectionHandler.Connect(gw.ctx, func() {
+		gw.reloadURLStructure(func() {})
+	}, &gwConfig)
+
+	timeout, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+
+	connected := gw.StorageConnectionHandler.WaitConnect(timeout)
+	if !connected {
+		mainLog.Error("storage: timeout connecting")
+	} else {
+		mainLog.Info("storage: connected to " + gwConfig.Storage.Type)
+	}
+
 	// suply rpc client globals to join it main loging and instrumentation sub systems
 	rpc.Log = log
 	rpc.Instrument = instrument
 
 	gw.setupGlobals()
+
 	gwConfig = gw.GetConfig()
 	if *cli.Port != "" {
 		portNum, err := strconv.Atoi(*cli.Port)
@@ -1593,6 +1624,8 @@ func (gw *Gateway) getHostDetails(file string) {
 
 func (gw *Gateway) getGlobalMDCBStorageHandler(keyPrefix string, hashKeys bool) storage.Handler {
 	localStorage := &storage.RedisCluster{KeyPrefix: keyPrefix, HashKeys: hashKeys, ConnectionHandler: gw.StorageConnectionHandler}
+	localStorage.Connect()
+
 	logger := logrus.New().WithFields(logrus.Fields{"prefix": "mdcb-storage-handler"})
 
 	if gw.GetConfig().SlaveOptions.UseRPC {
@@ -1650,7 +1683,7 @@ func Start() {
 	}
 
 	gwConfig = gw.GetConfig()
-	if gwConfig.ControlAPIPort == 0 {
+	if !gw.isRunningTests() && gwConfig.ControlAPIPort == 0 {
 		mainLog.Warn("The control_api_port should be changed for production")
 	}
 
@@ -1698,10 +1731,6 @@ func Start() {
 		gw.GetConfig().DBAppConfOptions.Tags)
 
 	gw.start()
-	configs := gw.GetConfig()
-	go gw.StorageConnectionHandler.Connect(gw.ctx, func() {
-		gw.reloadURLStructure(func() {})
-	}, &configs)
 
 	unix := time.Now().Unix()
 

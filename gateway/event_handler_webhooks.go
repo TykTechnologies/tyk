@@ -62,7 +62,7 @@ func (w *WebHookHandler) Init(handlerConf interface{}) error {
 		return err
 	}
 
-	if w.conf.Disabled {
+	if w.conf.Disabled || w.conf.TargetPath == "" {
 		log.WithFields(logrus.Fields{
 			"prefix": "webhooks",
 		}).Infof("skipping disabled webhook %s", w.conf.Name)
