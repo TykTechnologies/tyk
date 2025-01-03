@@ -92,7 +92,8 @@ require (
 	github.com/goccy/go-json v0.10.4
 	github.com/google/go-cmp v0.6.0
 	github.com/nats-io/nats.go v1.38.0
-	github.com/newrelic/go-agent v2.13.0+incompatible
+	github.com/newrelic/go-agent/v3 v3.35.1
+	github.com/newrelic/go-agent/v3/integrations/nrgorilla v1.2.2
 	github.com/testcontainers/testcontainers-go v0.34.0
 	github.com/testcontainers/testcontainers-go/modules/kafka v0.33.0
 	github.com/testcontainers/testcontainers-go/modules/nats v0.33.0
