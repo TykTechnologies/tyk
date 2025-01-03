@@ -1078,7 +1078,6 @@ func (gw *Gateway) reloadQueueLoop(cb ...func()) {
 	for {
 		select {
 		case <-gw.ctx.Done():
-			log.Warn("Canceled ctx in reloadQueueLoop")
 			return
 		case fn := <-gw.reloadQueue:
 			gw.requeueLock.Lock()
@@ -1248,9 +1247,6 @@ func (gw *Gateway) initSystem() error {
 			return err
 		}
 
-		if gwConfig.PIDFileLocation == "" {
-			gwConfig.PIDFileLocation = "/var/run/tyk/tyk-gateway.pid"
-		}
 		gw.SetConfig(gwConfig)
 		gw.afterConfSetup()
 	}
@@ -1360,20 +1356,16 @@ func (gw *Gateway) SignatureVerifier() (goverify.Verifier, error) {
 	return verifier, nil
 }
 
+func getPID() string {
+	return strconv.Itoa(os.Getpid())
+}
+
 func writePIDFile(file string) error {
 	if err := os.MkdirAll(filepath.Dir(file), 0755); err != nil {
 		return err
 	}
-	pid := strconv.Itoa(os.Getpid())
+	pid := getPID()
 	return ioutil.WriteFile(file, []byte(pid), 0600)
-}
-
-var readPIDFromFile = func(file string) (int, error) {
-	b, err := ioutil.ReadFile(file)
-	if err != nil {
-		return 0, err
-	}
-	return strconv.Atoi(string(b))
 }
 
 // afterConfSetup takes care of non-sensical config values (such as zero
@@ -1555,9 +1547,7 @@ var getIpAddress = netutil.GetIpAddress
 
 func (gw *Gateway) getHostDetails(file string) {
 	var err error
-	if gw.hostDetails.PID, err = readPIDFromFile(file); err != nil {
-		mainLog.Error("Failed ot get host pid: ", err)
-	}
+	gw.hostDetails.PID = os.Getpid()
 	if gw.hostDetails.Hostname, err = os.Hostname(); err != nil {
 		mainLog.Error("Failed to get hostname: ", err)
 	}
@@ -1624,10 +1614,6 @@ func Start() {
 			mainLog.Fatalf("Error falling back to default config with env: %v", err)
 		}
 		gwConfig = *defaultConfig
-	}
-
-	if gwConfig.PIDFileLocation == "" {
-		gwConfig.PIDFileLocation = "/var/run/tyk/tyk-gateway.pid"
 	}
 
 	gw := NewGateway(gwConfig, ctx)

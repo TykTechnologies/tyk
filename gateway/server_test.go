@@ -325,17 +325,17 @@ func TestGatewayGetHostDetails(t *testing.T) {
 	t.Skip()
 
 	var (
-		orig_readPIDFromFile = readPIDFromFile
-		orig_mainLog         = mainLog
-		orig_getIpAddress    = netutil.GetIpAddress
-		bl                   = test.NewBufferingLogger()
+		//		orig_readPIDFromFile = readPIDFromFile
+		orig_mainLog      = mainLog
+		orig_getIpAddress = netutil.GetIpAddress
+		bl                = test.NewBufferingLogger()
 	)
 
 	tests := defineGatewayGetHostDetailsTests()
 
 	// restore the original functions
 	defer func() {
-		readPIDFromFile = orig_readPIDFromFile
+		//		readPIDFromFile = orig_readPIDFromFile
 		mainLog = orig_mainLog
 		getIpAddress = orig_getIpAddress
 	}()
@@ -347,7 +347,7 @@ func TestGatewayGetHostDetails(t *testing.T) {
 			// replace functions with mocks
 			mainLog = bl.Logger.WithField("prefix", "test")
 			if tt.readPIDFromFile != nil {
-				readPIDFromFile = tt.readPIDFromFile
+				// readPIDFromFile = tt.readPIDFromFile
 			}
 
 			if tt.netutilGetIpAddress != nil {
