@@ -9,17 +9,16 @@ import (
 	"github.com/TykTechnologies/tyk/internal/httpctx"
 )
 
+// Type aliases used from newrelic pkg.
 type (
 	Application  = newrelic.Application
 	Transaction  = newrelic.Transaction
 	ConfigOption = newrelic.ConfigOption
 )
 
+// Variable aliases used from newrelic pkg.
 var (
 	NewApplication = newrelic.NewApplication
-
-	// Context exposes a repository for the newrelic *Transaction.
-	Context = httpctx.NewValue[*Transaction]("internal:new-relic-transaction")
 
 	ConfigLogger                   = newrelic.ConfigLogger
 	ConfigEnabled                  = newrelic.ConfigEnabled
@@ -28,7 +27,12 @@ var (
 	ConfigDistributedTracerEnabled = newrelic.ConfigDistributedTracerEnabled
 )
 
-// AddNewRelicInstrumentation adds NewRelic instrumentation to the router
+var (
+	// Context exposes a repository for the newrelic *Transaction on request context.
+	Context = httpctx.NewValue[*Transaction]("internal:new-relic-transaction")
+)
+
+// AddNewRelicInstrumentation adds NewRelic instrumentation to the router.
 func AddNewRelicInstrumentation(app *newrelic.Application, r *mux.Router) {
 	r.Use(nrgorilla.Middleware(app))
 }
