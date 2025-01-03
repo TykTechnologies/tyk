@@ -4,7 +4,6 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/newrelic/go-agent/v3/integrations/nrgorilla"
 	"github.com/newrelic/go-agent/v3/newrelic"
-	"github.com/sirupsen/logrus"
 )
 
 // Type aliases used from newrelic pkg.
@@ -28,7 +27,7 @@ var (
 
 // Mount adds the nrgorilla middleware to the router. The application is added to the request context.
 // If app is nil, nothing will be done and the function will return.
-func Mount(router *mux.Router, app *Application, logger *logrus.Entry) {
+func Mount(router *mux.Router, app *Application) {
 	if app == nil {
 		return
 	}
