@@ -164,6 +164,9 @@ func (w *WebHookHandler) checkURL(r string) bool {
 	log.WithFields(logrus.Fields{
 		"prefix": "webhooks",
 	}).Debug("Checking URL: ", r)
+	if r == "" {
+		return false
+	}
 	if _, err := url.ParseRequestURI(r); err != nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "webhooks",
