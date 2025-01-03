@@ -56,6 +56,7 @@ var (
 			Enabled:     false,
 			AllowUnsafe: []string{},
 		},
+		PIDFileLocation: "/var/run/tyk/tyk-gateway.pid",
 	}
 )
 

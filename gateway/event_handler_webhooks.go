@@ -62,7 +62,7 @@ func (w *WebHookHandler) Init(handlerConf interface{}) error {
 		return err
 	}
 
-	if w.conf.Disabled {
+	if w.conf.Disabled || w.conf.TargetPath == "" {
 		log.WithFields(logrus.Fields{
 			"prefix": "webhooks",
 		}).Infof("skipping disabled webhook %s", w.conf.Name)
@@ -164,6 +164,9 @@ func (w *WebHookHandler) checkURL(r string) bool {
 	log.WithFields(logrus.Fields{
 		"prefix": "webhooks",
 	}).Debug("Checking URL: ", r)
+	if r == "" {
+		return false
+	}
 	if _, err := url.ParseRequestURI(r); err != nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "webhooks",
