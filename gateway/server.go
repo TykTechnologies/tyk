@@ -77,8 +77,7 @@ var (
 	pubSubLog = log.WithField("prefix", "pub-sub")
 	rawLog    = logger.GetRaw()
 
-	memProfFile         *os.File
-	NewRelicApplication *newrelic.Application
+	memProfFile *os.File
 
 	// confPaths is the series of paths to try to use as config files. The
 	// first one to exist will be used. If none exists, a default config
@@ -125,6 +124,7 @@ type Gateway struct {
 	HostCheckTicker      chan struct{}
 	HostCheckerClient    *http.Client
 	TracerProvider       otel.TracerProvider
+	NewRelicApplication  *newrelic.Application
 
 	keyGen DefaultKeyGenerator
 
@@ -467,7 +467,7 @@ func (gw *Gateway) setupGlobals() {
 	}
 
 	if gw.GetConfig().NewRelic.AppName != "" {
-		NewRelicApplication = gw.SetupNewRelic()
+		gw.NewRelicApplication = gw.SetupNewRelic()
 	}
 
 	gw.readGraphqlPlaygroundTemplate()

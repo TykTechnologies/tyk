@@ -1,12 +1,10 @@
 package newrelic
 
 import (
+	"github.com/gorilla/mux"
 	"github.com/newrelic/go-agent/v3/integrations/nrgorilla"
 	"github.com/newrelic/go-agent/v3/newrelic"
-
-	"github.com/gorilla/mux"
-
-	"github.com/TykTechnologies/tyk/internal/httpctx"
+	"github.com/sirupsen/logrus"
 )
 
 // Type aliases used from newrelic pkg.
@@ -19,6 +17,7 @@ type (
 // Variable aliases used from newrelic pkg.
 var (
 	NewApplication = newrelic.NewApplication
+	FromContext    = newrelic.FromContext
 
 	ConfigLogger                   = newrelic.ConfigLogger
 	ConfigEnabled                  = newrelic.ConfigEnabled
@@ -27,12 +26,12 @@ var (
 	ConfigDistributedTracerEnabled = newrelic.ConfigDistributedTracerEnabled
 )
 
-var (
-	// Context exposes a repository for the newrelic *Transaction on request context.
-	Context = httpctx.NewValue[*Transaction]("internal:new-relic-transaction")
-)
+// Mount adds the nrgorilla middleware to the router. The application is added to the request context.
+// If app is nil, nothing will be done and the function will return.
+func Mount(router *mux.Router, app *Application, logger *logrus.Entry) {
+	if app == nil {
+		return
+	}
 
-// AddNewRelicInstrumentation adds NewRelic instrumentation to the router.
-func AddNewRelicInstrumentation(app *newrelic.Application, r *mux.Router) {
-	r.Use(nrgorilla.Middleware(app))
+	router.Use(nrgorilla.Middleware(app))
 }

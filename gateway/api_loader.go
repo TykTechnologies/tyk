@@ -29,6 +29,7 @@ import (
 	"github.com/TykTechnologies/tyk/internal/httpctx"
 	"github.com/TykTechnologies/tyk/internal/httputil"
 	"github.com/TykTechnologies/tyk/internal/otel"
+	"github.com/TykTechnologies/tyk/internal/service/newrelic"
 )
 
 const (
@@ -769,6 +770,8 @@ func (gw *Gateway) loadHTTPService(spec *APISpec, apisByListen map[string]int, g
 	router := muxer.router(port, spec.Protocol, gwConfig)
 	if router == nil {
 		router = mux.NewRouter()
+		newrelic.Mount(router, gw.NewRelicApplication, logrus.NewEntry(log))
+
 		muxer.setRouter(port, spec.Protocol, router, gwConfig)
 	}
 

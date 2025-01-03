@@ -1313,6 +1313,7 @@ func (s *Test) Close() {
 	s.Gw.Analytics.Stop()
 	s.Gw.ReloadTestCase.StopTicker()
 	s.Gw.GlobalHostChecker.StopPoller()
+	s.Gw.NewRelicApplication.Shutdown(5 * time.Second)
 
 	err = s.RemoveApis()
 	if err != nil {

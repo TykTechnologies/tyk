@@ -137,10 +137,8 @@ func (gw *Gateway) createMiddleware(actualMW TykMiddleware) func(http.Handler) h
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			logger := mw.Base().SetRequestLogger(r)
 
-			if gw.GetConfig().NewRelic.AppName != "" {
-				if txn := newrelic.Context.Get(r); txn != nil {
-					defer txn.StartSegment(mw.Name()).End()
-				}
+			if txn := newrelic.FromContext(r.Context()); txn != nil {
+				defer txn.StartSegment(mw.Name()).End()
 			}
 
 			job := instrument.NewJob("MiddlewareCall")
