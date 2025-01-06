@@ -1554,7 +1554,7 @@ type TrafficLogs struct {
 	// Tyk classic API definition: `do_not_track`.
 	Enabled bool `bson:"enabled" json:"enabled"`
 	// TagHeaders is a string array of HTTP headers that can be extracted
-	// and transformed into analytic tags(statistics aggregated by tag, per hour).
+	// and transformed into analytics tags (statistics aggregated by tag, per hour).
 	TagHeaders []string `bson:"tagHeaders" json:"tagHeaders,omitempty"`
 }
 
