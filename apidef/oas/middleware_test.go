@@ -175,6 +175,55 @@ func TestGlobal(t *testing.T) {
 	})
 }
 
+func TestTrafficLogs(t *testing.T) {
+	t.Parallel()
+	t.Run("empty", func(t *testing.T) {
+		t.Parallel()
+
+		var emptyTrafficLogs TrafficLogs
+
+		var convertedAPI apidef.APIDefinition
+		convertedAPI.SetDisabledFlags()
+		emptyTrafficLogs.ExtractTo(&convertedAPI)
+
+		var resultTrafficLogs TrafficLogs
+		resultTrafficLogs.Fill(convertedAPI)
+
+		assert.Equal(t, emptyTrafficLogs, resultTrafficLogs)
+	})
+
+	t.Run("enabled with tag header", func(t *testing.T) {
+		t.Parallel()
+		trafficLogs := TrafficLogs{
+			Enabled:    true,
+			TagHeaders: []string{"X-Team-Name"},
+		}
+
+		var convertedAPI apidef.APIDefinition
+		convertedAPI.SetDisabledFlags()
+		trafficLogs.ExtractTo(&convertedAPI)
+		assert.Equal(t, trafficLogs.TagHeaders, convertedAPI.TagHeaders)
+		assert.False(t, convertedAPI.DoNotTrack)
+
+		var resultTrafficLogs TrafficLogs
+		resultTrafficLogs.Fill(convertedAPI)
+		assert.Equal(t, trafficLogs.TagHeaders, resultTrafficLogs.TagHeaders)
+		assert.Equal(t, trafficLogs.Enabled, resultTrafficLogs.Enabled)
+	})
+
+	t.Run("enabled with no tag header", func(t *testing.T) {
+		t.Parallel()
+		trafficLogs := TrafficLogs{
+			Enabled:    true,
+			TagHeaders: []string{},
+		}
+		var convertedAPI apidef.APIDefinition
+		convertedAPI.SetDisabledFlags()
+		trafficLogs.ExtractTo(&convertedAPI)
+		assert.Empty(t, convertedAPI.TagHeaders)
+	})
+}
+
 func TestPluginConfig(t *testing.T) {
 	t.Parallel()
 	t.Run("empty", func(t *testing.T) {

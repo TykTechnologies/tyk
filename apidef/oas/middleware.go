@@ -1553,16 +1553,21 @@ type TrafficLogs struct {
 	// Enabled enables traffic log analytics for the API.
 	// Tyk classic API definition: `do_not_track`.
 	Enabled bool `bson:"enabled" json:"enabled"`
+	// TagHeaders is a string array of HTTP headers that can be extracted
+	// and transformed into analytic tags(statistics aggregated by tag, per hour)
+	TagHeaders []string `bson:"tagHeaders" json:"tagHeaders,omitempty"`
 }
 
 // Fill fills *TrafficLogs from apidef.APIDefinition.
 func (t *TrafficLogs) Fill(api apidef.APIDefinition) {
 	t.Enabled = !api.DoNotTrack
+	t.TagHeaders = api.TagHeaders
 }
 
 // ExtractTo extracts *TrafficLogs into *apidef.APIDefinition.
 func (t *TrafficLogs) ExtractTo(api *apidef.APIDefinition) {
 	api.DoNotTrack = !t.Enabled
+	api.TagHeaders = t.TagHeaders
 }
 
 // ContextVariables holds the configuration related to Tyk context variables.
