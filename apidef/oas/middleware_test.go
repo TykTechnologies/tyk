@@ -207,8 +207,7 @@ func TestTrafficLogs(t *testing.T) {
 
 		var resultTrafficLogs TrafficLogs
 		resultTrafficLogs.Fill(convertedAPI)
-		assert.Equal(t, trafficLogs.TagHeaders, resultTrafficLogs.TagHeaders)
-		assert.Equal(t, trafficLogs.Enabled, resultTrafficLogs.Enabled)
+		assert.Equal(t, trafficLogs, resultTrafficLogs)
 	})
 
 	t.Run("enabled with no tag header", func(t *testing.T) {
