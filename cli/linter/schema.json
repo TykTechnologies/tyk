@@ -662,6 +662,15 @@
       "type": "string",
       "enum": ["", "standard", "json"]
     },
+    "access_logs": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        }
+      }
+    },
     "enable_http_profiler": {
       "type": "boolean"
     },
