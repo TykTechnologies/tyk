@@ -2,6 +2,7 @@ package accesslog
 
 import (
 	"net/http"
+	"net/http/httptest"
 	"testing"
 
 	"github.com/TykTechnologies/tyk/request"
@@ -33,7 +34,7 @@ func TestNewRecordWithLatency(t *testing.T) {
 }
 
 func TestNewRecordWithRequest(t *testing.T) {
-	req, _ := http.NewRequest(http.MethodGet, "/", nil)
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
 
 	record := NewRecord().WithRequest(req).Fields()
 
@@ -60,7 +61,7 @@ func TestNewRecordField(t *testing.T) {
 		Upstream: 101,
 	}
 
-	req, _ := http.NewRequest(http.MethodGet, "http://example.com/path?userid=1", nil)
+	req := httptest.NewRequest(http.MethodGet, "http://example.com/path?userid=1", nil)
 	req.RemoteAddr = "0.0.0.0"
 	req.Header.Set("User-Agent", "user-agent")
 
