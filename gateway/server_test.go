@@ -252,7 +252,6 @@ func gatewayGetHostDetailsTestAddress() gatewayGetHostDetailsTestCheckFn {
 func defineGatewayGetHostDetailsTests() []struct {
 	name                string
 	before              func(*Gateway)
-	readPIDFromFile     func(string) (int, error)
 	netutilGetIpAddress func() ([]string, error)
 	checks              []gatewayGetHostDetailsTestCheckFn
 } {
@@ -261,13 +260,11 @@ func defineGatewayGetHostDetailsTests() []struct {
 	return []struct {
 		name                string
 		before              func(*Gateway)
-		readPIDFromFile     func(string) (int, error)
 		netutilGetIpAddress func() ([]string, error)
 		checks              []gatewayGetHostDetailsTestCheckFn
 	}{
 		{
-			name:            "fail-read-pid",
-			readPIDFromFile: func(_ string) (int, error) { return 0, fmt.Errorf("Error opening file") },
+			name: "fail-read-pid",
 			before: func(gw *Gateway) {
 				gw.SetConfig(config.Config{
 					ListenAddress: "127.0.0.1",
@@ -278,8 +275,7 @@ func defineGatewayGetHostDetailsTests() []struct {
 			),
 		},
 		{
-			name:            "success-listen-address-set",
-			readPIDFromFile: func(string) (int, error) { return 1000, nil },
+			name: "success-listen-address-set",
 			before: func(gw *Gateway) {
 				gw.SetConfig(config.Config{
 					ListenAddress: "127.0.0.1",
@@ -291,8 +287,7 @@ func defineGatewayGetHostDetailsTests() []struct {
 			),
 		},
 		{
-			name:            "success-listen-address-not-set",
-			readPIDFromFile: func(_ string) (int, error) { return 1000, nil },
+			name: "success-listen-address-not-set",
 			before: func(gw *Gateway) {
 				gw.SetConfig(config.Config{
 					ListenAddress: "",
@@ -304,8 +299,7 @@ func defineGatewayGetHostDetailsTests() []struct {
 			),
 		},
 		{
-			name:            "fail-getting-network-address",
-			readPIDFromFile: func(_ string) (int, error) { return 1000, nil },
+			name: "fail-getting-network-address",
 			before: func(gw *Gateway) {
 				gw.SetConfig(config.Config{
 					ListenAddress: "",
@@ -325,7 +319,6 @@ func TestGatewayGetHostDetails(t *testing.T) {
 	t.Skip()
 
 	var (
-		//		orig_readPIDFromFile = readPIDFromFile
 		orig_mainLog      = mainLog
 		orig_getIpAddress = netutil.GetIpAddress
 		bl                = test.NewBufferingLogger()
@@ -335,7 +328,6 @@ func TestGatewayGetHostDetails(t *testing.T) {
 
 	// restore the original functions
 	defer func() {
-		//		readPIDFromFile = orig_readPIDFromFile
 		mainLog = orig_mainLog
 		getIpAddress = orig_getIpAddress
 	}()
@@ -346,9 +338,6 @@ func TestGatewayGetHostDetails(t *testing.T) {
 			bl.ClearLogs()
 			// replace functions with mocks
 			mainLog = bl.Logger.WithField("prefix", "test")
-			if tt.readPIDFromFile != nil {
-				// readPIDFromFile = tt.readPIDFromFile
-			}
 
 			if tt.netutilGetIpAddress != nil {
 				getIpAddress = tt.netutilGetIpAddress
