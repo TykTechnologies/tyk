@@ -176,9 +176,7 @@ func TestGlobal(t *testing.T) {
 }
 
 func TestTrafficLogs(t *testing.T) {
-	t.Parallel()
 	t.Run("empty", func(t *testing.T) {
-		t.Parallel()
 
 		var emptyTrafficLogs TrafficLogs
 		var convertedAPI apidef.APIDefinition
@@ -212,7 +210,6 @@ func TestTrafficLogs(t *testing.T) {
 	})
 
 	t.Run("enabled with no tag header", func(t *testing.T) {
-		t.Parallel()
 		trafficLogs := TrafficLogs{
 			Enabled:    true,
 			TagHeaders: []string{},
