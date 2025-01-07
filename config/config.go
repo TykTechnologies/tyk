@@ -255,6 +255,10 @@ type AnalyticsConfigConfig struct {
 type AccessLogsConfig struct {
 	// Enable the transaction logs. Default: false
 	Enabled bool `json:"enabled"`
+
+	// This setting defaults to empty which prints the default log.
+	// Set this value to determine which fields will be printed in the access log.
+	Template []string `json:"template"`
 }
 
 type HealthCheckConfig struct {

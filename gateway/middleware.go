@@ -10,6 +10,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -437,14 +438,63 @@ func (t *BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 // recordAccessLog is only used for Success/Error handler
 func (t *BaseMiddleware) recordAccessLog(req *http.Request, resp *http.Response, latency *analytics.Latency) {
 	hashKeys := t.Gw.GetConfig().HashKeys
-
 	accessLog := accesslog.NewRecord()
-	accessLog.WithAuthToken(req, hashKeys, t.Gw.obfuscateKey)
-	accessLog.WithLatency(latency)
-	accessLog.WithRequest(req)
-	accessLog.WithResponse(resp)
+	accessLogTemplate := t.Gw.GetConfig().AccessLogs.Template
+
+	// Check for template config
+	if isValidAccessLogTemplate(accessLogTemplate) {
+		// Custom access log template
+		t.logger.Debug("Using CUSTOM access log template")
+
+		for _, conf := range accessLogTemplate {
+			switch strings.ToLower(conf) {
+			case "auth":
+				accessLog.WithAuthToken(req, hashKeys, t.Gw.obfuscateKey)
+			case "clientip":
+				accessLog.WithClientIP(req)
+			case "latency":
+				accessLog.WithLatency(latency)
+			case "request":
+				accessLog.WithRequest(req)
+			case "requesturi":
+				accessLog.WithRequestURI(req)
+			case "response":
+				accessLog.WithResponse(resp)
+			case "upstream":
+				accessLog.WithUpstreamAddress(req)
+			case "upstreamuri":
+				accessLog.WithUpstreamURI(req)
+			default:
+				if conf == "" {
+					t.logger.Debug("Empty string is not a valid access template value")
+				} else {
+					t.logger.Debug(conf, " is not a valid access template value")
+				}
+			}
+		}
+	} else {
+		// Default access log
+		t.logger.Debug("Using DEFAULT access log template")
+		accessLog.WithRequest(req)
+		accessLog.WithResponse(resp)
+	}
 
 	t.Logger().WithFields(accessLog.Fields()).Info()
+}
+
+func isValidAccessLogTemplate(template []string) bool {
+	// Check if template is empty
+	if template == nil || len(template) == 0 {
+		return false
+	}
+
+	// Check if there is at least one non-empty config string
+	for _, conf := range template {
+		if strings.TrimSpace(conf) != "" {
+			return true
+		}
+	}
+	return false
 }
 
 func copyAllowedURLs(input []user.AccessSpec) []user.AccessSpec {
