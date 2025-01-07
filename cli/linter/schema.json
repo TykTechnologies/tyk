@@ -668,6 +668,9 @@
       "properties": {
         "enabled": {
           "type": "boolean"
+        },
+        "template": {
+          "type": ["object", "null"]
         }
       }
     },
