@@ -3,7 +3,7 @@ version: "3"
 
 includes:
   test: .taskfiles/test.yml
-  deps: .taskfiles/deps/Taskfile.yml
+  deps: .taskfiles/deps.yml
   hooks: .taskfiles/hooks.yml
   opentelemetry:
     taskfile: ci/tests/tracing/Taskfile.yml
