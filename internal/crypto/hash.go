@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"hash"
 
+	"github.com/sirupsen/logrus"
+
 	"github.com/TykTechnologies/murmur3"
 )
 
@@ -39,7 +41,12 @@ func HashStr(in string, withAlg ...string) string {
 		algo = TokenHashAlgo(in)
 	}
 
-	h, _ := hashFunction(algo)
+	h, err := hashFunction(algo)
+
+	if err != nil {
+		logrus.Error(err)
+	}
+
 	h.Write([]byte(in))
 	return hex.EncodeToString(h.Sum(nil))
 }

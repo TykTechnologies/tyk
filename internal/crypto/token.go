@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/sirupsen/logrus"
+
 	"github.com/buger/jsonparser"
 
 	"github.com/TykTechnologies/tyk/internal/uuid"
@@ -43,7 +45,13 @@ func TokenHashAlgo(token string) string {
 	// Legacy tokens not b64 and not JSON records
 	if strings.HasPrefix(token, B64JSONPrefix) {
 		if jsonToken, err := base64.StdEncoding.DecodeString(token); err == nil {
-			hashAlgo, _ := jsonparser.GetString(jsonToken, "h")
+			hashAlgo, err := jsonparser.GetString(jsonToken, "h")
+
+			if err != nil {
+				logrus.Error(err)
+				return ""
+			}
+
 			return hashAlgo
 		}
 	}
@@ -63,7 +71,7 @@ func TokenID(token string) (id string, err error) {
 func TokenOrg(token string) string {
 	if strings.HasPrefix(token, B64JSONPrefix) {
 		if jsonToken, err := base64.StdEncoding.DecodeString(token); err == nil {
-			// Checking error in case if it is a legacy tooken which just by accided has the same b64JSON prefix
+			// Checking error in case if it is a legacy token which just by accided has the same b64JSON prefix
 			if org, err := jsonparser.GetString(jsonToken, "org"); err == nil {
 				return org
 			}

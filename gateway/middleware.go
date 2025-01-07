@@ -484,7 +484,7 @@ func (t *BaseMiddleware) recordAccessLog(req *http.Request, resp *http.Response,
 
 func isValidAccessLogTemplate(template []string) bool {
 	// Check if template is empty
-	if template == nil || len(template) == 0 {
+	if len(template) == 0 {
 		return false
 	}
 
