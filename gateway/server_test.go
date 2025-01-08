@@ -349,7 +349,7 @@ func TestGatewayGetHostDetails(t *testing.T) {
 				tt.before(gw)
 			}
 
-			gw.getHostDetails(gw.GetConfig().PIDFileLocation)
+			gw.getHostDetails()
 			for _, c := range tt.checks {
 				c(t, bl, gw)
 			}
