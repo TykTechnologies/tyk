@@ -1288,9 +1288,10 @@ func (s *Test) Close() {
 		}
 	}
 
+	gwConfig := s.Gw.GetConfig()
+
 	s.Gw.DefaultProxyMux.swap(&proxyMux{}, s.Gw)
 	if s.config.SeparateControlAPI {
-		gwConfig := s.Gw.GetConfig()
 		gwConfig.ControlAPIPort = 0
 		s.Gw.SetConfig(gwConfig)
 	}

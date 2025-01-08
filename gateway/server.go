@@ -119,7 +119,7 @@ type Gateway struct {
 	RPCListener          RPCStorageHandler
 	DashService          DashboardServiceSender
 	CertificateManager   certs.CertificateManager
-	GlobalHostChecker    HostCheckerManager
+	GlobalHostChecker    *HostCheckerManager
 	ConnectionWatcher    *httputil.ConnectionWatcher
 	HostCheckTicker      chan struct{}
 	HostCheckerClient    *http.Client
