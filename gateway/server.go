@@ -792,13 +792,13 @@ func (gw *Gateway) addOAuthHandlers(spec *APISpec, muxer *mux.Router) *OAuthMana
 	storageManager := gw.getGlobalMDCBStorageHandler(prefix, false)
 	storageManager.Connect()
 
-	storage := &storage.RedisCluster{KeyPrefix: prefix, HashKeys: false, ConnectionHandler: gw.StorageConnectionHandler}
-	storage.Connect()
+	storageDriver := &storage.RedisCluster{KeyPrefix: prefix, HashKeys: false, ConnectionHandler: gw.StorageConnectionHandler}
+	storageDriver.Connect()
 
 	osinStorage := &RedisOsinStorageInterface{
 		storageManager,
 		gw.GlobalSessionManager,
-		storage,
+		storageDriver,
 		spec.OrgID,
 		gw,
 	}
