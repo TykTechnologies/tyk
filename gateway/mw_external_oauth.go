@@ -296,14 +296,14 @@ func isExpired(claims jwt.MapClaims) bool {
 }
 
 func newIntrospectionCache(gw *Gateway) *introspectionCache {
-	conn := storage.RedisCluster{KeyPrefix: "introspection-", ConnectionHandler: gw.StorageConnectionHandler}
+	conn := &storage.RedisCluster{KeyPrefix: "introspection-", ConnectionHandler: gw.StorageConnectionHandler}
 	conn.Connect()
 
 	return &introspectionCache{RedisCluster: conn}
 }
 
 type introspectionCache struct {
-	storage.RedisCluster
+	*storage.RedisCluster
 }
 
 func (c *introspectionCache) GetRes(token string) (jwt.MapClaims, bool) {
