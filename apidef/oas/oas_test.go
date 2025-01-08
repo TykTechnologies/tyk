@@ -6,6 +6,10 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/oasdiff/yaml"
+
+	"github.com/TykTechnologies/storage/persistent/model"
+
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/stretchr/testify/assert"
 
@@ -1309,4 +1313,54 @@ func TestAPIContext_getValidationOptionsFromConfig(t *testing.T) {
 
 		assert.Len(t, options, 0)
 	})
+}
+
+func TestYaml(t *testing.T) {
+	oasDoc := OAS{}
+	Fill(t, &oasDoc, 0)
+
+	tykExt := XTykAPIGateway{}
+	Fill(t, &tykExt, 0)
+	// json unmarshal workarounds
+	{
+		tykExt.Info.DBID = model.NewObjectID()
+		tykExt.Middleware.Global.PrePlugin = nil
+		tykExt.Middleware.Global.PostPlugin = nil
+		tykExt.Middleware.Global.PostAuthenticationPlugin = nil
+		tykExt.Middleware.Global.ResponsePlugin = nil
+
+		for k, v := range tykExt.Server.Authentication.SecuritySchemes {
+			intVal, ok := v.(int)
+			assert.True(t, ok)
+			tykExt.Server.Authentication.SecuritySchemes[k] = float64(intVal)
+		}
+
+		for k, v := range tykExt.Middleware.Global.PluginConfig.Data.Value {
+			intVal, ok := v.(int)
+			assert.True(t, ok)
+			tykExt.Middleware.Global.PluginConfig.Data.Value[k] = float64(intVal)
+		}
+	}
+
+	oasDoc.SetTykExtension(&tykExt)
+
+	jsonBody, err := json.Marshal(&oasDoc)
+	assert.NoError(t, err)
+
+	yamlBody, err := yaml.JSONToYAML(jsonBody)
+	assert.NoError(t, err)
+
+	yamlOAS, err := openapi3.NewLoader().LoadFromData(yamlBody)
+	assert.NoError(t, err)
+
+	yamlOASDoc := OAS{
+		T: *yamlOAS,
+	}
+
+	yamlOASExt := yamlOASDoc.GetTykExtension()
+	assert.Equal(t, tykExt, *yamlOASExt)
+
+	yamlOASDoc.SetTykExtension(nil)
+	oasDoc.SetTykExtension(nil)
+	assert.Equal(t, oasDoc, yamlOASDoc)
 }
