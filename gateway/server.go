@@ -374,20 +374,20 @@ func (gw *Gateway) setupGlobals() {
 			mainLog.Warn("Running Uptime checks in a management node.")
 		}
 
-		healthCheckStore := storage.RedisCluster{KeyPrefix: "host-checker:", IsAnalytics: true, ConnectionHandler: gw.StorageConnectionHandler}
+		healthCheckStore := &storage.RedisCluster{KeyPrefix: "host-checker:", IsAnalytics: true, ConnectionHandler: gw.StorageConnectionHandler}
 		healthCheckStore.Connect()
 
-		gw.InitHostCheckManager(gw.ctx, &healthCheckStore)
+		gw.InitHostCheckManager(gw.ctx, healthCheckStore)
 	}
 
 	gw.initHealthCheck(gw.ctx)
 
-	redisStore := storage.RedisCluster{KeyPrefix: "apikey-", HashKeys: gwConfig.HashKeys, ConnectionHandler: gw.StorageConnectionHandler}
+	redisStore := &storage.RedisCluster{KeyPrefix: "apikey-", HashKeys: gwConfig.HashKeys, ConnectionHandler: gw.StorageConnectionHandler}
 	redisStore.Connect()
 
-	gw.GlobalSessionManager.Init(&redisStore)
+	gw.GlobalSessionManager.Init(redisStore)
 
-	versionStore := storage.RedisCluster{KeyPrefix: "version-check-", ConnectionHandler: gw.StorageConnectionHandler}
+	versionStore := &storage.RedisCluster{KeyPrefix: "version-check-", ConnectionHandler: gw.StorageConnectionHandler}
 	versionStore.Connect()
 
 	err := versionStore.SetKey("gateway", VERSION, 0)
@@ -402,16 +402,16 @@ func (gw *Gateway) setupGlobals() {
 		gw.SetConfig(Conf)
 		mainLog.Debug("Setting up analytics DB connection")
 
-		analyticsStore := storage.RedisCluster{KeyPrefix: "analytics-", IsAnalytics: true, ConnectionHandler: gw.StorageConnectionHandler}
+		analyticsStore := &storage.RedisCluster{KeyPrefix: "analytics-", IsAnalytics: true, ConnectionHandler: gw.StorageConnectionHandler}
 		analyticsStore.Connect()
 
-		gw.Analytics.Store = &analyticsStore
+		gw.Analytics.Store = analyticsStore
 		gw.Analytics.Init()
 
-		store := storage.RedisCluster{KeyPrefix: "analytics-", IsAnalytics: true, ConnectionHandler: gw.StorageConnectionHandler}
+		store := &storage.RedisCluster{KeyPrefix: "analytics-", IsAnalytics: true, ConnectionHandler: gw.StorageConnectionHandler}
 		store.Connect()
 
-		redisPurger := RedisPurger{Store: &store, Gw: gw}
+		redisPurger := RedisPurger{Store: store, Gw: gw}
 		go redisPurger.PurgeLoop(gw.ctx)
 
 		if gw.GetConfig().AnalyticsConfig.Type == "rpc" {
@@ -420,13 +420,14 @@ func (gw *Gateway) setupGlobals() {
 			} else {
 				mainLog.Debug("Using RPC cache purge")
 
-				store := storage.RedisCluster{KeyPrefix: "analytics-", IsAnalytics: true, ConnectionHandler: gw.StorageConnectionHandler}
+				store := &storage.RedisCluster{KeyPrefix: "analytics-", IsAnalytics: true, ConnectionHandler: gw.StorageConnectionHandler}
 				store.Connect()
 
 				purger := rpc.Purger{
-					Store: &store,
+					Store: store,
 				}
 				purger.Connect()
+
 				go purger.PurgeLoop(gw.ctx, time.Duration(gw.GetConfig().AnalyticsConfig.PurgeInterval))
 			}
 
@@ -442,8 +443,10 @@ func (gw *Gateway) setupGlobals() {
 
 	// Get the notifier ready
 	mainLog.Debug("Notifier will not work in hybrid mode")
+
 	mainNotifierStore := &storage.RedisCluster{ConnectionHandler: gw.StorageConnectionHandler}
 	mainNotifierStore.Connect()
+
 	gw.MainNotifier = RedisNotifier{mainNotifierStore, RedisPubSubChannel, gw}
 
 	if gwConfig.Monitor.EnableTriggerMonitors {
@@ -468,7 +471,9 @@ func (gw *Gateway) setupGlobals() {
 
 	storeCert := &storage.RedisCluster{KeyPrefix: "cert-", HashKeys: false, ConnectionHandler: gw.StorageConnectionHandler}
 	storeCert.Connect()
+
 	gw.CertificateManager = certs.NewCertificateManager(storeCert, certificateSecret, log, !gw.GetConfig().Cloud)
+
 	if gw.GetConfig().SlaveOptions.UseRPC {
 		rpcStore := &RPCStorageHandler{
 			KeyPrefix: "cert-",
@@ -1378,7 +1383,7 @@ func (gw *Gateway) initSystem() error {
 
 	gw.SetConfig(gwConfig)
 	config.Global = gw.GetConfig
-	gw.getHostDetails(gw.GetConfig().PIDFileLocation)
+	gw.getHostDetails()
 	gw.initRPCCache()
 	gw.setupInstrumentation()
 
@@ -1603,7 +1608,7 @@ func (gw *Gateway) setUpConsul() error {
 
 var getIpAddress = netutil.GetIpAddress
 
-func (gw *Gateway) getHostDetails(file string) {
+func (gw *Gateway) getHostDetails() {
 	var err error
 	gw.hostDetails.PID = os.Getpid()
 	if gw.hostDetails.Hostname, err = os.Hostname(); err != nil {
@@ -1651,7 +1656,9 @@ func (gw *Gateway) getGlobalStorageHandler(keyPrefix string, hashKeys bool) stor
 			Gw:        gw,
 		}
 	}
-	return &storage.RedisCluster{KeyPrefix: keyPrefix, HashKeys: hashKeys, ConnectionHandler: gw.StorageConnectionHandler}
+	handler := &storage.RedisCluster{KeyPrefix: keyPrefix, HashKeys: hashKeys, ConnectionHandler: gw.StorageConnectionHandler}
+	handler.Connect()
+	return handler
 }
 
 func Start() {

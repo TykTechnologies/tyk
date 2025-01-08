@@ -889,7 +889,10 @@ func TestCacheAllSafeRequests(t *testing.T) {
 	t.Skip() // DeleteScanMatch interferes with other tests.
 
 	ts := StartTest(nil)
+
 	cache := storage.RedisCluster{KeyPrefix: "cache-", ConnectionHandler: ts.Gw.StorageConnectionHandler}
+	cache.Connect()
+
 	t.Cleanup(func() {
 		ts.Close()
 		cache.DeleteScanMatch("*")
@@ -919,7 +922,10 @@ func TestCacheAllSafeRequestsWithCachedHeaders(t *testing.T) {
 	t.Skip() // DeleteScanMatch interferes with other tests.
 
 	ts := StartTest(nil)
+
 	cache := storage.RedisCluster{KeyPrefix: "cache-", ConnectionHandler: ts.Gw.StorageConnectionHandler}
+	cache.Connect()
+
 	t.Cleanup(func() {
 		ts.Close()
 		cache.DeleteScanMatch("*")
@@ -965,7 +971,10 @@ func TestCacheWithAdvanceUrlRewrite(t *testing.T) {
 	t.Skip() // DeleteScanMatch interferes with other tests.
 
 	ts := StartTest(nil)
+
 	cache := storage.RedisCluster{KeyPrefix: "cache-", ConnectionHandler: ts.Gw.StorageConnectionHandler}
+	cache.Connect()
+
 	t.Cleanup(func() {
 		ts.Close()
 		cache.DeleteScanMatch("*")
@@ -1024,7 +1033,10 @@ func TestCachePostRequest(t *testing.T) {
 	t.Skip() // DeleteScanMatch interferes with other tests.
 
 	ts := StartTest(nil)
+
 	cache := storage.RedisCluster{KeyPrefix: "cache-", ConnectionHandler: ts.Gw.StorageConnectionHandler}
+	cache.Connect()
+
 	t.Cleanup(func() {
 		ts.Close()
 		cache.DeleteScanMatch("*")
@@ -1071,7 +1083,10 @@ func TestAdvanceCachePutRequest(t *testing.T) {
 	t.Skip() // DeleteScanMatch interferes with other tests.
 
 	ts := StartTest(nil)
+
 	cache := storage.RedisCluster{KeyPrefix: "cache-", ConnectionHandler: ts.Gw.StorageConnectionHandler}
+	cache.Connect()
+
 	t.Cleanup(func() {
 		ts.Close()
 		cache.DeleteScanMatch("*")
@@ -1164,7 +1179,10 @@ func TestCacheAllSafeRequestsWithAdvancedCacheEndpoint(t *testing.T) {
 	t.Skip() // DeleteScanMatch interferes with other tests.
 
 	ts := StartTest(nil)
+
 	cache := storage.RedisCluster{KeyPrefix: "cache-", ConnectionHandler: ts.Gw.StorageConnectionHandler}
+	cache.Connect()
+
 	t.Cleanup(func() {
 		ts.Close()
 		cache.DeleteScanMatch("*")
@@ -1203,7 +1221,9 @@ func TestCacheEtag(t *testing.T) {
 	t.Skip() // DeleteScanMatch interferes with other tests.
 
 	ts := StartTest(nil)
+
 	cache := storage.RedisCluster{KeyPrefix: "cache-", ConnectionHandler: ts.Gw.StorageConnectionHandler}
+	cache.Connect()
 
 	t.Cleanup(func() {
 		ts.Close()
@@ -1258,7 +1278,10 @@ func TestOldCachePlugin(t *testing.T) {
 		t.Helper()
 
 		ts := StartTest(nil)
+
 		cache := storage.RedisCluster{KeyPrefix: "cache-", ConnectionHandler: ts.Gw.StorageConnectionHandler}
+		cache.Connect()
+
 		t.Cleanup(func() {
 			ts.Close()
 			cache.DeleteScanMatch("*")
@@ -1287,7 +1310,10 @@ func TestAdvanceCacheTimeoutPerEndpoint(t *testing.T) {
 	t.Skip() // DeleteScanMatch interferes with other tests.
 
 	ts := StartTest(nil)
+
 	cache := storage.RedisCluster{KeyPrefix: "cache-", ConnectionHandler: ts.Gw.StorageConnectionHandler}
+	cache.Connect()
+
 	t.Cleanup(func() {
 		ts.Close()
 		cache.DeleteScanMatch("*")
