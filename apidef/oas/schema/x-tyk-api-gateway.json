@@ -552,6 +552,9 @@
         },
         "trafficLogs": {
           "$ref": "#/definitions/X-Tyk-TrafficLogs"
+        },
+        "requestSizeLimit": {
+          "$ref": "#/definitions/X-Tyk-GlobalRequestSizeLimit"
         }
       }
     },
@@ -1998,6 +2001,21 @@
       },
       "required": [
         "enabled"
+      ]
+    },
+    "X-Tyk-GlobalRequestSizeLimit": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "value": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "enabled",
+        "value"
       ]
     },
     "X-Tyk-UInt": {
