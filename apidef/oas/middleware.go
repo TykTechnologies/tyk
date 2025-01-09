@@ -1649,21 +1649,3 @@ func (c *ContextVariables) Fill(api apidef.APIDefinition) {
 func (c *ContextVariables) ExtractTo(api *apidef.APIDefinition) {
 	api.EnableContextVars = c.Enabled
 }
-
-func requireMainVersion(api *apidef.APIDefinition) apidef.VersionInfo {
-	if len(api.VersionData.Versions) == 0 {
-		api.VersionData.Versions = map[string]apidef.VersionInfo{
-			Main: {},
-		}
-	}
-
-	if _, ok := api.VersionData.Versions[Main]; !ok {
-		api.VersionData.Versions[Main] = apidef.VersionInfo{}
-	}
-
-	return api.VersionData.Versions[Main]
-}
-
-func updateMainVersion(api *apidef.APIDefinition, updatedMainVersion apidef.VersionInfo) {
-	api.VersionData.Versions[Main] = updatedMainVersion
-}
