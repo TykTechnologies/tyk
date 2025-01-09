@@ -70,9 +70,9 @@ func TestReloadGoroutineLeakWithCircuitBreaker(t *testing.T) {
 
 	stage1 := newRecord()
 
-	specs := ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+	specs := ts.Gw.BuildAndLoadAPI(func(spec *gateway.APISpec) {
 		spec.Proxy.ListenPath = "/"
-		UpdateAPIVersion(spec, "v1", func(version *apidef.VersionInfo) {
+		gateway.UpdateAPIVersion(spec, "v1", func(version *apidef.VersionInfo) {
 			version.ExtendedPaths = apidef.ExtendedPathsSet{
 				CircuitBreaker: []apidef.CircuitBreakerMeta{
 					{
