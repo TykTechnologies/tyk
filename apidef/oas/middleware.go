@@ -1596,8 +1596,12 @@ func (t *TrafficLogs) ExtractTo(api *apidef.APIDefinition) {
 
 // GlobalRequestSizeLimit holds configuration about the global limits for request sizes.
 type GlobalRequestSizeLimit struct {
-	Enabled bool  `bson:"enabled" json:"enabled"`
-	Value   int64 `bson:"value" json:"value"`
+	// Enabled activates the Request Size Limit.
+	// Tyk classic API definition: `version_data.versions..global_size_limit_disabled`.
+	Enabled bool `bson:"enabled" json:"enabled"`
+	// Value contains the value of the request size limit.
+	// Tyk classic API definition: `version_data.versions..global_size_limit`.
+	Value int64 `bson:"value" json:"value"`
 }
 
 // Fill fills *GlobalRequestSizeLimit from apidef.APIDefinition.
