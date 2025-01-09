@@ -4,7 +4,8 @@ version: "3"
 
 includes:
   test: .taskfiles/test.yml
-  deps: .taskfiles/deps/Taskfile.yml
+  deps: .taskfiles/deps.yml
+  hooks: .taskfiles/hooks.yml
   opentelemetry:
     taskfile: ci/tests/tracing/Taskfile.yml
     dir: ci/tests/tracing/
@@ -25,7 +26,7 @@ tasks:
   docker:
     desc: "build Tyk gateway internal/tyk-gateway"
     cmds:
-      - docker build --platform "linux/amd64" --rm -t internal/tyk-gateway .
+      - docker build --build-arg GO_VERSION="$(go mod edit -json | jq .Go -r)" --platform "linux/amd64" --rm -t internal/tyk-gateway .
     sources:
       - go.mod
       - go.sum
