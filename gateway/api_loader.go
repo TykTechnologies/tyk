@@ -45,9 +45,16 @@ type ChainObject struct {
 
 func (gw *Gateway) prepareStorage() generalStores {
 	var gs generalStores
+
 	gs.redisStore = &storage.RedisCluster{KeyPrefix: "apikey-", HashKeys: gw.GetConfig().HashKeys, ConnectionHandler: gw.StorageConnectionHandler}
+	gs.redisStore.Connect()
+
 	gs.redisOrgStore = &storage.RedisCluster{KeyPrefix: "orgkey.", ConnectionHandler: gw.StorageConnectionHandler}
+	gs.redisOrgStore.Connect()
+
 	gs.healthStore = &storage.RedisCluster{KeyPrefix: "apihealth.", ConnectionHandler: gw.StorageConnectionHandler}
+	gs.healthStore.Connect()
+
 	gs.rpcAuthStore = &RPCStorageHandler{KeyPrefix: "apikey-", HashKeys: gw.GetConfig().HashKeys, Gw: gw}
 	gs.rpcOrgStore = gw.getGlobalMDCBStorageHandler("orgkey.", false)
 
@@ -56,7 +63,6 @@ func (gw *Gateway) prepareStorage() generalStores {
 }
 
 func (gw *Gateway) skipSpecBecauseInvalid(spec *APISpec, logger *logrus.Entry) bool {
-
 	switch spec.Protocol {
 	case "", "http", "https":
 		if spec.Proxy.ListenPath == "" {
@@ -1064,7 +1070,8 @@ func (gw *Gateway) loadApps(specs []*APISpec) {
 
 	gwListenPort := gw.GetConfig().ListenPort
 	controlApiIsConfigured := (gw.GetConfig().ControlAPIPort != 0 && gw.GetConfig().ControlAPIPort != gwListenPort) || gw.GetConfig().ControlAPIHostname != ""
-	if gw.allApisAreMTLS() && !gw.GetConfig().Security.ControlAPIUseMutualTLS && !controlApiIsConfigured {
+
+	if !gw.isRunningTests() && gw.allApisAreMTLS() && !gw.GetConfig().Security.ControlAPIUseMutualTLS && !controlApiIsConfigured {
 		mainLog.Warning("All APIs are protected with mTLS, except for the control API. " +
 			"We recommend configuring the control API port or control hostname to ensure consistent security measures")
 	}
