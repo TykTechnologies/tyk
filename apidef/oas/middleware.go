@@ -101,6 +101,9 @@ type Global struct {
 
 	// TrafficLogs contains the configurations related to API level log analytics.
 	TrafficLogs *TrafficLogs `bson:"trafficLogs,omitempty" json:"trafficLogs,omitempty"`
+
+	// RequestSizeLimit contains the configuration related to limiting the global request size.
+	RequestSizeLimit *GlobalRequestSizeLimit `bson:"requestSizeLimit,omitempty" json:"requestSizeLimit,omitempty"`
 }
 
 // MarshalJSON is a custom JSON marshaler for the Global struct. It is implemented
@@ -227,6 +230,8 @@ func (g *Global) Fill(api apidef.APIDefinition) {
 	g.fillContextVariables(api)
 
 	g.fillTrafficLogs(api)
+
+	g.fillRequestSizeLimit(api)
 }
 
 func (g *Global) fillTrafficLogs(api apidef.APIDefinition) {
@@ -237,6 +242,17 @@ func (g *Global) fillTrafficLogs(api apidef.APIDefinition) {
 	g.TrafficLogs.Fill(api)
 	if ShouldOmit(g.TrafficLogs) {
 		g.TrafficLogs = nil
+	}
+}
+
+func (g *Global) fillRequestSizeLimit(api apidef.APIDefinition) {
+	if g.RequestSizeLimit == nil {
+		g.RequestSizeLimit = &GlobalRequestSizeLimit{}
+	}
+
+	g.RequestSizeLimit.Fill(api)
+	if ShouldOmit(g.RequestSizeLimit) {
+		g.RequestSizeLimit = nil
 	}
 }
 
@@ -312,12 +328,7 @@ func (g *Global) ExtractTo(api *apidef.APIDefinition) {
 	var resHeaderMeta apidef.HeaderInjectionMeta
 	g.TransformResponseHeaders.ExtractTo(&resHeaderMeta)
 
-	if len(api.VersionData.Versions) == 0 {
-		api.VersionData.Versions = map[string]apidef.VersionInfo{
-			Main: {},
-		}
-	}
-
+	requireMainVersion(api)
 	vInfo := api.VersionData.Versions[Main]
 	vInfo.GlobalHeadersDisabled = headerMeta.Disabled
 	vInfo.GlobalHeaders = headerMeta.AddHeaders
@@ -326,7 +337,9 @@ func (g *Global) ExtractTo(api *apidef.APIDefinition) {
 	vInfo.GlobalResponseHeadersDisabled = resHeaderMeta.Disabled
 	vInfo.GlobalResponseHeaders = resHeaderMeta.AddHeaders
 	vInfo.GlobalResponseHeadersRemove = resHeaderMeta.DeleteHeaders
-	api.VersionData.Versions[Main] = vInfo
+	updateMainVersion(api, vInfo)
+
+	g.extractRequestSizeLimitTo(api)
 }
 
 func (g *Global) extractTrafficLogsTo(api *apidef.APIDefinition) {
@@ -338,6 +351,17 @@ func (g *Global) extractTrafficLogsTo(api *apidef.APIDefinition) {
 	}
 
 	g.TrafficLogs.ExtractTo(api)
+}
+
+func (g *Global) extractRequestSizeLimitTo(api *apidef.APIDefinition) {
+	if g.RequestSizeLimit == nil {
+		g.RequestSizeLimit = &GlobalRequestSizeLimit{}
+		defer func() {
+			g.RequestSizeLimit = nil
+		}()
+	}
+
+	g.RequestSizeLimit.ExtractTo(api)
 }
 
 func (g *Global) extractContextVariablesTo(api *apidef.APIDefinition) {
@@ -1570,6 +1594,45 @@ func (t *TrafficLogs) ExtractTo(api *apidef.APIDefinition) {
 	api.TagHeaders = t.TagHeaders
 }
 
+// GlobalRequestSizeLimit holds configuration about the global limits for request sizes.
+type GlobalRequestSizeLimit struct {
+	Enabled bool  `bson:"enabled" json:"enabled"`
+	Value   int64 `bson:"value" json:"value"`
+}
+
+// Fill fills *GlobalRequestSizeLimit from apidef.APIDefinition.
+func (g *GlobalRequestSizeLimit) Fill(api apidef.APIDefinition) {
+	ok := false
+	if api.VersionData.Versions != nil {
+		_, ok = api.VersionData.Versions[Main]
+	}
+	if !ok || api.VersionData.Versions[Main].GlobalSizeLimit == 0 {
+		g.Enabled = false
+		g.Value = 0
+		return
+	}
+
+	g.Enabled = !api.VersionData.Versions[Main].GlobalSizeLimitDisabled
+	g.Value = api.VersionData.Versions[Main].GlobalSizeLimit
+}
+
+// ExtractTo extracts *GlobalRequestSizeLimit into *apidef.APIDefinition.
+func (g *GlobalRequestSizeLimit) ExtractTo(api *apidef.APIDefinition) {
+	mainVersion := requireMainVersion(api)
+	defer func() {
+		updateMainVersion(api, mainVersion)
+	}()
+
+	if g.Value == 0 {
+		mainVersion.GlobalSizeLimit = 0
+		mainVersion.GlobalSizeLimitDisabled = true
+		return
+	}
+
+	mainVersion.GlobalSizeLimitDisabled = !g.Enabled
+	mainVersion.GlobalSizeLimit = g.Value
+}
+
 // ContextVariables holds the configuration related to Tyk context variables.
 type ContextVariables struct {
 	// Enabled enables context variables to be passed to Tyk middlewares.
@@ -1585,4 +1648,22 @@ func (c *ContextVariables) Fill(api apidef.APIDefinition) {
 // ExtractTo extracts *ContextVariables into *apidef.APIDefinition.
 func (c *ContextVariables) ExtractTo(api *apidef.APIDefinition) {
 	api.EnableContextVars = c.Enabled
+}
+
+func requireMainVersion(api *apidef.APIDefinition) apidef.VersionInfo {
+	if len(api.VersionData.Versions) == 0 {
+		api.VersionData.Versions = map[string]apidef.VersionInfo{
+			Main: {},
+		}
+	}
+
+	if _, ok := api.VersionData.Versions[Main]; !ok {
+		api.VersionData.Versions[Main] = apidef.VersionInfo{}
+	}
+
+	return api.VersionData.Versions[Main]
+}
+
+func updateMainVersion(api *apidef.APIDefinition, updatedMainVersion apidef.VersionInfo) {
+	api.VersionData.Versions[Main] = updatedMainVersion
 }
