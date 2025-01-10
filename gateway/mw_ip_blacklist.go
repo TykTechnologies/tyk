@@ -18,11 +18,11 @@ func (i *IPBlackListMiddleware) Name() string {
 }
 
 func (i *IPBlackListMiddleware) EnabledForSpec() bool {
-	if i.Spec.APIDefinition.IPAccessControlDisabled {
+	if !(!i.Spec.APIDefinition.IPAccessControlDisabled || i.Spec.APIDefinition.EnableIpBlacklisting) {
 		return false
 	}
 
-	return i.Spec.EnableIpBlacklisting && len(i.Spec.BlacklistedIPs) > 0
+	return len(i.Spec.APIDefinition.BlacklistedIPs) > 0
 }
 
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail
