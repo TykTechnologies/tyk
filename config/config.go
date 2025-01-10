@@ -251,13 +251,14 @@ type AnalyticsConfigConfig struct {
 	SerializerType string `json:"serializer_type"`
 }
 
-// AccessLogsConfig defines the type of transactions logs printed to stdout
+// AccessLogsConfig defines the type of transactions logs printed to stdout.
 type AccessLogsConfig struct {
-	// Enable the transaction logs. Default: false
+	// Enabled controls enabling the transaction logs. Default: false.
 	Enabled bool `json:"enabled"`
 
-	// This setting defaults to empty which prints the default log.
+	// Template defaults to empty which prints the default log.
 	// Set this value to determine which fields will be printed in the access log.
+	// Example: ["..."].
 	Template []string `json:"template"`
 }
 
@@ -1023,8 +1024,8 @@ type Config struct {
 	// If not set or left empty, it will default to `standard`.
 	LogFormat string `json:"log_format"`
 
-	// You can configure the transaction logs to be turned on
-	// If not set or left empty, it will default to 'false'
+	// AccessLogs configures the output for access logs.
+	// If not configured, the access log is disabled.
 	AccessLogs AccessLogsConfig `json:"access_logs"`
 
 	// Section for configuring OpenTracing support
