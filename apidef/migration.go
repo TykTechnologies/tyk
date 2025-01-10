@@ -472,7 +472,6 @@ func (a *APIDefinition) SetDisabledFlags() {
 	a.DoNotTrack = true
 
 	a.setEventHandlersDisabledFlags()
-
 }
 
 func (a *APIDefinition) setEventHandlersDisabledFlags() {
@@ -521,6 +520,8 @@ func (a *APIDefinition) migrateGlobalRateLimit() {
 }
 
 func (a *APIDefinition) migrateIPAccessControl() {
+	a.IPAccessControlDisabled = false
+
 	if a.EnableIpBlacklisting && len(a.BlacklistedIPs) > 0 {
 		return
 	}

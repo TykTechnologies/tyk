@@ -42,7 +42,7 @@ type Server struct {
 	// IPAccessControl configures IP access control for this API.
 	//
 	// Tyk classic API definition: `allowed_ips` and `blacklisted_ips`.
-	IPAccessControl *IPAccessControl `bson:"ipAccessControl" json:"ipAccessControl,omitempty"`
+	IPAccessControl *IPAccessControl `bson:"ipAccessControl,omitempty" json:"ipAccessControl,omitempty"`
 }
 
 // Fill fills *Server from apidef.APIDefinition.
@@ -314,15 +314,15 @@ func (dt *DetailedTracing) ExtractTo(api *apidef.APIDefinition) {
 // IPAccessControl represents IP access control configuration.
 type IPAccessControl struct {
 	// Enabled indicates whether IP access control is enabled.
-	Enabled bool `json:"enabled"`
+	Enabled bool `bson:"enabled" json:"enabled"`
 
 	// Allow is a list of allowed IP addresses or CIDR blocks (e.g. "192.168.1.0/24").
 	// Note that if an IP address is present in both Allow and Block, the Block rule will take precedence.
-	Allow []string `json:"allow"`
+	Allow []string `bson:"allow,omitempty" json:"allow,omitempty"`
 
 	// Block is a list of blocked IP addresses or CIDR blocks (e.g. "192.168.1.100/32").
 	// If an IP address is present in both Allow and Block, the Block rule will take precedence.
-	Block []string `json:"block"`
+	Block []string `bson:"block,omitempty" json:"block,omitempty"`
 }
 
 // Fill fills *IPAccessControl from apidef.APIDefinition.

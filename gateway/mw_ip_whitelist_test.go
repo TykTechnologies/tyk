@@ -5,8 +5,9 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/stretchr/testify/assert"
 
+	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/header"
 )
 
@@ -102,9 +103,7 @@ func TestIPWhiteListMiddleware_EnabledForSpec(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			middleware := &IPWhiteListMiddleware{BaseMiddleware: &BaseMiddleware{Spec: tt.spec}}
 			gotResult := middleware.EnabledForSpec()
-			if gotResult != tt.wantResult {
-				t.Errorf("EnabledForSpec() = %v, want %v", gotResult, tt.wantResult)
-			}
+			assert.Equal(t, tt.wantResult, gotResult)
 		})
 	}
 }
