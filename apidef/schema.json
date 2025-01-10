@@ -34,6 +34,9 @@
     "tags_disabled": {
       "type": "boolean"
     },
+    "ip_access_control_disabled": {
+      "type": "boolean"
+    },
     "enable_ip_whitelisting": {
       "type": "boolean"
     },

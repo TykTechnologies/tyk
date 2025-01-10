@@ -173,6 +173,7 @@ func TestOAS_ExtractTo_ResetAPIDefinition(t *testing.T) {
 	a.EnableContextVars = false
 	a.DisableRateLimit = false
 	a.DoNotTrack = false
+	a.IPAccessControlDisabled = false
 
 	// deprecated fields
 	a.Auth = apidef.AuthConfig{}
@@ -263,9 +264,7 @@ func TestOAS_ExtractTo_ResetAPIDefinition(t *testing.T) {
 		"APIDefinition.SessionProvider.Meta[0]",
 		"APIDefinition.EnableBatchRequestSupport",
 		"APIDefinition.EnableIpWhiteListing",
-		"APIDefinition.AllowedIPs[0]",
 		"APIDefinition.EnableIpBlacklisting",
-		"APIDefinition.BlacklistedIPs[0]",
 		"APIDefinition.DontSetQuotasOnCreate",
 		"APIDefinition.ExpireAnalyticsAfter",
 		"APIDefinition.ResponseProcessors[0].Name",

@@ -38,6 +38,11 @@ type Server struct {
 	//
 	// Tyk classic API definition: `event_handlers`
 	EventHandlers EventHandlers `bson:"eventHandlers,omitempty" json:"eventHandlers,omitempty"`
+
+	// IPAccessControl configures IP access control for this API.
+	//
+	// Tyk classic API definition: `allowed_ips` and `blacklisted_ips`.
+	IPAccessControl *IPAccessControl `bson:"ipAccessControl,omitempty" json:"ipAccessControl,omitempty"`
 }
 
 // Fill fills *Server from apidef.APIDefinition.
@@ -94,6 +99,8 @@ func (s *Server) Fill(api apidef.APIDefinition) {
 	if ShouldOmit(s.EventHandlers) {
 		s.EventHandlers = nil
 	}
+
+	s.fillIPAccessControl(api)
 }
 
 // ExtractTo extracts *Server into *apidef.APIDefinition.
@@ -153,6 +160,8 @@ func (s *Server) ExtractTo(api *apidef.APIDefinition) {
 	}
 
 	s.EventHandlers.ExtractTo(api)
+
+	s.extractIPAccessControlTo(api)
 }
 
 // ListenPath is the base path on Tyk to which requests for this API
@@ -286,4 +295,54 @@ func (dt *DetailedTracing) Fill(api apidef.APIDefinition) {
 // ExtractTo extracts *DetailedTracing into *apidef.APIDefinition.
 func (dt *DetailedTracing) ExtractTo(api *apidef.APIDefinition) {
 	api.DetailedTracing = dt.Enabled
+}
+
+// IPAccessControl represents IP access control configuration.
+type IPAccessControl struct {
+	// Enabled indicates whether IP access control is enabled.
+	Enabled bool `bson:"enabled" json:"enabled"`
+
+	// Allow is a list of allowed IP addresses or CIDR blocks (e.g. "192.168.1.0/24").
+	// Note that if an IP address is present in both Allow and Block, the Block rule will take precedence.
+	Allow []string `bson:"allow,omitempty" json:"allow,omitempty"`
+
+	// Block is a list of blocked IP addresses or CIDR blocks (e.g. "192.168.1.100/32").
+	// If an IP address is present in both Allow and Block, the Block rule will take precedence.
+	Block []string `bson:"block,omitempty" json:"block,omitempty"`
+}
+
+// Fill fills *IPAccessControl from apidef.APIDefinition.
+func (i *IPAccessControl) Fill(api apidef.APIDefinition) {
+	i.Enabled = !api.IPAccessControlDisabled
+	i.Block = api.BlacklistedIPs
+	i.Allow = api.AllowedIPs
+}
+
+// ExtractTo extracts *IPAccessControl into *apidef.APIDefinition.
+func (i *IPAccessControl) ExtractTo(api *apidef.APIDefinition) {
+	api.IPAccessControlDisabled = !i.Enabled
+	api.BlacklistedIPs = i.Block
+	api.AllowedIPs = i.Allow
+}
+
+func (s *Server) fillIPAccessControl(api apidef.APIDefinition) {
+	if s.IPAccessControl == nil {
+		s.IPAccessControl = &IPAccessControl{}
+	}
+
+	s.IPAccessControl.Fill(api)
+	if ShouldOmit(s.IPAccessControl) {
+		s.IPAccessControl = nil
+	}
+}
+
+func (s *Server) extractIPAccessControlTo(api *apidef.APIDefinition) {
+	if s.IPAccessControl == nil {
+		s.IPAccessControl = &IPAccessControl{}
+		defer func() {
+			s.IPAccessControl = nil
+		}()
+	}
+
+	s.IPAccessControl.ExtractTo(api)
 }
