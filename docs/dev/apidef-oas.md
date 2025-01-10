@@ -6,6 +6,8 @@ To ensure feature parity between Tyk OAS APIs and Tyk classic API definitions, f
 
 Define the necessary structs or add the necessary fields in the `apidef/oas` package.
 
+Make sure `json` and `bson` tags are added to the fields.
+
 If an `enabled` flag is specified in the OAS contract, make sure a corresponding `disabled` or `enabled` flag is added in the classic API definition.
 
 Also make sure that `disabled`/`enabled` flag toggles the feature on or off. 
@@ -42,9 +44,11 @@ For fields that are required:
 
 For optional fields:
 
- 1. Add the `omitempty` tag.
+ 1. Add the `omitempty` tag
 
- 2. Use pointer types for structs.
+ 2. Use pointer types for structs. 
+ 
+ 3. Make sure that `omitempty` tag is added for slice fields that are optional.
 
 ## Add Go Doc Comments
 
