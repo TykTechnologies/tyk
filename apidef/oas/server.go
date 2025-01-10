@@ -100,14 +100,7 @@ func (s *Server) Fill(api apidef.APIDefinition) {
 		s.EventHandlers = nil
 	}
 
-	if s.IPAccessControl == nil {
-		s.IPAccessControl = &IPAccessControl{}
-	}
-
-	s.IPAccessControl.Fill(api)
-	if ShouldOmit(s.IPAccessControl) {
-		s.IPAccessControl = nil
-	}
+	s.fillIPAccessControl(api)
 }
 
 // ExtractTo extracts *Server into *apidef.APIDefinition.
@@ -168,14 +161,7 @@ func (s *Server) ExtractTo(api *apidef.APIDefinition) {
 
 	s.EventHandlers.ExtractTo(api)
 
-	if s.IPAccessControl == nil {
-		s.IPAccessControl = &IPAccessControl{}
-		defer func() {
-			s.IPAccessControl = nil
-		}()
-	}
-
-	s.IPAccessControl.ExtractTo(api)
+	s.extractIPAccessControlTo(api)
 }
 
 // ListenPath is the base path on Tyk to which requests for this API
@@ -337,4 +323,26 @@ func (i *IPAccessControl) ExtractTo(api *apidef.APIDefinition) {
 	api.IPAccessControlDisabled = !i.Enabled
 	api.BlacklistedIPs = i.Block
 	api.AllowedIPs = i.Allow
+}
+
+func (s *Server) fillIPAccessControl(api apidef.APIDefinition) {
+	if s.IPAccessControl == nil {
+		s.IPAccessControl = &IPAccessControl{}
+	}
+
+	s.IPAccessControl.Fill(api)
+	if ShouldOmit(s.IPAccessControl) {
+		s.IPAccessControl = nil
+	}
+}
+
+func (s *Server) extractIPAccessControlTo(api *apidef.APIDefinition) {
+	if s.IPAccessControl == nil {
+		s.IPAccessControl = &IPAccessControl{}
+		defer func() {
+			s.IPAccessControl = nil
+		}()
+	}
+
+	s.IPAccessControl.ExtractTo(api)
 }
