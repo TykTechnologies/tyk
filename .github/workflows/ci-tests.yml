@@ -94,15 +94,12 @@ jobs:
       fail-fast: false
       matrix:
         redis-version: [7]
-        go-version: [1.22.x]
+        go-version: [1.23.x]
 
     env:
       REDIS_IMAGE: redis:${{ matrix.redis-version }}
 
     steps:
-      - name: "Reclaim some runner space"
-        run: sudo rm -rf /usr/local/bin/* /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
-
       - name: Checkout Tyk
         uses: actions/checkout@v4
         with:
@@ -212,9 +209,10 @@ jobs:
 
       - name: Check reports existence
         id: check_files
-        uses: andstor/file-existence-action@v1
+        uses: andstor/file-existence-action@v3
         with:
-          files: 'coverage/gateway-all.cov, golangci-lint-report.json'
+          files: 'gateway-all.cov, golangci-lint-report.json'
+          fail: true
 
       - name: Install Dependencies
         env:
@@ -233,7 +231,7 @@ jobs:
             -Dsonar.coverage.exclusions=**/*_test.go,**/mock/*
             -Dsonar.test.inclusions=**/*_test.go
             -Dsonar.tests=.
-            -Dsonar.go.coverage.reportPaths=coverage/gateway-all.cov
+            -Dsonar.go.coverage.reportPaths=gateway-all.cov
             -Dsonar.go.golangci-lint.reportPaths=golangci-lint-report.json
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

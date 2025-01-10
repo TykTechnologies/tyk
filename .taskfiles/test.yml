@@ -2,7 +2,7 @@
 version: "3"
 
 includes:
-  deps: ./deps/Taskfile.yml
+  deps: ./deps.yml
   services:
     taskfile: ../docker/services/Taskfile.yml
     dir: ../docker/services

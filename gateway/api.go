@@ -42,6 +42,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/TykTechnologies/tyk/internal/httpctx"
+
 	gqlv2 "github.com/TykTechnologies/graphql-go-tools/v2/pkg/graphql"
 
 	"github.com/getkin/kin-openapi/openapi3"
@@ -2234,13 +2236,16 @@ func (gw *Gateway) createOauthClient(w http.ResponseWriter, r *http.Request) {
 					storageManager := gw.getGlobalMDCBStorageHandler(prefix, false)
 					storageManager.Connect()
 
+					storageDriver := &storage.RedisCluster{KeyPrefix: prefix, HashKeys: false, ConnectionHandler: gw.StorageConnectionHandler}
+					storageDriver.Connect()
+
 					apiSpec.OAuthManager = &OAuthManager{
 						OsinServer: gw.TykOsinNewServer(
 							&osin.ServerConfig{},
 							&RedisOsinStorageInterface{
 								storageManager,
 								gw.GlobalSessionManager,
-								&storage.RedisCluster{KeyPrefix: prefix, HashKeys: false, ConnectionHandler: gw.StorageConnectionHandler},
+								storageDriver,
 								apiSpec.OrgID,
 								gw,
 							}),
@@ -2621,12 +2626,16 @@ func (gw *Gateway) getOauthClientDetails(keyName, apiID string) (interface{}, in
 		prefix := generateOAuthPrefix(apiSpec.APIID)
 		storageManager := gw.getGlobalMDCBStorageHandler(prefix, false)
 		storageManager.Connect()
+
+		storageDriver := &storage.RedisCluster{KeyPrefix: prefix, HashKeys: false, ConnectionHandler: gw.StorageConnectionHandler}
+		storageDriver.Connect()
+
 		apiSpec.OAuthManager = &OAuthManager{
 			OsinServer: gw.TykOsinNewServer(&osin.ServerConfig{},
 				&RedisOsinStorageInterface{
 					storageManager,
 					gw.GlobalSessionManager,
-					&storage.RedisCluster{KeyPrefix: prefix, HashKeys: false, ConnectionHandler: gw.StorageConnectionHandler},
+					storageDriver,
 					apiSpec.OrgID,
 					gw,
 				}),
@@ -3176,6 +3185,11 @@ func ctxSetCheckLoopLimits(r *http.Request, b bool) {
 
 // Should we check Rate limits and Quotas?
 func ctxCheckLimits(r *http.Request) bool {
+	// If this is a self loop, do not need to check the limits and quotas.
+	if httpctx.IsSelfLooping(r) {
+		return false
+	}
+
 	// If looping disabled, allow all
 	if !ctxLoopingEnabled(r) {
 		return true

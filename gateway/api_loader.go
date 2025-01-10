@@ -26,7 +26,10 @@ import (
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/trace"
 
+	"github.com/TykTechnologies/tyk/internal/httpctx"
+	"github.com/TykTechnologies/tyk/internal/httputil"
 	"github.com/TykTechnologies/tyk/internal/otel"
+	"github.com/TykTechnologies/tyk/internal/service/newrelic"
 )
 
 const (
@@ -42,9 +45,16 @@ type ChainObject struct {
 
 func (gw *Gateway) prepareStorage() generalStores {
 	var gs generalStores
+
 	gs.redisStore = &storage.RedisCluster{KeyPrefix: "apikey-", HashKeys: gw.GetConfig().HashKeys, ConnectionHandler: gw.StorageConnectionHandler}
+	gs.redisStore.Connect()
+
 	gs.redisOrgStore = &storage.RedisCluster{KeyPrefix: "orgkey.", ConnectionHandler: gw.StorageConnectionHandler}
+	gs.redisOrgStore.Connect()
+
 	gs.healthStore = &storage.RedisCluster{KeyPrefix: "apihealth.", ConnectionHandler: gw.StorageConnectionHandler}
+	gs.healthStore.Connect()
+
 	gs.rpcAuthStore = &RPCStorageHandler{KeyPrefix: "apikey-", HashKeys: gw.GetConfig().HashKeys, Gw: gw}
 	gs.rpcOrgStore = gw.getGlobalMDCBStorageHandler("orgkey.", false)
 
@@ -53,7 +63,6 @@ func (gw *Gateway) prepareStorage() generalStores {
 }
 
 func (gw *Gateway) skipSpecBecauseInvalid(spec *APISpec, logger *logrus.Entry) bool {
-
 	switch spec.Protocol {
 	case "", "http", "https":
 		if spec.Proxy.ListenPath == "" {
@@ -598,6 +607,7 @@ func (d *DummyProxyHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 		var handler http.Handler
 		if r.URL.Hostname() == "self" {
+			httpctx.SetSelfLooping(r, true)
 			if h, found := d.Gw.apisHandlesByID.Load(d.SH.Spec.APIID); found {
 				if chain, ok := h.(*ChainObject); ok {
 					handler = chain.ThisHandler
@@ -751,7 +761,13 @@ func explicitRouteSubpaths(prefix string, handler http.Handler, enabled bool) ht
 //
 // - register gorilla/mux routing handless with proxyMux directly (wrapped),
 // - return a raw http.Handler for tyk://ID urls.
-func (gw *Gateway) loadHTTPService(spec *APISpec, apisByListen map[string]int, gs *generalStores, muxer *proxyMux) *ChainObject {
+func (gw *Gateway) loadHTTPService(spec *APISpec, apisByListen map[string]int, gs *generalStores, muxer *proxyMux) (*ChainObject, error) {
+	// MakeSpec validates listenpath, but we can't be sure that it's in all the invocation paths.
+	// Since the check is relatively inexpensive, do it here to prevent issues in uncovered paths.
+	if err := httputil.ValidatePath(spec.Proxy.ListenPath); err != nil {
+		return nil, fmt.Errorf("invalid listen path while loading api: %w", err)
+	}
+
 	gwConfig := gw.GetConfig()
 	port := gwConfig.ListenPort
 	if spec.ListenPort != 0 {
@@ -760,6 +776,8 @@ func (gw *Gateway) loadHTTPService(spec *APISpec, apisByListen map[string]int, g
 	router := muxer.router(port, spec.Protocol, gwConfig)
 	if router == nil {
 		router = mux.NewRouter()
+		newrelic.Mount(router, gw.NewRelicApplication)
+
 		muxer.setRouter(port, spec.Protocol, router, gwConfig)
 	}
 
@@ -783,7 +801,7 @@ func (gw *Gateway) loadHTTPService(spec *APISpec, apisByListen map[string]int, g
 	}
 
 	if chainObj.Skip {
-		return chainObj
+		return chainObj, nil
 	}
 
 	// Prefixes are multiple paths that the API endpoints are listening on.
@@ -810,7 +828,7 @@ func (gw *Gateway) loadHTTPService(spec *APISpec, apisByListen map[string]int, g
 		subrouter.NewRoute().Handler(httpHandler)
 	}
 
-	return chainObj
+	return chainObj, nil
 }
 
 func (gw *Gateway) loadTCPService(spec *APISpec, gs *generalStores, muxer *proxyMux) {
@@ -993,7 +1011,12 @@ func (gw *Gateway) loadApps(specs []*APISpec) {
 						mainLog.Infof("Intialized tracer  api_name=%q", spec.Name)
 					}
 				}
-				tmpSpecHandles.Store(spec.APIID, gw.loadHTTPService(spec, apisByListen, &gs, muxer))
+				tmpSpecHandle, err := gw.loadHTTPService(spec, apisByListen, &gs, muxer)
+				if err != nil {
+					log.WithError(err).Errorf("error loading API")
+					return
+				}
+				tmpSpecHandles.Store(spec.APIID, tmpSpecHandle)
 			case "tcp", "tls":
 				gw.loadTCPService(spec, &gs, muxer)
 			}
@@ -1047,7 +1070,8 @@ func (gw *Gateway) loadApps(specs []*APISpec) {
 
 	gwListenPort := gw.GetConfig().ListenPort
 	controlApiIsConfigured := (gw.GetConfig().ControlAPIPort != 0 && gw.GetConfig().ControlAPIPort != gwListenPort) || gw.GetConfig().ControlAPIHostname != ""
-	if gw.allApisAreMTLS() && !gw.GetConfig().Security.ControlAPIUseMutualTLS && !controlApiIsConfigured {
+
+	if !gw.isRunningTests() && gw.allApisAreMTLS() && !gw.GetConfig().Security.ControlAPIUseMutualTLS && !controlApiIsConfigured {
 		mainLog.Warning("All APIs are protected with mTLS, except for the control API. " +
 			"We recommend configuring the control API port or control hostname to ensure consistent security measures")
 	}

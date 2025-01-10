@@ -15,7 +15,6 @@ import (
 
 	"github.com/gocraft/health"
 	"github.com/justinas/alice"
-	newrelic "github.com/newrelic/go-agent"
 	"github.com/paulbellamy/ratecounter"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sync/singleflight"
@@ -27,6 +26,7 @@ import (
 	"github.com/TykTechnologies/tyk/internal/middleware"
 	"github.com/TykTechnologies/tyk/internal/otel"
 	"github.com/TykTechnologies/tyk/internal/policy"
+	"github.com/TykTechnologies/tyk/internal/service/newrelic"
 	"github.com/TykTechnologies/tyk/request"
 	"github.com/TykTechnologies/tyk/rpc"
 	"github.com/TykTechnologies/tyk/storage"
@@ -137,10 +137,8 @@ func (gw *Gateway) createMiddleware(actualMW TykMiddleware) func(http.Handler) h
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			logger := mw.Base().SetRequestLogger(r)
 
-			if gw.GetConfig().NewRelic.AppName != "" {
-				if txn, ok := w.(newrelic.Transaction); ok {
-					defer newrelic.StartSegment(txn, mw.Name()).End()
-				}
+			if txn := newrelic.FromContext(r.Context()); txn != nil {
+				defer txn.StartSegment(mw.Name()).End()
 			}
 
 			job := instrument.NewJob("MiddlewareCall")
