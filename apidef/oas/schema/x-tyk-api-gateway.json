@@ -1244,6 +1244,9 @@
         },
         "contextVariables": {
           "$ref": "#/definitions/X-Tyk-ContextVariables"
+        },
+        "ipAccessControl": {
+          "$ref": "#/definitions/X-Tyk-IPAccessControl"
         }
       },
       "required": [
@@ -2157,6 +2160,26 @@
         },
         "name": {
           "type": "string"
+        }
+      }
+    },
+    "X-Tyk-IPAccessControl": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "allow": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "block": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
         }
       }
     }

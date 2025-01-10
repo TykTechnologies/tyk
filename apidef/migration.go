@@ -248,6 +248,7 @@ func (a *APIDefinition) Migrate() (versions []APIDefinition, err error) {
 	a.migrateScopeToPolicy()
 	a.migrateResponseProcessors()
 	a.migrateGlobalRateLimit()
+	a.migrateIPAccessControl()
 
 	versions, err = a.MigrateVersioning()
 	if err != nil {
@@ -471,6 +472,7 @@ func (a *APIDefinition) SetDisabledFlags() {
 	a.DoNotTrack = true
 
 	a.setEventHandlersDisabledFlags()
+
 }
 
 func (a *APIDefinition) setEventHandlersDisabledFlags() {
@@ -516,4 +518,16 @@ func (a *APIDefinition) migrateGlobalRateLimit() {
 	if a.GlobalRateLimit.Per <= 0 || a.GlobalRateLimit.Rate <= 0 {
 		a.GlobalRateLimit.Disabled = true
 	}
+}
+
+func (a *APIDefinition) migrateIPAccessControl() {
+	if a.EnableIpBlacklisting && len(a.BlacklistedIPs) > 0 {
+		return
+	}
+
+	if a.EnableIpWhiteListing && len(a.AllowedIPs) > 0 {
+		return
+	}
+
+	a.IPAccessControlDisabled = true
 }
