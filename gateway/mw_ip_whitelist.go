@@ -18,7 +18,7 @@ func (i *IPWhiteListMiddleware) Name() string {
 }
 
 func (i *IPWhiteListMiddleware) EnabledForSpec() bool {
-	if i.Spec.IPAccessControlDisabled {
+	if i.Spec.APIDefinition.IPAccessControlDisabled {
 		return false
 	}
 
