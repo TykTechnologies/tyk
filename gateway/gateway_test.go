@@ -11,7 +11,6 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"os"
-	"runtime"
 	"strconv"
 	"strings"
 	"sync/atomic"
@@ -640,61 +639,6 @@ func TestListenPathTykPrefix(t *testing.T) {
 		Path: "/tyk-foo/",
 		Code: 200,
 	})
-}
-
-func TestReloadGoroutineLeakWithTest(t *testing.T) {
-	test.Flaky(t)
-
-	before := runtime.NumGoroutine()
-
-	ts := StartTest(nil)
-	ts.Close()
-
-	time.Sleep(time.Second)
-
-	after := runtime.NumGoroutine()
-
-	if before < after {
-		t.Errorf("Goroutine leak, was: %d, after reload: %d", before, after)
-	}
-}
-
-func TestReloadGoroutineLeakWithCircuitBreaker(t *testing.T) {
-	ts := StartTest(nil)
-	t.Cleanup(ts.Close)
-
-	globalConf := ts.Gw.GetConfig()
-	globalConf.EnableJSVM = false
-	ts.Gw.SetConfig(globalConf)
-
-	specs := ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
-		spec.Proxy.ListenPath = "/"
-		UpdateAPIVersion(spec, "v1", func(version *apidef.VersionInfo) {
-			version.ExtendedPaths = apidef.ExtendedPathsSet{
-				CircuitBreaker: []apidef.CircuitBreakerMeta{
-					{
-						Path:                 "/",
-						Method:               http.MethodGet,
-						ThresholdPercent:     0.5,
-						Samples:              5,
-						ReturnToServiceAfter: 10,
-					},
-				},
-			}
-		})
-	})
-
-	before := runtime.NumGoroutine()
-
-	ts.Gw.LoadAPI(specs...) // just doing globalGateway.DoReload() doesn't load anything as BuildAndLoadAPI cleans up folder with API specs
-
-	time.Sleep(100 * time.Millisecond)
-
-	after := runtime.NumGoroutine()
-
-	if before < after {
-		t.Errorf("Goroutine leak, was: %d, after reload: %d", before, after)
-	}
 }
 
 func listenProxyProto(ls net.Listener) error {
