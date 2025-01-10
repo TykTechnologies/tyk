@@ -438,6 +438,7 @@ func (a *APIDefinition) SetDisabledFlags() {
 	a.ConfigDataDisabled = true
 	a.Proxy.ServiceDiscovery.CacheDisabled = true
 	a.UptimeTests.Config.ServiceDiscovery.CacheDisabled = true
+	a.DisableExpireAnalytics = true
 
 	for i := 0; i < len(a.CustomMiddleware.Pre); i++ {
 		a.CustomMiddleware.Pre[i].Disabled = true

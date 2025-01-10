@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/TykTechnologies/tyk/apidef"
 )
@@ -243,6 +244,10 @@ func (g *Global) fillTrafficLogs(api apidef.APIDefinition) {
 	if ShouldOmit(g.TrafficLogs) {
 		g.TrafficLogs = nil
 	}
+
+	if g.TrafficLogs.Enabled && g.TrafficLogs.RetentionPeriod != nil {
+		g.TrafficLogs.RetentionPeriod.Fill(api)
+	}
 }
 
 func (g *Global) fillRequestSizeLimit(api apidef.APIDefinition) {
@@ -351,6 +356,15 @@ func (g *Global) extractTrafficLogsTo(api *apidef.APIDefinition) {
 	}
 
 	g.TrafficLogs.ExtractTo(api)
+
+	//if g.TrafficLogs.RetentionPeriod == nil {
+	//	g.TrafficLogs.RetentionPeriod = &RetentionPeriod{}
+	//	defer func() {
+	//		g.TrafficLogs.RetentionPeriod = nil
+	//	}()
+	//}
+
+	g.TrafficLogs.RetentionPeriod.ExtractTo(api)
 }
 
 func (g *Global) extractRequestSizeLimitTo(api *apidef.APIDefinition) {
@@ -1580,18 +1594,65 @@ type TrafficLogs struct {
 	// TagHeaders is a string array of HTTP headers that can be extracted
 	// and transformed into analytics tags (statistics aggregated by tag, per hour).
 	TagHeaders []string `bson:"tagHeaders" json:"tagHeaders,omitempty"`
+
+	// RetentionPeriod holds the configuration for the analytics retention, it contains configuration
+	// for how long you would like analytics data to last for
+	RetentionPeriod *RetentionPeriod `bson:"retentionPeriod" json:"retentionPeriod,omitempty"`
 }
 
 // Fill fills *TrafficLogs from apidef.APIDefinition.
 func (t *TrafficLogs) Fill(api apidef.APIDefinition) {
 	t.Enabled = !api.DoNotTrack
 	t.TagHeaders = api.TagHeaders
+
+	retPeriod := &RetentionPeriod{}
+	retPeriod.Fill(api)
+	t.RetentionPeriod = retPeriod
 }
 
 // ExtractTo extracts *TrafficLogs into *apidef.APIDefinition.
 func (t *TrafficLogs) ExtractTo(api *apidef.APIDefinition) {
 	api.DoNotTrack = !t.Enabled
 	api.TagHeaders = t.TagHeaders
+
+	if t.RetentionPeriod != nil {
+		t.RetentionPeriod.ExtractTo(api)
+	}
+}
+
+type RetentionPeriod struct {
+	// Enabled enables log analytics retention for the API
+	//
+	// Tyk classic API definition: `!disable_expire_analytics`.
+	Enabled bool `bson:"enabled" json:"enabled"`
+	// Value is the interval to keep the analytics record for
+	// The value of Value is a string that specifies the interval in a compact form,
+	// where hours, minutes and seconds are denoted by 'h', 'm' and 's' respectively.
+	// Multiple units can be combined to represent the duration.
+	//
+	// Examples of valid shorthand notations:
+	// - "1h"   : one hour
+	// - "20m"  : twenty minutes
+	// - "30s"  : thirty seconds
+	// - "1m29s": one minute and twenty-nine seconds
+	// - "1h30m" : one hour and thirty minutes
+	//
+	// An empty value is interpreted as "0s"
+	//
+	// Tyk classic API definition: `expire_analytics_after`.
+	Value ReadableDuration `bson:"value" json:"value"`
+}
+
+// Fill fills *RetentionPeriod from apidef.APIDefinition
+func (r *RetentionPeriod) Fill(api apidef.APIDefinition) {
+	r.Enabled = !api.DisableExpireAnalytics
+	r.Value = ReadableDuration(time.Duration(api.ExpireAnalyticsAfter) * time.Second)
+}
+
+// ExtractTo extracts *RetentionPeriod into apidef.APIDefinition
+func (r *RetentionPeriod) ExtractTo(api *apidef.APIDefinition) {
+	api.DisableExpireAnalytics = !r.Enabled
+	api.ExpireAnalyticsAfter = int64(r.Value.Seconds())
 }
 
 // GlobalRequestSizeLimit holds configuration about the global limits for request sizes.

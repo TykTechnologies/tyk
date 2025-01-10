@@ -3,6 +3,7 @@ package oas
 import (
 	"encoding/json"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 
@@ -218,6 +219,27 @@ func TestTrafficLogs(t *testing.T) {
 		convertedAPI.SetDisabledFlags()
 		trafficLogs.ExtractTo(&convertedAPI)
 		assert.Empty(t, convertedAPI.TagHeaders)
+	})
+
+	t.Run("retention header enabled", func(t *testing.T) {
+		trafficLogs := TrafficLogs{
+			Enabled: true,
+			RetentionPeriod: &RetentionPeriod{
+				Enabled: true,
+				Value:   ReadableDuration(time.Minute * 2),
+			},
+		}
+
+		var convertedAPI apidef.APIDefinition
+		var resultTrafficLogs TrafficLogs
+		convertedAPI.SetDisabledFlags()
+		trafficLogs.ExtractTo(&convertedAPI)
+
+		assert.Equal(t, trafficLogs.RetentionPeriod.Enabled, !convertedAPI.DisableExpireAnalytics)
+		assert.Equal(t, int64(120), convertedAPI.ExpireAnalyticsAfter)
+
+		resultTrafficLogs.Fill(convertedAPI)
+		assert.Equal(t, trafficLogs, resultTrafficLogs)
 	})
 }
 
