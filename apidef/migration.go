@@ -248,6 +248,7 @@ func (a *APIDefinition) Migrate() (versions []APIDefinition, err error) {
 	a.migrateScopeToPolicy()
 	a.migrateResponseProcessors()
 	a.migrateGlobalRateLimit()
+	a.migrateIPAccessControl()
 
 	versions, err = a.MigrateVersioning()
 	if err != nil {
@@ -516,4 +517,18 @@ func (a *APIDefinition) migrateGlobalRateLimit() {
 	if a.GlobalRateLimit.Per <= 0 || a.GlobalRateLimit.Rate <= 0 {
 		a.GlobalRateLimit.Disabled = true
 	}
+}
+
+func (a *APIDefinition) migrateIPAccessControl() {
+	a.IPAccessControlDisabled = false
+
+	if a.EnableIpBlacklisting && len(a.BlacklistedIPs) > 0 {
+		return
+	}
+
+	if a.EnableIpWhiteListing && len(a.AllowedIPs) > 0 {
+		return
+	}
+
+	a.IPAccessControlDisabled = true
 }
