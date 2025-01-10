@@ -847,7 +847,7 @@ func TestAPIDefinition_migrateIPAccessControl(t *testing.T) {
 			assert.True(t, base.IPAccessControlDisabled)
 		})
 
-		t.Run("IPWhiteListEnabled=true, non-emtpy whitelist", func(t *testing.T) {
+		t.Run("IPWhiteListEnabled=true, non-empty whitelist", func(t *testing.T) {
 			base := oldTestAPI()
 			base.EnableIpWhiteListing = true
 			base.AllowedIPs = []string{"127.0.0.1"}
@@ -864,7 +864,7 @@ func TestAPIDefinition_migrateIPAccessControl(t *testing.T) {
 			assert.True(t, base.IPAccessControlDisabled)
 		})
 
-		t.Run("IPWhiteListEnabled=false, non-emtpy whitelist", func(t *testing.T) {
+		t.Run("IPWhiteListEnabled=false, non-empty whitelist", func(t *testing.T) {
 			base := oldTestAPI()
 			base.EnableIpWhiteListing = false
 			base.AllowedIPs = []string{"127.0.0.1"}
@@ -883,7 +883,7 @@ func TestAPIDefinition_migrateIPAccessControl(t *testing.T) {
 			assert.True(t, base.IPAccessControlDisabled)
 		})
 
-		t.Run("EnableIpBlacklisting=true, non-emtpy blacklist", func(t *testing.T) {
+		t.Run("EnableIpBlacklisting=true, non-empty blacklist", func(t *testing.T) {
 			base := oldTestAPI()
 			base.EnableIpBlacklisting = true
 			base.BlacklistedIPs = []string{"127.0.0.1"}
@@ -900,7 +900,7 @@ func TestAPIDefinition_migrateIPAccessControl(t *testing.T) {
 			assert.True(t, base.IPAccessControlDisabled)
 		})
 
-		t.Run("IPWhiteListEnabled=false, non-emtpy blacklist", func(t *testing.T) {
+		t.Run("IPWhiteListEnabled=false, non-empty blacklist", func(t *testing.T) {
 			base := oldTestAPI()
 			base.EnableIpBlacklisting = false
 			base.BlacklistedIPs = []string{"127.0.0.1"}
