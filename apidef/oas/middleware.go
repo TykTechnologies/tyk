@@ -356,8 +356,6 @@ func (g *Global) extractTrafficLogsTo(api *apidef.APIDefinition) {
 	}
 
 	g.TrafficLogs.ExtractTo(api)
-
-	g.TrafficLogs.RetentionPeriod.ExtractTo(api)
 }
 
 func (g *Global) extractRequestSizeLimitTo(api *apidef.APIDefinition) {
@@ -1607,9 +1605,13 @@ func (t *TrafficLogs) ExtractTo(api *apidef.APIDefinition) {
 	api.DoNotTrack = !t.Enabled
 	api.TagHeaders = t.TagHeaders
 
-	if t.RetentionPeriod != nil {
-		t.RetentionPeriod.ExtractTo(api)
+	if t.RetentionPeriod == nil {
+		t.RetentionPeriod = &RetentionPeriod{}
+		defer func() {
+			t.RetentionPeriod = nil
+		}()
 	}
+	t.RetentionPeriod.ExtractTo(api)
 }
 
 // RetentionPeriod holds the configuration for analytics retention.

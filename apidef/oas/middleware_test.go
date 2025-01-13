@@ -241,6 +241,28 @@ func TestTrafficLogs(t *testing.T) {
 		resultTrafficLogs.Fill(convertedAPI)
 		assert.Equal(t, trafficLogs, resultTrafficLogs)
 	})
+
+	t.Run("retention header disabled", func(t *testing.T) {
+		trafficLogs := TrafficLogs{
+			Enabled:         true,
+			RetentionPeriod: nil,
+		}
+
+		var convertedAPI apidef.APIDefinition
+		var resultTrafficLogs TrafficLogs
+
+		convertedAPI.SetDisabledFlags()
+		trafficLogs.ExtractTo(&convertedAPI)
+
+		assert.Equal(t, true, convertedAPI.DisableExpireAnalytics)
+		assert.Equal(t, int64(0), convertedAPI.ExpireAnalyticsAfter)
+
+		resultTrafficLogs.Fill(convertedAPI)
+		assert.Equal(t, &RetentionPeriod{
+			Enabled: false,
+			Value:   0,
+		}, resultTrafficLogs.RetentionPeriod)
+	})
 }
 
 func TestPluginConfig(t *testing.T) {
