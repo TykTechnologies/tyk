@@ -750,6 +750,7 @@ type APIDefinition struct {
 	IPAccessControlDisabled              bool                   `mapstructure:"ip_access_control_disabled" bson:"ip_access_control_disabled" json:"ip_access_control_disabled"`
 	DontSetQuotasOnCreate                bool                   `mapstructure:"dont_set_quota_on_create" bson:"dont_set_quota_on_create" json:"dont_set_quota_on_create"`
 	ExpireAnalyticsAfter                 int64                  `mapstructure:"expire_analytics_after" bson:"expire_analytics_after" json:"expire_analytics_after"` // must have an expireAt TTL index set (http://docs.mongodb.org/manual/tutorial/expire-data/)
+	DisableExpireAnalytics               bool                   `mapstructure:"disable_expire_analytics" bson:"disable_expire_analytics" json:"disable_expire_analytics"`
 	ResponseProcessors                   []ResponseProcessor    `bson:"response_processors" json:"response_processors"`
 	CORS                                 CORSConfig             `bson:"CORS" json:"CORS"`
 	Domain                               string                 `bson:"domain" json:"domain"`

@@ -174,6 +174,7 @@ func TestOAS_ExtractTo_ResetAPIDefinition(t *testing.T) {
 	a.DisableRateLimit = false
 	a.DoNotTrack = false
 	a.IPAccessControlDisabled = false
+	a.DisableExpireAnalytics = false
 
 	// deprecated fields
 	a.Auth = apidef.AuthConfig{}
@@ -266,7 +267,6 @@ func TestOAS_ExtractTo_ResetAPIDefinition(t *testing.T) {
 		"APIDefinition.EnableIpWhiteListing",
 		"APIDefinition.EnableIpBlacklisting",
 		"APIDefinition.DontSetQuotasOnCreate",
-		"APIDefinition.ExpireAnalyticsAfter",
 		"APIDefinition.ResponseProcessors[0].Name",
 		"APIDefinition.ResponseProcessors[0].Options",
 		"APIDefinition.GraphQL.Enabled",
@@ -948,6 +948,9 @@ func TestMigrateAndFillOAS_DropEmpties(t *testing.T) {
 			Global: &Global{
 				TrafficLogs: &TrafficLogs{
 					Enabled: true,
+					RetentionPeriod: &RetentionPeriod{
+						Enabled: true,
+					},
 				},
 			},
 		}, baseAPI.OAS.GetTykExtension().Middleware)
