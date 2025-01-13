@@ -357,13 +357,6 @@ func (g *Global) extractTrafficLogsTo(api *apidef.APIDefinition) {
 
 	g.TrafficLogs.ExtractTo(api)
 
-	//if g.TrafficLogs.RetentionPeriod == nil {
-	//	g.TrafficLogs.RetentionPeriod = &RetentionPeriod{}
-	//	defer func() {
-	//		g.TrafficLogs.RetentionPeriod = nil
-	//	}()
-	//}
-
 	g.TrafficLogs.RetentionPeriod.ExtractTo(api)
 }
 

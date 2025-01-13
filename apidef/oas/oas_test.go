@@ -266,7 +266,6 @@ func TestOAS_ExtractTo_ResetAPIDefinition(t *testing.T) {
 		"APIDefinition.EnableIpWhiteListing",
 		"APIDefinition.EnableIpBlacklisting",
 		"APIDefinition.DontSetQuotasOnCreate",
-		"APIDefinition.ExpireAnalyticsAfter",
 		"APIDefinition.ResponseProcessors[0].Name",
 		"APIDefinition.ResponseProcessors[0].Options",
 		"APIDefinition.GraphQL.Enabled",
