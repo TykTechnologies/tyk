@@ -479,6 +479,7 @@ type VersionInfo struct {
 	GlobalResponseHeadersDisabled bool              `bson:"global_response_headers_disabled" json:"global_response_headers_disabled"`
 	IgnoreEndpointCase            bool              `bson:"ignore_endpoint_case" json:"ignore_endpoint_case"`
 	GlobalSizeLimit               int64             `bson:"global_size_limit" json:"global_size_limit"`
+	GlobalSizeLimitDisabled       bool              `bson:"global_size_limit_disabled" json:"global_size_limit_disabled"`
 	OverrideTarget                string            `bson:"override_target" json:"override_target"`
 }
 

@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	logrus "github.com/sirupsen/logrus/hooks/test"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/TykTechnologies/tyk/apidef"
@@ -91,5 +92,51 @@ func TestRequestSizeLimit(t *testing.T) {
 			require.Equal(t, http.StatusLengthRequired, code)
 			require.Errorf(t, err, "Content length is required for this request")
 		}
+	})
+
+	t.Run("check enabled for spec", func(t *testing.T) {
+		createMiddleware := func(versionInfoUpdater func(*apidef.VersionInfo)) *RequestSizeLimitMiddleware {
+			logger, _ := logrus.NewNullLogger()
+			spec := ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+				UpdateAPIVersion(spec, "v1", versionInfoUpdater)
+			})[0]
+			baseMid := &BaseMiddleware{
+				Spec:   spec,
+				logger: logger.WithContext(context.Background()),
+			}
+			return &RequestSizeLimitMiddleware{baseMid}
+		}
+
+		t.Run("request size limit set to 0 (disabled)", func(t *testing.T) {
+			mw := createMiddleware(func(v *apidef.VersionInfo) {
+				v.GlobalSizeLimit = 0
+				v.GlobalSizeLimitDisabled = false
+			})
+			assert.False(t, mw.EnabledForSpec())
+		})
+
+		t.Run("request size limit set to value but disabled", func(t *testing.T) {
+			mw := createMiddleware(func(v *apidef.VersionInfo) {
+				v.GlobalSizeLimit = 5000
+				v.GlobalSizeLimitDisabled = true
+			})
+			assert.False(t, mw.EnabledForSpec())
+		})
+
+		t.Run("request size limit set to 0 and disabled", func(t *testing.T) {
+			mw := createMiddleware(func(v *apidef.VersionInfo) {
+				v.GlobalSizeLimit = 0
+				v.GlobalSizeLimitDisabled = true
+			})
+			assert.False(t, mw.EnabledForSpec())
+		})
+
+		t.Run("request size limit set to value and enabled", func(t *testing.T) {
+			mw := createMiddleware(func(v *apidef.VersionInfo) {
+				v.GlobalSizeLimit = 5000
+				v.GlobalSizeLimitDisabled = false
+			})
+			assert.True(t, mw.EnabledForSpec())
+		})
 	})
 }
