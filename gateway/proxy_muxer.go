@@ -287,11 +287,11 @@ func (gw *Gateway) flushNetworkAnalytics(ctx context.Context) {
 					APIID:        spec.APIID,
 					OrgID:        spec.OrgID,
 				}
-				expiresAfter := spec.ExpireAnalyticsAfter
 				if spec.DisableExpireAnalytics {
-					expiresAfter = 0
+					record.SetExpiry(0)
+				} else {
+					record.SetExpiry(spec.ExpireAnalyticsAfter)
 				}
-				record.SetExpiry(expiresAfter)
 				_ = gw.Analytics.RecordHit(&record)
 			}
 			gw.apisMu.RUnlock()
