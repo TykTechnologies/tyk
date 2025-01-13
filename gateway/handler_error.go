@@ -293,7 +293,9 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 			if orgExpireDataTime > 0 {
 				expiresAfter = orgExpireDataTime
 			}
-
+		}
+		if e.Spec.DisableExpireAnalytics {
+			expiresAfter = 0
 		}
 		record.SetExpiry(expiresAfter)
 

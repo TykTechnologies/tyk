@@ -19,6 +19,9 @@
     "expire_analytics_after": {
       "type": "number"
     },
+    "disable_expire_analytics": {
+      "type": "boolean"
+    },
     "id": {
       "type": "string"
     },
