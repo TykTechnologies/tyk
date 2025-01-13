@@ -1587,9 +1587,8 @@ type TrafficLogs struct {
 	// TagHeaders is a string array of HTTP headers that can be extracted
 	// and transformed into analytics tags (statistics aggregated by tag, per hour).
 	TagHeaders []string `bson:"tagHeaders" json:"tagHeaders,omitempty"`
-
 	// RetentionPeriod holds the configuration for the analytics retention, it contains configuration
-	// for how long you would like analytics data to last for
+	// for how long you would like analytics data to last for.
 	RetentionPeriod *RetentionPeriod `bson:"retentionPeriod" json:"retentionPeriod,omitempty"`
 }
 
@@ -1613,6 +1612,7 @@ func (t *TrafficLogs) ExtractTo(api *apidef.APIDefinition) {
 	}
 }
 
+// RetentionPeriod holds the configuration for analytics retention.
 type RetentionPeriod struct {
 	// Enabled enables log analytics retention for the API
 	//
