@@ -39,7 +39,7 @@ func (t *RequestSizeLimitMiddleware) Name() string {
 func (t *RequestSizeLimitMiddleware) EnabledForSpec() bool {
 	for _, version := range t.Spec.VersionData.Versions {
 		if len(version.ExtendedPaths.SizeLimit) > 0 ||
-			version.GlobalSizeLimit > 0 {
+			(!version.GlobalSizeLimitDisabled && version.GlobalSizeLimit > 0) {
 			return true
 		}
 	}
