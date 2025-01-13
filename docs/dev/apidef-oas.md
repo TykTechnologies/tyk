@@ -79,6 +79,12 @@ if ShouldOmit(u.RateLimit) {
 
 This ensures the field is reset to empty when not configured in the classic API definition.
 
+### Working with `VersionData`
+A `Main` version will be provided that can be used for `Fill`.
+```go
+api.VersionData.Versions[Main]
+```
+
 ## Implement ExtractTo Method Pattern
 
 Similarly, follow this pattern with `ExtractTo`:
@@ -92,6 +98,19 @@ if u.RateLimit == nil {
 }
 
 u.RateLimit.ExtractTo(api)
+```
+
+### Working with `VersionData`
+There are 2 helper functions for `ExtractTo` that will help to handle `VersionData`. You can use them like this:
+```go
+func (g *GlobalRequestSizeLimit) ExtractTo(api *apidef.APIDefinition) {
+	mainVersion := requireMainVersion(api)
+	defer func() {
+		updateMainVersion(api, mainVersion)
+	}()
+
+	// manipulate the Main VersionInfo here
+}
 ```
 
 ## Write Tests

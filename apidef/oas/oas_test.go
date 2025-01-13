@@ -193,6 +193,7 @@ func TestOAS_ExtractTo_ResetAPIDefinition(t *testing.T) {
 	vInfo.GlobalHeadersDisabled = false
 	vInfo.GlobalResponseHeadersDisabled = false
 	vInfo.UseExtendedPaths = false
+	vInfo.GlobalSizeLimitDisabled = false
 
 	vInfo.ExtendedPaths.Clear()
 
@@ -229,7 +230,6 @@ func TestOAS_ExtractTo_ResetAPIDefinition(t *testing.T) {
 		"APIDefinition.VersionData.Versions[0].ExtendedPaths.PersistGraphQL[0].Operation",
 		"APIDefinition.VersionData.Versions[0].ExtendedPaths.PersistGraphQL[0].Variables[0]",
 		"APIDefinition.VersionData.Versions[0].IgnoreEndpointCase",
-		"APIDefinition.VersionData.Versions[0].GlobalSizeLimit",
 		"APIDefinition.UptimeTests.CheckList[0].CheckURL",
 		"APIDefinition.UptimeTests.CheckList[0].Protocol",
 		"APIDefinition.UptimeTests.CheckList[0].Timeout",
