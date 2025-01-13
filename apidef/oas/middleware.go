@@ -244,10 +244,6 @@ func (g *Global) fillTrafficLogs(api apidef.APIDefinition) {
 	if ShouldOmit(g.TrafficLogs) {
 		g.TrafficLogs = nil
 	}
-
-	if g.TrafficLogs.Enabled && g.TrafficLogs.RetentionPeriod != nil {
-		g.TrafficLogs.RetentionPeriod.Fill(api)
-	}
 }
 
 func (g *Global) fillRequestSizeLimit(api apidef.APIDefinition) {
@@ -1595,9 +1591,13 @@ func (t *TrafficLogs) Fill(api apidef.APIDefinition) {
 	t.Enabled = !api.DoNotTrack
 	t.TagHeaders = api.TagHeaders
 
-	retPeriod := &RetentionPeriod{}
-	retPeriod.Fill(api)
-	t.RetentionPeriod = retPeriod
+	if t.RetentionPeriod == nil {
+		t.RetentionPeriod = &RetentionPeriod{}
+	}
+	t.RetentionPeriod.Fill(api)
+	if ShouldOmit(t.RetentionPeriod) {
+		t.RetentionPeriod = nil
+	}
 }
 
 // ExtractTo extracts *TrafficLogs into *apidef.APIDefinition.

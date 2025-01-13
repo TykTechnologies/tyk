@@ -258,10 +258,7 @@ func TestTrafficLogs(t *testing.T) {
 		assert.Equal(t, int64(0), convertedAPI.ExpireAnalyticsAfter)
 
 		resultTrafficLogs.Fill(convertedAPI)
-		assert.Equal(t, &RetentionPeriod{
-			Enabled: false,
-			Value:   0,
-		}, resultTrafficLogs.RetentionPeriod)
+		assert.Nil(t, resultTrafficLogs.RetentionPeriod)
 	})
 }
 
