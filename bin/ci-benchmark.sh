@@ -9,5 +9,9 @@ BENCHMARKS=$(./gateway.test -test.list=Bench.+)
 for benchmark in $BENCHMARKS; do
 	echo $benchmark
 	benchRegex="^${benchmark}$"
-	./gateway.test -test.run=^$ -test.bench=$benchRegex -test.count=1 -test.benchtime 10s -test.benchmem -test.cpuprofile=tyk-cpu.out -test.memprofile=mem.out -test.trace=trace.out
+	./gateway.test -test.run=^$ -test.bench=$benchRegex -test.count=1 \
+			-test.benchtime 10s -test.benchmem \
+			-test.cpuprofile=coverage/$benchmark-cpu.out \
+			-test.memprofile=coverage/$benchmark-mem.out \
+			-test.trace=coverage/$benchmark-trace.out
 done
