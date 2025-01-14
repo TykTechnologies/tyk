@@ -64,15 +64,17 @@ func BenchmarkTransformNonAscii(b *testing.B) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
-	spec := APISpec{}
-	base := &BaseMiddleware{Spec: &spec, Gw: ts.Gw}
-	base.Spec.EnableContextVars = false
-	transform := TransformMiddleware{base}
+	spec := &APISpec{
+		APIDefinition: &apidef.APIDefinition{},
+	}
+	base := &BaseMiddleware{Spec: spec, Gw: ts.Gw}
+
+	transform := &TransformMiddleware{base}
 
 	for i := 0; i < b.N; i++ {
 		r := TestReq(b, "GET", "/", in)
 
-		if err := transformBody(r, tmeta, &transform); err != nil {
+		if err := transformBody(r, tmeta, transform); err != nil {
 			b.Fatalf("wanted nil error, got %v", err)
 		}
 	}
@@ -236,9 +238,9 @@ func BenchmarkTransformJSONMarshal(b *testing.B) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
-	spec := APISpec{}
+	spec := APISpec{APIDefinition: &apidef.APIDefinition{}}
 	base := &BaseMiddleware{Spec: &spec, Gw: ts.Gw}
-	base.Spec.EnableContextVars = false
+
 	transform := TransformMiddleware{base}
 
 	for i := 0; i < b.N; i++ {

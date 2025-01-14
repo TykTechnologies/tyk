@@ -58,6 +58,9 @@ type SessionLimiter struct {
 	smoothing      *rate.Smoothing
 }
 
+// Encourage reuse in NewSessionLimiter.
+var sessionLimiterBucketStore = memorycache.New()
+
 // NewSessionLimiter initializes the session limiter.
 //
 // The session limiter initializes the storage required for rate limiters.
@@ -70,7 +73,7 @@ func NewSessionLimiter(ctx context.Context, conf *config.Config, drlManager *drl
 		ctx:         ctx,
 		drlManager:  drlManager,
 		config:      conf,
-		bucketStore: memorycache.New(),
+		bucketStore: sessionLimiterBucketStore,
 	}
 
 	log.Infof("[RATELIMIT] %s", conf.RateLimit.String())
