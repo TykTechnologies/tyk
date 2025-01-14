@@ -59,7 +59,3 @@ testcases:
           X-Tyk-Authorization: {{ .bearerToken }}
         assertions:
           - result.statuscode ShouldBeIn 200
-
-
-
-
