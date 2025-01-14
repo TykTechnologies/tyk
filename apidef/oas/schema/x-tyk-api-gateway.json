@@ -1999,7 +1999,10 @@
           }
         },
         "plugins": {
-          "$ref": "#/definitions/X-Tyk-CustomPluginConfig"
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/X-Tyk-CustomPluginConfig"
+          }
         }
       },
       "required": [

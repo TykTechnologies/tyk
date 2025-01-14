@@ -44,6 +44,9 @@ func TestMiddleware(t *testing.T) {
 				ResponsePlugin: &ResponsePlugin{
 					Plugins: customPlugins,
 				},
+				TrafficLogs: &TrafficLogs{
+					Plugins: customPlugins,
+				},
 			},
 		}
 
@@ -58,6 +61,7 @@ func TestMiddleware(t *testing.T) {
 				PostAuthenticationPlugin: &PostAuthenticationPlugin{},
 				PostPlugin:               &PostPlugin{},
 				ResponsePlugin:           &ResponsePlugin{},
+				TrafficLogs:              &TrafficLogs{},
 			},
 		}
 		resultMiddleware.Fill(convertedAPI)
@@ -68,6 +72,9 @@ func TestMiddleware(t *testing.T) {
 				PostAuthenticationPlugins: customPlugins,
 				PostPlugins:               customPlugins,
 				ResponsePlugins:           customPlugins,
+				TrafficLogs: &TrafficLogs{
+					Plugins: customPlugins,
+				},
 			},
 		}
 		assert.Equal(t, expectedMW, resultMiddleware)

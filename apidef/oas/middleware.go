@@ -1580,7 +1580,6 @@ type TrafficLogs struct {
 	// TagHeaders is a string array of HTTP headers that can be extracted
 	// and transformed into analytics tags (statistics aggregated by tag, per hour).
 	TagHeaders []string `bson:"tagHeaders" json:"tagHeaders,omitempty"`
-
 	// Plugins configures custom plugins to allow for extensive modifications to analytics records
 	// The plugins would be executed in the order of configuration in the list.
 	Plugins CustomPlugins `bson:"plugins,omitempty" json:"plugins,omitempty"`
@@ -1591,13 +1590,13 @@ func (t *TrafficLogs) Fill(api apidef.APIDefinition) {
 	t.Enabled = !api.DoNotTrack
 	t.TagHeaders = api.TagHeaders
 
-	if len(api.CustomMiddleware.Response) == 0 {
+	if len(api.CustomMiddleware.TrafficLogs) == 0 {
 		t.Plugins = nil
 		return
 	}
 
-	t.Plugins = make(CustomPlugins, len(api.CustomMiddleware.Response))
-	t.Plugins.Fill(api.CustomMiddleware.Response)
+	t.Plugins = make(CustomPlugins, len(api.CustomMiddleware.TrafficLogs))
+	t.Plugins.Fill(api.CustomMiddleware.TrafficLogs)
 }
 
 // ExtractTo extracts *TrafficLogs into *apidef.APIDefinition.
@@ -1606,12 +1605,12 @@ func (t *TrafficLogs) ExtractTo(api *apidef.APIDefinition) {
 	api.TagHeaders = t.TagHeaders
 
 	if len(t.Plugins) == 0 {
-		api.CustomMiddleware.Response = nil
+		api.CustomMiddleware.TrafficLogs = nil
 		return
 	}
 
-	api.CustomMiddleware.Response = make([]apidef.MiddlewareDefinition, len(t.Plugins))
-	t.Plugins.ExtractTo(api.CustomMiddleware.Response)
+	api.CustomMiddleware.TrafficLogs = make([]apidef.MiddlewareDefinition, len(t.Plugins))
+	t.Plugins.ExtractTo(api.CustomMiddleware.TrafficLogs)
 }
 
 // GlobalRequestSizeLimit holds configuration about the global limits for request sizes.
