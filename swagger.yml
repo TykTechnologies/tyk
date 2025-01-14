@@ -6277,6 +6277,7 @@ components:
           - executionEngine
           - subgraph
           - supergraph
+          - ""  # Allow empty string
           type: string
         introspection:
           $ref: '#/components/schemas/GraphQLIntrospectionConfig'
@@ -6301,9 +6302,9 @@ components:
           type: array
         version:
           enum:
-          - ''''
           - "1"
           - "2"
+          - ""  # Allow empty string
           type: string
       type: object
     GraphQLEngineConfig:

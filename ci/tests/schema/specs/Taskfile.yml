@@ -1,0 +1,9 @@
+version: "3"
+dotenv: [.env]
+tasks:
+  portman_tests:
+    desc: "Run the OpenAPI specification tests"
+    cmds:
+      - venom run testdata/populate_gateway_test_data.yaml --var bearerToken=$PORTMAN_API_Key  --stop-on-failure && rm venom*.log
+      - npm install
+      - npm start

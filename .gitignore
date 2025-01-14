@@ -65,3 +65,8 @@ tyk_linux_*
 main
 
 /coprocess/*.pb.go-e
+ci/tests/schema/specs/tmp
+ci/tests/schema/specs/node_modules
+ci/tests/schema/specs/package-lock.json
+ci/tests/schema/specs/gateway.collection.postman.json
+ci/tests/schema/specs/.env

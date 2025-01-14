@@ -1,0 +1,144 @@
+{
+  "version": 1.0,
+  "$schema": "https://raw.githubusercontent.com/apideck-libraries/portman/main/src/utils/portman-config-schema.json",
+  "tests": {
+    "contractTests": [
+      {
+        "openApiOperation": "*::/*",
+        "excludeForOperations": [],
+        "statusSuccess": {
+          "enabled": true
+        }
+      },
+      {
+        "openApiOperation": "*::/*",
+        "excludeForOperations": [],
+        "responseTime": {
+          "enabled": false,
+          "maxMs": 300
+        }
+      },
+      {
+        "openApiOperation": "*::/*",
+        "excludeForOperations": [
+
+        ],
+        "contentType": {
+          "enabled": true
+        }
+      },
+      {
+        "openApiOperation": "*::/*",
+        "excludeForOperations": [
+
+        ],
+        "jsonBody": {
+          "enabled": true
+        }
+      },
+      {
+        "openApiOperation": "*::/*",
+        "excludeForOperations": [
+
+        ],
+        "schemaValidation": {
+          "enabled": true
+        }
+      },
+      {
+        "openApiOperation": "*::/*",
+        "headersPresent": {
+          "enabled": true
+        }
+      }
+    ],
+    "contentTests": [],
+    "extendTests": [
+
+    ],
+    "variationTests": []
+  },
+  "assignVariables": [
+    {
+      "openApiOperationIds": ["createApiOAS"],
+      "collectionVariables": [
+        {
+          "responseBodyProp": "key",
+          "name": "createApiOAS.apiID"
+        }
+      ]
+    },
+    {
+      "openApiOperationIds": ["createApi"],
+      "collectionVariables": [
+        {
+          "responseBodyProp": "key",
+          "name": "createApi.apiID"
+        }
+      ]
+    }
+  ],
+  "operationPreRequestScripts": [
+    {
+      "openApiOperationIds": ["updateApi","deleteApi","getApi","updateApi","listApiVersions","deleteOASApi","getOASApi","patchApiOAS","updateApiOAS","downloadApiOASPublic"],
+      "scripts": ["file:config/prescript.js"]
+    }
+  ],
+  "overwrites": [
+    {
+      "openApiOperationIds": ["listOASApiVersions","deleteOASApi","getOASApi","patchApiOAS","updateApiOAS","downloadApiOASPublic"],
+      "overwriteRequestPathVariables": [
+        {
+          "value": "{{createApiOAS.apiID}}",
+          "overwrite": true,
+          "key": "apiID"
+        }
+      ]
+    },
+    {
+      "openApiOperationIds": ["updateApiOAS","patchApiOAS"],
+      "overwriteRequestBody": [
+        {
+          "overwrite": true,
+          "key": "x-tyk-api-gateway.info.id",
+          "value":"{{createApiOAS.apiID}}"
+        }
+      ]
+    },
+    {
+      "openApiOperationIds": ["deleteApi","getApi","updateApi","listApiVersions"],
+      "overwriteRequestPathVariables": [
+        {
+          "key": "apiID",
+          "value": "{{createApi.apiID}}",
+          "overwrite": true
+        }
+      ]
+    },
+    {
+      "openApiOperationIds": ["updateApi"],
+      "overwriteRequestBody": [
+        {
+          "key": "api_id",
+          "value": "{{createApi.apiID}}",
+          "overwrite": true
+        }
+      ]
+    }
+  ],
+  "globals": {
+    "collectionPreRequestScripts": [
+
+    ],
+    "keyValueReplacements": {},
+    "valueReplacements": {},
+    "rawReplacements": [],
+    "orderOfOperations": [
+      "POST::/*",
+      "GET::/*",
+      "PUT::/*",
+      "PATCH::/*",
+      "DELETE::/*"
+    ]
+  }
+}
