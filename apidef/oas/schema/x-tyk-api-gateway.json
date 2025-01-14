@@ -1997,6 +1997,9 @@
           "items": {
             "type": "string"
           }
+        },
+        "plugins": {
+          "$ref": "#/definitions/X-Tyk-CustomPluginConfig"
         }
       },
       "required": [

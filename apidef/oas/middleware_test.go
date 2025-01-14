@@ -219,6 +219,29 @@ func TestTrafficLogs(t *testing.T) {
 		trafficLogs.ExtractTo(&convertedAPI)
 		assert.Empty(t, convertedAPI.TagHeaders)
 	})
+
+	t.Run("with custom plugin", func(t *testing.T) {
+		t.Parallel()
+		expectedTrafficLogsPlugin := TrafficLogs{
+			Enabled:    true,
+			TagHeaders: []string{},
+			Plugins: CustomPlugins{
+				{
+					Enabled:      true,
+					FunctionName: "CustomAnalyticsPlugin",
+					Path:         "/path/to/plugin",
+				},
+			},
+		}
+
+		api := apidef.APIDefinition{}
+		api.SetDisabledFlags()
+		expectedTrafficLogsPlugin.ExtractTo(&api)
+
+		actualTrafficLogsPlugin := TrafficLogs{}
+		actualTrafficLogsPlugin.Fill(api)
+		assert.Equal(t, expectedTrafficLogsPlugin, actualTrafficLogsPlugin)
+	})
 }
 
 func TestPluginConfig(t *testing.T) {
