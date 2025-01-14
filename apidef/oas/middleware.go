@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/TykTechnologies/tyk/apidef"
 )
@@ -101,6 +102,9 @@ type Global struct {
 
 	// TrafficLogs contains the configurations related to API level log analytics.
 	TrafficLogs *TrafficLogs `bson:"trafficLogs,omitempty" json:"trafficLogs,omitempty"`
+
+	// RequestSizeLimit contains the configuration related to limiting the global request size.
+	RequestSizeLimit *GlobalRequestSizeLimit `bson:"requestSizeLimit,omitempty" json:"requestSizeLimit,omitempty"`
 }
 
 // MarshalJSON is a custom JSON marshaler for the Global struct. It is implemented
@@ -227,6 +231,8 @@ func (g *Global) Fill(api apidef.APIDefinition) {
 	g.fillContextVariables(api)
 
 	g.fillTrafficLogs(api)
+
+	g.fillRequestSizeLimit(api)
 }
 
 func (g *Global) fillTrafficLogs(api apidef.APIDefinition) {
@@ -237,6 +243,17 @@ func (g *Global) fillTrafficLogs(api apidef.APIDefinition) {
 	g.TrafficLogs.Fill(api)
 	if ShouldOmit(g.TrafficLogs) {
 		g.TrafficLogs = nil
+	}
+}
+
+func (g *Global) fillRequestSizeLimit(api apidef.APIDefinition) {
+	if g.RequestSizeLimit == nil {
+		g.RequestSizeLimit = &GlobalRequestSizeLimit{}
+	}
+
+	g.RequestSizeLimit.Fill(api)
+	if ShouldOmit(g.RequestSizeLimit) {
+		g.RequestSizeLimit = nil
 	}
 }
 
@@ -312,12 +329,7 @@ func (g *Global) ExtractTo(api *apidef.APIDefinition) {
 	var resHeaderMeta apidef.HeaderInjectionMeta
 	g.TransformResponseHeaders.ExtractTo(&resHeaderMeta)
 
-	if len(api.VersionData.Versions) == 0 {
-		api.VersionData.Versions = map[string]apidef.VersionInfo{
-			Main: {},
-		}
-	}
-
+	requireMainVersion(api)
 	vInfo := api.VersionData.Versions[Main]
 	vInfo.GlobalHeadersDisabled = headerMeta.Disabled
 	vInfo.GlobalHeaders = headerMeta.AddHeaders
@@ -326,7 +338,9 @@ func (g *Global) ExtractTo(api *apidef.APIDefinition) {
 	vInfo.GlobalResponseHeadersDisabled = resHeaderMeta.Disabled
 	vInfo.GlobalResponseHeaders = resHeaderMeta.AddHeaders
 	vInfo.GlobalResponseHeadersRemove = resHeaderMeta.DeleteHeaders
-	api.VersionData.Versions[Main] = vInfo
+	updateMainVersion(api, vInfo)
+
+	g.extractRequestSizeLimitTo(api)
 }
 
 func (g *Global) extractTrafficLogsTo(api *apidef.APIDefinition) {
@@ -338,6 +352,17 @@ func (g *Global) extractTrafficLogsTo(api *apidef.APIDefinition) {
 	}
 
 	g.TrafficLogs.ExtractTo(api)
+}
+
+func (g *Global) extractRequestSizeLimitTo(api *apidef.APIDefinition) {
+	if g.RequestSizeLimit == nil {
+		g.RequestSizeLimit = &GlobalRequestSizeLimit{}
+		defer func() {
+			g.RequestSizeLimit = nil
+		}()
+	}
+
+	g.RequestSizeLimit.ExtractTo(api)
 }
 
 func (g *Global) extractContextVariablesTo(api *apidef.APIDefinition) {
@@ -1553,16 +1578,119 @@ type TrafficLogs struct {
 	// Enabled enables traffic log analytics for the API.
 	// Tyk classic API definition: `do_not_track`.
 	Enabled bool `bson:"enabled" json:"enabled"`
+	// TagHeaders is a string array of HTTP headers that can be extracted
+	// and transformed into analytics tags (statistics aggregated by tag, per hour).
+	TagHeaders []string `bson:"tagHeaders" json:"tagHeaders,omitempty"`
+	// RetentionPeriod holds the configuration for the analytics retention, it contains configuration
+	// for how long you would like analytics data to last for.
+	RetentionPeriod *RetentionPeriod `bson:"retentionPeriod" json:"retentionPeriod,omitempty"`
 }
 
 // Fill fills *TrafficLogs from apidef.APIDefinition.
 func (t *TrafficLogs) Fill(api apidef.APIDefinition) {
 	t.Enabled = !api.DoNotTrack
+	t.TagHeaders = api.TagHeaders
+
+	if t.RetentionPeriod == nil {
+		t.RetentionPeriod = &RetentionPeriod{}
+	}
+	t.RetentionPeriod.Fill(api)
+	if ShouldOmit(t.RetentionPeriod) {
+		t.RetentionPeriod = nil
+	}
 }
 
 // ExtractTo extracts *TrafficLogs into *apidef.APIDefinition.
 func (t *TrafficLogs) ExtractTo(api *apidef.APIDefinition) {
 	api.DoNotTrack = !t.Enabled
+	api.TagHeaders = t.TagHeaders
+
+	if t.RetentionPeriod == nil {
+		t.RetentionPeriod = &RetentionPeriod{}
+		defer func() {
+			t.RetentionPeriod = nil
+		}()
+	}
+	t.RetentionPeriod.ExtractTo(api)
+}
+
+// RetentionPeriod holds the configuration for analytics retention.
+type RetentionPeriod struct {
+	// Enabled enables log analytics retention for the API
+	//
+	// Tyk classic API definition: `!disable_expire_analytics`.
+	Enabled bool `bson:"enabled" json:"enabled"`
+	// Value is the interval to keep the analytics record for
+	// The value of Value is a string that specifies the interval in a compact form,
+	// where hours, minutes and seconds are denoted by 'h', 'm' and 's' respectively.
+	// Multiple units can be combined to represent the duration.
+	//
+	// Examples of valid shorthand notations:
+	// - "1h"   : one hour
+	// - "20m"  : twenty minutes
+	// - "30s"  : thirty seconds
+	// - "1m29s": one minute and twenty-nine seconds
+	// - "1h30m" : one hour and thirty minutes
+	//
+	// An empty value is interpreted as "0s"
+	//
+	// Tyk classic API definition: `expire_analytics_after`.
+	Value ReadableDuration `bson:"value" json:"value"`
+}
+
+// Fill fills *RetentionPeriod from apidef.APIDefinition
+func (r *RetentionPeriod) Fill(api apidef.APIDefinition) {
+	r.Enabled = !api.DisableExpireAnalytics
+	r.Value = ReadableDuration(time.Duration(api.ExpireAnalyticsAfter) * time.Second)
+}
+
+// ExtractTo extracts *RetentionPeriod into apidef.APIDefinition
+func (r *RetentionPeriod) ExtractTo(api *apidef.APIDefinition) {
+	api.DisableExpireAnalytics = !r.Enabled
+	api.ExpireAnalyticsAfter = int64(r.Value.Seconds())
+}
+
+// GlobalRequestSizeLimit holds configuration about the global limits for request sizes.
+type GlobalRequestSizeLimit struct {
+	// Enabled activates the Request Size Limit.
+	// Tyk classic API definition: `version_data.versions..global_size_limit_disabled`.
+	Enabled bool `bson:"enabled" json:"enabled"`
+	// Value contains the value of the request size limit.
+	// Tyk classic API definition: `version_data.versions..global_size_limit`.
+	Value int64 `bson:"value" json:"value"`
+}
+
+// Fill fills *GlobalRequestSizeLimit from apidef.APIDefinition.
+func (g *GlobalRequestSizeLimit) Fill(api apidef.APIDefinition) {
+	ok := false
+	if api.VersionData.Versions != nil {
+		_, ok = api.VersionData.Versions[Main]
+	}
+	if !ok || api.VersionData.Versions[Main].GlobalSizeLimit == 0 {
+		g.Enabled = false
+		g.Value = 0
+		return
+	}
+
+	g.Enabled = !api.VersionData.Versions[Main].GlobalSizeLimitDisabled
+	g.Value = api.VersionData.Versions[Main].GlobalSizeLimit
+}
+
+// ExtractTo extracts *GlobalRequestSizeLimit into *apidef.APIDefinition.
+func (g *GlobalRequestSizeLimit) ExtractTo(api *apidef.APIDefinition) {
+	mainVersion := requireMainVersion(api)
+	defer func() {
+		updateMainVersion(api, mainVersion)
+	}()
+
+	if g.Value == 0 {
+		mainVersion.GlobalSizeLimit = 0
+		mainVersion.GlobalSizeLimitDisabled = true
+		return
+	}
+
+	mainVersion.GlobalSizeLimitDisabled = !g.Enabled
+	mainVersion.GlobalSizeLimit = g.Value
 }
 
 // ContextVariables holds the configuration related to Tyk context variables.

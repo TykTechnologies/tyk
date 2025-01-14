@@ -17,6 +17,8 @@ import (
 	"github.com/TykTechnologies/tyk/internal/uuid"
 )
 
+//go:generate mockgen -destination=./mock/storage.go -package mock . Handler
+
 var log = logger.Get()
 
 // ErrKeyNotFound is a standard error for when a key is not found in the storage engine

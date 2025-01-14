@@ -2,7 +2,7 @@
 version: "3"
 
 includes:
-  deps: ./deps/Taskfile.yml
+  deps: ./deps.yml
   services:
     taskfile: ../docker/services/Taskfile.yml
     dir: ../docker/services
@@ -50,8 +50,9 @@ tasks:
       - rm -rf coverage && mkdir -p coverage
       - for: { var: packages, as: package }
         cmd: |-
-          gotestsum --no-color=false --hide-summary=skipped --raw-command \
-          go test -p 1 -parallel 1 -json {{.testArgs}} {{.args}} -count=1 -v \
+          gotestsum --no-color=false --hide-summary=skipped \
+          --jsonfile coverage/{{.product}}-{{.package | replace "." "gateway" | replace "/" "-"}}.json \
+          --raw-command go test -p 1 -parallel 1 -json {{.testArgs}} {{.args}} -count=1 -v \
           -coverprofile=coverage/{{.package | replace "." "gateway" | replace "/" "-"}}.cov {{.package}} | head -n -2
 
   integration-combined:
@@ -86,8 +87,8 @@ tasks:
     vars:
       count: '{{ .count | default "10" }}'
     cmds:
-      - gotestsum --hide-summary=skipped --junitfile=unit-tests.xml --raw-command cat coverage/{{.product}}-all.json
-      - echo "Slowest {{.count}} tests:" && cat coverage/{{.product}}-all.json | gotestsum tool slowest | head -n {{.count}} | sed -e 's|{{.package}}/||g'
+      - gotestsum --hide-summary=skipped --junitfile=unit-tests.xml --raw-command cat coverage/*.json
+      - echo "Slowest {{.count}} tests:" && cat coverage/*.json | gotestsum tool slowest | head -n {{.count}} | sed -e 's|{{.package}}/||g'
 
   clean:
     desc: "Clean test outputs"

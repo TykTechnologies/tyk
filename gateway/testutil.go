@@ -890,6 +890,12 @@ func (s *Test) CreatePolicy(pGen ...func(p *user.Policy)) string {
 	return pol.ID
 }
 
+func (s *Test) DeletePolicy(policyID string) {
+	s.Gw.policiesMu.Lock()
+	delete(s.Gw.policiesByID, policyID)
+	s.Gw.policiesMu.Unlock()
+}
+
 func CreateJWKToken(jGen ...func(*jwt.Token)) string {
 	// Create the token
 	token := jwt.New(jwt.GetSigningMethod("RS512"))
@@ -1155,6 +1161,10 @@ func (s *Test) newGateway(genConf func(globalConf *config.Config)) *Gateway {
 	gwConfig.BundleBaseURL = testHttpBundles
 	gwConfig.MiddlewarePath = testMiddlewarePath
 
+	if err := config.FillEnv(&gwConfig); err != nil {
+		log.WithError(err).Error("error filling test config from env")
+	}
+
 	// force ipv4 for now, to work around the docker bug affecting
 	// Go 1.8 and earlier
 	gwConfig.ListenAddress = "127.0.0.1"
@@ -1278,9 +1288,10 @@ func (s *Test) Close() {
 		}
 	}
 
+	gwConfig := s.Gw.GetConfig()
+
 	s.Gw.DefaultProxyMux.swap(&proxyMux{}, s.Gw)
 	if s.config.SeparateControlAPI {
-		gwConfig := s.Gw.GetConfig()
 		gwConfig.ControlAPIPort = 0
 		s.Gw.SetConfig(gwConfig)
 	}
@@ -1303,6 +1314,7 @@ func (s *Test) Close() {
 	s.Gw.Analytics.Stop()
 	s.Gw.ReloadTestCase.StopTicker()
 	s.Gw.GlobalHostChecker.StopPoller()
+	s.Gw.NewRelicApplication.Shutdown(5 * time.Second)
 
 	err = s.RemoveApis()
 	if err != nil {
@@ -1792,9 +1804,13 @@ func BuildAPI(apiGens ...func(spec *APISpec)) (specs []*APISpec) {
 }
 
 func (gw *Gateway) LoadAPI(specs ...*APISpec) (out []*APISpec) {
+	var err error
 	gwConf := gw.GetConfig()
 	oldPath := gwConf.AppPath
-	gwConf.AppPath, _ = ioutil.TempDir("", "apps")
+	gwConf.AppPath, err = ioutil.TempDir("", "apps")
+	if err != nil {
+		log.WithError(err).Errorf("loadapi: failed to create temp dir")
+	}
 	gw.SetConfig(gwConf, true)
 	defer func() {
 		globalConf := gw.GetConfig()

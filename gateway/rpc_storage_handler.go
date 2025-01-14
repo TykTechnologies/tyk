@@ -162,7 +162,7 @@ func (r *RPCStorageHandler) buildNodeInfo() []byte {
 		intCheckDuration = int64(checkDuration / time.Second)
 	}
 
-	r.Gw.getHostDetails(r.Gw.GetConfig().PIDFileLocation)
+	r.Gw.getHostDetails()
 	node := model.NodeData{
 		NodeID:          r.Gw.GetNodeID(),
 		GroupID:         config.SlaveOptions.GroupID,

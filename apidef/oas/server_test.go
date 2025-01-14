@@ -323,3 +323,37 @@ func TestExportDetailedTracing(t *testing.T) {
 		})
 	}
 }
+
+func TestIPAccessControl(t *testing.T) {
+	t.Run("empty", func(t *testing.T) {
+		var emptyIPAccessControl IPAccessControl
+
+		var convertedAPI apidef.APIDefinition
+		convertedAPI.SetDisabledFlags()
+		emptyIPAccessControl.ExtractTo(&convertedAPI)
+
+		var resultIPAccessControl IPAccessControl
+		resultIPAccessControl.Fill(convertedAPI)
+
+		assert.Equal(t, emptyIPAccessControl, resultIPAccessControl)
+	})
+
+	t.Run("valid", func(t *testing.T) {
+		ipAccessControl := IPAccessControl{
+			Enabled: true,
+			Allow:   []string{"127.0.0.1"},
+			Block:   []string{"10.0.0.1"},
+		}
+
+		var convertedAPI apidef.APIDefinition
+		convertedAPI.SetDisabledFlags()
+		ipAccessControl.ExtractTo(&convertedAPI)
+
+		assert.False(t, convertedAPI.IPAccessControlDisabled)
+
+		var resultIPAccessControl IPAccessControl
+		resultIPAccessControl.Fill(convertedAPI)
+
+		assert.Equal(t, ipAccessControl, resultIPAccessControl)
+	})
+}

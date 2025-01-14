@@ -552,6 +552,9 @@
         },
         "trafficLogs": {
           "$ref": "#/definitions/X-Tyk-TrafficLogs"
+        },
+        "requestSizeLimit": {
+          "$ref": "#/definitions/X-Tyk-GlobalRequestSizeLimit"
         }
       }
     },
@@ -1244,6 +1247,9 @@
         },
         "contextVariables": {
           "$ref": "#/definitions/X-Tyk-ContextVariables"
+        },
+        "ipAccessControl": {
+          "$ref": "#/definitions/X-Tyk-IPAccessControl"
         }
       },
       "required": [
@@ -1985,10 +1991,47 @@
       "properties": {
         "enabled": {
           "type": "boolean"
+        },
+        "tagHeaders": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "retentionPeriod": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "value": {
+              "type": "string",
+              "pattern": "^(\\d+h)?(\\d+m)?(\\d+s)?$"
+            }
+          },
+          "required": [
+            "enabled",
+            "value"
+          ]
         }
       },
       "required": [
         "enabled"
+      ]
+    },
+    "X-Tyk-GlobalRequestSizeLimit": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "value": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "enabled",
+        "value"
       ]
     },
     "X-Tyk-UInt": {
@@ -2151,6 +2194,26 @@
         },
         "name": {
           "type": "string"
+        }
+      }
+    },
+    "X-Tyk-IPAccessControl": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "allow": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "block": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
         }
       }
     }
