@@ -10,6 +10,16 @@ testcases:
         assertions:
           - result.statuscode ShouldBeIn 200 404
 
+  - name: Delete Policy
+    steps:
+      - type: http
+        method: DELETE
+        url: http://localhost:8080/tyk/policies/46ad120575961080181867e
+        headers:
+          X-Tyk-Authorization: {{ .bearerToken }}
+        assertions:
+          - result.statuscode ShouldBeIn 200 500
+
   - name: Create API
     steps:
       - type: http
@@ -50,6 +60,66 @@ testcases:
           }
         assertions:
           - result.statuscode ShouldEqual 200
+
+  - name: Create Policy
+    steps:
+      - type: http
+        method: POST
+        url: http://localhost:8080/tyk/policies
+        headers:
+          Content-Type: application/json
+          X-Tyk-Authorization: {{ .bearerToken }}
+        body: |
+          {
+            "access_rights": {
+              "itachi-api": {
+                "allowed_urls": [
+                  {
+                    "methods": [
+                      "GET"
+                    ],
+                    "url": "/users"
+                  }
+                ],
+                "api_id": "f84ve1a04e5648c2797170567971565n",
+                "api_name": "Itachi api",
+                "disable_introspection": false,
+                "versions": [
+                  "Default"
+                ]
+              }
+            },
+            "active": true,
+            "hmac_enabled": false,
+            "id": "46ad120575961080181867e",
+            "is_inactive": false,
+            "key_expires_in": 2592000,
+            "max_query_depth": -1,
+            "meta_data": {
+              "update": "sample policy test",
+              "user_type": "mobile_user"
+            },
+            "name": "Sample policy",
+            "partitions": {
+              "acl": true,
+              "complexity": false,
+              "per_api": false,
+              "quota": true,
+              "rate_limit": true
+            },
+            "per": 60,
+            "quota_max": 10000,
+            "quota_renewal_rate": 3600,
+            "rate": 1000,
+            "tags": [
+              "security"
+            ],
+            "throttle_interval": 10,
+            "throttle_retry_limit": 10
+          }
+        assertions:
+          - result.statuscode ShouldEqual 200
+
   - name: Reload  gateway
     steps:
       - type: http

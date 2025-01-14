@@ -39,7 +39,7 @@
       {
         "openApiOperation": "*::/*",
         "excludeForOperations": [
-
+            "validateAKeyDefinition","listCerts"
         ],
         "schemaValidation": {
           "enabled": true
@@ -60,6 +60,36 @@
   },
   "assignVariables": [
     {
+      "openApiOperationIds": ["addPolicy"],
+      "collectionVariables": [
+        {
+          "responseBodyProp": "key",
+          "name": "addPolicy.ID"
+        }
+      ]
+    },
+    {
+      "openApiOperationIds": ["addCert"],
+      "collectionVariables": [
+        {
+          "responseBodyProp": "id",
+          "name": "addCert.id"
+        }
+      ]
+    },
+    {
+      "openApiOperationIds": ["addKey"],
+      "collectionVariables": [
+        {
+          "responseBodyProp": "key_hash",
+          "name": "addKey.key_hash"
+        },{
+          "responseBodyProp": "key",
+          "name": "addKey.key"
+        }
+      ]
+    },
+    {
       "openApiOperationIds": ["createApiOAS"],
       "collectionVariables": [
         {
@@ -78,13 +108,28 @@
       ]
     }
   ],
+
   "operationPreRequestScripts": [
     {
-      "openApiOperationIds": ["updateApi","deleteApi","getApi","updateApi","listApiVersions","deleteOASApi","getOASApi","patchApiOAS","updateApiOAS","downloadApiOASPublic"],
+      "openApiOperationIds": ["addCert"],
+      "scripts": ["file:config/certs.js"]
+    },
+    {
+      "openApiOperationIds": ["updateApi","deleteApi","getApi","updateApi","listApiVersions","deleteOASApi","getOASApi","patchApiOAS","updateApiOAS","downloadApiOASPublic","getPolicy"],
       "scripts": ["file:config/prescript.js"]
     }
   ],
   "overwrites": [
+    {
+      "openApiOperationIds": ["getPolicy","deletePolicy","updatePolicy"],
+      "overwriteRequestPathVariables": [
+        {
+          "value": "{{addPolicy.ID}}",
+          "key": "polID",
+          "overwrite": true
+        }
+      ]
+    },
     {
       "openApiOperationIds": ["listOASApiVersions","deleteOASApi","getOASApi","patchApiOAS","updateApiOAS","downloadApiOASPublic"],
       "overwriteRequestPathVariables": [
@@ -96,12 +141,92 @@
       ]
     },
     {
+      "openApiOperationIds": ["deleteCerts"],
+      "overwriteRequestPathVariables": [
+        {
+          "key": "certID",
+          "value": "{{addCert.id}}",
+          "overwrite": true
+        }
+      ]
+    },
+    {
+      "openApiOperationIds": ["getKey","updateKey","deleteKey"],
+      "overwriteRequestPathVariables": [
+        {
+          "key": "keyID",
+          "value": "{{addKey.key}}",
+          "overwrite": true
+        }
+      ]
+    },
+    {
+      "openApiOperationIds": ["invalidateOAuthRefresh"],
+      "overwriteRequestQueryParams": [
+        {
+          "key": "api_id",
+          "value": "f84ve1a04e5648c2797170567971565n"
+        }
+      ]
+    },
+    {
+      "openApiOperationIds": ["getApisForOauthApp"],
+      "overwriteRequestQueryParams": [
+        {
+          "key": "orgID",
+          "value": ""
+        }
+      ]
+    },
+    {
+      "openApiOperationIds": ["listOAuthClients","getOAuthClient","getOAuthClientTokens","updateOAuthClient","rotateOauthClient","deleteOAuthClient"],
+      "overwriteRequestPathVariables": [
+        {
+          "key": "apiID",
+          "value": "f84ve1a04e5648c2797170567971565n",
+          "overwrite": true
+        }
+      ]
+    },
+    {
+      "openApiOperationIds": ["createOAuthClient"],
+      "overwriteRequestBody": [
+        {
+          "key": "api_id",
+          "value": "f84ve1a04e5648c2797170567971565n",
+          "overwrite": true
+        }
+      ]
+    },
+    {
+      "openApiOperationIds": ["addKey","createCustomKey","createKey","updateKey"],
+      "overwriteRequestBody": [
+        {
+          "key": "apply_policies",
+          "overwrite": true,
+          "value": [
+            "46ad120575961080181867e"
+          ]
+        }
+      ]
+    },
+    {
       "openApiOperationIds": ["updateApiOAS","patchApiOAS"],
       "overwriteRequestBody": [
         {
           "overwrite": true,
           "key": "x-tyk-api-gateway.info.id",
           "value":"{{createApiOAS.apiID}}"
+        }
+      ]
+    },
+    {
+      "openApiOperationIds": ["setPoliciesToHashedKey"],
+      "overwriteRequestPathVariables": [
+        {
+          "key": "keyID",
+          "value": "{{addKey.key_hash}}",
+          "overwrite": true
         }
       ]
     },

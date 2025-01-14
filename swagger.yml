@@ -7266,6 +7266,7 @@ components:
         trigger:
           type: number
       type: object
+      nullable: true
     RateLimitType2:
       properties:
         per:
