@@ -2013,6 +2013,12 @@
             "enabled",
             "value"
           ]
+        },
+        "plugins": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/X-Tyk-CustomPluginConfig"
+          }
         }
       },
       "required": [
