@@ -10,7 +10,7 @@ for benchmark in $BENCHMARKS; do
 	echo $benchmark
 	benchRegex="^${benchmark}$"
 	./gateway.test -test.run=^$ -test.bench=$benchRegex -test.count=1 \
-			-test.benchtime 10s -test.benchmem \
+			-test.benchtime 30s -test.benchmem \
 			-test.cpuprofile=coverage/$benchmark-cpu.out \
 			-test.memprofile=coverage/$benchmark-mem.out \
 			-test.trace=coverage/$benchmark-trace.out
