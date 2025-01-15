@@ -8,9 +8,13 @@
 
 # Core API Squad ownership of plugin compiler and related tests.
 
+<<<<<<< HEAD
 /smoke-tests/                           @TykTechnologies/core-api-squad
 /ci/tests/                              @TykTechnologies/core-api-squad
 /ci/images/plugin-compiler/             @TykTechnologies/core-api-squad
+=======
+/bin/                                   @TykTechnologies/core-api-squad
+>>>>>>> 155e11bb3... [TT-13819] Benchmark updates, session limiter workaround for test goroutine leak (#6826)
 .github/workflows/ci-tests.yml          @TykTechnologies/core-api-squad
 .github/workflows/release-tests.yml     @TykTechnologies/core-api-squad
 /.taskfiles/                            @TykTechnologies/core-api-squad
