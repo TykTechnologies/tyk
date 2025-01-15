@@ -1306,6 +1306,9 @@
         },
         "authentication": {
           "$ref": "#/definitions/X-Tyk-UpstreamAuthentication"
+        },
+        "loadBalancing": {
+          "$ref": "#/definitions/X-Tyk-LoadBalancing"
         }
       },
       "required": [
@@ -2222,6 +2225,41 @@
           }
         }
       }
+    },
+    "X-Tyk-LoadBalancing": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "targets": {
+          "type": "array",
+          "items": [
+            {
+              "$ref": "#/definitions/X-Tyk-LoadBalancingTarget"
+            }
+          ]
+        }
+      },
+      "required": [
+        "enabled",
+        "targets"
+      ]
+    },
+    "X-Tyk-LoadBalancingTarget": {
+      "type": "object",
+      "properties": {
+        "url": {
+          "type": "string"
+        },
+        "weight": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "url",
+        "weight"
+      ]
     }
   }
 }

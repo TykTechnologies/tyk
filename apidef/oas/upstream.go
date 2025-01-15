@@ -32,6 +32,9 @@ type Upstream struct {
 
 	// Authentication contains the configuration related to upstream authentication.
 	Authentication *UpstreamAuth `bson:"authentication,omitempty" json:"authentication,omitempty"`
+
+	// LoadBalancing contains configuration for load balancing between multiple upstream targets.
+	LoadBalancing *LoadBalancing `bson:"loadBalancing,omitempty" json:"loadBalancing,omitempty"`
 }
 
 // Fill fills *Upstream from apidef.APIDefinition.
@@ -91,6 +94,8 @@ func (u *Upstream) Fill(api apidef.APIDefinition) {
 	if ShouldOmit(u.Authentication) {
 		u.Authentication = nil
 	}
+
+	u.fillLoadBalancing(api)
 }
 
 // ExtractTo extracts *Upstream into *apidef.APIDefinition.
@@ -150,6 +155,30 @@ func (u *Upstream) ExtractTo(api *apidef.APIDefinition) {
 	}
 
 	u.Authentication.ExtractTo(&api.UpstreamAuth)
+
+	u.loadBalancingExtractTo(api)
+}
+
+func (u *Upstream) fillLoadBalancing(api apidef.APIDefinition) {
+	if u.LoadBalancing == nil {
+		u.LoadBalancing = &LoadBalancing{}
+	}
+
+	u.LoadBalancing.Fill(api)
+	if ShouldOmit(u.LoadBalancing) {
+		u.LoadBalancing = nil
+	}
+}
+
+func (u *Upstream) loadBalancingExtractTo(api *apidef.APIDefinition) {
+	if u.LoadBalancing == nil {
+		u.LoadBalancing = &LoadBalancing{}
+		defer func() {
+			u.LoadBalancing = nil
+		}()
+	}
+
+	u.LoadBalancing.ExtractTo(api)
 }
 
 // ServiceDiscovery holds configuration required for service discovery.
@@ -804,4 +833,79 @@ func (u *UpstreamOAuth) ExtractTo(api *apidef.UpstreamOAuth) {
 		}()
 	}
 	u.PasswordAuthentication.ExtractTo(&api.PasswordAuthentication)
+}
+
+// LoadBalancing represents the configuration for load balancing between multiple upstream targets.
+type LoadBalancing struct {
+	// Enabled determines if load balancing is active.
+	Enabled bool `json:"enabled,omitempty" bson:"enabled,omitempty"`
+	// Targets defines the list of targets with their respective weights for load balancing.
+	Targets []LoadBalancingTarget `json:"targets,omitempty" bson:"targets,omitempty"`
+}
+
+// LoadBalancingTarget represents a single upstream target for load balancing with a URL and an associated weight.
+type LoadBalancingTarget struct {
+	// URL specifies the upstream target URL for load balancing, represented as a string.
+	URL string `json:"url,omitempty" bson:"url,omitempty"`
+	// Weight specifies the relative distribution factor for load balancing, determining the importance of this target.
+	Weight int `json:"weight,omitempty" bson:"weight,omitempty"`
+}
+
+// Fill populates the LoadBalancing structure based on the provided APIDefinition, including targets and their weights.
+func (l *LoadBalancing) Fill(api apidef.APIDefinition) {
+	if len(api.Proxy.Targets) == 0 {
+		api.Proxy.EnableLoadBalancing = false
+		api.Proxy.Targets = nil
+		return
+	}
+
+	l.Enabled = api.Proxy.EnableLoadBalancing
+
+	targetCounter := make(map[string]*LoadBalancingTarget)
+	for _, target := range api.Proxy.Targets {
+		if _, ok := targetCounter[target]; !ok {
+			targetCounter[target] = &LoadBalancingTarget{
+				URL:    target,
+				Weight: 0,
+			}
+		}
+		targetCounter[target].Weight++
+	}
+
+	targets := make([]LoadBalancingTarget, len(targetCounter))
+	i := 0
+	for _, target := range targetCounter {
+		targets[i] = *target
+		i++
+	}
+
+	targetsSorter := func(i, j int) bool {
+		return targets[i].URL < targets[j].URL
+	}
+
+	sort.Slice(targets, targetsSorter)
+	l.Targets = targets
+}
+
+// ExtractTo populates an APIDefinition's proxy load balancing configuration with data from the LoadBalancing instance.
+func (l *LoadBalancing) ExtractTo(api *apidef.APIDefinition) {
+	if len(l.Targets) == 0 {
+		api.Proxy.EnableLoadBalancing = false
+		api.Proxy.Targets = nil
+		return
+	}
+
+	proxyConfTargets := api.Proxy.Targets
+	if proxyConfTargets == nil {
+		proxyConfTargets = make([]string, 0)
+	}
+
+	api.Proxy.EnableLoadBalancing = l.Enabled
+	for _, target := range l.Targets {
+		for i := 0; i < target.Weight; i++ {
+			proxyConfTargets = append(proxyConfTargets, target.URL)
+		}
+	}
+
+	api.Proxy.Targets = proxyConfTargets
 }
