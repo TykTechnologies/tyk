@@ -25,7 +25,7 @@ jobs:
       - name: Create .env file with tokens
         run: |
           cd ci/tests/schema/specs
-          echo "PORTMAN_API_Key=${{ env.TYK_GW_SECRET }}" > .env
+          echo "PORTMAN_API_Key=example_gateway_secret" > .env
           cat .env
 
       - name: Run gateway containers
