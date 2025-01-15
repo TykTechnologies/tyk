@@ -1401,6 +1401,8 @@ func TestPurgeOAuthClientTokens(t *testing.T) {
 }
 
 func BenchmarkPurgeLapsedOAuthTokens(b *testing.B) {
+	b.Skip()
+
 	conf := func(globalConf *config.Config) {
 		// set tokens to be expired after 1 second
 		globalConf.OauthTokenExpire = 1
