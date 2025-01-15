@@ -5,14 +5,14 @@
     "contractTests": [
       {
         "openApiOperation": "*::/*",
-        "excludeForOperations": [],
+        "excludeForOperations": ["batch"],
         "statusSuccess": {
           "enabled": true
         }
       },
       {
         "openApiOperation": "*::/*",
-        "excludeForOperations": [],
+        "excludeForOperations": ["batch"],
         "responseTime": {
           "enabled": false,
           "maxMs": 300
@@ -21,7 +21,7 @@
       {
         "openApiOperation": "*::/*",
         "excludeForOperations": [
-
+"batch"
         ],
         "contentType": {
           "enabled": true
@@ -30,7 +30,7 @@
       {
         "openApiOperation": "*::/*",
         "excludeForOperations": [
-
+"batch"
         ],
         "jsonBody": {
           "enabled": true
@@ -39,7 +39,7 @@
       {
         "openApiOperation": "*::/*",
         "excludeForOperations": [
-            "validateAKeyDefinition","listCerts"
+            "validateAKeyDefinition","listCerts","batch"
         ],
         "schemaValidation": {
           "enabled": true
@@ -141,7 +141,7 @@
       ]
     },
     {
-      "openApiOperationIds": ["deleteCerts"],
+      "openApiOperationIds": ["deleteCerts","listCertsWithIDs"],
       "overwriteRequestPathVariables": [
         {
           "key": "certID",

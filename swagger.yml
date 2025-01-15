@@ -1787,7 +1787,7 @@ paths:
       summary: Return one certificate or list multiple certificates in the Tyk Gateway
         given a comma separated list of cert IDs.
       tags:
-      - CertsTag
+      - Certs
   /tyk/debug:
     post:
       description: Used to test API definition by sending sample request and analysing
