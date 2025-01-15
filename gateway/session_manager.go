@@ -38,11 +38,33 @@ type SessionLimiter struct {
 	Gw          *Gateway `json:"-"`
 }
 
+<<<<<<< HEAD
 func (l *SessionLimiter) doRollingWindowWrite(key, rateLimiterKey, rateLimiterSentinelKey string,
 	currentSession *user.SessionState,
 	store storage.Handler,
 	globalConf *config.Config,
 	apiLimit *user.APILimit, dryRun bool) bool {
+=======
+// Encourage reuse in NewSessionLimiter.
+var sessionLimiterBucketStore = memorycache.New()
+
+// NewSessionLimiter initializes the session limiter.
+//
+// The session limiter initializes the storage required for rate limiters.
+// It supports two storage types: `redis` and `local`. If redis storage is
+// configured, then redis will be used. If local storage is configured, then
+// in-memory counters will be used. If no storage is configured, it falls
+// back onto the default gateway storage configuration.
+func NewSessionLimiter(ctx context.Context, conf *config.Config, drlManager *drl.DRL) SessionLimiter {
+	sessionLimiter := SessionLimiter{
+		ctx:         ctx,
+		drlManager:  drlManager,
+		config:      conf,
+		bucketStore: sessionLimiterBucketStore,
+	}
+
+	log.Infof("[RATELIMIT] %s", conf.RateLimit.String())
+>>>>>>> 155e11bb3... [TT-13819] Benchmark updates, session limiter workaround for test goroutine leak (#6826)
 
 	var per, rate float64
 

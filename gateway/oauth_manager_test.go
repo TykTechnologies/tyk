@@ -1309,7 +1309,98 @@ func TestJSONToFormValues(t *testing.T) {
 	})
 }
 
+<<<<<<< HEAD
 func TestPurgeOAuthClientTokensEvent(t *testing.T) {
+=======
+func assertTokensLen(t *testing.T, storageManager storage.Handler, storageKey string, expectedTokensLen int) {
+	t.Helper()
+	nowTs := time.Now().Unix()
+	startScore := strconv.FormatInt(nowTs, 10)
+	tokens, _, err := storageManager.GetSortedSetRange(storageKey, startScore, "+inf")
+	assert.NoError(t, err)
+	assert.Equal(t, expectedTokensLen, len(tokens))
+}
+
+func TestPurgeOAuthClientTokens(t *testing.T) {
+	t.Run("event", func(t *testing.T) {
+		conf := func(globalConf *config.Config) {
+			// set tokens to be expired after 1 second
+			globalConf.OauthTokenExpire = 1
+			// cleanup tokens older than 1 seconds
+			globalConf.OauthTokenExpiredRetainPeriod = 1
+		}
+
+		ts := StartTest(conf)
+		defer ts.Close()
+
+		spec := ts.LoadTestOAuthSpec()
+
+		clientID1, clientID2 := uuid.New(), uuid.New()
+
+		ts.createOAuthClientIDAndTokens(t, spec, clientID1)
+		ts.createOAuthClientIDAndTokens(t, spec, clientID2)
+		storageKey1, storageKey2 := fmt.Sprintf("%s%s", prefixClientTokens, clientID1),
+			fmt.Sprintf("%s%s", prefixClientTokens, clientID2)
+
+		storageManager := ts.Gw.getGlobalMDCBStorageHandler(generateOAuthPrefix(spec.APIID), false)
+		storageManager.Connect()
+
+		assertTokensLen(t, storageManager, storageKey1, 3)
+		assertTokensLen(t, storageManager, storageKey2, 3)
+
+		time.Sleep(time.Second * 2)
+
+		// emit event
+
+		n := Notification{
+			Command: OAuthPurgeLapsedTokens,
+			Gw:      ts.Gw,
+		}
+		ts.Gw.MainNotifier.Notify(n)
+
+		assertTokensLen(t, storageManager, storageKey1, 0)
+		assertTokensLen(t, storageManager, storageKey2, 0)
+	})
+
+	t.Run("background", func(t *testing.T) {
+
+		conf := func(globalConf *config.Config) {
+			// set tokens to be expired after 1 second
+			globalConf.OauthTokenExpire = 1
+			// cleanup tokens older than 2 seconds
+			globalConf.OauthTokenExpiredRetainPeriod = 1
+		}
+
+		ts := StartTest(conf)
+		defer ts.Close()
+
+		spec := ts.LoadTestOAuthSpec()
+
+		clientID1, clientID2 := uuid.New(), uuid.New()
+
+		ts.createOAuthClientIDAndTokens(t, spec, clientID1)
+		ts.createOAuthClientIDAndTokens(t, spec, clientID2)
+		storageKey1, storageKey2 := fmt.Sprintf("%s%s", prefixClientTokens, clientID1),
+			fmt.Sprintf("%s%s", prefixClientTokens, clientID2)
+
+		storageManager := ts.Gw.getGlobalMDCBStorageHandler(generateOAuthPrefix(spec.APIID), false)
+		storageManager.Connect()
+
+		assertTokensLen(t, storageManager, storageKey1, 3)
+		assertTokensLen(t, storageManager, storageKey2, 3)
+
+		time.Sleep(time.Second * 2)
+
+		assertTokensLen(t, storageManager, storageKey1, 0)
+		assertTokensLen(t, storageManager, storageKey2, 0)
+	})
+
+}
+
+func BenchmarkPurgeLapsedOAuthTokens(b *testing.B) {
+	b.Skip()
+
+>>>>>>> 155e11bb3... [TT-13819] Benchmark updates, session limiter workaround for test goroutine leak (#6826)
 	conf := func(globalConf *config.Config) {
 		// set tokens to be expired after 1 second
 		globalConf.OauthTokenExpire = 1
