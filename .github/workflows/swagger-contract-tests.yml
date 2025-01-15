@@ -32,7 +32,6 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.ORG_GH_TOKEN }}
           GATEWAY_IMAGE: docker.tyk.io/tyk-gateway/tyk-gateway:v5.7.0
-          TYK_GW_SECRET: ${{ env.TYK_GW_SECRET }}
         run: |
           task run_gateway_to_test_oas
 
