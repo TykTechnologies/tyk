@@ -37,11 +37,18 @@ func TestTransformNonAscii(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
+<<<<<<< HEAD
 	ad := apidef.APIDefinition{}
 	spec := APISpec{APIDefinition: &ad}
 	spec.EnableContextVars = false
 	base := BaseMiddleware{Spec: &spec, Gw: ts.Gw}
 	base.Spec.EnableContextVars = false
+=======
+	ad := &apidef.APIDefinition{}
+	spec := &APISpec{APIDefinition: ad}
+	base := &BaseMiddleware{Spec: spec, Gw: ts.Gw}
+
+>>>>>>> 155e11bb3... [TT-13819] Benchmark updates, session limiter workaround for test goroutine leak (#6826)
 	transform := TransformMiddleware{base}
 
 	if err := transformBody(r, tmeta, &transform); err != nil {
@@ -64,15 +71,23 @@ func BenchmarkTransformNonAscii(b *testing.B) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
+<<<<<<< HEAD
 	spec := APISpec{}
 	base := BaseMiddleware{Spec: &spec, Gw: ts.Gw}
 	base.Spec.EnableContextVars = false
 	transform := TransformMiddleware{base}
+=======
+	ad := &apidef.APIDefinition{}
+	spec := &APISpec{APIDefinition: ad}
+	base := &BaseMiddleware{Spec: spec, Gw: ts.Gw}
+
+	transform := &TransformMiddleware{base}
+>>>>>>> 155e11bb3... [TT-13819] Benchmark updates, session limiter workaround for test goroutine leak (#6826)
 
 	for i := 0; i < b.N; i++ {
 		r := TestReq(b, "GET", "/", in)
 
-		if err := transformBody(r, tmeta, &transform); err != nil {
+		if err := transformBody(r, tmeta, transform); err != nil {
 			b.Fatalf("wanted nil error, got %v", err)
 		}
 	}
@@ -90,10 +105,17 @@ func TestTransformXMLCrash(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
+<<<<<<< HEAD
 	ad := apidef.APIDefinition{}
 	spec := APISpec{APIDefinition: &ad}
 	base := BaseMiddleware{Spec: &spec, Gw: ts.Gw}
 	base.Spec.EnableContextVars = false
+=======
+	ad := &apidef.APIDefinition{}
+	spec := &APISpec{APIDefinition: ad}
+	base := &BaseMiddleware{Spec: spec, Gw: ts.Gw}
+
+>>>>>>> 155e11bb3... [TT-13819] Benchmark updates, session limiter workaround for test goroutine leak (#6826)
 	transform := TransformMiddleware{base}
 
 	if err := transformBody(r, tmeta, &transform); err == nil {
@@ -145,10 +167,17 @@ func TestTransformJSONMarshalXMLInput(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
+<<<<<<< HEAD
 	ad := apidef.APIDefinition{}
 	spec := APISpec{APIDefinition: &ad}
 	base := BaseMiddleware{Spec: &spec, Gw: ts.Gw}
 	base.Spec.EnableContextVars = false
+=======
+	ad := &apidef.APIDefinition{}
+	spec := &APISpec{APIDefinition: ad}
+	base := &BaseMiddleware{Spec: spec, Gw: ts.Gw}
+
+>>>>>>> 155e11bb3... [TT-13819] Benchmark updates, session limiter workaround for test goroutine leak (#6826)
 	transform := TransformMiddleware{base}
 
 	if err := transformBody(r, tmeta, &transform); err != nil {
@@ -172,10 +201,17 @@ func TestTransformJSONMarshalJSONInput(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
+<<<<<<< HEAD
 	ad := apidef.APIDefinition{}
 	spec := APISpec{APIDefinition: &ad}
 	base := BaseMiddleware{Spec: &spec, Gw: ts.Gw}
 	base.Spec.EnableContextVars = false
+=======
+	ad := &apidef.APIDefinition{}
+	spec := &APISpec{APIDefinition: ad}
+	base := &BaseMiddleware{Spec: spec, Gw: ts.Gw}
+
+>>>>>>> 155e11bb3... [TT-13819] Benchmark updates, session limiter workaround for test goroutine leak (#6826)
 	transform := TransformMiddleware{base}
 
 	if err := transformBody(r, tmeta, &transform); err != nil {
@@ -211,10 +247,17 @@ func TestTransformJSONMarshalJSONArrayInput(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
+<<<<<<< HEAD
 	ad := apidef.APIDefinition{}
 	spec := APISpec{APIDefinition: &ad}
 	base := BaseMiddleware{Spec: &spec, Gw: ts.Gw}
 	base.Spec.EnableContextVars = false
+=======
+	ad := &apidef.APIDefinition{}
+	spec := &APISpec{APIDefinition: ad}
+	base := &BaseMiddleware{Spec: spec, Gw: ts.Gw}
+
+>>>>>>> 155e11bb3... [TT-13819] Benchmark updates, session limiter workaround for test goroutine leak (#6826)
 	transform := TransformMiddleware{base}
 
 	if err := transformBody(r, tmeta, &transform); err != nil {
@@ -236,9 +279,16 @@ func BenchmarkTransformJSONMarshal(b *testing.B) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
+<<<<<<< HEAD
 	spec := APISpec{}
 	base := BaseMiddleware{Spec: &spec, Gw: ts.Gw}
 	base.Spec.EnableContextVars = false
+=======
+	ad := &apidef.APIDefinition{}
+	spec := &APISpec{APIDefinition: ad}
+	base := &BaseMiddleware{Spec: spec, Gw: ts.Gw}
+
+>>>>>>> 155e11bb3... [TT-13819] Benchmark updates, session limiter workaround for test goroutine leak (#6826)
 	transform := TransformMiddleware{base}
 
 	for i := 0; i < b.N; i++ {
@@ -257,10 +307,17 @@ func TestTransformXMLMarshal(t *testing.T) {
 		ts := StartTest(nil)
 		defer ts.Close()
 
+<<<<<<< HEAD
 		ad := apidef.APIDefinition{}
 		spec := APISpec{APIDefinition: &ad}
 		base := BaseMiddleware{Spec: &spec, Gw: ts.Gw}
 		base.Spec.EnableContextVars = false
+=======
+		ad := &apidef.APIDefinition{}
+		spec := &APISpec{APIDefinition: ad}
+		base := &BaseMiddleware{Spec: spec, Gw: ts.Gw}
+
+>>>>>>> 155e11bb3... [TT-13819] Benchmark updates, session limiter workaround for test goroutine leak (#6826)
 		transform := TransformMiddleware{base}
 
 		if err := transformBody(r, tmeta, &transform); err != nil {
