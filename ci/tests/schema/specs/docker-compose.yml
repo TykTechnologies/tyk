@@ -20,4 +20,3 @@ services:
       - "8080:8080"
     environment:
       - TYK_LOGLEVEL=debug
-      - TYK_GW_SECRET= ${PORTMAN_API_Key}
