@@ -22,6 +22,12 @@ jobs:
         run: |
           RANDOM_STRING=$(openssl rand -base64 32)
           echo "TYK_GW_SECRET=$RANDOM_STRING" >> $GITHUB_ENV
+      - name: Create .env file with tokens
+        run: |
+          cd ci/tests/schema/specs
+          echo "PORTMAN_API_Key=${{ env.TYK_GW_SECRET }}" > .env
+          cat .env
+
       - name: Run gateway containers
         env:
           GH_TOKEN: ${{ secrets.ORG_GH_TOKEN }}
@@ -30,11 +36,6 @@ jobs:
         run: |
           task run_gateway_to_test_oas
 
-      - name: Create .env file with tokens
-        run: |
-          cd ci/tests/schema/specs
-          echo "PORTMAN_API_Key=${{ env.TYK_GW_SECRET }}" > .env
-          cat .env
       - name: Install venom
         run: |
           curl https://github.com/ovh/venom/releases/download/v1.1.0/venom.linux-amd64 -L -o /usr/local/bin/venom && chmod +x /usr/local/bin/venom
