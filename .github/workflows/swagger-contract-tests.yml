@@ -1,9 +1,8 @@
 name: Run Open Api Specifications contract tests with live gateway
 on:
-  pull_request:
+  push:
     branches:
-      - master
-      - release-**
+      - '*'
 permissions:
   id-token: write
   contents: read
