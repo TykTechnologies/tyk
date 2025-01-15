@@ -95,3 +95,7 @@ jobs:
                   cd -
               fi
           done
+
+  run-swagger-contract-tests:
+    uses: ./.github/workflows/swagger-contract-tests.yml
+    secrets: inherit
