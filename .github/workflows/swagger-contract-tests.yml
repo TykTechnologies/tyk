@@ -25,7 +25,6 @@ jobs:
         run: |
           cd ci/tests/schema/specs
           echo "PORTMAN_API_Key=example_gateway_secret" > .env
-          cat .env
 
       - name: Run gateway containers
         env:
