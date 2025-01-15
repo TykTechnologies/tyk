@@ -1584,6 +1584,9 @@ type TrafficLogs struct {
 	// RetentionPeriod holds the configuration for the analytics retention, it contains configuration
 	// for how long you would like analytics data to last for.
 	RetentionPeriod *RetentionPeriod `bson:"retentionPeriod" json:"retentionPeriod,omitempty"`
+	// Plugins configures custom plugins to allow for extensive modifications to analytics records
+	// The plugins would be executed in the order of configuration in the list.
+	Plugins CustomPlugins `bson:"plugins,omitempty" json:"plugins,omitempty"`
 }
 
 // Fill fills *TrafficLogs from apidef.APIDefinition.
@@ -1597,6 +1600,13 @@ func (t *TrafficLogs) Fill(api apidef.APIDefinition) {
 	t.RetentionPeriod.Fill(api)
 	if ShouldOmit(t.RetentionPeriod) {
 		t.RetentionPeriod = nil
+	}
+
+	if len(api.CustomMiddleware.TrafficLogs) == 0 {
+		t.Plugins = nil
+	} else {
+		t.Plugins = make(CustomPlugins, len(api.CustomMiddleware.TrafficLogs))
+		t.Plugins.Fill(api.CustomMiddleware.TrafficLogs)
 	}
 }
 
@@ -1612,6 +1622,13 @@ func (t *TrafficLogs) ExtractTo(api *apidef.APIDefinition) {
 		}()
 	}
 	t.RetentionPeriod.ExtractTo(api)
+
+	if len(t.Plugins) == 0 {
+		api.CustomMiddleware.TrafficLogs = nil
+	} else {
+		api.CustomMiddleware.TrafficLogs = make([]apidef.MiddlewareDefinition, len(t.Plugins))
+		t.Plugins.ExtractTo(api.CustomMiddleware.TrafficLogs)
+	}
 }
 
 // RetentionPeriod holds the configuration for analytics retention.
