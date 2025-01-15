@@ -1,0 +1,52 @@
+name: Run Open Api Specifications contract tests with live gateway
+on:
+  pull_request:
+    branches:
+      - master
+      - release-**
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  run-contract-test-with-live-gateway:
+    runs-on: ubuntu-latest
+    name: Run Open Api Specifications contract tests
+    steps:
+      - name: Checkout current repository
+        uses: actions/checkout@v4
+
+      - name: Install go-stask
+        uses: arduino/setup-task@v1
+        with:
+          version: '3.39.0'
+
+      # Run gateway containers
+      - name: Generate random string
+        id: Generate random string
+        run: |
+          RANDOM_STRING=$(openssl rand -base64 32)
+          echo "TYK_GW_SECRET=$RANDOM_SECRET" >> $GITHUB_ENV
+      - name: Run gateway containers
+        env:
+          GH_TOKEN: ${{ secrets.ORG_GH_TOKEN }}
+          GATEWAY_IMAGE: docker.tyk.io/tyk-gateway/tyk-gateway:v5.7.0
+          TYK_GW_SECRET: ${{ env.TYK_GW_SECRET }}
+        run: |
+          task run_gateway_to_test_oas
+
+      - name: Create .env file with tokens
+        run: |
+          cd ci/tests/schema/specs
+          echo "PORTMAN_API_Key=${{ env.TYK_GW_SECRET }}" > .env
+          cat .env
+      - name: Install venom
+        run: |
+          curl https://github.com/ovh/venom/releases/download/v1.1.0/venom.linux-amd64 -L -o /usr/local/bin/venom && chmod +x /usr/local/bin/venom
+      - name: Run the Portman tests
+        run: |
+          task portman_tests
+
+      - name: Clean up
+        run: |
+          task stop_gateway_to_test_oas

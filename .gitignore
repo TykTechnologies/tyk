@@ -70,3 +70,5 @@ ci/tests/schema/specs/node_modules
 ci/tests/schema/specs/package-lock.json
 ci/tests/schema/specs/gateway.collection.postman.json
 ci/tests/schema/specs/.env
+ci/tests/schema/specs/apps
+ci/tests/schema/specs/policies

@@ -20,6 +20,9 @@ includes:
   apidef-oas:
     taskfile: apidef/oas/Taskfile.yml
     dir: apidef/oas/
+  portman_integration_tests:
+    taskfile: ./ci/tests/schema/specs/Taskfile.yml
+    dir: ./ci/tests/schema/specs
 
 tasks:
   docker:
@@ -102,3 +105,20 @@ tasks:
     cmds:
       - task: deps:default
       - lefthook install
+
+  portman_tests:
+    desc: "Run the OpenAPI specification tests from schema tests"
+    dotenv: [ 'ci/tests/schema/specs/.env' ]
+    cmds:
+      - task portman_integration_tests:portman_tests
+
+  run_gateway_to_test_oas:
+    desc: "Start the gateway to test portman"
+    dotenv: [ 'ci/tests/schema/specs/.env' ]
+    cmds:
+      - task portman_integration_tests:run_gateway_to_test_oas
+  stop_gateway_to_test_oas:
+    desc: "Stop the gateway to test portman"
+    dotenv: [ 'ci/tests/schema/specs/.env' ]
+    cmds:
+      - task portman_integration_tests:stop_gateway_to_test_oas

@@ -1,6 +1,13 @@
 version: "3"
-dotenv: [.env]
 tasks:
+  run_gateway_to_test_oas:
+    desc: "Start the gateway to test portman"
+    cmds:
+      - docker compose up -d
+  stop_gateway_to_test_oas:
+    desc: "Stop the gateway to test portman"
+    cmds:
+      - docker compose down
   portman_tests:
     desc: "Run the OpenAPI specification tests"
     cmds:
