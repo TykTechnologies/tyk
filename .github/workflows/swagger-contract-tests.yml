@@ -21,7 +21,7 @@ jobs:
       - name: Generate random string
         run: |
           RANDOM_STRING=$(openssl rand -base64 32)
-          echo "TYK_GW_SECRET=$RANDOM_SECRET" >> $GITHUB_ENV
+          echo "TYK_GW_SECRET=$RANDOM_STRING" >> $GITHUB_ENV
       - name: Run gateway containers
         env:
           GH_TOKEN: ${{ secrets.ORG_GH_TOKEN }}
