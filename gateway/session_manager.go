@@ -36,8 +36,49 @@ const (
 // SessionLimiter is the rate limiter for the API, use ForwardMessage() to
 // check if a message should pass through or not
 type SessionLimiter struct {
+<<<<<<< HEAD
 	bucketStore leakybucket.Storage
 	Gw          *Gateway `json:"-"`
+=======
+	ctx            context.Context
+	drlManager     *drl.DRL
+	config         *config.Config
+	bucketStore    leakybucket.Storage
+	limiterStorage redis.UniversalClient
+	smoothing      *rate.Smoothing
+}
+
+// Encourage reuse in NewSessionLimiter.
+var sessionLimiterBucketStore = memorycache.New()
+
+// NewSessionLimiter initializes the session limiter.
+//
+// The session limiter initializes the storage required for rate limiters.
+// It supports two storage types: `redis` and `local`. If redis storage is
+// configured, then redis will be used. If local storage is configured, then
+// in-memory counters will be used. If no storage is configured, it falls
+// back onto the default gateway storage configuration.
+func NewSessionLimiter(ctx context.Context, conf *config.Config, drlManager *drl.DRL) SessionLimiter {
+	sessionLimiter := SessionLimiter{
+		ctx:         ctx,
+		drlManager:  drlManager,
+		config:      conf,
+		bucketStore: sessionLimiterBucketStore,
+	}
+
+	log.Infof("[RATELIMIT] %s", conf.RateLimit.String())
+
+	storageConf := conf.GetRateLimiterStorage()
+
+	switch storageConf.Type {
+	case "redis":
+		sessionLimiter.limiterStorage = rate.NewStorage(storageConf)
+	}
+
+	sessionLimiter.smoothing = rate.NewSmoothing(sessionLimiter.limiterStorage)
+
+	return sessionLimiter
+>>>>>>> 155e11bb3... [TT-13819] Benchmark updates, session limiter workaround for test goroutine leak (#6826)
 }
 
 func (l *SessionLimiter) Context() context.Context {
