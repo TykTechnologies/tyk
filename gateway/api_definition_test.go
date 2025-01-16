@@ -1063,13 +1063,9 @@ func (ts *Test) testPrepareDefaultVersion() string {
 		spec.Proxy.ListenPath = "/"
 
 		spec.UseKeylessAccess = false
-<<<<<<< HEAD
-	})
-=======
 		spec.DisableRateLimit = true
 		spec.DisableQuota = true
-	})[0]
->>>>>>> 155e11bb3... [TT-13819] Benchmark updates, session limiter workaround for test goroutine leak (#6826)
+	})
 
 	return CreateSession(ts.Gw, func(s *user.SessionState) {
 		s.AccessRights = map[string]user.AccessDefinition{"test": {
