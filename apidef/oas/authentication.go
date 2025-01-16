@@ -59,20 +59,41 @@ type Authentication struct {
 	// SecuritySchemes contains security schemes definitions.
 	SecuritySchemes SecuritySchemes `bson:"securitySchemes,omitempty" json:"securitySchemes,omitempty"`
 
-	// keyRetentionPeriod contains configuration for managing time-to-live(TTL) for tokens.
+	// KeyRetentionPeriod contains configuration for key retention.
 	KeyRetentionPeriod *KeyRetentionPeriod `bson:"keyRetentionPeriod,omitempty" json:"keyRetentionPeriod,omitempty"`
 }
 
+// KeyRetentionPeriod contains configuration for key retention.
 type KeyRetentionPeriod struct {
-	Enabled bool             `bson:"enabled,omitempty" json:"enabled,omitempty"`
-	Value   ReadableDuration `bson:"value" json:"value"`
+	// Enabled enables Key retention for the API
+	//
+	// Tyk classic API definition: `!disable_expire_analytics`.
+	Enabled bool `bson:"enabled,omitempty" json:"enabled,omitempty"`
+	// Value is the interval to keep the Key for
+	// The value of Value is a string that specifies the interval in a compact form,
+	// where hours, minutes and seconds are denoted by 'h', 'm' and 's' respectively.
+	// Multiple units can be combined to represent the duration.
+	//
+	// Examples of valid shorthand notations:
+	// - "1h"   : one hour
+	// - "20m"  : twenty minutes
+	// - "30s"  : thirty seconds
+	// - "1m29s": one minute and twenty-nine seconds
+	// - "1h30m" : one hour and thirty minutes
+	//
+	// An empty value is interpreted as "0s"
+	//
+	// Tyk classic API definition: `expire_analytics_after`.
+	Value ReadableDuration `bson:"value" json:"value"`
 }
 
+// Fill fills *KeyRetentionPeriod from apidef.APIDefinition.
 func (k *KeyRetentionPeriod) Fill(api apidef.APIDefinition) {
 	k.Enabled = !api.SessionLifetimeDisabled
 	k.Value = ReadableDuration(time.Duration(api.ExpireAnalyticsAfter) * time.Second)
 }
 
+// ExtractTo extracts *Authentication into *apidef.APIDefinition.
 func (k *KeyRetentionPeriod) ExtractTo(api *apidef.APIDefinition) {
 	api.SessionLifetimeDisabled = !k.Enabled
 	api.SessionLifetime = int64(k.Value.Seconds())
