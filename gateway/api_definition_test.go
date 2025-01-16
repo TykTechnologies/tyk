@@ -1063,6 +1063,8 @@ func (ts *Test) testPrepareDefaultVersion() string {
 		spec.Proxy.ListenPath = "/"
 
 		spec.UseKeylessAccess = false
+		spec.DisableRateLimit = true
+		spec.DisableQuota = true
 	})
 
 	return CreateSession(ts.Gw, func(s *user.SessionState) {
