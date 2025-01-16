@@ -102,3 +102,9 @@ tasks:
     cmds:
       - task: deps:default
       - lefthook install
+
+  clean:
+    desc: "Clean test files"
+    cmds:
+      - find -name '*.so' -delete -print
+      - find -name '*.test' -delete -print

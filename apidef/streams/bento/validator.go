@@ -10,7 +10,7 @@ import (
 
 	"github.com/hashicorp/go-multierror"
 
-	"github.com/TykTechnologies/gojsonschema"
+	"github.com/TykTechnologies/tyk/internal/service/gojsonschema"
 	tykerrors "github.com/TykTechnologies/tyk/internal/errors"
 )
 
