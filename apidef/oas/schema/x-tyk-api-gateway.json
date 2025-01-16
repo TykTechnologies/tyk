@@ -1216,8 +1216,7 @@
             }
           },
           "required": [
-            "enabled",
-            "value"
+            "enabled"
           ]
         }
       },

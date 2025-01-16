@@ -65,7 +65,7 @@ type Authentication struct {
 
 type KeyRetentionPeriod struct {
 	Enabled bool             `bson:"enabled,omitempty" json:"enabled,omitempty"`
-	Value   ReadableDuration `bson:"value,omitempty" json:"value,omitempty"`
+	Value   ReadableDuration `bson:"value" json:"value"`
 }
 
 func (k *KeyRetentionPeriod) Fill(api apidef.APIDefinition) {
