@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"reflect"
 	"sort"
+	"time"
 
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/mitchellh/mapstructure"
@@ -57,6 +58,24 @@ type Authentication struct {
 
 	// SecuritySchemes contains security schemes definitions.
 	SecuritySchemes SecuritySchemes `bson:"securitySchemes,omitempty" json:"securitySchemes,omitempty"`
+
+	// keyRetentionPeriod contains configuration for managing time-to-live(TTL) for tokens.
+	KeyRetentionPeriod *KeyRetentionPeriod `bson:"keyRetentionPeriod,omitempty" json:"keyRetentionPeriod,omitempty"`
+}
+
+type KeyRetentionPeriod struct {
+	Enabled bool             `bson:"enabled,omitempty" json:"enabled,omitempty"`
+	Value   ReadableDuration `bson:"value,omitempty" json:"value,omitempty"`
+}
+
+func (k *KeyRetentionPeriod) Fill(api apidef.APIDefinition) {
+	k.Enabled = !api.SessionLifetimeDisabled
+	k.Value = ReadableDuration(time.Duration(api.ExpireAnalyticsAfter) * time.Second)
+}
+
+func (k *KeyRetentionPeriod) ExtractTo(api *apidef.APIDefinition) {
+	api.SessionLifetimeDisabled = !k.Enabled
+	api.SessionLifetime = int64(k.Value.Seconds())
 }
 
 // Fill fills *Authentication from apidef.APIDefinition.
@@ -73,6 +92,14 @@ func (a *Authentication) Fill(api apidef.APIDefinition) {
 
 	if ShouldOmit(a.Custom) {
 		a.Custom = nil
+	}
+
+	if a.KeyRetentionPeriod == nil {
+		a.KeyRetentionPeriod = &KeyRetentionPeriod{}
+	}
+	a.KeyRetentionPeriod.Fill(api)
+	if ShouldOmit(a.KeyRetentionPeriod) {
+		a.KeyRetentionPeriod = nil
 	}
 
 	if api.AuthConfigs == nil || len(api.AuthConfigs) == 0 {
@@ -126,6 +153,14 @@ func (a *Authentication) ExtractTo(api *apidef.APIDefinition) {
 	}
 
 	a.Custom.ExtractTo(api)
+
+	if a.KeyRetentionPeriod == nil {
+		a.KeyRetentionPeriod = &KeyRetentionPeriod{}
+		defer func() {
+			a.KeyRetentionPeriod = nil
+		}()
+	}
+	a.KeyRetentionPeriod.ExtractTo(api)
 }
 
 // SecuritySchemes holds security scheme values, filled with Import().
