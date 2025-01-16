@@ -1,10 +1,3 @@
-<<<<<<< HEAD
-/ci/ @TykTechnologies/devops
-.github/workflows/release.yml @TykTechnologies/devops
-.github/workflows/sync-automation.yml @TykTechnologies/devops
-.github/workflows/pac.yml @TykTechnologies/devops
-/repo-policy/ @TykTechnologies/devops
-=======
 # SysE/DevOps ownership of CI release pipeline, repo policy, automations.
 
 /ci/                                    @TykTechnologies/devops
@@ -27,4 +20,3 @@
 /smoke-tests/                           @TykTechnologies/core-api-squad
 /ci/tests/                              @TykTechnologies/core-api-squad
 /ci/images/plugin-compiler/             @TykTechnologies/core-api-squad
->>>>>>> 155e11bb3... [TT-13819] Benchmark updates, session limiter workaround for test goroutine leak (#6826)
