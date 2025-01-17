@@ -55,6 +55,9 @@
     "do_not_track": {
       "type": "boolean"
     },
+    "session_lifetime_disabled": {
+      "type": "boolean"
+    },
     "enable_jwt": {
       "type": "boolean"
     },
