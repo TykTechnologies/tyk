@@ -677,6 +677,7 @@ func TestSetDisabledFlags(t *testing.T) {
 		DomainDisabled:                 true,
 		CustomMiddlewareBundleDisabled: true,
 		ConfigDataDisabled:             true,
+		SessionLifetimeDisabled:        true,
 		Proxy: ProxyConfig{
 			ServiceDiscovery: ServiceDiscoveryConfiguration{
 				CacheDisabled: true,

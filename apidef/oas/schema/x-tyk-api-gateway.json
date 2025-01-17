@@ -1203,6 +1203,21 @@
               ]
             }
           }
+        },
+        "keyRetentionPeriod": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "value": {
+              "type": "string",
+              "pattern": "^(\\d+h)?(\\d+m)?(\\d+s)?$"
+            }
+          },
+          "required": [
+            "enabled"
+          ]
         }
       },
       "required": [
