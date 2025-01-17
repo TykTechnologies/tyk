@@ -69,8 +69,8 @@ type KeyRetentionPeriod struct {
 	//
 	// Tyk classic API definition: `disable_expire_analytics`.
 	Enabled bool `bson:"enabled,omitempty" json:"enabled,omitempty"`
-	// Value is the interval to keep the Key for
-	// The value of Value is a string that specifies the interval in a compact form,
+	// Value configures the expiry interval for a Key.
+	// The value is a string that specifies the interval in a compact form,
 	// where hours, minutes and seconds are denoted by 'h', 'm' and 's' respectively.
 	// Multiple units can be combined to represent the duration.
 	//
