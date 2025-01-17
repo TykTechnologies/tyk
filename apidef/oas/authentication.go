@@ -67,7 +67,7 @@ type Authentication struct {
 type KeyRetentionPeriod struct {
 	// Enabled enables Key retention for the API
 	//
-	// Tyk classic API definition: `!disable_expire_analytics`.
+	// Tyk classic API definition: `disable_expire_analytics`.
 	Enabled bool `bson:"enabled,omitempty" json:"enabled,omitempty"`
 	// Value is the interval to keep the Key for
 	// The value of Value is a string that specifies the interval in a compact form,
