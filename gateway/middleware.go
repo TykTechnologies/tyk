@@ -439,45 +439,34 @@ func (t *BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 func (t *BaseMiddleware) recordAccessLog(req *http.Request, resp *http.Response, latency *analytics.Latency) {
 	hashKeys := t.Gw.GetConfig().HashKeys
 	accessLog := accesslog.NewRecord()
-	accessLogTemplate := t.Gw.GetConfig().AccessLogs.Template
+	allowedFields := t.Gw.GetConfig().AccessLogs.Template
+	fields := accessLog.Fields()
+
+	// Set the access log fields
+	accessLog.WithApiKey(req, hashKeys, t.Gw.obfuscateKey)
+	accessLog.WithClientIP(req)
+	accessLog.WithRemoteAddr(req)
+	accessLog.WithHost(req)
+	accessLog.WithLatencyTotal(latency)
+	accessLog.WithMethod(req)
+	accessLog.WithPath(req)
+	accessLog.WithProtocol(req)
+	accessLog.WithStatus(resp)
+	accessLog.WithUpstreamAddress(req)
+	accessLog.WithUpstreamLatency(latency)
+	accessLog.WithUserAgent(req)
 
 	// Check for template config
-	if isValidAccessLogTemplate(accessLogTemplate) {
-		// Custom access log template
+	if isValidAccessLogTemplate(allowedFields) {
+		// Filter based on custom log template
 		t.logger.Debug("Using CUSTOM access log template")
-
-		for _, conf := range accessLogTemplate {
-			switch strings.ToLower(conf) {
-			case "auth":
-				accessLog.WithAuthToken(req, hashKeys, t.Gw.obfuscateKey)
-			case "clientip":
-				accessLog.WithClientIP(req)
-			case "latency":
-				accessLog.WithLatency(latency)
-			case "request":
-				accessLog.WithRequest(req)
-			case "requesturl":
-				accessLog.WithRequestURL(req)
-			case "response":
-				accessLog.WithResponse(resp)
-			case "upstream":
-				accessLog.WithUpstreamAddress(req)
-			default:
-				if conf == "" {
-					t.logger.Debug("Empty string is not a valid access template value")
-				} else {
-					t.logger.Debug(conf, " is not a valid access template value")
-				}
-			}
-		}
+		filteredFields := accesslog.Filter(&fields, allowedFields)
+		t.Logger().WithFields(*filteredFields).Info()
 	} else {
 		// Default access log
 		t.logger.Debug("Using DEFAULT access log template")
-		accessLog.WithRequest(req)
-		accessLog.WithResponse(resp)
+		t.Logger().WithFields(fields).Info()
 	}
-
-	t.Logger().WithFields(accessLog.Fields()).Info()
 }
 
 func isValidAccessLogTemplate(template []string) bool {
