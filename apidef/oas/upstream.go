@@ -838,7 +838,7 @@ func (u *UpstreamOAuth) ExtractTo(api *apidef.UpstreamOAuth) {
 // LoadBalancing represents the configuration for load balancing between multiple upstream targets.
 type LoadBalancing struct {
 	// Enabled determines if load balancing is active.
-	Enabled bool `json:"enabled,omitempty" bson:"enabled,omitempty"`
+	Enabled bool `json:"enabled" bson:"enabled"` // required
 	// Targets defines the list of targets with their respective weights for load balancing.
 	Targets []LoadBalancingTarget `json:"targets,omitempty" bson:"targets,omitempty"`
 }
@@ -846,9 +846,9 @@ type LoadBalancing struct {
 // LoadBalancingTarget represents a single upstream target for load balancing with a URL and an associated weight.
 type LoadBalancingTarget struct {
 	// URL specifies the upstream target URL for load balancing, represented as a string.
-	URL string `json:"url,omitempty" bson:"url,omitempty"`
+	URL string `json:"url" bson:"url"` // required
 	// Weight specifies the relative distribution factor for load balancing, determining the importance of this target.
-	Weight int `json:"weight,omitempty" bson:"weight,omitempty"`
+	Weight int `json:"weight" bson:"weight"` // required
 }
 
 // Fill populates the LoadBalancing structure based on the provided APIDefinition, including targets and their weights.
