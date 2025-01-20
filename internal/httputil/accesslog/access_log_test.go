@@ -69,7 +69,7 @@ func TestNewRecordField(t *testing.T) {
 		StatusCode: http.StatusOK,
 	}
 
-	record := NewRecord().WithClientIP(req).WithLatency(latency).WithRequest(req).WithResponse(resp).WithUpstreamAddress(req).WithUpstreamURI(req).Fields()
+	record := NewRecord().WithClientIP(req).WithLatency(latency).WithRequest(req).WithRequestURL(req).WithResponse(resp).WithUpstreamAddress(req).Fields()
 
 	assert.Equal(t, "access-log", record["prefix"])
 
@@ -87,12 +87,12 @@ func TestNewRecordField(t *testing.T) {
 	assert.Equal(t, "HTTP/1.1", record["protocol"])
 	assert.Equal(t, "user-agent", record["user_agent"])
 
+	// WithRequestURL
+	assert.Equal(t, "http://example.com/path?userid=1", record["request_url"])
+
 	// WithResponse
 	assert.Equal(t, http.StatusOK, record["status_code"])
 
 	// WithUpstreamAddress
 	assert.Equal(t, "http://example.com/path", record["upstream_address"])
-
-	// WithUpstreamURI
-	assert.Equal(t, "/path?userid=1", record["upstream_uri"])
 }
