@@ -456,12 +456,12 @@ func (t *BaseMiddleware) recordAccessLog(req *http.Request, resp *http.Response,
 				accessLog.WithLatency(latency)
 			case "request":
 				accessLog.WithRequest(req)
+			case "requesturl":
+				accessLog.WithRequestURL(req)
 			case "response":
 				accessLog.WithResponse(resp)
 			case "upstream":
 				accessLog.WithUpstreamAddress(req)
-			case "upstreamuri":
-				accessLog.WithUpstreamURI(req)
 			default:
 				if conf == "" {
 					t.logger.Debug("Empty string is not a valid access template value")

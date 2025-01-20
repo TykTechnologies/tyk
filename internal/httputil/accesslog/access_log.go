@@ -71,6 +71,14 @@ func (a *Record) WithRequest(req *http.Request) *Record {
 	return a
 }
 
+// WithRequestURL sets the request URL of the Record.
+func (a *Record) WithRequestURL(req *http.Request) *Record {
+	if req != nil {
+		a.fields["request_url"] = req.RequestURI
+	}
+	return a
+}
+
 // WithResponse sets the response data of the Record.
 func (a *Record) WithResponse(resp *http.Response) *Record {
 	if resp != nil {
@@ -90,15 +98,6 @@ func (a *Record) WithUpstreamAddress(req *http.Request) *Record {
 		}
 
 		a.fields["upstream_address"] = upstreamAddress.String()
-	}
-	return a
-}
-
-// WithUpstreamURI sets the upstream URI of the Record. May contain sensitive data such as
-// query parameters etc.
-func (a *Record) WithUpstreamURI(req *http.Request) *Record {
-	if req != nil {
-		a.fields["upstream_uri"] = req.URL.RequestURI()
 	}
 	return a
 }
