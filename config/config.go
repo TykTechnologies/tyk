@@ -258,7 +258,7 @@ type AccessLogsConfig struct {
 
 	// Template defaults to empty which prints the default log.
 	// Set this value to determine which fields will be printed in the access log.
-	// Example: ["..."].
+	// Example: ["auth", "request", "clientip", "latency", "response", "requesturl", "upstream"].
 	Template []string `json:"template"`
 }
 
