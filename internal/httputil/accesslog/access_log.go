@@ -71,10 +71,10 @@ func (a *Record) WithRequest(req *http.Request) *Record {
 	return a
 }
 
-// WithRequestURL sets the request URL of the Record.
-func (a *Record) WithRequestURL(req *http.Request) *Record {
+// WithPath sets the request URL of the Record.
+func (a *Record) WithPath(req *http.Request) *Record {
 	if req != nil {
-		a.fields["request_url"] = req.URL.Path
+		a.fields["path"] = req.URL.Path
 	}
 	return a
 }
