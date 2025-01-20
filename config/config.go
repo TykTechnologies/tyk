@@ -258,7 +258,21 @@ type AccessLogsConfig struct {
 
 	// Template defaults to empty which prints the default log.
 	// Set this value to determine which fields will be printed in the access log.
-	// Example: ["auth", "request", "clientip", "latency", "response", "requesturl", "upstream"].
+	// Example: ["..."].
+	//
+	// Template Options:
+	// - `api_key` will include they obfuscated or hashed key.
+	// - `client_ip` will include the ip of the request.
+	// - `host` will include the host of the request.
+	// - `latency_total` will include the total latency of the request.
+	// - `method` will include the request method.
+	// - `path` will include the path of the request.
+	// - `protocol` will include the protocol of the request.
+	// - `remote_addr` will include the remote address of the request.
+	// - `status` will include the response status code.
+	// - `upstream_address` will include the upstream address (scheme, host and path)
+	// - `upstream_latency` will include the upstream latency of the request.
+	// - `use_agent` will include the user agent of the request.
 	Template []string `json:"template"`
 }
 
