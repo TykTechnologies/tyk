@@ -88,7 +88,7 @@ func TestNewRecordField(t *testing.T) {
 	assert.Equal(t, "user-agent", record["user_agent"])
 
 	// WithRequestURL
-	assert.Equal(t, "http://example.com/path?userid=1", record["request_url"])
+	assert.Equal(t, "/path", record["request_url"])
 
 	// WithResponse
 	assert.Equal(t, http.StatusOK, record["status_code"])
