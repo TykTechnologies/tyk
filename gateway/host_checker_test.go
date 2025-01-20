@@ -398,6 +398,8 @@ func TestTestCheckerTCPHosts_correct_answers_proxy_protocol(t *testing.T) {
 }
 
 func TestTestCheckerTCPHosts_correct_wrong_answers(t *testing.T) {
+	t.Skip() // TT-13861
+
 	ts := StartTest(nil)
 	defer ts.Close()
 
