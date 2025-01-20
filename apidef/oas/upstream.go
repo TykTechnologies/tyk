@@ -35,6 +35,14 @@ type Upstream struct {
 
 	// LoadBalancing contains configuration for load balancing between multiple upstream targets.
 	LoadBalancing *LoadBalancing `bson:"loadBalancing,omitempty" json:"loadBalancing,omitempty"`
+
+	// TLSTransport contains the configuration for TLS transport settings.
+	// Tyk classic API definition: `proxy.transport`
+	TLSTransport *TLSTransport `bson:"tlsTransport,omitempty" json:"tlsTransport,omitempty"`
+
+	// Proxy contains the configuration for an internal proxy.
+	// Tyk classic API definition: `proxy.proxy_url`
+	Proxy *Proxy `bson:"proxy,omitempty" json:"proxy,omitempty"`
 }
 
 // Fill fills *Upstream from apidef.APIDefinition.
@@ -179,6 +187,62 @@ func (u *Upstream) loadBalancingExtractTo(api *apidef.APIDefinition) {
 	}
 
 	u.LoadBalancing.ExtractTo(api)
+}
+
+// TLSTransport contains the configuration for TLS transport settings.
+// This struct allows you to specify a custom proxy and set the minimum TLS versions and any SSL ciphers.
+//
+// Example:
+//
+//	{
+//	  "proxy_url": "http(s)://proxy.url:1234",
+//	  "minVersion": "1.0",
+//	  "maxVersion": "1.0",
+//	  "ciphers": [
+//	    "TLS_RSA_WITH_AES_128_GCM_SHA256",
+//	    "TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA"
+//	  ],
+//	  "insecureSkipVerify": true,
+//	  "forceCommonNameCheck": false
+//	}
+//
+// Tyk classic API definition: `proxy.transport`
+type TLSTransport struct {
+	// InsecureSkipVerify controls whether a client verifies the server's certificate chain and host name.
+	// If InsecureSkipVerify is true, crypto/tls accepts any certificate presented by the server and any host name in that certificate.
+	// In this mode, TLS is susceptible to machine-in-the-middle attacks unless custom verification is used.
+	// This should be used only for testing or in combination with VerifyConnection or VerifyPeerCertificate.
+	//
+	// Tyk classic API definition: `proxy.transport.ssl_insecure_skip_verify`
+	InsecureSkipVerify bool `bson:"insecureSkipVerify,omitempty" json:"insecureSkipVerify,omitempty"`
+
+	// Ciphers is a list of SSL ciphers to be used. If unset, the default ciphers will be used.
+	//
+	// Tyk classic API definition: `proxy.transport.ssl_ciphers`
+	Ciphers []string `bson:"ciphers,omitempty" json:"ciphers,omitempty"`
+
+	// MinVersion is the minimum SSL/TLS version that is acceptable.
+	// Tyk classic API definition: `proxy.transport.ssl_min_version`
+	MinVersion string `bson:"minVersion,omitempty" json:"minVersion,omitempty"`
+
+	// MaxVersion is the maximum SSL/TLS version that is acceptable.
+	MaxVersion string `bson:"maxVersion,omitempty" json:"maxVersion,omitempty"`
+
+	// ForceCommonNameCheck forces the validation of the hostname against the certificate Common Name.
+	//
+	// Tyk classic API definition: `proxy.transport.ssl_force_common_name_check`
+	ForceCommonNameCheck bool `bson:"forceCommonNameCheck,omitempty" json:"forceCommonNameCheck,omitempty"`
+}
+
+// Proxy contains the configuration for an internal proxy.
+//
+// Tyk classic API definition: `proxy.proxy_url`
+type Proxy struct {
+	// Enabled determines if the proxy is active.
+	Enabled bool `bson:"enabled" json:"enabled"`
+
+	// URL specifies the URL of the internal proxy.
+	URL string `bson:"url" json:"url"`
 }
 
 // ServiceDiscovery holds configuration required for service discovery.
