@@ -10,7 +10,7 @@ tasks:
     desc: "Run tests (requires redis)"
     cmds:
       - task: fmt
-      - go test {{.testArgs}} -count=1 -cover -coverprofile=rate.cov {{.coverpkg}} ./...
+      - go test {{.testArgs}} -count=1 -cover -coverprofile=rate.cov -coverpkg={{.coverpkg}} ./...
 
   bench:
     desc: "Run benchmarks"
