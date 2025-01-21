@@ -1,6 +1,7 @@
 package oas
 
 import (
+	"crypto/tls"
 	"sort"
 	"strings"
 
@@ -106,6 +107,14 @@ func (u *Upstream) Fill(api apidef.APIDefinition) {
 	}
 
 	u.fillLoadBalancing(api)
+
+	if u.TLSTransport == nil {
+		u.TLSTransport = &TLSTransport{}
+	}
+	u.TLSTransport.Fill(api)
+	if ShouldOmit(u.TLSTransport) {
+		u.TLSTransport = nil
+	}
 }
 
 // ExtractTo extracts *Upstream into *apidef.APIDefinition.
@@ -247,6 +256,52 @@ type TLSTransport struct {
 	//
 	// Tyk classic API definition: `proxy.transport.ssl_force_common_name_check`
 	ForceCommonNameCheck bool `bson:"forceCommonNameCheck,omitempty" json:"forceCommonNameCheck,omitempty"`
+}
+
+func (t *TLSTransport) Fill(api apidef.APIDefinition) {
+	t.ForceCommonNameCheck = api.Proxy.Transport.SSLForceCommonNameCheck
+	t.Ciphers = api.Proxy.Transport.SSLCipherSuites
+	t.MaxVersion = tlsVersionToString(api.Proxy.Transport.SSLMaxVersion)
+	t.MinVersion = tlsVersionToString(api.Proxy.Transport.SSLMinVersion)
+	t.InsecureSkipVerify = api.Proxy.Transport.SSLInsecureSkipVerify
+}
+
+func (t *TLSTransport) ExtractTo(api *apidef.APIDefinition) {
+	api.Proxy.Transport.SSLForceCommonNameCheck = t.ForceCommonNameCheck
+	api.Proxy.Transport.SSLCipherSuites = t.Ciphers
+	api.Proxy.Transport.SSLMaxVersion = tlsVersionFromString(t.MaxVersion)
+	api.Proxy.Transport.SSLMinVersion = tlsVersionFromString(t.MinVersion)
+	api.Proxy.Transport.SSLInsecureSkipVerify = t.InsecureSkipVerify
+}
+
+func tlsVersionFromString(v string) uint16 {
+	switch v {
+	case "1.0":
+		return tls.VersionTLS10
+	case "1.1":
+		return tls.VersionTLS11
+	case "1.2":
+		return tls.VersionTLS12
+	case "1.3":
+		return tls.VersionTLS13
+	default:
+		return 0
+	}
+}
+
+func tlsVersionToString(v uint16) string {
+	switch v {
+	case tls.VersionTLS10:
+		return "1.0"
+	case tls.VersionTLS11:
+		return "1.1"
+	case tls.VersionTLS12:
+		return "1.2"
+	case tls.VersionTLS13:
+		return "1.3"
+	default:
+		return ""
+	}
 }
 
 // Proxy contains the configuration for an internal proxy.

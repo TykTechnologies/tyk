@@ -1,6 +1,7 @@
 package oas
 
 import (
+	"crypto/tls"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -608,11 +609,53 @@ func TestUpstreamRequestSigning(t *testing.T) {
 	})
 }
 
-func TestTLSTransport(t *testing.T) {
+func TestTLSTransportProxy(t *testing.T) {
 	t.Run("with tls settings", func(t *testing.T) {
 		transport := TLSTransport{
-			InsecureSkipVerify: false,
+			InsecureSkipVerify:   true,
+			MinVersion:           "1.2",
+			MaxVersion:           "1.3",
+			ForceCommonNameCheck: true,
 		}
+
+		var convertedAPI apidef.APIDefinition
+		var resultTransport TLSTransport
+
+		convertedAPI.SetDisabledFlags()
+		transport.ExtractTo(&convertedAPI)
+
+		assert.Equal(t, transport.InsecureSkipVerify, convertedAPI.Proxy.Transport.SSLInsecureSkipVerify)
+		assert.Equal(t, uint16(tls.VersionTLS12), convertedAPI.Proxy.Transport.SSLMinVersion)
+		assert.Equal(t, uint16(tls.VersionTLS13), convertedAPI.Proxy.Transport.SSLMaxVersion)
+		assert.Equal(t, transport.ForceCommonNameCheck, convertedAPI.Proxy.Transport.SSLForceCommonNameCheck)
+
+		resultTransport.Fill(convertedAPI)
+
+		assert.Equal(t, transport, resultTransport)
+	})
+
+	t.Run("emmpty tls settings", func(t *testing.T) {
+		var emptyTlsTransport TLSTransport
+		var convertedAPI apidef.APIDefinition
+		var resultTransport TLSTransport
+
+		convertedAPI.SetDisabledFlags()
+		emptyTlsTransport.ExtractTo(&convertedAPI)
+		resultTransport.Fill(convertedAPI)
+
+		assert.Equal(t, emptyTlsTransport, resultTransport)
+	})
+
+	t.Run("proxy settings", func(t *testing.T) {
+		proxyTransport := Proxy{
+			URL: "proxy-url",
+		}
+		var convertedAPI apidef.APIDefinition
+		var resultProxy Proxy
+
+		convertedAPI.SetDisabledFlags()
+		proxyTransport.Fill(convertedAPI)
+		assert.Equal(t, proxyTransport, resultProxy)
 	})
 }
 
