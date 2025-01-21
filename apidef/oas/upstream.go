@@ -115,6 +115,14 @@ func (u *Upstream) Fill(api apidef.APIDefinition) {
 	if ShouldOmit(u.TLSTransport) {
 		u.TLSTransport = nil
 	}
+
+	if u.Proxy == nil {
+		u.Proxy = &Proxy{}
+	}
+	u.Proxy.Fill(api)
+	if ShouldOmit(u.Proxy) {
+		u.Proxy = nil
+	}
 }
 
 // ExtractTo extracts *Upstream into *apidef.APIDefinition.
@@ -176,6 +184,22 @@ func (u *Upstream) ExtractTo(api *apidef.APIDefinition) {
 	u.Authentication.ExtractTo(api)
 
 	u.loadBalancingExtractTo(api)
+
+	if u.TLSTransport == nil {
+		u.TLSTransport = &TLSTransport{}
+		defer func() {
+			u.TLSTransport = nil
+		}()
+	}
+	u.TLSTransport.ExtractTo(api)
+
+	if u.Proxy == nil {
+		u.Proxy = &Proxy{}
+		defer func() {
+			u.Proxy = nil
+		}()
+	}
+	u.Proxy.ExtractTo(api)
 
 	u.preserveHostHeaderExtractTo(api)
 }
@@ -258,6 +282,7 @@ type TLSTransport struct {
 	ForceCommonNameCheck bool `bson:"forceCommonNameCheck,omitempty" json:"forceCommonNameCheck,omitempty"`
 }
 
+// Fill fills *TLSTransport from apidef.ServiceDiscoveryConfiguration.
 func (t *TLSTransport) Fill(api apidef.APIDefinition) {
 	t.ForceCommonNameCheck = api.Proxy.Transport.SSLForceCommonNameCheck
 	t.Ciphers = api.Proxy.Transport.SSLCipherSuites
@@ -266,6 +291,7 @@ func (t *TLSTransport) Fill(api apidef.APIDefinition) {
 	t.InsecureSkipVerify = api.Proxy.Transport.SSLInsecureSkipVerify
 }
 
+// ExtractTo extracts *TLSTransport into *apidef.ServiceDiscoveryConfiguration.
 func (t *TLSTransport) ExtractTo(api *apidef.APIDefinition) {
 	api.Proxy.Transport.SSLForceCommonNameCheck = t.ForceCommonNameCheck
 	api.Proxy.Transport.SSLCipherSuites = t.Ciphers
@@ -274,6 +300,7 @@ func (t *TLSTransport) ExtractTo(api *apidef.APIDefinition) {
 	api.Proxy.Transport.SSLInsecureSkipVerify = t.InsecureSkipVerify
 }
 
+// tlsVersionFromString converts v in the form of 1.2/1.3 to the version int
 func tlsVersionFromString(v string) uint16 {
 	switch v {
 	case "1.0":
@@ -289,6 +316,7 @@ func tlsVersionFromString(v string) uint16 {
 	}
 }
 
+// tlsVersionFromString converts v from version into to the form 1.0/1.1
 func tlsVersionToString(v uint16) string {
 	switch v {
 	case tls.VersionTLS10:
@@ -313,6 +341,16 @@ type Proxy struct {
 
 	// URL specifies the URL of the internal proxy.
 	URL string `bson:"url" json:"url"`
+}
+
+// Fill fills *Proxy from apidef.ServiceDiscoveryConfiguration.
+func (p *Proxy) Fill(api apidef.APIDefinition) {
+	p.URL = api.Proxy.Transport.ProxyURL
+}
+
+// ExtractTo extracts *Proxy into *apidef.ServiceDiscoveryConfiguration.
+func (p *Proxy) ExtractTo(api *apidef.APIDefinition) {
+	api.Proxy.Transport.ProxyURL = p.URL
 }
 
 // ServiceDiscovery holds configuration required for service discovery.

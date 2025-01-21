@@ -654,7 +654,11 @@ func TestTLSTransportProxy(t *testing.T) {
 		var resultProxy Proxy
 
 		convertedAPI.SetDisabledFlags()
-		proxyTransport.Fill(convertedAPI)
+		proxyTransport.ExtractTo(&convertedAPI)
+
+		assert.Equal(t, "proxy-url", convertedAPI.Proxy.Transport.ProxyURL)
+
+		resultProxy.Fill(convertedAPI)
 		assert.Equal(t, proxyTransport, resultProxy)
 	})
 }
