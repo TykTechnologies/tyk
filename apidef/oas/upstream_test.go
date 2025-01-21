@@ -472,6 +472,14 @@ func TestCertificatePinning(t *testing.T) {
 	})
 }
 
+func TestTLSTransport(t *testing.T) {
+	t.Run("with tls settings", func(t *testing.T) {
+		transport := TLSTransport{
+			InsecureSkipVerify: false,
+		}
+	})
+}
+
 func TestLoadBalancing(t *testing.T) {
 	t.Parallel()
 	t.Run("fill", func(t *testing.T) {
