@@ -1366,6 +1366,11 @@
         },
         "preserveHostHeader": {
           "$ref": "#/definitions/X-Tyk-PreserveHostHeader"
+        "tlsTransport": {
+          "$ref": "#/definitions/X-Tyk-TLSTransport"
+        },
+        "proxy": {
+          "$ref": "#/definitions/X-Tyk-Proxy"
         }
       },
       "anyOf": [
@@ -2359,6 +2364,41 @@
           }
         }
       ]
+    },
+    "X-Tyk-TLSTransport": {
+      "type": "object",
+      "properties": {
+        "insecureSkipVerify": {
+          "type": "boolean"
+        },
+        "ciphers": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "minVersion": {
+          "type": "string"
+        },
+        "maxVersion": {
+          "type": "string"
+        },
+        "forceCommonNameCheck": {
+          "type": "boolean"
+        }
+      }
+    },
+    "X-Tyk-Proxy": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "url": {
+          "type": "string"
+        }
+      },
+      "required": ["enabled"]
     },
     "X-Tyk-PreserveHostHeader": {
       "type": "object",

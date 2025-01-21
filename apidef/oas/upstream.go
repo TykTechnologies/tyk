@@ -106,20 +106,6 @@ func (u *Upstream) Fill(api apidef.APIDefinition) {
 	}
 
 	u.fillLoadBalancing(api)
-
-	u.fillPreserveHostHeader(api)
-}
-
-func (u *Upstream) fillPreserveHostHeader(api apidef.APIDefinition) {
-	if u.PreserveHostHeader == nil {
-		u.PreserveHostHeader = &PreserveHostHeader{}
-	}
-
-	u.PreserveHostHeader.Fill(api)
-
-	if ShouldOmit(u.PreserveHostHeader) {
-		u.PreserveHostHeader = nil
-	}
 }
 
 // ExtractTo extracts *Upstream into *apidef.APIDefinition.
