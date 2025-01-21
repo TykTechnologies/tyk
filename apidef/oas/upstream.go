@@ -113,6 +113,14 @@ func (u *Upstream) Fill(api apidef.APIDefinition) {
 	if ShouldOmit(u.TLSTransport) {
 		u.TLSTransport = nil
 	}
+
+	if u.Proxy == nil {
+		u.Proxy = &Proxy{}
+	}
+	u.Proxy.Fill(api)
+	if ShouldOmit(u.Proxy) {
+		u.Proxy = nil
+	}
 }
 
 // ExtractTo extracts *Upstream into *apidef.APIDefinition.
@@ -174,6 +182,22 @@ func (u *Upstream) ExtractTo(api *apidef.APIDefinition) {
 	u.Authentication.ExtractTo(&api.UpstreamAuth)
 
 	u.loadBalancingExtractTo(api)
+
+	if u.TLSTransport == nil {
+		u.TLSTransport = &TLSTransport{}
+		defer func() {
+			u.TLSTransport = nil
+		}()
+	}
+	u.TLSTransport.ExtractTo(api)
+
+	if u.Proxy == nil {
+		u.Proxy = &Proxy{}
+		defer func() {
+			u.Proxy = nil
+		}()
+	}
+	u.Proxy.ExtractTo(api)
 }
 
 func (u *Upstream) fillLoadBalancing(api apidef.APIDefinition) {
