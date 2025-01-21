@@ -23,7 +23,7 @@ import (
 
 	"github.com/TykTechnologies/graphql-go-tools/pkg/execution/datasource"
 
-	"github.com/TykTechnologies/gojsonschema"
+	"github.com/TykTechnologies/tyk/internal/service/gojsonschema"
 
 	"github.com/TykTechnologies/tyk/regexp"
 
