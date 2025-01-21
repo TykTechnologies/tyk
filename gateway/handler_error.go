@@ -314,11 +314,7 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 		}
 	}
 
-	// Print the transaction logs for error situations if enabled. Success transaction
-	// logs will be handled by the "handler_success.go"
-	if e.Spec.GlobalConfig.AccessLogs.Enabled {
-		e.recordAccessLog(r, response, nil)
-	}
+	e.RecordAccessLog(r, response, analytics.Latency{})
 
 	// Report in health check
 	reportHealthValue(e.Spec, BlockedRequestLog, "-1")

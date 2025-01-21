@@ -54,7 +54,7 @@ func (a *Record) WithUpstreamAddress(req *http.Request) *Record {
 }
 
 // WithLatency sets the upstream latency of the Record.
-func (a *Record) WithLatency(latency *analytics.Latency) *Record {
+func (a *Record) WithLatency(latency analytics.Latency) *Record {
 	a.fields["upstream_latency"] = latency.Upstream
 	a.fields["latency_total"] = latency.Total
 	return a

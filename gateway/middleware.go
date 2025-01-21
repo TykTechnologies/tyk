@@ -434,8 +434,12 @@ func (t *BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 	return store.Apply(session)
 }
 
-// recordAccessLog is only used for Success/Error handler
-func (t *BaseMiddleware) recordAccessLog(req *http.Request, resp *http.Response, latency *analytics.Latency) {
+// RecordAccessLog is used for Success/Error handler logging.
+func (t *BaseMiddleware) RecordAccessLog(req *http.Request, resp *http.Response, latency analytics.Latency) {
+	if !t.Spec.GlobalConfig.AccessLogs.Enabled {
+		return
+	}
+
 	hashKeys := t.Gw.GetConfig().HashKeys
 	accessLog := accesslog.NewRecord()
 	allowedFields := t.Gw.GetConfig().AccessLogs.Template
