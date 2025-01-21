@@ -90,6 +90,10 @@ func TestXTykGateway_Lint(t *testing.T) {
 			BasicAuth: nil,
 			OAuth:     nil,
 		}
+
+		settings.Upstream.TLSTransport.MinVersion = "1.2"
+		settings.Upstream.TLSTransport.MaxVersion = "1.2"
+		settings.Upstream.TLSTransport.Ciphers = []string{"TLS_RSA_WITH_RC4_128_SHA"}
 		settings.Middleware.Global.TrafficLogs.RetentionPeriod.Value = ReadableDuration(time.Minute * 10)
 	}
 
