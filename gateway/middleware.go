@@ -10,7 +10,6 @@ import (
 	"io/ioutil"
 	"net/http"
 	"strconv"
-	"strings"
 	"sync"
 	"time"
 
@@ -440,48 +439,15 @@ func (t *BaseMiddleware) recordAccessLog(req *http.Request, resp *http.Response,
 	hashKeys := t.Gw.GetConfig().HashKeys
 	accessLog := accesslog.NewRecord()
 	allowedFields := t.Gw.GetConfig().AccessLogs.Template
-	fields := accessLog.Fields()
 
 	// Set the access log fields
 	accessLog.WithApiKey(req, hashKeys, t.Gw.obfuscateKey)
-	accessLog.WithClientIP(req)
-	accessLog.WithRemoteAddr(req)
-	accessLog.WithHost(req)
-	accessLog.WithLatencyTotal(latency)
-	accessLog.WithMethod(req)
-	accessLog.WithPath(req)
-	accessLog.WithProtocol(req)
-	accessLog.WithStatus(resp)
-	accessLog.WithUpstreamAddress(req)
-	accessLog.WithUpstreamLatency(latency)
-	accessLog.WithUserAgent(req)
+	accessLog.WithRequest(req)
+	accessLog.WithResponse(resp)
+	accessLog.WithLatency(latency)
 
-	// Check for template config
-	if isValidAccessLogTemplate(allowedFields) {
-		// Filter based on custom log template
-		t.logger.Debug("Using CUSTOM access log template")
-		filteredFields := accesslog.Filter(&fields, allowedFields)
-		t.Logger().WithFields(*filteredFields).Info()
-	} else {
-		// Default access log
-		t.logger.Debug("Using DEFAULT access log template")
-		t.Logger().WithFields(fields).Info()
-	}
-}
-
-func isValidAccessLogTemplate(template []string) bool {
-	// Check if template is empty
-	if len(template) == 0 {
-		return false
-	}
-
-	// Check if there is at least one non-empty config string
-	for _, conf := range template {
-		if strings.TrimSpace(conf) != "" {
-			return true
-		}
-	}
-	return false
+	logFields := accessLog.Fields(allowedFields)
+	t.Logger().WithFields(logFields).Info()
 }
 
 func copyAllowedURLs(input []user.AccessSpec) []user.AccessSpec {
