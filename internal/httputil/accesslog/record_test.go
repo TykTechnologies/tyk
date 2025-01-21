@@ -29,9 +29,8 @@ func TestRecord(t *testing.T) {
 	}
 
 	record := accesslog.NewRecord()
-	record.WithRequest(req)
+	record.WithRequest(req, latency)
 	record.WithResponse(resp)
-	record.WithLatency(latency)
 
 	got := record.Fields(nil)
 

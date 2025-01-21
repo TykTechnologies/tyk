@@ -446,11 +446,11 @@ func (t *BaseMiddleware) RecordAccessLog(req *http.Request, resp *http.Response,
 
 	// Set the access log fields
 	accessLog.WithApiKey(req, hashKeys, t.Gw.obfuscateKey)
-	accessLog.WithRequest(req)
+	accessLog.WithRequest(req, latency)
 	accessLog.WithResponse(resp)
-	accessLog.WithLatency(latency)
 
 	logFields := accessLog.Fields(allowedFields)
+
 	t.Logger().WithFields(logFields).Info()
 }
 

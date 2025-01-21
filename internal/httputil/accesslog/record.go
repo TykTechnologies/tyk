@@ -40,28 +40,24 @@ func (a *Record) WithApiKey(req *http.Request, hashKeys bool, obfuscate func(str
 	return a
 }
 
-// WithLatency sets the upstream latency of the Record.
-func (a *Record) WithLatency(latency analytics.Latency) *Record {
-	a.fields["upstream_latency"] = latency.Upstream
-	a.fields["latency_total"] = latency.Total
-	return a
-}
-
 // WithRequest fills fields from the http request.
-func (a *Record) WithRequest(req *http.Request) *Record {
+func (a *Record) WithRequest(req *http.Request, latency analytics.Latency) *Record {
 	upstreamAddress := &url.URL{
 		Scheme: req.URL.Scheme,
 		Host:   req.URL.Host,
 		Path:   req.URL.Path,
 	}
 
-	a.fields["upstream_address"] = upstreamAddress.String()
-	a.fields["protocol"] = req.Proto
-	a.fields["path"] = req.URL.Path
-	a.fields["host"] = req.Host
-	a.fields["method"] = req.Method
-	a.fields["remote_addr"] = req.RemoteAddr
+	// Keep the sort in sync with config.AccessLog.Template godoc.
 	a.fields["client_ip"] = request.RealIP(req)
+	a.fields["host"] = req.Host
+	a.fields["latency_total"] = latency.Total
+	a.fields["method"] = req.Method
+	a.fields["path"] = req.URL.Path
+	a.fields["protocol"] = req.Proto
+	a.fields["remote_addr"] = req.RemoteAddr
+	a.fields["upstream_address"] = upstreamAddress.String()
+	a.fields["upstream_latency"] = latency.Upstream
 	a.fields["user_agent"] = req.UserAgent()
 	return a
 }
