@@ -29,12 +29,14 @@ func accessLogTestCases(status int) []accessLogTestCase {
 
 // Setup starts the gateway according to test case settings.
 func (tt accessLogTestCase) Setup(tb testing.TB) *gateway.Test {
-	conf := func(globalConf *config.Config) {
+	tb.Helper()
+
+	ts := gateway.StartTest(func(globalConf *config.Config) {
 		globalConf.HashKeys = tt.hashKeys
 		globalConf.AccessLogs.Enabled = tt.accessLogsEnabled
-	}
-	ts := gateway.StartTest(conf)
+	})
 	tb.Cleanup(ts.Close)
+
 	return ts
 }
 
