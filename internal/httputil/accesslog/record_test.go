@@ -15,7 +15,7 @@ import (
 )
 
 func TestRecord(t *testing.T) {
-	latency := &analytics.Latency{
+	latency := analytics.Latency{
 		Total:    99,
 		Upstream: 101,
 	}
@@ -31,7 +31,6 @@ func TestRecord(t *testing.T) {
 	record := accesslog.NewRecord()
 	record.WithRequest(req)
 	record.WithResponse(resp)
-	record.WithUpstreamAddress(req)
 	record.WithLatency(latency)
 
 	got := record.Fields(nil)

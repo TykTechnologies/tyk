@@ -40,19 +40,6 @@ func (a *Record) WithApiKey(req *http.Request, hashKeys bool, obfuscate func(str
 	return a
 }
 
-// WithUpstreamAddress sets the upstream address of the Record.
-func (a *Record) WithUpstreamAddress(req *http.Request) *Record {
-	// Default upstream address
-	upstreamAddress := &url.URL{
-		Scheme: req.URL.Scheme,
-		Host:   req.URL.Host,
-		Path:   req.URL.Path,
-	}
-
-	a.fields["upstream_address"] = upstreamAddress.String()
-	return a
-}
-
 // WithLatency sets the upstream latency of the Record.
 func (a *Record) WithLatency(latency analytics.Latency) *Record {
 	a.fields["upstream_latency"] = latency.Upstream
@@ -62,13 +49,20 @@ func (a *Record) WithLatency(latency analytics.Latency) *Record {
 
 // WithRequest fills fields from the http request.
 func (a *Record) WithRequest(req *http.Request) *Record {
-	a.fields["user_agent"] = req.UserAgent()
+	upstreamAddress := &url.URL{
+		Scheme: req.URL.Scheme,
+		Host:   req.URL.Host,
+		Path:   req.URL.Path,
+	}
+
+	a.fields["upstream_address"] = upstreamAddress.String()
 	a.fields["protocol"] = req.Proto
 	a.fields["path"] = req.URL.Path
-	a.fields["client_ip"] = request.RealIP(req)
 	a.fields["host"] = req.Host
 	a.fields["method"] = req.Method
 	a.fields["remote_addr"] = req.RemoteAddr
+	a.fields["client_ip"] = request.RealIP(req)
+	a.fields["user_agent"] = req.UserAgent()
 	return a
 }
 
