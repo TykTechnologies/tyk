@@ -6,6 +6,8 @@ To ensure feature parity between Tyk OAS APIs and Tyk classic API definitions, f
 
 Define the necessary structs or add the necessary fields in the `apidef/oas` package.
 
+Make sure `json` and `bson` tags are added to the fields.
+
 If an `enabled` flag is specified in the OAS contract, make sure a corresponding `disabled` or `enabled` flag is added in the classic API definition.
 
 Also make sure that `disabled`/`enabled` flag toggles the feature on or off. 
@@ -42,9 +44,11 @@ For fields that are required:
 
 For optional fields:
 
- 1. Add the `omitempty` tag.
+ 1. Add the `omitempty` tag
 
- 2. Use pointer types for structs.
+ 2. Use pointer types for structs. 
+ 
+ 3. Make sure that `omitempty` tag is added for slice fields that are optional.
 
 ## Add Go Doc Comments
 
@@ -75,6 +79,12 @@ if ShouldOmit(u.RateLimit) {
 
 This ensures the field is reset to empty when not configured in the classic API definition.
 
+### Working with `VersionData`
+A `Main` version will be provided that can be used for `Fill`.
+```go
+api.VersionData.Versions[Main]
+```
+
 ## Implement ExtractTo Method Pattern
 
 Similarly, follow this pattern with `ExtractTo`:
@@ -88,6 +98,19 @@ if u.RateLimit == nil {
 }
 
 u.RateLimit.ExtractTo(api)
+```
+
+### Working with `VersionData`
+There are 2 helper functions for `ExtractTo` that will help to handle `VersionData`. You can use them like this:
+```go
+func (g *GlobalRequestSizeLimit) ExtractTo(api *apidef.APIDefinition) {
+	mainVersion := requireMainVersion(api)
+	defer func() {
+		updateMainVersion(api, mainVersion)
+	}()
+
+	// manipulate the Main VersionInfo here
+}
 ```
 
 ## Write Tests

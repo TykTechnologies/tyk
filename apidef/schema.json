@@ -19,6 +19,9 @@
     "expire_analytics_after": {
       "type": "number"
     },
+    "disable_expire_analytics": {
+      "type": "boolean"
+    },
     "id": {
       "type": "string"
     },
@@ -34,6 +37,9 @@
     "tags_disabled": {
       "type": "boolean"
     },
+    "ip_access_control_disabled": {
+      "type": "boolean"
+    },
     "enable_ip_whitelisting": {
       "type": "boolean"
     },
@@ -47,6 +53,9 @@
       "type": "boolean"
     },
     "do_not_track": {
+      "type": "boolean"
+    },
+    "session_lifetime_disabled": {
       "type": "boolean"
     },
     "enable_jwt": {

@@ -173,6 +173,9 @@ func TestOAS_ExtractTo_ResetAPIDefinition(t *testing.T) {
 	a.EnableContextVars = false
 	a.DisableRateLimit = false
 	a.DoNotTrack = false
+	a.IPAccessControlDisabled = false
+	a.DisableExpireAnalytics = false
+	a.SessionLifetimeDisabled = false
 
 	// deprecated fields
 	a.Auth = apidef.AuthConfig{}
@@ -192,6 +195,7 @@ func TestOAS_ExtractTo_ResetAPIDefinition(t *testing.T) {
 	vInfo.GlobalHeadersDisabled = false
 	vInfo.GlobalResponseHeadersDisabled = false
 	vInfo.UseExtendedPaths = false
+	vInfo.GlobalSizeLimitDisabled = false
 
 	vInfo.ExtendedPaths.Clear()
 
@@ -228,7 +232,6 @@ func TestOAS_ExtractTo_ResetAPIDefinition(t *testing.T) {
 		"APIDefinition.VersionData.Versions[0].ExtendedPaths.PersistGraphQL[0].Operation",
 		"APIDefinition.VersionData.Versions[0].ExtendedPaths.PersistGraphQL[0].Variables[0]",
 		"APIDefinition.VersionData.Versions[0].IgnoreEndpointCase",
-		"APIDefinition.VersionData.Versions[0].GlobalSizeLimit",
 		"APIDefinition.UptimeTests.CheckList[0].CheckURL",
 		"APIDefinition.UptimeTests.CheckList[0].Protocol",
 		"APIDefinition.UptimeTests.CheckList[0].Timeout",
@@ -243,8 +246,6 @@ func TestOAS_ExtractTo_ResetAPIDefinition(t *testing.T) {
 		"APIDefinition.UptimeTests.Config.RecheckWait",
 		"APIDefinition.Proxy.PreserveHostHeader",
 		"APIDefinition.Proxy.DisableStripSlash",
-		"APIDefinition.Proxy.EnableLoadBalancing",
-		"APIDefinition.Proxy.Targets[0]",
 		"APIDefinition.Proxy.CheckHostAgainstUptimeTests",
 		"APIDefinition.Proxy.Transport.SSLInsecureSkipVerify",
 		"APIDefinition.Proxy.Transport.SSLCipherSuites[0]",
@@ -254,7 +255,6 @@ func TestOAS_ExtractTo_ResetAPIDefinition(t *testing.T) {
 		"APIDefinition.Proxy.Transport.ProxyURL",
 		"APIDefinition.DisableQuota",
 		"APIDefinition.SessionLifetimeRespectsKeyExpiration",
-		"APIDefinition.SessionLifetime",
 		"APIDefinition.AuthProvider.Name",
 		"APIDefinition.AuthProvider.StorageEngine",
 		"APIDefinition.AuthProvider.Meta[0]",
@@ -263,11 +263,8 @@ func TestOAS_ExtractTo_ResetAPIDefinition(t *testing.T) {
 		"APIDefinition.SessionProvider.Meta[0]",
 		"APIDefinition.EnableBatchRequestSupport",
 		"APIDefinition.EnableIpWhiteListing",
-		"APIDefinition.AllowedIPs[0]",
 		"APIDefinition.EnableIpBlacklisting",
-		"APIDefinition.BlacklistedIPs[0]",
 		"APIDefinition.DontSetQuotasOnCreate",
-		"APIDefinition.ExpireAnalyticsAfter",
 		"APIDefinition.ResponseProcessors[0].Name",
 		"APIDefinition.ResponseProcessors[0].Options",
 		"APIDefinition.GraphQL.Enabled",
@@ -949,6 +946,9 @@ func TestMigrateAndFillOAS_DropEmpties(t *testing.T) {
 			Global: &Global{
 				TrafficLogs: &TrafficLogs{
 					Enabled: true,
+					RetentionPeriod: &RetentionPeriod{
+						Enabled: true,
+					},
 				},
 			},
 		}, baseAPI.OAS.GetTykExtension().Middleware)
@@ -1055,6 +1055,10 @@ func TestMigrateAndFillOAS_CustomPluginAuth(t *testing.T) {
 					Path:         "/path/to/plugin",
 				},
 			},
+			KeyRetentionPeriod: &KeyRetentionPeriod{
+				Enabled: true,
+				Value:   0,
+			},
 		}
 
 		assert.Equal(t, expectedAuthentication, *migratedAPI.OAS.GetTykExtension().Server.Authentication)
@@ -1104,6 +1108,10 @@ func TestMigrateAndFillOAS_CustomPluginAuth(t *testing.T) {
 						Name:    "Authorization",
 					},
 				},
+			},
+			KeyRetentionPeriod: &KeyRetentionPeriod{
+				Enabled: true,
+				Value:   0,
 			},
 		}
 

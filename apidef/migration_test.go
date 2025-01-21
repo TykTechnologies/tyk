@@ -642,6 +642,7 @@ func TestSetDisabledFlags(t *testing.T) {
 		},
 	}
 	expectedAPIDef := APIDefinition{
+		DisableExpireAnalytics: true,
 		CustomMiddleware: MiddlewareSection{
 			AuthCheck: MiddlewareDefinition{
 				Disabled: true,
@@ -676,6 +677,7 @@ func TestSetDisabledFlags(t *testing.T) {
 		DomainDisabled:                 true,
 		CustomMiddlewareBundleDisabled: true,
 		ConfigDataDisabled:             true,
+		SessionLifetimeDisabled:        true,
 		Proxy: ProxyConfig{
 			ServiceDiscovery: ServiceDiscoveryConfiguration{
 				CacheDisabled: true,
@@ -835,4 +837,79 @@ func TestAPIDefinition_migrateGlobalRateLimit(t *testing.T) {
 
 		assert.False(t, base.GlobalRateLimit.Disabled)
 	})
+}
+
+func TestAPIDefinition_migrateIPAccessControl(t *testing.T) {
+	t.Run("whitelisting", func(t *testing.T) {
+		t.Run("EnableIpWhitelisting=true, no whitelist", func(t *testing.T) {
+			base := oldTestAPI()
+			base.EnableIpWhiteListing = true
+			_, err := base.Migrate()
+			assert.NoError(t, err)
+			assert.True(t, base.IPAccessControlDisabled)
+		})
+
+		t.Run("IPWhiteListEnabled=true, non-empty whitelist", func(t *testing.T) {
+			base := oldTestAPI()
+			base.EnableIpWhiteListing = true
+			base.AllowedIPs = []string{"127.0.0.1"}
+			_, err := base.Migrate()
+			assert.NoError(t, err)
+			assert.False(t, base.IPAccessControlDisabled)
+		})
+
+		t.Run("EnableIpWhitelisting=false, no whitelist", func(t *testing.T) {
+			base := oldTestAPI()
+			base.EnableIpWhiteListing = false
+			_, err := base.Migrate()
+			assert.NoError(t, err)
+			assert.True(t, base.IPAccessControlDisabled)
+		})
+
+		t.Run("IPWhiteListEnabled=false, non-empty whitelist", func(t *testing.T) {
+			base := oldTestAPI()
+			base.EnableIpWhiteListing = false
+			base.AllowedIPs = []string{"127.0.0.1"}
+			_, err := base.Migrate()
+			assert.NoError(t, err)
+			assert.True(t, base.IPAccessControlDisabled)
+		})
+	})
+
+	t.Run("blacklisting", func(t *testing.T) {
+		t.Run("EnableIpBlacklisting=true, no blacklist", func(t *testing.T) {
+			base := oldTestAPI()
+			base.EnableIpBlacklisting = true
+			_, err := base.Migrate()
+			assert.NoError(t, err)
+			assert.True(t, base.IPAccessControlDisabled)
+		})
+
+		t.Run("EnableIpBlacklisting=true, non-empty blacklist", func(t *testing.T) {
+			base := oldTestAPI()
+			base.EnableIpBlacklisting = true
+			base.BlacklistedIPs = []string{"127.0.0.1"}
+			_, err := base.Migrate()
+			assert.NoError(t, err)
+			assert.False(t, base.IPAccessControlDisabled)
+		})
+
+		t.Run("EnableIpBlacklisting=false, no blacklist", func(t *testing.T) {
+			base := oldTestAPI()
+			base.EnableIpBlacklisting = false
+			_, err := base.Migrate()
+			assert.NoError(t, err)
+			assert.True(t, base.IPAccessControlDisabled)
+		})
+
+		t.Run("IPWhiteListEnabled=false, non-empty blacklist", func(t *testing.T) {
+			base := oldTestAPI()
+			base.EnableIpBlacklisting = false
+			base.BlacklistedIPs = []string{"127.0.0.1"}
+			_, err := base.Migrate()
+			assert.NoError(t, err)
+			assert.True(t, base.IPAccessControlDisabled)
+		})
+	})
+
 }

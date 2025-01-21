@@ -552,6 +552,9 @@
         },
         "trafficLogs": {
           "$ref": "#/definitions/X-Tyk-TrafficLogs"
+        },
+        "requestSizeLimit": {
+          "$ref": "#/definitions/X-Tyk-GlobalRequestSizeLimit"
         }
       }
     },
@@ -1200,6 +1203,21 @@
               ]
             }
           }
+        },
+        "keyRetentionPeriod": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "value": {
+              "type": "string",
+              "pattern": "^(\\d+h)?(\\d+m)?(\\d+s)?$"
+            }
+          },
+          "required": [
+            "enabled"
+          ]
         }
       },
       "required": [
@@ -1244,6 +1262,9 @@
         },
         "contextVariables": {
           "$ref": "#/definitions/X-Tyk-ContextVariables"
+        },
+        "ipAccessControl": {
+          "$ref": "#/definitions/X-Tyk-IPAccessControl"
         }
       },
       "required": [
@@ -1300,6 +1321,9 @@
         },
         "authentication": {
           "$ref": "#/definitions/X-Tyk-UpstreamAuthentication"
+        },
+        "loadBalancing": {
+          "$ref": "#/definitions/X-Tyk-LoadBalancing"
         }
       },
       "required": [
@@ -1991,10 +2015,47 @@
           "items": {
             "type": "string"
           }
+        },
+        "retentionPeriod": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "value": {
+              "type": "string",
+              "pattern": "^(\\d+h)?(\\d+m)?(\\d+s)?$"
+            }
+          },
+          "required": [
+            "enabled",
+            "value"
+          ]
+        },
+        "plugins": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/X-Tyk-CustomPluginConfig"
+          }
         }
       },
       "required": [
         "enabled"
+      ]
+    },
+    "X-Tyk-GlobalRequestSizeLimit": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "value": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "enabled",
+        "value"
       ]
     },
     "X-Tyk-UInt": {
@@ -2159,6 +2220,60 @@
           "type": "string"
         }
       }
+    },
+    "X-Tyk-IPAccessControl": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "allow": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "block": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "X-Tyk-LoadBalancing": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "targets": {
+          "type": "array",
+          "items": [
+            {
+              "$ref": "#/definitions/X-Tyk-LoadBalancingTarget"
+            }
+          ]
+        }
+      },
+      "required": [
+        "enabled"
+      ]
+    },
+    "X-Tyk-LoadBalancingTarget": {
+      "type": "object",
+      "properties": {
+        "url": {
+          "type": "string"
+        },
+        "weight": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "url",
+        "weight"
+      ]
     }
   }
 }

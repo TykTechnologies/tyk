@@ -20,6 +20,8 @@ func (ts *Test) testPrepareVersioning() (string, string) {
 		spec.VersionDefinition.Location = "header"
 		spec.VersionDefinition.Key = "version"
 		spec.Proxy.ListenPath = "/"
+		spec.DisableRateLimit = true
+		spec.DisableQuota = true
 		spec.VersionData.Versions["expired"] = apidef.VersionInfo{
 			Name:    "expired",
 			Expires: "2006-01-02 15:04",

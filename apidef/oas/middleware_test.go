@@ -3,6 +3,7 @@ package oas
 import (
 	"encoding/json"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 
@@ -44,6 +45,9 @@ func TestMiddleware(t *testing.T) {
 				ResponsePlugin: &ResponsePlugin{
 					Plugins: customPlugins,
 				},
+				TrafficLogs: &TrafficLogs{
+					Plugins: customPlugins,
+				},
 			},
 		}
 
@@ -58,6 +62,7 @@ func TestMiddleware(t *testing.T) {
 				PostAuthenticationPlugin: &PostAuthenticationPlugin{},
 				PostPlugin:               &PostPlugin{},
 				ResponsePlugin:           &ResponsePlugin{},
+				TrafficLogs:              &TrafficLogs{},
 			},
 		}
 		resultMiddleware.Fill(convertedAPI)
@@ -68,6 +73,9 @@ func TestMiddleware(t *testing.T) {
 				PostAuthenticationPlugins: customPlugins,
 				PostPlugins:               customPlugins,
 				ResponsePlugins:           customPlugins,
+				TrafficLogs: &TrafficLogs{
+					Plugins: customPlugins,
+				},
 			},
 		}
 		assert.Equal(t, expectedMW, resultMiddleware)
@@ -218,6 +226,69 @@ func TestTrafficLogs(t *testing.T) {
 		convertedAPI.SetDisabledFlags()
 		trafficLogs.ExtractTo(&convertedAPI)
 		assert.Empty(t, convertedAPI.TagHeaders)
+	})
+
+	t.Run("retention header enabled", func(t *testing.T) {
+		trafficLogs := TrafficLogs{
+			Enabled: true,
+			RetentionPeriod: &RetentionPeriod{
+				Enabled: true,
+				Value:   ReadableDuration(time.Minute * 2),
+			},
+		}
+
+		var convertedAPI apidef.APIDefinition
+		var resultTrafficLogs TrafficLogs
+		convertedAPI.SetDisabledFlags()
+		trafficLogs.ExtractTo(&convertedAPI)
+
+		assert.Equal(t, trafficLogs.RetentionPeriod.Enabled, !convertedAPI.DisableExpireAnalytics)
+		assert.Equal(t, int64(120), convertedAPI.ExpireAnalyticsAfter)
+
+		resultTrafficLogs.Fill(convertedAPI)
+		assert.Equal(t, trafficLogs, resultTrafficLogs)
+	})
+
+	t.Run("retention header disabled", func(t *testing.T) {
+		trafficLogs := TrafficLogs{
+			Enabled:         true,
+			RetentionPeriod: nil,
+		}
+
+		var convertedAPI apidef.APIDefinition
+		var resultTrafficLogs TrafficLogs
+
+		convertedAPI.SetDisabledFlags()
+		trafficLogs.ExtractTo(&convertedAPI)
+
+		assert.Equal(t, true, convertedAPI.DisableExpireAnalytics)
+		assert.Equal(t, int64(0), convertedAPI.ExpireAnalyticsAfter)
+
+		resultTrafficLogs.Fill(convertedAPI)
+		assert.Nil(t, resultTrafficLogs.RetentionPeriod)
+	})
+
+	t.Run("with custom analytics plugin", func(t *testing.T) {
+		t.Parallel()
+		expectedTrafficLogsPlugin := TrafficLogs{
+			Enabled:    true,
+			TagHeaders: []string{},
+			Plugins: CustomPlugins{
+				{
+					Enabled:      true,
+					FunctionName: "CustomAnalyticsPlugin",
+					Path:         "/path/to/plugin",
+				},
+			},
+		}
+
+		api := apidef.APIDefinition{}
+		api.SetDisabledFlags()
+		expectedTrafficLogsPlugin.ExtractTo(&api)
+
+		actualTrafficLogsPlugin := TrafficLogs{}
+		actualTrafficLogsPlugin.Fill(api)
+		assert.Equal(t, expectedTrafficLogsPlugin, actualTrafficLogsPlugin)
 	})
 }
 
@@ -1082,6 +1153,150 @@ func TestContextVariables(t *testing.T) {
 				g.ExtractTo(&apiDef)
 
 				assert.Equal(t, tc.expected, apiDef.EnableContextVars)
+			})
+		}
+	})
+}
+
+func TestGlobalRequestSizeLimit(t *testing.T) {
+	t.Parallel()
+	t.Run("fill", func(t *testing.T) {
+		t.Parallel()
+		testcases := []struct {
+			title    string
+			input    apidef.APIDefinition
+			expected *GlobalRequestSizeLimit
+		}{
+			{
+				title:    "no versions",
+				input:    apidef.APIDefinition{},
+				expected: nil,
+			},
+			{
+				title: "no main version",
+				input: apidef.APIDefinition{
+					VersionData: apidef.VersionData{
+						Versions: map[string]apidef.VersionInfo{
+							"NotMain": {},
+						},
+					},
+				},
+				expected: nil,
+			},
+			{
+				title: "request size limit set to 0 (disabled)",
+				input: apidef.APIDefinition{
+					VersionData: apidef.VersionData{
+						Versions: map[string]apidef.VersionInfo{
+							Main: {
+								GlobalSizeLimit:         0,
+								GlobalSizeLimitDisabled: false,
+							},
+						},
+					},
+				},
+				expected: nil,
+			},
+			{
+				title: "request size limit set to some value (enabled)",
+				input: apidef.APIDefinition{
+					VersionData: apidef.VersionData{
+						Versions: map[string]apidef.VersionInfo{
+							Main: {
+								GlobalSizeLimit:         5000,
+								GlobalSizeLimitDisabled: false,
+							},
+						},
+					},
+				},
+				expected: &GlobalRequestSizeLimit{
+					Enabled: true,
+					Value:   5000,
+				},
+			},
+			{
+				title: "request size limit set to some value but disabled",
+				input: apidef.APIDefinition{
+					VersionData: apidef.VersionData{
+						Versions: map[string]apidef.VersionInfo{
+							Main: {
+								GlobalSizeLimit:         5000,
+								GlobalSizeLimitDisabled: true,
+							},
+						},
+					},
+				},
+				expected: &GlobalRequestSizeLimit{
+					Enabled: false,
+					Value:   5000,
+				},
+			},
+		}
+
+		for _, tc := range testcases {
+			tc := tc
+			t.Run(tc.title, func(t *testing.T) {
+				t.Parallel()
+
+				g := new(Global)
+				g.Fill(tc.input)
+
+				assert.Equal(t, tc.expected, g.RequestSizeLimit)
+			})
+		}
+	})
+
+	t.Run("extractTo", func(t *testing.T) {
+		t.Parallel()
+
+		testcases := []struct {
+			title                                  string
+			input                                  *GlobalRequestSizeLimit
+			expectedGlobalRequestSizeLimit         int64
+			expectedGlobalRequestSizeLimitDisabled bool
+		}{
+			{
+				title: "request size limit set to 0 (disabled)",
+				input: &GlobalRequestSizeLimit{
+					Enabled: true,
+					Value:   0,
+				},
+				expectedGlobalRequestSizeLimit:         0,
+				expectedGlobalRequestSizeLimitDisabled: true,
+			},
+			{
+				title: "request size limit set to a value (enabled)",
+				input: &GlobalRequestSizeLimit{
+					Enabled: true,
+					Value:   5000,
+				},
+				expectedGlobalRequestSizeLimit:         5000,
+				expectedGlobalRequestSizeLimitDisabled: false,
+			},
+			{
+				title: "request size limit set to a value and disabled",
+				input: &GlobalRequestSizeLimit{
+					Enabled: false,
+					Value:   5000,
+				},
+				expectedGlobalRequestSizeLimit:         5000,
+				expectedGlobalRequestSizeLimitDisabled: true,
+			},
+		}
+
+		for _, tc := range testcases {
+			tc := tc // Creating a new 'tc' scoped to the loop
+			t.Run(tc.title, func(t *testing.T) {
+				t.Parallel()
+
+				g := new(Global)
+				g.RequestSizeLimit = tc.input
+
+				var apiDef apidef.APIDefinition
+				g.ExtractTo(&apiDef)
+
+				assert.Equal(t, tc.expectedGlobalRequestSizeLimit, apiDef.VersionData.Versions[Main].GlobalSizeLimit)
+				assert.Equal(t, tc.expectedGlobalRequestSizeLimitDisabled, apiDef.VersionData.Versions[Main].GlobalSizeLimitDisabled)
 			})
 		}
 	})
