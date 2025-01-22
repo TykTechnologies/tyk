@@ -1213,6 +1213,9 @@
             "value": {
               "type": "string",
               "pattern": "^(\\d+h)?(\\d+m)?(\\d+s)?$"
+            },
+            "respectExpiry": {
+              "type": "boolean"
             }
           },
           "required": [

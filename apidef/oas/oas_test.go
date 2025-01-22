@@ -252,7 +252,6 @@ func TestOAS_ExtractTo_ResetAPIDefinition(t *testing.T) {
 		"APIDefinition.Proxy.Transport.SSLForceCommonNameCheck",
 		"APIDefinition.Proxy.Transport.ProxyURL",
 		"APIDefinition.DisableQuota",
-		"APIDefinition.SessionLifetimeRespectsKeyExpiration",
 		"APIDefinition.AuthProvider.Name",
 		"APIDefinition.AuthProvider.StorageEngine",
 		"APIDefinition.AuthProvider.Meta[0]",
