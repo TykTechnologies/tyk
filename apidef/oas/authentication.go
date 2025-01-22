@@ -85,18 +85,23 @@ type KeyRetentionPeriod struct {
 	//
 	// Tyk classic API definition: `expire_analytics_after`.
 	Value ReadableDuration `bson:"value" json:"value"`
+	// RespectExpiry respects the key expiration time when the session lifetime is less than the key expiration.
+	//That is, Redis waits the key expiration for physical removal.
+	RespectExpiry bool `bson:"respectExpiry,omitempty" json:"respectExpiry,omitempty"`
 }
 
 // Fill fills *KeyRetentionPeriod from apidef.APIDefinition.
 func (k *KeyRetentionPeriod) Fill(api apidef.APIDefinition) {
 	k.Enabled = !api.SessionLifetimeDisabled
-	k.Value = ReadableDuration(time.Duration(api.ExpireAnalyticsAfter) * time.Second)
+	k.Value = ReadableDuration(time.Duration(api.SessionLifetime) * time.Second)
+	k.RespectExpiry = api.SessionLifetimeRespectsKeyExpiration
 }
 
 // ExtractTo extracts *Authentication into *apidef.APIDefinition.
 func (k *KeyRetentionPeriod) ExtractTo(api *apidef.APIDefinition) {
 	api.SessionLifetimeDisabled = !k.Enabled
 	api.SessionLifetime = int64(k.Value.Seconds())
+	api.SessionLifetimeRespectsKeyExpiration = k.RespectExpiry
 }
 
 // Fill fills *Authentication from apidef.APIDefinition.
