@@ -11,11 +11,11 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"github.com/TykTechnologies/drl"
-	"github.com/TykTechnologies/leakybucket"
-	"github.com/TykTechnologies/leakybucket/memorycache"
 
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/internal/httputil"
+	"github.com/TykTechnologies/tyk/internal/memorycache"
+	"github.com/TykTechnologies/tyk/internal/model"
 	"github.com/TykTechnologies/tyk/internal/rate"
 	"github.com/TykTechnologies/tyk/internal/rate/limiter"
 	"github.com/TykTechnologies/tyk/internal/redis"
@@ -53,13 +53,10 @@ type SessionLimiter struct {
 	ctx            context.Context
 	drlManager     *drl.DRL
 	config         *config.Config
-	bucketStore    leakybucket.Storage
+	bucketStore    model.BucketStorage
 	limiterStorage redis.UniversalClient
 	smoothing      *rate.Smoothing
 }
-
-// Encourage reuse in NewSessionLimiter.
-var sessionLimiterBucketStore = memorycache.New()
 
 // NewSessionLimiter initializes the session limiter.
 //
@@ -73,7 +70,7 @@ func NewSessionLimiter(ctx context.Context, conf *config.Config, drlManager *drl
 		ctx:         ctx,
 		drlManager:  drlManager,
 		config:      conf,
-		bucketStore: sessionLimiterBucketStore,
+		bucketStore: memorycache.New(ctx),
 	}
 
 	log.Infof("[RATELIMIT] %s", conf.RateLimit.String())
