@@ -69,6 +69,12 @@ func (cache *Cache) cleanup() {
 	cache.mutex.Unlock()
 }
 
+func (cache *Cache) clear() {
+	cache.mutex.Lock()
+	cache.items = map[string]*Item{}
+	cache.mutex.Unlock()
+}
+
 func (cache *Cache) startCleanupTimer(ctx context.Context) {
 	interval := cache.ttl
 	if interval < time.Second {
@@ -81,10 +87,13 @@ func (cache *Cache) startCleanupTimer(ctx context.Context) {
 	for {
 		select {
 		case <-ctx.Done():
-			// fmt.Println("Shutting down cleanup timer:", ctx.Err())
-			return
+			//fmt.Println("Shutting down cleanup timer:", ctx.Err())
+			goto done
 		case <-ticker.C:
 			cache.cleanup()
 		}
+		break
 	}
+done:
+	cache.clear()
 }
