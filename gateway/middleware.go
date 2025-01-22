@@ -13,6 +13,9 @@ import (
 	"sync"
 	"time"
 
+	"github.com/TykTechnologies/tyk-pump/analytics"
+	"github.com/TykTechnologies/tyk/internal/httputil/accesslog"
+
 	"github.com/gocraft/health"
 	"github.com/justinas/alice"
 	"github.com/paulbellamy/ratecounter"
@@ -429,6 +432,30 @@ func (t *BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 	}
 	store := policy.New(orgID, t.Gw, log)
 	return store.Apply(session)
+}
+
+// RecordAccessLog is used for Success/Error handler logging.
+// It emits a log entry with populated access log fields.
+func (t *BaseMiddleware) RecordAccessLog(req *http.Request, resp *http.Response, latency analytics.Latency) {
+	if !t.Spec.GlobalConfig.AccessLogs.Enabled {
+		return
+	}
+
+	gw := t.Gw
+	gwConfig := gw.GetConfig()
+
+	hashKeys := gwConfig.HashKeys
+	allowedFields := gwConfig.AccessLogs.Template
+
+	// Set the access log fields
+	accessLog := accesslog.NewRecord()
+	accessLog.WithApiKey(req, hashKeys, gw.obfuscateKey)
+	accessLog.WithRequest(req, latency)
+	accessLog.WithResponse(resp)
+
+	logFields := accessLog.Fields(allowedFields)
+
+	t.Logger().WithFields(logFields).Info()
 }
 
 func copyAllowedURLs(input []user.AccessSpec) []user.AccessSpec {
