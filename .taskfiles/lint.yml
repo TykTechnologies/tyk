@@ -20,8 +20,6 @@ tasks:
   fmt:
     desc: "Run typical code cleanup steps"
     cmds:
-      - go generate ./...
-      - sleep 1
       - go fmt ./...
       - go mod tidy
 

@@ -56,10 +56,17 @@ tasks:
         yq -i ".dockers[4].extra_files |= [\"$replacement\"]" ci/goreleaser/goreleaser.yml
       - echo goreleaser release --clean --snapshot -f ci/goreleaser/goreleaser.yml
 
+  codegen:
+    deps: [deps]
+    desc: "Run code generation steps"
+    cmds:
+      - go generate ./...
+
   # Used in CI
   lint:
     desc: "Tidy the codebase"
     cmds:
+      - task: codegen
       - task: lint:run
       - task: lint:extras
 
