@@ -76,7 +76,7 @@ tasks:
       - coprocess:lint
       - apidef-oas:lint
 
-  fmt:imports:
+  fmt:
     desc: "Reformat import groups"
     cmds:
       - goimports-reviser -imports-order std,general,company,project,blanked,dotted -company-prefixes github.com/TykTechnologies/ ./...
