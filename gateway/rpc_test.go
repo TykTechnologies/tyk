@@ -3,7 +3,6 @@ package gateway
 
 import (
 	"net/http"
-	_ "net/http"
 	"testing"
 	"time"
 

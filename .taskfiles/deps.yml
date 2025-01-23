@@ -31,6 +31,7 @@ tasks:
       - type goimports
     cmds:
       - go install golang.org/x/tools/cmd/goimports@latest
+      - go install github.com/incu6us/goimports-reviser/v3@latest
 
   golangci-lint:
     internal: true
@@ -38,7 +39,7 @@ tasks:
     status:
       - type golangci-lint
     cmds:
-      - go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.55.2
+      - go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
 
   faillint:
     internal: true

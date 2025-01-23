@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"path"
-	_ "path"
 	"reflect"
 	"sync/atomic"
 	"testing"
