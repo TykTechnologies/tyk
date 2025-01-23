@@ -86,7 +86,7 @@ type KeyRetentionPeriod struct {
 	// Tyk classic API definition: `expire_analytics_after`.
 	Value ReadableDuration `bson:"value" json:"value"`
 	// RespectExpiry ensures that Tyk respects the expiry configured in the key when the API level configuration grants a shorter lifetime.
-	//That is, Redis waits the key expiration for physical removal.
+	//That is, Redis waits until the the key has expired before deleting it.
 	RespectExpiry bool `bson:"respectExpiry,omitempty" json:"respectExpiry,omitempty"`
 }
 
