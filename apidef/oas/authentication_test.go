@@ -2,6 +2,7 @@ package oas
 
 import (
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 
@@ -123,6 +124,39 @@ func TestOIDC(t *testing.T) {
 
 		assert.Len(t, api.OpenIDOptions.Providers, 1)
 		assert.Equal(t, "5678", api.OpenIDOptions.Providers[0].Issuer)
+	})
+}
+
+func TestKeyRetentionPeriod(t *testing.T) {
+	t.Run("empty", func(t *testing.T) {
+		var emptyKeyRetentionPeriod KeyRetentionPeriod
+		var convertedAPI apidef.APIDefinition
+		var resultKeyRetentionPeriod KeyRetentionPeriod
+
+		convertedAPI.SetDisabledFlags()
+		emptyKeyRetentionPeriod.ExtractTo(&convertedAPI)
+		resultKeyRetentionPeriod.Fill(convertedAPI)
+
+		assert.Equal(t, emptyKeyRetentionPeriod, resultKeyRetentionPeriod)
+	})
+
+	t.Run("filled", func(t *testing.T) {
+		var keyRetentionPeriod = KeyRetentionPeriod{
+			Enabled:       true,
+			Value:         ReadableDuration(5 * time.Minute),
+			RespectExpiry: true,
+		}
+		var convertedAPI apidef.APIDefinition
+		var resultKeyRetentionPeriod KeyRetentionPeriod
+
+		keyRetentionPeriod.ExtractTo(&convertedAPI)
+
+		assert.Equal(t, int64(300), convertedAPI.SessionLifetime)
+		assert.True(t, convertedAPI.SessionLifetimeRespectsKeyExpiration)
+
+		resultKeyRetentionPeriod.Fill(convertedAPI)
+
+		assert.Equal(t, keyRetentionPeriod, resultKeyRetentionPeriod)
 	})
 }
 
