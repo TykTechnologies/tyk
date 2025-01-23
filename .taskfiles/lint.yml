@@ -5,8 +5,6 @@ vars:
   golangci: '--max-same-issues=0 --max-issues-per-linter=0 --fix'
   root:
     sh: git rev-parse --show-toplevel
-  package:
-    sh: go mod edit -json | jq .Module.Path -r
 
 tasks:
   run:
