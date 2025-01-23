@@ -58,6 +58,7 @@ tasks:
       - go install github.com/evilmartians/lefthook@latest
 
   exp:
+    internal: true
     desc: 'Install exp/cmd'
     requires:
       vars: [name]

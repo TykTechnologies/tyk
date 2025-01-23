@@ -9,7 +9,7 @@ tasks:
       - task: :lint:fmt
       - task: :lint:golangci-lint
         vars:
-          args: "{{.golangci}} --new-from-rev=origin/master --issues-exit-code=0"
+          args: "{{.golangci}} --new-from-rev=origin/master --issues-exit-code=1"
 
   # pre-push: in essence runs `task lint` with some additional
   # build tests for the package and the tests.
