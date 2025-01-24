@@ -48,9 +48,9 @@ type Server struct {
 	// - "http": Standard HTTP/1.1 protocol
 	// - "http2": HTTP/2 protocol with TLS
 	// - "h2c": HTTP/2 protocol without TLS (cleartext).
-	Protocol string `bson:"protocol" json:"protocol"`
+	Protocol string `bson:"protocol,omitempty" json:"protocol,omitempty"`
 	// Port Setting this value will change the port that Tyk listens on. Default: 8080.
-	Port int `bson:"port" json:"port"`
+	Port int `bson:"port,omitempty" json:"port,omitempty"`
 }
 
 // Fill fills *Server from apidef.APIDefinition.

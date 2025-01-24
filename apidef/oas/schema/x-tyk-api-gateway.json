@@ -1267,7 +1267,9 @@
           "$ref": "#/definitions/X-Tyk-IPAccessControl"
         },
         "port": {
-          "type": "integer"
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 65535
         },
         "protocol": {
           "type": "string",
