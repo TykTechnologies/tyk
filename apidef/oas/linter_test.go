@@ -91,6 +91,7 @@ func TestXTykGateway_Lint(t *testing.T) {
 			OAuth:     nil,
 		}
 		settings.Middleware.Global.TrafficLogs.RetentionPeriod.Value = ReadableDuration(time.Minute * 10)
+		settings.Server.Protocol = "http"
 	}
 
 	// Encode data to json
