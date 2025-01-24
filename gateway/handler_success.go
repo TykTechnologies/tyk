@@ -388,8 +388,10 @@ func (s *SuccessHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) *http
 			Upstream: int64(DurationToMillisecond(resp.UpstreamLatency)),
 		}
 		s.RecordHit(r, latency, resp.Response.StatusCode, resp.Response, false)
+		s.RecordAccessLog(r, resp.Response, latency)
 	}
 	log.Debug("Done proxy")
+
 	return nil
 }
 
