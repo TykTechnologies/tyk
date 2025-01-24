@@ -43,10 +43,21 @@ type Server struct {
 	//
 	// Tyk classic API definition: `allowed_ips` and `blacklisted_ips`.
 	IPAccessControl *IPAccessControl `bson:"ipAccessControl,omitempty" json:"ipAccessControl,omitempty"`
+	// Protocol configures the HTTP protocol used by the API.
+	// Possible values are:
+	// - "http": Standard HTTP/1.1 protocol
+	// - "http2": HTTP/2 protocol with TLS
+	// - "h2c": HTTP/2 protocol without TLS (cleartext).
+	Protocol string `bson:"protocol" json:"protocol"`
+	// Port Setting this value will change the port that Tyk listens on. Default: 8080.
+	Port int `bson:"port" json:"port"`
 }
 
 // Fill fills *Server from apidef.APIDefinition.
 func (s *Server) Fill(api apidef.APIDefinition) {
+	s.Protocol = api.Protocol
+	s.Port = api.ListenPort
+
 	s.ListenPath.Fill(api)
 
 	if s.ClientCertificates == nil {
@@ -105,6 +116,8 @@ func (s *Server) Fill(api apidef.APIDefinition) {
 
 // ExtractTo extracts *Server into *apidef.APIDefinition.
 func (s *Server) ExtractTo(api *apidef.APIDefinition) {
+	api.Protocol = s.Protocol
+	api.ListenPort = s.Port
 	s.ListenPath.ExtractTo(api)
 
 	if s.ClientCertificates == nil {
