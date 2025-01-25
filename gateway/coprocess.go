@@ -619,7 +619,7 @@ func syncHeadersAndMultiValueHeaders(headers map[string]string, multiValueHeader
 		for _, header := range multiValueHeaders {
 			if header.Key == k {
 				found = true
-				header.Values = []string{v}
+				header.Values[0] = v
 				break
 			}
 		}
