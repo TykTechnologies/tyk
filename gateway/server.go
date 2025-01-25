@@ -1246,7 +1246,7 @@ func (gw *Gateway) initSystem() error {
 
 	// Initialize the appropriate log formatter
 	if !gw.isRunningTests() && os.Getenv("TYK_LOGFORMAT") == "" && !*cli.DebugMode {
-		log.Formatter = logger.NewFormatter(gwConfig.LogFormat)
+		log.SetFormatter(logger.NewFormatter(gwConfig.LogFormat))
 		mainLog.Debugf("Set log format to %q", gwConfig.LogFormat)
 	}
 
@@ -1266,6 +1266,13 @@ func (gw *Gateway) initSystem() error {
 			mainLog.Fatalf("Invalid log level %q specified in config, must be error, warn, debug or info. ", level)
 		}
 		mainLog.Debugf("Set log level to %q", log.Level)
+	}
+
+	if !gw.isRunningTests() {
+		output := os.Getenv("TYK_LOGOUTPUT")
+		if output == "stdout" {
+			log.SetOutput(os.Stdout)
+		}
 	}
 
 	if gw.isRunningTests() && os.Getenv("TYK_LOGLEVEL") == "" {
