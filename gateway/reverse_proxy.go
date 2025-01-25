@@ -1335,7 +1335,8 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 		*inres = *res // includes shallow copies of maps, but okay
 
 		if !upgrade {
-			defer res.Body.Close()
+			closeConn := res.Body.Close
+			defer closeConn()
 
 			// Buffer body data
 			var bodyBuffer bytes.Buffer
