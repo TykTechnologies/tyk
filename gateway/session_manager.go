@@ -376,7 +376,6 @@ func (l *SessionLimiter) ForwardMessage(r *http.Request, session *user.SessionSt
 	}
 
 	return sessionFailNone
-
 }
 
 // RedisQuotaExceeded returns true if the request should be blocked as over quota.
