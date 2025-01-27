@@ -10,18 +10,38 @@ import (
 )
 
 func TestServer(t *testing.T) {
-	t.Parallel()
+	t.Run("empty", func(t *testing.T) {
+		t.Parallel()
 
-	var emptyServer Server
+		var emptyServer Server
 
-	var convertedAPI apidef.APIDefinition
-	convertedAPI.SetDisabledFlags()
-	emptyServer.ExtractTo(&convertedAPI)
+		var convertedAPI apidef.APIDefinition
+		convertedAPI.SetDisabledFlags()
+		emptyServer.ExtractTo(&convertedAPI)
 
-	var resultServer Server
-	resultServer.Fill(convertedAPI)
+		var resultServer Server
+		resultServer.Fill(convertedAPI)
 
-	assert.Equal(t, emptyServer, resultServer)
+		assert.Equal(t, emptyServer, resultServer)
+	})
+
+	t.Run("port protocol", func(t *testing.T) {
+		var server = Server{
+			Port:     3000,
+			Protocol: "http",
+		}
+		var convertedAPI apidef.APIDefinition
+		var resultServer Server
+
+		server.ExtractTo(&convertedAPI)
+
+		assert.Equal(t, server.Port, convertedAPI.ListenPort)
+		assert.Equal(t, server.Protocol, convertedAPI.Protocol)
+
+		resultServer.Fill(convertedAPI)
+		assert.Equal(t, server, resultServer)
+	})
+
 }
 
 func TestListenPath(t *testing.T) {
