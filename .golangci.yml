@@ -147,3 +147,4 @@ issues:
   exclude:
     - G404    # Use of weak random number generator (math/rand instead of crypto/rand)
     - SA9004  # only the first constant in this group has an explicit type
+    - SA1019  # Warning on deprecated imports (stdlib ioutil, grpc import)
