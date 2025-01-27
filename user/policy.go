@@ -2,6 +2,7 @@ package user
 
 import (
 	"github.com/TykTechnologies/storage/persistent/model"
+
 	"github.com/TykTechnologies/tyk/apidef"
 )
 

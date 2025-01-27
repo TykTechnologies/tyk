@@ -8,8 +8,6 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/TykTechnologies/tyk/user"
-
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/stretchr/testify/assert"
 
@@ -17,6 +15,7 @@ import (
 	"github.com/TykTechnologies/tyk/apidef/oas"
 	"github.com/TykTechnologies/tyk/gateway"
 	"github.com/TykTechnologies/tyk/test"
+	"github.com/TykTechnologies/tyk/user"
 )
 
 func goPluginFilename() string {

@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/TykTechnologies/exp/pkg/limiters"
+
 	"github.com/TykTechnologies/tyk/internal/redis"
 )
 

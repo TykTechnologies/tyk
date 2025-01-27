@@ -6,11 +6,10 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/TykTechnologies/graphql-go-tools/pkg/engine/datasource/httpclient"
-
 	"github.com/jensneuse/abstractlogger"
 	"github.com/sirupsen/logrus"
 
+	"github.com/TykTechnologies/graphql-go-tools/pkg/engine/datasource/httpclient"
 	"github.com/TykTechnologies/graphql-go-tools/pkg/engine/resolve"
 	"github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
 	"github.com/TykTechnologies/graphql-go-tools/pkg/subscription"

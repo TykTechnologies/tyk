@@ -2,7 +2,6 @@ package newrelic
 
 import (
 	"github.com/newrelic/go-agent/v3/newrelic"
-
 	"github.com/sirupsen/logrus"
 )
 

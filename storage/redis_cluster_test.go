@@ -8,13 +8,13 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 
 	"github.com/TykTechnologies/storage/temporal/model"
 	tempmocks "github.com/TykTechnologies/storage/temporal/tempmocks"
+
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/internal/redis"
-
-	"github.com/stretchr/testify/mock"
 )
 
 var rc *ConnectionHandler

@@ -10,9 +10,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/TykTechnologies/tyk/apidef"
-
 	kingpin "github.com/alecthomas/kingpin/v2"
+
+	"github.com/TykTechnologies/tyk/apidef"
 )
 
 var (

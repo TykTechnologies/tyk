@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	graphqlv2 "github.com/TykTechnologies/graphql-go-tools/v2/pkg/graphql"
+
 	"github.com/TykTechnologies/tyk/apidef"
 )
 

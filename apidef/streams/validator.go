@@ -9,15 +9,13 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/TykTechnologies/tyk/apidef/oas"
-
 	"github.com/buger/jsonparser"
 	"github.com/hashicorp/go-multierror"
 	pkgver "github.com/hashicorp/go-version"
 	"github.com/xeipuuv/gojsonschema"
 
+	"github.com/TykTechnologies/tyk/apidef/oas"
 	"github.com/TykTechnologies/tyk/apidef/streams/bento"
-
 	tykerrors "github.com/TykTechnologies/tyk/internal/errors"
 )
 

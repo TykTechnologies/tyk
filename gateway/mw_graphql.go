@@ -11,17 +11,15 @@ import (
 
 	"github.com/TykTechnologies/graphql-go-tools/pkg/engine/resolve"
 	"github.com/TykTechnologies/graphql-go-tools/pkg/execution/datasource"
+	gql "github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
 	gqlwebsocket "github.com/TykTechnologies/graphql-go-tools/pkg/subscription/websocket"
-
-	"github.com/TykTechnologies/tyk/internal/graphengine"
+	gqlv2 "github.com/TykTechnologies/graphql-go-tools/v2/pkg/graphql"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/ctx"
 	"github.com/TykTechnologies/tyk/header"
+	"github.com/TykTechnologies/tyk/internal/graphengine"
 	"github.com/TykTechnologies/tyk/user"
-
-	gql "github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
-	gqlv2 "github.com/TykTechnologies/graphql-go-tools/v2/pkg/graphql"
 )
 
 var (

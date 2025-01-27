@@ -14,20 +14,18 @@ import (
 	"testing"
 	"time"
 
+	"github.com/IBM/sarama"
+	"github.com/getkin/kin-openapi/openapi3"
+	"github.com/gorilla/websocket"
 	"github.com/nats-io/nats.go"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/testcontainers/testcontainers-go"
+	"github.com/testcontainers/testcontainers-go/modules/kafka"
 	natscon "github.com/testcontainers/testcontainers-go/modules/nats"
 	"github.com/testcontainers/testcontainers-go/wait"
-
-	"github.com/getkin/kin-openapi/openapi3"
-	"github.com/gorilla/websocket"
 	"gopkg.in/yaml.v2"
-
-	"github.com/IBM/sarama"
-	"github.com/testcontainers/testcontainers-go/modules/kafka"
 
 	"github.com/TykTechnologies/tyk/apidef/oas"
 	"github.com/TykTechnologies/tyk/config"

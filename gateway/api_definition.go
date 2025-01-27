@@ -17,34 +17,26 @@ import (
 	texttemplate "text/template"
 	"time"
 
-	"github.com/TykTechnologies/tyk/ee/middleware/streams"
-	"github.com/TykTechnologies/tyk/storage/kv"
-
-	"github.com/TykTechnologies/tyk/internal/httputil"
-
-	"github.com/getkin/kin-openapi/routers/gorillamux"
-
-	"github.com/getkin/kin-openapi/openapi3"
-
-	"github.com/TykTechnologies/tyk/apidef/oas"
-
-	"github.com/cenk/backoff"
-
 	"github.com/Masterminds/sprig/v3"
-
+	"github.com/cenk/backoff"
+	"github.com/getkin/kin-openapi/openapi3"
+	"github.com/getkin/kin-openapi/routers/gorillamux"
 	"github.com/sirupsen/logrus"
 
 	circuit "github.com/TykTechnologies/circuitbreaker"
 
-	"github.com/TykTechnologies/tyk/internal/service/gojsonschema"
-
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/apidef/oas"
 	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/ee/middleware/streams"
 	"github.com/TykTechnologies/tyk/header"
+	"github.com/TykTechnologies/tyk/internal/httputil"
 	"github.com/TykTechnologies/tyk/internal/model"
+	"github.com/TykTechnologies/tyk/internal/service/gojsonschema"
 	"github.com/TykTechnologies/tyk/regexp"
 	"github.com/TykTechnologies/tyk/rpc"
 	"github.com/TykTechnologies/tyk/storage"
+	"github.com/TykTechnologies/tyk/storage/kv"
 )
 
 // const used by cache middleware

@@ -9,6 +9,7 @@ import (
 	otelconfig "github.com/TykTechnologies/opentelemetry/config"
 	semconv "github.com/TykTechnologies/opentelemetry/semconv/v1.0.0"
 	tyktrace "github.com/TykTechnologies/opentelemetry/trace"
+
 	"github.com/TykTechnologies/tyk/apidef"
 )
 

@@ -7,16 +7,15 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/TykTechnologies/tyk-pump/logger"
-
 	"github.com/sirupsen/logrus"
+	"github.com/stretchr/testify/assert"
+	"google.golang.org/grpc"
 
 	semconv "github.com/TykTechnologies/opentelemetry/semconv/v1.0.0"
 	tyktrace "github.com/TykTechnologies/opentelemetry/trace"
-	"github.com/TykTechnologies/tyk/apidef"
 
-	"github.com/stretchr/testify/assert"
-	"google.golang.org/grpc"
+	"github.com/TykTechnologies/tyk-pump/logger"
+	"github.com/TykTechnologies/tyk/apidef"
 )
 
 func Test_InitOpenTelemetry(t *testing.T) {

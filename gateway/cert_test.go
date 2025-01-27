@@ -22,19 +22,15 @@ import (
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
 
-	"github.com/TykTechnologies/tyk/certs/mock"
-
-	"github.com/TykTechnologies/tyk/internal/crypto"
-
-	"github.com/TykTechnologies/tyk/header"
-	"github.com/TykTechnologies/tyk/storage"
-
-	"github.com/TykTechnologies/tyk/user"
-
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/certs"
+	"github.com/TykTechnologies/tyk/certs/mock"
 	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/header"
+	"github.com/TykTechnologies/tyk/internal/crypto"
+	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/test"
+	"github.com/TykTechnologies/tyk/user"
 )
 
 const (

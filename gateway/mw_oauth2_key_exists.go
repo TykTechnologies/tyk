@@ -4,10 +4,9 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/internal/otel"
-
-	"github.com/TykTechnologies/tyk/apidef"
 )
 
 const (

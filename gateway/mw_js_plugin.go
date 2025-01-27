@@ -15,14 +15,13 @@ import (
 	"strings"
 	"time"
 
-	"github.com/TykTechnologies/tyk/apidef"
-
 	"github.com/robertkrimen/otto"
-	_ "github.com/robertkrimen/otto/underscore"
+	"github.com/sirupsen/logrus"
 
+	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/user"
 
-	"github.com/sirupsen/logrus"
+	_ "github.com/robertkrimen/otto/underscore"
 )
 
 // Lets the user override and return a response from middleware

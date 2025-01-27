@@ -10,20 +10,17 @@ import (
 	"encoding/pem"
 	"errors"
 	"fmt"
-	"os"
-
-	"github.com/stretchr/testify/assert"
-
-	"github.com/TykTechnologies/tyk/config"
-	tykcrypto "github.com/TykTechnologies/tyk/internal/crypto"
-
-	//	"net"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strings"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+
 	"github.com/TykTechnologies/tyk/certs"
+	"github.com/TykTechnologies/tyk/config"
+	tykcrypto "github.com/TykTechnologies/tyk/internal/crypto"
 	"github.com/TykTechnologies/tyk/test"
 )
 

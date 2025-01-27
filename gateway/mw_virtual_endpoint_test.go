@@ -5,10 +5,9 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/TykTechnologies/tyk/user"
-
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/test"
+	"github.com/TykTechnologies/tyk/user"
 )
 
 const virtTestJS = `

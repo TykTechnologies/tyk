@@ -3,13 +3,12 @@ package test
 import (
 	"encoding/json"
 	"fmt"
-	"os"
-	"runtime"
-	"time"
-
 	"log"
+	"os"
 	"os/signal"
+	"runtime"
 	"syscall"
+	"time"
 )
 
 type Monitor struct {

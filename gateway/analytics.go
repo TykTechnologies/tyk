@@ -8,11 +8,10 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/TykTechnologies/tyk-pump/analytics"
-	"github.com/TykTechnologies/tyk-pump/serializer"
-
 	maxminddb "github.com/oschwald/maxminddb-golang"
 
+	"github.com/TykTechnologies/tyk-pump/analytics"
+	"github.com/TykTechnologies/tyk-pump/serializer"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/regexp"
 	"github.com/TykTechnologies/tyk/storage"

@@ -13,6 +13,7 @@ import (
 	kafkadatasource "github.com/TykTechnologies/graphql-go-tools/v2/pkg/engine/datasource/kafka_datasource"
 	restdatasource "github.com/TykTechnologies/graphql-go-tools/v2/pkg/engine/datasource/rest_datasource"
 	"github.com/TykTechnologies/graphql-go-tools/v2/pkg/engine/plan"
+
 	"github.com/TykTechnologies/tyk/apidef"
 )
 

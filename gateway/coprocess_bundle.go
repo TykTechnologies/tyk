@@ -1,14 +1,6 @@
 package gateway
 
 import (
-	"path"
-	"strings"
-	"time"
-
-	"github.com/cenk/backoff"
-
-	"github.com/sirupsen/logrus"
-
 	"archive/zip"
 	"bytes"
 	"crypto/md5"
@@ -22,9 +14,16 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"path"
 	"path/filepath"
+	"strings"
+	"time"
+
+	"github.com/cenk/backoff"
+	"github.com/sirupsen/logrus"
 
 	"github.com/TykTechnologies/goverify"
+
 	"github.com/TykTechnologies/tyk/apidef"
 )
 

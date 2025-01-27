@@ -4,10 +4,7 @@ import (
 	"html/template"
 	"net/http"
 
-	// Example of package with different version in go.mod
 	"github.com/Masterminds/sprig/v3"
-
-	// Example of package which is not part of Gateway
 	"github.com/kr/pretty"
 
 	"github.com/TykTechnologies/tyk/ctx"

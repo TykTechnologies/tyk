@@ -12,20 +12,18 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/TykTechnologies/tyk-pump/analytics"
-
+	"github.com/gorilla/mux"
+	proxyproto "github.com/pires/go-proxyproto"
+	"github.com/sirupsen/logrus"
+	"golang.org/x/net/http2"
 	"golang.org/x/net/http2/h2c"
 
-	proxyproto "github.com/pires/go-proxyproto"
-
 	"github.com/TykTechnologies/again"
+
+	"github.com/TykTechnologies/tyk-pump/analytics"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/internal/httputil"
 	"github.com/TykTechnologies/tyk/tcp"
-
-	"github.com/gorilla/mux"
-	"github.com/sirupsen/logrus"
-	"golang.org/x/net/http2"
 )
 
 // handleWrapper's only purpose is to allow router to be dynamically replaced

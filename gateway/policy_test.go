@@ -10,16 +10,15 @@ import (
 	"testing"
 	"time"
 
-	persistentmodel "github.com/TykTechnologies/storage/persistent/model"
-
 	"github.com/stretchr/testify/assert"
+
+	persistentmodel "github.com/TykTechnologies/storage/persistent/model"
 
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/header"
+	"github.com/TykTechnologies/tyk/internal/uuid"
 	"github.com/TykTechnologies/tyk/test"
 	"github.com/TykTechnologies/tyk/user"
-
-	"github.com/TykTechnologies/tyk/internal/uuid"
 )
 
 func TestLoadPoliciesFromDashboardReLogin(t *testing.T) {

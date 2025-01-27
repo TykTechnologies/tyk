@@ -6,25 +6,21 @@ import (
 	"os"
 	"testing"
 
-	"go.opentelemetry.io/otel/trace/embedded"
-
 	log "github.com/sirupsen/logrus"
-
-	semconv "github.com/TykTechnologies/opentelemetry/semconv/v1.0.0"
-
+	"github.com/stretchr/testify/assert"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/trace"
-
-	"github.com/TykTechnologies/graphql-go-tools/pkg/engine/resolve"
-	"github.com/TykTechnologies/graphql-go-tools/pkg/operationreport"
-	"github.com/TykTechnologies/graphql-go-tools/pkg/postprocess"
-	tyktrace "github.com/TykTechnologies/opentelemetry/trace"
-
-	"github.com/stretchr/testify/assert"
+	"go.opentelemetry.io/otel/trace/embedded"
 	"go.uber.org/mock/gomock"
 
+	"github.com/TykTechnologies/graphql-go-tools/pkg/engine/resolve"
 	"github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
+	"github.com/TykTechnologies/graphql-go-tools/pkg/operationreport"
+	"github.com/TykTechnologies/graphql-go-tools/pkg/postprocess"
+	semconv "github.com/TykTechnologies/opentelemetry/semconv/v1.0.0"
+	tyktrace "github.com/TykTechnologies/opentelemetry/trace"
+
 	"github.com/TykTechnologies/tyk-pump/logger"
 	"github.com/TykTechnologies/tyk/internal/otel"
 )

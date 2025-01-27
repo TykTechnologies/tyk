@@ -22,14 +22,13 @@ import (
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/coprocess"
-	"github.com/TykTechnologies/tyk/rpc"
-	"github.com/TykTechnologies/tyk/storage"
-	"github.com/TykTechnologies/tyk/trace"
-
 	"github.com/TykTechnologies/tyk/internal/httpctx"
 	"github.com/TykTechnologies/tyk/internal/httputil"
 	"github.com/TykTechnologies/tyk/internal/otel"
 	"github.com/TykTechnologies/tyk/internal/service/newrelic"
+	"github.com/TykTechnologies/tyk/rpc"
+	"github.com/TykTechnologies/tyk/storage"
+	"github.com/TykTechnologies/tyk/trace"
 )
 
 const (

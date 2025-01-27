@@ -5,11 +5,10 @@ import (
 	"encoding/base64"
 	"fmt"
 
+	"example.com/basic-plugin/analytics"
 	"github.com/buger/jsonparser"
 
 	pumpAnalytics "github.com/TykTechnologies/tyk-pump/analytics"
-
-	"example.com/basic-plugin/analytics"
 )
 
 func ExampleMyAnalyticsPluginDeleteHeader() {

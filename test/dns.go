@@ -7,10 +7,8 @@ import (
 	"reflect"
 	"regexp"
 	"strings"
-
-	"time"
-
 	"sync"
+	"time"
 
 	"github.com/miekg/dns"
 )

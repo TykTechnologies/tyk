@@ -16,13 +16,11 @@ import (
 
 	"github.com/gorilla/mux"
 
-	"github.com/TykTechnologies/tyk/internal/crypto"
-
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/certs"
 	"github.com/TykTechnologies/tyk/config"
-
 	"github.com/TykTechnologies/tyk/internal/cache"
+	"github.com/TykTechnologies/tyk/internal/crypto"
 )
 
 const ListDetailed = "detailed"

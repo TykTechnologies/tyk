@@ -4,8 +4,6 @@ import (
 	"context"
 	"sync"
 
-	semconv "github.com/TykTechnologies/opentelemetry/semconv/v1.0.0"
-
 	"github.com/TykTechnologies/graphql-go-tools/pkg/ast"
 	"github.com/TykTechnologies/graphql-go-tools/pkg/engine/plan"
 	"github.com/TykTechnologies/graphql-go-tools/pkg/engine/resolve"
@@ -13,6 +11,8 @@ import (
 	"github.com/TykTechnologies/graphql-go-tools/pkg/lexer/literal"
 	"github.com/TykTechnologies/graphql-go-tools/pkg/operationreport"
 	"github.com/TykTechnologies/graphql-go-tools/pkg/postprocess"
+	semconv "github.com/TykTechnologies/opentelemetry/semconv/v1.0.0"
+
 	"github.com/TykTechnologies/tyk/internal/otel"
 )
 

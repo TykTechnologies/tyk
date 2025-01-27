@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/TykTechnologies/gorpc"
+
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/internal/model"
 	"github.com/TykTechnologies/tyk/rpc"

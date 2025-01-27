@@ -8,14 +8,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
 	"golang.org/x/oauth2"
 
+	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/ee/middleware/upstreamoauth"
 	"github.com/TykTechnologies/tyk/gateway"
-
-	"github.com/stretchr/testify/assert"
-
-	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/header"
 	"github.com/TykTechnologies/tyk/test"
 )

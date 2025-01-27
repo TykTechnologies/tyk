@@ -5,13 +5,13 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/TykTechnologies/tyk/apidef"
-
 	"github.com/stretchr/testify/assert"
 
-	. "github.com/TykTechnologies/tyk/gateway"
+	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/internal/uuid"
 	"github.com/TykTechnologies/tyk/test"
+
+	. "github.com/TykTechnologies/tyk/gateway"
 )
 
 func buildPathRateLimitAPI(tb testing.TB, gw *Gateway, per int64, rateLimits []apidef.RateLimitMeta) {

@@ -5,11 +5,10 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/TykTechnologies/tyk/internal/httputil"
-
-	"github.com/TykTechnologies/tyk/internal/model"
-
 	"github.com/stretchr/testify/assert"
+
+	"github.com/TykTechnologies/tyk/internal/httputil"
+	"github.com/TykTechnologies/tyk/internal/model"
 )
 
 func createReq(tb testing.TB) *http.Request {

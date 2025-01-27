@@ -4,9 +4,8 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/newrelic/go-agent/v3/newrelic"
-
 	"github.com/gocraft/health"
+	"github.com/newrelic/go-agent/v3/newrelic"
 )
 
 type Sink struct {

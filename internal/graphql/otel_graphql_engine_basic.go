@@ -10,6 +10,7 @@ import (
 	"github.com/TykTechnologies/graphql-go-tools/pkg/operationreport"
 	"github.com/TykTechnologies/graphql-go-tools/pkg/postprocess"
 	semconv "github.com/TykTechnologies/opentelemetry/semconv/v1.0.0"
+
 	"github.com/TykTechnologies/tyk/internal/otel"
 )
 

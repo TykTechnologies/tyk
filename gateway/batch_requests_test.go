@@ -13,11 +13,10 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"github.com/TykTechnologies/tyk/certs"
-
 	"github.com/valyala/fasthttp"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/certs"
 	"github.com/TykTechnologies/tyk/test"
 )
 
