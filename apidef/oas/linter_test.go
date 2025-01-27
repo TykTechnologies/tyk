@@ -71,6 +71,8 @@ func TestXTykGateway_Lint(t *testing.T) {
 		settings.Server.Authentication.SecuritySchemes = map[string]interface{}{
 			"test-basic": securityScheme,
 		}
+		settings.Server.Protocol = "http"
+		settings.Server.Port = 3000
 		for i := range settings.Server.EventHandlers {
 			settings.Server.EventHandlers[i].Kind = event.WebhookKind
 			settings.Server.EventHandlers[i].Webhook.Method = http.MethodPost
@@ -91,8 +93,6 @@ func TestXTykGateway_Lint(t *testing.T) {
 			OAuth:     nil,
 		}
 		settings.Middleware.Global.TrafficLogs.RetentionPeriod.Value = ReadableDuration(time.Minute * 10)
-		settings.Server.Protocol = "http"
-		settings.Server.Port = 3000
 	}
 
 	// Encode data to json
