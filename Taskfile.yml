@@ -79,6 +79,7 @@ tasks:
   fmt:
     desc: "Reformat import groups"
     cmds:
+      - task: lint:fmt
       - goimports-reviser -imports-order std,general,company,project,blanked,dotted -company-prefixes github.com/TykTechnologies/ ./...
 
   setup:

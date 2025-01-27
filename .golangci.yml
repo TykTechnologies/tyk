@@ -145,5 +145,5 @@ issues:
         - funlen # many functions can be very long
         - gosec # tests don't have CVEs
   exclude:
-    - G404 # Use of weak random number generator (math/rand instead of crypto/rand)
-    - SA9004 # only the first constant in this group has an explicit type
+    - G404    # Use of weak random number generator (math/rand instead of crypto/rand)
+    - SA9004  # only the first constant in this group has an explicit type

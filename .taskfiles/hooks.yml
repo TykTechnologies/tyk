@@ -7,7 +7,7 @@ tasks:
   pre-commit:
     desc: "Run pre-commit hooks"
     cmds:
-      - task: :lint:fmt
+      - task: :fmt
       - task: :lint:golangci-lint
         vars:
           args: "{{.golangci}} --new-from-rev=origin/master --issues-exit-code=1"
