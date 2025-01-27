@@ -655,6 +655,11 @@ func TestLoadBalancing(t *testing.T) {
 				g.LoadBalancing = tc.input
 
 				var apiDef apidef.APIDefinition
+				apiDef.Proxy.Targets = []string{
+					"http://old1.upstream.test",
+					"http://old2.upstream.test",
+					"http://old3.upstream.test",
+				}
 				g.ExtractTo(&apiDef)
 
 				assert.Equal(t, tc.expectedEnabled, apiDef.Proxy.EnableLoadBalancing)
