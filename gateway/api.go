@@ -1042,7 +1042,9 @@ func (gw *Gateway) handleGetAPIOAS(apiID string, modePublic bool) (interface{}, 
 
 	obj, code := gw.handleGetAPI(apiID, true)
 	if apiOAS, ok := obj.(*oas.OAS); ok && modePublic {
-		apiOAS.RemoveTykExtension()
+		oasCopy := *apiOAS
+		oasCopy.RemoveTykExtension()
+		return oasCopy, code
 	}
 	return obj, code
 
