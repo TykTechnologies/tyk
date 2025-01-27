@@ -895,7 +895,7 @@ func (l *LoadBalancing) ExtractTo(api *apidef.APIDefinition) {
 		return
 	}
 
-	proxyConfTargets := make([]string, 0)
+	proxyConfTargets := make([]string, 0, len(l.Targets))
 	api.Proxy.EnableLoadBalancing = l.Enabled
 	for _, target := range l.Targets {
 		for i := 0; i < target.Weight; i++ {
