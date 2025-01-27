@@ -286,8 +286,8 @@ type TLSTransport struct {
 func (t *TLSTransport) Fill(api apidef.APIDefinition) {
 	t.ForceCommonNameCheck = api.Proxy.Transport.SSLForceCommonNameCheck
 	t.Ciphers = api.Proxy.Transport.SSLCipherSuites
-	t.MaxVersion = tlsVersionToString(api.Proxy.Transport.SSLMaxVersion)
-	t.MinVersion = tlsVersionToString(api.Proxy.Transport.SSLMinVersion)
+	t.MaxVersion = t.tlsVersionToString(api.Proxy.Transport.SSLMaxVersion)
+	t.MinVersion = t.tlsVersionToString(api.Proxy.Transport.SSLMinVersion)
 	t.InsecureSkipVerify = api.Proxy.Transport.SSLInsecureSkipVerify
 }
 
@@ -295,13 +295,13 @@ func (t *TLSTransport) Fill(api apidef.APIDefinition) {
 func (t *TLSTransport) ExtractTo(api *apidef.APIDefinition) {
 	api.Proxy.Transport.SSLForceCommonNameCheck = t.ForceCommonNameCheck
 	api.Proxy.Transport.SSLCipherSuites = t.Ciphers
-	api.Proxy.Transport.SSLMaxVersion = tlsVersionFromString(t.MaxVersion)
-	api.Proxy.Transport.SSLMinVersion = tlsVersionFromString(t.MinVersion)
+	api.Proxy.Transport.SSLMaxVersion = t.tlsVersionFromString(t.MaxVersion)
+	api.Proxy.Transport.SSLMinVersion = t.tlsVersionFromString(t.MinVersion)
 	api.Proxy.Transport.SSLInsecureSkipVerify = t.InsecureSkipVerify
 }
 
 // tlsVersionFromString converts v in the form of 1.2/1.3 to the version int
-func tlsVersionFromString(v string) uint16 {
+func (t *TLSTransport) tlsVersionFromString(v string) uint16 {
 	switch v {
 	case "1.0":
 		return tls.VersionTLS10
@@ -317,7 +317,7 @@ func tlsVersionFromString(v string) uint16 {
 }
 
 // tlsVersionFromString converts v from version into to the form 1.0/1.1
-func tlsVersionToString(v uint16) string {
+func (t *TLSTransport) tlsVersionToString(v uint16) string {
 	switch v {
 	case tls.VersionTLS10:
 		return "1.0"
