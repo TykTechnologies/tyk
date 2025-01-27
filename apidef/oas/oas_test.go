@@ -211,8 +211,6 @@ func TestOAS_ExtractTo_ResetAPIDefinition(t *testing.T) {
 
 	expectedFields := []string{
 		"APIDefinition.Slug",
-		"APIDefinition.ListenPort",
-		"APIDefinition.Protocol",
 		"APIDefinition.EnableProxyProtocol",
 		"APIDefinition.RequestSigning.IsEnabled",
 		"APIDefinition.RequestSigning.Secret",
