@@ -10,14 +10,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/TykTechnologies/tyk/internal/crypto"
-
-	"github.com/stretchr/testify/assert"
-
 	"github.com/justinas/alice"
 	"github.com/sirupsen/logrus"
+	"github.com/stretchr/testify/assert"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/internal/crypto"
 	"github.com/TykTechnologies/tyk/test"
 	"github.com/TykTechnologies/tyk/user"
 )

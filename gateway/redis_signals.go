@@ -6,7 +6,6 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
-
 	"strconv"
 	"strings"
 	"sync"

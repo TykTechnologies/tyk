@@ -4,6 +4,7 @@ version: "3"
 includes:
   test: .taskfiles/test.yml
   deps: .taskfiles/deps.yml
+  lint: .taskfiles/lint.yml
   hooks: .taskfiles/hooks.yml
   opentelemetry:
     taskfile: ci/tests/tracing/Taskfile.yml
@@ -55,47 +56,31 @@ tasks:
         yq -i ".dockers[4].extra_files |= [\"$replacement\"]" ci/goreleaser/goreleaser.yml
       - echo goreleaser release --clean --snapshot -f ci/goreleaser/goreleaser.yml
 
+  codegen:
+    deps: [deps]
+    desc: "Run code generation steps"
+    cmds:
+      - go generate ./...
+
   # Used in CI
   lint:
     desc: "Tidy the codebase"
     cmds:
-      - task: lint:tidy
-      - task: lint:all
+      - task: codegen
+      - task: lint:run
+      - task: lint:extras
 
-  lint:tidy:
-    desc: "Run typical code cleanup steps"
-    aliases: [fmt]
-    cmds:
-      - gofmt -w .
-      - go generate ./...
-      - go fmt ./...
-      - go mod tidy
-      - goimports -local github.com/TykTechnologies,github.com/TykTechnologies/tyk/internal -w .
-      - go mod tidy
-
-  lint:all:
+  lint:extras:
     desc: "Run more specific linters"
     deps:
-      - lint:config
-      - lint:imports
-      - lint:x-tyk-gateway
       - coprocess:lint
       - apidef-oas:lint
 
-  lint:imports:
-    internal: true
+  fmt:
+    desc: "Reformat import groups"
     cmds:
-      - go-fsck lint
-
-  lint:config:
-    internal: true
-    cmds:
-      - go test -count 1 ./cli/linter/...
-
-  lint:x-tyk-gateway:
-    internal: true
-    cmds:
-      - go test -count 1 -run=TestXTykGateway_Lint ./apidef/oas/
+      - task: lint:fmt
+      - goimports-reviser -imports-order std,general,company,project,blanked,dotted -company-prefixes github.com/TykTechnologies/ ./...
 
   setup:
     desc: "Setup the project including dependencies and git hooks using lefthooks"

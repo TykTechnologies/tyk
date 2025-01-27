@@ -5,10 +5,9 @@ import (
 	"errors"
 	"strings"
 
-	"github.com/TykTechnologies/tyk/internal/crypto"
-
 	"github.com/sirupsen/logrus"
 
+	"github.com/TykTechnologies/tyk/internal/crypto"
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/user"
 )

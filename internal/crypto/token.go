@@ -6,9 +6,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/sirupsen/logrus"
-
 	"github.com/buger/jsonparser"
+	"github.com/sirupsen/logrus"
 
 	"github.com/TykTechnologies/tyk/internal/uuid"
 )

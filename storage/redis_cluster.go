@@ -16,13 +16,11 @@ import (
 	templist "github.com/TykTechnologies/storage/temporal/list"
 	"github.com/TykTechnologies/storage/temporal/model"
 	tempqueue "github.com/TykTechnologies/storage/temporal/queue"
-
-	//nolint:misspell
 	tempset "github.com/TykTechnologies/storage/temporal/set"
 	tempsortedset "github.com/TykTechnologies/storage/temporal/sortedset"
-	redis "github.com/TykTechnologies/tyk/internal/redis"
 
 	"github.com/TykTechnologies/tyk/config"
+	redis "github.com/TykTechnologies/tyk/internal/redis"
 )
 
 var (

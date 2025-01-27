@@ -8,9 +8,8 @@ import (
 	"testing"
 	texttemplate "text/template"
 
-	"github.com/TykTechnologies/tyk/test"
-
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/test"
 )
 
 func testPrepareTransformNonAscii() (*TransformSpec, string) {

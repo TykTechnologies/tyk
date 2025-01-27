@@ -3,9 +3,8 @@ package kv
 import (
 	"testing"
 
-	"github.com/stretchr/testify/assert"
-
 	consulapi "github.com/hashicorp/consul/api"
+	"github.com/stretchr/testify/assert"
 
 	"github.com/TykTechnologies/tyk/config"
 )

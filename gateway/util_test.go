@@ -4,10 +4,10 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
-
-	"github.com/stretchr/testify/assert"
 )
 
 func TestAppendIfMissingUniqueness(t *testing.T) {

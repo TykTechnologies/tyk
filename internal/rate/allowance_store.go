@@ -8,6 +8,7 @@ import (
 	"sync/atomic"
 
 	"github.com/TykTechnologies/exp/pkg/limiters"
+
 	"github.com/TykTechnologies/tyk/internal/redis"
 )
 

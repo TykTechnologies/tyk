@@ -8,9 +8,8 @@ import (
 	"io"
 	"net/http"
 
-	"github.com/jensneuse/abstractlogger"
-
 	"github.com/buger/jsonparser"
+	"github.com/jensneuse/abstractlogger"
 
 	"github.com/TykTechnologies/graphql-go-tools/v2/pkg/astparser"
 	postprocessv2 "github.com/TykTechnologies/graphql-go-tools/v2/pkg/engine/postprocess"

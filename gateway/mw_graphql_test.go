@@ -11,21 +11,18 @@ import (
 	"testing"
 
 	"github.com/buger/jsonparser"
-
-	"github.com/TykTechnologies/tyk/config"
-
 	"github.com/gorilla/websocket"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/TykTechnologies/tyk/apidef"
-	"github.com/TykTechnologies/tyk/header"
-	"github.com/TykTechnologies/tyk/user"
-
 	gql "github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
 	gqlwebsocket "github.com/TykTechnologies/graphql-go-tools/pkg/subscription/websocket"
 
+	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/header"
 	"github.com/TykTechnologies/tyk/test"
+	"github.com/TykTechnologies/tyk/user"
 )
 
 // Note: here we test only validation behaviour and do not expect real graphql responses here

@@ -8,7 +8,6 @@ import (
 	"strings"
 
 	"github.com/TykTechnologies/tyk/apidef"
-
 	"github.com/TykTechnologies/tyk/internal/uuid"
 )
 

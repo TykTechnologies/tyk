@@ -13,6 +13,7 @@ import (
 	kafkadatasource "github.com/TykTechnologies/graphql-go-tools/pkg/engine/datasource/kafka_datasource"
 	"github.com/TykTechnologies/graphql-go-tools/pkg/operationreport"
 	"github.com/TykTechnologies/graphql-translator/asyncapi"
+
 	"github.com/TykTechnologies/tyk/apidef"
 )
 

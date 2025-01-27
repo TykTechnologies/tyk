@@ -8,10 +8,9 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 
+	"github.com/TykTechnologies/tyk-pump/analytics"
 	"github.com/TykTechnologies/tyk/internal/httputil/accesslog"
 	"github.com/TykTechnologies/tyk/request"
-
-	"github.com/TykTechnologies/tyk-pump/analytics"
 )
 
 func TestRecord(t *testing.T) {

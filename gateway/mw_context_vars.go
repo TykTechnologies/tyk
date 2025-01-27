@@ -5,7 +5,6 @@ import (
 	"strings"
 
 	"github.com/TykTechnologies/tyk/internal/uuid"
-
 	"github.com/TykTechnologies/tyk/request"
 )
 

@@ -13,11 +13,12 @@ import (
 	"io/ioutil"
 	"os"
 
+	kingpin "github.com/alecthomas/kingpin/v2"
+
 	"github.com/TykTechnologies/goverify"
+
 	"github.com/TykTechnologies/tyk/apidef"
 	logger "github.com/TykTechnologies/tyk/log"
-
-	kingpin "github.com/alecthomas/kingpin/v2"
 )
 
 const (

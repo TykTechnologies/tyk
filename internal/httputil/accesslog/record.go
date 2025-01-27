@@ -6,11 +6,10 @@ import (
 
 	"github.com/sirupsen/logrus"
 
+	"github.com/TykTechnologies/tyk-pump/analytics"
 	"github.com/TykTechnologies/tyk/ctx"
 	"github.com/TykTechnologies/tyk/internal/crypto"
 	"github.com/TykTechnologies/tyk/request"
-
-	"github.com/TykTechnologies/tyk-pump/analytics"
 )
 
 // Record is a representation of a transaction log in the Gateway.

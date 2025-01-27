@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/getkin/kin-openapi/openapi3"
-
 	"github.com/getkin/kin-openapi/openapi3filter"
 )
 

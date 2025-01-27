@@ -4,14 +4,13 @@ import (
 	"errors"
 	"net/http"
 
-	gqlv2 "github.com/TykTechnologies/graphql-go-tools/v2/pkg/graphql"
-	v3adapter "github.com/TykTechnologies/tyk/apidef/adapter/gqlengineadapter/enginev3"
-
 	"github.com/TykTechnologies/graphql-go-tools/pkg/engine/datasource/httpclient"
 	"github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
+	gqlv2 "github.com/TykTechnologies/graphql-go-tools/v2/pkg/graphql"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/apidef/adapter/gqlengineadapter"
+	v3adapter "github.com/TykTechnologies/tyk/apidef/adapter/gqlengineadapter/enginev3"
 )
 
 var ErrUnsupportedGraphQLConfigVersion = errors.New("provided version of GraphQL config is not supported for this operation")

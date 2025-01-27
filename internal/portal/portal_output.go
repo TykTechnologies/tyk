@@ -9,8 +9,9 @@ import (
 	"net/http"
 	"strings"
 
-	_ "github.com/warpstreamlabs/bento/public/components/pure"
 	"github.com/warpstreamlabs/bento/public/service"
+
+	_ "github.com/warpstreamlabs/bento/public/components/pure"
 )
 
 type portalOutputConfig struct {

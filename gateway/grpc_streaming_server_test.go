@@ -33,10 +33,8 @@ import (
 	"testing"
 	"time"
 
-	"google.golang.org/grpc"
-
 	"github.com/golang/protobuf/proto"
-
+	"google.golang.org/grpc"
 	pb "google.golang.org/grpc/examples/route_guide/routeguide"
 )
 

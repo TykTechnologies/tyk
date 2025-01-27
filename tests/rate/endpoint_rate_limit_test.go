@@ -7,10 +7,11 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	. "github.com/TykTechnologies/tyk/gateway"
 	"github.com/TykTechnologies/tyk/header"
 	"github.com/TykTechnologies/tyk/test"
 	"github.com/TykTechnologies/tyk/user"
+
+	. "github.com/TykTechnologies/tyk/gateway"
 )
 
 func rlTestRunnerProvider(t *testing.T, hashKey bool, hashAlgo string, limiter string) *Test {

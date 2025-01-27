@@ -5,26 +5,21 @@ package gateway
 
 import (
 	"C"
+	"fmt"
 	"io/ioutil"
+	"os"
 	"path/filepath"
 	"runtime"
+	"sync"
 	"unsafe"
 
+	"github.com/golang/protobuf/proto"
 	"github.com/sirupsen/logrus"
-
-	"fmt"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/coprocess"
-
-	"github.com/golang/protobuf/proto"
-
 	python "github.com/TykTechnologies/tyk/dlpython"
-)
-import (
-	"os"
-	"sync"
 )
 
 var (
@@ -132,7 +127,6 @@ func (d *PythonDispatcher) Dispatch(object *coprocess.Object) (*coprocess.Object
 		return nil, err
 	}
 	return newObject, nil
-
 }
 
 // DispatchEvent dispatches a Tyk event.

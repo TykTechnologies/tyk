@@ -4,13 +4,11 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/TykTechnologies/tyk/coprocess"
-
-	"github.com/stretchr/testify/assert"
-
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/coprocess"
 )
 
 func Test_getIDExtractor(t *testing.T) {

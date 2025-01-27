@@ -5,14 +5,14 @@ import (
 	"errors"
 	"net/http"
 
-	"github.com/TykTechnologies/tyk/apidef"
-
 	"github.com/jensneuse/abstractlogger"
 
 	httpclientv2 "github.com/TykTechnologies/graphql-go-tools/v2/pkg/engine/datasource/httpclient"
 	graphqlv2 "github.com/TykTechnologies/graphql-go-tools/v2/pkg/graphql"
 	subscriptionv2 "github.com/TykTechnologies/graphql-go-tools/v2/pkg/subscription"
 	gqlwebsocketv2 "github.com/TykTechnologies/graphql-go-tools/v2/pkg/subscription/websocket"
+
+	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/internal/otel"
 )
 

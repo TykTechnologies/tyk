@@ -12,7 +12,6 @@ import (
 	"time"
 
 	"github.com/TykTechnologies/tyk/certs"
-
 	"github.com/TykTechnologies/tyk/internal/crypto"
 )
 

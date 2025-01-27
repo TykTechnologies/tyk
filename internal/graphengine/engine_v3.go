@@ -8,6 +8,7 @@ import (
 	"github.com/sirupsen/logrus"
 
 	graphqlv2 "github.com/TykTechnologies/graphql-go-tools/v2/pkg/graphql"
+
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/apidef/adapter"
 	graphqlinternal "github.com/TykTechnologies/tyk/internal/graphql"

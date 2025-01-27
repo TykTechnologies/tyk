@@ -7,11 +7,11 @@ import (
 
 	"github.com/sirupsen/logrus"
 
-	"github.com/TykTechnologies/tyk/internal/event"
-
 	circuit "github.com/TykTechnologies/circuitbreaker"
+
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/internal/event"
 )
 
 // The name for event handlers as defined in the API Definition JSON/BSON format
