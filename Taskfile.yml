@@ -22,6 +22,9 @@ includes:
     taskfile: apidef/oas/Taskfile.yml
     dir: apidef/oas/
 
+vars:
+  path: ./...
+
 tasks:
   docker:
     desc: "build Tyk gateway internal/tyk-gateway"
@@ -76,11 +79,25 @@ tasks:
       - coprocess:lint
       - apidef-oas:lint
 
+  # Used in CI by hooks, lint.
   fmt:
     desc: "Reformat import groups"
     cmds:
       - task: lint:fmt
-      - goimports-reviser -imports-order std,general,company,project,blanked,dotted -company-prefixes github.com/TykTechnologies/ ./...
+
+  # This reformats imports with goimports-reviser;
+  #
+  # To limit reformatting scope to packages or files, set `path`:
+  #
+  # - `task fmt:imports path="./ctx ./rpc"`
+  #
+  # Current status: does not run in CI, triggers golangci-lint issues
+  # in the files it fixed. They are preexisting but block golangci-lint
+  # passing in CI.
+  fmt:imports:
+    desc: "Format imports"
+    cmds:
+      - goimports-reviser -imports-order std,general,company,project,blanked,dotted -company-prefixes github.com/TykTechnologies/ {{.path}}
 
   setup:
     desc: "Setup the project including dependencies and git hooks using lefthooks"
