@@ -1265,6 +1265,19 @@
         },
         "ipAccessControl": {
           "$ref": "#/definitions/X-Tyk-IPAccessControl"
+        },
+        "port": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 65535
+        },
+        "protocol": {
+          "type": "string",
+          "enum": [
+            "http",
+            "http2",
+            "h2c"
+          ]
         }
       },
       "required": [
