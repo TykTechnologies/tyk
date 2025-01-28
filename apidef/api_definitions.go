@@ -908,9 +908,19 @@ type UptimeTests struct {
 }
 
 type UptimeTestsConfig struct {
-	ExpireUptimeAnalyticsAfter int64                         `bson:"expire_utime_after" json:"expire_utime_after"` // must have an expireAt TTL index set (http://docs.mongodb.org/manual/tutorial/expire-data/)
-	ServiceDiscovery           ServiceDiscoveryConfiguration `bson:"service_discovery" json:"service_discovery"`
-	RecheckWait                int                           `bson:"recheck_wait" json:"recheck_wait"`
+	// ExpireAnalyticsAfter controls the expire time in seconds.
+	// If no value is configured, or if set to 0, then the expire time
+	// is set to 100 years. This arsises out of a MongoDB restriction:
+	//
+	// Must have an expireAt TTL index set:
+	// http://docs.mongodb.org/manual/tutorial/expire-data/
+	ExpireUptimeAnalyticsAfter int64 `bson:"expire_utime_after" json:"expire_utime_after"`
+
+	// ServiceDiscovery configures service discovery for uptime tests.
+	ServiceDiscovery ServiceDiscoveryConfiguration `bson:"service_discovery" json:"service_discovery"`
+
+	// RecheckWait is the time in seconds to wait for a re-check when a check fails.
+	RecheckWait int `bson:"recheck_wait" json:"recheck_wait"`
 }
 
 type AuthConfig struct {
