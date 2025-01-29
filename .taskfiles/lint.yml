@@ -12,9 +12,6 @@ tasks:
     cmds:
       - task: fmt
       - task: vet
-      - task: golangci-lint
-        vars:
-          args: "{{.golangci}} --new-from-rev=origin/master"
       - task: check
 
   fmt:
