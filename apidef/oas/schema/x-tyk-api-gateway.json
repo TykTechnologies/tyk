@@ -2038,21 +2038,12 @@
             "type": "string"
           }
         },
-        "retentionPeriod": {
-          "type": "object",
-          "properties": {
-            "enabled": {
-              "type": "boolean"
-            },
-            "value": {
-              "type": "string",
-              "pattern": "^(\\d+h)?(\\d+m)?(\\d+s)?$"
-            }
-          },
-          "required": [
-            "enabled",
-            "value"
-          ]
+        "customRetentionPeriod": {
+          "type": "string",
+          "pattern": "^(\\d+h)?(\\d+m)?(\\d+s)?$",
+          "not": {
+            "pattern": "^(0h)?(0m)?(0s)?$"
+          }
         },
         "plugins": {
           "type": "array",
