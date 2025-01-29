@@ -44,7 +44,7 @@ func TestRecord(t *testing.T) {
 		"path":             "/path",
 		"protocol":         "HTTP/1.1",
 		"status":           http.StatusOK,
-		"upstream_address": "http://example.com/path",
+		"upstream_addr":    "http://example.com/path",
 		"upstream_latency": int64(101),
 		"user_agent":       "user-agent",
 	}

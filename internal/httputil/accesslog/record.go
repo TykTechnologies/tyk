@@ -56,7 +56,7 @@ func (a *Record) WithRequest(req *http.Request, latency analytics.Latency) *Reco
 	a.fields["path"] = req.URL.Path
 	a.fields["protocol"] = req.Proto
 	a.fields["remote_addr"] = req.RemoteAddr
-	a.fields["upstream_address"] = upstreamAddress.String()
+	a.fields["upstream_addr"] = upstreamAddress.String()
 	a.fields["upstream_latency"] = latency.Upstream
 	a.fields["user_agent"] = req.UserAgent()
 	return a

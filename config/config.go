@@ -270,7 +270,7 @@ type AccessLogsConfig struct {
 	// - `path` will include the path of the request.
 	// - `protocol` will include the protocol of the request.
 	// - `remote_addr` will include the remote address of the request.
-	// - `upstream_address` will include the upstream address (scheme, host and path)
+	// - `upstream_addr` will include the upstream address (scheme, host and path)
 	// - `upstream_latency` will include the upstream latency of the request.
 	// - `latency_total` will include the total latency of the request.
 	// - `user_agent` will include the user agent of the request.
