@@ -41,6 +41,7 @@ type APIAllCertificateBasics struct {
 	Certs []*certs.CertificateBasics `json:"certs"`
 }
 
+// Deprecated: use tls.CipherSuites() now
 var cipherSuites = map[string]uint16{
 	"TLS_RSA_WITH_RC4_128_SHA":                0x0005,
 	"TLS_RSA_WITH_3DES_EDE_CBC_SHA":           0x000a,
@@ -581,10 +582,10 @@ func (gw *Gateway) certHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func getCipherAliases(ciphers []string) (cipherCodes []uint16) {
-	for k, v := range cipherSuites {
+	for _, v := range tls.CipherSuites() {
 		for _, str := range ciphers {
-			if str == k {
-				cipherCodes = append(cipherCodes, v)
+			if str == v.Name {
+				cipherCodes = append(cipherCodes, v.ID)
 			}
 		}
 	}
