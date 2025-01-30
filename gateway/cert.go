@@ -582,12 +582,13 @@ func (gw *Gateway) certHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func getCipherAliases(ciphers []string) (cipherCodes []uint16) {
-	for _, v := range tls.CipherSuites() {
-		for _, str := range ciphers {
-			if str == v.Name {
-				cipherCodes = append(cipherCodes, v.ID)
-			}
+	for _, v := range ciphers {
+		id, err := crypto.ResolveCipher(v)
+		if err != nil {
+			log.Debugf("cipher %s not found; skipped", v)
+			continue
 		}
+		cipherCodes = append(cipherCodes, id)
 	}
 	return cipherCodes
 }
