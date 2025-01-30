@@ -2,36 +2,23 @@
 version: "3"
 
 vars:
-  golangci: '--max-same-issues=0 --max-issues-per-linter=0'
+  golangci: '--max-same-issues=0 --max-issues-per-linter=0 --fix'
   root:
     sh: git rev-parse --show-toplevel
-  package:
-    sh: go mod edit -json | jq .Module.Path -r
 
 tasks:
-  default:
+  run:
     desc: "Run linters"
     cmds:
+      - task: fmt
       - task: vet
-      - task: golangci-lint
-        vars:
-          args: "{{.golangci}} --new-from-rev=origin/master"
-      - task: x-tyk-gateway
+      - task: check
 
-  all:
-    desc: "Run linters (full source)"
+  fmt:
+    desc: "Run typical code cleanup steps"
     cmds:
-      - task: vet
-      - task: golangci-lint
-        vars:
-          args: "{{.golangci}}"
-      - task: x-tyk-gateway
-
-  x-tyk-gateway:
-    desc: "Lint x-tyk-gateway schema"
-    dir: '{{.root}}'
-    cmds:
-      - go test -run=TestXTykGateway_Lint -v ./apidef/oas/
+      - go fmt ./...
+      - go mod tidy
 
   vet:
     desc: "Run go vet"
@@ -46,24 +33,40 @@ tasks:
     cmds:
       - golangci-lint run {{.args}} -v ./...
 
-  goimports:
-    desc: "Run goimports"
-    dir: '{{.root}}'
-    cmds:
-      - goimports -local {{.package | dir}},{{.package}}/internal -w .
-
-  gofmt:
-    desc: "Run gofmt"
-    dir: '{{.root}}'
-    cmds:
-      - gofmt -w .
-
-  simple-build:
+  build:
     desc: "Run go build for sanity check"
+    dir: '{{.root}}'
     cmds:
       - go build .
 
-  compile-tests:
+  build-test:
     desc: "Compile go tests for sanity check"
+    dir: '{{.root}}'
     cmds:
       - cd gateway && go test -c .
+
+  check:
+    desc: "Run repository specific checks"
+    cmds:
+      - task: check:x-tyk-gateway
+      - task: check:imports
+      - task: check:config
+
+  check:imports:
+    desc: "go-fsck lint import paths"
+    dir: '{{.root}}'
+    cmds:
+      - go-fsck lint
+
+  check:config:
+    internal: true
+    desc: "lint config schema"
+    dir: '{{.root}}'
+    cmds:
+      - go test -count 1 ./cli/linter/...
+
+  check:x-tyk-gateway:
+    desc: "Lint x-tyk-gateway schema"
+    dir: '{{.root}}'
+    cmds:
+      - go test -count 1 -run=TestXTykGateway_Lint ./apidef/oas/
