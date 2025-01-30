@@ -1,0 +1,21 @@
+name: tyk-service-discovery
+
+include:
+  - src/docker-compose.yml
+  - ../../../docker/services/redis.yml
+  - ../../../docker/services/httpbin.yml
+
+services:
+  tyk:
+    image: internal/tyk-gateway
+    networks: [ proxy ]
+    ports:
+    - 9000:8080
+    volumes:
+    - $PWD/tyk.conf:/opt/tyk-gateway/tyk.conf
+
+networks:
+  proxy:
+    name: proxy
+    driver: bridge
+    external: true

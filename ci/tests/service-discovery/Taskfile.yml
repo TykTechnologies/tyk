@@ -1,0 +1,47 @@
+---
+version: "3"
+
+tasks:
+  default:
+    desc: "Run test"
+    cmds:
+      - rm -rf src/
+      - git clone --depth=1 https://github.com/guessi/docker-compose-etcd src
+      - task: up
+
+  status:
+    desc: "Print etcd status"
+    cmds:
+      - docker compose exec etcd-1 etcdctl endpoint health
+      - docker compose exec etcd-2 etcdctl endpoint health
+      - docker compose exec etcd-3 etcdctl endpoint health
+
+  build:
+    desc: "Build docker image"
+    cmds:
+      - docker compose build
+
+  pull:
+    desc: "Pull docker images"
+    cmds:
+      - docker compose pull
+
+  ps:
+    desc: "Environment status"
+    cmds:
+      - docker compose ps
+
+  up:
+    desc: "Bring up env"
+    cmds:
+      - docker compose up -d --remove-orphans
+
+  down:
+    desc: "Shut down env"
+    cmds:
+      - docker compose down
+
+  logs:
+    desc: "Tail container logs (live)"
+    cmds:
+      - docker compose logs --tail=10 -f
