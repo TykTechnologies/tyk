@@ -31,8 +31,10 @@ linters:
     - testpackage
     - paralleltest
     - ireturn
+    - goimports
   enable:
     - govet
+    - gofumpt
     - forbidigo
     - gochecknoinits
     - thelper
@@ -42,10 +44,47 @@ linters:
     - dupl
     - nilerr
     - misspell
-    - goimports
     - revive
+    - whitespace
+    - wsl
 
 linters-settings:
+  misspell:
+    ignore-words:
+      - tempset  # temporary set, not "tempest"
+
+  whitespace:
+    multi-if: true  # Enforces newlines (or comments) after every multi-line if statement
+    multi-func: true  # Enforces newlines (or comments) after every multi-line function signature
+
+  wsl:
+    # Controls if you may cuddle assignments and anything without needing an empty line between them.
+    allow-assign-and-anything: false
+    # Allow calls and assignments to be cuddled as long as the lines have any matching variables, fields or types.
+    # Default is true.
+    allow-assign-and-call: true
+    # Controls if you may end case statements with a whitespace.
+    allow-case-trailing-whitespace: true
+    # Allow declarations (var) to be cuddled.
+    allow-cuddle-declarations: true
+    # Allow multiline assignments to be cuddled. Default is true.
+    allow-multiline-assign: true
+    # This option allows whitespace after each comment group that begins a block.
+    allow-separated-leading-comment: false
+    # Allow trailing comments in ending of blocks
+    allow-trailing-comment: false
+    # Enforces that an if statement checking an error variable
+    # is cuddled with the line that assigned that error variable.
+    enforce-err-cuddling: true
+    # Force newlines in end of case at this limit (0 = never).
+    force-case-trailing-whitespace: 0
+    # Enforces that an assignment which is actually a short declaration (using :=)
+    # is only allowed to cuddle with other short declarations, and not plain assignments, blocks, etc.
+    force-short-decl-cuddling: false
+    # Append is only allowed to be cuddled if appending value is matching variables, fields or types on line above.
+    # Default is true.
+    strict-append: true
+
   fobidigo:
     forbid:
       - p: ^fmt\.Print.*$
@@ -74,9 +113,6 @@ linters-settings:
     disable:
       - fieldalignment
       - shadow
-
-  goimports:
-    local-prefixes: github.com/TykTechnologies,github.com/TykTechnologies/tyk/internal
 
   errcheck:
     check-type-assertions: true
@@ -109,5 +145,6 @@ issues:
         - funlen # many functions can be very long
         - gosec # tests don't have CVEs
   exclude:
-    - G404 # Use of weak random number generator (math/rand instead of crypto/rand)
-    - SA9004 # only the first constant in this group has an explicit type
+    - G404    # Use of weak random number generator (math/rand instead of crypto/rand)
+    - SA9004  # only the first constant in this group has an explicit type
+    - SA1019  # Warning on deprecated imports (stdlib ioutil, grpc import)

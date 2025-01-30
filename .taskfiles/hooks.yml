@@ -1,23 +1,23 @@
+---
 version: "3"
 
-includes:
-  lint_dep: lint.yml
-
 tasks:
+  # pre-commit: run formatting linters on each commit
+  # runs go fmt, go generate and golangci-lint for autofixes.
   pre-commit:
     desc: "Run pre-commit hooks"
     cmds:
-      - task: :lint:tidy
-      - task: lint_dep:compile-tests
+      - task: :fmt
+      - task: :lint:golangci-lint
+        vars:
+          args: "{{.golangci}} --new-from-rev=origin/master --issues-exit-code=1"
 
+  # pre-push: in essence runs `task lint` with some additional
+  # build tests for the package and the tests.
   pre-push:
     desc: "Run pre-push hooks"
     cmds:
-      - task: :lint:tidy
-      - task: lint_dep:vet
-      - task: lint_dep:golangci-lint
-        vars:
-          args: "{{.golangci}} --new-from-rev=origin/master"
-      - task: :lint:x-tyk-gateway
-      - task: lint_dep:compile-tests
-      - task: lint_dep:simple-build
+      - task: :lint
+      - task: :lint:build-test
+      - task: :lint:build
+
