@@ -20,7 +20,7 @@ type Upstream struct {
 	ServiceDiscovery *ServiceDiscovery `bson:"serviceDiscovery,omitempty" json:"serviceDiscovery,omitempty"`
 
 	// Test contains the configuration related to uptime tests.
-	Test *Test `bson:"test,omitempty" json:"test,omitempty"`
+	UptimeTests *UptimeTests `bson:"uptimeTests,omitempty" json:"uptimeTests,omitempty"`
 
 	// MutualTLS contains the configuration for establishing a mutual TLS connection between Tyk and the upstream server.
 	MutualTLS *MutualTLS `bson:"mutualTLS,omitempty" json:"mutualTLS,omitempty"`
@@ -61,13 +61,13 @@ func (u *Upstream) Fill(api apidef.APIDefinition) {
 		u.ServiceDiscovery = nil
 	}
 
-	if u.Test == nil {
-		u.Test = &Test{}
+	if u.UptimeTests == nil {
+		u.UptimeTests = &UptimeTests{}
 	}
 
-	u.Test.Fill(api.UptimeTests)
-	if ShouldOmit(u.Test) {
-		u.Test = nil
+	u.UptimeTests.Fill(api.UptimeTests)
+	if ShouldOmit(u.UptimeTests) {
+		u.UptimeTests = nil
 	}
 
 	if u.MutualTLS == nil {
@@ -151,14 +151,14 @@ func (u *Upstream) ExtractTo(api *apidef.APIDefinition) {
 
 	u.ServiceDiscovery.ExtractTo(&api.Proxy.ServiceDiscovery)
 
-	if u.Test == nil {
-		u.Test = &Test{}
+	if u.UptimeTests == nil {
+		u.UptimeTests = &UptimeTests{}
 		defer func() {
-			u.Test = nil
+			u.UptimeTests = nil
 		}()
 	}
 
-	u.Test.ExtractTo(&api.UptimeTests)
+	u.UptimeTests.ExtractTo(&api.UptimeTests)
 
 	if u.MutualTLS == nil {
 		u.MutualTLS = &MutualTLS{}
@@ -534,17 +534,31 @@ func (sd *ServiceDiscovery) ExtractTo(serviceDiscovery *apidef.ServiceDiscoveryC
 	serviceDiscovery.CacheDisabled = !enabled
 }
 
-// Test holds the test configuration for service discovery.
-type Test struct {
+// UptimeTests holds the test configuration for uptime tests.
+type UptimeTests struct {
 	// ServiceDiscovery contains the configuration related to test Service Discovery.
 	// Tyk classic API definition: `proxy.service_discovery`
-	ServiceDiscovery *ServiceDiscovery `bson:"serviceDiscovery,omitempty" json:"serviceDiscovery,omitempty"`
+	ServiceDiscovery *UptimeTestsServiceDiscovery `bson:"serviceDiscovery,omitempty" json:"serviceDiscovery,omitempty"`
 }
 
-// Fill fills *Test from apidef.UptimeTests.
-func (t *Test) Fill(uptimeTests apidef.UptimeTests) {
+// UptimeTestsServiceDiscovery extends ServiceDiscovery with RecheckWait.
+type UptimeTestsServiceDiscovery struct {
+	*ServiceDiscovery
+
+	// RecheckWait
+	RecheckWait time.ReadableDuration
+}
+
+func NewUptimeTestsServiceDiscovery() *UptimeTestsServiceDiscovery {
+	return &UptimeTestsServiceDiscovery{
+		ServiceDiscovery: &ServiceDiscovery{},
+	}
+}
+
+// Fill fills *UptimeTests from apidef.UptimeTests.
+func (t *UptimeTests) Fill(uptimeTests apidef.UptimeTests) {
 	if t.ServiceDiscovery == nil {
-		t.ServiceDiscovery = &ServiceDiscovery{}
+		t.ServiceDiscovery = NewUptimeTestsServiceDiscovery()
 	}
 
 	t.ServiceDiscovery.Fill(uptimeTests.Config.ServiceDiscovery)
@@ -553,10 +567,10 @@ func (t *Test) Fill(uptimeTests apidef.UptimeTests) {
 	}
 }
 
-// ExtractTo extracts *Test into *apidef.UptimeTests.
-func (t *Test) ExtractTo(uptimeTests *apidef.UptimeTests) {
+// ExtractTo extracts *UptimeTests into *apidef.UptimeTests.
+func (t *UptimeTests) ExtractTo(uptimeTests *apidef.UptimeTests) {
 	if t.ServiceDiscovery == nil {
-		t.ServiceDiscovery = &ServiceDiscovery{}
+		t.ServiceDiscovery = NewUptimeTestsServiceDiscovery()
 		defer func() {
 			t.ServiceDiscovery = nil
 		}()
