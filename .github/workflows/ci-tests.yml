@@ -67,7 +67,7 @@ jobs:
       - name: golangci-lint
         if: ${{ github.event_name == 'pull_request' }}
         run: |
-          golangci-lint run --out-format colored-line-number,checkstyle:golangci-lint-report.json --issues-exit-code=0 --new-from-rev=origin/${{ github.base_ref }} -v ./...
+          golangci-lint run --out-format colored-line-number,checkstyle:golangci-lint-report.json --issues-exit-code=1 --new-from-rev=origin/${{ github.base_ref }} -v ./...
 
       - name: golangci-lint-on-push
         if: ${{ github.event_name == 'push' }}
@@ -104,6 +104,11 @@ jobs:
         uses: actions/checkout@v4
         with:
           ref: ${{ github.event.pull_request.head.ref }}
+
+      - name: "Get base ref"
+        run: |
+          git fetch origin ${{ github.base_ref }}
+          git rev-parse origin/${{ github.base_ref }}
 
       # Regardless that the base image provides a python release, we need
       # setup-python so it properly configures the python3-venv.
