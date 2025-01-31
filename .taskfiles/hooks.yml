@@ -8,9 +8,7 @@ tasks:
     desc: "Run pre-commit hooks"
     cmds:
       - task: :fmt
-      - task: :lint:golangci-lint
-        vars:
-          args: "{{.golangci}} --new-from-rev=origin/master --issues-exit-code=1"
+      - golangci-lint run --config .golangci.dev.yml --new-from-rev=origin/master --issues-exit-code=1 --fix ./...
 
   # pre-push: in essence runs `task lint` with some additional
   # build tests for the package and the tests.

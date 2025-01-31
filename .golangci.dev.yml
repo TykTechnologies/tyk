@@ -24,36 +24,37 @@ run:
   # If false (default) - golangci-lint acquires file lock on start.
   allow-parallel-runners: false
 
-# This configures the release linters at tyk.
-#
-# The guideline is simple: keep linters you want to track in release
-# code. This includes any quality gates or refactors that apply to
-# testing code, including updating practices with new Go releases.
-
-# Tag linters with: testing, dev, or message with reason.
 linters:
   disable:
-    - varnamelen # disabled, opinionated on anarchy with variable names
-    - tagliatelle # disabled, no naming double checks
-    - testpackage # testing/dev (structural lint, unconfigured!)
-    - paralleltest # testing
-    - thelper # testing
-    - ireturn # dev
-    - goimports # using goimports-revive (`task -l`: fmt, lint, lint:imports targets)
-    - misspell # dev
-    - noctx # dev
-    - unused # dev
-    - dupl # dev
+    - varnamelen
+    - tagliatelle
+    - testpackage
+    - paralleltest
+    - ireturn
+    - goimports
   enable:
-    - forbidigo # debt: measure API leaks / dev: extend the list
-    - govet # debt: don't want these defects in product
-    - gochecknoinits # same, but exclusions apply for tests
-    - errcheck # debt: measure checking errors
-    - errorlint # debt: measure error handling improvements
-    - nilerr # debt: measure code that returns nil on non-nil error
-    - revive # keep - measured for stats, shows code smells
+    - govet
+    - forbidigo
+    - gochecknoinits
+    - errcheck
+    - errorlint
+    - thelper
+    - noctx
+    - dupl
+    - nilerr
+    - misspell
+    - revive
+    - whitespace
 
 linters-settings:
+  misspell:
+    ignore-words:
+      - tempset  # temporary set, not "tempest"
+
+  whitespace:
+    multi-if: true  # Enforces newlines (or comments) after every multi-line if statement
+    multi-func: true  # Enforces newlines (or comments) after every multi-line function signature
+
   fobidigo:
     forbid:
       - p: ^fmt\.Print.*$
@@ -89,7 +90,6 @@ linters-settings:
     exclude-functions:
       - (*github.com/TykTechnologies/tyk/gateway.Test).Run
       - time.Parse
-      - strconv.ParseBool
 
 issues:
   max-issues-per-linter: 0
@@ -104,13 +104,6 @@ issues:
     - bin
     - webclient
     - portal
-  # The `exclude-rules` configuration below configures
-  # more particular exclusion rules, mostly aimed at tests
-  # or some structurally known areas like testutil and test
-  # folders which are not part of product packages.
-  #
-  # Development doesn't carry these exclusions, as we have
-  # testing concerns that are being excluded here.
   exclude-rules:
     # cli package uses fmt.Print by design
     - path: ^cli/

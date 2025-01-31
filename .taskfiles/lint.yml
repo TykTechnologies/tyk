@@ -2,7 +2,6 @@
 version: "3"
 
 vars:
-  golangci: '--max-same-issues=0 --max-issues-per-linter=0 --fix'
   root:
     sh: git rev-parse --show-toplevel
 
@@ -28,10 +27,20 @@ tasks:
 
   golangci-lint:
     desc: "Run golangci-lint"
-    dir: '{{.root}}'
     require: [args]
     cmds:
-      - golangci-lint run {{.args}} -v ./...
+      - golangci-lint run --out-format json ./... | summary golangcilint > golangci-lint.json
+      - golangci-lint run --out-format json --config .golangci.dev.yml ./... | summary golangcilint > golangci-lint-dev.json
+
+  golangci-lint:fix:
+    desc: "Run golangci-lint w fixing"
+    cmds:
+      - golangci-lint run --config .golangci.dev.yml --fix ./...
+
+  golangci-lint:diff:
+    desc: "Print changes from dev -> CI"
+    cmds:
+      - dyff between -i .golangci.dev.yml .golangci.yml
 
   build:
     desc: "Run go build for sanity check"
