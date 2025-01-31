@@ -86,7 +86,7 @@ type CustomKeyLifetime struct {
 	// Tyk classic API definition: `expire_analytics_after`.
 	Value ReadableDuration `bson:"value" json:"value"`
 	// RespectValidity ensures that Tyk respects the expiry configured in the key when the API level configuration grants a shorter lifetime.
-	//That is, Redis waits until the key has expired before deleting it.
+	// That is, Redis waits until the key has expired before deleting it.
 	RespectValidity bool `bson:"respectValidity,omitempty" json:"respectValidity,omitempty"`
 }
 
@@ -132,7 +132,9 @@ func (a *Authentication) Fill(api apidef.APIDefinition) {
 	if a.CustomKeyLifetime == nil {
 		a.CustomKeyLifetime = &CustomKeyLifetime{}
 	}
+
 	a.CustomKeyLifetime.Fill(api)
+
 	if ShouldOmit(a.CustomKeyLifetime) {
 		a.CustomKeyLifetime = nil
 	}
@@ -195,6 +197,7 @@ func (a *Authentication) ExtractTo(api *apidef.APIDefinition) {
 			a.CustomKeyLifetime = nil
 		}()
 	}
+
 	a.CustomKeyLifetime.ExtractTo(api)
 }
 

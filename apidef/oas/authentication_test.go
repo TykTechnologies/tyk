@@ -143,7 +143,7 @@ func TestKeyRetentionPeriod(t *testing.T) {
 	})
 
 	t.Run("filled", func(t *testing.T) {
-		var keyRetentionPeriod = CustomKeyLifetime{
+		keyRetentionPeriod := CustomKeyLifetime{
 			Enabled:         true,
 			Value:           ReadableDuration(5 * time.Minute),
 			RespectValidity: true,
@@ -178,7 +178,7 @@ func TestCustomPlugin(t *testing.T) {
 
 	t.Run("values", func(t *testing.T) {
 		t.Run("goplugin", func(t *testing.T) {
-			var expectedCustomPluginAuth = CustomPluginAuthentication{
+			expectedCustomPluginAuth := CustomPluginAuthentication{
 				Enabled: true,
 				Config: &AuthenticationPlugin{
 					Enabled:      true,
@@ -199,7 +199,7 @@ func TestCustomPlugin(t *testing.T) {
 		})
 
 		t.Run("coprocess", func(t *testing.T) {
-			var expectedCustomPluginAuth = CustomPluginAuthentication{
+			expectedCustomPluginAuth := CustomPluginAuthentication{
 				Enabled: true,
 				Config: &AuthenticationPlugin{
 					Enabled:      true,
@@ -225,7 +225,6 @@ func TestCustomPlugin(t *testing.T) {
 			assert.NotEmpty(t, actualCustomPluginAuth.AuthSources)
 		})
 	})
-
 }
 
 func TestIDExtractorConfig(t *testing.T) {
@@ -246,7 +245,8 @@ func TestIDExtractorConfig(t *testing.T) {
 
 	t.Run("values", func(t *testing.T) {
 		t.Parallel()
-		var expectedIDExtractorConfig = IDExtractorConfig{
+
+		expectedIDExtractorConfig := IDExtractorConfig{
 			HeaderName:       "Authorization",
 			FormParamName:    "Authorization",
 			RegexpMatchIndex: 1,
@@ -283,7 +283,8 @@ func TestIDExtractor(t *testing.T) {
 
 	t.Run("values", func(t *testing.T) {
 		t.Parallel()
-		var expectedIDExtractor = IDExtractor{
+
+		expectedIDExtractor := IDExtractor{
 			Enabled: true,
 			Source:  apidef.HeaderSource,
 			With:    apidef.ValueExtractor,
