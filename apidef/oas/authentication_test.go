@@ -129,25 +129,27 @@ func TestOIDC(t *testing.T) {
 
 func TestKeyRetentionPeriod(t *testing.T) {
 	t.Run("empty", func(t *testing.T) {
-		var emptyKeyRetentionPeriod KeyRetentionPeriod
+		var emptyCustomKeyLifetime CustomKeyLifetime
 		var convertedAPI apidef.APIDefinition
-		var resultKeyRetentionPeriod KeyRetentionPeriod
+		var resultCustomKeyLifetime CustomKeyLifetime
 
 		convertedAPI.SetDisabledFlags()
-		emptyKeyRetentionPeriod.ExtractTo(&convertedAPI)
-		resultKeyRetentionPeriod.Fill(convertedAPI)
+		emptyCustomKeyLifetime.ExtractTo(&convertedAPI)
+		resultCustomKeyLifetime.Fill(convertedAPI)
 
-		assert.Equal(t, emptyKeyRetentionPeriod, resultKeyRetentionPeriod)
+		assert.Equal(t, int64(0), convertedAPI.SessionLifetime)
+
+		assert.Equal(t, emptyCustomKeyLifetime, resultCustomKeyLifetime)
 	})
 
 	t.Run("filled", func(t *testing.T) {
-		var keyRetentionPeriod = KeyRetentionPeriod{
-			Enabled:       true,
-			Value:         ReadableDuration(5 * time.Minute),
-			RespectExpiry: true,
+		var keyRetentionPeriod = CustomKeyLifetime{
+			Enabled:         true,
+			Value:           ReadableDuration(5 * time.Minute),
+			RespectValidity: true,
 		}
 		var convertedAPI apidef.APIDefinition
-		var resultKeyRetentionPeriod KeyRetentionPeriod
+		var resultKeyRetentionPeriod CustomKeyLifetime
 
 		keyRetentionPeriod.ExtractTo(&convertedAPI)
 

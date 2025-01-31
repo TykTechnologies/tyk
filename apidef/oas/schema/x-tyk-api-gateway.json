@@ -1204,7 +1204,7 @@
             }
           }
         },
-        "keyRetentionPeriod": {
+        "customKeyLifetime": {
           "type": "object",
           "properties": {
             "enabled": {
@@ -1212,9 +1212,12 @@
             },
             "value": {
               "type": "string",
-              "pattern": "^(\\d+h)?(\\d+m)?(\\d+s)?$"
+              "pattern": "^(\\d+h)?(\\d+m)?(\\d+s)?$",
+              "not": {
+                "pattern": "^(0h)?(0m)?(0s)?$"
+              }
             },
-            "respectExpiry": {
+            "respectValidity": {
               "type": "boolean"
             }
           },

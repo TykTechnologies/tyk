@@ -175,7 +175,6 @@ func TestOAS_ExtractTo_ResetAPIDefinition(t *testing.T) {
 	a.DoNotTrack = false
 	a.IPAccessControlDisabled = false
 	a.DisableExpireAnalytics = false
-	a.SessionLifetimeDisabled = false
 
 	// deprecated fields
 	a.Auth = apidef.AuthConfig{}
@@ -1052,10 +1051,6 @@ func TestMigrateAndFillOAS_CustomPluginAuth(t *testing.T) {
 					Path:         "/path/to/plugin",
 				},
 			},
-			KeyRetentionPeriod: &KeyRetentionPeriod{
-				Enabled: true,
-				Value:   0,
-			},
 		}
 
 		assert.Equal(t, expectedAuthentication, *migratedAPI.OAS.GetTykExtension().Server.Authentication)
@@ -1105,10 +1100,6 @@ func TestMigrateAndFillOAS_CustomPluginAuth(t *testing.T) {
 						Name:    "Authorization",
 					},
 				},
-			},
-			KeyRetentionPeriod: &KeyRetentionPeriod{
-				Enabled: true,
-				Value:   0,
 			},
 		}
 
