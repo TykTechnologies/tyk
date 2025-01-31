@@ -24,67 +24,36 @@ run:
   # If false (default) - golangci-lint acquires file lock on start.
   allow-parallel-runners: false
 
+# This configures the release linters at tyk.
+#
+# The guideline is simple: keep linters you want to track in release
+# code. This includes any quality gates or refactors that apply to
+# testing code, including updating practices with new Go releases.
+
+# Tag linters with: testing, dev, or message with reason.
 linters:
   disable:
-    - varnamelen
-    - tagliatelle
-    - testpackage
-    - paralleltest
-    - ireturn
-    - goimports
+    - varnamelen # disabled, opinionated on anarchy with variable names
+    - tagliatelle # disabled, no naming double checks
+    - testpackage # testing/dev (structural lint, unconfigured!)
+    - paralleltest # testing
+    - thelper # testing
+    - ireturn # dev
+    - goimports # using goimports-revive (`task -l`: fmt, lint, lint:imports targets)
+    - misspell # dev
+    - noctx # dev
+    - revive # keep - measured for stats
+    - unused # dev
+    - dupl # dev
   enable:
-    - govet
-    - gofumpt
-    - forbidigo
-    - gochecknoinits
-    - thelper
-    - errcheck
-    - errorlint
-    - noctx
-    - dupl
-    - nilerr
-    - misspell
-    - revive
-    - whitespace
-    - wsl
+    - forbidigo # debt: measure API leaks / dev: extend the list
+    - govet # debt: don't want these defects in product
+    - gochecknoinits # same, but exclusions apply for tests
+    - errcheck # debt: measure checking errors
+    - errorlint # debt: measure error handling improvements
+    - nilerr # debt: measure code that returns nil on non-nil error
 
 linters-settings:
-  misspell:
-    ignore-words:
-      - tempset  # temporary set, not "tempest"
-
-  whitespace:
-    multi-if: true  # Enforces newlines (or comments) after every multi-line if statement
-    multi-func: true  # Enforces newlines (or comments) after every multi-line function signature
-
-  wsl:
-    # Controls if you may cuddle assignments and anything without needing an empty line between them.
-    allow-assign-and-anything: false
-    # Allow calls and assignments to be cuddled as long as the lines have any matching variables, fields or types.
-    # Default is true.
-    allow-assign-and-call: true
-    # Controls if you may end case statements with a whitespace.
-    allow-case-trailing-whitespace: true
-    # Allow declarations (var) to be cuddled.
-    allow-cuddle-declarations: true
-    # Allow multiline assignments to be cuddled. Default is true.
-    allow-multiline-assign: true
-    # This option allows whitespace after each comment group that begins a block.
-    allow-separated-leading-comment: false
-    # Allow trailing comments in ending of blocks
-    allow-trailing-comment: false
-    # Enforces that an if statement checking an error variable
-    # is cuddled with the line that assigned that error variable.
-    enforce-err-cuddling: true
-    # Force newlines in end of case at this limit (0 = never).
-    force-case-trailing-whitespace: 0
-    # Enforces that an assignment which is actually a short declaration (using :=)
-    # is only allowed to cuddle with other short declarations, and not plain assignments, blocks, etc.
-    force-short-decl-cuddling: false
-    # Append is only allowed to be cuddled if appending value is matching variables, fields or types on line above.
-    # Default is true.
-    strict-append: true
-
   fobidigo:
     forbid:
       - p: ^fmt\.Print.*$
@@ -120,6 +89,7 @@ linters-settings:
     exclude-functions:
       - (*github.com/TykTechnologies/tyk/gateway.Test).Run
       - time.Parse
+      - strconv.ParseBool
 
 issues:
   max-issues-per-linter: 0
@@ -134,10 +104,31 @@ issues:
     - bin
     - webclient
     - portal
+  # The `exclude-rules` configuration below configures
+  # more particular exclusion rules, mostly aimed at tests
+  # or some structurally known areas like testutil and test
+  # folders which are not part of product packages.
+  #
+  # Development doesn't carry these exclusions, as we have
+  # testing concerns that are being excluded here.
   exclude-rules:
+    # cli package uses fmt.Print by design
     - path: ^cli/
       linters:
-        - forbidigo # cli package uses fmt.Print by design
+        - forbidigo
+    # we don't want to silence test, but we want to silence
+    # some known issues in them which rank lower than product.
+    # generally no test code impacts the quality of product
+    # code, if the test is deleted. Whatever test metrics we
+    # measure are to our benefit.
+    - path: (^test/|^tests/|/testutil.go|_test\.go)
+      linters:
+        - errcheck
+      text: "error return value of `[^`]+` is not checked" # unsafe typecasts are common
+    - path: (^test/|^tests/|/testutil.go|_test\.go)
+      linters:
+        - errcheck
+      text: "Error return value is not checked"
     - path: _test\.go
       linters:
         - dupl # many functions looks like dupes
@@ -148,3 +139,4 @@ issues:
     - G404    # Use of weak random number generator (math/rand instead of crypto/rand)
     - SA9004  # only the first constant in this group has an explicit type
     - SA1019  # Warning on deprecated imports (stdlib ioutil, grpc import)
+    - SA1029  # should not use built-in type string as key for value; define your own type to avoid collision
