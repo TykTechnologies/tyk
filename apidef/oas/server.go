@@ -371,7 +371,7 @@ func (s *Server) extractIPAccessControlTo(api *apidef.APIDefinition) {
 // BatchProcessing represents the configuration for enabling or disabling batch request support for an API.
 type BatchProcessing struct {
 	// Enabled determines whether batch request support is enabled or disabled for the API.
-	Enabled bool `bson:"enabled" json:"enabled"` //required
+	Enabled bool `bson:"enabled" json:"enabled"` // required
 }
 
 // Fill updates the BatchProcessing configuration based on the EnableBatchRequestSupport value from the given APIDefinition.
@@ -388,7 +388,9 @@ func (s *Server) fillBatchProcessing(api apidef.APIDefinition) {
 	if s.BatchProcessing == nil {
 		s.BatchProcessing = &BatchProcessing{}
 	}
+
 	s.BatchProcessing.Fill(api)
+
 	if ShouldOmit(s.BatchProcessing) {
 		s.BatchProcessing = nil
 	}
