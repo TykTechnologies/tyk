@@ -377,3 +377,85 @@ func TestIPAccessControl(t *testing.T) {
 		assert.Equal(t, ipAccessControl, resultIPAccessControl)
 	})
 }
+
+func TestBatchProcessing(t *testing.T) {
+	t.Run("fill", func(t *testing.T) {
+		type testCase struct {
+			title    string
+			input    apidef.APIDefinition
+			expected *BatchProcessing
+		}
+
+		testCases := []testCase{
+			{
+				title: "not enabled",
+				input: apidef.APIDefinition{
+					EnableBatchRequestSupport: false,
+				},
+				expected: nil,
+			},
+			{
+				title: "enabled",
+				input: apidef.APIDefinition{
+					EnableBatchRequestSupport: true,
+				},
+				expected: &BatchProcessing{
+					Enabled: true,
+				},
+			},
+		}
+
+		for _, tc := range testCases {
+			tc := tc
+			t.Run(tc.title, func(t *testing.T) {
+				t.Parallel()
+
+				server := new(Server)
+				server.Fill(tc.input)
+
+				assert.Equal(t, tc.expected, server.BatchProcessing)
+			})
+		}
+	})
+
+	t.Run("extractTo", func(t *testing.T) {
+		type testCase struct {
+			title    string
+			input    *BatchProcessing
+			expected apidef.APIDefinition
+		}
+
+		testCases := []testCase{
+			{
+				title: "not enabled",
+				input: &BatchProcessing{
+					Enabled: false,
+				},
+				expected: apidef.APIDefinition{
+					EnableBatchRequestSupport: false,
+				},
+			},
+			{
+				title: "enabled",
+				input: &BatchProcessing{
+					Enabled: true,
+				},
+				expected: apidef.APIDefinition{
+					EnableBatchRequestSupport: true,
+				},
+			},
+		}
+
+		for _, tc := range testCases {
+			tc := tc
+			t.Run(tc.title, func(t *testing.T) {
+				t.Parallel()
+
+				var apiDef apidef.APIDefinition
+				tc.input.ExtractTo(&apiDef)
+
+				assert.Equal(t, tc.expected, apiDef)
+			})
+		}
+	})
+}

@@ -257,7 +257,6 @@ func TestOAS_ExtractTo_ResetAPIDefinition(t *testing.T) {
 		"APIDefinition.SessionProvider.Name",
 		"APIDefinition.SessionProvider.StorageEngine",
 		"APIDefinition.SessionProvider.Meta[0]",
-		"APIDefinition.EnableBatchRequestSupport",
 		"APIDefinition.EnableIpWhiteListing",
 		"APIDefinition.EnableIpBlacklisting",
 		"APIDefinition.DontSetQuotasOnCreate",
