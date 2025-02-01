@@ -8,7 +8,10 @@ tasks:
     desc: "Run pre-commit hooks"
     cmds:
       - task: :fmt
-      - golangci-lint run --config .golangci.dev.yml --new-from-rev=origin/master --issues-exit-code=1 --fix ./...
+      # this takes care of quality gates that are sonarcould reported kpis, don't add new issues
+      - golangci-lint run --new-from-rev=origin/master --issues-exit-code=1 --fix ./...
+      # this adds additional scanning for development focused linters
+      - golangci-lint run --config .golangci.dev.yml --new-from-rev=origin/master --issues-exit-code=0 --fix ./...
 
   # pre-push: in essence runs `task lint` with some additional
   # build tests for the package and the tests.
