@@ -119,7 +119,7 @@ type Gateway struct {
 	RPCListener          RPCStorageHandler
 	DashService          DashboardServiceSender
 	CertificateManager   certs.CertificateManager
-	GlobalHostChecker    *HostCheckerManager
+	GlobalHostChecker    HostCheckerManager
 	ConnectionWatcher    *httputil.ConnectionWatcher
 	HostCheckTicker      chan struct{}
 	HostCheckerClient    *http.Client
@@ -374,22 +374,17 @@ func (gw *Gateway) setupGlobals() {
 			mainLog.Warn("Running Uptime checks in a management node.")
 		}
 
-		healthCheckStore := &storage.RedisCluster{KeyPrefix: "host-checker:", IsAnalytics: true, ConnectionHandler: gw.StorageConnectionHandler}
-		healthCheckStore.Connect()
-
-		gw.InitHostCheckManager(gw.ctx, healthCheckStore)
+		healthCheckStore := storage.RedisCluster{KeyPrefix: "host-checker:", IsAnalytics: true, ConnectionHandler: gw.StorageConnectionHandler}
+		gw.InitHostCheckManager(gw.ctx, &healthCheckStore)
 	}
 
 	gw.initHealthCheck(gw.ctx)
 
-	redisStore := &storage.RedisCluster{KeyPrefix: "apikey-", HashKeys: gwConfig.HashKeys, ConnectionHandler: gw.StorageConnectionHandler}
-	redisStore.Connect()
+	redisStore := storage.RedisCluster{KeyPrefix: "apikey-", HashKeys: gwConfig.HashKeys, ConnectionHandler: gw.StorageConnectionHandler}
+	gw.GlobalSessionManager.Init(&redisStore)
 
-	gw.GlobalSessionManager.Init(redisStore)
-
-	versionStore := &storage.RedisCluster{KeyPrefix: "version-check-", ConnectionHandler: gw.StorageConnectionHandler}
+	versionStore := storage.RedisCluster{KeyPrefix: "version-check-", ConnectionHandler: gw.StorageConnectionHandler}
 	versionStore.Connect()
-
 	err := versionStore.SetKey("gateway", VERSION, 0)
 
 	if err != nil {
@@ -402,16 +397,12 @@ func (gw *Gateway) setupGlobals() {
 		gw.SetConfig(Conf)
 		mainLog.Debug("Setting up analytics DB connection")
 
-		analyticsStore := &storage.RedisCluster{KeyPrefix: "analytics-", IsAnalytics: true, ConnectionHandler: gw.StorageConnectionHandler}
-		analyticsStore.Connect()
-
-		gw.Analytics.Store = analyticsStore
+		analyticsStore := storage.RedisCluster{KeyPrefix: "analytics-", IsAnalytics: true, ConnectionHandler: gw.StorageConnectionHandler}
+		gw.Analytics.Store = &analyticsStore
 		gw.Analytics.Init()
 
-		store := &storage.RedisCluster{KeyPrefix: "analytics-", IsAnalytics: true, ConnectionHandler: gw.StorageConnectionHandler}
-		store.Connect()
-
-		redisPurger := RedisPurger{Store: store, Gw: gw}
+		store := storage.RedisCluster{KeyPrefix: "analytics-", IsAnalytics: true, ConnectionHandler: gw.StorageConnectionHandler}
+		redisPurger := RedisPurger{Store: &store, Gw: gw}
 		go redisPurger.PurgeLoop(gw.ctx)
 
 		if gw.GetConfig().AnalyticsConfig.Type == "rpc" {
@@ -420,14 +411,11 @@ func (gw *Gateway) setupGlobals() {
 			} else {
 				mainLog.Debug("Using RPC cache purge")
 
-				store := &storage.RedisCluster{KeyPrefix: "analytics-", IsAnalytics: true, ConnectionHandler: gw.StorageConnectionHandler}
-				store.Connect()
-
+				store := storage.RedisCluster{KeyPrefix: "analytics-", IsAnalytics: true, ConnectionHandler: gw.StorageConnectionHandler}
 				purger := rpc.Purger{
-					Store: store,
+					Store: &store,
 				}
 				purger.Connect()
-
 				go purger.PurgeLoop(gw.ctx, time.Duration(gw.GetConfig().AnalyticsConfig.PurgeInterval))
 			}
 
@@ -443,10 +431,8 @@ func (gw *Gateway) setupGlobals() {
 
 	// Get the notifier ready
 	mainLog.Debug("Notifier will not work in hybrid mode")
-
 	mainNotifierStore := &storage.RedisCluster{ConnectionHandler: gw.StorageConnectionHandler}
 	mainNotifierStore.Connect()
-
 	gw.MainNotifier = RedisNotifier{mainNotifierStore, RedisPubSubChannel, gw}
 
 	if gwConfig.Monitor.EnableTriggerMonitors {
@@ -470,10 +456,7 @@ func (gw *Gateway) setupGlobals() {
 	}
 
 	storeCert := &storage.RedisCluster{KeyPrefix: "cert-", HashKeys: false, ConnectionHandler: gw.StorageConnectionHandler}
-	storeCert.Connect()
-
 	gw.CertificateManager = certs.NewCertificateManager(storeCert, certificateSecret, log, !gw.GetConfig().Cloud)
-
 	if gw.GetConfig().SlaveOptions.UseRPC {
 		rpcStore := &RPCStorageHandler{
 			KeyPrefix: "cert-",
@@ -791,14 +774,10 @@ func (gw *Gateway) addOAuthHandlers(spec *APISpec, muxer *mux.Router) *OAuthMana
 	prefix := generateOAuthPrefix(spec.APIID)
 	storageManager := gw.getGlobalMDCBStorageHandler(prefix, false)
 	storageManager.Connect()
-
-	storageDriver := &storage.RedisCluster{KeyPrefix: prefix, HashKeys: false, ConnectionHandler: gw.StorageConnectionHandler}
-	storageDriver.Connect()
-
 	osinStorage := &RedisOsinStorageInterface{
 		storageManager,
 		gw.GlobalSessionManager,
-		storageDriver,
+		&storage.RedisCluster{KeyPrefix: prefix, HashKeys: false, ConnectionHandler: gw.StorageConnectionHandler},
 		spec.OrgID,
 		gw,
 	}
@@ -1126,6 +1105,7 @@ func (gw *Gateway) reloadQueueLoop(cb ...func()) {
 	for {
 		select {
 		case <-gw.ctx.Done():
+			log.Warn("Canceled ctx in reloadQueueLoop")
 			return
 		case fn := <-gw.reloadQueue:
 			gw.requeueLock.Lock()
@@ -1287,7 +1267,7 @@ func (gw *Gateway) initSystem() error {
 		mainLog.Debug("No configuration file defined, will try to use default (tyk.conf)")
 	}
 
-	mainLog.Infof("Tyk API Gateway %s", VERSION)
+	mainLog.Infof("Tyk API Gateway hehehehe %s", VERSION)
 
 	if !gw.isRunningTests() {
 		gwConfig := config.Config{}
@@ -1295,6 +1275,9 @@ func (gw *Gateway) initSystem() error {
 			return err
 		}
 
+		if gwConfig.PIDFileLocation == "" {
+			gwConfig.PIDFileLocation = "/var/run/tyk/tyk-gateway.pid"
+		}
 		gw.SetConfig(gwConfig)
 		gw.afterConfSetup()
 	}
@@ -1306,26 +1289,11 @@ func (gw *Gateway) initSystem() error {
 		mainLog.Fatal("Redis connection details not set, please ensure that the storage type is set to Redis and that the connection parameters are correct.")
 	}
 
-	go gw.StorageConnectionHandler.Connect(gw.ctx, func() {
-		gw.reloadURLStructure(func() {})
-	}, &gwConfig)
-
-	timeout, cancel := context.WithTimeout(context.Background(), time.Second)
-	defer cancel()
-
-	connected := gw.StorageConnectionHandler.WaitConnect(timeout)
-	if !connected {
-		mainLog.Error("storage: timeout connecting")
-	} else {
-		mainLog.Info("storage: connected to " + gwConfig.Storage.Type)
-	}
-
 	// suply rpc client globals to join it main loging and instrumentation sub systems
 	rpc.Log = log
 	rpc.Instrument = instrument
 
 	gw.setupGlobals()
-
 	gwConfig = gw.GetConfig()
 	if *cli.Port != "" {
 		portNum, err := strconv.Atoi(*cli.Port)
@@ -1342,7 +1310,7 @@ func (gw *Gateway) initSystem() error {
 	mainLog.Info("PIDFile location set to: ", gwConfig.PIDFileLocation)
 
 	if err := writePIDFile(gw.GetConfig().PIDFileLocation); err != nil {
-		mainLog.Warn("Failed to write PIDFile: ", err)
+		mainLog.Error("Failed to write PIDFile: ", err)
 	}
 
 	if gw.GetConfig().UseDBAppConfigs && gw.GetConfig().Policies.PolicySource != config.DefaultDashPolicySource {
@@ -1383,7 +1351,7 @@ func (gw *Gateway) initSystem() error {
 
 	gw.SetConfig(gwConfig)
 	config.Global = gw.GetConfig
-	gw.getHostDetails()
+	gw.getHostDetails(gw.GetConfig().PIDFileLocation)
 	gw.initRPCCache()
 	gw.setupInstrumentation()
 
@@ -1419,16 +1387,20 @@ func (gw *Gateway) SignatureVerifier() (goverify.Verifier, error) {
 	return verifier, nil
 }
 
-func getPID() string {
-	return strconv.Itoa(os.Getpid())
-}
-
 func writePIDFile(file string) error {
 	if err := os.MkdirAll(filepath.Dir(file), 0755); err != nil {
 		return err
 	}
-	pid := getPID()
+	pid := strconv.Itoa(os.Getpid())
 	return ioutil.WriteFile(file, []byte(pid), 0600)
+}
+
+var readPIDFromFile = func(file string) (int, error) {
+	b, err := ioutil.ReadFile(file)
+	if err != nil {
+		return 0, err
+	}
+	return strconv.Atoi(string(b))
 }
 
 // afterConfSetup takes care of non-sensical config values (such as zero
@@ -1608,9 +1580,11 @@ func (gw *Gateway) setUpConsul() error {
 
 var getIpAddress = netutil.GetIpAddress
 
-func (gw *Gateway) getHostDetails() {
+func (gw *Gateway) getHostDetails(file string) {
 	var err error
-	gw.hostDetails.PID = os.Getpid()
+	if gw.hostDetails.PID, err = readPIDFromFile(file); err != nil {
+		mainLog.Error("Failed ot get host pid: ", err)
+	}
 	if gw.hostDetails.Hostname, err = os.Hostname(); err != nil {
 		mainLog.Error("Failed to get hostname: ", err)
 	}
@@ -1629,8 +1603,6 @@ func (gw *Gateway) getHostDetails() {
 
 func (gw *Gateway) getGlobalMDCBStorageHandler(keyPrefix string, hashKeys bool) storage.Handler {
 	localStorage := &storage.RedisCluster{KeyPrefix: keyPrefix, HashKeys: hashKeys, ConnectionHandler: gw.StorageConnectionHandler}
-	localStorage.Connect()
-
 	logger := logrus.New().WithFields(logrus.Fields{"prefix": "mdcb-storage-handler"})
 
 	if gw.GetConfig().SlaveOptions.UseRPC {
@@ -1656,9 +1628,7 @@ func (gw *Gateway) getGlobalStorageHandler(keyPrefix string, hashKeys bool) stor
 			Gw:        gw,
 		}
 	}
-	handler := &storage.RedisCluster{KeyPrefix: keyPrefix, HashKeys: hashKeys, ConnectionHandler: gw.StorageConnectionHandler}
-	handler.Connect()
-	return handler
+	return &storage.RedisCluster{KeyPrefix: keyPrefix, HashKeys: hashKeys, ConnectionHandler: gw.StorageConnectionHandler}
 }
 
 func Start() {
@@ -1683,6 +1653,10 @@ func Start() {
 		gwConfig = *defaultConfig
 	}
 
+	if gwConfig.PIDFileLocation == "" {
+		gwConfig.PIDFileLocation = "/var/run/tyk/tyk-gateway.pid"
+	}
+
 	gw := NewGateway(gwConfig, ctx)
 
 	if err := gw.initSystem(); err != nil {
@@ -1690,7 +1664,7 @@ func Start() {
 	}
 
 	gwConfig = gw.GetConfig()
-	if !gw.isRunningTests() && gwConfig.ControlAPIPort == 0 {
+	if gwConfig.ControlAPIPort == 0 {
 		mainLog.Warn("The control_api_port should be changed for production")
 	}
 
@@ -1738,6 +1712,10 @@ func Start() {
 		gw.GetConfig().DBAppConfOptions.Tags)
 
 	gw.start()
+	configs := gw.GetConfig()
+	go gw.StorageConnectionHandler.Connect(gw.ctx, func() {
+		gw.reloadURLStructure(func() {})
+	}, &configs)
 
 	unix := time.Now().Unix()
 

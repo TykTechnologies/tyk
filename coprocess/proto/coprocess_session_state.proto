@@ -180,4 +180,8 @@ message SessionState {
   // MaxQueryDepth relates to graphQL APIs. If the session key has a maximum query depth limit defined then it is included in the
   // session instance. Currently unsupported and under development.
   int64 max_query_depth = 31;
+
+  // DoNotTrack is set to true to prevent the session from being tracked in the analytics.
+  // This is useful if there is a key which analytics are not required (e.g. health checks)
+  bool do_not_track = 32;
 }

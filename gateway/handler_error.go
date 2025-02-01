@@ -198,6 +198,12 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 
 		oauthClientID := ""
 		session := ctxGetSession(r)
+
+		// If the key is configured to not track, then we don't track
+		if session.DoNotTrack {
+			return
+		}
+
 		tags := make([]string, 0, estimateTagsCapacity(session, e.Spec))
 
 		if session != nil {
@@ -293,9 +299,7 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 			if orgExpireDataTime > 0 {
 				expiresAfter = orgExpireDataTime
 			}
-		}
-		if e.Spec.DisableExpireAnalytics {
-			expiresAfter = 0
+
 		}
 		record.SetExpiry(expiresAfter)
 
@@ -313,9 +317,6 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 			log.WithError(err).Error("could not store analytic record")
 		}
 	}
-
-	e.RecordAccessLog(r, response, analytics.Latency{})
-
 	// Report in health check
 	reportHealthValue(e.Spec, BlockedRequestLog, "-1")
 }
