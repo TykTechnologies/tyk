@@ -1582,7 +1582,7 @@ type TrafficLogs struct {
 	// and transformed into analytics tags (statistics aggregated by tag, per hour).
 	TagHeaders []string `bson:"tagHeaders" json:"tagHeaders,omitempty"`
 	// CustomRetentionPeriod configures a custom value for how long the analytics is retained for,
-	// defaults to 100 years
+	// defaults to 100 years.
 	CustomRetentionPeriod ReadableDuration `bson:"customRetentionPeriod,omitempty" json:"customRetentionPeriod,omitempty"`
 	// Plugins configures custom plugins to allow for extensive modifications to analytics records
 	// The plugins would be executed in the order of configuration in the list.
