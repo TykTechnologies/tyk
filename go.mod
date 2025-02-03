@@ -89,6 +89,7 @@ require (
 	github.com/go-redis/redismock/v9 v9.2.0
 	github.com/goccy/go-json v0.10.4
 	github.com/google/go-cmp v0.6.0
+	github.com/huandu/go-clone/generic v1.7.2
 	github.com/nats-io/nats.go v1.38.0
 	github.com/newrelic/go-agent/v3 v3.35.1
 	github.com/newrelic/go-agent/v3/integrations/nrgorilla v1.2.2
@@ -185,6 +186,7 @@ require (
 	github.com/hashicorp/hcl v1.0.0 // indirect
 	github.com/hashicorp/raft v1.7.1 // indirect
 	github.com/hashicorp/serf v0.10.1 // indirect
+	github.com/huandu/go-clone v1.6.0 // indirect
 	github.com/huandu/xstrings v1.5.0 // indirect
 	github.com/iancoleman/strcase v0.3.0 // indirect
 	github.com/imdario/mergo v0.3.13 // indirect
