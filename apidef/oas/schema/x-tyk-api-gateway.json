@@ -1272,6 +1272,9 @@
         "ipAccessControl": {
           "$ref": "#/definitions/X-Tyk-IPAccessControl"
         },
+        "batchProcessing": {
+          "$ref": "#/definitions/X-Tyk-BatchProcessing"
+        },
         "port": {
           "type": "integer",
           "minimum": 1,
@@ -2259,6 +2262,16 @@
           }
         }
       }
+    },
+    "X-Tyk-BatchProcessing": {
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "enabled"
+      ]
     },
     "X-Tyk-LoadBalancing": {
       "type": "object",
