@@ -2,6 +2,7 @@ package oas
 
 import (
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 
@@ -126,6 +127,41 @@ func TestOIDC(t *testing.T) {
 	})
 }
 
+func TestKeyRetentionPeriod(t *testing.T) {
+	t.Run("empty", func(t *testing.T) {
+		var emptyCustomKeyLifetime CustomKeyLifetime
+		var convertedAPI apidef.APIDefinition
+		var resultCustomKeyLifetime CustomKeyLifetime
+
+		convertedAPI.SetDisabledFlags()
+		emptyCustomKeyLifetime.ExtractTo(&convertedAPI)
+		resultCustomKeyLifetime.Fill(convertedAPI)
+
+		assert.Equal(t, int64(0), convertedAPI.SessionLifetime)
+
+		assert.Equal(t, emptyCustomKeyLifetime, resultCustomKeyLifetime)
+	})
+
+	t.Run("filled", func(t *testing.T) {
+		keyRetentionPeriod := CustomKeyLifetime{
+			Enabled:         true,
+			Value:           ReadableDuration(5 * time.Minute),
+			RespectValidity: true,
+		}
+		var convertedAPI apidef.APIDefinition
+		var resultKeyRetentionPeriod CustomKeyLifetime
+
+		keyRetentionPeriod.ExtractTo(&convertedAPI)
+
+		assert.Equal(t, int64(300), convertedAPI.SessionLifetime)
+		assert.True(t, convertedAPI.SessionLifetimeRespectsKeyExpiration)
+
+		resultKeyRetentionPeriod.Fill(convertedAPI)
+
+		assert.Equal(t, keyRetentionPeriod, resultKeyRetentionPeriod)
+	})
+}
+
 func TestCustomPlugin(t *testing.T) {
 	t.Run("empty", func(t *testing.T) {
 		var emptyCustomPlugin CustomPluginAuthentication
@@ -142,7 +178,7 @@ func TestCustomPlugin(t *testing.T) {
 
 	t.Run("values", func(t *testing.T) {
 		t.Run("goplugin", func(t *testing.T) {
-			var expectedCustomPluginAuth = CustomPluginAuthentication{
+			expectedCustomPluginAuth := CustomPluginAuthentication{
 				Enabled: true,
 				Config: &AuthenticationPlugin{
 					Enabled:      true,
@@ -163,7 +199,7 @@ func TestCustomPlugin(t *testing.T) {
 		})
 
 		t.Run("coprocess", func(t *testing.T) {
-			var expectedCustomPluginAuth = CustomPluginAuthentication{
+			expectedCustomPluginAuth := CustomPluginAuthentication{
 				Enabled: true,
 				Config: &AuthenticationPlugin{
 					Enabled:      true,
@@ -189,7 +225,6 @@ func TestCustomPlugin(t *testing.T) {
 			assert.NotEmpty(t, actualCustomPluginAuth.AuthSources)
 		})
 	})
-
 }
 
 func TestIDExtractorConfig(t *testing.T) {
@@ -210,7 +245,8 @@ func TestIDExtractorConfig(t *testing.T) {
 
 	t.Run("values", func(t *testing.T) {
 		t.Parallel()
-		var expectedIDExtractorConfig = IDExtractorConfig{
+
+		expectedIDExtractorConfig := IDExtractorConfig{
 			HeaderName:       "Authorization",
 			FormParamName:    "Authorization",
 			RegexpMatchIndex: 1,
@@ -247,7 +283,8 @@ func TestIDExtractor(t *testing.T) {
 
 	t.Run("values", func(t *testing.T) {
 		t.Parallel()
-		var expectedIDExtractor = IDExtractor{
+
+		expectedIDExtractor := IDExtractor{
 			Enabled: true,
 			Source:  apidef.HeaderSource,
 			With:    apidef.ValueExtractor,
