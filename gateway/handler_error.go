@@ -299,7 +299,9 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 			if orgExpireDataTime > 0 {
 				expiresAfter = orgExpireDataTime
 			}
-
+		}
+		if e.Spec.DisableExpireAnalytics {
+			expiresAfter = 0
 		}
 		record.SetExpiry(expiresAfter)
 
@@ -317,6 +319,9 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 			log.WithError(err).Error("could not store analytic record")
 		}
 	}
+
+	e.RecordAccessLog(r, response, analytics.Latency{})
+
 	// Report in health check
 	reportHealthValue(e.Spec, BlockedRequestLog, "-1")
 }

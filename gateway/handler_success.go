@@ -187,12 +187,12 @@ func (s *SuccessHandler) RecordHit(r *http.Request, timing analytics.Latency, co
 		oauthClientID := ""
 		var alias string
 		session := ctxGetSession(r)
-
+		
 		// If the key is configured to not track, then we don't track
 		if session.DoNotTrack {
 			return
 		}
-
+		
 		tags := make([]string, 0, estimateTagsCapacity(session, s.Spec))
 		if session != nil {
 			oauthClientID = session.OauthClientID
@@ -311,6 +311,10 @@ func (s *SuccessHandler) RecordHit(r *http.Request, timing analytics.Latency, co
 			}
 		}
 
+		if s.Spec.DisableExpireAnalytics {
+			expiresAfter = 0
+		}
+
 		record.SetExpiry(expiresAfter)
 
 		if s.Spec.GlobalConfig.AnalyticsConfig.NormaliseUrls.Enabled {
@@ -390,8 +394,10 @@ func (s *SuccessHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) *http
 			Upstream: int64(DurationToMillisecond(resp.UpstreamLatency)),
 		}
 		s.RecordHit(r, latency, resp.Response.StatusCode, resp.Response, false)
+		s.RecordAccessLog(r, resp.Response, latency)
 	}
 	log.Debug("Done proxy")
+
 	return nil
 }
 

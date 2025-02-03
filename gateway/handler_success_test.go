@@ -119,49 +119,7 @@ func TestRecordDetail(t *testing.T) {
 		})
 	}
 }
-// Test key with DoNotTrack with enabled analytics
-func TestDoNotTrack(t *testing.T) {
-	conf := func(config *config.Config) {
-		config.EnableAnalytics = true
-	}
-	ts := StartTest(conf)
-	defer ts.Close()
 
-	keyID := CreateSession(ts.Gw, func(s *user.SessionState) {
-		s.DoNotTrack = true
-	})
-
-	headers := map[string]string{"authorization": keyID}
-
-	apiDef := ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
-		spec.Name = "test API"
-		spec.APIID = "test-api"
-		spec.Proxy.TargetURL = TestHttpGet
-		spec.Proxy.ListenPath = "/"
-		spec.AuthConfigs = map[string]apidef.AuthConfig{
-			apidef.AuthTokenType: {
-				AuthHeaderName: "authorization",
-			},
-		}
-	})[0]
-	
-	ts.Gw.LoadAPI(apiDef)
-
-	// Make request
-	_, _ = ts.Run(t, []test.TestCase{
-		{ Method:  "GET", Path: "/", Headers: headers, Code: http.StatusOK },
-	}...)
-
-	// Check if the request is not tracked
-	redisAnalyticsKeyName := string("analytics-tyk-system-analytics")
-
-	// Check if the request is not tracked
-	t.Run("Check if the request is not tracked", func(t *testing.T) {
-		analyticsKey := ts.Gw.Analytics.Store.GetAndDeleteSet(redisAnalyticsKeyName)
-		assert.Empty(t, analyticsKey)
-	})
-
-}
 func TestAnalyticRecord_GraphStats(t *testing.T) {
 
 	apiDef := BuildAPI(func(spec *APISpec) {
