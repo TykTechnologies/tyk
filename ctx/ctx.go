@@ -115,15 +115,14 @@ func SetSession(r *http.Request, s *user.SessionState, scheduleUpdate bool, hash
 	}
 }
 
-// SetDefinition can be used to set a modified API definition to the request context.
+// SetDefinition sets an API definition object to the request context.
 func SetDefinition(r *http.Request, s *apidef.APIDefinition) {
 	ctx := r.Context()
 	ctx = context.WithValue(ctx, Definition, s)
 	httputil.SetContext(r, ctx)
 }
 
-// GetDefinition will return a copy of the API definition valid for the request.
-// This copy is there to prevent shared API definition pointers.
+// GetDefinition will return a deep copy of the API definition valid for the request.
 func GetDefinition(r *http.Request) *apidef.APIDefinition {
 	if v := r.Context().Value(Definition); v != nil {
 		if val, ok := v.(*apidef.APIDefinition); ok {
@@ -134,7 +133,7 @@ func GetDefinition(r *http.Request) *apidef.APIDefinition {
 	return nil
 }
 
-// GetOASDefinition returns a deep copy of the OAS definition of the called API.
+// GetOASDefinition will return a deep copy of the OAS API definition valid for the request.
 func GetOASDefinition(r *http.Request) *oas.OAS {
 	if v := r.Context().Value(OASDefinition); v != nil {
 		if val, ok := v.(*oas.OAS); ok {
