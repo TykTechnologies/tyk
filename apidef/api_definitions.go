@@ -738,7 +738,6 @@ type APIDefinition struct {
 	CacheOptions                         CacheOptions           `bson:"cache_options" json:"cache_options"`
 	SessionLifetimeRespectsKeyExpiration bool                   `bson:"session_lifetime_respects_key_expiration" json:"session_lifetime_respects_key_expiration,omitempty"`
 	SessionLifetime                      int64                  `bson:"session_lifetime" json:"session_lifetime"`
-	SessionLifetimeDisabled              bool                   `bson:"session_lifetime_disabled" json:"session_lifetime_disabled"`
 	Active                               bool                   `bson:"active" json:"active"`
 	Internal                             bool                   `bson:"internal" json:"internal"`
 	AuthProvider                         AuthProviderMeta       `bson:"auth_provider" json:"auth_provider"`

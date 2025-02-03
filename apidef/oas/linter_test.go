@@ -85,7 +85,7 @@ func TestXTykGateway_Lint(t *testing.T) {
 		}
 
 		settings.Upstream.RateLimit.Per = ReadableDuration(10 * time.Second)
-		settings.Server.Authentication.KeyRetentionPeriod.Value = ReadableDuration(10 * time.Second)
+		settings.Server.Authentication.CustomKeyLifetime.Value = ReadableDuration(10 * time.Second)
 
 		settings.Upstream.Authentication = &UpstreamAuth{
 			Enabled:   false,
