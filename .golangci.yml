@@ -90,6 +90,7 @@ linters-settings:
       - (*github.com/TykTechnologies/tyk/gateway.Test).Run
       - time.Parse
       - strconv.ParseBool
+      - strconv.ParseInt
 
 issues:
   max-issues-per-linter: 0

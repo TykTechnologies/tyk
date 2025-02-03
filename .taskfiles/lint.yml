@@ -12,6 +12,7 @@ tasks:
       - task: fmt
       - task: vet
       - task: check
+      - golangci-lint run --new-from-rev=origin/master --issues-exit-code=1 --fix ./...
 
   fmt:
     desc: "Run typical code cleanup steps"
@@ -25,9 +26,9 @@ tasks:
     cmds:
       - go vet ./...
 
+  # this has manual use
   golangci-lint:
-    desc: "Run golangci-lint"
-    require: [args]
+    desc: "Run golangci-lint for json summaries"
     cmds:
       - golangci-lint run --out-format json ./... | summary golangcilint > golangci-lint.json
       - golangci-lint run --out-format json --config .golangci.dev.yml ./... | summary golangcilint > golangci-lint-dev.json
