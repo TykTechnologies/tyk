@@ -305,10 +305,6 @@ func (s *SuccessHandler) RecordHit(r *http.Request, timing analytics.Latency, co
 			}
 		}
 
-		if s.Spec.DisableExpireAnalytics {
-			expiresAfter = 0
-		}
-
 		record.SetExpiry(expiresAfter)
 
 		if s.Spec.GlobalConfig.AnalyticsConfig.NormaliseUrls.Enabled {
