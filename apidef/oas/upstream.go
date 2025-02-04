@@ -103,7 +103,9 @@ func (u *Upstream) Fill(api apidef.APIDefinition) {
 	if u.PreserveHostHeader == nil {
 		u.PreserveHostHeader = &PreserveHostHeader{}
 	}
+
 	u.PreserveHostHeader.Fill(api)
+
 	if ShouldOmit(u.PreserveHostHeader) {
 		u.PreserveHostHeader = nil
 	}
@@ -175,6 +177,7 @@ func (u *Upstream) ExtractTo(api *apidef.APIDefinition) {
 			u.PreserveHostHeader = nil
 		}()
 	}
+
 	u.PreserveHostHeader.ExtractTo(api)
 }
 
