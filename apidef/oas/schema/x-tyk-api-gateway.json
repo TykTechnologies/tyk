@@ -1368,7 +1368,7 @@
           "$ref": "#/definitions/X-Tyk-PreserveHostHeader"
         }
       },
-      "oneOf": [
+      "anyOf": [
         {
           "required": ["url"]
         },
@@ -2341,6 +2341,23 @@
       },
       "required": [
         "enabled"
+      ],
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "enabled": { "const": true }
+            }
+          },
+          "then": {
+            "properties": {
+              "targets": {
+                "minItems": 1
+              }
+            },
+            "required": ["targets"]
+          }
+        }
       ]
     },
     "X-Tyk-PreserveHostHeader": {
