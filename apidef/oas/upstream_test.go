@@ -673,11 +673,13 @@ func TestPreserveHostHeader(t *testing.T) {
 	t.Parallel()
 	t.Run("fill", func(t *testing.T) {
 		t.Parallel()
-		testcases := []struct {
+
+		type testCase struct {
 			title    string
 			input    apidef.APIDefinition
 			expected *PreserveHostHeader
-		}{
+		}
+		testCases := []testCase{
 			{
 				title: "preserve host header disabled",
 				input: apidef.APIDefinition{
@@ -699,7 +701,7 @@ func TestPreserveHostHeader(t *testing.T) {
 				},
 			},
 		}
-		for _, tc := range testcases {
+		for _, tc := range testCases {
 			tc := tc
 			t.Run(tc.title, func(t *testing.T) {
 				t.Parallel()
@@ -715,11 +717,12 @@ func TestPreserveHostHeader(t *testing.T) {
 	t.Run("extractTo", func(t *testing.T) {
 		t.Parallel()
 
-		testcases := []struct {
+		type testCase struct {
 			title           string
 			input           *PreserveHostHeader
 			expectedEnabled bool
-		}{
+		}
+		testcases := []testCase{
 			{
 				title: "preserve host header disabled",
 				input: &PreserveHostHeader{
