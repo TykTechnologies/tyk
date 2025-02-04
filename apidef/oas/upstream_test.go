@@ -670,10 +670,7 @@ func TestLoadBalancing(t *testing.T) {
 }
 
 func TestPreserveHostHeader(t *testing.T) {
-	t.Parallel()
 	t.Run("fill", func(t *testing.T) {
-		t.Parallel()
-
 		type testCase struct {
 			title    string
 			input    apidef.APIDefinition
@@ -715,8 +712,6 @@ func TestPreserveHostHeader(t *testing.T) {
 	})
 
 	t.Run("extractTo", func(t *testing.T) {
-		t.Parallel()
-
 		type testCase struct {
 			title           string
 			input           *PreserveHostHeader
@@ -742,8 +737,6 @@ func TestPreserveHostHeader(t *testing.T) {
 		for _, tc := range testcases {
 			tc := tc // Creating a new 'tc' scoped to the loop
 			t.Run(tc.title, func(t *testing.T) {
-				t.Parallel()
-
 				g := new(Upstream)
 				g.PreserveHostHeader = tc.input
 
