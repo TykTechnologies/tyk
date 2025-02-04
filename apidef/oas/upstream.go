@@ -938,6 +938,7 @@ func (l *LoadBalancing) ExtractTo(api *apidef.APIDefinition) {
 
 // PreserveHostHeader holds the configuration for preserving the host header.
 type PreserveHostHeader struct {
+	// Enabled activates preserving the host header.
 	Enabled bool `json:"enabled" bson:"enabled"`
 }
 
