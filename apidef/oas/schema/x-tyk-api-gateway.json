@@ -1203,6 +1203,27 @@
               ]
             }
           }
+        },
+        "customKeyLifetime": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "value": {
+              "type": "string",
+              "pattern": "^(\\d+h)?(\\d+m)?(\\d+s)?$",
+              "not": {
+                "pattern": "^(0h)?(0m)?(0s)?$"
+              }
+            },
+            "respectValidity": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "enabled"
+          ]
         }
       },
       "required": [
@@ -1250,6 +1271,22 @@
         },
         "ipAccessControl": {
           "$ref": "#/definitions/X-Tyk-IPAccessControl"
+        },
+        "batchProcessing": {
+          "$ref": "#/definitions/X-Tyk-BatchProcessing"
+        },
+        "port": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 65535
+        },
+        "protocol": {
+          "type": "string",
+          "enum": [
+            "http",
+            "http2",
+            "h2c"
+          ]
         }
       },
       "required": [
@@ -1306,6 +1343,9 @@
         },
         "authentication": {
           "$ref": "#/definitions/X-Tyk-UpstreamAuthentication"
+        },
+        "loadBalancing": {
+          "$ref": "#/definitions/X-Tyk-LoadBalancing"
         }
       },
       "required": [
@@ -1998,21 +2038,12 @@
             "type": "string"
           }
         },
-        "retentionPeriod": {
-          "type": "object",
-          "properties": {
-            "enabled": {
-              "type": "boolean"
-            },
-            "value": {
-              "type": "string",
-              "pattern": "^(\\d+h)?(\\d+m)?(\\d+s)?$"
-            }
-          },
-          "required": [
-            "enabled",
-            "value"
-          ]
+        "customRetentionPeriod": {
+          "type": "string",
+          "pattern": "^(\\d+h)?(\\d+m)?(\\d+s)?$",
+          "not": {
+            "pattern": "^(0h)?(0m)?(0s)?$"
+          }
         },
         "plugins": {
           "type": "array",
@@ -2222,6 +2253,50 @@
           }
         }
       }
+    },
+    "X-Tyk-BatchProcessing": {
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "enabled"
+      ]
+    },
+    "X-Tyk-LoadBalancing": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "targets": {
+          "type": "array",
+          "items": [
+            {
+              "$ref": "#/definitions/X-Tyk-LoadBalancingTarget"
+            }
+          ]
+        }
+      },
+      "required": [
+        "enabled"
+      ]
+    },
+    "X-Tyk-LoadBalancingTarget": {
+      "type": "object",
+      "properties": {
+        "url": {
+          "type": "string"
+        },
+        "weight": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "url",
+        "weight"
+      ]
     }
   }
 }

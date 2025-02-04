@@ -228,44 +228,22 @@ func TestTrafficLogs(t *testing.T) {
 		assert.Empty(t, convertedAPI.TagHeaders)
 	})
 
-	t.Run("retention header enabled", func(t *testing.T) {
-		trafficLogs := TrafficLogs{
-			Enabled: true,
-			RetentionPeriod: &RetentionPeriod{
-				Enabled: true,
-				Value:   ReadableDuration(time.Minute * 2),
-			},
-		}
-
+	t.Run("enable with retention period", func(t *testing.T) {
 		var convertedAPI apidef.APIDefinition
 		var resultTrafficLogs TrafficLogs
+		trafficLogs := TrafficLogs{
+			Enabled:               true,
+			CustomRetentionPeriod: ReadableDuration(time.Minute * 2),
+		}
+
 		convertedAPI.SetDisabledFlags()
 		trafficLogs.ExtractTo(&convertedAPI)
 
-		assert.Equal(t, trafficLogs.RetentionPeriod.Enabled, !convertedAPI.DisableExpireAnalytics)
 		assert.Equal(t, int64(120), convertedAPI.ExpireAnalyticsAfter)
 
 		resultTrafficLogs.Fill(convertedAPI)
+
 		assert.Equal(t, trafficLogs, resultTrafficLogs)
-	})
-
-	t.Run("retention header disabled", func(t *testing.T) {
-		trafficLogs := TrafficLogs{
-			Enabled:         true,
-			RetentionPeriod: nil,
-		}
-
-		var convertedAPI apidef.APIDefinition
-		var resultTrafficLogs TrafficLogs
-
-		convertedAPI.SetDisabledFlags()
-		trafficLogs.ExtractTo(&convertedAPI)
-
-		assert.Equal(t, true, convertedAPI.DisableExpireAnalytics)
-		assert.Equal(t, int64(0), convertedAPI.ExpireAnalyticsAfter)
-
-		resultTrafficLogs.Fill(convertedAPI)
-		assert.Nil(t, resultTrafficLogs.RetentionPeriod)
 	})
 
 	t.Run("with custom analytics plugin", func(t *testing.T) {

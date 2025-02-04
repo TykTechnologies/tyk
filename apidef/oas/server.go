@@ -43,10 +43,27 @@ type Server struct {
 	//
 	// Tyk classic API definition: `allowed_ips` and `blacklisted_ips`.
 	IPAccessControl *IPAccessControl `bson:"ipAccessControl,omitempty" json:"ipAccessControl,omitempty"`
+
+	// BatchProcessing contains configuration settings to enable or disable batch request support for the API.
+	//
+	// Tyk classic API definition: `enable_batch_request_support`.
+	BatchProcessing *BatchProcessing `bson:"batchProcessing,omitempty" json:"batchProcessing,omitempty"`
+
+	// Protocol configures the HTTP protocol used by the API.
+	// Possible values are:
+	// - "http": Standard HTTP/1.1 protocol
+	// - "http2": HTTP/2 protocol with TLS
+	// - "h2c": HTTP/2 protocol without TLS (cleartext).
+	Protocol string `bson:"protocol,omitempty" json:"protocol,omitempty"`
+	// Port Setting this value will change the port that Tyk listens on. Default: 8080.
+	Port int `bson:"port,omitempty" json:"port,omitempty"`
 }
 
 // Fill fills *Server from apidef.APIDefinition.
 func (s *Server) Fill(api apidef.APIDefinition) {
+	s.Protocol = api.Protocol
+	s.Port = api.ListenPort
+
 	s.ListenPath.Fill(api)
 
 	if s.ClientCertificates == nil {
@@ -101,10 +118,13 @@ func (s *Server) Fill(api apidef.APIDefinition) {
 	}
 
 	s.fillIPAccessControl(api)
+	s.fillBatchProcessing(api)
 }
 
 // ExtractTo extracts *Server into *apidef.APIDefinition.
 func (s *Server) ExtractTo(api *apidef.APIDefinition) {
+	api.Protocol = s.Protocol
+	api.ListenPort = s.Port
 	s.ListenPath.ExtractTo(api)
 
 	if s.ClientCertificates == nil {
@@ -162,6 +182,7 @@ func (s *Server) ExtractTo(api *apidef.APIDefinition) {
 	s.EventHandlers.ExtractTo(api)
 
 	s.extractIPAccessControlTo(api)
+	s.extractBatchProcessingTo(api)
 }
 
 // ListenPath is the base path on Tyk to which requests for this API
@@ -345,4 +366,43 @@ func (s *Server) extractIPAccessControlTo(api *apidef.APIDefinition) {
 	}
 
 	s.IPAccessControl.ExtractTo(api)
+}
+
+// BatchProcessing represents the configuration for enabling or disabling batch request support for an API.
+type BatchProcessing struct {
+	// Enabled determines whether batch request support is enabled or disabled for the API.
+	Enabled bool `bson:"enabled" json:"enabled"` // required
+}
+
+// Fill updates the BatchProcessing configuration based on the EnableBatchRequestSupport value from the given APIDefinition.
+func (b *BatchProcessing) Fill(api apidef.APIDefinition) {
+	b.Enabled = api.EnableBatchRequestSupport
+}
+
+// ExtractTo copies the Enabled state of BatchProcessing into the EnableBatchRequestSupport field of the provided APIDefinition.
+func (b *BatchProcessing) ExtractTo(api *apidef.APIDefinition) {
+	api.EnableBatchRequestSupport = b.Enabled
+}
+
+func (s *Server) fillBatchProcessing(api apidef.APIDefinition) {
+	if s.BatchProcessing == nil {
+		s.BatchProcessing = &BatchProcessing{}
+	}
+
+	s.BatchProcessing.Fill(api)
+
+	if ShouldOmit(s.BatchProcessing) {
+		s.BatchProcessing = nil
+	}
+}
+
+func (s *Server) extractBatchProcessingTo(api *apidef.APIDefinition) {
+	if s.BatchProcessing == nil {
+		s.BatchProcessing = &BatchProcessing{}
+		defer func() {
+			s.BatchProcessing = nil
+		}()
+	}
+
+	s.BatchProcessing.ExtractTo(api)
 }

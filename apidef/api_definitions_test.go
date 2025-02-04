@@ -8,15 +8,15 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	schema "github.com/xeipuuv/gojsonschema"
+	"github.com/TykTechnologies/tyk/internal/service/gojsonschema"
 )
 
 func TestSchema(t *testing.T) {
-	schemaLoader := schema.NewBytesLoader([]byte(Schema))
+	schemaLoader := gojsonschema.NewBytesLoader([]byte(Schema))
 
 	spec := DummyAPI()
-	goLoader := schema.NewGoLoader(spec)
-	result, err := schema.Validate(schemaLoader, goLoader)
+	goLoader := gojsonschema.NewGoLoader(spec)
+	result, err := gojsonschema.Validate(schemaLoader, goLoader)
 	if err != nil {
 		t.Error(err)
 	}
@@ -97,14 +97,14 @@ func TestDecodeFromDB(t *testing.T) {
 }
 
 func TestSchemaGraphqlConfig(t *testing.T) {
-	schemaLoader := schema.NewBytesLoader([]byte(Schema))
+	schemaLoader := gojsonschema.NewBytesLoader([]byte(Schema))
 
 	spec := DummyAPI()
 	spec.GraphQL.ExecutionMode = ""
 
-	goLoader := schema.NewGoLoader(spec)
+	goLoader := gojsonschema.NewGoLoader(spec)
 
-	result, err := schema.Validate(schemaLoader, goLoader)
+	result, err := gojsonschema.Validate(schemaLoader, goLoader)
 	if err != nil {
 		t.Error(err)
 	}

@@ -305,10 +305,6 @@ func (s *SuccessHandler) RecordHit(r *http.Request, timing analytics.Latency, co
 			}
 		}
 
-		if s.Spec.DisableExpireAnalytics {
-			expiresAfter = 0
-		}
-
 		record.SetExpiry(expiresAfter)
 
 		if s.Spec.GlobalConfig.AnalyticsConfig.NormaliseUrls.Enabled {
@@ -388,8 +384,10 @@ func (s *SuccessHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) *http
 			Upstream: int64(DurationToMillisecond(resp.UpstreamLatency)),
 		}
 		s.RecordHit(r, latency, resp.Response.StatusCode, resp.Response, false)
+		s.RecordAccessLog(r, resp.Response, latency)
 	}
 	log.Debug("Done proxy")
+
 	return nil
 }
 

@@ -10,8 +10,8 @@ import (
 
 	"github.com/hashicorp/go-multierror"
 
-	"github.com/TykTechnologies/gojsonschema"
 	tykerrors "github.com/TykTechnologies/tyk/internal/errors"
+	"github.com/TykTechnologies/tyk/internal/service/gojsonschema"
 )
 
 type ConfigValidator interface {

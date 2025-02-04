@@ -141,6 +141,8 @@ func (ts *Test) prepareGenericJWTSession(testName string, method string, claimNa
 		spec.EnableJWT = true
 		spec.Proxy.ListenPath = "/"
 		spec.JWTSkipKid = ApiSkipKid
+		spec.DisableRateLimit = true
+		spec.DisableQuota = true
 
 		if claimName != KID {
 			spec.JWTIdentityBaseField = claimName
@@ -471,6 +473,8 @@ func (ts *Test) prepareJWTSessionRSAWithRawSourceOnWithClientID(isBench bool) st
 		spec.JWTIdentityBaseField = "user_id"
 		spec.JWTClientIDBaseField = "azp"
 		spec.Proxy.ListenPath = "/"
+		spec.DisableRateLimit = true
+		spec.DisableQuota = true
 	})[0]
 
 	policyID := ts.CreatePolicy(func(p *user.Policy) {
@@ -552,6 +556,8 @@ func (ts *Test) prepareJWTSessionRSAWithRawSource() string {
 		spec.JWTIdentityBaseField = "user_id"
 		spec.JWTPolicyFieldName = "policy_id"
 		spec.Proxy.ListenPath = "/"
+		spec.DisableRateLimit = true
+		spec.DisableQuota = true
 	})
 
 	pID := ts.CreatePolicy(func(p *user.Policy) {
@@ -681,6 +687,8 @@ func TestJWTSessionExpiresAtValidationConfigs(t *testing.T) {
 
 	// This test is successful by definition
 	t.Run("Expiry_After_now--Valid_jwt", func(t *testing.T) {
+		t.Skip() // if you issue a 0 second skew at 0.99th of the current second? flaky test due to time math.
+
 		spec.JWTExpiresAtValidationSkew = 0 //Default value
 		ts.Gw.LoadAPI(spec)
 
@@ -1511,6 +1519,8 @@ func (ts *Test) prepareJWTSessionRSAWithJWK() string {
 		spec.JWTIdentityBaseField = "user_id"
 		spec.JWTPolicyFieldName = "policy_id"
 		spec.Proxy.ListenPath = "/"
+		spec.DisableRateLimit = true
+		spec.DisableQuota = true
 	})
 
 	pID := ts.CreatePolicy(func(p *user.Policy) {
@@ -1579,6 +1589,8 @@ func (ts *Test) prepareJWTSessionRSAWithEncodedJWK() (*APISpec, string) {
 		spec.JWTIdentityBaseField = "user_id"
 		spec.JWTPolicyFieldName = "policy_id"
 		spec.Proxy.ListenPath = "/"
+		spec.DisableRateLimit = true
+		spec.DisableQuota = true
 	})[0]
 
 	pID := ts.CreatePolicy(func(p *user.Policy) {

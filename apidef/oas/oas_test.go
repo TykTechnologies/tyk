@@ -174,7 +174,6 @@ func TestOAS_ExtractTo_ResetAPIDefinition(t *testing.T) {
 	a.DisableRateLimit = false
 	a.DoNotTrack = false
 	a.IPAccessControlDisabled = false
-	a.DisableExpireAnalytics = false
 
 	// deprecated fields
 	a.Auth = apidef.AuthConfig{}
@@ -210,8 +209,6 @@ func TestOAS_ExtractTo_ResetAPIDefinition(t *testing.T) {
 
 	expectedFields := []string{
 		"APIDefinition.Slug",
-		"APIDefinition.ListenPort",
-		"APIDefinition.Protocol",
 		"APIDefinition.EnableProxyProtocol",
 		"APIDefinition.RequestSigning.IsEnabled",
 		"APIDefinition.RequestSigning.Secret",
@@ -245,8 +242,6 @@ func TestOAS_ExtractTo_ResetAPIDefinition(t *testing.T) {
 		"APIDefinition.UptimeTests.Config.RecheckWait",
 		"APIDefinition.Proxy.PreserveHostHeader",
 		"APIDefinition.Proxy.DisableStripSlash",
-		"APIDefinition.Proxy.EnableLoadBalancing",
-		"APIDefinition.Proxy.Targets[0]",
 		"APIDefinition.Proxy.CheckHostAgainstUptimeTests",
 		"APIDefinition.Proxy.Transport.SSLInsecureSkipVerify",
 		"APIDefinition.Proxy.Transport.SSLCipherSuites[0]",
@@ -255,15 +250,12 @@ func TestOAS_ExtractTo_ResetAPIDefinition(t *testing.T) {
 		"APIDefinition.Proxy.Transport.SSLForceCommonNameCheck",
 		"APIDefinition.Proxy.Transport.ProxyURL",
 		"APIDefinition.DisableQuota",
-		"APIDefinition.SessionLifetimeRespectsKeyExpiration",
-		"APIDefinition.SessionLifetime",
 		"APIDefinition.AuthProvider.Name",
 		"APIDefinition.AuthProvider.StorageEngine",
 		"APIDefinition.AuthProvider.Meta[0]",
 		"APIDefinition.SessionProvider.Name",
 		"APIDefinition.SessionProvider.StorageEngine",
 		"APIDefinition.SessionProvider.Meta[0]",
-		"APIDefinition.EnableBatchRequestSupport",
 		"APIDefinition.EnableIpWhiteListing",
 		"APIDefinition.EnableIpBlacklisting",
 		"APIDefinition.DontSetQuotasOnCreate",
@@ -948,9 +940,6 @@ func TestMigrateAndFillOAS_DropEmpties(t *testing.T) {
 			Global: &Global{
 				TrafficLogs: &TrafficLogs{
 					Enabled: true,
-					RetentionPeriod: &RetentionPeriod{
-						Enabled: true,
-					},
 				},
 			},
 		}, baseAPI.OAS.GetTykExtension().Middleware)

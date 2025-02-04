@@ -4,6 +4,7 @@ version: "3"
 includes:
   test: .taskfiles/test.yml
   deps: .taskfiles/deps.yml
+  lint: .taskfiles/lint.yml
   hooks: .taskfiles/hooks.yml
   opentelemetry:
     taskfile: ci/tests/tracing/Taskfile.yml
@@ -23,6 +24,9 @@ includes:
   portman_integration_tests:
     taskfile: ./ci/tests/schema/specs/Taskfile.yml
     dir: ./ci/tests/schema/specs
+
+vars:
+  path: ./...
 
 tasks:
   docker:
@@ -58,47 +62,45 @@ tasks:
         yq -i ".dockers[4].extra_files |= [\"$replacement\"]" ci/goreleaser/goreleaser.yml
       - echo goreleaser release --clean --snapshot -f ci/goreleaser/goreleaser.yml
 
+  codegen:
+    deps: [deps]
+    desc: "Run code generation steps"
+    cmds:
+      - go generate ./...
+
   # Used in CI
   lint:
     desc: "Tidy the codebase"
     cmds:
-      - task: lint:tidy
-      - task: lint:all
+      - task: codegen
+      - task: lint:run
+      - task: lint:extras
 
-  lint:tidy:
-    desc: "Run typical code cleanup steps"
-    aliases: [fmt]
-    cmds:
-      - gofmt -w .
-      - go generate ./...
-      - go fmt ./...
-      - go mod tidy
-      - goimports -local github.com/TykTechnologies,github.com/TykTechnologies/tyk/internal -w .
-      - go mod tidy
-
-  lint:all:
+  lint:extras:
     desc: "Run more specific linters"
     deps:
-      - lint:config
-      - lint:imports
-      - lint:x-tyk-gateway
       - coprocess:lint
       - apidef-oas:lint
 
-  lint:imports:
-    internal: true
+  # Used in CI by hooks, lint.
+  fmt:
+    desc: "Reformat import groups"
     cmds:
-      - go-fsck lint
+      - task: lint:fmt
 
-  lint:config:
-    internal: true
+  # This reformats imports with goimports-reviser;
+  #
+  # To limit reformatting scope to packages or files, set `path`:
+  #
+  # - `task fmt:imports path="./ctx ./rpc"`
+  #
+  # Current status: does not run in CI, triggers golangci-lint issues
+  # in the files it fixed. They are preexisting but block golangci-lint
+  # passing in CI.
+  fmt:imports:
+    desc: "Format imports"
     cmds:
-      - go test -count 1 ./cli/linter/...
-
-  lint:x-tyk-gateway:
-    internal: true
-    cmds:
-      - go test -count 1 -run=TestXTykGateway_Lint ./apidef/oas/
+      - goimports-reviser -imports-order std,general,company,project,blanked,dotted -company-prefixes github.com/TykTechnologies/ {{.path}}
 
   setup:
     desc: "Setup the project including dependencies and git hooks using lefthooks"
@@ -122,3 +124,8 @@ tasks:
     dotenv: [ 'ci/tests/schema/specs/.env' ]
     cmds:
       - task portman_integration_tests:stop_gateway_to_test_oas
+  clean:
+    desc: "Clean test files"
+    cmds:
+      - find -name '*.so' -delete -print
+      - find -name '*.test' -delete -print
