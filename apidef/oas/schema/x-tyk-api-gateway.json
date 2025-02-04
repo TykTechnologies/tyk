@@ -1368,8 +1368,13 @@
           "$ref": "#/definitions/X-Tyk-PreserveHostHeader"
         }
       },
-      "required": [
-        "url"
+      "oneOf": [
+        {
+          "required": ["url"]
+        },
+        {
+          "required": ["loadBalancing"]
+        }
       ]
     },
     "X-Tyk-State": {
