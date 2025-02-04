@@ -174,7 +174,6 @@ func TestOAS_ExtractTo_ResetAPIDefinition(t *testing.T) {
 	a.DisableRateLimit = false
 	a.DoNotTrack = false
 	a.IPAccessControlDisabled = false
-	a.DisableExpireAnalytics = false
 
 	// deprecated fields
 	a.Auth = apidef.AuthConfig{}
@@ -940,9 +939,6 @@ func TestMigrateAndFillOAS_DropEmpties(t *testing.T) {
 			Global: &Global{
 				TrafficLogs: &TrafficLogs{
 					Enabled: true,
-					RetentionPeriod: &RetentionPeriod{
-						Enabled: true,
-					},
 				},
 			},
 		}, baseAPI.OAS.GetTykExtension().Middleware)
