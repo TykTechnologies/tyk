@@ -241,7 +241,6 @@ func TestOAS_ExtractTo_ResetAPIDefinition(t *testing.T) {
 		"APIDefinition.UptimeTests.Config.ExpireUptimeAnalyticsAfter",
 		"APIDefinition.UptimeTests.Config.ServiceDiscovery.CacheDisabled",
 		"APIDefinition.UptimeTests.Config.RecheckWait",
-		"APIDefinition.Proxy.PreserveHostHeader",
 		"APIDefinition.Proxy.DisableStripSlash",
 		"APIDefinition.Proxy.CheckHostAgainstUptimeTests",
 		"APIDefinition.Proxy.Transport.SSLInsecureSkipVerify",

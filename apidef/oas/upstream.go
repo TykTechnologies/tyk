@@ -35,6 +35,9 @@ type Upstream struct {
 
 	// LoadBalancing contains configuration for load balancing between multiple upstream targets.
 	LoadBalancing *LoadBalancing `bson:"loadBalancing,omitempty" json:"loadBalancing,omitempty"`
+
+	// PreserveHostHeader contains the configuration for preserving the host header.
+	PreserveHostHeader *PreserveHostHeader `bson:"preserveHostHeader,omitempty" json:"preserveHostHeader,omitempty"`
 }
 
 // Fill fills *Upstream from apidef.APIDefinition.
@@ -96,6 +99,14 @@ func (u *Upstream) Fill(api apidef.APIDefinition) {
 	}
 
 	u.fillLoadBalancing(api)
+
+	if u.PreserveHostHeader == nil {
+		u.PreserveHostHeader = &PreserveHostHeader{}
+	}
+	u.PreserveHostHeader.Fill(api)
+	if ShouldOmit(u.PreserveHostHeader) {
+		u.PreserveHostHeader = nil
+	}
 }
 
 // ExtractTo extracts *Upstream into *apidef.APIDefinition.
@@ -157,6 +168,14 @@ func (u *Upstream) ExtractTo(api *apidef.APIDefinition) {
 	u.Authentication.ExtractTo(&api.UpstreamAuth)
 
 	u.loadBalancingExtractTo(api)
+
+	if u.PreserveHostHeader == nil {
+		u.PreserveHostHeader = &PreserveHostHeader{}
+		defer func() {
+			u.PreserveHostHeader = nil
+		}()
+	}
+	u.PreserveHostHeader.ExtractTo(api)
 }
 
 func (u *Upstream) fillLoadBalancing(api apidef.APIDefinition) {
@@ -904,4 +923,19 @@ func (l *LoadBalancing) ExtractTo(api *apidef.APIDefinition) {
 	}
 
 	api.Proxy.Targets = proxyConfTargets
+}
+
+// PreserveHostHeader holds the configuration for preserving the host header.
+type PreserveHostHeader struct {
+	Enabled bool `json:"enabled" bson:"enabled"`
+}
+
+// Fill fills *PreserveHostHeader from apidef.APIDefinition.
+func (p *PreserveHostHeader) Fill(api apidef.APIDefinition) {
+	p.Enabled = api.Proxy.PreserveHostHeader
+}
+
+// ExtractTo extracts *PreserveHostHeader into *apidef.APIDefinition.
+func (p *PreserveHostHeader) ExtractTo(api *apidef.APIDefinition) {
+	api.Proxy.PreserveHostHeader = p.Enabled
 }
