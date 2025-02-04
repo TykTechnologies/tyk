@@ -100,6 +100,10 @@ func (u *Upstream) Fill(api apidef.APIDefinition) {
 
 	u.fillLoadBalancing(api)
 
+	u.fillPreserveHostHeader(api)
+}
+
+func (u *Upstream) fillPreserveHostHeader(api apidef.APIDefinition) {
 	if u.PreserveHostHeader == nil {
 		u.PreserveHostHeader = &PreserveHostHeader{}
 	}
@@ -171,6 +175,10 @@ func (u *Upstream) ExtractTo(api *apidef.APIDefinition) {
 
 	u.loadBalancingExtractTo(api)
 
+	u.preserveHostHeaderExtractTo(api)
+}
+
+func (u *Upstream) preserveHostHeaderExtractTo(api *apidef.APIDefinition) {
 	if u.PreserveHostHeader == nil {
 		u.PreserveHostHeader = &PreserveHostHeader{}
 		defer func() {
