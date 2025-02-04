@@ -1346,6 +1346,9 @@
         },
         "loadBalancing": {
           "$ref": "#/definitions/X-Tyk-LoadBalancing"
+        },
+        "preserveHostHeader": {
+          "$ref": "#/definitions/X-Tyk-PreserveHostHeader"
         }
       },
       "required": [
@@ -2282,6 +2285,17 @@
       "required": [
         "enabled"
       ]
+    },
+    "X-Tyk-PreserveHostHeader": {
+      "type": "object",
+        "properties": {
+            "enabled": {
+            "type": "boolean"
+            }
+        },
+        "required": [
+            "enabled"
+        ]
     },
     "X-Tyk-LoadBalancingTarget": {
       "type": "object",
