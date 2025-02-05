@@ -99,7 +99,6 @@ func (gw *Gateway) traceHandler(w http.ResponseWriter, r *http.Request) {
 	if traceReq.OAS != nil {
 		var newDef apidef.APIDefinition
 		traceReq.OAS.ExtractTo(&newDef)
-		log.Infof("OAS extracted definition: %+v", newDef)
 		traceReq.Spec = &newDef
 	} else if traceReq.Spec == nil {
 		log.Error("Spec field is missing")
