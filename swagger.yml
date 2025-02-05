@@ -7760,12 +7760,19 @@ components:
           type: string
       type: object
     TraceRequest:
+      type: object
       properties:
         request:
           $ref: '#/components/schemas/TraceHttpRequest'
         spec:
           $ref: '#/components/schemas/APIDefinition'
-      type: object
+        oas:
+          oneOf:
+            - $ref: 'https://raw.githubusercontent.com/TykTechnologies/tyk/master/apidef/oas/schema/3.0.json'
+            - $ref: '#/components/schemas/XTykAPIGateway'
+      oneOf:
+        - required: [oas]
+        - required: [spec]
     TraceResponse:
       properties:
         logs:
