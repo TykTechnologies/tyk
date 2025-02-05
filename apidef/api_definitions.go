@@ -576,7 +576,6 @@ type MiddlewareSection struct {
 	PostKeyAuth []MiddlewareDefinition `bson:"post_key_auth" json:"post_key_auth"`
 	AuthCheck   MiddlewareDefinition   `bson:"auth_check" json:"auth_check"`
 	Response    []MiddlewareDefinition `bson:"response" json:"response"`
-	TrafficLogs []MiddlewareDefinition `bson:"traffic_logs" json:"traffic_logs"`
 	Driver      MiddlewareDriver       `bson:"driver" json:"driver"`
 	IdExtractor MiddlewareIdExtractor  `bson:"id_extractor" json:"id_extractor"`
 }

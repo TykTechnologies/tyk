@@ -46,7 +46,7 @@ func TestMiddleware(t *testing.T) {
 					Plugins: customPlugins,
 				},
 				TrafficLogs: &TrafficLogs{
-					Plugins: customPlugins,
+					Plugins: CustomAnalyticsPlugins(customPlugins),
 				},
 			},
 		}
@@ -74,7 +74,7 @@ func TestMiddleware(t *testing.T) {
 				PostPlugins:               customPlugins,
 				ResponsePlugins:           customPlugins,
 				TrafficLogs: &TrafficLogs{
-					Plugins: customPlugins,
+					Plugins: CustomAnalyticsPlugins(customPlugins),
 				},
 			},
 		}
@@ -251,7 +251,7 @@ func TestTrafficLogs(t *testing.T) {
 		expectedTrafficLogsPlugin := TrafficLogs{
 			Enabled:    true,
 			TagHeaders: []string{},
-			Plugins: CustomPlugins{
+			Plugins: CustomAnalyticsPlugins{
 				{
 					Enabled:      true,
 					FunctionName: "CustomAnalyticsPlugin",
@@ -263,6 +263,10 @@ func TestTrafficLogs(t *testing.T) {
 		api := apidef.APIDefinition{}
 		api.SetDisabledFlags()
 		expectedTrafficLogsPlugin.ExtractTo(&api)
+
+		assert.Equal(t, expectedTrafficLogsPlugin.Plugins[0].FunctionName, api.AnalyticsPlugin.FuncName)
+		assert.Equal(t, true, api.AnalyticsPlugin.Enabled)
+		assert.Equal(t, expectedTrafficLogsPlugin.Plugins[0].Path, api.AnalyticsPlugin.PluginPath)
 
 		actualTrafficLogsPlugin := TrafficLogs{}
 		actualTrafficLogsPlugin.Fill(api)
