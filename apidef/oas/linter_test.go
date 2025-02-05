@@ -86,13 +86,13 @@ func TestXTykGateway_Lint(t *testing.T) {
 
 		settings.Upstream.RateLimit.Per = ReadableDuration(10 * time.Second)
 		settings.Server.Authentication.CustomKeyLifetime.Value = ReadableDuration(10 * time.Second)
+		settings.Middleware.Global.TrafficLogs.CustomRetentionPeriod = ReadableDuration(10 * time.Second)
 
 		settings.Upstream.Authentication = &UpstreamAuth{
 			Enabled:   false,
 			BasicAuth: nil,
 			OAuth:     nil,
 		}
-		settings.Middleware.Global.TrafficLogs.RetentionPeriod.Value = ReadableDuration(time.Minute * 10)
 	}
 
 	// Encode data to json
