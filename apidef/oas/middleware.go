@@ -1619,6 +1619,7 @@ func (t *TrafficLogs) ExtractTo(api *apidef.APIDefinition) {
 	t.Plugins.ExtractTo(api)
 }
 
+// CustomAnalyticsPlugins is a list of CustomPlugin objects for analytics.
 type CustomAnalyticsPlugins []CustomPlugin
 
 // Fill fills CustomAnalyticsPlugins from AnalyticsPlugin in the supplied api.
