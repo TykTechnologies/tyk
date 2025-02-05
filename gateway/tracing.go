@@ -100,7 +100,9 @@ func (gw *Gateway) traceHandler(w http.ResponseWriter, r *http.Request) {
 		var newDef apidef.APIDefinition
 		traceReq.OAS.ExtractTo(&newDef)
 		traceReq.Spec = &newDef
-	} else if traceReq.Spec == nil {
+	}
+
+	if traceReq.Spec == nil {
 		log.Error("Spec field is missing")
 		doJSONWrite(w, http.StatusBadRequest, apiError("Spec field is missing"))
 		return
