@@ -7768,7 +7768,7 @@ components:
           $ref: '#/components/schemas/APIDefinition'
         oas:
           oneOf:
-            - $ref: 'https://raw.githubusercontent.com/TykTechnologies/tyk/master/apidef/oas/schema/3.0.json'
+            - $ref: 'https://raw.githubusercontent.com/TykTechnologies/tyk/refs/heads/master/apidef/oas/schema/3.0.json'
             - $ref: '#/components/schemas/XTykAPIGateway'
       oneOf:
         - required: [oas]
