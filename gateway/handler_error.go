@@ -294,9 +294,7 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 				expiresAfter = orgExpireDataTime
 			}
 		}
-		if e.Spec.DisableExpireAnalytics {
-			expiresAfter = 0
-		}
+
 		record.SetExpiry(expiresAfter)
 
 		if e.Spec.GlobalConfig.AnalyticsConfig.NormaliseUrls.Enabled {

@@ -668,3 +668,84 @@ func TestLoadBalancing(t *testing.T) {
 		}
 	})
 }
+
+func TestPreserveHostHeader(t *testing.T) {
+	t.Run("fill", func(t *testing.T) {
+		type testCase struct {
+			title    string
+			input    apidef.APIDefinition
+			expected *PreserveHostHeader
+		}
+		testCases := []testCase{
+			{
+				title: "preserve host header disabled",
+				input: apidef.APIDefinition{
+					Proxy: apidef.ProxyConfig{
+						PreserveHostHeader: false,
+					},
+				},
+				expected: nil,
+			},
+			{
+				title: "preserve host header enabled",
+				input: apidef.APIDefinition{
+					Proxy: apidef.ProxyConfig{
+						PreserveHostHeader: true,
+					},
+				},
+				expected: &PreserveHostHeader{
+					Enabled: true,
+				},
+			},
+		}
+		for _, tc := range testCases {
+			tc := tc
+			t.Run(tc.title, func(t *testing.T) {
+				t.Parallel()
+
+				g := new(Upstream)
+				g.Fill(tc.input)
+
+				assert.Equal(t, tc.expected, g.PreserveHostHeader)
+			})
+		}
+	})
+
+	t.Run("extractTo", func(t *testing.T) {
+		type testCase struct {
+			title           string
+			input           *PreserveHostHeader
+			expectedEnabled bool
+		}
+		testcases := []testCase{
+			{
+				title: "preserve host header disabled",
+				input: &PreserveHostHeader{
+					Enabled: false,
+				},
+				expectedEnabled: false,
+			},
+			{
+				title: "preserve host header enabled",
+				input: &PreserveHostHeader{
+					Enabled: true,
+				},
+				expectedEnabled: true,
+			},
+		}
+
+		for _, tc := range testcases {
+			tc := tc // Creating a new 'tc' scoped to the loop
+			t.Run(tc.title, func(t *testing.T) {
+				g := new(Upstream)
+				g.PreserveHostHeader = tc.input
+
+				var apiDef apidef.APIDefinition
+				apiDef.Proxy.PreserveHostHeader = true
+				g.ExtractTo(&apiDef)
+
+				assert.Equal(t, tc.expectedEnabled, apiDef.Proxy.PreserveHostHeader)
+			})
+		}
+	})
+}
