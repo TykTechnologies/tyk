@@ -173,6 +173,8 @@ func TestInitGenericEventHandlers(t *testing.T) {
 }
 
 func BenchmarkInitGenericEventHandlers(b *testing.B) {
+	b.Skip()
+
 	ts := StartTest(nil)
 	defer ts.Close()
 

@@ -1024,6 +1024,8 @@ func (ts *Test) testPrepareDefaultVersion() (string, *APISpec) {
 		spec.Proxy.ListenPath = "/"
 
 		spec.UseKeylessAccess = false
+		spec.DisableRateLimit = true
+		spec.DisableQuota = true
 	})[0]
 
 	return CreateSession(ts.Gw, func(s *user.SessionState) {

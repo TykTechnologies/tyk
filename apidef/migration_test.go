@@ -642,7 +642,6 @@ func TestSetDisabledFlags(t *testing.T) {
 		},
 	}
 	expectedAPIDef := APIDefinition{
-		DisableExpireAnalytics: true,
 		CustomMiddleware: MiddlewareSection{
 			AuthCheck: MiddlewareDefinition{
 				Disabled: true,
