@@ -1,22 +1,25 @@
+name: "Open Api specification contract tests"
+include:
+  - ../../../../docker/services/redis.yml
+  - ../../../../docker/services/httpbin.yml
 services:
-  redis:
-    image: redis:7.2.7-alpine
-    healthcheck:
-      test: [ "CMD", "redis-cli", "-h", "localhost", "-p", "6379", "PING" ]
-      interval: 10s
-      retries: 3
-      timeout: 3s
-
-  gw:
+  tyk:
     image: ${GATEWAY_IMAGE}
+    networks: [ proxy ]
     depends_on:
       redis:
         condition: service_healthy
     volumes:
       - ./policies:/opt/tyk-gateway/policies
       - ./apps:/opt/tyk-gateway/apps
-      - ./config/tyk.standalone.conf:/opt/tyk-gateway/tyk.conf
+      -  $PWD/config/tyk.standalone.conf:/opt/tyk-gateway/tyk.conf
     ports:
       - "8080:8080"
     environment:
       - TYK_LOGLEVEL=debug
+
+networks:
+  proxy:
+    name: proxy
+    driver: bridge
+    external: true
