@@ -86,7 +86,12 @@ func TestXTykGateway_Lint(t *testing.T) {
 
 		settings.Upstream.RateLimit.Per = ReadableDuration(10 * time.Second)
 		settings.Server.Authentication.CustomKeyLifetime.Value = ReadableDuration(10 * time.Second)
+
 		settings.Middleware.Global.TrafficLogs.CustomRetentionPeriod = ReadableDuration(10 * time.Second)
+		for i := range settings.Middleware.Global.TrafficLogs.Plugins {
+			settings.Middleware.Global.TrafficLogs.Plugins[i].RawBodyOnly = false
+			settings.Middleware.Global.TrafficLogs.Plugins[i].RequireSession = false
+		}
 
 		settings.Upstream.Authentication = &UpstreamAuth{
 			Enabled:   false,

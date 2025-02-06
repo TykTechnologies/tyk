@@ -295,6 +295,24 @@
       ],
       "additionalProperties": false
     },
+    "X-Tyk-CustomAnalyticsPluginConfig": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "functionName": {
+          "type": "string"
+        },
+        "path": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "enabled"
+      ],
+      "additionalProperties": false
+    },
     "X-Tyk-CustomPluginConfig": {
       "type": "object",
       "properties": {
@@ -2131,7 +2149,7 @@
         "plugins": {
           "type": "array",
           "items": {
-            "$ref": "#/definitions/X-Tyk-CustomPluginConfig"
+            "$ref": "#/definitions/X-Tyk-CustomAnalyticsPluginConfig"
           }
         }
       },

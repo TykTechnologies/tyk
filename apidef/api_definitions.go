@@ -893,10 +893,14 @@ func (a AuthSource) AuthKeyName() string {
 	return a.Name
 }
 
+// AnalyticsPluginConfig holds the configuration for the analytics custom function plugins
 type AnalyticsPluginConfig struct {
-	Enabled    bool   `bson:"enable" json:"enable,omitempty"`
+	// Enabled activates the custom plugin
+	Enabled bool `bson:"enable" json:"enable,omitempty"`
+	// PluginPath is the path to the shared object file or path to js code.
 	PluginPath string `bson:"plugin_path" json:"plugin_path,omitempty"`
-	FuncName   string `bson:"func_name" json:"func_name,omitempty"`
+	// FunctionName is the name of the method.
+	FuncName string `bson:"func_name" json:"func_name,omitempty"`
 }
 
 type UptimeTests struct {
