@@ -595,17 +595,6 @@ type ResponseProcessor struct {
 	Options interface{} `bson:"options" json:"options"`
 }
 
-type HostCheckObject struct {
-	CheckURL            string            `bson:"url" json:"url"`
-	Protocol            string            `bson:"protocol" json:"protocol"`
-	Timeout             time.Duration     `bson:"timeout" json:"timeout"`
-	EnableProxyProtocol bool              `bson:"enable_proxy_protocol" json:"enable_proxy_protocol"`
-	Commands            []CheckCommand    `bson:"commands" json:"commands"`
-	Method              string            `bson:"method" json:"method"`
-	Headers             map[string]string `bson:"headers" json:"headers"`
-	Body                string            `bson:"body" json:"body"`
-}
-
 type CheckCommand struct {
 	Name    string `bson:"name" json:"name"`
 	Message string `bson:"message" json:"message"`
@@ -906,6 +895,17 @@ type AnalyticsPluginConfig struct {
 type UptimeTests struct {
 	CheckList []HostCheckObject `bson:"check_list" json:"check_list"`
 	Config    UptimeTestsConfig `bson:"config" json:"config"`
+}
+
+type HostCheckObject struct {
+	CheckURL            string            `bson:"url" json:"url"`
+	Protocol            string            `bson:"protocol" json:"protocol"`
+	Timeout             time.Duration     `bson:"timeout" json:"timeout"`
+	EnableProxyProtocol bool              `bson:"enable_proxy_protocol" json:"enable_proxy_protocol"`
+	Commands            []CheckCommand    `bson:"commands" json:"commands"`
+	Method              string            `bson:"method" json:"method"`
+	Headers             map[string]string `bson:"headers" json:"headers"`
+	Body                string            `bson:"body" json:"body"`
 }
 
 type UptimeTestsConfig struct {
