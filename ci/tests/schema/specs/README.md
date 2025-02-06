@@ -40,7 +40,9 @@ To run the tests locally, install the following:
 
 Once these dependencies are installed, navigate to the `ci/tests/schema/specs` directory and create a `.env` file. Inside the `.env` file, add:
 
+~~~bash
 PORTMAN_API_Key=<Your Tyk Gateway secret>
+~~~
 
 After adding the `PORTMAN_API_Key`, run the task `task portman_tests` from the root of the `tyk gateway` repository to create and execute the Portman tests
 
