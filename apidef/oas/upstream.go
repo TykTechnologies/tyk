@@ -553,26 +553,29 @@ type UptimeTests struct {
 	LogRetentionPeriod time.ReadableDuration `bson:"logRetentionPeriod" json:"logRetentionPeriod"`
 }
 
+// UptimeTest represents a single uptime test check.
 type UptimeTest struct {
-	CheckURL string              `bson:"url" json:"url"`
-	Protocol string              `bson:"protocol" json:"protocol"`
-	Timeout  time.Duration       `bson:"timeout" json:"timeout"`
-	Commands []UptimeTestCommand `bson:"commands" json:"commands"`
-	Method   string              `bson:"method" json:"method"`
-	Headers  map[string]string   `bson:"headers" json:"headers"`
-	Body     string              `bson:"body" json:"body"`
-
-	EnableProxyProtocol bool `bson:"enable_proxy_protocol" json:"enable_proxy_protocol"`
+	CheckURL            string                `bson:"url" json:"url"`
+	Protocol            string                `bson:"protocol" json:"protocol"`
+	Timeout             time.ReadableDuration `bson:"timeout" json:"timeout"`
+	Method              string                `bson:"method" json:"method"`
+	Headers             map[string]string     `bson:"headers" json:"headers"`
+	Body                string                `bson:"body" json:"body"`
+	Commands            []UptimeTestCommand   `bson:"commands" json:"commands"`
+	EnableProxyProtocol bool                  `bson:"enable_proxy_protocol" json:"enable_proxy_protocol"`
 }
 
+// AddCommand will append a new command to the test.
 func (t *UptimeTest) AddCommand(name, message string) {
 	command := UptimeTestCommand{
 		Name:    name,
 		Message: message,
 	}
+
 	t.Commands = append(t.Commands, command)
 }
 
+// UptimeTestCommand handles additional checks for tcp connections.
 type UptimeTestCommand struct {
 	Name    string `bson:"name" json:"name"`
 	Message string `bson:"message" json:"message"`
@@ -589,8 +592,30 @@ func (t *UptimeTests) Fill(uptimeTests apidef.UptimeTests) {
 		t.ServiceDiscovery = nil
 	}
 
+	t.Tests = nil
 	t.LogRetentionPeriod = ReadableDuration(time.Duration(uptimeTests.Config.ExpireUptimeAnalyticsAfter) * time.Second)
 	t.HostDownRetestPeriod = ReadableDuration(time.Duration(uptimeTests.Config.RecheckWait) * time.Second)
+
+	result := []UptimeTest{}
+	for _, v := range uptimeTests.CheckList {
+		check := UptimeTest{
+			CheckURL: v.CheckURL,
+			Protocol: v.Protocol,
+			Timeout:  ReadableDuration(v.Timeout),
+			Method:   v.Method,
+			Headers:  v.Headers,
+			Body:     v.Body,
+		}
+		for _, command := range v.Commands {
+			check.AddCommand(command.Name, command.Message)
+		}
+
+		result = append(result, check)
+	}
+
+	if len(result) > 0 {
+		t.Tests = result
+	}
 }
 
 // ExtractTo extracts *UptimeTests into *apidef.UptimeTests.
@@ -606,6 +631,29 @@ func (t *UptimeTests) ExtractTo(uptimeTests *apidef.UptimeTests) {
 
 	uptimeTests.Config.ExpireUptimeAnalyticsAfter = int64(t.LogRetentionPeriod.Seconds())
 	uptimeTests.Config.RecheckWait = int(t.HostDownRetestPeriod.Seconds())
+
+	uptimeTests.CheckList = nil
+
+	result := []apidef.HostCheckObject{}
+	for _, v := range t.Tests {
+		check := apidef.HostCheckObject{
+			CheckURL: v.CheckURL,
+			Protocol: v.Protocol,
+			Timeout:  time.Duration(v.Timeout),
+			Method:   v.Method,
+			Headers:  v.Headers,
+			Body:     v.Body,
+		}
+		for _, command := range v.Commands {
+			check.AddCommand(command.Name, command.Message)
+		}
+
+		result = append(result, check)
+	}
+
+	if len(result) > 0 {
+		uptimeTests.CheckList = result
+	}
 }
 
 // MutualTLS contains the configuration for establishing a mutual TLS connection between Tyk and the upstream server.

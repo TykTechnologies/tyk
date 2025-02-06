@@ -595,11 +595,6 @@ type ResponseProcessor struct {
 	Options interface{} `bson:"options" json:"options"`
 }
 
-type CheckCommand struct {
-	Name    string `bson:"name" json:"name"`
-	Message string `bson:"message" json:"message"`
-}
-
 type ServiceDiscoveryConfiguration struct {
 	UseDiscoveryService bool   `bson:"use_discovery_service" json:"use_discovery_service"`
 	QueryEndpoint       string `bson:"query_endpoint" json:"query_endpoint"`
@@ -892,11 +887,19 @@ type AnalyticsPluginConfig struct {
 	FuncName string `bson:"func_name" json:"func_name,omitempty"`
 }
 
+// UptimeTests holds the test configuration for uptime tests.
 type UptimeTests struct {
 	CheckList []HostCheckObject `bson:"check_list" json:"check_list"`
 	Config    UptimeTestsConfig `bson:"config" json:"config"`
 }
 
+// UptimeTestCommand handles additional checks for tcp connections.
+type CheckCommand struct {
+	Name    string `bson:"name" json:"name"`
+	Message string `bson:"message" json:"message"`
+}
+
+// HostCheckObject represents a single uptime test check.
 type HostCheckObject struct {
 	CheckURL            string            `bson:"url" json:"url"`
 	Protocol            string            `bson:"protocol" json:"protocol"`
@@ -907,6 +910,17 @@ type HostCheckObject struct {
 	Headers             map[string]string `bson:"headers" json:"headers"`
 	Body                string            `bson:"body" json:"body"`
 }
+
+// AddCommand will append a new command to the test.
+func (h *HostCheckObject) AddCommand(name, message string) {
+	command := CheckCommand{
+		Name: name,
+		Message: message,
+	}
+
+	h.Commands = append(h.Commands, command)
+}
+
 
 type UptimeTestsConfig struct {
 	ExpireUptimeAnalyticsAfter int64                         `bson:"expire_utime_after" json:"expire_utime_after"` // must have an expireAt TTL index set (http://docs.mongodb.org/manual/tutorial/expire-data/)
