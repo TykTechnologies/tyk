@@ -61,7 +61,8 @@
       },
       "required": [
         "enabled"
-      ]
+      ],
+      "additionalProperties": false
     },
     "X-Tyk-ServiceDiscoveryCache": {
       "type": "object",
@@ -76,7 +77,8 @@
       },
       "required": [
         "enabled"
-      ]
+      ],
+      "additionalProperties": false
     },
     "X-Tyk-DetailedActivityLogs": {
       "type": "object",
@@ -87,7 +89,8 @@
       },
       "required": [
         "enabled"
-      ]
+      ],
+      "additionalProperties": false
     },
     "X-Tyk-AuthSource": {
       "type": "object",
@@ -101,7 +104,8 @@
       },
       "required": [
         "enabled"
-      ]
+      ],
+      "additionalProperties": false
     },
     "X-Tyk-MutualTLS": {
       "type": "object",
@@ -121,7 +125,8 @@
       "required": [
         "enabled",
         "domainToCertificateMapping"
-      ]
+      ],
+      "additionalProperties": false
     },
     "X-Tyk-DomainToCertificate": {
       "type": "object",
@@ -136,7 +141,8 @@
       "required": [
         "domain",
         "certificate"
-      ]
+      ],
+      "additionalProperties": false
     },
     "X-Tyk-CertificatePinning": {
       "type": "object",
@@ -156,7 +162,8 @@
       "required": [
         "enabled",
         "domainToPublicKeysMapping"
-      ]
+      ],
+      "additionalProperties": false
     },
     "X-Tyk-PinnedPublicKeys": {
       "type": "object",
@@ -172,7 +179,8 @@
             }
           ]
         }
-      }
+      },
+      "additionalProperties": false
     },
     "X-Tyk-ClientToPolicy": {
       "type": "object",
@@ -183,7 +191,8 @@
         "policyId": {
           "type": "string"
         }
-      }
+      },
+      "additionalProperties": false
     },
     "X-Tyk-Provider": {
       "type": "object",
@@ -199,7 +208,8 @@
             }
           ]
         }
-      }
+      },
+      "additionalProperties": false
     },
     "X-Tyk-ScopeToPolicy": {
       "type": "object",
@@ -210,7 +220,8 @@
         "policyId": {
           "type": "string"
         }
-      }
+      },
+      "additionalProperties": false
     },
     "X-Tyk-Scopes": {
       "type": "object",
@@ -226,7 +237,8 @@
             }
           ]
         }
-      }
+      },
+      "additionalProperties": false
     },
     "X-Tyk-ClientCertificates": {
       "type": "object",
@@ -242,7 +254,8 @@
             }
           ]
         }
-      }
+      },
+      "additionalProperties": false
     },
     "X-Tyk-PluginConfig": {
       "type": "object",
@@ -263,7 +276,8 @@
         "data": {
           "$ref": "#/definitions/X-Tyk-PluginConfigData"
         }
-      }
+      },
+      "additionalProperties": false
     },
     "X-Tyk-PluginConfigData": {
       "type": "object",
@@ -278,7 +292,8 @@
       "required": [
         "enabled",
         "value"
-      ]
+      ],
+      "additionalProperties": false
     },
     "X-Tyk-CustomAnalyticsPluginConfig": {
       "type": "object",
@@ -295,7 +310,8 @@
       },
       "required": [
         "enabled"
-      ]
+      ],
+      "additionalProperties": false
     },
     "X-Tyk-CustomPluginConfig": {
       "type": "object",
@@ -303,7 +319,8 @@
         "plugins": {
           "$ref": "#/definitions/X-Tyk-CustomPlugins"
         }
-      }
+      },
+      "additionalProperties": false
     },
     "X-Tyk-CustomPlugins": {
       "type": "array",
@@ -312,7 +329,8 @@
           "$ref": "#/definitions/X-Tyk-CustomPluginDefinition"
         }
       ],
-      "minItems": 1
+      "minItems": 1,
+      "additionalProperties": false
     },
     "X-Tyk-CustomPluginDefinition": {
       "properties": {
@@ -335,7 +353,8 @@
       "required": [
         "enabled",
         "functionName"
-      ]
+      ],
+      "additionalProperties": false
     },
     "X-Tyk-IDExtractorConfig": {
       "type": "object",
@@ -355,7 +374,8 @@
         "xPathExp": {
           "type": "string"
         }
-      }
+      },
+      "additionalProperties": false
     },
     "X-Tyk-IDExtractor": {
       "type": "object",
@@ -388,7 +408,8 @@
         "source",
         "with",
         "config"
-      ]
+      ],
+      "additionalProperties": false
     },
     "X-Tyk-AuthenticationPlugin": {
       "type": "object",
@@ -412,7 +433,8 @@
       "required": [
         "enabled",
         "functionName"
-      ]
+      ],
+      "additionalProperties": false
     },
     "X-Tyk-PluginBundle": {
       "type": "object",
@@ -428,7 +450,8 @@
       "required": [
         "enabled",
         "path"
-      ]
+      ],
+      "additionalProperties": false
     },
     "X-Tyk-CORS": {
       "type": "object",
@@ -483,7 +506,8 @@
       },
       "required": [
         "enabled"
-      ]
+      ],
+      "additionalProperties": false
     },
     "X-Tyk-Cache": {
       "type": "object",
@@ -520,7 +544,8 @@
         "controlTTLHeaderName": {
           "type": "string"
         }
-      }
+      },
+      "additionalProperties": false
     },
     "X-Tyk-Global": {
       "type": "object",
@@ -573,7 +598,8 @@
         "requestSizeLimit": {
           "$ref": "#/definitions/X-Tyk-GlobalRequestSizeLimit"
         }
-      }
+      },
+      "additionalProperties": false
     },
     "X-Tyk-Allowance": {
       "type": "object",
@@ -587,7 +613,8 @@
       },
       "required": [
         "enabled"
-      ]
+      ],
+      "additionalProperties": false
     },
     "X-Tyk-TransformRequestMethod": {
       "type": "object",
@@ -602,7 +629,8 @@
       "required": [
         "enabled",
         "toMethod"
-      ]
+      ],
+      "additionalProperties": false
     },
     "X-Tyk-TransformBody": {
       "type": "object",
@@ -640,7 +668,8 @@
         "enabled",
         "format"
       ],
-      "minProperties": 3
+      "minProperties": 3,
+      "additionalProperties": false
     },
     "X-Tyk-TransformHeaders": {
       "type": "object",
@@ -667,7 +696,8 @@
       },
       "required": [
         "enabled"
-      ]
+      ],
+      "additionalProperties": false
     },
     "X-Tyk-CachePlugin": {
       "type": "object",
@@ -694,7 +724,8 @@
       },
       "required": [
         "enabled"
-      ]
+      ],
+      "additionalProperties": false
     },
     "X-Tyk-EnforceTimeout": {
       "type": "object",
@@ -710,7 +741,8 @@
       "required": [
         "enabled",
         "value"
-      ]
+      ],
+      "additionalProperties": false
     },
     "X-Tyk-ValidateRequest": {
       "type": "object",
@@ -724,7 +756,8 @@
       },
       "required": [
         "enabled"
-      ]
+      ],
+      "additionalProperties": false
     },
     "X-Tyk-MockResponse": {
       "type": "object",
@@ -768,7 +801,8 @@
       },
       "required": [
         "enabled"
-      ]
+      ],
+      "additionalProperties": false
     },
     "X-Tyk-RequestSizeLimit": {
       "type": "object",
@@ -784,7 +818,8 @@
       "required": [
         "enabled",
         "value"
-      ]
+      ],
+      "additionalProperties": false
     },
     "X-Tyk-VirtualEndpoint": {
       "type": "object",
@@ -814,7 +849,8 @@
       "required": [
         "enabled",
         "functionName"
-      ]
+      ],
+      "additionalProperties": false
     },
     "X-Tyk-URLRewrite": {
       "type": "object",
@@ -841,7 +877,8 @@
         "enabled",
         "pattern",
         "rewriteTo"
-      ]
+      ],
+      "additionalProperties": false
     },
     "X-Tyk-TrackEndpoint": {
       "type": "object",
@@ -852,7 +889,8 @@
       },
       "required": [
         "enabled"
-      ]
+      ],
+      "additionalProperties": false
     },
     "X-Tyk-URLRewriteTrigger": {
       "type": "object",
@@ -883,7 +921,8 @@
       "required": [
         "condition",
         "rewriteTo"
-      ]
+      ],
+      "additionalProperties": false
     },
     "X-Tyk-URLRewriteRuleForRequestBody": {
       "type": "object",
@@ -906,7 +945,8 @@
       "required": [
         "in",
         "pattern"
-      ]
+      ],
+      "additionalProperties": false
     },
     "X-Tyk-URLRewriteRule": {
       "type": "object",
@@ -934,7 +974,8 @@
         "in",
         "name",
         "pattern"
-      ]
+      ],
+      "additionalProperties": false
     },
     "X-Tyk-EndpointPostPlugin": {
       "type": "object",
@@ -956,7 +997,8 @@
         "enabled",
         "functionName",
         "path"
-      ]
+      ],
+      "additionalProperties": false
     },
     "X-Tyk-Internal": {
       "type": "object",
@@ -967,7 +1009,8 @@
       },
       "required": [
         "enabled"
-      ]
+      ],
+      "additionalProperties": false
     },
     "X-Tyk-Operation": {
       "type": "object",
@@ -1040,7 +1083,8 @@
         "rateLimit": {
           "$ref": "#/definitions/X-Tyk-RateLimit"
         }
-      }
+      },
+      "additionalProperties": false
     },
     "X-Tyk-Operations": {
       "type": "object",
@@ -1048,7 +1092,8 @@
         "\\S+": {
           "$ref": "#/definitions/X-Tyk-Operation"
         }
-      }
+      },
+      "additionalProperties": false
     },
     "X-Tyk-Middleware": {
       "type": "object",
@@ -1059,7 +1104,8 @@
         "operations": {
           "$ref": "#/definitions/X-Tyk-Operations"
         }
-      }
+      },
+      "additionalProperties": false
     },
     "X-Tyk-ListenPath": {
       "type": "object",
@@ -1074,7 +1120,8 @@
       },
       "required": [
         "value"
-      ]
+      ],
+      "additionalProperties": false
     },
     "X-Tyk-HMAC": {
       "type": "object",
@@ -1106,7 +1153,8 @@
       },
       "required": [
         "enabled"
-      ]
+      ],
+      "additionalProperties": false
     },
     "X-Tyk-OIDC": {
       "type": "object",
@@ -1141,7 +1189,8 @@
       },
       "required": [
         "enabled"
-      ]
+      ],
+      "additionalProperties": false
     },
     "X-Tyk-CustomPluginAuthentication": {
       "type": "object",
@@ -1164,7 +1213,8 @@
       },
       "required": [
         "enabled"
-      ]
+      ],
+      "additionalProperties": false
     },
     "X-Tyk-Authentication": {
       "type": "object",
@@ -1245,7 +1295,8 @@
       },
       "required": [
         "enabled"
-      ]
+      ],
+      "additionalProperties": false
     },
     "X-Tyk-Server": {
       "type": "object",
@@ -1308,7 +1359,8 @@
       },
       "required": [
         "listenPath"
-      ]
+      ],
+      "additionalProperties": false
     },
     "X-Tyk-GatewayTags": {
       "type": "object",
@@ -1329,7 +1381,8 @@
       "required": [
         "enabled",
         "tags"
-      ]
+      ],
+      "additionalProperties": false
     },
     "X-Tyk-Upstream": {
       "type": "object",
@@ -1370,7 +1423,8 @@
       },
       "required": [
         "url"
-      ]
+      ],
+      "additionalProperties": false
     },
     "X-Tyk-State": {
       "type": "object",
@@ -1384,7 +1438,8 @@
       },
       "required": [
         "active"
-      ]
+      ],
+      "additionalProperties": false
     },
     "X-Tyk-Versioning": {
       "type": "object",
@@ -1430,7 +1485,8 @@
         "location",
         "key",
         "versions"
-      ]
+      ],
+      "additionalProperties": false
     },
     "X-Tyk-VersionToID": {
       "type": "object",
@@ -1447,7 +1503,8 @@
       "required": [
         "name",
         "id"
-      ]
+      ],
+      "additionalProperties": false
     },
     "X-Tyk-Info": {
       "type": "object",
@@ -1478,7 +1535,8 @@
       "required": [
         "name",
         "state"
-      ]
+      ],
+      "additionalProperties": false
     },
     "X-Tyk-ExtractCredentialsFromBody": {
       "type": "object",
@@ -1495,7 +1553,8 @@
       },
       "required": [
         "enabled"
-      ]
+      ],
+      "additionalProperties": false
     },
     "X-Tyk-Notifications": {
       "type": "object",
@@ -1506,7 +1565,8 @@
         "onKeyChangeUrl": {
           "type": "string"
         }
-      }
+      },
+      "additionalProperties": false
     },
     "X-Tyk-Signature": {
       "type": "object",
@@ -1536,7 +1596,8 @@
         "errorMessage": {
           "type": "string"
         }
-      }
+      },
+      "additionalProperties": false
     },
     "X-Tyk-Token": {
       "type": "object",
@@ -1562,7 +1623,8 @@
       },
       "required": [
         "enabled"
-      ]
+      ],
+      "additionalProperties": false
     },
     "X-Tyk-JWT": {
       "type": "object",
@@ -1629,7 +1691,8 @@
       },
       "required": [
         "enabled"
-      ]
+      ],
+      "additionalProperties": false
     },
     "X-Tyk-Basic": {
       "type": "object",
@@ -1658,7 +1721,8 @@
       },
       "required": [
         "enabled"
-      ]
+      ],
+      "additionalProperties": false
     },
     "X-Tyk-OAuth": {
       "type": "object",
@@ -1697,7 +1761,8 @@
       },
       "required": [
         "enabled"
-      ]
+      ],
+      "additionalProperties": false
     },
     "X-Tyk-ExternalOAuth": {
       "type": "object",
@@ -1726,7 +1791,8 @@
       },
       "required": [
         "enabled"
-      ]
+      ],
+      "additionalProperties": false
     },
     "X-Tyk-OAuthProvider": {
       "type": "object",
@@ -1737,7 +1803,8 @@
         "introspection": {
           "$ref": "#/definitions/X-Tyk-Introspection"
         }
-      }
+      },
+      "additionalProperties": false
     },
     "X-Tyk-JWTValidation": {
       "type": "object",
@@ -1768,7 +1835,8 @@
         "enabled",
         "signingMethod",
         "source"
-      ]
+      ],
+      "additionalProperties": false
     },
     "X-Tyk-Introspection": {
       "type": "object",
@@ -1792,7 +1860,8 @@
         "cache": {
           "$ref": "#/definitions/X-Tyk-IntrospectionCache"
         }
-      }
+      },
+      "additionalProperties": false
     },
     "X-Tyk-IntrospectionCache": {
       "type": "object",
@@ -1807,7 +1876,8 @@
       "required": [
         "enabled",
         "timeout"
-      ]
+      ],
+      "additionalProperties": false
     },
     "X-Tyk-CustomDomain": {
       "type": "object",
@@ -1830,7 +1900,8 @@
       "required": [
         "enabled",
         "name"
-      ]
+      ],
+      "additionalProperties": false
     },
     "X-Tyk-Header": {
       "type": "object",
@@ -1845,7 +1916,8 @@
       "required": [
         "name",
         "value"
-      ]
+      ],
+      "additionalProperties": false
     },
     "X-Tyk-CircuitBreaker": {
       "type": "object",
@@ -1877,7 +1949,8 @@
         "sampleSize",
         "coolDownPeriod",
         "halfOpenStateEnabled"
-      ]
+      ],
+      "additionalProperties": false
     },
     "X-Tyk-RateLimit": {
       "type": "object",
@@ -1897,7 +1970,8 @@
         "enabled",
         "rate",
         "per"
-      ]
+      ],
+      "additionalProperties": false
     },
     "X-Tyk-DetailedTracing": {
       "type": "object",
@@ -1908,7 +1982,8 @@
       },
       "required": [
         "enabled"
-      ]
+      ],
+      "additionalProperties": false
     },
     "X-Tyk-EventHandlers": {
       "type": "object",
@@ -1919,7 +1994,8 @@
         {
           "$ref": "#/definitions/X-Tyk-Webhook-Without-ID"
         }
-      ]
+      ],
+      "additionalProperties": false
     },
     "X-Tyk-Webhook-With-ID": {
       "type": "object",
@@ -1949,7 +2025,8 @@
         "trigger",
         "id",
         "cooldownPeriod"
-      ]
+      ],
+      "additionalProperties": false
     },
     "X-Tyk-Webhook-Without-ID": {
       "type": "object",
@@ -2004,13 +2081,15 @@
         "method",
         "cooldownPeriod",
         "bodyTemplate"
-      ]
+      ],
+      "additionalProperties": false
     },
     "X-Tyk-EventType": {
       "type": "string",
       "enum": [
         "webhook"
-      ]
+      ],
+      "additionalProperties": false
     },
     "X-Tyk-EventTrigger": {
       "type": "string",
@@ -2033,7 +2112,8 @@
         "TokenCreated",
         "TokenUpdated",
         "TokenDeleted"
-      ]
+      ],
+      "additionalProperties": false
     },
     "X-Tyk-ContextVariables": {
       "type": "object",
@@ -2044,7 +2124,8 @@
       },
       "required": [
         "enabled"
-      ]
+      ],
+      "additionalProperties": false
     },
     "X-Tyk-TrafficLogs": {
       "type": "object",
@@ -2074,7 +2155,8 @@
       },
       "required": [
         "enabled"
-      ]
+      ],
+      "additionalProperties": false
     },
     "X-Tyk-GlobalRequestSizeLimit": {
       "type": "object",
@@ -2089,15 +2171,18 @@
       "required": [
         "enabled",
         "value"
-      ]
+      ],
+      "additionalProperties": false
     },
     "X-Tyk-UInt": {
       "type": "integer",
-      "minimum": 0
+      "minimum": 0,
+      "additionalProperties": false
     },
     "X-Tyk-DomainDef": {
       "type": "string",
-      "pattern": "^([*a-zA-Z0-9-]+(\\.[*a-zA-Z0-9-]+)*)(:\\d+)?$"
+      "pattern": "^([*a-zA-Z0-9-]+(\\.[*a-zA-Z0-9-]+)*)(:\\d+)?$",
+      "additionalProperties": false
     },
     "X-Tyk-UpstreamAuthentication": {
       "type": "object",
@@ -2114,7 +2199,8 @@
       },
       "required": [
         "enabled"
-      ]
+      ],
+      "additionalProperties": false
     },
     "X-Tyk-UpstreamBasicAuthentication": {
       "type": "object",
@@ -2136,7 +2222,8 @@
         "enabled",
         "username",
         "password"
-      ]
+      ],
+      "additionalProperties": false
     },
     "X-Tyk-UpstreamOAuth": {
       "type": "object",
@@ -2237,11 +2324,13 @@
       "required": [
         "enabled",
         "allowedAuthorizeTypes"
-      ]
+      ],
+      "additionalProperties": false
     },
     "X-Tyk-NonEmptyString": {
       "type": "string",
-      "pattern": "\\S+"
+      "pattern": "\\S+",
+      "additionalProperties": false
     },
     "X-Tyk-UpstreamAuthSource": {
       "type": "object",
@@ -2252,7 +2341,8 @@
         "name": {
           "type": "string"
         }
-      }
+      },
+      "additionalProperties": false
     },
     "X-Tyk-IPAccessControl": {
       "type": "object",
@@ -2272,7 +2362,8 @@
             "type": "string"
           }
         }
-      }
+      },
+      "additionalProperties": false
     },
     "X-Tyk-BatchProcessing": {
       "properties": {
@@ -2282,7 +2373,8 @@
       },
       "required": [
         "enabled"
-      ]
+      ],
+      "additionalProperties": false
     },
     "X-Tyk-LoadBalancing": {
       "type": "object",
@@ -2301,18 +2393,20 @@
       },
       "required": [
         "enabled"
-      ]
+      ],
+      "additionalProperties": false
     },
     "X-Tyk-PreserveHostHeader": {
       "type": "object",
-        "properties": {
-            "enabled": {
-            "type": "boolean"
-            }
-        },
-        "required": [
-            "enabled"
-        ]
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "enabled"
+      ],
+      "additionalProperties": false
     },
     "X-Tyk-LoadBalancingTarget": {
       "type": "object",
@@ -2327,7 +2421,9 @@
       "required": [
         "url",
         "weight"
-      ]
+      ],
+      "additionalProperties": false
     }
-  }
+  },
+  "additionalProperties": false
 }

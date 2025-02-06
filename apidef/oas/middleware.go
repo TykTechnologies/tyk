@@ -1586,7 +1586,7 @@ type TrafficLogs struct {
 	CustomRetentionPeriod ReadableDuration `bson:"customRetentionPeriod,omitempty" json:"customRetentionPeriod,omitempty"`
 	// Plugins configures custom plugins to allow for extensive modifications to analytics records
 	// The plugins would be executed in the order of configuration in the list.
-	Plugins CustomPlugins `bson:"plugins,omitempty" json:"plugins,omitempty"`
+	Plugins CustomAnalyticsPlugins `bson:"plugins,omitempty" json:"plugins,omitempty"`
 }
 
 // Fill fills *TrafficLogs from apidef.APIDefinition.
@@ -1595,11 +1595,12 @@ func (t *TrafficLogs) Fill(api apidef.APIDefinition) {
 	t.TagHeaders = api.TagHeaders
 	t.CustomRetentionPeriod = ReadableDuration(time.Duration(api.ExpireAnalyticsAfter) * time.Second)
 
-	if len(api.CustomMiddleware.TrafficLogs) == 0 {
+	if t.Plugins == nil {
+		t.Plugins = make(CustomAnalyticsPlugins, 0)
+	}
+	t.Plugins.Fill(api)
+	if ShouldOmit(t.Plugins) {
 		t.Plugins = nil
-	} else {
-		t.Plugins = make(CustomPlugins, len(api.CustomMiddleware.TrafficLogs))
-		t.Plugins.Fill(api.CustomMiddleware.TrafficLogs)
 	}
 }
 
@@ -1609,11 +1610,40 @@ func (t *TrafficLogs) ExtractTo(api *apidef.APIDefinition) {
 	api.TagHeaders = t.TagHeaders
 	api.ExpireAnalyticsAfter = int64(t.CustomRetentionPeriod.Seconds())
 
-	if len(t.Plugins) == 0 {
-		api.CustomMiddleware.TrafficLogs = nil
-	} else {
-		api.CustomMiddleware.TrafficLogs = make([]apidef.MiddlewareDefinition, len(t.Plugins))
-		t.Plugins.ExtractTo(api.CustomMiddleware.TrafficLogs)
+	if t.Plugins == nil {
+		t.Plugins = make(CustomAnalyticsPlugins, 0)
+		defer func() {
+			t.Plugins = nil
+		}()
+	}
+	t.Plugins.ExtractTo(api)
+}
+
+// CustomAnalyticsPlugins is a list of CustomPlugin objects for analytics.
+type CustomAnalyticsPlugins []CustomPlugin
+
+// Fill fills CustomAnalyticsPlugins from AnalyticsPlugin in the supplied api.
+func (c *CustomAnalyticsPlugins) Fill(api apidef.APIDefinition) {
+	if api.AnalyticsPlugin.Enabled {
+		customPlugins := []CustomPlugin{
+			{
+				Enabled:      api.AnalyticsPlugin.Enabled,
+				FunctionName: api.AnalyticsPlugin.FuncName,
+				Path:         api.AnalyticsPlugin.PluginPath,
+			},
+		}
+		*c = customPlugins
+	}
+}
+
+// ExtractTo extracts CustomAnalyticsPlugins into AnalyticsPlugin of supplied api.
+func (c *CustomAnalyticsPlugins) ExtractTo(api *apidef.APIDefinition) {
+	if len(*c) > 0 {
+		// extract the first item in the customAnalyticsPlugin into apidef
+		plugin := (*c)[0]
+		api.AnalyticsPlugin.Enabled = plugin.Enabled
+		api.AnalyticsPlugin.FuncName = plugin.FunctionName
+		api.AnalyticsPlugin.PluginPath = plugin.Path
 	}
 }
 

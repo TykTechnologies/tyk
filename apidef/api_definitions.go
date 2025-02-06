@@ -576,7 +576,6 @@ type MiddlewareSection struct {
 	PostKeyAuth []MiddlewareDefinition `bson:"post_key_auth" json:"post_key_auth"`
 	AuthCheck   MiddlewareDefinition   `bson:"auth_check" json:"auth_check"`
 	Response    []MiddlewareDefinition `bson:"response" json:"response"`
-	TrafficLogs []MiddlewareDefinition `bson:"traffic_logs" json:"traffic_logs"`
 	Driver      MiddlewareDriver       `bson:"driver" json:"driver"`
 	IdExtractor MiddlewareIdExtractor  `bson:"id_extractor" json:"id_extractor"`
 }
@@ -894,10 +893,14 @@ func (a AuthSource) AuthKeyName() string {
 	return a.Name
 }
 
+// AnalyticsPluginConfig holds the configuration for the analytics custom function plugins
 type AnalyticsPluginConfig struct {
-	Enabled    bool   `bson:"enable" json:"enable,omitempty"`
+	// Enabled activates the custom plugin
+	Enabled bool `bson:"enable" json:"enable,omitempty"`
+	// PluginPath is the path to the shared object file or path to js code.
 	PluginPath string `bson:"plugin_path" json:"plugin_path,omitempty"`
-	FuncName   string `bson:"func_name" json:"func_name,omitempty"`
+	// FunctionName is the name of the method.
+	FuncName string `bson:"func_name" json:"func_name,omitempty"`
 }
 
 type UptimeTests struct {
