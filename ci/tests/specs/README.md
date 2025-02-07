@@ -36,15 +36,15 @@ To run the tests locally, install the following:
 
 3. [Newman](https://github.com/postmanlabs/newman): A Postman CLI tool needed to run the contract tests.
 
-4. A running Tyk gateway. (you can use `task run_gateway_to_test_oas` to run a gateway in the tyk gateway repo)
-
-Once these dependencies are installed, navigate to the `ci/tests/schema/specs` directory and create a `.env` file using .env.example as template. Inside the `.env` file, add:
+Once these dependencies are installed, navigate to the `ci/tests/specs` directory and create a `.env` file using .env.example as template. Inside the `.env` file, add:
 
 ```bash
 PORTMAN_API_Key=<Your Tyk Gateway secret>
 ```
 
-After adding the `PORTMAN_API_Key`, run the task `task portman_tests` from the root of the `tyk gateway` repository to create and execute the Portman tests
+After adding the `PORTMAN_API_Key`, run the `task` command from ci/tests/specs directory to run a gateway instance and execute portman tests.
+
+You can then stop the gateway instance by running `task down` command from the  ci/tests/specs directory.
 
 ## How It Is Run on the CI
 
@@ -52,4 +52,4 @@ The GitHub Action used to run these tests is `swagger-contract-tests.yml`.
 
 - In the CI environment, we launch a live gateway using the using th image created by release.yml GitHub action on every pull request.
 
-- After that, we run the task `task portman_tests`, which uses Portman to generate and execute all the Swagger contract tests.
+- After that, we run the task `task tests`, which uses Portman to generate and execute all the Swagger contract tests.

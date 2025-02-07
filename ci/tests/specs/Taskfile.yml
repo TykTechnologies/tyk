@@ -7,7 +7,7 @@ tasks:
     desc: "Run the portman tests"
     cmds:
       - task: up
-      - task: portman_tests
+      - task: tests
 
   tests:
     desc: "Run the OpenAPI specification tests"

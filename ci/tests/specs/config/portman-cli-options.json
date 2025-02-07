@@ -1,5 +1,5 @@
 {
-  "local": "../../../../swagger.yml",
+  "local": "../../../swagger.yml",
   "baseUrl": "http://localhost:8080",
   "output": "gateway.collection.postman.json",
   "oaOutput": "filtered.gateway.swagger.yml",

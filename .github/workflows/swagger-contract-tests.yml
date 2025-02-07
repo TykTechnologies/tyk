@@ -18,7 +18,7 @@ jobs:
         uses: ./.github/actions/ecr-login
 
       - name: Create .env file with tokens
-        working-directory: ci/tests/schema/specs
+        working-directory: ci/tests/specs
         run: |
           echo "PORTMAN_API_Key=example_gateway_secret" > .env
 
@@ -26,7 +26,7 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.ORG_GH_TOKEN }}
           GATEWAY_IMAGE: ${{ steps.ecr-login.outputs.registry }}/tyk:sha-${{ github.sha }}
-        working-directory: ci/tests/schema/specs
+        working-directory: ci/tests/specs
         run: |
           task up
 
@@ -35,14 +35,14 @@ jobs:
           curl https://github.com/ovh/venom/releases/download/v1.1.0/venom.linux-amd64 -L -o /usr/local/bin/venom && chmod +x /usr/local/bin/venom
 
       - name: Run the Portman tests
-        working-directory: ci/tests/schema/specs
+        working-directory: ci/tests/specs
         run: task tests
 
       - name: Clean up
         env:
           GH_TOKEN: ${{ secrets.ORG_GH_TOKEN }}
           GATEWAY_IMAGE: ${{ steps.ecr-login.outputs.registry }}/tyk:sha-${{ github.sha }}
-        working-directory: ci/tests/schema/specs
+        working-directory: ci/tests/specs
         run: task down
 
 

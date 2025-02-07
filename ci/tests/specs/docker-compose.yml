@@ -1,8 +1,8 @@
 name: open-api-specification-contract-tests
 
 include:
-  - ../../../../docker/services/redis.yml
-  - ../../../../docker/services/httpbin.yml
+  - ../../../docker/services/redis.yml
+  - ../../../docker/services/httpbin.yml
 
 services:
   tyk:
