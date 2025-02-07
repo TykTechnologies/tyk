@@ -8,7 +8,7 @@ services:
   tyk:
     image: ${GATEWAY_IMAGE}
     networks: [ proxy ]
-    build: ../../../../.
+    build: ../../../.
     depends_on:
       - redis
     volumes:
