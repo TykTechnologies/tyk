@@ -1,18 +1,20 @@
-name: "Open Api specification contract tests"
+name: open-api-specification-contract-tests
+
 include:
   - ../../../../docker/services/redis.yml
   - ../../../../docker/services/httpbin.yml
+
 services:
   tyk:
     image: ${GATEWAY_IMAGE}
     networks: [ proxy ]
+    build: ../../../../.
     depends_on:
-      redis:
-        condition: service_healthy
+      - redis
     volumes:
       - ./policies:/opt/tyk-gateway/policies
       - ./apps:/opt/tyk-gateway/apps
-      -  $PWD/config/tyk.standalone.conf:/opt/tyk-gateway/tyk.conf
+      -  ./config/tyk.standalone.conf:/opt/tyk-gateway/tyk.conf
     ports:
       - "8080:8080"
     environment:
@@ -22,4 +24,3 @@ networks:
   proxy:
     name: proxy
     driver: bridge
-    external: true

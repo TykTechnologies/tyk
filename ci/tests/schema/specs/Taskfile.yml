@@ -1,25 +1,25 @@
 version: "3"
+
+dotenv: ['.env']
+
 tasks:
   default:
     desc: "Run the portman tests"
     cmds:
       - task: up
-      - task: run_gateway_to_test_oas
-      - task: down
-  run_gateway_to_test_oas:
-    desc: "Start the gateway to test portman"
-    cmds:
-      - docker compose up -d
-  stop_gateway_to_test_oas:
-    desc: "Stop the gateway to test portman"
-    cmds:
-      - docker compose down
-  portman_tests:
+      - task: portman_tests
+
+  tests:
     desc: "Run the OpenAPI specification tests"
     cmds:
       - venom run testdata/populate_gateway_test_data.yaml --var bearerToken=$PORTMAN_API_Key  --stop-on-failure && rm venom*.log
       - npm install
       - npm start
+
+  build:
+    desc: "Build docker image"
+    cmds:
+      - docker compose build
 
   up:
     desc: "Bring up env"
