@@ -1031,6 +1031,7 @@ func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string, orgId string) 
 	CertificatesToAdd := map[string]string{}
 	OauthClients := map[string]string{}
 	apiIDsToDeleteCache := make([]string, 0)
+	userKeysToReset := map[string]string{}
 
 	for _, key := range keys {
 		splitKeys := strings.Split(key, ":")
@@ -1057,6 +1058,9 @@ func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string, orgId string) 
 			case NoticeDeleteAPICache.String():
 				apiIDsToDeleteCache = append(apiIDsToDeleteCache, splitKeys[0])
 				notRegularKeys[key] = true
+			case NoticeUserKeyReset.String():
+				userKeys := strings.Split(splitKeys[0], ".")
+				userKeysToReset[userKeys[0]] = userKeys[1]
 			default:
 				log.Debug("ignoring processing of action:", action)
 			}
@@ -1165,6 +1169,22 @@ func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string, orgId string) 
 		}
 
 		log.WithField("apiID", apiID).Error("cache invalidation failed")
+	}
+
+	for _, newKey := range userKeysToReset {
+		err := r.Disconnect()
+		if err != nil {
+			log.Error("Failed to disconnect from RPC storage:", err)
+			continue
+		}
+		config := r.Gw.GetConfig()
+		config.SlaveOptions.APIKey = newKey
+		r.Gw.SetConfig(config)
+		connected := r.Connect()
+		if !connected {
+			log.Error("Failed to reconnect to RPC storage:")
+			continue
+		}
 	}
 	// Notify rest of gateways in cluster to flush cache
 	n := Notification{

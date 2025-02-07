@@ -41,6 +41,7 @@ const (
 	OAuthPurgeLapsedTokens       NotificationCommand = "OAuthPurgeLapsedTokens"
 	// NoticeDeleteAPICache is the command with which event is emitted from dashboard to invalidate cache for an API.
 	NoticeDeleteAPICache NotificationCommand = "DeleteAPICache"
+	NoticeUserKeyReset   NotificationCommand = "UserKeyReset"
 )
 
 // Notification is a type that encodes a message published to a pub sub channel (shared between implementations)
