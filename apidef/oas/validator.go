@@ -25,6 +25,7 @@ const (
 	keyDefinitions              = "definitions"
 	keyProperties               = "properties"
 	keyRequired                 = "required"
+	keyAnyOf                    = "anyOf"
 	oasSchemaVersionNotFoundFmt = "Schema not found for version %q"
 )
 
@@ -157,6 +158,14 @@ func ValidateOASTemplate(documentBody []byte, oasVersion string) error {
 
 	for _, path := range unsetReqFieldsPaths {
 		definitions = jsonparser.Delete(definitions, path, keyRequired)
+	}
+
+	unsetAnyOfFieldsPaths := []string{
+		"X-Tyk-Upstream",
+	}
+
+	for _, path := range unsetAnyOfFieldsPaths {
+		definitions = jsonparser.Delete(definitions, path, keyAnyOf)
 	}
 
 	oasSchema, err = jsonparser.Set(oasSchema, definitions, keyDefinitions)
