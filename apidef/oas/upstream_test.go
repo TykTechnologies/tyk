@@ -472,6 +472,142 @@ func TestCertificatePinning(t *testing.T) {
 	})
 }
 
+func TestUpstreamRequestSigning(t *testing.T) {
+	t.Parallel()
+	t.Run("fill", func(t *testing.T) {
+		t.Parallel()
+		testcases := []struct {
+			title    string
+			input    apidef.APIDefinition
+			expected *UpstreamAuth
+		}{
+			{
+				title: "request signing disabled and everything else is empty should omit",
+				input: apidef.APIDefinition{
+					RequestSigning: apidef.RequestSigningMeta{
+						IsEnabled:       false,
+						Secret:          "",
+						KeyId:           "",
+						Algorithm:       "",
+						HeaderList:      nil,
+						CertificateId:   "",
+						SignatureHeader: "",
+					},
+				},
+				expected: nil,
+			},
+			{
+				title: "request signing enabled and values are set",
+				input: apidef.APIDefinition{
+					RequestSigning: apidef.RequestSigningMeta{
+						IsEnabled:       true,
+						Secret:          "secret",
+						KeyId:           "key-1",
+						Algorithm:       "hmac-sha256",
+						HeaderList:      []string{"header1", "header2"},
+						CertificateId:   "cert-1",
+						SignatureHeader: "Signature",
+					},
+				},
+				expected: &UpstreamAuth{
+					RequestSigning: &UpstreamRequestSigning{
+						Enabled:         true,
+						SignatureHeader: "Signature",
+						Algorithm:       "hmac-sha256",
+						KeyID:           "key-1",
+						Headers:         []string{"header1", "header2"},
+						Secret:          "secret",
+						CertificateID:   "cert-1",
+					},
+				},
+			},
+		}
+
+		for _, tc := range testcases {
+			tc := tc
+			t.Run(tc.title, func(t *testing.T) {
+				t.Parallel()
+
+				g := new(Upstream)
+				g.Fill(tc.input)
+
+				assert.Equal(t, tc.expected, g.Authentication)
+			})
+		}
+	})
+
+	t.Run("extractTo", func(t *testing.T) {
+		t.Parallel()
+
+		testcases := []struct {
+			title                  string
+			input                  *UpstreamRequestSigning
+			expectedRequestSigning apidef.RequestSigningMeta
+		}{
+			{
+				title: "request signing disabled and everything else is empty",
+				input: &UpstreamRequestSigning{
+					Enabled:         false,
+					SignatureHeader: "",
+					Algorithm:       "",
+					KeyID:           "",
+					Headers:         nil,
+					Secret:          "",
+					CertificateID:   "",
+				},
+				expectedRequestSigning: apidef.RequestSigningMeta{
+					IsEnabled:       false,
+					Secret:          "",
+					KeyId:           "",
+					Algorithm:       "",
+					HeaderList:      nil,
+					CertificateId:   "",
+					SignatureHeader: "",
+				},
+			},
+			{
+				title: "request signing enabled and values are set",
+				input: &UpstreamRequestSigning{
+					Enabled:         true,
+					SignatureHeader: "Signature",
+					Algorithm:       "hmac-sha256",
+					KeyID:           "key-1",
+					Headers:         []string{"header1", "header2"},
+					Secret:          "secret",
+					CertificateID:   "cert-1",
+				},
+				expectedRequestSigning: apidef.RequestSigningMeta{
+					IsEnabled:       true,
+					Secret:          "secret",
+					KeyId:           "key-1",
+					Algorithm:       "hmac-sha256",
+					HeaderList:      []string{"header1", "header2"},
+					CertificateId:   "cert-1",
+					SignatureHeader: "Signature",
+				},
+			},
+		}
+
+		for _, tc := range testcases {
+			tc := tc // Creating a new 'tc' scoped to the loop
+			t.Run(tc.title, func(t *testing.T) {
+				t.Parallel()
+
+				g := new(Upstream)
+				g.Authentication = &UpstreamAuth{
+					RequestSigning: tc.input,
+				}
+
+				var apiDef apidef.APIDefinition
+				apiDef.RequestSigning.HeaderList = []string{"headerOld1", "headerOld2"}
+				g.ExtractTo(&apiDef)
+
+				assert.Equal(t, tc.expectedRequestSigning, apiDef.RequestSigning)
+			})
+		}
+	})
+}
+
 func TestLoadBalancing(t *testing.T) {
 	t.Parallel()
 	t.Run("fill", func(t *testing.T) {
