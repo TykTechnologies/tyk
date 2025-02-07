@@ -44,7 +44,7 @@ PORTMAN_API_Key=<Your Tyk Gateway secret>
 
 After adding the `PORTMAN_API_Key`, run the `task` command from ci/tests/specs directory to run a gateway instance and execute portman tests.
 
-You can then stop the gateway instance by running `task down` command from the  ci/tests/specs directory.
+You can then stop the gateway instance by running `task down` command from the ci/tests/specs directory.
 
 ## How It Is Run on the CI
 
