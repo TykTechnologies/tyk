@@ -1,6 +1,7 @@
 package oas
 
 import (
+	"crypto/tls"
 	"sort"
 	"strings"
 
@@ -38,6 +39,13 @@ type Upstream struct {
 
 	// PreserveHostHeader contains the configuration for preserving the host header.
 	PreserveHostHeader *PreserveHostHeader `bson:"preserveHostHeader,omitempty" json:"preserveHostHeader,omitempty"`
+	// TLSTransport contains the configuration for TLS transport settings.
+	// Tyk classic API definition: `proxy.transport`
+	TLSTransport *TLSTransport `bson:"tlsTransport,omitempty" json:"tlsTransport,omitempty"`
+
+	// Proxy contains the configuration for an internal proxy.
+	// Tyk classic API definition: `proxy.proxy_url`
+	Proxy *Proxy `bson:"proxy,omitempty" json:"proxy,omitempty"`
 }
 
 // Fill fills *Upstream from apidef.APIDefinition.
@@ -98,8 +106,23 @@ func (u *Upstream) Fill(api apidef.APIDefinition) {
 		u.Authentication = nil
 	}
 
-	u.fillLoadBalancing(api)
+	if u.TLSTransport == nil {
+		u.TLSTransport = &TLSTransport{}
+	}
+	u.TLSTransport.Fill(api)
+	if ShouldOmit(u.TLSTransport) {
+		u.TLSTransport = nil
+	}
 
+	if u.Proxy == nil {
+		u.Proxy = &Proxy{}
+	}
+	u.Proxy.Fill(api)
+	if ShouldOmit(u.Proxy) {
+		u.Proxy = nil
+	}
+
+	u.fillLoadBalancing(api)
 	u.fillPreserveHostHeader(api)
 }
 
@@ -175,6 +198,22 @@ func (u *Upstream) ExtractTo(api *apidef.APIDefinition) {
 
 	u.loadBalancingExtractTo(api)
 
+	if u.TLSTransport == nil {
+		u.TLSTransport = &TLSTransport{}
+		defer func() {
+			u.TLSTransport = nil
+		}()
+	}
+	u.TLSTransport.ExtractTo(api)
+
+	if u.Proxy == nil {
+		u.Proxy = &Proxy{}
+		defer func() {
+			u.Proxy = nil
+		}()
+	}
+	u.Proxy.ExtractTo(api)
+
 	u.preserveHostHeaderExtractTo(api)
 }
 
@@ -209,6 +248,122 @@ func (u *Upstream) loadBalancingExtractTo(api *apidef.APIDefinition) {
 	}
 
 	u.LoadBalancing.ExtractTo(api)
+}
+
+// TLSTransport contains the configuration for TLS transport settings.
+// This struct allows you to specify a custom proxy and set the minimum TLS versions and any SSL ciphers.
+//
+// Example:
+//
+//	{
+//	  "proxy_url": "http(s)://proxy.url:1234",
+//	  "minVersion": "1.0",
+//	  "maxVersion": "1.0",
+//	  "ciphers": [
+//	    "TLS_RSA_WITH_AES_128_GCM_SHA256",
+//	    "TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA"
+//	  ],
+//	  "insecureSkipVerify": true,
+//	  "forceCommonNameCheck": false
+//	}
+//
+// Tyk classic API definition: `proxy.transport`
+type TLSTransport struct {
+	// InsecureSkipVerify controls whether a client verifies the server's certificate chain and host name.
+	// If InsecureSkipVerify is true, crypto/tls accepts any certificate presented by the server and any host name in that certificate.
+	// In this mode, TLS is susceptible to machine-in-the-middle attacks unless custom verification is used.
+	// This should be used only for testing or in combination with VerifyConnection or VerifyPeerCertificate.
+	//
+	// Tyk classic API definition: `proxy.transport.ssl_insecure_skip_verify`
+	InsecureSkipVerify bool `bson:"insecureSkipVerify,omitempty" json:"insecureSkipVerify,omitempty"`
+
+	// Ciphers is a list of SSL ciphers to be used. If unset, the default ciphers will be used.
+	//
+	// Tyk classic API definition: `proxy.transport.ssl_ciphers`
+	Ciphers []string `bson:"ciphers,omitempty" json:"ciphers,omitempty"`
+
+	// MinVersion is the minimum SSL/TLS version that is acceptable.
+	// Tyk classic API definition: `proxy.transport.ssl_min_version`
+	MinVersion string `bson:"minVersion,omitempty" json:"minVersion,omitempty"`
+
+	// MaxVersion is the maximum SSL/TLS version that is acceptable.
+	MaxVersion string `bson:"maxVersion,omitempty" json:"maxVersion,omitempty"`
+
+	// ForceCommonNameCheck forces the validation of the hostname against the certificate Common Name.
+	//
+	// Tyk classic API definition: `proxy.transport.ssl_force_common_name_check`
+	ForceCommonNameCheck bool `bson:"forceCommonNameCheck,omitempty" json:"forceCommonNameCheck,omitempty"`
+}
+
+// Fill fills *TLSTransport from apidef.ServiceDiscoveryConfiguration.
+func (t *TLSTransport) Fill(api apidef.APIDefinition) {
+	t.ForceCommonNameCheck = api.Proxy.Transport.SSLForceCommonNameCheck
+	t.Ciphers = api.Proxy.Transport.SSLCipherSuites
+	t.MaxVersion = t.tlsVersionToString(api.Proxy.Transport.SSLMaxVersion)
+	t.MinVersion = t.tlsVersionToString(api.Proxy.Transport.SSLMinVersion)
+	t.InsecureSkipVerify = api.Proxy.Transport.SSLInsecureSkipVerify
+}
+
+// ExtractTo extracts *TLSTransport into *apidef.ServiceDiscoveryConfiguration.
+func (t *TLSTransport) ExtractTo(api *apidef.APIDefinition) {
+	api.Proxy.Transport.SSLForceCommonNameCheck = t.ForceCommonNameCheck
+	api.Proxy.Transport.SSLCipherSuites = t.Ciphers
+	api.Proxy.Transport.SSLMaxVersion = t.tlsVersionFromString(t.MaxVersion)
+	api.Proxy.Transport.SSLMinVersion = t.tlsVersionFromString(t.MinVersion)
+	api.Proxy.Transport.SSLInsecureSkipVerify = t.InsecureSkipVerify
+}
+
+// tlsVersionFromString converts v in the form of 1.2/1.3 to the version int
+func (t *TLSTransport) tlsVersionFromString(v string) uint16 {
+	switch v {
+	case "1.0":
+		return tls.VersionTLS10
+	case "1.1":
+		return tls.VersionTLS11
+	case "1.2":
+		return tls.VersionTLS12
+	case "1.3":
+		return tls.VersionTLS13
+	default:
+		return 0
+	}
+}
+
+// tlsVersionFromString converts v from version into to the form 1.0/1.1
+func (t *TLSTransport) tlsVersionToString(v uint16) string {
+	switch v {
+	case tls.VersionTLS10:
+		return "1.0"
+	case tls.VersionTLS11:
+		return "1.1"
+	case tls.VersionTLS12:
+		return "1.2"
+	case tls.VersionTLS13:
+		return "1.3"
+	default:
+		return ""
+	}
+}
+
+// Proxy contains the configuration for an internal proxy.
+//
+// Tyk classic API definition: `proxy.proxy_url`
+type Proxy struct {
+	// Enabled determines if the proxy is active.
+	Enabled bool `bson:"enabled" json:"enabled"`
+
+	// URL specifies the URL of the internal proxy.
+	URL string `bson:"url" json:"url"`
+}
+
+// Fill fills *Proxy from apidef.ServiceDiscoveryConfiguration.
+func (p *Proxy) Fill(api apidef.APIDefinition) {
+	p.URL = api.Proxy.Transport.ProxyURL
+}
+
+// ExtractTo extracts *Proxy into *apidef.ServiceDiscoveryConfiguration.
+func (p *Proxy) ExtractTo(api *apidef.APIDefinition) {
+	api.Proxy.Transport.ProxyURL = p.URL
 }
 
 // ServiceDiscovery holds configuration required for service discovery.
