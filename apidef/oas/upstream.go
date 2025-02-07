@@ -93,7 +93,7 @@ func (u *Upstream) Fill(api apidef.APIDefinition) {
 		u.Authentication = &UpstreamAuth{}
 	}
 
-	u.Authentication.Fill(api.UpstreamAuth)
+	u.Authentication.Fill(api)
 	if ShouldOmit(u.Authentication) {
 		u.Authentication = nil
 	}
@@ -171,7 +171,7 @@ func (u *Upstream) ExtractTo(api *apidef.APIDefinition) {
 		}()
 	}
 
-	u.Authentication.ExtractTo(&api.UpstreamAuth)
+	u.Authentication.ExtractTo(api)
 
 	u.loadBalancingExtractTo(api)
 
@@ -618,16 +618,18 @@ type UpstreamAuth struct {
 	BasicAuth *UpstreamBasicAuth `bson:"basicAuth,omitempty" json:"basicAuth,omitempty"`
 	// OAuth contains the configuration for OAuth2 Client Credentials flow.
 	OAuth *UpstreamOAuth `bson:"oauth,omitempty" json:"oauth,omitempty"`
+	// RequestSigning holds the configuration for generating signed requests to an upstream API.
+	RequestSigning *UpstreamRequestSigning `bson:"requestSigning,omitempty" json:"requestSigning,omitempty"`
 }
 
-// Fill fills *UpstreamAuth from apidef.UpstreamAuth.
-func (u *UpstreamAuth) Fill(api apidef.UpstreamAuth) {
-	u.Enabled = api.Enabled
+// Fill fills *UpstreamAuth from apidef.APIDefinition.
+func (u *UpstreamAuth) Fill(api apidef.APIDefinition) {
+	u.Enabled = api.UpstreamAuth.Enabled
 
 	if u.BasicAuth == nil {
 		u.BasicAuth = &UpstreamBasicAuth{}
 	}
-	u.BasicAuth.Fill(api.BasicAuth)
+	u.BasicAuth.Fill(api.UpstreamAuth.BasicAuth)
 	if ShouldOmit(u.BasicAuth) {
 		u.BasicAuth = nil
 	}
@@ -635,15 +637,17 @@ func (u *UpstreamAuth) Fill(api apidef.UpstreamAuth) {
 	if u.OAuth == nil {
 		u.OAuth = &UpstreamOAuth{}
 	}
-	u.OAuth.Fill(api.OAuth)
+	u.OAuth.Fill(api.UpstreamAuth.OAuth)
 	if ShouldOmit(u.OAuth) {
 		u.OAuth = nil
 	}
+
+	u.fillRequestSigning(api)
 }
 
-// ExtractTo extracts *UpstreamAuth into *apidef.UpstreamAuth.
-func (u *UpstreamAuth) ExtractTo(api *apidef.UpstreamAuth) {
-	api.Enabled = u.Enabled
+// ExtractTo extracts *UpstreamAuth into *apidef.APIDefinition.
+func (u *UpstreamAuth) ExtractTo(api *apidef.APIDefinition) {
+	api.UpstreamAuth.Enabled = u.Enabled
 
 	if u.BasicAuth == nil {
 		u.BasicAuth = &UpstreamBasicAuth{}
@@ -651,7 +655,7 @@ func (u *UpstreamAuth) ExtractTo(api *apidef.UpstreamAuth) {
 			u.BasicAuth = nil
 		}()
 	}
-	u.BasicAuth.ExtractTo(&api.BasicAuth)
+	u.BasicAuth.ExtractTo(&api.UpstreamAuth.BasicAuth)
 
 	if u.OAuth == nil {
 		u.OAuth = &UpstreamOAuth{}
@@ -659,7 +663,29 @@ func (u *UpstreamAuth) ExtractTo(api *apidef.UpstreamAuth) {
 			u.OAuth = nil
 		}()
 	}
-	u.OAuth.ExtractTo(&api.OAuth)
+	u.OAuth.ExtractTo(&api.UpstreamAuth.OAuth)
+
+	u.requestSigningExtractTo(api)
+}
+
+func (u *UpstreamAuth) fillRequestSigning(api apidef.APIDefinition) {
+	if u.RequestSigning == nil {
+		u.RequestSigning = &UpstreamRequestSigning{}
+	}
+	u.RequestSigning.Fill(api)
+	if ShouldOmit(u.RequestSigning) {
+		u.RequestSigning = nil
+	}
+}
+
+func (u *UpstreamAuth) requestSigningExtractTo(api *apidef.APIDefinition) {
+	if u.RequestSigning == nil {
+		u.RequestSigning = &UpstreamRequestSigning{}
+		defer func() {
+			u.BasicAuth = nil
+		}()
+	}
+	u.RequestSigning.ExtractTo(api)
 }
 
 // UpstreamBasicAuth holds upstream basic authentication configuration.
@@ -863,6 +889,46 @@ func (u *UpstreamOAuth) ExtractTo(api *apidef.UpstreamOAuth) {
 		}()
 	}
 	u.PasswordAuthentication.ExtractTo(&api.PasswordAuthentication)
+}
+
+// UpstreamRequestSigning represents configuration for generating signed requests to an upstream API.
+type UpstreamRequestSigning struct {
+	// Enabled determines if request signing is enabled or disabled.
+	Enabled bool `bson:"enabled" json:"enabled"` // required
+	// SignatureHeader specifies the HTTP header name for the signature.
+	SignatureHeader string `bson:"signatureHeader,omitempty" json:"signatureHeader,omitempty"`
+	// Algorithm represents the signing algorithm used (e.g., HMAC-SHA256).
+	Algorithm string `bson:"algorithm,omitempty" json:"algorithm,omitempty"`
+	// KeyID identifies the key used for signing purposes.
+	KeyID string `bson:"keyId,omitempty" json:"keyId,omitempty"`
+	// Headers contains a list of headers included in the signature calculation.
+	Headers []string `bson:"headers,omitempty" json:"headers,omitempty"`
+	// Secret holds the secret used for signing when applicable.
+	Secret string `bson:"secret,omitempty" json:"secret,omitempty"`
+	// CertificateID specifies the certificate ID used in signing operations.
+	CertificateID string `bson:"certificateId,omitempty" json:"certificateId,omitempty"`
+}
+
+// Fill populates the UpstreamRequestSigning fields from the given apidef.APIDefinition configuration.
+func (l *UpstreamRequestSigning) Fill(api apidef.APIDefinition) {
+	l.Enabled = api.RequestSigning.IsEnabled
+	l.SignatureHeader = api.RequestSigning.SignatureHeader
+	l.Algorithm = api.RequestSigning.Algorithm
+	l.KeyID = api.RequestSigning.KeyId
+	l.Headers = api.RequestSigning.HeaderList
+	l.Secret = api.RequestSigning.Secret
+	l.CertificateID = api.RequestSigning.CertificateId
+}
+
+// ExtractTo populates the given apidef.APIDefinition RequestSigning fields with values from the UpstreamRequestSigning.
+func (l *UpstreamRequestSigning) ExtractTo(api *apidef.APIDefinition) {
+	api.RequestSigning.IsEnabled = l.Enabled
+	api.RequestSigning.SignatureHeader = l.SignatureHeader
+	api.RequestSigning.Algorithm = l.Algorithm
+	api.RequestSigning.KeyId = l.KeyID
+	api.RequestSigning.HeaderList = l.Headers
+	api.RequestSigning.Secret = l.Secret
+	api.RequestSigning.CertificateId = l.CertificateID
 }
 
 // LoadBalancing represents the configuration for load balancing between multiple upstream targets.

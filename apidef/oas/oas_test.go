@@ -210,13 +210,6 @@ func TestOAS_ExtractTo_ResetAPIDefinition(t *testing.T) {
 	expectedFields := []string{
 		"APIDefinition.Slug",
 		"APIDefinition.EnableProxyProtocol",
-		"APIDefinition.RequestSigning.IsEnabled",
-		"APIDefinition.RequestSigning.Secret",
-		"APIDefinition.RequestSigning.KeyId",
-		"APIDefinition.RequestSigning.Algorithm",
-		"APIDefinition.RequestSigning.HeaderList[0]",
-		"APIDefinition.RequestSigning.CertificateId",
-		"APIDefinition.RequestSigning.SignatureHeader",
 		"APIDefinition.VersionData.Versions[0].ExtendedPaths.TransformJQ[0].Filter",
 		"APIDefinition.VersionData.Versions[0].ExtendedPaths.TransformJQ[0].Path",
 		"APIDefinition.VersionData.Versions[0].ExtendedPaths.TransformJQ[0].Method",
