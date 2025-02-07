@@ -1368,8 +1368,13 @@
           "$ref": "#/definitions/X-Tyk-PreserveHostHeader"
         }
       },
-      "required": [
-        "url"
+      "anyOf": [
+        {
+          "required": ["url"]
+        },
+        {
+          "required": ["loadBalancing"]
+        }
       ]
     },
     "X-Tyk-State": {
@@ -2110,6 +2115,9 @@
         },
         "oauth": {
           "$ref": "#/definitions/X-Tyk-UpstreamOAuth"
+        },
+        "requestSigning": {
+          "$ref": "#/definitions/X-Tyk-UpstreamRequestSigning"
         }
       },
       "required": [
@@ -2239,6 +2247,38 @@
         "allowedAuthorizeTypes"
       ]
     },
+    "X-Tyk-UpstreamRequestSigning": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "signatureHeader": {
+          "type": "string"
+        },
+        "algorithm": {
+          "type": "string"
+        },
+        "keyId": {
+          "type": "string"
+        },
+        "headers": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "secret": {
+          "type": "string"
+        },
+        "certificateId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "enabled"
+      ]
+    },
     "X-Tyk-NonEmptyString": {
       "type": "string",
       "pattern": "\\S+"
@@ -2301,6 +2341,23 @@
       },
       "required": [
         "enabled"
+      ],
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "enabled": { "const": true }
+            }
+          },
+          "then": {
+            "properties": {
+              "targets": {
+                "minItems": 1
+              }
+            },
+            "required": ["targets"]
+          }
+        }
       ]
     },
     "X-Tyk-PreserveHostHeader": {
