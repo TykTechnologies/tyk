@@ -285,7 +285,7 @@ func TestProxyTransport(t *testing.T) {
 		// force creating new transport on each reque
 		globalConf.MaxConnTime = -1
 
-		globalConf.ProxySSLCipherSuites = []string{"TLS_RSA_WITH_AES_128_CBC_SHA"}
+		globalConf.ProxySSLCipherSuites = []string{"TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA"}
 		ts.Gw.SetConfig(globalConf)
 		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 			spec.Proxy.ListenPath = "/"
@@ -300,7 +300,7 @@ func TestProxyTransport(t *testing.T) {
 		// force creating new transport on each reque
 		globalConf.MaxConnTime = -1
 
-		globalConf.ProxySSLCipherSuites = []string{"TLS_RSA_WITH_RC4_128_SHA"}
+		globalConf.ProxySSLCipherSuites = []string{"TLS_AES_256_GCM_SHA384"}
 		ts.Gw.SetConfig(globalConf)
 		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 			spec.Proxy.ListenPath = "/"
