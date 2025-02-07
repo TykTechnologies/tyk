@@ -1,5 +1,11 @@
 version: "3"
 tasks:
+  default:
+    desc: "Run the portman tests"
+    cmds:
+      - task: up
+      - task: run_gateway_to_test_oas
+      - task: down
   run_gateway_to_test_oas:
     desc: "Start the gateway to test portman"
     cmds:
@@ -14,3 +20,18 @@ tasks:
       - venom run testdata/populate_gateway_test_data.yaml --var bearerToken=$PORTMAN_API_Key  --stop-on-failure && rm venom*.log
       - npm install
       - npm start
+
+  up:
+    desc: "Bring up env"
+    cmds:
+      - docker compose up -d --remove-orphans
+
+  down:
+    desc: "Shut down env"
+    cmds:
+      - docker compose down
+
+  logs:
+    desc: "Tail container logs (live)"
+    cmds:
+      - docker compose logs --tail=10 -f
