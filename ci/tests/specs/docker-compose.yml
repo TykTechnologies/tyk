@@ -19,6 +19,12 @@ services:
       - "8080:8080"
     environment:
       - TYK_LOGLEVEL=debug
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/hello"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
 
 networks:
   proxy:

@@ -24,7 +24,7 @@ tasks:
   up:
     desc: "Bring up env"
     cmds:
-      - docker compose up -d --remove-orphans
+      - docker compose up -d --wait --force-recreate || { docker compose logs gw; exit 1; }
 
   down:
     desc: "Shut down env"

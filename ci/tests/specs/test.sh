@@ -16,5 +16,6 @@ trap "task down" EXIT
 echo "Creating .env file..."
 echo "PORTMAN_API_Key=example_gateway_secret" > ".env"
 
-task default
+task up
 
+task tests
