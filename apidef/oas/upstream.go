@@ -106,8 +106,6 @@ func (u *Upstream) Fill(api apidef.APIDefinition) {
 		u.Authentication = nil
 	}
 
-	u.fillLoadBalancing(api)
-
 	if u.TLSTransport == nil {
 		u.TLSTransport = &TLSTransport{}
 	}
@@ -122,6 +120,21 @@ func (u *Upstream) Fill(api apidef.APIDefinition) {
 	u.Proxy.Fill(api)
 	if ShouldOmit(u.Proxy) {
 		u.Proxy = nil
+	}
+
+	u.fillLoadBalancing(api)
+	u.fillPreserveHostHeader(api)
+}
+
+func (u *Upstream) fillPreserveHostHeader(api apidef.APIDefinition) {
+	if u.PreserveHostHeader == nil {
+		u.PreserveHostHeader = &PreserveHostHeader{}
+	}
+
+	u.PreserveHostHeader.Fill(api)
+
+	if ShouldOmit(u.PreserveHostHeader) {
+		u.PreserveHostHeader = nil
 	}
 }
 
