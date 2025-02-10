@@ -19,7 +19,7 @@ type Upstream struct {
 	// Tyk classic API definition: `proxy.service_discovery`
 	ServiceDiscovery *ServiceDiscovery `bson:"serviceDiscovery,omitempty" json:"serviceDiscovery,omitempty"`
 
-	// Test contains the configuration related to uptime tests.
+	// UptimeTests contains the configuration related to uptime tests.
 	UptimeTests *UptimeTests `bson:"uptimeTests,omitempty" json:"uptimeTests,omitempty"`
 
 	// MutualTLS contains the configuration for establishing a mutual TLS connection between Tyk and the upstream server.
@@ -534,7 +534,7 @@ func (sd *ServiceDiscovery) ExtractTo(serviceDiscovery *apidef.ServiceDiscoveryC
 	serviceDiscovery.CacheDisabled = !enabled
 }
 
-// UptimeTests holds the test configuration for uptime tests.
+// UptimeTests configures uptime tests.
 type UptimeTests struct {
 	// ServiceDiscovery contains the configuration related to test Service Discovery.
 	// Tyk classic API definition: `proxy.service_discovery`
@@ -553,16 +553,41 @@ type UptimeTests struct {
 	LogRetentionPeriod time.ReadableDuration `bson:"logRetentionPeriod" json:"logRetentionPeriod"`
 }
 
-// UptimeTest represents a single uptime test check.
+// UptimeTest configures an uptime test check.
 type UptimeTest struct {
-	CheckURL            string                `bson:"url" json:"url"`
-	Protocol            string                `bson:"protocol" json:"protocol"`
-	Timeout             time.ReadableDuration `bson:"timeout" json:"timeout"`
-	Method              string                `bson:"method" json:"method"`
-	Headers             map[string]string     `bson:"headers" json:"headers"`
-	Body                string                `bson:"body" json:"body"`
-	Commands            []UptimeTestCommand   `bson:"commands" json:"commands"`
-	EnableProxyProtocol bool                  `bson:"enable_proxy_protocol" json:"enable_proxy_protocol"`
+	// CheckURL is the URL for a request. If service discovery is in use,
+	// the hostname will be resolved to a service host.
+	//
+	// Examples:
+	//
+	// - `http://database1.company.local`
+	// - `https://webcluster.service/health`
+	// - `127.0.0.1:6379` (for TCP checks).
+	CheckURL string `bson:"url" json:"url"`
+
+	// Protocol is the protocol for the request. Supported values are
+	// `http` and `tcp`, depending on what kind of check is performed.
+	Protocol string `bson:"protocol" json:"protocol"`
+
+	// Timeout declares a timeout for the request. If the test exceeds
+	// this timeout, the check fails.
+	Timeout time.ReadableDuration `bson:"timeout" json:"timeout"`
+
+	// Method allows you to customize the HTTP method for the test (`GET`, `POST`,...).
+	Method string `bson:"method" json:"method"`
+
+	// Headers contain any custom headers for the back end service.
+	Headers map[string]string `bson:"headers" json:"headers,omitempty"`
+
+	// Body is the body of the test request.
+	Body string `bson:"body" json:"body"`
+
+	// Commands are used for TCP checks.
+	Commands []UptimeTestCommand `bson:"commands" json:"commands,omitempty"`
+
+	// EnableProxyProtocol enables proxy protocol support when making request.
+	// The back end service needs to support this.
+	EnableProxyProtocol bool `bson:"enable_proxy_protocol" json:"enable_proxy_protocol"`
 }
 
 // AddCommand will append a new command to the test.
@@ -577,7 +602,11 @@ func (t *UptimeTest) AddCommand(name, message string) {
 
 // UptimeTestCommand handles additional checks for tcp connections.
 type UptimeTestCommand struct {
-	Name    string `bson:"name" json:"name"`
+	// Name can be either `send` or `expect`, designating if the
+	// message should be sent, or read from the connection.
+	Name string `bson:"name" json:"name"`
+
+	// Message contains the payload to send or expect.
 	Message string `bson:"message" json:"message"`
 }
 
