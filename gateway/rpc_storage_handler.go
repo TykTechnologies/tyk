@@ -1061,6 +1061,14 @@ func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string, orgId string) 
 			case NoticeUserKeyReset.String():
 				userKeys := strings.Split(splitKeys[0], ".")
 				userKeysToReset[userKeys[0]] = userKeys[1]
+				ok := r.Gw.MainNotifier.Notify(Notification{
+					Command: NoticeUserKeyReset,
+					Payload: key,
+					Gw:      r.Gw,
+				})
+				if !ok {
+					log.Error("Failed to notify other gateways about user key reset")
+				}
 			default:
 				log.Debug("ignoring processing of action:", action)
 			}
@@ -1126,6 +1134,17 @@ func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string, orgId string) 
 
 	synchronizerEnabled := r.Gw.GetConfig().SlaveOptions.SynchroniserEnabled
 	for _, key := range keys {
+		// Skip keys that are user keys to be reset
+		splitKeys := strings.Split(key, ":")
+		if len(splitKeys) > 1 {
+			userKeys := strings.Split(splitKeys[0], ".")
+			if len(userKeys) == 2 {
+				_, ok := userKeysToReset[userKeys[0]]
+				if ok {
+					continue
+				}
+			}
+		}
 		_, isOauthTokenKey := notRegularKeys[key]
 		if !isOauthTokenKey {
 			splitKeys := strings.Split(key, ":")
@@ -1171,19 +1190,16 @@ func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string, orgId string) 
 		log.WithField("apiID", apiID).Error("cache invalidation failed")
 	}
 
-	for _, newKey := range userKeysToReset {
-		err := r.Disconnect()
-		if err != nil {
-			log.Error("Failed to disconnect from RPC storage:", err)
-			continue
-		}
-		config := r.Gw.GetConfig()
-		config.SlaveOptions.APIKey = newKey
-		r.Gw.SetConfig(config)
-		connected := r.Connect()
-		if !connected {
-			log.Error("Failed to reconnect to RPC storage:")
-			continue
+	for oldKey, newKey := range userKeysToReset {
+		if r.Gw.GetConfig().SlaveOptions.APIKey == oldKey {
+			config := r.Gw.GetConfig()
+			config.SlaveOptions.APIKey = newKey
+			r.Gw.SetConfig(config)
+			connected := r.Connect()
+			if !connected {
+				log.Error("Failed to reconnect to RPC storage:")
+				continue
+			}
 		}
 	}
 	// Notify rest of gateways in cluster to flush cache

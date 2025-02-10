@@ -158,6 +158,8 @@ func (gw *Gateway) handleRedisEvent(v interface{}, handled func(NotificationComm
 		if ok := gw.invalidateAPICache(notif.Payload); !ok {
 			log.WithError(err).Errorf("cache invalidation failed for: %s", notif.Payload)
 		}
+	case NoticeUserKeyReset:
+		gw.handleUserKeyReset(notif.Payload)
 	default:
 		pubSubLog.Warnf("Unknown notification command: %q", notif.Command)
 		return
@@ -321,5 +323,27 @@ func (gw *Gateway) handleDashboardZeroConfMessage(payload string) {
 	if setHostname {
 		gw.SetConfig(globalConf)
 		pubSubLog.Info("Hostname set with dashboard zeroconf signal")
+	}
+}
+
+// handleUserKeyReset processes a user key reset notification
+func (gw *Gateway) handleUserKeyReset(payload string) {
+	splitKeys := strings.Split(payload, ":")
+	if len(splitKeys) > 1 {
+		userKeys := strings.Split(splitKeys[0], ".")
+		if len(userKeys) == 2 {
+			oldKey := userKeys[0]
+			newKey := userKeys[1]
+
+			config := gw.GetConfig()
+			if config.SlaveOptions.APIKey == oldKey {
+				config.SlaveOptions.APIKey = newKey
+				gw.SetConfig(config)
+
+				if store, ok := gw.GlobalSessionManager.Store().(*RPCStorageHandler); ok {
+					store.Connect()
+				}
+			}
+		}
 	}
 }
