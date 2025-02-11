@@ -75,9 +75,9 @@ tasks:
 
   lint:extras:
     desc: "Run more specific linters"
-    deps:
-      - coprocess:lint
-      - apidef-oas:lint
+    cmds:
+      - task: coprocess:lint
+      - task: apidef-oas:lint
 
   # Used in CI by hooks, lint.
   fmt:
