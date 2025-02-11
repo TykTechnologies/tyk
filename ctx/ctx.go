@@ -133,6 +133,13 @@ func GetDefinition(r *http.Request) *apidef.APIDefinition {
 	return nil
 }
 
+// SetOASDefinition sets an OAS API definition object to the request context.
+func SetOASDefinition(r *http.Request, s *oas.OAS) {
+	ctx := r.Context()
+	ctx = context.WithValue(ctx, OASDefinition, s)
+	httputil.SetContext(r, ctx)
+}
+
 // GetOASDefinition will return a deep copy of the OAS API definition valid for the request.
 func GetOASDefinition(r *http.Request) *oas.OAS {
 	if v := r.Context().Value(OASDefinition); v != nil {
