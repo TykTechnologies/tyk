@@ -2173,7 +2173,12 @@ func TestAPIsHavingShorterSubstringListenPathButLongerCustomDomainAndListenPaths
 
 // section E - end
 
+// Deprecated: ResetTestConfig; StartTest takes func(*config.Config) to set.
+func (*Test) ResetTestConfig() {}
+
 // extra - start
+
+// ResetTestConfig usage (should update StartTest):
 func TestDifferentDomainsIdenticalListenPaths(t *testing.T) {
 	ts := StartTest(nil)
 	t.Cleanup(ts.Close)
