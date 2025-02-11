@@ -587,7 +587,7 @@ type UptimeTest struct {
 
 	// EnableProxyProtocol enables proxy protocol support when making request.
 	// The back end service needs to support this.
-	EnableProxyProtocol bool `bson:"enable_proxy_protocol" json:"enable_proxy_protocol"`
+	EnableProxyProtocol bool `bson:"enableProxyProtocol" json:"enableProxyProtocol"`
 }
 
 // AddCommand will append a new command to the test.
