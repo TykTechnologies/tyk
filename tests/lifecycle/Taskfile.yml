@@ -1,0 +1,7 @@
+---
+version: "3"
+
+tasks:
+  default:
+    desc: "Run tests"
+    cmd: go test -v -race .
