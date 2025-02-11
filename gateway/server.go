@@ -347,9 +347,6 @@ func (gw *Gateway) apisByIDLen() int {
 
 // Create all globals and init connection handlers
 func (gw *Gateway) setupGlobals() {
-	globalMu.Lock()
-	defer globalMu.Unlock()
-
 	defaultTykErrors()
 
 	gwConfig := gw.GetConfig()
@@ -1242,6 +1239,9 @@ func (gw *Gateway) setupLogger() {
 }
 
 func (gw *Gateway) initSystem() error {
+	globalMu.Lock()
+	defer globalMu.Unlock()
+
 	gwConfig := gw.GetConfig()
 
 	// Initialize the appropriate log formatter
