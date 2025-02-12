@@ -1060,6 +1060,10 @@ func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string, orgId string) 
 				notRegularKeys[key] = true
 			case NoticeUserKeyReset.String():
 				userKeys := strings.Split(splitKeys[0], ".")
+				if len(userKeys) != 2 {
+					log.Error("Invalid user key reset format")
+					continue
+				}
 				userKeysToReset[userKeys[0]] = userKeys[1]
 				ok := r.Gw.MainNotifier.Notify(Notification{
 					Command: NoticeUserKeyReset,

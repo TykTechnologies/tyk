@@ -690,3 +690,67 @@ func TestDeleteUsingTokenID(t *testing.T) {
 		assert.Equal(t, 404, status)
 	})
 }
+
+func TestProcessKeySpaceChanges_UserKeyReset(t *testing.T) {
+	g := StartTest(func(globalConf *config.Config) {
+		globalConf.SlaveOptions.UseRPC = false
+		globalConf.SlaveOptions.ConnectionString = ""
+	})
+	defer g.Close()
+
+	oldKey := "old-api-key"
+	newKey := "new-api-key"
+
+	rpcListener := RPCStorageHandler{
+		KeyPrefix:        "rpc.listener.",
+		SuppressRegister: true,
+		HashKeys:         false,
+		Gw:               g.Gw,
+	}
+
+	// Setup initial config
+	config := g.Gw.GetConfig()
+	config.SlaveOptions.APIKey = oldKey
+	g.Gw.SetConfig(config)
+
+	testCases := []struct {
+		name     string
+		keys     []string
+		expected string
+	}{
+		{
+			name:     "Valid key reset",
+			keys:     []string{fmt.Sprintf("%s.%s:UserKeyReset", oldKey, newKey)},
+			expected: newKey,
+		},
+		{
+			name:     "Invalid key format - no action",
+			keys:     []string{"invalid-format"},
+			expected: oldKey,
+		},
+		{
+			name:     "Invalid key format - wrong separator",
+			keys:     []string{"invalid-format:UserKeyReset"},
+			expected: oldKey,
+		},
+		{
+			name:     "Multiple keys with reset",
+			keys:     []string{fmt.Sprintf("%s.%s:UserKeyReset", oldKey, newKey), "other-key:action"},
+			expected: newKey,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			// Reset config before each test
+			config := g.Gw.GetConfig()
+			config.SlaveOptions.APIKey = oldKey
+			g.Gw.SetConfig(config)
+
+			rpcListener.ProcessKeySpaceChanges(tc.keys, DefaultOrg)
+
+			updatedConfig := g.Gw.GetConfig()
+			assert.Equal(t, tc.expected, updatedConfig.SlaveOptions.APIKey)
+		})
+	}
+}
