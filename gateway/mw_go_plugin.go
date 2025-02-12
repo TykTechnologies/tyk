@@ -2,14 +2,11 @@ package gateway
 
 import (
 	"bytes"
-	"context"
 	"errors"
 	"fmt"
 	"io/ioutil"
 	"net/http"
 	"time"
-
-	"github.com/TykTechnologies/tyk/apidef/oas"
 
 	"github.com/TykTechnologies/tyk/ctx"
 
@@ -226,7 +223,7 @@ func (m *GoPluginMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reque
 
 	// Inject definition into request context:
 	if m.Spec.IsOAS {
-		setOASDefinition(r, &m.Spec.OAS)
+		ctx.SetOASDefinition(r, &m.Spec.OAS)
 	} else {
 		ctx.SetDefinition(r, m.Spec.APIDefinition)
 	}
@@ -273,10 +270,4 @@ func (m *GoPluginMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reque
 	}
 
 	return
-}
-
-func setOASDefinition(r *http.Request, s *oas.OAS) {
-	cntx := r.Context()
-	cntx = context.WithValue(cntx, ctx.OASDefinition, s)
-	setContext(r, cntx)
 }
