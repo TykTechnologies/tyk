@@ -781,10 +781,14 @@ func TestOAS_Clone(t *testing.T) {
 	s.GetTykExtension().Info.Name = "my-api-modified"
 	assert.NotEqual(t, s, clonedOAS)
 
-	t.Run("marshal error", func(t *testing.T) {
+	t.Run("clone impossible to marshal value", func(t *testing.T) {
 		s.Extensions["weird extension"] = make(chan int)
-		_, err = s.Clone()
-		assert.ErrorContains(t, err, "unsupported type: chan int")
+
+		result, err := s.Clone()
+		assert.NoError(t, err)
+
+		_, ok := result.Extensions["weird extension"]
+		assert.True(t, ok)
 	})
 }
 
