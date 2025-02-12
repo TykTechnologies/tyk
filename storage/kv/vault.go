@@ -25,7 +25,6 @@ func NewVault(conf config.VaultConfig) (Store, error) {
 }
 
 func (v *Vault) Get(key string) (string, error) {
-
 	logicalStore := v.client.Logical()
 
 	if v.kvV2 {
@@ -68,6 +67,41 @@ func (v *Vault) Get(key string) (string, error) {
 	}
 
 	return value.(string), nil
+}
+
+func (v *Vault) Put(key string, value string) error {
+	logicalStore := v.client.Logical()
+
+	if v.kvV2 {
+		// Version 2 engine. Make sure to append data in front
+		splitKey := strings.Split(key, "/")
+		if len(splitKey) > 0 {
+			splitKey[0] = splitKey[0] + "/data"
+			key = strings.Join(splitKey, "/")
+		}
+	}
+
+	splitted := strings.Split(key, ".")
+	if len(splitted) != 2 {
+		return errors.New("key should be in form of config.value")
+	}
+
+	// For v2, we need to wrap the data in a data object
+	var data map[string]interface{}
+	if v.kvV2 {
+		data = map[string]interface{}{
+			"data": map[string]interface{}{
+				splitted[1]: value,
+			},
+		}
+	} else {
+		data = map[string]interface{}{
+			splitted[1]: value,
+		}
+	}
+
+	_, err := logicalStore.Write(splitted[0], data)
+	return err
 }
 
 func newVault(conf config.VaultConfig) (Store, error) {

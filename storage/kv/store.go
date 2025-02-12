@@ -11,4 +11,6 @@ var (
 // Store is a standard interface to a KV backend
 type Store interface {
 	Get(key string) (string, error)
+	// Put writes a value to the KV store
+	Put(key string, value string) error
 }

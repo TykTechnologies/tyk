@@ -547,3 +547,32 @@ func SetLoadCounts(t *testing.T, value int) {
 	t.Helper()
 	values.SetLoadCounts(value)
 }
+
+// ReconnectWithNewCredentials stops the current RPC connection, resets the internal state,
+// and establishes a new connection with the provided credentials. It returns true if the
+// reconnection was successful, false otherwise.
+func ReconnectWithNewCredentials(newConfig Config) bool {
+	rpcConnectMu.Lock()
+	defer rpcConnectMu.Unlock()
+
+	// Stop existing client if it exists
+	if clientSingleton != nil {
+		clientSingleton.Stop()
+		clientSingleton = nil
+		funcClientSingleton = nil
+	}
+
+	// Reset internal state
+	values.Reset()
+
+	// Store new config
+	values.config.Store(newConfig)
+
+	// Clear and recreate dispatcher
+	dispatcher = gorpc.NewDispatcher()
+	addedFuncs = make(map[string]bool)
+
+	// Attempt to connect with new credentials
+	// Pass empty dispatcher functions as they will be added later when needed
+	return Connect(newConfig, false, make(map[string]interface{}), getGroupLoginCallback, emergencyModeCallback, emergencyModeLoadedCallback)
+}

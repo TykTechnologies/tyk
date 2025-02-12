@@ -41,6 +41,7 @@ const (
 	OAuthPurgeLapsedTokens       NotificationCommand = "OAuthPurgeLapsedTokens"
 	// NoticeDeleteAPICache is the command with which event is emitted from dashboard to invalidate cache for an API.
 	NoticeDeleteAPICache NotificationCommand = "DeleteAPICache"
+	NoticeUserKeyReset   NotificationCommand = "UserKeyReset"
 )
 
 // Notification is a type that encodes a message published to a pub sub channel (shared between implementations)
@@ -157,6 +158,8 @@ func (gw *Gateway) handleRedisEvent(v interface{}, handled func(NotificationComm
 		if ok := gw.invalidateAPICache(notif.Payload); !ok {
 			log.WithError(err).Errorf("cache invalidation failed for: %s", notif.Payload)
 		}
+	case NoticeUserKeyReset:
+		gw.handleUserKeyReset(notif.Payload)
 	default:
 		pubSubLog.Warnf("Unknown notification command: %q", notif.Command)
 		return
@@ -320,5 +323,57 @@ func (gw *Gateway) handleDashboardZeroConfMessage(payload string) {
 	if setHostname {
 		gw.SetConfig(globalConf)
 		pubSubLog.Info("Hostname set with dashboard zeroconf signal")
+	}
+}
+
+// handleUserKeyReset processes a user key reset notification
+func (gw *Gateway) handleUserKeyReset(payload string) {
+	keys := strings.Split(payload, ":")
+	if len(keys) != 2 {
+		log.Error("Invalid user key reset payload")
+		return
+	}
+
+	keys = strings.Split(keys[0], ".")
+	if len(keys) != 2 {
+		log.Error("Invalid user key reset payload")
+		return
+	}
+
+	oldKey := keys[0]
+	newKey := keys[1]
+
+	config := gw.GetConfig()
+
+	if oldKey == config.SlaveOptions.APIKey {
+		config.SlaveOptions.APIKey = newKey
+		gw.SetConfig(config)
+
+		// If we're using a KV store, update the API key there as well
+		if config.SlaveOptions.OriginalAPIKeyPath != "" {
+			if strings.HasPrefix(config.SlaveOptions.OriginalAPIKeyPath, "vault://") {
+				actualPath := strings.TrimPrefix(config.SlaveOptions.OriginalAPIKeyPath, "vault://")
+				if gw.vaultKVStore != nil {
+					if err := gw.vaultKVStore.Put(actualPath, newKey); err != nil {
+						log.WithError(err).Error("Failed to update API key in Vault")
+					} else {
+						log.Info("Successfully updated API key in Vault")
+					}
+				}
+			} else if strings.HasPrefix(config.SlaveOptions.OriginalAPIKeyPath, "consul://") {
+				actualPath := strings.TrimPrefix(config.SlaveOptions.OriginalAPIKeyPath, "consul://")
+				if gw.consulKVStore != nil {
+					if err := gw.consulKVStore.Put(actualPath, newKey); err != nil {
+						log.WithError(err).Error("Failed to update API key in Consul")
+					} else {
+						log.Info("Successfully updated API key in Consul")
+					}
+				}
+			}
+		}
+
+		if store, ok := gw.GlobalSessionManager.Store().(*RPCStorageHandler); ok {
+			store.Connect()
+		}
 	}
 }
