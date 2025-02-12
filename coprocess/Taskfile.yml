@@ -28,9 +28,6 @@ tasks:
   lint:
     desc: "Ensure linter pass"
     cmds:
-      # the replacement exists as a hack for:
-      # https://github.com/grpc/grpc-go/issues/7350
-      - sed -i -e 's/compatibility$/compatibility./g' *.pb.go
       - schema-gen extract -o - | schema-gen lint -i -
 
   deps:
