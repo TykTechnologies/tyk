@@ -11,6 +11,7 @@ tasks:
   test:
     desc: "Run tests"
     cmds:
+      - cd schema && ./build.sh && cd -
       - go fmt ./...
       - go test -count=1 ./...
 
