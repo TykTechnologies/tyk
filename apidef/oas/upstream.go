@@ -19,8 +19,8 @@ type Upstream struct {
 	// Tyk classic API definition: `proxy.service_discovery`
 	ServiceDiscovery *ServiceDiscovery `bson:"serviceDiscovery,omitempty" json:"serviceDiscovery,omitempty"`
 
-	// Test contains the configuration related to uptime tests.
-	Test *Test `bson:"test,omitempty" json:"test,omitempty"`
+	// UptimeTests contains the configuration related to uptime tests.
+	UptimeTests *UptimeTests `bson:"uptimeTests,omitempty" json:"uptimeTests,omitempty"`
 
 	// MutualTLS contains the configuration for establishing a mutual TLS connection between Tyk and the upstream server.
 	MutualTLS *MutualTLS `bson:"mutualTLS,omitempty" json:"mutualTLS,omitempty"`
@@ -61,13 +61,13 @@ func (u *Upstream) Fill(api apidef.APIDefinition) {
 		u.ServiceDiscovery = nil
 	}
 
-	if u.Test == nil {
-		u.Test = &Test{}
+	if u.UptimeTests == nil {
+		u.UptimeTests = &UptimeTests{}
 	}
 
-	u.Test.Fill(api.UptimeTests)
-	if ShouldOmit(u.Test) {
-		u.Test = nil
+	u.UptimeTests.Fill(api.UptimeTests)
+	if ShouldOmit(u.UptimeTests) {
+		u.UptimeTests = nil
 	}
 
 	if u.MutualTLS == nil {
@@ -151,14 +151,14 @@ func (u *Upstream) ExtractTo(api *apidef.APIDefinition) {
 
 	u.ServiceDiscovery.ExtractTo(&api.Proxy.ServiceDiscovery)
 
-	if u.Test == nil {
-		u.Test = &Test{}
+	if u.UptimeTests == nil {
+		u.UptimeTests = &UptimeTests{}
 		defer func() {
-			u.Test = nil
+			u.UptimeTests = nil
 		}()
 	}
 
-	u.Test.ExtractTo(&api.UptimeTests)
+	u.UptimeTests.ExtractTo(&api.UptimeTests)
 
 	if u.MutualTLS == nil {
 		u.MutualTLS = &MutualTLS{}
@@ -534,15 +534,84 @@ func (sd *ServiceDiscovery) ExtractTo(serviceDiscovery *apidef.ServiceDiscoveryC
 	serviceDiscovery.CacheDisabled = !enabled
 }
 
-// Test holds the test configuration for service discovery.
-type Test struct {
+// UptimeTests configures uptime tests.
+type UptimeTests struct {
 	// ServiceDiscovery contains the configuration related to test Service Discovery.
 	// Tyk classic API definition: `proxy.service_discovery`
 	ServiceDiscovery *ServiceDiscovery `bson:"serviceDiscovery,omitempty" json:"serviceDiscovery,omitempty"`
+
+	// Tests contains individual connectivity tests defined for checking if a service is online.
+	Tests []UptimeTest `bson:"tests,omitempty" json:"tests,omitempty"`
+
+	// HostDownRetestPeriod is the time to wait until rechecking a failed test.
+	// If undefined, the default testing interval (10s) is in use.
+	// Setting this to a lower value would result in quicker recovery on failed checks.
+	HostDownRetestPeriod time.ReadableDuration `bson:"hostDownRetestPeriod" json:"hostDownRetestPeriod"`
+
+	// LogRetentionPeriod holds a time to live for the uptime test results.
+	// If unset, a value of 100 years is the default.
+	LogRetentionPeriod time.ReadableDuration `bson:"logRetentionPeriod" json:"logRetentionPeriod"`
 }
 
-// Fill fills *Test from apidef.UptimeTests.
-func (t *Test) Fill(uptimeTests apidef.UptimeTests) {
+// UptimeTest configures an uptime test check.
+type UptimeTest struct {
+	// CheckURL is the URL for a request. If service discovery is in use,
+	// the hostname will be resolved to a service host.
+	//
+	// Examples:
+	//
+	// - `http://database1.company.local`
+	// - `https://webcluster.service/health`
+	// - `127.0.0.1:6379` (for TCP checks).
+	CheckURL string `bson:"url" json:"url"`
+
+	// Protocol is the protocol for the request. Supported values are
+	// `http` and `tcp`, depending on what kind of check is performed.
+	Protocol string `bson:"protocol" json:"protocol"`
+
+	// Timeout declares a timeout for the request. If the test exceeds
+	// this timeout, the check fails.
+	Timeout time.ReadableDuration `bson:"timeout" json:"timeout"`
+
+	// Method allows you to customize the HTTP method for the test (`GET`, `POST`,...).
+	Method string `bson:"method" json:"method"`
+
+	// Headers contain any custom headers for the back end service.
+	Headers map[string]string `bson:"headers" json:"headers,omitempty"`
+
+	// Body is the body of the test request.
+	Body string `bson:"body" json:"body"`
+
+	// Commands are used for TCP checks.
+	Commands []UptimeTestCommand `bson:"commands" json:"commands,omitempty"`
+
+	// EnableProxyProtocol enables proxy protocol support when making request.
+	// The back end service needs to support this.
+	EnableProxyProtocol bool `bson:"enableProxyProtocol" json:"enableProxyProtocol"`
+}
+
+// AddCommand will append a new command to the test.
+func (t *UptimeTest) AddCommand(name, message string) {
+	command := UptimeTestCommand{
+		Name:    name,
+		Message: message,
+	}
+
+	t.Commands = append(t.Commands, command)
+}
+
+// UptimeTestCommand handles additional checks for tcp connections.
+type UptimeTestCommand struct {
+	// Name can be either `send` or `expect`, designating if the
+	// message should be sent, or read from the connection.
+	Name string `bson:"name" json:"name"`
+
+	// Message contains the payload to send or expect.
+	Message string `bson:"message" json:"message"`
+}
+
+// Fill fills *UptimeTests from apidef.UptimeTests.
+func (t *UptimeTests) Fill(uptimeTests apidef.UptimeTests) {
 	if t.ServiceDiscovery == nil {
 		t.ServiceDiscovery = &ServiceDiscovery{}
 	}
@@ -551,10 +620,35 @@ func (t *Test) Fill(uptimeTests apidef.UptimeTests) {
 	if ShouldOmit(t.ServiceDiscovery) {
 		t.ServiceDiscovery = nil
 	}
+
+	t.Tests = nil
+	t.LogRetentionPeriod = ReadableDuration(time.Duration(uptimeTests.Config.ExpireUptimeAnalyticsAfter) * time.Second)
+	t.HostDownRetestPeriod = ReadableDuration(time.Duration(uptimeTests.Config.RecheckWait) * time.Second)
+
+	result := []UptimeTest{}
+	for _, v := range uptimeTests.CheckList {
+		check := UptimeTest{
+			CheckURL: v.CheckURL,
+			Protocol: v.Protocol,
+			Timeout:  ReadableDuration(v.Timeout),
+			Method:   v.Method,
+			Headers:  v.Headers,
+			Body:     v.Body,
+		}
+		for _, command := range v.Commands {
+			check.AddCommand(command.Name, command.Message)
+		}
+
+		result = append(result, check)
+	}
+
+	if len(result) > 0 {
+		t.Tests = result
+	}
 }
 
-// ExtractTo extracts *Test into *apidef.UptimeTests.
-func (t *Test) ExtractTo(uptimeTests *apidef.UptimeTests) {
+// ExtractTo extracts *UptimeTests into *apidef.UptimeTests.
+func (t *UptimeTests) ExtractTo(uptimeTests *apidef.UptimeTests) {
 	if t.ServiceDiscovery == nil {
 		t.ServiceDiscovery = &ServiceDiscovery{}
 		defer func() {
@@ -563,6 +657,32 @@ func (t *Test) ExtractTo(uptimeTests *apidef.UptimeTests) {
 	}
 
 	t.ServiceDiscovery.ExtractTo(&uptimeTests.Config.ServiceDiscovery)
+
+	uptimeTests.Config.ExpireUptimeAnalyticsAfter = int64(t.LogRetentionPeriod.Seconds())
+	uptimeTests.Config.RecheckWait = int(t.HostDownRetestPeriod.Seconds())
+
+	uptimeTests.CheckList = nil
+
+	result := []apidef.HostCheckObject{}
+	for _, v := range t.Tests {
+		check := apidef.HostCheckObject{
+			CheckURL: v.CheckURL,
+			Protocol: v.Protocol,
+			Timeout:  time.Duration(v.Timeout),
+			Method:   v.Method,
+			Headers:  v.Headers,
+			Body:     v.Body,
+		}
+		for _, command := range v.Commands {
+			check.AddCommand(command.Name, command.Message)
+		}
+
+		result = append(result, check)
+	}
+
+	if len(result) > 0 {
+		uptimeTests.CheckList = result
+	}
 }
 
 // MutualTLS contains the configuration for establishing a mutual TLS connection between Tyk and the upstream server.

@@ -1341,13 +1341,8 @@
         "serviceDiscovery": {
           "$ref": "#/definitions/X-Tyk-ServiceDiscovery"
         },
-        "test": {
-          "type": "object",
-          "properties": {
-            "serviceDiscovery": {
-              "$ref": "#/definitions/X-Tyk-ServiceDiscovery"
-            }
-          }
+        "uptimeTests": {
+          "$ref": "#/definitions/X-Tyk-UptimeTests"
         },
         "mutualTLS": {
           "$ref": "#/definitions/X-Tyk-MutualTLS"
@@ -2405,14 +2400,84 @@
     },
     "X-Tyk-PreserveHostHeader": {
       "type": "object",
-        "properties": {
-            "enabled": {
-            "type": "boolean"
-            }
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "enabled"
+      ]
+    },
+    "X-Tyk-UptimeTestCommand": {
+      "type": "object",
+      "properties": {
+        "message": {
+          "type": "string"
         },
-        "required": [
-            "enabled"
-        ]
+        "name": {
+          "type": "string"
+        }
+      }
+    },
+    "X-Tyk-UptimeTest": {
+      "type": "object",
+      "properties": {
+        "body": {
+          "type": "string"
+        },
+        "commands": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/X-Tyk-UptimeTestCommand"
+          }
+        },
+        "enableProxyProtocol": {
+          "type": "boolean"
+        },
+        "headers": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "method": {
+          "type": "string"
+        },
+        "protocol": {
+          "type": "string"
+        },
+        "timeout": {
+          "$ref": "#/definitions/X-Tyk-ReadableDuration"
+        },
+        "url": {
+          "type": "string"
+        }
+      }
+    },
+    "X-Tyk-UptimeTests": {
+      "type": "object",
+      "properties": {
+        "hostDownRetestPeriod": {
+          "$ref": "#/definitions/X-Tyk-ReadableDuration"
+        },
+        "logRetentionPeriod": {
+          "$ref": "#/definitions/X-Tyk-ReadableDuration"
+        },
+        "serviceDiscovery": {
+          "$ref": "#/definitions/X-Tyk-ServiceDiscovery"
+        },
+        "tests": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/X-Tyk-UptimeTest"
+          }
+        }
+      }
+    },
+    "X-Tyk-ReadableDuration": {
+      "type": "string",
+      "pattern": "^(\\d+h)?(\\d+m)?(\\d+s)?$"
     },
     "X-Tyk-LoadBalancingTarget": {
       "type": "object",

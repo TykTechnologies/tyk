@@ -99,6 +99,29 @@ func TestXTykGateway_Lint(t *testing.T) {
 			OAuth:     nil,
 		}
 
+		settings.Upstream.UptimeTests = &UptimeTests{
+			HostDownRetestPeriod: ReadableDuration(10 * time.Second),
+			LogRetentionPeriod:   ReadableDuration(10 * time.Second),
+			Tests: []UptimeTest{
+				{
+					Timeout: ReadableDuration(10 * time.Second),
+					Commands: []UptimeTestCommand{
+						{
+							Name:    "send",
+							Message: "PING",
+						},
+						{
+							Name:    "recv",
+							Message: "+PONG",
+						},
+					},
+					Headers: map[string]string{
+						"Request-Id": "1",
+					},
+				},
+			},
+		}
+
 		settings.Upstream.TLSTransport.MinVersion = "1.2"
 		settings.Upstream.TLSTransport.MaxVersion = "1.2"
 		settings.Upstream.TLSTransport.Ciphers = []string{"TLS_RSA_WITH_RC4_128_SHA"}

@@ -147,13 +147,13 @@ func TestServiceDiscovery(t *testing.T) {
 	assert.Equal(t, emptyServiceDiscovery, resultServiceDiscovery)
 }
 
-func TestTest(t *testing.T) {
-	var emptyTest Test
+func TestUptimeTests(t *testing.T) {
+	var emptyTest UptimeTests
 
 	var convertedTest apidef.UptimeTests
 	emptyTest.ExtractTo(&convertedTest)
 
-	var resultTest Test
+	var resultTest UptimeTests
 	resultTest.Fill(convertedTest)
 
 	assert.Equal(t, emptyTest, resultTest)
