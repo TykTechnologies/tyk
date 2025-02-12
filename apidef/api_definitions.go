@@ -914,13 +914,12 @@ type HostCheckObject struct {
 // AddCommand will append a new command to the test.
 func (h *HostCheckObject) AddCommand(name, message string) {
 	command := CheckCommand{
-		Name: name,
+		Name:    name,
 		Message: message,
 	}
 
 	h.Commands = append(h.Commands, command)
 }
-
 
 type UptimeTestsConfig struct {
 	ExpireUptimeAnalyticsAfter int64                         `bson:"expire_utime_after" json:"expire_utime_after"` // must have an expireAt TTL index set (http://docs.mongodb.org/manual/tutorial/expire-data/)
