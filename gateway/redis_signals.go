@@ -328,22 +328,52 @@ func (gw *Gateway) handleDashboardZeroConfMessage(payload string) {
 
 // handleUserKeyReset processes a user key reset notification
 func (gw *Gateway) handleUserKeyReset(payload string) {
-	splitKeys := strings.Split(payload, ":")
-	if len(splitKeys) > 1 {
-		userKeys := strings.Split(splitKeys[0], ".")
-		if len(userKeys) == 2 {
-			oldKey := userKeys[0]
-			newKey := userKeys[1]
+	keys := strings.Split(payload, ":")
+	if len(keys) != 2 {
+		log.Error("Invalid user key reset payload")
+		return
+	}
 
-			config := gw.GetConfig()
-			if config.SlaveOptions.APIKey == oldKey {
-				config.SlaveOptions.APIKey = newKey
-				gw.SetConfig(config)
+	keys = strings.Split(keys[0], ".")
+	if len(keys) != 2 {
+		log.Error("Invalid user key reset payload")
+		return
+	}
 
-				if store, ok := gw.GlobalSessionManager.Store().(*RPCStorageHandler); ok {
-					store.Connect()
+	oldKey := keys[0]
+	newKey := keys[1]
+
+	config := gw.GetConfig()
+
+	if oldKey == config.SlaveOptions.APIKey {
+		config.SlaveOptions.APIKey = newKey
+		gw.SetConfig(config)
+
+		// If we're using a KV store, update the API key there as well
+		if config.SlaveOptions.OriginalAPIKeyPath != "" {
+			if strings.HasPrefix(config.SlaveOptions.OriginalAPIKeyPath, "vault://") {
+				actualPath := strings.TrimPrefix(config.SlaveOptions.OriginalAPIKeyPath, "vault://")
+				if gw.vaultKVStore != nil {
+					if err := gw.vaultKVStore.Put(actualPath, newKey); err != nil {
+						log.WithError(err).Error("Failed to update API key in Vault")
+					} else {
+						log.Info("Successfully updated API key in Vault")
+					}
+				}
+			} else if strings.HasPrefix(config.SlaveOptions.OriginalAPIKeyPath, "consul://") {
+				actualPath := strings.TrimPrefix(config.SlaveOptions.OriginalAPIKeyPath, "consul://")
+				if gw.consulKVStore != nil {
+					if err := gw.consulKVStore.Put(actualPath, newKey); err != nil {
+						log.WithError(err).Error("Failed to update API key in Consul")
+					} else {
+						log.Info("Successfully updated API key in Consul")
+					}
 				}
 			}
+		}
+
+		if store, ok := gw.GlobalSessionManager.Store().(*RPCStorageHandler); ok {
+			store.Connect()
 		}
 	}
 }

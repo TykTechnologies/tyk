@@ -396,6 +396,10 @@ type SlaveOptionsConfig struct {
 
 	// SynchroniserEnabled enable this config if MDCB has enabled the synchoniser. If disabled then it will ignore signals to synchonise recources
 	SynchroniserEnabled bool `json:"synchroniser_enabled"`
+
+	// OriginalAPIKeyPath is the original path to the API key in the configuration file. Only used to modify the external KV store in case of API Key Reset.
+	// This is set automatically in afterConfSetup()
+	OriginalAPIKeyPath string `json:"-"`
 }
 
 type LocalSessionCacheConf struct {

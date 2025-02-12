@@ -1518,6 +1518,14 @@ func (gw *Gateway) afterConfSetup() {
 		}
 	}
 
+	if conf.SlaveOptions.APIKey != "" {
+		conf.SlaveOptions.OriginalAPIKeyPath = conf.SlaveOptions.APIKey
+		conf.SlaveOptions.APIKey, err = gw.kvStore(conf.SlaveOptions.APIKey)
+		if err != nil {
+			log.Fatalf("Could not retrieve API key from KV store... %v", err)
+		}
+	}
+
 	if conf.OpenTelemetry.Enabled {
 		if conf.OpenTelemetry.ResourceName == "" {
 			conf.OpenTelemetry.ResourceName = config.DefaultOTelResourceName
@@ -1538,7 +1546,6 @@ func (gw *Gateway) kvStore(value string) (string, error) {
 		if !ok {
 			return "", fmt.Errorf("secrets does not exist in config.. %s not found", key)
 		}
-
 		return val, nil
 	}
 

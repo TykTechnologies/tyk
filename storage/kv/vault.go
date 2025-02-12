@@ -2,6 +2,7 @@ package kv
 
 import (
 	"errors"
+	"fmt"
 	"strings"
 
 	vaultapi "github.com/hashicorp/vault/api"
@@ -25,7 +26,62 @@ func NewVault(conf config.VaultConfig) (Store, error) {
 }
 
 func (v *Vault) Get(key string) (string, error) {
+	fmt.Printf("[DEBUG] Vault.Get called with key: %s\n", key)
 
+	logicalStore := v.client.Logical()
+
+	if v.kvV2 {
+		// Version 2 engine. Make sure to append data in front
+		splitKey := strings.Split(key, "/")
+		if len(splitKey) > 0 {
+			splitKey[0] = splitKey[0] + "/data"
+			key = strings.Join(splitKey, "/")
+		}
+		fmt.Printf("[DEBUG] KV v2 adjusted key: %s\n", key)
+	}
+
+	splitted := strings.Split(key, ".")
+	if len(splitted) != 2 {
+		fmt.Printf("[DEBUG] Invalid key format. Expected 'config.value' but got: %s\n", key)
+		return "", errors.New("key should be in form of config.value")
+	}
+
+	fmt.Printf("[DEBUG] Reading from Vault path: %s\n", splitted[0])
+	secret, err := logicalStore.Read(splitted[0])
+	if err != nil {
+		fmt.Printf("[DEBUG] Vault Read error: %v\n", err)
+		return "", err
+	}
+
+	if secret == nil {
+		fmt.Printf("[DEBUG] No secret found at path: %s\n", splitted[0])
+		return "", ErrKeyNotFound
+	}
+
+	var val map[string]interface{} = secret.Data
+	fmt.Printf("[DEBUG] Raw secret data: %+v\n", val)
+
+	if v.kvV2 {
+		var ok bool
+		val, ok = secret.Data["data"].(map[string]interface{})
+		if !ok {
+			fmt.Printf("[DEBUG] Failed to get data field from KV v2 secret\n")
+			return "", ErrKeyNotFound
+		}
+		fmt.Printf("[DEBUG] KV v2 data field: %+v\n", val)
+	}
+
+	value, ok := val[splitted[1]]
+	if !ok {
+		fmt.Printf("[DEBUG] Key %s not found in secret data\n", splitted[1])
+		return "", ErrKeyNotFound
+	}
+
+	fmt.Printf("[DEBUG] Found value for key %s\n", splitted[1])
+	return value.(string), nil
+}
+
+func (v *Vault) Put(key string, value string) error {
 	logicalStore := v.client.Logical()
 
 	if v.kvV2 {
@@ -39,35 +95,25 @@ func (v *Vault) Get(key string) (string, error) {
 
 	splitted := strings.Split(key, ".")
 	if len(splitted) != 2 {
-		return "", errors.New("key should be in form of config.value")
+		return errors.New("key should be in form of config.value")
 	}
 
-	secret, err := logicalStore.Read(splitted[0])
-	if err != nil {
-		return "", err
-	}
-
-	if secret == nil {
-		return "", ErrKeyNotFound
-	}
-
-	var val map[string]interface{} = secret.Data
-
+	// For v2, we need to wrap the data in a data object
+	var data map[string]interface{}
 	if v.kvV2 {
-		var ok bool
-		val, ok = secret.Data["data"].(map[string]interface{})
-		if !ok {
-			// This is unlikely to happen though
-			return "", ErrKeyNotFound
+		data = map[string]interface{}{
+			"data": map[string]interface{}{
+				splitted[1]: value,
+			},
+		}
+	} else {
+		data = map[string]interface{}{
+			splitted[1]: value,
 		}
 	}
 
-	value, ok := val[splitted[1]]
-	if !ok {
-		return "", ErrKeyNotFound
-	}
-
-	return value.(string), nil
+	_, err := logicalStore.Write(splitted[0], data)
+	return err
 }
 
 func newVault(conf config.VaultConfig) (Store, error) {
