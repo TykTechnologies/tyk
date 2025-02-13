@@ -262,6 +262,14 @@ func InitTestMain(ctx context.Context, m *testing.M) int {
 // TestBrokenClients
 // TestGRPC_TokenBasedAuthentication
 
+// Deprecated: ResetTestConfig resets the config for the global gateway.
+//
+// The function does nothing, the correct way is to reuse StartTest(), filling
+// the config from the provided callback. Usage impacts a few tests (small).
+// See TestCustomDomain for an updated test.
+func (s *Test) ResetTestConfig() {
+}
+
 // simulate reloads in the background, i.e. writes to
 // global variables that should not be accessed in a
 // racy way like the policies and api specs maps.
