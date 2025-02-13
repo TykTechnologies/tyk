@@ -2174,7 +2174,6 @@ func TestAPIsHavingShorterSubstringListenPathButLongerCustomDomainAndListenPaths
 // section E - end
 
 // extra - start
-
 func TestDifferentDomainsIdenticalListenPaths(t *testing.T) {
 	ts := StartTest(nil)
 	t.Cleanup(ts.Close)
