@@ -95,7 +95,9 @@ type Kind string
 const (
 	// WebhookKind is the action to be specified in OAS API definition.
 	WebhookKind Kind = "webhook"
-	JSVMKind    Kind = "custom"
+
+	// JSVMKind represents a custom action to be executed when an event is triggered.
+	JSVMKind Kind = "custom"
 )
 
 type contextKey string
