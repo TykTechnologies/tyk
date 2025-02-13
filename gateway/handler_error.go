@@ -198,6 +198,12 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 
 		oauthClientID := ""
 		session := ctxGetSession(r)
+
+		// If the key is configured to not track, then we don't track
+		if session.DoNotTrack {
+			return
+		}
+
 		tags := make([]string, 0, estimateTagsCapacity(session, e.Spec))
 
 		if session != nil {
