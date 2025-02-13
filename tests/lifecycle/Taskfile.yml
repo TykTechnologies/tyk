@@ -18,7 +18,6 @@ tasks:
     desc: "Run tests (requires redis)"
     deps: [ services:up ]
     cmds:
-      - ln -fs ../../templates
       - defer:
           task: services:down
       - task: fmt
