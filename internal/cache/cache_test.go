@@ -44,4 +44,9 @@ func TestCache_Expired(t *testing.T) {
 		cache.Cleanup()
 		assert.Equal(t, 1, cache.Count())
 	})
+
+	t.Run("Test Set", func(t *testing.T) {
+		cache.Set("foo", "bar", 0)
+		assert.Equal(t, 2, cache.Count())
+	})
 }

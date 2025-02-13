@@ -5,16 +5,6 @@ import (
 	"time"
 )
 
-const (
-	// For use with functions that take an expiration time.
-	NoExpiration time.Duration = -1
-
-	// For use with functions that take an expiration time. Equivalent to
-	// passing in the same expiration duration as was given to New() or
-	// NewFrom() when the cache was created (e.g. 5 minutes.)
-	DefaultExpiration time.Duration = 0
-)
-
 // Cache holds key-value pairs with a TTL.
 type Cache struct {
 	// expiration (<= 0 means never expire).
@@ -30,7 +20,7 @@ type Cache struct {
 
 // NewCache creates a new *Cache for storing items with a TTL.
 func NewCache(expiration, cleanupInterval time.Duration) *Cache {
-	if expiration == DefaultExpiration {
+	if expiration == 0 {
 		expiration = -1
 	}
 
@@ -56,12 +46,11 @@ func (c *Cache) Close() {
 	c.Flush()
 }
 
-// Add an item to the cache, replacing any existing item. If the duration is 0
-// (DefaultExpiration), the cache's default expiration time is used. If it is -1
-// (NoExpiration), the item never expires.
+// Add an item to the cache, replacing any existing item. If the duration is 0,
+// the cache's expiration time is used. If it is -1, the item never expires.
 func (c *Cache) Set(k string, x any, d time.Duration) {
 	var e int64
-	if d == DefaultExpiration {
+	if d == 0 {
 		d = c.expiration
 	}
 	if d > 0 {

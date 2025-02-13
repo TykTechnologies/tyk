@@ -9,37 +9,37 @@ import (
 )
 
 func TestRepository(t *testing.T) {
-	cache := cache.New(1, 1)
+	store := cache.New(1, 1)
 
-	assert.Equal(t, 0, cache.Count())
+	assert.Equal(t, 0, store.Count())
 
-	cache.Set("key", "value", 1)
-	assert.Equal(t, 1, cache.Count())
+	store.Set("key", "value", 1)
+	assert.Equal(t, 1, store.Count())
 
-	cache.Set("key", "value", 0)
-	assert.Equal(t, 1, cache.Count())
+	store.Set("key", "value", 0)
+	assert.Equal(t, 1, store.Count())
 
-	val, ok := cache.Get("key")
+	val, ok := store.Get("key")
 	assert.True(t, ok)
 
 	castVal, ok := val.(string)
 	assert.True(t, ok)
 	assert.Equal(t, "value", castVal)
 
-	val2, ok := cache.Get("missing")
+	val2, ok := store.Get("missing")
 	assert.False(t, ok)
 	assert.Nil(t, val2)
 
-	cache.Delete("key")
-	assert.Equal(t, 0, cache.Count())
+	store.Delete("key")
+	assert.Equal(t, 0, store.Count())
 
-	cache.Set("key", "value", 1)
-	cache.Flush()
-	assert.Equal(t, 0, cache.Count())
+	store.Set("key", "value", 1)
+	store.Flush()
+	assert.Equal(t, 0, store.Count())
 
-	cache.Set("key", "value", 1)
-	assert.Equal(t, 1, cache.Count())
+	store.Set("key", "value", 1)
+	assert.Equal(t, 1, store.Count())
 
-	cache.Close()
-	assert.Equal(t, 0, cache.Count())
+	store.Close()
+	assert.Equal(t, 0, store.Count())
 }
