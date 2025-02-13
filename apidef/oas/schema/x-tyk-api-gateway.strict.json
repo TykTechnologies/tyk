@@ -2109,6 +2109,7 @@
         "RateLimitSmoothingUp",
         "RateLimitSmoothingDown",
         "AuthFailure",
+        "UpstreamOAuthError",
         "KeyExpired",
         "VersionFailure",
         "OrgQuotaExceeded",
@@ -2550,7 +2551,7 @@
             "$ref": "#/definitions/X-Tyk-UptimeTestCommand"
           }
         },
-        "enable_proxy_protocol": {
+        "enableProxyProtocol": {
           "type": "boolean"
         },
         "headers": {
