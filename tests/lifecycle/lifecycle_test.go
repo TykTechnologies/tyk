@@ -37,9 +37,14 @@ func TestGateway_TestLifeCycle(t *testing.T) {
 
 	func() {
 		for {
-			if err := printMemStats(t); err != nil {
-				t.Logf("Breaking out on error: %v", err)
-				break
+			// Run runtime.GC every 16 (0xF) loops.
+			current := atomic.LoadInt64(&i)
+			if (current & 0xff) == 0 {
+				if err := printMemStats(t); err != nil {
+					t.Logf("Breaking out on error: %v", err)
+					break
+				}
+				runtime.GC()
 			}
 
 			go func() {
@@ -55,7 +60,6 @@ func TestGateway_TestLifeCycle(t *testing.T) {
 			default:
 			}
 
-			runtime.GC()
 		}
 	}()
 
