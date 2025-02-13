@@ -12,13 +12,12 @@ tasks:
   test:
     desc: "Run tests"
     cmds:
-      - cd schema && ./build.sh && cd -
+      - go test -count=1 ./...
 
   fmt:
     desc: "Format sources"
     cmds:
       - go fmt ./...
-      - go test -count=1 ./...
 
   # lint target is run from CI before go tests
   lint:
