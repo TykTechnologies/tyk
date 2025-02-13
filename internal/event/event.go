@@ -15,6 +15,8 @@ const (
 	QuotaExceeded Event = "QuotaExceeded"
 	// AuthFailure is the event triggered when key has failed authentication or has attempted access and was denied.
 	AuthFailure Event = "AuthFailure"
+	// UpstreamOAuthError is the event triggered when an upstream OAuth error occurs.
+	UpstreamOAuthError Event = "UpstreamOAuthError"
 	// KeyExpired is the event triggered when a key has attempted access but is expired.
 	KeyExpired Event = "KeyExpired"
 	// VersionFailure is the event triggered when a key has attempted access to a version it does not have permission to access.

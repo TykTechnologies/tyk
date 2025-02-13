@@ -28,6 +28,8 @@ const (
 	EventRateLimitExceeded = event.RateLimitExceeded
 	// EventAuthFailure is an alias maintained for backwards compatibility.
 	EventAuthFailure = event.AuthFailure
+	// EventUpstreamOAuthError is an alias maintained for backwards compatibility.
+	UpstreamOAuthError = event.UpstreamOAuthError
 	// EventKeyExpired is an alias maintained for backwards compatibility.
 	EventKeyExpired = event.KeyExpired
 	// EventVersionFailure is an alias maintained for backwards compatibility.
