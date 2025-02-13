@@ -2,10 +2,11 @@ package oas
 
 import (
 	"encoding/json"
+	"maps"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/internal/event"
-	internalreflect "github.com/TykTechnologies/tyk/internal/reflect"
+	"github.com/TykTechnologies/tyk/internal/reflect"
 	"github.com/TykTechnologies/tyk/internal/time"
 )
 
@@ -42,33 +43,27 @@ type EventHandler struct {
 func (e EventHandler) MarshalJSON() ([]byte, error) {
 	type helperEventHandler EventHandler
 	helper := helperEventHandler(e)
-	outMap, err := internalreflect.Cast[map[string]any](helper)
+
+	outMap, err := reflect.Cast[map[string]any](helper)
 	if err != nil {
 		return nil, err
 	}
 
-	var outMapVal map[string]any
+	outMapVal := *outMap
+
 	switch helper.Kind {
 	case WebhookKind:
-		webhookMap, err := internalreflect.Cast[map[string]any](helper.Webhook)
+		webhookMap, err := reflect.Cast[map[string]any](helper.Webhook)
 		if err != nil {
 			return nil, err
 		}
-
-		outMapVal = *outMap
-		for k, v := range *webhookMap {
-			outMapVal[k] = v
-		}
+		maps.Insert(outMapVal, maps.All(*webhookMap))
 	case JSVMKind:
-		jsvmMap, err := internalreflect.Cast[map[string]any](helper.JSVMEvent)
+		jsvmMap, err := reflect.Cast[map[string]any](helper.JSVMEvent)
 		if err != nil {
 			return nil, err
 		}
-
-		outMapVal = *outMap
-		for k, v := range *jsvmMap {
-			outMapVal[k] = v
-		}
+		maps.Insert(outMapVal, maps.All(*jsvmMap))
 	}
 
 	return json.Marshal(outMapVal)
@@ -251,11 +246,11 @@ func (e *EventHandlers) ExtractTo(api *apidef.APIDefinition) {
 		case WebhookKind:
 			handler = event.WebHookHandler
 			whConf := ev.GetWebhookConf()
-			handlerMeta, err = internalreflect.Cast[map[string]any](whConf)
+			handlerMeta, err = reflect.Cast[map[string]any](whConf)
 		case JSVMKind:
 			handler = event.JSVMHandler
 			jsvmConf := ev.GetJSVMEventHandlerConf()
-			handlerMeta, err = internalreflect.Cast[map[string]any](jsvmConf)
+			handlerMeta, err = reflect.Cast[map[string]any](jsvmConf)
 		default:
 			continue
 		}
