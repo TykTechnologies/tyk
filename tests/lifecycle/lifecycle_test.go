@@ -6,7 +6,6 @@ import (
 	"os"
 	"runtime"
 	"strconv"
-	"sync/atomic"
 	"testing"
 	"time"
 
@@ -37,9 +36,8 @@ func TestGateway_TestLifeCycle(t *testing.T) {
 
 	func() {
 		for {
-			// Run runtime.GC every 16 (0xF) loops.
-			current := atomic.LoadInt64(&i)
-			if (current & 0xff) == 0 {
+			// Run runtime.GC every 256 loops to relax GC pressure.
+			if (i & 0xff) == 0 {
 				if err := printMemStats(t); err != nil {
 					t.Logf("Breaking out on error: %v", err)
 					break
@@ -52,7 +50,8 @@ func TestGateway_TestLifeCycle(t *testing.T) {
 				t.Log(t1.URL)
 				t1.Close()
 			}()
-			atomic.AddInt64(&i, 1)
+
+			i++
 
 			select {
 			case <-ctx.Done():
@@ -63,7 +62,7 @@ func TestGateway_TestLifeCycle(t *testing.T) {
 		}
 	}()
 
-	t.Logf("Got %d gateway Start/Stop's", atomic.LoadInt64(&i))
+	t.Logf("Got %d gateway Start/Stop's", i)
 }
 
 func printMemStats(tb testing.TB) error {
