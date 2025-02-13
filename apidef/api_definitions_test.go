@@ -324,3 +324,25 @@ func TestAPIDefinition_GetScopeToPolicyMapping(t *testing.T) {
 	}
 
 }
+
+func TestJSVMEventHandlerConf_Scan(t *testing.T) {
+	jsvmEventMeta := map[string]any{
+		"disabled": true,
+		"id":       "1234",
+		"name":     "myMethod",
+		"path":     "my_script.js",
+	}
+
+	expected := JSVMEventHandlerConf{
+		Disabled:   true,
+		ID:         "1234",
+		MethodName: "myMethod",
+		Path:       "my_script.js",
+	}
+
+	var jsvmEventConf JSVMEventHandlerConf
+	err := jsvmEventConf.Scan(jsvmEventMeta)
+
+	assert.NoError(t, err)
+	assert.Equal(t, expected, jsvmEventConf)
+}
