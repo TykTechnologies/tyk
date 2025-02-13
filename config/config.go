@@ -1340,7 +1340,7 @@ func WriteConf(path string, conf *Config) error {
 
 // writeDefault will set conf to the default config and write it to disk
 // in path, if the path is non-empty.
-func WriteDefault(path string, conf *Config) error {
+func WriteDefault(in string, conf *Config) error {
 	wd, err := os.Getwd()
 	if err != nil {
 		return fmt.Errorf("Can't get working directory: %w", err)
@@ -1351,10 +1351,10 @@ func WriteDefault(path string, conf *Config) error {
 	if err := envconfig.Process(envPrefix, conf); err != nil {
 		return err
 	}
-	if path == "" {
+	if in == "" {
 		return nil
 	}
-	return WriteConf(path, conf)
+	return WriteConf(in, conf)
 }
 
 // Load will load a configuration file, trying each of the paths given
