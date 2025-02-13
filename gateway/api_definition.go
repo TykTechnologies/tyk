@@ -845,19 +845,21 @@ func (a APIDefinitionLoader) filterSprigFuncs() texttemplate.FuncMap {
 	return texttemplate.FuncMap(tmp)
 }
 
-func (a APIDefinitionLoader) loadFileTemplate(path string) (*texttemplate.Template, error) {
-	log.Debug("-- Loading template: ", path)
-	tmpName := filepath.Base(path)
-	return apidef.Template.New(tmpName).Funcs(a.filterSprigFuncs()).ParseFiles(path)
+func (a APIDefinitionLoader) loadFileTemplate(in string) (*texttemplate.Template, error) {
+	tmpName := filepath.Base(in)
+	return apidef.Template.New(tmpName).Funcs(a.filterSprigFuncs()).ParseFiles(in)
 }
 
 func (a APIDefinitionLoader) loadBlobTemplate(blob string) (*texttemplate.Template, error) {
-	log.Debug("-- Loading blob")
 	uDec, err := base64.StdEncoding.DecodeString(blob)
 	if err != nil {
 		return nil, err
 	}
-	return apidef.Template.New("").Funcs(a.filterSprigFuncs()).Parse(string(uDec))
+	return a.loadStringTemplate(string(uDec))
+}
+
+func (a APIDefinitionLoader) loadStringTemplate(in string) (*texttemplate.Template, error) {
+	return apidef.Template.New("").Funcs(a.filterSprigFuncs()).Parse(in)
 }
 
 func (a APIDefinitionLoader) compileTransformPathSpec(paths []apidef.TemplateMeta, stat URLStatus, conf config.Config) []URLSpec {

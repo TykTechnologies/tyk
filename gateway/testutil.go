@@ -1151,6 +1151,7 @@ func (s *Test) newGateway(genConf func(globalConf *config.Config)) *Gateway {
 	gatewayPath := filepath.Dir(b)
 	rootPath := filepath.Dir(gatewayPath)
 
+	gwConfig.TemplatePath = filepath.Join(rootPath, "templates")
 	gwConfig.AnalyticsConfig.GeoIPDBLocation = filepath.Join(rootPath, "testdata", "MaxMind-DB-test-ipv4-24.mmdb")
 	gwConfig.EnableJSVM = true
 	gwConfig.HashKeyFunction = storage.HashMurmur64
