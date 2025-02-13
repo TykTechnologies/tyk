@@ -1914,6 +1914,7 @@
         "RateLimitSmoothingUp",
         "RateLimitSmoothingDown",
         "AuthFailure",
+        "UpstreamOAuthError",
         "KeyExpired",
         "VersionFailure",
         "OrgQuotaExceeded",
