@@ -19,6 +19,7 @@ tasks:
   lint:
     desc: "Ensure linter pass"
     cmds:
+      - cd schema && ./build.sh && cd -
       - schema-gen extract -o - | schema-gen lint --summary -i -
 
   deps:
