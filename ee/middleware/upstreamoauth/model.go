@@ -10,7 +10,6 @@ import (
 )
 
 const (
-	ErrorEventName = "UpstreamOAuthError"
 	MiddlewareName = "UpstreamOAuth"
 
 	ClientCredentialsAuthorizeType = "clientCredentials"
