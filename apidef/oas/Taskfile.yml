@@ -5,17 +5,22 @@ tasks:
   default:
     desc: "Run everything"
     cmds:
-      - task: test
+      - task: fmt
       - task: lint
+      - task: test
 
   test:
     desc: "Run tests"
     cmds:
       - cd schema && ./build.sh && cd -
+
+  fmt:
+    desc: "Format sources"
+    cmds:
       - go fmt ./...
       - go test -count=1 ./...
 
-  # lint target is run from CI
+  # lint target is run from CI before go tests
   lint:
     desc: "Ensure linter pass"
     cmds:
