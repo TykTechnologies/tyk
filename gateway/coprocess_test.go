@@ -232,6 +232,16 @@ func TestSyncHeadersAndMultiValueHeaders(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "empty multi value headers",
+			headers: map[string]string{
+				"Header": "newValue1",
+			},
+			initialMultiValueHeaders: []*coprocess.Header{},
+			expectedMultiValueHeaders: []*coprocess.Header{
+				{Key: "Header", Values: []string{"newValue1"}},
+			},
+		},
 	}
 
 	for _, tc := range testCases {
