@@ -2003,6 +2003,9 @@
         },
         {
           "$ref": "#/definitions/X-Tyk-Webhook-Without-ID"
+        },
+        {
+          "$ref": "#/definitions/X-Tyk-JSVMEvent"
         }
       ],
       "additionalProperties": false
@@ -2094,10 +2097,46 @@
       ],
       "additionalProperties": false
     },
+    "X-Tyk-JSVMEvent": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "trigger": {
+          "$ref": "#/definitions/X-Tyk-EventTrigger"
+        },
+        "type": {
+          "$ref": "#/definitions/X-Tyk-EventType"
+        },
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "functionName": {
+          "type": "string"
+        },
+        "path": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "enabled",
+        "trigger",
+        "type",
+        "name",
+        "functionName",
+        "path"
+      ],
+      "additionalProperties": false
+    },
     "X-Tyk-EventType": {
       "type": "string",
       "enum": [
-        "webhook"
+        "webhook",
+        "custom"
       ],
       "additionalProperties": false
     },
