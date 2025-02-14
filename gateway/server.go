@@ -1507,14 +1507,14 @@ func (gw *Gateway) afterConfSetup() {
 	if conf.UseDBAppConfigs {
 		conf.DBAppConfOptions.ConnectionString, err = gw.kvStore(conf.DBAppConfOptions.ConnectionString)
 		if err != nil {
-			log.Fatalf("Could not fetch dashboard connection string.. %v", err)
+			log.Fatalf("Could not fetch dashboard connection string.")
 		}
 	}
 
 	if conf.Policies.PolicySource == "service" {
 		conf.Policies.PolicyConnectionString, err = gw.kvStore(conf.Policies.PolicyConnectionString)
 		if err != nil {
-			log.Fatalf("Could not fetch policy connection string... %v", err)
+			log.Fatalf("Could not fetch policy connection string.")
 		}
 	}
 
@@ -1522,7 +1522,7 @@ func (gw *Gateway) afterConfSetup() {
 		conf.SlaveOptions.OriginalAPIKeyPath = conf.SlaveOptions.APIKey
 		conf.SlaveOptions.APIKey, err = gw.kvStore(conf.SlaveOptions.APIKey)
 		if err != nil {
-			log.Fatalf("Could not retrieve API key from KV store... %v", err)
+			log.Fatalf("Could not retrieve API key from KV store.")
 		}
 	}
 
