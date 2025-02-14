@@ -304,7 +304,7 @@ func Connect(connConfig Config, suppressRegister bool, dispatcherFuncs map[strin
 		funcClientSingleton = dispatcher.NewFuncClient(clientSingleton)
 	}
 	// wait until a connection is dialed so we can call login or fall in emergency mode
-	WaitForConnectionOrEmergency(clientSingleton)
+	waitForConnectionOrEmergency(clientSingleton)
 	handleLogin()
 
 	if !suppressRegister {
@@ -315,7 +315,7 @@ func Connect(connConfig Config, suppressRegister bool, dispatcherFuncs map[strin
 	return true
 }
 
-func WaitForConnectionOrEmergency(clientSingleton *gorpc.Client) bool {
+func waitForConnectionOrEmergency(clientSingleton *gorpc.Client) bool {
 	ticker := time.NewTicker(100 * time.Millisecond)
 	defer ticker.Stop()
 
