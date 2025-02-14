@@ -709,9 +709,9 @@ func TestProcessKeySpaceChanges_UserKeyReset(t *testing.T) {
 	}
 
 	// Setup initial config
-	config := g.Gw.GetConfig()
-	config.SlaveOptions.APIKey = oldKey
-	g.Gw.SetConfig(config)
+	gwConfig := g.Gw.GetConfig()
+	gwConfig.SlaveOptions.APIKey = oldKey
+	g.Gw.SetConfig(gwConfig)
 
 	testCases := []struct {
 		name     string
