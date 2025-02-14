@@ -423,7 +423,6 @@ func TestEventHandler_MarshalJSON(t *testing.T) {
 				"name":         "test-custom",
 				"functionName": "myCustomEventHandler",
 				"path":         "event_handlers/session_editor.js",
-				"body":         "console.log('hello world');",
 			},
 		},
 	}
