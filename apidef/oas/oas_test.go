@@ -141,8 +141,15 @@ func TestOAS_ExtractTo_ResetAPIDefinition(t *testing.T) {
 		event.QuotaExceeded: {
 			{
 				Handler: event.WebHookHandler,
-				HandlerMeta: map[string]interface{}{
+				HandlerMeta: map[string]any{
 					"target_path": "https://webhook.site/uuid",
+				},
+			},
+			{
+				Handler: event.JSVMHandler,
+				HandlerMeta: map[string]any{
+					"name": "myHandler",
+					"path": "my_script.js",
 				},
 			},
 		},

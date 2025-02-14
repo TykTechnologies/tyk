@@ -2,10 +2,11 @@ package oas
 
 import (
 	"encoding/json"
+	"maps"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/internal/event"
-	internalreflect "github.com/TykTechnologies/tyk/internal/reflect"
+	"github.com/TykTechnologies/tyk/internal/reflect"
 	"github.com/TykTechnologies/tyk/internal/time"
 )
 
@@ -13,7 +14,10 @@ import (
 type Kind = event.Kind
 
 // WebhookKind is an alias maintained to be used in imports.
-const WebhookKind = event.WebhookKind
+const (
+	WebhookKind = event.WebhookKind
+	JSVMKind    = event.JSVMKind
+)
 
 // EventHandler holds information about individual event to be configured on the API.
 type EventHandler struct {
@@ -30,25 +34,36 @@ type EventHandler struct {
 
 	// Webhook contains WebhookEvent configs. Encoding and decoding is handled by the custom marshaller.
 	Webhook WebhookEvent `bson:"-" json:"-"`
+
+	// JSVMEvent holds information about JavaScript VM events.
+	JSVMEvent JSVMEvent `bson:"-" json:"-"`
 }
 
 // MarshalJSON marshals EventHandler as per Tyk OAS API definition contract.
 func (e EventHandler) MarshalJSON() ([]byte, error) {
 	type helperEventHandler EventHandler
 	helper := helperEventHandler(e)
-	outMap, err := internalreflect.Cast[map[string]interface{}](helper)
-	if err != nil {
-		return nil, err
-	}
 
-	webhookMap, err := internalreflect.Cast[map[string]interface{}](helper.Webhook)
+	outMap, err := reflect.Cast[map[string]any](helper)
 	if err != nil {
 		return nil, err
 	}
 
 	outMapVal := *outMap
-	for k, v := range *webhookMap {
-		outMapVal[k] = v
+
+	switch helper.Kind {
+	case WebhookKind:
+		webhookMap, err := reflect.Cast[map[string]any](helper.Webhook)
+		if err != nil {
+			return nil, err
+		}
+		maps.Insert(outMapVal, maps.All(*webhookMap))
+	case JSVMKind:
+		jsvmMap, err := reflect.Cast[map[string]any](helper.JSVMEvent)
+		if err != nil {
+			return nil, err
+		}
+		maps.Insert(outMapVal, maps.All(*jsvmMap))
 	}
 
 	return json.Marshal(outMapVal)
@@ -65,6 +80,10 @@ func (e *EventHandler) UnmarshalJSON(in []byte) error {
 	switch helper.Kind {
 	case WebhookKind:
 		if err := json.Unmarshal(in, &helper.Webhook); err != nil {
+			return err
+		}
+	case JSVMKind:
+		if err := json.Unmarshal(in, &helper.JSVMEvent); err != nil {
 			return err
 		}
 	}
@@ -116,10 +135,28 @@ func (e *EventHandler) GetWebhookConf() apidef.WebHookHandlerConf {
 	}
 }
 
+// JSVMEvent represents a JavaScript VM event configuration for event handlers.
+type JSVMEvent struct {
+	// FunctionName specifies the JavaScript function name to be executed.
+	FunctionName string `json:"functionName" bson:"functionName"`
+	// Path specifies the path to the JavaScript file containing the function.
+	Path string `json:"path" bson:"path"`
+}
+
+// GetJSVMEventHandlerConf generates the JavaScript VM event handler configuration using the current EventHandler instance.
+func (e *EventHandler) GetJSVMEventHandlerConf() apidef.JSVMEventHandlerConf {
+	return apidef.JSVMEventHandlerConf{
+		Disabled:   !e.Enabled,
+		ID:         e.ID,
+		MethodName: e.JSVMEvent.FunctionName,
+		Path:       e.JSVMEvent.Path,
+	}
+}
+
 // EventHandlers holds the list of events to be processed for the API.
 type EventHandlers []EventHandler
 
-// Fill fills EventHandlers from classic API definition. Currently only webhook events are supported.
+// Fill fills EventHandlers from classic API definition. Currently only webhook and jsvm events are supported.
 func (e *EventHandlers) Fill(api apidef.APIDefinition) {
 	events := EventHandlers{}
 	if len(api.EventHandlers.Events) == 0 {
@@ -153,6 +190,26 @@ func (e *EventHandlers) Fill(api apidef.APIDefinition) {
 				}
 
 				events = append(events, ev)
+			case event.JSVMHandler:
+				jsvmHandlerConf := apidef.JSVMEventHandlerConf{}
+				err := jsvmHandlerConf.Scan(eh.HandlerMeta)
+				if err != nil {
+					continue
+				}
+
+				ev := EventHandler{
+					Enabled: !jsvmHandlerConf.Disabled,
+					Trigger: gwEvent,
+					Kind:    JSVMKind,
+					ID:      jsvmHandlerConf.ID,
+					Name:    jsvmHandlerConf.MethodName, // jsvm events don't have human-readable names, let's reuse the methodName
+					JSVMEvent: JSVMEvent{
+						FunctionName: jsvmHandlerConf.MethodName,
+						Path:         jsvmHandlerConf.Path,
+					},
+				}
+
+				events = append(events, ev)
 			default:
 				continue
 			}
@@ -181,7 +238,7 @@ func (e *EventHandlers) ExtractTo(api *apidef.APIDefinition) {
 	for _, ev := range *e {
 		var (
 			handler     event.HandlerName
-			handlerMeta *map[string]interface{}
+			handlerMeta *map[string]any
 			err         error
 		)
 
@@ -189,7 +246,11 @@ func (e *EventHandlers) ExtractTo(api *apidef.APIDefinition) {
 		case WebhookKind:
 			handler = event.WebHookHandler
 			whConf := ev.GetWebhookConf()
-			handlerMeta, err = internalreflect.Cast[map[string]interface{}](whConf)
+			handlerMeta, err = reflect.Cast[map[string]any](whConf)
+		case JSVMKind:
+			handler = event.JSVMHandler
+			jsvmConf := ev.GetJSVMEventHandlerConf()
+			handlerMeta, err = reflect.Cast[map[string]any](jsvmConf)
 		default:
 			continue
 		}
@@ -221,7 +282,7 @@ func resetOASSupportedEventHandlers(api *apidef.APIDefinition) {
 		triggersExcludingWebhooks := make([]apidef.EventHandlerTriggerConfig, 0)
 		for _, eventTrigger := range eventTriggers {
 			switch eventTrigger.Handler {
-			case event.WebHookHandler:
+			case event.WebHookHandler, event.JSVMHandler:
 				continue
 			}
 

@@ -1666,3 +1666,26 @@ func (w *WebHookHandlerConf) Scan(in any) error {
 	*w = *conf
 	return nil
 }
+
+// JSVMEventHandlerConf represents the configuration for a JavaScript VM event handler in the API definition.
+type JSVMEventHandlerConf struct {
+	// Disabled indicates whether the event handler is inactive.
+	Disabled bool `bson:"disabled" json:"disabled"`
+	// ID is the optional unique identifier for the event handler.
+	ID string `bson:"id" json:"id"`
+	// MethodName specifies the JavaScript function name to be executed.
+	MethodName string `bson:"name" json:"name"`
+	// Path refers to the file path of the JavaScript source code for the handler.
+	Path string `bson:"path" json:"path"`
+}
+
+// Scan populates the JSVMEventHandlerConf struct by casting and copying data from the provided input.
+func (j *JSVMEventHandlerConf) Scan(in any) error {
+	conf, err := reflect.Cast[JSVMEventHandlerConf](in)
+	if err != nil {
+		return err
+	}
+
+	*j = *conf
+	return nil
+}
