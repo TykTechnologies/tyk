@@ -24,6 +24,8 @@ import (
 
 	"github.com/TykTechnologies/tyk-pump/analytics"
 	"github.com/TykTechnologies/tyk/apidef"
+
+	"github.com/TykTechnologies/tyk/apidef/oas"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/test"
@@ -784,16 +786,13 @@ func TestMultiTargetProxy(t *testing.T) {
 }
 
 func TestCustomDomain(t *testing.T) {
-	ts := StartTest(nil)
-	t.Cleanup(ts.Close)
-
 	localClient := test.NewClientLocal()
 
 	t.Run("With custom domain support", func(t *testing.T) {
-		globalConf := ts.Gw.GetConfig()
-		globalConf.EnableCustomDomains = true
-		ts.Gw.SetConfig(globalConf)
-		defer ts.ResetTestConfig()
+		ts := StartTest(func(conf *config.Config) {
+			conf.EnableCustomDomains = true
+		})
+		t.Cleanup(ts.Close)
 
 		ts.Gw.BuildAndLoadAPI(
 			func(spec *APISpec) {
@@ -815,6 +814,8 @@ func TestCustomDomain(t *testing.T) {
 	})
 
 	t.Run("Without custom domain support", func(t *testing.T) {
+		ts := StartTest(nil)
+		t.Cleanup(ts.Close)
 
 		ts.Gw.BuildAndLoadAPI(
 			func(spec *APISpec) {
@@ -1726,6 +1727,11 @@ func TestTracing(t *testing.T) {
 		spec.UseKeylessAccess = false
 	})[0]
 
+	oasSpec := BuildOASAPI(func(oasDef *oas.OAS) {
+		tykExt := oasDef.GetTykExtension()
+		tykExt.Info.State.Active = true
+	})[0]
+
 	apiDefWithBundle := &apidef.APIDefinition{
 		CustomMiddlewareBundle: "some-path",
 	}
@@ -1742,6 +1748,7 @@ func TestTracing(t *testing.T) {
 		{Method: "POST", Path: "/tyk/debug", Data: traceRequest{Spec: spec.APIDefinition, Request: &traceHttpRequest{Method: "GET", Path: "/"}}, AdminAuth: true, Code: 200, BodyMatch: `401 Unauthorized`},
 		{Method: "POST", Path: "/tyk/debug", Data: traceRequest{Spec: apiDefWithBundle, Request: &traceHttpRequest{Method: "GET", Path: "/", Headers: authHeaders}}, AdminAuth: true, Code: http.StatusBadRequest, BodyMatch: `Couldn't load bundle`},
 		{Method: "POST", Path: "/tyk/debug", Data: traceRequest{Spec: spec.APIDefinition, Request: &traceHttpRequest{Path: "/", Headers: authHeaders}}, AdminAuth: true, Code: 200, BodyMatch: `200 OK`},
+		{Method: "POST", Path: "/tyk/debug", Data: traceRequest{OAS: &oasSpec.OAS, Request: &traceHttpRequest{Method: "GET", Path: "/"}}, AdminAuth: true, Code: http.StatusOK},
 	}...)
 
 	t.Run("Custom auth header", func(t *testing.T) {

@@ -65,7 +65,6 @@ var (
 	// Used to store the test bundles:
 	testMiddlewarePath, _ = ioutil.TempDir("", "tyk-middleware-path")
 
-	defaultTestConfig config.Config
 	EnableTestDNSMock = false
 	MockHandle        *test.DnsMockHandle
 )
@@ -263,9 +262,12 @@ func InitTestMain(ctx context.Context, m *testing.M) int {
 // TestBrokenClients
 // TestGRPC_TokenBasedAuthentication
 
-// ResetTestConfig resets the config for the global gateway
+// Deprecated: ResetTestConfig resets the config for the global gateway.
+//
+// The function does nothing, the correct way is to reuse StartTest(), filling
+// the config from the provided callback. Usage impacts a few tests (small).
+// See TestCustomDomain for an updated test.
 func (s *Test) ResetTestConfig() {
-	s.Gw.SetConfig(defaultTestConfig)
 }
 
 // simulate reloads in the background, i.e. writes to
@@ -1149,6 +1151,7 @@ func (s *Test) newGateway(genConf func(globalConf *config.Config)) *Gateway {
 	gatewayPath := filepath.Dir(b)
 	rootPath := filepath.Dir(gatewayPath)
 
+	gwConfig.TemplatePath = filepath.Join(rootPath, "templates")
 	gwConfig.AnalyticsConfig.GeoIPDBLocation = filepath.Join(rootPath, "testdata", "MaxMind-DB-test-ipv4-24.mmdb")
 	gwConfig.EnableJSVM = true
 	gwConfig.HashKeyFunction = storage.HashMurmur64
@@ -1195,7 +1198,6 @@ func (s *Test) newGateway(genConf func(globalConf *config.Config)) *Gateway {
 	gw.CoProcessInit()
 	gw.afterConfSetup()
 
-	defaultTestConfig = gwConfig
 	gw.SetConfig(gwConfig)
 
 	cli.Init(confPaths)
@@ -1320,6 +1322,8 @@ func (s *Test) Close() {
 	if err != nil {
 		log.Error("could not remove apis")
 	}
+
+	s.Gw.cacheClose()
 }
 
 // RemoveApis clean all the apis from a living gw
@@ -1913,7 +1917,6 @@ func (p *httpProxyHandler) handleHTTP(w http.ResponseWriter, req *http.Request) 
 }
 
 func (p *httpProxyHandler) Stop(s *Test) error {
-	s.ResetTestConfig()
 	return p.server.Close()
 }
 

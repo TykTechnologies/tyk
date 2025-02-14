@@ -1787,7 +1787,7 @@ paths:
       summary: Return one certificate or list multiple certificates in the Tyk Gateway
         given a comma separated list of cert IDs.
       tags:
-      - CertsTag
+      - Certs
   /tyk/debug:
     post:
       description: Used to test API definition by sending sample request and analysing
@@ -1796,29 +1796,71 @@ paths:
       requestBody:
         content:
           application/json:
-            example:
-              request:
-                method: GET
-                path: /update-listen-path
-              spec:
-                api_id: b84fe1a04e5648927971c0557971565c
-                auth:
-                  auth_header_name: authorization
-                definition:
-                  key: version
-                  location: header
-                name: Tyk Test API
-                org_id: 664a14650619d40001f1f00f
-                proxy:
-                  listen_path: /tyk-api-test/
-                  strip_listen_path: true
-                  target_url: https://httpbin.org
-                use_oauth2: true
-                version_data:
-                  not_versioned: true
-                  versions:
-                    Default:
-                      name: Default
+            examples:
+              apiDefinition:
+                summary: Calling debug endpoint with classic API definition.
+                value:
+                  request:
+                    method: GET
+                    path: /update-listen-path
+                  spec:
+                    api_id: b84fe1a04e5648927971c0557971565c
+                    auth:
+                      auth_header_name: authorization
+                    definition:
+                      key: version
+                      location: header
+                    name: Tyk Test API
+                    org_id: 664a14650619d40001f1f00f
+                    proxy:
+                      listen_path: /tyk-api-test/
+                      strip_listen_path: true
+                      target_url: https://httpbin.org
+                    use_oauth2: true
+                    version_data:
+                      not_versioned: true
+                      versions:
+                        Default:
+                          name: Default
+              oasApiDefinition:
+                summary: Calling debug endpoint with OAS API definition.
+                value:
+                  request:
+                    method: GET
+                    path: /get
+                    oas:
+                      info:
+                        title: testdebug
+                        version: 1.0.0
+                      openapi: 3.0.3
+                      servers:
+                      - url: http://localhost:8181/testdebug/
+                      security: []
+                      paths: {}
+                      components:
+                        securitySchemes: {}
+                      x-tyk-api-gateway:
+                        info:
+                          dbId: 67a25ff65b60081c8731464f
+                          id: d37ea0e360c245cf406d640f1dbf788d
+                          orgId: 645b3db586341f751f4258aa
+                          name: testdebug
+                          state:
+                            active: true
+                            internal: false
+                        middleware:
+                          global:
+                            contextVariables:
+                              enabled: true
+                            trafficLogs:
+                              enabled: true
+                        server:
+                          listenPath:
+                            strip: true
+                            value: "/testdebug/"
+                        upstream:
+                          url: http://httpbin.org/
+                
             schema:
               $ref: '#/components/schemas/TraceRequest'
       responses:
@@ -1861,7 +1903,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
           description: Internal server error.
-      summary: Test an an API definition.
+      summary: Test a Classic or an OAS API definition.
       tags:
       - Debug
   /tyk/keys:
@@ -6277,6 +6319,7 @@ components:
           - executionEngine
           - subgraph
           - supergraph
+          - ""  # Allow empty string
           type: string
         introspection:
           $ref: '#/components/schemas/GraphQLIntrospectionConfig'
@@ -6301,9 +6344,9 @@ components:
           type: array
         version:
           enum:
-          - ''''
           - "1"
           - "2"
+          - ""  # Allow empty string
           type: string
       type: object
     GraphQLEngineConfig:
@@ -7265,6 +7308,7 @@ components:
         trigger:
           type: number
       type: object
+      nullable: true
     RateLimitType2:
       properties:
         per:
@@ -7718,12 +7762,19 @@ components:
           type: string
       type: object
     TraceRequest:
+      type: object
       properties:
         request:
           $ref: '#/components/schemas/TraceHttpRequest'
         spec:
           $ref: '#/components/schemas/APIDefinition'
-      type: object
+        oas:
+          oneOf:
+            - $ref: 'https://raw.githubusercontent.com/TykTechnologies/tyk/refs/heads/master/apidef/oas/schema/3.0.json'
+            - $ref: '#/components/schemas/XTykAPIGateway'
+      oneOf:
+        - required: [oas]
+        - required: [spec]
     TraceResponse:
       properties:
         logs:

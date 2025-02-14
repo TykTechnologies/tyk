@@ -6,11 +6,11 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/TykTechnologies/tyk/config"
-
 	"github.com/getkin/kin-openapi/openapi3"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/internal/reflect"
 )
 
 const (
@@ -205,18 +205,7 @@ func (s *OAS) RemoveTykExtension() {
 
 // Clone creates a deep copy of the OAS object and returns a new instance.
 func (s *OAS) Clone() (*OAS, error) {
-	oasInBytes, err := json.Marshal(s)
-	if err != nil {
-		return nil, err
-	}
-
-	var retOAS OAS
-	_ = json.Unmarshal(oasInBytes, &retOAS)
-
-	// convert Tyk extension from map to struct
-	retOAS.GetTykExtension()
-
-	return &retOAS, nil
+	return reflect.Clone(s), nil
 }
 
 func (s *OAS) getTykAuthentication() (authentication *Authentication) {

@@ -642,7 +642,6 @@ func TestSetDisabledFlags(t *testing.T) {
 		},
 	}
 	expectedAPIDef := APIDefinition{
-		DisableExpireAnalytics: true,
 		CustomMiddleware: MiddlewareSection{
 			AuthCheck: MiddlewareDefinition{
 				Disabled: true,
@@ -677,7 +676,6 @@ func TestSetDisabledFlags(t *testing.T) {
 		DomainDisabled:                 true,
 		CustomMiddlewareBundleDisabled: true,
 		ConfigDataDisabled:             true,
-		SessionLifetimeDisabled:        true,
 		Proxy: ProxyConfig{
 			ServiceDiscovery: ServiceDiscoveryConfiguration{
 				CacheDisabled: true,

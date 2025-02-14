@@ -59,13 +59,13 @@ type Authentication struct {
 	// SecuritySchemes contains security schemes definitions.
 	SecuritySchemes SecuritySchemes `bson:"securitySchemes,omitempty" json:"securitySchemes,omitempty"`
 
-	// KeyRetentionPeriod contains configuration for key retention.
-	KeyRetentionPeriod *KeyRetentionPeriod `bson:"keyRetentionPeriod,omitempty" json:"keyRetentionPeriod,omitempty"`
+	// CustomKeyLifetime contains configuration for the maximum retention period for tokens.
+	CustomKeyLifetime *CustomKeyLifetime `bson:"customKeyLifetime,omitempty" json:"customKeyLifetime,omitempty"`
 }
 
-// KeyRetentionPeriod contains configuration for key retention.
-type KeyRetentionPeriod struct {
-	// Enabled enables Key retention for the API
+// CustomKeyLifetime contains configuration for custom key retention.
+type CustomKeyLifetime struct {
+	// Enabled enables custom maximum retention for keys for the API
 	//
 	// Tyk classic API definition: `disable_expire_analytics`.
 	Enabled bool `bson:"enabled,omitempty" json:"enabled,omitempty"`
@@ -85,18 +85,32 @@ type KeyRetentionPeriod struct {
 	//
 	// Tyk classic API definition: `expire_analytics_after`.
 	Value ReadableDuration `bson:"value" json:"value"`
+	// RespectValidity ensures that Tyk respects the expiry configured in the key when the API level configuration grants a shorter lifetime.
+	// That is, Redis waits until the key has expired before deleting it.
+	RespectValidity bool `bson:"respectValidity,omitempty" json:"respectValidity,omitempty"`
 }
 
-// Fill fills *KeyRetentionPeriod from apidef.APIDefinition.
-func (k *KeyRetentionPeriod) Fill(api apidef.APIDefinition) {
-	k.Enabled = !api.SessionLifetimeDisabled
-	k.Value = ReadableDuration(time.Duration(api.ExpireAnalyticsAfter) * time.Second)
+// Fill fills *CustomKeyLifetime from apidef.APIDefinition.
+func (k *CustomKeyLifetime) Fill(api apidef.APIDefinition) {
+	k.RespectValidity = api.SessionLifetimeRespectsKeyExpiration
+
+	if api.SessionLifetime == 0 {
+		k.Enabled = false
+	} else {
+		k.Enabled = true
+		k.Value = ReadableDuration(time.Duration(api.SessionLifetime) * time.Second)
+	}
 }
 
 // ExtractTo extracts *Authentication into *apidef.APIDefinition.
-func (k *KeyRetentionPeriod) ExtractTo(api *apidef.APIDefinition) {
-	api.SessionLifetimeDisabled = !k.Enabled
-	api.SessionLifetime = int64(k.Value.Seconds())
+func (k *CustomKeyLifetime) ExtractTo(api *apidef.APIDefinition) {
+	api.SessionLifetimeRespectsKeyExpiration = k.RespectValidity
+
+	if k.Enabled {
+		api.SessionLifetime = int64(k.Value.Seconds())
+	} else {
+		api.SessionLifetime = 0
+	}
 }
 
 // Fill fills *Authentication from apidef.APIDefinition.
@@ -115,12 +129,14 @@ func (a *Authentication) Fill(api apidef.APIDefinition) {
 		a.Custom = nil
 	}
 
-	if a.KeyRetentionPeriod == nil {
-		a.KeyRetentionPeriod = &KeyRetentionPeriod{}
+	if a.CustomKeyLifetime == nil {
+		a.CustomKeyLifetime = &CustomKeyLifetime{}
 	}
-	a.KeyRetentionPeriod.Fill(api)
-	if ShouldOmit(a.KeyRetentionPeriod) {
-		a.KeyRetentionPeriod = nil
+
+	a.CustomKeyLifetime.Fill(api)
+
+	if ShouldOmit(a.CustomKeyLifetime) {
+		a.CustomKeyLifetime = nil
 	}
 
 	if api.AuthConfigs == nil || len(api.AuthConfigs) == 0 {
@@ -175,13 +191,14 @@ func (a *Authentication) ExtractTo(api *apidef.APIDefinition) {
 
 	a.Custom.ExtractTo(api)
 
-	if a.KeyRetentionPeriod == nil {
-		a.KeyRetentionPeriod = &KeyRetentionPeriod{}
+	if a.CustomKeyLifetime == nil {
+		a.CustomKeyLifetime = &CustomKeyLifetime{}
 		defer func() {
-			a.KeyRetentionPeriod = nil
+			a.CustomKeyLifetime = nil
 		}()
 	}
-	a.KeyRetentionPeriod.ExtractTo(api)
+
+	a.CustomKeyLifetime.ExtractTo(api)
 }
 
 // SecuritySchemes holds security scheme values, filled with Import().

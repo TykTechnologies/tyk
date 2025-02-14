@@ -280,6 +280,23 @@
         "value"
       ]
     },
+    "X-Tyk-CustomAnalyticsPluginConfig": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "functionName": {
+          "type": "string"
+        },
+        "path": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "enabled"
+      ]
+    },
     "X-Tyk-CustomPluginConfig": {
       "type": "object",
       "properties": {
@@ -1204,7 +1221,7 @@
             }
           }
         },
-        "keyRetentionPeriod": {
+        "customKeyLifetime": {
           "type": "object",
           "properties": {
             "enabled": {
@@ -1212,7 +1229,13 @@
             },
             "value": {
               "type": "string",
-              "pattern": "^(\\d+h)?(\\d+m)?(\\d+s)?$"
+              "pattern": "^(\\d+h)?(\\d+m)?(\\d+s)?$",
+              "not": {
+                "pattern": "^(0h)?(0m)?(0s)?$"
+              }
+            },
+            "respectValidity": {
+              "type": "boolean"
             }
           },
           "required": [
@@ -1266,6 +1289,9 @@
         "ipAccessControl": {
           "$ref": "#/definitions/X-Tyk-IPAccessControl"
         },
+        "batchProcessing": {
+          "$ref": "#/definitions/X-Tyk-BatchProcessing"
+        },
         "port": {
           "type": "integer",
           "minimum": 1,
@@ -1315,13 +1341,8 @@
         "serviceDiscovery": {
           "$ref": "#/definitions/X-Tyk-ServiceDiscovery"
         },
-        "test": {
-          "type": "object",
-          "properties": {
-            "serviceDiscovery": {
-              "$ref": "#/definitions/X-Tyk-ServiceDiscovery"
-            }
-          }
+        "uptimeTests": {
+          "$ref": "#/definitions/X-Tyk-UptimeTests"
         },
         "mutualTLS": {
           "$ref": "#/definitions/X-Tyk-MutualTLS"
@@ -1337,10 +1358,24 @@
         },
         "loadBalancing": {
           "$ref": "#/definitions/X-Tyk-LoadBalancing"
+        },
+        "preserveHostHeader": {
+          "$ref": "#/definitions/X-Tyk-PreserveHostHeader"
+        },
+        "tlsTransport": {
+          "$ref": "#/definitions/X-Tyk-TLSTransport"
+        },
+        "proxy": {
+          "$ref": "#/definitions/X-Tyk-Proxy"
         }
       },
-      "required": [
-        "url"
+      "anyOf": [
+        {
+          "required": ["url"]
+        },
+        {
+          "required": ["loadBalancing"]
+        }
       ]
     },
     "X-Tyk-State": {
@@ -1889,6 +1924,9 @@
         },
         {
           "$ref": "#/definitions/X-Tyk-Webhook-Without-ID"
+        },
+        {
+          "$ref": "#/definitions/X-Tyk-JSVMEvent"
         }
       ]
     },
@@ -1977,10 +2015,45 @@
         "bodyTemplate"
       ]
     },
+    "X-Tyk-JSVMEvent": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "trigger": {
+          "$ref": "#/definitions/X-Tyk-EventTrigger"
+        },
+        "type": {
+          "$ref": "#/definitions/X-Tyk-EventType"
+        },
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "functionName": {
+          "type": "string"
+        },
+        "path": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "enabled",
+        "trigger",
+        "type",
+        "name",
+        "functionName",
+        "path"
+      ]
+    },
     "X-Tyk-EventType": {
       "type": "string",
       "enum": [
-        "webhook"
+        "webhook",
+        "custom"
       ]
     },
     "X-Tyk-EventTrigger": {
@@ -1991,6 +2064,7 @@
         "RateLimitSmoothingUp",
         "RateLimitSmoothingDown",
         "AuthFailure",
+        "UpstreamOAuthError",
         "KeyExpired",
         "VersionFailure",
         "OrgQuotaExceeded",
@@ -2029,26 +2103,17 @@
             "type": "string"
           }
         },
-        "retentionPeriod": {
-          "type": "object",
-          "properties": {
-            "enabled": {
-              "type": "boolean"
-            },
-            "value": {
-              "type": "string",
-              "pattern": "^(\\d+h)?(\\d+m)?(\\d+s)?$"
-            }
-          },
-          "required": [
-            "enabled",
-            "value"
-          ]
+        "customRetentionPeriod": {
+          "type": "string",
+          "pattern": "^(\\d+h)?(\\d+m)?(\\d+s)?$",
+          "not": {
+            "pattern": "^(0h)?(0m)?(0s)?$"
+          }
         },
         "plugins": {
           "type": "array",
           "items": {
-            "$ref": "#/definitions/X-Tyk-CustomPluginConfig"
+            "$ref": "#/definitions/X-Tyk-CustomAnalyticsPluginConfig"
           }
         }
       },
@@ -2090,6 +2155,9 @@
         },
         "oauth": {
           "$ref": "#/definitions/X-Tyk-UpstreamOAuth"
+        },
+        "requestSigning": {
+          "$ref": "#/definitions/X-Tyk-UpstreamRequestSigning"
         }
       },
       "required": [
@@ -2219,6 +2287,38 @@
         "allowedAuthorizeTypes"
       ]
     },
+    "X-Tyk-UpstreamRequestSigning": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "signatureHeader": {
+          "type": "string"
+        },
+        "algorithm": {
+          "type": "string"
+        },
+        "keyId": {
+          "type": "string"
+        },
+        "headers": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "secret": {
+          "type": "string"
+        },
+        "certificateId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "enabled"
+      ]
+    },
     "X-Tyk-NonEmptyString": {
       "type": "string",
       "pattern": "\\S+"
@@ -2254,6 +2354,16 @@
         }
       }
     },
+    "X-Tyk-BatchProcessing": {
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "enabled"
+      ]
+    },
     "X-Tyk-LoadBalancing": {
       "type": "object",
       "properties": {
@@ -2271,7 +2381,142 @@
       },
       "required": [
         "enabled"
+      ],
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "enabled": { "const": true }
+            }
+          },
+          "then": {
+            "properties": {
+              "targets": {
+                "minItems": 1
+              }
+            },
+            "required": ["targets"]
+          }
+        }
       ]
+    },
+    "X-Tyk-TLSTransport": {
+      "type": "object",
+      "properties": {
+        "insecureSkipVerify": {
+          "type": "boolean"
+        },
+        "ciphers": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "minVersion": {
+          "type": "string",
+          "enum": ["1.0", "1.1", "1.2", "1.3"]
+        },
+        "maxVersion": {
+          "type": "string",
+          "enum": ["1.0", "1.1", "1.2", "1.3"]
+        },
+        "forceCommonNameCheck": {
+          "type": "boolean"
+        }
+      }
+    },
+    "X-Tyk-Proxy": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "url": {
+          "type": "string"
+        }
+      },
+      "required": ["enabled"]
+    },
+    "X-Tyk-PreserveHostHeader": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "enabled"
+      ]
+    },
+    "X-Tyk-UptimeTestCommand": {
+      "type": "object",
+      "properties": {
+        "message": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        }
+      }
+    },
+    "X-Tyk-UptimeTest": {
+      "type": "object",
+      "properties": {
+        "body": {
+          "type": "string"
+        },
+        "commands": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/X-Tyk-UptimeTestCommand"
+          }
+        },
+        "enableProxyProtocol": {
+          "type": "boolean"
+        },
+        "headers": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "method": {
+          "type": "string"
+        },
+        "protocol": {
+          "type": "string"
+        },
+        "timeout": {
+          "$ref": "#/definitions/X-Tyk-ReadableDuration"
+        },
+        "url": {
+          "type": "string"
+        }
+      }
+    },
+    "X-Tyk-UptimeTests": {
+      "type": "object",
+      "properties": {
+        "hostDownRetestPeriod": {
+          "$ref": "#/definitions/X-Tyk-ReadableDuration"
+        },
+        "logRetentionPeriod": {
+          "$ref": "#/definitions/X-Tyk-ReadableDuration"
+        },
+        "serviceDiscovery": {
+          "$ref": "#/definitions/X-Tyk-ServiceDiscovery"
+        },
+        "tests": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/X-Tyk-UptimeTest"
+          }
+        }
+      }
+    },
+    "X-Tyk-ReadableDuration": {
+      "type": "string",
+      "pattern": "^(\\d+h)?(\\d+m)?(\\d+s)?$"
     },
     "X-Tyk-LoadBalancingTarget": {
       "type": "object",

@@ -46,7 +46,7 @@ func TestMiddleware(t *testing.T) {
 					Plugins: customPlugins,
 				},
 				TrafficLogs: &TrafficLogs{
-					Plugins: customPlugins,
+					Plugins: CustomAnalyticsPlugins(customPlugins),
 				},
 			},
 		}
@@ -74,7 +74,7 @@ func TestMiddleware(t *testing.T) {
 				PostPlugins:               customPlugins,
 				ResponsePlugins:           customPlugins,
 				TrafficLogs: &TrafficLogs{
-					Plugins: customPlugins,
+					Plugins: CustomAnalyticsPlugins(customPlugins),
 				},
 			},
 		}
@@ -228,44 +228,22 @@ func TestTrafficLogs(t *testing.T) {
 		assert.Empty(t, convertedAPI.TagHeaders)
 	})
 
-	t.Run("retention header enabled", func(t *testing.T) {
-		trafficLogs := TrafficLogs{
-			Enabled: true,
-			RetentionPeriod: &RetentionPeriod{
-				Enabled: true,
-				Value:   ReadableDuration(time.Minute * 2),
-			},
-		}
-
+	t.Run("enable with retention period", func(t *testing.T) {
 		var convertedAPI apidef.APIDefinition
 		var resultTrafficLogs TrafficLogs
+		trafficLogs := TrafficLogs{
+			Enabled:               true,
+			CustomRetentionPeriod: ReadableDuration(time.Minute * 2),
+		}
+
 		convertedAPI.SetDisabledFlags()
 		trafficLogs.ExtractTo(&convertedAPI)
 
-		assert.Equal(t, trafficLogs.RetentionPeriod.Enabled, !convertedAPI.DisableExpireAnalytics)
 		assert.Equal(t, int64(120), convertedAPI.ExpireAnalyticsAfter)
 
 		resultTrafficLogs.Fill(convertedAPI)
+
 		assert.Equal(t, trafficLogs, resultTrafficLogs)
-	})
-
-	t.Run("retention header disabled", func(t *testing.T) {
-		trafficLogs := TrafficLogs{
-			Enabled:         true,
-			RetentionPeriod: nil,
-		}
-
-		var convertedAPI apidef.APIDefinition
-		var resultTrafficLogs TrafficLogs
-
-		convertedAPI.SetDisabledFlags()
-		trafficLogs.ExtractTo(&convertedAPI)
-
-		assert.Equal(t, true, convertedAPI.DisableExpireAnalytics)
-		assert.Equal(t, int64(0), convertedAPI.ExpireAnalyticsAfter)
-
-		resultTrafficLogs.Fill(convertedAPI)
-		assert.Nil(t, resultTrafficLogs.RetentionPeriod)
 	})
 
 	t.Run("with custom analytics plugin", func(t *testing.T) {
@@ -273,7 +251,7 @@ func TestTrafficLogs(t *testing.T) {
 		expectedTrafficLogsPlugin := TrafficLogs{
 			Enabled:    true,
 			TagHeaders: []string{},
-			Plugins: CustomPlugins{
+			Plugins: CustomAnalyticsPlugins{
 				{
 					Enabled:      true,
 					FunctionName: "CustomAnalyticsPlugin",
@@ -285,6 +263,10 @@ func TestTrafficLogs(t *testing.T) {
 		api := apidef.APIDefinition{}
 		api.SetDisabledFlags()
 		expectedTrafficLogsPlugin.ExtractTo(&api)
+
+		assert.Equal(t, expectedTrafficLogsPlugin.Plugins[0].FunctionName, api.AnalyticsPlugin.FuncName)
+		assert.Equal(t, true, api.AnalyticsPlugin.Enabled)
+		assert.Equal(t, expectedTrafficLogsPlugin.Plugins[0].Path, api.AnalyticsPlugin.PluginPath)
 
 		actualTrafficLogsPlugin := TrafficLogs{}
 		actualTrafficLogsPlugin.Fill(api)

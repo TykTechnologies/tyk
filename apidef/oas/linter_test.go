@@ -85,14 +85,46 @@ func TestXTykGateway_Lint(t *testing.T) {
 		}
 
 		settings.Upstream.RateLimit.Per = ReadableDuration(10 * time.Second)
-		settings.Server.Authentication.KeyRetentionPeriod.Value = ReadableDuration(10 * time.Second)
+		settings.Server.Authentication.CustomKeyLifetime.Value = ReadableDuration(10 * time.Second)
+
+		settings.Middleware.Global.TrafficLogs.CustomRetentionPeriod = ReadableDuration(10 * time.Second)
+		for i := range settings.Middleware.Global.TrafficLogs.Plugins {
+			settings.Middleware.Global.TrafficLogs.Plugins[i].RawBodyOnly = false
+			settings.Middleware.Global.TrafficLogs.Plugins[i].RequireSession = false
+		}
 
 		settings.Upstream.Authentication = &UpstreamAuth{
 			Enabled:   false,
 			BasicAuth: nil,
 			OAuth:     nil,
 		}
-		settings.Middleware.Global.TrafficLogs.RetentionPeriod.Value = ReadableDuration(time.Minute * 10)
+
+		settings.Upstream.UptimeTests = &UptimeTests{
+			HostDownRetestPeriod: ReadableDuration(10 * time.Second),
+			LogRetentionPeriod:   ReadableDuration(10 * time.Second),
+			Tests: []UptimeTest{
+				{
+					Timeout: ReadableDuration(10 * time.Second),
+					Commands: []UptimeTestCommand{
+						{
+							Name:    "send",
+							Message: "PING",
+						},
+						{
+							Name:    "recv",
+							Message: "+PONG",
+						},
+					},
+					Headers: map[string]string{
+						"Request-Id": "1",
+					},
+				},
+			},
+		}
+
+		settings.Upstream.TLSTransport.MinVersion = "1.2"
+		settings.Upstream.TLSTransport.MaxVersion = "1.2"
+		settings.Upstream.TLSTransport.Ciphers = []string{"TLS_RSA_WITH_RC4_128_SHA"}
 	}
 
 	// Encode data to json

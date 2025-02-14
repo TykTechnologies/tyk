@@ -1581,32 +1581,26 @@ type TrafficLogs struct {
 	// TagHeaders is a string array of HTTP headers that can be extracted
 	// and transformed into analytics tags (statistics aggregated by tag, per hour).
 	TagHeaders []string `bson:"tagHeaders" json:"tagHeaders,omitempty"`
-	// RetentionPeriod holds the configuration for the analytics retention, it contains configuration
-	// for how long you would like analytics data to last for.
-	RetentionPeriod *RetentionPeriod `bson:"retentionPeriod" json:"retentionPeriod,omitempty"`
+	// CustomRetentionPeriod configures a custom value for how long the analytics is retained for,
+	// defaults to 100 years.
+	CustomRetentionPeriod ReadableDuration `bson:"customRetentionPeriod,omitempty" json:"customRetentionPeriod,omitempty"`
 	// Plugins configures custom plugins to allow for extensive modifications to analytics records
 	// The plugins would be executed in the order of configuration in the list.
-	Plugins CustomPlugins `bson:"plugins,omitempty" json:"plugins,omitempty"`
+	Plugins CustomAnalyticsPlugins `bson:"plugins,omitempty" json:"plugins,omitempty"`
 }
 
 // Fill fills *TrafficLogs from apidef.APIDefinition.
 func (t *TrafficLogs) Fill(api apidef.APIDefinition) {
 	t.Enabled = !api.DoNotTrack
 	t.TagHeaders = api.TagHeaders
+	t.CustomRetentionPeriod = ReadableDuration(time.Duration(api.ExpireAnalyticsAfter) * time.Second)
 
-	if t.RetentionPeriod == nil {
-		t.RetentionPeriod = &RetentionPeriod{}
+	if t.Plugins == nil {
+		t.Plugins = make(CustomAnalyticsPlugins, 0)
 	}
-	t.RetentionPeriod.Fill(api)
-	if ShouldOmit(t.RetentionPeriod) {
-		t.RetentionPeriod = nil
-	}
-
-	if len(api.CustomMiddleware.TrafficLogs) == 0 {
+	t.Plugins.Fill(api)
+	if ShouldOmit(t.Plugins) {
 		t.Plugins = nil
-	} else {
-		t.Plugins = make(CustomPlugins, len(api.CustomMiddleware.TrafficLogs))
-		t.Plugins.Fill(api.CustomMiddleware.TrafficLogs)
 	}
 }
 
@@ -1614,57 +1608,43 @@ func (t *TrafficLogs) Fill(api apidef.APIDefinition) {
 func (t *TrafficLogs) ExtractTo(api *apidef.APIDefinition) {
 	api.DoNotTrack = !t.Enabled
 	api.TagHeaders = t.TagHeaders
+	api.ExpireAnalyticsAfter = int64(t.CustomRetentionPeriod.Seconds())
 
-	if t.RetentionPeriod == nil {
-		t.RetentionPeriod = &RetentionPeriod{}
+	if t.Plugins == nil {
+		t.Plugins = make(CustomAnalyticsPlugins, 0)
 		defer func() {
-			t.RetentionPeriod = nil
+			t.Plugins = nil
 		}()
 	}
-	t.RetentionPeriod.ExtractTo(api)
+	t.Plugins.ExtractTo(api)
+}
 
-	if len(t.Plugins) == 0 {
-		api.CustomMiddleware.TrafficLogs = nil
-	} else {
-		api.CustomMiddleware.TrafficLogs = make([]apidef.MiddlewareDefinition, len(t.Plugins))
-		t.Plugins.ExtractTo(api.CustomMiddleware.TrafficLogs)
+// CustomAnalyticsPlugins is a list of CustomPlugin objects for analytics.
+type CustomAnalyticsPlugins []CustomPlugin
+
+// Fill fills CustomAnalyticsPlugins from AnalyticsPlugin in the supplied api.
+func (c *CustomAnalyticsPlugins) Fill(api apidef.APIDefinition) {
+	if api.AnalyticsPlugin.Enabled {
+		customPlugins := []CustomPlugin{
+			{
+				Enabled:      api.AnalyticsPlugin.Enabled,
+				FunctionName: api.AnalyticsPlugin.FuncName,
+				Path:         api.AnalyticsPlugin.PluginPath,
+			},
+		}
+		*c = customPlugins
 	}
 }
 
-// RetentionPeriod holds the configuration for analytics retention.
-type RetentionPeriod struct {
-	// Enabled enables log analytics retention for the API
-	//
-	// Tyk classic API definition: `!disable_expire_analytics`.
-	Enabled bool `bson:"enabled" json:"enabled"`
-	// Value is the interval to keep the analytics record for
-	// The value of Value is a string that specifies the interval in a compact form,
-	// where hours, minutes and seconds are denoted by 'h', 'm' and 's' respectively.
-	// Multiple units can be combined to represent the duration.
-	//
-	// Examples of valid shorthand notations:
-	// - "1h"   : one hour
-	// - "20m"  : twenty minutes
-	// - "30s"  : thirty seconds
-	// - "1m29s": one minute and twenty-nine seconds
-	// - "1h30m" : one hour and thirty minutes
-	//
-	// An empty value is interpreted as "0s"
-	//
-	// Tyk classic API definition: `expire_analytics_after`.
-	Value ReadableDuration `bson:"value" json:"value"`
-}
-
-// Fill fills *RetentionPeriod from apidef.APIDefinition
-func (r *RetentionPeriod) Fill(api apidef.APIDefinition) {
-	r.Enabled = !api.DisableExpireAnalytics
-	r.Value = ReadableDuration(time.Duration(api.ExpireAnalyticsAfter) * time.Second)
-}
-
-// ExtractTo extracts *RetentionPeriod into apidef.APIDefinition
-func (r *RetentionPeriod) ExtractTo(api *apidef.APIDefinition) {
-	api.DisableExpireAnalytics = !r.Enabled
-	api.ExpireAnalyticsAfter = int64(r.Value.Seconds())
+// ExtractTo extracts CustomAnalyticsPlugins into AnalyticsPlugin of supplied api.
+func (c *CustomAnalyticsPlugins) ExtractTo(api *apidef.APIDefinition) {
+	if len(*c) > 0 {
+		// extract the first item in the customAnalyticsPlugin into apidef
+		plugin := (*c)[0]
+		api.AnalyticsPlugin.Enabled = plugin.Enabled
+		api.AnalyticsPlugin.FuncName = plugin.FunctionName
+		api.AnalyticsPlugin.PluginPath = plugin.Path
+	}
 }
 
 // GlobalRequestSizeLimit holds configuration about the global limits for request sizes.

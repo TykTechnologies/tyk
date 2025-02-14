@@ -141,8 +141,15 @@ func TestOAS_ExtractTo_ResetAPIDefinition(t *testing.T) {
 		event.QuotaExceeded: {
 			{
 				Handler: event.WebHookHandler,
-				HandlerMeta: map[string]interface{}{
+				HandlerMeta: map[string]any{
 					"target_path": "https://webhook.site/uuid",
+				},
+			},
+			{
+				Handler: event.JSVMHandler,
+				HandlerMeta: map[string]any{
+					"name": "myHandler",
+					"path": "my_script.js",
 				},
 			},
 		},
@@ -174,8 +181,6 @@ func TestOAS_ExtractTo_ResetAPIDefinition(t *testing.T) {
 	a.DisableRateLimit = false
 	a.DoNotTrack = false
 	a.IPAccessControlDisabled = false
-	a.DisableExpireAnalytics = false
-	a.SessionLifetimeDisabled = false
 
 	// deprecated fields
 	a.Auth = apidef.AuthConfig{}
@@ -212,13 +217,6 @@ func TestOAS_ExtractTo_ResetAPIDefinition(t *testing.T) {
 	expectedFields := []string{
 		"APIDefinition.Slug",
 		"APIDefinition.EnableProxyProtocol",
-		"APIDefinition.RequestSigning.IsEnabled",
-		"APIDefinition.RequestSigning.Secret",
-		"APIDefinition.RequestSigning.KeyId",
-		"APIDefinition.RequestSigning.Algorithm",
-		"APIDefinition.RequestSigning.HeaderList[0]",
-		"APIDefinition.RequestSigning.CertificateId",
-		"APIDefinition.RequestSigning.SignatureHeader",
 		"APIDefinition.VersionData.Versions[0].ExtendedPaths.TransformJQ[0].Filter",
 		"APIDefinition.VersionData.Versions[0].ExtendedPaths.TransformJQ[0].Path",
 		"APIDefinition.VersionData.Versions[0].ExtendedPaths.TransformJQ[0].Method",
@@ -230,36 +228,16 @@ func TestOAS_ExtractTo_ResetAPIDefinition(t *testing.T) {
 		"APIDefinition.VersionData.Versions[0].ExtendedPaths.PersistGraphQL[0].Operation",
 		"APIDefinition.VersionData.Versions[0].ExtendedPaths.PersistGraphQL[0].Variables[0]",
 		"APIDefinition.VersionData.Versions[0].IgnoreEndpointCase",
-		"APIDefinition.UptimeTests.CheckList[0].CheckURL",
-		"APIDefinition.UptimeTests.CheckList[0].Protocol",
-		"APIDefinition.UptimeTests.CheckList[0].Timeout",
-		"APIDefinition.UptimeTests.CheckList[0].EnableProxyProtocol",
-		"APIDefinition.UptimeTests.CheckList[0].Commands[0].Name",
-		"APIDefinition.UptimeTests.CheckList[0].Commands[0].Message",
-		"APIDefinition.UptimeTests.CheckList[0].Method",
-		"APIDefinition.UptimeTests.CheckList[0].Headers[0]",
-		"APIDefinition.UptimeTests.CheckList[0].Body",
-		"APIDefinition.UptimeTests.Config.ExpireUptimeAnalyticsAfter",
 		"APIDefinition.UptimeTests.Config.ServiceDiscovery.CacheDisabled",
-		"APIDefinition.UptimeTests.Config.RecheckWait",
-		"APIDefinition.Proxy.PreserveHostHeader",
 		"APIDefinition.Proxy.DisableStripSlash",
 		"APIDefinition.Proxy.CheckHostAgainstUptimeTests",
-		"APIDefinition.Proxy.Transport.SSLInsecureSkipVerify",
-		"APIDefinition.Proxy.Transport.SSLCipherSuites[0]",
-		"APIDefinition.Proxy.Transport.SSLMinVersion",
-		"APIDefinition.Proxy.Transport.SSLMaxVersion",
-		"APIDefinition.Proxy.Transport.SSLForceCommonNameCheck",
-		"APIDefinition.Proxy.Transport.ProxyURL",
 		"APIDefinition.DisableQuota",
-		"APIDefinition.SessionLifetimeRespectsKeyExpiration",
 		"APIDefinition.AuthProvider.Name",
 		"APIDefinition.AuthProvider.StorageEngine",
 		"APIDefinition.AuthProvider.Meta[0]",
 		"APIDefinition.SessionProvider.Name",
 		"APIDefinition.SessionProvider.StorageEngine",
 		"APIDefinition.SessionProvider.Meta[0]",
-		"APIDefinition.EnableBatchRequestSupport",
 		"APIDefinition.EnableIpWhiteListing",
 		"APIDefinition.EnableIpBlacklisting",
 		"APIDefinition.DontSetQuotasOnCreate",
@@ -810,10 +788,14 @@ func TestOAS_Clone(t *testing.T) {
 	s.GetTykExtension().Info.Name = "my-api-modified"
 	assert.NotEqual(t, s, clonedOAS)
 
-	t.Run("marshal error", func(t *testing.T) {
+	t.Run("clone impossible to marshal value", func(t *testing.T) {
 		s.Extensions["weird extension"] = make(chan int)
-		_, err = s.Clone()
-		assert.ErrorContains(t, err, "unsupported type: chan int")
+
+		result, err := s.Clone()
+		assert.NoError(t, err)
+
+		_, ok := result.Extensions["weird extension"]
+		assert.True(t, ok)
 	})
 }
 
@@ -944,9 +926,6 @@ func TestMigrateAndFillOAS_DropEmpties(t *testing.T) {
 			Global: &Global{
 				TrafficLogs: &TrafficLogs{
 					Enabled: true,
-					RetentionPeriod: &RetentionPeriod{
-						Enabled: true,
-					},
 				},
 			},
 		}, baseAPI.OAS.GetTykExtension().Middleware)
@@ -1053,10 +1032,6 @@ func TestMigrateAndFillOAS_CustomPluginAuth(t *testing.T) {
 					Path:         "/path/to/plugin",
 				},
 			},
-			KeyRetentionPeriod: &KeyRetentionPeriod{
-				Enabled: true,
-				Value:   0,
-			},
 		}
 
 		assert.Equal(t, expectedAuthentication, *migratedAPI.OAS.GetTykExtension().Server.Authentication)
@@ -1106,10 +1081,6 @@ func TestMigrateAndFillOAS_CustomPluginAuth(t *testing.T) {
 						Name:    "Authorization",
 					},
 				},
-			},
-			KeyRetentionPeriod: &KeyRetentionPeriod{
-				Enabled: true,
-				Value:   0,
 			},
 		}
 
