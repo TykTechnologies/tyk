@@ -265,7 +265,7 @@ func (gw *Gateway) cacheCreate() {
 	gw.RPCCertCache = cache.New(int64(conf.SlaveOptions.RPCCertCacheExpiration), 15)
 }
 
-// stopCaches will close the caches in *Gateway, cleaning up the goroutines.
+// cacheClose will close the caches in *Gateway, cleaning up the goroutines.
 func (gw *Gateway) cacheClose() {
 	gw.SessionCache.Close()
 	gw.ServiceCache.Close()
