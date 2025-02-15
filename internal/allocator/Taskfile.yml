@@ -1,0 +1,37 @@
+---
+version: "3"
+
+vars:
+  coverage: test/allocator.cov
+  cpuprofile: test/allocator.prof
+  memprofile: test/allocator.mprof
+
+tasks:
+  default:
+    desc: "Run everything"
+    cmds:
+      - task: fmt
+      - task: test
+
+  fmt:
+    desc: "Run formatters"
+    cmds:
+      - goimports -w .
+      - go fmt ./...
+
+  test:
+    desc: "Build/run tests"
+    cmds:
+      - mkdir -p test
+      - go test -bench=. -benchtime=2s -benchmem -race -cpu 1,2,3 -cover -coverprofile {{.coverage}} -cpuprofile {{.cpuprofile}} -memprofile {{.memprofile}} -coverpkg=$(go list .) -v .
+
+  cover:
+    desc: "Show source coverage"
+    aliases: [coverage, cov]
+    cmds:
+      - go tool cover -func={{.coverage}}
+
+  uncover:
+    desc: "Show uncovered source"
+    cmds:
+      - uncover {{.coverage}}
