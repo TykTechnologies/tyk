@@ -140,7 +140,6 @@ type configTestReverseProxyDnsCache struct {
 }
 
 func (s *Test) flakySetupTestReverseProxyDnsCache(cfg *configTestReverseProxyDnsCache) func() {
-	pullDomains := s.MockHandle.PushDomains(cfg.etcHostsMap, nil)
 	s.Gw.dnsCacheManager.InitDNSCaching(
 		time.Duration(cfg.dnsConfig.TTL)*time.Second, time.Duration(cfg.dnsConfig.CheckInterval)*time.Second)
 
@@ -151,7 +150,6 @@ func (s *Test) flakySetupTestReverseProxyDnsCache(cfg *configTestReverseProxyDns
 	s.Gw.SetConfig(globalConf)
 
 	return func() {
-		pullDomains()
 		s.Gw.dnsCacheManager.DisposeCache()
 		globalConf.HttpServerOptions.EnableWebSockets = enableWebSockets
 		s.Gw.SetConfig(globalConf)
@@ -188,11 +186,7 @@ func TestReverseProxyDnsCache(t *testing.T) {
 	)
 
 	ts := StartTest(nil)
-	ts.MockHandle, _ = test.InitDNSMock(etcHostsMap, nil)
 	defer ts.Close()
-	defer func() {
-		_ = ts.MockHandle.ShutdownDnsMock()
-	}()
 
 	tearDown := ts.flakySetupTestReverseProxyDnsCache(&configTestReverseProxyDnsCache{t, etcHostsMap,
 		config.DnsCacheConfig{
