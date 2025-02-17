@@ -152,6 +152,12 @@ func TestOAS_ExtractTo_ResetAPIDefinition(t *testing.T) {
 					"path": "my_script.js",
 				},
 			},
+			{
+				Handler: event.LogHandler,
+				HandlerMeta: map[string]any{
+					"prefix": "QuotaExceededEvent",
+				},
+			},
 		},
 	}
 
