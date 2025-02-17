@@ -169,23 +169,19 @@ func TestEventHandlers(t *testing.T) {
 					Events: map[event.Event][]apidef.EventHandlerTriggerConfig{
 						event.QuotaExceeded: {
 							{
-								Handler: event.JSVMHandler,
+								Handler: event.LogHandler,
 								HandlerMeta: map[string]any{
 									"disabled": false,
-									"id":       "random-id",
-									"name":     "myQuotaEventHandler",
-									"path":     "my_script.js",
+									"prefix":   "QuotaExceededEvent",
 								},
 							},
 						},
 						event.RateLimitExceeded: {
 							{
-								Handler: event.JSVMHandler,
+								Handler: event.LogHandler,
 								HandlerMeta: map[string]any{
 									"disabled": true,
-									"id":       "",
-									"name":     "myRateLimitEventHandler",
-									"path":     "my_script.js",
+									"prefix":   "RateLimitExceededEvent",
 								},
 							},
 						},
