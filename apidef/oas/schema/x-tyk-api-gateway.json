@@ -1301,7 +1301,7 @@
           "type": "string",
           "enum": [
             "http",
-            "http2",
+            "https",
             "h2c"
           ]
         }
