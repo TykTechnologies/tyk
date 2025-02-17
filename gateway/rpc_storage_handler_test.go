@@ -7,7 +7,9 @@ import (
 	"io"
 	"net/http"
 	"testing"
+	"time"
 
+	"github.com/TykTechnologies/gorpc"
 	"github.com/TykTechnologies/tyk/internal/model"
 	"github.com/TykTechnologies/tyk/rpc"
 
@@ -692,14 +694,38 @@ func TestDeleteUsingTokenID(t *testing.T) {
 }
 
 func TestProcessKeySpaceChanges_UserKeyReset(t *testing.T) {
+	oldKey := "old-api-key"
+	newKey := "new-api-key"
+
+	dispatcher := gorpc.NewDispatcher()
+	dispatcher.AddFunc("Login", func(clientAddr, userKey string) bool {
+		return true
+	})
+	dispatcher.AddFunc("Disconnect", func(clientAddr string, groupData *model.GroupLoginRequest) error {
+		return nil
+	})
+	dispatcher.AddFunc("GetKeySpaceUpdate", func(clientAddr, orgId string) ([]string, error) {
+		return []string{}, nil
+	})
+	dispatcher.AddFunc("GetGroupKeySpaceUpdate", func(clientAddr string, groupData *model.GroupKeySpaceRequest) ([]string, error) {
+		return []string{}, nil
+	})
+
+	rpcMock, connectionString := startRPCMock(dispatcher)
+	defer stopRPCMock(rpcMock)
+
 	g := StartTest(func(globalConf *config.Config) {
-		globalConf.SlaveOptions.UseRPC = false
-		globalConf.SlaveOptions.ConnectionString = ""
+		globalConf.SlaveOptions.UseRPC = true
+		globalConf.SlaveOptions.RPCKey = "test_org"
+		globalConf.SlaveOptions.APIKey = oldKey
+		globalConf.SlaveOptions.ConnectionString = connectionString
+		globalConf.SlaveOptions.CallTimeout = 1
+		globalConf.SlaveOptions.RPCPoolSize = 2
+		globalConf.SlaveOptions.DisableKeySpaceSync = true
 	})
 	defer g.Close()
 
-	oldKey := "old-api-key"
-	newKey := "new-api-key"
+	time.Sleep(100 * time.Millisecond)
 
 	rpcListener := RPCStorageHandler{
 		KeyPrefix:        "rpc.listener.",
@@ -708,10 +734,10 @@ func TestProcessKeySpaceChanges_UserKeyReset(t *testing.T) {
 		Gw:               g.Gw,
 	}
 
-	// Setup initial config
-	gwConfig := g.Gw.GetConfig()
-	gwConfig.SlaveOptions.APIKey = oldKey
-	g.Gw.SetConfig(gwConfig)
+	connected := rpcListener.Connect()
+	if !connected {
+		t.Fatal("Failed to connect to RPC server")
+	}
 
 	testCases := []struct {
 		name     string
@@ -748,7 +774,6 @@ func TestProcessKeySpaceChanges_UserKeyReset(t *testing.T) {
 			g.Gw.SetConfig(config)
 
 			rpcListener.ProcessKeySpaceChanges(tc.keys, DefaultOrg)
-
 			updatedConfig := g.Gw.GetConfig()
 			assert.Equal(t, tc.expected, updatedConfig.SlaveOptions.APIKey)
 		})

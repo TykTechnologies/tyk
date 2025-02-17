@@ -16,6 +16,7 @@ import (
 
 	"github.com/TykTechnologies/tyk/internal/crypto"
 	"github.com/TykTechnologies/tyk/storage"
+	"github.com/TykTechnologies/tyk/storage/kv"
 )
 
 type NotificationCommand string
@@ -326,6 +327,40 @@ func (gw *Gateway) handleDashboardZeroConfMessage(payload string) {
 	}
 }
 
+// updateKeyInStore updates the API key in the specified KV store
+func (gw *Gateway) updateKeyInStore(keyPath, newKey string) {
+	if keyPath == "" {
+		return
+	}
+
+	var store kv.Store
+	var storeType string
+	actualPath := ""
+
+	switch {
+	case strings.HasPrefix(keyPath, "vault://"):
+		store = gw.vaultKVStore
+		storeType = "Vault"
+		actualPath = strings.TrimPrefix(keyPath, "vault://")
+	case strings.HasPrefix(keyPath, "consul://"):
+		store = gw.consulKVStore
+		storeType = "Consul"
+		actualPath = strings.TrimPrefix(keyPath, "consul://")
+	default:
+		return
+	}
+
+	if store == nil {
+		return
+	}
+
+	if err := store.Put(actualPath, newKey); err != nil {
+		log.WithError(err).Errorf("Failed to update API key in %s", storeType)
+		return
+	}
+	log.Infof("Successfully updated API key in %s", storeType)
+}
+
 // handleUserKeyReset processes a user key reset notification
 func (gw *Gateway) handleUserKeyReset(payload string) {
 	keys := strings.Split(payload, ":")
@@ -350,27 +385,7 @@ func (gw *Gateway) handleUserKeyReset(payload string) {
 		gw.SetConfig(config)
 
 		// If we're using a KV store, update the API key there as well
-		if config.SlaveOptions.OriginalAPIKeyPath != "" {
-			if strings.HasPrefix(config.SlaveOptions.OriginalAPIKeyPath, "vault://") {
-				actualPath := strings.TrimPrefix(config.SlaveOptions.OriginalAPIKeyPath, "vault://")
-				if gw.vaultKVStore != nil {
-					if err := gw.vaultKVStore.Put(actualPath, newKey); err != nil {
-						log.WithError(err).Error("Failed to update API key in Vault")
-					} else {
-						log.Info("Successfully updated API key in Vault")
-					}
-				}
-			} else if strings.HasPrefix(config.SlaveOptions.OriginalAPIKeyPath, "consul://") {
-				actualPath := strings.TrimPrefix(config.SlaveOptions.OriginalAPIKeyPath, "consul://")
-				if gw.consulKVStore != nil {
-					if err := gw.consulKVStore.Put(actualPath, newKey); err != nil {
-						log.WithError(err).Error("Failed to update API key in Consul")
-					} else {
-						log.Info("Successfully updated API key in Consul")
-					}
-				}
-			}
-		}
+		gw.updateKeyInStore(config.SlaveOptions.OriginalAPIKeyPath, newKey)
 
 		if store, ok := gw.GlobalSessionManager.Store().(*RPCStorageHandler); ok {
 			store.Connect()

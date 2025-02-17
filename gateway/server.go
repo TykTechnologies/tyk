@@ -1493,40 +1493,40 @@ func (gw *Gateway) afterConfSetup() {
 
 	conf.Secret, err = gw.kvStore(conf.Secret)
 	if err != nil {
-		log.Fatalf("could not retrieve the secret key.. %v", err)
+		log.WithError(err).Fatal("Could not retrieve the secret key...")
 	}
 
 	conf.NodeSecret, err = gw.kvStore(conf.NodeSecret)
 	if err != nil {
-		log.Fatalf("could not retrieve the NodeSecret key.. %v", err)
+		log.WithError(err).Fatal("Could not retrieve the NodeSecret key...")
 	}
 
 	conf.Storage.Password, err = gw.kvStore(conf.Storage.Password)
 	if err != nil {
-		log.Fatalf("Could not retrieve redis password... %v", err)
+		log.WithError(err).Fatal("Could not retrieve redis password...")
 	}
 
 	conf.CacheStorage.Password, err = gw.kvStore(conf.CacheStorage.Password)
 	if err != nil {
-		log.Fatalf("Could not retrieve cache storage password... %v", err)
+		log.WithError(err).Fatal("Could not retrieve cache storage password...")
 	}
 
 	conf.Security.PrivateCertificateEncodingSecret, err = gw.kvStore(conf.Security.PrivateCertificateEncodingSecret)
 	if err != nil {
-		log.Fatalf("Could not retrieve the private certificate encoding secret... %v", err)
+		log.WithError(err).Fatal("Could not retrieve the private certificate encoding secret...")
 	}
 
 	if conf.UseDBAppConfigs {
 		conf.DBAppConfOptions.ConnectionString, err = gw.kvStore(conf.DBAppConfOptions.ConnectionString)
 		if err != nil {
-			log.Fatalf("Could not fetch dashboard connection string.")
+			log.WithError(err).Fatal("Could not fetch dashboard connection string.")
 		}
 	}
 
 	if conf.Policies.PolicySource == "service" {
 		conf.Policies.PolicyConnectionString, err = gw.kvStore(conf.Policies.PolicyConnectionString)
 		if err != nil {
-			log.Fatalf("Could not fetch policy connection string.")
+			log.WithError(err).Fatal("Could not fetch policy connection string.")
 		}
 	}
 
@@ -1534,7 +1534,7 @@ func (gw *Gateway) afterConfSetup() {
 		conf.SlaveOptions.OriginalAPIKeyPath = conf.SlaveOptions.APIKey
 		conf.SlaveOptions.APIKey, err = gw.kvStore(conf.SlaveOptions.APIKey)
 		if err != nil {
-			log.Fatalf("Could not retrieve API key from KV store.")
+			log.WithError(err).Fatalf("Could not retrieve API key from KV store.")
 		}
 	}
 
