@@ -89,7 +89,6 @@ tasks:
     desc: "Reformat import groups"
     cmds:
       - task: lint:fmt
-      - task: docs:fmt
 
   # This reformats imports with goimports-reviser;
   #
