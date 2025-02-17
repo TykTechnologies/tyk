@@ -14,6 +14,7 @@ tasks:
     cmds:
       - task: generate:internal
       - task: generate:plugin
+      - task: fmt
 
   generate:internal:
     internal: true
@@ -25,10 +26,10 @@ tasks:
     internal: true
     desc: "Generate plugin API godocs."
     cmds:
-      - cd '{{.root}}/ctx'     && go-fsck docs ./... >  ../docs/dev/plugin-apis.md && cd ..
-      - cd '{{.root}}/user'    && go-fsck docs ./... >> ../docs/dev/plugin-apis.md && cd ..
-      - cd '{{.root}}/storage' && go-fsck docs ./... >> ../docs/dev/plugin-apis.md && cd ..
-      - cd '{{.root}}/log'     && go-fsck docs ./... >> ../docs/dev/plugin-apis.md && cd ..
+      - cd '{{.root}}/ctx'     && go-fsck docs . >  ../docs/dev/plugin-apis.md && cd ..
+      - cd '{{.root}}/user'    && go-fsck docs . >> ../docs/dev/plugin-apis.md && cd ..
+      - cd '{{.root}}/storage' && go-fsck docs . >> ../docs/dev/plugin-apis.md && cd ..
+      - cd '{{.root}}/log'     && go-fsck docs . >> ../docs/dev/plugin-apis.md && cd ..
 
   fmt:
     desc: "Run mdox to format markdowns"
