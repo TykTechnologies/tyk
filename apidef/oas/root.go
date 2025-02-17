@@ -76,6 +76,8 @@ type Info struct {
 	State State `bson:"state" json:"state"` // required
 	// Versioning holds configuration for API versioning.
 	Versioning *Versioning `bson:"versioning,omitempty" json:"versioning,omitempty"`
+	// ClassicAPIID is the ID of the classic API definition this OAS api is staged from during migration.
+	ClassicAPIID string `bson:"classicApiId,omitempty" json:"-"`
 }
 
 // Fill fills *Info from apidef.APIDefinition.
