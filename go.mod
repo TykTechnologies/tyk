@@ -87,6 +87,7 @@ require (
 	github.com/alecthomas/kingpin/v2 v2.4.0
 	github.com/go-redis/redismock/v9 v9.2.0
 	github.com/goccy/go-json v0.10.4
+	github.com/goccy/go-yaml v1.15.23
 	github.com/google/go-cmp v0.6.0
 	github.com/huandu/go-clone/generic v1.7.2
 	github.com/nats-io/nats.go v1.38.0

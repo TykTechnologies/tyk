@@ -1,0 +1,26 @@
+name: Service Discovery
+tests:
+  - source: oas
+    input:
+      x-tyk-api-gateway:
+        upstream:
+          serviceDiscovery:
+            enabled: true
+    output:
+      proxy:
+        service_discovery:
+          use_discovery_service: true
+          cache_disabled: true
+          cache_timeout: 0
+  - source: classic
+    input:
+      proxy:
+        service_discovery:
+          use_discovery_service: true
+          cache_disabled: false
+          cache_timeout: 10
+    output:
+      x-tyk-api-gateway:
+        upstream:
+          serviceDiscovery:
+            enabled: true
