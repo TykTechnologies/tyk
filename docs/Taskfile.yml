@@ -1,11 +1,19 @@
+# Running this taskfile ensures that markdowns are
+# consistently formatted according to mdox rules.
 ---
 version: "3"
 
-# Running this taskfile ensures that markdowns are
-# consistently formatted according to mdox rules.
+vars:
+  root:
+    sh: git rev-parse --show-toplevel
 
 tasks:
-  default:
+  fmt:
     desc: "Run mdox to format markdowns"
     cmds:
       - mdox fmt --no-soft-wraps $(find -name '*.md')
+
+  deps:
+    desc:
+    cmds:
+      - go install github.com/bwplotka/mdox@latest
