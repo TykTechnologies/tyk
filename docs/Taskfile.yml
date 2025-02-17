@@ -8,12 +8,36 @@ vars:
     sh: git rev-parse --show-toplevel
 
 tasks:
+  generate:
+    desc: "Generate documentation"
+    aliases: [codegen, gen]
+    cmds:
+      - task: generate:internal
+      - task: generate:plugin
+
+  generate:internal:
+    internal: true
+    desc: "Generate internal API godocs."
+    cmds:
+      - cd '{{.root}}/internal' && go-fsck docs ./... > ../docs/dev/internal.md
+
+  generate:plugin:
+    internal: true
+    desc: "Generate plugin API godocs."
+    cmds:
+      - cd '{{.root}}/ctx'     && go-fsck docs ./... >  ../docs/dev/plugin-apis.md && cd ..
+      - cd '{{.root}}/user'    && go-fsck docs ./... >> ../docs/dev/plugin-apis.md && cd ..
+      - cd '{{.root}}/storage' && go-fsck docs ./... >> ../docs/dev/plugin-apis.md && cd ..
+      - cd '{{.root}}/log'     && go-fsck docs ./... >> ../docs/dev/plugin-apis.md && cd ..
+
   fmt:
     desc: "Run mdox to format markdowns"
     cmds:
-      - mdox fmt --no-soft-wraps $(find -name '*.md')
+      - cd '{{.root}}/docs' && mdox fmt --no-soft-wraps $(find -name '*.md') && cd ..
 
   deps:
-    desc:
+    desc: "Install dependencies"
+    status:
+      - type mdox
     cmds:
       - go install github.com/bwplotka/mdox@latest

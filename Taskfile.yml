@@ -6,6 +6,9 @@ includes:
   deps: .taskfiles/deps.yml
   lint: .taskfiles/lint.yml
   hooks: .taskfiles/hooks.yml
+  docs:
+    taskfile: docs/Taskfile.yml
+    dir: docs/
   opentelemetry:
     taskfile: ci/tests/tracing/Taskfile.yml
     dir: ci/tests/tracing/
@@ -59,11 +62,13 @@ tasks:
         yq -i ".dockers[4].extra_files |= [\"$replacement\"]" ci/goreleaser/goreleaser.yml
       - echo goreleaser release --clean --snapshot -f ci/goreleaser/goreleaser.yml
 
-  codegen:
+  generate:
     deps: [deps]
+    aliases: [codegen, gen]
     desc: "Run code generation steps"
     cmds:
       - go generate ./...
+      - task: docs:codegen
 
   # Used in CI
   lint:
@@ -84,6 +89,7 @@ tasks:
     desc: "Reformat import groups"
     cmds:
       - task: lint:fmt
+      - task: docs:fmt
 
   # This reformats imports with goimports-reviser;
   #
