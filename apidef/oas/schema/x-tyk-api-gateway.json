@@ -2093,8 +2093,7 @@
         "trigger",
         "type",
         "name",
-        "functionName",
-        "path"
+        "logPrefix"
       ]
     },
     "X-Tyk-EventType": {

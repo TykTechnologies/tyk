@@ -2176,8 +2176,7 @@
         "trigger",
         "type",
         "name",
-        "functionName",
-        "path"
+        "logPrefix"
       ],
       "additionalProperties": false
     },
