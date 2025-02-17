@@ -17,6 +17,7 @@ tasks:
   fmt:
     desc: "Format sources"
     cmds:
+      - goimports -w .
       - go fmt ./...
 
   # lint target is run from CI before go tests
