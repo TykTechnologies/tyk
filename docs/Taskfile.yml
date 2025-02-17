@@ -12,24 +12,19 @@ tasks:
     desc: "Generate documentation"
     aliases: [codegen, gen]
     cmds:
-      - task: generate:internal
-      - task: generate:plugin
+      - task: generate:docs
       - task: fmt
 
-  generate:internal:
-    internal: true
-    desc: "Generate internal API godocs."
-    cmds:
-      - cd '{{.root}}/internal' && go-fsck docs ./... > ../docs/dev/internal.md
-
-  generate:plugin:
+  generate:docs:
     internal: true
     desc: "Generate plugin API godocs."
     cmds:
-      - cd '{{.root}}/ctx'     && go-fsck docs . >  ../docs/dev/plugin-apis.md && cd ..
-      - cd '{{.root}}/user'    && go-fsck docs . >> ../docs/dev/plugin-apis.md && cd ..
-      - cd '{{.root}}/storage' && go-fsck docs . >> ../docs/dev/plugin-apis.md && cd ..
-      - cd '{{.root}}/log'     && go-fsck docs . >> ../docs/dev/plugin-apis.md && cd ..
+      - cd '{{.root}}/internal' && go-fsck docs ./... > ../docs/dev/internal.md
+      - cd '{{.root}}/apidef/oas' && go-fsck docs . > ../../docs/dev/oas-apis.md
+      - cd '{{.root}}/ctx'      && go-fsck docs . >  ../docs/dev/plugin-apis.md
+      - cd '{{.root}}/user'     && go-fsck docs . >> ../docs/dev/plugin-apis.md
+      - cd '{{.root}}/storage'  && go-fsck docs . >> ../docs/dev/plugin-apis.md
+      - cd '{{.root}}/log'      && go-fsck docs . >> ../docs/dev/plugin-apis.md
 
   fmt:
     desc: "Run mdox to format markdowns"
