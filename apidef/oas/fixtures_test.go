@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"maps"
+	"os"
 	"slices"
 	"strings"
 	"testing"
@@ -19,6 +20,7 @@ import (
 )
 
 var Flatten = reflect.Flatten
+var isDebug = os.Getenv("DEBUG") != ""
 
 // The fixtures.yml file contains a list of migration areas and corresponding test cases,
 // each with a source API definition ("apidef" by default) and its expected OAS migration output.
@@ -73,6 +75,18 @@ type FixtureTest struct {
 
 	// Output holds the expected OAS API definition's explicitly set fields.
 	Output map[string]any `yaml:"output"`
+
+	// Errors should be configured to assert on errors.
+	Errors FixtureError `yaml:"errors"`
+}
+
+// FixtureError holds configuration for assertion errors in FixtureTest.
+type FixtureError struct {
+	// Enabled if set to true will check error returns.
+	Enabled bool `yaml:"enabled"`
+
+	// Want if set to true will expect a filled error.
+	Want bool `yaml:"want"`
 }
 
 // Fixtures will read the fixtures under fixtures/*.yml into a single
@@ -124,85 +138,75 @@ func TestFixtures(t *testing.T) {
 					name = fmt.Sprintf("case %d", idx)
 				}
 				t.Run(name, func(t *testing.T) {
-					var oasMap = make(map[string]any)
+					var result = make(map[string]any)
 
 					switch tc.Source {
 					case "oas":
 						// Read in input api definition
-						var from *oas.OAS = &oas.OAS{T: openapi3.T{}}
+						var from *oas.OAS = &oas.OAS{T: openapi3.T{Info: &openapi3.Info{}}}
 						assert.NoError(t, json.Unmarshal(encodeJSON(tc.Input), &from))
 
 						// Fill oas from api definition, src modified in place.
 						src := &apidef.APIDefinition{}
 						from.ExtractTo(src)
-						oasJSON := encodeJSON(src)
 
-						assert.NoError(t, json.Unmarshal(oasJSON, &oasMap))
-
-						// Flatten output
-						oasFlatMap, err := Flatten(oasMap)
-						assert.NoError(t, err)
-
-						// Print debug output
-						if false {
-							keys := slices.Sorted(maps.Keys(oasFlatMap))
-
-							for _, k := range keys {
-								v := oasFlatMap[k]
-								t.Log("-", k, v)
-							}
-						}
-
-						// Flatten expected output
-						outputFlatMap, err := Flatten(tc.Output)
-						assert.NoError(t, err)
-
-						// Assert results
-						for k, want := range outputFlatMap {
-							got, ok := oasFlatMap[k]
-
-							assert.True(t, ok, "expected key %s in output", k)
-							assert.Equal(t, want, got, "expected key %s=%s, got %s", k, want, got)
-						}
+						assert.False(t, tc.Errors.Enabled, "OAS migrations to classic don't support error=true")
+						assert.NoError(t, json.Unmarshal(encodeJSON(src), &result))
 					default:
 						// Read in input api definition
 						var from apidef.APIDefinition
+						from.VersionData = apidef.VersionData{
+							Versions: map[string]apidef.VersionInfo{
+								"v1": {
+									GlobalSizeLimit:         0,
+									GlobalSizeLimitDisabled: false,
+								},
+							},
+						}
+
 						assert.NoError(t, json.Unmarshal(encodeJSON(tc.Input), &from))
 						from.Migrate()
 
 						// Fill oas from api definition, src modified in place.
-						src := &oas.OAS{T: openapi3.T{}}
-						oas.FillOASFromClassicAPIDefinition(&from, src)
-						oasJSON := encodeJSON(src)
+						src := &oas.OAS{T: openapi3.T{Info: &openapi3.Info{}}}
+						_, err := oas.FillOASFromClassicAPIDefinition(&from, src)
 
-						assert.NoError(t, json.Unmarshal(oasJSON, &oasMap))
-
-						// Flatten output
-						oasFlatMap, err := Flatten(oasMap)
-						assert.NoError(t, err)
-
-						// Print debug output
-						if false {
-							keys := slices.Sorted(maps.Keys(oasFlatMap))
-
-							for _, k := range keys {
-								v := oasFlatMap[k]
-								t.Log("-", k, v)
+						if tc.Errors.Enabled {
+							if tc.Errors.Want {
+								assert.Error(t, err)
+							} else {
+								assert.NoError(t, err)
 							}
 						}
 
-						// Flatten expected output
-						outputFlatMap, err := Flatten(tc.Output)
-						assert.NoError(t, err)
+						assert.NoError(t, json.Unmarshal(encodeJSON(src), &result))
+					}
 
-						// Assert results
-						for k, want := range outputFlatMap {
-							got, ok := oasFlatMap[k]
+					resultMap, err := Flatten(result)
+					assert.NoError(t, err)
 
-							assert.True(t, ok, "expected key %s in output", k)
-							assert.Equal(t, want, got, "expected key %s=%s, got %s", k, want, got)
+					// Print debug output
+					if isDebug {
+						keys := slices.Sorted(maps.Keys(resultMap))
+
+						for _, k := range keys {
+							v := resultMap[k]
+							t.Logf("- %s \"%v\"", k, v)
 						}
 					}
+
+					// Flatten expected output
+					want, err := Flatten(tc.Output)
+					assert.NoError(t, err)
+
+					// Assert results
+					for k, want := range want {
+						got, ok := resultMap[k]
+
+						assert.True(t, ok, "expected key %s in output", k)
+						assert.Equal(t, want, got, "expected key %s=%s, got %s", k, want, got)
+					}
+
 				})
 			}
 		})

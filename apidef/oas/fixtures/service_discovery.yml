@@ -13,13 +13,20 @@ tests:
           cache_disabled: true
           cache_timeout: 0
   - source: classic
+    errors:
+      variant: "Errors are checked and expected (general OAS validation)"
+      check: true
+      expect: true
     input:
+      name: "Name"
       proxy:
         service_discovery:
           use_discovery_service: true
           cache_disabled: false
           cache_timeout: 10
     output:
+      info:
+        title: "Name"
       x-tyk-api-gateway:
         upstream:
           serviceDiscovery:
