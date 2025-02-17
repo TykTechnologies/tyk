@@ -114,10 +114,12 @@ func TestFixtures(t *testing.T) {
 						oasFlatMap, err := maps.Flatten(oasMap)
 						assert.NoError(t, err)
 
-						// Print output
-						fmt.Println("keys")
-						for k, v := range oasFlatMap {
-							fmt.Println(k, v)
+						// Print debug output
+						if false {
+							fmt.Println("keys")
+							for k, v := range oasFlatMap {
+								fmt.Println(k, v)
+							}
 						}
 
 						// Flatten expected output
