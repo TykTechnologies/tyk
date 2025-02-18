@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"maps"
-	"os"
 	"slices"
 	"strings"
 	"testing"
@@ -20,7 +19,6 @@ import (
 )
 
 var Flatten = reflect.Flatten
-var isDebug = os.Getenv("DEBUG") != ""
 
 // The fixtures.yml file contains a list of migration areas and corresponding test cases,
 // each with a source API definition ("apidef" by default) and its expected OAS migration output.
@@ -81,6 +79,9 @@ type FixtureTest struct {
 
 	// Errors should be configured to assert on errors.
 	Errors FixtureError `yaml:"errors"`
+
+	// Debug is used to print the resulting API values after api migration.
+	Debug bool `yaml:"debug"`
 }
 
 // FixtureIgnore
@@ -246,10 +247,9 @@ func TestFixtures(t *testing.T) {
 
 						assert.False(t, tc.Errors.Enabled, "OAS migrations to classic don't support error=true")
 
-						if len(tc.Output) == 0 {
+						if len(tc.Output) == 0 || tc.Debug {
 							skip = oasEmptyMap
 						}
-
 						result = flatMap(t, dest, skip)
 					default:
 						var dest *oas.OAS
@@ -257,15 +257,14 @@ func TestFixtures(t *testing.T) {
 
 						dest, err = migrateClassic(def)
 
-						if len(tc.Output) == 0 {
+						if len(tc.Output) == 0 || tc.Debug {
 							skip = classicEmptyMap
 						}
-
 						result = flatMap(t, dest, skip)
 					}
 
 					if tc.Errors.Enabled {
-						if isDebug {
+						if tc.Debug {
 							t.Logf("Checking errors enabled, %#v", tc.Errors)
 						}
 						if tc.Errors.Want {
@@ -275,8 +274,8 @@ func TestFixtures(t *testing.T) {
 						}
 					}
 
-					// Print debug output
-					if isDebug || len(tc.Output) == 0 {
+					// Print Verbose output
+					if tc.Debug || len(tc.Output) == 0 {
 						keys := slices.Sorted(maps.Keys(result))
 
 						t.Log("Changed keys after migration:")
@@ -303,6 +302,7 @@ func TestFixtures(t *testing.T) {
 								}
 								return false
 							}()
+
 							if shouldIgnore {
 								continue
 							}
@@ -317,17 +317,16 @@ func TestFixtures(t *testing.T) {
 						want, err = Flatten(tc.Output)
 						assert.NoError(t, err)
 					} else {
-						assert.True(t, false, "Expecting configured `output` for test assertion.")
+						assert.True(t, tc.Debug, "Expecting configured `output` for test assertion.")
 					}
 
 					// Assert results
-					for k, want := range want {
+					for k, v := range want {
 						got, ok := result[k]
 
 						assert.True(t, ok, "expected key %s in output", k)
-						assert.Equal(t, want, got, "expected key %s=%s, got %s", k, want, got)
+						assert.Equal(t, v, got, "expected key %s=\"%s\", got \"%v\"", k, want, got)
 					}
-
 				})
 			}
 		})
