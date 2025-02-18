@@ -2374,7 +2374,6 @@ var (
 - `func (URLRewriteInput) Err () error`
 - `func (URLRewriteInput) Index () int`
 - `func (URLRewriteInput) Valid () bool`
-- `func (pathPart) String () string`
 
 ### ExampleExtractor
 
@@ -2664,10 +2663,4 @@ func (*OAS) RemoveTykStreamingExtension()
 
 ```go
 func (*OAS) SetTykStreamingExtension(xTykStreaming *XTykStreaming)
-```
-
-### String
-
-```go
-func (pathPart) String() string
 ```

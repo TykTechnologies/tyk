@@ -1915,7 +1915,6 @@ type TykOtelExecutorI interface {
 - `func (*MockExecutionEngineI) Setup (ctx context.Context, postProcessor *postprocess.Processor, resolveContext *resolve.Context, operation *graphql.Request, options ...graphql.ExecutionOptionsV2)`
 - `func (*MockExecutionEngineI) Teardown ()`
 - `func (*MockExecutionEngineI) ValidateForSchema (operation *graphql.Request) error`
-- `func (*otelGraphqlEngineV2Common) SetContext (ctx context.Context)`
 
 ### NewMockExecutionEngineI
 
@@ -2039,12 +2038,6 @@ func (*GraphStatsExtractionVisitor) ExtractStats(rawRequest, response, schema st
 
 ```go
 func (*GraphStatsExtractionVisitor) GraphErrors(response []byte) ([]string, error)
-```
-
-### SetContext
-
-```go
-func (*otelGraphqlEngineV2Common) SetContext(ctx context.Context)
 ```
 
 # Package ./graphengine
@@ -2489,9 +2482,6 @@ var (
 - `func (*EngineV3) ProcessRequest (ctx context.Context, w http.ResponseWriter, r *http.Request) (error, int)`
 - `func (*GraphQLEngineTransport) RoundTrip (request *http.Request) (*http.Response, error)`
 - `func (*GraphQLProxyOnlyContext) Response () *http.Response`
-- `func (*complexityCheckerV1) DepthLimitExceeded (r *http.Request, accessDefinition *ComplexityAccessDefinition) ComplexityFailReason`
-- `func (*granularAccessCheckerV1) CheckGraphQLRequestFieldAllowance (w http.ResponseWriter, r *http.Request, accessDefinition *GranularAccessDefinition) GraphQLGranularAccessResult`
-- `func (*reverseProxyPreHandlerV1) PreHandle (params ReverseProxyParams) (ReverseProxyType, error)`
 
 ### DetermineGraphQLEngineTransportType
 
@@ -2611,24 +2601,6 @@ func (*GraphQLEngineTransport) RoundTrip(request *http.Request) (*http.Response,
 
 ```go
 func (*GraphQLProxyOnlyContext) Response() *http.Response
-```
-
-### DepthLimitExceeded
-
-```go
-func (*complexityCheckerV1) DepthLimitExceeded(r *http.Request, accessDefinition *ComplexityAccessDefinition) ComplexityFailReason
-```
-
-### CheckGraphQLRequestFieldAllowance
-
-```go
-func (*granularAccessCheckerV1) CheckGraphQLRequestFieldAllowance(w http.ResponseWriter, r *http.Request, accessDefinition *GranularAccessDefinition) GraphQLGranularAccessResult
-```
-
-### PreHandle
-
-```go
-func (*reverseProxyPreHandlerV1) PreHandle(params ReverseProxyParams) (ReverseProxyType, error)
 ```
 
 # Package ./httpctx
@@ -3195,9 +3167,6 @@ type WebhookCredential struct {
 
 - `func NewClient (baseURL,secret string) *Client`
 - `func (*Client) ListWebhookCredentials () ([]WebhookCredential, error)`
-- `func (*portalOutput) Close (_ context.Context) error`
-- `func (*portalOutput) Connect (_ context.Context) error`
-- `func (*portalOutput) Write (_ context.Context, msg *service.Message) error`
 
 ### NewClient
 
@@ -3213,24 +3182,6 @@ ListWebhookCredentials retrieves a list of apps and filters out their webhook cr
 
 ```go
 func (*Client) ListWebhookCredentials() ([]WebhookCredential, error)
-```
-
-### Close
-
-```go
-func (*portalOutput) Close(_ context.Context) error
-```
-
-### Connect
-
-```go
-func (*portalOutput) Connect(_ context.Context) error
-```
-
-### Write
-
-```go
-func (*portalOutput) Write(_ context.Context, msg *service.Message) error
 ```
 
 # Package ./rate/limiter
