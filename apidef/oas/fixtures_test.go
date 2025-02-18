@@ -63,8 +63,8 @@ type Fixture struct {
 
 // Fixture represents a single migration test case.
 type FixtureTest struct {
-	// Variant is an optional message to attach to the fixture.
-	Variant string `yaml:"variant"`
+	// Desc is an optional message to attach to the fixture.
+	Desc string `yaml:"desc"`
 
 	// Source indicates the source definition type, either "apidef" (classic API) or "oas".
 	// Defaults to "apidef" if not specified.
@@ -82,6 +82,9 @@ type FixtureTest struct {
 
 // FixtureError holds configuration for assertion errors in FixtureTest.
 type FixtureError struct {
+	// Desc is an optional message to attach to the error config.
+	Desc string `yaml:"desc"`
+
 	// Enabled if set to true will check error returns.
 	Enabled bool `yaml:"enabled"`
 
@@ -133,7 +136,7 @@ func TestFixtures(t *testing.T) {
 	for _, fixture := range doc.Fixtures {
 		t.Run(fixture.Name, func(t *testing.T) {
 			for idx, tc := range fixture.Tests {
-				name := tc.Variant
+				name := tc.Desc
 				if name == "" {
 					name = fmt.Sprintf("case %d", idx)
 				}
@@ -172,6 +175,7 @@ func TestFixtures(t *testing.T) {
 						_, err := oas.FillOASFromClassicAPIDefinition(&from, src)
 
 						if tc.Errors.Enabled {
+							t.Log("Checking errors enabled, want=", tc.Errors.Want)
 							if tc.Errors.Want {
 								assert.Error(t, err)
 							} else {

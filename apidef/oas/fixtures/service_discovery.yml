@@ -1,6 +1,8 @@
-name: Service Discovery
+---
+name: "Service Discovery"
 tests:
-  - source: oas
+  - desc: "From OAS to Classic"
+    source: oas
     input:
       x-tyk-api-gateway:
         upstream:
@@ -12,11 +14,12 @@ tests:
           use_discovery_service: true
           cache_disabled: true
           cache_timeout: 0
-  - source: classic
+  - desc: "From Classic to OAS"
+    source: classic
     errors:
-      variant: "Errors are checked and expected (general OAS validation)"
-      check: true
-      expect: true
+      desc: "Errors are checked and wanted (general OAS validation)"
+      enabled: true
+      want: true
     input:
       name: "Name"
       proxy:
