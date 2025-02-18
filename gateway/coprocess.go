@@ -621,6 +621,7 @@ func syncHeadersAndMultiValueHeaders(headers map[string]string, multiValueHeader
 			if header.Key == k {
 				found = true
 
+				// if the key is present in multiValueHeaders, update the first value with the value from headers
 				if len(header.Values) > 0 {
 					header.Values[0] = v
 				}
