@@ -1,14 +1,16 @@
 # OAS Fixtures
 
+A test fixture is a device used to consistently test some item, device, or piece of software.
+
 It's a common concern to answer the following questions:
 
 - What is the definition of an OAS feature like UptimeTests
 - What are the classic API fields that contract is being migrated to
 - Are classic settings migrated to OAS definitions correctly (reverse test)
 
-Under `apidef/oas/fixtures` you can create a file with test fixtures for the migration. Lets take a look at an example development flow.
+The fixtures are located under `apidef/oas/testdata/fixtures`. Extend the location with new migration tests. Lets take a look at an example development flow.
 
-In addition to running `task`, to run test fixtures you can:
+In addition to running `task` in `apidef/oas`, you can use the fixtures test file to run only the fixtures, due to the black box nature of the test.
 
 ```
 go test -count=1 -v fixtures_test.go
@@ -33,7 +35,7 @@ PASS
 ok  	command-line-arguments	0.035s
 ```
 
-The tests are run and filled from fixture yaml files.
+The tests are run and filled from fixture yaml files. To enable more debug output, set an environment of `DEBUG=1`.
 
 ## Creating a fixture
 
@@ -78,3 +80,15 @@ This gives you a way to fill out `output`.
 ```
 
 For the migration example you can see that some fields have not been migrated (functionName, path, etc.). The list of detected results is untrimmed, assertions should be added and migration fixed.
+
+## Additional fixture settings
+
+Additional fixture settings are possible for asserting errors:
+
+```
+    errors:
+      enabled: true
+      want: true
+```
+
+By default error checks are not enabled, and if you enable them then it should be set to `want: true` if an error is expected. Due to validation failing with API definition partials, it's suggested to leave this inconfigured.

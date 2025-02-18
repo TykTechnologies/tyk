@@ -42,7 +42,7 @@ var isDebug = os.Getenv("DEBUG") != ""
 //               enabled: false
 //
 
-//go:embed fixtures/*.yml
+//go:embed testdata/fixtures/*.yml
 var fixtures embed.FS
 
 // FixtureDocument represents the root structure of the fixtures configuration.
@@ -109,8 +109,8 @@ type FixtureError struct {
 func Fixtures(tb testing.TB) *FixtureDocument {
 	doc := &FixtureDocument{}
 
-	// Read all embedded fixture files matching fixtures/*.yml.
-	files, err := fixtures.ReadDir("fixtures")
+	// Read all embedded fixture files matching testdata/fixtures/*.yml.
+	files, err := fixtures.ReadDir("testdata/fixtures")
 	assert.NoError(tb, err, "failed to read fixtures directory from embed FS")
 
 	for _, file := range files {
@@ -118,7 +118,7 @@ func Fixtures(tb testing.TB) *FixtureDocument {
 			continue
 		}
 
-		data, err := fixtures.ReadFile("fixtures/" + file.Name())
+		data, err := fixtures.ReadFile("testdata/fixtures/" + file.Name())
 		assert.NoError(tb, err, "failed to read "+file.Name()+" from embed FS")
 
 		var f Fixture
@@ -178,13 +178,13 @@ func createClassic(tb testing.TB, patch any) *apidef.APIDefinition {
 	return def
 }
 
-func migrateClassic(tb testing.TB, def *apidef.APIDefinition) (*oas.OAS, error) {
+func migrateClassic(def *apidef.APIDefinition) (*oas.OAS, error) {
 	src := &oas.OAS{T: openapi3.T{Info: &openapi3.Info{}}}
 	_, err := oas.FillOASFromClassicAPIDefinition(def, src)
 	return src, err
 }
 
-func migrateOAS(tb testing.TB, def *oas.OAS) (*apidef.APIDefinition, error) {
+func migrateOAS(def *oas.OAS) (*apidef.APIDefinition, error) {
 	src := &apidef.APIDefinition{}
 	def.ExtractTo(src)
 	return src, nil
@@ -215,11 +215,11 @@ func TestFixtures(t *testing.T) {
 
 	// Base migration gives us an initial state.
 	oasEmpty := createOAS(t, nil)
-	oasEmptyClassic, _ := migrateOAS(t, oasEmpty)
+	oasEmptyClassic, _ := migrateOAS(oasEmpty)
 	oasEmptyMap := flatMap(t, oasEmptyClassic, nil)
 
 	classicEmpty := createClassic(t, nil)
-	classicEmptyOAS, _ := migrateClassic(t, classicEmpty)
+	classicEmptyOAS, _ := migrateClassic(classicEmpty)
 	classicEmptyMap := flatMap(t, classicEmptyOAS, nil)
 
 	// Optionally, iterate through each fixture and log its details.
@@ -233,15 +233,16 @@ func TestFixtures(t *testing.T) {
 				t.Run(name, func(t *testing.T) {
 					var (
 						err    error
-						skip   map[string]any = nil
-						result                = make(map[string]any)
+						skip   map[string]any
+						result map[string]any
 					)
 
 					switch tc.Source {
 					case "oas":
 						var dest *apidef.APIDefinition
 						def := createOAS(t, tc.Input)
-						dest, err = migrateOAS(t, def)
+
+						dest, err = migrateOAS(def)
 
 						assert.False(t, tc.Errors.Enabled, "OAS migrations to classic don't support error=true")
 
@@ -253,7 +254,8 @@ func TestFixtures(t *testing.T) {
 					default:
 						var dest *oas.OAS
 						def := createClassic(t, tc.Input)
-						dest, err = migrateClassic(t, def)
+
+						dest, err = migrateClassic(def)
 
 						if len(tc.Output) == 0 {
 							skip = classicEmptyMap
@@ -263,7 +265,9 @@ func TestFixtures(t *testing.T) {
 					}
 
 					if tc.Errors.Enabled {
-						t.Logf("Checking errors enabled, want=%v", tc.Errors.Want)
+						if isDebug {
+							t.Logf("Checking errors enabled, %#v", tc.Errors)
+						}
 						if tc.Errors.Want {
 							assert.Error(t, err)
 						} else {
@@ -275,8 +279,7 @@ func TestFixtures(t *testing.T) {
 					if isDebug || len(tc.Output) == 0 {
 						keys := slices.Sorted(maps.Keys(result))
 
-						fmt.Printf("Ignores: %s\n", encodeJSON(t, tc.Ignores))
-
+						t.Log("Changed keys after migration:")
 						for _, k := range keys {
 							raw := result[k]
 							v := strval(raw)
@@ -310,6 +313,8 @@ func TestFixtures(t *testing.T) {
 					if len(tc.Output) > 0 {
 						want, err = Flatten(tc.Output)
 						assert.NoError(t, err)
+					} else {
+						assert.True(t, false, "Expecting configured `output` for test assertion.")
 					}
 
 					// Assert results
