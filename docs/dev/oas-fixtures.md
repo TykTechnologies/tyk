@@ -16,27 +16,7 @@ In addition to running `task` in `apidef/oas`, you can use the fixtures test fil
 go test -count=1 -v fixtures_test.go
 ```
 
-The tests are run and filled from fixture yaml files. To enable more debug output, set an environment of `DEBUG=1`.
-
-## Fixture setup
-
-To configure a fixture, the following setup is in use:
-
-```yaml
-# Any yaml comments
----
-name: "Fixture name"
-tests:
-  - desc: "From OAS to Classic"
-    source: oas
-    input: {}
-    output: {}
-    errors: {}
-    ignores: {}
-}
-```
-
-Depending on `source`, you configure `input` and `output` appropriately with a partial of API definition or OAS definition schema.
+The tests are run and filled from fixture yaml files.
 
 ## Creating a fixture
 
@@ -48,6 +28,7 @@ name: "Plugins"
 tests:
   - desc: "From OAS to Classic"
     source: oas
+    debug: true
     input:
       x-tyk-api-gateway:
         server:
@@ -61,10 +42,13 @@ tests:
 ```
 
 - `source` can be `oas` or `classic`
+- `debug` set to true will print which fields have been modified
 - `input` declares api definition schema based on source
 - `output` checks the migrated api definition for values
 
 This fixture defines a test case that sets OAS inputs. By running the fixture tests, they detect this and print any changed values vs. the migration that would result with an empty input. The idea behind it is that each input field maps to one or more values between schemas.
+
+If you don't configure `output` and set `debug=true`:
 
 ```text
 === RUN   TestFixtures/Plugins/From_OAS_to_Classic
