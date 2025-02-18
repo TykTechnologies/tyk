@@ -242,6 +242,32 @@ func TestSyncHeadersAndMultiValueHeaders(t *testing.T) {
 				{Key: "Header", Values: []string{"newValue1"}},
 			},
 		},
+		{
+			name: "multiple Set-Cookie headers",
+			headers: map[string]string{
+				"Set-Cookie": "session=abc123; Path=/",
+			},
+			initialMultiValueHeaders: []*coprocess.Header{
+				{
+					Key: "Set-Cookie",
+					Values: []string{
+						"session=dce123; Path=/",
+						"user=john; Path=/",
+						"theme=dark; Path=/",
+					},
+				},
+			},
+			expectedMultiValueHeaders: []*coprocess.Header{
+				{
+					Key: "Set-Cookie",
+					Values: []string{
+						"session=abc123; Path=/",
+						"user=john; Path=/",
+						"theme=dark; Path=/",
+					},
+				},
+			},
+		},
 	}
 
 	for _, tc := range testCases {

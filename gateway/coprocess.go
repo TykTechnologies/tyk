@@ -611,6 +611,7 @@ func (h *CustomMiddlewareResponseHook) HandleResponse(rw http.ResponseWriter, re
 // syncHeadersAndMultiValueHeaders synchronizes the content of 'headers' and 'multiValueHeaders'.
 // If a key is updated or added in 'headers', the corresponding key in 'multiValueHeaders' is also updated or added.
 // If a key is removed from 'headers', the corresponding key in 'multiValueHeaders' is also removed.
+// If multiValuesHeaders contains a key with multiple values and the same key is present in headers, the first value in multiValuesHeaders is updated with the value from headers, while the remaining values remain unchanged.
 func syncHeadersAndMultiValueHeaders(headers map[string]string, multiValueHeaders []*coprocess.Header) []*coprocess.Header {
 	updatedMultiValueHeaders := []*coprocess.Header{}
 
