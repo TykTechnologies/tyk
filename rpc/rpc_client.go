@@ -209,7 +209,6 @@ func Connect(connConfig Config, suppressRegister bool, dispatcherFuncs map[strin
 	emergencyModeLoadedFunc func()) bool {
 	rpcConnectMu.Lock()
 	defer rpcConnectMu.Unlock()
-
 	values.config.Store(connConfig)
 	getGroupLoginCallback = getGroupLoginFunc
 	emergencyModeCallback = emergencyModeFunc
@@ -305,15 +304,33 @@ func Connect(connConfig Config, suppressRegister bool, dispatcherFuncs map[strin
 	if funcClientSingleton == nil {
 		funcClientSingleton = dispatcher.NewFuncClient(clientSingleton)
 	}
-	// wait until all the pool connections are dialed so we can call login
-	clientSingleton.WaitForConnection()
+	// wait until a connection is dialed so we can call login or fall in emergency mode
+	waitForClientReadiness(clientSingleton)
 	handleLogin()
+
 	if !suppressRegister {
 		register()
 		go checkDisconnect()
 	}
 
 	return true
+}
+
+func waitForClientReadiness(clientSingleton *gorpc.Client) {
+	ticker := time.NewTicker(100 * time.Millisecond)
+	defer ticker.Stop()
+
+	for {
+		if IsEmergencyMode() {
+			return
+		}
+
+		select {
+		case <-clientSingleton.ClientReadyChan:
+			return
+		case <-ticker.C:
+		}
+	}
 }
 
 func handleLogin() {
