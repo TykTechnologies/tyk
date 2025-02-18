@@ -296,7 +296,10 @@ func TestFixtures(t *testing.T) {
 									}
 
 									matchedKey := ign.Key == "" || strings.Contains(k, ign.Key)
-									return matchedValue && matchedKey
+
+									if matchedKey && matchedValue {
+										return true
+									}
 								}
 								return false
 							}()

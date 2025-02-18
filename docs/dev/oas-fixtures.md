@@ -16,26 +16,25 @@ In addition to running `task` in `apidef/oas`, you can use the fixtures test fil
 go test -count=1 -v fixtures_test.go
 ```
 
-This will report output similar to:
-
-```
-~~~
-=== RUN   TestFixtures
-=== RUN   TestFixtures/Plugins
-=== RUN   TestFixtures/Service_Discovery
-=== RUN   TestFixtures/Service_Discovery/From_OAS_to_Classic
-=== RUN   TestFixtures/Service_Discovery/From_Classic_to_OAS
---- PASS: TestFixtures (0.03s)
-    --- PASS: TestFixtures/Plugins (0.00s)
-        --- PASS: TestFixtures/Plugins/From_OAS_to_Classic (0.00s)
-    --- PASS: TestFixtures/Service_Discovery (0.03s)
-        --- PASS: TestFixtures/Service_Discovery/From_OAS_to_Classic (0.00s)
-        --- PASS: TestFixtures/Service_Discovery/From_Classic_to_OAS (0.03s)
-PASS
-ok  	command-line-arguments	0.035s
-```
-
 The tests are run and filled from fixture yaml files. To enable more debug output, set an environment of `DEBUG=1`.
+
+## Fixture setup
+
+To configure a fixture, the following setup is in use:
+
+```yaml
+name: "Fixture name"
+tests:
+  - desc: "From OAS to Classic"
+    source: oas
+    input: {}
+    output: {}
+    errors: {}
+    ignores: {}
+}
+```
+
+Depending on `source`, you configure `input` and `output` appropriately with a partial of API definition or OAS definition schema.
 
 ## Creating a fixture
 
@@ -92,3 +91,16 @@ Additional fixture settings are possible for asserting errors:
 ```
 
 By default error checks are not enabled, and if you enable them then it should be set to `want: true` if an error is expected. Due to validation failing with API definition partials, it's suggested to leave this inconfigured.
+
+## Debug output filtering
+
+If you're looking at debug output and want to ignore keys or values, you can configure `ignores` to skip a combination of keys or values you set:
+
+```
+    ignores:
+      - key: "use_"
+        values: [false]
+      - key: "disabled"
+        values: [true]
+      - values: ["", 0]
+```
