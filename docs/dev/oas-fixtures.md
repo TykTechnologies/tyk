@@ -12,7 +12,7 @@ The fixtures are located under `apidef/oas/testdata/fixtures`. Extend the locati
 
 In addition to running `task` in `apidef/oas`, you can use the fixtures test file to run only the fixtures, due to the black box nature of the test.
 
-```
+```bash
 go test -count=1 -v fixtures_test.go
 ```
 
@@ -23,6 +23,8 @@ The tests are run and filled from fixture yaml files. To enable more debug outpu
 To configure a fixture, the following setup is in use:
 
 ```yaml
+# Any yaml comments
+---
 name: "Fixture name"
 tests:
   - desc: "From OAS to Classic"
@@ -40,7 +42,7 @@ Depending on `source`, you configure `input` and `output` appropriately with a p
 
 When creating a fixture, create a `plugins.yml` or `service_discovery.yml` or similarly named files under apidef/oas fixtures. Start with either a classic API setting, or an OAS API setting, for example:
 
-```
+```yaml
 ---
 name: "Plugins"
 tests:
@@ -64,7 +66,7 @@ tests:
 
 This fixture defines a test case that sets OAS inputs. By running the fixture tests, they detect this and print any changed values vs. the migration that would result with an empty input. The idea behind it is that each input field maps to one or more values between schemas.
 
-```
+```text
 === RUN   TestFixtures/Plugins/From_OAS_to_Classic
     fixtures_test.go:280: Ignores: []
     fixtures_test.go:281: Changed keys after migration:
@@ -73,7 +75,7 @@ This fixture defines a test case that sets OAS inputs. By running the fixture te
 
 This gives you a way to fill out `output`.
 
-```
+```yaml
     output:
       custom_plugin_auth_enabled: true
 ```
@@ -84,7 +86,7 @@ For the migration example you can see that some fields have not been migrated (f
 
 Additional fixture settings are possible for asserting errors:
 
-```
+```yaml
     errors:
       enabled: true
       want: true
@@ -96,7 +98,7 @@ By default error checks are not enabled, and if you enable them then it should b
 
 If you're looking at debug output and want to ignore keys or values, you can configure `ignores` to skip a combination of keys or values you set:
 
-```
+```yaml
     ignores:
       - key: "use_"
         values: [false]
