@@ -1950,9 +1950,8 @@ func (gw *Gateway) startServer() {
 	mainLog.Info("--> Listening on address: ", address)
 	mainLog.Info("--> Listening on port: ", gw.GetConfig().ListenPort)
 	mainLog.Info("--> PID: ", gw.hostDetails.PID)
-	if !rpc.IsEmergencyMode() {
-		gw.DoReload()
-	}
+
+	gw.DoReload()
 }
 
 func (gw *Gateway) GetConfig() config.Config {
