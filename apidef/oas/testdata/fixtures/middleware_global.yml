@@ -1,0 +1,23 @@
+---
+name: "Middleware global settings"
+tests:
+  - desc: "ignorecase enabled"
+    source: oas
+    input:
+      x-tyk-api-gateway:
+        middleware:
+          global:
+            ignoreCase:
+              enabled: true
+    output:
+      version_data.versions..ignore_endpoint_case: true
+  - desc: "ignorecase disabled"
+    source: oas
+    input:
+      x-tyk-api-gateway:
+        middleware:
+          global:
+            ignoreCase:
+              enabled: false
+    output:
+      version_data.versions..ignore_endpoint_case: false

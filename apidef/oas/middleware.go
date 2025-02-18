@@ -105,6 +105,9 @@ type Global struct {
 
 	// RequestSizeLimit contains the configuration related to limiting the global request size.
 	RequestSizeLimit *GlobalRequestSizeLimit `bson:"requestSizeLimit,omitempty" json:"requestSizeLimit,omitempty"`
+
+	// IgnoreCase contains the configuration to treat routes as case insensitive.
+	IgnoreCase *IgnoreCase `bson:"ignoreCase" json:"ignoreCase"`
 }
 
 // MarshalJSON is a custom JSON marshaler for the Global struct. It is implemented
@@ -228,6 +231,8 @@ func (g *Global) Fill(api apidef.APIDefinition) {
 		g.TransformResponseHeaders = nil
 	}
 
+	g.fillIgnoreCase(api)
+
 	g.fillContextVariables(api)
 
 	g.fillTrafficLogs(api)
@@ -304,6 +309,8 @@ func (g *Global) ExtractTo(api *apidef.APIDefinition) {
 	g.Cache.ExtractTo(&api.CacheOptions)
 
 	g.extractResponsePluginsTo(api)
+
+	g.extractIgnoreCase(api)
 
 	g.extractContextVariablesTo(api)
 
@@ -1705,4 +1712,58 @@ func (c *ContextVariables) Fill(api apidef.APIDefinition) {
 // ExtractTo extracts *ContextVariables into *apidef.APIDefinition.
 func (c *ContextVariables) ExtractTo(api *apidef.APIDefinition) {
 	api.EnableContextVars = c.Enabled
+}
+
+// IgnoreCase will make route matching be case insensitive.
+// This accepts request to `/AAA` or `/aaa` if set to true.
+type IgnoreCase struct {
+	// Enabled activates case insensitive route matching.
+	Enabled bool `json:"enabled" bson:"enabled"`
+}
+
+// Fill fills *IgnoreCase from apidef.APIDefinition.
+func (p *IgnoreCase) Fill(api apidef.APIDefinition) {
+	ok := false
+	if api.VersionData.Versions != nil {
+		_, ok = api.VersionData.Versions[Main]
+	}
+	if !ok || api.VersionData.Versions[Main].IgnoreEndpointCase {
+		p.Enabled = false
+		return
+	}
+
+	p.Enabled = api.VersionData.Versions[Main].IgnoreEndpointCase
+}
+
+func (g *Global) fillIgnoreCase(api apidef.APIDefinition) {
+	if g.IgnoreCase == nil {
+		g.IgnoreCase = &IgnoreCase{}
+	}
+
+	g.IgnoreCase.Fill(api)
+
+	if !g.IgnoreCase.Enabled {
+		g.IgnoreCase = nil
+	}
+}
+
+func (g *Global) extractIgnoreCase(api *apidef.APIDefinition) {
+	if g.IgnoreCase == nil {
+		g.IgnoreCase = &IgnoreCase{}
+		defer func() {
+			g.IgnoreCase = nil
+		}()
+	}
+
+	g.IgnoreCase.ExtractTo(api)
+}
+
+// ExtractTo extracts *IgnoreCase into *apidef.APIDefinition.
+func (p *IgnoreCase) ExtractTo(api *apidef.APIDefinition) {
+	mainVersion := requireMainVersion(api)
+	defer func() {
+		updateMainVersion(api, mainVersion)
+	}()
+
+	mainVersion.IgnoreEndpointCase = p.Enabled
 }

@@ -13,6 +13,5 @@ tests:
               path: "/path/to/file.so"
               rawBodyOnly: true
               requireSession: true
-    debug: true
     output:
       custom_plugin_auth_enabled: true
