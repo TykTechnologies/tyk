@@ -9,7 +9,7 @@ require (
 	github.com/TykTechnologies/circuitbreaker v2.2.2+incompatible
 	github.com/TykTechnologies/drl v0.0.0-20231218155806-88e4363884a2
 	github.com/TykTechnologies/goautosocket v0.0.0-20190430121222-97bfa5e7e481
-	github.com/TykTechnologies/gorpc v0.0.0-20241016124253-606484472fbb
+	github.com/TykTechnologies/gorpc v0.0.0-20250214161245-e9f3f088e8c6
 	github.com/TykTechnologies/goverify v0.0.0-20220808203004-1486f89e7708
 	github.com/TykTechnologies/graphql-go-tools v1.6.2-0.20241212110213-7724a3b64bb2
 	github.com/TykTechnologies/graphql-translator v0.0.0-20240319092712-4ba87e4c06ff
@@ -87,6 +87,7 @@ require (
 	github.com/alecthomas/kingpin/v2 v2.4.0
 	github.com/go-redis/redismock/v9 v9.2.0
 	github.com/goccy/go-json v0.10.4
+	github.com/goccy/go-yaml v1.15.23
 	github.com/google/go-cmp v0.6.0
 	github.com/huandu/go-clone/generic v1.7.2
 	github.com/nats-io/nats.go v1.38.0

@@ -222,22 +222,17 @@ jobs:
           files: 'gateway-all.cov, golangci-lint-report.json'
           fail: true
 
-      - name: Install Dependencies
-        env:
-          TOKEN: '${{ secrets.ORG_GH_TOKEN }}'
-        run: git config --global url."https://${TOKEN}@github.com".insteadOf "https://github.com"
-
-      - name: SonarCloud Scan
+      - name: Scan
         if: always()
-        uses: sonarsource/sonarcloud-github-action@master
+        uses: sonarsource/sonarqube-scan-action@master
         with:
           args: >
             -Dsonar.organization=tyktechnologies
             -Dsonar.projectKey=TykTechnologies_tyk
             -Dsonar.sources=.
-            -Dsonar.exclusions=**/testdata/*,test/**,coprocess/**/*,ci/**,smoke-tests/**,apidef/oas/schema/schema.gen.go,templates/**
-            -Dsonar.coverage.exclusions=**/*_test.go,**/mock/*
-            -Dsonar.test.inclusions=**/*_test.go
+            -Dsonar.exclusions=**/testdata/*,test/**,tests/**,coprocess/**/*,ci/**,templates/**
+            -Dsonar.coverage.exclusions=**/*_test.go,**/mock/*,tests/**
+            -Dsonar.test.inclusions=**/*_test.go,tests/**
             -Dsonar.tests=.
             -Dsonar.go.coverage.reportPaths=gateway-all.cov
             -Dsonar.go.golangci-lint.reportPaths=golangci-lint-report.json

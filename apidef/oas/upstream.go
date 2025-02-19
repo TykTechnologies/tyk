@@ -508,12 +508,12 @@ func (sd *ServiceDiscovery) Fill(serviceDiscovery apidef.ServiceDiscoveryConfigu
 	timeout := serviceDiscovery.CacheTimeout
 
 	sd.CacheTimeout = 0
-	sd.Cache = &ServiceDiscoveryCache{
-		Enabled: enabled,
-		Timeout: timeout,
-	}
-	if ShouldOmit(sd.Cache) {
-		sd.Cache = nil
+	sd.Cache = nil
+	if enabled || timeout != 0 {
+		sd.Cache = &ServiceDiscoveryCache{
+			Enabled: enabled,
+			Timeout: timeout,
+		}
 	}
 }
 

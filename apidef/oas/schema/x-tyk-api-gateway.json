@@ -405,6 +405,9 @@
         "rawBodyOnly": {
           "type": "boolean"
         },
+        "requireSession": {
+          "type": "boolean"
+        },
         "idExtractor": {
           "$ref": "#/definitions/X-Tyk-IDExtractor"
         }
@@ -1301,7 +1304,7 @@
           "type": "string",
           "enum": [
             "http",
-            "http2",
+            "https",
             "h2c"
           ]
         }
