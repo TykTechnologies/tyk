@@ -2,11 +2,12 @@
 
 FROM debian:bookworm-slim as DEB
 ARG TARGETARCH
+ARG EDITION
 
 ENV DEBIAN_FRONTEND=noninteractive
 
 COPY *${TARGETARCH}.deb /
-RUN rm -f /*fips*.deb && dpkg -i /tyk-gateway*${TARGETARCH}.deb && rm /*.deb
+RUN rm -f /*fips*.deb && dpkg -i /tyk-gateway${EDITION}_*${TARGETARCH}.deb && rm /*.deb
 
 FROM gcr.io/distroless/base-debian12:latest
 
