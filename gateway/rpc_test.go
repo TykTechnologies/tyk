@@ -346,7 +346,7 @@ func TestSyncAPISpecsRPCSuccess(t *testing.T) {
 }
 
 func TestSyncAPISpecsRPC_redis_failure(t *testing.T) {
-	test.Flaky(t) // TT-9117
+	test.Flaky(t) // Test uses StorageConnectionHandler (singleton).
 
 	dispatcher := gorpc.NewDispatcher()
 	dispatcher.AddFunc("GetApiDefinitions", func(clientAddr string, dr *model.DefRequest) (string, error) {
@@ -423,7 +423,7 @@ func TestOrgSessionWithRPCDown(t *testing.T) {
 		globalConf.Policies.PolicySource = "rpc"
 	}
 	ts := StartTest(conf)
-	defer ts.Close()
+	t.Cleanup(ts.Close)
 
 	m := &BaseMiddleware{
 		Spec: &APISpec{

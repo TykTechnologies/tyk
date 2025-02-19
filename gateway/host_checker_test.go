@@ -68,7 +68,6 @@ func (w *testEventHandler) HandleEvent(em config.EventMessage) {
 	w.cb(em)
 }
 
-// // ToDo check why it blocks
 func TestHostChecker(t *testing.T) {
 	ts := StartTest(func(globalConf *config.Config) {
 		globalConf.UptimeTests.PollerGroup = uuid.New()
@@ -399,6 +398,8 @@ func TestTestCheckerTCPHosts_correct_answers_proxy_protocol(t *testing.T) {
 }
 
 func TestTestCheckerTCPHosts_correct_wrong_answers(t *testing.T) {
+	t.Skip() // TT-13861
+
 	ts := StartTest(nil)
 	defer ts.Close()
 

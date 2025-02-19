@@ -23,7 +23,7 @@ import (
 
 	"github.com/TykTechnologies/graphql-go-tools/pkg/execution/datasource"
 
-	"github.com/TykTechnologies/gojsonschema"
+	"github.com/TykTechnologies/tyk/internal/service/gojsonschema"
 
 	"github.com/TykTechnologies/tyk/regexp"
 
@@ -119,18 +119,24 @@ const (
 	OAuthType         = "oauth"
 	ExternalOAuthType = "externalOAuth"
 	OIDCType          = "oidc"
+
+	// OAuthAuthorizationTypeClientCredentials is the authorization type for client credentials flow.
+	OAuthAuthorizationTypeClientCredentials = "clientCredentials"
+	// OAuthAuthorizationTypePassword is the authorization type for password flow.
+	OAuthAuthorizationTypePassword = "password"
 )
 
 var (
 	// Deprecated: Use ErrClassicAPIExpected instead.
-	ErrAPIMigrated                = errors.New("the supplied API definition is in Tyk classic format, please use OAS format for this API")
-	ErrClassicAPIExpected         = errors.New("this API endpoint only supports Tyk Classic APIs; please use the appropriate Tyk OAS API endpoint")
-	ErrAPINotMigrated             = errors.New("the supplied API definition is in OAS format, please use the Tyk classic format for this API")
-	ErrOASGetForOldAPI            = errors.New("the requested API definition is in Tyk classic format, please use old api endpoint")
-	ErrImportWithTykExtension     = errors.New("the import payload should not contain x-tyk-api-gateway")
-	ErrPayloadWithoutTykExtension = errors.New("the payload should contain x-tyk-api-gateway")
-	ErrAPINotFound                = errors.New("API not found")
-	ErrMissingAPIID               = errors.New("missing API ID")
+	ErrAPIMigrated                         = errors.New("the supplied API definition is in Tyk classic format, please use OAS format for this API")
+	ErrClassicAPIExpected                  = errors.New("this API endpoint only supports Tyk Classic APIs; please use the appropriate Tyk OAS API endpoint")
+	ErrAPINotMigrated                      = errors.New("the supplied API definition is in OAS format, please use the Tyk classic format for this API")
+	ErrOASGetForOldAPI                     = errors.New("the requested API definition is in Tyk classic format, please use old api endpoint")
+	ErrImportWithTykExtension              = errors.New("the import payload should not contain x-tyk-api-gateway")
+	ErrPayloadWithoutTykExtension          = errors.New("the payload should contain x-tyk-api-gateway")
+	ErrPayloadWithoutTykStreamingExtension = errors.New("the payload should contain x-tyk-streaming")
+	ErrAPINotFound                         = errors.New("API not found")
+	ErrMissingAPIID                        = errors.New("missing API ID")
 )
 
 type EndpointMethodMeta struct {
@@ -473,6 +479,7 @@ type VersionInfo struct {
 	GlobalResponseHeadersDisabled bool              `bson:"global_response_headers_disabled" json:"global_response_headers_disabled"`
 	IgnoreEndpointCase            bool              `bson:"ignore_endpoint_case" json:"ignore_endpoint_case"`
 	GlobalSizeLimit               int64             `bson:"global_size_limit" json:"global_size_limit"`
+	GlobalSizeLimitDisabled       bool              `bson:"global_size_limit_disabled" json:"global_size_limit_disabled"`
 	OverrideTarget                string            `bson:"override_target" json:"override_target"`
 }
 
@@ -588,22 +595,6 @@ type ResponseProcessor struct {
 	Options interface{} `bson:"options" json:"options"`
 }
 
-type HostCheckObject struct {
-	CheckURL            string            `bson:"url" json:"url"`
-	Protocol            string            `bson:"protocol" json:"protocol"`
-	Timeout             time.Duration     `bson:"timeout" json:"timeout"`
-	EnableProxyProtocol bool              `bson:"enable_proxy_protocol" json:"enable_proxy_protocol"`
-	Commands            []CheckCommand    `bson:"commands" json:"commands"`
-	Method              string            `bson:"method" json:"method"`
-	Headers             map[string]string `bson:"headers" json:"headers"`
-	Body                string            `bson:"body" json:"body"`
-}
-
-type CheckCommand struct {
-	Name    string `bson:"name" json:"name"`
-	Message string `bson:"message" json:"message"`
-}
-
 type ServiceDiscoveryConfiguration struct {
 	UseDiscoveryService bool   `bson:"use_discovery_service" json:"use_discovery_service"`
 	QueryEndpoint       string `bson:"query_endpoint" json:"query_endpoint"`
@@ -628,6 +619,9 @@ type OIDProviderConfig struct {
 	ClientIDs map[string]string `bson:"client_ids" json:"client_ids"`
 }
 
+// OpenID Connect middleware support will be deprecated starting from 5.7.0.
+// To avoid any disruptions, we recommend that you use JSON Web Token (JWT) instead,
+// as explained in https://tyk.io/docs/basic-config-and-security/security/authentication-authorization/openid-connect/.
 type OpenIDOptions struct {
 	Providers         []OIDProviderConfig `bson:"providers" json:"providers"`
 	SegregateByClient bool                `bson:"segregate_by_client" json:"segregate_by_client"`
@@ -737,6 +731,7 @@ type APIDefinition struct {
 	AllowedIPs                           []string               `mapstructure:"allowed_ips" bson:"allowed_ips" json:"allowed_ips"`
 	EnableIpBlacklisting                 bool                   `mapstructure:"enable_ip_blacklisting" bson:"enable_ip_blacklisting" json:"enable_ip_blacklisting"`
 	BlacklistedIPs                       []string               `mapstructure:"blacklisted_ips" bson:"blacklisted_ips" json:"blacklisted_ips"`
+	IPAccessControlDisabled              bool                   `mapstructure:"ip_access_control_disabled" bson:"ip_access_control_disabled" json:"ip_access_control_disabled"`
 	DontSetQuotasOnCreate                bool                   `mapstructure:"dont_set_quota_on_create" bson:"dont_set_quota_on_create" json:"dont_set_quota_on_create"`
 	ExpireAnalyticsAfter                 int64                  `mapstructure:"expire_analytics_after" bson:"expire_analytics_after" json:"expire_analytics_after"` // must have an expireAt TTL index set (http://docs.mongodb.org/manual/tutorial/expire-data/)
 	ResponseProcessors                   []ResponseProcessor    `bson:"response_processors" json:"response_processors"`
@@ -797,20 +792,42 @@ type UpstreamBasicAuth struct {
 	Username string `bson:"username" json:"username"`
 	// Password is the password to be used for upstream basic authentication.
 	Password string `bson:"password" json:"password"`
-	// HeaderName is the custom header name to be used for upstream basic authentication.
+	// Header holds the configuration for custom header name to be used for upstream basic authentication.
 	// Defaults to `Authorization`.
-	HeaderName string `bson:"header_name" json:"header_name"`
+	Header AuthSource `bson:"header" json:"header"`
 }
 
 // UpstreamOAuth holds upstream OAuth2 authentication configuration.
 type UpstreamOAuth struct {
 	// Enabled enables upstream OAuth2 authentication.
 	Enabled bool `bson:"enabled" json:"enabled"`
+	// AllowedAuthorizeTypes specifies the allowed authorization types for upstream OAuth2 authentication.
+	AllowedAuthorizeTypes []string `bson:"allowed_authorize_types" json:"allowed_authorize_types"`
 	// ClientCredentials holds the client credentials for upstream OAuth2 authentication.
 	ClientCredentials ClientCredentials `bson:"client_credentials" json:"client_credentials"`
-	// HeaderName is the custom header name to be used for upstream basic authentication.
-	// Defaults to `Authorization`.
-	HeaderName string `bson:"header_name" json:"header_name,omitempty"`
+	// PasswordAuthentication holds the configuration for upstream OAauth password authentication flow.
+	PasswordAuthentication PasswordAuthentication `bson:"password,omitempty" json:"password,omitempty"`
+}
+
+// PasswordAuthentication holds the configuration for upstream OAuth2 password authentication flow.
+type PasswordAuthentication struct {
+	ClientAuthData
+	// Header holds the configuration for the custom header to be used for OAuth authentication.
+	Header AuthSource `bson:"header" json:"header"`
+	// Username is the username to be used for upstream OAuth2 password authentication.
+	Username string `bson:"username" json:"username"`
+	// Password is the password to be used for upstream OAuth2 password authentication.
+	Password string `bson:"password" json:"password"`
+	// TokenURL is the resource server's token endpoint
+	// URL. This is a constant specific to each server.
+	TokenURL string `bson:"token_url" json:"token_url"`
+	// Scopes specifies optional requested permissions.
+	Scopes []string `bson:"scopes" json:"scopes,omitempty"`
+	// ExtraMetadata holds the keys that we want to extract from the token and pass to the upstream.
+	ExtraMetadata []string `bson:"extra_metadata" json:"extra_metadata,omitempty"`
+
+	// TokenProvider is the OAuth2 password authentication flow token for internal use.
+	Token *oauth2.Token `bson:"-" json:"-"`
 }
 
 // ClientAuthData holds the client ID and secret for upstream OAuth2 authentication.
@@ -818,31 +835,90 @@ type ClientAuthData struct {
 	// ClientID is the application's ID.
 	ClientID string `bson:"client_id" json:"client_id"`
 	// ClientSecret is the application's secret.
-	ClientSecret string `bson:"client_secret" json:"client_secret"`
+	ClientSecret string `bson:"client_secret,omitempty" json:"client_secret,omitempty"` // client secret is optional for password flow
 }
 
 // ClientCredentials holds the client credentials for upstream OAuth2 authentication.
 type ClientCredentials struct {
 	ClientAuthData
+	// Header holds the configuration for the custom header to be used for OAuth authentication.
+	Header AuthSource `bson:"header" json:"header"`
 	// TokenURL is the resource server's token endpoint
 	// URL. This is a constant specific to each server.
 	TokenURL string `bson:"token_url" json:"token_url"`
 	// Scopes specifies optional requested permissions.
 	Scopes []string `bson:"scopes" json:"scopes,omitempty"`
+	// ExtraMetadata holds the keys that we want to extract from the token and pass to the upstream.
+	ExtraMetadata []string `bson:"extra_metadata" json:"extra_metadata,omitempty"`
 
 	// TokenProvider is the OAuth2 token provider for internal use.
 	TokenProvider oauth2.TokenSource `bson:"-" json:"-"`
 }
 
-type AnalyticsPluginConfig struct {
-	Enabled    bool   `bson:"enable" json:"enable,omitempty"`
-	PluginPath string `bson:"plugin_path" json:"plugin_path,omitempty"`
-	FuncName   string `bson:"func_name" json:"func_name,omitempty"`
+// AuthSource is a common type to be used for auth configurations.
+type AuthSource struct {
+	// Enabled enables the auth source.
+	Enabled bool `bson:"enabled" json:"enabled"`
+	// Name specifies the key to be used in the auth source.
+	Name string `bson:"name" json:"name"`
 }
 
+// IsEnabled returns the enabled status of the auth source.
+func (a AuthSource) IsEnabled() bool {
+	return a.Enabled
+}
+
+// AuthKeyName returns the key name to be used for the auth source.
+func (a AuthSource) AuthKeyName() string {
+	if !a.IsEnabled() {
+		return ""
+	}
+
+	return a.Name
+}
+
+// AnalyticsPluginConfig holds the configuration for the analytics custom function plugins
+type AnalyticsPluginConfig struct {
+	// Enabled activates the custom plugin
+	Enabled bool `bson:"enable" json:"enable,omitempty"`
+	// PluginPath is the path to the shared object file or path to js code.
+	PluginPath string `bson:"plugin_path" json:"plugin_path,omitempty"`
+	// FunctionName is the name of the method.
+	FuncName string `bson:"func_name" json:"func_name,omitempty"`
+}
+
+// UptimeTests holds the test configuration for uptime tests.
 type UptimeTests struct {
 	CheckList []HostCheckObject `bson:"check_list" json:"check_list"`
 	Config    UptimeTestsConfig `bson:"config" json:"config"`
+}
+
+// UptimeTestCommand handles additional checks for tcp connections.
+type CheckCommand struct {
+	Name    string `bson:"name" json:"name"`
+	Message string `bson:"message" json:"message"`
+}
+
+// HostCheckObject represents a single uptime test check.
+type HostCheckObject struct {
+	CheckURL            string            `bson:"url" json:"url"`
+	Protocol            string            `bson:"protocol" json:"protocol"`
+	Timeout             time.Duration     `bson:"timeout" json:"timeout"`
+	EnableProxyProtocol bool              `bson:"enable_proxy_protocol" json:"enable_proxy_protocol"`
+	Commands            []CheckCommand    `bson:"commands" json:"commands"`
+	Method              string            `bson:"method" json:"method"`
+	Headers             map[string]string `bson:"headers" json:"headers"`
+	Body                string            `bson:"body" json:"body"`
+}
+
+// AddCommand will append a new command to the test.
+func (h *HostCheckObject) AddCommand(name, message string) {
+	command := CheckCommand{
+		Name:    name,
+		Message: message,
+	}
+
+	h.Commands = append(h.Commands, command)
 }
 
 type UptimeTestsConfig struct {
@@ -1523,6 +1599,9 @@ var Template = template.New("").Funcs(map[string]interface{}{
 	},
 })
 
+// ExternalOAuth support will be deprecated starting from 5.7.0.
+// To avoid any disruptions, we recommend that you use JSON Web Token (JWT) instead,
+// as explained in https://tyk.io/docs/basic-config-and-security/security/authentication-authorization/ext-oauth-middleware/.
 type ExternalOAuth struct {
 	Enabled   bool       `bson:"enabled" json:"enabled"`
 	Providers []Provider `bson:"providers" json:"providers"`
@@ -1585,5 +1664,28 @@ func (w *WebHookHandlerConf) Scan(in any) error {
 	}
 
 	*w = *conf
+	return nil
+}
+
+// JSVMEventHandlerConf represents the configuration for a JavaScript VM event handler in the API definition.
+type JSVMEventHandlerConf struct {
+	// Disabled indicates whether the event handler is inactive.
+	Disabled bool `bson:"disabled" json:"disabled"`
+	// ID is the optional unique identifier for the event handler.
+	ID string `bson:"id" json:"id"`
+	// MethodName specifies the JavaScript function name to be executed.
+	MethodName string `bson:"name" json:"name"`
+	// Path refers to the file path of the JavaScript source code for the handler.
+	Path string `bson:"path" json:"path"`
+}
+
+// Scan populates the JSVMEventHandlerConf struct by casting and copying data from the provided input.
+func (j *JSVMEventHandlerConf) Scan(in any) error {
+	conf, err := reflect.Cast[JSVMEventHandlerConf](in)
+	if err != nil {
+		return err
+	}
+
+	*j = *conf
 	return nil
 }

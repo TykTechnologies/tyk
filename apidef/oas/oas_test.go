@@ -6,6 +6,10 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/oasdiff/yaml"
+
+	"github.com/TykTechnologies/storage/persistent/model"
+
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/stretchr/testify/assert"
 
@@ -137,8 +141,15 @@ func TestOAS_ExtractTo_ResetAPIDefinition(t *testing.T) {
 		event.QuotaExceeded: {
 			{
 				Handler: event.WebHookHandler,
-				HandlerMeta: map[string]interface{}{
+				HandlerMeta: map[string]any{
 					"target_path": "https://webhook.site/uuid",
+				},
+			},
+			{
+				Handler: event.JSVMHandler,
+				HandlerMeta: map[string]any{
+					"name": "myHandler",
+					"path": "my_script.js",
 				},
 			},
 		},
@@ -169,6 +180,7 @@ func TestOAS_ExtractTo_ResetAPIDefinition(t *testing.T) {
 	a.EnableContextVars = false
 	a.DisableRateLimit = false
 	a.DoNotTrack = false
+	a.IPAccessControlDisabled = false
 
 	// deprecated fields
 	a.Auth = apidef.AuthConfig{}
@@ -188,6 +200,7 @@ func TestOAS_ExtractTo_ResetAPIDefinition(t *testing.T) {
 	vInfo.GlobalHeadersDisabled = false
 	vInfo.GlobalResponseHeadersDisabled = false
 	vInfo.UseExtendedPaths = false
+	vInfo.GlobalSizeLimitDisabled = false
 
 	vInfo.ExtendedPaths.Clear()
 
@@ -203,16 +216,7 @@ func TestOAS_ExtractTo_ResetAPIDefinition(t *testing.T) {
 
 	expectedFields := []string{
 		"APIDefinition.Slug",
-		"APIDefinition.ListenPort",
-		"APIDefinition.Protocol",
 		"APIDefinition.EnableProxyProtocol",
-		"APIDefinition.RequestSigning.IsEnabled",
-		"APIDefinition.RequestSigning.Secret",
-		"APIDefinition.RequestSigning.KeyId",
-		"APIDefinition.RequestSigning.Algorithm",
-		"APIDefinition.RequestSigning.HeaderList[0]",
-		"APIDefinition.RequestSigning.CertificateId",
-		"APIDefinition.RequestSigning.SignatureHeader",
 		"APIDefinition.VersionData.Versions[0].ExtendedPaths.TransformJQ[0].Filter",
 		"APIDefinition.VersionData.Versions[0].ExtendedPaths.TransformJQ[0].Path",
 		"APIDefinition.VersionData.Versions[0].ExtendedPaths.TransformJQ[0].Method",
@@ -224,49 +228,21 @@ func TestOAS_ExtractTo_ResetAPIDefinition(t *testing.T) {
 		"APIDefinition.VersionData.Versions[0].ExtendedPaths.PersistGraphQL[0].Operation",
 		"APIDefinition.VersionData.Versions[0].ExtendedPaths.PersistGraphQL[0].Variables[0]",
 		"APIDefinition.VersionData.Versions[0].IgnoreEndpointCase",
-		"APIDefinition.VersionData.Versions[0].GlobalSizeLimit",
-		"APIDefinition.UptimeTests.CheckList[0].CheckURL",
-		"APIDefinition.UptimeTests.CheckList[0].Protocol",
-		"APIDefinition.UptimeTests.CheckList[0].Timeout",
-		"APIDefinition.UptimeTests.CheckList[0].EnableProxyProtocol",
-		"APIDefinition.UptimeTests.CheckList[0].Commands[0].Name",
-		"APIDefinition.UptimeTests.CheckList[0].Commands[0].Message",
-		"APIDefinition.UptimeTests.CheckList[0].Method",
-		"APIDefinition.UptimeTests.CheckList[0].Headers[0]",
-		"APIDefinition.UptimeTests.CheckList[0].Body",
-		"APIDefinition.UptimeTests.Config.ExpireUptimeAnalyticsAfter",
 		"APIDefinition.UptimeTests.Config.ServiceDiscovery.CacheDisabled",
-		"APIDefinition.UptimeTests.Config.RecheckWait",
-		"APIDefinition.Proxy.PreserveHostHeader",
 		"APIDefinition.Proxy.DisableStripSlash",
-		"APIDefinition.Proxy.EnableLoadBalancing",
-		"APIDefinition.Proxy.Targets[0]",
 		"APIDefinition.Proxy.CheckHostAgainstUptimeTests",
-		"APIDefinition.Proxy.Transport.SSLInsecureSkipVerify",
-		"APIDefinition.Proxy.Transport.SSLCipherSuites[0]",
-		"APIDefinition.Proxy.Transport.SSLMinVersion",
-		"APIDefinition.Proxy.Transport.SSLMaxVersion",
-		"APIDefinition.Proxy.Transport.SSLForceCommonNameCheck",
-		"APIDefinition.Proxy.Transport.ProxyURL",
 		"APIDefinition.DisableQuota",
-		"APIDefinition.SessionLifetimeRespectsKeyExpiration",
-		"APIDefinition.SessionLifetime",
 		"APIDefinition.AuthProvider.Name",
 		"APIDefinition.AuthProvider.StorageEngine",
 		"APIDefinition.AuthProvider.Meta[0]",
 		"APIDefinition.SessionProvider.Name",
 		"APIDefinition.SessionProvider.StorageEngine",
 		"APIDefinition.SessionProvider.Meta[0]",
-		"APIDefinition.EnableBatchRequestSupport",
 		"APIDefinition.EnableIpWhiteListing",
-		"APIDefinition.AllowedIPs[0]",
 		"APIDefinition.EnableIpBlacklisting",
-		"APIDefinition.BlacklistedIPs[0]",
 		"APIDefinition.DontSetQuotasOnCreate",
-		"APIDefinition.ExpireAnalyticsAfter",
 		"APIDefinition.ResponseProcessors[0].Name",
 		"APIDefinition.ResponseProcessors[0].Options",
-		"APIDefinition.TagHeaders[0]",
 		"APIDefinition.GraphQL.Enabled",
 		"APIDefinition.GraphQL.ExecutionMode",
 		"APIDefinition.GraphQL.Version",
@@ -812,10 +788,14 @@ func TestOAS_Clone(t *testing.T) {
 	s.GetTykExtension().Info.Name = "my-api-modified"
 	assert.NotEqual(t, s, clonedOAS)
 
-	t.Run("marshal error", func(t *testing.T) {
+	t.Run("clone impossible to marshal value", func(t *testing.T) {
 		s.Extensions["weird extension"] = make(chan int)
-		_, err = s.Clone()
-		assert.ErrorContains(t, err, "unsupported type: chan int")
+
+		result, err := s.Clone()
+		assert.NoError(t, err)
+
+		_, ok := result.Extensions["weird extension"]
+		assert.True(t, ok)
 	})
 }
 
@@ -1310,4 +1290,54 @@ func TestAPIContext_getValidationOptionsFromConfig(t *testing.T) {
 
 		assert.Len(t, options, 0)
 	})
+}
+
+func TestYaml(t *testing.T) {
+	oasDoc := OAS{}
+	Fill(t, &oasDoc, 0)
+
+	tykExt := XTykAPIGateway{}
+	Fill(t, &tykExt, 0)
+	// json unmarshal workarounds
+	{
+		tykExt.Info.DBID = model.NewObjectID()
+		tykExt.Middleware.Global.PrePlugin = nil
+		tykExt.Middleware.Global.PostPlugin = nil
+		tykExt.Middleware.Global.PostAuthenticationPlugin = nil
+		tykExt.Middleware.Global.ResponsePlugin = nil
+
+		for k, v := range tykExt.Server.Authentication.SecuritySchemes {
+			intVal, ok := v.(int)
+			assert.True(t, ok)
+			tykExt.Server.Authentication.SecuritySchemes[k] = float64(intVal)
+		}
+
+		for k, v := range tykExt.Middleware.Global.PluginConfig.Data.Value {
+			intVal, ok := v.(int)
+			assert.True(t, ok)
+			tykExt.Middleware.Global.PluginConfig.Data.Value[k] = float64(intVal)
+		}
+	}
+
+	oasDoc.SetTykExtension(&tykExt)
+
+	jsonBody, err := json.Marshal(&oasDoc)
+	assert.NoError(t, err)
+
+	yamlBody, err := yaml.JSONToYAML(jsonBody)
+	assert.NoError(t, err)
+
+	yamlOAS, err := openapi3.NewLoader().LoadFromData(yamlBody)
+	assert.NoError(t, err)
+
+	yamlOASDoc := OAS{
+		T: *yamlOAS,
+	}
+
+	yamlOASExt := yamlOASDoc.GetTykExtension()
+	assert.Equal(t, tykExt, *yamlOASExt)
+
+	yamlOASDoc.SetTykExtension(nil)
+	oasDoc.SetTykExtension(nil)
+	assert.Equal(t, oasDoc, yamlOASDoc)
 }

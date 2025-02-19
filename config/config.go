@@ -7,7 +7,6 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"time"
 
@@ -56,6 +55,7 @@ var (
 			Enabled:     false,
 			AllowUnsafe: []string{},
 		},
+		PIDFileLocation: "/var/run/tyk/tyk-gateway.pid",
 	}
 )
 
@@ -248,6 +248,33 @@ type AnalyticsConfigConfig struct {
 
 	// Determines the serialization engine for analytics. Available options: msgpack, and protobuf. By default, msgpack.
 	SerializerType string `json:"serializer_type"`
+}
+
+// AccessLogsConfig defines the type of transactions logs printed to stdout.
+type AccessLogsConfig struct {
+	// Enabled controls enabling the transaction logs. Default: false.
+	Enabled bool `json:"enabled"`
+
+	// Template configures which fields to log into the access log.
+	// If unconfigured, all fields listed will be logged.
+	//
+	// Example: ["client_ip", "path"].
+	//
+	// Template Options:
+	//
+	// - `api_key` will include they obfuscated or hashed key.
+	// - `client_ip` will include the ip of the request.
+	// - `host` will include the host of the request.
+	// - `method` will include the request method.
+	// - `path` will include the path of the request.
+	// - `protocol` will include the protocol of the request.
+	// - `remote_addr` will include the remote address of the request.
+	// - `upstream_addr` will include the upstream address (scheme, host and path)
+	// - `upstream_latency` will include the upstream latency of the request.
+	// - `latency_total` will include the total latency of the request.
+	// - `user_agent` will include the user agent of the request.
+	// - `status` will include the response status code.
+	Template []string `json:"template"`
 }
 
 type HealthCheckConfig struct {
@@ -813,6 +840,9 @@ type Config struct {
 	// Note:
 	//   If you set `db_app_conf_options.node_is_segmented` to `true` for multiple Gateway nodes, you should ensure that `management_node` is set to `false`.
 	//   This is to ensure visibility for the management node across all APIs.
+	//
+	//   For pro installations, `management_node` is not a valid configuration option.
+	//   Always set `management_node` to `false` in pro environments.
 	ManagementNode bool `json:"management_node"`
 
 	// This is used as part of the RPC / Hybrid back-end configuration in a Tyk Enterprise installation and isn’t used anywhere else.
@@ -1033,6 +1063,10 @@ type Config struct {
 	// If not set or left empty, it will default to `standard`.
 	LogFormat string `json:"log_format"`
 
+	// AccessLogs configures the output for access logs.
+	// If not configured, the access log is disabled.
+	AccessLogs AccessLogsConfig `json:"access_logs"`
+
 	// Section for configuring OpenTracing support
 	// Deprecated: use OpenTelemetry instead.
 	Tracer Tracer `json:"tracing"`
@@ -1107,8 +1141,20 @@ type Config struct {
 		Vault  VaultConfig  `json:"vault"`
 	} `json:"kv"`
 
-	// Secrets are key-value pairs that can be accessed in the dashboard via "secrets://"
-	Secrets map[string]string `json:"secrets" structviewer:"obfuscate"`
+
+	// Secrets configures a list of key/value pairs for the gateway.
+	// When configuring it via environment variable, the expected value
+	// is a comma separated list of key-value pairs delimited with a colon.
+	//
+	// Example: `TYK_GW_SECRETS=key1:value1,key2:/value2`
+	// Produces: `{"key1": "value1", "key2": "/value2"}`
+	//
+	// The secret value may be used as `secrets://key1` from the API definition.
+	// In versions before gateway 5.3, only `listen_path` and `target_url` fields
+	// have had the secrets replaced.
+	// See more details https://tyk.io/docs/tyk-configuration-reference/kv-store/#how-to-access-the-externally-stored-data
+	Secrets map[string]string `json:"secrets"`
+
 
 	// Override the default error code and or message returned by middleware.
 	// The following message IDs can be used to override the message and error codes:
@@ -1320,20 +1366,21 @@ func WriteConf(path string, conf *Config) error {
 
 // writeDefault will set conf to the default config and write it to disk
 // in path, if the path is non-empty.
-func WriteDefault(path string, conf *Config) error {
-	_, b, _, _ := runtime.Caller(0)
-	configPath := filepath.Dir(b)
-	rootPath := filepath.Dir(configPath)
-	Default.TemplatePath = filepath.Join(rootPath, "templates")
+func WriteDefault(in string, conf *Config) error {
+	wd, err := os.Getwd()
+	if err != nil {
+		return fmt.Errorf("Can't get working directory: %w", err)
+	}
 
 	*conf = Default
+	conf.TemplatePath = filepath.Join(wd, "templates")
 	if err := envconfig.Process(envPrefix, conf); err != nil {
 		return err
 	}
-	if path == "" {
+	if in == "" {
 		return nil
 	}
-	return WriteConf(path, conf)
+	return WriteConf(in, conf)
 }
 
 // Load will load a configuration file, trying each of the paths given

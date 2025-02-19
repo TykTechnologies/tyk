@@ -12,13 +12,14 @@ import (
 
 // Manager is responsible for creating a single stream.
 type Manager struct {
-	streams         sync.Map
-	routeLock       sync.Mutex
-	muxer           *mux.Router
-	mw              *Middleware
-	dryRun          bool
-	listenPaths     []string
-	activityCounter atomic.Int32 // Counts active subscriptions, requests.
+	streams          sync.Map
+	routeLock        sync.Mutex
+	muxer            *mux.Router
+	mw               *Middleware
+	dryRun           bool
+	listenPaths      []string
+	activityCounter  atomic.Int32 // Counts active subscriptions, requests.
+	analyticsFactory StreamAnalyticsFactory
 }
 
 func (sm *Manager) initStreams(r *http.Request, config *StreamsConfig) {
@@ -62,9 +63,7 @@ func (sm *Manager) setUpOrDryRunStream(streamConfig any, streamID string) {
 
 // removeStream removes a stream
 func (sm *Manager) removeStream(streamID string) error {
-	streamFullID := fmt.Sprintf("%s_%s", sm.mw.Spec.APIID, streamID)
-
-	if streamValue, exists := sm.streams.Load(streamFullID); exists {
+	if streamValue, exists := sm.streams.Load(streamID); exists {
 		stream, ok := streamValue.(*Stream)
 		if !ok {
 			return fmt.Errorf("stream %s is not a valid stream", streamID)
@@ -73,7 +72,7 @@ func (sm *Manager) removeStream(streamID string) error {
 		if err != nil {
 			return err
 		}
-		sm.streams.Delete(streamFullID)
+		sm.streams.Delete(streamID)
 	} else {
 		return fmt.Errorf("stream %s does not exist", streamID)
 	}
@@ -85,14 +84,24 @@ func (sm *Manager) createStream(streamID string, config map[string]interface{}) 
 	streamFullID := fmt.Sprintf("%s_%s", sm.mw.Spec.APIID, streamID)
 	sm.mw.Logger().Debugf("Creating stream: %s", streamFullID)
 
+	// add logger to config
+	config["logger"] = map[string]interface{}{
+		"level":         "INFO",
+		"format":        "json",
+		"add_timestamp": true,
+		"static_fields": map[string]interface{}{
+			"stream": streamID,
+		},
+	}
+
 	stream := NewStream(sm.mw.allowedUnsafe)
-	err := stream.Start(config, &handleFuncAdapter{
-		mw:       sm.mw,
-		streamID: streamFullID,
-		muxer:    sm.muxer,
-		sm:       sm,
+	err := stream.Start(config, &HandleFuncAdapter{
+		StreamMiddleware: sm.mw,
+		StreamID:         streamFullID,
+		Muxer:            sm.muxer,
+		StreamManager:    sm,
 		// child logger is necessary to prevent race condition
-		logger: sm.mw.Logger().WithField("stream", streamFullID),
+		Logger: sm.mw.Logger().WithField("stream", streamFullID),
 	})
 	if err != nil {
 		sm.mw.Logger().Errorf("Failed to start stream %s: %v", streamFullID, err)
@@ -112,4 +121,11 @@ func (sm *Manager) hasPath(path string) bool {
 		}
 	}
 	return false
+}
+
+func (sm *Manager) SetAnalyticsFactory(factory StreamAnalyticsFactory) {
+	if factory == nil {
+		factory = &NoopStreamAnalyticsFactory{}
+	}
+	sm.analyticsFactory = factory
 }

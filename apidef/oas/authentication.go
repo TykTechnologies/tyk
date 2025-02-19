@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"reflect"
 	"sort"
+	"time"
 
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/mitchellh/mapstructure"
@@ -57,6 +58,59 @@ type Authentication struct {
 
 	// SecuritySchemes contains security schemes definitions.
 	SecuritySchemes SecuritySchemes `bson:"securitySchemes,omitempty" json:"securitySchemes,omitempty"`
+
+	// CustomKeyLifetime contains configuration for the maximum retention period for tokens.
+	CustomKeyLifetime *CustomKeyLifetime `bson:"customKeyLifetime,omitempty" json:"customKeyLifetime,omitempty"`
+}
+
+// CustomKeyLifetime contains configuration for custom key retention.
+type CustomKeyLifetime struct {
+	// Enabled enables custom maximum retention for keys for the API
+	//
+	// Tyk classic API definition: `disable_expire_analytics`.
+	Enabled bool `bson:"enabled,omitempty" json:"enabled,omitempty"`
+	// Value configures the expiry interval for a Key.
+	// The value is a string that specifies the interval in a compact form,
+	// where hours, minutes and seconds are denoted by 'h', 'm' and 's' respectively.
+	// Multiple units can be combined to represent the duration.
+	//
+	// Examples of valid shorthand notations:
+	// - "1h"   : one hour
+	// - "20m"  : twenty minutes
+	// - "30s"  : thirty seconds
+	// - "1m29s": one minute and twenty-nine seconds
+	// - "1h30m" : one hour and thirty minutes
+	//
+	// An empty value is interpreted as "0s"
+	//
+	// Tyk classic API definition: `expire_analytics_after`.
+	Value ReadableDuration `bson:"value" json:"value"`
+	// RespectValidity ensures that Tyk respects the expiry configured in the key when the API level configuration grants a shorter lifetime.
+	// That is, Redis waits until the key has expired before deleting it.
+	RespectValidity bool `bson:"respectValidity,omitempty" json:"respectValidity,omitempty"`
+}
+
+// Fill fills *CustomKeyLifetime from apidef.APIDefinition.
+func (k *CustomKeyLifetime) Fill(api apidef.APIDefinition) {
+	k.RespectValidity = api.SessionLifetimeRespectsKeyExpiration
+
+	if api.SessionLifetime == 0 {
+		k.Enabled = false
+	} else {
+		k.Enabled = true
+		k.Value = ReadableDuration(time.Duration(api.SessionLifetime) * time.Second)
+	}
+}
+
+// ExtractTo extracts *Authentication into *apidef.APIDefinition.
+func (k *CustomKeyLifetime) ExtractTo(api *apidef.APIDefinition) {
+	api.SessionLifetimeRespectsKeyExpiration = k.RespectValidity
+
+	if k.Enabled {
+		api.SessionLifetime = int64(k.Value.Seconds())
+	} else {
+		api.SessionLifetime = 0
+	}
 }
 
 // Fill fills *Authentication from apidef.APIDefinition.
@@ -73,6 +127,16 @@ func (a *Authentication) Fill(api apidef.APIDefinition) {
 
 	if ShouldOmit(a.Custom) {
 		a.Custom = nil
+	}
+
+	if a.CustomKeyLifetime == nil {
+		a.CustomKeyLifetime = &CustomKeyLifetime{}
+	}
+
+	a.CustomKeyLifetime.Fill(api)
+
+	if ShouldOmit(a.CustomKeyLifetime) {
+		a.CustomKeyLifetime = nil
 	}
 
 	if api.AuthConfigs == nil || len(api.AuthConfigs) == 0 {
@@ -126,6 +190,15 @@ func (a *Authentication) ExtractTo(api *apidef.APIDefinition) {
 	}
 
 	a.Custom.ExtractTo(api)
+
+	if a.CustomKeyLifetime == nil {
+		a.CustomKeyLifetime = &CustomKeyLifetime{}
+		defer func() {
+			a.CustomKeyLifetime = nil
+		}()
+	}
+
+	a.CustomKeyLifetime.ExtractTo(api)
 }
 
 // SecuritySchemes holds security scheme values, filled with Import().
@@ -495,6 +568,9 @@ func (h *HMAC) ExtractTo(api *apidef.APIDefinition) {
 }
 
 // OIDC contains configuration for the OIDC authentication mode.
+// OIDC support will be deprecated starting from 5.7.0.
+// To avoid any disruptions, we recommend that you use JSON Web Token (JWT) instead,
+// as explained in https://tyk.io/docs/basic-config-and-security/security/authentication-authorization/openid-connect/.
 type OIDC struct {
 	// Enabled activates the OIDC authentication mode.
 	//
@@ -679,6 +755,8 @@ type AuthenticationPlugin struct {
 	Path string `bson:"path" json:"path"`
 	// RawBodyOnly if set to true, do not fill body in request or response object.
 	RawBodyOnly bool `bson:"rawBodyOnly,omitempty" json:"rawBodyOnly,omitempty"`
+	// RequireSession passes down the session information for plugins after authentication.
+	RequireSession bool `bson:"requireSession,omitempty" json:"requireSession,omitempty"`
 	// IDExtractor configures ID extractor with coprocess custom authentication.
 	IDExtractor *IDExtractor `bson:"idExtractor,omitempty" json:"idExtractor,omitempty"`
 }
@@ -687,6 +765,7 @@ func (ap *AuthenticationPlugin) Fill(api apidef.APIDefinition) {
 	ap.FunctionName = api.CustomMiddleware.AuthCheck.Name
 	ap.Path = api.CustomMiddleware.AuthCheck.Path
 	ap.RawBodyOnly = api.CustomMiddleware.AuthCheck.RawBodyOnly
+	ap.RequireSession = api.CustomMiddleware.AuthCheck.RequireSession
 	ap.Enabled = !api.CustomMiddleware.AuthCheck.Disabled
 	if ap.IDExtractor == nil {
 		ap.IDExtractor = &IDExtractor{}
@@ -703,6 +782,7 @@ func (ap *AuthenticationPlugin) ExtractTo(api *apidef.APIDefinition) {
 	api.CustomMiddleware.AuthCheck.Name = ap.FunctionName
 	api.CustomMiddleware.AuthCheck.Path = ap.Path
 	api.CustomMiddleware.AuthCheck.RawBodyOnly = ap.RawBodyOnly
+	api.CustomMiddleware.AuthCheck.RequireSession = ap.RequireSession
 
 	if ap.IDExtractor == nil {
 		ap.IDExtractor = &IDExtractor{}

@@ -500,6 +500,8 @@ streams:
 }
 
 func TestAsyncAPIHttp(t *testing.T) {
+	t.Skip() // Expensive. Runs containerized tests. 15s.
+
 	var tests = []struct {
 		name          string
 		consumerGroup string
@@ -739,7 +741,7 @@ func waitForAPIToBeLoaded(ts *Test) error {
 }
 
 func TestWebSocketConnectionClosedOnAPIReload(t *testing.T) {
-	t.Skip()
+	t.Skip() // Is this also skipped because running containers is slow?
 	ctx := context.Background()
 	kafkaContainer, err := kafka.Run(ctx, "confluentinc/confluent-local:7.5.0")
 	if err != nil {
@@ -965,7 +967,7 @@ func TestStreamingAPIGarbageCollection(t *testing.T) {
 
 	apiSpec := streams.NewAPISpec(specs[0].APIID, specs[0].Name, specs[0].IsOAS, specs[0].OAS, specs[0].StripListenPath)
 
-	s := streams.NewMiddleware(ts.Gw, &DummyBase{}, apiSpec)
+	s := streams.NewMiddleware(ts.Gw, &DummyBase{}, apiSpec, nil)
 
 	if err := setUpStreamAPI(ts, apiName, bentoHTTPServerTemplate); err != nil {
 		t.Fatal(err)

@@ -214,6 +214,60 @@ func TestSyncHeadersAndMultiValueHeaders(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "keeping multivalue headers",
+			headers: map[string]string{
+				"Header": "newValue1",
+			},
+			initialMultiValueHeaders: []*coprocess.Header{
+				{
+					Key:    "Header",
+					Values: []string{"oldValue1", "value2"},
+				},
+			},
+			expectedMultiValueHeaders: []*coprocess.Header{
+				{
+					Key:    "Header",
+					Values: []string{"newValue1", "value2"},
+				},
+			},
+		},
+		{
+			name: "empty multi value headers",
+			headers: map[string]string{
+				"Header": "newValue1",
+			},
+			initialMultiValueHeaders: []*coprocess.Header{},
+			expectedMultiValueHeaders: []*coprocess.Header{
+				{Key: "Header", Values: []string{"newValue1"}},
+			},
+		},
+		{
+			name: "multiple Set-Cookie headers",
+			headers: map[string]string{
+				"Set-Cookie": "session=abc123; Path=/",
+			},
+			initialMultiValueHeaders: []*coprocess.Header{
+				{
+					Key: "Set-Cookie",
+					Values: []string{
+						"session=dce123; Path=/",
+						"user=john; Path=/",
+						"theme=dark; Path=/",
+					},
+				},
+			},
+			expectedMultiValueHeaders: []*coprocess.Header{
+				{
+					Key: "Set-Cookie",
+					Values: []string{
+						"session=abc123; Path=/",
+						"user=john; Path=/",
+						"theme=dark; Path=/",
+					},
+				},
+			},
+		},
 	}
 
 	for _, tc := range testCases {
@@ -244,12 +298,7 @@ func equalHeaders(h1, h2 []*coprocess.Header) bool {
 }
 
 func TestCoProcessMiddlewareName(t *testing.T) {
-	// Initialize the CoProcessMiddleware
-	m := &CoProcessMiddleware{BaseMiddleware: &BaseMiddleware{}}
+	m := &CoProcessMiddleware{}
 
-	// Get the name using the method
-	name := m.Name()
-
-	// Check that the returned name is "CoProcessMiddleware"
-	require.Equal(t, "CoProcessMiddleware", name, "Name method did not return the expected value")
+	require.Equal(t, "CoProcessMiddleware", m.Name(), "Name method did not return the expected value")
 }

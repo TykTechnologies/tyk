@@ -1,13 +1,14 @@
 package gateway
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 
-	"github.com/TykTechnologies/gojsonschema"
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/internal/service/gojsonschema"
 )
 
 type ValidateJSON struct {
@@ -42,17 +43,13 @@ func (k *ValidateJSON) ProcessRequest(w http.ResponseWriter, r *http.Request, _ 
 		return errors.New("no schemas to validate against"), http.StatusInternalServerError
 	}
 
-	if val, exists := vPathMeta.Schema["$schema"]; exists {
-		if val != "http://json-schema.org/draft-04/schema#" {
-			return errors.New("unsupported schema, unable to validate"), http.StatusInternalServerError
-		}
-	}
-
+	nopCloseRequestBody(r)
 	// Load input body into gojsonschema
-	bodyBytes, err := ioutil.ReadAll(r.Body)
+	bodyBytes, err := io.ReadAll(r.Body)
 	if err != nil {
 		return err, http.StatusBadRequest
 	}
+	r.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
 	defer r.Body.Close()
 	inputLoader := gojsonschema.NewBytesLoader(bodyBytes)
 

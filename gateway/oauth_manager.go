@@ -342,6 +342,10 @@ type OAuthManager struct {
 	Gw         *Gateway `json:"-"`
 }
 
+func (o *OAuthManager) Storage() ExtendedOsinStorageInterface {
+	return o.OsinServer.Storage
+}
+
 // HandleAuthorisation creates the authorisation data for the request
 func (o *OAuthManager) HandleAuthorisation(r *http.Request, complete bool, session string) *osin.Response {
 	resp := o.OsinServer.NewResponse()
@@ -1191,6 +1195,7 @@ func (gw *Gateway) purgeLapsedOAuthTokens() error {
 	}
 
 	redisCluster := &storage.RedisCluster{KeyPrefix: "", HashKeys: false, ConnectionHandler: gw.StorageConnectionHandler}
+	redisCluster.Connect()
 
 	ok, err := redisCluster.Lock("oauth-purge-lock", time.Minute)
 	if err != nil {

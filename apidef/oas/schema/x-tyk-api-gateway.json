@@ -280,6 +280,23 @@
         "value"
       ]
     },
+    "X-Tyk-CustomAnalyticsPluginConfig": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "functionName": {
+          "type": "string"
+        },
+        "path": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "enabled"
+      ]
+    },
     "X-Tyk-CustomPluginConfig": {
       "type": "object",
       "properties": {
@@ -386,6 +403,9 @@
           "type": "string"
         },
         "rawBodyOnly": {
+          "type": "boolean"
+        },
+        "requireSession": {
           "type": "boolean"
         },
         "idExtractor": {
@@ -552,6 +572,9 @@
         },
         "trafficLogs": {
           "$ref": "#/definitions/X-Tyk-TrafficLogs"
+        },
+        "requestSizeLimit": {
+          "$ref": "#/definitions/X-Tyk-GlobalRequestSizeLimit"
         }
       }
     },
@@ -1090,6 +1113,7 @@
     },
     "X-Tyk-OIDC": {
       "type": "object",
+      "description": "Support for external OAuth Middleware will be deprecated starting from 5.7.0. To avoid any disruptions, we recommend that you use JSON Web Token (JWT) instead, as explained in https://tyk.io/docs/basic-config-and-security/security/authentication-authorization/openid-connect/",
       "properties": {
         "enabled": {
           "type": "boolean"
@@ -1199,6 +1223,27 @@
               ]
             }
           }
+        },
+        "customKeyLifetime": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "value": {
+              "type": "string",
+              "pattern": "^(\\d+h)?(\\d+m)?(\\d+s)?$",
+              "not": {
+                "pattern": "^(0h)?(0m)?(0s)?$"
+              }
+            },
+            "respectValidity": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "enabled"
+          ]
         }
       },
       "required": [
@@ -1243,6 +1288,25 @@
         },
         "contextVariables": {
           "$ref": "#/definitions/X-Tyk-ContextVariables"
+        },
+        "ipAccessControl": {
+          "$ref": "#/definitions/X-Tyk-IPAccessControl"
+        },
+        "batchProcessing": {
+          "$ref": "#/definitions/X-Tyk-BatchProcessing"
+        },
+        "port": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 65535
+        },
+        "protocol": {
+          "type": "string",
+          "enum": [
+            "http",
+            "https",
+            "h2c"
+          ]
         }
       },
       "required": [
@@ -1280,13 +1344,8 @@
         "serviceDiscovery": {
           "$ref": "#/definitions/X-Tyk-ServiceDiscovery"
         },
-        "test": {
-          "type": "object",
-          "properties": {
-            "serviceDiscovery": {
-              "$ref": "#/definitions/X-Tyk-ServiceDiscovery"
-            }
-          }
+        "uptimeTests": {
+          "$ref": "#/definitions/X-Tyk-UptimeTests"
         },
         "mutualTLS": {
           "$ref": "#/definitions/X-Tyk-MutualTLS"
@@ -1299,10 +1358,27 @@
         },
         "authentication": {
           "$ref": "#/definitions/X-Tyk-UpstreamAuthentication"
+        },
+        "loadBalancing": {
+          "$ref": "#/definitions/X-Tyk-LoadBalancing"
+        },
+        "preserveHostHeader": {
+          "$ref": "#/definitions/X-Tyk-PreserveHostHeader"
+        },
+        "tlsTransport": {
+          "$ref": "#/definitions/X-Tyk-TLSTransport"
+        },
+        "proxy": {
+          "$ref": "#/definitions/X-Tyk-Proxy"
         }
       },
-      "required": [
-        "url"
+      "anyOf": [
+        {
+          "required": ["url"]
+        },
+        {
+          "required": ["loadBalancing"]
+        }
       ]
     },
     "X-Tyk-State": {
@@ -1634,6 +1710,7 @@
     },
     "X-Tyk-ExternalOAuth": {
       "type": "object",
+      "description": "Support for external OAuth Middleware will be deprecated starting from 5.7.0. To avoid any disruptions, we recommend that you use JSON Web Token (JWT) instead, as explained in https://tyk.io/docs/basic-config-and-security/security/authentication-authorization/ext-oauth-middleware/",
       "properties": {
         "enabled": {
           "type": "boolean"
@@ -1850,6 +1927,9 @@
         },
         {
           "$ref": "#/definitions/X-Tyk-Webhook-Without-ID"
+        },
+        {
+          "$ref": "#/definitions/X-Tyk-JSVMEvent"
         }
       ]
     },
@@ -1938,10 +2018,45 @@
         "bodyTemplate"
       ]
     },
+    "X-Tyk-JSVMEvent": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "trigger": {
+          "$ref": "#/definitions/X-Tyk-EventTrigger"
+        },
+        "type": {
+          "$ref": "#/definitions/X-Tyk-EventType"
+        },
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "functionName": {
+          "type": "string"
+        },
+        "path": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "enabled",
+        "trigger",
+        "type",
+        "name",
+        "functionName",
+        "path"
+      ]
+    },
     "X-Tyk-EventType": {
       "type": "string",
       "enum": [
-        "webhook"
+        "webhook",
+        "custom"
       ]
     },
     "X-Tyk-EventTrigger": {
@@ -1952,6 +2067,7 @@
         "RateLimitSmoothingUp",
         "RateLimitSmoothingDown",
         "AuthFailure",
+        "UpstreamOAuthError",
         "KeyExpired",
         "VersionFailure",
         "OrgQuotaExceeded",
@@ -1983,10 +2099,44 @@
       "properties": {
         "enabled": {
           "type": "boolean"
+        },
+        "tagHeaders": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "customRetentionPeriod": {
+          "type": "string",
+          "pattern": "^(\\d+h)?(\\d+m)?(\\d+s)?$",
+          "not": {
+            "pattern": "^(0h)?(0m)?(0s)?$"
+          }
+        },
+        "plugins": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/X-Tyk-CustomAnalyticsPluginConfig"
+          }
         }
       },
       "required": [
         "enabled"
+      ]
+    },
+    "X-Tyk-GlobalRequestSizeLimit": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "value": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "enabled",
+        "value"
       ]
     },
     "X-Tyk-UInt": {
@@ -2008,6 +2158,9 @@
         },
         "oauth": {
           "$ref": "#/definitions/X-Tyk-UpstreamOAuth"
+        },
+        "requestSigning": {
+          "$ref": "#/definitions/X-Tyk-UpstreamRequestSigning"
         }
       },
       "required": [
@@ -2020,13 +2173,148 @@
         "enabled": {
           "type": "boolean"
         },
-        "headerName": {
-          "type": "string"
+        "header": {
+          "$ref": "#/definitions/X-Tyk-UpstreamAuthSource"
         },
         "username": {
-          "type": "string"
+          "$ref": "#/definitions/X-Tyk-NonEmptyString"
         },
         "password": {
+          "$ref": "#/definitions/X-Tyk-NonEmptyString"
+        }
+      },
+      "required": [
+        "enabled",
+        "username",
+        "password"
+      ]
+    },
+    "X-Tyk-UpstreamOAuth": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "allowedAuthorizeTypes": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string",
+            "enum": [
+              "clientCredentials",
+              "password"
+            ]
+          },
+          "minItems": 0
+        },
+        "clientCredentials": {
+          "type": "object",
+          "properties": {
+            "clientId": {
+              "$ref": "#/definitions/X-Tyk-NonEmptyString"
+            },
+            "clientSecret": {
+              "$ref": "#/definitions/X-Tyk-NonEmptyString"
+            },
+            "tokenUrl": {
+              "$ref": "#/definitions/X-Tyk-NonEmptyString"
+            },
+            "scopes": {
+              "type": [
+                "array",
+                "null"
+              ]
+            },
+            "header": {
+              "$ref": "#/definitions/X-Tyk-UpstreamAuthSource"
+            },
+            "extraMetadata": {
+              "type": [
+                "array",
+                "null"
+              ]
+            }
+          },
+          "required": [
+            "clientId",
+            "clientSecret",
+            "tokenUrl"
+          ]
+        },
+        "password": {
+          "type": "object",
+          "properties": {
+            "clientId": {
+              "$ref": "#/definitions/X-Tyk-NonEmptyString"
+            },
+            "clientSecret": {
+              "$ref": "#/definitions/X-Tyk-NonEmptyString"
+            },
+            "tokenUrl": {
+              "$ref": "#/definitions/X-Tyk-NonEmptyString"
+            },
+            "scopes": {
+              "type": [
+                "array",
+                "null"
+              ]
+            },
+            "username": {
+              "$ref": "#/definitions/X-Tyk-NonEmptyString"
+            },
+            "password": {
+              "$ref": "#/definitions/X-Tyk-NonEmptyString"
+            },
+            "header": {
+              "$ref": "#/definitions/X-Tyk-UpstreamAuthSource"
+            },
+            "extraMetadata": {
+              "type": [
+                "array",
+                "null"
+              ]
+            }
+          },
+          "required": [
+            "clientId",
+            "tokenUrl",
+            "username",
+            "password"
+          ]
+        }
+      },
+      "required": [
+        "enabled",
+        "allowedAuthorizeTypes"
+      ]
+    },
+    "X-Tyk-UpstreamRequestSigning": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "signatureHeader": {
+          "type": "string"
+        },
+        "algorithm": {
+          "type": "string"
+        },
+        "keyId": {
+          "type": "string"
+        },
+        "headers": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "secret": {
+          "type": "string"
+        },
+        "certificateId": {
           "type": "string"
         }
       },
@@ -2034,33 +2322,219 @@
         "enabled"
       ]
     },
-    "X-Tyk-UpstreamOAuth": {
-      "type":"object",
+    "X-Tyk-NonEmptyString": {
+      "type": "string",
+      "pattern": "\\S+"
+    },
+    "X-Tyk-UpstreamAuthSource": {
+      "type": "object",
       "properties": {
         "enabled": {
           "type": "boolean"
         },
-        "clientCredentials": {
-          "type": "object",
-          "properties": {
-            "clientId": {
-              "type": "string"
-            },
-            "clientSecret": {
-              "type": "string"
-            },
-            "tokenUrl": {
-              "type": "string"
-            },
-            "scopes":{
-              "type": ["array", "null"]
-            }
-          }
-        },
-        "headerName": {
+        "name": {
           "type": "string"
         }
       }
+    },
+    "X-Tyk-IPAccessControl": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "allow": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "block": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "X-Tyk-BatchProcessing": {
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "enabled"
+      ]
+    },
+    "X-Tyk-LoadBalancing": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "targets": {
+          "type": "array",
+          "items": [
+            {
+              "$ref": "#/definitions/X-Tyk-LoadBalancingTarget"
+            }
+          ]
+        }
+      },
+      "required": [
+        "enabled"
+      ],
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "enabled": { "const": true }
+            }
+          },
+          "then": {
+            "properties": {
+              "targets": {
+                "minItems": 1
+              }
+            },
+            "required": ["targets"]
+          }
+        }
+      ]
+    },
+    "X-Tyk-TLSTransport": {
+      "type": "object",
+      "properties": {
+        "insecureSkipVerify": {
+          "type": "boolean"
+        },
+        "ciphers": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "minVersion": {
+          "type": "string",
+          "enum": ["1.0", "1.1", "1.2", "1.3"]
+        },
+        "maxVersion": {
+          "type": "string",
+          "enum": ["1.0", "1.1", "1.2", "1.3"]
+        },
+        "forceCommonNameCheck": {
+          "type": "boolean"
+        }
+      }
+    },
+    "X-Tyk-Proxy": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "url": {
+          "type": "string"
+        }
+      },
+      "required": ["enabled"]
+    },
+    "X-Tyk-PreserveHostHeader": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "enabled"
+      ]
+    },
+    "X-Tyk-UptimeTestCommand": {
+      "type": "object",
+      "properties": {
+        "message": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        }
+      }
+    },
+    "X-Tyk-UptimeTest": {
+      "type": "object",
+      "properties": {
+        "body": {
+          "type": "string"
+        },
+        "commands": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/X-Tyk-UptimeTestCommand"
+          }
+        },
+        "enableProxyProtocol": {
+          "type": "boolean"
+        },
+        "headers": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "method": {
+          "type": "string"
+        },
+        "protocol": {
+          "type": "string"
+        },
+        "timeout": {
+          "$ref": "#/definitions/X-Tyk-ReadableDuration"
+        },
+        "url": {
+          "type": "string"
+        }
+      }
+    },
+    "X-Tyk-UptimeTests": {
+      "type": "object",
+      "properties": {
+        "hostDownRetestPeriod": {
+          "$ref": "#/definitions/X-Tyk-ReadableDuration"
+        },
+        "logRetentionPeriod": {
+          "$ref": "#/definitions/X-Tyk-ReadableDuration"
+        },
+        "serviceDiscovery": {
+          "$ref": "#/definitions/X-Tyk-ServiceDiscovery"
+        },
+        "tests": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/X-Tyk-UptimeTest"
+          }
+        }
+      }
+    },
+    "X-Tyk-ReadableDuration": {
+      "type": "string",
+      "pattern": "^(\\d+h)?(\\d+m)?(\\d+s)?$"
+    },
+    "X-Tyk-LoadBalancingTarget": {
+      "type": "object",
+      "properties": {
+        "url": {
+          "type": "string"
+        },
+        "weight": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "url",
+        "weight"
+      ]
     }
   }
 }

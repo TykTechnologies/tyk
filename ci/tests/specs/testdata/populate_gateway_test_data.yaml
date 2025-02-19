@@ -1,0 +1,174 @@
+name: Manage APIs and Policies
+testcases:
+  - name: Delete API
+    steps:
+      - type: http
+        method: DELETE
+        url: http://localhost:8080/tyk/apis/f84ve1a04e5648c2797170567971565n
+        headers:
+          X-Tyk-Authorization: {{ .bearerToken }}
+        assertions:
+          - result.statuscode ShouldBeIn 200 404
+
+  - name: Delete Keyless API
+    steps:
+      - type: http
+        method: DELETE
+        url: http://localhost:8080/tyk/apis/Nwupjt6uqbohnSxgdrTfm7p7b50a5kgU
+        headers:
+          X-Tyk-Authorization: {{ .bearerToken }}
+        assertions:
+          - result.statuscode ShouldBeIn 200 404
+
+  - name: Delete Policy
+    steps:
+      - type: http
+        method: DELETE
+        url: http://localhost:8080/tyk/policies/46ad120575961080181867e
+        headers:
+          X-Tyk-Authorization: {{ .bearerToken }}
+        assertions:
+          - result.statuscode ShouldBeIn 200 500
+
+  - name: Create API
+    steps:
+      - type: http
+        method: POST
+        url: http://localhost:8080/tyk/apis
+        headers:
+          Content-Type: application/json
+          X-Tyk-Authorization: {{ .bearerToken }}
+        body: |
+          {
+            "api_id": "f84ve1a04e5648c2797170567971565n",
+            "auth": {
+              "auth_header_name": "authorization"
+            },
+            "definition": {
+              "key": "version",
+              "location": "header"
+            },
+            "name": "Tyk Test API",
+            "org_id": "664a14650619d40001f1f00f",
+            "proxy": {
+              "listen_path": "/tyk-api-test/",
+              "strip_listen_path": true,
+              "target_url": "https://httpbin.org"
+            },
+            "use_oauth2": true,
+            "version_data": {
+              "not_versioned": true,
+              "versions": {
+                "Default": {
+                  "name": "Default"
+                }
+              }
+            }
+          }
+        assertions:
+          - result.statuscode ShouldEqual 200
+
+  - name: Create Keyless API
+    steps:
+      - type: http
+        method: POST
+        url: http://localhost:8080/tyk/apis
+        headers:
+          Content-Type: application/json
+          X-Tyk-Authorization: {{ .bearerToken }}
+        body: |
+          {
+            "api_id": "Nwupjt6uqbohnSxgdrTfm7p7b50a5kgU",
+            "use_keyless": true,
+            "definition": {
+              "key": "version",
+              "location": "header"
+            },
+            "name": "Tyk Keyless API",
+            "org_id": "664a14650619d40001f1f00f",
+            "proxy": {
+              "listen_path": "/tyk-keyless-api/",
+              "strip_listen_path": true,
+              "target_url": "https://httpbin.org"
+            },
+            "use_oauth2": false,
+            "version_data": {
+              "not_versioned": true,
+              "versions": {
+                "Default": {
+                  "name": "Default"
+                }
+              }
+            }
+          }
+        assertions:
+          - result.statuscode ShouldEqual 200
+
+  - name: Create Policy
+    steps:
+      - type: http
+        method: POST
+        url: http://localhost:8080/tyk/policies
+        headers:
+          Content-Type: application/json
+          X-Tyk-Authorization: {{ .bearerToken }}
+        body: |
+          {
+            "access_rights": {
+              "itachi-api": {
+                "allowed_urls": [
+                  {
+                    "methods": [
+                      "GET"
+                    ],
+                    "url": "/users"
+                  }
+                ],
+                "api_id": "f84ve1a04e5648c2797170567971565n",
+                "api_name": "Itachi api",
+                "disable_introspection": false,
+                "versions": [
+                  "Default"
+                ]
+              }
+            },
+            "active": true,
+            "hmac_enabled": false,
+            "id": "46ad120575961080181867e",
+            "is_inactive": false,
+            "key_expires_in": 2592000,
+            "max_query_depth": -1,
+            "meta_data": {
+              "update": "sample policy test",
+              "user_type": "mobile_user"
+            },
+            "name": "Sample policy",
+            "partitions": {
+              "acl": true,
+              "complexity": false,
+              "per_api": false,
+              "quota": true,
+              "rate_limit": true
+            },
+            "per": 60,
+            "quota_max": 10000,
+            "quota_renewal_rate": 3600,
+            "rate": 1000,
+            "tags": [
+              "security"
+            ],
+            "throttle_interval": 10,
+            "throttle_retry_limit": 10
+          }
+        assertions:
+          - result.statuscode ShouldEqual 200
+
+  - name: Reload  gateway
+    steps:
+      - type: http
+        method: GET
+        url: http://localhost:8080/tyk/reload
+        headers:
+          X-Tyk-Authorization: {{ .bearerToken }}
+        assertions:
+          - result.statuscode ShouldBeIn 200

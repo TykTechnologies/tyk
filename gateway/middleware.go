@@ -10,11 +10,14 @@ import (
 	"io/ioutil"
 	"net/http"
 	"strconv"
+	"sync"
 	"time"
+
+	"github.com/TykTechnologies/tyk-pump/analytics"
+	"github.com/TykTechnologies/tyk/internal/httputil/accesslog"
 
 	"github.com/gocraft/health"
 	"github.com/justinas/alice"
-	newrelic "github.com/newrelic/go-agent"
 	"github.com/paulbellamy/ratecounter"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sync/singleflight"
@@ -26,6 +29,7 @@ import (
 	"github.com/TykTechnologies/tyk/internal/middleware"
 	"github.com/TykTechnologies/tyk/internal/otel"
 	"github.com/TykTechnologies/tyk/internal/policy"
+	"github.com/TykTechnologies/tyk/internal/service/newrelic"
 	"github.com/TykTechnologies/tyk/request"
 	"github.com/TykTechnologies/tyk/rpc"
 	"github.com/TykTechnologies/tyk/storage"
@@ -48,8 +52,6 @@ type TykMiddleware interface {
 	GetSpec() *APISpec
 
 	Init()
-	SetName(string)
-	SetRequestLogger(*http.Request)
 	Logger() *logrus.Entry
 	Config() (interface{}, error)
 	ProcessRequest(w http.ResponseWriter, r *http.Request, conf interface{}) (error, int) // Handles request
@@ -71,7 +73,9 @@ func (tr TraceMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request,
 		defer span.Finish()
 		setContext(r, ctx)
 		return tr.TykMiddleware.ProcessRequest(w, r, conf)
-	} else if baseMw := tr.Base(); baseMw != nil {
+	}
+
+	if baseMw := tr.Base(); baseMw != nil {
 		cfg := baseMw.Gw.GetConfig()
 		if cfg.OpenTelemetry.Enabled {
 			otel.AddTraceID(r.Context(), w)
@@ -104,7 +108,7 @@ func (tr TraceMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request,
 
 func (gw *Gateway) createDynamicMiddleware(name string, isPre, useSession bool, baseMid *BaseMiddleware) func(http.Handler) http.Handler {
 	dMiddleware := &DynamicMiddleware{
-		BaseMiddleware:      baseMid,
+		BaseMiddleware:      baseMid, // already a Copy from api_loader.
 		MiddlewareClassName: name,
 		Pre:                 isPre,
 		UseSession:          useSession,
@@ -120,7 +124,7 @@ func (gw *Gateway) createMiddleware(actualMW TykMiddleware) func(http.Handler) h
 	}
 	// construct a new instance
 	mw.Init()
-	mw.SetName(mw.Name())
+	mw.Base().SetName(mw.Name())
 	mw.Logger().Debug("Init")
 
 	spec := mw.GetSpec()
@@ -134,12 +138,10 @@ func (gw *Gateway) createMiddleware(actualMW TykMiddleware) func(http.Handler) h
 
 	return func(h http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			mw.SetRequestLogger(r)
+			logger := mw.Base().SetRequestLogger(r)
 
-			if gw.GetConfig().NewRelic.AppName != "" {
-				if txn, ok := w.(newrelic.Transaction); ok {
-					defer newrelic.StartSegment(txn, mw.Name()).End()
-				}
+			if txn := newrelic.FromContext(r.Context()); txn != nil {
+				defer txn.StartSegment(mw.Name()).End()
 			}
 
 			job := instrument.NewJob("MiddlewareCall")
@@ -160,7 +162,7 @@ func (gw *Gateway) createMiddleware(actualMW TykMiddleware) func(http.Handler) h
 			}
 
 			startTime := time.Now()
-			mw.Logger().WithField("ts", startTime.UnixNano()).WithField("mw", mw.Name()).Debug("Started")
+			logger.WithField("ts", startTime.UnixNano()).WithField("mw", mw.Name()).Debug("Started")
 
 			if mw.Base().Spec.CORS.OptionsPassthrough && r.Method == "OPTIONS" {
 				h.ServeHTTP(w, r)
@@ -188,7 +190,7 @@ func (gw *Gateway) createMiddleware(actualMW TykMiddleware) func(http.Handler) h
 					job.TimingKv(eventName+".exec_time", finishTime.Nanoseconds(), meta)
 				}
 
-				mw.Logger().WithError(err).WithField("code", errCode).WithField("ns", finishTime.Nanoseconds()).Debug("Finished")
+				logger.WithError(err).WithField("code", errCode).WithField("ns", finishTime.Nanoseconds()).Debug("Finished")
 				return
 			}
 
@@ -199,7 +201,7 @@ func (gw *Gateway) createMiddleware(actualMW TykMiddleware) func(http.Handler) h
 				job.TimingKv(eventName+".exec_time", finishTime.Nanoseconds(), meta)
 			}
 
-			mw.Logger().WithField("code", errCode).WithField("ns", finishTime.Nanoseconds()).Debug("Finished")
+			logger.WithField("code", errCode).WithField("ns", finishTime.Nanoseconds()).Debug("Finished")
 
 			mw.Base().UpdateRequestSession(r)
 			// Special code, bypasses all other execution
@@ -240,30 +242,88 @@ func (gw *Gateway) mwList(mws ...TykMiddleware) []alice.Constructor {
 // BaseMiddleware wraps up the ApiSpec and Proxy objects to be included in a
 // middleware handler, this can probably be handled better.
 type BaseMiddleware struct {
-	Spec   *APISpec
-	Proxy  ReturningHttpHandler
-	logger *logrus.Entry
-	Gw     *Gateway `json:"-"`
+	Spec  *APISpec
+	Proxy ReturningHttpHandler
+	Gw    *Gateway `json:"-"`
+
+	loggerMu sync.Mutex
+	logger   *logrus.Entry
 }
 
-func (t BaseMiddleware) Base() *BaseMiddleware {
-	return &t
-}
-
-func (t *BaseMiddleware) Logger() (logger *logrus.Entry) {
-	if t.logger == nil {
-		t.logger = logrus.NewEntry(log)
+// NewBaseMiddleware creates a new *BaseMiddleware.
+// The passed logrus.Entry is duplicated.
+// BaseMiddleware keeps the pointer to *Gateway and *APISpec, as well as Proxy.
+// The logger duplication is used so that basemiddleware copies can be created for different middleware.
+func NewBaseMiddleware(gw *Gateway, spec *APISpec, proxy ReturningHttpHandler, logger *logrus.Entry) *BaseMiddleware {
+	if logger == nil {
+		logger = logrus.NewEntry(log)
+	}
+	baseMid := &BaseMiddleware{
+		Spec:   spec,
+		Proxy:  proxy,
+		logger: logger.Dup(),
+		Gw:     gw,
 	}
 
-	return t.logger
+	for _, v := range baseMid.Spec.VersionData.Versions {
+		if len(v.ExtendedPaths.CircuitBreaker) > 0 {
+			baseMid.Spec.CircuitBreakerEnabled = true
+		}
+		if len(v.ExtendedPaths.HardTimeouts) > 0 {
+			baseMid.Spec.EnforcedTimeoutEnabled = true
+		}
+	}
+
+	return baseMid
+}
+
+// Copy provides a new BaseMiddleware with it's own logger scope (copy).
+// The Spec, Proxy and Gw values are not copied.
+func (m *BaseMiddleware) Copy() *BaseMiddleware {
+	return &BaseMiddleware{
+		logger: m.logger.Dup(),
+		Spec:   m.Spec,
+		Proxy:  m.Proxy,
+		Gw:     m.Gw,
+	}
+}
+
+// Base serves to provide the full BaseMiddleware API. It's part of the TykMiddleware interface.
+// It escapes to a wider API surface than TykMiddleware, used by middlewares, etc.
+func (t *BaseMiddleware) Base() *BaseMiddleware {
+	return t
 }
 
 func (t *BaseMiddleware) SetName(name string) {
-	t.logger = t.Logger().WithField("mw", name)
+	t.loggerMu.Lock()
+	defer t.loggerMu.Unlock()
+
+	if t.logger == nil {
+		t.logger = logrus.NewEntry(log)
+	}
+	t.logger = t.logger.WithField("mw", name)
 }
 
-func (t *BaseMiddleware) SetRequestLogger(r *http.Request) {
-	t.logger = t.Gw.getLogEntryForRequest(t.Logger(), r, ctxGetAuthToken(r), nil)
+// Logger is used by middleware process functions.
+func (t *BaseMiddleware) Logger() (logger *logrus.Entry) {
+	t.loggerMu.Lock()
+	defer t.loggerMu.Unlock()
+
+	if t.logger == nil {
+		t.logger = logrus.NewEntry(log)
+	}
+	return t.logger
+}
+
+func (t *BaseMiddleware) SetRequestLogger(r *http.Request) *logrus.Entry {
+	t.loggerMu.Lock()
+	defer t.loggerMu.Unlock()
+
+	if t.logger == nil {
+		t.logger = logrus.NewEntry(log)
+	}
+	t.logger = t.Gw.getLogEntryForRequest(t.logger, r, ctxGetAuthToken(r), nil)
+	return t.logger
 }
 
 func (t *BaseMiddleware) Init() {}
@@ -372,6 +432,30 @@ func (t *BaseMiddleware) ApplyPolicies(session *user.SessionState) error {
 	}
 	store := policy.New(orgID, t.Gw, log)
 	return store.Apply(session)
+}
+
+// RecordAccessLog is used for Success/Error handler logging.
+// It emits a log entry with populated access log fields.
+func (t *BaseMiddleware) RecordAccessLog(req *http.Request, resp *http.Response, latency analytics.Latency) {
+	if !t.Spec.GlobalConfig.AccessLogs.Enabled {
+		return
+	}
+
+	gw := t.Gw
+	gwConfig := gw.GetConfig()
+
+	hashKeys := gwConfig.HashKeys
+	allowedFields := gwConfig.AccessLogs.Template
+
+	// Set the access log fields
+	accessLog := accesslog.NewRecord()
+	accessLog.WithApiKey(req, hashKeys, gw.obfuscateKey)
+	accessLog.WithRequest(req, latency)
+	accessLog.WithResponse(resp)
+
+	logFields := accessLog.Fields(allowedFields)
+
+	t.Logger().WithFields(logFields).Info()
 }
 
 func copyAllowedURLs(input []user.AccessSpec) []user.AccessSpec {
@@ -528,21 +612,6 @@ func (t *BaseMiddleware) emitRateLimitEvent(r *http.Request, e event.Event, mess
 		Path:   r.URL.Path,
 		Origin: request.RealIP(r),
 		Key:    rateLimitKey,
-	})
-}
-
-// emitUpstreamOAuthEvent emits an upstream OAuth event with an optional custom message.
-func (t *BaseMiddleware) emitUpstreamOAuthEvent(r *http.Request, e event.Event, message string, apiId string) {
-	if message == "" {
-		message = event.String(e)
-	}
-
-	t.FireEvent(e, EventUpstreamOAuthMeta{
-		EventMetaDefault: EventMetaDefault{
-			Message:            message,
-			OriginatingRequest: EncodeRequestToEvent(r),
-		},
-		APIID: apiId,
 	})
 }
 
