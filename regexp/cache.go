@@ -4,7 +4,7 @@ import (
 	"regexp"
 	"time"
 
-	gocache "github.com/pmylund/go-cache"
+	gocache "github.com/TykTechnologies/tyk/internal/cache"
 )
 
 const (
@@ -17,13 +17,14 @@ const (
 
 type cache struct {
 	*gocache.Cache
+
 	isEnabled bool
 	ttl       time.Duration
 }
 
 func newCache(ttl time.Duration, isEnabled bool) *cache {
 	return &cache{
-		Cache:     gocache.New(ttl, defaultCacheCleanupInterval),
+		Cache:     gocache.NewCache(ttl, defaultCacheCleanupInterval),
 		isEnabled: isEnabled,
 		ttl:       ttl,
 	}
@@ -34,7 +35,7 @@ func (c *cache) enabled() bool {
 }
 
 func (c *cache) add(key string, value interface{}) {
-	c.Add(key, value, c.ttl)
+	c.Set(key, value, c.ttl)
 }
 
 func (c *cache) getRegexp(key string) (*regexp.Regexp, bool) {
