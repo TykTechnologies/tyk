@@ -8,13 +8,11 @@ name: Release
 # - docker hub
 # - devenv ECR
 # - Cloudsmith
-concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+# concurrency:
+#   group: ${{ github.workflow }}-${{ github.ref }}
+#   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 on:
-  # Trigger release every monday at midnight for master CI images
-  schedule:
-    - cron: "0 0 * * 1"
   pull_request:
   push:
     branches:
@@ -174,6 +172,8 @@ jobs:
           cache-to: type=gha,mode=max
           tags: ${{ steps.ci_metadata.outputs.tags }}
           labels: ${{ steps.tag_metadata.outputs.labels }}
+          build-args: |
+            EDITION=
       - name: Docker metadata for tag push
         id: tag_metadata
         uses: docker/metadata-action@v5
@@ -202,6 +202,8 @@ jobs:
           push: ${{ startsWith(github.ref, 'refs/tags') }}
           tags: ${{ steps.tag_metadata.outputs.tags }}
           labels: ${{ steps.tag_metadata.outputs.labels }}
+          build-args: |
+            EDITION=
       - name: save deb
         uses: actions/upload-artifact@v4
         if: ${{ matrix.golang_cross == '1.16' }}
@@ -285,7 +287,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release download --repo github.com/tyklabs/tyk-pro --archive tar.gz -O env.tgz
+          gh release download --repo github.com/TykTechnologies/tyk-pro --archive tar.gz -O env.tgz
           mkdir auto && tar --strip-components=1 -C auto -xzvf env.tgz
       - name: env up
         shell: bash
@@ -302,6 +304,7 @@ jobs:
           set -eaxo pipefail
           docker run -q --rm -v ~/.docker/config.json:/root/.docker/config.json tykio/gromit policy match ${tags[0]} ${match_tag} 2>versions.env
           echo '# alfa and beta have to come after the override
+
           tyk_alfa_image=$tyk_image
           tyk_beta_image=$tyk_image
           ECR=${{steps.ecr.outputs.registry}}
