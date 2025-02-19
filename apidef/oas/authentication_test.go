@@ -181,9 +181,10 @@ func TestCustomPlugin(t *testing.T) {
 			expectedCustomPluginAuth := CustomPluginAuthentication{
 				Enabled: true,
 				Config: &AuthenticationPlugin{
-					Enabled:      true,
-					FunctionName: "Auth",
-					Path:         "/path/to/plugin",
+					Enabled:        true,
+					FunctionName:   "Auth",
+					Path:           "/path/to/plugin",
+					RequireSession: true,
 				},
 			}
 
@@ -202,9 +203,10 @@ func TestCustomPlugin(t *testing.T) {
 			expectedCustomPluginAuth := CustomPluginAuthentication{
 				Enabled: true,
 				Config: &AuthenticationPlugin{
-					Enabled:      true,
-					FunctionName: "Auth",
-					Path:         "/path/to/plugin",
+					Enabled:        true,
+					FunctionName:   "Auth",
+					Path:           "/path/to/plugin",
+					RequireSession: true,
 				},
 				AuthSources: AuthSources{
 					Header: &AuthSource{
