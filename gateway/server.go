@@ -1531,7 +1531,7 @@ func (gw *Gateway) afterConfSetup() {
 	}
 
 	if conf.SlaveOptions.APIKey != "" {
-		conf.SlaveOptions.OriginalAPIKeyPath = conf.SlaveOptions.APIKey
+		conf.Private.OriginalAPIKeyPath = conf.SlaveOptions.APIKey
 		conf.SlaveOptions.APIKey, err = gw.kvStore(conf.SlaveOptions.APIKey)
 		if err != nil {
 			log.WithError(err).Fatalf("Could not retrieve API key from KV store.")

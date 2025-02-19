@@ -105,7 +105,7 @@ func TestHandleUserKeyReset(t *testing.T) {
 			config := ts.Gw.GetConfig()
 			config.SlaveOptions.APIKey = oldKey
 			if tc.kvPath != "" {
-				config.SlaveOptions.OriginalAPIKeyPath = tc.kvPath
+				config.Private.OriginalAPIKeyPath = tc.kvPath
 			}
 			ts.Gw.SetConfig(config)
 
