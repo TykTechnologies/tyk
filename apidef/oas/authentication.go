@@ -755,6 +755,8 @@ type AuthenticationPlugin struct {
 	Path string `bson:"path" json:"path"`
 	// RawBodyOnly if set to true, do not fill body in request or response object.
 	RawBodyOnly bool `bson:"rawBodyOnly,omitempty" json:"rawBodyOnly,omitempty"`
+	// RequireSession passes down the session information for plugins after authentication.
+	RequireSession bool `bson:"requireSession,omitempty" json:"requireSession,omitempty"`
 	// IDExtractor configures ID extractor with coprocess custom authentication.
 	IDExtractor *IDExtractor `bson:"idExtractor,omitempty" json:"idExtractor,omitempty"`
 }
@@ -763,6 +765,7 @@ func (ap *AuthenticationPlugin) Fill(api apidef.APIDefinition) {
 	ap.FunctionName = api.CustomMiddleware.AuthCheck.Name
 	ap.Path = api.CustomMiddleware.AuthCheck.Path
 	ap.RawBodyOnly = api.CustomMiddleware.AuthCheck.RawBodyOnly
+	ap.RequireSession = api.CustomMiddleware.AuthCheck.RequireSession
 	ap.Enabled = !api.CustomMiddleware.AuthCheck.Disabled
 	if ap.IDExtractor == nil {
 		ap.IDExtractor = &IDExtractor{}
@@ -779,6 +782,7 @@ func (ap *AuthenticationPlugin) ExtractTo(api *apidef.APIDefinition) {
 	api.CustomMiddleware.AuthCheck.Name = ap.FunctionName
 	api.CustomMiddleware.AuthCheck.Path = ap.Path
 	api.CustomMiddleware.AuthCheck.RawBodyOnly = ap.RawBodyOnly
+	api.CustomMiddleware.AuthCheck.RequireSession = ap.RequireSession
 
 	if ap.IDExtractor == nil {
 		ap.IDExtractor = &IDExtractor{}
