@@ -135,6 +135,112 @@ func TestMiddleware(t *testing.T) {
 
 		assert.Equal(t, expectedMW, resultMiddleware)
 	})
+
+	t.Run("mock response", func(t *testing.T) {
+		// Setup
+		mockResponse := MockResponse{
+			Enabled: true,
+			Code:    200,
+			Body:    "test body",
+			Headers: []Header{},
+		}
+
+		// Create API definition to test extraction
+		var convertedMockResponse apidef.MockResponseMeta
+		mockResponse.ExtractTo(&convertedMockResponse)
+
+		// Verify extraction
+		assert.False(t, convertedMockResponse.Disabled)
+		assert.Equal(t, mockResponse.Code, convertedMockResponse.Code)
+		assert.Equal(t, mockResponse.Body, convertedMockResponse.Body)
+
+		// Test filling from API definition
+		var resultMockResponse MockResponse
+		resultMockResponse.Fill(convertedMockResponse)
+
+		// Verify fill matches original
+		assert.Equal(t, mockResponse, resultMockResponse)
+	})
+}
+
+func TestMiddleware_Fill(t *testing.T) {
+	t.Run("fills empty middleware", func(t *testing.T) {
+		// Setup
+		var m Middleware
+		api := apidef.APIDefinition{}
+
+		// Execute
+		m.Fill(api)
+
+		// Verify
+		assert.NotNil(t, m.Global, "Global should be initialized")
+		assert.NotNil(t, m.Operations, "Operations should be initialized")
+	})
+
+	t.Run("fills existing middleware", func(t *testing.T) {
+		// Setup
+		m := Middleware{
+			Global:     &Global{},
+			Operations: Operations{},
+		}
+		api := apidef.APIDefinition{}
+
+		// Execute
+		m.Fill(api)
+
+		// Verify
+		assert.NotNil(t, m.Global, "Global should remain initialized")
+		assert.NotNil(t, m.Operations, "Operations should remain initialized")
+	})
+
+	t.Run("preserves non-empty Global", func(t *testing.T) {
+		// Setup
+		m := Middleware{}
+		api := apidef.APIDefinition{
+			CORS: apidef.CORSConfig{
+				Enable: true,
+			},
+		}
+
+		// Execute
+		m.Fill(api)
+
+		// Verify
+		assert.NotNil(t, m.Global, "Global should not be nil when containing data")
+		assert.True(t, m.Global.CORS.Enabled, "CORS should be enabled")
+		assert.NotNil(t, m.Operations, "Operations should be initialized")
+	})
+
+	t.Run("fills complex middleware configuration", func(t *testing.T) {
+		// Setup
+		m := Middleware{}
+		api := apidef.APIDefinition{
+			CORS: apidef.CORSConfig{
+				Enable:           true,
+				AllowCredentials: true,
+				AllowedOrigins:   []string{"*"},
+			},
+			CacheOptions: apidef.CacheOptions{
+				EnableCache:  true,
+				CacheTimeout: 60,
+			},
+		}
+
+		// Execute
+		m.Fill(api)
+
+		// Verify
+		assert.NotNil(t, m.Global, "Global should not be nil")
+		assert.True(t, m.Global.CORS.Enabled, "CORS should be enabled")
+		assert.True(t, m.Global.CORS.AllowCredentials, "CORS should allow credentials")
+		assert.Equal(t, []string{"*"}, m.Global.CORS.AllowedOrigins, "CORS should have correct allowed origins")
+
+		assert.NotNil(t, m.Global.Cache, "Cache should not be nil")
+		assert.True(t, m.Global.Cache.Enabled, "Cache should be enabled")
+		assert.Equal(t, int64(60), m.Global.Cache.Timeout, "Cache should have correct timeout")
+
+		assert.NotNil(t, m.Operations, "Operations should be initialized")
+	})
 }
 
 func TestGlobal(t *testing.T) {

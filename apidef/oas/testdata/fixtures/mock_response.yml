@@ -1,0 +1,79 @@
+---
+name: "Mock Response"
+tests:
+  - desc: "Mock response - from oas to classic"
+    source: oas
+    input:
+      paths:
+        /test:
+          get:
+            operationId: "test"
+            responses:
+              "200":
+                description: "OK"
+                content:
+                  text/plain:
+                    schema:
+                      type: string
+      x-tyk-api-gateway:
+        middleware:
+          operations:
+            test:
+              mockResponse:
+                enabled: true
+                code: 200
+                body: "Hello World"
+                headers:
+                  - name: "Content-Type"
+                    value: "text/plain"
+    output:
+      version_data:
+        versions:
+          Default:
+            extended_paths:
+              mock_response:
+                - disabled: false
+                  path: "/test"
+                  method: "GET"
+                  code: 200
+                  body: "Hello World"
+                  headers:
+                    Content-Type: "text/plain"
+  - desc: "Mock response - from classic to oas"
+    source: classic
+    input:
+      version_data:
+        versions:
+          Default:
+            extended_paths:
+              mock_response:
+                - disabled: false
+                  path: "/test"
+                  method: "GET"
+                  code: 200
+                  body: "Hello World"
+                  headers:
+                    Content-Type: "text/plain"
+    output:
+      paths:
+        /test:
+          get:
+            operationId: "test"
+            responses:
+              "200":
+                description: "OK"
+                content:
+                  text/plain:
+                    schema:
+                      type: string
+      x-tyk-api-gateway:
+        middleware:
+          operations:
+            test:
+              mockResponse:
+                enabled: true
+                code: 200
+                body: "Hello World"
+                headers:
+                  - name: "Content-Type"
+                    value: "text/plain"

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/getkin/kin-openapi/openapi3"
@@ -14,6 +15,58 @@ import (
 
 // Operations holds Operation definitions.
 type Operations map[string]*Operation
+
+// Fill fills Operations from *apidef.APIDefinition.
+func (o Operations) Fill(api apidef.APIDefinition) {
+	// Check if versions map exists and has the Main version
+	if api.VersionData.Versions == nil {
+		return
+	}
+
+	mainVersion, exists := api.VersionData.Versions[Main]
+	if !exists {
+		return
+	}
+
+	mockResponses := mainVersion.ExtendedPaths.MockResponse
+	if mockResponses == nil {
+		return
+	}
+
+	for _, mockResponse := range mockResponses {
+		operationID := generateOperationID(mockResponse)
+		if _, exists := o[operationID]; !exists {
+			o[operationID] = &Operation{
+				IgnoreAuthentication: &Allowance{
+					Enabled: true,
+				},
+			}
+		}
+
+		operation := o[operationID]
+		operation.MockResponse = &MockResponse{}
+		operation.MockResponse.Fill(mockResponse)
+	}
+}
+
+// ExtractTo extracts Operations into *apidef.APIDefinition.
+func (o Operations) ExtractTo(api *apidef.APIDefinition) {
+	mainVersion := api.VersionData.Versions[Main]
+	extendedPaths := mainVersion.ExtendedPaths
+
+	for path, operation := range o {
+		if operation.MockResponse == nil {
+			continue
+		}
+
+		mockMeta := apidef.MockResponseMeta{Path: path}
+		operation.ExtractTo(&mockMeta)
+		extendedPaths.MockResponse = append(extendedPaths.MockResponse, mockMeta)
+	}
+
+	mainVersion.ExtendedPaths = extendedPaths
+	api.VersionData.Versions[Main] = mainVersion
+}
 
 // Operation holds a request operation configuration, allowances, tranformations, caching, timeouts and validation.
 type Operation struct {
@@ -81,6 +134,49 @@ type Operation struct {
 
 	// RateLimit contains endpoint level rate limit configuration.
 	RateLimit *RateLimitEndpoint `bson:"rateLimit,omitempty" json:"rateLimit,omitempty"`
+}
+
+// Fill fills Operation from *apidef.MockResponseMeta.
+func (o *Operation) Fill(op apidef.MockResponseMeta) {
+	if o.MockResponse == nil {
+		o.MockResponse = &MockResponse{}
+	}
+
+	headers := make([]Header, 0)
+	for k, v := range op.Headers {
+		headers = append(headers, Header{
+			Name:  k,
+			Value: v,
+		})
+	}
+
+	o.MockResponse.Enabled = !op.Disabled
+	o.MockResponse.Code = op.Code
+	o.MockResponse.Body = op.Body
+	o.MockResponse.Headers = headers
+
+	// Enable ignore authentication for this endpoint to maintain compatibility with Classic APIs
+	// In Classic APIs, mock responses are processed before authentication
+	// In OAS, mock responses are processed at the end of the chain, so we need to explicitly
+	// bypass authentication to maintain the same behavior during migration
+	o.IgnoreAuthentication = &Allowance{
+		Enabled: true,
+	}
+}
+
+// ExtractTo extracts Operation into *apidef.MockResponseMeta.
+func (o *Operation) ExtractTo(op *apidef.MockResponseMeta) {
+	op.Disabled = !o.MockResponse.Enabled
+	op.Code = o.MockResponse.Code
+	op.Body = o.MockResponse.Body
+
+	// Convert Headers slice back to map
+	headers := make(map[string]string)
+	for _, h := range o.MockResponse.Headers {
+		headers[h.Name] = h.Value
+	}
+
+	op.Headers = headers
 }
 
 // AllowanceType holds the valid allowance types values.
@@ -163,6 +259,96 @@ func (s *OAS) fillPathsAndOperations(ep apidef.ExtendedPathsSet) {
 	s.fillDoNotTrackEndpoint(ep.DoNotTrackEndpoints)
 	s.fillRequestSizeLimit(ep.SizeLimit)
 	s.fillRateLimitEndpoints(ep.RateLimit)
+	s.fillMockResponsePaths(s.Paths, ep)
+}
+
+func (s *OAS) fillMockResponsePaths(paths openapi3.Paths, ep apidef.ExtendedPathsSet) {
+	for _, mockResponse := range ep.MockResponse {
+		path := mockResponse.Path
+		method := mockResponse.Method
+
+		// Create path item if it doesn't exist
+		if paths[path] == nil {
+			paths[path] = &openapi3.PathItem{}
+		}
+
+		statusCode := strconv.Itoa(mockResponse.Code)
+		headers := make(map[string]string)
+		for k, v := range mockResponse.Headers {
+			headers[k] = v
+		}
+
+		// Determine content type from headers, default to text/plain
+		contentType := "text/plain"
+		if ct, exists := headers["Content-Type"]; exists {
+			contentType = ct
+		}
+
+		// Convert headers to OAS3 format
+		oasHeaders := openapi3.Headers{}
+		for name, value := range headers {
+			oasHeaders[name] = &openapi3.HeaderRef{
+				Value: &openapi3.Header{
+					Parameter: openapi3.Parameter{
+						Schema: &openapi3.SchemaRef{
+							Value: &openapi3.Schema{
+								Type:    "string",
+								Example: value,
+							},
+						},
+					},
+				},
+			}
+		}
+
+		// Create MediaType with both schema and example
+		mediaType := &openapi3.MediaType{
+			Schema: &openapi3.SchemaRef{
+				Value: &openapi3.Schema{
+					Type:    "string",
+					Example: mockResponse.Body,
+				},
+			},
+			Example: mockResponse.Body,
+			Examples: openapi3.Examples{
+				"default": &openapi3.ExampleRef{
+					Value: &openapi3.Example{
+						Value: mockResponse.Body,
+					},
+				},
+			},
+		}
+
+		oasContent := openapi3.Content{
+			contentType: mediaType,
+		}
+
+		oasOperation := &openapi3.Operation{
+			OperationID: generateOperationID(mockResponse),
+			Responses: openapi3.Responses{
+				statusCode: {
+					Value: &openapi3.Response{
+						Content: oasContent,
+						Headers: oasHeaders,
+					},
+				},
+			},
+		}
+
+		// Set the operation based on the HTTP method
+		switch method {
+		case http.MethodGet:
+			paths[path].Get = oasOperation
+		case http.MethodPost:
+			paths[path].Post = oasOperation
+		case http.MethodPut:
+			paths[path].Put = oasOperation
+		case http.MethodDelete:
+			paths[path].Delete = oasOperation
+		case http.MethodPatch:
+			paths[path].Patch = oasOperation
+		}
+	}
 }
 
 func (s *OAS) extractPathsAndOperations(ep *apidef.ExtendedPathsSet) {
@@ -197,6 +383,7 @@ func (s *OAS) extractPathsAndOperations(ep *apidef.ExtendedPathsSet) {
 					tykOp.extractDoNotTrackEndpointTo(ep, path, method)
 					tykOp.extractRequestSizeLimitTo(ep, path, method)
 					tykOp.extractRateLimitEndpointTo(ep, path, method)
+					tykOp.extractMockResponsePaths(ep, path, method)
 					break
 				}
 			}
@@ -464,6 +651,31 @@ func (o *Operation) extractRequestSizeLimitTo(ep *apidef.ExtendedPathsSet, path 
 	ep.SizeLimit = append(ep.SizeLimit, meta)
 }
 
+func (o *Operation) extractMockResponsePaths(ep *apidef.ExtendedPathsSet, path, method string) {
+	if o.MockResponse == nil {
+		return
+	}
+
+	headers := make(map[string]string)
+
+	for _, header := range o.MockResponse.Headers {
+		headers[header.Name] = header.Value
+	}
+
+	if ep.MockResponse == nil {
+		ep.MockResponse = make([]apidef.MockResponseMeta, 0)
+	}
+
+	ep.MockResponse = append(ep.MockResponse, apidef.MockResponseMeta{
+		Disabled: !o.MockResponse.Enabled,
+		Path:     path,
+		Method:   method,
+		Code:     o.MockResponse.Code,
+		Body:     o.MockResponse.Body,
+		Headers:  headers,
+	})
+}
+
 // detect possible regex pattern:
 // - character match ([a-z])
 // - greedy match (.*)
@@ -729,6 +941,38 @@ type MockResponse struct {
 	FromOASExamples *FromOASExamples `bson:"fromOASExamples,omitempty" json:"fromOASExamples,omitempty"`
 }
 
+func (m *MockResponse) Fill(op apidef.MockResponseMeta) {
+	headers := make([]Header, 0)
+	for k, v := range op.Headers {
+		headers = append(headers, Header{
+			Name:  k,
+			Value: v,
+		})
+	}
+
+	m.Enabled = !op.Disabled
+	m.Code = op.Code
+	m.Body = op.Body
+	m.Headers = headers
+}
+
+func (m *MockResponse) ExtractTo(meta *apidef.MockResponseMeta) {
+	meta.Disabled = !m.Enabled
+	meta.Code = m.Code
+	meta.Body = m.Body
+
+	// Initialize headers map even when empty
+	meta.Headers = make(map[string]string)
+
+	for _, h := range m.Headers {
+		meta.Headers[h.Name] = h.Value
+	}
+
+	if len(meta.Headers) == 0 {
+		meta.Headers = nil
+	}
+}
+
 // FromOASExamples configures mock responses that should be returned from OAS example responses.
 type FromOASExamples struct {
 	// Enabled activates getting a mock response from OAS examples or schemas documented in OAS.
@@ -865,4 +1109,8 @@ func (s *OAS) fillCircuitBreaker(metas []apidef.CircuitBreakerMeta) {
 			operation.CircuitBreaker = nil
 		}
 	}
+}
+
+func generateOperationID(mockResponse apidef.MockResponseMeta) string {
+	return strings.TrimPrefix(mockResponse.Path, "/") + mockResponse.Method
 }
