@@ -3,7 +3,8 @@ package gateway
 import (
 	"context"
 	"crypto/tls"
-	mathRand "math/rand"
+	"errors"
+	mathrand "math/rand"
 	"net"
 	"net/http"
 	"net/url"
@@ -90,11 +91,11 @@ func (h *HostUptimeChecker) getStaggeredTime() time.Duration {
 		return time.Duration(h.checkTimeout) * time.Second
 	}
 
-	mathRand.Seed(time.Now().Unix())
+	mathrand.Seed(time.Now().Unix())
 	min := h.checkTimeout - 3
 	max := h.checkTimeout + 3
 
-	dur := mathRand.Intn(max-min) + min
+	dur := mathrand.Intn(max-min) + min
 
 	return time.Duration(dur) * time.Second
 }
@@ -137,7 +138,7 @@ func (h *HostUptimeChecker) execCheck() {
 	h.resetListMu.Unlock()
 	for _, host := range h.HostList {
 		_, err := h.pool.ProcessCtx(h.Gw.ctx, host)
-		if err != nil && err != tunny.ErrPoolNotRunning {
+		if err != nil && !errors.Is(err, tunny.ErrPoolNotRunning) {
 			log.Warnf("[HOST CHECKER] could not send work, error: %v", err)
 		}
 	}
@@ -397,6 +398,10 @@ func eraseSyncMap(m *sync.Map) {
 }
 
 func (h *HostUptimeChecker) Stop() {
+	if h == nil {
+		return
+	}
+
 	was := atomic.SwapInt32(&h.isClosed, CLOSED)
 	if was == OPEN {
 		eraseSyncMap(h.samples)

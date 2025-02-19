@@ -2,14 +2,11 @@ package gateway
 
 import (
 	"bytes"
-	"context"
 	"errors"
 	"fmt"
 	"io/ioutil"
 	"net/http"
 	"time"
-
-	"github.com/TykTechnologies/tyk/apidef/oas"
 
 	"github.com/TykTechnologies/tyk/ctx"
 
@@ -165,7 +162,7 @@ func (m *GoPluginMiddleware) loadPlugin() bool {
 	}
 
 	// to record 2XX hits in analytics
-	m.successHandler = &SuccessHandler{BaseMiddleware: m.BaseMiddleware}
+	m.successHandler = &SuccessHandler{BaseMiddleware: m.BaseMiddleware.Copy()}
 	return true
 }
 
@@ -189,7 +186,7 @@ func (m *GoPluginMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reque
 		if pluginMw, found := m.goPluginFromRequest(r); found {
 			logger = pluginMw.logger
 			handler = pluginMw.handler
-			successHandler = &SuccessHandler{BaseMiddleware: m.BaseMiddleware}
+			successHandler = &SuccessHandler{BaseMiddleware: m.BaseMiddleware.Copy()}
 		} else {
 			return nil, http.StatusOK // next middleware
 		}
@@ -226,7 +223,7 @@ func (m *GoPluginMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reque
 
 	// Inject definition into request context:
 	if m.Spec.IsOAS {
-		setOASDefinition(r, &m.Spec.OAS)
+		ctx.SetOASDefinition(r, &m.Spec.OAS)
 	} else {
 		ctx.SetDefinition(r, m.Spec.APIDefinition)
 	}
@@ -263,7 +260,7 @@ func (m *GoPluginMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reque
 			logger.WithError(err).Error("Failed to process request with Go-plugin middleware func")
 		default:
 			// record 2XX to analytics
-			successHandler.RecordHit(r, analytics.Latency{Total: int64(ms)}, rw.statusCodeSent, rw.getHttpResponse(r))
+			successHandler.RecordHit(r, analytics.Latency{Total: int64(ms)}, rw.statusCodeSent, rw.getHttpResponse(r), false)
 
 			// no need to continue passing this request down to reverse proxy
 			respCode = mwStatusRespond
@@ -273,10 +270,4 @@ func (m *GoPluginMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reque
 	}
 
 	return
-}
-
-func setOASDefinition(r *http.Request, s *oas.OAS) {
-	cntx := r.Context()
-	cntx = context.WithValue(cntx, ctx.OASDefinition, s)
-	setContext(r, cntx)
 }

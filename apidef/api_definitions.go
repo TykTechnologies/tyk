@@ -5,21 +5,26 @@ import (
 	"encoding/json"
 	"encoding/xml"
 	"errors"
+	"fmt"
 	"net/http"
 	"text/template"
 	"time"
 
-	"github.com/TykTechnologies/storage/persistent/model"
-
 	"github.com/clbanning/mxj"
 	"github.com/lonelycode/osin"
 
+	"github.com/TykTechnologies/storage/persistent/model"
+
+	"github.com/TykTechnologies/tyk/internal/event"
+
 	"github.com/TykTechnologies/tyk/internal/reflect"
 
-	"github.com/TykTechnologies/graphql-go-tools/pkg/engine/datasource/kafka_datasource"
+	"golang.org/x/oauth2"
+
 	"github.com/TykTechnologies/graphql-go-tools/pkg/execution/datasource"
 
-	"github.com/TykTechnologies/gojsonschema"
+	"github.com/TykTechnologies/tyk/internal/service/gojsonschema"
+
 	"github.com/TykTechnologies/tyk/regexp"
 
 	"github.com/TykTechnologies/tyk/internal/uuid"
@@ -28,8 +33,12 @@ import (
 type AuthProviderCode string
 type SessionProviderCode string
 type StorageEngineCode string
-type TykEvent string            // A type so we can ENUM event types easily, e.g. EventQuotaExceeded
-type TykEventHandlerName string // A type for handler codes in API definitions
+
+// TykEvent is an alias maintained for backwards compatibility.
+type TykEvent = event.Event
+
+// TykEventHandlerName is an alias maintained for backwards compatibility.
+type TykEventHandlerName = event.HandlerName
 
 type EndpointMethodAction string
 type SourceMode string
@@ -110,18 +119,24 @@ const (
 	OAuthType         = "oauth"
 	ExternalOAuthType = "externalOAuth"
 	OIDCType          = "oidc"
+
+	// OAuthAuthorizationTypeClientCredentials is the authorization type for client credentials flow.
+	OAuthAuthorizationTypeClientCredentials = "clientCredentials"
+	// OAuthAuthorizationTypePassword is the authorization type for password flow.
+	OAuthAuthorizationTypePassword = "password"
 )
 
 var (
 	// Deprecated: Use ErrClassicAPIExpected instead.
-	ErrAPIMigrated                = errors.New("the supplied API definition is in Tyk classic format, please use OAS format for this API")
-	ErrClassicAPIExpected         = errors.New("this API endpoint only supports Tyk Classic APIs; please use the appropriate Tyk OAS API endpoint")
-	ErrAPINotMigrated             = errors.New("the supplied API definition is in OAS format, please use the Tyk classic format for this API")
-	ErrOASGetForOldAPI            = errors.New("the requested API definition is in Tyk classic format, please use old api endpoint")
-	ErrImportWithTykExtension     = errors.New("the import payload should not contain x-tyk-api-gateway")
-	ErrPayloadWithoutTykExtension = errors.New("the payload should contain x-tyk-api-gateway")
-	ErrAPINotFound                = errors.New("API not found")
-	ErrMissingAPIID               = errors.New("missing API ID")
+	ErrAPIMigrated                         = errors.New("the supplied API definition is in Tyk classic format, please use OAS format for this API")
+	ErrClassicAPIExpected                  = errors.New("this API endpoint only supports Tyk Classic APIs; please use the appropriate Tyk OAS API endpoint")
+	ErrAPINotMigrated                      = errors.New("the supplied API definition is in OAS format, please use the Tyk classic format for this API")
+	ErrOASGetForOldAPI                     = errors.New("the requested API definition is in Tyk classic format, please use old api endpoint")
+	ErrImportWithTykExtension              = errors.New("the import payload should not contain x-tyk-api-gateway")
+	ErrPayloadWithoutTykExtension          = errors.New("the payload should contain x-tyk-api-gateway")
+	ErrPayloadWithoutTykStreamingExtension = errors.New("the payload should contain x-tyk-streaming")
+	ErrAPINotFound                         = errors.New("API not found")
+	ErrMissingAPIID                        = errors.New("missing API ID")
 )
 
 type EndpointMethodMeta struct {
@@ -205,6 +220,39 @@ type TrackEndpointMeta struct {
 	Disabled bool   `bson:"disabled" json:"disabled"`
 	Path     string `bson:"path" json:"path"`
 	Method   string `bson:"method" json:"method"`
+}
+
+// RateLimitMeta configures rate limits per API path.
+type RateLimitMeta struct {
+	Disabled bool   `bson:"disabled" json:"disabled"`
+	Path     string `bson:"path" json:"path"`
+	Method   string `bson:"method" json:"method"`
+
+	Rate float64 `bson:"rate" json:"rate"`
+	Per  float64 `bson:"per" json:"per"`
+}
+
+// Valid will return true if the rate limit should be applied.
+func (r *RateLimitMeta) Valid() bool {
+	if err := r.Err(); err != nil {
+		return false
+	}
+	return true
+}
+
+// Err checks the rate limit configuration for validity and returns an error if it is not valid.
+// It checks for a nil value, the enabled flag and valid values for each setting.
+func (r *RateLimitMeta) Err() error {
+	if r == nil || r.Disabled {
+		return errors.New("rate limit disabled")
+	}
+	if r.Per <= 0 {
+		return fmt.Errorf("rate limit disabled: per invalid")
+	}
+	if r.Rate == 0 {
+		return fmt.Errorf("rate limit disabled: rate zero")
+	}
+	return nil
 }
 
 type InternalMeta struct {
@@ -356,6 +404,7 @@ type ExtendedPathsSet struct {
 	Internal                []InternalMeta        `bson:"internal" json:"internal,omitempty"`
 	GoPlugin                []GoPluginMeta        `bson:"go_plugin" json:"go_plugin,omitempty"`
 	PersistGraphQL          []PersistGraphQLMeta  `bson:"persist_graphql" json:"persist_graphql"`
+	RateLimit               []RateLimitMeta       `bson:"rate_limit" json:"rate_limit"`
 }
 
 // Clear omits values that have OAS API definition conversions in place.
@@ -369,17 +418,40 @@ func (e *ExtendedPathsSet) Clear() {
 	}
 }
 
+// VersionDefinition is a struct that holds the versioning information for an API.
 type VersionDefinition struct {
-	Enabled             bool              `bson:"enabled" json:"enabled"`
-	Name                string            `bson:"name" json:"name"`
-	Default             string            `bson:"default" json:"default"`
-	Location            string            `bson:"location" json:"location"`
-	Key                 string            `bson:"key" json:"key"`
-	StripPath           bool              `bson:"strip_path" json:"strip_path"` // Deprecated. Use StripVersioningData instead.
-	StripVersioningData bool              `bson:"strip_versioning_data" json:"strip_versioning_data"`
-	FallbackToDefault   bool              `bson:"fallback_to_default" json:"fallback_to_default"`
-	Versions            map[string]string `bson:"versions" json:"versions"`
-	BaseID              string            `bson:"base_id" json:"-"` // json tag is `-` because we want this to be hidden to user
+	// Enabled indicates whether this version is enabled or not.
+	Enabled bool `bson:"enabled" json:"enabled"`
+
+	// Name is the name of this version.
+	Name string `bson:"name" json:"name"`
+
+	// Default is the default version to use if no version is specified in the request.
+	Default string `bson:"default" json:"default"`
+
+	// Location is the location in the request where the version information can be found.
+	Location string `bson:"location" json:"location"`
+
+	// Key is the key to use to extract the version information from the specified location.
+	Key string `bson:"key" json:"key"`
+
+	// StripPath is a deprecated field. Use StripVersioningData instead.
+	StripPath bool `bson:"strip_path" json:"strip_path"` // Deprecated. Use StripVersioningData instead.
+
+	// StripVersioningData indicates whether to strip the versioning data from the request.
+	StripVersioningData bool `bson:"strip_versioning_data" json:"strip_versioning_data"`
+
+	// UrlVersioningPattern is the regex pattern to match in the URL for versioning.
+	UrlVersioningPattern string `bson:"url_versioning_pattern" json:"url_versioning_pattern"`
+
+	// FallbackToDefault indicates whether to fallback to the default version if the version in the request does not exist.
+	FallbackToDefault bool `bson:"fallback_to_default" json:"fallback_to_default"`
+
+	// Versions is a map of version names to version ApiIDs.
+	Versions map[string]string `bson:"versions" json:"versions"`
+
+	// BaseID is a hidden field used internally that represents the ApiID of the base API.
+	BaseID string `bson:"base_id" json:"-"` // json tag is `-` because we want this to be hidden to user
 }
 
 type VersionData struct {
@@ -407,6 +479,7 @@ type VersionInfo struct {
 	GlobalResponseHeadersDisabled bool              `bson:"global_response_headers_disabled" json:"global_response_headers_disabled"`
 	IgnoreEndpointCase            bool              `bson:"ignore_endpoint_case" json:"ignore_endpoint_case"`
 	GlobalSizeLimit               int64             `bson:"global_size_limit" json:"global_size_limit"`
+	GlobalSizeLimitDisabled       bool              `bson:"global_size_limit_disabled" json:"global_size_limit_disabled"`
 	OverrideTarget                string            `bson:"override_target" json:"override_target"`
 }
 
@@ -522,22 +595,6 @@ type ResponseProcessor struct {
 	Options interface{} `bson:"options" json:"options"`
 }
 
-type HostCheckObject struct {
-	CheckURL            string            `bson:"url" json:"url"`
-	Protocol            string            `bson:"protocol" json:"protocol"`
-	Timeout             time.Duration     `bson:"timeout" json:"timeout"`
-	EnableProxyProtocol bool              `bson:"enable_proxy_protocol" json:"enable_proxy_protocol"`
-	Commands            []CheckCommand    `bson:"commands" json:"commands"`
-	Method              string            `bson:"method" json:"method"`
-	Headers             map[string]string `bson:"headers" json:"headers"`
-	Body                string            `bson:"body" json:"body"`
-}
-
-type CheckCommand struct {
-	Name    string `bson:"name" json:"name"`
-	Message string `bson:"message" json:"message"`
-}
-
 type ServiceDiscoveryConfiguration struct {
 	UseDiscoveryService bool   `bson:"use_discovery_service" json:"use_discovery_service"`
 	QueryEndpoint       string `bson:"query_endpoint" json:"query_endpoint"`
@@ -562,6 +619,9 @@ type OIDProviderConfig struct {
 	ClientIDs map[string]string `bson:"client_ids" json:"client_ids"`
 }
 
+// OpenID Connect middleware support will be deprecated starting from 5.7.0.
+// To avoid any disruptions, we recommend that you use JSON Web Token (JWT) instead,
+// as explained in https://tyk.io/docs/basic-config-and-security/security/authentication-authorization/openid-connect/.
 type OpenIDOptions struct {
 	Providers         []OIDProviderConfig `bson:"providers" json:"providers"`
 	SegregateByClient bool                `bson:"segregate_by_client" json:"segregate_by_client"`
@@ -671,6 +731,7 @@ type APIDefinition struct {
 	AllowedIPs                           []string               `mapstructure:"allowed_ips" bson:"allowed_ips" json:"allowed_ips"`
 	EnableIpBlacklisting                 bool                   `mapstructure:"enable_ip_blacklisting" bson:"enable_ip_blacklisting" json:"enable_ip_blacklisting"`
 	BlacklistedIPs                       []string               `mapstructure:"blacklisted_ips" bson:"blacklisted_ips" json:"blacklisted_ips"`
+	IPAccessControlDisabled              bool                   `mapstructure:"ip_access_control_disabled" bson:"ip_access_control_disabled" json:"ip_access_control_disabled"`
 	DontSetQuotasOnCreate                bool                   `mapstructure:"dont_set_quota_on_create" bson:"dont_set_quota_on_create" json:"dont_set_quota_on_create"`
 	ExpireAnalyticsAfter                 int64                  `mapstructure:"expire_analytics_after" bson:"expire_analytics_after" json:"expire_analytics_after"` // must have an expireAt TTL index set (http://docs.mongodb.org/manual/tutorial/expire-data/)
 	ResponseProcessors                   []ResponseProcessor    `bson:"response_processors" json:"response_processors"`
@@ -698,17 +759,166 @@ type APIDefinition struct {
 	VersionName string `bson:"-" json:"-"`
 
 	DetailedTracing bool `bson:"detailed_tracing" json:"detailed_tracing"`
+
+	// UpstreamAuth stores information about authenticating against upstream.
+	UpstreamAuth UpstreamAuth `bson:"upstream_auth" json:"upstream_auth"`
 }
 
+// UpstreamAuth holds the configurations related to upstream API authentication.
+type UpstreamAuth struct {
+	// Enabled enables upstream API authentication.
+	Enabled bool `bson:"enabled" json:"enabled"`
+	// BasicAuth holds the basic authentication configuration for upstream API authentication.
+	BasicAuth UpstreamBasicAuth `bson:"basic_auth" json:"basic_auth"`
+	// OAuth holds the OAuth2 configuration for the upstream client credentials API authentication.
+	OAuth UpstreamOAuth `bson:"oauth" json:"oauth"`
+}
+
+// IsEnabled checks if UpstreamAuthentication is enabled for the API.
+func (u *UpstreamAuth) IsEnabled() bool {
+	return u.Enabled && (u.BasicAuth.Enabled || u.OAuth.Enabled)
+}
+
+// IsEnabled checks if UpstreamOAuth is enabled for the API.
+func (u UpstreamOAuth) IsEnabled() bool {
+	return u.Enabled
+}
+
+// UpstreamBasicAuth holds upstream basic authentication configuration.
+type UpstreamBasicAuth struct {
+	// Enabled enables upstream basic authentication.
+	Enabled bool `bson:"enabled" json:"enabled,omitempty"`
+	// Username is the username to be used for upstream basic authentication.
+	Username string `bson:"username" json:"username"`
+	// Password is the password to be used for upstream basic authentication.
+	Password string `bson:"password" json:"password"`
+	// Header holds the configuration for custom header name to be used for upstream basic authentication.
+	// Defaults to `Authorization`.
+	Header AuthSource `bson:"header" json:"header"`
+}
+
+// UpstreamOAuth holds upstream OAuth2 authentication configuration.
+type UpstreamOAuth struct {
+	// Enabled enables upstream OAuth2 authentication.
+	Enabled bool `bson:"enabled" json:"enabled"`
+	// AllowedAuthorizeTypes specifies the allowed authorization types for upstream OAuth2 authentication.
+	AllowedAuthorizeTypes []string `bson:"allowed_authorize_types" json:"allowed_authorize_types"`
+	// ClientCredentials holds the client credentials for upstream OAuth2 authentication.
+	ClientCredentials ClientCredentials `bson:"client_credentials" json:"client_credentials"`
+	// PasswordAuthentication holds the configuration for upstream OAauth password authentication flow.
+	PasswordAuthentication PasswordAuthentication `bson:"password,omitempty" json:"password,omitempty"`
+}
+
+// PasswordAuthentication holds the configuration for upstream OAuth2 password authentication flow.
+type PasswordAuthentication struct {
+	ClientAuthData
+	// Header holds the configuration for the custom header to be used for OAuth authentication.
+	Header AuthSource `bson:"header" json:"header"`
+	// Username is the username to be used for upstream OAuth2 password authentication.
+	Username string `bson:"username" json:"username"`
+	// Password is the password to be used for upstream OAuth2 password authentication.
+	Password string `bson:"password" json:"password"`
+	// TokenURL is the resource server's token endpoint
+	// URL. This is a constant specific to each server.
+	TokenURL string `bson:"token_url" json:"token_url"`
+	// Scopes specifies optional requested permissions.
+	Scopes []string `bson:"scopes" json:"scopes,omitempty"`
+	// ExtraMetadata holds the keys that we want to extract from the token and pass to the upstream.
+	ExtraMetadata []string `bson:"extra_metadata" json:"extra_metadata,omitempty"`
+
+	// TokenProvider is the OAuth2 password authentication flow token for internal use.
+	Token *oauth2.Token `bson:"-" json:"-"`
+}
+
+// ClientAuthData holds the client ID and secret for upstream OAuth2 authentication.
+type ClientAuthData struct {
+	// ClientID is the application's ID.
+	ClientID string `bson:"client_id" json:"client_id"`
+	// ClientSecret is the application's secret.
+	ClientSecret string `bson:"client_secret,omitempty" json:"client_secret,omitempty"` // client secret is optional for password flow
+}
+
+// ClientCredentials holds the client credentials for upstream OAuth2 authentication.
+type ClientCredentials struct {
+	ClientAuthData
+	// Header holds the configuration for the custom header to be used for OAuth authentication.
+	Header AuthSource `bson:"header" json:"header"`
+	// TokenURL is the resource server's token endpoint
+	// URL. This is a constant specific to each server.
+	TokenURL string `bson:"token_url" json:"token_url"`
+	// Scopes specifies optional requested permissions.
+	Scopes []string `bson:"scopes" json:"scopes,omitempty"`
+	// ExtraMetadata holds the keys that we want to extract from the token and pass to the upstream.
+	ExtraMetadata []string `bson:"extra_metadata" json:"extra_metadata,omitempty"`
+
+	// TokenProvider is the OAuth2 token provider for internal use.
+	TokenProvider oauth2.TokenSource `bson:"-" json:"-"`
+}
+
+// AuthSource is a common type to be used for auth configurations.
+type AuthSource struct {
+	// Enabled enables the auth source.
+	Enabled bool `bson:"enabled" json:"enabled"`
+	// Name specifies the key to be used in the auth source.
+	Name string `bson:"name" json:"name"`
+}
+
+// IsEnabled returns the enabled status of the auth source.
+func (a AuthSource) IsEnabled() bool {
+	return a.Enabled
+}
+
+// AuthKeyName returns the key name to be used for the auth source.
+func (a AuthSource) AuthKeyName() string {
+	if !a.IsEnabled() {
+		return ""
+	}
+
+	return a.Name
+}
+
+// AnalyticsPluginConfig holds the configuration for the analytics custom function plugins
 type AnalyticsPluginConfig struct {
-	Enabled    bool   `bson:"enable" json:"enable,omitempty"`
+	// Enabled activates the custom plugin
+	Enabled bool `bson:"enable" json:"enable,omitempty"`
+	// PluginPath is the path to the shared object file or path to js code.
 	PluginPath string `bson:"plugin_path" json:"plugin_path,omitempty"`
-	FuncName   string `bson:"func_name" json:"func_name,omitempty"`
+	// FunctionName is the name of the method.
+	FuncName string `bson:"func_name" json:"func_name,omitempty"`
 }
 
+// UptimeTests holds the test configuration for uptime tests.
 type UptimeTests struct {
 	CheckList []HostCheckObject `bson:"check_list" json:"check_list"`
 	Config    UptimeTestsConfig `bson:"config" json:"config"`
+}
+
+// UptimeTestCommand handles additional checks for tcp connections.
+type CheckCommand struct {
+	Name    string `bson:"name" json:"name"`
+	Message string `bson:"message" json:"message"`
+}
+
+// HostCheckObject represents a single uptime test check.
+type HostCheckObject struct {
+	CheckURL            string            `bson:"url" json:"url"`
+	Protocol            string            `bson:"protocol" json:"protocol"`
+	Timeout             time.Duration     `bson:"timeout" json:"timeout"`
+	EnableProxyProtocol bool              `bson:"enable_proxy_protocol" json:"enable_proxy_protocol"`
+	Commands            []CheckCommand    `bson:"commands" json:"commands"`
+	Method              string            `bson:"method" json:"method"`
+	Headers             map[string]string `bson:"headers" json:"headers"`
+	Body                string            `bson:"body" json:"body"`
+}
+
+// AddCommand will append a new command to the test.
+func (h *HostCheckObject) AddCommand(name, message string) {
+	command := CheckCommand{
+		Name:    name,
+		Message: message,
+	}
+
+	h.Commands = append(h.Commands, command)
 }
 
 type UptimeTestsConfig struct {
@@ -828,9 +1038,10 @@ type GraphQLConfig struct {
 type GraphQLConfigVersion string
 
 const (
-	GraphQLConfigVersionNone GraphQLConfigVersion = ""
-	GraphQLConfigVersion1    GraphQLConfigVersion = "1"
-	GraphQLConfigVersion2    GraphQLConfigVersion = "2"
+	GraphQLConfigVersionNone     GraphQLConfigVersion = ""
+	GraphQLConfigVersion1        GraphQLConfigVersion = "1"
+	GraphQLConfigVersion2        GraphQLConfigVersion = "2"
+	GraphQLConfigVersion3Preview GraphQLConfigVersion = "3-preview"
 )
 
 type GraphQLIntrospectionConfig struct {
@@ -842,10 +1053,21 @@ type GraphQLResponseExtensions struct {
 }
 
 type GraphQLProxyConfig struct {
-	AuthHeaders           map[string]string         `bson:"auth_headers" json:"auth_headers"`
-	SubscriptionType      SubscriptionType          `bson:"subscription_type" json:"subscription_type,omitempty"`
-	RequestHeaders        map[string]string         `bson:"request_headers" json:"request_headers"`
-	UseResponseExtensions GraphQLResponseExtensions `bson:"use_response_extensions" json:"use_response_extensions"`
+	Features              GraphQLProxyFeaturesConfig             `bson:"features" json:"features"`
+	AuthHeaders           map[string]string                      `bson:"auth_headers" json:"auth_headers"`
+	SubscriptionType      SubscriptionType                       `bson:"subscription_type" json:"subscription_type,omitempty"`
+	RequestHeaders        map[string]string                      `bson:"request_headers" json:"request_headers"`
+	UseResponseExtensions GraphQLResponseExtensions              `bson:"use_response_extensions" json:"use_response_extensions"`
+	RequestHeadersRewrite map[string]RequestHeadersRewriteConfig `json:"request_headers_rewrite" bson:"request_headers_rewrite"`
+}
+
+type GraphQLProxyFeaturesConfig struct {
+	UseImmutableHeaders bool `bson:"use_immutable_headers" json:"use_immutable_headers"`
+}
+
+type RequestHeadersRewriteConfig struct {
+	Value  string `json:"value" bson:"value"`
+	Remove bool   `json:"remove" bson:"remove"`
 }
 
 type GraphQLSubgraphConfig struct {
@@ -928,15 +1150,21 @@ type GraphQLEngineDataSourceConfigGraphQL struct {
 }
 
 type GraphQLEngineDataSourceConfigKafka struct {
-	BrokerAddresses      []string              `bson:"broker_addresses" json:"broker_addresses"`
-	Topics               []string              `bson:"topics" json:"topics"`
-	GroupID              string                `bson:"group_id" json:"group_id"`
-	ClientID             string                `bson:"client_id" json:"client_id"`
-	KafkaVersion         string                `bson:"kafka_version" json:"kafka_version"`
-	StartConsumingLatest bool                  `json:"start_consuming_latest"`
-	BalanceStrategy      string                `json:"balance_strategy"`
-	IsolationLevel       string                `json:"isolation_level"`
-	SASL                 kafka_datasource.SASL `json:"sasl"`
+	BrokerAddresses      []string               `bson:"broker_addresses" json:"broker_addresses"`
+	Topics               []string               `bson:"topics" json:"topics"`
+	GroupID              string                 `bson:"group_id" json:"group_id"`
+	ClientID             string                 `bson:"client_id" json:"client_id"`
+	KafkaVersion         string                 `bson:"kafka_version" json:"kafka_version"`
+	StartConsumingLatest bool                   `json:"start_consuming_latest"`
+	BalanceStrategy      string                 `json:"balance_strategy"`
+	IsolationLevel       string                 `json:"isolation_level"`
+	SASL                 GraphQLEngineKafkaSASL `json:"sasl"`
+}
+
+type GraphQLEngineKafkaSASL struct {
+	Enable   bool   `json:"enable"`
+	User     string `json:"user"`
+	Password string `json:"password"`
 }
 
 type QueryVariable struct {
@@ -1277,6 +1505,9 @@ func DummyAPI() APIDefinition {
 		Version:          GraphQLConfigVersion2,
 		LastSchemaUpdate: nil,
 		Proxy: GraphQLProxyConfig{
+			Features: GraphQLProxyFeaturesConfig{
+				UseImmutableHeaders: true,
+			},
 			AuthHeaders: map[string]string{},
 		},
 	}
@@ -1368,6 +1599,9 @@ var Template = template.New("").Funcs(map[string]interface{}{
 	},
 })
 
+// ExternalOAuth support will be deprecated starting from 5.7.0.
+// To avoid any disruptions, we recommend that you use JSON Web Token (JWT) instead,
+// as explained in https://tyk.io/docs/basic-config-and-security/security/authentication-authorization/ext-oauth-middleware/.
 type ExternalOAuth struct {
 	Enabled   bool       `bson:"enabled" json:"enabled"`
 	Providers []Provider `bson:"providers" json:"providers"`
@@ -1400,4 +1634,58 @@ type Introspection struct {
 type IntrospectionCache struct {
 	Enabled bool  `bson:"enabled" json:"enabled"`
 	Timeout int64 `bson:"timeout" json:"timeout"`
+}
+
+// WebHookHandlerConf holds configuration related to webhook event handler.
+type WebHookHandlerConf struct {
+	// Disabled enables/disables this webhook.
+	Disabled bool `bson:"disabled" json:"disabled"`
+	// ID optional ID of the webhook, to be used in pro mode.
+	ID string `bson:"id" json:"id"`
+	// Name is the name of webhook.
+	Name string `bson:"name" json:"name"`
+	// The method to use for the webhook.
+	Method string `bson:"method" json:"method"`
+	// The target path on which to send the request.
+	TargetPath string `bson:"target_path" json:"target_path"`
+	// The template to load in order to format the request.
+	TemplatePath string `bson:"template_path" json:"template_path"`
+	// Headers to set when firing the webhook.
+	HeaderList map[string]string `bson:"header_map" json:"header_map"`
+	// The cool-down for the event so it does not trigger again (in seconds).
+	EventTimeout int64 `bson:"event_timeout" json:"event_timeout"`
+}
+
+// Scan scans WebHookHandlerConf from `any` in.
+func (w *WebHookHandlerConf) Scan(in any) error {
+	conf, err := reflect.Cast[WebHookHandlerConf](in)
+	if err != nil {
+		return err
+	}
+
+	*w = *conf
+	return nil
+}
+
+// JSVMEventHandlerConf represents the configuration for a JavaScript VM event handler in the API definition.
+type JSVMEventHandlerConf struct {
+	// Disabled indicates whether the event handler is inactive.
+	Disabled bool `bson:"disabled" json:"disabled"`
+	// ID is the optional unique identifier for the event handler.
+	ID string `bson:"id" json:"id"`
+	// MethodName specifies the JavaScript function name to be executed.
+	MethodName string `bson:"name" json:"name"`
+	// Path refers to the file path of the JavaScript source code for the handler.
+	Path string `bson:"path" json:"path"`
+}
+
+// Scan populates the JSVMEventHandlerConf struct by casting and copying data from the provided input.
+func (j *JSVMEventHandlerConf) Scan(in any) error {
+	conf, err := reflect.Cast[JSVMEventHandlerConf](in)
+	if err != nil {
+		return err
+	}
+
+	*j = *conf
+	return nil
 }

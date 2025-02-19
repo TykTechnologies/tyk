@@ -2,7 +2,13 @@ package test
 
 import (
 	"os"
+	"sync"
 	"testing"
+)
+
+var (
+	// exclusiveTestMu is used by Exclusive()
+	exclusiveTestMu sync.Mutex
 )
 
 // CI returns true when a non-empty CI env is present
@@ -17,7 +23,7 @@ func Flaky(t *testing.T, fake ...func() (bool, func(...interface{}))) {
 
 // Racy skips a racy test in a CI environment
 func Racy(t *testing.T, fake ...func() (bool, func(...interface{}))) {
-	skipCI(t, "Skipping Racy test", fake...)
+	skipCI(t, "Skipping racy test", fake...)
 }
 
 func skipCI(t *testing.T, message string, fake ...func() (bool, func(...interface{}))) {

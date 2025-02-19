@@ -16,13 +16,13 @@ type redisChannelHook struct {
 func (gw *Gateway) newRedisHook() *redisChannelHook {
 	hook := &redisChannelHook{}
 	hook.formatter = new(logrus.JSONFormatter)
-	hook.notifier.store = &storage.RedisCluster{KeyPrefix: "gateway-notifications:", ConnectionHandler: gw.StorageConnectionHandler}
 	hook.notifier.channel = "dashboard.ui.messages"
+	hook.notifier.store = &storage.RedisCluster{KeyPrefix: "gateway-notifications:", ConnectionHandler: gw.StorageConnectionHandler}
+	hook.notifier.store.Connect()
 	return hook
 }
 
 func (hook *redisChannelHook) Fire(entry *logrus.Entry) error {
-
 	orgId, found := entry.Data["org_id"]
 	if !found {
 		return nil
@@ -44,6 +44,7 @@ func (hook *redisChannelHook) Fire(entry *logrus.Entry) error {
 	}
 
 	go hook.notifier.Notify(n)
+
 	return nil
 }
 

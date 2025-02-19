@@ -112,7 +112,7 @@ func (k *Oauth2KeyExists) ProcessRequest(w http.ResponseWriter, r *http.Request,
 		oauthClientDeleted = val.(bool)
 	} else {
 		// if not cached in memory then hit Redis to get oauth-client from there
-		if _, err := k.Spec.OAuthManager.OsinServer.Storage.GetClient(session.OauthClientID); err != nil {
+		if _, err := k.Spec.OAuthManager.Storage().GetClient(session.OauthClientID); err != nil {
 			// set this oauth client as deleted in memory cache for the next N sec
 			k.Gw.UtilCache.Set(oauthClientDeletedKey, true, checkOAuthClientDeletedInterval)
 			oauthClientDeleted = true
@@ -129,8 +129,11 @@ func (k *Oauth2KeyExists) ProcessRequest(w http.ResponseWriter, r *http.Request,
 	// Set session state on context, we will need it later
 	switch k.Spec.BaseIdentityProvidedBy {
 	case apidef.OAuthKey, apidef.UnsetAuth:
-		ctxSetSession(r, &session, false, k.Gw.GetConfig().HashKeys)
-		ctxSetSpanAttributes(r, k.Name(), otel.OAuthClientIDAttribute(session.OauthClientID))
+		hashKeys := k.Gw.GetConfig().HashKeys
+		ctxSetSession(r, &session, false, hashKeys)
+		if hashKeys {
+			ctxSetSpanAttributes(r, k.Name(), otel.OAuthClientIDAttribute(session.KeyHash()))
+		}
 	}
 
 	// Request is valid, carry on

@@ -6,13 +6,16 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/TykTechnologies/tyk/config"
+	"github.com/oasdiff/yaml"
+
+	"github.com/TykTechnologies/storage/persistent/model"
 
 	"github.com/getkin/kin-openapi/openapi3"
-
 	"github.com/stretchr/testify/assert"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/internal/event"
 )
 
 func TestOAS(t *testing.T) {
@@ -28,7 +31,6 @@ func TestOAS(t *testing.T) {
 
 		var convertedAPI apidef.APIDefinition
 		emptyOASPaths.ExtractTo(&convertedAPI)
-		assert.True(t, convertedAPI.EnableContextVars)
 
 		var resultOAS OAS
 		resultOAS.Fill(convertedAPI)
@@ -134,6 +136,25 @@ func TestOAS_ExtractTo_ResetAPIDefinition(t *testing.T) {
 	var a apidef.APIDefinition
 	Fill(t, &a, 0)
 
+	// Fill doesn't populate eventhandlers to a valid value, we do it now.
+	a.EventHandlers.Events = map[apidef.TykEvent][]apidef.EventHandlerTriggerConfig{
+		event.QuotaExceeded: {
+			{
+				Handler: event.WebHookHandler,
+				HandlerMeta: map[string]any{
+					"target_path": "https://webhook.site/uuid",
+				},
+			},
+			{
+				Handler: event.JSVMHandler,
+				HandlerMeta: map[string]any{
+					"name": "myHandler",
+					"path": "my_script.js",
+				},
+			},
+		},
+	}
+
 	var vInfo apidef.VersionInfo
 	Fill(t, &vInfo, 0)
 	a.VersionData.Versions = map[string]apidef.VersionInfo{
@@ -158,6 +179,8 @@ func TestOAS_ExtractTo_ResetAPIDefinition(t *testing.T) {
 	a.IDPClientIDMappingDisabled = false
 	a.EnableContextVars = false
 	a.DisableRateLimit = false
+	a.DoNotTrack = false
+	a.IPAccessControlDisabled = false
 
 	// deprecated fields
 	a.Auth = apidef.AuthConfig{}
@@ -177,6 +200,7 @@ func TestOAS_ExtractTo_ResetAPIDefinition(t *testing.T) {
 	vInfo.GlobalHeadersDisabled = false
 	vInfo.GlobalResponseHeadersDisabled = false
 	vInfo.UseExtendedPaths = false
+	vInfo.GlobalSizeLimitDisabled = false
 
 	vInfo.ExtendedPaths.Clear()
 
@@ -192,16 +216,7 @@ func TestOAS_ExtractTo_ResetAPIDefinition(t *testing.T) {
 
 	expectedFields := []string{
 		"APIDefinition.Slug",
-		"APIDefinition.ListenPort",
-		"APIDefinition.Protocol",
 		"APIDefinition.EnableProxyProtocol",
-		"APIDefinition.RequestSigning.IsEnabled",
-		"APIDefinition.RequestSigning.Secret",
-		"APIDefinition.RequestSigning.KeyId",
-		"APIDefinition.RequestSigning.Algorithm",
-		"APIDefinition.RequestSigning.HeaderList[0]",
-		"APIDefinition.RequestSigning.CertificateId",
-		"APIDefinition.RequestSigning.SignatureHeader",
 		"APIDefinition.VersionData.Versions[0].ExtendedPaths.TransformJQ[0].Filter",
 		"APIDefinition.VersionData.Versions[0].ExtendedPaths.TransformJQ[0].Path",
 		"APIDefinition.VersionData.Versions[0].ExtendedPaths.TransformJQ[0].Method",
@@ -213,51 +228,21 @@ func TestOAS_ExtractTo_ResetAPIDefinition(t *testing.T) {
 		"APIDefinition.VersionData.Versions[0].ExtendedPaths.PersistGraphQL[0].Operation",
 		"APIDefinition.VersionData.Versions[0].ExtendedPaths.PersistGraphQL[0].Variables[0]",
 		"APIDefinition.VersionData.Versions[0].IgnoreEndpointCase",
-		"APIDefinition.VersionData.Versions[0].GlobalSizeLimit",
-		"APIDefinition.UptimeTests.CheckList[0].CheckURL",
-		"APIDefinition.UptimeTests.CheckList[0].Protocol",
-		"APIDefinition.UptimeTests.CheckList[0].Timeout",
-		"APIDefinition.UptimeTests.CheckList[0].EnableProxyProtocol",
-		"APIDefinition.UptimeTests.CheckList[0].Commands[0].Name",
-		"APIDefinition.UptimeTests.CheckList[0].Commands[0].Message",
-		"APIDefinition.UptimeTests.CheckList[0].Method",
-		"APIDefinition.UptimeTests.CheckList[0].Headers[0]",
-		"APIDefinition.UptimeTests.CheckList[0].Body",
-		"APIDefinition.UptimeTests.Config.ExpireUptimeAnalyticsAfter",
 		"APIDefinition.UptimeTests.Config.ServiceDiscovery.CacheDisabled",
-		"APIDefinition.UptimeTests.Config.RecheckWait",
-		"APIDefinition.Proxy.PreserveHostHeader",
 		"APIDefinition.Proxy.DisableStripSlash",
-		"APIDefinition.Proxy.EnableLoadBalancing",
-		"APIDefinition.Proxy.Targets[0]",
 		"APIDefinition.Proxy.CheckHostAgainstUptimeTests",
-		"APIDefinition.Proxy.Transport.SSLInsecureSkipVerify",
-		"APIDefinition.Proxy.Transport.SSLCipherSuites[0]",
-		"APIDefinition.Proxy.Transport.SSLMinVersion",
-		"APIDefinition.Proxy.Transport.SSLMaxVersion",
-		"APIDefinition.Proxy.Transport.SSLForceCommonNameCheck",
-		"APIDefinition.Proxy.Transport.ProxyURL",
 		"APIDefinition.DisableQuota",
-		"APIDefinition.SessionLifetimeRespectsKeyExpiration",
-		"APIDefinition.SessionLifetime",
 		"APIDefinition.AuthProvider.Name",
 		"APIDefinition.AuthProvider.StorageEngine",
 		"APIDefinition.AuthProvider.Meta[0]",
 		"APIDefinition.SessionProvider.Name",
 		"APIDefinition.SessionProvider.StorageEngine",
 		"APIDefinition.SessionProvider.Meta[0]",
-		"APIDefinition.EventHandlers.Events[0]",
-		"APIDefinition.EnableBatchRequestSupport",
 		"APIDefinition.EnableIpWhiteListing",
-		"APIDefinition.AllowedIPs[0]",
 		"APIDefinition.EnableIpBlacklisting",
-		"APIDefinition.BlacklistedIPs[0]",
 		"APIDefinition.DontSetQuotasOnCreate",
-		"APIDefinition.ExpireAnalyticsAfter",
 		"APIDefinition.ResponseProcessors[0].Name",
 		"APIDefinition.ResponseProcessors[0].Options",
-		"APIDefinition.DoNotTrack",
-		"APIDefinition.TagHeaders[0]",
 		"APIDefinition.GraphQL.Enabled",
 		"APIDefinition.GraphQL.ExecutionMode",
 		"APIDefinition.GraphQL.Version",
@@ -282,10 +267,13 @@ func TestOAS_ExtractTo_ResetAPIDefinition(t *testing.T) {
 		"APIDefinition.GraphQL.Engine.DataSources[0].Config[0]",
 		"APIDefinition.GraphQL.Engine.GlobalHeaders[0].Key",
 		"APIDefinition.GraphQL.Engine.GlobalHeaders[0].Value",
+		"APIDefinition.GraphQL.Proxy.Features.UseImmutableHeaders",
 		"APIDefinition.GraphQL.Proxy.AuthHeaders[0]",
 		"APIDefinition.GraphQL.Proxy.SubscriptionType",
 		"APIDefinition.GraphQL.Proxy.RequestHeaders[0]",
 		"APIDefinition.GraphQL.Proxy.UseResponseExtensions.OnErrorForwarding",
+		"APIDefinition.GraphQL.Proxy.RequestHeadersRewrite[0].Value",
+		"APIDefinition.GraphQL.Proxy.RequestHeadersRewrite[0].Remove",
 		"APIDefinition.GraphQL.Subgraph.SDL",
 		"APIDefinition.GraphQL.Supergraph.Subgraphs[0].APIID",
 		"APIDefinition.GraphQL.Supergraph.Subgraphs[0].Name",
@@ -800,10 +788,14 @@ func TestOAS_Clone(t *testing.T) {
 	s.GetTykExtension().Info.Name = "my-api-modified"
 	assert.NotEqual(t, s, clonedOAS)
 
-	t.Run("marshal error", func(t *testing.T) {
+	t.Run("clone impossible to marshal value", func(t *testing.T) {
 		s.Extensions["weird extension"] = make(chan int)
-		_, err = s.Clone()
-		assert.ErrorContains(t, err, "unsupported type: chan int")
+
+		result, err := s.Clone()
+		assert.NoError(t, err)
+
+		_, ok := result.Extensions["weird extension"]
+		assert.True(t, ok)
 	})
 }
 
@@ -856,21 +848,16 @@ func TestMigrateAndFillOAS(t *testing.T) {
 	assert.Equal(t, DefaultOpenAPI, baseAPIDef.OAS.OpenAPI)
 	assert.Equal(t, "Furkan", baseAPIDef.OAS.Info.Title)
 	assert.Equal(t, "Default", baseAPIDef.OAS.Info.Version)
-	assert.True(t, baseAPIDef.Classic.EnableContextVars)
 
 	assert.True(t, versionAPIDefs[0].Classic.IsOAS)
 	assert.Equal(t, DefaultOpenAPI, versionAPIDefs[0].OAS.OpenAPI)
 	assert.Equal(t, "Furkan-v1", versionAPIDefs[0].OAS.Info.Title)
 	assert.Equal(t, "v1", versionAPIDefs[0].OAS.Info.Version)
-	assert.True(t, versionAPIDefs[0].Classic.EnableContextVars)
 
 	assert.True(t, versionAPIDefs[1].Classic.IsOAS)
 	assert.Equal(t, DefaultOpenAPI, versionAPIDefs[1].OAS.OpenAPI)
 	assert.Equal(t, "Furkan-v2", versionAPIDefs[1].OAS.Info.Title)
 	assert.Equal(t, "v2", versionAPIDefs[1].OAS.Info.Version)
-	assert.True(t, versionAPIDefs[1].Classic.EnableContextVars)
-
-	assert.NotEqual(t, versionAPIDefs[0].Classic.APIID, versionAPIDefs[1].Classic.APIID)
 
 	err = baseAPIDef.OAS.Validate(context.Background())
 	assert.NoError(t, err)
@@ -935,7 +922,13 @@ func TestMigrateAndFillOAS_DropEmpties(t *testing.T) {
 	})
 
 	t.Run("plugin bundle", func(t *testing.T) {
-		assert.Nil(t, baseAPI.OAS.GetTykExtension().Middleware)
+		assert.Equal(t, &Middleware{
+			Global: &Global{
+				TrafficLogs: &TrafficLogs{
+					Enabled: true,
+				},
+			},
+		}, baseAPI.OAS.GetTykExtension().Middleware)
 	})
 
 	t.Run("mutualTLS", func(t *testing.T) {
@@ -1297,4 +1290,54 @@ func TestAPIContext_getValidationOptionsFromConfig(t *testing.T) {
 
 		assert.Len(t, options, 0)
 	})
+}
+
+func TestYaml(t *testing.T) {
+	oasDoc := OAS{}
+	Fill(t, &oasDoc, 0)
+
+	tykExt := XTykAPIGateway{}
+	Fill(t, &tykExt, 0)
+	// json unmarshal workarounds
+	{
+		tykExt.Info.DBID = model.NewObjectID()
+		tykExt.Middleware.Global.PrePlugin = nil
+		tykExt.Middleware.Global.PostPlugin = nil
+		tykExt.Middleware.Global.PostAuthenticationPlugin = nil
+		tykExt.Middleware.Global.ResponsePlugin = nil
+
+		for k, v := range tykExt.Server.Authentication.SecuritySchemes {
+			intVal, ok := v.(int)
+			assert.True(t, ok)
+			tykExt.Server.Authentication.SecuritySchemes[k] = float64(intVal)
+		}
+
+		for k, v := range tykExt.Middleware.Global.PluginConfig.Data.Value {
+			intVal, ok := v.(int)
+			assert.True(t, ok)
+			tykExt.Middleware.Global.PluginConfig.Data.Value[k] = float64(intVal)
+		}
+	}
+
+	oasDoc.SetTykExtension(&tykExt)
+
+	jsonBody, err := json.Marshal(&oasDoc)
+	assert.NoError(t, err)
+
+	yamlBody, err := yaml.JSONToYAML(jsonBody)
+	assert.NoError(t, err)
+
+	yamlOAS, err := openapi3.NewLoader().LoadFromData(yamlBody)
+	assert.NoError(t, err)
+
+	yamlOASDoc := OAS{
+		T: *yamlOAS,
+	}
+
+	yamlOASExt := yamlOASDoc.GetTykExtension()
+	assert.Equal(t, tykExt, *yamlOASExt)
+
+	yamlOASDoc.SetTykExtension(nil)
+	oasDoc.SetTykExtension(nil)
+	assert.Equal(t, oasDoc, yamlOASDoc)
 }

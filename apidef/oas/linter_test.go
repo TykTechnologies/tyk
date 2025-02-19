@@ -3,12 +3,16 @@ package oas
 import (
 	"bytes"
 	"encoding/json"
+	"net/http"
 	"os"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/xeipuuv/gojsonschema"
+
+	"github.com/TykTechnologies/tyk/internal/event"
+	"github.com/TykTechnologies/tyk/internal/time"
 )
 
 func TestXTykGateway_Lint(t *testing.T) {
@@ -28,6 +32,9 @@ func TestXTykGateway_Lint(t *testing.T) {
 			}
 			if op.TransformResponseBody != nil {
 				op.TransformResponseBody.Format = "json"
+			}
+			if op.RateLimit != nil {
+				op.RateLimit.Per = ReadableDuration(time.Minute)
 			}
 			if op.URLRewrite != nil {
 				triggers := []*URLRewriteTrigger{}
@@ -64,11 +71,60 @@ func TestXTykGateway_Lint(t *testing.T) {
 		settings.Server.Authentication.SecuritySchemes = map[string]interface{}{
 			"test-basic": securityScheme,
 		}
-		for idx, _ := range settings.Middleware.Operations {
+		settings.Server.Protocol = "http"
+		settings.Server.Port = 3000
+		for i := range settings.Server.EventHandlers {
+			settings.Server.EventHandlers[i].Kind = event.WebhookKind
+			settings.Server.EventHandlers[i].Webhook.Method = http.MethodPost
+			settings.Server.EventHandlers[i].Trigger = event.QuotaExceeded
+			settings.Server.EventHandlers[i].Webhook.CoolDownPeriod = ReadableDuration(time.Second * 20)
+		}
+
+		for idx := range settings.Middleware.Operations {
 			settings.Middleware.Operations[idx].CircuitBreaker.Threshold = 0.5
 		}
 
-		settings.Upstream.RateLimit.Per = "10s"
+		settings.Upstream.RateLimit.Per = ReadableDuration(10 * time.Second)
+		settings.Server.Authentication.CustomKeyLifetime.Value = ReadableDuration(10 * time.Second)
+
+		settings.Middleware.Global.TrafficLogs.CustomRetentionPeriod = ReadableDuration(10 * time.Second)
+		for i := range settings.Middleware.Global.TrafficLogs.Plugins {
+			settings.Middleware.Global.TrafficLogs.Plugins[i].RawBodyOnly = false
+			settings.Middleware.Global.TrafficLogs.Plugins[i].RequireSession = false
+		}
+
+		settings.Upstream.Authentication = &UpstreamAuth{
+			Enabled:   false,
+			BasicAuth: nil,
+			OAuth:     nil,
+		}
+
+		settings.Upstream.UptimeTests = &UptimeTests{
+			HostDownRetestPeriod: ReadableDuration(10 * time.Second),
+			LogRetentionPeriod:   ReadableDuration(10 * time.Second),
+			Tests: []UptimeTest{
+				{
+					Timeout: ReadableDuration(10 * time.Second),
+					Commands: []UptimeTestCommand{
+						{
+							Name:    "send",
+							Message: "PING",
+						},
+						{
+							Name:    "recv",
+							Message: "+PONG",
+						},
+					},
+					Headers: map[string]string{
+						"Request-Id": "1",
+					},
+				},
+			},
+		}
+
+		settings.Upstream.TLSTransport.MinVersion = "1.2"
+		settings.Upstream.TLSTransport.MaxVersion = "1.2"
+		settings.Upstream.TLSTransport.Ciphers = []string{"TLS_RSA_WITH_RC4_128_SHA"}
 	}
 
 	// Encode data to json

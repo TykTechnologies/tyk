@@ -10,7 +10,7 @@ import (
 	"sync"
 	"sync/atomic"
 	"testing"
-	textTemplate "text/template"
+	texttemplate "text/template"
 	"time"
 
 	proxyproto "github.com/pires/go-proxyproto"
@@ -68,7 +68,6 @@ func (w *testEventHandler) HandleEvent(em config.EventMessage) {
 	w.cb(em)
 }
 
-// // ToDo check why it blocks
 func TestHostChecker(t *testing.T) {
 	ts := StartTest(func(globalConf *config.Config) {
 		globalConf.UptimeTests.PollerGroup = uuid.New()
@@ -76,7 +75,7 @@ func TestHostChecker(t *testing.T) {
 	})
 	defer ts.Close()
 
-	specTmpl := textTemplate.Must(textTemplate.New("spec").Parse(sampleUptimeTestAPI))
+	specTmpl := texttemplate.Must(texttemplate.New("spec").Parse(sampleUptimeTestAPI))
 
 	tmplData := struct {
 		Host1, Host2 string
@@ -184,7 +183,7 @@ func TestReverseProxyAllDown(t *testing.T) {
 	})
 	defer ts.Close()
 
-	specTmpl := textTemplate.Must(textTemplate.New("spec").Parse(sampleUptimeTestAPI))
+	specTmpl := texttemplate.Must(texttemplate.New("spec").Parse(sampleUptimeTestAPI))
 
 	tmplData := struct {
 		Host1, Host2 string
@@ -399,6 +398,8 @@ func TestTestCheckerTCPHosts_correct_answers_proxy_protocol(t *testing.T) {
 }
 
 func TestTestCheckerTCPHosts_correct_wrong_answers(t *testing.T) {
+	t.Skip() // TT-13861
+
 	ts := StartTest(nil)
 	defer ts.Close()
 

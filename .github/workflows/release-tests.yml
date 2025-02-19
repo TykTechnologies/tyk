@@ -39,6 +39,13 @@ jobs:
       - id: ecr-login
         uses: ./.github/actions/ecr-login
 
+      - name: Setup CI Tooling
+        uses: shrink/actions-docker-extract@v3
+        with:
+          image: tykio/ci-tools:latest
+          path: /usr/local/bin/.
+          destination: /usr/local/bin
+
       - name: Run /ci/tests
         shell: bash
         env:

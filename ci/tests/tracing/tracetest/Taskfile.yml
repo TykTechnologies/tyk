@@ -1,0 +1,39 @@
+---
+version: "3"
+
+vars:
+  version: '1.0.0'
+
+tasks:
+  install:
+    desc: "Install tracetest"
+    deps:
+      - install:linux
+      - install:darwin
+
+  configure:
+    desc: "Configure tracetest"
+    deps: [ install ]
+    cmds:
+      - tracetest configure -g --server-url http://localhost:11633
+
+  install:darwin:
+    internal: true
+    desc: "Install tracetest"
+    status:
+      - type tracetest
+    platforms: [darwin]
+    cmds:
+      - brew install kubeshop/tracetest/tracetest@{{.version}}
+
+  install:linux:
+    internal: true
+    desc: "Install tracetest"
+    status:
+      - type tracetest
+    platforms: [linux]
+    cmds:  # https://docs.tracetest.io/getting-started/cli-installation-reference#apt
+      - sudo apt-get update && sudo apt-get install -y apt-transport-https ca-certificates
+      - echo "deb [trusted=yes] https://apt.fury.io/tracetest/ /" | sudo tee /etc/apt/sources.list.d/fury.list
+      - sudo apt-get update
+      - sudo apt-get install tracetest={{.version}}

@@ -101,9 +101,7 @@ func NewSlaveCertManager(localStorage, rpcStorage storage.Handler, secret string
 		return err
 	}
 
-	mdcbStorage := storage.NewMdcbStorage(localStorage, rpcStorage, log)
-	mdcbStorage.CallbackonPullfromRPC = &callbackOnPullCertFromRPC
-
+	mdcbStorage := storage.NewMdcbStorage(localStorage, rpcStorage, log, callbackOnPullCertFromRPC)
 	cm.storage = mdcbStorage
 	return cm
 }
@@ -271,6 +269,7 @@ type CertificateBasics struct {
 	HasPrivateKey bool      `json:"has_private"`
 	NotBefore     time.Time `json:"not_before"`
 	NotAfter      time.Time `json:"not_after"`
+	IsCA          bool      `json:"is_ca"`
 }
 
 func ExtractCertificateBasics(cert *tls.Certificate, certID string) *CertificateBasics {
@@ -282,6 +281,7 @@ func ExtractCertificateBasics(cert *tls.Certificate, certID string) *Certificate
 		HasPrivateKey: !isPrivateKeyEmpty(cert),
 		NotAfter:      cert.Leaf.NotAfter,
 		NotBefore:     cert.Leaf.NotBefore,
+		IsCA:          cert.Leaf.IsCA,
 	}
 }
 
@@ -294,6 +294,7 @@ type CertificateMeta struct {
 	NotBefore     time.Time `json:"not_before,omitempty"`
 	NotAfter      time.Time `json:"not_after,omitempty"`
 	DNSNames      []string  `json:"dns_names,omitempty"`
+	IsCA          bool      `json:"is_ca"`
 }
 
 func ExtractCertificateMeta(cert *tls.Certificate, certID string) *CertificateMeta {
@@ -306,6 +307,7 @@ func ExtractCertificateMeta(cert *tls.Certificate, certID string) *CertificateMe
 		NotBefore:     cert.Leaf.NotBefore,
 		NotAfter:      cert.Leaf.NotAfter,
 		DNSNames:      cert.Leaf.DNSNames,
+		IsCA:          cert.Leaf.IsCA,
 	}
 }
 

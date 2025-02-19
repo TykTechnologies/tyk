@@ -16,7 +16,7 @@ import (
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/certs"
 	"github.com/TykTechnologies/tyk/config"
-	"github.com/TykTechnologies/tyk/signature_validator"
+	signaturevalidator "github.com/TykTechnologies/tyk/signature_validator"
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/test"
 	"github.com/TykTechnologies/tyk/user"
@@ -108,8 +108,11 @@ func TestMurmur3CharBug(t *testing.T) {
 }
 
 func TestSignatureValidation(t *testing.T) {
+	test.Flaky(t) // Test uses StorageConnectionHandler (singleton).
+
 	ts := StartTest(nil)
-	defer ts.Close()
+	t.Cleanup(ts.Close)
+
 	api := BuildAPI(func(spec *APISpec) {
 		spec.UseKeylessAccess = false
 		spec.Proxy.ListenPath = "/"
@@ -134,7 +137,7 @@ func TestSignatureValidation(t *testing.T) {
 
 	t.Run("Static signature", func(t *testing.T) {
 		key := CreateSession(ts.Gw)
-		hasher := signature_validator.MasheryMd5sum{}
+		hasher := signaturevalidator.MasheryMd5sum{}
 		validHash := hasher.Hash(key, "foobar", time.Now().Unix())
 
 		validSigHeader := map[string]string{
@@ -166,7 +169,7 @@ func TestSignatureValidation(t *testing.T) {
 
 	t.Run("Static signature in params", func(t *testing.T) {
 		key := CreateSession(ts.Gw)
-		hasher := signature_validator.MasheryMd5sum{}
+		hasher := signaturevalidator.MasheryMd5sum{}
 		validHash := hasher.Hash(key, "foobar", time.Now().Unix())
 
 		emptySigPath := "?api_key=" + key
@@ -199,7 +202,7 @@ func TestSignatureValidation(t *testing.T) {
 			}
 		})
 
-		hasher := signature_validator.MasheryMd5sum{}
+		hasher := signaturevalidator.MasheryMd5sum{}
 		validHash := hasher.Hash(key, "foobar", time.Now().Unix())
 
 		validSigHeader := map[string]string{
@@ -244,7 +247,7 @@ func TestSignatureValidation(t *testing.T) {
 		_, _ = ts.Run(t, test.TestCase{AdminAuth: true, Method: http.MethodPost, Path: "/tyk/keys/" + customKey,
 			Data: session, Client: client, Code: http.StatusOK})
 
-		hasher := signature_validator.MasheryMd5sum{}
+		hasher := signaturevalidator.MasheryMd5sum{}
 
 		// First request is for raw key scenarios, signature is based on this key:
 		validHash := hasher.Hash(customKey, secret, time.Now().Unix())

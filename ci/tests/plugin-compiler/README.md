@@ -30,13 +30,19 @@ The following variables are set as defaults:
 | Variable name | Default value                        |
 | ------------- | ------------------------------------ |
 | tag           | v0.0.0                               |
-| base          | tykio/golang-cross:1.21-bookworm     |
+| base          | tykio/golang-cross:1.22-bullseye     |
 | dockerfile    | ci/images/plugin-compiler/Dockerfile |
 | image         | internal/plugin-compiler             |
 | sha           | `$(git rev-parse HEAD)`              |
 | root          | `$(git rev-parse --show-toplevel)`   |
 
 Use `task -l` to list available targets, or read on.
+
+Example: Run a plugin subtest against a release image.
+
+```
+task test:qa-plugin image=tykio/tyk-plugin-compiler:v5.3.9-rc4
+```
 
 ## Building and testing plugin compiler locally
 

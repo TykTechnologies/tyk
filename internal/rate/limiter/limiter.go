@@ -2,7 +2,6 @@ package limiter
 
 import (
 	"context"
-	"strings"
 
 	"github.com/TykTechnologies/exp/pkg/limiters"
 
@@ -12,47 +11,31 @@ import (
 var ErrLimitExhausted = limiters.ErrLimitExhausted
 
 type Limiter struct {
-	prefix string
-	redis  redis.UniversalClient
+	redis redis.UniversalClient
 
-	lock   limiters.DistLocker
+	locker limiters.DistLocker
 	logger limiters.Logger
 	clock  limiters.Clock
 }
 
 type LimiterFunc func(ctx context.Context, key string, rate float64, per float64) error
 
-func NewLimiter(prefix string, redis redis.UniversalClient) *Limiter {
+// NewLimiter creates a new limiter object. It holds the redis client and the
+// default non-distributed locks, logger, and a clock for supporting tests.
+func NewLimiter(redis redis.UniversalClient) *Limiter {
 	return &Limiter{
-		prefix: prefix,
 		redis:  redis,
-		lock:   limiters.NewLockNoop(),
+		locker: limiters.NewLockNoop(),
 		logger: limiters.NewStdLogger(),
 		clock:  limiters.NewSystemClock(),
 	}
 }
 
-func (l *Limiter) redisLock(name string) limiters.DistLocker {
-	return limiters.NewLockRedis(redis.NewPool(l.redis), name+"-lock")
-}
-
-func Prefix(params ...string) string {
-	var res strings.Builder
-	var written int
-
-	for _, p := range params {
-		if p == "" {
-			continue
-		}
-
-		if written == 0 {
-			res.Write([]byte(p))
-			written++
-			continue
-		}
-
-		res.Write([]byte("-"))
-		res.Write([]byte(p))
+// Locker will ensure a distributed lock with redis, using redsync for a key.
+// If redis is not in use, fallback is done to use the default locker.
+func (l *Limiter) Locker(name string) limiters.DistLocker {
+	if l.redis != nil {
+		return limiters.NewLockRedis(redis.NewPool(l.redis), name+"-lock")
 	}
-	return res.String()
+	return l.locker
 }

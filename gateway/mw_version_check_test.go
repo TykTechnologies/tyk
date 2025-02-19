@@ -20,6 +20,8 @@ func (ts *Test) testPrepareVersioning() (string, string) {
 		spec.VersionDefinition.Location = "header"
 		spec.VersionDefinition.Key = "version"
 		spec.Proxy.ListenPath = "/"
+		spec.DisableRateLimit = true
+		spec.DisableQuota = true
 		spec.VersionData.Versions["expired"] = apidef.VersionInfo{
 			Name:    "expired",
 			Expires: "2006-01-02 15:04",
@@ -355,6 +357,7 @@ func TestOldVersioning_DefaultVersionEmpty(t *testing.T) {
 	})[0]
 
 	check := func(t *testing.T, tc []test.TestCase, apis ...*APISpec) {
+		t.Helper()
 		ts.Gw.LoadAPI(apis...)
 		_, _ = ts.Run(t, tc...)
 	}
@@ -396,6 +399,7 @@ func TestOldVersioning_StripPath(t *testing.T) {
 	}
 
 	check := func(t *testing.T, api *APISpec, tc test.TestCase) {
+		t.Helper()
 		ts.Gw.LoadAPI(api)
 		_, _ = ts.Run(t, tc)
 
@@ -443,7 +447,9 @@ func TestOldVersioning_Expires(t *testing.T) {
 	}
 
 	check := func(t *testing.T, api *APISpec, tc test.TestCase, expirationHeaderEmpty bool) {
+		t.Helper()
 		subCheck := func(t *testing.T, apis ...*APISpec) {
+			t.Helper()
 			ts.Gw.LoadAPI(apis...)
 			resp, _ := ts.Run(t, tc)
 

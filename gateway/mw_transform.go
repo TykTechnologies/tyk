@@ -67,7 +67,7 @@ func transformBody(r *http.Request, tmeta *TransformSpec, t *TransformMiddleware
 		var err error
 		bodyData, err = mxj.NewMapXml(body) // unmarshal
 		if err != nil {
-			return fmt.Errorf("error unmarshalling XML: %v", err)
+			return fmt.Errorf("error unmarshalling XML: %w", err)
 		}
 	case apidef.RequestJSON:
 		if len(body) == 0 {
@@ -104,10 +104,10 @@ func transformBody(r *http.Request, tmeta *TransformSpec, t *TransformMiddleware
 	// Apply to template
 	var bodyBuffer bytes.Buffer
 	if err := tmeta.Template.Execute(&bodyBuffer, bodyData); err != nil {
-		return fmt.Errorf("failed to apply template to request: %v", err)
+		return fmt.Errorf("failed to apply template to request: %w", err)
 	}
 
-	s := t.Gw.replaceTykVariables(r, bodyBuffer.String(), true)
+	s := t.Gw.ReplaceTykVariables(r, bodyBuffer.String(), true)
 
 	newBuf := bytes.NewBufferString(s)
 

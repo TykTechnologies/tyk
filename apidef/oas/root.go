@@ -54,9 +54,6 @@ func (x *XTykAPIGateway) ExtractTo(api *apidef.APIDefinition) {
 	}
 
 	x.Middleware.ExtractTo(api)
-
-	// will be always enabled
-	api.EnableContextVars = true
 }
 
 // Info contains the main metadata for the API definition.
@@ -172,6 +169,8 @@ type Versioning struct {
 	Versions []VersionToID `bson:"versions" json:"versions"` // required
 	// StripVersioningData is a boolean flag, if set to `true`, the API responses will be stripped of versioning data.
 	StripVersioningData bool `bson:"stripVersioningData,omitempty" json:"stripVersioningData,omitempty"`
+	// UrlVersioningPattern is a string that contains the pattern that if matched will remove the version from the URL.
+	UrlVersioningPattern string `bson:"urlVersioningPattern,omitempty" json:"urlVersioningPattern,omitempty"`
 	// FallbackToDefault controls the behaviour of Tyk when a versioned API is called with a nonexistent version name.
 	// If set to `true` then the default API version will be invoked; if set to `false` Tyk will return an HTTP 404
 	// `This API version does not seem to exist` error in this scenario.
@@ -200,6 +199,7 @@ func (v *Versioning) Fill(api apidef.APIDefinition) {
 
 	v.StripVersioningData = api.VersionDefinition.StripVersioningData
 	v.FallbackToDefault = api.VersionDefinition.FallbackToDefault
+	v.UrlVersioningPattern = api.VersionDefinition.UrlVersioningPattern
 }
 
 // ExtractTo extracts *Versioning into *apidef.APIDefinition.
@@ -220,6 +220,7 @@ func (v *Versioning) ExtractTo(api *apidef.APIDefinition) {
 	}
 
 	api.VersionDefinition.StripVersioningData = v.StripVersioningData
+	api.VersionDefinition.UrlVersioningPattern = v.UrlVersioningPattern
 	api.VersionDefinition.FallbackToDefault = v.FallbackToDefault
 }
 
@@ -229,4 +230,40 @@ type VersionToID struct {
 	Name string `bson:"name" json:"name"`
 	// ID is the API ID for the version set in Name.
 	ID string `bson:"id" json:"id"`
+}
+
+// enableContextVariablesIfEmpty enables context variables in middleware.global.contextVariables.
+// Context variables will be set only if it is not set, if it is already set to false, it won't be enabled.
+func (x *XTykAPIGateway) enableContextVariablesIfEmpty() {
+	if x.Middleware == nil {
+		x.Middleware = &Middleware{}
+	}
+
+	if x.Middleware.Global == nil {
+		x.Middleware.Global = &Global{}
+	}
+
+	if x.Middleware.Global.ContextVariables == nil {
+		x.Middleware.Global.ContextVariables = &ContextVariables{
+			Enabled: true,
+		}
+	}
+}
+
+// enableTrafficLogsIfEmpty enables traffic logs in middleware.global.trafficLogs.
+// Traffic logs will be set only if it is not set. If it is already set to false, it won't be enabled.
+func (x *XTykAPIGateway) enableTrafficLogsIfEmpty() {
+	if x.Middleware == nil {
+		x.Middleware = &Middleware{}
+	}
+
+	if x.Middleware.Global == nil {
+		x.Middleware.Global = &Global{}
+	}
+
+	if x.Middleware.Global.TrafficLogs == nil {
+		x.Middleware.Global.TrafficLogs = &TrafficLogs{
+			Enabled: true,
+		}
+	}
 }

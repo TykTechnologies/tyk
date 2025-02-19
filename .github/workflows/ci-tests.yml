@@ -1,3 +1,5 @@
+# yamllint disable rule:line-length
+---
 name: CI tests
 
 on:
@@ -15,22 +17,90 @@ on:
       - master
       - release-**
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 env:
-  TYK_DB_REDISHOST: localhost
-  TYK_GW_STORAGE_HOST: localhost
   PYTHON_VERSION: "3.11"
   PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION: python
 
 jobs:
+  golangci-lint:
+    runs-on: ubuntu-latest
+    if: ${{ !github.event.pull_request.draft }}
+    steps:
+      - name: "Checkout PR"
+        uses: TykTechnologies/github-actions/.github/actions/checkout-pr@main
+        with:
+          token: ${{ secrets.ORG_GH_TOKEN }}
+
+      - name: "Get base ref"
+        run: |
+          git fetch origin ${{ github.base_ref }}
+          git rev-parse origin/${{ github.base_ref }}
+
+      - name: Setup Golang
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
+
+      - name: Cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/golangci-lint
+          key: 'golangci-lint-${{ runner.os }}-${{ hashFiles(''**/go.sum'') }}'
+          restore-keys: |
+            golangci-lint-${{ runner.os }}-
+
+      - name: Setup CI Tooling
+        uses: shrink/actions-docker-extract@v3
+        with:
+          image: tykio/ci-tools:latest
+          path: /usr/local/bin/golangci-lint
+          destination: /usr/local/bin
+
+      - run: golangci-lint version && golangci-lint cache status
+
+      - name: golangci-lint
+        if: ${{ github.event_name == 'pull_request' }}
+        # This is a pull request, but exiting here skips CI tests (`needs: golangci-lint`). Exit code 0 to always run tests.
+        # PR uses the "prod" config and must pass.
+        run: |
+          golangci-lint run --out-format colored-line-number,checkstyle:golangci-lint-report.json --issues-exit-code=0 --new-from-rev=origin/${{ github.base_ref }} -v ./...
+
+      - name: golangci-lint-on-push
+        if: ${{ github.event_name == 'push' }}
+        # Using the default config, reports stats to sonarcloud. No requirements on passing other than KPIs tracked in dev.
+        run: |
+          golangci-lint run --out-format checkstyle:golangci-lint-report.json --issues-exit-code=0 -v ./...
+
+      - uses: actions/upload-artifact@v4
+        if: ${{ always() }}
+        with:
+          name: golangcilint
+          retention-days: 1
+          path: |
+            golangci-lint-report.json
+
   test:
     name: Go ${{ matrix.go-version }} Redis ${{ matrix.redis-version }}
-    runs-on: ubuntu-latest
+    if: ${{ !github.event.pull_request.draft }}
+    needs: golangci-lint
+    # Runs on is pinned to a version that provides python 3.10.
+    # See: https://github.com/actions/runner-images?tab=readme-ov-file#available-images
+    # Avoid using ubuntu-latest as it would upgrade python unattended.
+    runs-on: ubuntu-22.04
     strategy:
-      fail-fast: true
+      fail-fast: false
       matrix:
-        redis-version: [5, 7]
-        python-version: ["3.11"]
-        go-version: [1.21.x]
+        redis-version: [7]
+        go-version: [1.23.x]
+
+    env:
+      REDIS_IMAGE: redis:${{ matrix.redis-version }}
 
     steps:
       - name: Checkout Tyk
@@ -38,15 +108,36 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.ref }}
 
-      - name: Setup Golang
-        uses: actions/setup-go@v2
-        with:
-          go-version: ${{ matrix.go-version }}
+      - name: "Get base ref"
+        run: |
+          git fetch origin ${{ github.base_ref }}
+          git rev-parse origin/${{ github.base_ref }}
 
+      # Regardless that the base image provides a python release, we need
+      # setup-python so it properly configures the python3-venv.
       - name: Setup Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
-          python-version: ${{ matrix.python-version }}
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Print runtime python version
+        run: python3 -c 'import sys; print("%d.%d" % (sys.version_info[0], sys.version_info[1]))'
+
+      - name: Print runtime pip version
+        run: pip -V && pip3 -V
+
+      - name: Setup CI Tooling
+        uses: shrink/actions-docker-extract@v3
+        with:
+          image: tykio/ci-tools:latest
+          path: /usr/local/bin/.
+          destination: /usr/local/bin
+
+      - name: Setup Golang
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
 
       - name: Install Dependencies and basic hygiene test
         id: hygiene
@@ -58,12 +149,11 @@ jobs:
           pip install google
           pip install 'protobuf==4.24.4'
 
-          make lint
+          task --version
+          task lint
 
           git add --all
-
           git diff HEAD > git-state.log
-
           git_state_count=$(wc -l < git-state.log)
 
           if [[ $git_state_count -ne 0 ]]
@@ -72,70 +162,80 @@ jobs:
             cat git-state.log >> $GITHUB_OUTPUT
             echo "EOF" >> $GITHUB_OUTPUT
 
-            echo "make lint made git state dirty, please run make lint locally and update PR"
+            echo "task lint made git state dirty, please run task lint locally and update PR"
+            echo
+            cat git-state.log
             exit 1
           fi
 
-      - name: Fetch base branch
-        if: ${{ github.event_name == 'pull_request' }}
-        run: git fetch origin ${{ github.base_ref }}
-      - name: Start Redis
-        uses: supercharge/redis-github-action@1.2.0
-        with:
-          redis-version: ${{ matrix.redis-version }}
+      - name: Bring up test services
+        run: task services:up
 
-      - name: Cache
-        uses: actions/cache@v2
-        with:
-          path: ~/go/pkg/mod
-          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
-          restore-keys: |
-            ${{ runner.os }}-go-
+      - name: Preflight Python tests
+        if: runner.debug == '1'
+        run: TYK_LOGLEVEL=debug go test -p 1 -parallel 1 -race -v ./dlpython ./coprocess/...
 
       - name: Run Gateway Tests
         id: ci-tests
         run: |
-          ./bin/ci-tests.sh 2>&1
+          task test:e2e-combined args="-race -timeout=15m"
+          task test:coverage
 
-      - name: Notify status
-        if: ${{ failure() && github.event.pull_request.number && !github.event.pull_request.draft }}
-        uses: peter-evans/create-or-update-comment@v1
+      - uses: actions/upload-artifact@v4
+        if: ${{ always() }}
         with:
-          issue-number: ${{ github.event.pull_request.number }}
-          body: |
-            # :boom: CI tests failed :see_no_evil:
+          name: coverage
+          retention-days: 1
+          path: coverage/gateway-all.cov
 
-            ## git-state
-            ```shellsession
-            ${{ steps.hygiene.outputs.git-state || 'all ok' }}
-            ```
+      - uses: actions/upload-artifact@v4
+        if: ${{ always() }}
+        with:
+          name: testjson
+          retention-days: 1
+          path: coverage/gateway-all.json
 
-            Please look at [the run](https://github.com/TykTechnologies/tyk/pull/${{ github.event.pull_request.number }}/checks?check_run_id=${{ github.run_id }}) or in the _Checks_ tab.
+  sonar-cloud-analysis:
+    runs-on: ubuntu-latest
+    if: ${{ !github.event.pull_request.draft }}
+    needs: [test, golangci-lint]
+    steps:
+      - name: "Checkout repository"
+        uses: TykTechnologies/github-actions/.github/actions/checkout-pr@main
+        with:
+          token: ${{ secrets.ORG_GH_TOKEN }}
 
-      - name: Download golangci-lint
-        run: curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin
+      - name: Download coverage artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: coverage
 
-      - name: golangci-lint
-        if: ${{ github.event_name == 'pull_request' }}
-        run: |
-          $(go env GOPATH)/bin/golangci-lint run --out-format checkstyle --issues-exit-code=0 --new-from-rev=origin/${{ github.base_ref }} ./... > golanglint.xml
-      - name: golangci-lint-on-push
-        if: ${{ github.event_name == 'push' }}
-        run: |
-          $(go env GOPATH)/bin/golangci-lint run --out-format checkstyle --issues-exit-code=0 ./... > golanglint.xml
-      - name: SonarCloud Scan
-        uses: sonarsource/sonarcloud-github-action@master
+      - name: Download golangcilint artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: golangcilint
+
+      - name: Check reports existence
+        id: check_files
+        uses: andstor/file-existence-action@v3
+        with:
+          files: 'gateway-all.cov, golangci-lint-report.json'
+          fail: true
+
+      - name: Scan
+        if: always()
+        uses: sonarsource/sonarqube-scan-action@master
         with:
           args: >
             -Dsonar.organization=tyktechnologies
             -Dsonar.projectKey=TykTechnologies_tyk
             -Dsonar.sources=.
-            -Dsonar.exclusions=**/testdata/*,coprocess/**/*,ci/**,smoke-tests/**,apidef/oas/schema/schema.gen.go
-            -Dsonar.coverage.exclusions=**/*_test.go,**/mock/*
-            -Dsonar.test.inclusions=**/*_test.go
+            -Dsonar.exclusions=**/testdata/*,test/**,tests/**,coprocess/**/*,ci/**,templates/**
+            -Dsonar.coverage.exclusions=**/*_test.go,**/mock/*,tests/**
+            -Dsonar.test.inclusions=**/*_test.go,tests/**
             -Dsonar.tests=.
-            -Dsonar.go.coverage.reportPaths=*.cov
-            -Dsonar.go.golangci-lint.reportPaths=golanglint.xml
+            -Dsonar.go.coverage.reportPaths=gateway-all.cov
+            -Dsonar.go.golangci-lint.reportPaths=golangci-lint-report.json
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}

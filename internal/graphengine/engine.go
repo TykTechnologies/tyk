@@ -92,6 +92,16 @@ type ReverseProxyParams struct {
 	NeedsEngine        bool
 	IsCORSPreflight    bool
 	IsWebSocketUpgrade bool
+	HeadersConfig      ReverseProxyHeadersConfig
+}
+
+type ReverseProxyHeadersConfig struct {
+	ProxyOnly ProxyOnlyHeadersConfig
+}
+
+type ProxyOnlyHeadersConfig struct {
+	UseImmutableHeaders   bool
+	RequestHeadersRewrite map[string]apidef.RequestHeadersRewriteConfig
 }
 
 type ReverseProxyPreHandler interface {
