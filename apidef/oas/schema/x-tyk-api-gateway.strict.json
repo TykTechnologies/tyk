@@ -426,6 +426,9 @@
         "rawBodyOnly": {
           "type": "boolean"
         },
+        "requireSession": {
+          "type": "boolean"
+        },
         "idExtractor": {
           "$ref": "#/definitions/X-Tyk-IDExtractor"
         }
