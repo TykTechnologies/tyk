@@ -240,6 +240,17 @@ func (e *EngineV2) HandleReverseProxy(params ReverseProxyParams) (res *http.Resp
 	}
 
 	gqlRequest := e.ctxRetrieveRequestFunc(params.OutRequest)
+	// Cleanup method, frees allocated resources, if they are eligible for freeing up.
+	// Currently, it only frees up the allocated resources of a GraphQL query that
+	// has a cached query plan.
+	//
+	// graphql-go-tools uses the parsed query (ast.Document in graphql-go-tools codebase)
+	// in the planner and caches the plans. If a plan has been cached, we can reset the created
+	// ast.Document struct and put it back to the pool for later use. By this way, we can reduce the GC
+	// pressure and number of allocations per GraphQL query.
+	// See TT-9864 for the details.
+	defer gqlRequest.Cleanup()
+
 	switch reverseProxyType {
 	case ReverseProxyTypeIntrospection:
 		return e.gqlTools.handleIntrospection(e.Schema)
@@ -247,6 +258,11 @@ func (e *EngineV2) HandleReverseProxy(params ReverseProxyParams) (res *http.Resp
 		return e.handoverWebSocketConnectionToGraphQLExecutionEngine(&params)
 	case ReverseProxyTypeGraphEngine:
 		return e.handoverRequestToGraphQLExecutionEngine(gqlRequest, params.OutRequest)
+	case ReverseProxyTypePreFlight:
+		if e.ApiDefinition.GraphQL.ExecutionMode == apidef.GraphQLExecutionModeProxyOnly {
+			return nil, false, nil
+		}
+		return nil, false, errors.New("options passthrough not allowed")
 	case ReverseProxyTypeNone:
 		return nil, false, nil
 	}

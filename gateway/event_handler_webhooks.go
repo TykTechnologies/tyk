@@ -4,8 +4,8 @@ import (
 	"bytes"
 	"crypto/md5"
 	"encoding/hex"
-	"encoding/json"
-	htmlTemplate "html/template"
+	"errors"
+	htmltemplate "html/template"
 	"io/ioutil"
 	"net/http"
 	"net/url"
@@ -18,6 +18,7 @@ import (
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/header"
+	"github.com/TykTechnologies/tyk/internal/event"
 	"github.com/TykTechnologies/tyk/storage"
 )
 
@@ -30,14 +31,20 @@ const (
 	WH_DELETE WebHookRequestMethod = "DELETE"
 	WH_PATCH  WebHookRequestMethod = "PATCH"
 
-	// Define the Event Handler name so we can register it
-	EH_WebHook apidef.TykEventHandlerName = "eh_web_hook_handler"
+	// EH_WebHook is an alias maintained for backwards compatibility.
+	// it is the handler to register a webhook event.
+	EH_WebHook = event.WebHookHandler
+)
+
+var (
+	// ErrEventHandlerDisabled is returned when the event handler is disabled.
+	ErrEventHandlerDisabled = errors.New("event handler disabled")
 )
 
 // WebHookHandler is an event handler that triggers web hooks
 type WebHookHandler struct {
-	conf     config.WebHookHandlerConf
-	template *htmlTemplate.Template // non-nil if Init is run without error
+	conf     apidef.WebHookHandlerConf
+	template *htmltemplate.Template // non-nil if Init is run without error
 	store    storage.Handler
 
 	contentType      string
@@ -45,31 +52,21 @@ type WebHookHandler struct {
 	Gw               *Gateway
 }
 
-// createConfigObject by default tyk will provide a map[string]interface{} type as a conf, converting it
-// specifically here makes it easier to handle, only happens once, so not a massive issue, but not pretty
-func (w *WebHookHandler) createConfigObject(handlerConf interface{}) (config.WebHookHandlerConf, error) {
-	newConf := config.WebHookHandlerConf{}
-
-	asJSON, _ := json.Marshal(handlerConf)
-	if err := json.Unmarshal(asJSON, &newConf); err != nil {
-		log.WithFields(logrus.Fields{
-			"prefix": "webhooks",
-		}).Error("Format of webhook configuration is incorrect: ", err)
-		return newConf, err
-	}
-
-	return newConf, nil
-}
-
 // Init enables the init of event handler instances when they are created on ApiSpec creation
 func (w *WebHookHandler) Init(handlerConf interface{}) error {
 	var err error
-	w.conf, err = w.createConfigObject(handlerConf)
-	if err != nil {
+	if err = w.conf.Scan(handlerConf); err != nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "webhooks",
 		}).Error("Problem getting configuration, skipping. ", err)
 		return err
+	}
+
+	if w.conf.Disabled {
+		log.WithFields(logrus.Fields{
+			"prefix": "webhooks",
+		}).Infof("skipping disabled webhook %s", w.conf.Name)
+		return ErrEventHandlerDisabled
 	}
 
 	w.store = &storage.RedisCluster{KeyPrefix: "webhook.cache.", ConnectionHandler: w.Gw.StorageConnectionHandler}
@@ -77,7 +74,7 @@ func (w *WebHookHandler) Init(handlerConf interface{}) error {
 
 	// Pre-load template on init
 	if w.conf.TemplatePath != "" {
-		w.template, err = htmlTemplate.ParseFiles(w.conf.TemplatePath)
+		w.template, err = htmltemplate.ParseFiles(w.conf.TemplatePath)
 		if err != nil {
 			log.WithFields(logrus.Fields{
 				"prefix": "webhooks",
@@ -98,7 +95,7 @@ func (w *WebHookHandler) Init(handlerConf interface{}) error {
 			"target": w.conf.TargetPath,
 		}).Info("Loading default template.")
 		defaultPath := filepath.Join(w.Gw.GetConfig().TemplatePath, "default_webhook.json")
-		w.template, err = htmlTemplate.ParseFiles(defaultPath)
+		w.template, err = htmltemplate.ParseFiles(defaultPath)
 		if err != nil {
 			log.WithFields(logrus.Fields{
 				"prefix": "webhooks",
@@ -164,9 +161,14 @@ func (w *WebHookHandler) getRequestMethod(m string) WebHookRequestMethod {
 }
 
 func (w *WebHookHandler) checkURL(r string) bool {
+	if r == "" {
+		return false
+	}
+
 	log.WithFields(logrus.Fields{
 		"prefix": "webhooks",
 	}).Debug("Checking URL: ", r)
+
 	if _, err := url.ParseRequestURI(r); err != nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "webhooks",
@@ -207,18 +209,30 @@ func (w *WebHookHandler) BuildRequest(reqBody string) (*http.Request, error) {
 	return req, nil
 }
 
+// CreateBody will render the webhook event message template and return it as a string.
+// If an error occurs, an empty string will be returned alongside an error.
 func (w *WebHookHandler) CreateBody(em config.EventMessage) (string, error) {
 	var reqBody bytes.Buffer
-	w.template.Execute(&reqBody, em)
-
-	return reqBody.String(), nil
+	err := w.template.Execute(&reqBody, em)
+	if err != nil {
+		return "", err
+	}
+	return reqBody.String(), err
 }
 
 // HandleEvent will be fired when the event handler instance is found in an APISpec EventPaths object during a request chain
 func (w *WebHookHandler) HandleEvent(em config.EventMessage) {
 
 	// Inject event message into template, render to string
-	reqBody, _ := w.CreateBody(em)
+	reqBody, err := w.CreateBody(em)
+	if err != nil {
+		// We're just logging the template rendering issue here
+		// but we're passing on the partial rendered contents
+		log.WithError(err).WithFields(logrus.Fields{
+			"prefix": "webhooks",
+		}).Error("Webhook template rendering error")
+		return
+	}
 
 	// Construct request (method, body, params)
 	req, err := w.BuildRequest(reqBody)

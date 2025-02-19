@@ -490,14 +490,12 @@ func (r *reverseProxyPreHandlerV1) PreHandle(params ReverseProxyParams) (reverse
 		DetermineGraphQLEngineTransportType(r.apiDefinition),
 		params.RoundTripper,
 		r.newReusableBodyReadCloser,
+		params.HeadersConfig,
 	)
 
 	switch {
 	case params.IsCORSPreflight:
-		if params.NeedsEngine {
-			err = errors.New("options passthrough not allowed")
-			return ReverseProxyTypeNone, err
-		}
+		return ReverseProxyTypePreFlight, nil
 	case params.IsWebSocketUpgrade:
 		if params.NeedsEngine {
 			return ReverseProxyTypeWebsocketUpgrade, nil

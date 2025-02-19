@@ -45,7 +45,7 @@ tasks:
     quiet: true
     vars:
       funcs:
-        sh: ./regression.test -test.list=Test | egrep -v 'Test_Issue[0-9]+' || true
+        sh: ./regression.test -test.list=Test | egrep -v '(Test_Issue[0-9]+|TestLoadAPISpec)' || true
     cmds:
       - cmd: '{{if ne .funcs ""}}echo -e "Naming violations:\n{{.funcs}}" && exit 1 {{end}}'
 

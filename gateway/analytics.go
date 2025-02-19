@@ -2,7 +2,7 @@ package gateway
 
 import (
 	"fmt"
-	mathRand "math/rand"
+	mathrand "math/rand"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -141,14 +141,14 @@ func (r *RedisAnalyticsHandler) recordWorker() {
 	// this is buffer to send one pipelined command to redis
 	// use r.recordsBufferSize as cap to reduce slice re-allocations
 	recordsBuffer := make([][]byte, 0, r.workerBufferSize)
-	mathRand.Seed(time.Now().Unix())
+	mathrand.Seed(time.Now().Unix())
 
 	// read records from channel and process
 	lastSentTs := time.Now()
 	for {
 		analyticKey := analyticsKeyName
 		if r.enableMultipleAnalyticsKeys {
-			suffix := mathRand.Intn(10)
+			suffix := mathrand.Intn(10)
 			analyticKey = fmt.Sprintf("%v_%v", analyticKey, suffix)
 		}
 		serliazerSuffix := r.analyticsSerializer.GetSuffix()

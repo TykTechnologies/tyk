@@ -42,14 +42,26 @@ var (
 
 // TykExtensionConfigParams holds the essential configuration required for the Tyk Extension schema.
 type TykExtensionConfigParams struct {
-	UpstreamURL     string
-	ListenPath      string
-	CustomDomain    string
-	ApiID           string
-	Authentication  *bool
-	AllowList       *bool
+	// UpstreamURL configures the upstream URL.
+	UpstreamURL string
+	// ListenPath configures the listen path.
+	ListenPath string
+	// CustomDomain configures the domain name.
+	CustomDomain string
+	// ApiID is the API ID.
+	ApiID string
+
+	// Authentication is true if the API configures authentication.
+	Authentication *bool
+	// AllowList is true if the API configures an allow list.
+	AllowList *bool
+	// ValidateRequest is true if the API enables request validation.
 	ValidateRequest *bool
-	MockResponse    *bool
+	// MockResponse is true if a mocked response is configured.
+	MockResponse *bool
+
+	// pathItemHasParameters is set to true when parameters are defined the same level as of operations within path.
+	pathItemHasParameters bool
 }
 
 // BuildDefaultTykExtension builds a default tyk extension in *OAS based on function arguments.
@@ -65,6 +77,8 @@ func (s *OAS) BuildDefaultTykExtension(overRideValues TykExtensionConfigParams, 
 		xTykAPIGateway.Info.State.Active = true
 		xTykAPIGateway.Info.State.Internal = false
 		xTykAPIGateway.Server.ListenPath.Strip = true
+		xTykAPIGateway.enableContextVariablesIfEmpty()
+		xTykAPIGateway.enableTrafficLogsIfEmpty()
 	}
 
 	if xTykAPIGateway.Info.Name == "" {
@@ -207,6 +221,7 @@ func (s *OAS) importMiddlewares(overRideValues TykExtensionConfigParams) {
 	}
 
 	for path, pathItem := range s.Paths {
+		overRideValues.pathItemHasParameters = len(pathItem.Parameters) > 0
 		for _, method := range allowedMethods {
 			if operation := pathItem.GetOperation(method); operation != nil {
 				tykOperation := s.getTykOperation(method, path)

@@ -319,6 +319,63 @@ func TestEngineV2_HandleReverseProxy(t *testing.T) {
 		assert.Equal(t, 200, result.StatusCode)
 		assert.Equal(t, `{"data":{"hello":"world"}}`, body.String())
 	})
+
+	t.Run("should return error if reverse proxy pre handler returns proxy type preflight and execution mode is NOT proxy only", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) {}))
+		t.Cleanup(server.Close)
+
+		engine, mocks := newTestEngineV2(t, withApiDefinitionTestEngineV2(newTestApiDefinitionV2(apidef.GraphQLExecutionModeSubgraph, server.URL)))
+
+		defer mocks.controller.Finish()
+		params := ReverseProxyParams{
+			OutRequest:      &http.Request{},
+			IsCORSPreflight: true,
+		}
+		mocks.reverseProxyPreHandler.EXPECT().PreHandle(gomock.Eq(params)).
+			Return(ReverseProxyTypePreFlight, nil)
+
+		engine.ctxRetrieveRequestFunc = func(r *http.Request) *graphql.Request {
+			return &graphql.Request{}
+		}
+
+		result, hijacked, err := engine.HandleReverseProxy(params)
+		var body bytes.Buffer
+		if result != nil {
+			_, _ = body.ReadFrom(result.Body)
+		}
+
+		assert.Error(t, err)
+		assert.False(t, hijacked)
+		assert.Nil(t, result)
+	})
+
+	t.Run("should return successful if reverse proxy pre handler returns proxy type preflight and execution mode is proxy only", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) {}))
+		t.Cleanup(server.Close)
+
+		engine, mocks := newTestEngineV2(t, withApiDefinitionTestEngineV2(newTestApiDefinitionV2(apidef.GraphQLExecutionModeProxyOnly, server.URL)))
+		defer mocks.controller.Finish()
+		params := ReverseProxyParams{
+			OutRequest:      &http.Request{},
+			IsCORSPreflight: true,
+		}
+		mocks.reverseProxyPreHandler.EXPECT().PreHandle(gomock.Eq(params)).
+			Return(ReverseProxyTypePreFlight, nil)
+
+		engine.ctxRetrieveRequestFunc = func(r *http.Request) *graphql.Request {
+			return &graphql.Request{}
+		}
+
+		result, hijacked, err := engine.HandleReverseProxy(params)
+		var body bytes.Buffer
+		if result != nil {
+			_, _ = body.ReadFrom(result.Body)
+		}
+
+		assert.NoError(t, err)
+		assert.False(t, hijacked)
+		assert.Nil(t, result)
+	})
 }
 
 type testEngineV2Options struct {
@@ -362,6 +419,8 @@ func withOpenTelemetryTestEngineV2(detailedTracing bool) testEngineV2Option {
 }
 
 func newTestEngineV2(t *testing.T, options ...testEngineV2Option) (*EngineV2, engineV2Mocks) {
+	t.Helper()
+
 	definedOptions := testEngineV2Options{
 		otelConfig:    EngineV2OTelConfig{},
 		apiDefinition: newTestApiDefinitionV2(apidef.GraphQLExecutionModeProxyOnly, "http://example.com"),

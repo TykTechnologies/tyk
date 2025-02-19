@@ -6,16 +6,15 @@ import (
 	"strings"
 	"time"
 
-	"github.com/TykTechnologies/tyk/internal/crypto"
-	"github.com/TykTechnologies/tyk/internal/otel"
-	"github.com/TykTechnologies/tyk/storage"
-
-	"github.com/TykTechnologies/tyk/user"
-
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/internal/crypto"
+	"github.com/TykTechnologies/tyk/internal/httpctx"
+	"github.com/TykTechnologies/tyk/internal/otel"
 	"github.com/TykTechnologies/tyk/request"
-	"github.com/TykTechnologies/tyk/signature_validator"
+	signaturevalidator "github.com/TykTechnologies/tyk/signature_validator"
+	"github.com/TykTechnologies/tyk/storage"
+	"github.com/TykTechnologies/tyk/user"
 )
 
 const (
@@ -95,7 +94,7 @@ func (k *AuthKey) ProcessRequest(_ http.ResponseWriter, r *http.Request, _ inter
 	}
 
 	// skip auth key check if the request is looped.
-	if ses := ctxGetSession(r); ses != nil && !ctxCheckLimits(r) {
+	if ses := ctxGetSession(r); ses != nil && httpctx.IsSelfLooping(r) {
 		return nil, http.StatusOK
 	}
 
@@ -149,12 +148,18 @@ func (k *AuthKey) ProcessRequest(_ http.ResponseWriter, r *http.Request, _ inter
 	// Set session state on context, we will need it later
 	switch k.Spec.BaseIdentityProvidedBy {
 	case apidef.AuthToken, apidef.UnsetAuth:
-		ctxSetSession(r, &session, updateSession, k.Gw.GetConfig().HashKeys)
+		hashKeys := k.Gw.GetConfig().HashKeys
+		ctxSetSession(r, &session, updateSession, hashKeys)
+
 		k.setContextVars(r, key)
-		ctxSetSpanAttributes(r, k.Name(), []otel.SpanAttribute{
-			otel.APIKeyAttribute(key),
-			otel.APIKeyAliasAttribute(session.Alias),
-		}...)
+
+		attributes := []otel.SpanAttribute{otel.APIKeyAliasAttribute(session.Alias)}
+
+		if hashKeys {
+			attributes = append(attributes, otel.APIKeyAttribute(session.KeyHash()))
+		}
+
+		ctxSetSpanAttributes(r, k.Name(), attributes...)
 	}
 
 	// Try using org-key format first:
@@ -170,7 +175,7 @@ func (k *AuthKey) ProcessRequest(_ http.ResponseWriter, r *http.Request, _ inter
 	if err == nil {
 		err, statusCode := k.validateSignature(r, keyID)
 		if err == nil {
-			return err, statusCode
+			return nil, statusCode
 		}
 	}
 
@@ -209,7 +214,7 @@ func (k *AuthKey) validateSignature(r *http.Request, key string) (error, int) {
 		errorMessage = authConfig.Signature.ErrorMessage
 	}
 
-	validator := signature_validator.SignatureValidator{}
+	validator := signaturevalidator.SignatureValidator{}
 	if err := validator.Init(authConfig.Signature.Algorithm); err != nil {
 		logger.WithError(err).Info("Invalid signature verification algorithm")
 		return errors.New("internal server error"), http.StatusInternalServerError
@@ -236,7 +241,7 @@ func (k *AuthKey) validateSignature(r *http.Request, key string) (error, int) {
 		return errors.New(errorMessage), errorCode
 	}
 
-	secret := k.Gw.replaceTykVariables(r, authConfig.Signature.Secret, false)
+	secret := k.Gw.ReplaceTykVariables(r, authConfig.Signature.Secret, false)
 
 	if secret == "" {
 		logger.Info("Request signature secret not found or empty")

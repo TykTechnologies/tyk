@@ -1,0 +1,33 @@
+---
+version: "3"
+
+tasks:
+  default:
+    desc: "Run everything"
+    cmds:
+      - task: fmt
+      - task: lint
+      - task: test
+
+  test:
+    desc: "Run tests"
+    cmds:
+      - go test -count=1 ./...
+
+  fmt:
+    desc: "Format sources"
+    cmds:
+      - goimports -w .
+      - go fmt ./...
+
+  # lint target is run from CI before go tests
+  lint:
+    desc: "Ensure linter pass"
+    cmds:
+      - cd schema && ./build.sh && cd -
+      - schema-gen extract -o - | schema-gen lint --summary -i -
+
+  deps:
+    desc: "Update deps"
+    cmds:
+      - go install github.com/TykTechnologies/exp/cmd/schema-gen@main

@@ -208,7 +208,6 @@ func Connect(connConfig Config, suppressRegister bool, dispatcherFuncs map[strin
 	emergencyModeLoadedFunc func()) bool {
 	rpcConnectMu.Lock()
 	defer rpcConnectMu.Unlock()
-
 	values.config.Store(connConfig)
 	getGroupLoginCallback = getGroupLoginFunc
 	emergencyModeCallback = emergencyModeFunc
@@ -253,12 +252,11 @@ func Connect(connConfig Config, suppressRegister bool, dispatcherFuncs map[strin
 	clientSingleton.OnConnect = onConnectFunc
 
 	clientSingleton.Conns = values.Config().RPCPoolSize
-	if clientSingleton.Conns == 0 {
+	if clientSingleton.Conns <= 0 {
 		clientSingleton.Conns = 5
 	}
 
 	clientSingleton.Dial = func(addr string) (conn net.Conn, err error) {
-
 		dialer := &net.Dialer{
 			Timeout:   10 * time.Second,
 			KeepAlive: 30 * time.Second,
@@ -294,8 +292,10 @@ func Connect(connConfig Config, suppressRegister bool, dispatcherFuncs map[strin
 		conn.Write([]byte("proto2"))
 		conn.Write([]byte{byte(len(connID))})
 		conn.Write([]byte(connID))
+
 		return conn, nil
 	}
+
 	clientSingleton.Start()
 
 	loadDispatcher(dispatcherFuncs)
@@ -303,13 +303,33 @@ func Connect(connConfig Config, suppressRegister bool, dispatcherFuncs map[strin
 	if funcClientSingleton == nil {
 		funcClientSingleton = dispatcher.NewFuncClient(clientSingleton)
 	}
-
+	// wait until a connection is dialed so we can call login or fall in emergency mode
+	waitForClientReadiness(clientSingleton)
 	handleLogin()
+
 	if !suppressRegister {
 		register()
 		go checkDisconnect()
 	}
+
 	return true
+}
+
+func waitForClientReadiness(clientSingleton *gorpc.Client) {
+	ticker := time.NewTicker(100 * time.Millisecond)
+	defer ticker.Stop()
+
+	for {
+		if IsEmergencyMode() {
+			return
+		}
+
+		select {
+		case <-clientSingleton.ClientReadyChan:
+			return
+		case <-ticker.C:
+		}
+	}
 }
 
 func handleLogin() {

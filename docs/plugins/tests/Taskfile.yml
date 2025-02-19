@@ -1,0 +1,61 @@
+---
+version: "3"
+
+tasks:
+  all:
+    desc: "Do everything"
+    cmds:
+      - task: checkout
+        vars:
+          version: release-5.3.6
+      - task: clean
+      - task: workspace
+      - task: test
+
+  checkout:
+    desc: "Checking out tyk"
+    cmds:
+      - git clone --branch {{.version}} https://github.com/TykTechnologies/tyk.git tyk-{{.version}} || true
+
+  workspace:
+    desc: "Create workspace"
+    vars:
+      release: tyk-release-5.3.6
+      commit:
+        sh: git rev-parse HEAD
+      go:
+        sh: go mod edit -json ./{{.release}}/go.mod | jq .Go -r
+    cmds:
+      - mkdir -p plugins
+      - task: workspace:plugins
+        vars:
+          go: '{{.go}}'
+      - go work init ./{{.release}}
+      - go work use ./plugins
+      - cd plugins && go get github.com/TykTechnologies/tyk@{{.commit}}
+
+  workspace:plugins:
+    internal: true
+    desc: "Setup plugins"
+    dir: plugins
+    requires:
+      vars: [go]
+    cmds:
+      - rm -f go.mod go.sum
+      - go mod init testplugin
+      - go mod edit -go "{{.go}}"
+      - wget -q https://raw.githubusercontent.com/TykTechnologies/custom-go-plugin/refs/heads/master/go/src/CustomGoPlugin.go
+
+  test:
+    desc: "Test plugin build"
+    vars:
+      args: -trimpath -race
+    cmds:
+      - cd tyk-release-5.3.6 && go build -tags=goplugin {{.args}} .
+      - cd plugins && go build {{.args}} -buildmode=plugin .
+      - ./tyk-release-5.3.6/tyk plugin load -f plugins/testplugin.so -s AuthCheck
+
+  clean:
+    desc: "Clean workspace"
+    cmds:
+      - rm -rf plugins go.work*

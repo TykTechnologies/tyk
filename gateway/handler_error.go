@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"encoding/base64"
 	"errors"
-	htmlTemplate "html/template"
+	htmltemplate "html/template"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -72,7 +72,7 @@ func overrideTykErrors(gw *Gateway) {
 
 // APIError is generic error object returned if there is something wrong with the request
 type APIError struct {
-	Message htmlTemplate.HTML
+	Message htmltemplate.HTML
 }
 
 // ErrorHandler is invoked whenever there is an issue with a proxied request, most middleware will invoke
@@ -152,10 +152,10 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 			var tmplExecutor TemplateExecutor
 			tmplExecutor = tmpl
 
-			apiError := APIError{htmlTemplate.HTML(htmlTemplate.JSEscapeString(errMsg))}
+			apiError := APIError{htmltemplate.HTML(htmltemplate.JSEscapeString(errMsg))}
 
 			if contentType == header.ApplicationXML || contentType == header.TextXML {
-				apiError.Message = htmlTemplate.HTML(errMsg)
+				apiError.Message = htmltemplate.HTML(errMsg)
 
 				//we look up in the last defined templateName to obtain the template.
 				rawTmpl := e.Gw.templatesRaw.Lookup(templateName)
@@ -193,7 +193,7 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 		}
 
 		if e.Spec.Proxy.StripListenPath {
-			r.URL.Path = e.Spec.StripListenPath(r, r.URL.Path)
+			r.URL.Path = e.Spec.StripListenPath(r.URL.Path)
 		}
 
 		oauthClientID := ""
@@ -293,8 +293,8 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 			if orgExpireDataTime > 0 {
 				expiresAfter = orgExpireDataTime
 			}
-
 		}
+
 		record.SetExpiry(expiresAfter)
 
 		if e.Spec.GlobalConfig.AnalyticsConfig.NormaliseUrls.Enabled {
@@ -311,6 +311,9 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 			log.WithError(err).Error("could not store analytic record")
 		}
 	}
+
+	e.RecordAccessLog(r, response, analytics.Latency{})
+
 	// Report in health check
 	reportHealthValue(e.Spec, BlockedRequestLog, "-1")
 }

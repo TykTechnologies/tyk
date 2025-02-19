@@ -2,17 +2,16 @@ package gateway
 
 import (
 	"bytes"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/TykTechnologies/tyk/ctx"
-
-	"github.com/TykTechnologies/tyk/test"
-
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/ctx"
+	"github.com/TykTechnologies/tyk/test"
 	"github.com/TykTechnologies/tyk/user"
 )
 
@@ -158,11 +157,12 @@ func BenchmarkRewriter(b *testing.B) {
 
 func TestRewriterTriggers(t *testing.T) {
 	type TestDef struct {
-		name        string
-		pattern, to string
-		in, want    string
-		triggerConf []apidef.RoutingTrigger
-		req         *http.Request
+		name           string
+		pattern, to    string
+		in, want       string
+		triggerConf    []apidef.RoutingTrigger
+		req            *http.Request
+		payloadTrigger bool
 	}
 
 	ts := StartTest(nil)
@@ -194,6 +194,7 @@ func TestRewriterTriggers(t *testing.T) {
 					},
 				},
 				r,
+				false,
 			}
 		},
 		func() TestDef {
@@ -220,6 +221,7 @@ func TestRewriterTriggers(t *testing.T) {
 					},
 				},
 				r,
+				false,
 			}
 		},
 		func() TestDef {
@@ -250,6 +252,7 @@ func TestRewriterTriggers(t *testing.T) {
 					},
 				},
 				r,
+				false,
 			}
 		},
 		func() TestDef {
@@ -280,6 +283,7 @@ func TestRewriterTriggers(t *testing.T) {
 					},
 				},
 				r,
+				false,
 			}
 		},
 		func() TestDef {
@@ -310,6 +314,7 @@ func TestRewriterTriggers(t *testing.T) {
 					},
 				},
 				r,
+				false,
 			}
 		},
 		func() TestDef {
@@ -355,6 +360,7 @@ func TestRewriterTriggers(t *testing.T) {
 					},
 				},
 				r,
+				false,
 			}
 		},
 		func() TestDef {
@@ -385,6 +391,7 @@ func TestRewriterTriggers(t *testing.T) {
 					},
 				},
 				r,
+				false,
 			}
 		},
 		func() TestDef {
@@ -415,6 +422,7 @@ func TestRewriterTriggers(t *testing.T) {
 					},
 				},
 				r,
+				false,
 			}
 		},
 		func() TestDef {
@@ -439,6 +447,7 @@ func TestRewriterTriggers(t *testing.T) {
 					},
 				},
 				r,
+				false,
 			}
 		},
 		func() TestDef {
@@ -463,6 +472,7 @@ func TestRewriterTriggers(t *testing.T) {
 					},
 				},
 				r,
+				false,
 			}
 		},
 		func() TestDef {
@@ -490,6 +500,7 @@ func TestRewriterTriggers(t *testing.T) {
 					},
 				},
 				r,
+				false,
 			}
 		},
 		func() TestDef {
@@ -520,6 +531,7 @@ func TestRewriterTriggers(t *testing.T) {
 					},
 				},
 				r,
+				false,
 			}
 		},
 		func() TestDef {
@@ -550,6 +562,7 @@ func TestRewriterTriggers(t *testing.T) {
 					},
 				},
 				r,
+				false,
 			}
 		},
 		func() TestDef {
@@ -584,6 +597,7 @@ func TestRewriterTriggers(t *testing.T) {
 					},
 				},
 				r,
+				false,
 			}
 		},
 		func() TestDef {
@@ -618,6 +632,7 @@ func TestRewriterTriggers(t *testing.T) {
 					},
 				},
 				r,
+				false,
 			}
 		},
 		func() TestDef {
@@ -652,6 +667,7 @@ func TestRewriterTriggers(t *testing.T) {
 					},
 				},
 				r,
+				false,
 			}
 		},
 		func() TestDef {
@@ -675,6 +691,7 @@ func TestRewriterTriggers(t *testing.T) {
 					},
 				},
 				r,
+				true,
 			}
 		},
 		func() TestDef {
@@ -698,6 +715,7 @@ func TestRewriterTriggers(t *testing.T) {
 					},
 				},
 				r,
+				true,
 			}
 		},
 		func() TestDef {
@@ -721,6 +739,7 @@ func TestRewriterTriggers(t *testing.T) {
 					},
 				},
 				r,
+				true,
 			}
 		},
 		func() TestDef {
@@ -744,6 +763,7 @@ func TestRewriterTriggers(t *testing.T) {
 					},
 				},
 				r,
+				true,
 			}
 		},
 		func() TestDef {
@@ -773,6 +793,7 @@ func TestRewriterTriggers(t *testing.T) {
 					},
 				},
 				r,
+				true,
 			}
 		},
 		func() TestDef {
@@ -802,6 +823,7 @@ func TestRewriterTriggers(t *testing.T) {
 					},
 				},
 				r,
+				true,
 			}
 		},
 		func() TestDef {
@@ -825,6 +847,7 @@ func TestRewriterTriggers(t *testing.T) {
 					},
 				},
 				r,
+				false,
 			}
 		},
 		func() TestDef {
@@ -854,6 +877,7 @@ func TestRewriterTriggers(t *testing.T) {
 					},
 				},
 				r,
+				true,
 			}
 		},
 		func() TestDef {
@@ -883,6 +907,7 @@ func TestRewriterTriggers(t *testing.T) {
 					},
 				},
 				r,
+				true,
 			}
 		},
 		func() TestDef {
@@ -906,6 +931,7 @@ func TestRewriterTriggers(t *testing.T) {
 					},
 				},
 				r,
+				false,
 			}
 		},
 		func() TestDef {
@@ -929,6 +955,7 @@ func TestRewriterTriggers(t *testing.T) {
 					},
 				},
 				r,
+				false,
 			}
 		},
 		func() TestDef {
@@ -958,6 +985,7 @@ func TestRewriterTriggers(t *testing.T) {
 					},
 				},
 				r,
+				false,
 			}
 		},
 		func() TestDef {
@@ -987,6 +1015,7 @@ func TestRewriterTriggers(t *testing.T) {
 					},
 				},
 				r,
+				false,
 			}
 		},
 		func() TestDef {
@@ -1017,6 +1046,7 @@ func TestRewriterTriggers(t *testing.T) {
 					},
 				},
 				r,
+				false,
 			}
 		},
 		func() TestDef {
@@ -1044,6 +1074,7 @@ func TestRewriterTriggers(t *testing.T) {
 					},
 				},
 				r,
+				false,
 			}
 		},
 		func() TestDef {
@@ -1073,6 +1104,7 @@ func TestRewriterTriggers(t *testing.T) {
 					},
 				},
 				r,
+				false,
 			}
 		},
 		func() TestDef {
@@ -1096,6 +1128,7 @@ func TestRewriterTriggers(t *testing.T) {
 					},
 				},
 				r,
+				false,
 			}
 		},
 	}
@@ -1113,6 +1146,14 @@ func TestRewriterTriggers(t *testing.T) {
 			if err != nil {
 				t.Error("compile failed:", err)
 			}
+
+			//added check to ensure that reading the payload to check for the trigger does not break the request
+			if tc.payloadTrigger {
+				body, err := io.ReadAll(tc.req.Body)
+				assert.NotEqual(t, "", string(body))
+				assert.NoError(t, err)
+			}
+
 			if got != tc.want {
 				t.Errorf("rewrite failed, want %q, got %q", tc.want, got)
 			}

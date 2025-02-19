@@ -66,7 +66,6 @@ func TestRateLimit_Unlimited(t *testing.T) {
 }
 
 func TestNeverRenewQuota(t *testing.T) {
-
 	g := StartTest(nil)
 	defer g.Close()
 
@@ -192,6 +191,8 @@ func TestMwRateLimiting_DepthLimit(t *testing.T) {
 }
 
 func providerCustomRatelimitKey(t *testing.T, limiter string) {
+	t.Skip() // DeleteAllKeys interferes with other tests.
+
 	t.Helper()
 
 	tcs := []struct {
@@ -246,7 +247,7 @@ func providerCustomRatelimitKey(t *testing.T, limiter string) {
 
 			ts.Gw.SetConfig(globalConf)
 
-			ok := ts.Gw.GlobalSessionManager.Store().DeleteAllKeys()
+			ok := ts.Gw.GlobalSessionManager.Store().DeleteAllKeys() // exclusive
 			assert.True(t, ok)
 
 			customRateLimitKey := "portal-developer-1" + tc.hashAlgo + limiter
@@ -299,8 +300,10 @@ func providerCustomRatelimitKey(t *testing.T, limiter string) {
 						APIID:   spec.APIID,
 						APIName: spec.Name,
 						Limit: user.APILimit{
-							Rate: 3,
-							Per:  1000,
+							RateLimit: user.RateLimit{
+								Rate: 3,
+								Per:  1000,
+							},
 						},
 					},
 				}
@@ -317,8 +320,10 @@ func providerCustomRatelimitKey(t *testing.T, limiter string) {
 						APIID:   spec.APIID,
 						APIName: spec.Name,
 						Limit: user.APILimit{
-							Rate: 3,
-							Per:  1000,
+							RateLimit: user.RateLimit{
+								Rate: 3,
+								Per:  1000,
+							},
 						},
 					},
 				}

@@ -4,12 +4,12 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/internal/event"
 )
 
-// Constant for event system.
-const EH_CoProcessHandler apidef.TykEventHandlerName = "cp_dynamic_handler"
+// EH_CoProcessHandler is used for event system, maintained here for backwards compatibility.
+const EH_CoProcessHandler = event.CoProcessHandler
 
 type CoProcessEventHandler struct {
 	methodName string
@@ -34,7 +34,7 @@ func (l *CoProcessEventHandler) Init(handlerConf interface{}) error {
 
 	gValAsJSON, err := json.Marshal(globalVals)
 	if err != nil {
-		return fmt.Errorf("failed to marshal globals: %v", err)
+		return fmt.Errorf("failed to marshal globals: %w", err)
 	}
 
 	l.SpecJSON = json.RawMessage(gValAsJSON)

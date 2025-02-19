@@ -22,6 +22,14 @@ type GroupLoginRequest struct {
 	Node      []byte
 }
 
+// HostDetails contains information about a host machine,
+// including its hostname, process ID (PID), and IP address.
+type HostDetails struct {
+	Hostname string
+	PID      int
+	Address  string
+}
+
 type NodeData struct {
 	NodeID          string                     `json:"node_id"`
 	APIKey          string                     `json:"api_key"`
@@ -32,6 +40,7 @@ type NodeData struct {
 	Tags            []string                   `json:"tags"`
 	Health          map[string]HealthCheckItem `json:"health"`
 	Stats           GWStats                    `json:"stats"`
+	HostDetails     HostDetails                `json:"host_details"`
 }
 
 type GWStats struct {
