@@ -492,7 +492,7 @@ type HttpServerOptionsConfig struct {
 
 	// Index of certificates available to the Gateway for use in client and upstream communication.
 	// The string value in the array can be two of the following options:
-	// 1. A certificate IDs
+	// 1. The ID assigned to and used to identify a certificate in the Tyk Certificate Store
 	// 2. A path to a PEM file. The PEM file will have both the private key and the certificated concatenated.
 	SSLCertificates []string `json:"ssl_certificates"`
 
