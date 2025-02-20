@@ -1282,12 +1282,8 @@
           "$ref": "#/definitions/X-Tyk-DetailedTracing"
         },
         "eventHandlers": {
-          "type": "array",
-          "items": [
-            {
-              "$ref": "#/definitions/X-Tyk-EventHandlers"
-            }
-          ]
+          "type": "object",
+          "$ref": "#/definitions/X-Tyk-EventHandlers"
         },
         "contextVariables": {
           "$ref": "#/definitions/X-Tyk-ContextVariables"
@@ -1925,6 +1921,14 @@
       ]
     },
     "X-Tyk-EventHandlers": {
+      "type": "array",
+      "items":[
+        {
+          "$ref": "#/definitions/X-Tyk-EventHandler"
+        }
+      ]
+    },
+    "X-Tyk-EventHandler": {
       "type": "object",
       "anyOf": [
         {
