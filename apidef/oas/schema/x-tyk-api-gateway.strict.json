@@ -1947,8 +1947,7 @@
         "threshold": {
           "type": "number",
           "minimum": 0,
-          "maximum": 1,
-          "multipleOf": 0.01
+          "maximum": 1
         },
         "sampleSize": {
           "type": "integer",
