@@ -10,5 +10,9 @@ output="x-tyk-api-gateway.strict.json"
 
 cat $input \
 	| jq -r '(.additionalProperties = false) | (.definitions |= map_values(. + {"additionalProperties": false}))' \
-	| jq -r '.definitions["X-Tyk-EventHandlers"].additionalProperties = true' \
 	> $output
+
+# If to modify some fields in strict schema, append something like this
+# to the command above, before piping to $output.
+#
+#	| jq -r '.definitions["X-Tyk-EventHandlers"].additionalProperties = true' \

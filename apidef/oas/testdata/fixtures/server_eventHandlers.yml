@@ -1,0 +1,13 @@
+---
+name: "Server.EventHandlers"
+tests:
+  - source: oas
+    debug: true
+    input:
+      x-tyk-api-gateway:
+        server:
+          eventHandlers:
+            - enabled: true
+              trigger: RateLimitExceeded
+              type: custom
+              name: testName

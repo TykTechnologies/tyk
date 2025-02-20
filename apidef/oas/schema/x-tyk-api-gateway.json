@@ -1285,7 +1285,7 @@
           "type": "array",
           "items": [
             {
-              "$ref": "#/definitions/X-Tyk-EventHandlers"
+              "$ref": "#/definitions/X-Tyk-EventHandler"
             }
           ]
         },
@@ -1924,21 +1924,7 @@
         "enabled"
       ]
     },
-    "X-Tyk-EventHandlers": {
-      "type": "object",
-      "anyOf": [
-        {
-          "$ref": "#/definitions/X-Tyk-Webhook-With-ID"
-        },
-        {
-          "$ref": "#/definitions/X-Tyk-Webhook-Without-ID"
-        },
-        {
-          "$ref": "#/definitions/X-Tyk-JSVMEvent"
-        }
-      ]
-    },
-    "X-Tyk-Webhook-With-ID": {
+    "X-Tyk-EventHandler": {
       "type": "object",
       "properties": {
         "enabled": {
@@ -1955,29 +1941,14 @@
         },
         "cooldownPeriod": {
           "$ref": "#/definitions/X-Tyk-ReadableDuration"
-        }
-      },
-      "required": [
-        "enabled",
-        "type",
-        "trigger",
-        "id",
-        "cooldownPeriod"
-      ]
-    },
-    "X-Tyk-Webhook-Without-ID": {
-      "type": "object",
-      "properties": {
-        "enabled": {
-          "type": "boolean"
-        },
-        "trigger": {
-          "$ref": "#/definitions/X-Tyk-EventTrigger"
-        },
-        "type": {
-          "$ref": "#/definitions/X-Tyk-EventType"
         },
         "name": {
+          "type": "string"
+        },
+        "functionName": {
+          "type": "string"
+        },
+        "path": {
           "type": "string"
         },
         "url": {
@@ -1994,10 +1965,6 @@
             "PATCH"
           ]
         },
-        "cooldownPeriod": {
-          "type": "string",
-          "pattern": "^(\\d+h)?(\\d+m)?(\\d+s)?$"
-        },
         "bodyTemplate": {
           "type": "string"
         },
@@ -2010,48 +1977,37 @@
           ]
         }
       },
-      "required": [
-        "enabled",
-        "type",
-        "trigger",
-        "url",
-        "method",
-        "cooldownPeriod",
-        "bodyTemplate"
-      ]
-    },
-    "X-Tyk-JSVMEvent": {
-      "type": "object",
-      "properties": {
-        "enabled": {
-          "type": "boolean"
+      "anyOf": [
+        {
+          "required": [
+            "enabled",
+            "type",
+            "trigger",
+            "id",
+            "cooldownPeriod"
+          ]
         },
-        "trigger": {
-          "$ref": "#/definitions/X-Tyk-EventTrigger"
+        {
+          "required": [
+            "enabled",
+            "type",
+            "trigger",
+            "url",
+            "method",
+            "cooldownPeriod",
+            "bodyTemplate"
+          ]
         },
-        "type": {
-          "$ref": "#/definitions/X-Tyk-EventType"
-        },
-        "id": {
-          "type": "string"
-        },
-        "name": {
-          "type": "string"
-        },
-        "functionName": {
-          "type": "string"
-        },
-        "path": {
-          "type": "string"
+        {
+          "required": [
+            "enabled",
+            "trigger",
+            "type",
+            "name",
+            "functionName",
+            "path"
+          ]
         }
-      },
-      "required": [
-        "enabled",
-        "trigger",
-        "type",
-        "name",
-        "functionName",
-        "path"
       ]
     },
     "X-Tyk-EventType": {
