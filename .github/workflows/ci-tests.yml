@@ -37,8 +37,8 @@ jobs:
 
       - name: "Get base ref"
         run: |
-          git fetch origin ${{ github.base_ref }}
-          git rev-parse origin/${{ github.base_ref }}
+          git fetch origin ${{ github.base_ref || github.ref_name }}
+          git rev-parse origin/${{ github.base_ref || github.ref_name }}
 
       - name: Setup Golang
         uses: actions/setup-go@v5
@@ -69,7 +69,7 @@ jobs:
         # This is a pull request, but exiting here skips CI tests (`needs: golangci-lint`). Exit code 0 to always run tests.
         # PR uses the "prod" config and must pass.
         run: |
-          golangci-lint run --out-format colored-line-number,checkstyle:golangci-lint-report.json --issues-exit-code=0 --new-from-rev=origin/${{ github.base_ref }} -v ./...
+          golangci-lint run --out-format colored-line-number,checkstyle:golangci-lint-report.json --issues-exit-code=0 --new-from-rev=origin/${{ github.base_ref || github.ref_name }} -v ./...
 
       - name: golangci-lint-on-push
         if: ${{ github.event_name == 'push' }}
@@ -110,8 +110,8 @@ jobs:
 
       - name: "Get base ref"
         run: |
-          git fetch origin ${{ github.base_ref }}
-          git rev-parse origin/${{ github.base_ref }}
+          git fetch origin ${{ github.base_ref || github.ref_name }}
+          git rev-parse origin/${{ github.base_ref || github.ref_name }}
 
       # Regardless that the base image provides a python release, we need
       # setup-python so it properly configures the python3-venv.
