@@ -4,11 +4,13 @@ import (
 	"context"
 	"embed"
 	"sort"
+	"strconv"
 	"strings"
 	"testing"
 
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/internal/time"
@@ -141,31 +143,34 @@ func TestOAS_PathsAndOperations(t *testing.T) {
 func TestOAS_MockResponse_extractPathsAndOperations(t *testing.T) {
 	t.Parallel()
 
-	// Test case 1: Basic mock response
-	t.Run("basic mock response", func(t *testing.T) {
-		spec := OAS{
-			T: openapi3.T{
-				OpenAPI: DefaultOpenAPI,
-				Paths: openapi3.Paths{
-					"/test": {
-						Get: &openapi3.Operation{
-							OperationID: "testGET",
+	tests := []struct {
+		name string
+		spec OAS
+		want func(t *testing.T, ep *apidef.ExtendedPathsSet)
+	}{
+		{
+			name: "basic mock response",
+			spec: OAS{
+				T: openapi3.T{
+					OpenAPI: DefaultOpenAPI,
+					Paths: openapi3.Paths{
+						"/test": {
+							Get: &openapi3.Operation{
+								OperationID: "testGET",
+							},
 						},
 					},
-				},
-				Extensions: map[string]interface{}{
-					"x-tyk-api-gateway": &XTykAPIGateway{
-						Middleware: &Middleware{
-							Operations: Operations{
-								"testGET": &Operation{
-									MockResponse: &MockResponse{
-										Enabled: true,
-										Code:    200,
-										Body:    `{"message": "success"}`,
-										Headers: []Header{
-											{
-												Name:  "Content-Type",
-												Value: "application/json",
+					Extensions: map[string]interface{}{
+						"x-tyk-api-gateway": &XTykAPIGateway{
+							Middleware: &Middleware{
+								Operations: Operations{
+									"testGET": &Operation{
+										MockResponse: &MockResponse{
+											Enabled: true,
+											Code:    200,
+											Body:    `{"message": "success"}`,
+											Headers: []Header{
+												{Name: "Content-Type", Value: "application/json"},
 											},
 										},
 									},
@@ -175,59 +180,55 @@ func TestOAS_MockResponse_extractPathsAndOperations(t *testing.T) {
 					},
 				},
 			},
-		}
-
-		var ep apidef.ExtendedPathsSet
-		spec.extractPathsAndOperations(&ep)
-
-		// Verify the mock response was correctly extracted
-		assert.Len(t, ep.MockResponse, 1)
-		mockResp := ep.MockResponse[0]
-		assert.Equal(t, "/test", mockResp.Path)
-		assert.Equal(t, "GET", mockResp.Method)
-		assert.Equal(t, 200, mockResp.Code)
-		assert.Equal(t, `{"message": "success"}`, mockResp.Body)
-		assert.Equal(t, map[string]string{"Content-Type": "application/json"}, mockResp.Headers)
-		assert.False(t, mockResp.Disabled)
-	})
-
-	// Test case 2: Multiple mock responses
-	t.Run("multiple mock responses", func(t *testing.T) {
-		spec := OAS{
-			T: openapi3.T{
-				OpenAPI: DefaultOpenAPI,
-				Paths: openapi3.Paths{
-					"/test": {
-						Get: &openapi3.Operation{
-							OperationID: "testGET",
-						},
-						Post: &openapi3.Operation{
-							OperationID: "testPOST",
+			want: func(t *testing.T, ep *apidef.ExtendedPathsSet) {
+				assert.Len(t, ep.MockResponse, 1)
+				mockResp := ep.MockResponse[0]
+				assert.Equal(t, "/test", mockResp.Path)
+				assert.Equal(t, "GET", mockResp.Method)
+				assert.Equal(t, 200, mockResp.Code)
+				assert.Equal(t, `{"message": "success"}`, mockResp.Body)
+				assert.Equal(t, map[string]string{"Content-Type": "application/json"}, mockResp.Headers)
+				assert.False(t, mockResp.Disabled)
+			},
+		},
+		{
+			name: "multiple methods on same path",
+			spec: OAS{
+				T: openapi3.T{
+					OpenAPI: DefaultOpenAPI,
+					Paths: openapi3.Paths{
+						"/test": {
+							Get: &openapi3.Operation{
+								OperationID: "testGET",
+							},
+							Post: &openapi3.Operation{
+								OperationID: "testPOST",
+							},
 						},
 					},
-				},
-				Extensions: map[string]interface{}{
-					"x-tyk-api-gateway": &XTykAPIGateway{
-						Middleware: &Middleware{
-							Operations: Operations{
-								"testGET": &Operation{
-									MockResponse: &MockResponse{
-										Enabled: true,
-										Code:    200,
-										Body:    `{"status": "ok"}`,
-										Headers: []Header{
-											{Name: "Content-Type", Value: "application/json"},
+					Extensions: map[string]interface{}{
+						"x-tyk-api-gateway": &XTykAPIGateway{
+							Middleware: &Middleware{
+								Operations: Operations{
+									"testGET": &Operation{
+										MockResponse: &MockResponse{
+											Enabled: true,
+											Code:    200,
+											Body:    `{"status": "ok"}`,
+											Headers: []Header{
+												{Name: "Content-Type", Value: "application/json"},
+											},
 										},
 									},
-								},
-								"testPOST": &Operation{
-									MockResponse: &MockResponse{
-										Enabled: true,
-										Code:    201,
-										Body:    `{"id": "123"}`,
-										Headers: []Header{
-											{Name: "Content-Type", Value: "application/json"},
-											{Name: "Location", Value: "/test/123"},
+									"testPOST": &Operation{
+										MockResponse: &MockResponse{
+											Enabled: true,
+											Code:    201,
+											Body:    `{"id": "123"}`,
+											Headers: []Header{
+												{Name: "Content-Type", Value: "application/json"},
+												{Name: "Location", Value: "/test/123"},
+											},
 										},
 									},
 								},
@@ -236,86 +237,182 @@ func TestOAS_MockResponse_extractPathsAndOperations(t *testing.T) {
 					},
 				},
 			},
-		}
+			want: func(t *testing.T, ep *apidef.ExtendedPathsSet) {
+				assert.Len(t, ep.MockResponse, 2)
 
-		var ep apidef.ExtendedPathsSet
-		spec.extractPathsAndOperations(&ep)
+				// Sort mock responses for consistent testing
+				sort.Slice(ep.MockResponse, func(i, j int) bool {
+					if ep.MockResponse[i].Path == ep.MockResponse[j].Path {
+						return ep.MockResponse[i].Method < ep.MockResponse[j].Method
+					}
+					return ep.MockResponse[i].Path < ep.MockResponse[j].Path
+				})
 
-		// Verify multiple mock responses were correctly extracted
-		assert.Len(t, ep.MockResponse, 2)
+				// Verify GET mock response
+				getMock := ep.MockResponse[0]
+				assert.Equal(t, "/test", getMock.Path)
+				assert.Equal(t, "GET", getMock.Method)
+				assert.Equal(t, 200, getMock.Code)
+				assert.Equal(t, `{"status": "ok"}`, getMock.Body)
+				assert.Equal(t, map[string]string{"Content-Type": "application/json"}, getMock.Headers)
+				assert.False(t, getMock.Disabled)
 
-		// Sort mock responses by path+method for consistent testing
-		sort.Slice(ep.MockResponse, func(i, j int) bool {
-			if ep.MockResponse[i].Path == ep.MockResponse[j].Path {
-				return ep.MockResponse[i].Method < ep.MockResponse[j].Method
-			}
-			return ep.MockResponse[i].Path < ep.MockResponse[j].Path
+				// Verify POST mock response
+				postMock := ep.MockResponse[1]
+				assert.Equal(t, "/test", postMock.Path)
+				assert.Equal(t, "POST", postMock.Method)
+				assert.Equal(t, 201, postMock.Code)
+				assert.Equal(t, `{"id": "123"}`, postMock.Body)
+				assert.Equal(t, map[string]string{
+					"Content-Type": "application/json",
+					"Location":     "/test/123",
+				}, postMock.Headers)
+				assert.False(t, postMock.Disabled)
+			},
+		},
+		{
+			name: "disabled mock response",
+			spec: OAS{
+				T: openapi3.T{
+					OpenAPI: DefaultOpenAPI,
+					Paths: openapi3.Paths{
+						"/test": {
+							Get: &openapi3.Operation{
+								OperationID: "testGET",
+							},
+						},
+					},
+					Extensions: map[string]interface{}{
+						"x-tyk-api-gateway": &XTykAPIGateway{
+							Middleware: &Middleware{
+								Operations: Operations{
+									"testGET": &Operation{
+										MockResponse: &MockResponse{
+											Enabled: false,
+											Code:    404,
+											Body:    `{"error": "not found"}`,
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			want: func(t *testing.T, ep *apidef.ExtendedPathsSet) {
+				assert.Len(t, ep.MockResponse, 1)
+				mockResp := ep.MockResponse[0]
+				assert.Equal(t, "/test", mockResp.Path)
+				assert.Equal(t, "GET", mockResp.Method)
+				assert.Equal(t, 404, mockResp.Code)
+				assert.Equal(t, `{"error": "not found"}`, mockResp.Body)
+				assert.True(t, mockResp.Disabled)
+			},
+		},
+		{
+			name: "no mock responses",
+			spec: OAS{
+				T: openapi3.T{
+					OpenAPI: DefaultOpenAPI,
+					Paths: openapi3.Paths{
+						"/test": {
+							Get: &openapi3.Operation{
+								OperationID: "testGET",
+							},
+						},
+					},
+					Extensions: map[string]interface{}{
+						"x-tyk-api-gateway": &XTykAPIGateway{
+							Middleware: &Middleware{
+								Operations: Operations{
+									"testGET": &Operation{},
+								},
+							},
+						},
+					},
+				},
+			},
+			want: func(t *testing.T, ep *apidef.ExtendedPathsSet) {
+				assert.Empty(t, ep.MockResponse)
+			},
+		},
+		{
+			name: "multiple paths with mock responses",
+			spec: OAS{
+				T: openapi3.T{
+					OpenAPI: DefaultOpenAPI,
+					Paths: openapi3.Paths{
+						"/users": {
+							Get: &openapi3.Operation{
+								OperationID: "usersGET",
+							},
+						},
+						"/items": {
+							Get: &openapi3.Operation{
+								OperationID: "itemsGET",
+							},
+						},
+					},
+					Extensions: map[string]interface{}{
+						"x-tyk-api-gateway": &XTykAPIGateway{
+							Middleware: &Middleware{
+								Operations: Operations{
+									"usersGET": &Operation{
+										MockResponse: &MockResponse{
+											Enabled: true,
+											Code:    200,
+											Body:    `["user1", "user2"]`,
+											Headers: []Header{{Name: "Content-Type", Value: "application/json"}},
+										},
+									},
+									"itemsGET": &Operation{
+										MockResponse: &MockResponse{
+											Enabled: true,
+											Code:    200,
+											Body:    `["item1", "item2"]`,
+											Headers: []Header{{Name: "Content-Type", Value: "application/json"}},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			want: func(t *testing.T, ep *apidef.ExtendedPathsSet) {
+				assert.Len(t, ep.MockResponse, 2)
+
+				// Sort for consistent testing
+				sort.Slice(ep.MockResponse, func(i, j int) bool {
+					return ep.MockResponse[i].Path < ep.MockResponse[j].Path
+				})
+
+				// Verify items response
+				itemsResp := ep.MockResponse[0]
+				assert.Equal(t, "/items", itemsResp.Path)
+				assert.Equal(t, "GET", itemsResp.Method)
+				assert.Equal(t, 200, itemsResp.Code)
+				assert.Equal(t, `["item1", "item2"]`, itemsResp.Body)
+				assert.Equal(t, map[string]string{"Content-Type": "application/json"}, itemsResp.Headers)
+
+				// Verify users response
+				usersResp := ep.MockResponse[1]
+				assert.Equal(t, "/users", usersResp.Path)
+				assert.Equal(t, "GET", usersResp.Method)
+				assert.Equal(t, 200, usersResp.Code)
+				assert.Equal(t, `["user1", "user2"]`, usersResp.Body)
+				assert.Equal(t, map[string]string{"Content-Type": "application/json"}, usersResp.Headers)
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var ep apidef.ExtendedPathsSet
+			tt.spec.extractPathsAndOperations(&ep)
+			tt.want(t, &ep)
 		})
-
-		// Verify GET mock response
-		getMock := ep.MockResponse[0]
-		assert.Equal(t, "/test", getMock.Path)
-		assert.Equal(t, "GET", getMock.Method)
-		assert.Equal(t, 200, getMock.Code)
-		assert.Equal(t, `{"status": "ok"}`, getMock.Body)
-		assert.Equal(t, map[string]string{"Content-Type": "application/json"}, getMock.Headers)
-		assert.False(t, getMock.Disabled)
-
-		// Verify POST mock response
-		postMock := ep.MockResponse[1]
-		assert.Equal(t, "/test", postMock.Path)
-		assert.Equal(t, "POST", postMock.Method)
-		assert.Equal(t, 201, postMock.Code)
-		assert.Equal(t, `{"id": "123"}`, postMock.Body)
-		assert.Equal(t, map[string]string{
-			"Content-Type": "application/json",
-			"Location":     "/test/123",
-		}, postMock.Headers)
-		assert.False(t, postMock.Disabled)
-	})
-
-	// Test case 3: Disabled mock response
-	t.Run("disabled mock response", func(t *testing.T) {
-		spec := OAS{
-			T: openapi3.T{
-				OpenAPI: DefaultOpenAPI,
-				Paths: openapi3.Paths{
-					"/test": {
-						Get: &openapi3.Operation{
-							OperationID: "testGET",
-						},
-					},
-				},
-				Extensions: map[string]interface{}{
-					"x-tyk-api-gateway": &XTykAPIGateway{
-						Middleware: &Middleware{
-							Operations: Operations{
-								"testGET": &Operation{
-									MockResponse: &MockResponse{
-										Enabled: false,
-										Code:    404,
-										Body:    `{"error": "not found"}`,
-									},
-								},
-							},
-						},
-					},
-				},
-			},
-		}
-
-		var ep apidef.ExtendedPathsSet
-		spec.extractPathsAndOperations(&ep)
-
-		// Verify disabled mock response was correctly extracted
-		assert.Len(t, ep.MockResponse, 1)
-		mockResp := ep.MockResponse[0]
-		assert.Equal(t, "/test", mockResp.Path)
-		assert.Equal(t, "GET", mockResp.Method)
-		assert.Equal(t, 404, mockResp.Code)
-		assert.Equal(t, `{"error": "not found"}`, mockResp.Body)
-		assert.True(t, mockResp.Disabled)
-	})
+	}
 }
 
 func TestOAS_PathsAndOperationsRegex(t *testing.T) {
@@ -462,11 +559,15 @@ func TestOAS_RegexPaths(t *testing.T) {
 func TestOAS_MockResponse_fillMockResponsePaths(t *testing.T) {
 	t.Parallel()
 
-	// Test case 1: Basic mock response
-	t.Run("basic mock response", func(t *testing.T) {
-		ep := apidef.ExtendedPathsSet{
-			MockResponse: []apidef.MockResponseMeta{
-				{
+	tests := []struct {
+		name string
+		ep   apidef.ExtendedPathsSet
+		want func(t *testing.T, spec *OAS)
+	}{
+		{
+			name: "basic mock response",
+			ep: apidef.ExtendedPathsSet{
+				MockResponse: []apidef.MockResponseMeta{{
 					Path:   "/test",
 					Method: "GET",
 					Code:   200,
@@ -474,134 +575,417 @@ func TestOAS_MockResponse_fillMockResponsePaths(t *testing.T) {
 					Headers: map[string]string{
 						"Content-Type": "application/json",
 					},
-				},
+				}},
 			},
-		}
+			want: func(t *testing.T, spec *OAS) {
+				assert.Len(t, spec.Paths, 1)
+				pathItem := spec.Paths["/test"]
+				require.NotNil(t, pathItem)
 
-		spec := &OAS{
-			T: openapi3.T{
-				Paths: openapi3.Paths{},
+				// Verify operation
+				require.NotNil(t, pathItem.Get)
+				assert.Equal(t, "getTest200", pathItem.Get.OperationID)
+				assert.Nil(t, pathItem.Post)
+				assert.Nil(t, pathItem.Put)
+				assert.Nil(t, pathItem.Patch)
+				assert.Nil(t, pathItem.Delete)
+
+				// Verify response
+				response200Ref := pathItem.Get.Responses["200"]
+				require.NotNil(t, response200Ref, "Response ref for 200 should not be nil")
+				response200 := response200Ref.Value
+				require.NotNil(t, response200, "Response value for 200 should not be nil")
+
+				// Verify content
+				mediaType := response200.Content["application/json"]
+				require.NotNil(t, mediaType)
+				require.NotNil(t, mediaType.Examples)
+				example := mediaType.Examples["default"]
+				require.NotNil(t, example)
+				assert.Equal(t, `{"message": "success"}`, example.Value.Value)
+
+				// Verify headers
+				assert.Equal(t, "application/json", response200.Headers["Content-Type"].Value.Schema.Value.Example)
 			},
-		}
-
-		spec.fillMockResponsePaths(spec.Paths, ep)
-
-		// Verify the mock response was correctly added to paths
-		assert.Len(t, spec.Paths, 1)
-		pathItem := spec.Paths["/test"]
-		assert.NotNil(t, pathItem)
-		assert.NotNil(t, pathItem.Get)
-		assert.Equal(t, "testGET", pathItem.Get.OperationID)
-		assert.Nil(t, pathItem.Post)
-		assert.Nil(t, pathItem.Put)
-		assert.Nil(t, pathItem.Patch)
-		assert.Nil(t, pathItem.Delete)
-
-		// Verify response
-		responses := pathItem.Get.Responses
-		assert.NotNil(t, responses)
-		response := responses["200"]
-		assert.NotNil(t, response.Value)
-
-		// Verify content
-		content := response.Value.Content
-		assert.NotNil(t, content["application/json"])
-		mediaType := content["application/json"]
-		assert.Equal(t, `{"message": "success"}`, mediaType.Example)
-		assert.Equal(t, `{"message": "success"}`, mediaType.Examples["default"].Value.Value)
-
-		// Verify headers
-		headers := response.Value.Headers
-		assert.NotNil(t, headers["Content-Type"])
-		assert.Equal(t, "application/json", headers["Content-Type"].Value.Schema.Value.Example)
-	})
-
-	// Test case 2: Multiple methods
-	t.Run("multiple methods", func(t *testing.T) {
-		ep := apidef.ExtendedPathsSet{
-			MockResponse: []apidef.MockResponseMeta{
-				{
-					Path:   "/test",
-					Method: "GET",
-					Code:   200,
-					Body:   `{"status": "ok"}`,
-					Headers: map[string]string{
-						"Content-Type": "application/json",
+		},
+		{
+			name: "multiple methods on same path",
+			ep: apidef.ExtendedPathsSet{
+				MockResponse: []apidef.MockResponseMeta{
+					{
+						Path:   "/test",
+						Method: "GET",
+						Code:   200,
+						Body:   `{"status": "ok"}`,
+						Headers: map[string]string{
+							"Content-Type": "application/json",
+						},
 					},
-				},
-				{
-					Path:   "/test",
-					Method: "POST",
-					Code:   201,
-					Body:   `{"id": "123"}`,
-					Headers: map[string]string{
-						"Content-Type": "application/json",
-						"Location":     "/test/123",
+					{
+						Path:   "/test",
+						Method: "POST",
+						Code:   201,
+						Body:   `{"id": "123"}`,
+						Headers: map[string]string{
+							"Content-Type": "application/json",
+							"Location":     "/test/123",
+						},
 					},
 				},
 			},
-		}
+			want: func(t *testing.T, spec *OAS) {
+				assert.Len(t, spec.Paths, 1)
+				pathItem := spec.Paths["/test"]
+				require.NotNil(t, pathItem)
 
-		spec := &OAS{
-			T: openapi3.T{
-				Paths: openapi3.Paths{},
+				// Verify GET operation
+				require.NotNil(t, pathItem.Get)
+				assert.Equal(t, "getTest200", pathItem.Get.OperationID)
+				response200Ref := pathItem.Get.Responses["200"]
+				require.NotNil(t, response200Ref, "Response ref for 200 should not be nil")
+				response200 := response200Ref.Value
+				require.NotNil(t, response200, "Response value for 200 should not be nil")
+				assert.Equal(t, `{"status": "ok"}`, response200.Content["application/json"].Examples["default"].Value.Value)
+				assert.Equal(t, "application/json", response200.Headers["Content-Type"].Value.Schema.Value.Example)
+
+				// Verify POST operation
+				require.NotNil(t, pathItem.Post)
+				assert.Equal(t, "postTest201", pathItem.Post.OperationID)
+				postResponse := pathItem.Post.Responses["201"].Value
+				require.NotNil(t, postResponse)
+				require.NotNil(t, postResponse.Content["application/json"].Examples)
+				assert.Equal(t, `{"id": "123"}`, postResponse.Content["application/json"].Examples["default"].Value.Value)
+				assert.Equal(t, "application/json", postResponse.Headers["Content-Type"].Value.Schema.Value.Example)
+				assert.Equal(t, "/test/123", postResponse.Headers["Location"].Value.Schema.Value.Example)
 			},
-		}
-
-		spec.fillMockResponsePaths(spec.Paths, ep)
-
-		// Verify path item
-		assert.Len(t, spec.Paths, 1)
-		pathItem := spec.Paths["/test"]
-		assert.NotNil(t, pathItem)
-		assert.NotNil(t, pathItem.Get)
-		assert.NotNil(t, pathItem.Post)
-
-		// Verify GET operation
-		assert.Equal(t, "testGET", pathItem.Get.OperationID)
-		getResponse := pathItem.Get.Responses["200"].Value
-		assert.Equal(t, `{"status": "ok"}`, getResponse.Content["application/json"].Example)
-		assert.Equal(t, "application/json", getResponse.Headers["Content-Type"].Value.Schema.Value.Example)
-
-		// Verify POST operation
-		assert.Equal(t, "testPOST", pathItem.Post.OperationID)
-		postResponse := pathItem.Post.Responses["201"].Value
-		assert.Equal(t, `{"id": "123"}`, postResponse.Content["application/json"].Example)
-		assert.Equal(t, "application/json", postResponse.Headers["Content-Type"].Value.Schema.Value.Example)
-		assert.Equal(t, "/test/123", postResponse.Headers["Location"].Value.Schema.Value.Example)
-	})
-
-	// Test case 3: No content type header
-	t.Run("no content type header", func(t *testing.T) {
-		ep := apidef.ExtendedPathsSet{
-			MockResponse: []apidef.MockResponseMeta{
-				{
+		},
+		{
+			name: "no content type header defaults to text/plain",
+			ep: apidef.ExtendedPathsSet{
+				MockResponse: []apidef.MockResponseMeta{{
 					Path:   "/test",
 					Method: "GET",
 					Code:   204,
 					Body:   "",
+				}},
+			},
+			want: func(t *testing.T, spec *OAS) {
+				pathItem := spec.Paths["/test"]
+				require.NotNil(t, pathItem)
+				response204Ref := pathItem.Get.Responses["204"]
+				require.NotNil(t, response204Ref, "Response ref for 204 should not be nil")
+				response204 := response204Ref.Value
+				require.NotNil(t, response204, "Response value for 204 should not be nil")
+				require.NotNil(t, response204.Content["text/plain"])
+				require.NotNil(t, response204.Content["text/plain"].Examples)
+				assert.Equal(t, "", response204.Content["text/plain"].Examples["default"].Value.Value)
+				assert.Empty(t, response204.Headers)
+			},
+		},
+		{
+			name: "multiple paths",
+			ep: apidef.ExtendedPathsSet{
+				MockResponse: []apidef.MockResponseMeta{
+					{
+						Path:   "/users",
+						Method: "GET",
+						Code:   200,
+						Body:   `["user1", "user2"]`,
+						Headers: map[string]string{
+							"Content-Type": "application/json",
+						},
+					},
+					{
+						Path:   "/items",
+						Method: "GET",
+						Code:   200,
+						Body:   `["item1", "item2"]`,
+						Headers: map[string]string{
+							"Content-Type": "application/json",
+						},
+					},
 				},
 			},
-		}
+			want: func(t *testing.T, spec *OAS) {
+				assert.Len(t, spec.Paths, 2)
 
-		spec := &OAS{
-			T: openapi3.T{
-				Paths: openapi3.Paths{},
+				// Verify /users path
+				usersPath := spec.Paths["/users"]
+				require.NotNil(t, usersPath)
+				require.NotNil(t, usersPath.Get)
+				assert.Equal(t, "getUsers200", usersPath.Get.OperationID)
+				usersResponse := usersPath.Get.Responses["200"].Value
+				require.NotNil(t, usersResponse)
+				assert.Equal(t, `["user1", "user2"]`, usersResponse.Content["application/json"].Examples["default"].Value.Value)
+
+				// Verify /items path
+				itemsPath := spec.Paths["/items"]
+				require.NotNil(t, itemsPath)
+				require.NotNil(t, itemsPath.Get)
+				assert.Equal(t, "getItems200", itemsPath.Get.OperationID)
+				itemsResponse := itemsPath.Get.Responses["200"].Value
+				require.NotNil(t, itemsResponse)
+				assert.Equal(t, `["item1", "item2"]`, itemsResponse.Content["application/json"].Examples["default"].Value.Value)
 			},
-		}
+		},
+		{
+			name: "empty mock response list",
+			ep: apidef.ExtendedPathsSet{
+				MockResponse: []apidef.MockResponseMeta{},
+			},
+			want: func(t *testing.T, spec *OAS) {
+				assert.Empty(t, spec.Paths)
+			},
+		},
+		{
+			name: "multiple response codes for same path",
+			ep: apidef.ExtendedPathsSet{
+				MockResponse: []apidef.MockResponseMeta{
+					{
+						Path:   "/test",
+						Method: "GET",
+						Code:   200,
+						Body:   `{"status": "success"}`,
+						Headers: map[string]string{
+							"Content-Type": "application/json",
+						},
+					},
+				},
+			},
+			want: func(t *testing.T, spec *OAS) {
+				pathItem := spec.Paths["/test"]
+				require.NotNil(t, pathItem)
+				require.NotNil(t, pathItem.Get)
+				assert.Equal(t, "getTest200", pathItem.Get.OperationID)
 
-		spec.fillMockResponsePaths(spec.Paths, ep)
+				// Verify responses exist
+				require.NotNil(t, pathItem.Get.Responses)
 
-		// Verify response
-		pathItem := spec.Paths["/test"]
-		assert.NotNil(t, pathItem)
-		response := pathItem.Get.Responses["204"].Value
+				// Verify 200 response
+				response200 := pathItem.Get.Responses.Get(200)
+				require.NotNil(t, response200, "Response for 200 should not be nil")
+				mediaType200 := response200.Value.Content["application/json"]
+				require.NotNil(t, mediaType200)
+				require.NotNil(t, mediaType200.Examples)
+				assert.Equal(t, `{"status": "success"}`, mediaType200.Examples["default"].Value.Value)
+			},
+		},
+		{
+			name: "different content types",
+			ep: apidef.ExtendedPathsSet{
+				MockResponse: []apidef.MockResponseMeta{
+					{
+						Path:   "/test",
+						Method: "GET",
+						Code:   200,
+						Body:   `{"data": "json"}`,
+						Headers: map[string]string{
+							"Content-Type": "application/json",
+						},
+					},
+					{
+						Path:   "/test.xml",
+						Method: "GET",
+						Code:   200,
+						Body:   `<data>xml</data>`,
+						Headers: map[string]string{
+							"Content-Type": "application/xml",
+						},
+					},
+					{
+						Path:   "/test.txt",
+						Method: "GET",
+						Code:   200,
+						Body:   `plain text`,
+						Headers: map[string]string{
+							"Content-Type": "text/plain",
+						},
+					},
+				},
+			},
+			want: func(t *testing.T, spec *OAS) {
+				// JSON endpoint
+				jsonPath := spec.Paths["/test"]
+				require.NotNil(t, jsonPath)
+				jsonResponse := jsonPath.Get.Responses["200"].Value
+				assert.Equal(t, `{"data": "json"}`, jsonResponse.Content["application/json"].Examples["default"].Value.Value)
 
-		// When no content type is specified, it should default to text/plain
-		assert.NotNil(t, response.Content["text/plain"])
-		assert.Equal(t, "", response.Content["text/plain"].Example)
-		assert.Empty(t, response.Headers)
-	})
+				// XML endpoint
+				xmlPath := spec.Paths["/test.xml"]
+				require.NotNil(t, xmlPath)
+				xmlResponse := xmlPath.Get.Responses["200"].Value
+				assert.Equal(t, `<data>xml</data>`, xmlResponse.Content["application/xml"].Examples["default"].Value.Value)
+
+				// Text endpoint
+				txtPath := spec.Paths["/test.txt"]
+				require.NotNil(t, txtPath)
+				txtResponse := txtPath.Get.Responses["200"].Value
+				assert.Equal(t, `plain text`, txtResponse.Content["text/plain"].Examples["default"].Value.Value)
+			},
+		},
+		{
+			name: "custom headers",
+			ep: apidef.ExtendedPathsSet{
+				MockResponse: []apidef.MockResponseMeta{{
+					Path:   "/test",
+					Method: "GET",
+					Code:   200,
+					Body:   `{"data": "test"}`,
+					Headers: map[string]string{
+						"Content-Type":      "application/json",
+						"X-Custom-Header":   "custom-value",
+						"X-Request-ID":      "123",
+						"X-Correlation-ID":  "abc",
+						"Cache-Control":     "no-cache",
+						"X-RateLimit-Limit": "100",
+					},
+				}},
+			},
+			want: func(t *testing.T, spec *OAS) {
+				pathItem := spec.Paths["/test"]
+				require.NotNil(t, pathItem)
+				response := pathItem.Get.Responses["200"].Value
+				require.NotNil(t, response)
+
+				// Verify all headers
+				expectedHeaders := map[string]string{
+					"Content-Type":      "application/json",
+					"X-Custom-Header":   "custom-value",
+					"X-Request-ID":      "123",
+					"X-Correlation-ID":  "abc",
+					"Cache-Control":     "no-cache",
+					"X-RateLimit-Limit": "100",
+				}
+
+				for header, value := range expectedHeaders {
+					headerObj := response.Headers[header]
+					require.NotNil(t, headerObj, "Header %s not found", header)
+					assert.Equal(t, value, headerObj.Value.Schema.Value.Example)
+				}
+			},
+		},
+		{
+			name: "all HTTP methods",
+			ep: apidef.ExtendedPathsSet{
+				MockResponse: []apidef.MockResponseMeta{
+					{Path: "/test", Method: "GET", Code: 200, Body: `{"method":"get"}`},
+					{Path: "/test", Method: "POST", Code: 201, Body: `{"method":"post"}`},
+					{Path: "/test", Method: "PUT", Code: 200, Body: `{"method":"put"}`},
+					{Path: "/test", Method: "PATCH", Code: 200, Body: `{"method":"patch"}`},
+					{Path: "/test", Method: "DELETE", Code: 204, Body: ``},
+					{Path: "/test", Method: "HEAD", Code: 200, Body: ``},
+					{Path: "/test", Method: "OPTIONS", Code: 200, Body: ``},
+				},
+			},
+			want: func(t *testing.T, spec *OAS) {
+				pathItem := spec.Paths["/test"]
+				require.NotNil(t, pathItem)
+
+				// Helper function to verify operation
+				verifyOperation := func(op *openapi3.Operation, method string, code int, body string) {
+					require.NotNil(t, op, "Operation %s should exist", method)
+					response := op.Responses[strconv.Itoa(code)].Value
+					require.NotNil(t, response)
+					if body != "" {
+						contentType := "text/plain" // default content type
+						if ct, ok := response.Headers["Content-Type"]; ok {
+							contentType = ct.Value.Schema.Value.Example.(string)
+						}
+						assert.Equal(t, body, response.Content[contentType].Examples["default"].Value.Value)
+					}
+				}
+
+				verifyOperation(pathItem.Get, "GET", 200, `{"method":"get"}`)
+				verifyOperation(pathItem.Post, "POST", 201, `{"method":"post"}`)
+				verifyOperation(pathItem.Put, "PUT", 200, `{"method":"put"}`)
+				verifyOperation(pathItem.Patch, "PATCH", 200, `{"method":"patch"}`)
+				verifyOperation(pathItem.Delete, "DELETE", 204, ``)
+				verifyOperation(pathItem.Head, "HEAD", 200, ``)
+				verifyOperation(pathItem.Options, "OPTIONS", 200, ``)
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			spec := &OAS{
+				T: openapi3.T{
+					OpenAPI: DefaultOpenAPI,
+					Info: &openapi3.Info{
+						Title:   "Test API",
+						Version: "1.0.0",
+					},
+					Paths: openapi3.Paths{},
+				},
+			}
+
+			// Initialize the middleware extension with proper mock response setup
+			middleware := &Middleware{
+				Operations: make(Operations),
+			}
+
+			// Pre-initialize operations with mock responses
+			for _, mockResp := range tt.ep.MockResponse {
+				operationID := spec.getOperationID(mockResp.Path, mockResp.Method)
+				operation := &Operation{
+					MockResponse: &MockResponse{
+						Code:    mockResp.Code,
+						Body:    mockResp.Body,
+						Headers: make([]Header, 0),
+					},
+				}
+
+				// Convert headers to the expected format
+				for name, value := range mockResp.Headers {
+					operation.MockResponse.Headers = append(operation.MockResponse.Headers, Header{
+						Name:  name,
+						Value: value,
+					})
+				}
+
+				middleware.Operations[operationID] = operation
+			}
+
+			spec.SetTykExtension(&XTykAPIGateway{
+				Middleware: middleware,
+			})
+
+			// Initialize paths
+			for _, mockResp := range tt.ep.MockResponse {
+				path := mockResp.Path
+				if spec.Paths[path] == nil {
+					spec.Paths[path] = &openapi3.PathItem{}
+				}
+
+				// Initialize operation with responses
+				op := &openapi3.Operation{
+					OperationID: spec.getOperationID(mockResp.Path, mockResp.Method),
+					Responses:   openapi3.NewResponses(),
+				}
+
+				// Set the operation based on method
+				switch mockResp.Method {
+				case "GET":
+					spec.Paths[path].Get = op
+				case "POST":
+					spec.Paths[path].Post = op
+				case "PUT":
+					spec.Paths[path].Put = op
+				case "PATCH":
+					spec.Paths[path].Patch = op
+				case "DELETE":
+					spec.Paths[path].Delete = op
+				case "HEAD":
+					spec.Paths[path].Head = op
+				case "OPTIONS":
+					spec.Paths[path].Options = op
+				}
+			}
+
+			spec.fillMockResponsePaths(spec.Paths, tt.ep)
+			tt.want(t, spec)
+		})
+	}
 }
 
 func compareOperations(t *testing.T, got, want *openapi3.Operation, method, path string) {

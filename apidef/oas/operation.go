@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/getkin/kin-openapi/openapi3"
+	"github.com/iancoleman/strcase"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/internal/oasutil"
@@ -168,78 +169,108 @@ func (s *OAS) fillPathsAndOperations(ep apidef.ExtendedPathsSet) {
 }
 
 func (s *OAS) fillMockResponsePaths(paths openapi3.Paths, ep apidef.ExtendedPathsSet) {
-	if paths == nil {
-		paths = make(openapi3.Paths)
+	// Map HTTP methods to their corresponding operation fields
+	var methodOperationMap = map[string]func(*openapi3.PathItem, *openapi3.Operation){
+		"GET":     func(p *openapi3.PathItem, op *openapi3.Operation) { p.Get = op },
+		"POST":    func(p *openapi3.PathItem, op *openapi3.Operation) { p.Post = op },
+		"PUT":     func(p *openapi3.PathItem, op *openapi3.Operation) { p.Put = op },
+		"PATCH":   func(p *openapi3.PathItem, op *openapi3.Operation) { p.Patch = op },
+		"DELETE":  func(p *openapi3.PathItem, op *openapi3.Operation) { p.Delete = op },
+		"HEAD":    func(p *openapi3.PathItem, op *openapi3.Operation) { p.Head = op },
+		"OPTIONS": func(p *openapi3.PathItem, op *openapi3.Operation) { p.Options = op },
 	}
 
-	for _, mockResponse := range ep.MockResponse {
-		path := mockResponse.Path
-		method := mockResponse.Method
-
-		if paths[path] == nil {
-			paths[path] = &openapi3.PathItem{}
+	for _, mock := range ep.MockResponse {
+		// Create path item if it doesn't exist
+		pathItem := paths[mock.Path]
+		if pathItem == nil {
+			pathItem = &openapi3.PathItem{}
+			paths[mock.Path] = pathItem
 		}
 
-		statusCode := strconv.Itoa(mockResponse.Code)
+		// Create operation based on HTTP method
+		operation := &openapi3.Operation{
+			Responses: openapi3.NewResponses(),
+		}
 
+		// Set operation ID
+		operation.OperationID = genMockResponseOperationID(mock)
+
+		// Create response
+		response := &openapi3.Response{
+			Headers: make(openapi3.Headers),
+		}
+
+		// Set content type and body
 		contentType := "text/plain"
-		canonicalContentType := http.CanonicalHeaderKey("Content-Type")
-		if ct, ok := mockResponse.Headers[canonicalContentType]; ok && ct != "" {
-			contentType = ct
-		}
 
-		// Detect JSON content
-		if mockResponse.Body != "" {
-			var mockBody json.RawMessage
-			if err := json.Unmarshal([]byte(mockResponse.Body), &mockBody); err == nil {
-				contentType = "application/json"
+		for name, value := range mock.Headers {
+			if http.CanonicalHeaderKey(name) == "Content-Type" {
+				contentType = value
+				break
 			}
 		}
 
-		operationID := genMockResponseOperationID(mockResponse)
-
-		// TODO(TT-7306): Add schema for headers?
-		op := &openapi3.Operation{
-			OperationID: operationID,
-			Responses: openapi3.Responses{
-				statusCode: &openapi3.ResponseRef{
-					Value: &openapi3.Response{
-						Description: &[]string{"OK"}[0],
-						Content: openapi3.Content{
-							contentType: &openapi3.MediaType{
-								Schema: &openapi3.SchemaRef{
-									Value: &openapi3.Schema{
-										// TODO(TT-7306): Improve schema for body?
-										Type:    "string",
-										Example: mockResponse.Body,
-									},
-								},
-							},
-						},
+		// Create media type with example
+		mediaType := &openapi3.MediaType{
+			Examples: openapi3.Examples{
+				"default": &openapi3.ExampleRef{
+					Value: &openapi3.Example{
+						Value: mock.Body,
 					},
 				},
 			},
 		}
 
-		paths[path].SetOperation(method, op)
+		response.Content = openapi3.Content{
+			contentType: mediaType,
+		}
 
+		// Add headers
+		for name, value := range mock.Headers {
+			response.Headers[name] = &openapi3.HeaderRef{
+				Value: &openapi3.Header{
+					Parameter: openapi3.Parameter{
+						Schema: &openapi3.SchemaRef{
+							Value: &openapi3.Schema{
+								Type:    "string",
+								Example: value,
+							},
+						},
+					},
+				},
+			}
+		}
+
+		// Add response to operation
+		operation.Responses[strconv.Itoa(mock.Code)] = &openapi3.ResponseRef{
+			Value: response,
+		}
+
+		// Set operation in path item based on method
+		if setOperation, exists := methodOperationMap[mock.Method]; exists {
+			setOperation(pathItem, operation)
+		}
+
+		// Initialize TykOperation if needed
 		if s.GetTykExtension() == nil {
 			s.SetTykExtension(&XTykAPIGateway{})
 		}
 
-		operation := s.GetTykExtension().getOperation(operationID)
-		if operation == nil {
-			operation = &Operation{
-				MockResponse: &MockResponse{},
-				IgnoreAuthentication: &Allowance{
-					Enabled: true,
-				},
+		tykOperation := s.GetTykExtension().getOperation(operation.OperationID)
+		if tykOperation == nil {
+			tykOperation = &Operation{
+				MockResponse:         &MockResponse{},
+				IgnoreAuthentication: &Allowance{Enabled: true},
 			}
-
-			s.GetTykExtension().Middleware.Operations[operationID] = operation
+			s.GetTykExtension().Middleware.Operations[operation.OperationID] = tykOperation
 		}
 
-		operation.MockResponse.Fill(mockResponse)
+		if tykOperation.MockResponse == nil {
+			tykOperation.MockResponse = &MockResponse{}
+		}
+
+		tykOperation.MockResponse.Fill(mock)
 	}
 }
 
@@ -837,7 +868,7 @@ func (m *MockResponse) Fill(op apidef.MockResponseMeta) {
 	headers := make([]Header, 0)
 	for k, v := range op.Headers {
 		headers = append(headers, Header{
-			Name:  k,
+			Name:  http.CanonicalHeaderKey(k),
 			Value: v,
 		})
 	}
@@ -1005,28 +1036,10 @@ func (s *OAS) fillCircuitBreaker(metas []apidef.CircuitBreakerMeta) {
 
 // genMockResponseOperationID creates a unique operation ID that includes method, path and status code
 func genMockResponseOperationID(mockResponse apidef.MockResponseMeta) string {
-	combined := fmt.Sprintf("%v %v %v",
+	combined := fmt.Sprintf("%v %v %d",
 		mockResponse.Method,
 		strings.Trim(mockResponse.Path, "/"),
 		mockResponse.Code,
 	)
-	return toCamelCase(combined)
-}
-
-// toCamelCase converts a string to camelCase format.
-func toCamelCase(s string) string {
-	words := strings.FieldsFunc(s, func(r rune) bool {
-		return r == ' ' || r == '-' || r == '_'
-	})
-
-	if len(words) == 0 {
-		return ""
-	}
-
-	result := strings.ToLower(words[0])
-	for _, word := range words[1:] {
-		result += strings.ToUpper(word[:1]) + strings.ToLower(word[1:])
-	}
-
-	return result
+	return strcase.ToLowerCamel(combined)
 }
