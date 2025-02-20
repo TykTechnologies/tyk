@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"sort"
 	"strconv"
 	"strings"
 	"unicode"
@@ -169,39 +170,31 @@ func (s *OAS) fillPathsAndOperations(ep apidef.ExtendedPathsSet) {
 }
 
 func (s *OAS) fillMockResponsePaths(paths openapi3.Paths, ep apidef.ExtendedPathsSet) {
-	// Map HTTP methods to their corresponding operation fields
 	var methodOperationMap = map[string]func(*openapi3.PathItem, *openapi3.Operation){
-		"GET":     func(p *openapi3.PathItem, op *openapi3.Operation) { p.Get = op },
-		"POST":    func(p *openapi3.PathItem, op *openapi3.Operation) { p.Post = op },
-		"PUT":     func(p *openapi3.PathItem, op *openapi3.Operation) { p.Put = op },
-		"PATCH":   func(p *openapi3.PathItem, op *openapi3.Operation) { p.Patch = op },
-		"DELETE":  func(p *openapi3.PathItem, op *openapi3.Operation) { p.Delete = op },
-		"HEAD":    func(p *openapi3.PathItem, op *openapi3.Operation) { p.Head = op },
-		"OPTIONS": func(p *openapi3.PathItem, op *openapi3.Operation) { p.Options = op },
+		http.MethodGet:    func(p *openapi3.PathItem, op *openapi3.Operation) { p.Get = op },
+		http.MethodPost:   func(p *openapi3.PathItem, op *openapi3.Operation) { p.Post = op },
+		http.MethodPut:    func(p *openapi3.PathItem, op *openapi3.Operation) { p.Put = op },
+		http.MethodPatch:  func(p *openapi3.PathItem, op *openapi3.Operation) { p.Patch = op },
+		http.MethodDelete: func(p *openapi3.PathItem, op *openapi3.Operation) { p.Delete = op },
 	}
 
 	for _, mock := range ep.MockResponse {
-		// Create path item if it doesn't exist
 		pathItem := paths[mock.Path]
 		if pathItem == nil {
 			pathItem = &openapi3.PathItem{}
 			paths[mock.Path] = pathItem
 		}
 
-		// Create operation based on HTTP method
 		operation := &openapi3.Operation{
 			Responses: openapi3.NewResponses(),
 		}
 
-		// Set operation ID
 		operation.OperationID = genMockResponseOperationID(mock)
 
-		// Create response
 		response := &openapi3.Response{
 			Headers: make(openapi3.Headers),
 		}
 
-		// Set content type and body
 		contentType := "text/plain"
 
 		for name, value := range mock.Headers {
@@ -211,7 +204,6 @@ func (s *OAS) fillMockResponsePaths(paths openapi3.Paths, ep apidef.ExtendedPath
 			}
 		}
 
-		// Create media type with example
 		mediaType := &openapi3.MediaType{
 			Examples: openapi3.Examples{
 				"default": &openapi3.ExampleRef{
@@ -242,32 +234,30 @@ func (s *OAS) fillMockResponsePaths(paths openapi3.Paths, ep apidef.ExtendedPath
 			}
 		}
 
-		// Add response to operation
 		operation.Responses[strconv.Itoa(mock.Code)] = &openapi3.ResponseRef{
 			Value: response,
 		}
 
-		// Set operation in path item based on method
 		if setOperation, exists := methodOperationMap[mock.Method]; exists {
 			setOperation(pathItem, operation)
 		}
 
-		// Initialize TykOperation if needed
 		if s.GetTykExtension() == nil {
 			s.SetTykExtension(&XTykAPIGateway{})
 		}
 
 		tykOperation := s.GetTykExtension().getOperation(operation.OperationID)
 		if tykOperation == nil {
-			tykOperation = &Operation{
-				MockResponse:         &MockResponse{},
-				IgnoreAuthentication: &Allowance{Enabled: true},
-			}
+			tykOperation = &Operation{}
 			s.GetTykExtension().Middleware.Operations[operation.OperationID] = tykOperation
 		}
 
 		if tykOperation.MockResponse == nil {
 			tykOperation.MockResponse = &MockResponse{}
+		}
+
+		if tykOperation.IgnoreAuthentication == nil {
+			tykOperation.IgnoreAuthentication = &Allowance{Enabled: true}
 		}
 
 		tykOperation.MockResponse.Fill(mock)
@@ -312,6 +302,19 @@ func (s *OAS) extractPathsAndOperations(ep *apidef.ExtendedPathsSet) {
 			}
 		}
 	}
+
+	sort.Slice(ep.MockResponse, func(i, j int) bool {
+		// First sort by path
+		if ep.MockResponse[i].Path != ep.MockResponse[j].Path {
+			return ep.MockResponse[i].Path < ep.MockResponse[j].Path
+		}
+		// Then by method
+		if ep.MockResponse[i].Method != ep.MockResponse[j].Method {
+			return ep.MockResponse[i].Method < ep.MockResponse[j].Method
+		}
+		// Finally by response code
+		return ep.MockResponse[i].Code < ep.MockResponse[j].Code
+	})
 }
 
 func (s *OAS) fillAllowance(endpointMetas []apidef.EndPointMeta, typ AllowanceType) {
@@ -585,18 +588,26 @@ func (o *Operation) extractMockResponsePaths(ep *apidef.ExtendedPathsSet, path, 
 		headers[header.Name] = header.Value
 	}
 
-	if ep.MockResponse == nil {
-		ep.MockResponse = make([]apidef.MockResponseMeta, 0)
+	if ep.WhiteList == nil {
+		ep.WhiteList = make([]apidef.EndPointMeta, 0)
 	}
 
-	ep.MockResponse = append(ep.MockResponse, apidef.MockResponseMeta{
+	wl := apidef.EndPointMeta{
 		Disabled: !o.MockResponse.Enabled,
 		Path:     path,
 		Method:   method,
-		Code:     o.MockResponse.Code,
-		Body:     o.MockResponse.Body,
-		Headers:  headers,
-	})
+	}
+
+	wl.MethodActions = make(map[string]apidef.EndpointMethodMeta)
+
+	wl.MethodActions[method] = apidef.EndpointMethodMeta{
+		Action:  apidef.Reply,
+		Code:    o.MockResponse.Code,
+		Data:    o.MockResponse.Body,
+		Headers: headers,
+	}
+
+	ep.WhiteList = append(ep.WhiteList, wl)
 }
 
 // detect possible regex pattern:
@@ -873,6 +884,11 @@ func (m *MockResponse) Fill(op apidef.MockResponseMeta) {
 		})
 	}
 
+	// Sort headers by name
+	sort.Slice(headers, func(i, j int) bool {
+		return headers[i].Name < headers[j].Name
+	})
+
 	m.Enabled = !op.Disabled
 	m.Code = op.Code
 	m.Body = op.Body
@@ -1045,7 +1061,6 @@ func genMockResponseOperationID(mockResponse apidef.MockResponseMeta) string {
 }
 
 func toCamelCase(s string) string {
-	// Split the string by spaces and special characters
 	words := strings.FieldsFunc(s, func(r rune) bool {
 		return !unicode.IsLetter(r) && !unicode.IsNumber(r)
 	})
@@ -1054,15 +1069,12 @@ func toCamelCase(s string) string {
 		return ""
 	}
 
-	// Convert first word to lowercase
 	result := strings.ToLower(words[0])
-
-	// Convert subsequent words to title case and append
 	for _, word := range words[1:] {
 		if word == "" {
 			continue
 		}
-		result += strings.Title(strings.ToLower(word))
+		result += strings.ToUpper(word[:1]) + strings.ToLower(word[1:])
 	}
 
 	return result

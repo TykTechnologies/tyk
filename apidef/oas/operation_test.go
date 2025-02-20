@@ -900,8 +900,6 @@ func TestOAS_MockResponse_fillMockResponsePaths(t *testing.T) {
 				verifyOperation(pathItem.Put, "PUT", 200, `{"method":"put"}`)
 				verifyOperation(pathItem.Patch, "PATCH", 200, `{"method":"patch"}`)
 				verifyOperation(pathItem.Delete, "DELETE", 204, ``)
-				verifyOperation(pathItem.Head, "HEAD", 200, ``)
-				verifyOperation(pathItem.Options, "OPTIONS", 200, ``)
 			},
 		},
 	}
