@@ -570,6 +570,9 @@
         "contextVariables": {
           "$ref": "#/definitions/X-Tyk-ContextVariables"
         },
+        "ignoreCase": {
+          "$ref": "#/definitions/X-Tyk-IgnoreCase"
+        },
         "trafficLogs": {
           "$ref": "#/definitions/X-Tyk-TrafficLogs"
         },
@@ -1365,6 +1368,9 @@
         "preserveHostHeader": {
           "$ref": "#/definitions/X-Tyk-PreserveHostHeader"
         },
+        "preserveTrailingSlash": {
+          "$ref": "#/definitions/X-Tyk-PreserveTrailingSlash"
+        },
         "tlsTransport": {
           "$ref": "#/definitions/X-Tyk-TLSTransport"
         },
@@ -1865,8 +1871,7 @@
         "threshold": {
           "type": "number",
           "minimum": 0,
-          "maximum": 1,
-          "multipleOf": 0.01
+          "maximum": 1
         },
         "sampleSize": {
           "type": "integer",
@@ -2084,6 +2089,17 @@
       ]
     },
     "X-Tyk-ContextVariables": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "enabled"
+      ]
+    },
+    "X-Tyk-IgnoreCase": {
       "type": "object",
       "properties": {
         "enabled": {
@@ -2441,6 +2457,17 @@
       "required": ["enabled"]
     },
     "X-Tyk-PreserveHostHeader": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "enabled"
+      ]
+    },
+    "X-Tyk-PreserveTrailingSlash": {
       "type": "object",
       "properties": {
         "enabled": {

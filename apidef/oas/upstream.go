@@ -39,6 +39,10 @@ type Upstream struct {
 
 	// PreserveHostHeader contains the configuration for preserving the host header.
 	PreserveHostHeader *PreserveHostHeader `bson:"preserveHostHeader,omitempty" json:"preserveHostHeader,omitempty"`
+
+	// PreserveTrailingSlash contains the configuration for preserving the host header.
+	PreserveTrailingSlash *PreserveTrailingSlash `bson:"preserveTrailingSlash,omitempty" json:"preserveTrailingSlash,omitempty"`
+
 	// TLSTransport contains the configuration for TLS transport settings.
 	// Tyk classic API definition: `proxy.transport`
 	TLSTransport *TLSTransport `bson:"tlsTransport,omitempty" json:"tlsTransport,omitempty"`
@@ -124,6 +128,18 @@ func (u *Upstream) Fill(api apidef.APIDefinition) {
 
 	u.fillLoadBalancing(api)
 	u.fillPreserveHostHeader(api)
+	u.fillPreserveTrailingSlash(api)
+}
+
+func (u *Upstream) fillPreserveTrailingSlash(api apidef.APIDefinition) {
+	if u.PreserveTrailingSlash == nil {
+		u.PreserveTrailingSlash = &PreserveTrailingSlash{}
+	}
+	u.PreserveTrailingSlash.Fill(api)
+
+	if !u.PreserveTrailingSlash.Enabled {
+		u.PreserveTrailingSlash = nil
+	}
 }
 
 func (u *Upstream) fillPreserveHostHeader(api apidef.APIDefinition) {
@@ -133,7 +149,7 @@ func (u *Upstream) fillPreserveHostHeader(api apidef.APIDefinition) {
 
 	u.PreserveHostHeader.Fill(api)
 
-	if ShouldOmit(u.PreserveHostHeader) {
+	if !u.PreserveHostHeader.Enabled {
 		u.PreserveHostHeader = nil
 	}
 }
@@ -215,6 +231,7 @@ func (u *Upstream) ExtractTo(api *apidef.APIDefinition) {
 	u.Proxy.ExtractTo(api)
 
 	u.preserveHostHeaderExtractTo(api)
+	u.preserveTrailingSlashExtractTo(api)
 }
 
 func (u *Upstream) preserveHostHeaderExtractTo(api *apidef.APIDefinition) {
@@ -226,6 +243,17 @@ func (u *Upstream) preserveHostHeaderExtractTo(api *apidef.APIDefinition) {
 	}
 
 	u.PreserveHostHeader.ExtractTo(api)
+}
+
+func (u *Upstream) preserveTrailingSlashExtractTo(api *apidef.APIDefinition) {
+	if u.PreserveTrailingSlash == nil {
+		u.PreserveTrailingSlash = &PreserveTrailingSlash{}
+		defer func() {
+			u.PreserveTrailingSlash = nil
+		}()
+	}
+
+	u.PreserveTrailingSlash.ExtractTo(api)
 }
 
 func (u *Upstream) fillLoadBalancing(api apidef.APIDefinition) {
@@ -1291,4 +1319,26 @@ func (p *PreserveHostHeader) Fill(api apidef.APIDefinition) {
 // ExtractTo extracts *PreserveHostHeader into *apidef.APIDefinition.
 func (p *PreserveHostHeader) ExtractTo(api *apidef.APIDefinition) {
 	api.Proxy.PreserveHostHeader = p.Enabled
+}
+
+// PreserveTrailingSlash holds the configuration for preserving the
+// trailing slash when routed to upstream services.
+//
+// The default behaviour of Tyk is to strip any trailing slash (/) from
+// the target URL when proxying the request upstream. In some use cases the
+// upstream might expect the trailing slash - or might consider /users/ to
+// be a different endpoint from /users (for example).
+type PreserveTrailingSlash struct {
+	// Enabled activates preserving the trailing slash when routing requests.
+	Enabled bool `json:"enabled" bson:"enabled"` // required
+}
+
+// Fill fills *PreserveTrailingSlash from apidef.APIDefinition.
+func (p *PreserveTrailingSlash) Fill(api apidef.APIDefinition) {
+	p.Enabled = api.Proxy.DisableStripSlash
+}
+
+// ExtractTo extracts *PreserveTrailingSlash into *apidef.APIDefinition.
+func (p *PreserveTrailingSlash) ExtractTo(api *apidef.APIDefinition) {
+	api.Proxy.DisableStripSlash = p.Enabled
 }
