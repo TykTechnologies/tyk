@@ -186,7 +186,10 @@ func (s *OAS) fillMockResponsePaths(paths openapi3.Paths, ep apidef.ExtendedPath
 		}
 
 		operation := &openapi3.Operation{
-			Responses: openapi3.NewResponses(),
+			// TODO(TT-7306): Change this values
+			Summary:     "CHANGE ME",
+			Description: "CHANGE ME",
+			Responses:   openapi3.NewResponses(),
 		}
 
 		operation.OperationID = genMockResponseOperationID(mock)
