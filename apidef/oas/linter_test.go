@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"net/http"
-	"os"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -143,7 +142,7 @@ func TestXTykGateway_Lint(t *testing.T) {
 	require.NoError(t, err)
 
 	// Load schema
-	schema, err := os.ReadFile("schema/x-tyk-api-gateway.json")
+	schema, err := schemaDir.ReadFile("schema/x-tyk-api-gateway.strict.json")
 	require.NoError(t, err)
 
 	// Run schema validation

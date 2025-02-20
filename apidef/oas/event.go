@@ -96,8 +96,10 @@ func (e *EventHandler) UnmarshalJSON(in []byte) error {
 type WebhookEvent struct {
 	// URL is the target URL for the webhook.
 	URL string `json:"url" bson:"url"`
+
 	// Method is the HTTP method for the webhook.
 	Method string `json:"method" bson:"method"`
+
 	// CoolDownPeriod defines cool-down for the event, so it does not trigger again.
 	// It uses shorthand notation.
 	// The value of CoolDownPeriod is a string that specifies the interval in a compact form,
@@ -115,8 +117,10 @@ type WebhookEvent struct {
 	// It's important to format the string correctly, as invalid formats will
 	// be considered as 0s/empty.
 	CoolDownPeriod ReadableDuration `json:"cooldownPeriod" bson:"cooldownPeriod"`
+
 	// BodyTemplate is the template to be used for request payload.
 	BodyTemplate string `json:"bodyTemplate,omitempty" bson:"bodyTemplate,omitempty"`
+
 	// Headers are the list of request headers to be used.
 	Headers Headers `json:"headers,omitempty" bson:"headers,omitempty"`
 }
@@ -146,10 +150,10 @@ type JSVMEvent struct {
 // GetJSVMEventHandlerConf generates the JavaScript VM event handler configuration using the current EventHandler instance.
 func (e *EventHandler) GetJSVMEventHandlerConf() apidef.JSVMEventHandlerConf {
 	return apidef.JSVMEventHandlerConf{
-		Disabled:   !e.Enabled,
-		ID:         e.ID,
-		MethodName: e.JSVMEvent.FunctionName,
-		Path:       e.JSVMEvent.Path,
+		Disabled: !e.Enabled,
+		ID:       e.ID,
+		Name:     e.JSVMEvent.FunctionName,
+		Path:     e.JSVMEvent.Path,
 	}
 }
 
@@ -202,9 +206,9 @@ func (e *EventHandlers) Fill(api apidef.APIDefinition) {
 					Trigger: gwEvent,
 					Kind:    JSVMKind,
 					ID:      jsvmHandlerConf.ID,
-					Name:    jsvmHandlerConf.MethodName, // jsvm events don't have human-readable names, let's reuse the methodName
+					Name:    jsvmHandlerConf.Name, // jsvm events don't have human-readable names, let's reuse the methodName
 					JSVMEvent: JSVMEvent{
-						FunctionName: jsvmHandlerConf.MethodName,
+						FunctionName: jsvmHandlerConf.Name,
 						Path:         jsvmHandlerConf.Path,
 					},
 				}

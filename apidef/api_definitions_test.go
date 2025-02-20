@@ -334,10 +334,10 @@ func TestJSVMEventHandlerConf_Scan(t *testing.T) {
 	}
 
 	expected := JSVMEventHandlerConf{
-		Disabled:   true,
-		ID:         "1234",
-		MethodName: "myMethod",
-		Path:       "my_script.js",
+		Disabled: true,
+		ID:       "1234",
+		Name:     "myMethod",
+		Path:     "my_script.js",
 	}
 
 	var jsvmEventConf JSVMEventHandlerConf

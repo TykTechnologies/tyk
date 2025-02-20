@@ -8,6 +8,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"testing"
 
 	"github.com/buger/jsonparser"
 	"github.com/hashicorp/go-multierror"
@@ -39,9 +40,20 @@ var (
 	defaultVersion string
 )
 
-func loadOASSchema() error {
+// LoadOASSchema is a testing hook to increase schema strictness.
+// This allows reporting unrecognized fields during development.
+func LoadOASSchema(_ testing.TB, strict bool) error {
+	return loadOASSchema(strict)
+}
+
+func loadOASSchema(strict bool) error {
+	schemaFile := "schema/%s.json"
+	if strict {
+		schemaFile = "schema/%s.strict.json"
+	}
+
 	load := func() error {
-		xTykAPIGwSchema, err := schemaDir.ReadFile(fmt.Sprintf("schema/%s.strict.json", ExtensionTykAPIGateway))
+		xTykAPIGwSchema, err := schemaDir.ReadFile(fmt.Sprintf(schemaFile, ExtensionTykAPIGateway))
 		if err != nil {
 			return fmt.Errorf("%s loading failed: %w", ExtensionTykAPIGateway, err)
 		}
@@ -181,7 +193,7 @@ func ValidateOASTemplate(documentBody []byte, oasVersion string) error {
 
 // GetOASSchema returns an oas schema for a particular version.
 func GetOASSchema(version string) ([]byte, error) {
-	if err := loadOASSchema(); err != nil {
+	if err := loadOASSchema(false); err != nil {
 		return nil, fmt.Errorf("loadOASSchema failed: %w", err)
 	}
 
