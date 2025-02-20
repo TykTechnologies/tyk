@@ -247,7 +247,7 @@ func TestFixtures(t *testing.T) {
 
 						assert.False(t, tc.Errors.Enabled, "OAS migrations to classic don't support error=true")
 
-						if len(tc.Output) == 0 || tc.Debug {
+						if len(tc.Output) == 0 && !tc.Debug {
 							skip = oasEmptyMap
 						}
 						result = flatMap(t, dest, skip)
@@ -257,7 +257,7 @@ func TestFixtures(t *testing.T) {
 
 						dest, err = migrateClassic(def)
 
-						if len(tc.Output) == 0 || tc.Debug {
+						if len(tc.Output) == 0 && !tc.Debug {
 							skip = classicEmptyMap
 						}
 						result = flatMap(t, dest, skip)
