@@ -1330,7 +1330,7 @@ func (p *PreserveHostHeader) ExtractTo(api *apidef.APIDefinition) {
 // be a different endpoint from /users (for example).
 type PreserveTrailingSlash struct {
 	// Enabled activates preserving the trailing slash when routing requests.
-	Enabled bool `json:"enabled" bson:"enabled"`
+	Enabled bool `json:"enabled" bson:"enabled"` // required
 }
 
 // Fill fills *PreserveTrailingSlash from apidef.APIDefinition.
