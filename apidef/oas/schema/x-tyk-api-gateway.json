@@ -1368,6 +1368,9 @@
         "preserveHostHeader": {
           "$ref": "#/definitions/X-Tyk-PreserveHostHeader"
         },
+        "preserveTrailingSlash": {
+          "$ref": "#/definitions/X-Tyk-PreserveTrailingSlash"
+        },
         "tlsTransport": {
           "$ref": "#/definitions/X-Tyk-TLSTransport"
         },
@@ -2455,6 +2458,17 @@
       "required": ["enabled"]
     },
     "X-Tyk-PreserveHostHeader": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "enabled"
+      ]
+    },
+    "X-Tyk-PreserveTrailingSlash": {
       "type": "object",
       "properties": {
         "enabled": {
