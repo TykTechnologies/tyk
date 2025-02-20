@@ -41,12 +41,13 @@ var (
 
 func loadOASSchema() error {
 	load := func() error {
-		xTykAPIGwSchema, err := schemaDir.ReadFile(fmt.Sprintf("schema/%s.json", ExtensionTykAPIGateway))
+		xTykAPIGwSchema, err := schemaDir.ReadFile(fmt.Sprintf("schema/%s.strict.json", ExtensionTykAPIGateway))
 		if err != nil {
 			return fmt.Errorf("%s loading failed: %w", ExtensionTykAPIGateway, err)
 		}
 
 		xTykAPIGwSchemaWithoutDefs := jsonparser.Delete(xTykAPIGwSchema, keyDefinitions)
+
 		oasJSONSchemas = make(map[string][]byte)
 		members, err := schemaDir.ReadDir("schema")
 		for _, member := range members {
@@ -59,8 +60,10 @@ func loadOASSchema() error {
 				continue
 			}
 
-			if strings.HasSuffix(fileName, fmt.Sprintf("%s.json", ExtensionTykAPIGateway)) ||
-				strings.HasSuffix(fileName, fmt.Sprintf("%s.strict.json", ExtensionTykAPIGateway)) {
+			if strings.HasSuffix(fileName, fmt.Sprintf("%s.json", ExtensionTykAPIGateway)) {
+				continue
+			}
+			if strings.HasSuffix(fileName, fmt.Sprintf("%s.strict.json", ExtensionTykAPIGateway)) {
 				continue
 			}
 

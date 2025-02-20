@@ -570,6 +570,9 @@
         "contextVariables": {
           "$ref": "#/definitions/X-Tyk-ContextVariables"
         },
+        "ignoreCase": {
+          "$ref": "#/definitions/X-Tyk-IgnoreCase"
+        },
         "trafficLogs": {
           "$ref": "#/definitions/X-Tyk-TrafficLogs"
         },
@@ -2084,6 +2087,17 @@
       ]
     },
     "X-Tyk-ContextVariables": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "enabled"
+      ]
+    },
+    "X-Tyk-IgnoreCase": {
       "type": "object",
       "properties": {
         "enabled": {

@@ -107,7 +107,7 @@ type Global struct {
 	RequestSizeLimit *GlobalRequestSizeLimit `bson:"requestSizeLimit,omitempty" json:"requestSizeLimit,omitempty"`
 
 	// IgnoreCase contains the configuration to treat routes as case insensitive.
-	IgnoreCase *IgnoreCase `bson:"ignoreCase" json:"ignoreCase"`
+	IgnoreCase *IgnoreCase `bson:"ignoreCase,omitempty" json:"ignoreCase,omitempty"`
 }
 
 // MarshalJSON is a custom JSON marshaler for the Global struct. It is implemented
