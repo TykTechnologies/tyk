@@ -707,7 +707,7 @@ func TestProcessKeySpaceChanges_UserKeyReset(t *testing.T) {
 	dispatcher.AddFunc("GetKeySpaceUpdate", func(_, _ string) ([]string, error) {
 		return []string{}, nil
 	})
-	dispatcher.AddFunc("GetGroupKeySpaceUpdate", func(_, _ *model.GroupKeySpaceRequest) ([]string, error) {
+	dispatcher.AddFunc("GetGroupKeySpaceUpdate", func(_ string, _ string) ([]string, error) {
 		return []string{}, nil
 	})
 
