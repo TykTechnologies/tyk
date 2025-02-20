@@ -183,15 +183,14 @@ func (s *OAS) fillMockResponsePaths(paths openapi3.Paths, ep apidef.ExtendedPath
 
 		statusCode := strconv.Itoa(mockResponse.Code)
 
-		// Improved Content-Type handling
 		contentType := "text/plain"
-		if ct, exists := mockResponse.Headers["Content-Type"]; exists && ct != "" {
+		if ct, ok := mockResponse.Headers["Content-Type"]; ok && ct != "" {
 			contentType = ct
-		} else if ct, exists := mockResponse.Headers["content-type"]; exists && ct != "" {
+		} else if ct, ok := mockResponse.Headers["content-type"]; ok && ct != "" {
 			contentType = ct
 		}
 
-		// Try to detect JSON content
+		// Detect JSON content
 		if mockResponse.Body != "" {
 			var js interface{}
 			if err := json.Unmarshal([]byte(mockResponse.Body), &js); err == nil {
@@ -199,8 +198,11 @@ func (s *OAS) fillMockResponsePaths(paths openapi3.Paths, ep apidef.ExtendedPath
 			}
 		}
 
+		operationID := genMockResponseOperationID(mockResponse)
+
+		// TODO(TT-7306): Add schema for headers?
 		op := &openapi3.Operation{
-			OperationID: generateMockResponseOperationID(mockResponse),
+			OperationID: operationID,
 			Responses: openapi3.Responses{
 				statusCode: &openapi3.ResponseRef{
 					Value: &openapi3.Response{
@@ -209,6 +211,7 @@ func (s *OAS) fillMockResponsePaths(paths openapi3.Paths, ep apidef.ExtendedPath
 							contentType: &openapi3.MediaType{
 								Schema: &openapi3.SchemaRef{
 									Value: &openapi3.Schema{
+										// TODO(TT-7306): Improve schema for body?
 										Type:    "string",
 										Example: mockResponse.Body,
 									},
@@ -220,11 +223,8 @@ func (s *OAS) fillMockResponsePaths(paths openapi3.Paths, ep apidef.ExtendedPath
 			},
 		}
 
-		// Set the operation based on method using the PathItem's SetOperation method
 		paths[path].SetOperation(method, op)
 
-		// Set up the mock response in Tyk extension
-		operationID := generateMockResponseOperationID(mockResponse)
 		operation := s.GetTykExtension().getOperation(operationID)
 		if operation.MockResponse == nil {
 			operation.MockResponse = &MockResponse{}
@@ -1004,12 +1004,11 @@ func (s *OAS) fillCircuitBreaker(metas []apidef.CircuitBreakerMeta) {
 	}
 }
 
-// generateMockResponseOperationID creates a unique operation ID that includes method, path and status code
-func generateMockResponseOperationID(mockResponse apidef.MockResponseMeta) string {
-	id := fmt.Sprintf("%v %v %v",
+// genMockResponseOperationID creates a unique operation ID that includes method, path and status code
+func genMockResponseOperationID(mockResponse apidef.MockResponseMeta) string {
+	return strcase.ToLowerCamel(fmt.Sprintf("%v %v %v",
 		mockResponse.Method,
 		strings.Trim(mockResponse.Path, "/"),
-		mockResponse.Code)
-
-	return strcase.ToLowerCamel(id)
+		mockResponse.Code,
+	))
 }
