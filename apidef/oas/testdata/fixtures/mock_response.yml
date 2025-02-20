@@ -7,7 +7,7 @@ tests:
       paths:
         /test:
           get:
-            operationId: "test"
+            operationId: "testGET"
             responses:
               "200":
                 description: "OK"
@@ -18,7 +18,7 @@ tests:
       x-tyk-api-gateway:
         middleware:
           operations:
-            test:
+            testGET:
               mockResponse:
                 enabled: true
                 code: 200
@@ -29,7 +29,7 @@ tests:
     output:
       version_data:
         versions:
-          Default:
+          "":
             extended_paths:
               mock_response:
                 - disabled: false
@@ -44,7 +44,7 @@ tests:
     input:
       version_data:
         versions:
-          Default:
+          "":
             extended_paths:
               mock_response:
                 - disabled: false
@@ -58,7 +58,7 @@ tests:
       paths:
         /test:
           get:
-            operationId: "test"
+            operationId: "testGET"
             responses:
               "200":
                 description: "OK"
@@ -69,7 +69,7 @@ tests:
       x-tyk-api-gateway:
         middleware:
           operations:
-            test:
+            testGET:
               mockResponse:
                 enabled: true
                 code: 200
@@ -77,3 +77,45 @@ tests:
                 headers:
                   - name: "Content-Type"
                     value: "text/plain"
+              ignoreAuthentication:
+                enabled: true
+  - desc: "Mock response - from classic to oas - disabled"
+    source: classic
+    input:
+      version_data:
+        versions:
+          "":
+            extended_paths:
+              mock_response:
+                - disabled: true
+                  path: "/test"
+                  method: "POST"
+                  code: 201
+                  body: "Hello World"
+                  headers:
+                    Content-Type: "text/plain"
+    output:
+      paths:
+        /test:
+          post:
+            operationId: "testPOST"
+            responses:
+              "201":
+                description: "OK"
+                content:
+                  text/plain:
+                    schema:
+                      type: string
+      x-tyk-api-gateway:
+        middleware:
+          operations:
+            testPOST:
+              mockResponse:
+                enabled: false
+                code: 201
+                body: "Hello World"
+                headers:
+                  - name: "Content-Type"
+                    value: "text/plain"
+              ignoreAuthentication:
+                enabled: true

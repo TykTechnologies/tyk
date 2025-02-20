@@ -33,11 +33,6 @@ func (m *Middleware) Fill(api apidef.APIDefinition) {
 	if m.Operations == nil {
 		m.Operations = Operations{}
 	}
-
-	m.Operations.Fill(api)
-	if ShouldOmit(m.Operations) {
-		m.Operations = nil
-	}
 }
 
 // ExtractTo extracts *Middleware into *apidef.APIDefinition.
@@ -50,7 +45,6 @@ func (m *Middleware) ExtractTo(api *apidef.APIDefinition) {
 	}
 
 	m.Global.ExtractTo(api)
-	m.Operations.ExtractTo(api)
 }
 
 // Global contains configuration that affects the whole API (all endpoints).

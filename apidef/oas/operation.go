@@ -16,58 +16,6 @@ import (
 // Operations holds Operation definitions.
 type Operations map[string]*Operation
 
-// Fill fills Operations from *apidef.APIDefinition.
-func (o Operations) Fill(api apidef.APIDefinition) {
-	// Check if versions map exists and has the Main version
-	if api.VersionData.Versions == nil {
-		return
-	}
-
-	mainVersion, exists := api.VersionData.Versions[Main]
-	if !exists {
-		return
-	}
-
-	mockResponses := mainVersion.ExtendedPaths.MockResponse
-	if mockResponses == nil {
-		return
-	}
-
-	for _, mockResponse := range mockResponses {
-		operationID := generateOperationID(mockResponse)
-		if _, exists := o[operationID]; !exists {
-			o[operationID] = &Operation{
-				IgnoreAuthentication: &Allowance{
-					Enabled: true,
-				},
-			}
-		}
-
-		operation := o[operationID]
-		operation.MockResponse = &MockResponse{}
-		operation.MockResponse.Fill(mockResponse)
-	}
-}
-
-// ExtractTo extracts Operations into *apidef.APIDefinition.
-func (o Operations) ExtractTo(api *apidef.APIDefinition) {
-	mainVersion := api.VersionData.Versions[Main]
-	extendedPaths := mainVersion.ExtendedPaths
-
-	for path, operation := range o {
-		if operation.MockResponse == nil {
-			continue
-		}
-
-		mockMeta := apidef.MockResponseMeta{Path: path}
-		operation.ExtractTo(&mockMeta)
-		extendedPaths.MockResponse = append(extendedPaths.MockResponse, mockMeta)
-	}
-
-	mainVersion.ExtendedPaths = extendedPaths
-	api.VersionData.Versions[Main] = mainVersion
-}
-
 // Operation holds a request operation configuration, allowances, tranformations, caching, timeouts and validation.
 type Operation struct {
 	// Allow request by allowance.
@@ -134,49 +82,6 @@ type Operation struct {
 
 	// RateLimit contains endpoint level rate limit configuration.
 	RateLimit *RateLimitEndpoint `bson:"rateLimit,omitempty" json:"rateLimit,omitempty"`
-}
-
-// Fill fills Operation from *apidef.MockResponseMeta.
-func (o *Operation) Fill(op apidef.MockResponseMeta) {
-	if o.MockResponse == nil {
-		o.MockResponse = &MockResponse{}
-	}
-
-	headers := make([]Header, 0)
-	for k, v := range op.Headers {
-		headers = append(headers, Header{
-			Name:  k,
-			Value: v,
-		})
-	}
-
-	o.MockResponse.Enabled = !op.Disabled
-	o.MockResponse.Code = op.Code
-	o.MockResponse.Body = op.Body
-	o.MockResponse.Headers = headers
-
-	// Enable ignore authentication for this endpoint to maintain compatibility with Classic APIs
-	// In Classic APIs, mock responses are processed before authentication
-	// In OAS, mock responses are processed at the end of the chain, so we need to explicitly
-	// bypass authentication to maintain the same behavior during migration
-	o.IgnoreAuthentication = &Allowance{
-		Enabled: true,
-	}
-}
-
-// ExtractTo extracts Operation into *apidef.MockResponseMeta.
-func (o *Operation) ExtractTo(op *apidef.MockResponseMeta) {
-	op.Disabled = !o.MockResponse.Enabled
-	op.Code = o.MockResponse.Code
-	op.Body = o.MockResponse.Body
-
-	// Convert Headers slice back to map
-	headers := make(map[string]string)
-	for _, h := range o.MockResponse.Headers {
-		headers[h.Name] = h.Value
-	}
-
-	op.Headers = headers
 }
 
 // AllowanceType holds the valid allowance types values.
@@ -263,91 +168,77 @@ func (s *OAS) fillPathsAndOperations(ep apidef.ExtendedPathsSet) {
 }
 
 func (s *OAS) fillMockResponsePaths(paths openapi3.Paths, ep apidef.ExtendedPathsSet) {
+	if paths == nil {
+		paths = make(openapi3.Paths)
+	}
+
 	for _, mockResponse := range ep.MockResponse {
 		path := mockResponse.Path
 		method := mockResponse.Method
 
-		// Create path item if it doesn't exist
 		if paths[path] == nil {
 			paths[path] = &openapi3.PathItem{}
 		}
 
 		statusCode := strconv.Itoa(mockResponse.Code)
-		headers := make(map[string]string)
-		for k, v := range mockResponse.Headers {
-			headers[k] = v
-		}
-
-		// Determine content type from headers, default to text/plain
 		contentType := "text/plain"
-		if ct, exists := headers["Content-Type"]; exists {
+		if ct, exists := mockResponse.Headers["Content-Type"]; exists {
 			contentType = ct
 		}
 
-		// Convert headers to OAS3 format
-		oasHeaders := openapi3.Headers{}
-		for name, value := range headers {
-			oasHeaders[name] = &openapi3.HeaderRef{
-				Value: &openapi3.Header{
-					Parameter: openapi3.Parameter{
-						Schema: &openapi3.SchemaRef{
-							Value: &openapi3.Schema{
-								Type:    "string",
-								Example: value,
+		op := &openapi3.Operation{
+			OperationID: generateOperationID(mockResponse),
+			Responses: openapi3.Responses{
+				statusCode: &openapi3.ResponseRef{
+					Value: &openapi3.Response{
+						Description: &[]string{"OK"}[0],
+						Content: openapi3.Content{
+							contentType: &openapi3.MediaType{
+								Schema: &openapi3.SchemaRef{
+									Value: &openapi3.Schema{
+										Type:    "string",
+										Example: mockResponse.Body,
+									},
+								},
 							},
 						},
 					},
 				},
+			},
+		}
+
+		// Set the operation based on method
+		switch method {
+		case http.MethodGet:
+			paths[path].Get = op
+		case http.MethodPost:
+			paths[path].Post = op
+		case http.MethodPut:
+			paths[path].Put = op
+		case http.MethodDelete:
+			paths[path].Delete = op
+		case http.MethodPatch:
+			paths[path].Patch = op
+		}
+
+		// Set up the mock response in Tyk extension
+		operationID := generateOperationID(mockResponse)
+		operation := s.GetTykExtension().getOperation(operationID)
+		if operation.MockResponse == nil {
+			operation.MockResponse = &MockResponse{}
+		}
+
+		if operation.IgnoreAuthentication == nil {
+			// Enable ignore authentication for this endpoint to maintain compatibility with Classic APIs
+			// In Classic APIs, mock responses are processed before authentication
+			// In OAS, mock responses are processed at the end of the chain, so we need to explicitly
+			// bypass authentication to maintain the same behavior during migration
+			operation.IgnoreAuthentication = &Allowance{
+				Enabled: true,
 			}
 		}
 
-		// Create MediaType with both schema and example
-		mediaType := &openapi3.MediaType{
-			Schema: &openapi3.SchemaRef{
-				Value: &openapi3.Schema{
-					Type:    "string",
-					Example: mockResponse.Body,
-				},
-			},
-			Example: mockResponse.Body,
-			Examples: openapi3.Examples{
-				"default": &openapi3.ExampleRef{
-					Value: &openapi3.Example{
-						Value: mockResponse.Body,
-					},
-				},
-			},
-		}
-
-		oasContent := openapi3.Content{
-			contentType: mediaType,
-		}
-
-		oasOperation := &openapi3.Operation{
-			OperationID: generateOperationID(mockResponse),
-			Responses: openapi3.Responses{
-				statusCode: {
-					Value: &openapi3.Response{
-						Content: oasContent,
-						Headers: oasHeaders,
-					},
-				},
-			},
-		}
-
-		// Set the operation based on the HTTP method
-		switch method {
-		case http.MethodGet:
-			paths[path].Get = oasOperation
-		case http.MethodPost:
-			paths[path].Post = oasOperation
-		case http.MethodPut:
-			paths[path].Put = oasOperation
-		case http.MethodDelete:
-			paths[path].Delete = oasOperation
-		case http.MethodPatch:
-			paths[path].Patch = oasOperation
-		}
+		operation.MockResponse.Fill(mockResponse)
 	}
 }
 
