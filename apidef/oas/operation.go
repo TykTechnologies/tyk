@@ -8,7 +8,6 @@ import (
 	"strings"
 
 	"github.com/getkin/kin-openapi/openapi3"
-	"github.com/iancoleman/strcase"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/internal/oasutil"
@@ -1009,9 +1008,28 @@ func (s *OAS) fillCircuitBreaker(metas []apidef.CircuitBreakerMeta) {
 
 // genMockResponseOperationID creates a unique operation ID that includes method, path and status code
 func genMockResponseOperationID(mockResponse apidef.MockResponseMeta) string {
-	return strcase.ToLowerCamel(fmt.Sprintf("%v %v %v",
+	combined := fmt.Sprintf("%v %v %v",
 		mockResponse.Method,
 		strings.Trim(mockResponse.Path, "/"),
 		mockResponse.Code,
-	))
+	)
+	return toCamelCase(combined)
+}
+
+// toCamelCase converts a string to camelCase format.
+func toCamelCase(s string) string {
+	words := strings.FieldsFunc(s, func(r rune) bool {
+		return r == ' ' || r == '-' || r == '_'
+	})
+
+	if len(words) == 0 {
+		return ""
+	}
+
+	result := strings.ToLower(words[0])
+	for _, word := range words[1:] {
+		result += strings.ToUpper(word[:1]) + strings.ToLower(word[1:])
+	}
+
+	return result
 }
