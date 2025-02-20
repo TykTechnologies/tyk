@@ -119,7 +119,7 @@ type WebhookEvent struct {
 	CoolDownPeriod ReadableDuration `json:"cooldownPeriod" bson:"cooldownPeriod"`
 
 	// BodyTemplate is the template to be used for request payload.
-	BodyTemplate string `json:"bodyTemplate" bson:"bodyTemplate"`
+	BodyTemplate string `json:"bodyTemplate,omitempty" bson:"bodyTemplate,omitempty"`
 
 	// Headers are the list of request headers to be used.
 	Headers Headers `json:"headers,omitempty" bson:"headers,omitempty"`
