@@ -490,7 +490,7 @@ type HttpServerOptionsConfig struct {
 	Certificates CertsData `json:"certificates"`
 
 
-	// The certificate store of the Gateway.
+	// Index of certificates available to the Gateway for use in client and upstream communication.
 	// The string value in the array can be two of the following options:
 	// 1. A certificate IDs
 	// 2. A path to a PEM file. The PEM file will have both the private key and the certificated concatenated.
