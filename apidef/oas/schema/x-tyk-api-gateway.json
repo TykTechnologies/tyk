@@ -1948,16 +1948,13 @@
           "$ref": "#/definitions/X-Tyk-EventTrigger"
         },
         "type": {
-          "method": {
-            "$ref": "#/definitions/X-Tyk-EventType"
-          }
+          "$ref": "#/definitions/X-Tyk-EventType"
         },
         "id": {
           "type": "string"
         },
         "cooldownPeriod": {
-          "type": "string",
-          "pattern": "^(\\d+h)?(\\d+m)?(\\d+s)?$"
+          "$ref": "#/definitions/X-Tyk-ReadableDuration"
         }
       },
       "required": [

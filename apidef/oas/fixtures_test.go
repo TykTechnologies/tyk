@@ -212,6 +212,8 @@ func flatMap(tb testing.TB, src any, base map[string]any) map[string]any {
 // unmarshals the YAML content into a FixtureDocument, and logs the parsed fixtures.
 // This test currently only prints the YAML content for debugging purposes.
 func TestFixtures(t *testing.T) {
+	assert.NoError(t, oas.LoadOASSchema(true))
+
 	doc := Fixtures(t)
 
 	// Base migration gives us an initial state.
@@ -278,7 +280,9 @@ func TestFixtures(t *testing.T) {
 					if tc.Debug || len(tc.Output) == 0 {
 						keys := slices.Sorted(maps.Keys(result))
 
-						t.Log("Changed keys after migration:")
+						if len(keys) > 0 {
+							t.Log("Changed keys after migration:")
+						}
 						for _, k := range keys {
 							raw := result[k]
 							v := strval(raw)
