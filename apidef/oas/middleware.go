@@ -29,10 +29,6 @@ func (m *Middleware) Fill(api apidef.APIDefinition) {
 	if ShouldOmit(m.Global) {
 		m.Global = nil
 	}
-
-	if m.Operations == nil {
-		m.Operations = Operations{}
-	}
 }
 
 // ExtractTo extracts *Middleware into *apidef.APIDefinition.

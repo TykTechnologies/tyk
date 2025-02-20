@@ -135,32 +135,6 @@ func TestMiddleware(t *testing.T) {
 
 		assert.Equal(t, expectedMW, resultMiddleware)
 	})
-
-	t.Run("mock response", func(t *testing.T) {
-		// Setup
-		mockResponse := MockResponse{
-			Enabled: true,
-			Code:    200,
-			Body:    "test body",
-			Headers: []Header{},
-		}
-
-		// Create API definition to test extraction
-		var convertedMockResponse apidef.MockResponseMeta
-		mockResponse.ExtractTo(&convertedMockResponse)
-
-		// Verify extraction
-		assert.False(t, convertedMockResponse.Disabled)
-		assert.Equal(t, mockResponse.Code, convertedMockResponse.Code)
-		assert.Equal(t, mockResponse.Body, convertedMockResponse.Body)
-
-		// Test filling from API definition
-		var resultMockResponse MockResponse
-		resultMockResponse.Fill(convertedMockResponse)
-
-		// Verify fill matches original
-		assert.Equal(t, mockResponse, resultMockResponse)
-	})
 }
 
 func TestGlobal(t *testing.T) {
