@@ -108,7 +108,7 @@ jobs:
       - name: Checkout Tyk
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.pull_request.head.ref }}
+          ref: ${{ github.ref }}
 
       - name: "Get base ref"
         run: |
