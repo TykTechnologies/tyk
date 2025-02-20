@@ -385,7 +385,7 @@ func (gw *Gateway) handleUserKeyReset(payload string) {
 		gw.SetConfig(config)
 
 		// If we're using a KV store, update the API key there as well
-		gw.updateKeyInStore(config.Private.OriginalAPIKeyPath, newKey)
+		gw.updateKeyInStore(config.Private.EdgeOriginalAPIKeyPath, newKey)
 
 		if store, ok := gw.GlobalSessionManager.Store().(*RPCStorageHandler); ok {
 			store.Connect()

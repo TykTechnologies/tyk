@@ -10,9 +10,11 @@ type Private struct {
 	// none was found, it's the path to the default config file that
 	// was written.
 	OriginalPath string `json:"-"`
-	// OriginalAPIKeyPath is the original path to the API key in the configuration file. Only used to modify the external KV store in case of API Key Reset.
+	// EdgeOriginalAPIKeyPath is the original path to the API key in the configuration file.
+	// This is only used when the gateway is running as an edge gateway (slave mode) in an MDCB setup
+	// to modify the external KV store in case of API Key Reset.
 	// This is set automatically in afterConfSetup()
-	OriginalAPIKeyPath string `json:"-"`
+	EdgeOriginalAPIKeyPath string `json:"-"`
 }
 
 // GetOAuthTokensPurgeInterval returns purge interval for lapsed OAuth tokens.
