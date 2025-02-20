@@ -50,6 +50,8 @@ tests:
                 name: ""
                 target_path: "http://httpbin/get"
                 template_path: "/templates/default_template.json"
+                header_map:
+                  foo: bar
             - handler_name: eh_dynamic_handler
               handler_meta:
                 disabled: false
