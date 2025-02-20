@@ -11,3 +11,15 @@ tests:
               trigger: RateLimitExceeded
               type: custom
               name: testName
+              functionName: functionName
+              path: path
+    output:
+      event_handlers:
+        events:
+          RateLimitExceeded:
+            - handler_name: eh_dynamic_handler
+              handler_meta:
+                disabled: false
+                id: ""
+                name: functionName
+                path: path
