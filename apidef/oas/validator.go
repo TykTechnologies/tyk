@@ -8,6 +8,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"testing"
 
 	"github.com/buger/jsonparser"
 	"github.com/hashicorp/go-multierror"
@@ -39,7 +40,9 @@ var (
 	defaultVersion string
 )
 
-func LoadOASSchema(strict bool) error {
+// LoadOASSchema is a testing hook to increase schema strictness.
+// This allows reporting unrecognized fields during development.
+func LoadOASSchema(_ testing.TB, strict bool) error {
 	return loadOASSchema(strict)
 }
 

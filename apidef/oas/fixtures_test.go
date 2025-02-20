@@ -212,7 +212,7 @@ func flatMap(tb testing.TB, src any, base map[string]any) map[string]any {
 // unmarshals the YAML content into a FixtureDocument, and logs the parsed fixtures.
 // This test currently only prints the YAML content for debugging purposes.
 func TestFixtures(t *testing.T) {
-	assert.NoError(t, oas.LoadOASSchema(true))
+	assert.NoError(t, oas.LoadOASSchema(t, true))
 
 	doc := Fixtures(t)
 
