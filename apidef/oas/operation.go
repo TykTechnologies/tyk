@@ -223,23 +223,20 @@ func (s *OAS) fillMockResponsePaths(paths openapi3.Paths, ep apidef.ExtendedPath
 
 		paths[path].SetOperation(method, op)
 
+		if s.GetTykExtension() == nil {
+			s.SetTykExtension(&XTykAPIGateway{})
+		}
+
 		operation := s.GetTykExtension().getOperation(operationID)
 		if operation == nil {
-			continue
-		}
-
-		if operation.MockResponse == nil {
-			operation.MockResponse = &MockResponse{}
-		}
-
-		if operation.IgnoreAuthentication == nil {
-			// Enable ignore authentication for this endpoint to maintain compatibility with Classic APIs
-			// In Classic APIs, mock responses are processed before authentication
-			// In OAS, mock responses are processed at the end of the chain, so we need to explicitly
-			// bypass authentication to maintain the same behavior during migration
-			operation.IgnoreAuthentication = &Allowance{
-				Enabled: true,
+			operation = &Operation{
+				MockResponse: &MockResponse{},
+				IgnoreAuthentication: &Allowance{
+					Enabled: true,
+				},
 			}
+
+			s.GetTykExtension().Middleware.Operations[operationID] = operation
 		}
 
 		operation.MockResponse.Fill(mockResponse)
