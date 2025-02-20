@@ -1,5 +1,5 @@
 ---
-name: "Server.EventHandlers"
+name: "Server.EventHandlers TT-11966"
 tests:
   - source: oas
     debug: true
@@ -9,14 +9,47 @@ tests:
           eventHandlers:
             - enabled: true
               trigger: RateLimitExceeded
+              type: webhook
+              cooldownPeriod: 10,
+              id: webhookID
+            - enabled: true
+              trigger: RateLimitExceeded
+              type: webhook
+              cooldownPeriod: 30,
+              id: webhookID2
+              url: http://httpbin/get
+              method: GET
+              bodyTemplate: /templates/default_template.json
+              headers:
+                - name: foo
+                  value: bar
+            - enabled: true
+              trigger: RateLimitExceeded
               type: custom
-              name: testName
               functionName: functionName
               path: path
     output:
       event_handlers:
         events:
           RateLimitExceeded:
+            - handler_name: eh_web_hook_handler
+              handler_meta:
+                disabled: false
+                event_timeout: 0
+                id: webhookID
+                method: ""
+                name: ""
+                target_path: ""
+                template_path: ""
+            - handler_name: eh_web_hook_handler
+              handler_meta:
+                disabled: false
+                event_timeout: 0
+                id: webhookID2
+                method: "GET"
+                name: ""
+                target_path: "http://httpbin/get"
+                template_path: "/templates/default_template.json"
             - handler_name: eh_dynamic_handler
               handler_meta:
                 disabled: false
