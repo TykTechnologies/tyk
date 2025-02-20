@@ -184,16 +184,15 @@ func (s *OAS) fillMockResponsePaths(paths openapi3.Paths, ep apidef.ExtendedPath
 		statusCode := strconv.Itoa(mockResponse.Code)
 
 		contentType := "text/plain"
-		if ct, ok := mockResponse.Headers["Content-Type"]; ok && ct != "" {
-			contentType = ct
-		} else if ct, ok := mockResponse.Headers["content-type"]; ok && ct != "" {
+		canonicalContentType := http.CanonicalHeaderKey("Content-Type")
+		if ct, ok := mockResponse.Headers[canonicalContentType]; ok && ct != "" {
 			contentType = ct
 		}
 
 		// Detect JSON content
 		if mockResponse.Body != "" {
-			var js interface{}
-			if err := json.Unmarshal([]byte(mockResponse.Body), &js); err == nil {
+			var mockBody json.RawMessage
+			if err := json.Unmarshal([]byte(mockResponse.Body), &mockBody); err == nil {
 				contentType = "application/json"
 			}
 		}
@@ -226,6 +225,10 @@ func (s *OAS) fillMockResponsePaths(paths openapi3.Paths, ep apidef.ExtendedPath
 		paths[path].SetOperation(method, op)
 
 		operation := s.GetTykExtension().getOperation(operationID)
+		if operation == nil {
+			continue
+		}
+
 		if operation.MockResponse == nil {
 			operation.MockResponse = &MockResponse{}
 		}
