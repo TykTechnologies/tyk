@@ -698,16 +698,16 @@ func TestProcessKeySpaceChanges_UserKeyReset(t *testing.T) {
 	newKey := "new-api-key"
 
 	dispatcher := gorpc.NewDispatcher()
-	dispatcher.AddFunc("Login", func(clientAddr, userKey string) bool {
+	dispatcher.AddFunc("Login", func(_, _ string) bool {
 		return true
 	})
-	dispatcher.AddFunc("Disconnect", func(clientAddr string, groupData *model.GroupLoginRequest) error {
+	dispatcher.AddFunc("Disconnect", func(_ string, _ *model.GroupLoginRequest) error {
 		return nil
 	})
-	dispatcher.AddFunc("GetKeySpaceUpdate", func(clientAddr, orgId string) ([]string, error) {
+	dispatcher.AddFunc("GetKeySpaceUpdate", func(_, _ string) ([]string, error) {
 		return []string{}, nil
 	})
-	dispatcher.AddFunc("GetGroupKeySpaceUpdate", func(clientAddr string, groupData *model.GroupKeySpaceRequest) ([]string, error) {
+	dispatcher.AddFunc("GetGroupKeySpaceUpdate", func(_, _ *model.GroupKeySpaceRequest) ([]string, error) {
 		return []string{}, nil
 	})
 

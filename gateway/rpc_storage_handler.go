@@ -1088,7 +1088,6 @@ func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string, orgId string) 
 			Gw:      r.Gw,
 		})
 		if !ok {
-			fmt.Println("Failed to notify other gateways about user key reset")
 			log.Error("Failed to notify other gateways about user key reset")
 		}
 	}
