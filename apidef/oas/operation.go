@@ -6,9 +6,9 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"unicode"
 
 	"github.com/getkin/kin-openapi/openapi3"
-	"github.com/iancoleman/strcase"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/internal/oasutil"
@@ -1041,5 +1041,29 @@ func genMockResponseOperationID(mockResponse apidef.MockResponseMeta) string {
 		strings.Trim(mockResponse.Path, "/"),
 		mockResponse.Code,
 	)
-	return strcase.ToLowerCamel(combined)
+	return toCamelCase(combined)
+}
+
+func toCamelCase(s string) string {
+	// Split the string by spaces and special characters
+	words := strings.FieldsFunc(s, func(r rune) bool {
+		return !unicode.IsLetter(r) && !unicode.IsNumber(r)
+	})
+
+	if len(words) == 0 {
+		return ""
+	}
+
+	// Convert first word to lowercase
+	result := strings.ToLower(words[0])
+
+	// Convert subsequent words to title case and append
+	for _, word := range words[1:] {
+		if word == "" {
+			continue
+		}
+		result += strings.Title(strings.ToLower(word))
+	}
+
+	return result
 }
