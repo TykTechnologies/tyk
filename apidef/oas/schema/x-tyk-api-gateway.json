@@ -1944,6 +1944,9 @@
         },
         {
           "$ref": "#/definitions/X-Tyk-JSVMEvent"
+        },
+        {
+          "$ref": "#/definitions/X-Tyk-LogEvent"
         }
       ]
     },
