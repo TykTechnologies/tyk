@@ -486,7 +486,6 @@ type HttpServerOptionsConfig struct {
 
   
 	// Deprecated: Use `ssl_certificates`instead.
-	// SSL certificates used by Gateway server.
 	Certificates CertsData `json:"certificates"`
 
 
