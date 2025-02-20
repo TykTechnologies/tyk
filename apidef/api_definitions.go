@@ -1640,18 +1640,25 @@ type IntrospectionCache struct {
 type WebHookHandlerConf struct {
 	// Disabled enables/disables this webhook.
 	Disabled bool `bson:"disabled" json:"disabled"`
+
 	// ID optional ID of the webhook, to be used in pro mode.
 	ID string `bson:"id" json:"id"`
+
 	// Name is the name of webhook.
 	Name string `bson:"name" json:"name"`
+
 	// The method to use for the webhook.
 	Method string `bson:"method" json:"method"`
+
 	// The target path on which to send the request.
 	TargetPath string `bson:"target_path" json:"target_path"`
+
 	// The template to load in order to format the request.
 	TemplatePath string `bson:"template_path" json:"template_path"`
+
 	// Headers to set when firing the webhook.
 	HeaderList map[string]string `bson:"header_map" json:"header_map"`
+
 	// The cool-down for the event so it does not trigger again (in seconds).
 	EventTimeout int64 `bson:"event_timeout" json:"event_timeout"`
 }
@@ -1671,10 +1678,13 @@ func (w *WebHookHandlerConf) Scan(in any) error {
 type JSVMEventHandlerConf struct {
 	// Disabled indicates whether the event handler is inactive.
 	Disabled bool `bson:"disabled" json:"disabled"`
+
 	// ID is the optional unique identifier for the event handler.
 	ID string `bson:"id" json:"id"`
-	// MethodName specifies the JavaScript function name to be executed.
-	MethodName string `bson:"name" json:"name"`
+
+	// Name specifies the JavaScript function name to be executed.
+	Name string `bson:"name" json:"name"`
+
 	// Path refers to the file path of the JavaScript source code for the handler.
 	Path string `bson:"path" json:"path"`
 }

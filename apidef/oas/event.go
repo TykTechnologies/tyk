@@ -150,10 +150,10 @@ type JSVMEvent struct {
 // GetJSVMEventHandlerConf generates the JavaScript VM event handler configuration using the current EventHandler instance.
 func (e *EventHandler) GetJSVMEventHandlerConf() apidef.JSVMEventHandlerConf {
 	return apidef.JSVMEventHandlerConf{
-		Disabled:   !e.Enabled,
-		ID:         e.ID,
-		MethodName: e.JSVMEvent.FunctionName,
-		Path:       e.JSVMEvent.Path,
+		Disabled: !e.Enabled,
+		ID:       e.ID,
+		Name:     e.JSVMEvent.FunctionName,
+		Path:     e.JSVMEvent.Path,
 	}
 }
 
@@ -206,9 +206,9 @@ func (e *EventHandlers) Fill(api apidef.APIDefinition) {
 					Trigger: gwEvent,
 					Kind:    JSVMKind,
 					ID:      jsvmHandlerConf.ID,
-					Name:    jsvmHandlerConf.MethodName, // jsvm events don't have human-readable names, let's reuse the methodName
+					Name:    jsvmHandlerConf.Name, // jsvm events don't have human-readable names, let's reuse the methodName
 					JSVMEvent: JSVMEvent{
-						FunctionName: jsvmHandlerConf.MethodName,
+						FunctionName: jsvmHandlerConf.Name,
 						Path:         jsvmHandlerConf.Path,
 					},
 				}
