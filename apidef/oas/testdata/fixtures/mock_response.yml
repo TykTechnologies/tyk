@@ -39,6 +39,44 @@ tests:
                   body: "Hello World"
                   headers:
                     Content-Type: "text/plain"
+  - desc: "Mock response - from oas to classic - disabled"
+    source: oas
+    input:
+      paths:
+        /test:
+          get:
+            operationId: "testGET"
+            responses:
+              "200":
+                description: "OK"
+                content:
+                  text/plain:
+                    schema:
+                      type: string
+      x-tyk-api-gateway:
+        middleware:
+          operations:
+            testGET:
+              mockResponse:
+                enabled: false
+                code: 200
+                body: "Hello World"
+                headers:
+                  - name: "Content-Type"
+                    value: "text/plain"
+    output:
+      version_data:
+        versions:
+          "":
+            extended_paths:
+              mock_response:
+                - disabled: true
+                  path: "/test"
+                  method: "GET"
+                  code: 200
+                  body: "Hello World"
+                  headers:
+                    Content-Type: "text/plain"
   - desc: "Mock response - from classic to oas"
     source: classic
     input:
