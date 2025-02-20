@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/getkin/kin-openapi/openapi3"
+	"github.com/iancoleman/strcase"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/internal/oasutil"
@@ -181,13 +182,25 @@ func (s *OAS) fillMockResponsePaths(paths openapi3.Paths, ep apidef.ExtendedPath
 		}
 
 		statusCode := strconv.Itoa(mockResponse.Code)
+
+		// Improved Content-Type handling
 		contentType := "text/plain"
-		if ct, exists := mockResponse.Headers["Content-Type"]; exists {
+		if ct, exists := mockResponse.Headers["Content-Type"]; exists && ct != "" {
+			contentType = ct
+		} else if ct, exists := mockResponse.Headers["content-type"]; exists && ct != "" {
 			contentType = ct
 		}
 
+		// Try to detect JSON content
+		if mockResponse.Body != "" {
+			var js interface{}
+			if err := json.Unmarshal([]byte(mockResponse.Body), &js); err == nil {
+				contentType = "application/json"
+			}
+		}
+
 		op := &openapi3.Operation{
-			OperationID: generateOperationID(mockResponse),
+			OperationID: generateMockResponseOperationID(mockResponse),
 			Responses: openapi3.Responses{
 				statusCode: &openapi3.ResponseRef{
 					Value: &openapi3.Response{
@@ -207,22 +220,11 @@ func (s *OAS) fillMockResponsePaths(paths openapi3.Paths, ep apidef.ExtendedPath
 			},
 		}
 
-		// Set the operation based on method
-		switch method {
-		case http.MethodGet:
-			paths[path].Get = op
-		case http.MethodPost:
-			paths[path].Post = op
-		case http.MethodPut:
-			paths[path].Put = op
-		case http.MethodDelete:
-			paths[path].Delete = op
-		case http.MethodPatch:
-			paths[path].Patch = op
-		}
+		// Set the operation based on method using the PathItem's SetOperation method
+		paths[path].SetOperation(method, op)
 
 		// Set up the mock response in Tyk extension
-		operationID := generateOperationID(mockResponse)
+		operationID := generateMockResponseOperationID(mockResponse)
 		operation := s.GetTykExtension().getOperation(operationID)
 		if operation.MockResponse == nil {
 			operation.MockResponse = &MockResponse{}
@@ -1002,6 +1004,12 @@ func (s *OAS) fillCircuitBreaker(metas []apidef.CircuitBreakerMeta) {
 	}
 }
 
-func generateOperationID(mockResponse apidef.MockResponseMeta) string {
-	return strings.TrimPrefix(mockResponse.Path, "/") + mockResponse.Method
+// generateMockResponseOperationID creates a unique operation ID that includes method, path and status code
+func generateMockResponseOperationID(mockResponse apidef.MockResponseMeta) string {
+	id := fmt.Sprintf("%v %v %v",
+		mockResponse.Method,
+		strings.Trim(mockResponse.Path, "/"),
+		mockResponse.Code)
+
+	return strcase.ToLowerCamel(id)
 }

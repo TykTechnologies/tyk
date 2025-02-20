@@ -7,7 +7,7 @@ tests:
       paths:
         /test:
           get:
-            operationId: "testGET"
+            operationId: "getTest200"
             responses:
               "200":
                 description: "OK"
@@ -15,10 +15,11 @@ tests:
                   text/plain:
                     schema:
                       type: string
+                    example: "Hello World"
       x-tyk-api-gateway:
         middleware:
           operations:
-            testGET:
+            getTest200:
               mockResponse:
                 enabled: true
                 code: 200
@@ -45,7 +46,7 @@ tests:
       paths:
         /test:
           get:
-            operationId: "testGET"
+            operationId: "getTest200"
             responses:
               "200":
                 description: "OK"
@@ -56,7 +57,7 @@ tests:
       x-tyk-api-gateway:
         middleware:
           operations:
-            testGET:
+            getTest200:
               mockResponse:
                 enabled: false
                 code: 200
@@ -96,7 +97,7 @@ tests:
       paths:
         /test:
           get:
-            operationId: "testGET"
+            operationId: "getTest200"
             responses:
               "200":
                 description: "OK"
@@ -107,7 +108,7 @@ tests:
       x-tyk-api-gateway:
         middleware:
           operations:
-            testGET:
+            getTest200:
               mockResponse:
                 enabled: true
                 code: 200
@@ -136,7 +137,7 @@ tests:
       paths:
         /test:
           post:
-            operationId: "testPOST"
+            operationId: "postTest201"
             responses:
               "201":
                 description: "OK"
@@ -147,7 +148,7 @@ tests:
       x-tyk-api-gateway:
         middleware:
           operations:
-            testPOST:
+            postTest201:
               mockResponse:
                 enabled: false
                 code: 201
