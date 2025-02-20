@@ -10,12 +10,12 @@ tests:
             - enabled: true
               trigger: RateLimitExceeded
               type: webhook
-              cooldownPeriod: 10,
+              cooldownPeriod: "10s"
               id: webhookID
             - enabled: true
               trigger: RateLimitExceeded
               type: webhook
-              cooldownPeriod: 30,
+              cooldownPeriod: "30s"
               id: webhookID2
               url: http://httpbin/get
               method: GET
@@ -35,7 +35,7 @@ tests:
             - handler_name: eh_web_hook_handler
               handler_meta:
                 disabled: false
-                event_timeout: 0
+                event_timeout: 10
                 id: webhookID
                 method: ""
                 name: ""
@@ -44,7 +44,7 @@ tests:
             - handler_name: eh_web_hook_handler
               handler_meta:
                 disabled: false
-                event_timeout: 0
+                event_timeout: 30
                 id: webhookID2
                 method: "GET"
                 name: ""
