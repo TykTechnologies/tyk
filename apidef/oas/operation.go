@@ -169,6 +169,11 @@ func (s *OAS) fillPathsAndOperations(ep apidef.ExtendedPathsSet) {
 	s.fillMockResponsePaths(s.Paths, ep)
 }
 
+// fillMockResponsePaths converts classic API mock responses to OAS format.
+// For each mock response, it:
+// 1. Creates an OAS operation with a unique ID (method + path + status code)
+// 2. Sets up the mock response with content type detection and example values
+// 3. Configures the Tyk extension to ignore authentication for this endpoint
 func (s *OAS) fillMockResponsePaths(paths openapi3.Paths, ep apidef.ExtendedPathsSet) {
 	var methodOperationMap = map[string]func(*openapi3.PathItem, *openapi3.Operation){
 		http.MethodGet:    func(p *openapi3.PathItem, op *openapi3.Operation) { p.Get = op },
@@ -186,15 +191,13 @@ func (s *OAS) fillMockResponsePaths(paths openapi3.Paths, ep apidef.ExtendedPath
 		}
 
 		operation := &openapi3.Operation{
-			// TODO(TT-7306): Change this values
-			Summary:     "CHANGE ME",
-			Description: "CHANGE ME",
-			Responses:   openapi3.NewResponses(),
+			Responses: openapi3.NewResponses(),
 		}
 
 		operation.OperationID = genMockResponseOperationID(mock)
 
-		// TODO(TT-7306): Change this values
+		// Response description is required by the OAS spec, but we don't have it in Tyk classic.
+		// So we're using a dummy value to satisfy the spec.
 		dummyDescription := "CHANGE ME"
 
 		response := &openapi3.Response{
@@ -208,6 +211,14 @@ func (s *OAS) fillMockResponsePaths(paths openapi3.Paths, ep apidef.ExtendedPath
 			if http.CanonicalHeaderKey(name) == "Content-Type" {
 				contentType = value
 				break
+			}
+		}
+
+		// We attempt to guess the content type by checking if the body is a valid JSON.
+		if mock.Body != "" {
+			var body json.RawMessage
+			if err := json.Unmarshal([]byte(mock.Body), &body); err == nil {
+				contentType = "application/json"
 			}
 		}
 
@@ -225,9 +236,8 @@ func (s *OAS) fillMockResponsePaths(paths openapi3.Paths, ep apidef.ExtendedPath
 			contentType: mediaType,
 		}
 
-		// Add headers
 		for name, value := range mock.Headers {
-			response.Headers[name] = &openapi3.HeaderRef{
+			response.Headers[http.CanonicalHeaderKey(name)] = &openapi3.HeaderRef{
 				Value: &openapi3.Header{
 					Parameter: openapi3.Parameter{
 						Schema: &openapi3.SchemaRef{
@@ -249,9 +259,9 @@ func (s *OAS) fillMockResponsePaths(paths openapi3.Paths, ep apidef.ExtendedPath
 			setOperation(pathItem, operation)
 		}
 
-		if s.GetTykExtension() == nil {
-			s.SetTykExtension(&XTykAPIGateway{})
-		}
+		// if s.GetTykExtension() == nil {
+		// 	s.SetTykExtension(&XTykAPIGateway{})
+		// }
 
 		tykOperation := s.GetTykExtension().getOperation(operation.OperationID)
 		if tykOperation == nil {
@@ -310,6 +320,8 @@ func (s *OAS) extractPathsAndOperations(ep *apidef.ExtendedPathsSet) {
 		}
 	}
 
+	// Sort the mock response paths by path, method, and response code.
+	// This ensures a deterministic order of mock responses.
 	sort.Slice(ep.MockResponse, func(i, j int) bool {
 		// First sort by path
 		if ep.MockResponse[i].Path != ep.MockResponse[j].Path {
@@ -1057,7 +1069,11 @@ func (s *OAS) fillCircuitBreaker(metas []apidef.CircuitBreakerMeta) {
 	}
 }
 
-// genMockResponseOperationID creates a unique operation ID that includes method, path and status code
+// genMockResponseOperationID creates a unique operation ID by combining:
+// - HTTP method (e.g. GET)
+// - Path (without leading slash)
+// - Status code
+// Example: "GET users 200" becomes "getUsers200"
 func genMockResponseOperationID(mockResponse apidef.MockResponseMeta) string {
 	combined := fmt.Sprintf("%v %v %d",
 		mockResponse.Method,
@@ -1067,6 +1083,8 @@ func genMockResponseOperationID(mockResponse apidef.MockResponseMeta) string {
 	return toCamelCase(combined)
 }
 
+// toCamelCase converts a space/symbol separated string to camelCase.
+// Example: "get users 200" becomes "getUsers200"
 func toCamelCase(s string) string {
 	words := strings.FieldsFunc(s, func(r rune) bool {
 		return !unicode.IsLetter(r) && !unicode.IsNumber(r)
