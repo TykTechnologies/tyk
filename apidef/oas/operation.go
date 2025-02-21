@@ -897,6 +897,12 @@ type MockResponse struct {
 	FromOASExamples *FromOASExamples `bson:"fromOASExamples,omitempty" json:"fromOASExamples,omitempty"`
 }
 
+// Fill populates the MockResponse fields from a classic API MockResponseMeta.
+// It sets:
+// - Enabled status (inverted from Disabled)
+// - Response status code
+// - Response body
+// - Response headers (canonicalized and sorted alphabetically)
 func (m *MockResponse) Fill(op apidef.MockResponseMeta) {
 	headers := make([]Header, 0)
 	for k, v := range op.Headers {
