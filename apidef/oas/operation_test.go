@@ -183,13 +183,15 @@ func TestOAS_MockResponse_extractPathsAndOperations(t *testing.T) {
 				},
 			},
 			want: func(t *testing.T, ep *apidef.ExtendedPathsSet) {
-				assert.Len(t, ep.MockResponse, 1)
-				mockResp := ep.MockResponse[0]
+				assert.Len(t, ep.WhiteList, 1)
+				mockResp := ep.WhiteList[0]
 				assert.Equal(t, "/test", mockResp.Path)
 				assert.Equal(t, "GET", mockResp.Method)
-				assert.Equal(t, 200, mockResp.Code)
-				assert.Equal(t, `{"message": "success"}`, mockResp.Body)
-				assert.Equal(t, map[string]string{"Content-Type": "application/json"}, mockResp.Headers)
+				require.NotNil(t, mockResp.MethodActions["GET"])
+				assert.Equal(t, apidef.Reply, mockResp.MethodActions["GET"].Action)
+				assert.Equal(t, 200, mockResp.MethodActions["GET"].Code)
+				assert.Equal(t, `{"message": "success"}`, mockResp.MethodActions["GET"].Data)
+				assert.Equal(t, map[string]string{"Content-Type": "application/json"}, mockResp.MethodActions["GET"].Headers)
 				assert.False(t, mockResp.Disabled)
 			},
 		},
@@ -240,35 +242,39 @@ func TestOAS_MockResponse_extractPathsAndOperations(t *testing.T) {
 				},
 			},
 			want: func(t *testing.T, ep *apidef.ExtendedPathsSet) {
-				assert.Len(t, ep.MockResponse, 2)
+				assert.Len(t, ep.WhiteList, 2)
 
 				// Sort mock responses for consistent testing
-				sort.Slice(ep.MockResponse, func(i, j int) bool {
-					if ep.MockResponse[i].Path == ep.MockResponse[j].Path {
-						return ep.MockResponse[i].Method < ep.MockResponse[j].Method
+				sort.Slice(ep.WhiteList, func(i, j int) bool {
+					if ep.WhiteList[i].Path == ep.WhiteList[j].Path {
+						return ep.WhiteList[i].Method < ep.WhiteList[j].Method
 					}
-					return ep.MockResponse[i].Path < ep.MockResponse[j].Path
+					return ep.WhiteList[i].Path < ep.WhiteList[j].Path
 				})
 
 				// Verify GET mock response
-				getMock := ep.MockResponse[0]
+				getMock := ep.WhiteList[0]
 				assert.Equal(t, "/test", getMock.Path)
 				assert.Equal(t, "GET", getMock.Method)
-				assert.Equal(t, 200, getMock.Code)
-				assert.Equal(t, `{"status": "ok"}`, getMock.Body)
-				assert.Equal(t, map[string]string{"Content-Type": "application/json"}, getMock.Headers)
+				require.NotNil(t, getMock.MethodActions["GET"])
+				assert.Equal(t, apidef.Reply, getMock.MethodActions["GET"].Action)
+				assert.Equal(t, 200, getMock.MethodActions["GET"].Code)
+				assert.Equal(t, `{"status": "ok"}`, getMock.MethodActions["GET"].Data)
+				assert.Equal(t, map[string]string{"Content-Type": "application/json"}, getMock.MethodActions["GET"].Headers)
 				assert.False(t, getMock.Disabled)
 
 				// Verify POST mock response
-				postMock := ep.MockResponse[1]
+				postMock := ep.WhiteList[1]
 				assert.Equal(t, "/test", postMock.Path)
 				assert.Equal(t, "POST", postMock.Method)
-				assert.Equal(t, 201, postMock.Code)
-				assert.Equal(t, `{"id": "123"}`, postMock.Body)
+				require.NotNil(t, postMock.MethodActions["POST"])
+				assert.Equal(t, apidef.Reply, postMock.MethodActions["POST"].Action)
+				assert.Equal(t, 201, postMock.MethodActions["POST"].Code)
+				assert.Equal(t, `{"id": "123"}`, postMock.MethodActions["POST"].Data)
 				assert.Equal(t, map[string]string{
 					"Content-Type": "application/json",
 					"Location":     "/test/123",
-				}, postMock.Headers)
+				}, postMock.MethodActions["POST"].Headers)
 				assert.False(t, postMock.Disabled)
 			},
 		},
@@ -302,12 +308,14 @@ func TestOAS_MockResponse_extractPathsAndOperations(t *testing.T) {
 				},
 			},
 			want: func(t *testing.T, ep *apidef.ExtendedPathsSet) {
-				assert.Len(t, ep.MockResponse, 1)
-				mockResp := ep.MockResponse[0]
+				assert.Len(t, ep.WhiteList, 1)
+				mockResp := ep.WhiteList[0]
 				assert.Equal(t, "/test", mockResp.Path)
 				assert.Equal(t, "GET", mockResp.Method)
-				assert.Equal(t, 404, mockResp.Code)
-				assert.Equal(t, `{"error": "not found"}`, mockResp.Body)
+				require.NotNil(t, mockResp.MethodActions["GET"])
+				assert.Equal(t, apidef.Reply, mockResp.MethodActions["GET"].Action)
+				assert.Equal(t, 404, mockResp.MethodActions["GET"].Code)
+				assert.Equal(t, `{"error": "not found"}`, mockResp.MethodActions["GET"].Data)
 				assert.True(t, mockResp.Disabled)
 			},
 		},
@@ -382,28 +390,32 @@ func TestOAS_MockResponse_extractPathsAndOperations(t *testing.T) {
 				},
 			},
 			want: func(t *testing.T, ep *apidef.ExtendedPathsSet) {
-				assert.Len(t, ep.MockResponse, 2)
+				assert.Len(t, ep.WhiteList, 2)
 
 				// Sort for consistent testing
-				sort.Slice(ep.MockResponse, func(i, j int) bool {
-					return ep.MockResponse[i].Path < ep.MockResponse[j].Path
+				sort.Slice(ep.WhiteList, func(i, j int) bool {
+					return ep.WhiteList[i].Path < ep.WhiteList[j].Path
 				})
 
 				// Verify items response
-				itemsResp := ep.MockResponse[0]
+				itemsResp := ep.WhiteList[0]
 				assert.Equal(t, "/items", itemsResp.Path)
 				assert.Equal(t, "GET", itemsResp.Method)
-				assert.Equal(t, 200, itemsResp.Code)
-				assert.Equal(t, `["item1", "item2"]`, itemsResp.Body)
-				assert.Equal(t, map[string]string{"Content-Type": "application/json"}, itemsResp.Headers)
+				require.NotNil(t, itemsResp.MethodActions["GET"])
+				assert.Equal(t, apidef.Reply, itemsResp.MethodActions["GET"].Action)
+				assert.Equal(t, 200, itemsResp.MethodActions["GET"].Code)
+				assert.Equal(t, `["item1", "item2"]`, itemsResp.MethodActions["GET"].Data)
+				assert.Equal(t, map[string]string{"Content-Type": "application/json"}, itemsResp.MethodActions["GET"].Headers)
 
 				// Verify users response
-				usersResp := ep.MockResponse[1]
+				usersResp := ep.WhiteList[1]
 				assert.Equal(t, "/users", usersResp.Path)
 				assert.Equal(t, "GET", usersResp.Method)
-				assert.Equal(t, 200, usersResp.Code)
-				assert.Equal(t, `["user1", "user2"]`, usersResp.Body)
-				assert.Equal(t, map[string]string{"Content-Type": "application/json"}, usersResp.Headers)
+				require.NotNil(t, usersResp.MethodActions["GET"])
+				assert.Equal(t, apidef.Reply, usersResp.MethodActions["GET"].Action)
+				assert.Equal(t, 200, usersResp.MethodActions["GET"].Code)
+				assert.Equal(t, `["user1", "user2"]`, usersResp.MethodActions["GET"].Data)
+				assert.Equal(t, map[string]string{"Content-Type": "application/json"}, usersResp.MethodActions["GET"].Headers)
 			},
 		},
 	}
