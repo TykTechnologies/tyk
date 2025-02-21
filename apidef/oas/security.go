@@ -599,7 +599,14 @@ type ExternalOAuth struct {
 func (s *OAS) fillExternalOAuth(api apidef.APIDefinition) {
 	authConfig, ok := api.AuthConfigs[apidef.ExternalOAuthType]
 	if !ok || authConfig.Name == "" {
-		return
+		if !api.ExternalOAuth.Enabled {
+			return
+		}
+		// Assign a sensible default to authConfig if api.ExternalOAuth.Enabled is true.
+		authConfig = apidef.AuthConfig{
+			Name:          apidef.ExternalOAuthType,
+			DisableHeader: true,
+		}
 	}
 
 	s.fillOAuthSchemeForExternal(authConfig.Name)
