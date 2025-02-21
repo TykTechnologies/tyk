@@ -578,6 +578,15 @@
         },
         "requestSizeLimit": {
           "$ref": "#/definitions/X-Tyk-GlobalRequestSizeLimit"
+        },
+        "skipRateLimit": {
+          "type": "boolean"
+        },
+        "skipQuota": {
+          "type": "boolean"
+        },
+        "skipQuotaReset": {
+          "type": "boolean"
         }
       }
     },

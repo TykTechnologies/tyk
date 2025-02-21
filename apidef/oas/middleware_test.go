@@ -181,6 +181,50 @@ func TestGlobal(t *testing.T) {
 		assert.Nil(t, updatedGlobal.ResponsePlugin)
 		assert.NotNil(t, updatedGlobal.ResponsePlugins)
 	})
+
+	t.Run("skips", func(t *testing.T) {
+		t.Run("fill", func(t *testing.T) {
+			api := apidef.APIDefinition{
+				DisableRateLimit:      true,
+				DisableQuota:          true,
+				DontSetQuotasOnCreate: true,
+			}
+
+			expectedGlobal := Global{
+				SkipRateLimit:  true,
+				SkipQuota:      true,
+				SkipQuotaReset: true,
+			}
+
+			actualGlobal := Global{}
+			actualGlobal.Fill(api)
+
+			assert.Equal(t, expectedGlobal.SkipRateLimit, actualGlobal.SkipRateLimit)
+			assert.Equal(t, expectedGlobal.SkipQuotaReset, actualGlobal.SkipQuota)
+			assert.Equal(t, expectedGlobal.SkipQuotaReset, actualGlobal.SkipQuotaReset)
+		})
+
+		t.Run("extractTo", func(t *testing.T) {
+			global := Global{
+				SkipRateLimit:  true,
+				SkipQuota:      true,
+				SkipQuotaReset: true,
+			}
+
+			expectedApi := apidef.APIDefinition{
+				DisableRateLimit:      true,
+				DisableQuota:          true,
+				DontSetQuotasOnCreate: true,
+			}
+
+			actualApi := apidef.APIDefinition{}
+			global.ExtractTo(&actualApi)
+
+			assert.Equal(t, expectedApi.DisableRateLimit, actualApi.DisableRateLimit)
+			assert.Equal(t, expectedApi.DisableQuota, actualApi.DisableQuota)
+			assert.Equal(t, expectedApi.DontSetQuotasOnCreate, actualApi.DontSetQuotasOnCreate)
+		})
+	})
 }
 
 func TestTrafficLogs(t *testing.T) {
