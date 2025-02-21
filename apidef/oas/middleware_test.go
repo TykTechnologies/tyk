@@ -200,7 +200,7 @@ func TestGlobal(t *testing.T) {
 			actualGlobal.Fill(api)
 
 			assert.Equal(t, expectedGlobal.SkipRateLimit, actualGlobal.SkipRateLimit)
-			assert.Equal(t, expectedGlobal.SkipQuotaReset, actualGlobal.SkipQuota)
+			assert.Equal(t, expectedGlobal.SkipQuota, actualGlobal.SkipQuota)
 			assert.Equal(t, expectedGlobal.SkipQuotaReset, actualGlobal.SkipQuotaReset)
 		})
 
