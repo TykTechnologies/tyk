@@ -3,6 +3,8 @@ package oas
 import (
 	"context"
 	"embed"
+	"encoding/json"
+	"net/http"
 	"sort"
 	"strconv"
 	"strings"
@@ -858,7 +860,7 @@ func TestOAS_MockResponse_fillMockResponsePaths(t *testing.T) {
 				}
 
 				for header, value := range expectedHeaders {
-					headerObj := response.Headers[header]
+					headerObj := response.Headers[http.CanonicalHeaderKey(header)]
 					require.NotNil(t, headerObj, "Header %s not found", header)
 					assert.Equal(t, value, headerObj.Value.Schema.Value.Example)
 				}
@@ -888,9 +890,18 @@ func TestOAS_MockResponse_fillMockResponsePaths(t *testing.T) {
 					require.NotNil(t, response)
 					if body != "" {
 						contentType := "text/plain" // default content type
+
 						if ct, ok := response.Headers["Content-Type"]; ok {
 							contentType = ct.Value.Schema.Value.Example.(string)
 						}
+
+						var parsedBody json.RawMessage
+						if err := json.Unmarshal([]byte(body), &parsedBody); err == nil {
+							contentType = "application/json"
+						}
+
+						require.NotNil(t, response.Content[contentType], "Content type %s not found", contentType)
+						require.NotNil(t, response.Content[contentType].Examples, "Examples for content type %s not found", contentType)
 						assert.Equal(t, body, response.Content[contentType].Examples["default"].Value.Value)
 					}
 				}

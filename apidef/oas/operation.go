@@ -173,14 +173,16 @@ func (s *OAS) fillPathsAndOperations(ep apidef.ExtendedPathsSet) {
 // For each mock response, it:
 // 1. Creates an OAS operation with a unique ID (method + path + status code)
 // 2. Sets up the mock response with content type detection and example values
-// 3. Configures the Tyk extension to ignore authentication for this endpoint
+// 3. Configures the operation to ignore authentication for this endpoint
 func (s *OAS) fillMockResponsePaths(paths openapi3.Paths, ep apidef.ExtendedPathsSet) {
 	var methodOperationMap = map[string]func(*openapi3.PathItem, *openapi3.Operation){
-		http.MethodGet:    func(p *openapi3.PathItem, op *openapi3.Operation) { p.Get = op },
-		http.MethodPost:   func(p *openapi3.PathItem, op *openapi3.Operation) { p.Post = op },
-		http.MethodPut:    func(p *openapi3.PathItem, op *openapi3.Operation) { p.Put = op },
-		http.MethodPatch:  func(p *openapi3.PathItem, op *openapi3.Operation) { p.Patch = op },
-		http.MethodDelete: func(p *openapi3.PathItem, op *openapi3.Operation) { p.Delete = op },
+		http.MethodGet:     func(p *openapi3.PathItem, op *openapi3.Operation) { p.Get = op },
+		http.MethodPost:    func(p *openapi3.PathItem, op *openapi3.Operation) { p.Post = op },
+		http.MethodPut:     func(p *openapi3.PathItem, op *openapi3.Operation) { p.Put = op },
+		http.MethodPatch:   func(p *openapi3.PathItem, op *openapi3.Operation) { p.Patch = op },
+		http.MethodDelete:  func(p *openapi3.PathItem, op *openapi3.Operation) { p.Delete = op },
+		http.MethodHead:    func(p *openapi3.PathItem, op *openapi3.Operation) { p.Head = op },
+		http.MethodOptions: func(p *openapi3.PathItem, op *openapi3.Operation) { p.Options = op },
 	}
 
 	for _, mock := range ep.MockResponse {
@@ -258,10 +260,6 @@ func (s *OAS) fillMockResponsePaths(paths openapi3.Paths, ep apidef.ExtendedPath
 		if setOperation, exists := methodOperationMap[mock.Method]; exists {
 			setOperation(pathItem, operation)
 		}
-
-		// if s.GetTykExtension() == nil {
-		// 	s.SetTykExtension(&XTykAPIGateway{})
-		// }
 
 		tykOperation := s.GetTykExtension().getOperation(operation.OperationID)
 		if tykOperation == nil {
@@ -596,6 +594,11 @@ func (o *Operation) extractRequestSizeLimitTo(ep *apidef.ExtendedPathsSet, path 
 	ep.SizeLimit = append(ep.SizeLimit, meta)
 }
 
+// extractMockResponsePaths converts OAS mock responses to classic API format.
+// For each mock response, it:
+// 1. Creates a classic API whitelist entry with the mock response configuration
+// 2. Sets up the response code, body and headers
+// 3. Configures the endpoint to use the Reply action
 func (o *Operation) extractMockResponsePaths(ep *apidef.ExtendedPathsSet, path, method string) {
 	if o.MockResponse == nil {
 		return
@@ -903,7 +906,7 @@ func (m *MockResponse) Fill(op apidef.MockResponseMeta) {
 		})
 	}
 
-	// Sort headers by name
+	// Sort headers by name so that the order is deterministic
 	sort.Slice(headers, func(i, j int) bool {
 		return headers[i].Name < headers[j].Name
 	})
