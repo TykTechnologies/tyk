@@ -194,8 +194,12 @@ func (s *OAS) fillMockResponsePaths(paths openapi3.Paths, ep apidef.ExtendedPath
 
 		operation.OperationID = genMockResponseOperationID(mock)
 
+		// TODO(TT-7306): Change this values
+		dummyDescription := "CHANGE ME"
+
 		response := &openapi3.Response{
-			Headers: make(openapi3.Headers),
+			Headers:     make(openapi3.Headers),
+			Description: &dummyDescription,
 		}
 
 		contentType := "text/plain"
