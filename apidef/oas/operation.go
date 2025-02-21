@@ -12,6 +12,7 @@ import (
 	"github.com/getkin/kin-openapi/openapi3"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	tykheader "github.com/TykTechnologies/tyk/header"
 	"github.com/TykTechnologies/tyk/internal/oasutil"
 )
 
@@ -219,7 +220,7 @@ func (s *OAS) fillMockResponsePaths(paths openapi3.Paths, ep apidef.ExtendedPath
 		contentType := "text/plain"
 
 		for name, value := range mock.Headers {
-			if http.CanonicalHeaderKey(name) == header.ContentType {
+			if http.CanonicalHeaderKey(name) == tykheader.ContentType {
 				contentType = value
 				break
 			}
