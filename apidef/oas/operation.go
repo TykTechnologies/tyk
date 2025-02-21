@@ -170,10 +170,19 @@ func (s *OAS) fillPathsAndOperations(ep apidef.ExtendedPathsSet) {
 }
 
 // fillMockResponsePaths converts classic API mock responses to OAS format.
+// This method only handles direct mock response conversions, as other middleware
+// configurations (like allow lists, block lists, etc.) are converted to classic
+// API mock responses in an earlier step of the process.
+//
 // For each mock response, it:
 // 1. Creates an OAS operation with a unique ID (method + path + status code)
 // 2. Sets up the mock response with content type detection and example values
 // 3. Configures the operation to ignore authentication for this endpoint
+//
+// The content type is determined by:
+// - Checking the Content-Type header if present
+// - Attempting to parse the body as JSON
+// - Defaulting to text/plain if neither above applies
 func (s *OAS) fillMockResponsePaths(paths openapi3.Paths, ep apidef.ExtendedPathsSet) {
 	var methodOperationMap = map[string]func(*openapi3.PathItem, *openapi3.Operation){
 		http.MethodGet:     func(p *openapi3.PathItem, op *openapi3.Operation) { p.Get = op },
@@ -272,6 +281,8 @@ func (s *OAS) fillMockResponsePaths(paths openapi3.Paths, ep apidef.ExtendedPath
 		}
 
 		if tykOperation.IgnoreAuthentication == nil {
+			// We need to to add ignoreAuthentication middleware to the operation
+			// to stay consistent to the way mock responses work for classic APIs
 			tykOperation.IgnoreAuthentication = &Allowance{Enabled: true}
 		}
 
@@ -325,17 +336,26 @@ func (s *OAS) extractPathsAndOperations(ep *apidef.ExtendedPathsSet) {
 
 	// Sort the mock response paths by path, method, and response code.
 	// This ensures a deterministic order of mock responses.
-	sort.Slice(ep.MockResponse, func(i, j int) bool {
+	sort.Slice(ep.WhiteList, func(i, j int) bool {
 		// First sort by path
-		if ep.MockResponse[i].Path != ep.MockResponse[j].Path {
-			return ep.MockResponse[i].Path < ep.MockResponse[j].Path
+		if ep.WhiteList[i].Path != ep.WhiteList[j].Path {
+			return ep.WhiteList[i].Path < ep.WhiteList[j].Path
 		}
 		// Then by method
-		if ep.MockResponse[i].Method != ep.MockResponse[j].Method {
-			return ep.MockResponse[i].Method < ep.MockResponse[j].Method
+		if ep.WhiteList[i].Method != ep.WhiteList[j].Method {
+			return ep.WhiteList[i].Method < ep.WhiteList[j].Method
 		}
+
 		// Finally by response code
-		return ep.MockResponse[i].Code < ep.MockResponse[j].Code
+		actionI, existsI := ep.WhiteList[i].MethodActions[ep.WhiteList[i].Method]
+		actionJ, existsJ := ep.WhiteList[j].MethodActions[ep.WhiteList[j].Method]
+
+		// If either method action doesn't exist, maintain stable sort order
+		if !existsI || !existsJ {
+			return false
+		}
+
+		return actionI.Code < actionJ.Code
 	})
 }
 
@@ -600,10 +620,9 @@ func (o *Operation) extractRequestSizeLimitTo(ep *apidef.ExtendedPathsSet, path 
 }
 
 // extractMockResponsePaths converts OAS mock responses to classic API format.
-// For each mock response, it:
-// 1. Creates a classic API whitelist entry with the mock response configuration
-// 2. Sets up the response code, body and headers
-// 3. Configures the endpoint to use the Reply action
+// While classic APIs have direct support for mock responses, the API Designer UI
+// doesn't support them yet. Therefore, we are extracting them to a combination of
+// allow list entries and method actions instead.
 func (o *Operation) extractMockResponsePaths(ep *apidef.ExtendedPathsSet, path, method string) {
 	if o.MockResponse == nil {
 		return
@@ -612,7 +631,7 @@ func (o *Operation) extractMockResponsePaths(ep *apidef.ExtendedPathsSet, path, 
 	headers := make(map[string]string)
 
 	for _, header := range o.MockResponse.Headers {
-		headers[header.Name] = header.Value
+		headers[http.CanonicalHeaderKey(header.Name)] = header.Value
 	}
 
 	if ep.WhiteList == nil {
