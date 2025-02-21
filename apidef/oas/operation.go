@@ -219,7 +219,7 @@ func (s *OAS) fillMockResponsePaths(paths openapi3.Paths, ep apidef.ExtendedPath
 		contentType := "text/plain"
 
 		for name, value := range mock.Headers {
-			if http.CanonicalHeaderKey(name) == "Content-Type" {
+			if http.CanonicalHeaderKey(name) == header.ContentType {
 				contentType = value
 				break
 			}
