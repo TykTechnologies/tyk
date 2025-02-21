@@ -115,7 +115,7 @@ type Global struct {
 	// SkipQuota determines whether quota enforcement should be bypassed. Classic: `disable_quota`.
 	SkipQuota bool `bson:"skipQuota,omitempty" json:"skipQuota,omitempty"`
 
-	// SkipQuotaReset indicates if quota limits should not be reset when creating or updating quotas for the API. Classic: `dont_set_quotas_on_create`.
+	// SkipQuotaReset indicates if quota limits should not be reset when creating or updating quotas for the API. Classic: `dont_set_quota_on_create`.
 	SkipQuotaReset bool `bson:"skipQuotaReset,omitempty" json:"skipQuotaReset,omitempty"`
 }
 
