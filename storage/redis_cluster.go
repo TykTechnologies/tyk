@@ -409,6 +409,37 @@ func (r *RedisCluster) Decrement(keyName string) {
 	}
 }
 
+func (r *RedisCluster) IncrementByWithExpire(keyName string, by int64, expire int64) int64 {
+	// log.Debug("Incrementing raw key: ", keyName)
+	if err := r.up(); err != nil {
+		log.Debug(err)
+		return 0
+	}
+
+	singleton, err := r.singleton()
+	if err != nil {
+		log.Error(err)
+		return 0
+	}
+
+	// This function uses a raw key, so we shouldn't call fixKey
+	fixedKey := keyName
+
+	val, err := singleton.IncrBy(r.RedisController.ctx, fixedKey, by).Result()
+	if err != nil {
+		log.Error("Error trying to increment value:", err)
+	} else {
+		log.Debug("Incremented key: ", keyName, ", val is: ", val)
+	}
+
+	if val == 1 && expire > 0 {
+		log.Debug("--> Setting Expire")
+		singleton.Expire(r.RedisController.ctx, r.fixKey(keyName), time.Duration(expire)*time.Second)
+	}
+
+	return val
+}
+
 // IncrementWithExpire will increment a key in redis
 func (r *RedisCluster) IncrememntWithExpire(keyName string, expire int64) int64 {
 	storage, err := r.kv()

@@ -162,6 +162,10 @@ func (l *LDAPStorageHandler) Decrement(keyName string) {
 	l.notifyReadOnly()
 }
 
+func (l *LDAPStorageHandler) IncrementByWithExpire(keyName string, int64, timeout int64) int64 {
+	panic("IncrementByWithExpire not implemented")
+}
+
 func (l *LDAPStorageHandler) IncrememntWithExpire(keyName string, timeout int64) int64 {
 	l.notifyReadOnly()
 	return 999
