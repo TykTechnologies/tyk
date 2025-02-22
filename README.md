@@ -191,6 +191,10 @@ Note that tests require Redis to be running on the same machine (default port).
 
 To write your own test please use this guide [https://github.com/TykTechnologies/tyk/blob/master/TESTING.md](https://github.com/TykTechnologies/tyk/blob/master/TESTING.md)
 
+## Security Issues
+
+If you discover a security vulnerability within this project, please don't use the issue tracker. Instead, kindly email us directly at [support@tyk.io](mailto:support@tyk.io). We take security seriously and will promptly address your concerns.
+
 ## Contributing
 
 For more information about contributing PRs and issues, see [CONTRIBUTING.md](https://github.com/TykTechnologies/tyk/blob/master/CONTRIBUTING.md).
