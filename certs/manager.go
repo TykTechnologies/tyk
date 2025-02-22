@@ -445,6 +445,11 @@ func (c *certificateManager) List(certIDs []string, mode CertificateType) (out [
 	return out
 }
 
+// ListAny func returns list of certificates of any kind.
+func (c *certificateManager) ListAny(certIDs []string) []*tls.Certificate {
+	return c.List(certIDs, CertificateAny)
+}
+
 // Returns list of fingerprints
 func (c *certificateManager) ListPublicKeys(keyIDs []string) (out []string) {
 	var rawKey []byte
