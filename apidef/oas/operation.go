@@ -621,10 +621,11 @@ type pathPart struct {
 	name    string
 	value   string
 	isRegex bool
+	isParam bool
 }
 
 func (p pathPart) String() string {
-	if p.isRegex {
+	if p.isRegex || p.isParam {
 		return "{" + p.name + "}"
 	}
 
@@ -633,25 +634,19 @@ func (p pathPart) String() string {
 
 // splitPath splits URL into folder parts, detecting regex patterns.
 func splitPath(inPath string) ([]pathPart, bool) {
-	// Each URL fragment can contain a regex, but the whole
-	// URL isn't just a regex (`/a/.*/foot` => `/a/{param1}/foot`)
-	inPath = strings.Trim(inPath, "/")
+	trimmedPath := strings.Trim(inPath, "/")
 
-	if inPath == "" {
+	if trimmedPath == "" {
 		return []pathPart{}, false
 	}
 
-	if err := validatePath("/" + inPath); err != nil {
-		return []pathPart{}, false
-	}
-
-	parts := strings.Split(inPath, "/")
+	parts := strings.Split(trimmedPath, "/")
 
 	result := make([]pathPart, len(parts))
 	found := 0
 	nCustomRegex := 0
 
-	trimPathParam := func(value string) string {
+	trimPart := func(value string) string {
 		value = strings.TrimPrefix(value, "{")
 		value = strings.TrimSuffix(value, "}")
 
@@ -665,8 +660,9 @@ func splitPath(inPath string) ([]pathPart, bool) {
 			name := value
 
 			result[k] = pathPart{
-				name:  name,
-				value: value,
+				name:    name,
+				value:   value,
+				isRegex: isRegex(value),
 			}
 
 			if isRegex(value) {
@@ -681,34 +677,31 @@ func splitPath(inPath string) ([]pathPart, bool) {
 		}
 
 		// Handle bracketed path segments
-		segment := trimPathParam(value)
+		segment := trimPart(value)
 
-		// Parameter with pattern case:
-		// for example: /a/{id:[0-9]}
+		// Simple parameter case: {name}
+		if isParamName(segment) {
+			result[k] = pathPart{
+				name:    segment,
+				isParam: true,
+			}
+			found++
+			continue
+		}
+
+		// Parameter with pattern case: {name:pattern}
 		if name, pattern, ok := strings.Cut(segment, ":"); ok && isParamName(name) {
 			result[k] = pathPart{
 				name:    name,
 				value:   pattern,
 				isRegex: true,
-			}
-
-			found++
-			continue
-		}
-
-		// Simple parameter case:
-		// for example: /a/{id}
-		if isParamName(segment) {
-			result[k] = pathPart{
-				name:    segment,
-				isRegex: true,
+				isParam: true,
 			}
 			found++
 			continue
 		}
 
-		// Direct regex pattern case:
-		// for example: /a/{[0-9]}
+		// Direct regex pattern case: {pattern}
 		nCustomRegex++
 		result[k] = pathPart{
 			name:    fmt.Sprintf("customRegex%d", nCustomRegex),
@@ -808,7 +801,7 @@ func (s *OAS) getOperationID(inPath, method string) string {
 		p.Parameters = []*openapi3.ParameterRef{}
 
 		for _, part := range parts {
-			if part.isRegex {
+			if part.isRegex || part.isParam {
 				schema := &openapi3.SchemaRef{
 					Value: &openapi3.Schema{
 						Type:    "string",
