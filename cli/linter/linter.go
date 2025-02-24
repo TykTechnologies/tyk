@@ -7,21 +7,20 @@ import (
 	"net"
 	"os"
 
-	schema "github.com/xeipuuv/gojsonschema"
-
 	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/internal/service/gojsonschema"
 )
 
 // Run will lint the configuration file. It will return the path to the
 // config file that was checked, a list of warnings and an error, if any
 // happened.
 func Run(schm string, paths []string) (string, []string, error) {
-	addFormats(&schema.FormatCheckers)
+	addFormats(&gojsonschema.FormatCheckers)
 	var conf config.Config
 	if err := config.Load(paths, &conf); err != nil {
 		return "", nil, err
 	}
-	schemaLoader := schema.NewBytesLoader([]byte(schm))
+	schemaLoader := gojsonschema.NewBytesLoader([]byte(schm))
 
 	var orig map[string]interface{}
 	f, err := os.Open(conf.Private.OriginalPath)
@@ -40,8 +39,8 @@ func Run(schm string, paths []string) (string, []string, error) {
 		delete(orig, "Monitor")
 	}
 
-	fileLoader := schema.NewGoLoader(orig)
-	result, err := schema.Validate(schemaLoader, fileLoader)
+	fileLoader := gojsonschema.NewGoLoader(orig)
+	result, err := gojsonschema.Validate(schemaLoader, fileLoader)
 	if err != nil {
 		return "", nil, err
 	}
@@ -64,7 +63,7 @@ func (f stringFormat) IsFormat(v interface{}) bool {
 	return f(s)
 }
 
-func addFormats(chain *schema.FormatCheckerChain) {
+func addFormats(chain *gojsonschema.FormatCheckerChain) {
 	chain.Add("path", stringFormat(func(path string) bool {
 		_, err := os.Stat(path)
 		return err == nil // must be accessible
@@ -80,11 +79,11 @@ func addFormats(chain *schema.FormatCheckerChain) {
 	}))
 }
 
-func resultWarns(result *schema.Result) []string {
+func resultWarns(result *gojsonschema.Result) []string {
 	warns := result.Errors()
 	strs := make([]string, len(warns))
 	for i, warn := range warns {
-		ferr, ok := warn.(*schema.DoesNotMatchFormatError)
+		ferr, ok := warn.(*gojsonschema.DoesNotMatchFormatError)
 		if !ok {
 			strs[i] = warn.String()
 			continue
