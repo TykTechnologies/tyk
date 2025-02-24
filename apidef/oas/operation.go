@@ -499,13 +499,15 @@ func isRegex(value string) bool {
 
 // splitPath splits URL into folder parts, detecting regex patterns.
 func splitPath(inPath string) ([]pathPart, bool) {
-	trimmedPath := strings.Trim(inPath, "/")
+	// Each URL fragment can contain a regex, but the whole
+	// URL isn't just a regex (`/a/.*/foot` => `/a/{param1}/foot`)
+	inPath = strings.Trim(inPath, "/")
 
-	if trimmedPath == "" {
+	if inPath == "" {
 		return []pathPart{}, false
 	}
 
-	parts := strings.Split(trimmedPath, "/")
+	parts := strings.Split(inPath, "/")
 
 	result := make([]pathPart, len(parts))
 	found := 0
@@ -520,6 +522,7 @@ func splitPath(inPath string) ([]pathPart, bool) {
 
 	for k, value := range parts {
 		// Handle non-bracketed path segments
+		// for example: /a/b/c, /a/[0-9]
 		if !strings.HasPrefix(value, "{") && !strings.HasSuffix(value, "}") {
 			name := value
 
@@ -542,7 +545,8 @@ func splitPath(inPath string) ([]pathPart, bool) {
 		// Handle bracketed path segments
 		segment := trimPathParam(value)
 
-		// Parameter with pattern case: {name:pattern}
+		// Parameter with pattern case:
+		// for example: /a/{id:[0-9]}
 		if name, pattern, ok := strings.Cut(segment, ":"); ok && isParamName(name) {
 			result[k] = pathPart{
 				name:    name,
@@ -554,7 +558,8 @@ func splitPath(inPath string) ([]pathPart, bool) {
 			continue
 		}
 
-		// Simple parameter case: {name}
+		// Simple parameter case:
+		// for example: /a/{id}
 		if isParamName(segment) {
 			result[k] = pathPart{
 				name:    segment,
@@ -564,7 +569,8 @@ func splitPath(inPath string) ([]pathPart, bool) {
 			continue
 		}
 
-		// Direct regex pattern case: {pattern}
+		// Direct regex pattern case:
+		// for example: /a/{[0-9]}
 		nCustomRegex++
 		result[k] = pathPart{
 			name:    fmt.Sprintf("customRegex%d", nCustomRegex),
@@ -577,7 +583,8 @@ func splitPath(inPath string) ([]pathPart, bool) {
 	return result, found > 0
 }
 
-// isParamName checks if a string is a valid variable name containing only alphanumeric and underscore characters
+// isParamName checks if a string is a valid variable name containing only
+// alphanumeric, underscore and hyphen characters
 func isParamName(s string) bool {
 	if len(s) == 0 {
 		return false
