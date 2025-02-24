@@ -501,25 +501,109 @@ func isRegex(value string) bool {
 func splitPath(inPath string) ([]pathPart, bool) {
 	// Each URL fragment can contain a regex, but the whole
 	// URL isn't just a regex (`/a/.*/foot` => `/a/{param1}/foot`)
-	parts := strings.Split(strings.Trim(inPath, "/"), "/")
+	inPath = strings.Trim(inPath, "/")
+
+	if inPath == "" {
+		return []pathPart{}, false
+	}
+
+	parts := strings.Split(inPath, "/")
+
 	result := make([]pathPart, len(parts))
 	found := 0
+	nCustomRegex := 0
+
+	trimPathParam := func(value string) string {
+		value = strings.TrimPrefix(value, "{")
+		value = strings.TrimSuffix(value, "}")
+
+		return value
+	}
 
 	for k, value := range parts {
-		name := value
-		isRegex := isRegex(value)
-		if isRegex {
+		// Handle non-bracketed path segments
+		// for example: /a/b/c, /a/[0-9]
+		if !strings.HasPrefix(value, "{") && !strings.HasSuffix(value, "}") {
+			name := value
+
+			result[k] = pathPart{
+				name:  name,
+				value: value,
+			}
+
+			if isRegex(value) {
+				nCustomRegex++
+				found++
+
+				result[k].name = fmt.Sprintf("customRegex%d", nCustomRegex)
+				result[k].isRegex = true
+			}
+
+			continue
+		}
+
+		// Handle bracketed path segments
+		segment := trimPathParam(value)
+
+		// Parameter with pattern case:
+		// for example: /a/{id:[0-9]}
+		if name, pattern, ok := strings.Cut(segment, ":"); ok && isParamName(name) {
+			result[k] = pathPart{
+				name:    name,
+				value:   pattern,
+				isRegex: true,
+			}
+
 			found++
-			name = fmt.Sprintf("customRegex%d", found)
+			continue
 		}
+
+		// Simple parameter case:
+		// for example: /a/{id}
+		if isParamName(segment) {
+			result[k] = pathPart{
+				name:    segment,
+				isRegex: true,
+			}
+			found++
+			continue
+		}
+
+		// Direct regex pattern case:
+		// for example: /a/{[0-9]}
+		nCustomRegex++
 		result[k] = pathPart{
-			name:    name,
-			value:   value,
-			isRegex: isRegex,
+			name:    fmt.Sprintf("customRegex%d", nCustomRegex),
+			value:   segment,
+			isRegex: true,
 		}
+		found++
 	}
 
 	return result, found > 0
+}
+
+// isParamName checks if a string is a valid variable name containing only
+// alphanumeric, underscore and hyphen characters
+func isParamName(s string) bool {
+	if len(s) == 0 {
+		return false
+	}
+
+	// Check if string ends with hyphen
+	if s[len(s)-1] == '-' {
+		return false
+	}
+
+	for i, c := range s {
+		if i == 0 && !((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '_') {
+			return false
+		}
+		if !((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_') {
+			return false
+		}
+	}
+	return true
 }
 
 // buildPath converts the URL paths with regex to named parameters
@@ -583,6 +667,11 @@ func (s *OAS) getOperationID(inPath, method string) string {
 						Pattern: part.value,
 					},
 				}
+
+				if part.isRegex {
+					schema.Value.Pattern = part.value
+				}
+
 				param := &openapi3.ParameterRef{
 					Value: &openapi3.Parameter{
 						Name:     part.name,
