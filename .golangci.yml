@@ -52,6 +52,7 @@ linters:
     - errorlint # debt: measure error handling improvements
     - nilerr # debt: measure code that returns nil on non-nil error
     - revive # keep - measured for stats, shows code smells
+    - gomodguard # keep - for dependency management/enforcement
 
 linters-settings:
   fobidigo:
@@ -91,6 +92,17 @@ linters-settings:
       - time.Parse
       - strconv.ParseBool
       - strconv.ParseInt
+
+  # https://golangci-lint.run/usage/linters/#gomodguard
+  gomodguard:
+    blocked:
+      modules:
+        - "github.com/xeipuuv/gojsonschema":
+            recommendations:
+              - "github.com/TykTechnologies/internal/service/gojsonschema"
+            reason: "import pollution, unmaintained package"
+    # replaces are undesired due to CGO/plugins
+    local_replace_directives: true
 
 issues:
   max-issues-per-linter: 0
@@ -136,6 +148,9 @@ issues:
         - gocyclo # many functions can be very long
         - funlen # many functions can be very long
         - gosec # tests don't have CVEs
+    - path: ^internal/service/
+      linters:
+        - gomodguard
   exclude:
     - G404    # Use of weak random number generator (math/rand instead of crypto/rand)
     - SA9004  # only the first constant in this group has an explicit type
