@@ -631,13 +631,6 @@ func (p pathPart) String() string {
 	return p.value
 }
 
-func trimPart(value string) string {
-	value = strings.TrimPrefix(value, "{")
-	value = strings.TrimSuffix(value, "}")
-
-	return value
-}
-
 // splitPath splits URL into folder parts, detecting regex patterns.
 func splitPath(inPath string) ([]pathPart, bool) {
 	trimmedPath := strings.Trim(inPath, "/")
@@ -651,6 +644,13 @@ func splitPath(inPath string) ([]pathPart, bool) {
 	result := make([]pathPart, len(parts))
 	found := 0
 	nCustomRegex := 0
+
+	trimPathParam := func(value string) string {
+		value = strings.TrimPrefix(value, "{")
+		value = strings.TrimSuffix(value, "}")
+
+		return value
+	}
 
 	for k, value := range parts {
 		// Handle non-bracketed path segments
@@ -674,7 +674,7 @@ func splitPath(inPath string) ([]pathPart, bool) {
 		}
 
 		// Handle bracketed path segments
-		segment := trimPart(value)
+		segment := trimPathParam(value)
 
 		// Parameter with pattern case: {name:pattern}
 		if name, pattern, ok := strings.Cut(segment, ":"); ok && isParamName(name) {

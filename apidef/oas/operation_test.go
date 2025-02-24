@@ -1243,11 +1243,7 @@ func TestSplitPath(t *testing.T) {
 			path: "/users/{id}/profile",
 			expectedParts: []pathPart{
 				{name: "users", value: "users", isRegex: false},
-<<<<<<< HEAD
 				{name: "id", value: "", isRegex: true},
-=======
-				{name: "id", value: "", isRegex: false},
->>>>>>> d9fa8ff7a (fix errors)
 				{name: "profile", value: "profile", isRegex: false},
 			},
 			expectedRegex: true,
