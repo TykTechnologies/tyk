@@ -66,8 +66,6 @@ func (s *Stream) Start(config map[string]interface{}, mux service.HTTPMultiplexe
 	s.log.Debugf("Building new stream")
 	builder := service.NewStreamBuilder()
 
-	println(string(configPayload))
-
 	err = builder.SetYAML(string(configPayload))
 	if err != nil {
 		s.log.Errorf("Failed to set YAML: %v", err)
