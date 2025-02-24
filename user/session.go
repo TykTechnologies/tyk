@@ -285,6 +285,7 @@ type SessionState struct {
 	LastUpdated             string                 `json:"last_updated" msg:"last_updated"`
 	IdExtractorDeadline     int64                  `json:"id_extractor_deadline" msg:"id_extractor_deadline"`
 	SessionLifetime         int64                  `bson:"session_lifetime" json:"session_lifetime"`
+	DoNotTrack 							bool 									 `json:"do_not_track" msg:"do_not_track"`
 
 	// Used to store token hash
 	keyHash string
