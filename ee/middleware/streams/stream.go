@@ -11,9 +11,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v2"
 
-	_ "github.com/warpstreamlabs/bento/public/components/io"
-	_ "github.com/warpstreamlabs/bento/public/components/kafka"
-	_ "github.com/warpstreamlabs/bento/public/components/nats"
+	_ "github.com/warpstreamlabs/bento/public/components/all"
 	"github.com/warpstreamlabs/bento/public/service"
 
 	_ "github.com/TykTechnologies/tyk/internal/portal"
@@ -67,6 +65,8 @@ func (s *Stream) Start(config map[string]interface{}, mux service.HTTPMultiplexe
 
 	s.log.Debugf("Building new stream")
 	builder := service.NewStreamBuilder()
+
+	println(string(configPayload))
 
 	err = builder.SetYAML(string(configPayload))
 	if err != nil {

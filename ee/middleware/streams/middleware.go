@@ -15,6 +15,7 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/sirupsen/logrus"
 
+	"github.com/TykTechnologies/tyk/apidef/streams"
 	"github.com/TykTechnologies/tyk/internal/middleware"
 	"github.com/TykTechnologies/tyk/internal/model"
 )
@@ -72,8 +73,20 @@ func (s *Middleware) EnabledForSpec() bool {
 		s.Logger().Debugf("Allowed unsafe components: %v", s.allowedUnsafe)
 
 		config := s.getStreamsConfig(nil)
-		GlobalStreamCounter.Add(int64(len(config.Streams)))
+		if s.Spec.IsOAS {
+			oasBytes, err := s.Spec.OAS.MarshalJSON()
+			if err != nil {
+				s.Logger().WithError(err).Error("Failed to marshal OAS configuration")
+				return false
+			}
 
+			if err := streams.ValidateOASObjectWithConfig(oasBytes, "", streamingConfig.EnableAll); err != nil {
+				s.Logger().WithError(err).Error("Failed to validate streams configuration")
+				return false
+			}
+		}
+
+		GlobalStreamCounter.Add(int64(len(config.Streams)))
 		s.Logger().Debug("Total streams count: ", len(config.Streams))
 
 		return len(config.Streams) != 0

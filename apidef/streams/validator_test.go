@@ -15,6 +15,7 @@ import (
 	_ "github.com/warpstreamlabs/bento/public/components/kafka"
 
 	"github.com/TykTechnologies/tyk/apidef/oas"
+	"github.com/TykTechnologies/tyk/apidef/streams/bento"
 )
 
 //go:embed testdata/*-oas-template.json
@@ -388,6 +389,66 @@ func TestValidateTykStreams_BentoConfigValidation_Additional_Properties(t *testi
         }
     }
 }`)
-	err := ValidateOASObject(document, "3.0.3")
-	require.NoError(t, err)
+	t.Run("with default validator", func(t *testing.T) {
+		err := ValidateOASObjectWithBentoConfigValidator(document, "3.0.3", bento.DefaultValidator)
+		require.NoError(t, err)
+	})
+
+	t.Run("with enabled-all validator", func(t *testing.T) {
+		err := ValidateOASObjectWithBentoConfigValidator(document, "3.0.3", bento.EnabledAll)
+		require.NoError(t, err)
+
+		// Test with AMQP configuration
+		var amqpDocument = []byte(`{
+			"info": {
+				"title": "test-streams",
+				"version": "1.0.0"
+			},
+			"openapi": "3.0.3",
+			"paths": {},
+			"x-tyk-streaming": {
+				"streams": {
+					"test-amqp-stream": {
+						"input": {
+							"label": "",
+							"amqp": {
+								"url": "amqp://guest:guest@localhost:5672/",
+								"queue": "test-queue",
+								"consumer_tag": "test-consumer",
+								"prefetch_count": 10,
+								"prefetch_size": 4096,
+								"auto_ack": false
+							}
+						},
+						"output": {
+							"label": "",
+							"amqp": {
+								"url": "amqp://guest:guest@localhost:5672/",
+								"exchange": "test-exchange",
+								"key": "test-key",
+								"persistent": true,
+								"mandatory": false,
+								"immediate": false
+							}
+						}
+					}
+				}
+			},
+			"x-tyk-api-gateway": {
+				"info": {
+					"name": "test-streams",
+					"state": {
+						"active": true
+					}
+				},
+				"server": {
+					"listenPath": {
+						"value": "/test-streams"
+					}
+				}
+			}
+		}`)
+		err = ValidateOASObjectWithBentoConfigValidator(amqpDocument, "3.0.3", bento.EnabledAll)
+		require.NoError(t, err)
+	})
 }
