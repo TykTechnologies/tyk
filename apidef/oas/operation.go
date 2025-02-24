@@ -477,14 +477,96 @@ type pathPart struct {
 	name    string
 	value   string
 	isRegex bool
+	isParam bool
 }
 
 func (p pathPart) String() string {
-	if p.isRegex {
+	if p.isRegex || p.isParam {
 		return "{" + p.name + "}"
 	}
 
 	return p.value
+}
+
+func trimPart(value string) string {
+	value = strings.TrimPrefix(value, "{")
+	value = strings.TrimSuffix(value, "}")
+
+	return value
+}
+
+// splitPath splits URL into folder parts, detecting regex patterns.
+func splitPath(inPath string) ([]pathPart, bool) {
+	trimmedPath := strings.Trim(inPath, "/")
+
+	if trimmedPath == "" {
+		return []pathPart{}, false
+	}
+
+	parts := strings.Split(trimmedPath, "/")
+
+	result := make([]pathPart, len(parts))
+	found := 0
+	nCustomRegex := 0
+
+	for k, value := range parts {
+		// Handle non-bracketed path segments
+		if !strings.HasPrefix(value, "{") && !strings.HasSuffix(value, "}") {
+			name := value
+
+			result[k] = pathPart{
+				name:    name,
+				value:   value,
+				isRegex: isRegex(value),
+			}
+
+			if isRegex(value) {
+				nCustomRegex++
+				found++
+
+				result[k].name = fmt.Sprintf("customRegex%d", nCustomRegex)
+				result[k].isRegex = true
+			}
+
+			continue
+		}
+
+		// Handle bracketed path segments
+		segment := trimPart(value)
+
+		// Simple parameter case: {name}
+		if isParamName(segment) {
+			result[k] = pathPart{
+				name:    segment,
+				isParam: true,
+			}
+			found++
+			continue
+		}
+
+		// Parameter with pattern case: {name:pattern}
+		if name, pattern, ok := strings.Cut(segment, ":"); ok && isParamName(name) {
+			result[k] = pathPart{
+				name:    name,
+				value:   pattern,
+				isRegex: true,
+				isParam: true,
+			}
+			found++
+			continue
+		}
+
+		// Direct regex pattern case: {pattern}
+		nCustomRegex++
+		result[k] = pathPart{
+			name:    fmt.Sprintf("customRegex%d", nCustomRegex),
+			value:   segment,
+			isRegex: true,
+		}
+		found++
+	}
+
+	return result, found > 0
 }
 
 // isRegex checks if value has expected regular expression patterns.
@@ -497,29 +579,26 @@ func isRegex(value string) bool {
 	return false
 }
 
-// splitPath splits URL into folder parts, detecting regex patterns.
-func splitPath(inPath string) ([]pathPart, bool) {
-	// Each URL fragment can contain a regex, but the whole
-	// URL isn't just a regex (`/a/.*/foot` => `/a/{param1}/foot`)
-	parts := strings.Split(strings.Trim(inPath, "/"), "/")
-	result := make([]pathPart, len(parts))
-	found := 0
-
-	for k, value := range parts {
-		name := value
-		isRegex := isRegex(value)
-		if isRegex {
-			found++
-			name = fmt.Sprintf("customRegex%d", found)
-		}
-		result[k] = pathPart{
-			name:    name,
-			value:   value,
-			isRegex: isRegex,
-		}
+// isParamName checks if a string is a valid variable name containing only alphanumeric and underscore characters
+func isParamName(s string) bool {
+	if len(s) == 0 {
+		return false
 	}
 
-	return result, found > 0
+	// Check if string ends with hyphen
+	if s[len(s)-1] == '-' {
+		return false
+	}
+
+	for i, c := range s {
+		if i == 0 && !((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '_') {
+			return false
+		}
+		if !((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_') {
+			return false
+		}
+	}
+	return true
 }
 
 // buildPath converts the URL paths with regex to named parameters
@@ -576,13 +655,18 @@ func (s *OAS) getOperationID(inPath, method string) string {
 		p.Parameters = []*openapi3.ParameterRef{}
 
 		for _, part := range parts {
-			if part.isRegex {
+			if part.isRegex || part.isParam {
 				schema := &openapi3.SchemaRef{
 					Value: &openapi3.Schema{
 						Type:    "string",
 						Pattern: part.value,
 					},
 				}
+
+				if part.isRegex {
+					schema.Value.Pattern = part.value
+				}
+
 				param := &openapi3.ParameterRef{
 					Value: &openapi3.Parameter{
 						Name:     part.name,
