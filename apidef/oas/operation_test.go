@@ -360,8 +360,8 @@ func TestPathPartString(t *testing.T) {
 			name: "named pattern format",
 			pathPart: pathPart{
 				name:    "id",
-				value:   "{id:[0-9]+}",
-				isRegex: false,
+				value:   "[0-9]+",
+				isRegex: true,
 			},
 			want: "{id}",
 		},
@@ -369,8 +369,8 @@ func TestPathPartString(t *testing.T) {
 			name: "named pattern with multiple colons",
 			pathPart: pathPart{
 				name:    "path",
-				value:   "{path:.*:more:stuff}",
-				isRegex: false,
+				value:   ".*:more:stuff",
+				isRegex: true,
 			},
 			want: "{path}",
 		},
@@ -397,9 +397,9 @@ func TestSplitPath(t *testing.T) {
 			name: "standard path without regex",
 			path: "/users/documents/list",
 			expectedParts: []pathPart{
-				{name: "users", value: "users", isRegex: false, isParam: false},
-				{name: "documents", value: "documents", isRegex: false, isParam: false},
-				{name: "list", value: "list", isRegex: false, isParam: false},
+				{name: "users", value: "users", isRegex: false},
+				{name: "documents", value: "documents", isRegex: false},
+				{name: "list", value: "list", isRegex: false},
 			},
 			expectedRegex: false,
 		},
@@ -407,9 +407,9 @@ func TestSplitPath(t *testing.T) {
 			name: "path with named parameter",
 			path: "/users/{id}/profile",
 			expectedParts: []pathPart{
-				{name: "users", value: "users", isRegex: false, isParam: false},
-				{name: "id", value: "", isRegex: false, isParam: true},
-				{name: "profile", value: "profile", isRegex: false, isParam: false},
+				{name: "users", value: "users", isRegex: false},
+				{name: "id", value: "", isRegex: false},
+				{name: "profile", value: "profile", isRegex: false},
 			},
 			expectedRegex: true,
 		},
@@ -417,9 +417,9 @@ func TestSplitPath(t *testing.T) {
 			name: "path with regex pattern",
 			path: "/users/{id:[0-9]+}/profile",
 			expectedParts: []pathPart{
-				{name: "users", value: "users", isRegex: false, isParam: false},
-				{name: "id", value: "[0-9]+", isRegex: true, isParam: true},
-				{name: "profile", value: "profile", isRegex: false, isParam: false},
+				{name: "users", value: "users", isRegex: false},
+				{name: "id", value: "[0-9]+", isRegex: true},
+				{name: "profile", value: "profile", isRegex: false},
 			},
 			expectedRegex: true,
 		},
@@ -427,9 +427,9 @@ func TestSplitPath(t *testing.T) {
 			name: "path with direct regex",
 			path: "/files/{.*}/download",
 			expectedParts: []pathPart{
-				{name: "files", value: "files", isRegex: false, isParam: false},
-				{name: "customRegex1", value: ".*", isRegex: true, isParam: false},
-				{name: "download", value: "download", isRegex: false, isParam: false},
+				{name: "files", value: "files", isRegex: false},
+				{name: "customRegex1", value: ".*", isRegex: true},
+				{name: "download", value: "download", isRegex: false},
 			},
 			expectedRegex: true,
 		},
@@ -437,9 +437,9 @@ func TestSplitPath(t *testing.T) {
 			name: "path with multiple regex patterns",
 			path: "/{id:[0-9]+}/{name:[a-zA-Z]+}/{.*}",
 			expectedParts: []pathPart{
-				{name: "id", value: "[0-9]+", isRegex: true, isParam: true},
-				{name: "name", value: "[a-zA-Z]+", isRegex: true, isParam: true},
-				{name: "customRegex1", value: ".*", isRegex: true, isParam: false},
+				{name: "id", value: "[0-9]+", isRegex: true},
+				{name: "name", value: "[a-zA-Z]+", isRegex: true},
+				{name: "customRegex1", value: ".*", isRegex: true},
 			},
 			expectedRegex: true,
 		},
@@ -447,9 +447,18 @@ func TestSplitPath(t *testing.T) {
 			name: "path with invalid parameter names",
 			path: "/users/{123}/{user-name}",
 			expectedParts: []pathPart{
-				{name: "users", value: "users", isRegex: false, isParam: false},
-				{name: "customRegex1", value: "123", isRegex: true, isParam: false},
-				{name: "customRegex2", value: "user-name", isRegex: true, isParam: false},
+				{name: "users", value: "users", isRegex: false},
+				{name: "customRegex1", value: "123", isRegex: true},
+				{name: "customRegex2", value: "user-name", isRegex: true},
+			},
+			expectedRegex: true,
+		},
+		{
+			name: "path with invalid starting character",
+			path: "/users/{1invalid}",
+			expectedParts: []pathPart{
+				{name: "users", value: "users", isRegex: false},
+				{name: "customRegex1", value: "1invalid", isRegex: true},
 			},
 			expectedRegex: true,
 		},
@@ -469,8 +478,8 @@ func TestSplitPath(t *testing.T) {
 			name: "path with trailing slash",
 			path: "/users/profile/",
 			expectedParts: []pathPart{
-				{name: "users", value: "users", isRegex: false, isParam: false},
-				{name: "profile", value: "profile", isRegex: false, isParam: false},
+				{name: "users", value: "users", isRegex: false},
+				{name: "profile", value: "profile", isRegex: false},
 			},
 			expectedRegex: false,
 		},
@@ -478,9 +487,9 @@ func TestSplitPath(t *testing.T) {
 			name: "path with complex regex pattern",
 			path: "/dates/{date:[0-9]{4}-[0-9]{2}-[0-9]{2}}/events",
 			expectedParts: []pathPart{
-				{name: "dates", value: "dates", isRegex: false, isParam: false},
-				{name: "date", value: "[0-9]{4}-[0-9]{2}-[0-9]{2}", isRegex: true, isParam: true},
-				{name: "events", value: "events", isRegex: false, isParam: false},
+				{name: "dates", value: "dates", isRegex: false},
+				{name: "date", value: "[0-9]{4}-[0-9]{2}-[0-9]{2}", isRegex: true},
+				{name: "events", value: "events", isRegex: false},
 			},
 			expectedRegex: true,
 		},
@@ -488,7 +497,7 @@ func TestSplitPath(t *testing.T) {
 			name: "root regex pattern",
 			path: "/.+",
 			expectedParts: []pathPart{
-				{name: "customRegex1", value: ".+", isRegex: true, isParam: false},
+				{name: "customRegex1", value: ".+", isRegex: true},
 			},
 			expectedRegex: true,
 		},
@@ -496,7 +505,7 @@ func TestSplitPath(t *testing.T) {
 			name: "root regex pattern with trailing slash",
 			path: "/.+",
 			expectedParts: []pathPart{
-				{name: "customRegex1", value: ".+", isRegex: true, isParam: false},
+				{name: "customRegex1", value: ".+", isRegex: true},
 			},
 			expectedRegex: true,
 		},
@@ -504,8 +513,8 @@ func TestSplitPath(t *testing.T) {
 			name: "path with trailing slash",
 			path: "/users/my-profile/",
 			expectedParts: []pathPart{
-				{name: "users", value: "users", isRegex: false, isParam: false},
-				{name: "my-profile", value: "my-profile", isRegex: false, isParam: false},
+				{name: "users", value: "users", isRegex: false},
+				{name: "my-profile", value: "my-profile", isRegex: false},
 			},
 			expectedRegex: false,
 		},
@@ -513,9 +522,9 @@ func TestSplitPath(t *testing.T) {
 			name: "path with multiple regex patterns",
 			path: "/[0-9]+/[a-zA-Z]+/.*",
 			expectedParts: []pathPart{
-				{name: "customRegex1", value: "[0-9]+", isRegex: true, isParam: false},
-				{name: "customRegex2", value: "[a-zA-Z]+", isRegex: true, isParam: false},
-				{name: "customRegex3", value: ".*", isRegex: true, isParam: false},
+				{name: "customRegex1", value: "[0-9]+", isRegex: true},
+				{name: "customRegex2", value: "[a-zA-Z]+", isRegex: true},
+				{name: "customRegex3", value: ".*", isRegex: true},
 			},
 			expectedRegex: true,
 		},
@@ -544,9 +553,6 @@ func TestSplitPath(t *testing.T) {
 				}
 				if part.isRegex != expected.isRegex {
 					t.Errorf("Part %d isRegex = %v, want %v", i, part.isRegex, expected.isRegex)
-				}
-				if part.isParam != expected.isParam {
-					t.Errorf("Part %d isParam = %v, want %v", i, part.isParam, expected.isParam)
 				}
 			}
 		})

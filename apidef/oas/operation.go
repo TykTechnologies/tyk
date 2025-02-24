@@ -477,11 +477,10 @@ type pathPart struct {
 	name    string
 	value   string
 	isRegex bool
-	isParam bool
 }
 
 func (p pathPart) String() string {
-	if p.isRegex || p.isParam {
+	if p.isRegex {
 		return "{" + p.name + "}"
 	}
 
@@ -515,9 +514,8 @@ func splitPath(inPath string) ([]pathPart, bool) {
 			name := value
 
 			result[k] = pathPart{
-				name:    name,
-				value:   value,
-				isRegex: isRegex(value),
+				name:  name,
+				value: value,
 			}
 
 			if isRegex(value) {
@@ -534,23 +532,23 @@ func splitPath(inPath string) ([]pathPart, bool) {
 		// Handle bracketed path segments
 		segment := trimPart(value)
 
-		// Simple parameter case: {name}
-		if isParamName(segment) {
-			result[k] = pathPart{
-				name:    segment,
-				isParam: true,
-			}
-			found++
-			continue
-		}
-
 		// Parameter with pattern case: {name:pattern}
 		if name, pattern, ok := strings.Cut(segment, ":"); ok && isParamName(name) {
 			result[k] = pathPart{
 				name:    name,
 				value:   pattern,
 				isRegex: true,
-				isParam: true,
+			}
+
+			found++
+			continue
+		}
+
+		// Simple parameter case: {name}
+		if isParamName(segment) {
+			result[k] = pathPart{
+				name:    segment,
+				isRegex: true,
 			}
 			found++
 			continue
@@ -655,7 +653,7 @@ func (s *OAS) getOperationID(inPath, method string) string {
 		p.Parameters = []*openapi3.ParameterRef{}
 
 		for _, part := range parts {
-			if part.isRegex || part.isParam {
+			if part.isRegex {
 				schema := &openapi3.SchemaRef{
 					Value: &openapi3.Schema{
 						Type:    "string",
