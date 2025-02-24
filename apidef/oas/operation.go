@@ -487,11 +487,14 @@ func (p pathPart) String() string {
 	return p.value
 }
 
-func trimPart(value string) string {
-	value = strings.TrimPrefix(value, "{")
-	value = strings.TrimSuffix(value, "}")
-
-	return value
+// isRegex checks if value has expected regular expression patterns.
+func isRegex(value string) bool {
+	for _, pattern := range regexPatterns {
+		if strings.Contains(value, pattern) {
+			return true
+		}
+	}
+	return false
 }
 
 // splitPath splits URL into folder parts, detecting regex patterns.
@@ -507,6 +510,13 @@ func splitPath(inPath string) ([]pathPart, bool) {
 	result := make([]pathPart, len(parts))
 	found := 0
 	nCustomRegex := 0
+
+	trimPathParam := func(value string) string {
+		value = strings.TrimPrefix(value, "{")
+		value = strings.TrimSuffix(value, "}")
+
+		return value
+	}
 
 	for k, value := range parts {
 		// Handle non-bracketed path segments
@@ -530,7 +540,7 @@ func splitPath(inPath string) ([]pathPart, bool) {
 		}
 
 		// Handle bracketed path segments
-		segment := trimPart(value)
+		segment := trimPathParam(value)
 
 		// Parameter with pattern case: {name:pattern}
 		if name, pattern, ok := strings.Cut(segment, ":"); ok && isParamName(name) {
@@ -565,16 +575,6 @@ func splitPath(inPath string) ([]pathPart, bool) {
 	}
 
 	return result, found > 0
-}
-
-// isRegex checks if value has expected regular expression patterns.
-func isRegex(value string) bool {
-	for _, pattern := range regexPatterns {
-		if strings.Contains(value, pattern) {
-			return true
-		}
-	}
-	return false
 }
 
 // isParamName checks if a string is a valid variable name containing only alphanumeric and underscore characters
