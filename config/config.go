@@ -688,6 +688,8 @@ func (pwl *PortsWhiteList) Decode(value string) error {
 type StreamingConfig struct {
 	Enabled     bool     `json:"enabled"`
 	AllowUnsafe []string `json:"allow_unsafe"`
+	// EnableAll enables all Bento plugins (except unsafe ones) by disabling the streams validator
+	EnableAll bool `json:"enable_all"`
 }
 
 // Config is the configuration object used by Tyk to set up various parameters.
