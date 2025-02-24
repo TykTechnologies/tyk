@@ -106,13 +106,22 @@ type Global struct {
 	// RequestSizeLimit contains the configuration related to limiting the global request size.
 	RequestSizeLimit *GlobalRequestSizeLimit `bson:"requestSizeLimit,omitempty" json:"requestSizeLimit,omitempty"`
 
-	// IgnoreCase contains the configuration to treat routes as case insensitive.
+	// IgnoreCase contains the configuration to treat routes as case-insensitive.
 	IgnoreCase *IgnoreCase `bson:"ignoreCase,omitempty" json:"ignoreCase,omitempty"`
+
+	// SkipRateLimit determines whether the rate-limiting middleware logic should be skipped. Classic: `disable_rate_limit`.
+	SkipRateLimit bool `bson:"skipRateLimit,omitempty" json:"skipRateLimit,omitempty"`
+
+	// SkipQuota determines whether quota enforcement should be bypassed. Classic: `disable_quota`.
+	SkipQuota bool `bson:"skipQuota,omitempty" json:"skipQuota,omitempty"`
+
+	// SkipQuotaReset indicates if quota limits should not be reset when creating or updating quotas for the API. Classic: `dont_set_quota_on_create`.
+	SkipQuotaReset bool `bson:"skipQuotaReset,omitempty" json:"skipQuotaReset,omitempty"`
 }
 
-// MarshalJSON is a custom JSON marshaler for the Global struct. It is implemented
+// MarshalJSON is a custom JSON marshaller for the Global struct. It is implemented
 // to facilitate a smooth migration from deprecated fields that were previously used to represent
-// the same data. This custom marshaler ensures backwards compatibility and proper handling of the
+// the same data. This custom marshaller ensures backwards compatibility and proper handling of the
 // deprecated fields during the migration process.
 func (g *Global) MarshalJSON() ([]byte, error) {
 	if g == nil {
@@ -238,6 +247,8 @@ func (g *Global) Fill(api apidef.APIDefinition) {
 	g.fillTrafficLogs(api)
 
 	g.fillRequestSizeLimit(api)
+
+	g.fillSkips(api)
 }
 
 func (g *Global) fillTrafficLogs(api apidef.APIDefinition) {
@@ -271,6 +282,12 @@ func (g *Global) fillContextVariables(api apidef.APIDefinition) {
 	if ShouldOmit(g.ContextVariables) {
 		g.ContextVariables = nil
 	}
+}
+
+func (g *Global) fillSkips(api apidef.APIDefinition) {
+	g.SkipRateLimit = api.DisableRateLimit
+	g.SkipQuota = api.DisableQuota
+	g.SkipQuotaReset = api.DontSetQuotasOnCreate
 }
 
 // ExtractTo extracts *Global into *apidef.APIDefinition.
@@ -348,6 +365,8 @@ func (g *Global) ExtractTo(api *apidef.APIDefinition) {
 	updateMainVersion(api, vInfo)
 
 	g.extractRequestSizeLimitTo(api)
+
+	g.extractSkipsTo(api)
 }
 
 func (g *Global) extractTrafficLogsTo(api *apidef.APIDefinition) {
@@ -454,6 +473,12 @@ func (g *Global) extractResponsePluginsTo(api *apidef.APIDefinition) {
 	}
 
 	g.ResponsePlugin.ExtractTo(api)
+}
+
+func (g *Global) extractSkipsTo(api *apidef.APIDefinition) {
+	api.DisableRateLimit = g.SkipRateLimit
+	api.DisableQuota = g.SkipQuota
+	api.DontSetQuotasOnCreate = g.SkipQuotaReset
 }
 
 // PluginConfigData configures config data for custom plugins.

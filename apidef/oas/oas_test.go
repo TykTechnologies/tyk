@@ -178,7 +178,6 @@ func TestOAS_ExtractTo_ResetAPIDefinition(t *testing.T) {
 	a.IsOAS = false
 	a.IDPClientIDMappingDisabled = false
 	a.EnableContextVars = false
-	a.DisableRateLimit = false
 	a.DoNotTrack = false
 	a.IPAccessControlDisabled = false
 
@@ -229,7 +228,6 @@ func TestOAS_ExtractTo_ResetAPIDefinition(t *testing.T) {
 		"APIDefinition.VersionData.Versions[0].ExtendedPaths.PersistGraphQL[0].Variables[0]",
 		"APIDefinition.UptimeTests.Config.ServiceDiscovery.CacheDisabled",
 		"APIDefinition.Proxy.CheckHostAgainstUptimeTests",
-		"APIDefinition.DisableQuota",
 		"APIDefinition.AuthProvider.Name",
 		"APIDefinition.AuthProvider.StorageEngine",
 		"APIDefinition.AuthProvider.Meta[0]",
@@ -238,7 +236,6 @@ func TestOAS_ExtractTo_ResetAPIDefinition(t *testing.T) {
 		"APIDefinition.SessionProvider.Meta[0]",
 		"APIDefinition.EnableIpWhiteListing",
 		"APIDefinition.EnableIpBlacklisting",
-		"APIDefinition.DontSetQuotasOnCreate",
 		"APIDefinition.ResponseProcessors[0].Name",
 		"APIDefinition.ResponseProcessors[0].Options",
 		"APIDefinition.GraphQL.Enabled",
