@@ -633,9 +633,11 @@ func (p pathPart) String() string {
 
 // splitPath splits URL into folder parts, detecting regex patterns.
 func splitPath(inPath string) ([]pathPart, bool) {
-	trimmedPath := strings.Trim(inPath, "/")
+	// Each URL fragment can contain a regex, but the whole
+	// URL isn't just a regex (`/a/.*/foot` => `/a/{param1}/foot`)
+	inPath = strings.Trim(inPath, "/")
 
-	if trimmedPath == "" {
+	if inPath == "" {
 		return []pathPart{}, false
 	}
 
@@ -681,7 +683,8 @@ func splitPath(inPath string) ([]pathPart, bool) {
 		// Handle bracketed path segments
 		segment := trimPathParam(value)
 
-		// Parameter with pattern case: {name:pattern}
+		// Parameter with pattern case:
+		// for example: /a/{id:[0-9]}
 		if name, pattern, ok := strings.Cut(segment, ":"); ok && isParamName(name) {
 			result[k] = pathPart{
 				name:    name,
@@ -693,7 +696,8 @@ func splitPath(inPath string) ([]pathPart, bool) {
 			continue
 		}
 
-		// Simple parameter case: {name}
+		// Simple parameter case:
+		// for example: /a/{id}
 		if isParamName(segment) {
 			result[k] = pathPart{
 				name:    segment,
@@ -703,7 +707,8 @@ func splitPath(inPath string) ([]pathPart, bool) {
 			continue
 		}
 
-		// Direct regex pattern case: {pattern}
+		// Direct regex pattern case:
+		// for example: /a/{[0-9]}
 		nCustomRegex++
 		result[k] = pathPart{
 			name:    fmt.Sprintf("customRegex%d", nCustomRegex),
