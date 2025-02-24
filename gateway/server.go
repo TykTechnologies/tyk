@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/TykTechnologies/structviewer"
 	htmltemplate "html/template"
 	"io/ioutil"
 	stdlog "log"
@@ -689,6 +690,7 @@ func (gw *Gateway) loadControlAPIEndpoints(muxer *mux.Router) {
 		muxer.HandleFunc("/debug/pprof/profile", pprofhttp.Profile)
 		muxer.HandleFunc("/debug/pprof/{_:.*}", pprofhttp.Index)
 	}
+	gw.loadConfigurationAPI(muxer)
 
 	r.MethodNotAllowedHandler = MethodNotAllowedHandler{}
 
@@ -2005,6 +2007,7 @@ func (gw *Gateway) startServer() {
 	muxer := &proxyMux{}
 
 	router := mux.NewRouter()
+
 	gw.loadControlAPIEndpoints(router)
 
 	muxer.setRouter(gw.GetConfig().ControlAPIPort, "", router, gw.GetConfig())
@@ -2040,4 +2043,72 @@ func (gw *Gateway) SetConfig(conf config.Config, skipReload ...bool) {
 	gw.configMu.Lock()
 	gw.config.Store(conf)
 	gw.configMu.Unlock()
+}
+
+func (gw *Gateway) loadConfigurationAPI(muxer *mux.Router) error {
+
+	config := gw.GetConfig()
+
+	// Check if enabled
+	if config.ConfigurationReflection.Enable != true {
+		mainLog.Info("configuration reflection API is disabled in the configuration. Please enable it if you need to use it")
+		return nil
+	}
+	mainLog.Debug("configuration reflection API is enabled")
+
+	if config.ControlAPIPort == 0 {
+		return fmt.Errorf("configuration reflection API requires a dedicated control port. Please set `control_api_port` in order to use it")
+	}
+	/*
+		port := config.ControlAPIPort
+		if port == 0 {
+			port = config.ConfigurationReflection.APIPort
+		}
+		// Check the port
+		if port == 0 {
+			return fmt.Errorf("configuration reflection API requires a separate port. Please set it in order to use it")
+		}
+		mainLog.Info("configuration reflection API Port is set to %d", port)
+	*/
+
+	// Check the API key
+	if config.ConfigurationReflection.APIKey == "" {
+		return fmt.Errorf("configuration reflection API port is not set. Please set it in order to use it")
+	}
+
+	var structviewerCfg = &structviewer.Config{
+		Object:        config,
+		ParseComments: false,
+	}
+	const GW_ENV_PREFIX = "TYK_GW_"
+	v, err := structviewer.New(structviewerCfg, GW_ENV_PREFIX)
+	if err != nil {
+		return err
+	}
+
+	// TODO: Update swagger.yaml of the gateway
+	// Define routes and middleware specific to the Config API
+	muxer.Handle("/config", authConfigurationAPI(http.HandlerFunc(v.ConfigHandler), config.ConfigurationReflection.APIKey))
+	muxer.Handle("/env", authConfigurationAPI(http.HandlerFunc(v.EnvsHandler), config.ConfigurationReflection.APIKey))
+
+	mainLog.Info("--> Configuration reflection API is available on control port")
+
+	return nil
+}
+
+// authConfigurationAPI will ensure that the accessor of the HTTP API has the
+// correct security credentials - this is a shared secret between the
+// client and the owner and is set in the settings. This should
+// never be made public!
+func authConfigurationAPI(next http.Handler, apiKey string) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		tykAuthKey := r.Header.Get(header.XTykAuthorization)
+		if tykAuthKey != apiKey {
+			errMsg := "Attempted administrative access to cnfiguration reflection with invalid or missing key!"
+			mainLog.Error(errMsg)
+			doJSONWrite(w, http.StatusUnauthorized, apiError(errMsg))
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
 }
