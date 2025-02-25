@@ -387,8 +387,12 @@ func (gw *Gateway) handleUserKeyReset(payload string) {
 		// If we're using a KV store, update the API key there as well
 		gw.updateKeyInStore(config.Private.EdgeOriginalAPIKeyPath, newKey)
 
-		if store, ok := gw.GlobalSessionManager.Store().(*RPCStorageHandler); ok {
-			store.Connect()
+		if gw.isRPCMode() {
+			ok := gw.RPCListener.Connect()
+			if !ok {
+				log.Error("Failed to establish RPC connection")
+			}
+
 		}
 	}
 }

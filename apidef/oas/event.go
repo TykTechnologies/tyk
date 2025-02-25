@@ -17,6 +17,7 @@ type Kind = event.Kind
 const (
 	WebhookKind = event.WebhookKind
 	JSVMKind    = event.JSVMKind
+	LogKind     = event.LogKind
 )
 
 // EventHandler holds information about individual event to be configured on the API.
@@ -37,6 +38,9 @@ type EventHandler struct {
 
 	// JSVMEvent holds information about JavaScript VM events.
 	JSVMEvent JSVMEvent `bson:"-" json:"-"`
+
+	// LogEvent represents the configuration for logging events tied to an event handler.
+	LogEvent LogEvent `bson:"-" json:"-"`
 }
 
 // MarshalJSON marshals EventHandler as per Tyk OAS API definition contract.
@@ -64,6 +68,12 @@ func (e EventHandler) MarshalJSON() ([]byte, error) {
 			return nil, err
 		}
 		maps.Insert(outMapVal, maps.All(*jsvmMap))
+	case LogKind:
+		logMap, err := reflect.Cast[map[string]any](helper.LogEvent)
+		if err != nil {
+			return nil, err
+		}
+		maps.Insert(outMapVal, maps.All(*logMap))
 	}
 
 	return json.Marshal(outMapVal)
@@ -84,6 +94,10 @@ func (e *EventHandler) UnmarshalJSON(in []byte) error {
 		}
 	case JSVMKind:
 		if err := json.Unmarshal(in, &helper.JSVMEvent); err != nil {
+			return err
+		}
+	case LogKind:
+		if err := json.Unmarshal(in, &helper.LogEvent); err != nil {
 			return err
 		}
 	}
@@ -153,6 +167,20 @@ func (e *EventHandler) GetJSVMEventHandlerConf() apidef.JSVMEventHandlerConf {
 	}
 }
 
+// LogEvent represents the configuration for logging events within an event handler.
+type LogEvent struct {
+	// LogPrefix defines the prefix used for log messages in the logging event.
+	LogPrefix string `json:"logPrefix" bson:"logPrefix"`
+}
+
+// GetLogEventHandlerConf creates and returns a LogEventHandlerConf based on the current EventHandler configuration.
+func (e *EventHandler) GetLogEventHandlerConf() apidef.LogEventHandlerConf {
+	return apidef.LogEventHandlerConf{
+		Disabled: !e.Enabled,
+		Prefix:   e.LogEvent.LogPrefix,
+	}
+}
+
 // EventHandlers holds the list of events to be processed for the API.
 type EventHandlers []EventHandler
 
@@ -210,6 +238,24 @@ func (e *EventHandlers) Fill(api apidef.APIDefinition) {
 				}
 
 				events = append(events, ev)
+			case event.LogHandler:
+				logHandlerConf := apidef.LogEventHandlerConf{}
+				err := logHandlerConf.Scan(eh.HandlerMeta)
+				if err != nil {
+					continue
+				}
+
+				ev := EventHandler{
+					Enabled: !logHandlerConf.Disabled,
+					Trigger: gwEvent,
+					Kind:    LogKind,
+					Name:    logHandlerConf.Prefix, // log events don't have human-readable names, let's reuse the prefix
+					LogEvent: LogEvent{
+						LogPrefix: logHandlerConf.Prefix,
+					},
+				}
+
+				events = append(events, ev)
 			default:
 				continue
 			}
@@ -251,6 +297,10 @@ func (e *EventHandlers) ExtractTo(api *apidef.APIDefinition) {
 			handler = event.JSVMHandler
 			jsvmConf := ev.GetJSVMEventHandlerConf()
 			handlerMeta, err = reflect.Cast[map[string]any](jsvmConf)
+		case LogKind:
+			handler = event.LogHandler
+			logConf := ev.GetLogEventHandlerConf()
+			handlerMeta, err = reflect.Cast[map[string]any](logConf)
 		default:
 			continue
 		}
@@ -282,7 +332,7 @@ func resetOASSupportedEventHandlers(api *apidef.APIDefinition) {
 		triggersExcludingWebhooks := make([]apidef.EventHandlerTriggerConfig, 0)
 		for _, eventTrigger := range eventTriggers {
 			switch eventTrigger.Handler {
-			case event.WebHookHandler, event.JSVMHandler:
+			case event.WebHookHandler, event.JSVMHandler, event.LogHandler:
 				continue
 			}
 
