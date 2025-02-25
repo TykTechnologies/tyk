@@ -186,13 +186,27 @@ func (s *OAS) fillPathsAndOperations(ep apidef.ExtendedPathsSet) {
 // - Defaulting to text/plain if neither above applies
 func (s *OAS) fillMockResponsePaths(paths openapi3.Paths, ep apidef.ExtendedPathsSet) {
 	var methodOperationMap = map[string]func(*openapi3.PathItem, *openapi3.Operation){
-		http.MethodGet:     func(p *openapi3.PathItem, op *openapi3.Operation) { p.Get = op },
-		http.MethodPost:    func(p *openapi3.PathItem, op *openapi3.Operation) { p.Post = op },
-		http.MethodPut:     func(p *openapi3.PathItem, op *openapi3.Operation) { p.Put = op },
-		http.MethodPatch:   func(p *openapi3.PathItem, op *openapi3.Operation) { p.Patch = op },
-		http.MethodDelete:  func(p *openapi3.PathItem, op *openapi3.Operation) { p.Delete = op },
-		http.MethodHead:    func(p *openapi3.PathItem, op *openapi3.Operation) { p.Head = op },
-		http.MethodOptions: func(p *openapi3.PathItem, op *openapi3.Operation) { p.Options = op },
+		http.MethodGet: func(p *openapi3.PathItem, op *openapi3.Operation) {
+			copyOperationResponse(&p.Get, op)
+		},
+		http.MethodPost: func(p *openapi3.PathItem, op *openapi3.Operation) {
+			copyOperationResponse(&p.Post, op)
+		},
+		http.MethodPut: func(p *openapi3.PathItem, op *openapi3.Operation) {
+			copyOperationResponse(&p.Put, op)
+		},
+		http.MethodDelete: func(p *openapi3.PathItem, op *openapi3.Operation) {
+			copyOperationResponse(&p.Delete, op)
+		},
+		http.MethodPatch: func(p *openapi3.PathItem, op *openapi3.Operation) {
+			copyOperationResponse(&p.Patch, op)
+		},
+		http.MethodHead: func(p *openapi3.PathItem, op *openapi3.Operation) {
+			copyOperationResponse(&p.Head, op)
+		},
+		http.MethodOptions: func(p *openapi3.PathItem, op *openapi3.Operation) {
+			copyOperationResponse(&p.Options, op)
+		},
 	}
 
 	for _, mock := range ep.MockResponse {
@@ -206,7 +220,7 @@ func (s *OAS) fillMockResponsePaths(paths openapi3.Paths, ep apidef.ExtendedPath
 			Responses: openapi3.NewResponses(),
 		}
 
-		operation.OperationID = genMockResponseOperationID(mock)
+		operation.OperationID = s.getOperationID(mock.Path, mock.Method)
 
 		// Response description is required by the OAS spec, but we don't have it in Tyk classic.
 		// So we're using a dummy value to satisfy the spec.
@@ -219,18 +233,26 @@ func (s *OAS) fillMockResponsePaths(paths openapi3.Paths, ep apidef.ExtendedPath
 
 		contentType := "text/plain"
 
+		// We attempt to guess the content type by checking if the body is a valid JSON.
+		if mock.Body != "" {
+			var jsonValue = []interface{}{
+				map[string]json.RawMessage{},
+				[]json.RawMessage{},
+			}
+
+			for _, value := range jsonValue {
+				if err := json.Unmarshal([]byte(mock.Body), value); err == nil {
+					contentType = "application/json"
+					break
+				}
+			}
+		}
+
+		// Check Content-Type header if present (takes precedence over auto-detection)
 		for name, value := range mock.Headers {
 			if http.CanonicalHeaderKey(name) == tykheader.ContentType {
 				contentType = value
 				break
-			}
-		}
-
-		// We attempt to guess the content type by checking if the body is a valid JSON.
-		if mock.Body != "" {
-			var body json.RawMessage
-			if err := json.Unmarshal([]byte(mock.Body), &body); err == nil {
-				contentType = "application/json"
 			}
 		}
 
@@ -272,9 +294,9 @@ func (s *OAS) fillMockResponsePaths(paths openapi3.Paths, ep apidef.ExtendedPath
 		}
 
 		tykOperation := s.GetTykExtension().getOperation(operation.OperationID)
-		if tykOperation == nil {
-			tykOperation = &Operation{}
-			s.GetTykExtension().Middleware.Operations[operation.OperationID] = tykOperation
+
+		if tykOperation.Allow == nil || tykOperation.Allow.Enabled == false {
+			tykOperation.Allow = &Allowance{Enabled: true}
 		}
 
 		if tykOperation.MockResponse == nil {
@@ -293,6 +315,20 @@ func (s *OAS) fillMockResponsePaths(paths openapi3.Paths, ep apidef.ExtendedPath
 			tykOperation.MockResponse = nil
 			tykOperation.IgnoreAuthentication = nil
 		}
+	}
+}
+
+func copyOperationResponse(dst **openapi3.Operation, src *openapi3.Operation) {
+	if *dst == nil {
+		*dst = openapi3.NewOperation()
+	}
+
+	if (*dst).Responses == nil {
+		(*dst).Responses = openapi3.NewResponses()
+	}
+
+	for code, response := range src.Responses {
+		(*dst).Responses[code] = response
 	}
 }
 

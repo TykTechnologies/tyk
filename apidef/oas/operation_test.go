@@ -598,7 +598,7 @@ func TestOAS_MockResponse_fillMockResponsePaths(t *testing.T) {
 
 				// Verify operation
 				require.NotNil(t, pathItem.Get)
-				assert.Equal(t, "getTest200", pathItem.Get.OperationID)
+				assert.Equal(t, "testGET", pathItem.Get.OperationID)
 				assert.Nil(t, pathItem.Post)
 				assert.Nil(t, pathItem.Put)
 				assert.Nil(t, pathItem.Patch)
@@ -654,7 +654,7 @@ func TestOAS_MockResponse_fillMockResponsePaths(t *testing.T) {
 
 				// Verify GET operation
 				require.NotNil(t, pathItem.Get)
-				assert.Equal(t, "getTest200", pathItem.Get.OperationID)
+				assert.Equal(t, "testGET", pathItem.Get.OperationID)
 				response200Ref := pathItem.Get.Responses["200"]
 				require.NotNil(t, response200Ref, "Response ref for 200 should not be nil")
 				response200 := response200Ref.Value
@@ -664,7 +664,7 @@ func TestOAS_MockResponse_fillMockResponsePaths(t *testing.T) {
 
 				// Verify POST operation
 				require.NotNil(t, pathItem.Post)
-				assert.Equal(t, "postTest201", pathItem.Post.OperationID)
+				assert.Equal(t, "testPOST", pathItem.Post.OperationID)
 				postResponse := pathItem.Post.Responses["201"].Value
 				require.NotNil(t, postResponse)
 				require.NotNil(t, postResponse.Content["application/json"].Examples)
@@ -686,6 +686,7 @@ func TestOAS_MockResponse_fillMockResponsePaths(t *testing.T) {
 			want: func(t *testing.T, spec *OAS) {
 				pathItem := spec.Paths["/test"]
 				require.NotNil(t, pathItem)
+				assert.Equal(t, "testGET", pathItem.Get.OperationID)
 				response204Ref := pathItem.Get.Responses["204"]
 				require.NotNil(t, response204Ref, "Response ref for 204 should not be nil")
 				response204 := response204Ref.Value
@@ -727,7 +728,7 @@ func TestOAS_MockResponse_fillMockResponsePaths(t *testing.T) {
 				usersPath := spec.Paths["/users"]
 				require.NotNil(t, usersPath)
 				require.NotNil(t, usersPath.Get)
-				assert.Equal(t, "getUsers200", usersPath.Get.OperationID)
+				assert.Equal(t, "usersGET", usersPath.Get.OperationID)
 				usersResponse := usersPath.Get.Responses["200"].Value
 				require.NotNil(t, usersResponse)
 				assert.Equal(t, `["user1", "user2"]`, usersResponse.Content["application/json"].Examples["default"].Value.Value)
@@ -736,7 +737,7 @@ func TestOAS_MockResponse_fillMockResponsePaths(t *testing.T) {
 				itemsPath := spec.Paths["/items"]
 				require.NotNil(t, itemsPath)
 				require.NotNil(t, itemsPath.Get)
-				assert.Equal(t, "getItems200", itemsPath.Get.OperationID)
+				assert.Equal(t, "itemsGET", itemsPath.Get.OperationID)
 				itemsResponse := itemsPath.Get.Responses["200"].Value
 				require.NotNil(t, itemsResponse)
 				assert.Equal(t, `["item1", "item2"]`, itemsResponse.Content["application/json"].Examples["default"].Value.Value)
@@ -770,7 +771,7 @@ func TestOAS_MockResponse_fillMockResponsePaths(t *testing.T) {
 				pathItem := spec.Paths["/test"]
 				require.NotNil(t, pathItem)
 				require.NotNil(t, pathItem.Get)
-				assert.Equal(t, "getTest200", pathItem.Get.OperationID)
+				assert.Equal(t, "testGET", pathItem.Get.OperationID)
 
 				// Verify responses exist
 				require.NotNil(t, pathItem.Get.Responses)
@@ -898,18 +899,30 @@ func TestOAS_MockResponse_fillMockResponsePaths(t *testing.T) {
 				// Helper function to verify operation
 				verifyOperation := func(op *openapi3.Operation, method string, code int, body string) {
 					require.NotNil(t, op, "Operation %s should exist", method)
-					response := op.Responses[strconv.Itoa(code)].Value
+					require.NotNil(t, op.Responses, "Responses should not be nil")
+
+					statusCode := strconv.Itoa(code)
+					require.NotNil(t, op.Responses[statusCode], "Responses should not be nil for status code %s and method %s", statusCode, method)
+
+					response := op.Responses[statusCode].Value
 					require.NotNil(t, response)
 					if body != "" {
 						contentType := "text/plain" // default content type
 
-						if ct, ok := response.Headers["Content-Type"]; ok {
-							contentType = ct.Value.Schema.Value.Example.(string)
+						var jsonValue = []interface{}{
+							map[string]json.RawMessage{},
+							[]json.RawMessage{},
 						}
 
-						var parsedBody json.RawMessage
-						if err := json.Unmarshal([]byte(body), &parsedBody); err == nil {
-							contentType = "application/json"
+						for _, value := range jsonValue {
+							if err := json.Unmarshal([]byte(body), value); err == nil {
+								contentType = "application/json"
+								break
+							}
+						}
+
+						if ct, ok := response.Headers["Content-Type"]; ok {
+							contentType = ct.Value.Schema.Value.Example.(string)
 						}
 
 						require.NotNil(t, response.Content[contentType], "Content type %s not found", contentType)

@@ -189,7 +189,7 @@ tests:
       paths:
         /test:
           get:
-            operationId: getTest200
+            operationId: testGET
             responses:
               "200":
                 content:
@@ -205,7 +205,7 @@ tests:
       x-tyk-api-gateway:
         middleware:
           operations:
-            getTest200:
+            testGET:
               mockResponse:
                 enabled: true
                 code: 200
@@ -213,6 +213,10 @@ tests:
                 headers:
                   - name: Content-Type
                     value: application/json
+              allow:
+                enabled: true
+              ignoreAuthentication:
+                enabled: true
 
   - desc: "multiple methods on same path - classic"
     source: "classic" 
@@ -244,7 +248,7 @@ tests:
       paths:
         /test:
           get:
-            operationId: getTest200
+            operationId: testGET
             responses:
               "200":
                 content:
@@ -258,7 +262,7 @@ tests:
                       type: string
                       example: application/json
           post:
-            operationId: postTest201
+            operationId: testPOST
             responses:
               "201":
                 content:
@@ -278,7 +282,7 @@ tests:
       x-tyk-api-gateway:
         middleware:
           operations:
-            getTest200:
+            testGET:
               mockResponse:
                 enabled: true
                 code: 200
@@ -288,7 +292,7 @@ tests:
                     value: application/json
               ignoreAuthentication:
                 enabled: true
-            postTest201:
+            testPOST:
               mockResponse:
                 enabled: true
                 code: 201
@@ -299,6 +303,8 @@ tests:
                   - name: Location
                     value: /test/123
               ignoreAuthentication:
+                enabled: true
+              allow:
                 enabled: true
   - desc: "disabled mock response - classic"
     source: "classic"
@@ -323,7 +329,7 @@ tests:
       paths:
         /test:
           get:
-            operationId: getTest404
+            operationId: testGET
             responses:
               "404":
                 content:
@@ -334,12 +340,14 @@ tests:
       x-tyk-api-gateway:
         middleware:
           operations:
-            getTest404:
+            testGET:
               mockResponse:
                 enabled: false
                 code: 404
                 body: '{"error": "not found"}'
               ignoreAuthentication:
+                enabled: true
+              allow:
                 enabled: true
   - desc: "empty mock response section - classic"
     source: "classic"
