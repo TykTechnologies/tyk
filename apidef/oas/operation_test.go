@@ -570,16 +570,41 @@ func TestOAS_RegexPaths(t *testing.T) {
 	}
 }
 
+// Map HTTP methods to their corresponding PathItem field setters
+var methodSetters = map[string]func(*openapi3.PathItem, *openapi3.Operation){
+	"GET":     func(p *openapi3.PathItem, op *openapi3.Operation) { p.Get = op },
+	"POST":    func(p *openapi3.PathItem, op *openapi3.Operation) { p.Post = op },
+	"PUT":     func(p *openapi3.PathItem, op *openapi3.Operation) { p.Put = op },
+	"PATCH":   func(p *openapi3.PathItem, op *openapi3.Operation) { p.Patch = op },
+	"DELETE":  func(p *openapi3.PathItem, op *openapi3.Operation) { p.Delete = op },
+	"HEAD":    func(p *openapi3.PathItem, op *openapi3.Operation) { p.Head = op },
+	"OPTIONS": func(p *openapi3.PathItem, op *openapi3.Operation) { p.Options = op },
+}
+
 func TestOAS_MockResponse_fillMockResponsePaths(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
 		name string
 		ep   apidef.ExtendedPathsSet
+		spec *OAS
 		want func(t *testing.T, spec *OAS)
 	}{
 		{
 			name: "basic mock response",
+			spec: &OAS{
+				T: openapi3.T{
+					OpenAPI: DefaultOpenAPI,
+					Paths: openapi3.Paths{
+						"/test": {
+							Get: &openapi3.Operation{
+								Summary:     "Existing summary",
+								OperationID: "testGET",
+							},
+						},
+					},
+				},
+			},
 			ep: apidef.ExtendedPathsSet{
 				MockResponse: []apidef.MockResponseMeta{{
 					Path:   "/test",
@@ -599,6 +624,7 @@ func TestOAS_MockResponse_fillMockResponsePaths(t *testing.T) {
 				// Verify operation
 				require.NotNil(t, pathItem.Get)
 				assert.Equal(t, "testGET", pathItem.Get.OperationID)
+				assert.Equal(t, "Existing summary", pathItem.Get.Summary)
 				assert.Nil(t, pathItem.Post)
 				assert.Nil(t, pathItem.Put)
 				assert.Nil(t, pathItem.Patch)
@@ -953,6 +979,10 @@ func TestOAS_MockResponse_fillMockResponsePaths(t *testing.T) {
 				},
 			}
 
+			if tt.spec != nil && tt.spec.Paths != nil {
+				spec.Paths = tt.spec.Paths
+			}
+
 			// Initialize the middleware extension with proper mock response setup
 			middleware := &Middleware{
 				Operations: make(Operations),
@@ -961,6 +991,7 @@ func TestOAS_MockResponse_fillMockResponsePaths(t *testing.T) {
 			// Pre-initialize operations with mock responses
 			for _, mockResp := range tt.ep.MockResponse {
 				operationID := spec.getOperationID(mockResp.Path, mockResp.Method)
+
 				operation := &Operation{
 					MockResponse: &MockResponse{
 						Code:    mockResp.Code,
@@ -986,33 +1017,48 @@ func TestOAS_MockResponse_fillMockResponsePaths(t *testing.T) {
 
 			// Initialize paths
 			for _, mockResp := range tt.ep.MockResponse {
-				path := mockResp.Path
-				if spec.Paths[path] == nil {
-					spec.Paths[path] = &openapi3.PathItem{}
-				}
+				operationID := spec.getOperationID(mockResp.Path, mockResp.Method)
 
 				// Initialize operation with responses
 				op := &openapi3.Operation{
-					OperationID: spec.getOperationID(mockResp.Path, mockResp.Method),
+					OperationID: operationID,
 					Responses:   openapi3.NewResponses(),
 				}
 
+				// Preserve existing operation properties if they exist
+				if pathItem := spec.Paths.Find(mockResp.Path); pathItem != nil {
+					if existingOp := pathItem.GetOperation(mockResp.Method); existingOp != nil {
+						op.Summary = existingOp.Summary
+						op.Description = existingOp.Description
+						// Copy other relevant fields as needed
+					}
+				}
+
+				if tt.spec != nil {
+					if spec.Paths == nil {
+						spec.Paths = openapi3.Paths{}
+					}
+					for k, v := range tt.spec.Paths {
+						spec.Paths[k] = v
+					}
+				}
+
 				// Set the operation based on method
-				switch mockResp.Method {
-				case "GET":
-					spec.Paths[path].Get = op
-				case "POST":
-					spec.Paths[path].Post = op
-				case "PUT":
-					spec.Paths[path].Put = op
-				case "PATCH":
-					spec.Paths[path].Patch = op
-				case "DELETE":
-					spec.Paths[path].Delete = op
-				case "HEAD":
-					spec.Paths[path].Head = op
-				case "OPTIONS":
-					spec.Paths[path].Options = op
+				if setter, ok := methodSetters[mockResp.Method]; ok {
+					path := mockResp.Path // Use the mock response path directly
+					if spec.Paths[path] == nil {
+						spec.Paths[path] = &openapi3.PathItem{}
+					}
+					setter(spec.Paths[path], op)
+
+					// Add response for the specific status code
+					statusCode := strconv.Itoa(mockResp.Code)
+					op.Responses[statusCode] = &openapi3.ResponseRef{
+						Value: &openapi3.Response{
+							Headers: make(openapi3.Headers),
+							Content: make(openapi3.Content),
+						},
+					}
 				}
 			}
 

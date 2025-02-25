@@ -7,7 +7,6 @@ import (
 	"sort"
 	"strconv"
 	"strings"
-	"unicode"
 
 	"github.com/getkin/kin-openapi/openapi3"
 
@@ -176,7 +175,7 @@ func (s *OAS) fillPathsAndOperations(ep apidef.ExtendedPathsSet) {
 // API mock responses in an earlier step of the process.
 //
 // For each mock response, it:
-// 1. Creates an OAS operation with a unique ID (method + path + status code)
+// 1. Creates an OAS operation with a unique ID (if it doesn't exist)
 // 2. Sets up the mock response with content type detection and example values
 // 3. Configures the operation to ignore authentication for this endpoint
 //
@@ -185,42 +184,21 @@ func (s *OAS) fillPathsAndOperations(ep apidef.ExtendedPathsSet) {
 // - Attempting to parse the body as JSON
 // - Defaulting to text/plain if neither above applies
 func (s *OAS) fillMockResponsePaths(paths openapi3.Paths, ep apidef.ExtendedPathsSet) {
-	var methodOperationMap = map[string]func(*openapi3.PathItem, *openapi3.Operation){
-		http.MethodGet: func(p *openapi3.PathItem, op *openapi3.Operation) {
-			copyOperationResponse(&p.Get, op)
-		},
-		http.MethodPost: func(p *openapi3.PathItem, op *openapi3.Operation) {
-			copyOperationResponse(&p.Post, op)
-		},
-		http.MethodPut: func(p *openapi3.PathItem, op *openapi3.Operation) {
-			copyOperationResponse(&p.Put, op)
-		},
-		http.MethodDelete: func(p *openapi3.PathItem, op *openapi3.Operation) {
-			copyOperationResponse(&p.Delete, op)
-		},
-		http.MethodPatch: func(p *openapi3.PathItem, op *openapi3.Operation) {
-			copyOperationResponse(&p.Patch, op)
-		},
-		http.MethodHead: func(p *openapi3.PathItem, op *openapi3.Operation) {
-			copyOperationResponse(&p.Head, op)
-		},
-		http.MethodOptions: func(p *openapi3.PathItem, op *openapi3.Operation) {
-			copyOperationResponse(&p.Options, op)
-		},
-	}
-
 	for _, mock := range ep.MockResponse {
-		pathItem := paths[mock.Path]
-		if pathItem == nil {
-			pathItem = &openapi3.PathItem{}
-			paths[mock.Path] = pathItem
+		operationID := s.getOperationID(mock.Path, mock.Method)
+
+		var operation *openapi3.Operation
+
+		for _, item := range paths {
+			if op := item.GetOperation(mock.Method); op != nil && op.OperationID == operationID {
+				operation = op
+				break
+			}
 		}
 
-		operation := &openapi3.Operation{
-			Responses: openapi3.NewResponses(),
+		if operation.Responses == nil {
+			operation.Responses = openapi3.NewResponses()
 		}
-
-		operation.OperationID = s.getOperationID(mock.Path, mock.Method)
 
 		// Response description is required by the OAS spec, but we don't have it in Tyk classic.
 		// So we're using a dummy value to satisfy the spec.
@@ -289,13 +267,9 @@ func (s *OAS) fillMockResponsePaths(paths openapi3.Paths, ep apidef.ExtendedPath
 			Value: response,
 		}
 
-		if setOperation, exists := methodOperationMap[mock.Method]; exists {
-			setOperation(pathItem, operation)
-		}
-
 		tykOperation := s.GetTykExtension().getOperation(operation.OperationID)
 
-		if tykOperation.Allow == nil || tykOperation.Allow.Enabled == false {
+		if tykOperation.Allow == nil || !tykOperation.Allow.Enabled {
 			tykOperation.Allow = &Allowance{Enabled: true}
 		}
 
@@ -315,20 +289,6 @@ func (s *OAS) fillMockResponsePaths(paths openapi3.Paths, ep apidef.ExtendedPath
 			tykOperation.MockResponse = nil
 			tykOperation.IgnoreAuthentication = nil
 		}
-	}
-}
-
-func copyOperationResponse(dst **openapi3.Operation, src *openapi3.Operation) {
-	if *dst == nil {
-		*dst = openapi3.NewOperation()
-	}
-
-	if (*dst).Responses == nil {
-		(*dst).Responses = openapi3.NewResponses()
-	}
-
-	for code, response := range src.Responses {
-		(*dst).Responses[code] = response
 	}
 }
 
@@ -1132,40 +1092,4 @@ func (s *OAS) fillCircuitBreaker(metas []apidef.CircuitBreakerMeta) {
 			operation.CircuitBreaker = nil
 		}
 	}
-}
-
-// genMockResponseOperationID creates a unique operation ID by combining:
-// - HTTP method (e.g. GET)
-// - Path (without leading slash)
-// - Status code
-// Example: "GET users 200" becomes "getUsers200"
-func genMockResponseOperationID(mockResponse apidef.MockResponseMeta) string {
-	combined := fmt.Sprintf("%v %v %d",
-		mockResponse.Method,
-		strings.Trim(mockResponse.Path, "/"),
-		mockResponse.Code,
-	)
-	return toCamelCase(combined)
-}
-
-// toCamelCase converts a space/symbol separated string to camelCase.
-// Example: "get users 200" becomes "getUsers200"
-func toCamelCase(s string) string {
-	words := strings.FieldsFunc(s, func(r rune) bool {
-		return !unicode.IsLetter(r) && !unicode.IsNumber(r)
-	})
-
-	if len(words) == 0 {
-		return ""
-	}
-
-	result := strings.ToLower(words[0])
-	for _, word := range words[1:] {
-		if word == "" {
-			continue
-		}
-		result += strings.ToUpper(word[:1]) + strings.ToLower(word[1:])
-	}
-
-	return result
 }
