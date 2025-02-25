@@ -92,6 +92,7 @@ func TykSessionState(session *coprocess.SessionState) *user.SessionState {
 		LastUpdated:             session.LastUpdated,
 		IdExtractorDeadline:     session.IdExtractorDeadline,
 		SessionLifetime:         session.SessionLifetime,
+		KeyID:                   session.KeyId,
 	}
 }
 
