@@ -621,3 +621,81 @@ func TestValidatePath(t *testing.T) {
 		})
 	}
 }
+
+func TestIsParamName(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected bool
+	}{
+		{
+			name:     "valid parameter name with letters",
+			input:    "param",
+			expected: true,
+		},
+		{
+			name:     "valid parameter with underscore",
+			input:    "my_param",
+			expected: true,
+		},
+		{
+			name:     "valid parameter with hyphen",
+			input:    "my-param",
+			expected: true,
+		},
+		{
+			name:     "valid parameter with numbers",
+			input:    "param123",
+			expected: true,
+		},
+		{
+			name:     "valid mixed case parameter",
+			input:    "myParam",
+			expected: true,
+		},
+		{
+			name:     "empty string",
+			input:    "",
+			expected: false,
+		},
+		{
+			name:     "starts with number",
+			input:    "1param",
+			expected: false,
+		},
+		{
+			name:     "starts with hyphen",
+			input:    "-param",
+			expected: false,
+		},
+		{
+			name:     "ends with hyphen",
+			input:    "param-",
+			expected: false,
+		},
+		{
+			name:     "contains special characters",
+			input:    "param@name",
+			expected: false,
+		},
+		{
+			name:     "has space",
+			input:    "param name",
+			expected: false,
+		},
+		{
+			name:     "starts with underscore",
+			input:    "_param",
+			expected: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := isParamName(tt.input)
+			if result != tt.expected {
+				t.Errorf("isParamName(%q) = %v, want %v", tt.input, result, tt.expected)
+			}
+		})
+	}
+}
