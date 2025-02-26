@@ -39,13 +39,6 @@ func (l *LogMessageEventHandler) Init(handlerConf any) error {
 	}
 
 	l.logger = log
-	if l.Gw.isRunningTests() {
-		rawConf := handlerConf.(map[string]any)
-		logger, ok := rawConf["logger"]
-		if ok {
-			l.logger = logger.(*logrus.Logger)
-		}
-	}
 	return nil
 }
 
@@ -55,13 +48,17 @@ func (l *LogMessageEventHandler) HandleEvent(em config.EventMessage) {
 
 	// We can handle specific event types easily
 	if em.Type == EventQuotaExceeded {
-		msgConf := em.Meta.(EventKeyFailureMeta)
-		logMsg = logMsg + ":" + msgConf.Key + ":" + msgConf.Origin + ":" + msgConf.Path
+		msgConf, ok := em.Meta.(EventKeyFailureMeta)
+		if ok {
+			logMsg = logMsg + ":" + msgConf.Key + ":" + msgConf.Origin + ":" + msgConf.Path
+		}
 	}
 
 	if em.Type == EventBreakerTriggered {
-		msgConf := em.Meta.(EventCurcuitBreakerMeta)
-		logMsg = logMsg + ":" + msgConf.APIID + ":" + msgConf.Path + ": [STATUS] " + fmt.Sprint(msgConf.CircuitEvent)
+		msgConf, ok := em.Meta.(EventCurcuitBreakerMeta)
+		if ok {
+			logMsg = logMsg + ":" + msgConf.APIID + ":" + msgConf.Path + ": [STATUS] " + fmt.Sprint(msgConf.CircuitEvent)
+		}
 	}
 
 	l.logger.Warning(logMsg)
