@@ -639,7 +639,11 @@ func splitPath(inPath string) ([]pathPart, bool) {
 		return []pathPart{}, false
 	}
 
-	parts := strings.Split(trimmedPath, "/")
+	if err := validatePath(inPath); err != nil {
+		return []pathPart{}, false
+	}
+
+	parts := strings.Split(inPath, "/")
 
 	result := make([]pathPart, len(parts))
 	found := 0
@@ -654,7 +658,7 @@ func splitPath(inPath string) ([]pathPart, bool) {
 
 	for k, value := range parts {
 		// Handle non-bracketed path segments
-		if !strings.HasPrefix(value, "{") && !strings.HasSuffix(value, "}") {
+		if !isParamName(value) {
 			name := value
 
 			result[k] = pathPart{
