@@ -618,6 +618,8 @@ func TestOAS_MockResponse_fillMockResponsePaths(t *testing.T) {
 				}},
 			},
 			want: func(t *testing.T, spec *OAS) {
+				t.Helper()
+
 				require.Len(t, spec.Paths, 1)
 
 				pathItem := spec.Paths["/test"]
@@ -678,6 +680,8 @@ func TestOAS_MockResponse_fillMockResponsePaths(t *testing.T) {
 				},
 			},
 			want: func(t *testing.T, spec *OAS) {
+				t.Helper()
+
 				assert.Len(t, spec.Paths, 1)
 
 				pathItem := spec.Paths["/test"]
@@ -718,6 +722,8 @@ func TestOAS_MockResponse_fillMockResponsePaths(t *testing.T) {
 				}},
 			},
 			want: func(t *testing.T, spec *OAS) {
+				t.Helper()
+
 				pathItem := spec.Paths["/test"]
 				require.NotNil(t, pathItem)
 				require.Equal(t, "testGET", pathItem.Get.OperationID)
@@ -758,6 +764,7 @@ func TestOAS_MockResponse_fillMockResponsePaths(t *testing.T) {
 				},
 			},
 			want: func(t *testing.T, spec *OAS) {
+				t.Helper()
 				assert.Len(t, spec.Paths, 2)
 
 				// Verify /users path
@@ -806,6 +813,8 @@ func TestOAS_MockResponse_fillMockResponsePaths(t *testing.T) {
 				},
 			},
 			want: func(t *testing.T, spec *OAS) {
+				t.Helper()
+
 				pathItem := spec.Paths["/test"]
 				require.NotNil(t, pathItem)
 				require.NotNil(t, pathItem.Get)
@@ -858,6 +867,8 @@ func TestOAS_MockResponse_fillMockResponsePaths(t *testing.T) {
 				},
 			},
 			want: func(t *testing.T, spec *OAS) {
+				t.Helper()
+
 				// JSON endpoint
 				jsonPath := spec.Paths["/test"]
 				require.NotNil(t, jsonPath)
@@ -897,6 +908,8 @@ func TestOAS_MockResponse_fillMockResponsePaths(t *testing.T) {
 				}},
 			},
 			want: func(t *testing.T, spec *OAS) {
+				t.Helper()
+
 				pathItem := spec.Paths["/test"]
 				require.NotNil(t, pathItem)
 				response := pathItem.Get.Responses["200"].Value
@@ -933,6 +946,8 @@ func TestOAS_MockResponse_fillMockResponsePaths(t *testing.T) {
 				},
 			},
 			want: func(t *testing.T, spec *OAS) {
+				t.Helper()
+
 				pathItem := spec.Paths["/test"]
 				require.NotNil(t, pathItem)
 
@@ -1049,6 +1064,8 @@ func TestOAS_MockResponse_fillMockResponsePaths(t *testing.T) {
 
 // Helper function to verify OpenAPI operation responses
 func verifyOASOperation(t *testing.T, op *openapi3.Operation, method string, code int, body string) {
+	t.Helper()
+
 	require.NotNil(t, op, "Operation %s should exist", method)
 	require.NotNil(t, op.Responses, "Responses should not be nil")
 
