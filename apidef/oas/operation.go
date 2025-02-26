@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/getkin/kin-openapi/openapi3"
+	"github.com/gorilla/mux"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/internal/oasutil"
@@ -507,6 +508,10 @@ func splitPath(inPath string) ([]pathPart, bool) {
 		return []pathPart{}, false
 	}
 
+	if err := validatePath(inPath); err != nil {
+		return []pathPart{}, false
+	}
+
 	parts := strings.Split(inPath, "/")
 
 	result := make([]pathPart, len(parts))
@@ -954,4 +959,11 @@ func (s *OAS) fillCircuitBreaker(metas []apidef.CircuitBreakerMeta) {
 			operation.CircuitBreaker = nil
 		}
 	}
+}
+
+// validatePath validates if the path is valid. Returns an error.
+// TODO: This is a temporary implementation to avoid circular dependency.
+// Should be refactored to use httputil.ValidatePath once dependency structure is resolved.
+func validatePath(in string) error {
+	return mux.NewRouter().PathPrefix(in).GetError()
 }

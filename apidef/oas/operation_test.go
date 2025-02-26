@@ -558,3 +558,66 @@ func TestSplitPath(t *testing.T) {
 		})
 	}
 }
+
+func TestValidatePath(t *testing.T) {
+	tests := []struct {
+		name    string
+		path    string
+		wantErr bool
+	}{
+		{
+			name:    "valid simple path",
+			path:    "/api/users",
+			wantErr: false,
+		},
+		{
+			name:    "valid path with parameter",
+			path:    "/api/users/{id}",
+			wantErr: false,
+		},
+		{
+			name:    "valid path with multiple parameters",
+			path:    "/api/users/{id}/posts/{postId}",
+			wantErr: false,
+		},
+		{
+			name:    "valid path with regex parameter",
+			path:    "/api/users/{id:[0-9]+}",
+			wantErr: false,
+		},
+		{
+			name:    "invalid path - unclosed brace",
+			path:    "/api/users/{id",
+			wantErr: true,
+		},
+		{
+			name:    "invalid path - unmatched closing brace",
+			path:    "/api/users/}",
+			wantErr: true,
+		},
+		{
+			name:    "invalid path - empty parameter name",
+			path:    "/api/users/{}",
+			wantErr: true,
+		},
+		{
+			name:    "valid path with unamed regex parameter enclosed by curly braces",
+			path:    "/api/users/{[0-9]+}",
+			wantErr: false,
+		},
+		{
+			name:    "valid path with unamed regex parameter",
+			path:    "/api/users/[0-9]+",
+			wantErr: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := validatePath(tt.path)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("ValidatePath() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
