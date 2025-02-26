@@ -1,0 +1,56 @@
+---
+name: "Upstream uptime tests"
+tests:
+  - desc: "unset oas uptime tests"
+    source: oas
+    input:
+      x-tyk-api-gateway:
+        upstream: {}
+    output:
+      proxy:
+        check_host_against_uptime_tests: false
+  - desc: "upstream uptime test oas"
+    source: oas
+    input:
+      x-tyk-api-gateway:
+        upstream:
+          uptimeTests:
+            enabled: true
+            hostDownRetestPeriod: 20s
+            logRetentionPeriod: 10s
+    output:
+      proxy.check_host_against_uptime_tests: true
+      uptime_tests.config.expire_utime_after: 10
+      uptime_tests.config.recheck_wait: 20
+  - desc: "upstream uptime test classic"
+    source: classic
+    input:
+      proxy:
+        check_host_against_uptime_tests: true
+      uptime_tests:
+        config:
+          expire_utime_after: 10
+          recheck_wait: 20
+    output:
+      x-tyk-api-gateway:
+        upstream:
+          uptimeTests:
+            enabled: true
+            hostDownRetestPeriod: 20s
+            logRetentionPeriod: 10s
+  - desc: "upstream uptime test classic"
+    source: classic
+    input:
+      proxy:
+        check_host_against_uptime_tests: false
+      uptime_tests:
+        config:
+          expire_utime_after: 10
+          recheck_wait: 20
+    output:
+      x-tyk-api-gateway:
+        upstream:
+          uptimeTests:
+            enabled: false
+            hostDownRetestPeriod: 20s
+            logRetentionPeriod: 10s
