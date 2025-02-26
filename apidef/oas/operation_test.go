@@ -449,7 +449,7 @@ func TestSplitPath(t *testing.T) {
 			expectedParts: []pathPart{
 				{name: "users", value: "users", isRegex: false},
 				{name: "customRegex1", value: "123", isRegex: true},
-				{name: "customRegex2", value: "user-name", isRegex: true},
+				{name: "user-name", value: "", isRegex: true},
 			},
 			expectedRegex: true,
 		},

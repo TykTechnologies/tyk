@@ -508,7 +508,7 @@ func splitPath(inPath string) ([]pathPart, bool) {
 		return []pathPart{}, false
 	}
 
-	if err := validatePath(inPath); err != nil {
+	if err := validatePath("/" + inPath); err != nil {
 		return []pathPart{}, false
 	}
 
@@ -528,7 +528,7 @@ func splitPath(inPath string) ([]pathPart, bool) {
 	for k, value := range parts {
 		// Handle non-bracketed path segments
 		// for example: /a/b/c, /a/[0-9]
-		if !IsMuxTemplate(value) {
+		if !isMuxTemplate(value) {
 			name := value
 
 			result[k] = pathPart{
@@ -968,10 +968,10 @@ func validatePath(in string) error {
 	return mux.NewRouter().PathPrefix(in).GetError()
 }
 
-// IsMuxTemplate determines if a pattern is a mux template by counting the number of opening and closing braces.
+// isMuxTemplate determines if a pattern is a mux template by counting the number of opening and closing braces.
 // TODO: This is a temporary implementation to avoid circular dependency.
-// Should be refactored to use httputil.IsMuxTemplate once dependency structure is resolved.
-func IsMuxTemplate(pattern string) bool {
+// Should be refactored to use httputil.isMuxTemplate once dependency structure is resolved.
+func isMuxTemplate(pattern string) bool {
 	openBraces := strings.Count(pattern, "{")
 	closeBraces := strings.Count(pattern, "}")
 	return openBraces > 0 && openBraces == closeBraces
