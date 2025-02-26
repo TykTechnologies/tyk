@@ -640,7 +640,7 @@ func splitPath(inPath string) ([]pathPart, bool) {
 		return []pathPart{}, false
 	}
 
-	if err := validatePath(inPath); err != nil {
+	if err := validatePath("/" + inPath); err != nil {
 		return []pathPart{}, false
 	}
 
