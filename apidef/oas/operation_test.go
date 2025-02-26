@@ -799,6 +799,8 @@ func TestOAS_MockResponse_fillMockResponsePaths(t *testing.T) {
 				MockResponse: []apidef.MockResponseMeta{},
 			},
 			want: func(t *testing.T, spec *OAS) {
+				t.Helper()
+
 				assert.Empty(t, spec.Paths)
 			},
 		},
