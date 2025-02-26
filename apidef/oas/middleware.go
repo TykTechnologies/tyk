@@ -1752,7 +1752,7 @@ func (p *IgnoreCase) Fill(api apidef.APIDefinition) {
 	if api.VersionData.Versions != nil {
 		_, ok = api.VersionData.Versions[Main]
 	}
-	if !ok || api.VersionData.Versions[Main].IgnoreEndpointCase {
+	if !ok {
 		p.Enabled = false
 		return
 	}
