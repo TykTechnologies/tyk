@@ -202,37 +202,14 @@ func (s *OAS) fillMockResponsePaths(paths openapi3.Paths, ep apidef.ExtendedPath
 
 		// Response description is required by the OAS spec, but we don't have it in Tyk classic.
 		// So we're using a dummy value to satisfy the spec.
-		dummyDescription := "CHANGE ME"
+		oasRequiredDummyValue := "CHANGE ME"
 
 		response := &openapi3.Response{
 			Headers:     make(openapi3.Headers),
-			Description: &dummyDescription,
+			Description: &oasRequiredDummyValue,
 		}
 
-		contentType := "text/plain"
-
-		// We attempt to guess the content type by checking if the body is a valid JSON.
-		if mock.Body != "" {
-			var jsonValue = []interface{}{
-				map[string]json.RawMessage{},
-				[]json.RawMessage{},
-			}
-
-			for _, value := range jsonValue {
-				if err := json.Unmarshal([]byte(mock.Body), value); err == nil {
-					contentType = "application/json"
-					break
-				}
-			}
-		}
-
-		// Check Content-Type header if present (takes precedence over auto-detection)
-		for name, value := range mock.Headers {
-			if http.CanonicalHeaderKey(name) == tykheader.ContentType {
-				contentType = value
-				break
-			}
-		}
+		contentType := detectMockResponseContentType(mock)
 
 		mediaType := &openapi3.MediaType{
 			Examples: openapi3.Examples{
@@ -331,29 +308,7 @@ func (s *OAS) extractPathsAndOperations(ep *apidef.ExtendedPathsSet) {
 		}
 	}
 
-	// Sort the mock response paths by path, method, and response code.
-	// This ensures a deterministic order of mock responses.
-	sort.Slice(ep.WhiteList, func(i, j int) bool {
-		// First sort by path
-		if ep.WhiteList[i].Path != ep.WhiteList[j].Path {
-			return ep.WhiteList[i].Path < ep.WhiteList[j].Path
-		}
-		// Then by method
-		if ep.WhiteList[i].Method != ep.WhiteList[j].Method {
-			return ep.WhiteList[i].Method < ep.WhiteList[j].Method
-		}
-
-		// Finally by response code
-		actionI, existsI := ep.WhiteList[i].MethodActions[ep.WhiteList[i].Method]
-		actionJ, existsJ := ep.WhiteList[j].MethodActions[ep.WhiteList[j].Method]
-
-		// If either method action doesn't exist, maintain stable sort order
-		if !existsI || !existsJ {
-			return false
-		}
-
-		return actionI.Code < actionJ.Code
-	})
+	sortMockResponseAllowList(ep)
 }
 
 func (s *OAS) fillAllowance(endpointMetas []apidef.EndPointMeta, typ AllowanceType) {
@@ -1092,4 +1047,58 @@ func (s *OAS) fillCircuitBreaker(metas []apidef.CircuitBreakerMeta) {
 			operation.CircuitBreaker = nil
 		}
 	}
+}
+
+// detectMockResponseContentType determines the Content-Type of the mock response.
+// It first checks the headers for an explicit Content-Type, then attempts to detect
+// the type from the body content. Returns "text/plain" if no specific type can be determined.
+func detectMockResponseContentType(mock apidef.MockResponseMeta) string {
+	for name, value := range mock.Headers {
+		if http.CanonicalHeaderKey(name) == tykheader.ContentType {
+			return value
+		}
+	}
+
+	if mock.Body == "" {
+		return "text/plain"
+	}
+
+	// We attempt to guess the content type by checking if the body is a valid JSON.
+	var arrayValue = []json.RawMessage{}
+	if err := json.Unmarshal([]byte(mock.Body), &arrayValue); err == nil {
+		return "application/json"
+	}
+
+	var objectValue = map[string]json.RawMessage{}
+	if err := json.Unmarshal([]byte(mock.Body), &objectValue); err == nil {
+		return "application/json"
+	}
+
+	return "text/plain"
+}
+
+// sortMockResponseAllowList sorts the mock response paths by path, method, and response code.
+// This ensures a deterministic order of mock responses.
+func sortMockResponseAllowList(ep *apidef.ExtendedPathsSet) {
+	sort.Slice(ep.WhiteList, func(i, j int) bool {
+		// First sort by path
+		if ep.WhiteList[i].Path != ep.WhiteList[j].Path {
+			return ep.WhiteList[i].Path < ep.WhiteList[j].Path
+		}
+		// Then by method
+		if ep.WhiteList[i].Method != ep.WhiteList[j].Method {
+			return ep.WhiteList[i].Method < ep.WhiteList[j].Method
+		}
+
+		// Finally by response code
+		actionI, existsI := ep.WhiteList[i].MethodActions[ep.WhiteList[i].Method]
+		actionJ, existsJ := ep.WhiteList[j].MethodActions[ep.WhiteList[j].Method]
+
+		// If either method action doesn't exist, maintain stable sort order
+		if !existsI || !existsJ {
+			return false
+		}
+
+		return actionI.Code < actionJ.Code
+	})
 }
