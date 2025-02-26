@@ -183,6 +183,7 @@ func TestOAS_MockResponse_extractPathsAndOperations(t *testing.T) {
 				},
 			},
 			want: func(t *testing.T, ep *apidef.ExtendedPathsSet) {
+				t.Helper()
 				require.Len(t, ep.WhiteList, 1)
 
 				mockResp := ep.WhiteList[0]
@@ -243,6 +244,7 @@ func TestOAS_MockResponse_extractPathsAndOperations(t *testing.T) {
 				},
 			},
 			want: func(t *testing.T, ep *apidef.ExtendedPathsSet) {
+				t.Helper()
 				assert.Len(t, ep.WhiteList, 2)
 
 				// Sort mock responses for consistent testing
@@ -309,6 +311,8 @@ func TestOAS_MockResponse_extractPathsAndOperations(t *testing.T) {
 				},
 			},
 			want: func(t *testing.T, ep *apidef.ExtendedPathsSet) {
+				t.Helper()
+
 				assert.Len(t, ep.WhiteList, 1)
 				mockResp := ep.WhiteList[0]
 				require.Equal(t, "/test", mockResp.Path)
@@ -391,6 +395,7 @@ func TestOAS_MockResponse_extractPathsAndOperations(t *testing.T) {
 				},
 			},
 			want: func(t *testing.T, ep *apidef.ExtendedPathsSet) {
+				t.Helper()
 				assert.Len(t, ep.WhiteList, 2)
 
 				// Sort for consistent testing
