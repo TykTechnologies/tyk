@@ -639,7 +639,7 @@ func splitPath(inPath string) ([]pathPart, bool) {
 		return []pathPart{}, false
 	}
 
-	if err := validatePath(inPath); err != nil {
+	if err := validatePath("/" + inPath); err != nil {
 		return []pathPart{}, false
 	}
 
@@ -658,7 +658,8 @@ func splitPath(inPath string) ([]pathPart, bool) {
 
 	for k, value := range parts {
 		// Handle non-bracketed path segments
-		if !isParamName(value) {
+		// for example: /a/b/c, /a/[0-9]
+		if !isMuxTemplate(value) {
 			name := value
 
 			result[k] = pathPart{
