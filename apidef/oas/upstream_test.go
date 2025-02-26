@@ -149,12 +149,13 @@ func TestServiceDiscovery(t *testing.T) {
 
 func TestUptimeTests(t *testing.T) {
 	var emptyTest UptimeTests
+	var enabled bool
 
 	var convertedTest apidef.UptimeTests
-	emptyTest.ExtractTo(&convertedTest)
+	emptyTest.ExtractTo(&convertedTest, &enabled)
 
 	var resultTest UptimeTests
-	resultTest.Fill(convertedTest)
+	resultTest.Fill(convertedTest, enabled)
 
 	assert.Equal(t, emptyTest, resultTest)
 }
