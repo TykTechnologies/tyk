@@ -32,7 +32,6 @@ func (ts *Test) prepareSpecWithEvents(logger *logrus.Logger) (spec *APISpec) {
 						Handler: EH_LogHandler,
 						HandlerMeta: map[string]interface{}{
 							"prefix": "testprefix",
-							"logger": logger,
 						},
 					},
 				},
@@ -46,6 +45,10 @@ func (ts *Test) prepareSpecWithEvents(logger *logrus.Logger) (spec *APISpec) {
 	for eventName, eventHandlerConfs := range def.EventHandlers.Events {
 		for _, handlerConf := range eventHandlerConfs {
 			eventHandlerInstance, err := ts.Gw.EventHandlerByName(handlerConf, spec)
+			logEventHandler, ok := eventHandlerInstance.(*LogMessageEventHandler)
+			if ok {
+				logEventHandler.logger = logger
+			}
 
 			if err != nil {
 				log.Error("Failed to init event handler: ", err)
@@ -68,7 +71,6 @@ func prepareEventsConf() (conf *config.Config) {
 						Handler: EH_LogHandler,
 						HandlerMeta: map[string]interface{}{
 							"prefix": "testprefix1",
-							"logger": log,
 						},
 					},
 				},
@@ -77,7 +79,6 @@ func prepareEventsConf() (conf *config.Config) {
 						Handler: EH_LogHandler,
 						HandlerMeta: map[string]interface{}{
 							"prefix": "testprefix2",
-							"logger": log,
 						},
 					},
 				},
@@ -92,7 +93,6 @@ func prepareEventHandlerConfig(handler apidef.TykEventHandlerName) (config apide
 	case EH_LogHandler:
 		config.HandlerMeta = map[string]interface{}{
 			"prefix": "testprefix",
-			"logger": log,
 		}
 	case EH_WebHook:
 		config.HandlerMeta = map[string]interface{}{}
