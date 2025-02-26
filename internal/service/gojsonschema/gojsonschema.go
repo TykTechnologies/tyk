@@ -4,9 +4,17 @@ import (
 	"github.com/xeipuuv/gojsonschema"
 )
 
-type JSONLoader = gojsonschema.JSONLoader
-type ResultError = gojsonschema.ResultError
+type (
+	JSONLoader              = gojsonschema.JSONLoader
+	ResultError             = gojsonschema.ResultError
+	Result                  = gojsonschema.Result
+	FormatCheckerChain      = gojsonschema.FormatCheckerChain
+	DoesNotMatchFormatError = gojsonschema.DoesNotMatchFormatError
+)
 
-var NewBytesLoader = gojsonschema.NewBytesLoader
-var NewGoLoader = gojsonschema.NewGoLoader
-var Validate = gojsonschema.Validate
+var (
+	NewBytesLoader = gojsonschema.NewBytesLoader
+	NewGoLoader    = gojsonschema.NewGoLoader
+	FormatCheckers = gojsonschema.FormatCheckers
+	Validate       = gojsonschema.Validate
+)
