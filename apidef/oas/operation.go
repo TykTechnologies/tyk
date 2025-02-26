@@ -640,7 +640,11 @@ func splitPath(inPath string) ([]pathPart, bool) {
 		return []pathPart{}, false
 	}
 
-	parts := strings.Split(trimmedPath, "/")
+	if err := validatePath(inPath); err != nil {
+		return []pathPart{}, false
+	}
+
+	parts := strings.Split(inPath, "/")
 
 	result := make([]pathPart, len(parts))
 	found := 0
