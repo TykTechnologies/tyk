@@ -2570,6 +2570,9 @@
     "X-Tyk-UptimeTests": {
       "type": "object",
       "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
         "hostDownRetestPeriod": {
           "$ref": "#/definitions/X-Tyk-ReadableDuration"
         },
@@ -2585,7 +2588,10 @@
             "$ref": "#/definitions/X-Tyk-UptimeTest"
           }
         }
-      }
+      },
+      "required": [
+        "enabled"
+      ]
     },
     "X-Tyk-ReadableDuration": {
       "type": "string",
