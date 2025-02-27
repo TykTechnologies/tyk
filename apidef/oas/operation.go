@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -642,7 +643,7 @@ func splitPath(inPath string) ([]pathPart, bool) {
 		return []pathPart{}, false
 	}
 
-	if err := validatePath("/" + inPath); err != nil {
+	if err := validatePath(inPath); err != nil {
 		return []pathPart{}, false
 	}
 
@@ -662,7 +663,7 @@ func splitPath(inPath string) ([]pathPart, bool) {
 	for k, value := range parts {
 		// Handle non-bracketed path segments
 		// for example: /a/b/c, /a/[0-9]
-		if !strings.HasPrefix(value, "{") && !strings.HasSuffix(value, "}") {
+		if !isMuxTemplate(value) {
 			name := value
 
 			result[k] = pathPart{
@@ -681,12 +682,22 @@ func splitPath(inPath string) ([]pathPart, bool) {
 			continue
 		}
 
+		// if !isValidPathSegment(value) {
+		// 	continue
+		// }
+
 		// Handle bracketed path segments
 		segment := trimPathParam(value)
 
 		// Parameter with pattern case:
 		// for example: /a/{id:[0-9]}
-		if name, pattern, ok := strings.Cut(segment, ":"); ok && isParamName(name) {
+		if name, pattern, ok := strings.Cut(segment, ":"); ok {
+			// this is required because GetPathRegexp doesn't check if the regex is valid
+			// it doesn't return an error even if the regex is invalid (eg. [a-zA-Z+)
+			if _, err := regexp.Compile(pattern); err != nil {
+				return []pathPart{}, false
+			}
+
 			result[k] = pathPart{
 				name:    name,
 				value:   pattern,
@@ -694,6 +705,7 @@ func splitPath(inPath string) ([]pathPart, bool) {
 			}
 
 			found++
+
 			continue
 		}
 
@@ -704,8 +716,16 @@ func splitPath(inPath string) ([]pathPart, bool) {
 				name:    segment,
 				isRegex: true,
 			}
+
 			found++
+
 			continue
+		}
+
+		// this is required because GetPathRegexp doesn't check if the regex is valid
+		// it doesn't return an error even if the regex is invalid (eg. [a-zA-Z+)
+		if _, err := regexp.Compile(segment); err != nil {
+			return []pathPart{}, false
 		}
 
 		// Direct regex pattern case:
@@ -1203,7 +1223,19 @@ func sortMockResponseAllowList(ep *apidef.ExtendedPathsSet) {
 // TODO: This is a temporary implementation to avoid circular dependency.
 // Should be refactored to use httputil.ValidatePath once dependency structure is resolved.
 func validatePath(in string) error {
-	return mux.NewRouter().PathPrefix(in).GetError()
+	in = "/" + strings.Trim(in, "/")
+
+	route := mux.NewRouter().PathPrefix(in)
+
+	if err := route.GetError(); err != nil {
+		return err
+	}
+
+	if _, err := route.GetPathRegexp(); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 // isMuxTemplate determines if a pattern is a mux template by counting the number of opening and closing braces.
@@ -1213,4 +1245,20 @@ func isMuxTemplate(pattern string) bool {
 	openBraces := strings.Count(pattern, "{")
 	closeBraces := strings.Count(pattern, "}")
 	return openBraces > 0 && openBraces == closeBraces
+}
+
+func isValidPathSegment(segment string) bool {
+	segment = "/" + strings.Trim(segment, "/")
+
+	route := mux.NewRouter().PathPrefix(segment)
+
+	if err := route.GetError(); err != nil {
+		return false
+	}
+
+	if _, err := route.GetPathRegexp(); err != nil {
+		return false
+	}
+
+	return true
 }

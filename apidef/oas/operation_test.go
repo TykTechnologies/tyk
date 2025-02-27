@@ -1363,6 +1363,18 @@ func TestSplitPath(t *testing.T) {
 			},
 			expectedRegex: true,
 		},
+		{
+			name:          "path with broken regex",
+			path:          "/[0-9]+/{id:[a-zA-Z+}/.*",
+			expectedParts: []pathPart{},
+			expectedRegex: false,
+		},
+		{
+			name:          "path with unamed broken regex",
+			path:          "/[0-9]+/{[a-zA-Z+}/.*",
+			expectedParts: []pathPart{},
+			expectedRegex: false,
+		},
 	}
 
 	for _, tt := range tests {
