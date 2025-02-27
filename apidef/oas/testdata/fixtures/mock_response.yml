@@ -217,9 +217,8 @@ tests:
                 enabled: true
               ignoreAuthentication:
                 enabled: true
-
   - desc: "multiple methods on same path - classic"
-    source: "classic" 
+    source: "classic"
     input:
       version_data:
         versions:
@@ -362,7 +361,6 @@ tests:
       x-tyk-api-gateway:
         middleware:
           operations: {}
-
   - desc: "no mock response section - classic"
     source: "classic"
     input:
