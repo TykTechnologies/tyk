@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/getkin/kin-openapi/openapi3"
@@ -164,6 +166,107 @@ func (s *OAS) fillPathsAndOperations(ep apidef.ExtendedPathsSet) {
 	s.fillDoNotTrackEndpoint(ep.DoNotTrackEndpoints)
 	s.fillRequestSizeLimit(ep.SizeLimit)
 	s.fillRateLimitEndpoints(ep.RateLimit)
+	s.fillMockResponsePaths(s.Paths, ep)
+}
+
+// fillMockResponsePaths converts classic API mock responses to OAS format.
+// This method only handles direct mock response conversions, as other middleware
+// configurations (like allow lists, block lists, etc.) are converted to classic
+// API mock responses in an earlier step of the process.
+//
+// For each mock response, it:
+// 1. Creates an OAS operation with a unique ID (if it doesn't exist)
+// 2. Sets up the mock response with content type detection and example values
+// 3. Configures the operation to ignore authentication for this endpoint
+//
+// The content type is determined by:
+// - Checking the Content-Type header if present
+// - Attempting to parse the body as JSON
+// - Defaulting to text/plain if neither above applies
+func (s *OAS) fillMockResponsePaths(paths openapi3.Paths, ep apidef.ExtendedPathsSet) {
+	for _, mock := range ep.MockResponse {
+		operationID := s.getOperationID(mock.Path, mock.Method)
+
+		var operation *openapi3.Operation
+
+		for _, item := range paths {
+			if op := item.GetOperation(mock.Method); op != nil && op.OperationID == operationID {
+				operation = op
+				break
+			}
+		}
+
+		if operation.Responses == nil {
+			operation.Responses = openapi3.NewResponses()
+		}
+
+		// Response description is required by the OAS spec, but we don't have it in Tyk classic.
+		// So we're using a dummy value to satisfy the spec.
+		oasResponseDesc := "oasRequiredDummyValue"
+
+		response := &openapi3.Response{
+			Headers:     make(openapi3.Headers),
+			Description: &oasResponseDesc,
+		}
+
+		contentType := detectMockResponseContentType(mock)
+
+		mediaType := &openapi3.MediaType{
+			Examples: openapi3.Examples{
+				"default": &openapi3.ExampleRef{
+					Value: &openapi3.Example{
+						Value: mock.Body,
+					},
+				},
+			},
+		}
+
+		response.Content = openapi3.Content{
+			contentType: mediaType,
+		}
+
+		for name, value := range mock.Headers {
+			response.Headers[http.CanonicalHeaderKey(name)] = &openapi3.HeaderRef{
+				Value: &openapi3.Header{
+					Parameter: openapi3.Parameter{
+						Schema: &openapi3.SchemaRef{
+							Value: &openapi3.Schema{
+								Type:    "string",
+								Example: value,
+							},
+						},
+					},
+				},
+			}
+		}
+
+		operation.Responses[strconv.Itoa(mock.Code)] = &openapi3.ResponseRef{
+			Value: response,
+		}
+
+		tykOperation := s.GetTykExtension().getOperation(operation.OperationID)
+
+		if tykOperation.Allow == nil || !tykOperation.Allow.Enabled {
+			tykOperation.Allow = &Allowance{Enabled: true}
+		}
+
+		if tykOperation.MockResponse == nil {
+			tykOperation.MockResponse = &MockResponse{}
+		}
+
+		if tykOperation.IgnoreAuthentication == nil {
+			// We need to to add ignoreAuthentication middleware to the operation
+			// to stay consistent to the way mock responses work for classic APIs
+			tykOperation.IgnoreAuthentication = &Allowance{Enabled: true}
+		}
+
+		tykOperation.MockResponse.Fill(mock)
+
+		if ShouldOmit(tykOperation.MockResponse) {
+			tykOperation.MockResponse = nil
+			tykOperation.IgnoreAuthentication = nil
+		}
+	}
 }
 
 func (s *OAS) extractPathsAndOperations(ep *apidef.ExtendedPathsSet) {
@@ -198,11 +301,14 @@ func (s *OAS) extractPathsAndOperations(ep *apidef.ExtendedPathsSet) {
 					tykOp.extractDoNotTrackEndpointTo(ep, path, method)
 					tykOp.extractRequestSizeLimitTo(ep, path, method)
 					tykOp.extractRateLimitEndpointTo(ep, path, method)
+					tykOp.extractMockResponsePaths(ep, path, method)
 					break
 				}
 			}
 		}
 	}
+
+	sortMockResponseAllowList(ep)
 }
 
 func (s *OAS) fillAllowance(endpointMetas []apidef.EndPointMeta, typ AllowanceType) {
@@ -463,6 +569,43 @@ func (o *Operation) extractRequestSizeLimitTo(ep *apidef.ExtendedPathsSet, path 
 	meta := apidef.RequestSizeMeta{Path: path, Method: method}
 	o.RequestSizeLimit.ExtractTo(&meta)
 	ep.SizeLimit = append(ep.SizeLimit, meta)
+}
+
+// extractMockResponsePaths converts OAS mock responses to classic API format.
+// While classic APIs have direct support for mock responses, the API Designer UI
+// doesn't support them yet. Therefore, we are extracting them to a combination of
+// allow list entries and method actions instead.
+func (o *Operation) extractMockResponsePaths(ep *apidef.ExtendedPathsSet, path, method string) {
+	if o.MockResponse == nil {
+		return
+	}
+
+	headers := make(map[string]string)
+
+	for _, header := range o.MockResponse.Headers {
+		headers[http.CanonicalHeaderKey(header.Name)] = header.Value
+	}
+
+	if ep.WhiteList == nil {
+		ep.WhiteList = make([]apidef.EndPointMeta, 0)
+	}
+
+	wl := apidef.EndPointMeta{
+		Disabled: !o.MockResponse.Enabled,
+		Path:     path,
+		Method:   method,
+	}
+
+	wl.MethodActions = make(map[string]apidef.EndpointMethodMeta)
+
+	wl.MethodActions[method] = apidef.EndpointMethodMeta{
+		Action:  apidef.Reply,
+		Code:    o.MockResponse.Code,
+		Data:    o.MockResponse.Body,
+		Headers: headers,
+	}
+
+	ep.WhiteList = append(ep.WhiteList, wl)
 }
 
 // detect possible regex pattern:
@@ -823,6 +966,44 @@ type MockResponse struct {
 	FromOASExamples *FromOASExamples `bson:"fromOASExamples,omitempty" json:"fromOASExamples,omitempty"`
 }
 
+// Fill populates the MockResponse fields from a classic API MockResponseMeta.
+func (m *MockResponse) Fill(op apidef.MockResponseMeta) {
+	headers := make([]Header, 0)
+	for k, v := range op.Headers {
+		headers = append(headers, Header{
+			Name:  http.CanonicalHeaderKey(k),
+			Value: v,
+		})
+	}
+
+	// Sort headers by name so that the order is deterministic
+	sort.Slice(headers, func(i, j int) bool {
+		return headers[i].Name < headers[j].Name
+	})
+
+	m.Enabled = !op.Disabled
+	m.Code = op.Code
+	m.Body = op.Body
+	m.Headers = headers
+}
+
+func (m *MockResponse) ExtractTo(meta *apidef.MockResponseMeta) {
+	meta.Disabled = !m.Enabled
+	meta.Code = m.Code
+	meta.Body = m.Body
+
+	// Initialize headers map even when empty
+	meta.Headers = make(map[string]string)
+
+	for _, h := range m.Headers {
+		meta.Headers[h.Name] = h.Value
+	}
+
+	if len(meta.Headers) == 0 {
+		meta.Headers = nil
+	}
+}
+
 // FromOASExamples configures mock responses that should be returned from OAS example responses.
 type FromOASExamples struct {
 	// Enabled activates getting a mock response from OAS examples or schemas documented in OAS.
@@ -959,6 +1140,62 @@ func (s *OAS) fillCircuitBreaker(metas []apidef.CircuitBreakerMeta) {
 			operation.CircuitBreaker = nil
 		}
 	}
+}
+
+// detectMockResponseContentType determines the Content-Type of the mock response.
+// It first checks the headers for an explicit Content-Type, then attempts to detect
+// the type from the body content. Returns "text/plain" if no specific type can be determined.
+func detectMockResponseContentType(mock apidef.MockResponseMeta) string {
+	const headerContentType = "Content-Type"
+
+	for name, value := range mock.Headers {
+		if http.CanonicalHeaderKey(name) == headerContentType {
+			return value
+		}
+	}
+
+	if mock.Body == "" {
+		return "text/plain"
+	}
+
+	// We attempt to guess the content type by checking if the body is a valid JSON.
+	var arrayValue = []json.RawMessage{}
+	if err := json.Unmarshal([]byte(mock.Body), &arrayValue); err == nil {
+		return "application/json"
+	}
+
+	var objectValue = map[string]json.RawMessage{}
+	if err := json.Unmarshal([]byte(mock.Body), &objectValue); err == nil {
+		return "application/json"
+	}
+
+	return "text/plain"
+}
+
+// sortMockResponseAllowList sorts the mock response paths by path, method, and response code.
+// This ensures a deterministic order of mock responses.
+func sortMockResponseAllowList(ep *apidef.ExtendedPathsSet) {
+	sort.Slice(ep.WhiteList, func(i, j int) bool {
+		// First sort by path
+		if ep.WhiteList[i].Path != ep.WhiteList[j].Path {
+			return ep.WhiteList[i].Path < ep.WhiteList[j].Path
+		}
+		// Then by method
+		if ep.WhiteList[i].Method != ep.WhiteList[j].Method {
+			return ep.WhiteList[i].Method < ep.WhiteList[j].Method
+		}
+
+		// Finally by response code
+		actionI, existsI := ep.WhiteList[i].MethodActions[ep.WhiteList[i].Method]
+		actionJ, existsJ := ep.WhiteList[j].MethodActions[ep.WhiteList[j].Method]
+
+		// If either method action doesn't exist, maintain stable sort order
+		if !existsI || !existsJ {
+			return false
+		}
+
+		return actionI.Code < actionJ.Code
+	})
 }
 
 // validatePath validates if the path is valid. Returns an error.
