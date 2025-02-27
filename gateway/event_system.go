@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/TykTechnologies/tyk/internal/event"
@@ -9,6 +10,17 @@ import (
 	circuit "github.com/TykTechnologies/circuitbreaker"
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
+)
+
+const (
+	// EH_WebHook is an alias maintained for backwards compatibility.
+	// it is the handler to register a webhook event.
+	EH_WebHook = event.WebHookHandler
+	// EH_JSVMHandler is aliased for backwards compatibility.
+	EH_JSVMHandler = event.JSVMHandler
+	// EH_LogHandler is an alias maintained for backwards compatibility.
+	// It is used to register log handler on an event.
+	EH_LogHandler = event.LogHandler
 )
 
 const (
@@ -62,12 +74,20 @@ type EventKeyFailureMeta struct {
 	Key    string
 }
 
+func (e *EventKeyFailureMeta) LogMessage(prefix string) string {
+	return fmt.Sprintf("%s:%s:%s:%s", prefix, e.Key, e.Origin, e.Path)
+}
+
 // EventCurcuitBreakerMeta is the event status for a circuit breaker tripping
 type EventCurcuitBreakerMeta struct {
 	EventMetaDefault
 	Path         string
 	APIID        string
 	CircuitEvent circuit.BreakerEvent
+}
+
+func (e *EventCurcuitBreakerMeta) LogMessage(prefix string) string {
+	return fmt.Sprintf("%s:%s:%s: [STATUS] %s", prefix, e.APIID, e.Path, fmt.Sprint(e.CircuitEvent))
 }
 
 // EventVersionFailureMeta is the metadata structure for an auth failure (EventKeyExpired)

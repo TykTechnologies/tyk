@@ -38,7 +38,7 @@ func TestJSVMEventHandler_Init(t *testing.T) {
 		t.Run("on disabled", func(t *testing.T) {
 			jsvmHandler, meta := setupHandlerAndMeta(false)
 			err := jsvmHandler.Init(meta)
-			assert.Equal(t, err, ErrEventHandlerDisabled)
+			assert.ErrorIs(t, err, ErrEventHandlerDisabled)
 		})
 	})
 }

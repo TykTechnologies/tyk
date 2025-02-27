@@ -6,11 +6,7 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"github.com/TykTechnologies/tyk/config"
-	"github.com/TykTechnologies/tyk/internal/event"
 )
-
-// EH_JSVMHandler is aliased for backwards compatibility.
-const EH_JSVMHandler = event.JSVMHandler
 
 type JSVMContextGlobal struct {
 	APIID string

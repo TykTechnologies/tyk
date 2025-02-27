@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"bytes"
+	"github.com/stretchr/testify/assert"
 	"strings"
 	"testing"
 	"time"
@@ -170,6 +171,28 @@ func TestInitGenericEventHandlers(t *testing.T) {
 			t.Fatal("EventTriggers handlers length doesn't match")
 		}
 	}
+}
+
+func TestEventKeyFailureMeta_LogMessage(t *testing.T) {
+	em := EventKeyFailureMeta{
+		EventMetaDefault: EventMetaDefault{Message: "QuotaExceeded"},
+		Path:             "/my-path",
+		Origin:           "127.0.0.1",
+		Key:              "abc",
+	}
+	expectedMessage := "myQuotaEvent:QuotaExceeded:abc:127.0.0.1:/my-path"
+	assert.Equal(t, expectedMessage, em.LogMessage("myQuotaEvent:QuotaExceeded"))
+}
+
+func TestEventCurcuitBreakerMeta_LogMessage(t *testing.T) {
+	em := EventCurcuitBreakerMeta{
+		EventMetaDefault: EventMetaDefault{Message: "BreakerTriggered"},
+		Path:             "/my-path",
+		APIID:            "123abc",
+		CircuitEvent:     1,
+	}
+	expectedMessage := "myBreakerEvent:BreakerTriggered:123abc:/my-path: [STATUS] 1"
+	assert.Equal(t, expectedMessage, em.LogMessage("myBreakerEvent:BreakerTriggered"))
 }
 
 func BenchmarkInitGenericEventHandlers(b *testing.B) {

@@ -1,18 +1,15 @@
 package gateway
 
 import (
-	"fmt"
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
-	"github.com/TykTechnologies/tyk/internal/event"
 	"github.com/sirupsen/logrus"
 )
 
-const (
-	// EH_LogHandler is an alias maintained for backwards compatibility.
-	// It is used to register log handler on an event.
-	EH_LogHandler = event.LogHandler
-)
+// LogEventMessage is an interface that provides a method for formatting log events into a string with a given prefix.
+type LogEventMessage interface {
+	LogMessage(prefix string) string
+}
 
 // LogMessageEventHandler is a sample Event Handler
 type LogMessageEventHandler struct {
@@ -46,19 +43,9 @@ func (l *LogMessageEventHandler) Init(handlerConf any) error {
 func (l *LogMessageEventHandler) HandleEvent(em config.EventMessage) {
 	logMsg := l.conf.Prefix + ":" + string(em.Type)
 
-	// We can handle specific event types easily
-	if em.Type == EventQuotaExceeded {
-		msgConf, ok := em.Meta.(EventKeyFailureMeta)
-		if ok {
-			logMsg = logMsg + ":" + msgConf.Key + ":" + msgConf.Origin + ":" + msgConf.Path
-		}
-	}
-
-	if em.Type == EventBreakerTriggered {
-		msgConf, ok := em.Meta.(EventCurcuitBreakerMeta)
-		if ok {
-			logMsg = logMsg + ":" + msgConf.APIID + ":" + msgConf.Path + ": [STATUS] " + fmt.Sprint(msgConf.CircuitEvent)
-		}
+	logEventMessage, ok := em.Meta.(LogEventMessage)
+	if ok {
+		logMsg = logEventMessage.LogMessage(logMsg)
 	}
 
 	l.logger.Warning(logMsg)

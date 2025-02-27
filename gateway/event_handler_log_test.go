@@ -33,7 +33,7 @@ func TestLogMessageEventHandler_Init(t *testing.T) {
 		t.Run("on disabled", func(t *testing.T) {
 			logHandler, meta := setupHandlerAndMeta(false)
 			err := logHandler.Init(meta)
-			assert.Equal(t, err, ErrEventHandlerDisabled)
+			assert.ErrorIs(t, err, ErrEventHandlerDisabled)
 		})
 	})
 }
