@@ -55,6 +55,9 @@ type Fixture struct {
 	// Name holds the name of the fixture, e.g. a product area, a feature.
 	Name string
 
+	// Filename holds the fixture filename for output.
+	Filename string
+
 	// Tests hold the individual migration test cases.
 	Tests []FixtureTest `yaml:"tests"`
 }
@@ -125,6 +128,8 @@ func Fixtures(tb testing.TB) *FixtureDocument {
 		var f Fixture
 		err = yaml.Unmarshal(data, &f)
 		assert.NoError(tb, err, "failed to unmarshal "+file.Name()+" YAML")
+
+		f.Filename = file.Name()
 
 		// Append fixtures together
 		doc.Fixtures = append(doc.Fixtures, f)
@@ -227,11 +232,7 @@ func TestFixtures(t *testing.T) {
 	for _, fixture := range doc.Fixtures {
 		t.Run(fixture.Name, func(t *testing.T) {
 			for idx, tc := range fixture.Tests {
-				name := tc.Desc
-				if name == "" {
-					name = fmt.Sprintf("case %d", idx)
-				}
-				t.Run(name, func(t *testing.T) {
+				t.Run(fmt.Sprintf("%s/%d", fixture.Filename, idx), func(t *testing.T) {
 					var (
 						err    error
 						skip   map[string]any
@@ -324,8 +325,22 @@ func TestFixtures(t *testing.T) {
 					for k, v := range want {
 						got, ok := result[k]
 
+						// If a key is not found, a "<nil>" value is matched against.
+						// This allows the fixture to assert that a key doesn't exist.
+						if got == nil {
+							got = "<nil>"
+							ok = true
+						}
+
+						if strval(v) == "<nil>" {
+							// Check for nested flattened keys.
+							for i, j := range result {
+								assert.False(t, strings.HasPrefix(i, k+"."), "wanted %s=<nil>, found key %s=\"%v\"", k, i, j)
+							}
+						}
+
 						assert.True(t, ok, "expected key %s in output", k)
-						assert.Equal(t, v, got, "expected key %s=\"%s\", got \"%v\"", k, want, got)
+						assert.Equal(t, v, got, "expected key %s=\"%v\", got \"%v\"", k, want, got)
 					}
 				})
 			}

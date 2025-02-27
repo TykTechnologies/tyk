@@ -532,17 +532,17 @@ func (sd *ServiceDiscovery) Fill(serviceDiscovery apidef.ServiceDiscoveryConfigu
 	sd.DataPath = serviceDiscovery.DataPath
 	sd.PortDataPath = serviceDiscovery.PortDataPath
 
-	enabled := !serviceDiscovery.CacheDisabled
-	timeout := serviceDiscovery.CacheTimeout
+	timeout, enabled := serviceDiscovery.CacheOptions()
+	sd.Cache = &ServiceDiscoveryCache{
+		Enabled: enabled && sd.Enabled,
+		Timeout: timeout,
+	}
+
+	if !enabled && timeout == 0 {
+		sd.Cache = nil
+	}
 
 	sd.CacheTimeout = 0
-	sd.Cache = nil
-	if enabled || timeout != 0 {
-		sd.Cache = &ServiceDiscoveryCache{
-			Enabled: enabled,
-			Timeout: timeout,
-		}
-	}
 }
 
 // ExtractTo extracts *ServiceDiscovery into *apidef.ServiceDiscoveryConfiguration.
@@ -558,8 +558,11 @@ func (sd *ServiceDiscovery) ExtractTo(serviceDiscovery *apidef.ServiceDiscoveryC
 	serviceDiscovery.PortDataPath = sd.PortDataPath
 
 	timeout, enabled := sd.CacheOptions()
-	serviceDiscovery.CacheTimeout = timeout
 	serviceDiscovery.CacheDisabled = !enabled
+	serviceDiscovery.CacheTimeout = timeout
+	if !sd.Enabled {
+		serviceDiscovery.CacheDisabled = true
+	}
 }
 
 // UptimeTests configures uptime tests.

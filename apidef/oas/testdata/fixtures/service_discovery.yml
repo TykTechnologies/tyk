@@ -34,3 +34,49 @@ tests:
         upstream:
           serviceDiscovery:
             enabled: true
+            cache:
+              enabled: true
+              timeout: 10
+  - desc: "From Classic to OAS"
+    source: classic
+    errors:
+      desc: "Errors are checked and wanted (general OAS validation)"
+      enabled: true
+      want: true
+    input:
+      name: "Name"
+      proxy:
+        service_discovery:
+          use_discovery_service: false
+          cache_disabled: true
+          cache_timeout: 10
+    output:
+      info:
+        title: "Name"
+      x-tyk-api-gateway:
+        upstream:
+          serviceDiscovery:
+            enabled: false
+            cache:
+              enabled: false
+              timeout: 10
+  # If service discovery is disabled (unconfigured) then honor
+  # cache_disabled=false as being still disabled.
+  - desc: "From Classic to OAS"
+    source: classic
+    errors:
+      desc: "Errors are checked and wanted (general OAS validation)"
+      enabled: true
+      want: true
+    input:
+      name: "Name"
+      proxy:
+        service_discovery:
+          use_discovery_service: false
+          cache_disabled: false
+    output:
+      info:
+        title: "Name"
+      x-tyk-api-gateway:
+        upstream:
+          serviceDiscovery: "<nil>"
