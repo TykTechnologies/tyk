@@ -31,13 +31,15 @@ tests:
       proxy.check_host_against_uptime_tests: true
       uptime_tests.config.expire_utime_after: 10
       uptime_tests.config.recheck_wait: 20
-      uptime_tests.check_list.0.url: "https://www.google.com"
-      uptime_tests.check_list.0.protocol: "http"
-      uptime_tests.check_list.0.timeout: 1000000000
-      uptime_tests.check_list.0.method: "GET"
-      uptime_tests.check_list.0.headers.Content-Type: "application/json"
-      uptime_tests.check_list.0.body: "test"
-      uptime_tests.check_list.0.enable_proxy_protocol: true
+      uptime_tests:
+        check_list:
+          - url: "https://www.google.com"
+            protocol: "http"
+            timeout: 1000000000
+            method: "GET"
+            headers.Content-Type: "application/json"
+            body: "test"
+            enable_proxy_protocol: true
       serviceDiscovery: null
   - desc: "upstream uptime test classic"
     source: classic
