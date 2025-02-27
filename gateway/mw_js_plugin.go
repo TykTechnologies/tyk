@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/ctx"
 
 	"github.com/robertkrimen/otto"
 	_ "github.com/robertkrimen/otto/underscore"
@@ -243,10 +244,7 @@ func (d *DynamicMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 	// make sure request's body can be re-read again
 	nopCloseRequestBody(r)
 
-	r.URL, err = url.Parse(newRequestData.Request.URL)
-	if err != nil {
-		return nil, http.StatusOK
-	}
+	d.SetUrlAndCheckHostRewrite(newRequestData.Request.URL, r)
 
 	ignoreCanonical := d.Gw.GetConfig().IgnoreCanonicalMIMEHeaderKey
 	// Delete and set headers
@@ -321,6 +319,33 @@ func mapStrsToIfaces(m map[string]string) map[string]interface{} {
 		m2[k] = v
 	}
 	return m2
+}
+
+func (d *DynamicMiddleware) SetUrlAndCheckHostRewrite(newTarget string, r *http.Request) error {
+
+	// During looping target can be API name
+	// Need make it compatible with URL parser
+	if strings.HasPrefix(newTarget, LoopScheme) {
+		newTarget = LoopHostRE.ReplaceAllStringFunc(newTarget, func(match string) string {
+			host := strings.TrimPrefix(match, LoopScheme+"://")
+			return LoopingUrl(host)
+		})
+	}
+
+	newAsURL, errParseNew := url.Parse(newTarget)
+	if errParseNew != nil {
+		return errParseNew
+	}
+
+	if shouldRewriteHost(r.URL, newAsURL) {
+		log.Debug("Detected a host rewrite in pattern!")
+		d.Spec.URLRewriteEnabled = true
+		setCtxValue(r, ctx.RetainHost, true)
+	}
+
+	r.URL = newAsURL
+
+	return nil
 }
 
 // --- Utility functions during startup to ensure a sane VM is present for each API Def ----
