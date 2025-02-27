@@ -11,7 +11,6 @@ import (
 	"github.com/getkin/kin-openapi/openapi3"
 
 	"github.com/TykTechnologies/tyk/apidef"
-	tykheader "github.com/TykTechnologies/tyk/header"
 	"github.com/TykTechnologies/tyk/internal/oasutil"
 )
 
@@ -1053,8 +1052,10 @@ func (s *OAS) fillCircuitBreaker(metas []apidef.CircuitBreakerMeta) {
 // It first checks the headers for an explicit Content-Type, then attempts to detect
 // the type from the body content. Returns "text/plain" if no specific type can be determined.
 func detectMockResponseContentType(mock apidef.MockResponseMeta) string {
+	const headerContentType = "Content-Type"
+
 	for name, value := range mock.Headers {
-		if http.CanonicalHeaderKey(name) == tykheader.ContentType {
+		if http.CanonicalHeaderKey(name) == headerContentType {
 			return value
 		}
 	}
