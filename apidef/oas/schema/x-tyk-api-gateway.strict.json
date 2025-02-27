@@ -2028,7 +2028,7 @@
           "$ref": "#/definitions/X-Tyk-LogEvent"
         }
       ],
-      "additionalProperties": false
+      "additionalProperties": true
     },
     "X-Tyk-Webhook-With-ID": {
       "type": "object",
@@ -2059,7 +2059,7 @@
         "id",
         "cooldownPeriod"
       ],
-      "additionalProperties": false
+      "additionalProperties": true
     },
     "X-Tyk-Webhook-Without-ID": {
       "type": "object",
@@ -2115,7 +2115,7 @@
         "cooldownPeriod",
         "bodyTemplate"
       ],
-      "additionalProperties": false
+      "additionalProperties": true
     },
     "X-Tyk-JSVMEvent": {
       "type": "object",
@@ -2150,7 +2150,7 @@
         "functionName",
         "path"
       ],
-      "additionalProperties": false
+      "additionalProperties": true
     },
     "X-Tyk-LogEvent": {
       "type": "object",
@@ -2181,7 +2181,7 @@
         "name",
         "logPrefix"
       ],
-      "additionalProperties": false
+      "additionalProperties": true
     },
     "X-Tyk-EventType": {
       "type": "string",
