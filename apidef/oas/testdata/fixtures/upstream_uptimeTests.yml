@@ -40,7 +40,7 @@ tests:
             headers.Content-Type: "application/json"
             body: "test"
             enable_proxy_protocol: true
-      serviceDiscovery: null
+      serviceDiscovery: <nil>
   - desc: "upstream uptime test classic"
     source: classic
     input:
@@ -60,7 +60,7 @@ tests:
     output:
       x-tyk-api-gateway:
         upstream:
-          serviceDiscovery: null
+          serviceDiscovery: <nil>
           uptimeTests:
             enabled: true
             hostDownRetestPeriod: 20s
@@ -92,7 +92,7 @@ tests:
     output:
       x-tyk-api-gateway:
         upstream:
-          serviceDiscovery: null
+          serviceDiscovery: <nil>
           uptimeTests:
             enabled: false
             hostDownRetestPeriod: 20s
@@ -130,7 +130,7 @@ tests:
     output:
       x-tyk-api-gateway:
         upstream:
-          serviceDiscovery: null
+          serviceDiscovery: <nil>
           uptimeTests:
             enabled: false
             hostDownRetestPeriod: 20s
