@@ -621,10 +621,11 @@ type pathPart struct {
 	name    string
 	value   string
 	isRegex bool
+	isParam bool
 }
 
 func (p pathPart) String() string {
-	if p.isRegex {
+	if p.isRegex || p.isParam {
 		return "{" + p.name + "}"
 	}
 
@@ -803,7 +804,7 @@ func (s *OAS) getOperationID(inPath, method string) string {
 		p.Parameters = []*openapi3.ParameterRef{}
 
 		for _, part := range parts {
-			if part.isRegex {
+			if part.isRegex || part.isParam {
 				schema := &openapi3.SchemaRef{
 					Value: &openapi3.Schema{
 						Type:    "string",
