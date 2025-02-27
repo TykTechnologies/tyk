@@ -691,7 +691,7 @@ func splitPath(inPath string) ([]pathPart, bool) {
 
 		// Parameter with pattern case:
 		// for example: /a/{id:[0-9]}
-		if name, pattern, ok := strings.Cut(segment, ":"); ok {
+		if name, pattern, ok := strings.Cut(segment, ":"); ok && strings.TrimSpace(name) != "" {
 			// this is required because GetPathRegexp doesn't check if the regex is valid
 			// it doesn't return an error even if the regex is invalid (eg. [a-zA-Z+)
 			if _, err := regexp.Compile(pattern); err != nil {
@@ -1209,20 +1209,4 @@ func isMuxTemplate(pattern string) bool {
 	openBraces := strings.Count(pattern, "{")
 	closeBraces := strings.Count(pattern, "}")
 	return openBraces > 0 && openBraces == closeBraces
-}
-
-func isValidPathSegment(segment string) bool {
-	segment = "/" + strings.Trim(segment, "/")
-
-	route := mux.NewRouter().PathPrefix(segment)
-
-	if err := route.GetError(); err != nil {
-		return false
-	}
-
-	if _, err := route.GetPathRegexp(); err != nil {
-		return false
-	}
-
-	return true
 }
