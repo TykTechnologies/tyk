@@ -211,6 +211,8 @@ func TestOAS_ExtractTo_ResetAPIDefinition(t *testing.T) {
 
 	a.VersionData.Versions[""] = vInfo
 
+	a.UptimeTests.Config.ServiceDiscovery.CacheDisabled = false
+
 	assert.Empty(t, a.Name)
 
 	noOASSupportFields := getNonEmptyFields(a, "APIDefinition")
@@ -232,7 +234,6 @@ func TestOAS_ExtractTo_ResetAPIDefinition(t *testing.T) {
 		"APIDefinition.VersionData.Versions[0].ExtendedPaths.PersistGraphQL[0].Method",
 		"APIDefinition.VersionData.Versions[0].ExtendedPaths.PersistGraphQL[0].Operation",
 		"APIDefinition.VersionData.Versions[0].ExtendedPaths.PersistGraphQL[0].Variables[0]",
-		"APIDefinition.UptimeTests.Config.ServiceDiscovery.CacheDisabled",
 		"APIDefinition.AuthProvider.Name",
 		"APIDefinition.AuthProvider.StorageEngine",
 		"APIDefinition.AuthProvider.Meta[0]",
