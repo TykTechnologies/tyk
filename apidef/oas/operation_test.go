@@ -145,11 +145,13 @@ func TestOAS_PathsAndOperations(t *testing.T) {
 func TestOAS_MockResponse_extractPathsAndOperations(t *testing.T) {
 	t.Parallel()
 
-	tests := []struct {
+	type testCase struct {
 		name string
 		spec OAS
 		want func(t *testing.T, ep *apidef.ExtendedPathsSet)
-	}{
+	}
+
+	tests := []testCase{
 		{
 			name: "basic mock response",
 			spec: OAS{
@@ -595,12 +597,14 @@ var methodSetters = map[string]func(*openapi3.PathItem, *openapi3.Operation){
 func TestOAS_MockResponse_fillMockResponsePaths(t *testing.T) {
 	t.Parallel()
 
-	tests := []struct {
+	type testCase struct {
 		name string
 		ep   apidef.ExtendedPathsSet
 		spec *OAS
 		want func(t *testing.T, spec *OAS)
-	}{
+	}
+
+	tests := []testCase{
 		{
 			name: "basic mock response",
 			spec: &OAS{
