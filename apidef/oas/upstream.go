@@ -665,12 +665,13 @@ func (t *UptimeTests) Fill(uptimeTests apidef.UptimeTests, enabled bool) {
 	result := []UptimeTest{}
 	for _, v := range uptimeTests.CheckList {
 		check := UptimeTest{
-			CheckURL: v.CheckURL,
-			Protocol: v.Protocol,
-			Timeout:  ReadableDuration(v.Timeout),
-			Method:   v.Method,
-			Headers:  v.Headers,
-			Body:     v.Body,
+			CheckURL:            v.CheckURL,
+			Protocol:            v.Protocol,
+			Timeout:             ReadableDuration(v.Timeout),
+			Method:              v.Method,
+			Headers:             v.Headers,
+			Body:                v.Body,
+			EnableProxyProtocol: v.EnableProxyProtocol,
 		}
 		for _, command := range v.Commands {
 			check.AddCommand(command.Name, command.Message)
@@ -705,12 +706,13 @@ func (t *UptimeTests) ExtractTo(uptimeTests *apidef.UptimeTests, enabled *bool) 
 	result := []apidef.HostCheckObject{}
 	for _, v := range t.Tests {
 		check := apidef.HostCheckObject{
-			CheckURL: v.CheckURL,
-			Protocol: v.Protocol,
-			Timeout:  time.Duration(v.Timeout),
-			Method:   v.Method,
-			Headers:  v.Headers,
-			Body:     v.Body,
+			CheckURL:            v.CheckURL,
+			Protocol:            v.Protocol,
+			Timeout:             time.Duration(v.Timeout),
+			Method:              v.Method,
+			Headers:             v.Headers,
+			Body:                v.Body,
+			EnableProxyProtocol: v.EnableProxyProtocol,
 		}
 		for _, command := range v.Commands {
 			check.AddCommand(command.Name, command.Message)
