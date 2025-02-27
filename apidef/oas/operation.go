@@ -634,9 +634,11 @@ func (p pathPart) String() string {
 
 // splitPath splits URL into folder parts, detecting regex patterns.
 func splitPath(inPath string) ([]pathPart, bool) {
-	trimmedPath := strings.Trim(inPath, "/")
+	// Each URL fragment can contain a regex, but the whole
+	// URL isn't just a regex (`/a/.*/foot` => `/a/{param1}/foot`)
+	inPath = strings.Trim(inPath, "/")
 
-	if trimmedPath == "" {
+	if inPath == "" {
 		return []pathPart{}, false
 	}
 
@@ -650,7 +652,7 @@ func splitPath(inPath string) ([]pathPart, bool) {
 	found := 0
 	nCustomRegex := 0
 
-	trimPart := func(value string) string {
+	trimPathParam := func(value string) string {
 		value = strings.TrimPrefix(value, "{")
 		value = strings.TrimSuffix(value, "}")
 
@@ -660,13 +662,12 @@ func splitPath(inPath string) ([]pathPart, bool) {
 	for k, value := range parts {
 		// Handle non-bracketed path segments
 		// for example: /a/b/c, /a/[0-9]
-		if !isMuxTemplate(value) {
+		if !strings.HasPrefix(value, "{") && !strings.HasSuffix(value, "}") {
 			name := value
 
 			result[k] = pathPart{
-				name:    name,
-				value:   value,
-				isRegex: isRegex(value),
+				name:  name,
+				value: value,
 			}
 
 			if isRegex(value) {
@@ -681,31 +682,34 @@ func splitPath(inPath string) ([]pathPart, bool) {
 		}
 
 		// Handle bracketed path segments
-		segment := trimPart(value)
+		segment := trimPathParam(value)
 
-		// Simple parameter case: {name}
-		if isParamName(segment) {
-			result[k] = pathPart{
-				name:    segment,
-				isParam: true,
-			}
-			found++
-			continue
-		}
-
-		// Parameter with pattern case: {name:pattern}
+		// Parameter with pattern case:
+		// for example: /a/{id:[0-9]}
 		if name, pattern, ok := strings.Cut(segment, ":"); ok && isParamName(name) {
 			result[k] = pathPart{
 				name:    name,
 				value:   pattern,
 				isRegex: true,
-				isParam: true,
+			}
+
+			found++
+			continue
+		}
+
+		// Simple parameter case:
+		// for example: /a/{id}
+		if isParamName(segment) {
+			result[k] = pathPart{
+				name:    segment,
+				isRegex: true,
 			}
 			found++
 			continue
 		}
 
-		// Direct regex pattern case: {pattern}
+		// Direct regex pattern case:
+		// for example: /a/{[0-9]}
 		nCustomRegex++
 		result[k] = pathPart{
 			name:    fmt.Sprintf("customRegex%d", nCustomRegex),
