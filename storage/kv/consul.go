@@ -33,6 +33,18 @@ func (c *Consul) Get(key string) (string, error) {
 	return string(pair.Value), nil
 }
 
+func (c *Consul) Put(key string, value string) error {
+	kv := c.store
+
+	p := &consulapi.KVPair{
+		Key:   key,
+		Value: []byte(value),
+	}
+
+	_, err := kv.Put(p, nil)
+	return err
+}
+
 func newConsul(conf config.ConsulConfig) (Store, error) {
 	defaultCfg := consulapi.DefaultConfig()
 

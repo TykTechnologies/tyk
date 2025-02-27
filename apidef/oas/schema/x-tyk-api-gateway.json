@@ -578,6 +578,15 @@
         },
         "requestSizeLimit": {
           "$ref": "#/definitions/X-Tyk-GlobalRequestSizeLimit"
+        },
+        "skipRateLimit": {
+          "type": "boolean"
+        },
+        "skipQuota": {
+          "type": "boolean"
+        },
+        "skipQuotaReset": {
+          "type": "boolean"
         }
       }
     },
@@ -1924,7 +1933,24 @@
         "enabled"
       ]
     },
-    "X-Tyk-EventHandler": {
+    "X-Tyk-EventHandlers": {
+      "type": "object",
+      "anyOf": [
+        {
+          "$ref": "#/definitions/X-Tyk-Webhook-With-ID"
+        },
+        {
+          "$ref": "#/definitions/X-Tyk-Webhook-Without-ID"
+        },
+        {
+          "$ref": "#/definitions/X-Tyk-JSVMEvent"
+        },
+        {
+          "$ref": "#/definitions/X-Tyk-LogEvent"
+        }
+      ]
+    },
+    "X-Tyk-Webhook-With-ID": {
       "type": "object",
       "properties": {
         "enabled": {
@@ -2010,11 +2036,42 @@
         }
       ]
     },
+    "X-Tyk-LogEvent": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "trigger": {
+          "$ref": "#/definitions/X-Tyk-EventTrigger"
+        },
+        "type": {
+          "$ref": "#/definitions/X-Tyk-EventType"
+        },
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "logPrefix": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "enabled",
+        "trigger",
+        "type",
+        "name",
+        "logPrefix"
+      ]
+    },
     "X-Tyk-EventType": {
       "type": "string",
       "enum": [
         "webhook",
-        "custom"
+        "custom",
+        "log"
       ]
     },
     "X-Tyk-EventTrigger": {

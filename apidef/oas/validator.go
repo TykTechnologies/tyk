@@ -13,9 +13,9 @@ import (
 	"github.com/buger/jsonparser"
 	"github.com/hashicorp/go-multierror"
 	pkgver "github.com/hashicorp/go-version"
-	"github.com/xeipuuv/gojsonschema"
 
 	tykerrors "github.com/TykTechnologies/tyk/internal/errors"
+	"github.com/TykTechnologies/tyk/internal/service/gojsonschema"
 	logger "github.com/TykTechnologies/tyk/log"
 )
 

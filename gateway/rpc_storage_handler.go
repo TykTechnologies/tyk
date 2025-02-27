@@ -3,6 +3,7 @@ package gateway
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
@@ -1021,7 +1022,7 @@ func (gw *Gateway) ProcessOauthClientsOps(clients map[string]string) {
 
 // ProcessKeySpaceChanges receives an array of keys to be processed, those keys are considered changes in the keyspace in the
 // management layer, they could be: regular keys (hashed, unhashed), revoke oauth client, revoke single oauth token,
-// certificates (added, removed), oauth client (added, updated, removed)
+// certificates (added, removed), oauth client (added, updated, removed), user key events (reset)
 func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string, orgId string) {
 	keysToReset := map[string]bool{}
 	TokensToBeRevoked := map[string]string{}
@@ -1031,6 +1032,7 @@ func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string, orgId string) 
 	CertificatesToAdd := map[string]string{}
 	OauthClients := map[string]string{}
 	apiIDsToDeleteCache := make([]string, 0)
+	userKeyResets := make(map[string]string)
 
 	for _, key := range keys {
 		splitKeys := strings.Split(key, ":")
@@ -1057,12 +1059,45 @@ func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string, orgId string) 
 			case NoticeDeleteAPICache.String():
 				apiIDsToDeleteCache = append(apiIDsToDeleteCache, splitKeys[0])
 				notRegularKeys[key] = true
+			case NoticeUserKeyReset.String():
+				keyParts := strings.Split(splitKeys[0], ".")
+				if len(keyParts) != 2 {
+					log.Error("Invalid user key reset format")
+					continue
+				}
+				userKeyResets[keyParts[0]] = keyParts[1]
 			default:
 				log.Debug("ignoring processing of action:", action)
 			}
 		}
 	}
+	for oldKey, newKey := range userKeyResets {
+		if r.Gw.GetConfig().SlaveOptions.APIKey == oldKey {
+			config := r.Gw.GetConfig()
+
+			// Updating the key in the KV store if we are using one
+			r.Gw.updateKeyInStore(config.Private.EdgeOriginalAPIKeyPath, newKey)
+
+			config.SlaveOptions.APIKey = newKey
+			r.Gw.SetConfig(config)
+			connected := r.Connect()
+			if !connected {
+				log.Error("Failed to reconnect to RPC storage")
+				continue
+			}
+		}
+		ok := r.Gw.MainNotifier.Notify(Notification{
+			Command: NoticeUserKeyReset,
+			Payload: fmt.Sprintf("%s.%s:%s", oldKey, newKey, NoticeUserKeyReset),
+			Gw:      r.Gw,
+		})
+		if !ok {
+			log.Error("Failed to notify other gateways about user key reset")
+		}
+	}
+	// Process OAuth clients
 	r.Gw.ProcessOauthClientsOps(OauthClients)
+
 	for clientId, key := range ClientsToBeRevoked {
 		splitKeys := strings.Split(key, ":")
 		apiId := splitKeys[0]
@@ -1122,6 +1157,17 @@ func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string, orgId string) 
 
 	synchronizerEnabled := r.Gw.GetConfig().SlaveOptions.SynchroniserEnabled
 	for _, key := range keys {
+		// Skip keys that are user keys to be reset
+		splitKeys := strings.Split(key, ":")
+		if len(splitKeys) > 1 {
+			userKeys := strings.Split(splitKeys[0], ".")
+			if len(userKeys) == 2 {
+				_, ok := userKeyResets[userKeys[0]]
+				if ok {
+					continue
+				}
+			}
+		}
 		_, isOauthTokenKey := notRegularKeys[key]
 		if !isOauthTokenKey {
 			splitKeys := strings.Split(key, ":")
@@ -1166,6 +1212,7 @@ func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string, orgId string) 
 
 		log.WithField("apiID", apiID).Error("cache invalidation failed")
 	}
+
 	// Notify rest of gateways in cluster to flush cache
 	n := Notification{
 		Command: KeySpaceUpdateNotification,

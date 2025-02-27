@@ -1699,3 +1699,21 @@ func (j *JSVMEventHandlerConf) Scan(in any) error {
 	*j = *conf
 	return nil
 }
+
+// LogEventHandlerConf represents the configuration for a log event handler.
+type LogEventHandlerConf struct {
+	// Disabled indicates whether the handler is inactive.
+	Disabled bool `bson:"disabled" json:"disabled"`
+	// Prefix specifies the prefix used for log events.
+	Prefix string `bson:"prefix" json:"prefix"`
+}
+
+// Scan extracts data from the input into the LogEventHandlerConf struct by performing type conversion.
+func (l *LogEventHandlerConf) Scan(in any) error {
+	conf, err := reflect.Cast[LogEventHandlerConf](in)
+	if err != nil {
+		return err
+	}
+	*l = *conf
+	return nil
+}
