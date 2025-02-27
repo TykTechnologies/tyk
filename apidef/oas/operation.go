@@ -709,19 +709,6 @@ func splitPath(inPath string) ([]pathPart, bool) {
 			continue
 		}
 
-		// Simple parameter case:
-		// for example: /a/{id}
-		if isParamName(segment) {
-			result[k] = pathPart{
-				name:    segment,
-				isRegex: true,
-			}
-
-			found++
-
-			continue
-		}
-
 		// this is required because GetPathRegexp doesn't check if the regex is valid
 		// it doesn't return an error even if the regex is invalid (eg. [a-zA-Z+)
 		if _, err := regexp.Compile(segment); err != nil {
@@ -750,29 +737,6 @@ func isRegex(value string) bool {
 		}
 	}
 	return false
-}
-
-// isParamName checks if a string is a valid variable name containing only
-// alphanumeric, underscore and hyphen characters
-func isParamName(s string) bool {
-	if len(s) == 0 {
-		return false
-	}
-
-	// Check if string ends with hyphen
-	if s[len(s)-1] == '-' {
-		return false
-	}
-
-	for i, c := range s {
-		if i == 0 && !((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '_') {
-			return false
-		}
-		if !((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_' || c == '-') {
-			return false
-		}
-	}
-	return true
 }
 
 // buildPath converts the URL paths with regex to named parameters

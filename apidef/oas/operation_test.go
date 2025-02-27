@@ -546,7 +546,7 @@ func TestOAS_RegexPaths(t *testing.T) {
 		{"/group/foo$", "/group/{customRegex1}", []string{"customRegex1"}},
 		{"/group/[^a]*/.*", "/group/{customRegex1}/{customRegex2}", []string{"customRegex1", "customRegex2"}},
 		{"/users/documents/list", "/users/documents/list", []string{}},
-		{"/users/{id}/profile", "/users/{id}/profile", []string{"id"}},
+		{"/users/{id}/profile", "/users/{customRegex1}/profile", []string{"customRegex1"}},
 		{"/users/{id:[0-9]+}/profile", "/users/{id}/profile", []string{"id"}},
 		{"/files/{.*}/download", "/files/{customRegex1}/download", []string{"customRegex1"}},
 		{"/{id:[0-9]+}/{name:[a-zA-Z]+}/{.*}", "/{id}/{name}/{customRegex1}", []string{"id", "name", "customRegex1"}},
@@ -610,7 +610,7 @@ func TestOAS_RegexPaths(t *testing.T) {
 			}
 
 			pattern := param.Value.Schema.Value.Pattern
-			isNamedParam := isParamName(param.Value.Name) && !strings.HasPrefix(param.Value.Name, "customRegex")
+			isNamedParam := !strings.HasPrefix(param.Value.Name, "customRegex")
 			hasBraces := false
 			for _, part := range strings.Split(tc.input, "/") {
 				if strings.HasPrefix(part, "{") && strings.HasSuffix(part, "}") {
@@ -1243,7 +1243,7 @@ func TestSplitPath(t *testing.T) {
 			path: "/users/{id}/profile",
 			expectedParts: []pathPart{
 				{name: "users", value: "users", isRegex: false},
-				{name: "id", value: "", isRegex: true},
+				{name: "customRegex1", value: "id", isRegex: true},
 				{name: "profile", value: "profile", isRegex: false},
 			},
 			expectedRegex: true,
@@ -1284,7 +1284,7 @@ func TestSplitPath(t *testing.T) {
 			expectedParts: []pathPart{
 				{name: "users", value: "users", isRegex: false},
 				{name: "customRegex1", value: "123", isRegex: true},
-				{name: "user-name", value: "", isRegex: true},
+				{name: "customRegex2", value: "user-name", isRegex: true},
 			},
 			expectedRegex: true,
 		},
@@ -1464,84 +1464,6 @@ func TestValidatePath(t *testing.T) {
 			err := validatePath(tt.path)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("ValidatePath() error = %v, wantErr %v", err, tt.wantErr)
-			}
-		})
-	}
-}
-
-func TestIsParamName(t *testing.T) {
-	tests := []struct {
-		name     string
-		input    string
-		expected bool
-	}{
-		{
-			name:     "valid parameter name with letters",
-			input:    "param",
-			expected: true,
-		},
-		{
-			name:     "valid parameter with underscore",
-			input:    "my_param",
-			expected: true,
-		},
-		{
-			name:     "valid parameter with hyphen",
-			input:    "my-param",
-			expected: true,
-		},
-		{
-			name:     "valid parameter with numbers",
-			input:    "param123",
-			expected: true,
-		},
-		{
-			name:     "valid mixed case parameter",
-			input:    "myParam",
-			expected: true,
-		},
-		{
-			name:     "empty string",
-			input:    "",
-			expected: false,
-		},
-		{
-			name:     "starts with number",
-			input:    "1param",
-			expected: false,
-		},
-		{
-			name:     "starts with hyphen",
-			input:    "-param",
-			expected: false,
-		},
-		{
-			name:     "ends with hyphen",
-			input:    "param-",
-			expected: false,
-		},
-		{
-			name:     "contains special characters",
-			input:    "param@name",
-			expected: false,
-		},
-		{
-			name:     "has space",
-			input:    "param name",
-			expected: false,
-		},
-		{
-			name:     "starts with underscore",
-			input:    "_param",
-			expected: true,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result := isParamName(tt.input)
-			if result != tt.expected {
-				t.Errorf("isParamName(%q) = %v, want %v", tt.input, result, tt.expected)
 			}
 		})
 	}
