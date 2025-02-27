@@ -4,11 +4,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
 
 	"github.com/getkin/kin-openapi/openapi3"
+	"github.com/gorilla/mux"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/internal/oasutil"
@@ -620,14 +622,111 @@ type pathPart struct {
 	name    string
 	value   string
 	isRegex bool
+	isParam bool
 }
 
 func (p pathPart) String() string {
-	if p.isRegex {
+	if p.isRegex || p.isParam {
 		return "{" + p.name + "}"
 	}
 
 	return p.value
+}
+
+// splitPath splits URL into folder parts, detecting regex patterns.
+func splitPath(inPath string) ([]pathPart, bool) {
+	// Each URL fragment can contain a regex, but the whole
+	// URL isn't just a regex (`/a/.*/foot` => `/a/{param1}/foot`)
+	inPath = strings.Trim(inPath, "/")
+
+	if inPath == "" {
+		return []pathPart{}, false
+	}
+
+	if err := validatePath(inPath); err != nil {
+		return []pathPart{}, false
+	}
+
+	parts := strings.Split(inPath, "/")
+
+	result := make([]pathPart, len(parts))
+	found := 0
+	nCustomRegex := 0
+
+	trimPathParam := func(value string) string {
+		value = strings.TrimPrefix(value, "{")
+		value = strings.TrimSuffix(value, "}")
+
+		return value
+	}
+
+	for k, value := range parts {
+		// Handle non-bracketed path segments
+		// for example: /a/b/c, /a/[0-9]
+		if !isMuxTemplate(value) {
+			name := value
+
+			result[k] = pathPart{
+				name:  name,
+				value: value,
+			}
+
+			if isRegex(value) {
+				nCustomRegex++
+				found++
+
+				result[k].name = fmt.Sprintf("customRegex%d", nCustomRegex)
+				result[k].isRegex = true
+			}
+
+			continue
+		}
+
+		// if !isValidPathSegment(value) {
+		// 	continue
+		// }
+
+		// Handle bracketed path segments
+		segment := trimPathParam(value)
+
+		// Parameter with pattern case:
+		// for example: /a/{id:[0-9]}
+		if name, pattern, ok := strings.Cut(segment, ":"); ok && strings.TrimSpace(name) != "" {
+			// this is required because GetPathRegexp doesn't check if the regex is valid
+			// it doesn't return an error even if the regex is invalid (eg. [a-zA-Z+)
+			if _, err := regexp.Compile(pattern); err != nil {
+				return []pathPart{}, false
+			}
+
+			result[k] = pathPart{
+				name:    name,
+				value:   pattern,
+				isRegex: true,
+			}
+
+			found++
+
+			continue
+		}
+
+		// this is required because GetPathRegexp doesn't check if the regex is valid
+		// it doesn't return an error even if the regex is invalid (eg. [a-zA-Z+)
+		if _, err := regexp.Compile(segment); err != nil {
+			return []pathPart{}, false
+		}
+
+		// Direct regex pattern case:
+		// for example: /a/{[0-9]}
+		nCustomRegex++
+		result[k] = pathPart{
+			name:    fmt.Sprintf("customRegex%d", nCustomRegex),
+			value:   segment,
+			isRegex: true,
+		}
+		found++
+	}
+
+	return result, found > 0
 }
 
 // isRegex checks if value has expected regular expression patterns.
@@ -638,31 +737,6 @@ func isRegex(value string) bool {
 		}
 	}
 	return false
-}
-
-// splitPath splits URL into folder parts, detecting regex patterns.
-func splitPath(inPath string) ([]pathPart, bool) {
-	// Each URL fragment can contain a regex, but the whole
-	// URL isn't just a regex (`/a/.*/foot` => `/a/{param1}/foot`)
-	parts := strings.Split(strings.Trim(inPath, "/"), "/")
-	result := make([]pathPart, len(parts))
-	found := 0
-
-	for k, value := range parts {
-		name := value
-		isRegex := isRegex(value)
-		if isRegex {
-			found++
-			name = fmt.Sprintf("customRegex%d", found)
-		}
-		result[k] = pathPart{
-			name:    name,
-			value:   value,
-			isRegex: isRegex,
-		}
-	}
-
-	return result, found > 0
 }
 
 // buildPath converts the URL paths with regex to named parameters
@@ -719,13 +793,18 @@ func (s *OAS) getOperationID(inPath, method string) string {
 		p.Parameters = []*openapi3.ParameterRef{}
 
 		for _, part := range parts {
-			if part.isRegex {
+			if part.isRegex || part.isParam {
 				schema := &openapi3.SchemaRef{
 					Value: &openapi3.Schema{
 						Type:    "string",
 						Pattern: part.value,
 					},
 				}
+
+				if part.isRegex {
+					schema.Value.Pattern = part.value
+				}
+
 				param := &openapi3.ParameterRef{
 					Value: &openapi3.Parameter{
 						Name:     part.name,
@@ -1102,4 +1181,32 @@ func sortMockResponseAllowList(ep *apidef.ExtendedPathsSet) {
 
 		return actionI.Code < actionJ.Code
 	})
+}
+
+// validatePath validates if the path is valid. Returns an error.
+// TODO: This is a temporary implementation to avoid circular dependency.
+// Should be refactored to use httputil.ValidatePath once dependency structure is resolved.
+func validatePath(in string) error {
+	in = "/" + strings.Trim(in, "/")
+
+	route := mux.NewRouter().PathPrefix(in)
+
+	if err := route.GetError(); err != nil {
+		return err
+	}
+
+	if _, err := route.GetPathRegexp(); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// isMuxTemplate determines if a pattern is a mux template by counting the number of opening and closing braces.
+// TODO: This is a temporary implementation to avoid circular dependency.
+// Should be refactored to use httputil.isMuxTemplate once dependency structure is resolved.
+func isMuxTemplate(pattern string) bool {
+	openBraces := strings.Count(pattern, "{")
+	closeBraces := strings.Count(pattern, "}")
+	return openBraces > 0 && openBraces == closeBraces
 }

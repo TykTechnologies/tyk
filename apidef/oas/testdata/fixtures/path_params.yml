@@ -1,0 +1,77 @@
+---
+name: "Path params"
+tests:
+  - desc: "regex path params"
+    source: classic
+    input:
+      version_data:
+        versions:
+          Default:
+            name: Default
+            extended_paths:
+              white_list:
+              - disabled: false
+                path: "/{id:[a-z]}"
+                ignore_case: false
+                method_actions:
+                  GET:
+                    action: no_action
+                    code: 200
+                    headers: {}
+              - disabled: false
+                path: "/b/{[0-9]}"
+                ignore_case: false
+                method_actions:
+                  GET:
+                    action: no_action
+                    code: 200
+                    headers: {}
+              - disabled: false
+                path: "/a/[0-9]"
+                ignore_case: false
+                method_actions:
+                  GET:
+                    action: no_action
+                    code: 200
+                    headers: {}
+    output:
+      paths:
+        /a/{customRegex1}:
+          get:
+            operationId: a/[0-9]GET
+            responses:
+              default:
+                description: ''
+          parameters:
+            - in: path
+              name: customRegex1
+              required: true
+              schema:
+                pattern: '[0-9]'
+                type: string
+        /b/{customRegex1}:
+          get:
+            operationId: b/{[0-9]}GET
+            responses:
+              default:
+                description: ''
+          parameters:
+            - in: path
+              name: customRegex1
+              required: true
+              schema:
+                pattern: '[0-9]'
+                type: string
+        /{id}:
+          get:
+            operationId: '{id:[a-z]}GET'
+            responses:
+              default:
+                description: ''
+          parameters:
+            - in: path
+              name: id
+              required: true
+              schema:
+                pattern: '[a-z]'
+                type: string
