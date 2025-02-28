@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"encoding/json"
+
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/sirupsen/logrus"
 
