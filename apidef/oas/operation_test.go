@@ -4,6 +4,7 @@ import (
 	"context"
 	"embed"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"sort"
 	"strconv"
@@ -532,21 +533,30 @@ func TestOAS_RegexPaths(t *testing.T) {
 	type test struct {
 		input  string
 		want   string
-		params int
+		params []string
 	}
 
 	tests := []test{
-		{"/v1.Service", "/v1.Service", 0},
-		{"/v1.Service/stats.Service", "/v1.Service/stats.Service", 0},
-		{"/.+", "/{customRegex1}", 1},
-		{"/.*", "/{customRegex1}", 1},
-		{"/[^a]*", "/{customRegex1}", 1},
-		{"/foo$", "/{customRegex1}", 1},
-		{"/group/.+", "/group/{customRegex1}", 1},
-		{"/group/.*", "/group/{customRegex1}", 1},
-		{"/group/[^a]*", "/group/{customRegex1}", 1},
-		{"/group/foo$", "/group/{customRegex1}", 1},
-		{"/group/[^a]*/.*", "/group/{customRegex1}/{customRegex2}", 2},
+		{"/v1.Service", "/v1.Service", []string{}},
+		{"/v1.Service/stats.Service", "/v1.Service/stats.Service", []string{}},
+		{"/users/documents/list", "/users/documents/list", []string{}},
+		{"/group/.+", "/group/{customRegex1}", []string{"customRegex1"}},
+		{"/group/.*", "/group/{customRegex1}", []string{"customRegex1"}},
+		{"/group/[^a]*", "/group/{customRegex1}", []string{"customRegex1"}},
+		{"/group/foo$", "/group/{customRegex1}", []string{"customRegex1"}},
+		{"/group/[^a]*/.*", "/group/{customRegex1}/{customRegex2}", []string{"customRegex1", "customRegex2"}},
+		{"/users/documents/list", "/users/documents/list", []string{}},
+		{"/users/{id}/profile", "/users/{id}/profile", []string{"id"}},
+		{"/users/{id:[0-9]+}/profile", "/users/{id}/profile", []string{"id"}},
+		{"/files/{.*}/download", "/files/{customRegex1}/download", []string{"customRegex1"}},
+		{"/{id:[0-9]+}/{name:[a-zA-Z]+}/{.*}", "/{id}/{name}/{customRegex1}", []string{"id", "name", "customRegex1"}},
+		{"", "", []string{}},
+		{"/", "/", []string{}},
+		{"/users/profile/", "/users/profile/", []string{}},
+		{"/.+", "/{customRegex1}", []string{"customRegex1"}},
+		{"/.+/", "/{customRegex1}/", []string{"customRegex1"}},
+		{"/users/my-profile/", "/users/my-profile/", []string{}},
+		{"/[0-9]+/[a-zA-Z]+/.*", "/{customRegex1}/{customRegex2}/{customRegex3}", []string{"customRegex1", "customRegex2", "customRegex3"}},
 	}
 
 	for i, tc := range tests {
@@ -565,18 +575,60 @@ func TestOAS_RegexPaths(t *testing.T) {
 
 		p, ok := oas.Paths[tc.want]
 		assert.Truef(t, ok, "test %d: path doesn't exist in OAS: %v", i, tc.want)
-		assert.Lenf(t, p.Parameters, tc.params, "test %d: expected %d parameters, got %d", i, tc.params, len(p.Parameters))
+		assert.Lenf(t, p.Parameters, len(tc.params), "test %d: expected %d parameters, got %d", i, len(tc.params), len(p.Parameters))
+
+		extractedParams := make([]string, 0, len(p.Parameters))
+		for _, param := range p.Parameters {
+			if param.Value == nil {
+				continue
+			}
+
+			if param.Value.Schema == nil {
+				continue
+			}
+
+			if param.Value.Schema.Value == nil {
+				continue
+			}
+
+			extractedParams = append(extractedParams, param.Value.Name)
+		}
+
+		assert.ElementsMatch(t, tc.params, extractedParams)
 
 		// rebuild original link
 		got := tc.want
 		for _, param := range p.Parameters {
-			assert.NotNilf(t, param.Value, "test %d: missing value", i)
-			assert.NotNilf(t, param.Value.Schema, "test %d: missing schema", i)
-			assert.NotNilf(t, param.Value.Schema.Value, "test %d: missing schema value", i)
+			require.NotNilf(t, param.Value, "test %d: missing value", i)
+			require.NotNilf(t, param.Value.Schema, "test %d: missing schema", i)
+			require.NotNilf(t, param.Value.Schema.Value, "test %d: missing schema value", i)
 
-			assert.Truef(t, strings.HasPrefix(param.Value.Name, "customRegex"), "test %d: invalid name %v", i, param.Value.Name)
+			paramName := "{" + param.Value.Name + "}"
+			if param.Value.Schema.Value.Pattern == "" {
+				continue
+			}
 
-			got = strings.ReplaceAll(got, "{"+param.Value.Name+"}", param.Value.Schema.Value.Pattern)
+			pattern := param.Value.Schema.Value.Pattern
+			isNamedParam := !strings.HasPrefix(param.Value.Name, "customRegex")
+			hasBraces := false
+			for _, part := range strings.Split(tc.input, "/") {
+				if strings.HasPrefix(part, "{") && strings.HasSuffix(part, "}") {
+					hasBraces = true
+					break
+				}
+			}
+
+			switch {
+			case isNamedParam:
+				// For named parameters like "id", use {id:pattern} format
+				got = strings.ReplaceAll(got, paramName, fmt.Sprintf("{%s:%s}", param.Value.Name, pattern))
+			case hasBraces:
+				// If original input used braces, maintain them
+				got = strings.ReplaceAll(got, paramName, "{"+pattern+"}")
+			default:
+				// Otherwise use the pattern directly
+				got = strings.ReplaceAll(got, paramName, pattern)
+			}
 		}
 
 		assert.Equalf(t, tc.input, got, "test %d: rebuilt link, expected %v, got %v", i, tc.input, got)
@@ -1111,5 +1163,297 @@ func verifyOASOperation(t *testing.T, op *openapi3.Operation, method string, cod
 		require.NotNil(t, response.Content[contentType], "Content type %s not found", contentType)
 		require.NotNil(t, response.Content[contentType].Examples, "Examples for content type %s not found", contentType)
 		require.Equal(t, body, response.Content[contentType].Examples["default"].Value.Value)
+	}
+}
+
+func TestPathPartString(t *testing.T) {
+	tests := []struct {
+		name     string
+		pathPart pathPart
+		want     string
+	}{
+		{
+			name: "regular path part",
+			pathPart: pathPart{
+				name:    "users",
+				value:   "users",
+				isRegex: false,
+			},
+			want: "users",
+		},
+		{
+			name: "regex path part",
+			pathPart: pathPart{
+				name:    "customRegex1",
+				value:   ".*",
+				isRegex: true,
+			},
+			want: "{customRegex1}",
+		},
+		{
+			name: "named pattern format",
+			pathPart: pathPart{
+				name:    "id",
+				value:   "[0-9]+",
+				isRegex: true,
+			},
+			want: "{id}",
+		},
+		{
+			name: "named pattern with multiple colons",
+			pathPart: pathPart{
+				name:    "path",
+				value:   ".*:more:stuff",
+				isRegex: true,
+			},
+			want: "{path}",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := tt.pathPart.String()
+			if got != tt.want {
+				t.Errorf("pathPart.String() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestSplitPath(t *testing.T) {
+	tests := []struct {
+		name          string
+		path          string
+		expectedParts []pathPart
+		expectedRegex bool
+	}{
+		{
+			name: "standard path without regex",
+			path: "/users/documents/list",
+			expectedParts: []pathPart{
+				{name: "users", value: "users", isRegex: false},
+				{name: "documents", value: "documents", isRegex: false},
+				{name: "list", value: "list", isRegex: false},
+			},
+			expectedRegex: false,
+		},
+		{
+			name: "path with named parameter",
+			path: "/users/{id}/profile",
+			expectedParts: []pathPart{
+				{name: "users", value: "users", isRegex: false},
+				{name: "id", value: "", isRegex: true},
+				{name: "profile", value: "profile", isRegex: false},
+			},
+			expectedRegex: true,
+		},
+		{
+			name: "path with regex pattern",
+			path: "/users/{id:[0-9]+}/profile",
+			expectedParts: []pathPart{
+				{name: "users", value: "users", isRegex: false},
+				{name: "id", value: "[0-9]+", isRegex: true},
+				{name: "profile", value: "profile", isRegex: false},
+			},
+			expectedRegex: true,
+		},
+		{
+			name: "path with direct regex",
+			path: "/files/{.*}/download",
+			expectedParts: []pathPart{
+				{name: "files", value: "files", isRegex: false},
+				{name: "customRegex1", value: ".*", isRegex: true},
+				{name: "download", value: "download", isRegex: false},
+			},
+			expectedRegex: true,
+		},
+		{
+			name: "path with multiple regex patterns",
+			path: "/{id:[0-9]+}/{name:[a-zA-Z]+}/{.*}",
+			expectedParts: []pathPart{
+				{name: "id", value: "[0-9]+", isRegex: true},
+				{name: "name", value: "[a-zA-Z]+", isRegex: true},
+				{name: "customRegex1", value: ".*", isRegex: true},
+			},
+			expectedRegex: true,
+		},
+		{
+			name: "path with invalid parameter names",
+			path: "/users/{123}/{user-name}",
+			expectedParts: []pathPart{
+				{name: "users", value: "users", isRegex: false},
+				{name: "123", value: "", isRegex: true},
+				{name: "user-name", value: "", isRegex: true},
+			},
+			expectedRegex: true,
+		},
+		{
+			name: "path with invalid starting character",
+			path: "/users/{1invalid}",
+			expectedParts: []pathPart{
+				{name: "users", value: "users", isRegex: false},
+				{name: "1invalid", value: "", isRegex: true},
+			},
+			expectedRegex: true,
+		},
+		{
+			name:          "empty path",
+			path:          "",
+			expectedParts: []pathPart{},
+			expectedRegex: false,
+		},
+		{
+			name:          "root path",
+			path:          "/",
+			expectedParts: []pathPart{},
+			expectedRegex: false,
+		},
+		{
+			name: "path with trailing slash",
+			path: "/users/profile/",
+			expectedParts: []pathPart{
+				{name: "users", value: "users", isRegex: false},
+				{name: "profile", value: "profile", isRegex: false},
+			},
+			expectedRegex: false,
+		},
+		{
+			name: "root regex pattern",
+			path: "/.+",
+			expectedParts: []pathPart{
+				{name: "customRegex1", value: ".+", isRegex: true},
+			},
+			expectedRegex: true,
+		},
+		{
+			name: "root regex pattern with trailing slash",
+			path: "/.+",
+			expectedParts: []pathPart{
+				{name: "customRegex1", value: ".+", isRegex: true},
+			},
+			expectedRegex: true,
+		},
+		{
+			name: "path with trailing slash",
+			path: "/users/my-profile/",
+			expectedParts: []pathPart{
+				{name: "users", value: "users", isRegex: false},
+				{name: "my-profile", value: "my-profile", isRegex: false},
+			},
+			expectedRegex: false,
+		},
+		{
+			name: "path with multiple regex patterns",
+			path: "/[0-9]+/[a-zA-Z]+/.*",
+			expectedParts: []pathPart{
+				{name: "customRegex1", value: "[0-9]+", isRegex: true},
+				{name: "customRegex2", value: "[a-zA-Z]+", isRegex: true},
+				{name: "customRegex3", value: ".*", isRegex: true},
+			},
+			expectedRegex: true,
+		},
+		{
+			name:          "path with broken regex",
+			path:          "/[0-9]+/{id:[a-zA-Z+}/.*",
+			expectedParts: []pathPart{},
+			expectedRegex: false,
+		},
+		{
+			name:          "path with unamed broken regex",
+			path:          "/[0-9]+/{[a-zA-Z+}/.*",
+			expectedParts: []pathPart{},
+			expectedRegex: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			parts, hasRegex := splitPath(tt.path)
+
+			if hasRegex != tt.expectedRegex {
+				t.Errorf("splitPath() hasRegex = %v, want %v", hasRegex, tt.expectedRegex)
+			}
+
+			if len(parts) != len(tt.expectedParts) {
+				t.Errorf("splitPath() returned %d parts, want %d", len(parts), len(tt.expectedParts))
+				return
+			}
+
+			for i, part := range parts {
+				expected := tt.expectedParts[i]
+				if part.name != expected.name {
+					t.Errorf("Part %d name = %v, want %v", i, part.name, expected.name)
+				}
+				if part.value != expected.value {
+					t.Errorf("Part %d value = %v, want %v", i, part.value, expected.value)
+				}
+				if part.isRegex != expected.isRegex {
+					t.Errorf("Part %d isRegex = %v, want %v", i, part.isRegex, expected.isRegex)
+				}
+			}
+		})
+	}
+}
+
+func TestValidatePath(t *testing.T) {
+	tests := []struct {
+		name    string
+		path    string
+		wantErr bool
+	}{
+		{
+			name:    "valid simple path",
+			path:    "/api/users",
+			wantErr: false,
+		},
+		{
+			name:    "valid path with parameter",
+			path:    "/api/users/{id}",
+			wantErr: false,
+		},
+		{
+			name:    "valid path with multiple parameters",
+			path:    "/api/users/{id}/posts/{postId}",
+			wantErr: false,
+		},
+		{
+			name:    "valid path with regex parameter",
+			path:    "/api/users/{id:[0-9]+}",
+			wantErr: false,
+		},
+		{
+			name:    "invalid path - unclosed brace",
+			path:    "/api/users/{id",
+			wantErr: true,
+		},
+		{
+			name:    "invalid path - unmatched closing brace",
+			path:    "/api/users/}",
+			wantErr: true,
+		},
+		{
+			name:    "invalid path - empty parameter name",
+			path:    "/api/users/{}",
+			wantErr: true,
+		},
+		{
+			name:    "valid path with unamed regex parameter enclosed by curly braces",
+			path:    "/api/users/{[0-9]+}",
+			wantErr: false,
+		},
+		{
+			name:    "valid path with unamed regex parameter",
+			path:    "/api/users/[0-9]+",
+			wantErr: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := validatePath(tt.path)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("ValidatePath() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
 	}
 }

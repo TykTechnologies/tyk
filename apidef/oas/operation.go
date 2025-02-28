@@ -11,7 +11,9 @@ import (
 	"github.com/getkin/kin-openapi/openapi3"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/internal/httputil"
 	"github.com/TykTechnologies/tyk/internal/oasutil"
+	"github.com/TykTechnologies/tyk/regexp"
 )
 
 // Operations holds Operation definitions.
@@ -620,14 +622,82 @@ type pathPart struct {
 	name    string
 	value   string
 	isRegex bool
+	isParam bool
 }
 
 func (p pathPart) String() string {
-	if p.isRegex {
+	if p.isRegex || p.isParam {
 		return "{" + p.name + "}"
 	}
 
 	return p.value
+}
+
+// splitPath splits URL into folder parts, detecting regex patterns.
+func splitPath(inPath string) ([]pathPart, bool) {
+	// Each URL fragment can contain a regex, but the whole
+	// URL isn't just a regex (`/a/.*/foot` => `/a/{param1}/foot`)
+	inPath = strings.Trim(inPath, "/")
+
+	if inPath == "" {
+		return []pathPart{}, false
+	}
+
+	if err := validatePath(inPath); err != nil {
+		return []pathPart{}, false
+	}
+
+	parts := strings.Split(inPath, "/")
+
+	result := make([]pathPart, len(parts))
+	found := 0
+	nCustomRegex := 0
+
+	for k, value := range parts {
+		// Handle non-bracketed path segments
+		// for example: /a/b/c, /a/[0-9]
+		if !httputil.IsMuxTemplate(value) {
+			name := value
+
+			result[k] = pathPart{
+				name:  name,
+				value: value,
+			}
+
+			if isRegex(value) {
+				nCustomRegex++
+				found++
+
+				result[k].name = fmt.Sprintf("customRegex%d", nCustomRegex)
+				result[k].isRegex = true
+			}
+
+			continue
+		}
+
+		// Try to handle as parameter with pattern
+		if part, ok := handleNamedRegexPattern(value); ok {
+			result[k] = part
+			found++
+
+			continue
+		}
+
+		// Try to handle as direct regex pattern
+		if part, ok := handleDirectRegexPattern(value, nCustomRegex); ok {
+			result[k] = part
+
+			nCustomRegex++
+			found++
+
+			continue
+		}
+
+		// If we reach here, the pattern was invalid
+		return []pathPart{}, false
+	}
+
+	return result, found > 0
 }
 
 // isRegex checks if value has expected regular expression patterns.
@@ -638,31 +708,6 @@ func isRegex(value string) bool {
 		}
 	}
 	return false
-}
-
-// splitPath splits URL into folder parts, detecting regex patterns.
-func splitPath(inPath string) ([]pathPart, bool) {
-	// Each URL fragment can contain a regex, but the whole
-	// URL isn't just a regex (`/a/.*/foot` => `/a/{param1}/foot`)
-	parts := strings.Split(strings.Trim(inPath, "/"), "/")
-	result := make([]pathPart, len(parts))
-	found := 0
-
-	for k, value := range parts {
-		name := value
-		isRegex := isRegex(value)
-		if isRegex {
-			found++
-			name = fmt.Sprintf("customRegex%d", found)
-		}
-		result[k] = pathPart{
-			name:    name,
-			value:   value,
-			isRegex: isRegex,
-		}
-	}
-
-	return result, found > 0
 }
 
 // buildPath converts the URL paths with regex to named parameters
@@ -719,13 +764,18 @@ func (s *OAS) getOperationID(inPath, method string) string {
 		p.Parameters = []*openapi3.ParameterRef{}
 
 		for _, part := range parts {
-			if part.isRegex {
+			if part.isRegex || part.isParam {
 				schema := &openapi3.SchemaRef{
 					Value: &openapi3.Schema{
 						Type:    "string",
 						Pattern: part.value,
 					},
 				}
+
+				if part.isRegex {
+					schema.Value.Pattern = part.value
+				}
+
 				param := &openapi3.ParameterRef{
 					Value: &openapi3.Parameter{
 						Name:     part.name,
@@ -1102,4 +1152,62 @@ func sortMockResponseAllowList(ep *apidef.ExtendedPathsSet) {
 
 		return actionI.Code < actionJ.Code
 	})
+}
+
+// validatePath validates if the path is valid. Returns an error.
+func validatePath(in string) error {
+	in = "/" + strings.Trim(in, "/")
+
+	return httputil.ValidatePath(in)
+}
+
+// validateRegexPattern checks if a regex pattern is valid by attempting to compile it
+func validateRegexPattern(pattern string) bool {
+	_, err := regexp.Compile(pattern)
+	return err == nil
+}
+
+// handleNamedRegexPattern processes a path segment that contains a named parameter with a pattern
+// e.g. "id:[0-9]" becomes {name: "id", value: "[0-9]", isRegex: true}
+func handleNamedRegexPattern(segment string) (pathPart, bool) {
+	segment = strings.Trim(segment, "{}")
+
+	name, pattern, ok := strings.Cut(segment, ":")
+	if !ok || strings.TrimSpace(name) == "" {
+		return pathPart{}, false
+	}
+
+	if !validateRegexPattern(pattern) {
+		return pathPart{}, false
+	}
+
+	return pathPart{
+		name:    name,
+		value:   pattern,
+		isRegex: true,
+	}, true
+}
+
+// handleDirectRegexPattern processes a path segment that is a direct regex pattern
+// e.g. "[0-9]" becomes {name: "customRegex1", value: "[0-9]", isRegex: true}
+func handleDirectRegexPattern(segment string, regexCount int) (pathPart, bool) {
+	segment = strings.Trim(segment, "{}")
+
+	if !validateRegexPattern(segment) {
+		return pathPart{}, false
+	}
+
+	name := fmt.Sprintf("customRegex%d", regexCount+1)
+	value := segment
+
+	if !isRegex(segment) {
+		name = segment
+		value = ""
+	}
+
+	return pathPart{
+		name:    name,
+		value:   value,
+		isRegex: true,
+	}, true
 }
