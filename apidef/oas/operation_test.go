@@ -1243,7 +1243,7 @@ func TestSplitPath(t *testing.T) {
 			path: "/users/{id}/profile",
 			expectedParts: []pathPart{
 				{name: "users", value: "users", isRegex: false},
-				{name: "customRegex1", value: "id", isRegex: true},
+				{name: "id", value: "", isRegex: true},
 				{name: "profile", value: "profile", isRegex: false},
 			},
 			expectedRegex: true,
@@ -1283,8 +1283,8 @@ func TestSplitPath(t *testing.T) {
 			path: "/users/{123}/{user-name}",
 			expectedParts: []pathPart{
 				{name: "users", value: "users", isRegex: false},
-				{name: "customRegex1", value: "123", isRegex: true},
-				{name: "customRegex2", value: "user-name", isRegex: true},
+				{name: "123", value: "", isRegex: true},
+				{name: "user-name", value: "", isRegex: true},
 			},
 			expectedRegex: true,
 		},
@@ -1293,7 +1293,7 @@ func TestSplitPath(t *testing.T) {
 			path: "/users/{1invalid}",
 			expectedParts: []pathPart{
 				{name: "users", value: "users", isRegex: false},
-				{name: "customRegex1", value: "1invalid", isRegex: true},
+				{name: "1invalid", value: "", isRegex: true},
 			},
 			expectedRegex: true,
 		},

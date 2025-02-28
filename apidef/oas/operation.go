@@ -8,13 +8,11 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/getkin/kin-openapi/openapi3"
-
-	"github.com/TykTechnologies/tyk/regexp"
-
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/internal/httputil"
 	"github.com/TykTechnologies/tyk/internal/oasutil"
+	"github.com/TykTechnologies/tyk/regexp"
+	"github.com/getkin/kin-openapi/openapi3"
 )
 
 // Operations holds Operation definitions.
@@ -1171,7 +1169,9 @@ func validateRegexPattern(pattern string) bool {
 // handleNamedRegexPattern processes a path segment that contains a named parameter with a pattern
 // e.g. "id:[0-9]" becomes {name: "id", value: "[0-9]", isRegex: true}
 func handleNamedRegexPattern(segment string) (pathPart, bool) {
-	segment = strings.Trim(segment, "{}")
+	segment = strings.TrimPrefix(segment, "{")
+	segment = strings.TrimSuffix(segment, "}")
+
 	name, pattern, ok := strings.Cut(segment, ":")
 	if !ok || strings.TrimSpace(name) == "" {
 		return pathPart{}, false
@@ -1191,15 +1191,24 @@ func handleNamedRegexPattern(segment string) (pathPart, bool) {
 // handleDirectRegexPattern processes a path segment that is a direct regex pattern
 // e.g. "[0-9]" becomes {name: "customRegex1", value: "[0-9]", isRegex: true}
 func handleDirectRegexPattern(segment string, regexCount int) (pathPart, bool) {
-	segment = strings.Trim(segment, "{}")
+	segment = strings.TrimPrefix(segment, "{")
+	segment = strings.TrimSuffix(segment, "}")
 
 	if !validateRegexPattern(segment) {
 		return pathPart{}, false
 	}
 
+	name := fmt.Sprintf("customRegex%d", regexCount+1)
+	value := segment
+
+	if !isRegex(segment) {
+		name = segment
+		value = ""
+	}
+
 	return pathPart{
-		name:    fmt.Sprintf("customRegex%d", regexCount+1),
-		value:   segment,
+		name:    name,
+		value:   value,
 		isRegex: true,
 	}, true
 }
