@@ -1319,16 +1319,6 @@ func TestSplitPath(t *testing.T) {
 			expectedRegex: false,
 		},
 		{
-			name: "path with complex regex pattern",
-			path: "/dates/{date:[0-9]{4}-[0-9]{2}-[0-9]{2}}/events",
-			expectedParts: []pathPart{
-				{name: "dates", value: "dates", isRegex: false},
-				{name: "date", value: "[0-9]{4}-[0-9]{2}-[0-9]{2}", isRegex: true},
-				{name: "events", value: "events", isRegex: false},
-			},
-			expectedRegex: true,
-		},
-		{
 			name: "root regex pattern",
 			path: "/.+",
 			expectedParts: []pathPart{

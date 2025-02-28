@@ -653,13 +653,6 @@ func splitPath(inPath string) ([]pathPart, bool) {
 	found := 0
 	nCustomRegex := 0
 
-	trimPathParam := func(value string) string {
-		value = strings.TrimPrefix(value, "{")
-		value = strings.TrimSuffix(value, "}")
-
-		return value
-	}
-
 	for k, value := range parts {
 		// Handle non-bracketed path segments
 		// for example: /a/b/c, /a/[0-9]
@@ -687,7 +680,7 @@ func splitPath(inPath string) ([]pathPart, bool) {
 		// }
 
 		// Handle bracketed path segments
-		segment := trimPathParam(value)
+		segment := strings.Trim(value, "{}")
 
 		// Parameter with pattern case:
 		// for example: /a/{id:[0-9]}
