@@ -1169,8 +1169,7 @@ func validateRegexPattern(pattern string) bool {
 // handleNamedRegexPattern processes a path segment that contains a named parameter with a pattern
 // e.g. "id:[0-9]" becomes {name: "id", value: "[0-9]", isRegex: true}
 func handleNamedRegexPattern(segment string) (pathPart, bool) {
-	segment = strings.TrimPrefix(segment, "{")
-	segment = strings.TrimSuffix(segment, "}")
+	segment = strings.Trim(segment, "{}")
 
 	name, pattern, ok := strings.Cut(segment, ":")
 	if !ok || strings.TrimSpace(name) == "" {
@@ -1191,8 +1190,7 @@ func handleNamedRegexPattern(segment string) (pathPart, bool) {
 // handleDirectRegexPattern processes a path segment that is a direct regex pattern
 // e.g. "[0-9]" becomes {name: "customRegex1", value: "[0-9]", isRegex: true}
 func handleDirectRegexPattern(segment string, regexCount int) (pathPart, bool) {
-	segment = strings.TrimPrefix(segment, "{")
-	segment = strings.TrimSuffix(segment, "}")
+	segment = strings.Trim(segment, "{}")
 
 	if !validateRegexPattern(segment) {
 		return pathPart{}, false
