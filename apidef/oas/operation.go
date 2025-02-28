@@ -9,11 +9,11 @@ import (
 	"strings"
 
 	"github.com/getkin/kin-openapi/openapi3"
-	"github.com/gorilla/mux"
 
 	"github.com/TykTechnologies/tyk/regexp"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/internal/httputil"
 	"github.com/TykTechnologies/tyk/internal/oasutil"
 )
 
@@ -657,7 +657,7 @@ func splitPath(inPath string) ([]pathPart, bool) {
 	for k, value := range parts {
 		// Handle non-bracketed path segments
 		// for example: /a/b/c, /a/[0-9]
-		if !isMuxTemplate(value) {
+		if !httputil.IsMuxTemplate(value) {
 			name := value
 
 			result[k] = pathPart{
@@ -1156,31 +1156,10 @@ func sortMockResponseAllowList(ep *apidef.ExtendedPathsSet) {
 }
 
 // validatePath validates if the path is valid. Returns an error.
-// TODO: This is a temporary implementation to avoid circular dependency.
-// Should be refactored to use httputil.ValidatePath once dependency structure is resolved.
 func validatePath(in string) error {
 	in = "/" + strings.Trim(in, "/")
 
-	route := mux.NewRouter().PathPrefix(in)
-
-	if err := route.GetError(); err != nil {
-		return err
-	}
-
-	if _, err := route.GetPathRegexp(); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-// isMuxTemplate determines if a pattern is a mux template by counting the number of opening and closing braces.
-// TODO: This is a temporary implementation to avoid circular dependency.
-// Should be refactored to use httputil.isMuxTemplate once dependency structure is resolved.
-func isMuxTemplate(pattern string) bool {
-	openBraces := strings.Count(pattern, "{")
-	closeBraces := strings.Count(pattern, "}")
-	return openBraces > 0 && openBraces == closeBraces
+	return httputil.ValidatePath(in)
 }
 
 // validateRegexPattern checks if a regex pattern is valid by attempting to compile it
