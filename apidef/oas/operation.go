@@ -8,11 +8,12 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/getkin/kin-openapi/openapi3"
+
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/internal/httputil"
 	"github.com/TykTechnologies/tyk/internal/oasutil"
 	"github.com/TykTechnologies/tyk/regexp"
-	"github.com/getkin/kin-openapi/openapi3"
 )
 
 // Operations holds Operation definitions.
