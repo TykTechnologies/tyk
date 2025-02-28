@@ -8,6 +8,7 @@ import (
 	"github.com/TykTechnologies/tyk/header"
 	"github.com/TykTechnologies/tyk/internal/httputil"
 	"github.com/TykTechnologies/tyk/internal/model"
+	"github.com/TykTechnologies/tyk/internal/service/core"
 )
 
 // Middleware implements upstream basic auth middleware.
@@ -73,6 +74,6 @@ func (m *Middleware) ProcessRequest(_ http.ResponseWriter, r *http.Request, _ in
 
 	upstreamBasicAuthProvider.AuthValue = httputil.AuthHeader(basicAuthConfig.Username, basicAuthConfig.Password)
 
-	httputil.SetUpstreamAuth(r, upstreamBasicAuthProvider)
+	core.SetUpstreamAuth(r, upstreamBasicAuthProvider)
 	return nil, http.StatusOK
 }
