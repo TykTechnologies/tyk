@@ -4,13 +4,14 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"regexp"
 	"sort"
 	"strconv"
 	"strings"
 
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/gorilla/mux"
+
+	"github.com/TykTechnologies/tyk/regexp"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/internal/oasutil"
