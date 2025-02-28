@@ -8,8 +8,8 @@ import (
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/apidef/oas"
 	"github.com/TykTechnologies/tyk/config"
-	"github.com/TykTechnologies/tyk/internal/httputil"
 	"github.com/TykTechnologies/tyk/internal/reflect"
+	"github.com/TykTechnologies/tyk/internal/service/core"
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/user"
 
@@ -77,7 +77,7 @@ func ctxSetSession(r *http.Request, s *user.SessionState, scheduleUpdate bool, h
 		s.Touch()
 	}
 
-	httputil.SetContext(r, ctx)
+	core.SetContext(r, ctx)
 }
 
 func GetAuthToken(r *http.Request) string {
@@ -119,7 +119,7 @@ func SetSession(r *http.Request, s *user.SessionState, scheduleUpdate bool, hash
 func SetDefinition(r *http.Request, s *apidef.APIDefinition) {
 	ctx := r.Context()
 	ctx = context.WithValue(ctx, Definition, s)
-	httputil.SetContext(r, ctx)
+	core.SetContext(r, ctx)
 }
 
 // GetDefinition will return a deep copy of the API definition valid for the request.
@@ -137,7 +137,7 @@ func GetDefinition(r *http.Request) *apidef.APIDefinition {
 func SetOASDefinition(r *http.Request, s *oas.OAS) {
 	ctx := r.Context()
 	ctx = context.WithValue(ctx, OASDefinition, s)
-	httputil.SetContext(r, ctx)
+	core.SetContext(r, ctx)
 }
 
 // GetOASDefinition will return a deep copy of the OAS API definition valid for the request.

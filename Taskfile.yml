@@ -26,6 +26,12 @@ vars:
   path: ./...
 
 tasks:
+  build:
+    desc: "Build tyk gateway"
+    cmds:
+      - go build .
+      - cd gateway && go test -c . && cd ..
+
   docker:
     desc: "build Tyk gateway internal/tyk-gateway"
     cmds:
