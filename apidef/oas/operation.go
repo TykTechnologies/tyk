@@ -676,48 +676,26 @@ func splitPath(inPath string) ([]pathPart, bool) {
 			continue
 		}
 
-		// if !isValidPathSegment(value) {
-		// 	continue
-		// }
-
-		// Handle bracketed path segments
-		segment := strings.Trim(value, "{}")
-
-		// Parameter with pattern case:
-		// for example: /a/{id:[0-9]}
-		if name, pattern, ok := strings.Cut(segment, ":"); ok && strings.TrimSpace(name) != "" {
-			// this is required because GetPathRegexp doesn't check if the regex is valid
-			// it doesn't return an error even if the regex is invalid (eg. [a-zA-Z+)
-			if _, err := regexp.Compile(pattern); err != nil {
-				return []pathPart{}, false
-			}
-
-			result[k] = pathPart{
-				name:    name,
-				value:   pattern,
-				isRegex: true,
-			}
-
+		// Try to handle as parameter with pattern
+		if part, ok := handleNamedRegexPattern(value); ok {
+			result[k] = part
 			found++
 
 			continue
 		}
 
-		// this is required because GetPathRegexp doesn't check if the regex is valid
-		// it doesn't return an error even if the regex is invalid (eg. [a-zA-Z+)
-		if _, err := regexp.Compile(segment); err != nil {
-			return []pathPart{}, false
+		// Try to handle as direct regex pattern
+		if part, ok := handleDirectRegexPattern(value, nCustomRegex); ok {
+			result[k] = part
+
+			nCustomRegex++
+			found++
+
+			continue
 		}
 
-		// Direct regex pattern case:
-		// for example: /a/{[0-9]}
-		nCustomRegex++
-		result[k] = pathPart{
-			name:    fmt.Sprintf("customRegex%d", nCustomRegex),
-			value:   segment,
-			isRegex: true,
-		}
-		found++
+		// If we reach here, the pattern was invalid
+		return []pathPart{}, false
 	}
 
 	return result, found > 0
@@ -1203,4 +1181,46 @@ func isMuxTemplate(pattern string) bool {
 	openBraces := strings.Count(pattern, "{")
 	closeBraces := strings.Count(pattern, "}")
 	return openBraces > 0 && openBraces == closeBraces
+}
+
+// validateRegexPattern checks if a regex pattern is valid by attempting to compile it
+func validateRegexPattern(pattern string) bool {
+	_, err := regexp.Compile(pattern)
+	return err == nil
+}
+
+// handleNamedRegexPattern processes a path segment that contains a named parameter with a pattern
+// e.g. "id:[0-9]" becomes {name: "id", value: "[0-9]", isRegex: true}
+func handleNamedRegexPattern(segment string) (pathPart, bool) {
+	segment = strings.Trim(segment, "{}")
+	name, pattern, ok := strings.Cut(segment, ":")
+	if !ok || strings.TrimSpace(name) == "" {
+		return pathPart{}, false
+	}
+
+	if !validateRegexPattern(pattern) {
+		return pathPart{}, false
+	}
+
+	return pathPart{
+		name:    name,
+		value:   pattern,
+		isRegex: true,
+	}, true
+}
+
+// handleDirectRegexPattern processes a path segment that is a direct regex pattern
+// e.g. "[0-9]" becomes {name: "customRegex1", value: "[0-9]", isRegex: true}
+func handleDirectRegexPattern(segment string, regexCount int) (pathPart, bool) {
+	segment = strings.Trim(segment, "{}")
+
+	if !validateRegexPattern(segment) {
+		return pathPart{}, false
+	}
+
+	return pathPart{
+		name:    fmt.Sprintf("customRegex%d", regexCount+1),
+		value:   segment,
+		isRegex: true,
+	}, true
 }
