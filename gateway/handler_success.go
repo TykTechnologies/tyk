@@ -187,6 +187,12 @@ func (s *SuccessHandler) RecordHit(r *http.Request, timing analytics.Latency, co
 		oauthClientID := ""
 		var alias string
 		session := ctxGetSession(r)
+		
+		// If the key is configured to not track, then we don't track
+		if session.DoNotTrack {
+			return
+		}
+		
 		tags := make([]string, 0, estimateTagsCapacity(session, s.Spec))
 		if session != nil {
 			oauthClientID = session.OauthClientID
