@@ -8,13 +8,11 @@ name: Release
 # - docker hub
 # - devenv ECR
 # - Cloudsmith
-concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+# concurrency:
+#   group: ${{ github.workflow }}-${{ github.ref }}
+#   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 on:
-  # Trigger release every monday at midnight for master CI images
-  schedule:
-    - cron: "0 0 * * 1"
   pull_request:
   push:
     branches:
@@ -49,7 +47,7 @@ jobs:
             rpmvers: 'el/7 el/8 el/9 amazon/2 amazon/2023'
             debvers: 'ubuntu/xenial ubuntu/bionic ubuntu/focal ubuntu/jammy debian/jessie debian/buster debian/bullseye debian/bookworm'
     outputs:
-      tags: ${{ steps.ci_metadata_ee.outputs.tags }}
+      tags: ${{ steps.ci_metadata.outputs.tags }}
       commit_author: ${{ steps.set_outputs.outputs.commit_author}}
     steps:
       - name: Checkout of tyk
@@ -131,7 +129,7 @@ jobs:
         with:
           mask-password: 'true'
       - name: Docker metadata for CI
-        id: ci_metadata_
+        id: ci_metadata
         if: ${{ matrix.golang_cross == '1.23-bullseye' }}
         uses: docker/metadata-action@v5
         with:
@@ -157,12 +155,12 @@ jobs:
           push: true
           cache-from: type=gha
           cache-to: type=gha,mode=max
-          tags: ${{ steps.ci_metadata_.outputs.tags }}
+          tags: ${{ steps.ci_metadata.outputs.tags }}
           labels: ${{ steps.tag_metadata.outputs.labels }}
           build-args: |
             EDITION=
       - name: Docker metadata for CI ee
-        id: ci_metadata_ee
+        id: ci_metadata
         if: ${{ matrix.golang_cross == '1.23-bullseye' }}
         uses: docker/metadata-action@v5
         with:
@@ -188,12 +186,12 @@ jobs:
           push: true
           cache-from: type=gha
           cache-to: type=gha,mode=max
-          tags: ${{ steps.ci_metadata_ee.outputs.tags }}
+          tags: ${{ steps.ci_metadataee.outputs.tags }}
           labels: ${{ steps.tag_metadata.outputs.labels }}
           build-args: |
             EDITION=-ee
       - name: Docker metadata for tag push
-        id: tag_metadata_
+        id: tag_metadata
         uses: docker/metadata-action@v5
         with:
           images: |
@@ -218,12 +216,12 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
           push: ${{ startsWith(github.ref, 'refs/tags') }}
-          tags: ${{ steps.tag_metadata_.outputs.tags }}
-          labels: ${{ steps.tag_metadata_.outputs.labels }}
+          tags: ${{ steps.tag_metadata.outputs.tags }}
+          labels: ${{ steps.tag_metadata.outputs.labels }}
           build-args: |
             EDITION=
       - name: Docker metadata for tag push ee
-        id: tag_metadata_ee
+        id: tag_metadata
         uses: docker/metadata-action@v5
         with:
           images: |
@@ -247,8 +245,8 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
           push: ${{ startsWith(github.ref, 'refs/tags') }}
-          tags: ${{ steps.tag_metadata_ee.outputs.tags }}
-          labels: ${{ steps.tag_metadata_ee.outputs.labels }}
+          tags: ${{ steps.tag_metadata.outputs.tags }}
+          labels: ${{ steps.tag_metadata.outputs.labels }}
           build-args: |
             EDITION=-ee
       - name: save deb
@@ -351,6 +349,7 @@ jobs:
           set -eaxo pipefail
           docker run -q --rm -v ~/.docker/config.json:/root/.docker/config.json tykio/gromit policy match ${tags[0]} ${match_tag} 2>versions.env
           echo '# alfa and beta have to come after the override
+
           tyk_alfa_image=$tyk_image
           tyk_beta_image=$tyk_image
           ECR=${{steps.ecr.outputs.registry}}
@@ -374,9 +373,37 @@ jobs:
           repository: TykTechnologies/tyk-analytics
           path: tyk-analytics
           token: ${{ secrets.ORG_GH_TOKEN }}
-          fetch-depth: 1
-          ref: ${{ env.BASE_REF }}
+          fetch-depth: 0
           sparse-checkout: tests/api
+      - name: Choosing test code branch
+        working-directory: tyk-analytics/tests/api
+        run: |
+          if [[ ${{ github.event_name }} == "release" ]]; then
+            echo "Checking out release tag..."
+            TAG_NAME=${{ github.event.release.tag_name }}
+            git checkout "$TAG_NAME"
+          fi
+          if [[ ${{ github.event_name }} == "pull_request" ]]; then
+            PR_BRANCH=${{ github.event.pull_request.head.ref }}
+            TARGET_BRANCH=${{ github.event.pull_request.base.ref }}
+            echo "Looking for PR_BRANCH:$PR_BRANCH or TARGET_BRANCH:$TARGET_BRANCH..."
+            if git rev-parse --verify "origin/$PR_BRANCH" >/dev/null 2>&1; then
+              echo "PR branch $PR_BRANCH exists. Checking out..."
+              git checkout "$PR_BRANCH"
+            elif git rev-parse --verify "origin/$TARGET_BRANCH" >/dev/null 2>&1; then
+              echo "Target branch $TARGET_BRANCH exists. Checking out..."
+              git checkout "$TARGET_BRANCH"
+            fi
+          fi
+          if [[ ${{ github.event_name }} == "push" ]]; then
+            PUSH_BRANCH=${{ github.ref_name }}
+            echo "Looking for PUSH_BRANCH:$PUSH_BRANCH..."
+            if git rev-parse --verify "origin/$PUSH_BRANCH" >/dev/null 2>&1; then
+              echo "Push branch $PUSH_BRANCH exists. Checking out..."
+              git checkout "$PUSH_BRANCH"
+            fi
+          fi
+          echo "Current commit: $(git rev-parse HEAD)"
       - uses: actions/setup-python@v5
         with:
           cache: 'pip'
@@ -405,20 +432,6 @@ jobs:
           USER_API_SECRET=${{ steps.env_up.outputs.USER_API_SECRET }}
           EOF
           env $(cat pytest.env | xargs) $pytest -m "${{ matrix.envfiles.apimarkers }}"
-      - name: Upload Playwright Test Report to S3
-        if: failure() && steps.test_execution.outcome != 'success' && steps.env_up.outcome == 'success'
-        run: npm run upload_report_to_s3
-        env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.UI_AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.UI_AWS_SECRET_ACCESS_KEY }}
-          RUN_ID: 'tyk-analytics/${{ github.run_id }}'
-        working-directory: tyk-analytics/tests/ui
-      - name: Share S3 report link into summary
-        if: failure() && steps.test_execution.outcome != 'success' && steps.env_up.outcome == 'success'
-        run: |
-          echo "# :clipboard: S3 UI Test REPORT: ${{ matrix.envfiles.db }}-${{ matrix.envfiles.conf }}" >> $GITHUB_STEP_SUMMARY
-          echo "- Status: ${{ steps.test_execution.outcome == 'success' && ':white_check_mark:' || ':no_entry_sign:' }}" >> $GITHUB_STEP_SUMMARY
-          echo "- [Link to report](https://tyk-qa-reports.s3.eu-central-1.amazonaws.com/tyk-analytics/${{ github.run_id }}/index.html)" >> $GITHUB_STEP_SUMMARY
       - name: Generate metadata and upload test reports
         id: metadata_report
         if: always() && (steps.test_execution.conclusion != 'skipped')
