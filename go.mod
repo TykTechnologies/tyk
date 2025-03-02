@@ -1,6 +1,18 @@
 module github.com/TykTechnologies/tyk
 
-go 1.23.4
+go 1.23.6
+
+godebug tls10server=1
+
+godebug tls3des=1
+
+godebug tlsrsakex=1
+
+godebug tlsunsafeekm=1
+
+godebug x509keypairleaf=0
+
+godebug x509negativeserial=1
 
 require (
 	github.com/Jeffail/tunny v0.1.4
