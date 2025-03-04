@@ -201,42 +201,10 @@ func (s *OAS) fillMockResponsePaths(paths openapi3.Paths, ep apidef.ExtendedPath
 
 		// Response description is required by the OAS spec, but we don't have it in Tyk classic.
 		// So we're using a dummy value to satisfy the spec.
-		oasResponseDesc := "oasRequiredDummyValue"
+		var oasDesc string
 
 		response := &openapi3.Response{
-			Headers:     make(openapi3.Headers),
-			Description: &oasResponseDesc,
-		}
-
-		contentType := detectMockResponseContentType(mock)
-
-		mediaType := &openapi3.MediaType{
-			Examples: openapi3.Examples{
-				"default": &openapi3.ExampleRef{
-					Value: &openapi3.Example{
-						Value: mock.Body,
-					},
-				},
-			},
-		}
-
-		response.Content = openapi3.Content{
-			contentType: mediaType,
-		}
-
-		for name, value := range mock.Headers {
-			response.Headers[http.CanonicalHeaderKey(name)] = &openapi3.HeaderRef{
-				Value: &openapi3.Header{
-					Parameter: openapi3.Parameter{
-						Schema: &openapi3.SchemaRef{
-							Value: &openapi3.Schema{
-								Type:    "string",
-								Example: value,
-							},
-						},
-					},
-				},
-			}
+			Description: &oasDesc,
 		}
 
 		operation.Responses[strconv.Itoa(mock.Code)] = &openapi3.ResponseRef{
