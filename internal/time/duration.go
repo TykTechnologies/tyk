@@ -62,7 +62,7 @@ func (d *ReadableDuration) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-// Seconds returns ReadableDuration in seconds.
+// Seconds returns ReadableDuration rounded down to the seconds.
 func (d ReadableDuration) Seconds() float64 {
 	durationInSeconds := math.Floor(Duration(d).Seconds())
 	return durationInSeconds

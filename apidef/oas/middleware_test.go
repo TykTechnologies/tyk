@@ -277,7 +277,7 @@ func TestTrafficLogs(t *testing.T) {
 		var resultTrafficLogs TrafficLogs
 		trafficLogs := TrafficLogs{
 			Enabled: true,
-			// add 50 milliseconds tp make sure the duration is rounded up
+			// add 50 milliseconds tp make sure the duration is floored
 			CustomRetentionPeriod: ReadableDuration(time.Minute*2 + time.Millisecond*50),
 		}
 
