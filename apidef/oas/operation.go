@@ -219,17 +219,16 @@ func (s *OAS) fillMockResponsePaths(paths openapi3.Paths, ep apidef.ExtendedPath
 			tykOperation.MockResponse = &MockResponse{}
 		}
 
-		if tykOperation.IgnoreAuthentication == nil {
+		tykOperation.MockResponse.Fill(mock)
+
+		if tykOperation.IgnoreAuthentication == nil && tykOperation.MockResponse.FromOASExamples == nil {
 			// We need to to add ignoreAuthentication middleware to the operation
 			// to stay consistent to the way mock responses work for classic APIs
 			tykOperation.IgnoreAuthentication = &Allowance{Enabled: true}
 		}
 
-		tykOperation.MockResponse.Fill(mock)
-
 		if ShouldOmit(tykOperation.MockResponse) {
-			tykOperation.MockResponse = nil
-			tykOperation.IgnoreAuthentication = nil
+			tykOperation.MockResponse = &MockResponse{}
 		}
 	}
 }
