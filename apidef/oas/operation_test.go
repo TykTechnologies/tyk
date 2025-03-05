@@ -185,16 +185,16 @@ func TestOAS_MockResponse_extractPathsAndOperations(t *testing.T) {
 			want: func(t *testing.T, ep *apidef.ExtendedPathsSet) {
 				t.Helper()
 
-				require.Len(t, ep.WhiteList, 1)
+				// Verify mock responses
+				mockResponses := ep.MockResponse
+				require.Len(t, mockResponses, 1)
 
-				mockResp := ep.WhiteList[0]
+				mockResp := mockResponses[0]
 				require.Equal(t, "/test", mockResp.Path)
 				require.Equal(t, "GET", mockResp.Method)
-				require.NotNil(t, mockResp.MethodActions["GET"])
-				require.Equal(t, apidef.Reply, mockResp.MethodActions["GET"].Action)
-				require.Equal(t, 200, mockResp.MethodActions["GET"].Code)
-				require.Equal(t, `{"message": "success"}`, mockResp.MethodActions["GET"].Data)
-				require.Equal(t, map[string]string{"Content-Type": "application/json"}, mockResp.MethodActions["GET"].Headers)
+				require.Equal(t, 200, mockResp.Code)
+				require.Equal(t, `{"message": "success"}`, mockResp.Body)
+				require.Equal(t, map[string]string{"Content-Type": "application/json"}, mockResp.Headers)
 				require.False(t, mockResp.Disabled)
 			},
 		},
@@ -247,39 +247,37 @@ func TestOAS_MockResponse_extractPathsAndOperations(t *testing.T) {
 			want: func(t *testing.T, ep *apidef.ExtendedPathsSet) {
 				t.Helper()
 
-				assert.Len(t, ep.WhiteList, 2)
+				// Verify mock responses
+				mockResponses := ep.MockResponse
+				require.Len(t, mockResponses, 2)
 
-				// Sort mock responses for consistent testing
-				sort.Slice(ep.WhiteList, func(i, j int) bool {
-					if ep.WhiteList[i].Path == ep.WhiteList[j].Path {
-						return ep.WhiteList[i].Method < ep.WhiteList[j].Method
+				// Sort for consistent testing
+				sort.Slice(mockResponses, func(i, j int) bool {
+					if mockResponses[i].Path == mockResponses[j].Path {
+						return mockResponses[i].Method < mockResponses[j].Method
 					}
-					return ep.WhiteList[i].Path < ep.WhiteList[j].Path
+					return mockResponses[i].Path < mockResponses[j].Path
 				})
 
 				// Verify GET mock response
-				getMock := ep.WhiteList[0]
+				getMock := mockResponses[0]
 				require.Equal(t, "/test", getMock.Path)
 				require.Equal(t, "GET", getMock.Method)
-				require.NotNil(t, getMock.MethodActions["GET"])
-				require.Equal(t, apidef.Reply, getMock.MethodActions["GET"].Action)
-				require.Equal(t, 200, getMock.MethodActions["GET"].Code)
-				require.Equal(t, `{"status": "ok"}`, getMock.MethodActions["GET"].Data)
-				require.Equal(t, map[string]string{"Content-Type": "application/json"}, getMock.MethodActions["GET"].Headers)
+				require.Equal(t, 200, getMock.Code)
+				require.Equal(t, `{"status": "ok"}`, getMock.Body)
+				require.Equal(t, map[string]string{"Content-Type": "application/json"}, getMock.Headers)
 				require.False(t, getMock.Disabled)
 
 				// Verify POST mock response
-				postMock := ep.WhiteList[1]
+				postMock := mockResponses[1]
 				require.Equal(t, "/test", postMock.Path)
 				require.Equal(t, "POST", postMock.Method)
-				require.NotNil(t, postMock.MethodActions["POST"])
-				require.Equal(t, apidef.Reply, postMock.MethodActions["POST"].Action)
-				require.Equal(t, 201, postMock.MethodActions["POST"].Code)
-				require.Equal(t, `{"id": "123"}`, postMock.MethodActions["POST"].Data)
+				require.Equal(t, 201, postMock.Code)
+				require.Equal(t, `{"id": "123"}`, postMock.Body)
 				require.Equal(t, map[string]string{
 					"Content-Type": "application/json",
 					"Location":     "/test/123",
-				}, postMock.MethodActions["POST"].Headers)
+				}, postMock.Headers)
 				require.False(t, postMock.Disabled)
 			},
 		},
@@ -315,14 +313,15 @@ func TestOAS_MockResponse_extractPathsAndOperations(t *testing.T) {
 			want: func(t *testing.T, ep *apidef.ExtendedPathsSet) {
 				t.Helper()
 
-				assert.Len(t, ep.WhiteList, 1)
-				mockResp := ep.WhiteList[0]
+				// Verify mock responses
+				mockResponses := ep.MockResponse
+				require.Len(t, mockResponses, 1)
+
+				mockResp := mockResponses[0]
 				require.Equal(t, "/test", mockResp.Path)
 				require.Equal(t, "GET", mockResp.Method)
-				require.NotNil(t, mockResp.MethodActions["GET"])
-				require.Equal(t, apidef.Reply, mockResp.MethodActions["GET"].Action)
-				require.Equal(t, 404, mockResp.MethodActions["GET"].Code)
-				require.Equal(t, `{"error": "not found"}`, mockResp.MethodActions["GET"].Data)
+				require.Equal(t, 404, mockResp.Code)
+				require.Equal(t, `{"error": "not found"}`, mockResp.Body)
 				require.True(t, mockResp.Disabled)
 			},
 		},
@@ -401,32 +400,32 @@ func TestOAS_MockResponse_extractPathsAndOperations(t *testing.T) {
 			want: func(t *testing.T, ep *apidef.ExtendedPathsSet) {
 				t.Helper()
 
-				assert.Len(t, ep.WhiteList, 2)
+				// Verify mock responses
+				mockResponses := ep.MockResponse
+				require.Len(t, mockResponses, 2)
 
 				// Sort for consistent testing
-				sort.Slice(ep.WhiteList, func(i, j int) bool {
-					return ep.WhiteList[i].Path < ep.WhiteList[j].Path
+				sort.Slice(mockResponses, func(i, j int) bool {
+					return mockResponses[i].Path < mockResponses[j].Path
 				})
 
 				// Verify items response
-				itemsResp := ep.WhiteList[0]
+				itemsResp := mockResponses[0]
+				require.False(t, itemsResp.Disabled)
 				require.Equal(t, "/items", itemsResp.Path)
 				require.Equal(t, "GET", itemsResp.Method)
-				require.NotNil(t, itemsResp.MethodActions["GET"])
-				require.Equal(t, apidef.Reply, itemsResp.MethodActions["GET"].Action)
-				require.Equal(t, 200, itemsResp.MethodActions["GET"].Code)
-				require.Equal(t, `["item1", "item2"]`, itemsResp.MethodActions["GET"].Data)
-				require.Equal(t, map[string]string{"Content-Type": "application/json"}, itemsResp.MethodActions["GET"].Headers)
+				require.Equal(t, 200, itemsResp.Code)
+				require.Equal(t, `["item1", "item2"]`, itemsResp.Body)
+				require.Equal(t, map[string]string{"Content-Type": "application/json"}, itemsResp.Headers)
 
 				// Verify users response
-				usersResp := ep.WhiteList[1]
+				usersResp := mockResponses[1]
+				require.False(t, usersResp.Disabled)
 				require.Equal(t, "/users", usersResp.Path)
 				require.Equal(t, "GET", usersResp.Method)
-				require.NotNil(t, usersResp.MethodActions["GET"])
-				require.Equal(t, apidef.Reply, usersResp.MethodActions["GET"].Action)
-				require.Equal(t, 200, usersResp.MethodActions["GET"].Code)
-				require.Equal(t, `["user1", "user2"]`, usersResp.MethodActions["GET"].Data)
-				require.Equal(t, map[string]string{"Content-Type": "application/json"}, usersResp.MethodActions["GET"].Headers)
+				require.Equal(t, 200, usersResp.Code)
+				require.Equal(t, `["user1", "user2"]`, usersResp.Body)
+				require.Equal(t, map[string]string{"Content-Type": "application/json"}, usersResp.Headers)
 			},
 		},
 	}
