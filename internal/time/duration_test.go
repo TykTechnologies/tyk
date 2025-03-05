@@ -26,6 +26,23 @@ func TestReadableDuration_MarshalJSON(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, string(expectedJSON), string(resultJSON))
 	})
+
+	t.Run("50 milliseconds", func(t *testing.T) {
+		duration := ReadableDuration(time.Millisecond * 50)
+		expectedJSON := []byte(`"50ms"`)
+		resultJSON, err := json.Marshal(&duration)
+		assert.NoError(t, err)
+		assert.Equal(t, string(expectedJSON), string(resultJSON))
+	})
+
+}
+
+func TestReadableDuration_Seconds(t *testing.T) {
+	inputJSON := []byte(`"30m50ms"`)
+	var duration ReadableDuration
+	err := json.Unmarshal(inputJSON, &duration)
+	assert.NoError(t, err)
+	assert.Equal(t, float64(1800), duration.Seconds())
 }
 
 func TestReadableDuration_UnmarshalJSON(t *testing.T) {
