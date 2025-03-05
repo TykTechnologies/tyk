@@ -204,8 +204,6 @@ tests:
                 headers:
                   - name: Content-Type
                     value: application/json
-              allow:
-                enabled: true
               ignoreAuthentication:
                 enabled: true
   - desc: "multiple methods on same path - classic"
@@ -272,8 +270,6 @@ tests:
                     value: /test/123
               ignoreAuthentication:
                 enabled: true
-              allow:
-                enabled: true
   - desc: "disabled mock response - classic"
     source: "classic"
     input:
@@ -310,8 +306,6 @@ tests:
                 code: 404
                 body: '{"error": "not found"}'
               ignoreAuthentication:
-                enabled: true
-              allow:
                 enabled: true
   - desc: "empty mock response section - classic"
     source: "classic"

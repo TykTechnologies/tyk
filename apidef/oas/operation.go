@@ -217,10 +217,6 @@ func (s *OAS) fillMockResponsePaths(paths openapi3.Paths, ep apidef.ExtendedPath
 
 		tykOperation := s.GetTykExtension().getOperation(operation.OperationID)
 
-		if tykOperation.Allow == nil || !tykOperation.Allow.Enabled {
-			tykOperation.Allow = &Allowance{Enabled: true}
-		}
-
 		if tykOperation.MockResponse == nil {
 			tykOperation.MockResponse = &MockResponse{}
 		}
