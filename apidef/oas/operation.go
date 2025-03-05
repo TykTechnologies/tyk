@@ -211,9 +211,7 @@ func (s *OAS) fillMockResponsePaths(paths openapi3.Paths, ep apidef.ExtendedPath
 			Value: response,
 		}
 
-		if operation.Responses["default"] != nil {
-			delete(operation.Responses, "default")
-		}
+		delete(operation.Responses, "default")
 
 		tykOperation := s.GetTykExtension().getOperation(operation.OperationID)
 

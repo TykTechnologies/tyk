@@ -434,6 +434,10 @@ func TestOAS_MockResponse_extractPathsAndOperations(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			var ep apidef.ExtendedPathsSet
 			tt.spec.extractPathsAndOperations(&ep)
+
+			// We should ensure no AllowList is created
+			require.Len(t, ep.WhiteList, 0)
+
 			tt.want(t, &ep)
 		})
 	}
