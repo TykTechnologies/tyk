@@ -228,7 +228,9 @@ func (s *OAS) fillMockResponsePaths(paths openapi3.Paths, ep apidef.ExtendedPath
 		}
 
 		if ShouldOmit(tykOperation.MockResponse) {
-			tykOperation.MockResponse = &MockResponse{}
+			tykOperation.MockResponse = &MockResponse{
+				FromOASExamples: &FromOASExamples{},
+			}
 		}
 	}
 }
