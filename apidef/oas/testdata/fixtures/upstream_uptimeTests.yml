@@ -15,7 +15,6 @@ tests:
       x-tyk-api-gateway:
         upstream:
           uptimeTests:
-            enabled: true
             hostDownRetestPeriod: 20s
             logRetentionPeriod: 10s
             tests:
@@ -28,7 +27,6 @@ tests:
                 "Content-Type": "application/json"
               body: "test"
     output:
-      proxy.check_host_against_uptime_tests: true
       uptime_tests.config.expire_utime_after: 10
       uptime_tests.config.recheck_wait: 20
       uptime_tests:
@@ -44,8 +42,6 @@ tests:
   - desc: "upstream uptime test classic"
     source: classic
     input:
-      proxy:
-        check_host_against_uptime_tests: true
       uptime_tests:
         config:
           expire_utime_after: 10
@@ -62,7 +58,6 @@ tests:
         upstream:
           serviceDiscovery: <nil>
           uptimeTests:
-            enabled: true
             hostDownRetestPeriod: 20s
             logRetentionPeriod: 10s
             tests:
@@ -75,8 +70,6 @@ tests:
   - desc: "upstream uptime test classic"
     source: classic
     input:
-      proxy:
-        check_host_against_uptime_tests: false
       uptime_tests:
         config:
           expire_utime_after: 10
@@ -94,7 +87,6 @@ tests:
         upstream:
           serviceDiscovery: <nil>
           uptimeTests:
-            enabled: false
             hostDownRetestPeriod: 20s
             logRetentionPeriod: 10s
             tests:
@@ -108,8 +100,6 @@ tests:
   - desc: "upstream uptime test classic - commands"
     source: classic
     input:
-      proxy:
-        check_host_against_uptime_tests: false
       uptime_tests:
         config:
           expire_utime_after: 10
@@ -132,7 +122,6 @@ tests:
         upstream:
           serviceDiscovery: <nil>
           uptimeTests:
-            enabled: false
             hostDownRetestPeriod: 20s
             logRetentionPeriod: 10s
             tests:

@@ -69,7 +69,7 @@ func (u *Upstream) Fill(api apidef.APIDefinition) {
 		u.UptimeTests = &UptimeTests{}
 	}
 
-	u.UptimeTests.Fill(api.UptimeTests, api.Proxy.CheckHostAgainstUptimeTests)
+	u.UptimeTests.Fill(api.UptimeTests)
 	if ShouldOmit(u.UptimeTests) {
 		u.UptimeTests = nil
 	}
@@ -174,7 +174,7 @@ func (u *Upstream) ExtractTo(api *apidef.APIDefinition) {
 		}()
 	}
 
-	u.UptimeTests.ExtractTo(&api.UptimeTests, &api.Proxy.CheckHostAgainstUptimeTests)
+	u.UptimeTests.ExtractTo(&api.UptimeTests)
 
 	if u.MutualTLS == nil {
 		u.MutualTLS = &MutualTLS{}
@@ -567,11 +567,6 @@ func (sd *ServiceDiscovery) ExtractTo(serviceDiscovery *apidef.ServiceDiscoveryC
 
 // UptimeTests configures uptime tests.
 type UptimeTests struct {
-	// Enabled if true enables uptime tests.
-	//
-	// Tyk classic API definition: `check_hosts_against_uptime_tests`
-	Enabled bool `bson:"enabled" json:"enabled"` // required
-
 	// ServiceDiscovery contains the configuration related to test Service Discovery.
 	// Tyk classic API definition: `proxy.service_discovery`
 	ServiceDiscovery *ServiceDiscovery `bson:"serviceDiscovery,omitempty" json:"serviceDiscovery,omitempty"`
@@ -646,8 +641,8 @@ type UptimeTestCommand struct {
 	Message string `bson:"message" json:"message"`
 }
 
-// Fill fills *UptimeTests from apidef.UptimeTests and enabled.
-func (t *UptimeTests) Fill(uptimeTests apidef.UptimeTests, enabled bool) {
+// Fill fills *UptimeTests from apidef.UptimeTests.
+func (t *UptimeTests) Fill(uptimeTests apidef.UptimeTests) {
 	if t.ServiceDiscovery == nil {
 		t.ServiceDiscovery = &ServiceDiscovery{}
 	}
@@ -658,7 +653,6 @@ func (t *UptimeTests) Fill(uptimeTests apidef.UptimeTests, enabled bool) {
 	}
 
 	t.Tests = nil
-	t.Enabled = enabled
 	t.LogRetentionPeriod = ReadableDuration(time.Duration(uptimeTests.Config.ExpireUptimeAnalyticsAfter) * time.Second)
 	t.HostDownRetestPeriod = ReadableDuration(time.Duration(uptimeTests.Config.RecheckWait) * time.Second)
 
@@ -685,8 +679,8 @@ func (t *UptimeTests) Fill(uptimeTests apidef.UptimeTests, enabled bool) {
 	}
 }
 
-// ExtractTo extracts *UptimeTests into *apidef.UptimeTests and enabled.
-func (t *UptimeTests) ExtractTo(uptimeTests *apidef.UptimeTests, enabled *bool) {
+// ExtractTo extracts *UptimeTests into *apidef.UptimeTests.
+func (t *UptimeTests) ExtractTo(uptimeTests *apidef.UptimeTests) {
 	if t.ServiceDiscovery == nil {
 		t.ServiceDiscovery = &ServiceDiscovery{}
 		defer func() {
@@ -695,8 +689,6 @@ func (t *UptimeTests) ExtractTo(uptimeTests *apidef.UptimeTests, enabled *bool) 
 	}
 
 	t.ServiceDiscovery.ExtractTo(&uptimeTests.Config.ServiceDiscovery)
-
-	*enabled = t.Enabled
 
 	uptimeTests.Config.ExpireUptimeAnalyticsAfter = int64(t.LogRetentionPeriod.Seconds())
 	uptimeTests.Config.RecheckWait = int(t.HostDownRetestPeriod.Seconds())
@@ -1251,6 +1243,9 @@ func (l *UpstreamRequestSigning) ExtractTo(api *apidef.APIDefinition) {
 type LoadBalancing struct {
 	// Enabled determines if load balancing is active.
 	Enabled bool `json:"enabled" bson:"enabled"` // required
+	// SkipUnavailableHosts determines whether to skip unavailable hosts during load balancing based on uptime tests.
+	// Tyk classic field: `proxy.check_host_against_uptime_tests`
+	SkipUnavailableHosts bool `json:"skipUnavailableHosts,omitempty" bson:"skipUnavailableHosts,omitempty"`
 	// Targets defines the list of targets with their respective weights for load balancing.
 	Targets []LoadBalancingTarget `json:"targets,omitempty" bson:"targets,omitempty"`
 }
@@ -1267,11 +1262,13 @@ type LoadBalancingTarget struct {
 func (l *LoadBalancing) Fill(api apidef.APIDefinition) {
 	if len(api.Proxy.Targets) == 0 {
 		api.Proxy.EnableLoadBalancing = false
+		api.Proxy.CheckHostAgainstUptimeTests = false
 		api.Proxy.Targets = nil
 		return
 	}
 
 	l.Enabled = api.Proxy.EnableLoadBalancing
+	l.SkipUnavailableHosts = api.Proxy.CheckHostAgainstUptimeTests
 
 	targetCounter := make(map[string]*LoadBalancingTarget)
 	for _, target := range api.Proxy.Targets {
@@ -1303,12 +1300,14 @@ func (l *LoadBalancing) Fill(api apidef.APIDefinition) {
 func (l *LoadBalancing) ExtractTo(api *apidef.APIDefinition) {
 	if len(l.Targets) == 0 {
 		api.Proxy.EnableLoadBalancing = false
+		api.Proxy.CheckHostAgainstUptimeTests = false
 		api.Proxy.Targets = nil
 		return
 	}
 
 	proxyConfTargets := make([]string, 0, len(l.Targets))
 	api.Proxy.EnableLoadBalancing = l.Enabled
+	api.Proxy.CheckHostAgainstUptimeTests = l.SkipUnavailableHosts
 	for _, target := range l.Targets {
 		for i := 0; i < target.Weight; i++ {
 			proxyConfTargets = append(proxyConfTargets, target.URL)
