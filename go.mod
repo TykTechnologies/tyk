@@ -37,7 +37,7 @@ require (
 	github.com/hashicorp/consul/api v1.31.2
 	github.com/hashicorp/go-multierror v1.1.1
 	github.com/hashicorp/go-version v1.7.0
-	github.com/hashicorp/vault/api v1.15.0
+	github.com/hashicorp/vault/api v1.16.0
 	github.com/jensneuse/abstractlogger v0.0.4
 	github.com/justinas/alice v1.2.0
 	github.com/kelseyhightower/envconfig v1.4.0
