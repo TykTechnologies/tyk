@@ -53,9 +53,15 @@ func TLSVersions(in []uint16) []string {
 // GetCiphers generates a list of CipherSuite from the available ciphers.
 func GetCiphers() []*CipherSuite {
 	ciphers := tls.CipherSuites()
-	result := make([]*CipherSuite, 0, len(ciphers))
+	ciphersInsecure := tls.InsecureCipherSuites()
+
+	result := make([]*CipherSuite, 0, len(ciphers)+len(ciphersInsecure))
 
 	for _, cipher := range ciphers {
+		result = append(result, NewCipher(cipher))
+	}
+
+	for _, cipher := range ciphersInsecure {
 		result = append(result, NewCipher(cipher))
 	}
 
