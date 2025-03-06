@@ -34,7 +34,7 @@ require (
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/gorilla/mux v1.8.1
 	github.com/gorilla/websocket v1.5.3
-	github.com/hashicorp/consul/api v1.30.0
+	github.com/hashicorp/consul/api v1.31.2
 	github.com/hashicorp/go-multierror v1.1.1
 	github.com/hashicorp/go-version v1.7.0
 	github.com/hashicorp/vault/api v1.15.0
@@ -62,7 +62,7 @@ require (
 	github.com/vmihailenco/msgpack v4.0.4+incompatible
 	github.com/xeipuuv/gojsonschema v1.2.0
 	golang.org/x/crypto v0.35.0
-	golang.org/x/net v0.33.0
+	golang.org/x/net v0.34.0
 	golang.org/x/sync v0.11.0
 	google.golang.org/grpc v1.69.2
 	google.golang.org/grpc/examples v0.0.0-20220317213542-f95b001a48df // test
@@ -290,12 +290,12 @@ require (
 	go.uber.org/atomic v1.11.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	go.uber.org/zap v1.27.0 // indirect
-	golang.org/x/exp v0.0.0-20241108190413-2d47ceb2692f // indirect
+	golang.org/x/exp v0.0.0-20250106191152-7588d65b2ba8 // indirect
 	golang.org/x/mod v0.22.0 // indirect
 	golang.org/x/sys v0.30.0 // indirect
 	golang.org/x/text v0.22.0 // indirect
 	golang.org/x/time v0.7.0 // indirect
-	golang.org/x/tools v0.27.0 // indirect
+	golang.org/x/tools v0.29.0 // indirect
 	google.golang.org/appengine v1.6.8 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20241104194629-dd2ea8efbc28 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20241104194629-dd2ea8efbc28 // indirect
