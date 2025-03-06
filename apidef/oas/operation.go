@@ -201,69 +201,36 @@ func (s *OAS) fillMockResponsePaths(paths openapi3.Paths, ep apidef.ExtendedPath
 
 		// Response description is required by the OAS spec, but we don't have it in Tyk classic.
 		// So we're using a dummy value to satisfy the spec.
-		oasResponseDesc := "oasRequiredDummyValue"
+		var oasDesc string
 
 		response := &openapi3.Response{
-			Headers:     make(openapi3.Headers),
-			Description: &oasResponseDesc,
-		}
-
-		contentType := detectMockResponseContentType(mock)
-
-		mediaType := &openapi3.MediaType{
-			Examples: openapi3.Examples{
-				"default": &openapi3.ExampleRef{
-					Value: &openapi3.Example{
-						Value: mock.Body,
-					},
-				},
-			},
-		}
-
-		response.Content = openapi3.Content{
-			contentType: mediaType,
-		}
-
-		for name, value := range mock.Headers {
-			response.Headers[http.CanonicalHeaderKey(name)] = &openapi3.HeaderRef{
-				Value: &openapi3.Header{
-					Parameter: openapi3.Parameter{
-						Schema: &openapi3.SchemaRef{
-							Value: &openapi3.Schema{
-								Type:    "string",
-								Example: value,
-							},
-						},
-					},
-				},
-			}
+			Description: &oasDesc,
 		}
 
 		operation.Responses[strconv.Itoa(mock.Code)] = &openapi3.ResponseRef{
 			Value: response,
 		}
 
-		tykOperation := s.GetTykExtension().getOperation(operation.OperationID)
+		delete(operation.Responses, "default")
 
-		if tykOperation.Allow == nil || !tykOperation.Allow.Enabled {
-			tykOperation.Allow = &Allowance{Enabled: true}
-		}
+		tykOperation := s.GetTykExtension().getOperation(operation.OperationID)
 
 		if tykOperation.MockResponse == nil {
 			tykOperation.MockResponse = &MockResponse{}
 		}
 
-		if tykOperation.IgnoreAuthentication == nil {
+		tykOperation.MockResponse.Fill(mock)
+
+		if tykOperation.IgnoreAuthentication == nil && tykOperation.MockResponse.FromOASExamples == nil {
 			// We need to to add ignoreAuthentication middleware to the operation
 			// to stay consistent to the way mock responses work for classic APIs
 			tykOperation.IgnoreAuthentication = &Allowance{Enabled: true}
 		}
 
-		tykOperation.MockResponse.Fill(mock)
-
 		if ShouldOmit(tykOperation.MockResponse) {
-			tykOperation.MockResponse = nil
-			tykOperation.IgnoreAuthentication = nil
+			tykOperation.MockResponse = &MockResponse{
+				FromOASExamples: &FromOASExamples{},
+			}
 		}
 	}
 }
@@ -571,40 +538,26 @@ func (o *Operation) extractRequestSizeLimitTo(ep *apidef.ExtendedPathsSet, path 
 }
 
 // extractMockResponsePaths converts OAS mock responses to classic API format.
-// While classic APIs have direct support for mock responses, the API Designer UI
-// doesn't support them yet. Therefore, we are extracting them to a combination of
-// allow list entries and method actions instead.
 func (o *Operation) extractMockResponsePaths(ep *apidef.ExtendedPathsSet, path, method string) {
 	if o.MockResponse == nil {
 		return
 	}
 
 	headers := make(map[string]string)
-
 	for _, header := range o.MockResponse.Headers {
 		headers[http.CanonicalHeaderKey(header.Name)] = header.Value
 	}
 
-	if ep.WhiteList == nil {
-		ep.WhiteList = make([]apidef.EndPointMeta, 0)
-	}
-
-	wl := apidef.EndPointMeta{
+	mockResponse := apidef.MockResponseMeta{
 		Disabled: !o.MockResponse.Enabled,
 		Path:     path,
 		Method:   method,
+		Code:     o.MockResponse.Code,
+		Body:     o.MockResponse.Body,
+		Headers:  headers,
 	}
 
-	wl.MethodActions = make(map[string]apidef.EndpointMethodMeta)
-
-	wl.MethodActions[method] = apidef.EndpointMethodMeta{
-		Action:  apidef.Reply,
-		Code:    o.MockResponse.Code,
-		Data:    o.MockResponse.Body,
-		Headers: headers,
-	}
-
-	ep.WhiteList = append(ep.WhiteList, wl)
+	ep.MockResponse = append(ep.MockResponse, mockResponse)
 }
 
 // detect possible regex pattern:
