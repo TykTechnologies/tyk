@@ -559,41 +559,49 @@ func (gw *Gateway) SetCheckerHostList() {
 	hostList := []HostData{}
 	gw.apisMu.RLock()
 	for _, spec := range gw.apisByID {
-		if spec.UptimeTests.Config.ServiceDiscovery.UseDiscoveryService {
-			hostList, err := gw.GlobalHostChecker.ListFromService(spec.APIID)
-			if err == nil {
-				hostList = append(hostList, hostList...)
-				for _, t := range hostList {
-					log.WithFields(logrus.Fields{
-						"prefix": "host-check-mgr",
-					}).WithFields(logrus.Fields{
-						"prefix": "host-check-mgr",
-					}).Info("---> Adding uptime test: ", t.CheckURL)
-				}
-			}
-		} else {
-			for _, checkItem := range spec.UptimeTests.CheckList {
-				newHostDoc, err := gw.GlobalHostChecker.PrepareTrackingHost(checkItem, spec.APIID)
-				if err == nil {
-					hostList = append(hostList, newHostDoc)
-					log.WithFields(logrus.Fields{
-						"prefix": "host-check-mgr",
-					}).Info("---> Adding uptime test: ", checkItem.CheckURL)
-				} else {
-					log.WithFields(logrus.Fields{
-						"prefix": "host-check-mgr",
-					}).Warning("---> Adding uptime test failed: ", checkItem.CheckURL)
-					log.WithFields(logrus.Fields{
-						"prefix": "host-check-mgr",
-					}).Warning("--------> Error was: ", err)
-				}
-
-			}
-		}
+		gw.populateHostListByApiSpec(&hostList, spec)
 	}
 	gw.apisMu.RUnlock()
 
 	gw.GlobalHostChecker.UpdateTrackingList(hostList)
+}
+
+func (gw *Gateway) populateHostListByApiSpec(hostList *[]HostData, spec *APISpec) {
+	if spec.UptimeTests.Disabled {
+		return
+	}
+
+	if spec.UptimeTests.Config.ServiceDiscovery.UseDiscoveryService {
+		hostList, err := gw.GlobalHostChecker.ListFromService(spec.APIID)
+		if err == nil {
+			hostList = append(hostList, hostList...)
+			for _, t := range hostList {
+				log.WithFields(logrus.Fields{
+					"prefix": "host-check-mgr",
+				}).WithFields(logrus.Fields{
+					"prefix": "host-check-mgr",
+				}).Info("---> Adding uptime test: ", t.CheckURL)
+			}
+		}
+	} else {
+		for _, checkItem := range spec.UptimeTests.CheckList {
+			newHostDoc, err := gw.GlobalHostChecker.PrepareTrackingHost(checkItem, spec.APIID)
+			if err == nil {
+				*hostList = append(*hostList, newHostDoc)
+				log.WithFields(logrus.Fields{
+					"prefix": "host-check-mgr",
+				}).Info("---> Adding uptime test: ", checkItem.CheckURL)
+			} else {
+				log.WithFields(logrus.Fields{
+					"prefix": "host-check-mgr",
+				}).Warning("---> Adding uptime test failed: ", checkItem.CheckURL)
+				log.WithFields(logrus.Fields{
+					"prefix": "host-check-mgr",
+				}).Warning("--------> Error was: ", err)
+			}
+
+		}
+	}
 }
 
 /*

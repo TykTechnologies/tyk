@@ -567,6 +567,10 @@ func (sd *ServiceDiscovery) ExtractTo(serviceDiscovery *apidef.ServiceDiscoveryC
 
 // UptimeTests configures uptime tests.
 type UptimeTests struct {
+	// Enabled specifies whether the uptime tests are active or not.
+	// Tyk classic API definition: `uptime_tests.disabled`
+	Enabled bool `bson:"enabled" json:"enabled"`
+
 	// ServiceDiscovery contains the configuration related to test Service Discovery.
 	// Tyk classic API definition: `proxy.service_discovery`
 	ServiceDiscovery *ServiceDiscovery `bson:"serviceDiscovery,omitempty" json:"serviceDiscovery,omitempty"`
@@ -643,6 +647,8 @@ type UptimeTestCommand struct {
 
 // Fill fills *UptimeTests from apidef.UptimeTests.
 func (t *UptimeTests) Fill(uptimeTests apidef.UptimeTests) {
+	t.Enabled = !uptimeTests.Disabled
+
 	if t.ServiceDiscovery == nil {
 		t.ServiceDiscovery = &ServiceDiscovery{}
 	}
@@ -681,6 +687,8 @@ func (t *UptimeTests) Fill(uptimeTests apidef.UptimeTests) {
 
 // ExtractTo extracts *UptimeTests into *apidef.UptimeTests.
 func (t *UptimeTests) ExtractTo(uptimeTests *apidef.UptimeTests) {
+	uptimeTests.Disabled = !t.Enabled
+
 	if t.ServiceDiscovery == nil {
 		t.ServiceDiscovery = &ServiceDiscovery{}
 		defer func() {

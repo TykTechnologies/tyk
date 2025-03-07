@@ -15,6 +15,7 @@ tests:
       x-tyk-api-gateway:
         upstream:
           uptimeTests:
+            enabled: true
             hostDownRetestPeriod: 20s
             logRetentionPeriod: 10s
             tests:
@@ -30,6 +31,7 @@ tests:
       uptime_tests.config.expire_utime_after: 10
       uptime_tests.config.recheck_wait: 20
       uptime_tests:
+        disabled: false
         check_list:
           - url: "https://www.google.com"
             protocol: "http"
@@ -43,6 +45,7 @@ tests:
     source: classic
     input:
       uptime_tests:
+        disabled: true
         config:
           expire_utime_after: 10
           recheck_wait: 20
@@ -58,6 +61,7 @@ tests:
         upstream:
           serviceDiscovery: <nil>
           uptimeTests:
+            enabled: false
             hostDownRetestPeriod: 20s
             logRetentionPeriod: 10s
             tests:
@@ -71,6 +75,7 @@ tests:
     source: classic
     input:
       uptime_tests:
+        disabled: false
         config:
           expire_utime_after: 10
           recheck_wait: 20
@@ -87,6 +92,7 @@ tests:
         upstream:
           serviceDiscovery: <nil>
           uptimeTests:
+            enabled: true
             hostDownRetestPeriod: 20s
             logRetentionPeriod: 10s
             tests:
@@ -101,6 +107,7 @@ tests:
     source: classic
     input:
       uptime_tests:
+        disabled: false
         config:
           expire_utime_after: 10
           recheck_wait: 20
@@ -122,6 +129,7 @@ tests:
         upstream:
           serviceDiscovery: <nil>
           uptimeTests:
+            enabled: true
             hostDownRetestPeriod: 20s
             logRetentionPeriod: 10s
             tests:
