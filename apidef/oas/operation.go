@@ -291,6 +291,12 @@ func (s *OAS) fillAllowance(endpointMetas []apidef.EndPointMeta, typ AllowanceTy
 		case ignoreAuthentication:
 			allowance = newAllowance(&operation.IgnoreAuthentication)
 		default:
+			for _, m := range em.MethodActions {
+				if m.Action == apidef.Reply {
+					continue
+				}
+			}
+
 			allowance = newAllowance(&operation.Allow)
 		}
 
