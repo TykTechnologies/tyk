@@ -1044,7 +1044,7 @@ func TestShouldCreateAllowance(t *testing.T) {
 	}{
 		"empty method actions": {
 			methodActions: map[string]apidef.EndpointMethodMeta{},
-			want:          false,
+			want:          true,
 		},
 		"single mock response": {
 			methodActions: map[string]apidef.EndpointMethodMeta{
@@ -1090,7 +1090,9 @@ func TestShouldCreateAllowance(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			got := shouldCreateAllowance(tc.methodActions)
+			got := shouldCreateAllowance(apidef.EndPointMeta{
+				MethodActions: tc.methodActions,
+			})
 			if got != tc.want {
 				t.Errorf("shouldCreateAllowance() = %v, want %v", got, tc.want)
 			}

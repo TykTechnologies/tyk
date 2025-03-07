@@ -290,7 +290,7 @@ func (s *OAS) fillAllowance(endpointMetas []apidef.EndPointMeta, typ AllowanceTy
 			allowance = newAllowance(&operation.IgnoreAuthentication)
 		default:
 			// We should avoid creating an allowance for mock responses (white list + method action with action=reply)
-			if shouldCreateAllowance(em.MethodActions) {
+			if shouldCreateAllowance(em) {
 				allowance = newAllowance(&operation.Allow)
 			}
 		}
@@ -306,8 +306,15 @@ func (s *OAS) fillAllowance(endpointMetas []apidef.EndPointMeta, typ AllowanceTy
 }
 
 // shouldCreateAllowance checks if we should create an allowance based on method actions.
-// We only want to create an allowance if we find at least one method that is NOT a mock response.
-func shouldCreateAllowance(methodActions map[string]apidef.EndpointMethodMeta) bool {
+// We want to create an allowance by default, and only skip it if ALL methods are mock responses.
+func shouldCreateAllowance(em apidef.EndPointMeta) bool {
+	methodActions := em.MethodActions
+
+	// If there are no method actions, create allowance by default
+	if len(methodActions) == 0 {
+		return true
+	}
+
 	methods := []string{
 		http.MethodGet,
 		http.MethodPost,
@@ -319,20 +326,25 @@ func shouldCreateAllowance(methodActions map[string]apidef.EndpointMethodMeta) b
 		http.MethodTrace,
 	}
 
+	// Track how many methods we've found
+	foundMethods := 0
+
 	for _, m := range methods {
 		methodAction, ok := methodActions[m]
 		if !ok {
 			continue
 		}
 
-		// If we find any method action that is not a Reply (mock response),
-		// we need to create an allowance for this operation
+		foundMethods++
+
+		// If we find any method that is not a Reply, create an allowance
 		if methodAction.Action != apidef.Reply {
 			return true
 		}
 	}
 
-	return false
+	// Only skip allowance creation if we found methods and they were ALL replies
+	return foundMethods == 0
 }
 
 func newAllowance(prev **Allowance) *Allowance {
