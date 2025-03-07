@@ -2556,9 +2556,6 @@
         "method": {
           "type": "string"
         },
-        "protocol": {
-          "type": "string"
-        },
         "timeout": {
           "$ref": "#/definitions/X-Tyk-ReadableDuration"
         },

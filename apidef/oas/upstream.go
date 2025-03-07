@@ -2,6 +2,7 @@ package oas
 
 import (
 	"crypto/tls"
+	"fmt"
 	"sort"
 	"strings"
 
@@ -597,12 +598,8 @@ type UptimeTest struct {
 	//
 	// - `http://database1.company.local`
 	// - `https://webcluster.service/health`
-	// - `127.0.0.1:6379` (for TCP checks).
+	// - `tcp://127.0.0.1:6379` (for TCP checks).
 	CheckURL string `bson:"url" json:"url"`
-
-	// Protocol is the protocol for the request. Supported values are
-	// `http` and `tcp`, depending on what kind of check is performed.
-	Protocol string `bson:"protocol" json:"protocol"`
 
 	// Timeout declares a timeout for the request. If the test exceeds
 	// this timeout, the check fails.
@@ -646,27 +643,26 @@ type UptimeTestCommand struct {
 }
 
 // Fill fills *UptimeTests from apidef.UptimeTests.
-func (t *UptimeTests) Fill(uptimeTests apidef.UptimeTests) {
-	t.Enabled = !uptimeTests.Disabled
+func (u *UptimeTests) Fill(uptimeTests apidef.UptimeTests) {
+	u.Enabled = !uptimeTests.Disabled
 
-	if t.ServiceDiscovery == nil {
-		t.ServiceDiscovery = &ServiceDiscovery{}
+	if u.ServiceDiscovery == nil {
+		u.ServiceDiscovery = &ServiceDiscovery{}
 	}
 
-	t.ServiceDiscovery.Fill(uptimeTests.Config.ServiceDiscovery)
-	if ShouldOmit(t.ServiceDiscovery) {
-		t.ServiceDiscovery = nil
+	u.ServiceDiscovery.Fill(uptimeTests.Config.ServiceDiscovery)
+	if ShouldOmit(u.ServiceDiscovery) {
+		u.ServiceDiscovery = nil
 	}
 
-	t.Tests = nil
-	t.LogRetentionPeriod = ReadableDuration(time.Duration(uptimeTests.Config.ExpireUptimeAnalyticsAfter) * time.Second)
-	t.HostDownRetestPeriod = ReadableDuration(time.Duration(uptimeTests.Config.RecheckWait) * time.Second)
+	u.Tests = nil
+	u.LogRetentionPeriod = ReadableDuration(time.Duration(uptimeTests.Config.ExpireUptimeAnalyticsAfter) * time.Second)
+	u.HostDownRetestPeriod = ReadableDuration(time.Duration(uptimeTests.Config.RecheckWait) * time.Second)
 
 	result := []UptimeTest{}
 	for _, v := range uptimeTests.CheckList {
 		check := UptimeTest{
-			CheckURL:            v.CheckURL,
-			Protocol:            v.Protocol,
+			CheckURL:            u.fillCheckURL(v.Protocol, v.CheckURL),
 			Timeout:             ReadableDuration(v.Timeout),
 			Method:              v.Method,
 			Headers:             v.Headers,
@@ -681,33 +677,34 @@ func (t *UptimeTests) Fill(uptimeTests apidef.UptimeTests) {
 	}
 
 	if len(result) > 0 {
-		t.Tests = result
+		u.Tests = result
 	}
 }
 
 // ExtractTo extracts *UptimeTests into *apidef.UptimeTests.
-func (t *UptimeTests) ExtractTo(uptimeTests *apidef.UptimeTests) {
-	uptimeTests.Disabled = !t.Enabled
+func (u *UptimeTests) ExtractTo(uptimeTests *apidef.UptimeTests) {
+	uptimeTests.Disabled = !u.Enabled
 
-	if t.ServiceDiscovery == nil {
-		t.ServiceDiscovery = &ServiceDiscovery{}
+	if u.ServiceDiscovery == nil {
+		u.ServiceDiscovery = &ServiceDiscovery{}
 		defer func() {
-			t.ServiceDiscovery = nil
+			u.ServiceDiscovery = nil
 		}()
 	}
 
-	t.ServiceDiscovery.ExtractTo(&uptimeTests.Config.ServiceDiscovery)
+	u.ServiceDiscovery.ExtractTo(&uptimeTests.Config.ServiceDiscovery)
 
-	uptimeTests.Config.ExpireUptimeAnalyticsAfter = int64(t.LogRetentionPeriod.Seconds())
-	uptimeTests.Config.RecheckWait = int(t.HostDownRetestPeriod.Seconds())
+	uptimeTests.Config.ExpireUptimeAnalyticsAfter = int64(u.LogRetentionPeriod.Seconds())
+	uptimeTests.Config.RecheckWait = int(u.HostDownRetestPeriod.Seconds())
 
 	uptimeTests.CheckList = nil
 
 	result := []apidef.HostCheckObject{}
-	for _, v := range t.Tests {
+	for _, v := range u.Tests {
+		classicProtocol, classicCheckURL := u.extractToProtocolAndCheckURL(v.CheckURL)
 		check := apidef.HostCheckObject{
-			CheckURL:            v.CheckURL,
-			Protocol:            v.Protocol,
+			CheckURL:            classicCheckURL,
+			Protocol:            classicProtocol,
 			Timeout:             time.Duration(v.Timeout),
 			Method:              v.Method,
 			Headers:             v.Headers,
@@ -724,6 +721,29 @@ func (t *UptimeTests) ExtractTo(uptimeTests *apidef.UptimeTests) {
 	if len(result) > 0 {
 		uptimeTests.CheckList = result
 	}
+}
+
+// fillCheckURL constructs a valid URL by appending the protocol to the provided URL, removing any existing protocol.
+// This needs to be done because classic can have invalid protocol and checkURL combinations, e.g.
+// protocol=tcp, checkURL=https://myservice.fake
+func (u *UptimeTests) fillCheckURL(protocol string, checkURL string) string {
+	protocolessURL := checkURL
+	splitURL := strings.Split(checkURL, "://")
+	if len(splitURL) > 1 {
+		protocolessURL = splitURL[1]
+	}
+
+	return fmt.Sprintf("%s://%s", protocol, protocolessURL)
+}
+
+// extractToProtocolAndCheckURL splits a URL into its protocol and the remaining part of the URL, returning both as strings.
+// Classic has a special field for protocol while OAS only has checkURL. The protocol should remain inside checkURL.
+func (u *UptimeTests) extractToProtocolAndCheckURL(checkURL string) (classicProtocol, classicCheckURL string) {
+	splitURL := strings.Split(checkURL, "://")
+	if len(splitURL) > 1 {
+		return splitURL[0], checkURL
+	}
+	return "", checkURL // should never happen, but let's be sure to not have panics
 }
 
 // MutualTLS contains the configuration for establishing a mutual TLS connection between Tyk and the upstream server.
