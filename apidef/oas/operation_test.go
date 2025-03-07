@@ -3,6 +3,7 @@ package oas
 import (
 	"context"
 	"embed"
+	"net/http"
 	"strconv"
 	"strings"
 	"testing"
@@ -1034,4 +1035,187 @@ func verifyOASOperation(t *testing.T, spec *OAS, op *openapi3.Operation, method 
 	tykOperation := spec.GetTykExtension().getOperation(op.OperationID)
 	require.NotNil(t, tykOperation)
 	require.Nil(t, tykOperation.Allow)
+}
+
+func TestOAS_fillAllowance(t *testing.T) {
+	t.Run("should fill allow list correctly", func(t *testing.T) {
+		s := &OAS{
+			T: openapi3.T{
+				Paths: make(openapi3.Paths),
+			},
+		}
+
+		s.SetTykExtension(&XTykAPIGateway{
+			Middleware: &Middleware{
+				Operations: make(Operations),
+			},
+		})
+
+		endpointMetas := []apidef.EndPointMeta{
+			{
+				Path:   "/test",
+				Method: http.MethodGet,
+				MethodActions: map[string]apidef.EndpointMethodMeta{
+					http.MethodGet: {
+						Action: apidef.NoAction,
+					},
+				},
+			},
+		}
+
+		s.fillAllowance(endpointMetas, allow)
+
+		operationID := s.getOperationID("/test", http.MethodGet)
+		operation := s.GetTykExtension().getOperation(operationID)
+
+		assert.NotNil(t, operation.Allow)
+		assert.True(t, operation.Allow.Enabled)
+		assert.Nil(t, operation.Block)
+		assert.Nil(t, operation.IgnoreAuthentication)
+	})
+
+	t.Run("should fill block list correctly", func(t *testing.T) {
+		s := &OAS{
+			T: openapi3.T{
+				Paths: make(openapi3.Paths),
+			},
+		}
+
+		s.SetTykExtension(&XTykAPIGateway{
+			Middleware: &Middleware{
+				Operations: make(Operations),
+			},
+		})
+
+		endpointMetas := []apidef.EndPointMeta{
+			{
+				Path:   "/test",
+				Method: http.MethodGet,
+			},
+		}
+
+		s.fillAllowance(endpointMetas, block)
+
+		operationID := s.getOperationID("/test", http.MethodGet)
+		operation := s.GetTykExtension().getOperation(operationID)
+
+		assert.NotNil(t, operation.Block)
+		assert.True(t, operation.Block.Enabled)
+		assert.Nil(t, operation.Allow)
+		assert.Nil(t, operation.IgnoreAuthentication)
+	})
+
+	t.Run("should fill ignore authentication correctly", func(t *testing.T) {
+		s := &OAS{
+			T: openapi3.T{
+				Paths: make(openapi3.Paths),
+			},
+		}
+
+		s.SetTykExtension(&XTykAPIGateway{
+			Middleware: &Middleware{
+				Operations: make(Operations),
+			},
+		})
+
+		endpointMetas := []apidef.EndPointMeta{
+			{
+				Path:   "/test",
+				Method: http.MethodGet,
+			},
+		}
+
+		s.fillAllowance(endpointMetas, ignoreAuthentication)
+
+		operationID := s.getOperationID("/test", http.MethodGet)
+		operation := s.GetTykExtension().getOperation(operationID)
+
+		assert.NotNil(t, operation.IgnoreAuthentication)
+		assert.True(t, operation.IgnoreAuthentication.Enabled)
+		assert.Nil(t, operation.Allow)
+		assert.Nil(t, operation.Block)
+	})
+
+	t.Run("should skip Reply actions for allow list", func(t *testing.T) {
+		spec := &OAS{
+			T: openapi3.T{
+				Paths: make(openapi3.Paths),
+			},
+		}
+
+		spec.SetTykExtension(&XTykAPIGateway{
+			Middleware: &Middleware{
+				Operations: make(Operations),
+			},
+		})
+
+		endpointMetas := []apidef.EndPointMeta{
+			{
+				Path:   "/test",
+				Method: http.MethodGet,
+				MethodActions: map[string]apidef.EndpointMethodMeta{
+					http.MethodGet: {
+						Action: apidef.Reply,
+					},
+				},
+			},
+		}
+
+		spec.fillAllowance(endpointMetas, allow)
+
+		operationID := spec.getOperationID("/test", http.MethodGet)
+		operation := spec.GetTykExtension().getOperation(operationID)
+
+		assert.Nil(t, operation.Allow, "Allow should be nil for Reply actions")
+	})
+
+	t.Run("should handle empty endpoint metas", func(t *testing.T) {
+		s := &OAS{
+			T: openapi3.T{
+				Paths: make(openapi3.Paths),
+			},
+		}
+
+		s.SetTykExtension(&XTykAPIGateway{
+			Middleware: &Middleware{
+				Operations: make(Operations),
+			},
+		})
+
+		var endpointMetas []apidef.EndPointMeta
+
+		s.fillAllowance(endpointMetas, allow)
+
+		assert.Empty(t, s.Paths)
+	})
+
+	t.Run("should set allowance disabled when ShouldOmit returns true", func(t *testing.T) {
+		s := &OAS{
+			T: openapi3.T{
+				Paths: make(openapi3.Paths),
+			},
+		}
+
+		s.SetTykExtension(&XTykAPIGateway{
+			Middleware: &Middleware{
+				Operations: make(Operations),
+			},
+		})
+
+		endpointMetas := []apidef.EndPointMeta{
+			{
+				Path:     "/test",
+				Method:   http.MethodGet,
+				Disabled: true,
+			},
+		}
+
+		s.fillAllowance(endpointMetas, allow)
+
+		operationID := s.getOperationID("/test", http.MethodGet)
+		operation := s.GetTykExtension().getOperation(operationID)
+
+		assert.NotNil(t, operation.Allow)
+		assert.False(t, operation.Allow.Enabled)
+	})
 }

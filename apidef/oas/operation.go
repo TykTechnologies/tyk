@@ -291,10 +291,10 @@ func (s *OAS) fillAllowance(endpointMetas []apidef.EndPointMeta, typ AllowanceTy
 		case ignoreAuthentication:
 			allowance = newAllowance(&operation.IgnoreAuthentication)
 		default:
-			for _, m := range em.MethodActions {
-				if m.Action == apidef.Reply {
-					continue
-				}
+			// Skip endpoints that have mock responses configured via method actions, we should avoid
+			// creating allowance for them.
+			if hasMockResponse(em.MethodActions) {
+				continue
 			}
 
 			allowance = newAllowance(&operation.Allow)
@@ -1039,4 +1039,16 @@ func sortMockResponseAllowList(ep *apidef.ExtendedPathsSet) {
 
 		return actionI.Code < actionJ.Code
 	})
+}
+
+// hasMockResponse returns true if any method action has a Reply action type.
+// This is used to determine if an endpoint should be treated as a mock response.
+func hasMockResponse(methodActions map[string]apidef.EndpointMethodMeta) bool {
+	for _, action := range methodActions {
+		if action.Action == apidef.Reply {
+			return true
+		}
+	}
+
+	return false
 }
