@@ -41,7 +41,8 @@ type Upstream struct {
 	// PreserveHostHeader contains the configuration for preserving the host header.
 	PreserveHostHeader *PreserveHostHeader `bson:"preserveHostHeader,omitempty" json:"preserveHostHeader,omitempty"`
 
-	// PreserveTrailingSlash contains the configuration for preserving the host header.
+	// PreserveTrailingSlash controls whether Tyk preserves trailing slashes in URLs when proxying
+	// requests to upstream services. When enabled, URLs like "/users/" will retain the trailing slash.
 	PreserveTrailingSlash *PreserveTrailingSlash `bson:"preserveTrailingSlash,omitempty" json:"preserveTrailingSlash,omitempty"`
 
 	// TLSTransport contains the configuration for TLS transport settings.

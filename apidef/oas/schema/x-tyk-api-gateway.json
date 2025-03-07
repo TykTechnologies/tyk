@@ -2595,7 +2595,7 @@
     },
     "X-Tyk-ReadableDuration": {
       "type": "string",
-      "pattern": "^(\\d+h)?(\\d+m)?(\\d+s)?$"
+      "pattern": "^(\\d+h)?(\\d+m)?(\\d+s)?(\\d+ms)?$"
     },
     "X-Tyk-LoadBalancingTarget": {
       "type": "object",

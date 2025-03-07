@@ -148,15 +148,39 @@ func TestServiceDiscovery(t *testing.T) {
 }
 
 func TestUptimeTests(t *testing.T) {
-	var emptyTest UptimeTests
+	t.Run("empty", func(t *testing.T) {
+		var emptyTest UptimeTests
 
-	var convertedTest apidef.UptimeTests
-	emptyTest.ExtractTo(&convertedTest)
+		var convertedTest apidef.UptimeTests
+		emptyTest.ExtractTo(&convertedTest)
 
-	var resultTest UptimeTests
-	resultTest.Fill(convertedTest)
+		var resultTest UptimeTests
+		resultTest.Fill(convertedTest)
 
-	assert.Equal(t, emptyTest, resultTest)
+		assert.Equal(t, emptyTest, resultTest)
+	})
+
+	t.Run("filled & check timeout", func(t *testing.T) {
+		var uptimeTests = UptimeTests{
+			Enabled:          true,
+			ServiceDiscovery: nil,
+			Tests: []UptimeTest{
+				{
+					CheckURL: "http://test.com",
+					Timeout:  ReadableDuration(time.Millisecond * 50),
+					Method:   "POST",
+				},
+			},
+		}
+
+		var convertedTest apidef.UptimeTests
+
+		uptimeTests.ExtractTo(&convertedTest)
+
+		assert.Equal(t, time.Millisecond*50, convertedTest.CheckList[0].Timeout)
+		assert.Equal(t, uptimeTests.Tests[0].CheckURL, convertedTest.CheckList[0].CheckURL)
+		assert.Equal(t, uptimeTests.Tests[0].Method, convertedTest.CheckList[0].Method)
+	})
 }
 
 func TestUpstreamMutualTLS(t *testing.T) {
@@ -676,9 +700,8 @@ func TestLoadBalancing(t *testing.T) {
 				title: "disable load balancing when targets list is empty",
 				input: apidef.APIDefinition{
 					Proxy: apidef.ProxyConfig{
-						EnableLoadBalancing:         true,
-						CheckHostAgainstUptimeTests: true,
-						Targets:                     []string{},
+						EnableLoadBalancing: true,
+						Targets:             []string{},
 					},
 				},
 				expected: nil,
@@ -687,8 +710,7 @@ func TestLoadBalancing(t *testing.T) {
 				title: "load balancing disabled with filled target list",
 				input: apidef.APIDefinition{
 					Proxy: apidef.ProxyConfig{
-						EnableLoadBalancing:         false,
-						CheckHostAgainstUptimeTests: true,
+						EnableLoadBalancing: false,
 						Targets: []string{
 							"http://upstream-one",
 							"http://upstream-one",
@@ -701,8 +723,7 @@ func TestLoadBalancing(t *testing.T) {
 					},
 				},
 				expected: &LoadBalancing{
-					Enabled:              false,
-					SkipUnavailableHosts: true,
+					Enabled: false,
 					Targets: []LoadBalancingTarget{
 						{
 							URL:    "http://upstream-one",
@@ -719,8 +740,7 @@ func TestLoadBalancing(t *testing.T) {
 				title: "load balancing enabled with filled target list",
 				input: apidef.APIDefinition{
 					Proxy: apidef.ProxyConfig{
-						EnableLoadBalancing:         true,
-						CheckHostAgainstUptimeTests: true,
+						EnableLoadBalancing: true,
 						Targets: []string{
 							"http://upstream-one",
 							"http://upstream-one",
@@ -733,8 +753,7 @@ func TestLoadBalancing(t *testing.T) {
 					},
 				},
 				expected: &LoadBalancing{
-					Enabled:              true,
-					SkipUnavailableHosts: true,
+					Enabled: true,
 					Targets: []LoadBalancingTarget{
 						{
 							URL:    "http://upstream-one",
@@ -766,28 +785,24 @@ func TestLoadBalancing(t *testing.T) {
 		t.Parallel()
 
 		testcases := []struct {
-			title                        string
-			input                        *LoadBalancing
-			expectedEnabled              bool
-			expectedSkipUnavailableHosts bool
-			expectedTargets              []string
+			title           string
+			input           *LoadBalancing
+			expectedEnabled bool
+			expectedTargets []string
 		}{
 			{
 				title: "disable load balancing when targets list is empty",
 				input: &LoadBalancing{
-					Enabled:              false,
-					SkipUnavailableHosts: false,
-					Targets:              nil,
+					Enabled: false,
+					Targets: nil,
 				},
-				expectedEnabled:              false,
-				expectedSkipUnavailableHosts: false,
-				expectedTargets:              nil,
+				expectedEnabled: false,
+				expectedTargets: nil,
 			},
 			{
 				title: "load balancing disabled with filled target list",
 				input: &LoadBalancing{
-					Enabled:              false,
-					SkipUnavailableHosts: true,
+					Enabled: false,
 					Targets: []LoadBalancingTarget{
 						{
 							URL:    "http://upstream-one",
@@ -803,8 +818,7 @@ func TestLoadBalancing(t *testing.T) {
 						},
 					},
 				},
-				expectedEnabled:              false,
-				expectedSkipUnavailableHosts: true,
+				expectedEnabled: false,
 				expectedTargets: []string{
 					"http://upstream-one",
 					"http://upstream-one",
@@ -818,8 +832,7 @@ func TestLoadBalancing(t *testing.T) {
 			{
 				title: "load balancing enabled with filled target list",
 				input: &LoadBalancing{
-					Enabled:              true,
-					SkipUnavailableHosts: true,
+					Enabled: true,
 					Targets: []LoadBalancingTarget{
 						{
 							URL:    "http://upstream-one",
@@ -835,8 +848,7 @@ func TestLoadBalancing(t *testing.T) {
 						},
 					},
 				},
-				expectedEnabled:              true,
-				expectedSkipUnavailableHosts: true,
+				expectedEnabled: true,
 				expectedTargets: []string{
 					"http://upstream-one",
 					"http://upstream-one",
@@ -866,7 +878,6 @@ func TestLoadBalancing(t *testing.T) {
 				g.ExtractTo(&apiDef)
 
 				assert.Equal(t, tc.expectedEnabled, apiDef.Proxy.EnableLoadBalancing)
-				assert.Equal(t, tc.expectedSkipUnavailableHosts, apiDef.Proxy.CheckHostAgainstUptimeTests)
 				assert.Equal(t, tc.expectedTargets, apiDef.Proxy.Targets)
 			})
 		}
