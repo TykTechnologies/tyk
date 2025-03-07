@@ -155,6 +155,7 @@ tests:
         middleware:
           operations:
             testGET:
+              allow: <nil>
               mockResponse:
                 enabled: true
                 code: 200
@@ -207,6 +208,7 @@ tests:
         middleware:
           operations:
             testGET:
+              allow: <nil>
               mockResponse:
                 enabled: true
                 code: 200
@@ -217,6 +219,7 @@ tests:
               ignoreAuthentication:
                 enabled: true
             testPOST:
+              allow: <nil>
               mockResponse:
                 enabled: true
                 code: 201
@@ -259,6 +262,7 @@ tests:
         middleware:
           operations:
             testGET:
+              allow: <nil>
               mockResponse:
                 enabled: false
                 code: 404

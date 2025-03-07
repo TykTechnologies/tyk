@@ -227,10 +227,6 @@ func (s *OAS) fillMockResponsePaths(paths openapi3.Paths, ep apidef.ExtendedPath
 			tykOperation.IgnoreAuthentication = &Allowance{Enabled: true}
 		}
 
-		if tykOperation.Allow != nil {
-			tykOperation.Allow = nil
-		}
-
 		if ShouldOmit(tykOperation.MockResponse) {
 			tykOperation.MockResponse = &MockResponse{
 				FromOASExamples: &FromOASExamples{},
@@ -293,14 +289,50 @@ func (s *OAS) fillAllowance(endpointMetas []apidef.EndPointMeta, typ AllowanceTy
 		case ignoreAuthentication:
 			allowance = newAllowance(&operation.IgnoreAuthentication)
 		default:
-			allowance = newAllowance(&operation.Allow)
+			// We should avoid creating an allowance for mock responses (white list + method action with action=reply)
+			if shouldCreateAllowance(em.MethodActions) {
+				allowance = newAllowance(&operation.Allow)
+			}
 		}
 
-		allowance.Fill(em)
+		if allowance != nil {
+			allowance.Fill(em)
+		}
+
 		if ShouldOmit(allowance) {
 			allowance = nil
 		}
 	}
+}
+
+// shouldCreateAllowance checks if we should create an allowance based on method actions.
+// We only want to create an allowance if we find at least one method that is NOT a mock response.
+func shouldCreateAllowance(methodActions map[string]apidef.EndpointMethodMeta) bool {
+	methods := []string{
+		http.MethodGet,
+		http.MethodPost,
+		http.MethodPut,
+		http.MethodDelete,
+		http.MethodPatch,
+		http.MethodHead,
+		http.MethodOptions,
+		http.MethodTrace,
+	}
+
+	for _, m := range methods {
+		methodAction, ok := methodActions[m]
+		if !ok {
+			continue
+		}
+
+		// If we find any method action that is not a Reply (mock response),
+		// we need to create an allowance for this operation
+		if methodAction.Action != apidef.Reply {
+			return true
+		}
+	}
+
+	return false
 }
 
 func newAllowance(prev **Allowance) *Allowance {
