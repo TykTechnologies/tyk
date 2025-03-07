@@ -103,7 +103,7 @@ func TestXTykGateway_Lint(t *testing.T) {
 			LogRetentionPeriod:   ReadableDuration(10 * time.Second),
 			Tests: []UptimeTest{
 				{
-					Timeout: ReadableDuration(10 * time.Second),
+					Timeout: ReadableDuration(10 * time.Millisecond),
 					Commands: []UptimeTestCommand{
 						{
 							Name:    "send",
