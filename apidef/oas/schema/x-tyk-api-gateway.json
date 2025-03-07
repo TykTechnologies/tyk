@@ -2432,6 +2432,9 @@
         "enabled": {
           "type": "boolean"
         },
+        "skipUnavailableHosts": {
+          "type": "boolean"
+        },
         "targets": {
           "type": "array",
           "items": [
