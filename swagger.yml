@@ -30,7 +30,7 @@ info:
     name: Mozilla Public License Version 2.0
     url: https://github.com/TykTechnologies/tyk/blob/master/LICENSE.md
   title: Tyk Gateway API
-  version: 5.7.1
+  version: 5.8.0
 servers:
 - url: https://{tenant}
   variables:
@@ -1823,7 +1823,7 @@ paths:
                         Default:
                           name: Default
               oasApiDefinition:
-                summary: Calling debug endpoint with OAS API definition.
+                summary: Calling debug endpoint with Tyk OAS API definition.
                 value:
                   request:
                     method: GET
@@ -1903,7 +1903,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
           description: Internal server error.
-      summary: Test a Classic or an OAS API definition.
+      summary: Test a Tyk Classic or Tyk OAS API definition.
       tags:
       - Debug
   /tyk/keys:
