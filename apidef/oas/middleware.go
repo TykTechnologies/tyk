@@ -718,6 +718,7 @@ type Cache struct {
 // Fill fills *Cache from apidef.CacheOptions.
 func (c *Cache) Fill(cache apidef.CacheOptions) {
 	c.Enabled = cache.EnableCache
+	c.Enabled = cache.EnableCache
 	c.Timeout = cache.CacheTimeout
 	c.CacheAllSafeRequests = cache.CacheAllSafeRequests
 	c.CacheResponseCodes = cache.CacheOnlyResponseCodes
@@ -1201,10 +1202,18 @@ type CachePlugin struct {
 
 // Fill fills *CachePlugin from apidef.CacheMeta.
 func (a *CachePlugin) Fill(cm apidef.CacheMeta) {
+	// TODO(TT-14102): Add test for this
+	const defaultCacheTimeout = 60
+
 	a.Enabled = !cm.Disabled
 	a.CacheByRegex = cm.CacheKeyRegex
 	a.CacheResponseCodes = cm.CacheOnlyResponseCodes
 	a.Timeout = cm.Timeout
+
+	// TODO(TT-14102): Add test for this
+	if a.Timeout == 0 {
+		a.Timeout = defaultCacheTimeout
+	}
 }
 
 // ExtractTo extracts *CachePlugin values to *apidef.CacheMeta.

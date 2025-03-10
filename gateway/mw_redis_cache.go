@@ -201,11 +201,16 @@ func (m *RedisCacheMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 			cacheOnlyResponseCodes = cacheMeta.CacheOnlyResponseCodes
 		}
 
+		log.Printf("CACHE META: %#+v", cacheMeta)
+
 		// override api level Timout by endpoint level if provided
 		if cacheMeta.Timeout > 0 {
 			timeout = cacheMeta.Timeout
 		}
 	}
+
+	log.Printf("RESPONSE CODES: %#+v", cacheOnlyResponseCodes)
+	log.Printf("TIMEOUT: %#+v", timeout)
 
 	ctxSetCacheOptions(r, &cacheOptions{
 		key:                    key,
