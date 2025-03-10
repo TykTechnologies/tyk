@@ -54,8 +54,12 @@ type Server struct {
 	// - "http": Standard HTTP/1.1 protocol
 	// - "http2": HTTP/2 protocol with TLS
 	// - "h2c": HTTP/2 protocol without TLS (cleartext).
+	//
+	// Tyk classic API definition: `protocol`.
 	Protocol string `bson:"protocol,omitempty" json:"protocol,omitempty"`
 	// Port Setting this value will change the port that Tyk listens on. Default: 8080.
+	//
+	// Tyk classic API definition: `listen_port`.
 	Port int `bson:"port,omitempty" json:"port,omitempty"`
 }
 
@@ -220,8 +224,12 @@ func (lp *ListenPath) ExtractTo(api *apidef.APIDefinition) {
 // ClientCertificates contains the configurations related to establishing static mutual TLS between the client and Tyk.
 type ClientCertificates struct {
 	// Enabled activates static mTLS for the API.
+	//
+	// Tyk classic API definition: `use_mutual_tls_auth`.
 	Enabled bool `bson:"enabled" json:"enabled"`
 	// Allowlist is the list of client certificates which are allowed.
+	//
+	// Tyk classic API definition: `client_certificates`.
 	Allowlist []string `bson:"allowlist" json:"allowlist"`
 }
 
@@ -240,8 +248,12 @@ func (cc *ClientCertificates) ExtractTo(api *apidef.APIDefinition) {
 // GatewayTags holds a list of segment tags that should apply for a gateway.
 type GatewayTags struct {
 	// Enabled activates use of segment tags.
+	//
+	// Tyk classic API definition: `tags_disabled` (negated).
 	Enabled bool `bson:"enabled" json:"enabled"`
 	// Tags contains a list of segment tags.
+	//
+	// Tyk classic API definition: `tags`.
 	Tags []string `bson:"tags" json:"tags"`
 }
 
@@ -260,8 +272,12 @@ func (gt *GatewayTags) ExtractTo(api *apidef.APIDefinition) {
 // Domain holds the configuration of the domain name the server should listen on.
 type Domain struct {
 	// Enabled allow/disallow the usage of the domain.
+	//
+	// Tyk classic API definition: `domain_disabled` (negated).
 	Enabled bool `bson:"enabled" json:"enabled"`
 	// Name is the name of the domain.
+	//
+	// Tyk classic API definition: `domain`.
 	Name string `bson:"name" json:"name"`
 	// Certificates defines a field for specifying certificate IDs or file paths
 	// that the Gateway can utilise to dynamically load certificates for your custom domain.
@@ -305,6 +321,8 @@ func (d *DetailedActivityLogs) Fill(api apidef.APIDefinition) {
 // DetailedTracing holds the configuration of the detailed tracing.
 type DetailedTracing struct {
 	// Enabled activates detailed tracing.
+	//
+	// Tyk classic API definition: `detailed_tracing`.
 	Enabled bool `bson:"enabled" json:"enabled"`
 }
 
@@ -321,14 +339,20 @@ func (dt *DetailedTracing) ExtractTo(api *apidef.APIDefinition) {
 // IPAccessControl represents IP access control configuration.
 type IPAccessControl struct {
 	// Enabled indicates whether IP access control is enabled.
+	//
+	// Tyk classic API definition: `ip_access_control_disabled` (negated).
 	Enabled bool `bson:"enabled" json:"enabled"`
 
 	// Allow is a list of allowed IP addresses or CIDR blocks (e.g. "192.168.1.0/24").
 	// Note that if an IP address is present in both Allow and Block, the Block rule will take precedence.
+	//
+	// Tyk classic API definition: `allowed_ips`.
 	Allow []string `bson:"allow,omitempty" json:"allow,omitempty"`
 
 	// Block is a list of blocked IP addresses or CIDR blocks (e.g. "192.168.1.100/32").
 	// If an IP address is present in both Allow and Block, the Block rule will take precedence.
+	//
+	// Tyk classic API definition: `blacklisted_ips`.
 	Block []string `bson:"block,omitempty" json:"block,omitempty"`
 }
 
@@ -371,6 +395,8 @@ func (s *Server) extractIPAccessControlTo(api *apidef.APIDefinition) {
 // BatchProcessing represents the configuration for enabling or disabling batch request support for an API.
 type BatchProcessing struct {
 	// Enabled determines whether batch request support is enabled or disabled for the API.
+	//
+	// Tyk classic API definition: `enable_batch_request_support`.
 	Enabled bool `bson:"enabled" json:"enabled"` // required
 }
 

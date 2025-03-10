@@ -487,9 +487,13 @@ func (g *Global) extractSkipsTo(api *apidef.APIDefinition) {
 // PluginConfigData configures config data for custom plugins.
 type PluginConfigData struct {
 	// Enabled activates custom plugin config data.
+	//
+	// Tyk classic API definition: `config_data_disabled` (negated).
 	Enabled bool `bson:"enabled" json:"enabled"` // required.
 
 	// Value is the value of custom plugin config data.
+	//
+	// Tyk classic API definition: `config_data`.
 	Value map[string]interface{} `bson:"value" json:"value"` // required.
 }
 
@@ -1116,12 +1120,20 @@ func (tm *TransformRequestMethod) ExtractTo(meta *apidef.MethodTransformMeta) {
 // TransformBody holds configuration about request/response body transformations.
 type TransformBody struct {
 	// Enabled activates transform request/request body middleware.
+	//
+	// Tyk classic API definition: `version_data.versions..extended_paths.transform[].disabled` (negated).
 	Enabled bool `bson:"enabled" json:"enabled"`
 	// Format of the request/response body, xml or json.
+	//
+	// Tyk classic API definition: `version_data.versions..extended_paths.transform[].template_data.input_type`.
 	Format apidef.RequestInputType `bson:"format" json:"format"`
 	// Path file path for the template.
+	//
+	// Tyk classic API definition: `version_data.versions..extended_paths.transform[].template_data.template_source` when `template_data.template_mode` is `file`.
 	Path string `bson:"path,omitempty" json:"path,omitempty"`
 	// Body base64 encoded representation of the template.
+	//
+	// Tyk classic API definition: `version_data.versions..extended_paths.transform[].template_data.template_source` when `template_data.template_mode` is `blob`.
 	Body string `bson:"body,omitempty" json:"body,omitempty"`
 }
 
@@ -1153,10 +1165,16 @@ func (tr *TransformBody) ExtractTo(meta *apidef.TemplateMeta) {
 // TransformHeaders holds configuration about request/response header transformations.
 type TransformHeaders struct {
 	// Enabled activates Header Transform for the given path and method.
+	//
+	// Tyk classic API definition: `version_data.versions..extended_paths.transform_headers[].disabled` (negated).
 	Enabled bool `bson:"enabled" json:"enabled"`
 	// Remove specifies header names to be removed from the request/response.
+	//
+	// Tyk classic API definition: `version_data.versions..extended_paths.transform_headers[].delete_headers`.
 	Remove []string `bson:"remove,omitempty" json:"remove,omitempty"`
 	// Add specifies headers to be added to the request/response.
+	//
+	// Tyk classic API definition: `version_data.versions..extended_paths.transform_headers[].add_headers`.
 	Add Headers `bson:"add,omitempty" json:"add,omitempty"`
 }
 
@@ -1185,17 +1203,25 @@ func (th *TransformHeaders) ExtractTo(meta *apidef.HeaderInjectionMeta) {
 // CachePlugin holds the configuration for the cache plugins.
 type CachePlugin struct {
 	// Enabled is a boolean flag. If set to `true`, the advanced caching plugin will be enabled.
+	//
+	// Tyk classic API definition: `version_data.versions..extended_paths.advance_cache_config[].disabled` (negated).
 	Enabled bool `bson:"enabled" json:"enabled"`
 
 	// CacheByRegex defines a regular expression used against the request body to produce a cache key.
 	//
 	// Example value: `\"id\":[^,]*` (quoted json value).
+	//
+	// Tyk classic API definition: `version_data.versions..extended_paths.advance_cache_config[].cache_key_regex`.
 	CacheByRegex string `bson:"cacheByRegex,omitempty" json:"cacheByRegex,omitempty"`
 
 	// CacheResponseCodes contains a list of valid response codes for responses that are okay to add to the cache.
+	//
+	// Tyk classic API definition: `version_data.versions..extended_paths.advance_cache_config[].cache_response_codes`.
 	CacheResponseCodes []int `bson:"cacheResponseCodes,omitempty" json:"cacheResponseCodes,omitempty"`
 
 	// Timeout is the TTL for the endpoint level caching in seconds. 0 means no caching.
+	//
+	// Tyk classic API definition: `version_data.versions..extended_paths.advance_cache_config[].timeout`.
 	Timeout int64 `bson:"timeout,omitempty" json:"timeout,omitempty"`
 }
 
@@ -1218,9 +1244,13 @@ func (a *CachePlugin) ExtractTo(cm *apidef.CacheMeta) {
 // EnforceTimeout holds the configuration for enforcing request timeouts.
 type EnforceTimeout struct {
 	// Enabled is a boolean flag. If set to `true`, requests will enforce a configured timeout.
+	//
+	// Tyk classic API definition: `version_data.versions..extended_paths.hard_timeouts[].disabled` (negated).
 	Enabled bool `bson:"enabled" json:"enabled"`
 
 	// Value is the configured timeout in seconds.
+	//
+	// Tyk classic API definition: `version_data.versions..extended_paths.hard_timeouts[].timeout`.
 	Value int `bson:"value" json:"value"`
 }
 
@@ -1238,16 +1268,31 @@ func (et *EnforceTimeout) ExtractTo(meta *apidef.HardTimeoutMeta) {
 
 // CustomPlugin configures custom plugin.
 type CustomPlugin struct {
-	// Enabled activates the custom pre plugin.
+	// Enabled activates the custom plugin.
+	//
+	// Tyk classic API definition: `custom_middleware.pre[].disabled`, `custom_middleware.post_key_auth[].disabled`,
+	// `custom_middleware.post[].disabled`, `custom_middleware.response[].disabled` (negated).
 	Enabled bool `bson:"enabled" json:"enabled"` // required.
 	// FunctionName is the name of authentication method.
+	//
+	// Tyk classic API definition: `custom_middleware.pre[].name`, `custom_middleware.post_key_auth[].name`,
+	// `custom_middleware.post[].name`, `custom_middleware.response[].name`.
 	FunctionName string `bson:"functionName" json:"functionName"` // required.
 	// Path is the path to shared object file in case of goplugin mode or path to JS code in case of otto auth plugin.
+	//
+	// Tyk classic API definition: `custom_middleware.pre[].path`, `custom_middleware.post_key_auth[].path`,
+	// `custom_middleware.post[].path`, `custom_middleware.response[].path`.
 	Path string `bson:"path" json:"path"`
 	// RawBodyOnly if set to true, do not fill body in request or response object.
+	//
+	// Tyk classic API definition: `custom_middleware.pre[].raw_body_only`, `custom_middleware.post_key_auth[].raw_body_only`,
+	// `custom_middleware.post[].raw_body_only`, `custom_middleware.response[].raw_body_only`.
 	RawBodyOnly bool `bson:"rawBodyOnly,omitempty" json:"rawBodyOnly,omitempty"`
 	// RequireSession if set to true passes down the session information for plugins after authentication.
 	// RequireSession is used only with JSVM custom middleware.
+	//
+	// Tyk classic API definition: `custom_middleware.pre[].require_session`, `custom_middleware.post_key_auth[].require_session`,
+	// `custom_middleware.post[].require_session`, `custom_middleware.response[].require_session`.
 	RequireSession bool `bson:"requireSession,omitempty" json:"requireSession,omitempty"`
 }
 
@@ -1414,19 +1459,31 @@ func (p *ResponsePlugin) ExtractTo(api *apidef.APIDefinition) {
 // VirtualEndpoint contains virtual endpoint configuration.
 type VirtualEndpoint struct {
 	// Enabled activates virtual endpoint.
+	//
+	// Tyk classic API definition: `virtual.disabled` (negated).
 	Enabled bool `bson:"enabled" json:"enabled"` // required.
 	// Name is the name of plugin function to be executed.
 	// Deprecated: Use FunctionName instead.
 	Name string `bson:"name,omitempty" json:"name,omitempty"`
 	// FunctionName is the name of plugin function to be executed.
+	//
+	// Tyk classic API definition: `virtual.response_function_name`.
 	FunctionName string `bson:"functionName" json:"functionName"` // required.
 	// Path is the path to JS file.
+	//
+	// Tyk classic API definition: `virtual.function_source_uri` when `virtual.function_source_type` is `file`.
 	Path string `bson:"path,omitempty" json:"path,omitempty"`
 	// Body is the JS function to execute encoded in base64 format.
+	//
+	// Tyk classic API definition: `virtual.function_source_uri` when `virtual.function_source_type` is `blob`.
 	Body string `bson:"body,omitempty" json:"body,omitempty"`
 	// ProxyOnError proxies if virtual endpoint errors out.
+	//
+	// Tyk classic API definition: `virtual.proxy_on_error`.
 	ProxyOnError bool `bson:"proxyOnError,omitempty" json:"proxyOnError,omitempty"`
 	// RequireSession if enabled passes session to virtual endpoint.
+	//
+	// Tyk classic API definition: `virtual.use_session`.
 	RequireSession bool `bson:"requireSession,omitempty" json:"requireSession,omitempty"`
 }
 
@@ -1492,13 +1549,19 @@ type EndpointPostPlugins []EndpointPostPlugin
 // EndpointPostPlugin contains endpoint level post plugin configuration.
 type EndpointPostPlugin struct {
 	// Enabled activates post plugin.
+	//
+	// Tyk classic API definition: `version_data.versions..extended_paths.go_plugin.disabled`(negated).
 	Enabled bool `bson:"enabled" json:"enabled"` // required.
 	// Name is the name of plugin function to be executed.
 	// Deprecated: Use FunctionName instead.
 	Name string `bson:"name,omitempty" json:"name,omitempty"`
 	// FunctionName is the name of plugin function to be executed.
+	//
+	// Tyk classic API definition: `version_data.versions..extended_paths.go_plugin.symbol_name`(negated).
 	FunctionName string `bson:"functionName" json:"functionName"` // required.
 	// Path is the path to plugin.
+	//
+	// Tyk classic API definition: `version_data.versions..extended_paths.go_plugin.plugin_path`(negated).
 	Path string `bson:"path" json:"path"` // required.
 }
 
@@ -1554,19 +1617,24 @@ func (e EndpointPostPlugins) ExtractTo(meta *apidef.GoPluginMeta) {
 // Tyk classic API definition: `version_data.versions..extended_paths.circuit_breakers[*]`.
 type CircuitBreaker struct {
 	// Enabled activates the Circuit Breaker functionality.
-	// Tyk classic API definition: `version_data.versions..extended_paths.circuit_breakers[*].disabled`.
+	//
+	// Tyk classic API definition: `version_data.versions..extended_paths.circuit_breakers[*].disabled` (negated).
 	Enabled bool `bson:"enabled" json:"enabled"`
 	// Threshold is the proportion from each `sampleSize` requests that must fail for the breaker to be tripped. This must be a value between 0.0 and 1.0. If `sampleSize` is 100 then a threshold of 0.4 means that the breaker will be tripped if 40 out of every 100 requests fails.
+	//
 	// Tyk classic API definition: `version_data.versions..extended_paths.circuit_breakers[*].threshold_percent`.
 	Threshold float64 `bson:"threshold" json:"threshold"`
 	// SampleSize is the size of the circuit breaker sampling window. Combining this with `threshold` gives the failure rate required to trip the circuit breaker.
+	//
 	// Tyk classic API definition: `version_data.versions..extended_paths.circuit_breakers[*].samples`.
 	SampleSize int `bson:"sampleSize" json:"sampleSize"`
 	// CoolDownPeriod is the period of time (in seconds) for which the circuit breaker will remain open before returning to service.
+	//
 	// Tyk classic API definition: `version_data.versions..extended_paths.circuit_breakers[*].return_to_service_after`.
 	CoolDownPeriod int `bson:"coolDownPeriod" json:"coolDownPeriod"`
 	// HalfOpenStateEnabled , if enabled, allows some requests to pass through the circuit breaker during the cool down period. If Tyk detects that the path is now working, the circuit breaker will be automatically reset and traffic will be resumed to the upstream.
-	// Tyk classic API definition: `version_data.versions..extended_paths.circuit_breakers[*].disable_half_open_state`.
+	//
+	// Tyk classic API definition: `version_data.versions..extended_paths.circuit_breakers[*].disable_half_open_state` (negated).
 	HalfOpenStateEnabled bool `bson:"halfOpenStateEnabled" json:"halfOpenStateEnabled"`
 }
 
@@ -1591,8 +1659,12 @@ func (cb *CircuitBreaker) ExtractTo(circuitBreaker *apidef.CircuitBreakerMeta) {
 // RequestSizeLimit limits the maximum allowed size of the request body in bytes.
 type RequestSizeLimit struct {
 	// Enabled activates the Request Size Limit functionality.
+	//
+	// Tyk classic API definition: `version_data.versions..extended_paths.size_limits[].disabled` (negated).
 	Enabled bool `bson:"enabled" json:"enabled"`
 	// Value is the maximum allowed size of the request body in bytes.
+	//
+	// Tyk classic API definition: `version_data.versions..extended_paths.size_limits[].size_limit`.
 	Value int64 `bson:"value" json:"value"`
 }
 
@@ -1685,9 +1757,11 @@ func (c *CustomAnalyticsPlugins) ExtractTo(api *apidef.APIDefinition) {
 // GlobalRequestSizeLimit holds configuration about the global limits for request sizes.
 type GlobalRequestSizeLimit struct {
 	// Enabled activates the Request Size Limit.
-	// Tyk classic API definition: `version_data.versions..global_size_limit_disabled`.
+	//
+	// Tyk classic API definition: `version_data.versions..global_size_limit_disabled` (negated).
 	Enabled bool `bson:"enabled" json:"enabled"`
 	// Value contains the value of the request size limit.
+	//
 	// Tyk classic API definition: `version_data.versions..global_size_limit`.
 	Value int64 `bson:"value" json:"value"`
 }
@@ -1728,6 +1802,7 @@ func (g *GlobalRequestSizeLimit) ExtractTo(api *apidef.APIDefinition) {
 // ContextVariables holds the configuration related to Tyk context variables.
 type ContextVariables struct {
 	// Enabled enables context variables to be passed to Tyk middlewares.
+	//
 	// Tyk classic API definition: `enable_context_vars`.
 	Enabled bool `json:"enabled" bson:"enabled"`
 }
@@ -1746,6 +1821,8 @@ func (c *ContextVariables) ExtractTo(api *apidef.APIDefinition) {
 // This accepts request to `/AAA` or `/aaa` if set to true.
 type IgnoreCase struct {
 	// Enabled activates case insensitive route matching.
+	//
+	// Tyk classic API definition: `version_data.versions..ignore_endpoint_case`.
 	Enabled bool `json:"enabled" bson:"enabled"`
 }
 
