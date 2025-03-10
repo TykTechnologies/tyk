@@ -26,7 +26,7 @@ require (
 	github.com/evalphobia/logrus_sentry v0.8.2
 	github.com/gemnasium/logrus-graylog-hook v2.0.7+incompatible
 	github.com/getkin/kin-openapi v0.115.0
-	github.com/go-jose/go-jose/v3 v3.0.3
+	github.com/go-jose/go-jose/v3 v3.0.4
 	github.com/gocraft/health v0.0.0-20170925182251-8675af27fef0
 	github.com/gofrs/uuid v4.4.0+incompatible
 	github.com/golang-jwt/jwt/v4 v4.5.1
