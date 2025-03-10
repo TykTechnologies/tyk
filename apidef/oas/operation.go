@@ -232,6 +232,8 @@ func (s *OAS) fillMockResponsePaths(paths openapi3.Paths, ep apidef.ExtendedPath
 				FromOASExamples: &FromOASExamples{},
 			}
 		}
+
+		tykOperation.Allow = nil
 	}
 }
 
@@ -267,7 +269,6 @@ func (s *OAS) extractPathsAndOperations(ep *apidef.ExtendedPathsSet) {
 					tykOp.extractDoNotTrackEndpointTo(ep, path, method)
 					tykOp.extractRequestSizeLimitTo(ep, path, method)
 					tykOp.extractRateLimitEndpointTo(ep, path, method)
-					tykOp.extractMockResponsePaths(ep, path, method)
 					break
 				}
 			}
@@ -290,6 +291,12 @@ func (s *OAS) fillAllowance(endpointMetas []apidef.EndPointMeta, typ AllowanceTy
 		case ignoreAuthentication:
 			allowance = newAllowance(&operation.IgnoreAuthentication)
 		default:
+			// Skip endpoints that have mock responses configured via method actions, we should avoid
+			// creating allowance for them.
+			if hasMockResponse(em.MethodActions) {
+				continue
+			}
+
 			allowance = newAllowance(&operation.Allow)
 		}
 
@@ -535,29 +542,6 @@ func (o *Operation) extractRequestSizeLimitTo(ep *apidef.ExtendedPathsSet, path 
 	meta := apidef.RequestSizeMeta{Path: path, Method: method}
 	o.RequestSizeLimit.ExtractTo(&meta)
 	ep.SizeLimit = append(ep.SizeLimit, meta)
-}
-
-// extractMockResponsePaths converts OAS mock responses to classic API format.
-func (o *Operation) extractMockResponsePaths(ep *apidef.ExtendedPathsSet, path, method string) {
-	if o.MockResponse == nil {
-		return
-	}
-
-	headers := make(map[string]string)
-	for _, header := range o.MockResponse.Headers {
-		headers[http.CanonicalHeaderKey(header.Name)] = header.Value
-	}
-
-	mockResponse := apidef.MockResponseMeta{
-		Disabled: !o.MockResponse.Enabled,
-		Path:     path,
-		Method:   method,
-		Code:     o.MockResponse.Code,
-		Body:     o.MockResponse.Body,
-		Headers:  headers,
-	}
-
-	ep.MockResponse = append(ep.MockResponse, mockResponse)
 }
 
 // detect possible regex pattern:
@@ -1055,4 +1039,16 @@ func sortMockResponseAllowList(ep *apidef.ExtendedPathsSet) {
 
 		return actionI.Code < actionJ.Code
 	})
+}
+
+// hasMockResponse returns true if any method action has a Reply action type.
+// This is used to determine if an endpoint should be treated as a mock response.
+func hasMockResponse(methodActions map[string]apidef.EndpointMethodMeta) bool {
+	for _, action := range methodActions {
+		if action.Action == apidef.Reply {
+			return true
+		}
+	}
+
+	return false
 }
