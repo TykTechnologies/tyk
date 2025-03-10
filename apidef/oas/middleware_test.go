@@ -276,8 +276,9 @@ func TestTrafficLogs(t *testing.T) {
 		var convertedAPI apidef.APIDefinition
 		var resultTrafficLogs TrafficLogs
 		trafficLogs := TrafficLogs{
-			Enabled:               true,
-			CustomRetentionPeriod: ReadableDuration(time.Minute * 2),
+			Enabled: true,
+			// add 50 milliseconds tp make sure the duration is floored
+			CustomRetentionPeriod: ReadableDuration(time.Minute*2 + time.Millisecond*50),
 		}
 
 		convertedAPI.SetDisabledFlags()
@@ -286,6 +287,8 @@ func TestTrafficLogs(t *testing.T) {
 		assert.Equal(t, int64(120), convertedAPI.ExpireAnalyticsAfter)
 
 		resultTrafficLogs.Fill(convertedAPI)
+		// change customretentionPeriod back to 2 minutes for comparison
+		trafficLogs.CustomRetentionPeriod = ReadableDuration(time.Minute * 2)
 
 		assert.Equal(t, trafficLogs, resultTrafficLogs)
 	})

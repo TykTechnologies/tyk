@@ -33,18 +33,15 @@ tests:
         versions:
           "":
             extended_paths:
-              white_list:
+              mock_response:
                 - disabled: false
                   path: "/test"
                   method: "GET"
                   ignore_case: false
-                  method_actions:
-                    GET:
-                      action: "reply"
-                      code: 200
-                      headers:
-                        Content-Type: "application/json"
-                      data: '{"message": "success"}'
+                  code: 200
+                  headers:
+                    Content-Type: "application/json"
+                  body: '{"message": "success"}'
   - desc: "multiple methods on same path"
     source: oas
     input:
@@ -98,30 +95,24 @@ tests:
         versions:
           "":
             extended_paths:
-              white_list:
+              mock_response:
                 - disabled: false
                   path: "/test"
                   method: "GET"
                   ignore_case: false
-                  method_actions:
-                    GET:
-                      action: "reply"
-                      code: 200
-                      headers:
-                        Content-Type: "application/json"
-                      data: '{"status": "ok"}'
+                  code: 200
+                  headers:
+                    Content-Type: "application/json"
+                  body: '{"status": "ok"}'
                 - disabled: false
                   path: "/test"
                   method: "POST"
                   ignore_case: false
-                  method_actions:
-                    POST:
-                      action: "reply"
-                      code: 201
-                      headers:
-                        Content-Type: "application/json"
-                        Location: "/test/123"
-                      data: '{"id": "123"}'
+                  code: 201
+                  headers:
+                    Content-Type: "application/json"
+                    Location: "/test/123"
+                  body: '{"id": "123"}'
   - desc: "disabled mock response"
     source: oas
     input:
@@ -154,18 +145,15 @@ tests:
         versions:
           "":
             extended_paths:
-              white_list:
+              mock_response:
                 - disabled: true
                   path: "/test"
                   method: "GET"
                   ignore_case: false
-                  method_actions:
-                    GET:
-                      action: "reply"
-                      code: 404
-                      headers:
-                        Content-Type: "application/json"
-                      data: '{"error": "not found"}'
+                  code: 404
+                  headers:
+                    Content-Type: "application/json"
+                  body: '{"error": "not found"}'
   - desc: "basic mock response - classic"
     source: "classic"
     input:
@@ -192,16 +180,7 @@ tests:
             operationId: testGET
             responses:
               "200":
-                content:
-                  application/json:
-                    examples:
-                      default:
-                        value: '{"message": "success"}'
-                headers:
-                  Content-Type:
-                    schema:
-                      type: string
-                      example: application/json
+                description: ''
       x-tyk-api-gateway:
         middleware:
           operations:
@@ -213,8 +192,6 @@ tests:
                 headers:
                   - name: Content-Type
                     value: application/json
-              allow:
-                enabled: true
               ignoreAuthentication:
                 enabled: true
   - desc: "multiple methods on same path - classic"
@@ -250,34 +227,12 @@ tests:
             operationId: testGET
             responses:
               "200":
-                content:
-                  application/json:
-                    examples:
-                      default:
-                        value: '{"status": "ok"}'
-                headers:
-                  Content-Type:
-                    schema:
-                      type: string
-                      example: application/json
+                description: ''
           post:
             operationId: testPOST
             responses:
               "201":
-                content:
-                  application/json:
-                    examples:
-                      default:
-                        value: '{"id": "123"}'
-                headers:
-                  Content-Type:
-                    schema:
-                      type: string
-                      example: application/json
-                  Location:
-                    schema:
-                      type: string
-                      example: /test/123
+                description: ''
       x-tyk-api-gateway:
         middleware:
           operations:
@@ -302,8 +257,6 @@ tests:
                   - name: Location
                     value: /test/123
               ignoreAuthentication:
-                enabled: true
-              allow:
                 enabled: true
   - desc: "disabled mock response - classic"
     source: "classic"
@@ -331,11 +284,7 @@ tests:
             operationId: testGET
             responses:
               "404":
-                content:
-                  application/json:
-                    examples:
-                      default:
-                        value: '{"error": "not found"}'
+                description: ''
       x-tyk-api-gateway:
         middleware:
           operations:
@@ -345,8 +294,6 @@ tests:
                 code: 404
                 body: '{"error": "not found"}'
               ignoreAuthentication:
-                enabled: true
-              allow:
                 enabled: true
   - desc: "empty mock response section - classic"
     source: "classic"

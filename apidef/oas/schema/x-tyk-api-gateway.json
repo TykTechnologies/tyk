@@ -2432,6 +2432,9 @@
         "enabled": {
           "type": "boolean"
         },
+        "skipUnavailableHosts": {
+          "type": "boolean"
+        },
         "targets": {
           "type": "array",
           "items": [
@@ -2556,9 +2559,6 @@
         "method": {
           "type": "string"
         },
-        "protocol": {
-          "type": "string"
-        },
         "timeout": {
           "$ref": "#/definitions/X-Tyk-ReadableDuration"
         },
@@ -2595,7 +2595,7 @@
     },
     "X-Tyk-ReadableDuration": {
       "type": "string",
-      "pattern": "^(\\d+h)?(\\d+m)?(\\d+s)?$"
+      "pattern": "^(\\d+h)?(\\d+m)?(\\d+s)?(\\d+ms)?$"
     },
     "X-Tyk-LoadBalancingTarget": {
       "type": "object",

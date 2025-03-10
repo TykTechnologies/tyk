@@ -704,7 +704,7 @@ type Config struct {
 	// Custom hostname for the Control API
 	ControlAPIHostname string `json:"control_api_hostname"`
 
-	// Set to run your Gateway Control API on a separate port, and protect it behind a firewall if needed. Please make sure you follow this guide when setting the control port https://tyk.io/docs/planning-for-production/#change-your-control-port.
+	// Set this to expose the Tyk Gateway API on a separate port. You can protect it behind a firewall if needed. Please make sure you follow this guide when setting the control port https://tyk.io/docs/planning-for-production/#change-your-control-port.
 	ControlAPIPort int `json:"control_api_port"`
 
 	// This should be changed as soon as Tyk is installed on your system.
@@ -1154,7 +1154,7 @@ type Config struct {
 	// ```
 	OverrideMessages map[string]TykError `bson:"override_messages" json:"override_messages"`
 
-	// Cloud flag shows the Gateway runs in Tyk-cloud.
+	// Cloud flag indicates that the Gateway is deployed in a Tyk Cloud data plane.
 	Cloud bool `json:"cloud"`
 
 	// Skip TLS verification for JWT JWKs url validation

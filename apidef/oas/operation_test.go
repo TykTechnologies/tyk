@@ -3,8 +3,6 @@ package oas
 import (
 	"context"
 	"embed"
-	"encoding/json"
-	"net/http"
 	"sort"
 	"strconv"
 	"strings"
@@ -187,16 +185,16 @@ func TestOAS_MockResponse_extractPathsAndOperations(t *testing.T) {
 			want: func(t *testing.T, ep *apidef.ExtendedPathsSet) {
 				t.Helper()
 
-				require.Len(t, ep.WhiteList, 1)
+				// Verify mock responses
+				mockResponses := ep.MockResponse
+				require.Len(t, mockResponses, 1)
 
-				mockResp := ep.WhiteList[0]
+				mockResp := mockResponses[0]
 				require.Equal(t, "/test", mockResp.Path)
 				require.Equal(t, "GET", mockResp.Method)
-				require.NotNil(t, mockResp.MethodActions["GET"])
-				require.Equal(t, apidef.Reply, mockResp.MethodActions["GET"].Action)
-				require.Equal(t, 200, mockResp.MethodActions["GET"].Code)
-				require.Equal(t, `{"message": "success"}`, mockResp.MethodActions["GET"].Data)
-				require.Equal(t, map[string]string{"Content-Type": "application/json"}, mockResp.MethodActions["GET"].Headers)
+				require.Equal(t, 200, mockResp.Code)
+				require.Equal(t, `{"message": "success"}`, mockResp.Body)
+				require.Equal(t, map[string]string{"Content-Type": "application/json"}, mockResp.Headers)
 				require.False(t, mockResp.Disabled)
 			},
 		},
@@ -249,39 +247,37 @@ func TestOAS_MockResponse_extractPathsAndOperations(t *testing.T) {
 			want: func(t *testing.T, ep *apidef.ExtendedPathsSet) {
 				t.Helper()
 
-				assert.Len(t, ep.WhiteList, 2)
+				// Verify mock responses
+				mockResponses := ep.MockResponse
+				require.Len(t, mockResponses, 2)
 
-				// Sort mock responses for consistent testing
-				sort.Slice(ep.WhiteList, func(i, j int) bool {
-					if ep.WhiteList[i].Path == ep.WhiteList[j].Path {
-						return ep.WhiteList[i].Method < ep.WhiteList[j].Method
+				// Sort for consistent testing
+				sort.Slice(mockResponses, func(i, j int) bool {
+					if mockResponses[i].Path == mockResponses[j].Path {
+						return mockResponses[i].Method < mockResponses[j].Method
 					}
-					return ep.WhiteList[i].Path < ep.WhiteList[j].Path
+					return mockResponses[i].Path < mockResponses[j].Path
 				})
 
 				// Verify GET mock response
-				getMock := ep.WhiteList[0]
+				getMock := mockResponses[0]
 				require.Equal(t, "/test", getMock.Path)
 				require.Equal(t, "GET", getMock.Method)
-				require.NotNil(t, getMock.MethodActions["GET"])
-				require.Equal(t, apidef.Reply, getMock.MethodActions["GET"].Action)
-				require.Equal(t, 200, getMock.MethodActions["GET"].Code)
-				require.Equal(t, `{"status": "ok"}`, getMock.MethodActions["GET"].Data)
-				require.Equal(t, map[string]string{"Content-Type": "application/json"}, getMock.MethodActions["GET"].Headers)
+				require.Equal(t, 200, getMock.Code)
+				require.Equal(t, `{"status": "ok"}`, getMock.Body)
+				require.Equal(t, map[string]string{"Content-Type": "application/json"}, getMock.Headers)
 				require.False(t, getMock.Disabled)
 
 				// Verify POST mock response
-				postMock := ep.WhiteList[1]
+				postMock := mockResponses[1]
 				require.Equal(t, "/test", postMock.Path)
 				require.Equal(t, "POST", postMock.Method)
-				require.NotNil(t, postMock.MethodActions["POST"])
-				require.Equal(t, apidef.Reply, postMock.MethodActions["POST"].Action)
-				require.Equal(t, 201, postMock.MethodActions["POST"].Code)
-				require.Equal(t, `{"id": "123"}`, postMock.MethodActions["POST"].Data)
+				require.Equal(t, 201, postMock.Code)
+				require.Equal(t, `{"id": "123"}`, postMock.Body)
 				require.Equal(t, map[string]string{
 					"Content-Type": "application/json",
 					"Location":     "/test/123",
-				}, postMock.MethodActions["POST"].Headers)
+				}, postMock.Headers)
 				require.False(t, postMock.Disabled)
 			},
 		},
@@ -317,14 +313,15 @@ func TestOAS_MockResponse_extractPathsAndOperations(t *testing.T) {
 			want: func(t *testing.T, ep *apidef.ExtendedPathsSet) {
 				t.Helper()
 
-				assert.Len(t, ep.WhiteList, 1)
-				mockResp := ep.WhiteList[0]
+				// Verify mock responses
+				mockResponses := ep.MockResponse
+				require.Len(t, mockResponses, 1)
+
+				mockResp := mockResponses[0]
 				require.Equal(t, "/test", mockResp.Path)
 				require.Equal(t, "GET", mockResp.Method)
-				require.NotNil(t, mockResp.MethodActions["GET"])
-				require.Equal(t, apidef.Reply, mockResp.MethodActions["GET"].Action)
-				require.Equal(t, 404, mockResp.MethodActions["GET"].Code)
-				require.Equal(t, `{"error": "not found"}`, mockResp.MethodActions["GET"].Data)
+				require.Equal(t, 404, mockResp.Code)
+				require.Equal(t, `{"error": "not found"}`, mockResp.Body)
 				require.True(t, mockResp.Disabled)
 			},
 		},
@@ -403,32 +400,32 @@ func TestOAS_MockResponse_extractPathsAndOperations(t *testing.T) {
 			want: func(t *testing.T, ep *apidef.ExtendedPathsSet) {
 				t.Helper()
 
-				assert.Len(t, ep.WhiteList, 2)
+				// Verify mock responses
+				mockResponses := ep.MockResponse
+				require.Len(t, mockResponses, 2)
 
 				// Sort for consistent testing
-				sort.Slice(ep.WhiteList, func(i, j int) bool {
-					return ep.WhiteList[i].Path < ep.WhiteList[j].Path
+				sort.Slice(mockResponses, func(i, j int) bool {
+					return mockResponses[i].Path < mockResponses[j].Path
 				})
 
 				// Verify items response
-				itemsResp := ep.WhiteList[0]
+				itemsResp := mockResponses[0]
+				require.False(t, itemsResp.Disabled)
 				require.Equal(t, "/items", itemsResp.Path)
 				require.Equal(t, "GET", itemsResp.Method)
-				require.NotNil(t, itemsResp.MethodActions["GET"])
-				require.Equal(t, apidef.Reply, itemsResp.MethodActions["GET"].Action)
-				require.Equal(t, 200, itemsResp.MethodActions["GET"].Code)
-				require.Equal(t, `["item1", "item2"]`, itemsResp.MethodActions["GET"].Data)
-				require.Equal(t, map[string]string{"Content-Type": "application/json"}, itemsResp.MethodActions["GET"].Headers)
+				require.Equal(t, 200, itemsResp.Code)
+				require.Equal(t, `["item1", "item2"]`, itemsResp.Body)
+				require.Equal(t, map[string]string{"Content-Type": "application/json"}, itemsResp.Headers)
 
 				// Verify users response
-				usersResp := ep.WhiteList[1]
+				usersResp := mockResponses[1]
+				require.False(t, usersResp.Disabled)
 				require.Equal(t, "/users", usersResp.Path)
 				require.Equal(t, "GET", usersResp.Method)
-				require.NotNil(t, usersResp.MethodActions["GET"])
-				require.Equal(t, apidef.Reply, usersResp.MethodActions["GET"].Action)
-				require.Equal(t, 200, usersResp.MethodActions["GET"].Code)
-				require.Equal(t, `["user1", "user2"]`, usersResp.MethodActions["GET"].Data)
-				require.Equal(t, map[string]string{"Content-Type": "application/json"}, usersResp.MethodActions["GET"].Headers)
+				require.Equal(t, 200, usersResp.Code)
+				require.Equal(t, `["user1", "user2"]`, usersResp.Body)
+				require.Equal(t, map[string]string{"Content-Type": "application/json"}, usersResp.Headers)
 			},
 		},
 	}
@@ -437,6 +434,10 @@ func TestOAS_MockResponse_extractPathsAndOperations(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			var ep apidef.ExtendedPathsSet
 			tt.spec.extractPathsAndOperations(&ep)
+
+			// We should ensure no AllowList is created
+			require.Len(t, ep.WhiteList, 0)
+
 			tt.want(t, &ep)
 		})
 	}
@@ -654,18 +655,10 @@ func TestOAS_MockResponse_fillMockResponsePaths(t *testing.T) {
 
 				response200 := response200Ref.Value
 				require.NotNil(t, response200, "Response value for 200 should not be nil")
-
-				// Verify content
-				mediaType := response200.Content["application/json"]
-				require.NotNil(t, mediaType)
-				require.NotNil(t, mediaType.Examples)
-
-				example := mediaType.Examples["default"]
-				require.NotNil(t, example)
-				require.Equal(t, `{"message": "success"}`, example.Value.Value)
+				require.NotNil(t, response200.Description)
 
 				// Verify headers
-				assert.Equal(t, "application/json", response200.Headers["Content-Type"].Value.Schema.Value.Example)
+				require.Nil(t, response200.Headers)
 			},
 		},
 		{
@@ -709,9 +702,8 @@ func TestOAS_MockResponse_fillMockResponsePaths(t *testing.T) {
 				require.NotNil(t, response200Ref, "Response ref for 200 should not be nil")
 
 				response200 := response200Ref.Value
-				require.NotNil(t, response200, "Response value for 200 should not be nil")
-				require.Equal(t, `{"status": "ok"}`, response200.Content["application/json"].Examples["default"].Value.Value)
-				require.Equal(t, "application/json", response200.Headers["Content-Type"].Value.Schema.Value.Example)
+				require.NotNil(t, response200, "Response value should not be nil")
+				require.NotNil(t, response200.Description)
 
 				// Verify POST operation
 				require.NotNil(t, pathItem.Post)
@@ -719,10 +711,7 @@ func TestOAS_MockResponse_fillMockResponsePaths(t *testing.T) {
 
 				postResponse := pathItem.Post.Responses["201"].Value
 				require.NotNil(t, postResponse)
-				require.NotNil(t, postResponse.Content["application/json"].Examples)
-				require.Equal(t, `{"id": "123"}`, postResponse.Content["application/json"].Examples["default"].Value.Value)
-				require.Equal(t, "application/json", postResponse.Headers["Content-Type"].Value.Schema.Value.Example)
-				require.Equal(t, "/test/123", postResponse.Headers["Location"].Value.Schema.Value.Example)
+				require.NotNil(t, postResponse.Description)
 			},
 		},
 		{
@@ -747,9 +736,7 @@ func TestOAS_MockResponse_fillMockResponsePaths(t *testing.T) {
 
 				response204 := response204Ref.Value
 				require.NotNil(t, response204, "Response value for 204 should not be nil")
-				require.NotNil(t, response204.Content["text/plain"])
-				require.NotNil(t, response204.Content["text/plain"].Examples)
-				require.Equal(t, "", response204.Content["text/plain"].Examples["default"].Value.Value)
+				require.Nil(t, response204.Content["text/plain"])
 				require.Empty(t, response204.Headers)
 			},
 		},
@@ -789,7 +776,7 @@ func TestOAS_MockResponse_fillMockResponsePaths(t *testing.T) {
 
 				usersResponse := usersPath.Get.Responses["200"].Value
 				require.NotNil(t, usersResponse)
-				require.Equal(t, `["user1", "user2"]`, usersResponse.Content["application/json"].Examples["default"].Value.Value)
+				require.NotNil(t, usersResponse.Description)
 
 				// Verify /items path
 				itemsPath := spec.Paths["/items"]
@@ -799,7 +786,7 @@ func TestOAS_MockResponse_fillMockResponsePaths(t *testing.T) {
 
 				itemsResponse := itemsPath.Get.Responses["200"].Value
 				require.NotNil(t, itemsResponse)
-				require.Equal(t, `["item1", "item2"]`, itemsResponse.Content["application/json"].Examples["default"].Value.Value)
+				require.NotNil(t, itemsResponse.Description)
 			},
 		},
 		{
@@ -842,11 +829,8 @@ func TestOAS_MockResponse_fillMockResponsePaths(t *testing.T) {
 				// Verify 200 response
 				response200 := pathItem.Get.Responses.Get(200)
 				require.NotNil(t, response200, "Response for 200 should not be nil")
-
-				mediaType200 := response200.Value.Content["application/json"]
-				require.NotNil(t, mediaType200)
-				require.NotNil(t, mediaType200.Examples)
-				require.Equal(t, `{"status": "success"}`, mediaType200.Examples["default"].Value.Value)
+				require.NotNil(t, response200.Value)
+				require.NotNil(t, response200.Value.Description)
 			},
 		},
 		{
@@ -889,20 +873,22 @@ func TestOAS_MockResponse_fillMockResponsePaths(t *testing.T) {
 				jsonPath := spec.Paths["/test"]
 				require.NotNil(t, jsonPath)
 				jsonResponse := jsonPath.Get.Responses["200"].Value
-				require.Equal(t, `{"data": "json"}`, jsonResponse.Content["application/json"].Examples["default"].Value.Value)
+				require.NotNil(t, jsonResponse)
+				require.NotNil(t, jsonResponse.Description)
 
 				// XML endpoint
 				xmlPath := spec.Paths["/test.xml"]
 				require.NotNil(t, xmlPath)
 				xmlResponse := xmlPath.Get.Responses["200"].Value
-				require.Equal(t, `<data>xml</data>`, xmlResponse.Content["application/xml"].Examples["default"].Value.Value)
+				require.NotNil(t, xmlResponse)
+				require.NotNil(t, xmlResponse.Description)
 
 				// Text endpoint
 				txtPath := spec.Paths["/test.txt"]
 				require.NotNil(t, txtPath)
-
 				txtResponse := txtPath.Get.Responses["200"].Value
-				require.Equal(t, `plain text`, txtResponse.Content["text/plain"].Examples["default"].Value.Value)
+				require.NotNil(t, txtResponse)
+				require.NotNil(t, txtResponse.Description)
 			},
 		},
 		{
@@ -930,22 +916,7 @@ func TestOAS_MockResponse_fillMockResponsePaths(t *testing.T) {
 				require.NotNil(t, pathItem)
 				response := pathItem.Get.Responses["200"].Value
 				require.NotNil(t, response)
-
-				// Verify all headers
-				expectedHeaders := map[string]string{
-					"Content-Type":      "application/json",
-					"X-Custom-Header":   "custom-value",
-					"X-Request-ID":      "123",
-					"X-Correlation-ID":  "abc",
-					"Cache-Control":     "no-cache",
-					"X-RateLimit-Limit": "100",
-				}
-
-				for header, value := range expectedHeaders {
-					headerObj := response.Headers[http.CanonicalHeaderKey(header)]
-					require.NotNil(t, headerObj, "Header %s not found", header)
-					assert.Equal(t, value, headerObj.Value.Schema.Value.Example)
-				}
+				require.NotNil(t, response.Description)
 			},
 		},
 		{
@@ -967,11 +938,11 @@ func TestOAS_MockResponse_fillMockResponsePaths(t *testing.T) {
 				pathItem := spec.Paths["/test"]
 				require.NotNil(t, pathItem)
 
-				verifyOASOperation(t, pathItem.Get, "GET", 200, `{"method":"get"}`)
-				verifyOASOperation(t, pathItem.Post, "POST", 201, `{"method":"post"}`)
-				verifyOASOperation(t, pathItem.Put, "PUT", 200, `{"method":"put"}`)
-				verifyOASOperation(t, pathItem.Patch, "PATCH", 200, `{"method":"patch"}`)
-				verifyOASOperation(t, pathItem.Delete, "DELETE", 204, ``)
+				verifyOASOperation(t, pathItem.Get, "GET", 200)
+				verifyOASOperation(t, pathItem.Post, "POST", 201)
+				verifyOASOperation(t, pathItem.Put, "PUT", 200)
+				verifyOASOperation(t, pathItem.Patch, "PATCH", 200)
+				verifyOASOperation(t, pathItem.Delete, "DELETE", 204)
 			},
 		},
 	}
@@ -1061,12 +1032,14 @@ func TestOAS_MockResponse_fillMockResponsePaths(t *testing.T) {
 					}
 					setter(spec.Paths[path], op)
 
+					var desc string
+
 					// Add response for the specific status code
 					statusCode := strconv.Itoa(mockResp.Code)
+
 					op.Responses[statusCode] = &openapi3.ResponseRef{
 						Value: &openapi3.Response{
-							Headers: make(openapi3.Headers),
-							Content: make(openapi3.Content),
+							Description: &desc,
 						},
 					}
 				}
@@ -1079,7 +1052,7 @@ func TestOAS_MockResponse_fillMockResponsePaths(t *testing.T) {
 }
 
 // Helper function to verify OpenAPI operation responses
-func verifyOASOperation(t *testing.T, op *openapi3.Operation, method string, code int, body string) {
+func verifyOASOperation(t *testing.T, op *openapi3.Operation, method string, code int) {
 	t.Helper()
 
 	require.NotNil(t, op, "Operation %s should exist", method)
@@ -1090,26 +1063,5 @@ func verifyOASOperation(t *testing.T, op *openapi3.Operation, method string, cod
 
 	response := op.Responses[statusCode].Value
 	require.NotNil(t, response)
-
-	if body != "" {
-		contentType := "text/plain" // default content type
-
-		var arrayValue []json.RawMessage
-		if err := json.Unmarshal([]byte(body), &arrayValue); err == nil {
-			contentType = "application/json"
-		}
-
-		var objectValue map[string]json.RawMessage
-		if err := json.Unmarshal([]byte(body), &objectValue); err == nil {
-			contentType = "application/json"
-		}
-
-		if ct, ok := response.Headers["Content-Type"]; ok {
-			contentType = ct.Value.Schema.Value.Example.(string)
-		}
-
-		require.NotNil(t, response.Content[contentType], "Content type %s not found", contentType)
-		require.NotNil(t, response.Content[contentType].Examples, "Examples for content type %s not found", contentType)
-		require.Equal(t, body, response.Content[contentType].Examples["default"].Value.Value)
-	}
+	require.NotNil(t, response.Description)
 }

@@ -186,6 +186,7 @@ func TestOAS_ExtractTo_ResetAPIDefinition(t *testing.T) {
 	a.EnableContextVars = false
 	a.DoNotTrack = false
 	a.IPAccessControlDisabled = false
+	a.UptimeTests.Disabled = false
 
 	// deprecated fields
 	a.Auth = apidef.AuthConfig{}

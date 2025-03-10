@@ -109,13 +109,16 @@ type Global struct {
 	// IgnoreCase contains the configuration to treat routes as case-insensitive.
 	IgnoreCase *IgnoreCase `bson:"ignoreCase,omitempty" json:"ignoreCase,omitempty"`
 
-	// SkipRateLimit determines whether the rate-limiting middleware logic should be skipped. Classic: `disable_rate_limit`.
+	// SkipRateLimit determines whether the rate-limiting middleware logic should be skipped.
+	// Tyk classic API definition: `disable_rate_limit`.
 	SkipRateLimit bool `bson:"skipRateLimit,omitempty" json:"skipRateLimit,omitempty"`
 
-	// SkipQuota determines whether quota enforcement should be bypassed. Classic: `disable_quota`.
+	// SkipQuota determines whether quota enforcement should be bypassed.
+	// Tyk classic API definition: `disable_quota`.
 	SkipQuota bool `bson:"skipQuota,omitempty" json:"skipQuota,omitempty"`
 
-	// SkipQuotaReset indicates if quota limits should not be reset when creating or updating quotas for the API. Classic: `dont_set_quota_on_create`.
+	// SkipQuotaReset indicates if quota limits should not be reset when creating or updating quotas for the API.
+	// Tyk classic API definition: `dont_set_quota_on_create`.
 	SkipQuotaReset bool `bson:"skipQuotaReset,omitempty" json:"skipQuotaReset,omitempty"`
 }
 
