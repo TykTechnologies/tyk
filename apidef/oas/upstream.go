@@ -21,28 +21,36 @@ type Upstream struct {
 	ServiceDiscovery *ServiceDiscovery `bson:"serviceDiscovery,omitempty" json:"serviceDiscovery,omitempty"`
 
 	// UptimeTests contains the configuration related to uptime tests.
+	// Tyk classic API definition: `uptime_tests` and `check_host_against_uptime_tests`.
 	UptimeTests *UptimeTests `bson:"uptimeTests,omitempty" json:"uptimeTests,omitempty"`
 
 	// MutualTLS contains the configuration for establishing a mutual TLS connection between Tyk and the upstream server.
+	// Tyk classic API definition: `upstream_certificates_disabled` and `upstream_certificates`.
 	MutualTLS *MutualTLS `bson:"mutualTLS,omitempty" json:"mutualTLS,omitempty"`
 
 	// CertificatePinning contains the configuration related to certificate pinning.
+	// Tyk classic API definition: `certificate_pinning_disabled` and `pinned_public_keys`.
 	CertificatePinning *CertificatePinning `bson:"certificatePinning,omitempty" json:"certificatePinning,omitempty"`
 
 	// RateLimit contains the configuration related to API level rate limit.
+	// Tyk classic API definition: `global_rate_limit`.
 	RateLimit *RateLimit `bson:"rateLimit,omitempty" json:"rateLimit,omitempty"`
 
 	// Authentication contains the configuration related to upstream authentication.
+	// Tyk classic API definition: `upstream_auth`.
 	Authentication *UpstreamAuth `bson:"authentication,omitempty" json:"authentication,omitempty"`
 
 	// LoadBalancing contains configuration for load balancing between multiple upstream targets.
+	// Tyk classic API definition: `proxy.enable_load_balancing` and `proxy.targets`.
 	LoadBalancing *LoadBalancing `bson:"loadBalancing,omitempty" json:"loadBalancing,omitempty"`
 
 	// PreserveHostHeader contains the configuration for preserving the host header.
+	// Tyk classic API definition: `proxy.preserve_host_header`.
 	PreserveHostHeader *PreserveHostHeader `bson:"preserveHostHeader,omitempty" json:"preserveHostHeader,omitempty"`
 
 	// PreserveTrailingSlash controls whether Tyk preserves trailing slashes in URLs when proxying
 	// requests to upstream services. When enabled, URLs like "/users/" will retain the trailing slash.
+	// Tyk classic API definition: `proxy.disable_strip_slash`.
 	PreserveTrailingSlash *PreserveTrailingSlash `bson:"preserveTrailingSlash,omitempty" json:"preserveTrailingSlash,omitempty"`
 
 	// TLSTransport contains the configuration for TLS transport settings.
@@ -1229,6 +1237,7 @@ func (u *UpstreamOAuth) ExtractTo(api *apidef.UpstreamOAuth) {
 }
 
 // UpstreamRequestSigning represents configuration for generating signed requests to an upstream API.
+// Tyk classic API definition: `request_signing`.
 type UpstreamRequestSigning struct {
 	// Enabled determines if request signing is enabled or disabled.
 	Enabled bool `bson:"enabled" json:"enabled"` // required
