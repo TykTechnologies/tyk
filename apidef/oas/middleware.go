@@ -717,6 +717,9 @@ type Cache struct {
 
 // Fill fills *Cache from apidef.CacheOptions.
 func (c *Cache) Fill(cache apidef.CacheOptions) {
+	// TODO(TT-14102): Add test for this
+	const defaultCacheTimeout = 60
+
 	c.Enabled = cache.EnableCache
 	c.Timeout = cache.CacheTimeout
 	c.CacheAllSafeRequests = cache.CacheAllSafeRequests
@@ -724,6 +727,11 @@ func (c *Cache) Fill(cache apidef.CacheOptions) {
 	c.CacheByHeaders = cache.CacheByHeaders
 	c.EnableUpstreamCacheControl = cache.EnableUpstreamCacheControl
 	c.ControlTTLHeaderName = cache.CacheControlTTLHeader
+
+	// TODO(TT-14102): Add test for this
+	if c.Timeout == 0 {
+		c.Timeout = defaultCacheTimeout
+	}
 }
 
 // ExtractTo extracts *Cache into *apidef.CacheOptions.
