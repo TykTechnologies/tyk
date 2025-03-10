@@ -684,9 +684,14 @@ func (pwl *PortsWhiteList) Decode(value string) error {
 	return nil
 }
 
-// StreamingConfig is for configuring tyk streaming
+// StreamingConfig holds the configuration for Tyk Streaming functionalities
 type StreamingConfig struct {
-	Enabled     bool     `json:"enabled"`
+	// This flag enables the Tyk Streaming feature.
+	Enabled bool `json:"enabled"`
+	// AllowUnsafe specifies a list of potentially unsafe streaming components that should be allowed in the configuration.
+	// By default, components that could pose security risks (like file access, subprocess execution, socket operations, etc.)
+	// are filtered out. This field allows administrators to explicitly permit specific unsafe components when needed.
+	// Use with caution as enabling unsafe components may introduce security vulnerabilities.
 	AllowUnsafe []string `json:"allow_unsafe"`
 }
 
@@ -1172,6 +1177,7 @@ type Config struct {
 	// OAS holds the configuration for various OpenAPI-specific functionalities
 	OAS OASConfig `json:"oas_config"`
 
+	// Streaming holds the configuration for Tyk Streaming functionalities
 	Streaming StreamingConfig `json:"streaming"`
 
 	Labs LabsConfig `json:"labs"`
