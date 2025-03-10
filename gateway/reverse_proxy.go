@@ -16,6 +16,7 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"io"
@@ -24,6 +25,7 @@ import (
 	"net/http"
 	"net/textproto"
 	"net/url"
+	"path"
 	"strconv"
 	"strings"
 	"sync"
@@ -37,6 +39,7 @@ import (
 	"golang.org/x/net/http/httpguts"
 	"golang.org/x/net/http2"
 
+	"github.com/TykTechnologies/tyk-pump/analytics"
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/ctx"
 	"github.com/TykTechnologies/tyk/header"
@@ -1539,36 +1542,475 @@ func (p *ReverseProxy) handleUpgradeResponse(rw http.ResponseWriter, req *http.R
 	defer conn.Close()
 	res.Body = nil // so res.Write only writes the headers; we have res.Body in backConn above
 	if err := res.Write(brw); err != nil {
+		res.Body = io.NopCloser(strings.NewReader(""))
 		return fmt.Errorf("response write: %w", err)
 	}
 	if err := brw.Flush(); err != nil {
+		res.Body = io.NopCloser(strings.NewReader(""))
 		return fmt.Errorf("response flush: %w", err)
 	}
-	errc := make(chan error, 1)
-	spc := switchProtocolCopier{user: conn, backend: backConn}
-	go spc.copyToBackend(errc)
-	go spc.copyFromBackend(errc)
-	<-errc
 
-	res.Body = ioutil.NopCloser(strings.NewReader(""))
+	// Wrap the user connection with tapReader
+	userTap, err := NewTap(conn, conn, true, req, p.Gw, p.TykAPISpec)
+	if err != nil {
+		return fmt.Errorf("failed to create user tap reader: %w", err)
+	}
+
+	// Wrap the backend connection with tapReader if needed
+	backendTap, err := NewTap(backConn, backConn, false, req, p.Gw, p.TykAPISpec)
+	if err != nil {
+		return fmt.Errorf("failed to create backend tap reader: %w", err)
+	}
+
+	// Start copying data between user and backend
+	errc := make(chan error, 2)
+	go func() {
+		_, err := io.Copy(backendTap, userTap)
+		errc <- err
+	}()
+	go func() {
+		_, err := io.Copy(userTap, backendTap)
+		errc <- err
+	}()
+
+	select {
+	case err := <-errc:
+		log.Error("Websocket error: ", err)
+		if _, ok := err.(*RateLimitError); ok {
+			// statusCode := 4000
+			// reason := rateLimitErr.Message
+
+			// switch reason {
+			// case "Rate limit exceeded":
+			// 	statusCode = 4000
+			// case "Quota exceeded":
+			// 	statusCode = 4001
+			// case "Access denied":
+			// 	statusCode = 4003
+			// }
+
+			userTap.sendCloseFrame()
+			backendTap.sendCloseFrame()
+
+			// Close the connection
+			conn.Close()
+		}
+	}
+
+	res.Body = io.NopCloser(strings.NewReader(""))
 
 	return nil
 }
 
-// switchProtocolCopier exists so goroutines proxying data back and
-// forth have nice names in stacks.
-type switchProtocolCopier struct {
-	user, backend io.ReadWriter
+var errIncompleteFrame = errors.New("incomplete frame")
+
+// Implement a tapReader that reads from the connection and allows inspection
+type tap struct {
+	reader       io.Reader // The underlying reader, if any
+	writer       io.Writer // The underlying writer, if any
+	isClient     bool
+	gw           *Gateway
+	req          *http.Request
+	spec         *APISpec
+	session      *user.SessionState
+	rateLimitKey string
+	quotaKey     string
+	buffer       []byte
+
+	shouldDiscardMessage bool
+
+	// New fields for handling fragmentation
+	fragmentedPayload []byte // Accumulates payloads for fragmented messages
+	fragmentedOpcode  byte   // Stores the opcode of the fragmented message
+	isFragmented      bool   // Indicates if we are currently processing a fragmented message
 }
 
-func (c switchProtocolCopier) copyFromBackend(errc chan<- error) {
-	_, err := io.Copy(c.user, c.backend)
-	errc <- err
+func NewTap(reader io.Reader, writer io.Writer, isClient bool, req *http.Request, gw *Gateway, spec *APISpec) (*tap, error) {
+	session := ctxGetSession(req)
+	rateLimitKey := ctxGetAuthToken(req)
+	quotaKey := ""
+
+	if session == nil {
+		return nil, errors.New("There is no session and limits found")
+	}
+
+	if pattern, found := session.MetaData["rate_limit_pattern"]; found {
+		if patternString, ok := pattern.(string); ok && patternString != "" {
+			if customKeyValue := gw.replaceTykVariables(req, patternString, false); customKeyValue != "" {
+				rateLimitKey = customKeyValue
+				quotaKey = customKeyValue
+			}
+		}
+	}
+
+	return &tap{
+		reader:       reader,
+		writer:       writer,
+		isClient:     isClient,
+		req:          req,
+		gw:           gw,
+		spec:         spec,
+		session:      session,
+		rateLimitKey: rateLimitKey,
+		quotaKey:     quotaKey,
+	}, nil
 }
 
-func (c switchProtocolCopier) copyToBackend(errc chan<- error) {
-	_, err := io.Copy(c.backend, c.user)
-	errc <- err
+func (t *tap) Read(p []byte) (int, error) {
+	if t.reader == nil {
+		return 0, errors.New("no underlying reader")
+	}
+
+	n, err := t.reader.Read(p)
+	if n > 0 {
+		data := make([]byte, n)
+		copy(data, p[:n])
+		if rateErr := t.processData(data, "read"); rateErr != nil {
+			if _, ok := rateErr.(*RateLimitError); ok {
+				return n, rateErr
+			}
+		}
+	}
+
+	return n, err
+}
+
+// Implement the Write method for tap
+func (t *tap) Write(p []byte) (int, error) {
+	if t.writer == nil {
+		return 0, errors.New("no underlying writer")
+	}
+
+	if len(p) > 0 {
+		data := make([]byte, len(p))
+		copy(data, p)
+		if rateErr := t.processData(data, "write"); rateErr != nil {
+			if _, ok := rateErr.(*RateLimitError); ok {
+				return 0, rateErr
+			}
+		}
+	}
+
+	if t.shouldDiscardMessage {
+		return len(p), nil
+	}
+
+	return t.writer.Write(p)
+}
+
+func (t *tap) processData(data []byte, action string) error {
+	t.buffer = append(t.buffer, data...)
+	for {
+		opcode, payload, fin, rest, err := parseFrame(t.buffer, t.isClient)
+		if err != nil {
+			if err == errIncompleteFrame {
+				// Not enough data to parse a full frame, wait for more data
+				break
+			}
+			log.Printf("Error parsing frame: %v", err)
+			return err
+		}
+
+		if opcode == 0x8 { // Close frame
+			return io.EOF
+		}
+
+		if opcode == 0x9 || opcode == 0xA { // Ping/Pong frames
+			// Handle control frames if necessary
+			// For now, we can skip processing these frames
+		} else {
+			if t.isFragmented {
+				if opcode != 0x0 {
+					// Unexpected new message while processing fragmented message
+					log.Printf("Received new message opcode %d while processing fragmented message", opcode)
+					return fmt.Errorf("unexpected new message during fragmented message")
+				}
+				// Continuation frame
+				t.fragmentedPayload = append(t.fragmentedPayload, payload...)
+			} else {
+				if opcode == 0x0 {
+					// Unexpected continuation frame without starting fragmentation
+					log.Printf("Received continuation frame without starting fragmented message")
+					return fmt.Errorf("unexpected continuation frame")
+				}
+				if fin {
+					// Single-frame message
+					shouldForward, err := t.handleMessage(opcode, payload, action)
+					if err != nil {
+						return err
+					}
+					if !shouldForward {
+						// Do not forward the message
+						// Remove the message data from the buffer
+						t.buffer = rest
+						continue
+					}
+					// else, proceed to forwarding
+				} else {
+					// Start of a fragmented message
+					t.isFragmented = true
+					t.fragmentedOpcode = opcode
+					t.fragmentedPayload = append(t.fragmentedPayload, payload...)
+				}
+			}
+
+			if fin {
+				if t.isFragmented {
+					// End of fragmented message
+					shouldForward, err := t.handleMessage(t.fragmentedOpcode, t.fragmentedPayload, action)
+					if err != nil {
+						return err
+					}
+					if !shouldForward {
+						// Do not forward the message
+						// Remove the message data from the buffer
+						t.isFragmented = false
+						t.fragmentedOpcode = 0
+						t.fragmentedPayload = nil
+						t.buffer = rest
+						continue
+					}
+					// Reset fragmentation state
+					t.isFragmented = false
+					t.fragmentedOpcode = 0
+					t.fragmentedPayload = nil
+				}
+				// else: fin is true for a single-frame message, already handled above
+			}
+		}
+
+		// Move to the next frame and clear processed data from buffer
+		t.buffer = rest
+		if len(rest) == 0 {
+			t.buffer = t.buffer[:0] // Clear the buffer when fully processed
+			break
+		}
+	}
+	return nil
+}
+
+func (t *tap) handleMessage(opcode byte, payload []byte, action string) (bool, error) {
+	// Apply rate limiting or other processing as needed
+	if t.isClient && action == "write" && t.gw.GetConfig().Streaming.EnableWebSocketRateLimiting {
+		err := t.applyRateLimiting()
+		if err != nil {
+			if rateErr, ok := err.(*RateLimitError); ok {
+				t.shouldDiscardMessage = true
+				if t.gw.GetConfig().Streaming.EnableWebSocketCloseOnRateLimit {
+					// Return the error to terminate the connection
+					return false, rateErr
+				} else {
+					// Write error message back to the user
+					t.writeErrorMessage(`{"error": "` + rateErr.Error() + `"}`)
+					// Do not forward the message to the backend
+					// Return false to indicate that the message should not be forwarded
+					return false, nil
+				}
+			} else {
+				// Return other errors
+				return false, err
+			}
+		} else {
+			t.shouldDiscardMessage = false
+		}
+	}
+
+	// If detailed recording is enabled, record the message
+	if t.gw.GetConfig().Streaming.EnableWebSocketDetailedRecording {
+		handler := SuccessHandler{&BaseMiddleware{Spec: t.spec, Gw: t.gw}}
+		latency := analytics.Latency{
+			Total:    0, // We don't have timing information in this context
+			Upstream: 0, // We don't have upstream latency information in this context
+		}
+		reqCopy := t.req.Clone(t.req.Context())
+		respCopy := &http.Response{
+			StatusCode: 200,
+			Header:     make(http.Header),
+		}
+
+		if t.isClient {
+			reqCopy.URL.Path = path.Join(reqCopy.URL.Path, "sent")
+			reqCopy.Body = io.NopCloser(bytes.NewBuffer(payload))
+			reqCopy.ContentLength = int64(len(payload))
+			reqCopy.Header.Set("Content-Length", strconv.FormatInt(int64(len(payload)), 10))
+
+			respCopy.Header.Set("Content-Length", strconv.FormatInt(0, 10))
+			respCopy.Body = io.NopCloser(strings.NewReader(""))
+			respCopy.ContentLength = 0
+		} else {
+			reqCopy.URL.Path = path.Join(reqCopy.URL.Path, "received")
+			respCopy.Body = io.NopCloser(bytes.NewBuffer(payload))
+			respCopy.ContentLength = int64(len(payload))
+			respCopy.Header.Set("Content-Length", strconv.FormatInt(int64(len(payload)), 10))
+
+			reqCopy.Header.Set("Content-Length", strconv.FormatInt(0, 10))
+			reqCopy.Body = io.NopCloser(strings.NewReader(""))
+			reqCopy.ContentLength = 0
+		}
+
+		handler.RecordHit(reqCopy, latency, 200, respCopy, false)
+	}
+
+	// Return true to indicate that the message should be forwarded
+	return true, nil
+}
+
+// Implement the writeErrorMessage method in the tap struct:
+func (t *tap) writeErrorMessage(msg string) {
+	opcode := byte(0x1) // Text frame
+	fin := byte(0x80)
+	payload := []byte(msg)
+	header := []byte{fin | opcode}
+
+	payloadLen := len(payload)
+	if payloadLen <= 125 {
+		header = append(header, byte(payloadLen))
+	} else if payloadLen <= 65535 {
+		header = append(header, 126)
+		extendedPayloadLen := make([]byte, 2)
+		binary.BigEndian.PutUint16(extendedPayloadLen, uint16(payloadLen))
+		header = append(header, extendedPayloadLen...)
+	} else {
+		header = append(header, 127)
+		extendedPayloadLen := make([]byte, 8)
+		binary.BigEndian.PutUint64(extendedPayloadLen, uint64(payloadLen))
+		header = append(header, extendedPayloadLen...)
+	}
+	frame := append(header, payload...)
+
+	// Write the error message frame to the client
+	if t.writer != nil {
+		t.writer.Write(frame)
+	}
+}
+
+func (t *tap) applyRateLimiting() error {
+	reason := t.gw.SessionLimiter.ForwardMessage(
+		t.req,
+		t.session,
+		t.rateLimitKey,
+		t.quotaKey,
+		t.gw.GlobalSessionManager.Store(),
+		!t.spec.DisableRateLimit,
+		!t.spec.DisableQuota,
+		t.spec,
+		false, // Not a dry run
+	)
+
+	switch reason {
+	case sessionFailNone:
+		return nil
+	case sessionFailRateLimit:
+		return &RateLimitError{Message: "rate limit exceeded"}
+	case sessionFailQuota:
+		return &RateLimitError{Message: "quota exceeded"}
+	default:
+		return &RateLimitError{Message: "access denied"}
+	}
+}
+
+// Implement sendCloseFrame to send a close frame to the peer
+func (t *tap) sendCloseFrame() {
+	// Construct the close frame
+	closeCode := 4000 // Customize the close code as needed
+	payload := make([]byte, 2)
+	binary.BigEndian.PutUint16(payload, uint16(closeCode))
+
+	opcode := byte(0x8) // Close opcode
+	fin := byte(0x80)
+	header := []byte{fin | opcode}
+
+	payloadLen := len(payload)
+	if payloadLen <= 125 {
+		header = append(header, byte(payloadLen))
+	} else if payloadLen <= 65535 {
+		header = append(header, 126)
+		extendedPayloadLen := make([]byte, 2)
+		binary.BigEndian.PutUint16(extendedPayloadLen, uint16(payloadLen))
+		header = append(header, extendedPayloadLen...)
+	} else {
+		header = append(header, 127)
+		extendedPayloadLen := make([]byte, 8)
+		binary.BigEndian.PutUint64(extendedPayloadLen, uint64(payloadLen))
+		header = append(header, extendedPayloadLen...)
+	}
+	frame := append(header, payload...)
+
+	// Write the close frame to the underlying writer
+	if t.writer != nil {
+		t.writer.Write(frame)
+		if closer, ok := t.writer.(io.Closer); ok {
+			closer.Close()
+		}
+	} else if t.reader != nil {
+		// Close the underlying reader if possible
+		if closer, ok := t.reader.(io.Closer); ok {
+			closer.Close()
+		}
+	}
+}
+
+func parseFrame(data []byte, isClient bool) (opcode byte, payload []byte, fin bool, rest []byte, err error) {
+	// Ensure we have enough data for the header
+	if len(data) < 2 {
+		return 0, nil, false, data, errIncompleteFrame
+	}
+
+	fin = data[0]&0x80 != 0
+	opcode = data[0] & 0x0F
+	masked := data[1]&0x80 != 0
+	payloadLen := int(data[1] & 0x7F)
+
+	offset := 2
+
+	if payloadLen == 126 {
+		if len(data) < offset+2 {
+			return 0, nil, false, data, errIncompleteFrame
+		}
+		payloadLen = int(binary.BigEndian.Uint16(data[offset : offset+2]))
+		offset += 2
+	} else if payloadLen == 127 {
+		if len(data) < offset+8 {
+			return 0, nil, false, data, errIncompleteFrame
+		}
+		payloadLen = int(binary.BigEndian.Uint64(data[offset : offset+8]))
+		offset += 8
+	}
+
+	var maskingKey []byte
+	if masked {
+		if len(data) < offset+4 {
+			return 0, nil, false, data, errIncompleteFrame
+		}
+		maskingKey = data[offset : offset+4]
+		offset += 4
+	}
+
+	if len(data) < offset+payloadLen {
+		return 0, nil, false, data, errIncompleteFrame
+	}
+
+	payload = data[offset : offset+payloadLen]
+
+	// Unmask the payload if necessary
+	if masked {
+		for i := 0; i < payloadLen; i++ {
+			payload[i] ^= maskingKey[i%4]
+		}
+	}
+
+	rest = data[offset+payloadLen:]
+
+	return opcode, payload, fin, rest, nil
+}
+
+// RateLimitError represents an error due to rate limiting
+type RateLimitError struct {
+	Message string
+}
+
+func (e *RateLimitError) Error() string {
+	return e.Message
 }
 
 type writeFlusher interface {

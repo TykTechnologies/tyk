@@ -1544,6 +1544,92 @@ func TestWebsocketsAndHTTPEndpointMatch(t *testing.T) {
 	})
 }
 
+func TestWebsocketsWithRateLimit(t *testing.T) {
+	ts := StartTest(nil)
+	t.Cleanup(ts.Close)
+
+	globalConf := ts.Gw.GetConfig()
+	globalConf.HttpServerOptions.EnableWebSockets = true
+	globalConf.Streaming.EnableWebSocketRateLimiting = true
+	ts.Gw.SetConfig(globalConf)
+
+	// Create a session with a rate limit of 5 requests per 5 seconds
+	session := CreateSession(ts.Gw, func(s *user.SessionState) {
+		s.Rate = 5
+		s.Per = 1
+		s.QuotaMax = -1
+	})
+
+	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		spec.Proxy.ListenPath = "/"
+		spec.UseKeylessAccess = false
+	})
+
+	baseURL := strings.Replace(ts.URL, "http://", "ws://", -1)
+
+	// Function to create a new WebSocket connection
+	dialWS := func() (*websocket.Conn, *http.Response, error) {
+		headers := http.Header{"Authorization": {session}}
+		return websocket.DefaultDialer.Dial(baseURL+"/ws", headers)
+	}
+
+	conn, _, err := dialWS()
+	if err != nil {
+		t.Fatalf("cannot make websocket connection: %v", err)
+	}
+	defer conn.Close()
+
+	// Connect and send messages within rate limit
+	for i := 0; i < 4; i++ {
+		err = conn.WriteMessage(websocket.TextMessage, []byte(fmt.Sprintf("test message %d", i+1)))
+		if err != nil {
+			t.Fatalf("cannot write message: %v", err)
+		}
+		_, p, err := conn.ReadMessage()
+		if err != nil {
+			t.Fatalf("cannot read message: %v, %d", err, i)
+		}
+		if !strings.Contains(string(p), fmt.Sprintf("test message %d", i+1)) {
+			t.Errorf("Unexpected reply: %s", string(p))
+		}
+	}
+
+	err = conn.WriteMessage(websocket.TextMessage, []byte("exceeding rate limit"))
+	if err != nil {
+		t.Fatalf("cannot write message: %v", err)
+	}
+
+	_, _, err = conn.ReadMessage()
+	if err == nil {
+		t.Errorf("Expected rate limit error, got no error")
+	} else if !websocket.IsCloseError(err, 4000) {
+		t.Errorf("Expected rate limit error (code 4000), got: %v", err)
+	}
+
+	// Wait for rate limit to reset
+	time.Sleep(1 * time.Second)
+
+	// Should be able to connect and send message again
+	conn, _, err = dialWS()
+	if err != nil {
+		t.Fatalf("cannot make websocket connection after rate limit reset: %v", err)
+	}
+	defer conn.Close()
+
+	err = conn.WriteMessage(websocket.TextMessage, []byte("after rate limit reset"))
+	if err != nil {
+		t.Fatalf("cannot write message after rate limit reset: %v", err)
+	}
+
+	_, p, err := conn.ReadMessage()
+	if err != nil {
+		t.Fatalf("cannot read message after rate limit reset: %v", err)
+	}
+	if !strings.Contains(string(p), "after rate limit reset") {
+		t.Errorf("Unexpected reply after rate limit reset: %s", string(p))
+	}
+}
+
 func createTestUptream(t *testing.T, allowedConns int, readsPerConn int) net.Listener {
 	l, _ := net.Listen("tcp", "127.0.0.1:0")
 	go func() {
