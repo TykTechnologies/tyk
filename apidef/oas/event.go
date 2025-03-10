@@ -23,14 +23,24 @@ const (
 // EventHandler holds information about individual event to be configured on the API.
 type EventHandler struct {
 	// Enabled enables the event handler.
+	//
+	// Tyk classic API definition: `event_handlers.events[].handler_meta.disabled` (negated).
 	Enabled bool `json:"enabled" bson:"enabled"`
 	// Trigger specifies the TykEvent that should trigger the event handler.
+	//
+	// Tyk classic API definition: `event_handlers.events` key.
 	Trigger event.Event `json:"trigger" bson:"trigger"`
 	// Kind specifies the action to be taken on the event trigger.
+	//
+	// Tyk classic API definition: `event_handlers.events[].handler`.
 	Kind Kind `json:"type" bson:"type"` // json tag is changed as per contract
 	// ID is the ID of event handler in storage.
+	//
+	// Tyk classic API definition: `event_handlers.events[].handler_meta.id`.
 	ID string `json:"id,omitempty" bson:"id,omitempty"`
 	// Name is the name of event handler.
+	//
+	// Tyk classic API definition: `event_handlers.events[].handler_meta.name`.
 	Name string `json:"name,omitempty" bson:"name,omitempty"`
 
 	// Webhook contains WebhookEvent configs. Encoding and decoding is handled by the custom marshaller.
@@ -109,8 +119,12 @@ func (e *EventHandler) UnmarshalJSON(in []byte) error {
 // WebhookEvent stores the core information about a webhook event.
 type WebhookEvent struct {
 	// URL is the target URL for the webhook.
+	//
+	// Tyk classic API definition: `event_handlers.events[].handler_meta.target_path`.
 	URL string `json:"url" bson:"url"`
 	// Method is the HTTP method for the webhook.
+	//
+	// Tyk classic API definition: `event_handlers.events[].handler_meta.method`.
 	Method string `json:"method" bson:"method"`
 	// CoolDownPeriod defines cool-down for the event, so it does not trigger again.
 	// It uses shorthand notation.
@@ -128,10 +142,16 @@ type WebhookEvent struct {
 	// An empty value is interpreted as "0s", implying no cool-down.
 	// It's important to format the string correctly, as invalid formats will
 	// be considered as 0s/empty.
+	//
+	// Tyk classic API definition: `event_handlers.events[].handler_meta.event_timeout`.
 	CoolDownPeriod ReadableDuration `json:"cooldownPeriod" bson:"cooldownPeriod"`
 	// BodyTemplate is the template to be used for request payload.
+	//
+	// Tyk classic API definition: `event_handlers.events[].handler_meta.template_path`.
 	BodyTemplate string `json:"bodyTemplate,omitempty" bson:"bodyTemplate,omitempty"`
 	// Headers are the list of request headers to be used.
+	//
+	// Tyk classic API definition: `event_handlers.events[].handler_meta.header_map`.
 	Headers Headers `json:"headers,omitempty" bson:"headers,omitempty"`
 }
 
@@ -152,8 +172,12 @@ func (e *EventHandler) GetWebhookConf() apidef.WebHookHandlerConf {
 // JSVMEvent represents a JavaScript VM event configuration for event handlers.
 type JSVMEvent struct {
 	// FunctionName specifies the JavaScript function name to be executed.
+	//
+	// Tyk classic API definition: `event_handlers.events[].handler_meta.method_name`.
 	FunctionName string `json:"functionName" bson:"functionName"`
 	// Path specifies the path to the JavaScript file containing the function.
+	//
+	// Tyk classic API definition: `event_handlers.events[].handler_meta.path`.
 	Path string `json:"path" bson:"path"`
 }
 
@@ -170,6 +194,8 @@ func (e *EventHandler) GetJSVMEventHandlerConf() apidef.JSVMEventHandlerConf {
 // LogEvent represents the configuration for logging events within an event handler.
 type LogEvent struct {
 	// LogPrefix defines the prefix used for log messages in the logging event.
+	//
+	// Tyk classic API definition: `event_handlers.events[].handler_meta.prefix`.
 	LogPrefix string `json:"logPrefix" bson:"logPrefix"`
 }
 

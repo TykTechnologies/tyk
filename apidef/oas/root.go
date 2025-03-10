@@ -71,6 +71,7 @@ type Info struct {
 	// Tyk classic API definition: `name`
 	Name string `bson:"name" json:"name"` // required
 	// Expiration date.
+	// Tyk classic API definition: `expiration`
 	Expiration string `bson:"expiration,omitempty" json:"expiration,omitempty"`
 	// State holds configuration for API definition states (active, internal).
 	State State `bson:"state" json:"state"` // required
@@ -225,6 +226,7 @@ func (v *Versioning) ExtractTo(api *apidef.APIDefinition) {
 }
 
 // VersionToID contains a single mapping from a version name into an API ID.
+// Tyk classic API definition: Entry in `version_definition.versions` map.
 type VersionToID struct {
 	// Name contains the user chosen version name, e.g. `v1` or similar.
 	Name string `bson:"name" json:"name"`
