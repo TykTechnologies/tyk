@@ -1121,19 +1121,19 @@ func (tm *TransformRequestMethod) ExtractTo(meta *apidef.MethodTransformMeta) {
 type TransformBody struct {
 	// Enabled activates transform request/request body middleware.
 	//
-	// Tyk classic API definition: `version_data.versions.extended_paths.transform[].disabled` (negated).
+	// Tyk classic API definition: `version_data.versions..extended_paths.transform[].disabled` (negated).
 	Enabled bool `bson:"enabled" json:"enabled"`
 	// Format of the request/response body, xml or json.
 	//
-	// Tyk classic API definition: `version_data.versions.extended_paths.transform[].template_data.input_type`.
+	// Tyk classic API definition: `version_data.versions..extended_paths.transform[].template_data.input_type`.
 	Format apidef.RequestInputType `bson:"format" json:"format"`
 	// Path file path for the template.
 	//
-	// Tyk classic API definition: `version_data.versions.extended_paths.transform[].template_data.template_source` when `template_data.template_mode` is `file`.
+	// Tyk classic API definition: `version_data.versions..extended_paths.transform[].template_data.template_source` when `template_data.template_mode` is `file`.
 	Path string `bson:"path,omitempty" json:"path,omitempty"`
 	// Body base64 encoded representation of the template.
 	//
-	// Tyk classic API definition: `version_data.versions.extended_paths.transform[].template_data.template_source` when `template_data.template_mode` is `blob`.
+	// Tyk classic API definition: `version_data.versions..extended_paths.transform[].template_data.template_source` when `template_data.template_mode` is `blob`.
 	Body string `bson:"body,omitempty" json:"body,omitempty"`
 }
 
@@ -1268,26 +1268,31 @@ func (et *EnforceTimeout) ExtractTo(meta *apidef.HardTimeoutMeta) {
 
 // CustomPlugin configures custom plugin.
 type CustomPlugin struct {
-	// Enabled activates the custom pre plugin.
+	// Enabled activates the custom plugin.
 	//
-	// Tyk classic API definition: `custom_middleware.pre[].disabled` (negated).
+	// Tyk classic API definition: `custom_middleware.pre[].disabled`, `custom_middleware.post_key_auth[].disabled`,
+	// `custom_middleware.post[].disabled`, `custom_middleware.response[].disabled` (negated).
 	Enabled bool `bson:"enabled" json:"enabled"` // required.
 	// FunctionName is the name of authentication method.
 	//
-	// Tyk classic API definition: `custom_middleware.pre[].name`.
+	// Tyk classic API definition: `custom_middleware.pre[].name`, `custom_middleware.post_key_auth[].name`,
+	// `custom_middleware.post[].name`, `custom_middleware.response[].name`.
 	FunctionName string `bson:"functionName" json:"functionName"` // required.
 	// Path is the path to shared object file in case of goplugin mode or path to JS code in case of otto auth plugin.
 	//
-	// Tyk classic API definition: `custom_middleware.pre[].path`.
+	// Tyk classic API definition: `custom_middleware.pre[].path`, `custom_middleware.post_key_auth[].path`,
+	// `custom_middleware.post[].path`, `custom_middleware.response[].path`.
 	Path string `bson:"path" json:"path"`
 	// RawBodyOnly if set to true, do not fill body in request or response object.
 	//
-	// Tyk classic API definition: `custom_middleware.pre[].raw_body_only`.
+	// Tyk classic API definition: `custom_middleware.pre[].raw_body_only`, `custom_middleware.post_key_auth[].raw_body_only`,
+	// `custom_middleware.post[].raw_body_only`, `custom_middleware.response[].raw_body_only`.
 	RawBodyOnly bool `bson:"rawBodyOnly,omitempty" json:"rawBodyOnly,omitempty"`
 	// RequireSession if set to true passes down the session information for plugins after authentication.
 	// RequireSession is used only with JSVM custom middleware.
 	//
-	// Tyk classic API definition: `custom_middleware.pre[].require_session`.
+	// Tyk classic API definition: `custom_middleware.pre[].require_session`, `custom_middleware.post_key_auth[].require_session`,
+	// `custom_middleware.post[].require_session`, `custom_middleware.response[].require_session`.
 	RequireSession bool `bson:"requireSession,omitempty" json:"requireSession,omitempty"`
 }
 
@@ -1545,18 +1550,18 @@ type EndpointPostPlugins []EndpointPostPlugin
 type EndpointPostPlugin struct {
 	// Enabled activates post plugin.
 	//
-	// Tyk classic API definition: `custom_middleware.go_plugin.disabled` (negated).
+	// Tyk classic API definition: `version_data.versions..extended_paths.go_plugin.disabled`(negated).
 	Enabled bool `bson:"enabled" json:"enabled"` // required.
 	// Name is the name of plugin function to be executed.
 	// Deprecated: Use FunctionName instead.
 	Name string `bson:"name,omitempty" json:"name,omitempty"`
 	// FunctionName is the name of plugin function to be executed.
 	//
-	// Tyk classic API definition: `custom_middleware.go_plugin.symbol_name`.
+	// Tyk classic API definition: `version_data.versions..extended_paths.go_plugin.symbol_name`(negated).
 	FunctionName string `bson:"functionName" json:"functionName"` // required.
 	// Path is the path to plugin.
 	//
-	// Tyk classic API definition: `custom_middleware.go_plugin.plugin_path`.
+	// Tyk classic API definition: `version_data.versions..extended_paths.go_plugin.plugin_path`(negated).
 	Path string `bson:"path" json:"path"` // required.
 }
 
