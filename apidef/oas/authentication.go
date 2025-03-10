@@ -65,7 +65,7 @@ type Authentication struct {
 
 // CustomKeyLifetime contains configuration for custom key retention.
 type CustomKeyLifetime struct {
-	// Enabled enables custom maximum retention for keys for the API
+	// Enabled enables custom maximum retention for keys for the API.
 	Enabled bool `bson:"enabled,omitempty" json:"enabled,omitempty"`
 	// Value configures the expiry interval for a Key.
 	// The value is a string that specifies the interval in a compact form,
@@ -528,14 +528,14 @@ type ScopeToPolicy struct {
 	//
 	// Tyk classic API definition:
 	// - For OIDC: Key in `scopes.oidc.scope_to_policy` map
-	// - For JWT: Key in `scopes.jwt.scope_to_policy` map
+	// - For JWT: Key in `scopes.jwt.scope_to_policy` map.
 	Scope string `bson:"scope,omitempty" json:"scope,omitempty"`
 
 	// PolicyID contains the Policy ID.
 	//
 	// Tyk classic API definition:
 	// - For OIDC: Value in `scopes.oidc.scope_to_policy` map
-	// - For JWT: Value in `scopes.jwt.scope_to_policy` map
+	// - For JWT: Value in `scopes.jwt.scope_to_policy` map.
 	PolicyID string `bson:"policyId,omitempty" json:"policyId,omitempty"`
 }
 
