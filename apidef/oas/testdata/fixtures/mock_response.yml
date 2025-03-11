@@ -33,23 +33,8 @@ tests:
         versions:
           "":
             extended_paths:
-<<<<<<< HEAD
-              white_list:
-                - disabled: false
-                  path: "/test"
-                  method: "GET"
-                  ignore_case: false
-                  method_actions:
-                    GET:
-                      action: "reply"
-                      code: 200
-                      headers:
-                        Content-Type: "application/json"
-                      data: '{"message": "success"}'
-=======
               mock_response: <nil>
               white_list: <nil>
->>>>>>> a145dbd4d... [TT-7306] Ensure ignoreAuthentication is only enabled in migration scenario (#6923)
   - desc: "multiple methods on same path"
     source: oas
     input:
@@ -103,35 +88,8 @@ tests:
         versions:
           "":
             extended_paths:
-<<<<<<< HEAD
-              white_list:
-                - disabled: false
-                  path: "/test"
-                  method: "GET"
-                  ignore_case: false
-                  method_actions:
-                    GET:
-                      action: "reply"
-                      code: 200
-                      headers:
-                        Content-Type: "application/json"
-                      data: '{"status": "ok"}'
-                - disabled: false
-                  path: "/test"
-                  method: "POST"
-                  ignore_case: false
-                  method_actions:
-                    POST:
-                      action: "reply"
-                      code: 201
-                      headers:
-                        Content-Type: "application/json"
-                        Location: "/test/123"
-                      data: '{"id": "123"}'
-=======
               mock_response: <nil>
               white_list: <nil>
->>>>>>> a145dbd4d... [TT-7306] Ensure ignoreAuthentication is only enabled in migration scenario (#6923)
   - desc: "disabled mock response"
     source: oas
     input:
@@ -164,23 +122,8 @@ tests:
         versions:
           "":
             extended_paths:
-<<<<<<< HEAD
-              white_list:
-                - disabled: true
-                  path: "/test"
-                  method: "GET"
-                  ignore_case: false
-                  method_actions:
-                    GET:
-                      action: "reply"
-                      code: 404
-                      headers:
-                        Content-Type: "application/json"
-                      data: '{"error": "not found"}'
-=======
               mock_response: <nil>
               white_list: <nil>
->>>>>>> a145dbd4d... [TT-7306] Ensure ignoreAuthentication is only enabled in migration scenario (#6923)
   - desc: "basic mock response - classic"
     source: "classic"
     input:

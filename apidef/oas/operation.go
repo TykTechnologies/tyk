@@ -577,46 +577,6 @@ func (o *Operation) extractRequestSizeLimitTo(ep *apidef.ExtendedPathsSet, path 
 	ep.SizeLimit = append(ep.SizeLimit, meta)
 }
 
-<<<<<<< HEAD
-// extractMockResponsePaths converts OAS mock responses to classic API format.
-// While classic APIs have direct support for mock responses, the API Designer UI
-// doesn't support them yet. Therefore, we are extracting them to a combination of
-// allow list entries and method actions instead.
-func (o *Operation) extractMockResponsePaths(ep *apidef.ExtendedPathsSet, path, method string) {
-	if o.MockResponse == nil {
-		return
-	}
-
-	headers := make(map[string]string)
-
-	for _, header := range o.MockResponse.Headers {
-		headers[http.CanonicalHeaderKey(header.Name)] = header.Value
-	}
-
-	if ep.WhiteList == nil {
-		ep.WhiteList = make([]apidef.EndPointMeta, 0)
-	}
-
-	wl := apidef.EndPointMeta{
-		Disabled: !o.MockResponse.Enabled,
-		Path:     path,
-		Method:   method,
-	}
-
-	wl.MethodActions = make(map[string]apidef.EndpointMethodMeta)
-
-	wl.MethodActions[method] = apidef.EndpointMethodMeta{
-		Action:  apidef.Reply,
-		Code:    o.MockResponse.Code,
-		Data:    o.MockResponse.Body,
-		Headers: headers,
-	}
-
-	ep.WhiteList = append(ep.WhiteList, wl)
-}
-
-=======
->>>>>>> a145dbd4d... [TT-7306] Ensure ignoreAuthentication is only enabled in migration scenario (#6923)
 // detect possible regex pattern:
 // - character match ([a-z])
 // - greedy match (.*)
