@@ -3,7 +3,7 @@ package oas
 import (
 	"context"
 	"embed"
-	"sort"
+	"net/http"
 	"strconv"
 	"strings"
 	"testing"
@@ -187,15 +187,7 @@ func TestOAS_MockResponse_extractPathsAndOperations(t *testing.T) {
 
 				// Verify mock responses
 				mockResponses := ep.MockResponse
-				require.Len(t, mockResponses, 1)
-
-				mockResp := mockResponses[0]
-				require.Equal(t, "/test", mockResp.Path)
-				require.Equal(t, "GET", mockResp.Method)
-				require.Equal(t, 200, mockResp.Code)
-				require.Equal(t, `{"message": "success"}`, mockResp.Body)
-				require.Equal(t, map[string]string{"Content-Type": "application/json"}, mockResp.Headers)
-				require.False(t, mockResp.Disabled)
+				require.Len(t, mockResponses, 0)
 			},
 		},
 		{
@@ -249,36 +241,7 @@ func TestOAS_MockResponse_extractPathsAndOperations(t *testing.T) {
 
 				// Verify mock responses
 				mockResponses := ep.MockResponse
-				require.Len(t, mockResponses, 2)
-
-				// Sort for consistent testing
-				sort.Slice(mockResponses, func(i, j int) bool {
-					if mockResponses[i].Path == mockResponses[j].Path {
-						return mockResponses[i].Method < mockResponses[j].Method
-					}
-					return mockResponses[i].Path < mockResponses[j].Path
-				})
-
-				// Verify GET mock response
-				getMock := mockResponses[0]
-				require.Equal(t, "/test", getMock.Path)
-				require.Equal(t, "GET", getMock.Method)
-				require.Equal(t, 200, getMock.Code)
-				require.Equal(t, `{"status": "ok"}`, getMock.Body)
-				require.Equal(t, map[string]string{"Content-Type": "application/json"}, getMock.Headers)
-				require.False(t, getMock.Disabled)
-
-				// Verify POST mock response
-				postMock := mockResponses[1]
-				require.Equal(t, "/test", postMock.Path)
-				require.Equal(t, "POST", postMock.Method)
-				require.Equal(t, 201, postMock.Code)
-				require.Equal(t, `{"id": "123"}`, postMock.Body)
-				require.Equal(t, map[string]string{
-					"Content-Type": "application/json",
-					"Location":     "/test/123",
-				}, postMock.Headers)
-				require.False(t, postMock.Disabled)
+				require.Len(t, mockResponses, 0)
 			},
 		},
 		{
@@ -315,14 +278,7 @@ func TestOAS_MockResponse_extractPathsAndOperations(t *testing.T) {
 
 				// Verify mock responses
 				mockResponses := ep.MockResponse
-				require.Len(t, mockResponses, 1)
-
-				mockResp := mockResponses[0]
-				require.Equal(t, "/test", mockResp.Path)
-				require.Equal(t, "GET", mockResp.Method)
-				require.Equal(t, 404, mockResp.Code)
-				require.Equal(t, `{"error": "not found"}`, mockResp.Body)
-				require.True(t, mockResp.Disabled)
+				require.Len(t, mockResponses, 0)
 			},
 		},
 		{
@@ -402,30 +358,7 @@ func TestOAS_MockResponse_extractPathsAndOperations(t *testing.T) {
 
 				// Verify mock responses
 				mockResponses := ep.MockResponse
-				require.Len(t, mockResponses, 2)
-
-				// Sort for consistent testing
-				sort.Slice(mockResponses, func(i, j int) bool {
-					return mockResponses[i].Path < mockResponses[j].Path
-				})
-
-				// Verify items response
-				itemsResp := mockResponses[0]
-				require.False(t, itemsResp.Disabled)
-				require.Equal(t, "/items", itemsResp.Path)
-				require.Equal(t, "GET", itemsResp.Method)
-				require.Equal(t, 200, itemsResp.Code)
-				require.Equal(t, `["item1", "item2"]`, itemsResp.Body)
-				require.Equal(t, map[string]string{"Content-Type": "application/json"}, itemsResp.Headers)
-
-				// Verify users response
-				usersResp := mockResponses[1]
-				require.False(t, usersResp.Disabled)
-				require.Equal(t, "/users", usersResp.Path)
-				require.Equal(t, "GET", usersResp.Method)
-				require.Equal(t, 200, usersResp.Code)
-				require.Equal(t, `["user1", "user2"]`, usersResp.Body)
-				require.Equal(t, map[string]string{"Content-Type": "application/json"}, usersResp.Headers)
+				require.Len(t, mockResponses, 0)
 			},
 		},
 	}
@@ -639,6 +572,9 @@ func TestOAS_MockResponse_fillMockResponsePaths(t *testing.T) {
 
 				pathItem := spec.Paths["/test"]
 				require.NotNil(t, pathItem)
+				tykOperation := spec.GetTykExtension().getOperation(pathItem.Get.OperationID)
+				require.NotNil(t, tykOperation)
+				require.Nil(t, tykOperation.Allow)
 
 				// Verify operation
 				require.NotNil(t, pathItem.Get)
@@ -697,6 +633,9 @@ func TestOAS_MockResponse_fillMockResponsePaths(t *testing.T) {
 				// Verify GET operation
 				require.NotNil(t, pathItem.Get)
 				require.Equal(t, "testGET", pathItem.Get.OperationID)
+				tykOperation := spec.GetTykExtension().getOperation(pathItem.Get.OperationID)
+				require.NotNil(t, tykOperation)
+				require.Nil(t, tykOperation.Allow)
 
 				response200Ref := pathItem.Get.Responses["200"]
 				require.NotNil(t, response200Ref, "Response ref for 200 should not be nil")
@@ -708,6 +647,9 @@ func TestOAS_MockResponse_fillMockResponsePaths(t *testing.T) {
 				// Verify POST operation
 				require.NotNil(t, pathItem.Post)
 				require.Equal(t, "testPOST", pathItem.Post.OperationID)
+				tykOperation = spec.GetTykExtension().getOperation(pathItem.Post.OperationID)
+				require.NotNil(t, tykOperation)
+				require.Nil(t, tykOperation.Allow)
 
 				postResponse := pathItem.Post.Responses["201"].Value
 				require.NotNil(t, postResponse)
@@ -730,6 +672,9 @@ func TestOAS_MockResponse_fillMockResponsePaths(t *testing.T) {
 				pathItem := spec.Paths["/test"]
 				require.NotNil(t, pathItem)
 				require.Equal(t, "testGET", pathItem.Get.OperationID)
+				tykOperation := spec.GetTykExtension().getOperation(pathItem.Get.OperationID)
+				require.NotNil(t, tykOperation)
+				require.Nil(t, tykOperation.Allow)
 
 				response204Ref := pathItem.Get.Responses["204"]
 				require.NotNil(t, response204Ref, "Response ref for 204 should not be nil")
@@ -773,6 +718,9 @@ func TestOAS_MockResponse_fillMockResponsePaths(t *testing.T) {
 				require.NotNil(t, usersPath)
 				require.NotNil(t, usersPath.Get)
 				require.Equal(t, "usersGET", usersPath.Get.OperationID)
+				tykOperation := spec.GetTykExtension().getOperation(usersPath.Get.OperationID)
+				require.NotNil(t, tykOperation)
+				require.Nil(t, tykOperation.Allow)
 
 				usersResponse := usersPath.Get.Responses["200"].Value
 				require.NotNil(t, usersResponse)
@@ -783,6 +731,9 @@ func TestOAS_MockResponse_fillMockResponsePaths(t *testing.T) {
 				require.NotNil(t, itemsPath)
 				require.NotNil(t, itemsPath.Get)
 				require.Equal(t, "itemsGET", itemsPath.Get.OperationID)
+				tykOperation = spec.GetTykExtension().getOperation(itemsPath.Get.OperationID)
+				require.NotNil(t, tykOperation)
+				require.Nil(t, tykOperation.Allow)
 
 				itemsResponse := itemsPath.Get.Responses["200"].Value
 				require.NotNil(t, itemsResponse)
@@ -831,6 +782,9 @@ func TestOAS_MockResponse_fillMockResponsePaths(t *testing.T) {
 				require.NotNil(t, response200, "Response for 200 should not be nil")
 				require.NotNil(t, response200.Value)
 				require.NotNil(t, response200.Value.Description)
+				tykOperation := spec.GetTykExtension().getOperation(pathItem.Get.OperationID)
+				require.NotNil(t, tykOperation)
+				require.Nil(t, tykOperation.Allow)
 			},
 		},
 		{
@@ -875,6 +829,9 @@ func TestOAS_MockResponse_fillMockResponsePaths(t *testing.T) {
 				jsonResponse := jsonPath.Get.Responses["200"].Value
 				require.NotNil(t, jsonResponse)
 				require.NotNil(t, jsonResponse.Description)
+				tykOperation := spec.GetTykExtension().getOperation(jsonPath.Get.OperationID)
+				require.NotNil(t, tykOperation)
+				require.Nil(t, tykOperation.Allow)
 
 				// XML endpoint
 				xmlPath := spec.Paths["/test.xml"]
@@ -882,6 +839,9 @@ func TestOAS_MockResponse_fillMockResponsePaths(t *testing.T) {
 				xmlResponse := xmlPath.Get.Responses["200"].Value
 				require.NotNil(t, xmlResponse)
 				require.NotNil(t, xmlResponse.Description)
+				tykOperation = spec.GetTykExtension().getOperation(xmlPath.Get.OperationID)
+				require.NotNil(t, tykOperation)
+				require.Nil(t, tykOperation.Allow)
 
 				// Text endpoint
 				txtPath := spec.Paths["/test.txt"]
@@ -889,6 +849,9 @@ func TestOAS_MockResponse_fillMockResponsePaths(t *testing.T) {
 				txtResponse := txtPath.Get.Responses["200"].Value
 				require.NotNil(t, txtResponse)
 				require.NotNil(t, txtResponse.Description)
+				tykOperation = spec.GetTykExtension().getOperation(txtPath.Get.OperationID)
+				require.NotNil(t, tykOperation)
+				require.Nil(t, tykOperation.Allow)
 			},
 		},
 		{
@@ -917,6 +880,10 @@ func TestOAS_MockResponse_fillMockResponsePaths(t *testing.T) {
 				response := pathItem.Get.Responses["200"].Value
 				require.NotNil(t, response)
 				require.NotNil(t, response.Description)
+
+				tykOperation := spec.GetTykExtension().getOperation(pathItem.Get.OperationID)
+				require.NotNil(t, tykOperation)
+				require.Nil(t, tykOperation.Allow)
 			},
 		},
 		{
@@ -938,11 +905,11 @@ func TestOAS_MockResponse_fillMockResponsePaths(t *testing.T) {
 				pathItem := spec.Paths["/test"]
 				require.NotNil(t, pathItem)
 
-				verifyOASOperation(t, pathItem.Get, "GET", 200)
-				verifyOASOperation(t, pathItem.Post, "POST", 201)
-				verifyOASOperation(t, pathItem.Put, "PUT", 200)
-				verifyOASOperation(t, pathItem.Patch, "PATCH", 200)
-				verifyOASOperation(t, pathItem.Delete, "DELETE", 204)
+				verifyOASOperation(t, spec, pathItem.Get, "GET", 200)
+				verifyOASOperation(t, spec, pathItem.Post, "POST", 201)
+				verifyOASOperation(t, spec, pathItem.Put, "PUT", 200)
+				verifyOASOperation(t, spec, pathItem.Patch, "PATCH", 200)
+				verifyOASOperation(t, spec, pathItem.Delete, "DELETE", 204)
 			},
 		},
 	}
@@ -1052,7 +1019,7 @@ func TestOAS_MockResponse_fillMockResponsePaths(t *testing.T) {
 }
 
 // Helper function to verify OpenAPI operation responses
-func verifyOASOperation(t *testing.T, op *openapi3.Operation, method string, code int) {
+func verifyOASOperation(t *testing.T, spec *OAS, op *openapi3.Operation, method string, code int) {
 	t.Helper()
 
 	require.NotNil(t, op, "Operation %s should exist", method)
@@ -1064,4 +1031,191 @@ func verifyOASOperation(t *testing.T, op *openapi3.Operation, method string, cod
 	response := op.Responses[statusCode].Value
 	require.NotNil(t, response)
 	require.NotNil(t, response.Description)
+
+	tykOperation := spec.GetTykExtension().getOperation(op.OperationID)
+	require.NotNil(t, tykOperation)
+	require.Nil(t, tykOperation.Allow)
+}
+
+func TestOAS_fillAllowance(t *testing.T) {
+	t.Run("should fill allow list correctly", func(t *testing.T) {
+		s := &OAS{
+			T: openapi3.T{
+				Paths: make(openapi3.Paths),
+			},
+		}
+
+		s.SetTykExtension(&XTykAPIGateway{
+			Middleware: &Middleware{
+				Operations: make(Operations),
+			},
+		})
+
+		endpointMetas := []apidef.EndPointMeta{
+			{
+				Path:   "/test",
+				Method: http.MethodGet,
+				MethodActions: map[string]apidef.EndpointMethodMeta{
+					http.MethodGet: {
+						Action: apidef.NoAction,
+					},
+				},
+			},
+		}
+
+		s.fillAllowance(endpointMetas, allow)
+
+		operationID := s.getOperationID("/test", http.MethodGet)
+		operation := s.GetTykExtension().getOperation(operationID)
+
+		assert.NotNil(t, operation.Allow)
+		assert.True(t, operation.Allow.Enabled)
+		assert.Nil(t, operation.Block)
+		assert.Nil(t, operation.IgnoreAuthentication)
+	})
+
+	t.Run("should fill block list correctly", func(t *testing.T) {
+		s := &OAS{
+			T: openapi3.T{
+				Paths: make(openapi3.Paths),
+			},
+		}
+
+		s.SetTykExtension(&XTykAPIGateway{
+			Middleware: &Middleware{
+				Operations: make(Operations),
+			},
+		})
+
+		endpointMetas := []apidef.EndPointMeta{
+			{
+				Path:   "/test",
+				Method: http.MethodGet,
+			},
+		}
+
+		s.fillAllowance(endpointMetas, block)
+
+		operationID := s.getOperationID("/test", http.MethodGet)
+		operation := s.GetTykExtension().getOperation(operationID)
+
+		assert.NotNil(t, operation.Block)
+		assert.True(t, operation.Block.Enabled)
+		assert.Nil(t, operation.Allow)
+		assert.Nil(t, operation.IgnoreAuthentication)
+	})
+
+	t.Run("should fill ignore authentication correctly", func(t *testing.T) {
+		s := &OAS{
+			T: openapi3.T{
+				Paths: make(openapi3.Paths),
+			},
+		}
+
+		s.SetTykExtension(&XTykAPIGateway{
+			Middleware: &Middleware{
+				Operations: make(Operations),
+			},
+		})
+
+		endpointMetas := []apidef.EndPointMeta{
+			{
+				Path:   "/test",
+				Method: http.MethodGet,
+			},
+		}
+
+		s.fillAllowance(endpointMetas, ignoreAuthentication)
+
+		operationID := s.getOperationID("/test", http.MethodGet)
+		operation := s.GetTykExtension().getOperation(operationID)
+
+		assert.NotNil(t, operation.IgnoreAuthentication)
+		assert.True(t, operation.IgnoreAuthentication.Enabled)
+		assert.Nil(t, operation.Allow)
+		assert.Nil(t, operation.Block)
+	})
+
+	t.Run("should skip Reply actions for allow list", func(t *testing.T) {
+		spec := &OAS{
+			T: openapi3.T{
+				Paths: make(openapi3.Paths),
+			},
+		}
+
+		spec.SetTykExtension(&XTykAPIGateway{
+			Middleware: &Middleware{
+				Operations: make(Operations),
+			},
+		})
+
+		endpointMetas := []apidef.EndPointMeta{
+			{
+				Path:   "/test",
+				Method: http.MethodGet,
+				MethodActions: map[string]apidef.EndpointMethodMeta{
+					http.MethodGet: {
+						Action: apidef.Reply,
+					},
+				},
+			},
+		}
+
+		spec.fillAllowance(endpointMetas, allow)
+
+		operationID := spec.getOperationID("/test", http.MethodGet)
+		operation := spec.GetTykExtension().getOperation(operationID)
+
+		assert.Nil(t, operation.Allow, "Allow should be nil for Reply actions")
+	})
+
+	t.Run("should handle empty endpoint metas", func(t *testing.T) {
+		s := &OAS{
+			T: openapi3.T{
+				Paths: make(openapi3.Paths),
+			},
+		}
+
+		s.SetTykExtension(&XTykAPIGateway{
+			Middleware: &Middleware{
+				Operations: make(Operations),
+			},
+		})
+
+		var endpointMetas []apidef.EndPointMeta
+
+		s.fillAllowance(endpointMetas, allow)
+
+		assert.Empty(t, s.Paths)
+	})
+
+	t.Run("should set allowance disabled when ShouldOmit returns true", func(t *testing.T) {
+		s := &OAS{
+			T: openapi3.T{
+				Paths: make(openapi3.Paths),
+			},
+		}
+
+		s.SetTykExtension(&XTykAPIGateway{
+			Middleware: &Middleware{
+				Operations: make(Operations),
+			},
+		})
+
+		endpointMetas := []apidef.EndPointMeta{
+			{
+				Path:     "/test",
+				Method:   http.MethodGet,
+				Disabled: true,
+			},
+		}
+
+		s.fillAllowance(endpointMetas, allow)
+
+		operationID := s.getOperationID("/test", http.MethodGet)
+		operation := s.GetTykExtension().getOperation(operationID)
+
+		assert.NotNil(t, operation.Allow)
+		assert.False(t, operation.Allow.Enabled)
+	})
 }
