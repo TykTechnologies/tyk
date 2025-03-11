@@ -1202,16 +1202,18 @@ type CachePlugin struct {
 
 // Fill fills *CachePlugin from apidef.CacheMeta.
 func (a *CachePlugin) Fill(cm apidef.CacheMeta) {
-	// TODO(TT-14102): Add test for this
-	const defaultCacheTimeout = 600
-
 	a.Enabled = !cm.Disabled
 	a.CacheByRegex = cm.CacheKeyRegex
 	a.CacheResponseCodes = cm.CacheOnlyResponseCodes
 	a.Timeout = cm.Timeout
 
+	// Default cache timeout in seconds if none is specified but caching is enabled
 	// TODO(TT-14102): Add test for this
-	if a.Timeout == 0 {
+	const defaultCacheTimeout = 60
+
+	// If caching is enabled but no timeout was specified, set a default timeout
+	// TODO(TT-14102): Add test for this
+	if a.Enabled && a.Timeout == 0 {
 		a.Timeout = defaultCacheTimeout
 	}
 }

@@ -346,20 +346,29 @@ func (a *APIDefinition) MigrateCachePlugin() {
 	vInfo := a.VersionData.Versions[""]
 	list := vInfo.ExtendedPaths.Cached
 
+	timeout := int64(60)
+
+	if a.CacheOptions.CacheTimeout > 0 {
+		timeout = a.CacheOptions.CacheTimeout
+	}
+
 	if vInfo.UseExtendedPaths && len(list) > 0 {
 		var advCacheMethods []CacheMeta
 		for _, cache := range list {
 			newGetMethodCache := CacheMeta{
-				Path:   cache,
-				Method: http.MethodGet,
+				Path:    cache,
+				Method:  http.MethodGet,
+				Timeout: timeout,
 			}
 			newHeadMethodCache := CacheMeta{
-				Path:   cache,
-				Method: http.MethodHead,
+				Path:    cache,
+				Method:  http.MethodHead,
+				Timeout: timeout,
 			}
 			newOptionsMethodCache := CacheMeta{
-				Path:   cache,
-				Method: http.MethodOptions,
+				Path:    cache,
+				Method:  http.MethodOptions,
+				Timeout: timeout,
 			}
 			advCacheMethods = append(advCacheMethods, newGetMethodCache, newHeadMethodCache, newOptionsMethodCache)
 		}
