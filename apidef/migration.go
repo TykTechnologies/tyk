@@ -386,8 +386,13 @@ func (a *APIDefinition) MigrateCachePlugin() {
 			advCacheMethods = append(advCacheMethods, newGetMethodCache, newHeadMethodCache, newOptionsMethodCache)
 		}
 
-		vInfo.ExtendedPaths.AdvanceCacheConfig = advCacheMethods
-		// reset cache to empty
+		// Create a new slice combining the newly created cache methods with any existing advanced cache config
+		// advCacheMethods contains the migrated simple cache paths converted to method-specific cache configurations
+		// vInfo.ExtendedPaths.AdvanceCacheConfig contains any existing advanced cache configurations
+		// This preserves both the migrated simple cache paths and any existing advanced configurations
+		vInfo.ExtendedPaths.AdvanceCacheConfig = append(advCacheMethods, vInfo.ExtendedPaths.AdvanceCacheConfig...)
+
+		// Clear the old simple cache paths since they've been migrated to the advanced configuration
 		vInfo.ExtendedPaths.Cached = nil
 	}
 
