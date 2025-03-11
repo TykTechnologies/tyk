@@ -352,23 +352,31 @@ func (a *APIDefinition) MigrateCachePlugin() {
 		timeout = a.CacheOptions.CacheTimeout
 	}
 
+	var cacheResponseCodes []int
+	if a.CacheOptions.CacheOnlyResponseCodes != nil {
+		cacheResponseCodes = a.CacheOptions.CacheOnlyResponseCodes
+	}
+
 	if vInfo.UseExtendedPaths && len(list) > 0 {
 		var advCacheMethods []CacheMeta
 		for _, cache := range list {
 			newGetMethodCache := CacheMeta{
-				Path:    cache,
-				Method:  http.MethodGet,
-				Timeout: timeout,
+				Path:                   cache,
+				Method:                 http.MethodGet,
+				Timeout:                timeout,
+				CacheOnlyResponseCodes: cacheResponseCodes,
 			}
 			newHeadMethodCache := CacheMeta{
-				Path:    cache,
-				Method:  http.MethodHead,
-				Timeout: timeout,
+				Path:                   cache,
+				Method:                 http.MethodHead,
+				Timeout:                timeout,
+				CacheOnlyResponseCodes: cacheResponseCodes,
 			}
 			newOptionsMethodCache := CacheMeta{
-				Path:    cache,
-				Method:  http.MethodOptions,
-				Timeout: timeout,
+				Path:                   cache,
+				Method:                 http.MethodOptions,
+				Timeout:                timeout,
+				CacheOnlyResponseCodes: cacheResponseCodes,
 			}
 			advCacheMethods = append(advCacheMethods, newGetMethodCache, newHeadMethodCache, newOptionsMethodCache)
 		}
