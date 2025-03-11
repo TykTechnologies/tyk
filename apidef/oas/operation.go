@@ -265,6 +265,8 @@ func (s *OAS) fillMockResponsePaths(paths openapi3.Paths, ep apidef.ExtendedPath
 			tykOperation.MockResponse = nil
 			tykOperation.IgnoreAuthentication = nil
 		}
+
+		tykOperation.Allow = nil
 	}
 }
 
@@ -300,7 +302,6 @@ func (s *OAS) extractPathsAndOperations(ep *apidef.ExtendedPathsSet) {
 					tykOp.extractDoNotTrackEndpointTo(ep, path, method)
 					tykOp.extractRequestSizeLimitTo(ep, path, method)
 					tykOp.extractRateLimitEndpointTo(ep, path, method)
-					tykOp.extractMockResponsePaths(ep, path, method)
 					break
 				}
 			}
@@ -323,6 +324,12 @@ func (s *OAS) fillAllowance(endpointMetas []apidef.EndPointMeta, typ AllowanceTy
 		case ignoreAuthentication:
 			allowance = newAllowance(&operation.IgnoreAuthentication)
 		default:
+			// Skip endpoints that have mock responses configured via method actions, we should avoid
+			// creating allowance for them.
+			if hasMockResponse(em.MethodActions) {
+				continue
+			}
+
 			allowance = newAllowance(&operation.Allow)
 		}
 
@@ -570,6 +577,7 @@ func (o *Operation) extractRequestSizeLimitTo(ep *apidef.ExtendedPathsSet, path 
 	ep.SizeLimit = append(ep.SizeLimit, meta)
 }
 
+<<<<<<< HEAD
 // extractMockResponsePaths converts OAS mock responses to classic API format.
 // While classic APIs have direct support for mock responses, the API Designer UI
 // doesn't support them yet. Therefore, we are extracting them to a combination of
@@ -607,6 +615,8 @@ func (o *Operation) extractMockResponsePaths(ep *apidef.ExtendedPathsSet, path, 
 	ep.WhiteList = append(ep.WhiteList, wl)
 }
 
+=======
+>>>>>>> a145dbd4d... [TT-7306] Ensure ignoreAuthentication is only enabled in migration scenario (#6923)
 // detect possible regex pattern:
 // - character match ([a-z])
 // - greedy match (.*)
@@ -1102,4 +1112,16 @@ func sortMockResponseAllowList(ep *apidef.ExtendedPathsSet) {
 
 		return actionI.Code < actionJ.Code
 	})
+}
+
+// hasMockResponse returns true if any method action has a Reply action type.
+// This is used to determine if an endpoint should be treated as a mock response.
+func hasMockResponse(methodActions map[string]apidef.EndpointMethodMeta) bool {
+	for _, action := range methodActions {
+		if action.Action == apidef.Reply {
+			return true
+		}
+	}
+
+	return false
 }

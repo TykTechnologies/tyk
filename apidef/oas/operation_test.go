@@ -3,9 +3,13 @@ package oas
 import (
 	"context"
 	"embed"
+<<<<<<< HEAD
 	"encoding/json"
 	"net/http"
 	"sort"
+=======
+	"net/http"
+>>>>>>> a145dbd4d... [TT-7306] Ensure ignoreAuthentication is only enabled in migration scenario (#6923)
 	"strconv"
 	"strings"
 	"testing"
@@ -187,6 +191,7 @@ func TestOAS_MockResponse_extractPathsAndOperations(t *testing.T) {
 			want: func(t *testing.T, ep *apidef.ExtendedPathsSet) {
 				t.Helper()
 
+<<<<<<< HEAD
 				require.Len(t, ep.WhiteList, 1)
 
 				mockResp := ep.WhiteList[0]
@@ -198,6 +203,11 @@ func TestOAS_MockResponse_extractPathsAndOperations(t *testing.T) {
 				require.Equal(t, `{"message": "success"}`, mockResp.MethodActions["GET"].Data)
 				require.Equal(t, map[string]string{"Content-Type": "application/json"}, mockResp.MethodActions["GET"].Headers)
 				require.False(t, mockResp.Disabled)
+=======
+				// Verify mock responses
+				mockResponses := ep.MockResponse
+				require.Len(t, mockResponses, 0)
+>>>>>>> a145dbd4d... [TT-7306] Ensure ignoreAuthentication is only enabled in migration scenario (#6923)
 			},
 		},
 		{
@@ -249,6 +259,7 @@ func TestOAS_MockResponse_extractPathsAndOperations(t *testing.T) {
 			want: func(t *testing.T, ep *apidef.ExtendedPathsSet) {
 				t.Helper()
 
+<<<<<<< HEAD
 				assert.Len(t, ep.WhiteList, 2)
 
 				// Sort mock responses for consistent testing
@@ -283,6 +294,11 @@ func TestOAS_MockResponse_extractPathsAndOperations(t *testing.T) {
 					"Location":     "/test/123",
 				}, postMock.MethodActions["POST"].Headers)
 				require.False(t, postMock.Disabled)
+=======
+				// Verify mock responses
+				mockResponses := ep.MockResponse
+				require.Len(t, mockResponses, 0)
+>>>>>>> a145dbd4d... [TT-7306] Ensure ignoreAuthentication is only enabled in migration scenario (#6923)
 			},
 		},
 		{
@@ -317,6 +333,7 @@ func TestOAS_MockResponse_extractPathsAndOperations(t *testing.T) {
 			want: func(t *testing.T, ep *apidef.ExtendedPathsSet) {
 				t.Helper()
 
+<<<<<<< HEAD
 				assert.Len(t, ep.WhiteList, 1)
 				mockResp := ep.WhiteList[0]
 				require.Equal(t, "/test", mockResp.Path)
@@ -326,6 +343,11 @@ func TestOAS_MockResponse_extractPathsAndOperations(t *testing.T) {
 				require.Equal(t, 404, mockResp.MethodActions["GET"].Code)
 				require.Equal(t, `{"error": "not found"}`, mockResp.MethodActions["GET"].Data)
 				require.True(t, mockResp.Disabled)
+=======
+				// Verify mock responses
+				mockResponses := ep.MockResponse
+				require.Len(t, mockResponses, 0)
+>>>>>>> a145dbd4d... [TT-7306] Ensure ignoreAuthentication is only enabled in migration scenario (#6923)
 			},
 		},
 		{
@@ -403,6 +425,7 @@ func TestOAS_MockResponse_extractPathsAndOperations(t *testing.T) {
 			want: func(t *testing.T, ep *apidef.ExtendedPathsSet) {
 				t.Helper()
 
+<<<<<<< HEAD
 				assert.Len(t, ep.WhiteList, 2)
 
 				// Sort for consistent testing
@@ -429,6 +452,11 @@ func TestOAS_MockResponse_extractPathsAndOperations(t *testing.T) {
 				require.Equal(t, 200, usersResp.MethodActions["GET"].Code)
 				require.Equal(t, `["user1", "user2"]`, usersResp.MethodActions["GET"].Data)
 				require.Equal(t, map[string]string{"Content-Type": "application/json"}, usersResp.MethodActions["GET"].Headers)
+=======
+				// Verify mock responses
+				mockResponses := ep.MockResponse
+				require.Len(t, mockResponses, 0)
+>>>>>>> a145dbd4d... [TT-7306] Ensure ignoreAuthentication is only enabled in migration scenario (#6923)
 			},
 		},
 	}
@@ -638,6 +666,9 @@ func TestOAS_MockResponse_fillMockResponsePaths(t *testing.T) {
 
 				pathItem := spec.Paths["/test"]
 				require.NotNil(t, pathItem)
+				tykOperation := spec.GetTykExtension().getOperation(pathItem.Get.OperationID)
+				require.NotNil(t, tykOperation)
+				require.Nil(t, tykOperation.Allow)
 
 				// Verify operation
 				require.NotNil(t, pathItem.Get)
@@ -704,6 +735,9 @@ func TestOAS_MockResponse_fillMockResponsePaths(t *testing.T) {
 				// Verify GET operation
 				require.NotNil(t, pathItem.Get)
 				require.Equal(t, "testGET", pathItem.Get.OperationID)
+				tykOperation := spec.GetTykExtension().getOperation(pathItem.Get.OperationID)
+				require.NotNil(t, tykOperation)
+				require.Nil(t, tykOperation.Allow)
 
 				response200Ref := pathItem.Get.Responses["200"]
 				require.NotNil(t, response200Ref, "Response ref for 200 should not be nil")
@@ -716,6 +750,9 @@ func TestOAS_MockResponse_fillMockResponsePaths(t *testing.T) {
 				// Verify POST operation
 				require.NotNil(t, pathItem.Post)
 				require.Equal(t, "testPOST", pathItem.Post.OperationID)
+				tykOperation = spec.GetTykExtension().getOperation(pathItem.Post.OperationID)
+				require.NotNil(t, tykOperation)
+				require.Nil(t, tykOperation.Allow)
 
 				postResponse := pathItem.Post.Responses["201"].Value
 				require.NotNil(t, postResponse)
@@ -741,6 +778,9 @@ func TestOAS_MockResponse_fillMockResponsePaths(t *testing.T) {
 				pathItem := spec.Paths["/test"]
 				require.NotNil(t, pathItem)
 				require.Equal(t, "testGET", pathItem.Get.OperationID)
+				tykOperation := spec.GetTykExtension().getOperation(pathItem.Get.OperationID)
+				require.NotNil(t, tykOperation)
+				require.Nil(t, tykOperation.Allow)
 
 				response204Ref := pathItem.Get.Responses["204"]
 				require.NotNil(t, response204Ref, "Response ref for 204 should not be nil")
@@ -786,6 +826,9 @@ func TestOAS_MockResponse_fillMockResponsePaths(t *testing.T) {
 				require.NotNil(t, usersPath)
 				require.NotNil(t, usersPath.Get)
 				require.Equal(t, "usersGET", usersPath.Get.OperationID)
+				tykOperation := spec.GetTykExtension().getOperation(usersPath.Get.OperationID)
+				require.NotNil(t, tykOperation)
+				require.Nil(t, tykOperation.Allow)
 
 				usersResponse := usersPath.Get.Responses["200"].Value
 				require.NotNil(t, usersResponse)
@@ -796,6 +839,9 @@ func TestOAS_MockResponse_fillMockResponsePaths(t *testing.T) {
 				require.NotNil(t, itemsPath)
 				require.NotNil(t, itemsPath.Get)
 				require.Equal(t, "itemsGET", itemsPath.Get.OperationID)
+				tykOperation = spec.GetTykExtension().getOperation(itemsPath.Get.OperationID)
+				require.NotNil(t, tykOperation)
+				require.Nil(t, tykOperation.Allow)
 
 				itemsResponse := itemsPath.Get.Responses["200"].Value
 				require.NotNil(t, itemsResponse)
@@ -842,11 +888,19 @@ func TestOAS_MockResponse_fillMockResponsePaths(t *testing.T) {
 				// Verify 200 response
 				response200 := pathItem.Get.Responses.Get(200)
 				require.NotNil(t, response200, "Response for 200 should not be nil")
+<<<<<<< HEAD
 
 				mediaType200 := response200.Value.Content["application/json"]
 				require.NotNil(t, mediaType200)
 				require.NotNil(t, mediaType200.Examples)
 				require.Equal(t, `{"status": "success"}`, mediaType200.Examples["default"].Value.Value)
+=======
+				require.NotNil(t, response200.Value)
+				require.NotNil(t, response200.Value.Description)
+				tykOperation := spec.GetTykExtension().getOperation(pathItem.Get.OperationID)
+				require.NotNil(t, tykOperation)
+				require.Nil(t, tykOperation.Allow)
+>>>>>>> a145dbd4d... [TT-7306] Ensure ignoreAuthentication is only enabled in migration scenario (#6923)
 			},
 		},
 		{
@@ -889,20 +943,44 @@ func TestOAS_MockResponse_fillMockResponsePaths(t *testing.T) {
 				jsonPath := spec.Paths["/test"]
 				require.NotNil(t, jsonPath)
 				jsonResponse := jsonPath.Get.Responses["200"].Value
+<<<<<<< HEAD
 				require.Equal(t, `{"data": "json"}`, jsonResponse.Content["application/json"].Examples["default"].Value.Value)
+=======
+				require.NotNil(t, jsonResponse)
+				require.NotNil(t, jsonResponse.Description)
+				tykOperation := spec.GetTykExtension().getOperation(jsonPath.Get.OperationID)
+				require.NotNil(t, tykOperation)
+				require.Nil(t, tykOperation.Allow)
+>>>>>>> a145dbd4d... [TT-7306] Ensure ignoreAuthentication is only enabled in migration scenario (#6923)
 
 				// XML endpoint
 				xmlPath := spec.Paths["/test.xml"]
 				require.NotNil(t, xmlPath)
 				xmlResponse := xmlPath.Get.Responses["200"].Value
+<<<<<<< HEAD
 				require.Equal(t, `<data>xml</data>`, xmlResponse.Content["application/xml"].Examples["default"].Value.Value)
+=======
+				require.NotNil(t, xmlResponse)
+				require.NotNil(t, xmlResponse.Description)
+				tykOperation = spec.GetTykExtension().getOperation(xmlPath.Get.OperationID)
+				require.NotNil(t, tykOperation)
+				require.Nil(t, tykOperation.Allow)
+>>>>>>> a145dbd4d... [TT-7306] Ensure ignoreAuthentication is only enabled in migration scenario (#6923)
 
 				// Text endpoint
 				txtPath := spec.Paths["/test.txt"]
 				require.NotNil(t, txtPath)
 
 				txtResponse := txtPath.Get.Responses["200"].Value
+<<<<<<< HEAD
 				require.Equal(t, `plain text`, txtResponse.Content["text/plain"].Examples["default"].Value.Value)
+=======
+				require.NotNil(t, txtResponse)
+				require.NotNil(t, txtResponse.Description)
+				tykOperation = spec.GetTykExtension().getOperation(txtPath.Get.OperationID)
+				require.NotNil(t, tykOperation)
+				require.Nil(t, tykOperation.Allow)
+>>>>>>> a145dbd4d... [TT-7306] Ensure ignoreAuthentication is only enabled in migration scenario (#6923)
 			},
 		},
 		{
@@ -930,6 +1008,7 @@ func TestOAS_MockResponse_fillMockResponsePaths(t *testing.T) {
 				require.NotNil(t, pathItem)
 				response := pathItem.Get.Responses["200"].Value
 				require.NotNil(t, response)
+<<<<<<< HEAD
 
 				// Verify all headers
 				expectedHeaders := map[string]string{
@@ -946,6 +1025,13 @@ func TestOAS_MockResponse_fillMockResponsePaths(t *testing.T) {
 					require.NotNil(t, headerObj, "Header %s not found", header)
 					assert.Equal(t, value, headerObj.Value.Schema.Value.Example)
 				}
+=======
+				require.NotNil(t, response.Description)
+
+				tykOperation := spec.GetTykExtension().getOperation(pathItem.Get.OperationID)
+				require.NotNil(t, tykOperation)
+				require.Nil(t, tykOperation.Allow)
+>>>>>>> a145dbd4d... [TT-7306] Ensure ignoreAuthentication is only enabled in migration scenario (#6923)
 			},
 		},
 		{
@@ -967,11 +1053,19 @@ func TestOAS_MockResponse_fillMockResponsePaths(t *testing.T) {
 				pathItem := spec.Paths["/test"]
 				require.NotNil(t, pathItem)
 
+<<<<<<< HEAD
 				verifyOASOperation(t, pathItem.Get, "GET", 200, `{"method":"get"}`)
 				verifyOASOperation(t, pathItem.Post, "POST", 201, `{"method":"post"}`)
 				verifyOASOperation(t, pathItem.Put, "PUT", 200, `{"method":"put"}`)
 				verifyOASOperation(t, pathItem.Patch, "PATCH", 200, `{"method":"patch"}`)
 				verifyOASOperation(t, pathItem.Delete, "DELETE", 204, ``)
+=======
+				verifyOASOperation(t, spec, pathItem.Get, "GET", 200)
+				verifyOASOperation(t, spec, pathItem.Post, "POST", 201)
+				verifyOASOperation(t, spec, pathItem.Put, "PUT", 200)
+				verifyOASOperation(t, spec, pathItem.Patch, "PATCH", 200)
+				verifyOASOperation(t, spec, pathItem.Delete, "DELETE", 204)
+>>>>>>> a145dbd4d... [TT-7306] Ensure ignoreAuthentication is only enabled in migration scenario (#6923)
 			},
 		},
 	}
@@ -1079,7 +1173,11 @@ func TestOAS_MockResponse_fillMockResponsePaths(t *testing.T) {
 }
 
 // Helper function to verify OpenAPI operation responses
+<<<<<<< HEAD
 func verifyOASOperation(t *testing.T, op *openapi3.Operation, method string, code int, body string) {
+=======
+func verifyOASOperation(t *testing.T, spec *OAS, op *openapi3.Operation, method string, code int) {
+>>>>>>> a145dbd4d... [TT-7306] Ensure ignoreAuthentication is only enabled in migration scenario (#6923)
 	t.Helper()
 
 	require.NotNil(t, op, "Operation %s should exist", method)
@@ -1090,6 +1188,7 @@ func verifyOASOperation(t *testing.T, op *openapi3.Operation, method string, cod
 
 	response := op.Responses[statusCode].Value
 	require.NotNil(t, response)
+<<<<<<< HEAD
 
 	if body != "" {
 		contentType := "text/plain" // default content type
@@ -1112,4 +1211,194 @@ func verifyOASOperation(t *testing.T, op *openapi3.Operation, method string, cod
 		require.NotNil(t, response.Content[contentType].Examples, "Examples for content type %s not found", contentType)
 		require.Equal(t, body, response.Content[contentType].Examples["default"].Value.Value)
 	}
+=======
+	require.NotNil(t, response.Description)
+
+	tykOperation := spec.GetTykExtension().getOperation(op.OperationID)
+	require.NotNil(t, tykOperation)
+	require.Nil(t, tykOperation.Allow)
+}
+
+func TestOAS_fillAllowance(t *testing.T) {
+	t.Run("should fill allow list correctly", func(t *testing.T) {
+		s := &OAS{
+			T: openapi3.T{
+				Paths: make(openapi3.Paths),
+			},
+		}
+
+		s.SetTykExtension(&XTykAPIGateway{
+			Middleware: &Middleware{
+				Operations: make(Operations),
+			},
+		})
+
+		endpointMetas := []apidef.EndPointMeta{
+			{
+				Path:   "/test",
+				Method: http.MethodGet,
+				MethodActions: map[string]apidef.EndpointMethodMeta{
+					http.MethodGet: {
+						Action: apidef.NoAction,
+					},
+				},
+			},
+		}
+
+		s.fillAllowance(endpointMetas, allow)
+
+		operationID := s.getOperationID("/test", http.MethodGet)
+		operation := s.GetTykExtension().getOperation(operationID)
+
+		assert.NotNil(t, operation.Allow)
+		assert.True(t, operation.Allow.Enabled)
+		assert.Nil(t, operation.Block)
+		assert.Nil(t, operation.IgnoreAuthentication)
+	})
+
+	t.Run("should fill block list correctly", func(t *testing.T) {
+		s := &OAS{
+			T: openapi3.T{
+				Paths: make(openapi3.Paths),
+			},
+		}
+
+		s.SetTykExtension(&XTykAPIGateway{
+			Middleware: &Middleware{
+				Operations: make(Operations),
+			},
+		})
+
+		endpointMetas := []apidef.EndPointMeta{
+			{
+				Path:   "/test",
+				Method: http.MethodGet,
+			},
+		}
+
+		s.fillAllowance(endpointMetas, block)
+
+		operationID := s.getOperationID("/test", http.MethodGet)
+		operation := s.GetTykExtension().getOperation(operationID)
+
+		assert.NotNil(t, operation.Block)
+		assert.True(t, operation.Block.Enabled)
+		assert.Nil(t, operation.Allow)
+		assert.Nil(t, operation.IgnoreAuthentication)
+	})
+
+	t.Run("should fill ignore authentication correctly", func(t *testing.T) {
+		s := &OAS{
+			T: openapi3.T{
+				Paths: make(openapi3.Paths),
+			},
+		}
+
+		s.SetTykExtension(&XTykAPIGateway{
+			Middleware: &Middleware{
+				Operations: make(Operations),
+			},
+		})
+
+		endpointMetas := []apidef.EndPointMeta{
+			{
+				Path:   "/test",
+				Method: http.MethodGet,
+			},
+		}
+
+		s.fillAllowance(endpointMetas, ignoreAuthentication)
+
+		operationID := s.getOperationID("/test", http.MethodGet)
+		operation := s.GetTykExtension().getOperation(operationID)
+
+		assert.NotNil(t, operation.IgnoreAuthentication)
+		assert.True(t, operation.IgnoreAuthentication.Enabled)
+		assert.Nil(t, operation.Allow)
+		assert.Nil(t, operation.Block)
+	})
+
+	t.Run("should skip Reply actions for allow list", func(t *testing.T) {
+		spec := &OAS{
+			T: openapi3.T{
+				Paths: make(openapi3.Paths),
+			},
+		}
+
+		spec.SetTykExtension(&XTykAPIGateway{
+			Middleware: &Middleware{
+				Operations: make(Operations),
+			},
+		})
+
+		endpointMetas := []apidef.EndPointMeta{
+			{
+				Path:   "/test",
+				Method: http.MethodGet,
+				MethodActions: map[string]apidef.EndpointMethodMeta{
+					http.MethodGet: {
+						Action: apidef.Reply,
+					},
+				},
+			},
+		}
+
+		spec.fillAllowance(endpointMetas, allow)
+
+		operationID := spec.getOperationID("/test", http.MethodGet)
+		operation := spec.GetTykExtension().getOperation(operationID)
+
+		assert.Nil(t, operation.Allow, "Allow should be nil for Reply actions")
+	})
+
+	t.Run("should handle empty endpoint metas", func(t *testing.T) {
+		s := &OAS{
+			T: openapi3.T{
+				Paths: make(openapi3.Paths),
+			},
+		}
+
+		s.SetTykExtension(&XTykAPIGateway{
+			Middleware: &Middleware{
+				Operations: make(Operations),
+			},
+		})
+
+		var endpointMetas []apidef.EndPointMeta
+
+		s.fillAllowance(endpointMetas, allow)
+
+		assert.Empty(t, s.Paths)
+	})
+
+	t.Run("should set allowance disabled when ShouldOmit returns true", func(t *testing.T) {
+		s := &OAS{
+			T: openapi3.T{
+				Paths: make(openapi3.Paths),
+			},
+		}
+
+		s.SetTykExtension(&XTykAPIGateway{
+			Middleware: &Middleware{
+				Operations: make(Operations),
+			},
+		})
+
+		endpointMetas := []apidef.EndPointMeta{
+			{
+				Path:     "/test",
+				Method:   http.MethodGet,
+				Disabled: true,
+			},
+		}
+
+		s.fillAllowance(endpointMetas, allow)
+
+		operationID := s.getOperationID("/test", http.MethodGet)
+		operation := s.GetTykExtension().getOperation(operationID)
+
+		assert.NotNil(t, operation.Allow)
+		assert.False(t, operation.Allow.Enabled)
+	})
+>>>>>>> a145dbd4d... [TT-7306] Ensure ignoreAuthentication is only enabled in migration scenario (#6923)
 }
