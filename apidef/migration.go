@@ -343,36 +343,41 @@ func (a *APIDefinition) migrateGlobalResponseHeaders() {
 }
 
 func (a *APIDefinition) MigrateCachePlugin() {
+	// defaultCacheTimeout represents the default cache duration in seconds if no specific timeout is configured
+	const defaultCacheTimeout int64 = 60
+
 	vInfo := a.VersionData.Versions[""]
 	list := vInfo.ExtendedPaths.Cached
 
-	timeout := int64(60)
+	timeout := defaultCacheTimeout
 
-	if a.CacheOptions.CacheTimeout > 0 {
-		timeout = a.CacheOptions.CacheTimeout
+	opts := a.CacheOptions
+
+	if opts.CacheTimeout > 0 {
+		timeout = opts.CacheTimeout
 	}
 
-	var cacheResponseCodes []int
-	if a.CacheOptions.CacheOnlyResponseCodes != nil {
-		cacheResponseCodes = a.CacheOptions.CacheOnlyResponseCodes
-	}
+	cacheResponseCodes := opts.CacheOnlyResponseCodes
 
 	if vInfo.UseExtendedPaths && len(list) > 0 {
 		var advCacheMethods []CacheMeta
 		for _, cache := range list {
 			newGetMethodCache := CacheMeta{
+				Disabled:               !opts.EnableCache,
 				Path:                   cache,
 				Method:                 http.MethodGet,
 				Timeout:                timeout,
 				CacheOnlyResponseCodes: cacheResponseCodes,
 			}
 			newHeadMethodCache := CacheMeta{
+				Disabled:               !opts.EnableCache,
 				Path:                   cache,
 				Method:                 http.MethodHead,
 				Timeout:                timeout,
 				CacheOnlyResponseCodes: cacheResponseCodes,
 			}
 			newOptionsMethodCache := CacheMeta{
+				Disabled:               !opts.EnableCache,
 				Path:                   cache,
 				Method:                 http.MethodOptions,
 				Timeout:                timeout,
