@@ -13,6 +13,8 @@ import (
 
 const (
 	ResponseProcessorResponseBodyTransform = "response_body_transform"
+	// DefaultCacheTimeout is the default cache TTL in seconds if not specified for api and endpoint level caching
+	DefaultCacheTimeout int64 = 60
 )
 
 var (
@@ -343,53 +345,21 @@ func (a *APIDefinition) migrateGlobalResponseHeaders() {
 }
 
 func (a *APIDefinition) MigrateCachePlugin() {
-	// defaultCacheTimeout represents the default cache duration in seconds if no specific timeout is configured
-	const defaultCacheTimeout int64 = 60
-
 	vInfo := a.VersionData.Versions[""]
 	list := vInfo.ExtendedPaths.Cached
-
-	timeout := defaultCacheTimeout
-
-	opts := a.CacheOptions
-
-	if opts.CacheTimeout > 0 {
-		timeout = opts.CacheTimeout
-	}
-
-	cacheResponseCodes := opts.CacheOnlyResponseCodes
 
 	if vInfo.UseExtendedPaths && len(list) > 0 {
 		var advCacheMethods []CacheMeta
 		for _, cache := range list {
-			newGetMethodCache := CacheMeta{
-				Disabled:               !opts.EnableCache,
-				Path:                   cache,
-				Method:                 http.MethodGet,
-				Timeout:                timeout,
-				CacheOnlyResponseCodes: cacheResponseCodes,
-			}
-			newHeadMethodCache := CacheMeta{
-				Disabled:               !opts.EnableCache,
-				Path:                   cache,
-				Method:                 http.MethodHead,
-				Timeout:                timeout,
-				CacheOnlyResponseCodes: cacheResponseCodes,
-			}
-			newOptionsMethodCache := CacheMeta{
-				Disabled:               !opts.EnableCache,
-				Path:                   cache,
-				Method:                 http.MethodOptions,
-				Timeout:                timeout,
-				CacheOnlyResponseCodes: cacheResponseCodes,
-			}
+			newGetMethodCache := createAdvancedCacheConfig(a.CacheOptions, cache, http.MethodGet)
+			newHeadMethodCache := createAdvancedCacheConfig(a.CacheOptions, cache, http.MethodHead)
+			newOptionsMethodCache := createAdvancedCacheConfig(a.CacheOptions, cache, http.MethodOptions)
+
 			advCacheMethods = append(advCacheMethods, newGetMethodCache, newHeadMethodCache, newOptionsMethodCache)
 		}
 
-		// Create a new slice combining the newly created cache methods with any existing advanced cache config
-		// advCacheMethods contains the migrated simple cache paths converted to method-specific cache configurations
-		// vInfo.ExtendedPaths.AdvanceCacheConfig contains any existing advanced cache configurations
-		// This preserves both the migrated simple cache paths and any existing advanced configurations
+		// Combine the new method-specific cache configs with any existing advanced configs
+		// Note: existing configs are added last so they have higher priority
 		vInfo.ExtendedPaths.AdvanceCacheConfig = append(advCacheMethods, vInfo.ExtendedPaths.AdvanceCacheConfig...)
 
 		// Clear the old simple cache paths since they've been migrated to the advanced configuration
@@ -397,6 +367,33 @@ func (a *APIDefinition) MigrateCachePlugin() {
 	}
 
 	a.VersionData.Versions[""] = vInfo
+}
+
+func createAdvancedCacheConfig(cacheOpts CacheOptions, path string, method string) CacheMeta {
+	// Default cache timeout in seconds if none is specified but caching is enabled
+	timeout := DefaultCacheTimeout
+
+	// Use the global cache timeout from cache_options.
+	// If not set (0), defaults to DefaultCacheTimeout (60s)
+	if cacheOpts.CacheTimeout > 0 {
+		timeout = cacheOpts.CacheTimeout
+	}
+
+	cacheResponseCodes := cacheOpts.CacheOnlyResponseCodes
+
+	return CacheMeta{
+		// When migrating to advanced cache configuration:
+		// - If global cache is disabled, create the advanced config but mark it as disabled
+		// - If global cache is enabled, create the advanced config as enabled
+		Disabled: !cacheOpts.EnableCache,
+		Path:     path,
+		Method:   method,
+		// Use the global cache timeout from cache_options.
+		// If not set (0), defaults to DefaultCacheTimeout (60s)
+		Timeout: timeout,
+		// We should take response codes from global cache (cache_options)
+		CacheOnlyResponseCodes: cacheResponseCodes,
+	}
 }
 
 func (a *APIDefinition) MigrateAuthentication() {

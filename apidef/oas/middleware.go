@@ -718,7 +718,6 @@ type Cache struct {
 // Fill fills *Cache from apidef.CacheOptions.
 func (c *Cache) Fill(cache apidef.CacheOptions) {
 	c.Enabled = cache.EnableCache
-	c.Enabled = cache.EnableCache
 	c.Timeout = cache.CacheTimeout
 	c.CacheAllSafeRequests = cache.CacheAllSafeRequests
 	c.CacheResponseCodes = cache.CacheOnlyResponseCodes
@@ -1207,14 +1206,9 @@ func (a *CachePlugin) Fill(cm apidef.CacheMeta) {
 	a.CacheResponseCodes = cm.CacheOnlyResponseCodes
 	a.Timeout = cm.Timeout
 
-	// Default cache timeout in seconds if none is specified but caching is enabled
-	// TODO(TT-14102): Add test for this
-	const defaultCacheTimeout = 60
-
-	// If caching is enabled but no timeout was specified, set a default timeout
-	// TODO(TT-14102): Add test for this
+	//TT-14102: Default cache timeout in seconds if none is specified but caching is enabled
 	if a.Enabled && a.Timeout == 0 {
-		a.Timeout = defaultCacheTimeout
+		a.Timeout = apidef.DefaultCacheTimeout
 	}
 }
 
