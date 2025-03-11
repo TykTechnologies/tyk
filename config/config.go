@@ -252,11 +252,11 @@ type AnalyticsConfigConfig struct {
 
 // AccessLogsConfig defines the type of transactions logs printed to stdout.
 type AccessLogsConfig struct {
-	// Enabled controls enabling the transaction logs. Default: false.
+	// Enabled controls the generation of access logs by the Gateway. Default: false.
 	Enabled bool `json:"enabled"`
 
-	// Template configures which fields to log into the access log.
-	// If unconfigured, all fields listed will be logged.
+	// Template configures which fields to include in the access log.
+	// If no template is configured, all available fields will be logged.
 	//
 	// Example: ["client_ip", "path"].
 	//
@@ -493,7 +493,7 @@ type HttpServerOptionsConfig struct {
 	// Start your Gateway HTTP server on specific server name
 	ServerName string `json:"server_name"`
 
-	// Minimum TLS version. Possible values: https://tyk.io/docs/basic-config-and-security/security/tls-and-ssl/#values-for-tls-versions
+	// Minimum TLS version. Possible values: https://tyk.io/docs/api-management/certificates#supported-tls-versions
 	MinVersion uint16 `json:"min_version"`
 
 	// Maximum TLS version.
@@ -515,7 +515,7 @@ type HttpServerOptionsConfig struct {
 	// Disable automatic character escaping, allowing to path original URL data to the upstream.
 	SkipTargetPathEscaping bool `json:"skip_target_path_escaping"`
 
-	// Custom SSL ciphers. See list of ciphers here https://tyk.io/docs/basic-config-and-security/security/tls-and-ssl/#specify-tls-cipher-suites-for-tyk-gateway--tyk-dashboard
+	// Custom SSL ciphers applicable when using TLS version 1.2. See the list of ciphers here https://tyk.io/docs/api-management/certificates#supported-tls-cipher-suites
 	Ciphers []string `json:"ssl_ciphers"`
 
 	// MaxRequestBodySize configures a maximum size limit for request body size (in bytes) for all APIs on the Gateway.
@@ -709,7 +709,7 @@ type Config struct {
 	// Custom hostname for the Control API
 	ControlAPIHostname string `json:"control_api_hostname"`
 
-	// Set this to expose the Tyk Gateway API on a separate port. You can protect it behind a firewall if needed. Please make sure you follow this guide when setting the control port https://tyk.io/docs/planning-for-production/#change-your-control-port.
+	// Set this to expose the Tyk Gateway API on a separate port. You can protect it behind a firewall if needed. Please make sure you follow this guide when setting the control port https://tyk.io/docs/tyk-self-managed/#change-your-control-port.
 	ControlAPIPort int `json:"control_api_port"`
 
 	// This should be changed as soon as Tyk is installed on your system.
@@ -1116,7 +1116,7 @@ type Config struct {
 	GlobalSessionLifetime int64 `bson:"global_session_lifetime" json:"global_session_lifetime"`
 
 	// This section enables the use of the KV capabilities to substitute configuration values.
-	// See more details https://tyk.io/docs/tyk-configuration-reference/kv-store/
+	// See more details https://tyk.io/docs/tyk-self-managed/#store-configuration-with-key-value-store
 	KV struct {
 		Consul ConsulConfig `json:"consul"`
 		Vault  VaultConfig  `json:"vault"`
@@ -1132,7 +1132,7 @@ type Config struct {
 	// The secret value may be used as `secrets://key1` from the API definition.
 	// In versions before gateway 5.3, only `listen_path` and `target_url` fields
 	// have had the secrets replaced.
-	// See more details https://tyk.io/docs/tyk-configuration-reference/kv-store/#how-to-access-the-externally-stored-data
+	// See more details https://tyk.io/docs/tyk-self-managed/#how-to-access-the-externally-stored-data
 	Secrets map[string]string `json:"secrets"`
 
 	// Override the default error code and or message returned by middleware.
