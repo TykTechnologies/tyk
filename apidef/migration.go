@@ -359,7 +359,7 @@ func (a *APIDefinition) MigrateCachePlugin() {
 		}
 
 		// Combine the new method-specific cache configs with any existing advanced configs
-		// Note: existing configs are added last so they have higher priority
+		// Note: existing configs are added last so they have higher priority (last wins)
 		vInfo.ExtendedPaths.AdvanceCacheConfig = append(advCacheMethods, vInfo.ExtendedPaths.AdvanceCacheConfig...)
 
 		// Clear the old simple cache paths since they've been migrated to the advanced configuration
