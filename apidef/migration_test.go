@@ -874,7 +874,46 @@ func TestAPIDefinition_migrateIPAccessControl(t *testing.T) {
 
 }
 
-func TestMigrateCachePlugin(t *testing.T) {
+func TestAPIDefinition_MigrateCachePlugin(t *testing.T) {
+	versionInfo := VersionInfo{
+		UseExtendedPaths: true,
+		ExtendedPaths: ExtendedPathsSet{
+			Cached: []string{"test"},
+		},
+	}
+
+	old := APIDefinition{
+		VersionData: VersionData{
+			Versions: map[string]VersionInfo{
+				"": versionInfo,
+			},
+		},
+	}
+
+	old.MigrateCachePlugin()
+
+	cacheItemGet := CacheMeta{
+		Method:        http.MethodGet,
+		Disabled:      false,
+		Path:          "test",
+		CacheKeyRegex: "",
+	}
+	cacheItemHead := cacheItemGet
+	cacheItemHead.Method = http.MethodHead
+
+	cacheItemOptions := cacheItemGet
+	cacheItemOptions.Method = http.MethodOptions
+	expectedAdvCacheMethods := []CacheMeta{
+		cacheItemGet,
+		cacheItemHead,
+		cacheItemOptions,
+	}
+
+	assert.Empty(t, old.VersionData.Versions[""].ExtendedPaths.Cached)
+	assert.Equal(t, expectedAdvCacheMethods, old.VersionData.Versions[""].ExtendedPaths.AdvanceCacheConfig)
+}
+
+func TestAPIDefinition_MigrateCachePlugin_MultipleMethods(t *testing.T) {
 	tests := []struct {
 		name string
 		api  *APIDefinition

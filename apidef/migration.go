@@ -369,6 +369,7 @@ func (a *APIDefinition) MigrateCachePlugin() {
 	a.VersionData.Versions[""] = vInfo
 }
 
+// createAdvancedCacheConfig creates a new CacheMeta configuration for advanced caching.
 func createAdvancedCacheConfig(cacheOpts CacheOptions, path string, method string) CacheMeta {
 	// Default cache timeout in seconds if none is specified but caching is enabled
 	timeout := DefaultCacheTimeout
