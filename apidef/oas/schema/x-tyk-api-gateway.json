@@ -2432,6 +2432,9 @@
         "enabled": {
           "type": "boolean"
         },
+        "skipUnavailableHosts": {
+          "type": "boolean"
+        },
         "targets": {
           "type": "array",
           "items": [
@@ -2554,9 +2557,6 @@
           }
         },
         "method": {
-          "type": "string"
-        },
-        "protocol": {
           "type": "string"
         },
         "timeout": {
