@@ -1274,6 +1274,8 @@ func (s *Test) Close() {
 	if err != nil {
 		log.Error("could not remove apis")
 	}
+
+	s.Gw.cacheClose()
 }
 
 // RemoveApis clean all the apis from a living gw
