@@ -529,7 +529,7 @@ type HttpServerOptionsConfig struct {
 	// A value of zero (default) means that no maximum is set and API requests will not be tested.
 	//
 	// See more information about setting request size limits here:
-	// https://tyk.io/docs/basic-config-and-security/control-limit-traffic/request-size-limits/#maximum-request-sizes
+	// https://tyk.io/docs/api-management/traffic-transformation/#request-size-limits
 	MaxRequestBodySize int64 `json:"max_request_body_size"`
 }
 
@@ -782,7 +782,7 @@ type Config struct {
 	Policies PoliciesConfig `json:"policies"`
 
 	// Defines the ports that will be available for the API services to bind to in the format
-	// documented here https://tyk.io/docs/key-concepts/tcp-proxy/#allowing-specific-ports.
+	// documented here https://tyk.io/docs/api-management/non-http-protocols/#allowing-specific-ports.
 	// Ports can be configured per protocol, e.g. https, tls etc.
 	// If configuring via environment variable `TYK_GW_PORTWHITELIST` then remember to escape
 	// JSON strings.
@@ -1057,7 +1057,7 @@ type Config struct {
 
 	NewRelic NewRelicConfig `json:"newrelic"`
 
-	// Enable debugging of your Tyk Gateway by exposing profiling information through https://tyk.io/docs/troubleshooting/tyk-gateway/profiling/
+	// Enable debugging of your Tyk Gateway by exposing profiling information through https://tyk.io/docs/api-management/troubleshooting-debugging
 	HTTPProfile bool `json:"enable_http_profiler"`
 
 	// Enables the real-time Gateway log view in the Dashboard.
@@ -1159,7 +1159,7 @@ type Config struct {
 	// ```
 	OverrideMessages map[string]TykError `bson:"override_messages" json:"override_messages"`
 
-	// Cloud flag indicates that the Gateway is deployed in a Tyk Cloud data plane.
+	// Cloud flag shows the Gateway runs in Tyk Cloud.
 	Cloud bool `json:"cloud"`
 
 	// Skip TLS verification for JWT JWKs url validation
