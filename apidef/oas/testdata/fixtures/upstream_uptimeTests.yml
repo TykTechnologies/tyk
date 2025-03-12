@@ -20,7 +20,6 @@ tests:
             logRetentionPeriod: 10s
             tests:
             - url: "https://www.google.com"
-              protocol: "http"
               timeout: 1s
               method: "GET"
               enableProxyProtocol: true
@@ -28,13 +27,13 @@ tests:
                 "Content-Type": "application/json"
               body: "test"
     output:
-      proxy.check_host_against_uptime_tests: true
       uptime_tests.config.expire_utime_after: 10
       uptime_tests.config.recheck_wait: 20
       uptime_tests:
+        disabled: false
         check_list:
           - url: "https://www.google.com"
-            protocol: "http"
+            protocol: "https"
             timeout: 1000000000
             method: "GET"
             headers.Content-Type: "application/json"
@@ -44,49 +43,16 @@ tests:
   - desc: "upstream uptime test classic"
     source: classic
     input:
-      proxy:
-        check_host_against_uptime_tests: true
       uptime_tests:
+        disabled: true
         config:
           expire_utime_after: 10
           recheck_wait: 20
         check_list:
-          - url: "https://www.google.com"
-            protocol: "http"
+          - url: "http://www.google.com"
+            protocol: "https"
             timeout: 2000000
             method: "GET"
-            headers:
-              "Content-Type": "application/json"
-    output:
-      x-tyk-api-gateway:
-        upstream:
-          serviceDiscovery: <nil>
-          uptimeTests:
-            enabled: true
-            hostDownRetestPeriod: 20s
-            logRetentionPeriod: 10s
-            tests:
-            - url: "https://www.google.com"
-              protocol: "http"
-              timeout: 2ms
-              method: "GET"
-              headers:
-                "Content-Type": "application/json"
-  - desc: "upstream uptime test classic"
-    source: classic
-    input:
-      proxy:
-        check_host_against_uptime_tests: false
-      uptime_tests:
-        config:
-          expire_utime_after: 10
-          recheck_wait: 20
-        check_list:
-          - url: "https://www.google.com"
-            protocol: "http"
-            timeout: 2000000000
-            method: "GET"
-            enable_proxy_protocol: true
             headers:
               "Content-Type": "application/json"
     output:
@@ -99,7 +65,36 @@ tests:
             logRetentionPeriod: 10s
             tests:
             - url: "https://www.google.com"
-              protocol: "http"
+              timeout: 2ms
+              method: "GET"
+              headers:
+                "Content-Type": "application/json"
+  - desc: "upstream uptime test classic"
+    source: classic
+    input:
+      uptime_tests:
+        disabled: false
+        config:
+          expire_utime_after: 10
+          recheck_wait: 20
+        check_list:
+          - url: "https://www.google.com"
+            protocol: "https"
+            timeout: 2000000000
+            method: "GET"
+            enable_proxy_protocol: true
+            headers:
+              "Content-Type": "application/json"
+    output:
+      x-tyk-api-gateway:
+        upstream:
+          serviceDiscovery: <nil>
+          uptimeTests:
+            enabled: true
+            hostDownRetestPeriod: 20s
+            logRetentionPeriod: 10s
+            tests:
+            - url: "https://www.google.com"
               timeout: 2s
               method: "GET"
               enableProxyProtocol: true
@@ -108,15 +103,14 @@ tests:
   - desc: "upstream uptime test classic - commands"
     source: classic
     input:
-      proxy:
-        check_host_against_uptime_tests: false
       uptime_tests:
+        disabled: false
         config:
           expire_utime_after: 10
           recheck_wait: 20
         check_list:
           - url: "https://www.google.com"
-            protocol: "http"
+            protocol: "https"
             timeout: 2000000000
             method: "GET"
             enable_proxy_protocol: true
@@ -132,12 +126,11 @@ tests:
         upstream:
           serviceDiscovery: <nil>
           uptimeTests:
-            enabled: false
+            enabled: true
             hostDownRetestPeriod: 20s
             logRetentionPeriod: 10s
             tests:
             - url: "https://www.google.com"
-              protocol: "http"
               timeout: 2s
               method: "GET"
               enableProxyProtocol: true
