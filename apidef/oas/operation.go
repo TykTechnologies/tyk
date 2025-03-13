@@ -265,8 +265,6 @@ func (s *OAS) fillMockResponsePaths(paths openapi3.Paths, ep apidef.ExtendedPath
 			tykOperation.MockResponse = nil
 			tykOperation.IgnoreAuthentication = nil
 		}
-
-		tykOperation.Allow = nil
 	}
 }
 
