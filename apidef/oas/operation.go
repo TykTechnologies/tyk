@@ -983,6 +983,36 @@ func (s *OAS) fillCircuitBreaker(metas []apidef.CircuitBreakerMeta) {
 	}
 }
 
+// detectMockResponseContentType determines the Content-Type of the mock response.
+// It first checks the headers for an explicit Content-Type, then attempts to detect
+// the type from the body content. Returns "text/plain" if no specific type can be determined.
+func detectMockResponseContentType(mock apidef.MockResponseMeta) string {
+	const headerContentType = "Content-Type"
+
+	for name, value := range mock.Headers {
+		if http.CanonicalHeaderKey(name) == headerContentType {
+			return value
+		}
+	}
+
+	if mock.Body == "" {
+		return "text/plain"
+	}
+
+	// We attempt to guess the content type by checking if the body is a valid JSON.
+	var arrayValue = []json.RawMessage{}
+	if err := json.Unmarshal([]byte(mock.Body), &arrayValue); err == nil {
+		return "application/json"
+	}
+
+	var objectValue = map[string]json.RawMessage{}
+	if err := json.Unmarshal([]byte(mock.Body), &objectValue); err == nil {
+		return "application/json"
+	}
+
+	return "text/plain"
+}
+
 // sortMockResponseAllowList sorts the mock response paths by path, method, and response code.
 // This ensures a deterministic order of mock responses.
 func sortMockResponseAllowList(ep *apidef.ExtendedPathsSet) {
