@@ -542,32 +542,6 @@ func (o *Operation) extractRequestSizeLimitTo(ep *apidef.ExtendedPathsSet, path 
 	ep.SizeLimit = append(ep.SizeLimit, meta)
 }
 
-<<<<<<< HEAD
-=======
-// extractMockResponsePaths converts OAS mock responses to classic API format.
-func (o *Operation) extractMockResponsePaths(ep *apidef.ExtendedPathsSet, path, method string) {
-	if o.MockResponse == nil {
-		return
-	}
-
-	headers := make(map[string]string)
-	for _, header := range o.MockResponse.Headers {
-		headers[http.CanonicalHeaderKey(header.Name)] = header.Value
-	}
-
-	mockResponse := apidef.MockResponseMeta{
-		Disabled: !o.MockResponse.Enabled,
-		Path:     path,
-		Method:   method,
-		Code:     o.MockResponse.Code,
-		Body:     o.MockResponse.Body,
-		Headers:  headers,
-	}
-
-	ep.MockResponse = append(ep.MockResponse, mockResponse)
-}
-
->>>>>>> 8d005fd5f... [TT-7306] [fix] Migrate Mock Response from Classic API Definition to OAS API Definition (#6914)
 // detect possible regex pattern:
 // - character match ([a-z])
 // - greedy match (.*)
