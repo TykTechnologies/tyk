@@ -64,9 +64,6 @@ var (
 
 	// Used to store the test bundles:
 	testMiddlewarePath, _ = ioutil.TempDir("", "tyk-middleware-path")
-
-	EnableTestDNSMock = false
-	MockHandle        *test.DnsMockHandle
 )
 
 // ReloadMachinery is a helper struct to use when writing tests that do manual
@@ -242,16 +239,6 @@ func InitTestMain(ctx context.Context, m *testing.M) int {
 
 	bundleBackoffMultiplier = 0
 	bundleMaxBackoffRetries = 0
-
-	if EnableTestDNSMock {
-		var errMock error
-		MockHandle, errMock = test.InitDNSMock(test.DomainsToAddresses, nil)
-		if errMock != nil {
-			panic(errMock)
-		}
-
-		defer MockHandle.ShutdownDnsMock()
-	}
 
 	exitCode := m.Run()
 
@@ -1000,32 +987,6 @@ func firstVals(vals map[string][]string) map[string]string {
 	return m
 }
 
-type TestConfig struct {
-	SeparateControlAPI bool
-	Delay              time.Duration
-	HotReload          bool
-	overrideDefaults   bool
-	CoprocessConfig    config.CoProcessConfig
-	EnableTestDNSMock  bool
-}
-
-type Test struct {
-	URL        string
-	testRunner *test.HTTPTestRunner
-	// GlobalConfig deprecate this and instead use GW.getConfig()
-	GlobalConfig     config.Config
-	config           TestConfig
-	Gw               *Gateway `json:"-"`
-	HttpHandler      *http.Server
-	TestServerRouter *mux.Router
-	MockHandle       *test.DnsMockHandle
-
-	ctx    context.Context
-	cancel context.CancelFunc
-
-	dynamicHandlers map[string]http.HandlerFunc
-}
-
 type SlaveDataCenter struct {
 	SlaveOptions config.SlaveOptionsConfig
 	Redis        config.StorageOptionsConf
@@ -1036,8 +997,6 @@ func StartTest(genConf func(globalConf *config.Config), testConfig ...TestConfig
 		dynamicHandlers: make(map[string]http.HandlerFunc),
 	}
 
-	// DNS mock enabled by default
-	t.config.EnableTestDNSMock = false
 	if len(testConfig) > 0 {
 		t.config = testConfig[0]
 	}
@@ -1045,66 +1004,6 @@ func StartTest(genConf func(globalConf *config.Config), testConfig ...TestConfig
 	t.Gw = t.start(genConf)
 
 	return t
-}
-
-func (s *Test) start(genConf func(globalConf *config.Config)) *Gateway {
-	// init and create gw
-	ctx, cancel := context.WithCancel(context.Background())
-
-	log.Info("starting test")
-
-	s.ctx = ctx
-	s.cancel = func() {
-		cancel()
-		log.Info("Cancelling test context")
-	}
-
-	gw := s.newGateway(genConf)
-	gw.setupPortsWhitelist()
-	gw.startServer()
-	gw.setupGlobals()
-
-	// Set up a default org manager so we can traverse non-live paths
-	if !gw.GetConfig().SupressDefaultOrgStore {
-		gw.DefaultOrgStore.Init(gw.getGlobalStorageHandler("orgkey.", false))
-		gw.DefaultQuotaStore.Init(gw.getGlobalStorageHandler("orgkey.", false))
-	}
-
-	s.GlobalConfig = gw.GetConfig()
-
-	scheme := "http://"
-	if s.GlobalConfig.HttpServerOptions.UseSSL {
-		scheme = "https://"
-	}
-
-	s.URL = scheme + gw.DefaultProxyMux.getProxy(gw.GetConfig().ListenPort, gw.GetConfig()).listener.Addr().String()
-
-	s.testRunner = &test.HTTPTestRunner{
-		RequestBuilder: func(tc *test.TestCase) (*http.Request, error) {
-			tc.BaseURL = s.URL
-			if tc.ControlRequest {
-				if s.config.SeparateControlAPI {
-					tc.BaseURL = scheme + s.controlProxy().listener.Addr().String()
-				} else if s.GlobalConfig.ControlAPIHostname != "" {
-					tc.Domain = s.GlobalConfig.ControlAPIHostname
-				}
-			}
-			r, err := test.NewRequest(tc)
-
-			if tc.AdminAuth {
-				r = s.withAuth(r)
-			}
-
-			if s.config.Delay > 0 {
-				tc.Delay = s.config.Delay
-			}
-
-			return r, err
-		},
-		Do: test.HttpServerRunner(),
-	}
-
-	return gw
 }
 
 func (s *Test) AddDynamicHandler(path string, handlerFunc http.HandlerFunc) {
@@ -1134,8 +1033,6 @@ func (s *Test) newGateway(genConf func(globalConf *config.Config)) *Gateway {
 	gw := NewGateway(gwConfig, s.ctx)
 	gw.setTestMode(true)
 	gw.ConnectionWatcher = httputil.NewConnectionWatcher()
-
-	s.MockHandle = MockHandle
 
 	var err error
 	gwConfig.Storage.Database = mathrand.Intn(15)
@@ -1279,51 +1176,6 @@ func (s *Test) Do(tc test.TestCase) (*http.Response, error) {
 func (s *Test) ReloadGatewayProxy() {
 	s.Gw.DefaultProxyMux.swap(&proxyMux{}, s.Gw)
 	s.Gw.startServer()
-}
-
-func (s *Test) Close() {
-	defer s.cancel()
-
-	for _, p := range s.Gw.DefaultProxyMux.proxies {
-		if p.listener != nil {
-			p.listener.Close()
-		}
-	}
-
-	gwConfig := s.Gw.GetConfig()
-
-	s.Gw.DefaultProxyMux.swap(&proxyMux{}, s.Gw)
-	if s.config.SeparateControlAPI {
-		gwConfig.ControlAPIPort = 0
-		s.Gw.SetConfig(gwConfig)
-	}
-
-	// if jsvm enabled we need to unmount to prevent high memory consumption
-	if s.Gw.GetConfig().EnableJSVM {
-		s.Gw.GlobalEventsJSVM.VM = nil
-	}
-
-	ctxShutDown, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	err := s.HttpHandler.Shutdown(ctxShutDown)
-	if err != nil {
-		log.WithError(err).Error("shutting down the http handler")
-	} else {
-		log.Info("server exited properly")
-	}
-
-	s.Gw.Analytics.Stop()
-	s.Gw.ReloadTestCase.StopTicker()
-	s.Gw.GlobalHostChecker.StopPoller()
-	s.Gw.NewRelicApplication.Shutdown(5 * time.Second)
-
-	err = s.RemoveApis()
-	if err != nil {
-		log.Error("could not remove apis")
-	}
-
-	s.Gw.cacheClose()
 }
 
 // RemoveApis clean all the apis from a living gw
