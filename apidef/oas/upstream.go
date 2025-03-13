@@ -736,6 +736,10 @@ func (u *UptimeTests) ExtractTo(uptimeTests *apidef.UptimeTests) {
 // This needs to be done because classic can have invalid protocol and checkURL combinations, e.g.
 // protocol=tcp, checkURL=https://myservice.fake
 func (u *UptimeTests) fillCheckURL(protocol string, checkURL string) string {
+	// in classic API, protocol can be empty so we need to check for that and return the original URL
+	if protocol == "" {
+		return checkURL
+	}
 	protocolessURL := checkURL
 	splitURL := strings.Split(checkURL, "://")
 	if len(splitURL) > 1 {
