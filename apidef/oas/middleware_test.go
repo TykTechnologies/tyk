@@ -1330,3 +1330,127 @@ func TestGlobalRequestSizeLimit(t *testing.T) {
 		}
 	})
 }
+
+func TestCachePlugin_Fill(t *testing.T) {
+	t.Run("should fill cache plugin with provided values", func(t *testing.T) {
+		cacheMeta := apidef.CacheMeta{
+			Disabled:               false,
+			CacheKeyRegex:          "test-regex",
+			CacheOnlyResponseCodes: []int{200, 201},
+			Timeout:                60,
+		}
+
+		cachePlugin := &CachePlugin{}
+		cachePlugin.Fill(cacheMeta)
+
+		assert.True(t, cachePlugin.Enabled)
+		assert.Equal(t, "test-regex", cachePlugin.CacheByRegex)
+		assert.Equal(t, []int{200, 201}, cachePlugin.CacheResponseCodes)
+		assert.Equal(t, int64(60), cachePlugin.Timeout)
+	})
+
+	t.Run("should apply default timeout when enabled but no timeout specified", func(t *testing.T) {
+		cacheMeta := apidef.CacheMeta{
+			Disabled:               false,
+			CacheKeyRegex:          "test-regex",
+			CacheOnlyResponseCodes: []int{200},
+			Timeout:                0,
+		}
+
+		cachePlugin := &CachePlugin{}
+		cachePlugin.Fill(cacheMeta)
+
+		assert.True(t, cachePlugin.Enabled)
+		assert.Equal(t, apidef.DefaultCacheTimeout, cachePlugin.Timeout)
+	})
+
+	t.Run("should not apply default timeout when disabled", func(t *testing.T) {
+		cacheMeta := apidef.CacheMeta{
+			Disabled: true,
+			Timeout:  0,
+		}
+
+		cachePlugin := &CachePlugin{}
+		cachePlugin.Fill(cacheMeta)
+
+		assert.False(t, cachePlugin.Enabled)
+		assert.Equal(t, int64(0), cachePlugin.Timeout)
+	})
+
+	t.Run("should handle empty response codes", func(t *testing.T) {
+		cacheMeta := apidef.CacheMeta{
+			Disabled:               false,
+			CacheKeyRegex:          "test-regex",
+			CacheOnlyResponseCodes: []int{},
+			Timeout:                60,
+		}
+
+		cachePlugin := &CachePlugin{}
+		cachePlugin.Fill(cacheMeta)
+
+		assert.True(t, cachePlugin.Enabled)
+		assert.Empty(t, cachePlugin.CacheResponseCodes)
+	})
+
+	t.Run("should handle empty regex", func(t *testing.T) {
+		cacheMeta := apidef.CacheMeta{
+			Disabled:               false,
+			CacheKeyRegex:          "",
+			CacheOnlyResponseCodes: []int{200},
+			Timeout:                60,
+		}
+
+		cachePlugin := &CachePlugin{}
+		cachePlugin.Fill(cacheMeta)
+
+		assert.True(t, cachePlugin.Enabled)
+		assert.Empty(t, cachePlugin.CacheByRegex)
+	})
+
+	t.Run("should handle negative timeout", func(t *testing.T) {
+		cacheMeta := apidef.CacheMeta{
+			Disabled:               false,
+			CacheKeyRegex:          "test-regex",
+			CacheOnlyResponseCodes: []int{200},
+			Timeout:                -1,
+		}
+
+		cachePlugin := &CachePlugin{}
+		cachePlugin.Fill(cacheMeta)
+
+		assert.True(t, cachePlugin.Enabled)
+		assert.Equal(t, int64(-1), cachePlugin.Timeout)
+	})
+
+	t.Run("should handle nil response codes", func(t *testing.T) {
+		cacheMeta := apidef.CacheMeta{
+			Disabled:               false,
+			CacheKeyRegex:          "test-regex",
+			CacheOnlyResponseCodes: nil,
+			Timeout:                60,
+		}
+
+		cachePlugin := &CachePlugin{}
+		cachePlugin.Fill(cacheMeta)
+
+		assert.True(t, cachePlugin.Enabled)
+		assert.Nil(t, cachePlugin.CacheResponseCodes)
+	})
+
+	t.Run("should preserve zero values when disabled", func(t *testing.T) {
+		cacheMeta := apidef.CacheMeta{
+			Disabled:               true,
+			CacheKeyRegex:          "test-regex",
+			CacheOnlyResponseCodes: []int{200, 201},
+			Timeout:                60,
+		}
+
+		cachePlugin := &CachePlugin{}
+		cachePlugin.Fill(cacheMeta)
+
+		assert.False(t, cachePlugin.Enabled)
+		assert.Equal(t, "test-regex", cachePlugin.CacheByRegex)
+		assert.Equal(t, []int{200, 201}, cachePlugin.CacheResponseCodes)
+		assert.Equal(t, int64(60), cachePlugin.Timeout)
+	})
+}

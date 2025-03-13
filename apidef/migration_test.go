@@ -2,6 +2,7 @@ package apidef
 
 import (
 	"net/http"
+	"reflect"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -490,45 +491,6 @@ func TestAPIDefinition_MigrateEndpointMeta(t *testing.T) {
 	assert.Equal(t, expectedMockResponse, api.VersionData.Versions[""].ExtendedPaths.MockResponse)
 }
 
-func TestAPIDefinition_MigrateCachePlugin(t *testing.T) {
-	versionInfo := VersionInfo{
-		UseExtendedPaths: true,
-		ExtendedPaths: ExtendedPathsSet{
-			Cached: []string{"test"},
-		},
-	}
-
-	old := APIDefinition{
-		VersionData: VersionData{
-			Versions: map[string]VersionInfo{
-				"": versionInfo,
-			},
-		},
-	}
-
-	old.MigrateCachePlugin()
-
-	cacheItemGet := CacheMeta{
-		Method:        http.MethodGet,
-		Disabled:      false,
-		Path:          "test",
-		CacheKeyRegex: "",
-	}
-	cacheItemHead := cacheItemGet
-	cacheItemHead.Method = http.MethodHead
-
-	cacheItemOptions := cacheItemGet
-	cacheItemOptions.Method = http.MethodOptions
-	expectedAdvCacheMethods := []CacheMeta{
-		cacheItemGet,
-		cacheItemHead,
-		cacheItemOptions,
-	}
-
-	assert.Empty(t, old.VersionData.Versions[""].ExtendedPaths.Cached)
-	assert.Equal(t, expectedAdvCacheMethods, old.VersionData.Versions[""].ExtendedPaths.AdvanceCacheConfig)
-}
-
 func TestAPIDefinition_MigrateAuthConfigNames(t *testing.T) {
 	base := oldTestAPI()
 	_, err := base.Migrate()
@@ -910,4 +872,329 @@ func TestAPIDefinition_migrateIPAccessControl(t *testing.T) {
 		})
 	})
 
+}
+
+func TestAPIDefinition_MigrateCachePlugin(t *testing.T) {
+	versionInfo := VersionInfo{
+		UseExtendedPaths: true,
+		ExtendedPaths: ExtendedPathsSet{
+			Cached: []string{"test"},
+		},
+	}
+
+	old := APIDefinition{
+		CacheOptions: CacheOptions{
+			EnableCache: true,
+		},
+		VersionData: VersionData{
+			Versions: map[string]VersionInfo{
+				"": versionInfo,
+			},
+		},
+	}
+
+	old.MigrateCachePlugin()
+
+	cacheItemGet := CacheMeta{
+		Method:        http.MethodGet,
+		Disabled:      false,
+		Path:          "test",
+		CacheKeyRegex: "",
+		Timeout:       60,
+	}
+	cacheItemHead := cacheItemGet
+	cacheItemHead.Method = http.MethodHead
+
+	cacheItemOptions := cacheItemGet
+	cacheItemOptions.Method = http.MethodOptions
+	expectedAdvCacheMethods := []CacheMeta{
+		cacheItemGet,
+		cacheItemHead,
+		cacheItemOptions,
+	}
+
+	assert.Empty(t, old.VersionData.Versions[""].ExtendedPaths.Cached)
+	assert.Equal(t, expectedAdvCacheMethods, old.VersionData.Versions[""].ExtendedPaths.AdvanceCacheConfig)
+}
+
+func TestAPIDefinition_MigrateCachePlugin_MultipleMethods(t *testing.T) {
+	tests := []struct {
+		name string
+		api  *APIDefinition
+		want *APIDefinition
+	}{
+		{
+			name: "empty cache config - no migration needed",
+			api: &APIDefinition{
+				VersionData: VersionData{
+					Versions: map[string]VersionInfo{
+						"": {
+							UseExtendedPaths: false,
+							ExtendedPaths: ExtendedPathsSet{
+								Cached: nil,
+							},
+						},
+					},
+				},
+			},
+			want: &APIDefinition{
+				VersionData: VersionData{
+					Versions: map[string]VersionInfo{
+						"": {
+							UseExtendedPaths: false,
+							ExtendedPaths: ExtendedPathsSet{
+								Cached: nil,
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "migrate simple cache paths to advanced config",
+			api: &APIDefinition{
+				CacheOptions: CacheOptions{
+					EnableCache:            true,
+					CacheTimeout:           120,
+					CacheOnlyResponseCodes: []int{200, 404},
+				},
+				VersionData: VersionData{
+					Versions: map[string]VersionInfo{
+						"": {
+							UseExtendedPaths: true,
+							ExtendedPaths: ExtendedPathsSet{
+								Cached: []string{"/test", "/api"},
+							},
+						},
+					},
+				},
+			},
+			want: &APIDefinition{
+				CacheOptions: CacheOptions{
+					EnableCache:            true,
+					CacheTimeout:           120,
+					CacheOnlyResponseCodes: []int{200, 404},
+				},
+				VersionData: VersionData{
+					Versions: map[string]VersionInfo{
+						"": {
+							UseExtendedPaths: true,
+							ExtendedPaths: ExtendedPathsSet{
+								Cached: nil,
+								AdvanceCacheConfig: []CacheMeta{
+									{
+										Path:                   "/test",
+										Method:                 http.MethodGet,
+										Disabled:               false,
+										Timeout:                120,
+										CacheOnlyResponseCodes: []int{200, 404},
+									},
+									{
+										Path:                   "/test",
+										Method:                 http.MethodHead,
+										Disabled:               false,
+										Timeout:                120,
+										CacheOnlyResponseCodes: []int{200, 404},
+									},
+									{
+										Path:                   "/test",
+										Method:                 http.MethodOptions,
+										Disabled:               false,
+										Timeout:                120,
+										CacheOnlyResponseCodes: []int{200, 404},
+									},
+									{
+										Path:                   "/api",
+										Method:                 http.MethodGet,
+										Disabled:               false,
+										Timeout:                120,
+										CacheOnlyResponseCodes: []int{200, 404},
+									},
+									{
+										Path:                   "/api",
+										Method:                 http.MethodHead,
+										Disabled:               false,
+										Timeout:                120,
+										CacheOnlyResponseCodes: []int{200, 404},
+									},
+									{
+										Path:                   "/api",
+										Method:                 http.MethodOptions,
+										Disabled:               false,
+										Timeout:                120,
+										CacheOnlyResponseCodes: []int{200, 404},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "preserve existing advanced cache config",
+			api: &APIDefinition{
+				CacheOptions: CacheOptions{
+					EnableCache:            true,
+					CacheTimeout:           120,
+					CacheOnlyResponseCodes: []int{200},
+				},
+				VersionData: VersionData{
+					Versions: map[string]VersionInfo{
+						"": {
+							UseExtendedPaths: true,
+							ExtendedPaths: ExtendedPathsSet{
+								Cached: []string{"/test"},
+								AdvanceCacheConfig: []CacheMeta{
+									{
+										Path:                   "/existing",
+										Method:                 http.MethodPost,
+										Disabled:               false,
+										Timeout:                60,
+										CacheOnlyResponseCodes: []int{201},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			want: &APIDefinition{
+				CacheOptions: CacheOptions{
+					EnableCache:            true,
+					CacheTimeout:           120,
+					CacheOnlyResponseCodes: []int{200},
+				},
+				VersionData: VersionData{
+					Versions: map[string]VersionInfo{
+						"": {
+							UseExtendedPaths: true,
+							ExtendedPaths: ExtendedPathsSet{
+								Cached: nil,
+								AdvanceCacheConfig: []CacheMeta{
+									{
+										Path:                   "/test",
+										Method:                 http.MethodGet,
+										Disabled:               false,
+										Timeout:                120,
+										CacheOnlyResponseCodes: []int{200},
+									},
+									{
+										Path:                   "/test",
+										Method:                 http.MethodHead,
+										Disabled:               false,
+										Timeout:                120,
+										CacheOnlyResponseCodes: []int{200},
+									},
+									{
+										Path:                   "/test",
+										Method:                 http.MethodOptions,
+										Disabled:               false,
+										Timeout:                120,
+										CacheOnlyResponseCodes: []int{200},
+									},
+									{
+										Path:                   "/existing",
+										Method:                 http.MethodPost,
+										Disabled:               false,
+										Timeout:                60,
+										CacheOnlyResponseCodes: []int{201},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tt.api.MigrateCachePlugin()
+			if !reflect.DeepEqual(tt.api, tt.want) {
+				t.Errorf("MigrateCachePlugin() = %v, want %v", tt.api, tt.want)
+			}
+		})
+	}
+}
+
+func TestCreateAdvancedCacheConfig(t *testing.T) {
+	tests := []struct {
+		name      string
+		cacheOpts CacheOptions
+		path      string
+		method    string
+		want      CacheMeta
+	}{
+		{
+			name: "default settings with cache enabled",
+			cacheOpts: CacheOptions{
+				EnableCache: true,
+			},
+			path:   "/test",
+			method: "GET",
+			want: CacheMeta{
+				Disabled: false,
+				Path:     "/test",
+				Method:   "GET",
+				Timeout:  DefaultCacheTimeout,
+			},
+		},
+		{
+			name: "custom timeout with cache enabled",
+			cacheOpts: CacheOptions{
+				EnableCache:  true,
+				CacheTimeout: 120,
+			},
+			path:   "/custom",
+			method: "POST",
+			want: CacheMeta{
+				Disabled: false,
+				Path:     "/custom",
+				Method:   "POST",
+				Timeout:  120,
+			},
+		},
+		{
+			name: "cache disabled",
+			cacheOpts: CacheOptions{
+				EnableCache:  false,
+				CacheTimeout: 30,
+			},
+			path:   "/disabled",
+			method: "GET",
+			want: CacheMeta{
+				Disabled: true,
+				Path:     "/disabled",
+				Method:   "GET",
+				Timeout:  30,
+			},
+		},
+		{
+			name: "with response codes",
+			cacheOpts: CacheOptions{
+				EnableCache:            true,
+				CacheOnlyResponseCodes: []int{200, 201},
+			},
+			path:   "/with-codes",
+			method: "GET",
+			want: CacheMeta{
+				Disabled:               false,
+				Path:                   "/with-codes",
+				Method:                 "GET",
+				Timeout:                DefaultCacheTimeout,
+				CacheOnlyResponseCodes: []int{200, 201},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := createAdvancedCacheConfig(tt.cacheOpts, tt.path, tt.method)
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("createAdvancedCacheConfig() = %v, want %v", got, tt.want)
+			}
+		})
+	}
 }

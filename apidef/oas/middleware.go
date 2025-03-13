@@ -1231,6 +1231,11 @@ func (a *CachePlugin) Fill(cm apidef.CacheMeta) {
 	a.CacheByRegex = cm.CacheKeyRegex
 	a.CacheResponseCodes = cm.CacheOnlyResponseCodes
 	a.Timeout = cm.Timeout
+
+	//TT-14102: Default cache timeout in seconds if none is specified but caching is enabled
+	if a.Enabled && a.Timeout == 0 {
+		a.Timeout = apidef.DefaultCacheTimeout
+	}
 }
 
 // ExtractTo extracts *CachePlugin values to *apidef.CacheMeta.
