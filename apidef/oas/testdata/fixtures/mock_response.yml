@@ -150,16 +150,7 @@ tests:
             operationId: testGET
             responses:
               "200":
-                content:
-                  application/json:
-                    examples:
-                      default:
-                        value: '{"message": "success"}'
-                headers:
-                  Content-Type:
-                    schema:
-                      type: string
-                      example: application/json
+                description: ''
       x-tyk-api-gateway:
         middleware:
           operations:
@@ -174,8 +165,6 @@ tests:
                 headers:
                   - name: Content-Type
                     value: application/json
-              allow:
-                enabled: true
               ignoreAuthentication:
                 enabled: true
   - desc: "multiple methods on same path - classic"
@@ -211,34 +200,12 @@ tests:
             operationId: testGET
             responses:
               "200":
-                content:
-                  application/json:
-                    examples:
-                      default:
-                        value: '{"status": "ok"}'
-                headers:
-                  Content-Type:
-                    schema:
-                      type: string
-                      example: application/json
+                description: ''
           post:
             operationId: testPOST
             responses:
               "201":
-                content:
-                  application/json:
-                    examples:
-                      default:
-                        value: '{"id": "123"}'
-                headers:
-                  Content-Type:
-                    schema:
-                      type: string
-                      example: application/json
-                  Location:
-                    schema:
-                      type: string
-                      example: /test/123
+                description: ''
       x-tyk-api-gateway:
         middleware:
           operations:
@@ -269,8 +236,6 @@ tests:
                     value: /test/123
               ignoreAuthentication:
                 enabled: true
-              allow:
-                enabled: true
   - desc: "disabled mock response - classic"
     source: "classic"
     input:
@@ -297,11 +262,7 @@ tests:
             operationId: testGET
             responses:
               "404":
-                content:
-                  application/json:
-                    examples:
-                      default:
-                        value: '{"error": "not found"}'
+                description: ''
       x-tyk-api-gateway:
         middleware:
           operations:
@@ -314,8 +275,6 @@ tests:
                 code: 404
                 body: '{"error": "not found"}'
               ignoreAuthentication:
-                enabled: true
-              allow:
                 enabled: true
   - desc: "empty mock response section - classic"
     source: "classic"

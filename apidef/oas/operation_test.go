@@ -367,6 +367,10 @@ func TestOAS_MockResponse_extractPathsAndOperations(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			var ep apidef.ExtendedPathsSet
 			tt.spec.extractPathsAndOperations(&ep)
+
+			// We should ensure no AllowList is created
+			require.Len(t, ep.WhiteList, 0)
+
 			tt.want(t, &ep)
 		})
 	}
@@ -587,18 +591,10 @@ func TestOAS_MockResponse_fillMockResponsePaths(t *testing.T) {
 
 				response200 := response200Ref.Value
 				require.NotNil(t, response200, "Response value for 200 should not be nil")
-
-				// Verify content
-				mediaType := response200.Content["application/json"]
-				require.NotNil(t, mediaType)
-				require.NotNil(t, mediaType.Examples)
-
-				example := mediaType.Examples["default"]
-				require.NotNil(t, example)
-				require.Equal(t, `{"message": "success"}`, example.Value.Value)
+				require.NotNil(t, response200.Description)
 
 				// Verify headers
-				assert.Equal(t, "application/json", response200.Headers["Content-Type"].Value.Schema.Value.Example)
+				require.Nil(t, response200.Headers)
 			},
 		},
 		{
@@ -645,9 +641,8 @@ func TestOAS_MockResponse_fillMockResponsePaths(t *testing.T) {
 				require.NotNil(t, response200Ref, "Response ref for 200 should not be nil")
 
 				response200 := response200Ref.Value
-				require.NotNil(t, response200, "Response value for 200 should not be nil")
-				require.Equal(t, `{"status": "ok"}`, response200.Content["application/json"].Examples["default"].Value.Value)
-				require.Equal(t, "application/json", response200.Headers["Content-Type"].Value.Schema.Value.Example)
+				require.NotNil(t, response200, "Response value should not be nil")
+				require.NotNil(t, response200.Description)
 
 				// Verify POST operation
 				require.NotNil(t, pathItem.Post)
@@ -658,10 +653,7 @@ func TestOAS_MockResponse_fillMockResponsePaths(t *testing.T) {
 
 				postResponse := pathItem.Post.Responses["201"].Value
 				require.NotNil(t, postResponse)
-				require.NotNil(t, postResponse.Content["application/json"].Examples)
-				require.Equal(t, `{"id": "123"}`, postResponse.Content["application/json"].Examples["default"].Value.Value)
-				require.Equal(t, "application/json", postResponse.Headers["Content-Type"].Value.Schema.Value.Example)
-				require.Equal(t, "/test/123", postResponse.Headers["Location"].Value.Schema.Value.Example)
+				require.NotNil(t, postResponse.Description)
 			},
 		},
 		{
@@ -689,9 +681,7 @@ func TestOAS_MockResponse_fillMockResponsePaths(t *testing.T) {
 
 				response204 := response204Ref.Value
 				require.NotNil(t, response204, "Response value for 204 should not be nil")
-				require.NotNil(t, response204.Content["text/plain"])
-				require.NotNil(t, response204.Content["text/plain"].Examples)
-				require.Equal(t, "", response204.Content["text/plain"].Examples["default"].Value.Value)
+				require.Nil(t, response204.Content["text/plain"])
 				require.Empty(t, response204.Headers)
 			},
 		},
@@ -734,7 +724,7 @@ func TestOAS_MockResponse_fillMockResponsePaths(t *testing.T) {
 
 				usersResponse := usersPath.Get.Responses["200"].Value
 				require.NotNil(t, usersResponse)
-				require.Equal(t, `["user1", "user2"]`, usersResponse.Content["application/json"].Examples["default"].Value.Value)
+				require.NotNil(t, usersResponse.Description)
 
 				// Verify /items path
 				itemsPath := spec.Paths["/items"]
@@ -747,7 +737,7 @@ func TestOAS_MockResponse_fillMockResponsePaths(t *testing.T) {
 
 				itemsResponse := itemsPath.Get.Responses["200"].Value
 				require.NotNil(t, itemsResponse)
-				require.Equal(t, `["item1", "item2"]`, itemsResponse.Content["application/json"].Examples["default"].Value.Value)
+				require.NotNil(t, itemsResponse.Description)
 			},
 		},
 		{
@@ -856,7 +846,6 @@ func TestOAS_MockResponse_fillMockResponsePaths(t *testing.T) {
 				// Text endpoint
 				txtPath := spec.Paths["/test.txt"]
 				require.NotNil(t, txtPath)
-
 				txtResponse := txtPath.Get.Responses["200"].Value
 				require.NotNil(t, txtResponse)
 				require.NotNil(t, txtResponse.Description)
@@ -1010,12 +999,14 @@ func TestOAS_MockResponse_fillMockResponsePaths(t *testing.T) {
 					}
 					setter(spec.Paths[path], op)
 
+					var desc string
+
 					// Add response for the specific status code
 					statusCode := strconv.Itoa(mockResp.Code)
+
 					op.Responses[statusCode] = &openapi3.ResponseRef{
 						Value: &openapi3.Response{
-							Headers: make(openapi3.Headers),
-							Content: make(openapi3.Content),
+							Description: &desc,
 						},
 					}
 				}

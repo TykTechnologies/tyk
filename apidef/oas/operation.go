@@ -201,69 +201,36 @@ func (s *OAS) fillMockResponsePaths(paths openapi3.Paths, ep apidef.ExtendedPath
 
 		// Response description is required by the OAS spec, but we don't have it in Tyk classic.
 		// So we're using a dummy value to satisfy the spec.
-		oasResponseDesc := "oasRequiredDummyValue"
+		var oasDesc string
 
 		response := &openapi3.Response{
-			Headers:     make(openapi3.Headers),
-			Description: &oasResponseDesc,
-		}
-
-		contentType := detectMockResponseContentType(mock)
-
-		mediaType := &openapi3.MediaType{
-			Examples: openapi3.Examples{
-				"default": &openapi3.ExampleRef{
-					Value: &openapi3.Example{
-						Value: mock.Body,
-					},
-				},
-			},
-		}
-
-		response.Content = openapi3.Content{
-			contentType: mediaType,
-		}
-
-		for name, value := range mock.Headers {
-			response.Headers[http.CanonicalHeaderKey(name)] = &openapi3.HeaderRef{
-				Value: &openapi3.Header{
-					Parameter: openapi3.Parameter{
-						Schema: &openapi3.SchemaRef{
-							Value: &openapi3.Schema{
-								Type:    "string",
-								Example: value,
-							},
-						},
-					},
-				},
-			}
+			Description: &oasDesc,
 		}
 
 		operation.Responses[strconv.Itoa(mock.Code)] = &openapi3.ResponseRef{
 			Value: response,
 		}
 
-		tykOperation := s.GetTykExtension().getOperation(operation.OperationID)
+		delete(operation.Responses, "default")
 
-		if tykOperation.Allow == nil || !tykOperation.Allow.Enabled {
-			tykOperation.Allow = &Allowance{Enabled: true}
-		}
+		tykOperation := s.GetTykExtension().getOperation(operation.OperationID)
 
 		if tykOperation.MockResponse == nil {
 			tykOperation.MockResponse = &MockResponse{}
 		}
 
-		if tykOperation.IgnoreAuthentication == nil {
+		tykOperation.MockResponse.Fill(mock)
+
+		if tykOperation.IgnoreAuthentication == nil && tykOperation.MockResponse.FromOASExamples == nil {
 			// We need to to add ignoreAuthentication middleware to the operation
 			// to stay consistent to the way mock responses work for classic APIs
 			tykOperation.IgnoreAuthentication = &Allowance{Enabled: true}
 		}
 
-		tykOperation.MockResponse.Fill(mock)
-
 		if ShouldOmit(tykOperation.MockResponse) {
-			tykOperation.MockResponse = nil
-			tykOperation.IgnoreAuthentication = nil
+			tykOperation.MockResponse = &MockResponse{
+				FromOASExamples: &FromOASExamples{},
+			}
 		}
 	}
 }
