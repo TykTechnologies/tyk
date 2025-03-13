@@ -883,6 +883,9 @@ func TestAPIDefinition_MigrateCachePlugin(t *testing.T) {
 	}
 
 	old := APIDefinition{
+		CacheOptions: CacheOptions{
+			EnableCache: true,
+		},
 		VersionData: VersionData{
 			Versions: map[string]VersionInfo{
 				"": versionInfo,
@@ -897,6 +900,7 @@ func TestAPIDefinition_MigrateCachePlugin(t *testing.T) {
 		Disabled:      false,
 		Path:          "test",
 		CacheKeyRegex: "",
+		Timeout:       60,
 	}
 	cacheItemHead := cacheItemGet
 	cacheItemHead.Method = http.MethodHead
