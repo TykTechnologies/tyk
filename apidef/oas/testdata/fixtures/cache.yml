@@ -1,0 +1,98 @@
+---
+name: "Cache"
+tests:
+  - desc: "basic cache - classic"
+    source: "classic"
+    input:
+      cache_options:
+        cache_timeout: 60
+        enable_cache: true
+        cache_all_safe_requests: false
+        cache_response_codes: []
+        enable_upstream_cache_control: false
+        cache_control_ttl_header: ''
+        cache_by_headers: []
+      version_data:
+        versions:
+          "":
+            name: Default
+            extended_paths:
+              cache:
+              - "/get"
+    output:
+      x-tyk-api-gateway:
+        middleware:
+          global:
+            cache:
+              cacheResponseCodes: []
+              cacheByHeaders: []
+              timeout: 60
+              enabled: true
+          operations: <nil>
+  - desc: "multiple advanced cache entries"
+    source: "classic"
+    input:
+      cache_options:
+        cache_timeout: 60
+        enable_cache: true
+        cache_all_safe_requests: false
+        cache_response_codes: []
+        enable_upstream_cache_control: false
+        cache_control_ttl_header: ''
+        cache_by_headers: []
+      version_data:
+        versions:
+          "":
+            name: Default
+            extended_paths:
+              advance_cache_config:
+              - path: "/get"
+                method: "GET"
+                cache_response_codes: []
+                disabled: false
+                timeout: 120        
+              - path: "/get"
+                method: "HEAD"
+                cache_response_codes: []
+                disabled: false
+                timeout: 150
+              - path: "/get"
+                method: "OPTIONS"
+                cache_response_codes: [
+                  200
+                ]
+                disabled: false
+                timeout: 200
+              - path: "/get"
+                method: "OPTIONS"
+                cache_response_codes: [
+                  204
+                ]
+                disabled: false
+                timeout: 300
+    output:
+      x-tyk-api-gateway:
+        middleware:
+          global:
+            cache:
+              cacheResponseCodes: []
+              cacheByHeaders: []
+              timeout: 60
+          operations:
+            getGET:
+              cache:
+                enabled: true
+                timeout: 120
+                cacheResponseCodes: []
+            getHEAD:
+              cache:
+                enabled: true
+                timeout: 150
+                cacheResponseCodes: []
+            getOPTIONS:
+              cache:
+                enabled: true
+                timeout: 300
+                cacheResponseCodes:
+                - 204
+                
