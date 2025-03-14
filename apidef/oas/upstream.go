@@ -672,7 +672,7 @@ func (u *UptimeTests) Fill(uptimeTests apidef.UptimeTests) {
 	for _, v := range uptimeTests.CheckList {
 		check := UptimeTest{
 			CheckURL:            u.fillCheckURL(v.Protocol, v.CheckURL),
-			Timeout:             ReadableDuration(v.Timeout * time.Second),
+			Timeout:             ReadableDuration(v.Timeout * time.Nanosecond),
 			Method:              v.Method,
 			Headers:             v.Headers,
 			Body:                v.Body,
