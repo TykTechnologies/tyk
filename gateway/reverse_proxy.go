@@ -167,10 +167,13 @@ func (gw *Gateway) nextTarget(targetData *apidef.HostList, spec *APISpec) (strin
 			if !spec.Proxy.CheckHostAgainstUptimeTests {
 				return host, nil // we don't care if it's up
 			}
-			// As checked by HostCheckerManager.AmIPolling
-			if gw.GlobalHostChecker.store == nil {
-				return host, nil
+
+			// GlobalHostCheck has not been initialized, return the host picked
+			// by round-robin algorithm.
+			if gw.GlobalHostChecker == nil {
+				return host, nil // we don't care if it's up
 			}
+			// As checked by HostCheckerManager.AmIPolling
 			if !gw.GlobalHostChecker.HostDown(host) {
 				return host, nil // we do care and it's up
 			}
