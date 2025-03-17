@@ -788,3 +788,37 @@ func TestChecker_HostReporter_down_then_up(t *testing.T) {
 	assert.Equal(t, 1, up.Load().(int), "expected host up to be fired once")
 
 }
+
+func TestUptimeTests_When_UptimeTests_Disabled_In_GW_Config(t *testing.T) {
+	// See TT-14276
+	// Test case: Uptime Tests feature is disabled in GW config but enabled in the API definition.
+	conf := func(conf *config.Config) {
+		conf.UptimeTests.Disable = true
+	}
+	ts := StartTest(conf)
+	defer ts.Close()
+
+	upstreamHost := httptest.NewServer(http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) {
+	}))
+	defer upstreamHost.Close()
+
+	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		spec.Proxy.ListenPath = "/"
+		spec.Proxy.EnableLoadBalancing = true
+		spec.Proxy.Targets = []string{upstreamHost.URL}
+		spec.Proxy.CheckHostAgainstUptimeTests = true
+		spec.UptimeTests.CheckList = []apidef.HostCheckObject{
+			{CheckURL: upstreamHost.URL},
+		}
+	})
+
+	// GlobalHostChecker not initialized, it must be nil.
+	assert.Nil(t, ts.Gw.GlobalHostChecker)
+
+	// A request to the defined API should return 200 OK response instead of
+	// panicking the GW.
+	res, err := http.Get(ts.URL + "/")
+	assert.Nil(t, err)
+	defer res.Body.Close()
+	assert.Equal(t, http.StatusOK, res.StatusCode)
+}
