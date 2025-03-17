@@ -73,6 +73,35 @@ tests:
     source: classic
     input:
       uptime_tests:
+        disabled: true
+        config:
+          expire_utime_after: 10
+          recheck_wait: 20
+        check_list:
+          - url: "http://www.google.com"
+            protocol: "https"
+            timeout: 20000
+            method: "GET"
+            headers:
+              "Content-Type": "application/json"
+    output:
+      x-tyk-api-gateway:
+        upstream:
+          serviceDiscovery: <nil>
+          uptimeTests:
+            enabled: false
+            hostDownRetestPeriod: 20s
+            logRetentionPeriod: 10s
+            tests:
+              - url: "https://www.google.com"
+                timeout: 20000ns
+                method: "GET"
+                headers:
+                  "Content-Type": "application/json"
+  - desc: "upstream uptime test classic"
+    source: classic
+    input:
+      uptime_tests:
         disabled: false
         config:
           expire_utime_after: 10
