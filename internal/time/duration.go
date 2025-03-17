@@ -77,3 +77,8 @@ func (d ReadableDuration) Milliseconds() int64 {
 func (d ReadableDuration) Nanoseconds() int64 {
 	return Duration(d).Nanoseconds()
 }
+
+// Microseconds returns ReadableDuration in microseconds.
+func (d ReadableDuration) Microseconds() int64 {
+	return Duration(d).Microseconds()
+}
