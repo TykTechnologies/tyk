@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -14,6 +13,7 @@ import (
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/internal/httputil"
 	"github.com/TykTechnologies/tyk/internal/oasutil"
+	"github.com/TykTechnologies/tyk/regexp"
 )
 
 // Operations holds Operation definitions.
@@ -1065,8 +1065,7 @@ func parsePathSegment(segment string, regexCount int, hasRegex bool) (pathPart, 
 
 // parseMuxTemplate parses a segment that is a mux template and extracts the name or assigns a custom regex name.
 func parseMuxTemplate(segment string, regexCount int) (pathPart, int, bool) {
-	segment = strings.TrimPrefix(segment, "{")
-	segment = strings.TrimSuffix(segment, "}")
+	segment = strings.Trim(segment, "{}")
 
 	name, _, ok := strings.Cut(segment, ":")
 	if ok || isIdentifier(segment) {
