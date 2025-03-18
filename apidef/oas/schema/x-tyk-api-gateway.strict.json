@@ -2719,7 +2719,7 @@
     },
     "X-Tyk-ReadableDuration": {
       "type": "string",
-      "pattern": "^(\\d+h)?(\\d+m)?(\\d+s)?(\\d+ms)?$",
+      "pattern": "^(\\d+h)?(\\d+m)?(\\d+s)?(\\d+ms)?(\\d+µs)?(\\d+ns)?$",
       "additionalProperties": false
     },
     "X-Tyk-LoadBalancingTarget": {
