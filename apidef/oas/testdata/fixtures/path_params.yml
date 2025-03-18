@@ -1,8 +1,7 @@
 ---
 name: "Path Params"
 tests:
-  - desc: "Path params - classic"
-    source: "classic"
+  - source: "classic"
     input:
       version_data:
         versions:
@@ -30,8 +29,7 @@ tests:
               schema:
                 type: string
                 pattern: <nil>
-  - desc: "Path params - classic"
-    source: "classic"
+  - source: "classic"
     input:
       version_data:
         versions:
@@ -59,8 +57,7 @@ tests:
               schema:
                 type: string
                 pattern: "<nil>"
-  - desc: "Path params - classic"
-    source: "classic"
+  - source: "classic"
     input:
       version_data:
         versions:
@@ -88,8 +85,7 @@ tests:
               schema:
                 type: string
                 pattern: "[0-9]+"
-  - desc: "Path params - classic"
-    source: "classic"
+  - source: "classic"
     input:
       version_data:
         versions:
@@ -111,8 +107,7 @@ tests:
       paths:
         /test/testId:
           parameters: <nil>
-  - desc: "Path params - classic"
-    source: "classic"
+  - source: "classic"
     input:
       version_data:
         versions:
@@ -146,3 +141,37 @@ tests:
               schema:
                 type: string
                 pattern: <nil>
+  - source: "classic"
+    input:
+      version_data:
+        versions:
+          "":
+            extended_paths:
+              white_list:
+                - path: "/abc/{id}/def/[0-9]+"
+                  method: ""
+                  ignore_case: false
+                  disabled: false
+                  method_actions:
+                    GET:
+                      action: "reply"
+                      code: 200
+                      headers:
+                        Content-Type: "application/json"
+                      data: '{"message": "success"}'
+    output:
+      paths:
+        /abc/{id}/def/{customRegex1}:
+          parameters:
+            - name: id
+              in: path
+              required: true
+              schema:
+                type: string
+                pattern: <nil>
+            - name: customRegex1
+              in: path
+              required: true
+              schema:
+                type: string
+                pattern: "[0-9]+"

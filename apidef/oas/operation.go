@@ -11,7 +11,6 @@ import (
 	"github.com/getkin/kin-openapi/openapi3"
 
 	"github.com/TykTechnologies/tyk/apidef"
-	"github.com/TykTechnologies/tyk/internal/httputil"
 	"github.com/TykTechnologies/tyk/internal/oasutil"
 	"github.com/TykTechnologies/tyk/regexp"
 )
@@ -1053,7 +1052,7 @@ func hasMockResponse(methodActions map[string]apidef.EndpointMethodMeta) bool {
 
 // parsePathSegment parses a single path segment and determines if it contains a regex pattern.
 func parsePathSegment(segment string, regexCount int, hasRegex bool) (pathPart, int, bool) {
-	if httputil.IsMuxTemplate(segment) {
+	if strings.HasPrefix(segment, "{") && strings.HasSuffix(segment, "}") {
 		return parseMuxTemplate(segment, regexCount)
 	} else if isIdentifier(segment) {
 		return pathPart{name: segment, value: segment, isRegex: false}, regexCount, hasRegex

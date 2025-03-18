@@ -1280,6 +1280,23 @@ func TestSplitPath(t *testing.T) {
 			wantParts: []pathPart{},
 			wantRegex: false,
 		},
+		"path with multiple regexes": {
+			input: "/users/{userId:[0-9]+}/posts/{postId:[a-z]+}/[a-z]+/{[0-9]{2}}/[a-z]{10}/abc/{id}/def/[0-9]+",
+			wantParts: []pathPart{
+				{name: "users", value: "users", isRegex: false},
+				{name: "userId", isRegex: true},
+				{name: "posts", value: "posts", isRegex: false},
+				{name: "postId", isRegex: true},
+				{name: "customRegex1", value: "[a-z]+", isRegex: true},
+				{name: "customRegex2", isRegex: true},
+				{name: "customRegex3", value: "[a-z]{10}", isRegex: true},
+				{name: "abc", value: "abc", isRegex: false},
+				{name: "id", isRegex: true},
+				{name: "def", value: "def", isRegex: false},
+				{name: "customRegex4", value: "[0-9]+", isRegex: true},
+			},
+			wantRegex: true,
+		},
 	}
 
 	for name, tc := range tests {
