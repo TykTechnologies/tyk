@@ -4,13 +4,7 @@ version: "3"
 vars:
   root:
     sh: git rev-parse --show-toplevel
-  branch_name:
-    sh: |
-      if [ -z "$BRANCH_NAME" ]; then
-        echo master
-      else
-        echo $BRANCH_NAME
-      fi
+  branch_name: '{{.BRANCH_NAME | default "master"}}'
 
 tasks:
   run:
