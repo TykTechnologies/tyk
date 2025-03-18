@@ -7,7 +7,7 @@ vars:
   branch_name:
     sh: |
       if [ -z "$BRANCH_NAME" ]; then
-        git rev-parse --abbrev-ref HEAD
+        echo master
       else
         echo $BRANCH_NAME
       fi
