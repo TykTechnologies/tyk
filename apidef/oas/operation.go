@@ -587,50 +587,19 @@ func splitPath(inPath string) ([]pathPart, bool) {
 		return []pathPart{}, false
 	}
 
-	// Each URL fragment can contain a regex, but the whole
-	// URL isn't just a regex (`/a/.*/foot` => `/a/{param1}/foot`)
 	parts := strings.Split(trimmedPath, "/")
 	result := make([]pathPart, len(parts))
 
-	found := 0
+	regexCount := 0
 	hasRegex := false
 
-	for k, value := range parts {
+	for i, segment := range parts {
 		var part pathPart
-
-		// check if the segment is inside curly braces
-		if httputil.IsMuxTemplate(value) {
-			value = strings.TrimPrefix(value, "{")
-			value = strings.TrimSuffix(value, "}")
-
-			name, _, ok := strings.Cut(value, ":")
-			if ok {
-				part = pathPart{name: name, isRegex: true}
-			} else if isIdentifier(value) {
-				part = pathPart{name: value, isRegex: true}
-			} else {
-				found++
-
-				part = pathPart{name: fmt.Sprintf("customRegex%d", found), isRegex: true}
-			}
-
-			hasRegex = true
-		} else if isIdentifier(value) {
-			part = pathPart{name: value, value: value, isRegex: false}
-		} else {
-			found++
-			part = pathPart{name: fmt.Sprintf("customRegex%d", found), value: value, isRegex: true}
-		}
-
-		result[k] = part
+		part, regexCount, hasRegex = parsePathSegment(segment, regexCount, hasRegex)
+		result[i] = part
 	}
 
-	return result, found > 0 || hasRegex
-}
-
-func isIdentifier(value string) bool {
-	matched, _ := regexp.MatchString(`^[a-zA-Z0-9._-]+$`, value) //nolint
-	return matched
+	return result, hasRegex
 }
 
 // buildPath converts the URL paths with regex to named parameters
@@ -1082,4 +1051,35 @@ func hasMockResponse(methodActions map[string]apidef.EndpointMethodMeta) bool {
 	}
 
 	return false
+}
+
+// parsePathSegment parses a single path segment and determines if it contains a regex pattern.
+func parsePathSegment(segment string, regexCount int, hasRegex bool) (pathPart, int, bool) {
+	if httputil.IsMuxTemplate(segment) {
+		return parseMuxTemplate(segment, regexCount)
+	} else if isIdentifier(segment) {
+		return pathPart{name: segment, value: segment, isRegex: false}, regexCount, hasRegex
+	} else {
+		regexCount++
+		return pathPart{name: fmt.Sprintf("customRegex%d", regexCount), value: segment, isRegex: true}, regexCount, true
+	}
+}
+
+// parseMuxTemplate parses a segment that is a mux template and extracts the name or assigns a custom regex name.
+func parseMuxTemplate(segment string, regexCount int) (pathPart, int, bool) {
+	segment = strings.TrimPrefix(segment, "{")
+	segment = strings.TrimSuffix(segment, "}")
+
+	name, _, ok := strings.Cut(segment, ":")
+	if ok || isIdentifier(segment) {
+		return pathPart{name: name, isRegex: true}, regexCount, true
+	}
+
+	regexCount++
+	return pathPart{name: fmt.Sprintf("customRegex%d", regexCount), isRegex: true}, regexCount, true
+}
+
+func isIdentifier(value string) bool {
+	matched, _ := regexp.MatchString(`^[a-zA-Z0-9._-]+$`, value) //nolint
+	return matched
 }
