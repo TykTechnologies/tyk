@@ -1219,3 +1219,75 @@ func TestOAS_fillAllowance(t *testing.T) {
 		assert.False(t, operation.Allow.Enabled)
 	})
 }
+
+func TestSplitPath(t *testing.T) {
+	tests := map[string]struct {
+		input     string
+		wantParts []pathPart
+		wantRegex bool
+	}{
+		"simple path": {
+			input: "/test/path",
+			wantParts: []pathPart{
+				{name: "test", value: "test", isRegex: false},
+				{name: "path", value: "path", isRegex: false},
+			},
+			wantRegex: false,
+		},
+		"path with regex": {
+			input: "/test/.*/end",
+			wantParts: []pathPart{
+				{name: "test", value: "test", isRegex: false},
+				{name: "customRegex1", value: ".*", isRegex: true},
+				{name: "end", value: "end", isRegex: false},
+			},
+			wantRegex: true,
+		},
+		"path with curly braces": {
+			input: "/users/{id}/profile",
+			wantParts: []pathPart{
+				{name: "users", value: "users", isRegex: false},
+				{name: "id", isRegex: true},
+				{name: "profile", value: "profile", isRegex: false},
+			},
+			wantRegex: true,
+		},
+		"path with named regex": {
+			input: "/users/{userId:[0-9]+}/posts",
+			wantParts: []pathPart{
+				{name: "users", value: "users", isRegex: false},
+				{name: "userId", isRegex: true},
+				{name: "posts", value: "posts", isRegex: false},
+			},
+			wantRegex: true,
+		},
+		"path with named direct regex": {
+			input: "/users/[0-9]+/posts",
+			wantParts: []pathPart{
+				{name: "users", value: "users", isRegex: false},
+				{name: "customRegex1", value: "[0-9]+", isRegex: true},
+				{name: "posts", value: "posts", isRegex: false},
+			},
+			wantRegex: true,
+		},
+		"empty path": {
+			input:     "",
+			wantParts: []pathPart{},
+			wantRegex: false,
+		},
+		"root path": {
+			input:     "/",
+			wantParts: []pathPart{},
+			wantRegex: false,
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			gotParts, gotRegex := splitPath(tc.input)
+
+			assert.Equal(t, tc.wantRegex, gotRegex, "regex detection mismatch")
+			assert.Equal(t, tc.wantParts, gotParts, "parts mismatch")
+		})
+	}
+}

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -11,6 +12,7 @@ import (
 	"github.com/getkin/kin-openapi/openapi3"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/internal/httputil"
 	"github.com/TykTechnologies/tyk/internal/oasutil"
 )
 
@@ -579,27 +581,56 @@ func isRegex(value string) bool {
 
 // splitPath splits URL into folder parts, detecting regex patterns.
 func splitPath(inPath string) ([]pathPart, bool) {
-	// Each URL fragment can contain a regex, but the whole
-	// URL isn't just a regex (`/a/.*/foot` => `/a/{param1}/foot`)
-	parts := strings.Split(strings.Trim(inPath, "/"), "/")
-	result := make([]pathPart, len(parts))
-	found := 0
+	trimmedPath := strings.Trim(inPath, "/")
 
-	for k, value := range parts {
-		name := value
-		isRegex := isRegex(value)
-		if isRegex {
-			found++
-			name = fmt.Sprintf("customRegex%d", found)
-		}
-		result[k] = pathPart{
-			name:    name,
-			value:   value,
-			isRegex: isRegex,
-		}
+	if trimmedPath == "" {
+		return []pathPart{}, false
 	}
 
-	return result, found > 0
+	// Each URL fragment can contain a regex, but the whole
+	// URL isn't just a regex (`/a/.*/foot` => `/a/{param1}/foot`)
+	parts := strings.Split(trimmedPath, "/")
+	result := make([]pathPart, len(parts))
+
+	found := 0
+	hasRegex := false
+
+	for k, value := range parts {
+		var part pathPart
+
+		// check if the segment is inside curly braces
+		if httputil.IsMuxTemplate(value) {
+			value = strings.TrimPrefix(value, "{")
+			value = strings.TrimSuffix(value, "}")
+
+			name, _, ok := strings.Cut(value, ":")
+			if ok {
+				part = pathPart{name: name, isRegex: true}
+			} else if isIdentifier(value) {
+				part = pathPart{name: value, isRegex: true}
+			} else {
+				found++
+
+				part = pathPart{name: fmt.Sprintf("customRegex%d", found), isRegex: true}
+			}
+
+			hasRegex = true
+		} else if isIdentifier(value) {
+			part = pathPart{name: value, value: value, isRegex: false}
+		} else {
+			found++
+			part = pathPart{name: fmt.Sprintf("customRegex%d", found), value: value, isRegex: true}
+		}
+
+		result[k] = part
+	}
+
+	return result, found > 0 || hasRegex
+}
+
+func isIdentifier(value string) bool {
+	matched, _ := regexp.MatchString(`^[a-zA-Z0-9._-]+$`, value) //nolint
+	return matched
 }
 
 // buildPath converts the URL paths with regex to named parameters

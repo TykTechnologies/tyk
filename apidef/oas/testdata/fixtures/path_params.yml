@@ -1,0 +1,144 @@
+---
+name: "Path Params"
+tests:
+  - desc: "Path params - classic"
+    source: "classic"
+    input:
+      version_data:
+        versions:
+          "":
+            extended_paths:
+              white_list:
+                - path: "/test/{id}"
+                  method: ""
+                  ignore_case: false
+                  disabled: false
+                  method_actions:
+                    GET:
+                      action: "reply"
+                      code: 200
+                      headers:
+                        Content-Type: "application/json"
+                      data: '{"message": "success"}'
+    output:
+      paths:
+        /test/{id}:
+          parameters:
+            - name: id
+              in: path
+              required: true
+              schema:
+                type: string
+  - desc: "Path params - classic"
+    source: "classic"
+    input:
+      version_data:
+        versions:
+          "":
+            extended_paths:
+              white_list:
+                - path: "/test/{testId:[0-9]+}"
+                  method: ""
+                  ignore_case: false
+                  disabled: false
+                  method_actions:
+                    GET:
+                      action: "reply"
+                      code: 200
+                      headers:
+                        Content-Type: "application/json"
+                      data: '{"message": "success"}'
+    output:
+      paths:
+        /test/{testId}:
+          parameters:
+            - name: testId
+              in: path
+              required: true
+              schema:
+                type: string                  
+  - desc: "Path params - classic"
+    source: "classic"
+    input:
+      version_data:
+        versions:
+          "":
+            extended_paths:
+              white_list:
+                - path: "/test/[0-9]+"
+                  method: ""
+                  ignore_case: false
+                  disabled: false
+                  method_actions:
+                    GET:
+                      action: "reply"
+                      code: 200
+                      headers:
+                        Content-Type: "application/json"
+                      data: '{"message": "success"}'
+    output:
+      paths:
+        /test/{customRegex1}:
+          parameters:
+            - name: customRegex1
+              in: path
+              required: true
+              schema:
+                type: string
+                pattern: "[0-9]+"
+  - desc: "Path params - classic"
+    source: "classic"
+    input:
+      version_data:
+        versions:
+          "":
+            extended_paths:
+              white_list:
+                - path: "/test/testId"
+                  method: ""
+                  ignore_case: false
+                  disabled: false
+                  method_actions:
+                    GET:
+                      action: "reply"
+                      code: 200
+                      headers:
+                        Content-Type: "application/json"
+                      data: '{"message": "success"}'
+    output:
+      paths:
+        /test/testId:
+          parameters: <nil>
+  - desc: "Path params - classic"
+    source: "classic"
+    input:
+      version_data:
+        versions:
+          "":
+            extended_paths:
+              white_list:
+                - path: "/test/{[0-9]+}/{id}"
+                  method: ""
+                  ignore_case: false
+                  disabled: false
+                  method_actions:
+                    GET:
+                      action: "reply"
+                      code: 200
+                      headers:
+                        Content-Type: "application/json"
+                      data: '{"message": "success"}'
+    output:
+      paths:
+        /test/{customRegex1}/{id}:
+          parameters:
+            - name: customRegex1
+              in: path
+              required: true
+              schema:
+                type: string
+            - name: id
+              in: path
+              required: true
+              schema:
+                type: string
