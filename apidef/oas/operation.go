@@ -234,8 +234,6 @@ func (s *OAS) fillMockResponsePaths(paths openapi3.Paths, ep apidef.ExtendedPath
 				FromOASExamples: &FromOASExamples{},
 			}
 		}
-
-		tykOperation.Allow = nil
 	}
 }
 
