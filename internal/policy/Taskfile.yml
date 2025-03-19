@@ -1,22 +1,15 @@
 ---
 version: "3"
 
-includes:
-  services:
-    taskfile: ../../docker/services/Taskfile.yml
-    dir: ../../docker/services
-
 vars:
   run: .
 
 tasks:
   default:
     desc: "Run tests"
-    deps: [ services:up ]
     requires:
       vars: [run]
     cmds:
-      - defer: { task: services:down }
       - goimports -w .
       - go fmt ./...
       - task: test
