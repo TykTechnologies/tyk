@@ -777,11 +777,16 @@ func testPrepareApplyPolicies(tb testing.TB) (*policy.Service, []testApplyPolici
 			sessMatch: func(t *testing.T, s *user.SessionState) {
 				t.Helper()
 
+				// It should get intersection of allowed/restricted types.
 				want := map[string]user.AccessDefinition{
-					"a": { // It should get intersection of restricted types.
+					"a": {
 						AllowedTypes: []graphql.Type{
 							{Name: "Country", Fields: []string{"code"}},
 							{Name: "Person", Fields: []string{"name"}},
+						},
+						RestrictedTypes: []graphql.Type{
+							{Name: "Dog", Fields: []string{"name", "breed"}},
+							{Name: "Cat", Fields: []string{"name"}},
 						},
 						Limit: user.APILimit{},
 					},
