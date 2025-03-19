@@ -4,6 +4,13 @@ version: "3"
 vars:
   root:
     sh: git rev-parse --show-toplevel
+  branch_name:
+    sh: |
+      if [ -z "$BRANCH_NAME" ]; then
+        git rev-parse --abbrev-ref HEAD
+      else
+        echo $BRANCH_NAME
+      fi
 
 tasks:
   run:
@@ -12,7 +19,7 @@ tasks:
       - task: fmt
       - task: vet
       - task: check
-      - golangci-lint run --new-from-rev=origin/master --issues-exit-code=1 --fix ./...
+      - golangci-lint run --new-from-rev=origin/{{ .branch_name }} --issues-exit-code=1 --fix ./...
 
   fmt:
     desc: "Run typical code cleanup steps"
