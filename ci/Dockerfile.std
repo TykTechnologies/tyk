@@ -21,7 +21,7 @@ RUN rm -rf /root/.cache \
     && find /usr/lib -type f -name '*.a' -o -name '*.o' -delete
 
 # Comment this to test in dev
-COPY ${BUILD_PACKAGE_NAME}*${TARGETARCH}.deb /
+COPY ${BUILD_PACKAGE_NAME}_*${TARGETARCH}.deb /
 RUN dpkg -i /${BUILD_PACKAGE_NAME}*${TARGETARCH}.deb && rm /*.deb
 
 ARG PORTS
