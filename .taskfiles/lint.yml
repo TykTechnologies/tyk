@@ -13,11 +13,7 @@ tasks:
       - task: fmt
       - task: vet
       - task: check
-<<<<<<< HEAD
-      - golangci-lint run --new-from-rev=origin/master --issues-exit-code=1 --fix ./...
-=======
       - golangci-lint run --new-from-rev=origin/{{ .branch_name }} --issues-exit-code=1 --fix ./...
->>>>>>> 32351873d... Tt 14350 fix gateway linter using wrong branch causing ci to mailfunction on release p rs (#6965)
 
   fmt:
     desc: "Run typical code cleanup steps"
