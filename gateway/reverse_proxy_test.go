@@ -2027,3 +2027,285 @@ func BenchmarkLargeResponsePayload(b *testing.B) {
 		})
 	}
 }
+
+func TestTimeoutPrioritization(t *testing.T) {
+	ts := StartTest(func(c *config.Config) {
+		c.ProxyDefaultTimeout = 2
+	})
+	defer ts.Close()
+
+	t.Run("Basic Timeout Behavior - enforced timeout higher than default", func(t *testing.T) {
+		upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			time.Sleep(3 * time.Second)
+			w.Write([]byte("Success"))
+		}))
+		defer upstream.Close()
+
+		api := BuildAPI(func(spec *APISpec) {
+			spec.Proxy.ListenPath = "/"
+			spec.Proxy.TargetURL = upstream.URL
+			spec.UseKeylessAccess = true
+			spec.EnforcedTimeoutEnabled = true
+			UpdateAPIVersion(spec, "", func(version *apidef.VersionInfo) {
+				version.UseExtendedPaths = true
+				version.ExtendedPaths.HardTimeouts = []apidef.HardTimeoutMeta{
+					{
+						Disabled: false,
+						Path:     "/test1",
+						Method:   http.MethodGet,
+						TimeOut:  4,
+					},
+				}
+			})
+		})[0]
+
+		ts.Gw.LoadAPI(api)
+
+		// Request should complete successfully since enforced timeout (60ms) > delay (50ms)
+		_, _ = ts.Run(t, test.TestCase{
+			Method:    http.MethodGet,
+			Path:      "/test1",
+			Code:      http.StatusOK,
+			BodyMatch: "Success",
+		})
+	})
+
+	t.Run("Basic Timeout Behavior - enforced timeout lower than default", func(t *testing.T) {
+		upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			time.Sleep(1800 * time.Millisecond)
+			w.Write([]byte("Success"))
+		}))
+		defer upstream.Close()
+
+		api := BuildAPI(func(spec *APISpec) {
+			spec.Proxy.ListenPath = "/"
+			spec.Proxy.TargetURL = upstream.URL
+			spec.UseKeylessAccess = true
+			spec.EnforcedTimeoutEnabled = true
+			UpdateAPIVersion(spec, "", func(version *apidef.VersionInfo) {
+				version.UseExtendedPaths = true
+				version.ExtendedPaths.HardTimeouts = []apidef.HardTimeoutMeta{
+					{
+						Disabled: false,
+						Path:     "/test2",
+						Method:   http.MethodGet,
+						TimeOut:  1,
+					},
+				}
+			})
+		})[0]
+
+		ts.Gw.LoadAPI(api)
+
+		_, _ = ts.Run(t, test.TestCase{
+			Method:    http.MethodGet,
+			Path:      "/test2",
+			Code:      http.StatusGatewayTimeout,
+			BodyMatch: "Upstream service reached hard timeout",
+		})
+	})
+
+	t.Run("Basic Timeout Behavior - delay higher than both timeouts", func(t *testing.T) {
+		upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			time.Sleep(2500 * time.Millisecond)
+			w.Write([]byte("Success"))
+		}))
+		defer upstream.Close()
+
+		api := BuildAPI(func(spec *APISpec) {
+			spec.Proxy.ListenPath = "/"
+			spec.Proxy.TargetURL = upstream.URL
+			spec.UseKeylessAccess = true
+			spec.EnforcedTimeoutEnabled = true
+			UpdateAPIVersion(spec, "", func(version *apidef.VersionInfo) {
+				version.UseExtendedPaths = true
+				version.ExtendedPaths.HardTimeouts = []apidef.HardTimeoutMeta{
+					{
+						Disabled: false,
+						Path:     "/test3",
+						Method:   http.MethodGet,
+						TimeOut:  1,
+					},
+				}
+			})
+		})[0]
+
+		ts.Gw.LoadAPI(api)
+
+		_, _ = ts.Run(t, test.TestCase{
+			Method:    http.MethodGet,
+			Path:      "/test3",
+			Code:      http.StatusGatewayTimeout,
+			BodyMatch: "Upstream service reached hard timeout",
+		})
+	})
+
+	t.Run("Basic Timeout Behavior - delay within enforced timeout", func(t *testing.T) {
+		upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			time.Sleep(500 * time.Millisecond)
+			w.Write([]byte("Success"))
+		}))
+		defer upstream.Close()
+
+		api := BuildAPI(func(spec *APISpec) {
+			spec.Proxy.ListenPath = "/"
+			spec.Proxy.TargetURL = upstream.URL
+			spec.UseKeylessAccess = true
+			spec.EnforcedTimeoutEnabled = true
+			UpdateAPIVersion(spec, "", func(version *apidef.VersionInfo) {
+				version.UseExtendedPaths = true
+				version.ExtendedPaths.HardTimeouts = []apidef.HardTimeoutMeta{
+					{
+						Disabled: false,
+						Path:     "/test4",
+						Method:   http.MethodGet,
+						TimeOut:  1,
+					},
+				}
+			})
+		})[0]
+
+		ts.Gw.LoadAPI(api)
+
+		// Request should succeed since enforced timeout (27ms) > delay (25ms)
+		_, _ = ts.Run(t, test.TestCase{
+			Method:    http.MethodGet,
+			Path:      "/test4",
+			Code:      http.StatusOK,
+			BodyMatch: "Success",
+		})
+	})
+
+	t.Run("Multiple Endpoints with Different Enforced Timeouts", func(t *testing.T) {
+		upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if strings.HasPrefix(r.URL.Path, "/delay/") {
+				time.Sleep(3200 * time.Millisecond)
+				w.Write([]byte("Delay 3.2s response"))
+			} else if strings.HasPrefix(r.URL.Path, "/delay2/") {
+				time.Sleep(3200 * time.Millisecond)
+				w.Write([]byte("Delay2 3.2s response"))
+			} else {
+				w.WriteHeader(http.StatusNotFound)
+			}
+		}))
+		defer upstream.Close()
+
+		// Create API with different enforced timeouts for different paths
+		api := BuildAPI(func(spec *APISpec) {
+			spec.Proxy.ListenPath = "/"
+			spec.Proxy.TargetURL = upstream.URL
+			spec.UseKeylessAccess = true
+			spec.EnforcedTimeoutEnabled = true
+			// Global default timeout is not set, will default to 30s (30ms in our test)
+			UpdateAPIVersion(spec, "", func(version *apidef.VersionInfo) {
+				version.UseExtendedPaths = true
+				version.ExtendedPaths.HardTimeouts = []apidef.HardTimeoutMeta{
+					{
+						Disabled: false,
+						Path:     "/delay/.*",
+						Method:   http.MethodGet,
+						TimeOut:  4,
+					},
+					{
+						Disabled: false,
+						Path:     "/delay2/.*",
+						Method:   http.MethodGet,
+						TimeOut:  1,
+					},
+				}
+			})
+		})[0]
+
+		ts.Gw.LoadAPI(api)
+
+		_, _ = ts.Run(t, test.TestCase{
+			Method:    http.MethodGet,
+			Path:      "/delay/3",
+			Code:      http.StatusOK,
+			BodyMatch: "Delay 3.2s response",
+		})
+
+		_, _ = ts.Run(t, test.TestCase{
+			Method:    http.MethodGet,
+			Path:      "/delay2/3",
+			Code:      http.StatusGatewayTimeout,
+			BodyMatch: "Upstream service reached hard timeout",
+		})
+	})
+
+	t.Run("Explicit vs Default Global Timeout", func(t *testing.T) {
+		// Setup a test server that handles different delay paths
+		upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if strings.HasPrefix(r.URL.Path, "/delay/2500") {
+				time.Sleep(2500 * time.Millisecond)
+				w.Write([]byte("Delay 2.5s response"))
+			} else if strings.HasPrefix(r.URL.Path, "/delay/4000") {
+				time.Sleep(4000 * time.Millisecond)
+				w.Write([]byte("Delay 4s response"))
+			} else if strings.HasPrefix(r.URL.Path, "/delay2/1000") {
+				time.Sleep(1000 * time.Millisecond)
+				w.Write([]byte("Delay2 1s response"))
+			} else if strings.HasPrefix(r.URL.Path, "/delay2/3500") {
+				time.Sleep(3500 * time.Millisecond)
+				w.Write([]byte("Delay2 3.5s response"))
+			} else {
+				w.WriteHeader(http.StatusNotFound)
+			}
+		}))
+		defer upstream.Close()
+
+		// Create API with explicit global timeout and path-specific enforced timeout
+		api := BuildAPI(func(spec *APISpec) {
+			spec.Proxy.ListenPath = "/"
+			spec.Proxy.TargetURL = upstream.URL
+			spec.UseKeylessAccess = true
+			spec.EnforcedTimeoutEnabled = true
+			// Set an explicit global default timeout
+			spec.GlobalConfig.ProxyDefaultTimeout = 50 // 50ms in our test
+			UpdateAPIVersion(spec, "", func(version *apidef.VersionInfo) {
+				version.UseExtendedPaths = true
+				version.ExtendedPaths.HardTimeouts = []apidef.HardTimeoutMeta{
+					{
+						Disabled: false,
+						Path:     "/delay/.*",
+						Method:   http.MethodGet,
+						TimeOut:  3,
+					},
+					// No explicit timeout for /delay2/* endpoints - will use global
+				}
+			})
+		})[0]
+
+		ts.Gw.LoadAPI(api)
+
+		// Test case 1: Should succeed (delay 45ms < enforced timeout 60ms)
+		_, _ = ts.Run(t, test.TestCase{
+			Method:    http.MethodGet,
+			Path:      "/delay/2500",
+			Code:      http.StatusOK,
+			BodyMatch: "Delay 2.5s response",
+		})
+
+		_, _ = ts.Run(t, test.TestCase{
+			Method:    http.MethodGet,
+			Path:      "/delay/4000",
+			Code:      http.StatusGatewayTimeout,
+			BodyMatch: "Upstream service reached hard timeout",
+		})
+
+		_, _ = ts.Run(t, test.TestCase{
+			Method:    http.MethodGet,
+			Path:      "/delay2/1000",
+			Code:      http.StatusOK,
+			BodyMatch: "Delay2 1s response",
+		})
+
+		// Test case 4: Should timeout at global value (delay 60ms > global timeout 50ms)
+		_, _ = ts.Run(t, test.TestCase{
+			Method:    http.MethodGet,
+			Path:      "/delay2/3500",
+			Code:      http.StatusGatewayTimeout,
+			BodyMatch: "Upstream service reached hard timeout",
+		})
+	})
+}
