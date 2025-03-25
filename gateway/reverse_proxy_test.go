@@ -2061,7 +2061,6 @@ func TestTimeoutPrioritization(t *testing.T) {
 
 		ts.Gw.LoadAPI(api)
 
-		// Request should complete successfully since enforced timeout (60ms) > delay (50ms)
 		_, _ = ts.Run(t, test.TestCase{
 			Method:    http.MethodGet,
 			Path:      "/test1",
@@ -2167,7 +2166,6 @@ func TestTimeoutPrioritization(t *testing.T) {
 
 		ts.Gw.LoadAPI(api)
 
-		// Request should succeed since enforced timeout (27ms) > delay (25ms)
 		_, _ = ts.Run(t, test.TestCase{
 			Method:    http.MethodGet,
 			Path:      "/test4",
@@ -2190,13 +2188,11 @@ func TestTimeoutPrioritization(t *testing.T) {
 		}))
 		defer upstream.Close()
 
-		// Create API with different enforced timeouts for different paths
 		api := BuildAPI(func(spec *APISpec) {
 			spec.Proxy.ListenPath = "/"
 			spec.Proxy.TargetURL = upstream.URL
 			spec.UseKeylessAccess = true
 			spec.EnforcedTimeoutEnabled = true
-			// Global default timeout is not set, will default to 30s (30ms in our test)
 			UpdateAPIVersion(spec, "", func(version *apidef.VersionInfo) {
 				version.UseExtendedPaths = true
 				version.ExtendedPaths.HardTimeouts = []apidef.HardTimeoutMeta{
@@ -2234,7 +2230,6 @@ func TestTimeoutPrioritization(t *testing.T) {
 	})
 
 	t.Run("Explicit vs Default Global Timeout", func(t *testing.T) {
-		// Setup a test server that handles different delay paths
 		upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			if strings.HasPrefix(r.URL.Path, "/delay/2500") {
 				time.Sleep(2500 * time.Millisecond)
@@ -2254,14 +2249,11 @@ func TestTimeoutPrioritization(t *testing.T) {
 		}))
 		defer upstream.Close()
 
-		// Create API with explicit global timeout and path-specific enforced timeout
 		api := BuildAPI(func(spec *APISpec) {
 			spec.Proxy.ListenPath = "/"
 			spec.Proxy.TargetURL = upstream.URL
 			spec.UseKeylessAccess = true
 			spec.EnforcedTimeoutEnabled = true
-			// Set an explicit global default timeout
-			spec.GlobalConfig.ProxyDefaultTimeout = 50 // 50ms in our test
 			UpdateAPIVersion(spec, "", func(version *apidef.VersionInfo) {
 				version.UseExtendedPaths = true
 				version.ExtendedPaths.HardTimeouts = []apidef.HardTimeoutMeta{
