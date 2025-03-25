@@ -650,9 +650,23 @@ func (s *OAS) getOperationID(inPath, method string) string {
 		newPath := buildPath(parts, strings.HasSuffix(inPath, "/"))
 
 		p = createOrGetPathItem(newPath)
-		p.Parameters = []*openapi3.ParameterRef{}
+
+		// We should check if the parameters are already set before initializing it.
+		if p.Parameters == nil {
+			p.Parameters = []*openapi3.ParameterRef{}
+		}
+
+		existingParams := make(map[string]bool)
+		for _, existingParam := range p.Parameters {
+			existingParams[existingParam.Value.Name] = true
+		}
 
 		for _, part := range parts {
+			// Skip adding the parameter if it already exists so that we don't override it.
+			if existingParams[part.name] {
+				continue
+			}
+
 			if part.isRegex {
 				schema := &openapi3.SchemaRef{
 					Value: &openapi3.Schema{
