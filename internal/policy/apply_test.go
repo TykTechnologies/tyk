@@ -759,7 +759,7 @@ func testPrepareApplyPolicies(tb testing.TB) (*policy.Service, []testApplyPolici
 				t.Helper()
 
 				want := map[string]user.AccessDefinition{
-					"a": { // It should get intersection of restricted types.
+					"a": {
 						RestrictedTypes: []graphql.Type{
 							{Name: "Country", Fields: []string{"code"}},
 							{Name: "Person", Fields: []string{"name"}},
@@ -778,10 +778,14 @@ func testPrepareApplyPolicies(tb testing.TB) (*policy.Service, []testApplyPolici
 				t.Helper()
 
 				want := map[string]user.AccessDefinition{
-					"a": { // It should get intersection of restricted types.
+					"a": {
 						AllowedTypes: []graphql.Type{
-							{Name: "Country", Fields: []string{"code"}},
-							{Name: "Person", Fields: []string{"name"}},
+							{Name: "Country", Fields: []string{"code", "name", "phone"}},
+							{Name: "Person", Fields: []string{"name", "height", "mass"}},
+						},
+						RestrictedTypes: []graphql.Type{
+							{Name: "Dog", Fields: []string{"name", "breed"}},
+							{Name: "Cat", Fields: []string{"name"}},
 						},
 						Limit: user.APILimit{},
 					},
