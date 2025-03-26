@@ -42,7 +42,7 @@ var supportedItems = []string{
 }
 
 func printErrorAndExit(err error) {
-	_, _ = fmt.Fprint(os.Stderr, err)
+	_, _ = fmt.Fprint(os.Stdout, err)
 	os.Exit(1)
 }
 
@@ -53,15 +53,14 @@ func findTemplate(kind string, data []byte) ([]byte, error) {
 	}
 
 	var template []byte
-	_, err = jsonparser.ArrayEach(kindData, func(value []byte, dataType jsonparser.ValueType, offset int, err error) {
-		_, _, _, err = jsonparser.Get(value, "properties")
-		if errors.Is(err, jsonparser.KeyPathNotFoundError) {
+	_, err = jsonparser.ArrayEach(kindData, func(value []byte, _ jsonparser.ValueType, _ int, _ error) {
+		_, _, _, getErr := jsonparser.Get(value, "properties")
+		if errors.Is(getErr, jsonparser.KeyPathNotFoundError) {
 			// continue
-			err = nil
 			return
 		}
-		if err != nil {
-			printErrorAndExit(err)
+		if getErr != nil {
+			printErrorAndExit(getErr)
 		}
 		template = value
 	})
@@ -69,7 +68,7 @@ func findTemplate(kind string, data []byte) ([]byte, error) {
 }
 
 func scanProperties(data []byte) error {
-	return jsonparser.ObjectEach(data, func(key []byte, value []byte, dataType jsonparser.ValueType, offset int) error {
+	return jsonparser.ObjectEach(data, func(key []byte, value []byte, _ jsonparser.ValueType, _ int) error {
 		var err error
 		for _, property := range properties {
 			if string(key) == property {
@@ -103,7 +102,7 @@ func insertDefinitions(data []byte) error {
 }
 
 func scanDefinitions(data []byte) error {
-	err := jsonparser.ObjectEach(data, func(key []byte, value []byte, dataType jsonparser.ValueType, offset int) error {
+	err := jsonparser.ObjectEach(data, func(key []byte, value []byte, _ jsonparser.ValueType, _ int) error {
 		var err error
 		for _, definition := range definitions {
 			if string(key) == definition {
@@ -123,7 +122,7 @@ func scanDefinitions(data []byte) error {
 }
 
 func insertDefinitionKind(kind string, anyOfItems []byte) error {
-	_, err := jsonparser.ArrayEach(anyOfItems, func(value []byte, dataType jsonparser.ValueType, offset int, err error) {
+	_, err := jsonparser.ArrayEach(anyOfItems, func(value []byte, _ jsonparser.ValueType, _ int, _ error) {
 		for _, item := range supportedItems {
 			var data []byte
 			var jsonErr error
@@ -132,13 +131,13 @@ func insertDefinitionKind(kind string, anyOfItems []byte) error {
 				continue
 			}
 			if jsonErr != nil {
-				err = jsonErr
+				printErrorAndExit(jsonErr)
 				return
 			}
 
 			result, jsonErr = jsonparser.Set(result, data, "definitions", kind, "properties", item)
 			if jsonErr != nil {
-				err = jsonErr
+				printErrorAndExit(jsonErr)
 				return
 			}
 		}
@@ -155,24 +154,23 @@ func scanDefinitionsForKind(kind string, data []byte) error {
 		return fmt.Errorf("expected array but got %s", dataType)
 	}
 
-	_, err = jsonparser.ArrayEach(bentoInputs, func(value []byte, dataType jsonparser.ValueType, offset int, err error) {
+	_, err = jsonparser.ArrayEach(bentoInputs, func(value []byte, dataType jsonparser.ValueType, _ int, _ error) {
 		if dataType != jsonparser.Object {
 			return
 		}
 
-		anyOfItems, _, _, err := jsonparser.Get(value, "anyOf")
-		if errors.Is(err, jsonparser.KeyPathNotFoundError) {
-			// The following lines mean `continue` in jsonparser's context.
-			err = nil
+		anyOfItems, _, _, getErr := jsonparser.Get(value, "anyOf")
+		if errors.Is(getErr, jsonparser.KeyPathNotFoundError) {
+			// Continue
 			return
 		}
-		if err != nil {
-			printErrorAndExit(err)
+		if getErr != nil {
+			printErrorAndExit(getErr)
 		}
 
-		err = insertDefinitionKind(kind, anyOfItems)
-		if err != nil {
-			printErrorAndExit(err)
+		insertErr := insertDefinitionKind(kind, anyOfItems)
+		if insertErr != nil {
+			printErrorAndExit(insertErr)
 		}
 	})
 	return err
@@ -205,7 +203,7 @@ func saveFile(outputPath string) {
 		printErrorAndExit(fmt.Errorf("error closing file on the disk: %w", err))
 	}
 
-	fmt.Printf("Bento schema generated in '%s'\n", file.Name())
+	_, _ = fmt.Fprintf(os.Stdout, "Bento schema generated in '%s'\n", file.Name())
 }
 
 /*
@@ -245,7 +243,7 @@ func main() {
 		printErrorAndExit(fmt.Errorf("error marshaling bento schema: %w", err))
 	}
 
-	err = jsonparser.ObjectEach(data, func(key []byte, value []byte, dataType jsonparser.ValueType, offset int) error {
+	err = jsonparser.ObjectEach(data, func(key []byte, value []byte, _ jsonparser.ValueType, _ int) error {
 		if string(key) == "properties" {
 			result, err = jsonparser.Set(result, []byte("{}"), "properties")
 			if err != nil {
