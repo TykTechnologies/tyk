@@ -72,6 +72,11 @@ type CoProcessor struct {
 
 // BuildObject constructs a CoProcessObject from a given http.Request.
 func (c *CoProcessor) BuildObject(req *http.Request, res *http.Response, spec *APISpec) (*coprocess.Object, error) {
+	logger := log.WithFields(logrus.Fields{
+		"prefix": "coprocess",
+		"func":   "BuildObject",
+	})
+
 	headers := ProtoMap(req.Header)
 
 	host := req.Host
@@ -103,15 +108,39 @@ func (c *CoProcessor) BuildObject(req *http.Request, res *http.Response, spec *A
 	}
 
 	if req.Body != nil {
-		defer req.Body.Close()
 		var err error
-		miniRequestObject.RawBody, err = ioutil.ReadAll(req.Body)
-		if err != nil {
-			return nil, err
+		contentLength := req.ContentLength
+		logger.Debugf("Request body processing - Content-Length header: %d", contentLength)
+		
+		// Check if body is empty (might have been read already)
+		emptyBody := false
+		if req.GetBody == nil {
+			logger.Debug("Request GetBody is nil, body might have been read already")
+			emptyBody = true
 		}
+		
+		body, _ := copyBody(req.Body, false)
+		bodyBytes, err := ioutil.ReadAll(body)
+		bytesRead := len(bodyBytes)
+		
+		if err != nil {
+			logger.WithError(err).Errorf("Failed to read request body - Content-Length: %d, Bytes read: %d, Empty body: %v",
+				contentLength, bytesRead, emptyBody)
+			return nil, fmt.Errorf("failed to read request body: %w (Content-Length: %d, Bytes read: %d)",
+				err, contentLength, bytesRead)
+		}
+		
+		logger.Debugf("Successfully read request body - Content-Length: %d, Bytes read: %d",
+			contentLength, bytesRead)
+		
+		body.Close()
+
+		miniRequestObject.RawBody = bodyBytes
 		if utf8.Valid(miniRequestObject.RawBody) && !c.Middleware.RawBodyOnly {
 			miniRequestObject.Body = string(miniRequestObject.RawBody)
 		}
+	} else {
+		logger.Debug("Request body is nil")
 	}
 
 	object := &coprocess.Object{
@@ -175,10 +204,22 @@ func (c *CoProcessor) BuildObject(req *http.Request, res *http.Response, spec *A
 			resObj.MultivalueHeaders = append(resObj.MultivalueHeaders, &currentHeader)
 		}
 		resObj.StatusCode = int32(res.StatusCode)
+		contentLength := res.ContentLength
+		logger.Debugf("Response body processing - Content-Length header: %d", contentLength)
+		
 		rawBody, err := ioutil.ReadAll(res.Body)
+		bytesRead := len(rawBody)
+		
 		if err != nil {
-			return nil, err
+			logger.WithError(err).Errorf("Failed to read response body - Content-Length: %d, Bytes read: %d",
+				contentLength, bytesRead)
+			return nil, fmt.Errorf("failed to read response body: %w (Content-Length: %d, Bytes read: %d)",
+				err, contentLength, bytesRead)
 		}
+		
+		logger.Debugf("Successfully read response body - Content-Length: %d, Bytes read: %d",
+			contentLength, bytesRead)
+		
 		resObj.RawBody = rawBody
 		res.Body = ioutil.NopCloser(bytes.NewReader(rawBody))
 		if utf8.Valid(rawBody) && !c.Middleware.RawBodyOnly {

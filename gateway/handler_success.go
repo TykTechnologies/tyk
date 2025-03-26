@@ -129,7 +129,8 @@ func recordGraphDetails(rec *analytics.AnalyticsRecord, r *http.Request, resp *h
 	if r.Body == nil {
 		return
 	}
-	body, err := io.ReadAll(r.Body)
+	reqBody, _ := copyBody(r.Body, false)
+	body, err := io.ReadAll(reqBody)
 	defer func() {
 		_ = r.Body.Close()
 		r.Body = io.NopCloser(bytes.NewBuffer(body))

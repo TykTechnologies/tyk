@@ -52,30 +52,30 @@ func (t *TransformMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 }
 
 func transformBody(r *http.Request, tmeta *TransformSpec, t *TransformMiddleware) error {
-	body, _ := ioutil.ReadAll(r.Body)
-	defer r.Body.Close()
+	body, _ := copyBody(r.Body, false)
+	bodyBytes, _ := ioutil.ReadAll(body)
 
 	// Put into an interface:
 	bodyData := make(map[string]interface{})
 
 	switch tmeta.TemplateData.Input {
 	case apidef.RequestXML:
-		if len(body) == 0 {
-			body = []byte("<_/>")
+		if len(bodyBytes) == 0 {
+			bodyBytes = []byte("<_/>")
 		}
 		mxj.XmlCharsetReader = WrappedCharsetReader
 		var err error
-		bodyData, err = mxj.NewMapXml(body) // unmarshal
+		bodyData, err = mxj.NewMapXml(bodyBytes) // unmarshal
 		if err != nil {
 			return fmt.Errorf("error unmarshalling XML: %w", err)
 		}
 	case apidef.RequestJSON:
-		if len(body) == 0 {
-			body = []byte("{}")
+		if len(bodyBytes) == 0 {
+			bodyBytes = []byte("{}")
 		}
 
 		var tempBody interface{}
-		if err := json.Unmarshal(body, &tempBody); err != nil {
+		if err := json.Unmarshal(bodyBytes, &tempBody); err != nil {
 			return err
 		}
 

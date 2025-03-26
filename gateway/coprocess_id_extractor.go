@@ -68,11 +68,12 @@ func (e *BaseExtractor) ExtractForm(r *http.Request, paramName string) (formValu
 
 // ExtractBody is used when BodySource is specified.
 func (e *BaseExtractor) ExtractBody(r *http.Request) (string, error) {
-	body, err := ioutil.ReadAll(r.Body)
+	body, _ := copyBody(r.Body, false)
+	bodyBytes, err := ioutil.ReadAll(body)
 	if err != nil {
 		return "", err
 	}
-	return string(body), err
+	return string(bodyBytes), err
 }
 
 // Error is a helper for logging the extractor errors. It always returns HTTP 400 (so we don't expose any details).
