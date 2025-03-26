@@ -6,6 +6,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"io/ioutil"
 	"os"
 
 	"github.com/buger/jsonparser"
@@ -206,6 +207,27 @@ func saveFile(outputPath string) {
 	_, _ = fmt.Fprintf(os.Stdout, "Bento schema generated in '%s'\n", file.Name())
 }
 
+func usage() {
+	var msg = `Usage: generate_bent_config_schema [options] ...
+
+This program generates a JSON schema for the Input/Output resources Tyk supports.
+
+Options:
+  -h, --help    Print this message and exit.
+  -o, --output  Path to save the generated schema. 
+                Default is '%s' in the current working folder.
+`
+	_, err := fmt.Fprintf(os.Stdout, msg, defaultOutput)
+	if err != nil {
+		panic(err)
+	}
+}
+
+type arguments struct {
+	help   bool
+	output string
+}
+
 /*
 How to use this program?
 
@@ -234,9 +256,23 @@ func main() {
 	// Importing a small number of components was preferred instead of importing `components/all` because importing all components
 	// results in a huge `definitions/processor` object and there is no way to know which processor are used by the components we support.
 
-	var outputPath string
-	flag.StringVar(&outputPath, "output-path", defaultOutput, "Path to save the output")
-	flag.Parse()
+	var args arguments
+	f := flag.NewFlagSet(os.Args[0], flag.ContinueOnError)
+	f.SetOutput(ioutil.Discard)
+	f.BoolVar(&args.help, "h", false, "")
+	f.BoolVar(&args.help, "help", false, "")
+	f.StringVar(&args.output, "output", defaultOutput, "")
+	f.StringVar(&args.output, "o", defaultOutput, "")
+	if err := f.Parse(os.Args[1:]); err != nil {
+		_, _ = fmt.Fprintf(os.Stdout, "failed to parse CLI arguments: %v\n", err)
+		usage()
+		os.Exit(1)
+	}
+
+	if args.help {
+		usage()
+		return
+	}
 
 	data, err := service.GlobalEnvironment().FullConfigSchema("", "").MarshalJSONSchema()
 	if err != nil {
@@ -263,5 +299,5 @@ func main() {
 		printErrorAndExit(fmt.Errorf("error generating bento configuration validator: %w", err))
 	}
 
-	saveFile(outputPath)
+	saveFile(args.output)
 }
