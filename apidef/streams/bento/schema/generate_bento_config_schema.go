@@ -35,7 +35,7 @@ var definitions = []string{
 	"scanner",
 }
 
-var supportedItems = []string{
+var supportedSources = []string{
 	"broker",
 	"http_client",
 	"http_server",
@@ -124,10 +124,10 @@ func scanDefinitions(data []byte) error {
 
 func insertDefinitionKind(kind string, anyOfItems []byte) error {
 	_, err := jsonparser.ArrayEach(anyOfItems, func(value []byte, _ jsonparser.ValueType, _ int, _ error) {
-		for _, item := range supportedItems {
+		for _, source := range supportedSources {
 			var data []byte
 			var jsonErr error
-			data, _, _, jsonErr = jsonparser.Get(value, "properties", item)
+			data, _, _, jsonErr = jsonparser.Get(value, "properties", source)
 			if errors.Is(jsonErr, jsonparser.KeyPathNotFoundError) {
 				continue
 			}
@@ -136,7 +136,7 @@ func insertDefinitionKind(kind string, anyOfItems []byte) error {
 				return
 			}
 
-			result, jsonErr = jsonparser.Set(result, data, "definitions", kind, "properties", item)
+			result, jsonErr = jsonparser.Set(result, data, "definitions", kind, "properties", source)
 			if jsonErr != nil {
 				printErrorAndExit(jsonErr)
 				return
@@ -177,34 +177,62 @@ func scanDefinitionsForKind(kind string, data []byte) error {
 	return err
 }
 
-func saveFile(outputPath string) {
+func saveFile(outputPath string) error {
 	file, err := os.Create(outputPath)
 	if err != nil {
-		printErrorAndExit(fmt.Errorf("error creating file on the disk: %w", err))
+		return fmt.Errorf("error creating file on the disk: %w", err)
 	}
 
 	buf := bytes.NewBuffer(nil)
 	err = json.Indent(buf, result, "", "  ")
 	if err != nil {
-		printErrorAndExit(fmt.Errorf("error indenting bento configuration validator: %w", err))
+		return fmt.Errorf("error indenting bento configuration validator: %w", err)
 	}
 
 	_, err = file.Write(buf.Bytes())
 	if err != nil {
-		printErrorAndExit(fmt.Errorf("error writing to file on the disk: %w", err))
+		return fmt.Errorf("error writing to file on the disk: %w", err)
 	}
 
 	err = file.Sync()
 	if err != nil {
-		printErrorAndExit(fmt.Errorf("error running fsync on the file: %w", err))
+		return fmt.Errorf("error running fsync on the file: %w", err)
 	}
 
 	err = file.Close()
 	if err != nil {
-		printErrorAndExit(fmt.Errorf("error closing file on the disk: %w", err))
+		return fmt.Errorf("error closing file on the disk: %w", err)
+	}
+	return nil
+}
+
+func generateBentoConfigSchema(output string) error {
+	data, err := service.GlobalEnvironment().FullConfigSchema("", "").MarshalJSONSchema()
+	if err != nil {
+		return fmt.Errorf("error marshaling bento schema: %w", err)
 	}
 
-	_, _ = fmt.Fprintf(os.Stdout, "Bento schema generated in '%s'\n", file.Name())
+	err = jsonparser.ObjectEach(data, func(key []byte, value []byte, _ jsonparser.ValueType, _ int) error {
+		if string(key) == "properties" {
+			result, err = jsonparser.Set(result, []byte("{}"), "properties")
+			if err != nil {
+				return err
+			}
+			return scanProperties(value)
+		} else if string(key) == "definitions" {
+			result, err = jsonparser.Set(result, []byte("{}"), "definitions")
+			if err != nil {
+				return err
+			}
+			return scanDefinitions(value)
+		}
+		return nil
+	})
+	if err != nil {
+		return fmt.Errorf("error generating bento configuration validator: %w", err)
+	}
+
+	return saveFile(output)
 }
 
 func usage() {
@@ -248,7 +276,7 @@ func main() {
 
 		       _ "github.com/warpstreamlabs/bento/public/components/redis"
 
-			2- Add its name to `supportedItems` slice. You should know that some components exposes different input/output sources
+			2- Add its name to `supportedSources` slice. You should know that some components exposes different input/output sources
 			   For example, components/kafka exposes `kafka` and `kafka_franz`. You need to dig into the Bento's codebase to understand
 		       which input/output is exposed by a component.
 	*/
@@ -274,30 +302,8 @@ func main() {
 		return
 	}
 
-	data, err := service.GlobalEnvironment().FullConfigSchema("", "").MarshalJSONSchema()
-	if err != nil {
-		printErrorAndExit(fmt.Errorf("error marshaling bento schema: %w", err))
+	if err := generateBentoConfigSchema(args.output); err != nil {
+		printErrorAndExit(err)
 	}
-
-	err = jsonparser.ObjectEach(data, func(key []byte, value []byte, _ jsonparser.ValueType, _ int) error {
-		if string(key) == "properties" {
-			result, err = jsonparser.Set(result, []byte("{}"), "properties")
-			if err != nil {
-				return err
-			}
-			return scanProperties(value)
-		} else if string(key) == "definitions" {
-			result, err = jsonparser.Set(result, []byte("{}"), "definitions")
-			if err != nil {
-				return err
-			}
-			return scanDefinitions(value)
-		}
-		return nil
-	})
-	if err != nil {
-		printErrorAndExit(fmt.Errorf("error generating bento configuration validator: %w", err))
-	}
-
-	saveFile(args.output)
+	_, _ = fmt.Fprintf(os.Stdout, "Bento schema generated in '%s'\n", args.output)
 }
