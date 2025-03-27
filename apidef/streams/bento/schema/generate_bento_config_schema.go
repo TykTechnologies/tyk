@@ -267,6 +267,12 @@ go run generate_bento_config.go
 
 It'll generate a `bento-config-schema.json` file in the current working folder. You can also set
 an output path via -output-path <string> parameter.
+
+Run via task runner:
+
+task generate-bento-config-validator-schema
+
+The task will automatically update `apidef/streams/bento/schema/bento-config-schema.json` file.
 */
 func main() {
 	/*
