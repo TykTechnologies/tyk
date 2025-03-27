@@ -1308,3 +1308,139 @@ func TestSplitPath(t *testing.T) {
 		})
 	}
 }
+
+func TestGetOperationID(t *testing.T) {
+	type expectedParam struct {
+		pattern   string
+		paramType string
+	}
+
+	tests := map[string]struct {
+		inPath         string
+		method         string
+		expectedID     string
+		expectedPath   string
+		existingParams map[string]expectedParam
+		expectedParams map[string]expectedParam
+	}{
+		"simple path": {
+			inPath:         "/simple",
+			method:         "GET",
+			expectedID:     "simpleGET",
+			expectedPath:   "/simple",
+			existingParams: nil,
+			expectedParams: nil,
+		},
+		"path with regex": {
+			inPath:         "/items/{id}",
+			method:         "GET",
+			expectedID:     "items/{id}GET",
+			expectedPath:   "/items/{id}",
+			existingParams: nil,
+			expectedParams: map[string]expectedParam{
+				"id": {pattern: "", paramType: "string"},
+			},
+		},
+		"path with trailing slash": {
+			inPath:         "/trailing/",
+			method:         "POST",
+			expectedID:     "trailing/POST",
+			expectedPath:   "/trailing/",
+			existingParams: nil,
+			expectedParams: nil,
+		},
+		"complex regex path": {
+			inPath:       "/complex/{id}",
+			method:       "PUT",
+			expectedID:   "complex/{id}PUT",
+			expectedPath: "/complex/{id}",
+			existingParams: map[string]expectedParam{
+				"id": {pattern: "", paramType: "integer"},
+			},
+			expectedParams: map[string]expectedParam{
+				"id": {pattern: "", paramType: "integer"},
+			},
+		},
+		"path with existing parameter": {
+			inPath:       "/existing/{id}",
+			method:       "DELETE",
+			expectedID:   "existing/{id}DELETE",
+			expectedPath: "/existing/{id}",
+			existingParams: map[string]expectedParam{
+				"id": {pattern: "[0-9]+", paramType: "string"},
+			},
+			expectedParams: map[string]expectedParam{
+				"id": {pattern: "[0-9]+", paramType: "string"},
+			},
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			oas := &OAS{
+				T: openapi3.T{
+					Paths: make(openapi3.Paths),
+				},
+			}
+
+			// Prepopulate existing parameters if any
+			if tc.existingParams != nil {
+				pathItem := &openapi3.PathItem{}
+				for paramName, param := range tc.existingParams {
+					pathItem.Parameters = append(pathItem.Parameters, &openapi3.ParameterRef{
+						Value: &openapi3.Parameter{
+							Name:     paramName,
+							In:       "path",
+							Required: true,
+							Schema: &openapi3.SchemaRef{
+								Value: &openapi3.Schema{
+									Type:    param.paramType,
+									Pattern: param.pattern,
+								},
+							},
+						},
+					})
+				}
+				oas.Paths[tc.expectedPath] = pathItem
+			}
+
+			operationID := oas.getOperationID(tc.inPath, tc.method)
+
+			if operationID != tc.expectedID {
+				t.Errorf("expected operation ID %s, got %s", tc.expectedID, operationID)
+			}
+
+			pathItem, ok := oas.Paths[tc.expectedPath]
+			if !ok {
+				t.Errorf("expected path %s to be created", tc.expectedPath)
+				return
+			}
+
+			if tc.expectedParams != nil {
+				if pathItem.Parameters == nil {
+					t.Errorf("expected parameters for path %s, but got none", tc.expectedPath)
+					return
+				}
+
+				for _, paramRef := range pathItem.Parameters {
+					param := paramRef.Value
+					expected, exists := tc.expectedParams[param.Name]
+					if !exists {
+						t.Errorf("unexpected parameter %s found", param.Name)
+						continue
+					}
+
+					if param.Schema.Value.Pattern != expected.pattern {
+						t.Errorf("expected pattern %s for parameter %s, got %s", expected.pattern, param.Name, param.Schema.Value.Pattern)
+					}
+
+					if param.Schema.Value.Type != expected.paramType {
+						t.Errorf("expected type %s for parameter %s, got %s", expected.paramType, param.Name, param.Schema.Value.Type)
+					}
+				}
+			} else if pathItem.Parameters != nil {
+				t.Errorf("did not expect parameters for path %s, but found some", tc.expectedPath)
+			}
+		})
+	}
+}
