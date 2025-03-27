@@ -2035,7 +2035,7 @@ func TestTimeoutPrioritization(t *testing.T) {
 	defer ts.Close()
 
 	t.Run("Basic Timeout Behavior - enforced timeout higher than default", func(t *testing.T) {
-		upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 			time.Sleep(3 * time.Second)
 			w.Write([]byte("Success"))
 		}))
@@ -2070,7 +2070,7 @@ func TestTimeoutPrioritization(t *testing.T) {
 	})
 
 	t.Run("Basic Timeout Behavior - enforced timeout lower than default", func(t *testing.T) {
-		upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 			time.Sleep(1800 * time.Millisecond)
 			w.Write([]byte("Success"))
 		}))
@@ -2105,7 +2105,7 @@ func TestTimeoutPrioritization(t *testing.T) {
 	})
 
 	t.Run("Basic Timeout Behavior - delay higher than both timeouts", func(t *testing.T) {
-		upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 			time.Sleep(2500 * time.Millisecond)
 			w.Write([]byte("Success"))
 		}))
@@ -2140,7 +2140,7 @@ func TestTimeoutPrioritization(t *testing.T) {
 	})
 
 	t.Run("Basic Timeout Behavior - delay within enforced timeout", func(t *testing.T) {
-		upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 			time.Sleep(500 * time.Millisecond)
 			w.Write([]byte("Success"))
 		}))
