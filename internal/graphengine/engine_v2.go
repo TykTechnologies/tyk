@@ -74,21 +74,6 @@ type EngineV2Options struct {
 	Injections      EngineV2Injections
 }
 
-type variableReplaceRoundTripper struct {
-	next             http.RoundTripper
-	variableReplacer TykVariableReplacer
-	outReq           *http.Request
-}
-
-func (d *variableReplaceRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
-	for key := range req.Header {
-		val := d.variableReplacer(d.outReq, req.Header.Get(key), false)
-		req.Header.Set(key, val)
-	}
-
-	return d.next.RoundTrip(req)
-}
-
 func NewEngineV2(options EngineV2Options) (*EngineV2, error) {
 	logger := createAbstractLogrusLogger(options.Logger)
 	gqlTools := graphqlGoToolsV1{}
@@ -248,11 +233,6 @@ func (e *EngineV2) ProcessGraphQLGranularAccess(w http.ResponseWriter, r *http.R
 }
 
 func (e *EngineV2) HandleReverseProxy(params ReverseProxyParams) (res *http.Response, hijacked bool, err error) {
-	params.RoundTripper = &variableReplaceRoundTripper{
-		next:             params.RoundTripper,
-		variableReplacer: e.tykVariableReplacer,
-		outReq:           params.OutRequest,
-	}
 	reverseProxyType, err := e.reverseProxyPreHandler.PreHandle(params)
 	if err != nil {
 		e.logger.Error("error on reverse proxy pre handler", abstractlogger.Error(err))
