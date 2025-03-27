@@ -1049,3 +1049,91 @@ func testJSVM_Auth(t *testing.T, hashKeys bool) {
 		},
 	}...)
 }
+
+func TestDynamicMiddleware_SetUrlAndCheckHostRewrite(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	type args struct {
+		oldPath   string
+		newTarget string
+	}
+
+	tests := []struct {
+		name          string
+		args          args
+		errExpected   bool
+		retainHostVal interface{}
+	}{
+		{
+			name: "no host rewrite",
+			args: args{
+				oldPath:   "/hello",
+				newTarget: "/status",
+			},
+			errExpected:   false,
+			retainHostVal: nil,
+		},
+		{
+			name: "invalid new path",
+			args: args{
+				oldPath:   "/hello",
+				newTarget: "http:// example.com/status",
+			},
+			errExpected:   true,
+			retainHostVal: nil,
+		},
+		{
+			name: "host rewrite",
+			args: args{
+				oldPath:   "/hello",
+				newTarget: "http://example.com/status",
+			},
+			errExpected:   false,
+			retainHostVal: true,
+		},
+		{
+			name: "scheme in oldPath - host rewrite",
+			args: args{
+				oldPath:   "http://tyk-gateway/hello",
+				newTarget: "http://example.com/status",
+			},
+			errExpected:   false,
+			retainHostVal: true,
+		},
+		{
+			name: "scheme in oldPath - no host rewrite",
+			args: args{
+				oldPath:   "http://tyk-gateway/hello",
+				newTarget: "/status",
+			},
+			errExpected:   false,
+			retainHostVal: nil,
+		},
+		{
+			name: "same host for new and old URL",
+			args: args{
+				oldPath:   "http://tyk-gateway/hello",
+				newTarget: "http://tyk-gateway/status",
+			},
+			errExpected:   false,
+			retainHostVal: nil,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ts := StartTest(nil)
+			defer ts.Close()
+
+			m := &DynamicMiddleware{
+				BaseMiddleware: &BaseMiddleware{
+					Spec: &APISpec{APIDefinition: &apidef.APIDefinition{}},
+					Gw:   ts.Gw,
+				}}
+			r := httptest.NewRequest("GET", tt.args.oldPath, nil)
+			err := m.SetUrlAndCheckHostRewrite(tt.args.newTarget, r)
+			assert.Equal(t, tt.errExpected, err != nil)
+			assert.Equal(t, tt.retainHostVal, r.Context().Value(ctx.RetainHost))
+		})
+	}
+}
