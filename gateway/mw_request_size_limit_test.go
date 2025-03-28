@@ -61,7 +61,7 @@ func TestRequestSizeLimit(t *testing.T) {
 
 	t.Run("should not break the request, if the method is skipped", func(t *testing.T) {
 		// GET, DELETE, TRACE, OPTIONS and HEAD
-		for method, _ := range skippedMethods {
+		for method := range skippedMethods {
 			_, _ = ts.Run(t, []test.TestCase{
 				{Method: method, Path: "/sample/", Code: http.StatusOK},
 			}...)
