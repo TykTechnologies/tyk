@@ -978,6 +978,10 @@ func (gw *Gateway) createResponseMiddlewareChain(spec *APISpec, responseFuncs []
 		responseMWChain = append(responseMWChain, processor)
 	}
 
+	quotaProcessor := gw.responseProcessorByName("response_quota", baseHandler)
+	quotaProcessor.Init(nil, spec)
+	responseMWChain = append(responseMWChain, gw.responseProcessorByName("response_quota", baseHandler))
+
 	for _, mw := range responseFuncs {
 		var processor TykResponseHandler
 		//is it goplugin or other middleware

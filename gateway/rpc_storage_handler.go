@@ -408,6 +408,11 @@ func (r *RPCStorageHandler) Decrement(keyName string) {
 	}
 }
 
+// IncrementByWithExpire will increment a key in redis by a specified value and set expiry
+func (r *RPCStorageHandler) IncrementByWithExpire(keyName string, incrementBy int64, expire int64) int64 {
+	panic("RPCStorageHandler.IncrementByWithExpire - Not Implemented")
+}
+
 // IncrementWithExpire will increment a key in redis
 func (r *RPCStorageHandler) IncrememntWithExpire(keyName string, expire int64) int64 {
 
