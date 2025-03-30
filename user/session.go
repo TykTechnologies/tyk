@@ -277,8 +277,8 @@ type SessionState struct {
 	Monitor                       Monitor                     `json:"monitor" msg:"monitor"`
 	// Deprecated: EnableDetailRecording is deprecated. Use EnableDetailedRecording
 	// going forward instead
-	EnableDetailRecording   bool                   `json:"enable_detail_recording" msg:"enable_detail_recording"`
-	EnableDetailedRecording bool                   `json:"enable_detailed_recording" msg:"enable_detailed_recording"`
+	enable_detailed_recording   bool                   `json:"enable_detailed_recording" msg:"enable_detailed_recording"`
+	enable_detailed_recording bool                   `json:"enable_detailed_recording" msg:"enable_detailed_recording"`
 	MetaData                map[string]interface{} `json:"meta_data" msg:"meta_data"`
 	Tags                    []string               `json:"tags" msg:"tags"`
 	Alias                   string                 `json:"alias" msg:"alias"`
