@@ -8,8 +8,8 @@ import (
 
 	"github.com/TykTechnologies/tyk/header"
 	"github.com/TykTechnologies/tyk/internal/event"
-	"github.com/TykTechnologies/tyk/internal/httputil"
 	"github.com/TykTechnologies/tyk/internal/model"
+	"github.com/TykTechnologies/tyk/internal/service/core"
 )
 
 // Middleware implements upstream OAuth middleware.
@@ -95,7 +95,7 @@ func (m *Middleware) ProcessRequest(_ http.ResponseWriter, r *http.Request, _ in
 		}
 	}
 
-	httputil.SetUpstreamAuth(r, upstreamOAuthProvider)
+	core.SetUpstreamAuth(r, upstreamOAuthProvider)
 	return nil, http.StatusOK
 }
 

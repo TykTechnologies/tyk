@@ -1074,6 +1074,10 @@ func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string, orgId string) 
 	for oldKey, newKey := range userKeyResets {
 		if r.Gw.GetConfig().SlaveOptions.APIKey == oldKey {
 			config := r.Gw.GetConfig()
+
+			// Updating the key in the KV store if we are using one
+			r.Gw.updateKeyInStore(config.Private.EdgeOriginalAPIKeyPath, newKey)
+
 			config.SlaveOptions.APIKey = newKey
 			r.Gw.SetConfig(config)
 			connected := r.Connect()

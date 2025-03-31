@@ -2,6 +2,7 @@ package oas
 
 import (
 	"crypto/tls"
+	"fmt"
 	"sort"
 	"strings"
 
@@ -20,27 +21,36 @@ type Upstream struct {
 	ServiceDiscovery *ServiceDiscovery `bson:"serviceDiscovery,omitempty" json:"serviceDiscovery,omitempty"`
 
 	// UptimeTests contains the configuration related to uptime tests.
+	// Tyk classic API definition: `uptime_tests` and `check_host_against_uptime_tests`.
 	UptimeTests *UptimeTests `bson:"uptimeTests,omitempty" json:"uptimeTests,omitempty"`
 
 	// MutualTLS contains the configuration for establishing a mutual TLS connection between Tyk and the upstream server.
+	// Tyk classic API definition: `upstream_certificates_disabled` and `upstream_certificates`.
 	MutualTLS *MutualTLS `bson:"mutualTLS,omitempty" json:"mutualTLS,omitempty"`
 
 	// CertificatePinning contains the configuration related to certificate pinning.
+	// Tyk classic API definition: `certificate_pinning_disabled` and `pinned_public_keys`.
 	CertificatePinning *CertificatePinning `bson:"certificatePinning,omitempty" json:"certificatePinning,omitempty"`
 
 	// RateLimit contains the configuration related to API level rate limit.
+	// Tyk classic API definition: `global_rate_limit`.
 	RateLimit *RateLimit `bson:"rateLimit,omitempty" json:"rateLimit,omitempty"`
 
 	// Authentication contains the configuration related to upstream authentication.
+	// Tyk classic API definition: `upstream_auth`.
 	Authentication *UpstreamAuth `bson:"authentication,omitempty" json:"authentication,omitempty"`
 
 	// LoadBalancing contains configuration for load balancing between multiple upstream targets.
+	// Tyk classic API definition: `proxy.enable_load_balancing` and `proxy.targets`.
 	LoadBalancing *LoadBalancing `bson:"loadBalancing,omitempty" json:"loadBalancing,omitempty"`
 
 	// PreserveHostHeader contains the configuration for preserving the host header.
+	// Tyk classic API definition: `proxy.preserve_host_header`.
 	PreserveHostHeader *PreserveHostHeader `bson:"preserveHostHeader,omitempty" json:"preserveHostHeader,omitempty"`
 
-	// PreserveTrailingSlash contains the configuration for preserving the host header.
+	// PreserveTrailingSlash controls whether Tyk preserves trailing slashes in URLs when proxying
+	// requests to upstream services. When enabled, URLs like "/users/" will retain the trailing slash.
+	// Tyk classic API definition: `proxy.disable_strip_slash`.
 	PreserveTrailingSlash *PreserveTrailingSlash `bson:"preserveTrailingSlash,omitempty" json:"preserveTrailingSlash,omitempty"`
 
 	// TLSTransport contains the configuration for TLS transport settings.
@@ -532,17 +542,17 @@ func (sd *ServiceDiscovery) Fill(serviceDiscovery apidef.ServiceDiscoveryConfigu
 	sd.DataPath = serviceDiscovery.DataPath
 	sd.PortDataPath = serviceDiscovery.PortDataPath
 
-	enabled := !serviceDiscovery.CacheDisabled
-	timeout := serviceDiscovery.CacheTimeout
+	timeout, enabled := serviceDiscovery.CacheOptions()
+	sd.Cache = &ServiceDiscoveryCache{
+		Enabled: enabled && sd.Enabled,
+		Timeout: timeout,
+	}
+
+	if !enabled && timeout == 0 {
+		sd.Cache = nil
+	}
 
 	sd.CacheTimeout = 0
-	sd.Cache = nil
-	if enabled || timeout != 0 {
-		sd.Cache = &ServiceDiscoveryCache{
-			Enabled: enabled,
-			Timeout: timeout,
-		}
-	}
 }
 
 // ExtractTo extracts *ServiceDiscovery into *apidef.ServiceDiscoveryConfiguration.
@@ -558,12 +568,19 @@ func (sd *ServiceDiscovery) ExtractTo(serviceDiscovery *apidef.ServiceDiscoveryC
 	serviceDiscovery.PortDataPath = sd.PortDataPath
 
 	timeout, enabled := sd.CacheOptions()
-	serviceDiscovery.CacheTimeout = timeout
 	serviceDiscovery.CacheDisabled = !enabled
+	serviceDiscovery.CacheTimeout = timeout
+	if !sd.Enabled {
+		serviceDiscovery.CacheDisabled = true
+	}
 }
 
 // UptimeTests configures uptime tests.
 type UptimeTests struct {
+	// Enabled specifies whether the uptime tests are active or not.
+	// Tyk classic API definition: `uptime_tests.disabled`
+	Enabled bool `bson:"enabled" json:"enabled"`
+
 	// ServiceDiscovery contains the configuration related to test Service Discovery.
 	// Tyk classic API definition: `proxy.service_discovery`
 	ServiceDiscovery *ServiceDiscovery `bson:"serviceDiscovery,omitempty" json:"serviceDiscovery,omitempty"`
@@ -590,12 +607,8 @@ type UptimeTest struct {
 	//
 	// - `http://database1.company.local`
 	// - `https://webcluster.service/health`
-	// - `127.0.0.1:6379` (for TCP checks).
+	// - `tcp://127.0.0.1:6379` (for TCP checks).
 	CheckURL string `bson:"url" json:"url"`
-
-	// Protocol is the protocol for the request. Supported values are
-	// `http` and `tcp`, depending on what kind of check is performed.
-	Protocol string `bson:"protocol" json:"protocol"`
 
 	// Timeout declares a timeout for the request. If the test exceeds
 	// this timeout, the check fails.
@@ -639,29 +652,31 @@ type UptimeTestCommand struct {
 }
 
 // Fill fills *UptimeTests from apidef.UptimeTests.
-func (t *UptimeTests) Fill(uptimeTests apidef.UptimeTests) {
-	if t.ServiceDiscovery == nil {
-		t.ServiceDiscovery = &ServiceDiscovery{}
+func (u *UptimeTests) Fill(uptimeTests apidef.UptimeTests) {
+	u.Enabled = !uptimeTests.Disabled
+
+	if u.ServiceDiscovery == nil {
+		u.ServiceDiscovery = &ServiceDiscovery{}
 	}
 
-	t.ServiceDiscovery.Fill(uptimeTests.Config.ServiceDiscovery)
-	if ShouldOmit(t.ServiceDiscovery) {
-		t.ServiceDiscovery = nil
+	u.ServiceDiscovery.Fill(uptimeTests.Config.ServiceDiscovery)
+	if ShouldOmit(u.ServiceDiscovery) {
+		u.ServiceDiscovery = nil
 	}
 
-	t.Tests = nil
-	t.LogRetentionPeriod = ReadableDuration(time.Duration(uptimeTests.Config.ExpireUptimeAnalyticsAfter) * time.Second)
-	t.HostDownRetestPeriod = ReadableDuration(time.Duration(uptimeTests.Config.RecheckWait) * time.Second)
+	u.Tests = nil
+	u.LogRetentionPeriod = ReadableDuration(time.Duration(uptimeTests.Config.ExpireUptimeAnalyticsAfter) * time.Second)
+	u.HostDownRetestPeriod = ReadableDuration(time.Duration(uptimeTests.Config.RecheckWait) * time.Second)
 
 	result := []UptimeTest{}
 	for _, v := range uptimeTests.CheckList {
 		check := UptimeTest{
-			CheckURL: v.CheckURL,
-			Protocol: v.Protocol,
-			Timeout:  ReadableDuration(v.Timeout),
-			Method:   v.Method,
-			Headers:  v.Headers,
-			Body:     v.Body,
+			CheckURL:            u.fillCheckURL(v.Protocol, v.CheckURL),
+			Timeout:             ReadableDuration(v.Timeout),
+			Method:              v.Method,
+			Headers:             v.Headers,
+			Body:                v.Body,
+			EnableProxyProtocol: v.EnableProxyProtocol,
 		}
 		for _, command := range v.Commands {
 			check.AddCommand(command.Name, command.Message)
@@ -671,35 +686,39 @@ func (t *UptimeTests) Fill(uptimeTests apidef.UptimeTests) {
 	}
 
 	if len(result) > 0 {
-		t.Tests = result
+		u.Tests = result
 	}
 }
 
 // ExtractTo extracts *UptimeTests into *apidef.UptimeTests.
-func (t *UptimeTests) ExtractTo(uptimeTests *apidef.UptimeTests) {
-	if t.ServiceDiscovery == nil {
-		t.ServiceDiscovery = &ServiceDiscovery{}
+func (u *UptimeTests) ExtractTo(uptimeTests *apidef.UptimeTests) {
+	uptimeTests.Disabled = !u.Enabled
+
+	if u.ServiceDiscovery == nil {
+		u.ServiceDiscovery = &ServiceDiscovery{}
 		defer func() {
-			t.ServiceDiscovery = nil
+			u.ServiceDiscovery = nil
 		}()
 	}
 
-	t.ServiceDiscovery.ExtractTo(&uptimeTests.Config.ServiceDiscovery)
+	u.ServiceDiscovery.ExtractTo(&uptimeTests.Config.ServiceDiscovery)
 
-	uptimeTests.Config.ExpireUptimeAnalyticsAfter = int64(t.LogRetentionPeriod.Seconds())
-	uptimeTests.Config.RecheckWait = int(t.HostDownRetestPeriod.Seconds())
+	uptimeTests.Config.ExpireUptimeAnalyticsAfter = int64(u.LogRetentionPeriod.Seconds())
+	uptimeTests.Config.RecheckWait = int(u.HostDownRetestPeriod.Seconds())
 
 	uptimeTests.CheckList = nil
 
 	result := []apidef.HostCheckObject{}
-	for _, v := range t.Tests {
+	for _, v := range u.Tests {
+		classicProtocol, classicCheckURL := u.extractToProtocolAndCheckURL(v.CheckURL)
 		check := apidef.HostCheckObject{
-			CheckURL: v.CheckURL,
-			Protocol: v.Protocol,
-			Timeout:  time.Duration(v.Timeout),
-			Method:   v.Method,
-			Headers:  v.Headers,
-			Body:     v.Body,
+			CheckURL:            classicCheckURL,
+			Protocol:            classicProtocol,
+			Timeout:             time.Duration(v.Timeout),
+			Method:              v.Method,
+			Headers:             v.Headers,
+			Body:                v.Body,
+			EnableProxyProtocol: v.EnableProxyProtocol,
 		}
 		for _, command := range v.Commands {
 			check.AddCommand(command.Name, command.Message)
@@ -711,6 +730,33 @@ func (t *UptimeTests) ExtractTo(uptimeTests *apidef.UptimeTests) {
 	if len(result) > 0 {
 		uptimeTests.CheckList = result
 	}
+}
+
+// fillCheckURL constructs a valid URL by appending the protocol to the provided URL, removing any existing protocol.
+// This needs to be done because classic can have invalid protocol and checkURL combinations, e.g.
+// protocol=tcp, checkURL=https://myservice.fake
+func (u *UptimeTests) fillCheckURL(protocol string, checkURL string) string {
+	// in classic API, protocol can be empty so we need to check for that and return the original URL
+	if protocol == "" {
+		return checkURL
+	}
+	protocolessURL := checkURL
+	splitURL := strings.Split(checkURL, "://")
+	if len(splitURL) > 1 {
+		protocolessURL = splitURL[1]
+	}
+
+	return fmt.Sprintf("%s://%s", protocol, protocolessURL)
+}
+
+// extractToProtocolAndCheckURL splits a URL into its protocol and the remaining part of the URL, returning both as strings.
+// Classic has a special field for protocol while OAS only has checkURL. The protocol should remain inside checkURL.
+func (u *UptimeTests) extractToProtocolAndCheckURL(checkURL string) (classicProtocol, classicCheckURL string) {
+	splitURL := strings.Split(checkURL, "://")
+	if len(splitURL) > 1 {
+		return splitURL[0], checkURL
+	}
+	return "", checkURL // should never happen, but let's be sure to not have panics
 }
 
 // MutualTLS contains the configuration for establishing a mutual TLS connection between Tyk and the upstream server.
@@ -1195,6 +1241,7 @@ func (u *UpstreamOAuth) ExtractTo(api *apidef.UpstreamOAuth) {
 }
 
 // UpstreamRequestSigning represents configuration for generating signed requests to an upstream API.
+// Tyk classic API definition: `request_signing`.
 type UpstreamRequestSigning struct {
 	// Enabled determines if request signing is enabled or disabled.
 	Enabled bool `bson:"enabled" json:"enabled"` // required
@@ -1238,6 +1285,9 @@ func (l *UpstreamRequestSigning) ExtractTo(api *apidef.APIDefinition) {
 type LoadBalancing struct {
 	// Enabled determines if load balancing is active.
 	Enabled bool `json:"enabled" bson:"enabled"` // required
+	// SkipUnavailableHosts determines whether to skip unavailable hosts during load balancing based on uptime tests.
+	// Tyk classic field: `proxy.check_host_against_uptime_tests`
+	SkipUnavailableHosts bool `json:"skipUnavailableHosts,omitempty" bson:"skipUnavailableHosts,omitempty"`
 	// Targets defines the list of targets with their respective weights for load balancing.
 	Targets []LoadBalancingTarget `json:"targets,omitempty" bson:"targets,omitempty"`
 }
@@ -1254,11 +1304,13 @@ type LoadBalancingTarget struct {
 func (l *LoadBalancing) Fill(api apidef.APIDefinition) {
 	if len(api.Proxy.Targets) == 0 {
 		api.Proxy.EnableLoadBalancing = false
+		api.Proxy.CheckHostAgainstUptimeTests = false
 		api.Proxy.Targets = nil
 		return
 	}
 
 	l.Enabled = api.Proxy.EnableLoadBalancing
+	l.SkipUnavailableHosts = api.Proxy.CheckHostAgainstUptimeTests
 
 	targetCounter := make(map[string]*LoadBalancingTarget)
 	for _, target := range api.Proxy.Targets {
@@ -1290,12 +1342,14 @@ func (l *LoadBalancing) Fill(api apidef.APIDefinition) {
 func (l *LoadBalancing) ExtractTo(api *apidef.APIDefinition) {
 	if len(l.Targets) == 0 {
 		api.Proxy.EnableLoadBalancing = false
+		api.Proxy.CheckHostAgainstUptimeTests = false
 		api.Proxy.Targets = nil
 		return
 	}
 
 	proxyConfTargets := make([]string, 0, len(l.Targets))
 	api.Proxy.EnableLoadBalancing = l.Enabled
+	api.Proxy.CheckHostAgainstUptimeTests = l.SkipUnavailableHosts
 	for _, target := range l.Targets {
 		for i := 0; i < target.Weight; i++ {
 			proxyConfTargets = append(proxyConfTargets, target.URL)

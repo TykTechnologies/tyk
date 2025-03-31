@@ -14,9 +14,9 @@ import (
 	"github.com/buger/jsonparser"
 	"github.com/hashicorp/go-multierror"
 	pkgver "github.com/hashicorp/go-version"
-	"github.com/xeipuuv/gojsonschema"
 
 	"github.com/TykTechnologies/tyk/apidef/streams/bento"
+	"github.com/TykTechnologies/tyk/internal/service/gojsonschema"
 
 	tykerrors "github.com/TykTechnologies/tyk/internal/errors"
 )

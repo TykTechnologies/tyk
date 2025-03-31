@@ -12,9 +12,9 @@ import (
 	"github.com/buger/jsonparser"
 	"github.com/hashicorp/go-multierror"
 	pkgver "github.com/hashicorp/go-version"
-	"github.com/xeipuuv/gojsonschema"
 
 	tykerrors "github.com/TykTechnologies/tyk/internal/errors"
+	"github.com/TykTechnologies/tyk/internal/service/gojsonschema"
 	logger "github.com/TykTechnologies/tyk/log"
 )
 
@@ -41,7 +41,7 @@ var (
 
 func loadOASSchema() error {
 	load := func() error {
-		xTykAPIGwSchema, err := schemaDir.ReadFile(fmt.Sprintf("schema/%s.strict.json", ExtensionTykAPIGateway))
+		xTykAPIGwSchema, err := schemaDir.ReadFile(fmt.Sprintf("schema/%s.json", ExtensionTykAPIGateway))
 		if err != nil {
 			return fmt.Errorf("%s loading failed: %w", ExtensionTykAPIGateway, err)
 		}

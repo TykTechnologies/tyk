@@ -889,8 +889,12 @@ type AnalyticsPluginConfig struct {
 
 // UptimeTests holds the test configuration for uptime tests.
 type UptimeTests struct {
+	// Disabled indicates whether the uptime test configuration is disabled.
+	Disabled bool `bson:"disabled" json:"disabled"`
+	// CheckList represents a collection of HostCheckObject used to define multiple checks in uptime test configurations.
 	CheckList []HostCheckObject `bson:"check_list" json:"check_list"`
-	Config    UptimeTestsConfig `bson:"config" json:"config"`
+	// Config defines the configuration settings for uptime tests, including analytics expiration and service discovery.
+	Config UptimeTestsConfig `bson:"config" json:"config"`
 }
 
 // UptimeTestCommand handles additional checks for tcp connections.
@@ -1687,5 +1691,23 @@ func (j *JSVMEventHandlerConf) Scan(in any) error {
 	}
 
 	*j = *conf
+	return nil
+}
+
+// LogEventHandlerConf represents the configuration for a log event handler.
+type LogEventHandlerConf struct {
+	// Disabled indicates whether the handler is inactive.
+	Disabled bool `bson:"disabled" json:"disabled"`
+	// Prefix specifies the prefix used for log events.
+	Prefix string `bson:"prefix" json:"prefix"`
+}
+
+// Scan extracts data from the input into the LogEventHandlerConf struct by performing type conversion.
+func (l *LogEventHandlerConf) Scan(in any) error {
+	conf, err := reflect.Cast[LogEventHandlerConf](in)
+	if err != nil {
+		return err
+	}
+	*l = *conf
 	return nil
 }

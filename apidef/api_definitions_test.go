@@ -346,3 +346,21 @@ func TestJSVMEventHandlerConf_Scan(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, expected, jsvmEventConf)
 }
+
+func TestLogEventHandlerConf_Scan(t *testing.T) {
+	logEventMeta := map[string]any{
+		"disabled": true,
+		"prefix":   "AuthFailureEvent",
+	}
+
+	expected := LogEventHandlerConf{
+		Disabled: true,
+		Prefix:   "AuthFailureEvent",
+	}
+
+	var logEventConf LogEventHandlerConf
+	err := logEventConf.Scan(logEventMeta)
+
+	assert.NoError(t, err)
+	assert.Equal(t, expected, logEventConf)
+}

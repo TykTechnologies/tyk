@@ -21,3 +21,41 @@ tests:
               enabled: false
     output:
       version_data.versions..ignore_endpoint_case: false
+  - desc: "ignorecase enabled from classic"
+    input:
+      version_data:
+        versions:
+          "":
+            ignore_endpoint_case: true
+    output:
+      x-tyk-api-gateway:
+        middleware:
+          global:
+            ignoreCase:
+              enabled: true
+  - desc: "skip rate limit and quotas (classic-->oas)"
+    source: classic
+    input:
+      disable_rate_limit: true
+      disable_quota: true
+      dont_set_quota_on_create: true
+    output:
+      x-tyk-api-gateway:
+        middleware:
+          global:
+            skipRateLimit: true
+            skipQuota: true
+            skipQuotaReset: true
+  - desc: "skip rate limit and quotas (oas-->classic)"
+    source: oas
+    input:
+      x-tyk-api-gateway:
+        middleware:
+          global:
+            skipRateLimit: true
+            skipQuota: true
+            skipQuotaReset: true
+    output:
+      disable_rate_limit: true
+      disable_quota: true
+      dont_set_quota_on_create: true
