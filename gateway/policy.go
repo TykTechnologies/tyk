@@ -128,6 +128,7 @@ func (gw *Gateway) LoadPoliciesFromDashboard(endpoint, secret string, allowExpli
 
 	newRequest.Header.Set("authorization", secret)
 	newRequest.Header.Set("x-tyk-nodeid", gw.GetNodeID())
+	newRequest.Header.Set("x-tyk-session-id", gw.SessionID)
 
 	gw.ServiceNonceMutex.RLock()
 	newRequest.Header.Set("x-tyk-nonce", gw.ServiceNonce)
