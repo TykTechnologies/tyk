@@ -14,10 +14,10 @@ func TestCache(t *testing.T) {
 func TestCache_Expired(t *testing.T) {
 	cache := &Cache{
 		items: map[string]Item{
-			"one": Item{
+			"one": {
 				Expiration: 1,
 			},
-			"two": Item{
+			"two": {
 				Expiration: 0,
 			},
 		},
@@ -30,7 +30,7 @@ func TestCache_Expired(t *testing.T) {
 
 	t.Run("Test Items", func(t *testing.T) {
 		want := map[string]Item{
-			"two": Item{
+			"two": {
 				Expiration: 0,
 			},
 		}

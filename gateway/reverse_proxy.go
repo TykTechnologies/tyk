@@ -1008,6 +1008,21 @@ func isCORSPreflight(r *http.Request) bool {
 	return r.Method == http.MethodOptions
 }
 
+type variableReplaceRoundTripper struct {
+	next   http.RoundTripper
+	outReq *http.Request
+	gw     *Gateway
+}
+
+func (d *variableReplaceRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
+	for key := range req.Header {
+		val := d.gw.ReplaceTykVariables(d.outReq, req.Header.Get(key), false)
+		req.Header.Set(key, val)
+	}
+
+	return d.next.RoundTrip(req)
+}
+
 func (p *ReverseProxy) handleGraphQL(roundTripper *TykRoundTripper, outreq *http.Request, w http.ResponseWriter) (res *http.Response, hijacked bool, err error) {
 	isWebSocketUpgrade := ctxGetGraphQLIsWebSocketUpgrade(outreq)
 	needsEngine := needsGraphQLExecutionEngine(p.TykAPISpec)
@@ -1018,7 +1033,7 @@ func (p *ReverseProxy) handleGraphQL(roundTripper *TykRoundTripper, outreq *http
 		requestHeadersRewrite[textproto.CanonicalMIMEHeaderKey(key)] = value
 	}
 	res, hijacked, err = p.TykAPISpec.GraphEngine.HandleReverseProxy(graphengine.ReverseProxyParams{
-		RoundTripper:       roundTripper,
+		RoundTripper:       &variableReplaceRoundTripper{next: roundTripper, outReq: outreq, gw: p.Gw},
 		ResponseWriter:     w,
 		OutRequest:         outreq,
 		WebSocketUpgrader:  &p.wsUpgrader,
