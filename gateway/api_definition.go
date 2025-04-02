@@ -419,13 +419,11 @@ func (a APIDefinitionLoader) FromDashboardService(endpoint string) ([]*APISpec, 
 
 	if resp.StatusCode == http.StatusForbidden {
 		body, _ := ioutil.ReadAll(resp.Body)
-		a.Gw.reLogin()
 		return nil, fmt.Errorf("login failure, Response was: %v", string(body))
 	}
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := ioutil.ReadAll(resp.Body)
-		a.Gw.reLogin()
 		return nil, fmt.Errorf("dashboard API error, response was: %v", string(body))
 	}
 
