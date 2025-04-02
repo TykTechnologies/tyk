@@ -943,8 +943,27 @@ func sortSpecsByListenPath(specs []*APISpec) {
 		if (specs[i].Domain == "") != (specs[j].Domain == "") {
 			return specs[i].Domain != ""
 		}
-		return len(specs[i].Proxy.ListenPath) > len(specs[j].Proxy.ListenPath)
+
+		return computeListenPathLength(specs[i].Proxy.ListenPath) > computeListenPathLength(specs[j].Proxy.ListenPath)
 	})
+}
+
+func computeListenPathLength(listenPath string) int {
+	// Count the number of slashes in the original path
+	slashCount := strings.Count(listenPath, "/")
+
+	segments := strings.Split(listenPath, "/")
+	totalLength := slashCount // Start with the count of slashes
+
+	for _, segment := range segments {
+		if strings.HasPrefix(segment, "{") && strings.HasSuffix(segment, "}") && len(segment) > 2 {
+			// If the segment is enclosed by {} and has a non-empty string inside, count it as 0
+			continue
+		}
+		totalLength += len(segment)
+	}
+
+	return totalLength
 }
 
 // Create the individual API (app) specs based on live configurations and assign middleware
