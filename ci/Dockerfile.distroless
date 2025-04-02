@@ -6,7 +6,8 @@ ARG BUILD_PACKAGE_NAME
 
 ENV DEBIAN_FRONTEND=noninteractive
 
-COPY ${BUILD_PACKAGE_NAME}*${TARGETARCH}.deb /
+# The _ after the pkg name is to match tyk-gateway strictly and not tyk-gateway-fips (for example)
+COPY ${BUILD_PACKAGE_NAME}_*${TARGETARCH}.deb /
 RUN dpkg -i /${BUILD_PACKAGE_NAME}_*${TARGETARCH}.deb && rm /*.deb
 
 FROM gcr.io/distroless/base-debian12:latest
