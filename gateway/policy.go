@@ -150,7 +150,6 @@ func (gw *Gateway) LoadPoliciesFromDashboard(endpoint, secret string, allowExpli
 	if resp.StatusCode != http.StatusOK {
 		body, _ := ioutil.ReadAll(resp.Body)
 		log.Error("Policy request login failure, Response was: ", string(body))
-		gw.reLogin()
 		return nil, ErrPoliciesFetchFailed
 	}
 
