@@ -228,6 +228,7 @@ func (h *HTTPDashboardHandler) Register() error {
 	h.Gw.ServiceNonce = val.Nonce
 	h.Gw.ServiceNonceMutex.Unlock()
 	dashLog.Debug("Registration Finished: Nonce Set: ", val.Nonce)
+	h.Gw.DoReload()
 
 	return nil
 }
