@@ -944,26 +944,28 @@ func sortSpecsByListenPath(specs []*APISpec) {
 			return specs[i].Domain != ""
 		}
 
-		return computeListenPathLength(specs[i].Proxy.ListenPath) > computeListenPathLength(specs[j].Proxy.ListenPath)
+		return listenPathLength(specs[i].Proxy.ListenPath) > listenPathLength(specs[j].Proxy.ListenPath)
 	})
 }
 
-func computeListenPathLength(listenPath string) int {
-	// Count the number of slashes in the original path
-	slashCount := strings.Count(listenPath, "/")
-
-	segments := strings.Split(listenPath, "/")
-	totalLength := slashCount // Start with the count of slashes
-
-	for _, segment := range segments {
-		if strings.HasPrefix(segment, "{") && strings.HasSuffix(segment, "}") && len(segment) > 2 {
-			// If the segment is enclosed by {} and has a non-empty string inside, count it as 0
-			continue
-		}
-		totalLength += len(segment)
+func listenPathLength(listenPath string) int {
+	// If the path doesn't contain '{', compute the length directly
+	if !strings.Contains(listenPath, "{") {
+		return len(listenPath)
 	}
 
-	return totalLength
+	// Split the path into segments and calculate the total length
+	length := strings.Count(listenPath, "/")
+
+	for _, segment := range strings.Split(listenPath, "/") {
+		// Skip segments enclosed by {} with non-empty content
+		if len(segment) > 2 && segment[0] == '{' && segment[len(segment)-1] == '}' {
+			continue
+		}
+		length += len(segment)
+	}
+
+	return length
 }
 
 // Create the individual API (app) specs based on live configurations and assign middleware

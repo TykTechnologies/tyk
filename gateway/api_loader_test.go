@@ -9546,8 +9546,12 @@ func TestSortSpecsByListenPath(t *testing.T) {
 				createSpec("/bar/{id}/baz"),
 				createSpec("/bar/id/baz"),
 				createSpec("/bar/{id}/baz/{id}"),
+				createSpec("/path/{param}/endpoint"),
+				createSpec("/path/specific/endpoint"),
 			},
 			expected: []string{
+				"/path/specific/endpoint",
+				"/path/{param}/endpoint",
 				"/foo-bar-baz",
 				"/bar/id/baz",
 				"/bar/{id}/baz/{id}",
@@ -9557,17 +9561,6 @@ func TestSortSpecsByListenPath(t *testing.T) {
 				"/foo",
 				"/foo",
 				"/bar",
-			},
-		},
-		{
-			name: "Basic Parameter vs Static Path",
-			specs: []*APISpec{
-				createSpec("/path/{param}/endpoint"),
-				createSpec("/path/specific/endpoint"),
-			},
-			expected: []string{
-				"/path/specific/endpoint",
-				"/path/{param}/endpoint",
 			},
 		},
 		{
