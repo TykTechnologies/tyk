@@ -2298,8 +2298,8 @@ func TestTimeoutPrioritization(t *testing.T) {
 				time.Sleep(4000 * time.Millisecond)
 				w.Write([]byte("Delay 4s response"))
 			} else if strings.HasPrefix(r.URL.Path, "/delay2/1000") {
-				time.Sleep(1000 * time.Millisecond)
-				w.Write([]byte("Delay2 1s response"))
+				time.Sleep(2000 * time.Millisecond)
+				w.Write([]byte("Delay2 2s response"))
 			} else if strings.HasPrefix(r.URL.Path, "/delay2/4000") {
 				time.Sleep(4000 * time.Millisecond)
 				w.Write([]byte("Delay2 4s response"))
@@ -2349,7 +2349,7 @@ func TestTimeoutPrioritization(t *testing.T) {
 			Method:    http.MethodGet,
 			Path:      "/delay2/1000",
 			Code:      http.StatusOK,
-			BodyMatch: "Delay2 1s response",
+			BodyMatch: "Delay2 2s response",
 		})
 
 		// Test case 4: Should timeout at global value (delay 60ms > global timeout 50ms)
