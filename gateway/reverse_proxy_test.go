@@ -2258,21 +2258,13 @@ func TestTimeoutPrioritization(t *testing.T) {
 				version.ExtendedPaths.HardTimeouts = []apidef.HardTimeoutMeta{
 					{
 						Disabled: false,
-<<<<<<< HEAD
-						Path:     "/delay/.*",
-=======
 						Path:     "^/delay/1$",
->>>>>>> 976714fe6... [TT-12343] Improve Timeout Test Coverage and Consistency in TestTimeoutPrioritization (#6992)
 						Method:   http.MethodGet,
 						TimeOut:  4,
 					},
 					{
 						Disabled: false,
-<<<<<<< HEAD
-						Path:     "/delay2/.*",
-=======
 						Path:     "^/delay2/2$",
->>>>>>> 976714fe6... [TT-12343] Improve Timeout Test Coverage and Consistency in TestTimeoutPrioritization (#6992)
 						Method:   http.MethodGet,
 						TimeOut:  1,
 					},
