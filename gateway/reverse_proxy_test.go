@@ -2291,15 +2291,15 @@ func TestTimeoutPrioritization(t *testing.T) {
 
 	t.Run("Explicit vs Default Global Timeout", func(t *testing.T) {
 		upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			if strings.HasPrefix(r.URL.Path, "/delay/2000") {
-				time.Sleep(2000 * time.Millisecond)
-				w.Write([]byte("Delay 2s response"))
+			if strings.HasPrefix(r.URL.Path, "/delay/1000") {
+				time.Sleep(1000 * time.Millisecond)
+				w.Write([]byte("Delay 1s response"))
 			} else if strings.HasPrefix(r.URL.Path, "/delay/4000") {
 				time.Sleep(4000 * time.Millisecond)
 				w.Write([]byte("Delay 4s response"))
 			} else if strings.HasPrefix(r.URL.Path, "/delay2/1000") {
-				time.Sleep(1000 * time.Millisecond)
-				w.Write([]byte("Delay2 1s response"))
+				time.Sleep(2000 * time.Millisecond)
+				w.Write([]byte("Delay2 2s response"))
 			} else if strings.HasPrefix(r.URL.Path, "/delay2/4000") {
 				time.Sleep(4000 * time.Millisecond)
 				w.Write([]byte("Delay2 4s response"))
@@ -2321,7 +2321,7 @@ func TestTimeoutPrioritization(t *testing.T) {
 						Disabled: false,
 						Path:     "/delay/.*",
 						Method:   http.MethodGet,
-						TimeOut:  4,
+						TimeOut:  3,
 					},
 					// No explicit timeout for /delay2/* endpoints - will use global
 				}
@@ -2333,9 +2333,9 @@ func TestTimeoutPrioritization(t *testing.T) {
 		// Test case 1: Should succeed (delay 45ms < enforced timeout 60ms)
 		_, _ = ts.Run(t, test.TestCase{
 			Method:    http.MethodGet,
-			Path:      "/delay/2000",
+			Path:      "/delay/1000",
 			Code:      http.StatusOK,
-			BodyMatch: "Delay 2s response",
+			BodyMatch: "Delay 1s response",
 		})
 
 		_, _ = ts.Run(t, test.TestCase{
@@ -2349,7 +2349,7 @@ func TestTimeoutPrioritization(t *testing.T) {
 			Method:    http.MethodGet,
 			Path:      "/delay2/1000",
 			Code:      http.StatusOK,
-			BodyMatch: "Delay2 1s response",
+			BodyMatch: "Delay2 2s response",
 		})
 
 		// Test case 4: Should timeout at global value (delay 60ms > global timeout 50ms)
