@@ -275,7 +275,7 @@ func (e *EngineV2) handoverRequestToGraphQLExecutionEngine(gqlRequest *graphql.R
 	}
 
 	upstreamHeaders := additionalUpstreamHeaders(e.logger, outreq, e.ApiDefinition)
-	execOptions = append(execOptions, graphql.WithHeaderModifier(e.gqlTools.headerModifier(outreq, upstreamHeaders, e.tykVariableReplacer)))
+	execOptions = append(execOptions, graphql.WithHeaderModifier(e.gqlTools.headerModifier(upstreamHeaders)))
 
 	if e.OpenTelemetry.Executor != nil {
 		if err = e.OpenTelemetry.Executor.Execute(reqCtx, gqlRequest, &resultWriter, execOptions...); err != nil {
@@ -367,7 +367,7 @@ func (e *EngineV2) handoverWebSocketConnectionToGraphQLExecutionEngine(params *R
 	executorPool = subscription.NewExecutorV2Pool(
 		e.ExecutionEngine,
 		initialRequestContext,
-		subscription.WithExecutorV2HeaderModifier(e.gqlTools.headerModifier(params.OutRequest, upstreamHeaders, e.tykVariableReplacer)),
+		subscription.WithExecutorV2HeaderModifier(e.gqlTools.headerModifier(upstreamHeaders)),
 	)
 
 	go gqlwebsocket.Handle(

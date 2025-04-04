@@ -72,17 +72,12 @@ func (g graphqlGoToolsV1) handleIntrospection(schema *graphql.Schema) (res *http
 	return
 }
 
-func (g graphqlGoToolsV1) headerModifier(outreq *http.Request, additionalHeaders http.Header, variableReplacer TykVariableReplacer) postprocess.HeaderModifier {
+func (g graphqlGoToolsV1) headerModifier(additionalHeaders http.Header) postprocess.HeaderModifier {
 	return func(header http.Header) {
 		for key := range additionalHeaders {
 			if header.Get(key) == "" {
 				header.Set(key, additionalHeaders.Get(key))
 			}
-		}
-
-		for key := range header {
-			val := variableReplacer(outreq, header.Get(key), false)
-			header.Set(key, val)
 		}
 	}
 }
