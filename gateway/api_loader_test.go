@@ -9517,3 +9517,110 @@ func TestAPILoaderValidation(t *testing.T) {
 		)
 	})
 }
+
+func TestSortSpecsByListenPath(t *testing.T) {
+	createSpec := func(listenPath string) *APISpec {
+		return &APISpec{
+			APIDefinition: &apidef.APIDefinition{
+				Proxy: apidef.ProxyConfig{
+					ListenPath: listenPath,
+				},
+			},
+		}
+	}
+
+	tests := []struct {
+		name     string
+		specs    []*APISpec
+		expected []string
+	}{
+		{
+			name: "Basic Parameter vs Static Path",
+			specs: []*APISpec{
+				createSpec("/foo"),
+				createSpec("/foo-bar"),
+				createSpec("/foo-bar-baz"),
+				createSpec("/foo"),
+				createSpec("/bar"),
+				createSpec("/bar/{id}"),
+				createSpec("/bar/{id}/baz"),
+				createSpec("/bar/id/baz"),
+				createSpec("/bar/{id}/baz/{id}"),
+				createSpec("/path/{param}/endpoint"),
+				createSpec("/path/specific/endpoint"),
+			},
+			expected: []string{
+				"/path/specific/endpoint",
+				"/path/{param}/endpoint",
+				"/foo-bar-baz",
+				"/bar/id/baz",
+				"/bar/{id}/baz/{id}",
+				"/bar/{id}/baz",
+				"/foo-bar",
+				"/bar/{id}",
+				"/foo",
+				"/foo",
+				"/bar",
+			},
+		},
+		{
+			name: "Multiple Parameters vs Longer Static Path",
+			specs: []*APISpec{
+				createSpec("/api/{param1}/{param2}/resource"),
+				createSpec("/api/specific/path/resource"),
+			},
+			expected: []string{
+				"/api/specific/path/resource",
+				"/api/{param1}/{param2}/resource",
+			},
+		},
+		{
+			name: "Identical Paths Except for Parameter",
+			specs: []*APISpec{
+				createSpec("/users/{id}/profile"),
+				createSpec("/users/settings/profile"),
+			},
+			expected: []string{
+				"/users/settings/profile",
+				"/users/{id}/profile",
+			},
+		},
+		{
+			name: "Customer Reported Case",
+			specs: []*APISpec{
+				createSpec("/information-concept/something/{thisisalongidname}/stuff"),
+				createSpec("/information-concept/something/ted/stuff/things"),
+			},
+			expected: []string{
+				"/information-concept/something/ted/stuff/things",
+				"/information-concept/something/{thisisalongidname}/stuff",
+			},
+		},
+		{
+			name: "Parameter at Different Position",
+			specs: []*APISpec{
+				createSpec("/products/{category}/items"),
+				createSpec("/products/featured/items/{id}"),
+			},
+			expected: []string{
+				"/products/featured/items/{id}",
+				"/products/{category}/items",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			sortSpecsByListenPath(tt.specs)
+
+			var sortedPaths []string
+			for _, spec := range tt.specs {
+				sortedPaths = append(sortedPaths, spec.Proxy.ListenPath)
+			}
+
+			if !reflect.DeepEqual(sortedPaths, tt.expected) {
+				t.Errorf("Expected %v, but got %v", tt.expected, sortedPaths)
+			}
+		})
+	}
+}
