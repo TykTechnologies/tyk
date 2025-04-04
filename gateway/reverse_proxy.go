@@ -1187,12 +1187,6 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 
 		timeout := proxyTimeout(p.TykAPISpec)
 
-		// If an enforced timeout is configured for this API endpoint, use it instead
-		// of the global default timeout, as it should take precedence
-		if isTimeoutEnforced {
-			timeout = enforcedTimeout
-		}
-
 		p.TykAPISpec.HTTPTransport = p.httpTransport(timeout, rw, req, outreq)
 		p.TykAPISpec.HTTPTransportCreated = time.Now()
 
