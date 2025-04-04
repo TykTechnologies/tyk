@@ -233,7 +233,7 @@ jobs:
             -Dsonar.projectKey=TykTechnologies_tyk
             -Dsonar.sources=.
             -Dsonar.exclusions=**/testdata/*,test/**,tests/**,coprocess/**/*,ci/**,templates/**
-            -Dsonar.coverage.exclusions=**/*_test.go,**/mock/*,tests/**
+            -Dsonar.coverage.exclusions=**/*_test.go,**/mock/*,tests/**,swagger*.yml
             -Dsonar.test.inclusions=**/*_test.go,tests/**
             -Dsonar.tests=.
             -Dsonar.go.coverage.reportPaths=gateway-all.cov
