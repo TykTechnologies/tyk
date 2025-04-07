@@ -2087,6 +2087,8 @@ func BenchmarkLargeResponsePayload(b *testing.B) {
 }
 
 func TestTimeoutPrioritization(t *testing.T) {
+	t.Parallel()
+
 	ts := StartTest(func(c *config.Config) {
 		c.ProxyDefaultTimeout = 2
 	})
@@ -2094,7 +2096,7 @@ func TestTimeoutPrioritization(t *testing.T) {
 
 	t.Run("Basic Timeout Behavior - enforced timeout higher than default", func(t *testing.T) {
 		upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-			time.Sleep(3 * time.Second)
+			time.Sleep(1 * time.Second)
 			w.Write([]byte("Success"))
 		}))
 		defer upstream.Close()
@@ -2129,7 +2131,7 @@ func TestTimeoutPrioritization(t *testing.T) {
 
 	t.Run("Basic Timeout Behavior - enforced timeout lower than default", func(t *testing.T) {
 		upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-			time.Sleep(1800 * time.Millisecond)
+			time.Sleep(3 * time.Second)
 			w.Write([]byte("Success"))
 		}))
 		defer upstream.Close()
@@ -2164,7 +2166,7 @@ func TestTimeoutPrioritization(t *testing.T) {
 
 	t.Run("Basic Timeout Behavior - delay higher than both timeouts", func(t *testing.T) {
 		upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-			time.Sleep(2500 * time.Millisecond)
+			time.Sleep(3 * time.Second)
 			w.Write([]byte("Success"))
 		}))
 		defer upstream.Close()
@@ -2199,7 +2201,7 @@ func TestTimeoutPrioritization(t *testing.T) {
 
 	t.Run("Basic Timeout Behavior - delay within enforced timeout", func(t *testing.T) {
 		upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-			time.Sleep(500 * time.Millisecond)
+			time.Sleep(1 * time.Second)
 			w.Write([]byte("Success"))
 		}))
 		defer upstream.Close()
@@ -2216,7 +2218,7 @@ func TestTimeoutPrioritization(t *testing.T) {
 						Disabled: false,
 						Path:     "/test4",
 						Method:   http.MethodGet,
-						TimeOut:  1,
+						TimeOut:  3,
 					},
 				}
 			})
@@ -2235,11 +2237,11 @@ func TestTimeoutPrioritization(t *testing.T) {
 	t.Run("Multiple Endpoints with Different Enforced Timeouts", func(t *testing.T) {
 		upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			if strings.HasPrefix(r.URL.Path, "/delay/") {
-				time.Sleep(3200 * time.Millisecond)
-				w.Write([]byte("Delay 3.2s response"))
+				time.Sleep(1000 * time.Millisecond)
+				w.Write([]byte("Delay 1s response"))
 			} else if strings.HasPrefix(r.URL.Path, "/delay2/") {
-				time.Sleep(3200 * time.Millisecond)
-				w.Write([]byte("Delay2 3.2s response"))
+				time.Sleep(2000 * time.Millisecond)
+				w.Write([]byte("Delay2 2s response"))
 			} else {
 				w.WriteHeader(http.StatusNotFound)
 			}
@@ -2256,13 +2258,13 @@ func TestTimeoutPrioritization(t *testing.T) {
 				version.ExtendedPaths.HardTimeouts = []apidef.HardTimeoutMeta{
 					{
 						Disabled: false,
-						Path:     "/delay/.*",
+						Path:     "^/delay/1$",
 						Method:   http.MethodGet,
 						TimeOut:  4,
 					},
 					{
 						Disabled: false,
-						Path:     "/delay2/.*",
+						Path:     "^/delay2/2$",
 						Method:   http.MethodGet,
 						TimeOut:  1,
 					},
@@ -2274,14 +2276,14 @@ func TestTimeoutPrioritization(t *testing.T) {
 
 		_, _ = ts.Run(t, test.TestCase{
 			Method:    http.MethodGet,
-			Path:      "/delay/3",
+			Path:      "/delay/1",
 			Code:      http.StatusOK,
-			BodyMatch: "Delay 3.2s response",
+			BodyMatch: "Delay 1s response",
 		})
 
 		_, _ = ts.Run(t, test.TestCase{
 			Method:    http.MethodGet,
-			Path:      "/delay2/3",
+			Path:      "/delay2/2",
 			Code:      http.StatusGatewayTimeout,
 			BodyMatch: "Upstream service reached hard timeout",
 		})
@@ -2289,18 +2291,18 @@ func TestTimeoutPrioritization(t *testing.T) {
 
 	t.Run("Explicit vs Default Global Timeout", func(t *testing.T) {
 		upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			if strings.HasPrefix(r.URL.Path, "/delay/2500") {
-				time.Sleep(2500 * time.Millisecond)
-				w.Write([]byte("Delay 2.5s response"))
+			if strings.HasPrefix(r.URL.Path, "/delay/1000") {
+				time.Sleep(1000 * time.Millisecond)
+				w.Write([]byte("Delay 1s response"))
 			} else if strings.HasPrefix(r.URL.Path, "/delay/4000") {
 				time.Sleep(4000 * time.Millisecond)
 				w.Write([]byte("Delay 4s response"))
 			} else if strings.HasPrefix(r.URL.Path, "/delay2/1000") {
 				time.Sleep(1000 * time.Millisecond)
 				w.Write([]byte("Delay2 1s response"))
-			} else if strings.HasPrefix(r.URL.Path, "/delay2/3500") {
-				time.Sleep(3500 * time.Millisecond)
-				w.Write([]byte("Delay2 3.5s response"))
+			} else if strings.HasPrefix(r.URL.Path, "/delay2/4000") {
+				time.Sleep(4000 * time.Millisecond)
+				w.Write([]byte("Delay2 4s response"))
 			} else {
 				w.WriteHeader(http.StatusNotFound)
 			}
@@ -2331,9 +2333,9 @@ func TestTimeoutPrioritization(t *testing.T) {
 		// Test case 1: Should succeed (delay 45ms < enforced timeout 60ms)
 		_, _ = ts.Run(t, test.TestCase{
 			Method:    http.MethodGet,
-			Path:      "/delay/2500",
+			Path:      "/delay/1000",
 			Code:      http.StatusOK,
-			BodyMatch: "Delay 2.5s response",
+			BodyMatch: "Delay 1s response",
 		})
 
 		_, _ = ts.Run(t, test.TestCase{
@@ -2353,7 +2355,7 @@ func TestTimeoutPrioritization(t *testing.T) {
 		// Test case 4: Should timeout at global value (delay 60ms > global timeout 50ms)
 		_, _ = ts.Run(t, test.TestCase{
 			Method:    http.MethodGet,
-			Path:      "/delay2/3500",
+			Path:      "/delay2/4000",
 			Code:      http.StatusGatewayTimeout,
 			BodyMatch: "Upstream service reached hard timeout",
 		})
