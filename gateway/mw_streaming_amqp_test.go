@@ -3,11 +3,13 @@
 package gateway
 
 import (
+	"bytes"
 	"context"
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"io"
+	"net/http"
 	"strconv"
 	"strings"
 	"testing"
@@ -21,10 +23,63 @@ import (
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
 	"github.com/rabbitmq/amqp091-go"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/modules/rabbitmq"
 )
+
+type amqpTestContext struct {
+	t            *testing.T
+	ts           *Test
+	apiName      string
+	exchangeName string
+	queueName    string
+	amqpURL      string
+	input        string
+	output       string
+}
+
+func initializeAMQP09Environment(testCtx *amqpTestContext) {
+	conn, err := amqp091.Dial(testCtx.amqpURL)
+	require.NoError(testCtx.t, err, "Failed to connect to RabbitMQ")
+
+	defer conn.Close()
+
+	ch, err := conn.Channel()
+	require.NoError(testCtx.t, err, "Failed to open an AMQP09 channel")
+
+	defer ch.Close()
+
+	err = ch.ExchangeDeclare(
+		testCtx.exchangeName, // name
+		"fanout",             // type
+		true,                 // durable
+		false,                // auto-deleted
+		false,                // internal
+		false,                // no-wait
+		nil,                  // arguments
+	)
+	require.NoError(testCtx.t, err, "Failed to declare an exchange")
+
+	_, err = ch.QueueDeclare(
+		testCtx.queueName, // name
+		true,              // durable
+		false,             // delete when unused
+		false,             // exclusive
+		false,             // no-wait
+		nil,               // arguments
+	)
+	require.NoError(testCtx.t, err, "Failed to declare a queue")
+
+	err = ch.QueueBind(
+		testCtx.queueName,    // queue name
+		"",                   // routing key
+		testCtx.exchangeName, // exchange
+		false,
+		nil,
+	)
+}
 
 func setupOASForStreamingAPIWithAMQP(t *testing.T, streamingConfig string) oas.OAS {
 	t.Helper()
@@ -89,59 +144,57 @@ func amqp1Publisher(t *testing.T, amqpURL string, queueName string, messages [][
 	}
 }
 
-func amqp09Publisher(t *testing.T, amqpURL string, queueName string, messages [][]byte) {
-	const exchangeName = "test-exchange"
-
-	conn, err := amqp091.Dial(amqpURL)
-	require.NoErrorf(t, err, "Failed to connect to RabbitMQ")
+func amqp09Publisher(testCtx *amqpTestContext, messages [][]byte) {
+	conn, err := amqp091.Dial(testCtx.amqpURL)
+	require.NoErrorf(testCtx.t, err, "Failed to connect to RabbitMQ")
 	defer func() {
-		require.NoError(t, conn.Close())
+		require.NoError(testCtx.t, conn.Close())
 	}()
 
 	ch, err := conn.Channel()
-	require.NoErrorf(t, err, "Failed to open a channel")
+	require.NoErrorf(testCtx.t, err, "Failed to open a channel")
 	defer func() {
-		require.NoError(t, ch.Close())
+		require.NoError(testCtx.t, ch.Close())
 	}()
 
-	t.Log("Channel opened")
+	testCtx.t.Log("Channel opened")
 
 	err = ch.ExchangeDeclare(
-		exchangeName, // name
-		"fanout",     // type
-		true,         // durable
-		false,        // auto-deleted
-		false,        // internal
-		false,        // no-wait
-		nil,          // arguments
+		testCtx.exchangeName, // name
+		"fanout",             // type
+		true,                 // durable
+		false,                // auto-deleted
+		false,                // internal
+		false,                // no-wait
+		nil,                  // arguments
 	)
-	require.NoErrorf(t, err, "Failed to declare an exchange")
-	t.Logf("Exchange declared: %s", exchangeName)
+	require.NoErrorf(testCtx.t, err, "Failed to declare an exchange")
+	testCtx.t.Logf("Exchange declared: %s", testCtx.exchangeName)
 
 	queue, err := ch.QueueDeclare(
-		queueName, // name of the queue
-		true,      // durable
-		false,     // delete when unused
-		false,     // exclusive
-		false,     // noWait
-		nil,       // arguments
+		testCtx.queueName, // name of the queue
+		true,              // durable
+		false,             // delete when unused
+		false,             // exclusive
+		false,             // noWait
+		nil,               // arguments
 	)
-	require.NoErrorf(t, err, "Failed to declare a queue")
-	t.Logf("Queue declared: %s", queue.Name)
+	require.NoErrorf(testCtx.t, err, "Failed to declare a queue")
+	testCtx.t.Logf("Queue declared: %s", queue.Name)
 
-	err = ch.QueueBind(queue.Name, "", exchangeName, false, nil)
-	require.NoErrorf(t, err, "Failed to bind a queue")
-	t.Logf("Queue binded: %s", queueName)
+	err = ch.QueueBind(queue.Name, "", testCtx.exchangeName, false, nil)
+	require.NoErrorf(testCtx.t, err, "Failed to bind a queue")
+	testCtx.t.Logf("Queue binded: %s", testCtx.queueName)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
 	for _, message := range messages {
 		err = ch.PublishWithContext(ctx,
-			exchangeName, // exchange
-			"",           // routing key
-			false,        // mandatory
-			false,        // immediate
+			testCtx.exchangeName, // exchange
+			"",                   // routing key
+			false,                // mandatory
+			false,                // immediate
 			amqp091.Publishing{
 				ContentType: "application/octet-stream",
 				Body:        message,
@@ -175,32 +228,7 @@ func createWebsocketClients(t *testing.T, ts *Test, apiName string, numClients i
 	return wsClients
 }
 
-func testAMQPPublisherWebsocketConsumer(t *testing.T, ts *Test, queue string, input string, amqpURL string, apiName string) {
-	t.Helper()
-
-	const (
-		messageToSend = "hello amqp"
-		numMessages   = 2
-		numClients    = 2
-	)
-
-	// Create WebSocket clients
-	wsClients := createWebsocketClients(t, ts, apiName, numClients)
-
-	// Publish messages to the AMQP Broker
-	messages := make([][]byte, numMessages)
-	for i := 0; i < numMessages; i++ {
-		messages[i] = []byte(messageToSend + "-" + strconv.Itoa(i))
-	}
-
-	if input == "amqp_0_9" {
-		amqp09Publisher(t, amqpURL, queue, messages)
-	} else if input == "amqp_1" {
-		amqp1Publisher(t, amqpURL, queue, messages)
-	} else {
-		require.Fail(t, "Invalid input type")
-	}
-
+func testWebsocketOutput(t *testing.T, wsClients []*websocket.Conn, messageToSend string, numMessages int) {
 	expectedTotalMessages := numMessages
 	messagesReceived := 0
 	overallTimeout := time.After(20 * time.Second)
@@ -254,6 +282,95 @@ func testAMQPPublisherWebsocketConsumer(t *testing.T, ts *Test, queue string, in
 	t.Log("Test completed, closing WebSocket connections")
 }
 
+func testAMQP09Output(testCtx *amqpTestContext, expectedMessages [][]byte) {
+	conn, err := amqp091.Dial(testCtx.amqpURL)
+	require.NoError(testCtx.t, err, "Failed to connect to RabbitMQ")
+
+	defer conn.Close()
+
+	ch, err := conn.Channel()
+	require.NoError(testCtx.t, err, "Failed to open an AMQP09 channel")
+
+	defer ch.Close()
+
+	msgs, err := ch.Consume(
+		testCtx.queueName, // queue
+		"consumer",        // consumer
+		true,              // auto-ack
+		false,             // exclusive
+		false,             // no-local
+		false,             // no-wait
+		nil,               // args
+	)
+	require.NoError(testCtx.t, err, "Failed to consume messages")
+	done := make(chan struct{})
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	var result [][]byte
+	go func() {
+		for d := range msgs {
+			result = append(result, d.Body)
+			if len(result) == len(expectedMessages) {
+				close(done)
+			}
+		}
+	}()
+
+	select {
+	case <-ctx.Done():
+	case <-done:
+	}
+
+	assert.Equal(testCtx.t, expectedMessages, result)
+}
+
+func testTykStreamAMQPIntegration(testCtx *amqpTestContext) {
+	testCtx.t.Helper()
+
+	const (
+		messageToSend = "hello amqp"
+		numMessages   = 2
+		numClients    = 2
+	)
+
+	var wsClients []*websocket.Conn
+	if testCtx.output == "websocket" {
+		// Create WebSocket clients
+		wsClients = createWebsocketClients(testCtx.t, testCtx.ts, testCtx.apiName, numClients)
+	}
+
+	// Publish messages to the AMQP Broker
+	messages := make([][]byte, numMessages)
+	for i := 0; i < numMessages; i++ {
+		messages[i] = []byte(messageToSend + "-" + strconv.Itoa(i))
+	}
+
+	if testCtx.input == "amqp_0_9" {
+		amqp09Publisher(testCtx, messages)
+	} else if testCtx.input == "amqp_1" {
+		amqp1Publisher(testCtx.t, testCtx.amqpURL, testCtx.queueName, messages)
+	} else if testCtx.input == "http_server" {
+		publishURL := fmt.Sprintf("%s/%s/post", testCtx.ts.URL, testCtx.apiName)
+		for _, message := range messages {
+			resp, err := http.Post(publishURL, "application/json", bytes.NewReader(message))
+			require.NoError(testCtx.t, err)
+			data, _ := io.ReadAll(resp.Body)
+			fmt.Println(string(data))
+			_ = resp.Body.Close()
+		}
+	} else {
+		require.Fail(testCtx.t, "Invalid input type")
+	}
+
+	if testCtx.output == "websocket" {
+		testWebsocketOutput(testCtx.t, wsClients, messageToSend, numMessages)
+	} else if testCtx.output == "amqp_0_9" {
+		testAMQP09Output(testCtx, messages)
+	}
+}
+
 func Test_TykStreaming_AMQP(t *testing.T) {
 	ctx := context.Background()
 	rabbitmqContainer, err := rabbitmq.Run(ctx,
@@ -275,6 +392,8 @@ func Test_TykStreaming_AMQP(t *testing.T) {
 	})
 	defer ts.Close()
 
+	const exchangeName = "test-exchange"
+
 	t.Run("Publish messages to amqp_0_9 input then consume messages via Websocket", func(t *testing.T) {
 		queueName := "test-queue-amqp-0-9"
 		streamingConfig := fmt.Sprintf(`
@@ -294,7 +413,18 @@ streams:
 `, amqpURL, queueName)
 		tykStreamingOAS := setupOASForStreamingAPIWithAMQP(t, streamingConfig)
 		apiName := setupStreamingAPIForAMQP(t, ts, &tykStreamingOAS)
-		testAMQPPublisherWebsocketConsumer(t, ts, queueName, "amqp_0_9", amqpURL, apiName)
+		testCtx := &amqpTestContext{
+			t:            t,
+			ts:           ts,
+			apiName:      apiName,
+			queueName:    queueName,
+			exchangeName: exchangeName,
+			amqpURL:      amqpURL,
+			input:        "amqp_0_9",
+			output:       "websocket",
+		}
+		initializeAMQP09Environment(testCtx)
+		testTykStreamAMQPIntegration(testCtx)
 	})
 
 	t.Run("Publish messages to amqp_1 input then consume messages via Websocket", func(t *testing.T) {
@@ -314,6 +444,46 @@ streams:
 `, amqpURL, queueName)
 		tykStreamingOAS := setupOASForStreamingAPIWithAMQP(t, streamingConfig)
 		apiName := setupStreamingAPIForAMQP(t, ts, &tykStreamingOAS)
-		testAMQPPublisherWebsocketConsumer(t, ts, queueName, "amqp_1", amqpURL, apiName)
+		testContext := &amqpTestContext{
+			t:            t,
+			ts:           ts,
+			apiName:      apiName,
+			queueName:    queueName,
+			exchangeName: exchangeName,
+			amqpURL:      amqpURL,
+			input:        "amqp_1",
+			output:       "websocket",
+		}
+		testTykStreamAMQPIntegration(testContext)
+	})
+
+	t.Run("Publish messages to http input then consume messages from amqp_9 output", func(t *testing.T) {
+		queueName := "test-queue-amqp-0-9-input-output"
+		streamingConfig := fmt.Sprintf(`
+streams:
+  test:
+    input:
+      http_server:
+        path: /post
+        timeout: 1s
+    output:
+      amqp_0_9:
+        urls: [%s]
+        exchange: "%s"
+`, amqpURL, exchangeName)
+		tykStreamingOAS := setupOASForStreamingAPIWithAMQP(t, streamingConfig)
+		apiName := setupStreamingAPIForAMQP(t, ts, &tykStreamingOAS)
+		testCtx := &amqpTestContext{
+			t:            t,
+			ts:           ts,
+			apiName:      apiName,
+			queueName:    queueName,
+			exchangeName: exchangeName,
+			amqpURL:      amqpURL,
+			input:        "http_server",
+			output:       "amqp_0_9",
+		}
+		initializeAMQP09Environment(testCtx)
+		testTykStreamAMQPIntegration(testCtx)
 	})
 }
