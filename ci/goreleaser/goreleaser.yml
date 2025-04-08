@@ -81,7 +81,7 @@ nfpms:
     description: Tyk Open Source API Gateway written in Go, supporting REST, GraphQL, TCP and gRPC protocols Built with boringssl
     package_name: tyk-gateway-fips
     file_name_template: "{{ .ConventionalFileName }}"
-    builds:
+    ids:
       - fips-amd64
     formats:
       - deb
@@ -138,7 +138,7 @@ nfpms:
     description: Tyk Open Source API Gateway written in Go, supporting REST, GraphQL, TCP and gRPC protocols
     package_name: tyk-gateway
     file_name_template: "{{ .ConventionalFileName }}"
-    builds:
+    ids:
       - std-amd64
       - std-arm64
       - std-s390x
@@ -196,7 +196,7 @@ publishers:
       - fips
     env:
       - PACKAGECLOUD_TOKEN={{ .Env.PACKAGECLOUD_TOKEN }}
-    cmd: packagecloud publish --debvers "{{ .Env.DEBVERS }}" --rpmvers "{{ .Env.RPMVERS }}" tyk/ {{ .ArtifactPath }}
+    cmd: packagecloud publish --debvers "{{ .Env.DEBVERS }}" --rpmvers "{{ .Env.RPMVERS }}" tyk/tyk-ee-unstable {{ .ArtifactPath }}
   - name: std
     ids:
       - std
@@ -205,7 +205,7 @@ publishers:
     cmd: packagecloud publish --debvers "{{ .Env.DEBVERS }}" --rpmvers "{{ .Env.RPMVERS }}" tyk/tyk-gateway-unstable {{ .ArtifactPath }}
 # This disables archives
 archives:
-  - format: binary
+  - formats: ['binary']
     allow_different_binary_count: true
 checksum:
   disable: true
