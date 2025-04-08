@@ -6,7 +6,6 @@ import (
 	"bytes"
 	"context"
 	"crypto/tls"
-	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -18,8 +17,6 @@ import (
 	amqp1 "github.com/Azure/go-amqp"
 	"github.com/TykTechnologies/tyk/apidef/oas"
 	"github.com/TykTechnologies/tyk/config"
-	"github.com/TykTechnologies/tyk/ee/middleware/streams"
-	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
 	"github.com/rabbitmq/amqp091-go"
@@ -98,34 +95,6 @@ func initializeAMQP09Environment(testCtx *amqpTestContext) {
 		nil,
 	)
 	testCtx.t.Logf("AMQP-0.9 queue: %s bound to exchange: %s", testCtx.queueName, testCtx.exchangeName)
-}
-
-func setupOASForStreamingAPIWithAMQP(t *testing.T, streamingConfig string) oas.OAS {
-	t.Helper()
-
-	streamingConfigJSON, err := ConvertYAMLToJSON([]byte(streamingConfig))
-	require.NoErrorf(t, err, "Failed to convert YAML to JSON: %v", streamingConfigJSON)
-
-	var parsedStreamingConfig map[string]interface{}
-	err = json.Unmarshal(streamingConfigJSON, &parsedStreamingConfig)
-	require.NoErrorf(t, err, "Failed to unmarshal JSON: %v", streamingConfigJSON)
-
-	oasAPI := oas.OAS{
-		T: openapi3.T{
-			OpenAPI: "3.0.3",
-			Info: &openapi3.Info{
-				Title:   "oas doc",
-				Version: "1",
-			},
-			Paths: make(openapi3.Paths),
-		},
-	}
-
-	oasAPI.Extensions = map[string]interface{}{
-		streams.ExtensionTykStreaming: parsedStreamingConfig,
-	}
-
-	return oasAPI
 }
 
 func setupStreamingAPIForAMQP(t *testing.T, ts *Test, tykStreamOAS *oas.OAS) string {
@@ -425,7 +394,8 @@ streams:
         path: /get
         ws_path: /get/ws
 `, amqpURL, queueName)
-		tykStreamingOAS := setupOASForStreamingAPIWithAMQP(t, streamingConfig)
+		tykStreamingOAS, oasErr := setupOASForStreamAPI(streamingConfig)
+		require.NoError(t, oasErr)
 		apiName := setupStreamingAPIForAMQP(t, ts, &tykStreamingOAS)
 		testCtx := &amqpTestContext{
 			t:            t,
@@ -456,7 +426,8 @@ streams:
         path: /get
         ws_path: /get/ws
 `, amqpURL, queueName)
-		tykStreamingOAS := setupOASForStreamingAPIWithAMQP(t, streamingConfig)
+		tykStreamingOAS, oasErr := setupOASForStreamAPI(streamingConfig)
+		require.NoError(t, oasErr)
 		apiName := setupStreamingAPIForAMQP(t, ts, &tykStreamingOAS)
 		testContext := &amqpTestContext{
 			t:            t,
@@ -486,7 +457,8 @@ streams:
         urls: [%s]
         exchange: "%s"
 `, amqpURL, exchangeName)
-		tykStreamingOAS := setupOASForStreamingAPIWithAMQP(t, streamingConfig)
+		tykStreamingOAS, oasErr := setupOASForStreamAPI(streamingConfig)
+		require.NoError(t, oasErr)
 		apiName := setupStreamingAPIForAMQP(t, ts, &tykStreamingOAS)
 		testCtx := &amqpTestContext{
 			t:            t,
