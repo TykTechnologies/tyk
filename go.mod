@@ -93,7 +93,7 @@ require (
 )
 
 require (
-	github.com/Azure/go-amqp v1.4.0
+	github.com/Azure/go-amqp v1.0.5
 	github.com/IBM/sarama v1.43.3
 	github.com/Jeffail/gabs/v2 v2.7.0
 	github.com/TykTechnologies/graphql-go-tools/v2 v2.0.0-20240509085643-e95cdc317e1d
