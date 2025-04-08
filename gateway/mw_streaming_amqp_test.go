@@ -357,6 +357,7 @@ func testTykStreamAMQPIntegration(testCtx *amqpTestContext) {
 			resp, err := http.Post(publishURL, "application/json", bytes.NewReader(message))
 			require.NoError(testCtx.t, err)
 			data, _ := io.ReadAll(resp.Body)
+			// TODO:
 			fmt.Println(string(data))
 			_ = resp.Body.Close()
 		}
@@ -369,6 +370,10 @@ func testTykStreamAMQPIntegration(testCtx *amqpTestContext) {
 	} else if testCtx.output == "amqp_0_9" {
 		testAMQP09Output(testCtx, messages)
 	}
+}
+
+func randomExchangeName() string {
+	return fmt.Sprintf("test-exchange-%s", uuid.New().String())
 }
 
 func Test_TykStreaming_AMQP(t *testing.T) {
@@ -392,8 +397,6 @@ func Test_TykStreaming_AMQP(t *testing.T) {
 	})
 	defer ts.Close()
 
-	const exchangeName = "test-exchange"
-
 	t.Run("Publish messages to amqp_0_9 input then consume messages via Websocket", func(t *testing.T) {
 		queueName := "test-queue-amqp-0-9"
 		streamingConfig := fmt.Sprintf(`
@@ -404,8 +407,6 @@ streams:
       amqp_0_9:
         urls: [%s]
         queue: "%s"
-        consumer_tag: ""
-        prefetch_count: 10
     output:
       http_server:
         path: /get
@@ -418,7 +419,7 @@ streams:
 			ts:           ts,
 			apiName:      apiName,
 			queueName:    queueName,
-			exchangeName: exchangeName,
+			exchangeName: randomExchangeName(),
 			amqpURL:      amqpURL,
 			input:        "amqp_0_9",
 			output:       "websocket",
@@ -449,7 +450,7 @@ streams:
 			ts:           ts,
 			apiName:      apiName,
 			queueName:    queueName,
-			exchangeName: exchangeName,
+			exchangeName: randomExchangeName(),
 			amqpURL:      amqpURL,
 			input:        "amqp_1",
 			output:       "websocket",
@@ -459,6 +460,7 @@ streams:
 
 	t.Run("Publish messages to http input then consume messages from amqp_9 output", func(t *testing.T) {
 		queueName := "test-queue-amqp-0-9-input-output"
+		exchangeName := randomExchangeName()
 		streamingConfig := fmt.Sprintf(`
 streams:
   test:
