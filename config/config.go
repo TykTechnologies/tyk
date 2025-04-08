@@ -484,10 +484,8 @@ type HttpServerOptionsConfig struct {
 	// Enabled WebSockets and server side events support
 	EnableWebSockets bool `json:"enable_websockets"`
 
-  
 	// Deprecated: Use `ssl_certificates`instead.
 	Certificates CertsData `json:"certificates"`
-
 
 	// Index of certificates available to the Gateway for use in client and upstream communication.
 	// The string value in the array can be two of the following options:
