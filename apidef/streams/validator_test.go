@@ -284,7 +284,10 @@ func TestValidateTykStreams_BentoConfigValidation_Invalid_Config(t *testing.T) {
                         "checkpoint_limit": 1024,
                         "auto_replay_nacks": "true"
                     }
-                }
+                }, 
+				"processors": {
+					"bloblang": "root = this \n root.fans = this.fans.filter(fan -> fan.obsession > 0.5)"
+				}
             }
         }
     },
