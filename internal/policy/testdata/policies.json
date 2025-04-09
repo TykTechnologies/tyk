@@ -49,6 +49,23 @@
               "height"
             ]
           }
+        ],
+        "restricted_types": [
+          {
+            "name": "Dog",
+            "fields": [
+              "name",
+              "breed",
+              "country"
+            ]
+          },
+          {
+            "name": "Cat",
+            "fields": [
+              "name",
+              "country"
+            ]
+          }
         ]
       }
     },
@@ -71,6 +88,21 @@
             "fields": [
               "name",
               "mass"
+            ]
+          }
+        ],
+        "restricted_types": [
+          {
+            "name": "Dog",
+            "fields": [
+              "name",
+              "breed"
+            ]
+          },
+          {
+            "name": "Cat",
+            "fields": [
+              "name"
             ]
           }
         ]

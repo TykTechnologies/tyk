@@ -375,6 +375,10 @@ func (t *Service) applyPartitions(policy user.Policy, session *user.SessionState
 
 				r.AllowedURLs = MergeAllowedURLs(r.AllowedURLs, v.AllowedURLs)
 
+				// When two or more non-empty policies are applied, only the
+				// fields restricted by all policies are in the resulting policy.
+				// A merge of `[a b]` and `[b c]` becomes `[b]`, as `b` is
+				// restricted by both of the policies.
 				if len(r.RestrictedTypes) == 0 {
 					r.RestrictedTypes = v.RestrictedTypes
 				} else {
@@ -387,13 +391,16 @@ func (t *Service) applyPartitions(policy user.Policy, session *user.SessionState
 					}
 				}
 
+				// When two or more non-empty policies are applied, the fields allowed
+				// are merged in the resulting policy. For an example, `[a b]` and `[b c]`,
+				// results in a polict that allows `[a b c]`.
 				if len(r.AllowedTypes) == 0 {
 					r.AllowedTypes = v.AllowedTypes
 				} else {
 					for _, t := range v.AllowedTypes {
 						for ri, rt := range r.AllowedTypes {
 							if t.Name == rt.Name {
-								r.AllowedTypes[ri].Fields = intersection(rt.Fields, t.Fields)
+								r.AllowedTypes[ri].Fields = appendIfMissing(rt.Fields, t.Fields...)
 							}
 						}
 					}
