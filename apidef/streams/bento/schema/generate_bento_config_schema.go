@@ -10,6 +10,8 @@ import (
 	"os"
 
 	"github.com/buger/jsonparser"
+	_ "github.com/warpstreamlabs/bento/public/components/amqp09"
+	_ "github.com/warpstreamlabs/bento/public/components/amqp1"
 	_ "github.com/warpstreamlabs/bento/public/components/io"
 	_ "github.com/warpstreamlabs/bento/public/components/kafka"
 	"github.com/warpstreamlabs/bento/public/service"
@@ -40,6 +42,8 @@ var supportedSources = []string{
 	"http_client",
 	"http_server",
 	"kafka",
+	"amqp_0_9",
+	"amqp_1",
 }
 
 func printErrorAndExit(err error) {
