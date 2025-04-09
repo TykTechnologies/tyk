@@ -24,7 +24,7 @@ on:
       - 'v*'
 env:
   GOPRIVATE: github.com/TykTechnologies
-  VARIATION: inverted
+  VARIATION: prod-variation
   DOCKER_BUILD_SUMMARY: false
   DOCKER_BUILD_RECORD_UPLOAD: false
   # startsWith covers pull_request_target too
@@ -47,9 +47,9 @@ jobs:
             goreleaser: 'ci/goreleaser/goreleaser.yml'
             cgo: 1
             rpmvers: 'el/7 el/8 el/9 amazon/2 amazon/2023'
-            debvers: 'ubuntu/xenial ubuntu/bionic ubuntu/focal ubuntu/jammy debian/jessie debian/buster debian/bullseye debian/bookworm'
+            debvers: 'ubuntu/xenial ubuntu/bionic ubuntu/focal ubuntu/jammy ubuntu/noble debian/jessie debian/buster debian/bullseye debian/bookworm debian/trixie'
     outputs:
-      tags: ${{ steps.ci_metadata.outputs.tags }}
+      std_tags: ${{ steps.ci_metadata_std.outputs.tags }}
       commit_author: ${{ steps.set_outputs.outputs.commit_author}}
     steps:
       - name: Checkout of tyk
@@ -145,12 +145,13 @@ jobs:
         if: ${{ matrix.golang_cross == '1.16' }}
         with:
           mask-password: 'true'
-      - name: Docker metadata for CI
-        id: ci_metadata
+      - name: Docker metadata for std CI
+        id: ci_metadata_std
         if: ${{ matrix.golang_cross == '1.16' }}
         uses: docker/metadata-action@v5
         with:
-          images: ${{ steps.ecr.outputs.registry }}/tyk
+          images: |
+            ${{ steps.ecr.outputs.registry }}/tyk
           flavor: |
             latest=false
           tags: |
@@ -160,48 +161,57 @@ jobs:
             type=semver,pattern={{major}},prefix=v
             type=semver,pattern={{major}}.{{minor}},prefix=v
             type=semver,pattern={{version}},prefix=v
-      - name: push image to CI
+      - name: push std image to CI
         if: ${{ matrix.golang_cross == '1.16' }}
         uses: docker/build-push-action@v6
         with:
           context: "dist"
-          platforms: linux/amd64,linux/arm64
+          platforms: linux/amd64,linux/arm64,linux/s390x
           file: ci/Dockerfile.std
           provenance: mode=max
           sbom: true
           push: true
           cache-from: type=gha
           cache-to: type=gha,mode=max
-          tags: ${{ steps.ci_metadata.outputs.tags }}
-          labels: ${{ steps.tag_metadata.outputs.labels }}
+          tags: ${{ steps.ci_metadata_std.outputs.tags }}
+          labels: ${{ steps.ci_metadata_std.outputs.labels }}
+          build-args: |
+            BUILD_PACKAGE_NAME=tyk-gateway
       - name: Docker metadata for tag push
-        id: tag_metadata
+        id: tag_metadata_std
         uses: docker/metadata-action@v5
         with:
           images: |
-            tykio/tyk-gateway
             docker.tyk.io/tyk-gateway/tyk-gateway
+
+            tykio/tyk-gateway
           flavor: |
             latest=false
             prefix=v
           tags: |
             type=semver,pattern={{major}}.{{minor}}
             type=semver,pattern={{version}}
-          labels: "org.opencontainers.image.title=tyk-gateway \norg.opencontainers.image.description=Tyk Open Source API Gateway written in Go, supporting REST, GraphQL, TCP and gRPC protocols\norg.opencontainers.image.vendor=tyk.io\norg.opencontainers.image.version=${{ github.ref_name }}\n"
-      - name: push image to prod
+          labels: |
+            org.opencontainers.image.title=Tyk Gateway
+            org.opencontainers.image.description=Tyk Open Source API Gateway written in Go, supporting REST, GraphQL, TCP and gRPC protocols
+            org.opencontainers.image.vendor=tyk.io
+            org.opencontainers.image.version=${{ github.ref_name }}
+      - name: push std image to prod
         if: ${{ matrix.golang_cross == '1.16' }}
         uses: docker/build-push-action@v6
         with:
           context: "dist"
-          platforms: linux/amd64,linux/arm64
+          platforms: linux/amd64,linux/arm64,linux/s390x
           file: ci/Dockerfile.std
           provenance: mode=max
           sbom: true
           cache-from: type=gha
           cache-to: type=gha,mode=max
           push: ${{ startsWith(github.ref, 'refs/tags') }}
-          tags: ${{ steps.tag_metadata.outputs.tags }}
-          labels: ${{ steps.tag_metadata.outputs.labels }}
+          tags: ${{ steps.tag_metadata_std.outputs.tags }}
+          labels: ${{ steps.tag_metadata_std.outputs.labels }}
+          build-args: |
+            BUILD_PACKAGE_NAME=tyk-gateway
       - name: save deb
         uses: actions/upload-artifact@v4
         if: ${{ matrix.golang_cross == '1.16' }}
@@ -285,7 +295,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release download --repo github.com/tyklabs/tyk-pro --archive tar.gz -O env.tgz
+          gh release download --repo github.com/TykTechnologies/tyk-pro --archive tar.gz -O env.tgz
           mkdir auto && tar --strip-components=1 -C auto -xzvf env.tgz
       - name: env up
         shell: bash
@@ -298,10 +308,11 @@ jobs:
           TYK_MDCB_LICENSE: ${{ secrets.MDCB_LICENSE }}
         run: |
           match_tag=${{steps.ecr.outputs.registry}}/tyk:$BASE_REF
-          tags=(${{ needs.goreleaser.outputs.tags }})
+          tags=(${{ needs.goreleaser.outputs.std_tags }})
           set -eaxo pipefail
           docker run -q --rm -v ~/.docker/config.json:/root/.docker/config.json tykio/gromit policy match ${tags[0]} ${match_tag} 2>versions.env
           echo '# alfa and beta have to come after the override
+
           tyk_alfa_image=$tyk_image
           tyk_beta_image=$tyk_image
           ECR=${{steps.ecr.outputs.registry}}
@@ -359,7 +370,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           cache: 'pip'
-          python-version: '3.11'
+          python-version: '3.10'
       - name: Run API tests
         id: test_execution
         working-directory: tyk-analytics/tests/api
@@ -503,9 +514,11 @@ jobs:
           load: true
       - name: Test the built container image with api functionality test.
         run: |
-          docker run -d -p8080:8080 --network ${{ job.container.network }} --rm test-${{ matrix.distro }}-${{ matrix.arch }}
+          docker run -d -p8080:8080 --name=test --platform linux/${{ matrix.arch }} --network ${{ job.container.network }} --rm test-${{ matrix.distro }}-${{ matrix.arch }}
           sleep 2
           ./ci/tests/api-functionality/api_test.sh
+          sleep 2
+          docker stop test || true
   upgrade-rpm:
     services:
       httpbin.org:
@@ -560,7 +573,7 @@ jobs:
           tags: test-${{ matrix.distro }}-${{ matrix.arch }}
           load: true
       - name: Test the built container image with api functionality test.
-        run: "docker run -d -p8080:8080 --network ${{ job.container.network }} --rm test-${{ matrix.distro }}-${{ matrix.arch }}\nsleep 2\n./ci/tests/api-functionality/api_test.sh  \n"
+        run: "docker run -d -p8080:8080 --name=test --platform linux/${{ matrix.arch }} --network ${{ job.container.network }} --rm test-${{ matrix.distro }}-${{ matrix.arch }}\nsleep 2\n./ci/tests/api-functionality/api_test.sh\nsleep 2\ndocker stop test || true  \n"
   sbom:
     needs: goreleaser
     uses: TykTechnologies/github-actions/.github/workflows/sbom.yaml@main
