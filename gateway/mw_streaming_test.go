@@ -146,8 +146,11 @@ streams:
       http_server:
         path: /get
         ws_path: /get/ws
-    processors:
-      bloblang: "root = this"
+    pipeline:
+      processors:
+        - bloblang: |
+            root.id = "stub"
+            root.message = content().string()
     logger:
       level: DEBUG
       format: logfmt
@@ -229,10 +232,29 @@ func TestStreamingAPISingleClient(t *testing.T) {
 	err = wsConn.SetReadDeadline(time.Now().Add(500 * time.Millisecond))
 	require.NoError(t, err, "error setting read deadline")
 
+	// use an array to track received messages for index
+	expectedMessages := make(map[string]bool)
 	for i := 0; i < totalMessages; i++ {
+		expectedMessages[fmt.Sprintf(`{"id":"stub","message":"Hello %d"}`, i)] = false
+	}
+
+	receivedCount := 0
+	for receivedCount < totalMessages {
 		_, p, err := wsConn.ReadMessage()
 		require.NoError(t, err, "error reading message")
-		assert.Equal(t, fmt.Sprintf("Hello %d", i), string(p), "message not equal")
+
+		received := string(p)
+
+		gotten, exists := expectedMessages[received]
+		require.True(t, exists, "received unexpected message: %s", received)
+		require.False(t, gotten, "received duplicate message: %s", received)
+
+		expectedMessages[received] = true
+		receivedCount++
+	}
+
+	for msg, received := range expectedMessages {
+		require.True(t, received, "did not receive expected message: %s", msg)
 	}
 }
 func TestStreamingAPIMultipleClients(t *testing.T) {

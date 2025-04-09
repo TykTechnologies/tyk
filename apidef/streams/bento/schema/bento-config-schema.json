@@ -1336,6 +1336,208 @@
         "type": {
           "type": "string"
         },
+        "amqp_0_9": {
+          "additionalProperties": false,
+          "properties": {
+            "auto_ack": {
+              "type": "boolean"
+            },
+            "bindings_declare": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "exchange": {
+                    "type": "string"
+                  },
+                  "key": {
+                    "type": "string"
+                  }
+                },
+                "type": "object"
+              },
+              "type": "array"
+            },
+            "consumer_tag": {
+              "type": "string"
+            },
+            "nack_reject_patterns": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "prefetch_count": {
+              "type": "number"
+            },
+            "prefetch_size": {
+              "type": "number"
+            },
+            "queue": {
+              "type": "string"
+            },
+            "queue_declare": {
+              "additionalProperties": false,
+              "properties": {
+                "auto_delete": {
+                  "type": "boolean"
+                },
+                "durable": {
+                  "type": "boolean"
+                },
+                "enabled": {
+                  "type": "boolean"
+                }
+              },
+              "type": "object"
+            },
+            "tls": {
+              "additionalProperties": false,
+              "properties": {
+                "client_certs": {
+                  "items": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "cert": {
+                        "type": "string"
+                      },
+                      "cert_file": {
+                        "type": "string"
+                      },
+                      "key": {
+                        "type": "string"
+                      },
+                      "key_file": {
+                        "type": "string"
+                      },
+                      "password": {
+                        "type": "string"
+                      }
+                    },
+                    "type": "object"
+                  },
+                  "type": "array"
+                },
+                "enable_renegotiation": {
+                  "type": "boolean"
+                },
+                "enabled": {
+                  "type": "boolean"
+                },
+                "root_cas": {
+                  "type": "string"
+                },
+                "root_cas_file": {
+                  "type": "string"
+                },
+                "skip_cert_verify": {
+                  "type": "boolean"
+                }
+              },
+              "type": "object"
+            },
+            "urls": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "urls",
+            "queue"
+          ],
+          "type": "object"
+        },
+        "amqp_1": {
+          "additionalProperties": false,
+          "properties": {
+            "azure_renew_lock": {
+              "type": "boolean"
+            },
+            "credit": {
+              "type": "number"
+            },
+            "read_header": {
+              "type": "boolean"
+            },
+            "sasl": {
+              "additionalProperties": false,
+              "properties": {
+                "mechanism": {
+                  "type": "string"
+                },
+                "password": {
+                  "type": "string"
+                },
+                "user": {
+                  "type": "string"
+                }
+              },
+              "type": "object"
+            },
+            "source_address": {
+              "type": "string"
+            },
+            "tls": {
+              "additionalProperties": false,
+              "properties": {
+                "client_certs": {
+                  "items": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "cert": {
+                        "type": "string"
+                      },
+                      "cert_file": {
+                        "type": "string"
+                      },
+                      "key": {
+                        "type": "string"
+                      },
+                      "key_file": {
+                        "type": "string"
+                      },
+                      "password": {
+                        "type": "string"
+                      }
+                    },
+                    "type": "object"
+                  },
+                  "type": "array"
+                },
+                "enable_renegotiation": {
+                  "type": "boolean"
+                },
+                "enabled": {
+                  "type": "boolean"
+                },
+                "root_cas": {
+                  "type": "string"
+                },
+                "root_cas_file": {
+                  "type": "string"
+                },
+                "skip_cert_verify": {
+                  "type": "boolean"
+                }
+              },
+              "type": "object"
+            },
+            "url": {
+              "type": "string"
+            },
+            "urls": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "source_address"
+          ],
+          "type": "object"
+        },
         "broker": {
           "additionalProperties": false,
           "properties": {
@@ -1926,6 +2128,244 @@
         },
         "type": {
           "type": "string"
+        },
+        "amqp_0_9": {
+          "additionalProperties": false,
+          "properties": {
+            "app_id": {
+              "type": "string"
+            },
+            "content_encoding": {
+              "type": "string"
+            },
+            "content_type": {
+              "type": "string"
+            },
+            "correlation_id": {
+              "type": "string"
+            },
+            "exchange": {
+              "type": "string"
+            },
+            "exchange_declare": {
+              "additionalProperties": false,
+              "properties": {
+                "durable": {
+                  "type": "boolean"
+                },
+                "enabled": {
+                  "type": "boolean"
+                },
+                "type": {
+                  "type": "string"
+                }
+              },
+              "type": "object"
+            },
+            "expiration": {
+              "type": "string"
+            },
+            "immediate": {
+              "type": "boolean"
+            },
+            "key": {
+              "type": "string"
+            },
+            "mandatory": {
+              "type": "boolean"
+            },
+            "max_in_flight": {
+              "type": "number"
+            },
+            "message_id": {
+              "type": "string"
+            },
+            "metadata": {
+              "additionalProperties": false,
+              "properties": {
+                "exclude_prefixes": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                }
+              },
+              "type": "object"
+            },
+            "persistent": {
+              "type": "boolean"
+            },
+            "priority": {
+              "type": "string"
+            },
+            "reply_to": {
+              "type": "string"
+            },
+            "timeout": {
+              "type": "string"
+            },
+            "tls": {
+              "additionalProperties": false,
+              "properties": {
+                "client_certs": {
+                  "items": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "cert": {
+                        "type": "string"
+                      },
+                      "cert_file": {
+                        "type": "string"
+                      },
+                      "key": {
+                        "type": "string"
+                      },
+                      "key_file": {
+                        "type": "string"
+                      },
+                      "password": {
+                        "type": "string"
+                      }
+                    },
+                    "type": "object"
+                  },
+                  "type": "array"
+                },
+                "enable_renegotiation": {
+                  "type": "boolean"
+                },
+                "enabled": {
+                  "type": "boolean"
+                },
+                "root_cas": {
+                  "type": "string"
+                },
+                "root_cas_file": {
+                  "type": "string"
+                },
+                "skip_cert_verify": {
+                  "type": "boolean"
+                }
+              },
+              "type": "object"
+            },
+            "type": {
+              "type": "string"
+            },
+            "urls": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "user_id": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "urls",
+            "exchange"
+          ],
+          "type": "object"
+        },
+        "amqp_1": {
+          "additionalProperties": false,
+          "properties": {
+            "application_properties_map": {
+              "type": "string"
+            },
+            "max_in_flight": {
+              "type": "number"
+            },
+            "metadata": {
+              "additionalProperties": false,
+              "properties": {
+                "exclude_prefixes": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                }
+              },
+              "type": "object"
+            },
+            "sasl": {
+              "additionalProperties": false,
+              "properties": {
+                "mechanism": {
+                  "type": "string"
+                },
+                "password": {
+                  "type": "string"
+                },
+                "user": {
+                  "type": "string"
+                }
+              },
+              "type": "object"
+            },
+            "target_address": {
+              "type": "string"
+            },
+            "tls": {
+              "additionalProperties": false,
+              "properties": {
+                "client_certs": {
+                  "items": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "cert": {
+                        "type": "string"
+                      },
+                      "cert_file": {
+                        "type": "string"
+                      },
+                      "key": {
+                        "type": "string"
+                      },
+                      "key_file": {
+                        "type": "string"
+                      },
+                      "password": {
+                        "type": "string"
+                      }
+                    },
+                    "type": "object"
+                  },
+                  "type": "array"
+                },
+                "enable_renegotiation": {
+                  "type": "boolean"
+                },
+                "enabled": {
+                  "type": "boolean"
+                },
+                "root_cas": {
+                  "type": "string"
+                },
+                "root_cas_file": {
+                  "type": "string"
+                },
+                "skip_cert_verify": {
+                  "type": "boolean"
+                }
+              },
+              "type": "object"
+            },
+            "url": {
+              "type": "string"
+            },
+            "urls": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "target_address"
+          ],
+          "type": "object"
         },
         "broker": {
           "additionalProperties": false,

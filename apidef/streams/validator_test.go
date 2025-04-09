@@ -313,7 +313,7 @@ func TestValidateTykStreams_BentoConfigValidation_Invalid_Config(t *testing.T) {
     }
 }`)
 	err := ValidateOASObject(document, "3.0.3")
-	require.ErrorContains(t, err, "test-kafka-stream: input.kafka.auto_replay_nacks: Invalid type. Expected: boolean, given: string")
+	require.ErrorContains(t, err, "input.kafka.auto_replay_nacks: Invalid type. Expected: boolean, given: string")
 	require.ErrorContains(t, err, "pipeline: Additional property bloblang is not allowed")
 }
 
