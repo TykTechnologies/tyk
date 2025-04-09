@@ -146,6 +146,8 @@ streams:
       http_server:
         path: /get
         ws_path: /get/ws
+    processors:
+      bloblang: "root = this"
     logger:
       level: DEBUG
       format: logfmt

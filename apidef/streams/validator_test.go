@@ -241,7 +241,14 @@ func TestValidateTykStreams_BentoConfigValidation(t *testing.T) {
                         "checkpoint_limit": 1024,
                         "auto_replay_nacks": true
                     }
-                }
+                },
+				"pipeline": {
+					"processors": [
+						{
+							"bloblang": "root = this \n root.fans = this.fans.filter(fan -> fan.obsession > 0.5)"
+						}
+					]
+				}
             }
         }
     },
@@ -285,7 +292,7 @@ func TestValidateTykStreams_BentoConfigValidation_Invalid_Config(t *testing.T) {
                         "auto_replay_nacks": "true"
                     }
                 }, 
-				"processors": {
+				"pipeline": {
 					"bloblang": "root = this \n root.fans = this.fans.filter(fan -> fan.obsession > 0.5)"
 				}
             }
@@ -307,6 +314,7 @@ func TestValidateTykStreams_BentoConfigValidation_Invalid_Config(t *testing.T) {
 }`)
 	err := ValidateOASObject(document, "3.0.3")
 	require.ErrorContains(t, err, "test-kafka-stream: input.kafka.auto_replay_nacks: Invalid type. Expected: boolean, given: string")
+	require.ErrorContains(t, err, "pipeline: Additional property bloblang is not allowed")
 }
 
 func TestValidateTykStreams_BentoConfigValidation_Additional_Properties(t *testing.T) {
