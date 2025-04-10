@@ -3058,6 +3058,21 @@
       },
       "type": "array"
     },
+    "pipeline": {
+      "additionalProperties": false,
+      "properties": {
+        "processors": {
+          "items": {
+            "$ref": "#/definitions/processor"
+          },
+          "type": "array"
+        },
+        "threads": {
+          "type": "number"
+        }
+      },
+      "type": "object"
+    },
     "processor_resources": {
       "items": {
         "$ref": "#/definitions/processor"

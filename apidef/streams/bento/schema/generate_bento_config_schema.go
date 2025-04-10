@@ -30,6 +30,7 @@ var properties = []string{
 	"processor_resources",
 	"shutdown_delay",
 	"shutdown_timeout",
+	"pipeline",
 }
 
 var definitions = []string{
