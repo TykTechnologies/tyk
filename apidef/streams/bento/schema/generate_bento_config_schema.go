@@ -14,6 +14,7 @@ import (
 	_ "github.com/warpstreamlabs/bento/public/components/amqp1"
 	_ "github.com/warpstreamlabs/bento/public/components/io"
 	_ "github.com/warpstreamlabs/bento/public/components/kafka"
+	_ "github.com/warpstreamlabs/bento/public/components/mqtt"
 	"github.com/warpstreamlabs/bento/public/service"
 )
 
@@ -45,6 +46,7 @@ var supportedSources = []string{
 	"kafka",
 	"amqp_0_9",
 	"amqp_1",
+	"mqtt",
 }
 
 func printErrorAndExit(err error) {

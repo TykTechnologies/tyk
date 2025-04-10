@@ -2106,6 +2106,121 @@
             "topics"
           ],
           "type": "object"
+        },
+        "mqtt": {
+          "additionalProperties": false,
+          "properties": {
+            "auto_replay_nacks": {
+              "type": "boolean"
+            },
+            "clean_session": {
+              "type": "boolean"
+            },
+            "client_id": {
+              "type": "string"
+            },
+            "connect_timeout": {
+              "type": "string"
+            },
+            "dynamic_client_id_suffix": {
+              "type": "string"
+            },
+            "keepalive": {
+              "type": "number"
+            },
+            "password": {
+              "type": "string"
+            },
+            "qos": {
+              "type": "number"
+            },
+            "tls": {
+              "additionalProperties": false,
+              "properties": {
+                "client_certs": {
+                  "items": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "cert": {
+                        "type": "string"
+                      },
+                      "cert_file": {
+                        "type": "string"
+                      },
+                      "key": {
+                        "type": "string"
+                      },
+                      "key_file": {
+                        "type": "string"
+                      },
+                      "password": {
+                        "type": "string"
+                      }
+                    },
+                    "type": "object"
+                  },
+                  "type": "array"
+                },
+                "enable_renegotiation": {
+                  "type": "boolean"
+                },
+                "enabled": {
+                  "type": "boolean"
+                },
+                "root_cas": {
+                  "type": "string"
+                },
+                "root_cas_file": {
+                  "type": "string"
+                },
+                "skip_cert_verify": {
+                  "type": "boolean"
+                }
+              },
+              "type": "object"
+            },
+            "topics": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "urls": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "user": {
+              "type": "string"
+            },
+            "will": {
+              "additionalProperties": false,
+              "properties": {
+                "enabled": {
+                  "type": "boolean"
+                },
+                "payload": {
+                  "type": "string"
+                },
+                "qos": {
+                  "type": "number"
+                },
+                "retained": {
+                  "type": "boolean"
+                },
+                "topic": {
+                  "type": "string"
+                }
+              },
+              "type": "object"
+            }
+          },
+          "required": [
+            "urls",
+            "topics"
+          ],
+          "type": "object"
         }
       },
       "type": "object"
@@ -2968,6 +3083,124 @@
           },
           "required": [
             "addresses",
+            "topic"
+          ],
+          "type": "object"
+        },
+        "mqtt": {
+          "additionalProperties": false,
+          "properties": {
+            "client_id": {
+              "type": "string"
+            },
+            "connect_timeout": {
+              "type": "string"
+            },
+            "dynamic_client_id_suffix": {
+              "type": "string"
+            },
+            "keepalive": {
+              "type": "number"
+            },
+            "max_in_flight": {
+              "type": "number"
+            },
+            "password": {
+              "type": "string"
+            },
+            "qos": {
+              "type": "number"
+            },
+            "retained": {
+              "type": "boolean"
+            },
+            "retained_interpolated": {
+              "type": "string"
+            },
+            "tls": {
+              "additionalProperties": false,
+              "properties": {
+                "client_certs": {
+                  "items": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "cert": {
+                        "type": "string"
+                      },
+                      "cert_file": {
+                        "type": "string"
+                      },
+                      "key": {
+                        "type": "string"
+                      },
+                      "key_file": {
+                        "type": "string"
+                      },
+                      "password": {
+                        "type": "string"
+                      }
+                    },
+                    "type": "object"
+                  },
+                  "type": "array"
+                },
+                "enable_renegotiation": {
+                  "type": "boolean"
+                },
+                "enabled": {
+                  "type": "boolean"
+                },
+                "root_cas": {
+                  "type": "string"
+                },
+                "root_cas_file": {
+                  "type": "string"
+                },
+                "skip_cert_verify": {
+                  "type": "boolean"
+                }
+              },
+              "type": "object"
+            },
+            "topic": {
+              "type": "string"
+            },
+            "urls": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "user": {
+              "type": "string"
+            },
+            "will": {
+              "additionalProperties": false,
+              "properties": {
+                "enabled": {
+                  "type": "boolean"
+                },
+                "payload": {
+                  "type": "string"
+                },
+                "qos": {
+                  "type": "number"
+                },
+                "retained": {
+                  "type": "boolean"
+                },
+                "topic": {
+                  "type": "string"
+                }
+              },
+              "type": "object"
+            },
+            "write_timeout": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "urls",
             "topic"
           ],
           "type": "object"
