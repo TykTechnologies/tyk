@@ -156,6 +156,25 @@ streams:
       format: logfmt
       add_timestamp: false
 `
+
+const bentoNatsTemplateNoBloblang = `
+streams:
+  test:
+    input:
+      nats:
+        auto_replay_nacks: true
+        subject: "%s"
+        urls: ["%s"]
+    output:
+      http_server:
+        path: /get
+        ws_path: /get/ws
+    logger:
+      level: DEBUG
+      format: logfmt
+      add_timestamp: false
+`
+
 const bentoHTTPServerTemplate = `
 streams:
   test:
@@ -271,7 +290,7 @@ func TestStreamingAPIMultipleClients(t *testing.T) {
 	connectionStr, err := natsContainer.ConnectionString(ctx)
 	require.NoError(t, err)
 
-	streamConfig := fmt.Sprintf(bentoNatsTemplate, "test", connectionStr)
+	streamConfig := fmt.Sprintf(bentoNatsTemplateNoBloblang, "test", connectionStr)
 
 	ts := StartTest(func(globalConf *config.Config) {
 		globalConf.Streaming.Enabled = true
