@@ -12,10 +12,10 @@ AMQP load generator. Publishes messages to a RabbitMQ queue using the specified 
 
 Options:
   -h, --help     Print this message and exit.
-      --protocol AMQP protocol version to use. Supported values: amqp_9, amqp_1. Default: amqp_9.
+      --protocol AMQP protocol version to use. Supported values: amqp_0_9, amqp_1. Default: amqp_0_9.
       --url      RabbitMQ server URL. Default: amqp://guest:guest@localhost:5672/.
       --queue    RabbitMQ queue name. Default: tyk-streams-test-queue.
-      --exchange RabbitMQ exchange name, only valid for amqp_9 Default: tyk-streams-test-exchange.
+      --exchange RabbitMQ exchange name, only valid for amqp_0_9 Default: tyk-streams-test-exchange.
 ```
 
 Sample usage: 
@@ -32,7 +32,7 @@ Publishing message to amqp_1: {payload: 1744619974460}
 ```
 
 * Queue name is `tyk-streams-test-queue` by default. 
-* Exchange name is `tyk-streams-test-exchange` by default. It's only required for amqp_9.
+* Exchange name is `tyk-streams-test-exchange` by default. It's only required for amqp_0_9.
 
 ### Installing RabbitMQ
 
