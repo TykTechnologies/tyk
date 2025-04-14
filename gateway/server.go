@@ -231,7 +231,7 @@ func NewGateway(config config.Config, ctx context.Context) *Gateway {
 	gw.apisByID = map[string]*APISpec{}
 	gw.apisHandlesByID = new(sync.Map)
 
-	gw.policiesByID = map[string]user.Policy{}
+	gw.policiesByID = make(map[string]user.Policy)
 
 	// reload
 	gw.reloadQueue = make(chan func())
