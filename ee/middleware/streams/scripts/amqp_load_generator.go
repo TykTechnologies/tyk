@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"io/ioutil"
@@ -39,6 +40,10 @@ Options:
 	}
 }
 
+type payload struct {
+	Payload int64 `json:"payload"`
+}
+
 type arguments struct {
 	help     bool
 	protocol string
@@ -55,7 +60,9 @@ func failOnError(err error, msg string) {
 
 // generatePayload creates a JSON-formatted string containing the current Unix time in milliseconds as the payload.
 func generatePayload() string {
-	return fmt.Sprintf("{payload: %d}", time.Now().UnixMilli())
+	result, err := json.Marshal(payload{time.Now().UnixMilli()})
+	failOnError(err, "Failed to marshal payload")
+	return string(result)
 }
 
 // publishMessagesWithAMQP09 publishes messages to a RabbitMQ queue using the
