@@ -510,6 +510,8 @@ func (a APIDefinitionLoader) FromDashboardService(endpoint string) ([]*APISpec, 
 	newRequest.Header.Set(header.XTykNonce, a.Gw.ServiceNonce)
 	a.Gw.ServiceNonceMutex.RUnlock()
 
+	newRequest.Header.Set(header.XTykSessionID, a.Gw.SessionID)
+
 	c := a.Gw.initialiseClient()
 	resp, err := c.Do(newRequest)
 	if err != nil {

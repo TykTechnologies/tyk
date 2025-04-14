@@ -8,6 +8,8 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/TykTechnologies/tyk/header"
+
 	"github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
 
 	"github.com/TykTechnologies/tyk/rpc"
@@ -123,7 +125,8 @@ func (gw *Gateway) LoadPoliciesFromDashboard(endpoint, secret string, allowExpli
 	}
 
 	newRequest.Header.Set("authorization", secret)
-	newRequest.Header.Set("x-tyk-nodeid", gw.GetNodeID())
+	newRequest.Header.Set(header.XTykNodeID, gw.GetNodeID())
+	newRequest.Header.Set(header.XTykSessionID, gw.SessionID)
 
 	gw.ServiceNonceMutex.RLock()
 	newRequest.Header.Set("x-tyk-nonce", gw.ServiceNonce)

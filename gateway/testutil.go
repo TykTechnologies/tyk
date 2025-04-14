@@ -272,11 +272,17 @@ func (s *Test) reloadSimulation(ctx context.Context, gw *Gateway) {
 			return
 		default:
 			gw.policiesMu.Lock()
+			if gw.policiesByID == nil {
+				gw.policiesByID = make(map[string]user.Policy)
+			}
 			gw.policiesByID["_"] = user.Policy{}
 			delete(gw.policiesByID, "_")
 			gw.policiesMu.Unlock()
 
 			gw.apisMu.Lock()
+			if gw.apisByID == nil {
+				gw.apisByID = make(map[string]*APISpec)
+			}
 			gw.apisByID["_"] = nil
 			delete(gw.apisByID, "_")
 			gw.apisMu.Unlock()
