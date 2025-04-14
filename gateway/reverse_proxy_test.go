@@ -2258,21 +2258,13 @@ func TestTimeoutPrioritization(t *testing.T) {
 				version.ExtendedPaths.HardTimeouts = []apidef.HardTimeoutMeta{
 					{
 						Disabled: false,
-<<<<<<< HEAD
-						Path:     "^/delay/1$",
-=======
 						Path:     "^/delay/3$",
->>>>>>> 1ff18786f... [TT-12442] Force gw reload after registration to have synced polciies and apis (#6988)
 						Method:   http.MethodGet,
 						TimeOut:  4,
 					},
 					{
 						Disabled: false,
-<<<<<<< HEAD
-						Path:     "^/delay2/2$",
-=======
 						Path:     "^/delay2/3$",
->>>>>>> 1ff18786f... [TT-12442] Force gw reload after registration to have synced polciies and apis (#6988)
 						Method:   http.MethodGet,
 						TimeOut:  1,
 					},
