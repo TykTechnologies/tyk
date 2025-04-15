@@ -6,9 +6,11 @@ import (
 	"bytes"
 	"context"
 	"crypto/tls"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"testing"
@@ -25,6 +27,17 @@ import (
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/modules/rabbitmq"
 )
+
+const (
+	AlivenessCheckPath    = "/api/aliveness-test/"
+	DefaultVirtualHost    = "/"
+	RabbitmqAdminUsername = "guest"
+	RabbitmqAdminPassword = "guest"
+)
+
+type alivenessCheckResponse struct {
+	Status string `json:"status"`
+}
 
 type amqpTestContext struct {
 	t            *testing.T
@@ -358,18 +371,72 @@ func (t *amqpTestContext) testTykStreamAMQPIntegration() {
 	}
 }
 
+// checkRabbitMQAliveness verifies the RabbitMQ management endpoint for its
+// aliveness status with retries until a timeout occurs. It performs health checks
+// by querying the management API and ensures RabbitMQ is ready for further integration tests.
+func checkRabbitMQAliveness(t *testing.T, rabbitmqContainer *rabbitmq.RabbitMQContainer) {
+	managementURL, err := rabbitmqContainer.HttpURL(context.Background())
+	require.NoError(t, err)
+
+	parsedUrl, err := url.Parse(managementURL)
+	require.NoError(t, err)
+
+	parsedUrl.Path = AlivenessCheckPath
+	parsedUrl.User = url.UserPassword(RabbitmqAdminUsername, RabbitmqAdminPassword)
+	alivenessCheckURL := parsedUrl.String() + url.PathEscape(DefaultVirtualHost)
+
+	const interval = 250 * time.Millisecond
+	duration, err := time.ParseDuration("5s")
+	require.NoError(t, err)
+
+	checkAliveness := func() bool {
+		resp, reqErr := http.Get(alivenessCheckURL)
+		require.NoError(t, reqErr)
+
+		defer func() {
+			require.NoError(t, resp.Body.Close())
+		}()
+
+		// status code might be 404 if the virtual host doesn't exist.
+		require.Equal(t, http.StatusOK, resp.StatusCode)
+
+		data, readErr := io.ReadAll(resp.Body)
+		require.NoError(t, readErr)
+
+		response := &alivenessCheckResponse{}
+		require.NoError(t, json.Unmarshal(data, response))
+		return response.Status == "ok"
+	}
+
+	maxAttempts := int(duration.Milliseconds() / interval.Milliseconds())
+	for attempt := 0; attempt < maxAttempts; attempt++ {
+		time.Sleep(interval)
+		if rabbitmqContainer.IsRunning() {
+			if checkAliveness() {
+				// It's alive, let's start running the integration tests.
+				return
+			}
+		}
+		t.Logf("RabbitMQ is not ready to accept requests, attempt %d/%d", attempt+1, maxAttempts)
+	}
+
+	require.Fail(t, "RabbitMQ is not alive after %d attempts", maxAttempts)
+}
+
 func TestAMQP(t *testing.T) {
 	ctx := context.Background()
 	rabbitmqContainer, err := rabbitmq.Run(ctx,
 		"rabbitmq:4.0.8-management-alpine",
-		rabbitmq.WithAdminUsername("guest"),
-		rabbitmq.WithAdminPassword("guest"),
+		rabbitmq.WithAdminUsername(RabbitmqAdminUsername),
+		rabbitmq.WithAdminPassword(RabbitmqAdminPassword),
 	)
 	defer func() {
 		terminateErr := testcontainers.TerminateContainer(rabbitmqContainer)
 		require.NoError(t, terminateErr)
 	}()
 	require.NoError(t, err)
+
+	checkRabbitMQAliveness(t, rabbitmqContainer)
 
 	amqpURL, err := rabbitmqContainer.AmqpURL(ctx)
 	require.NoError(t, err)
