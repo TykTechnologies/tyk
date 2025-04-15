@@ -37,15 +37,15 @@ type amqpTestContext struct {
 	output       string
 }
 
-func publishHTTPMessage(testCtx *amqpTestContext, contentType string, message []byte) {
-	publishURL := fmt.Sprintf("%s/%s/post", testCtx.ts.URL, testCtx.apiName)
+func (t *amqpTestContext) publishHTTPMessage(contentType string, message []byte) {
+	publishURL := fmt.Sprintf("%s/%s/post", t.ts.URL, t.apiName)
 	resp, err := http.Post(publishURL, contentType, bytes.NewReader(message))
-	require.NoError(testCtx.t, err)
+	require.NoError(t.t, err)
 
 	data, err := io.ReadAll(resp.Body)
-	require.NoError(testCtx.t, err)
+	require.NoError(t.t, err)
 	if data != nil {
-		testCtx.t.Logf("Received response: %s", string(data))
+		t.t.Logf("Received response: %s", string(data))
 	}
 
 	_ = resp.Body.Close()
@@ -55,46 +55,46 @@ func randomExchangeName() string {
 	return fmt.Sprintf("test-exchange-%s", uuid.New().String())
 }
 
-func initializeAMQP09Environment(testCtx *amqpTestContext) {
-	conn, err := amqp091.Dial(testCtx.amqpURL)
-	require.NoError(testCtx.t, err, "Failed to connect to RabbitMQ")
+func (t *amqpTestContext) initializeAMQP09Environment() {
+	conn, err := amqp091.Dial(t.amqpURL)
+	require.NoError(t.t, err, "Failed to connect to RabbitMQ")
 
 	defer conn.Close()
 
 	ch, err := conn.Channel()
-	require.NoError(testCtx.t, err, "Failed to open an AMQP09 channel")
+	require.NoError(t.t, err, "Failed to open an AMQP09 channel")
 
 	defer ch.Close()
 
 	err = ch.ExchangeDeclare(
-		testCtx.exchangeName, // name
-		"fanout",             // type
-		true,                 // durable
-		false,                // auto-deleted
-		false,                // internal
-		false,                // no-wait
-		nil,                  // arguments
+		t.exchangeName, // name
+		"fanout",       // type
+		true,           // durable
+		false,          // auto-deleted
+		false,          // internal
+		false,          // no-wait
+		nil,            // arguments
 	)
-	require.NoError(testCtx.t, err, "Failed to declare an exchange")
+	require.NoError(t.t, err, "Failed to declare an exchange")
 
 	_, err = ch.QueueDeclare(
-		testCtx.queueName, // name
-		true,              // durable
-		false,             // delete when unused
-		false,             // exclusive
-		false,             // no-wait
-		nil,               // arguments
+		t.queueName, // name
+		true,        // durable
+		false,       // delete when unused
+		false,       // exclusive
+		false,       // no-wait
+		nil,         // arguments
 	)
-	require.NoError(testCtx.t, err, "Failed to declare a queue")
+	require.NoError(t.t, err, "Failed to declare a queue")
 
 	err = ch.QueueBind(
-		testCtx.queueName,    // queue name
-		"",                   // routing key
-		testCtx.exchangeName, // exchange
+		t.queueName,    // queue name
+		"",             // routing key
+		t.exchangeName, // exchange
 		false,
 		nil,
 	)
-	testCtx.t.Logf("AMQP-0.9 queue: %s bound to exchange: %s", testCtx.queueName, testCtx.exchangeName)
+	t.t.Logf("AMQP-0.9 queue: %s bound to exchange: %s", t.queueName, t.exchangeName)
 }
 
 func setupStreamingAPIForOAS(t *testing.T, ts *Test, tykStreamOAS *oas.OAS) string {
@@ -131,57 +131,57 @@ func amqp1Publisher(t *testing.T, amqpURL string, queueName string, messages [][
 	}
 }
 
-func amqp09Publisher(testCtx *amqpTestContext, messages [][]byte) {
-	conn, err := amqp091.Dial(testCtx.amqpURL)
-	require.NoErrorf(testCtx.t, err, "Failed to connect to RabbitMQ")
+func (t *amqpTestContext) amqp09Publisher(messages [][]byte) {
+	conn, err := amqp091.Dial(t.amqpURL)
+	require.NoErrorf(t.t, err, "Failed to connect to RabbitMQ")
 	defer func() {
-		require.NoError(testCtx.t, conn.Close())
+		require.NoError(t.t, conn.Close())
 	}()
 
 	ch, err := conn.Channel()
-	require.NoErrorf(testCtx.t, err, "Failed to open a channel")
+	require.NoErrorf(t.t, err, "Failed to open a channel")
 	defer func() {
-		require.NoError(testCtx.t, ch.Close())
+		require.NoError(t.t, ch.Close())
 	}()
 
-	testCtx.t.Log("Channel opened")
+	t.t.Log("Channel opened")
 
 	err = ch.ExchangeDeclare(
-		testCtx.exchangeName, // name
-		"fanout",             // type
-		true,                 // durable
-		false,                // auto-deleted
-		false,                // internal
-		false,                // no-wait
-		nil,                  // arguments
+		t.exchangeName, // name
+		"fanout",       // type
+		true,           // durable
+		false,          // auto-deleted
+		false,          // internal
+		false,          // no-wait
+		nil,            // arguments
 	)
-	require.NoErrorf(testCtx.t, err, "Failed to declare an exchange")
-	testCtx.t.Logf("Exchange declared: %s", testCtx.exchangeName)
+	require.NoErrorf(t.t, err, "Failed to declare an exchange")
+	t.t.Logf("Exchange declared: %s", t.exchangeName)
 
 	queue, err := ch.QueueDeclare(
-		testCtx.queueName, // name of the queue
-		true,              // durable
-		false,             // delete when unused
-		false,             // exclusive
-		false,             // noWait
-		nil,               // arguments
+		t.queueName, // name of the queue
+		true,        // durable
+		false,       // delete when unused
+		false,       // exclusive
+		false,       // noWait
+		nil,         // arguments
 	)
-	require.NoErrorf(testCtx.t, err, "Failed to declare a queue")
-	testCtx.t.Logf("Queue declared: %s", queue.Name)
+	require.NoErrorf(t.t, err, "Failed to declare a queue")
+	t.t.Logf("Queue declared: %s", queue.Name)
 
-	err = ch.QueueBind(queue.Name, "", testCtx.exchangeName, false, nil)
-	require.NoErrorf(testCtx.t, err, "Failed to bind a queue")
-	testCtx.t.Logf("Queue binded: %s", testCtx.queueName)
+	err = ch.QueueBind(queue.Name, "", t.exchangeName, false, nil)
+	require.NoErrorf(t.t, err, "Failed to bind a queue")
+	t.t.Logf("Queue binded: %s", t.queueName)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
 	for _, message := range messages {
 		err = ch.PublishWithContext(ctx,
-			testCtx.exchangeName, // exchange
-			"",                   // routing key
-			false,                // mandatory
-			false,                // immediate
+			t.exchangeName, // exchange
+			"",             // routing key
+			false,          // mandatory
+			false,          // immediate
 			amqp091.Publishing{
 				ContentType: "text/plain",
 				Body:        message,
@@ -189,7 +189,7 @@ func amqp09Publisher(testCtx *amqpTestContext, messages [][]byte) {
 	}
 }
 
-func createWebsocketClients(testCtx *amqpTestContext, numClients int) []*websocket.Conn {
+func (t *amqpTestContext) createWebsocketClients(numClients int) []*websocket.Conn {
 	// Create WebSocket clients
 	wsClients := make([]*websocket.Conn, numClients)
 	for i := 0; i < numClients; i++ {
@@ -197,23 +197,23 @@ func createWebsocketClients(testCtx *amqpTestContext, numClients int) []*websock
 			HandshakeTimeout: 5 * time.Second,
 			TLSClientConfig:  &tls.Config{InsecureSkipVerify: true},
 		}
-		wsURL := strings.Replace(testCtx.ts.URL, "http", "ws", 1) + fmt.Sprintf("/%s/get/ws", testCtx.apiName)
+		wsURL := strings.Replace(t.ts.URL, "http", "ws", 1) + fmt.Sprintf("/%s/get/ws", t.apiName)
 		wsConn, resp, err := dialer.Dial(wsURL, nil)
 		if err != nil {
 			if resp != nil {
 				data, _ := io.ReadAll(resp.Body)
-				require.FailNow(testCtx.t, "Failed to connect to WebSocket %d: %v\nStatusCode: %d\nResponse: %+v", i, err, resp.StatusCode, data)
+				require.FailNow(t.t, "Failed to connect to WebSocket %d: %v\nStatusCode: %d\nResponse: %+v", i, err, resp.StatusCode, data)
 			} else {
-				require.FailNow(testCtx.t, "Failed to connect to WebSocket %d: %v\n", i, err)
+				require.FailNow(t.t, "Failed to connect to WebSocket %d: %v\n", i, err)
 			}
 		}
-		testCtx.t.Cleanup(func() {
+		t.t.Cleanup(func() {
 			if err = wsConn.Close(); err != nil {
-				testCtx.t.Logf("Failed to close WebSocket %d: %v", i, err)
+				t.t.Logf("Failed to close WebSocket %d: %v", i, err)
 			}
 		})
 		wsClients[i] = wsConn
-		testCtx.t.Logf("Successfully connected to WebSocket %d", i)
+		t.t.Logf("Successfully connected to WebSocket %d", i)
 	}
 	return wsClients
 }
@@ -272,27 +272,27 @@ func testWebsocketOutput(t *testing.T, wsClients []*websocket.Conn, messageToSen
 	t.Log("Test completed, closing WebSocket connections")
 }
 
-func testAMQP09Output(testCtx *amqpTestContext, expectedMessages [][]byte) {
-	conn, err := amqp091.Dial(testCtx.amqpURL)
-	require.NoError(testCtx.t, err, "Failed to connect to RabbitMQ")
+func (t *amqpTestContext) testAMQP09Output(expectedMessages [][]byte) {
+	conn, err := amqp091.Dial(t.amqpURL)
+	require.NoError(t.t, err, "Failed to connect to RabbitMQ")
 
 	defer conn.Close()
 
 	ch, err := conn.Channel()
-	require.NoError(testCtx.t, err, "Failed to open an AMQP09 channel")
+	require.NoError(t.t, err, "Failed to open an AMQP09 channel")
 
 	defer ch.Close()
 
 	msgs, err := ch.Consume(
-		testCtx.queueName, // queue
-		"consumer",        // consumer
-		true,              // auto-ack
-		false,             // exclusive
-		false,             // no-local
-		false,             // no-wait
-		nil,               // args
+		t.queueName, // queue
+		"consumer",  // consumer
+		true,        // auto-ack
+		false,       // exclusive
+		false,       // no-local
+		false,       // no-wait
+		nil,         // args
 	)
-	require.NoError(testCtx.t, err, "Failed to consume messages")
+	require.NoError(t.t, err, "Failed to consume messages")
 	done := make(chan struct{})
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -313,11 +313,11 @@ func testAMQP09Output(testCtx *amqpTestContext, expectedMessages [][]byte) {
 	case <-done:
 	}
 
-	assert.Equal(testCtx.t, expectedMessages, result)
+	assert.Equal(t.t, expectedMessages, result)
 }
 
-func testTykStreamAMQPIntegration(testCtx *amqpTestContext) {
-	testCtx.t.Helper()
+func (t *amqpTestContext) testTykStreamAMQPIntegration() {
+	t.t.Helper()
 
 	const (
 		messageToSend = "hello amqp"
@@ -326,9 +326,9 @@ func testTykStreamAMQPIntegration(testCtx *amqpTestContext) {
 	)
 
 	var wsClients []*websocket.Conn
-	if testCtx.output == "websocket" {
+	if t.output == "websocket" {
 		// Create WebSocket clients
-		wsClients = createWebsocketClients(testCtx, numClients)
+		wsClients = t.createWebsocketClients(numClients)
 	}
 
 	// Publish messages to the AMQP Broker
@@ -337,24 +337,24 @@ func testTykStreamAMQPIntegration(testCtx *amqpTestContext) {
 		messages[i] = []byte(messageToSend + "-" + strconv.Itoa(i))
 	}
 
-	if testCtx.input == "amqp_0_9" {
-		amqp09Publisher(testCtx, messages)
-	} else if testCtx.input == "amqp_1" {
-		amqp1Publisher(testCtx.t, testCtx.amqpURL, testCtx.queueName, messages)
-	} else if testCtx.input == "http_server" {
+	if t.input == "amqp_0_9" {
+		t.amqp09Publisher(messages)
+	} else if t.input == "amqp_1" {
+		amqp1Publisher(t.t, t.amqpURL, t.queueName, messages)
+	} else if t.input == "http_server" {
 		for _, message := range messages {
-			publishHTTPMessage(testCtx, "text/plain", message)
+			t.publishHTTPMessage("text/plain", message)
 		}
 	} else {
-		require.Fail(testCtx.t, "Invalid input type")
+		require.Fail(t.t, "Invalid input type")
 	}
 
-	if testCtx.output == "websocket" {
-		testWebsocketOutput(testCtx.t, wsClients, messageToSend, numMessages)
-	} else if testCtx.output == "amqp_0_9" {
-		testAMQP09Output(testCtx, messages)
+	if t.output == "websocket" {
+		testWebsocketOutput(t.t, wsClients, messageToSend, numMessages)
+	} else if t.output == "amqp_0_9" {
+		t.testAMQP09Output(messages)
 	} else {
-		require.Fail(testCtx.t, "Invalid output type")
+		require.Fail(t.t, "Invalid output type")
 	}
 }
 
@@ -407,8 +407,8 @@ streams:
 			input:        "amqp_0_9",
 			output:       "websocket",
 		}
-		initializeAMQP09Environment(testCtx)
-		testTykStreamAMQPIntegration(testCtx)
+		testCtx.initializeAMQP09Environment()
+		testCtx.testTykStreamAMQPIntegration()
 	})
 
 	t.Run("Publish messages to amqp_1 input then consume messages via Websocket", func(t *testing.T) {
@@ -439,7 +439,7 @@ streams:
 			input:        "amqp_1",
 			output:       "websocket",
 		}
-		testTykStreamAMQPIntegration(testContext)
+		testContext.testTykStreamAMQPIntegration()
 	})
 
 	t.Run("Publish messages to http input then consume messages from amqp_9 output", func(t *testing.T) {
@@ -470,7 +470,7 @@ streams:
 			input:        "http_server",
 			output:       "amqp_0_9",
 		}
-		initializeAMQP09Environment(testCtx)
-		testTykStreamAMQPIntegration(testCtx)
+		testCtx.initializeAMQP09Environment()
+		testCtx.testTykStreamAMQPIntegration()
 	})
 }

@@ -3,10 +3,13 @@
 package gateway
 
 import (
+	"bytes"
 	"context"
 	"crypto/tls"
 	"fmt"
 	"github.com/stretchr/testify/assert"
+	"io"
+	"net/http"
 	"strings"
 	"testing"
 	"time"
@@ -53,10 +56,14 @@ allow_anonymous true
 	return url
 }
 
-func createMqttClient(t *testing.T, url, clientID string) mqtt.Client {
+func createMqttClient(t *testing.T, url, clientID string, optModifier func(o *mqtt.ClientOptions)) mqtt.Client {
 	opts := mqtt.NewClientOptions()
 	opts.AddBroker(url)
 	opts.SetClientID(clientID)
+
+	if optModifier != nil {
+		optModifier(opts)
+	}
 
 	client := mqtt.NewClient(opts)
 	token := client.Connect()
@@ -103,8 +110,8 @@ streams:
 		require.NoError(t, err)
 
 		apiName := setupStreamingAPIForOAS(t, ts, &streamingOAS)
-		doneChan := listenToWebsocketMessage(t, ts, apiName, 1, numMessages)
-		client := createMqttClient(t, brokerURL, clientID)
+		doneChan := listenToWebsocketMessage(t, ts, apiName, 2, numMessages)
+		client := createMqttClient(t, brokerURL, clientID, nil)
 
 		for i := 0; i < numMessages; i++ {
 			timer := time.After(5 * time.Second)
@@ -123,6 +130,38 @@ streams:
 		case <-doneChan:
 		case <-timeout:
 			assert.FailNow(t, "timeout waiting for message from websocket")
+		}
+	})
+
+	t.Run("publish messages to http input and consume via mqtt", func(t *testing.T) {
+		streamConfig := fmt.Sprintf(`
+streams:
+  test:
+    input:
+      http_server:
+        path: /post
+        timeout: 1s
+    output:
+      mqtt:
+        urls: [%s]
+        client_id: bento-client
+        topic: tyk-test
+        connect_timeout: 5s
+`, brokerURL)
+
+		streamingOAS, err := setupOASForStreamAPI(streamConfig)
+		require.NoError(t, err)
+
+		numMessages := 3
+		apiName := setupStreamingAPIForOAS(t, ts, &streamingOAS)
+		doneChan := listenToAMQTT(t, brokerURL, "tyk-client", "tyk-test", 3)
+		publishHTTPMessage(t, fmt.Sprintf("%s/%s", ts.URL, apiName), []byte("hello"), numMessages)
+
+		totalTimeout := time.After(10 * time.Second)
+		select {
+		case <-doneChan:
+		case <-totalTimeout:
+			t.Fatal("Timed out waiting for message from mqtt")
 		}
 	})
 }
@@ -166,4 +205,56 @@ func listenToWebsocketMessage(t *testing.T, ts *Test, apiName string, numClients
 		}
 	}()
 	return doneChan
+}
+
+func listenToAMQTT(t *testing.T, brokerURL, clientID, topic string, total int) (done chan struct{}) {
+	done = make(chan struct{})
+	choke := make(chan [2]string)
+	client := createMqttClient(t, brokerURL, clientID, func(o *mqtt.ClientOptions) {
+		o.SetDefaultPublishHandler(func(client mqtt.Client, msg mqtt.Message) {
+			choke <- [2]string{msg.Topic(), string(msg.Payload())}
+		})
+	})
+
+	if token := client.Connect(); token.Wait() && token.Error() != nil {
+		panic(token.Error())
+	}
+
+	if token := client.Subscribe(topic, 1, nil); token.Wait() && token.Error() != nil {
+		require.NoError(t, token.Error())
+	}
+
+	go func() {
+		receiveCount := 0
+		for receiveCount < total {
+			listenTimer := time.NewTimer(time.Second * 10)
+			select {
+			case <-listenTimer.C:
+				return
+			case incoming := <-choke:
+				t.Logf("RECEIVED TOPIC: %s MESSAGE: %s\n", incoming[0], incoming[1])
+				receiveCount++
+			}
+		}
+		done <- struct{}{}
+	}()
+
+	return done
+}
+
+func publishHTTPMessage(t *testing.T, url string, message []byte, count int) {
+	publishURL := fmt.Sprintf("%s/post", url)
+	for i := 0; i < count; i++ {
+		resp, err := http.Post(publishURL, "text/plain", bytes.NewReader(message))
+		require.NoError(t, err)
+
+		data, err := io.ReadAll(resp.Body)
+		require.NoError(t, err)
+		if data != nil {
+			t.Logf("Received response: %s", string(data))
+		}
+
+		_ = resp.Body.Close()
+	}
+
 }
