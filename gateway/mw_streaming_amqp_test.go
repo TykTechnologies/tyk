@@ -383,7 +383,8 @@ func checkRabbitMQAliveness(t *testing.T, rabbitmqContainer *rabbitmq.RabbitMQCo
 
 	parsedUrl.Path = AlivenessCheckPath
 	parsedUrl.User = url.UserPassword(RabbitmqAdminUsername, RabbitmqAdminPassword)
-	alivenessCheckURL := parsedUrl.String() + url.PathEscape(DefaultVirtualHost)
+	alivenessCheckURL, err := url.JoinPath(parsedUrl.String(), url.PathEscape(DefaultVirtualHost))
+	require.NoError(t, err)
 
 	const interval = 250 * time.Millisecond
 	duration, err := time.ParseDuration("5s")
@@ -391,14 +392,19 @@ func checkRabbitMQAliveness(t *testing.T, rabbitmqContainer *rabbitmq.RabbitMQCo
 
 	checkAliveness := func() bool {
 		resp, reqErr := http.Get(alivenessCheckURL)
-		require.NoError(t, reqErr)
+		if reqErr != nil {
+			t.Logf("Failed to check RabbitMQ aliveness: %v", reqErr)
+			return false
+		}
 
 		defer func() {
 			require.NoError(t, resp.Body.Close())
 		}()
 
 		// status code might be 404 if the virtual host doesn't exist.
-		require.Equal(t, http.StatusOK, resp.StatusCode)
+		if resp.StatusCode != http.StatusOK {
+			return false
+		}
 
 		data, readErr := io.ReadAll(resp.Body)
 		require.NoError(t, readErr)
