@@ -382,11 +382,23 @@ func (t *Service) applyPartitions(policy user.Policy, session *user.SessionState
 				if len(r.RestrictedTypes) == 0 {
 					r.RestrictedTypes = v.RestrictedTypes
 				} else {
+					// Create a map to track which types have been processed
+					processedTypes := make(map[string]bool)
+
 					for _, t := range v.RestrictedTypes {
+						typeFound := false
 						for ri, rt := range r.RestrictedTypes {
 							if t.Name == rt.Name {
+								// Merge fields for existing types
 								r.RestrictedTypes[ri].Fields = appendIfMissing(rt.Fields, t.Fields...)
+								typeFound = true
+								processedTypes[t.Name] = true
+								break
 							}
+						}
+						// Add new types that don't exist in destination
+						if !typeFound {
+							r.RestrictedTypes = append(r.RestrictedTypes, t)
 						}
 					}
 				}
@@ -397,11 +409,23 @@ func (t *Service) applyPartitions(policy user.Policy, session *user.SessionState
 				if len(r.AllowedTypes) == 0 {
 					r.AllowedTypes = v.AllowedTypes
 				} else {
+					// Create a map to track which types have been processed
+					processedTypes := make(map[string]bool)
+
 					for _, t := range v.AllowedTypes {
+						typeFound := false
 						for ri, rt := range r.AllowedTypes {
 							if t.Name == rt.Name {
+								// Merge fields for existing types
 								r.AllowedTypes[ri].Fields = appendIfMissing(rt.Fields, t.Fields...)
+								typeFound = true
+								processedTypes[t.Name] = true
+								break
 							}
+						}
+						// Add new types that don't exist in destination
+						if !typeFound {
+							r.AllowedTypes = append(r.AllowedTypes, t)
 						}
 					}
 				}
