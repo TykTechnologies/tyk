@@ -97,10 +97,10 @@ func initializeAMQP09Environment(testCtx *amqpTestContext) {
 	testCtx.t.Logf("AMQP-0.9 queue: %s bound to exchange: %s", testCtx.queueName, testCtx.exchangeName)
 }
 
-func setupStreamingAPIForAMQP(t *testing.T, ts *Test, tykStreamOAS *oas.OAS) string {
+func setupStreamingAPIForOAS(t *testing.T, ts *Test, tykStreamOAS *oas.OAS) string {
 	t.Helper()
 
-	apiName := fmt.Sprintf("streaming-api-amqp-%s", uuid.New().String())
+	apiName := fmt.Sprintf("streaming-api-%s", uuid.New().String())
 	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 		spec.Proxy.ListenPath = fmt.Sprintf("/%s", apiName)
 		spec.UseKeylessAccess = true
@@ -396,7 +396,7 @@ streams:
 `, amqpURL, queueName)
 		tykStreamingOAS, oasErr := setupOASForStreamAPI(streamingConfig)
 		require.NoError(t, oasErr)
-		apiName := setupStreamingAPIForAMQP(t, ts, &tykStreamingOAS)
+		apiName := setupStreamingAPIForOAS(t, ts, &tykStreamingOAS)
 		testCtx := &amqpTestContext{
 			t:            t,
 			ts:           ts,
@@ -428,7 +428,7 @@ streams:
 `, amqpURL, queueName)
 		tykStreamingOAS, oasErr := setupOASForStreamAPI(streamingConfig)
 		require.NoError(t, oasErr)
-		apiName := setupStreamingAPIForAMQP(t, ts, &tykStreamingOAS)
+		apiName := setupStreamingAPIForOAS(t, ts, &tykStreamingOAS)
 		testContext := &amqpTestContext{
 			t:            t,
 			ts:           ts,
@@ -459,7 +459,7 @@ streams:
 `, amqpURL, exchangeName)
 		tykStreamingOAS, oasErr := setupOASForStreamAPI(streamingConfig)
 		require.NoError(t, oasErr)
-		apiName := setupStreamingAPIForAMQP(t, ts, &tykStreamingOAS)
+		apiName := setupStreamingAPIForOAS(t, ts, &tykStreamingOAS)
 		testCtx := &amqpTestContext{
 			t:            t,
 			ts:           ts,

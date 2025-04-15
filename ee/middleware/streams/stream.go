@@ -15,6 +15,7 @@ import (
 	_ "github.com/warpstreamlabs/bento/public/components/amqp1"
 	_ "github.com/warpstreamlabs/bento/public/components/io"
 	_ "github.com/warpstreamlabs/bento/public/components/kafka"
+	_ "github.com/warpstreamlabs/bento/public/components/mqtt"
 	_ "github.com/warpstreamlabs/bento/public/components/nats"
 	"github.com/warpstreamlabs/bento/public/service"
 
