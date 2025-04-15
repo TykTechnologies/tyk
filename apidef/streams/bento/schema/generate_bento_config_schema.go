@@ -10,8 +10,11 @@ import (
 	"os"
 
 	"github.com/buger/jsonparser"
+	_ "github.com/warpstreamlabs/bento/public/components/amqp09"
+	_ "github.com/warpstreamlabs/bento/public/components/amqp1"
 	_ "github.com/warpstreamlabs/bento/public/components/io"
 	_ "github.com/warpstreamlabs/bento/public/components/kafka"
+	_ "github.com/warpstreamlabs/bento/public/components/mqtt"
 	"github.com/warpstreamlabs/bento/public/service"
 )
 
@@ -28,6 +31,7 @@ var properties = []string{
 	"processor_resources",
 	"shutdown_delay",
 	"shutdown_timeout",
+	"pipeline",
 }
 
 var definitions = []string{
@@ -40,6 +44,9 @@ var supportedSources = []string{
 	"http_client",
 	"http_server",
 	"kafka",
+	"amqp_0_9",
+	"amqp_1",
+	"mqtt",
 }
 
 func printErrorAndExit(err error) {
