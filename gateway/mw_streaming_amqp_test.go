@@ -393,13 +393,13 @@ func checkRabbitMQAliveness(t *testing.T, rabbitmqContainer *rabbitmq.RabbitMQCo
 
 	maxAttempts := int(duration.Milliseconds() / interval.Milliseconds())
 	for attempt := 0; attempt < maxAttempts; attempt++ {
-		time.Sleep(interval)
 		if rabbitmqContainer.IsRunning() && checkAliveness() {
 			// It's alive, let's start running the integration tests.
 			t.Logf("RabbitMQ is alive after %d attempts", attempt+1)
 			return
 		}
 		t.Logf("RabbitMQ is not ready to accept requests, attempt %d/%d", attempt+1, maxAttempts)
+		time.Sleep(interval)
 	}
 	require.Fail(t, "RabbitMQ is not alive after %d attempts", maxAttempts)
 }
