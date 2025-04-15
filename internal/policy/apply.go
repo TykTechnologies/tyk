@@ -382,11 +382,18 @@ func (t *Service) applyPartitions(policy user.Policy, session *user.SessionState
 				if len(r.RestrictedTypes) == 0 {
 					r.RestrictedTypes = v.RestrictedTypes
 				} else {
+					typeMap := make(map[string]int)
+					for i, rt := range r.RestrictedTypes {
+						typeMap[rt.Name] = i
+					}
+
 					for _, t := range v.RestrictedTypes {
-						for ri, rt := range r.RestrictedTypes {
-							if t.Name == rt.Name {
-								r.RestrictedTypes[ri].Fields = intersection(rt.Fields, t.Fields)
-							}
+						if existingIndex, exists := typeMap[t.Name]; exists {
+							// Type exists in both policies - intersect fields
+							r.RestrictedTypes[existingIndex].Fields = intersection(r.RestrictedTypes[existingIndex].Fields, t.Fields)
+						} else {
+							// Type only exists in new policy - add it
+							r.RestrictedTypes = append(r.RestrictedTypes, t)
 						}
 					}
 				}
