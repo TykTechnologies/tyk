@@ -6,11 +6,9 @@ import (
 	"bytes"
 	"context"
 	"crypto/tls"
-	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
-	"net/url"
 	"strconv"
 	"strings"
 	"testing"
@@ -29,15 +27,9 @@ import (
 )
 
 const (
-	AlivenessCheckPath    = "/api/aliveness-test/"
-	DefaultVirtualHost    = "/"
 	RabbitmqAdminUsername = "guest"
 	RabbitmqAdminPassword = "guest"
 )
-
-type alivenessCheckResponse struct {
-	Status string `json:"status"`
-}
 
 type amqpTestContext struct {
 	t            *testing.T
@@ -371,61 +363,44 @@ func (t *amqpTestContext) testTykStreamAMQPIntegration() {
 	}
 }
 
-// checkRabbitMQAliveness verifies the RabbitMQ management endpoint for its
-// aliveness status with retries until a timeout occurs. It performs health checks
-// by querying the management API and ensures RabbitMQ is ready for further integration tests.
+// checkRabbitMQAliveness verifies the RabbitMQ container is alive and accepting connections within a specified duration.
 func checkRabbitMQAliveness(t *testing.T, rabbitmqContainer *rabbitmq.RabbitMQContainer) {
-	managementURL, err := rabbitmqContainer.HttpURL(context.Background())
-	require.NoError(t, err)
-
-	parsedUrl, err := url.Parse(managementURL)
-	require.NoError(t, err)
-
-	parsedUrl.Path = AlivenessCheckPath
-	parsedUrl.User = url.UserPassword(RabbitmqAdminUsername, RabbitmqAdminPassword)
-	alivenessCheckURL, err := url.JoinPath(parsedUrl.String(), url.PathEscape(DefaultVirtualHost))
+	amqpURL, err := rabbitmqContainer.AmqpURL(context.Background())
 	require.NoError(t, err)
 
 	const interval = 250 * time.Millisecond
-	duration, err := time.ParseDuration("5s")
+	duration, err := time.ParseDuration("60s")
 	require.NoError(t, err)
 
 	checkAliveness := func() bool {
-		resp, reqErr := http.Get(alivenessCheckURL)
-		if reqErr != nil {
-			t.Logf("Failed to check RabbitMQ aliveness: %v", reqErr)
-			return false
+		var alive bool
+		// Dial method may return an established TCP connection even if dialErr is not nil.
+		conn, dialErr := amqp091.Dial(amqpURL)
+		if dialErr == nil {
+			alive = true
 		}
-
-		defer func() {
-			require.NoError(t, resp.Body.Close())
-		}()
-
-		// status code might be 404 if the virtual host doesn't exist.
-		if resp.StatusCode != http.StatusOK {
-			return false
+		if dialErr != nil {
+			t.Logf("Failed to connect to RabbitMQ: %v", dialErr)
 		}
-
-		data, readErr := io.ReadAll(resp.Body)
-		require.NoError(t, readErr)
-
-		response := &alivenessCheckResponse{}
-		require.NoError(t, json.Unmarshal(data, response))
-		return response.Status == "ok"
+		if conn != nil {
+			closeErr := conn.Close()
+			if closeErr != nil {
+				t.Logf("Failed to close RabbitMQ connection: %v", closeErr)
+			}
+		}
+		return alive
 	}
 
 	maxAttempts := int(duration.Milliseconds() / interval.Milliseconds())
 	for attempt := 0; attempt < maxAttempts; attempt++ {
 		time.Sleep(interval)
-		if rabbitmqContainer.IsRunning() {
-			if checkAliveness() {
-				// It's alive, let's start running the integration tests.
-				return
-			}
+		if rabbitmqContainer.IsRunning() && checkAliveness() {
+			// It's alive, let's start running the integration tests.
+			t.Logf("RabbitMQ is alive after %d attempts", attempt+1)
+			return
 		}
 		t.Logf("RabbitMQ is not ready to accept requests, attempt %d/%d", attempt+1, maxAttempts)
 	}
-
 	require.Fail(t, "RabbitMQ is not alive after %d attempts", maxAttempts)
 }
 
