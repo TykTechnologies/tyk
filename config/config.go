@@ -448,12 +448,6 @@ type HttpServerOptionsConfig struct {
 	// Enabled WebSockets and server side events support
 	EnableWebSockets bool `json:"enable_websockets"`
 
-<<<<<<< HEAD
-	// Deprecated. SSL certificates used by Gateway server.
-	Certificates CertsData `json:"certificates"`
-
-	// SSL certificates used by your Gateway server. A list of certificate IDs or path to files.
-=======
 	// Deprecated: Use `ssl_certificates`instead.
 	Certificates CertsData `json:"certificates"`
 
@@ -461,7 +455,6 @@ type HttpServerOptionsConfig struct {
 	// The string value in the array can be two of the following options:
 	// 1. The ID assigned to and used to identify a certificate in the Tyk Certificate Store
 	// 2. The path to a file accessible to the Gateway. This PEM file must contain the private key and public certificate pair concatenated together.
->>>>>>> 9979e1318... TT-14365: internal/policy: add restricted_types behaviour test (#6972)
 	SSLCertificates []string `json:"ssl_certificates"`
 
 	// Start your Gateway HTTP server on specific server name
