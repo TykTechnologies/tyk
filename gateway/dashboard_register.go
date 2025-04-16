@@ -186,6 +186,8 @@ func (h *HTTPDashboardHandler) NotifyDashboardOfEvent(event interface{}) error {
 func (h *HTTPDashboardHandler) Register() error {
 	dashLog.Info("Registering gateway node with Dashboard")
 	req := h.newRequest(http.MethodGet, h.RegistrationEndpoint)
+	req.Header.Set(header.XTykSessionID, h.Gw.SessionID)
+
 	c := h.Gw.initialiseClient()
 
 	resp, err := c.Do(req)
@@ -226,6 +228,7 @@ func (h *HTTPDashboardHandler) Register() error {
 	h.Gw.ServiceNonce = val.Nonce
 	h.Gw.ServiceNonceMutex.Unlock()
 	dashLog.Debug("Registration Finished: Nonce Set: ", val.Nonce)
+	h.Gw.DoReload()
 
 	return nil
 }
