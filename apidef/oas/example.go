@@ -1,6 +1,6 @@
 package oas
 
-import "github.com/getkin/kin-openapi/openapi3"
+import "github.com/TykTechnologies/kin-openapi/openapi3"
 
 // ExampleExtractor returns an example payload according to the openapi3.SchemaRef object.
 func ExampleExtractor(schema *openapi3.SchemaRef) interface{} {
