@@ -6,8 +6,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/buger/jsonparser"
 	"github.com/TykTechnologies/kin-openapi/openapi3"
+	"github.com/buger/jsonparser"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
