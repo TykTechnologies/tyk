@@ -109,7 +109,7 @@ require (
 	github.com/nats-io/nats.go v1.38.0
 	github.com/newrelic/go-agent/v3 v3.35.1
 	github.com/newrelic/go-agent/v3/integrations/nrgorilla v1.2.2
-	github.com/oasdiff/yaml v0.0.0-20241214135536-5f7845c759c8
+	github.com/oasdiff/yaml v0.0.0-20250309154309-f31be36b4037
 	github.com/rabbitmq/amqp091-go v1.9.0
 	github.com/shirou/gopsutil v3.20.11+incompatible
 	github.com/testcontainers/testcontainers-go v0.36.0
@@ -178,8 +178,8 @@ require (
 	github.com/go-logr/logr v1.4.2 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/go-ole/go-ole v1.2.6 // indirect
-	github.com/go-openapi/jsonpointer v0.19.6 // indirect
-	github.com/go-openapi/swag v0.22.4 // indirect
+	github.com/go-openapi/jsonpointer v0.21.0 // indirect
+	github.com/go-openapi/swag v0.23.0 // indirect
 	github.com/gobwas/httphead v0.1.0 // indirect
 	github.com/gobwas/pool v0.2.1 // indirect
 	github.com/gobwas/ws v1.2.1 // indirect
@@ -253,7 +253,7 @@ require (
 	github.com/nats-io/nkeys v0.4.9 // indirect
 	github.com/nats-io/nuid v1.0.1 // indirect
 	github.com/nats-io/stan.go v0.10.4 // indirect
-	github.com/oasdiff/yaml3 v0.0.0-20241214160948-977117996672 // indirect
+	github.com/oasdiff/yaml3 v0.0.0-20250309153720-d2182401db90 // indirect
 	github.com/opencontainers/go-digest v1.0.0 // indirect
 	github.com/opencontainers/image-spec v1.1.1 // indirect
 	github.com/perimeterx/marshmallow v1.1.5 // indirect
@@ -327,3 +327,5 @@ require (
 )
 
 replace go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.54.0 => go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.49.0
+
+replace github.com/getkin/kin-openapi => github.com/TykTechnologies/kin-openapi v0.90.1-0.20250417085524-a1dc7dfcc5c2
