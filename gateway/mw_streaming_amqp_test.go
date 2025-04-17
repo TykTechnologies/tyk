@@ -17,6 +17,7 @@ import (
 	amqp1 "github.com/Azure/go-amqp"
 	"github.com/TykTechnologies/tyk/apidef/oas"
 	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/test"
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
 	"github.com/rabbitmq/amqp091-go"
@@ -24,6 +25,11 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/modules/rabbitmq"
+)
+
+const (
+	RabbitmqAdminUsername = "guest"
+	RabbitmqAdminPassword = "guest"
 )
 
 type amqpTestContext struct {
@@ -358,18 +364,66 @@ func (t *amqpTestContext) testTykStreamAMQPIntegration() {
 	}
 }
 
+// checkRabbitMQAliveness verifies the RabbitMQ container is alive and accepting connections within a specified duration.
+func checkRabbitMQAliveness(t *testing.T, rabbitmqContainer *rabbitmq.RabbitMQContainer) {
+	amqpURL, err := rabbitmqContainer.AmqpURL(context.Background())
+	require.NoError(t, err)
+
+	const interval = 250 * time.Millisecond
+	duration, err := time.ParseDuration("60s")
+	require.NoError(t, err)
+
+	checkAliveness := func() bool {
+		var alive bool
+		// Dial method may return an established TCP connection even if dialErr is not nil.
+		conn, dialErr := amqp091.Dial(amqpURL)
+		if dialErr == nil {
+			alive = true
+		}
+		if dialErr != nil {
+			t.Logf("Failed to connect to RabbitMQ: %v", dialErr)
+		}
+		if conn != nil {
+			closeErr := conn.Close()
+			if closeErr != nil {
+				t.Logf("Failed to close RabbitMQ connection: %v", closeErr)
+			}
+		}
+		return alive
+	}
+
+	maxAttempts := int(duration.Milliseconds() / interval.Milliseconds())
+	for attempt := 0; attempt < maxAttempts; attempt++ {
+		if rabbitmqContainer.IsRunning() && checkAliveness() {
+			// It's alive, let's start running the integration tests.
+			t.Logf("RabbitMQ is alive after %d attempts", attempt+1)
+			return
+		}
+		t.Logf("RabbitMQ is not ready to accept requests, attempt %d/%d", attempt+1, maxAttempts)
+		time.Sleep(interval)
+	}
+	require.Fail(t, "RabbitMQ is not alive after %d attempts", maxAttempts)
+}
+
 func TestAMQP(t *testing.T) {
+	// Marking AMQP tests flaky because RabbitMQ refuses connections time to time
+	// on GitHub Actions environment. We could not find any way to fix that problem.
+	// Here is the error message:
+	// Failed to connect to RabbitMQ: Exception (501) Reason: "read tcp [::1]:46712->[::1]:32773: read: connection reset by peer"
+	test.Flaky(t)
 	ctx := context.Background()
 	rabbitmqContainer, err := rabbitmq.Run(ctx,
 		"rabbitmq:4.0.8-management-alpine",
-		rabbitmq.WithAdminUsername("guest"),
-		rabbitmq.WithAdminPassword("guest"),
+		rabbitmq.WithAdminUsername(RabbitmqAdminUsername),
+		rabbitmq.WithAdminPassword(RabbitmqAdminPassword),
 	)
 	defer func() {
 		terminateErr := testcontainers.TerminateContainer(rabbitmqContainer)
 		require.NoError(t, terminateErr)
 	}()
 	require.NoError(t, err)
+
+	checkRabbitMQAliveness(t, rabbitmqContainer)
 
 	amqpURL, err := rabbitmqContainer.AmqpURL(ctx)
 	require.NoError(t, err)
