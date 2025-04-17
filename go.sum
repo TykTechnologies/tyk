@@ -69,10 +69,10 @@ github.com/TykTechnologies/graphql-go-tools v1.6.2-0.20241212110213-7724a3b64bb2
 github.com/TykTechnologies/graphql-go-tools v1.6.2-0.20241212110213-7724a3b64bb2/go.mod h1:NE9MYGcB5eWKW0OefGOjZZEPv6S20AQ0OTsO+npGR8I=
 github.com/TykTechnologies/graphql-go-tools/v2 v2.0.0-20240509085643-e95cdc317e1d h1:ntmDECMD7475TK/cxshJ1b8KJvUM1wppohd0qZjqUqI=
 github.com/TykTechnologies/graphql-go-tools/v2 v2.0.0-20240509085643-e95cdc317e1d/go.mod h1:eOt2cxB9sZ80mz4q1UKzzk9CE4QZaS6jP20X2LwPwy8=
-github.com/TykTechnologies/graphql-translator v0.0.0-20240319092712-4ba87e4c06ff h1:kFA240S1Y4snsEL4Ng4Ch1Ib2N04A15Y+9KYumK6uCg=
-github.com/TykTechnologies/graphql-translator v0.0.0-20240319092712-4ba87e4c06ff/go.mod h1:K3KhGG9CmvXv1lJhKZpnLb1tC8N1oIzXTunQsc6N9og=
-github.com/TykTechnologies/kin-openapi v0.90.1-0.20250416082231-59815ff298a7 h1:1mX3H290iTyav2FToICcRmZdFmjroA9WGPm0yih4u2I=
-github.com/TykTechnologies/kin-openapi v0.90.1-0.20250416082231-59815ff298a7/go.mod h1:5ACVjH19q2L40v+Pp10Z9VZJdCkFRx9UKCqRwBS1XcI=
+github.com/TykTechnologies/graphql-translator v0.0.0-20250417102834-5f421d17dd07 h1:eG+lvk63kUCu46Kq3Jl5ZbtrhZARjnrRYPbXWdh4wLs=
+github.com/TykTechnologies/graphql-translator v0.0.0-20250417102834-5f421d17dd07/go.mod h1:oCHdt4376SUItVfTIDtn54DXuLhmIbF9o0chbfbheIk=
+github.com/TykTechnologies/kin-openapi v0.90.1-0.20250417085524-a1dc7dfcc5c2 h1:ZdwVrBRiXUiU4DGHQ3ZujCygCiTea8vsPvXIt5vl3v4=
+github.com/TykTechnologies/kin-openapi v0.90.1-0.20250417085524-a1dc7dfcc5c2/go.mod h1:5ACVjH19q2L40v+Pp10Z9VZJdCkFRx9UKCqRwBS1XcI=
 github.com/TykTechnologies/murmur3 v0.0.0-20230310161213-aad17efd5632 h1:T5NWziFusj8au5nxAqMMh/bZyX9CAyYnBkaMSsfH6BA=
 github.com/TykTechnologies/murmur3 v0.0.0-20230310161213-aad17efd5632/go.mod h1:UsPYgOFBpNzDXLEti7MKOwHLpVSqdzuNGkVFPspQmnQ=
 github.com/TykTechnologies/openid2go v0.1.2 h1:WXctksOahA/epTVVvbn9iNUuMXKRr0ksrF4dY9KW8o8=
@@ -227,8 +227,6 @@ github.com/fsnotify/fsnotify v1.7.0 h1:8JEhPFa5W2WU7YfeZzPNqzMP6Lwt7L2715Ggo0nos
 github.com/fsnotify/fsnotify v1.7.0/go.mod h1:40Bi/Hjc2AVfZrqy+aj+yEI+/bRxZnMJyTJwOpGvigM=
 github.com/gemnasium/logrus-graylog-hook v2.0.7+incompatible h1:lgnKqRfXdYPljf5yj0SOYSH+i29U8E3KKzdOIWsHZno=
 github.com/gemnasium/logrus-graylog-hook v2.0.7+incompatible/go.mod h1:85jwR23cg8rapnMQj96B9pX4XzmkXMNAPVfnnUNP8Dk=
-github.com/getkin/kin-openapi v0.115.0 h1:c8WHRLVY3G8m9jQTy0/DnIuljgRwTCB5twZytQS4JyU=
-github.com/getkin/kin-openapi v0.115.0/go.mod h1:l5e9PaFUo9fyLJCPGQeXI2ML8c3P8BHOEV2VaAVf/pc=
 github.com/getsentry/raven-go v0.2.0 h1:no+xWJRb5ZI7eE8TWgIq1jLulQiIoLG0IfYxv5JYMGs=
 github.com/getsentry/raven-go v0.2.0/go.mod h1:KungGk8q33+aIAZUIVWZDr2OfAEBsO49PX4NzFV5kcQ=
 github.com/go-faker/faker/v4 v4.3.0 h1:UXOW7kn/Mwd0u6MR30JjUKVzguT20EB/hBOddAAO+DY=

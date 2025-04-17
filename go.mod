@@ -26,7 +26,7 @@ require (
 	github.com/TykTechnologies/gorpc v0.0.0-20250214161245-e9f3f088e8c6
 	github.com/TykTechnologies/goverify v0.0.0-20220808203004-1486f89e7708
 	github.com/TykTechnologies/graphql-go-tools v1.6.2-0.20241212110213-7724a3b64bb2
-	github.com/TykTechnologies/graphql-translator v0.0.0-20240319092712-4ba87e4c06ff
+	github.com/TykTechnologies/graphql-translator v0.0.0-20250417102834-5f421d17dd07
 	github.com/TykTechnologies/murmur3 v0.0.0-20230310161213-aad17efd5632
 	github.com/TykTechnologies/openid2go v0.1.2
 	github.com/TykTechnologies/storage v1.2.2
@@ -39,7 +39,6 @@ require (
 	github.com/clbanning/mxj v1.8.4
 	github.com/evalphobia/logrus_sentry v0.8.2
 	github.com/gemnasium/logrus-graylog-hook v2.0.7+incompatible
-	github.com/getkin/kin-openapi v0.115.0
 	github.com/go-jose/go-jose/v3 v3.0.4
 	github.com/gocraft/health v0.0.0-20170925182251-8675af27fef0
 	github.com/gofrs/uuid v4.4.0+incompatible
@@ -97,7 +96,7 @@ require (
 	github.com/IBM/sarama v1.43.3
 	github.com/Jeffail/gabs/v2 v2.7.0
 	github.com/TykTechnologies/graphql-go-tools/v2 v2.0.0-20240509085643-e95cdc317e1d
-	github.com/TykTechnologies/kin-openapi v0.90.1-0.20250416082231-59815ff298a7
+	github.com/TykTechnologies/kin-openapi v0.90.1-0.20250417085524-a1dc7dfcc5c2
 	github.com/TykTechnologies/opentelemetry v0.0.22
 	github.com/alecthomas/kingpin/v2 v2.4.0
 	github.com/eclipse/paho.mqtt.golang v1.4.3
