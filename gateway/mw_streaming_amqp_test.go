@@ -17,6 +17,7 @@ import (
 	amqp1 "github.com/Azure/go-amqp"
 	"github.com/TykTechnologies/tyk/apidef/oas"
 	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/test"
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
 	"github.com/rabbitmq/amqp091-go"
@@ -405,6 +406,11 @@ func checkRabbitMQAliveness(t *testing.T, rabbitmqContainer *rabbitmq.RabbitMQCo
 }
 
 func TestAMQP(t *testing.T) {
+	// Marking AMQP tests flaky because RabbitMQ refuses connections time to time
+	// on GitHub Actions environment. We could not find any way to fix that problem.
+	// Here is the error message:
+	// Failed to connect to RabbitMQ: Exception (501) Reason: "read tcp [::1]:46712->[::1]:32773: read: connection reset by peer"
+	test.Flaky(t)
 	ctx := context.Background()
 	rabbitmqContainer, err := rabbitmq.Run(ctx,
 		"rabbitmq:4.0.8-management-alpine",
