@@ -310,12 +310,55 @@ func (t *amqpTestContext) testAMQP09Output(expectedMessages [][]byte) {
 			result = append(result, d.Body)
 			if len(result) == len(expectedMessages) {
 				close(done)
+				break
 			}
 		}
 	}()
 
 	select {
 	case <-ctx.Done():
+	case <-done:
+	}
+
+	assert.Equal(t.t, expectedMessages, result)
+}
+
+func (t *amqpTestContext) testAMQP1Output(expectedMessages [][]byte) {
+	baseCtx := context.Background()
+	conn, err := amqp1.Dial(baseCtx, t.amqpURL, nil)
+	require.NoErrorf(t.t, err, "Failed to connect to RabbitMQ")
+
+	session, err := conn.NewSession(baseCtx, nil)
+	require.NoErrorf(t.t, err, "Failed to create a session")
+
+	// create a new receiver
+	receiver, err := session.NewReceiver(baseCtx, t.queueName, nil)
+	require.NoErrorf(t.t, err, "Failed to create a receiver")
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	done := make(chan struct{})
+	var result [][]byte
+	go func() {
+		for {
+			msg, receiverErr := receiver.Receive(ctx, nil)
+			if receiverErr != nil {
+				t.t.Logf("Failed to receive message: %v", receiverErr)
+				break
+			}
+
+			result = append(result, msg.GetData())
+			if len(result) == len(expectedMessages) {
+				close(done)
+				break
+			}
+			require.NoError(t.t, receiver.AcceptMessage(ctx, msg))
+		}
+	}()
+
+	select {
+	case <-baseCtx.Done():
 	case <-done:
 	}
 
@@ -359,6 +402,8 @@ func (t *amqpTestContext) testTykStreamAMQPIntegration() {
 		testWebsocketOutput(t.t, wsClients, messageToSend, numMessages)
 	} else if t.output == "amqp_0_9" {
 		t.testAMQP09Output(messages)
+	} else if t.output == "amqp_1" {
+		t.testAMQP1Output(messages)
 	} else {
 		require.Fail(t.t, "Invalid output type")
 	}
@@ -525,6 +570,42 @@ streams:
 			output:       "amqp_0_9",
 		}
 		testCtx.initializeAMQP09Environment()
+		testCtx.testTykStreamAMQPIntegration()
+	})
+
+	t.Run("Publish messages to http input then consume messages from amqp_1 output", func(t *testing.T) {
+		// We need to add pipeline processor for amqp_1 output,
+		// see https://github.com/warpstreamlabs/bento/issues/302
+		queueName := "test-queue-input-http-amqp-1-output"
+		streamingConfig := fmt.Sprintf(`
+streams:
+  test:
+    input:
+      http_server:
+        path: /post
+        timeout: 1s
+    pipeline:
+      processors:
+      - mapping: |
+          meta = deleted()
+    output:
+      amqp_1:
+        urls: 
+          - %s
+        target_address: %s
+`, amqpURL, queueName)
+		tykStreamingOAS, oasErr := setupOASForStreamAPI(streamingConfig)
+		require.NoError(t, oasErr)
+		apiName := setupStreamingAPIForOAS(t, ts, &tykStreamingOAS)
+		testCtx := &amqpTestContext{
+			t:         t,
+			ts:        ts,
+			apiName:   apiName,
+			queueName: queueName,
+			amqpURL:   amqpURL,
+			input:     "http_server",
+			output:    "amqp_1",
+		}
 		testCtx.testTykStreamAMQPIntegration()
 	})
 }
