@@ -71,8 +71,8 @@ github.com/TykTechnologies/graphql-go-tools/v2 v2.0.0-20240509085643-e95cdc317e1
 github.com/TykTechnologies/graphql-go-tools/v2 v2.0.0-20240509085643-e95cdc317e1d/go.mod h1:eOt2cxB9sZ80mz4q1UKzzk9CE4QZaS6jP20X2LwPwy8=
 github.com/TykTechnologies/graphql-translator v0.0.0-20250417102834-5f421d17dd07 h1:eG+lvk63kUCu46Kq3Jl5ZbtrhZARjnrRYPbXWdh4wLs=
 github.com/TykTechnologies/graphql-translator v0.0.0-20250417102834-5f421d17dd07/go.mod h1:oCHdt4376SUItVfTIDtn54DXuLhmIbF9o0chbfbheIk=
-github.com/TykTechnologies/kin-openapi v0.90.1-0.20250417085524-a1dc7dfcc5c2 h1:ZdwVrBRiXUiU4DGHQ3ZujCygCiTea8vsPvXIt5vl3v4=
-github.com/TykTechnologies/kin-openapi v0.90.1-0.20250417085524-a1dc7dfcc5c2/go.mod h1:5ACVjH19q2L40v+Pp10Z9VZJdCkFRx9UKCqRwBS1XcI=
+github.com/TykTechnologies/kin-openapi v0.91.0 h1:9PI1Ll68MPRwl6OXWkvJW5YOYGg5pc8n0QTcPLtL7v8=
+github.com/TykTechnologies/kin-openapi v0.91.0/go.mod h1:5ACVjH19q2L40v+Pp10Z9VZJdCkFRx9UKCqRwBS1XcI=
 github.com/TykTechnologies/murmur3 v0.0.0-20230310161213-aad17efd5632 h1:T5NWziFusj8au5nxAqMMh/bZyX9CAyYnBkaMSsfH6BA=
 github.com/TykTechnologies/murmur3 v0.0.0-20230310161213-aad17efd5632/go.mod h1:UsPYgOFBpNzDXLEti7MKOwHLpVSqdzuNGkVFPspQmnQ=
 github.com/TykTechnologies/openid2go v0.1.2 h1:WXctksOahA/epTVVvbn9iNUuMXKRr0ksrF4dY9KW8o8=
