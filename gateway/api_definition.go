@@ -21,14 +21,14 @@ import (
 
 	"github.com/TykTechnologies/tyk/storage/kv"
 
-	"github.com/getkin/kin-openapi/routers"
+	"github.com/TykTechnologies/kin-openapi/routers"
 
 	"github.com/TykTechnologies/tyk/internal/graphengine"
 	"github.com/TykTechnologies/tyk/internal/httputil"
 
-	"github.com/getkin/kin-openapi/routers/gorillamux"
+	"github.com/TykTechnologies/kin-openapi/routers/gorillamux"
 
-	"github.com/getkin/kin-openapi/openapi3"
+	"github.com/TykTechnologies/kin-openapi/openapi3"
 
 	"github.com/TykTechnologies/tyk/apidef/oas"
 

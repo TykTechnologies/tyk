@@ -45,7 +45,7 @@ import (
 
 	"github.com/TykTechnologies/tyk/internal/httpctx"
 
-	"github.com/getkin/kin-openapi/openapi3"
+	"github.com/TykTechnologies/kin-openapi/openapi3"
 
 	"github.com/TykTechnologies/tyk/config"
 

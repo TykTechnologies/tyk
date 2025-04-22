@@ -26,14 +26,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/getkin/kin-openapi/openapi3"
+	"github.com/TykTechnologies/kin-openapi/openapi3"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/TykTechnologies/tyk/apidef/oas"
 
 	"github.com/TykTechnologies/tyk/rpc"
-
-	"github.com/golang-jwt/jwt/v4"
 
 	"github.com/gorilla/mux"
 	"github.com/gorilla/websocket"

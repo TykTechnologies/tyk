@@ -8,7 +8,7 @@ import (
 
 	"github.com/TykTechnologies/tyk/apidef"
 
-	"github.com/getkin/kin-openapi/openapi3"
+	"github.com/TykTechnologies/kin-openapi/openapi3"
 	"github.com/stretchr/testify/assert"
 )
 
