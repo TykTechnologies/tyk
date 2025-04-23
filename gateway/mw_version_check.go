@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/getkin/kin-openapi/routers"
+	"github.com/TykTechnologies/kin-openapi/routers"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/apidef/oas"
