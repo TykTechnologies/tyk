@@ -6,8 +6,9 @@ import (
 	"reflect"
 	"sort"
 
-	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/mitchellh/mapstructure"
+
+	"github.com/TykTechnologies/kin-openapi/openapi3"
 
 	"github.com/TykTechnologies/tyk/apidef"
 )
