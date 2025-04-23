@@ -26,7 +26,7 @@ require (
 	github.com/TykTechnologies/gorpc v0.0.0-20250214161245-e9f3f088e8c6
 	github.com/TykTechnologies/goverify v0.0.0-20220808203004-1486f89e7708
 	github.com/TykTechnologies/graphql-go-tools v1.6.2-0.20241212110213-7724a3b64bb2
-	github.com/TykTechnologies/graphql-translator v0.0.0-20250417102834-5f421d17dd07
+	github.com/TykTechnologies/graphql-translator v0.0.0-20250423061552-2acd6818080e
 	github.com/TykTechnologies/murmur3 v0.0.0-20230310161213-aad17efd5632
 	github.com/TykTechnologies/openid2go v0.1.2
 	github.com/TykTechnologies/storage v1.2.2
