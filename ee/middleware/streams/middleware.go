@@ -263,13 +263,29 @@ func (s *Middleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _ in
 	return nil, middleware.StatusRespond
 }
 
-// Unload closes and remove active streams.
+func (s *Middleware) resetStream(streamValue any) {
+	if stream, ok := streamValue.(*Stream); ok {
+		if err := stream.Reset(); err != nil {
+			s.Logger().WithError(err).Error("Failed to reset stream")
+		}
+	}
+}
+
+// Unload closes and remove active streams. This method is called when the API is removed.
 func (s *Middleware) Unload() {
 	s.Logger().Debugf("Unloading streaming middleware %s", s.Spec.Name)
 
 	totalStreams := 0
 	s.cancel()
 
+	// Reset the default manager and stop the underlying Bento Stream
+	s.defaultManager.streams.Range(func(_, streamValue interface{}) bool {
+		totalStreams++
+		s.resetStream(streamValue)
+		return true // continue iterating
+	})
+
+	// Reset cached stream and stop the underlying Bento Streams
 	s.StreamManagerCache.Range(func(_, value interface{}) bool {
 		manager, ok := value.(*Manager)
 		if !ok {
@@ -277,12 +293,8 @@ func (s *Middleware) Unload() {
 		}
 		manager.streams.Range(func(_, streamValue interface{}) bool {
 			totalStreams++
-			if stream, ok := streamValue.(*Stream); ok {
-				if err := stream.Reset(); err != nil {
-					s.Logger().WithError(err).Error("Failed to reset stream")
-				}
-			}
-			return true
+			s.resetStream(streamValue)
+			return true // continue iterating
 		})
 		return true
 	})
