@@ -13,7 +13,7 @@ type wrapMiddleware struct {
 	mw model.Middleware
 }
 
-var _ TykMiddleware = &wrapMiddleware{}
+var _ TykMiddleware = (*wrapMiddleware)(nil)
 
 // WrapMiddleware returns a new TykMiddleware with the provided base middleware,
 // and the smaller model.Middleware interface. It allows to implement model.Middleware,
@@ -41,8 +41,8 @@ func (w *wrapMiddleware) Name() string {
 	return w.mw.Name()
 }
 
-func (s *wrapMiddleware) Logger() *logrus.Entry {
-	return s.mw.Logger()
+func (w *wrapMiddleware) Logger() *logrus.Entry {
+	return w.mw.Logger()
 }
 
 func (w *wrapMiddleware) EnabledForSpec() bool {
@@ -51,4 +51,8 @@ func (w *wrapMiddleware) EnabledForSpec() bool {
 
 func (w *wrapMiddleware) ProcessRequest(rw http.ResponseWriter, r *http.Request, data interface{}) (error, int) {
 	return w.mw.ProcessRequest(rw, r, data)
+}
+
+func (w *wrapMiddleware) Unload() {
+	w.mw.Unload()
 }
