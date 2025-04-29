@@ -278,14 +278,7 @@ func (s *Middleware) Unload() {
 	totalStreams := 0
 	s.cancel()
 
-	// Reset the default manager and stop the underlying Bento Stream
-	s.defaultManager.streams.Range(func(_, streamValue interface{}) bool {
-		totalStreams++
-		s.resetStream(streamValue)
-		return true // continue iterating
-	})
-
-	// Reset cached stream and stop the underlying Bento Streams
+	// Reset cached streams and stop the underlying Bento instances
 	s.StreamManagerCache.Range(func(_, value interface{}) bool {
 		manager, ok := value.(*Manager)
 		if !ok {
@@ -297,6 +290,13 @@ func (s *Middleware) Unload() {
 			return true // continue iterating
 		})
 		return true
+	})
+
+	// Finally, reset the default manager and stop the underlying Bento instance
+	s.defaultManager.streams.Range(func(_, streamValue interface{}) bool {
+		totalStreams++
+		s.resetStream(streamValue)
+		return true // continue iterating
 	})
 
 	GlobalStreamCounter.Add(-int64(totalStreams))
