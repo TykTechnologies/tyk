@@ -9661,7 +9661,7 @@ func TestForTyk5OasMigration(t *testing.T) {
 
 type MockSessionHandler struct{}
 
-func (MockSessionHandler) Init(store storage.Handler) {
+func (MockSessionHandler) Init(storage.Handler) {
 	return
 }
 
@@ -9670,32 +9670,32 @@ func (MockSessionHandler) Store() storage.Handler {
 	panic("implement me")
 }
 
-func (MockSessionHandler) UpdateSession(keyName string, session *user.SessionState, resetTTLTo int64, hashed bool) error {
+func (MockSessionHandler) UpdateSession(string, *user.SessionState, int64, bool) error {
 	//TODO implement me
 	panic("implement me")
 }
 
-func (MockSessionHandler) RemoveSession(orgID string, keyName string, hashed bool) bool {
+func (MockSessionHandler) RemoveSession(string, string, bool) bool {
 	//TODO implement me
 	panic("implement me")
 }
 
-func (MockSessionHandler) SessionDetail(orgID string, keyName string, hashed bool) (user.SessionState, bool) {
+func (MockSessionHandler) SessionDetail(string, string, bool) (user.SessionState, bool) {
 	//TODO implement me
 	panic("implement me")
 }
 
-func (MockSessionHandler) KeyExpired(newSession *user.SessionState) bool {
+func (MockSessionHandler) KeyExpired(*user.SessionState) bool {
 	//TODO implement me
 	panic("implement me")
 }
 
-func (MockSessionHandler) Sessions(filter string) []string {
+func (MockSessionHandler) Sessions(string) []string {
 	//TODO implement me
 	panic("implement me")
 }
 
-func (MockSessionHandler) ResetQuota(s string, state *user.SessionState, b bool) {
+func (MockSessionHandler) ResetQuota(string, *user.SessionState, bool) {
 	//TODO implement me
 	panic("implement me")
 }
@@ -9707,7 +9707,7 @@ func (MockSessionHandler) Stop() {
 
 type MockHealthChecker struct{}
 
-func (MockHealthChecker) Init(handler storage.Handler) {
+func (MockHealthChecker) Init(storage.Handler) {
 	return
 }
 
@@ -9716,7 +9716,7 @@ func (MockHealthChecker) ApiHealthValues() (HealthCheckValues, error) {
 	panic("implement me")
 }
 
-func (MockHealthChecker) StoreCounterVal(prefix HealthPrefix, s string) {
+func (MockHealthChecker) StoreCounterVal(HealthPrefix, string) {
 	//TODO implement me
 	panic("implement me")
 }
