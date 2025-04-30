@@ -9662,7 +9662,6 @@ func TestForTyk5OasMigration(t *testing.T) {
 type MockSessionHandler struct{}
 
 func (MockSessionHandler) Init(storage.Handler) {
-	return
 }
 
 func (MockSessionHandler) Store() storage.Handler {
@@ -9708,7 +9707,6 @@ func (MockSessionHandler) Stop() {
 type MockHealthChecker struct{}
 
 func (MockHealthChecker) Init(storage.Handler) {
-	return
 }
 
 func (MockHealthChecker) ApiHealthValues() (HealthCheckValues, error) {
