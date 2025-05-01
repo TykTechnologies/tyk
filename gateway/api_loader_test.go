@@ -9636,7 +9636,7 @@ func TestForTyk5OasMigration(t *testing.T) {
 		spec.IsOAS = true
 		spec.VersionData.Versions = map[string]apidef.VersionInfo{"a": {ExtendedPaths: apidef.ExtendedPathsSet{ValidateRequest: []apidef.ValidateRequestMeta{{Enabled: true}}}}}
 		spec.Name = "test-for-legacy-oas"
-		spec.APIID = "test1"
+		spec.APIID = "test-legacy-oas-api-id"
 		spec.Proxy.ListenPath = "/"
 		spec.AuthManager = MockSessionHandler{}
 		spec.Health = MockHealthChecker{}
