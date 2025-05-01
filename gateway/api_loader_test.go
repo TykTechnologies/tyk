@@ -9656,7 +9656,7 @@ func TestForTyk5OasMigration(t *testing.T) {
 
 	_, err := g.Gw.loadHTTPService(internal, apiByListenPath, &generalStores{}, &proxyMux{})
 
-	assert.Equal(t, fmt.Sprint(err.Error()), "trying to import invalid api test1, skipping")
+	assert.Equal(t, fmt.Sprint(err.Error()), "trying to import invalid api test-legacy-oas-api-id, skipping")
 }
 
 type MockSessionHandler struct{}
