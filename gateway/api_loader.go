@@ -800,6 +800,10 @@ func (gw *Gateway) loadHTTPService(spec *APISpec, apisByListen map[string]int, g
 		chainObj = gw.processSpec(spec, apisByListen, gs, logrus.NewEntry(log))
 	}
 
+	if chainObj == nil {
+		return nil, fmt.Errorf("trying to import invalid api %s, skipping", spec.APIID)
+	}
+
 	if chainObj.Skip {
 		return chainObj, nil
 	}
