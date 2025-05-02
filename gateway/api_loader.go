@@ -1070,12 +1070,13 @@ func (gw *Gateway) loadApps(specs []*APISpec) {
 		}
 	}
 
+	// Warning: Disable this block temporarily to debug the issue with CI.
 	// Find the removed specs to unload them
-	for apiID, curSpec := range gw.apisByID {
+	/*for apiID, curSpec := range gw.apisByID {
 		if _, ok := tmpSpecRegister[apiID]; !ok {
 			specsToUnload = append(specsToUnload, curSpec)
 		}
-	}
+	}*/
 
 	gw.apisByID = tmpSpecRegister
 	gw.apisHandlesByID = tmpSpecHandles
