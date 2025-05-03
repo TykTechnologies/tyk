@@ -1170,6 +1170,7 @@ func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string, orgId string) 
 		}
 		_, isOauthTokenKey := notRegularKeys[key]
 		if !isOauthTokenKey {
+			log.Infof("\n Key: %v", key)
 			splitKeys := strings.Split(key, ":")
 			_, resetQuota := keysToReset[splitKeys[0]]
 
