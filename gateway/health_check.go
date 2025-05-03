@@ -216,6 +216,10 @@ func (gw *Gateway) liveCheckHandler(w http.ResponseWriter, r *http.Request) {
 		addMascotHeaders(w)
 	}
 
-	w.WriteHeader(http.StatusOK)
+	if status == model.Pass {
+		w.WriteHeader(http.StatusOK)
+	} else {
+		w.WriteHeader(http.StatusInternalServerError)
+	}
 	json.NewEncoder(w).Encode(res)
 }
