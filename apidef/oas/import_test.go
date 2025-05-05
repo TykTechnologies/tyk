@@ -86,8 +86,8 @@ func TestImportValidateRequest(t *testing.T) {
 			"/store/order/{orderId}",
 		}
 
-		got := make([]string, 0, len(petstore.Paths))
-		for endpoint := range petstore.Paths {
+		got := make([]string, 0, len(petstore.Paths.Map()))
+		for endpoint := range petstore.Paths.Map() {
 			got = append(got, endpoint)
 		}
 

@@ -8,7 +8,7 @@ import (
 
 	"github.com/TykTechnologies/tyk/apidef"
 
-	"github.com/TykTechnologies/kin-openapi/openapi3"
+	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -411,22 +411,24 @@ func TestOAS_BuildDefaultTykExtension(t *testing.T) {
 							URL: "https://example-org.com/api",
 						},
 					},
-					Paths: openapi3.Paths{
-						"/pets": {
+					Paths: func() *openapi3.Paths {
+						paths := openapi3.NewPaths()
+						paths.Set("/pets", &openapi3.PathItem{
 							Get: &openapi3.Operation{
-								Responses: openapi3.Responses{},
+								Responses: openapi3.NewResponses(),
 							},
 							Post: &openapi3.Operation{
-								Responses: openapi3.Responses{},
+								Responses: openapi3.NewResponses(),
 							},
-						},
-					},
+						})
+						return paths
+					}(),
 				},
 			}
 
-			var responses = make(openapi3.Responses)
+			responses := openapi3.NewResponses()
 			if withValidResponses {
-				responses["200"] = &openapi3.ResponseRef{
+				responses.Set("200", &openapi3.ResponseRef{
 					Value: &openapi3.Response{
 						Content: map[string]*openapi3.MediaType{
 							"application/json": {
@@ -434,23 +436,25 @@ func TestOAS_BuildDefaultTykExtension(t *testing.T) {
 							},
 						},
 					},
-				}
+				})
 			}
 
-			oasDef.Paths = openapi3.Paths{
-				"/pets": {
-					Get: &openapi3.Operation{
-						Responses: responses,
-					},
-					Post: &openapi3.Operation{
-						Responses: responses,
-					},
+			paths := openapi3.NewPaths()
+			paths.Set("/pets", &openapi3.PathItem{
+				Get: &openapi3.Operation{
+					Responses: responses,
 				},
-			}
+				Post: &openapi3.Operation{
+					Responses: responses,
+				},
+			})
+			oasDef.Paths = paths
 
 			if withOperationID {
-				oasDef.Paths["/pets"].Get.OperationID = oasGetOperationID
-				oasDef.Paths["/pets"].Post.OperationID = oasPostOperationID
+				pathsMap := oasDef.Paths.Map()
+
+				pathsMap["/pets"].Get.OperationID = oasGetOperationID
+				pathsMap["/pets"].Post.OperationID = oasPostOperationID
 			}
 
 			return oasDef
@@ -465,7 +469,7 @@ func TestOAS_BuildDefaultTykExtension(t *testing.T) {
 			valueSchema.Properties = openapi3.Schemas{
 				"value": {
 					Value: &openapi3.Schema{
-						Type: openapi3.TypeBoolean,
+						Type: &openapi3.Types{openapi3.TypeBoolean},
 					},
 				},
 			}
@@ -1025,7 +1029,7 @@ func TestOAS_BuildDefaultTykExtension(t *testing.T) {
 								In:   header,
 								Schema: &openapi3.SchemaRef{
 									Value: &openapi3.Schema{
-										Type: "string",
+										Type: &openapi3.Types{openapi3.TypeString},
 									},
 								},
 							},
@@ -1117,15 +1121,17 @@ func TestOAS_BuildDefaultTykExtension(t *testing.T) {
 				func(t *testing.T) {
 					oasDef := getOASDef(false, false)
 					description := "description"
-					simpleResponse := openapi3.Responses{
-						"200": &openapi3.ResponseRef{
-							Value: &openapi3.Response{
-								Description: &description,
-							},
+
+					pathsMap := oasDef.Paths.Map()
+
+					simpleResponse := openapi3.NewResponses()
+					simpleResponse.Set("200", &openapi3.ResponseRef{
+						Value: &openapi3.Response{
+							Description: &description,
 						},
-					}
-					oasDef.Paths["/pets"].Get.Responses = simpleResponse
-					oasDef.Paths["/pets"].Post.Responses = simpleResponse
+					})
+					pathsMap["/pets"].Get.Responses = simpleResponse
+					pathsMap["/pets"].Post.Responses = simpleResponse
 					tykExtensionConfigParams := TykExtensionConfigParams{
 						MockResponse: &trueVal,
 					}
@@ -1150,23 +1156,23 @@ func TestOAS_BuildDefaultTykExtension(t *testing.T) {
 				func(t *testing.T) {
 					oasDef := getOASDef(true, false)
 
-					validResponseWithExamples := openapi3.Responses{
-						"200": &openapi3.ResponseRef{
-							Value: &openapi3.Response{
-								Content: openapi3.Content{
-									"application/json": {
-										Examples: openapi3.Examples{
-											"1": &openapi3.ExampleRef{
-												Value: &openapi3.Example{Value: map[string]interface{}{"status": "ok"}},
-											},
+					validResponseWithExamples := openapi3.NewResponses()
+					validResponseWithExamples.Set("200", &openapi3.ResponseRef{
+						Value: &openapi3.Response{
+							Content: openapi3.Content{
+								"application/json": {
+									Examples: openapi3.Examples{
+										"1": &openapi3.ExampleRef{
+											Value: &openapi3.Example{Value: map[string]interface{}{"status": "ok"}},
 										},
 									},
 								},
 							},
 						},
-					}
-					oasDef.Paths["/pets"].Get.Responses = validResponseWithExamples
-					oasDef.Paths["/pets"].Post.Responses = validResponseWithExamples
+					})
+					pathsMap := oasDef.Paths.Map()
+					pathsMap["/pets"].Get.Responses = validResponseWithExamples
+					pathsMap["/pets"].Post.Responses = validResponseWithExamples
 					tykExtensionConfigParams := TykExtensionConfigParams{
 						MockResponse: &trueVal,
 					}

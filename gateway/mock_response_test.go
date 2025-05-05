@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/TykTechnologies/kin-openapi/openapi3"
+	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/TykTechnologies/tyk/apidef/oas"
@@ -53,7 +53,8 @@ func TestMockResponse(t *testing.T) {
 
 	desc := "desc"
 	responses := openapi3.NewResponses()
-	responses["200"] = &openapi3.ResponseRef{
+	responsesMap := responses.Map()
+	responsesMap["200"] = &openapi3.ResponseRef{
 		Value: &openapi3.Response{
 			Description: &desc,
 			Content: openapi3.Content{
@@ -70,14 +71,25 @@ func TestMockResponse(t *testing.T) {
 		},
 	}
 
-	oasDoc.Paths = openapi3.Paths{
-		"/get": {
-			Get: &openapi3.Operation{
-				OperationID: operationID,
-				Responses:   responses,
-			},
+	paths := openapi3.NewPaths()
+	pathsMap := paths.Map()
+	pathsMap["/get"] = &openapi3.PathItem{
+		Get: &openapi3.Operation{
+			OperationID: operationID,
+			Responses:   responses,
 		},
 	}
+
+	oasDoc.Paths = paths
+
+	// oasDoc.Paths = openapi3.Paths{
+	// 	"/get": {
+	// 		Get: &openapi3.Operation{
+	// 			OperationID: operationID,
+	// 			Responses:   responses,
+	// 		},
+	// 	},
+	// }
 
 	err := oasDoc.Validate(context.Background())
 	assert.NoError(t, err)
@@ -168,92 +180,92 @@ func Test_mockFromConfig(t *testing.T) {
 func Test_mockFromOAS(t *testing.T) {
 	fromOASExamples := &oas.FromOASExamples{}
 	operation := openapi3.NewOperation()
-	operation.Responses = openapi3.Responses{
-		"200": &openapi3.ResponseRef{
-			Value: &openapi3.Response{
-				Headers: openapi3.Headers{
-					"Test-header-1": &openapi3.HeaderRef{
-						Value: &openapi3.Header{
-							Parameter: openapi3.Parameter{
-								Schema: &openapi3.SchemaRef{
-									Value: &openapi3.Schema{
-										Example: "test-header-value-1",
-									},
-								},
-							},
-						},
-					},
-					"Test-header-2": &openapi3.HeaderRef{
-						Value: &openapi3.Header{
-							Parameter: openapi3.Parameter{
-								Schema: &openapi3.SchemaRef{
-									Value: &openapi3.Schema{
-										Example: "test-header-value-2",
-									},
+	responses := openapi3.NewResponses()
+	responses.Set("200", &openapi3.ResponseRef{
+		Value: &openapi3.Response{
+			Headers: openapi3.Headers{
+				"Test-header-1": &openapi3.HeaderRef{
+					Value: &openapi3.Header{
+						Parameter: openapi3.Parameter{
+							Schema: &openapi3.SchemaRef{
+								Value: &openapi3.Schema{
+									Example: "test-header-value-1",
 								},
 							},
 						},
 					},
 				},
-				Content: openapi3.Content{
-					"application/json": {
-						Example: "Furkan",
-					},
-				},
-			},
-		},
-		"208": &openapi3.ResponseRef{
-			Value: &openapi3.Response{
-				Content: openapi3.Content{
-					"application/xml": {
-						Example: "test-example-1",
-					},
-				},
-			},
-		},
-		"418": &openapi3.ResponseRef{
-			Value: &openapi3.Response{
-				Content: openapi3.Content{
-					"text": {
-						Example: "test-example-2",
-					},
-				},
-			},
-		},
-		"404": &openapi3.ResponseRef{
-			Value: &openapi3.Response{
-				Content: openapi3.Content{
-					"text": {
-						Examples: openapi3.Examples{
-							"first": &openapi3.ExampleRef{
-								Value: &openapi3.Example{
-									Value: "first-value",
-								},
-							},
-							"second": &openapi3.ExampleRef{
-								Value: &openapi3.Example{
-									Value: "second-value",
+				"Test-header-2": &openapi3.HeaderRef{
+					Value: &openapi3.Header{
+						Parameter: openapi3.Parameter{
+							Schema: &openapi3.SchemaRef{
+								Value: &openapi3.Schema{
+									Example: "test-header-value-2",
 								},
 							},
 						},
 					},
 				},
 			},
+			Content: openapi3.Content{
+				"application/json": {
+					Example: "Furkan",
+				},
+			},
 		},
-		"405": &openapi3.ResponseRef{
-			Value: &openapi3.Response{
-				Content: openapi3.Content{
-					"text": {
-						Schema: &openapi3.SchemaRef{
-							Value: &openapi3.Schema{
-								Example: 5,
+	})
+	responses.Set("208", &openapi3.ResponseRef{
+		Value: &openapi3.Response{
+			Content: openapi3.Content{
+				"application/xml": {
+					Example: "test-example-1",
+				},
+			},
+		},
+	})
+	responses.Set("418", &openapi3.ResponseRef{
+		Value: &openapi3.Response{
+			Content: openapi3.Content{
+				"text": {
+					Example: "test-example-2",
+				},
+			},
+		},
+	})
+	responses.Set("404", &openapi3.ResponseRef{
+		Value: &openapi3.Response{
+			Content: openapi3.Content{
+				"text": {
+					Examples: openapi3.Examples{
+						"first": &openapi3.ExampleRef{
+							Value: &openapi3.Example{
+								Value: "first-value",
+							},
+						},
+						"second": &openapi3.ExampleRef{
+							Value: &openapi3.Example{
+								Value: "second-value",
 							},
 						},
 					},
 				},
 			},
 		},
-	}
+	})
+	responses.Set("405", &openapi3.ResponseRef{
+		Value: &openapi3.Response{
+			Content: openapi3.Content{
+				"text": {
+					Schema: &openapi3.SchemaRef{
+						Value: &openapi3.Schema{
+							Example: 5,
+						},
+					},
+				},
+			},
+		},
+	})
+	operation.Responses = responses
 
 	t.Run("select by config", func(t *testing.T) {
 		t.Run("empty config", func(t *testing.T) {

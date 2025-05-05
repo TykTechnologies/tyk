@@ -1,9 +1,9 @@
 package oas
 
 import (
-	"github.com/TykTechnologies/kin-openapi/openapi3"
+	"github.com/getkin/kin-openapi/openapi3"
 
-	openapifork "github.com/TykTechnologies/kin-openapi/openapi3"
+	openapifork "github.com/getkin/kin-openapi/openapi3"
 )
 
 // OldOAS serves for data model migration/conversion purposes (gorm).

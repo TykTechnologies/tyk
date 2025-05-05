@@ -3,14 +3,15 @@ package oasutil
 import (
 	"testing"
 
-	"github.com/TykTechnologies/kin-openapi/openapi3"
+	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/stretchr/testify/assert"
 )
 
 func testOASPaths(paths []string) openapi3.Paths {
 	result := openapi3.Paths{}
+	pathsMap := result.Map()
 	for _, p := range paths {
-		result[p] = nil
+		pathsMap[p] = nil
 	}
 	return result
 }
