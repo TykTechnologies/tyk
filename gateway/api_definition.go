@@ -178,7 +178,8 @@ func (s *APISpec) Unload() {
 
 	// cancel execution contexts
 	if s.GraphEngine != nil {
-		s.GraphEngine.Cancel()
+		// Disable it temporarily to see how api-tests behave.
+		//s.GraphEngine.Cancel()
 	}
 
 	// release all other resources associated with spec

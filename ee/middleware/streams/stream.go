@@ -153,9 +153,7 @@ func (s *Stream) GetConfig() string {
 
 // Reset stops the stream
 func (s *Stream) Reset() error {
-	// Disable it temporarily to see how api-tests behave.
-	return nil
-	//return s.Stop()
+	return s.Stop()
 }
 
 var unsafeComponents = []string{
