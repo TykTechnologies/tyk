@@ -166,7 +166,7 @@ func (s *OAS) fillPathsAndOperations(ep apidef.ExtendedPathsSet) {
 	s.fillDoNotTrackEndpoint(ep.DoNotTrackEndpoints)
 	s.fillRequestSizeLimit(ep.SizeLimit)
 	s.fillRateLimitEndpoints(ep.RateLimit)
-	s.fillMockResponsePaths(*s.Paths, ep)
+	s.fillMockResponsePaths(s.Paths, ep)
 }
 
 // fillMockResponsePaths converts classic API mock responses to OAS format.
@@ -621,8 +621,6 @@ func buildPath(parts []pathPart, appendSlash bool) string {
 
 func (s *OAS) getOperationID(inPath, method string) string {
 	operationID := strings.TrimPrefix(inPath, "/") + method
-
-	paths := s.Paths.Map()
 
 	createOrGetPathItem := func(item string) *openapi3.PathItem {
 		if s.Paths.Value(item) == nil {
