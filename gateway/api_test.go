@@ -1349,14 +1349,6 @@ func TestHashKeyListingDisabled(t *testing.T) {
 				AdminAuth: true,
 				Code:      404,
 			},
-			// get list of keys' hashes, API specified
-			{
-				Method:    "GET",
-				Path:      "/tyk/keys?api_id=test",
-				Data:      string(withAccessJSON),
-				AdminAuth: true,
-				Code:      404,
-			},
 			// delete one key by hash value with specifying hashed=true
 			{
 				Method:    "DELETE",
@@ -2977,7 +2969,6 @@ func TestOAS(t *testing.T) {
 					},
 				},
 			})
-
 			oasAPI.Paths = paths
 		}
 

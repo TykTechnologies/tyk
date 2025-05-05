@@ -56,7 +56,8 @@ func TestMockResponse(t *testing.T) {
 		responses := openapi3.NewResponses()
 		responses.Delete("default")
 
-		responses.Set("200", &openapi3.ResponseRef{
+		responsesMap := responses.Map()
+		responsesMap.Set("200", &openapi3.ResponseRef{
 			Value: &openapi3.Response{
 				Description: &desc,
 				Content: openapi3.Content{
@@ -85,6 +86,17 @@ func TestMockResponse(t *testing.T) {
 	})
 
 	oasDoc.Paths = paths
+
+	oasDoc.Paths = paths
+
+	// oasDoc.Paths = openapi3.Paths{
+	// 	"/get": {
+	// 		Get: &openapi3.Operation{
+	// 			OperationID: operationID,
+	// 			Responses:   responses,
+	// 		},
+	// 	},
+	// }
 
 	err := oasDoc.Validate(context.Background())
 	assert.NoError(t, err)
