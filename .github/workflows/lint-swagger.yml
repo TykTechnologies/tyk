@@ -105,3 +105,17 @@ jobs:
             ${{ steps.api-check.outputs.diff-output || 'no api changes detected' }}
             ```
           edit-mode: replace
+  report_logs:
+    runs-on: ubuntu-latest
+    needs: [redocly_validator, diff_swagger]
+    if: ${{ !github.event.pull_request.draft }}
+    name: Report GH Logs on Failure
+    permissions:
+      actions: read
+      contents: read
+    steps:
+      - name: Upload failed job logs
+        uses: TykTechnologies/github-actions/.github/actions/gh-logs-analyser@main
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          gh_logs_analyser_token: ${{ secrets.GH_LOGS_ANALYSER }}

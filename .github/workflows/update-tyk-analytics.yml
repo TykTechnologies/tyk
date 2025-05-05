@@ -26,3 +26,16 @@ jobs:
           repository: TykTechnologies/tyk-sink
           event-type: new-tyk
           client-payload: '{"ref": "${{ github.ref }}", "sha": "${{ github.sha }}"}'
+  report_logs:
+    runs-on: ubuntu-latest
+    needs: [sync]
+    name: Report GH Logs on Failure
+    permissions:
+      actions: read
+      contents: read
+    steps:
+      - name: Upload failed job logs
+        uses: TykTechnologies/github-actions/.github/actions/gh-logs-analyser@main
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          gh_logs_analyser_token: ${{ secrets.GH_LOGS_ANALYSER }}
