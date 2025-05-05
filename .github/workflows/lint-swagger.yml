@@ -108,7 +108,7 @@ jobs:
   report_logs:
     runs-on: ubuntu-latest
     needs: [redocly_validator, diff_swagger]
-    if: ${{ !github.event.pull_request.draft }}
+    if: ${{ !github.event.pull_request.draft && always() }}
     name: Report GH Logs on Failure
     permissions:
       actions: read
