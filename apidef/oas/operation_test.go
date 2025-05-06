@@ -497,7 +497,7 @@ func TestOAS_RegexPaths(t *testing.T) {
 		oas.Paths.Set(tc.input, &openapi3.PathItem{
 			Get: &openapi3.Operation{},
 		})
-		got := oas.getOperationID(tc.input, "GET")
+		// got := oas.getOperationID(tc.input, "GET")
 
 		pathKeys := make([]string, 0, len(oas.Paths.Map()))
 		for k := range oas.Paths.Map() {
@@ -513,7 +513,7 @@ func TestOAS_RegexPaths(t *testing.T) {
 		assert.Lenf(t, p.Parameters, tc.params, "test %d: expected %d parameters, got %d", i, tc.params, len(p.Parameters))
 
 		// rebuild original link
-		got = tc.want
+		got := tc.want
 		for _, param := range p.Parameters {
 			assert.NotNilf(t, param.Value, "test %d: missing value", i)
 			assert.NotNilf(t, param.Value.Schema, "test %d: missing schema", i)
