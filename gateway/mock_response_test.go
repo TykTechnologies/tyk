@@ -72,24 +72,14 @@ func TestMockResponse(t *testing.T) {
 	}
 
 	paths := openapi3.NewPaths()
-	pathsMap := paths.Map()
-	pathsMap["/get"] = &openapi3.PathItem{
+	paths.Set("/get", &openapi3.PathItem{
 		Get: &openapi3.Operation{
 			OperationID: operationID,
 			Responses:   responses,
 		},
-	}
+	})
 
 	oasDoc.Paths = paths
-
-	// oasDoc.Paths = openapi3.Paths{
-	// 	"/get": {
-	// 		Get: &openapi3.Operation{
-	// 			OperationID: operationID,
-	// 			Responses:   responses,
-	// 		},
-	// 	},
-	// }
 
 	err := oasDoc.Validate(context.Background())
 	assert.NoError(t, err)
