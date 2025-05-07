@@ -589,7 +589,7 @@ func TestOAS_MockResponse_fillMockResponsePaths(t *testing.T) {
 
 				require.Len(t, spec.Paths.Map(), 1)
 
-				pathItem := spec.Paths.Map()["/test"]
+				pathItem := spec.Paths.Value("/test")
 				require.NotNil(t, pathItem)
 				tykOperation := spec.GetTykExtension().getOperation(pathItem.Get.OperationID)
 				require.NotNil(t, tykOperation)
@@ -605,7 +605,7 @@ func TestOAS_MockResponse_fillMockResponsePaths(t *testing.T) {
 				require.Nil(t, pathItem.Delete)
 
 				// Verify response
-				response200Ref := pathItem.Get.Responses.Map()["200"]
+				response200Ref := pathItem.Get.Responses.Value("200")
 				require.NotNil(t, response200Ref, "Response ref for 200 should not be nil")
 
 				response200 := response200Ref.Value
@@ -656,7 +656,7 @@ func TestOAS_MockResponse_fillMockResponsePaths(t *testing.T) {
 				require.NotNil(t, tykOperation)
 				require.Nil(t, tykOperation.Allow)
 
-				response200Ref := pathItem.Get.Responses.Map()["200"]
+				response200Ref := pathItem.Get.Responses.Value("200")
 				require.NotNil(t, response200Ref, "Response ref for 200 should not be nil")
 
 				response200 := response200Ref.Value
@@ -670,9 +670,10 @@ func TestOAS_MockResponse_fillMockResponsePaths(t *testing.T) {
 				require.NotNil(t, tykOperation)
 				require.Nil(t, tykOperation.Allow)
 
-				postResponse := pathItem.Post.Responses.Map()["201"].Value
+				postResponse := pathItem.Post.Responses.Value("201")
 				require.NotNil(t, postResponse)
-				require.NotNil(t, postResponse.Description)
+				require.NotNil(t, postResponse.Value)
+				require.NotNil(t, postResponse.Value.Description)
 			},
 		},
 		{
@@ -695,7 +696,7 @@ func TestOAS_MockResponse_fillMockResponsePaths(t *testing.T) {
 				require.NotNil(t, tykOperation)
 				require.Nil(t, tykOperation.Allow)
 
-				response204Ref := pathItem.Get.Responses.Map()["204"]
+				response204Ref := pathItem.Get.Responses.Value("204")
 				require.NotNil(t, response204Ref, "Response ref for 204 should not be nil")
 
 				response204 := response204Ref.Value
@@ -741,9 +742,10 @@ func TestOAS_MockResponse_fillMockResponsePaths(t *testing.T) {
 				require.NotNil(t, tykOperation)
 				require.Nil(t, tykOperation.Allow)
 
-				usersResponse := usersPath.Get.Responses.Map()["200"].Value
+				usersResponse := usersPath.Get.Responses.Value("200")
 				require.NotNil(t, usersResponse)
-				require.NotNil(t, usersResponse.Description)
+				require.NotNil(t, usersResponse.Value)
+				require.NotNil(t, usersResponse.Value.Description)
 
 				// Verify /items path
 				itemsPath := spec.Paths.Map()["/items"]
@@ -754,9 +756,10 @@ func TestOAS_MockResponse_fillMockResponsePaths(t *testing.T) {
 				require.NotNil(t, tykOperation)
 				require.Nil(t, tykOperation.Allow)
 
-				itemsResponse := itemsPath.Get.Responses.Map()["200"].Value
+				itemsResponse := itemsPath.Get.Responses.Value("200")
 				require.NotNil(t, itemsResponse)
-				require.NotNil(t, itemsResponse.Description)
+				require.NotNil(t, itemsResponse.Value)
+				require.NotNil(t, itemsResponse.Value.Description)
 			},
 		},
 		{
@@ -797,7 +800,7 @@ func TestOAS_MockResponse_fillMockResponsePaths(t *testing.T) {
 				require.NotNil(t, pathItem.Get.Responses)
 
 				// Verify 200 response
-				response200 := pathItem.Get.Responses.Map()["200"]
+				response200 := pathItem.Get.Responses.Value("200")
 				require.NotNil(t, response200, "Response for 200 should not be nil")
 				require.NotNil(t, response200.Value)
 				require.NotNil(t, response200.Value.Description)
@@ -845,9 +848,10 @@ func TestOAS_MockResponse_fillMockResponsePaths(t *testing.T) {
 				// JSON endpoint
 				jsonPath := spec.Paths.Map()["/test"]
 				require.NotNil(t, jsonPath)
-				jsonResponse := jsonPath.Get.Responses.Map()["200"].Value
+				jsonResponse := jsonPath.Get.Responses.Value("200")
 				require.NotNil(t, jsonResponse)
-				require.NotNil(t, jsonResponse.Description)
+				require.NotNil(t, jsonResponse.Value)
+				require.NotNil(t, jsonResponse.Value.Description)
 				tykOperation := spec.GetTykExtension().getOperation(jsonPath.Get.OperationID)
 				require.NotNil(t, tykOperation)
 				require.Nil(t, tykOperation.Allow)
@@ -855,9 +859,10 @@ func TestOAS_MockResponse_fillMockResponsePaths(t *testing.T) {
 				// XML endpoint
 				xmlPath := spec.Paths.Map()["/test.xml"]
 				require.NotNil(t, xmlPath)
-				xmlResponse := xmlPath.Get.Responses.Map()["200"].Value
+				xmlResponse := xmlPath.Get.Responses.Value("200")
 				require.NotNil(t, xmlResponse)
-				require.NotNil(t, xmlResponse.Description)
+				require.NotNil(t, xmlResponse.Value)
+				require.NotNil(t, xmlResponse.Value.Description)
 				tykOperation = spec.GetTykExtension().getOperation(xmlPath.Get.OperationID)
 				require.NotNil(t, tykOperation)
 				require.Nil(t, tykOperation.Allow)
@@ -865,9 +870,10 @@ func TestOAS_MockResponse_fillMockResponsePaths(t *testing.T) {
 				// Text endpoint
 				txtPath := spec.Paths.Map()["/test.txt"]
 				require.NotNil(t, txtPath)
-				txtResponse := txtPath.Get.Responses.Map()["200"].Value
+				txtResponse := txtPath.Get.Responses.Value("200")
 				require.NotNil(t, txtResponse)
-				require.NotNil(t, txtResponse.Description)
+				require.NotNil(t, txtResponse.Value)
+				require.NotNil(t, txtResponse.Value.Description)
 				tykOperation = spec.GetTykExtension().getOperation(txtPath.Get.OperationID)
 				require.NotNil(t, tykOperation)
 				require.Nil(t, tykOperation.Allow)
@@ -896,9 +902,10 @@ func TestOAS_MockResponse_fillMockResponsePaths(t *testing.T) {
 
 				pathItem := spec.Paths.Map()["/test"]
 				require.NotNil(t, pathItem)
-				response := pathItem.Get.Responses.Map()["200"].Value
+				response := pathItem.Get.Responses.Value("200")
 				require.NotNil(t, response)
-				require.NotNil(t, response.Description)
+				require.NotNil(t, response.Value)
+				require.NotNil(t, response.Value.Description)
 
 				tykOperation := spec.GetTykExtension().getOperation(pathItem.Get.OperationID)
 				require.NotNil(t, tykOperation)
