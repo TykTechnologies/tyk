@@ -450,11 +450,9 @@ func TestOAS_BuildDefaultTykExtension(t *testing.T) {
 			})
 			oasDef.Paths = paths
 
-			if withOperationID {
-				if value := oasDef.Paths.Value("/pets"); value != nil {
-					value.Get.OperationID = oasGetOperationID
-					value.Post.OperationID = oasPostOperationID
-				}
+			if value := oasDef.Paths.Value("/pets"); value != nil && withOperationID {
+				value.Get.OperationID = oasGetOperationID
+				value.Post.OperationID = oasPostOperationID
 			}
 
 			return oasDef
@@ -1171,14 +1169,14 @@ func TestOAS_BuildDefaultTykExtension(t *testing.T) {
 						},
 					})
 
-					oasDef.Paths.Set("/pets", &openapi3.PathItem{
-						Get: &openapi3.Operation{
-							Responses: validResponseWithExamples,
-						},
-						Post: &openapi3.Operation{
-							Responses: validResponseWithExamples,
-						},
-					})
+					if value := oasDef.Paths.Value("/pets"); value != nil {
+						if value.Get != nil {
+							value.Get.Responses = validResponseWithExamples
+						}
+						if value.Post != nil {
+							value.Post.Responses = validResponseWithExamples
+						}
+					}
 
 					tykExtensionConfigParams := TykExtensionConfigParams{
 						MockResponse: &trueVal,
