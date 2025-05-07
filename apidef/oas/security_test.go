@@ -4,7 +4,7 @@ import (
 	"sort"
 	"testing"
 
-	"github.com/TykTechnologies/kin-openapi/openapi3"
+	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/TykTechnologies/tyk/apidef"
@@ -400,7 +400,7 @@ func TestOAS_OAuth(t *testing.T) {
 	}
 
 	var oas OAS
-	oas.Paths = make(openapi3.Paths)
+	oas.Paths = openapi3.NewPaths()
 	oas.Security = openapi3.SecurityRequirements{
 		{
 			securityName: []string{},
@@ -464,7 +464,7 @@ func TestOAS_ExternalOAuth(t *testing.T) {
 	}
 
 	var oas OAS
-	oas.Paths = make(openapi3.Paths)
+	oas.Paths = openapi3.NewPaths()
 	oas.Security = openapi3.SecurityRequirements{
 		{
 			securityName: []string{},
@@ -602,7 +602,7 @@ func TestOAS_TykAuthentication_NoOASSecurity(t *testing.T) {
 
 	var oas OAS
 	oas.Components = &openapi3.Components{}
-	oas.Paths = make(openapi3.Paths)
+	oas.Paths = openapi3.NewPaths()
 	oas.Extensions = map[string]interface{}{
 		ExtensionTykAPIGateway: &XTykAPIGateway{
 			Server: Server{

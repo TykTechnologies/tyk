@@ -9,7 +9,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/TykTechnologies/kin-openapi/openapi3"
+	"github.com/getkin/kin-openapi/openapi3"
 )
 
 const (
@@ -220,7 +220,7 @@ func (s *OAS) importMiddlewares(overRideValues TykExtensionConfigParams) {
 		xTykAPIGateway.Middleware = &Middleware{}
 	}
 
-	for path, pathItem := range s.Paths {
+	for path, pathItem := range s.Paths.Map() {
 		overRideValues.pathItemHasParameters = len(pathItem.Parameters) > 0
 		for _, method := range allowedMethods {
 			if operation := pathItem.GetOperation(method); operation != nil {

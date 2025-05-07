@@ -10,7 +10,7 @@ import (
 
 	"github.com/TykTechnologies/tyk/user"
 
-	"github.com/TykTechnologies/kin-openapi/openapi3"
+	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/TykTechnologies/tyk/apidef"
@@ -522,7 +522,7 @@ func TestGoPlugin_AccessingOASAPIDef(t *testing.T) {
 		Version: "1",
 		Title:   oasDocTitle,
 	}
-	oasDoc.Paths = openapi3.Paths{}
+	oasDoc.Paths = openapi3.NewPaths()
 
 	oasDoc.SetTykExtension(&oas.XTykAPIGateway{})
 
