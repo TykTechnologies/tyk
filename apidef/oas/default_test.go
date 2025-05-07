@@ -1170,9 +1170,16 @@ func TestOAS_BuildDefaultTykExtension(t *testing.T) {
 							},
 						},
 					})
-					pathsMap := oasDef.Paths.Map()
-					pathsMap["/pets"].Get.Responses = validResponseWithExamples
-					pathsMap["/pets"].Post.Responses = validResponseWithExamples
+
+					oasDef.Paths.Set("/pets", &openapi3.PathItem{
+						Get: &openapi3.Operation{
+							Responses: validResponseWithExamples,
+						},
+						Post: &openapi3.Operation{
+							Responses: validResponseWithExamples,
+						},
+					})
+
 					tykExtensionConfigParams := TykExtensionConfigParams{
 						MockResponse: &trueVal,
 					}
