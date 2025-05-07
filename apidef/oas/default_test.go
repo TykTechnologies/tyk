@@ -451,10 +451,10 @@ func TestOAS_BuildDefaultTykExtension(t *testing.T) {
 			oasDef.Paths = paths
 
 			if withOperationID {
-				pathsMap := oasDef.Paths.Map()
-
-				pathsMap["/pets"].Get.OperationID = oasGetOperationID
-				pathsMap["/pets"].Post.OperationID = oasPostOperationID
+				if value := oasDef.Paths.Value("/pets"); value != nil {
+					value.Get.OperationID = oasGetOperationID
+					value.Post.OperationID = oasPostOperationID
+				}
 			}
 
 			return oasDef
