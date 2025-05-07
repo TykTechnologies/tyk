@@ -522,7 +522,7 @@ func TestGoPlugin_AccessingOASAPIDef(t *testing.T) {
 		Version: "1",
 		Title:   oasDocTitle,
 	}
-	oasDoc.Paths = openapi3.Paths{}
+	oasDoc.Paths = openapi3.NewPaths()
 
 	oasDoc.SetTykExtension(&oas.XTykAPIGateway{})
 
