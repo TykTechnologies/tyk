@@ -196,6 +196,10 @@ func (s *OAS) fillMockResponsePaths(paths openapi3.Paths, ep apidef.ExtendedPath
 			}
 		}
 
+		if operation == nil {
+			continue
+		}
+
 		if operation.Responses == nil {
 			operation.Responses = openapi3.NewResponses()
 		}
@@ -618,14 +622,12 @@ func buildPath(parts []pathPart, appendSlash bool) string {
 func (s *OAS) getOperationID(inPath, method string) string {
 	operationID := strings.TrimPrefix(inPath, "/") + method
 
-	paths := s.Paths.Map()
-
 	createOrGetPathItem := func(item string) *openapi3.PathItem {
-		if paths[item] == nil {
-			paths[item] = &openapi3.PathItem{}
+		if s.Paths.Value(item) == nil {
+			s.Paths.Set(item, &openapi3.PathItem{})
 		}
 
-		return paths[item]
+		return s.Paths.Value(item)
 	}
 
 	createOrUpdateOperation := func(p *openapi3.PathItem) *openapi3.Operation {
@@ -635,6 +637,7 @@ func (s *OAS) getOperationID(inPath, method string) string {
 			operation = &openapi3.Operation{
 				Responses: openapi3.NewResponses(),
 			}
+
 			p.SetOperation(method, operation)
 		}
 
