@@ -68,7 +68,7 @@ func TestImportValidateRequest(t *testing.T) {
 	assert.NoError(t, petstore.BuildDefaultTykExtension(params, isImport))
 
 	t.Run("Check paths got imported", func(t *testing.T) {
-		assert.Len(t, petstore.Paths, 13)
+		assert.Len(t, petstore.Paths.Map(), 13)
 
 		want := []string{
 			"/pet/{petId}/uploadImage",
