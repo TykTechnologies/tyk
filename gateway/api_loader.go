@@ -1003,7 +1003,7 @@ func (gw *Gateway) loadApps(specs []*APISpec) {
 			defer func() {
 				// recover from panic if one occurred. Set err to nil otherwise.
 				if err := recover(); err != nil {
-					if spec.APIDefinition.IsOAS == true && spec.OAS.GetTykExtension() == nil {
+					if spec.APIDefinition.IsOAS && spec.OAS.GetTykExtension() == nil {
 						log.Errorf("trying to import invalid OAS api %s, skipping", spec.APIID)
 					} else {
 						log.Errorf("Panic while loading an API: %v, panic: %v, stacktrace: %v", spec.APIDefinition, err, string(debug.Stack()))
