@@ -19,6 +19,10 @@ type Middleware struct {
 	base BaseMiddleware
 }
 
+func (m *Middleware) Unload() {
+	// nothing to do here
+}
+
 // Middleware implements model.Middleware.
 var _ model.Middleware = &Middleware{}
 
