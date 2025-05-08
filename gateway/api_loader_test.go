@@ -10,7 +10,7 @@ import (
 	"path"
 	_ "path"
 	"reflect"
-	"sync"
+	"strings"
 	"sync/atomic"
 	"testing"
 
@@ -18,9 +18,9 @@ import (
 
 	persistentmodel "github.com/TykTechnologies/storage/persistent/model"
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/apidef/oas"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/internal/uuid"
-	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/test"
 	"github.com/TykTechnologies/tyk/trace"
 	"github.com/TykTechnologies/tyk/user"
@@ -9627,94 +9627,36 @@ func TestSortSpecsByListenPath(t *testing.T) {
 	}
 }
 
-func TestForTyk5OasMigration(t *testing.T) {
-	g := StartTest(nil)
-	defer g.Close()
-
-	internal := BuildAPI(func(spec *APISpec) {
-		spec.OAS.Extensions = nil
-		spec.IsOAS = true
-		spec.VersionData.Versions = map[string]apidef.VersionInfo{"a": {ExtendedPaths: apidef.ExtendedPathsSet{ValidateRequest: []apidef.ValidateRequestMeta{{Enabled: true}}}}}
-		spec.Name = "test-for-legacy-oas"
-		spec.APIID = "test-legacy-oas-api-id"
-		spec.Proxy.ListenPath = "/test-for-legacy-oas"
-		spec.AuthManager = MockSessionHandler{}
-		spec.Health = MockHealthChecker{}
-		spec.OrgSessionManager = MockSessionHandler{}
-	})[0]
-
-	g.Gw.apisMu.Lock()
-	g.Gw.apisByID[internal.APIID] = internal
-	g.Gw.apisMu.Unlock()
-
-	if g.Gw.apisHandlesByID == nil {
-		g.Gw.apisHandlesByID = new(sync.Map)
+func TestRecoverFromLoadApiPanic(t *testing.T) {
+	tests := []struct {
+		name     string
+		spec     *APISpec
+		err      any
+		expected string
+	}{
+		{
+			name: "invalid OAS api",
+			spec: &APISpec{
+				APIDefinition: &apidef.APIDefinition{
+					APIID: "test-api",
+					IsOAS: true,
+				},
+				OAS: oas.OAS{},
+			},
+			err:      "test error",
+			expected: "trying to import invalid OAS api test-api, skipping",
+		},
 	}
-	g.Gw.apisHandlesByID.Delete(internal.APIID)
 
-	apiByListenPath := map[string]int{}
-
-	_, err := g.Gw.loadHTTPService(internal, apiByListenPath, &generalStores{}, &proxyMux{})
-
-	assert.Equal(t, fmt.Sprint(err.Error()), "trying to import invalid api test-legacy-oas-api-id, skipping")
-}
-
-type MockSessionHandler struct{}
-
-func (MockSessionHandler) Init(storage.Handler) {
-}
-
-func (MockSessionHandler) Store() storage.Handler {
-	//TODO implement me
-	panic("implement me")
-}
-
-func (MockSessionHandler) UpdateSession(string, *user.SessionState, int64, bool) error {
-	//TODO implement me
-	panic("implement me")
-}
-
-func (MockSessionHandler) RemoveSession(string, string, bool) bool {
-	//TODO implement me
-	panic("implement me")
-}
-
-func (MockSessionHandler) SessionDetail(string, string, bool) (user.SessionState, bool) {
-	//TODO implement me
-	panic("implement me")
-}
-
-func (MockSessionHandler) KeyExpired(*user.SessionState) bool {
-	//TODO implement me
-	panic("implement me")
-}
-
-func (MockSessionHandler) Sessions(string) []string {
-	//TODO implement me
-	panic("implement me")
-}
-
-func (MockSessionHandler) ResetQuota(string, *user.SessionState, bool) {
-	//TODO implement me
-	panic("implement me")
-}
-
-func (MockSessionHandler) Stop() {
-	//TODO implement me
-	panic("implement me")
-}
-
-type MockHealthChecker struct{}
-
-func (MockHealthChecker) Init(storage.Handler) {
-}
-
-func (MockHealthChecker) ApiHealthValues() (HealthCheckValues, error) {
-	//TODO implement me
-	panic("implement me")
-}
-
-func (MockHealthChecker) StoreCounterVal(HealthPrefix, string) {
-	//TODO implement me
-	panic("implement me")
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := recoverFromLoadApiPanic(tt.spec, tt.err)
+			if err == nil {
+				t.Fatal("expected error, got nil")
+			}
+			if !strings.Contains(err.Error(), tt.expected) {
+				t.Errorf("expected error to contain %q, got %q", tt.expected, err.Error())
+			}
+		})
+	}
 }
