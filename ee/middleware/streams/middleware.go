@@ -228,7 +228,7 @@ func (s *Middleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _ in
 	strippedPath := s.Spec.StripListenPath(r.URL.Path)
 	if !s.defaultManager.hasPath(strippedPath) {
 		s.Logger().Debugf("Path not found: %s", strippedPath)
-		return errors.New("path not found"), http.StatusNotFound
+		return errors.New("not found"), http.StatusNotFound
 	}
 
 	s.Logger().Debugf("Processing request: %s, %s", r.URL.Path, strippedPath)
