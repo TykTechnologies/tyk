@@ -19,7 +19,6 @@ import (
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/internal/uuid"
-	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/test"
 	"github.com/TykTechnologies/tyk/trace"
 	"github.com/TykTechnologies/tyk/user"
@@ -9624,64 +9623,4 @@ func TestSortSpecsByListenPath(t *testing.T) {
 			}
 		})
 	}
-}
-
-type MockSessionHandler struct{}
-
-func (MockSessionHandler) Init(storage.Handler) {
-}
-
-func (MockSessionHandler) Store() storage.Handler {
-	//TODO implement me
-	panic("implement me")
-}
-
-func (MockSessionHandler) UpdateSession(string, *user.SessionState, int64, bool) error {
-	//TODO implement me
-	panic("implement me")
-}
-
-func (MockSessionHandler) RemoveSession(string, string, bool) bool {
-	//TODO implement me
-	panic("implement me")
-}
-
-func (MockSessionHandler) SessionDetail(string, string, bool) (user.SessionState, bool) {
-	//TODO implement me
-	panic("implement me")
-}
-
-func (MockSessionHandler) KeyExpired(*user.SessionState) bool {
-	//TODO implement me
-	panic("implement me")
-}
-
-func (MockSessionHandler) Sessions(string) []string {
-	//TODO implement me
-	panic("implement me")
-}
-
-func (MockSessionHandler) ResetQuota(string, *user.SessionState, bool) {
-	//TODO implement me
-	panic("implement me")
-}
-
-func (MockSessionHandler) Stop() {
-	//TODO implement me
-	panic("implement me")
-}
-
-type MockHealthChecker struct{}
-
-func (MockHealthChecker) Init(storage.Handler) {
-}
-
-func (MockHealthChecker) ApiHealthValues() (HealthCheckValues, error) {
-	//TODO implement me
-	panic("implement me")
-}
-
-func (MockHealthChecker) StoreCounterVal(HealthPrefix, string) {
-	//TODO implement me
-	panic("implement me")
 }
