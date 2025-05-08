@@ -800,10 +800,6 @@ func (gw *Gateway) loadHTTPService(spec *APISpec, apisByListen map[string]int, g
 		chainObj = gw.processSpec(spec, apisByListen, gs, logrus.NewEntry(log))
 	}
 
-	if chainObj == nil {
-		return nil, fmt.Errorf("trying to import invalid api %s, skipping", spec.APIID)
-	}
-
 	if chainObj.Skip {
 		return chainObj, nil
 	}
@@ -1007,7 +1003,9 @@ func (gw *Gateway) loadApps(specs []*APISpec) {
 			defer func() {
 				// recover from panic if one occurred. Set err to nil otherwise.
 				if err := recover(); err != nil {
-					log.Errorf("Panic while loading an API: %v, panic: %v, stacktrace: %v", spec.APIDefinition, err, string(debug.Stack()))
+					if err := recoverFromLoadApiPanic(spec, err); err != nil {
+						log.Error(err)
+					}
 				}
 			}()
 
@@ -1100,6 +1098,13 @@ func (gw *Gateway) loadApps(specs []*APISpec) {
 		mainLog.Warning("All APIs are protected with mTLS, except for the control API. " +
 			"We recommend configuring the control API port or control hostname to ensure consistent security measures")
 	}
+}
+
+func recoverFromLoadApiPanic(spec *APISpec, err any) error {
+	if spec.APIDefinition.IsOAS && spec.OAS.GetTykExtension() == nil {
+		return fmt.Errorf("trying to import invalid OAS api %s, skipping", spec.APIID)
+	}
+	return fmt.Errorf("Panic while loading an API: %v, panic: %v, stacktrace: %v", spec.APIDefinition, err, string(debug.Stack()))
 }
 
 func (gw *Gateway) allApisAreMTLS() bool {
