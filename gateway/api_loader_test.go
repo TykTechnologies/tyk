@@ -10,7 +10,6 @@ import (
 	"path"
 	_ "path"
 	"reflect"
-	"sync"
 	"sync/atomic"
 	"testing"
 
@@ -9625,38 +9624,6 @@ func TestSortSpecsByListenPath(t *testing.T) {
 			}
 		})
 	}
-}
-
-func TestForTyk5OasMigration(t *testing.T) {
-	g := StartTest(nil)
-	defer g.Close()
-
-	internal := BuildAPI(func(spec *APISpec) {
-		spec.OAS.Extensions = nil
-		spec.IsOAS = true
-		spec.VersionData.Versions = map[string]apidef.VersionInfo{"a": {ExtendedPaths: apidef.ExtendedPathsSet{ValidateRequest: []apidef.ValidateRequestMeta{{Enabled: true}}}}}
-		spec.Name = "test-for-legacy-oas"
-		spec.APIID = "test-legacy-oas-api-id"
-		spec.Proxy.ListenPath = "/test-for-legacy-oas"
-		spec.AuthManager = MockSessionHandler{}
-		spec.Health = MockHealthChecker{}
-		spec.OrgSessionManager = MockSessionHandler{}
-	})[0]
-
-	g.Gw.apisMu.Lock()
-	g.Gw.apisByID[internal.APIID] = internal
-	g.Gw.apisMu.Unlock()
-
-	if g.Gw.apisHandlesByID == nil {
-		g.Gw.apisHandlesByID = new(sync.Map)
-	}
-	g.Gw.apisHandlesByID.Delete(internal.APIID)
-
-	apiByListenPath := map[string]int{}
-
-	_, err := g.Gw.loadHTTPService(internal, apiByListenPath, &generalStores{}, &proxyMux{})
-
-	assert.Equal(t, fmt.Sprint(err.Error()), "trying to import invalid api test-legacy-oas-api-id, skipping")
 }
 
 type MockSessionHandler struct{}

@@ -800,10 +800,6 @@ func (gw *Gateway) loadHTTPService(spec *APISpec, apisByListen map[string]int, g
 		chainObj = gw.processSpec(spec, apisByListen, gs, logrus.NewEntry(log))
 	}
 
-	if chainObj == nil {
-		return nil, fmt.Errorf("trying to import invalid api %s, skipping", spec.APIID)
-	}
-
 	if chainObj.Skip {
 		return chainObj, nil
 	}
@@ -1007,7 +1003,11 @@ func (gw *Gateway) loadApps(specs []*APISpec) {
 			defer func() {
 				// recover from panic if one occurred. Set err to nil otherwise.
 				if err := recover(); err != nil {
-					log.Errorf("Panic while loading an API: %v, panic: %v, stacktrace: %v", spec.APIDefinition, err, string(debug.Stack()))
+					if spec.APIDefinition.IsOAS == true && spec.OAS.GetTykExtension() == nil {
+						log.Errorf("trying to import invalid OAS api %s, skipping", spec.APIID)
+					} else {
+						log.Errorf("Panic while loading an API: %v, panic: %v, stacktrace: %v", spec.APIDefinition, err, string(debug.Stack()))
+					}
 				}
 			}()
 
