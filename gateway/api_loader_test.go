@@ -10,6 +10,7 @@ import (
 	"path"
 	_ "path"
 	"reflect"
+	"strings"
 	"sync/atomic"
 	"testing"
 
@@ -17,6 +18,7 @@ import (
 
 	persistentmodel "github.com/TykTechnologies/storage/persistent/model"
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/apidef/oas"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/internal/uuid"
 	"github.com/TykTechnologies/tyk/test"
@@ -9620,6 +9622,40 @@ func TestSortSpecsByListenPath(t *testing.T) {
 
 			if !reflect.DeepEqual(sortedPaths, tt.expected) {
 				t.Errorf("Expected %v, but got %v", tt.expected, sortedPaths)
+			}
+		})
+	}
+}
+
+func TestRecoverFromLoadApiPanic(t *testing.T) {
+	tests := []struct {
+		name     string
+		spec     *APISpec
+		err      any
+		expected string
+	}{
+		{
+			name: "invalid OAS api",
+			spec: &APISpec{
+				APIDefinition: &apidef.APIDefinition{
+					APIID: "test-api",
+					IsOAS: true,
+				},
+				OAS: oas.OAS{},
+			},
+			err:      "test error",
+			expected: "trying to import invalid OAS api test-api, skipping",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := recoverFromLoadApiPanic(tt.spec, tt.err)
+			if err == nil {
+				t.Fatal("expected error, got nil")
+			}
+			if !strings.Contains(err.Error(), tt.expected) {
+				t.Errorf("expected error to contain %q, got %q", tt.expected, err.Error())
 			}
 		})
 	}
