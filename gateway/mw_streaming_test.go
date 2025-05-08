@@ -1065,7 +1065,7 @@ func TestStreaming_HttpOutputPaths(t *testing.T) {
 
 	apiUrl := fmt.Sprintf("%s/%s", ts.URL, apiName)
 
-	t.Run("should fail with 400 Not Found if the path is invalid", func(t *testing.T) {
+	t.Run("should fail with 404 Not Found if the path is invalid", func(t *testing.T) {
 		pathWithTypo := "get/steam"
 		targetUrl := fmt.Sprintf("%s/%s", apiUrl, pathWithTypo)
 
