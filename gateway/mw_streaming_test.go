@@ -3,6 +3,7 @@
 package gateway
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"crypto/tls"
@@ -11,6 +12,7 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -161,6 +163,7 @@ streams:
     output:
       http_server:
         ws_path: /subscribe
+        stream_path: /get/stream
 `
 
 func TestStreamingAPISingleClient(t *testing.T) {
@@ -997,4 +1000,149 @@ func TestStreamingAPIGarbageCollection(t *testing.T) {
 		return true
 	})
 	require.Equal(t, 0, streamManagersAfterGC)
+}
+
+func TestStreaming_HttpOutputPaths(t *testing.T) {
+	ts := StartTest(func(globalConf *config.Config) {
+		globalConf.Streaming.Enabled = true
+	})
+	t.Cleanup(ts.Close)
+
+	oasAPI, err := setupOASForStreamAPI(bentoHTTPServerTemplate)
+	require.NoError(t, err)
+
+	apiName := "output-paths-test-api"
+	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		spec.Proxy.ListenPath = fmt.Sprintf("/%s", apiName)
+		spec.UseKeylessAccess = true
+		spec.IsOAS = true
+		spec.OAS = oasAPI
+		spec.OAS.Fill(*spec.APIDefinition)
+	})
+
+	apiUrl := fmt.Sprintf("%s/%s", ts.URL, apiName)
+
+	t.Run("should fail with 404 Not Found if the path is invalid", func(t *testing.T) {
+		pathWithTypo := "get/steam"
+		targetUrl := fmt.Sprintf("%s/%s", apiUrl, pathWithTypo)
+
+		sseClient := newTestStreamSSEClient(context.Background(), targetUrl)
+		statusCode, err := sseClient.Connect()
+
+		assert.NoError(t, err)
+		assert.Equal(t, http.StatusNotFound, statusCode)
+	})
+
+	t.Run("should connect to SSE endpoint and consume messages as expected", func(t *testing.T) {
+		correctPath := "get/stream"
+		targetUrl := fmt.Sprintf("%s/%s", apiUrl, correctPath)
+
+		sseContext, cancelFn := context.WithCancel(context.Background())
+		sseClient := newTestStreamSSEClient(sseContext, targetUrl)
+		go func() {
+			statusCode, err := sseClient.Connect()
+			require.NoError(t, err)
+			require.Equal(t, http.StatusOK, statusCode)
+		}()
+
+		defer func() {
+			err := sseClient.Close()
+			require.NoError(t, err)
+			cancelFn()
+		}()
+
+		receiveMessageChan := make(chan string)
+		go func() {
+			err := sseClient.ReadMessages(receiveMessageChan)
+			require.NoError(t, err)
+		}()
+
+		testMessage := `{"test": "message"}`
+		publishURL := fmt.Sprintf("%s/post", apiUrl)
+		publishResp, err := http.Post(publishURL, "application/json", bytes.NewReader([]byte(testMessage)))
+		require.NoError(t, err)
+		require.Equal(t, http.StatusOK, publishResp.StatusCode)
+
+		var message string
+		assert.Eventuallyf(t, func() bool {
+			message = <-receiveMessageChan
+			return true
+		}, 3*time.Second, 10*time.Millisecond, "SSE message not received")
+		assert.Equal(t, testMessage, message)
+	})
+}
+
+type testStreamSSEClient struct {
+	ctx    context.Context
+	url    string
+	client http.Client
+	resp   *http.Response
+	done   chan struct{}
+	wg     *sync.WaitGroup
+}
+
+func newTestStreamSSEClient(ctx context.Context, url string) *testStreamSSEClient {
+	wg := sync.WaitGroup{}
+	wg.Add(1)
+
+	return &testStreamSSEClient{
+		ctx:    ctx,
+		url:    url,
+		client: http.Client{},
+		done:   make(chan struct{}),
+		wg:     &wg,
+	}
+}
+
+func (sse *testStreamSSEClient) Connect() (statusCode int, err error) {
+	req, err := http.NewRequestWithContext(sse.ctx, http.MethodGet, sse.url, nil)
+	if err != nil {
+		return 0, fmt.Errorf("creating request: %w", err)
+	}
+
+	req.Header.Set("Accept", "text/event-stream")
+	req.Header.Set("Cache-Control", "no-cache")
+	req.Header.Set("Connection", "keep-alive")
+
+	sse.resp, err = sse.client.Do(req)
+	sse.wg.Done()
+	if err != nil {
+		close(sse.done)
+		if sse.resp != nil {
+			statusCode = sse.resp.StatusCode
+		}
+		return statusCode, fmt.Errorf("doing request: %w", err)
+	}
+
+	return sse.resp.StatusCode, nil
+}
+
+func (sse *testStreamSSEClient) Close() error {
+	close(sse.done)
+	return nil
+}
+
+func (sse *testStreamSSEClient) ReadMessages(messageChan chan<- string) (err error) {
+	sse.wg.Wait() // we need to make sure that the connection is ready
+	scanner := bufio.NewScanner(sse.resp.Body)
+
+	defer func() {
+		err = sse.resp.Body.Close()
+	}()
+
+	for scanner.Scan() {
+		select {
+		case <-sse.ctx.Done():
+			return nil
+		case <-sse.done:
+			return nil
+		default:
+			message := scanner.Text()
+			if message != "" {
+				messageChan <- message
+			}
+		}
+	}
+
+	return nil
 }
