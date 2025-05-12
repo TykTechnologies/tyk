@@ -3,6 +3,7 @@ package gateway
 import (
 	"context"
 	"errors"
+	"google.golang.org/grpc/credentials/insecure"
 	"net"
 	"net/url"
 	"time"
@@ -91,12 +92,18 @@ func (gw *Gateway) NewGRPCDispatcher() (coprocess.Dispatcher, error) {
 	authority := gw.GetConfig().CoProcessOptions.GRPCAuthority
 
 	var err error
-	grpcConnection, err = grpc.Dial("",
+	//grpcConnection, err = grpc.Dial("",
+	//	gw.grpcCallOpts(),
+	//	grpc.WithInsecure(),
+	//	grpc.WithAuthority(authority),
+	//	grpc.WithDialer(gw.dialer),
+	//)
+
+	grpcConnection, err = grpc.NewClient(
+		"",
 		gw.grpcCallOpts(),
-		grpc.WithInsecure(),
 		grpc.WithAuthority(authority),
-		grpc.WithDialer(gw.dialer),
-	)
+		grpc.WithTransportCredentials(insecure.NewCredentials()))
 
 	grpcClient = coprocess.NewDispatcherClient(grpcConnection)
 
