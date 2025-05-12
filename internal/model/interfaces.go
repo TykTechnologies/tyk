@@ -27,6 +27,7 @@ type Middleware interface {
 	Logger() *logrus.Entry
 	ProcessRequest(w http.ResponseWriter, r *http.Request, conf interface{}) (error, int) // Handles request
 	EnabledForSpec() bool
+	Unload()
 }
 
 // LoggerProvider returns a new *logrus.Entry for the request.
