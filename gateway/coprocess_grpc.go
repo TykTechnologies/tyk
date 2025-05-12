@@ -41,11 +41,11 @@ func (gw *Gateway) GetCoProcessGrpcServerTargetURL() (*url.URL, error) {
 	return grpcURL, nil
 }
 
-func GetCoProcessGrpcServerTargetUrlAsString(url *url.URL) string {
-	if url.Scheme == "" {
-		return url.String()
+func GetCoProcessGrpcServerTargetUrlAsString(targetUrl *url.URL) string {
+	if targetUrl.Scheme == "" {
+		return targetUrl.String()
 	}
-	return url.String()[len(url.Scheme)+3:]
+	return targetUrl.String()[len(targetUrl.Scheme)+3:]
 }
 
 // Dispatch takes a CoProcessMessage and sends it to the CP.
