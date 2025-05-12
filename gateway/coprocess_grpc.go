@@ -42,6 +42,9 @@ func (gw *Gateway) GetCoProcessGrpcServerTargetURL() (*url.URL, error) {
 }
 
 func GetCoProcessGrpcServerTargetUrlAsString(url *url.URL) string {
+	if url.Scheme == "" {
+		return url.String()
+	}
 	return url.String()[len(url.Scheme)+3:]
 }
 
