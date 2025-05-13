@@ -863,6 +863,32 @@ func TestNopCloseResponseBody(t *testing.T) {
 	}
 }
 
+func TestDeepCopyBody(t *testing.T) {
+	var src *http.Request
+	var trg *http.Request
+	assert.Nil(t, deepCopyBody(src, trg), "nil requests should remain nil without any error")
+
+	src = &http.Request{}
+	trg = &http.Request{}
+	assert.Nil(t, deepCopyBody(src, trg), "nil source request body should return without any error")
+
+	testData := []byte("testDeepCopy")
+	src = httptest.NewRequest(http.MethodPost, "/test", bytes.NewReader(testData))
+	src.ContentLength = -1
+	assert.Nil(t, deepCopyBody(src, trg),
+		"source request with ContentLength == -1 should return without any error")
+	assert.Nil(t, trg.Body, "target request body should not be updated when ContentLength == -1")
+
+	src = httptest.NewRequest(http.MethodPost, "/test", bytes.NewReader(testData))
+	assert.Nil(t, deepCopyBody(src, trg), "request with body should return without any error")
+	assert.NotNil(t, trg.Body, "target request body should be updated")
+	assert.True(t, src.Body != trg.Body, "target request should have different body than source request")
+
+	trgData, err := io.ReadAll(trg.Body)
+	assert.Nil(t, err, "target request body should be readable")
+	assert.Equal(t, testData, trgData, "target request body should contain the same data")
+}
+
 func BenchmarkGraphqlUDG(b *testing.B) {
 	g := StartTest(func(globalConf *config.Config) {
 		globalConf.OpenTelemetry.Enabled = true
