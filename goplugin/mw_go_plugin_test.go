@@ -5,7 +5,6 @@ package goplugin_test
 
 import (
 	"context"
-	"github.com/stretchr/testify/require"
 	"net/http"
 	"testing"
 
@@ -13,6 +12,7 @@ import (
 
 	"github.com/TykTechnologies/kin-openapi/openapi3"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/apidef/oas"
