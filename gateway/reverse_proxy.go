@@ -1097,6 +1097,14 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 
 	*outreq = *req // includes shallow copies of maps, but okay
 	*logreq = *req
+
+	deepCopyErr := deepCopyBody(req, outreq)
+	if deepCopyErr != nil {
+		p.logger.Debug("Unable to create deep copy of request, err: ", deepCopyErr)
+		p.ErrorHandler.HandleError(rw, logreq, "Service temporarily unavailable.", 503, true)
+		return ProxyResponse{}
+	}
+
 	// remove context data from the copies
 	setContext(outreq, context.Background())
 	setContext(logreq, context.Background())
@@ -1861,6 +1869,29 @@ func nopCloseResponseBody(r *http.Response) {
 	}
 
 	copyResponse(r)
+}
+
+// Creates a deep copy of source request.Body and replaces target request.Body with it.
+func deepCopyBody(source *http.Request, target *http.Request) error {
+	if source.Body == nil {
+		return errors.New("empty body")
+	}
+
+	defer source.Body.Close()
+	bodyBytes, err := io.ReadAll(source.Body)
+	if err != nil {
+		return err
+	}
+
+	bodySize := int64(len(bodyBytes))
+
+	source.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
+	source.ContentLength = bodySize
+
+	target.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
+	target.ContentLength = bodySize
+
+	return nil
 }
 
 // IsUpgrade will return the upgrade header value and true if present for the request.
