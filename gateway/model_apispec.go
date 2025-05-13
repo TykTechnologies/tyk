@@ -1,6 +1,7 @@
 package gateway
 
 import (
+	"github.com/TykTechnologies/tyk/ctx"
 	"net/http"
 	"net/url"
 	"strings"
@@ -130,4 +131,12 @@ func (a *APISpec) getMatchPathAndMethod(r *http.Request, mode URLStatus) (string
 	}
 
 	return matchPath, method
+}
+
+func (a *APISpec) injectIntoReqContext(req *http.Request) {
+	if a.IsOAS {
+		ctx.SetOASDefinition(req, &a.OAS)
+	} else {
+		ctx.SetDefinition(req, a.APIDefinition)
+	}
 }

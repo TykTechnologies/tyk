@@ -5,6 +5,7 @@ package goplugin_test
 
 import (
 	"context"
+	"github.com/stretchr/testify/require"
 	"net/http"
 	"testing"
 
@@ -555,6 +556,53 @@ func TestGoPlugin_AccessingOASAPIDef(t *testing.T) {
 			},
 		},
 	}...)
+}
+
+func TestGoPlugin_MyResponsePluginAccessingOASAPI(t *testing.T) {
+	ts := gateway.StartTest(nil)
+	defer ts.Close()
+
+	oasDoc := oas.OAS{}
+	oasDoc.OpenAPI = "3.0.3"
+	oasDoc.Info = &openapi3.Info{
+		Version: "1",
+		Title:   "My OAS Documentation TestGoPlugin_MyResponsePluginAccessingOASAPI",
+	}
+	oasDoc.Paths = openapi3.Paths{}
+	oasDoc.SetTykExtension(&oas.XTykAPIGateway{})
+	err := oasDoc.Validate(context.Background())
+
+	require.NoError(t, err)
+
+	ts.Gw.BuildAndLoadAPI(func(spec *gateway.APISpec) {
+		spec.IsOAS = true
+		spec.OAS = oasDoc
+		spec.Proxy.ListenPath = "/goplugin-response"
+		spec.UseKeylessAccess = true
+		spec.UseStandardAuth = false
+		spec.UseGoPluginAuth = false
+		spec.CustomMiddleware = apidef.MiddlewareSection{
+			Driver: apidef.GoPluginDriver,
+			Response: []apidef.MiddlewareDefinition{
+				{
+					Name: "MyResponsePluginAccessingOASAPI",
+					Path: goPluginFilename(),
+				},
+			},
+		}
+	})
+
+	t.Run("Run Go-plugin all middle-wares", func(t *testing.T) {
+		ts.Run(t, []test.TestCase{
+			{
+				Path: "/goplugin-response/plugin_hit",
+				Code: http.StatusOK,
+				HeadersMatch: map[string]string{
+					"X-OAS-Doc-Title": oasDoc.Info.Title,
+				},
+			},
+		}...)
+	})
 }
 
 func TestGoPlugin_PreventDoubleError(t *testing.T) {
