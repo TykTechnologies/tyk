@@ -1873,23 +1873,22 @@ func nopCloseResponseBody(r *http.Response) {
 
 // Creates a deep copy of source request.Body and replaces target request.Body with it.
 func deepCopyBody(source *http.Request, target *http.Request) error {
-	if source.Body == nil {
-		return errors.New("empty body")
+	if source.Body == nil || source.ContentLength == -1 {
+		return nil
 	}
 
-	defer source.Body.Close()
 	bodyBytes, err := io.ReadAll(source.Body)
+	defer func() {
+		source.Body.Close()
+		source.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
+		nopCloseRequestBody(source)
+	}()
 	if err != nil {
 		return err
 	}
 
-	bodySize := int64(len(bodyBytes))
-
-	source.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
-	source.ContentLength = bodySize
-
 	target.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
-	target.ContentLength = bodySize
+	nopCloseRequestBody(target)
 
 	return nil
 }
