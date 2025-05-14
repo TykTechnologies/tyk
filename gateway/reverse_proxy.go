@@ -1101,7 +1101,8 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 	deepCopyErr := deepCopyBody(req, outreq)
 	if deepCopyErr != nil {
 		p.logger.Debug("Unable to create deep copy of request, err: ", deepCopyErr)
-		p.ErrorHandler.HandleError(rw, logreq, "Service temporarily unavailable.", 503, true)
+		p.ErrorHandler.HandleError(rw, logreq, "There was a problem with reading Body of the Request.",
+			http.StatusInternalServerError, true)
 		return ProxyResponse{}
 	}
 
