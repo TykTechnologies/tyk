@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/TykTechnologies/kin-openapi/routers"
+	"github.com/getkin/kin-openapi/routers"
 
 	"github.com/TykTechnologies/tyk-pump/analytics"
 	"github.com/TykTechnologies/tyk/apidef"
