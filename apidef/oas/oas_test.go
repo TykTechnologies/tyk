@@ -63,8 +63,13 @@ func TestOAS(t *testing.T) {
 		const operationID = "userGET"
 		t.Parallel()
 
-		var oasWithPaths OAS
-		oasWithPaths.Components = &openapi3.Components{}
+		var oasWithPaths = OAS{
+			T: openapi3.T{
+				Components: &openapi3.Components{},
+				Paths:      openapi3.NewPaths(),
+			},
+		}
+
 		oasWithPaths.SetTykExtension(&XTykAPIGateway{
 			Middleware: &Middleware{
 				Operations: Operations{
@@ -76,24 +81,12 @@ func TestOAS(t *testing.T) {
 				},
 			},
 		})
-		oasWithPaths.Paths = func() *openapi3.Paths {
-			paths := openapi3.NewPaths()
-			paths.Set("/user", &openapi3.PathItem{
-				Get: &openapi3.Operation{
-					OperationID: operationID,
-					Responses: func() *openapi3.Responses {
-						responses := openapi3.NewResponses()
-						responses.Set("200", &openapi3.ResponseRef{
-							Value: &openapi3.Response{
-								Description: getStrPointer("some example endpoint"),
-							},
-						})
-						return responses
-					}(),
-				},
-			})
-			return paths
-		}()
+		oasWithPaths.Paths.Set("/user", &openapi3.PathItem{
+			Get: &openapi3.Operation{
+				OperationID: operationID,
+				Responses:   openapi3.NewResponses(),
+			},
+		})
 
 		var convertedAPI apidef.APIDefinition
 		oasWithPaths.ExtractTo(&convertedAPI)
