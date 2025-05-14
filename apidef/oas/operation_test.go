@@ -113,7 +113,7 @@ func TestOAS_PathsAndOperations(t *testing.T) {
 			Responses:   openapi3.NewResponses(),
 		},
 	})
-	convertedOAS.Paths = paths
+	convertedOAS.Paths = convertedPaths
 	convertedOAS.SetTykExtension(&XTykAPIGateway{Middleware: &Middleware{Operations: Operations{}}})
 	convertedOAS.fillPathsAndOperations(ep)
 
@@ -131,19 +131,7 @@ func TestOAS_PathsAndOperations(t *testing.T) {
 		},
 	})
 
-	// require.Equal(t, expCombinedPaths.Map(), convertedOAS.Paths.Map())
-
-	require.NotNil(t, expCombinedPaths.Value("/user"))
-	require.NotNil(t, convertedOAS.Paths.Value("/user"))
-
-	require.NotNil(t, expCombinedPaths.Value("/user").Get)
-	require.NotNil(t, convertedOAS.Paths.Value("/user").Get)
-
-	require.NotNil(t, expCombinedPaths.Value("/user").Post)
-	require.NotNil(t, convertedOAS.Paths.Value("/user").Post)
-
-	// require.Equal(t, expCombinedPaths.Value("/user").Get.OperationID, convertedOAS.Paths.Value("/user").Get.OperationID)
-	// require.Equal(t, expCombinedPaths.Value("/user"), convertedOAS.Paths.Value("/user"))
+	assert.Equal(t, expCombinedPaths.Map(), convertedOAS.Paths.Map())
 
 	t.Run("oas validation", func(t *testing.T) {
 		err := convertedOAS.Validate(context.Background())
