@@ -16,6 +16,10 @@ import (
 	"github.com/TykTechnologies/tyk/user"
 )
 
+const (
+	XOASDocTitle = "X-OAS-Doc-Title"
+)
+
 // MyPluginPre checks if session is NOT present, adds custom header
 // with initial URI path and will be used as "pre" custom MW
 func MyPluginPre(rw http.ResponseWriter, r *http.Request) {
@@ -196,12 +200,18 @@ func MyAnalyticsPluginMaskJSONLoginBody(record *analytics.AnalyticsRecord) {
 
 func MyPluginAccessingOASAPI(rw http.ResponseWriter, r *http.Request) {
 	oas := ctx.GetOASDefinition(r)
-	rw.Header().Add("X-OAS-Doc-Title", oas.Info.Title)
+	rw.Header().Add(XOASDocTitle, oas.Info.Title)
+}
+
+// MyResponsePluginAccessingOASAPI fake
+func MyResponsePluginAccessingOASAPI(rw http.ResponseWriter, _ *http.Response, req *http.Request) {
+	oas := ctx.GetOASDefinition(req)
+	rw.Header().Add(XOASDocTitle, oas.Info.Title)
 }
 
 func MyPluginReturningError(rw http.ResponseWriter, r *http.Request) {
 	rw.WriteHeader(http.StatusTeapot)
-	rw.Write([]byte(http.StatusText(http.StatusTeapot)))
+	_, _ = rw.Write([]byte(http.StatusText(http.StatusTeapot)))
 }
 
 func MyPluginApplyingPolicy(rw http.ResponseWriter, r *http.Request) {
