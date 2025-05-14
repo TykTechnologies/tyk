@@ -13,6 +13,7 @@ import (
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/apidef/oas"
 	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/ctx"
 	"github.com/TykTechnologies/tyk/internal/graphengine"
 )
 
@@ -130,4 +131,12 @@ func (a *APISpec) getMatchPathAndMethod(r *http.Request, mode URLStatus) (string
 	}
 
 	return matchPath, method
+}
+
+func (a *APISpec) injectIntoReqContext(req *http.Request) {
+	if a.IsOAS {
+		ctx.SetOASDefinition(req, &a.OAS)
+	} else {
+		ctx.SetDefinition(req, a.APIDefinition)
+	}
 }
