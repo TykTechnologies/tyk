@@ -332,7 +332,7 @@ func main() {
 		return
 	}
 
-	if err := generateBentoConfigSchema(args.output, []customValidationRule{&addURIFormatToHTTPClient{}}); err != nil {
+	if err := generateBentoConfigSchema(args.output, []customValidationRule{&addURIFormatToHTTPClientRule{}}); err != nil {
 		printErrorAndExit(err)
 	}
 	_, _ = fmt.Fprintf(os.Stdout, "Bento schema generated in '%s'\n", args.output)
@@ -340,14 +340,16 @@ func main() {
 
 // Custom rules defined here
 
-// addURIFormatToHTTPClient represents a custom rule for adding URI format validation to HTTP client URL properties in a schema.
-type addURIFormatToHTTPClient struct{}
+// addURIFormatToHTTPClientRule represents a custom rule for adding URI format validation to HTTP client URL properties in a schema.
+type addURIFormatToHTTPClientRule struct{}
 
-func (a *addURIFormatToHTTPClient) Name() string {
+var _ customValidationRule = (*addURIFormatToHTTPClientRule)(nil)
+
+func (a *addURIFormatToHTTPClientRule) Name() string {
 	return "add_uri_format_to_http_client"
 }
 
-func (a *addURIFormatToHTTPClient) Apply(input []byte) ([]byte, error) {
+func (a *addURIFormatToHTTPClientRule) Apply(input []byte) ([]byte, error) {
 	for _, kind := range []string{"input", "output"} {
 		data, dataType, _, err := jsonparser.Get(input, "definitions", kind, "properties", "http_client", "properties", "url")
 		if err != nil {
@@ -369,5 +371,3 @@ func (a *addURIFormatToHTTPClient) Apply(input []byte) ([]byte, error) {
 	}
 	return input, nil
 }
-
-var _ customValidationRule = (*addURIFormatToHTTPClient)(nil)
