@@ -117,7 +117,7 @@ const (
 	BasicType     = "basic"
 	CoprocessType = "coprocess"
 	OAuthType     = "oauth"
-	// ExternalOAuth
+	// ExternalOAuthType
 	// Deprecated: ExternalOAuth holds configuration for an external OAuth provider.
 	// ExternalOAuth support has been deprecated from 5.7.0.
 	// To avoid any disruptions, we recommend that you use JSON Web Token (JWT) instead,
