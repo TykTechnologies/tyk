@@ -2130,7 +2130,7 @@ type MockErrorReader struct {
 	ReturnError error
 }
 
-func (e *MockErrorReader) Read(p []byte) (n int, err error) {
+func (e *MockErrorReader) Read(_ []byte) (n int, err error) {
 	return 0, e.ReturnError
 }
 
