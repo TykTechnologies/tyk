@@ -65,3 +65,25 @@ func TestAddURIFormatToHTTPClient(t *testing.T) {
 		require.Equal(t, "uri", string(data))
 	}
 }
+
+func TestAddURIFormatToHTTPClient_Malformed_input(t *testing.T) {
+	rule := &addURIFormatToHTTPClient{}
+
+	t.Run("Key path not found", func(t *testing.T) {
+		_, err := rule.Apply([]byte(`{}`))
+		require.Errorf(t, err, "error while applying add_uri_format_to_http_client rule, getting URL property returned: Key path not found")
+	})
+
+	t.Run(" Unknown value type", func(t *testing.T) {
+		var err error
+		input := []byte(`{}`)
+		for _, kind := range []string{"input", "output"} {
+			// Value type must be an object.
+			input, err = jsonparser.Set(input, []byte("some-string"), "definitions", kind, "properties", "http_client", "properties", "url")
+			require.NoError(t, err)
+		}
+
+		_, err = rule.Apply(input)
+		require.Errorf(t, err, "error while applying add_uri_format_to_http_client rule, getting URL property returned: Unknown value type")
+	})
+}

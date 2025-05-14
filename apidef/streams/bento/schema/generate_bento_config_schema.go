@@ -332,11 +332,7 @@ func main() {
 		return
 	}
 
-	customRules := []customValidationRule{
-		&addURIFormatToHTTPClient{},
-	}
-
-	if err := generateBentoConfigSchema(args.output, customRules); err != nil {
+	if err := generateBentoConfigSchema(args.output, []customValidationRule{&addURIFormatToHTTPClient{}}); err != nil {
 		printErrorAndExit(err)
 	}
 	_, _ = fmt.Fprintf(os.Stdout, "Bento schema generated in '%s'\n", args.output)
