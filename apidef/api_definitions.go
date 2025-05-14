@@ -117,16 +117,16 @@ const (
 	BasicType     = "basic"
 	CoprocessType = "coprocess"
 	OAuthType     = "oauth"
-	// ExternalOAuthType
-	// Deprecated: ExternalOAuth holds configuration for an external OAuth provider.
-	// ExternalOAuth support has been deprecated from 5.7.0.
+	// ExternalOAuthType holds configuration for an external OAuth provider.
+	// Deprecated: ExternalOAuth support has been deprecated from 5.7.0.
 	// To avoid any disruptions, we recommend that you use JSON Web Token (JWT) instead,
 	// as explained in https://tyk.io/docs/basic-config-and-security/security/authentication-authorization/ext-oauth-middleware/.
 	ExternalOAuthType = "externalOAuth"
-	// OIDC
+	// OIDCType holds configuration for OpenID Connect.
 	// Deprecated: OIDC support has been deprecated from 5.7.0.
 	// To avoid any disruptions, we recommend that you use JSON Web Token (JWT) instead,
 	// as explained in https://tyk.io/docs/api-management/client-authentication/#integrate-with-openid-connect-deprecated.
+
 	OIDCType = "oidc"
 
 	// OAuthAuthorizationTypeClientCredentials is the authorization type for client credentials flow.
