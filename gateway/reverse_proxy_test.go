@@ -377,6 +377,14 @@ func (s *Test) TestNewWrappedServeHTTP() *ReverseProxy {
 	return s.Gw.TykNewSingleHostReverseProxy(target, spec, nil)
 }
 
+func createReverseProxyAndServeHTTP(ts *Test, req *http.Request) (*httptest.ResponseRecorder, ProxyResponse) {
+	proxy := ts.TestNewWrappedServeHTTP()
+	recorder := httptest.NewRecorder()
+	resp := proxy.WrappedServeHTTP(recorder, req, false)
+
+	return recorder, resp
+}
+
 func TestWrappedServeHTTP(t *testing.T) {
 	idleConnTimeout = 1
 
@@ -384,15 +392,23 @@ func TestWrappedServeHTTP(t *testing.T) {
 	defer ts.Close()
 
 	for i := 0; i < 10; i++ {
-		proxy := ts.TestNewWrappedServeHTTP()
-		recorder := httptest.NewRecorder()
-		req, _ := http.NewRequest(http.MethodGet, "/", nil)
-		proxy.WrappedServeHTTP(recorder, req, false)
+		req := httptest.NewRequest(http.MethodGet, "/", nil)
+		_, _ = createReverseProxyAndServeHTTP(ts, req)
 	}
 
 	assert.Equal(t, 10, ts.Gw.ConnectionWatcher.Count())
 	time.Sleep(time.Second * 2)
 	assert.Equal(t, 0, ts.Gw.ConnectionWatcher.Count())
+
+	// Test error on deepCopyBody function
+	mockReadCloser := createMockReadCloserWithError(errors.New("test error"))
+	req := httptest.NewRequest(http.MethodPost, "/test", mockReadCloser)
+	// Set any ContentLength - httptest.NewRequest sets it only for bytes.Buffer, bytes.Reader and strings.Reader
+	req.ContentLength = 1
+	recorder, proxyResponse := createReverseProxyAndServeHTTP(ts, req)
+	assert.NotNil(t, proxyResponse, "error on deepCopyBody should return an empty ProxyResponse")
+	assert.Nil(t, proxyResponse.Response, "no response should be expected on error")
+	assert.Equal(t, http.StatusInternalServerError, recorder.Code)
 }
 
 func TestCircuitBreaker5xxs(t *testing.T) {
@@ -861,6 +877,44 @@ func TestNopCloseResponseBody(t *testing.T) {
 			t.Error("3rd read, body's data is not as expectd")
 		}
 	}
+}
+
+func TestDeepCopyBody(t *testing.T) {
+	var src *http.Request
+	var trg *http.Request
+	assert.Nil(t, deepCopyBody(src, trg), "nil requests should remain nil without any error")
+
+	src = &http.Request{}
+	trg = &http.Request{}
+	assert.Nil(t, deepCopyBody(src, trg), "nil source request body should return without any error")
+
+	testData := []byte("testDeepCopy")
+	src = httptest.NewRequest(http.MethodPost, "/test", bytes.NewReader(testData))
+	src.ContentLength = -1
+	assert.Nil(t, deepCopyBody(src, trg),
+		"source request with ContentLength == -1 should return without any error")
+	assert.Nil(t, trg.Body, "target request body should not be updated when ContentLength == -1")
+
+	src = httptest.NewRequest(http.MethodPost, "/test", bytes.NewReader(testData))
+	assert.Nil(t, deepCopyBody(src, trg), "request with body should return without any error")
+	assert.NotNil(t, trg.Body, "target request body should be updated")
+	assert.True(t, src.Body != trg.Body, "target request should have different body than source request")
+
+	trgData, err := io.ReadAll(trg.Body)
+	assert.Nil(t, err, "target request body should be readable")
+	assert.Equal(t, testData, trgData, "target request body should contain the same data")
+
+	mockReadCloser := createMockReadCloserWithError(errors.New("test error"))
+	src = httptest.NewRequest(http.MethodPost, "/test", mockReadCloser)
+	// Set any ContentLength - httptest.NewRequest sets it only for bytes.Buffer, bytes.Reader and strings.Reader
+	src.ContentLength = int64(len(testData))
+	trg = &http.Request{}
+	err = deepCopyBody(src, trg)
+	assert.NotNil(t, err, "function should return an error when ReadAll fails")
+	assert.Nil(t, trg.Body, "target request body should not be updated when ReadAll fails")
+	assert.True(t, mockReadCloser.CloseCalled, "close function should have been called")
+	_, ok := src.Body.(*nopCloserBuffer)
+	assert.True(t, ok, "target request body should have been of type nopCloserBuffer")
 }
 
 func BenchmarkGraphqlUDG(b *testing.B) {
