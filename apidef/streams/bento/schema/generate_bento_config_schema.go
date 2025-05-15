@@ -17,6 +17,16 @@ import (
 
 const defaultOutput = "bento-config-schema.json"
 
+// customValidationRule is an interface for defining custom validation rules for JSON schemas.
+type customValidationRule interface {
+	// Name returns the name of the validation rule.
+	Name() string
+
+	// Apply applies the validation rule to the provided input data and
+	// returns the processed data or an error if validation fails.
+	Apply(input []byte) ([]byte, error)
+}
+
 var result = []byte(`{}`)
 
 var properties = []string{
@@ -206,7 +216,7 @@ func saveFile(outputPath string) error {
 	return nil
 }
 
-func generateBentoConfigSchema(output string) error {
+func generateBentoConfigSchema(output string, rules []customValidationRule) error {
 	data, err := service.GlobalEnvironment().FullConfigSchema("", "").MarshalJSONSchema()
 	if err != nil {
 		return fmt.Errorf("error marshaling bento schema: %w", err)
@@ -230,6 +240,13 @@ func generateBentoConfigSchema(output string) error {
 	})
 	if err != nil {
 		return fmt.Errorf("error generating bento configuration validator: %w", err)
+	}
+
+	for _, rule := range rules {
+		result, err = rule.Apply(result)
+		if err != nil {
+			return fmt.Errorf("error applying rule %s: %w", rule.Name(), err)
+		}
 	}
 
 	return saveFile(output)
@@ -308,8 +325,45 @@ func main() {
 		return
 	}
 
-	if err := generateBentoConfigSchema(args.output); err != nil {
+	if err := generateBentoConfigSchema(args.output, []customValidationRule{&addURIFormatToHTTPClientRule{}}); err != nil {
 		printErrorAndExit(err)
 	}
 	_, _ = fmt.Fprintf(os.Stdout, "Bento schema generated in '%s'\n", args.output)
+}
+
+// Custom rules defined here
+
+// addURIFormatToHTTPClientRule represents a custom rule for adding URI format validation to HTTP client URL properties in a schema.
+type addURIFormatToHTTPClientRule struct{}
+
+var _ customValidationRule = (*addURIFormatToHTTPClientRule)(nil)
+
+func (a *addURIFormatToHTTPClientRule) Name() string {
+	return "add_uri_format_to_http_client"
+}
+
+func (a *addURIFormatToHTTPClientRule) setModifiedURLSection(input, data []byte, keys ...string) ([]byte, error) {
+	data, err := jsonparser.Set(data, []byte("\"uri\""), "format")
+	if err != nil {
+		return nil, err
+	}
+	return jsonparser.Set(input, data, keys...)
+}
+
+func (a *addURIFormatToHTTPClientRule) Apply(input []byte) ([]byte, error) {
+	for _, kind := range []string{"input", "output"} {
+		data, dataType, _, err := jsonparser.Get(input, "definitions", kind, "properties", "http_client", "properties", "url")
+		if err != nil {
+			return nil, fmt.Errorf("error while applying %s rule, getting URL property returned: %w", a.Name(), err)
+		}
+		if dataType != jsonparser.Object {
+			return nil, fmt.Errorf("error while applying %s rule, URL property is not an object", a.Name())
+		}
+
+		input, err = a.setModifiedURLSection(input, data, "definitions", kind, "properties", "http_client", "properties", "url")
+		if err != nil {
+			return nil, fmt.Errorf("error while applying %s rule, setting URL property returned: %w", a.Name(), err)
+		}
+	}
+	return input, nil
 }
