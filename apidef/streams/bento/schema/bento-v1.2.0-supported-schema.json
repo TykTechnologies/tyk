@@ -1486,7 +1486,40 @@
               },
               "type": "object"
             },
+<<<<<<< HEAD:apidef/streams/bento/schema/bento-v1.2.0-supported-schema.json
             {
+=======
+            "url": {
+              "type": "string",
+              "format": "uri"
+            },
+            "verb": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "url"
+          ],
+          "type": "object"
+        },
+        "http_server": {
+          "additionalProperties": false,
+          "properties": {
+            "address": {
+              "type": "string"
+            },
+            "allowed_verbs": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "cert_file": {
+              "type": "string"
+            },
+            "cors": {
+              "additionalProperties": false,
+>>>>>>> 18f959848... [TT-14252] Add customValidationRule interface to generate_bento_config_schema script (#7057):apidef/streams/bento/schema/bento-config-schema.json
               "properties": {
                 "group_by": {
                   "items": {
@@ -2299,6 +2332,16 @@
                 }
               },
               "type": "object"
+<<<<<<< HEAD:apidef/streams/bento/schema/bento-v1.2.0-supported-schema.json
+=======
+            },
+            "url": {
+              "type": "string",
+              "format": "uri"
+            },
+            "verb": {
+              "type": "string"
+>>>>>>> 18f959848... [TT-14252] Add customValidationRule interface to generate_bento_config_schema script (#7057):apidef/streams/bento/schema/bento-config-schema.json
             }
           ]
         },
