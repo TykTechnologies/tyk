@@ -99,4 +99,11 @@ func TestAddURIFormatToHTTPClient_Malformed_input(t *testing.T) {
 		_, err = rule.Apply(input)
 		require.ErrorContains(t, err, "error while applying add_uri_format_to_http_client rule, URL property is not an object")
 	})
+
+	t.Run("Malformed url object", func(t *testing.T) {
+		input := []byte(`{}`)
+		data := "some-string"
+		_, err := rule.setModifiedURLSection(input, []byte(data), "some", "path")
+		require.ErrorIs(t, err, jsonparser.KeyPathNotFoundError)
+	})
 }

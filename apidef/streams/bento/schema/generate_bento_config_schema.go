@@ -349,6 +349,14 @@ func (a *addURIFormatToHTTPClientRule) Name() string {
 	return "add_uri_format_to_http_client"
 }
 
+func (a *addURIFormatToHTTPClientRule) setModifiedURLSection(input, data []byte, keys ...string) ([]byte, error) {
+	data, err := jsonparser.Set(data, []byte("\"uri\""), "format")
+	if err != nil {
+		return nil, err
+	}
+	return jsonparser.Set(input, data, keys...)
+}
+
 func (a *addURIFormatToHTTPClientRule) Apply(input []byte) ([]byte, error) {
 	for _, kind := range []string{"input", "output"} {
 		data, dataType, _, err := jsonparser.Get(input, "definitions", kind, "properties", "http_client", "properties", "url")
@@ -359,12 +367,7 @@ func (a *addURIFormatToHTTPClientRule) Apply(input []byte) ([]byte, error) {
 			return nil, fmt.Errorf("error while applying %s rule, URL property is not an object", a.Name())
 		}
 
-		data, err = jsonparser.Set(data, []byte("\"uri\""), "format")
-		if err != nil {
-			return nil, fmt.Errorf("error while applying %s rule, setting URL format returned: %w", a.Name(), err)
-		}
-
-		input, err = jsonparser.Set(input, data, "definitions", kind, "properties", "http_client", "properties", "url")
+		input, err = a.setModifiedURLSection(input, data, "definitions", kind, "properties", "http_client", "properties", "url")
 		if err != nil {
 			return nil, fmt.Errorf("error while applying %s rule, setting URL property returned: %w", a.Name(), err)
 		}
