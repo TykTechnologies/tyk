@@ -2549,6 +2549,7 @@ func TestJWTMiddleware_getSecretToVerifySignature_JWKNoKID(t *testing.T) {
 
 	m := JWTMiddleware{BaseMiddleware: &BaseMiddleware{}}
 	api := &apidef.APIDefinition{JWTSource: jwkURL}
+	api.JWTJwksURIs = []apidef.JWK{}
 	m.Spec = &APISpec{APIDefinition: api}
 
 	token := &jwt.Token{Header: make(map[string]interface{})}
@@ -2559,6 +2560,28 @@ func TestJWTMiddleware_getSecretToVerifySignature_JWKNoKID(t *testing.T) {
 		api.JWTSource = base64.StdEncoding.EncodeToString([]byte(api.JWTSource))
 		_, err := m.getSecretToVerifySignature(nil, token)
 		assert.ErrorIs(t, err, ErrKIDNotAString)
+	})
+
+	t.Run("multiple JWK URIs", func(t *testing.T) {
+		api.JWTJwksURIs = []apidef.JWK{
+			{
+				URL: "http://localhost:8080/realms/jwt/protocol/openid-connect/certs",
+			},
+		}
+		_, err := m.getSecretToVerifySignature(nil, token)
+		assert.Error(t, err)
+	})
+
+	t.Run("multiple JWK URIs with a source", func(t *testing.T) {
+		api.JWTJwksURIs = []apidef.JWK{
+			{
+				URL: "http://localhost:8080/realms/jwt/protocol/openid-connect/certs",
+			},
+		}
+
+		api.JWTSource = jwkURL
+		_, err := m.getSecretToVerifySignature(nil, token)
+		assert.Error(t, err)
 	})
 }
 

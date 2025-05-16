@@ -13,6 +13,7 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/go-jose/go-jose/v3"
@@ -187,6 +188,12 @@ func (k *JWTMiddleware) getIdentityFromToken(token *jwt.Token) (string, error) {
 
 func (k *JWTMiddleware) getSecretToVerifySignature(r *http.Request, token *jwt.Token) (interface{}, error) {
 	config := k.Spec.APIDefinition
+
+	// Try all JWK URIs, return on first successful match
+	if len(config.JWTJwksURIs) > 0 {
+		return k.getSecretFromMultipleJWKURIs(config.JWTJwksURIs, token.Header[KID], k.Spec.JWTSigningMethod)
+	}
+
 	// Check for central JWT source
 	if config.JWTSource != "" {
 		// Is it a URL?
@@ -224,6 +231,57 @@ func (k *JWTMiddleware) getSecretToVerifySignature(r *http.Request, token *jwt.T
 		return nil, errors.New("token invalid, key not found")
 	}
 	return []byte(session.JWTData.Secret), nil
+}
+
+func (k *JWTMiddleware) getSecretFromMultipleJWKURIs(jwkURIs []apidef.JWK, kid interface{}, keyType string) (interface{}, error) {
+	var (
+		wg       sync.WaitGroup
+		once     sync.Once
+		resultCh = make(chan interface{}, 1)
+		errCh    = make(chan error, len(jwkURIs))
+	)
+
+	for _, jwk := range jwkURIs {
+		wg.Add(1)
+		go func(uri string) {
+			defer wg.Done()
+			secret, err := k.getSecretFromURL(uri, kid, keyType)
+			if err == nil && secret != nil {
+				once.Do(func() {
+					resultCh <- secret
+				})
+			} else {
+				errCh <- fmt.Errorf("uri %s: %w", uri, err)
+			}
+		}(jwk.URL)
+	}
+
+	go func() {
+		wg.Wait()
+		close(resultCh)
+		close(errCh)
+	}()
+
+	if secret, ok := <-resultCh; ok {
+		return secret, nil
+	}
+
+	var errorMessages []string
+	for err := range errCh {
+		k.Logger().WithError(err).Error("JWK URI fetch attempt failed")
+		errorMessages = append(errorMessages, err.Error())
+	}
+
+	if len(errorMessages) > 0 {
+		combined := fmt.Errorf("no matching KID found in any JWTJwkURIs:\n%s", strings.Join(errorMessages, "\n"))
+		k.Logger().WithError(combined).Error("All JWK URI fetch attempts failed")
+		return nil, combined
+	}
+
+	err := errors.New("no matching KID found in any JWTJwkURIs")
+	k.Logger().WithError(err).Error("No JWK fetch attempt succeeded")
+
+	return nil, err
 }
 
 func (k *JWTMiddleware) getPolicyIDFromToken(claims jwt.MapClaims) (string, bool) {
