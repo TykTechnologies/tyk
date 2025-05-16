@@ -118,6 +118,6 @@ func NewEnableAllConfigValidator() *EnableAllConfigValidator {
 }
 
 // Validate always returns nil, effectively enabling all configurations
-func (v *EnableAllConfigValidator) Validate(document []byte) error {
+func (v *EnableAllConfigValidator) Validate(_ []byte) error {
 	return nil
 }

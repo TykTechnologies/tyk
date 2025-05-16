@@ -17,7 +17,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/getkin/kin-openapi/openapi3"
+	"github.com/TykTechnologies/kin-openapi/openapi3"
 	"github.com/gorilla/websocket"
 	"github.com/nats-io/nats.go"
 	"github.com/sirupsen/logrus"
@@ -27,8 +27,6 @@ import (
 	"github.com/testcontainers/testcontainers-go/modules/kafka"
 	natscon "github.com/testcontainers/testcontainers-go/modules/nats"
 	"github.com/testcontainers/testcontainers-go/wait"
-	"github.com/TykTechnologies/kin-openapi/openapi3"
-	"github.com/gorilla/websocket"
 	"gopkg.in/yaml.v2"
 
 	"github.com/IBM/sarama"
