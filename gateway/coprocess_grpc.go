@@ -3,12 +3,10 @@ package gateway
 import (
 	"context"
 	"errors"
-	"net"
-	"net/url"
-	"time"
-
 	"github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
+	"net/url"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/coprocess"
@@ -24,7 +22,7 @@ type GRPCDispatcher struct {
 	coprocess.Dispatcher
 }
 
-func (gw *Gateway) dialer(addr string, timeout time.Duration) (net.Conn, error) {
+func (gw *Gateway) GetCoProcessGrpcServerTargetURL() (*url.URL, error) {
 	grpcURL, err := url.Parse(gw.GetConfig().CoProcessOptions.CoProcessGRPCServer)
 	if err != nil {
 		log.WithFields(logrus.Fields{
@@ -38,11 +36,16 @@ func (gw *Gateway) dialer(addr string, timeout time.Duration) (net.Conn, error) 
 		log.WithFields(logrus.Fields{
 			"prefix": "coprocess",
 		}).Error(errString)
-		return nil, errors.New(errString)
+		return nil, err
 	}
+	return grpcURL, nil
+}
 
-	grpcURLString := gw.GetConfig().CoProcessOptions.CoProcessGRPCServer[len(grpcURL.Scheme)+3:]
-	return net.DialTimeout(grpcURL.Scheme, grpcURLString, timeout)
+func GetCoProcessGrpcServerTargetUrlAsString(targetUrl *url.URL) string {
+	if targetUrl.Scheme == "" {
+		return targetUrl.String()
+	}
+	return targetUrl.String()[len(targetUrl.Scheme)+3:]
 }
 
 // Dispatch takes a CoProcessMessage and sends it to the CP.
@@ -91,12 +94,21 @@ func (gw *Gateway) NewGRPCDispatcher() (coprocess.Dispatcher, error) {
 	authority := gw.GetConfig().CoProcessOptions.GRPCAuthority
 
 	var err error
-	grpcConnection, err = grpc.Dial("",
+	//grpcConnection, err = grpc.Dial("",
+	//	gw.grpcCallOpts(),
+	//	grpc.WithInsecure(),
+	//	grpc.WithAuthority(authority),
+	//	grpc.WithDialer(gw.dialer),
+	//)
+	grpcUrl, err := gw.GetCoProcessGrpcServerTargetURL()
+	if err != nil {
+		return nil, err
+	}
+	grpcConnection, err = grpc.NewClient(
+		GetCoProcessGrpcServerTargetUrlAsString(grpcUrl),
 		gw.grpcCallOpts(),
-		grpc.WithInsecure(),
 		grpc.WithAuthority(authority),
-		grpc.WithDialer(gw.dialer),
-	)
+		grpc.WithTransportCredentials(insecure.NewCredentials()))
 
 	grpcClient = coprocess.NewDispatcherClient(grpcConnection)
 
