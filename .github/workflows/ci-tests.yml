@@ -24,6 +24,7 @@ concurrency:
 env:
   PYTHON_VERSION: "3.11"
   PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION: python
+  BRANCH_NAME: ${{ github.base_ref || github.ref_name }} # base_ref for PRs is 'master', but merges read in ref_name
 
 jobs:
   golangci-lint:
@@ -37,8 +38,8 @@ jobs:
 
       - name: "Get base ref"
         run: |
-          git fetch origin ${{ github.base_ref }}
-          git rev-parse origin/${{ github.base_ref }}
+          git fetch origin ${{ env.BRANCH_NAME }}
+          git rev-parse origin/${{ env.BRANCH_NAME }}
 
       - name: Setup Golang
         uses: actions/setup-go@v5
@@ -69,7 +70,8 @@ jobs:
         # This is a pull request, but exiting here skips CI tests (`needs: golangci-lint`). Exit code 0 to always run tests.
         # PR uses the "prod" config and must pass.
         run: |
-          golangci-lint run --out-format colored-line-number,checkstyle:golangci-lint-report.json --issues-exit-code=0 --new-from-rev=origin/${{ github.base_ref }} -v ./...
+          golangci-lint run --out-format colored-line-number,checkstyle:golangci-lint-report.json \
+                            --issues-exit-code=0 --new-from-rev=origin/${{ env.BRANCH_NAME }} -v ./...
 
       - name: golangci-lint-on-push
         if: ${{ github.event_name == 'push' }}
@@ -106,12 +108,12 @@ jobs:
       - name: Checkout Tyk
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.pull_request.head.ref }}
+          ref: ${{ github.ref }}
 
       - name: "Get base ref"
         run: |
-          git fetch origin ${{ github.base_ref }}
-          git rev-parse origin/${{ github.base_ref }}
+          git fetch origin ${{ env.BRANCH_NAME }}
+          git rev-parse origin/${{ env.BRANCH_NAME }}
 
       # Regardless that the base image provides a python release, we need
       # setup-python so it properly configures the python3-venv.
@@ -222,22 +224,17 @@ jobs:
           files: 'gateway-all.cov, golangci-lint-report.json'
           fail: true
 
-      - name: Install Dependencies
-        env:
-          TOKEN: '${{ secrets.ORG_GH_TOKEN }}'
-        run: git config --global url."https://${TOKEN}@github.com".insteadOf "https://github.com"
-
-      - name: SonarCloud Scan
+      - name: Scan
         if: always()
-        uses: sonarsource/sonarcloud-github-action@master
+        uses: sonarsource/sonarqube-scan-action@master
         with:
           args: >
             -Dsonar.organization=tyktechnologies
             -Dsonar.projectKey=TykTechnologies_tyk
             -Dsonar.sources=.
-            -Dsonar.exclusions=**/testdata/*,test/**,coprocess/**/*,ci/**,smoke-tests/**,apidef/oas/schema/schema.gen.go,templates/**
-            -Dsonar.coverage.exclusions=**/*_test.go,**/mock/*
-            -Dsonar.test.inclusions=**/*_test.go
+            -Dsonar.exclusions=**/testdata/*,test/**,tests/**,coprocess/**/*,ci/**,templates/**
+            -Dsonar.coverage.exclusions=**/*_test.go,**/mock/*,tests/**,swagger*.yml
+            -Dsonar.test.inclusions=**/*_test.go,tests/**
             -Dsonar.tests=.
             -Dsonar.go.coverage.reportPaths=gateway-all.cov
             -Dsonar.go.golangci-lint.reportPaths=golangci-lint-report.json

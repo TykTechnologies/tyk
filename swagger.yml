@@ -5,6 +5,9 @@ info:
     name: Tyk Technologies
     url: https://tyk.io/contact
   description: |+
+    <img src="https://tyk.io/docs/img/swagger_gateway_image.png" width="963" height="250">
+    <img src="https://tyk.io/docs/img/swagger_gateway_direction_image.png" width="946" height="392">
+    
     The Tyk Gateway API is the primary means for integrating your application with the Tyk API Gateway system. This API is very small, and has no granular permissions system. It is intended to be used purely for internal automation and integration.
 
     **Warning: Under no circumstances should outside parties be granted access to this API.**
@@ -30,7 +33,7 @@ info:
     name: Mozilla Public License Version 2.0
     url: https://github.com/TykTechnologies/tyk/blob/master/LICENSE.md
   title: Tyk Gateway API
-  version: 5.7.1
+  version: 5.8.0
 servers:
 - url: https://{tenant}
   variables:
@@ -1823,7 +1826,7 @@ paths:
                         Default:
                           name: Default
               oasApiDefinition:
-                summary: Calling debug endpoint with OAS API definition.
+                summary: Calling debug endpoint with Tyk OAS API definition.
                 value:
                   request:
                     method: GET
@@ -1903,7 +1906,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ApiStatusMessage'
           description: Internal server error.
-      summary: Test a Classic or an OAS API definition.
+      summary: Test a Tyk Classic or Tyk OAS API definition.
       tags:
       - Debug
   /tyk/keys:

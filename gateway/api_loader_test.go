@@ -10,6 +10,7 @@ import (
 	"path"
 	_ "path"
 	"reflect"
+	"strings"
 	"sync/atomic"
 	"testing"
 
@@ -17,6 +18,7 @@ import (
 
 	persistentmodel "github.com/TykTechnologies/storage/persistent/model"
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/apidef/oas"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/internal/uuid"
 	"github.com/TykTechnologies/tyk/test"
@@ -9516,4 +9518,145 @@ func TestAPILoaderValidation(t *testing.T) {
 			},
 		)
 	})
+}
+
+func TestSortSpecsByListenPath(t *testing.T) {
+	createSpec := func(listenPath string) *APISpec {
+		return &APISpec{
+			APIDefinition: &apidef.APIDefinition{
+				Proxy: apidef.ProxyConfig{
+					ListenPath: listenPath,
+				},
+			},
+		}
+	}
+
+	tests := []struct {
+		name     string
+		specs    []*APISpec
+		expected []string
+	}{
+		{
+			name: "Basic Parameter vs Static Path",
+			specs: []*APISpec{
+				createSpec("/foo"),
+				createSpec("/foo-bar"),
+				createSpec("/foo-bar-baz"),
+				createSpec("/foo"),
+				createSpec("/bar"),
+				createSpec("/bar/{id}"),
+				createSpec("/bar/{id}/baz"),
+				createSpec("/bar/id/baz"),
+				createSpec("/bar/{id}/baz/{id}"),
+				createSpec("/path/{param}/endpoint"),
+				createSpec("/path/specific/endpoint"),
+			},
+			expected: []string{
+				"/path/specific/endpoint",
+				"/path/{param}/endpoint",
+				"/foo-bar-baz",
+				"/bar/id/baz",
+				"/bar/{id}/baz/{id}",
+				"/bar/{id}/baz",
+				"/foo-bar",
+				"/bar/{id}",
+				"/foo",
+				"/foo",
+				"/bar",
+			},
+		},
+		{
+			name: "Multiple Parameters vs Longer Static Path",
+			specs: []*APISpec{
+				createSpec("/api/{param1}/{param2}/resource"),
+				createSpec("/api/specific/path/resource"),
+			},
+			expected: []string{
+				"/api/specific/path/resource",
+				"/api/{param1}/{param2}/resource",
+			},
+		},
+		{
+			name: "Identical Paths Except for Parameter",
+			specs: []*APISpec{
+				createSpec("/users/{id}/profile"),
+				createSpec("/users/settings/profile"),
+			},
+			expected: []string{
+				"/users/settings/profile",
+				"/users/{id}/profile",
+			},
+		},
+		{
+			name: "Customer Reported Case",
+			specs: []*APISpec{
+				createSpec("/information-concept/something/{thisisalongidname}/stuff"),
+				createSpec("/information-concept/something/ted/stuff/things"),
+			},
+			expected: []string{
+				"/information-concept/something/ted/stuff/things",
+				"/information-concept/something/{thisisalongidname}/stuff",
+			},
+		},
+		{
+			name: "Parameter at Different Position",
+			specs: []*APISpec{
+				createSpec("/products/{category}/items"),
+				createSpec("/products/featured/items/{id}"),
+			},
+			expected: []string{
+				"/products/featured/items/{id}",
+				"/products/{category}/items",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			sortSpecsByListenPath(tt.specs)
+
+			var sortedPaths []string
+			for _, spec := range tt.specs {
+				sortedPaths = append(sortedPaths, spec.Proxy.ListenPath)
+			}
+
+			if !reflect.DeepEqual(sortedPaths, tt.expected) {
+				t.Errorf("Expected %v, but got %v", tt.expected, sortedPaths)
+			}
+		})
+	}
+}
+
+func TestRecoverFromLoadApiPanic(t *testing.T) {
+	tests := []struct {
+		name     string
+		spec     *APISpec
+		err      any
+		expected string
+	}{
+		{
+			name: "invalid OAS api",
+			spec: &APISpec{
+				APIDefinition: &apidef.APIDefinition{
+					APIID: "test-api",
+					IsOAS: true,
+				},
+				OAS: oas.OAS{},
+			},
+			err:      "test error",
+			expected: "trying to import invalid OAS api test-api, skipping",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := recoverFromLoadApiPanic(tt.spec, tt.err)
+			if err == nil {
+				t.Fatal("expected error, got nil")
+			}
+			if !strings.Contains(err.Error(), tt.expected) {
+				t.Errorf("expected error to contain %q, got %q", tt.expected, err.Error())
+			}
+		})
+	}
 }

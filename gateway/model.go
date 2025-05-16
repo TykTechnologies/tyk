@@ -6,8 +6,8 @@ import (
 	"github.com/TykTechnologies/tyk/ctx"
 	"github.com/TykTechnologies/tyk/internal/event"
 	"github.com/TykTechnologies/tyk/internal/httpctx"
-	"github.com/TykTechnologies/tyk/internal/httputil"
 	"github.com/TykTechnologies/tyk/internal/model"
+	"github.com/TykTechnologies/tyk/internal/service/core"
 )
 
 type EventMetaDefault = model.EventMetaDefault
@@ -18,7 +18,7 @@ var (
 	ctxGetData = ctxData.Get
 	ctxSetData = ctxData.Set
 
-	setContext = httputil.SetContext
+	setContext = core.SetContext
 
 	// how is type safety avoided: exhibit A, old school generics
 	setCtxValue = func(h *http.Request, key, value any) {

@@ -4,7 +4,7 @@ import (
 	"sort"
 	"testing"
 
-	"github.com/getkin/kin-openapi/openapi3"
+	"github.com/TykTechnologies/kin-openapi/openapi3"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/TykTechnologies/tyk/apidef"
@@ -517,6 +517,23 @@ func TestOAS_ExternalOAuth(t *testing.T) {
 	assert.Equal(t, flows.AuthorizationCode.TokenURL, "{api-url}/oauth/token")
 
 	assert.Equal(t, oas, convertedOAS)
+
+	t.Run("when externalOAuthType doesn't exist in AuthConfigs", func(t *testing.T) {
+		// Delete externalOAuth config from AuthConfigs map, a sensible default config will be used by
+		// OAS.fillExternalOAuth method.
+		delete(api.AuthConfigs, apidef.ExternalOAuthType)
+
+		var convertedOASWithoutExternalOAuth OAS
+		convertedOASWithoutExternalOAuth.Components = &openapi3.Components{SecuritySchemes: oas.Components.SecuritySchemes}
+		convertedOASWithoutExternalOAuth.Fill(api)
+		authFlows := convertedOASWithoutExternalOAuth.Components.SecuritySchemes[securityName].Value.Flows
+		assert.Equal(t, authFlows.AuthorizationCode.AuthorizationURL, "{api-url}/oauth/authorize")
+		assert.Equal(t, authFlows.AuthorizationCode.TokenURL, "{api-url}/oauth/token")
+		assert.Equal(t,
+			oas.Components.SecuritySchemes[apidef.ExternalOAuthType],
+			convertedOASWithoutExternalOAuth.Components.SecuritySchemes[apidef.ExternalOAuthType],
+		)
+	})
 }
 
 func TestOAS_OIDC(t *testing.T) {

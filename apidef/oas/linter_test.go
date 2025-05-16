@@ -4,14 +4,13 @@ import (
 	"bytes"
 	"encoding/json"
 	"net/http"
-	"os"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/xeipuuv/gojsonschema"
 
 	"github.com/TykTechnologies/tyk/internal/event"
+	"github.com/TykTechnologies/tyk/internal/service/gojsonschema"
 	"github.com/TykTechnologies/tyk/internal/time"
 )
 
@@ -104,7 +103,7 @@ func TestXTykGateway_Lint(t *testing.T) {
 			LogRetentionPeriod:   ReadableDuration(10 * time.Second),
 			Tests: []UptimeTest{
 				{
-					Timeout: ReadableDuration(10 * time.Second),
+					Timeout: ReadableDuration(10 * time.Millisecond),
 					Commands: []UptimeTestCommand{
 						{
 							Name:    "send",
@@ -143,7 +142,7 @@ func TestXTykGateway_Lint(t *testing.T) {
 	require.NoError(t, err)
 
 	// Load schema
-	schema, err := os.ReadFile("schema/x-tyk-api-gateway.json")
+	schema, err := schemaDir.ReadFile("schema/x-tyk-api-gateway.strict.json")
 	require.NoError(t, err)
 
 	// Run schema validation

@@ -6,6 +6,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
+
 	"github.com/sirupsen/logrus"
 
 	"github.com/TykTechnologies/tyk/apidef"
@@ -32,7 +34,6 @@ func (ts *Test) prepareSpecWithEvents(logger *logrus.Logger) (spec *APISpec) {
 						Handler: EH_LogHandler,
 						HandlerMeta: map[string]interface{}{
 							"prefix": "testprefix",
-							"logger": logger,
 						},
 					},
 				},
@@ -46,6 +47,10 @@ func (ts *Test) prepareSpecWithEvents(logger *logrus.Logger) (spec *APISpec) {
 	for eventName, eventHandlerConfs := range def.EventHandlers.Events {
 		for _, handlerConf := range eventHandlerConfs {
 			eventHandlerInstance, err := ts.Gw.EventHandlerByName(handlerConf, spec)
+			logEventHandler, ok := eventHandlerInstance.(*LogMessageEventHandler)
+			if ok {
+				logEventHandler.logger = logger
+			}
 
 			if err != nil {
 				log.Error("Failed to init event handler: ", err)
@@ -68,7 +73,6 @@ func prepareEventsConf() (conf *config.Config) {
 						Handler: EH_LogHandler,
 						HandlerMeta: map[string]interface{}{
 							"prefix": "testprefix1",
-							"logger": log,
 						},
 					},
 				},
@@ -77,7 +81,6 @@ func prepareEventsConf() (conf *config.Config) {
 						Handler: EH_LogHandler,
 						HandlerMeta: map[string]interface{}{
 							"prefix": "testprefix2",
-							"logger": log,
 						},
 					},
 				},
@@ -92,7 +95,6 @@ func prepareEventHandlerConfig(handler apidef.TykEventHandlerName) (config apide
 	case EH_LogHandler:
 		config.HandlerMeta = map[string]interface{}{
 			"prefix": "testprefix",
-			"logger": log,
 		}
 	case EH_WebHook:
 		config.HandlerMeta = map[string]interface{}{}
@@ -170,6 +172,28 @@ func TestInitGenericEventHandlers(t *testing.T) {
 			t.Fatal("EventTriggers handlers length doesn't match")
 		}
 	}
+}
+
+func TestEventKeyFailureMeta_LogMessage(t *testing.T) {
+	em := EventKeyFailureMeta{
+		EventMetaDefault: EventMetaDefault{Message: "QuotaExceeded"},
+		Path:             "/my-path",
+		Origin:           "127.0.0.1",
+		Key:              "abc",
+	}
+	expectedMessage := "myQuotaEvent:QuotaExceeded:abc:127.0.0.1:/my-path"
+	assert.Equal(t, expectedMessage, em.LogMessage("myQuotaEvent:QuotaExceeded"))
+}
+
+func TestEventCurcuitBreakerMeta_LogMessage(t *testing.T) {
+	em := EventCurcuitBreakerMeta{
+		EventMetaDefault: EventMetaDefault{Message: "BreakerTriggered"},
+		Path:             "/my-path",
+		APIID:            "123abc",
+		CircuitEvent:     1,
+	}
+	expectedMessage := "myBreakerEvent:BreakerTriggered:123abc:/my-path: [STATUS] 1"
+	assert.Equal(t, expectedMessage, em.LogMessage("myBreakerEvent:BreakerTriggered"))
 }
 
 func BenchmarkInitGenericEventHandlers(b *testing.B) {

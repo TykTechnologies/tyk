@@ -3,6 +3,7 @@
 package gateway
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"crypto/tls"
@@ -12,6 +13,7 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -25,6 +27,8 @@ import (
 	"github.com/testcontainers/testcontainers-go/modules/kafka"
 	natscon "github.com/testcontainers/testcontainers-go/modules/nats"
 	"github.com/testcontainers/testcontainers-go/wait"
+	"github.com/TykTechnologies/kin-openapi/openapi3"
+	"github.com/gorilla/websocket"
 	"gopkg.in/yaml.v2"
 
 	"github.com/IBM/sarama"
@@ -146,11 +150,35 @@ streams:
       http_server:
         path: /get
         ws_path: /get/ws
+    pipeline:
+      processors:
+        - bloblang: |
+            root.id = "stub"
+            root.message = content().string()
     logger:
       level: DEBUG
       format: logfmt
       add_timestamp: false
 `
+
+const bentoNatsTemplateNoBloblang = `
+streams:
+  test:
+    input:
+      nats:
+        auto_replay_nacks: true
+        subject: "%s"
+        urls: ["%s"]
+    output:
+      http_server:
+        path: /get
+        ws_path: /get/ws
+    logger:
+      level: DEBUG
+      format: logfmt
+      add_timestamp: false
+`
+
 const bentoHTTPServerTemplate = `
 streams:
   test:
@@ -161,6 +189,7 @@ streams:
     output:
       http_server:
         ws_path: /subscribe
+        stream_path: /get/stream
 `
 
 func TestStreamingAPISingleClient(t *testing.T) {
@@ -223,10 +252,29 @@ func TestStreamingAPISingleClient(t *testing.T) {
 	err = wsConn.SetReadDeadline(time.Now().Add(500 * time.Millisecond))
 	require.NoError(t, err, "error setting read deadline")
 
+	// use an array to track received messages for index
+	expectedMessages := make(map[string]bool)
 	for i := 0; i < totalMessages; i++ {
+		expectedMessages[fmt.Sprintf(`{"id":"stub","message":"Hello %d"}`, i)] = false
+	}
+
+	receivedCount := 0
+	for receivedCount < totalMessages {
 		_, p, err := wsConn.ReadMessage()
 		require.NoError(t, err, "error reading message")
-		assert.Equal(t, fmt.Sprintf("Hello %d", i), string(p), "message not equal")
+
+		received := string(p)
+
+		gotten, exists := expectedMessages[received]
+		require.True(t, exists, "received unexpected message: %s", received)
+		require.False(t, gotten, "received duplicate message: %s", received)
+
+		expectedMessages[received] = true
+		receivedCount++
+	}
+
+	for msg, received := range expectedMessages {
+		require.True(t, received, "did not receive expected message: %s", msg)
 	}
 }
 
@@ -244,7 +292,7 @@ func TestStreamingAPIMultipleClients(t *testing.T) {
 	connectionStr, err := natsContainer.ConnectionString(ctx)
 	require.NoError(t, err)
 
-	streamConfig := fmt.Sprintf(bentoNatsTemplate, "test", connectionStr)
+	streamConfig := fmt.Sprintf(bentoNatsTemplateNoBloblang, "test", connectionStr)
 
 	ts := StartTest(func(globalConf *config.Config) {
 		globalConf.Streaming.Enabled = true
@@ -975,6 +1023,151 @@ func TestStreamingAPIGarbageCollection(t *testing.T) {
 		return true
 	})
 	require.Equal(t, 0, streamManagersAfterGC)
+}
+
+func TestStreaming_HttpOutputPaths(t *testing.T) {
+	ts := StartTest(func(globalConf *config.Config) {
+		globalConf.Streaming.Enabled = true
+	})
+	t.Cleanup(ts.Close)
+
+	oasAPI, err := setupOASForStreamAPI(bentoHTTPServerTemplate)
+	require.NoError(t, err)
+
+	apiName := "output-paths-test-api"
+	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		spec.Proxy.ListenPath = fmt.Sprintf("/%s", apiName)
+		spec.UseKeylessAccess = true
+		spec.IsOAS = true
+		spec.OAS = oasAPI
+		spec.OAS.Fill(*spec.APIDefinition)
+	})
+
+	apiUrl := fmt.Sprintf("%s/%s", ts.URL, apiName)
+
+	t.Run("should fail with 404 Not Found if the path is invalid", func(t *testing.T) {
+		pathWithTypo := "get/steam"
+		targetUrl := fmt.Sprintf("%s/%s", apiUrl, pathWithTypo)
+
+		sseClient := newTestStreamSSEClient(context.Background(), targetUrl)
+		statusCode, err := sseClient.Connect()
+
+		assert.NoError(t, err)
+		assert.Equal(t, http.StatusNotFound, statusCode)
+	})
+
+	t.Run("should connect to SSE endpoint and consume messages as expected", func(t *testing.T) {
+		correctPath := "get/stream"
+		targetUrl := fmt.Sprintf("%s/%s", apiUrl, correctPath)
+
+		sseContext, cancelFn := context.WithCancel(context.Background())
+		sseClient := newTestStreamSSEClient(sseContext, targetUrl)
+		go func() {
+			statusCode, err := sseClient.Connect()
+			require.NoError(t, err)
+			require.Equal(t, http.StatusOK, statusCode)
+		}()
+
+		defer func() {
+			err := sseClient.Close()
+			require.NoError(t, err)
+			cancelFn()
+		}()
+
+		receiveMessageChan := make(chan string)
+		go func() {
+			err := sseClient.ReadMessages(receiveMessageChan)
+			require.NoError(t, err)
+		}()
+
+		testMessage := `{"test": "message"}`
+		publishURL := fmt.Sprintf("%s/post", apiUrl)
+		publishResp, err := http.Post(publishURL, "application/json", bytes.NewReader([]byte(testMessage)))
+		require.NoError(t, err)
+		require.Equal(t, http.StatusOK, publishResp.StatusCode)
+
+		var message string
+		assert.Eventuallyf(t, func() bool {
+			message = <-receiveMessageChan
+			return true
+		}, 3*time.Second, 10*time.Millisecond, "SSE message not received")
+		assert.Equal(t, testMessage, message)
+	})
+}
+
+type testStreamSSEClient struct {
+	ctx    context.Context
+	url    string
+	client http.Client
+	resp   *http.Response
+	done   chan struct{}
+	wg     *sync.WaitGroup
+}
+
+func newTestStreamSSEClient(ctx context.Context, url string) *testStreamSSEClient {
+	wg := sync.WaitGroup{}
+	wg.Add(1)
+
+	return &testStreamSSEClient{
+		ctx:    ctx,
+		url:    url,
+		client: http.Client{},
+		done:   make(chan struct{}),
+		wg:     &wg,
+	}
+}
+
+func (sse *testStreamSSEClient) Connect() (statusCode int, err error) {
+	req, err := http.NewRequestWithContext(sse.ctx, http.MethodGet, sse.url, nil)
+	if err != nil {
+		return 0, fmt.Errorf("creating request: %w", err)
+	}
+
+	req.Header.Set("Accept", "text/event-stream")
+	req.Header.Set("Cache-Control", "no-cache")
+	req.Header.Set("Connection", "keep-alive")
+
+	sse.resp, err = sse.client.Do(req)
+	sse.wg.Done()
+	if err != nil {
+		close(sse.done)
+		if sse.resp != nil {
+			statusCode = sse.resp.StatusCode
+		}
+		return statusCode, fmt.Errorf("doing request: %w", err)
+	}
+
+	return sse.resp.StatusCode, nil
+}
+
+func (sse *testStreamSSEClient) Close() error {
+	close(sse.done)
+	return nil
+}
+
+func (sse *testStreamSSEClient) ReadMessages(messageChan chan<- string) (err error) {
+	sse.wg.Wait() // we need to make sure that the connection is ready
+	scanner := bufio.NewScanner(sse.resp.Body)
+
+	defer func() {
+		err = sse.resp.Body.Close()
+	}()
+
+	for scanner.Scan() {
+		select {
+		case <-sse.ctx.Done():
+			return nil
+		case <-sse.done:
+			return nil
+		default:
+			message := scanner.Text()
+			if message != "" {
+				messageChan <- message
+			}
+		}
+	}
+
+	return nil
 }
 
 // -------------------------------------------------------------------

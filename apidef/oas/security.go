@@ -1,7 +1,7 @@
 package oas
 
 import (
-	"github.com/getkin/kin-openapi/openapi3"
+	"github.com/TykTechnologies/kin-openapi/openapi3"
 	"github.com/lonelycode/osin"
 
 	"github.com/TykTechnologies/tyk/apidef"
@@ -147,17 +147,25 @@ type JWT struct {
 	DefaultPolicies []string `bson:"defaultPolicies,omitempty" json:"defaultPolicies,omitempty"`
 
 	// IssuedAtValidationSkew contains the duration in seconds for which token issuance can predate the current time during the request.
+	//
+	// Tyk classic API definition: `jwt_issued_at_validation_skew`.
 	IssuedAtValidationSkew uint64 `bson:"issuedAtValidationSkew,omitempty" json:"issuedAtValidationSkew,omitempty"`
 
 	// NotBeforeValidationSkew contains the duration in seconds for which token validity can predate the current time during the request.
+	//
+	// Tyk classic API definition: `jwt_not_before_validation_skew`.
 	NotBeforeValidationSkew uint64 `bson:"notBeforeValidationSkew,omitempty" json:"notBeforeValidationSkew,omitempty"`
 
 	// ExpiresAtValidationSkew contains the duration in seconds for which the token can be expired before we consider it expired.
+	//
+	// Tyk classic API definition: `jwt_expires_at_validation_skew`.
 	ExpiresAtValidationSkew uint64 `bson:"expiresAtValidationSkew,omitempty" json:"expiresAtValidationSkew,omitempty"`
 
 	// IDPClientIDMappingDisabled prevents Tyk from automatically detecting the use of certain IDPs based on standard claims
 	// that they include in the JWT: `client_id`, `cid`, `clientId`. Setting this flag to `true` disables the mapping and avoids
 	// accidentally misidentifying the use of one of these IDPs if one of their standard values is configured in your JWT.
+	//
+	// Tyk classic API definition: `idp_client_id_mapping_disabled`.
 	IDPClientIDMappingDisabled bool `bson:"idpClientIdMappingDisabled,omitempty" json:"idpClientIdMappingDisabled,omitempty"`
 }
 
@@ -372,21 +380,31 @@ func (e *ExtractCredentialsFromBody) ExtractTo(api *apidef.APIDefinition) {
 // OAuth configures the OAuth middleware.
 type OAuth struct {
 	// Enabled activates the OAuth middleware.
+	//
+	// Tyk classic API definition: `use_oauth2`.
 	Enabled bool `bson:"enabled" json:"enabled"` // required
 
 	// AuthSources configures the sources for OAuth credentials.
 	AuthSources `bson:",inline" json:",inline"`
 
 	// AllowedAuthorizeTypes is an array of OAuth authorization types.
+	//
+	// Tyk classic API definition: `oauth_meta.allowed_authorize_types`.
 	AllowedAuthorizeTypes []osin.AuthorizeRequestType `bson:"allowedAuthorizeTypes,omitempty" json:"allowedAuthorizeTypes,omitempty"`
 
 	// RefreshToken enables clients using a refresh token to get a new bearer access token.
+	//
+	// Tyk classic API definition: `oauth_meta.allowed_access_types` (contains REFRESH_TOKEN).
 	RefreshToken bool `bson:"refreshToken,omitempty" json:"refreshToken,omitempty"`
 
 	// AuthLoginRedirect configures a URL to redirect to after a successful login.
+	//
+	// Tyk classic API definition: `oauth_meta.auth_login_redirect`.
 	AuthLoginRedirect string `bson:"authLoginRedirect,omitempty" json:"authLoginRedirect,omitempty"`
 
 	// Notifications configures a URL trigger on key changes.
+	//
+	// Tyk classic API definition: `notifications`.
 	Notifications *Notifications `bson:"notifications,omitempty" json:"notifications,omitempty"`
 }
 
@@ -463,8 +481,12 @@ func (s *OAS) extractOAuthTo(api *apidef.APIDefinition, name string) {
 // OAuthProvider holds the configuration for validation and introspection of OAuth tokens.
 type OAuthProvider struct {
 	// JWT configures JWT validation.
+	//
+	// Tyk classic API definition: `external_oauth.providers[].jwt`.
 	JWT *JWTValidation `bson:"jwt,omitempty" json:"jwt,omitempty"`
 	// Introspection configures token introspection.
+	//
+	// Tyk classic API definition: `external_oauth.providers[].introspection`.
 	Introspection *Introspection `bson:"introspection,omitempty" json:"introspection,omitempty"`
 }
 
@@ -472,9 +494,13 @@ type OAuthProvider struct {
 // against a third party API, usually one provided by the IDP.
 type JWTValidation struct {
 	// Enabled activates OAuth access token validation.
+	//
+	// Tyk classic API definition: `external_oauth.providers[].jwt.enabled`.
 	Enabled bool `bson:"enabled" json:"enabled"`
 
 	// SigningMethod to verify signing method used in jwt - allowed values HMAC/RSA/ECDSA.
+	//
+	// Tyk classic API definition: `external_oauth.providers[].jwt.signing_method`.
 	SigningMethod string `bson:"signingMethod" json:"signingMethod"`
 
 	// Source is the secret to verify signature. Valid values are:
@@ -482,18 +508,28 @@ type JWTValidation struct {
 	// - a base64 encoded static secret,
 	// - a valid JWK URL in plain text,
 	// - a valid JWK URL in base64 encoded format.
+	//
+	// Tyk classic API definition: `external_oauth.providers[].jwt.source`.
 	Source string `bson:"source" json:"source"`
 
 	// IdentityBaseField is the identity claim name.
+	//
+	// Tyk classic API definition: `external_oauth.providers[].jwt.identity_base_field`.
 	IdentityBaseField string `bson:"identityBaseField,omitempty" json:"identityBaseField,omitempty"`
 
 	// IssuedAtValidationSkew is the clock skew to be considered while validating the iat claim.
+	//
+	// Tyk classic API definition: `external_oauth.providers[].jwt.issued_at_validation_skew`.
 	IssuedAtValidationSkew uint64 `bson:"issuedAtValidationSkew,omitempty" json:"issuedAtValidationSkew,omitempty"`
 
 	// NotBeforeValidationSkew is the clock skew to be considered while validating the nbf claim.
+	//
+	// Tyk classic API definition: `external_oauth.providers[].jwt.not_before_validation_skew`.
 	NotBeforeValidationSkew uint64 `bson:"notBeforeValidationSkew,omitempty" json:"notBeforeValidationSkew,omitempty"`
 
 	// ExpiresAtValidationSkew is the clock skew to be considered while validating the exp claim.
+	//
+	// Tyk classic API definition: `external_oauth.providers[].jwt.expires_at_validation_skew`.
 	ExpiresAtValidationSkew uint64 `bson:"expiresAtValidationSkew,omitempty" json:"expiresAtValidationSkew,omitempty"`
 }
 
@@ -520,16 +556,28 @@ func (j *JWTValidation) ExtractTo(jwt *apidef.JWTValidation) {
 // Introspection holds configuration for OAuth token introspection.
 type Introspection struct {
 	// Enabled activates OAuth access token validation by introspection to a third party.
+	//
+	// Tyk classic API definition: `external_oauth.providers[].introspection.enabled`.
 	Enabled bool `bson:"enabled" json:"enabled"`
 	// URL is the URL of the third party provider's introspection endpoint.
+	//
+	// Tyk classic API definition: `external_oauth.providers[].introspection.url`.
 	URL string `bson:"url" json:"url"`
 	// ClientID is the public identifier for the client, acquired from the third party.
+	//
+	// Tyk classic API definition: `external_oauth.providers[].introspection.client_id`.
 	ClientID string `bson:"clientId" json:"clientId"`
 	// ClientSecret is a secret known only to the client and the authorisation server, acquired from the third party.
+	//
+	// Tyk classic API definition: `external_oauth.providers[].introspection.client_secret`.
 	ClientSecret string `bson:"clientSecret" json:"clientSecret"`
 	// IdentityBaseField is the key showing where to find the user id in the claims. If it is empty, the `sub` key is looked at.
+	//
+	// Tyk classic API definition: `external_oauth.providers[].introspection.identity_base_field`.
 	IdentityBaseField string `bson:"identityBaseField,omitempty" json:"identityBaseField,omitempty"`
 	// Cache is the caching mechanism for introspection responses.
+	//
+	// Tyk classic API definition: `external_oauth.providers[].introspection.cache`.
 	Cache *IntrospectionCache `bson:"cache,omitempty" json:"cache,omitempty"`
 }
 
@@ -565,9 +613,13 @@ func (i *Introspection) ExtractTo(intros *apidef.Introspection) {
 // IntrospectionCache holds configuration for caching introspection requests.
 type IntrospectionCache struct {
 	// Enabled activates the caching mechanism for introspection responses.
+	//
+	// Tyk classic API definition: `external_oauth.providers[].introspection.cache.enabled`.
 	Enabled bool `bson:"enabled" json:"enabled"`
 	// Timeout is the duration in seconds of how long the cached value stays.
 	// For introspection caching, it is suggested to use a short interval.
+	//
+	// Tyk classic API definition: `external_oauth.providers[].introspection.cache.timeout`.
 	Timeout int64 `bson:"timeout" json:"timeout"`
 }
 
@@ -582,24 +634,35 @@ func (c *IntrospectionCache) ExtractTo(cache *apidef.IntrospectionCache) {
 }
 
 // ExternalOAuth holds configuration for an external OAuth provider.
-// ExternalOAuth support will be deprecated starting from 5.7.0.
+// Deprecated: ExternalOAuth support has been deprecated from 5.7.0.
 // To avoid any disruptions, we recommend that you use JSON Web Token (JWT) instead,
 // as explained in https://tyk.io/docs/basic-config-and-security/security/authentication-authorization/ext-oauth-middleware/.
 type ExternalOAuth struct {
 	// Enabled activates external oauth functionality.
+	//
+	// Tyk classic API definition: `external_oauth.enabled`.
 	Enabled bool `bson:"enabled" json:"enabled"` // required
 
 	// AuthSources configures the source for the authentication token.
 	AuthSources `bson:",inline" json:",inline"`
 
 	// Providers is used to configure OAuth providers.
+	//
+	// Tyk classic API definition: `external_oauth.providers`.
 	Providers []OAuthProvider `bson:"providers" json:"providers"` // required
 }
 
 func (s *OAS) fillExternalOAuth(api apidef.APIDefinition) {
 	authConfig, ok := api.AuthConfigs[apidef.ExternalOAuthType]
 	if !ok || authConfig.Name == "" {
-		return
+		if !api.ExternalOAuth.Enabled {
+			return
+		}
+		// Assign a sensible default to authConfig if api.ExternalOAuth.Enabled is true.
+		authConfig = apidef.AuthConfig{
+			Name:          apidef.ExternalOAuthType,
+			DisableHeader: true,
+		}
 	}
 
 	s.fillOAuthSchemeForExternal(authConfig.Name)
@@ -671,8 +734,12 @@ func (s *OAS) extractExternalOAuthTo(api *apidef.APIDefinition, name string) {
 // Notifications holds configuration for updates to keys.
 type Notifications struct {
 	// SharedSecret is the shared secret used in the notification request.
+	//
+	// Tyk classic API definition: `notifications.shared_secret`.
 	SharedSecret string `bson:"sharedSecret,omitempty" json:"sharedSecret,omitempty"`
 	// OnKeyChangeURL is the URL a request will be triggered against.
+	//
+	// Tyk classic API definition: `notifications.oauth_on_keychange_url`.
 	OnKeyChangeURL string `bson:"onKeyChangeUrl,omitempty" json:"onKeyChangeUrl,omitempty"`
 }
 
@@ -786,7 +853,10 @@ func resetSecuritySchemes(api *apidef.APIDefinition) {
 	// External OAuth
 	api.ExternalOAuth = apidef.ExternalOAuth{}
 
-	// OIDC
+	// OIDC holds configuration for OpenID Connect.
+	// Deprecated: OIDC support has been deprecated from 5.7.0.
+	// To avoid any disruptions, we recommend that you use JSON Web Token (JWT) instead,
+	// as explained in https://tyk.io/docs/api-management/client-authentication/#integrate-with-openid-connect-deprecated.
 	api.UseOpenID = false
 	api.Scopes.OIDC = apidef.ScopeClaim{}
 	api.OpenIDOptions = apidef.OpenIDOptions{}

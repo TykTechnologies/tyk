@@ -8,8 +8,6 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/TykTechnologies/tyk/ctx"
-
 	"github.com/TykTechnologies/tyk-pump/analytics"
 	"github.com/TykTechnologies/tyk/apidef"
 
@@ -222,11 +220,7 @@ func (m *GoPluginMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reque
 	t1 := time.Now()
 
 	// Inject definition into request context:
-	if m.Spec.IsOAS {
-		ctx.SetOASDefinition(r, &m.Spec.OAS)
-	} else {
-		ctx.SetDefinition(r, m.Spec.APIDefinition)
-	}
+	m.Spec.injectIntoReqContext(r)
 
 	handler(rw, r)
 	if session := ctxGetSession(r); session != nil {

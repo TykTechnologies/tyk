@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/getkin/kin-openapi/openapi3"
+	"github.com/TykTechnologies/kin-openapi/openapi3"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
@@ -30,6 +30,13 @@ const (
 // OAS holds the upstream OAS definition as well as adds functionality like custom JSON marshalling.
 type OAS struct {
 	openapi3.T
+}
+
+// NewOAS returns an allocated *OAS.
+func NewOAS() *OAS {
+	return &OAS{
+		T: openapi3.T{},
+	}
 }
 
 // MarshalJSON implements json.Marshaller.
@@ -450,14 +457,14 @@ func MigrateAndFillOAS(api *apidef.APIDefinition) (APIDef, []APIDef, error) {
 		return baseAPIDef, nil, err
 	}
 
-	baseAPIDef.OAS, err = newOASFromClassicAPIDefinition(api)
+	baseAPIDef.OAS, err = NewOASFromClassicAPIDefinition(api)
 	if err != nil {
 		return baseAPIDef, nil, fmt.Errorf("base API %s migrated OAS is not valid: %w", api.Name, err)
 	}
 
 	versionAPIDefs := make([]APIDef, len(versions))
 	for i := 0; i < len(versions); i++ {
-		versionOAS, err := newOASFromClassicAPIDefinition(&versions[i])
+		versionOAS, err := NewOASFromClassicAPIDefinition(&versions[i])
 		if err != nil {
 			return baseAPIDef, nil, fmt.Errorf("version API %s migrated OAS is not valid: %w", versions[i].Name, err)
 		}
@@ -467,9 +474,14 @@ func MigrateAndFillOAS(api *apidef.APIDefinition) (APIDef, []APIDef, error) {
 	return baseAPIDef, versionAPIDefs, err
 }
 
-func newOASFromClassicAPIDefinition(api *apidef.APIDefinition) (*OAS, error) {
-	api.IsOAS = true
+func NewOASFromClassicAPIDefinition(api *apidef.APIDefinition) (*OAS, error) {
 	var oas OAS
+	return FillOASFromClassicAPIDefinition(api, &oas)
+}
+
+func FillOASFromClassicAPIDefinition(api *apidef.APIDefinition, oas *OAS) (*OAS, error) {
+	api.IsOAS = true
+
 	oas.Fill(*api)
 	oas.setRequiredFields(api.Name, api.VersionName)
 	clearClassicAPIForSomeFeatures(api)
@@ -482,12 +494,12 @@ func newOASFromClassicAPIDefinition(api *apidef.APIDefinition) (*OAS, error) {
 		return nil, err
 	}
 
-	bytes, err := oas.MarshalJSON()
+	b, err := oas.MarshalJSON()
 	if err != nil {
 		return nil, err
 	}
 
-	return &oas, ValidateOASObject(bytes, oas.OpenAPI)
+	return oas, ValidateOASObject(b, oas.OpenAPI)
 }
 
 // setRequiredFields sets some required fields to make OAS object a valid one.
@@ -503,6 +515,10 @@ func (s *OAS) setRequiredFields(name string, versionName string) {
 // For example, the new validate request will just be valid for OAS APIs so after migrating from classic API definition
 // the existing feature should be cleared to prevent ValidateJSON middleware interference.
 func clearClassicAPIForSomeFeatures(api *apidef.APIDefinition) {
+	if len(api.VersionData.Versions) == 0 {
+		return
+	}
+
 	// clear ValidateJSON after migration to OAS-only ValidateRequest
 	vInfo := api.VersionData.Versions[Main]
 	vInfo.ExtendedPaths.ValidateJSON = nil

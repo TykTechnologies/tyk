@@ -3,6 +3,7 @@ package time
 import (
 	"errors"
 	"fmt"
+	"math"
 	"strconv"
 	"time"
 )
@@ -61,7 +62,23 @@ func (d *ReadableDuration) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-// Seconds returns ReadableDuration in seconds.
+// Seconds returns ReadableDuration rounded down to the seconds.
 func (d ReadableDuration) Seconds() float64 {
-	return Duration(d).Seconds()
+	durationInSeconds := math.Floor(Duration(d).Seconds())
+	return durationInSeconds
+}
+
+// Millisecond returns ReadableDuration in milliseconds.
+func (d ReadableDuration) Milliseconds() int64 {
+	return Duration(d).Milliseconds()
+}
+
+// Nanoseconds returns ReadableDuration in nanoseconds.
+func (d ReadableDuration) Nanoseconds() int64 {
+	return Duration(d).Nanoseconds()
+}
+
+// Microseconds returns ReadableDuration in microseconds.
+func (d ReadableDuration) Microseconds() int64 {
+	return Duration(d).Microseconds()
 }

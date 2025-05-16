@@ -252,11 +252,11 @@ type AnalyticsConfigConfig struct {
 
 // AccessLogsConfig defines the type of transactions logs printed to stdout.
 type AccessLogsConfig struct {
-	// Enabled controls enabling the transaction logs. Default: false.
+	// Enabled controls the generation of access logs by the Gateway. Default: false.
 	Enabled bool `json:"enabled"`
 
-	// Template configures which fields to log into the access log.
-	// If unconfigured, all fields listed will be logged.
+	// Template configures which fields to include in the access log.
+	// If no template is configured, all available fields will be logged.
 	//
 	// Example: ["client_ip", "path"].
 	//
@@ -484,16 +484,19 @@ type HttpServerOptionsConfig struct {
 	// Enabled WebSockets and server side events support
 	EnableWebSockets bool `json:"enable_websockets"`
 
-	// Deprecated. SSL certificates used by Gateway server.
+	// Deprecated: Use `ssl_certificates`instead.
 	Certificates CertsData `json:"certificates"`
 
-	// SSL certificates used by your Gateway server. A list of certificate IDs or path to files.
+	// Index of certificates available to the Gateway for use in client and upstream communication.
+	// The string value in the array can be two of the following options:
+	// 1. The ID assigned to and used to identify a certificate in the Tyk Certificate Store
+	// 2. The path to a file accessible to the Gateway. This PEM file must contain the private key and public certificate pair concatenated together.
 	SSLCertificates []string `json:"ssl_certificates"`
 
 	// Start your Gateway HTTP server on specific server name
 	ServerName string `json:"server_name"`
 
-	// Minimum TLS version. Possible values: https://tyk.io/docs/basic-config-and-security/security/tls-and-ssl/#values-for-tls-versions
+	// Minimum TLS version. Possible values: https://tyk.io/docs/api-management/certificates#supported-tls-versions
 	MinVersion uint16 `json:"min_version"`
 
 	// Maximum TLS version.
@@ -515,7 +518,7 @@ type HttpServerOptionsConfig struct {
 	// Disable automatic character escaping, allowing to path original URL data to the upstream.
 	SkipTargetPathEscaping bool `json:"skip_target_path_escaping"`
 
-	// Custom SSL ciphers. See list of ciphers here https://tyk.io/docs/basic-config-and-security/security/tls-and-ssl/#specify-tls-cipher-suites-for-tyk-gateway--tyk-dashboard
+	// Custom SSL ciphers applicable when using TLS version 1.2. See the list of ciphers here https://tyk.io/docs/api-management/certificates#supported-tls-cipher-suites
 	Ciphers []string `json:"ssl_ciphers"`
 
 	// MaxRequestBodySize configures a maximum size limit for request body size (in bytes) for all APIs on the Gateway.
@@ -529,7 +532,7 @@ type HttpServerOptionsConfig struct {
 	// A value of zero (default) means that no maximum is set and API requests will not be tested.
 	//
 	// See more information about setting request size limits here:
-	// https://tyk.io/docs/basic-config-and-security/control-limit-traffic/request-size-limits/#maximum-request-sizes
+	// https://tyk.io/docs/api-management/traffic-transformation/#request-size-limits
 	MaxRequestBodySize int64 `json:"max_request_body_size"`
 }
 
@@ -684,9 +687,14 @@ func (pwl *PortsWhiteList) Decode(value string) error {
 	return nil
 }
 
-// StreamingConfig is for configuring tyk streaming
+// StreamingConfig holds the configuration for Tyk Streaming functionalities
 type StreamingConfig struct {
-	Enabled     bool     `json:"enabled"`
+	// This flag enables the Tyk Streaming feature.
+	Enabled bool `json:"enabled"`
+	// AllowUnsafe specifies a list of potentially unsafe streaming components that should be allowed in the configuration.
+	// By default, components that could pose security risks (like file access, subprocess execution, socket operations, etc.)
+	// are filtered out. This field allows administrators to explicitly permit specific unsafe components when needed.
+	// Use with caution as enabling unsafe components may introduce security vulnerabilities.
 	AllowUnsafe []string `json:"allow_unsafe"`
 	// EnableAll enables all Bento plugins (except unsafe ones) by disabling the streams validator
 	EnableAll bool `json:"enable_all"`
@@ -706,7 +714,7 @@ type Config struct {
 	// Custom hostname for the Control API
 	ControlAPIHostname string `json:"control_api_hostname"`
 
-	// Set to run your Gateway Control API on a separate port, and protect it behind a firewall if needed. Please make sure you follow this guide when setting the control port https://tyk.io/docs/planning-for-production/#change-your-control-port.
+	// Set this to expose the Tyk Gateway API on a separate port. You can protect it behind a firewall if needed. Please make sure you follow this guide when setting the control port https://tyk.io/docs/tyk-self-managed/#change-your-control-port.
 	ControlAPIPort int `json:"control_api_port"`
 
 	// This should be changed as soon as Tyk is installed on your system.
@@ -779,7 +787,7 @@ type Config struct {
 	Policies PoliciesConfig `json:"policies"`
 
 	// Defines the ports that will be available for the API services to bind to in the format
-	// documented here https://tyk.io/docs/key-concepts/tcp-proxy/#allowing-specific-ports.
+	// documented here https://tyk.io/docs/api-management/non-http-protocols/#allowing-specific-ports.
 	// Ports can be configured per protocol, e.g. https, tls etc.
 	// If configuring via environment variable `TYK_GW_PORTWHITELIST` then remember to escape
 	// JSON strings.
@@ -1054,7 +1062,7 @@ type Config struct {
 
 	NewRelic NewRelicConfig `json:"newrelic"`
 
-	// Enable debugging of your Tyk Gateway by exposing profiling information through https://tyk.io/docs/troubleshooting/tyk-gateway/profiling/
+	// Enable debugging of your Tyk Gateway by exposing profiling information through https://tyk.io/docs/api-management/troubleshooting-debugging
 	HTTPProfile bool `json:"enable_http_profiler"`
 
 	// Enables the real-time Gateway log view in the Dashboard.
@@ -1113,7 +1121,7 @@ type Config struct {
 	GlobalSessionLifetime int64 `bson:"global_session_lifetime" json:"global_session_lifetime"`
 
 	// This section enables the use of the KV capabilities to substitute configuration values.
-	// See more details https://tyk.io/docs/tyk-configuration-reference/kv-store/
+	// See more details https://tyk.io/docs/tyk-self-managed/#store-configuration-with-key-value-store
 	KV struct {
 		Consul ConsulConfig `json:"consul"`
 		Vault  VaultConfig  `json:"vault"`
@@ -1129,7 +1137,7 @@ type Config struct {
 	// The secret value may be used as `secrets://key1` from the API definition.
 	// In versions before gateway 5.3, only `listen_path` and `target_url` fields
 	// have had the secrets replaced.
-	// See more details https://tyk.io/docs/tyk-configuration-reference/kv-store/#how-to-access-the-externally-stored-data
+	// See more details https://tyk.io/docs/tyk-self-managed/#how-to-access-the-externally-stored-data
 	Secrets map[string]string `json:"secrets"`
 
 	// Override the default error code and or message returned by middleware.
@@ -1156,7 +1164,7 @@ type Config struct {
 	// ```
 	OverrideMessages map[string]TykError `bson:"override_messages" json:"override_messages"`
 
-	// Cloud flag shows the Gateway runs in Tyk-cloud.
+	// Cloud flag shows the Gateway runs in Tyk Cloud.
 	Cloud bool `json:"cloud"`
 
 	// Skip TLS verification for JWT JWKs url validation
@@ -1174,6 +1182,7 @@ type Config struct {
 	// OAS holds the configuration for various OpenAPI-specific functionalities
 	OAS OASConfig `json:"oas_config"`
 
+	// Streaming holds the configuration for Tyk Streaming functionalities
 	Streaming StreamingConfig `json:"streaming"`
 
 	Labs LabsConfig `json:"labs"`

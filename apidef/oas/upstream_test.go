@@ -148,15 +148,39 @@ func TestServiceDiscovery(t *testing.T) {
 }
 
 func TestUptimeTests(t *testing.T) {
-	var emptyTest UptimeTests
+	t.Run("empty", func(t *testing.T) {
+		var emptyTest UptimeTests
 
-	var convertedTest apidef.UptimeTests
-	emptyTest.ExtractTo(&convertedTest)
+		var convertedTest apidef.UptimeTests
+		emptyTest.ExtractTo(&convertedTest)
 
-	var resultTest UptimeTests
-	resultTest.Fill(convertedTest)
+		var resultTest UptimeTests
+		resultTest.Fill(convertedTest)
 
-	assert.Equal(t, emptyTest, resultTest)
+		assert.Equal(t, emptyTest, resultTest)
+	})
+
+	t.Run("filled & check timeout", func(t *testing.T) {
+		var uptimeTests = UptimeTests{
+			Enabled:          true,
+			ServiceDiscovery: nil,
+			Tests: []UptimeTest{
+				{
+					CheckURL: "http://test.com",
+					Timeout:  ReadableDuration(time.Millisecond * 50),
+					Method:   "POST",
+				},
+			},
+		}
+
+		var convertedTest apidef.UptimeTests
+
+		uptimeTests.ExtractTo(&convertedTest)
+
+		assert.Equal(t, time.Millisecond*50, convertedTest.CheckList[0].Timeout)
+		assert.Equal(t, uptimeTests.Tests[0].CheckURL, convertedTest.CheckList[0].CheckURL)
+		assert.Equal(t, uptimeTests.Tests[0].Method, convertedTest.CheckList[0].Method)
+	})
 }
 
 func TestUpstreamMutualTLS(t *testing.T) {

@@ -12,9 +12,9 @@ import (
 	"github.com/buger/jsonparser"
 	"github.com/hashicorp/go-multierror"
 	pkgver "github.com/hashicorp/go-version"
-	"github.com/xeipuuv/gojsonschema"
 
 	tykerrors "github.com/TykTechnologies/tyk/internal/errors"
+	"github.com/TykTechnologies/tyk/internal/service/gojsonschema"
 	logger "github.com/TykTechnologies/tyk/log"
 )
 
@@ -47,6 +47,7 @@ func loadOASSchema() error {
 		}
 
 		xTykAPIGwSchemaWithoutDefs := jsonparser.Delete(xTykAPIGwSchema, keyDefinitions)
+
 		oasJSONSchemas = make(map[string][]byte)
 		members, err := schemaDir.ReadDir("schema")
 		for _, member := range members {
@@ -59,8 +60,10 @@ func loadOASSchema() error {
 				continue
 			}
 
-			if strings.HasSuffix(fileName, fmt.Sprintf("%s.json", ExtensionTykAPIGateway)) ||
-				strings.HasSuffix(fileName, fmt.Sprintf("%s.strict.json", ExtensionTykAPIGateway)) {
+			if strings.HasSuffix(fileName, fmt.Sprintf("%s.json", ExtensionTykAPIGateway)) {
+				continue
+			}
+			if strings.HasSuffix(fileName, fmt.Sprintf("%s.strict.json", ExtensionTykAPIGateway)) {
 				continue
 			}
 

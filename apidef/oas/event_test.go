@@ -142,6 +142,53 @@ func TestEventHandlers(t *testing.T) {
 				},
 			},
 			{
+				title: "log events",
+				input: EventHandlers{
+					{
+						Enabled: true,
+						Trigger: event.QuotaExceeded,
+						Kind:    event.LogKind,
+						ID:      "random-id",
+						Name:    "QuotaExceededEvent",
+						LogEvent: LogEvent{
+							LogPrefix: "QuotaExceededEvent",
+						},
+					},
+					{
+						Enabled: false,
+						Trigger: event.RateLimitExceeded,
+						Kind:    event.LogKind,
+						ID:      "",
+						Name:    "RateLimitExceededEvent",
+						LogEvent: LogEvent{
+							LogPrefix: "RateLimitExceededEvent",
+						},
+					},
+				},
+				expected: apidef.EventHandlerMetaConfig{
+					Events: map[event.Event][]apidef.EventHandlerTriggerConfig{
+						event.QuotaExceeded: {
+							{
+								Handler: event.LogHandler,
+								HandlerMeta: map[string]any{
+									"disabled": false,
+									"prefix":   "QuotaExceededEvent",
+								},
+							},
+						},
+						event.RateLimitExceeded: {
+							{
+								Handler: event.LogHandler,
+								HandlerMeta: map[string]any{
+									"disabled": true,
+									"prefix":   "RateLimitExceededEvent",
+								},
+							},
+						},
+					},
+				},
+			},
+			{
 				title: "skip non webhook actions",
 				input: EventHandlers{
 					{
@@ -323,6 +370,53 @@ func TestEventHandlers(t *testing.T) {
 				},
 			},
 			{
+				title: "log event",
+				input: apidef.EventHandlerMetaConfig{
+					Events: map[event.Event][]apidef.EventHandlerTriggerConfig{
+						event.QuotaExceeded: {
+							{
+								Handler: event.LogHandler,
+								HandlerMeta: map[string]any{
+									"disabled": false,
+									"prefix":   "QuotaExceededEvent",
+								},
+							},
+						},
+						event.RateLimitExceeded: {
+							{
+								Handler: event.LogHandler,
+								HandlerMeta: map[string]any{
+									"disabled": true,
+									"prefix":   "RateLimitExceededEvent",
+								},
+							},
+						},
+					},
+				},
+				expected: EventHandlers{
+					{
+						Enabled: true,
+						Trigger: event.QuotaExceeded,
+						Kind:    event.LogKind,
+						ID:      "",
+						Name:    "QuotaExceededEvent",
+						LogEvent: LogEvent{
+							LogPrefix: "QuotaExceededEvent",
+						},
+					},
+					{
+						Enabled: false,
+						Trigger: event.RateLimitExceeded,
+						Kind:    event.LogKind,
+						ID:      "",
+						Name:    "RateLimitExceededEvent",
+						LogEvent: LogEvent{
+							LogPrefix: "RateLimitExceededEvent",
+						},
+					},
+				},
+			},
+			{
 				title:    "skip empty actions",
 				input:    apidef.EventHandlerMetaConfig{},
 				expected: nil,
@@ -425,6 +519,27 @@ func TestEventHandler_MarshalJSON(t *testing.T) {
 				"path":         "event_handlers/session_editor.js",
 			},
 		},
+		{
+			title: "should marshal log event handler",
+			input: EventHandler{
+				Enabled: true,
+				Trigger: event.QuotaExceeded,
+				Kind:    event.LogKind,
+				ID:      "random-id",
+				Name:    "test-log",
+				LogEvent: LogEvent{
+					LogPrefix: "QuotaExceededEvent",
+				},
+			},
+			expected: map[string]any{
+				"id":        "random-id",
+				"enabled":   true,
+				"trigger":   "QuotaExceeded",
+				"type":      "log",
+				"name":      "test-log",
+				"logPrefix": "QuotaExceededEvent",
+			},
+		},
 	}
 
 	for _, tc := range testCases {
@@ -505,6 +620,27 @@ func TestEventHandler_UnmarshalJSON(t *testing.T) {
 				JSVMEvent: JSVMEvent{
 					FunctionName: "myCustomEventHandler",
 					Path:         "event_handlers/session_editor.js",
+				},
+			},
+		},
+		{
+			title: "should unmarshal log event handler",
+			input: map[string]any{
+				"id":        "random-id",
+				"enabled":   true,
+				"trigger":   "QuotaExceeded",
+				"type":      "log",
+				"name":      "test-log",
+				"logPrefix": "QuotaExceededEvent",
+			},
+			expected: EventHandler{
+				Enabled: true,
+				Trigger: event.QuotaExceeded,
+				Kind:    event.LogKind,
+				ID:      "random-id",
+				Name:    "test-log",
+				LogEvent: LogEvent{
+					LogPrefix: "QuotaExceededEvent",
 				},
 			},
 		},

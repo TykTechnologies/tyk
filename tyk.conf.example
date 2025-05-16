@@ -28,7 +28,8 @@
   },
   "allow_master_keys": false,
   "policies": {
-    "policy_source": "file"
+    "policy_source": "file",
+    "allow_explicit_policy_id": true
   },
   "http_server_options": {
     "enable_strict_routes": true,

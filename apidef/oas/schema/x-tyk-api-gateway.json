@@ -405,6 +405,9 @@
         "rawBodyOnly": {
           "type": "boolean"
         },
+        "requireSession": {
+          "type": "boolean"
+        },
         "idExtractor": {
           "$ref": "#/definitions/X-Tyk-IDExtractor"
         }
@@ -567,11 +570,23 @@
         "contextVariables": {
           "$ref": "#/definitions/X-Tyk-ContextVariables"
         },
+        "ignoreCase": {
+          "$ref": "#/definitions/X-Tyk-IgnoreCase"
+        },
         "trafficLogs": {
           "$ref": "#/definitions/X-Tyk-TrafficLogs"
         },
         "requestSizeLimit": {
           "$ref": "#/definitions/X-Tyk-GlobalRequestSizeLimit"
+        },
+        "skipRateLimit": {
+          "type": "boolean"
+        },
+        "skipQuota": {
+          "type": "boolean"
+        },
+        "skipQuotaReset": {
+          "type": "boolean"
         }
       }
     },
@@ -1362,6 +1377,9 @@
         "preserveHostHeader": {
           "$ref": "#/definitions/X-Tyk-PreserveHostHeader"
         },
+        "preserveTrailingSlash": {
+          "$ref": "#/definitions/X-Tyk-PreserveTrailingSlash"
+        },
         "tlsTransport": {
           "$ref": "#/definitions/X-Tyk-TLSTransport"
         },
@@ -1862,8 +1880,7 @@
         "threshold": {
           "type": "number",
           "minimum": 0,
-          "maximum": 1,
-          "multipleOf": 0.01
+          "maximum": 1
         },
         "sampleSize": {
           "type": "integer",
@@ -1927,6 +1944,9 @@
         },
         {
           "$ref": "#/definitions/X-Tyk-JSVMEvent"
+        },
+        {
+          "$ref": "#/definitions/X-Tyk-LogEvent"
         }
       ]
     },
@@ -2049,11 +2069,42 @@
         "path"
       ]
     },
+    "X-Tyk-LogEvent": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "trigger": {
+          "$ref": "#/definitions/X-Tyk-EventTrigger"
+        },
+        "type": {
+          "$ref": "#/definitions/X-Tyk-EventType"
+        },
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "logPrefix": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "enabled",
+        "trigger",
+        "type",
+        "name",
+        "logPrefix"
+      ]
+    },
     "X-Tyk-EventType": {
       "type": "string",
       "enum": [
         "webhook",
-        "custom"
+        "custom",
+        "log"
       ]
     },
     "X-Tyk-EventTrigger": {
@@ -2081,6 +2132,17 @@
       ]
     },
     "X-Tyk-ContextVariables": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "enabled"
+      ]
+    },
+    "X-Tyk-IgnoreCase": {
       "type": "object",
       "properties": {
         "enabled": {
@@ -2370,6 +2432,9 @@
         "enabled": {
           "type": "boolean"
         },
+        "skipUnavailableHosts": {
+          "type": "boolean"
+        },
         "targets": {
           "type": "array",
           "items": [
@@ -2448,6 +2513,17 @@
         "enabled"
       ]
     },
+    "X-Tyk-PreserveTrailingSlash": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "enabled"
+      ]
+    },
     "X-Tyk-UptimeTestCommand": {
       "type": "object",
       "properties": {
@@ -2483,9 +2559,6 @@
         "method": {
           "type": "string"
         },
-        "protocol": {
-          "type": "string"
-        },
         "timeout": {
           "$ref": "#/definitions/X-Tyk-ReadableDuration"
         },
@@ -2497,6 +2570,9 @@
     "X-Tyk-UptimeTests": {
       "type": "object",
       "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
         "hostDownRetestPeriod": {
           "$ref": "#/definitions/X-Tyk-ReadableDuration"
         },
@@ -2512,11 +2588,14 @@
             "$ref": "#/definitions/X-Tyk-UptimeTest"
           }
         }
-      }
+      },
+      "required": [
+        "enabled"
+      ]
     },
     "X-Tyk-ReadableDuration": {
       "type": "string",
-      "pattern": "^(\\d+h)?(\\d+m)?(\\d+s)?$"
+      "pattern": "^(\\d+h)?(\\d+m)?(\\d+s)?(\\d+ms)?(\\d+µs)?(\\d+ns)?$"
     },
     "X-Tyk-LoadBalancingTarget": {
       "type": "object",

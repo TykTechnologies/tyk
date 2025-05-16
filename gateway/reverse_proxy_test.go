@@ -377,6 +377,14 @@ func (s *Test) TestNewWrappedServeHTTP() *ReverseProxy {
 	return s.Gw.TykNewSingleHostReverseProxy(target, spec, nil)
 }
 
+func createReverseProxyAndServeHTTP(ts *Test, req *http.Request) (*httptest.ResponseRecorder, ProxyResponse) {
+	proxy := ts.TestNewWrappedServeHTTP()
+	recorder := httptest.NewRecorder()
+	resp := proxy.WrappedServeHTTP(recorder, req, false)
+
+	return recorder, resp
+}
+
 func TestWrappedServeHTTP(t *testing.T) {
 	idleConnTimeout = 1
 
@@ -384,15 +392,23 @@ func TestWrappedServeHTTP(t *testing.T) {
 	defer ts.Close()
 
 	for i := 0; i < 10; i++ {
-		proxy := ts.TestNewWrappedServeHTTP()
-		recorder := httptest.NewRecorder()
-		req, _ := http.NewRequest(http.MethodGet, "/", nil)
-		proxy.WrappedServeHTTP(recorder, req, false)
+		req := httptest.NewRequest(http.MethodGet, "/", nil)
+		_, _ = createReverseProxyAndServeHTTP(ts, req)
 	}
 
 	assert.Equal(t, 10, ts.Gw.ConnectionWatcher.Count())
 	time.Sleep(time.Second * 2)
 	assert.Equal(t, 0, ts.Gw.ConnectionWatcher.Count())
+
+	// Test error on deepCopyBody function
+	mockReadCloser := createMockReadCloserWithError(errors.New("test error"))
+	req := httptest.NewRequest(http.MethodPost, "/test", mockReadCloser)
+	// Set any ContentLength - httptest.NewRequest sets it only for bytes.Buffer, bytes.Reader and strings.Reader
+	req.ContentLength = 1
+	recorder, proxyResponse := createReverseProxyAndServeHTTP(ts, req)
+	assert.NotNil(t, proxyResponse, "error on deepCopyBody should return an empty ProxyResponse")
+	assert.Nil(t, proxyResponse.Response, "no response should be expected on error")
+	assert.Equal(t, http.StatusInternalServerError, recorder.Code)
 }
 
 func TestCircuitBreaker5xxs(t *testing.T) {
@@ -863,6 +879,83 @@ func TestNopCloseResponseBody(t *testing.T) {
 	}
 }
 
+func TestDeepCopyBody(t *testing.T) {
+	var src *http.Request
+	var trg *http.Request
+	assert.Nil(t, deepCopyBody(src, trg), "nil requests should remain nil without any error")
+
+	src = &http.Request{}
+	trg = &http.Request{}
+	assert.Nil(t, deepCopyBody(src, trg), "nil source request body should return without any error")
+
+	testData := []byte("testDeepCopy")
+	src = httptest.NewRequest(http.MethodPost, "/test", bytes.NewReader(testData))
+	src.ContentLength = -1
+	assert.Nil(t, deepCopyBody(src, trg),
+		"source request with ContentLength == -1 should return without any error")
+	assert.Nil(t, trg.Body, "target request body should not be updated when ContentLength == -1")
+
+	src = httptest.NewRequest(http.MethodPost, "/test", bytes.NewReader(testData))
+	assert.Nil(t, deepCopyBody(src, trg), "request with body should return without any error")
+	assert.NotNil(t, trg.Body, "target request body should be updated")
+	assert.True(t, src.Body != trg.Body, "target request should have different body than source request")
+
+	trgData, err := io.ReadAll(trg.Body)
+	assert.Nil(t, err, "target request body should be readable")
+	assert.Equal(t, testData, trgData, "target request body should contain the same data")
+
+	mockReadCloser := createMockReadCloserWithError(errors.New("test error"))
+	src = httptest.NewRequest(http.MethodPost, "/test", mockReadCloser)
+	// Set any ContentLength - httptest.NewRequest sets it only for bytes.Buffer, bytes.Reader and strings.Reader
+	src.ContentLength = int64(len(testData))
+	trg = &http.Request{}
+	err = deepCopyBody(src, trg)
+	assert.NotNil(t, err, "function should return an error when ReadAll fails")
+	assert.Nil(t, trg.Body, "target request body should not be updated when ReadAll fails")
+	assert.True(t, mockReadCloser.CloseCalled, "close function should have been called")
+	_, ok := src.Body.(*nopCloserBuffer)
+	assert.True(t, ok, "target request body should have been of type nopCloserBuffer")
+}
+
+func BenchmarkGraphqlUDG(b *testing.B) {
+	g := StartTest(func(globalConf *config.Config) {
+		globalConf.OpenTelemetry.Enabled = true
+	})
+	b.Cleanup(g.Close)
+
+	composedAPI := BuildAPI(func(spec *APISpec) {
+		spec.Proxy.ListenPath = "/"
+		spec.EnableContextVars = true
+		spec.GraphQL.Enabled = true
+		spec.GraphQL.ExecutionMode = apidef.GraphQLExecutionModeExecutionEngine
+		spec.GraphQL.Version = apidef.GraphQLConfigVersion2
+
+		spec.GraphQL.Engine.DataSources = []apidef.GraphQLEngineDataSource{
+			generateRESTDataSourceV2(func(ds *apidef.GraphQLEngineDataSource, restConfig *apidef.GraphQLEngineDataSourceConfigREST) {
+				require.NoError(b, json.Unmarshal([]byte(testRESTHeadersDataSourceConfigurationV2), ds))
+				require.NoError(b, json.Unmarshal(ds.Config, restConfig))
+			}),
+		}
+
+		spec.GraphQL.TypeFieldConfigurations = nil
+	})[0]
+
+	g.Gw.LoadAPI(composedAPI)
+
+	headers := graphql.Request{
+		Query: "query Query { headers { name value } }",
+	}
+
+	for i := 0; i < b.N; i++ {
+		_, _ = g.Run(b, []test.TestCase{
+			{
+				Data: headers,
+				Code: http.StatusOK,
+			},
+		}...)
+	}
+}
+
 func TestGraphQL_UDGHeaders(t *testing.T) {
 	g := StartTest(nil)
 	t.Cleanup(g.Close)
@@ -904,6 +997,7 @@ func TestGraphQL_UDGHeaders(t *testing.T) {
 		Query: "query Query { headers { name value } }",
 	}
 
+	// Test headers are gotten and updated for subsequent requests
 	_, _ = g.Run(t, []test.TestCase{
 		{
 			Data: headers,
@@ -921,6 +1015,24 @@ func TestGraphQL_UDGHeaders(t *testing.T) {
 					strings.Contains(string(b), `{"name":"Context","value":"request-context"}`) &&
 					strings.Contains(string(b), `{"name":"Global-Static","value":"foobar"}`) &&
 					strings.Contains(string(b), `{"name":"Global-Context","value":"request-global-context"}`) &&
+					strings.Contains(string(b), `{"name":"Does-Exist-Already","value":"ds-does-exist-already"}`)
+			},
+		},
+		{
+			Data: headers,
+			Headers: map[string]string{
+				"injected":            "FOO",
+				"From-Request":        "request-context",
+				"Global-From-Request": "follow-up-request-global-context",
+			},
+			Code: http.StatusOK,
+			BodyMatchFunc: func(b []byte) bool {
+				return strings.Contains(string(b), `"headers":`) &&
+					strings.Contains(string(b), `{"name":"Injected","value":"FOO"}`) &&
+					strings.Contains(string(b), `{"name":"Static","value":"barbaz"}`) &&
+					strings.Contains(string(b), `{"name":"Context","value":"request-context"}`) &&
+					strings.Contains(string(b), `{"name":"Global-Static","value":"foobar"}`) &&
+					strings.Contains(string(b), `{"name":"Global-Context","value":"follow-up-request-global-context"}`) &&
 					strings.Contains(string(b), `{"name":"Does-Exist-Already","value":"ds-does-exist-already"}`)
 			},
 		},
@@ -2026,4 +2138,280 @@ func BenchmarkLargeResponsePayload(b *testing.B) {
 			Code:   http.StatusOK,
 		})
 	}
+}
+
+func TestTimeoutPrioritization(t *testing.T) {
+	t.Parallel()
+
+	ts := StartTest(func(c *config.Config) {
+		c.ProxyDefaultTimeout = 2
+	})
+	defer ts.Close()
+
+	t.Run("Basic Timeout Behavior - enforced timeout higher than default", func(t *testing.T) {
+		upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			time.Sleep(1 * time.Second)
+			w.Write([]byte("Success"))
+		}))
+		defer upstream.Close()
+
+		api := BuildAPI(func(spec *APISpec) {
+			spec.Proxy.ListenPath = "/"
+			spec.Proxy.TargetURL = upstream.URL
+			spec.UseKeylessAccess = true
+			spec.EnforcedTimeoutEnabled = true
+			UpdateAPIVersion(spec, "", func(version *apidef.VersionInfo) {
+				version.UseExtendedPaths = true
+				version.ExtendedPaths.HardTimeouts = []apidef.HardTimeoutMeta{
+					{
+						Disabled: false,
+						Path:     "/test1",
+						Method:   http.MethodGet,
+						TimeOut:  4,
+					},
+				}
+			})
+		})[0]
+
+		ts.Gw.LoadAPI(api)
+
+		_, _ = ts.Run(t, test.TestCase{
+			Method:    http.MethodGet,
+			Path:      "/test1",
+			Code:      http.StatusOK,
+			BodyMatch: "Success",
+		})
+	})
+
+	t.Run("Basic Timeout Behavior - enforced timeout lower than default", func(t *testing.T) {
+		upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			time.Sleep(3 * time.Second)
+			w.Write([]byte("Success"))
+		}))
+		defer upstream.Close()
+
+		api := BuildAPI(func(spec *APISpec) {
+			spec.Proxy.ListenPath = "/"
+			spec.Proxy.TargetURL = upstream.URL
+			spec.UseKeylessAccess = true
+			spec.EnforcedTimeoutEnabled = true
+			UpdateAPIVersion(spec, "", func(version *apidef.VersionInfo) {
+				version.UseExtendedPaths = true
+				version.ExtendedPaths.HardTimeouts = []apidef.HardTimeoutMeta{
+					{
+						Disabled: false,
+						Path:     "/test2",
+						Method:   http.MethodGet,
+						TimeOut:  1,
+					},
+				}
+			})
+		})[0]
+
+		ts.Gw.LoadAPI(api)
+
+		_, _ = ts.Run(t, test.TestCase{
+			Method:    http.MethodGet,
+			Path:      "/test2",
+			Code:      http.StatusGatewayTimeout,
+			BodyMatch: "Upstream service reached hard timeout",
+		})
+	})
+
+	t.Run("Basic Timeout Behavior - delay higher than both timeouts", func(t *testing.T) {
+		upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			time.Sleep(3 * time.Second)
+			w.Write([]byte("Success"))
+		}))
+		defer upstream.Close()
+
+		api := BuildAPI(func(spec *APISpec) {
+			spec.Proxy.ListenPath = "/"
+			spec.Proxy.TargetURL = upstream.URL
+			spec.UseKeylessAccess = true
+			spec.EnforcedTimeoutEnabled = true
+			UpdateAPIVersion(spec, "", func(version *apidef.VersionInfo) {
+				version.UseExtendedPaths = true
+				version.ExtendedPaths.HardTimeouts = []apidef.HardTimeoutMeta{
+					{
+						Disabled: false,
+						Path:     "/test3",
+						Method:   http.MethodGet,
+						TimeOut:  1,
+					},
+				}
+			})
+		})[0]
+
+		ts.Gw.LoadAPI(api)
+
+		_, _ = ts.Run(t, test.TestCase{
+			Method:    http.MethodGet,
+			Path:      "/test3",
+			Code:      http.StatusGatewayTimeout,
+			BodyMatch: "Upstream service reached hard timeout",
+		})
+	})
+
+	t.Run("Basic Timeout Behavior - delay within enforced timeout", func(t *testing.T) {
+		upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			time.Sleep(1 * time.Second)
+			w.Write([]byte("Success"))
+		}))
+		defer upstream.Close()
+
+		api := BuildAPI(func(spec *APISpec) {
+			spec.Proxy.ListenPath = "/"
+			spec.Proxy.TargetURL = upstream.URL
+			spec.UseKeylessAccess = true
+			spec.EnforcedTimeoutEnabled = true
+			UpdateAPIVersion(spec, "", func(version *apidef.VersionInfo) {
+				version.UseExtendedPaths = true
+				version.ExtendedPaths.HardTimeouts = []apidef.HardTimeoutMeta{
+					{
+						Disabled: false,
+						Path:     "/test4",
+						Method:   http.MethodGet,
+						TimeOut:  3,
+					},
+				}
+			})
+		})[0]
+
+		ts.Gw.LoadAPI(api)
+
+		_, _ = ts.Run(t, test.TestCase{
+			Method:    http.MethodGet,
+			Path:      "/test4",
+			Code:      http.StatusOK,
+			BodyMatch: "Success",
+		})
+	})
+
+	t.Run("Multiple Endpoints with Different Enforced Timeouts", func(t *testing.T) {
+		upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if strings.HasPrefix(r.URL.Path, "/delay/") {
+				time.Sleep(1000 * time.Millisecond)
+				w.Write([]byte("Delay 1s response"))
+			} else if strings.HasPrefix(r.URL.Path, "/delay2/") {
+				time.Sleep(2000 * time.Millisecond)
+				w.Write([]byte("Delay2 2s response"))
+			} else {
+				w.WriteHeader(http.StatusNotFound)
+			}
+		}))
+		defer upstream.Close()
+
+		api := BuildAPI(func(spec *APISpec) {
+			spec.Proxy.ListenPath = "/"
+			spec.Proxy.TargetURL = upstream.URL
+			spec.UseKeylessAccess = true
+			spec.EnforcedTimeoutEnabled = true
+			UpdateAPIVersion(spec, "", func(version *apidef.VersionInfo) {
+				version.UseExtendedPaths = true
+				version.ExtendedPaths.HardTimeouts = []apidef.HardTimeoutMeta{
+					{
+						Disabled: false,
+						Path:     "^/delay/1$",
+						Method:   http.MethodGet,
+						TimeOut:  4,
+					},
+					{
+						Disabled: false,
+						Path:     "^/delay2/2$",
+						Method:   http.MethodGet,
+						TimeOut:  1,
+					},
+				}
+			})
+		})[0]
+
+		ts.Gw.LoadAPI(api)
+
+		_, _ = ts.Run(t, test.TestCase{
+			Method:    http.MethodGet,
+			Path:      "/delay/1",
+			Code:      http.StatusOK,
+			BodyMatch: "Delay 1s response",
+		})
+
+		_, _ = ts.Run(t, test.TestCase{
+			Method:    http.MethodGet,
+			Path:      "/delay2/2",
+			Code:      http.StatusGatewayTimeout,
+			BodyMatch: "Upstream service reached hard timeout",
+		})
+	})
+
+	t.Run("Explicit vs Default Global Timeout", func(t *testing.T) {
+		upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if strings.HasPrefix(r.URL.Path, "/delay/1000") {
+				time.Sleep(1000 * time.Millisecond)
+				w.Write([]byte("Delay 1s response"))
+			} else if strings.HasPrefix(r.URL.Path, "/delay/4000") {
+				time.Sleep(4000 * time.Millisecond)
+				w.Write([]byte("Delay 4s response"))
+			} else if strings.HasPrefix(r.URL.Path, "/delay2/1000") {
+				time.Sleep(1000 * time.Millisecond)
+				w.Write([]byte("Delay2 1s response"))
+			} else if strings.HasPrefix(r.URL.Path, "/delay2/4000") {
+				time.Sleep(4000 * time.Millisecond)
+				w.Write([]byte("Delay2 4s response"))
+			} else {
+				w.WriteHeader(http.StatusNotFound)
+			}
+		}))
+		defer upstream.Close()
+
+		api := BuildAPI(func(spec *APISpec) {
+			spec.Proxy.ListenPath = "/"
+			spec.Proxy.TargetURL = upstream.URL
+			spec.UseKeylessAccess = true
+			spec.EnforcedTimeoutEnabled = true
+			UpdateAPIVersion(spec, "", func(version *apidef.VersionInfo) {
+				version.UseExtendedPaths = true
+				version.ExtendedPaths.HardTimeouts = []apidef.HardTimeoutMeta{
+					{
+						Disabled: false,
+						Path:     "/delay/.*",
+						Method:   http.MethodGet,
+						TimeOut:  3,
+					},
+					// No explicit timeout for /delay2/* endpoints - will use global
+				}
+			})
+		})[0]
+
+		ts.Gw.LoadAPI(api)
+
+		// Test case 1: Should succeed (delay 45ms < enforced timeout 60ms)
+		_, _ = ts.Run(t, test.TestCase{
+			Method:    http.MethodGet,
+			Path:      "/delay/1000",
+			Code:      http.StatusOK,
+			BodyMatch: "Delay 1s response",
+		})
+
+		_, _ = ts.Run(t, test.TestCase{
+			Method:    http.MethodGet,
+			Path:      "/delay/4000",
+			Code:      http.StatusGatewayTimeout,
+			BodyMatch: "Upstream service reached hard timeout",
+		})
+
+		_, _ = ts.Run(t, test.TestCase{
+			Method:    http.MethodGet,
+			Path:      "/delay2/1000",
+			Code:      http.StatusOK,
+			BodyMatch: "Delay2 1s response",
+		})
+
+		// Test case 4: Should timeout at global value (delay 60ms > global timeout 50ms)
+		_, _ = ts.Run(t, test.TestCase{
+			Method:    http.MethodGet,
+			Path:      "/delay2/4000",
+			Code:      http.StatusGatewayTimeout,
+			BodyMatch: "Upstream service reached hard timeout",
+		})
+	})
 }

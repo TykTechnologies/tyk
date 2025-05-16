@@ -26,6 +26,12 @@ vars:
   path: ./...
 
 tasks:
+  build:
+    desc: "Build tyk gateway"
+    cmds:
+      - go build .
+      - cd gateway && go test -c . && cd ..
+
   docker:
     desc: "build Tyk gateway internal/tyk-gateway"
     cmds:
@@ -110,3 +116,8 @@ tasks:
     cmds:
       - find -name '*.so' -delete -print
       - find -name '*.test' -delete -print
+
+  generate-bento-config-validator-schema:
+    desc: "Generate Bento Config Validator Schema"
+    cmds:
+      - go run apidef/streams/bento/schema/generate_bento_config_schema.go -o apidef/streams/bento/schema/bento-config-schema.json

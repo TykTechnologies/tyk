@@ -4,12 +4,15 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"sort"
+	"strconv"
 	"strings"
 
-	"github.com/getkin/kin-openapi/openapi3"
+	"github.com/TykTechnologies/kin-openapi/openapi3"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/internal/oasutil"
+	"github.com/TykTechnologies/tyk/regexp"
 )
 
 // Operations holds Operation definitions.
@@ -163,6 +166,74 @@ func (s *OAS) fillPathsAndOperations(ep apidef.ExtendedPathsSet) {
 	s.fillDoNotTrackEndpoint(ep.DoNotTrackEndpoints)
 	s.fillRequestSizeLimit(ep.SizeLimit)
 	s.fillRateLimitEndpoints(ep.RateLimit)
+	s.fillMockResponsePaths(s.Paths, ep)
+}
+
+// fillMockResponsePaths converts classic API mock responses to OAS format.
+// This method only handles direct mock response conversions, as other middleware
+// configurations (like allow lists, block lists, etc.) are converted to classic
+// API mock responses in an earlier step of the process.
+//
+// For each mock response, it:
+// 1. Creates an OAS operation with a unique ID (if it doesn't exist)
+// 2. Sets up the mock response with content type detection and example values
+// 3. Configures the operation to ignore authentication for this endpoint
+//
+// The content type is determined by:
+// - Checking the Content-Type header if present
+// - Attempting to parse the body as JSON
+// - Defaulting to text/plain if neither above applies
+func (s *OAS) fillMockResponsePaths(paths openapi3.Paths, ep apidef.ExtendedPathsSet) {
+	for _, mock := range ep.MockResponse {
+		operationID := s.getOperationID(mock.Path, mock.Method)
+
+		var operation *openapi3.Operation
+
+		for _, item := range paths {
+			if op := item.GetOperation(mock.Method); op != nil && op.OperationID == operationID {
+				operation = op
+				break
+			}
+		}
+
+		if operation.Responses == nil {
+			operation.Responses = openapi3.NewResponses()
+		}
+
+		// Response description is required by the OAS spec, but we don't have it in Tyk classic.
+		// So we're using a dummy value to satisfy the spec.
+		var oasDesc string
+
+		response := &openapi3.Response{
+			Description: &oasDesc,
+		}
+
+		operation.Responses[strconv.Itoa(mock.Code)] = &openapi3.ResponseRef{
+			Value: response,
+		}
+
+		delete(operation.Responses, "default")
+
+		tykOperation := s.GetTykExtension().getOperation(operation.OperationID)
+
+		if tykOperation.MockResponse == nil {
+			tykOperation.MockResponse = &MockResponse{}
+		}
+
+		tykOperation.MockResponse.Fill(mock)
+
+		if tykOperation.IgnoreAuthentication == nil && tykOperation.MockResponse.FromOASExamples == nil {
+			// We need to to add ignoreAuthentication middleware to the operation
+			// to stay consistent to the way mock responses work for classic APIs
+			tykOperation.IgnoreAuthentication = &Allowance{Enabled: true}
+		}
+
+		if ShouldOmit(tykOperation.MockResponse) {
+			tykOperation.MockResponse = &MockResponse{
+				FromOASExamples: &FromOASExamples{},
+			}
+		}
+	}
 }
 
 func (s *OAS) extractPathsAndOperations(ep *apidef.ExtendedPathsSet) {
@@ -202,6 +273,8 @@ func (s *OAS) extractPathsAndOperations(ep *apidef.ExtendedPathsSet) {
 			}
 		}
 	}
+
+	sortMockResponseAllowList(ep)
 }
 
 func (s *OAS) fillAllowance(endpointMetas []apidef.EndPointMeta, typ AllowanceType) {
@@ -217,6 +290,12 @@ func (s *OAS) fillAllowance(endpointMetas []apidef.EndPointMeta, typ AllowanceTy
 		case ignoreAuthentication:
 			allowance = newAllowance(&operation.IgnoreAuthentication)
 		default:
+			// Skip endpoints that have mock responses configured via method actions, we should avoid
+			// creating allowance for them.
+			if hasMockResponse(em.MethodActions) {
+				continue
+			}
+
 			allowance = newAllowance(&operation.Allow)
 		}
 
@@ -499,27 +578,25 @@ func isRegex(value string) bool {
 
 // splitPath splits URL into folder parts, detecting regex patterns.
 func splitPath(inPath string) ([]pathPart, bool) {
-	// Each URL fragment can contain a regex, but the whole
-	// URL isn't just a regex (`/a/.*/foot` => `/a/{param1}/foot`)
-	parts := strings.Split(strings.Trim(inPath, "/"), "/")
-	result := make([]pathPart, len(parts))
-	found := 0
+	trimmedPath := strings.Trim(inPath, "/")
 
-	for k, value := range parts {
-		name := value
-		isRegex := isRegex(value)
-		if isRegex {
-			found++
-			name = fmt.Sprintf("customRegex%d", found)
-		}
-		result[k] = pathPart{
-			name:    name,
-			value:   value,
-			isRegex: isRegex,
-		}
+	if trimmedPath == "" {
+		return []pathPart{}, false
 	}
 
-	return result, found > 0
+	parts := strings.Split(trimmedPath, "/")
+	result := make([]pathPart, len(parts))
+
+	regexCount := 0
+	hasRegex := false
+
+	for i, segment := range parts {
+		var part pathPart
+		part, regexCount, hasRegex = parsePathSegment(segment, regexCount, hasRegex)
+		result[i] = part
+	}
+
+	return result, hasRegex
 }
 
 // buildPath converts the URL paths with regex to named parameters
@@ -573,9 +650,23 @@ func (s *OAS) getOperationID(inPath, method string) string {
 		newPath := buildPath(parts, strings.HasSuffix(inPath, "/"))
 
 		p = createOrGetPathItem(newPath)
-		p.Parameters = []*openapi3.ParameterRef{}
+
+		// We should check if the parameters are already set before initializing it.
+		if p.Parameters == nil {
+			p.Parameters = []*openapi3.ParameterRef{}
+		}
+
+		existingParams := make(map[string]bool)
+		for _, existingParam := range p.Parameters {
+			existingParams[existingParam.Value.Name] = true
+		}
 
 		for _, part := range parts {
+			// Skip adding the parameter if it already exists so that we don't override it.
+			if existingParams[part.name] {
+				continue
+			}
+
 			if part.isRegex {
 				schema := &openapi3.SchemaRef{
 					Value: &openapi3.Schema{
@@ -729,6 +820,44 @@ type MockResponse struct {
 	FromOASExamples *FromOASExamples `bson:"fromOASExamples,omitempty" json:"fromOASExamples,omitempty"`
 }
 
+// Fill populates the MockResponse fields from a classic API MockResponseMeta.
+func (m *MockResponse) Fill(op apidef.MockResponseMeta) {
+	headers := make([]Header, 0)
+	for k, v := range op.Headers {
+		headers = append(headers, Header{
+			Name:  http.CanonicalHeaderKey(k),
+			Value: v,
+		})
+	}
+
+	// Sort headers by name so that the order is deterministic
+	sort.Slice(headers, func(i, j int) bool {
+		return headers[i].Name < headers[j].Name
+	})
+
+	m.Enabled = !op.Disabled
+	m.Code = op.Code
+	m.Body = op.Body
+	m.Headers = headers
+}
+
+func (m *MockResponse) ExtractTo(meta *apidef.MockResponseMeta) {
+	meta.Disabled = !m.Enabled
+	meta.Code = m.Code
+	meta.Body = m.Body
+
+	// Initialize headers map even when empty
+	meta.Headers = make(map[string]string)
+
+	for _, h := range m.Headers {
+		meta.Headers[h.Name] = h.Value
+	}
+
+	if len(meta.Headers) == 0 {
+		meta.Headers = nil
+	}
+}
+
 // FromOASExamples configures mock responses that should be returned from OAS example responses.
 type FromOASExamples struct {
 	// Enabled activates getting a mock response from OAS examples or schemas documented in OAS.
@@ -865,4 +994,102 @@ func (s *OAS) fillCircuitBreaker(metas []apidef.CircuitBreakerMeta) {
 			operation.CircuitBreaker = nil
 		}
 	}
+}
+
+// detectMockResponseContentType determines the Content-Type of the mock response.
+// It first checks the headers for an explicit Content-Type, then attempts to detect
+// the type from the body content. Returns "text/plain" if no specific type can be determined.
+func detectMockResponseContentType(mock apidef.MockResponseMeta) string {
+	const headerContentType = "Content-Type"
+
+	for name, value := range mock.Headers {
+		if http.CanonicalHeaderKey(name) == headerContentType {
+			return value
+		}
+	}
+
+	if mock.Body == "" {
+		return "text/plain"
+	}
+
+	// We attempt to guess the content type by checking if the body is a valid JSON.
+	var arrayValue = []json.RawMessage{}
+	if err := json.Unmarshal([]byte(mock.Body), &arrayValue); err == nil {
+		return "application/json"
+	}
+
+	var objectValue = map[string]json.RawMessage{}
+	if err := json.Unmarshal([]byte(mock.Body), &objectValue); err == nil {
+		return "application/json"
+	}
+
+	return "text/plain"
+}
+
+// sortMockResponseAllowList sorts the mock response paths by path, method, and response code.
+// This ensures a deterministic order of mock responses.
+func sortMockResponseAllowList(ep *apidef.ExtendedPathsSet) {
+	sort.Slice(ep.WhiteList, func(i, j int) bool {
+		// First sort by path
+		if ep.WhiteList[i].Path != ep.WhiteList[j].Path {
+			return ep.WhiteList[i].Path < ep.WhiteList[j].Path
+		}
+		// Then by method
+		if ep.WhiteList[i].Method != ep.WhiteList[j].Method {
+			return ep.WhiteList[i].Method < ep.WhiteList[j].Method
+		}
+
+		// Finally by response code
+		actionI, existsI := ep.WhiteList[i].MethodActions[ep.WhiteList[i].Method]
+		actionJ, existsJ := ep.WhiteList[j].MethodActions[ep.WhiteList[j].Method]
+
+		// If either method action doesn't exist, maintain stable sort order
+		if !existsI || !existsJ {
+			return false
+		}
+
+		return actionI.Code < actionJ.Code
+	})
+}
+
+// hasMockResponse returns true if any method action has a Reply action type.
+// This is used to determine if an endpoint should be treated as a mock response.
+func hasMockResponse(methodActions map[string]apidef.EndpointMethodMeta) bool {
+	for _, action := range methodActions {
+		if action.Action == apidef.Reply {
+			return true
+		}
+	}
+
+	return false
+}
+
+// parsePathSegment parses a single path segment and determines if it contains a regex pattern.
+func parsePathSegment(segment string, regexCount int, hasRegex bool) (pathPart, int, bool) {
+	if strings.HasPrefix(segment, "{") && strings.HasSuffix(segment, "}") {
+		return parseMuxTemplate(segment, regexCount)
+	} else if isIdentifier(segment) {
+		return pathPart{name: segment, value: segment, isRegex: false}, regexCount, hasRegex
+	} else {
+		regexCount++
+		return pathPart{name: fmt.Sprintf("customRegex%d", regexCount), value: segment, isRegex: true}, regexCount, true
+	}
+}
+
+// parseMuxTemplate parses a segment that is a mux template and extracts the name or assigns a custom regex name.
+func parseMuxTemplate(segment string, regexCount int) (pathPart, int, bool) {
+	segment = strings.Trim(segment, "{}")
+
+	name, _, ok := strings.Cut(segment, ":")
+	if ok || isIdentifier(segment) {
+		return pathPart{name: name, isRegex: true}, regexCount, true
+	}
+
+	regexCount++
+	return pathPart{name: fmt.Sprintf("customRegex%d", regexCount), isRegex: true}, regexCount, true
+}
+
+func isIdentifier(value string) bool {
+	matched, _ := regexp.MatchString(`^[a-zA-Z0-9._-]+$`, value) //nolint
+	return matched
 }

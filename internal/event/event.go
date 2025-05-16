@@ -97,6 +97,8 @@ const (
 	WebhookKind Kind = "webhook"
 	// JSVMKind represents a custom action to be executed when an event is triggered.
 	JSVMKind Kind = "custom"
+	// LogKind represents a log action to be performed when an event is triggered.
+	LogKind Kind = "log"
 )
 
 type contextKey string

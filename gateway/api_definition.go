@@ -22,9 +22,9 @@ import (
 
 	"github.com/TykTechnologies/tyk/internal/httputil"
 
-	"github.com/getkin/kin-openapi/routers/gorillamux"
+	"github.com/TykTechnologies/kin-openapi/routers/gorillamux"
 
-	"github.com/getkin/kin-openapi/openapi3"
+	"github.com/TykTechnologies/kin-openapi/openapi3"
 
 	"github.com/TykTechnologies/tyk/apidef/oas"
 
@@ -408,6 +408,8 @@ func (a APIDefinitionLoader) FromDashboardService(endpoint string) ([]*APISpec, 
 	newRequest.Header.Set(header.XTykNonce, a.Gw.ServiceNonce)
 	a.Gw.ServiceNonceMutex.RUnlock()
 
+	newRequest.Header.Set(header.XTykSessionID, a.Gw.SessionID)
+
 	c := a.Gw.initialiseClient()
 	resp, err := c.Do(newRequest)
 	if err != nil {
@@ -417,13 +419,11 @@ func (a APIDefinitionLoader) FromDashboardService(endpoint string) ([]*APISpec, 
 
 	if resp.StatusCode == http.StatusForbidden {
 		body, _ := ioutil.ReadAll(resp.Body)
-		a.Gw.reLogin()
 		return nil, fmt.Errorf("login failure, Response was: %v", string(body))
 	}
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := ioutil.ReadAll(resp.Body)
-		a.Gw.reLogin()
 		return nil, fmt.Errorf("dashboard API error, response was: %v", string(body))
 	}
 

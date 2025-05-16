@@ -26,7 +26,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/getkin/kin-openapi/openapi3"
+	"github.com/TykTechnologies/kin-openapi/openapi3"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/TykTechnologies/tyk/apidef/oas"
@@ -280,11 +280,17 @@ func (s *Test) reloadSimulation(ctx context.Context, gw *Gateway) {
 			return
 		default:
 			gw.policiesMu.Lock()
+			if gw.policiesByID == nil {
+				gw.policiesByID = make(map[string]user.Policy)
+			}
 			gw.policiesByID["_"] = user.Policy{}
 			delete(gw.policiesByID, "_")
 			gw.policiesMu.Unlock()
 
 			gw.apisMu.Lock()
+			if gw.apisByID == nil {
+				gw.apisByID = make(map[string]*APISpec)
+			}
 			gw.apisByID["_"] = nil
 			delete(gw.apisByID, "_")
 			gw.apisMu.Unlock()
@@ -2117,4 +2123,35 @@ func TestHelperSSEStreamClient(tb testing.TB, ts *Test, enableWebSockets bool) e
 	}
 	assert.Equal(tb, i, 5)
 	return nil
+}
+
+// MockErrorReader is a mock io.Reader that returns an error on Read
+type MockErrorReader struct {
+	ReturnError error
+}
+
+func (e *MockErrorReader) Read(_ []byte) (n int, err error) {
+	return 0, e.ReturnError
+}
+
+type MockReadCloser struct {
+	Reader      io.Reader
+	CloseError  error
+	CloseCalled bool
+}
+
+func (m *MockReadCloser) Read(p []byte) (n int, err error) {
+	return m.Reader.Read(p)
+}
+
+func (m *MockReadCloser) Close() error {
+	m.CloseCalled = true
+
+	return m.CloseError
+}
+
+func createMockReadCloserWithError(err error) *MockReadCloser {
+	return &MockReadCloser{
+		Reader: &MockErrorReader{err},
+	}
 }

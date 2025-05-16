@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/TykTechnologies/kin-openapi/openapi3"
 	"github.com/buger/jsonparser"
-	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	_ "github.com/warpstreamlabs/bento/public/components/io"
@@ -242,7 +242,14 @@ func TestValidateTykStreams_BentoConfigValidation(t *testing.T) {
                         "checkpoint_limit": 1024,
                         "auto_replay_nacks": true
                     }
-                }
+                },
+				"pipeline": {
+					"processors": [
+						{
+							"bloblang": "root = this \n root.fans = this.fans.filter(fan -> fan.obsession > 0.5)"
+						}
+					]
+				}
             }
         }
     },
@@ -285,7 +292,10 @@ func TestValidateTykStreams_BentoConfigValidation_Invalid_Config(t *testing.T) {
                         "checkpoint_limit": 1024,
                         "auto_replay_nacks": "true"
                     }
-                }
+                }, 
+				"pipeline": {
+					"bloblang": "root = this \n root.fans = this.fans.filter(fan -> fan.obsession > 0.5)"
+				}
             }
         }
     },
@@ -304,7 +314,8 @@ func TestValidateTykStreams_BentoConfigValidation_Invalid_Config(t *testing.T) {
     }
 }`)
 	err := ValidateOASObject(document, "3.0.3")
-	require.ErrorContains(t, err, "test-kafka-stream: input.kafka.auto_replay_nacks: Invalid type. Expected: boolean, given: string")
+	require.ErrorContains(t, err, "input.kafka.auto_replay_nacks: Invalid type. Expected: boolean, given: string")
+	require.ErrorContains(t, err, "pipeline: Additional property bloblang is not allowed")
 }
 
 func TestValidateTykStreams_BentoConfigValidation_Additional_Properties(t *testing.T) {

@@ -13,7 +13,6 @@ import (
 
 	_ "github.com/warpstreamlabs/bento/public/components/all"
 	"github.com/warpstreamlabs/bento/public/service"
-
 	_ "github.com/TykTechnologies/tyk/internal/portal"
 )
 
