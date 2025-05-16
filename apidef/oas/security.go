@@ -108,6 +108,11 @@ type JWT struct {
 	// Tyk classic API definition: `jwt_source`
 	Source string `bson:"source,omitempty" json:"source,omitempty"`
 
+	// JwkURIs contains a list of whitelisted JWK endpoints.
+	//
+	// Tyk classic API definition: `jwt_source`
+	JwkURIs []apidef.JWK `bson:"jwkURIs,omitempty" json:"jwkURIs,omitempty"`
+
 	// SigningMethod contains the signing method to use for the JWT.
 	//
 	// Tyk classic API definition: `jwt_signing_method`
@@ -206,6 +211,7 @@ func (s *OAS) fillJWT(api apidef.APIDefinition) {
 	jwt.Enabled = api.EnableJWT
 	jwt.AuthSources.Fill(ac)
 	jwt.Source = api.JWTSource
+	jwt.JwkURIs = api.JWTJwkURIs
 	jwt.SigningMethod = api.JWTSigningMethod
 	jwt.IdentityBaseField = api.JWTIdentityBaseField
 	jwt.SkipKid = api.JWTSkipKid
@@ -241,6 +247,7 @@ func (s *OAS) extractJWTTo(api *apidef.APIDefinition, name string) {
 	api.EnableJWT = jwt.Enabled
 	jwt.AuthSources.ExtractTo(&ac)
 	api.JWTSource = jwt.Source
+	api.JWTJwkURIs = jwt.JwkURIs
 	api.JWTSigningMethod = jwt.SigningMethod
 	api.JWTIdentityBaseField = jwt.IdentityBaseField
 	api.JWTSkipKid = jwt.SkipKid
@@ -878,6 +885,7 @@ func resetSecuritySchemes(api *apidef.APIDefinition) {
 	// JWT
 	api.EnableJWT = false
 	api.JWTSource = ""
+	api.JWTJwkURIs = nil
 	api.JWTSigningMethod = ""
 	api.JWTIdentityBaseField = ""
 	api.JWTSkipKid = false

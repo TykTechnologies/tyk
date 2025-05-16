@@ -2560,6 +2560,16 @@ func TestJWTMiddleware_getSecretToVerifySignature_JWKNoKID(t *testing.T) {
 		_, err := m.getSecretToVerifySignature(nil, token)
 		assert.ErrorIs(t, err, ErrKIDNotAString)
 	})
+
+	t.Run("multiple JWK URIs", func(t *testing.T) {
+		api.JWTJwkURIs = []apidef.JWK{
+			{
+				URL: "http://localhost:8080/realms/jwt/protocol/openid-connect/certs",
+			},
+		}
+		_, err := m.getSecretToVerifySignature(nil, token)
+		assert.Error(t, err)
+	})
 }
 
 func TestJWT_ExtractOAuthClientIDForDCR(t *testing.T) {
