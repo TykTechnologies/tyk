@@ -568,7 +568,7 @@ func TestGoPlugin_MyResponsePluginAccessingOASAPI(t *testing.T) {
 		Version: "1",
 		Title:   "My OAS Documentation TestGoPlugin_MyResponsePluginAccessingOASAPI",
 	}
-	oasDoc.Paths = openapi3.Paths{}
+	oasDoc.Paths = openapi3.NewPaths()
 	oasDoc.SetTykExtension(&oas.XTykAPIGateway{})
 	err := oasDoc.Validate(context.Background())
 
