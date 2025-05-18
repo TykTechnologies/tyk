@@ -634,7 +634,7 @@ func (c *IntrospectionCache) ExtractTo(cache *apidef.IntrospectionCache) {
 }
 
 // ExternalOAuth holds configuration for an external OAuth provider.
-// ExternalOAuth support will be deprecated starting from 5.7.0.
+// Deprecated: ExternalOAuth support has been deprecated from 5.7.0.
 // To avoid any disruptions, we recommend that you use JSON Web Token (JWT) instead,
 // as explained in https://tyk.io/docs/basic-config-and-security/security/authentication-authorization/ext-oauth-middleware/.
 type ExternalOAuth struct {
@@ -853,7 +853,10 @@ func resetSecuritySchemes(api *apidef.APIDefinition) {
 	// External OAuth
 	api.ExternalOAuth = apidef.ExternalOAuth{}
 
-	// OIDC
+	// OIDC holds configuration for OpenID Connect.
+	// Deprecated: OIDC support has been deprecated from 5.7.0.
+	// To avoid any disruptions, we recommend that you use JSON Web Token (JWT) instead,
+	// as explained in https://tyk.io/docs/api-management/client-authentication/#integrate-with-openid-connect-deprecated.
 	api.UseOpenID = false
 	api.Scopes.OIDC = apidef.ScopeClaim{}
 	api.OpenIDOptions = apidef.OpenIDOptions{}

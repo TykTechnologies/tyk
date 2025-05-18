@@ -2124,3 +2124,34 @@ func TestHelperSSEStreamClient(tb testing.TB, ts *Test, enableWebSockets bool) e
 	assert.Equal(tb, i, 5)
 	return nil
 }
+
+// MockErrorReader is a mock io.Reader that returns an error on Read
+type MockErrorReader struct {
+	ReturnError error
+}
+
+func (e *MockErrorReader) Read(_ []byte) (n int, err error) {
+	return 0, e.ReturnError
+}
+
+type MockReadCloser struct {
+	Reader      io.Reader
+	CloseError  error
+	CloseCalled bool
+}
+
+func (m *MockReadCloser) Read(p []byte) (n int, err error) {
+	return m.Reader.Read(p)
+}
+
+func (m *MockReadCloser) Close() error {
+	m.CloseCalled = true
+
+	return m.CloseError
+}
+
+func createMockReadCloserWithError(err error) *MockReadCloser {
+	return &MockReadCloser{
+		Reader: &MockErrorReader{err},
+	}
+}

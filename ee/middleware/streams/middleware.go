@@ -227,7 +227,8 @@ func (s *Middleware) processStreamsConfig(r *http.Request, streams map[string]an
 func (s *Middleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
 	strippedPath := s.Spec.StripListenPath(r.URL.Path)
 	if !s.defaultManager.hasPath(strippedPath) {
-		return nil, http.StatusOK
+		s.Logger().Debugf("Path not found: %s", strippedPath)
+		return errors.New("not found"), http.StatusNotFound
 	}
 
 	s.Logger().Debugf("Processing request: %s, %s", r.URL.Path, strippedPath)
@@ -262,13 +263,22 @@ func (s *Middleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _ in
 	return nil, middleware.StatusRespond
 }
 
-// Unload closes and remove active streams.
+func (s *Middleware) resetStream(streamValue any) {
+	if stream, ok := streamValue.(*Stream); ok {
+		if err := stream.Reset(); err != nil {
+			s.Logger().WithError(err).Error("Failed to reset stream")
+		}
+	}
+}
+
+// Unload closes and remove active streams. This method is called when the API is removed.
 func (s *Middleware) Unload() {
 	s.Logger().Debugf("Unloading streaming middleware %s", s.Spec.Name)
 
 	totalStreams := 0
 	s.cancel()
 
+	// Reset cached streams and stop the underlying Bento instances
 	s.StreamManagerCache.Range(func(_, value interface{}) bool {
 		manager, ok := value.(*Manager)
 		if !ok {
@@ -276,14 +286,17 @@ func (s *Middleware) Unload() {
 		}
 		manager.streams.Range(func(_, streamValue interface{}) bool {
 			totalStreams++
-			if stream, ok := streamValue.(*Stream); ok {
-				if err := stream.Reset(); err != nil {
-					s.Logger().WithError(err).Error("Failed to reset stream")
-				}
-			}
-			return true
+			s.resetStream(streamValue)
+			return true // continue iterating
 		})
 		return true
+	})
+
+	// Finally, reset the default manager and stop the underlying Bento instance
+	s.defaultManager.streams.Range(func(_, streamValue interface{}) bool {
+		totalStreams++
+		s.resetStream(streamValue)
+		return true // continue iterating
 	})
 
 	GlobalStreamCounter.Add(-int64(totalStreams))
