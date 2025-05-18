@@ -1027,7 +1027,7 @@ func TestOAS_MockResponse_fillMockResponsePaths(t *testing.T) {
 				}
 			}
 
-			spec.fillMockResponsePaths(*spec.Paths, tt.ep)
+			spec.fillMockResponsePaths(spec.Paths, tt.ep)
 			tt.want(t, spec)
 		})
 	}

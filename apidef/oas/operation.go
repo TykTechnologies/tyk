@@ -166,7 +166,7 @@ func (s *OAS) fillPathsAndOperations(ep apidef.ExtendedPathsSet) {
 	s.fillDoNotTrackEndpoint(ep.DoNotTrackEndpoints)
 	s.fillRequestSizeLimit(ep.SizeLimit)
 	s.fillRateLimitEndpoints(ep.RateLimit)
-	s.fillMockResponsePaths(*s.Paths, ep)
+	s.fillMockResponsePaths(s.Paths, ep)
 }
 
 // fillMockResponsePaths converts classic API mock responses to OAS format.
@@ -183,7 +183,7 @@ func (s *OAS) fillPathsAndOperations(ep apidef.ExtendedPathsSet) {
 // - Checking the Content-Type header if present
 // - Attempting to parse the body as JSON
 // - Defaulting to text/plain if neither above applies
-func (s *OAS) fillMockResponsePaths(paths openapi3.Paths, ep apidef.ExtendedPathsSet) {
+func (s *OAS) fillMockResponsePaths(paths *openapi3.Paths, ep apidef.ExtendedPathsSet) {
 	for _, mock := range ep.MockResponse {
 		operationID := s.getOperationID(mock.Path, mock.Method)
 
