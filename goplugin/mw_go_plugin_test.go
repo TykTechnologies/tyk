@@ -10,7 +10,7 @@ import (
 
 	"github.com/TykTechnologies/tyk/user"
 
-	"github.com/TykTechnologies/kin-openapi/openapi3"
+	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -523,7 +523,7 @@ func TestGoPlugin_AccessingOASAPIDef(t *testing.T) {
 		Version: "1",
 		Title:   oasDocTitle,
 	}
-	oasDoc.Paths = openapi3.Paths{}
+	oasDoc.Paths = openapi3.NewPaths()
 
 	oasDoc.SetTykExtension(&oas.XTykAPIGateway{})
 
@@ -568,7 +568,7 @@ func TestGoPlugin_MyResponsePluginAccessingOASAPI(t *testing.T) {
 		Version: "1",
 		Title:   "My OAS Documentation TestGoPlugin_MyResponsePluginAccessingOASAPI",
 	}
-	oasDoc.Paths = openapi3.Paths{}
+	oasDoc.Paths = openapi3.NewPaths()
 	oasDoc.SetTykExtension(&oas.XTykAPIGateway{})
 	err := oasDoc.Validate(context.Background())
 
