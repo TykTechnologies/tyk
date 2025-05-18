@@ -52,24 +52,29 @@ func TestMockResponse(t *testing.T) {
 	}
 
 	desc := "desc"
-	responses := openapi3.NewResponses()
-	responsesMap := responses.Map()
-	responsesMap["200"] = &openapi3.ResponseRef{
-		Value: &openapi3.Response{
-			Description: &desc,
-			Content: openapi3.Content{
-				"application/json": &openapi3.MediaType{
-					Examples: openapi3.Examples{
-						"engineer": &openapi3.ExampleRef{
-							Value: &openapi3.Example{
-								Value: "Furkan",
+	responses := func() *openapi3.Responses {
+		responses := openapi3.NewResponses()
+		responses.Delete("default")
+
+		responses.Set("200", &openapi3.ResponseRef{
+			Value: &openapi3.Response{
+				Description: &desc,
+				Content: openapi3.Content{
+					"application/json": &openapi3.MediaType{
+						Examples: openapi3.Examples{
+							"engineer": &openapi3.ExampleRef{
+								Value: &openapi3.Example{
+									Value: "Furkan",
+								},
 							},
 						},
 					},
 				},
 			},
-		},
-	}
+		})
+
+		return responses
+	}()
 
 	paths := openapi3.NewPaths()
 	paths.Set("/get", &openapi3.PathItem{
