@@ -42,10 +42,7 @@ func (gw *Gateway) GetCoProcessGrpcServerTargetURL() (*url.URL, error) {
 }
 
 func GetCoProcessGrpcServerTargetUrlAsString(targetUrl *url.URL) string {
-	if targetUrl.Scheme == "" {
-		return targetUrl.String()
-	}
-	return targetUrl.String()[len(targetUrl.Scheme)+3:]
+	return targetUrl.String()
 }
 
 // Dispatch takes a CoProcessMessage and sends it to the CP.
@@ -91,33 +88,30 @@ func (gw *Gateway) NewGRPCDispatcher() (coprocess.Dispatcher, error) {
 	if gw.GetConfig().CoProcessOptions.CoProcessGRPCServer == "" {
 		return nil, errors.New("No gRPC URL is set")
 	}
-	authority := gw.GetConfig().CoProcessOptions.GRPCAuthority
 
 	var err error
-	//grpcConnection, err = grpc.Dial("",
-	//	gw.grpcCallOpts(),
-	//	grpc.WithInsecure(),
-	//	grpc.WithAuthority(authority),
-	//	grpc.WithDialer(gw.dialer),
-	//)
 	grpcUrl, err := gw.GetCoProcessGrpcServerTargetURL()
 	if err != nil {
 		return nil, err
 	}
+
+	dialOptions := []grpc.DialOption{gw.grpcCallOpts(), grpc.WithTransportCredentials(insecure.NewCredentials())}
+	authority := gw.GetConfig().CoProcessOptions.GRPCAuthority
+	if authority != "" {
+		dialOptions = append(dialOptions, grpc.WithAuthority(authority))
+	}
+
 	grpcConnection, err = grpc.NewClient(
 		GetCoProcessGrpcServerTargetUrlAsString(grpcUrl),
-		gw.grpcCallOpts(),
-		grpc.WithAuthority(authority),
-		grpc.WithTransportCredentials(insecure.NewCredentials()))
-
-	grpcClient = coprocess.NewDispatcherClient(grpcConnection)
-
+		dialOptions...,
+	)
 	if err != nil {
-
 		log.WithFields(logrus.Fields{
 			"prefix": "coprocess",
 		}).Error(err)
 		return nil, err
 	}
+
+	grpcClient = coprocess.NewDispatcherClient(grpcConnection)
 	return &GRPCDispatcher{}, nil
 }
