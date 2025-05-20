@@ -115,6 +115,22 @@
     "jwt_source": {
       "type": "string"
     },
+    "jwt_jwks_uris": {
+      "type": [
+        "array",
+        "null"
+      ],
+      "items": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "format": "uri"
+          }
+        },
+        "required": ["url"]
+      }
+    },     
     "jwt_identity_base_field": {
       "type": "string"
     },
