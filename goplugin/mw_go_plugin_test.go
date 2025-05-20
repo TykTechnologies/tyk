@@ -5,6 +5,7 @@ package goplugin_test
 
 import (
 	"context"
+	"github.com/TykTechnologies/tyk/internal/maps"
 	"net/http"
 	"testing"
 
@@ -574,31 +575,105 @@ func TestGoPlugin_MyResponsePluginAccessingOASAPI(t *testing.T) {
 
 	require.NoError(t, err)
 
-	ts.Gw.BuildAndLoadAPI(func(spec *gateway.APISpec) {
-		spec.IsOAS = true
-		spec.OAS = oasDoc
-		spec.Proxy.ListenPath = "/goplugin-response"
-		spec.UseKeylessAccess = true
-		spec.UseStandardAuth = false
-		spec.UseGoPluginAuth = false
-		spec.CustomMiddleware = apidef.MiddlewareSection{
-			Driver: apidef.GoPluginDriver,
-			Response: []apidef.MiddlewareDefinition{
-				{
-					Name: "MyResponsePluginAccessingOASAPI",
-					Path: goPluginFilename(),
+	t.Run("Run Go-plugin on standalone response plugin", func(t *testing.T) {
+		ts.Gw.BuildAndLoadAPI(func(spec *gateway.APISpec) {
+			spec.IsOAS = true
+			spec.OAS = oasDoc
+			spec.Proxy.ListenPath = "/goplugin/stanalone_response_plugin"
+			spec.UseKeylessAccess = true
+			spec.UseStandardAuth = false
+			spec.UseGoPluginAuth = false
+			spec.CustomMiddleware = apidef.MiddlewareSection{
+				Driver: apidef.GoPluginDriver,
+				Response: []apidef.MiddlewareDefinition{
+					{
+						Name: "MyResponsePluginAccessingOASAPI",
+						Path: goPluginFilename(),
+					},
 				},
-			},
-		}
-	})
+			}
+		})
 
-	t.Run("Run Go-plugin all middle-wares", func(t *testing.T) {
 		ts.Run(t, []test.TestCase{
 			{
-				Path: "/goplugin-response/plugin_hit",
+				Path: "/goplugin/stanalone_response_plugin/plugin_hit",
+				Code: http.StatusOK,
+				HeadersMatch: maps.New(
+					maps.WithEntry("X-OAS-Doc-Title", oasDoc.Info.Title),
+				),
+			},
+		}...)
+	})
+
+	t.Run("request-pre and response plugins chained work good", func(t *testing.T) {
+		ts.Gw.BuildAndLoadAPI(func(spec *gateway.APISpec) {
+			spec.IsOAS = true
+			spec.OAS = oasDoc
+			spec.Proxy.ListenPath = "/goplugin/request_and_response_plugin"
+			spec.UseKeylessAccess = true
+			spec.UseStandardAuth = false
+			spec.UseGoPluginAuth = false
+			spec.CustomMiddleware = apidef.MiddlewareSection{
+				Driver: apidef.GoPluginDriver,
+				Pre: []apidef.MiddlewareDefinition{
+					{
+						Name: "MyPluginAccessingOASAPI",
+						Path: goPluginFilename(),
+					},
+				},
+				Response: []apidef.MiddlewareDefinition{
+					{
+						Name: "MyResponsePluginAccessingOASAPI",
+						Path: goPluginFilename(),
+					},
+				},
+			}
+		})
+
+		ts.Run(t, []test.TestCase{
+			{
+				Path: "/goplugin/request_and_response_plugin/plugin_hit",
 				Code: http.StatusOK,
 				HeadersMatch: map[string]string{
-					"X-OAS-Doc-Title": oasDoc.Info.Title,
+					"X-OAS-Doc-Title":                        oasDoc.Info.Title,
+					"X-My-Plugin-Accessing-OAS-API":          oasDoc.Info.Title,
+					"X-My-Response-Plugin-Accessing-OAS-API": oasDoc.Info.Title,
+				},
+			},
+		}...)
+	})
+
+	t.Run("chained response plugin work fine", func(t *testing.T) {
+		ts.Gw.BuildAndLoadAPI(func(spec *gateway.APISpec) {
+			spec.IsOAS = true
+			spec.OAS = oasDoc
+			spec.Proxy.ListenPath = "/goplugin/request_chaining"
+			spec.UseKeylessAccess = true
+			spec.UseStandardAuth = false
+			spec.UseGoPluginAuth = false
+			spec.CustomMiddleware = apidef.MiddlewareSection{
+				Driver: apidef.GoPluginDriver,
+				Response: []apidef.MiddlewareDefinition{
+					{
+						Name: "MyResponsePluginAccessingOASAPI",
+						Path: goPluginFilename(),
+					},
+					{
+						Name: "MyResponsePluginAccessingOASAPI2",
+						Path: goPluginFilename(),
+					},
+				},
+			}
+		})
+
+		ts.Run(t, []test.TestCase{
+			{
+				Path: "/goplugin/request_chaining/plugin_hit",
+				Code: http.StatusOK,
+				HeadersMatch: map[string]string{
+					"X-OAS-Doc-Title":                          oasDoc.Info.Title,
+					"X-My-Response-Plugin-Accessing-OAS-API-2": oasDoc.Info.Title,
+					"X-My-Response-Plugin-Accessing-OAS-API":   oasDoc.Info.Title,
 				},
 			},
 		}...)
