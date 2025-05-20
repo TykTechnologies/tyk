@@ -891,9 +891,15 @@ func TestDeepCopyBody(t *testing.T) {
 	testData := []byte("testDeepCopy")
 	src = httptest.NewRequest(http.MethodPost, "/test", bytes.NewReader(testData))
 	src.ContentLength = -1
+	src.Header.Set("Content-Type", "application/grpc")
 	assert.Nil(t, deepCopyBody(src, trg),
-		"source request with ContentLength == -1 should return without any error")
-	assert.Nil(t, trg.Body, "target request body should not be updated when ContentLength == -1")
+		"grpc request should return without any error")
+	assert.Nil(t, trg.Body, "target request body should not be updated when it is grpc request")
+
+	src.Header.Set("Connection", "Upgrade")
+	assert.Nil(t, deepCopyBody(src, trg),
+		"upgraded request should return without any error")
+	assert.Nil(t, trg.Body, "target request body should not be updated when it is upgrade request")
 
 	src = httptest.NewRequest(http.MethodPost, "/test", bytes.NewReader(testData))
 	assert.Nil(t, deepCopyBody(src, trg), "request with body should return without any error")
