@@ -5,8 +5,11 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/header"
 )
+
+var Global func() config.Config
 
 // RealIP takes a request object, and returns the real Client IP address.
 func RealIP(r *http.Request) string {
@@ -22,14 +25,38 @@ func RealIP(r *http.Request) string {
 	}
 
 	if fw := r.Header.Get(header.XForwardFor); fw != "" {
-		// X-Forwarded-For has no port
-		if i := strings.IndexByte(fw, ','); i >= 0 {
-			fw = fw[:i]
+		xffs := strings.Split(fw, ",")
+
+		// If no IPs, return the first IP in the chain
+		if len(xffs) == 0 {
+			return ""
 		}
 
-		if fwIP := net.ParseIP(fw); fwIP != nil {
-			return fwIP.String()
+		// Get depth from config, default to 0 (first IP in chain)
+		depth := 0
+		if Global != nil {
+			depth = Global().HttpServerOptions.XFFDepth
 		}
+
+		// If depth exceeds available IPs, return empty
+		if depth > len(xffs) {
+			return ""
+		}
+
+		// Choose the appropriate IP based on depth
+		// depth=0 means first IP (leftmost), depth=1 means last IP, depth=2 means second to last, etc.
+		var ip string
+		if depth == 0 {
+			ip = strings.TrimSpace(xffs[0])
+		} else {
+			ip = strings.TrimSpace(xffs[len(xffs)-depth])
+		}
+
+		// Validate that the IP is properly formatted before returning it
+		if parsedIP := net.ParseIP(ip); parsedIP != nil {
+			return parsedIP.String()
+		}
+		// If IP is invalid, fall through to use RemoteAddr
 	}
 
 	// From net/http.Request.RemoteAddr:
