@@ -1874,7 +1874,7 @@ func nopCloseResponseBody(r *http.Response) {
 
 // Creates a deep copy of source request.Body and replaces target request.Body with it.
 func deepCopyBody(source *http.Request, target *http.Request) error {
-	if source == nil || target == nil || source.Body == nil || source.ContentLength == -1 {
+	if source == nil || target == nil || source.Body == nil || httputil.IsStreamingRequest(source) {
 		return nil
 	}
 
