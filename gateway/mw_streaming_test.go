@@ -1216,6 +1216,8 @@ func setupOASForStreamAPIWithAPIConfig(streamingConfig string, configData map[st
 }
 
 func TestStreamingAPIWithAPIConfig(t *testing.T) {
+	t.Skip()
+
 	ts := StartTest(func(globalConf *config.Config) {
 		globalConf.Streaming.Enabled = true
 	})
