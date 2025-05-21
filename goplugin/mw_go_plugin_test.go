@@ -578,7 +578,7 @@ func TestGoPlugin_MyResponsePluginAccessingOASAPI(t *testing.T) {
 		ts.Gw.BuildAndLoadAPI(func(spec *gateway.APISpec) {
 			spec.IsOAS = true
 			spec.OAS = oasDoc
-			spec.Proxy.ListenPath = "/goplugin/stanalone_response_plugin"
+			spec.Proxy.ListenPath = "/goplugin/standalone_response_plugin"
 			spec.UseKeylessAccess = true
 			spec.UseStandardAuth = false
 			spec.UseGoPluginAuth = false
@@ -595,7 +595,7 @@ func TestGoPlugin_MyResponsePluginAccessingOASAPI(t *testing.T) {
 
 		ts.Run(t, []test.TestCase{
 			{
-				Path: "/goplugin/stanalone_response_plugin/plugin_hit",
+				Path: "/goplugin/standalone_response_plugin/plugin_hit",
 				Code: http.StatusOK,
 				HeadersMatch: map[string]string{
 					"X-OAS-Doc-Title": oasDoc.Info.Title,
