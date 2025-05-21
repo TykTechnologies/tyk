@@ -534,6 +534,13 @@ type HttpServerOptionsConfig struct {
 	// See more information about setting request size limits here:
 	// https://tyk.io/docs/api-management/traffic-transformation/#request-size-limits
 	MaxRequestBodySize int64 `json:"max_request_body_size"`
+
+	// MaxHeaderBytes configures a maximum size limit for request header size (in bytes) for all APIs on the Gateway.
+	//
+	// Tyk Gateway will evaluate all API requests against this size limit and will respond with HTTP 431 status code if the header of the request is larger.
+	//
+	// Unset value, or a value of zero (default), means will use the Golang HTTP default value of 1 MB.
+	MaxHeaderBytes int `json:"max_header_bytes"`
 }
 
 type AuthOverrideConf struct {
