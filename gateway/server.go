@@ -1716,6 +1716,7 @@ func Start() {
 	}
 
 	gw := NewGateway(gwConfig, ctx)
+	gwConfig = gw.GetConfig()
 
 	go func() {
 		select {
@@ -1726,7 +1727,8 @@ func Start() {
 			cancel()
 
 			// Perform graceful shutdown
-			shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 30*time.Second)
+			shutdownCtx, shutdownCancel := context.WithTimeout(
+				context.Background(), time.Duration(gwConfig.GracefulShutdownTimeoutDuration)*time.Second)
 			defer shutdownCancel()
 
 			if err := gw.gracefulShutdown(shutdownCtx); err != nil {
@@ -1739,7 +1741,6 @@ func Start() {
 		mainLog.Fatalf("Error initialising system: %v", err)
 	}
 
-	gwConfig = gw.GetConfig()
 	if !gw.isRunningTests() && gwConfig.ControlAPIPort == 0 {
 		mainLog.Warn("The control_api_port should be changed for production")
 	}
@@ -2076,17 +2077,9 @@ func (gw *Gateway) SetConfig(conf config.Config, skipReload ...bool) {
 // gracefulShutdown performs a graceful shutdown of all services
 func (gw *Gateway) gracefulShutdown(ctx context.Context) error {
 	mainLog.Info("Gracefully shutting down services...")
-
 	mainLog.Info("Waiting for in-flight requests to complete...")
-	shutdownTimeout := 15 * time.Second
-
-	// Second step: Shutdown all HTTP servers with a timeout
 	var wg sync.WaitGroup
 	errChan := make(chan error, 10) // Buffer for potential errors
-
-	// Create a separate context with a timeout for server shutdown
-	shutdownCtx, shutdownCancel := context.WithTimeout(ctx, shutdownTimeout)
-	defer shutdownCancel()
 
 	// Shutdown all HTTP servers in the proxy mux
 	gw.DefaultProxyMux.Lock()
@@ -2099,7 +2092,7 @@ func (gw *Gateway) gracefulShutdown(ctx context.Context) error {
 
 				// Server.Shutdown gracefully shuts down the server without
 				// interrupting any active connections
-				if err := server.Shutdown(shutdownCtx); err != nil {
+				if err := server.Shutdown(ctx); err != nil {
 					mainLog.Errorf("Error shutting down HTTP server on port %d: %v", port, err)
 					errChan <- err
 				}
@@ -2118,7 +2111,7 @@ func (gw *Gateway) gracefulShutdown(ctx context.Context) error {
 	select {
 	case <-serverShutdownDone:
 		mainLog.Info("All HTTP servers gracefully shut down")
-	case <-shutdownCtx.Done():
+	case <-ctx.Done():
 		mainLog.Warning("Shutdown timeout reached, some connections may have been terminated")
 	}
 
