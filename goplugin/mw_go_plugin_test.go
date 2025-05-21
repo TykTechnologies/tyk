@@ -5,7 +5,6 @@ package goplugin_test
 
 import (
 	"context"
-	"github.com/TykTechnologies/tyk/internal/maps"
 	"net/http"
 	"testing"
 
@@ -598,9 +597,9 @@ func TestGoPlugin_MyResponsePluginAccessingOASAPI(t *testing.T) {
 			{
 				Path: "/goplugin/stanalone_response_plugin/plugin_hit",
 				Code: http.StatusOK,
-				HeadersMatch: maps.New(
-					maps.WithEntry("X-OAS-Doc-Title", oasDoc.Info.Title),
-				),
+				HeadersMatch: map[string]string{
+					"X-OAS-Doc-Title": oasDoc.Info.Title,
+				},
 			},
 		}...)
 	})
