@@ -27,7 +27,6 @@ const (
 	vaultLabel       = "$secret_vault."
 	envLabel         = "$secret_env."
 	secretsConfLabel = "$secret_conf."
-	apiConfigLabel   = "$api_config."
 	triggerKeyPrefix = "trigger"
 	triggerKeySep    = "-"
 )
@@ -39,7 +38,6 @@ var vaultMatch = regexp.MustCompile(`\$secret_vault.([A-Za-z0-9\/\-\.]+)`)
 var envValueMatch = regexp.MustCompile(`\$secret_env.([A-Za-z0-9_\-\.]+)`)
 var metaMatch = regexp.MustCompile(`\$tyk_meta.([A-Za-z0-9_\-\.]+)`)
 var secretsConfMatch = regexp.MustCompile(`\$secret_conf.([A-Za-z0-9[.\-\_]+)`)
-var apiConfigMatch = regexp.MustCompile(`\$api_config.([A-Za-z0-9_\-]+)`)
 
 func (gw *Gateway) urlRewrite(meta *apidef.URLRewriteMeta, r *http.Request) (string, error) {
 	rawPath := r.URL.String()
@@ -218,13 +216,6 @@ func (gw *Gateway) urlRewrite(meta *apidef.URLRewriteMeta, r *http.Request) (str
 // parameter for a HTTP request would. If no replacement has been made, `in`
 // is returned without modification.
 func (gw *Gateway) ReplaceTykVariables(r *http.Request, in string, escape bool) string {
-
-	if strings.Contains(in, apiConfigLabel) {
-		if apiDef := ctx.GetDefinition(r); apiDef != nil && !apiDef.ConfigDataDisabled {
-			vars := apiConfigMatch.FindAllString(in, -1)
-			in = gw.replaceVariables(in, vars, apiDef.ConfigData, apiConfigLabel, escape)
-		}
-	}
 
 	if strings.Contains(in, secretsConfLabel) {
 		contextData := ctxGetData(r)
