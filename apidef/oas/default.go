@@ -13,7 +13,7 @@ import (
 )
 
 const (
-	invalidServerURLFmt          = "Please update %q to be a valid URL or pass a valid URL with upstreamURL query param"
+	invalidServerURLFmt          = "Please update %q to be a valid URL and try again."
 	unsupportedSecuritySchemeFmt = "unsupported security scheme: %s"
 
 	middlewareValidateRequest = "validateRequest"
@@ -22,10 +22,10 @@ const (
 )
 
 var (
-	errEmptyServersObject  = errors.New("servers object is empty in OAS")
-	errEmptySecurityObject = errors.New("security object is empty in OAS")
-	errInvalidUpstreamURL  = errors.New("invalid upstream URL")
-	errInvalidServerURL    = errors.New("error validating servers entry in OAS")
+	errEmptyServersObject  = errors.New("The ‘servers’ object is empty in your OAS. You can either add a ‘servers’ section to your OpenAPI description or provide a Custom Upstream URL in the manual configuration options below.")
+	errEmptySecurityObject = errors.New("The ‘security’ object is empty in your OAS. When enabling authentication, your OpenAPI description must include a ‘security’ object that defines the authentication schemes. You can either add a ‘security’ object or disable authentication in the API settings.")
+	errInvalidUpstreamURL  = errors.New("The manually configured upstream URL is not valid. The URL must be absolute and properly formatted (e.g. https://example.com). Please check the URL format and try again.")
+	errInvalidServerURL    = errors.New("The first entry in the ‘servers’ object of your OAS in not valid. The URL must be absolute and properly formatted (e.g. https://example.com).")
 
 	allowedMethods = []string{
 		http.MethodConnect,
