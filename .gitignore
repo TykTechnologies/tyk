@@ -3,8 +3,10 @@
 .vagrant/
 .venv/
 .vscode/
+.air.toml
 coverage/
 temp/
+/tmp
 /middleware/bundles
 testapps/
 
