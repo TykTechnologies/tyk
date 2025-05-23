@@ -24,9 +24,7 @@ type GRPCDispatcher struct {
 }
 
 func (gw *Gateway) GetCoProcessGrpcServerTargetURL() (*url.URL, error) {
-	coprocessServerUrl := strings.TrimPrefix(gw.GetConfig().CoProcessOptions.CoProcessGRPCServer, "tcp://")
-
-	grpcURL, err := url.Parse(coprocessServerUrl)
+	grpcURL, err := url.Parse(gw.GetConfig().CoProcessOptions.CoProcessGRPCServer)
 	if err != nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "coprocess",
@@ -34,7 +32,7 @@ func (gw *Gateway) GetCoProcessGrpcServerTargetURL() (*url.URL, error) {
 		return nil, err
 	}
 
-	if grpcURL == nil || coprocessServerUrl == "" {
+	if grpcURL == nil || gw.GetConfig().CoProcessOptions.CoProcessGRPCServer == "" {
 		errString := "No gRPC URL is set!"
 		log.WithFields(logrus.Fields{
 			"prefix": "coprocess",
@@ -45,7 +43,7 @@ func (gw *Gateway) GetCoProcessGrpcServerTargetURL() (*url.URL, error) {
 }
 
 func GetCoProcessGrpcServerTargetUrlAsString(targetUrl *url.URL) string {
-	return targetUrl.String()
+	return strings.TrimPrefix(targetUrl.String(), "tcp://")
 }
 
 // Dispatch takes a CoProcessMessage and sends it to the CP.

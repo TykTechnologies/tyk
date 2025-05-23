@@ -16,12 +16,6 @@ func TestGetCoProcessGrpcServerTargetURL(t *testing.T) {
 		expectError         bool
 	}{
 		{
-			name:                "Valid URL",
-			coProcessGRPCServer: "tcp://localhost:9000",
-			expectedURL:         "localhost:9000",
-			expectError:         false,
-		},
-		{
 			name:                "Invalid URL",
 			coProcessGRPCServer: "://invalid",
 			expectedURL:         "",
@@ -70,4 +64,8 @@ func TestGetCoProcessGrpcServerTargetURLAsString(t *testing.T) {
 
 	// Check the result
 	assert.Equal(t, "localhost:9000", result)
+}
+
+func TestGetCoProcessGrpcServerTargetUrlAsString(t *testing.T) {
+	assert.Equal(t, "localhost:3000", GetCoProcessGrpcServerTargetUrlAsString(&url.URL{Scheme: "tcp", Host: "localhost:3000"}))
 }
