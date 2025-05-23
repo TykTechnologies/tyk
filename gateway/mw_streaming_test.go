@@ -16,11 +16,13 @@ import (
 	"testing"
 	"time"
 
+	"github.com/gorilla/websocket"
 	"github.com/nats-io/nats.go"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/testcontainers/testcontainers-go"
+	"github.com/testcontainers/testcontainers-go/modules/kafka"
 	natscon "github.com/testcontainers/testcontainers-go/modules/nats"
 	"github.com/testcontainers/testcontainers-go/wait"
 
@@ -29,7 +31,6 @@ import (
 	"gopkg.in/yaml.v2"
 
 	"github.com/IBM/sarama"
-	"github.com/testcontainers/testcontainers-go/modules/kafka"
 
 	"github.com/TykTechnologies/tyk/apidef/oas"
 	"github.com/TykTechnologies/tyk/config"
@@ -202,8 +203,6 @@ func TestStreamingAPISingleClient(t *testing.T) {
 		).WithDeadline(30*time.Second)))
 	require.NoError(t, err)
 
-	//skip if is dynamic, does not work
-
 	configSubject := "test"
 
 	connectionStr, err := natsContainer.ConnectionString(ctx)
@@ -216,7 +215,7 @@ func TestStreamingAPISingleClient(t *testing.T) {
 	t.Cleanup(func() {
 		ts.Close()
 	})
-	//t.Cleanup(func() { ts.Close() })
+
 	apiName := "test-api"
 	if err = setUpStreamAPI(ts, apiName, streamConfig); err != nil {
 		t.Fatal(err)
@@ -230,8 +229,6 @@ func TestStreamingAPISingleClient(t *testing.T) {
 	}
 
 	wsURL := strings.Replace(ts.URL, "http", "ws", 1) + fmt.Sprintf("/%s/get/ws", apiName)
-
-	println("wsURL:", wsURL)
 
 	wsConn, _, err := dialer.Dial(wsURL, nil)
 	require.NoError(t, err, "failed to connect to ws server")
@@ -279,6 +276,7 @@ func TestStreamingAPISingleClient(t *testing.T) {
 		require.True(t, received, "did not receive expected message: %s", msg)
 	}
 }
+
 func TestStreamingAPIMultipleClients(t *testing.T) {
 	ctx := context.Background()
 
@@ -351,7 +349,6 @@ func TestStreamingAPIMultipleClients(t *testing.T) {
 	var readMessages int
 	for readMessages < totalMessages {
 		for clientID, wsConn := range wsConns {
-			// We need to stop waiting for a message if the subscriber is consumed all of its received messages.
 			err = wsConn.SetReadDeadline(time.Now().Add(100 * time.Millisecond))
 			require.NoError(t, err, fmt.Sprintf("error setting read deadline for client %d", clientID))
 
@@ -437,9 +434,7 @@ func TestAsyncAPI(t *testing.T) {
 		spec.UseKeylessAccess = true
 	})
 
-	// Check that standard API works
 	_, _ = ts.Run(t, test.TestCase{Code: http.StatusOK, Method: http.MethodGet, Path: "/test"})
-
 	defer ts.Close()
 
 	tempFile, err := os.CreateTemp("", "test-output-*.txt")
@@ -495,7 +490,6 @@ streams:
 
 	oasAPI.Extensions = map[string]interface{}{
 		streams.ExtensionTykStreaming: parsedStreamingConfig,
-		// oas.ExtensionTykAPIGateway: tykExtension,
 	}
 
 	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
@@ -513,7 +507,6 @@ streams:
 		spec.OAS.Fill(*spec.APIDefinition)
 	})
 
-	// Check that standard API still works
 	_, _ = ts.Run(t, test.TestCase{Code: http.StatusOK, Method: http.MethodGet, Path: "/test"})
 
 	if streams.GlobalStreamCounter.Load() != 1 {
@@ -528,8 +521,6 @@ streams:
 	}
 
 	lines := strings.Split(string(content), "\n")
-
-	// Adjust for the trailing new line which results in an extra empty element in the slice
 	if len(lines) > 0 && lines[len(lines)-1] == "" {
 		lines = lines[:len(lines)-1]
 	}
@@ -771,15 +762,11 @@ func waitForAPIToBeLoaded(ts *Test) error {
 		}
 		resp, err := http.DefaultClient.Do(req)
 		if err == nil && resp.StatusCode == http.StatusOK {
-			if err = resp.Body.Close(); err != nil {
-				log.Printf("Failed to close response body: %v", err)
-			}
+			_ = resp.Body.Close()
 			return nil
 		}
 		if resp != nil {
-			if err = resp.Body.Close(); err != nil {
-				log.Printf("Failed to close response body: %v", err)
-			}
+			_ = resp.Body.Close()
 		}
 		time.Sleep(1 * time.Second)
 	}
@@ -897,7 +884,6 @@ func TestStreamingAPISingleClient_Input_HTTPServer(t *testing.T) {
 	require.NoError(t, err, "error setting read deadline")
 
 	for i := 0; i < totalMessages; i++ {
-		println("reading message", i)
 		_, p, err := wsConn.ReadMessage()
 		require.NoError(t, err, "error reading message")
 		assert.Equal(t, fmt.Sprintf("{\"test\": \"message %d\"}", i), string(p), "message not equal")
@@ -905,9 +891,6 @@ func TestStreamingAPISingleClient_Input_HTTPServer(t *testing.T) {
 }
 
 func TestStreamingAPIMultipleClients_Input_HTTPServer(t *testing.T) {
-	// Testing input http -> output http (3 output instances and 10 messages)
-	// Messages are distributed in a round-robin fashion.
-
 	ts := StartTest(func(globalConf *config.Config) {
 		globalConf.Streaming.Enabled = true
 	})
@@ -944,7 +927,7 @@ func TestStreamingAPIMultipleClients_Input_HTTPServer(t *testing.T) {
 		})
 	}
 
-	// Publish 10 messages
+	// Publish messages
 	messages := make(map[string]struct{})
 	publishURL := fmt.Sprintf("%s/%s/post", ts.URL, apiName)
 	for i := 0; i < totalMessages; i++ {
@@ -957,12 +940,9 @@ func TestStreamingAPIMultipleClients_Input_HTTPServer(t *testing.T) {
 		_ = resp.Body.Close()
 	}
 
-	// Read messages from all subscribers
-	// Messages are distributed in a round-robin fashion, count the number of messages and check the messages individually.
 	var readMessages int
 	for readMessages < totalMessages {
 		for clientID, wsConn := range wsConns {
-			// We need to stop waiting for a message if the subscriber is consumed all of its received messages.
 			err := wsConn.SetReadDeadline(time.Now().Add(100 * time.Millisecond))
 			require.NoError(t, err, fmt.Sprintf("error while setting read deadline for client %d", clientID))
 
@@ -970,7 +950,7 @@ func TestStreamingAPIMultipleClients_Input_HTTPServer(t *testing.T) {
 			if os.IsTimeout(err) {
 				continue
 			}
-			require.NoError(t, err, fmt.Sprintf("error while reading message %d", clientID))
+			require.NoError(t, err, fmt.Sprintf("error while reading message for client %d", clientID))
 
 			message := string(data)
 			_, ok := messages[message]
@@ -1012,7 +992,6 @@ func TestStreamingAPIGarbageCollection(t *testing.T) {
 	})
 
 	apiSpec := streams.NewAPISpec(specs[0].APIID, specs[0].Name, specs[0].IsOAS, specs[0].OAS, specs[0].StripListenPath)
-
 	s := streams.NewMiddleware(ts.Gw, &DummyBase{}, apiSpec, nil)
 
 	if err := setUpStreamAPI(ts, apiName, bentoHTTPServerTemplate); err != nil {
