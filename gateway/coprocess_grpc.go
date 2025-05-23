@@ -24,10 +24,7 @@ type GRPCDispatcher struct {
 }
 
 func (gw *Gateway) GetCoProcessGrpcServerTargetURL() (*url.URL, error) {
-	coprocessServerUrl := gw.GetConfig().CoProcessOptions.CoProcessGRPCServer
-	if strings.HasPrefix(coprocessServerUrl, "tcp://") {
-		coprocessServerUrl = strings.TrimPrefix(coprocessServerUrl, "tcp://")
-	}
+	coprocessServerUrl := strings.TrimPrefix(gw.GetConfig().CoProcessOptions.CoProcessGRPCServer, "tcp://")
 
 	grpcURL, err := url.Parse(coprocessServerUrl)
 	if err != nil {
