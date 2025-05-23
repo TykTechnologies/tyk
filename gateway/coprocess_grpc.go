@@ -7,6 +7,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"net/url"
+	"strings"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/coprocess"
@@ -23,7 +24,12 @@ type GRPCDispatcher struct {
 }
 
 func (gw *Gateway) GetCoProcessGrpcServerTargetURL() (*url.URL, error) {
-	grpcURL, err := url.Parse(gw.GetConfig().CoProcessOptions.CoProcessGRPCServer)
+	coprocessServerUrl := gw.GetConfig().CoProcessOptions.CoProcessGRPCServer
+	if strings.HasPrefix(coprocessServerUrl, "tcp://") {
+		coprocessServerUrl = strings.TrimPrefix(coprocessServerUrl, "tcp://")
+	}
+
+	grpcURL, err := url.Parse(coprocessServerUrl)
 	if err != nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "coprocess",
@@ -31,7 +37,7 @@ func (gw *Gateway) GetCoProcessGrpcServerTargetURL() (*url.URL, error) {
 		return nil, err
 	}
 
-	if grpcURL == nil || gw.GetConfig().CoProcessOptions.CoProcessGRPCServer == "" {
+	if grpcURL == nil || coprocessServerUrl == "" {
 		errString := "No gRPC URL is set!"
 		log.WithFields(logrus.Fields{
 			"prefix": "coprocess",
