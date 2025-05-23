@@ -3222,7 +3222,9 @@ func TestOAS(t *testing.T) {
 
 			_, _ = ts.Run(t, []test.TestCase{
 				{AdminAuth: true, Method: http.MethodPatch, Path: patchPath, Data: &apiInOAS,
-					QueryParams: params, BodyMatch: `"message":"invalid upstream URL"`, Code: http.StatusBadRequest},
+					QueryParams: params,
+					BodyMatch:   `The manually configured upstream URL is not valid. The URL must be absolute and properly formatted \(e.g. https://example.com\). Please check the URL format and try again.`,
+					Code:        http.StatusBadRequest},
 			}...)
 		})
 
@@ -3519,7 +3521,8 @@ func TestOAS(t *testing.T) {
 			newParam.UpstreamURL = "upstream.example.com"
 			params := configParams(newParam)
 			_ = testImportOAS(t, ts, test.TestCase{QueryParams: params,
-				Code: http.StatusBadRequest, Data: oasCopy(false, nil), AdminAuth: true, BodyMatch: "invalid upstream URL",
+				Code: http.StatusBadRequest, Data: oasCopy(false, nil), AdminAuth: true,
+				BodyMatch: `The manually configured upstream URL is not valid. The URL must be absolute and properly formatted \(e.g. https://example.com\). Please check the URL format and try again.`,
 			})
 		})
 
@@ -3527,7 +3530,8 @@ func TestOAS(t *testing.T) {
 			oasAPI := oasCopy(false, func(t *openapi3.T) {
 				t.Servers = openapi3.Servers{}
 			})
-			_ = testImportOAS(t, ts, test.TestCase{Code: http.StatusBadRequest, Data: oasAPI, AdminAuth: true, BodyMatch: "servers object is empty in OAS"})
+			_ = testImportOAS(t, ts, test.TestCase{Code: http.StatusBadRequest, Data: oasAPI, AdminAuth: true,
+				BodyMatch: "The ‘servers’ object is empty in your OAS. You can either add a ‘servers’ section to your OpenAPI description or provide a Custom Upstream URL in the manual configuration options below."})
 		})
 
 		t.Run("success without config query params, no tyk ext", func(t *testing.T) {
