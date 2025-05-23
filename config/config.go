@@ -606,7 +606,7 @@ type CertificatesConfig struct {
 
 type SecurityConfig struct {
 	// Set the AES256 secret which is used to encode certificate private keys when they uploaded via certificate storage
-	PrivateCertificateEncodingSecret string `json:"private_certificate_encoding_secret"`
+	PrivateCertificateEncodingSecret string `json:"private_certificate_encoding_secret" structviewer:"obfuscate"`
 
 	// Enable Gateway Control API to use Mutual TLS. Certificates can be set via `security.certificates.control_api` section
 	ControlAPIUseMutualTLS bool `json:"control_api_use_mutual_tls"`
@@ -615,6 +615,28 @@ type SecurityConfig struct {
 	PinnedPublicKeys map[string]string `json:"pinned_public_keys"`
 
 	Certificates CertificatesConfig `json:"certificates"`
+}
+
+type ConfigurationReflectionCfg struct {
+
+	// Enable controls the availability of HTTP endpoints for monitoring and debugging Tyk Gateway.
+	// These endpoints provide critical system information and are disabled by default for security reasons.
+	// Access to these endpoints requires a secret, defined in the `security.secret` configuration field.
+	// Available endpoints include:
+	// * /config - a read-only HTTP endpoint that returns the current config keys and values in JSON notation.
+	// * /env    - a read-only HTTP endpoint that returns the current config keys and values in an environment variable
+	//   format
+	Enable bool `json:"enable"`
+
+	// Ensure the Gateway configuration port is set
+	// The Configuration API runs on a separate port, so you can secure this port behind a firewall.
+	APIPort int `json:"api_port"`
+
+	// This should be changed as soon as Tyk is installed on your system.
+	// This value is used in when using Tyk Gateway Config APIs. It should be passed along as the X-Tyk-Authorization
+	// header in any requests made. Tyk assumes that you are sensible enough not to expose the management endpoints
+	// publicly and to keep this configuration value to yourself.
+	APIKey string `json:"api_key" structviewer:"obfuscate"`
 }
 
 type NewRelicConfig struct {
@@ -717,13 +739,15 @@ type Config struct {
 	// Set this to expose the Tyk Gateway API on a separate port. You can protect it behind a firewall if needed. Please make sure you follow this guide when setting the control port https://tyk.io/docs/tyk-self-managed/#change-your-control-port.
 	ControlAPIPort int `json:"control_api_port"`
 
+	ConfigurationReflection ConfigurationReflectionCfg `json:"configuration_reflection"`
+
 	// This should be changed as soon as Tyk is installed on your system.
 	// This value is used in every interaction with the Tyk Gateway API. It should be passed along as the X-Tyk-Authorization header in any requests made.
 	// Tyk assumes that you are sensible enough not to expose the management endpoints publicly and to keep this configuration value to yourself.
-	Secret string `json:"secret"`
+	Secret string `json:"secret" structviewer:"obfuscate"`
 
 	// The shared secret between the Gateway and the Dashboard to ensure that API Definition downloads, heartbeat and Policy loads are from a valid source.
-	NodeSecret string `json:"node_secret"`
+	NodeSecret string `json:"node_secret" structviewer:"obfuscate"`
 
 	// Linux PID file location. Do not change unless you know what you are doing. Default: /var/run/tyk/tyk-gateway.pid
 	PIDFileLocation string `json:"pid_file_location"`
@@ -1127,6 +1151,7 @@ type Config struct {
 		Vault  VaultConfig  `json:"vault"`
 	} `json:"kv"`
 
+
 	// Secrets configures a list of key/value pairs for the gateway.
 	// When configuring it via environment variable, the expected value
 	// is a comma separated list of key-value pairs delimited with a colon.
@@ -1139,6 +1164,7 @@ type Config struct {
 	// have had the secrets replaced.
 	// See more details https://tyk.io/docs/tyk-self-managed/#how-to-access-the-externally-stored-data
 	Secrets map[string]string `json:"secrets"`
+
 
 	// Override the default error code and or message returned by middleware.
 	// The following message IDs can be used to override the message and error codes:
