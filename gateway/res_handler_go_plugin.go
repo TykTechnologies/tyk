@@ -8,7 +8,6 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"github.com/TykTechnologies/tyk/apidef"
-	"github.com/TykTechnologies/tyk/ctx"
 	"github.com/TykTechnologies/tyk/goplugin"
 	"github.com/TykTechnologies/tyk/user"
 )
@@ -89,7 +88,7 @@ func (h *ResponseGoPluginMiddleware) HandleGoPluginResponse(w http.ResponseWrite
 	}()
 
 	// Inject definition into response context
-	ctx.SetDefinition(req, h.Spec.APIDefinition)
+	h.Spec.injectIntoReqContext(req)
 
 	// wrap ResponseWriter to check if response was sent
 	rw := &customResponseWriter{
