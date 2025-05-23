@@ -775,7 +775,10 @@ func (k *JWTMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _
 		// Token is valid - let's move on
 
 		// Are we mapping to a central JWT Secret?
-		if k.Spec.JWTSource != "" {
+		hasJWTSource := k.Spec.JWTSource != ""
+		hasJwksURIs := len(k.Spec.JWTJwksURIs) > 0
+
+		if hasJWTSource || hasJwksURIs {
 			return k.processCentralisedJWT(r, token)
 		}
 
