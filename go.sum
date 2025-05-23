@@ -65,8 +65,8 @@ github.com/TykTechnologies/gorpc v0.0.0-20250214161245-e9f3f088e8c6 h1:wwt23wdyi
 github.com/TykTechnologies/gorpc v0.0.0-20250214161245-e9f3f088e8c6/go.mod h1:v6v7Mlj08+EmEcXOfpuTxGt2qYU9yhqqtv4QF9Wf50E=
 github.com/TykTechnologies/goverify v0.0.0-20220808203004-1486f89e7708 h1:cmXjlMzcexhc/Cg+QB/c2CPUVs1ux9xn6162qaf/LC4=
 github.com/TykTechnologies/goverify v0.0.0-20220808203004-1486f89e7708/go.mod h1:mkS8jKcz8otdfEXhJs1QQ/DKoIY1NFFsRPKS0RwQENI=
-github.com/TykTechnologies/graphql-go-tools v1.6.2-0.20241212110213-7724a3b64bb2 h1:/B7Dmb35zO4392FACTKyVDH7XTQ0xAb80/M1GMk97Is=
-github.com/TykTechnologies/graphql-go-tools v1.6.2-0.20241212110213-7724a3b64bb2/go.mod h1:NE9MYGcB5eWKW0OefGOjZZEPv6S20AQ0OTsO+npGR8I=
+github.com/TykTechnologies/graphql-go-tools v1.6.2-0.20250515125820-331bc08d1480 h1:58Ug2ih+WS2WAZleEi6Iq6dn9F+DpHj16KQCe1iwRWg=
+github.com/TykTechnologies/graphql-go-tools v1.6.2-0.20250515125820-331bc08d1480/go.mod h1:NE9MYGcB5eWKW0OefGOjZZEPv6S20AQ0OTsO+npGR8I=
 github.com/TykTechnologies/graphql-go-tools/v2 v2.0.0-20240509085643-e95cdc317e1d h1:ntmDECMD7475TK/cxshJ1b8KJvUM1wppohd0qZjqUqI=
 github.com/TykTechnologies/graphql-go-tools/v2 v2.0.0-20240509085643-e95cdc317e1d/go.mod h1:eOt2cxB9sZ80mz4q1UKzzk9CE4QZaS6jP20X2LwPwy8=
 github.com/TykTechnologies/graphql-translator v0.0.0-20250423061552-2acd6818080e h1:4cWfUGBDhNpksMGuKqUWgLkV9e7H9N+vjZthaoIjME4=

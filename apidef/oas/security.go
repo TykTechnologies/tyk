@@ -108,6 +108,11 @@ type JWT struct {
 	// Tyk classic API definition: `jwt_source`
 	Source string `bson:"source,omitempty" json:"source,omitempty"`
 
+	// JwksURIs contains a list of whitelisted JWK endpoints.
+	//
+	// Tyk classic API definition: `jwt_jwks_uris`
+	JwksURIs []apidef.JWK `bson:"jwksURIs,omitempty" json:"jwksURIs,omitempty"`
+
 	// SigningMethod contains the signing method to use for the JWT.
 	//
 	// Tyk classic API definition: `jwt_signing_method`
@@ -206,6 +211,7 @@ func (s *OAS) fillJWT(api apidef.APIDefinition) {
 	jwt.Enabled = api.EnableJWT
 	jwt.AuthSources.Fill(ac)
 	jwt.Source = api.JWTSource
+	jwt.JwksURIs = api.JWTJwksURIs
 	jwt.SigningMethod = api.JWTSigningMethod
 	jwt.IdentityBaseField = api.JWTIdentityBaseField
 	jwt.SkipKid = api.JWTSkipKid
@@ -241,6 +247,7 @@ func (s *OAS) extractJWTTo(api *apidef.APIDefinition, name string) {
 	api.EnableJWT = jwt.Enabled
 	jwt.AuthSources.ExtractTo(&ac)
 	api.JWTSource = jwt.Source
+	api.JWTJwksURIs = jwt.JwksURIs
 	api.JWTSigningMethod = jwt.SigningMethod
 	api.JWTIdentityBaseField = jwt.IdentityBaseField
 	api.JWTSkipKid = jwt.SkipKid
@@ -634,7 +641,7 @@ func (c *IntrospectionCache) ExtractTo(cache *apidef.IntrospectionCache) {
 }
 
 // ExternalOAuth holds configuration for an external OAuth provider.
-// ExternalOAuth support will be deprecated starting from 5.7.0.
+// Deprecated: ExternalOAuth support has been deprecated from 5.7.0.
 // To avoid any disruptions, we recommend that you use JSON Web Token (JWT) instead,
 // as explained in https://tyk.io/docs/basic-config-and-security/security/authentication-authorization/ext-oauth-middleware/.
 type ExternalOAuth struct {
@@ -853,7 +860,10 @@ func resetSecuritySchemes(api *apidef.APIDefinition) {
 	// External OAuth
 	api.ExternalOAuth = apidef.ExternalOAuth{}
 
-	// OIDC
+	// OIDC holds configuration for OpenID Connect.
+	// Deprecated: OIDC support has been deprecated from 5.7.0.
+	// To avoid any disruptions, we recommend that you use JSON Web Token (JWT) instead,
+	// as explained in https://tyk.io/docs/api-management/client-authentication/#integrate-with-openid-connect-deprecated.
 	api.UseOpenID = false
 	api.Scopes.OIDC = apidef.ScopeClaim{}
 	api.OpenIDOptions = apidef.OpenIDOptions{}
@@ -875,6 +885,7 @@ func resetSecuritySchemes(api *apidef.APIDefinition) {
 	// JWT
 	api.EnableJWT = false
 	api.JWTSource = ""
+	api.JWTJwksURIs = nil
 	api.JWTSigningMethod = ""
 	api.JWTIdentityBaseField = ""
 	api.JWTSkipKid = false

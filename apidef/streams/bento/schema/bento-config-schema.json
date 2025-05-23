@@ -1838,7 +1838,8 @@
               "type": "object"
             },
             "url": {
-              "type": "string"
+              "type": "string",
+              "format": "uri"
             },
             "verb": {
               "type": "string"
@@ -2809,7 +2810,8 @@
               "type": "object"
             },
             "url": {
-              "type": "string"
+              "type": "string",
+              "format": "uri"
             },
             "verb": {
               "type": "string"

@@ -43,3 +43,29 @@ See the list of components: https://github.com/warpstreamlabs/bento/tree/main/pu
 
 Importing all components was not preferred because it results in generating a gigantic JSON schema, and it’s too hard to 
 navigate in that file and debug possible issues. 
+
+## How to add a new validator rule
+
+A validator rule has been defined by a simple interface:
+
+```go
+// customValidationRule is an interface for defining custom validation rules for JSON schemas.
+type customValidationRule interface {
+	// Name returns the name of the validation rule.
+	Name() string
+
+	// Apply applies the validation rule to the provided input data and
+	// returns the processed data or an error if validation fails.
+	Apply(input []byte) ([]byte, error)
+}
+```
+
+`Apply` method takes the input and returns the processed input by the validator rule implementation. 
+
+You can add rules to the pipeline like the following, `generateBentoConfigSchema` will take a list of rules and apply them respectively.
+
+```go
+err = generateBentoConfigSchema(args.output, []customValidationRule{
+	&addURIFormatToHTTPClientRule{}
+})
+```

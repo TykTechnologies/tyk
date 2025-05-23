@@ -111,14 +111,23 @@ const (
 	DefaultAPIVersionKey = "x-api-version"
 	HeaderBaseAPIID      = "x-tyk-base-api-id"
 
-	AuthTokenType     = "authToken"
-	JWTType           = "jwt"
-	HMACType          = "hmac"
-	BasicType         = "basic"
-	CoprocessType     = "coprocess"
-	OAuthType         = "oauth"
+	AuthTokenType = "authToken"
+	JWTType       = "jwt"
+	HMACType      = "hmac"
+	BasicType     = "basic"
+	CoprocessType = "coprocess"
+	OAuthType     = "oauth"
+	// ExternalOAuthType holds configuration for an external OAuth provider.
+	// Deprecated: ExternalOAuth support has been deprecated from 5.7.0.
+	// To avoid any disruptions, we recommend that you use JSON Web Token (JWT) instead,
+	// as explained in https://tyk.io/docs/basic-config-and-security/security/authentication-authorization/ext-oauth-middleware/.
 	ExternalOAuthType = "externalOAuth"
-	OIDCType          = "oidc"
+	// OIDCType holds configuration for OpenID Connect.
+	// Deprecated: OIDC support has been deprecated from 5.7.0.
+	// To avoid any disruptions, we recommend that you use JSON Web Token (JWT) instead,
+	// as explained in https://tyk.io/docs/api-management/client-authentication/#integrate-with-openid-connect-deprecated.
+
+	OIDCType = "oidc"
 
 	// OAuthAuthorizationTypeClientCredentials is the authorization type for client credentials flow.
 	OAuthAuthorizationTypeClientCredentials = "clientCredentials"
@@ -691,6 +700,7 @@ type APIDefinition struct {
 	CustomPluginAuthEnabled              bool                   `bson:"custom_plugin_auth_enabled" json:"custom_plugin_auth_enabled"`
 	JWTSigningMethod                     string                 `bson:"jwt_signing_method" json:"jwt_signing_method"`
 	JWTSource                            string                 `bson:"jwt_source" json:"jwt_source"`
+	JWTJwksURIs                          []JWK                  `bson:"jwt_jwks_uris" json:"jwt_jwks_uris"`
 	JWTIdentityBaseField                 string                 `bson:"jwt_identit_base_field" json:"jwt_identity_base_field"`
 	JWTClientIDBaseField                 string                 `bson:"jwt_client_base_field" json:"jwt_client_base_field"`
 	JWTPolicyFieldName                   string                 `bson:"jwt_policy_field_name" json:"jwt_policy_field_name"`
@@ -762,6 +772,11 @@ type APIDefinition struct {
 
 	// UpstreamAuth stores information about authenticating against upstream.
 	UpstreamAuth UpstreamAuth `bson:"upstream_auth" json:"upstream_auth"`
+}
+
+type JWK struct {
+	// url is the jwk endpoint
+	URL string `json:"url"`
 }
 
 // UpstreamAuth holds the configurations related to upstream API authentication.

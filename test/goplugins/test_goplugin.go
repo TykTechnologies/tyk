@@ -197,11 +197,26 @@ func MyAnalyticsPluginMaskJSONLoginBody(record *analytics.AnalyticsRecord) {
 func MyPluginAccessingOASAPI(rw http.ResponseWriter, r *http.Request) {
 	oas := ctx.GetOASDefinition(r)
 	rw.Header().Add("X-OAS-Doc-Title", oas.Info.Title)
+	rw.Header().Add("X-My-Plugin-Accessing-OAS-API", oas.Info.Title)
+}
+
+// MyResponsePluginAccessingOASAPI fake plugin which modifies data
+func MyResponsePluginAccessingOASAPI(rw http.ResponseWriter, _ *http.Response, req *http.Request) {
+	oas := ctx.GetOASDefinition(req)
+	rw.Header().Add("X-OAS-Doc-Title", oas.Info.Title)
+	rw.Header().Add("X-My-Response-Plugin-Accessing-OAS-API", oas.Info.Title)
+}
+
+// MyResponsePluginAccessingOASAPI2 fake plugin which modifies headers
+func MyResponsePluginAccessingOASAPI2(rw http.ResponseWriter, _ *http.Response, req *http.Request) {
+	oas := ctx.GetOASDefinition(req)
+	rw.Header().Add("X-OAS-Doc-Title", oas.Info.Title)
+	rw.Header().Add("X-My-Response-Plugin-Accessing-OAS-API-2", oas.Info.Title)
 }
 
 func MyPluginReturningError(rw http.ResponseWriter, r *http.Request) {
 	rw.WriteHeader(http.StatusTeapot)
-	rw.Write([]byte(http.StatusText(http.StatusTeapot)))
+	_, _ = rw.Write([]byte(http.StatusText(http.StatusTeapot)))
 }
 
 func MyPluginApplyingPolicy(rw http.ResponseWriter, r *http.Request) {
