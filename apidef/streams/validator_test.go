@@ -409,57 +409,71 @@ func TestValidateTykStreams_BentoConfigValidation_Additional_Properties(t *testi
 		err := ValidateOASObjectWithBentoConfigValidator(document, "3.0.3", bento.EnabledAll)
 		require.NoError(t, err)
 
-		// Test with AMQP configuration
+		// Test with aws_sns output configuration, it's not officially supported by Tyk Streams.
 		var amqpDocument = []byte(`{
-			"info": {
-				"title": "test-streams",
-				"version": "1.0.0"
-			},
-			"openapi": "3.0.3",
-			"paths": {},
-			"x-tyk-streaming": {
-				"streams": {
-					"test-amqp-stream": {
-						"input": {
-							"label": "",
-							"amqp": {
-								"url": "amqp://guest:guest@localhost:5672/",
-								"queue": "test-queue",
-								"consumer_tag": "test-consumer",
-								"prefetch_count": 10,
-								"prefetch_size": 4096,
-								"auto_ack": false
-							}
-						},
-						"output": {
-							"label": "",
-							"amqp": {
-								"url": "amqp://guest:guest@localhost:5672/",
-								"exchange": "test-exchange",
-								"key": "test-key",
-								"persistent": true,
-								"mandatory": false,
-								"immediate": false
-							}
-						}
-					}
-				}
-			},
-			"x-tyk-api-gateway": {
-				"info": {
-					"name": "test-streams",
-					"state": {
-						"active": true
-					}
-				},
-				"server": {
-					"listenPath": {
-						"value": "/test-streams"
-					}
-				}
-			}
-		}`)
+    "info": {
+        "title": "test-streams",
+        "version": "1.0.0"
+    },
+    "openapi": "3.0.3",
+    "paths": {},
+    "x-tyk-streaming": {
+        "streams": {
+            "test-enabled-all-stream": {
+                "input": {
+                    "label": "",
+                    "kafka": {
+                        "addresses": [],
+                        "topics": [],
+                        "target_version": "2.1.0",
+                        "consumer_group": "",
+                        "checkpoint_limit": 1024,
+                        "auto_replay_nacks": true
+                    },
+                    "additional": {
+                        "configuration": true
+                    }
+                },
+                "output": {
+                    "label": "",
+                    "drop_on": {
+                        "error": false,
+                        "error_patterns": [],
+                        "back_pressure": "30s",
+                        "output": null
+                    },
+                    "aws_sns": {
+                        "topic_arn": "",
+                        "message_group_id": "",
+                        "message_deduplication_id": "",
+                        "max_in_flight": 64,
+                        "metadata": {
+                            "exclude_prefixes": []
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "x-tyk-api-gateway": {
+        "info": {
+            "name": "test-streams",
+            "state": {
+                "active": true
+            }
+        },
+        "server": {
+            "listenPath": {
+                "value": "/test-streams"
+            }
+        }
+    }
+}`)
 		err = ValidateOASObjectWithBentoConfigValidator(amqpDocument, "3.0.3", bento.EnabledAll)
+		require.NoError(t, err)
+
+		// This method is used by the Dashboard, so we need to test it as well.
+		err = ValidateOASObjectWithConfig(amqpDocument, "3.0.3", true)
 		require.NoError(t, err)
 	})
 }
