@@ -7,12 +7,13 @@ import (
 	"context"
 	"crypto/tls"
 	"fmt"
-	"github.com/stretchr/testify/assert"
 	"io"
 	"net/http"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/assert"
 
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/gorilla/websocket"
@@ -175,11 +176,11 @@ func listenToWebsocketMessage(t *testing.T, ts *Test, apiName string, numClients
 	wsClients := make([]*websocket.Conn, numClients)
 	for i := 0; i < numClients; i++ {
 		conn, _, err := dialer.Dial(wsURL, nil)
+		require.NoError(t, err)
 		t.Cleanup(func() {
-			conn.Close()
+			require.NoError(t, conn.Close())
 		})
 		wsClients[i] = conn
-		require.NoError(t, err)
 	}
 
 	doneChan := make(chan struct{})

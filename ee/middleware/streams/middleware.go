@@ -73,7 +73,6 @@ func (s *Middleware) EnabledForSpec() bool {
 
 		config := s.getStreamsConfig(nil)
 		GlobalStreamCounter.Add(int64(len(config.Streams)))
-
 		s.Logger().Debug("Total streams count: ", len(config.Streams))
 
 		return len(config.Streams) != 0
