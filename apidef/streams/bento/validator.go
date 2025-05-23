@@ -23,7 +23,7 @@ type ValidatorKind string
 const (
 	DefaultBentoConfigSchemaName string        = "bento-config-schema.json"
 	DefaultValidator             ValidatorKind = "default-validator"
-	EnabledAll                   ValidatorKind = "enabled-all"
+	EnableAll                    ValidatorKind = "enable-all"
 )
 
 var (

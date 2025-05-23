@@ -405,8 +405,8 @@ func TestValidateTykStreams_BentoConfigValidation_Additional_Properties(t *testi
 		require.NoError(t, err)
 	})
 
-	t.Run("with enabled-all validator", func(t *testing.T) {
-		err := ValidateOASObjectWithBentoConfigValidator(document, "3.0.3", bento.EnabledAll)
+	t.Run("with enable-all validator", func(t *testing.T) {
+		err := ValidateOASObjectWithBentoConfigValidator(document, "3.0.3", bento.EnableAll)
 		require.NoError(t, err)
 
 		// Test with aws_sns output configuration, it's not officially supported by Tyk Streams.
@@ -419,7 +419,7 @@ func TestValidateTykStreams_BentoConfigValidation_Additional_Properties(t *testi
     "paths": {},
     "x-tyk-streaming": {
         "streams": {
-            "test-enabled-all-stream": {
+            "test-enable-all-stream": {
                 "input": {
                     "label": "",
                     "kafka": {
@@ -469,7 +469,7 @@ func TestValidateTykStreams_BentoConfigValidation_Additional_Properties(t *testi
         }
     }
 }`)
-		err = ValidateOASObjectWithBentoConfigValidator(amqpDocument, "3.0.3", bento.EnabledAll)
+		err = ValidateOASObjectWithBentoConfigValidator(amqpDocument, "3.0.3", bento.EnableAll)
 		require.NoError(t, err)
 
 		// This method is used by the Dashboard, so we need to test it as well.

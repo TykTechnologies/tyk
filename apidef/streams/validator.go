@@ -124,7 +124,7 @@ func loadSchemas() error {
 			return err
 		}
 		bentoValidators[bento.DefaultValidator] = defaultValidator
-		bentoValidators[bento.EnabledAll] = bento.NewEnableAllConfigValidator()
+		bentoValidators[bento.EnableAll] = bento.NewEnableAllConfigValidator()
 		return nil
 	}
 
@@ -149,8 +149,8 @@ func validateBentoConfiguration(document []byte, bentoValidatorKind bento.Valida
 		return fmt.Errorf("failed getting streams configuration: %w", err)
 	}
 
-	// If using enabled-all validator, skip validation
-	if bentoValidatorKind == bento.EnabledAll {
+	// If using enable-all validator, skip validation
+	if bentoValidatorKind == bento.EnableAll {
 		return nil
 	}
 
@@ -210,7 +210,7 @@ func ValidateOASObject(documentBody []byte, oasVersion string) error {
 func ValidateOASObjectWithConfig(documentBody []byte, oasVersion string, disableValidator bool) error {
 	validatorKind := bento.DefaultValidator
 	if disableValidator {
-		validatorKind = bento.EnabledAll
+		validatorKind = bento.EnableAll
 	}
 	return ValidateOASObjectWithBentoConfigValidator(documentBody, oasVersion, validatorKind)
 }
