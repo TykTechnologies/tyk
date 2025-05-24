@@ -179,7 +179,8 @@ func createClassic(tb testing.TB, patch any) *apidef.APIDefinition {
 		assert.NoError(tb, json.Unmarshal(encodeJSON(tb, patch), &def))
 	}
 
-	def.Migrate()
+	_, err := def.Migrate()
+	assert.NoError(tb, err)
 
 	return def
 }

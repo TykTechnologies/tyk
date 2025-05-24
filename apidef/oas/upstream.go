@@ -548,7 +548,7 @@ func (sd *ServiceDiscovery) Fill(serviceDiscovery apidef.ServiceDiscoveryConfigu
 		Timeout: timeout,
 	}
 
-	if !enabled && timeout == 0 {
+	if !sd.Cache.Enabled {
 		sd.Cache = nil
 	}
 
@@ -621,7 +621,7 @@ type UptimeTest struct {
 	Headers map[string]string `bson:"headers" json:"headers,omitempty"`
 
 	// Body is the body of the test request.
-	Body string `bson:"body" json:"body"`
+	Body string `bson:"body" json:"body,omitempty"`
 
 	// Commands are used for TCP checks.
 	Commands []UptimeTestCommand `bson:"commands" json:"commands,omitempty"`
@@ -653,22 +653,20 @@ type UptimeTestCommand struct {
 
 // Fill fills *UptimeTests from apidef.UptimeTests.
 func (u *UptimeTests) Fill(uptimeTests apidef.UptimeTests) {
-	u.Enabled = !uptimeTests.Disabled
-
 	if u.ServiceDiscovery == nil {
 		u.ServiceDiscovery = &ServiceDiscovery{}
 	}
 
 	u.ServiceDiscovery.Fill(uptimeTests.Config.ServiceDiscovery)
+
 	if ShouldOmit(u.ServiceDiscovery) {
 		u.ServiceDiscovery = nil
 	}
 
-	u.Tests = nil
 	u.LogRetentionPeriod = ReadableDuration(time.Duration(uptimeTests.Config.ExpireUptimeAnalyticsAfter) * time.Second)
 	u.HostDownRetestPeriod = ReadableDuration(time.Duration(uptimeTests.Config.RecheckWait) * time.Second)
 
-	result := []UptimeTest{}
+	u.Tests = nil
 	for _, v := range uptimeTests.CheckList {
 		check := UptimeTest{
 			CheckURL:            u.fillCheckURL(v.Protocol, v.CheckURL),
@@ -681,13 +679,10 @@ func (u *UptimeTests) Fill(uptimeTests apidef.UptimeTests) {
 		for _, command := range v.Commands {
 			check.AddCommand(command.Name, command.Message)
 		}
-
-		result = append(result, check)
+		u.Tests = append(u.Tests, check)
 	}
 
-	if len(result) > 0 {
-		u.Tests = result
-	}
+	u.Enabled = len(u.Tests) > 0 && !uptimeTests.Disabled
 }
 
 // ExtractTo extracts *UptimeTests into *apidef.UptimeTests.

@@ -23,6 +23,8 @@ testapps/
 /*.conf
 /*.json
 /*.bak
+/.air.toml
+
 
 /tyk
 logs/

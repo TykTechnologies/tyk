@@ -2,6 +2,9 @@ package oas
 
 import (
 	"crypto/tls"
+	"encoding/json"
+	"net/http"
+	"reflect"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -180,6 +183,47 @@ func TestUptimeTests(t *testing.T) {
 		assert.Equal(t, time.Millisecond*50, convertedTest.CheckList[0].Timeout)
 		assert.Equal(t, uptimeTests.Tests[0].CheckURL, convertedTest.CheckList[0].CheckURL)
 		assert.Equal(t, uptimeTests.Tests[0].Method, convertedTest.CheckList[0].Method)
+	})
+
+	t.Run("fill makes empty structure if no-one test was provided", func(t *testing.T) {
+		var classicTests apidef.UptimeTests
+
+		var zero UptimeTests
+		var uptimeTests UptimeTests
+
+		assert.True(t, ShouldOmit(uptimeTests))
+		uptimeTests.Fill(classicTests)
+
+		assert.True(t, reflect.DeepEqual(zero, uptimeTests))
+	})
+
+	t.Run("empty body is not shown in serialized json", func(t *testing.T) {
+		var classicTests apidef.UptimeTests
+		classicTests.Disabled = false
+		classicTests.Config.RecheckWait = 0
+		classicTests.Config.ExpireUptimeAnalyticsAfter = 0
+		classicTests.CheckList = []apidef.HostCheckObject{
+			{
+				Method:   http.MethodGet,
+				Protocol: "",
+				Body:     "",
+				CheckURL: "http://localhost:8200/get",
+			},
+		}
+
+		var uptimeTests UptimeTests
+		uptimeTests.Fill(classicTests)
+		assert.Len(t, uptimeTests.Tests, 1)
+
+		jsonStr, err := json.Marshal(uptimeTests.Tests[0])
+		assert.Nil(t, err)
+
+		var res = make(map[string]interface{})
+		err = json.Unmarshal(jsonStr, &res)
+		assert.Nil(t, err)
+
+		assert.NotContains(t, res, "body")
+		assert.NotContains(t, res, "protocol")
 	})
 }
 

@@ -59,11 +59,7 @@ tests:
         title: "Name"
       x-tyk-api-gateway:
         upstream:
-          serviceDiscovery:
-            enabled: false
-            cache:
-              enabled: false
-              timeout: 10
+          serviceDiscovery: "<nil>"
   - source: classic
     desc: |
       If service discovery is disabled (unconfigured) then honor cache_disabled=false as being still disabled.
