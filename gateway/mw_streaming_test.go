@@ -16,10 +16,7 @@ import (
 	"testing"
 	"time"
 
-<<<<<<< HEAD
-=======
 	"github.com/getkin/kin-openapi/openapi3"
->>>>>>> 7b6a83f (Upgrade kin-openapi to v0.132.0)
 	"github.com/gorilla/websocket"
 	"github.com/nats-io/nats.go"
 	"github.com/sirupsen/logrus"
