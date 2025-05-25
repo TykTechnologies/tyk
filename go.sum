@@ -2251,6 +2251,10 @@ github.com/stvp/tempredis v0.0.0-20181119212430-b82af8480203 h1:QVqDTf3h2WHt08Yu
 github.com/stvp/tempredis v0.0.0-20181119212430-b82af8480203/go.mod h1:oqN97ltKNihBbwlX8dLpwxCl3+HnXKV/R0e+sRLd9C8=
 github.com/testcontainers/testcontainers-go v0.37.0 h1:L2Qc0vkTw2EHWQ08djon0D2uw7Z/PtHS/QzZZ5Ra/hg=
 github.com/testcontainers/testcontainers-go v0.37.0/go.mod h1:QPzbxZhQ6Bclip9igjLFj6z0hs01bU8lrl2dHQmgFGM=
+github.com/testcontainers/testcontainers-go/modules/kafka v0.37.0 h1:ZkYNKqhqvKm+aZk9C1fxw/fpNNOK+Nm/wHPjmJdN3Ko=
+github.com/testcontainers/testcontainers-go/modules/kafka v0.37.0/go.mod h1:+LvaFfSFW5PMiJTxTQlV6TBpXH1Ktk1h0FTVRZfqSxY=
+github.com/testcontainers/testcontainers-go/modules/nats v0.37.0 h1:W0CuaYbJZBeao2B0/AgjdRbDjnQFPu9gWpnxylNevts=
+github.com/testcontainers/testcontainers-go/modules/nats v0.37.0/go.mod h1:yPPcc9JrIF6i/lhBdvcSWjVG/LcEdX04VB8Z0zePBgg=
 github.com/testcontainers/testcontainers-go/modules/rabbitmq v0.36.0 h1:gobSVNvTsiJTcGTlVJMpeUfAcz85HAMMwo8xEVQZItE=
 github.com/testcontainers/testcontainers-go/modules/rabbitmq v0.36.0/go.mod h1:rLtFlrLEWcU/Ud52FiGk57QvUqoAHvR380hZo+tkBaI=
 github.com/tetratelabs/wazero v1.6.0 h1:z0H1iikCdP8t+q341xqepY4EWvHEw8Es7tlqiVzlP3g=
