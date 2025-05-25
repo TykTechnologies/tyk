@@ -74,9 +74,9 @@ require (
 	github.com/valyala/fasthttp v1.58.0 // test
 	github.com/vmihailenco/msgpack v4.0.4+incompatible
 	github.com/xeipuuv/gojsonschema v1.2.0
-	golang.org/x/crypto v0.36.0
-	golang.org/x/net v0.37.0
-	golang.org/x/sync v0.12.0
+	golang.org/x/crypto v0.37.0
+	golang.org/x/net v0.38.0
+	golang.org/x/sync v0.13.0
 	google.golang.org/grpc v1.70.0
 	google.golang.org/grpc/examples v0.0.0-20220317213542-f95b001a48df // test
 	google.golang.org/protobuf v1.36.4
@@ -93,6 +93,7 @@ require (
 
 require (
 	github.com/Azure/go-amqp v1.0.5
+	github.com/IBM/sarama v1.43.3
 	github.com/Jeffail/gabs/v2 v2.7.0
 	github.com/TykTechnologies/graphql-go-tools/v2 v2.0.0-20240509085643-e95cdc317e1d
 	github.com/TykTechnologies/opentelemetry v0.0.22
@@ -104,12 +105,15 @@ require (
 	github.com/goccy/go-yaml v1.15.23
 	github.com/google/go-cmp v0.7.0
 	github.com/huandu/go-clone/generic v1.7.2
+	github.com/nats-io/nats.go v1.38.0
 	github.com/newrelic/go-agent/v3 v3.35.1
 	github.com/newrelic/go-agent/v3/integrations/nrgorilla v1.2.2
 	github.com/oasdiff/yaml v0.0.0-20250309154309-f31be36b4037
 	github.com/rabbitmq/amqp091-go v1.9.0
 	github.com/shirou/gopsutil v3.21.11+incompatible
-	github.com/testcontainers/testcontainers-go v0.36.0
+	github.com/testcontainers/testcontainers-go v0.37.0
+	github.com/testcontainers/testcontainers-go/modules/kafka v0.37.0
+	github.com/testcontainers/testcontainers-go/modules/nats v0.37.0
 	github.com/testcontainers/testcontainers-go/modules/rabbitmq v0.36.0
 	github.com/warpstreamlabs/bento v1.7.1
 	go.opentelemetry.io/otel v1.35.0
@@ -160,7 +164,6 @@ require (
 	github.com/GoogleCloudPlatform/opentelemetry-operations-go/exporter/trace v1.21.0 // indirect
 	github.com/GoogleCloudPlatform/opentelemetry-operations-go/internal/resourcemapping v0.45.0 // indirect
 	github.com/HdrHistogram/hdrhistogram-go v1.1.2 // indirect
-	github.com/IBM/sarama v1.43.3 // indirect
 	github.com/Jeffail/checkpoint v1.0.1 // indirect
 	github.com/Jeffail/grok v1.1.0 // indirect
 	github.com/Jeffail/shutdown v1.0.0 // indirect
@@ -385,7 +388,7 @@ require (
 	github.com/linkedin/goavro/v2 v2.12.0 // indirect
 	github.com/lonelycode/go-uuid v0.0.0-20141202165402-ed3ca8a15a93 // indirect
 	github.com/lufia/plan9stats v0.0.0-20230326075908-cb1d2100619a // indirect
-	github.com/magiconair/properties v1.8.9 // indirect
+	github.com/magiconair/properties v1.8.10 // indirect
 	github.com/mailru/easyjson v0.7.7 // indirect
 	github.com/matoous/go-nanoid/v2 v2.0.0 // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect
@@ -412,7 +415,6 @@ require (
 	github.com/mtibben/percent v0.2.1 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/nats-io/jwt/v2 v2.7.2 // indirect
-	github.com/nats-io/nats.go v1.38.0 // indirect
 	github.com/nats-io/nkeys v0.4.9 // indirect
 	github.com/nats-io/nuid v1.0.1 // indirect
 	github.com/nats-io/stan.go v0.10.4 // indirect
@@ -527,9 +529,9 @@ require (
 	go.uber.org/zap v1.27.0 // indirect
 	golang.org/x/exp v0.0.0-20250106191152-7588d65b2ba8 // indirect
 	golang.org/x/mod v0.22.0 // indirect
-	golang.org/x/sys v0.31.0 // indirect
-	golang.org/x/term v0.30.0 // indirect
-	golang.org/x/text v0.23.0 // indirect
+	golang.org/x/sys v0.32.0 // indirect
+	golang.org/x/term v0.31.0 // indirect
+	golang.org/x/text v0.24.0 // indirect
 	golang.org/x/time v0.9.0 // indirect
 	golang.org/x/tools v0.29.0 // indirect
 	golang.org/x/xerrors v0.0.0-20240903120638-7835f813f4da // indirect
