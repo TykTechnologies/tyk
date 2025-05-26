@@ -240,7 +240,10 @@ func (gw *Gateway) liveCheckHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(httpStatus)
-	json.NewEncoder(w).Encode(res)
+	err := json.NewEncoder(w).Encode(res)
+	if err != nil {
+		mainLog.Warning("[Liveness] Could not encode response")
+	}
 }
 
 // readinessHandler is a dedicated endpoint for readiness probes

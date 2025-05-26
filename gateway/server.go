@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/TykTechnologies/tyk/trace"
 	htmltemplate "html/template"
 	"io/ioutil"
 	stdlog "log"
@@ -22,6 +21,8 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+
+	"github.com/TykTechnologies/tyk/trace"
 
 	"sync/atomic"
 	"syscall"
@@ -1719,21 +1720,19 @@ func Start() {
 	gwConfig = gw.GetConfig()
 
 	go func() {
-		select {
-		case sig := <-sigChan:
-			// This case handles SIGTERM for Kubernetes shutdowns
-			mainLog.Infof("SIGTERM received: %v. Initiating graceful shutdown...", sig)
-			// Cancel the context to notify all goroutines
-			cancel()
+		sig := <-sigChan
+		// This case handles SIGTERM for Kubernetes shutdowns
+		mainLog.Infof("SIGTERM received: %v. Initiating graceful shutdown...", sig)
+		// Cancel the context to notify all goroutines
+		cancel()
 
-			// Perform graceful shutdown
-			shutdownCtx, shutdownCancel := context.WithTimeout(
-				context.Background(), time.Duration(gwConfig.GracefulShutdownTimeoutDuration)*time.Second)
-			defer shutdownCancel()
+		// Perform graceful shutdown
+		shutdownCtx, shutdownCancel := context.WithTimeout(
+			context.Background(), time.Duration(gwConfig.GracefulShutdownTimeoutDuration)*time.Second)
+		defer shutdownCancel()
 
-			if err := gw.gracefulShutdown(shutdownCtx); err != nil {
-				mainLog.Errorf("Graceful shutdown error: %v", err)
-			}
+		if err := gw.gracefulShutdown(shutdownCtx); err != nil {
+			mainLog.Errorf("Graceful shutdown error: %v", err)
 		}
 	}()
 
