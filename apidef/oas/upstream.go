@@ -591,11 +591,11 @@ type UptimeTests struct {
 	// HostDownRetestPeriod is the time to wait until rechecking a failed test.
 	// If undefined, the default testing interval (10s) is in use.
 	// Setting this to a lower value would result in quicker recovery on failed checks.
-	HostDownRetestPeriod time.ReadableDuration `bson:"hostDownRetestPeriod" json:"hostDownRetestPeriod"`
+	HostDownRetestPeriod time.ReadableDuration `bson:"hostDownRetestPeriod" json:"hostDownRetestPeriod,omitempty"`
 
 	// LogRetentionPeriod holds a time to live for the uptime test results.
 	// If unset, a value of 100 years is the default.
-	LogRetentionPeriod time.ReadableDuration `bson:"logRetentionPeriod" json:"logRetentionPeriod"`
+	LogRetentionPeriod time.ReadableDuration `bson:"logRetentionPeriod" json:"logRetentionPeriod,omitempty"`
 }
 
 // UptimeTest configures an uptime test check.
