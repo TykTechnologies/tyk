@@ -697,6 +697,8 @@ type StreamingConfig struct {
 	// are filtered out. This field allows administrators to explicitly permit specific unsafe components when needed.
 	// Use with caution as enabling unsafe components may introduce security vulnerabilities.
 	AllowUnsafe []string `json:"allow_unsafe"`
+	// EnableAll enables all Bento plugins (except unsafe ones) by disabling the streams validator
+	EnableAll bool `json:"enable_all"`
 }
 
 // Config is the configuration object used by Tyk to set up various parameters.
