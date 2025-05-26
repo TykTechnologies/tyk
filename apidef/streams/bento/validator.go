@@ -23,6 +23,7 @@ type ValidatorKind string
 const (
 	DefaultBentoConfigSchemaName string        = "bento-config-schema.json"
 	DefaultValidator             ValidatorKind = "default-validator"
+	EnableAll                    ValidatorKind = "enable-all"
 )
 
 var (
@@ -106,4 +107,17 @@ func (v *DefaultConfigValidator) Validate(document []byte) error {
 		combinedErr = multierror.Append(combinedErr, errors.New(validationErr.String()))
 	}
 	return combinedErr.ErrorOrNil()
+}
+
+// EnableAllConfigValidator is a validator that skips all validation
+type EnableAllConfigValidator struct{}
+
+// NewEnableAllConfigValidator creates a new validator that skips all validation
+func NewEnableAllConfigValidator() *EnableAllConfigValidator {
+	return &EnableAllConfigValidator{}
+}
+
+// Validate always returns nil, effectively enabling all configurations
+func (v *EnableAllConfigValidator) Validate(_ []byte) error {
+	return nil
 }
