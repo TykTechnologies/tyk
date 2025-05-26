@@ -98,6 +98,7 @@ require (
 	github.com/TykTechnologies/graphql-go-tools/v2 v2.0.0-20240509085643-e95cdc317e1d
 	github.com/TykTechnologies/kin-openapi v0.91.0
 	github.com/TykTechnologies/opentelemetry v0.0.22
+	github.com/TykTechnologies/structviewer v1.1.1
 	github.com/alecthomas/kingpin/v2 v2.4.0
 	github.com/eclipse/paho.mqtt.golang v1.4.3
 	github.com/go-redis/redismock/v9 v9.2.0
