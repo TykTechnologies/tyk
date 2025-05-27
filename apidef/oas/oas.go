@@ -461,7 +461,7 @@ func (s *OAS) validateSecurity() error {
 	}
 
 	for _, requirement := range s.Security {
-		for key, _ := range requirement {
+		for key := range requirement {
 			if _, ok := s.Components.SecuritySchemes[key]; !ok {
 				errorMsg := fmt.Sprintf("Missing required Security Scheme '%s' in Components.SecuritySchemes. "+
 					"For more information please visit https://swagger.io/specification/#security-requirement-object",
