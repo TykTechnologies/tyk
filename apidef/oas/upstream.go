@@ -612,7 +612,7 @@ type UptimeTest struct {
 
 	// Timeout declares a timeout for the request. If the test exceeds
 	// this timeout, the check fails.
-	Timeout time.ReadableDuration `bson:"timeout" json:"timeout"`
+	Timeout time.ReadableDuration `bson:"timeout" json:"timeout,omitempty"`
 
 	// Method allows you to customize the HTTP method for the test (`GET`, `POST`,...).
 	Method string `bson:"method" json:"method"`
