@@ -537,7 +537,7 @@ func TestGateway_gracefulShutdown_ConcurrentSafety(t *testing.T) {
 	gw.cacheCreate()
 
 	var wg sync.WaitGroup
-	errors := make(chan error, 3)
+	errorChan := make(chan error, 3)
 
 	// Start multiple graceful shutdowns concurrently
 	for i := 0; i < 3; i++ {
@@ -547,16 +547,16 @@ func TestGateway_gracefulShutdown_ConcurrentSafety(t *testing.T) {
 			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 			defer cancel()
 			err := gw.gracefulShutdown(ctx)
-			errors <- err
+			errorChan <- err
 		}()
 	}
 
 	wg.Wait()
-	close(errors)
+	close(errorChan)
 
 	// At least one should succeed, others might fail due to already closed servers
 	var successCount int
-	for err := range errors {
+	for err := range errorChan {
 		if err == nil {
 			successCount++
 		}

@@ -28,23 +28,23 @@ func TestGateway_readinessHandler(t *testing.T) {
 		{
 			name:                 "method not allowed - POST",
 			method:               http.MethodPost,
-			setupGateway:         func(gw *Gateway) {},
-			setupHealthCheck:     func(gw *Gateway) {},
+			setupGateway:         func(_ *Gateway) {},
+			setupHealthCheck:     func(_ *Gateway) {},
 			expectedStatus:       http.StatusMethodNotAllowed,
 			expectedErrorMessage: "Method Not Allowed",
 		},
 		{
 			name:                 "method not allowed - PUT",
 			method:               http.MethodPut,
-			setupGateway:         func(gw *Gateway) {},
-			setupHealthCheck:     func(gw *Gateway) {},
+			setupGateway:         func(_ *Gateway) {},
+			setupHealthCheck:     func(_ *Gateway) {},
 			expectedStatus:       http.StatusMethodNotAllowed,
 			expectedErrorMessage: "Method Not Allowed",
 		},
 		{
 			name:   "redis health check failed",
 			method: http.MethodGet,
-			setupGateway: func(gw *Gateway) {
+			setupGateway: func(_ *Gateway) {
 				// No need to mock storage connection handler for this test
 			},
 			setupHealthCheck: func(gw *Gateway) {
