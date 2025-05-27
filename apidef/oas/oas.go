@@ -3,6 +3,7 @@ package oas
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -437,6 +438,40 @@ func (s *OAS) ReplaceServers(apiURLs, oldAPIURLs []string) {
 	}
 
 	s.Servers = append(newServers, userAddedServers...)
+}
+
+// Validate validates OAS document by calling openapi3.T.Validate() function. In addition, it validates Security
+// Requirement section and it's requirements by calling OAS.validateSecurity() function.
+func (s *OAS) Validate(ctx context.Context, opts ...openapi3.ValidationOption) error {
+	validationErr := s.T.Validate(ctx, opts...)
+	securityErr := s.validateSecurity()
+
+	return errors.Join(validationErr, securityErr)
+}
+
+// validateSecurity verifies that existing Security Requirement Objects has Security Schemes declared in the Security
+// Schemes under the Components Object. This function closes gap in validation provided by OAS.Validate func.
+func (s *OAS) validateSecurity() error {
+	if len(s.Security) == 0 {
+		return nil
+	}
+
+	if s.Components == nil || s.Components.SecuritySchemes == nil || len(s.Components.SecuritySchemes) == 0 {
+		return errors.New("No components or security schemes present in OAS")
+	}
+
+	for _, requirement := range s.Security {
+		for key, _ := range requirement {
+			if _, ok := s.Components.SecuritySchemes[key]; !ok {
+				errorMsg := fmt.Sprintf("Missing required Security Scheme '%s' in Components.SecuritySchemes. "+
+					"For more information please visit https://swagger.io/specification/#security-requirement-object",
+					key)
+				return errors.New(errorMsg)
+			}
+		}
+	}
+
+	return nil
 }
 
 // APIDef holds both OAS and Classic forms of an API definition.
