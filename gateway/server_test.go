@@ -45,7 +45,8 @@ func TestGateway_afterConfSetup(t *testing.T) {
 				AnalyticsConfig: config.AnalyticsConfigConfig{
 					PurgeInterval: 10,
 				},
-				HealthCheckEndpointName: "hello",
+				HealthCheckEndpointName:    "hello",
+				ReadinessCheckEndpointName: "ready",
 			},
 		},
 		{
@@ -71,7 +72,8 @@ func TestGateway_afterConfSetup(t *testing.T) {
 				AnalyticsConfig: config.AnalyticsConfigConfig{
 					PurgeInterval: 10,
 				},
-				HealthCheckEndpointName: "hello",
+				HealthCheckEndpointName:    "hello",
+				ReadinessCheckEndpointName: "ready",
 			},
 		},
 	}
