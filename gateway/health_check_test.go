@@ -431,7 +431,7 @@ func TestGateway_isCriticalFailure(t *testing.T) {
 			gw := NewGateway(conf, nil)
 
 			// Call the function under test
-			result := gw.isCriticalFailure(tt.component, tt.check)
+			result := gw.isCriticalFailure(tt.component)
 
 			// Assert the result
 			assert.Equal(t, tt.expectedResult, result)

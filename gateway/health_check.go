@@ -286,7 +286,7 @@ func (gw *Gateway) evaluateHealthChecks(checks map[string]HealthCheckItem) (fail
 		if check.Status == Fail {
 			failCount++
 
-			if gw.isCriticalFailure(component, check) {
+			if gw.isCriticalFailure(component) {
 				criticalFailure = true
 			}
 		}
@@ -294,7 +294,7 @@ func (gw *Gateway) evaluateHealthChecks(checks map[string]HealthCheckItem) (fail
 	return failCount, criticalFailure
 }
 
-func (gw *Gateway) isCriticalFailure(component string, check HealthCheckItem) bool {
+func (gw *Gateway) isCriticalFailure(component string) bool {
 	// Redis is always considered critical
 	if component == "redis" {
 		return true
