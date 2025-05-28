@@ -312,3 +312,433 @@ func TestGateway_readinessHandler_Integration(t *testing.T) {
 		assert.Equal(t, "Method Not Allowed", errorResponse.Message)
 	})
 }
+
+func TestGateway_isCriticalFailure(t *testing.T) {
+	tests := []struct {
+		name           string
+		component      string
+		check          HealthCheckItem
+		setupConfig    func(*config.Config)
+		expectedResult bool
+	}{
+		{
+			name:      "redis component is always critical",
+			component: "redis",
+			check: HealthCheckItem{
+				Status:        Fail,
+				ComponentType: Datastore,
+			},
+			setupConfig:    func(_ *config.Config) {},
+			expectedResult: true,
+		},
+		{
+			name:      "dashboard component is critical when UseDBAppConfigs is enabled",
+			component: "dashboard",
+			check: HealthCheckItem{
+				Status:        Fail,
+				ComponentType: System,
+			},
+			setupConfig: func(conf *config.Config) {
+				conf.UseDBAppConfigs = true
+			},
+			expectedResult: true,
+		},
+		{
+			name:      "dashboard component is not critical when UseDBAppConfigs is disabled",
+			component: "dashboard",
+			check: HealthCheckItem{
+				Status:        Fail,
+				ComponentType: System,
+			},
+			setupConfig: func(conf *config.Config) {
+				conf.UseDBAppConfigs = false
+			},
+			expectedResult: false,
+		},
+		{
+			name:      "rpc component is critical when PolicySource is rpc",
+			component: "rpc",
+			check: HealthCheckItem{
+				Status:        Fail,
+				ComponentType: System,
+			},
+			setupConfig: func(conf *config.Config) {
+				conf.Policies.PolicySource = "rpc"
+			},
+			expectedResult: true,
+		},
+		{
+			name:      "rpc component is not critical when PolicySource is not rpc",
+			component: "rpc",
+			check: HealthCheckItem{
+				Status:        Fail,
+				ComponentType: System,
+			},
+			setupConfig: func(conf *config.Config) {
+				conf.Policies.PolicySource = "file"
+			},
+			expectedResult: false,
+		},
+		{
+			name:      "unknown component is not critical",
+			component: "unknown",
+			check: HealthCheckItem{
+				Status:        Fail,
+				ComponentType: System,
+			},
+			setupConfig:    func(_ *config.Config) {},
+			expectedResult: false,
+		},
+		{
+			name:      "custom component is not critical",
+			component: "custom-service",
+			check: HealthCheckItem{
+				Status:        Fail,
+				ComponentType: System,
+			},
+			setupConfig:    func(_ *config.Config) {},
+			expectedResult: false,
+		},
+		{
+			name:      "redis component with pass status (edge case)",
+			component: "redis",
+			check: HealthCheckItem{
+				Status:        Pass,
+				ComponentType: Datastore,
+			},
+			setupConfig:    func(_ *config.Config) {},
+			expectedResult: true, // Redis is always critical regardless of status
+		},
+		{
+			name:      "dashboard with UseDBAppConfigs enabled and warn status",
+			component: "dashboard",
+			check: HealthCheckItem{
+				Status:        Warn,
+				ComponentType: System,
+			},
+			setupConfig: func(conf *config.Config) {
+				conf.UseDBAppConfigs = true
+			},
+			expectedResult: true, // Critical based on component and config, not status
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Create a new gateway instance for each test
+			conf := config.Config{}
+			tt.setupConfig(&conf)
+			gw := NewGateway(conf, nil)
+
+			// Call the function under test
+			result := gw.isCriticalFailure(tt.component, tt.check)
+
+			// Assert the result
+			assert.Equal(t, tt.expectedResult, result)
+		})
+	}
+}
+
+func TestGateway_evaluateHealthChecks(t *testing.T) {
+	tests := []struct {
+		name                    string
+		checks                  map[string]HealthCheckItem
+		setupConfig             func(*config.Config)
+		expectedFailCount       int
+		expectedCriticalFailure bool
+	}{
+		{
+			name:                    "no health checks",
+			checks:                  map[string]HealthCheckItem{},
+			setupConfig:             func(_ *config.Config) {},
+			expectedFailCount:       0,
+			expectedCriticalFailure: false,
+		},
+		{
+			name: "all checks passing",
+			checks: map[string]HealthCheckItem{
+				"redis": {
+					Status:        Pass,
+					ComponentType: Datastore,
+				},
+				"dashboard": {
+					Status:        Pass,
+					ComponentType: System,
+				},
+			},
+			setupConfig:             func(_ *config.Config) {},
+			expectedFailCount:       0,
+			expectedCriticalFailure: false,
+		},
+		{
+			name: "redis failing - critical failure",
+			checks: map[string]HealthCheckItem{
+				"redis": {
+					Status:        Fail,
+					ComponentType: Datastore,
+				},
+				"dashboard": {
+					Status:        Pass,
+					ComponentType: System,
+				},
+			},
+			setupConfig:             func(_ *config.Config) {},
+			expectedFailCount:       1,
+			expectedCriticalFailure: true,
+		},
+		{
+			name: "dashboard failing with UseDBAppConfigs enabled - critical failure",
+			checks: map[string]HealthCheckItem{
+				"redis": {
+					Status:        Pass,
+					ComponentType: Datastore,
+				},
+				"dashboard": {
+					Status:        Fail,
+					ComponentType: System,
+				},
+			},
+			setupConfig: func(conf *config.Config) {
+				conf.UseDBAppConfigs = true
+			},
+			expectedFailCount:       1,
+			expectedCriticalFailure: true,
+		},
+		{
+			name: "dashboard failing with UseDBAppConfigs disabled - non-critical failure",
+			checks: map[string]HealthCheckItem{
+				"redis": {
+					Status:        Pass,
+					ComponentType: Datastore,
+				},
+				"dashboard": {
+					Status:        Fail,
+					ComponentType: System,
+				},
+			},
+			setupConfig: func(conf *config.Config) {
+				conf.UseDBAppConfigs = false
+			},
+			expectedFailCount:       1,
+			expectedCriticalFailure: false,
+		},
+		{
+			name: "rpc failing with PolicySource rpc - critical failure",
+			checks: map[string]HealthCheckItem{
+				"redis": {
+					Status:        Pass,
+					ComponentType: Datastore,
+				},
+				"rpc": {
+					Status:        Fail,
+					ComponentType: System,
+				},
+			},
+			setupConfig: func(conf *config.Config) {
+				conf.Policies.PolicySource = "rpc"
+			},
+			expectedFailCount:       1,
+			expectedCriticalFailure: true,
+		},
+		{
+			name: "rpc failing with PolicySource file - non-critical failure",
+			checks: map[string]HealthCheckItem{
+				"redis": {
+					Status:        Pass,
+					ComponentType: Datastore,
+				},
+				"rpc": {
+					Status:        Fail,
+					ComponentType: System,
+				},
+			},
+			setupConfig: func(conf *config.Config) {
+				conf.Policies.PolicySource = "file"
+			},
+			expectedFailCount:       1,
+			expectedCriticalFailure: false,
+		},
+		{
+			name: "multiple failures with one critical",
+			checks: map[string]HealthCheckItem{
+				"redis": {
+					Status:        Fail,
+					ComponentType: Datastore,
+				},
+				"dashboard": {
+					Status:        Fail,
+					ComponentType: System,
+				},
+				"custom": {
+					Status:        Fail,
+					ComponentType: System,
+				},
+			},
+			setupConfig: func(conf *config.Config) {
+				conf.UseDBAppConfigs = false // dashboard not critical
+			},
+			expectedFailCount:       3,
+			expectedCriticalFailure: true, // redis is critical
+		},
+		{
+			name: "multiple non-critical failures",
+			checks: map[string]HealthCheckItem{
+				"redis": {
+					Status:        Pass,
+					ComponentType: Datastore,
+				},
+				"dashboard": {
+					Status:        Fail,
+					ComponentType: System,
+				},
+				"custom": {
+					Status:        Fail,
+					ComponentType: System,
+				},
+			},
+			setupConfig: func(conf *config.Config) {
+				conf.UseDBAppConfigs = false // dashboard not critical
+			},
+			expectedFailCount:       2,
+			expectedCriticalFailure: false,
+		},
+		{
+			name: "warning status not counted as failure",
+			checks: map[string]HealthCheckItem{
+				"redis": {
+					Status:        Warn,
+					ComponentType: Datastore,
+				},
+				"dashboard": {
+					Status:        Warn,
+					ComponentType: System,
+				},
+			},
+			setupConfig:             func(_ *config.Config) {},
+			expectedFailCount:       0,
+			expectedCriticalFailure: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Create a new gateway instance for each test
+			conf := config.Config{}
+			tt.setupConfig(&conf)
+			gw := NewGateway(conf, nil)
+
+			// Call the function under test
+			failCount, criticalFailure := gw.evaluateHealthChecks(tt.checks)
+
+			// Assert the results
+			assert.Equal(t, tt.expectedFailCount, failCount)
+			assert.Equal(t, tt.expectedCriticalFailure, criticalFailure)
+		})
+	}
+}
+
+func TestGateway_determineHealthStatus(t *testing.T) {
+	tests := []struct {
+		name               string
+		failCount          int
+		criticalFailure    bool
+		totalChecks        int
+		expectedStatus     HealthCheckStatus
+		expectedHTTPStatus int
+	}{
+		{
+			name:               "no failures - all pass",
+			failCount:          0,
+			criticalFailure:    false,
+			totalChecks:        3,
+			expectedStatus:     Pass,
+			expectedHTTPStatus: http.StatusOK,
+		},
+		{
+			name:               "no failures with zero checks",
+			failCount:          0,
+			criticalFailure:    false,
+			totalChecks:        0,
+			expectedStatus:     Pass,
+			expectedHTTPStatus: http.StatusOK,
+		},
+		{
+			name:               "critical failure present",
+			failCount:          1,
+			criticalFailure:    true,
+			totalChecks:        3,
+			expectedStatus:     Fail,
+			expectedHTTPStatus: http.StatusServiceUnavailable,
+		},
+		{
+			name:               "multiple failures with critical",
+			failCount:          2,
+			criticalFailure:    true,
+			totalChecks:        3,
+			expectedStatus:     Fail,
+			expectedHTTPStatus: http.StatusServiceUnavailable,
+		},
+		{
+			name:               "all checks failed",
+			failCount:          3,
+			criticalFailure:    false,
+			totalChecks:        3,
+			expectedStatus:     Fail,
+			expectedHTTPStatus: http.StatusServiceUnavailable,
+		},
+		{
+			name:               "all checks failed with critical",
+			failCount:          3,
+			criticalFailure:    true,
+			totalChecks:        3,
+			expectedStatus:     Fail,
+			expectedHTTPStatus: http.StatusServiceUnavailable,
+		},
+		{
+			name:               "single check failed (all failed case)",
+			failCount:          1,
+			criticalFailure:    false,
+			totalChecks:        1,
+			expectedStatus:     Fail,
+			expectedHTTPStatus: http.StatusServiceUnavailable,
+		},
+		{
+			name:               "partial non-critical failures - warning",
+			failCount:          1,
+			criticalFailure:    false,
+			totalChecks:        3,
+			expectedStatus:     Warn,
+			expectedHTTPStatus: http.StatusOK,
+		},
+		{
+			name:               "multiple non-critical failures - warning",
+			failCount:          2,
+			criticalFailure:    false,
+			totalChecks:        5,
+			expectedStatus:     Warn,
+			expectedHTTPStatus: http.StatusOK,
+		},
+		{
+			name:               "edge case - zero total checks with failures",
+			failCount:          1,
+			criticalFailure:    false,
+			totalChecks:        0,
+			expectedStatus:     Warn,
+			expectedHTTPStatus: http.StatusOK,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Create a gateway instance (config doesn't matter for this function)
+			gw := NewGateway(config.Config{}, nil)
+
+			// Call the function under test
+			status, httpStatus := gw.determineHealthStatus(tt.failCount, tt.criticalFailure, tt.totalChecks)
+
+			// Assert the results
+			assert.Equal(t, tt.expectedStatus, status)
+			assert.Equal(t, tt.expectedHTTPStatus, httpStatus)
+		})
+	}
+}

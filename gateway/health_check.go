@@ -186,49 +186,9 @@ func (gw *Gateway) liveCheckHandler(w http.ResponseWriter, r *http.Request) {
 		Details:     checks,
 	}
 
-	var failCount int
-	var criticalFailure bool
+	failCount, criticalFailure := gw.evaluateHealthChecks(checks)
 
-	// Check for critical failures
-	for component, check := range checks {
-		if check.Status == Fail {
-			failCount++
-
-			// Redis is always considered critical
-			if component == "redis" {
-				criticalFailure = true
-			}
-
-			// Consider dashboard critical only if UseDBAppConfigs is enabled
-			if component == "dashboard" && gw.GetConfig().UseDBAppConfigs {
-				criticalFailure = true
-			}
-
-			// Consider RPC critical only if using RPC
-			if component == "rpc" && gw.GetConfig().Policies.PolicySource == "rpc" {
-				criticalFailure = true
-			}
-		}
-	}
-
-	var status HealthCheckStatus
-	var httpStatus int
-
-	switch {
-	case failCount == 0:
-		status = Pass
-		httpStatus = http.StatusOK
-	case criticalFailure:
-		status = Fail
-		httpStatus = http.StatusServiceUnavailable
-	case failCount == len(checks):
-		status = Fail
-		httpStatus = http.StatusServiceUnavailable
-	default:
-		status = Warn
-		// Non-critical failures return a warning but still 200 OK
-		httpStatus = http.StatusOK
-	}
+	status, httpStatus := gw.determineHealthStatus(failCount, criticalFailure, len(checks))
 
 	res.Status = status
 
@@ -304,4 +264,51 @@ func (gw *Gateway) readinessHandler(w http.ResponseWriter, r *http.Request) {
 
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(res)
+}
+
+func (gw *Gateway) determineHealthStatus(failCount int, criticalFailure bool, totalChecks int) (HealthCheckStatus, int) {
+	switch {
+	case failCount == 0:
+		return Pass, http.StatusOK
+	case criticalFailure:
+		return Fail, http.StatusServiceUnavailable
+	case failCount == totalChecks:
+		return Fail, http.StatusServiceUnavailable
+	default:
+		// Non-critical failures return a warning but still 200 OK
+		return Warn, http.StatusOK
+	}
+}
+
+func (gw *Gateway) evaluateHealthChecks(checks map[string]HealthCheckItem) (failCount int, criticalFailure bool) {
+	// Check for critical failures
+	for component, check := range checks {
+		if check.Status == Fail {
+			failCount++
+
+			if gw.isCriticalFailure(component, check) {
+				criticalFailure = true
+			}
+		}
+	}
+	return failCount, criticalFailure
+}
+
+func (gw *Gateway) isCriticalFailure(component string, check HealthCheckItem) bool {
+	// Redis is always considered critical
+	if component == "redis" {
+		return true
+	}
+
+	// Consider dashboard critical only if UseDBAppConfigs is enabled
+	if component == "dashboard" && gw.GetConfig().UseDBAppConfigs {
+		return true
+	}
+
+	// Consider RPC critical only if using RPC
+	if component == "rpc" && gw.GetConfig().Policies.PolicySource == "rpc" {
+		return true
+	}
+
+	return false
 }
