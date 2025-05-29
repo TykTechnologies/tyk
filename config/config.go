@@ -52,6 +52,7 @@ var (
 		LivenessCheck: LivenessCheckConfig{
 			CheckDuration: time.Second * 10,
 		},
+		GracefulShutdownTimeoutDuration: 30,
 		Streaming: StreamingConfig{
 			Enabled:     false,
 			AllowUnsafe: []string{},
@@ -938,7 +939,7 @@ type Config struct {
 	ReadinessCheckEndpointName string `json:"readiness_check_endpoint_name"`
 
 	// GracefulShutdownTimeoutDuration sets how many seconds the gateway should wait for an existing connection
-	//to finish before shutting down the server
+	//to finish before shutting down the server. Defaults to 30 seconds.
 	GracefulShutdownTimeoutDuration int `json:"graceful_shutdown_timeout_duration"`
 
 	// Change the expiry time of a refresh token. By default 14 days (in seconds).

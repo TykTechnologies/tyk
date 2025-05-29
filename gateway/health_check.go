@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"sync"
 	"time"
@@ -202,7 +203,7 @@ func (gw *Gateway) liveCheckHandler(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(httpStatus)
 	err := json.NewEncoder(w).Encode(res)
 	if err != nil {
-		mainLog.Warning("[Liveness] Could not encode response")
+		mainLog.Warning(fmt.Sprintf("[Liveness] Could not encode response, error: %s", err.Error()))
 	}
 }
 
