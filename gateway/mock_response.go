@@ -142,8 +142,8 @@ func mockFromOAS(r *http.Request, operation *openapi3.Operation, fromOASExamples
 		example = media.Example
 	}
 
-	// 2. Named or first example from Examples map
-	if len(media.Examples) > 0 {
+	// 2. Named or first example from Examples map (only if no direct example)
+	if example == nil && len(media.Examples) > 0 {
 		if exampleName != "" {
 			// Use the named example if it exists
 			exampleRef, ok := media.Examples[exampleName]
