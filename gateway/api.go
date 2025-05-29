@@ -1489,7 +1489,6 @@ func (gw *Gateway) apiOASPutHandler(w http.ResponseWriter, r *http.Request) {
 	doJSONWrite(w, code, obj)
 }
 
-// Add this function before apiOASPatchHandler
 // isPureOASPatch determines if a request is a pure OAS patch without any Tyk extensions
 // This is needed to identify cases where we should bypass the API ID check when patching
 // A pure OAS patch is one where:
@@ -1551,56 +1550,7 @@ func (gw *Gateway) apiOASPatchHandler(w http.ResponseWriter, r *http.Request) {
 		tykExtToPatch = oasObjToPatch.GetTykExtension()
 	}
 
-	// Store existing servers from the API definition
-	// This is crucial for preventing server URL loss during patching
-	// and maintaining backward compatibility with existing APIs
-	existingServers := oasObjToPatch.Servers
-
-	// Update other OAS fields
-	oasObjToPatch.T = oasObj.T
-
-	// IMPORTANT: Server merging logic that preserves existing configurations
-	// This ensures that when patching an API:
-	// 1. If no servers are provided in the patch, all existing servers are retained
-	// 2. If servers are provided, we preserve the first server (typically the gateway URL)
-	//    while adding new servers, avoiding duplication
-	// 3. This maintains backward compatibility with existing APIs that rely on
-	//    the gateway URL remaining as the first server
-	if len(oasObj.Servers) == 0 {
-		// If no servers in the patch, maintain existing servers
-		// This preserves backward compatibility when patches don't specify servers
-		oasObjToPatch.Servers = existingServers
-	} else {
-		// Merge servers, preserving the first entry from existing servers
-		if len(existingServers) > 0 {
-
-			// Create a new server list starting with the first existing server
-			// This ensures the gateway URL remains as the first server
-			mergedServers := openapi3.Servers{existingServers[0]}
-
-			// Check each new server to avoid duplicates
-			// This prevents server duplication which could cause issues with routing
-			for _, server := range oasObj.Servers {
-				isDuplicate := false
-				for _, existing := range mergedServers {
-					if strings.TrimSpace(existing.URL) == strings.TrimSpace(server.URL) {
-						isDuplicate = true
-						break
-					}
-				}
-
-				if !isDuplicate {
-					mergedServers = append(mergedServers, server)
-				}
-			}
-
-			oasObjToPatch.Servers = mergedServers
-		} else {
-			// If no existing servers, use the new ones
-			// This handles the case of APIs that didn't previously have servers defined
-			oasObjToPatch.Servers = oasObj.Servers
-		}
-	}
+	oas.RetainOldServerURL(oasObjToPatch.Servers, oasObj.Servers)
 
 	oasObjToPatch.SetTykExtension(tykExtToPatch)
 
