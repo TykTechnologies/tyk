@@ -3,6 +3,7 @@ package oas
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"testing"
 
@@ -1299,6 +1300,169 @@ func TestAPIContext_getValidationOptionsFromConfig(t *testing.T) {
 
 		assert.Len(t, options, 0)
 	})
+}
+
+func TestOAS_ValidateSecurity(t *testing.T) {
+	apiKey := "api_key"
+	oauth2 := "oauth2"
+
+	createSecurityReq := func(oas *OAS, key string, value []string) {
+		securityRequirement := openapi3.NewSecurityRequirement()
+		securityRequirement[key] = value
+		oas.Security = append(oas.Security, securityRequirement)
+	}
+
+	addSingleSecurityReq := func(oas *OAS) {
+		createSecurityReq(oas, apiKey, []string{})
+	}
+
+	addMultipleSecurityReq := func(oas *OAS) {
+		addSingleSecurityReq(oas)
+		createSecurityReq(oas, oauth2, []string{"read", "write"})
+	}
+
+	expectedErrorForNoComponentOrSchemes := "No components or security schemes present in OAS"
+	expectedErrorForMissingSchema := func(s string) string {
+		return fmt.Sprintf("Missing required Security Scheme '%s' in Components.SecuritySchemes", s)
+	}
+
+	tests := []struct {
+		name          string
+		setupOAS      func(oas *OAS)
+		expectedError string
+	}{
+		{
+			name: "no security requirements",
+			setupOAS: func(oas *OAS) {
+				oas.Security = openapi3.SecurityRequirements{}
+			},
+			expectedError: "",
+		},
+		{
+			name: "security requirements with matching security schemes",
+			setupOAS: func(oas *OAS) {
+				addSingleSecurityReq(oas)
+
+				if oas.Components == nil {
+					oas.Components = &openapi3.Components{}
+				}
+				if oas.Components.SecuritySchemes == nil {
+					oas.Components.SecuritySchemes = make(openapi3.SecuritySchemes)
+				}
+				oas.Components.SecuritySchemes[apiKey] = &openapi3.SecuritySchemeRef{
+					Value: openapi3.NewJWTSecurityScheme(),
+				}
+			},
+			expectedError: "",
+		},
+		{
+			name: "security requirements but no Components",
+			setupOAS: func(oas *OAS) {
+				addSingleSecurityReq(oas)
+
+				oas.Components = nil
+			},
+			expectedError: expectedErrorForNoComponentOrSchemes,
+		},
+		{
+			name: "security requirements but no SecuritySchemes",
+			setupOAS: func(oas *OAS) {
+				addSingleSecurityReq(oas)
+
+				// Add Components but not SecuritySchemes
+				oas.Components = &openapi3.Components{}
+				oas.Components.SecuritySchemes = nil
+			},
+			expectedError: expectedErrorForNoComponentOrSchemes,
+		},
+		{
+			name: "security requirements but empty SecuritySchemes",
+			setupOAS: func(oas *OAS) {
+				addSingleSecurityReq(oas)
+
+				oas.Components = &openapi3.Components{}
+				oas.Components.SecuritySchemes = make(openapi3.SecuritySchemes)
+			},
+			expectedError: expectedErrorForNoComponentOrSchemes,
+		},
+		{
+			name: "security requirements with missing security scheme for this requirement",
+			setupOAS: func(oas *OAS) {
+				addSingleSecurityReq(oas)
+
+				if oas.Components == nil {
+					oas.Components = &openapi3.Components{}
+				}
+				if oas.Components.SecuritySchemes == nil {
+					oas.Components.SecuritySchemes = make(openapi3.SecuritySchemes)
+				}
+				oas.Components.SecuritySchemes["other_key"] = &openapi3.SecuritySchemeRef{
+					Value: openapi3.NewJWTSecurityScheme(),
+				}
+			},
+			expectedError: expectedErrorForMissingSchema(apiKey),
+		},
+		{
+			name: "multiple security requirements with all matching security schemes",
+			setupOAS: func(oas *OAS) {
+				addMultipleSecurityReq(oas)
+
+				if oas.Components == nil {
+					oas.Components = &openapi3.Components{}
+				}
+				if oas.Components.SecuritySchemes == nil {
+					oas.Components.SecuritySchemes = make(openapi3.SecuritySchemes)
+				}
+				oas.Components.SecuritySchemes[apiKey] = &openapi3.SecuritySchemeRef{
+					Value: openapi3.NewJWTSecurityScheme(),
+				}
+				oas.Components.SecuritySchemes[oauth2] = &openapi3.SecuritySchemeRef{
+					Value: openapi3.NewJWTSecurityScheme(),
+				}
+			},
+			expectedError: "",
+		},
+		{
+			name: "multiple security requirements with one missing security scheme",
+			setupOAS: func(oas *OAS) {
+				addMultipleSecurityReq(oas)
+
+				if oas.Components == nil {
+					oas.Components = &openapi3.Components{}
+				}
+				if oas.Components.SecuritySchemes == nil {
+					oas.Components.SecuritySchemes = make(openapi3.SecuritySchemes)
+				}
+				oas.Components.SecuritySchemes[apiKey] = &openapi3.SecuritySchemeRef{}
+			},
+			expectedError: expectedErrorForMissingSchema(oauth2),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			oas := &OAS{
+				T: openapi3.T{
+					OpenAPI: "3.0.3",
+					Info: &openapi3.Info{
+						Title:   "Test API",
+						Version: "1.0.0",
+					},
+					Paths: openapi3.Paths{},
+				},
+			}
+
+			tt.setupOAS(oas)
+
+			err := oas.Validate(context.Background())
+			if tt.expectedError == "" {
+				assert.NoError(t, err)
+			} else {
+				assert.Error(t, err)
+				assert.Contains(t, err.Error(), tt.expectedError)
+			}
+		})
+	}
 }
 
 func TestYaml(t *testing.T) {
