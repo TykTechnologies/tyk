@@ -1161,6 +1161,15 @@
                     "custom_delimiter": {
                       "type": "string"
                     },
+                    "expected_headers": {
+                      "items": {
+                        "type": "string"
+                      },
+                      "type": "array"
+                    },
+                    "expected_number_of_fields": {
+                      "type": "number"
+                    },
                     "lazy_quotes": {
                       "type": "boolean"
                     },
@@ -1295,6 +1304,23 @@
                 "to_the_end": {
                   "additionalProperties": false,
                   "properties": {},
+                  "type": "object"
+                }
+              },
+              "type": "object"
+            },
+            {
+              "properties": {
+                "xml_documents": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "cast": {
+                      "type": "boolean"
+                    },
+                    "operator": {
+                      "type": "string"
+                    }
+                  },
                   "type": "object"
                 }
               },
@@ -2852,6 +2878,9 @@
               },
               "type": "object"
             },
+            "heartbeat": {
+              "type": "string"
+            },
             "key_file": {
               "type": "string"
             },
@@ -2864,6 +2893,9 @@
             "pong_wait": {
               "type": "string"
             },
+            "stream_format": {
+              "type": "string"
+            },
             "stream_path": {
               "type": "string"
             },
@@ -2871,6 +2903,9 @@
               "type": "string"
             },
             "write_wait": {
+              "type": "string"
+            },
+            "ws_message_type": {
               "type": "string"
             },
             "ws_path": {
