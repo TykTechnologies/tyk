@@ -15,7 +15,7 @@ import (
 	texttemplate "text/template"
 	"time"
 
-	"github.com/TykTechnologies/kin-openapi/openapi3"
+	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/stretchr/testify/assert"
 
 	persistentmodel "github.com/TykTechnologies/storage/persistent/model"

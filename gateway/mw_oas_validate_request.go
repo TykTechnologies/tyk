@@ -6,9 +6,9 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/TykTechnologies/kin-openapi/openapi3"
+	"github.com/getkin/kin-openapi/openapi3"
 
-	"github.com/TykTechnologies/kin-openapi/openapi3filter"
+	"github.com/getkin/kin-openapi/openapi3filter"
 )
 
 func init() {
