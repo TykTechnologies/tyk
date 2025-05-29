@@ -3,16 +3,16 @@ package gateway
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"sort"
 	"strconv"
 
-	"github.com/getkin/kin-openapi/openapi3"
-
 	"github.com/TykTechnologies/tyk/apidef/oas"
 	header "github.com/TykTechnologies/tyk/header"
+	"github.com/getkin/kin-openapi/openapi3"
 )
 
 const acceptContentType = "Accept"
@@ -76,17 +76,6 @@ func mockFromConfig(tykMockRespOp *oas.MockResponse) (int, []byte, []oas.Header)
 	return code, body, headers
 }
 
-// mockFromOAS extracts example responses from an OpenAPI specification.
-// It looks for examples in the following order of precedence:
-// 1. Direct example on the media type object (media.Example)
-// 2. Examples from the Examples map in the media type (media.Examples)
-// 3. Example from the schema (media.Schema)
-//
-// This function will:
-// - Check for and use specific examples by name if requested
-// - Support header-based content negotiation and status code selection
-// - Extract headers from the response definition
-// - Return appropriate error messages when examples cannot be found
 func mockFromOAS(r *http.Request, operation *openapi3.Operation, fromOASExamples *oas.FromOASExamples) (int, string, []byte, []oas.Header, error) {
 	exampleName := fromOASExamples.ExampleName
 	if headerExampleName := r.Header.Get(acceptExampleName); headerExampleName != "" {
@@ -114,16 +103,14 @@ func mockFromOAS(r *http.Request, operation *openapi3.Operation, fromOASExamples
 		contentType = headerContentType
 	}
 
-	responses := operation.Responses.Map()
-
-	response, ok := responses[strconv.Itoa(code)]
-	if !ok {
+	response := operation.Responses.Value(strconv.Itoa(code))
+	if response == nil {
 		return http.StatusNotFound, "", nil, nil, fmt.Errorf("there is no example response for the code: %d", code)
 	}
 
 	media := response.Value.Content.Get(contentType)
 	if media == nil {
-		return http.StatusNotFound, "", nil, nil, fmt.Errorf("there is no example response for the content type: %s", contentType)
+		return http.StatusNotFound, "", nil, nil, errors.New("there is no example response for the content type: " + contentType)
 	}
 
 	headers := make([]oas.Header, len(response.Value.Headers))
@@ -137,48 +124,28 @@ func mockFromOAS(r *http.Request, operation *openapi3.Operation, fromOASExamples
 		return headers[i].Name < headers[j].Name
 	})
 
-	// Try to find an example to use
 	var example interface{}
-
-	// First check for a direct example on the media type
 	if media.Example != nil {
 		example = media.Example
-	} else if len(media.Examples) > 0 {
-		// If we have examples in the Examples map
+	}
+
+	if len(media.Examples) > 0 {
 		if exampleName != "" {
-			// If a specific example name was requested
-			if exampleRef, ok := media.Examples[exampleName]; ok {
-				example = exampleRef.Value.Value
+			if exampleRef, ok := media.Examples[exampleName]; !ok {
+				return http.StatusNotFound, "", nil, nil, errors.New("there is no example response for the example name: " + exampleName)
 			} else {
-				return http.StatusNotFound, "", nil, nil, fmt.Errorf("there is no example response for the example name: %s", exampleName)
+				example = exampleRef.Value.Value
 			}
 		} else {
-			// If no specific example was requested, use the first one
-			// Sort keys for deterministic behavior
-			keys := make([]string, 0, len(media.Examples))
-			for k := range media.Examples {
-				keys = append(keys, k)
-			}
-			sort.Strings(keys)
-
-			// Use the first example after sorting
-			for _, key := range keys {
-				if exampleRef := media.Examples[key]; exampleRef != nil && exampleRef.Value != nil {
-					example = exampleRef.Value.Value
-					break
-				}
+			for _, iterExample := range media.Examples {
+				example = iterExample.Value.Value
+				break
 			}
 		}
 	}
 
-	// If no example was found, try to extract from schema
-	if example == nil && media.Schema != nil {
-		example = oas.ExampleExtractor(media.Schema)
-	}
-
-	// If we still have no example, return an error
 	if example == nil {
-		return http.StatusNotFound, "", nil, nil, fmt.Errorf("there is no example response for the content type: %s", contentType)
+		example = oas.ExampleExtractor(media.Schema)
 	}
 
 	body, err := json.Marshal(example)
@@ -186,5 +153,5 @@ func mockFromOAS(r *http.Request, operation *openapi3.Operation, fromOASExamples
 		return http.StatusForbidden, "", nil, nil, err
 	}
 
-	return code, contentType, body, headers, nil
+	return code, contentType, body, headers, err
 }
