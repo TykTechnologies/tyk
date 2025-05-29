@@ -147,8 +147,12 @@ func (gw *Gateway) generateSubRoutes(spec *APISpec, router *mux.Router, logger *
 	}
 }
 
-func (gw *Gateway) processSpec(spec *APISpec, apisByListen map[string]int,
-	gs *generalStores, logger *logrus.Entry) *ChainObject {
+func (gw *Gateway) processSpec(
+	spec *APISpec,
+	apisByListen map[string]int,
+	gs *generalStores,
+	logger *logrus.Entry,
+) *ChainObject {
 
 	var chainDef ChainObject
 

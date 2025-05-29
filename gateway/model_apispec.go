@@ -52,14 +52,12 @@ type APISpec struct {
 	OrgHasNoSession          bool
 	AnalyticsPluginConfig    *GoAnalyticsPlugin
 
-	middlewareChain *ChainObject
-	unloadHooks     []func()
+	unloadHooks []func()
 
 	network analytics.NetworkStats
 
 	GraphEngine graphengine.Engine
 
-	HasMock            bool
 	HasValidateRequest bool
 	OASRouter          routers.Router
 }
@@ -138,5 +136,45 @@ func (a *APISpec) injectIntoReqContext(req *http.Request) {
 		ctx.SetOASDefinition(req, &a.OAS)
 	} else {
 		ctx.SetDefinition(req, a.APIDefinition)
+	}
+}
+
+func (a *APISpec) findMatchedMockOperation(r *http.Request) *Operation {
+	middleware := a.OAS.GetTykMiddleware()
+	if middleware == nil {
+		return nil
+	}
+
+	route, pathParams, err := a.OASRouter.FindRoute(r)
+
+	if err != nil {
+		log.Warningf("Error finding route: %v", err)
+		return nil
+	}
+
+	operation, ok := middleware.Operations[route.Operation.OperationID]
+	if !ok {
+		log.Warningf("No operation found for ID: %s", route.Operation.OperationID)
+		return nil
+	}
+
+	if operation.MockResponse == nil || !operation.MockResponse.Enabled {
+		return nil
+	}
+
+	return &Operation{
+		Operation:  operation,
+		route:      route,
+		pathParams: pathParams,
+	}
+}
+
+func (a *APISpec) SetupMockOperation(r *http.Request) {
+	if !a.hasMock() {
+		return
+	}
+
+	if mockOp := a.findMatchedMockOperation(r); mockOp != nil {
+		ctxSetOperation(r, mockOp)
 	}
 }

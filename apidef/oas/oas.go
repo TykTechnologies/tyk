@@ -333,8 +333,8 @@ func (s *OAS) getTykSecurityScheme(name string) interface{} {
 
 // GetTykMiddleware returns middleware section from XTykAPIGateway.
 func (s *OAS) GetTykMiddleware() (middleware *Middleware) {
-	if s.GetTykExtension() != nil {
-		middleware = s.GetTykExtension().Middleware
+	if extension := s.GetTykExtension(); extension != nil {
+		middleware = extension.Middleware
 	}
 
 	return

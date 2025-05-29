@@ -37,8 +37,13 @@ func (k *ValidateRequest) EnabledForSpec() bool {
 		return false
 	}
 
-	middleware := k.Spec.OAS.GetTykExtension().Middleware
-	if middleware == nil {
+	extension := k.Spec.OAS.GetTykExtension()
+	if extension == nil {
+		return false
+	}
+
+	middleware := extension.Middleware
+	if extension.Middleware == nil {
 		return false
 	}
 
