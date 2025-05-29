@@ -14,6 +14,7 @@ import (
 	"net/http"
 	pprofhttp "net/http/pprof"
 	"os"
+	"os/signal"
 	"path/filepath"
 	"runtime"
 	"runtime/pprof"
@@ -21,7 +22,10 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/TykTechnologies/tyk/trace"
+
 	"sync/atomic"
+	"syscall"
 	texttemplate "text/template"
 	"time"
 
@@ -60,7 +64,6 @@ import (
 	"github.com/TykTechnologies/tyk/rpc"
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/storage/kv"
-	"github.com/TykTechnologies/tyk/trace"
 	"github.com/TykTechnologies/tyk/user"
 
 	"github.com/TykTechnologies/tyk/internal/cache"
@@ -674,6 +677,7 @@ func (gw *Gateway) loadControlAPIEndpoints(muxer *mux.Router) {
 	}
 
 	muxer.HandleFunc("/"+gw.GetConfig().HealthCheckEndpointName, gw.liveCheckHandler)
+	muxer.HandleFunc("/"+gw.GetConfig().ReadinessCheckEndpointName, gw.readinessHandler)
 
 	r := mux.NewRouter()
 	muxer.PathPrefix("/tyk/").Handler(http.StripPrefix("/tyk",
@@ -1489,6 +1493,10 @@ func (gw *Gateway) afterConfSetup() {
 		conf.HealthCheckEndpointName = "hello"
 	}
 
+	if conf.ReadinessCheckEndpointName == "" {
+		conf.ReadinessCheckEndpointName = "ready"
+	}
+
 	var err error
 
 	conf.Secret, err = gw.kvStore(conf.Secret)
@@ -1684,6 +1692,12 @@ func Start() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
+	// Set up signal handling for graceful shutdown
+	sigChan := make(chan os.Signal, 1)
+	// Only listen for SIGTERM which is what Kubernetes sends
+	signal.Notify(sigChan, syscall.SIGTERM)
+
+	// Initialize everything else as normal
 	cli.Init(confPaths)
 	cli.Parse()
 	// Stop gateway process if not running in "start" mode:
@@ -1703,12 +1717,29 @@ func Start() {
 	}
 
 	gw := NewGateway(gwConfig, ctx)
+	gwConfig = gw.GetConfig()
+
+	go func() {
+		sig := <-sigChan
+		// This case handles SIGTERM for Kubernetes shutdowns
+		mainLog.Infof("SIGTERM received: %v. Initiating graceful shutdown...", sig)
+		// Cancel the context to notify all goroutines
+		cancel()
+
+		// Perform graceful shutdown
+		shutdownCtx, shutdownCancel := context.WithTimeout(
+			context.Background(), time.Duration(gwConfig.GracefulShutdownTimeoutDuration)*time.Second)
+		defer shutdownCancel()
+
+		if err := gw.gracefulShutdown(shutdownCtx); err != nil {
+			mainLog.Errorf("Graceful shutdown error: %v", err)
+		}
+	}()
 
 	if err := gw.initSystem(); err != nil {
 		mainLog.Fatalf("Error initialising system: %v", err)
 	}
 
-	gwConfig = gw.GetConfig()
 	if !gw.isRunningTests() && gwConfig.ControlAPIPort == 0 {
 		mainLog.Warn("The control_api_port should be changed for production")
 	}
@@ -2040,4 +2071,68 @@ func (gw *Gateway) SetConfig(conf config.Config, skipReload ...bool) {
 	gw.configMu.Lock()
 	gw.config.Store(conf)
 	gw.configMu.Unlock()
+}
+
+// gracefulShutdown performs a graceful shutdown of all services
+func (gw *Gateway) gracefulShutdown(ctx context.Context) error {
+	mainLog.Info("Gracefully shutting down services...")
+	mainLog.Info("Waiting for in-flight requests to complete...")
+	var wg sync.WaitGroup
+	errChan := make(chan error, 10) // Buffer for potential errors
+
+	// Shutdown all HTTP servers in the proxy mux
+	gw.DefaultProxyMux.Lock()
+	for _, p := range gw.DefaultProxyMux.proxies {
+		if p.httpServer != nil {
+			wg.Add(1)
+			go func(server *http.Server, port int) {
+				defer wg.Done()
+				mainLog.Infof("Shutting down HTTP server on %s", server.Addr)
+
+				// Server.Shutdown gracefully shuts down the server without
+				// interrupting any active connections
+				if err := server.Shutdown(ctx); err != nil {
+					mainLog.Errorf("Error shutting down HTTP server on port %d: %v", port, err)
+					errChan <- err
+				}
+			}(p.httpServer, p.port)
+		}
+	}
+	gw.DefaultProxyMux.Unlock()
+
+	// Wait for all servers to shut down or timeout
+	serverShutdownDone := make(chan struct{})
+	go func() {
+		wg.Wait()
+		close(serverShutdownDone)
+	}()
+
+	select {
+	case <-serverShutdownDone:
+		mainLog.Info("All HTTP servers gracefully shut down")
+	case <-ctx.Done():
+		mainLog.Warning("Shutdown timeout reached, some connections may have been terminated")
+	}
+
+	// Close all cache stores and other resources
+	mainLog.Info("Closing cache stores and other resources...")
+	gw.cacheClose()
+
+	// Check if there were any errors during shutdown
+	close(errChan)
+	var shutdownErrors []error
+	for err := range errChan {
+		if err != nil {
+			mainLog.Errorf("Error during shutdown: %v", err)
+			shutdownErrors = append(shutdownErrors, err)
+		}
+	}
+
+	if len(shutdownErrors) > 0 {
+		mainLog.Errorf("Encountered %d errors during shutdown", len(shutdownErrors))
+		return fmt.Errorf("encountered %d errors during shutdown", len(shutdownErrors))
+	}
+
+	mainLog.Info("All services gracefully shut down")
+	return nil
 }
