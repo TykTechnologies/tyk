@@ -43,10 +43,9 @@ import (
 	"time"
 
 	"github.com/TykTechnologies/tyk/internal/httpctx"
+	"github.com/getkin/kin-openapi/openapi3"
 
 	gqlv2 "github.com/TykTechnologies/graphql-go-tools/v2/pkg/graphql"
-
-	"github.com/getkin/kin-openapi/openapi3"
 
 	"github.com/TykTechnologies/tyk/config"
 
@@ -1201,9 +1200,7 @@ func (gw *Gateway) handleUpdateApi(apiID string, r *http.Request, fs afero.Fs, o
 
 	}
 
-	// Skip API ID check for OAS objects that don't have an APIID set (pure OAS case)
-	// or when the API IDs match
-	if apiID != "" && newDef.APIID != "" && newDef.APIID != apiID {
+	if apiID != "" && newDef.APIID != apiID {
 		log.Error("PUT operation on different APIIDs")
 		return apiError("Request APIID does not match that in Definition! For Update operations these must match."), http.StatusBadRequest
 	}
@@ -1489,21 +1486,6 @@ func (gw *Gateway) apiOASPutHandler(w http.ResponseWriter, r *http.Request) {
 	doJSONWrite(w, code, obj)
 }
 
-// isPureOASPatch determines if a request is a pure OAS patch without any Tyk extensions
-// This is needed to identify cases where we should bypass the API ID check when patching
-// A pure OAS patch is one where:
-// 1. No query parameters are provided to override Tyk extension values
-// 2. The OAS object exists but doesn't contain Tyk extension
-func isPureOASPatch(oasObj *oas.OAS, params *oas.TykExtensionConfigParams) bool {
-	// 1) No other params provided
-	if params != nil {
-		return false
-	}
-
-	// 2) And either an OAS doc is present but without Tyk extension
-	return oasObj != nil && oasObj.GetTykExtension() == nil
-}
-
 func (gw *Gateway) apiOASPatchHandler(w http.ResponseWriter, r *http.Request) {
 	apiID := strings.TrimSpace(mux.Vars(r)["apiID"])
 	if apiID == "" {
@@ -1550,7 +1532,9 @@ func (gw *Gateway) apiOASPatchHandler(w http.ResponseWriter, r *http.Request) {
 		tykExtToPatch = oasObjToPatch.GetTykExtension()
 	}
 
-	oas.RetainOldServerURL(oasObjToPatch.Servers, oasObj.Servers)
+	oasObj.Servers = oas.RetainOldServerURL(oasObjToPatch.Servers, oasObj.Servers)
+
+	oasObjToPatch.T = oasObj.T
 
 	oasObjToPatch.SetTykExtension(tykExtToPatch)
 
@@ -1562,8 +1546,6 @@ func (gw *Gateway) apiOASPatchHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Use oasObjToPatch for serialization instead of oasObj
-	// This ensures all our careful server merging and extensions are preserved
 	oasAPIInBytes, err := oasObjToPatch.MarshalJSON()
 	if err != nil {
 		doJSONWrite(w, http.StatusInternalServerError, apiError(err.Error()))
@@ -1573,16 +1555,6 @@ func (gw *Gateway) apiOASPatchHandler(w http.ResponseWriter, r *http.Request) {
 	r.Body = ioutil.NopCloser(bytes.NewReader(oasAPIInBytes))
 
 	log.Debugf("PATCHing API: %q", apiID)
-
-	// Skip API ID check for pure OAS patches
-	// This maintains backward compatibility with standard OAS tools that don't
-	// know about Tyk's API ID requirements while ensuring security for Tyk-aware tools
-	if isPureOASPatch(oasObj, tykExtensionConfigParams) {
-		// For pure OAS patches, we need to set the API ID manually to match the URL
-		// This ensures it passes the validation in handleUpdateApi
-		oasObjToPatch.GetTykExtension().Info.ID = apiID
-	}
-
 	obj, code := gw.handleUpdateApi(apiID, r, afero.NewOsFs(), true)
 
 	doJSONWrite(w, code, obj)

@@ -297,34 +297,12 @@ func getQueryValPtr(val string) *bool {
 // tyk adds a server URL to the start of oas.Servers to add the gw URL
 // RetainOldServerURL can be used when API def is patched.
 func RetainOldServerURL(oldServers, newServers openapi3.Servers) openapi3.Servers {
-	// If there are no new servers, return nil
-	// This ensures empty server lists are properly represented
-	if len(newServers) == 0 {
-		return oldServers
-	}
-
-	// If there are no old servers, return the new ones
-	if len(oldServers) == 0 {
-		return newServers
-	}
-
-	// Always keep the first entry from oldServers
-	first := oldServers[0]
-
-	// Check if the first server is already in the new servers list
-	alreadyExists := false
-	for _, server := range newServers {
-		if strings.TrimSpace(server.URL) == strings.TrimSpace(first.URL) {
-			alreadyExists = true
-			break
+	if len(oldServers) > 0 && len(newServers) > 0 {
+		if oldServers[0].URL == newServers[0].URL {
+			return newServers
 		}
+		newServers = append(openapi3.Servers{oldServers[0]}, newServers...)
 	}
 
-	// If first server already exists in newServers, return newServers
-	if alreadyExists {
-		return newServers
-	}
-
-	// Otherwise, prepend the first old server to newServers
-	return append(openapi3.Servers{first}, newServers...)
+	return newServers
 }

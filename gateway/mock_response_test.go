@@ -86,17 +86,6 @@ func TestMockResponse(t *testing.T) {
 
 	oasDoc.Paths = paths
 
-	oasDoc.Paths = paths
-
-	// oasDoc.Paths = openapi3.Paths{
-	// 	"/get": {
-	// 		Get: &openapi3.Operation{
-	// 			OperationID: operationID,
-	// 			Responses:   responses,
-	// 		},
-	// 	},
-	// }
-
 	err := oasDoc.Validate(context.Background())
 	assert.NoError(t, err)
 

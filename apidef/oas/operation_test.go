@@ -1041,11 +1041,12 @@ func verifyOASOperation(t *testing.T, spec *OAS, op *openapi3.Operation, method 
 	require.NotNil(t, op.Responses, "Responses should not be nil")
 
 	statusCode := strconv.Itoa(code)
-	require.NotNil(t, op.Responses.Map()[statusCode], "Responses should not be nil for status code %s and method %s", statusCode, method)
+	require.NotNil(t, op.Responses.Value(statusCode), "Responses should not be nil for status code %s and method %s", statusCode, method)
 
-	response := op.Responses.Map()[statusCode].Value
+	response := op.Responses.Value(statusCode)
 	require.NotNil(t, response)
-	require.NotNil(t, response.Description)
+	require.NotNil(t, response.Value)
+	require.NotNil(t, response.Value.Description)
 
 	tykOperation := spec.GetTykExtension().getOperation(op.OperationID)
 	require.NotNil(t, tykOperation)

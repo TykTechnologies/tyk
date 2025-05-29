@@ -196,10 +196,6 @@ func (s *OAS) fillMockResponsePaths(paths *openapi3.Paths, ep apidef.ExtendedPat
 			}
 		}
 
-		if operation == nil {
-			continue
-		}
-
 		if operation.Responses == nil {
 			operation.Responses = openapi3.NewResponses()
 		}

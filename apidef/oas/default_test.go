@@ -413,6 +413,7 @@ func TestOAS_BuildDefaultTykExtension(t *testing.T) {
 					},
 					Paths: func() *openapi3.Paths {
 						paths := openapi3.NewPaths()
+
 						paths.Set("/pets", &openapi3.PathItem{
 							Get: &openapi3.Operation{
 								Responses: openapi3.NewResponses(),
@@ -421,12 +422,13 @@ func TestOAS_BuildDefaultTykExtension(t *testing.T) {
 								Responses: openapi3.NewResponses(),
 							},
 						})
+
 						return paths
 					}(),
 				},
 			}
 
-			responses := openapi3.NewResponses()
+			var responses = openapi3.NewResponses()
 			if withValidResponses {
 				responses.Set("200", &openapi3.ResponseRef{
 					Value: &openapi3.Response{
@@ -439,20 +441,28 @@ func TestOAS_BuildDefaultTykExtension(t *testing.T) {
 				})
 			}
 
-			paths := openapi3.NewPaths()
-			paths.Set("/pets", &openapi3.PathItem{
-				Get: &openapi3.Operation{
-					Responses: responses,
-				},
-				Post: &openapi3.Operation{
-					Responses: responses,
-				},
-			})
-			oasDef.Paths = paths
+			oasDef.Paths = func() *openapi3.Paths {
+				paths := openapi3.NewPaths()
 
-			if value := oasDef.Paths.Value("/pets"); value != nil && withOperationID {
-				value.Get.OperationID = oasGetOperationID
-				value.Post.OperationID = oasPostOperationID
+				paths.Set("/pets", &openapi3.PathItem{
+					Get: &openapi3.Operation{
+						Responses: responses,
+					},
+					Post: &openapi3.Operation{
+						Responses: responses,
+					},
+				})
+
+				return paths
+			}()
+
+			if withOperationID {
+				path := oasDef.Paths.Value("/pets")
+
+				path.Get.OperationID = oasGetOperationID
+				path.Post.OperationID = oasPostOperationID
+
+				oasDef.Paths.Set("/pets", path)
 			}
 
 			return oasDef
@@ -1120,16 +1130,19 @@ func TestOAS_BuildDefaultTykExtension(t *testing.T) {
 					oasDef := getOASDef(false, false)
 					description := "description"
 
-					pathsMap := oasDef.Paths.Map()
-
 					simpleResponse := openapi3.NewResponses()
 					simpleResponse.Set("200", &openapi3.ResponseRef{
 						Value: &openapi3.Response{
 							Description: &description,
 						},
 					})
-					pathsMap["/pets"].Get.Responses = simpleResponse
-					pathsMap["/pets"].Post.Responses = simpleResponse
+
+					path := oasDef.Paths.Value("/pets")
+					path.Get.Responses = simpleResponse
+					path.Post.Responses = simpleResponse
+
+					oasDef.Paths.Set("/pets", path)
+
 					tykExtensionConfigParams := TykExtensionConfigParams{
 						MockResponse: &trueVal,
 					}
@@ -1153,8 +1166,8 @@ func TestOAS_BuildDefaultTykExtension(t *testing.T) {
 			t.Run("enable oasMockResponse for all paths when operationID is configured in OAS with valid examples in response",
 				func(t *testing.T) {
 					oasDef := getOASDef(true, false)
-
 					validResponseWithExamples := openapi3.NewResponses()
+
 					validResponseWithExamples.Set("200", &openapi3.ResponseRef{
 						Value: &openapi3.Response{
 							Content: openapi3.Content{
@@ -1169,14 +1182,11 @@ func TestOAS_BuildDefaultTykExtension(t *testing.T) {
 						},
 					})
 
-					if value := oasDef.Paths.Value("/pets"); value != nil {
-						if value.Get != nil {
-							value.Get.Responses = validResponseWithExamples
-						}
-						if value.Post != nil {
-							value.Post.Responses = validResponseWithExamples
-						}
-					}
+					path := oasDef.Paths.Value("/pets")
+					path.Get.Responses = validResponseWithExamples
+					path.Post.Responses = validResponseWithExamples
+
+					oasDef.Paths.Set("/pets", path)
 
 					tykExtensionConfigParams := TykExtensionConfigParams{
 						MockResponse: &trueVal,
@@ -2249,19 +2259,4 @@ func TestRetainOldServerURL(t *testing.T) {
 			assert.EqualValues(t, tt.want, RetainOldServerURL(tt.args.oldServers, tt.args.newServers))
 		})
 	}
-}
-
-func TestRetainOldServerURL_EmptyNewServersReturnsOldServers(t *testing.T) {
-	oldServers := openapi3.Servers{
-		{
-			URL: "https://tyk-gateway.com/api",
-		},
-		{
-			URL: "https://upstream.xyz/api",
-		},
-	}
-	var newServers openapi3.Servers // empty
-
-	result := RetainOldServerURL(oldServers, newServers)
-	assert.EqualValues(t, oldServers, result, "Expected oldServers when newServers is empty (correct behavior)")
 }

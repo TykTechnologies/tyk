@@ -7,11 +7,10 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/getkin/kin-openapi/openapi3"
-
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/internal/reflect"
+	"github.com/getkin/kin-openapi/openapi3"
 )
 
 const (
