@@ -1448,7 +1448,7 @@ func TestOAS_ValidateSecurity(t *testing.T) {
 						Title:   "Test API",
 						Version: "1.0.0",
 					},
-					Paths: openapi3.Paths{},
+					Paths: openapi3.NewPaths(),
 				},
 			}
 
