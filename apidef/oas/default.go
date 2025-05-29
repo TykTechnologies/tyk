@@ -300,7 +300,7 @@ func RetainOldServerURL(oldServers, newServers openapi3.Servers) openapi3.Server
 	// If there are no new servers, return nil
 	// This ensures empty server lists are properly represented
 	if len(newServers) == 0 {
-		return nil
+		return oldServers
 	}
 
 	// If there are no old servers, return the new ones

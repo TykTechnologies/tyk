@@ -2250,3 +2250,18 @@ func TestRetainOldServerURL(t *testing.T) {
 		})
 	}
 }
+
+func TestRetainOldServerURL_EmptyNewServersReturnsOldServers(t *testing.T) {
+	oldServers := openapi3.Servers{
+		{
+			URL: "https://tyk-gateway.com/api",
+		},
+		{
+			URL: "https://upstream.xyz/api",
+		},
+	}
+	var newServers openapi3.Servers // empty
+
+	result := RetainOldServerURL(oldServers, newServers)
+	assert.EqualValues(t, oldServers, result, "Expected oldServers when newServers is empty (correct behavior)")
+}
