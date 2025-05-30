@@ -4,6 +4,7 @@ import (
 	"crypto/md5"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"reflect"
@@ -11,13 +12,16 @@ import (
 	"testing"
 	"time"
 
+	"github.com/go-jose/go-jose/v3"
 	"github.com/golang-jwt/jwt/v4"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/test"
 	"github.com/TykTechnologies/tyk/user"
 
+	"github.com/TykTechnologies/tyk/internal/cache"
 	"github.com/TykTechnologies/tyk/internal/uuid"
 )
 
@@ -2583,6 +2587,243 @@ func TestJWTMiddleware_getSecretToVerifySignature_JWKNoKID(t *testing.T) {
 		_, err := m.getSecretToVerifySignature(nil, token)
 		assert.Error(t, err)
 	})
+}
+
+func TestGetSecretFromMultipleJWKURIs(t *testing.T) {
+	originalGetJWK := GetJWK
+	defer func() { GetJWK = originalGetJWK }()
+
+	const testAPIID = "test-api"
+	const testJWKURL = "http://localhost:8080/realms/jwt/protocol/openid-connect/certs"
+	const encodedTestJWKURL = "aHR0cDovL2xvY2FsaG9zdDo4MDgwL3JlYWxtcy9qd3QvcHJvdG9jb2wvb3BlbmlkLWNvbm5lY3QvY2VydHM="
+
+	gw := &Gateway{}
+	gw.SetConfig(config.Config{
+		JWTSSLInsecureSkipVerify: true,
+	})
+
+	m := JWTMiddleware{
+		BaseMiddleware: &BaseMiddleware{
+			Gw: gw,
+		},
+	}
+
+	api := &apidef.APIDefinition{
+		APIID: "random-api",
+		OrgID: "org-id",
+	}
+
+	cacheKey := JWKsAPIDef + api.APIID + api.OrgID
+
+	api.JWTJwksURIs = []apidef.JWK{
+		{
+			URL: testJWKURL,
+		},
+	}
+
+	m.Spec = &APISpec{
+		APIDefinition: api,
+	}
+
+	createMiddleware := func(_ []apidef.JWK) *JWTMiddleware {
+		return &m
+	}
+
+	tests := []struct {
+		name                string
+		setup               func()
+		jwkURIs             []apidef.JWK
+		jwkURI              apidef.JWK
+		kid                 interface{}
+		expectKey           interface{}
+		expectError         error
+		useGetSecretFromURL bool
+	}{
+		{
+			name: "success with valid JWK URL and matching KID",
+			setup: func() {
+				GetJWK = func(_ string, _ bool) (*jose.JSONWebKeySet, error) {
+					return &jose.JSONWebKeySet{
+						Keys: []jose.JSONWebKey{
+							{KeyID: "test-kid", Key: "secret-key"},
+						},
+					}, nil
+				}
+			},
+			jwkURIs:     []apidef.JWK{{URL: testJWKURL}},
+			kid:         "test-kid",
+			expectKey:   "secret-key",
+			expectError: nil,
+		},
+		{
+			name:        "error when KID is not a string",
+			setup:       func() {},
+			jwkURIs:     []apidef.JWK{{URL: testJWKURL}},
+			kid:         12345,
+			expectKey:   nil,
+			expectError: ErrKIDNotAString,
+		},
+		{
+			name: "cache hit with unchanged URLs",
+			setup: func() {
+				GetJWK = func(_ string, _ bool) (*jose.JSONWebKeySet, error) {
+					return &jose.JSONWebKeySet{
+						Keys: []jose.JSONWebKey{
+							{KeyID: "cached-kid", Key: "cached-key"},
+						},
+					}, nil
+				}
+
+				JWKCache.Set(cacheKey, &apidef.APIDefinition{
+					APIID:       testAPIID,
+					JWTJwksURIs: []apidef.JWK{{URL: testJWKURL}},
+				}, cache.DefaultExpiration)
+
+				JWKCache.Set(testAPIID, &jose.JSONWebKeySet{
+					Keys: []jose.JSONWebKey{
+						{KeyID: "cached-kid", Key: "cached-key"},
+					},
+				}, cache.DefaultExpiration)
+			},
+			jwkURIs:     []apidef.JWK{{URL: testJWKURL}},
+			kid:         "cached-kid",
+			expectKey:   "cached-key",
+			expectError: nil,
+		},
+		{
+			name: "invalid JWK cache format triggers refetch",
+			setup: func() {
+				GetJWK = func(_ string, _ bool) (*jose.JSONWebKeySet, error) {
+					return &jose.JSONWebKeySet{
+						Keys: []jose.JSONWebKey{
+							{KeyID: "fresh-kid", Key: "fresh-key"},
+						},
+					}, nil
+				}
+				JWKCache.Set(testAPIID, "invalid-format", cache.DefaultExpiration)
+				JWKCache.Set(cacheKey, &apidef.APIDefinition{
+					APIID:       testAPIID,
+					JWTJwksURIs: []apidef.JWK{{URL: testJWKURL}},
+				}, cache.DefaultExpiration)
+			},
+			jwkURIs:     []apidef.JWK{{URL: testJWKURL}},
+			kid:         "fresh-kid",
+			expectKey:   "fresh-key",
+			expectError: nil,
+		},
+		{
+			name: "JWK URLs changed triggers refetch",
+			setup: func() {
+				GetJWK = func(_ string, _ bool) (*jose.JSONWebKeySet, error) {
+					return &jose.JSONWebKeySet{
+						Keys: []jose.JSONWebKey{
+							{KeyID: "new-kid", Key: "new-key"},
+						},
+					}, nil
+				}
+
+				JWKCache.Set(cacheKey, &apidef.APIDefinition{
+					APIID: testAPIID,
+					JWTJwksURIs: []apidef.JWK{
+						{URL: "http://localhost:8080/old-url"},
+					},
+				}, cache.DefaultExpiration)
+
+				JWKCache.Set(testAPIID, &jose.JSONWebKeySet{
+					Keys: []jose.JSONWebKey{
+						{KeyID: "old-kid", Key: "old-key"},
+					},
+				}, cache.DefaultExpiration)
+			},
+			jwkURIs:     []apidef.JWK{{URL: testJWKURL}},
+			kid:         "new-kid",
+			expectKey:   "new-key",
+			expectError: nil,
+		},
+		{
+			name: "error fetching jwks",
+			setup: func() {
+				GetJWK = func(_ string, _ bool) (*jose.JSONWebKeySet, error) {
+					return nil, errors.New("failed to fetch JWK")
+				}
+			},
+			jwkURIs:     []apidef.JWK{{URL: testJWKURL}},
+			kid:         "any-kid",
+			expectKey:   nil,
+			expectError: errors.New("no matching KID found in any JWKs or fallback"),
+		},
+		{
+			name: "Cached API definition is different from expected",
+			setup: func() {
+				GetJWK = func(_ string, _ bool) (*jose.JSONWebKeySet, error) {
+					return nil, errors.New("failed to fetch JWK")
+				}
+
+				JWKCache.Set(cacheKey, &apidef.APIDefinition{
+					APIID: testAPIID,
+					JWTJwksURIs: []apidef.JWK{
+						{URL: testJWKURL},
+					},
+				}, cache.DefaultExpiration)
+
+				JWKCache.Set(api.APIID, map[string]string{"jwk": "something-random"}, cache.DefaultExpiration)
+			},
+			jwkURIs:     []apidef.JWK{{URL: testJWKURL}},
+			kid:         "new-kid",
+			expectKey:   nil,
+			expectError: errors.New("no matching KID found in any JWKs or fallback"),
+		},
+		{
+			name: "Test getSecretFromURL using getSecretFromMultipleJWKURIs data",
+			setup: func() {
+				GetJWK = func(_ string, _ bool) (*jose.JSONWebKeySet, error) {
+					return nil, errors.New("failed to fetch JWK")
+				}
+
+				JWKCache.Set(cacheKey, &apidef.APIDefinition{
+					APIID:     testAPIID,
+					JWTSource: encodedTestJWKURL,
+				}, cache.DefaultExpiration)
+
+				JWKCache.Set(api.APIID, map[string]string{"jwk": "something-random"}, cache.DefaultExpiration)
+			},
+			jwkURI:              apidef.JWK{URL: testJWKURL},
+			kid:                 "new-kid",
+			expectKey:           nil,
+			expectError:         errors.New("failed to fetch JWK"),
+			useGetSecretFromURL: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			JWKCache.Flush()
+
+			if tt.setup != nil {
+				tt.setup()
+			}
+
+			mw := createMiddleware(tt.jwkURIs)
+
+			var key interface{}
+			var err error
+
+			if !tt.useGetSecretFromURL {
+				key, err = mw.getSecretFromMultipleJWKURIs(tt.jwkURIs, tt.kid, "RS256")
+			} else {
+				key, err = mw.getSecretFromURL(tt.jwkURI.URL, tt.kid, "RS256")
+			}
+
+			if tt.expectError != nil {
+				assert.Error(t, err)
+				assert.Contains(t, err.Error(), tt.expectError.Error())
+			} else {
+				assert.NoError(t, err)
+			}
+
+			assert.Equal(t, tt.expectKey, key)
+		})
+	}
 }
 
 func TestJWT_ExtractOAuthClientIDForDCR(t *testing.T) {
