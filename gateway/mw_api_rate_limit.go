@@ -17,8 +17,9 @@ import (
 type RateLimitForAPI struct {
 	*BaseMiddleware
 
-	keyName string
-	apiSess *user.SessionState
+	keyName  string
+	quotaKey string
+	apiSess  *user.SessionState
 }
 
 func (k *RateLimitForAPI) Name() string {
@@ -103,7 +104,7 @@ func (k *RateLimitForAPI) ProcessRequest(_ http.ResponseWriter, r *http.Request,
 		r,
 		k.getSession(r),
 		k.keyName,
-		"",
+		k.quotaKey,
 		storeRef,
 		true,
 		false,

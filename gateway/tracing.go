@@ -45,6 +45,7 @@ func (tr *traceRequest) toRequest(
 	ctx context.Context,
 	ignoreCanonicalMIMEHeaderKey bool,
 ) (*http.Request, error) {
+
 	path, err := url.JoinPath(
 		tr.Spec.Proxy.ListenPath,
 		tr.Request.Path,
@@ -151,7 +152,13 @@ func (gw *Gateway) traceHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	chainObj := gw.processSpec(spec, nil, &gs, logrus.NewEntry(logger))
+	chainObj := gw.processSpec(
+		spec,
+		nil,
+		&gs,
+		logrus.NewEntry(logger),
+		WithQuotaKey(spec.Checksum),
+	)
 	gw.generateSubRoutes(spec, subrouter, logrus.NewEntry(logger))
 
 	if chainObj.ThisHandler == nil {

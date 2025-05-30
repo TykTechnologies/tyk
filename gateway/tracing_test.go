@@ -18,11 +18,12 @@ func TestTraceHttpRequest_toRequest(t *testing.T) {
 	defer cancel()
 
 	const body = `{"foo":"bar"}`
-	header := http.Header{}
-	header.Add("key", "value")
+	var headers = http.Header{}
+	headers.Add("key", "value")
+	headers.Add("Content-Type", "application/json")
 
 	tr := traceRequest{
-		Request: &traceHttpRequest{Path: "", Method: http.MethodPost, Body: body, Headers: header},
+		Request: &traceHttpRequest{Path: "", Method: http.MethodPost, Body: body, Headers: headers},
 		Spec: &apidef.APIDefinition{
 			Proxy: apidef.ProxyConfig{
 				ListenPath: "",
@@ -32,12 +33,15 @@ func TestTraceHttpRequest_toRequest(t *testing.T) {
 	}
 
 	request, err := tr.toRequest(ctx, ts.Gw.GetConfig().IgnoreCanonicalMIMEHeaderKey)
-	bodyInBytes, _ := io.ReadAll(request.Body)
-
 	assert.NoError(t, err)
+	assert.NotNil(t, request)
+
+	bodyInBytes, err := io.ReadAll(request.Body)
+	assert.NoError(t, err)
+
 	assert.Equal(t, http.MethodPost, request.Method)
 	assert.Equal(t, "", request.URL.Host)
 	assert.Equal(t, "", request.URL.Path)
-	assert.Equal(t, header, request.Header)
+	assert.Equal(t, headers, request.Header)
 	assert.Equal(t, string(bodyInBytes), body)
 }
