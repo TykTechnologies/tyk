@@ -37,7 +37,14 @@ func IsZero(v reflect.Value) bool {
 	case reflect.Chan, reflect.Func, reflect.Interface, reflect.UnsafePointer:
 		return v.IsNil()
 	case reflect.Ptr:
-		return v.IsNil() || IsZero(v.Elem())
+		if v.IsNil() {
+			return true
+		}
+		if v.Elem().Kind() == reflect.Bool {
+			return false
+		}
+
+		return IsZero(v.Elem())
 	case reflect.Slice, reflect.Map:
 		return v.Len() == 0
 	case reflect.String:
