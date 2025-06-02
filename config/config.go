@@ -44,13 +44,15 @@ var (
 			CheckInterval:             dnsCacheDefaultCheckInterval,
 			MultipleIPsHandleStrategy: NoCacheStrategy,
 		},
-		HealthCheckEndpointName: "hello",
+		HealthCheckEndpointName:    "hello",
+		ReadinessCheckEndpointName: "ready",
 		CoProcessOptions: CoProcessConfig{
 			EnableCoProcess: false,
 		},
 		LivenessCheck: LivenessCheckConfig{
 			CheckDuration: time.Second * 10,
 		},
+		GracefulShutdownTimeoutDuration: 30,
 		Streaming: StreamingConfig{
 			Enabled:     false,
 			AllowUnsafe: []string{},
@@ -928,8 +930,17 @@ type Config struct {
 	// This section enables the configuration of the health-check API endpoint and the size of the sample data cache (in seconds).
 	HealthCheck HealthCheckConfig `json:"health_check"`
 
-	// Enables you to rename the /hello endpoint
+	// HealthCheckEndpointName Enables you to change the liveness endpoint.
+	// Default is "/hello"
 	HealthCheckEndpointName string `json:"health_check_endpoint_name"`
+
+	// ReadinessCheckEndpointName Enables you to change the readiness endpoint
+	// Default is "/ready"
+	ReadinessCheckEndpointName string `json:"readiness_check_endpoint_name"`
+
+	// GracefulShutdownTimeoutDuration sets how many seconds the gateway should wait for an existing connection
+	//to finish before shutting down the server. Defaults to 30 seconds.
+	GracefulShutdownTimeoutDuration int `json:"graceful_shutdown_timeout_duration"`
 
 	// Change the expiry time of a refresh token. By default 14 days (in seconds).
 	OauthRefreshExpire int64 `json:"oauth_refresh_token_expire"`
