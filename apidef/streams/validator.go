@@ -124,7 +124,7 @@ func loadSchemas() error {
 			return err
 		}
 		bentoValidators[bento.DefaultValidator] = defaultValidator
-		bentoValidators[bento.EnableAll] = bento.NewEnableAllConfigValidator()
+		bentoValidators[bento.EnableAllExperimental] = bento.NewEnableAllExperimentalConfigValidator()
 		return nil
 	}
 
@@ -150,7 +150,7 @@ func validateBentoConfiguration(document []byte, bentoValidatorKind bento.Valida
 	}
 
 	// If using enable-all validator, skip validation
-	if bentoValidatorKind == bento.EnableAll {
+	if bentoValidatorKind == bento.EnableAllExperimental {
 		return nil
 	}
 
@@ -210,7 +210,7 @@ func ValidateOASObject(documentBody []byte, oasVersion string) error {
 func ValidateOASObjectWithConfig(documentBody []byte, oasVersion string, disableValidator bool) error {
 	validatorKind := bento.DefaultValidator
 	if disableValidator {
-		validatorKind = bento.EnableAll
+		validatorKind = bento.EnableAllExperimental
 	}
 	return ValidateOASObjectWithBentoConfigValidator(documentBody, oasVersion, validatorKind)
 }

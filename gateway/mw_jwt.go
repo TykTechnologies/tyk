@@ -13,7 +13,6 @@ import (
 	"io"
 	"net/http"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/go-jose/go-jose/v3"
@@ -40,6 +39,7 @@ const (
 )
 
 const UnexpectedSigningMethod = "Unexpected signing method"
+const JWKsAPIDef = "jwks_api_def_"
 
 var (
 	// List of common OAuth Client ID claims used by IDPs:
@@ -144,11 +144,44 @@ func (k *JWTMiddleware) getSecretFromURL(url string, kidVal interface{}, keyType
 	var (
 		jwkSet *jose.JSONWebKeySet
 		err    error
+		found  bool
 	)
 
-	cachedJWK, found := JWKCache.Get(k.Spec.APIID)
-	if !found {
-		if jwkSet, err = getJWK(url, k.Gw.GetConfig().JWTSSLInsecureSkipVerify); err != nil {
+	cacheAPIDef := k.specCacheKey(k.Spec, JWKsAPIDef)
+	cacheOutdated := false
+
+	cachedAPIDefRaw, foundDef := JWKCache.Get(cacheAPIDef)
+	if foundDef {
+		cachedAPIDef, ok := cachedAPIDefRaw.(*apidef.APIDefinition)
+		if !ok {
+			cacheOutdated = true
+		}
+
+		decodedURL, err := base64.StdEncoding.DecodeString(cachedAPIDef.JWTSource)
+		if err != nil {
+			return nil, err
+		}
+
+		if string(decodedURL) != url {
+			cacheOutdated = true
+		} else {
+			cachedJWK, ok := JWKCache.Get(k.Spec.APIID)
+			if ok {
+				found = true
+				var okType bool
+				jwkSet, okType = cachedJWK.(*jose.JSONWebKeySet)
+				if !okType {
+					// Invalidate cache if value is of unexpected type.
+					// Value will be of unexpected type since it could also contain merged JWKs
+					found = false
+					jwkSet = nil
+				}
+			}
+		}
+	}
+
+	if !found || cacheOutdated {
+		if jwkSet, err = GetJWK(url, k.Gw.GetConfig().JWTSSLInsecureSkipVerify); err != nil {
 			k.Logger().WithError(err).Info("Failed to decode JWKs body. Trying x5c PEM fallback.")
 
 			key, legacyError := k.legacyGetSecretFromURL(url, kid, keyType)
@@ -162,11 +195,9 @@ func (k *JWTMiddleware) getSecretFromURL(url string, kidVal interface{}, keyType
 		// Cache it
 		k.Logger().Debug("Caching JWK")
 		JWKCache.Set(k.Spec.APIID, jwkSet, cache.DefaultExpiration)
-	} else {
-		if jwkSet, ok = cachedJWK.(*jose.JSONWebKeySet); !ok {
-			return nil, errors.New("Failed to parse JWKs body. Trying x5c PEM fallback.")
-		}
+		JWKCache.Set(cacheAPIDef, k.Spec.APIDefinition, cache.DefaultExpiration)
 	}
+
 	k.Logger().Debug("Checking JWKs...")
 	if keys := jwkSet.Key(kid); len(keys) > 0 {
 		return keys[0].Key, nil
@@ -235,55 +266,105 @@ func (k *JWTMiddleware) getSecretToVerifySignature(r *http.Request, token *jwt.T
 	return []byte(session.JWTData.Secret), nil
 }
 
-func (k *JWTMiddleware) getSecretFromMultipleJWKURIs(jwkURIs []apidef.JWK, kid interface{}, keyType string) (interface{}, error) {
+var GetJWK = getJWK
+
+func (k *JWTMiddleware) specCacheKey(spec *APISpec, prefix string) string {
+	return prefix + spec.APIID + spec.OrgID
+}
+
+func (k *JWTMiddleware) getSecretFromMultipleJWKURIs(jwkURIs []apidef.JWK, kidVal interface{}, keyType string) (interface{}, error) {
 	var (
-		wg       sync.WaitGroup
-		once     sync.Once
-		resultCh = make(chan interface{}, 1)
-		errCh    = make(chan error, len(jwkURIs))
+		jwkSets         []*jose.JSONWebKeySet
+		fallbackJWKURIs []apidef.JWK
+		kid, ok         = kidVal.(string)
 	)
 
-	for _, jwk := range jwkURIs {
-		wg.Add(1)
-		go func(uri string) {
-			defer wg.Done()
-			secret, err := k.getSecretFromURL(uri, kid, keyType)
-			if err == nil && secret != nil {
-				once.Do(func() {
-					resultCh <- secret
-				})
-			} else {
-				errCh <- fmt.Errorf("uri %s: %w", uri, err)
+	if !ok {
+		return nil, ErrKIDNotAString
+	}
+	cacheAPIDef := k.specCacheKey(k.Spec, JWKsAPIDef)
+	cacheOutdated := false
+
+	cachedAPIDefRaw, foundDef := JWKCache.Get(cacheAPIDef)
+	if foundDef {
+		cachedAPIDef, ok := cachedAPIDefRaw.(*apidef.APIDefinition)
+		if !ok {
+			cacheOutdated = true
+		}
+
+		if jwkURLsChanged(cachedAPIDef.JWTJwksURIs, jwkURIs) {
+			k.Logger().Infof("Detected change in JWK URLs — refreshing cache for APIID %s", k.Spec.APIID)
+			cacheOutdated = true
+		} else {
+			cachedJWKs, foundJWKs := JWKCache.Get(k.Spec.APIID)
+			if foundJWKs {
+				jwkSets, ok = cachedJWKs.([]*jose.JSONWebKeySet)
+				if !ok {
+					k.Logger().Warnf("Invalid JWK cache format for APIID %s — ignoring", k.Spec.APIID)
+
+					jwkSets = nil
+				}
 			}
-		}(jwk.URL)
+		}
 	}
 
-	go func() {
-		wg.Wait()
-		close(resultCh)
-		close(errCh)
-	}()
+	if !foundDef || cacheOutdated || len(jwkSets) == 0 {
+		jwkSets = nil
+		for _, jwk := range jwkURIs {
+			jwkSet, err := GetJWK(jwk.URL, k.Gw.GetConfig().JWTSSLInsecureSkipVerify)
+			if err != nil {
+				k.Logger().WithError(err).Infof("Failed to fetch or decode JWKs from %s", jwk.URL)
+				fallbackJWKURIs = append(fallbackJWKURIs, jwk)
+				continue
+			}
 
-	if secret, ok := <-resultCh; ok {
-		return secret, nil
+			jwkSets = append(jwkSets, jwkSet)
+		}
+
+		if len(jwkSets) > 0 {
+			k.Logger().Debugf("Caching %d JWK sets for APIID %s", len(jwkSets), k.Spec.APIID)
+			JWKCache.Set(k.Spec.APIID, jwkSets, cache.DefaultExpiration)
+			JWKCache.Set(cacheAPIDef, k.Spec.APIDefinition, cache.DefaultExpiration)
+		}
 	}
 
-	var errorMessages []string
-	for err := range errCh {
-		k.Logger().WithError(err).Error("JWK URI fetch attempt failed")
-		errorMessages = append(errorMessages, err.Error())
+	for _, jwkSet := range jwkSets {
+		if keys := jwkSet.Key(kid); len(keys) > 0 {
+			return keys[0].Key, nil
+		}
 	}
 
-	if len(errorMessages) > 0 {
-		combined := fmt.Errorf("no matching KID found in any JWTJwkURIs:\n%s", strings.Join(errorMessages, "\n"))
-		k.Logger().WithError(combined).Error("All JWK URI fetch attempts failed")
-		return nil, combined
+	for _, jwk := range fallbackJWKURIs {
+		key, legacyErr := k.legacyGetSecretFromURL(jwk.URL, kid, keyType)
+		if legacyErr == nil {
+			return key, nil
+		}
+		k.Logger().WithError(legacyErr).Warnf("Legacy fallback failed for %s", jwk.URL)
 	}
 
-	err := errors.New("no matching KID found in any JWTJwkURIs")
-	k.Logger().WithError(err).Error("No JWK fetch attempt succeeded")
+	err := errors.New("no matching KID found in any JWKs or fallback")
+	k.Logger().WithError(err).Error("JWK resolution failed")
 
 	return nil, err
+}
+
+func jwkURLsChanged(a, b []apidef.JWK) bool {
+	if len(a) != len(b) {
+		return true
+	}
+
+	urlMap := make(map[string]struct{}, len(b))
+	for _, jwk := range b {
+		urlMap[jwk.URL] = struct{}{}
+	}
+
+	for _, jwk := range a {
+		if _, exists := urlMap[jwk.URL]; !exists {
+			return true
+		}
+	}
+
+	return false
 }
 
 func (k *JWTMiddleware) getPolicyIDFromToken(claims jwt.MapClaims) (string, bool) {
