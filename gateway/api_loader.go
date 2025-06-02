@@ -3,7 +3,7 @@ package gateway
 import (
 	"crypto/tls"
 	"fmt"
-	"github.com/TykTechnologies/tyk/gateway/option"
+	"github.com/TykTechnologies/tyk/common/option"
 	"io/ioutil"
 	"net/http"
 	"net/url"
@@ -161,7 +161,7 @@ func (gw *Gateway) processSpec(
 	opts ...option.Option[ProcessSpecOptions],
 ) *ChainObject {
 
-	var options = option.New(opts...).Build(ProcessSpecOptions{
+	var options = option.New(opts).Build(ProcessSpecOptions{
 		quotaKey: "",
 	})
 

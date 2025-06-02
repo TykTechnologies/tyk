@@ -163,7 +163,9 @@ func (k *JWTMiddleware) getSecretFromURL(url string, kidVal interface{}, keyType
 		k.Logger().Debug("Caching JWK")
 		JWKCache.Set(k.Spec.APIID, jwkSet, cache.DefaultExpiration)
 	} else {
-		jwkSet = cachedJWK.(*jose.JSONWebKeySet)
+		if jwkSet, ok = cachedJWK.(*jose.JSONWebKeySet); !ok {
+			return nil, errors.New("Failed to parse JWKs body. Trying x5c PEM fallback.")
+		}
 	}
 	k.Logger().Debug("Checking JWKs...")
 	if keys := jwkSet.Key(kid); len(keys) > 0 {

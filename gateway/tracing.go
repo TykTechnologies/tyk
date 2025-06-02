@@ -1,13 +1,17 @@
 package gateway
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"strings"
+	"time"
 
 	"github.com/gorilla/mux"
 	"github.com/sirupsen/logrus"
@@ -16,6 +20,12 @@ import (
 	"github.com/TykTechnologies/tyk/apidef/oas"
 	"github.com/TykTechnologies/tyk/internal/httputil"
 	"github.com/TykTechnologies/tyk/internal/model"
+)
+
+const (
+	reqHeader    = "====== Request ======"
+	respHeader   = "====== Response ======"
+	reqSeparator = "\n"
 )
 
 type traceHttpRequest struct {
@@ -39,6 +49,47 @@ type traceResponse struct {
 	Message  string `json:"message"`
 	Response string `json:"response"`
 	Logs     string `json:"logs"`
+}
+
+type traceLogEntry struct {
+	ApiId   string     `json:"api_id,omitempty"`
+	ApiName string     `json:"api_name,omitempty"`
+	Level   string     `json:"level,omitempty"`
+	Msg     string     `json:"msg,omitempty"`
+	Mw      string     `json:"mw,omitempty"`
+	OrgId   string     `json:"org_id,omitempty"`
+	Ts      *time.Time `json:"time,omitempty"`
+}
+
+func (tr *traceResponse) parseTrace() (*http.Request, *http.Response, error) {
+	return parseTrace(tr.Response)
+}
+
+// logs extract logs for unit test cases
+func (tr *traceResponse) logs() ([]traceLogEntry, error) {
+	var res []traceLogEntry
+	scanner := bufio.NewScanner(bytes.NewReader([]byte(tr.Logs)))
+
+	for scanner.Scan() {
+		lineBytes := scanner.Bytes()
+
+		if len(strings.TrimSpace(string(lineBytes))) == 0 {
+			continue
+		}
+
+		var msg traceLogEntry
+		if err := json.Unmarshal(lineBytes, &msg); err != nil {
+			return nil, err
+		}
+
+		res = append(res, msg)
+	}
+
+	if err := scanner.Err(); err != nil {
+		return nil, fmt.Errorf("error reading input: %w", err)
+	}
+
+	return res, nil
 }
 
 func (tr *traceRequest) toRequest(
@@ -191,7 +242,38 @@ func (gw *Gateway) traceHandler(w http.ResponseWriter, r *http.Request) {
 		request = err.Error()
 	}
 
-	requestDump := "====== Request ======\n" + request + "\n====== Response ======\n" + response
+	doJSONWrite(w, http.StatusOK, traceResponse{
+		Message:  "ok",
+		Response: makeTraceDump(request, response),
+		Logs:     logStorage.String(),
+	})
+}
 
-	doJSONWrite(w, http.StatusOK, traceResponse{Message: "ok", Response: requestDump, Logs: logStorage.String()})
+func makeTraceDump(request, response string) string {
+	var sb strings.Builder
+	sb.WriteString(reqHeader + reqSeparator)
+	sb.WriteString(request)
+	sb.WriteString(reqSeparator + respHeader + reqSeparator)
+	sb.WriteString(response)
+	return sb.String()
+}
+
+func parseTrace(tracedReqRes string) (req *http.Request, res *http.Response, err error) {
+	tracedReqRes = strings.TrimPrefix(tracedReqRes, reqHeader+reqSeparator)
+	parts := strings.Split(tracedReqRes, reqSeparator+respHeader+reqSeparator)
+
+	if len(parts) != 2 {
+		err = errors.New("invalid traced request response format")
+		return
+	}
+
+	reqBuf := bufio.NewReader(strings.NewReader(parts[0]))
+	if req, err = http.ReadRequest(reqBuf); err != nil {
+		return
+	}
+
+	respBuf := bufio.NewReader(strings.NewReader(parts[1]))
+	res, err = http.ReadResponse(respBuf, req)
+
+	return
 }

@@ -8,7 +8,7 @@ type (
 	FailableOption[O any] func(*O) error
 )
 
-func New[O any](opts ...Option[O]) Options[O] {
+func New[O any](opts []Option[O]) Options[O] {
 	return opts
 }
 

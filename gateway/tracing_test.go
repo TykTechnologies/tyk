@@ -4,13 +4,14 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"github.com/samber/lo"
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
-	"github.com/TykTechnologies/kin-openapi/openapi3"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -53,60 +54,95 @@ func TestTraceHttpRequest_toRequest(t *testing.T) {
 	assert.Equal(t, string(bodyInBytes), body)
 }
 
-func TestTraceHandler_RateLimiterExceeded(t *testing.T) {
+func TestTraceHandler_RateLimiterGlobalWorksAsExpected(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
-	// Create OAS definition with strict rate limit (1 request per minute)
-	// todo: extract to OAS builder
-	oasDef := oas.OAS{}
-	oasDef.Paths = openapi3.Paths{
-		"/uuid": &openapi3.PathItem{
-			Get: &openapi3.Operation{
-				OperationID: "uuidget",
-				Description: "uuidget descr",
-			},
-		},
-	}
-	oasDef.SetTykExtension(&oas.XTykAPIGateway{
-		Info: oas.Info{},
-		Server: oas.Server{
-			ListenPath: oas.ListenPath{
-				Strip: true,
-				Value: "/rate-limited-api/",
-			},
-		},
-		Upstream: oas.Upstream{
-			Proxy: &oas.Proxy{Enabled: true},
-			URL:   "http://localhost:3128/",
-			// todo: split api rate limit tests and endpoint rate limits
-			// add edd endpoint with middlewares and
-			RateLimit: &oas.RateLimit{
-				Enabled: false,
-				Rate:    10,
-				Per:     oas.ReadableDuration(60 * time.Second),
-			},
-		},
-		Middleware: &oas.Middleware{
-			Operations: oas.Operations{
-				"uuidget": {
-					RateLimit: &oas.RateLimitEndpoint{
-						Enabled: true,
-						Rate:    1,
-						Per:     oas.ReadableDuration(60 * time.Second),
-					},
-				},
-			},
-		},
-	})
+	oasDef, err := oas.NewOas(
+		oas.WithTestDefaults(),
+		oas.WithGlobalRateLimit(1, 60*time.Second),
+		oas.WithGet("/rate-limited-api", func(b *oas.EndpointBuilder) {
+			b.Mock(func(_ *oas.MockResponse) {})
+		}),
+	)
+
+	require.NoError(t, err)
+	require.NotNil(t, oasDef)
 
 	// Create trace request
 	traceReq := traceRequest{
 		Request: &traceHttpRequest{
 			Method: http.MethodGet,
-			Path:   "/uuid",
+			Path:   "/test/rate-limited-api",
 		},
-		OAS: &oasDef,
+		OAS: oasDef,
+	}
+
+	// Marshal trace request
+	reqBody, err := json.Marshal(traceReq)
+	require.NoError(t, err)
+	require.NotNil(t, reqBody)
+
+	// First request should succeed
+	req1 := httptest.NewRequest(http.MethodPost, "/debug/trace", bytes.NewReader(reqBody))
+	req1.Header.Set("Content-Type", "application/json")
+
+	// Listen path is empty
+
+	w1 := httptest.NewRecorder()
+	ts.Gw.traceHandler(w1, req1)
+	require.Equal(t, http.StatusOK, w1.Code)
+
+	// Second request should be rate limited
+	req2 := httptest.NewRequest(http.MethodPost, "/debug/trace", bytes.NewReader(reqBody))
+	req2.Header.Set("Content-Type", "application/json")
+
+	w2 := httptest.NewRecorder()
+	ts.Gw.traceHandler(w2, req2)
+
+	// Parse response
+	var traceResp2 traceResponse
+	err = json.Unmarshal(w2.Body.Bytes(), &traceResp2)
+	assert.NoError(t, err)
+
+	logs, err := traceResp2.logs()
+	require.NoError(t, err)
+
+	_, tResponse, err := traceResp2.parseTrace()
+	require.NoError(t, err)
+
+	defer func() {
+		_ = tResponse.Body.Close()
+	}()
+
+	// Verify rate limit response
+	assert.Equal(t, http.StatusTooManyRequests, tResponse.StatusCode)
+	require.True(t, lo.SomeBy(logs, func(item traceLogEntry) bool {
+		return strings.Contains(item.Msg, "API Rate Limit Exceeded")
+	}))
+}
+
+func TestTraceHandler_RateLimiterExceeded(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	oasDef, err := oas.NewOas(
+		oas.WithTestDefaults(),
+		oas.WithGet("/rate-limited-api", func(b *oas.EndpointBuilder) {
+			b.Mock(func(_ *oas.MockResponse) {}).RateLimit(1, time.Second)
+		}),
+	)
+
+	require.NoError(t, err)
+	require.NotNil(t, oasDef)
+
+	// Create trace request
+	traceReq := traceRequest{
+		Request: &traceHttpRequest{
+			Method: http.MethodGet,
+			Path:   "/rate-limited-api",
+		},
+		OAS: oasDef,
 	}
 
 	// Marshal trace request
@@ -126,7 +162,6 @@ func TestTraceHandler_RateLimiterExceeded(t *testing.T) {
 	// Second request should be rate limited
 	req2 := httptest.NewRequest(http.MethodPost, "/debug/trace", bytes.NewReader(reqBody))
 	req2.Header.Set("Content-Type", "application/json")
-	req2 = ts.withAuth(req2)
 
 	w2 := httptest.NewRecorder()
 	ts.Gw.traceHandler(w2, req2)
@@ -136,7 +171,87 @@ func TestTraceHandler_RateLimiterExceeded(t *testing.T) {
 	err = json.Unmarshal(w2.Body.Bytes(), &traceResp2)
 	assert.NoError(t, err)
 
+	logs, err := traceResp2.logs()
+	require.NoError(t, err)
+
+	_, tResponse, err := traceResp2.parseTrace()
+	require.NoError(t, err)
+
 	// Verify rate limit response
-	assert.Contains(t, traceResp2.Response, "429 Too Many Requests")
-	assert.Contains(t, traceResp2.Logs, "API Rate Limit Exceeded")
+	require.Equal(t, http.StatusTooManyRequests, tResponse.StatusCode)
+	require.True(t, lo.SomeBy(logs, func(item traceLogEntry) bool {
+		return strings.Contains(item.Msg, "API Rate Limit Exceeded")
+	}))
+}
+
+func TestTraceHandler_MockMiddlewareRespondsWithProvidedData(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	type typedResponse struct {
+		Message string `json:"message"`
+	}
+
+	srcMessage := typedResponse{
+		Message: "knock knock this is mock",
+	}
+
+	msgJson, err := json.Marshal(srcMessage)
+	require.NoError(t, err)
+
+	oasDef, err := oas.NewOas(
+		oas.WithTestDefaults(),
+		oas.WithGet("/mock", func(b *oas.EndpointBuilder) {
+			b.Mock(func(mock *oas.MockResponse) {
+				mock.Code = http.StatusCreated
+				mock.Body = string(msgJson)
+				mock.Headers = append(mock.Headers, oas.Header{Name: "hello", Value: "world"})
+				mock.Headers = append(mock.Headers, oas.Header{Name: "Content-Type", Value: "application/json"})
+			})
+		}),
+	)
+
+	require.NoError(t, err)
+	require.NotNil(t, oasDef)
+
+	// Create trace request
+	traceReq := traceRequest{
+		Request: &traceHttpRequest{
+			Method: http.MethodGet,
+			Path:   "/mock",
+		},
+		OAS: oasDef,
+	}
+
+	reqBody, err := json.Marshal(traceReq)
+	require.NoError(t, err)
+	require.NotNil(t, reqBody)
+
+	req := httptest.NewRequest(http.MethodPost, "/debug/trace", bytes.NewReader(reqBody))
+	req.Header.Set("Content-Type", "application/json")
+
+	res := httptest.NewRecorder()
+	ts.Gw.traceHandler(res, req)
+	require.Equal(t, http.StatusOK, res.Code)
+
+	var traceResp traceResponse
+
+	err = json.NewDecoder(res.Body).Decode(&traceResp)
+	assert.NoError(t, err)
+
+	request, response, err := traceResp.parseTrace()
+	require.NoError(t, err)
+
+	defer func() {
+		_ = response.Body.Close()
+	}()
+
+	require.NotNil(t, request)
+	require.NotNil(t, response)
+
+	var mockedResponse typedResponse
+	require.Equal(t, http.StatusCreated, response.StatusCode)
+	err = json.NewDecoder(response.Body).Decode(&mockedResponse)
+	assert.NoError(t, err)
+	assert.Equal(t, srcMessage.Message, mockedResponse.Message)
 }

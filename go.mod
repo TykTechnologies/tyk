@@ -110,6 +110,7 @@ require (
 	github.com/newrelic/go-agent/v3/integrations/nrgorilla v1.2.2
 	github.com/oasdiff/yaml v0.0.0-20241214135536-5f7845c759c8
 	github.com/rabbitmq/amqp091-go v1.9.0
+	github.com/samber/lo v1.50.0
 	github.com/shirou/gopsutil v3.21.11+incompatible
 	github.com/testcontainers/testcontainers-go v0.36.0
 	github.com/testcontainers/testcontainers-go/modules/kafka v0.33.0
