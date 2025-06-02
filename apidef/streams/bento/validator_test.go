@@ -87,7 +87,7 @@ func TestValidateBentoConfiguration(t *testing.T) {
 	})
 }
 
-func TestValidateBentoConfiguration_NewEnableAllConfigValidator(t *testing.T) {
+func TestValidateBentoConfiguration_NewEnableAllExperimentalConfigValidator(t *testing.T) {
 	// The purpose of this test is to make SonarCloud happy. EnableAllExperimentalConfigValidator validates everything.
 	validator := NewEnableAllExperimentalConfigValidator()
 	require.NotNil(t, validator)
