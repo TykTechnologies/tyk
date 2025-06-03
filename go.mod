@@ -26,7 +26,7 @@ require (
 	github.com/TykTechnologies/gorpc v0.0.0-20250214161245-e9f3f088e8c6
 	github.com/TykTechnologies/goverify v0.0.0-20220808203004-1486f89e7708
 	github.com/TykTechnologies/graphql-go-tools v1.6.2-0.20250527121326-5f5c91189896
-	github.com/TykTechnologies/graphql-translator v0.0.0-20250423061552-2acd6818080e
+	github.com/TykTechnologies/graphql-translator v0.0.0-20250602105400-41c2e7514a36
 	github.com/TykTechnologies/murmur3 v0.0.0-20230310161213-aad17efd5632
 	github.com/TykTechnologies/openid2go v0.1.2
 	github.com/TykTechnologies/storage v1.2.2
@@ -74,9 +74,9 @@ require (
 	github.com/valyala/fasthttp v1.58.0 // test
 	github.com/vmihailenco/msgpack v4.0.4+incompatible
 	github.com/xeipuuv/gojsonschema v1.2.0
-	golang.org/x/crypto v0.36.0
-	golang.org/x/net v0.37.0
-	golang.org/x/sync v0.12.0
+	golang.org/x/crypto v0.37.0
+	golang.org/x/net v0.38.0
+	golang.org/x/sync v0.13.0
 	google.golang.org/grpc v1.70.0
 	google.golang.org/grpc/examples v0.0.0-20220317213542-f95b001a48df // test
 	google.golang.org/protobuf v1.36.4
@@ -95,11 +95,11 @@ require (
 	github.com/Azure/go-amqp v1.0.5
 	github.com/IBM/sarama v1.43.3
 	github.com/Jeffail/gabs/v2 v2.7.0
-	github.com/TykTechnologies/graphql-go-tools/v2 v2.0.0-20240509085643-e95cdc317e1d
-	github.com/TykTechnologies/kin-openapi v0.91.0
+	github.com/TykTechnologies/graphql-go-tools/v2 v2.0.0-20250527121326-5f5c91189896
 	github.com/TykTechnologies/opentelemetry v0.0.22
 	github.com/alecthomas/kingpin/v2 v2.4.0
 	github.com/eclipse/paho.mqtt.golang v1.4.3
+	github.com/getkin/kin-openapi v0.132.0
 	github.com/go-redis/redismock/v9 v9.2.0
 	github.com/goccy/go-json v0.10.4
 	github.com/goccy/go-yaml v1.15.23
@@ -108,12 +108,12 @@ require (
 	github.com/nats-io/nats.go v1.38.0
 	github.com/newrelic/go-agent/v3 v3.35.1
 	github.com/newrelic/go-agent/v3/integrations/nrgorilla v1.2.2
-	github.com/oasdiff/yaml v0.0.0-20241214135536-5f7845c759c8
+	github.com/oasdiff/yaml v0.0.0-20250309154309-f31be36b4037
 	github.com/rabbitmq/amqp091-go v1.9.0
 	github.com/shirou/gopsutil v3.21.11+incompatible
-	github.com/testcontainers/testcontainers-go v0.36.0
-	github.com/testcontainers/testcontainers-go/modules/kafka v0.33.0
-	github.com/testcontainers/testcontainers-go/modules/nats v0.33.0
+	github.com/testcontainers/testcontainers-go v0.37.0
+	github.com/testcontainers/testcontainers-go/modules/kafka v0.37.0
+	github.com/testcontainers/testcontainers-go/modules/nats v0.37.0
 	github.com/testcontainers/testcontainers-go/modules/rabbitmq v0.36.0
 	github.com/warpstreamlabs/bento v1.7.1
 	go.opentelemetry.io/otel v1.35.0
@@ -296,8 +296,8 @@ require (
 	github.com/go-logr/logr v1.4.2 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/go-ole/go-ole v1.3.0 // indirect
-	github.com/go-openapi/jsonpointer v0.19.6 // indirect
-	github.com/go-openapi/swag v0.22.4 // indirect
+	github.com/go-openapi/jsonpointer v0.21.0 // indirect
+	github.com/go-openapi/swag v0.23.0 // indirect
 	github.com/go-sourcemap/sourcemap v2.1.4+incompatible // indirect
 	github.com/go-sql-driver/mysql v1.7.1 // indirect
 	github.com/go-zeromq/goczmq/v4 v4.2.2 // indirect
@@ -353,7 +353,6 @@ require (
 	github.com/imdario/mergo v0.3.13 // indirect
 	github.com/influxdata/go-syslog/v3 v3.0.0 // indirect
 	github.com/influxdata/influxdb1-client v0.0.0-20220302092344-a9ab5670611c // indirect
-	github.com/invopop/yaml v0.2.0 // indirect
 	github.com/itchyny/gojq v0.12.16 // indirect
 	github.com/itchyny/timefmt-go v0.1.6 // indirect
 	github.com/jackc/chunkreader/v2 v2.0.1 // indirect
@@ -389,7 +388,7 @@ require (
 	github.com/linkedin/goavro/v2 v2.12.0 // indirect
 	github.com/lonelycode/go-uuid v0.0.0-20141202165402-ed3ca8a15a93 // indirect
 	github.com/lufia/plan9stats v0.0.0-20230326075908-cb1d2100619a // indirect
-	github.com/magiconair/properties v1.8.9 // indirect
+	github.com/magiconair/properties v1.8.10 // indirect
 	github.com/mailru/easyjson v0.7.7 // indirect
 	github.com/matoous/go-nanoid/v2 v2.0.0 // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect
@@ -422,7 +421,7 @@ require (
 	github.com/ncruces/go-strftime v0.1.9 // indirect
 	github.com/neo4j/neo4j-go-driver/v5 v5.24.0 // indirect
 	github.com/nsqio/go-nsq v1.1.0 // indirect
-	github.com/oasdiff/yaml3 v0.0.0-20241214160948-977117996672 // indirect
+	github.com/oasdiff/yaml3 v0.0.0-20250309153720-d2182401db90 // indirect
 	github.com/oklog/ulid v1.3.1 // indirect
 	github.com/olekukonko/tablewriter v0.0.5 // indirect
 	github.com/olivere/elastic/v7 v7.0.32 // indirect
@@ -530,9 +529,9 @@ require (
 	go.uber.org/zap v1.27.0 // indirect
 	golang.org/x/exp v0.0.0-20250106191152-7588d65b2ba8 // indirect
 	golang.org/x/mod v0.22.0 // indirect
-	golang.org/x/sys v0.31.0 // indirect
-	golang.org/x/term v0.30.0 // indirect
-	golang.org/x/text v0.23.0 // indirect
+	golang.org/x/sys v0.32.0 // indirect
+	golang.org/x/term v0.31.0 // indirect
+	golang.org/x/text v0.24.0 // indirect
 	golang.org/x/time v0.9.0 // indirect
 	golang.org/x/tools v0.29.0 // indirect
 	golang.org/x/xerrors v0.0.0-20240903120638-7835f813f4da // indirect
@@ -558,7 +557,6 @@ require (
 	modernc.org/sqlite v1.29.6 // indirect
 	modernc.org/strutil v1.2.0 // indirect
 	modernc.org/token v1.1.0 // indirect
-	nhooyr.io/websocket v1.8.10 // indirect
 )
 
 replace go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.54.0 => go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.49.0
