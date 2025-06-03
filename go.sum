@@ -818,8 +818,8 @@ github.com/TykTechnologies/graphql-go-tools v1.6.2-0.20250527121326-5f5c91189896
 github.com/TykTechnologies/graphql-go-tools v1.6.2-0.20250527121326-5f5c91189896/go.mod h1:NE9MYGcB5eWKW0OefGOjZZEPv6S20AQ0OTsO+npGR8I=
 github.com/TykTechnologies/graphql-go-tools/v2 v2.0.0-20250527121326-5f5c91189896 h1:LP/UJWznlC1FV+7ovBJjBCQE56fVaib0nL1CACWa9ho=
 github.com/TykTechnologies/graphql-go-tools/v2 v2.0.0-20250527121326-5f5c91189896/go.mod h1:XM1owY0ZCJ1Rai64Q1UKXZYNDkWikZDojgefZw8raPk=
-github.com/TykTechnologies/graphql-translator v0.0.0-20250529194503-15d5fe6073a9 h1:E4HVE1zRX+VH7VBwYudZqcy9F2fM/gGXv8vrLMYmY4o=
-github.com/TykTechnologies/graphql-translator v0.0.0-20250529194503-15d5fe6073a9/go.mod h1:qiglVaUPPOWET4bQsBmsAaLiCml20a01REQSi7TSUa0=
+github.com/TykTechnologies/graphql-translator v0.0.0-20250602105400-41c2e7514a36 h1:7nNsyocI/RKBqo73RR9G/SiFMZ8w2sN+HMsQXYp9wPI=
+github.com/TykTechnologies/graphql-translator v0.0.0-20250602105400-41c2e7514a36/go.mod h1:qiglVaUPPOWET4bQsBmsAaLiCml20a01REQSi7TSUa0=
 github.com/TykTechnologies/murmur3 v0.0.0-20230310161213-aad17efd5632 h1:T5NWziFusj8au5nxAqMMh/bZyX9CAyYnBkaMSsfH6BA=
 github.com/TykTechnologies/murmur3 v0.0.0-20230310161213-aad17efd5632/go.mod h1:UsPYgOFBpNzDXLEti7MKOwHLpVSqdzuNGkVFPspQmnQ=
 github.com/TykTechnologies/openid2go v0.1.2 h1:WXctksOahA/epTVVvbn9iNUuMXKRr0ksrF4dY9KW8o8=
