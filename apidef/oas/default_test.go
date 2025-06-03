@@ -413,7 +413,6 @@ func TestOAS_BuildDefaultTykExtension(t *testing.T) {
 					},
 					Paths: func() *openapi3.Paths {
 						paths := openapi3.NewPaths()
-
 						paths.Set("/pets", &openapi3.PathItem{
 							Get: &openapi3.Operation{
 								Responses: openapi3.NewResponses(),
