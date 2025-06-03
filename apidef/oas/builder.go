@@ -3,12 +3,13 @@ package oas
 import (
 	"errors"
 	"fmt"
-	"github.com/TykTechnologies/kin-openapi/openapi3"
-	"github.com/TykTechnologies/tyk/common/option"
 	"net/http"
 	"net/url"
 	"strings"
 	"time"
+
+	"github.com/TykTechnologies/tyk/common/option"
+	"github.com/getkin/kin-openapi/openapi3"
 )
 
 type (
@@ -54,7 +55,7 @@ func NewOas(opts ...BuilderOption) (*OAS, error) {
 func NewBuilder() Builder {
 	oasDef := OAS{}
 
-	oasDef.Paths = openapi3.Paths{}
+	oasDef.Paths = &openapi3.Paths{}
 
 	xTykAPIGateway := XTykAPIGateway{
 		Info: Info{},
@@ -245,11 +246,13 @@ func (eb *EndpointBuilder) build(builder *Builder) {
 
 	builder.xTykAPIGateway.Middleware.Operations[eb.operationId()] = eb.op
 
-	if _, ok := builder.oas.Paths[eb.path]; !ok {
-		builder.oas.Paths[eb.path] = &openapi3.PathItem{}
+	currentPath := builder.oas.Paths.Find(eb.path)
+
+	if currentPath == nil {
+		currentPath = &openapi3.PathItem{}
+		builder.oas.Paths.Set(eb.path, currentPath)
 	}
 
-	currentPath := builder.oas.Paths[eb.path]
 	currentPath.SetOperation(eb.method, &openapi3.Operation{
 		OperationID: eb.operationId(),
 	})
