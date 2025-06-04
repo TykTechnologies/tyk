@@ -181,6 +181,6 @@ message SessionState {
   // session instance. Currently unsupported and under development.
   int64 max_query_depth = 31;
 
-  // KeyID corresponding to the token used for API access
+  // KeyID corresponding to the token used for API access.
   string key_id = 32;
 }
