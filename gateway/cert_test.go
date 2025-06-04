@@ -1850,6 +1850,7 @@ func TestStaticMTLSAPI(t *testing.T) {
 	})
 
 	t.Run("validate client cert against certificate authority", func(t *testing.T) {
+
 		rootCertPEM, rootKeyPEM, err := crypto.GenerateRootCertAndKey(t)
 		assert.NoError(t, err)
 
