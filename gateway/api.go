@@ -27,7 +27,6 @@ package gateway
 
 import (
 	"bytes"
-	"context"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
@@ -43,9 +42,10 @@ import (
 	"sync"
 	"time"
 
-	gqlv2 "github.com/TykTechnologies/graphql-go-tools/v2/pkg/graphql"
-
+	"github.com/TykTechnologies/tyk/internal/httpctx"
 	"github.com/getkin/kin-openapi/openapi3"
+
+	gqlv2 "github.com/TykTechnologies/graphql-go-tools/v2/pkg/graphql"
 
 	"github.com/TykTechnologies/tyk/config"
 
@@ -1546,7 +1546,7 @@ func (gw *Gateway) apiOASPatchHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	oasAPIInBytes, err := oasObj.MarshalJSON()
+	oasAPIInBytes, err := oasObjToPatch.MarshalJSON()
 	if err != nil {
 		doJSONWrite(w, http.StatusInternalServerError, apiError(err.Error()))
 		return
@@ -2185,7 +2185,7 @@ func (gw *Gateway) createOauthClient(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		err := apiSpec.OAuthManager.OsinServer.Storage.SetClient(storageID, apiSpec.OrgID, &newClient, true)
+		err := apiSpec.OAuthManager.Storage().SetClient(storageID, apiSpec.OrgID, &newClient, true)
 		if err != nil {
 			log.WithFields(logrus.Fields{
 				"prefix": "api",
@@ -2235,19 +2235,22 @@ func (gw *Gateway) createOauthClient(w http.ResponseWriter, r *http.Request) {
 					storageManager := gw.getGlobalMDCBStorageHandler(prefix, false)
 					storageManager.Connect()
 
+					storageDriver := &storage.RedisCluster{KeyPrefix: prefix, HashKeys: false, ConnectionHandler: gw.StorageConnectionHandler}
+					storageDriver.Connect()
+
 					apiSpec.OAuthManager = &OAuthManager{
 						OsinServer: gw.TykOsinNewServer(
 							&osin.ServerConfig{},
 							&RedisOsinStorageInterface{
 								storageManager,
 								gw.GlobalSessionManager,
-								&storage.RedisCluster{KeyPrefix: prefix, HashKeys: false, ConnectionHandler: gw.StorageConnectionHandler},
+								storageDriver,
 								apiSpec.OrgID,
 								gw,
 							}),
 					}
 				}
-				err := apiSpec.OAuthManager.OsinServer.Storage.SetClient(storageID, apiSpec.APIDefinition.OrgID, &newClient, true)
+				err := apiSpec.OAuthManager.Storage().SetClient(storageID, apiSpec.APIDefinition.OrgID, &newClient, true)
 				if err != nil {
 					log.WithFields(logrus.Fields{
 						"prefix": "api",
@@ -2299,7 +2302,7 @@ func (gw *Gateway) rotateOauthClient(keyName, apiID string) (interface{}, int) {
 
 	// get existing version of oauth-client
 	storageID := oauthClientStorageID(keyName)
-	client, err := apiSpec.OAuthManager.OsinServer.Storage.GetExtendedClientNoPrefix(storageID)
+	client, err := apiSpec.OAuthManager.Storage().GetExtendedClientNoPrefix(storageID)
 	if err != nil {
 		return apiError("OAuth Client ID not found"), http.StatusNotFound
 	}
@@ -2314,7 +2317,7 @@ func (gw *Gateway) rotateOauthClient(keyName, apiID string) (interface{}, int) {
 		Description:       client.GetDescription(),
 	}
 
-	err = apiSpec.OAuthManager.OsinServer.Storage.SetClient(storageID, apiSpec.OrgID, &updatedClient, true)
+	err = apiSpec.OAuthManager.Storage().SetClient(storageID, apiSpec.OrgID, &updatedClient, true)
 	if err != nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "api",
@@ -2376,7 +2379,7 @@ func (gw *Gateway) updateOauthClient(keyName, apiID string, r *http.Request) (in
 
 	// get existing version of oauth-client
 	storageID := oauthClientStorageID(keyName)
-	client, err := apiSpec.OAuthManager.OsinServer.Storage.GetExtendedClientNoPrefix(storageID)
+	client, err := apiSpec.OAuthManager.Storage().GetExtendedClientNoPrefix(storageID)
 	if err != nil {
 		return apiError("OAuth Client ID not found"), http.StatusNotFound
 	}
@@ -2391,7 +2394,7 @@ func (gw *Gateway) updateOauthClient(keyName, apiID string, r *http.Request) (in
 		Description:       updateClientData.Description,       // update
 	}
 
-	err = apiSpec.OAuthManager.OsinServer.Storage.SetClient(storageID, apiSpec.OrgID, &updatedClient, true)
+	err = apiSpec.OAuthManager.Storage().SetClient(storageID, apiSpec.OrgID, &updatedClient, true)
 	if err != nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "api",
@@ -2456,7 +2459,7 @@ func (gw *Gateway) invalidateOauthRefresh(w http.ResponseWriter, r *http.Request
 	}
 
 	keyName := mux.Vars(r)["keyName"]
-	err := apiSpec.OAuthManager.OsinServer.Storage.RemoveRefresh(keyName)
+	err := apiSpec.OAuthManager.Storage().RemoveRefresh(keyName)
 	if err != nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "api",
@@ -2576,7 +2579,7 @@ func (gw *Gateway) oAuthClientTokensHandler(w http.ResponseWriter, r *http.Reque
 			page = 1
 		}
 
-		tokens, totalPages, err := apiSpec.OAuthManager.OsinServer.Storage.GetPaginatedClientTokens(keyName, page)
+		tokens, totalPages, err := apiSpec.OAuthManager.Storage().GetPaginatedClientTokens(keyName, page)
 		if err != nil {
 			doJSONWrite(w, http.StatusInternalServerError, apiError("Get client tokens failed"))
 			return
@@ -2594,7 +2597,7 @@ func (gw *Gateway) oAuthClientTokensHandler(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	tokens, err := apiSpec.OAuthManager.OsinServer.Storage.GetClientTokens(keyName)
+	tokens, err := apiSpec.OAuthManager.Storage().GetClientTokens(keyName)
 	if err != nil {
 		doJSONWrite(w, http.StatusInternalServerError, apiError("Get client tokens failed"))
 		return
@@ -2622,19 +2625,23 @@ func (gw *Gateway) getOauthClientDetails(keyName, apiID string) (interface{}, in
 		prefix := generateOAuthPrefix(apiSpec.APIID)
 		storageManager := gw.getGlobalMDCBStorageHandler(prefix, false)
 		storageManager.Connect()
+
+		storageDriver := &storage.RedisCluster{KeyPrefix: prefix, HashKeys: false, ConnectionHandler: gw.StorageConnectionHandler}
+		storageDriver.Connect()
+
 		apiSpec.OAuthManager = &OAuthManager{
 			OsinServer: gw.TykOsinNewServer(&osin.ServerConfig{},
 				&RedisOsinStorageInterface{
 					storageManager,
 					gw.GlobalSessionManager,
-					&storage.RedisCluster{KeyPrefix: prefix, HashKeys: false, ConnectionHandler: gw.StorageConnectionHandler},
+					storageDriver,
 					apiSpec.OrgID,
 					gw,
 				}),
 		}
 	}
 
-	clientData, err := apiSpec.OAuthManager.OsinServer.Storage.GetExtendedClientNoPrefix(storageID)
+	clientData, err := apiSpec.OAuthManager.Storage().GetExtendedClientNoPrefix(storageID)
 	if err != nil {
 		return apiError("OAuth Client ID not found"), http.StatusNotFound
 	}
@@ -2695,7 +2702,7 @@ func (gw *Gateway) handleDeleteOAuthClient(keyName, apiID string) (interface{}, 
 	}
 
 	if apiSpec.OAuthManager != nil {
-		err := apiSpec.OAuthManager.OsinServer.Storage.DeleteClient(storageID, apiSpec.OrgID, true)
+		err := apiSpec.OAuthManager.Storage().DeleteClient(storageID, apiSpec.OrgID, true)
 		if err != nil {
 			return apiError("Delete failed"), http.StatusInternalServerError
 		}
@@ -2743,7 +2750,7 @@ func (gw *Gateway) getApiClients(apiID string) ([]ExtendedOsinClientInterface, a
 
 	clientData := []ExtendedOsinClientInterface{}
 	if apiSpec.UseOauth2 {
-		clientData, err = apiSpec.OAuthManager.OsinServer.Storage.GetClients(filterID, apiSpec.OrgID, true)
+		clientData, err = apiSpec.OAuthManager.Storage().GetClients(filterID, apiSpec.OrgID, true)
 		if err != nil {
 			log.WithFields(logrus.Fields{
 				"prefix": "api",
@@ -2934,7 +2941,7 @@ func (gw *Gateway) GetStorageForApi(apiID string) (ExtendedOsinStorageInterface,
 		return nil, http.StatusNotFound, errors.New(oAuthNotPropagatedErr)
 	}
 
-	return apiSpec.OAuthManager.OsinServer.Storage, http.StatusOK, nil
+	return apiSpec.OAuthManager.Storage(), http.StatusOK, nil
 }
 
 func (gw *Gateway) RevokeAllTokensHandler(w http.ResponseWriter, r *http.Request) {
@@ -3062,34 +3069,6 @@ func (gw *Gateway) makeImportedOASTykAPI(next http.HandlerFunc) http.HandlerFunc
 	}
 }
 
-// TODO: Don't modify http.Request values in-place. We must right now
-// because our middleware design doesn't pass around http.Request
-// pointers, so we have no way to modify the pointer in a middleware.
-//
-// If we ever redesign middlewares - or if we find another workaround -
-// revisit this.
-func setContext(r *http.Request, ctx context.Context) {
-	r2 := r.WithContext(ctx)
-	*r = *r2
-}
-func setCtxValue(r *http.Request, key, val interface{}) {
-	setContext(r, context.WithValue(r.Context(), key, val))
-}
-
-func ctxGetData(r *http.Request) map[string]interface{} {
-	if v := r.Context().Value(ctx.ContextData); v != nil {
-		return v.(map[string]interface{})
-	}
-	return nil
-}
-
-func ctxSetData(r *http.Request, m map[string]interface{}) {
-	if m == nil {
-		panic("setting a nil context ContextData")
-	}
-	setCtxValue(r, ctx.ContextData, m)
-}
-
 // ctxSetCacheOptions sets a cache key to use for the http request
 func ctxSetCacheOptions(r *http.Request, options *cacheOptions) {
 	setCtxValue(r, ctx.CacheOptions, options)
@@ -3205,6 +3184,11 @@ func ctxSetCheckLoopLimits(r *http.Request, b bool) {
 
 // Should we check Rate limits and Quotas?
 func ctxCheckLimits(r *http.Request) bool {
+	// If this is a self loop, do not need to check the limits and quotas.
+	if httpctx.IsSelfLooping(r) {
+		return false
+	}
+
 	// If looping disabled, allow all
 	if !ctxLoopingEnabled(r) {
 		return true
@@ -3419,16 +3403,15 @@ var createOauthClientSecret = func() string {
 }
 
 // invalidate tokens if we had a new policy
-func invalidateTokens(prevClient ExtendedOsinClientInterface, updatedClient OAuthClient, oauthManager *OAuthManager) {
-
+func invalidateTokens(prevClient ExtendedOsinClientInterface, updatedClient OAuthClient, oauthManager OAuthManagerInterface) {
 	if prevPolicy := prevClient.GetPolicyID(); prevPolicy != "" && prevPolicy != updatedClient.PolicyID {
-		tokenList, err := oauthManager.OsinServer.Storage.GetClientTokens(updatedClient.ClientID)
+		tokenList, err := oauthManager.Storage().GetClientTokens(updatedClient.ClientID)
 		if err != nil {
 			log.WithError(err).Warning("Could not get list of tokens for updated OAuth client")
 		}
 
 		for _, token := range tokenList {
-			if err := oauthManager.OsinServer.Storage.RemoveAccess(token.Token); err != nil {
+			if err := oauthManager.Storage().RemoveAccess(token.Token); err != nil {
 				log.WithError(err).Warning("Could not remove token for updated OAuth client policy")
 			}
 		}

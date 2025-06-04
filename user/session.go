@@ -7,17 +7,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/TykTechnologies/tyk/internal/httputil"
-
-	"github.com/TykTechnologies/tyk/storage"
-
 	"github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
 
 	"github.com/TykTechnologies/tyk/apidef"
-	logger "github.com/TykTechnologies/tyk/log"
 )
-
-var log = logger.Get()
 
 type HashType string
 
@@ -214,11 +207,6 @@ type Endpoint struct {
 	Methods EndpointMethods `json:"methods,omitempty" msg:"methods"`
 }
 
-// match matches supplied endpoint with endpoint path.
-func (e Endpoint) match(endpoint string) (bool, error) {
-	return httputil.MatchEndpoint(e.Path, endpoint)
-}
-
 // EndpointMethods is a collection of EndpointMethod.
 type EndpointMethods []EndpointMethod
 
@@ -235,6 +223,16 @@ func (em EndpointMethods) Less(i, j int) bool {
 // Swap is used to implement sort interface.
 func (em EndpointMethods) Swap(i, j int) {
 	em[i], em[j] = em[j], em[i]
+}
+
+// Contains is used to assert if a method exists in EndpointMethods.
+func (em EndpointMethods) Contains(method string) bool {
+	for _, v := range em {
+		if strings.EqualFold(v.Name, method) {
+			return true
+		}
+	}
+	return false
 }
 
 // EndpointMethod holds the configuration on endpoint method level.
@@ -525,38 +523,6 @@ type EndpointRateLimitInfo struct {
 	Rate float64
 	// Per is the rate limiting interval.
 	Per float64
-}
-
-// RateLimitInfo returns EndpointRateLimitInfo for endpoint rate limiting.
-func (es Endpoints) RateLimitInfo(method string, reqEndpoint string) (*EndpointRateLimitInfo, bool) {
-	if len(es) == 0 {
-		return nil, false
-	}
-
-	for _, endpoint := range es {
-		match, err := endpoint.match(reqEndpoint)
-		if err != nil {
-			log.WithError(err).Errorf("error matching path regex: %q, skipping", endpoint.Path)
-		}
-
-		if !match {
-			continue
-		}
-
-		for _, endpointMethod := range endpoint.Methods {
-			if !strings.EqualFold(endpointMethod.Name, method) {
-				continue
-			}
-
-			return &EndpointRateLimitInfo{
-				KeySuffix: storage.HashStr(fmt.Sprintf("%s:%s", endpointMethod.Name, endpoint.Path)),
-				Rate:      endpointMethod.Limit.Rate,
-				Per:       endpointMethod.Limit.Per,
-			}, true
-		}
-	}
-
-	return nil, false
 }
 
 // Map returns EndpointsMap of Endpoints using the key format [method:path].

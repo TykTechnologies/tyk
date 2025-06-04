@@ -15,11 +15,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/TykTechnologies/tyk/storage"
-
 	"github.com/stretchr/testify/assert"
 
 	tykcrypto "github.com/TykTechnologies/tyk/internal/crypto"
+	"github.com/TykTechnologies/tyk/storage"
 )
 
 func newManager() *certificateManager {

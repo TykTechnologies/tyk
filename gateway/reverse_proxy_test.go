@@ -14,8 +14,10 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"reflect"
+	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	texttemplate "text/template"
 	"time"
@@ -23,19 +25,18 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/TykTechnologies/tyk/user"
-
-	"github.com/TykTechnologies/tyk/header"
-
 	"github.com/TykTechnologies/graphql-go-tools/pkg/execution/datasource"
 	"github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
+	"github.com/TykTechnologies/tyk-pump/analytics"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/ctx"
 	"github.com/TykTechnologies/tyk/dnscache"
+	"github.com/TykTechnologies/tyk/header"
 	"github.com/TykTechnologies/tyk/request"
 	"github.com/TykTechnologies/tyk/test"
+	"github.com/TykTechnologies/tyk/user"
 )
 
 func TestCopyHeader_NoDuplicateCORSHeaders(t *testing.T) {
@@ -376,6 +377,14 @@ func (s *Test) TestNewWrappedServeHTTP() *ReverseProxy {
 	return s.Gw.TykNewSingleHostReverseProxy(target, spec, nil)
 }
 
+func createReverseProxyAndServeHTTP(ts *Test, req *http.Request) (*httptest.ResponseRecorder, ProxyResponse) {
+	proxy := ts.TestNewWrappedServeHTTP()
+	recorder := httptest.NewRecorder()
+	resp := proxy.WrappedServeHTTP(recorder, req, false)
+
+	return recorder, resp
+}
+
 func TestWrappedServeHTTP(t *testing.T) {
 	idleConnTimeout = 1
 
@@ -383,15 +392,23 @@ func TestWrappedServeHTTP(t *testing.T) {
 	defer ts.Close()
 
 	for i := 0; i < 10; i++ {
-		proxy := ts.TestNewWrappedServeHTTP()
-		recorder := httptest.NewRecorder()
-		req, _ := http.NewRequest(http.MethodGet, "/", nil)
-		proxy.WrappedServeHTTP(recorder, req, false)
+		req := httptest.NewRequest(http.MethodGet, "/", nil)
+		_, _ = createReverseProxyAndServeHTTP(ts, req)
 	}
 
 	assert.Equal(t, 10, ts.Gw.ConnectionWatcher.Count())
 	time.Sleep(time.Second * 2)
 	assert.Equal(t, 0, ts.Gw.ConnectionWatcher.Count())
+
+	// Test error on deepCopyBody function
+	mockReadCloser := createMockReadCloserWithError(errors.New("test error"))
+	req := httptest.NewRequest(http.MethodPost, "/test", mockReadCloser)
+	// Set any ContentLength - httptest.NewRequest sets it only for bytes.Buffer, bytes.Reader and strings.Reader
+	req.ContentLength = 1
+	recorder, proxyResponse := createReverseProxyAndServeHTTP(ts, req)
+	assert.NotNil(t, proxyResponse, "error on deepCopyBody should return an empty ProxyResponse")
+	assert.Nil(t, proxyResponse.Response, "no response should be expected on error")
+	assert.Equal(t, http.StatusInternalServerError, recorder.Code)
 }
 
 func TestCircuitBreaker5xxs(t *testing.T) {
@@ -862,6 +879,89 @@ func TestNopCloseResponseBody(t *testing.T) {
 	}
 }
 
+func TestDeepCopyBody(t *testing.T) {
+	var src *http.Request
+	var trg *http.Request
+	assert.Nil(t, deepCopyBody(src, trg), "nil requests should remain nil without any error")
+
+	src = &http.Request{}
+	trg = &http.Request{}
+	assert.Nil(t, deepCopyBody(src, trg), "nil source request body should return without any error")
+
+	testData := []byte("testDeepCopy")
+	src = httptest.NewRequest(http.MethodPost, "/test", bytes.NewReader(testData))
+	src.ContentLength = -1
+	src.Header.Set("Content-Type", "application/grpc")
+	assert.Nil(t, deepCopyBody(src, trg),
+		"grpc request should return without any error")
+	assert.Nil(t, trg.Body, "target request body should not be updated when it is grpc request")
+
+	src.Header.Set("Connection", "Upgrade")
+	assert.Nil(t, deepCopyBody(src, trg),
+		"upgraded request should return without any error")
+	assert.Nil(t, trg.Body, "target request body should not be updated when it is upgrade request")
+
+	src = httptest.NewRequest(http.MethodPost, "/test", bytes.NewReader(testData))
+	assert.Nil(t, deepCopyBody(src, trg), "request with body should return without any error")
+	assert.NotNil(t, trg.Body, "target request body should be updated")
+	assert.True(t, src.Body != trg.Body, "target request should have different body than source request")
+
+	trgData, err := io.ReadAll(trg.Body)
+	assert.Nil(t, err, "target request body should be readable")
+	assert.Equal(t, testData, trgData, "target request body should contain the same data")
+
+	mockReadCloser := createMockReadCloserWithError(errors.New("test error"))
+	src = httptest.NewRequest(http.MethodPost, "/test", mockReadCloser)
+	// Set any ContentLength - httptest.NewRequest sets it only for bytes.Buffer, bytes.Reader and strings.Reader
+	src.ContentLength = int64(len(testData))
+	trg = &http.Request{}
+	err = deepCopyBody(src, trg)
+	assert.NotNil(t, err, "function should return an error when ReadAll fails")
+	assert.Nil(t, trg.Body, "target request body should not be updated when ReadAll fails")
+	assert.True(t, mockReadCloser.CloseCalled, "close function should have been called")
+	_, ok := src.Body.(*nopCloserBuffer)
+	assert.True(t, ok, "target request body should have been of type nopCloserBuffer")
+}
+
+func BenchmarkGraphqlUDG(b *testing.B) {
+	g := StartTest(func(globalConf *config.Config) {
+		globalConf.OpenTelemetry.Enabled = true
+	})
+	b.Cleanup(g.Close)
+
+	composedAPI := BuildAPI(func(spec *APISpec) {
+		spec.Proxy.ListenPath = "/"
+		spec.EnableContextVars = true
+		spec.GraphQL.Enabled = true
+		spec.GraphQL.ExecutionMode = apidef.GraphQLExecutionModeExecutionEngine
+		spec.GraphQL.Version = apidef.GraphQLConfigVersion2
+
+		spec.GraphQL.Engine.DataSources = []apidef.GraphQLEngineDataSource{
+			generateRESTDataSourceV2(func(ds *apidef.GraphQLEngineDataSource, restConfig *apidef.GraphQLEngineDataSourceConfigREST) {
+				require.NoError(b, json.Unmarshal([]byte(testRESTHeadersDataSourceConfigurationV2), ds))
+				require.NoError(b, json.Unmarshal(ds.Config, restConfig))
+			}),
+		}
+
+		spec.GraphQL.TypeFieldConfigurations = nil
+	})[0]
+
+	g.Gw.LoadAPI(composedAPI)
+
+	headers := graphql.Request{
+		Query: "query Query { headers { name value } }",
+	}
+
+	for i := 0; i < b.N; i++ {
+		_, _ = g.Run(b, []test.TestCase{
+			{
+				Data: headers,
+				Code: http.StatusOK,
+			},
+		}...)
+	}
+}
+
 func TestGraphQL_UDGHeaders(t *testing.T) {
 	g := StartTest(nil)
 	t.Cleanup(g.Close)
@@ -903,6 +1003,7 @@ func TestGraphQL_UDGHeaders(t *testing.T) {
 		Query: "query Query { headers { name value } }",
 	}
 
+	// Test headers are gotten and updated for subsequent requests
 	_, _ = g.Run(t, []test.TestCase{
 		{
 			Data: headers,
@@ -920,6 +1021,24 @@ func TestGraphQL_UDGHeaders(t *testing.T) {
 					strings.Contains(string(b), `{"name":"Context","value":"request-context"}`) &&
 					strings.Contains(string(b), `{"name":"Global-Static","value":"foobar"}`) &&
 					strings.Contains(string(b), `{"name":"Global-Context","value":"request-global-context"}`) &&
+					strings.Contains(string(b), `{"name":"Does-Exist-Already","value":"ds-does-exist-already"}`)
+			},
+		},
+		{
+			Data: headers,
+			Headers: map[string]string{
+				"injected":            "FOO",
+				"From-Request":        "request-context",
+				"Global-From-Request": "follow-up-request-global-context",
+			},
+			Code: http.StatusOK,
+			BodyMatchFunc: func(b []byte) bool {
+				return strings.Contains(string(b), `"headers":`) &&
+					strings.Contains(string(b), `{"name":"Injected","value":"FOO"}`) &&
+					strings.Contains(string(b), `{"name":"Static","value":"barbaz"}`) &&
+					strings.Contains(string(b), `{"name":"Context","value":"request-context"}`) &&
+					strings.Contains(string(b), `{"name":"Global-Static","value":"foobar"}`) &&
+					strings.Contains(string(b), `{"name":"Global-Context","value":"follow-up-request-global-context"}`) &&
 					strings.Contains(string(b), `{"name":"Does-Exist-Already","value":"ds-does-exist-already"}`)
 			},
 		},
@@ -1752,18 +1871,7 @@ func TestReverseProxyWebSocketCancelation(t *testing.T) {
 }
 
 func TestSSE(t *testing.T) {
-	sseServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "text/event-stream")
-		w.Header().Set("Connection", "keep-alive")
-
-		flusher, _ := w.(http.Flusher)
-		for i := 0; i < 5; i++ {
-			fmt.Fprintf(w, "data: %d\n", i)
-			flusher.Flush()
-			time.Sleep(50 * time.Millisecond)
-		}
-	}))
-
+	sseServer := TestHelperSSEServer(t)
 	conf := func(globalConf *config.Config) {
 		globalConf.HttpServerOptions.EnableWebSockets = false
 	}
@@ -1775,62 +1883,39 @@ func TestSSE(t *testing.T) {
 		spec.Proxy.ListenPath = "/"
 	})
 
-	req, _ := http.NewRequest(http.MethodGet, ts.URL, nil)
-	req.Header.Set("Accept", "text/event-stream")
-
-	client := http.Client{}
-
-	stream := func(enableWebSockets bool) error {
-		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
-		defer cancel()
-
-		globalConf := ts.Gw.GetConfig()
-		globalConf.HttpServerOptions.EnableWebSockets = enableWebSockets
-		ts.Gw.SetConfig(globalConf)
-
-		res, err := client.Do(req)
-		assert.NoError(t, err)
-
-		reader := bufio.NewReader(res.Body)
-		defer res.Body.Close()
-
-		i := 0
-		okChan := make(chan error)
-
-		go func() {
-			for {
-				line, err := reader.ReadBytes('\n')
-				if err != nil && errors.Is(err, io.EOF) {
-					err = nil
-				}
-
-				assert.NoError(t, err)
-
-				if len(line) == 0 {
-					break
-				}
-
-				assert.Equal(t, fmt.Sprintf("data: %v\n", i), string(line))
-				i++
-			}
-			close(okChan)
-		}()
-
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		case <-okChan:
-		}
-		assert.Equal(t, i, 5)
-		return nil
-	}
-
 	t.Run("websockets disabled", func(t *testing.T) {
-		assert.NoError(t, stream(false))
+		assert.NoError(t, TestHelperSSEStreamClient(t, ts, false))
 	})
 
 	t.Run("websockets enabled", func(t *testing.T) {
-		assert.NoError(t, stream(true))
+		assert.NoError(t, TestHelperSSEStreamClient(t, ts, true))
+	})
+
+	t.Run("sse streaming with detailed recording enabled", func(t *testing.T) {
+		sseServer := TestHelperSSEServer(t)
+		ts := StartTest(func(c *config.Config) {
+			c.AnalyticsConfig.EnableDetailedRecording = true
+		})
+
+		t.Cleanup(ts.Close)
+		ts.Gw.Analytics.Flush()
+
+		var activityCounter atomic.Int32
+
+		ts.Gw.Analytics.mockEnabled = true
+		ts.Gw.Analytics.mockRecordHit = func(record *analytics.AnalyticsRecord) {
+			activityCounter.Add(1)
+		}
+
+		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+			spec.Proxy.TargetURL = sseServer.URL
+			spec.Proxy.ListenPath = "/"
+			spec.EnableDetailedRecording = true
+			spec.UseKeylessAccess = true
+		})
+
+		require.NoError(t, TestHelperSSEStreamClient(t, ts, false))
+		assert.Equal(t, int32(1), activityCounter.Load())
 	})
 }
 
@@ -2022,4 +2107,317 @@ func TestQuotaResponseHeaders(t *testing.T) {
 		assertQuota(t, ts, policyKey)
 	})
 
+}
+
+func BenchmarkLargeResponsePayload(b *testing.B) {
+	ts := StartTest(func(_ *config.Config) {})
+	b.Cleanup(ts.Close)
+
+	// Create a 500 MB payload of zeros
+	payloadSize := 500 * 1024 * 1024 // 500 MB in bytes
+	largePayload := bytes.Repeat([]byte("x"), payloadSize)
+
+	largePayloadHandler := func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/octet-stream")
+		w.Header().Set("Content-Length", strconv.Itoa(payloadSize))
+		w.WriteHeader(http.StatusOK)
+		_, err := w.Write(largePayload)
+		assert.NoError(b, err)
+	}
+
+	// Create a test server with the largePayloadHandler
+	testServer := httptest.NewServer(http.HandlerFunc(largePayloadHandler))
+	b.Cleanup(testServer.Close)
+
+	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		spec.UseKeylessAccess = true
+		spec.Proxy.ListenPath = "/"
+		spec.Proxy.TargetURL = testServer.URL
+	})
+
+	b.ReportAllocs()
+
+	for i := 0; i < b.N; i++ {
+		ts.Run(b, test.TestCase{
+			Method: http.MethodGet,
+			Path:   "/",
+			Code:   http.StatusOK,
+		})
+	}
+}
+
+func TestTimeoutPrioritization(t *testing.T) {
+	t.Parallel()
+
+	ts := StartTest(func(c *config.Config) {
+		c.ProxyDefaultTimeout = 2
+	})
+	defer ts.Close()
+
+	t.Run("Basic Timeout Behavior - enforced timeout higher than default", func(t *testing.T) {
+		upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			time.Sleep(1 * time.Second)
+			w.Write([]byte("Success"))
+		}))
+		defer upstream.Close()
+
+		api := BuildAPI(func(spec *APISpec) {
+			spec.Proxy.ListenPath = "/"
+			spec.Proxy.TargetURL = upstream.URL
+			spec.UseKeylessAccess = true
+			spec.EnforcedTimeoutEnabled = true
+			UpdateAPIVersion(spec, "", func(version *apidef.VersionInfo) {
+				version.UseExtendedPaths = true
+				version.ExtendedPaths.HardTimeouts = []apidef.HardTimeoutMeta{
+					{
+						Disabled: false,
+						Path:     "/test1",
+						Method:   http.MethodGet,
+						TimeOut:  4,
+					},
+				}
+			})
+		})[0]
+
+		ts.Gw.LoadAPI(api)
+
+		_, _ = ts.Run(t, test.TestCase{
+			Method:    http.MethodGet,
+			Path:      "/test1",
+			Code:      http.StatusOK,
+			BodyMatch: "Success",
+		})
+	})
+
+	t.Run("Basic Timeout Behavior - enforced timeout lower than default", func(t *testing.T) {
+		upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			time.Sleep(3 * time.Second)
+			w.Write([]byte("Success"))
+		}))
+		defer upstream.Close()
+
+		api := BuildAPI(func(spec *APISpec) {
+			spec.Proxy.ListenPath = "/"
+			spec.Proxy.TargetURL = upstream.URL
+			spec.UseKeylessAccess = true
+			spec.EnforcedTimeoutEnabled = true
+			UpdateAPIVersion(spec, "", func(version *apidef.VersionInfo) {
+				version.UseExtendedPaths = true
+				version.ExtendedPaths.HardTimeouts = []apidef.HardTimeoutMeta{
+					{
+						Disabled: false,
+						Path:     "/test2",
+						Method:   http.MethodGet,
+						TimeOut:  1,
+					},
+				}
+			})
+		})[0]
+
+		ts.Gw.LoadAPI(api)
+
+		_, _ = ts.Run(t, test.TestCase{
+			Method:    http.MethodGet,
+			Path:      "/test2",
+			Code:      http.StatusGatewayTimeout,
+			BodyMatch: "Upstream service reached hard timeout",
+		})
+	})
+
+	t.Run("Basic Timeout Behavior - delay higher than both timeouts", func(t *testing.T) {
+		upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			time.Sleep(3 * time.Second)
+			w.Write([]byte("Success"))
+		}))
+		defer upstream.Close()
+
+		api := BuildAPI(func(spec *APISpec) {
+			spec.Proxy.ListenPath = "/"
+			spec.Proxy.TargetURL = upstream.URL
+			spec.UseKeylessAccess = true
+			spec.EnforcedTimeoutEnabled = true
+			UpdateAPIVersion(spec, "", func(version *apidef.VersionInfo) {
+				version.UseExtendedPaths = true
+				version.ExtendedPaths.HardTimeouts = []apidef.HardTimeoutMeta{
+					{
+						Disabled: false,
+						Path:     "/test3",
+						Method:   http.MethodGet,
+						TimeOut:  1,
+					},
+				}
+			})
+		})[0]
+
+		ts.Gw.LoadAPI(api)
+
+		_, _ = ts.Run(t, test.TestCase{
+			Method:    http.MethodGet,
+			Path:      "/test3",
+			Code:      http.StatusGatewayTimeout,
+			BodyMatch: "Upstream service reached hard timeout",
+		})
+	})
+
+	t.Run("Basic Timeout Behavior - delay within enforced timeout", func(t *testing.T) {
+		upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			time.Sleep(1 * time.Second)
+			w.Write([]byte("Success"))
+		}))
+		defer upstream.Close()
+
+		api := BuildAPI(func(spec *APISpec) {
+			spec.Proxy.ListenPath = "/"
+			spec.Proxy.TargetURL = upstream.URL
+			spec.UseKeylessAccess = true
+			spec.EnforcedTimeoutEnabled = true
+			UpdateAPIVersion(spec, "", func(version *apidef.VersionInfo) {
+				version.UseExtendedPaths = true
+				version.ExtendedPaths.HardTimeouts = []apidef.HardTimeoutMeta{
+					{
+						Disabled: false,
+						Path:     "/test4",
+						Method:   http.MethodGet,
+						TimeOut:  3,
+					},
+				}
+			})
+		})[0]
+
+		ts.Gw.LoadAPI(api)
+
+		_, _ = ts.Run(t, test.TestCase{
+			Method:    http.MethodGet,
+			Path:      "/test4",
+			Code:      http.StatusOK,
+			BodyMatch: "Success",
+		})
+	})
+
+	t.Run("Multiple Endpoints with Different Enforced Timeouts", func(t *testing.T) {
+		upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if strings.HasPrefix(r.URL.Path, "/delay/") {
+				time.Sleep(1000 * time.Millisecond)
+				w.Write([]byte("Delay 1s response"))
+			} else if strings.HasPrefix(r.URL.Path, "/delay2/") {
+				time.Sleep(2000 * time.Millisecond)
+				w.Write([]byte("Delay2 2s response"))
+			} else {
+				w.WriteHeader(http.StatusNotFound)
+			}
+		}))
+		defer upstream.Close()
+
+		api := BuildAPI(func(spec *APISpec) {
+			spec.Proxy.ListenPath = "/"
+			spec.Proxy.TargetURL = upstream.URL
+			spec.UseKeylessAccess = true
+			spec.EnforcedTimeoutEnabled = true
+			UpdateAPIVersion(spec, "", func(version *apidef.VersionInfo) {
+				version.UseExtendedPaths = true
+				version.ExtendedPaths.HardTimeouts = []apidef.HardTimeoutMeta{
+					{
+						Disabled: false,
+						Path:     "^/delay/1$",
+						Method:   http.MethodGet,
+						TimeOut:  4,
+					},
+					{
+						Disabled: false,
+						Path:     "^/delay2/2$",
+						Method:   http.MethodGet,
+						TimeOut:  1,
+					},
+				}
+			})
+		})[0]
+
+		ts.Gw.LoadAPI(api)
+
+		_, _ = ts.Run(t, test.TestCase{
+			Method:    http.MethodGet,
+			Path:      "/delay/1",
+			Code:      http.StatusOK,
+			BodyMatch: "Delay 1s response",
+		})
+
+		_, _ = ts.Run(t, test.TestCase{
+			Method:    http.MethodGet,
+			Path:      "/delay2/2",
+			Code:      http.StatusGatewayTimeout,
+			BodyMatch: "Upstream service reached hard timeout",
+		})
+	})
+
+	t.Run("Explicit vs Default Global Timeout", func(t *testing.T) {
+		upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if strings.HasPrefix(r.URL.Path, "/delay/1000") {
+				time.Sleep(1000 * time.Millisecond)
+				w.Write([]byte("Delay 1s response"))
+			} else if strings.HasPrefix(r.URL.Path, "/delay/4000") {
+				time.Sleep(4000 * time.Millisecond)
+				w.Write([]byte("Delay 4s response"))
+			} else if strings.HasPrefix(r.URL.Path, "/delay2/1000") {
+				time.Sleep(1000 * time.Millisecond)
+				w.Write([]byte("Delay2 1s response"))
+			} else if strings.HasPrefix(r.URL.Path, "/delay2/4000") {
+				time.Sleep(4000 * time.Millisecond)
+				w.Write([]byte("Delay2 4s response"))
+			} else {
+				w.WriteHeader(http.StatusNotFound)
+			}
+		}))
+		defer upstream.Close()
+
+		api := BuildAPI(func(spec *APISpec) {
+			spec.Proxy.ListenPath = "/"
+			spec.Proxy.TargetURL = upstream.URL
+			spec.UseKeylessAccess = true
+			spec.EnforcedTimeoutEnabled = true
+			UpdateAPIVersion(spec, "", func(version *apidef.VersionInfo) {
+				version.UseExtendedPaths = true
+				version.ExtendedPaths.HardTimeouts = []apidef.HardTimeoutMeta{
+					{
+						Disabled: false,
+						Path:     "/delay/.*",
+						Method:   http.MethodGet,
+						TimeOut:  3,
+					},
+					// No explicit timeout for /delay2/* endpoints - will use global
+				}
+			})
+		})[0]
+
+		ts.Gw.LoadAPI(api)
+
+		// Test case 1: Should succeed (delay 45ms < enforced timeout 60ms)
+		_, _ = ts.Run(t, test.TestCase{
+			Method:    http.MethodGet,
+			Path:      "/delay/1000",
+			Code:      http.StatusOK,
+			BodyMatch: "Delay 1s response",
+		})
+
+		_, _ = ts.Run(t, test.TestCase{
+			Method:    http.MethodGet,
+			Path:      "/delay/4000",
+			Code:      http.StatusGatewayTimeout,
+			BodyMatch: "Upstream service reached hard timeout",
+		})
+
+		_, _ = ts.Run(t, test.TestCase{
+			Method:    http.MethodGet,
+			Path:      "/delay2/1000",
+			Code:      http.StatusOK,
+			BodyMatch: "Delay2 1s response",
+		})
+
+		// Test case 4: Should timeout at global value (delay 60ms > global timeout 50ms)
+		_, _ = ts.Run(t, test.TestCase{
+			Method:    http.MethodGet,
+			Path:      "/delay2/4000",
+			Code:      http.StatusGatewayTimeout,
+			BodyMatch: "Upstream service reached hard timeout",
+		})
+	})
 }

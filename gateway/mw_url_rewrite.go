@@ -1,8 +1,9 @@
 package gateway
 
 import (
+	"bytes"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/textproto"
 	"net/url"
@@ -205,12 +206,16 @@ func (gw *Gateway) urlRewrite(meta *apidef.URLRewriteMeta, r *http.Request) (str
 		ctxSetUrlRewritePath(r, meta.Path)
 	}
 
-	newpath = gw.replaceTykVariables(r, newpath, true)
+	newpath = gw.ReplaceTykVariables(r, newpath, true)
 
 	return newpath, nil
 }
 
-func (gw *Gateway) replaceTykVariables(r *http.Request, in string, escape bool) string {
+// ReplaceTykVariables implements a variable replacement hook. It will replace
+// the template `in`. If `escape` is true, the values get escaped as a query
+// parameter for a HTTP request would. If no replacement has been made, `in`
+// is returned without modification.
+func (gw *Gateway) ReplaceTykVariables(r *http.Request, in string, escape bool) string {
 
 	if strings.Contains(in, secretsConfLabel) {
 		contextData := ctxGetData(r)
@@ -692,22 +697,39 @@ func checkContextTrigger(r *http.Request, options map[string]apidef.StringRegexM
 
 func checkPayload(r *http.Request, options apidef.StringRegexMap, triggernum int) bool {
 	contextData := ctxGetData(r)
-	bodyBytes, _ := ioutil.ReadAll(r.Body)
 
+	nopCloseRequestBody(r)
+	// Read the entire request body
+	bodyBytes, err := io.ReadAll(r.Body)
+	if err != nil {
+		log.WithError(err).Error("error reading request body")
+		return false
+	}
+	r.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
+
+	// Perform regex matching on the request body
 	matched, matches := options.FindAllStringSubmatch(string(bodyBytes), -1)
 
 	if matched {
 		kn := buildTriggerKey(triggernum, "payload")
+
 		if len(matches) == 0 {
+			// If there are no matches, simply return true
 			return true
 		}
+
+		// Store the first match in the context data
 		contextData[kn] = matches[0][0]
 
+		// Iterate over all matches and add them to the context data
 		for i, match := range matches {
 			if len(match) > 0 {
 				addMatchToContextData(contextData, match, triggernum, "payload", i)
 			}
 		}
+
+		// Update the context data with the modified map
+		ctxSetData(r, contextData)
 		return true
 	}
 

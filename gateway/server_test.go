@@ -5,6 +5,9 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"net/http"
+	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -45,7 +48,8 @@ func TestGateway_afterConfSetup(t *testing.T) {
 				AnalyticsConfig: config.AnalyticsConfigConfig{
 					PurgeInterval: 10,
 				},
-				HealthCheckEndpointName: "hello",
+				HealthCheckEndpointName:    "hello",
+				ReadinessCheckEndpointName: "ready",
 			},
 		},
 		{
@@ -71,7 +75,8 @@ func TestGateway_afterConfSetup(t *testing.T) {
 				AnalyticsConfig: config.AnalyticsConfigConfig{
 					PurgeInterval: 10,
 				},
-				HealthCheckEndpointName: "hello",
+				HealthCheckEndpointName:    "hello",
+				ReadinessCheckEndpointName: "ready",
 			},
 		},
 	}
@@ -252,7 +257,6 @@ func gatewayGetHostDetailsTestAddress() gatewayGetHostDetailsTestCheckFn {
 func defineGatewayGetHostDetailsTests() []struct {
 	name                string
 	before              func(*Gateway)
-	readPIDFromFile     func(string) (int, error)
 	netutilGetIpAddress func() ([]string, error)
 	checks              []gatewayGetHostDetailsTestCheckFn
 } {
@@ -261,13 +265,11 @@ func defineGatewayGetHostDetailsTests() []struct {
 	return []struct {
 		name                string
 		before              func(*Gateway)
-		readPIDFromFile     func(string) (int, error)
 		netutilGetIpAddress func() ([]string, error)
 		checks              []gatewayGetHostDetailsTestCheckFn
 	}{
 		{
-			name:            "fail-read-pid",
-			readPIDFromFile: func(_ string) (int, error) { return 0, fmt.Errorf("Error opening file") },
+			name: "fail-read-pid",
 			before: func(gw *Gateway) {
 				gw.SetConfig(config.Config{
 					ListenAddress: "127.0.0.1",
@@ -278,8 +280,7 @@ func defineGatewayGetHostDetailsTests() []struct {
 			),
 		},
 		{
-			name:            "success-listen-address-set",
-			readPIDFromFile: func(string) (int, error) { return 1000, nil },
+			name: "success-listen-address-set",
 			before: func(gw *Gateway) {
 				gw.SetConfig(config.Config{
 					ListenAddress: "127.0.0.1",
@@ -291,8 +292,7 @@ func defineGatewayGetHostDetailsTests() []struct {
 			),
 		},
 		{
-			name:            "success-listen-address-not-set",
-			readPIDFromFile: func(_ string) (int, error) { return 1000, nil },
+			name: "success-listen-address-not-set",
 			before: func(gw *Gateway) {
 				gw.SetConfig(config.Config{
 					ListenAddress: "",
@@ -304,8 +304,7 @@ func defineGatewayGetHostDetailsTests() []struct {
 			),
 		},
 		{
-			name:            "fail-getting-network-address",
-			readPIDFromFile: func(_ string) (int, error) { return 1000, nil },
+			name: "fail-getting-network-address",
 			before: func(gw *Gateway) {
 				gw.SetConfig(config.Config{
 					ListenAddress: "",
@@ -325,17 +324,15 @@ func TestGatewayGetHostDetails(t *testing.T) {
 	t.Skip()
 
 	var (
-		orig_readPIDFromFile = readPIDFromFile
-		orig_mainLog         = mainLog
-		orig_getIpAddress    = netutil.GetIpAddress
-		bl                   = test.NewBufferingLogger()
+		orig_mainLog      = mainLog
+		orig_getIpAddress = netutil.GetIpAddress
+		bl                = test.NewBufferingLogger()
 	)
 
 	tests := defineGatewayGetHostDetailsTests()
 
 	// restore the original functions
 	defer func() {
-		readPIDFromFile = orig_readPIDFromFile
 		mainLog = orig_mainLog
 		getIpAddress = orig_getIpAddress
 	}()
@@ -346,9 +343,6 @@ func TestGatewayGetHostDetails(t *testing.T) {
 			bl.ClearLogs()
 			// replace functions with mocks
 			mainLog = bl.Logger.WithField("prefix", "test")
-			if tt.readPIDFromFile != nil {
-				readPIDFromFile = tt.readPIDFromFile
-			}
 
 			if tt.netutilGetIpAddress != nil {
 				getIpAddress = tt.netutilGetIpAddress
@@ -360,10 +354,248 @@ func TestGatewayGetHostDetails(t *testing.T) {
 				tt.before(gw)
 			}
 
-			gw.getHostDetails(gw.GetConfig().PIDFileLocation)
+			gw.getHostDetails()
 			for _, c := range tt.checks {
 				c(t, bl, gw)
 			}
 		})
 	}
+}
+
+func TestGateway_gracefulShutdown(t *testing.T) {
+	tests := []struct {
+		name           string
+		setupGateway   func() *Gateway
+		setupContext   func() (context.Context, context.CancelFunc)
+		expectError    bool
+		errorContains  string
+		validateResult func(*testing.T, *Gateway)
+	}{
+		{
+			name: "successful shutdown with no servers",
+			setupGateway: func() *Gateway {
+				gw := &Gateway{
+					DefaultProxyMux: &proxyMux{
+						proxies: []*proxy{},
+					},
+				}
+				gw.SetConfig(config.Config{})
+				gw.cacheCreate()
+				return gw
+			},
+			setupContext: func() (context.Context, context.CancelFunc) {
+				return context.WithTimeout(context.Background(), 5*time.Second)
+			},
+			expectError: false,
+		},
+		{
+			name: "successful shutdown with HTTP servers",
+			setupGateway: func() *Gateway {
+				gw := &Gateway{
+					DefaultProxyMux: &proxyMux{
+						proxies: []*proxy{
+							{
+								port: 8080,
+								httpServer: &http.Server{
+									Addr: ":8080",
+								},
+							},
+							{
+								port: 8081,
+								httpServer: &http.Server{
+									Addr: ":8081",
+								},
+							},
+						},
+					},
+				}
+				gw.SetConfig(config.Config{})
+				gw.cacheCreate()
+				return gw
+			},
+			setupContext: func() (context.Context, context.CancelFunc) {
+				return context.WithTimeout(context.Background(), 5*time.Second)
+			},
+			expectError: false,
+		},
+		{
+			name: "shutdown with timeout context",
+			setupGateway: func() *Gateway {
+				gw := &Gateway{
+					DefaultProxyMux: &proxyMux{
+						proxies: []*proxy{
+							{
+								port: 8080,
+								httpServer: &http.Server{
+									Addr: ":8080",
+								},
+							},
+						},
+					},
+				}
+				gw.SetConfig(config.Config{})
+				gw.cacheCreate()
+				return gw
+			},
+			setupContext: func() (context.Context, context.CancelFunc) {
+				// Very short timeout to test timeout handling
+				return context.WithTimeout(context.Background(), 1*time.Nanosecond)
+			},
+			expectError: false, // Timeout is handled gracefully, not an error
+		},
+		{
+			name: "shutdown with nil httpServer (should skip)",
+			setupGateway: func() *Gateway {
+				gw := &Gateway{
+					DefaultProxyMux: &proxyMux{
+						proxies: []*proxy{
+							{
+								port:       8080,
+								httpServer: nil, // nil server should be skipped
+							},
+							{
+								port: 8081,
+								httpServer: &http.Server{
+									Addr: ":8081",
+								},
+							},
+						},
+					},
+				}
+				gw.SetConfig(config.Config{})
+				gw.cacheCreate()
+				return gw
+			},
+			setupContext: func() (context.Context, context.CancelFunc) {
+				return context.WithTimeout(context.Background(), 5*time.Second)
+			},
+			expectError: false,
+		},
+		{
+			name: "shutdown with empty proxy list",
+			setupGateway: func() *Gateway {
+				gw := &Gateway{
+					DefaultProxyMux: &proxyMux{
+						proxies: []*proxy{},
+					},
+				}
+				gw.SetConfig(config.Config{})
+				gw.cacheCreate()
+				return gw
+			},
+			setupContext: func() (context.Context, context.CancelFunc) {
+				return context.WithTimeout(context.Background(), 5*time.Second)
+			},
+			expectError: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gw := tt.setupGateway()
+			ctx, cancel := tt.setupContext()
+			defer cancel()
+
+			err := gw.gracefulShutdown(ctx)
+
+			if tt.expectError {
+				if err == nil {
+					t.Errorf("expected error but got none")
+					return
+				}
+				if tt.errorContains != "" && !strings.Contains(err.Error(), tt.errorContains) {
+					t.Errorf("expected error to contain %q, got %q", tt.errorContains, err.Error())
+				}
+			} else {
+				if err != nil {
+					t.Errorf("expected no error but got: %v", err)
+				}
+			}
+
+			if tt.validateResult != nil {
+				tt.validateResult(t, gw)
+			}
+		})
+	}
+}
+
+func TestGateway_gracefulShutdown_ConcurrentSafety(t *testing.T) {
+	// Test that gracefulShutdown is safe to call concurrently
+	gw := &Gateway{
+		DefaultProxyMux: &proxyMux{
+			proxies: []*proxy{
+				{
+					port: 8080,
+					httpServer: &http.Server{
+						Addr: ":8080",
+					},
+				},
+			},
+		},
+	}
+	gw.SetConfig(config.Config{})
+	gw.cacheCreate()
+
+	var wg sync.WaitGroup
+	errorChan := make(chan error, 3)
+
+	// Start multiple graceful shutdowns concurrently
+	for i := 0; i < 3; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+			err := gw.gracefulShutdown(ctx)
+			errorChan <- err
+		}()
+	}
+
+	wg.Wait()
+	close(errorChan)
+
+	// At least one should succeed, others might fail due to already closed servers
+	var successCount int
+	for err := range errorChan {
+		if err == nil {
+			successCount++
+		}
+	}
+
+	if successCount == 0 {
+		t.Error("expected at least one graceful shutdown to succeed")
+	}
+}
+
+// Test helper to create a Gateway with proper cache initialization
+func createTestGateway() *Gateway {
+	gw := &Gateway{
+		DefaultProxyMux: &proxyMux{
+			proxies: []*proxy{},
+		},
+	}
+
+	// Initialize config
+	conf := config.Config{}
+	gw.SetConfig(conf)
+	gw.cacheCreate()
+
+	return gw
+}
+
+func TestGateway_cacheClose(t *testing.T) {
+	// Test that cacheClose properly closes all caches
+	gw := createTestGateway()
+
+	// Verify caches are created and working
+	if gw.SessionCache == nil {
+		t.Error("SessionCache should be initialized")
+	}
+
+	// Call cacheClose
+	gw.cacheClose()
+
+	// Note: We can't easily test that caches are actually closed
+	// since the cache.Close() method doesn't expose internal state
+	// This test mainly ensures cacheClose doesn't panic
 }

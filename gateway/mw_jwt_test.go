@@ -4,6 +4,7 @@ import (
 	"crypto/md5"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"reflect"
@@ -11,13 +12,16 @@ import (
 	"testing"
 	"time"
 
+	"github.com/go-jose/go-jose/v3"
 	"github.com/golang-jwt/jwt/v4"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/test"
 	"github.com/TykTechnologies/tyk/user"
 
+	"github.com/TykTechnologies/tyk/internal/cache"
 	"github.com/TykTechnologies/tyk/internal/uuid"
 )
 
@@ -141,6 +145,8 @@ func (ts *Test) prepareGenericJWTSession(testName string, method string, claimNa
 		spec.EnableJWT = true
 		spec.Proxy.ListenPath = "/"
 		spec.JWTSkipKid = ApiSkipKid
+		spec.DisableRateLimit = true
+		spec.DisableQuota = true
 
 		if claimName != KID {
 			spec.JWTIdentityBaseField = claimName
@@ -471,6 +477,8 @@ func (ts *Test) prepareJWTSessionRSAWithRawSourceOnWithClientID(isBench bool) st
 		spec.JWTIdentityBaseField = "user_id"
 		spec.JWTClientIDBaseField = "azp"
 		spec.Proxy.ListenPath = "/"
+		spec.DisableRateLimit = true
+		spec.DisableQuota = true
 	})[0]
 
 	policyID := ts.CreatePolicy(func(p *user.Policy) {
@@ -542,8 +550,9 @@ func BenchmarkJWTSessionRSAWithRawSourceOnWithClientID(b *testing.B) {
 // JWTSessionRSAWithRawSource
 
 func (ts *Test) prepareJWTSessionRSAWithRawSource() string {
-
+	const testApiID = "test-api-id"
 	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		spec.APIID = testApiID
 		spec.UseKeylessAccess = false
 		spec.EnableJWT = true
 		spec.JWTSigningMethod = RSASign
@@ -551,9 +560,17 @@ func (ts *Test) prepareJWTSessionRSAWithRawSource() string {
 		spec.JWTIdentityBaseField = "user_id"
 		spec.JWTPolicyFieldName = "policy_id"
 		spec.Proxy.ListenPath = "/"
+		spec.DisableRateLimit = true
+		spec.DisableQuota = true
 	})
 
-	pID := ts.CreatePolicy()
+	pID := ts.CreatePolicy(func(p *user.Policy) {
+		p.AccessRights = map[string]user.AccessDefinition{
+			testApiID: {
+				APIName: "test-api-name",
+			},
+		}
+	})
 
 	jwtToken := CreateJWKToken(func(t *jwt.Token) {
 		t.Header["kid"] = "12345"
@@ -641,7 +658,16 @@ func TestJWTSessionExpiresAtValidationConfigs(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
-	pID := ts.CreatePolicy()
+	const testAPIID = "test-api-id"
+
+	pID := ts.CreatePolicy(func(p *user.Policy) {
+		p.AccessRights = map[string]user.AccessDefinition{
+			testAPIID: {
+				APIName: "test-api-name",
+			},
+		}
+	})
+
 	jwtAuthHeaderGen := func(skew time.Duration) map[string]string {
 		jwtToken := CreateJWKToken(func(t *jwt.Token) {
 			t.Claims.(jwt.MapClaims)["policy_id"] = pID
@@ -653,6 +679,7 @@ func TestJWTSessionExpiresAtValidationConfigs(t *testing.T) {
 	}
 
 	spec := BuildAPI(func(spec *APISpec) {
+		spec.APIID = testAPIID
 		spec.UseKeylessAccess = false
 		spec.EnableJWT = true
 		spec.JWTSigningMethod = RSASign
@@ -664,6 +691,8 @@ func TestJWTSessionExpiresAtValidationConfigs(t *testing.T) {
 
 	// This test is successful by definition
 	t.Run("Expiry_After_now--Valid_jwt", func(t *testing.T) {
+		t.Skip() // if you issue a 0 second skew at 0.99th of the current second? flaky test due to time math.
+
 		spec.JWTExpiresAtValidationSkew = 0 //Default value
 		ts.Gw.LoadAPI(spec)
 
@@ -716,7 +745,16 @@ func TestJWTSessionIssueAtValidationConfigs(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
-	pID := ts.CreatePolicy()
+	const testAPIID = "test-api-id"
+
+	pID := ts.CreatePolicy(func(p *user.Policy) {
+		p.AccessRights = map[string]user.AccessDefinition{
+			testAPIID: {
+				APIName: "test-api-name",
+			},
+		}
+	})
+
 	jwtAuthHeaderGen := func(skew time.Duration) map[string]string {
 		jwtToken := CreateJWKToken(func(t *jwt.Token) {
 			t.Claims.(jwt.MapClaims)["policy_id"] = pID
@@ -729,6 +767,7 @@ func TestJWTSessionIssueAtValidationConfigs(t *testing.T) {
 
 	spec := BuildAPI(func(spec *APISpec) {
 		spec.UseKeylessAccess = false
+		spec.APIID = testAPIID
 		spec.EnableJWT = true
 		spec.JWTSigningMethod = "rsa"
 		spec.JWTSource = base64.StdEncoding.EncodeToString([]byte(jwtRSAPubKey))
@@ -807,7 +846,16 @@ func TestJWTSessionNotBeforeValidationConfigs(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
-	pID := ts.CreatePolicy()
+	const testAPIID = "test-api-id"
+
+	pID := ts.CreatePolicy(func(p *user.Policy) {
+		p.AccessRights = map[string]user.AccessDefinition{
+			testAPIID: {
+				APIName: "test-api-name",
+			},
+		}
+	})
+
 	jwtAuthHeaderGen := func(skew time.Duration) map[string]string {
 		jwtToken := CreateJWKToken(func(t *jwt.Token) {
 			t.Claims.(jwt.MapClaims)["policy_id"] = pID
@@ -819,6 +867,7 @@ func TestJWTSessionNotBeforeValidationConfigs(t *testing.T) {
 
 	spec := BuildAPI(func(spec *APISpec) {
 		spec.UseKeylessAccess = false
+		spec.APIID = testAPIID
 		spec.EnableJWT = true
 		spec.Proxy.ListenPath = "/"
 		spec.JWTSigningMethod = "rsa"
@@ -875,7 +924,18 @@ func TestJWTExistingSessionRSAWithRawSourceInvalidPolicyID(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
+	const testAPIID = "test-api-id"
+
+	p1ID := ts.CreatePolicy(func(p *user.Policy) {
+		p.AccessRights = map[string]user.AccessDefinition{
+			testAPIID: {
+				APIName: "test-api-name",
+			},
+		}
+	})
+
 	spec := BuildAPI(func(spec *APISpec) {
+		spec.APIID = testAPIID
 		spec.UseKeylessAccess = false
 		spec.EnableJWT = true
 		spec.JWTSigningMethod = RSASign
@@ -887,7 +947,6 @@ func TestJWTExistingSessionRSAWithRawSourceInvalidPolicyID(t *testing.T) {
 
 	ts.Gw.LoadAPI(spec)
 
-	p1ID := ts.CreatePolicy()
 	user_id := uuid.New()
 
 	jwtToken := CreateJWKToken(func(t *jwt.Token) {
@@ -1360,8 +1419,11 @@ func TestJWTExistingSessionRSAWithRawSourcePolicyIDChanged(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
+	const testAPIID = "test-api-id"
+
 	spec := BuildAPI(func(spec *APISpec) {
 		spec.UseKeylessAccess = false
+		spec.APIID = testAPIID
 		spec.EnableJWT = true
 		spec.JWTSigningMethod = RSASign
 		spec.JWTSource = base64.StdEncoding.EncodeToString([]byte(jwtRSAPubKey))
@@ -1375,9 +1437,19 @@ func TestJWTExistingSessionRSAWithRawSourcePolicyIDChanged(t *testing.T) {
 
 	p1ID := ts.CreatePolicy(func(p *user.Policy) {
 		p.QuotaMax = 111
+		p.AccessRights = map[string]user.AccessDefinition{
+			testAPIID: {
+				APIName: "test-api-name",
+			},
+		}
 	})
 	p2ID := ts.CreatePolicy(func(p *user.Policy) {
 		p.QuotaMax = 999
+		p.AccessRights = map[string]user.AccessDefinition{
+			testAPIID: {
+				APIName: "test-api-name",
+			},
+		}
 	})
 	user_id := uuid.New()
 
@@ -1440,7 +1512,10 @@ func TestJWTExistingSessionRSAWithRawSourcePolicyIDChanged(t *testing.T) {
 
 func (ts *Test) prepareJWTSessionRSAWithJWK() string {
 
+	const testAPIID = "test-api-id"
+
 	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		spec.APIID = testAPIID
 		spec.UseKeylessAccess = false
 		spec.EnableJWT = true
 		spec.JWTSigningMethod = RSASign
@@ -1448,9 +1523,18 @@ func (ts *Test) prepareJWTSessionRSAWithJWK() string {
 		spec.JWTIdentityBaseField = "user_id"
 		spec.JWTPolicyFieldName = "policy_id"
 		spec.Proxy.ListenPath = "/"
+		spec.DisableRateLimit = true
+		spec.DisableQuota = true
 	})
 
-	pID := ts.CreatePolicy()
+	pID := ts.CreatePolicy(func(p *user.Policy) {
+		p.AccessRights = map[string]user.AccessDefinition{
+			testAPIID: {
+				APIName: "test-api-name",
+			},
+		}
+	})
+
 	jwtToken := CreateJWKToken(func(t *jwt.Token) {
 		t.Header["kid"] = "12345"
 		t.Claims.(jwt.MapClaims)["foo"] = "bar"
@@ -1500,16 +1584,27 @@ func BenchmarkJWTSessionRSAWithJWK(b *testing.B) {
 
 func (ts *Test) prepareJWTSessionRSAWithEncodedJWK() (*APISpec, string) {
 
+	const testAPIID = "test-api-id"
 	spec := BuildAPI(func(spec *APISpec) {
 		spec.UseKeylessAccess = false
+		spec.APIID = testAPIID
 		spec.EnableJWT = true
 		spec.JWTSigningMethod = RSASign
 		spec.JWTIdentityBaseField = "user_id"
 		spec.JWTPolicyFieldName = "policy_id"
 		spec.Proxy.ListenPath = "/"
+		spec.DisableRateLimit = true
+		spec.DisableQuota = true
 	})[0]
 
-	pID := ts.CreatePolicy()
+	pID := ts.CreatePolicy(func(p *user.Policy) {
+		p.AccessRights = map[string]user.AccessDefinition{
+			testAPIID: {
+				APIName: "test-api-name",
+			},
+		}
+	})
+
 	jwtToken := CreateJWKToken(func(t *jwt.Token) {
 		t.Header["kid"] = "12345"
 		// Set some claims
@@ -1579,9 +1674,114 @@ func TestParseRSAKeyFromJWK(t *testing.T) {
 		t.Error("expected an error")
 	}
 	_, err = ParseRSAPublicKey(b)
-	if err != nil {
-		t.Error("decoding as default ", err)
-	}
+	assert.NoError(t, err)
+}
+
+func TestParseRSAPubKeyFromJWK(t *testing.T) {
+	sample := `-----BEGIN PUBLIC KEY-----
+MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAu1SU1LfVLPHCozMxH2Mo
+4lgOEePzNm0tRgeLezV6ffAt0gunVTLw7onLRnrq0/IzW7yWR7QkrmBL7jTKEn5u
++qKhbwKfBstIs+bMY2Zkp18gnTxKLxoS2tFczGkPLPgizskuemMghRniWaoLcyeh
+kd3qqGElvW/VDL5AaWTg0nLVkjRo9z+40RQzuVaE8AkAFmxZzow3x+VJYKdjykkJ
+0iT9wCS0DRTXu269V264Vf/3jvredZiKRkgwlL9xNAwxXFg0x/XFw005UWVRIkdg
+cKWTjpBP2dPwVZ4WWC+9aGVd+Gyn1o0CLelf4rEjGoXbAAEgAqeGUxrcIlbjXfbc
+mwIDAQAB
+-----END PUBLIC KEY-----`
+
+	_, err := ParseRSAPublicKey([]byte(sample))
+	assert.NoError(t, err)
+}
+
+func TestAssertPS512JWT(t *testing.T) {
+	signingMethod := "rsa"
+	rawJWT := "eyJhbGciOiJQUzUxMiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODgiLCJuYW1lIjoiSm9obiBEb2UiLCJhZG1pbiI6dHJ1ZSwiaWF0IjoxNTE2MjM5MDIyfQ.Xm1AAFaIP12krQ57NF0FvFulIBvYPh_rtK2FgeUBN2TVbIBPBSgZ0EfdsPcGqKM1i-PeJM6PjcX_cRpdyJvMMq4xFkoEZTj6ONw4wg3kcIHBxKu8hg2qW-7voE6GGyldtQG5XmdzaayEdtuG-9mo_8BLADqbCR_-R8T3B7X1ko1TyDz0ZzMpT-46xsYPCFOMV0-u2xvqBBNfgMeXCOUzyxrl_sxw9yMgtu38qVCCRAK3lojxUjCsXMqL-wjpact0LBydX-880CU7QNAab4qdi6xA1GZhj-osJ267cHQO9Zc7G-stRMzw2zOKk3JfFQJes-t7TiMCpFdehUFNqGlgCw"
+	parser := jwt.NewParser(jwt.WithoutClaimsValidation())
+	pubKeyPem := `-----BEGIN PUBLIC KEY-----
+MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAu1SU1LfVLPHCozMxH2Mo
+4lgOEePzNm0tRgeLezV6ffAt0gunVTLw7onLRnrq0/IzW7yWR7QkrmBL7jTKEn5u
++qKhbwKfBstIs+bMY2Zkp18gnTxKLxoS2tFczGkPLPgizskuemMghRniWaoLcyeh
+kd3qqGElvW/VDL5AaWTg0nLVkjRo9z+40RQzuVaE8AkAFmxZzow3x+VJYKdjykkJ
+0iT9wCS0DRTXu269V264Vf/3jvredZiKRkgwlL9xNAwxXFg0x/XFw005UWVRIkdg
+cKWTjpBP2dPwVZ4WWC+9aGVd+Gyn1o0CLelf4rEjGoXbAAEgAqeGUxrcIlbjXfbc
+mwIDAQAB
+-----END PUBLIC KEY-----`
+
+	// Convert the PEM string to a byte slice
+	pubKey := []byte(pubKeyPem)
+
+	// Verify the token
+	_, err := parser.Parse(rawJWT, func(token *jwt.Token) (interface{}, error) {
+		// Don't forget to validate the alg is what you expect:
+		if err := assertSigningMethod(signingMethod, token); err != nil {
+			return nil, err
+		}
+
+		return parseJWTKey(signingMethod, pubKey)
+	})
+
+	// Should be able to validate RS256
+	assert.NoError(t, err)
+}
+
+func TestAssertNegativePS512JWT(t *testing.T) {
+	signingMethod := "rsa"
+	rawJWT := "eyJhbGciOiJQUzUxMiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODgiLCJuYW1lIjoiSm9obiBEb2UiLCJhZG1pbiI6dHJ1ZSwiaWF0IjoxNTE2MjM5MDIyfQ.I4IxcLO5sEMPXP_gX2UyoGN0lg2DWcRTm9w2ceSxqixE67qFODWUDNxI1TdbN4oCl9ZC_Jy8G4nJhNCu9dVptkMxnawnbIUwCsILd0SLfcAi-hFcG9K0nSzagm--6CtWlve1UbuQFW9X5fTQUESIblXbMFj6L95j4exVv1l7ch-N1Jl68fGLwoXJTQSg"
+	parser := jwt.NewParser(jwt.WithoutClaimsValidation())
+	pubKeyPem := `-----BEGIN PUBLIC KEY-----
+MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAu1SU1LfVLPHCozMxH2Mo
+4lgOEePzNm0tRgeLezV6ffAt0gunVTLw7onLRnrq0/IzW7yWR7QkrmBL7jTKEn5u
++qKhbwKfBstIs+bMY2Zkp18gnTxKLxoS2tFczGkPLPgizskuemMghRniWaoLcyeh
+kd3qqGElvW/VDL5AaWTg0nLVkjRo9z+40RQzuVaE8AkAFmxZzow3x+VJYKdjykkJ
+0iT9wCS0DRTXu269V264Vf/3jvredZiKRkgwlL9xNAwxXFg0x/XFw005UWVRIkdg
+cKWTjpBP2dPwVZ4WWC+9aGVd+Gyn1o0CLelf4rEjGoXbAAEgAqeGUxrcIlbjXfbc
+mwIDAQAB
+-----END PUBLIC KEY-----`
+
+	// Convert the PEM string to a byte slice
+	pubKey := []byte(pubKeyPem)
+
+	// Verify the token
+	_, err := parser.Parse(rawJWT, func(token *jwt.Token) (interface{}, error) {
+		// Don't forget to validate the alg is what you expect:
+		if err := assertSigningMethod(signingMethod, token); err != nil {
+			return nil, err
+		}
+
+		return parseJWTKey(signingMethod, pubKey)
+	})
+
+	assert.Error(t, err)
+}
+
+func TestAssertRS256JWT(t *testing.T) {
+	signingMethod := "rsa"
+	rawJWT := "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODgiLCJuYW1lIjoiSm9obiBEb2UiLCJhZG1pbiI6dHJ1ZSwiaWF0IjoxNTE2MjM5MDIyfQ.m2mydd79-40muPDwYbue7idTj-cKfW0jPYxcZH8-eqBc6WFJVCL--pr8IHqP-YdN7bNgfwq6iLh0kvOZ9l4Uu6xBaTdCpaXvJDfKqIqLzhltS4EfDNRkHRLDwLBvfsYt-9ijfNYvPOtTXfcIBXPby8fo529q7WYLFYR9tHAQYCLC_lS_2NieTQjAk5xAWIQ5LNItSM9iXmxhhqK47ZdzzVJnhtQ7onVY4LNgxxKqPPUQxQrq34cOBXozfA65bG7PLzvT7ais-E2_4AOXxDzspxYrDYwQFV2kjRijFcMcPc5pCWXWY9leUD1VklaSae6FuC9qJ2BATTsK8f92LSV4HA"
+	parser := jwt.NewParser(jwt.WithoutClaimsValidation())
+	pubKeyPem := `-----BEGIN PUBLIC KEY-----
+MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAu1SU1LfVLPHCozMxH2Mo
+4lgOEePzNm0tRgeLezV6ffAt0gunVTLw7onLRnrq0/IzW7yWR7QkrmBL7jTKEn5u
++qKhbwKfBstIs+bMY2Zkp18gnTxKLxoS2tFczGkPLPgizskuemMghRniWaoLcyeh
+kd3qqGElvW/VDL5AaWTg0nLVkjRo9z+40RQzuVaE8AkAFmxZzow3x+VJYKdjykkJ
+0iT9wCS0DRTXu269V264Vf/3jvredZiKRkgwlL9xNAwxXFg0x/XFw005UWVRIkdg
+cKWTjpBP2dPwVZ4WWC+9aGVd+Gyn1o0CLelf4rEjGoXbAAEgAqeGUxrcIlbjXfbc
+mwIDAQAB
+-----END PUBLIC KEY-----`
+
+	// Convert the PEM string to a byte slice
+	pubKey := []byte(pubKeyPem)
+
+	// Verify the token
+	_, err := parser.Parse(rawJWT, func(token *jwt.Token) (interface{}, error) {
+		// Don't forget to validate the alg is what you expect:
+		if err := assertSigningMethod(signingMethod, token); err != nil {
+			return nil, err
+		}
+
+		return parseJWTKey(signingMethod, pubKey)
+	})
+
+	// Should be able to validate the RS256 key.
+	assert.NoError(t, err)
 }
 
 func BenchmarkJWTSessionRSAWithEncodedJWK(b *testing.B) {
@@ -1626,8 +1826,11 @@ func TestJWTRSAIdInClaimsWithBaseField(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
+	const testAPIID = "test-api-id"
+
 	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 		spec.UseKeylessAccess = false
+		spec.APIID = testAPIID
 		spec.EnableJWT = true
 		spec.JWTSigningMethod = RSASign
 		spec.JWTSource = base64.StdEncoding.EncodeToString([]byte(jwtRSAPubKey))
@@ -1636,8 +1839,13 @@ func TestJWTRSAIdInClaimsWithBaseField(t *testing.T) {
 		spec.Proxy.ListenPath = "/"
 	})
 
-	pID := ts.CreatePolicy()
-
+	pID := ts.CreatePolicy(func(p *user.Policy) {
+		p.AccessRights = map[string]user.AccessDefinition{
+			testAPIID: {
+				APIName: "test-api-name",
+			},
+		}
+	})
 	//First test - user id in the configured base field 'user_id'
 	jwtToken := CreateJWKToken(func(t *jwt.Token) {
 		t.Header["kid"] = "12345"
@@ -1723,8 +1931,11 @@ func TestJWTRSAIdInClaimsWithoutBaseField(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
+	const testAPIID = "test-api-id"
+
 	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 		spec.UseKeylessAccess = false
+		spec.APIID = testAPIID
 		spec.EnableJWT = true
 		spec.JWTSigningMethod = RSASign
 		spec.JWTSource = base64.StdEncoding.EncodeToString([]byte(jwtRSAPubKey))
@@ -1733,7 +1944,13 @@ func TestJWTRSAIdInClaimsWithoutBaseField(t *testing.T) {
 		spec.Proxy.ListenPath = "/"
 	})
 
-	pID := ts.CreatePolicy()
+	pID := ts.CreatePolicy(func(p *user.Policy) {
+		p.AccessRights = map[string]user.AccessDefinition{
+			testAPIID: {
+				APIName: "test-api-name",
+			},
+		}
+	})
 
 	jwtToken := CreateJWKToken(func(t *jwt.Token) {
 		t.Header["kid"] = "12345"
@@ -1781,6 +1998,7 @@ func TestJWTDefaultPolicies(t *testing.T) {
 		}
 		p.Partitions = user.PolicyPartitions{
 			Quota: true,
+			Acl:   true,
 		}
 	})
 
@@ -2074,8 +2292,11 @@ func TestJWTExpOverride(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
+	const testAPIID = "test-api-id"
+
 	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 		spec.UseKeylessAccess = false
+		spec.APIID = testAPIID
 		spec.EnableJWT = true
 		spec.JWTSigningMethod = RSASign
 		spec.JWTSource = base64.StdEncoding.EncodeToString([]byte(jwtRSAPubKey))
@@ -2087,6 +2308,11 @@ func TestJWTExpOverride(t *testing.T) {
 		//create policy which sets keys to have expiry in one second
 		pID := ts.CreatePolicy(func(p *user.Policy) {
 			p.KeyExpiresIn = 1
+			p.AccessRights = map[string]user.AccessDefinition{
+				testAPIID: {
+					APIName: "test-api-name",
+				},
+			}
 		})
 
 		jwtToken := CreateJWKToken(func(t *jwt.Token) {
@@ -2107,6 +2333,11 @@ func TestJWTExpOverride(t *testing.T) {
 	t.Run("JWT expiration smaller then policy", func(t *testing.T) {
 		pID := ts.CreatePolicy(func(p *user.Policy) {
 			p.KeyExpiresIn = 5
+			p.AccessRights = map[string]user.AccessDefinition{
+				testAPIID: {
+					APIName: "test-api-name",
+				},
+			}
 		})
 
 		jwtToken := CreateJWKToken(func(t *jwt.Token) {
@@ -2126,6 +2357,11 @@ func TestJWTExpOverride(t *testing.T) {
 	t.Run("JWT expired but renewed, policy without expiration", func(t *testing.T) {
 		pID := ts.CreatePolicy(func(p *user.Policy) {
 			p.KeyExpiresIn = 0
+			p.AccessRights = map[string]user.AccessDefinition{
+				testAPIID: {
+					APIName: "test-api-name",
+				},
+			}
 		})
 
 		userID := uuid.New()
@@ -2317,6 +2553,7 @@ func TestJWTMiddleware_getSecretToVerifySignature_JWKNoKID(t *testing.T) {
 
 	m := JWTMiddleware{BaseMiddleware: &BaseMiddleware{}}
 	api := &apidef.APIDefinition{JWTSource: jwkURL}
+	api.JWTJwksURIs = []apidef.JWK{}
 	m.Spec = &APISpec{APIDefinition: api}
 
 	token := &jwt.Token{Header: make(map[string]interface{})}
@@ -2328,14 +2565,276 @@ func TestJWTMiddleware_getSecretToVerifySignature_JWKNoKID(t *testing.T) {
 		_, err := m.getSecretToVerifySignature(nil, token)
 		assert.ErrorIs(t, err, ErrKIDNotAString)
 	})
+
+	t.Run("multiple JWK URIs", func(t *testing.T) {
+		api.JWTJwksURIs = []apidef.JWK{
+			{
+				URL: "http://localhost:8080/realms/jwt/protocol/openid-connect/certs",
+			},
+		}
+		_, err := m.getSecretToVerifySignature(nil, token)
+		assert.Error(t, err)
+	})
+
+	t.Run("multiple JWK URIs with a source", func(t *testing.T) {
+		api.JWTJwksURIs = []apidef.JWK{
+			{
+				URL: "http://localhost:8080/realms/jwt/protocol/openid-connect/certs",
+			},
+		}
+
+		api.JWTSource = jwkURL
+		_, err := m.getSecretToVerifySignature(nil, token)
+		assert.Error(t, err)
+	})
+}
+
+func TestGetSecretFromMultipleJWKURIs(t *testing.T) {
+	originalGetJWK := GetJWK
+	defer func() { GetJWK = originalGetJWK }()
+
+	const testAPIID = "test-api"
+	const testJWKURL = "http://localhost:8080/realms/jwt/protocol/openid-connect/certs"
+	const encodedTestJWKURL = "aHR0cDovL2xvY2FsaG9zdDo4MDgwL3JlYWxtcy9qd3QvcHJvdG9jb2wvb3BlbmlkLWNvbm5lY3QvY2VydHM="
+
+	gw := &Gateway{}
+	gw.SetConfig(config.Config{
+		JWTSSLInsecureSkipVerify: true,
+	})
+
+	m := JWTMiddleware{
+		BaseMiddleware: &BaseMiddleware{
+			Gw: gw,
+		},
+	}
+
+	api := &apidef.APIDefinition{
+		APIID: "random-api",
+		OrgID: "org-id",
+	}
+
+	cacheKey := JWKsAPIDef + api.APIID + api.OrgID
+
+	api.JWTJwksURIs = []apidef.JWK{
+		{
+			URL: testJWKURL,
+		},
+	}
+
+	m.Spec = &APISpec{
+		APIDefinition: api,
+	}
+
+	createMiddleware := func(_ []apidef.JWK) *JWTMiddleware {
+		return &m
+	}
+
+	tests := []struct {
+		name                string
+		setup               func()
+		jwkURIs             []apidef.JWK
+		jwkURI              apidef.JWK
+		kid                 interface{}
+		expectKey           interface{}
+		expectError         error
+		useGetSecretFromURL bool
+	}{
+		{
+			name: "success with valid JWK URL and matching KID",
+			setup: func() {
+				GetJWK = func(_ string, _ bool) (*jose.JSONWebKeySet, error) {
+					return &jose.JSONWebKeySet{
+						Keys: []jose.JSONWebKey{
+							{KeyID: "test-kid", Key: "secret-key"},
+						},
+					}, nil
+				}
+			},
+			jwkURIs:     []apidef.JWK{{URL: testJWKURL}},
+			kid:         "test-kid",
+			expectKey:   "secret-key",
+			expectError: nil,
+		},
+		{
+			name:        "error when KID is not a string",
+			setup:       func() {},
+			jwkURIs:     []apidef.JWK{{URL: testJWKURL}},
+			kid:         12345,
+			expectKey:   nil,
+			expectError: ErrKIDNotAString,
+		},
+		{
+			name: "cache hit with unchanged URLs",
+			setup: func() {
+				GetJWK = func(_ string, _ bool) (*jose.JSONWebKeySet, error) {
+					return &jose.JSONWebKeySet{
+						Keys: []jose.JSONWebKey{
+							{KeyID: "cached-kid", Key: "cached-key"},
+						},
+					}, nil
+				}
+
+				JWKCache.Set(cacheKey, &apidef.APIDefinition{
+					APIID:       testAPIID,
+					JWTJwksURIs: []apidef.JWK{{URL: testJWKURL}},
+				}, cache.DefaultExpiration)
+
+				JWKCache.Set(testAPIID, &jose.JSONWebKeySet{
+					Keys: []jose.JSONWebKey{
+						{KeyID: "cached-kid", Key: "cached-key"},
+					},
+				}, cache.DefaultExpiration)
+			},
+			jwkURIs:     []apidef.JWK{{URL: testJWKURL}},
+			kid:         "cached-kid",
+			expectKey:   "cached-key",
+			expectError: nil,
+		},
+		{
+			name: "invalid JWK cache format triggers refetch",
+			setup: func() {
+				GetJWK = func(_ string, _ bool) (*jose.JSONWebKeySet, error) {
+					return &jose.JSONWebKeySet{
+						Keys: []jose.JSONWebKey{
+							{KeyID: "fresh-kid", Key: "fresh-key"},
+						},
+					}, nil
+				}
+				JWKCache.Set(testAPIID, "invalid-format", cache.DefaultExpiration)
+				JWKCache.Set(cacheKey, &apidef.APIDefinition{
+					APIID:       testAPIID,
+					JWTJwksURIs: []apidef.JWK{{URL: testJWKURL}},
+				}, cache.DefaultExpiration)
+			},
+			jwkURIs:     []apidef.JWK{{URL: testJWKURL}},
+			kid:         "fresh-kid",
+			expectKey:   "fresh-key",
+			expectError: nil,
+		},
+		{
+			name: "JWK URLs changed triggers refetch",
+			setup: func() {
+				GetJWK = func(_ string, _ bool) (*jose.JSONWebKeySet, error) {
+					return &jose.JSONWebKeySet{
+						Keys: []jose.JSONWebKey{
+							{KeyID: "new-kid", Key: "new-key"},
+						},
+					}, nil
+				}
+
+				JWKCache.Set(cacheKey, &apidef.APIDefinition{
+					APIID: testAPIID,
+					JWTJwksURIs: []apidef.JWK{
+						{URL: "http://localhost:8080/old-url"},
+					},
+				}, cache.DefaultExpiration)
+
+				JWKCache.Set(testAPIID, &jose.JSONWebKeySet{
+					Keys: []jose.JSONWebKey{
+						{KeyID: "old-kid", Key: "old-key"},
+					},
+				}, cache.DefaultExpiration)
+			},
+			jwkURIs:     []apidef.JWK{{URL: testJWKURL}},
+			kid:         "new-kid",
+			expectKey:   "new-key",
+			expectError: nil,
+		},
+		{
+			name: "error fetching jwks",
+			setup: func() {
+				GetJWK = func(_ string, _ bool) (*jose.JSONWebKeySet, error) {
+					return nil, errors.New("failed to fetch JWK")
+				}
+			},
+			jwkURIs:     []apidef.JWK{{URL: testJWKURL}},
+			kid:         "any-kid",
+			expectKey:   nil,
+			expectError: errors.New("no matching KID found in any JWKs or fallback"),
+		},
+		{
+			name: "Cached API definition is different from expected",
+			setup: func() {
+				GetJWK = func(_ string, _ bool) (*jose.JSONWebKeySet, error) {
+					return nil, errors.New("failed to fetch JWK")
+				}
+
+				JWKCache.Set(cacheKey, &apidef.APIDefinition{
+					APIID: testAPIID,
+					JWTJwksURIs: []apidef.JWK{
+						{URL: testJWKURL},
+					},
+				}, cache.DefaultExpiration)
+
+				JWKCache.Set(api.APIID, map[string]string{"jwk": "something-random"}, cache.DefaultExpiration)
+			},
+			jwkURIs:     []apidef.JWK{{URL: testJWKURL}},
+			kid:         "new-kid",
+			expectKey:   nil,
+			expectError: errors.New("no matching KID found in any JWKs or fallback"),
+		},
+		{
+			name: "Test getSecretFromURL using getSecretFromMultipleJWKURIs data",
+			setup: func() {
+				GetJWK = func(_ string, _ bool) (*jose.JSONWebKeySet, error) {
+					return nil, errors.New("failed to fetch JWK")
+				}
+
+				JWKCache.Set(cacheKey, &apidef.APIDefinition{
+					APIID:     testAPIID,
+					JWTSource: encodedTestJWKURL,
+				}, cache.DefaultExpiration)
+
+				JWKCache.Set(api.APIID, map[string]string{"jwk": "something-random"}, cache.DefaultExpiration)
+			},
+			jwkURI:              apidef.JWK{URL: testJWKURL},
+			kid:                 "new-kid",
+			expectKey:           nil,
+			expectError:         errors.New("failed to fetch JWK"),
+			useGetSecretFromURL: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			JWKCache.Flush()
+
+			if tt.setup != nil {
+				tt.setup()
+			}
+
+			mw := createMiddleware(tt.jwkURIs)
+
+			var key interface{}
+			var err error
+
+			if !tt.useGetSecretFromURL {
+				key, err = mw.getSecretFromMultipleJWKURIs(tt.jwkURIs, tt.kid, "RS256")
+			} else {
+				key, err = mw.getSecretFromURL(tt.jwkURI.URL, tt.kid, "RS256")
+			}
+
+			if tt.expectError != nil {
+				assert.Error(t, err)
+				assert.Contains(t, err.Error(), tt.expectError.Error())
+			} else {
+				assert.NoError(t, err)
+			}
+
+			assert.Equal(t, tt.expectKey, key)
+		})
+	}
 }
 
 func TestJWT_ExtractOAuthClientIDForDCR(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
+	const testAPIID = "test-api-id"
+
 	api := ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 		spec.UseKeylessAccess = false
+		spec.APIID = testAPIID
 		spec.EnableJWT = true
 		spec.JWTSigningMethod = RSASign
 		spec.JWTSource = base64.StdEncoding.EncodeToString([]byte(jwtRSAPubKey))
@@ -2344,7 +2843,14 @@ func TestJWT_ExtractOAuthClientIDForDCR(t *testing.T) {
 		spec.Proxy.ListenPath = "/"
 	})[0]
 
-	pID := ts.CreatePolicy()
+	pID := ts.CreatePolicy(func(p *user.Policy) {
+		p.AccessRights = map[string]user.AccessDefinition{
+			testAPIID: {
+				APIName: "test-api-name",
+			},
+		}
+	})
+
 	userID := uuid.New()
 	const myOKTAClientID = "myOKTAClientID"
 

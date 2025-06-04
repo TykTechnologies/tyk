@@ -202,18 +202,18 @@ func EmitErrorEventKv(jobName string, funcName string, err error, kv map[string]
 }
 
 // Connect will establish a connection to the RPC server specified in connection options
-func Connect(connConfig Config, suppressRegister bool, dispatcherFuncs map[string]interface{},
+func Connect(
+	connConfig Config,
+	suppressRegister bool,
+	dispatcherFuncs map[string]interface{},
 	getGroupLoginFunc func(string, string) interface{},
 	emergencyModeFunc func(),
-	emergencyModeLoadedFunc func()) bool {
+	emergencyModeLoadedFunc func(),
+) bool {
 	rpcConnectMu.Lock()
 	defer rpcConnectMu.Unlock()
 
-	values.config.Store(connConfig)
-	getGroupLoginCallback = getGroupLoginFunc
-	emergencyModeCallback = emergencyModeFunc
-	emergencyModeLoadedCallback = emergencyModeLoadedFunc
-
+	setupConnectionConfig(connConfig, getGroupLoginFunc, emergencyModeFunc, emergencyModeLoadedFunc)
 	if values.ClientIsConnected() {
 		Log.Debug("Using RPC singleton for connection")
 		return true
@@ -223,9 +223,38 @@ func Connect(connConfig Config, suppressRegister bool, dispatcherFuncs map[strin
 		return !values.GetEmergencyMode()
 	}
 
-	// RPC Client is unset
-	// Set up the cache
 	Log.Info("Setting new RPC connection!")
+	initializeClient()
+	loadDispatcher(dispatcherFuncs)
+
+	if funcClientSingleton == nil {
+		funcClientSingleton = dispatcher.NewFuncClient(clientSingleton)
+	}
+
+	handleLogin()
+	if !suppressRegister {
+		register()
+		go checkDisconnect()
+	}
+
+	return true
+}
+
+func setupConnectionConfig(
+	connConfig Config,
+	loginFunc func(string, string) interface{},
+	emergencyModeFunc func(),
+	emergencyModeLoadedFunc func(),
+) {
+	values.config.Store(connConfig)
+	getGroupLoginCallback = loginFunc
+	emergencyModeCallback = emergencyModeFunc
+	emergencyModeLoadedCallback = emergencyModeLoadedFunc
+}
+
+func initializeClient() {
+	//by default start in emergency until the rpc connection is stablished
+	values.SetEmergencyMode(true)
 
 	connID := uuid.New()
 
@@ -240,7 +269,6 @@ func Connect(connConfig Config, suppressRegister bool, dispatcherFuncs map[strin
 			MinVersion:         values.Config().SSLMinVersion,
 			MaxVersion:         values.Config().SSLMaxVersion,
 		}
-
 		clientSingleton = gorpc.NewTLSClient(values.Config().ConnectionString, clientCfg)
 	} else {
 		clientSingleton = gorpc.NewTCPClient(values.Config().ConnectionString)
@@ -253,12 +281,16 @@ func Connect(connConfig Config, suppressRegister bool, dispatcherFuncs map[strin
 	clientSingleton.OnConnect = onConnectFunc
 
 	clientSingleton.Conns = values.Config().RPCPoolSize
-	if clientSingleton.Conns == 0 {
+	if clientSingleton.Conns <= 0 {
 		clientSingleton.Conns = 5
 	}
 
-	clientSingleton.Dial = func(addr string) (conn net.Conn, err error) {
+	setupDialFunction(connID)
+	clientSingleton.Start()
+}
 
+func setupDialFunction(connID string) {
+	clientSingleton.Dial = func(addr string) (conn net.Conn, err error) {
 		dialer := &net.Dialer{
 			Timeout:   10 * time.Second,
 			KeepAlive: 30 * time.Second,
@@ -294,22 +326,9 @@ func Connect(connConfig Config, suppressRegister bool, dispatcherFuncs map[strin
 		conn.Write([]byte("proto2"))
 		conn.Write([]byte{byte(len(connID))})
 		conn.Write([]byte(connID))
+
 		return conn, nil
 	}
-	clientSingleton.Start()
-
-	loadDispatcher(dispatcherFuncs)
-
-	if funcClientSingleton == nil {
-		funcClientSingleton = dispatcher.NewFuncClient(clientSingleton)
-	}
-
-	handleLogin()
-	if !suppressRegister {
-		register()
-		go checkDisconnect()
-	}
-	return true
 }
 
 func handleLogin() {

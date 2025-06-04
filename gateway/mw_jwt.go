@@ -39,6 +39,7 @@ const (
 )
 
 const UnexpectedSigningMethod = "Unexpected signing method"
+const JWKsAPIDef = "jwks_api_def_"
 
 var (
 	// List of common OAuth Client ID claims used by IDPs:
@@ -143,11 +144,44 @@ func (k *JWTMiddleware) getSecretFromURL(url string, kidVal interface{}, keyType
 	var (
 		jwkSet *jose.JSONWebKeySet
 		err    error
+		found  bool
 	)
 
-	cachedJWK, found := JWKCache.Get(k.Spec.APIID)
-	if !found {
-		if jwkSet, err = getJWK(url, k.Gw.GetConfig().JWTSSLInsecureSkipVerify); err != nil {
+	cacheAPIDef := k.specCacheKey(k.Spec, JWKsAPIDef)
+	cacheOutdated := false
+
+	cachedAPIDefRaw, foundDef := JWKCache.Get(cacheAPIDef)
+	if foundDef {
+		cachedAPIDef, ok := cachedAPIDefRaw.(*apidef.APIDefinition)
+		if !ok {
+			cacheOutdated = true
+		}
+
+		decodedURL, err := base64.StdEncoding.DecodeString(cachedAPIDef.JWTSource)
+		if err != nil {
+			return nil, err
+		}
+
+		if string(decodedURL) != url {
+			cacheOutdated = true
+		} else {
+			cachedJWK, ok := JWKCache.Get(k.Spec.APIID)
+			if ok {
+				found = true
+				var okType bool
+				jwkSet, okType = cachedJWK.(*jose.JSONWebKeySet)
+				if !okType {
+					// Invalidate cache if value is of unexpected type.
+					// Value will be of unexpected type since it could also contain merged JWKs
+					found = false
+					jwkSet = nil
+				}
+			}
+		}
+	}
+
+	if !found || cacheOutdated {
+		if jwkSet, err = GetJWK(url, k.Gw.GetConfig().JWTSSLInsecureSkipVerify); err != nil {
 			k.Logger().WithError(err).Info("Failed to decode JWKs body. Trying x5c PEM fallback.")
 
 			key, legacyError := k.legacyGetSecretFromURL(url, kid, keyType)
@@ -161,9 +195,9 @@ func (k *JWTMiddleware) getSecretFromURL(url string, kidVal interface{}, keyType
 		// Cache it
 		k.Logger().Debug("Caching JWK")
 		JWKCache.Set(k.Spec.APIID, jwkSet, cache.DefaultExpiration)
-	} else {
-		jwkSet = cachedJWK.(*jose.JSONWebKeySet)
+		JWKCache.Set(cacheAPIDef, k.Spec.APIDefinition, cache.DefaultExpiration)
 	}
+
 	k.Logger().Debug("Checking JWKs...")
 	if keys := jwkSet.Key(kid); len(keys) > 0 {
 		return keys[0].Key, nil
@@ -187,6 +221,12 @@ func (k *JWTMiddleware) getIdentityFromToken(token *jwt.Token) (string, error) {
 
 func (k *JWTMiddleware) getSecretToVerifySignature(r *http.Request, token *jwt.Token) (interface{}, error) {
 	config := k.Spec.APIDefinition
+
+	// Try all JWK URIs, return on first successful match
+	if len(config.JWTJwksURIs) > 0 {
+		return k.getSecretFromMultipleJWKURIs(config.JWTJwksURIs, token.Header[KID], k.Spec.JWTSigningMethod)
+	}
+
 	// Check for central JWT source
 	if config.JWTSource != "" {
 		// Is it a URL?
@@ -224,6 +264,107 @@ func (k *JWTMiddleware) getSecretToVerifySignature(r *http.Request, token *jwt.T
 		return nil, errors.New("token invalid, key not found")
 	}
 	return []byte(session.JWTData.Secret), nil
+}
+
+var GetJWK = getJWK
+
+func (k *JWTMiddleware) specCacheKey(spec *APISpec, prefix string) string {
+	return prefix + spec.APIID + spec.OrgID
+}
+
+func (k *JWTMiddleware) getSecretFromMultipleJWKURIs(jwkURIs []apidef.JWK, kidVal interface{}, keyType string) (interface{}, error) {
+	var (
+		jwkSets         []*jose.JSONWebKeySet
+		fallbackJWKURIs []apidef.JWK
+		kid, ok         = kidVal.(string)
+	)
+
+	if !ok {
+		return nil, ErrKIDNotAString
+	}
+	cacheAPIDef := k.specCacheKey(k.Spec, JWKsAPIDef)
+	cacheOutdated := false
+
+	cachedAPIDefRaw, foundDef := JWKCache.Get(cacheAPIDef)
+	if foundDef {
+		cachedAPIDef, ok := cachedAPIDefRaw.(*apidef.APIDefinition)
+		if !ok {
+			cacheOutdated = true
+		}
+
+		if jwkURLsChanged(cachedAPIDef.JWTJwksURIs, jwkURIs) {
+			k.Logger().Infof("Detected change in JWK URLs — refreshing cache for APIID %s", k.Spec.APIID)
+			cacheOutdated = true
+		} else {
+			cachedJWKs, foundJWKs := JWKCache.Get(k.Spec.APIID)
+			if foundJWKs {
+				jwkSets, ok = cachedJWKs.([]*jose.JSONWebKeySet)
+				if !ok {
+					k.Logger().Warnf("Invalid JWK cache format for APIID %s — ignoring", k.Spec.APIID)
+
+					jwkSets = nil
+				}
+			}
+		}
+	}
+
+	if !foundDef || cacheOutdated || len(jwkSets) == 0 {
+		jwkSets = nil
+		for _, jwk := range jwkURIs {
+			jwkSet, err := GetJWK(jwk.URL, k.Gw.GetConfig().JWTSSLInsecureSkipVerify)
+			if err != nil {
+				k.Logger().WithError(err).Infof("Failed to fetch or decode JWKs from %s", jwk.URL)
+				fallbackJWKURIs = append(fallbackJWKURIs, jwk)
+				continue
+			}
+
+			jwkSets = append(jwkSets, jwkSet)
+		}
+
+		if len(jwkSets) > 0 {
+			k.Logger().Debugf("Caching %d JWK sets for APIID %s", len(jwkSets), k.Spec.APIID)
+			JWKCache.Set(k.Spec.APIID, jwkSets, cache.DefaultExpiration)
+			JWKCache.Set(cacheAPIDef, k.Spec.APIDefinition, cache.DefaultExpiration)
+		}
+	}
+
+	for _, jwkSet := range jwkSets {
+		if keys := jwkSet.Key(kid); len(keys) > 0 {
+			return keys[0].Key, nil
+		}
+	}
+
+	for _, jwk := range fallbackJWKURIs {
+		key, legacyErr := k.legacyGetSecretFromURL(jwk.URL, kid, keyType)
+		if legacyErr == nil {
+			return key, nil
+		}
+		k.Logger().WithError(legacyErr).Warnf("Legacy fallback failed for %s", jwk.URL)
+	}
+
+	err := errors.New("no matching KID found in any JWKs or fallback")
+	k.Logger().WithError(err).Error("JWK resolution failed")
+
+	return nil, err
+}
+
+func jwkURLsChanged(a, b []apidef.JWK) bool {
+	if len(a) != len(b) {
+		return true
+	}
+
+	urlMap := make(map[string]struct{}, len(b))
+	for _, jwk := range b {
+		urlMap[jwk.URL] = struct{}{}
+	}
+
+	for _, jwk := range a {
+		if _, exists := urlMap[jwk.URL]; !exists {
+			return true
+		}
+	}
+
+	return false
 }
 
 func (k *JWTMiddleware) getPolicyIDFromToken(claims jwt.MapClaims) (string, bool) {
@@ -579,12 +720,16 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 			prefix := generateOAuthPrefix(k.Spec.APIID)
 			storageManager := k.Gw.getGlobalMDCBStorageHandler(prefix, false)
 			storageManager.Connect()
+
+			storageDriver := &storage.RedisCluster{KeyPrefix: prefix, HashKeys: false, ConnectionHandler: k.Gw.StorageConnectionHandler}
+			storageDriver.Connect()
+
 			k.Spec.OAuthManager = &OAuthManager{
 				OsinServer: k.Gw.TykOsinNewServer(&osin.ServerConfig{},
 					&RedisOsinStorageInterface{
 						storageManager,
 						k.Gw.GlobalSessionManager,
-						&storage.RedisCluster{KeyPrefix: prefix, HashKeys: false, ConnectionHandler: k.Gw.StorageConnectionHandler},
+						storageDriver,
 						k.Spec.OrgID,
 						k.Gw,
 					}),
@@ -592,7 +737,7 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 		}
 
 		// Retrieve OAuth client data from storage and inject developer ID into the session object:
-		client, err := k.Spec.OAuthManager.OsinServer.Storage.GetClient(oauthClientID)
+		client, err := k.Spec.OAuthManager.Storage().GetClient(oauthClientID)
 		if err == nil {
 			userData := client.GetUserData()
 			if userData != nil {
@@ -713,7 +858,10 @@ func (k *JWTMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _
 		// Token is valid - let's move on
 
 		// Are we mapping to a central JWT Secret?
-		if k.Spec.JWTSource != "" {
+		hasJWTSource := k.Spec.JWTSource != ""
+		hasJwksURIs := len(k.Spec.JWTJwksURIs) > 0
+
+		if hasJWTSource || hasJwksURIs {
 			return k.processCentralisedJWT(r, token)
 		}
 
@@ -838,9 +986,12 @@ func assertSigningMethod(signingMethod string, token *jwt.Token) error {
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 			return fmt.Errorf("%v: %v and not HMAC signature", UnexpectedSigningMethod, token.Header["alg"])
 		}
+	// Supports both RSA + RSAPSS Signing.
 	case RSASign:
 		if _, ok := token.Method.(*jwt.SigningMethodRSA); !ok {
-			return fmt.Errorf("%v: %v and not RSA signature", UnexpectedSigningMethod, token.Header["alg"])
+			if _, ok := token.Method.(*jwt.SigningMethodRSAPSS); !ok {
+				return fmt.Errorf("%v: %v and not RSA or RSAPSS signature", UnexpectedSigningMethod, token.Header["alg"])
+			}
 		}
 	case ECDSASign:
 		if _, ok := token.Method.(*jwt.SigningMethodECDSA); !ok {

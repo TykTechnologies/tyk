@@ -1,5 +1,46 @@
 package gateway
 
+import (
+	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/regexp"
+)
+
+// URLSpec represents a flattened specification for URLs, used to check if a proxy URL
+// path is on any of the white, black or ignored lists. This is generated as part of the
+// configuration init
+type URLSpec struct {
+	spec *regexp.Regexp
+
+	Status                    URLStatus
+	MethodActions             map[string]apidef.EndpointMethodMeta
+	Whitelist                 apidef.EndPointMeta
+	Blacklist                 apidef.EndPointMeta
+	Ignored                   apidef.EndPointMeta
+	MockResponse              apidef.MockResponseMeta
+	CacheConfig               EndPointCacheMeta
+	TransformAction           TransformSpec
+	TransformResponseAction   TransformSpec
+	TransformJQAction         TransformJQSpec
+	TransformJQResponseAction TransformJQSpec
+	InjectHeaders             apidef.HeaderInjectionMeta
+	InjectHeadersResponse     apidef.HeaderInjectionMeta
+	HardTimeout               apidef.HardTimeoutMeta
+	CircuitBreaker            ExtendedCircuitBreakerMeta
+	URLRewrite                *apidef.URLRewriteMeta
+	VirtualPathSpec           apidef.VirtualMeta
+	RequestSize               apidef.RequestSizeMeta
+	MethodTransform           apidef.MethodTransformMeta
+	TrackEndpoint             apidef.TrackEndpointMeta
+	DoNotTrackEndpoint        apidef.TrackEndpointMeta
+	ValidatePathMeta          apidef.ValidatePathMeta
+	Internal                  apidef.InternalMeta
+	GoPluginMeta              GoPluginMiddleware
+	PersistGraphQL            apidef.PersistGraphQLMeta
+	RateLimit                 apidef.RateLimitMeta
+
+	IgnoreCase bool
+}
+
 // modeSpecificSpec returns the respective field of URLSpec if it matches the given mode.
 // Deprecated: Usage should not increase.
 func (u *URLSpec) modeSpecificSpec(mode URLStatus) (interface{}, bool) {
@@ -97,4 +138,26 @@ func (u *URLSpec) matchesMethod(method string) bool {
 	default:
 		return false
 	}
+}
+
+// matchesPath takes the input string and matches it against an internal regex.
+// it will match the regex against the clean URL with stripped listen path first,
+// then it will match against the full URL including the listen path as provided.
+// APISpec to provide URL sanitization of the input is passed along.
+func (a *URLSpec) matchesPath(reqPath string, api *APISpec) bool {
+	clean := api.StripListenPath(reqPath)
+	noVersion := api.StripVersionPath(clean)
+	// match /users
+	if noVersion != clean && a.spec.MatchString(noVersion) {
+		return true
+	}
+	// match /v3/users
+	if a.spec.MatchString(clean) {
+		return true
+	}
+	// match /listenpath/v3/users
+	if a.spec.MatchString(reqPath) {
+		return true
+	}
+	return false
 }

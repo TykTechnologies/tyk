@@ -2,21 +2,27 @@ package crypto
 
 import (
 	"bytes"
+	"crypto/aes"
+	"crypto/cipher"
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/sha256"
 	"crypto/tls"
 	"crypto/x509"
 	"crypto/x509/pkix"
+	"encoding/base64"
 	"encoding/hex"
 	"encoding/pem"
 	"errors"
+	"io"
 	"math/big"
 	"net"
 	"net/http"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/sirupsen/logrus"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -178,4 +184,71 @@ func GenerateRSAPublicKey(tb testing.TB) []byte {
 
 	publicKeyPEM := pem.EncodeToMemory(publicKeyBlock)
 	return publicKeyPEM
+}
+
+func GetPaddedString(str string) []byte {
+	return []byte(RightPad2Len(str, "=", 32))
+}
+
+// encrypt string to base64 crypto using AES
+func Encrypt(key []byte, str string) string {
+	plaintext := []byte(str)
+
+	block, err := aes.NewCipher(key)
+	if err != nil {
+		logrus.Error(err)
+		return ""
+	}
+
+	// The IV needs to be unique, but not secure. Therefore, it's common to
+	// include it at the beginning of the ciphertext.
+	ciphertext := make([]byte, aes.BlockSize+len(plaintext))
+	iv := ciphertext[:aes.BlockSize]
+	if _, err := io.ReadFull(rand.Reader, iv); err != nil {
+		logrus.Error(err)
+		return ""
+	}
+
+	stream := cipher.NewCFBEncrypter(block, iv)
+	stream.XORKeyStream(ciphertext[aes.BlockSize:], plaintext)
+
+	// convert to base64
+	return base64.URLEncoding.EncodeToString(ciphertext)
+}
+
+// Decrypt from base64 to decrypted string
+func Decrypt(key []byte, cryptoText string) string {
+	ciphertext, err := base64.URLEncoding.DecodeString(cryptoText)
+	if err != nil {
+		logrus.Error(err)
+		return ""
+	}
+
+	block, err := aes.NewCipher(key)
+	if err != nil {
+		logrus.Error(err)
+		return ""
+	}
+
+	// The IV needs to be unique, but not secure. Therefore it's common to
+	// include it at the beginning of the ciphertext.
+	if len(ciphertext) < aes.BlockSize {
+		logrus.Error("ciphertext too short")
+		return ""
+	}
+	iv := ciphertext[:aes.BlockSize]
+	ciphertext = ciphertext[aes.BlockSize:]
+
+	stream := cipher.NewCFBDecrypter(block, iv)
+
+	// XORKeyStream can work in-place if the two arguments are the same.
+	stream.XORKeyStream(ciphertext, ciphertext)
+
+	return string(ciphertext)
+}
+
+func RightPad2Len(s, padStr string, overallLen int) string {
+	padCountInt := 1 + (overallLen-len(padStr))/len(padStr)
+	retStr := s + strings.Repeat(padStr, padCountInt)
+	return retStr[:overallLen]
 }

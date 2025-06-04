@@ -3,7 +3,9 @@ version: "3"
 
 includes:
   test: .taskfiles/test.yml
-  deps: .taskfiles/deps/Taskfile.yml
+  deps: .taskfiles/deps.yml
+  lint: .taskfiles/lint.yml
+  hooks: .taskfiles/hooks.yml
   opentelemetry:
     taskfile: ci/tests/tracing/Taskfile.yml
     dir: ci/tests/tracing/
@@ -20,11 +22,20 @@ includes:
     taskfile: apidef/oas/Taskfile.yml
     dir: apidef/oas/
 
+vars:
+  path: ./...
+
 tasks:
+  build:
+    desc: "Build tyk gateway"
+    cmds:
+      - go build .
+      - cd gateway && go test -c . && cd ..
+
   docker:
     desc: "build Tyk gateway internal/tyk-gateway"
     cmds:
-      - docker build --platform "linux/amd64" --rm -t internal/tyk-gateway .
+      - docker build --build-arg GO_VERSION="$(go mod edit -json | jq .Go -r)" --platform "linux/amd64" --rm -t internal/tyk-gateway .
     sources:
       - go.mod
       - go.sum
@@ -54,44 +65,59 @@ tasks:
         yq -i ".dockers[4].extra_files |= [\"$replacement\"]" ci/goreleaser/goreleaser.yml
       - echo goreleaser release --clean --snapshot -f ci/goreleaser/goreleaser.yml
 
+  codegen:
+    deps: [deps]
+    desc: "Run code generation steps"
+    cmds:
+      - go generate ./...
+
   # Used in CI
   lint:
     desc: "Tidy the codebase"
     cmds:
-      - task: lint:tidy
-      - task: lint:all
+      - task: codegen
+      - task: lint:run
+      - task: lint:extras
 
-  lint:tidy:
-    desc: "Run typical code cleanup steps"
-    aliases: [fmt]
+  lint:extras:
+    desc: "Run more specific linters"
     cmds:
-      - gofmt -w .
-      - go generate ./...
-      - go fmt ./...
-      - go mod tidy
-      - goimports -local github.com/TykTechnologies,github.com/TykTechnologies/tyk/internal -w .
-      - go mod tidy
+      - task: coprocess:lint
+      - task: apidef-oas:lint
 
-  lint:all:
-    internal: true
-    deps:
-      - lint:config
-      - lint:imports
-      - lint:x-tyk-gateway
-      - coprocess:lint
-      - apidef-oas:lint
-
-  lint:imports:
-    internal: true
+  # Used in CI by hooks, lint.
+  fmt:
+    desc: "Reformat import groups"
     cmds:
-      - go-fsck lint
+      - task: lint:fmt
 
-  lint:config:
-    internal: true
+  # This reformats imports with goimports-reviser;
+  #
+  # To limit reformatting scope to packages or files, set `path`:
+  #
+  # - `task fmt:imports path="./ctx ./rpc"`
+  #
+  # Current status: does not run in CI, triggers golangci-lint issues
+  # in the files it fixed. They are preexisting but block golangci-lint
+  # passing in CI.
+  fmt:imports:
+    desc: "Format imports"
     cmds:
-      - go test -count 1 -v ./cli/linter/...
+      - goimports-reviser -imports-order std,general,company,project,blanked,dotted -company-prefixes github.com/TykTechnologies/ {{.path}}
 
-  lint:x-tyk-gateway:
-    internal: true
+  setup:
+    desc: "Setup the project including dependencies and git hooks using lefthooks"
     cmds:
-      - go test -count 1 -v -run=TestXTykGateway_Lint ./apidef/oas/
+      - task: deps:default
+      - lefthook install
+
+  clean:
+    desc: "Clean test files"
+    cmds:
+      - find -name '*.so' -delete -print
+      - find -name '*.test' -delete -print
+
+  generate-bento-config-validator-schema:
+    desc: "Generate Bento Config Validator Schema"
+    cmds:
+      - go run apidef/streams/bento/schema/generate_bento_config_schema.go -o apidef/streams/bento/schema/bento-config-schema.json

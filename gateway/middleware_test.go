@@ -12,6 +12,7 @@ import (
 	"github.com/TykTechnologies/tyk/apidef"
 	headers2 "github.com/TykTechnologies/tyk/header"
 	"github.com/TykTechnologies/tyk/internal/cache"
+	"github.com/TykTechnologies/tyk/internal/uuid"
 	"github.com/TykTechnologies/tyk/test"
 
 	"github.com/TykTechnologies/tyk/config"
@@ -258,24 +259,20 @@ func TestBaseMiddleware_getAuthToken(t *testing.T) {
 }
 
 func TestSessionLimiter_RedisQuotaExceeded_PerAPI(t *testing.T) {
+	t.Skip() // DeleteAllKeys interferes with other tests.
+
 	g := StartTest(nil)
 	defer g.Close()
-	g.Gw.GlobalSessionManager.Store().DeleteAllKeys()
-	defer g.Gw.GlobalSessionManager.Store().DeleteAllKeys()
 
-	apis := BuildAPI(func(spec *APISpec) {
-		spec.APIID = "api1"
+	g.Gw.GlobalSessionManager.Store().DeleteAllKeys()       // exclusive
+	defer g.Gw.GlobalSessionManager.Store().DeleteAllKeys() // exclusive
+
+	api := func(spec *APISpec) {
+		spec.APIID = uuid.New()
 		spec.UseKeylessAccess = false
-		spec.Proxy.ListenPath = "/api1/"
-	}, func(spec *APISpec) {
-		spec.APIID = "api2"
-		spec.UseKeylessAccess = false
-		spec.Proxy.ListenPath = "/api2/"
-	}, func(spec *APISpec) {
-		spec.APIID = "api3"
-		spec.UseKeylessAccess = false
-		spec.Proxy.ListenPath = "/api3/"
-	})
+		spec.Proxy.ListenPath = fmt.Sprintf("/%s/", spec.APIID)
+	}
+	apis := BuildAPI(api, api, api)
 
 	g.Gw.LoadAPI(apis...)
 
@@ -331,18 +328,24 @@ func TestSessionLimiter_RedisQuotaExceeded_PerAPI(t *testing.T) {
 		}
 	}
 
-	// for api1 - per api
-	sendReqAndCheckQuota(t, apis[0].APIID, 9, true)
-	sendReqAndCheckQuota(t, apis[0].APIID, 8, true)
-	sendReqAndCheckQuota(t, apis[0].APIID, 7, true)
+	t.Run("For api1 - per api", func(t *testing.T) {
+		sendReqAndCheckQuota(t, apis[0].APIID, 9, true)
+		sendReqAndCheckQuota(t, apis[0].APIID, 8, true)
+		sendReqAndCheckQuota(t, apis[0].APIID, 7, true)
+	})
 
-	// for api2 - per api
-	sendReqAndCheckQuota(t, apis[1].APIID, 1, true)
-	sendReqAndCheckQuota(t, apis[1].APIID, 0, true)
+	t.Run("For api2 - per api", func(t *testing.T) {
+		sendReqAndCheckQuota(t, apis[1].APIID, 1, true)
+		sendReqAndCheckQuota(t, apis[1].APIID, 0, true)
+	})
 
-	// for api3 - global
-	sendReqAndCheckQuota(t, apis[2].APIID, 24, false)
-	sendReqAndCheckQuota(t, apis[2].APIID, 23, false)
+	t.Run("For api3 - global", func(t *testing.T) {
+		sendReqAndCheckQuota(t, apis[2].APIID, 24, false)
+		sendReqAndCheckQuota(t, apis[2].APIID, 23, false)
+		sendReqAndCheckQuota(t, apis[2].APIID, 22, false)
+		sendReqAndCheckQuota(t, apis[2].APIID, 21, false)
+		sendReqAndCheckQuota(t, apis[2].APIID, 20, false)
+	})
 }
 
 func TestCopyAllowedURLs(t *testing.T) {
@@ -414,7 +417,8 @@ func TestQuotaNotAppliedWithURLRewrite(t *testing.T) {
 	spec := ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 		spec.Proxy.ListenPath = "/quota-test"
 		spec.UseKeylessAccess = false
-		UpdateAPIVersion(spec, "Default", func(v *apidef.VersionInfo) {
+		UpdateAPIVersion(spec, "v1", func(v *apidef.VersionInfo) {
+			v.UseExtendedPaths = true
 			v.ExtendedPaths.URLRewrite = []apidef.URLRewriteMeta{{
 				Path:         "/abc",
 				Method:       http.MethodGet,

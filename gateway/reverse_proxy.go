@@ -43,6 +43,7 @@ import (
 	"github.com/TykTechnologies/tyk/internal/graphengine"
 	"github.com/TykTechnologies/tyk/internal/httputil"
 	"github.com/TykTechnologies/tyk/internal/otel"
+	"github.com/TykTechnologies/tyk/internal/service/core"
 	"github.com/TykTechnologies/tyk/regexp"
 	"github.com/TykTechnologies/tyk/trace"
 	"github.com/TykTechnologies/tyk/user"
@@ -166,10 +167,13 @@ func (gw *Gateway) nextTarget(targetData *apidef.HostList, spec *APISpec) (strin
 			if !spec.Proxy.CheckHostAgainstUptimeTests {
 				return host, nil // we don't care if it's up
 			}
-			// As checked by HostCheckerManager.AmIPolling
-			if gw.GlobalHostChecker.store == nil {
-				return host, nil
+
+			// GlobalHostCheck has not been initialized, return the host picked
+			// by round-robin algorithm.
+			if gw.GlobalHostChecker == nil {
+				return host, nil // we don't care if it's up
 			}
+			// As checked by HostCheckerManager.AmIPolling
 			if !gw.GlobalHostChecker.HostDown(host) {
 				return host, nil // we do care and it's up
 			}
@@ -515,7 +519,7 @@ func (p *ReverseProxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) Prox
 	startTime := time.Now()
 	p.logger.WithField("ts", startTime.UnixNano()).Debug("Started")
 
-	resp := p.WrappedServeHTTP(rw, req, true)
+	resp := p.WrappedServeHTTP(rw, req, recordDetail(req, p.TykAPISpec))
 
 	finishTime := time.Since(startTime)
 	p.logger.WithField("ns", finishTime.Nanoseconds()).Debug("Finished")
@@ -1004,6 +1008,21 @@ func isCORSPreflight(r *http.Request) bool {
 	return r.Method == http.MethodOptions
 }
 
+type variableReplaceRoundTripper struct {
+	next   http.RoundTripper
+	outReq *http.Request
+	gw     *Gateway
+}
+
+func (d *variableReplaceRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
+	for key := range req.Header {
+		val := d.gw.ReplaceTykVariables(d.outReq, req.Header.Get(key), false)
+		req.Header.Set(key, val)
+	}
+
+	return d.next.RoundTrip(req)
+}
+
 func (p *ReverseProxy) handleGraphQL(roundTripper *TykRoundTripper, outreq *http.Request, w http.ResponseWriter) (res *http.Response, hijacked bool, err error) {
 	isWebSocketUpgrade := ctxGetGraphQLIsWebSocketUpgrade(outreq)
 	needsEngine := needsGraphQLExecutionEngine(p.TykAPISpec)
@@ -1014,7 +1033,7 @@ func (p *ReverseProxy) handleGraphQL(roundTripper *TykRoundTripper, outreq *http
 		requestHeadersRewrite[textproto.CanonicalMIMEHeaderKey(key)] = value
 	}
 	res, hijacked, err = p.TykAPISpec.GraphEngine.HandleReverseProxy(graphengine.ReverseProxyParams{
-		RoundTripper:       roundTripper,
+		RoundTripper:       &variableReplaceRoundTripper{next: roundTripper, outReq: outreq, gw: p.Gw},
 		ResponseWriter:     w,
 		OutRequest:         outreq,
 		WebSocketUpgrader:  &p.wsUpgrader,
@@ -1078,6 +1097,15 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 
 	*outreq = *req // includes shallow copies of maps, but okay
 	*logreq = *req
+
+	deepCopyErr := deepCopyBody(req, outreq)
+	if deepCopyErr != nil {
+		p.logger.Debug("Unable to create deep copy of request, err: ", deepCopyErr)
+		p.ErrorHandler.HandleError(rw, logreq, "There was a problem with reading Body of the Request.",
+			http.StatusInternalServerError, true)
+		return ProxyResponse{}
+	}
+
 	// remove context data from the copies
 	setContext(outreq, context.Background())
 	setContext(logreq, context.Background())
@@ -1184,6 +1212,12 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 
 		timeout := proxyTimeout(p.TykAPISpec)
 
+		// If an enforced timeout is configured for this API endpoint, use it instead
+		// of the global default timeout, as it should take precedence
+		if isTimeoutEnforced {
+			timeout = enforcedTimeout
+		}
+
 		p.TykAPISpec.HTTPTransport = p.httpTransport(timeout, rw, req, outreq)
 		p.TykAPISpec.HTTPTransportCreated = time.Now()
 
@@ -1218,6 +1252,8 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 		}
 
 	}
+
+	p.addAuthInfo(outreq, req)
 
 	// do request round trip
 	var (
@@ -1836,6 +1872,28 @@ func nopCloseResponseBody(r *http.Response) {
 	copyResponse(r)
 }
 
+// Creates a deep copy of source request.Body and replaces target request.Body with it.
+func deepCopyBody(source *http.Request, target *http.Request) error {
+	if source == nil || target == nil || source.Body == nil || httputil.IsStreamingRequest(source) {
+		return nil
+	}
+
+	bodyBytes, err := io.ReadAll(source.Body)
+	defer func() {
+		source.Body.Close()
+		source.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
+		nopCloseRequestBody(source)
+	}()
+	if err != nil {
+		return err
+	}
+
+	target.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
+	nopCloseRequestBody(target)
+
+	return nil
+}
+
 // IsUpgrade will return the upgrade header value and true if present for the request.
 // It requires EnableWebSockets to be enabled in the gateway HTTP server config.
 func (p *ReverseProxy) IsUpgrade(req *http.Request) (string, bool) {
@@ -1844,4 +1902,14 @@ func (p *ReverseProxy) IsUpgrade(req *http.Request) (string, bool) {
 	}
 
 	return httputil.IsUpgrade(req)
+}
+
+func (p *ReverseProxy) addAuthInfo(outReq, req *http.Request) {
+	if !p.TykAPISpec.UpstreamAuth.IsEnabled() {
+		return
+	}
+
+	if authProvider := core.GetUpstreamAuth(req); authProvider != nil {
+		authProvider.Fill(outReq)
+	}
 }

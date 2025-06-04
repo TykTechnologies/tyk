@@ -20,12 +20,12 @@ func Test_Issue11806_DomainRouting(t *testing.T) {
 		conf.EnableCustomDomains = true
 	}
 
-	noDomain := loadAPISpec(t, "testdata/issue-11806-api-no-domain.json")
-	withDomain := loadAPISpec(t, "testdata/issue-11806-api-with-domain.json")
+	noDomain := LoadAPISpec(t, "testdata/issue-11806-api-no-domain.json")
+	withDomain := LoadAPISpec(t, "testdata/issue-11806-api-with-domain.json")
 
 	t.Run("Load listenPath without domain first", func(t *testing.T) {
 		ts := gateway.StartTest(testConfig)
-		defer ts.Close()
+		t.Cleanup(ts.Close)
 
 		ts.Gw.LoadAPI(noDomain, withDomain)
 
@@ -34,7 +34,7 @@ func Test_Issue11806_DomainRouting(t *testing.T) {
 
 	t.Run("Load listenPath with domain first", func(t *testing.T) {
 		ts := gateway.StartTest(testConfig)
-		defer ts.Close()
+		t.Cleanup(ts.Close)
 
 		ts.Gw.LoadAPI(withDomain, noDomain)
 
@@ -62,10 +62,10 @@ func testDomainRouting(tb testing.TB, ts *gateway.Test) {
 		},
 		{
 			Path:      "/test/",
-			Host:      "customer.mydomain.com",
+			Host:      "example.com",
 			Method:    http.MethodGet,
 			Code:      http.StatusOK,
-			BodyMatch: "customer.mydomain.com",
+			BodyMatch: "example.com",
 		},
 	}...)
 }
@@ -80,7 +80,7 @@ func testSubrouterHost(t *testing.T) {
 	ctx := context.Background()
 
 	// Create a subrouter with a specific host
-	subrouter := router.Host("customer.mydomain.com").Subrouter()
+	subrouter := router.Host("example.com").Subrouter()
 	subrouter.HandleFunc("/test", func(w http.ResponseWriter, _ *http.Request) {
 		_, err := w.Write([]byte("Subrouter"))
 		assert.NoError(t, err)
@@ -117,7 +117,7 @@ func testSubrouterHost(t *testing.T) {
 	reqWithSpecificHost, err := http.NewRequestWithContext(ctx, "GET", "/test", nil)
 	assert.NoError(t, err)
 
-	reqWithSpecificHost.Host = "customer.mydomain.com"
+	reqWithSpecificHost.Host = "example.com"
 	respWithSpecificHost := httptest.NewRecorder()
 	router.ServeHTTP(respWithSpecificHost, reqWithSpecificHost)
 	if respWithSpecificHost.Body.String() != "Subrouter" {
@@ -131,7 +131,7 @@ func testRouteLongestPathFirst(t *testing.T) {
 	ts := gateway.StartTest(func(globalConf *config.Config) {
 		globalConf.EnableCustomDomains = true
 	})
-	defer ts.Close()
+	t.Cleanup(ts.Close)
 
 	type hostAndPath struct {
 		host, path string

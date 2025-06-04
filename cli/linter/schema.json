@@ -163,9 +163,23 @@
           }
         }
       }
+    },
+    "Streaming": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "allow_unsafe": {
+          "type": "array"
+        }
+      }
     }
   },
   "properties": {
+    "streaming": {
+      "$ref": "#/definitions/Streaming"
+    },
     "allow_insecure_configs": {
       "type": "boolean"
     },
@@ -550,6 +564,12 @@
         "enable_strict_routes": {
           "type": "boolean"
         },
+        "enable_path_prefix_matching": {
+          "type": "boolean"
+        },
+        "enable_path_suffix_matching": {
+          "type": "boolean"
+        },
         "flush_interval": {
           "type": "integer"
         },
@@ -641,6 +661,18 @@
     "log_format": {
       "type": "string",
       "enum": ["", "standard", "json"]
+    },
+    "access_logs": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "template": {
+          "type": ["object", "null"]
+        }
+      }
     },
     "enable_http_profiler": {
       "type": "boolean"
@@ -1071,6 +1103,12 @@
     "health_check_endpoint_name": {
       "type": "string"
     },
+    "readiness_check_endpoint_name": {
+      "type": "string"
+    },
+    "graceful_shutdown_timeout_duration": {
+      "type": "integer"
+    },
     "ssl_force_common_name_check": {
       "type": "boolean"
     },
@@ -1188,6 +1226,11 @@
     "oas_config": {
       "validate_examples": false,
       "validate_schema_defaults": false
+    },
+    "labs": {
+      "type": ["object", "null"],
+      "additionalProperties": true,
+      "properties": {}
     }
   }
 }

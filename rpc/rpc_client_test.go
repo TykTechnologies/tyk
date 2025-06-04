@@ -2,7 +2,7 @@ package rpc
 
 import "testing"
 
-func TestRecoveryFromEmregencyMode(t *testing.T) {
+func TestRecoveryFromEmergencyMode(t *testing.T) {
 	if IsEmergencyMode() {
 		t.Fatal("expected not to be in emergency mode before initiating login attempt")
 	}

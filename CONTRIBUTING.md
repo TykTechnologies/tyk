@@ -71,9 +71,17 @@ To build and test Tyk use built-in `go` commands: `go build` and `go test -v`. I
 
 Currently, in order for tests to pass, a **Redis host is required**. We know, this is terrible and should be handled with an interface, and it is, however in the current version there is a hard requirement for the application to have its default memory setup to use Redis as part of a deployment, this is to make it easier to install the application for the end-user. Future versions will work around this, or we may drop the memory requirement. The simplest way to run Redis is to use official Docker image [https://hub.docker.com/_/redis/](https://hub.docker.com/_/redis/)
 
-### Adding dependencies
+#### Using Task Commands
 
-If your patch depends on new packages, ensure that they will be put in `/vendor` folder. Here at Tyk we use `govendor` for managing our dependencies. Adding new dependencies can be done using following command: `govendor fetch github.com/alicebob/miniredis`.
+In addition to the standard Go commands, we also provide [Task](https://taskfile.dev/) commands to simplify the setup and local dev process. 
+If you haven't installed Task yet, please follow the [installation instructions](https://taskfile.dev/installation).
+
+Once Task is installed, you can use the following commands:
+
+```shell
+task setup   # Sets up the project depdendencies, including pre-commit hooks
+task test:integration    # Runs the tests
+```
 
 ### Geo IP features
 This product utilises GeoLite2 data created by MaxMind, available from [http://www.maxmind.com](http://www.maxmind.com).

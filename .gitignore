@@ -3,8 +3,10 @@
 .vagrant/
 .venv/
 .vscode/
+.air.toml
 coverage/
 temp/
+/tmp
 /middleware/bundles
 testapps/
 
@@ -21,6 +23,8 @@ testapps/
 /*.conf
 /*.json
 /*.bak
+/.air.toml
+
 
 /tyk
 logs/
@@ -48,14 +52,27 @@ petstore.json
 coprocess_gen_test.go
 session_state_gen_test.go
 __pycache__/
-tyk.test
+*.test
+*.test.log
 tyk-gateway.pid
+tests/pkgs.*
 
 tyk_linux_*
+.aider*
 /dist/
 
 .terraform**
+.terraform.lock.hcl
 .task/
 *.test
 
 main
+
+/coprocess/*.pb.go-e
+ci/tests/specs/tmp
+ci/tests/specs/node_modules
+ci/tests/specs/package-lock.json
+ci/tests/specs/gateway.collection.postman.json
+ci/tests/specs/.env
+ci/tests/specs/apps
+ci/tests/specs/policies

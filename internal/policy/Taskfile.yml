@@ -1,25 +1,34 @@
 ---
 version: "3"
 
-includes:
-  services:
-    taskfile: ../../docker/services/Taskfile.yml
-    dir: ../../docker/services
-
 vars:
   run: .
 
 tasks:
   default:
     desc: "Run tests"
-    deps: [ services:up ]
     requires:
       vars: [run]
     cmds:
-      - defer: { task: services:down }
       - goimports -w .
       - go fmt ./...
+      - task: test
+        vars:
+          run: '{{.run}}'
+
+  test:
+    desc: "Run tests"
+    requires:
+      vars: [run]
+    cmds:
       - go test -count=1 -run='({{.run}})' -cover -coverprofile=pkg.cov -v .
+
+  stress:
+    desc: "Run stress tests"
+    requires:
+      vars: [run]
+    cmds:
+      - go test -count=2000 -run='({{.run}})' -cover -coverprofile=pkg.cov .
 
   cover:
     desc: "Show source coverage"

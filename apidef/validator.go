@@ -57,6 +57,7 @@ var DefaultValidationRuleSet = ValidationRuleSet{
 	&RuleAtLeastEnableOneAuthSource{},
 	&RuleValidateIPList{},
 	&RuleValidateEnforceTimeout{},
+	&RuleUpstreamAuth{},
 }
 
 func Validate(definition *APIDefinition, ruleSet ValidationRuleSet) ValidationResult {
@@ -197,5 +198,55 @@ func (r *RuleValidateEnforceTimeout) Validate(apiDef *APIDefinition, validationR
 				}
 			}
 		}
+	}
+}
+
+var (
+	// ErrMultipleUpstreamAuthEnabled is the error to be returned when multiple upstream authentication modes are configured.
+	ErrMultipleUpstreamAuthEnabled = errors.New("multiple upstream authentication modes not allowed")
+	// ErrMultipleUpstreamOAuthAuthorizationType is the error to return when multiple OAuth authorization types are configured.
+	ErrMultipleUpstreamOAuthAuthorizationType = errors.New("multiple upstream OAuth authorization type not allowed")
+	// ErrUpstreamOAuthAuthorizationTypeRequired is the error to return when OAuth authorization type is not specified.
+	ErrUpstreamOAuthAuthorizationTypeRequired = errors.New("upstream OAuth authorization type is required")
+	// ErrInvalidUpstreamOAuthAuthorizationType is the error to return when configured OAuth authorization type is invalid.
+	ErrInvalidUpstreamOAuthAuthorizationType = errors.New("invalid OAuth authorization type")
+)
+
+// RuleUpstreamAuth implements validations for upstream authentication configurations.
+type RuleUpstreamAuth struct{}
+
+// Validate validates api definition upstream authentication configurations.
+func (r *RuleUpstreamAuth) Validate(apiDef *APIDefinition, validationResult *ValidationResult) {
+	upstreamAuth := apiDef.UpstreamAuth
+
+	if !upstreamAuth.IsEnabled() {
+		return
+	}
+
+	if upstreamAuth.BasicAuth.Enabled && upstreamAuth.OAuth.Enabled {
+		validationResult.IsValid = false
+		validationResult.AppendError(ErrMultipleUpstreamAuthEnabled)
+	}
+
+	upstreamOAuth := upstreamAuth.OAuth
+	// only OAuth checks moving forward
+	if !upstreamOAuth.IsEnabled() {
+		return
+	}
+
+	if len(upstreamOAuth.AllowedAuthorizeTypes) == 0 {
+		validationResult.IsValid = false
+		validationResult.AppendError(ErrUpstreamOAuthAuthorizationTypeRequired)
+		return
+	}
+
+	if len(upstreamAuth.OAuth.AllowedAuthorizeTypes) > 1 {
+		validationResult.IsValid = false
+		validationResult.AppendError(ErrMultipleUpstreamOAuthAuthorizationType)
+	}
+
+	if authType := upstreamAuth.OAuth.AllowedAuthorizeTypes[0]; authType != OAuthAuthorizationTypeClientCredentials && authType != OAuthAuthorizationTypePassword {
+		validationResult.IsValid = false
+		validationResult.AppendError(ErrInvalidUpstreamOAuthAuthorizationType)
 	}
 }

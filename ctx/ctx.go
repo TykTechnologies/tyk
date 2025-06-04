@@ -5,14 +5,15 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/TykTechnologies/tyk/apidef/oas"
-
-	"github.com/TykTechnologies/tyk/config"
-
 	"github.com/TykTechnologies/tyk/apidef"
-	logger "github.com/TykTechnologies/tyk/log"
+	"github.com/TykTechnologies/tyk/apidef/oas"
+	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/internal/reflect"
+	"github.com/TykTechnologies/tyk/internal/service/core"
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/user"
+
+	logger "github.com/TykTechnologies/tyk/log"
 )
 
 type Key uint
@@ -51,15 +52,10 @@ const (
 	// CacheOptions holds cache options required for cache writer middleware.
 	CacheOptions
 	OASDefinition
+	SelfLooping
 )
 
-func setContext(r *http.Request, ctx context.Context) {
-	r2 := r.WithContext(ctx)
-	*r = *r2
-}
-
 func ctxSetSession(r *http.Request, s *user.SessionState, scheduleUpdate bool, hashKey bool) {
-
 	if s == nil {
 		panic("setting a nil context SessionData")
 	}
@@ -81,12 +77,15 @@ func ctxSetSession(r *http.Request, s *user.SessionState, scheduleUpdate bool, h
 		s.Touch()
 	}
 
-	setContext(r, ctx)
+	core.SetContext(r, ctx)
 }
 
 func GetAuthToken(r *http.Request) string {
 	if v := r.Context().Value(AuthToken); v != nil {
-		return v.(string)
+		value, ok := v.(string)
+		if ok {
+			return value
+		}
 	}
 	return ""
 }
@@ -116,45 +115,38 @@ func SetSession(r *http.Request, s *user.SessionState, scheduleUpdate bool, hash
 	}
 }
 
+// SetDefinition sets an API definition object to the request context.
 func SetDefinition(r *http.Request, s *apidef.APIDefinition) {
 	ctx := r.Context()
 	ctx = context.WithValue(ctx, Definition, s)
-	setContext(r, ctx)
+	core.SetContext(r, ctx)
 }
 
+// GetDefinition will return a deep copy of the API definition valid for the request.
 func GetDefinition(r *http.Request) *apidef.APIDefinition {
 	if v := r.Context().Value(Definition); v != nil {
 		if val, ok := v.(*apidef.APIDefinition); ok {
-			return val
-		} else {
-			logger.Get().Warning("APIDefinition struct differ from the gateway version, trying to unmarshal.")
-			def := apidef.APIDefinition{}
-			b, _ := json.Marshal(v)
-			e := json.Unmarshal(b, &def)
-			if e == nil {
-				return &def
-			}
+			return reflect.Clone(val)
 		}
 	}
+
 	return nil
 }
 
-// GetOASDefinition returns a deep copy of the OAS definition of the called API.
+// SetOASDefinition sets an OAS API definition object to the request context.
+func SetOASDefinition(r *http.Request, s *oas.OAS) {
+	ctx := r.Context()
+	ctx = context.WithValue(ctx, OASDefinition, s)
+	core.SetContext(r, ctx)
+}
+
+// GetOASDefinition will return a deep copy of the OAS API definition valid for the request.
 func GetOASDefinition(r *http.Request) *oas.OAS {
-	v := r.Context().Value(OASDefinition)
-	if v == nil {
-		return nil
+	if v := r.Context().Value(OASDefinition); v != nil {
+		if val, ok := v.(*oas.OAS); ok {
+			return reflect.Clone(val)
+		}
 	}
 
-	val, ok := v.(*oas.OAS)
-	if !ok {
-		return nil
-	}
-
-	ret, err := val.Clone()
-	if err != nil {
-		logger.Get().WithError(err).Error("Cloning OAS object in the request context")
-	}
-
-	return ret
+	return nil
 }

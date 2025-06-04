@@ -9,6 +9,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
+
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/test"
 )
@@ -88,6 +90,8 @@ func testPrepareTestContextVarsMiddleware() map[string]testContextVarsData {
 					"x": {"123"},
 					"y": {"test"},
 				},
+				"request_data_x": "123",
+				"request_data_y": "test",
 				"headers": map[string][]string{
 					"x-header-a": {"A"},
 					"x-header-b": {"B"},
@@ -120,6 +124,11 @@ func testPrepareTestContextVarsMiddleware() map[string]testContextVarsData {
 					"j":   {"2"},
 					"str": {"abc"},
 				},
+				"request_data_x":   "123",
+				"request_data_y":   "test",
+				"request_data_i":   "1",
+				"request_data_j":   "2",
+				"request_data_str": "abc",
 				"headers": map[string][]string{
 					"x-header-a":   {"A"},
 					"x-header-b":   {"B"},
@@ -155,6 +164,11 @@ func testPrepareTestContextVarsMiddleware() map[string]testContextVarsData {
 					"j":   {"2"},
 					"str": {"abc"},
 				},
+				"request_data_x":   "123",
+				"request_data_y":   "test",
+				"request_data_i":   "1",
+				"request_data_j":   "2",
+				"request_data_str": "abc",
 				"headers": map[string][]string{
 					"x-header-a":   {"A"},
 					"x-header-b":   {"B"},
@@ -209,7 +223,8 @@ func TestContextVarsMiddlewareProcessRequest(t *testing.T) {
 			delete(ctxDataObject, "request_id")
 
 			if !reflect.DeepEqual(ctxDataObject, test.ExpectedCtxDataObject) {
-				t.Errorf("Expected: %v\n Got: %v\n", test.ExpectedCtxDataObject, ctxDataObject)
+				//t.Errorf("Expected: %v\n Got: %v\n", test.ExpectedCtxDataObject, ctxDataObject)
+				t.Errorf("diff: %s", cmp.Diff(ctxDataObject, test.ExpectedCtxDataObject))
 			}
 		})
 	}

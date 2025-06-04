@@ -2,8 +2,67 @@ package gateway
 
 import (
 	"net/http"
+	"net/url"
 	"strings"
+	"sync"
+	"time"
+
+	"github.com/getkin/kin-openapi/routers"
+
+	"github.com/TykTechnologies/tyk-pump/analytics"
+	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/apidef/oas"
+	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/ctx"
+	"github.com/TykTechnologies/tyk/internal/graphengine"
 )
+
+// APISpec represents a path specification for an API, to avoid enumerating multiple nested lists, a single
+// flattened URL list is checked for matching paths and then it's status evaluated if found.
+type APISpec struct {
+	*apidef.APIDefinition
+	OAS oas.OAS
+
+	sync.RWMutex
+
+	Checksum         string
+	RxPaths          map[string][]URLSpec
+	WhiteListEnabled map[string]bool
+	target           *url.URL
+	AuthManager      SessionHandler
+	OAuthManager     OAuthManagerInterface
+
+	OrgSessionManager        SessionHandler
+	EventPaths               map[apidef.TykEvent][]config.TykEventHandler
+	Health                   HealthChecker
+	JSVM                     JSVM
+	ResponseChain            []TykResponseHandler
+	RoundRobin               RoundRobin
+	URLRewriteEnabled        bool
+	CircuitBreakerEnabled    bool
+	EnforcedTimeoutEnabled   bool
+	LastGoodHostList         *apidef.HostList
+	HasRun                   bool
+	ServiceRefreshInProgress bool
+	HTTPTransport            *TykRoundTripper
+	HTTPTransportCreated     time.Time
+	WSTransport              http.RoundTripper
+	WSTransportCreated       time.Time
+	GlobalConfig             config.Config
+	OrgHasNoSession          bool
+	AnalyticsPluginConfig    *GoAnalyticsPlugin
+
+	middlewareChain *ChainObject
+	unloadHooks     []func()
+
+	network analytics.NetworkStats
+
+	GraphEngine graphengine.Engine
+
+	HasMock            bool
+	HasValidateRequest bool
+	OASRouter          routers.Router
+}
 
 // CheckSpecMatchesStatus checks if a URL spec has a specific status.
 // Deprecated: The function doesn't follow go return conventions (T, ok); use FindSpecMatchesStatus;
@@ -14,10 +73,10 @@ func (a *APISpec) CheckSpecMatchesStatus(r *http.Request, rxPaths []URLSpec, mod
 		if rxPaths[i].Status != mode {
 			continue
 		}
-		if !rxPaths[i].Spec.MatchString(matchPath) {
+		if !rxPaths[i].matchesMethod(method) {
 			continue
 		}
-		if !rxPaths[i].matchesMethod(method) {
+		if !rxPaths[i].matchesPath(matchPath, a) {
 			continue
 		}
 
@@ -36,10 +95,10 @@ func (a *APISpec) FindSpecMatchesStatus(r *http.Request, rxPaths []URLSpec, mode
 		if rxPaths[i].Status != mode {
 			continue
 		}
-		if !rxPaths[i].Spec.MatchString(matchPath) {
+		if !rxPaths[i].matchesMethod(method) {
 			continue
 		}
-		if !rxPaths[i].matchesMethod(method) {
+		if !rxPaths[i].matchesPath(matchPath, a) {
 			continue
 		}
 
@@ -64,7 +123,7 @@ func (a *APISpec) getMatchPathAndMethod(r *http.Request, mode URLStatus) (string
 	}
 
 	if a.Proxy.ListenPath != "/" {
-		matchPath = strings.TrimPrefix(matchPath, a.Proxy.ListenPath)
+		matchPath = a.StripListenPath(matchPath)
 	}
 
 	if !strings.HasPrefix(matchPath, "/") {
@@ -72,4 +131,12 @@ func (a *APISpec) getMatchPathAndMethod(r *http.Request, mode URLStatus) (string
 	}
 
 	return matchPath, method
+}
+
+func (a *APISpec) injectIntoReqContext(req *http.Request) {
+	if a.IsOAS {
+		ctx.SetOASDefinition(req, &a.OAS)
+	} else {
+		ctx.SetDefinition(req, a.APIDefinition)
+	}
 }

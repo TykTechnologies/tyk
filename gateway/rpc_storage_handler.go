@@ -1,7 +1,9 @@
+//nolint:revive
 package gateway
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
@@ -12,7 +14,6 @@ import (
 	"github.com/TykTechnologies/tyk/internal/model"
 	"github.com/TykTechnologies/tyk/rpc"
 
-	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/storage"
 
 	"github.com/sirupsen/logrus"
@@ -23,13 +24,13 @@ var (
 		"Login": func(clientAddr, userKey string) bool {
 			return false
 		},
-		"LoginWithGroup": func(clientAddr string, groupData *apidef.GroupLoginRequest) bool {
+		"LoginWithGroup": func(clientAddr string, groupData *model.GroupLoginRequest) bool {
 			return false
 		},
 		"GetKey": func(keyName string) (string, error) {
 			return "", nil
 		},
-		"SetKey": func(ibd *apidef.InboundData) error {
+		"SetKey": func(ibd *model.InboundData) error {
 			return nil
 		},
 		"GetExp": func(keyName string) (int64, error) {
@@ -44,10 +45,10 @@ var (
 		"DeleteRawKey": func(keyName string) (bool, error) {
 			return true, nil
 		},
-		"GetKeysAndValues": func(searchString string) (*apidef.KeysValuesPair, error) {
+		"GetKeysAndValues": func(searchString string) (*model.KeysValuesPair, error) {
 			return nil, nil
 		},
-		"GetKeysAndValuesWithFilter": func(searchString string) (*apidef.KeysValuesPair, error) {
+		"GetKeysAndValuesWithFilter": func(searchString string) (*model.KeysValuesPair, error) {
 			return nil, nil
 		},
 		"DeleteKeys": func(keys []string) (bool, error) {
@@ -59,16 +60,16 @@ var (
 		"Decrement": func(keyName string) error {
 			return nil
 		},
-		"IncrememntWithExpire": func(ibd *apidef.InboundData) (int64, error) {
+		"IncrememntWithExpire": func(ibd *model.InboundData) (int64, error) {
 			return 0, nil
 		},
-		"AppendToSet": func(ibd *apidef.InboundData) error {
+		"AppendToSet": func(ibd *model.InboundData) error {
 			return nil
 		},
-		"SetRollingWindow": func(ibd *apidef.InboundData) (int, error) {
+		"SetRollingWindow": func(ibd *model.InboundData) (int, error) {
 			return 0, nil
 		},
-		"GetApiDefinitions": func(dr *apidef.DefRequest) (string, error) {
+		"GetApiDefinitions": func(dr *model.DefRequest) (string, error) {
 			return "", nil
 		},
 		"GetPolicies": func(orgId string) (string, error) {
@@ -83,13 +84,13 @@ var (
 		"GetKeySpaceUpdate": func(clientAddr, orgId string) ([]string, error) {
 			return nil, nil
 		},
-		"GetGroupKeySpaceUpdate": func(clientAddr string, groupData *apidef.GroupKeySpaceRequest) ([]string, error) {
+		"GetGroupKeySpaceUpdate": func(clientAddr string, groupData *model.GroupKeySpaceRequest) ([]string, error) {
 			return nil, nil
 		},
 		"Ping": func() bool {
 			return false
 		},
-		"Disconnect": func(clientAddr string, groupData *apidef.GroupLoginRequest) error {
+		"Disconnect": func(clientAddr string, groupData *model.GroupLoginRequest) error {
 			return nil
 		},
 	}
@@ -162,8 +163,8 @@ func (r *RPCStorageHandler) buildNodeInfo() []byte {
 		intCheckDuration = int64(checkDuration / time.Second)
 	}
 
-	r.Gw.getHostDetails(r.Gw.GetConfig().PIDFileLocation)
-	node := apidef.NodeData{
+	r.Gw.getHostDetails()
+	node := model.NodeData{
 		NodeID:          r.Gw.GetNodeID(),
 		GroupID:         config.SlaveOptions.GroupID,
 		APIKey:          config.SlaveOptions.APIKey,
@@ -172,7 +173,7 @@ func (r *RPCStorageHandler) buildNodeInfo() []byte {
 		NodeIsSegmented: config.DBAppConfOptions.NodeIsSegmented,
 		Tags:            config.DBAppConfOptions.Tags,
 		Health:          r.Gw.getHealthCheckInfo(),
-		Stats: apidef.GWStats{
+		Stats: model.GWStats{
 			APIsCount:     r.Gw.apisByIDLen(),
 			PoliciesCount: r.Gw.PolicyCount(),
 		},
@@ -193,7 +194,7 @@ func (r *RPCStorageHandler) buildNodeInfo() []byte {
 }
 
 func (r *RPCStorageHandler) Disconnect() error {
-	request := apidef.GroupLoginRequest{
+	request := model.GroupLoginRequest{
 		UserKey: r.Gw.GetConfig().SlaveOptions.APIKey,
 		GroupID: r.Gw.GetConfig().SlaveOptions.GroupID,
 		Node:    r.buildNodeInfo(),
@@ -205,7 +206,7 @@ func (r *RPCStorageHandler) Disconnect() error {
 
 func (r *RPCStorageHandler) getGroupLoginCallback(synchroniserEnabled bool) func(userKey string, groupID string) interface{} {
 	groupLoginCallbackFn := func(userKey string, groupID string) interface{} {
-		return apidef.GroupLoginRequest{
+		return model.GroupLoginRequest{
 			UserKey: userKey,
 			GroupID: groupID,
 			Node:    r.buildNodeInfo(),
@@ -347,7 +348,7 @@ func (r *RPCStorageHandler) SetExp(keyName string, timeout int64) error {
 // SetKey will create (or update) a key value in the store
 func (r *RPCStorageHandler) SetKey(keyName, session string, timeout int64) error {
 	start := time.Now() // get current time
-	ibd := apidef.InboundData{
+	ibd := model.InboundData{
 		KeyName:      r.fixKey(keyName),
 		SessionState: session,
 		Timeout:      timeout,
@@ -410,7 +411,7 @@ func (r *RPCStorageHandler) Decrement(keyName string) {
 // IncrementWithExpire will increment a key in redis
 func (r *RPCStorageHandler) IncrememntWithExpire(keyName string, expire int64) int64 {
 
-	ibd := apidef.InboundData{
+	ibd := model.InboundData{
 		KeyName: keyName,
 		Expire:  expire,
 	}
@@ -475,8 +476,8 @@ func (r *RPCStorageHandler) GetKeysAndValuesWithFilter(filter string) map[string
 
 	returnValues := make(map[string]string)
 
-	for i, v := range kvPair.(*apidef.KeysValuesPair).Keys {
-		returnValues[r.cleanKey(v)] = kvPair.(*apidef.KeysValuesPair).Values[i]
+	for i, v := range kvPair.(*model.KeysValuesPair).Keys {
+		returnValues[r.cleanKey(v)] = kvPair.(*model.KeysValuesPair).Values[i]
 	}
 
 	return returnValues
@@ -501,8 +502,8 @@ func (r *RPCStorageHandler) GetKeysAndValues() map[string]string {
 	}
 
 	returnValues := make(map[string]string)
-	for i, v := range kvPair.(*apidef.KeysValuesPair).Keys {
-		returnValues[r.cleanKey(v)] = kvPair.(*apidef.KeysValuesPair).Values[i]
+	for i, v := range kvPair.(*model.KeysValuesPair).Keys {
+		returnValues[r.cleanKey(v)] = kvPair.(*model.KeysValuesPair).Values[i]
 	}
 
 	return returnValues
@@ -635,7 +636,7 @@ func (r *RPCStorageHandler) GetAndDeleteSet(keyName string) []interface{} {
 }
 
 func (r *RPCStorageHandler) AppendToSet(keyName, value string) {
-	ibd := apidef.InboundData{
+	ibd := model.InboundData{
 		KeyName: keyName,
 		Value:   value,
 	}
@@ -661,7 +662,7 @@ func (r *RPCStorageHandler) AppendToSet(keyName, value string) {
 // SetScrollingWindow is used in the rate limiter to handle rate limits fairly.
 func (r *RPCStorageHandler) SetRollingWindow(keyName string, per int64, val string, pipeline bool) (int, []interface{}) {
 	start := time.Now() // get current time
-	ibd := apidef.InboundData{
+	ibd := model.InboundData{
 		KeyName: keyName,
 		Per:     per,
 		Expire:  -1,
@@ -725,7 +726,7 @@ func (r RPCStorageHandler) IsRetriableError(err error) bool {
 
 // GetAPIDefinitions will pull API definitions from the RPC server
 func (r *RPCStorageHandler) GetApiDefinitions(orgId string, tags []string) string {
-	dr := apidef.DefRequest{
+	dr := model.DefRequest{
 		OrgId:   orgId,
 		Tags:    tags,
 		LoadOAS: true,
@@ -813,6 +814,8 @@ func (r *RPCStorageHandler) CheckForReload(orgId string) bool {
 				r.CheckForReload(orgId)
 			}
 		} else if !strings.Contains(err.Error(), "Cannot obtain response during") {
+			forcer := rpc.NewSyncForcer(r.Gw.StorageConnectionHandler, r.buildNodeInfo)
+			forcer.SetFirstConnection(true)
 			log.Warning("[RPC STORE] RPC Reload Checker encountered unexpected error: ", err)
 		}
 
@@ -889,7 +892,7 @@ func (r *RPCStorageHandler) CheckForKeyspaceChanges(orgId string) {
 		reqData["orgId"] = orgId
 	} else {
 		funcName = "GetGroupKeySpaceUpdate"
-		req = apidef.GroupKeySpaceRequest{
+		req = model.GroupKeySpaceRequest{
 			OrgID:   orgId,
 			GroupID: groupID,
 		}
@@ -1019,7 +1022,7 @@ func (gw *Gateway) ProcessOauthClientsOps(clients map[string]string) {
 
 // ProcessKeySpaceChanges receives an array of keys to be processed, those keys are considered changes in the keyspace in the
 // management layer, they could be: regular keys (hashed, unhashed), revoke oauth client, revoke single oauth token,
-// certificates (added, removed), oauth client (added, updated, removed)
+// certificates (added, removed), oauth client (added, updated, removed), user key events (reset)
 func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string, orgId string) {
 	keysToReset := map[string]bool{}
 	TokensToBeRevoked := map[string]string{}
@@ -1029,6 +1032,7 @@ func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string, orgId string) 
 	CertificatesToAdd := map[string]string{}
 	OauthClients := map[string]string{}
 	apiIDsToDeleteCache := make([]string, 0)
+	userKeyResets := make(map[string]string)
 
 	for _, key := range keys {
 		splitKeys := strings.Split(key, ":")
@@ -1055,12 +1059,45 @@ func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string, orgId string) 
 			case NoticeDeleteAPICache.String():
 				apiIDsToDeleteCache = append(apiIDsToDeleteCache, splitKeys[0])
 				notRegularKeys[key] = true
+			case NoticeUserKeyReset.String():
+				keyParts := strings.Split(splitKeys[0], ".")
+				if len(keyParts) != 2 {
+					log.Error("Invalid user key reset format")
+					continue
+				}
+				userKeyResets[keyParts[0]] = keyParts[1]
 			default:
 				log.Debug("ignoring processing of action:", action)
 			}
 		}
 	}
+	for oldKey, newKey := range userKeyResets {
+		if r.Gw.GetConfig().SlaveOptions.APIKey == oldKey {
+			config := r.Gw.GetConfig()
+
+			// Updating the key in the KV store if we are using one
+			r.Gw.updateKeyInStore(config.Private.EdgeOriginalAPIKeyPath, newKey)
+
+			config.SlaveOptions.APIKey = newKey
+			r.Gw.SetConfig(config)
+			connected := r.Connect()
+			if !connected {
+				log.Error("Failed to reconnect to RPC storage")
+				continue
+			}
+		}
+		ok := r.Gw.MainNotifier.Notify(Notification{
+			Command: NoticeUserKeyReset,
+			Payload: fmt.Sprintf("%s.%s:%s", oldKey, newKey, NoticeUserKeyReset),
+			Gw:      r.Gw,
+		})
+		if !ok {
+			log.Error("Failed to notify other gateways about user key reset")
+		}
+	}
+	// Process OAuth clients
 	r.Gw.ProcessOauthClientsOps(OauthClients)
+
 	for clientId, key := range ClientsToBeRevoked {
 		splitKeys := strings.Split(key, ":")
 		apiId := splitKeys[0]
@@ -1120,6 +1157,17 @@ func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string, orgId string) 
 
 	synchronizerEnabled := r.Gw.GetConfig().SlaveOptions.SynchroniserEnabled
 	for _, key := range keys {
+		// Skip keys that are user keys to be reset
+		splitKeys := strings.Split(key, ":")
+		if len(splitKeys) > 1 {
+			userKeys := strings.Split(splitKeys[0], ".")
+			if len(userKeys) == 2 {
+				_, ok := userKeyResets[userKeys[0]]
+				if ok {
+					continue
+				}
+			}
+		}
 		_, isOauthTokenKey := notRegularKeys[key]
 		if !isOauthTokenKey {
 			splitKeys := strings.Split(key, ":")
@@ -1164,6 +1212,7 @@ func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string, orgId string) 
 
 		log.WithField("apiID", apiID).Error("cache invalidation failed")
 	}
+
 	// Notify rest of gateways in cluster to flush cache
 	n := Notification{
 		Command: KeySpaceUpdateNotification,

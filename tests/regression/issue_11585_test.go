@@ -17,7 +17,7 @@ import (
 func Test_Issue11585_DeleteAPICacheSignal(t *testing.T) {
 	t.Run("redis event", func(t *testing.T) {
 		ts := gateway.StartTest(nil)
-		defer ts.Close()
+		t.Cleanup(ts.Close)
 
 		api := ts.Gw.BuildAndLoadAPI(func(spec *gateway.APISpec) {
 			spec.UseKeylessAccess = true
@@ -49,7 +49,7 @@ func Test_Issue11585_DeleteAPICacheSignal(t *testing.T) {
 
 	t.Run("rpc", func(t *testing.T) {
 		ts := gateway.StartTest(nil)
-		defer ts.Close()
+		t.Cleanup(ts.Close)
 
 		rpcListener := gateway.RPCStorageHandler{
 			KeyPrefix:        "rpc.listener.",

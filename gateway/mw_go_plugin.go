@@ -2,16 +2,11 @@ package gateway
 
 import (
 	"bytes"
-	"context"
 	"errors"
 	"fmt"
 	"io/ioutil"
 	"net/http"
 	"time"
-
-	"github.com/TykTechnologies/tyk/apidef/oas"
-
-	"github.com/TykTechnologies/tyk/ctx"
 
 	"github.com/TykTechnologies/tyk-pump/analytics"
 	"github.com/TykTechnologies/tyk/apidef"
@@ -165,7 +160,7 @@ func (m *GoPluginMiddleware) loadPlugin() bool {
 	}
 
 	// to record 2XX hits in analytics
-	m.successHandler = &SuccessHandler{BaseMiddleware: m.BaseMiddleware}
+	m.successHandler = &SuccessHandler{BaseMiddleware: m.BaseMiddleware.Copy()}
 	return true
 }
 
@@ -189,7 +184,7 @@ func (m *GoPluginMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reque
 		if pluginMw, found := m.goPluginFromRequest(r); found {
 			logger = pluginMw.logger
 			handler = pluginMw.handler
-			successHandler = &SuccessHandler{BaseMiddleware: m.BaseMiddleware}
+			successHandler = &SuccessHandler{BaseMiddleware: m.BaseMiddleware.Copy()}
 		} else {
 			return nil, http.StatusOK // next middleware
 		}
@@ -225,11 +220,7 @@ func (m *GoPluginMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reque
 	t1 := time.Now()
 
 	// Inject definition into request context:
-	if m.Spec.IsOAS {
-		setOASDefinition(r, &m.Spec.OAS)
-	} else {
-		ctx.SetDefinition(r, m.Spec.APIDefinition)
-	}
+	m.Spec.injectIntoReqContext(r)
 
 	handler(rw, r)
 	if session := ctxGetSession(r); session != nil {
@@ -273,10 +264,4 @@ func (m *GoPluginMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reque
 	}
 
 	return
-}
-
-func setOASDefinition(r *http.Request, s *oas.OAS) {
-	cntx := r.Context()
-	cntx = context.WithValue(cntx, ctx.OASDefinition, s)
-	setContext(r, cntx)
 }

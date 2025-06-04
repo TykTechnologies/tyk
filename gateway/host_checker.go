@@ -398,6 +398,10 @@ func eraseSyncMap(m *sync.Map) {
 }
 
 func (h *HostUptimeChecker) Stop() {
+	if h == nil {
+		return
+	}
+
 	was := atomic.SwapInt32(&h.isClosed, CLOSED)
 	if was == OPEN {
 		eraseSyncMap(h.samples)

@@ -38,10 +38,36 @@ type Server struct {
 	//
 	// Tyk classic API definition: `event_handlers`
 	EventHandlers EventHandlers `bson:"eventHandlers,omitempty" json:"eventHandlers,omitempty"`
+
+	// IPAccessControl configures IP access control for this API.
+	//
+	// Tyk classic API definition: `allowed_ips` and `blacklisted_ips`.
+	IPAccessControl *IPAccessControl `bson:"ipAccessControl,omitempty" json:"ipAccessControl,omitempty"`
+
+	// BatchProcessing contains configuration settings to enable or disable batch request support for the API.
+	//
+	// Tyk classic API definition: `enable_batch_request_support`.
+	BatchProcessing *BatchProcessing `bson:"batchProcessing,omitempty" json:"batchProcessing,omitempty"`
+
+	// Protocol configures the HTTP protocol used by the API.
+	// Possible values are:
+	// - "http": Standard HTTP/1.1 protocol
+	// - "http2": HTTP/2 protocol with TLS
+	// - "h2c": HTTP/2 protocol without TLS (cleartext).
+	//
+	// Tyk classic API definition: `protocol`.
+	Protocol string `bson:"protocol,omitempty" json:"protocol,omitempty"`
+	// Port Setting this value will change the port that Tyk listens on. Default: 8080.
+	//
+	// Tyk classic API definition: `listen_port`.
+	Port int `bson:"port,omitempty" json:"port,omitempty"`
 }
 
 // Fill fills *Server from apidef.APIDefinition.
 func (s *Server) Fill(api apidef.APIDefinition) {
+	s.Protocol = api.Protocol
+	s.Port = api.ListenPort
+
 	s.ListenPath.Fill(api)
 
 	if s.ClientCertificates == nil {
@@ -94,10 +120,15 @@ func (s *Server) Fill(api apidef.APIDefinition) {
 	if ShouldOmit(s.EventHandlers) {
 		s.EventHandlers = nil
 	}
+
+	s.fillIPAccessControl(api)
+	s.fillBatchProcessing(api)
 }
 
 // ExtractTo extracts *Server into *apidef.APIDefinition.
 func (s *Server) ExtractTo(api *apidef.APIDefinition) {
+	api.Protocol = s.Protocol
+	api.ListenPort = s.Port
 	s.ListenPath.ExtractTo(api)
 
 	if s.ClientCertificates == nil {
@@ -153,6 +184,9 @@ func (s *Server) ExtractTo(api *apidef.APIDefinition) {
 	}
 
 	s.EventHandlers.ExtractTo(api)
+
+	s.extractIPAccessControlTo(api)
+	s.extractBatchProcessingTo(api)
 }
 
 // ListenPath is the base path on Tyk to which requests for this API
@@ -190,8 +224,12 @@ func (lp *ListenPath) ExtractTo(api *apidef.APIDefinition) {
 // ClientCertificates contains the configurations related to establishing static mutual TLS between the client and Tyk.
 type ClientCertificates struct {
 	// Enabled activates static mTLS for the API.
+	//
+	// Tyk classic API definition: `use_mutual_tls_auth`.
 	Enabled bool `bson:"enabled" json:"enabled"`
 	// Allowlist is the list of client certificates which are allowed.
+	//
+	// Tyk classic API definition: `client_certificates`.
 	Allowlist []string `bson:"allowlist" json:"allowlist"`
 }
 
@@ -210,8 +248,12 @@ func (cc *ClientCertificates) ExtractTo(api *apidef.APIDefinition) {
 // GatewayTags holds a list of segment tags that should apply for a gateway.
 type GatewayTags struct {
 	// Enabled activates use of segment tags.
+	//
+	// Tyk classic API definition: `tags_disabled` (negated).
 	Enabled bool `bson:"enabled" json:"enabled"`
 	// Tags contains a list of segment tags.
+	//
+	// Tyk classic API definition: `tags`.
 	Tags []string `bson:"tags" json:"tags"`
 }
 
@@ -230,8 +272,12 @@ func (gt *GatewayTags) ExtractTo(api *apidef.APIDefinition) {
 // Domain holds the configuration of the domain name the server should listen on.
 type Domain struct {
 	// Enabled allow/disallow the usage of the domain.
+	//
+	// Tyk classic API definition: `domain_disabled` (negated).
 	Enabled bool `bson:"enabled" json:"enabled"`
 	// Name is the name of the domain.
+	//
+	// Tyk classic API definition: `domain`.
 	Name string `bson:"name" json:"name"`
 	// Certificates defines a field for specifying certificate IDs or file paths
 	// that the Gateway can utilise to dynamically load certificates for your custom domain.
@@ -275,6 +321,8 @@ func (d *DetailedActivityLogs) Fill(api apidef.APIDefinition) {
 // DetailedTracing holds the configuration of the detailed tracing.
 type DetailedTracing struct {
 	// Enabled activates detailed tracing.
+	//
+	// Tyk classic API definition: `detailed_tracing`.
 	Enabled bool `bson:"enabled" json:"enabled"`
 }
 
@@ -286,4 +334,101 @@ func (dt *DetailedTracing) Fill(api apidef.APIDefinition) {
 // ExtractTo extracts *DetailedTracing into *apidef.APIDefinition.
 func (dt *DetailedTracing) ExtractTo(api *apidef.APIDefinition) {
 	api.DetailedTracing = dt.Enabled
+}
+
+// IPAccessControl represents IP access control configuration.
+type IPAccessControl struct {
+	// Enabled indicates whether IP access control is enabled.
+	//
+	// Tyk classic API definition: `ip_access_control_disabled` (negated).
+	Enabled bool `bson:"enabled" json:"enabled"`
+
+	// Allow is a list of allowed IP addresses or CIDR blocks (e.g. "192.168.1.0/24").
+	// Note that if an IP address is present in both Allow and Block, the Block rule will take precedence.
+	//
+	// Tyk classic API definition: `allowed_ips`.
+	Allow []string `bson:"allow,omitempty" json:"allow,omitempty"`
+
+	// Block is a list of blocked IP addresses or CIDR blocks (e.g. "192.168.1.100/32").
+	// If an IP address is present in both Allow and Block, the Block rule will take precedence.
+	//
+	// Tyk classic API definition: `blacklisted_ips`.
+	Block []string `bson:"block,omitempty" json:"block,omitempty"`
+}
+
+// Fill fills *IPAccessControl from apidef.APIDefinition.
+func (i *IPAccessControl) Fill(api apidef.APIDefinition) {
+	i.Enabled = !api.IPAccessControlDisabled
+	i.Block = api.BlacklistedIPs
+	i.Allow = api.AllowedIPs
+}
+
+// ExtractTo extracts *IPAccessControl into *apidef.APIDefinition.
+func (i *IPAccessControl) ExtractTo(api *apidef.APIDefinition) {
+	api.IPAccessControlDisabled = !i.Enabled
+	api.BlacklistedIPs = i.Block
+	api.AllowedIPs = i.Allow
+}
+
+func (s *Server) fillIPAccessControl(api apidef.APIDefinition) {
+	if s.IPAccessControl == nil {
+		s.IPAccessControl = &IPAccessControl{}
+	}
+
+	s.IPAccessControl.Fill(api)
+	if ShouldOmit(s.IPAccessControl) {
+		s.IPAccessControl = nil
+	}
+}
+
+func (s *Server) extractIPAccessControlTo(api *apidef.APIDefinition) {
+	if s.IPAccessControl == nil {
+		s.IPAccessControl = &IPAccessControl{}
+		defer func() {
+			s.IPAccessControl = nil
+		}()
+	}
+
+	s.IPAccessControl.ExtractTo(api)
+}
+
+// BatchProcessing represents the configuration for enabling or disabling batch request support for an API.
+type BatchProcessing struct {
+	// Enabled determines whether batch request support is enabled or disabled for the API.
+	//
+	// Tyk classic API definition: `enable_batch_request_support`.
+	Enabled bool `bson:"enabled" json:"enabled"` // required
+}
+
+// Fill updates the BatchProcessing configuration based on the EnableBatchRequestSupport value from the given APIDefinition.
+func (b *BatchProcessing) Fill(api apidef.APIDefinition) {
+	b.Enabled = api.EnableBatchRequestSupport
+}
+
+// ExtractTo copies the Enabled state of BatchProcessing into the EnableBatchRequestSupport field of the provided APIDefinition.
+func (b *BatchProcessing) ExtractTo(api *apidef.APIDefinition) {
+	api.EnableBatchRequestSupport = b.Enabled
+}
+
+func (s *Server) fillBatchProcessing(api apidef.APIDefinition) {
+	if s.BatchProcessing == nil {
+		s.BatchProcessing = &BatchProcessing{}
+	}
+
+	s.BatchProcessing.Fill(api)
+
+	if ShouldOmit(s.BatchProcessing) {
+		s.BatchProcessing = nil
+	}
+}
+
+func (s *Server) extractBatchProcessingTo(api *apidef.APIDefinition) {
+	if s.BatchProcessing == nil {
+		s.BatchProcessing = &BatchProcessing{}
+		defer func() {
+			s.BatchProcessing = nil
+		}()
+	}
+
+	s.BatchProcessing.ExtractTo(api)
 }

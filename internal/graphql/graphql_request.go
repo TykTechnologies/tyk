@@ -88,7 +88,7 @@ func (g *GraphStatsExtractionVisitor) ExtractStats(rawRequest, response, schema 
 		if t == string(g.schema.Index.QueryTypeName) || t == string(g.schema.Index.MutationTypeName) || t == string(g.schema.Index.SubscriptionTypeName) {
 			isRootOperationType = true
 		}
-		for field, _ := range fields {
+		for field := range fields {
 			if isRootOperationType {
 				rootFields = append(rootFields, field)
 			} else {

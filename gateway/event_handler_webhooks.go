@@ -18,7 +18,6 @@ import (
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/header"
-	"github.com/TykTechnologies/tyk/internal/event"
 	"github.com/TykTechnologies/tyk/storage"
 )
 
@@ -30,10 +29,6 @@ const (
 	WH_POST   WebHookRequestMethod = "POST"
 	WH_DELETE WebHookRequestMethod = "DELETE"
 	WH_PATCH  WebHookRequestMethod = "PATCH"
-
-	// EH_WebHook is an alias maintained for backwards compatibility.
-	// it is the handler to register a webhook event.
-	EH_WebHook = event.WebHookHandler
 )
 
 var (
@@ -161,9 +156,14 @@ func (w *WebHookHandler) getRequestMethod(m string) WebHookRequestMethod {
 }
 
 func (w *WebHookHandler) checkURL(r string) bool {
+	if r == "" {
+		return false
+	}
+
 	log.WithFields(logrus.Fields{
 		"prefix": "webhooks",
 	}).Debug("Checking URL: ", r)
+
 	if _, err := url.ParseRequestURI(r); err != nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "webhooks",

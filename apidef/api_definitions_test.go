@@ -8,15 +8,15 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	schema "github.com/xeipuuv/gojsonschema"
+	"github.com/TykTechnologies/tyk/internal/service/gojsonschema"
 )
 
 func TestSchema(t *testing.T) {
-	schemaLoader := schema.NewBytesLoader([]byte(Schema))
+	schemaLoader := gojsonschema.NewBytesLoader([]byte(Schema))
 
 	spec := DummyAPI()
-	goLoader := schema.NewGoLoader(spec)
-	result, err := schema.Validate(schemaLoader, goLoader)
+	goLoader := gojsonschema.NewGoLoader(spec)
+	result, err := gojsonschema.Validate(schemaLoader, goLoader)
 	if err != nil {
 		t.Error(err)
 	}
@@ -97,14 +97,14 @@ func TestDecodeFromDB(t *testing.T) {
 }
 
 func TestSchemaGraphqlConfig(t *testing.T) {
-	schemaLoader := schema.NewBytesLoader([]byte(Schema))
+	schemaLoader := gojsonschema.NewBytesLoader([]byte(Schema))
 
 	spec := DummyAPI()
 	spec.GraphQL.ExecutionMode = ""
 
-	goLoader := schema.NewGoLoader(spec)
+	goLoader := gojsonschema.NewGoLoader(spec)
 
-	result, err := schema.Validate(schemaLoader, goLoader)
+	result, err := gojsonschema.Validate(schemaLoader, goLoader)
 	if err != nil {
 		t.Error(err)
 	}
@@ -323,4 +323,44 @@ func TestAPIDefinition_GetScopeToPolicyMapping(t *testing.T) {
 		})
 	}
 
+}
+
+func TestJSVMEventHandlerConf_Scan(t *testing.T) {
+	jsvmEventMeta := map[string]any{
+		"disabled": true,
+		"id":       "1234",
+		"name":     "myMethod",
+		"path":     "my_script.js",
+	}
+
+	expected := JSVMEventHandlerConf{
+		Disabled:   true,
+		ID:         "1234",
+		MethodName: "myMethod",
+		Path:       "my_script.js",
+	}
+
+	var jsvmEventConf JSVMEventHandlerConf
+	err := jsvmEventConf.Scan(jsvmEventMeta)
+
+	assert.NoError(t, err)
+	assert.Equal(t, expected, jsvmEventConf)
+}
+
+func TestLogEventHandlerConf_Scan(t *testing.T) {
+	logEventMeta := map[string]any{
+		"disabled": true,
+		"prefix":   "AuthFailureEvent",
+	}
+
+	expected := LogEventHandlerConf{
+		Disabled: true,
+		Prefix:   "AuthFailureEvent",
+	}
+
+	var logEventConf LogEventHandlerConf
+	err := logEventConf.Scan(logEventMeta)
+
+	assert.NoError(t, err)
+	assert.Equal(t, expected, logEventConf)
 }

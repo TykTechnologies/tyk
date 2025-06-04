@@ -11,7 +11,9 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/apidef/oas"
 	"github.com/TykTechnologies/tyk/internal/httputil"
+	"github.com/TykTechnologies/tyk/internal/model"
 )
 
 type traceHttpRequest struct {
@@ -41,6 +43,7 @@ func (tr *traceHttpRequest) toRequest(ignoreCanonicalMIMEHeaderKey bool) (*http.
 type traceRequest struct {
 	Request *traceHttpRequest     `json:"request"`
 	Spec    *apidef.APIDefinition `json:"spec"`
+	OAS     *oas.OAS              `json:"oas"`
 }
 
 // TraceResponse is for tracing an HTTP response
@@ -89,9 +92,14 @@ func (gw *Gateway) traceHandler(w http.ResponseWriter, r *http.Request) {
 	var traceReq traceRequest
 	if err := json.NewDecoder(r.Body).Decode(&traceReq); err != nil {
 		log.Error("Couldn't decode trace request: ", err)
-
 		doJSONWrite(w, http.StatusBadRequest, apiError("Request malformed"))
 		return
+	}
+
+	if traceReq.OAS != nil {
+		var newDef apidef.APIDefinition
+		traceReq.OAS.ExtractTo(&newDef)
+		traceReq.Spec = &newDef
 	}
 
 	if traceReq.Spec == nil {
@@ -117,7 +125,7 @@ func (gw *Gateway) traceHandler(w http.ResponseWriter, r *http.Request) {
 
 	loader := &APIDefinitionLoader{Gw: gw}
 
-	spec, err := loader.MakeSpec(&nestedApiDefinition{APIDefinition: traceReq.Spec}, logrus.NewEntry(logger))
+	spec, err := loader.MakeSpec(&model.MergedAPI{APIDefinition: traceReq.Spec}, logrus.NewEntry(logger))
 	if err != nil {
 		doJSONWrite(w, http.StatusBadRequest, traceResponse{Message: "error", Logs: logStorage.String()})
 		return

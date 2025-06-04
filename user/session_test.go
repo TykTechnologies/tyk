@@ -2,12 +2,9 @@ package user
 
 import (
 	"encoding/json"
-	"net/http"
 	"reflect"
 	"testing"
 	"time"
-
-	"github.com/TykTechnologies/tyk/storage"
 
 	"github.com/TykTechnologies/tyk/apidef"
 
@@ -373,150 +370,6 @@ func TestAPILimit_Clone(t *testing.T) {
 				clone.Smoothing.Enabled = false
 				assert.NotEqual(t, tt.input, clone)
 			}
-		})
-	}
-}
-
-func TestEndpoints_RateLimitInfo(t *testing.T) {
-	tests := []struct {
-		name      string
-		method    string
-		path      string
-		endpoints Endpoints
-		expected  *EndpointRateLimitInfo
-		found     bool
-	}{
-		{
-			name:   "Matching endpoint and method",
-			method: http.MethodGet,
-			path:   "/api/v1/users",
-			endpoints: Endpoints{
-				{
-					Path: "/api/v1/users",
-					Methods: []EndpointMethod{
-						{Name: "GET", Limit: RateLimit{Rate: 100, Per: 60}},
-					},
-				},
-			},
-			expected: &EndpointRateLimitInfo{
-				KeySuffix: storage.HashStr("GET:/api/v1/users"),
-				Rate:      100,
-				Per:       60,
-			},
-			found: true,
-		},
-		{
-			name:   "Matching endpoint, non-matching method",
-			path:   "/api/v1/users",
-			method: http.MethodPost,
-			endpoints: []Endpoint{
-				{
-					Path: "/api/v1/users",
-					Methods: []EndpointMethod{
-						{Name: "GET", Limit: RateLimit{Rate: 100, Per: 60}},
-					},
-				},
-			},
-			expected: nil,
-			found:    false,
-		},
-		{
-			name:   "Non-matching endpoint",
-			method: http.MethodGet,
-			path:   "/api/v1/products",
-			endpoints: []Endpoint{
-				{
-					Path: "/api/v1/users",
-					Methods: []EndpointMethod{
-						{Name: "GET", Limit: RateLimit{Rate: 100, Per: 60}},
-					},
-				},
-			},
-			expected: nil,
-			found:    false,
-		},
-		{
-			name:   "Regex path matching",
-			path:   "/api/v1/users/123",
-			method: http.MethodGet,
-			endpoints: []Endpoint{
-				{
-					Path: "/api/v1/users/[0-9]+",
-					Methods: []EndpointMethod{
-						{Name: "GET", Limit: RateLimit{Rate: 50, Per: 30}},
-					},
-				},
-			},
-			expected: &EndpointRateLimitInfo{
-				KeySuffix: storage.HashStr("GET:/api/v1/users/[0-9]+"),
-				Rate:      50,
-				Per:       30,
-			},
-			found: true,
-		},
-		{
-			name:   "Invalid regex path",
-			path:   "/api/v1/users",
-			method: http.MethodGet,
-			endpoints: []Endpoint{
-				{
-					Path: "[invalid regex",
-					Methods: []EndpointMethod{
-						{Name: "GET", Limit: RateLimit{Rate: 100, Per: 60}},
-					},
-				},
-			},
-			expected: nil,
-			found:    false,
-		},
-		{
-			name:   "Invalid regex path and valid url",
-			path:   "/api/v1/users",
-			method: http.MethodGet,
-			endpoints: []Endpoint{
-				{
-					Path: "[invalid regex",
-					Methods: []EndpointMethod{
-						{Name: "GET", Limit: RateLimit{Rate: 100, Per: 60}},
-					},
-				},
-				{
-					Path: "/api/v1/users",
-					Methods: []EndpointMethod{
-						{Name: "GET", Limit: RateLimit{Rate: 100, Per: 60}},
-					},
-				},
-			},
-			expected: &EndpointRateLimitInfo{
-				KeySuffix: storage.HashStr("GET:/api/v1/users"),
-				Rate:      100,
-				Per:       60,
-			},
-			found: true,
-		},
-		{
-			name:      "nil endpoints",
-			path:      "/api/v1/users",
-			method:    http.MethodGet,
-			endpoints: nil,
-			expected:  nil,
-			found:     false,
-		},
-		{
-			name:      "empty endpoints",
-			path:      "/api/v1/users",
-			method:    http.MethodGet,
-			endpoints: Endpoints{},
-			expected:  nil,
-			found:     false,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result, found := tt.endpoints.RateLimitInfo(tt.method, tt.path)
-			assert.Equal(t, tt.found, found)
-			assert.Equal(t, tt.expected, result)
 		})
 	}
 }

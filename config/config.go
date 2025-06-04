@@ -7,7 +7,6 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"time"
 
@@ -45,13 +44,20 @@ var (
 			CheckInterval:             dnsCacheDefaultCheckInterval,
 			MultipleIPsHandleStrategy: NoCacheStrategy,
 		},
-		HealthCheckEndpointName: "hello",
+		HealthCheckEndpointName:    "hello",
+		ReadinessCheckEndpointName: "ready",
 		CoProcessOptions: CoProcessConfig{
 			EnableCoProcess: false,
 		},
 		LivenessCheck: LivenessCheckConfig{
 			CheckDuration: time.Second * 10,
 		},
+		GracefulShutdownTimeoutDuration: 30,
+		Streaming: StreamingConfig{
+			Enabled:     false,
+			AllowUnsafe: []string{},
+		},
+		PIDFileLocation: "/var/run/tyk/tyk-gateway.pid",
 	}
 )
 
@@ -246,6 +252,33 @@ type AnalyticsConfigConfig struct {
 	SerializerType string `json:"serializer_type"`
 }
 
+// AccessLogsConfig defines the type of transactions logs printed to stdout.
+type AccessLogsConfig struct {
+	// Enabled controls the generation of access logs by the Gateway. Default: false.
+	Enabled bool `json:"enabled"`
+
+	// Template configures which fields to include in the access log.
+	// If no template is configured, all available fields will be logged.
+	//
+	// Example: ["client_ip", "path"].
+	//
+	// Template Options:
+	//
+	// - `api_key` will include they obfuscated or hashed key.
+	// - `client_ip` will include the ip of the request.
+	// - `host` will include the host of the request.
+	// - `method` will include the request method.
+	// - `path` will include the path of the request.
+	// - `protocol` will include the protocol of the request.
+	// - `remote_addr` will include the remote address of the request.
+	// - `upstream_addr` will include the upstream address (scheme, host and path)
+	// - `upstream_latency` will include the upstream latency of the request.
+	// - `latency_total` will include the total latency of the request.
+	// - `user_agent` will include the user agent of the request.
+	// - `status` will include the response status code.
+	Template []string `json:"template"`
+}
+
 type HealthCheckConfig struct {
 	// Setting this value to `true` will enable the health-check endpoint on /Tyk/health.
 	EnableHealthChecks bool `json:"enable_health_checks"`
@@ -408,22 +441,64 @@ type HttpServerOptionsConfig struct {
 	// Regular expressions and parameterized routes will be left alone regardless of this setting.
 	EnableStrictRoutes bool `json:"enable_strict_routes"`
 
+	// EnablePathPrefixMatching changes how the gateway matches incoming URL paths against routes (patterns) defined in the API definition.
+	// By default, the gateway uses wildcard matching. When EnablePathPrefixMatching is enabled, it switches to prefix matching. For example, a defined path such as `/json` will only match request URLs that begin with `/json`, rather than matching any URL containing `/json`.
+	//
+	// The gateway checks the request URL against several variations depending on whether path versioning is enabled:
+	// - Full path (listen path + version + endpoint): `/listen-path/v4/json`
+	// - Non-versioned full path (listen path + endpoint): `/listen-path/json`
+	// - Path without version (endpoint only): `/json`
+	//
+	// For patterns that start with `/`, the gateway prepends `^` before performing the check, ensuring a true prefix match.
+	// For patterns that start with `^`, the gateway will already perform prefix matching so EnablePathPrefixMatching will have no impact.
+	// This option allows for more specific and controlled routing of API requests, potentially reducing unintended matches. Note that you may need to adjust existing route definitions when enabling this option.
+	//
+	// Example:
+	//
+	// With wildcard matching, `/json` might match `/api/v1/data/json`.
+	// With prefix matching, `/json` would not match `/api/v1/data/json`, but would match `/json/data`.
+	//
+	// Combining EnablePathPrefixMatching with EnablePathSuffixMatching will result in exact URL matching, with `/json` being evaluated as `^/json$`.
+	EnablePathPrefixMatching bool `json:"enable_path_prefix_matching"`
+
+	// EnablePathSuffixMatching changes how the gateway matches incoming URL paths against routes (patterns) defined in the API definition.
+	// By default, the gateway uses wildcard matching. When EnablePathSuffixMatching is enabled, it switches to suffix matching. For example, a defined path such as `/json` will only match request URLs that end with `/json`, rather than matching any URL containing `/json`.
+	//
+	// The gateway checks the request URL against several variations depending on whether path versioning is enabled:
+	// - Full path (listen path + version + endpoint): `/listen-path/v4/json`
+	// - Non-versioned full path (listen path + endpoint): `/listen-path/json`
+	// - Path without version (endpoint only): `/json`
+	//
+	// For patterns that already end with `$`, the gateway will already perform suffix matching so EnablePathSuffixMatching will have no impact. For all other patterns, the gateway appends `$` before performing the check, ensuring a true suffix match.
+	// This option allows for more specific and controlled routing of API requests, potentially reducing unintended matches. Note that you may need to adjust existing route definitions when enabling this option.
+	//
+	// Example:
+	//
+	// With wildcard matching, `/json` might match `/api/v1/json/data`.
+	// With suffix matching, `/json` would not match `/api/v1/json/data`, but would match `/api/v1/json`.
+	//
+	// Combining EnablePathSuffixMatching with EnablePathPrefixMatching will result in exact URL matching, with `/json` being evaluated as `^/json$`.
+	EnablePathSuffixMatching bool `json:"enable_path_suffix_matching"`
+
 	// Disable TLS verification. Required if you are using self-signed certificates.
 	SSLInsecureSkipVerify bool `json:"ssl_insecure_skip_verify"`
 
 	// Enabled WebSockets and server side events support
 	EnableWebSockets bool `json:"enable_websockets"`
 
-	// Deprecated. SSL certificates used by Gateway server.
+	// Deprecated: Use `ssl_certificates`instead.
 	Certificates CertsData `json:"certificates"`
 
-	// SSL certificates used by your Gateway server. A list of certificate IDs or path to files.
+	// Index of certificates available to the Gateway for use in client and upstream communication.
+	// The string value in the array can be two of the following options:
+	// 1. The ID assigned to and used to identify a certificate in the Tyk Certificate Store
+	// 2. The path to a file accessible to the Gateway. This PEM file must contain the private key and public certificate pair concatenated together.
 	SSLCertificates []string `json:"ssl_certificates"`
 
 	// Start your Gateway HTTP server on specific server name
 	ServerName string `json:"server_name"`
 
-	// Minimum TLS version. Possible values: https://tyk.io/docs/basic-config-and-security/security/tls-and-ssl/#values-for-tls-versions
+	// Minimum TLS version. Possible values: https://tyk.io/docs/api-management/certificates#supported-tls-versions
 	MinVersion uint16 `json:"min_version"`
 
 	// Maximum TLS version.
@@ -445,7 +520,7 @@ type HttpServerOptionsConfig struct {
 	// Disable automatic character escaping, allowing to path original URL data to the upstream.
 	SkipTargetPathEscaping bool `json:"skip_target_path_escaping"`
 
-	// Custom SSL ciphers. See list of ciphers here https://tyk.io/docs/basic-config-and-security/security/tls-and-ssl/#specify-tls-cipher-suites-for-tyk-gateway--tyk-dashboard
+	// Custom SSL ciphers applicable when using TLS version 1.2. See the list of ciphers here https://tyk.io/docs/api-management/certificates#supported-tls-cipher-suites
 	Ciphers []string `json:"ssl_ciphers"`
 
 	// MaxRequestBodySize configures a maximum size limit for request body size (in bytes) for all APIs on the Gateway.
@@ -459,7 +534,7 @@ type HttpServerOptionsConfig struct {
 	// A value of zero (default) means that no maximum is set and API requests will not be tested.
 	//
 	// See more information about setting request size limits here:
-	// https://tyk.io/docs/basic-config-and-security/control-limit-traffic/request-size-limits/#maximum-request-sizes
+	// https://tyk.io/docs/api-management/traffic-transformation/#request-size-limits
 	MaxRequestBodySize int64 `json:"max_request_body_size"`
 }
 
@@ -614,6 +689,19 @@ func (pwl *PortsWhiteList) Decode(value string) error {
 	return nil
 }
 
+// StreamingConfig holds the configuration for Tyk Streaming functionalities
+type StreamingConfig struct {
+	// This flag enables the Tyk Streaming feature.
+	Enabled bool `json:"enabled"`
+	// AllowUnsafe specifies a list of potentially unsafe streaming components that should be allowed in the configuration.
+	// By default, components that could pose security risks (like file access, subprocess execution, socket operations, etc.)
+	// are filtered out. This field allows administrators to explicitly permit specific unsafe components when needed.
+	// Use with caution as enabling unsafe components may introduce security vulnerabilities.
+	AllowUnsafe []string `json:"allow_unsafe"`
+	// EnableAll enables all Bento plugins (except unsafe ones) by disabling the streams validator
+	EnableAll bool `json:"enable_all"`
+}
+
 // Config is the configuration object used by Tyk to set up various parameters.
 type Config struct {
 	// Force your Gateway to work only on a specific domain name. Can be overridden by API custom domain.
@@ -628,7 +716,7 @@ type Config struct {
 	// Custom hostname for the Control API
 	ControlAPIHostname string `json:"control_api_hostname"`
 
-	// Set to run your Gateway Control API on a separate port, and protect it behind a firewall if needed. Please make sure you follow this guide when setting the control port https://tyk.io/docs/planning-for-production/#change-your-control-port.
+	// Set this to expose the Tyk Gateway API on a separate port. You can protect it behind a firewall if needed. Please make sure you follow this guide when setting the control port https://tyk.io/docs/tyk-self-managed/#change-your-control-port.
 	ControlAPIPort int `json:"control_api_port"`
 
 	// This should be changed as soon as Tyk is installed on your system.
@@ -701,7 +789,7 @@ type Config struct {
 	Policies PoliciesConfig `json:"policies"`
 
 	// Defines the ports that will be available for the API services to bind to in the format
-	// documented here https://tyk.io/docs/key-concepts/tcp-proxy/#allowing-specific-ports.
+	// documented here https://tyk.io/docs/api-management/non-http-protocols/#allowing-specific-ports.
 	// Ports can be configured per protocol, e.g. https, tls etc.
 	// If configuring via environment variable `TYK_GW_PORTWHITELIST` then remember to escape
 	// JSON strings.
@@ -740,6 +828,9 @@ type Config struct {
 	// Note:
 	//   If you set `db_app_conf_options.node_is_segmented` to `true` for multiple Gateway nodes, you should ensure that `management_node` is set to `false`.
 	//   This is to ensure visibility for the management node across all APIs.
+	//
+	//   For pro installations, `management_node` is not a valid configuration option.
+	//   Always set `management_node` to `false` in pro environments.
 	ManagementNode bool `json:"management_node"`
 
 	// This is used as part of the RPC / Hybrid back-end configuration in a Tyk Enterprise installation and isn’t used anywhere else.
@@ -839,8 +930,17 @@ type Config struct {
 	// This section enables the configuration of the health-check API endpoint and the size of the sample data cache (in seconds).
 	HealthCheck HealthCheckConfig `json:"health_check"`
 
-	// Enables you to rename the /hello endpoint
+	// HealthCheckEndpointName Enables you to change the liveness endpoint.
+	// Default is "/hello"
 	HealthCheckEndpointName string `json:"health_check_endpoint_name"`
+
+	// ReadinessCheckEndpointName Enables you to change the readiness endpoint
+	// Default is "/ready"
+	ReadinessCheckEndpointName string `json:"readiness_check_endpoint_name"`
+
+	// GracefulShutdownTimeoutDuration sets how many seconds the gateway should wait for an existing connection
+	//to finish before shutting down the server. Defaults to 30 seconds.
+	GracefulShutdownTimeoutDuration int `json:"graceful_shutdown_timeout_duration"`
 
 	// Change the expiry time of a refresh token. By default 14 days (in seconds).
 	OauthRefreshExpire int64 `json:"oauth_refresh_token_expire"`
@@ -960,6 +1060,10 @@ type Config struct {
 	// If not set or left empty, it will default to `standard`.
 	LogFormat string `json:"log_format"`
 
+	// AccessLogs configures the output for access logs.
+	// If not configured, the access log is disabled.
+	AccessLogs AccessLogsConfig `json:"access_logs"`
+
 	// Section for configuring OpenTracing support
 	// Deprecated: use OpenTelemetry instead.
 	Tracer Tracer `json:"tracing"`
@@ -969,7 +1073,7 @@ type Config struct {
 
 	NewRelic NewRelicConfig `json:"newrelic"`
 
-	// Enable debugging of your Tyk Gateway by exposing profiling information through https://tyk.io/docs/troubleshooting/tyk-gateway/profiling/
+	// Enable debugging of your Tyk Gateway by exposing profiling information through https://tyk.io/docs/api-management/troubleshooting-debugging
 	HTTPProfile bool `json:"enable_http_profiler"`
 
 	// Enables the real-time Gateway log view in the Dashboard.
@@ -1028,13 +1132,23 @@ type Config struct {
 	GlobalSessionLifetime int64 `bson:"global_session_lifetime" json:"global_session_lifetime"`
 
 	// This section enables the use of the KV capabilities to substitute configuration values.
-	// See more details https://tyk.io/docs/tyk-configuration-reference/kv-store/
+	// See more details https://tyk.io/docs/tyk-self-managed/#store-configuration-with-key-value-store
 	KV struct {
 		Consul ConsulConfig `json:"consul"`
 		Vault  VaultConfig  `json:"vault"`
 	} `json:"kv"`
 
-	// Secrets are key-value pairs that can be accessed in the dashboard via "secrets://"
+	// Secrets configures a list of key/value pairs for the gateway.
+	// When configuring it via environment variable, the expected value
+	// is a comma separated list of key-value pairs delimited with a colon.
+	//
+	// Example: `TYK_GW_SECRETS=key1:value1,key2:/value2`
+	// Produces: `{"key1": "value1", "key2": "/value2"}`
+	//
+	// The secret value may be used as `secrets://key1` from the API definition.
+	// In versions before gateway 5.3, only `listen_path` and `target_url` fields
+	// have had the secrets replaced.
+	// See more details https://tyk.io/docs/tyk-self-managed/#how-to-access-the-externally-stored-data
 	Secrets map[string]string `json:"secrets"`
 
 	// Override the default error code and or message returned by middleware.
@@ -1061,7 +1175,7 @@ type Config struct {
 	// ```
 	OverrideMessages map[string]TykError `bson:"override_messages" json:"override_messages"`
 
-	// Cloud flag shows the Gateway runs in Tyk-cloud.
+	// Cloud flag shows the Gateway runs in Tyk Cloud.
 	Cloud bool `json:"cloud"`
 
 	// Skip TLS verification for JWT JWKs url validation
@@ -1078,6 +1192,25 @@ type Config struct {
 
 	// OAS holds the configuration for various OpenAPI-specific functionalities
 	OAS OASConfig `json:"oas_config"`
+
+	// Streaming holds the configuration for Tyk Streaming functionalities
+	Streaming StreamingConfig `json:"streaming"`
+
+	Labs LabsConfig `json:"labs"`
+}
+
+// LabsConfig include config for streaming
+type LabsConfig map[string]interface{}
+
+// Decode unmarshals json config into the Labs config
+func (lc *LabsConfig) Decode(value string) error {
+	var temp map[string]interface{}
+	if err := json.Unmarshal([]byte(value), &temp); err != nil {
+		log.Error("Error unmarshalling LabsConfig: ", err)
+		return err
+	}
+	*lc = temp
+	return nil
 }
 
 // OASConfig holds the configuration for various OpenAPI-specific functionalities
@@ -1229,20 +1362,21 @@ func WriteConf(path string, conf *Config) error {
 
 // writeDefault will set conf to the default config and write it to disk
 // in path, if the path is non-empty.
-func WriteDefault(path string, conf *Config) error {
-	_, b, _, _ := runtime.Caller(0)
-	configPath := filepath.Dir(b)
-	rootPath := filepath.Dir(configPath)
-	Default.TemplatePath = filepath.Join(rootPath, "templates")
+func WriteDefault(in string, conf *Config) error {
+	wd, err := os.Getwd()
+	if err != nil {
+		return fmt.Errorf("Can't get working directory: %w", err)
+	}
 
 	*conf = Default
+	conf.TemplatePath = filepath.Join(wd, "templates")
 	if err := envconfig.Process(envPrefix, conf); err != nil {
 		return err
 	}
-	if path == "" {
+	if in == "" {
 		return nil
 	}
-	return WriteConf(path, conf)
+	return WriteConf(in, conf)
 }
 
 // Load will load a configuration file, trying each of the paths given

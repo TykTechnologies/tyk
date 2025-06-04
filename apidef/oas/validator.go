@@ -12,9 +12,9 @@ import (
 	"github.com/buger/jsonparser"
 	"github.com/hashicorp/go-multierror"
 	pkgver "github.com/hashicorp/go-version"
-	"github.com/xeipuuv/gojsonschema"
 
 	tykerrors "github.com/TykTechnologies/tyk/internal/errors"
+	"github.com/TykTechnologies/tyk/internal/service/gojsonschema"
 	logger "github.com/TykTechnologies/tyk/log"
 )
 
@@ -25,6 +25,7 @@ const (
 	keyDefinitions              = "definitions"
 	keyProperties               = "properties"
 	keyRequired                 = "required"
+	keyAnyOf                    = "anyOf"
 	oasSchemaVersionNotFoundFmt = "Schema not found for version %q"
 )
 
@@ -46,6 +47,7 @@ func loadOASSchema() error {
 		}
 
 		xTykAPIGwSchemaWithoutDefs := jsonparser.Delete(xTykAPIGwSchema, keyDefinitions)
+
 		oasJSONSchemas = make(map[string][]byte)
 		members, err := schemaDir.ReadDir("schema")
 		for _, member := range members {
@@ -59,6 +61,9 @@ func loadOASSchema() error {
 			}
 
 			if strings.HasSuffix(fileName, fmt.Sprintf("%s.json", ExtensionTykAPIGateway)) {
+				continue
+			}
+			if strings.HasSuffix(fileName, fmt.Sprintf("%s.strict.json", ExtensionTykAPIGateway)) {
 				continue
 			}
 
@@ -156,6 +161,14 @@ func ValidateOASTemplate(documentBody []byte, oasVersion string) error {
 
 	for _, path := range unsetReqFieldsPaths {
 		definitions = jsonparser.Delete(definitions, path, keyRequired)
+	}
+
+	unsetAnyOfFieldsPaths := []string{
+		"X-Tyk-Upstream",
+	}
+
+	for _, path := range unsetAnyOfFieldsPaths {
+		definitions = jsonparser.Delete(definitions, path, keyAnyOf)
 	}
 
 	oasSchema, err = jsonparser.Set(oasSchema, definitions, keyDefinitions)

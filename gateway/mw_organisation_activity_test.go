@@ -49,6 +49,8 @@ func (ts *Test) testPrepareProcessRequestQuotaLimit(tb testing.TB, data map[stri
 }
 
 func TestOrganizationMonitorEnabled(t *testing.T) {
+	test.Flaky(t) // Test uses StorageConnectionHandler (singleton).
+
 	conf := func(globalConf *config.Config) {
 		globalConf.EnforceOrgQuotas = true
 		globalConf.ExperimentalProcessOrgOffThread = false
@@ -79,7 +81,7 @@ func TestOrganizationMonitorEnabled(t *testing.T) {
 }
 
 func TestProcessRequestLiveQuotaLimit(t *testing.T) {
-	test.Flaky(t) // TODO: TT-5254
+	test.Flaky(t) // Test uses StorageConnectionHandler (singleton).
 
 	conf := func(globalConf *config.Config) {
 		globalConf.EnforceOrgQuotas = true
@@ -154,7 +156,7 @@ func BenchmarkProcessRequestLiveQuotaLimit(b *testing.B) {
 }
 
 func TestProcessRequestOffThreadQuotaLimit(t *testing.T) {
-	test.Flaky(t) // TODO: TT-5254
+	test.Flaky(t) // Test uses StorageConnectionHandler (singleton).
 
 	conf := func(globalConf *config.Config) {
 		globalConf.EnforceOrgQuotas = true
@@ -251,7 +253,7 @@ func BenchmarkProcessRequestOffThreadQuotaLimit(b *testing.B) {
 }
 
 func TestProcessRequestLiveRedisRollingLimiter(t *testing.T) {
-	test.Flaky(t) // TODO: TT-5254
+	test.Flaky(t) // Test uses StorageConnectionHandler (singleton).
 
 	ts := StartTest(nil)
 	defer ts.Close()
@@ -340,7 +342,7 @@ func BenchmarkProcessRequestLiveRedisRollingLimiter(b *testing.B) {
 }
 
 func TestProcessRequestOffThreadRedisRollingLimiter(t *testing.T) {
-	test.Flaky(t) // TODO: TT-5254
+	test.Flaky(t) // Test uses StorageConnectionHandler (singleton).
 
 	// setup global config
 	conf := func(globalConf *config.Config) {

@@ -1,4 +1,4 @@
-ARG BASE_IMAGE=tykio/golang-cross:1.22-bullseye
+ARG BASE_IMAGE=tykio/golang-cross:1.23-bullseye
 FROM ${BASE_IMAGE}
 
 LABEL description="Image for plugin development"
@@ -20,17 +20,24 @@ RUN apt-get purge -y --allow-remove-essential --auto-remove mercurial wget curl 
 ADD go.mod go.sum $TYK_GW_PATH
 WORKDIR $TYK_GW_PATH
 
-RUN --mount=type=cache,mode=0755,target=/go/pkg/mod go mod download
+RUN --mount=type=cache,mode=0755,target=/go/pkg/mod \
+    --mount=type=cache,mode=0755,target=/root/.cache/go-build \
+    go mod download
 
 ADD . $TYK_GW_PATH
 
 # Provide a gateway test binary for testing plugin loading.
-RUN --mount=type=cache,mode=0755,target=/go/pkg/mod GOBIN=/usr/local/bin go install -tags=goplugin -trimpath .
+RUN --mount=type=cache,mode=0755,target=/go/pkg/mod \
+    --mount=type=cache,mode=0755,target=/root/.cache/go-build \
+    GOBIN=/usr/local/bin go install -tags=goplugin -trimpath .
 
 ARG GITHUB_SHA
 ARG GITHUB_TAG
-ENV GITHUB_SHA ${GITHUB_SHA}
-ENV GITHUB_TAG ${GITHUB_TAG}
+ENV GITHUB_SHA=${GITHUB_SHA}
+ENV GITHUB_TAG=${GITHUB_TAG}
+
+ARG BUILD_TAG
+ENV BUILD_TAG=${BUILD_TAG}
 
 COPY ci/images/plugin-compiler/data/build.sh /build.sh
 RUN chmod +x /build.sh

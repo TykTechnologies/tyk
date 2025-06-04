@@ -16,6 +16,7 @@ import (
 	"time"
 )
 
+type TestCases []TestCase
 type TestCase struct {
 	Host    string `json:",omitempty"`
 	Method  string `json:",omitempty"`

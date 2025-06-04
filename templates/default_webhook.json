@@ -48,6 +48,12 @@
     "api_id": "{{.Meta.APIID}}",
     "path": "{{.Meta.Path}}"
 }
+{{ else if eq .Type "UpstreamOAuthError"}}
+{
+    "event": "{{.Type}}",
+    "message": "{{.Meta.Message}}",
+    "api_id": "{{.Meta.APIID}}",
+}
 {{ else}}
 {
     "event": "{{.Type}}",

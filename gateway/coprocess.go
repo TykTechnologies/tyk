@@ -50,7 +50,7 @@ func CreateCoProcessMiddleware(hookName string, hookType coprocess.HookType, mwD
 		HookType:         hookType,
 		HookName:         hookName,
 		MiddlewareDriver: mwDriver,
-		successHandler:   &SuccessHandler{baseMid},
+		successHandler:   &SuccessHandler{baseMid.Copy()},
 	}
 
 	return baseMid.Gw.createMiddleware(dMiddleware)
@@ -308,7 +308,7 @@ func (m *CoProcessMiddleware) EnabledForSpec() bool {
 	log.WithFields(logrus.Fields{
 		"prefix": "coprocess",
 	}).Debug("Enabling CP middleware.")
-	m.successHandler = &SuccessHandler{m.BaseMiddleware}
+	m.successHandler = &SuccessHandler{m.BaseMiddleware.Copy()}
 	return true
 }
 
@@ -547,7 +547,7 @@ func (h *CustomMiddlewareResponseHook) Name() string {
 }
 
 func (h *CustomMiddlewareResponseHook) HandleError(rw http.ResponseWriter, req *http.Request) {
-	handler := ErrorHandler{h.mw.BaseMiddleware}
+	handler := ErrorHandler{h.mw.BaseMiddleware.Copy()}
 	handler.HandleError(rw, req, "Middleware error", http.StatusInternalServerError, true)
 }
 
@@ -598,6 +598,12 @@ func (h *CustomMiddlewareResponseHook) HandleResponse(rw http.ResponseWriter, re
 	bodyBuf := bytes.NewBuffer(retObject.Response.RawBody)
 	res.Body = ioutil.NopCloser(bodyBuf)
 
+	//set response body length with the size of response body returned from the hook
+	//so that it is updated accordingly in the response object
+	responseBodyLen := len(retObject.Response.RawBody)
+	res.ContentLength = int64(responseBodyLen)
+	res.Header.Set("Content-Length", fmt.Sprintf("%d", responseBodyLen))
+
 	res.StatusCode = int(retObject.Response.StatusCode)
 	return nil
 }
@@ -605,6 +611,7 @@ func (h *CustomMiddlewareResponseHook) HandleResponse(rw http.ResponseWriter, re
 // syncHeadersAndMultiValueHeaders synchronizes the content of 'headers' and 'multiValueHeaders'.
 // If a key is updated or added in 'headers', the corresponding key in 'multiValueHeaders' is also updated or added.
 // If a key is removed from 'headers', the corresponding key in 'multiValueHeaders' is also removed.
+// If multiValuesHeaders contains a key with multiple values and the same key is present in headers, the first value in multiValuesHeaders is updated with the value from headers, while the remaining values remain unchanged.
 func syncHeadersAndMultiValueHeaders(headers map[string]string, multiValueHeaders []*coprocess.Header) []*coprocess.Header {
 	updatedMultiValueHeaders := []*coprocess.Header{}
 
@@ -613,7 +620,12 @@ func syncHeadersAndMultiValueHeaders(headers map[string]string, multiValueHeader
 		for _, header := range multiValueHeaders {
 			if header.Key == k {
 				found = true
-				header.Values = []string{v}
+
+				// if the key is present in multiValueHeaders, update the first value with the value from headers
+				if len(header.Values) > 0 {
+					header.Values[0] = v
+				}
+
 				break
 			}
 		}

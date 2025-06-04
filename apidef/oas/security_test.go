@@ -400,7 +400,7 @@ func TestOAS_OAuth(t *testing.T) {
 	}
 
 	var oas OAS
-	oas.Paths = make(openapi3.Paths)
+	oas.Paths = openapi3.NewPaths()
 	oas.Security = openapi3.SecurityRequirements{
 		{
 			securityName: []string{},
@@ -464,7 +464,7 @@ func TestOAS_ExternalOAuth(t *testing.T) {
 	}
 
 	var oas OAS
-	oas.Paths = make(openapi3.Paths)
+	oas.Paths = openapi3.NewPaths()
 	oas.Security = openapi3.SecurityRequirements{
 		{
 			securityName: []string{},
@@ -517,6 +517,23 @@ func TestOAS_ExternalOAuth(t *testing.T) {
 	assert.Equal(t, flows.AuthorizationCode.TokenURL, "{api-url}/oauth/token")
 
 	assert.Equal(t, oas, convertedOAS)
+
+	t.Run("when externalOAuthType doesn't exist in AuthConfigs", func(t *testing.T) {
+		// Delete externalOAuth config from AuthConfigs map, a sensible default config will be used by
+		// OAS.fillExternalOAuth method.
+		delete(api.AuthConfigs, apidef.ExternalOAuthType)
+
+		var convertedOASWithoutExternalOAuth OAS
+		convertedOASWithoutExternalOAuth.Components = &openapi3.Components{SecuritySchemes: oas.Components.SecuritySchemes}
+		convertedOASWithoutExternalOAuth.Fill(api)
+		authFlows := convertedOASWithoutExternalOAuth.Components.SecuritySchemes[securityName].Value.Flows
+		assert.Equal(t, authFlows.AuthorizationCode.AuthorizationURL, "{api-url}/oauth/authorize")
+		assert.Equal(t, authFlows.AuthorizationCode.TokenURL, "{api-url}/oauth/token")
+		assert.Equal(t,
+			oas.Components.SecuritySchemes[apidef.ExternalOAuthType],
+			convertedOASWithoutExternalOAuth.Components.SecuritySchemes[apidef.ExternalOAuthType],
+		)
+	})
 }
 
 func TestOAS_OIDC(t *testing.T) {
@@ -585,7 +602,7 @@ func TestOAS_TykAuthentication_NoOASSecurity(t *testing.T) {
 
 	var oas OAS
 	oas.Components = &openapi3.Components{}
-	oas.Paths = make(openapi3.Paths)
+	oas.Paths = openapi3.NewPaths()
 	oas.Extensions = map[string]interface{}{
 		ExtensionTykAPIGateway: &XTykAPIGateway{
 			Server: Server{

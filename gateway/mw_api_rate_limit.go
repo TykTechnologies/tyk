@@ -1,6 +1,7 @@
 package gateway
 
 import (
+	"fmt"
 	"net/http"
 
 	"strconv"
@@ -54,7 +55,7 @@ func (k *RateLimitForAPI) getSession(r *http.Request) *user.SessionState {
 	if ok {
 		if limits := spec.RateLimit; limits.Valid() {
 			// track per-endpoint with a hash of the path
-			keyname := k.keyName + "-" + storage.HashStr(limits.Path)
+			keyname := k.keyName + "-" + storage.HashStr(fmt.Sprintf("%s:%s", limits.Method, limits.Path))
 
 			session := &user.SessionState{
 				Rate:        limits.Rate,

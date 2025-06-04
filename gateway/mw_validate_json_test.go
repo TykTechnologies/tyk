@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 	"testing"
 
 	"github.com/TykTechnologies/tyk/apidef"
@@ -59,7 +60,14 @@ func TestValidateJSONSchema(t *testing.T) {
 
 	_, _ = ts.Run(t, []test.TestCase{
 		{Method: http.MethodPost, Path: "/without_validation", Data: "{not_valid}", Code: http.StatusOK},
-		{Method: http.MethodPost, Path: "/v", Data: `{"age":23}`, BodyMatch: `firstName: firstName is required; lastName: lastName is required`, Code: http.StatusUnprocessableEntity},
+		{Method: http.MethodPost, Path: "/v", Data: `{"age":23}`, BodyMatchFunc: func(b []byte) bool {
+			var body = string(b)
+			var result = true
+			result = result && strings.Contains(body, "firstName is required")
+			result = result && strings.Contains(body, "lastName is required")
+			result = result && strings.Contains(body, `"error":`)
+			return result
+		}, Code: http.StatusUnprocessableEntity},
 		{Method: http.MethodPost, Path: "/v", Data: `[]`, BodyMatch: `Expected: object, given: array`, Code: http.StatusUnprocessableEntity},
 		{Method: http.MethodPost, Path: "/v", Data: `not_json`, Code: http.StatusBadRequest},
 		{Method: http.MethodPost, Path: "/v", Data: `{"age":23, "firstName": "Harry", "lastName": "Potter"}`, Code: http.StatusOK},

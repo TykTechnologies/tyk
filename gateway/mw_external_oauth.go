@@ -38,6 +38,10 @@ func (k *ExternalOAuthMiddleware) Name() string {
 }
 
 func (k *ExternalOAuthMiddleware) EnabledForSpec() bool {
+	if k.Spec.ExternalOAuth.Enabled {
+		log.Warn("Support for external OAuth Middleware will be deprecated starting from 5.7.0. To avoid any disruptions, we recommend that you use JSON Web Token (JWT) instead, as explained in https://tyk.io/docs/basic-config-and-security/security/authentication-authorization/ext-oauth-middleware/")
+	}
+
 	return k.Spec.ExternalOAuth.Enabled
 }
 
@@ -292,11 +296,14 @@ func isExpired(claims jwt.MapClaims) bool {
 }
 
 func newIntrospectionCache(gw *Gateway) *introspectionCache {
-	return &introspectionCache{RedisCluster: storage.RedisCluster{KeyPrefix: "introspection-", ConnectionHandler: gw.StorageConnectionHandler}}
+	conn := &storage.RedisCluster{KeyPrefix: "introspection-", ConnectionHandler: gw.StorageConnectionHandler}
+	conn.Connect()
+
+	return &introspectionCache{RedisCluster: conn}
 }
 
 type introspectionCache struct {
-	storage.RedisCluster
+	*storage.RedisCluster
 }
 
 func (c *introspectionCache) GetRes(token string) (jwt.MapClaims, bool) {
