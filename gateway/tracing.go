@@ -224,7 +224,7 @@ func (gw *Gateway) traceHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	spec.SetupMockOperation(tr)
+	spec.SetupOperation(tr)
 	nopCloseRequestBody(tr)
 	chainObj.ThisHandler.ServeHTTP(wr, tr)
 

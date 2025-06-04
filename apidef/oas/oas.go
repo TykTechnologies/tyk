@@ -513,11 +513,11 @@ func FillOASFromClassicAPIDefinition(api *apidef.APIDefinition, oas *OAS) (*OAS,
 	oas.setRequiredFields(api.Name, api.VersionName)
 	clearClassicAPIForSomeFeatures(api)
 
-	err := oas.Validate(context.Background(), []openapi3.ValidationOption{
+	if err := oas.Validate(
+		context.Background(),
 		openapi3.DisableExamplesValidation(),
 		openapi3.DisableSchemaDefaultsValidation(),
-	}...)
-	if err != nil {
+	); err != nil {
 		return nil, err
 	}
 

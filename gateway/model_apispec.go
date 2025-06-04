@@ -58,8 +58,7 @@ type APISpec struct {
 
 	GraphEngine graphengine.Engine
 
-	HasValidateRequest bool
-	OASRouter          routers.Router
+	OASRouter routers.Router
 }
 
 // CheckSpecMatchesStatus checks if a URL spec has a specific status.
@@ -139,7 +138,7 @@ func (a *APISpec) injectIntoReqContext(req *http.Request) {
 	}
 }
 
-func (a *APISpec) findMatchedMockOperation(r *http.Request) *Operation {
+func (a *APISpec) findOperations(r *http.Request) *Operation {
 	middleware := a.OAS.GetTykMiddleware()
 	if middleware == nil {
 		return nil
@@ -148,17 +147,13 @@ func (a *APISpec) findMatchedMockOperation(r *http.Request) *Operation {
 	route, pathParams, err := a.OASRouter.FindRoute(r)
 
 	if err != nil {
-		log.Warningf("Error finding route: %v", err)
+		log.Debugf("Error finding route: %v", err)
 		return nil
 	}
 
 	operation, ok := middleware.Operations[route.Operation.OperationID]
 	if !ok {
 		log.Warningf("No operation found for ID: %s", route.Operation.OperationID)
-		return nil
-	}
-
-	if operation.MockResponse == nil || !operation.MockResponse.Enabled {
 		return nil
 	}
 
@@ -169,12 +164,8 @@ func (a *APISpec) findMatchedMockOperation(r *http.Request) *Operation {
 	}
 }
 
-func (a *APISpec) SetupMockOperation(r *http.Request) {
-	if !a.hasMock() {
-		return
-	}
-
-	if mockOp := a.findMatchedMockOperation(r); mockOp != nil {
+func (a *APISpec) SetupOperation(r *http.Request) {
+	if mockOp := a.findOperations(r); mockOp != nil {
 		ctxSetOperation(r, mockOp)
 	}
 }
