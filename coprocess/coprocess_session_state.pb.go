@@ -411,7 +411,7 @@ type SessionState struct {
 	// MaxQueryDepth relates to graphQL APIs. If the session key has a maximum query depth limit defined then it is included in the
 	// session instance. Currently unsupported and under development.
 	MaxQueryDepth int64 `protobuf:"varint,31,opt,name=max_query_depth,json=maxQueryDepth,proto3" json:"max_query_depth,omitempty"`
-	// KeyID corresponding to the token used for API access.
+	// KeyId corresponds to the token used for API access.
 	KeyId string `protobuf:"bytes,32,opt,name=key_id,json=keyId,proto3" json:"key_id,omitempty"`
 }
 
