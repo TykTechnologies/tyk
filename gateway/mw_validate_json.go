@@ -30,7 +30,7 @@ func (k *ValidateJSON) EnabledForSpec() bool {
 }
 
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail
-func (k *ValidateJSON) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
+func (k *ValidateJSON) ProcessRequest(_ http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
 	versionInfo, _ := k.Spec.Version(r)
 	versionPaths := k.Spec.RxPaths[versionInfo.Name]
 	found, meta := k.Spec.CheckSpecMatchesStatus(r, versionPaths, ValidateJSONRequest)

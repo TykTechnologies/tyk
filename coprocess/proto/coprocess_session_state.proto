@@ -180,4 +180,7 @@ message SessionState {
   // MaxQueryDepth relates to graphQL APIs. If the session key has a maximum query depth limit defined then it is included in the
   // session instance. Currently unsupported and under development.
   int64 max_query_depth = 31;
+
+  // KeyId corresponds to the token used for API access.
+  string key_id = 32;
 }
