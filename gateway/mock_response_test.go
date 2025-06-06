@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"context"
+	"github.com/TykTechnologies/tyk/header"
 	"net/http"
 	"testing"
 
@@ -286,8 +287,8 @@ func Test_mockFromOAS(t *testing.T) {
 
 	t.Run("override config by request", func(t *testing.T) {
 		request := &http.Request{Header: http.Header{}}
-		request.Header.Set(acceptContentType, "text")
-		request.Header.Set(acceptCode, "418")
+		request.Header.Set(header.Accept, "text")
+		request.Header.Set(header.XTykAcceptExampleCode, "418")
 		code, contentType, body, _, err := mockFromOAS(request, operation, fromOASExamples)
 		assert.NoError(t, err)
 
@@ -309,7 +310,7 @@ func Test_mockFromOAS(t *testing.T) {
 
 		t.Run("by request", func(t *testing.T) {
 			request := &http.Request{Header: http.Header{}}
-			request.Header.Set(acceptExampleName, "second")
+			request.Header.Set(header.XTykAcceptExampleName, "second")
 			_, _, body, _, err := mockFromOAS(request, operation, fromOASExamples)
 			assert.NoError(t, err)
 
@@ -342,27 +343,27 @@ func Test_mockFromOAS(t *testing.T) {
 	t.Run("errors", func(t *testing.T) {
 		t.Run("content type", func(t *testing.T) {
 			request := &http.Request{Header: http.Header{}}
-			request.Header.Set(acceptContentType, "undefined")
+			request.Header.Set(header.Accept, "undefined")
 			_, _, _, _, err := mockFromOAS(request, operation, fromOASExamples)
 			assert.EqualError(t, err, "there is no example response for the content type: undefined")
 		})
 
 		t.Run("code", func(t *testing.T) {
 			request := &http.Request{Header: http.Header{}}
-			request.Header.Set(acceptCode, "undefined")
+			request.Header.Set(header.XTykAcceptExampleCode, "undefined")
 			_, _, _, _, err := mockFromOAS(request, operation, fromOASExamples)
 			assert.EqualError(t, err, "given code undefined is not a valid integer value")
 
-			request.Header.Set(acceptCode, "202")
+			request.Header.Set(header.XTykAcceptExampleCode, "202")
 			_, _, _, _, err = mockFromOAS(request, operation, fromOASExamples)
 			assert.EqualError(t, err, "there is no example response for the code: 202")
 		})
 
 		t.Run("example name", func(t *testing.T) {
 			request := &http.Request{Header: http.Header{}}
-			request.Header.Set(acceptCode, "404")
-			request.Header.Set(acceptContentType, "text")
-			request.Header.Set(acceptExampleName, "undefined")
+			request.Header.Set(header.XTykAcceptExampleCode, "404")
+			request.Header.Set(header.Accept, "text")
+			request.Header.Set(header.XTykAcceptExampleName, "undefined")
 			_, _, _, _, err := mockFromOAS(request, operation, fromOASExamples)
 			assert.EqualError(t, err, "there is no example response for the example name: undefined")
 		})

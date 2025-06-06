@@ -1042,7 +1042,7 @@ func TestSSLForceCommonName(t *testing.T) {
 			spec.Proxy.TargetURL = targetURL
 		})
 
-		_, _ = ts.Run(t, test.TestCase{Code: 200, Client: test.NewClientLocal()})
+		_, _ = ts.Run(t, test.TestCase{Code: http.StatusOK, Client: test.NewClientLocal()})
 	})
 }
 

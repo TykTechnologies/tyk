@@ -52,16 +52,13 @@ type APISpec struct {
 	OrgHasNoSession          bool
 	AnalyticsPluginConfig    *GoAnalyticsPlugin
 
-	middlewareChain *ChainObject
-	unloadHooks     []func()
+	unloadHooks []func()
 
 	network analytics.NetworkStats
 
 	GraphEngine graphengine.Engine
 
-	HasMock            bool
-	HasValidateRequest bool
-	OASRouter          routers.Router
+	OASRouter routers.Router
 }
 
 // CheckSpecMatchesStatus checks if a URL spec has a specific status.
@@ -138,5 +135,37 @@ func (a *APISpec) injectIntoReqContext(req *http.Request) {
 		ctx.SetOASDefinition(req, &a.OAS)
 	} else {
 		ctx.SetDefinition(req, a.APIDefinition)
+	}
+}
+
+func (a *APISpec) findOperations(r *http.Request) *Operation {
+	middleware := a.OAS.GetTykMiddleware()
+	if middleware == nil {
+		return nil
+	}
+
+	route, pathParams, err := a.OASRouter.FindRoute(r)
+
+	if err != nil {
+		log.Debugf("Error finding route: %v", err)
+		return nil
+	}
+
+	operation, ok := middleware.Operations[route.Operation.OperationID]
+	if !ok {
+		log.Warningf("No operation found for ID: %s", route.Operation.OperationID)
+		return nil
+	}
+
+	return &Operation{
+		Operation:  operation,
+		route:      route,
+		pathParams: pathParams,
+	}
+}
+
+func (a *APISpec) SetupOperation(r *http.Request) {
+	if mockOp := a.findOperations(r); mockOp != nil {
+		ctxSetOperation(r, mockOp)
 	}
 }

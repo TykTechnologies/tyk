@@ -37,8 +37,13 @@ func (k *ValidateRequest) EnabledForSpec() bool {
 		return false
 	}
 
-	middleware := k.Spec.OAS.GetTykExtension().Middleware
-	if middleware == nil {
+	extension := k.Spec.OAS.GetTykExtension()
+	if extension == nil {
+		return false
+	}
+
+	middleware := extension.Middleware
+	if extension.Middleware == nil {
 		return false
 	}
 
@@ -52,7 +57,6 @@ func (k *ValidateRequest) EnabledForSpec() bool {
 		}
 
 		if operation.ValidateRequest.Enabled {
-			k.Spec.HasValidateRequest = true
 			return true
 		}
 	}
@@ -63,6 +67,7 @@ func (k *ValidateRequest) EnabledForSpec() bool {
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail
 func (k *ValidateRequest) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
 	operation := ctxGetOperation(r)
+
 	if operation == nil {
 		return nil, http.StatusOK
 	}
