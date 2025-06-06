@@ -278,7 +278,16 @@ func (l *SessionLimiter) RateLimitInfo(r *http.Request, api *APISpec, endpoints 
 // sessionFailReason if session limits have been exceeded.
 // Key values to manage rate are Rate and Per, e.g. Rate of 10 messages
 // Per 10 seconds
-func (l *SessionLimiter) ForwardMessage(r *http.Request, session *user.SessionState, rateLimitKey string, quotaKey string, store storage.Handler, enableRL, enableQ bool, api *APISpec, dryRun bool) sessionFailReason {
+func (l *SessionLimiter) ForwardMessage(
+	r *http.Request,
+	session *user.SessionState,
+	rateLimitKey string,
+	quotaKey string,
+	store storage.Handler,
+	enableRL, enableQ bool,
+	api *APISpec,
+	dryRun bool,
+) sessionFailReason {
 	// check for limit on API level (set to session by ApplyPolicies)
 	accessDef, allowanceScope, err := GetAccessDefinitionByAPIIDOrSession(session, api)
 	if err != nil {
@@ -376,7 +385,6 @@ func (l *SessionLimiter) ForwardMessage(r *http.Request, session *user.SessionSt
 	}
 
 	return sessionFailNone
-
 }
 
 // RedisQuotaExceeded returns true if the request should be blocked as over quota.

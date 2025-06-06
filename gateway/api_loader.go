@@ -3,6 +3,7 @@ package gateway
 import (
 	"crypto/tls"
 	"fmt"
+	"github.com/TykTechnologies/tyk/common/option"
 	"io/ioutil"
 	"net/http"
 	"net/url"
@@ -41,6 +42,11 @@ type ChainObject struct {
 	RateLimitChain http.Handler
 	Open           bool
 	Skip           bool
+}
+
+// ProcessSpecOptions represents options for processSpec method
+type ProcessSpecOptions struct {
+	quotaKey string
 }
 
 func (gw *Gateway) prepareStorage() generalStores {
@@ -147,8 +153,17 @@ func (gw *Gateway) generateSubRoutes(spec *APISpec, router *mux.Router, logger *
 	}
 }
 
-func (gw *Gateway) processSpec(spec *APISpec, apisByListen map[string]int,
-	gs *generalStores, logger *logrus.Entry) *ChainObject {
+func (gw *Gateway) processSpec(
+	spec *APISpec,
+	apisByListen map[string]int,
+	gs *generalStores,
+	logger *logrus.Entry,
+	opts ...option.Option[ProcessSpecOptions],
+) *ChainObject {
+
+	var options = option.New(opts).Build(ProcessSpecOptions{
+		quotaKey: "",
+	})
 
 	var chainDef ChainObject
 
@@ -424,7 +439,7 @@ func (gw *Gateway) processSpec(spec *APISpec, apisByListen map[string]int,
 		gw.mwAppendEnabled(&chainArray, &RateLimitAndQuotaCheck{baseMid.Copy()})
 	}
 
-	gw.mwAppendEnabled(&chainArray, &RateLimitForAPI{BaseMiddleware: baseMid.Copy()})
+	gw.mwAppendEnabled(&chainArray, &RateLimitForAPI{BaseMiddleware: baseMid.Copy(), quotaKey: options.quotaKey})
 	gw.mwAppendEnabled(&chainArray, &GraphQLMiddleware{BaseMiddleware: baseMid.Copy()})
 
 	if streamMw := getStreamingMiddleware(baseMid); streamMw != nil {
@@ -1124,4 +1139,11 @@ func (gw *Gateway) allApisAreMTLS() bool {
 	}
 
 	return true
+}
+
+// WithQuotaKey overrides quota key manually
+func WithQuotaKey(key string) option.Option[ProcessSpecOptions] {
+	return func(p *ProcessSpecOptions) {
+		p.quotaKey = key
+	}
 }

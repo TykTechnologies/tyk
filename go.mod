@@ -92,11 +92,22 @@ require (
 	github.com/nats-io/nats.go v1.38.0
 	github.com/newrelic/go-agent/v3 v3.35.1
 	github.com/newrelic/go-agent/v3/integrations/nrgorilla v1.2.2
+<<<<<<< HEAD
 	github.com/oasdiff/yaml v0.0.0-20241214135536-5f7845c759c8
 	github.com/shirou/gopsutil v3.20.11+incompatible
 	github.com/testcontainers/testcontainers-go v0.34.0
 	github.com/testcontainers/testcontainers-go/modules/kafka v0.33.0
 	github.com/testcontainers/testcontainers-go/modules/nats v0.33.0
+=======
+	github.com/oasdiff/yaml v0.0.0-20250309154309-f31be36b4037
+	github.com/rabbitmq/amqp091-go v1.9.0
+	github.com/samber/lo v1.50.0
+	github.com/shirou/gopsutil v3.21.11+incompatible
+	github.com/testcontainers/testcontainers-go v0.37.0
+	github.com/testcontainers/testcontainers-go/modules/kafka v0.37.0
+	github.com/testcontainers/testcontainers-go/modules/nats v0.37.0
+	github.com/testcontainers/testcontainers-go/modules/rabbitmq v0.36.0
+>>>>>>> d9954f921... [Debugger MVP] Some middleware doesn't work for OAS debugger (#7093)
 	github.com/warpstreamlabs/bento v1.7.1
 	go.opentelemetry.io/otel v1.32.0
 	go.opentelemetry.io/otel/trace v1.32.0

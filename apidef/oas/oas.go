@@ -33,13 +33,6 @@ type OAS struct {
 	openapi3.T
 }
 
-// NewOAS returns an allocated *OAS.
-func NewOAS() *OAS {
-	return &OAS{
-		T: openapi3.T{},
-	}
-}
-
 // MarshalJSON implements json.Marshaller.
 func (s *OAS) MarshalJSON() ([]byte, error) {
 	if ShouldOmit(s.ExternalDocs) { // for sql case
@@ -333,8 +326,8 @@ func (s *OAS) getTykSecurityScheme(name string) interface{} {
 
 // GetTykMiddleware returns middleware section from XTykAPIGateway.
 func (s *OAS) GetTykMiddleware() (middleware *Middleware) {
-	if s.GetTykExtension() != nil {
-		middleware = s.GetTykExtension().Middleware
+	if extension := s.GetTykExtension(); extension != nil {
+		middleware = extension.Middleware
 	}
 
 	return
@@ -521,11 +514,11 @@ func FillOASFromClassicAPIDefinition(api *apidef.APIDefinition, oas *OAS) (*OAS,
 	oas.setRequiredFields(api.Name, api.VersionName)
 	clearClassicAPIForSomeFeatures(api)
 
-	err := oas.Validate(context.Background(), []openapi3.ValidationOption{
+	if err := oas.Validate(
+		context.Background(),
 		openapi3.DisableExamplesValidation(),
 		openapi3.DisableSchemaDefaultsValidation(),
-	}...)
-	if err != nil {
+	); err != nil {
 		return nil, err
 	}
 

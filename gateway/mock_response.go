@@ -13,12 +13,13 @@ import (
 	"github.com/TykTechnologies/kin-openapi/openapi3"
 
 	"github.com/TykTechnologies/tyk/apidef/oas"
+<<<<<<< HEAD
 	header "github.com/TykTechnologies/tyk/header"
+=======
+	"github.com/TykTechnologies/tyk/header"
+	"github.com/getkin/kin-openapi/openapi3"
+>>>>>>> d9954f921... [Debugger MVP] Some middleware doesn't work for OAS debugger (#7093)
 )
-
-const acceptContentType = "Accept"
-const acceptCode = "X-Tyk-Accept-Example-Code"
-const acceptExampleName = "X-Tyk-Accept-Example-Name"
 
 func (p *ReverseProxy) mockResponse(r *http.Request) (*http.Response, error) {
 	operation := ctxGetOperation(r)
@@ -79,7 +80,7 @@ func mockFromConfig(tykMockRespOp *oas.MockResponse) (int, []byte, []oas.Header)
 
 func mockFromOAS(r *http.Request, operation *openapi3.Operation, fromOASExamples *oas.FromOASExamples) (int, string, []byte, []oas.Header, error) {
 	exampleName := fromOASExamples.ExampleName
-	if headerExampleName := r.Header.Get(acceptExampleName); headerExampleName != "" {
+	if headerExampleName := r.Header.Get(header.XTykAcceptExampleName); headerExampleName != "" {
 		exampleName = headerExampleName
 	}
 
@@ -89,7 +90,7 @@ func mockFromOAS(r *http.Request, operation *openapi3.Operation, fromOASExamples
 	}
 
 	var err error
-	if headerCode := r.Header.Get(acceptCode); headerCode != "" {
+	if headerCode := r.Header.Get(header.XTykAcceptExampleCode); headerCode != "" {
 		if code, err = strconv.Atoi(headerCode); err != nil {
 			return http.StatusBadRequest, "", nil, nil, fmt.Errorf("given code %s is not a valid integer value", headerCode)
 		}
@@ -100,7 +101,7 @@ func mockFromOAS(r *http.Request, operation *openapi3.Operation, fromOASExamples
 		contentType = fromOASExamples.ContentType
 	}
 
-	if headerContentType := r.Header.Get(acceptContentType); headerContentType != "*/*" && headerContentType != "" {
+	if headerContentType := r.Header.Get(header.Accept); headerContentType != "*/*" && headerContentType != "" {
 		contentType = headerContentType
 	}
 
