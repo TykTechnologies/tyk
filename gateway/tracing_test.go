@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"github.com/TykTechnologies/tyk/header"
 	"github.com/samber/lo"
 	"io"
 	"net/http"
@@ -205,8 +206,8 @@ func TestTraceHandler_MockMiddlewareRespondsWithProvidedData(t *testing.T) {
 			b.Mock(func(mock *oas.MockResponse) {
 				mock.Code = http.StatusCreated
 				mock.Body = string(msgJson)
-				mock.Headers = append(mock.Headers, oas.Header{Name: "hello", Value: "world"})
-				mock.Headers = append(mock.Headers, oas.Header{Name: "Content-Type", Value: "application/json"})
+				mock.Headers.Add("hello", "world")
+				mock.Headers.Add(header.ContentType, "application/json")
 			})
 		}),
 	)

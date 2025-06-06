@@ -1,6 +1,7 @@
 package gateway
 
 import (
+	"github.com/TykTechnologies/tyk/internal/errors"
 	"net/http"
 	"net/url"
 	"strings"
@@ -58,7 +59,7 @@ type APISpec struct {
 
 	GraphEngine graphengine.Engine
 
-	OASRouter routers.Router
+	oasRouter routers.Router
 }
 
 // CheckSpecMatchesStatus checks if a URL spec has a specific status.
@@ -138,16 +139,20 @@ func (a *APISpec) injectIntoReqContext(req *http.Request) {
 	}
 }
 
-func (a *APISpec) findOperations(r *http.Request) *Operation {
+func (a *APISpec) findOperation(r *http.Request) *Operation {
 	middleware := a.OAS.GetTykMiddleware()
 	if middleware == nil {
 		return nil
 	}
 
-	route, pathParams, err := a.OASRouter.FindRoute(r)
+	route, pathParams, err := a.oasRouter.FindRoute(r)
+
+	if errors.Is(err, routers.ErrPathNotFound) {
+		return nil
+	}
 
 	if err != nil {
-		log.Debugf("Error finding route: %v", err)
+		log.Warningf("Error finding route: %v", err)
 		return nil
 	}
 
@@ -164,8 +169,9 @@ func (a *APISpec) findOperations(r *http.Request) *Operation {
 	}
 }
 
-func (a *APISpec) SetupOperation(r *http.Request) {
-	if mockOp := a.findOperations(r); mockOp != nil {
-		ctxSetOperation(r, mockOp)
-	}
-}
+// todo: remove ctxSetOperation
+//func (a *APISpec) SetupOperation(r *http.Request) {
+//	if mockOp := a.findOperation(r); mockOp != nil {
+//		ctxSetOperation(r, mockOp)
+//	}
+//}

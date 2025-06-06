@@ -210,7 +210,7 @@ func (gw *Gateway) traceHandler(w http.ResponseWriter, r *http.Request) {
 		logrus.NewEntry(logger),
 		WithQuotaKey(spec.Checksum),
 	)
-	gw.generateSubRoutes(spec, subrouter, logrus.NewEntry(logger))
+	gw.generateSubRoutes(spec, subrouter)
 
 	if chainObj.ThisHandler == nil {
 		doJSONWrite(w, http.StatusBadRequest, traceResponse{Message: "error", Logs: logStorage.String()})
@@ -224,7 +224,8 @@ func (gw *Gateway) traceHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	spec.SetupOperation(tr)
+	//
+	//spec.SetupOperation(tr)
 	nopCloseRequestBody(tr)
 	chainObj.ThisHandler.ServeHTTP(wr, tr)
 

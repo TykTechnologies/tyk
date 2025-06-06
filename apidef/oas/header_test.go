@@ -23,7 +23,7 @@ func TestHeaders_Map(t *testing.T) {
 		"k2": "v2",
 	}
 
-	assert.Equal(t, expected, headers.Map())
+	assert.Equal(t, expected, Map(headers))
 }
 
 func TestNewHeaders(t *testing.T) {

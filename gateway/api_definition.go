@@ -10,6 +10,7 @@ import (
 	"io"
 	"io/ioutil"
 	"net/http"
+	url "net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -379,7 +380,7 @@ func (a APIDefinitionLoader) MakeSpec(def *model.MergedAPI, logger *logrus.Entry
 		{URL: spec.Proxy.ListenPath},
 	}
 
-	spec.OASRouter, err = gorillamux.NewRouter(&oasSpec)
+	spec.oasRouter, err = gorillamux.NewRouter(&oasSpec)
 	if err != nil {
 		logger.WithError(err).Error("Could not create OAS router")
 	}
@@ -1725,7 +1726,20 @@ func (a *APISpec) SanitizeProxyPaths(r *http.Request) {
 	log.Debug("Upstream path is: ", r.URL.Path)
 }
 
-func (a *APISpec) hasMock() bool {
+// RewritePrefixPath is used for internal redirect
+func (a *APISpec) RewritePrefixPath(r *http.Request) {
+	newPath, err := url.JoinPath("/", a.target.Host, a.StripListenPath(r.URL.Path))
+
+	if err != nil {
+		log.Errorf("Error rewriting path %s: %v", newPath, err)
+		return
+	}
+
+	r.URL.Path = newPath
+}
+
+// hasActiveMock checks if specification has at least one active mock.
+func (a *APISpec) hasActiveMock() bool {
 	if !a.IsOAS {
 		return false
 	}
