@@ -5,20 +5,15 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+
 	"io"
 	"net/http"
 	"sort"
 	"strconv"
 
 	"github.com/TykTechnologies/kin-openapi/openapi3"
-
 	"github.com/TykTechnologies/tyk/apidef/oas"
-<<<<<<< HEAD
-	header "github.com/TykTechnologies/tyk/header"
-=======
 	"github.com/TykTechnologies/tyk/header"
-	"github.com/getkin/kin-openapi/openapi3"
->>>>>>> d9954f921... [Debugger MVP] Some middleware doesn't work for OAS debugger (#7093)
 )
 
 func (p *ReverseProxy) mockResponse(r *http.Request) (*http.Response, error) {

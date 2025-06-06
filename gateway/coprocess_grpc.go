@@ -24,7 +24,7 @@ type GRPCDispatcher struct {
 	coprocess.Dispatcher
 }
 
-func (gw *Gateway) dialer(addr string, timeout time.Duration) (net.Conn, error) {
+func (gw *Gateway) dialer(_ string, timeout time.Duration) (net.Conn, error) {
 	grpcURL, err := url.Parse(gw.GetConfig().CoProcessOptions.CoProcessGRPCServer)
 	if err != nil {
 		log.WithFields(logrus.Fields{
