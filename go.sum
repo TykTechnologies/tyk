@@ -57,10 +57,10 @@ github.com/TykTechnologies/exp/pkg/limiters v0.0.0-20231219151617-0c4f9315fe5c h
 github.com/TykTechnologies/exp/pkg/limiters v0.0.0-20231219151617-0c4f9315fe5c/go.mod h1:7zNtrBmhNOcnBcW7HzjQcwh0HbgslY2VKS4nQI5xmX0=
 github.com/TykTechnologies/goautosocket v0.0.0-20190430121222-97bfa5e7e481 h1:fPcSnu5/IBgyqf73GHA99QuwMDbfWH+L4BEX9EZ5kUo=
 github.com/TykTechnologies/goautosocket v0.0.0-20190430121222-97bfa5e7e481/go.mod h1:CtF8OunV123VfKa8Z9kKcIPHgcd67hSAwFMLlS7FvS4=
-github.com/TykTechnologies/gojsonschema v0.0.0-20170222154038-dcb3e4bb7990 h1:CJRTgg13M3vJG9S7k7kpnvDRMGMywm5OsN6eUE8VwJE=
-github.com/TykTechnologies/gojsonschema v0.0.0-20170222154038-dcb3e4bb7990/go.mod h1:SQT0NBrY4/pMikBgwFIrWCjcHBxg015Y8is0kAnMtug=
-github.com/TykTechnologies/gorpc v0.0.0-20250214161245-e9f3f088e8c6 h1:wwt23wdyiZg386taFYNx8NB0jNdtTe66yUcq7vKq9L8=
-github.com/TykTechnologies/gorpc v0.0.0-20250214161245-e9f3f088e8c6/go.mod h1:v6v7Mlj08+EmEcXOfpuTxGt2qYU9yhqqtv4QF9Wf50E=
+github.com/TykTechnologies/gojsonschema v0.0.0-20221026223418-8ec6134c8a60 h1:8N6ivi4lmUE1n5MvKIfo3R3WJ3NuKwHjlkTm7cCT0EQ=
+github.com/TykTechnologies/gojsonschema v0.0.0-20221026223418-8ec6134c8a60/go.mod h1:SQT0NBrY4/pMikBgwFIrWCjcHBxg015Y8is0kAnMtug=
+github.com/TykTechnologies/gorpc v0.0.0-20241016124253-606484472fbb h1:4ZQmRdKvOgE/KSlwT7Ze/imlWaC/z9kynUL4lADCz3Y=
+github.com/TykTechnologies/gorpc v0.0.0-20241016124253-606484472fbb/go.mod h1:v6v7Mlj08+EmEcXOfpuTxGt2qYU9yhqqtv4QF9Wf50E=
 github.com/TykTechnologies/goverify v0.0.0-20220808203004-1486f89e7708 h1:cmXjlMzcexhc/Cg+QB/c2CPUVs1ux9xn6162qaf/LC4=
 github.com/TykTechnologies/goverify v0.0.0-20220808203004-1486f89e7708/go.mod h1:mkS8jKcz8otdfEXhJs1QQ/DKoIY1NFFsRPKS0RwQENI=
 github.com/TykTechnologies/graphql-go-tools v1.6.2-0.20241212110213-7724a3b64bb2 h1:/B7Dmb35zO4392FACTKyVDH7XTQ0xAb80/M1GMk97Is=
