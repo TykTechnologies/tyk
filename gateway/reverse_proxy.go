@@ -1098,8 +1098,7 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 	*outreq = *req // includes shallow copies of maps, but okay
 	*logreq = *req
 
-	deepCopyErr := deepCopyBody(req, outreq)
-	if deepCopyErr != nil {
+	if deepCopyErr := deepCopyBody(req, outreq); deepCopyErr != nil {
 		p.logger.Debug("Unable to create deep copy of request, err: ", deepCopyErr)
 		p.ErrorHandler.HandleError(rw, logreq, "There was a problem with reading Body of the Request.",
 			http.StatusInternalServerError, true)

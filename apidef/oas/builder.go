@@ -222,7 +222,7 @@ func (eb *EndpointBuilder) Mock(fn func(mock *MockResponse)) *EndpointBuilder {
 }
 
 func (eb *EndpointBuilder) operationId() string {
-	return strings.ToLower(eb.path + eb.path)
+	return strings.ToLower(eb.path + eb.method)
 }
 
 func (eb *EndpointBuilder) operation() *Operation {
@@ -250,7 +250,7 @@ func (eb *EndpointBuilder) build(builder *Builder) {
 
 	if currentPath == nil {
 		currentPath = &openapi3.PathItem{}
-		builder.oas.Paths[eb.operationId()] = currentPath
+		builder.oas.Paths[eb.path] = currentPath
 	}
 
 	currentPath.SetOperation(eb.method, &openapi3.Operation{

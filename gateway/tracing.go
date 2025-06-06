@@ -116,8 +116,6 @@ func (tr *traceRequest) toRequest(
 		addCustomHeader(r.Header, key, values, ignoreCanonicalMIMEHeaderKey)
 	}
 
-	ctxSetTrace(r)
-
 	return r, nil
 }
 

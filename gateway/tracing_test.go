@@ -73,7 +73,7 @@ func TestTraceHandler_RateLimiterGlobalWorksAsExpected(t *testing.T) {
 	traceReq := traceRequest{
 		Request: &traceHttpRequest{
 			Method: http.MethodGet,
-			Path:   "/test/rate-limited-api",
+			Path:   "/rate-limited-api",
 		},
 		OAS: oasDef,
 	}
@@ -126,8 +126,15 @@ func TestTraceHandler_RateLimiterExceeded(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
+	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte("mock response"))
+	}))
+	defer mockServer.Close()
+
 	oasDef, err := oas.NewOas(
 		oas.WithTestDefaults(),
+		oas.WithUpstreamUrl(mockServer.URL),
 		oas.WithGet("/rate-limited-api", func(b *oas.EndpointBuilder) {
 			b.Mock(func(_ *oas.MockResponse) {}).RateLimit(1, time.Second)
 		}),
@@ -159,6 +166,14 @@ func TestTraceHandler_RateLimiterExceeded(t *testing.T) {
 	ts.Gw.traceHandler(w1, req1)
 	require.Equal(t, http.StatusOK, w1.Code)
 
+	var traceResp1 traceResponse
+	err = json.Unmarshal(w1.Body.Bytes(), &traceResp1)
+	assert.NoError(t, err)
+
+	_, tResponse1, err := traceResp1.parseTrace()
+	require.NoError(t, err)
+	require.Equal(t, http.StatusOK, tResponse1.StatusCode)
+
 	// Second request should be rate limited
 	req2 := httptest.NewRequest(http.MethodPost, "/debug/trace", bytes.NewReader(reqBody))
 	req2.Header.Set("Content-Type", "application/json")
@@ -174,12 +189,12 @@ func TestTraceHandler_RateLimiterExceeded(t *testing.T) {
 	logs, err := traceResp2.logs()
 	require.NoError(t, err)
 
-	_, tResponse, err := traceResp2.parseTrace()
+	_, tResponse2, err := traceResp2.parseTrace()
 	require.NoError(t, err)
 
 	// Verify rate limit response
-	require.Equal(t, http.StatusTooManyRequests, tResponse.StatusCode)
-	require.True(t, lo.SomeBy(logs, func(item traceLogEntry) bool {
+	assert.Equal(t, http.StatusTooManyRequests, tResponse2.StatusCode)
+	assert.True(t, lo.SomeBy(logs, func(item traceLogEntry) bool {
 		return strings.Contains(item.Msg, "API Rate Limit Exceeded")
 	}))
 }
@@ -187,6 +202,12 @@ func TestTraceHandler_RateLimiterExceeded(t *testing.T) {
 func TestTraceHandler_MockMiddlewareRespondsWithProvidedData(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
+
+	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte("mock response"))
+	}))
+	defer mockServer.Close()
 
 	type typedResponse struct {
 		Message string `json:"message"`
@@ -201,6 +222,7 @@ func TestTraceHandler_MockMiddlewareRespondsWithProvidedData(t *testing.T) {
 
 	oasDef, err := oas.NewOas(
 		oas.WithTestDefaults(),
+		oas.WithUpstreamUrl(mockServer.URL),
 		oas.WithGet("/mock", func(b *oas.EndpointBuilder) {
 			b.Mock(func(mock *oas.MockResponse) {
 				mock.Code = http.StatusCreated
@@ -250,8 +272,10 @@ func TestTraceHandler_MockMiddlewareRespondsWithProvidedData(t *testing.T) {
 	require.NotNil(t, response)
 
 	var mockedResponse typedResponse
-	require.Equal(t, http.StatusCreated, response.StatusCode)
-	err = json.NewDecoder(response.Body).Decode(&mockedResponse)
+	assert.Equal(t, http.StatusCreated, response.StatusCode)
+	jData, err := io.ReadAll(response.Body)
+	assert.NoError(t, err)
+	err = json.Unmarshal(jData, &mockedResponse)
 	assert.NoError(t, err)
 	assert.Equal(t, srcMessage.Message, mockedResponse.Message)
 }
