@@ -384,8 +384,6 @@ func (a APIDefinitionLoader) MakeSpec(def *model.MergedAPI, logger *logrus.Entry
 		logger.WithError(err).Error("Could not create OAS router")
 	}
 
-	spec.setHasMock()
-
 	return spec, nil
 }
 
@@ -1727,21 +1725,14 @@ func (a *APISpec) SanitizeProxyPaths(r *http.Request) {
 	log.Debug("Upstream path is: ", r.URL.Path)
 }
 
-func (a *APISpec) setHasMock() {
+func (a *APISpec) hasMock() bool {
 	if !a.IsOAS {
-		a.HasMock = false
-		return
+		return false
 	}
 
 	middleware := a.OAS.GetTykMiddleware()
 	if middleware == nil {
-		a.HasMock = false
-		return
-	}
-
-	if len(middleware.Operations) == 0 {
-		a.HasMock = false
-		return
+		return false
 	}
 
 	for _, operation := range middleware.Operations {
@@ -1750,12 +1741,32 @@ func (a *APISpec) setHasMock() {
 		}
 
 		if operation.MockResponse.Enabled {
-			a.HasMock = true
-			return
+			return true
 		}
 	}
 
-	a.HasMock = false
+	return false
+}
+
+func (a *APISpec) hasVirtualEndpoint() bool {
+	for _, version := range a.VersionData.Versions {
+		for _, virtual := range version.ExtendedPaths.Virtual {
+			if !virtual.Disabled {
+				return true
+			}
+		}
+	}
+
+	return false
+}
+
+// isListeningOnPort checks whether the API listens on the given port.
+func (a *APISpec) isListeningOnPort(port int, gwConfig *config.Config) bool {
+	if a.ListenPort == 0 {
+		return gwConfig.ListenPort == port
+	}
+
+	return a.ListenPort == port
 }
 
 type RoundRobin struct {
@@ -1769,25 +1780,4 @@ func (r *RoundRobin) WithLen(len int) int {
 	// -1 to start at 0, not 1
 	cur := atomic.AddUint32(&r.pos, 1) - 1
 	return int(cur) % len
-}
-
-func (s *APISpec) hasVirtualEndpoint() bool {
-	for _, version := range s.VersionData.Versions {
-		for _, virtual := range version.ExtendedPaths.Virtual {
-			if !virtual.Disabled {
-				return true
-			}
-		}
-	}
-
-	return false
-}
-
-// isListeningOnPort checks whether the API listens on the given port.
-func (s *APISpec) isListeningOnPort(port int, gwConfig *config.Config) bool {
-	if s.ListenPort == 0 {
-		return gwConfig.ListenPort == port
-	}
-
-	return s.ListenPort == port
 }
