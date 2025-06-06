@@ -23,6 +23,11 @@ func (hs Headers) Map() map[string]string {
 	return headersMap
 }
 
+// Add new header entry.
+func (hs *Headers) Add(hdr, value string) {
+	*hs = append(*hs, Header{Name: hdr, Value: value})
+}
+
 // NewHeaders creates Headers from in map.
 func NewHeaders(in map[string]string) Headers {
 	var headers = make(Headers, 0, len(in))

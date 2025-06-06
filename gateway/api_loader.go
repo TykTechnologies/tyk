@@ -123,7 +123,7 @@ func fixFuncPath(pathPrefix string, funcs []apidef.MiddlewareDefinition) {
 	}
 }
 
-func (gw *Gateway) generateSubRoutes(spec *APISpec, router *mux.Router, logger *logrus.Entry) {
+func (gw *Gateway) generateSubRoutes(spec *APISpec, router *mux.Router) {
 	if spec.GraphQL.GraphQLPlayground.Enabled {
 		gw.loadGraphQLPlayground(spec, router)
 	}
@@ -469,6 +469,7 @@ func (gw *Gateway) processSpec(
 	gw.mwAppendEnabled(&chainArray, &TransformMethod{BaseMiddleware: baseMid.Copy()})
 
 	// Earliest we can respond with cache get 200 ok
+	gw.mwAppendEnabled(&chainArray, newMockResponseMiddleware(baseMid.Copy()))
 	gw.mwAppendEnabled(&chainArray, &RedisCacheMiddleware{BaseMiddleware: baseMid.Copy(), store: &cacheStore})
 
 	gw.mwAppendEnabled(&chainArray, &VirtualEndpoint{BaseMiddleware: baseMid.Copy()})
@@ -671,7 +672,7 @@ func (d *DummyProxyHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		d.SH.Spec.SanitizeProxyPaths(r)
+		d.SH.Spec.RewritePrefixPath(r)
 		ctxSetVersionInfo(r, nil)
 		handler.ServeHTTP(w, r)
 		return
@@ -831,7 +832,7 @@ func (gw *Gateway) loadHTTPService(spec *APISpec, apisByListen map[string]int, g
 	for _, prefix := range prefixes {
 		subrouter := router.PathPrefix(prefix).Subrouter()
 
-		gw.generateSubRoutes(spec, subrouter, logrus.NewEntry(log))
+		gw.generateSubRoutes(spec, subrouter)
 
 		if !chainObj.Open {
 			subrouter.Handle(rateLimitEndpoint, chainObj.RateLimitChain)

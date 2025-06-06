@@ -94,8 +94,6 @@ func (v *VersionCheck) ProcessRequest(w http.ResponseWriter, r *http.Request, _ 
 		return nil, mwStatusRespond
 	}
 outside:
-	v.Spec.SetupOperation(r)
-
 	// Check versioning, blacklist, whitelist and ignored status
 	requestValid, stat := v.Spec.RequestValid(r)
 	if !requestValid {
