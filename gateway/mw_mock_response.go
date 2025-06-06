@@ -89,11 +89,6 @@ func (m *mockResponseMiddleware) mockResponse(r *http.Request) (*http.Response, 
 		return nil, nil
 	}
 
-	//operation := ctxGetOperation(r)
-	//if operation == nil {
-	//	return nil, nil
-	//}
-
 	mockResponse := operation.MockResponse
 	if mockResponse == nil || !mockResponse.Enabled {
 		return nil, nil

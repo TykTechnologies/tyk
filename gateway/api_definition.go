@@ -10,7 +10,7 @@ import (
 	"io"
 	"io/ioutil"
 	"net/http"
-	url "net/url"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"

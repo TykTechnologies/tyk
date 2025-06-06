@@ -163,7 +163,7 @@ func (e *EventHandler) GetWebhookConf() apidef.WebHookHandlerConf {
 		Name:         e.Name,
 		Method:       e.Webhook.Method,
 		TargetPath:   e.Webhook.URL,
-		HeaderList:   Map(e.Webhook.Headers),
+		HeaderList:   e.Webhook.Headers.Map(),
 		EventTimeout: int64(e.Webhook.CoolDownPeriod.Seconds()),
 		TemplatePath: e.Webhook.BodyTemplate,
 	}

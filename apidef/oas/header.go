@@ -14,7 +14,7 @@ type Header struct {
 type Headers []Header
 
 // Map transforms Headers into a map.
-func Map(hs Headers) map[string]string {
+func (hs Headers) Map() map[string]string {
 	var headersMap = make(map[string]string, len(hs))
 	for _, h := range hs {
 		headersMap[h.Name] = h.Value

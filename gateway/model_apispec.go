@@ -168,10 +168,3 @@ func (a *APISpec) findOperation(r *http.Request) *Operation {
 		pathParams: pathParams,
 	}
 }
-
-// todo: remove ctxSetOperation
-//func (a *APISpec) SetupOperation(r *http.Request) {
-//	if mockOp := a.findOperation(r); mockOp != nil {
-//		ctxSetOperation(r, mockOp)
-//	}
-//}
