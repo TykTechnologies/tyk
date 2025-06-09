@@ -469,7 +469,10 @@ func (gw *Gateway) processSpec(
 	gw.mwAppendEnabled(&chainArray, &TransformMethod{BaseMiddleware: baseMid.Copy()})
 
 	// Earliest we can respond with cache get 200 ok
-	gw.mwAppendEnabled(&chainArray, newMockResponseMiddleware(baseMid.Copy()))
+	gw.mwAppendEnabled(&chainArray, newMockResponseMiddleware(
+		baseMid.Copy(),
+		withOpenTelemetry(gw.GetConfig().OpenTelemetry.Enabled),
+	))
 	gw.mwAppendEnabled(&chainArray, &RedisCacheMiddleware{BaseMiddleware: baseMid.Copy(), store: &cacheStore})
 
 	gw.mwAppendEnabled(&chainArray, &VirtualEndpoint{BaseMiddleware: baseMid.Copy()})

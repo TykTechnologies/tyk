@@ -11,20 +11,32 @@ import (
 	"strconv"
 
 	"github.com/TykTechnologies/tyk/apidef/oas"
+	"github.com/TykTechnologies/tyk/common/option"
 	"github.com/TykTechnologies/tyk/header"
 	"github.com/TykTechnologies/tyk/internal/middleware"
+	"github.com/TykTechnologies/tyk/internal/otel"
 	"github.com/getkin/kin-openapi/openapi3"
+	"go.opentelemetry.io/otel/attribute"
+	semconv "go.opentelemetry.io/otel/semconv/v1.25.0"
 )
 
 var _ TykMiddleware = (*mockResponseMiddleware)(nil)
 
 type mockResponseMiddleware struct {
 	*BaseMiddleware
+
+	openTelemetryEnabled bool
 }
 
-func newMockResponseMiddleware(base *BaseMiddleware) TykMiddleware {
-	return &mockResponseMiddleware{
+func newMockResponseMiddleware(base *BaseMiddleware, opts ...option.Option[mockResponseMiddleware]) TykMiddleware {
+	return option.New(opts).Build(mockResponseMiddleware{
 		BaseMiddleware: base,
+	})
+}
+
+func withOpenTelemetry(enabled bool) option.Option[mockResponseMiddleware] {
+	return func(m *mockResponseMiddleware) {
+		m.openTelemetryEnabled = enabled
 	}
 }
 
@@ -36,7 +48,7 @@ func (m *mockResponseMiddleware) EnabledForSpec() bool {
 	return m.Spec.hasActiveMock()
 }
 
-func (m *mockResponseMiddleware) forward(res *http.Response, rw http.ResponseWriter) error {
+func (m *mockResponseMiddleware) forward(res *http.Response, rw http.ResponseWriter) (int, error) {
 	for key, values := range res.Header {
 		for _, value := range values {
 			rw.Header().Add(key, value)
@@ -45,18 +57,16 @@ func (m *mockResponseMiddleware) forward(res *http.Response, rw http.ResponseWri
 
 	rw.WriteHeader(res.StatusCode)
 	if res.Body == nil {
-		return nil
+		return 0, nil
 	}
 
 	body, err := io.ReadAll(res.Body)
 
 	if err != nil {
-		return err
+		return 0, err
 	}
 
-	_, err = rw.Write(body)
-
-	return err
+	return rw.Write(body)
 }
 
 func (m *mockResponseMiddleware) ProcessRequest(rw http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
@@ -74,11 +84,31 @@ func (m *mockResponseMiddleware) ProcessRequest(rw http.ResponseWriter, r *http.
 		return nil, http.StatusOK
 	}
 
-	if err = m.forward(res, rw); err != nil {
+	wroteBytes, err := m.forward(res, rw)
+
+	if err != nil {
 		return fmt.Errorf("failed to forward response: %w", err), http.StatusInternalServerError
 	}
 
+	m.overrideOpenTelemetryData(r, res, wroteBytes)
+
 	return nil, middleware.StatusRespond
+}
+
+func (m *mockResponseMiddleware) overrideOpenTelemetryData(
+	r *http.Request,
+	res *http.Response,
+	wroteBytes int,
+) {
+	if !m.openTelemetryEnabled {
+		return
+	}
+
+	otel.SpanFromContext(r.Context()).SetAttributes(
+		semconv.HTTPStatusCode(res.StatusCode),
+		semconv.HTTPMethod(r.Method),
+		attribute.Int("http.wrote_bytes", wroteBytes),
+	)
 }
 
 func (m *mockResponseMiddleware) mockResponse(r *http.Request) (*http.Response, error) {
