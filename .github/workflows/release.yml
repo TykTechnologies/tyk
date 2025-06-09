@@ -410,11 +410,22 @@ jobs:
             fi
           fi
           if [[ ${{ github.event_name }} == "push" ]]; then
-            PUSH_BRANCH=${{ github.ref_name }}
-            echo "Looking for PUSH_BRANCH:$PUSH_BRANCH..."
-            if git rev-parse --verify "origin/$PUSH_BRANCH" >/dev/null 2>&1; then
-              echo "Push branch $PUSH_BRANCH exists. Checking out..."
-              git checkout "$PUSH_BRANCH"
+            # Check if this is a tag push
+            if [[ ${{ github.ref }} == refs/tags/* ]]; then
+              TAG_NAME=${{ github.ref_name }}
+              echo "This is a tag push: $TAG_NAME"
+              if git rev-parse --verify "$TAG_NAME" >/dev/null 2>&1; then
+                echo "Tag $TAG_NAME exists. Checking out..."
+                git checkout "$TAG_NAME"
+              fi
+            else
+              # This is a branch push
+              PUSH_BRANCH=${{ github.ref_name }}
+              echo "Looking for PUSH_BRANCH:$PUSH_BRANCH..."
+              if git rev-parse --verify "origin/$PUSH_BRANCH" >/dev/null 2>&1; then
+                echo "Push branch $PUSH_BRANCH exists. Checking out..."
+                git checkout "$PUSH_BRANCH"
+              fi
             fi
           fi
           echo "Current commit: $(git rev-parse HEAD)"
