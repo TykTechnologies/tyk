@@ -116,7 +116,7 @@ type URLRewriteRule struct {
 
 	// Negate is a boolean negation operator. Setting it to true inverts the matching behaviour
 	// such that the rewrite will be triggered if the value does not match the `pattern` for this rule.
-	Negate bool `bson:"negate,omitempty" json:"negate,omitempty"`
+	Negate bool `bson:"negate" json:"negate"`
 }
 
 // Fill fills *URLRewrite receiver from apidef.URLRewriteMeta.
