@@ -9,6 +9,7 @@ builds:
   - id: ee-amd64
     flags:
       - -tags=goplugin,ee
+      - -trimpath
     env:
       - NOP=nop # ignore this, it is jsut to avoid a complex conditional in the templates
       - CC=gcc
@@ -25,6 +26,7 @@ builds:
   - id: ee-arm64
     flags:
       - -tags=goplugin,ee
+      - -trimpath
     env:
       - NOP=nop # ignore this, it is jsut to avoid a complex conditional in the templates
       - CC=aarch64-linux-gnu-gcc
@@ -41,6 +43,7 @@ builds:
   - id: ee-s390x
     flags:
       - -tags=goplugin,ee
+      - -trimpath
     env:
       - NOP=nop # ignore this, it is jsut to avoid a complex conditional in the templates
       - CC=s390x-linux-gnu-gcc
