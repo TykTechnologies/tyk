@@ -327,6 +327,9 @@
         "grpc_authority": {
           "type": "string"
         },
+        "grpc_round_robin_load_balancing": {
+          "type": "boolean"
+        },
         "enable_coprocess": {
           "type": "boolean"
         },
