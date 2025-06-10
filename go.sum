@@ -49,6 +49,7 @@ github.com/TykTechnologies/gorpc v0.0.0-20250214161245-e9f3f088e8c6 h1:wwt23wdyi
 github.com/TykTechnologies/gorpc v0.0.0-20250214161245-e9f3f088e8c6/go.mod h1:v6v7Mlj08+EmEcXOfpuTxGt2qYU9yhqqtv4QF9Wf50E=
 github.com/TykTechnologies/goverify v0.0.0-20220808203004-1486f89e7708 h1:cmXjlMzcexhc/Cg+QB/c2CPUVs1ux9xn6162qaf/LC4=
 github.com/TykTechnologies/goverify v0.0.0-20220808203004-1486f89e7708/go.mod h1:mkS8jKcz8otdfEXhJs1QQ/DKoIY1NFFsRPKS0RwQENI=
+<<<<<<< HEAD
 github.com/TykTechnologies/graphql-go-tools v1.6.2-0.20241212110213-7724a3b64bb2 h1:/B7Dmb35zO4392FACTKyVDH7XTQ0xAb80/M1GMk97Is=
 github.com/TykTechnologies/graphql-go-tools v1.6.2-0.20241212110213-7724a3b64bb2/go.mod h1:NE9MYGcB5eWKW0OefGOjZZEPv6S20AQ0OTsO+npGR8I=
 github.com/TykTechnologies/graphql-go-tools/v2 v2.0.0-20240131151522-40a1ee2bbfc3 h1:AN/173UtBXp69KOYxv02wi4dySSz0BzGj57x5dwiMrA=
@@ -61,6 +62,14 @@ github.com/TykTechnologies/leakybucket v0.0.0-20170301023702-71692c943e3c h1:j6f
 github.com/TykTechnologies/leakybucket v0.0.0-20170301023702-71692c943e3c/go.mod h1:GnHUbsQx+ysI10osPhUdTmsxcE7ef64cVp38Fdyd7e0=
 github.com/TykTechnologies/legacy-kin-openapi v0.0.3 h1:Z2m7r3zXp7pkJmstJcZT5AQWVQAGlL+aGZW63ZhtmxI=
 github.com/TykTechnologies/legacy-kin-openapi v0.0.3/go.mod h1:kyLnQ/A/pBn90ssF7Tpqas8+O326WS6nrb/vTqqAp6o=
+=======
+github.com/TykTechnologies/graphql-go-tools v1.6.2-0.20250606091303-a8e1ade2da8e h1:Na5aC2XYjv5zmCTKbvTfcMLSVAzc3P9fHpb1Iz/kHfI=
+github.com/TykTechnologies/graphql-go-tools v1.6.2-0.20250606091303-a8e1ade2da8e/go.mod h1:NE9MYGcB5eWKW0OefGOjZZEPv6S20AQ0OTsO+npGR8I=
+github.com/TykTechnologies/graphql-go-tools/v2 v2.0.0-20250527121326-5f5c91189896 h1:LP/UJWznlC1FV+7ovBJjBCQE56fVaib0nL1CACWa9ho=
+github.com/TykTechnologies/graphql-go-tools/v2 v2.0.0-20250527121326-5f5c91189896/go.mod h1:XM1owY0ZCJ1Rai64Q1UKXZYNDkWikZDojgefZw8raPk=
+github.com/TykTechnologies/graphql-translator v0.0.0-20250602105400-41c2e7514a36 h1:7nNsyocI/RKBqo73RR9G/SiFMZ8w2sN+HMsQXYp9wPI=
+github.com/TykTechnologies/graphql-translator v0.0.0-20250602105400-41c2e7514a36/go.mod h1:qiglVaUPPOWET4bQsBmsAaLiCml20a01REQSi7TSUa0=
+>>>>>>> eea47fad3... [TT-13740]: update mod and updated apidef (#7104)
 github.com/TykTechnologies/murmur3 v0.0.0-20230310161213-aad17efd5632 h1:T5NWziFusj8au5nxAqMMh/bZyX9CAyYnBkaMSsfH6BA=
 github.com/TykTechnologies/murmur3 v0.0.0-20230310161213-aad17efd5632/go.mod h1:UsPYgOFBpNzDXLEti7MKOwHLpVSqdzuNGkVFPspQmnQ=
 github.com/TykTechnologies/openid2go v0.1.2 h1:WXctksOahA/epTVVvbn9iNUuMXKRr0ksrF4dY9KW8o8=

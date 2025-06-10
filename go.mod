@@ -26,9 +26,14 @@ require (
 	github.com/TykTechnologies/gojsonschema v0.0.0-20170222154038-dcb3e4bb7990
 	github.com/TykTechnologies/gorpc v0.0.0-20250214161245-e9f3f088e8c6
 	github.com/TykTechnologies/goverify v0.0.0-20220808203004-1486f89e7708
+<<<<<<< HEAD
 	github.com/TykTechnologies/graphql-go-tools v1.6.2-0.20241212110213-7724a3b64bb2
 	github.com/TykTechnologies/graphql-translator v0.0.0-20250422055704-a48ce61e4f50
 	github.com/TykTechnologies/leakybucket v0.0.0-20170301023702-71692c943e3c
+=======
+	github.com/TykTechnologies/graphql-go-tools v1.6.2-0.20250606091303-a8e1ade2da8e
+	github.com/TykTechnologies/graphql-translator v0.0.0-20250602105400-41c2e7514a36
+>>>>>>> eea47fad3... [TT-13740]: update mod and updated apidef (#7104)
 	github.com/TykTechnologies/murmur3 v0.0.0-20230310161213-aad17efd5632
 	github.com/TykTechnologies/openid2go v0.1.2
 	github.com/TykTechnologies/storage v1.2.2

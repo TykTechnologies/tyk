@@ -845,10 +845,29 @@ type GraphQLResponseExtensions struct {
 }
 
 type GraphQLProxyConfig struct {
+<<<<<<< HEAD
 	AuthHeaders           map[string]string         `bson:"auth_headers" json:"auth_headers"`
 	SubscriptionType      SubscriptionType          `bson:"subscription_type" json:"subscription_type,omitempty"`
 	RequestHeaders        map[string]string         `bson:"request_headers" json:"request_headers"`
 	UseResponseExtensions GraphQLResponseExtensions `bson:"use_response_extensions" json:"use_response_extensions"`
+=======
+	Features              GraphQLProxyFeaturesConfig             `bson:"features" json:"features"`
+	AuthHeaders           map[string]string                      `bson:"auth_headers" json:"auth_headers"`
+	SubscriptionType      SubscriptionType                       `bson:"subscription_type" json:"subscription_type,omitempty"`
+	SSEUsePost            bool                                   `bson:"sse_use_post" json:"sse_use_post"`
+	RequestHeaders        map[string]string                      `bson:"request_headers" json:"request_headers"`
+	UseResponseExtensions GraphQLResponseExtensions              `bson:"use_response_extensions" json:"use_response_extensions"`
+	RequestHeadersRewrite map[string]RequestHeadersRewriteConfig `json:"request_headers_rewrite" bson:"request_headers_rewrite"`
+}
+
+type GraphQLProxyFeaturesConfig struct {
+	UseImmutableHeaders bool `bson:"use_immutable_headers" json:"use_immutable_headers"`
+}
+
+type RequestHeadersRewriteConfig struct {
+	Value  string `json:"value" bson:"value"`
+	Remove bool   `json:"remove" bson:"remove"`
+>>>>>>> eea47fad3... [TT-13740]: update mod and updated apidef (#7104)
 }
 
 type GraphQLSubgraphConfig struct {
@@ -871,6 +890,7 @@ type GraphQLSubgraphEntity struct {
 	SDL              string            `bson:"sdl" json:"sdl"`
 	Headers          map[string]string `bson:"headers" json:"headers"`
 	SubscriptionType SubscriptionType  `bson:"subscription_type" json:"subscription_type,omitempty"`
+	SSEUsePost       bool              `bson:"sse_use_post" json:"sse_use_post"`
 }
 
 type GraphQLEngineConfig struct {
@@ -925,6 +945,7 @@ type GraphQLEngineDataSourceConfigGraphQL struct {
 	Method           string            `bson:"method" json:"method"`
 	Headers          map[string]string `bson:"headers" json:"headers"`
 	SubscriptionType SubscriptionType  `bson:"subscription_type" json:"subscription_type,omitempty"`
+	SSEUsePost       bool              `bson:"sse_use_post" json:"sse_use_post"`
 	HasOperation     bool              `bson:"has_operation" json:"has_operation"`
 	Operation        string            `bson:"operation" json:"operation"`
 	Variables        json.RawMessage   `bson:"variables" json:"variables"`
