@@ -669,13 +669,24 @@ func (d *DummyProxyHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	if d.SH.Spec.target.Scheme == "tyk" {
 		handler, _, found := d.Gw.findInternalHttpHandlerByNameOrID(d.SH.Spec.target.Host)
+
 		if !found {
 			handler := ErrorHandler{d.SH.Base()}
 			handler.HandleError(w, r, "Couldn't detect target", http.StatusInternalServerError, true)
 			return
 		}
 
-		d.SH.Spec.RewritePrefixPath(r)
+		targetUrl, err := d.SH.Spec.getRedirectTargetUrl(ctxGetInternalRedirectTarget(r))
+
+		if err != nil {
+			log.Errorf("failed to create internal redirect url: %s", err)
+			handler := ErrorHandler{d.SH.Base()}
+			handler.HandleError(w, r, "Failed to perform internal redirect", http.StatusInternalServerError, true)
+			return
+		}
+
+		d.SH.Spec.SanitizeProxyPaths(r)
+		ctxSetInternalRedirectTarget(r, targetUrl)
 		ctxSetVersionInfo(r, nil)
 		handler.ServeHTTP(w, r)
 		return

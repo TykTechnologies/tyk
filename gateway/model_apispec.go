@@ -145,7 +145,15 @@ func (a *APISpec) findOperation(r *http.Request) *Operation {
 		return nil
 	}
 
-	route, pathParams, err := a.oasRouter.FindRoute(r)
+	if a.oasRouter == nil {
+		log.Warningf("OAS router not initialized propertly. Unable to find route for %s %v", r.Method, r.URL)
+		return nil
+	}
+
+	rClone := *r
+	rClone.URL = ctxGetInternalRedirectTarget(r)
+
+	route, pathParams, err := a.oasRouter.FindRoute(&rClone)
 
 	if errors.Is(err, routers.ErrPathNotFound) {
 		return nil

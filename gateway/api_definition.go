@@ -1726,16 +1726,21 @@ func (a *APISpec) SanitizeProxyPaths(r *http.Request) {
 	log.Debug("Upstream path is: ", r.URL.Path)
 }
 
-// RewritePrefixPath is used for internal redirect
-func (a *APISpec) RewritePrefixPath(r *http.Request) {
-	newPath, err := url.JoinPath("/", a.target.Host, a.StripListenPath(r.URL.Path))
-
-	if err != nil {
-		log.Errorf("Error rewriting path %s: %v", newPath, err)
-		return
+func (a *APISpec) getRedirectTargetUrl(inputUrl *url.URL) (*url.URL, error) {
+	if inputUrl == nil {
+		return nil, errors.New("input url is nil")
 	}
 
-	r.URL.Path = newPath
+	cloneUrl := *inputUrl
+	newPath, err := url.JoinPath("/", a.target.Host, a.StripListenPath(cloneUrl.Path))
+
+	if err != nil {
+		return nil, err
+	}
+
+	cloneUrl.Path = newPath
+	cloneUrl.RawPath = newPath
+	return &cloneUrl, nil
 }
 
 // hasActiveMock checks if specification has at least one active mock.

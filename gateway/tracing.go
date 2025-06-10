@@ -59,6 +59,7 @@ type traceLogEntry struct {
 	Mw      string     `json:"mw,omitempty"`
 	OrgId   string     `json:"org_id,omitempty"`
 	Ts      *time.Time `json:"time,omitempty"`
+	Code    int        `json:"code,omitempty"`
 }
 
 func (tr *traceResponse) parseTrace() (*http.Request, *http.Response, error) {
@@ -96,7 +97,6 @@ func (tr *traceRequest) toRequest(
 	ctx context.Context,
 	ignoreCanonicalMIMEHeaderKey bool,
 ) (*http.Request, error) {
-
 	path, err := url.JoinPath(
 		tr.Spec.Proxy.ListenPath,
 		tr.Request.Path,
@@ -115,8 +115,6 @@ func (tr *traceRequest) toRequest(
 	for key, values := range tr.Request.Headers {
 		addCustomHeader(r.Header, key, values, ignoreCanonicalMIMEHeaderKey)
 	}
-
-	ctxSetTrace(r)
 
 	return r, nil
 }

@@ -33,6 +33,7 @@ const (
 	TrackThisEndpoint
 	DoNotTrackThisEndpoint
 	UrlRewritePath
+	InternalRedirectTarget
 	RequestMethod
 	OrigRequestURL
 	LoopLevel

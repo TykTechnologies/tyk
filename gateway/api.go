@@ -3178,6 +3178,25 @@ func ctxGetUrlRewritePath(r *http.Request) string {
 	return ""
 }
 
+func ctxSetInternalRedirectTarget(r *http.Request, u *url.URL) {
+	setCtxValue(r, ctx.InternalRedirectTarget, u)
+}
+
+func ctxGetInternalRedirectTarget(r *http.Request) *url.URL {
+	if v := r.Context().Value(ctx.InternalRedirectTarget); v != nil {
+		if val, ok := v.(*url.URL); ok {
+			return val
+		}
+	}
+
+	if r.URL == nil {
+		return nil
+	}
+
+	clone := *r.URL
+	return &clone
+}
+
 func ctxSetCheckLoopLimits(r *http.Request, b bool) {
 	setCtxValue(r, ctx.CheckLoopLimits, b)
 }
@@ -3349,14 +3368,6 @@ func ctxSetThrottleLevel(r *http.Request, value int) {
 func ctxIncThrottleLevel(r *http.Request, throttleLimit int) {
 	ctxSetThrottleLimit(r, throttleLimit)
 	ctxSetThrottleLevel(r, ctxThrottleLevel(r)+1)
-}
-
-func ctxTraceEnabled(r *http.Request) bool {
-	return r.Context().Value(ctx.Trace) != nil
-}
-
-func ctxSetTrace(r *http.Request) {
-	setCtxValue(r, ctx.Trace, true)
 }
 
 func ctxSetSpanAttributes(r *http.Request, mwName string, attrs ...otel.SpanAttribute) {

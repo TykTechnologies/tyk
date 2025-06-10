@@ -14,10 +14,7 @@ import (
 	"github.com/TykTechnologies/tyk/common/option"
 	"github.com/TykTechnologies/tyk/header"
 	"github.com/TykTechnologies/tyk/internal/middleware"
-	"github.com/TykTechnologies/tyk/internal/otel"
 	"github.com/getkin/kin-openapi/openapi3"
-	"go.opentelemetry.io/otel/attribute"
-	semconv "go.opentelemetry.io/otel/semconv/v1.25.0"
 )
 
 var _ TykMiddleware = (*mockResponseMiddleware)(nil)
@@ -84,31 +81,13 @@ func (m *mockResponseMiddleware) ProcessRequest(rw http.ResponseWriter, r *http.
 		return nil, http.StatusOK
 	}
 
-	wroteBytes, err := m.forward(res, rw)
+	_, err = m.forward(res, rw)
 
 	if err != nil {
 		return fmt.Errorf("failed to forward response: %w", err), http.StatusInternalServerError
 	}
 
-	m.overrideOpenTelemetryData(r, res, wroteBytes)
-
 	return nil, middleware.StatusRespond
-}
-
-func (m *mockResponseMiddleware) overrideOpenTelemetryData(
-	r *http.Request,
-	res *http.Response,
-	wroteBytes int,
-) {
-	if !m.openTelemetryEnabled {
-		return
-	}
-
-	otel.SpanFromContext(r.Context()).SetAttributes(
-		semconv.HTTPStatusCode(res.StatusCode),
-		semconv.HTTPMethod(r.Method),
-		attribute.Int("http.wrote_bytes", wroteBytes),
-	)
 }
 
 func (m *mockResponseMiddleware) mockResponse(r *http.Request) (*http.Response, error) {
