@@ -306,6 +306,7 @@ const expectedOpenAPIGraphQLConfig = `{
             "use_immutable_headers": false
         },
         "auth_headers": {},
+        "sse_use_post": false,
         "request_headers": null,
         "use_response_extensions": {
             "on_error_forwarding": false
