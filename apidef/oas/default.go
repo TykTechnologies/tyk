@@ -9,7 +9,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/TykTechnologies/kin-openapi/openapi3"
+	"github.com/getkin/kin-openapi/openapi3"
 )
 
 const (
@@ -25,7 +25,7 @@ var (
 	errEmptyServersObject  = errors.New("The ‘servers’ object is empty in your OAS. You can either add a ‘servers’ section to your OpenAPI description or provide a Custom Upstream URL in the manual configuration options below.")
 	errEmptySecurityObject = errors.New("The ‘security’ object is empty in your OAS. When enabling authentication, your OpenAPI description must include a ‘security’ object that defines the authentication schemes. You can either add a ‘security’ object or disable authentication in the API settings.")
 	errInvalidUpstreamURL  = errors.New("The manually configured upstream URL is not valid. The URL must be absolute and properly formatted (e.g. https://example.com). Please check the URL format and try again.")
-	errInvalidServerURL    = errors.New("The first entry in the ‘servers’ object of your OAS in not valid. The URL must be absolute and properly formatted (e.g. https://example.com).")
+	errInvalidServerURL    = errors.New("The first entry in the ‘servers’ object of your OAS is not valid. The URL must be absolute and properly formatted (e.g. https://example.com).")
 
 	allowedMethods = []string{
 		http.MethodConnect,
@@ -220,7 +220,7 @@ func (s *OAS) importMiddlewares(overRideValues TykExtensionConfigParams) {
 		xTykAPIGateway.Middleware = &Middleware{}
 	}
 
-	for path, pathItem := range s.Paths {
+	for path, pathItem := range s.Paths.Map() {
 		overRideValues.pathItemHasParameters = len(pathItem.Parameters) > 0
 		for _, method := range allowedMethods {
 			if operation := pathItem.GetOperation(method); operation != nil {
@@ -256,7 +256,7 @@ func getURLFormatErr(fromParam bool, upstreamURL string) error {
 		if fromParam {
 			return errInvalidUpstreamURL
 		}
-		return fmt.Errorf("%w: %s", errInvalidServerURL, fmt.Sprintf(invalidServerURLFmt, parsedURL))
+		return fmt.Errorf("%w %s", errInvalidServerURL, fmt.Sprintf(invalidServerURLFmt, parsedURL))
 	}
 
 	return nil

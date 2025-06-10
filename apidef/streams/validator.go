@@ -124,6 +124,7 @@ func loadSchemas() error {
 			return err
 		}
 		bentoValidators[bento.DefaultValidator] = defaultValidator
+		bentoValidators[bento.EnableAllExperimental] = bento.NewEnableAllExperimentalConfigValidator()
 		return nil
 	}
 
@@ -146,6 +147,11 @@ func validateBentoConfiguration(document []byte, bentoValidatorKind bento.Valida
 	}
 	if err != nil {
 		return fmt.Errorf("failed getting streams configuration: %w", err)
+	}
+
+	// If using enable-all validator, skip validation
+	if bentoValidatorKind == bento.EnableAllExperimental {
+		return nil
 	}
 
 	bentoValidator := bentoValidators[bentoValidatorKind]
@@ -197,6 +203,16 @@ func ValidateOASObjectWithBentoConfigValidator(documentBody []byte, oasVersion s
 // ValidateOASObject validates a Tyk Streams document against a particular OAS version.
 func ValidateOASObject(documentBody []byte, oasVersion string) error {
 	return ValidateOASObjectWithBentoConfigValidator(documentBody, oasVersion, bento.DefaultValidator)
+}
+
+// ValidateOASObjectWithConfig validates a Tyk Streams document against a particular OAS version,
+// using the provided configuration to determine if validation should be disabled.
+func ValidateOASObjectWithConfig(documentBody []byte, oasVersion string, disableValidator bool) error {
+	validatorKind := bento.DefaultValidator
+	if disableValidator {
+		validatorKind = bento.EnableAllExperimental
+	}
+	return ValidateOASObjectWithBentoConfigValidator(documentBody, oasVersion, validatorKind)
 }
 
 // ValidateOASTemplate checks a Tyk Streams OAS API template for necessary fields,

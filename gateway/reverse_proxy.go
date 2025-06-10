@@ -989,7 +989,7 @@ func (p *ReverseProxy) handleOutboundRequest(roundTripper *TykRoundTripper, outr
 		latency = time.Since(begin)
 	}()
 
-	if p.TykAPISpec.HasMock {
+	if p.TykAPISpec.hasMock() {
 		if res, err = p.mockResponse(outreq); res != nil {
 			return
 		}

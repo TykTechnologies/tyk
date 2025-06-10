@@ -26,7 +26,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/TykTechnologies/kin-openapi/openapi3"
+	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/TykTechnologies/tyk/apidef/oas"
@@ -1786,7 +1786,7 @@ func getSampleOASAPI() oas.OAS {
 				Title:   "oas doc",
 				Version: "1",
 			},
-			Paths: make(openapi3.Paths),
+			Paths: openapi3.NewPaths(),
 		}}
 
 	oasAPI.SetTykExtension(tykExtension)

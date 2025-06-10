@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/TykTechnologies/kin-openapi/routers"
+	"github.com/getkin/kin-openapi/routers"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/apidef/oas"
@@ -44,20 +44,6 @@ type Operation struct {
 	*oas.Operation
 	route      *routers.Route
 	pathParams map[string]string
-}
-
-func findRouteAndOperation(spec *APISpec, r *http.Request) {
-	route, pathParams, err := spec.OASRouter.FindRoute(r)
-	if err != nil {
-		return
-	}
-
-	operation, ok := spec.OAS.GetTykExtension().Middleware.Operations[route.Operation.OperationID]
-	if !ok {
-		return
-	}
-
-	ctxSetOperation(r, &Operation{Operation: operation, route: route, pathParams: pathParams})
 }
 
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail
@@ -108,11 +94,7 @@ func (v *VersionCheck) ProcessRequest(w http.ResponseWriter, r *http.Request, _ 
 		return nil, mwStatusRespond
 	}
 outside:
-
-	// For OAS route matching
-	if v.Spec.HasMock || v.Spec.HasValidateRequest {
-		findRouteAndOperation(v.Spec, r)
-	}
+	v.Spec.SetupOperation(r)
 
 	// Check versioning, blacklist, whitelist and ignored status
 	requestValid, stat := v.Spec.RequestValid(r)
