@@ -194,10 +194,6 @@ func (v *Versioning) Fill(api apidef.APIDefinition) {
 		return v.Versions[i].Name < v.Versions[j].Name
 	})
 
-	if ShouldOmit(v.Versions) {
-		v.Versions = nil
-	}
-
 	v.StripVersioningData = api.VersionDefinition.StripVersioningData
 	v.FallbackToDefault = api.VersionDefinition.FallbackToDefault
 	v.UrlVersioningPattern = api.VersionDefinition.UrlVersioningPattern
