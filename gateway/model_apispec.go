@@ -146,7 +146,7 @@ func (a *APISpec) findOperation(r *http.Request) *Operation {
 	}
 
 	if a.oasRouter == nil {
-		log.Warningf("OAS router not initialized propertly. Unable to find route for %s %v", r.Method, r.URL)
+		log.Warningf("OAS router not initialized properly. Unable to find route for %s %v", r.Method, r.URL)
 		return nil
 	}
 

@@ -60,8 +60,11 @@ func TestTraceHandler_RateLimiterGlobalWorksAsExpected(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
 	oasDef, err := oas.NewOas(
-		oas.WithTestDefaults(),
+		oas.WithTestDefaults(ctx, "/test"),
 		oas.WithGlobalRateLimit(1, 60*time.Second),
 		oas.WithGet("/rate-limited-api", func(b *oas.EndpointBuilder) {
 			b.Mock(func(_ *oas.MockResponse) {})
@@ -139,8 +142,11 @@ func TestTraceHandler_RateLimiterExceeded(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
 	oasDef, err := oas.NewOas(
-		oas.WithTestDefaults(),
+		oas.WithTestDefaults(ctx, "/test"),
 		oas.WithGet("/rate-limited-api", func(b *oas.EndpointBuilder) {
 			b.Mock(func(_ *oas.MockResponse) {}).RateLimit(1, time.Second)
 		}),
@@ -200,6 +206,8 @@ func TestTraceHandler_RateLimiterExceeded(t *testing.T) {
 func TestTraceHandler_MockMiddlewareRespondsWithProvidedData(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
 	type typedResponse struct {
 		Message string `json:"message"`
@@ -213,7 +221,7 @@ func TestTraceHandler_MockMiddlewareRespondsWithProvidedData(t *testing.T) {
 	require.NoError(t, err)
 
 	oasDef, err := oas.NewOas(
-		oas.WithTestDefaults(),
+		oas.WithTestDefaults(ctx, "/test"),
 		oas.WithGet("/mock", func(b *oas.EndpointBuilder) {
 			b.Mock(func(mock *oas.MockResponse) {
 				mock.Code = http.StatusCreated
