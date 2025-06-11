@@ -34,7 +34,6 @@ import (
 	"github.com/TykTechnologies/tyk/internal/otel"
 	"github.com/TykTechnologies/tyk/internal/scheduler"
 	"github.com/TykTechnologies/tyk/test"
-
 	logstashhook "github.com/bshuster-repo/logrus-logstash-hook"
 	logrussentry "github.com/evalphobia/logrus_sentry"
 	grayloghook "github.com/gemnasium/logrus-graylog-hook"
@@ -945,15 +944,22 @@ func (gw *Gateway) loadCustomMiddleware(spec *APISpec) ([]string, apidef.Middlew
 }
 
 // Create the response processor chain
-func (gw *Gateway) createResponseMiddlewareChain(spec *APISpec, responseFuncs []apidef.MiddlewareDefinition) {
+func (gw *Gateway) createResponseMiddlewareChain(
+	spec *APISpec,
+	middlewares []apidef.MiddlewareDefinition,
+	log *logrus.Entry,
+) {
+
 	var (
 		responseMWChain []TykResponseHandler
 		baseHandler     = BaseTykResponseHandler{Spec: spec, Gw: gw}
 	)
-	gw.responseMWAppendEnabled(&responseMWChain, &ResponseTransformMiddleware{BaseTykResponseHandler: baseHandler})
+	decorate := makeDefaultDecorator(log)
 
-	headerInjector := &HeaderInjector{BaseTykResponseHandler: baseHandler}
+	gw.responseMWAppendEnabled(&responseMWChain, decorate(&ResponseTransformMiddleware{BaseTykResponseHandler: baseHandler}))
+	headerInjector := decorate(&HeaderInjector{BaseTykResponseHandler: baseHandler})
 	headerInjectorAdded := gw.responseMWAppendEnabled(&responseMWChain, headerInjector)
+
 	for _, processorDetail := range spec.ResponseProcessors {
 		// This if statement will be removed in 5.4 as header_injector response processor will be removed
 		if processorDetail.Name == "header_injector" {
@@ -962,7 +968,7 @@ func (gw *Gateway) createResponseMiddlewareChain(spec *APISpec, responseFuncs []
 			}
 
 			if err := headerInjector.Init(processorDetail.Options, spec); err != nil {
-				mainLog.Debug("Failed to init header injector processor: ", err)
+				log.Debug("Failed to init header injector processor: ", err)
 			}
 
 			continue
@@ -970,19 +976,21 @@ func (gw *Gateway) createResponseMiddlewareChain(spec *APISpec, responseFuncs []
 
 		processor := gw.responseProcessorByName(processorDetail.Name, baseHandler)
 		if processor == nil {
-			mainLog.Error("No such processor: ", processorDetail.Name)
+			log.Error("No such processor: ", processorDetail.Name)
 			continue
 		}
 
+		processor = decorate(processor)
+
 		if err := processor.Init(processorDetail.Options, spec); err != nil {
-			mainLog.Debug("Failed to init processor: ", err)
+			log.Debug("Failed to init processor: ", err)
 		}
-		mainLog.Debug("Loading Response processor: ", processorDetail.Name)
+		log.Debug("Loading Response processor: ", processorDetail.Name)
 
 		responseMWChain = append(responseMWChain, processor)
 	}
 
-	for _, mw := range responseFuncs {
+	for _, mw := range middlewares {
 		var processor TykResponseHandler
 		//is it goplugin or other middleware
 		if strings.HasSuffix(mw.Path, ".so") {
@@ -997,8 +1005,10 @@ func (gw *Gateway) createResponseMiddlewareChain(spec *APISpec, responseFuncs []
 			return
 		}
 
+		processor = decorate(processor)
+
 		if err := processor.Init(mw, spec); err != nil {
-			mainLog.WithError(err).Debug("Failed to init processor")
+			log.WithError(err).Debug("Failed to init processor")
 		}
 		responseMWChain = append(responseMWChain, processor)
 	}
@@ -1008,7 +1018,7 @@ func (gw *Gateway) createResponseMiddlewareChain(spec *APISpec, responseFuncs []
 	cacheStore.Connect()
 
 	// Add cache writer as the final step of the response middleware chain
-	processor := &ResponseCacheMiddleware{BaseTykResponseHandler: baseHandler, store: cacheStore}
+	processor := decorate(&ResponseCacheMiddleware{BaseTykResponseHandler: baseHandler, store: cacheStore})
 	if err := processor.Init(nil, spec); err != nil {
 		mainLog.WithError(err).Debug("Failed to init processor")
 	}

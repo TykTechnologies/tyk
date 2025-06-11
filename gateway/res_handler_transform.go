@@ -97,7 +97,7 @@ func (r *ResponseTransformMiddleware) HandleError(rw http.ResponseWriter, req *h
 }
 
 func (r *ResponseTransformMiddleware) HandleResponse(rw http.ResponseWriter, res *http.Response, req *http.Request, ses *user.SessionState) error {
-	logger := log.WithFields(logrus.Fields{
+	logger := r.logger().WithFields(logrus.Fields{
 		"prefix":      "outbound-transform",
 		"server_name": r.Spec.Proxy.TargetURL,
 		"api_id":      r.Spec.APIID,
