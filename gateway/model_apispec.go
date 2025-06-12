@@ -156,11 +156,12 @@ func (a *APISpec) findOperation(r *http.Request) *Operation {
 	route, pathParams, err := a.oasRouter.FindRoute(&rClone)
 
 	if errors.Is(err, routers.ErrPathNotFound) {
+		log.Tracef("Unable to find route for %s %v at spec %v", r.Method, r.URL, a.Id)
 		return nil
 	}
 
 	if err != nil {
-		log.Warningf("Error finding route: %v", err)
+		log.Errorf("Error finding route: %v", err)
 		return nil
 	}
 
