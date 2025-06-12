@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"github.com/TykTechnologies/tyk/header"
 	"github.com/TykTechnologies/tyk/internal/middleware"
+	"github.com/mccutchen/go-httpbin/v2/httpbin"
 	"github.com/samber/lo"
 	"io"
 	"net/http"
@@ -59,12 +60,11 @@ func TestTraceHttpRequest_toRequest(t *testing.T) {
 func TestTraceHandler_RateLimiterGlobalWorksAsExpected(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	tServer := httptest.NewServer(httpbin.New())
+	defer tServer.Close()
 
 	oasDef, err := oas.NewOas(
-		oas.WithTestDefaults(ctx, "/test"),
+		oas.WithTestListenPathAndUpstream("/test", tServer.URL),
 		oas.WithGlobalRateLimit(1, 60*time.Second),
 		oas.WithGet("/rate-limited-api", func(b *oas.EndpointBuilder) {
 			b.Mock(func(_ *oas.MockResponse) {})
@@ -141,12 +141,11 @@ func TestTraceHandler_RateLimiterGlobalWorksAsExpected(t *testing.T) {
 func TestTraceHandler_RateLimiterExceeded(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	tServer := httptest.NewServer(httpbin.New())
+	defer tServer.Close()
 
 	oasDef, err := oas.NewOas(
-		oas.WithTestDefaults(ctx, "/test"),
+		oas.WithTestListenPathAndUpstream("/test", tServer.URL),
 		oas.WithGet("/rate-limited-api", func(b *oas.EndpointBuilder) {
 			b.Mock(func(_ *oas.MockResponse) {}).RateLimit(1, time.Second)
 		}),
@@ -206,8 +205,8 @@ func TestTraceHandler_RateLimiterExceeded(t *testing.T) {
 func TestTraceHandler_MockMiddlewareRespondsWithProvidedData(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	tServer := httptest.NewServer(httpbin.New())
+	defer tServer.Close()
 
 	type typedResponse struct {
 		Message string `json:"message"`
@@ -221,7 +220,7 @@ func TestTraceHandler_MockMiddlewareRespondsWithProvidedData(t *testing.T) {
 	require.NoError(t, err)
 
 	oasDef, err := oas.NewOas(
-		oas.WithTestDefaults(ctx, "/test"),
+		oas.WithTestListenPathAndUpstream("/test", tServer.URL),
 		oas.WithGet("/mock", func(b *oas.EndpointBuilder) {
 			b.Mock(func(mock *oas.MockResponse) {
 				mock.Code = http.StatusCreated

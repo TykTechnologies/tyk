@@ -1,13 +1,11 @@
 package oas
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	tykheaders "github.com/TykTechnologies/tyk/header"
 	"github.com/TykTechnologies/tyk/internal/uuid"
 	"net/http"
-	"net/http/httptest"
 	"net/url"
 	"strings"
 	"time"
@@ -103,26 +101,12 @@ func (b *Builder) Build() (*OAS, error) {
 	return b.oas, nil
 }
 
-// WithTestDefaults sets defaults options
+// WithTestListenPathAndUpstream sets defaults options
 // to be sued for testing
-func WithTestDefaults(ctx context.Context, path string) BuilderOption {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		w.Header().Add(tykheaders.ContentType, "application/json")
-		w.WriteHeader(http.StatusNotFound)
-
-		if _, err := w.Write([]byte(`{"message": "not found"}`)); err != nil {
-			log.Errorf("failed to write response: %v", err)
-		}
-	}))
-
-	go func() {
-		<-ctx.Done()
-		defer server.Close()
-	}()
-
+func WithTestListenPathAndUpstream(path, upstreamUrl string) BuilderOption {
 	return combine(
 		withRandomId(),
-		WithUpstreamUrl(server.URL),
+		WithUpstreamUrl(upstreamUrl),
 		WithListenPath(path, true),
 	)
 }
@@ -248,8 +232,8 @@ func (eb *EndpointBuilder) Mock(fn func(mock *MockResponse)) *EndpointBuilder {
 	var mock MockResponse
 	mock.Enabled = true
 	mock.Code = http.StatusOK
-	mock.Headers.Add(tykheaders.ContentType, "application/json")
-	mock.Body = "{\"message\":\"ok\"}"
+	mock.Headers.Add(tykheaders.ContentType, tykheaders.ApplicationJSON)
+	mock.Body = `{"message":"ok"}`
 
 	fn(&mock)
 	eb.operation().MockResponse = &mock
@@ -300,7 +284,7 @@ func (eb *EndpointBuilder) build(builder *Builder) {
 		Value: &openapi3.Response{
 			Description: &emptyDescription,
 			Content: openapi3.Content{
-				"application/json": &openapi3.MediaType{},
+				tykheaders.ApplicationJSON: &openapi3.MediaType{},
 			},
 		},
 	})
