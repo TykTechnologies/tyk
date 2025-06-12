@@ -360,13 +360,12 @@ func (e *ErrorHandler) getAPIErrorMessage(errType string, r *http.Request) (stri
 					continue
 				}
 
-				// Check if the path matches
-				urlSpec := URLSpec{}
-				// Use the existing matchesPath method to check if the path matches
-				if !urlSpec.matchesPath(r.URL.Path, e.Spec) {
+				// Check if the path matches...ToDO: replace with regex
+				if !strings.HasSuffix(r.URL.Path, errorMeta.Path) {
 					continue
 				}
 
+				fmt.Println(errorMeta)
 				// Check if there's an error message for this error type
 				if apiErr, exists := errorMeta.ErrorMessages[errType]; exists {
 					return apiErr.Message, apiErr.Code
