@@ -1,7 +1,6 @@
 package oas
 
 import (
-	"github.com/TykTechnologies/tyk/config"
 	"sort"
 
 	"github.com/TykTechnologies/storage/persistent/model"
@@ -22,7 +21,7 @@ type XTykAPIGateway struct {
 	// Middleware contains the configurations related to the Tyk middleware.
 	Middleware *Middleware `bson:"middleware,omitempty" json:"middleware,omitempty"`
 	// ErrorMessages allows API-level customization of error messages
-	ErrorMessages map[string]config.TykError `bson:"error_messages,omitempty" json:"error_messages,omitempty"`
+	ErrorMessages map[string]apidef.TykError `bson:"error_messages,omitempty" json:"error_messages,omitempty"`
 }
 
 // Fill fills *XTykAPIGateway from apidef.APIDefinition.

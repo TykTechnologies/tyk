@@ -1173,7 +1173,7 @@ type Config struct {
 	//  }
 	// }
 	// ```
-	OverrideMessages map[string]TykError `bson:"override_messages" json:"override_messages"`
+	OverrideMessages map[string]apidef.TykError `bson:"override_messages" json:"override_messages"`
 
 	// Cloud flag shows the Gateway runs in Tyk Cloud.
 	Cloud bool `json:"cloud"`

@@ -6,7 +6,6 @@ import (
 	"encoding/xml"
 	"errors"
 	"fmt"
-	"github.com/TykTechnologies/tyk/config"
 	"net/http"
 	"text/template"
 	"time"
@@ -647,13 +646,18 @@ type Scopes struct {
 	OIDC ScopeClaim `bson:"oidc" json:"oidc,omitempty"`
 }
 
+type TykError struct {
+	Message string `json:"message" bson:"message"`
+	Code    int    `json:"code" bson:"code"`
+}
+
 // APIDefinition represents the configuration for a single proxied API and it's versions.
 //
 // swagger:model
 type APIDefinition struct {
 	Id model.ObjectID `bson:"_id,omitempty" json:"id,omitempty" gorm:"primaryKey;column:_id"`
 	// ErrorMessages allows API-level customization of error messages
-	ErrorMessages map[string]config.TykError `bson:"error_messages,omitempty" json:"error_messages,omitempty"`
+	ErrorMessages map[string]TykError `bson:"error_messages,omitempty" json:"error_messages,omitempty"`
 
 	Name                string        `bson:"name" json:"name"`
 	Expiration          string        `bson:"expiration" json:"expiration,omitempty"`

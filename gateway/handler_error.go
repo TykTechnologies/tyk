@@ -16,8 +16,6 @@ import (
 	"github.com/TykTechnologies/tyk/apidef"
 
 	"github.com/TykTechnologies/tyk-pump/analytics"
-	"github.com/TykTechnologies/tyk/config"
-
 	"github.com/TykTechnologies/tyk/header"
 	"github.com/TykTechnologies/tyk/request"
 )
@@ -38,7 +36,7 @@ const (
 
 var errCustomBodyResponse = errors.New("errCustomBodyResponse")
 
-var TykErrors = make(map[string]config.TykError)
+var TykErrors = make(map[string]apidef.TykError)
 
 func (e *ErrorHandler) errorAndStatusCode(errType string) (error, int) {
 	message, code := e.getAPIErrorMessage(errType)
@@ -46,7 +44,7 @@ func (e *ErrorHandler) errorAndStatusCode(errType string) (error, int) {
 }
 
 func defaultTykErrors() {
-	TykErrors = make(map[string]config.TykError)
+	TykErrors = make(map[string]apidef.TykError)
 
 	initAuthKeyErrors()
 	initOauth2KeyExistsErrors()
@@ -353,6 +351,8 @@ func (e *ErrorHandler) getAPIErrorMessage(errType string) (string, int) {
 				if apiErr, exists := ext.ErrorMessages[errType]; exists {
 					return apiErr.Message, apiErr.Code
 				}
+			} else {
+				fmt.Println("--------errors nil for api")
 			}
 		}
 	}

@@ -569,6 +569,7 @@ func (gw *Gateway) syncAPISpecs() (int, error) {
 			mainLog.WithError(err).WithField("spec", v.Name).Error("Skipping loading spec because it failed validation")
 			continue
 		}
+		fmt.Printf("\ncargando apis, el error: %v \n", v.ErrorMessages)
 		filter = append(filter, v)
 	}
 
