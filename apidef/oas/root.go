@@ -31,6 +31,10 @@ func (x *XTykAPIGateway) Fill(api apidef.APIDefinition) {
 	x.Upstream.Fill(api)
 	x.Server.Fill(api)
 
+	if api.ErrorMessages != nil {
+		x.ErrorMessages = api.ErrorMessages
+	}
+
 	if x.Middleware == nil {
 		x.Middleware = &Middleware{}
 	}
@@ -57,9 +61,7 @@ func (x *XTykAPIGateway) ExtractTo(api *apidef.APIDefinition) {
 	}
 
 	if x.ErrorMessages != nil {
-		panic(x.ErrorMessages)
-	} else {
-		panic("-------------2---------------es nil")
+		api.ErrorMessages = x.ErrorMessages
 	}
 
 	x.Middleware.ExtractTo(api)
