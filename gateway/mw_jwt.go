@@ -90,6 +90,7 @@ func parseJWK(buf []byte) (*jose.JSONWebKeySet, error) {
 func (k *JWTMiddleware) legacyGetSecretFromURL(url, kid, keyType string) (interface{}, error) {
 	var client http.Client
 	client.Transport = &http.Transport{
+		Proxy:           http.ProxyFromEnvironment,
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: k.Gw.GetConfig().JWTSSLInsecureSkipVerify},
 	}
 
@@ -1034,6 +1035,7 @@ func parseJWTKey(signingMethod string, secret interface{}) (interface{}, error) 
 func getJWK(url string, jwtSSLInsecureSkipVerify bool) (*jose.JSONWebKeySet, error) {
 	client := http.Client{
 		Transport: &http.Transport{
+			Proxy:           http.ProxyFromEnvironment,
 			TLSClientConfig: &tls.Config{InsecureSkipVerify: jwtSSLInsecureSkipVerify},
 		},
 	}
