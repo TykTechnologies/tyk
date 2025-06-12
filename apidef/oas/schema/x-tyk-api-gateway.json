@@ -28,8 +28,7 @@
     },
     "middleware": {
       "$ref": "#/definitions/X-Tyk-Middleware"
-    },
-    "errors"
+    }
   },
   "required": [
     "info",
