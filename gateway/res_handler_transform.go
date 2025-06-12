@@ -107,7 +107,9 @@ func (r *ResponseTransformMiddleware) HandleResponse(rw http.ResponseWriter, res
 	versionInfo, _ := r.Spec.Version(req)
 	versionPaths := r.Spec.RxPaths[versionInfo.Name]
 	found, meta := r.Spec.CheckSpecMatchesStatus(req, versionPaths, TransformedResponse)
+
 	if !found {
+		logger.Warning("CheckSpecMatchesStatus not found. Transformation stopped.")
 		return nil
 	}
 	tmeta := meta.(*TransformSpec)

@@ -952,7 +952,7 @@ func (gw *Gateway) createResponseMiddlewareChain(
 
 	var (
 		responseMWChain []TykResponseHandler
-		baseHandler     = BaseTykResponseHandler{Spec: spec, Gw: gw}
+		baseHandler     = BaseTykResponseHandler{Spec: spec, Gw: gw, log: log}
 	)
 	decorate := makeDefaultDecorator(log)
 
@@ -1001,8 +1001,8 @@ func (gw *Gateway) createResponseMiddlewareChain(
 
 		// TODO: perhaps error when plugin support is disabled?
 		if processor == nil {
-			mainLog.Error("Couldn't find custom middleware processor")
-			return
+			log.Errorf("Couldn't find custom middleware processor: %#v", mw)
+			continue
 		}
 
 		processor = decorate(processor)
@@ -1020,7 +1020,7 @@ func (gw *Gateway) createResponseMiddlewareChain(
 	// Add cache writer as the final step of the response middleware chain
 	processor := decorate(&ResponseCacheMiddleware{BaseTykResponseHandler: baseHandler, store: cacheStore})
 	if err := processor.Init(nil, spec); err != nil {
-		mainLog.WithError(err).Debug("Failed to init processor")
+		log.WithError(err).Debug("Failed to init processor")
 	}
 
 	responseMWChain = append(responseMWChain, processor)
