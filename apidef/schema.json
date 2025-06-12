@@ -7,6 +7,24 @@
   "id": "http://jsonschema.net",
   "additionalProperties": false,
   "properties": {
+    "error_messages": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "integer"
+          },
+          "message": {
+            "type": "string"
+          }
+        },
+        "required": ["code", "message"]
+      }
+    },
     "is_site": {
       "type": "boolean"
     },

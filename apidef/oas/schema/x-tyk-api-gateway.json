@@ -5,6 +5,21 @@
     "info": {
       "$ref": "#/definitions/X-Tyk-Info"
     },
+    "error_messages": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "integer"
+          },
+          "message": {
+            "type": "string"
+          }
+        },
+        "required": ["code", "message"]
+      }
+    },
     "upstream": {
       "$ref": "#/definitions/X-Tyk-Upstream"
     },
@@ -13,7 +28,8 @@
     },
     "middleware": {
       "$ref": "#/definitions/X-Tyk-Middleware"
-    }
+    },
+    "errors"
   },
   "required": [
     "info",

@@ -40,11 +40,9 @@ var errCustomBodyResponse = errors.New("errCustomBodyResponse")
 
 var TykErrors = make(map[string]config.TykError)
 
-func errorAndStatusCode(errType string) (error, int) {
-	err := TykErrors[errType]
-	fmt.Println("-------.--------------Busca: ", errType)
-	fmt.Println("-------retorna:")
-	return errors.New(err.Message), err.Code
+func (e *ErrorHandler) errorAndStatusCode(errType string) (error, int) {
+	message, code := e.getAPIErrorMessage(errType)
+	return errors.New(message), code
 }
 
 func defaultTykErrors() {
@@ -319,4 +317,51 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 
 	// Report in health check
 	reportHealthValue(e.Spec, BlockedRequestLog, "-1")
+}
+
+// Helper function to check if an error message is a known error type
+func isKnownError(errMsg string) (string, bool) {
+	// Check if the error message matches any known error types
+	for errType, errObj := range TykErrors {
+		if errMsg == errObj.Message {
+			return errType, true
+		}
+	}
+	return "", false
+}
+
+// getAPIErrorMessage returns the error message for a specific error type,
+// checking API-specific overrides first, then falling back to global defaults
+func (e *ErrorHandler) getAPIErrorMessage(errType string) (string, int) {
+	// First check API-specific error messages
+	if e.Spec != nil {
+		// For classic APIs
+		if e.Spec.ErrorMessages != nil {
+			if apiErr, exists := e.Spec.ErrorMessages[errType]; exists {
+				return apiErr.Message, apiErr.Code
+			}
+		}
+
+		// For OAS APIs
+		// For OAS APIs
+		if e.Spec.OAS.GetTykExtension() != nil {
+			fmt.Printf("\nOAS: %+v\n", e.Spec.OAS.GetTykExtension())
+			fmt.Println("-----------for oas apii......., looking for:", errType)
+			ext := e.Spec.OAS.GetTykExtension()
+			if ext.ErrorMessages != nil {
+				fmt.Println("--------errors defined for api")
+				if apiErr, exists := ext.ErrorMessages[errType]; exists {
+					return apiErr.Message, apiErr.Code
+				}
+			}
+		}
+	}
+
+	// Fall back to global error messages
+	globalErr, exists := TykErrors[errType]
+	if !exists {
+		return "An error occurred", http.StatusInternalServerError
+	}
+
+	return globalErr.Message, globalErr.Code
 }

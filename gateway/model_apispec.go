@@ -59,6 +59,8 @@ type APISpec struct {
 	GraphEngine graphengine.Engine
 
 	OASRouter routers.Router
+	// ErrorMessages allows API-level customization of error messages
+	ErrorMessages map[string]config.TykError `bson:"error_messages" json:"error_messages"`
 }
 
 // CheckSpecMatchesStatus checks if a URL spec has a specific status.

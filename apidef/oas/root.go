@@ -1,6 +1,7 @@
 package oas
 
 import (
+	"github.com/TykTechnologies/tyk/config"
 	"sort"
 
 	"github.com/TykTechnologies/storage/persistent/model"
@@ -20,6 +21,8 @@ type XTykAPIGateway struct {
 	Server Server `bson:"server" json:"server"` // required
 	// Middleware contains the configurations related to the Tyk middleware.
 	Middleware *Middleware `bson:"middleware,omitempty" json:"middleware,omitempty"`
+	// ErrorMessages allows API-level customization of error messages
+	ErrorMessages map[string]config.TykError `bson:"error_messages,omitempty" json:"error_messages,omitempty"`
 }
 
 // Fill fills *XTykAPIGateway from apidef.APIDefinition.
@@ -51,6 +54,12 @@ func (x *XTykAPIGateway) ExtractTo(api *apidef.APIDefinition) {
 		defer func() {
 			x.Middleware = nil
 		}()
+	}
+
+	if x.ErrorMessages != nil {
+		panic(x.ErrorMessages)
+	} else {
+		panic("-------------2---------------es nil")
 	}
 
 	x.Middleware.ExtractTo(api)

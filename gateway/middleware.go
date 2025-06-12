@@ -694,6 +694,11 @@ func (t *BaseMiddleware) generateSessionID(id string) string {
 	return t.Gw.generateToken(t.Spec.OrgID, keyID)
 }
 
+func (t *BaseMiddleware) GetErrorAndStatusCode(errType string) (error, int) {
+	handler := ErrorHandler{t}
+	return handler.errorAndStatusCode(errType)
+}
+
 type TykResponseHandler interface {
 	Enabled() bool
 	Init(interface{}, *APISpec) error

@@ -112,13 +112,13 @@ func (k *AuthKey) ProcessRequest(_ http.ResponseWriter, r *http.Request, _ inter
 		log.Debug("Trying to find key by client certificate")
 		certHash = k.Spec.OrgID + crypto.HexSHA256(r.TLS.PeerCertificates[0].Raw)
 		if time.Now().After(r.TLS.PeerCertificates[0].NotAfter) {
-			return errorAndStatusCode(ErrAuthCertExpired)
+			return k.GetErrorAndStatusCode(ErrAuthCertExpired)
 		}
 
 		key = k.Gw.generateToken(k.Spec.OrgID, certHash)
 	} else {
 		k.Logger().Info("Attempted access with malformed header, no auth header found.")
-		return errorAndStatusCode(ErrAuthAuthorizationFieldMissing)
+		return k.GetErrorAndStatusCode(ErrAuthAuthorizationFieldMissing)
 	}
 
 	session, keyExists = k.CheckSessionAndIdentityForValidKey(key, r)
@@ -194,7 +194,7 @@ func (k *AuthKey) reportInvalidKey(key string, r *http.Request, msg string, errM
 	// Report in health check
 	reportHealthValue(k.Spec, KeyFailure, "1")
 
-	return errorAndStatusCode(errMsg)
+	return k.GetErrorAndStatusCode(errMsg)
 }
 
 func (k *AuthKey) validateSignature(r *http.Request, key string) (error, int) {
