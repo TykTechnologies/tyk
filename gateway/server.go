@@ -364,6 +364,7 @@ func (gw *Gateway) apisByIDLen() int {
 // Create all globals and init connection handlers
 func (gw *Gateway) setupGlobals() {
 	defaultTykErrors()
+	overrideTykErrors(gw)
 
 	gwConfig := gw.GetConfig()
 	checkup.Run(&gwConfig)
@@ -1315,8 +1316,6 @@ func (gw *Gateway) initSystem() error {
 		gw.SetConfig(gwConfig)
 		gw.afterConfSetup()
 	}
-
-	overrideTykErrors(gw)
 
 	gwConfig = gw.GetConfig()
 	if gwConfig.Storage.Type != "redis" {

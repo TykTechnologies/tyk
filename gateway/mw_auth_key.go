@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
 	"strings"
 	"time"
@@ -35,6 +36,7 @@ const (
 )
 
 func initAuthKeyErrors() {
+	fmt.Println("----------Inicia default values for errors---------")
 	TykErrors[ErrAuthAuthorizationFieldMissing] = config.TykError{
 		Message: MsgAuthFieldMissing,
 		Code:    http.StatusUnauthorized,

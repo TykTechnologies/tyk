@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/base64"
 	"errors"
+	"fmt"
 	htmltemplate "html/template"
 	"io"
 	"io/ioutil"
@@ -41,6 +42,8 @@ var TykErrors = make(map[string]config.TykError)
 
 func errorAndStatusCode(errType string) (error, int) {
 	err := TykErrors[errType]
+	fmt.Println("-------.--------------Busca: ", errType)
+	fmt.Println("-------retorna:")
 	return errors.New(err.Message), err.Code
 }
 
@@ -53,9 +56,8 @@ func defaultTykErrors() {
 
 func overrideTykErrors(gw *Gateway) {
 	gwConfig := gw.GetConfig()
-
+	fmt.Println("--------OVERRIDING WITH CONFIGS")
 	for id, err := range gwConfig.OverrideMessages {
-
 		overridenErr := TykErrors[id]
 
 		if err.Code != 0 {
@@ -68,6 +70,7 @@ func overrideTykErrors(gw *Gateway) {
 
 		TykErrors[id] = overridenErr
 	}
+	fmt.Println("------AFTEr OVERRIDING:", TykErrors)
 }
 
 // APIError is generic error object returned if there is something wrong with the request
