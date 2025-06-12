@@ -153,6 +153,8 @@ type EndpointMethodMeta struct {
 	Code    int                  `bson:"code" json:"code"`
 	Data    string               `bson:"data" json:"data"`
 	Headers map[string]string    `bson:"headers" json:"headers"`
+	// ErrorMessages allows endpoint-level customization of error messages
+	ErrorMessages map[string]TykError `bson:"error_messages,omitempty" json:"error_messages,omitempty"`
 }
 
 type MockResponseMeta struct {
@@ -387,6 +389,13 @@ type GoPluginMeta struct {
 	SymbolName string `bson:"func_name" json:"func_name"`
 }
 
+type ErrorMessagesMeta struct {
+	Path          string              `bson:"path" json:"path"`
+	Method        string              `bson:"method" json:"method"`
+	Disabled      bool                `bson:"disabled" json:"disabled"`
+	ErrorMessages map[string]TykError `bson:"error_messages" json:"error_messages"`
+}
+
 type ExtendedPathsSet struct {
 	Ignored                 []EndPointMeta        `bson:"ignored" json:"ignored,omitempty"`
 	WhiteList               []EndPointMeta        `bson:"white_list" json:"white_list,omitempty"`
@@ -414,6 +423,7 @@ type ExtendedPathsSet struct {
 	GoPlugin                []GoPluginMeta        `bson:"go_plugin" json:"go_plugin,omitempty"`
 	PersistGraphQL          []PersistGraphQLMeta  `bson:"persist_graphql" json:"persist_graphql"`
 	RateLimit               []RateLimitMeta       `bson:"rate_limit" json:"rate_limit"`
+	ErrorMessages           []ErrorMessagesMeta   `bson:"error_messages" json:"error_messages"`
 }
 
 // Clear omits values that have OAS API definition conversions in place.

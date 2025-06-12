@@ -38,8 +38,8 @@ var errCustomBodyResponse = errors.New("errCustomBodyResponse")
 
 var TykErrors = make(map[string]apidef.TykError)
 
-func (e *ErrorHandler) errorAndStatusCode(errType string) (error, int) {
-	message, code := e.getAPIErrorMessage(errType)
+func (e *ErrorHandler) errorAndStatusCode(errType string, r *http.Request) (error, int) {
+	message, code := e.getAPIErrorMessage(errType, r)
 	return errors.New(message), code
 }
 
@@ -86,10 +86,26 @@ type TemplateExecutor interface {
 	Execute(wr io.Writer, data interface{}) error
 }
 
+// Helper function to check if an error message is a known error type
+func isKnownError(errMsg string) (string, bool) {
+	// Check if the error message matches any known error types
+	for errType, errObj := range TykErrors {
+		if errMsg == errObj.Message {
+			return errType, true
+		}
+	}
+	return "", false
+}
+
 // HandleError is the actual error handler and will store the error details in analytics if analytics processing is enabled.
 func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMsg string, errCode int, writeResponse bool) {
 	defer e.Base().UpdateRequestSession(r)
 	response := &http.Response{}
+
+	// Use the request-aware version of getAPIErrorMessage when possible
+	if errType, ok := isKnownError(errMsg); ok && r != nil {
+		errMsg, errCode = e.getAPIErrorMessage(errType, r)
+	}
 
 	if writeResponse {
 		var templateExtension string
@@ -317,42 +333,61 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 	reportHealthValue(e.Spec, BlockedRequestLog, "-1")
 }
 
-// Helper function to check if an error message is a known error type
-func isKnownError(errMsg string) (string, bool) {
-	// Check if the error message matches any known error types
-	for errType, errObj := range TykErrors {
-		if errMsg == errObj.Message {
-			return errType, true
-		}
-	}
-	return "", false
-}
-
 // getAPIErrorMessage returns the error message for a specific error type,
 // checking API-specific overrides first, then falling back to global defaults
-func (e *ErrorHandler) getAPIErrorMessage(errType string) (string, int) {
-	// First check API-specific error messages
-	if e.Spec != nil {
-		// For classic APIs
-		if e.Spec.ErrorMessages != nil {
-			if apiErr, exists := e.Spec.ErrorMessages[errType]; exists {
+func (e *ErrorHandler) getAPIErrorMessage(errType string, r *http.Request) (string, int) {
+	// First check endpoint-specific error messages
+	if e.Spec != nil && r != nil {
+		// For OAS APIs
+		if e.Spec.IsOAS {
+			if operation := e.Spec.findOperations(r); operation != nil {
+				if operation.ErrorMessages != nil {
+					if apiErr, exists := operation.ErrorMessages[errType]; exists {
+						return apiErr.Message, apiErr.Code
+					}
+				}
+			}
+		} else {
+			// For classic APIs
+			version, _ := e.Spec.Version(r)
+			// Check the new ErrorMessages section in ExtendedPathsSet
+			for _, errorMeta := range version.ExtendedPaths.ErrorMessages {
+				if errorMeta.Disabled {
+					continue
+				}
+
+				if errorMeta.Method != "" && errorMeta.Method != r.Method {
+					continue
+				}
+
+				// Check if the path matches
+				urlSpec := URLSpec{}
+				// Use the existing matchesPath method to check if the path matches
+				if !urlSpec.matchesPath(r.URL.Path, e.Spec) {
+					continue
+				}
+
+				// Check if there's an error message for this error type
+				if apiErr, exists := errorMeta.ErrorMessages[errType]; exists {
+					return apiErr.Message, apiErr.Code
+				}
+			}
+		}
+
+		// Fall back to API-level error messages
+		if e.Spec.APIDefinition.ErrorMessages != nil {
+			if apiErr, exists := e.Spec.APIDefinition.ErrorMessages[errType]; exists {
 				return apiErr.Message, apiErr.Code
 			}
 		}
 
-		// For OAS APIs
-		// For OAS APIs
+		// For OAS APIs, also check the OAS extension
 		if e.Spec.OAS.GetTykExtension() != nil {
-			fmt.Printf("\nOAS: %+v\n", e.Spec.OAS.GetTykExtension())
-			fmt.Println("-----------for oas apii......., looking for:", errType)
 			ext := e.Spec.OAS.GetTykExtension()
 			if ext.ErrorMessages != nil {
-				fmt.Println("--------errors defined for api")
 				if apiErr, exists := ext.ErrorMessages[errType]; exists {
 					return apiErr.Message, apiErr.Code
 				}
-			} else {
-				fmt.Println("--------errors nil for api")
 			}
 		}
 	}

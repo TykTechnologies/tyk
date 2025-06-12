@@ -76,13 +76,13 @@ func (k *Oauth2KeyExists) ProcessRequest(w http.ResponseWriter, r *http.Request,
 	if len(parts) < 2 {
 		logger.Info("Attempted access with malformed header, no auth header found.")
 
-		return k.GetErrorAndStatusCode(ErrOAuthAuthorizationFieldMissing)
+		return k.GetErrorAndStatusCode(ErrOAuthAuthorizationFieldMissing, r)
 	}
 
 	if strings.ToLower(parts[0]) != "bearer" {
 		logger.Info("Bearer token malformed")
 
-		return k.GetErrorAndStatusCode(ErrOAuthAuthorizationFieldMalformed)
+		return k.GetErrorAndStatusCode(ErrOAuthAuthorizationFieldMalformed, r)
 	}
 
 	accessToken := parts[1]
@@ -100,7 +100,7 @@ func (k *Oauth2KeyExists) ProcessRequest(w http.ResponseWriter, r *http.Request,
 		// Report in health check
 		reportHealthValue(k.Spec, KeyFailure, "-1")
 
-		return k.GetErrorAndStatusCode(ErrOAuthKeyNotFound)
+		return k.GetErrorAndStatusCode(ErrOAuthKeyNotFound, r)
 	}
 
 	// Make sure OAuth-client is still present
@@ -122,7 +122,7 @@ func (k *Oauth2KeyExists) ProcessRequest(w http.ResponseWriter, r *http.Request,
 	}
 	if oauthClientDeleted {
 		logger.WithField("oauthClientID", session.OauthClientID).Warning("Attempted access for deleted OAuth client.")
-		return k.GetErrorAndStatusCode(ErrOAuthClientDeleted)
+		return k.GetErrorAndStatusCode(ErrOAuthClientDeleted, r)
 	}
 
 	// Set session state on context, we will need it later

@@ -84,6 +84,9 @@ type Operation struct {
 
 	// RateLimit contains endpoint level rate limit configuration.
 	RateLimit *RateLimitEndpoint `bson:"rateLimit,omitempty" json:"rateLimit,omitempty"`
+
+	// ErrorMessages allows endpoint-level customization of error messages
+	ErrorMessages map[string]apidef.TykError `bson:"error_messages,omitempty" json:"error_messages,omitempty"`
 }
 
 // AllowanceType holds the valid allowance types values.

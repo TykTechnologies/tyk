@@ -532,7 +532,6 @@ func (gw *Gateway) syncAPISpecs() (int, error) {
 		}
 
 		s = tmpSpecs
-
 		mainLog.Debug("Downloading API Configurations from Dashboard Service")
 	} else if gw.GetConfig().SlaveOptions.UseRPC {
 		mainLog.Debug("Using RPC Configuration")
@@ -565,6 +564,8 @@ func (gw *Gateway) syncAPISpecs() (int, error) {
 	}
 	var filter []*APISpec
 	for _, v := range s {
+		mainLog.Infof("\napis: %+v \n", v.Name)
+		mainLog.Infof("\n: %+v \n", v.APIDefinition.ErrorMessages)
 		if err := v.Validate(gw.GetConfig().OAS); err != nil {
 			mainLog.WithError(err).WithField("spec", v.Name).Error("Skipping loading spec because it failed validation")
 			continue
