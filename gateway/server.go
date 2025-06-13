@@ -1695,7 +1695,7 @@ func Start() {
 	// Set up signal handling for graceful shutdown
 	sigChan := make(chan os.Signal, 1)
 	// Only listen for SIGTERM which is what Kubernetes sends
-	signal.Notify(sigChan, syscall.SIGTERM)
+	signal.Notify(sigChan, syscall.SIGTERM, syscall.SIGQUIT)
 
 	// Initialize everything else as normal
 	cli.Init(confPaths)
@@ -1853,15 +1853,6 @@ func Start() {
 	// write pprof profiles
 	writeProfiles()
 
-	if gwConfig.UseDBAppConfigs {
-		mainLog.Info("Stopping heartbeat...")
-		gw.DashService.StopBeating()
-		time.Sleep(2 * time.Second)
-		err := gw.DashService.DeRegister()
-		if err != nil {
-			mainLog.WithError(err).Error("deregistering in dashboard")
-		}
-	}
 	if gwConfig.SlaveOptions.UseRPC {
 		store := RPCStorageHandler{
 			DoReload: gw.DoReload,
