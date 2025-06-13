@@ -4,7 +4,6 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/internal/otel"
 
 	"github.com/TykTechnologies/tyk/apidef"
@@ -23,25 +22,26 @@ const (
 )
 
 func initOauth2KeyExistsErrors() {
-	TykErrors[ErrOAuthAuthorizationFieldMissing] = config.TykError{
+	TykErrors[ErrOAuthAuthorizationFieldMissing] = apidef.TykError{
 		Message: MsgAuthFieldMissing,
 		Code:    http.StatusBadRequest,
 	}
 
-	TykErrors[ErrOAuthAuthorizationFieldMalformed] = config.TykError{
+	TykErrors[ErrOAuthAuthorizationFieldMalformed] = apidef.TykError{
 		Message: MsgBearerMailformed,
 		Code:    http.StatusBadRequest,
 	}
 
-	TykErrors[ErrOAuthKeyNotFound] = config.TykError{
+	TykErrors[ErrOAuthKeyNotFound] = apidef.TykError{
 		Message: MsgKeyNotAuthorized,
 		Code:    http.StatusForbidden,
 	}
 
-	TykErrors[ErrOAuthClientDeleted] = config.TykError{
+	TykErrors[ErrOAuthClientDeleted] = apidef.TykError{
 		Message: MsgOauthClientRevoked,
 		Code:    http.StatusForbidden,
 	}
+
 }
 
 // Oauth2KeyExists will check if the key being used to access the API is in the request data,
@@ -77,13 +77,13 @@ func (k *Oauth2KeyExists) ProcessRequest(w http.ResponseWriter, r *http.Request,
 	if len(parts) < 2 {
 		logger.Info("Attempted access with malformed header, no auth header found.")
 
-		return errorAndStatusCode(ErrOAuthAuthorizationFieldMissing)
+		return k.GetErrorAndStatusCode(ErrOAuthAuthorizationFieldMissing, r)
 	}
 
 	if strings.ToLower(parts[0]) != "bearer" {
 		logger.Info("Bearer token malformed")
 
-		return errorAndStatusCode(ErrOAuthAuthorizationFieldMalformed)
+		return k.GetErrorAndStatusCode(ErrOAuthAuthorizationFieldMalformed, r)
 	}
 
 	accessToken := parts[1]
@@ -101,7 +101,7 @@ func (k *Oauth2KeyExists) ProcessRequest(w http.ResponseWriter, r *http.Request,
 		// Report in health check
 		reportHealthValue(k.Spec, KeyFailure, "-1")
 
-		return errorAndStatusCode(ErrOAuthKeyNotFound)
+		return k.GetErrorAndStatusCode(ErrOAuthKeyNotFound, r)
 	}
 
 	// Make sure OAuth-client is still present
@@ -123,7 +123,7 @@ func (k *Oauth2KeyExists) ProcessRequest(w http.ResponseWriter, r *http.Request,
 	}
 	if oauthClientDeleted {
 		logger.WithField("oauthClientID", session.OauthClientID).Warning("Attempted access for deleted OAuth client.")
-		return errorAndStatusCode(ErrOAuthClientDeleted)
+		return k.GetErrorAndStatusCode(ErrOAuthClientDeleted, r)
 	}
 
 	// Set session state on context, we will need it later
