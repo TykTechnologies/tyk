@@ -2037,6 +2037,7 @@ func (gw *Gateway) SetConfig(conf config.Config, skipReload ...bool) {
 
 // gracefulShutdown performs a graceful shutdown of all services
 func (gw *Gateway) gracefulShutdown(ctx context.Context) error {
+	mainLog.Info("Stop signal received.")
 	mainLog.Info("Gracefully shutting down services...")
 	mainLog.Info("Waiting for in-flight requests to complete...")
 	var wg sync.WaitGroup
@@ -2096,7 +2097,6 @@ func (gw *Gateway) gracefulShutdown(ctx context.Context) error {
 	}
 
 	mainLog.Info("All services gracefully shut down")
-	mainLog.Info("Stop signal received.")
 	if err := gw.DefaultProxyMux.again.Close(); err != nil {
 		mainLog.Error("Closing listeners: ", err)
 	}
