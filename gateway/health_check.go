@@ -238,6 +238,12 @@ func (gw *Gateway) readinessHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	if !gw.performedSuccessfulReload {
+		mainLog.Warning("[Readiness] Successful reload check failed")
+		doJSONWrite(w, http.StatusServiceUnavailable, apiError("A successful API reload did not happen"))
+		return
+	}
+
 	// All checks passed - use similar response format as liveCheckHandler
 	res := HealthCheckResponse{
 		Status:      Pass,

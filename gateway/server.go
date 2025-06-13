@@ -182,6 +182,8 @@ type Gateway struct {
 	// reloadQueue is used by reloadURLStructure to queue a reload. It's not
 	// buffered, as reloadQueueLoop should pick these up immediately.
 	reloadQueue chan func()
+	// performedSuccessfulReload is used to know whether a successful reload happened
+	performedSuccessfulReload bool
 
 	requeueLock sync.Mutex
 
@@ -1056,12 +1058,14 @@ func (gw *Gateway) DoReload() {
 		// and current registry had 0 APIs
 		if count == 0 && gw.apisByIDLen() == 0 {
 			mainLog.Warning("No API Definitions found, not reloading")
+			gw.performedSuccessfulReload = true
 			return
 		}
 	}
 
 	gw.loadGlobalApps()
 
+	gw.performedSuccessfulReload = true
 	mainLog.Info("API reload complete")
 }
 
@@ -1842,7 +1846,7 @@ func Start() {
 }
 
 func writeProfiles() {
-	if *cli.BlockProfile {
+	if cli.BlockProfile != nil && *cli.BlockProfile {
 		f, err := os.Create("tyk.blockprof")
 		if err != nil {
 			panic(err)
@@ -1852,7 +1856,7 @@ func writeProfiles() {
 		}
 		f.Close()
 	}
-	if *cli.MutexProfile {
+	if cli.MutexProfile != nil && *cli.MutexProfile {
 		f, err := os.Create("tyk.mutexprof")
 		if err != nil {
 			panic(err)
