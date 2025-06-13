@@ -2,14 +2,16 @@ package gateway
 
 import (
 	"context"
-	"github.com/TykTechnologies/tyk/header"
 	"net/http"
 	"testing"
 
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/TykTechnologies/tyk/apidef/oas"
+	"github.com/TykTechnologies/tyk/header"
+	"github.com/TykTechnologies/tyk/internal/uuid"
 	"github.com/TykTechnologies/tyk/test"
 )
 
@@ -585,5 +587,83 @@ func TestMockFromOAS_ExampleHandling(t *testing.T) {
 		assert.Error(t, err)
 		assert.Equal(t, http.StatusNotFound, code)
 		assert.Contains(t, err.Error(), "there is no example response for the content type")
+	})
+}
+
+func TestMockResponseWithInternalRedirect(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	firstApi := BuildOASAPI(func(oasDef *oas.OAS) {
+		opId := uuid.New()
+
+		headers := oas.Headers{}
+		headers.Add("Content-Type", "application/json")
+
+		tykExt := oasDef.GetTykExtension()
+		tykExt.Info.ID = "v1-api-name"
+		tykExt.Info.Name = "v1-api-name"
+		tykExt.Server.ListenPath.Value = "/v1-api-name"
+		tykExt.Middleware = &oas.Middleware{}
+		tykExt.Middleware.Operations = oas.Operations{}
+		tykExt.Middleware.Operations[opId] = &oas.Operation{
+			MockResponse: &oas.MockResponse{
+				Enabled: true,
+				Code:    201,
+				Body:    "[null]",
+				Headers: headers,
+			},
+		}
+
+		desc := "hello world"
+		responses := openapi3.NewResponses()
+		responses.Delete("default")
+		responses.Set("200", &openapi3.ResponseRef{
+			Value: &openapi3.Response{
+				Description: &desc,
+				Content: openapi3.Content{
+					"application/json": &openapi3.MediaType{},
+				},
+			},
+		})
+
+		oasDef.Paths = openapi3.NewPaths()
+		oasDef.Paths.Set("/hello", &openapi3.PathItem{
+			Get: &openapi3.Operation{
+				OperationID: opId,
+				Responses:   responses,
+			},
+		})
+	})[0]
+
+	//Create second API that redirects to the first API
+	secondAPI := BuildOASAPI(func(oasDef *oas.OAS) {
+		tykExt := oasDef.GetTykExtension()
+		tykExt.Info.ID = "test_redirect"
+		tykExt.Info.Name = "Test Redirect API"
+		tykExt.Server.ListenPath.Value = "/test_redirect"
+		tykExt.Server.ListenPath.Strip = true
+		tykExt.Upstream.URL = "tyk://v1-api-name"
+	})[0]
+
+	for spec := range ts.Gw.LoadAPI(firstApi, secondAPI) {
+		require.NotNil(t, spec, "expected to load api properly")
+	}
+
+	t.Run("direct request should respond with mocked data", func(t *testing.T) {
+		_, _ = ts.Run(t, test.TestCase{
+			Path:   "/v1-api-name/hello",
+			Method: http.MethodGet,
+			Code:   201,
+		})
+	})
+
+	// Test case: Request to the second API should return the mocked response from the first API
+	t.Run("Request to second API should return mocked response from first API", func(t *testing.T) {
+		_, _ = ts.Run(t, test.TestCase{
+			Path:   "/test_redirect/hello",
+			Method: http.MethodGet,
+			Code:   201,
+		})
 	})
 }
