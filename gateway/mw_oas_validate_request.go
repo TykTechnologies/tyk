@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"time"
 
@@ -76,10 +77,10 @@ func (k *ValidateRequest) ProcessRequest(w http.ResponseWriter, r *http.Request,
 		return nil, http.StatusOK
 	}
 
-	/*errResponseCode := http.StatusUnprocessableEntity
+	errResponseCode := http.StatusUnprocessableEntity
 	if validateRequest.ErrorResponseCode != 0 {
 		errResponseCode = validateRequest.ErrorResponseCode
-	}*/
+	}
 
 	// Validate request
 	requestValidationInput := &openapi3filter.RequestValidationInput{
@@ -95,8 +96,12 @@ func (k *ValidateRequest) ProcessRequest(w http.ResponseWriter, r *http.Request,
 
 	err := openapi3filter.ValidateRequest(r.Context(), requestValidationInput)
 	if err != nil {
-		//return fmt.Errorf("request validation error: %w", err), errResponseCode
-		return k.GetErrorAndStatusCode(ErrValidationRequestFailed, r)
+		retErr, retCode := k.GetErrorAndStatusCode(ErrValidationRequestFailed, r)
+		if retErr.Error() == ValidationRequestFailed {
+			// in case is the default then we return the old msg
+			return fmt.Errorf("request validation error: %w", err), errResponseCode
+		}
+		return retErr, retCode
 	}
 
 	// Handle Success
