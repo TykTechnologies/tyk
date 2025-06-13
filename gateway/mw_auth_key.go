@@ -28,10 +28,12 @@ const (
 	ErrAuthCertNotFound              = "auth.cert_not_found"
 	ErrAuthCertExpired               = "auth.cert_expired"
 	ErrAuthKeyIsInvalid              = "auth.key_is_invalid"
+	ErrValidationRequestFailed       = "validation.request_failed"
 
-	MsgNonExistentKey  = "Attempted access with non-existent key."
-	MsgNonExistentCert = "Attempted access with non-existent cert."
-	MsgInvalidKey      = "Attempted access with invalid key."
+	MsgNonExistentKey       = "Attempted access with non-existent key."
+	MsgNonExistentCert      = "Attempted access with non-existent cert."
+	MsgInvalidKey           = "Attempted access with invalid key."
+	ValidationRequestFailed = "validation did not pass"
 )
 
 func initAuthKeyErrors() {
@@ -39,6 +41,11 @@ func initAuthKeyErrors() {
 	TykErrors[ErrAuthAuthorizationFieldMissing] = apidef.TykError{
 		Message: MsgAuthFieldMissing,
 		Code:    http.StatusUnauthorized,
+	}
+
+	TykErrors[ErrValidationRequestFailed] = apidef.TykError{
+		Message: ValidationRequestFailed,
+		Code:    http.StatusUnprocessableEntity,
 	}
 
 	TykErrors[ErrAuthKeyNotFound] = apidef.TykError{

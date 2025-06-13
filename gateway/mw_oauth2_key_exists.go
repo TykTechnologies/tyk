@@ -41,6 +41,7 @@ func initOauth2KeyExistsErrors() {
 		Message: MsgOauthClientRevoked,
 		Code:    http.StatusForbidden,
 	}
+
 }
 
 // Oauth2KeyExists will check if the key being used to access the API is in the request data,

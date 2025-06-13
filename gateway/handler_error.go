@@ -393,6 +393,7 @@ func (e *ErrorHandler) getAPIErrorMessage(errType string, r *http.Request) (stri
 
 	// Fall back to global error messages
 	globalErr, exists := TykErrors[errType]
+	fmt.Println("Looking for ", errType, " in:", TykErrors)
 	if !exists {
 		return "An error occurred", http.StatusInternalServerError
 	}
