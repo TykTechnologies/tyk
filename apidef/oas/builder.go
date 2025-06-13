@@ -209,6 +209,32 @@ func (eb *EndpointBuilder) RateLimit(amount uint, duration time.Duration, enable
 	return eb
 }
 
+func (eb *EndpointBuilder) TransformResponseHeaders(factory func(*TransformHeaders)) *EndpointBuilder {
+	op := eb.operation().TransformResponseHeaders
+
+	if op == nil {
+		op = &TransformHeaders{Enabled: true}
+		eb.operation().TransformResponseHeaders = op
+	}
+
+	factory(op)
+
+	return eb
+}
+
+func (eb *EndpointBuilder) TransformResponseBody(factory func(*TransformBody)) *EndpointBuilder {
+	op := eb.operation().TransformResponseBody
+
+	if op == nil {
+		op = &TransformBody{Enabled: true}
+		eb.operation().TransformResponseBody = op
+	}
+
+	factory(op)
+
+	return eb
+}
+
 func (eb *EndpointBuilder) Mock(fn func(mock *MockResponse)) *EndpointBuilder {
 	var mock MockResponse
 	mock.Enabled = true

@@ -1178,6 +1178,10 @@ type TransformHeaders struct {
 	Add Headers `bson:"add,omitempty" json:"add,omitempty"`
 }
 
+func (th *TransformHeaders) AppendAdd(name, value string) {
+	th.Add = append(th.Add, Header{Name: name, Value: value})
+}
+
 // Fill fills *TransformHeaders from apidef.HeaderInjectionMeta.
 func (th *TransformHeaders) Fill(meta apidef.HeaderInjectionMeta) {
 	th.Enabled = !meta.Disabled

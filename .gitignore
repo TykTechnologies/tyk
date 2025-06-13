@@ -25,6 +25,9 @@ testapps/
 /*.bak
 /.air.toml
 
+/go.work
+/go.work.sum
+
 
 /tyk
 logs/
