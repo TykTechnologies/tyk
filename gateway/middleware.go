@@ -279,12 +279,12 @@ func NewBaseMiddleware(gw *Gateway, spec *APISpec, proxy ReturningHttpHandler, l
 
 // Copy provides a new BaseMiddleware with it's own logger scope (copy).
 // The Spec, Proxy and Gw values are not copied.
-func (m *BaseMiddleware) Copy() *BaseMiddleware {
+func (t *BaseMiddleware) Copy() *BaseMiddleware {
 	return &BaseMiddleware{
-		logger: m.logger.Dup(),
-		Spec:   m.Spec,
-		Proxy:  m.Proxy,
-		Gw:     m.Gw,
+		logger: t.logger.Dup(),
+		Spec:   t.Spec,
+		Proxy:  t.Proxy,
+		Gw:     t.Gw,
 	}
 }
 

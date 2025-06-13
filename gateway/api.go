@@ -43,10 +43,9 @@ import (
 	"time"
 
 	"github.com/TykTechnologies/tyk/internal/httpctx"
+	"github.com/getkin/kin-openapi/openapi3"
 
 	gqlv2 "github.com/TykTechnologies/graphql-go-tools/v2/pkg/graphql"
-
-	"github.com/TykTechnologies/kin-openapi/openapi3"
 
 	"github.com/TykTechnologies/tyk/config"
 
@@ -1547,7 +1546,7 @@ func (gw *Gateway) apiOASPatchHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	oasAPIInBytes, err := oasObj.MarshalJSON()
+	oasAPIInBytes, err := oasObjToPatch.MarshalJSON()
 	if err != nil {
 		doJSONWrite(w, http.StatusInternalServerError, apiError(err.Error()))
 		return

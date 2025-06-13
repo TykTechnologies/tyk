@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/TykTechnologies/kin-openapi/openapi3"
 	"github.com/buger/jsonparser"
+	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	_ "github.com/warpstreamlabs/bento/public/components/io"
@@ -27,7 +27,7 @@ func TestValidateTykStreamsOASObject(t *testing.T) {
 		T: openapi3.T{
 			OpenAPI:    "3.0.3",
 			Info:       &openapi3.Info{},
-			Paths:      map[string]*openapi3.PathItem{},
+			Paths:      openapi3.NewPaths(),
 			Extensions: map[string]interface{}{},
 		},
 	}
@@ -406,7 +406,7 @@ func TestValidateTykStreams_BentoConfigValidation_Additional_Properties(t *testi
 	})
 
 	t.Run("with enable-all validator", func(t *testing.T) {
-		err := ValidateOASObjectWithBentoConfigValidator(document, "3.0.3", bento.EnableAll)
+		err := ValidateOASObjectWithBentoConfigValidator(document, "3.0.3", bento.EnableAllExperimental)
 		require.NoError(t, err)
 
 		// Test with aws_sns output configuration, it's not officially supported by Tyk Streams.
@@ -469,7 +469,7 @@ func TestValidateTykStreams_BentoConfigValidation_Additional_Properties(t *testi
         }
     }
 }`)
-		err = ValidateOASObjectWithBentoConfigValidator(amqpDocument, "3.0.3", bento.EnableAll)
+		err = ValidateOASObjectWithBentoConfigValidator(amqpDocument, "3.0.3", bento.EnableAllExperimental)
 		require.NoError(t, err)
 
 		// This method is used by the Dashboard, so we need to test it as well.

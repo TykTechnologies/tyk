@@ -3,6 +3,7 @@ package oas
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"testing"
 
@@ -10,7 +11,7 @@ import (
 
 	"github.com/TykTechnologies/storage/persistent/model"
 
-	"github.com/TykTechnologies/kin-openapi/openapi3"
+	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/TykTechnologies/tyk/apidef"
@@ -26,7 +27,7 @@ func TestOAS(t *testing.T) {
 
 		var emptyOASPaths OAS
 		emptyOASPaths.Components = &openapi3.Components{}
-		emptyOASPaths.Paths = make(openapi3.Paths)
+		emptyOASPaths.Paths = openapi3.NewPaths()
 		emptyOASPaths.SetTykExtension(&XTykAPIGateway{})
 
 		var convertedAPI apidef.APIDefinition
@@ -54,7 +55,7 @@ func TestOAS(t *testing.T) {
 		resultOAS.Fill(convertedAPI)
 
 		// No paths in base OAS produce empty paths{} when converted back
-		nilOASPaths.Paths = make(openapi3.Paths)
+		nilOASPaths.Paths = openapi3.NewPaths()
 		nilOASPaths.Extensions = nil
 		assert.Equal(t, nilOASPaths, resultOAS)
 	})
@@ -63,8 +64,13 @@ func TestOAS(t *testing.T) {
 		const operationID = "userGET"
 		t.Parallel()
 
-		var oasWithPaths OAS
-		oasWithPaths.Components = &openapi3.Components{}
+		var oasWithPaths = OAS{
+			T: openapi3.T{
+				Components: &openapi3.Components{},
+				Paths:      openapi3.NewPaths(),
+			},
+		}
+
 		oasWithPaths.SetTykExtension(&XTykAPIGateway{
 			Middleware: &Middleware{
 				Operations: Operations{
@@ -76,14 +82,12 @@ func TestOAS(t *testing.T) {
 				},
 			},
 		})
-		oasWithPaths.Paths = openapi3.Paths{
-			"/user": {
-				Get: &openapi3.Operation{
-					OperationID: operationID,
-					Responses:   openapi3.NewResponses(),
-				},
+		oasWithPaths.Paths.Set("/user", &openapi3.PathItem{
+			Get: &openapi3.Operation{
+				OperationID: operationID,
+				Responses:   openapi3.NewResponses(),
 			},
-		}
+		})
 
 		var convertedAPI apidef.APIDefinition
 		oasWithPaths.ExtractTo(&convertedAPI)
@@ -272,6 +276,7 @@ func TestOAS_ExtractTo_ResetAPIDefinition(t *testing.T) {
 		"APIDefinition.GraphQL.Proxy.Features.UseImmutableHeaders",
 		"APIDefinition.GraphQL.Proxy.AuthHeaders[0]",
 		"APIDefinition.GraphQL.Proxy.SubscriptionType",
+		"APIDefinition.GraphQL.Proxy.SSEUsePost",
 		"APIDefinition.GraphQL.Proxy.RequestHeaders[0]",
 		"APIDefinition.GraphQL.Proxy.UseResponseExtensions.OnErrorForwarding",
 		"APIDefinition.GraphQL.Proxy.RequestHeadersRewrite[0].Value",
@@ -283,6 +288,7 @@ func TestOAS_ExtractTo_ResetAPIDefinition(t *testing.T) {
 		"APIDefinition.GraphQL.Supergraph.Subgraphs[0].SDL",
 		"APIDefinition.GraphQL.Supergraph.Subgraphs[0].Headers[0]",
 		"APIDefinition.GraphQL.Supergraph.Subgraphs[0].SubscriptionType",
+		"APIDefinition.GraphQL.Supergraph.Subgraphs[0].SSEUsePost",
 		"APIDefinition.GraphQL.Supergraph.MergedSDL",
 		"APIDefinition.GraphQL.Supergraph.GlobalHeaders[0]",
 		"APIDefinition.GraphQL.Supergraph.DisableQueryBatching",
@@ -807,19 +813,23 @@ func BenchmarkOAS_Clone(b *testing.B) {
 			Info: &openapi3.Info{
 				Title: "my-oas-doc",
 			},
-			Paths: map[string]*openapi3.PathItem{
-				"/get": {
+			Paths: func() *openapi3.Paths {
+				paths := openapi3.NewPaths()
+				paths.Set("/get", &openapi3.PathItem{
 					Get: &openapi3.Operation{
-						Responses: openapi3.Responses{
-							"200": &openapi3.ResponseRef{
+						Responses: func() *openapi3.Responses {
+							responses := openapi3.NewResponses()
+							responses.Set("200", &openapi3.ResponseRef{
 								Value: &openapi3.Response{
 									Description: getStrPointer("some example endpoint"),
 								},
-							},
-						},
+							})
+							return responses
+						}(),
 					},
-				},
-			},
+				})
+				return paths
+			}(),
 		},
 	}
 
@@ -1292,6 +1302,169 @@ func TestAPIContext_getValidationOptionsFromConfig(t *testing.T) {
 
 		assert.Len(t, options, 0)
 	})
+}
+
+func TestOAS_ValidateSecurity(t *testing.T) {
+	apiKey := "api_key"
+	oauth2 := "oauth2"
+
+	createSecurityReq := func(oas *OAS, key string, value []string) {
+		securityRequirement := openapi3.NewSecurityRequirement()
+		securityRequirement[key] = value
+		oas.Security = append(oas.Security, securityRequirement)
+	}
+
+	addSingleSecurityReq := func(oas *OAS) {
+		createSecurityReq(oas, apiKey, []string{})
+	}
+
+	addMultipleSecurityReq := func(oas *OAS) {
+		addSingleSecurityReq(oas)
+		createSecurityReq(oas, oauth2, []string{"read", "write"})
+	}
+
+	expectedErrorForNoComponentOrSchemes := "No components or security schemes present in OAS"
+	expectedErrorForMissingSchema := func(s string) string {
+		return fmt.Sprintf("Missing required Security Scheme '%s' in Components.SecuritySchemes", s)
+	}
+
+	tests := []struct {
+		name          string
+		setupOAS      func(oas *OAS)
+		expectedError string
+	}{
+		{
+			name: "no security requirements",
+			setupOAS: func(oas *OAS) {
+				oas.Security = openapi3.SecurityRequirements{}
+			},
+			expectedError: "",
+		},
+		{
+			name: "security requirements with matching security schemes",
+			setupOAS: func(oas *OAS) {
+				addSingleSecurityReq(oas)
+
+				if oas.Components == nil {
+					oas.Components = &openapi3.Components{}
+				}
+				if oas.Components.SecuritySchemes == nil {
+					oas.Components.SecuritySchemes = make(openapi3.SecuritySchemes)
+				}
+				oas.Components.SecuritySchemes[apiKey] = &openapi3.SecuritySchemeRef{
+					Value: openapi3.NewJWTSecurityScheme(),
+				}
+			},
+			expectedError: "",
+		},
+		{
+			name: "security requirements but no Components",
+			setupOAS: func(oas *OAS) {
+				addSingleSecurityReq(oas)
+
+				oas.Components = nil
+			},
+			expectedError: expectedErrorForNoComponentOrSchemes,
+		},
+		{
+			name: "security requirements but no SecuritySchemes",
+			setupOAS: func(oas *OAS) {
+				addSingleSecurityReq(oas)
+
+				// Add Components but not SecuritySchemes
+				oas.Components = &openapi3.Components{}
+				oas.Components.SecuritySchemes = nil
+			},
+			expectedError: expectedErrorForNoComponentOrSchemes,
+		},
+		{
+			name: "security requirements but empty SecuritySchemes",
+			setupOAS: func(oas *OAS) {
+				addSingleSecurityReq(oas)
+
+				oas.Components = &openapi3.Components{}
+				oas.Components.SecuritySchemes = make(openapi3.SecuritySchemes)
+			},
+			expectedError: expectedErrorForNoComponentOrSchemes,
+		},
+		{
+			name: "security requirements with missing security scheme for this requirement",
+			setupOAS: func(oas *OAS) {
+				addSingleSecurityReq(oas)
+
+				if oas.Components == nil {
+					oas.Components = &openapi3.Components{}
+				}
+				if oas.Components.SecuritySchemes == nil {
+					oas.Components.SecuritySchemes = make(openapi3.SecuritySchemes)
+				}
+				oas.Components.SecuritySchemes["other_key"] = &openapi3.SecuritySchemeRef{
+					Value: openapi3.NewJWTSecurityScheme(),
+				}
+			},
+			expectedError: expectedErrorForMissingSchema(apiKey),
+		},
+		{
+			name: "multiple security requirements with all matching security schemes",
+			setupOAS: func(oas *OAS) {
+				addMultipleSecurityReq(oas)
+
+				if oas.Components == nil {
+					oas.Components = &openapi3.Components{}
+				}
+				if oas.Components.SecuritySchemes == nil {
+					oas.Components.SecuritySchemes = make(openapi3.SecuritySchemes)
+				}
+				oas.Components.SecuritySchemes[apiKey] = &openapi3.SecuritySchemeRef{
+					Value: openapi3.NewJWTSecurityScheme(),
+				}
+				oas.Components.SecuritySchemes[oauth2] = &openapi3.SecuritySchemeRef{
+					Value: openapi3.NewJWTSecurityScheme(),
+				}
+			},
+			expectedError: "",
+		},
+		{
+			name: "multiple security requirements with one missing security scheme",
+			setupOAS: func(oas *OAS) {
+				addMultipleSecurityReq(oas)
+
+				if oas.Components == nil {
+					oas.Components = &openapi3.Components{}
+				}
+				if oas.Components.SecuritySchemes == nil {
+					oas.Components.SecuritySchemes = make(openapi3.SecuritySchemes)
+				}
+				oas.Components.SecuritySchemes[apiKey] = &openapi3.SecuritySchemeRef{}
+			},
+			expectedError: expectedErrorForMissingSchema(oauth2),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			oas := &OAS{
+				T: openapi3.T{
+					OpenAPI: "3.0.3",
+					Info: &openapi3.Info{
+						Title:   "Test API",
+						Version: "1.0.0",
+					},
+					Paths: openapi3.NewPaths(),
+				},
+			}
+
+			tt.setupOAS(oas)
+
+			err := oas.Validate(context.Background())
+			if tt.expectedError == "" {
+				assert.NoError(t, err)
+			} else {
+				assert.Error(t, err)
+				assert.Contains(t, err.Error(), tt.expectedError)
+			}
+		})
+	}
 }
 
 func TestYaml(t *testing.T) {

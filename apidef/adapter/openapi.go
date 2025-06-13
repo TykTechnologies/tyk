@@ -9,7 +9,7 @@ import (
 	"net/url"
 	"path"
 
-	"github.com/TykTechnologies/kin-openapi/openapi3"
+	"github.com/getkin/kin-openapi/openapi3"
 
 	"github.com/TykTechnologies/graphql-go-tools/pkg/astprinter"
 	"github.com/TykTechnologies/graphql-go-tools/pkg/operationreport"
@@ -64,7 +64,7 @@ func (o *openAPI) prepareGraphQLEngineConfig() error {
 		return err
 	}
 
-	for rawEndpoint, pathItem := range o.document.Paths {
+	for rawEndpoint, pathItem := range o.document.Paths.Map() {
 		// Converts /pets/{id} to /pets/{{.arguments.id}}
 		endpoint := processArgumentSection(rawEndpoint)
 

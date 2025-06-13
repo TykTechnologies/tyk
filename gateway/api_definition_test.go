@@ -15,7 +15,7 @@ import (
 	texttemplate "text/template"
 	"time"
 
-	"github.com/TykTechnologies/kin-openapi/openapi3"
+	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/stretchr/testify/assert"
 
 	persistentmodel "github.com/TykTechnologies/storage/persistent/model"
@@ -1498,45 +1498,36 @@ func Test_LoadAPIsFromRPC(t *testing.T) {
 	})
 }
 
-func TestAPISpec_setHasMock(t *testing.T) {
+func TestAPISpec_hasMock(t *testing.T) {
 	s := APISpec{APIDefinition: &apidef.APIDefinition{}}
-
-	s.setHasMock()
-	assert.False(t, s.HasMock)
+	assert.False(t, s.hasMock())
 
 	s.IsOAS = true
-	s.setHasMock()
-	assert.False(t, s.HasMock)
+	assert.False(t, s.hasMock())
 
 	s.OAS = oas.OAS{}
-	s.setHasMock()
-	assert.False(t, s.HasMock)
+	assert.False(t, s.hasMock())
 
 	xTyk := &oas.XTykAPIGateway{}
 	s.OAS.SetTykExtension(xTyk)
-	s.setHasMock()
-	assert.False(t, s.HasMock)
+	assert.False(t, s.hasMock())
 
 	middleware := &oas.Middleware{}
 	xTyk.Middleware = middleware
-	s.setHasMock()
-	assert.False(t, s.HasMock)
+	assert.False(t, s.hasMock())
 
 	op := &oas.Operation{}
 	middleware.Operations = oas.Operations{
 		"my-operation": op,
 	}
-	s.setHasMock()
-	assert.False(t, s.HasMock)
+	assert.False(t, s.hasMock())
 
 	mock := &oas.MockResponse{}
 	op.MockResponse = mock
-	s.setHasMock()
-	assert.False(t, s.HasMock)
+	assert.False(t, s.hasMock())
 
 	mock.Enabled = true
-	s.setHasMock()
-	assert.True(t, s.HasMock)
+	assert.True(t, s.hasMock())
 }
 
 func TestAPISpec_isStreamingAPI(t *testing.T) {
