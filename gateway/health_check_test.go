@@ -62,7 +62,7 @@ func TestGateway_readinessHandler(t *testing.T) {
 			expectedErrorMessage: "Redis connection not available",
 		},
 		{
-			name:   "no APIs loaded with UseDBAppConfigs enabled",
+			name:   "no APIs loaded with UseDBAppConfigs enabled should pass",
 			method: http.MethodGet,
 			setupGateway: func(gw *Gateway) {
 				// Enable UseDBAppConfigs
@@ -74,6 +74,9 @@ func TestGateway_readinessHandler(t *testing.T) {
 				gw.apisMu.Lock()
 				gw.apiSpecs = []*APISpec{}
 				gw.apisMu.Unlock()
+
+				// Set performedSuccessfulReload to true for this test to pass
+				gw.performedSuccessfulReload = true
 			},
 			setupHealthCheck: func(gw *Gateway) {
 				// Set up health check with passing redis
@@ -85,8 +88,8 @@ func TestGateway_readinessHandler(t *testing.T) {
 				}
 				gw.setCurrentHealthCheckInfo(healthInfo)
 			},
-			expectedStatus:       http.StatusServiceUnavailable,
-			expectedErrorMessage: "API definitions not loaded",
+			expectedStatus:         http.StatusOK,
+			expectedResponseStatus: Pass,
 		},
 		{
 			name:   "no APIs loaded with UseDBAppConfigs disabled - should pass",
@@ -101,6 +104,9 @@ func TestGateway_readinessHandler(t *testing.T) {
 				gw.apisMu.Lock()
 				gw.apiSpecs = []*APISpec{}
 				gw.apisMu.Unlock()
+
+				// Set performedSuccessfulReload to true for this test to pass
+				gw.performedSuccessfulReload = true
 			},
 			setupHealthCheck: func(gw *Gateway) {
 				// Set up health check with passing redis
@@ -130,6 +136,9 @@ func TestGateway_readinessHandler(t *testing.T) {
 					{APIDefinition: &apidef.APIDefinition{APIID: "test-api"}},
 				}
 				gw.apisMu.Unlock()
+
+				// Set performedSuccessfulReload to true for this test to pass
+				gw.performedSuccessfulReload = true
 			},
 			setupHealthCheck: func(gw *Gateway) {
 				// Set up health check with all passing
@@ -158,6 +167,9 @@ func TestGateway_readinessHandler(t *testing.T) {
 					{APIDefinition: &apidef.APIDefinition{APIID: "test-api"}},
 				}
 				gw.apisMu.Unlock()
+
+				// Set performedSuccessfulReload to true for this test to pass
+				gw.performedSuccessfulReload = true
 			},
 			setupHealthCheck: func(gw *Gateway) {
 				// Set up health check with redis warning (not failure)
@@ -181,6 +193,9 @@ func TestGateway_readinessHandler(t *testing.T) {
 				conf.HideGeneratorHeader = true
 				conf.UseDBAppConfigs = false
 				gw.SetConfig(conf)
+
+				// Set performedSuccessfulReload to true for this test to pass
+				gw.performedSuccessfulReload = true
 			},
 			setupHealthCheck: func(gw *Gateway) {
 				// Set up health check with passing redis
@@ -208,6 +223,26 @@ func TestGateway_readinessHandler(t *testing.T) {
 			},
 			expectedStatus:       http.StatusServiceUnavailable,
 			expectedErrorMessage: "Redis connection not available",
+		},
+		{
+			name:   "successful reload not performed",
+			method: http.MethodGet,
+			setupGateway: func(gw *Gateway) {
+				// Ensure performedSuccessfulReload is false (default state)
+				gw.performedSuccessfulReload = false
+			},
+			setupHealthCheck: func(gw *Gateway) {
+				// Set up health check with passing redis to ensure we get to the reload check
+				healthInfo := map[string]HealthCheckItem{
+					"redis": {
+						Status:        Pass,
+						ComponentType: Datastore,
+					},
+				}
+				gw.setCurrentHealthCheckInfo(healthInfo)
+			},
+			expectedStatus:       http.StatusServiceUnavailable,
+			expectedErrorMessage: "A successful API reload did not happen",
 		},
 	}
 
