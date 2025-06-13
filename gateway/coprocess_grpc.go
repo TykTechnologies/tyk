@@ -102,6 +102,11 @@ func (gw *Gateway) NewGRPCDispatcher() (coprocess.Dispatcher, error) {
 		dialOptions = append(dialOptions, grpc.WithAuthority(authority))
 	}
 
+	isRoundRobinEnabled := gw.GetConfig().CoProcessOptions.GRPCRoundRobinLoadBalancing
+	if isRoundRobinEnabled {
+		dialOptions = append(dialOptions, grpc.WithDefaultServiceConfig(`{"loadBalancingConfig": [{"round_robin":{}}]}`))
+	}
+
 	grpcConnection, err = grpc.NewClient(
 		GetCoProcessGrpcServerTargetUrlAsString(grpcUrl),
 		dialOptions...,
