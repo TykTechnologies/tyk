@@ -36,6 +36,8 @@ func emptyExampleVal(schema *openapi3.Schema) interface{} {
 		return 0
 	case schema.Type.Is(openapi3.TypeBoolean):
 		return true
+	case schema.Type.Is(openapi3.TypeArray):
+		return []interface{}{}
 	default:
 		return nil
 	}
