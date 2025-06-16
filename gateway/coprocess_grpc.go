@@ -100,6 +100,18 @@ func (gw *Gateway) NewGRPCDispatcher() (coprocess.Dispatcher, error) {
 
 	grpcClient = coprocess.NewDispatcherClient(grpcConnection)
 
+<<<<<<< HEAD
+=======
+	isRoundRobinEnabled := gw.GetConfig().CoProcessOptions.GRPCRoundRobinLoadBalancing
+	if isRoundRobinEnabled {
+		dialOptions = append(dialOptions, grpc.WithDefaultServiceConfig(`{"loadBalancingConfig": [{"round_robin":{}}]}`))
+	}
+
+	grpcConnection, err = grpc.NewClient(
+		GetCoProcessGrpcServerTargetUrlAsString(grpcUrl),
+		dialOptions...,
+	)
+>>>>>>> b44f7909f... [TT-10496] gRPC plugins do not terminate gracefully and cannot be load balanced (#7111)
 	if err != nil {
 
 		log.WithFields(logrus.Fields{

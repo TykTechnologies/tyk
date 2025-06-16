@@ -582,6 +582,9 @@ type CoProcessConfig struct {
 	// Authority used in GRPC connection
 	GRPCAuthority string `json:"grpc_authority"`
 
+	// GRPCRoundRobinLoadBalancing enables round robin load balancing for grpc services
+	GRPCRoundRobinLoadBalancing bool `json:"grpc_round_robin_load_balancing"`
+
 	// Sets the path to built-in Tyk modules. This will be part of the Python module lookup path. The value used here is the default one for most installations.
 	PythonPathPrefix string `json:"python_path_prefix"`
 
