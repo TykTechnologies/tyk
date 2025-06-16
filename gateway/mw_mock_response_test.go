@@ -541,7 +541,7 @@ func TestMockFromOAS_ExampleHandling(t *testing.T) {
 		}
 	})
 
-	t.Run("fallback handling", func(t *testing.T) {
+	t.Run("fallback handling does not respond with error if example is not provided", func(t *testing.T) {
 		// Test the fallback behavior when examples aren't available
 		operation := openapi3.NewOperation()
 		responses := openapi3.NewResponses()
@@ -577,17 +577,15 @@ func TestMockFromOAS_ExampleHandling(t *testing.T) {
 		req := &http.Request{Header: http.Header{}}
 		code, _, _, _, err := mockFromOAS(req, operation, fromOASExamples)
 
-		assert.Error(t, err)
-		assert.Equal(t, http.StatusNotFound, code)
-		assert.Contains(t, err.Error(), "there is no example response for the content type")
+		assert.NoError(t, err)
+		assert.Equal(t, http.StatusOK, code)
 
 		// Test with empty examples map
-		fromOASExamples.Code = 201
+		fromOASExamples.Code = http.StatusCreated
 		code, _, _, _, err = mockFromOAS(req, operation, fromOASExamples)
 
-		assert.Error(t, err)
-		assert.Equal(t, http.StatusNotFound, code)
-		assert.Contains(t, err.Error(), "there is no example response for the content type")
+		assert.NoError(t, err)
+		assert.Equal(t, http.StatusCreated, code)
 	})
 }
 
