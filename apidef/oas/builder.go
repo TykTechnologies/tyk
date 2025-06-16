@@ -3,6 +3,8 @@ package oas
 import (
 	"errors"
 	"fmt"
+	tykheaders "github.com/TykTechnologies/tyk/header"
+	"github.com/TykTechnologies/tyk/internal/uuid"
 	"net/http"
 	"net/url"
 	"strings"
@@ -37,14 +39,12 @@ type (
 
 const (
 	minAllowedTimeFrameLength = time.Millisecond * 100
-
-	// UpstreamUrlDefault default upstream url for OAS
-	UpstreamUrlDefault = "http://localhost:3478/"
 )
 
 var (
 	ErrMinRateLimitExceeded  = errors.New("minimum rate limit exceeded")
 	ErrZeroAmountInRateLimit = errors.New("zero amount in rate limit")
+	ErrEmptyApiSlug          = errors.New("empty api slug")
 )
 
 // NewOas returns an allocated *OAS due to provided options
@@ -55,7 +55,12 @@ func NewOas(opts ...BuilderOption) (*OAS, error) {
 func NewBuilder() Builder {
 	oasDef := OAS{}
 
-	oasDef.Paths = &openapi3.Paths{}
+	oasDef.OpenAPI = "3.0.0"
+	oasDef.Info = &openapi3.Info{
+		Title:   "Test API entity",
+		Version: "1.0.0",
+	}
+	oasDef.Paths = openapi3.NewPaths()
 
 	xTykAPIGateway := XTykAPIGateway{
 		Info: Info{},
@@ -96,12 +101,13 @@ func (b *Builder) Build() (*OAS, error) {
 	return b.oas, nil
 }
 
-// WithTestDefaults sets defaults options
+// WithTestListenPathAndUpstream sets defaults options
 // to be sued for testing
-func WithTestDefaults() BuilderOption {
+func WithTestListenPathAndUpstream(path, upstreamUrl string) BuilderOption {
 	return combine(
-		WithUpstreamUrl(UpstreamUrlDefault),
-		WithListenPath("/test", true),
+		withRandomId(),
+		WithUpstreamUrl(upstreamUrl),
+		WithListenPath(path, true),
 	)
 }
 
@@ -130,6 +136,15 @@ func WithUpstreamUrl(upstreamUrl string) BuilderOption {
 		}
 
 		b.xTykAPIGateway.Upstream.URL = upstreamUrl
+	}
+}
+
+func withRandomId() BuilderOption {
+	return func(b *Builder) {
+		b.xTykAPIGateway.Info.ID = uuid.New()
+		b.xTykAPIGateway.Info.Name = uuid.New()
+		b.xTykAPIGateway.Info.State.Active = true
+		b.xTykAPIGateway.Info.State.Internal = false
 	}
 }
 
@@ -209,11 +224,16 @@ func (eb *EndpointBuilder) RateLimit(amount uint, duration time.Duration, enable
 	return eb
 }
 
+func (eb *EndpointBuilder) MockDefault() *EndpointBuilder {
+	return eb.Mock(func(_ *MockResponse) {})
+}
+
 func (eb *EndpointBuilder) Mock(fn func(mock *MockResponse)) *EndpointBuilder {
 	var mock MockResponse
 	mock.Enabled = true
 	mock.Code = http.StatusOK
-	mock.Body = "ok"
+	mock.Headers.Add(tykheaders.ContentType, tykheaders.ApplicationJSON)
+	mock.Body = `{"message":"ok"}`
 
 	fn(&mock)
 	eb.operation().MockResponse = &mock
@@ -222,7 +242,7 @@ func (eb *EndpointBuilder) Mock(fn func(mock *MockResponse)) *EndpointBuilder {
 }
 
 func (eb *EndpointBuilder) operationId() string {
-	return strings.ToLower(eb.path + eb.path)
+	return strings.TrimPrefix(strings.ToLower(eb.path+eb.method), "/")
 }
 
 func (eb *EndpointBuilder) operation() *Operation {
@@ -239,6 +259,11 @@ func (eb *EndpointBuilder) build(builder *Builder) {
 		return
 	}
 
+	if builder.xTykAPIGateway.Server.ListenPath.Value == "" {
+		builder.appendErrors(ErrEmptyApiSlug)
+		return
+	}
+
 	if _, ok := builder.xTykAPIGateway.Middleware.Operations[eb.operationId()]; ok {
 		builder.appendErrors(fmt.Errorf("duplicate operation id: %s", eb.operationId()))
 		return
@@ -250,10 +275,24 @@ func (eb *EndpointBuilder) build(builder *Builder) {
 
 	if currentPath == nil {
 		currentPath = &openapi3.PathItem{}
-		builder.oas.Paths.Set(eb.path, currentPath)
 	}
+
+	emptyDescription := ""
+	responses := openapi3.NewResponses()
+	responses.Delete("default")
+	responses.Set("200", &openapi3.ResponseRef{
+		Value: &openapi3.Response{
+			Description: &emptyDescription,
+			Content: openapi3.Content{
+				tykheaders.ApplicationJSON: &openapi3.MediaType{},
+			},
+		},
+	})
 
 	currentPath.SetOperation(eb.method, &openapi3.Operation{
 		OperationID: eb.operationId(),
+		Responses:   responses,
 	})
+
+	builder.oas.Paths.Set(eb.path, currentPath)
 }
