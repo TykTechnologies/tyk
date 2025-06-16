@@ -4,6 +4,10 @@ import "github.com/getkin/kin-openapi/openapi3"
 
 // ExampleExtractor returns an example payload according to the openapi3.SchemaRef object.
 func ExampleExtractor(schema *openapi3.SchemaRef) interface{} {
+	if schema == nil {
+		return nil
+	}
+
 	val := schema.Value
 	if val.Example != nil {
 		return val.Example
@@ -36,6 +40,8 @@ func emptyExampleVal(schema *openapi3.Schema) interface{} {
 		return 0
 	case schema.Type.Is(openapi3.TypeBoolean):
 		return true
+	case schema.Type.Is(openapi3.TypeArray):
+		return []interface{}{}
 	default:
 		return nil
 	}

@@ -129,8 +129,7 @@ func mockFromOAS(r *http.Request, operation *openapi3.Operation, fromOASExamples
 	// Example selection precedence:
 	// 1. Direct example on the media type (media.Example)
 	// 2. Named example from Examples map (media.Examples) - if name provided, use it; otherwise, pick first by sorted key
-	// 3. Example from the schema (media.Schema.Value.Example)
-	// If none found, return error
+	// If none found, return fallback solution
 	var example interface{}
 
 	// 1. Direct example on the media type
@@ -164,14 +163,9 @@ func mockFromOAS(r *http.Request, operation *openapi3.Operation, fromOASExamples
 		}
 	}
 
-	// 3. Example from the schema
-	if example == nil && media.Schema != nil && media.Schema.Value != nil && media.Schema.Value.Example != nil {
-		example = media.Schema.Value.Example
-	}
-
 	// Nil check: if no example found, return error
 	if example == nil {
-		return http.StatusNotFound, "", nil, nil, errors.New("there is no example response for the content type: " + contentType)
+		example = oas.ExampleExtractor(media.Schema)
 	}
 
 	// Marshal the example to JSON for the response body
