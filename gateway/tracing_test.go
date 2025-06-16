@@ -277,7 +277,7 @@ func TestTraceHttpRequest(t *testing.T) {
 			oas.WithGet("/uuid", func(b *oas.EndpointBuilder) {
 				b.
 					TransformResponseHeaders(func(headers *oas.TransformHeaders) {
-						headers.AppendAdd(hdr.Name, hdr.Value)
+						headers.AppendAddOp(hdr.Name, hdr.Value)
 					}).
 					TransformResponseBody(func(tb *oas.TransformBody) {
 						tb.Enabled = true
