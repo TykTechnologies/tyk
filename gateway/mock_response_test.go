@@ -369,3 +369,212 @@ func Test_mockFromOAS(t *testing.T) {
 		})
 	})
 }
+
+func TestMockFromOAS_ExampleHandling(t *testing.T) {
+	t.Run("handles various example sources correctly", func(t *testing.T) {
+		// Create a test operation with multiple types of examples
+		operation := openapi3.NewOperation()
+		responses := openapi3.NewResponses()
+
+		// 1. Response with direct example on media type
+		responses["200"] = &openapi3.ResponseRef{
+			Value: &openapi3.Response{
+				Content: openapi3.Content{
+					"application/json": {
+						Example: map[string]interface{}{
+							"name": "Direct Example",
+							"type": "direct",
+						},
+					},
+				},
+			},
+		}
+
+		// 2. Response with examples in Examples map
+		responses["201"] = &openapi3.ResponseRef{
+			Value: &openapi3.Response{
+				Content: openapi3.Content{
+					"application/json": {
+						Examples: openapi3.Examples{
+							"example1": &openapi3.ExampleRef{
+								Value: &openapi3.Example{
+									Value: map[string]interface{}{
+										"name": "Example from Map",
+										"type": "examples_map",
+										"id":   1,
+									},
+								},
+							},
+							"example2": &openapi3.ExampleRef{
+								Value: &openapi3.Example{
+									Value: map[string]interface{}{
+										"name": "Second Example from Map",
+										"type": "examples_map",
+										"id":   2,
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		}
+
+		// 3. Response with schema example
+		responses["202"] = &openapi3.ResponseRef{
+			Value: &openapi3.Response{
+				Content: openapi3.Content{
+					"application/json": {
+						Schema: &openapi3.SchemaRef{
+							Value: &openapi3.Schema{
+								Example: map[string]interface{}{
+									"name": "Example from Schema",
+									"type": "schema",
+								},
+							},
+						},
+					},
+				},
+			},
+		}
+
+		// 4. Response with both direct example and examples map
+		responses["203"] = &openapi3.ResponseRef{
+			Value: &openapi3.Response{
+				Content: openapi3.Content{
+					"application/json": {
+						Example: map[string]interface{}{
+							"name": "Direct Example with Map",
+							"type": "direct_with_map",
+							"id":   0,
+						},
+						Examples: openapi3.Examples{
+							"mapExample": &openapi3.ExampleRef{
+								Value: &openapi3.Example{
+									Value: map[string]interface{}{
+										"name": "Map Example with Direct",
+										"type": "map_with_direct",
+										"id":   1,
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		}
+
+		operation.Responses = responses
+
+		// Test cases
+		testCases := []struct {
+			name           string
+			responseCode   int
+			exampleName    string
+			expectedBody   string
+			expectedStatus int
+		}{
+			{
+				name:         "direct example",
+				responseCode: 200,
+				expectedBody: `{"name":"Direct Example","type":"direct"}`,
+			},
+			{
+				name:         "examples map without specifying name",
+				responseCode: 201,
+				expectedBody: `{"id":1,"name":"Example from Map","type":"examples_map"}`,
+			},
+			{
+				name:         "examples map with specific example",
+				responseCode: 201,
+				exampleName:  "example2",
+				expectedBody: `{"id":2,"name":"Second Example from Map","type":"examples_map"}`,
+			},
+			{
+				name:         "schema example",
+				responseCode: 202,
+				expectedBody: `{"name":"Example from Schema","type":"schema"}`,
+			},
+			{
+				name:         "prioritizes examples map over direct example",
+				responseCode: 203,
+				expectedBody: `{"id":1,"name":"Map Example with Direct","type":"map_with_direct"}`,
+			},
+			{
+				name:           "handles non-existent example name",
+				responseCode:   201,
+				exampleName:    "nonexistent",
+				expectedStatus: http.StatusNotFound,
+			},
+		}
+
+		for _, tc := range testCases {
+			t.Run(tc.name, func(t *testing.T) {
+				fromOASExamples := &oas.FromOASExamples{
+					Code:        tc.responseCode,
+					ExampleName: tc.exampleName,
+				}
+
+				req := &http.Request{Header: http.Header{}}
+				code, contentType, body, _, err := mockFromOAS(req, operation, fromOASExamples)
+
+				if tc.expectedStatus != 0 {
+					assert.Error(t, err)
+					assert.Equal(t, tc.expectedStatus, code)
+				} else {
+					assert.NoError(t, err)
+					assert.Equal(t, tc.responseCode, code)
+					assert.Equal(t, "application/json", contentType)
+					assert.JSONEq(t, tc.expectedBody, string(body))
+				}
+			})
+		}
+	})
+
+	t.Run("fallback handling does not respond with error if example is not provided", func(t *testing.T) {
+		// Test the fallback behavior when examples aren't available
+		operation := openapi3.NewOperation()
+		responses := openapi3.NewResponses()
+
+		// Empty content
+		responses["200"] = &openapi3.ResponseRef{
+			Value: &openapi3.Response{
+				Content: openapi3.Content{
+					"application/json": {
+						// Nothing defined - no example, no examples map, no schema
+					},
+				},
+			},
+		}
+
+		// Empty examples map
+		responses["201"] = &openapi3.ResponseRef{
+			Value: &openapi3.Response{
+				Content: openapi3.Content{
+					"application/json": {
+						Examples: openapi3.Examples{},
+					},
+				},
+			},
+		}
+
+		operation.Responses = responses
+
+		fromOASExamples := &oas.FromOASExamples{
+			Code: 200,
+		}
+
+		req := &http.Request{Header: http.Header{}}
+		code, _, _, _, err := mockFromOAS(req, operation, fromOASExamples)
+
+		assert.NoError(t, err)
+		assert.Equal(t, http.StatusOK, code)
+
+		// Test with empty examples map
+		fromOASExamples.Code = http.StatusCreated
+		code, _, _, _, err = mockFromOAS(req, operation, fromOASExamples)
+
+		assert.NoError(t, err)
+		assert.Equal(t, http.StatusCreated, code)
+	})
+}

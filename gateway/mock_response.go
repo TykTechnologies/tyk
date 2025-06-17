@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-
 	"io"
 	"net/http"
 	"sort"
@@ -121,6 +120,10 @@ func mockFromOAS(r *http.Request, operation *openapi3.Operation, fromOASExamples
 		return headers[i].Name < headers[j].Name
 	})
 
+	// Example selection precedence:
+	// 1. Direct example on the media type (media.Example)
+	// 2. Named example from Examples map (media.Examples) - if name provided, use it; otherwise, pick first by sorted key
+	// If none found, return fallback solution
 	var example interface{}
 	if media.Example != nil {
 		example = media.Example
@@ -141,6 +144,7 @@ func mockFromOAS(r *http.Request, operation *openapi3.Operation, fromOASExamples
 		}
 	}
 
+	// Nil check: if no example found, return error
 	if example == nil {
 		example = oas.ExampleExtractor(media.Schema)
 	}
