@@ -37,6 +37,10 @@ type MQTTLoadGenerator struct {
 	args mqttArguments
 }
 
+func (m *MQTTLoadGenerator) Name() string {
+	return "MQTT"
+}
+
 func (m *MQTTLoadGenerator) Usage() string {
 	return `Usage: go run load_gen.go mqtt [options]
 
@@ -70,19 +74,19 @@ func (m *MQTTLoadGenerator) ParseArgs() error {
 
 func (m *MQTTLoadGenerator) Run() {
 	if m.args.help {
-		mqttUsage()
+		fmt.Printf("%s\n", m.Usage())
 		return
 	}
 
 	if m.args.broker == "" {
 		_, _ = fmt.Fprintf(os.Stdout, "broker cannot be empty\n")
-		mqttUsage()
+		fmt.Printf("%s\n", m.Usage())
 		return
 	}
 
 	if m.args.topic == "" {
 		_, _ = fmt.Fprintf(os.Stdout, "topic cannot be empty\n")
-		mqttUsage()
+		fmt.Printf("%s\n", m.Usage())
 		return
 	}
 
@@ -93,26 +97,6 @@ func (m *MQTTLoadGenerator) Run() {
 
 	// Blocking call. Press CTRL+C or send SIGTERM/SIGKILL to stop the script.
 	m.publishMessagesWithMQTT(m.args.broker, m.args.topic, m.args.clientID, m.args.qos, m.args.username, m.args.password)
-}
-
-func mqttUsage() {
-	var msg = `Usage: mqtt_load_generator [options]
-
-MQTT load generator. Publishes messages to an MQTT broker on the specified topic.
-
-Options:
-  -h, --help     Print this message and exit.
-      --broker   MQTT broker URL. Default: tcp://localhost:1883.
-      --topic    MQTT topic to publish to. Default: tyk-streams-test-topic.
-      --clientid MQTT client ID. Default: tyk-mqtt-load-generator.
-      --qos      MQTT QoS level (0, 1, or 2). Default: 1.
-      --username MQTT username (optional).
-      --password MQTT password (optional).
-`
-	_, err := fmt.Fprint(os.Stdout, msg)
-	if err != nil {
-		panic(err)
-	}
 }
 
 func (m *MQTTLoadGenerator) failOnError(err error, msg string) {

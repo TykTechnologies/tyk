@@ -6,6 +6,7 @@ import (
 )
 
 type LoadGenerator interface {
+	Name() string
 	Usage() string
 	ParseArgs() error
 	Run()
@@ -21,6 +22,8 @@ func main() {
 	switch os.Args[1] {
 	case "mqtt":
 		loadGen = &MQTTLoadGenerator{}
+	case "amqp":
+		loadGen = &AMQPLoadGenerator{}
 	default:
 		fmt.Printf("Unknown load generator type: %s\n", os.Args[1])
 		return
@@ -33,5 +36,6 @@ func main() {
 		os.Exit(1)
 	}
 
+	fmt.Printf("Starting %s load generator\n", loadGen.Name())
 	loadGen.Run()
 }
