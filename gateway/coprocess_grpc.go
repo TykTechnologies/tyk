@@ -23,11 +23,7 @@ type GRPCDispatcher struct {
 	coprocess.Dispatcher
 }
 
-<<<<<<< HEAD
-func (gw *Gateway) dialer(_ string, timeout time.Duration) (net.Conn, error) {
-=======
 func (gw *Gateway) GetCoProcessGrpcServerTargetURL() (*url.URL, error) {
->>>>>>> 41d831444... [TT-10496] GRPC plugins do not work with service names (#7052)
 	grpcURL, err := url.Parse(gw.GetConfig().CoProcessOptions.CoProcessGRPCServer)
 	if err != nil {
 		log.WithFields(logrus.Fields{
