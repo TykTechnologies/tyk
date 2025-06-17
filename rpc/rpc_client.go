@@ -563,3 +563,8 @@ func SetLoadCounts(t *testing.T, value int) {
 	t.Helper()
 	values.SetLoadCounts(value)
 }
+
+// EnableEmergencyMode sets the emergency mode state for production use
+func EnableEmergencyMode(enabled bool) {
+	values.SetEmergencyMode(enabled)
+}
