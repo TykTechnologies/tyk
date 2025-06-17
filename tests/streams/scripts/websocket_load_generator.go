@@ -120,6 +120,7 @@ func (w *WebSocketLoadGenerator) publishMessagesWithWebSocket(url string) {
 		if err != nil {
 			log.Printf("Failed to send message: %v", err)
 			// Try to reconnect
+			c.Close()
 			c, _, err = websocket.DefaultDialer.Dial(url, nil)
 			if err != nil {
 				w.failOnError(err, "Failed to reconnect to WebSocket server")
