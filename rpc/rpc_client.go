@@ -50,6 +50,12 @@ var (
 	UseSyncLoginRPC bool
 
 	AnalyticsSerializers []serializer.AnalyticsSerializer
+
+	// for dns monitoring
+	lastResolvedIPs     []string
+	dnsRefreshMutex     sync.RWMutex
+	dnsMonitoringActive bool
+	dnsMonitoringMutex  sync.Mutex
 )
 
 // ErrRPCIsDown this is returned when we can't reach rpc server.
@@ -150,6 +156,7 @@ type Config struct {
 	CallTimeout           int    `json:"call_timeout"`
 	PingTimeout           int    `json:"ping_timeout"`
 	RPCPoolSize           int    `json:"rpc_pool_size"`
+	DNSRefreshInterval    int    `json:"dns_refresh_interval"`
 }
 
 func IsEmergencyMode() bool {
@@ -236,6 +243,14 @@ func Connect(
 		register()
 		go checkDisconnect()
 	}
+
+	// Start DNS monitoring only once
+	dnsMonitoringMutex.Lock()
+	if !dnsMonitoringActive {
+		dnsMonitoringActive = true
+		go startDNSMonitoring(connConfig.ConnectionString, suppressRegister)
+	}
+	dnsMonitoringMutex.Unlock()
 
 	return true
 }
@@ -562,4 +577,106 @@ func SetEmergencyMode(t *testing.T, value bool) {
 func SetLoadCounts(t *testing.T, value int) {
 	t.Helper()
 	values.SetLoadCounts(value)
+}
+
+// Add this new function for DNS monitoring
+func startDNSMonitoring(connectionString string, suppressRegister bool) {
+	// Default to 30 seconds if not configured
+	refreshInterval := 30 * time.Second
+	if values.Config().DNSRefreshInterval > 0 {
+		refreshInterval = time.Duration(values.Config().DNSRefreshInterval) * time.Second
+	}
+
+	// Extract hostname from connection string
+	host, _, err := net.SplitHostPort(connectionString)
+	if err != nil {
+		Log.Error("Failed to parse connection string for DNS monitoring:", err)
+		return
+	}
+
+	// Initial DNS resolution
+	updateResolvedIPs(host)
+
+	// Start periodic check
+	ticker := time.NewTicker(refreshInterval)
+	defer ticker.Stop()
+
+	for range ticker.C {
+		if changed := updateResolvedIPs(host); changed {
+			Log.Info("MDCB DNS resolution changed, reconnecting...")
+			safeReconnectRPCClient(suppressRegister)
+		}
+	}
+}
+
+func updateResolvedIPs(host string) bool {
+	ips, err := net.LookupIP(host)
+	if err != nil {
+		Log.Error("Failed to resolve host during DNS refresh:", err)
+		return false
+	}
+
+	// Extract IPv4 addresses
+	newIPs := make([]string, 0, len(ips))
+	for _, ip := range ips {
+		if ipv4 := ip.To4(); ipv4 != nil {
+			newIPs = append(newIPs, ipv4.String())
+		}
+	}
+
+	dnsRefreshMutex.Lock()
+	defer dnsRefreshMutex.Unlock()
+
+	// Check if IPs have changed
+	changed := !equalStringSlices(lastResolvedIPs, newIPs)
+	if changed {
+		Log.Debug("DNS resolution changed from", lastResolvedIPs, "to", newIPs)
+		lastResolvedIPs = newIPs
+	}
+
+	return changed
+}
+
+func equalStringSlices(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+
+	mapA := make(map[string]struct{}, len(a))
+	for _, val := range a {
+		mapA[val] = struct{}{}
+	}
+
+	for _, val := range b {
+		if _, exists := mapA[val]; !exists {
+			return false
+		}
+	}
+
+	return true
+}
+
+func safeReconnectRPCClient(suppressRegister bool) {
+	// Stop existing client
+	if clientSingleton != nil {
+		oldClient := clientSingleton
+		clientSingleton = nil // Clear reference first
+		oldClient.Stop()      // Then stop the old client
+	}
+
+	// Reinitialize client
+	Log.Info("Reinitializing RPC client after DNS change...")
+	initializeClient()
+
+	// Reinitialize function client
+	if dispatcher != nil {
+		funcClientSingleton = dispatcher.NewFuncClient(clientSingleton)
+	}
+
+	// Relogin
+	handleLogin()
+	if !suppressRegister {
+		register()
+	}
+
 }

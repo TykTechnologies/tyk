@@ -397,6 +397,9 @@ type SlaveOptionsConfig struct {
 
 	// SynchroniserEnabled enable this config if MDCB has enabled the synchoniser. If disabled then it will ignore signals to synchonise recources
 	SynchroniserEnabled bool `json:"synchroniser_enabled"`
+
+	// DNSRefreshInterval defines the interval (in seconds) in which the app checks for changes in the DNS configuration
+	DNSRefreshInterval int `json:"dns_refresh_interval"`
 }
 
 type LocalSessionCacheConf struct {
