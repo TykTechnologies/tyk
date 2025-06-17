@@ -42,7 +42,7 @@ func (m *MQTTLoadGenerator) Name() string {
 }
 
 func (m *MQTTLoadGenerator) Usage() string {
-	return `Usage: go run load_gen.go mqtt [options]
+	return `Usage: load_gen mqtt [options]
 
 MQTT load generator. Publishes messages to an MQTT broker on the specified topic.
 

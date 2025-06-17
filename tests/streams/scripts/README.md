@@ -4,15 +4,15 @@
 
 This package contains multiple load generators for different protocols.
 
-You can run them by using the command: `go run load_gen.go <type>`
+You can run them by using the command: `./load_gen <type>`
 
 ### AMQP
 
 AMQP load generator, intended for testing purposes. Publishes messages to a RabbitMQ queue using the specified protocol.
 
 ```
-$ go run load_gen.go amqp -h
-Usage: go run load_gen.go amqp [options]
+$ ./load_gen amqp -h
+Usage: ./load_gen amqp [options]
 
 AMQP load generator. Publishes messages to a RabbitMQ queue using the specified protocol.
 
@@ -27,7 +27,7 @@ Options:
 Sample usage: 
 
 ```
-$ go run load_gen.go amqp --protocol amqp_1
+$ ./load_gen amqp --protocol amqp_1
 Publishing message to amqp_1: {payload: 1744619969422}
 Publishing message to amqp_1: {payload: 1744619970429}
 Publishing message to amqp_1: {payload: 1744619971436}
@@ -44,8 +44,8 @@ Publishing message to amqp_1: {payload: 1744619974460}
 MQTT load generator, intended for testing purposes. Publishes messages to an MQTT broker on the specified topic.
 
 ```
-$ go run load_gen.go mqtt -h
-Usage: go run load_gen.go mqtt [options]
+$ ./load_gen mqtt -h
+Usage: ./load_gen mqtt [options]
 
 MQTT load generator. Publishes messages to an MQTT broker on the specified topic.
 
@@ -62,7 +62,7 @@ Options:
 Sample usage: 
 
 ```
-$ go run load_gen.go mqtt
+$ ./load_gen mqtt
 2023/05/15 10:23:45 Connected to MQTT broker at tcp://localhost:1883
 2023/05/15 10:23:46 Publishing message to MQTT topic 'tyk-streams-test-topic': {"payload":1684142626000}
 2023/05/15 10:23:47 Publishing message to MQTT topic 'tyk-streams-test-topic': {"payload":1684142627000}
@@ -73,6 +73,35 @@ $ go run load_gen.go mqtt
 * Topic name is `tyk-streams-test-topic` by default.
 * QoS level is `1` (at least once delivery) by default.
 * The generator publishes messages at 1-second intervals.
+
+### WebSocket
+
+WebSocket load generator, intended for testing purposes. Sends location data to a WebSocket server at the specified URL.
+
+```
+$ ./load_gen ws -h
+Usage: ./load_gen ws [options]
+
+WebSocket load generator. Sends location data to a WebSocket server at the specified URL.
+
+Options:
+  -h, --help     Print this message and exit.
+      --url      WebSocket server URL. Default: ws://localhost:8080/ws.
+```
+
+Sample usage: 
+
+```
+$ ./load_gen ws
+2023/05/15 10:23:45 Connected to WebSocket server at ws://localhost:8080/ws
+2023/05/15 10:23:46 Sending message to WebSocket server: {"locations":[{"name":"Berlin","country":"Germany"},{"name":"London","country":"UK"},{"name":"Rhodes","country":"Greece"},{"name":"Washington D.C.","country":"USA"},{"name":"Athens","country":"Greece"}]}
+2023/05/15 10:23:47 Sending message to WebSocket server: {"locations":[{"name":"Berlin","country":"Germany"},{"name":"London","country":"UK"},{"name":"Rhodes","country":"Greece"},{"name":"Washington D.C.","country":"USA"},{"name":"Athens","country":"Greece"}]}
+2023/05/15 10:23:48 Sending message to WebSocket server: {"locations":[{"name":"Berlin","country":"Germany"},{"name":"London","country":"UK"},{"name":"Rhodes","country":"Greece"},{"name":"Washington D.C.","country":"USA"},{"name":"Athens","country":"Greece"}]}
+```
+
+* The default WebSocket URL is `ws://localhost:8080/ws`.
+* The generator sends a fixed JSON payload with location data.
+* The generator sends messages at 1-second intervals.
 
 ## Broker
 
@@ -183,3 +212,7 @@ https://www.cloudamqp.com/blog/part1-rabbitmq-for-beginners-what-is-rabbitmq.htm
 https://mqtt.org/
 https://www.hivemq.com/mqtt-essentials/
 https://mosquitto.org/documentation/
+
+### WebSocket
+https://developer.mozilla.org/en-US/docs/Web/API/WebSockets_API
+https://github.com/gorilla/websocket

@@ -43,7 +43,7 @@ func (a *AMQPLoadGenerator) Name() string {
 }
 
 func (a *AMQPLoadGenerator) Usage() string {
-	return `Usage: go run load_gen.go amqp [options]
+	return `Usage: load_gen amqp [options]
 
 AMQP load generator. Publishes messages to a RabbitMQ queue using the specified protocol.
 

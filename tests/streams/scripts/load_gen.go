@@ -24,6 +24,8 @@ func main() {
 		loadGen = &MQTTLoadGenerator{}
 	case "amqp":
 		loadGen = &AMQPLoadGenerator{}
+	case "ws":
+		loadGen = &WebSocketLoadGenerator{}
 	default:
 		fmt.Printf("Unknown load generator type: %s\n", os.Args[1])
 		return
