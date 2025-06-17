@@ -2108,6 +2108,17 @@ func (gw *Gateway) gracefulShutdown(ctx context.Context) error {
 		gw.Analytics.Stop()
 	}
 	writeProfiles()
+
+	if gw.GetConfig().UseDBAppConfigs {
+		mainLog.Info("Stopping heartbeat...")
+		gw.DashService.StopBeating()
+		time.Sleep(2 * time.Second)
+		err := gw.DashService.DeRegister()
+		if err != nil {
+			mainLog.WithError(err).Error("deregistering in dashboard")
+		}
+	}
+
 	if gw.GetConfig().SlaveOptions.UseRPC {
 		store := RPCStorageHandler{
 			DoReload: gw.DoReload,
