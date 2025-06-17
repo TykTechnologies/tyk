@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-
 	"io"
 	"net/http"
 	"sort"
@@ -121,13 +120,10 @@ func mockFromOAS(r *http.Request, operation *openapi3.Operation, fromOASExamples
 		return headers[i].Name < headers[j].Name
 	})
 
-<<<<<<< HEAD
-=======
 	// Example selection precedence:
 	// 1. Direct example on the media type (media.Example)
 	// 2. Named example from Examples map (media.Examples) - if name provided, use it; otherwise, pick first by sorted key
 	// If none found, return fallback solution
->>>>>>> b21e78cda... [TT-15065] Mock response stops working after kin-openapi upgrade (#7120)
 	var example interface{}
 	if media.Example != nil {
 		example = media.Example
@@ -148,10 +144,7 @@ func mockFromOAS(r *http.Request, operation *openapi3.Operation, fromOASExamples
 		}
 	}
 
-<<<<<<< HEAD
-=======
 	// Nil check: if no example found, return error
->>>>>>> b21e78cda... [TT-15065] Mock response stops working after kin-openapi upgrade (#7120)
 	if example == nil {
 		example = oas.ExampleExtractor(media.Schema)
 	}

@@ -369,8 +369,6 @@ func Test_mockFromOAS(t *testing.T) {
 		})
 	})
 }
-<<<<<<< HEAD
-=======
 
 func TestMockFromOAS_ExampleHandling(t *testing.T) {
 	t.Run("handles various example sources correctly", func(t *testing.T) {
@@ -379,7 +377,7 @@ func TestMockFromOAS_ExampleHandling(t *testing.T) {
 		responses := openapi3.NewResponses()
 
 		// 1. Response with direct example on media type
-		responses.Set("200", &openapi3.ResponseRef{
+		responses["200"] = &openapi3.ResponseRef{
 			Value: &openapi3.Response{
 				Content: openapi3.Content{
 					"application/json": {
@@ -390,10 +388,10 @@ func TestMockFromOAS_ExampleHandling(t *testing.T) {
 					},
 				},
 			},
-		})
+		}
 
 		// 2. Response with examples in Examples map
-		responses.Set("201", &openapi3.ResponseRef{
+		responses["201"] = &openapi3.ResponseRef{
 			Value: &openapi3.Response{
 				Content: openapi3.Content{
 					"application/json": {
@@ -420,10 +418,10 @@ func TestMockFromOAS_ExampleHandling(t *testing.T) {
 					},
 				},
 			},
-		})
+		}
 
 		// 3. Response with schema example
-		responses.Set("202", &openapi3.ResponseRef{
+		responses["202"] = &openapi3.ResponseRef{
 			Value: &openapi3.Response{
 				Content: openapi3.Content{
 					"application/json": {
@@ -438,10 +436,10 @@ func TestMockFromOAS_ExampleHandling(t *testing.T) {
 					},
 				},
 			},
-		})
+		}
 
 		// 4. Response with both direct example and examples map
-		responses.Set("203", &openapi3.ResponseRef{
+		responses["203"] = &openapi3.ResponseRef{
 			Value: &openapi3.Response{
 				Content: openapi3.Content{
 					"application/json": {
@@ -464,7 +462,7 @@ func TestMockFromOAS_ExampleHandling(t *testing.T) {
 					},
 				},
 			},
-		})
+		}
 
 		operation.Responses = responses
 
@@ -498,9 +496,9 @@ func TestMockFromOAS_ExampleHandling(t *testing.T) {
 				expectedBody: `{"name":"Example from Schema","type":"schema"}`,
 			},
 			{
-				name:         "prioritizes direct example over examples map",
+				name:         "prioritizes examples map over direct example",
 				responseCode: 203,
-				expectedBody: `{"id":0,"name":"Direct Example with Map","type":"direct_with_map"}`,
+				expectedBody: `{"id":1,"name":"Map Example with Direct","type":"map_with_direct"}`,
 			},
 			{
 				name:           "handles non-existent example name",
@@ -539,7 +537,7 @@ func TestMockFromOAS_ExampleHandling(t *testing.T) {
 		responses := openapi3.NewResponses()
 
 		// Empty content
-		responses.Set("200", &openapi3.ResponseRef{
+		responses["200"] = &openapi3.ResponseRef{
 			Value: &openapi3.Response{
 				Content: openapi3.Content{
 					"application/json": {
@@ -547,10 +545,10 @@ func TestMockFromOAS_ExampleHandling(t *testing.T) {
 					},
 				},
 			},
-		})
+		}
 
 		// Empty examples map
-		responses.Set("201", &openapi3.ResponseRef{
+		responses["201"] = &openapi3.ResponseRef{
 			Value: &openapi3.Response{
 				Content: openapi3.Content{
 					"application/json": {
@@ -558,7 +556,7 @@ func TestMockFromOAS_ExampleHandling(t *testing.T) {
 					},
 				},
 			},
-		})
+		}
 
 		operation.Responses = responses
 
@@ -580,4 +578,3 @@ func TestMockFromOAS_ExampleHandling(t *testing.T) {
 		assert.Equal(t, http.StatusCreated, code)
 	})
 }
->>>>>>> b21e78cda... [TT-15065] Mock response stops working after kin-openapi upgrade (#7120)
