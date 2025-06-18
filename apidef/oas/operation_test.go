@@ -1304,7 +1304,7 @@ func TestSplitPath(t *testing.T) {
 				{name: "posts", value: "posts", isRegex: false},
 				{name: "postId", isRegex: true},
 				{name: "customRegex1", value: "[a-z]+", isRegex: true},
-				{name: "customRegex2", isRegex: true},
+				{name: "customRegex2", value: "", isRegex: true},
 				{name: "customRegex3", value: "[a-z]{10}", isRegex: true},
 				{name: "abc", value: "abc", isRegex: false},
 				{name: "id", isRegex: true},

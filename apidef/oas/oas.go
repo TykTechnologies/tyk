@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/TykTechnologies/tyk/internal/pathnormalizer"
 	"strings"
 
 	"github.com/TykTechnologies/tyk/apidef"
@@ -536,6 +537,18 @@ func (s *OAS) setRequiredFields(name string, versionName string) {
 		Title:   name,
 		Version: versionName,
 	}
+}
+
+// Normalize normalizes path to acceptable form by openapi.
+// If API has named RegExp it will be converted to accepted form of api by OAS.
+func (s *OAS) Normalize() error {
+	if newPath, err := pathnormalizer.Normalize(s.Paths); err != nil {
+		return err
+	} else {
+		s.Paths = newPath
+	}
+
+	return nil
 }
 
 // clearClassicAPIForSomeFeatures clears some features that will be OAS-only.
