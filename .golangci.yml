@@ -117,6 +117,7 @@ issues:
     - bin
     - webclient
     - portal
+    - tests/streams/scripts
   # The `exclude-rules` configuration below configures
   # more particular exclusion rules, mostly aimed at tests
   # or some structurally known areas like testutil and test
