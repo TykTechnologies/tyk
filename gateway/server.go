@@ -364,6 +364,7 @@ func (gw *Gateway) apisByIDLen() int {
 // Create all globals and init connection handlers
 func (gw *Gateway) setupGlobals() {
 	defaultTykErrors()
+	overrideTykErrors(gw)
 
 	gwConfig := gw.GetConfig()
 	checkup.Run(&gwConfig)
@@ -531,7 +532,6 @@ func (gw *Gateway) syncAPISpecs() (int, error) {
 		}
 
 		s = tmpSpecs
-
 		mainLog.Debug("Downloading API Configurations from Dashboard Service")
 	} else if gw.GetConfig().SlaveOptions.UseRPC {
 		mainLog.Debug("Using RPC Configuration")
@@ -564,10 +564,13 @@ func (gw *Gateway) syncAPISpecs() (int, error) {
 	}
 	var filter []*APISpec
 	for _, v := range s {
+		mainLog.Infof("\napis: %+v \n", v.Name)
+		mainLog.Infof("\n: %+v \n", v.APIDefinition.ErrorMessages)
 		if err := v.Validate(gw.GetConfig().OAS); err != nil {
 			mainLog.WithError(err).WithField("spec", v.Name).Error("Skipping loading spec because it failed validation")
 			continue
 		}
+		fmt.Printf("\ncargando apis, el error: %v \n", v.ErrorMessages)
 		filter = append(filter, v)
 	}
 
@@ -1315,8 +1318,6 @@ func (gw *Gateway) initSystem() error {
 		gw.SetConfig(gwConfig)
 		gw.afterConfSetup()
 	}
-
-	overrideTykErrors(gw)
 
 	gwConfig = gw.GetConfig()
 	if gwConfig.Storage.Type != "redis" {

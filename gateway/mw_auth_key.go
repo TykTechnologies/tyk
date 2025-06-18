@@ -2,12 +2,12 @@ package gateway
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
 	"strings"
 	"time"
 
 	"github.com/TykTechnologies/tyk/apidef"
-	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/internal/crypto"
 	"github.com/TykTechnologies/tyk/internal/httpctx"
 	"github.com/TykTechnologies/tyk/internal/otel"
@@ -28,34 +28,42 @@ const (
 	ErrAuthCertNotFound              = "auth.cert_not_found"
 	ErrAuthCertExpired               = "auth.cert_expired"
 	ErrAuthKeyIsInvalid              = "auth.key_is_invalid"
+	ErrValidationRequestFailed       = "validation.request_failed"
 
-	MsgNonExistentKey  = "Attempted access with non-existent key."
-	MsgNonExistentCert = "Attempted access with non-existent cert."
-	MsgInvalidKey      = "Attempted access with invalid key."
+	MsgNonExistentKey       = "Attempted access with non-existent key."
+	MsgNonExistentCert      = "Attempted access with non-existent cert."
+	MsgInvalidKey           = "Attempted access with invalid key."
+	ValidationRequestFailed = "validation did not pass"
 )
 
 func initAuthKeyErrors() {
-	TykErrors[ErrAuthAuthorizationFieldMissing] = config.TykError{
+	fmt.Println("----------Inicia default values for errors---------")
+	TykErrors[ErrAuthAuthorizationFieldMissing] = apidef.TykError{
 		Message: MsgAuthFieldMissing,
 		Code:    http.StatusUnauthorized,
 	}
 
-	TykErrors[ErrAuthKeyNotFound] = config.TykError{
+	TykErrors[ErrValidationRequestFailed] = apidef.TykError{
+		Message: ValidationRequestFailed,
+		Code:    http.StatusUnprocessableEntity,
+	}
+
+	TykErrors[ErrAuthKeyNotFound] = apidef.TykError{
 		Message: MsgApiAccessDisallowed,
 		Code:    http.StatusForbidden,
 	}
 
-	TykErrors[ErrAuthCertNotFound] = config.TykError{
+	TykErrors[ErrAuthCertNotFound] = apidef.TykError{
 		Message: MsgApiAccessDisallowed,
 		Code:    http.StatusForbidden,
 	}
 
-	TykErrors[ErrAuthKeyIsInvalid] = config.TykError{
+	TykErrors[ErrAuthKeyIsInvalid] = apidef.TykError{
 		Message: MsgApiAccessDisallowed,
 		Code:    http.StatusForbidden,
 	}
 
-	TykErrors[ErrAuthCertExpired] = config.TykError{
+	TykErrors[ErrAuthCertExpired] = apidef.TykError{
 		Message: MsgCertificateExpired,
 		Code:    http.StatusForbidden,
 	}
@@ -110,13 +118,13 @@ func (k *AuthKey) ProcessRequest(_ http.ResponseWriter, r *http.Request, _ inter
 		log.Debug("Trying to find key by client certificate")
 		certHash = k.Spec.OrgID + crypto.HexSHA256(r.TLS.PeerCertificates[0].Raw)
 		if time.Now().After(r.TLS.PeerCertificates[0].NotAfter) {
-			return errorAndStatusCode(ErrAuthCertExpired)
+			return k.GetErrorAndStatusCode(ErrAuthCertExpired, r)
 		}
 
 		key = k.Gw.generateToken(k.Spec.OrgID, certHash)
 	} else {
 		k.Logger().Info("Attempted access with malformed header, no auth header found.")
-		return errorAndStatusCode(ErrAuthAuthorizationFieldMissing)
+		return k.GetErrorAndStatusCode(ErrAuthAuthorizationFieldMissing, r)
 	}
 
 	session, keyExists = k.CheckSessionAndIdentityForValidKey(key, r)
@@ -192,7 +200,7 @@ func (k *AuthKey) reportInvalidKey(key string, r *http.Request, msg string, errM
 	// Report in health check
 	reportHealthValue(k.Spec, KeyFailure, "1")
 
-	return errorAndStatusCode(errMsg)
+	return k.GetErrorAndStatusCode(errMsg, r)
 }
 
 func (k *AuthKey) validateSignature(r *http.Request, key string) (error, int) {

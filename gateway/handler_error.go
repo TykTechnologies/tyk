@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/base64"
 	"errors"
+	"fmt"
 	htmltemplate "html/template"
 	"io"
 	"io/ioutil"
@@ -15,8 +16,6 @@ import (
 	"github.com/TykTechnologies/tyk/apidef"
 
 	"github.com/TykTechnologies/tyk-pump/analytics"
-	"github.com/TykTechnologies/tyk/config"
-
 	"github.com/TykTechnologies/tyk/header"
 	"github.com/TykTechnologies/tyk/request"
 )
@@ -37,15 +36,15 @@ const (
 
 var errCustomBodyResponse = errors.New("errCustomBodyResponse")
 
-var TykErrors = make(map[string]config.TykError)
+var TykErrors = make(map[string]apidef.TykError)
 
-func errorAndStatusCode(errType string) (error, int) {
-	err := TykErrors[errType]
-	return errors.New(err.Message), err.Code
+func (e *ErrorHandler) errorAndStatusCode(errType string, r *http.Request) (error, int) {
+	message, code := e.getAPIErrorMessage(errType, r)
+	return errors.New(message), code
 }
 
 func defaultTykErrors() {
-	TykErrors = make(map[string]config.TykError)
+	TykErrors = make(map[string]apidef.TykError)
 
 	initAuthKeyErrors()
 	initOauth2KeyExistsErrors()
@@ -53,9 +52,8 @@ func defaultTykErrors() {
 
 func overrideTykErrors(gw *Gateway) {
 	gwConfig := gw.GetConfig()
-
+	fmt.Println("--------OVERRIDING WITH CONFIGS")
 	for id, err := range gwConfig.OverrideMessages {
-
 		overridenErr := TykErrors[id]
 
 		if err.Code != 0 {
@@ -68,6 +66,7 @@ func overrideTykErrors(gw *Gateway) {
 
 		TykErrors[id] = overridenErr
 	}
+	fmt.Println("------AFTEr OVERRIDING:", TykErrors)
 }
 
 // APIError is generic error object returned if there is something wrong with the request
@@ -87,10 +86,26 @@ type TemplateExecutor interface {
 	Execute(wr io.Writer, data interface{}) error
 }
 
+// Helper function to check if an error message is a known error type
+func isKnownError(errMsg string) (string, bool) {
+	// Check if the error message matches any known error types
+	for errType, errObj := range TykErrors {
+		if errMsg == errObj.Message {
+			return errType, true
+		}
+	}
+	return "", false
+}
+
 // HandleError is the actual error handler and will store the error details in analytics if analytics processing is enabled.
 func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMsg string, errCode int, writeResponse bool) {
 	defer e.Base().UpdateRequestSession(r)
 	response := &http.Response{}
+
+	// Use the request-aware version of getAPIErrorMessage when possible
+	if errType, ok := isKnownError(errMsg); ok && r != nil {
+		errMsg, errCode = e.getAPIErrorMessage(errType, r)
+	}
 
 	if writeResponse {
 		var templateExtension string
@@ -316,4 +331,72 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 
 	// Report in health check
 	reportHealthValue(e.Spec, BlockedRequestLog, "-1")
+}
+
+// getAPIErrorMessage returns the error message for a specific error type,
+// checking API-specific overrides first, then falling back to global defaults
+func (e *ErrorHandler) getAPIErrorMessage(errType string, r *http.Request) (string, int) {
+	// First check endpoint-specific error messages
+	if e.Spec != nil && r != nil {
+		// For OAS APIs
+		if e.Spec.IsOAS {
+			if operation := e.Spec.findOperations(r); operation != nil {
+				if operation.ErrorMessages != nil {
+					if apiErr, exists := operation.ErrorMessages[errType]; exists {
+						return apiErr.Message, apiErr.Code
+					}
+				}
+			}
+		} else {
+			// For classic APIs
+			version, _ := e.Spec.Version(r)
+			// Check the new ErrorMessages section in ExtendedPathsSet
+			for _, errorMeta := range version.ExtendedPaths.ErrorMessages {
+				if errorMeta.Disabled {
+					continue
+				}
+
+				if errorMeta.Method != "" && errorMeta.Method != r.Method {
+					continue
+				}
+
+				// Check if the path matches...ToDO: replace with regex
+				if !strings.HasSuffix(r.URL.Path, errorMeta.Path) {
+					continue
+				}
+
+				fmt.Println(errorMeta)
+				// Check if there's an error message for this error type
+				if apiErr, exists := errorMeta.ErrorMessages[errType]; exists {
+					return apiErr.Message, apiErr.Code
+				}
+			}
+		}
+
+		// Fall back to API-level error messages
+		if e.Spec.APIDefinition.ErrorMessages != nil {
+			if apiErr, exists := e.Spec.APIDefinition.ErrorMessages[errType]; exists {
+				return apiErr.Message, apiErr.Code
+			}
+		}
+
+		// For OAS APIs, also check the OAS extension
+		if e.Spec.OAS.GetTykExtension() != nil {
+			ext := e.Spec.OAS.GetTykExtension()
+			if ext.ErrorMessages != nil {
+				if apiErr, exists := ext.ErrorMessages[errType]; exists {
+					return apiErr.Message, apiErr.Code
+				}
+			}
+		}
+	}
+
+	// Fall back to global error messages
+	globalErr, exists := TykErrors[errType]
+	fmt.Println("Looking for ", errType, " in:", TykErrors)
+	if !exists {
+		return "An error occurred", http.StatusInternalServerError
+	}
+
+	return globalErr.Message, globalErr.Code
 }
