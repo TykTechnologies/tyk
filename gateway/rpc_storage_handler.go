@@ -140,7 +140,6 @@ func (r *RPCStorageHandler) Connect() bool {
 		CallTimeout:           slaveOptions.CallTimeout,
 		PingTimeout:           slaveOptions.PingTimeout,
 		RPCPoolSize:           slaveOptions.RPCPoolSize,
-		DNSRefreshInterval:    slaveOptions.DNSRefreshInterval,
 	}
 
 	return rpc.Connect(
