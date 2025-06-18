@@ -636,36 +636,6 @@ func EnableEmergencyMode(enabled bool) {
 	values.SetEmergencyMode(enabled)
 }
 
-// Add this new function for DNS monitoring
-func startDNSMonitoring(connectionString string, suppressRegister bool) {
-	// Default to 30 seconds if not configured
-	refreshInterval := 30 * time.Second
-	if values.Config().DNSRefreshInterval > 0 {
-		refreshInterval = time.Duration(values.Config().DNSRefreshInterval) * time.Second
-	}
-
-	// Extract hostname from connection string
-	host, _, err := net.SplitHostPort(connectionString)
-	if err != nil {
-		Log.Error("Failed to parse connection string for DNS monitoring:", err)
-		return
-	}
-
-	// Initial DNS resolution
-	updateResolvedIPs(host)
-
-	// Start periodic check
-	ticker := time.NewTicker(refreshInterval)
-	defer ticker.Stop()
-
-	for range ticker.C {
-		if changed := updateResolvedIPs(host); changed {
-			Log.Info("MDCB DNS resolution changed, reconnecting...")
-			safeReconnectRPCClient(suppressRegister)
-		}
-	}
-}
-
 func updateResolvedIPs(host string) bool {
 	ips, err := net.LookupIP(host)
 	if err != nil {
@@ -740,5 +710,8 @@ func safeReconnectRPCClient(suppressRegister bool) {
 
 	// Reset the DNS check flag after successful reconnection
 	values.SetDNSCheckedAfterError(false)
+<<<<<<< HEAD
+>>>>>>> 6842781fd (only check dns when rpc connection fails)
+=======
 >>>>>>> 6842781fd (only check dns when rpc connection fails)
 }
