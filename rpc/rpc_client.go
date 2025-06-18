@@ -50,12 +50,6 @@ var (
 	UseSyncLoginRPC bool
 
 	AnalyticsSerializers []serializer.AnalyticsSerializer
-
-	// for dns monitoring
-	lastResolvedIPs     []string
-	dnsRefreshMutex     sync.RWMutex
-	dnsMonitoringActive bool
-	dnsMonitoringMutex  sync.Mutex
 )
 
 // ErrRPCIsDown this is returned when we can't reach rpc server.
@@ -75,6 +69,9 @@ type rpcOpts struct {
 	config              atomic.Value
 	clientIsConnected   atomic.Value
 
+	// dnsCheckedAfterError tracks whether DNS has been checked after a connection error.
+	// This ensures DNS is only checked once per disconnection event, rather than
+	// on every failed RPC call. It's reset to false when a successful connection is made.
 	dnsCheckedAfterError atomic.Value
 }
 
@@ -257,10 +254,10 @@ func Connect(
 		go checkDisconnect()
 	}
 
-	// Initial DNS resolution (to get ip)
+	// Initial DNS resolution and get first ip
 	host, _, err := net.SplitHostPort(connConfig.ConnectionString)
 	if err == nil {
-		updateResolvedIPs(host)
+		updateResolvedIPs(host, dnsResolver)
 	}
 
 	return true
@@ -510,34 +507,26 @@ func recoverOp(fn func() error) func() error {
 // backoff ensuring indeed we can't connect to the rpc, this will eventually
 // fall into emergency mode( That is handled outside of this function call)
 func FuncClientSingleton(funcName string, request interface{}) (result interface{}, err error) {
-
 	be := backoff.Retry(func() error {
 		if !values.ClientIsConnected() {
 			return ErrRPCIsDown
 		}
 		result, err = funcClientSingleton.CallTimeout(funcName, request, GlobalRPCCallTimeout)
 
-		// If there's an error and we haven't checked DNS yet, check it now
-		if err != nil && !values.GetDNSCheckedAfterError() && !values.GetEmergencyMode() {
-			values.SetDNSCheckedAfterError(true)
-			Log.Info("RPC error detected, checking DNS as self-healing mechanism...")
-
-			// Check if DNS has changed and reconnect if needed
-			if changed := checkDNSAndReconnect(values.Config().ConnectionString, false); changed {
-				// If DNS changed and we reconnected, return nil to retry immediately
+		// If there's an error, check if DNS has changed
+		if err != nil {
+			_, shouldRetry := checkAndHandleDNSChange(values.Config().ConnectionString, false)
+			if shouldRetry {
+				// If DNS changed, and we reconnected, return nil to retry immediately
 				return nil
 			}
-			Log.Warning("Connection to MDCB failed. DNS resolution is unchanged - issue may be with MDCB service or network.")
 
-			// If DNS didn't change, continue with the error
+			// If DNS didn't change or we shouldn't retry, continue with the error
 			return err
 		}
 
 		// If the call was successful, reset the DNS checked flag for future errors
-		if err == nil {
-			values.SetDNSCheckedAfterError(false)
-		}
-
+		values.SetDNSCheckedAfterError(false)
 		return nil
 	}, backoff.WithMaxRetries(
 		backoff.NewConstantBackOff(10*time.Millisecond), 3,
@@ -546,23 +535,6 @@ func FuncClientSingleton(funcName string, request interface{}) (result interface
 		err = be
 	}
 	return
-}
-
-// checkDNSAndReconnect checks if DNS resolution has changed and reconnects if needed
-func checkDNSAndReconnect(connectionString string, suppressRegister bool) bool {
-	host, _, err := net.SplitHostPort(connectionString)
-	if err != nil {
-		Log.Error("Failed to parse connection string for DNS check:", err)
-		return false
-	}
-
-	// Check if DNS has changed
-	if changed := updateResolvedIPs(host); changed {
-		Log.Info("MDCB DNS resolution changed, reconnecting as self-healing mechanism...")
-		safeReconnectRPCClient(suppressRegister)
-		return true
-	}
-	return false
 }
 
 var rpcConnectionsPool []net.Conn
@@ -628,53 +600,6 @@ func SetEmergencyMode(t *testing.T, value bool) {
 func SetLoadCounts(t *testing.T, value int) {
 	t.Helper()
 	values.SetLoadCounts(value)
-}
-
-func updateResolvedIPs(host string) bool {
-	ips, err := net.LookupIP(host)
-	if err != nil {
-		Log.Error("Failed to resolve host during DNS refresh:", err)
-		return false
-	}
-
-	// Extract IPv4 addresses
-	newIPs := make([]string, 0, len(ips))
-	for _, ip := range ips {
-		if ipv4 := ip.To4(); ipv4 != nil {
-			newIPs = append(newIPs, ipv4.String())
-		}
-	}
-
-	dnsRefreshMutex.Lock()
-	defer dnsRefreshMutex.Unlock()
-
-	// Check if IPs have changed
-	changed := !equalStringSlices(lastResolvedIPs, newIPs)
-	if changed {
-		Log.Debug("DNS resolution changed from", lastResolvedIPs, "to", newIPs)
-		lastResolvedIPs = newIPs
-	}
-
-	return changed
-}
-
-func equalStringSlices(a, b []string) bool {
-	if len(a) != len(b) {
-		return false
-	}
-
-	mapA := make(map[string]struct{}, len(a))
-	for _, val := range a {
-		mapA[val] = struct{}{}
-	}
-
-	for _, val := range b {
-		if _, exists := mapA[val]; !exists {
-			return false
-		}
-	}
-
-	return true
 }
 
 func safeReconnectRPCClient(suppressRegister bool) {
