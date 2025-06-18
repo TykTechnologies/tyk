@@ -74,6 +74,19 @@ type rpcOpts struct {
 	emergencyModeLoaded atomic.Value
 	config              atomic.Value
 	clientIsConnected   atomic.Value
+
+	dnsCheckedAfterError atomic.Value
+}
+
+func (r *rpcOpts) SetDNSCheckedAfterError(checked bool) {
+	r.dnsCheckedAfterError.Store(checked)
+}
+
+func (r rpcOpts) GetDNSCheckedAfterError() bool {
+	if v := r.dnsCheckedAfterError.Load(); v != nil {
+		return v.(bool)
+	}
+	return false
 }
 
 func (r rpcOpts) ClientIsConnected() bool {
@@ -96,6 +109,7 @@ func (r *rpcOpts) Reset() {
 	r.emergencyMode.Store(false)
 	r.emergencyModeLoaded.Store(false)
 	r.clientIsConnected.Store(false)
+	r.dnsCheckedAfterError.Store(false)
 }
 
 func (r *rpcOpts) SetLoadCounts(n int) {
@@ -244,13 +258,11 @@ func Connect(
 		go checkDisconnect()
 	}
 
-	// Start DNS monitoring only once
-	dnsMonitoringMutex.Lock()
-	if !dnsMonitoringActive {
-		dnsMonitoringActive = true
-		go startDNSMonitoring(connConfig.ConnectionString, suppressRegister)
+	// Initial DNS resolution (to get ip)
+	host, _, err := net.SplitHostPort(connConfig.ConnectionString)
+	if err == nil {
+		updateResolvedIPs(host)
 	}
-	dnsMonitoringMutex.Unlock()
 
 	return true
 }
@@ -499,11 +511,34 @@ func recoverOp(fn func() error) func() error {
 // backoff ensuring indeed we can't connect to the rpc, this will eventually
 // fall into emergency mode( That is handled outside of this function call)
 func FuncClientSingleton(funcName string, request interface{}) (result interface{}, err error) {
+
 	be := backoff.Retry(func() error {
 		if !values.ClientIsConnected() {
 			return ErrRPCIsDown
 		}
 		result, err = funcClientSingleton.CallTimeout(funcName, request, GlobalRPCCallTimeout)
+
+		// If there's an error and we haven't checked DNS yet, check it now
+		if err != nil && !values.GetDNSCheckedAfterError() && !values.GetEmergencyMode() {
+			values.SetDNSCheckedAfterError(true)
+			Log.Info("RPC error detected, checking DNS as self-healing mechanism...")
+
+			// Check if DNS has changed and reconnect if needed
+			if changed := checkDNSAndReconnect(values.Config().ConnectionString, false); changed {
+				// If DNS changed and we reconnected, return nil to retry immediately
+				return nil
+			}
+			Log.Warning("Connection to MDCB failed. DNS resolution is unchanged - issue may be with MDCB service or network.")
+
+			// If DNS didn't change, continue with the error
+			return err
+		}
+
+		// If the call was successful, reset the DNS checked flag for future errors
+		if err == nil {
+			values.SetDNSCheckedAfterError(false)
+		}
+
 		return nil
 	}, backoff.WithMaxRetries(
 		backoff.NewConstantBackOff(10*time.Millisecond), 3,
@@ -512,6 +547,23 @@ func FuncClientSingleton(funcName string, request interface{}) (result interface
 		err = be
 	}
 	return
+}
+
+// checkDNSAndReconnect checks if DNS resolution has changed and reconnects if needed
+func checkDNSAndReconnect(connectionString string, suppressRegister bool) bool {
+	host, _, err := net.SplitHostPort(connectionString)
+	if err != nil {
+		Log.Error("Failed to parse connection string for DNS check:", err)
+		return false
+	}
+
+	// Check if DNS has changed
+	if changed := updateResolvedIPs(host); changed {
+		Log.Info("MDCB DNS resolution changed, reconnecting as self-healing mechanism...")
+		safeReconnectRPCClient(suppressRegister)
+		return true
+	}
+	return false
 }
 
 var rpcConnectionsPool []net.Conn
@@ -577,36 +629,6 @@ func SetEmergencyMode(t *testing.T, value bool) {
 func SetLoadCounts(t *testing.T, value int) {
 	t.Helper()
 	values.SetLoadCounts(value)
-}
-
-// Add this new function for DNS monitoring
-func startDNSMonitoring(connectionString string, suppressRegister bool) {
-	// Default to 30 seconds if not configured
-	refreshInterval := 30 * time.Second
-	if values.Config().DNSRefreshInterval > 0 {
-		refreshInterval = time.Duration(values.Config().DNSRefreshInterval) * time.Second
-	}
-
-	// Extract hostname from connection string
-	host, _, err := net.SplitHostPort(connectionString)
-	if err != nil {
-		Log.Error("Failed to parse connection string for DNS monitoring:", err)
-		return
-	}
-
-	// Initial DNS resolution
-	updateResolvedIPs(host)
-
-	// Start periodic check
-	ticker := time.NewTicker(refreshInterval)
-	defer ticker.Stop()
-
-	for range ticker.C {
-		if changed := updateResolvedIPs(host); changed {
-			Log.Info("MDCB DNS resolution changed, reconnecting...")
-			safeReconnectRPCClient(suppressRegister)
-		}
-	}
 }
 
 func updateResolvedIPs(host string) bool {
@@ -679,4 +701,6 @@ func safeReconnectRPCClient(suppressRegister bool) {
 		register()
 	}
 
+	// Reset the DNS check flag after successful reconnection
+	values.SetDNSCheckedAfterError(false)
 }
