@@ -170,7 +170,6 @@ type Config struct {
 	CallTimeout           int    `json:"call_timeout"`
 	PingTimeout           int    `json:"ping_timeout"`
 	RPCPoolSize           int    `json:"rpc_pool_size"`
-	DNSRefreshInterval    int    `json:"dns_refresh_interval"`
 }
 
 func IsEmergencyMode() bool {
