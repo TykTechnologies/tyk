@@ -115,7 +115,7 @@ func TestCheckDNSAndReconnect(t *testing.T) {
 
 			// Create a mock reconnect function
 			reconnectCalled := false
-			safeReconnectRPCClient = func(suppressRegister bool) {
+			safeReconnectRPCClient = func(_ bool) {
 				reconnectCalled = true
 			}
 
