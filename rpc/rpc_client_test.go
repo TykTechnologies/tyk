@@ -197,7 +197,7 @@ func TestUpdateResolvedIPs(t *testing.T) {
 			lastResolvedIPs = tt.initialIPs
 
 			// Configure mock resolver
-			mockResolver.LookupIPFunc = func(host string) ([]net.IP, error) {
+			mockResolver.LookupIPFunc = func(_ string) ([]net.IP, error) {
 				return tt.resolvedIPs, tt.resolveError
 			}
 
