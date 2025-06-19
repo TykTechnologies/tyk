@@ -85,7 +85,7 @@ func TestCheckDNSAndReconnect(t *testing.T) {
 
 			// Create a mock reconnect function
 			reconnectCalled := false
-			safeReconnectRPCClient = func(suppressRegister bool) {
+			safeReconnectRPCClient = func(_ bool) {
 				reconnectCalled = true
 			}
 
@@ -330,7 +330,7 @@ func TestCheckAndHandleDNSChange(t *testing.T) {
 
 			// Create a mock reconnect function
 			reconnectCalled := false
-			safeReconnectRPCClient = func(suppressRegister bool) {
+			safeReconnectRPCClient = func(_ bool) {
 				reconnectCalled = true
 			}
 
@@ -400,7 +400,7 @@ func TestDNSIsOnlyCheckedOncePerConnectionIssue(t *testing.T) {
 
 	// Create a mock reconnect function that counts calls
 	reconnectCount := 0
-	safeReconnectRPCClient = func(suppressRegister bool) {
+	safeReconnectRPCClient = func(_ bool) {
 		reconnectCount++
 	}
 
