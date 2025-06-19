@@ -200,11 +200,18 @@ func (gw *Gateway) liveCheckHandler(w http.ResponseWriter, r *http.Request) {
 	case 0:
 		status = Pass
 
+<<<<<<< HEAD
 	case len(checks):
 		status = Fail
 
 	default:
 		status = Warn
+=======
+	if !gw.performedSuccessfulReload {
+		mainLog.Warning("[Readiness] Successful reload check failed")
+		doJSONWrite(w, http.StatusServiceUnavailable, apiError("A successful API reload did not happen"))
+		return
+>>>>>>> 68dc95028... [TT-9234] graceful shutdown of gateway improvments and bug fix for mdcb scenario (#7117)
 	}
 
 	res.Status = status
