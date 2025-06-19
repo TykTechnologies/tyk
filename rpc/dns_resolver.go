@@ -17,6 +17,7 @@ var (
 	safeReconnectRPCClient func(suppressRegister bool)
 )
 
+//nolint:gochecknoinits
 func init() {
 	safeReconnectRPCClient = defaultSafeReconnectRPCClient
 }
