@@ -81,7 +81,9 @@ func (r *rpcOpts) SetDNSCheckedAfterError(checked bool) {
 
 func (r *rpcOpts) GetDNSCheckedAfterError() bool {
 	if v := r.dnsCheckedAfterError.Load(); v != nil {
-		return v.(bool)
+		if b, ok := v.(bool); ok {
+			return b
+		}
 	}
 	return false
 }
@@ -545,7 +547,7 @@ func handleRPCError(err error, connectionString string) bool {
 		return false
 	}
 
-	Log.WithError(err).Info("[RPC Store] --> Call failed")
+	Log.WithError(err).Debug("[RPC Store] --> Call failed")
 
 	// Check if it's a network-related error that might be resolved by a DNS check
 	if isNetworkError(err) {
@@ -554,7 +556,7 @@ func handleRPCError(err error, connectionString string) bool {
 		return dnsChanged && shouldRetry
 	}
 
-	Log.Info("[RPC Store] Non-network error, skipping DNS check")
+	Log.Debug("[RPC Store] Non-network error, skipping DNS check")
 	return false
 }
 
