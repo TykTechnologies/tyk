@@ -243,7 +243,7 @@ func Connect(
 	}
 
 	Log.Info("Setting new RPC connection!")
-	initializeClient()
+
 	loadDispatcher(dispatcherFuncs)
 
 	if funcClientSingleton == nil {
