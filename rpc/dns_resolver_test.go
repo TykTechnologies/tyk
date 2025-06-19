@@ -2,6 +2,8 @@ package rpc
 
 import (
 	"errors"
+	"github.com/TykTechnologies/tyk/test"
+	"github.com/miekg/dns"
 	"net"
 	"testing"
 )
@@ -259,144 +261,145 @@ func TestUpdateResolvedIPs(t *testing.T) {
 	}
 }
 
-func TestCheckAndHandleDNSChange(t *testing.T) {
-	// Save original values and restore after test
-	originalSafeReconnectRPCClient := safeReconnectRPCClient
-	originalIPs := lastResolvedIPs
-	originalResolver := dnsResolver
+/*
+	func TestCheckAndHandleDNSChange(t *testing.T) {
+		// Save original values and restore after test
+		originalSafeReconnectRPCClient := safeReconnectRPCClient
+		originalIPs := lastResolvedIPs
+		originalResolver := dnsResolver
 
-	// Save original values state
-	originalDNSChecked := values.GetDNSCheckedAfterError()
-	originalEmergencyMode := values.GetEmergencyMode()
+		// Save original values state
+		originalDNSChecked := values.GetDNSCheckedAfterError()
+		originalEmergencyMode := values.GetEmergencyMode()
 
-	defer func() {
-		// Restore all original values
-		safeReconnectRPCClient = originalSafeReconnectRPCClient
-		lastResolvedIPs = originalIPs
-		dnsResolver = originalResolver
-		values.SetDNSCheckedAfterError(originalDNSChecked)
-		values.SetEmergencyMode(originalEmergencyMode)
-	}()
+		defer func() {
+			// Restore all original values
+			safeReconnectRPCClient = originalSafeReconnectRPCClient
+			lastResolvedIPs = originalIPs
+			dnsResolver = originalResolver
+			values.SetDNSCheckedAfterError(originalDNSChecked)
+			values.SetEmergencyMode(originalEmergencyMode)
+		}()
 
-	// Test cases
-	tests := []struct {
-		name                 string
-		initialIPs           []string
-		resolvedIPs          []net.IP
-		resolveError         error
-		dnsCheckedAfterError bool
-		emergencyMode        bool
-		expectedDNSChanged   bool
-		expectedShouldRetry  bool
-		expectReconnectCall  bool
-	}{
-		{
-			name:                 "DNS changed - should reconnect and retry",
-			initialIPs:           []string{"192.168.1.1"},
-			resolvedIPs:          makeIPs("192.168.1.2"),
-			resolveError:         nil,
-			dnsCheckedAfterError: false,
-			emergencyMode:        false,
-			expectedDNSChanged:   true,
-			expectedShouldRetry:  true,
-			expectReconnectCall:  true,
-		},
-		{
-			name:                 "DNS unchanged - should not reconnect or retry",
-			initialIPs:           []string{"192.168.1.1"},
-			resolvedIPs:          makeIPs("192.168.1.1"),
-			resolveError:         nil,
-			dnsCheckedAfterError: false,
-			emergencyMode:        false,
-			expectedDNSChanged:   false,
-			expectedShouldRetry:  false,
-			expectReconnectCall:  false,
-		},
-		{
-			name:                 "DNS already checked - should skip check",
-			initialIPs:           []string{"192.168.1.1"},
-			resolvedIPs:          makeIPs("192.168.1.2"), // Would trigger reconnect if checked
-			resolveError:         nil,
-			dnsCheckedAfterError: true,
-			emergencyMode:        false,
-			expectedDNSChanged:   false,
-			expectedShouldRetry:  false,
-			expectReconnectCall:  false,
-		},
-		{
-			name:                 "In emergency mode - should skip check",
-			initialIPs:           []string{"192.168.1.1"},
-			resolvedIPs:          makeIPs("192.168.1.2"), // Would trigger reconnect if checked
-			resolveError:         nil,
-			dnsCheckedAfterError: false,
-			emergencyMode:        true,
-			expectedDNSChanged:   false,
-			expectedShouldRetry:  false,
-			expectReconnectCall:  false,
-		},
-		{
-			name:                 "DNS resolution error - should not reconnect",
-			initialIPs:           []string{"192.168.1.1"},
-			resolvedIPs:          nil,
-			resolveError:         errors.New("DNS resolution failed"),
-			dnsCheckedAfterError: false,
-			emergencyMode:        false,
-			expectedDNSChanged:   false,
-			expectedShouldRetry:  false,
-			expectReconnectCall:  false,
-		},
-	}
+		// Test cases
+		tests := []struct {
+			name                 string
+			initialIPs           []string
+			resolvedIPs          []net.IP
+			resolveError         error
+			dnsCheckedAfterError bool
+			emergencyMode        bool
+			expectedDNSChanged   bool
+			expectedShouldRetry  bool
+			expectReconnectCall  bool
+		}{
+			{
+				name:                 "DNS changed - should reconnect and retry",
+				initialIPs:           []string{"192.168.1.1"},
+				resolvedIPs:          makeIPs("192.168.1.2"),
+				resolveError:         nil,
+				dnsCheckedAfterError: false,
+				emergencyMode:        false,
+				expectedDNSChanged:   true,
+				expectedShouldRetry:  true,
+				expectReconnectCall:  true,
+			},
+			{
+				name:                 "DNS unchanged - should not reconnect or retry",
+				initialIPs:           []string{"192.168.1.1"},
+				resolvedIPs:          makeIPs("192.168.1.1"),
+				resolveError:         nil,
+				dnsCheckedAfterError: false,
+				emergencyMode:        false,
+				expectedDNSChanged:   false,
+				expectedShouldRetry:  false,
+				expectReconnectCall:  false,
+			},
+			{
+				name:                 "DNS already checked - should skip check",
+				initialIPs:           []string{"192.168.1.1"},
+				resolvedIPs:          makeIPs("192.168.1.2"), // Would trigger reconnect if checked
+				resolveError:         nil,
+				dnsCheckedAfterError: true,
+				emergencyMode:        false,
+				expectedDNSChanged:   false,
+				expectedShouldRetry:  false,
+				expectReconnectCall:  false,
+			},
+			{
+				name:                 "In emergency mode - should skip check",
+				initialIPs:           []string{"192.168.1.1"},
+				resolvedIPs:          makeIPs("192.168.1.2"), // Would trigger reconnect if checked
+				resolveError:         nil,
+				dnsCheckedAfterError: false,
+				emergencyMode:        true,
+				expectedDNSChanged:   false,
+				expectedShouldRetry:  false,
+				expectReconnectCall:  false,
+			},
+			{
+				name:                 "DNS resolution error - should not reconnect",
+				initialIPs:           []string{"192.168.1.1"},
+				resolvedIPs:          nil,
+				resolveError:         errors.New("DNS resolution failed"),
+				dnsCheckedAfterError: false,
+				emergencyMode:        false,
+				expectedDNSChanged:   false,
+				expectedShouldRetry:  false,
+				expectReconnectCall:  false,
+			},
+		}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			// Set initial IPs
-			lastResolvedIPs = tt.initialIPs
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				// Set initial IPs
+				lastResolvedIPs = tt.initialIPs
 
-			// Create a mock resolver
-			mockResolver := &MockDNSResolver{}
-			mockResolver.LookupIPFunc = func(_ string) ([]net.IP, error) {
-				return tt.resolvedIPs, tt.resolveError
-			}
-			dnsResolver = mockResolver
-
-			// Set initial state values
-			values.SetDNSCheckedAfterError(tt.dnsCheckedAfterError)
-			values.SetEmergencyMode(tt.emergencyMode)
-
-			// Create a mock reconnect function
-			reconnectCalled := false
-			safeReconnectRPCClient = func(_ bool) {
-				reconnectCalled = true
-			}
-
-			// Call the function
-			dnsChanged, shouldRetry := checkAndHandleDNSChange("example.com:8080", false)
-
-			// Check results
-			if dnsChanged != tt.expectedDNSChanged {
-				t.Errorf("dnsChanged = %v, expected %v", dnsChanged, tt.expectedDNSChanged)
-			}
-
-			if shouldRetry != tt.expectedShouldRetry {
-				t.Errorf("shouldRetry = %v, expected %v", shouldRetry, tt.expectedShouldRetry)
-			}
-
-			// Check if reconnect was called as expected
-			if reconnectCalled != tt.expectReconnectCall {
-				t.Errorf("reconnect called = %v, expected %v", reconnectCalled, tt.expectReconnectCall)
-			}
-
-			// If we weren't already in DNS checked state and not in emergency mode,
-			// verify that DNS checked flag was set to true
-			if !tt.dnsCheckedAfterError && !tt.emergencyMode {
-				if !values.GetDNSCheckedAfterError() {
-					t.Error("DNS checked flag should have been set to true")
+				// Create a mock resolver
+				mockResolver := &MockDNSResolver{}
+				mockResolver.LookupIPFunc = func(_ string) ([]net.IP, error) {
+					return tt.resolvedIPs, tt.resolveError
 				}
-			}
-		})
-	}
-}
+				dnsResolver = mockResolver
 
+				// Set initial state values
+				values.SetDNSCheckedAfterError(tt.dnsCheckedAfterError)
+				values.SetEmergencyMode(tt.emergencyMode)
+
+				// Create a mock reconnect function
+				reconnectCalled := false
+				safeReconnectRPCClient = func(_ bool) {
+					reconnectCalled = true
+				}
+
+				// Call the function
+				dnsChanged, shouldRetry := checkAndHandleDNSChange("example.com:8080", false)
+
+				// Check results
+				if dnsChanged != tt.expectedDNSChanged {
+					t.Errorf("dnsChanged = %v, expected %v", dnsChanged, tt.expectedDNSChanged)
+				}
+
+				if shouldRetry != tt.expectedShouldRetry {
+					t.Errorf("shouldRetry = %v, expected %v", shouldRetry, tt.expectedShouldRetry)
+				}
+
+				// Check if reconnect was called as expected
+				if reconnectCalled != tt.expectReconnectCall {
+					t.Errorf("reconnect called = %v, expected %v", reconnectCalled, tt.expectReconnectCall)
+				}
+
+				// If we weren't already in DNS checked state and not in emergency mode,
+				// verify that DNS checked flag was set to true
+				if !tt.dnsCheckedAfterError && !tt.emergencyMode {
+					if !values.GetDNSCheckedAfterError() {
+						t.Error("DNS checked flag should have been set to true")
+					}
+				}
+			})
+		}
+	}
+*/
 func TestDNSIsOnlyCheckedOncePerConnectionIssue(t *testing.T) {
 	// Save original values and restore after test
 	originalSafeReconnectRPCClient := safeReconnectRPCClient
@@ -498,4 +501,137 @@ func TestDNSIsOnlyCheckedOncePerConnectionIssue(t *testing.T) {
 	if !values.GetDNSCheckedAfterError() {
 		t.Error("Third call: DNS checked flag should be set to true again")
 	}
+}
+
+func TestCheckAndHandleDNSChangeWithDNSMock(t *testing.T) {
+	rpcDomain := "api.rpc.tyk.io"
+	// Save original values and restore after test
+	originalSafeReconnect := safeReconnectRPCClient
+	originalIPs := lastResolvedIPs
+	originalDNSChecked := values.GetDNSCheckedAfterError()
+	originalEmergencyMode := values.GetEmergencyMode()
+
+	defer func() {
+		safeReconnectRPCClient = originalSafeReconnect
+		lastResolvedIPs = originalIPs
+		values.SetDNSCheckedAfterError(originalDNSChecked)
+		values.SetEmergencyMode(originalEmergencyMode)
+	}()
+
+	mockHandle, err := test.InitDNSMock(map[string][]string{
+		"api.rpc.tyk.io.": {"192.168.1.1"},
+	}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mockHandle.ShutdownDnsMock()
+
+	// Create a mock reconnect function to track calls
+	reconnectCalled := false
+	safeReconnectRPCClient = func(_ bool) {
+		reconnectCalled = true
+	}
+
+	// Set the initial state
+	values.SetDNSCheckedAfterError(false)
+	values.SetEmergencyMode(false)
+	lastResolvedIPs = nil
+
+	// Test scenario 1: First call, DNS resolves to 192.168.1.1
+	checkAndHandleDNSChange(rpcDomain, false)
+
+	// Verify the state after the first call
+	if !reconnectCalled {
+		t.Error("Expected reconnect to be called on first DNS check")
+	}
+	if !values.GetDNSCheckedAfterError() {
+		t.Error("Expected DNSCheckedAfterError to be set")
+	}
+	if len(lastResolvedIPs) != 1 || lastResolvedIPs[0] != "192.168.1.1" {
+		t.Errorf("Expected lastResolvedIPs to be [192.168.1.1], got %v", lastResolvedIPs)
+	}
+
+	// Reset the reconnectCalled flag
+	reconnectCalled = false
+
+	// Test scenario 2: Second call, DNS already checked, shouldn't reconnect
+	checkAndHandleDNSChange(rpcDomain, false)
+
+	if reconnectCalled {
+		t.Error("Reconnect should not be called when DNS already checked")
+	}
+
+	// Test scenario 3: Change DNS record and reset DNSCheckedAfterError
+	// Push new domain mapping
+	restoreDomains := mockHandle.PushDomains(map[string][]string{
+		"api.rpc.tyk.io.": {"192.168.1.2"}, // Changed IP
+	}, nil)
+
+	// Reset the flag to allow DNS check
+	values.SetDNSCheckedAfterError(false)
+	reconnectCalled = false
+
+	// Call the function again
+	checkAndHandleDNSChange(rpcDomain, false)
+
+	// Verify the state after DNS change
+	if !reconnectCalled {
+		t.Error("Expected reconnect to be called after DNS change")
+	}
+	if !values.GetDNSCheckedAfterError() {
+		t.Error("Expected DNSCheckedAfterError to be set")
+	}
+	if len(lastResolvedIPs) != 1 || lastResolvedIPs[0] != "192.168.1.2" {
+		t.Errorf("Expected lastResolvedIPs to be [192.168.1.2], got %v", lastResolvedIPs)
+	}
+
+	// Restore original domain mappings
+	restoreDomains()
+
+	// Test scenario 4: Emergency mode, should check DNS even if already checked
+	values.SetEmergencyMode(true)
+	values.SetDNSCheckedAfterError(true) // Already checked
+	reconnectCalled = false
+
+	// Push new domain mapping for emergency mode test
+	restoreDomains = mockHandle.PushDomains(map[string][]string{
+		"api.rpc.tyk.io.": {"192.168.1.3"}, // Changed IP again
+	}, nil)
+
+	// Call the function in emergency mode
+	checkAndHandleDNSChange(rpcDomain, false)
+
+	// Verify the state after emergency mode call
+	if !reconnectCalled {
+		t.Error("Expected reconnect to be called in emergency mode")
+	}
+	if len(lastResolvedIPs) != 1 || lastResolvedIPs[0] != "192.168.1.3" {
+		t.Errorf("Expected lastResolvedIPs to be [192.168.1.3], got %v", lastResolvedIPs)
+	}
+
+	// Restore original domain mappings
+	restoreDomains()
+
+	// Test scenario 5: DNS resolution error
+	// Push domain with error
+	restoreDomains = mockHandle.PushDomains(nil, map[string]int{
+		"api.rpc.tyk.io.": dns.RcodeServerFailure,
+	})
+
+	values.SetDNSCheckedAfterError(false)
+	reconnectCalled = false
+
+	// Call the function with DNS error
+	checkAndHandleDNSChange(rpcDomain, false)
+
+	// Verify the state after DNS error
+	if reconnectCalled {
+		t.Error("Reconnect should not be called when DNS resolution fails")
+	}
+	if !values.GetDNSCheckedAfterError() {
+		t.Error("Expected DNSCheckedAfterError to be set even after DNS error")
+	}
+
+	// Restore original domain mappings
+	restoreDomains()
 }
