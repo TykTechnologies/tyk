@@ -26,11 +26,6 @@ func (r *DefaultDNSResolver) LookupIP(host string) ([]net.IP, error) {
 	return net.LookupIP(host)
 }
 
-// SetDNSResolver function to set the resolver (for testing)
-func SetDNSResolver(resolver DNSResolver) {
-	dnsResolver = resolver
-}
-
 // updateResolvedIPs checks if DNS resolution has changed using the provided resolver
 func updateResolvedIPs(host string, resolver DNSResolver) bool {
 	ips, err := resolver.LookupIP(host)
@@ -81,8 +76,10 @@ func checkDNSAndReconnect(connectionString string, suppressRegister bool) bool {
 // Returns true if DNS changed and reconnection was attempted, false otherwise.
 // Also returns a boolean indicating whether the function should retry the RPC call.
 func checkAndHandleDNSChange(connectionString string, suppressRegister bool) (dnsChanged bool, shouldRetry bool) {
+
 	// Skip if we've already checked DNS after an error, or we're in emergency mode
 	if values.GetDNSCheckedAfterError() || values.GetEmergencyMode() {
+		Log.Info("Skipping DNS check - already checked or in emergency mode")
 		return false, false
 	}
 
@@ -100,21 +97,26 @@ func checkAndHandleDNSChange(connectionString string, suppressRegister bool) (dn
 	return false, false // DNS unchanged, should not retry
 }
 
-func equalStringSlices(a, b []string) bool {
-	if len(a) != len(b) {
-		return false
+func safeReconnectRPCClient(suppressRegister bool) {
+	// Stop existing client
+	if clientSingleton != nil {
+		oldClient := clientSingleton
+		clientSingleton = nil // Clear reference first
+		oldClient.Stop()      // Then stop the old client
 	}
 
-	mapA := make(map[string]struct{}, len(a))
-	for _, val := range a {
-		mapA[val] = struct{}{}
+	// Reinitialize client
+	Log.Info("Reinitializing RPC client after DNS change...")
+	initializeClient()
+
+	// Reinitialize function client
+	if dispatcher != nil {
+		funcClientSingleton = dispatcher.NewFuncClient(clientSingleton)
 	}
 
-	for _, val := range b {
-		if _, exists := mapA[val]; !exists {
-			return false
-		}
+	// Relogin
+	handleLogin()
+	if !suppressRegister {
+		register()
 	}
-
-	return true
 }
