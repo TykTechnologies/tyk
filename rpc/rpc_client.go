@@ -55,7 +55,7 @@ var (
 // ErrRPCIsDown this is returned when we can't reach rpc server.
 var ErrRPCIsDown = errors.New("RPCStorageHandler: rpc is either down or was not configured")
 
-// rpc.Login is callend may places we only need one in flight at a time.
+// rpc.Login is called may places we only need one in flight at a time.
 var loginFlight singleflight.Group
 
 var values rpcOpts
@@ -79,7 +79,7 @@ func (r *rpcOpts) SetDNSCheckedAfterError(checked bool) {
 	r.dnsCheckedAfterError.Store(checked)
 }
 
-func (r rpcOpts) GetDNSCheckedAfterError() bool {
+func (r *rpcOpts) GetDNSCheckedAfterError() bool {
 	if v := r.dnsCheckedAfterError.Load(); v != nil {
 		return v.(bool)
 	}
@@ -390,6 +390,11 @@ func loginBase() bool {
 		rpcLoginMu.Unlock()
 		return false
 	}
+
+	// Login was successful, reset the DNS check flag
+	values.SetDNSCheckedAfterError(false)
+	Log.Debug("Reset DNS check flag after successful login")
+
 	return true
 }
 
@@ -513,20 +518,16 @@ func FuncClientSingleton(funcName string, request interface{}) (result interface
 		}
 		result, err = funcClientSingleton.CallTimeout(funcName, request, GlobalRPCCallTimeout)
 
-		// If there's an error, check if DNS has changed
+		// If there's an error, handle it with our dedicated error handler
 		if err != nil {
-			_, shouldRetry := checkAndHandleDNSChange(values.Config().ConnectionString, false)
-			if shouldRetry {
-				// If DNS changed, and we reconnected, return nil to retry immediately
+			if handleRPCError(err, values.Config().ConnectionString) {
+				// Error was handled and we should retry
 				return nil
 			}
-
-			// If DNS didn't change or we shouldn't retry, continue with the error
+			// Error wasn't handled or we shouldn't retry
 			return err
 		}
 
-		// If the call was successful, reset the DNS checked flag for future errors
-		values.SetDNSCheckedAfterError(false)
 		return nil
 	}, backoff.WithMaxRetries(
 		backoff.NewConstantBackOff(10*time.Millisecond), 3,
@@ -535,6 +536,26 @@ func FuncClientSingleton(funcName string, request interface{}) (result interface
 		err = be
 	}
 	return
+}
+
+// handleRPCError processes RPC errors and determines if a retry should be attempted
+// Returns true if the error was handled and a retry should be attempted
+func handleRPCError(err error, connectionString string) bool {
+	if err == nil {
+		return false
+	}
+
+	Log.WithError(err).Info("[RPC Store] --> Call failed")
+
+	// Check if it's a network-related error that might be resolved by a DNS check
+	if isNetworkError(err) {
+		Log.Info("[RPC Store] Network error detected, checking DNS...")
+		dnsChanged, shouldRetry := checkAndHandleDNSChange(connectionString, false)
+		return dnsChanged && shouldRetry
+	}
+
+	Log.Info("[RPC Store] Non-network error, skipping DNS check")
+	return false
 }
 
 var rpcConnectionsPool []net.Conn
@@ -600,31 +621,4 @@ func SetEmergencyMode(t *testing.T, value bool) {
 func SetLoadCounts(t *testing.T, value int) {
 	t.Helper()
 	values.SetLoadCounts(value)
-}
-
-func safeReconnectRPCClient(suppressRegister bool) {
-	// Stop existing client
-	if clientSingleton != nil {
-		oldClient := clientSingleton
-		clientSingleton = nil // Clear reference first
-		oldClient.Stop()      // Then stop the old client
-	}
-
-	// Reinitialize client
-	Log.Info("Reinitializing RPC client after DNS change...")
-	initializeClient()
-
-	// Reinitialize function client
-	if dispatcher != nil {
-		funcClientSingleton = dispatcher.NewFuncClient(clientSingleton)
-	}
-
-	// Relogin
-	handleLogin()
-	if !suppressRegister {
-		register()
-	}
-
-	// Reset the DNS check flag after successful reconnection
-	values.SetDNSCheckedAfterError(false)
 }
