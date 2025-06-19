@@ -59,7 +59,7 @@ func (o NormalizedPath) OperationId(method string) string {
 
 // RawOpIdPrefix returns prefix.
 func (o NormalizedPath) RawOpIdPrefix() string {
-	return strings.TrimPrefix(o.path, string(pathSeparator))
+	return strings.TrimPrefix(o.path, string(slash))
 }
 
 // Validate validates paths keys can be normalized from user-defined keys to proper ones.

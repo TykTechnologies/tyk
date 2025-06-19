@@ -3,27 +3,35 @@ package pathnormalizer
 import (
 	"errors"
 	"fmt"
-	"github.com/TykTechnologies/tyk/common/option"
 	"regexp"
 	"strings"
 
+	"github.com/TykTechnologies/tyk/common/option"
 	"github.com/getkin/kin-openapi/openapi3"
 )
 
 const (
-	pathSeparator   = '/'
-	curlyBraceLeft  = '{'
-	curlyBraceRight = '}'
+	slash                 = '/'
+	curlyBraceLeft        = '{'
+	curlyBraceRight       = '}'
+	muxIdPatternSeparator = ':'
 
 	// RePrefix default regexp prefix.
 	RePrefix = "customRegex"
 )
 
+var (
+	ErrUnreachableCase  = errors.New("unreachable case")
+	ErrUnexpectedSlash  = errors.New("unexpected slash symbol in pattern")
+	ErrUnexpectedSymbol = errors.New("unexpected symbol")
+)
+
 // Parser responsible for parsing user-defined path of given OAS.
 type Parser struct {
-	customReCounter int
-	prefix          string
-	stripSlashes    bool
+	anonymousReCounter int
+	prefix             string
+	stripSlashes       bool
+	ctrResets          bool
 }
 
 // WithNoStripSlashes skip strip slashes.
@@ -34,24 +42,39 @@ func WithNoStripSlashes() option.Option[Parser] {
 	}
 }
 
-// WithPrefix allows to us custom prefix.
+// WithPrefix allows to use custom prefix.
 func WithPrefix(prefix string) option.Option[Parser] {
 	return func(parser *Parser) {
 		parser.prefix = prefix
 	}
 }
 
+// WithCtrResets enables counter resets on each parse call.
+// Useful for testing.
+func WithCtrResets() option.Option[Parser] {
+	return func(parser *Parser) {
+		parser.ctrResets = true
+	}
+}
+
 // NewParser instantiates new parser instance
 func NewParser(opts ...option.Option[Parser]) *Parser {
 	return option.New(opts).Build(Parser{
-		customReCounter: 0,
-		prefix:          RePrefix,
-		stripSlashes:    true,
+		anonymousReCounter: 0,
+		prefix:             RePrefix,
+		stripSlashes:       true,
+		ctrResets:          false,
 	})
 }
 
 // Parse responsible for parsing next one path.
 func (p *Parser) Parse(path string) (*NormalizedPath, error) {
+	if p.ctrResets {
+		defer func() {
+			p.anonymousReCounter = 0
+		}()
+	}
+
 	singlePathParser := newPathParser(path, p)
 
 	pPath, err := singlePathParser.parse()
@@ -86,11 +109,11 @@ func (p *pathParser) parse() ([]pathPart, error) {
 		var part pathPart
 
 		switch {
-		case ch == pathSeparator:
+		case ch == slash:
 			if p.parent.stripSlashes {
-				p.consumeAll(pathSeparator)
+				p.consumeAll(slash)
 			} else {
-				p.consumeOne(pathSeparator)
+				p.consumeOne(slash)
 			}
 
 			part = newPathPartSplitter()
@@ -115,30 +138,126 @@ func (p *pathParser) parse() ([]pathPart, error) {
 	return parts, nil
 }
 
-func (p *pathParser) parseMuxRe() (pathPart, error) {
-	var zero pathPart
+func (p *pathParser) consumeMuxIdentifier() (res string, ok bool, finished bool) {
+	if !isLetter(p.src[p.pos]) {
+		return
+	}
 
-	return zero, errors.New("parseMuxRe not implemented")
-}
-
-func (p *pathParser) parseAnonymousRe() (pathPart, error) {
 	start := p.pos
-
-	for p.pos < len(p.src) && p.src[p.pos] != pathSeparator {
+	for p.pos < len(p.src) && isMuxIdentifierSymbol(p.src[p.pos]) {
 		p.pos++
 	}
 
-	pattern := p.src[start:p.pos]
-	if _, err := regexp.Compile(fmt.Sprintf("^%s$", pattern)); err != nil {
-		var zero pathPart
-		return zero, parseError{
-			prev: err,
-			pos:  start,
-			src:  p.src,
+	// end reached
+	if p.pos == len(p.src) {
+		p.pos = start
+		return
+	}
+
+	if p.src[p.pos] == muxIdPatternSeparator {
+		p.pos++
+		return p.src[start : p.pos-1], true, false
+	}
+
+	if p.src[p.pos] == curlyBraceRight {
+		p.pos++
+		return p.src[start : p.pos-1], true, true
+	}
+
+	p.pos = start
+	return
+}
+
+func (p *pathParser) parseMuxRe() (pathPart, error) {
+	if p.src[p.pos] != curlyBraceLeft {
+		return pathPart{}, ErrUnreachableCase
+	}
+
+	// consume first open curly brace
+	p.pos++
+	openBraceCtr := 1
+
+	paramName, idParsedOk, isFinished := p.consumeMuxIdentifier()
+
+	if isFinished {
+		return p.newPathPartRe(paramName, ".*")
+	}
+
+	start := p.pos
+loop:
+	for p.pos < len(p.src) {
+		ch := p.src[p.pos]
+		p.pos++
+
+		switch ch {
+		case slash:
+			p.pos--
+			break loop
+		case curlyBraceLeft:
+			openBraceCtr++
+		case curlyBraceRight:
+			openBraceCtr--
+			if openBraceCtr == 0 {
+				// if next exists it should be /
+				if p.pos < len(p.src) && p.src[p.pos] != slash {
+					return pathPart{}, p.parseError(ErrUnexpectedSymbol)
+				}
+
+				break loop
+			}
+		default:
 		}
 	}
 
-	return p.newPathPartRe(pattern), nil
+	if openBraceCtr != 0 {
+		p.pos--
+		return pathPart{}, p.parseError(ErrUnexpectedSlash)
+	}
+
+	if !idParsedOk {
+		paramName = p.newAnonymousName()
+	}
+
+	return p.newPathPartRe(paramName, p.src[start:p.pos-1])
+}
+
+func (p *pathParser) parseError(err error) parseError {
+	return parseError{
+		prev: err,
+		pos:  p.pos,
+		src:  p.src,
+	}
+}
+
+func (p *pathParser) parseAnonymousRe() (pathPart, error) {
+	var zero pathPart
+	start := p.pos
+	braceCtr := 0
+
+loop:
+	for p.pos < len(p.src) {
+		ch := p.src[p.pos]
+		p.pos++
+
+		switch ch {
+		case slash:
+			p.pos--
+			break loop
+		case curlyBraceLeft:
+			braceCtr++
+		case curlyBraceRight:
+			braceCtr--
+		}
+	}
+
+	if braceCtr != 0 {
+		return zero, p.parseError(ErrUnexpectedSlash)
+	}
+
+	return p.newPathPartRe(
+		p.newAnonymousName(),
+		p.src[start:p.pos],
+	)
 }
 
 func (p *pathParser) consumeAll(ch byte) {
@@ -165,7 +284,7 @@ loop:
 		pos++
 
 		switch {
-		case ch == pathSeparator:
+		case ch == slash:
 			pos--
 			break loop
 		case !isIdentifierSymbol(ch):
@@ -179,10 +298,15 @@ loop:
 	return string(b), len(b) > 0
 }
 
-func (p *pathParser) newPathPartRe(pattern string) pathPart {
-	p.parent.customReCounter++
+func (p *pathParser) newAnonymousName() string {
+	p.parent.anonymousReCounter++
+	return fmt.Sprintf("%s%d", p.parent.prefix, p.parent.anonymousReCounter)
+}
 
-	name := fmt.Sprintf("%s%d", p.parent.prefix, p.parent.customReCounter)
+func (p *pathParser) newPathPartRe(name, pattern string) (pathPart, error) {
+	if _, err := regexp.Compile(fmt.Sprintf("^%s$", pattern)); err != nil {
+		return pathPart{}, p.parseError(err)
+	}
 
 	return pathPart{
 		name:    name,
@@ -191,7 +315,7 @@ func (p *pathParser) newPathPartRe(pattern string) pathPart {
 		parameter: openapi3.
 			NewPathParameter(name).
 			WithSchema(openapi3.NewStringSchema().WithPattern(pattern)),
-	}
+	}, nil
 }
 
 type parseError struct {
@@ -261,6 +385,14 @@ func (r *pathPart) normalize() string {
 
 func isIdentifierSymbol(s byte) bool {
 	return isLowerLetter(s) || isUpperLetter(s) || isDigit(s) || isOneOf(s, "._-")
+}
+
+func isMuxIdentifierSymbol(s byte) bool {
+	return isLowerLetter(s) || isUpperLetter(s) || isDigit(s) || isOneOf(s, "_-")
+}
+
+func isLetter(s byte) bool {
+	return isLowerLetter(s) || isUpperLetter(s)
 }
 
 func isLowerLetter(s byte) bool {
