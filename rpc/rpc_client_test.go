@@ -1,8 +1,6 @@
 package rpc
 
-import (
-	"testing"
-)
+import "testing"
 
 func TestRecoveryFromEmergencyMode(t *testing.T) {
 	if IsEmergencyMode() {
