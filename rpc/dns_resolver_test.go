@@ -39,35 +39,63 @@ func TestCheckDNSAndReconnect(t *testing.T) {
 	// Test cases
 	tests := []struct {
 		name                string
+		connectionString    string
 		initialIPs          []string
 		resolvedIPs         []net.IP
 		resolveError        error
 		expectedResult      bool
 		expectReconnectCall bool
+		expectDNSLookup     bool
 	}{
 		{
 			name:                "DNS changed - should reconnect",
+			connectionString:    "example.com:8080",
 			initialIPs:          []string{"192.168.1.1"},
 			resolvedIPs:         makeIPs("192.168.1.2"),
 			resolveError:        nil,
 			expectedResult:      true,
 			expectReconnectCall: true,
+			expectDNSLookup:     true,
 		},
 		{
 			name:                "DNS unchanged - should not reconnect",
+			connectionString:    "example.com:8080",
 			initialIPs:          []string{"192.168.1.1"},
 			resolvedIPs:         makeIPs("192.168.1.1"),
 			resolveError:        nil,
 			expectedResult:      false,
 			expectReconnectCall: false,
+			expectDNSLookup:     true,
 		},
 		{
 			name:                "DNS resolution error - should not reconnect",
+			connectionString:    "example.com:8080",
 			initialIPs:          []string{"192.168.1.1"},
 			resolvedIPs:         nil,
 			resolveError:        errors.New("DNS resolution failed"),
 			expectedResult:      false,
 			expectReconnectCall: false,
+			expectDNSLookup:     true,
+		},
+		{
+			name:                "Invalid connection string - should not check DNS or reconnect",
+			connectionString:    "invalid-no-port", // Missing port
+			initialIPs:          []string{"192.168.1.1"},
+			resolvedIPs:         makeIPs("192.168.1.2"),
+			resolveError:        nil,
+			expectedResult:      false,
+			expectReconnectCall: false,
+			expectDNSLookup:     false,
+		},
+		{
+			name:                "Empty connection string - should not check DNS or reconnect",
+			connectionString:    "",
+			initialIPs:          []string{"192.168.1.1"},
+			resolvedIPs:         makeIPs("192.168.1.2"),
+			resolveError:        nil,
+			expectedResult:      false,
+			expectReconnectCall: false,
+			expectDNSLookup:     false,
 		},
 	}
 
@@ -77,20 +105,22 @@ func TestCheckDNSAndReconnect(t *testing.T) {
 			lastResolvedIPs = tt.initialIPs
 
 			// Create a mock resolver
+			dnsLookupCalled := false
 			mockResolver := &MockDNSResolver{}
 			mockResolver.LookupIPFunc = func(_ string) ([]net.IP, error) {
+				dnsLookupCalled = true
 				return tt.resolvedIPs, tt.resolveError
 			}
 			dnsResolver = mockResolver
 
 			// Create a mock reconnect function
 			reconnectCalled := false
-			safeReconnectRPCClient = func(_ bool) {
+			safeReconnectRPCClient = func(suppressRegister bool) {
 				reconnectCalled = true
 			}
 
 			// Call the function
-			result := checkDNSAndReconnect("example.com:8080", false)
+			result := checkDNSAndReconnect(tt.connectionString, false)
 
 			// Check result
 			if result != tt.expectedResult {
@@ -100,6 +130,11 @@ func TestCheckDNSAndReconnect(t *testing.T) {
 			// Check if reconnect was called as expected
 			if reconnectCalled != tt.expectReconnectCall {
 				t.Errorf("reconnect called = %v, expected %v", reconnectCalled, tt.expectReconnectCall)
+			}
+
+			// Check if DNS lookup was performed as expected
+			if dnsLookupCalled != tt.expectDNSLookup {
+				t.Errorf("DNS lookup performed = %v, expected %v", dnsLookupCalled, tt.expectDNSLookup)
 			}
 		})
 	}
