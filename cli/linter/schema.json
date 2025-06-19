@@ -1106,6 +1106,12 @@
     "health_check_endpoint_name": {
       "type": "string"
     },
+    "readiness_check_endpoint_name": {
+      "type": "string"
+    },
+    "graceful_shutdown_timeout_duration": {
+      "type": "integer"
+    },
     "ssl_force_common_name_check": {
       "type": "boolean"
     },
