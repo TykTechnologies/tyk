@@ -14,6 +14,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 
+	"github.com/TykTechnologies/again"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/internal/netutil"
 	"github.com/TykTechnologies/tyk/internal/otel"
@@ -422,6 +423,7 @@ func TestGateway_gracefulShutdown(t *testing.T) {
 				gw := &Gateway{
 					DefaultProxyMux: &proxyMux{
 						proxies: []*proxy{},
+						again:   again.New(),
 					},
 				}
 				gw.SetConfig(config.Config{})
@@ -452,6 +454,7 @@ func TestGateway_gracefulShutdown(t *testing.T) {
 								},
 							},
 						},
+						again: again.New(),
 					},
 				}
 				gw.SetConfig(config.Config{})
@@ -476,6 +479,7 @@ func TestGateway_gracefulShutdown(t *testing.T) {
 								},
 							},
 						},
+						again: again.New(),
 					},
 				}
 				gw.SetConfig(config.Config{})
@@ -505,6 +509,7 @@ func TestGateway_gracefulShutdown(t *testing.T) {
 								},
 							},
 						},
+						again: again.New(),
 					},
 				}
 				gw.SetConfig(config.Config{})
@@ -522,6 +527,7 @@ func TestGateway_gracefulShutdown(t *testing.T) {
 				gw := &Gateway{
 					DefaultProxyMux: &proxyMux{
 						proxies: []*proxy{},
+						again:   again.New(),
 					},
 				}
 				gw.SetConfig(config.Config{})
@@ -576,6 +582,7 @@ func TestGateway_gracefulShutdown_ConcurrentSafety(t *testing.T) {
 					},
 				},
 			},
+			again: again.New(),
 		},
 	}
 	gw.SetConfig(config.Config{})

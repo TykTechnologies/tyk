@@ -223,7 +223,7 @@ func (k *JWTMiddleware) getSecretToVerifySignature(r *http.Request, token *jwt.T
 	config := k.Spec.APIDefinition
 
 	// Try all JWK URIs, return on first successful match
-	if len(config.JWTJwksURIs) > 0 {
+	if len(config.JWTJwksURIs) > 0 && config.IsOAS {
 		return k.getSecretFromMultipleJWKURIs(config.JWTJwksURIs, token.Header[KID], k.Spec.JWTSigningMethod)
 	}
 
@@ -273,6 +273,13 @@ func (k *JWTMiddleware) specCacheKey(spec *APISpec, prefix string) string {
 }
 
 func (k *JWTMiddleware) getSecretFromMultipleJWKURIs(jwkURIs []apidef.JWK, kidVal interface{}, keyType string) (interface{}, error) {
+	if !k.Spec.APIDefinition.IsOAS {
+		err := errors.New("this feature is only available when using OAS API")
+		k.Logger().WithError(err).Infof("Failed to process api")
+
+		return nil, err
+	}
+
 	var (
 		jwkSets         []*jose.JSONWebKeySet
 		fallbackJWKURIs []apidef.JWK
@@ -282,6 +289,7 @@ func (k *JWTMiddleware) getSecretFromMultipleJWKURIs(jwkURIs []apidef.JWK, kidVa
 	if !ok {
 		return nil, ErrKIDNotAString
 	}
+
 	cacheAPIDef := k.specCacheKey(k.Spec, JWKsAPIDef)
 	cacheOutdated := false
 
