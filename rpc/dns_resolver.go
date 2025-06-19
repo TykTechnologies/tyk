@@ -12,7 +12,14 @@ var (
 
 	// global resolver to be replaced in tests
 	dnsResolver DNSResolver = &DefaultDNSResolver{}
+
+	// declare funcs as vars that we can override in testing
+	safeReconnectRPCClient func(suppressRegister bool)
 )
+
+func init() {
+	safeReconnectRPCClient = defaultSafeReconnectRPCClient
+}
 
 // DNSResolver provides methods for DNS resolution
 type DNSResolver interface {
@@ -97,7 +104,7 @@ func checkAndHandleDNSChange(connectionString string, suppressRegister bool) (dn
 	return false, false // DNS unchanged, should not retry
 }
 
-func safeReconnectRPCClient(suppressRegister bool) {
+func defaultSafeReconnectRPCClient(suppressRegister bool) {
 	// Stop existing client
 	if clientSingleton != nil {
 		oldClient := clientSingleton
