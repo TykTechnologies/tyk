@@ -199,12 +199,41 @@ func WithDelete(path string, fn EndpointFactory) BuilderOption {
 	return withEndpoint(http.MethodDelete, path, fn)
 }
 
+// RateLimit adds rate limit middleware to current endpoint.
 func (eb *EndpointBuilder) RateLimit(amount uint, duration time.Duration, enabled ...bool) *EndpointBuilder {
 	if rl, err := newRateLimit(amount, duration, enabled...); err != nil {
 		eb.errors = append(eb.errors, err)
 	} else {
 		eb.operation().RateLimit = (*RateLimitEndpoint)(rl)
 	}
+
+	return eb
+}
+
+// TransformResponseHeaders adds TransformResponseHeaders middleware to current endpoint.
+func (eb *EndpointBuilder) TransformResponseHeaders(factory func(*TransformHeaders)) *EndpointBuilder {
+	op := eb.operation().TransformResponseHeaders
+
+	if op == nil {
+		op = &TransformHeaders{Enabled: true}
+		eb.operation().TransformResponseHeaders = op
+	}
+
+	factory(op)
+
+	return eb
+}
+
+// TransformResponseBody adds TransformResponseBody middleware to current endpoint.
+func (eb *EndpointBuilder) TransformResponseBody(factory func(*TransformBody)) *EndpointBuilder {
+	op := eb.operation().TransformResponseBody
+
+	if op == nil {
+		op = &TransformBody{Enabled: true}
+		eb.operation().TransformResponseBody = op
+	}
+
+	factory(op)
 
 	return eb
 }

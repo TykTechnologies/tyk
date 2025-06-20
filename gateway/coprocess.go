@@ -552,28 +552,30 @@ func (h *CustomMiddlewareResponseHook) HandleError(rw http.ResponseWriter, req *
 }
 
 func (h *CustomMiddlewareResponseHook) HandleResponse(rw http.ResponseWriter, res *http.Response, req *http.Request, ses *user.SessionState) error {
-	log.WithFields(logrus.Fields{
+
+	h.logger().WithFields(logrus.Fields{
 		"prefix": "coprocess",
 	}).Debugf("Response hook '%s' is called", h.mw.Name())
+
 	coProcessor := CoProcessor{
 		Middleware: h.mw,
 	}
 
 	object, err := coProcessor.BuildObject(req, res, h.mw.Spec)
 	if err != nil {
-		log.WithError(err).Debug("Couldn't build request object")
+		h.logger().WithError(err).Debug("Couldn't build request object")
 		return errors.New("Middleware error")
 	}
 	object.Session = ProtoSessionState(ses)
 
 	retObject, err := coProcessor.Dispatch(object)
 	if err != nil {
-		log.WithError(err).Debug("Couldn't dispatch request object")
+		h.logger().WithError(err).Debug("Couldn't dispatch request object")
 		return errors.New("Middleware error")
 	}
 
 	if retObject.Response == nil {
-		log.WithError(err).Debug("No response object returned by response hook")
+		h.logger().WithError(err).Debug("No response object returned by response hook")
 		return errors.New("Middleware error")
 	}
 
