@@ -96,7 +96,12 @@ func (k *ValidateRequest) ProcessRequest(w http.ResponseWriter, r *http.Request,
 
 	err := openapi3filter.ValidateRequest(r.Context(), requestValidationInput)
 	if err != nil {
-		return fmt.Errorf("request validation error: %w", err), errResponseCode
+		retErr, retCode := k.GetErrorAndStatusCode(ErrValidationRequestFailed, r)
+		if retErr.Error() == ValidationRequestFailed {
+			// in case is the default then we return the old msg
+			return fmt.Errorf("request validation error: %w", err), errResponseCode
+		}
+		return retErr, retCode
 	}
 
 	// Handle Success

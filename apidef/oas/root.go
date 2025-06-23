@@ -20,6 +20,8 @@ type XTykAPIGateway struct {
 	Server Server `bson:"server" json:"server"` // required
 	// Middleware contains the configurations related to the Tyk middleware.
 	Middleware *Middleware `bson:"middleware,omitempty" json:"middleware,omitempty"`
+	// ErrorMessages allows API-level customization of error messages
+	ErrorMessages map[string]apidef.TykError `bson:"error_messages,omitempty" json:"error_messages,omitempty"`
 }
 
 // Fill fills *XTykAPIGateway from apidef.APIDefinition.
@@ -27,6 +29,10 @@ func (x *XTykAPIGateway) Fill(api apidef.APIDefinition) {
 	x.Info.Fill(api)
 	x.Upstream.Fill(api)
 	x.Server.Fill(api)
+
+	if api.ErrorMessages != nil {
+		x.ErrorMessages = api.ErrorMessages
+	}
 
 	if x.Middleware == nil {
 		x.Middleware = &Middleware{}
@@ -51,6 +57,10 @@ func (x *XTykAPIGateway) ExtractTo(api *apidef.APIDefinition) {
 		defer func() {
 			x.Middleware = nil
 		}()
+	}
+
+	if x.ErrorMessages != nil {
+		api.ErrorMessages = x.ErrorMessages
 	}
 
 	x.Middleware.ExtractTo(api)
