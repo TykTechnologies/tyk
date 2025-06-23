@@ -551,7 +551,7 @@ func handleRPCError(err error, connectionString string) bool {
 
 	// Check if it's a network-related error that might be resolved by a DNS check
 	if isNetworkError(err) {
-		Log.Info("[RPC Store] Network error detected, checking DNS...")
+		Log.Debug("[RPC Store] Network error detected, checking DNS...")
 		dnsChanged, shouldRetry := checkAndHandleDNSChange(connectionString, false)
 		return dnsChanged && shouldRetry
 	}

@@ -87,7 +87,7 @@ func checkAndHandleDNSChange(connectionString string, suppressRegister bool) (dn
 
 	// Skip if we've already checked DNS after an error, or we're in emergency mode
 	if values.GetDNSCheckedAfterError() || values.GetEmergencyMode() {
-		Log.Info("Skipping DNS check - already checked or in emergency mode")
+		Log.Debug("Skipping DNS check - already checked or in emergency mode")
 		return false, false
 	}
 
