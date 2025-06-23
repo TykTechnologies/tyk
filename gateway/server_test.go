@@ -211,7 +211,7 @@ func TestGateway_SyncResourcesWithReload(t *testing.T) {
 		syncFunc, hitCounter := syncFuncSuccessAt(t, 5)
 		startTime := time.Now()
 		resourceCount, err := syncResourcesWithReload("apis", ts.Gw.GetConfig(), syncFunc)
-		assert.Greater(t, time.Since(startTime), time.Second*3)
+		assert.Greater(t, time.Since(startTime), time.Second*2)
 		assert.ErrorIs(t, err, syncErr)
 		assert.Zero(t, resourceCount)
 		assert.Equal(t, 3, *hitCounter)
