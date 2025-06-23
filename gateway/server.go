@@ -619,11 +619,15 @@ func (gw *Gateway) syncPolicies() (count int, err error) {
 		mainLog.Debugf(" - %s", id)
 	}
 
+	if err != nil {
+		return len(pols), err
+	}
+
 	gw.policiesMu.Lock()
 	defer gw.policiesMu.Unlock()
 	gw.policiesByID = pols
 
-	return len(pols), err
+	return len(pols), nil
 }
 
 // stripSlashes removes any trailing slashes from the request's URL
