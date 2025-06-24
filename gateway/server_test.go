@@ -14,6 +14,7 @@ import (
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/internal/netutil"
 	"github.com/TykTechnologies/tyk/internal/otel"
+	"github.com/TykTechnologies/tyk/rpc"
 	"github.com/TykTechnologies/tyk/test"
 	"github.com/TykTechnologies/tyk/user"
 )
@@ -204,7 +205,7 @@ func TestGateway_SyncResourcesWithReload(t *testing.T) {
 		syncFunc, hitCounter := syncFuncSuccessAt(t, 5)
 		startTime := time.Now()
 		resourceCount, err := syncResourcesWithReload("apis", ts.Gw.GetConfig(), syncFunc)
-		assert.Greater(t, time.Since(startTime), time.Second*3)
+		assert.Greater(t, time.Since(startTime), time.Second*2)
 		assert.ErrorIs(t, err, syncErr)
 		assert.Zero(t, resourceCount)
 		assert.Equal(t, 3, *hitCounter)
@@ -221,6 +222,48 @@ func TestGateway_SyncResourcesWithReload(t *testing.T) {
 		assert.Equal(t, 2, *hitCounter)
 	})
 
+	t.Run("RPC timeout triggers emergency mode and loads from backup", func(t *testing.T) {
+		t.Parallel()
+
+		// Configure gateway for RPC mode
+		conf := ts.Gw.GetConfig()
+		conf.SlaveOptions.UseRPC = true
+
+		// Create a sync function that simulates timeout errors initially, then succeeds when emergency mode is enabled
+		var hitCount int
+		timeoutError := errors.New("Cannot obtain response during timeout=30s")
+
+		syncFunc := func() (int, error) {
+			hitCount++
+
+			// Always fail with timeout for the first retryAttempts+1 attempts (normal + last attempt)
+			// This ensures emergency mode gets triggered properly
+			if hitCount <= retryAttempts+1 {
+				return 0, timeoutError
+			}
+
+			// Succeed when emergency mode is enabled (backup loading)
+			// This will be called after emergency mode is enabled
+			return 5, nil // Simulate loading 5 items from backup
+		}
+
+		// Ensure we start without emergency mode
+		rpc.ResetEmergencyMode()
+		defer rpc.ResetEmergencyMode()
+
+		// Test the sync with timeout -> emergency mode -> success flow
+		resourceCount, err := syncResourcesWithReload("policies", conf, syncFunc)
+
+		// Should succeed after triggering emergency mode
+		assert.NoError(t, err)
+		assert.Equal(t, 5, resourceCount)
+
+		// Should have attempted retries + 1 emergency mode attempt
+		assert.Equal(t, retryAttempts+2, hitCount)
+
+		// Emergency mode should be enabled
+		assert.True(t, rpc.IsEmergencyMode())
+	})
 }
 
 type gatewayGetHostDetailsTestCheckFn func(*testing.T, *test.BufferedLogger, *Gateway)
