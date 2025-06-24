@@ -52,14 +52,22 @@ type traceResponse struct {
 }
 
 type traceLogEntry struct {
-	ApiId   string     `json:"api_id,omitempty"`
-	ApiName string     `json:"api_name,omitempty"`
-	Level   string     `json:"level,omitempty"`
-	Msg     string     `json:"msg,omitempty"`
-	Mw      string     `json:"mw,omitempty"`
-	OrgId   string     `json:"org_id,omitempty"`
-	Ts      *time.Time `json:"time,omitempty"`
+	ApiId   string       `json:"api_id,omitempty"`
+	ApiName string       `json:"api_name,omitempty"`
+	Level   string       `json:"level,omitempty"`
+	Msg     string       `json:"msg,omitempty"`
+	Mw      string       `json:"mw,omitempty"`
+	OrgId   string       `json:"org_id,omitempty"`
+	Ts      *time.Time   `json:"time,omitempty"`
+	Type    traceLogType `json:"type"`
 }
+
+type traceLogType string
+
+const (
+	traceLogRequest  traceLogType = "request"
+	traceLogResponse traceLogType = "response"
+)
 
 func (tr *traceResponse) parseTrace() (*http.Request, *http.Response, error) {
 	return parseTrace(tr.Response)
