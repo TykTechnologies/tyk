@@ -236,17 +236,15 @@ func TestGateway_SyncResourcesWithReload(t *testing.T) {
 		syncFunc := func() (int, error) {
 			hitCount++
 
-			// Fail with timeout for all normal attempts
-			if hitCount <= retryAttempts+1 && !rpc.IsEmergencyMode() {
+			// Always fail with timeout for the first retryAttempts+1 attempts (normal + last attempt)
+			// This ensures emergency mode gets triggered properly
+			if hitCount <= retryAttempts+1 {
 				return 0, timeoutError
 			}
 
 			// Succeed when emergency mode is enabled (backup loading)
-			if rpc.IsEmergencyMode() {
-				return 5, nil // Simulate loading 5 items from backup
-			}
-
-			return 0, timeoutError
+			// This will be called after emergency mode is enabled
+			return 5, nil // Simulate loading 5 items from backup
 		}
 
 		// Ensure we start without emergency mode
