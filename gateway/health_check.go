@@ -238,14 +238,9 @@ func (gw *Gateway) readinessHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Check API definitions loaded
-	gw.apisMu.RLock()
-	apisLoaded := len(gw.apiSpecs) > 0
-	gw.apisMu.RUnlock()
-
-	if !apisLoaded && gw.GetConfig().UseDBAppConfigs {
-		mainLog.Warning("[Readiness] No API definitions loaded")
-		doJSONWrite(w, http.StatusServiceUnavailable, apiError("API definitions not loaded"))
+	if !gw.performedSuccessfulReload {
+		mainLog.Warning("[Readiness] Successful reload check failed")
+		doJSONWrite(w, http.StatusServiceUnavailable, apiError("A successful API reload did not happen"))
 		return
 	}
 

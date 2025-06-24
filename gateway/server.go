@@ -181,6 +181,8 @@ type Gateway struct {
 	// reloadQueue is used by reloadURLStructure to queue a reload. It's not
 	// buffered, as reloadQueueLoop should pick these up immediately.
 	reloadQueue chan func()
+	// performedSuccessfulReload is used to know whether a successful reload happened
+	performedSuccessfulReload bool
 
 	requeueLock sync.Mutex
 
@@ -1066,12 +1068,14 @@ func (gw *Gateway) DoReload() {
 		// and current registry had 0 APIs
 		if count == 0 && gw.apisByIDLen() == 0 {
 			mainLog.Warning("No API Definitions found, not reloading")
+			gw.performedSuccessfulReload = true
 			return
 		}
 	}
 
 	gw.loadGlobalApps()
 
+	gw.performedSuccessfulReload = true
 	mainLog.Info("API reload complete")
 }
 
@@ -1705,7 +1709,7 @@ func Start() {
 	// Set up signal handling for graceful shutdown
 	sigChan := make(chan os.Signal, 1)
 	// Only listen for SIGTERM which is what Kubernetes sends
-	signal.Notify(sigChan, syscall.SIGTERM)
+	signal.Notify(sigChan, syscall.SIGTERM, syscall.SIGQUIT, syscall.SIGINT)
 
 	// Initialize everything else as normal
 	cli.Init(confPaths)
@@ -1731,19 +1735,15 @@ func Start() {
 
 	go func() {
 		sig := <-sigChan
-		// This case handles SIGTERM for Kubernetes shutdowns
-		mainLog.Infof("SIGTERM received: %v. Initiating graceful shutdown...", sig)
-		// Cancel the context to notify all goroutines
+		mainLog.Infof("Shutdown signal received: %v. Initiating graceful shutdown...", sig)
 		cancel()
-
-		// Perform graceful shutdown
 		shutdownCtx, shutdownCancel := context.WithTimeout(
 			context.Background(), time.Duration(gwConfig.GracefulShutdownTimeoutDuration)*time.Second)
 		defer shutdownCancel()
-
 		if err := gw.gracefulShutdown(shutdownCtx); err != nil {
 			mainLog.Errorf("Graceful shutdown error: %v", err)
 		}
+		os.Exit(0)
 	}()
 
 	if err := gw.initSystem(); err != nil {
@@ -1851,46 +1851,12 @@ func Start() {
 	if err != nil {
 		mainLog.WithError(err).Error("waiting")
 	}
-	mainLog.Info("Stop signal received.")
-	if err = gw.DefaultProxyMux.again.Close(); err != nil {
-		mainLog.Error("Closing listeners: ", err)
-	}
-	// stop analytics workers
-	if gwConfig.EnableAnalytics && gw.Analytics.Store == nil {
-		gw.Analytics.Stop()
-	}
-
-	// write pprof profiles
-	writeProfiles()
-
-	if gwConfig.UseDBAppConfigs {
-		mainLog.Info("Stopping heartbeat...")
-		gw.DashService.StopBeating()
-		time.Sleep(2 * time.Second)
-		err := gw.DashService.DeRegister()
-		if err != nil {
-			mainLog.WithError(err).Error("deregistering in dashboard")
-		}
-	}
-	if gwConfig.SlaveOptions.UseRPC {
-		store := RPCStorageHandler{
-			DoReload: gw.DoReload,
-			Gw:       gw,
-		}
-
-		err := store.Disconnect()
-		if err != nil {
-			mainLog.WithError(err).Error("deregistering in MDCB")
-		}
-	}
-
-	mainLog.Info("Terminating.")
-
 	time.Sleep(time.Second)
+	os.Exit(0)
 }
 
 func writeProfiles() {
-	if *cli.BlockProfile {
+	if cli.BlockProfile != nil && *cli.BlockProfile {
 		f, err := os.Create("tyk.blockprof")
 		if err != nil {
 			panic(err)
@@ -1900,7 +1866,7 @@ func writeProfiles() {
 		}
 		f.Close()
 	}
-	if *cli.MutexProfile {
+	if cli.MutexProfile != nil && *cli.MutexProfile {
 		f, err := os.Create("tyk.mutexprof")
 		if err != nil {
 			panic(err)
@@ -1977,12 +1943,12 @@ func handleDashboardRegistration(gw *Gateway) {
 	dashboardServiceInit(gw)
 
 	// connStr := buildDashboardConnStr("/register/node")
-	if err := gw.DashService.Register(); err != nil {
-		dashLog.Fatal("Registration failed: ", err)
+	if err := gw.DashService.Register(gw.ctx); err != nil {
+		dashLog.Error("Registration failed: ", err)
 	}
 
 	go func() {
-		beatErr := gw.DashService.StartBeating()
+		beatErr := gw.DashService.StartBeating(gw.ctx)
 		if beatErr != nil {
 			dashLog.Error("Could not start beating. ", beatErr.Error())
 		}
@@ -2085,6 +2051,7 @@ func (gw *Gateway) SetConfig(conf config.Config, skipReload ...bool) {
 
 // gracefulShutdown performs a graceful shutdown of all services
 func (gw *Gateway) gracefulShutdown(ctx context.Context) error {
+	mainLog.Info("Stop signal received.")
 	mainLog.Info("Gracefully shutting down services...")
 	mainLog.Info("Waiting for in-flight requests to complete...")
 	var wg sync.WaitGroup
@@ -2144,5 +2111,33 @@ func (gw *Gateway) gracefulShutdown(ctx context.Context) error {
 	}
 
 	mainLog.Info("All services gracefully shut down")
+	if err := gw.DefaultProxyMux.again.Close(); err != nil {
+		mainLog.Error("Closing listeners: ", err)
+	}
+	if gw.GetConfig().EnableAnalytics && gw.Analytics.Store == nil {
+		gw.Analytics.Stop()
+	}
+	writeProfiles()
+
+	if gw.GetConfig().UseDBAppConfigs {
+		mainLog.Info("Stopping heartbeat...")
+		gw.DashService.StopBeating()
+		time.Sleep(2 * time.Second)
+		err := gw.DashService.DeRegister()
+		if err != nil {
+			mainLog.WithError(err).Error("deregistering in dashboard")
+		}
+	}
+
+	if gw.GetConfig().SlaveOptions.UseRPC {
+		store := RPCStorageHandler{
+			DoReload: gw.DoReload,
+			Gw:       gw,
+		}
+		if err := store.Disconnect(); err != nil {
+			mainLog.WithError(err).Error("deregistering in MDCB")
+		}
+	}
+	mainLog.Info("Terminating.")
 	return nil
 }
