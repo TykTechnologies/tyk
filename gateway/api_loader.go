@@ -123,7 +123,7 @@ func fixFuncPath(pathPrefix string, funcs []apidef.MiddlewareDefinition) {
 	}
 }
 
-func (gw *Gateway) generateSubRoutes(spec *APISpec, router *mux.Router, logger *logrus.Entry) {
+func (gw *Gateway) generateSubRoutes(spec *APISpec, router *mux.Router, _ *logrus.Entry) {
 	if spec.GraphQL.GraphQLPlayground.Enabled {
 		gw.loadGraphQLPlayground(spec, router)
 	}
