@@ -694,7 +694,13 @@ func (t *BaseMiddleware) generateSessionID(id string) string {
 	return t.Gw.generateToken(t.Spec.OrgID, keyID)
 }
 
+type ResponseMwLogger interface {
+	setLogger(entry *logrus.Entry)
+	logger() *logrus.Entry
+}
+
 type TykResponseHandler interface {
+	ResponseMwLogger
 	Enabled() bool
 	Init(interface{}, *APISpec) error
 	Name() string
@@ -819,6 +825,7 @@ func parseForm(r *http.Request) {
 type BaseTykResponseHandler struct {
 	Spec *APISpec `json:"-"`
 	Gw   *Gateway `json:"-"`
+	log  *logrus.Entry
 }
 
 func (b *BaseTykResponseHandler) Enabled() bool {
@@ -838,3 +845,14 @@ func (b *BaseTykResponseHandler) HandleResponse(rw http.ResponseWriter, res *htt
 }
 
 func (b *BaseTykResponseHandler) HandleError(writer http.ResponseWriter, h *http.Request) {}
+
+func (b *BaseTykResponseHandler) setLogger(logger *logrus.Entry) {
+	b.log = logger
+}
+
+func (b *BaseTykResponseHandler) logger() *logrus.Entry {
+	if b.log == nil {
+		return logrus.NewEntry(log)
+	}
+	return b.log
+}
