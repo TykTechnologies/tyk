@@ -59,6 +59,7 @@ type traceLogEntry struct {
 	Mw      string       `json:"mw,omitempty"`
 	OrgId   string       `json:"org_id,omitempty"`
 	Ts      *time.Time   `json:"time,omitempty"`
+	Code    int          `json:"code,omitempty"`
 	Type    traceLogType `json:"type"`
 }
 
@@ -123,8 +124,6 @@ func (tr *traceRequest) toRequest(
 	for key, values := range tr.Request.Headers {
 		addCustomHeader(r.Header, key, values, ignoreCanonicalMIMEHeaderKey)
 	}
-
-	ctxSetTrace(r)
 
 	return r, nil
 }
@@ -218,7 +217,7 @@ func (gw *Gateway) traceHandler(w http.ResponseWriter, r *http.Request) {
 		logrus.NewEntry(logger),
 		WithQuotaKey(spec.Checksum),
 	)
-	gw.generateSubRoutes(spec, subrouter, logrus.NewEntry(logger))
+	gw.generateSubRoutes(spec, subrouter)
 
 	if chainObj.ThisHandler == nil {
 		doJSONWrite(w, http.StatusBadRequest, traceResponse{Message: "error", Logs: logStorage.String()})
@@ -232,7 +231,6 @@ func (gw *Gateway) traceHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	spec.SetupOperation(tr)
 	nopCloseRequestBody(tr)
 	chainObj.ThisHandler.ServeHTTP(wr, tr)
 
