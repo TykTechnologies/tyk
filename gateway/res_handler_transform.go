@@ -118,6 +118,12 @@ func (r *ResponseTransformMiddleware) HandleResponse(rw http.ResponseWriter, res
 	body, _ := ioutil.ReadAll(respBody)
 	defer respBody.Close()
 
+	// Check for error overrides
+	body, overrideApplied := r.handleErrorOverrides(res, body, tmeta)
+	if overrideApplied {
+		return nil
+	}
+
 	// Put into an interface:
 	bodyData := make(map[string]interface{})
 	switch tmeta.TemplateData.Input {
@@ -185,4 +191,43 @@ func (r *ResponseTransformMiddleware) HandleResponse(rw http.ResponseWriter, res
 	res.Body = ioutil.NopCloser(&bodyBuffer)
 
 	return nil
+}
+
+func (r *ResponseTransformMiddleware) handleErrorOverrides(res *http.Response, body []byte, tmeta *TransformSpec) ([]byte, bool) {
+	// Only process error responses
+	if res.StatusCode < 400 || tmeta.ErrorsOverride == nil {
+		return body, false
+	}
+
+	var errorResp struct {
+		Error string `json:"error"`
+	}
+
+	if err := json.Unmarshal(body, &errorResp); err != nil || errorResp.Error == "" {
+		return body, false
+	}
+
+	// Check if we have an override for this error message
+	for errType, override := range tmeta.ErrorsOverride {
+		if TykErrors[errType].Message == errorResp.Error {
+			// Apply the override
+			errorResp.Error = override.Message
+			newBody, _ := json.Marshal(errorResp)
+
+			// Update status code if specified
+			if override.Code != 0 {
+				res.StatusCode = override.Code
+				res.Status = http.StatusText(override.Code)
+			}
+
+			// Update response body
+			res.ContentLength = int64(len(newBody))
+			res.Header.Set("Content-Length", strconv.Itoa(len(newBody)))
+			res.Body = io.NopCloser(bytes.NewReader(newBody))
+
+			return newBody, true
+		}
+	}
+
+	return body, false
 }

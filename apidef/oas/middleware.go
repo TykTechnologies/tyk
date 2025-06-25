@@ -1135,6 +1135,8 @@ type TransformBody struct {
 	//
 	// Tyk classic API definition: `version_data.versions..extended_paths.transform[].template_data.template_source` when `template_data.template_mode` is `blob`.
 	Body string `bson:"body,omitempty" json:"body,omitempty"`
+
+	ErrorsOverride map[string]apidef.ErrorOverride `bson:"errors_override,omitempty" json:"errors_override,omitempty"`
 }
 
 // Fill fills *TransformBody from apidef.TemplateMeta.
@@ -1145,6 +1147,14 @@ func (tr *TransformBody) Fill(meta apidef.TemplateMeta) {
 		tr.Body = meta.TemplateData.TemplateSource
 	} else {
 		tr.Path = meta.TemplateData.TemplateSource
+	}
+
+	// Fill errors override if present
+	if meta.TemplateData.ErrorsOverride != nil {
+		tr.ErrorsOverride = make(map[string]apidef.ErrorOverride)
+		for k, v := range meta.TemplateData.ErrorsOverride {
+			tr.ErrorsOverride[k] = v
+		}
 	}
 }
 
@@ -1159,6 +1169,14 @@ func (tr *TransformBody) ExtractTo(meta *apidef.TemplateMeta) {
 	} else {
 		meta.TemplateData.Mode = apidef.UseFile
 		meta.TemplateData.TemplateSource = tr.Path
+	}
+
+	// Extract errors override if present
+	if tr.ErrorsOverride != nil {
+		meta.TemplateData.ErrorsOverride = make(map[string]apidef.ErrorOverride)
+		for k, v := range tr.ErrorsOverride {
+			meta.TemplateData.ErrorsOverride[k] = v
+		}
 	}
 }
 

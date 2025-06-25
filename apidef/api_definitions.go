@@ -185,18 +185,26 @@ type CacheMeta struct {
 
 type RequestInputType string
 
+// ErrorOverride defines a custom error message and status code
+type ErrorOverride struct {
+	Message string `bson:"message" json:"message"`
+	Code    int    `bson:"code" json:"code"`
+}
+
 type TemplateData struct {
-	Input          RequestInputType `bson:"input_type" json:"input_type"`
-	Mode           SourceMode       `bson:"template_mode" json:"template_mode"`
-	EnableSession  bool             `bson:"enable_session" json:"enable_session"`
-	TemplateSource string           `bson:"template_source" json:"template_source"`
+	Input          RequestInputType         `bson:"input_type" json:"input_type"`
+	Mode           SourceMode               `bson:"template_mode" json:"template_mode"`
+	EnableSession  bool                     `bson:"enable_session" json:"enable_session"`
+	TemplateSource string                   `bson:"template_source" json:"template_source"`
+	ErrorsOverride map[string]ErrorOverride `bson:"errors_override,omitempty" json:"errors_override,omitempty"`
 }
 
 type TemplateMeta struct {
-	Disabled     bool         `bson:"disabled" json:"disabled"`
-	TemplateData TemplateData `bson:"template_data" json:"template_data"`
-	Path         string       `bson:"path" json:"path"`
-	Method       string       `bson:"method" json:"method"`
+	Disabled       bool                     `bson:"disabled" json:"disabled"`
+	TemplateData   TemplateData             `bson:"template_data" json:"template_data"`
+	Path           string                   `bson:"path" json:"path"`
+	Method         string                   `bson:"method" json:"method"`
+	ErrorsOverride map[string]ErrorOverride `bson:"errors_override,omitempty" json:"errors_override,omitempty"`
 }
 
 type TransformJQMeta struct {
