@@ -229,6 +229,8 @@ github.com/fsnotify/fsnotify v1.7.0 h1:8JEhPFa5W2WU7YfeZzPNqzMP6Lwt7L2715Ggo0nos
 github.com/fsnotify/fsnotify v1.7.0/go.mod h1:40Bi/Hjc2AVfZrqy+aj+yEI+/bRxZnMJyTJwOpGvigM=
 github.com/gemnasium/logrus-graylog-hook v2.0.7+incompatible h1:lgnKqRfXdYPljf5yj0SOYSH+i29U8E3KKzdOIWsHZno=
 github.com/gemnasium/logrus-graylog-hook v2.0.7+incompatible/go.mod h1:85jwR23cg8rapnMQj96B9pX4XzmkXMNAPVfnnUNP8Dk=
+github.com/getkin/kin-openapi v0.132.0 h1:3ISeLMsQzcb5v26yeJrBcdTCEQTag36ZjaGk7MIRUwk=
+github.com/getkin/kin-openapi v0.132.0/go.mod h1:3OlG51PCYNsPByuiMB0t4fjnNlIDnaEDsjiKUV8nL58=
 github.com/getsentry/raven-go v0.2.0 h1:no+xWJRb5ZI7eE8TWgIq1jLulQiIoLG0IfYxv5JYMGs=
 github.com/getsentry/raven-go v0.2.0/go.mod h1:KungGk8q33+aIAZUIVWZDr2OfAEBsO49PX4NzFV5kcQ=
 github.com/go-faker/faker/v4 v4.3.0 h1:UXOW7kn/Mwd0u6MR30JjUKVzguT20EB/hBOddAAO+DY=
@@ -546,13 +548,8 @@ github.com/mavricknz/asn1-ber v0.0.0-20151103223136-b9df1c2f4213 h1:3DongGRjJZvI
 github.com/mavricknz/asn1-ber v0.0.0-20151103223136-b9df1c2f4213/go.mod h1:v/ZufymxjcI3pnNmQIUQQKxnHLTblrjZ4MNLs5DrZ1o=
 github.com/mavricknz/ldap v0.0.0-20160227184754-f5a958005e43 h1:x4SDcUPDTMzuFEdWe5lTznj1echpsd0ApTkZOdwtm7g=
 github.com/mavricknz/ldap v0.0.0-20160227184754-f5a958005e43/go.mod h1:z76yvVwVulPd8FyifHe8UEHeud6XXaSan0ibi2sDy6w=
-<<<<<<< HEAD
-=======
 github.com/mccutchen/go-httpbin/v2 v2.18.2 h1:UU5rd5ohZFX7ZyuTwINL4EBnParq0nM2JoJIVjA6hGQ=
 github.com/mccutchen/go-httpbin/v2 v2.18.2/go.mod h1:GBy5I7XwZ4ZLhT3hcq39I4ikwN9x4QUt6EAxNiR8Jus=
-github.com/mdelapenya/tlscert v0.1.0 h1:YTpF579PYUX475eOL+6zyEO3ngLTOUWck78NBuJVXaM=
-github.com/mdelapenya/tlscert v0.1.0/go.mod h1:wrbyM/DwbFCeCeqdPX/8c6hNOqQgbf0rUDErE1uD+64=
->>>>>>> b3f4e4d2b... [TT-14914] No response middleware information in Tyk OAS API Debugger (#7113)
 github.com/microcosm-cc/bluemonday v1.0.27 h1:MpEUotklkwCSLeH+Qdx1VJgNqLlpY2KXwXFM08ygZfk=
 github.com/microcosm-cc/bluemonday v1.0.27/go.mod h1:jFi9vgW+H7c3V0lb6nR74Ib/DIB5OBs92Dimizgw2cA=
 github.com/miekg/dns v1.1.26/go.mod h1:bPDLeHnStXmXAq1m/Ch/hvfNHr14JKNPMBo3VZKjuso=
