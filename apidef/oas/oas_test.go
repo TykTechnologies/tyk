@@ -710,6 +710,7 @@ func TestOAS_MarshalJSON(t *testing.T) {
 					},
 				},
 			},
+			false,
 		}
 
 		t.Run("int", func(t *testing.T) {

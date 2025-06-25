@@ -2,6 +2,7 @@ package reflect_test
 
 import (
 	"encoding/json"
+	"github.com/stretchr/testify/assert"
 	"testing"
 
 	"github.com/TykTechnologies/tyk/internal/reflect"
@@ -55,5 +56,50 @@ func BenchmarkJSONClone(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		_ = cloneJSON(sample)
+	}
+}
+
+func ptr[T any](val T) *T {
+	return &val
+}
+
+func TestReflectClone(t *testing.T) {
+	type dummyStruct struct {
+		ptr           *string
+		sliceOfPtr    []*string
+		mapOfPtrOfPtr map[string]*int
+	}
+
+	base := &dummyStruct{
+		ptr: ptr("ptr"),
+		sliceOfPtr: []*string{
+			ptr("a"),
+			ptr("b"),
+			ptr("c"),
+		},
+		mapOfPtrOfPtr: map[string]*int{
+			"one": ptr(1),
+			"two": ptr(2),
+		},
+	}
+
+	clone := reflect.Clone(base)
+
+	assert.Equal(t, base, clone)
+	assert.Equal(t, len(base.sliceOfPtr), len(clone.sliceOfPtr))
+	assert.Equal(t, len(base.mapOfPtrOfPtr), len(clone.mapOfPtrOfPtr))
+
+	assert.NotSame(t, base.ptr, clone.ptr)
+
+	for i := 0; i < len(base.sliceOfPtr); i++ {
+		assert.Equal(t, base.sliceOfPtr[i], clone.sliceOfPtr[i])
+		assert.NotSame(t, base.sliceOfPtr[i], clone.sliceOfPtr[i])
+	}
+
+	for key := range base.mapOfPtrOfPtr {
+		var eBase = base.mapOfPtrOfPtr[key]
+		var eClone = clone.mapOfPtrOfPtr[key]
+		assert.Equal(t, eBase, eClone)
+		assert.NotSame(t, eBase, eClone)
 	}
 }

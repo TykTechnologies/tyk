@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/TykTechnologies/tyk/internal/pathnormalizer"
 	"strings"
 
 	"github.com/TykTechnologies/tyk/apidef"
@@ -30,6 +31,7 @@ const (
 // OAS holds the upstream OAS definition as well as adds functionality like custom JSON marshalling.
 type OAS struct {
 	openapi3.T
+	normalized bool
 }
 
 // MarshalJSON implements json.Marshaller.
@@ -93,6 +95,7 @@ func (s *OAS) Fill(api apidef.APIDefinition) {
 
 // ExtractTo extracts *OAS into *apidef.APIDefinition.
 func (s *OAS) ExtractTo(api *apidef.APIDefinition) {
+	// todo: modify signature
 	if s.GetTykExtension() == nil {
 		s.SetTykExtension(&XTykAPIGateway{})
 		defer func() {
@@ -435,10 +438,25 @@ func (s *OAS) ReplaceServers(apiURLs, oldAPIURLs []string) {
 // Validate validates OAS document by calling openapi3.T.Validate() function. In addition, it validates Security
 // Requirement section and it's requirements by calling OAS.validateSecurity() function.
 func (s *OAS) Validate(ctx context.Context, opts ...openapi3.ValidationOption) error {
-	validationErr := s.T.Validate(ctx, opts...)
-	securityErr := s.validateSecurity()
+	normalized, err := s.newNormalized()
 
-	return errors.Join(validationErr, securityErr)
+	if err != nil {
+		return err
+	}
+
+	if err = normalized.T.Validate(ctx, opts...); err != nil {
+
+		log.
+			WithError(err).
+			WithField("origin", *s).
+			WithField("normalized", *normalized).
+			Errorf("failed to validate OAS")
+
+		return err
+	}
+
+	// todo: replace as it was (join errors)
+	return normalized.validateSecurity()
 }
 
 // validateSecurity verifies that existing Security Requirement Objects has Security Schemes declared in the Security
@@ -535,6 +553,34 @@ func (s *OAS) setRequiredFields(name string, versionName string) {
 	s.Info = &openapi3.Info{
 		Title:   name,
 		Version: versionName,
+	}
+}
+
+// Normalize normalizes path to acceptable form by openapi.
+// If API has named RegExp it will be converted to accepted form of api by OAS.
+func (s *OAS) Normalize() error {
+	if clone, err := s.newNormalized(); err != nil {
+		return err
+	} else {
+		*s = *clone
+		return nil
+	}
+}
+
+func (s *OAS) newNormalized() (*OAS, error) {
+	clone := reflect.Clone(s)
+	clone.normalized = true
+
+	// normalize only once
+	if s.normalized {
+		return clone, nil
+	}
+
+	if newPath, err := pathnormalizer.Normalize(clone.Paths); err != nil {
+		return nil, err
+	} else {
+		clone.Paths = newPath
+		return clone, nil
 	}
 }
 

@@ -3,6 +3,7 @@ package oas
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/TykTechnologies/tyk/internal/pathnormalizer"
 	"net/http"
 	"sort"
 	"strconv"
@@ -166,7 +167,8 @@ func (s *OAS) fillPathsAndOperations(ep apidef.ExtendedPathsSet) {
 	s.fillDoNotTrackEndpoint(ep.DoNotTrackEndpoints)
 	s.fillRequestSizeLimit(ep.SizeLimit)
 	s.fillRateLimitEndpoints(ep.RateLimit)
-	s.fillMockResponsePaths(s.Paths, ep)
+	//s.fillMockResponsePaths(s.Paths, ep)
+
 }
 
 // fillMockResponsePaths converts classic API mock responses to OAS format.
@@ -184,6 +186,7 @@ func (s *OAS) fillPathsAndOperations(ep apidef.ExtendedPathsSet) {
 // - Attempting to parse the body as JSON
 // - Defaulting to text/plain if neither above applies
 func (s *OAS) fillMockResponsePaths(paths *openapi3.Paths, ep apidef.ExtendedPathsSet) {
+	//
 	for _, mock := range ep.MockResponse {
 		operationID := s.getOperationID(mock.Path, mock.Method)
 
@@ -244,7 +247,19 @@ func (s *OAS) extractPathsAndOperations(ep *apidef.ExtendedPathsSet) {
 		return
 	}
 
-	for _, pathItem := range oasutil.SortByPathLength(*s.Paths) {
+	paths, err := pathnormalizer.Normalize(s.Paths)
+
+	if err != nil {
+		panic(err) // todo: replace by error move
+	}
+
+	if serialized, e := json.Marshal(paths); e == nil {
+		log.WithField("paths", string(serialized)).Debug("serialized paths")
+	} else {
+		log.WithError(e).Warn("Failed to normalize paths.")
+	}
+
+	for _, pathItem := range oasutil.SortByPathLength(*paths) {
 		for id, tykOp := range tykOperations {
 			path := pathItem.Path
 			for method, operation := range pathItem.Operations() {
@@ -268,6 +283,7 @@ func (s *OAS) extractPathsAndOperations(ep *apidef.ExtendedPathsSet) {
 					tykOp.extractDoNotTrackEndpointTo(ep, path, method)
 					tykOp.extractRequestSizeLimitTo(ep, path, method)
 					tykOp.extractRateLimitEndpointTo(ep, path, method)
+					tykOp.extractMockResponsePaths(ep, path, method)
 					break
 				}
 			}
@@ -543,15 +559,6 @@ func (o *Operation) extractRequestSizeLimitTo(ep *apidef.ExtendedPathsSet, path 
 	ep.SizeLimit = append(ep.SizeLimit, meta)
 }
 
-// detect possible regex pattern:
-// - character match ([a-z])
-// - greedy match (.*)
-// - ungreedy match (.+)
-// - end of string ($).
-var regexPatterns = []string{
-	".+", ".*", "[", "]", "$",
-}
-
 type pathPart struct {
 	name    string
 	value   string
@@ -564,16 +571,6 @@ func (p pathPart) String() string {
 	}
 
 	return p.value
-}
-
-// isRegex checks if value has expected regular expression patterns.
-func isRegex(value string) bool {
-	for _, pattern := range regexPatterns {
-		if strings.Contains(value, pattern) {
-			return true
-		}
-	}
-	return false
 }
 
 // splitPath splits URL into folder parts, detecting regex patterns.
@@ -615,83 +612,45 @@ func buildPath(parts []pathPart, appendSlash bool) string {
 	return newPath
 }
 
+func (s *OAS) getOrCreatePathItem(item string) *openapi3.PathItem {
+	if s.Paths.Value(item) == nil {
+		s.Paths.Set(item, &openapi3.PathItem{})
+	}
+
+	return s.Paths.Value(item)
+}
+
+func createOrUpdateOperation(
+	pathItem *openapi3.PathItem,
+	method, operationID string,
+) *openapi3.Operation {
+
+	operation := pathItem.GetOperation(method)
+
+	if operation == nil {
+		operation = &openapi3.Operation{
+			Responses: openapi3.NewResponses(),
+		}
+
+		pathItem.SetOperation(method, operation)
+	}
+
+	if operation.OperationID == "" {
+		operation.OperationID = operationID
+	}
+
+	return operation
+}
+
+// todo: OperationId => ValueObject
+func makeOperationId(inPath, method string) string {
+	return strings.TrimPrefix(inPath, "/") + strings.ToUpper(method)
+}
+
+// getOperationID side effect method.
+// Deprecated cause of side effects.
 func (s *OAS) getOperationID(inPath, method string) string {
-	operationID := strings.TrimPrefix(inPath, "/") + method
-
-	createOrGetPathItem := func(item string) *openapi3.PathItem {
-		if s.Paths.Value(item) == nil {
-			s.Paths.Set(item, &openapi3.PathItem{})
-		}
-
-		return s.Paths.Value(item)
-	}
-
-	createOrUpdateOperation := func(p *openapi3.PathItem) *openapi3.Operation {
-		operation := p.GetOperation(method)
-
-		if operation == nil {
-			operation = &openapi3.Operation{
-				Responses: openapi3.NewResponses(),
-			}
-
-			p.SetOperation(method, operation)
-		}
-
-		if operation.OperationID == "" {
-			operation.OperationID = operationID
-		}
-
-		return operation
-	}
-
-	var p *openapi3.PathItem
-	parts, hasRegex := splitPath(inPath)
-
-	if hasRegex {
-		newPath := buildPath(parts, strings.HasSuffix(inPath, "/"))
-
-		p = createOrGetPathItem(newPath)
-
-		// We should check if the parameters are already set before initializing it.
-		if p.Parameters == nil {
-			p.Parameters = []*openapi3.ParameterRef{}
-		}
-
-		existingParams := make(map[string]bool)
-		for _, existingParam := range p.Parameters {
-			existingParams[existingParam.Value.Name] = true
-		}
-
-		for _, part := range parts {
-			// Skip adding the parameter if it already exists so that we don't override it.
-			if existingParams[part.name] {
-				continue
-			}
-
-			if part.isRegex {
-				schema := &openapi3.SchemaRef{
-					Value: &openapi3.Schema{
-						Type:    &openapi3.Types{openapi3.TypeString},
-						Pattern: part.value,
-					},
-				}
-				param := &openapi3.ParameterRef{
-					Value: &openapi3.Parameter{
-						Name:     part.name,
-						In:       "path",
-						Required: true,
-						Schema:   schema,
-					},
-				}
-				p.Parameters = append(p.Parameters, param)
-			}
-		}
-	} else {
-		p = createOrGetPathItem(inPath)
-	}
-
-	operation := createOrUpdateOperation(p)
-	return operation.OperationID
+	return createOrUpdateOperation(s.getOrCreatePathItem(inPath), method, makeOperationId(inPath, method)).OperationID
 }
 
 func (x *XTykAPIGateway) getOperation(operationID string) *Operation {
@@ -982,6 +941,35 @@ func (o *Operation) extractCircuitBreakerTo(ep *apidef.ExtendedPathsSet, path st
 	ep.CircuitBreaker = append(ep.CircuitBreaker, meta)
 }
 
+func (o *Operation) extractMockResponsePaths(
+	ep *apidef.ExtendedPathsSet,
+	path string,
+	method string,
+) {
+
+	if o.MockResponse == nil {
+		return
+	}
+
+	statusCode := o.MockResponse.Code
+
+	if statusCode <= 0 {
+		statusCode = http.StatusOK
+	}
+
+	mr := apidef.MockResponseMeta{
+		Disabled:   false,
+		Path:       path,
+		Method:     method,
+		IgnoreCase: false,
+		Code:       statusCode,
+		Body:       o.MockResponse.Body,
+		Headers:    o.MockResponse.Headers.Map(),
+	}
+
+	ep.MockResponse = append(ep.MockResponse, mr)
+}
+
 func (s *OAS) fillCircuitBreaker(metas []apidef.CircuitBreakerMeta) {
 	for _, meta := range metas {
 		operationID := s.getOperationID(meta.Path, meta.Method)
@@ -995,36 +983,6 @@ func (s *OAS) fillCircuitBreaker(metas []apidef.CircuitBreakerMeta) {
 			operation.CircuitBreaker = nil
 		}
 	}
-}
-
-// detectMockResponseContentType determines the Content-Type of the mock response.
-// It first checks the headers for an explicit Content-Type, then attempts to detect
-// the type from the body content. Returns "text/plain" if no specific type can be determined.
-func detectMockResponseContentType(mock apidef.MockResponseMeta) string {
-	const headerContentType = "Content-Type"
-
-	for name, value := range mock.Headers {
-		if http.CanonicalHeaderKey(name) == headerContentType {
-			return value
-		}
-	}
-
-	if mock.Body == "" {
-		return "text/plain"
-	}
-
-	// We attempt to guess the content type by checking if the body is a valid JSON.
-	var arrayValue = []json.RawMessage{}
-	if err := json.Unmarshal([]byte(mock.Body), &arrayValue); err == nil {
-		return "application/json"
-	}
-
-	var objectValue = map[string]json.RawMessage{}
-	if err := json.Unmarshal([]byte(mock.Body), &objectValue); err == nil {
-		return "application/json"
-	}
-
-	return "text/plain"
 }
 
 // sortMockResponseAllowList sorts the mock response paths by path, method, and response code.
@@ -1091,6 +1049,7 @@ func parseMuxTemplate(segment string, regexCount int) (pathPart, int, bool) {
 }
 
 func isIdentifier(value string) bool {
-	matched, _ := regexp.MatchString(`^[a-zA-Z0-9._-]+$`, value) //nolint
-	return matched
+	return identifierRe.MatchString(value)
 }
+
+var identifierRe = regexp.MustCompile(`^[a-zA-Z0-9._-]+$`)
