@@ -2631,17 +2631,18 @@ func TestGetSecretFromMultipleJWKURIs(t *testing.T) {
 
 	tests := []struct {
 		name                string
-		setup               func()
+		setup               func(isOas bool)
 		jwkURIs             []apidef.JWK
 		jwkURI              apidef.JWK
 		kid                 interface{}
 		expectKey           interface{}
 		expectError         error
 		useGetSecretFromURL bool
+		isOas               bool
 	}{
 		{
 			name: "success with valid JWK URL and matching KID",
-			setup: func() {
+			setup: func(isOas bool) {
 				GetJWK = func(_ string, _ bool) (*jose.JSONWebKeySet, error) {
 					return &jose.JSONWebKeySet{
 						Keys: []jose.JSONWebKey{
@@ -2649,23 +2650,31 @@ func TestGetSecretFromMultipleJWKURIs(t *testing.T) {
 						},
 					}, nil
 				}
+
+				api.IsOAS = isOas
 			},
 			jwkURIs:     []apidef.JWK{{URL: testJWKURL}},
 			kid:         "test-kid",
 			expectKey:   "secret-key",
 			expectError: nil,
+			isOas:       true,
 		},
 		{
-			name:        "error when KID is not a string",
-			setup:       func() {},
+			name: "error when KID is not a string",
+			setup: func(isOas bool) {
+				api.IsOAS = isOas
+			},
 			jwkURIs:     []apidef.JWK{{URL: testJWKURL}},
 			kid:         12345,
 			expectKey:   nil,
 			expectError: ErrKIDNotAString,
+			isOas:       true,
 		},
 		{
 			name: "cache hit with unchanged URLs",
-			setup: func() {
+			setup: func(isOas bool) {
+				api.IsOAS = isOas
+
 				GetJWK = func(_ string, _ bool) (*jose.JSONWebKeySet, error) {
 					return &jose.JSONWebKeySet{
 						Keys: []jose.JSONWebKey{
@@ -2689,10 +2698,13 @@ func TestGetSecretFromMultipleJWKURIs(t *testing.T) {
 			kid:         "cached-kid",
 			expectKey:   "cached-key",
 			expectError: nil,
+			isOas:       true,
 		},
 		{
 			name: "invalid JWK cache format triggers refetch",
-			setup: func() {
+			setup: func(isOas bool) {
+				api.IsOAS = isOas
+
 				GetJWK = func(_ string, _ bool) (*jose.JSONWebKeySet, error) {
 					return &jose.JSONWebKeySet{
 						Keys: []jose.JSONWebKey{
@@ -2710,10 +2722,13 @@ func TestGetSecretFromMultipleJWKURIs(t *testing.T) {
 			kid:         "fresh-kid",
 			expectKey:   "fresh-key",
 			expectError: nil,
+			isOas:       true,
 		},
 		{
 			name: "JWK URLs changed triggers refetch",
-			setup: func() {
+			setup: func(isOas bool) {
+				api.IsOAS = isOas
+
 				GetJWK = func(_ string, _ bool) (*jose.JSONWebKeySet, error) {
 					return &jose.JSONWebKeySet{
 						Keys: []jose.JSONWebKey{
@@ -2739,10 +2754,13 @@ func TestGetSecretFromMultipleJWKURIs(t *testing.T) {
 			kid:         "new-kid",
 			expectKey:   "new-key",
 			expectError: nil,
+			isOas:       true,
 		},
 		{
 			name: "error fetching jwks",
-			setup: func() {
+			setup: func(isOas bool) {
+				api.IsOAS = isOas
+
 				GetJWK = func(_ string, _ bool) (*jose.JSONWebKeySet, error) {
 					return nil, errors.New("failed to fetch JWK")
 				}
@@ -2751,10 +2769,13 @@ func TestGetSecretFromMultipleJWKURIs(t *testing.T) {
 			kid:         "any-kid",
 			expectKey:   nil,
 			expectError: errors.New("no matching KID found in any JWKs or fallback"),
+			isOas:       true,
 		},
 		{
 			name: "Cached API definition is different from expected",
-			setup: func() {
+			setup: func(isOas bool) {
+				api.IsOAS = isOas
+
 				GetJWK = func(_ string, _ bool) (*jose.JSONWebKeySet, error) {
 					return nil, errors.New("failed to fetch JWK")
 				}
@@ -2772,10 +2793,13 @@ func TestGetSecretFromMultipleJWKURIs(t *testing.T) {
 			kid:         "new-kid",
 			expectKey:   nil,
 			expectError: errors.New("no matching KID found in any JWKs or fallback"),
+			isOas:       true,
 		},
 		{
 			name: "Test getSecretFromURL using getSecretFromMultipleJWKURIs data",
-			setup: func() {
+			setup: func(isOas bool) {
+				api.IsOAS = isOas
+
 				GetJWK = func(_ string, _ bool) (*jose.JSONWebKeySet, error) {
 					return nil, errors.New("failed to fetch JWK")
 				}
@@ -2792,6 +2816,31 @@ func TestGetSecretFromMultipleJWKURIs(t *testing.T) {
 			expectKey:           nil,
 			expectError:         errors.New("failed to fetch JWK"),
 			useGetSecretFromURL: true,
+			isOas:               true,
+		},
+		{
+			name: "ensure jwksURIs faeature works only with OAS",
+			setup: func(isOas bool) {
+				api.IsOAS = isOas
+
+				GetJWK = func(_ string, _ bool) (*jose.JSONWebKeySet, error) {
+					return &jose.JSONWebKeySet{
+						Keys: []jose.JSONWebKey{
+							{KeyID: "fresh-kid", Key: "fresh-key"},
+						},
+					}, nil
+				}
+				JWKCache.Set(testAPIID, "invalid-format", cache.DefaultExpiration)
+				JWKCache.Set(cacheKey, &apidef.APIDefinition{
+					APIID:       testAPIID,
+					JWTJwksURIs: []apidef.JWK{{URL: testJWKURL}},
+				}, cache.DefaultExpiration)
+			},
+			jwkURIs:     []apidef.JWK{{URL: testJWKURL}},
+			kid:         "fresh-kid",
+			expectKey:   nil,
+			expectError: errors.New("this feature is only available when using OAS API"),
+			isOas:       false,
 		},
 	}
 
@@ -2800,7 +2849,7 @@ func TestGetSecretFromMultipleJWKURIs(t *testing.T) {
 			JWKCache.Flush()
 
 			if tt.setup != nil {
-				tt.setup()
+				tt.setup(tt.isOas)
 			}
 
 			mw := createMiddleware(tt.jwkURIs)
