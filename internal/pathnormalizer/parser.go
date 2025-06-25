@@ -17,7 +17,8 @@ const (
 	muxIdPatternSeparator = ':'
 
 	// RePrefix default regexp prefix.
-	RePrefix = "customRegex"
+	RePrefix            = "customRegex"
+	DefaultNonDefinedRe = "[^/]+"
 )
 
 var (
@@ -120,7 +121,7 @@ func (p *pathParser) parse() ([]pathPart, error) {
 		case ch == curlyBraceLeft:
 			part, err = p.parseMuxRe()
 		default:
-			if id, ok := p.consumeIdentifier(); ok {
+			if id, ok := p.consumeStaticPart(); ok {
 				part = newPathPartRaw(id)
 				break
 			}
@@ -180,7 +181,7 @@ func (p *pathParser) parseMuxRe() (pathPart, error) {
 	paramName, idParsedOk, isFinished := p.consumeMuxIdentifier()
 
 	if isFinished {
-		return p.newPathPartRe(paramName, ".*")
+		return p.newPathPartRe(paramName, DefaultNonDefinedRe)
 	}
 
 	start := p.pos
@@ -230,7 +231,12 @@ func (p *pathParser) parseError(err error) parseError {
 }
 
 func (p *pathParser) parseAnonymousRe() (pathPart, error) {
-	var zero pathPart
+	paramName, idParsedOk, isFinished := p.consumeMuxIdentifier()
+
+	if isFinished {
+		return pathPart{}, p.parseError(ErrUnreachableCase)
+	}
+
 	start := p.pos
 	braceCtr := 0
 
@@ -251,11 +257,15 @@ loop:
 	}
 
 	if braceCtr != 0 {
-		return zero, p.parseError(ErrUnexpectedSlash)
+		return pathPart{}, p.parseError(ErrUnexpectedSlash)
+	}
+
+	if !idParsedOk {
+		paramName = p.newAnonymousName()
 	}
 
 	return p.newPathPartRe(
-		p.newAnonymousName(),
+		paramName,
 		p.src[start:p.pos],
 	)
 }
@@ -274,7 +284,7 @@ func (p *pathParser) consumeOne(ch byte) bool {
 	return false
 }
 
-func (p *pathParser) consumeIdentifier() (string, bool) {
+func (p *pathParser) consumeStaticPart() (string, bool) {
 	var b []byte
 	var pos = p.pos
 

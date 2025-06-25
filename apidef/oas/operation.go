@@ -3,6 +3,7 @@ package oas
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/TykTechnologies/tyk/internal/pathnormalizer"
 	"net/http"
 	"sort"
 	"strconv"
@@ -166,7 +167,8 @@ func (s *OAS) fillPathsAndOperations(ep apidef.ExtendedPathsSet) {
 	s.fillDoNotTrackEndpoint(ep.DoNotTrackEndpoints)
 	s.fillRequestSizeLimit(ep.SizeLimit)
 	s.fillRateLimitEndpoints(ep.RateLimit)
-	s.fillMockResponsePaths(s.Paths, ep)
+	//s.fillMockResponsePaths(s.Paths, ep)
+
 }
 
 // fillMockResponsePaths converts classic API mock responses to OAS format.
@@ -184,6 +186,7 @@ func (s *OAS) fillPathsAndOperations(ep apidef.ExtendedPathsSet) {
 // - Attempting to parse the body as JSON
 // - Defaulting to text/plain if neither above applies
 func (s *OAS) fillMockResponsePaths(paths *openapi3.Paths, ep apidef.ExtendedPathsSet) {
+	//
 	for _, mock := range ep.MockResponse {
 		operationID := s.getOperationID(mock.Path, mock.Method)
 
@@ -244,7 +247,19 @@ func (s *OAS) extractPathsAndOperations(ep *apidef.ExtendedPathsSet) {
 		return
 	}
 
-	for _, pathItem := range oasutil.SortByPathLength(*s.Paths) {
+	paths, err := pathnormalizer.Normalize(s.Paths)
+
+	if err != nil {
+		panic(err) // todo: replace by error move
+	}
+
+	if serialized, e := json.Marshal(paths); e == nil {
+		log.WithField("paths", string(serialized)).Debug("serialized paths")
+	} else {
+		log.WithError(e).Warn("Failed to normalize paths.")
+	}
+
+	for _, pathItem := range oasutil.SortByPathLength(*paths) {
 		for id, tykOp := range tykOperations {
 			path := pathItem.Path
 			for method, operation := range pathItem.Operations() {
@@ -268,6 +283,7 @@ func (s *OAS) extractPathsAndOperations(ep *apidef.ExtendedPathsSet) {
 					tykOp.extractDoNotTrackEndpointTo(ep, path, method)
 					tykOp.extractRequestSizeLimitTo(ep, path, method)
 					tykOp.extractRateLimitEndpointTo(ep, path, method)
+					tykOp.extractMockResponsePaths(ep, path, method)
 					break
 				}
 			}
@@ -634,39 +650,7 @@ func makeOperationId(inPath, method string) string {
 // getOperationID side effect method.
 // Deprecated cause of side effects.
 func (s *OAS) getOperationID(inPath, method string) string {
-	var p *openapi3.PathItem
-	parts, hasRegex := splitPath(inPath)
-
-	if hasRegex {
-		newPath := buildPath(parts, strings.HasSuffix(inPath, "/"))
-		p = s.getOrCreatePathItem(newPath)
-
-		existingParams := make(map[string]bool)
-		for _, existingParam := range p.Parameters {
-			existingParams[existingParam.Value.Name] = true
-		}
-
-		for _, part := range parts {
-			// Skip adding the parameter if it already exists so that we don't override it.
-			if existingParams[part.name] {
-				continue
-			}
-
-			if part.isRegex {
-				param := openapi3.
-					NewPathParameter(part.name).
-					WithSchema(openapi3.NewStringSchema().WithPattern(part.value))
-
-				p.Parameters = append(p.Parameters, &openapi3.ParameterRef{Value: param})
-			}
-		}
-	} else {
-		p = s.getOrCreatePathItem(inPath)
-	}
-
-	operation := createOrUpdateOperation(p, method, makeOperationId(inPath, method))
-
-	return operation.OperationID
+	return createOrUpdateOperation(s.getOrCreatePathItem(inPath), method, makeOperationId(inPath, method)).OperationID
 }
 
 func (x *XTykAPIGateway) getOperation(operationID string) *Operation {
@@ -955,6 +939,35 @@ func (o *Operation) extractCircuitBreakerTo(ep *apidef.ExtendedPathsSet, path st
 	meta := apidef.CircuitBreakerMeta{Path: path, Method: method}
 	o.CircuitBreaker.ExtractTo(&meta)
 	ep.CircuitBreaker = append(ep.CircuitBreaker, meta)
+}
+
+func (o *Operation) extractMockResponsePaths(
+	ep *apidef.ExtendedPathsSet,
+	path string,
+	method string,
+) {
+
+	if o.MockResponse == nil {
+		return
+	}
+
+	statusCode := o.MockResponse.Code
+
+	if statusCode <= 0 {
+		statusCode = http.StatusOK
+	}
+
+	mr := apidef.MockResponseMeta{
+		Disabled:   false,
+		Path:       path,
+		Method:     method,
+		IgnoreCase: false,
+		Code:       statusCode,
+		Body:       o.MockResponse.Body,
+		Headers:    o.MockResponse.Headers.Map(),
+	}
+
+	ep.MockResponse = append(ep.MockResponse, mr)
 }
 
 func (s *OAS) fillCircuitBreaker(metas []apidef.CircuitBreakerMeta) {

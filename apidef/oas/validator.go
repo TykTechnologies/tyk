@@ -4,6 +4,7 @@ import (
 	"embed"
 	"errors"
 	"fmt"
+	"github.com/getkin/kin-openapi/openapi3"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -232,4 +233,20 @@ func getMinorVersion(version string) (string, error) {
 
 	segments := v.Segments()
 	return fmt.Sprintf("%d.%d", segments[0], segments[1]), nil
+}
+
+// ValidationOptions extended oas validation options.
+type ValidationOptions struct {
+	kinOptions     []openapi3.ValidationOption
+	extendedOption bool
+}
+
+// ValidationOption func alias.
+type ValidationOption func(*ValidationOptions)
+
+// WithKin allows to provide basic kin options.
+func WithKin(kinOptions ...openapi3.ValidationOption) ValidationOption {
+	return func(options *ValidationOptions) {
+		options.kinOptions = append(options.kinOptions, kinOptions...)
+	}
 }

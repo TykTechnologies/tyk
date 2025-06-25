@@ -46,7 +46,7 @@ func TestParser(t *testing.T) {
 				"customRegex1": ".*",
 			}},
 			{"path with curly braces", "/users/{id}/profile", "users/{id}/profile", map[string]string{
-				"id": ".*",
+				"id": pathnormalizer.DefaultNonDefinedRe,
 			}},
 			{"path with named regex", "/users/{userId:[0-9]+}/posts", "users/{userId}/posts", map[string]string{
 				"userId": "[0-9]+",
@@ -61,7 +61,7 @@ func TestParser(t *testing.T) {
 					"customRegex2": "[0-9]{2}",
 					"customRegex3": "[a-z]{10}",
 					"customRegex4": "[0-9]+",
-					"id":           ".*",
+					"id":           "[^/]+",
 					"postId":       "[a-z]+",
 					"userId":       "[0-9]+",
 				},
@@ -81,6 +81,16 @@ func TestParser(t *testing.T) {
 
 			{"compound re in one path", "/users/[a-z]{10}[0-9]{5}", "users/{customRegex1}", map[string]string{
 				"customRegex1": "[a-z]{10}[0-9]{5}",
+			}},
+
+			// documentation test cases from (https://tyk.io/docs/getting-started/key-concepts/url-matching/)
+			{"test case unknown", "/products/{productId}/reviews/{rating:\\d+}", "products/{productId}/reviews/{rating}", map[string]string{
+				"productId": "[^/]+",
+				"rating":    "\\d+",
+			}},
+
+			{"must parse named identifier RegExp separated by colon", "/user/id:[0-9]+/accelerate", "user/{id}/accelerate", map[string]string{
+				"id": "[0-9]+",
 			}},
 		} {
 			t.Run(tc.name, func(t *testing.T) {

@@ -1,6 +1,7 @@
 package pathnormalizer
 
 import (
+	"github.com/TykTechnologies/tyk/internal/reflect"
 	"github.com/getkin/kin-openapi/openapi3"
 	"strings"
 )
@@ -73,20 +74,20 @@ func Normalize(paths *openapi3.Paths) (*openapi3.Paths, error) {
 	parser := NewParser()
 
 	for userPath, pathItem := range paths.Map() {
-		normalized, err := parser.Parse(userPath)
+		userPathClone := reflect.Clone(userPath)
+		normalized, err := parser.Parse(userPathClone)
 
 		if err != nil {
 			return nil, err
 		}
 
 		// process custom params from command line
+		pathItemClone := reflect.Clone(pathItem)
 		for _, parameterRef := range normalized.ParameterRefs() {
-			pathItem.Parameters = append(pathItem.Parameters, parameterRef)
+			pathItemClone.Parameters = append(pathItemClone.Parameters, parameterRef)
 		}
 
-		// todo: set identifier to an action????
-		//
-		newPaths.Set(normalized.path, pathItem)
+		newPaths.Set(normalized.path, pathItemClone)
 	}
 
 	return newPaths, nil
