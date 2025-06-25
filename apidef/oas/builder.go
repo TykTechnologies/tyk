@@ -3,13 +3,15 @@ package oas
 import (
 	"errors"
 	"fmt"
-	"github.com/TykTechnologies/kin-openapi/openapi3"
 	"net/http"
 	"net/url"
 	"strings"
 	"time"
 
+	"github.com/TykTechnologies/kin-openapi/openapi3"
 	"github.com/TykTechnologies/tyk/common/option"
+	tykheaders "github.com/TykTechnologies/tyk/header"
+	"github.com/TykTechnologies/tyk/internal/uuid"
 )
 
 type (
@@ -45,6 +47,7 @@ const (
 var (
 	ErrMinRateLimitExceeded  = errors.New("minimum rate limit exceeded")
 	ErrZeroAmountInRateLimit = errors.New("zero amount in rate limit")
+	ErrEmptyApiSlug          = errors.New("empty api slug")
 )
 
 // NewOas returns an allocated *OAS due to provided options
@@ -55,6 +58,11 @@ func NewOas(opts ...BuilderOption) (*OAS, error) {
 func NewBuilder() Builder {
 	oasDef := OAS{}
 
+	oasDef.OpenAPI = "3.0.0"
+	oasDef.Info = &openapi3.Info{
+		Title:   "Test API entity",
+		Version: "1.0.0",
+	}
 	oasDef.Paths = openapi3.Paths{}
 
 	xTykAPIGateway := XTykAPIGateway{
@@ -96,12 +104,13 @@ func (b *Builder) Build() (*OAS, error) {
 	return b.oas, nil
 }
 
-// WithTestDefaults sets defaults options
+// WithTestListenPathAndUpstream sets defaults options
 // to be sued for testing
-func WithTestDefaults() BuilderOption {
+func WithTestListenPathAndUpstream(path, upstreamUrl string) BuilderOption {
 	return combine(
-		WithUpstreamUrl(UpstreamUrlDefault),
-		WithListenPath("/test", true),
+		withRandomId(),
+		WithUpstreamUrl(upstreamUrl),
+		WithListenPath(path, true),
 	)
 }
 
@@ -130,6 +139,15 @@ func WithUpstreamUrl(upstreamUrl string) BuilderOption {
 		}
 
 		b.xTykAPIGateway.Upstream.URL = upstreamUrl
+	}
+}
+
+func withRandomId() BuilderOption {
+	return func(b *Builder) {
+		b.xTykAPIGateway.Info.ID = uuid.New()
+		b.xTykAPIGateway.Info.Name = uuid.New()
+		b.xTykAPIGateway.Info.State.Active = true
+		b.xTykAPIGateway.Info.State.Internal = false
 	}
 }
 
@@ -199,6 +217,7 @@ func WithDelete(path string, fn EndpointFactory) BuilderOption {
 	return withEndpoint(http.MethodDelete, path, fn)
 }
 
+// RateLimit adds rate limit middleware to current endpoint.
 func (eb *EndpointBuilder) RateLimit(amount uint, duration time.Duration, enabled ...bool) *EndpointBuilder {
 	if rl, err := newRateLimit(amount, duration, enabled...); err != nil {
 		eb.errors = append(eb.errors, err)
@@ -209,11 +228,44 @@ func (eb *EndpointBuilder) RateLimit(amount uint, duration time.Duration, enable
 	return eb
 }
 
+// TransformResponseHeaders adds TransformResponseHeaders middleware to current endpoint.
+func (eb *EndpointBuilder) TransformResponseHeaders(factory func(*TransformHeaders)) *EndpointBuilder {
+	op := eb.operation().TransformResponseHeaders
+
+	if op == nil {
+		op = &TransformHeaders{Enabled: true}
+		eb.operation().TransformResponseHeaders = op
+	}
+
+	factory(op)
+
+	return eb
+}
+
+// TransformResponseBody adds TransformResponseBody middleware to current endpoint.
+func (eb *EndpointBuilder) TransformResponseBody(factory func(*TransformBody)) *EndpointBuilder {
+	op := eb.operation().TransformResponseBody
+
+	if op == nil {
+		op = &TransformBody{Enabled: true}
+		eb.operation().TransformResponseBody = op
+	}
+
+	factory(op)
+
+	return eb
+}
+
+func (eb *EndpointBuilder) MockDefault() *EndpointBuilder {
+	return eb.Mock(func(_ *MockResponse) {})
+}
+
 func (eb *EndpointBuilder) Mock(fn func(mock *MockResponse)) *EndpointBuilder {
 	var mock MockResponse
 	mock.Enabled = true
 	mock.Code = http.StatusOK
-	mock.Body = "ok"
+	mock.Headers.Add(tykheaders.ContentType, tykheaders.ApplicationJSON)
+	mock.Body = `{"message":"ok"}`
 
 	fn(&mock)
 	eb.operation().MockResponse = &mock
@@ -222,7 +274,7 @@ func (eb *EndpointBuilder) Mock(fn func(mock *MockResponse)) *EndpointBuilder {
 }
 
 func (eb *EndpointBuilder) operationId() string {
-	return strings.ToLower(eb.path + eb.method)
+	return strings.TrimPrefix(strings.ToLower(eb.path+eb.method), "/")
 }
 
 func (eb *EndpointBuilder) operation() *Operation {
@@ -236,6 +288,11 @@ func (eb *EndpointBuilder) operation() *Operation {
 func (eb *EndpointBuilder) build(builder *Builder) {
 	if len(eb.errors) > 0 {
 		builder.appendErrors(eb.errors...)
+		return
+	}
+
+	if builder.xTykAPIGateway.Server.ListenPath.Value == "" {
+		builder.appendErrors(ErrEmptyApiSlug)
 		return
 	}
 
@@ -253,7 +310,22 @@ func (eb *EndpointBuilder) build(builder *Builder) {
 		builder.oas.Paths[eb.path] = currentPath
 	}
 
+	emptyDescription := ""
+	responses := openapi3.NewResponses()
+	delete(responses, "default")
+	responses["200"] = &openapi3.ResponseRef{
+		Value: &openapi3.Response{
+			Description: &emptyDescription,
+			Content: openapi3.Content{
+				tykheaders.ApplicationJSON: &openapi3.MediaType{},
+			},
+		},
+	}
+
 	currentPath.SetOperation(eb.method, &openapi3.Operation{
 		OperationID: eb.operationId(),
+		Responses:   responses,
 	})
+
+	builder.oas.Paths[eb.path] = currentPath
 }
