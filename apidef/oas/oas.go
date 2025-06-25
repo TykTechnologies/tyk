@@ -445,13 +445,11 @@ func (s *OAS) Validate(ctx context.Context, opts ...openapi3.ValidationOption) e
 	}
 
 	if err = normalized.T.Validate(ctx, opts...); err != nil {
-		origin, err2 := json.Marshal(s.T)
-		modified, err3 := json.Marshal(normalized.T)
 
 		log.
-			WithError(errors.Join(err, err2, err3)).
-			WithField("origin", string(origin)).
-			WithField("oas", string(modified)).
+			WithError(err).
+			WithField("origin", *s).
+			WithField("normalized", *normalized).
 			Errorf("failed to validate OAS")
 
 		return err
