@@ -265,10 +265,6 @@ func TestTraceHttpRequest(t *testing.T) {
 			Uuid string `json:"uuid"`
 		}
 
-		type WrappedUuidDto struct {
-			Data UuidDto `json:"data"`
-		}
-
 		var hdr = HeaderCnf{Name: "Content-Type", Value: "application/json"}
 
 		oasDef, err := oas.NewOas(
@@ -298,31 +294,9 @@ func TestTraceHttpRequest(t *testing.T) {
 			OAS: oasDef,
 		}
 
-<<<<<<< HEAD
-	oasDef, err := oas.NewOas(
-		oas.WithTestDefaults(),
-		oas.WithGlobalRateLimit(1, 60*time.Second),
-		oas.WithGet("/rate-limited-api", func(b *oas.EndpointBuilder) {
-			b.Mock(func(_ *oas.MockResponse) {})
-		}),
-	)
-
-	require.NoError(t, err)
-	require.NotNil(t, oasDef)
-
-	// Create trace request
-	traceReq := traceRequest{
-		Request: &traceHttpRequest{
-			Method: http.MethodGet,
-			Path:   "/rate-limited-api",
-		},
-		OAS: oasDef,
-	}
-=======
 		reqBody, err := json.Marshal(traceReq)
 		require.NoError(t, err)
 		require.NotNil(t, reqBody)
->>>>>>> b3f4e4d2b... [TT-14914] No response middleware information in Tyk OAS API Debugger (#7113)
 
 		req := httptest.NewRequest(http.MethodPost, "/debug/trace", bytes.NewReader(reqBody))
 		req.Header.Set("Content-Type", "application/json")
@@ -365,162 +339,6 @@ func TestTraceHttpRequest(t *testing.T) {
 	})
 }
 
-type cntPredicate[T any] func(T) bool
-
-<<<<<<< HEAD
-	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte("mock response"))
-	}))
-	defer mockServer.Close()
-
-	oasDef, err := oas.NewOas(
-		oas.WithTestDefaults(),
-		oas.WithUpstreamUrl(mockServer.URL),
-		oas.WithGet("/rate-limited-api", func(b *oas.EndpointBuilder) {
-			b.Mock(func(_ *oas.MockResponse) {}).RateLimit(1, time.Second)
-		}),
-	)
-
-	require.NoError(t, err)
-	require.NotNil(t, oasDef)
-
-	// Create trace request
-	traceReq := traceRequest{
-		Request: &traceHttpRequest{
-			Method: http.MethodGet,
-			Path:   "/rate-limited-api",
-		},
-		OAS: oasDef,
-	}
-
-	// Marshal trace request
-	reqBody, err := json.Marshal(traceReq)
-	require.NoError(t, err)
-	require.NotNil(t, reqBody)
-
-	// First request should succeed
-	req1 := httptest.NewRequest(http.MethodPost, "/debug/trace", bytes.NewReader(reqBody))
-	req1.Header.Set("Content-Type", "application/json")
-	req1 = ts.withAuth(req1)
-
-	w1 := httptest.NewRecorder()
-	ts.Gw.traceHandler(w1, req1)
-	require.Equal(t, http.StatusOK, w1.Code)
-
-	var traceResp1 traceResponse
-	err = json.Unmarshal(w1.Body.Bytes(), &traceResp1)
-	assert.NoError(t, err)
-
-	_, tResponse1, err := traceResp1.parseTrace()
-	require.NoError(t, err)
-	require.Equal(t, http.StatusOK, tResponse1.StatusCode)
-
-	// Second request should be rate limited
-	req2 := httptest.NewRequest(http.MethodPost, "/debug/trace", bytes.NewReader(reqBody))
-	req2.Header.Set("Content-Type", "application/json")
-
-	w2 := httptest.NewRecorder()
-	ts.Gw.traceHandler(w2, req2)
-
-	// Parse response
-	var traceResp2 traceResponse
-	err = json.Unmarshal(w2.Body.Bytes(), &traceResp2)
-	assert.NoError(t, err)
-
-	logs, err := traceResp2.logs()
-	require.NoError(t, err)
-
-	_, tResponse2, err := traceResp2.parseTrace()
-	require.NoError(t, err)
-
-	// Verify rate limit response
-	assert.Equal(t, http.StatusTooManyRequests, tResponse2.StatusCode)
-	assert.True(t, lo.SomeBy(logs, func(item traceLogEntry) bool {
-		return strings.Contains(item.Msg, "API Rate Limit Exceeded")
-	}))
-}
-
-func TestTraceHandler_MockMiddlewareRespondsWithProvidedData(t *testing.T) {
-	ts := StartTest(nil)
-	defer ts.Close()
-
-	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte("mock response"))
-	}))
-	defer mockServer.Close()
-
-	type typedResponse struct {
-		Message string `json:"message"`
-	}
-
-	srcMessage := typedResponse{
-		Message: "knock knock this is mock",
-	}
-
-	msgJson, err := json.Marshal(srcMessage)
-	require.NoError(t, err)
-
-	oasDef, err := oas.NewOas(
-		oas.WithTestDefaults(),
-		oas.WithUpstreamUrl(mockServer.URL),
-		oas.WithGet("/mock", func(b *oas.EndpointBuilder) {
-			b.Mock(func(mock *oas.MockResponse) {
-				mock.Code = http.StatusCreated
-				mock.Body = string(msgJson)
-				mock.Headers = append(mock.Headers, oas.Header{Name: "hello", Value: "world"})
-				mock.Headers = append(mock.Headers, oas.Header{Name: "Content-Type", Value: "application/json"})
-			})
-		}),
-	)
-
-	require.NoError(t, err)
-	require.NotNil(t, oasDef)
-
-	// Create trace request
-	traceReq := traceRequest{
-		Request: &traceHttpRequest{
-			Method: http.MethodGet,
-			Path:   "/mock",
-		},
-		OAS: oasDef,
-	}
-
-	reqBody, err := json.Marshal(traceReq)
-	require.NoError(t, err)
-	require.NotNil(t, reqBody)
-
-	req := httptest.NewRequest(http.MethodPost, "/debug/trace", bytes.NewReader(reqBody))
-	req.Header.Set("Content-Type", "application/json")
-
-	res := httptest.NewRecorder()
-	ts.Gw.traceHandler(res, req)
-	require.Equal(t, http.StatusOK, res.Code)
-
-	var traceResp traceResponse
-
-	err = json.NewDecoder(res.Body).Decode(&traceResp)
-	assert.NoError(t, err)
-
-	request, response, err := traceResp.parseTrace()
-	require.NoError(t, err)
-
-	defer func() {
-		_ = response.Body.Close()
-	}()
-
-	require.NotNil(t, request)
-	require.NotNil(t, response)
-
-	var mockedResponse typedResponse
-	assert.Equal(t, http.StatusCreated, response.StatusCode)
-	jData, err := io.ReadAll(response.Body)
-	assert.NoError(t, err)
-	err = json.Unmarshal(jData, &mockedResponse)
-	assert.NoError(t, err)
-	assert.Equal(t, srcMessage.Message, mockedResponse.Message)
-=======
 func byType(typ traceLogType) cntPredicate[traceLogEntry] {
 	return func(entry traceLogEntry) bool {
 		return entry.Type == typ
@@ -531,5 +349,6 @@ func byMiddleware(mwName string) cntPredicate[traceLogEntry] {
 	return func(entry traceLogEntry) bool {
 		return entry.Mw == mwName
 	}
->>>>>>> b3f4e4d2b... [TT-14914] No response middleware information in Tyk OAS API Debugger (#7113)
 }
+
+type cntPredicate[T any] func(T) bool
