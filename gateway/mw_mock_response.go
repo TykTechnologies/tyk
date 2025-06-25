@@ -11,12 +11,89 @@ import (
 	"strconv"
 
 	"github.com/TykTechnologies/tyk/apidef/oas"
+	"github.com/TykTechnologies/tyk/common/option"
 	"github.com/TykTechnologies/tyk/header"
+	"github.com/TykTechnologies/tyk/internal/middleware"
 	"github.com/getkin/kin-openapi/openapi3"
 )
 
-func (p *ReverseProxy) mockResponse(r *http.Request) (*http.Response, error) {
-	operation := ctxGetOperation(r)
+var _ TykMiddleware = (*mockResponseMiddleware)(nil)
+
+type mockResponseMiddleware struct {
+	*BaseMiddleware
+
+	openTelemetryEnabled bool
+}
+
+func newMockResponseMiddleware(base *BaseMiddleware, opts ...option.Option[mockResponseMiddleware]) TykMiddleware {
+	return option.New(opts).Build(mockResponseMiddleware{
+		BaseMiddleware: base,
+	})
+}
+
+func withOpenTelemetry(enabled bool) option.Option[mockResponseMiddleware] {
+	return func(m *mockResponseMiddleware) {
+		m.openTelemetryEnabled = enabled
+	}
+}
+
+func (m *mockResponseMiddleware) Name() string {
+	return "MockResponseMiddleware"
+}
+
+func (m *mockResponseMiddleware) EnabledForSpec() bool {
+	return m.Spec.hasActiveMock()
+}
+
+func (m *mockResponseMiddleware) forward(res *http.Response, rw http.ResponseWriter) (int, error) {
+	for key, values := range res.Header {
+		for _, value := range values {
+			rw.Header().Add(key, value)
+		}
+	}
+
+	rw.WriteHeader(res.StatusCode)
+	if res.Body == nil {
+		return 0, nil
+	}
+
+	body, err := io.ReadAll(res.Body)
+
+	if err != nil {
+		return 0, err
+	}
+
+	return rw.Write(body)
+}
+
+func (m *mockResponseMiddleware) ProcessRequest(rw http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
+	if !m.Spec.hasActiveMock() {
+		return nil, http.StatusOK
+	}
+
+	res, err := m.mockResponse(r)
+
+	if err != nil {
+		return fmt.Errorf("failed to mock response: %w", err), http.StatusInternalServerError
+	}
+
+	if res == nil {
+		return nil, http.StatusOK
+	}
+
+	_, err = m.forward(res, rw)
+
+	if err != nil {
+		return fmt.Errorf("failed to forward response: %w", err), http.StatusInternalServerError
+	}
+
+	return nil, middleware.StatusRespond
+}
+
+func (m *mockResponseMiddleware) mockResponse(r *http.Request) (*http.Response, error) {
+	// if response is nil we go further
+	operation := m.Spec.findOperation(r)
+
 	if operation == nil {
 		return nil, nil
 	}
@@ -62,6 +139,7 @@ func (p *ReverseProxy) mockResponse(r *http.Request) (*http.Response, error) {
 
 func mockFromConfig(tykMockRespOp *oas.MockResponse) (int, []byte, []oas.Header) {
 	code := tykMockRespOp.Code
+
 	if code == 0 {
 		code = http.StatusOK
 	}
