@@ -12,7 +12,7 @@ spec:
       - key: Content-Type
         value: application/json
   specs:
-  - name: /tykprotocol/ip http attributes
+  - name: /tykprotocl/ip http attributes
     selector: span[tracetest.span.type="http" name="GET /tykprotocol/ip" http.method="GET"]
     assertions:
     - attr:http.status_code = 200

@@ -52,7 +52,6 @@ type traceResponse struct {
 }
 
 type traceLogEntry struct {
-<<<<<<< HEAD
 	ApiId   string     `json:"api_id,omitempty"`
 	ApiName string     `json:"api_name,omitempty"`
 	Level   string     `json:"level,omitempty"`
@@ -60,17 +59,6 @@ type traceLogEntry struct {
 	Mw      string     `json:"mw,omitempty"`
 	OrgId   string     `json:"org_id,omitempty"`
 	Ts      *time.Time `json:"time,omitempty"`
-=======
-	ApiId   string       `json:"api_id,omitempty"`
-	ApiName string       `json:"api_name,omitempty"`
-	Level   string       `json:"level,omitempty"`
-	Msg     string       `json:"msg,omitempty"`
-	Mw      string       `json:"mw,omitempty"`
-	OrgId   string       `json:"org_id,omitempty"`
-	Ts      *time.Time   `json:"time,omitempty"`
-	Code    int          `json:"code,omitempty"`
-	Type    traceLogType `json:"type"`
->>>>>>> 400bb5df5... [TT-8963] Unable to loop mocked endpoint (#7105)
 }
 
 func (tr *traceResponse) parseTrace() (*http.Request, *http.Response, error) {
@@ -220,7 +208,7 @@ func (gw *Gateway) traceHandler(w http.ResponseWriter, r *http.Request) {
 		logrus.NewEntry(logger),
 		WithQuotaKey(spec.Checksum),
 	)
-	gw.generateSubRoutes(spec, subrouter)
+	gw.generateSubRoutes(spec, subrouter, logrus.NewEntry(logger))
 
 	if chainObj.ThisHandler == nil {
 		doJSONWrite(w, http.StatusBadRequest, traceResponse{Message: "error", Logs: logStorage.String()})
@@ -234,6 +222,7 @@ func (gw *Gateway) traceHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	spec.SetupOperation(tr)
 	nopCloseRequestBody(tr)
 	chainObj.ThisHandler.ServeHTTP(wr, tr)
 

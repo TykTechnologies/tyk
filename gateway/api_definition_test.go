@@ -1500,34 +1500,34 @@ func Test_LoadAPIsFromRPC(t *testing.T) {
 
 func TestAPISpec_hasMock(t *testing.T) {
 	s := APISpec{APIDefinition: &apidef.APIDefinition{}}
-	assert.False(t, s.hasActiveMock())
+	assert.False(t, s.hasMock())
 
 	s.IsOAS = true
-	assert.False(t, s.hasActiveMock())
+	assert.False(t, s.hasMock())
 
 	s.OAS = oas.OAS{}
-	assert.False(t, s.hasActiveMock())
+	assert.False(t, s.hasMock())
 
 	xTyk := &oas.XTykAPIGateway{}
 	s.OAS.SetTykExtension(xTyk)
-	assert.False(t, s.hasActiveMock())
+	assert.False(t, s.hasMock())
 
 	middleware := &oas.Middleware{}
 	xTyk.Middleware = middleware
-	assert.False(t, s.hasActiveMock())
+	assert.False(t, s.hasMock())
 
 	op := &oas.Operation{}
 	middleware.Operations = oas.Operations{
 		"my-operation": op,
 	}
-	assert.False(t, s.hasActiveMock())
+	assert.False(t, s.hasMock())
 
 	mock := &oas.MockResponse{}
 	op.MockResponse = mock
-	assert.False(t, s.hasActiveMock())
+	assert.False(t, s.hasMock())
 
 	mock.Enabled = true
-	assert.True(t, s.hasActiveMock())
+	assert.True(t, s.hasMock())
 }
 
 func TestAPISpec_isStreamingAPI(t *testing.T) {

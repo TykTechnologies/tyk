@@ -33,7 +33,6 @@ const (
 	TrackThisEndpoint
 	DoNotTrackThisEndpoint
 	UrlRewritePath
-	InternalRedirectTarget
 	RequestMethod
 	OrigRequestURL
 	LoopLevel
@@ -48,6 +47,7 @@ const (
 	RequestStatus
 	GraphQLRequest
 	GraphQLIsWebSocketUpgrade
+	OASOperation
 
 	// CacheOptions holds cache options required for cache writer middleware.
 	CacheOptions

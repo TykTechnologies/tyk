@@ -10,12 +10,6 @@ import (
 	"time"
 
 	"github.com/TykTechnologies/tyk/common/option"
-<<<<<<< HEAD
-=======
-	tykheaders "github.com/TykTechnologies/tyk/header"
-	"github.com/TykTechnologies/tyk/internal/uuid"
-	"github.com/getkin/kin-openapi/openapi3"
->>>>>>> 400bb5df5... [TT-8963] Unable to loop mocked endpoint (#7105)
 )
 
 type (
@@ -51,7 +45,6 @@ const (
 var (
 	ErrMinRateLimitExceeded  = errors.New("minimum rate limit exceeded")
 	ErrZeroAmountInRateLimit = errors.New("zero amount in rate limit")
-	ErrEmptyApiSlug          = errors.New("empty api slug")
 )
 
 // NewOas returns an allocated *OAS due to provided options
@@ -62,16 +55,7 @@ func NewOas(opts ...BuilderOption) (*OAS, error) {
 func NewBuilder() Builder {
 	oasDef := OAS{}
 
-<<<<<<< HEAD
 	oasDef.Paths = openapi3.Paths{}
-=======
-	oasDef.OpenAPI = "3.0.0"
-	oasDef.Info = &openapi3.Info{
-		Title:   "Test API entity",
-		Version: "1.0.0",
-	}
-	oasDef.Paths = openapi3.NewPaths()
->>>>>>> 400bb5df5... [TT-8963] Unable to loop mocked endpoint (#7105)
 
 	xTykAPIGateway := XTykAPIGateway{
 		Info: Info{},
@@ -112,13 +96,12 @@ func (b *Builder) Build() (*OAS, error) {
 	return b.oas, nil
 }
 
-// WithTestListenPathAndUpstream sets defaults options
+// WithTestDefaults sets defaults options
 // to be sued for testing
-func WithTestListenPathAndUpstream(path, upstreamUrl string) BuilderOption {
+func WithTestDefaults() BuilderOption {
 	return combine(
-		withRandomId(),
-		WithUpstreamUrl(upstreamUrl),
-		WithListenPath(path, true),
+		WithUpstreamUrl(UpstreamUrlDefault),
+		WithListenPath("/test", true),
 	)
 }
 
@@ -147,15 +130,6 @@ func WithUpstreamUrl(upstreamUrl string) BuilderOption {
 		}
 
 		b.xTykAPIGateway.Upstream.URL = upstreamUrl
-	}
-}
-
-func withRandomId() BuilderOption {
-	return func(b *Builder) {
-		b.xTykAPIGateway.Info.ID = uuid.New()
-		b.xTykAPIGateway.Info.Name = uuid.New()
-		b.xTykAPIGateway.Info.State.Active = true
-		b.xTykAPIGateway.Info.State.Internal = false
 	}
 }
 
@@ -235,47 +209,11 @@ func (eb *EndpointBuilder) RateLimit(amount uint, duration time.Duration, enable
 	return eb
 }
 
-<<<<<<< HEAD
-=======
-// TransformResponseHeaders adds TransformResponseHeaders middleware to current endpoint.
-func (eb *EndpointBuilder) TransformResponseHeaders(factory func(*TransformHeaders)) *EndpointBuilder {
-	op := eb.operation().TransformResponseHeaders
-
-	if op == nil {
-		op = &TransformHeaders{Enabled: true}
-		eb.operation().TransformResponseHeaders = op
-	}
-
-	factory(op)
-
-	return eb
-}
-
-// TransformResponseBody adds TransformResponseBody middleware to current endpoint.
-func (eb *EndpointBuilder) TransformResponseBody(factory func(*TransformBody)) *EndpointBuilder {
-	op := eb.operation().TransformResponseBody
-
-	if op == nil {
-		op = &TransformBody{Enabled: true}
-		eb.operation().TransformResponseBody = op
-	}
-
-	factory(op)
-
-	return eb
-}
-
-func (eb *EndpointBuilder) MockDefault() *EndpointBuilder {
-	return eb.Mock(func(_ *MockResponse) {})
-}
-
->>>>>>> 400bb5df5... [TT-8963] Unable to loop mocked endpoint (#7105)
 func (eb *EndpointBuilder) Mock(fn func(mock *MockResponse)) *EndpointBuilder {
 	var mock MockResponse
 	mock.Enabled = true
 	mock.Code = http.StatusOK
-	mock.Headers.Add(tykheaders.ContentType, tykheaders.ApplicationJSON)
-	mock.Body = `{"message":"ok"}`
+	mock.Body = "ok"
 
 	fn(&mock)
 	eb.operation().MockResponse = &mock
@@ -284,11 +222,7 @@ func (eb *EndpointBuilder) Mock(fn func(mock *MockResponse)) *EndpointBuilder {
 }
 
 func (eb *EndpointBuilder) operationId() string {
-<<<<<<< HEAD
 	return strings.ToLower(eb.path + eb.method)
-=======
-	return strings.TrimPrefix(strings.ToLower(eb.path+eb.method), "/")
->>>>>>> 400bb5df5... [TT-8963] Unable to loop mocked endpoint (#7105)
 }
 
 func (eb *EndpointBuilder) operation() *Operation {
@@ -305,11 +239,6 @@ func (eb *EndpointBuilder) build(builder *Builder) {
 		return
 	}
 
-	if builder.xTykAPIGateway.Server.ListenPath.Value == "" {
-		builder.appendErrors(ErrEmptyApiSlug)
-		return
-	}
-
 	if _, ok := builder.xTykAPIGateway.Middleware.Operations[eb.operationId()]; ok {
 		builder.appendErrors(fmt.Errorf("duplicate operation id: %s", eb.operationId()))
 		return
@@ -321,28 +250,10 @@ func (eb *EndpointBuilder) build(builder *Builder) {
 
 	if currentPath == nil {
 		currentPath = &openapi3.PathItem{}
-<<<<<<< HEAD
 		builder.oas.Paths[eb.path] = currentPath
-=======
->>>>>>> 400bb5df5... [TT-8963] Unable to loop mocked endpoint (#7105)
 	}
-
-	emptyDescription := ""
-	responses := openapi3.NewResponses()
-	responses.Delete("default")
-	responses.Set("200", &openapi3.ResponseRef{
-		Value: &openapi3.Response{
-			Description: &emptyDescription,
-			Content: openapi3.Content{
-				tykheaders.ApplicationJSON: &openapi3.MediaType{},
-			},
-		},
-	})
 
 	currentPath.SetOperation(eb.method, &openapi3.Operation{
 		OperationID: eb.operationId(),
-		Responses:   responses,
 	})
-
-	builder.oas.Paths.Set(eb.path, currentPath)
 }
