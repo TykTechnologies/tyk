@@ -23,9 +23,6 @@ import (
 )
 
 func TestTraceHttpRequest(t *testing.T) {
-	ts := StartTest(nil)
-	defer ts.Close()
-
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -33,6 +30,9 @@ func TestTraceHttpRequest(t *testing.T) {
 	defer testServer.Close()
 
 	t.Run("#toRequest", func(t *testing.T) {
+		ts := StartTest(nil)
+		defer ts.Close()
+
 		const body = `{"foo":"bar"}`
 		var headers = http.Header{}
 		headers.Add("key", "value")
@@ -63,8 +63,11 @@ func TestTraceHttpRequest(t *testing.T) {
 	})
 
 	t.Run("api-scoped rate limit works as expected", func(t *testing.T) {
+		ts := StartTest(nil)
+		defer ts.Close()
+
 		oasDef, err := oas.NewOas(
-			oas.WithTestDefaults(),
+			oas.WithListenPath("/test", true),
 			oas.WithGlobalRateLimit(1, 60*time.Second),
 			oas.WithGet("/rate-limited-api", func(b *oas.EndpointBuilder) {
 				b.Mock(func(_ *oas.MockResponse) {})
@@ -128,6 +131,9 @@ func TestTraceHttpRequest(t *testing.T) {
 	})
 
 	t.Run("endpoint-scoped rate limit middleware works as expected", func(t *testing.T) {
+		ts := StartTest(nil)
+		defer ts.Close()
+
 		oasDef, err := oas.NewOas(
 			oas.WithListenPath("/test", true),
 			oas.WithUpstreamUrl(testServer.URL),
@@ -196,6 +202,9 @@ func TestTraceHttpRequest(t *testing.T) {
 	})
 
 	t.Run("mock middleware works as expected", func(t *testing.T) {
+		ts := StartTest(nil)
+		defer ts.Close()
+
 		mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte("mock response"))
@@ -274,6 +283,9 @@ func TestTraceHttpRequest(t *testing.T) {
 	})
 
 	t.Run("responds with log request/response logs", func(t *testing.T) {
+		ts := StartTest(nil)
+		defer ts.Close()
+
 		type HeaderCnf struct {
 			Name  string
 			Value string
