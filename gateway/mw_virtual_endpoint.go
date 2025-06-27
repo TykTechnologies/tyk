@@ -48,7 +48,7 @@ type VMResponseObject struct {
 	SessionMeta map[string]interface{}
 }
 
-// DynamicMiddleware is a generic middleware that will execute JS code before continuing
+// VirtualEndpoint is a generic middleware that will execute JS code before continuing
 type VirtualEndpoint struct {
 	*BaseMiddleware
 

@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
-	"github.com/samber/lo"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -13,13 +12,15 @@ import (
 	"testing"
 	"time"
 
-	"github.com/google/uuid"
-	"github.com/mccutchen/go-httpbin/v2/httpbin"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
-
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/apidef/oas"
+	"github.com/TykTechnologies/tyk/header"
+	"github.com/TykTechnologies/tyk/internal/middleware"
+	"github.com/google/uuid"
+	"github.com/mccutchen/go-httpbin/v2/httpbin"
+	"github.com/samber/lo"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestTraceHttpRequest(t *testing.T) {
@@ -67,7 +68,7 @@ func TestTraceHttpRequest(t *testing.T) {
 		defer ts.Close()
 
 		oasDef, err := oas.NewOas(
-			oas.WithListenPath("/test", true),
+			oas.WithTestListenPathAndUpstream("/test", testServer.URL),
 			oas.WithGlobalRateLimit(1, 60*time.Second),
 			oas.WithGet("/rate-limited-api", func(b *oas.EndpointBuilder) {
 				b.Mock(func(_ *oas.MockResponse) {})
@@ -101,6 +102,21 @@ func TestTraceHttpRequest(t *testing.T) {
 		ts.Gw.traceHandler(w1, req1)
 		require.Equal(t, http.StatusOK, w1.Code)
 
+		var traceResp1 traceResponse
+		err = json.Unmarshal(w1.Body.Bytes(), &traceResp1)
+		assert.NoError(t, err)
+
+		_, tResponse1, err := traceResp1.parseTrace()
+		require.NoError(t, err)
+
+		// Verify rate limit response
+		assert.Equal(t, http.StatusOK, tResponse1.StatusCode)
+		logs1, err := traceResp1.logs()
+		assert.NoError(t, err)
+		require.True(t, lo.SomeBy(logs1, func(logEntry traceLogEntry) bool {
+			return logEntry.Mw == new(mockResponseMiddleware).Name() && logEntry.Code == middleware.StatusRespond
+		}))
+
 		// Second request should be rate limited
 		req2 := httptest.NewRequest(http.MethodPost, "/debug/trace", bytes.NewReader(reqBody))
 		req2.Header.Set("Content-Type", "application/json")
@@ -113,19 +129,15 @@ func TestTraceHttpRequest(t *testing.T) {
 		err = json.Unmarshal(w2.Body.Bytes(), &traceResp2)
 		assert.NoError(t, err)
 
-		logs, err := traceResp2.logs()
+		logs2, err := traceResp2.logs()
 		require.NoError(t, err)
 
-		_, tResponse, err := traceResp2.parseTrace()
+		_, tResponse2, err := traceResp2.parseTrace()
 		require.NoError(t, err)
-
-		defer func() {
-			_ = tResponse.Body.Close()
-		}()
 
 		// Verify rate limit response
-		assert.Equal(t, http.StatusTooManyRequests, tResponse.StatusCode)
-		require.True(t, lo.SomeBy(logs, func(item traceLogEntry) bool {
+		assert.Equal(t, http.StatusTooManyRequests, tResponse2.StatusCode)
+		require.True(t, lo.SomeBy(logs2, func(item traceLogEntry) bool {
 			return strings.Contains(item.Msg, "API Rate Limit Exceeded")
 		}))
 	})
@@ -135,8 +147,7 @@ func TestTraceHttpRequest(t *testing.T) {
 		defer ts.Close()
 
 		oasDef, err := oas.NewOas(
-			oas.WithListenPath("/test", true),
-			oas.WithUpstreamUrl(testServer.URL),
+			oas.WithTestListenPathAndUpstream("/test", testServer.URL),
 			oas.WithGet("/rate-limited-api2", func(b *oas.EndpointBuilder) {
 				b.Mock(func(_ *oas.MockResponse) {}).RateLimit(1, time.Second)
 			}),
@@ -205,12 +216,6 @@ func TestTraceHttpRequest(t *testing.T) {
 		ts := StartTest(nil)
 		defer ts.Close()
 
-		mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-			w.WriteHeader(http.StatusOK)
-			_, _ = w.Write([]byte("mock response"))
-		}))
-		defer mockServer.Close()
-
 		type typedResponse struct {
 			Message string `json:"message"`
 		}
@@ -223,14 +228,13 @@ func TestTraceHttpRequest(t *testing.T) {
 		require.NoError(t, err)
 
 		oasDef, err := oas.NewOas(
-			oas.WithTestDefaults(),
-			oas.WithUpstreamUrl(mockServer.URL),
+			oas.WithTestListenPathAndUpstream("/test", testServer.URL),
 			oas.WithGet("/mock", func(b *oas.EndpointBuilder) {
 				b.Mock(func(mock *oas.MockResponse) {
 					mock.Code = http.StatusCreated
 					mock.Body = string(msgJson)
-					mock.Headers = append(mock.Headers, oas.Header{Name: "hello", Value: "world"})
-					mock.Headers = append(mock.Headers, oas.Header{Name: "Content-Type", Value: "application/json"})
+					mock.Headers.Add("hello", "world")
+					mock.Headers.Add(header.ContentType, "application/json")
 				})
 			}),
 		)
@@ -302,8 +306,7 @@ func TestTraceHttpRequest(t *testing.T) {
 		var hdr = HeaderCnf{Name: "Content-Type", Value: "application/json"}
 
 		oasDef, err := oas.NewOas(
-			oas.WithTestDefaults(),
-			oas.WithUpstreamUrl(testServer.URL),
+			oas.WithTestListenPathAndUpstream("/test", testServer.URL),
 			oas.WithGet("/uuid", func(b *oas.EndpointBuilder) {
 				b.
 					TransformResponseHeaders(func(headers *oas.TransformHeaders) {

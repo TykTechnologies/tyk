@@ -66,7 +66,7 @@ func (k *ValidateRequest) EnabledForSpec() bool {
 
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail
 func (k *ValidateRequest) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
-	operation := ctxGetOperation(r)
+	operation := k.Spec.findOperation(r)
 
 	if operation == nil {
 		return nil, http.StatusOK
