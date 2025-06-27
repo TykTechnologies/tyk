@@ -44,7 +44,7 @@ require (
 	github.com/gofrs/uuid v4.4.0+incompatible
 	github.com/golang-jwt/jwt/v4 v4.5.2
 	github.com/golang/protobuf v1.5.4
-	github.com/google/uuid v1.6.0 // indirect
+	github.com/google/uuid v1.6.0
 	github.com/gorilla/mux v1.8.1
 	github.com/gorilla/websocket v1.5.3
 	github.com/hashicorp/consul/api v1.31.2
@@ -103,6 +103,7 @@ require (
 	github.com/goccy/go-yaml v1.15.23
 	github.com/google/go-cmp v0.7.0
 	github.com/huandu/go-clone/generic v1.7.2
+	github.com/mccutchen/go-httpbin/v2 v2.18.2
 	github.com/nats-io/nats.go v1.38.0
 	github.com/newrelic/go-agent/v3 v3.35.1
 	github.com/newrelic/go-agent/v3/integrations/nrgorilla v1.2.2
@@ -328,3 +329,5 @@ require (
 )
 
 replace go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.54.0 => go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.49.0
+
+replace github.com/TykTechnologies/graphql-translator => github.com/TykTechnologies/graphql-translator v0.0.0-20250423061552-2acd6818080e
