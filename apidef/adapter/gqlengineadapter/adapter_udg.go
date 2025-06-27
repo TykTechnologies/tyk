@@ -140,6 +140,7 @@ func (u *UniversalDataGraph) engineConfigV2DataSources() (planDataSources []plan
 				graphqlConfig.Method,
 				graphqlConfig.Headers,
 				graphqlConfig.SubscriptionType,
+				graphqlConfig.SSEUsePost,
 			))
 
 		case apidef.GraphQLEngineDataSourceKindKafka:
