@@ -24,8 +24,6 @@ import (
 )
 
 func TestTraceHttpRequest(t *testing.T) {
-	ts := StartTest(nil)
-	defer ts.Close()
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -33,6 +31,9 @@ func TestTraceHttpRequest(t *testing.T) {
 	defer testServer.Close()
 
 	t.Run("#toRequest", func(t *testing.T) {
+		ts := StartTest(nil)
+		defer ts.Close()
+
 		const body = `{"foo":"bar"}`
 		var headers = http.Header{}
 		headers.Add("key", "value")
@@ -63,6 +64,9 @@ func TestTraceHttpRequest(t *testing.T) {
 	})
 
 	t.Run("api-scoped rate limit works as expected", func(t *testing.T) {
+		ts := StartTest(nil)
+		defer ts.Close()
+
 		oasDef, err := oas.NewOas(
 			oas.WithTestListenPathAndUpstream("/test", testServer.URL),
 			oas.WithGlobalRateLimit(1, 60*time.Second),
@@ -139,9 +143,12 @@ func TestTraceHttpRequest(t *testing.T) {
 	})
 
 	t.Run("endpoint-scoped rate limit middleware works as expected", func(t *testing.T) {
+		ts := StartTest(nil)
+		defer ts.Close()
+
 		oasDef, err := oas.NewOas(
 			oas.WithTestListenPathAndUpstream("/test", testServer.URL),
-			oas.WithGet("/rate-limited-api", func(b *oas.EndpointBuilder) {
+			oas.WithGet("/rate-limited-api2", func(b *oas.EndpointBuilder) {
 				b.Mock(func(_ *oas.MockResponse) {}).RateLimit(1, time.Second)
 			}),
 		)
@@ -153,7 +160,7 @@ func TestTraceHttpRequest(t *testing.T) {
 		traceReq := traceRequest{
 			Request: &traceHttpRequest{
 				Method: http.MethodGet,
-				Path:   "/rate-limited-api",
+				Path:   "/rate-limited-api2",
 			},
 			OAS: oasDef,
 		}
@@ -172,6 +179,14 @@ func TestTraceHttpRequest(t *testing.T) {
 		ts.Gw.traceHandler(w1, req1)
 		require.Equal(t, http.StatusOK, w1.Code)
 
+		var traceResp1 traceResponse
+		err = json.Unmarshal(w1.Body.Bytes(), &traceResp1)
+		assert.NoError(t, err)
+
+		_, tResponse1, err := traceResp1.parseTrace()
+		require.NoError(t, err)
+		require.Equal(t, http.StatusOK, tResponse1.StatusCode)
+
 		// Second request should be rate limited
 		req2 := httptest.NewRequest(http.MethodPost, "/debug/trace", bytes.NewReader(reqBody))
 		req2.Header.Set("Content-Type", "application/json")
@@ -187,17 +202,20 @@ func TestTraceHttpRequest(t *testing.T) {
 		logs, err := traceResp2.logs()
 		require.NoError(t, err)
 
-		_, tResponse, err := traceResp2.parseTrace()
+		_, tResponse2, err := traceResp2.parseTrace()
 		require.NoError(t, err)
 
 		// Verify rate limit response
-		require.Equal(t, http.StatusTooManyRequests, tResponse.StatusCode)
-		require.True(t, lo.SomeBy(logs, func(item traceLogEntry) bool {
+		assert.Equal(t, http.StatusTooManyRequests, tResponse2.StatusCode)
+		assert.True(t, lo.SomeBy(logs, func(item traceLogEntry) bool {
 			return strings.Contains(item.Msg, "API Rate Limit Exceeded")
 		}))
 	})
 
 	t.Run("mock middleware works as expected", func(t *testing.T) {
+		ts := StartTest(nil)
+		defer ts.Close()
+
 		type typedResponse struct {
 			Message string `json:"message"`
 		}
@@ -260,13 +278,18 @@ func TestTraceHttpRequest(t *testing.T) {
 		require.NotNil(t, response)
 
 		var mockedResponse typedResponse
-		require.Equal(t, http.StatusCreated, response.StatusCode)
-		err = json.NewDecoder(response.Body).Decode(&mockedResponse)
+		assert.Equal(t, http.StatusCreated, response.StatusCode)
+		jData, err := io.ReadAll(response.Body)
+		assert.NoError(t, err)
+		err = json.Unmarshal(jData, &mockedResponse)
 		assert.NoError(t, err)
 		assert.Equal(t, srcMessage.Message, mockedResponse.Message)
 	})
 
 	t.Run("responds with log request/response logs", func(t *testing.T) {
+		ts := StartTest(nil)
+		defer ts.Close()
+
 		type HeaderCnf struct {
 			Name  string
 			Value string
@@ -287,7 +310,7 @@ func TestTraceHttpRequest(t *testing.T) {
 			oas.WithGet("/uuid", func(b *oas.EndpointBuilder) {
 				b.
 					TransformResponseHeaders(func(headers *oas.TransformHeaders) {
-						headers.Add.Add(hdr.Name, hdr.Value)
+						headers.AppendAddOp(hdr.Name, hdr.Value)
 					}).
 					TransformResponseBody(func(tb *oas.TransformBody) {
 						tb.Enabled = true
@@ -334,11 +357,11 @@ func TestTraceHttpRequest(t *testing.T) {
 		require.NotNil(t, response)
 		require.Equal(t, http.StatusOK, response.StatusCode)
 
-		_, err = traceResp.logs()
+		logs, err := traceResp.logs()
 		assert.NoError(t, err)
 
-		// assert.Greater(t, lo.CountBy(logs, byType(traceLogResponse)), 0)
-		// assert.True(t, lo.CountBy(logs, byMiddleware(new(HeaderInjector).Name())) > 0, "at least one mw log exist")
+		assert.Greater(t, lo.CountBy(logs, byType(traceLogResponse)), 0)
+		assert.True(t, lo.CountBy(logs, byMiddleware(new(HeaderInjector).Name())) > 0, "at least one mw log exist")
 		assert.Equal(t, response.Header.Values(hdr.Name), []string{hdr.Value})
 
 		responseBody, err := io.ReadAll(response.Body)
@@ -348,7 +371,7 @@ func TestTraceHttpRequest(t *testing.T) {
 		var uuidDto UuidDto
 		require.NoError(t, json.Unmarshal(responseBody, &uuidDto))
 
-		//require.True(t, lo.CountBy(logs, byMiddleware(new(ResponseTransformMiddleware).Name())) > 0)
+		require.True(t, lo.CountBy(logs, byMiddleware(new(ResponseTransformMiddleware).Name())) > 0)
 		require.NoError(t, uuid.Validate(uuidDto.Uuid))
 	})
 }

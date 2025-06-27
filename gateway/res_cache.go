@@ -8,8 +8,6 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/sirupsen/logrus"
-
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/user"
 )
@@ -55,15 +53,11 @@ func (m *ResponseCacheMiddleware) encodePayload(payload string, timestamp int64)
 	return sEnc + "|" + fmt.Sprint(timestamp)
 }
 
-func (m *ResponseCacheMiddleware) Logger() *logrus.Entry {
-	return log.WithField("mw", m.Name())
-}
-
 // HandleResponse checks if the http.Response argument can be cached and caches it for future requests.
 func (m *ResponseCacheMiddleware) HandleResponse(w http.ResponseWriter, res *http.Response, r *http.Request, ses *user.SessionState) error {
 	// No cache of empty responses
 	if res == nil {
-		m.Logger().Warning("Upstream request must have failed, response is empty")
+		m.logger().Warning("Upstream request must have failed, response is empty")
 		return nil
 	}
 
@@ -75,7 +69,7 @@ func (m *ResponseCacheMiddleware) HandleResponse(w http.ResponseWriter, res *htt
 	// Has cache been enabled on the request?
 	options := ctxGetCacheOptions(r)
 	if options == nil {
-		m.Logger().Debug("Request is not cacheable")
+		m.logger().Debug("Request is not cacheable")
 		return nil
 	}
 
@@ -122,13 +116,13 @@ func (m *ResponseCacheMiddleware) HandleResponse(w http.ResponseWriter, res *htt
 	if cacheThisRequest {
 		res.Body, err = newNopCloserBuffer(res.Body)
 		if err != nil {
-			m.Logger().WithError(err).Error("error reading cache body")
+			m.logger().WithError(err).Error("error reading cache body")
 			return nil
 		}
 
 		var wireFormatReq bytes.Buffer
 		if err := res.Write(&wireFormatReq); err != nil {
-			m.Logger().WithError(err).Error("error encoding cache")
+			m.logger().WithError(err).Error("error encoding cache")
 			return nil
 		}
 
@@ -138,7 +132,7 @@ func (m *ResponseCacheMiddleware) HandleResponse(w http.ResponseWriter, res *htt
 		go func() {
 			err := m.store.SetKey(options.key, toStore, cacheTTL)
 			if err != nil {
-				m.Logger().WithError(err).Error("could not save key in cache store")
+				m.logger().WithError(err).Error("could not save key in cache store")
 			}
 		}()
 	}

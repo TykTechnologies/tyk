@@ -171,6 +171,7 @@ func (gw *Gateway) processSpec(
 		"org_id":   spec.OrgID,
 		"api_id":   spec.APIID,
 		"api_name": spec.Name,
+		"type":     "request",
 	})
 
 	var coprocessLog = logger.WithFields(logrus.Fields{
@@ -297,7 +298,7 @@ func (gw *Gateway) processSpec(
 	}
 
 	// Create the response processors, pass all the loaded custom middleware response functions:
-	gw.createResponseMiddlewareChain(spec, mwResponseFuncs)
+	gw.createResponseMiddlewareChain(spec, mwResponseFuncs, logger)
 
 	baseMid := NewBaseMiddleware(gw, spec, proxy, logger)
 
@@ -669,7 +670,6 @@ func (d *DummyProxyHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	if d.SH.Spec.target.Scheme == "tyk" {
 		handler, _, found := d.Gw.findInternalHttpHandlerByNameOrID(d.SH.Spec.target.Host)
-
 		if !found {
 			handler := ErrorHandler{d.SH.Base()}
 			handler.HandleError(w, r, "Couldn't detect target", http.StatusInternalServerError, true)
