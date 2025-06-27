@@ -724,7 +724,7 @@ func (r RPCStorageHandler) IsRetriableError(err error) bool {
 		if errMsg == "Access Denied" {
 			return true
 		}
-		// Timeout errors from gorpc library
+		// Timeout errors from gorpc library 
 		if strings.Contains(errMsg, "Cannot obtain response during timeout") {
 			return true
 		}
