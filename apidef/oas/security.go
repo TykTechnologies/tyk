@@ -108,9 +108,7 @@ type JWT struct {
 	// Tyk classic API definition: `jwt_source`
 	Source string `bson:"source,omitempty" json:"source,omitempty"`
 
-	// JwksURIs contains a list of whitelisted JWK endpoints.
-	//
-	// Tyk classic API definition: `jwt_jwks_uris`
+	// JwksURIs contains a list of JSON Web Key Sets (JWKS) endpoints from which Tyk will retrieve JWKS to validate JSON Web Tokens (JWTs).
 	JwksURIs []apidef.JWK `bson:"jwksURIs,omitempty" json:"jwksURIs,omitempty"`
 
 	// SigningMethod contains the signing method to use for the JWT.
@@ -641,7 +639,7 @@ func (c *IntrospectionCache) ExtractTo(cache *apidef.IntrospectionCache) {
 }
 
 // ExternalOAuth holds configuration for an external OAuth provider.
-// Deprecated: ExternalOAuth support has been deprecated from 5.7.0.
+// Deprecated: ExternalOAuth support was deprecated in Tyk 5.7.0.
 // To avoid any disruptions, we recommend that you use JSON Web Token (JWT) instead,
 // as explained in https://tyk.io/docs/basic-config-and-security/security/authentication-authorization/ext-oauth-middleware/.
 type ExternalOAuth struct {
