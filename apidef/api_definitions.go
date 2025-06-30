@@ -118,7 +118,7 @@ const (
 	CoprocessType = "coprocess"
 	OAuthType     = "oauth"
 	// ExternalOAuthType holds configuration for an external OAuth provider.
-	// Deprecated: ExternalOAuth support has been deprecated from 5.7.0.
+	// Deprecated: ExternalOAuth support was deprecated in Tyk 5.7.0.
 	// To avoid any disruptions, we recommend that you use JSON Web Token (JWT) instead,
 	// as explained in https://tyk.io/docs/basic-config-and-security/security/authentication-authorization/ext-oauth-middleware/.
 	ExternalOAuthType = "externalOAuth"
