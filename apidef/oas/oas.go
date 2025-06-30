@@ -445,7 +445,6 @@ func (s *OAS) Validate(ctx context.Context, opts ...openapi3.ValidationOption) e
 	}
 
 	if err = normalized.T.Validate(ctx, opts...); err != nil {
-
 		log.
 			WithError(err).
 			WithField("origin", *s).
