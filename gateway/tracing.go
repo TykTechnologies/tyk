@@ -61,6 +61,20 @@ type traceLogEntry struct {
 	Ts      *time.Time `json:"time,omitempty"`
 }
 
+<<<<<<< HEAD
+=======
+type traceLogType string
+
+func (s traceLogType) String() string {
+	return string(s)
+}
+
+const (
+	traceLogRequest  traceLogType = "request"
+	traceLogResponse traceLogType = "response"
+)
+
+>>>>>>> 773ff7b23... [TT-14914] No response middleware information in Tyk OAS API Debugger (#7158)
 func (tr *traceResponse) parseTrace() (*http.Request, *http.Response, error) {
 	return parseTrace(tr.Response)
 }
@@ -188,7 +202,6 @@ func (gw *Gateway) traceHandler(w http.ResponseWriter, r *http.Request) {
 	logger.Out = &logStorage
 
 	gs := gw.prepareStorage()
-	subrouter := mux.NewRouter()
 
 	loader := &APIDefinitionLoader{Gw: gw}
 	traceReq.Spec.IsOAS = true
@@ -210,7 +223,11 @@ func (gw *Gateway) traceHandler(w http.ResponseWriter, r *http.Request) {
 		logrus.NewEntry(logger),
 		WithQuotaKey(spec.Checksum),
 	)
+<<<<<<< HEAD
 	gw.generateSubRoutes(spec, subrouter, logrus.NewEntry(logger))
+=======
+	gw.generateSubRoutes(spec, mux.NewRouter())
+>>>>>>> 773ff7b23... [TT-14914] No response middleware information in Tyk OAS API Debugger (#7158)
 
 	if chainObj.ThisHandler == nil {
 		doJSONWrite(w, http.StatusBadRequest, traceResponse{Message: "error", Logs: logStorage.String()})

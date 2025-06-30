@@ -9,6 +9,7 @@ import (
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/apidef/oas"
+	"github.com/TykTechnologies/tyk/internal/middleware"
 	"github.com/TykTechnologies/tyk/internal/otel"
 	"github.com/TykTechnologies/tyk/request"
 )
@@ -91,7 +92,7 @@ func (v *VersionCheck) ProcessRequest(w http.ResponseWriter, r *http.Request, _ 
 		v.Spec.SanitizeProxyPaths(r)
 
 		handler.ServeHTTP(w, r)
-		return nil, mwStatusRespond
+		return nil, middleware.StatusRespond
 	}
 outside:
 	v.Spec.SetupOperation(r)
@@ -129,7 +130,7 @@ outside:
 		}
 
 		v.DoMockReply(w, mockMeta)
-		return nil, mwStatusRespond
+		return nil, middleware.StatusRespond
 	}
 
 	if !v.Spec.ExpirationTs.IsZero() {

@@ -15,8 +15,87 @@ import (
 	"github.com/getkin/kin-openapi/openapi3"
 )
 
+<<<<<<< HEAD:gateway/mock_response.go
 func (p *ReverseProxy) mockResponse(r *http.Request) (*http.Response, error) {
 	operation := ctxGetOperation(r)
+=======
+var _ TykMiddleware = (*mockResponseMiddleware)(nil)
+
+type mockResponseMiddleware struct {
+	*BaseMiddleware
+}
+
+func newMockResponseMiddleware(base *BaseMiddleware, opts ...option.Option[mockResponseMiddleware]) TykMiddleware {
+	return option.New(opts).Build(mockResponseMiddleware{
+		BaseMiddleware: base,
+	})
+}
+
+func (m *mockResponseMiddleware) Name() string {
+	return "MockResponseMiddleware"
+}
+
+func (m *mockResponseMiddleware) EnabledForSpec() bool {
+	return m.Spec.hasActiveMock()
+}
+
+func (m *mockResponseMiddleware) forward(res *http.Response, rw http.ResponseWriter) error {
+	for key, values := range res.Header {
+		for _, value := range values {
+			rw.Header().Add(key, value)
+		}
+	}
+
+	rw.WriteHeader(res.StatusCode)
+	if res.Body == nil {
+		return nil
+	}
+
+	body, err := io.ReadAll(res.Body)
+
+	if err != nil {
+		return err
+	}
+
+	_, err = rw.Write(body)
+
+	return err
+}
+
+func (m *mockResponseMiddleware) ProcessRequest(rw http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
+	if !m.Spec.hasActiveMock() {
+		return nil, http.StatusOK
+	}
+
+	res, err := m.mockResponse(r)
+
+	if err != nil {
+		return fmt.Errorf("failed to mock response: %w", err), http.StatusInternalServerError
+	}
+
+	if res == nil {
+		return nil, http.StatusOK
+	}
+
+	if abortForward, err := handleResponseChain(m.Spec.ResponseChain, rw, res, r, ctxGetSession(r)); err != nil {
+		return fmt.Errorf("failed to process response chain: %w", err), http.StatusInternalServerError
+	} else if abortForward {
+		// response received from plugin
+		return nil, middleware.StatusRespond
+	}
+
+	if err = m.forward(res, rw); err != nil {
+		return fmt.Errorf("failed to forward response: %w", err), http.StatusInternalServerError
+	}
+
+	return nil, middleware.StatusRespond
+}
+
+func (m *mockResponseMiddleware) mockResponse(r *http.Request) (*http.Response, error) {
+	// if response is nil we go further
+	operation := m.Spec.findOperation(r)
+
+>>>>>>> 773ff7b23... [TT-14914] No response middleware information in Tyk OAS API Debugger (#7158):gateway/mw_mock_response.go
 	if operation == nil {
 		return nil, nil
 	}

@@ -171,6 +171,10 @@ func (gw *Gateway) processSpec(
 		"org_id":   spec.OrgID,
 		"api_id":   spec.APIID,
 		"api_name": spec.Name,
+<<<<<<< HEAD
+=======
+		"type":     traceLogRequest.String(),
+>>>>>>> 773ff7b23... [TT-14914] No response middleware information in Tyk OAS API Debugger (#7158)
 	})
 
 	var coprocessLog = logger.WithFields(logrus.Fields{
@@ -297,7 +301,11 @@ func (gw *Gateway) processSpec(
 	}
 
 	// Create the response processors, pass all the loaded custom middleware response functions:
+<<<<<<< HEAD
 	gw.createResponseMiddlewareChain(spec, mwResponseFuncs)
+=======
+	spec.ResponseChain = gw.createResponseMiddlewareChain(spec, mwResponseFuncs, logger)
+>>>>>>> 773ff7b23... [TT-14914] No response middleware information in Tyk OAS API Debugger (#7158)
 
 	baseMid := NewBaseMiddleware(gw, spec, proxy, logger)
 
@@ -469,8 +477,11 @@ func (gw *Gateway) processSpec(
 	gw.mwAppendEnabled(&chainArray, &TransformMethod{BaseMiddleware: baseMid.Copy()})
 
 	// Earliest we can respond with cache get 200 ok
+<<<<<<< HEAD
+=======
+	gw.mwAppendEnabled(&chainArray, newMockResponseMiddleware(baseMid.Copy()))
+>>>>>>> 773ff7b23... [TT-14914] No response middleware information in Tyk OAS API Debugger (#7158)
 	gw.mwAppendEnabled(&chainArray, &RedisCacheMiddleware{BaseMiddleware: baseMid.Copy(), store: &cacheStore})
-
 	gw.mwAppendEnabled(&chainArray, &VirtualEndpoint{BaseMiddleware: baseMid.Copy()})
 	gw.mwAppendEnabled(&chainArray, &RequestSigning{BaseMiddleware: baseMid.Copy()})
 	gw.mwAppendEnabled(&chainArray, &GoPluginMiddleware{BaseMiddleware: baseMid.Copy()})
