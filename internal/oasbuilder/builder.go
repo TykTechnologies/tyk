@@ -1,4 +1,4 @@
-package oas
+package oasbuilder
 
 import (
 	"errors"
@@ -9,37 +9,31 @@ import (
 	"strings"
 	"time"
 
+	"github.com/TykTechnologies/tyk/apidef/oas"
 	"github.com/TykTechnologies/tyk/common/option"
 )
 
 type (
-	// Builder OAS builder is responsible for providing methods for building valid OAS object.
 	Builder struct {
 		errors         []error
-		oas            *OAS
-		xTykAPIGateway *XTykAPIGateway
+		oas            *oas.OAS
+		xTykAPIGateway *oas.XTykAPIGateway
 	}
 
-	// EndpointBuilder OAS endpoint builder should be used for building endpoint and binding middlewares to it.
 	EndpointBuilder struct {
 		method string
 		path   string
 		errors []error
-		op     *Operation
+		op     *oas.Operation
 	}
 
-	// BuilderOption optional parameter should be used to define builder options in declarative way.
 	BuilderOption = option.Option[Builder]
 
-	// EndpointFactory factory method in which endpoint builder should be used.
 	EndpointFactory func(b *EndpointBuilder)
 )
 
 const (
 	minAllowedTimeFrameLength = time.Millisecond * 100
-
-	// UpstreamUrlDefault default upstream url for OAS
-	UpstreamUrlDefault = "http://localhost:3478/"
 )
 
 var (
@@ -47,31 +41,30 @@ var (
 	ErrZeroAmountInRateLimit = errors.New("zero amount in rate limit")
 )
 
-// NewOas returns an allocated *OAS due to provided options
-func NewOas(opts ...BuilderOption) (*OAS, error) {
-	return option.New(opts).Build(NewBuilder()).Build()
+func Build(opts ...BuilderOption) (*oas.OAS, error) {
+	return option.New(opts).Build(New()).Build()
 }
 
-func NewBuilder() Builder {
-	oasDef := OAS{}
+func New() Builder {
+	oasDef := oas.OAS{}
 
 	oasDef.Paths = openapi3.Paths{}
 
-	xTykAPIGateway := XTykAPIGateway{
-		Info: Info{},
+	xTykAPIGateway := oas.XTykAPIGateway{
+		Info: oas.Info{},
 
-		Server: Server{
-			ListenPath: ListenPath{
+		Server: oas.Server{
+			ListenPath: oas.ListenPath{
 				Strip: true,
 			},
 		},
 
-		Upstream: Upstream{
-			Proxy: &Proxy{Enabled: true},
+		Upstream: oas.Upstream{
+			Proxy: &oas.Proxy{Enabled: true},
 		},
 
-		Middleware: &Middleware{
-			Operations: Operations{},
+		Middleware: &oas.Middleware{
+			Operations: oas.Operations{},
 		},
 	}
 
@@ -86,7 +79,7 @@ func (b *Builder) appendErrors(errs ...error) {
 	b.errors = append(b.errors, errs...)
 }
 
-func (b *Builder) Build() (*OAS, error) {
+func (b *Builder) Build() (*oas.OAS, error) {
 	if len(b.errors) > 0 {
 		return nil, errors.Join(b.errors...)
 	}
@@ -96,9 +89,13 @@ func (b *Builder) Build() (*OAS, error) {
 	return b.oas, nil
 }
 
+<<<<<<< HEAD:apidef/oas/builder.go
 // WithTestDefaults sets defaults options
 // to be sued for testing
 func WithTestDefaults() BuilderOption {
+=======
+func WithTestListenPathAndUpstream(path, upstreamUrl string) BuilderOption {
+>>>>>>> 773ff7b23... [TT-14914] No response middleware information in Tyk OAS API Debugger (#7158):internal/oasbuilder/builder.go
 	return combine(
 		WithUpstreamUrl(UpstreamUrlDefault),
 		WithListenPath("/test", true),
@@ -112,7 +109,6 @@ func WithListenPath(path string, strip bool) BuilderOption {
 	}
 }
 
-// combine combines some options
 func combine(opts ...BuilderOption) BuilderOption {
 	return func(b *Builder) {
 		for _, apply := range opts {
@@ -121,7 +117,6 @@ func combine(opts ...BuilderOption) BuilderOption {
 	}
 }
 
-// WithUpstreamUrl defines upstream url
 func WithUpstreamUrl(upstreamUrl string) BuilderOption {
 	return func(b *Builder) {
 		if _, err := url.Parse(upstreamUrl); err != nil {
@@ -133,7 +128,19 @@ func WithUpstreamUrl(upstreamUrl string) BuilderOption {
 	}
 }
 
+<<<<<<< HEAD:apidef/oas/builder.go
 // WithGlobalRateLimit defines global rate limit
+=======
+func withRandomId() BuilderOption {
+	return func(b *Builder) {
+		b.xTykAPIGateway.Info.ID = uuid.New()
+		b.xTykAPIGateway.Info.Name = uuid.New()
+		b.xTykAPIGateway.Info.State.Active = true
+		b.xTykAPIGateway.Info.State.Internal = false
+	}
+}
+
+>>>>>>> 773ff7b23... [TT-14914] No response middleware information in Tyk OAS API Debugger (#7158):internal/oasbuilder/builder.go
 func WithGlobalRateLimit(rate uint, duration time.Duration, enabled ...bool) BuilderOption {
 	return func(b *Builder) {
 		if rl, err := newRateLimit(rate, duration, enabled...); err != nil {
@@ -145,7 +152,7 @@ func WithGlobalRateLimit(rate uint, duration time.Duration, enabled ...bool) Bui
 	}
 }
 
-func newRateLimit(rate uint, duration time.Duration, enabled ...bool) (*RateLimit, error) {
+func newRateLimit(rate uint, duration time.Duration, enabled ...bool) (*oas.RateLimit, error) {
 	if duration < minAllowedTimeFrameLength {
 		return nil, ErrMinRateLimitExceeded
 	}
@@ -159,10 +166,10 @@ func newRateLimit(rate uint, duration time.Duration, enabled ...bool) (*RateLimi
 		enable = enabled[0]
 	}
 
-	return &RateLimit{
+	return &oas.RateLimit{
 		Enabled: enable,
 		Rate:    int(rate),
-		Per:     ReadableDuration(duration),
+		Per:     oas.ReadableDuration(duration),
 	}, nil
 }
 
@@ -179,22 +186,18 @@ func withEndpoint(method, path string, fn EndpointFactory) BuilderOption {
 	}
 }
 
-// WithGet add get endpoint/path to OAS
 func WithGet(path string, fn EndpointFactory) BuilderOption {
 	return withEndpoint(http.MethodGet, path, fn)
 }
 
-// WithPost add post endpoint/path to OAS
 func WithPost(path string, fn EndpointFactory) BuilderOption {
 	return withEndpoint(http.MethodPost, path, fn)
 }
 
-// WithPut add put endpoint/path to OAS
 func WithPut(path string, fn EndpointFactory) BuilderOption {
 	return withEndpoint(http.MethodPut, path, fn)
 }
 
-// WithDelete add delete endpoint/path to OAS
 func WithDelete(path string, fn EndpointFactory) BuilderOption {
 	return withEndpoint(http.MethodDelete, path, fn)
 }
@@ -203,14 +206,49 @@ func (eb *EndpointBuilder) RateLimit(amount uint, duration time.Duration, enable
 	if rl, err := newRateLimit(amount, duration, enabled...); err != nil {
 		eb.errors = append(eb.errors, err)
 	} else {
-		eb.operation().RateLimit = (*RateLimitEndpoint)(rl)
+		eb.operation().RateLimit = (*oas.RateLimitEndpoint)(rl)
 	}
 
 	return eb
 }
 
+<<<<<<< HEAD:apidef/oas/builder.go
 func (eb *EndpointBuilder) Mock(fn func(mock *MockResponse)) *EndpointBuilder {
 	var mock MockResponse
+=======
+func (eb *EndpointBuilder) TransformResponseHeaders(factory func(*oas.TransformHeaders)) *EndpointBuilder {
+	op := eb.operation().TransformResponseHeaders
+
+	if op == nil {
+		op = &oas.TransformHeaders{Enabled: true}
+		eb.operation().TransformResponseHeaders = op
+	}
+
+	factory(op)
+
+	return eb
+}
+
+func (eb *EndpointBuilder) TransformResponseBody(factory func(*oas.TransformBody)) *EndpointBuilder {
+	op := eb.operation().TransformResponseBody
+
+	if op == nil {
+		op = &oas.TransformBody{Enabled: true}
+		eb.operation().TransformResponseBody = op
+	}
+
+	factory(op)
+
+	return eb
+}
+
+func (eb *EndpointBuilder) MockDefault() *EndpointBuilder {
+	return eb.Mock(func(_ *oas.MockResponse) {})
+}
+
+func (eb *EndpointBuilder) Mock(fn func(mock *oas.MockResponse)) *EndpointBuilder {
+	var mock oas.MockResponse
+>>>>>>> 773ff7b23... [TT-14914] No response middleware information in Tyk OAS API Debugger (#7158):internal/oasbuilder/builder.go
 	mock.Enabled = true
 	mock.Code = http.StatusOK
 	mock.Body = "ok"
@@ -225,9 +263,9 @@ func (eb *EndpointBuilder) operationId() string {
 	return strings.ToLower(eb.path + eb.method)
 }
 
-func (eb *EndpointBuilder) operation() *Operation {
+func (eb *EndpointBuilder) operation() *oas.Operation {
 	if eb.op == nil {
-		eb.op = &Operation{}
+		eb.op = &oas.Operation{}
 	}
 
 	return eb.op

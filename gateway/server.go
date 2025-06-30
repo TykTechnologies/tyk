@@ -947,7 +947,16 @@ func (gw *Gateway) loadCustomMiddleware(spec *APISpec) ([]string, apidef.Middlew
 }
 
 // Create the response processor chain
+<<<<<<< HEAD
 func (gw *Gateway) createResponseMiddlewareChain(spec *APISpec, responseFuncs []apidef.MiddlewareDefinition) {
+=======
+func (gw *Gateway) createResponseMiddlewareChain(
+	spec *APISpec,
+	middlewares []apidef.MiddlewareDefinition,
+	log *logrus.Entry,
+) []TykResponseHandler {
+
+>>>>>>> 773ff7b23... [TT-14914] No response middleware information in Tyk OAS API Debugger (#7158)
 	var (
 		responseMWChain []TykResponseHandler
 		baseHandler     = BaseTykResponseHandler{Spec: spec, Gw: gw}
@@ -1015,9 +1024,7 @@ func (gw *Gateway) createResponseMiddlewareChain(spec *APISpec, responseFuncs []
 		mainLog.WithError(err).Debug("Failed to init processor")
 	}
 
-	responseMWChain = append(responseMWChain, processor)
-
-	spec.ResponseChain = responseMWChain
+	return append(responseMWChain, processor)
 }
 
 func (gw *Gateway) isRPCMode() bool {
