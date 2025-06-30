@@ -65,20 +65,14 @@ func TestTraceHttpRequest(t *testing.T) {
 	})
 
 	t.Run("api-scoped rate limit works as expected", func(t *testing.T) {
-<<<<<<< HEAD
+
 		ts := StartTest(nil)
 		defer ts.Close()
 
-		oasDef, err := oas.NewOas(
-			oas.WithTestListenPathAndUpstream("/test", testServer.URL),
-			oas.WithGlobalRateLimit(1, 60*time.Second),
-			oas.WithGet("/rate-limited-api", func(b *oas.EndpointBuilder) {
-=======
 		oasDef, err := oasbuilder.Build(
 			oasbuilder.WithTestListenPathAndUpstream("/test", testServer.URL),
 			oasbuilder.WithGlobalRateLimit(1, 60*time.Second),
 			oasbuilder.WithGet("/rate-limited-api", func(b *oasbuilder.EndpointBuilder) {
->>>>>>> 773ff7b23... [TT-14914] No response middleware information in Tyk OAS API Debugger (#7158)
 				b.Mock(func(_ *oas.MockResponse) {})
 			}),
 		)
@@ -151,18 +145,13 @@ func TestTraceHttpRequest(t *testing.T) {
 	})
 
 	t.Run("endpoint-scoped rate limit middleware works as expected", func(t *testing.T) {
-<<<<<<< HEAD
+
 		ts := StartTest(nil)
 		defer ts.Close()
 
-		oasDef, err := oas.NewOas(
-			oas.WithTestListenPathAndUpstream("/test", testServer.URL),
-			oas.WithGet("/rate-limited-api2", func(b *oas.EndpointBuilder) {
-=======
 		oasDef, err := oasbuilder.Build(
 			oasbuilder.WithTestListenPathAndUpstream("/test", testServer.URL),
-			oasbuilder.WithGet("/rate-limited-api", func(b *oasbuilder.EndpointBuilder) {
->>>>>>> 773ff7b23... [TT-14914] No response middleware information in Tyk OAS API Debugger (#7158)
+			oasbuilder.WithGet("/rate-limited-api2", func(b *oasbuilder.EndpointBuilder) {
 				b.Mock(func(_ *oas.MockResponse) {}).RateLimit(1, time.Second)
 			}),
 		)

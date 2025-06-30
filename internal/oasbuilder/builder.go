@@ -8,11 +8,8 @@ import (
 	"strings"
 	"time"
 
-<<<<<<< HEAD:apidef/oas/builder.go
 	"github.com/TykTechnologies/kin-openapi/openapi3"
-=======
 	"github.com/TykTechnologies/tyk/apidef/oas"
->>>>>>> 773ff7b23... [TT-14914] No response middleware information in Tyk OAS API Debugger (#7158):internal/oasbuilder/builder.go
 	"github.com/TykTechnologies/tyk/common/option"
 	tykheaders "github.com/TykTechnologies/tyk/header"
 	"github.com/TykTechnologies/tyk/internal/uuid"
