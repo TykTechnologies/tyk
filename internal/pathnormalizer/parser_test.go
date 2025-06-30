@@ -92,6 +92,10 @@ func TestParser(t *testing.T) {
 			{"must parse named identifier RegExp separated by colon", "/user/id:[0-9]+/accelerate", "user/{id}/accelerate", map[string]string{
 				"id": "[0-9]+",
 			}},
+
+			// tests for parsing grpc-style paths
+			{"grpc service", "/v1.Service", "v1.Service", map[string]string{}},
+			{"grpc nested service", "/v1.Service/stats.Service", "v1.Service/stats.Service", map[string]string{}},
 		} {
 			t.Run(tc.name, func(t *testing.T) {
 				nPath, err := parser.Parse(tc.path)
@@ -150,6 +154,8 @@ func TestParser(t *testing.T) {
 }
 
 func paramsToMapHelper(t *testing.T, parameters []*openapi3.Parameter) map[string]string {
+	t.Helper()
+
 	m := make(map[string]string, len(parameters))
 
 	for _, p := range parameters {

@@ -414,7 +414,7 @@ func isUpperLetter(s byte) bool {
 }
 
 func isDigit(s byte) bool {
-	return s >= '0' && s <= '0'
+	return s >= '0' && s <= '9'
 }
 
 func isOneOf(s byte, str string) bool {
