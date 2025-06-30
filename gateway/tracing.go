@@ -65,6 +65,10 @@ type traceLogEntry struct {
 
 type traceLogType string
 
+func (s traceLogType) String() string {
+	return string(s)
+}
+
 const (
 	traceLogRequest  traceLogType = "request"
 	traceLogResponse traceLogType = "response"
@@ -195,7 +199,6 @@ func (gw *Gateway) traceHandler(w http.ResponseWriter, r *http.Request) {
 	logger.Out = &logStorage
 
 	gs := gw.prepareStorage()
-	subrouter := mux.NewRouter()
 
 	loader := &APIDefinitionLoader{Gw: gw}
 	traceReq.Spec.IsOAS = true
@@ -217,7 +220,7 @@ func (gw *Gateway) traceHandler(w http.ResponseWriter, r *http.Request) {
 		logrus.NewEntry(logger),
 		WithQuotaKey(spec.Checksum),
 	)
-	gw.generateSubRoutes(spec, subrouter)
+	gw.generateSubRoutes(spec, mux.NewRouter())
 
 	if chainObj.ThisHandler == nil {
 		doJSONWrite(w, http.StatusBadRequest, traceResponse{Message: "error", Logs: logStorage.String()})
