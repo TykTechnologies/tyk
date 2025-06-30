@@ -18,6 +18,7 @@ import (
 
 	"github.com/TykTechnologies/murmur3"
 	"github.com/TykTechnologies/tyk/header"
+	"github.com/TykTechnologies/tyk/internal/middleware"
 	"github.com/TykTechnologies/tyk/regexp"
 	"github.com/TykTechnologies/tyk/request"
 	"github.com/TykTechnologies/tyk/storage"
@@ -279,7 +280,7 @@ func (m *RedisCacheMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 	}
 
 	// Stop any further execution after we wrote cache out
-	return nil, mwStatusRespond
+	return nil, middleware.StatusRespond
 }
 
 func isSafeMethod(method string) bool {

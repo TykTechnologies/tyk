@@ -20,11 +20,10 @@ import (
 	_ "github.com/robertkrimen/otto/underscore"
 
 	"github.com/TykTechnologies/tyk-pump/analytics"
-
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/header"
+	"github.com/TykTechnologies/tyk/internal/middleware"
 	"github.com/TykTechnologies/tyk/user"
-
 	"github.com/sirupsen/logrus"
 )
 
@@ -318,7 +317,7 @@ func (d *VirtualEndpoint) ProcessRequest(w http.ResponseWriter, r *http.Request,
 		return errors.New(message), http.StatusInternalServerError
 	}
 
-	return nil, mwStatusRespond
+	return nil, middleware.StatusRespond
 }
 
 func (d *VirtualEndpoint) HandleResponse(rw http.ResponseWriter, res *http.Response, ses *user.SessionState) {

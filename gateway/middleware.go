@@ -38,7 +38,6 @@ import (
 )
 
 const (
-	mwStatusRespond                = middleware.StatusRespond
 	DEFAULT_ORG_SESSION_EXPIRATION = int64(604800)
 )
 
@@ -136,7 +135,7 @@ func (gw *Gateway) createMiddleware(actualMW TykMiddleware) func(http.Handler) h
 		mw.Logger().Fatal("[Middleware] Configuration load failed")
 	}
 
-	return func(h http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			logger := mw.Base().SetRequestLogger(r)
 
@@ -165,7 +164,7 @@ func (gw *Gateway) createMiddleware(actualMW TykMiddleware) func(http.Handler) h
 			logger.WithField("ts", startTime.UnixNano()).WithField("mw", mw.Name()).Debug("Started")
 
 			if mw.Base().Spec.CORS.OptionsPassthrough && r.Method == "OPTIONS" {
-				h.ServeHTTP(w, r)
+				next.ServeHTTP(w, r)
 				return
 			}
 
@@ -205,10 +204,10 @@ func (gw *Gateway) createMiddleware(actualMW TykMiddleware) func(http.Handler) h
 
 			mw.Base().UpdateRequestSession(r)
 			// Special code, bypasses all other execution
-			if errCode != mwStatusRespond {
+			if errCode != middleware.StatusRespond {
 				// No error, carry on...
 				meta["bypass"] = "1"
-				h.ServeHTTP(w, r)
+				next.ServeHTTP(w, r)
 			}
 		})
 	}
