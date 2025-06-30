@@ -950,7 +950,7 @@ func (gw *Gateway) createResponseMiddlewareChain(
 	spec *APISpec,
 	middlewares []apidef.MiddlewareDefinition,
 	log *logrus.Entry,
-) {
+) []TykResponseHandler {
 
 	var (
 		responseMWChain []TykResponseHandler
@@ -1025,9 +1025,7 @@ func (gw *Gateway) createResponseMiddlewareChain(
 		log.WithError(err).Debug("Failed to init processor")
 	}
 
-	responseMWChain = append(responseMWChain, processor)
-
-	spec.ResponseChain = responseMWChain
+	return append(responseMWChain, processor)
 }
 
 func (gw *Gateway) isRPCMode() bool {
