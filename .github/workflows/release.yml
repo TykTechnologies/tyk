@@ -344,7 +344,7 @@ jobs:
         with:
           org_gh_token: ${{ github.token }}
       - name: Set up test environment
-        uses: TykTechnologies/github-actions/.github/actions/tests/env-up@main
+        uses: TykTechnologies/github-actions/.github/actions/tests/env-up@fix_tags_inenv-up_action
         timeout-minutes: 5
         id: env_up
         with:
