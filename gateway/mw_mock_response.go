@@ -21,20 +21,12 @@ var _ TykMiddleware = (*mockResponseMiddleware)(nil)
 
 type mockResponseMiddleware struct {
 	*BaseMiddleware
-
-	openTelemetryEnabled bool
 }
 
 func newMockResponseMiddleware(base *BaseMiddleware, opts ...option.Option[mockResponseMiddleware]) TykMiddleware {
 	return option.New(opts).Build(mockResponseMiddleware{
 		BaseMiddleware: base,
 	})
-}
-
-func withOpenTelemetry(enabled bool) option.Option[mockResponseMiddleware] {
-	return func(m *mockResponseMiddleware) {
-		m.openTelemetryEnabled = enabled
-	}
 }
 
 func (m *mockResponseMiddleware) Name() string {
@@ -45,7 +37,7 @@ func (m *mockResponseMiddleware) EnabledForSpec() bool {
 	return m.Spec.hasActiveMock()
 }
 
-func (m *mockResponseMiddleware) forward(res *http.Response, rw http.ResponseWriter) (int, error) {
+func (m *mockResponseMiddleware) forward(res *http.Response, rw http.ResponseWriter) error {
 	for key, values := range res.Header {
 		for _, value := range values {
 			rw.Header().Add(key, value)
@@ -54,16 +46,18 @@ func (m *mockResponseMiddleware) forward(res *http.Response, rw http.ResponseWri
 
 	rw.WriteHeader(res.StatusCode)
 	if res.Body == nil {
-		return 0, nil
+		return nil
 	}
 
 	body, err := io.ReadAll(res.Body)
 
 	if err != nil {
-		return 0, err
+		return err
 	}
 
-	return rw.Write(body)
+	_, err = rw.Write(body)
+
+	return err
 }
 
 func (m *mockResponseMiddleware) ProcessRequest(rw http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
@@ -81,9 +75,14 @@ func (m *mockResponseMiddleware) ProcessRequest(rw http.ResponseWriter, r *http.
 		return nil, http.StatusOK
 	}
 
-	_, err = m.forward(res, rw)
+	if abortForward, err := handleResponseChain(m.Spec.ResponseChain, rw, res, r, ctxGetSession(r)); err != nil {
+		return fmt.Errorf("failed to process response chain: %w", err), http.StatusInternalServerError
+	} else if abortForward {
+		// response received from plugin
+		return nil, middleware.StatusRespond
+	}
 
-	if err != nil {
+	if err = m.forward(res, rw); err != nil {
 		return fmt.Errorf("failed to forward response: %w", err), http.StatusInternalServerError
 	}
 

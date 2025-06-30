@@ -8,12 +8,12 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/TykTechnologies/tyk-pump/analytics"
-	"github.com/TykTechnologies/tyk/apidef"
-
 	"github.com/sirupsen/logrus"
 
+	"github.com/TykTechnologies/tyk-pump/analytics"
+	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/goplugin"
+	"github.com/TykTechnologies/tyk/internal/middleware"
 	"github.com/TykTechnologies/tyk/request"
 )
 
@@ -257,7 +257,7 @@ func (m *GoPluginMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reque
 			successHandler.RecordHit(r, analytics.Latency{Total: int64(ms)}, rw.statusCodeSent, rw.getHttpResponse(r), false)
 
 			// no need to continue passing this request down to reverse proxy
-			respCode = mwStatusRespond
+			respCode = middleware.StatusRespond
 		}
 	} else {
 		respCode = http.StatusOK
