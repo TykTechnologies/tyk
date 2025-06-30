@@ -958,7 +958,7 @@ func (o *Operation) extractMockResponsePaths(
 	}
 
 	mr := apidef.MockResponseMeta{
-		Disabled:   false,
+		Disabled:   !o.MockResponse.Enabled,
 		Path:       path,
 		Method:     method,
 		IgnoreCase: false,
