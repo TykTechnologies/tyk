@@ -3,23 +3,22 @@ package gateway
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
+	"fmt"
+	"io/ioutil"
+	"net/http"
 	"net/url"
 	"reflect"
 	"strings"
 	"time"
 	"unicode/utf8"
 
-	"github.com/sirupsen/logrus"
-
 	"github.com/TykTechnologies/tyk-pump/analytics"
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/coprocess"
+	"github.com/TykTechnologies/tyk/internal/middleware"
 	"github.com/TykTechnologies/tyk/user"
-
-	"errors"
-	"fmt"
-	"io/ioutil"
-	"net/http"
+	"github.com/sirupsen/logrus"
 )
 
 var (
@@ -446,7 +445,7 @@ func (m *CoProcessMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 		}
 		res.ContentLength = int64(len(returnObject.Request.ReturnOverrides.ResponseBody))
 		m.successHandler.RecordHit(r, analytics.Latency(analytics.Latency{Total: int64(ms)}), int(returnObject.Request.ReturnOverrides.ResponseCode), res, false)
-		return nil, mwStatusRespond
+		return nil, middleware.StatusRespond
 	}
 
 	// Is this a CP authentication middleware?
