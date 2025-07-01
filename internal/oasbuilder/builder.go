@@ -1,14 +1,15 @@
-package oas
+package oasbuilder
 
 import (
 	"errors"
 	"fmt"
-	"github.com/TykTechnologies/kin-openapi/openapi3"
 	"net/http"
 	"net/url"
 	"strings"
 	"time"
 
+	"github.com/TykTechnologies/kin-openapi/openapi3"
+	"github.com/TykTechnologies/tyk/apidef/oas"
 	"github.com/TykTechnologies/tyk/common/option"
 )
 
@@ -16,8 +17,8 @@ type (
 	// Builder OAS builder is responsible for providing methods for building valid OAS object.
 	Builder struct {
 		errors         []error
-		oas            *OAS
-		xTykAPIGateway *XTykAPIGateway
+		oas            *oas.OAS
+		xTykAPIGateway *oas.XTykAPIGateway
 	}
 
 	// EndpointBuilder OAS endpoint builder should be used for building endpoint and binding middlewares to it.
@@ -25,7 +26,7 @@ type (
 		method string
 		path   string
 		errors []error
-		op     *Operation
+		op     *oas.Operation
 	}
 
 	// BuilderOption optional parameter should be used to define builder options in declarative way.
@@ -47,31 +48,31 @@ var (
 	ErrZeroAmountInRateLimit = errors.New("zero amount in rate limit")
 )
 
-// NewOas returns an allocated *OAS due to provided options
-func NewOas(opts ...BuilderOption) (*OAS, error) {
+// Build returns an allocated *OAS due to provided options
+func Build(opts ...BuilderOption) (*oas.OAS, error) {
 	return option.New(opts).Build(NewBuilder()).Build()
 }
 
 func NewBuilder() Builder {
-	oasDef := OAS{}
+	oasDef := oas.OAS{}
 
 	oasDef.Paths = openapi3.Paths{}
 
-	xTykAPIGateway := XTykAPIGateway{
-		Info: Info{},
+	xTykAPIGateway := oas.XTykAPIGateway{
+		Info: oas.Info{},
 
-		Server: Server{
-			ListenPath: ListenPath{
+		Server: oas.Server{
+			ListenPath: oas.ListenPath{
 				Strip: true,
 			},
 		},
 
-		Upstream: Upstream{
-			Proxy: &Proxy{Enabled: true},
+		Upstream: oas.Upstream{
+			Proxy: &oas.Proxy{Enabled: true},
 		},
 
-		Middleware: &Middleware{
-			Operations: Operations{},
+		Middleware: &oas.Middleware{
+			Operations: oas.Operations{},
 		},
 	}
 
@@ -86,7 +87,7 @@ func (b *Builder) appendErrors(errs ...error) {
 	b.errors = append(b.errors, errs...)
 }
 
-func (b *Builder) Build() (*OAS, error) {
+func (b *Builder) Build() (*oas.OAS, error) {
 	if len(b.errors) > 0 {
 		return nil, errors.Join(b.errors...)
 	}
@@ -145,7 +146,7 @@ func WithGlobalRateLimit(rate uint, duration time.Duration, enabled ...bool) Bui
 	}
 }
 
-func newRateLimit(rate uint, duration time.Duration, enabled ...bool) (*RateLimit, error) {
+func newRateLimit(rate uint, duration time.Duration, enabled ...bool) (*oas.RateLimit, error) {
 	if duration < minAllowedTimeFrameLength {
 		return nil, ErrMinRateLimitExceeded
 	}
@@ -159,10 +160,10 @@ func newRateLimit(rate uint, duration time.Duration, enabled ...bool) (*RateLimi
 		enable = enabled[0]
 	}
 
-	return &RateLimit{
+	return &oas.RateLimit{
 		Enabled: enable,
 		Rate:    int(rate),
-		Per:     ReadableDuration(duration),
+		Per:     oas.ReadableDuration(duration),
 	}, nil
 }
 
@@ -203,14 +204,14 @@ func (eb *EndpointBuilder) RateLimit(amount uint, duration time.Duration, enable
 	if rl, err := newRateLimit(amount, duration, enabled...); err != nil {
 		eb.errors = append(eb.errors, err)
 	} else {
-		eb.operation().RateLimit = (*RateLimitEndpoint)(rl)
+		eb.operation().RateLimit = (*oas.RateLimitEndpoint)(rl)
 	}
 
 	return eb
 }
 
-func (eb *EndpointBuilder) Mock(fn func(mock *MockResponse)) *EndpointBuilder {
-	var mock MockResponse
+func (eb *EndpointBuilder) Mock(fn func(mock *oas.MockResponse)) *EndpointBuilder {
+	var mock oas.MockResponse
 	mock.Enabled = true
 	mock.Code = http.StatusOK
 	mock.Body = "ok"
@@ -225,9 +226,9 @@ func (eb *EndpointBuilder) operationId() string {
 	return strings.ToLower(eb.path + eb.method)
 }
 
-func (eb *EndpointBuilder) operation() *Operation {
+func (eb *EndpointBuilder) operation() *oas.Operation {
 	if eb.op == nil {
-		eb.op = &Operation{}
+		eb.op = &oas.Operation{}
 	}
 
 	return eb.op

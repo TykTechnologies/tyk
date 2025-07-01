@@ -328,3 +328,5 @@ require (
 )
 
 replace go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.54.0 => go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.49.0
+
+replace github.com/TykTechnologies/graphql-translator => github.com/TykTechnologies/graphql-translator v0.0.0-20250423061552-2acd6818080e

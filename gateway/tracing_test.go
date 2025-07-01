@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"github.com/TykTechnologies/tyk/internal/oasbuilder"
 	"github.com/samber/lo"
 	"io"
 	"net/http"
@@ -58,10 +59,10 @@ func TestTraceHandler_RateLimiterGlobalWorksAsExpected(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
-	oasDef, err := oas.NewOas(
-		oas.WithTestDefaults(),
-		oas.WithGlobalRateLimit(1, 60*time.Second),
-		oas.WithGet("/rate-limited-api", func(b *oas.EndpointBuilder) {
+	oasDef, err := oasbuilder.Build(
+		oasbuilder.WithTestDefaults(),
+		oasbuilder.WithGlobalRateLimit(1, 60*time.Second),
+		oasbuilder.WithGet("/rate-limited-api", func(b *oasbuilder.EndpointBuilder) {
 			b.Mock(func(_ *oas.MockResponse) {})
 		}),
 	)
@@ -132,10 +133,10 @@ func TestTraceHandler_RateLimiterExceeded(t *testing.T) {
 	}))
 	defer mockServer.Close()
 
-	oasDef, err := oas.NewOas(
-		oas.WithTestDefaults(),
-		oas.WithUpstreamUrl(mockServer.URL),
-		oas.WithGet("/rate-limited-api", func(b *oas.EndpointBuilder) {
+	oasDef, err := oasbuilder.Build(
+		oasbuilder.WithTestDefaults(),
+		oasbuilder.WithUpstreamUrl(mockServer.URL),
+		oasbuilder.WithGet("/rate-limited-api", func(b *oasbuilder.EndpointBuilder) {
 			b.Mock(func(_ *oas.MockResponse) {}).RateLimit(1, time.Second)
 		}),
 	)
@@ -220,10 +221,10 @@ func TestTraceHandler_MockMiddlewareRespondsWithProvidedData(t *testing.T) {
 	msgJson, err := json.Marshal(srcMessage)
 	require.NoError(t, err)
 
-	oasDef, err := oas.NewOas(
-		oas.WithTestDefaults(),
-		oas.WithUpstreamUrl(mockServer.URL),
-		oas.WithGet("/mock", func(b *oas.EndpointBuilder) {
+	oasDef, err := oasbuilder.Build(
+		oasbuilder.WithTestDefaults(),
+		oasbuilder.WithUpstreamUrl(mockServer.URL),
+		oasbuilder.WithGet("/mock", func(b *oasbuilder.EndpointBuilder) {
 			b.Mock(func(mock *oas.MockResponse) {
 				mock.Code = http.StatusCreated
 				mock.Body = string(msgJson)

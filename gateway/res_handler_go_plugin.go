@@ -63,11 +63,11 @@ func (h *ResponseGoPluginMiddleware) Init(c interface{}, spec *APISpec) error {
 	return nil
 }
 
-func (h *ResponseGoPluginMiddleware) HandleError(rw http.ResponseWriter, req *http.Request) {
+func (h *ResponseGoPluginMiddleware) HandleError(_ http.ResponseWriter, _ *http.Request) {
 	//noop
 }
 
-func (h *ResponseGoPluginMiddleware) HandleResponse(w http.ResponseWriter, res *http.Response, req *http.Request, ses *user.SessionState) error {
+func (h *ResponseGoPluginMiddleware) HandleResponse(w http.ResponseWriter, res *http.Response, req *http.Request, _ *user.SessionState) error {
 	err := h.HandleGoPluginResponse(w, res, req)
 	if err != nil {
 		return err
