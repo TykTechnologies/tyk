@@ -32,6 +32,11 @@ type OAS struct {
 	openapi3.T
 }
 
+// NewOas create new empty OAS.
+func NewOas() (*OAS, error) {
+	return &OAS{}, nil
+}
+
 // MarshalJSON implements json.Marshaller.
 func (s *OAS) MarshalJSON() ([]byte, error) {
 	if ShouldOmit(s.ExternalDocs) { // for sql case
