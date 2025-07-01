@@ -3393,7 +3393,7 @@ func ctxSetOperation(r *http.Request, op *Operation) {
 
 func ctxGetOperation(r *http.Request) (op *Operation) {
 	if v := r.Context().Value(ctx.OASOperation); v != nil {
-		op = v.(*Operation)
+		op = v.(*Operation) // nolint
 	}
 	return
 }
