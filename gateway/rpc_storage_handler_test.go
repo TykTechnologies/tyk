@@ -651,3 +651,38 @@ func TestDeleteUsingTokenID(t *testing.T) {
 		assert.Equal(t, 404, status)
 	})
 }
+
+func TestIsRetriableError(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	rpcHandler := RPCStorageHandler{
+		KeyPrefix:        "rpc.listener.",
+		SuppressRegister: true,
+		Gw:               ts.Gw,
+	}
+
+	testCases := []struct {
+		name     string
+		err      error
+		expected bool
+	}{
+		{
+			name:     "Access Denied error is retriable",
+			err:      errors.New("Access Denied"),
+			expected: true,
+		},
+		{
+			name:     "Timeout error is retriable",
+			err:      errors.New("Cannot obtain response during timeout=30s"),
+			expected: true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			result := rpcHandler.IsRetriableError(tc.err)
+			assert.Equal(t, tc.expected, result, "IsRetriableError(%v) should return %v", tc.err, tc.expected)
+		})
+	}
+}
