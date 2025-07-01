@@ -435,6 +435,26 @@ func (s *OAS) ReplaceServers(apiURLs, oldAPIURLs []string) {
 	s.Servers = append(newServers, userAddedServers...)
 }
 
+func (s *OAS) findOrCreateOperation(path, method string) *openapi3.Operation {
+	operationID := s.getOperationID(path, method)
+	pathItem := s.getOrCreatePathItem(path)
+	operation := pathItem.GetOperation(method)
+
+	if operation == nil {
+		operation = &openapi3.Operation{
+			Responses: openapi3.NewResponses(),
+		}
+
+		pathItem.SetOperation(method, operation)
+	}
+
+	if operation.OperationID == "" {
+		operation.OperationID = operationID
+	}
+
+	return operation
+}
+
 // Validate validates OAS document by calling openapi3.T.Validate() function. In addition, it validates Security
 // Requirement section and it's requirements by calling OAS.validateSecurity() function.
 func (s *OAS) Validate(ctx context.Context, opts ...openapi3.ValidationOption) error {
@@ -450,12 +470,12 @@ func (s *OAS) Validate(ctx context.Context, opts ...openapi3.ValidationOption) e
 			WithField("origin", *s).
 			WithField("normalized", *normalized).
 			Errorf("failed to validate OAS")
-
-		return err
 	}
 
-	// todo: replace as it was (join errors)
-	return normalized.validateSecurity()
+	return errors.Join(
+		err,
+		normalized.validateSecurity(),
+	)
 }
 
 // validateSecurity verifies that existing Security Requirement Objects has Security Schemes declared in the Security

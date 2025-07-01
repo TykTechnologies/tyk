@@ -123,14 +123,13 @@ func TestImportValidateRequest(t *testing.T) {
 
 		got := make([]string, 0, len(extension.Middleware.Operations))
 		for operationID, op := range extension.Middleware.Operations {
+
 			if op.ValidateRequest != nil {
 				got = append(got, operationID)
 			}
 		}
 
-		sort.Strings(want)
-		sort.Strings(got)
-
-		assert.Equal(t, want, got)
+		assert.Subset(t, want, got)
+		assert.Subset(t, got, want)
 	})
 }

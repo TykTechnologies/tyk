@@ -908,7 +908,8 @@ func TestMigrateAndFillOAS(t *testing.T) {
 							},
 						},
 					},
-				}},
+				},
+			},
 		}
 		_, _, err = MigrateAndFillOAS(&api)
 		assert.ErrorContains(t, err, "version API Furkan-v2 migrated OAS is not valid")
@@ -1462,7 +1463,7 @@ func TestOAS_ValidateSecurity(t *testing.T) {
 				assert.NoError(t, err)
 			} else {
 				assert.Error(t, err)
-				assert.Contains(t, err.Error(), tt.expectedError)
+				assert.ErrorContains(t, err, tt.expectedError)
 			}
 		})
 	}

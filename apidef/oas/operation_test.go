@@ -4,6 +4,8 @@ import (
 	"cmp"
 	"context"
 	"embed"
+	"github.com/TykTechnologies/tyk/internal/reflect"
+	"github.com/TykTechnologies/tyk/internal/utils"
 	"net/http"
 	"slices"
 	"sort"
@@ -463,8 +465,16 @@ func TestOAS_PathsAndOperationsRegex(t *testing.T) {
 
 	var oas OAS
 	oas.Paths = openapi3.NewPaths()
+	oas.Paths.Set("/users/[a-z]+/[0-9]+$", &openapi3.PathItem{
+		Get: &openapi3.Operation{
+			OperationID: expectedOperationID,
+			Responses:   openapi3.NewResponses(),
+		},
+	})
+	err := oas.Normalize()
 
-	_ = oas.getOperationID("/users/[a-z]+/[0-9]+$", "GET")
+	require.NoError(t, err)
+	//_ = oas.getOperationID("/users/[a-z]+/[0-9]+$", "GET")
 
 	expectedPathItems := openapi3.NewPaths()
 	expectedPathItems.Set(expectedPath, &openapi3.PathItem{
@@ -561,16 +571,18 @@ func TestOAS_RegexPaths(t *testing.T) {
 	}
 
 	for i, tc := range tests {
+
 		var oas OAS
 		oas.Paths = openapi3.NewPaths()
-		_ = oas.getOperationID(tc.input, "GET")
-
-		pathKeys := make([]string, 0, len(oas.Paths.Map()))
-		for k := range oas.Paths.Map() {
-			pathKeys = append(pathKeys, k)
-		}
-
-		assert.Lenf(t, oas.Paths.Map(), 1, "Expected one path key being created, got %#v", pathKeys)
+		oas.Paths.Set(tc.input, &openapi3.PathItem{
+			Get: &openapi3.Operation{
+				OperationID: tc.input,
+				Responses:   openapi3.NewResponses(),
+			},
+		})
+		err := oas.Normalize()
+		require.NoError(t, err)
+		assert.Len(t, oas.Paths.Map(), 1)
 
 		p := oas.Paths.Value(tc.want)
 		require.NotNil(t, p, "test %s: expected path to be created", tc.input)
@@ -1306,110 +1318,10 @@ func TestOAS_fillAllowance(t *testing.T) {
 	})
 }
 
-func TestSplitPath(t *testing.T) {
-	tests := map[string]struct {
-		input     string
-		wantParts []pathPart
-		wantRegex bool
-	}{
-		"simple path": {
-			input: "/test/path",
-			wantParts: []pathPart{
-				{name: "test", value: "test", isRegex: false},
-				{name: "path", value: "path", isRegex: false},
-			},
-			wantRegex: false,
-		},
-		"path with regex": {
-			input: "/test/.*/end",
-			wantParts: []pathPart{
-				{name: "test", value: "test", isRegex: false},
-				{name: "customRegex1", value: ".*", isRegex: true},
-				{name: "end", value: "end", isRegex: false},
-			},
-			wantRegex: true,
-		},
-		"path with curly braces": {
-			input: "/users/{id}/profile",
-			wantParts: []pathPart{
-				{name: "users", value: "users", isRegex: false},
-				{name: "id", isRegex: true},
-				{name: "profile", value: "profile", isRegex: false},
-			},
-			wantRegex: true,
-		},
-		"path with named regex": {
-			input: "/users/{userId:[0-9]+}/posts",
-			wantParts: []pathPart{
-				{name: "users", value: "users", isRegex: false},
-				{name: "userId", isRegex: true},
-				{name: "posts", value: "posts", isRegex: false},
-			},
-			wantRegex: true,
-		},
-		"path with named direct regex": {
-			input: "/users/[0-9]+/posts",
-			wantParts: []pathPart{
-				{name: "users", value: "users", isRegex: false},
-				{name: "customRegex1", value: "[0-9]+", isRegex: true},
-				{name: "posts", value: "posts", isRegex: false},
-			},
-			wantRegex: true,
-		},
-		"empty path": {
-			input:     "",
-			wantParts: []pathPart{},
-			wantRegex: false,
-		},
-		"root path": {
-			input:     "/",
-			wantParts: []pathPart{},
-			wantRegex: false,
-		},
-		"path with multiple regexes": {
-			input: "/users/{userId:[0-9]+}/posts/{postId:[a-z]+}/[a-z]+/{[0-9]{2}}/[a-z]{10}/abc/{id}/def/[0-9]+",
-			wantParts: []pathPart{
-				{name: "users", value: "users", isRegex: false},
-				{name: "userId", isRegex: true},
-				{name: "posts", value: "posts", isRegex: false},
-				{name: "postId", isRegex: true},
-				{name: "customRegex1", value: "[a-z]+", isRegex: true},
-				{name: "customRegex2", value: "", isRegex: true},
-				{name: "customRegex3", value: "[a-z]{10}", isRegex: true},
-				{name: "abc", value: "abc", isRegex: false},
-				{name: "id", isRegex: true},
-				{name: "def", value: "def", isRegex: false},
-				{name: "customRegex4", value: "[0-9]+", isRegex: true},
-			},
-			wantRegex: true,
-		},
-	}
-
-	for name, tc := range tests {
-		t.Run(name, func(t *testing.T) {
-			gotParts, gotRegex := splitPath(tc.input)
-
-			assert.Equal(t, tc.wantRegex, gotRegex, "regex detection mismatch")
-			assert.Equal(t, tc.wantParts, gotParts, "parts mismatch")
-		})
-	}
-}
-
 func TestGetOperationID(t *testing.T) {
-	type expectedParam struct {
-		pattern   string
-		paramType string
-	}
-
-	tests := map[string]struct {
-		inPath         string
-		method         string
-		expectedID     string
-		expectedPath   string
-		existingParams map[string]expectedParam
-		expectedParams map[string]expectedParam
-	}{
-		"simple path": {
+	tests := []getOperationIdTestCase{
+		{
+			name:           "simple path",
 			inPath:         "/simple",
 			method:         "GET",
 			expectedID:     "simpleGET",
@@ -1417,17 +1329,19 @@ func TestGetOperationID(t *testing.T) {
 			existingParams: nil,
 			expectedParams: nil,
 		},
-		"path with regex": {
+		{
+			name:           "path with regex",
 			inPath:         "/items/{id}",
 			method:         "GET",
 			expectedID:     "items/{id}GET",
 			expectedPath:   "/items/{id}",
 			existingParams: nil,
-			expectedParams: map[string]expectedParam{
-				"id": {pattern: "", paramType: "string"},
+			expectedParams: testParams{
+				{"id", "[^/]+", "string"},
 			},
 		},
-		"path with trailing slash": {
+		{
+			name:           "path with trailing slash",
 			inPath:         "/trailing/",
 			method:         "POST",
 			expectedID:     "trailing/POST",
@@ -1435,102 +1349,121 @@ func TestGetOperationID(t *testing.T) {
 			existingParams: nil,
 			expectedParams: nil,
 		},
-		"complex regex path": {
+		{
+			name:         "complex regex path",
 			inPath:       "/complex/{id}",
 			method:       "PUT",
 			expectedID:   "complex/{id}PUT",
 			expectedPath: "/complex/{id}",
-			existingParams: map[string]expectedParam{
-				"id": {pattern: "", paramType: "integer"},
+			existingParams: testParams{
+				{"id", "", "integer"},
 			},
-			expectedParams: map[string]expectedParam{
-				"id": {pattern: "", paramType: "integer"},
+			expectedParams: testParams{
+				{"id", "", "integer"},
 			},
 		},
-		"path with existing parameter": {
+		{
+			name:         "path with existing parameter",
 			inPath:       "/existing/{id}",
 			method:       "DELETE",
 			expectedID:   "existing/{id}DELETE",
 			expectedPath: "/existing/{id}",
-			existingParams: map[string]expectedParam{
-				"id": {pattern: "[0-9]+", paramType: "string"},
+			existingParams: testParams{
+				{"id", "[0-9]+", "string"},
 			},
-			expectedParams: map[string]expectedParam{
-				"id": {pattern: "[0-9]+", paramType: "string"},
+			expectedParams: testParams{
+				{"id", "[0-9]+", "string"},
 			},
 		},
 	}
 
-	for name, tc := range tests {
-		t.Run(name, func(t *testing.T) {
-			oas := &OAS{
-				T: openapi3.T{
-					Paths: openapi3.NewPaths(),
-				},
-			}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			var oas = new(OAS)
+			oas.Paths = tc.createPaths()
+			err := oas.Normalize()
 
-			// Prepopulate existing parameters if any
-			if tc.existingParams != nil {
-				pathItem := &openapi3.PathItem{}
-				for paramName, param := range tc.existingParams {
-					pathItem.Parameters = append(pathItem.Parameters, &openapi3.ParameterRef{
-						Value: &openapi3.Parameter{
-							Name:     paramName,
-							In:       "path",
-							Required: true,
-							Schema: &openapi3.SchemaRef{
-								Value: &openapi3.Schema{
-									Type:    &openapi3.Types{param.paramType},
-									Pattern: param.pattern,
-								},
-							},
-						},
-					})
-				}
-				oas.Paths.Set(tc.expectedPath, pathItem)
-			}
+			assert.NoError(t, err)
 
-			operationID := oas.getOperationID(tc.inPath, tc.method)
-
-			if operationID != tc.expectedID {
-				t.Errorf("expected operation ID %s, got %s", tc.expectedID, operationID)
-			}
+			assert.Equal(t, tc.expectedID, oas.getOperationID(tc.inPath, tc.method))
 
 			pathItem := oas.Paths.Value(tc.expectedPath)
-			if pathItem == nil {
-				t.Errorf("expected path %s to be created", tc.expectedPath)
-				return
-			}
+			assert.NotNil(t, pathItem)
 
-			if tc.expectedParams != nil {
-				if pathItem.Parameters == nil {
-					t.Errorf("expected parameters for path %s, but got none", tc.expectedPath)
-					return
-				}
+			expected := tc.expectedParams.refs()
 
-				for _, paramRef := range pathItem.Parameters {
-					param := paramRef.Value
-					expected, exists := tc.expectedParams[param.Name]
-					if !exists {
-						t.Errorf("unexpected parameter %s found", param.Name)
-						continue
-					}
-
-					if param.Schema.Value.Pattern != expected.pattern {
-						t.Errorf("expected pattern %s for parameter %s, got %s", expected.pattern, param.Name, param.Schema.Value.Pattern)
-					}
-
-					if param.Schema.Value.Type == nil || len(*param.Schema.Value.Type) == 0 {
-						t.Errorf("parameter %s has nil or empty type", param.Name)
-						continue
-					}
-					if !param.Schema.Value.Type.Is(expected.paramType) {
-						t.Errorf("expected type %s for parameter %s, got %s", expected.paramType, param.Name, param.Schema.Value.Type)
-					}
-				}
-			} else if pathItem.Parameters != nil {
-				t.Errorf("did not expect parameters for path %s, but found some", tc.expectedPath)
-			}
+			assert.Equal(t, expected, pathItem.Parameters)
 		})
 	}
+}
+
+type testParam struct {
+	name      string
+	pattern   string
+	paramType string
+}
+
+type testParams []testParam
+
+func (tp testParams) each(cb func(param *openapi3.ParameterRef)) {
+	clone := reflect.Clone(tp)
+
+	slices.SortFunc(clone, func(a, b testParam) int {
+		return cmp.Compare(a.name, b.name)
+	})
+
+	for _, param := range clone {
+		pRef := openapi3.ParameterRef{
+			Value: openapi3.
+				NewPathParameter(param.name).
+				WithSchema(
+					&openapi3.Schema{
+						Type:    utils.AsPtr(openapi3.Types{param.paramType}),
+						Pattern: param.pattern,
+					},
+				),
+		}
+
+		cb(&pRef)
+	}
+}
+
+func (tp testParams) refs() openapi3.Parameters {
+	var res []*openapi3.ParameterRef
+
+	tp.each(func(param *openapi3.ParameterRef) {
+		res = append(res, param)
+	})
+
+	return res
+}
+
+type getOperationIdTestCase struct {
+	name           string
+	inPath         string
+	method         string
+	expectedID     string
+	expectedPath   string
+	existingParams testParams
+	expectedParams testParams
+}
+
+func (tc *getOperationIdTestCase) createPaths() *openapi3.Paths {
+	pathItem := &openapi3.PathItem{}
+	pathItem.SetOperation(tc.method, &openapi3.Operation{
+		OperationID: tc.expectedID,
+		Responses: openapi3.NewResponses(
+			openapi3.WithStatus(200, &openapi3.ResponseRef{
+				Value: openapi3.NewResponse(),
+			}),
+		),
+	})
+
+	tc.existingParams.each(func(param *openapi3.ParameterRef) {
+		pathItem.Parameters = append(pathItem.Parameters, reflect.Clone(param))
+	})
+
+	return openapi3.NewPaths(
+		openapi3.WithPath(tc.inPath, pathItem),
+	)
 }

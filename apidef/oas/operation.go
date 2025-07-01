@@ -2,7 +2,6 @@ package oas
 
 import (
 	"encoding/json"
-	"fmt"
 	"github.com/TykTechnologies/tyk/internal/pathnormalizer"
 	"net/http"
 	"sort"
@@ -13,7 +12,6 @@ import (
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/internal/oasutil"
-	"github.com/TykTechnologies/tyk/regexp"
 )
 
 // Operations holds Operation definitions.
@@ -573,73 +571,12 @@ func (p pathPart) String() string {
 	return p.value
 }
 
-// splitPath splits URL into folder parts, detecting regex patterns.
-func splitPath(inPath string) ([]pathPart, bool) {
-	trimmedPath := strings.Trim(inPath, "/")
-
-	if trimmedPath == "" {
-		return []pathPart{}, false
+func (s *OAS) getOrCreatePathItem(path string) *openapi3.PathItem {
+	if s.Paths.Value(path) == nil {
+		s.Paths.Set(path, &openapi3.PathItem{})
 	}
 
-	parts := strings.Split(trimmedPath, "/")
-	result := make([]pathPart, len(parts))
-
-	regexCount := 0
-	hasRegex := false
-
-	for i, segment := range parts {
-		var part pathPart
-		part, regexCount, hasRegex = parsePathSegment(segment, regexCount, hasRegex)
-		result[i] = part
-	}
-
-	return result, hasRegex
-}
-
-// buildPath converts the URL paths with regex to named parameters
-// e.g. ["a", ".*"] becomes /a/{customRegex1}.
-func buildPath(parts []pathPart, appendSlash bool) string {
-	newPath := ""
-
-	for _, part := range parts {
-		newPath += "/" + part.String()
-	}
-
-	if appendSlash {
-		return newPath + "/"
-	}
-
-	return newPath
-}
-
-func (s *OAS) getOrCreatePathItem(item string) *openapi3.PathItem {
-	if s.Paths.Value(item) == nil {
-		s.Paths.Set(item, &openapi3.PathItem{})
-	}
-
-	return s.Paths.Value(item)
-}
-
-func createOrUpdateOperation(
-	pathItem *openapi3.PathItem,
-	method, operationID string,
-) *openapi3.Operation {
-
-	operation := pathItem.GetOperation(method)
-
-	if operation == nil {
-		operation = &openapi3.Operation{
-			Responses: openapi3.NewResponses(),
-		}
-
-		pathItem.SetOperation(method, operation)
-	}
-
-	if operation.OperationID == "" {
-		operation.OperationID = operationID
-	}
-
-	return operation
+	return s.Paths.Value(path)
 }
 
 // todo: OperationId => ValueObject
@@ -650,7 +587,23 @@ func makeOperationId(inPath, method string) string {
 // getOperationID side effect method.
 // Deprecated cause of side effects.
 func (s *OAS) getOperationID(inPath, method string) string {
-	return createOrUpdateOperation(s.getOrCreatePathItem(inPath), method, makeOperationId(inPath, method)).OperationID
+	defaultOp := makeOperationId(inPath, method)
+	pathItem := s.Paths.Value(inPath)
+
+	if pathItem == nil {
+		return defaultOp
+	}
+
+	op := pathItem.GetOperation(method)
+	if op == nil {
+		return defaultOp
+	}
+
+	if len(op.OperationID) == 0 {
+		return defaultOp
+	}
+
+	return op.OperationID
 }
 
 func (x *XTykAPIGateway) getOperation(operationID string) *Operation {
@@ -734,7 +687,9 @@ func (s *OAS) fillOASValidateRequest(metas []apidef.ValidatePathMeta) {
 	for _, meta := range metas {
 		operationID := s.getOperationID(meta.Path, meta.Method)
 
-		operation := s.Paths.Find(meta.Path).GetOperation(meta.Method)
+		operation := s.findOrCreateOperation(meta.Path, meta.Method)
+		// s.Paths.Find(meta.Path).GetOperation(meta.Method)
+
 		requestBodyRef := operation.RequestBody
 		if operation.RequestBody == nil {
 			requestBodyRef = &openapi3.RequestBodyRef{}
@@ -1022,34 +977,3 @@ func hasMockResponse(methodActions map[string]apidef.EndpointMethodMeta) bool {
 
 	return false
 }
-
-// parsePathSegment parses a single path segment and determines if it contains a regex pattern.
-func parsePathSegment(segment string, regexCount int, hasRegex bool) (pathPart, int, bool) {
-	if strings.HasPrefix(segment, "{") && strings.HasSuffix(segment, "}") {
-		return parseMuxTemplate(segment, regexCount)
-	} else if isIdentifier(segment) {
-		return pathPart{name: segment, value: segment, isRegex: false}, regexCount, hasRegex
-	} else {
-		regexCount++
-		return pathPart{name: fmt.Sprintf("customRegex%d", regexCount), value: segment, isRegex: true}, regexCount, true
-	}
-}
-
-// parseMuxTemplate parses a segment that is a mux template and extracts the name or assigns a custom regex name.
-func parseMuxTemplate(segment string, regexCount int) (pathPart, int, bool) {
-	segment = strings.Trim(segment, "{}")
-
-	name, _, ok := strings.Cut(segment, ":")
-	if ok || isIdentifier(segment) {
-		return pathPart{name: name, isRegex: true}, regexCount, true
-	}
-
-	regexCount++
-	return pathPart{name: fmt.Sprintf("customRegex%d", regexCount), isRegex: true}, regexCount, true
-}
-
-func isIdentifier(value string) bool {
-	return identifierRe.MatchString(value)
-}
-
-var identifierRe = regexp.MustCompile(`^[a-zA-Z0-9._-]+$`)
