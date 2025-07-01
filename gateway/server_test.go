@@ -10,11 +10,7 @@ import (
 
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/internal/otel"
-<<<<<<< HEAD
-=======
 	"github.com/TykTechnologies/tyk/rpc"
-	"github.com/TykTechnologies/tyk/test"
->>>>>>> 3fde8c6e8... [TT-15059][TT-11285] MDCB DNS critical fix and policy sync cherrypick (#7167)
 	"github.com/TykTechnologies/tyk/user"
 )
 

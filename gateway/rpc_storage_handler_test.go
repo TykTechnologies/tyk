@@ -651,95 +651,6 @@ func TestDeleteUsingTokenID(t *testing.T) {
 		assert.Equal(t, 404, status)
 	})
 }
-<<<<<<< HEAD
-=======
-
-func TestProcessKeySpaceChanges_UserKeyReset(t *testing.T) {
-	oldKey := "old-api-key"
-	newKey := "new-api-key"
-
-	dispatcher := gorpc.NewDispatcher()
-	dispatcher.AddFunc("Login", func(_, _ string) bool {
-		return true
-	})
-	dispatcher.AddFunc("Disconnect", func(_ string, _ *model.GroupLoginRequest) error {
-		return nil
-	})
-	dispatcher.AddFunc("GetKeySpaceUpdate", func(_, _ string) ([]string, error) {
-		return []string{}, nil
-	})
-	dispatcher.AddFunc("GetGroupKeySpaceUpdate", func(_ string, _ string) ([]string, error) {
-		return []string{}, nil
-	})
-
-	rpcMock, connectionString := startRPCMock(dispatcher)
-	defer stopRPCMock(rpcMock)
-
-	g := StartTest(func(globalConf *config.Config) {
-		globalConf.SlaveOptions.UseRPC = true
-		globalConf.SlaveOptions.RPCKey = "test_org"
-		globalConf.SlaveOptions.APIKey = oldKey
-		globalConf.SlaveOptions.ConnectionString = connectionString
-		globalConf.SlaveOptions.CallTimeout = 1
-		globalConf.SlaveOptions.RPCPoolSize = 2
-		globalConf.SlaveOptions.DisableKeySpaceSync = true
-	})
-	defer g.Close()
-
-	time.Sleep(100 * time.Millisecond)
-
-	rpcListener := RPCStorageHandler{
-		KeyPrefix:        "rpc.listener.",
-		SuppressRegister: true,
-		HashKeys:         false,
-		Gw:               g.Gw,
-	}
-
-	connected := rpcListener.Connect()
-	if !connected {
-		t.Fatal("Failed to connect to RPC server")
-	}
-
-	testCases := []struct {
-		name     string
-		keys     []string
-		expected string
-	}{
-		{
-			name:     "Valid key reset",
-			keys:     []string{fmt.Sprintf("%s.%s:UserKeyReset", oldKey, newKey)},
-			expected: newKey,
-		},
-		{
-			name:     "Invalid key format - no action",
-			keys:     []string{"invalid-format"},
-			expected: oldKey,
-		},
-		{
-			name:     "Invalid key format - wrong separator",
-			keys:     []string{"invalid-format:UserKeyReset"},
-			expected: oldKey,
-		},
-		{
-			name:     "Multiple keys with reset",
-			keys:     []string{fmt.Sprintf("%s.%s:UserKeyReset", oldKey, newKey), "other-key:action"},
-			expected: newKey,
-		},
-	}
-
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			// Reset config before each test
-			config := g.Gw.GetConfig()
-			config.SlaveOptions.APIKey = oldKey
-			g.Gw.SetConfig(config)
-
-			rpcListener.ProcessKeySpaceChanges(tc.keys, DefaultOrg)
-			updatedConfig := g.Gw.GetConfig()
-			assert.Equal(t, tc.expected, updatedConfig.SlaveOptions.APIKey)
-		})
-	}
-}
 
 func TestIsRetriableError(t *testing.T) {
 	ts := StartTest(nil)
@@ -775,4 +686,3 @@ func TestIsRetriableError(t *testing.T) {
 		})
 	}
 }
->>>>>>> 3fde8c6e8... [TT-15059][TT-11285] MDCB DNS critical fix and policy sync cherrypick (#7167)
