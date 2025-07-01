@@ -68,9 +68,31 @@ func GetCiphers() []*CipherSuite {
 func ResolveCipher(cipherName string) (uint16, error) {
 	ciphers := GetCiphers()
 	for _, cipher := range ciphers {
-		if strings.EqualFold(cipher.Name, cipherName) {
+		if cipherNamesEqual(cipherName, cipher.Name) {
 			return cipher.ID, nil
 		}
 	}
 	return 0, fmt.Errorf("cipher %s not found", cipherName)
+}
+
+func cipherNamesEqual(s1, s2 string) bool {
+	// Legacy names for the corresponding cipher suites with the correct _SHA256
+	// suffix, retained for backward compatibility.
+	// TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305   = TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256
+	// TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305 = TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256
+	//
+	// Reference:
+	// - https://github.com/golang/go/blob/master/src/crypto/tls/cipher_suites.go#L720
+	legacyAlias := map[string]string{
+		"TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305":   "TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256",
+		"TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305": "TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256",
+	}
+
+	original := s1
+
+	if alias, ok := legacyAlias[strings.ToUpper(s1)]; ok {
+		original = alias
+	}
+
+	return strings.EqualFold(original, s2)
 }
