@@ -623,11 +623,15 @@ func (gw *Gateway) syncPolicies() (count int, err error) {
 		mainLog.Debugf(" - %s", id)
 	}
 
+	if err != nil {
+		return len(pols), err
+	}
+
 	gw.policiesMu.Lock()
 	defer gw.policiesMu.Unlock()
 	gw.policiesByID = pols
 
-	return len(pols), err
+	return len(pols), nil
 }
 
 // stripSlashes removes any trailing slashes from the request's URL
@@ -950,7 +954,7 @@ func (gw *Gateway) createResponseMiddlewareChain(
 	spec *APISpec,
 	middlewares []apidef.MiddlewareDefinition,
 	log *logrus.Entry,
-) {
+) []TykResponseHandler {
 
 	var (
 		responseMWChain []TykResponseHandler
@@ -1025,9 +1029,7 @@ func (gw *Gateway) createResponseMiddlewareChain(
 		log.WithError(err).Debug("Failed to init processor")
 	}
 
-	responseMWChain = append(responseMWChain, processor)
-
-	spec.ResponseChain = responseMWChain
+	return append(responseMWChain, processor)
 }
 
 func (gw *Gateway) isRPCMode() bool {
@@ -1096,6 +1098,24 @@ func syncResourcesWithReload(resource string, conf config.Config, syncFunc func(
 		}
 
 		mainLog.Errorf("Error during syncing %s: %s, attempt count %d", resource, err.Error(), i)
+
+		// Check if this is the last attempt
+		if i == conf.ResourceSync.RetryAttempts+1 {
+			// For RPC-based resources, trigger emergency mode if all retries failed
+			if conf.SlaveOptions.UseRPC {
+				mainLog.Warningf("All %s sync attempts failed, triggering emergency mode", resource)
+				rpc.EnableEmergencyMode(true)
+
+				// Try one more time with emergency mode enabled
+				count, err = syncFunc()
+				if err == nil {
+					mainLog.Infof("Successfully loaded %s from backup after enabling emergency mode", resource)
+					return count, nil
+				}
+			}
+			break
+		}
+
 		time.Sleep(time.Duration(conf.ResourceSync.Interval) * time.Second)
 	}
 
