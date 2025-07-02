@@ -1,7 +1,6 @@
 package gateway
 
 import (
-	"fmt"
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/internal/middleware"
 	"github.com/TykTechnologies/tyk/internal/uuid"
@@ -122,10 +121,9 @@ func TestCORSMiddleware_testApi(t *testing.T) {
 			apis[0].CORS.Enable = true
 			g.Gw.LoadAPI(apis...)
 
-			resp, _ := g.Run(t, []test.TestCase{
+			_, _ = g.Run(t, []test.TestCase{
 				{Path: "/cors-api/oauth/token", Headers: headers, HeadersMatch: headersMatch, Code: http.StatusForbidden},
 			}...)
-			fmt.Println(resp)
 		})
 	})
 }
