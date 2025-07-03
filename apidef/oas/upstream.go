@@ -293,6 +293,7 @@ func (u *Upstream) loadBalancingExtractTo(api *apidef.APIDefinition) {
 //
 // Example:
 //
+//	```
 //	{
 //	  "proxy_url": "http(s)://proxy.url:1234",
 //	  "minVersion": "1.0",
@@ -304,6 +305,7 @@ func (u *Upstream) loadBalancingExtractTo(api *apidef.APIDefinition) {
 //	  "insecureSkipVerify": true,
 //	  "forceCommonNameCheck": false
 //	}
+//	```
 //
 // Tyk classic API definition: `proxy.transport`
 type TLSTransport struct {

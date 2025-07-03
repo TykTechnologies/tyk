@@ -1763,6 +1763,12 @@ func Start() {
 		sig := <-sigChan
 		mainLog.Infof("Shutdown signal received: %v. Initiating graceful shutdown...", sig)
 		cancel()
+
+		// we need to set default cfg value here as the ctx is created before the afterconf is executed
+		if gwConfig.GracefulShutdownTimeoutDuration == 0 {
+			gwConfig.GracefulShutdownTimeoutDuration = config.GracefulShutdownDefaultDuration
+		}
+
 		shutdownCtx, shutdownCancel := context.WithTimeout(
 			context.Background(), time.Duration(gwConfig.GracefulShutdownTimeoutDuration)*time.Second)
 		defer shutdownCancel()
@@ -2096,7 +2102,11 @@ func (gw *Gateway) gracefulShutdown(ctx context.Context) error {
 				// interrupting any active connections
 				if err := server.Shutdown(ctx); err != nil {
 					mainLog.Errorf("Error shutting down HTTP server on port %d: %v", port, err)
-					errChan <- err
+					select {
+					case errChan <- err:
+					default:
+						// Channel closed, ignore
+					}
 				}
 			}(p.httpServer, p.port)
 		}
@@ -2115,6 +2125,8 @@ func (gw *Gateway) gracefulShutdown(ctx context.Context) error {
 		mainLog.Info("All HTTP servers gracefully shut down")
 	case <-ctx.Done():
 		mainLog.Warning("Shutdown timeout reached, some connections may have been terminated")
+		// Wait for goroutines to finish even after timeout to prevent panic
+		<-serverShutdownDone
 	}
 
 	// Close all cache stores and other resources
