@@ -1,12 +1,11 @@
 package pathnormalizer_test
 
 import (
+	"github.com/TykTechnologies/tyk/internal/pathnormalizer"
 	"testing"
 
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/stretchr/testify/assert"
-
-	"github.com/TykTechnologies/tyk/internal/pathnormalizer"
 )
 
 func TestParser(t *testing.T) {

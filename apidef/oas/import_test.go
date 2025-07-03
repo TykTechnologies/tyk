@@ -35,7 +35,8 @@ func TestLoad_URLRewrite(t *testing.T) {
 	}
 
 	var native apidef.APIDefinition
-	urlRewriteOAS.ExtractTo(&native)
+	err = urlRewriteOAS.ExtractTo(&native)
+	assert.NoError(t, err)
 
 	assert.Len(t, native.VersionData.Versions[oas.Main].ExtendedPaths.URLRewrite, 1)
 }

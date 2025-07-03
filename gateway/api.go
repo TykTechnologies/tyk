@@ -1063,7 +1063,9 @@ func (gw *Gateway) handleAddApi(r *http.Request, fs afero.Fs, oasEndpoint bool) 
 			return apiError("Request malformed"), http.StatusBadRequest
 		}
 
-		oasObj.ExtractTo(&newDef)
+		if err := oasObj.ExtractTo(&newDef); err != nil {
+			return apiError("Request malformed"), http.StatusBadRequest
+		}
 	} else {
 		if err := json.NewDecoder(r.Body).Decode(&newDef); err != nil {
 			log.Error("Couldn't decode new API Definition object: ", err)
@@ -1187,7 +1189,9 @@ func (gw *Gateway) handleUpdateApi(apiID string, r *http.Request, fs afero.Fs, o
 			return apiError("Request malformed"), http.StatusBadRequest
 		}
 
-		oasObj.ExtractTo(&newDef)
+		if err := oasObj.ExtractTo(&newDef); err != nil {
+			return apiError("Request malformed"), http.StatusBadRequest
+		}
 	} else {
 		if spec.IsOAS {
 			return apiError(apidef.ErrClassicAPIExpected.Error()), http.StatusBadRequest
@@ -1331,9 +1335,11 @@ func (gw *Gateway) handleDeleteAPI(apiID string) (interface{}, int) {
 
 		fs := afero.NewOsFs()
 		if baseAPI.IsOAS {
-			baseAPI.OAS.Fill(*baseAPI.APIDefinition)
-			err, _ := gw.writeOASAndAPIDefToFile(fs, baseAPI.APIDefinition, &baseAPI.OAS)
-			if err != nil {
+			if err = baseAPI.OAS.Fill(*baseAPI.APIDefinition); err != nil {
+				log.WithError(err).Errorf("Error occurred while updating api: %s", baseAPI.APIID)
+			}
+
+			if err, _ = gw.writeOASAndAPIDefToFile(fs, baseAPI.APIDefinition, &baseAPI.OAS); err != nil {
 				log.WithError(err).Errorf("Error occurred while updating base OAS API with id: %s", baseAPI.APIID)
 			}
 		} else {

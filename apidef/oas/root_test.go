@@ -61,10 +61,12 @@ func TestXTykAPIGateway(t *testing.T) {
 		}
 
 		var convertedAPI apidef.APIDefinition
-		oas.ExtractTo(&convertedAPI)
+		err := oas.ExtractTo(&convertedAPI)
+		assert.NoError(t, err)
 
 		var resultOAS OAS
-		resultOAS.Fill(convertedAPI)
+		err = resultOAS.Fill(convertedAPI)
+		assert.NoError(t, err)
 
 		assert.Equal(t, oas, resultOAS)
 	})

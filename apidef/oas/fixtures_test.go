@@ -4,6 +4,7 @@ import (
 	"embed"
 	"encoding/json"
 	"fmt"
+	"github.com/stretchr/testify/require"
 	"maps"
 	"slices"
 	"strings"
@@ -193,7 +194,9 @@ func migrateClassic(def *apidef.APIDefinition) (*oas.OAS, error) {
 
 func migrateOAS(def *oas.OAS) (*apidef.APIDefinition, error) {
 	src := &apidef.APIDefinition{}
-	def.ExtractTo(src)
+	if err := def.ExtractTo(src); err != nil {
+		return nil, err
+	}
 	return src, nil
 }
 
@@ -222,7 +225,8 @@ func TestFixtures(t *testing.T) {
 
 	// Base migration gives us an initial state.
 	oasEmpty := createOAS(t, nil)
-	oasEmptyClassic, _ := migrateOAS(oasEmpty)
+	oasEmptyClassic, err := migrateOAS(oasEmpty)
+	require.NoError(t, err)
 	oasEmptyMap := flatMap(t, oasEmptyClassic, nil)
 
 	classicEmpty := createClassic(t, nil)

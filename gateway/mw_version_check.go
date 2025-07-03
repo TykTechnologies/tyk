@@ -120,6 +120,7 @@ outside:
 		_, meta := v.Spec.URLAllowedAndIgnored(r, versionPaths, whiteListStatus)
 		var mockMeta apidef.MockResponseMeta
 		var ok bool
+
 		if mockMeta, ok = meta.(apidef.MockResponseMeta); !ok {
 			endpointMethodMeta := meta.(*apidef.EndpointMethodMeta)
 			mockMeta.Body = endpointMethodMeta.Data

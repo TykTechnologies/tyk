@@ -1,11 +1,11 @@
 package oas
 
 import (
+	"cmp"
 	"context"
 	"embed"
-	"github.com/TykTechnologies/tyk/internal/reflect"
-	"github.com/TykTechnologies/tyk/internal/utils"
 	"net/http"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -15,7 +15,10 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/internal/pathnormalizer"
+	"github.com/TykTechnologies/tyk/internal/reflect"
 	"github.com/TykTechnologies/tyk/internal/time"
+	"github.com/TykTechnologies/tyk/internal/utils"
 )
 
 func minimumValidOAS() OAS {
@@ -39,7 +42,8 @@ func TestOAS_PathsAndOperations_sorting(t *testing.T) {
 
 	decode(t, urlSortingFS, &oasDef, "testdata/urlSorting.json")
 
-	oasDef.ExtractTo(&classicDef)
+	err := oasDef.ExtractTo(&classicDef)
+	assert.NoError(t, err)
 
 	got := []string{}
 	for _, v := range classicDef.VersionData.Versions[""].ExtendedPaths.Ignored {
@@ -105,7 +109,8 @@ func TestOAS_PathsAndOperations(t *testing.T) {
 	oas.SetTykExtension(xTykAPIGateway)
 
 	var ep apidef.ExtendedPathsSet
-	oas.extractPathsAndOperations(&ep)
+	err := oas.extractPathsAndOperations(&ep)
+	assert.NoError(t, err)
 
 	convertedOAS := minimumValidOAS()
 	convertedPaths := openapi3.NewPaths()
@@ -117,7 +122,9 @@ func TestOAS_PathsAndOperations(t *testing.T) {
 	})
 	convertedOAS.Paths = convertedPaths
 	convertedOAS.SetTykExtension(&XTykAPIGateway{Middleware: &Middleware{Operations: Operations{}}})
-	convertedOAS.fillPathsAndOperations(ep)
+
+	err = convertedOAS.fillPathsAndOperations(ep)
+	require.NoError(t, err)
 
 	assert.Equal(t, oas.getTykOperations(), convertedOAS.getTykOperations())
 
@@ -377,7 +384,8 @@ func TestOAS_MockResponse_extractPathsAndOperations(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			var ep apidef.ExtendedPathsSet
-			tt.spec.extractPathsAndOperations(&ep)
+			err := tt.spec.extractPathsAndOperations(&ep)
+			require.NoError(t, err)
 
 			// We should ensure no AllowList is created
 			require.Len(t, ep.WhiteList, 0)
@@ -1039,7 +1047,8 @@ func TestOAS_MockResponse_fillMockResponsePaths(t *testing.T) {
 				}
 			}
 
-			spec.fillMockResponsePaths(spec.Paths, tt.ep)
+			err := spec.fillMockResponsePaths(tt.ep, pathnormalizer.MustMapper(openapi3.NewPaths()))
+			assert.NoError(t, err)
 			tt.want(t, spec)
 		})
 	}

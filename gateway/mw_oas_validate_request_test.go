@@ -120,7 +120,8 @@ func TestValidateRequest(t *testing.T) {
 	oasAPI.SetTykExtension(xTykAPIGateway)
 
 	var def apidef.APIDefinition
-	oasAPI.ExtractTo(&def)
+	err = oasAPI.ExtractTo(&def)
+	assert.NoError(t, err)
 
 	err = oasAPI.Validate(context.Background())
 	assert.NoError(t, err)

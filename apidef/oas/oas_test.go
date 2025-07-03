@@ -31,7 +31,8 @@ func TestOAS(t *testing.T) {
 		emptyOASPaths.SetTykExtension(&XTykAPIGateway{})
 
 		var convertedAPI apidef.APIDefinition
-		emptyOASPaths.ExtractTo(&convertedAPI)
+		err := emptyOASPaths.ExtractTo(&convertedAPI)
+		assert.NoError(t, err)
 
 		var resultOAS OAS
 		resultOAS.Fill(convertedAPI)
@@ -49,7 +50,8 @@ func TestOAS(t *testing.T) {
 		nilOASPaths.SetTykExtension(&XTykAPIGateway{})
 
 		var convertedAPI apidef.APIDefinition
-		nilOASPaths.ExtractTo(&convertedAPI)
+		err := nilOASPaths.ExtractTo(&convertedAPI)
+		assert.NoError(t, err)
 
 		var resultOAS OAS
 		resultOAS.Fill(convertedAPI)
@@ -90,10 +92,12 @@ func TestOAS(t *testing.T) {
 		})
 
 		var convertedAPI apidef.APIDefinition
-		oasWithPaths.ExtractTo(&convertedAPI)
+		err := oasWithPaths.ExtractTo(&convertedAPI)
+		assert.NoError(t, err)
 
 		var resultOAS OAS
-		resultOAS.Fill(convertedAPI)
+		err = resultOAS.Fill(convertedAPI)
+		assert.NoError(t, err)
 
 		assert.Equal(t, oasWithPaths, resultOAS)
 	})
@@ -109,10 +113,12 @@ func TestOAS(t *testing.T) {
 		api.AuthConfigs[apidef.AuthTokenType] = a
 
 		sw := &OAS{}
-		sw.Fill(api)
+		err := sw.Fill(api)
+		assert.NoError(t, err)
 
 		var converted apidef.APIDefinition
-		sw.ExtractTo(&converted)
+		err = sw.ExtractTo(&converted)
+		assert.NoError(t, err)
 
 		assert.Equal(t, api.AuthConfigs, converted.AuthConfigs)
 	})
@@ -131,7 +137,8 @@ func TestOAS_ExtractTo_DontTouchExistingClassicFields(t *testing.T) {
 	}
 
 	var s OAS
-	s.ExtractTo(&api)
+	err := s.ExtractTo(&api)
+	assert.NoError(t, err)
 
 	assert.Len(t, api.VersionData.Versions[Main].ExtendedPaths.PersistGraphQL, 1)
 }
@@ -172,7 +179,8 @@ func TestOAS_ExtractTo_ResetAPIDefinition(t *testing.T) {
 	}
 
 	var s OAS
-	s.ExtractTo(&a)
+	err := s.ExtractTo(&a)
+	assert.NoError(t, err)
 
 	a.UseKeylessAccess = false
 	a.UpstreamCertificatesDisabled = false

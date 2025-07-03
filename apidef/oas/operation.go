@@ -2,16 +2,15 @@ package oas
 
 import (
 	"encoding/json"
-	"github.com/TykTechnologies/tyk/internal/pathnormalizer"
 	"net/http"
 	"sort"
 	"strconv"
-	"strings"
-
-	"github.com/getkin/kin-openapi/openapi3"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/internal/oasutil"
+	"github.com/TykTechnologies/tyk/internal/pathnormalizer"
+	"github.com/TykTechnologies/tyk/internal/utils"
+	"github.com/getkin/kin-openapi/openapi3"
 )
 
 // Operations holds Operation definitions.
@@ -138,11 +137,16 @@ func (o *Operation) Import(oasOperation *openapi3.Operation, overRideValues TykE
 	}
 }
 
-func (s *OAS) fillPathsAndOperations(ep apidef.ExtendedPathsSet) {
+func (s *OAS) fillPathsAndOperations(ep apidef.ExtendedPathsSet) error {
 	// Regardless if `ep` is a zero value, we need a non-nil paths
 	// to produce a valid OAS document
 	if s.Paths == nil {
 		s.Paths = openapi3.NewPaths()
+	}
+
+	mapper, err := pathnormalizer.NewMapper(s.Paths)
+	if err != nil {
+		return err
 	}
 
 	s.fillAllowance(ep.WhiteList, allow)
@@ -164,9 +168,16 @@ func (s *OAS) fillPathsAndOperations(ep apidef.ExtendedPathsSet) {
 	s.fillTrackEndpoint(ep.TrackEndpoints)
 	s.fillDoNotTrackEndpoint(ep.DoNotTrackEndpoints)
 	s.fillRequestSizeLimit(ep.SizeLimit)
-	s.fillRateLimitEndpoints(ep.RateLimit)
-	//s.fillMockResponsePaths(s.Paths, ep)
 
+	if err = s.fillRateLimitEndpoints(ep.RateLimit, mapper); err != nil {
+		return err
+	}
+
+	if err = s.fillMockResponsePaths(ep, mapper); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 // fillMockResponsePaths converts classic API mock responses to OAS format.
@@ -183,18 +194,30 @@ func (s *OAS) fillPathsAndOperations(ep apidef.ExtendedPathsSet) {
 // - Checking the Content-Type header if present
 // - Attempting to parse the body as JSON
 // - Defaulting to text/plain if neither above applies
-func (s *OAS) fillMockResponsePaths(paths *openapi3.Paths, ep apidef.ExtendedPathsSet) {
-	//
+func (s *OAS) fillMockResponsePaths(
+	ep apidef.ExtendedPathsSet,
+	mapper *pathnormalizer.Mapper,
+) error {
+
 	for _, mock := range ep.MockResponse {
-		operationID := s.getOperationID(mock.Path, mock.Method)
+		tykOperation, entry, err := s.getOrCreateOpByNormalized(mock.Path, mock.Method, mapper)
 
-		var operation *openapi3.Operation
+		if err != nil {
+			return err
+		}
 
-		for _, item := range paths.Map() {
-			if op := item.GetOperation(mock.Method); op != nil && op.OperationID == operationID {
-				operation = op
-				break
-			}
+		pathItem := s.Paths.Find(entry.Extended)
+
+		if pathItem == nil {
+			pathItem = &openapi3.PathItem{}
+			s.Paths.Set(entry.Extended, pathItem)
+		}
+
+		operation := pathItem.GetOperation(mock.Method)
+
+		if operation == nil {
+			operation = openapi3.NewOperation()
+			pathItem.SetOperation(mock.Method, operation)
 		}
 
 		if operation.Responses == nil {
@@ -215,8 +238,6 @@ func (s *OAS) fillMockResponsePaths(paths *openapi3.Paths, ep apidef.ExtendedPat
 
 		operation.Responses.Delete("default")
 
-		tykOperation := s.GetTykExtension().getOperation(operation.OperationID)
-
 		if tykOperation.MockResponse == nil {
 			tykOperation.MockResponse = &MockResponse{}
 		}
@@ -224,7 +245,7 @@ func (s *OAS) fillMockResponsePaths(paths *openapi3.Paths, ep apidef.ExtendedPat
 		tykOperation.MockResponse.Fill(mock)
 
 		if tykOperation.IgnoreAuthentication == nil && tykOperation.MockResponse.FromOASExamples == nil {
-			// We need to to add ignoreAuthentication middleware to the operation
+			// We need to add ignoreAuthentication middleware to the operation
 			// to stay consistent to the way mock responses work for classic APIs
 			tykOperation.IgnoreAuthentication = &Allowance{Enabled: true}
 		}
@@ -235,28 +256,25 @@ func (s *OAS) fillMockResponsePaths(paths *openapi3.Paths, ep apidef.ExtendedPat
 			}
 		}
 	}
+
+	return nil
 }
 
-func (s *OAS) extractPathsAndOperations(ep *apidef.ExtendedPathsSet) {
+func (s *OAS) extractPathsAndOperations(ep *apidef.ExtendedPathsSet) error {
 	ep.Clear()
 
 	tykOperations := s.getTykOperations()
 	if len(tykOperations) == 0 {
-		return
+		return nil
 	}
 
-	paths, err := pathnormalizer.Normalize(s.Paths)
+	mapper, err := pathnormalizer.NewMapper(s.Paths)
 
 	if err != nil {
-		panic(err) // todo: replace by error move
+		return err
 	}
 
-	if serialized, e := json.Marshal(paths); e == nil {
-		log.WithField("paths", string(serialized)).Debug("serialized paths")
-	} else {
-		log.WithError(e).Warn("Failed to normalize paths.")
-	}
-
+	paths := mapper.Normalized()
 	for _, pathItem := range oasutil.SortByPathLength(*paths) {
 		for id, tykOp := range tykOperations {
 			path := pathItem.Path
@@ -281,7 +299,6 @@ func (s *OAS) extractPathsAndOperations(ep *apidef.ExtendedPathsSet) {
 					tykOp.extractDoNotTrackEndpointTo(ep, path, method)
 					tykOp.extractRequestSizeLimitTo(ep, path, method)
 					tykOp.extractRateLimitEndpointTo(ep, path, method)
-					tykOp.extractMockResponsePaths(ep, path, method)
 					break
 				}
 			}
@@ -289,6 +306,8 @@ func (s *OAS) extractPathsAndOperations(ep *apidef.ExtendedPathsSet) {
 	}
 
 	sortMockResponseAllowList(ep)
+
+	return nil
 }
 
 func (s *OAS) fillAllowance(endpointMetas []apidef.EndPointMeta, typ AllowanceType) {
@@ -579,15 +598,10 @@ func (s *OAS) getOrCreatePathItem(path string) *openapi3.PathItem {
 	return s.Paths.Value(path)
 }
 
-// todo: OperationId => ValueObject
-func makeOperationId(inPath, method string) string {
-	return strings.TrimPrefix(inPath, "/") + strings.ToUpper(method)
-}
-
 // getOperationID side effect method.
-// Deprecated cause of side effects.
+// Deprecated
 func (s *OAS) getOperationID(inPath, method string) string {
-	defaultOp := makeOperationId(inPath, method)
+	defaultOp := utils.OperationId(inPath, method)
 	pathItem := s.Paths.Value(inPath)
 
 	if pathItem == nil {
@@ -836,10 +850,57 @@ func (o *Operation) extractVirtualEndpointTo(ep *apidef.ExtendedPathsSet, path s
 	ep.Virtual = append(ep.Virtual, meta)
 }
 
-func (s *OAS) fillRateLimitEndpoints(endpointMetas []apidef.RateLimitMeta) {
+// getOrCreateOpByNormalized gets or creates new operation during to mappings.
+func (s *OAS) getOrCreateOpByNormalized(
+	path, method string,
+	mapper *pathnormalizer.Mapper,
+) (*Operation, pathnormalizer.Entry, error) {
+
+	entry, err := mapper.FindOrCreateByNormalized(path, method)
+
+	if err != nil {
+		return nil, entry, err
+	}
+
+	s.ensureDefaultOp(
+		entry,
+	)
+
+	return s.GetTykExtension().getOperation(entry.OperationID), entry, nil
+}
+
+func (s *OAS) ensureDefaultOp(entry pathnormalizer.Entry) {
+	path, method := entry.Extended, entry.Method
+
+	pathItem := s.Paths.Value(path)
+
+	if pathItem == nil {
+		pathItem = &openapi3.PathItem{}
+		s.Paths.Set(path, pathItem)
+		// todo: add pathItem params
+	}
+
+	operation := pathItem.GetOperation(method)
+	if operation == nil {
+		operation = openapi3.NewOperation()
+		pathItem.SetOperation(method, operation)
+	}
+
+	if operation.Responses == nil {
+		operation.Responses = openapi3.NewResponses()
+		operation.OperationID = entry.OperationID
+		// todo: add operation params
+	}
+}
+
+func (s *OAS) fillRateLimitEndpoints(endpointMetas []apidef.RateLimitMeta, mapper *pathnormalizer.Mapper) error {
 	for _, em := range endpointMetas {
-		operationID := s.getOperationID(em.Path, em.Method)
-		operation := s.GetTykExtension().getOperation(operationID)
+		operation, _, err := s.getOrCreateOpByNormalized(em.Path, em.Method, mapper)
+
+		if err != nil {
+			return err
+		}
+
 		if operation.RateLimit == nil {
 			operation.RateLimit = &RateLimitEndpoint{}
 		}
@@ -849,6 +910,8 @@ func (s *OAS) fillRateLimitEndpoints(endpointMetas []apidef.RateLimitMeta) {
 			operation.RateLimit = nil
 		}
 	}
+
+	return nil
 }
 
 func (o *Operation) extractRateLimitEndpointTo(ep *apidef.ExtendedPathsSet, path string, method string) {
@@ -894,35 +957,6 @@ func (o *Operation) extractCircuitBreakerTo(ep *apidef.ExtendedPathsSet, path st
 	meta := apidef.CircuitBreakerMeta{Path: path, Method: method}
 	o.CircuitBreaker.ExtractTo(&meta)
 	ep.CircuitBreaker = append(ep.CircuitBreaker, meta)
-}
-
-func (o *Operation) extractMockResponsePaths(
-	ep *apidef.ExtendedPathsSet,
-	path string,
-	method string,
-) {
-
-	if o.MockResponse == nil {
-		return
-	}
-
-	statusCode := o.MockResponse.Code
-
-	if statusCode <= 0 {
-		statusCode = http.StatusOK
-	}
-
-	mr := apidef.MockResponseMeta{
-		Disabled:   false,
-		Path:       path,
-		Method:     method,
-		IgnoreCase: false,
-		Code:       statusCode,
-		Body:       o.MockResponse.Body,
-		Headers:    o.MockResponse.Headers.Map(),
-	}
-
-	ep.MockResponse = append(ep.MockResponse, mr)
 }
 
 func (s *OAS) fillCircuitBreaker(metas []apidef.CircuitBreakerMeta) {

@@ -68,7 +68,7 @@ func (s *OAS) MarshalJSON() ([]byte, error) {
 }
 
 // Fill fills *OAS definition from apidef.APIDefinition.
-func (s *OAS) Fill(api apidef.APIDefinition) {
+func (s *OAS) Fill(api apidef.APIDefinition) error {
 	xTykAPIGateway := s.GetTykExtension()
 	if xTykAPIGateway == nil {
 		xTykAPIGateway = &XTykAPIGateway{}
@@ -76,7 +76,11 @@ func (s *OAS) Fill(api apidef.APIDefinition) {
 	}
 
 	xTykAPIGateway.Fill(api)
-	s.fillPathsAndOperations(api.VersionData.Versions[Main].ExtendedPaths)
+
+	if err := s.fillPathsAndOperations(api.VersionData.Versions[Main].ExtendedPaths); err != nil {
+		return err
+	}
+
 	s.fillSecurity(api)
 
 	if ShouldOmit(xTykAPIGateway) {
@@ -91,11 +95,12 @@ func (s *OAS) Fill(api apidef.APIDefinition) {
 	if ShouldOmit(s.ExternalDocs) {
 		s.ExternalDocs = nil
 	}
+
+	return nil
 }
 
 // ExtractTo extracts *OAS into *apidef.APIDefinition.
-func (s *OAS) ExtractTo(api *apidef.APIDefinition) {
-	// todo: modify signature
+func (s *OAS) ExtractTo(api *apidef.APIDefinition) error {
 	if s.GetTykExtension() == nil {
 		s.SetTykExtension(&XTykAPIGateway{})
 		defer func() {
@@ -109,8 +114,13 @@ func (s *OAS) ExtractTo(api *apidef.APIDefinition) {
 
 	vInfo := api.VersionData.Versions[Main]
 	vInfo.UseExtendedPaths = true
-	s.extractPathsAndOperations(&vInfo.ExtendedPaths)
+
+	if err := s.extractPathsAndOperations(&vInfo.ExtendedPaths); err != nil {
+		return err
+	}
 	api.VersionData.Versions[Main] = vInfo
+
+	return nil
 }
 
 func (s *OAS) SetTykStreamingExtension(xTykStreaming *XTykStreaming) {
@@ -436,6 +446,8 @@ func (s *OAS) ReplaceServers(apiURLs, oldAPIURLs []string) {
 }
 
 func (s *OAS) findOrCreateOperation(path, method string) *openapi3.Operation {
+	// todo: get rid of that code
+
 	operationID := s.getOperationID(path, method)
 	pathItem := s.getOrCreatePathItem(path)
 	operation := pathItem.GetOperation(method)
@@ -578,10 +590,10 @@ func (s *OAS) setRequiredFields(name string, versionName string) {
 // Normalize normalizes path to acceptable form by openapi.
 // If API has named RegExp it will be converted to accepted form of api by OAS.
 func (s *OAS) Normalize() error {
-	if clone, err := s.newNormalized(); err != nil {
+	if normalized, err := s.newNormalized(); err != nil {
 		return err
 	} else {
-		*s = *clone
+		*s = *normalized
 		return nil
 	}
 }

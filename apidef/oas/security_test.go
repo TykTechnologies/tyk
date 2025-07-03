@@ -247,10 +247,12 @@ func TestOAS_Token_MultipleSecuritySchemes(t *testing.T) {
 	oas.SetTykExtension(xTykAPIGateway)
 
 	var api apidef.APIDefinition
-	oas.ExtractTo(&api)
+	err := oas.ExtractTo(&api)
+	assert.NoError(t, err)
 
 	var convertedOAS OAS
-	convertedOAS.Fill(api)
+	err = convertedOAS.Fill(api)
+	assert.NoError(t, err)
 
 	assert.Len(t, convertedOAS.getTykSecuritySchemes(), 1)
 	assert.Contains(t, convertedOAS.getTykSecuritySchemes(), securityName)
@@ -442,11 +444,13 @@ func TestOAS_OAuth(t *testing.T) {
 	}
 
 	var api apidef.APIDefinition
-	oas.ExtractTo(&api)
+	err := oas.ExtractTo(&api)
+	assert.NoError(t, err)
 
 	var convertedOAS OAS
 	convertedOAS.Components = &openapi3.Components{SecuritySchemes: oas.Components.SecuritySchemes}
-	convertedOAS.Fill(api)
+	err = convertedOAS.Fill(api)
+	assert.NoError(t, err)
 	flows := convertedOAS.Components.SecuritySchemes[securityName].Value.Flows
 
 	assert.Equal(t, flows.AuthorizationCode.AuthorizationURL, "{api-url}/oauth/authorize")
@@ -506,11 +510,13 @@ func TestOAS_ExternalOAuth(t *testing.T) {
 	}
 
 	var api apidef.APIDefinition
-	oas.ExtractTo(&api)
+	err := oas.ExtractTo(&api)
+	assert.NoError(t, err)
 
 	var convertedOAS OAS
 	convertedOAS.Components = &openapi3.Components{SecuritySchemes: oas.Components.SecuritySchemes}
-	convertedOAS.Fill(api)
+	err = convertedOAS.Fill(api)
+	assert.NoError(t, err)
 	flows := convertedOAS.Components.SecuritySchemes[securityName].Value.Flows
 
 	assert.Equal(t, flows.AuthorizationCode.AuthorizationURL, "{api-url}/oauth/authorize")
