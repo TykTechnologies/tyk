@@ -20,6 +20,8 @@ import (
 
 type IPsHandleStrategy string
 
+const GracefulShutdownDefaultDuration = 30
+
 var (
 	log = logger.Get()
 
@@ -52,7 +54,7 @@ var (
 		LivenessCheck: LivenessCheckConfig{
 			CheckDuration: time.Second * 10,
 		},
-		GracefulShutdownTimeoutDuration: 30,
+		GracefulShutdownTimeoutDuration: GracefulShutdownDefaultDuration,
 		Streaming: StreamingConfig{
 			Enabled:     false,
 			AllowUnsafe: []string{},
