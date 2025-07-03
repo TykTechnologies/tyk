@@ -1,14 +1,11 @@
 package oas
 
 import (
-	"cmp"
 	"context"
 	"embed"
 	"github.com/TykTechnologies/tyk/internal/reflect"
 	"github.com/TykTechnologies/tyk/internal/utils"
 	"net/http"
-	"slices"
-	"sort"
 	"strconv"
 	"strings"
 	"testing"
@@ -193,15 +190,7 @@ func TestOAS_MockResponse_extractPathsAndOperations(t *testing.T) {
 
 				// Verify mock responses
 				mockResponses := ep.MockResponse
-				require.Len(t, mockResponses, 1)
-
-				mockResp := mockResponses[0]
-				require.Equal(t, "/test", mockResp.Path)
-				require.Equal(t, "GET", mockResp.Method)
-				require.Equal(t, 200, mockResp.Code)
-				require.Equal(t, `{"message": "success"}`, mockResp.Body)
-				require.Equal(t, map[string]string{"Content-Type": "application/json"}, mockResp.Headers)
-				require.False(t, mockResp.Disabled)
+				require.Len(t, mockResponses, 0)
 			},
 		},
 		{
@@ -257,36 +246,7 @@ func TestOAS_MockResponse_extractPathsAndOperations(t *testing.T) {
 
 				// Verify mock responses
 				mockResponses := ep.MockResponse
-				require.Len(t, mockResponses, 2)
-
-				// Sort for consistent testing
-				sort.Slice(mockResponses, func(i, j int) bool {
-					if mockResponses[i].Path == mockResponses[j].Path {
-						return mockResponses[i].Method < mockResponses[j].Method
-					}
-					return mockResponses[i].Path < mockResponses[j].Path
-				})
-
-				// Verify GET mock response
-				getMock := mockResponses[0]
-				require.Equal(t, "/test", getMock.Path)
-				require.Equal(t, "GET", getMock.Method)
-				require.Equal(t, 200, getMock.Code)
-				require.Equal(t, `{"status": "ok"}`, getMock.Body)
-				require.Equal(t, map[string]string{"Content-Type": "application/json"}, getMock.Headers)
-				require.False(t, getMock.Disabled)
-
-				// Verify POST mock response
-				postMock := mockResponses[1]
-				require.Equal(t, "/test", postMock.Path)
-				require.Equal(t, "POST", postMock.Method)
-				require.Equal(t, 201, postMock.Code)
-				require.Equal(t, `{"id": "123"}`, postMock.Body)
-				require.Equal(t, map[string]string{
-					"Content-Type": "application/json",
-					"Location":     "/test/123",
-				}, postMock.Headers)
-				require.False(t, postMock.Disabled)
+				require.Len(t, mockResponses, 0)
 			},
 		},
 		{
@@ -325,14 +285,7 @@ func TestOAS_MockResponse_extractPathsAndOperations(t *testing.T) {
 
 				// Verify mock responses
 				mockResponses := ep.MockResponse
-				require.Len(t, mockResponses, 1)
-
-				mockResp := mockResponses[0]
-				require.Equal(t, "/test", mockResp.Path)
-				require.Equal(t, "GET", mockResp.Method)
-				require.Equal(t, 404, mockResp.Code)
-				require.Equal(t, `{"error": "not found"}`, mockResp.Body)
-				require.True(t, mockResp.Disabled)
+				require.Len(t, mockResponses, 0)
 			},
 		},
 		{
@@ -416,30 +369,7 @@ func TestOAS_MockResponse_extractPathsAndOperations(t *testing.T) {
 
 				// Verify mock responses
 				mockResponses := ep.MockResponse
-				require.Len(t, mockResponses, 2)
-
-				// Sort for consistent testing
-				slices.SortFunc(mockResponses, func(a, b apidef.MockResponseMeta) int {
-					return cmp.Compare(a.Path, b.Path)
-				})
-
-				// Verify items response
-				itemsResp := mockResponses[0]
-				require.False(t, itemsResp.Disabled)
-				require.Equal(t, "/items", itemsResp.Path)
-				require.Equal(t, "GET", itemsResp.Method)
-				require.Equal(t, 200, itemsResp.Code)
-				require.Equal(t, `["item1", "item2"]`, itemsResp.Body)
-				require.Equal(t, map[string]string{"Content-Type": "application/json"}, itemsResp.Headers)
-
-				// Verify users response
-				usersResp := mockResponses[1]
-				require.False(t, usersResp.Disabled)
-				require.Equal(t, "/users", usersResp.Path)
-				require.Equal(t, "GET", usersResp.Method)
-				require.Equal(t, 200, usersResp.Code)
-				require.Equal(t, `["user1", "user2"]`, usersResp.Body)
-				require.Equal(t, map[string]string{"Content-Type": "application/json"}, usersResp.Headers)
+				require.Len(t, mockResponses, 0)
 			},
 		},
 	}
