@@ -194,7 +194,7 @@ type NormalisedURLConfig struct {
 	// Set this to true to have Tyk automatically match for numeric IDs, it will match with a preceding slash so as not to capture actual numbers:
 	NormaliseNumbers bool `json:"normalise_numbers"`
 
-	// This is a list of custom patterns you can add. These must be valid regex strings. Tyk will replace these values with a {var} placeholder.
+	// This is a list of custom patterns you can add. These must be valid regex strings. Tyk will replace these values with a `{var}` placeholder.
 	Custom []string `json:"custom_patterns"`
 
 	CompiledPatternSet NormaliseURLPatterns `json:"-"` // see analytics.go
@@ -586,7 +586,7 @@ type CoProcessConfig struct {
 	// Authority used in GRPC connection
 	GRPCAuthority string `json:"grpc_authority"`
 
-	// GRPCRoundRobinLoadBalancing enables round robin load balancing for grpc services
+	// GRPCRoundRobinLoadBalancing enables round robin load balancing for gRPC services
 	GRPCRoundRobinLoadBalancing bool `json:"grpc_round_robin_load_balancing"`
 
 	// Sets the path to built-in Tyk modules. This will be part of the Python module lookup path. The value used here is the default one for most installations.
