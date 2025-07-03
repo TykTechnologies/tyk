@@ -719,15 +719,7 @@ func (r RPCStorageHandler) RemoveFromSet(keyName, value string) {
 
 func (r RPCStorageHandler) IsRetriableError(err error) bool {
 	if err != nil {
-		errMsg := err.Error()
-		// Access denied errors (authentication issues)
-		if errMsg == "Access Denied" {
-			return true
-		}
-		// Timeout errors from gorpc library
-		if strings.Contains(errMsg, "Cannot obtain response during timeout") {
-			return true
-		}
+		return err.Error() == "Access Denied"
 	}
 	return false
 }

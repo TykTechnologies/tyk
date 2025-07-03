@@ -3,11 +3,12 @@ package gateway
 import (
 	"encoding/json"
 	"errors"
-	"github.com/TykTechnologies/tyk/header"
 	"io/ioutil"
 	"net/http"
 	"os"
 	"path/filepath"
+
+	"github.com/TykTechnologies/tyk/header"
 
 	"github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
 
@@ -227,9 +228,6 @@ func (gw *Gateway) LoadPoliciesFromRPC(store RPCDataLoader, orgId string, allowE
 	}
 
 	rpcPolicies := store.GetPolicies(orgId)
-	if rpcPolicies == "" {
-		return nil, errors.New("failed to fetch policies from RPC store; connection may be down")
-	}
 
 	policies, err := parsePoliciesFromRPC(rpcPolicies, allowExplicit)
 
