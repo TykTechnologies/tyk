@@ -5,6 +5,7 @@ import (
 	"compress/flate"
 	"compress/gzip"
 	"encoding/json"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -93,10 +94,8 @@ func compressBuffer(in bytes.Buffer, encoding string) (out bytes.Buffer) {
 	return out
 }
 
-func (r *ResponseTransformMiddleware) HandleError(rw http.ResponseWriter, req *http.Request) {
-}
-
 func (r *ResponseTransformMiddleware) HandleResponse(rw http.ResponseWriter, res *http.Response, req *http.Request, ses *user.SessionState) error {
+	fmt.Println("----HandleResponse from response middleware----")
 	logger := r.logger().WithFields(logrus.Fields{
 		"prefix":      "outbound-transform",
 		"server_name": r.Spec.Proxy.TargetURL,
@@ -117,6 +116,12 @@ func (r *ResponseTransformMiddleware) HandleResponse(rw http.ResponseWriter, res
 	respBody := respBodyReader(req, res)
 	body, _ := ioutil.ReadAll(respBody)
 	defer respBody.Close()
+
+	// Check for error overrides
+	body, overrideApplied := r.handleErrorOverrides(res, body, tmeta)
+	if overrideApplied {
+		return nil
+	}
 
 	// Put into an interface:
 	bodyData := make(map[string]interface{})
@@ -185,4 +190,50 @@ func (r *ResponseTransformMiddleware) HandleResponse(rw http.ResponseWriter, res
 	res.Body = ioutil.NopCloser(&bodyBuffer)
 
 	return nil
+}
+
+func (r *ResponseTransformMiddleware) handleErrorOverrides(res *http.Response, body []byte, tmeta *TransformSpec) ([]byte, bool) {
+	// Only process error responses
+	errors := tmeta.TemplateData.ErrorsOverride
+	fmt.Println("----LLega a handleErrorOverrides")
+	if res.StatusCode < 400 || errors == nil {
+		fmt.Println("gonna return on firt check...")
+		fmt.Println("tmeta: ", errors)
+		return body, false
+	}
+	fmt.Println("------gonna check for errors:", errors)
+
+	var errorResp struct {
+		Error string `json:"error"`
+	}
+
+	if err := json.Unmarshal(body, &errorResp); err != nil || errorResp.Error == "" {
+		fmt.Println("gonna return becasue error on resp:", string(body))
+		return body, false
+	}
+
+	// Check if we have an override for this error message
+	for errType, override := range errors {
+		fmt.Println("---checking for:", errorResp.Error, " in:", TykErrors[errType].Message)
+		if TykErrors[errType].Message == errorResp.Error {
+			// Apply the override
+			errorResp.Error = override.Message
+			newBody, _ := json.Marshal(errorResp)
+
+			// Update status code if specified
+			if override.Code != 0 {
+				res.StatusCode = override.Code
+				res.Status = http.StatusText(override.Code)
+			}
+
+			// Update response body
+			res.ContentLength = int64(len(newBody))
+			res.Header.Set("Content-Length", strconv.Itoa(len(newBody)))
+			res.Body = io.NopCloser(bytes.NewReader(newBody))
+
+			return newBody, true
+		}
+	}
+
+	return body, false
 }
