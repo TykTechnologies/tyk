@@ -20,7 +20,6 @@ func TestGraphqlDataSourceConfiguration(t *testing.T) {
 		method           string
 		headers          map[string]string
 		subscriptionType apidef.SubscriptionType
-		sseUsePost       bool
 	}
 
 	t.Run("with internal data source url and sse", func(t *testing.T) {
@@ -56,25 +55,9 @@ func TestGraphqlDataSourceConfiguration(t *testing.T) {
 			internaldatasource.method,
 			internaldatasource.headers,
 			internaldatasource.subscriptionType,
-			internaldatasource.sseUsePost,
 		)
 
 		assert.Equal(t, expectedGraphqlDataSourceConfiguration, actualGraphqlDataSourceConfiguration)
-
-		t.Run("sse post", func(t *testing.T) {
-			internaldatasource.sseUsePost = true
-			expectedGraphqlDataSourceConfiguration.Subscription.SSEMethodPost = true
-
-			actual := graphqlDataSourceConfiguration(
-				internaldatasource.url,
-				internaldatasource.method,
-				internaldatasource.headers,
-				internaldatasource.subscriptionType,
-				internaldatasource.sseUsePost,
-			)
-
-			assert.Equal(t, expectedGraphqlDataSourceConfiguration, actual)
-		})
 	})
 
 	t.Run("with external data source url and no sse", func(t *testing.T) {
@@ -109,7 +92,6 @@ func TestGraphqlDataSourceConfiguration(t *testing.T) {
 			externalDataSource.method,
 			externalDataSource.headers,
 			externalDataSource.subscriptionType,
-			externalDataSource.sseUsePost,
 		)
 
 		assert.Equal(t, expectedGraphqlDataSourceConfiguration, actualGraphqlDataSourceConfiguration)

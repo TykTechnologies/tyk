@@ -43,7 +43,6 @@ func (p *ProxyOnly) EngineConfig() (*graphql.EngineV2Configuration, error) {
 		URL:              url,
 		StaticHeaders:    staticHeaders,
 		SubscriptionType: graphqlSubscriptionType(p.ApiDefinition.GraphQL.Proxy.SubscriptionType),
-		SSEMethodPost:    p.ApiDefinition.GraphQL.Proxy.SSEUsePost,
 	}
 
 	v2Config, err := graphql.NewProxyEngineConfigFactory(

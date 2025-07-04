@@ -71,9 +71,7 @@ func (s *Supergraph) subgraphDataSourceConfigs() []graphqldatasource.Configurati
 			apiDefSubgraphConf.URL,
 			http.MethodPost,
 			hdr,
-			apiDefSubgraphConf.SubscriptionType,
-			apiDefSubgraphConf.SSEUsePost,
-		)
+			apiDefSubgraphConf.SubscriptionType)
 		conf.Federation = graphqldatasource.FederationConfiguration{
 			Enabled:    true,
 			ServiceSDL: apiDefSubgraphConf.SDL,
