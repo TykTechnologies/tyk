@@ -256,6 +256,7 @@ func TestFixtures(t *testing.T) {
 						if len(tc.Output) == 0 && !tc.Debug {
 							skip = oasEmptyMap
 						}
+
 						result = flatMap(t, dest, skip)
 					default:
 						var dest *oas.OAS
@@ -266,6 +267,11 @@ func TestFixtures(t *testing.T) {
 						if len(tc.Output) == 0 && !tc.Debug {
 							skip = classicEmptyMap
 						}
+
+						if dest != nil {
+							_ = dest.Normalize()
+						}
+
 						result = flatMap(t, dest, skip)
 					}
 

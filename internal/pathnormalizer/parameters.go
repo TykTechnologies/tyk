@@ -6,6 +6,10 @@ type parameters struct {
 	*openapi3.Parameters
 }
 
+func wrapParameters(dest *openapi3.Parameters) *parameters {
+	return &parameters{dest}
+}
+
 func (p *parameters) replaceOrAppend(pRef *openapi3.ParameterRef) {
 	if pRef.Value == nil {
 		*p.Parameters = append(*p.Parameters, pRef)
@@ -58,6 +62,12 @@ func (p *parameters) extendExistent(newRef *openapi3.ParameterRef, idx int) {
 
 	default:
 		(*p.Parameters)[idx] = newRef
+	}
+}
+
+func (p *parameters) extendBy(src openapi3.Parameters) {
+	for _, parameterRef := range src {
+		p.replaceOrAppend(parameterRef)
 	}
 }
 

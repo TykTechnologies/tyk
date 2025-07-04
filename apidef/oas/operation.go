@@ -178,7 +178,7 @@ func (s *OAS) fillPathsAndOperations(ep apidef.ExtendedPathsSet) error {
 		return s.fillMockResponsePaths(ep, mapper)
 	})
 
-	return collector.Err()
+	return nil
 }
 
 // fillMockResponsePaths converts classic API mock responses to OAS format.
@@ -269,13 +269,12 @@ func (s *OAS) extractPathsAndOperations(ep *apidef.ExtendedPathsSet) error {
 		return nil
 	}
 
-	mapper, err := pathnormalizer.NewMapper(s.Paths)
+	paths, err := pathnormalizer.Normalize(s.Paths)
 
 	if err != nil {
 		return err
 	}
 
-	paths := mapper.Normalized()
 	for _, pathItem := range oasutil.SortByPathLength(*paths) {
 		for id, tykOp := range tykOperations {
 			path := pathItem.Path
@@ -869,7 +868,7 @@ func (s *OAS) getOrCreateOpByNormalized(
 	mapper *pathnormalizer.Mapper,
 ) (*Operation, pathnormalizer.Entry, error) {
 
-	entry, err := mapper.FindOrCreateByNormalized(path, method)
+	entry, err := mapper.FindOrCreate(path, method)
 
 	if err != nil {
 		return nil, entry, err
@@ -888,20 +887,25 @@ func (s *OAS) ensureDefaultOp(entry pathnormalizer.Entry) {
 	if pathItem == nil {
 		pathItem = &openapi3.PathItem{}
 		s.Paths.Set(path, pathItem)
-		// todo: add pathItem params
 	}
+
+	entry.ExtendPathParameters(&pathItem.Parameters)
 
 	operation := pathItem.GetOperation(method)
 	if operation == nil {
 		operation = openapi3.NewOperation()
-		pathItem.SetOperation(method, operation)
 	}
 
 	if operation.Responses == nil {
 		operation.Responses = openapi3.NewResponses()
-		operation.OperationID = entry.OperationID
 		// todo: add operation params
 	}
+
+	if operation.OperationID == "" {
+		operation.OperationID = entry.OperationID
+	}
+
+	pathItem.SetOperation(method, operation)
 }
 
 func fillRateLimitEndpoints(em apidef.RateLimitMeta, operation *Operation) {

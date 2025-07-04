@@ -11,6 +11,8 @@ import (
 // Primary responsibility is reverse mapping from "normalized" endpoints to "extended"
 // Secondary responsibility is avoiding collisions of operation id and endpoint's collision too.
 type Mapper struct {
+	parser *Parser
+
 	extended   *openapi3.Paths
 	normalized *openapi3.Paths
 
@@ -20,11 +22,22 @@ type Mapper struct {
 }
 
 func NewMapper(in *openapi3.Paths) (*Mapper, error) {
-	normalizedPaths := openapi3.NewPaths()
+	m, err := newMapper(in)
+
+	if err != nil {
+		log.WithError(err).Error("failed to create mapper")
+	}
+
+	return m, err
+}
+
+func newMapper(in *openapi3.Paths) (*Mapper, error) {
 	in = reflect.Clone(in)
+	normalizedPaths := openapi3.NewPaths()
 	entriesNumber := countPathsEntries(in)
 
 	mapper := &Mapper{
+		parser:        NewParser(),
 		normalized:    normalizedPaths,
 		extended:      in,
 		extendedMap:   make(map[endpoint]*Entry, entriesNumber),
@@ -32,11 +45,8 @@ func NewMapper(in *openapi3.Paths) (*Mapper, error) {
 		operationsMap: make(map[string]*Entry, entriesNumber),
 	}
 
-	parser := NewParser()
-
-	// todo: think of sorting
 	for _, item := range oasutil.SortByPathLength(*in) {
-		normalized, err := parser.Parse(item.Path)
+		normalized, err := mapper.parser.Parse(item.Path)
 
 		if err != nil {
 			return nil, err
@@ -44,12 +54,7 @@ func NewMapper(in *openapi3.Paths) (*Mapper, error) {
 
 		// process custom params from command line
 		pathItem := reflect.Clone(item.PathItem)
-		params := parameters{&pathItem.Parameters}
-
-		for _, parameterRef := range normalized.ParameterRefs() {
-			params.replaceOrAppend(parameterRef)
-		}
-
+		extractParametersFromPath(&pathItem.Parameters, normalized.ParameterRefs())
 		normalizedPaths.Set(normalized.path, pathItem)
 
 		for method, pItem := range item.Operations() {
@@ -58,6 +63,7 @@ func NewMapper(in *openapi3.Paths) (*Mapper, error) {
 				Extended:    item.Path,
 				Normalized:  normalized.path,
 				OperationID: pItem.OperationID,
+				parameters:  &pathItem.Parameters,
 			}); err != nil {
 				return nil, err
 			}
@@ -82,6 +88,8 @@ func MustDummyMapper() *Mapper {
 }
 
 func (m *Mapper) add(newEntry Entry) error {
+	newEntry.mapper = m
+
 	if existent, ok := m.operationsMap[newEntry.OperationID]; ok {
 		return newCollisionError(*existent, newEntry)
 	}
@@ -101,32 +109,45 @@ func (m *Mapper) add(newEntry Entry) error {
 	return nil
 }
 
-func (m *Mapper) GetParametersByNormalized(path, method string) openapi3.Parameters {
-	entry, ok := m.normalizedMap[endpoint{Path: path, Method: method}]
+func (m *Mapper) FindOrCreate(path, method string) (Entry, error) {
+	entry, err := m.findOrCreate(path, method)
 
-	if !ok {
-		return nil
+	if err != nil {
+		log.WithError(err).Error("failed to find or create entry")
 	}
 
-	pathItem := m.extended.Value(entry.Extended)
-	if pathItem == nil {
-		return nil
-	}
-
-	return reflect.Clone(pathItem.Parameters)
+	return entry, err
 }
 
-func (m *Mapper) FindOrCreateByNormalized(path, method string) (Entry, error) {
+func (m *Mapper) findOrCreate(path, method string) (Entry, error) {
+	ep := endpoint{Path: path, Method: method}
+
 	// does classic api support patterns? if so this implementation could be wrong
-	if entry, ok := m.normalizedMap[endpoint{Path: path, Method: method}]; ok {
+	if entry, ok := m.normalizedMap[ep]; ok {
 		return *entry, nil
 	}
+
+	if entry, ok := m.extendedMap[ep]; ok {
+		return *entry, nil
+	}
+
+	normalized, err := m.parser.Parse(path)
+
+	if err != nil {
+		return Entry{}, err
+	}
+
+	pathItem := openapi3.PathItem{}
+	pathItem.Parameters = openapi3.NewParameters()
+	extractParametersFromPath(&pathItem.Parameters, normalized.ParameterRefs())
 
 	entry := Entry{
 		Method:      method,
 		OperationID: utils.OperationId(path, method),
 		Extended:    path,
-		Normalized:  path,
+		Normalized:  normalized.path,
+		mapper:      m,
+		parameters:  &pathItem.Parameters,
 	}
 
 	if err := m.add(entry); err != nil {
@@ -136,14 +157,13 @@ func (m *Mapper) FindOrCreateByNormalized(path, method string) (Entry, error) {
 	return entry, nil
 }
 
-func (m *Mapper) Normalized() *openapi3.Paths {
+func (m *Mapper) getNormalized() *openapi3.Paths {
 	return reflect.Clone(m.normalized)
 }
 
 type Entry struct {
 	OperationID string
 	Method      string
-
 	// represents extended endpoint
 	// e.g. /user/id:[0-9]+
 	// as well as  /user/{id}
@@ -152,19 +172,41 @@ type Entry struct {
 	// represents normalized endpoint path
 	// is fully compatible with OAS path
 	Normalized string
+
+	// path parameters
+	parameters *openapi3.Parameters
+	mapper     *Mapper
 }
 
-func (m Entry) extendedEndpoint() endpoint {
+func (e Entry) ExtendPathParameters(dest *openapi3.Parameters) {
+	wrapParameters(dest).extendBy(e.pathParameters())
+}
+
+func (e Entry) pathParameters() openapi3.Parameters {
+	if e.mapper == nil {
+		return nil
+	}
+
+	entry, ok := e.mapper.normalizedMap[e.normalizedEndpoint()]
+
+	if !ok || entry.parameters == nil {
+		return nil
+	}
+
+	return *entry.parameters
+}
+
+func (e Entry) extendedEndpoint() endpoint {
 	return endpoint{
-		Path:   m.Extended,
-		Method: m.Method,
+		Path:   e.Extended,
+		Method: e.Method,
 	}
 }
 
-func (m Entry) normalizedEndpoint() endpoint {
+func (e Entry) normalizedEndpoint() endpoint {
 	return endpoint{
-		Path:   m.Normalized,
-		Method: m.Method,
+		Path:   e.Normalized,
+		Method: e.Method,
 	}
 }
 
@@ -181,4 +223,8 @@ func countPathsEntries(in *openapi3.Paths) int {
 	}
 
 	return res
+}
+
+func extractParametersFromPath(in *openapi3.Parameters, src openapi3.Parameters) {
+	wrapParameters(in).extendBy(src)
 }

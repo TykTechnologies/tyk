@@ -28,7 +28,7 @@ tests:
               required: true
               schema:
                 type: string
-                pattern: <nil>
+                pattern: '[^/]+'
   - source: "classic"
     input:
       version_data:
@@ -56,7 +56,7 @@ tests:
               required: true
               schema:
                 type: string
-                pattern: "<nil>"
+                pattern: '[0-9]+'
   - source: "classic"
     input:
       version_data:
@@ -134,13 +134,13 @@ tests:
               required: true
               schema:
                 type: string
-                pattern: <nil>
+                pattern: '[0-9]+'
             - name: id
               in: path
               required: true
               schema:
                 type: string
-                pattern: <nil>
+                pattern: '[^/]+'
   - source: "classic"
     input:
       version_data:
@@ -168,7 +168,7 @@ tests:
               required: true
               schema:
                 type: string
-                pattern: <nil>
+                pattern: '[^/]+'
             - name: customRegex1
               in: path
               required: true

@@ -1,7 +1,12 @@
 package pathnormalizer
 
 import (
+	logger "github.com/TykTechnologies/tyk/log"
 	"github.com/getkin/kin-openapi/openapi3"
+)
+
+var (
+	log = logger.Get()
 )
 
 // Validate validates paths keys can be normalized from user-defined keys to proper ones.
@@ -18,5 +23,5 @@ func Normalize(paths *openapi3.Paths) (*openapi3.Paths, error) {
 		return nil, err
 	}
 
-	return mapper.Normalized(), nil
+	return mapper.getNormalized(), nil
 }
