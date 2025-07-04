@@ -23,8 +23,6 @@ import (
 
 	"github.com/TykTechnologies/tyk/internal/httputil"
 
-	"github.com/getkin/kin-openapi/routers/gorillamux"
-
 	"github.com/getkin/kin-openapi/openapi3"
 
 	"github.com/TykTechnologies/tyk/apidef/oas"
@@ -43,9 +41,12 @@ import (
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/header"
 	"github.com/TykTechnologies/tyk/internal/model"
+	"github.com/TykTechnologies/tyk/internal/reflect"
 	"github.com/TykTechnologies/tyk/regexp"
 	"github.com/TykTechnologies/tyk/rpc"
 	"github.com/TykTechnologies/tyk/storage"
+	"github.com/getkin/kin-openapi/routers"
+	"github.com/getkin/kin-openapi/routers/gorillamux"
 )
 
 // const used by cache middleware
@@ -202,10 +203,20 @@ func (s *APISpec) Unload() {
 	s.unloadHooks = nil
 }
 
+// normalize oas api during load.
+func (s *APISpec) normalize() error {
+	if !s.IsOAS {
+		return nil
+	}
+
+	return s.OAS.Normalize()
+}
+
 // Validate returns nil if s is a valid spec and an error stating why the spec is not valid.
 func (s *APISpec) Validate(oasConfig config.OASConfig) error {
 	if s.IsOAS {
 		err := s.OAS.Validate(context.Background(), oas.GetValidationOptionsFromConfig(oasConfig)...)
+
 		if err != nil {
 			return err
 		}
@@ -375,17 +386,40 @@ func (a APIDefinitionLoader) MakeSpec(def *model.MergedAPI, logger *logrus.Entry
 		return nil, err
 	}
 
-	oasSpec := spec.OAS.T
-	oasSpec.Servers = openapi3.Servers{
-		{URL: spec.Proxy.ListenPath},
-	}
+	spec.oasRouter, err = a.buildRouter(&spec.OAS, spec.Proxy.ListenPath)
 
-	spec.oasRouter, err = gorillamux.NewRouter(&oasSpec)
 	if err != nil {
 		logger.WithError(err).Error("Could not create OAS router")
 	}
 
 	return spec, nil
+}
+
+func (a APIDefinitionLoader) buildRouter(spec *oas.OAS, listenPath string) (router routers.Router, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			router = nil
+
+			err = errors.Join(
+				err,
+				fmt.Errorf("failed to build router: %v", r),
+			)
+		}
+	}()
+
+	spec = reflect.Clone(spec)
+
+	if err = spec.Normalize(); err != nil {
+		return
+	}
+
+	spec.Servers = openapi3.Servers{
+		{URL: listenPath},
+	}
+
+	router, err = gorillamux.NewRouter(&spec.T)
+
+	return
 }
 
 // FromDashboardService will connect and download ApiDefintions from a Tyk Dashboard instance.

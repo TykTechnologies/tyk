@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/TykTechnologies/tyk/internal/pathnormalizer"
 	"strings"
 
 	"github.com/TykTechnologies/tyk/apidef"
@@ -30,6 +31,7 @@ const (
 // OAS holds the upstream OAS definition as well as adds functionality like custom JSON marshalling.
 type OAS struct {
 	openapi3.T
+	normalized bool
 }
 
 // MarshalJSON implements json.Marshaller.
@@ -66,7 +68,7 @@ func (s *OAS) MarshalJSON() ([]byte, error) {
 }
 
 // Fill fills *OAS definition from apidef.APIDefinition.
-func (s *OAS) Fill(api apidef.APIDefinition) {
+func (s *OAS) Fill(api apidef.APIDefinition) error {
 	xTykAPIGateway := s.GetTykExtension()
 	if xTykAPIGateway == nil {
 		xTykAPIGateway = &XTykAPIGateway{}
@@ -74,7 +76,11 @@ func (s *OAS) Fill(api apidef.APIDefinition) {
 	}
 
 	xTykAPIGateway.Fill(api)
-	s.fillPathsAndOperations(api.VersionData.Versions[Main].ExtendedPaths)
+
+	if err := s.fillPathsAndOperations(api.VersionData.Versions[Main].ExtendedPaths); err != nil {
+		return err
+	}
+
 	s.fillSecurity(api)
 
 	if ShouldOmit(xTykAPIGateway) {
@@ -89,10 +95,12 @@ func (s *OAS) Fill(api apidef.APIDefinition) {
 	if ShouldOmit(s.ExternalDocs) {
 		s.ExternalDocs = nil
 	}
+
+	return nil
 }
 
 // ExtractTo extracts *OAS into *apidef.APIDefinition.
-func (s *OAS) ExtractTo(api *apidef.APIDefinition) {
+func (s *OAS) ExtractTo(api *apidef.APIDefinition) error {
 	if s.GetTykExtension() == nil {
 		s.SetTykExtension(&XTykAPIGateway{})
 		defer func() {
@@ -106,8 +114,13 @@ func (s *OAS) ExtractTo(api *apidef.APIDefinition) {
 
 	vInfo := api.VersionData.Versions[Main]
 	vInfo.UseExtendedPaths = true
-	s.extractPathsAndOperations(&vInfo.ExtendedPaths)
+
+	if err := s.extractPathsAndOperations(&vInfo.ExtendedPaths); err != nil {
+		return err
+	}
 	api.VersionData.Versions[Main] = vInfo
+
+	return nil
 }
 
 func (s *OAS) SetTykStreamingExtension(xTykStreaming *XTykStreaming) {
@@ -432,13 +445,47 @@ func (s *OAS) ReplaceServers(apiURLs, oldAPIURLs []string) {
 	s.Servers = append(newServers, userAddedServers...)
 }
 
+func (s *OAS) findOrCreateOperation(path, method string) *openapi3.Operation {
+	operationID := s.getOperationID(path, method)
+	pathItem := s.getOrCreatePathItem(path)
+	operation := pathItem.GetOperation(method)
+
+	if operation == nil {
+		operation = &openapi3.Operation{
+			Responses: openapi3.NewResponses(),
+		}
+
+		pathItem.SetOperation(method, operation)
+	}
+
+	if operation.OperationID == "" {
+		operation.OperationID = operationID
+	}
+
+	return operation
+}
+
 // Validate validates OAS document by calling openapi3.T.Validate() function. In addition, it validates Security
 // Requirement section and it's requirements by calling OAS.validateSecurity() function.
 func (s *OAS) Validate(ctx context.Context, opts ...openapi3.ValidationOption) error {
-	validationErr := s.T.Validate(ctx, opts...)
-	securityErr := s.validateSecurity()
+	normalized, err := s.newNormalized()
 
-	return errors.Join(validationErr, securityErr)
+	if err != nil {
+		return err
+	}
+
+	if err = normalized.T.Validate(ctx, opts...); err != nil {
+		log.
+			WithError(err).
+			WithField("origin", *s).
+			WithField("normalized", *normalized).
+			Errorf("failed to validate OAS")
+	}
+
+	return errors.Join(
+		err,
+		normalized.validateSecurity(),
+	)
 }
 
 // validateSecurity verifies that existing Security Requirement Objects has Security Schemes declared in the Security
@@ -509,7 +556,10 @@ func NewOASFromClassicAPIDefinition(api *apidef.APIDefinition) (*OAS, error) {
 func FillOASFromClassicAPIDefinition(api *apidef.APIDefinition, oas *OAS) (*OAS, error) {
 	api.IsOAS = true
 
-	oas.Fill(*api)
+	if err := oas.Fill(*api); err != nil {
+		return nil, err
+	}
+
 	oas.setRequiredFields(api.Name, api.VersionName)
 	clearClassicAPIForSomeFeatures(api)
 
@@ -535,6 +585,34 @@ func (s *OAS) setRequiredFields(name string, versionName string) {
 	s.Info = &openapi3.Info{
 		Title:   name,
 		Version: versionName,
+	}
+}
+
+// Normalize normalizes path to acceptable form by openapi.
+// If API has named RegExp it will be converted to accepted form of api by OAS.
+func (s *OAS) Normalize() error {
+	if normalized, err := s.newNormalized(); err != nil {
+		return err
+	} else {
+		*s = *normalized
+		return nil
+	}
+}
+
+func (s *OAS) newNormalized() (*OAS, error) {
+	clone := reflect.Clone(s)
+	clone.normalized = true
+
+	// normalize only once
+	if s.normalized {
+		return clone, nil
+	}
+
+	if newPath, err := pathnormalizer.Normalize(clone.Paths); err != nil {
+		return nil, err
+	} else {
+		clone.Paths = newPath
+		return clone, nil
 	}
 }
 

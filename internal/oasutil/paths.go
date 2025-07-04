@@ -1,7 +1,10 @@
 package oasutil
 
 import (
+	"github.com/samber/lo"
+	"maps"
 	"regexp"
+	"slices"
 	"sort"
 	"strings"
 
@@ -20,19 +23,14 @@ type PathItem struct {
 var pathParamRegex = regexp.MustCompile(`\{[^}]+\}`)
 
 // ExtractPaths will extract paths with the given order.
-func ExtractPaths(in openapi3.Paths, order []string) []PathItem {
+func ExtractPaths(in openapi3.Paths, keys []string) []PathItem {
 	// collect url and pathItem
-	result := []PathItem{}
-	pathsMap := in.Map()
-	for _, v := range order {
-		value := PathItem{
-			PathItem: pathsMap[v],
-			Path:     v,
+	return lo.Map(keys, func(path string, _ int) PathItem {
+		return PathItem{
+			PathItem: in.Value(path),
+			Path:     path,
 		}
-		result = append(result, value)
-	}
-
-	return result
+	})
 }
 
 // SortByPathLength decomposes an openapi3.Paths to a sorted []PathItem.
@@ -43,11 +41,7 @@ func ExtractPaths(in openapi3.Paths, order []string) []PathItem {
 // Check the test function for sorting expectations.
 func SortByPathLength(in openapi3.Paths) []PathItem {
 	// get urls
-	paths := []string{}
-	pathsMap := in.Map()
-	for k := range pathsMap {
-		paths = append(paths, k)
-	}
+	paths := slices.Sorted(maps.Keys(in.Map()))
 
 	// sort by length and lexicographically
 	sort.Slice(paths, func(i, j int) bool {

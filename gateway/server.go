@@ -569,6 +569,12 @@ func (gw *Gateway) syncAPISpecs() (int, error) {
 			mainLog.WithError(err).WithField("spec", v.Name).Error("Skipping loading spec because it failed validation")
 			continue
 		}
+
+		if err := v.normalize(); err != nil {
+			mainLog.WithError(err).WithField("spec", v.Name).Error("Failed to normalize spec in place. Skipping spec")
+			continue
+		}
+
 		filter = append(filter, v)
 	}
 

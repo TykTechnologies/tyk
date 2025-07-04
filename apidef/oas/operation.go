@@ -4,15 +4,16 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"reflect"
 	"sort"
 	"strconv"
-	"strings"
-
-	"github.com/getkin/kin-openapi/openapi3"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/internal/errcoll"
 	"github.com/TykTechnologies/tyk/internal/oasutil"
-	"github.com/TykTechnologies/tyk/regexp"
+	"github.com/TykTechnologies/tyk/internal/pathnormalizer"
+	"github.com/TykTechnologies/tyk/internal/utils"
+	"github.com/getkin/kin-openapi/openapi3"
 )
 
 // Operations holds Operation definitions.
@@ -139,34 +140,45 @@ func (o *Operation) Import(oasOperation *openapi3.Operation, overRideValues TykE
 	}
 }
 
-func (s *OAS) fillPathsAndOperations(ep apidef.ExtendedPathsSet) {
+func (s *OAS) fillPathsAndOperations(ep apidef.ExtendedPathsSet) error {
 	// Regardless if `ep` is a zero value, we need a non-nil paths
 	// to produce a valid OAS document
 	if s.Paths == nil {
 		s.Paths = openapi3.NewPaths()
 	}
 
-	s.fillAllowance(ep.WhiteList, allow)
-	s.fillAllowance(ep.BlackList, block)
-	s.fillAllowance(ep.Ignored, ignoreAuthentication)
-	s.fillTransformRequestMethod(ep.MethodTransforms)
-	s.fillTransformRequestBody(ep.Transform)
-	s.fillTransformResponseBody(ep.TransformResponse)
-	s.fillTransformRequestHeaders(ep.TransformHeader)
-	s.fillTransformResponseHeaders(ep.TransformResponseHeader)
-	s.fillURLRewrite(ep.URLRewrite)
-	s.fillInternal(ep.Internal)
-	s.fillCache(ep.AdvanceCacheConfig)
-	s.fillEnforceTimeout(ep.HardTimeouts)
-	s.fillOASValidateRequest(ep.ValidateJSON)
-	s.fillVirtualEndpoint(ep.Virtual)
-	s.fillEndpointPostPlugins(ep.GoPlugin)
-	s.fillCircuitBreaker(ep.CircuitBreaker)
-	s.fillTrackEndpoint(ep.TrackEndpoints)
-	s.fillDoNotTrackEndpoint(ep.DoNotTrackEndpoints)
-	s.fillRequestSizeLimit(ep.SizeLimit)
-	s.fillRateLimitEndpoints(ep.RateLimit)
-	s.fillMockResponsePaths(s.Paths, ep)
+	mapper, err := pathnormalizer.NewMapper(s.Paths)
+	if err != nil {
+		return err
+	}
+
+	collector := errcoll.New()
+
+	collector.Push(func() error { return s.fillAllowance(ep.WhiteList, allow, mapper) })
+	collector.Push(func() error { return s.fillAllowance(ep.BlackList, block, mapper) })
+	collector.Push(func() error { return s.fillAllowance(ep.Ignored, ignoreAuthentication, mapper) })
+	collector.Push(filler(s, ep.MethodTransforms, mapper, fillTransformRequestMethod))
+	collector.Push(filler(s, ep.Transform, mapper, fillTransformRequestBody))
+	collector.Push(filler(s, ep.TransformResponse, mapper, fillTransformResponseBody))
+	collector.Push(filler(s, ep.TransformHeader, mapper, fillTransformRequestHeaders))
+	collector.Push(filler(s, ep.TransformResponseHeader, mapper, fillTransformResponseHeaders))
+	collector.Push(filler(s, ep.URLRewrite, mapper, fillURLRewrite))
+	collector.Push(filler(s, ep.Internal, mapper, fillInternal))
+	collector.Push(filler(s, ep.AdvanceCacheConfig, mapper, fillCache))
+	collector.Push(filler(s, ep.HardTimeouts, mapper, fillEnforceTimeout))
+	collector.Push(func() error { return s.fillOASValidateRequest(ep.ValidateJSON, mapper) })
+	collector.Push(filler(s, ep.Virtual, mapper, fillVirtualEndpoint))
+	collector.Push(filler(s, ep.GoPlugin, mapper, fillEndpointPostPlugins))
+	collector.Push(filler(s, ep.CircuitBreaker, mapper, fillCircuitBreaker))
+	collector.Push(filler(s, ep.TrackEndpoints, mapper, fillTrackEndpoint))
+	collector.Push(filler(s, ep.DoNotTrackEndpoints, mapper, fillDoNotTrackEndpoint))
+	collector.Push(filler(s, ep.SizeLimit, mapper, fillRequestSizeLimit))
+	collector.Push(filler(s, ep.RateLimit, mapper, fillRateLimitEndpoints))
+	collector.Push(func() error {
+		return s.fillMockResponsePaths(ep, mapper)
+	})
+
+	return nil
 }
 
 // fillMockResponsePaths converts classic API mock responses to OAS format.
@@ -183,17 +195,30 @@ func (s *OAS) fillPathsAndOperations(ep apidef.ExtendedPathsSet) {
 // - Checking the Content-Type header if present
 // - Attempting to parse the body as JSON
 // - Defaulting to text/plain if neither above applies
-func (s *OAS) fillMockResponsePaths(paths *openapi3.Paths, ep apidef.ExtendedPathsSet) {
+func (s *OAS) fillMockResponsePaths(
+	ep apidef.ExtendedPathsSet,
+	mapper *pathnormalizer.Mapper,
+) error {
+
 	for _, mock := range ep.MockResponse {
-		operationID := s.getOperationID(mock.Path, mock.Method)
+		tykOperation, entry, err := s.getOrCreateOpByNormalized(mock.Path, mock.Method, mapper)
 
-		var operation *openapi3.Operation
+		if err != nil {
+			return err
+		}
 
-		for _, item := range paths.Map() {
-			if op := item.GetOperation(mock.Method); op != nil && op.OperationID == operationID {
-				operation = op
-				break
-			}
+		pathItem := s.Paths.Find(entry.Extended)
+
+		if pathItem == nil {
+			pathItem = &openapi3.PathItem{}
+			s.Paths.Set(entry.Extended, pathItem)
+		}
+
+		operation := pathItem.GetOperation(mock.Method)
+
+		if operation == nil {
+			operation = openapi3.NewOperation()
+			pathItem.SetOperation(mock.Method, operation)
 		}
 
 		if operation.Responses == nil {
@@ -214,8 +239,6 @@ func (s *OAS) fillMockResponsePaths(paths *openapi3.Paths, ep apidef.ExtendedPat
 
 		operation.Responses.Delete("default")
 
-		tykOperation := s.GetTykExtension().getOperation(operation.OperationID)
-
 		if tykOperation.MockResponse == nil {
 			tykOperation.MockResponse = &MockResponse{}
 		}
@@ -223,7 +246,7 @@ func (s *OAS) fillMockResponsePaths(paths *openapi3.Paths, ep apidef.ExtendedPat
 		tykOperation.MockResponse.Fill(mock)
 
 		if tykOperation.IgnoreAuthentication == nil && tykOperation.MockResponse.FromOASExamples == nil {
-			// We need to to add ignoreAuthentication middleware to the operation
+			// We need to add ignoreAuthentication middleware to the operation
 			// to stay consistent to the way mock responses work for classic APIs
 			tykOperation.IgnoreAuthentication = &Allowance{Enabled: true}
 		}
@@ -234,17 +257,25 @@ func (s *OAS) fillMockResponsePaths(paths *openapi3.Paths, ep apidef.ExtendedPat
 			}
 		}
 	}
+
+	return nil
 }
 
-func (s *OAS) extractPathsAndOperations(ep *apidef.ExtendedPathsSet) {
+func (s *OAS) extractPathsAndOperations(ep *apidef.ExtendedPathsSet) error {
 	ep.Clear()
 
 	tykOperations := s.getTykOperations()
 	if len(tykOperations) == 0 {
-		return
+		return nil
 	}
 
-	for _, pathItem := range oasutil.SortByPathLength(*s.Paths) {
+	paths, err := pathnormalizer.Normalize(s.Paths)
+
+	if err != nil {
+		return err
+	}
+
+	for _, pathItem := range oasutil.SortByPathLength(*paths) {
 		for id, tykOp := range tykOperations {
 			path := pathItem.Path
 			for method, operation := range pathItem.Operations() {
@@ -275,12 +306,22 @@ func (s *OAS) extractPathsAndOperations(ep *apidef.ExtendedPathsSet) {
 	}
 
 	sortMockResponseAllowList(ep)
+
+	return nil
 }
 
-func (s *OAS) fillAllowance(endpointMetas []apidef.EndPointMeta, typ AllowanceType) {
-	for _, em := range endpointMetas {
-		operationID := s.getOperationID(em.Path, em.Method)
-		operation := s.GetTykExtension().getOperation(operationID)
+func (s *OAS) fillAllowance(
+	srcList []apidef.EndPointMeta,
+	typ AllowanceType,
+	mapper *pathnormalizer.Mapper,
+) error {
+
+	for _, em := range srcList {
+		operation, _, err := s.getOrCreateOpByNormalized(em.Path, em.Method, mapper)
+
+		if err != nil {
+			return err
+		}
 
 		var allowance *Allowance
 
@@ -304,6 +345,8 @@ func (s *OAS) fillAllowance(endpointMetas []apidef.EndPointMeta, typ AllowanceTy
 			allowance = nil
 		}
 	}
+
+	return nil
 }
 
 func newAllowance(prev **Allowance) *Allowance {
@@ -314,127 +357,128 @@ func newAllowance(prev **Allowance) *Allowance {
 	return *prev
 }
 
-func (s *OAS) fillTransformRequestMethod(metas []apidef.MethodTransformMeta) {
-	for _, meta := range metas {
-		operationID := s.getOperationID(meta.Path, meta.Method)
-		operation := s.GetTykExtension().getOperation(operationID)
-		if operation.TransformRequestMethod == nil {
-			operation.TransformRequestMethod = &TransformRequestMethod{}
+func filler[T any](
+	dest *OAS,
+	src []T,
+	mapper *pathnormalizer.Mapper,
+	fn func(T, *Operation),
+) func() error {
+
+	return func() error {
+		typ := reflect.TypeFor[T]()
+		pathField, ok := typ.FieldByName("Path")
+
+		if !ok || pathField.Type.Kind() != reflect.String {
+			return fmt.Errorf("%s.%s has not filed Path with type string", typ.PkgPath(), typ.Name())
 		}
 
-		operation.TransformRequestMethod.Fill(meta)
-		if ShouldOmit(operation.TransformRequestMethod) {
-			operation.TransformRequestMethod = nil
+		methodField, ok := typ.FieldByName("Path")
+
+		if !ok || methodField.Type.Kind() != reflect.String {
+			return fmt.Errorf("%s.%s has not filed Method with type string", typ.PkgPath(), typ.Name())
 		}
+
+		for _, item := range src {
+			path := reflect.ValueOf(item).FieldByName("Path").String()
+			method := reflect.ValueOf(item).FieldByName("Method").String()
+
+			operation, _, err := dest.getOrCreateOpByNormalized(path, method, mapper)
+
+			if err != nil {
+				return err
+			}
+
+			fn(item, operation)
+		}
+		return nil
 	}
 }
 
-func (s *OAS) fillTransformRequestBody(metas []apidef.TemplateMeta) {
-	for _, meta := range metas {
-		operationID := s.getOperationID(meta.Path, meta.Method)
-		operation := s.GetTykExtension().getOperation(operationID)
+func fillTransformRequestMethod(meta apidef.MethodTransformMeta, operation *Operation) {
+	if operation.TransformRequestMethod == nil {
+		operation.TransformRequestMethod = &TransformRequestMethod{}
+	}
 
-		if operation.TransformRequestBody == nil {
-			operation.TransformRequestBody = &TransformBody{}
-		}
-
-		operation.TransformRequestBody.Fill(meta)
-		if ShouldOmit(operation.TransformRequestBody) {
-			operation.TransformRequestBody = nil
-		}
+	operation.TransformRequestMethod.Fill(meta)
+	if ShouldOmit(operation.TransformRequestMethod) {
+		operation.TransformRequestMethod = nil
 	}
 }
 
-func (s *OAS) fillTransformResponseBody(metas []apidef.TemplateMeta) {
-	for _, meta := range metas {
-		operationID := s.getOperationID(meta.Path, meta.Method)
-		operation := s.GetTykExtension().getOperation(operationID)
+func fillTransformRequestBody(meta apidef.TemplateMeta, operation *Operation) {
+	if operation.TransformRequestBody == nil {
+		operation.TransformRequestBody = &TransformBody{}
+	}
 
-		if operation.TransformResponseBody == nil {
-			operation.TransformResponseBody = &TransformBody{}
-		}
-
-		operation.TransformResponseBody.Fill(meta)
-		if ShouldOmit(operation.TransformResponseBody) {
-			operation.TransformResponseBody = nil
-		}
+	operation.TransformRequestBody.Fill(meta)
+	if ShouldOmit(operation.TransformRequestBody) {
+		operation.TransformRequestBody = nil
 	}
 }
 
-func (s *OAS) fillTransformRequestHeaders(metas []apidef.HeaderInjectionMeta) {
-	for _, meta := range metas {
-		operationID := s.getOperationID(meta.Path, meta.Method)
-		operation := s.GetTykExtension().getOperation(operationID)
+func fillTransformResponseBody(meta apidef.TemplateMeta, operation *Operation) {
+	if operation.TransformResponseBody == nil {
+		operation.TransformResponseBody = &TransformBody{}
+	}
 
-		if operation.TransformRequestHeaders == nil {
-			operation.TransformRequestHeaders = &TransformHeaders{}
-		}
-
-		operation.TransformRequestHeaders.Fill(meta)
-		if ShouldOmit(operation.TransformRequestHeaders) {
-			operation.TransformRequestHeaders = nil
-		}
+	operation.TransformResponseBody.Fill(meta)
+	if ShouldOmit(operation.TransformResponseBody) {
+		operation.TransformResponseBody = nil
 	}
 }
 
-func (s *OAS) fillTransformResponseHeaders(metas []apidef.HeaderInjectionMeta) {
-	for _, meta := range metas {
-		operationID := s.getOperationID(meta.Path, meta.Method)
-		operation := s.GetTykExtension().getOperation(operationID)
+func fillTransformRequestHeaders(meta apidef.HeaderInjectionMeta, operation *Operation) {
+	if operation.TransformRequestHeaders == nil {
+		operation.TransformRequestHeaders = &TransformHeaders{}
+	}
 
-		if operation.TransformResponseHeaders == nil {
-			operation.TransformResponseHeaders = &TransformHeaders{}
-		}
-
-		operation.TransformResponseHeaders.Fill(meta)
-		if ShouldOmit(operation.TransformResponseHeaders) {
-			operation.TransformResponseHeaders = nil
-		}
+	operation.TransformRequestHeaders.Fill(meta)
+	if ShouldOmit(operation.TransformRequestHeaders) {
+		operation.TransformRequestHeaders = nil
 	}
 }
 
-func (s *OAS) fillCache(metas []apidef.CacheMeta) {
-	for _, meta := range metas {
-		operationID := s.getOperationID(meta.Path, meta.Method)
-		operation := s.GetTykExtension().getOperation(operationID)
-		if operation.Cache == nil {
-			operation.Cache = &CachePlugin{}
-		}
+func fillTransformResponseHeaders(meta apidef.HeaderInjectionMeta, operation *Operation) {
+	if operation.TransformResponseHeaders == nil {
+		operation.TransformResponseHeaders = &TransformHeaders{}
+	}
 
-		operation.Cache.Fill(meta)
-		if ShouldOmit(operation.Cache) {
-			operation.Cache = nil
-		}
+	operation.TransformResponseHeaders.Fill(meta)
+	if ShouldOmit(operation.TransformResponseHeaders) {
+		operation.TransformResponseHeaders = nil
 	}
 }
 
-func (s *OAS) fillEnforceTimeout(metas []apidef.HardTimeoutMeta) {
-	for _, meta := range metas {
-		operationID := s.getOperationID(meta.Path, meta.Method)
-		operation := s.GetTykExtension().getOperation(operationID)
-		if operation.EnforceTimeout == nil {
-			operation.EnforceTimeout = &EnforceTimeout{}
-		}
+func fillCache(meta apidef.CacheMeta, operation *Operation) {
+	if operation.Cache == nil {
+		operation.Cache = &CachePlugin{}
+	}
 
-		operation.EnforceTimeout.Fill(meta)
-		if ShouldOmit(operation.EnforceTimeout) {
-			operation.EnforceTimeout = nil
-		}
+	operation.Cache.Fill(meta)
+	if ShouldOmit(operation.Cache) {
+		operation.Cache = nil
 	}
 }
 
-func (s *OAS) fillRequestSizeLimit(metas []apidef.RequestSizeMeta) {
-	for _, meta := range metas {
-		operationID := s.getOperationID(meta.Path, meta.Method)
-		operation := s.GetTykExtension().getOperation(operationID)
-		if operation.RequestSizeLimit == nil {
-			operation.RequestSizeLimit = &RequestSizeLimit{}
-		}
+func fillEnforceTimeout(meta apidef.HardTimeoutMeta, operation *Operation) {
+	if operation.EnforceTimeout == nil {
+		operation.EnforceTimeout = &EnforceTimeout{}
+	}
 
-		operation.RequestSizeLimit.Fill(meta)
-		if ShouldOmit(operation.RequestSizeLimit) {
-			operation.RequestSizeLimit = nil
-		}
+	operation.EnforceTimeout.Fill(meta)
+	if ShouldOmit(operation.EnforceTimeout) {
+		operation.EnforceTimeout = nil
+	}
+}
+
+func fillRequestSizeLimit(meta apidef.RequestSizeMeta, operation *Operation) {
+	if operation.RequestSizeLimit == nil {
+		operation.RequestSizeLimit = &RequestSizeLimit{}
+	}
+
+	operation.RequestSizeLimit.Fill(meta)
+	if ShouldOmit(operation.RequestSizeLimit) {
+		operation.RequestSizeLimit = nil
 	}
 }
 
@@ -543,15 +587,6 @@ func (o *Operation) extractRequestSizeLimitTo(ep *apidef.ExtendedPathsSet, path 
 	ep.SizeLimit = append(ep.SizeLimit, meta)
 }
 
-// detect possible regex pattern:
-// - character match ([a-z])
-// - greedy match (.*)
-// - ungreedy match (.+)
-// - end of string ($).
-var regexPatterns = []string{
-	".+", ".*", "[", "]", "$",
-}
-
 type pathPart struct {
 	name    string
 	value   string
@@ -566,132 +601,34 @@ func (p pathPart) String() string {
 	return p.value
 }
 
-// isRegex checks if value has expected regular expression patterns.
-func isRegex(value string) bool {
-	for _, pattern := range regexPatterns {
-		if strings.Contains(value, pattern) {
-			return true
-		}
+func (s *OAS) getOrCreatePathItem(path string) *openapi3.PathItem {
+	if s.Paths.Value(path) == nil {
+		s.Paths.Set(path, &openapi3.PathItem{})
 	}
-	return false
+
+	return s.Paths.Value(path)
 }
 
-// splitPath splits URL into folder parts, detecting regex patterns.
-func splitPath(inPath string) ([]pathPart, bool) {
-	trimmedPath := strings.Trim(inPath, "/")
-
-	if trimmedPath == "" {
-		return []pathPart{}, false
-	}
-
-	parts := strings.Split(trimmedPath, "/")
-	result := make([]pathPart, len(parts))
-
-	regexCount := 0
-	hasRegex := false
-
-	for i, segment := range parts {
-		var part pathPart
-		part, regexCount, hasRegex = parsePathSegment(segment, regexCount, hasRegex)
-		result[i] = part
-	}
-
-	return result, hasRegex
-}
-
-// buildPath converts the URL paths with regex to named parameters
-// e.g. ["a", ".*"] becomes /a/{customRegex1}.
-func buildPath(parts []pathPart, appendSlash bool) string {
-	newPath := ""
-
-	for _, part := range parts {
-		newPath += "/" + part.String()
-	}
-
-	if appendSlash {
-		return newPath + "/"
-	}
-
-	return newPath
-}
-
+// getOperationID side effect method.
+// Deprecated
 func (s *OAS) getOperationID(inPath, method string) string {
-	operationID := strings.TrimPrefix(inPath, "/") + method
+	defaultOp := utils.OperationId(inPath, method)
+	pathItem := s.Paths.Value(inPath)
 
-	createOrGetPathItem := func(item string) *openapi3.PathItem {
-		if s.Paths.Value(item) == nil {
-			s.Paths.Set(item, &openapi3.PathItem{})
-		}
-
-		return s.Paths.Value(item)
+	if pathItem == nil {
+		return defaultOp
 	}
 
-	createOrUpdateOperation := func(p *openapi3.PathItem) *openapi3.Operation {
-		operation := p.GetOperation(method)
-
-		if operation == nil {
-			operation = &openapi3.Operation{
-				Responses: openapi3.NewResponses(),
-			}
-
-			p.SetOperation(method, operation)
-		}
-
-		if operation.OperationID == "" {
-			operation.OperationID = operationID
-		}
-
-		return operation
+	op := pathItem.GetOperation(method)
+	if op == nil {
+		return defaultOp
 	}
 
-	var p *openapi3.PathItem
-	parts, hasRegex := splitPath(inPath)
-
-	if hasRegex {
-		newPath := buildPath(parts, strings.HasSuffix(inPath, "/"))
-
-		p = createOrGetPathItem(newPath)
-
-		// We should check if the parameters are already set before initializing it.
-		if p.Parameters == nil {
-			p.Parameters = []*openapi3.ParameterRef{}
-		}
-
-		existingParams := make(map[string]bool)
-		for _, existingParam := range p.Parameters {
-			existingParams[existingParam.Value.Name] = true
-		}
-
-		for _, part := range parts {
-			// Skip adding the parameter if it already exists so that we don't override it.
-			if existingParams[part.name] {
-				continue
-			}
-
-			if part.isRegex {
-				schema := &openapi3.SchemaRef{
-					Value: &openapi3.Schema{
-						Type:    &openapi3.Types{openapi3.TypeString},
-						Pattern: part.value,
-					},
-				}
-				param := &openapi3.ParameterRef{
-					Value: &openapi3.Parameter{
-						Name:     part.name,
-						In:       "path",
-						Required: true,
-						Schema:   schema,
-					},
-				}
-				p.Parameters = append(p.Parameters, param)
-			}
-		}
-	} else {
-		p = createOrGetPathItem(inPath)
+	if len(op.OperationID) == 0 {
+		return defaultOp
 	}
 
-	operation := createOrUpdateOperation(p)
-	return operation.OperationID
+	return op.OperationID
 }
 
 func (x *XTykAPIGateway) getOperation(operationID string) *Operation {
@@ -771,11 +708,16 @@ func convertSchema(mapSchema map[string]interface{}) (*openapi3.Schema, error) {
 	return schema, nil
 }
 
-func (s *OAS) fillOASValidateRequest(metas []apidef.ValidatePathMeta) {
+func (s *OAS) fillOASValidateRequest(metas []apidef.ValidatePathMeta, mapper *pathnormalizer.Mapper) error {
 	for _, meta := range metas {
-		operationID := s.getOperationID(meta.Path, meta.Method)
+		if _, _, err := s.getOrCreateOpByNormalized(meta.Path, meta.Method, mapper); err != nil {
+			// this op is necessary cause if it's ensures collisions does not occur
+			return err
+		}
 
-		operation := s.Paths.Find(meta.Path).GetOperation(meta.Method)
+		operation := s.findOrCreateOperation(meta.Path, meta.Method)
+		operationID := operation.OperationID
+
 		requestBodyRef := operation.RequestBody
 		if operation.RequestBody == nil {
 			requestBodyRef = &openapi3.RequestBodyRef{}
@@ -786,9 +728,9 @@ func (s *OAS) fillOASValidateRequest(metas []apidef.ValidatePathMeta) {
 			requestBodyRef.Value = openapi3.NewRequestBody()
 		}
 
-		schema, err := convertSchema(meta.Schema)
-		if err != nil {
+		if schema, err := convertSchema(meta.Schema); err != nil {
 			log.WithError(err).Error("Couldn't convert classic API validate JSON schema to OAS")
+			// consider returning error
 		} else {
 			requestBodyRef.Value.WithJSONSchema(schema)
 		}
@@ -805,6 +747,8 @@ func (s *OAS) fillOASValidateRequest(metas []apidef.ValidatePathMeta) {
 			tykOp.ValidateRequest = nil
 		}
 	}
+
+	return nil
 }
 
 // MockResponse configures the mock responses.
@@ -897,18 +841,14 @@ func (m *MockResponse) Import(enabled bool) {
 	}
 }
 
-func (s *OAS) fillVirtualEndpoint(endpointMetas []apidef.VirtualMeta) {
-	for _, em := range endpointMetas {
-		operationID := s.getOperationID(em.Path, em.Method)
-		operation := s.GetTykExtension().getOperation(operationID)
-		if operation.VirtualEndpoint == nil {
-			operation.VirtualEndpoint = &VirtualEndpoint{}
-		}
+func fillVirtualEndpoint(em apidef.VirtualMeta, operation *Operation) {
+	if operation.VirtualEndpoint == nil {
+		operation.VirtualEndpoint = &VirtualEndpoint{}
+	}
 
-		operation.VirtualEndpoint.Fill(em)
-		if ShouldOmit(operation.VirtualEndpoint) {
-			operation.VirtualEndpoint = nil
-		}
+	operation.VirtualEndpoint.Fill(em)
+	if ShouldOmit(operation.VirtualEndpoint) {
+		operation.VirtualEndpoint = nil
 	}
 }
 
@@ -922,18 +862,60 @@ func (o *Operation) extractVirtualEndpointTo(ep *apidef.ExtendedPathsSet, path s
 	ep.Virtual = append(ep.Virtual, meta)
 }
 
-func (s *OAS) fillRateLimitEndpoints(endpointMetas []apidef.RateLimitMeta) {
-	for _, em := range endpointMetas {
-		operationID := s.getOperationID(em.Path, em.Method)
-		operation := s.GetTykExtension().getOperation(operationID)
-		if operation.RateLimit == nil {
-			operation.RateLimit = &RateLimitEndpoint{}
-		}
+// getOrCreateOpByNormalized gets or creates new operation during to mappings.
+func (s *OAS) getOrCreateOpByNormalized(
+	path, method string,
+	mapper *pathnormalizer.Mapper,
+) (*Operation, pathnormalizer.Entry, error) {
 
-		operation.RateLimit.Fill(em)
-		if ShouldOmit(operation.RateLimit) {
-			operation.RateLimit = nil
-		}
+	entry, err := mapper.FindOrCreate(path, method)
+
+	if err != nil {
+		return nil, entry, err
+	}
+
+	s.ensureDefaultOp(entry)
+
+	return s.GetTykExtension().getOperation(entry.OperationID), entry, nil
+}
+
+func (s *OAS) ensureDefaultOp(entry pathnormalizer.Entry) {
+	path, method := entry.Extended, entry.Method
+
+	pathItem := s.Paths.Value(path)
+
+	if pathItem == nil {
+		pathItem = &openapi3.PathItem{}
+		s.Paths.Set(path, pathItem)
+	}
+
+	entry.ExtendPathParameters(&pathItem.Parameters)
+
+	operation := pathItem.GetOperation(method)
+	if operation == nil {
+		operation = openapi3.NewOperation()
+	}
+
+	if operation.Responses == nil {
+		operation.Responses = openapi3.NewResponses()
+		// todo: add operation params
+	}
+
+	if operation.OperationID == "" {
+		operation.OperationID = entry.OperationID
+	}
+
+	pathItem.SetOperation(method, operation)
+}
+
+func fillRateLimitEndpoints(em apidef.RateLimitMeta, operation *Operation) {
+	if operation.RateLimit == nil {
+		operation.RateLimit = &RateLimitEndpoint{}
+	}
+
+	operation.RateLimit.Fill(em)
+	if ShouldOmit(operation.RateLimit) {
+		operation.RateLimit = nil
 	}
 }
 
@@ -947,18 +929,14 @@ func (o *Operation) extractRateLimitEndpointTo(ep *apidef.ExtendedPathsSet, path
 	ep.RateLimit = append(ep.RateLimit, meta)
 }
 
-func (s *OAS) fillEndpointPostPlugins(endpointMetas []apidef.GoPluginMeta) {
-	for _, em := range endpointMetas {
-		operationID := s.getOperationID(em.Path, em.Method)
-		operation := s.GetTykExtension().getOperation(operationID)
-		if operation.PostPlugins == nil {
-			operation.PostPlugins = make(EndpointPostPlugins, 1)
-		}
+func fillEndpointPostPlugins(em apidef.GoPluginMeta, operation *Operation) {
+	if operation.PostPlugins == nil {
+		operation.PostPlugins = make(EndpointPostPlugins, 1)
+	}
 
-		operation.PostPlugins.Fill(em)
-		if ShouldOmit(operation.PostPlugins) {
-			operation.PostPlugins = nil
-		}
+	operation.PostPlugins.Fill(em)
+	if ShouldOmit(operation.PostPlugins) {
+		operation.PostPlugins = nil
 	}
 }
 
@@ -982,49 +960,15 @@ func (o *Operation) extractCircuitBreakerTo(ep *apidef.ExtendedPathsSet, path st
 	ep.CircuitBreaker = append(ep.CircuitBreaker, meta)
 }
 
-func (s *OAS) fillCircuitBreaker(metas []apidef.CircuitBreakerMeta) {
-	for _, meta := range metas {
-		operationID := s.getOperationID(meta.Path, meta.Method)
-		operation := s.GetTykExtension().getOperation(operationID)
-		if operation.CircuitBreaker == nil {
-			operation.CircuitBreaker = &CircuitBreaker{}
-		}
-
-		operation.CircuitBreaker.Fill(meta)
-		if ShouldOmit(operation.CircuitBreaker) {
-			operation.CircuitBreaker = nil
-		}
-	}
-}
-
-// detectMockResponseContentType determines the Content-Type of the mock response.
-// It first checks the headers for an explicit Content-Type, then attempts to detect
-// the type from the body content. Returns "text/plain" if no specific type can be determined.
-func detectMockResponseContentType(mock apidef.MockResponseMeta) string {
-	const headerContentType = "Content-Type"
-
-	for name, value := range mock.Headers {
-		if http.CanonicalHeaderKey(name) == headerContentType {
-			return value
-		}
+func fillCircuitBreaker(meta apidef.CircuitBreakerMeta, operation *Operation) {
+	if operation.CircuitBreaker == nil {
+		operation.CircuitBreaker = &CircuitBreaker{}
 	}
 
-	if mock.Body == "" {
-		return "text/plain"
+	operation.CircuitBreaker.Fill(meta)
+	if ShouldOmit(operation.CircuitBreaker) {
+		operation.CircuitBreaker = nil
 	}
-
-	// We attempt to guess the content type by checking if the body is a valid JSON.
-	var arrayValue = []json.RawMessage{}
-	if err := json.Unmarshal([]byte(mock.Body), &arrayValue); err == nil {
-		return "application/json"
-	}
-
-	var objectValue = map[string]json.RawMessage{}
-	if err := json.Unmarshal([]byte(mock.Body), &objectValue); err == nil {
-		return "application/json"
-	}
-
-	return "text/plain"
 }
 
 // sortMockResponseAllowList sorts the mock response paths by path, method, and response code.
@@ -1063,34 +1007,4 @@ func hasMockResponse(methodActions map[string]apidef.EndpointMethodMeta) bool {
 	}
 
 	return false
-}
-
-// parsePathSegment parses a single path segment and determines if it contains a regex pattern.
-func parsePathSegment(segment string, regexCount int, hasRegex bool) (pathPart, int, bool) {
-	if strings.HasPrefix(segment, "{") && strings.HasSuffix(segment, "}") {
-		return parseMuxTemplate(segment, regexCount)
-	} else if isIdentifier(segment) {
-		return pathPart{name: segment, value: segment, isRegex: false}, regexCount, hasRegex
-	} else {
-		regexCount++
-		return pathPart{name: fmt.Sprintf("customRegex%d", regexCount), value: segment, isRegex: true}, regexCount, true
-	}
-}
-
-// parseMuxTemplate parses a segment that is a mux template and extracts the name or assigns a custom regex name.
-func parseMuxTemplate(segment string, regexCount int) (pathPart, int, bool) {
-	segment = strings.Trim(segment, "{}")
-
-	name, _, ok := strings.Cut(segment, ":")
-	if ok || isIdentifier(segment) {
-		return pathPart{name: name, isRegex: true}, regexCount, true
-	}
-
-	regexCount++
-	return pathPart{name: fmt.Sprintf("customRegex%d", regexCount), isRegex: true}, regexCount, true
-}
-
-func isIdentifier(value string) bool {
-	matched, _ := regexp.MatchString(`^[a-zA-Z0-9._-]+$`, value) //nolint
-	return matched
 }

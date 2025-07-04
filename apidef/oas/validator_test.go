@@ -47,6 +47,7 @@ func TestValidateOASObject(t *testing.T) {
 				return paths
 			}(),
 		},
+		false,
 	}
 
 	validXTykAPIGateway := XTykAPIGateway{

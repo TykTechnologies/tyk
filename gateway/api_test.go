@@ -2248,7 +2248,8 @@ func TestHandleAddOASApi_AddVersionAtomically(t *testing.T) {
 
 		a.IsOAS = true
 		a.OAS = baseOAS
-		a.OAS.Fill(*a.APIDefinition)
+		err := a.OAS.Fill(*a.APIDefinition)
+		assert.NoError(t, err)
 	})[0]
 
 	v2 := BuildAPI(func(a *APISpec) {
@@ -2260,7 +2261,8 @@ func TestHandleAddOASApi_AddVersionAtomically(t *testing.T) {
 
 		a.IsOAS = true
 		a.OAS = baseOAS
-		a.OAS.Fill(*a.APIDefinition)
+		err := a.OAS.Fill(*a.APIDefinition)
+		assert.NoError(t, err)
 	})[0]
 
 	_, _ = ts.Run(t, []test.TestCase{
@@ -2388,7 +2390,8 @@ func TestHandleDeleteOASAPI_RemoveVersionAtomically(t *testing.T) {
 
 		a.IsOAS = true
 		a.OAS = baseOAS
-		a.OAS.Fill(*a.APIDefinition)
+		err := a.OAS.Fill(*a.APIDefinition)
+		assert.NoError(t, err)
 	})[0]
 	v2 := BuildAPI(func(a *APISpec) {
 		a.SetDisabledFlags()
@@ -2399,7 +2402,8 @@ func TestHandleDeleteOASAPI_RemoveVersionAtomically(t *testing.T) {
 
 		a.IsOAS = true
 		a.OAS = baseOAS
-		a.OAS.Fill(*a.APIDefinition)
+		err := a.OAS.Fill(*a.APIDefinition)
+		assert.NoError(t, err)
 	})[0]
 	baseAPI := BuildAPI(func(a *APISpec) {
 		a.SetDisabledFlags()
@@ -2416,7 +2420,8 @@ func TestHandleDeleteOASAPI_RemoveVersionAtomically(t *testing.T) {
 
 		a.IsOAS = true
 		a.OAS = baseOAS
-		a.OAS.Fill(*a.APIDefinition)
+		err := a.OAS.Fill(*a.APIDefinition)
+		assert.NoError(t, err)
 	})[0]
 
 	_, _ = ts.Run(t, []test.TestCase{
@@ -2717,7 +2722,8 @@ func TestOAS(t *testing.T) {
 
 				var oldAPIInOAS oas.OAS
 				oldAPI.APIDefinition.SetDisabledFlags()
-				oldAPIInOAS.Fill(*oldAPI.APIDefinition)
+				err := oldAPIInOAS.Fill(*oldAPI.APIDefinition)
+				assert.NoError(t, err)
 				oldAPIInOAS.OpenAPI = "3.0.3"
 				oldAPIInOAS.Info = &openapi3.Info{
 					Title:   "old-api",
@@ -3173,8 +3179,9 @@ func TestOAS(t *testing.T) {
 				testPatchOAS(t, ts, apiInOAS, nil, apiID)
 				patchedOASObj := testGetOASAPI(t, ts, apiID, tykExt.Info.Name, apiInOAS.T.Info.Title)
 
-				assert.EqualValues(t, gwServerURL, patchedOASObj.Servers[0].URL)
-				assert.Equal(t, serverURL, patchedOASObj.Servers[1].URL)
+				require.Len(t, patchedOASObj.Servers, 2)
+				require.EqualValues(t, gwServerURL, patchedOASObj.Servers[0].URL)
+				require.Equal(t, serverURL, patchedOASObj.Servers[1].URL)
 				// Reset
 				testUpdateAPI(t, ts, &oasAPI, oasAPIID, true)
 			})
@@ -3206,9 +3213,10 @@ func TestOAS(t *testing.T) {
 				testPatchOAS(t, ts, apiInOAS, nil, apiID)
 				patchedOASObj := testGetOASAPI(t, ts, apiID, tykExt.Info.Name, apiInOAS.T.Info.Title)
 
-				assert.EqualValues(t, serverURL1, patchedOASObj.Servers[0].URL)
-				assert.Equal(t, serverURL2, patchedOASObj.Servers[1].URL)
-				assert.Equal(t, serverURL3, patchedOASObj.Servers[2].URL)
+				require.Len(t, patchedOASObj.Servers, 3)
+				require.EqualValues(t, serverURL1, patchedOASObj.Servers[0].URL)
+				require.Equal(t, serverURL2, patchedOASObj.Servers[1].URL)
+				require.Equal(t, serverURL3, patchedOASObj.Servers[2].URL)
 				// Reset
 				testUpdateAPI(t, ts, &oasAPI, oasAPIID, true)
 			})
@@ -3309,7 +3317,8 @@ func TestOAS(t *testing.T) {
 
 			t.Run("fail when non OAS API tried to patch", func(t *testing.T) {
 				oldAPI.APIDefinition.SetDisabledFlags()
-				oldAPI.OAS.Fill(*oldAPI.APIDefinition)
+				err := oldAPI.OAS.Fill(*oldAPI.APIDefinition)
+				assert.NoError(t, err)
 				apiInOAS := oldAPI.OAS
 				fillPaths(&apiInOAS)
 				tykExt := apiInOAS.GetTykExtension()
@@ -3739,7 +3748,8 @@ func TestGetOASAPI_WithVersionBaseID(t *testing.T) {
 
 		a.IsOAS = true
 		a.OAS = baseOAS
-		a.OAS.Fill(*a.APIDefinition)
+		err := a.OAS.Fill(*a.APIDefinition)
+		assert.NoError(t, err)
 	})[0]
 
 	v2 := BuildAPI(func(a *APISpec) {
@@ -3747,7 +3757,8 @@ func TestGetOASAPI_WithVersionBaseID(t *testing.T) {
 
 		a.IsOAS = true
 		a.OAS = baseOAS
-		a.OAS.Fill(*a.APIDefinition)
+		err := a.OAS.Fill(*a.APIDefinition)
+		assert.NoError(t, err)
 	})[0]
 
 	v3 := BuildAPI(func(a *APISpec) {
@@ -3755,7 +3766,8 @@ func TestGetOASAPI_WithVersionBaseID(t *testing.T) {
 
 		a.IsOAS = true
 		a.OAS = baseOAS
-		a.OAS.Fill(*a.APIDefinition)
+		err := a.OAS.Fill(*a.APIDefinition)
+		assert.NoError(t, err)
 	})[0]
 
 	baseAPI := BuildAPI(func(a *APISpec) {
@@ -3772,7 +3784,8 @@ func TestGetOASAPI_WithVersionBaseID(t *testing.T) {
 
 		a.IsOAS = true
 		a.OAS = baseOAS
-		a.OAS.Fill(*a.APIDefinition)
+		err := a.OAS.Fill(*a.APIDefinition)
+		assert.NoError(t, err)
 	})[0]
 
 	ts.Gw.LoadAPI(v1, v2, v3, baseAPI)

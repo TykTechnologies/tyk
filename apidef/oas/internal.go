@@ -19,19 +19,14 @@ func (i *Internal) ExtractTo(meta *apidef.InternalMeta) {
 	meta.Disabled = !i.Enabled
 }
 
-func (s *OAS) fillInternal(metas []apidef.InternalMeta) {
-	for _, meta := range metas {
-		operationID := s.getOperationID(meta.Path, meta.Method)
-		operation := s.GetTykExtension().getOperation(operationID)
+func fillInternal(meta apidef.InternalMeta, operation *Operation) {
+	if operation.Internal == nil {
+		operation.Internal = &Internal{}
+	}
 
-		if operation.Internal == nil {
-			operation.Internal = &Internal{}
-		}
-
-		operation.Internal.Fill(meta)
-		if ShouldOmit(operation.Internal) {
-			operation.Internal = nil
-		}
+	operation.Internal.Fill(meta)
+	if ShouldOmit(operation.Internal) {
+		operation.Internal = nil
 	}
 }
 

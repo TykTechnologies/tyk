@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/getkin/kin-openapi/openapi3"
+	"github.com/stretchr/testify/assert"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/apidef/oas"
@@ -309,7 +310,8 @@ func TestLooping(t *testing.T) {
 		oasObj.SetTykExtension(&tykExtension)
 
 		oasAPIDef := apidef.APIDefinition{}
-		oasObj.ExtractTo(&oasAPIDef)
+		err := oasObj.ExtractTo(&oasAPIDef)
+		assert.NoError(t, err)
 
 		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 			spec.APIID = "external-api"

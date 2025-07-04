@@ -274,19 +274,14 @@ func (i URLRewriteInput) Err() error {
 	return nil
 }
 
-func (s *OAS) fillURLRewrite(metas []apidef.URLRewriteMeta) {
-	for _, meta := range metas {
-		operationID := s.getOperationID(meta.Path, meta.Method)
-		operation := s.GetTykExtension().getOperation(operationID)
+func fillURLRewrite(meta apidef.URLRewriteMeta, operation *Operation) {
+	if operation.URLRewrite == nil {
+		operation.URLRewrite = &URLRewrite{}
+	}
 
-		if operation.URLRewrite == nil {
-			operation.URLRewrite = &URLRewrite{}
-		}
-
-		operation.URLRewrite.Fill(meta)
-		if ShouldOmit(operation.URLRewrite) {
-			operation.URLRewrite = nil
-		}
+	operation.URLRewrite.Fill(meta)
+	if ShouldOmit(operation.URLRewrite) {
+		operation.URLRewrite = nil
 	}
 }
 

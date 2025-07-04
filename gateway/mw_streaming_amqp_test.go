@@ -112,7 +112,8 @@ func setupStreamingAPIForOAS(t *testing.T, ts *Test, tykStreamOAS *oas.OAS) stri
 		spec.UseKeylessAccess = true
 		spec.IsOAS = true
 		spec.OAS = *tykStreamOAS
-		spec.OAS.Fill(*spec.APIDefinition)
+		err := spec.OAS.Fill(*spec.APIDefinition)
+		assert.NoError(t, err)
 		spec.EnableContextVars = true
 	})
 

@@ -120,7 +120,8 @@ func TestOIDC(t *testing.T) {
 		}}
 
 		oas.SetTykExtension(xTyk)
-		oas.ExtractTo(&api)
+		err := oas.ExtractTo(&api)
+		assert.NoError(t, err)
 
 		assert.Len(t, api.OpenIDOptions.Providers, 1)
 		assert.Equal(t, "5678", api.OpenIDOptions.Providers[0].Issuer)
