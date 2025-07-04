@@ -3179,8 +3179,9 @@ func TestOAS(t *testing.T) {
 				testPatchOAS(t, ts, apiInOAS, nil, apiID)
 				patchedOASObj := testGetOASAPI(t, ts, apiID, tykExt.Info.Name, apiInOAS.T.Info.Title)
 
-				assert.EqualValues(t, gwServerURL, patchedOASObj.Servers[0].URL)
-				assert.Equal(t, serverURL, patchedOASObj.Servers[1].URL)
+				require.Len(t, patchedOASObj.Servers, 2)
+				require.EqualValues(t, gwServerURL, patchedOASObj.Servers[0].URL)
+				require.Equal(t, serverURL, patchedOASObj.Servers[1].URL)
 				// Reset
 				testUpdateAPI(t, ts, &oasAPI, oasAPIID, true)
 			})
@@ -3212,9 +3213,10 @@ func TestOAS(t *testing.T) {
 				testPatchOAS(t, ts, apiInOAS, nil, apiID)
 				patchedOASObj := testGetOASAPI(t, ts, apiID, tykExt.Info.Name, apiInOAS.T.Info.Title)
 
-				assert.EqualValues(t, serverURL1, patchedOASObj.Servers[0].URL)
-				assert.Equal(t, serverURL2, patchedOASObj.Servers[1].URL)
-				assert.Equal(t, serverURL3, patchedOASObj.Servers[2].URL)
+				require.Len(t, patchedOASObj.Servers, 3)
+				require.EqualValues(t, serverURL1, patchedOASObj.Servers[0].URL)
+				require.Equal(t, serverURL2, patchedOASObj.Servers[1].URL)
+				require.Equal(t, serverURL3, patchedOASObj.Servers[2].URL)
 				// Reset
 				testUpdateAPI(t, ts, &oasAPI, oasAPIID, true)
 			})
