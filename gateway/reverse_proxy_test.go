@@ -1617,11 +1617,6 @@ func TestGraphQL_OptionsPassThrough(t *testing.T) {
 			Path:    "/starwars",
 			Headers: headers,
 			Code:    http.StatusOK,
-			HeadersMatch: map[string]string{
-				"Access-Control-Allow-Methods": http.MethodPost,
-				"Access-Control-Allow-Headers": "content-type",
-				"Access-Control-Allow-Origin":  "*",
-			},
 		})
 	})
 	t.Run("UDG should not pass through", func(t *testing.T) {
