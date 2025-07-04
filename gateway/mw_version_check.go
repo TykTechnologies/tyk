@@ -4,7 +4,7 @@ import (
 	"errors"
 	"net/http"
 	"time"
-	
+
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/internal/middleware"
 	"github.com/TykTechnologies/tyk/internal/otel"

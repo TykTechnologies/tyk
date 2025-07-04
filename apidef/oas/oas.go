@@ -446,8 +446,6 @@ func (s *OAS) ReplaceServers(apiURLs, oldAPIURLs []string) {
 }
 
 func (s *OAS) findOrCreateOperation(path, method string) *openapi3.Operation {
-	// todo: get rid of that code
-
 	operationID := s.getOperationID(path, method)
 	pathItem := s.getOrCreatePathItem(path)
 	operation := pathItem.GetOperation(method)
