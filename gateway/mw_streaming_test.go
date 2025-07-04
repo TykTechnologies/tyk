@@ -589,7 +589,7 @@ func setupStreamingAPI(t *testing.T, ts *Test, consumerGroup string, tenantID st
 		spec.UseKeylessAccess = true
 		spec.IsOAS = true
 		spec.OAS = setupOASForStreamingAPI(t, consumerGroup, kafkaHost)
-		err = spec.OAS.Fill(*spec.APIDefinition)
+		err := spec.OAS.Fill(*spec.APIDefinition)
 		assert.NoError(t, err)
 		spec.EnableContextVars = true
 	})
