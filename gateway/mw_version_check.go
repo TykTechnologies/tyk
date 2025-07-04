@@ -4,11 +4,8 @@ import (
 	"errors"
 	"net/http"
 	"time"
-
-	"github.com/getkin/kin-openapi/routers"
-
+	
 	"github.com/TykTechnologies/tyk/apidef"
-	"github.com/TykTechnologies/tyk/apidef/oas"
 	"github.com/TykTechnologies/tyk/internal/middleware"
 	"github.com/TykTechnologies/tyk/internal/otel"
 	"github.com/TykTechnologies/tyk/request"
@@ -39,12 +36,6 @@ func (v *VersionCheck) DoMockReply(w http.ResponseWriter, meta apidef.MockRespon
 
 	w.WriteHeader(meta.Code)
 	w.Write(responseMessage)
-}
-
-type Operation struct {
-	*oas.Operation
-	route      *routers.Route
-	pathParams map[string]string
 }
 
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail

@@ -149,9 +149,18 @@ func (s *OAS) fillPathsAndOperations(ep apidef.ExtendedPathsSet) error {
 		return err
 	}
 
-	s.fillAllowance(ep.WhiteList, allow)
-	s.fillAllowance(ep.BlackList, block)
-	s.fillAllowance(ep.Ignored, ignoreAuthentication)
+	if err = s.fillAllowance(ep.WhiteList, allow, mapper); err != nil {
+		return err
+	}
+
+	if err = s.fillAllowance(ep.BlackList, block, mapper); err != nil {
+		return err
+	}
+
+	if err = s.fillAllowance(ep.Ignored, ignoreAuthentication, mapper); err != nil {
+		return err
+	}
+
 	s.fillTransformRequestMethod(ep.MethodTransforms)
 	s.fillTransformRequestBody(ep.Transform)
 	s.fillTransformResponseBody(ep.TransformResponse)
@@ -310,10 +319,17 @@ func (s *OAS) extractPathsAndOperations(ep *apidef.ExtendedPathsSet) error {
 	return nil
 }
 
-func (s *OAS) fillAllowance(endpointMetas []apidef.EndPointMeta, typ AllowanceType) {
-	for _, em := range endpointMetas {
-		operationID := s.getOperationID(em.Path, em.Method)
-		operation := s.GetTykExtension().getOperation(operationID)
+func (s *OAS) fillAllowance(
+	srcList []apidef.EndPointMeta,
+	typ AllowanceType,
+	mapper *pathnormalizer.Mapper,
+) error {
+	for _, em := range srcList {
+		operation, _, err := s.getOrCreateOpByNormalized(em.Path, em.Method, mapper)
+
+		if err != nil {
+			return err
+		}
 
 		var allowance *Allowance
 
@@ -337,6 +353,8 @@ func (s *OAS) fillAllowance(endpointMetas []apidef.EndPointMeta, typ AllowanceTy
 			allowance = nil
 		}
 	}
+
+	return nil
 }
 
 func newAllowance(prev **Allowance) *Allowance {

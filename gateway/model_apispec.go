@@ -139,7 +139,7 @@ func (a *APISpec) injectIntoReqContext(req *http.Request) {
 	}
 }
 
-func (a *APISpec) findOperation(r *http.Request) *Operation {
+func (a *APISpec) findOperation(r *http.Request) *opMatch {
 	middleware := a.OAS.GetTykMiddleware()
 	if middleware == nil {
 		return nil
@@ -165,15 +165,21 @@ func (a *APISpec) findOperation(r *http.Request) *Operation {
 		return nil
 	}
 
-	operation, ok := middleware.Operations[route.Operation.OperationID]
+	op, ok := middleware.Operations[route.Operation.OperationID]
 	if !ok {
 		log.Warningf("No operation found for ID: %s", route.Operation.OperationID)
 		return nil
 	}
 
-	return &Operation{
-		Operation:  operation,
+	return &opMatch{
+		Operation:  op,
 		route:      route,
 		pathParams: pathParams,
 	}
+}
+
+type opMatch struct {
+	*oas.Operation
+	route      *routers.Route
+	pathParams map[string]string
 }

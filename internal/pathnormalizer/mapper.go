@@ -77,6 +77,10 @@ func MustMapper(in *openapi3.Paths) *Mapper {
 	return mapper
 }
 
+func MustDummyMapper() *Mapper {
+	return MustMapper(openapi3.NewPaths())
+}
+
 func (m *Mapper) add(newEntry Entry) error {
 	if existent, ok := m.operationsMap[newEntry.OperationID]; ok {
 		return newCollisionError(*existent, newEntry)

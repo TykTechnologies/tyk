@@ -65,14 +65,14 @@ func (k *ValidateRequest) EnabledForSpec() bool {
 }
 
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail
-func (k *ValidateRequest) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
-	operation := k.Spec.findOperation(r)
+func (k *ValidateRequest) ProcessRequest(_ http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
+	op := k.Spec.findOperation(r)
 
-	if operation == nil {
+	if op == nil {
 		return nil, http.StatusOK
 	}
 
-	validateRequest := operation.ValidateRequest
+	validateRequest := op.ValidateRequest
 	if validateRequest == nil || !validateRequest.Enabled {
 		return nil, http.StatusOK
 	}
@@ -85,8 +85,8 @@ func (k *ValidateRequest) ProcessRequest(w http.ResponseWriter, r *http.Request,
 	// Validate request
 	requestValidationInput := &openapi3filter.RequestValidationInput{
 		Request:    r,
-		PathParams: operation.pathParams,
-		Route:      operation.route,
+		PathParams: op.pathParams,
+		Route:      op.route,
 		Options: &openapi3filter.Options{
 			AuthenticationFunc: func(ctx context.Context, input *openapi3filter.AuthenticationInput) error {
 				return nil

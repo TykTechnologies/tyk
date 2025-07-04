@@ -1100,7 +1100,8 @@ func TestOAS_fillAllowance(t *testing.T) {
 			},
 		}
 
-		s.fillAllowance(endpointMetas, allow)
+		err := s.fillAllowance(endpointMetas, allow, pathnormalizer.MustDummyMapper())
+		assert.NoError(t, err)
 
 		operationID := s.getOperationID("/test", http.MethodGet)
 		operation := s.GetTykExtension().getOperation(operationID)
@@ -1131,7 +1132,8 @@ func TestOAS_fillAllowance(t *testing.T) {
 			},
 		}
 
-		s.fillAllowance(endpointMetas, block)
+		err := s.fillAllowance(endpointMetas, block, pathnormalizer.MustDummyMapper())
+		assert.NoError(t, err)
 
 		operationID := s.getOperationID("/test", http.MethodGet)
 		operation := s.GetTykExtension().getOperation(operationID)
@@ -1162,7 +1164,8 @@ func TestOAS_fillAllowance(t *testing.T) {
 			},
 		}
 
-		s.fillAllowance(endpointMetas, ignoreAuthentication)
+		err := s.fillAllowance(endpointMetas, ignoreAuthentication, pathnormalizer.MustDummyMapper())
+		assert.NoError(t, err)
 
 		operationID := s.getOperationID("/test", http.MethodGet)
 		operation := s.GetTykExtension().getOperation(operationID)
@@ -1198,7 +1201,8 @@ func TestOAS_fillAllowance(t *testing.T) {
 			},
 		}
 
-		spec.fillAllowance(endpointMetas, allow)
+		err := spec.fillAllowance(endpointMetas, allow, pathnormalizer.MustDummyMapper())
+		assert.NoError(t, err)
 
 		operationID := spec.getOperationID("/test", http.MethodGet)
 		operation := spec.GetTykExtension().getOperation(operationID)
@@ -1221,7 +1225,8 @@ func TestOAS_fillAllowance(t *testing.T) {
 
 		var endpointMetas []apidef.EndPointMeta
 
-		s.fillAllowance(endpointMetas, allow)
+		err := s.fillAllowance(endpointMetas, allow, pathnormalizer.MustDummyMapper())
+		assert.NoError(t, err)
 
 		assert.Empty(t, s.Paths.Map())
 	})
@@ -1247,7 +1252,8 @@ func TestOAS_fillAllowance(t *testing.T) {
 			},
 		}
 
-		s.fillAllowance(endpointMetas, allow)
+		err := s.fillAllowance(endpointMetas, allow, pathnormalizer.MustDummyMapper())
+		assert.NoError(t, err)
 
 		operationID := s.getOperationID("/test", http.MethodGet)
 		operation := s.GetTykExtension().getOperation(operationID)
