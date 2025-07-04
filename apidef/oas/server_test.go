@@ -115,7 +115,8 @@ func TestGatewayTags(t *testing.T) {
 			tc.input.ExtractTo(&api)
 
 			var oas OAS
-			oas.Fill(api)
+			err := oas.Fill(api)
+			assert.NoError(t, err)
 
 			var schema = oas.GetTykExtension()
 			var got = schema.Server.GatewayTags

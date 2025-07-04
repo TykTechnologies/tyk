@@ -1000,11 +1000,14 @@ func (gw *Gateway) handleGetAPIListOAS(modePublic bool) (interface{}, int) {
 	gw.apisMu.RLock()
 	defer gw.apisMu.RUnlock()
 
-	apisList := []oas.OAS{}
+	var apisList []oas.OAS
 
 	for _, apiSpec := range gw.apisByID {
 		if apiSpec.IsOAS {
-			apiSpec.OAS.Fill(*apiSpec.APIDefinition)
+			if err := apiSpec.OAS.Fill(*apiSpec.APIDefinition); err != nil {
+				log.WithError(err).Error("Failed to fill OAS definition")
+				return nil, http.StatusOK
+			}
 			if modePublic {
 				apiSpec.OAS.RemoveTykExtension()
 			}
@@ -1018,7 +1021,9 @@ func (gw *Gateway) handleGetAPIListOAS(modePublic bool) (interface{}, int) {
 func (gw *Gateway) handleGetAPI(apiID string, oasEndpoint bool) (interface{}, int) {
 	if spec := gw.getApiSpec(apiID); spec != nil {
 		if oasEndpoint && spec.IsOAS {
-			spec.OAS.Fill(*spec.APIDefinition)
+			if err := spec.OAS.Fill(*spec.APIDefinition); err != nil {
+				return apiError(err.Error()), http.StatusBadRequest
+			}
 			return &spec.OAS, http.StatusOK
 		} else if oasEndpoint && !spec.IsOAS {
 			return apiError(apidef.ErrOASGetForOldAPI.Error()), http.StatusBadRequest
@@ -1145,9 +1150,11 @@ func (gw *Gateway) handleAddApi(r *http.Request, fs afero.Fs, oasEndpoint bool) 
 			}
 
 			if baseAPI.IsOAS {
-				baseAPI.OAS.Fill(*baseAPI.APIDefinition)
-				err, _ := gw.writeOASAndAPIDefToFile(fs, baseAPI.APIDefinition, &baseAPI.OAS)
-				if err != nil {
+				if err = baseAPI.OAS.Fill(*baseAPI.APIDefinition); err != nil {
+					log.WithError(err).Error("Couldn't fill OAS definition")
+				}
+
+				if err, _ = gw.writeOASAndAPIDefToFile(fs, baseAPI.APIDefinition, &baseAPI.OAS); err != nil {
 					log.WithError(err).Errorf("Error occurred while updating base OAS API with id: %s", baseAPI.APIID)
 				}
 			} else {
@@ -1527,7 +1534,11 @@ func (gw *Gateway) apiOASPatchHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var oasObjToPatch oas.OAS
-	existingAPISpec.OAS.Fill(*existingAPISpec.APIDefinition)
+	if err = existingAPISpec.OAS.Fill(*existingAPISpec.APIDefinition); err != nil {
+		doJSONWrite(w, http.StatusBadRequest, apiError(err.Error()))
+		return
+	}
+
 	oasObjToPatch = existingAPISpec.OAS
 
 	var tykExtToPatch *oas.XTykAPIGateway

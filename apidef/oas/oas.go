@@ -558,7 +558,10 @@ func NewOASFromClassicAPIDefinition(api *apidef.APIDefinition) (*OAS, error) {
 func FillOASFromClassicAPIDefinition(api *apidef.APIDefinition, oas *OAS) (*OAS, error) {
 	api.IsOAS = true
 
-	oas.Fill(*api)
+	if err := oas.Fill(*api); err != nil {
+		return nil, err
+	}
+	
 	oas.setRequiredFields(api.Name, api.VersionName)
 	clearClassicAPIForSomeFeatures(api)
 

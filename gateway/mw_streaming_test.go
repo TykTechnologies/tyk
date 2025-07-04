@@ -373,15 +373,16 @@ func setUpStreamAPI(ts *Test, apiName string, streamConfig string) error {
 	if err != nil {
 		return err
 	}
+
 	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 		spec.Proxy.ListenPath = fmt.Sprintf("/%s", apiName)
 		spec.UseKeylessAccess = true
 		spec.IsOAS = true
 		spec.OAS = oasAPI
-		spec.OAS.Fill(*spec.APIDefinition)
+		err = spec.OAS.Fill(*spec.APIDefinition)
 	})
 
-	return nil
+	return err
 }
 
 func setupOASForStreamAPI(streamingConfig string) (oas.OAS, error) {
@@ -503,7 +504,8 @@ streams:
 
 		spec.IsOAS = true
 		spec.OAS = oasAPI
-		spec.OAS.Fill(*spec.APIDefinition)
+		err = spec.OAS.Fill(*spec.APIDefinition)
+		assert.NoError(t, err)
 	})
 
 	_, _ = ts.Run(t, test.TestCase{Code: http.StatusOK, Method: http.MethodGet, Path: "/test"})
@@ -587,7 +589,8 @@ func setupStreamingAPI(t *testing.T, ts *Test, consumerGroup string, tenantID st
 		spec.UseKeylessAccess = true
 		spec.IsOAS = true
 		spec.OAS = setupOASForStreamingAPI(t, consumerGroup, kafkaHost)
-		spec.OAS.Fill(*spec.APIDefinition)
+		err = spec.OAS.Fill(*spec.APIDefinition)
+		assert.NoError(t, err)
 		spec.EnableContextVars = true
 	})
 
@@ -987,7 +990,8 @@ func TestStreamingAPIGarbageCollection(t *testing.T) {
 		spec.UseKeylessAccess = true
 		spec.IsOAS = true
 		spec.OAS = oasAPI
-		spec.OAS.Fill(*spec.APIDefinition)
+		err = spec.OAS.Fill(*spec.APIDefinition)
+		require.NoError(t, err)
 	})
 
 	apiSpec := streams.NewAPISpec(specs[0].APIID, specs[0].Name, specs[0].IsOAS, specs[0].OAS, specs[0].StripListenPath)
@@ -1038,7 +1042,8 @@ func TestStreaming_HttpOutputPaths(t *testing.T) {
 		spec.UseKeylessAccess = true
 		spec.IsOAS = true
 		spec.OAS = oasAPI
-		spec.OAS.Fill(*spec.APIDefinition)
+		err = spec.OAS.Fill(*spec.APIDefinition)
+		assert.NoError(t, err)
 	})
 
 	apiUrl := fmt.Sprintf("%s/%s", ts.URL, apiName)

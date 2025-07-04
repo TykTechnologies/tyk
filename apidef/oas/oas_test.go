@@ -35,7 +35,8 @@ func TestOAS(t *testing.T) {
 		assert.NoError(t, err)
 
 		var resultOAS OAS
-		resultOAS.Fill(convertedAPI)
+		err = resultOAS.Fill(convertedAPI)
+		assert.NoError(t, err)
 
 		// This tests that zero-value extensions are cleared
 		emptyOASPaths.Extensions = nil
@@ -54,7 +55,8 @@ func TestOAS(t *testing.T) {
 		assert.NoError(t, err)
 
 		var resultOAS OAS
-		resultOAS.Fill(convertedAPI)
+		err = resultOAS.Fill(convertedAPI)
+		assert.NoError(t, err)
 
 		// No paths in base OAS produce empty paths{} when converted back
 		nilOASPaths.Paths = openapi3.NewPaths()
