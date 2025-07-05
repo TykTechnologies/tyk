@@ -839,6 +839,16 @@ func (k *JWTMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _
 	// enable bearer token format
 	rawJWT = stripBearer(rawJWT)
 
+	// Check if this is a JWE token and decrypt it
+	if k.Spec.EnableJWE && isJWE(rawJWT) {
+		var err error
+		rawJWT, err = k.decryptJWE(rawJWT)
+		if err != nil {
+			k.Logger().WithError(err).Error("JWE decryption failed")
+			return errors.New("JWE decryption failed: " + err.Error()), http.StatusUnauthorized
+		}
+	}
+
 	// Use own validation logic, see below
 	parser := jwt.NewParser(jwt.WithoutClaimsValidation())
 
@@ -1136,4 +1146,82 @@ func getUserIDFromClaim(claims jwt.MapClaims, identityBaseField string) (string,
 
 	log.Error(ErrNoSuitableUserIDClaimFound)
 	return "", ErrNoSuitableUserIDClaimFound
+}
+
+// decryptJWE decrypts a JWE token and returns the nested JWT
+func (k *JWTMiddleware) decryptJWE(jweToken string) (string, error) {
+	if !k.Spec.EnableJWE {
+		return "", errors.New("JWE not enabled")
+	}
+
+	object, err := jose.ParseEncrypted(jweToken)
+	if err != nil {
+		return "", fmt.Errorf("failed to parse JWE token: %w", err)
+	}
+
+	// Extract header values
+	tokenAlg := object.Header.Algorithm
+
+	// If API definition specifies algorithms, validate them
+	if k.Spec.JWEDecryptionMethod != "" && k.Spec.JWEDecryptionMethod != tokenAlg {
+		return "", fmt.Errorf("JWE algorithm mismatch: expected %s, got %s",
+			k.Spec.JWEDecryptionMethod, tokenAlg)
+	}
+
+	actualAlg := tokenAlg
+	if k.Spec.JWEDecryptionMethod != "" {
+		actualAlg = k.Spec.JWEDecryptionMethod
+	}
+
+	var key interface{}
+	switch actualAlg {
+	case "dir", "A128KW", "A256KW":
+		key = []byte(k.Spec.JWEDecryptionKey)
+	case "RSA-OAEP", "RSA-OAEP-256":
+		if k.Spec.JWEDecryptionKeyIsPEM {
+			block, _ := pem.Decode([]byte(k.Spec.JWEDecryptionKey))
+			if block == nil {
+				return "", errors.New("failed to parse PEM block")
+			}
+			key, err = x509.ParsePKCS1PrivateKey(block.Bytes)
+			if err != nil {
+				key, err = x509.ParsePKCS8PrivateKey(block.Bytes)
+				if err != nil {
+					return "", fmt.Errorf("failed to parse private key: %w", err)
+				}
+			}
+		} else {
+			return "", errors.New("RSA private key must be in PEM format")
+		}
+	case "ECDH-ES", "ECDH-ES+A128KW", "ECDH-ES+A256KW":
+		if k.Spec.JWEDecryptionKeyIsPEM {
+			block, _ := pem.Decode([]byte(k.Spec.JWEDecryptionKey))
+			if block == nil {
+				return "", errors.New("failed to parse PEM block containing private key")
+			}
+
+			key, err = x509.ParseECPrivateKey(block.Bytes)
+			if err != nil {
+				return "", fmt.Errorf("failed to parse EC private key: %w", err)
+			}
+		} else {
+			return "", errors.New("EC private key must be in PEM format")
+		}
+	default:
+		return "", fmt.Errorf("unsupported JWE decryption method: %s", k.Spec.JWEDecryptionMethod)
+	}
+
+	decrypted, err := object.Decrypt(key)
+	if err != nil {
+		return "", fmt.Errorf("failed to decrypt JWE token: %w", err)
+	}
+
+	return string(decrypted), nil
+}
+
+// isJWE determines if a token is a JWE token
+// JWE is composed by 5 sections separated by .
+func isJWE(token string) bool {
+	parts := strings.Split(token, ".")
+	return len(parts) == 5
 }
