@@ -170,6 +170,11 @@ type JWT struct {
 	//
 	// Tyk classic API definition: `idp_client_id_mapping_disabled`.
 	IDPClientIDMappingDisabled bool `bson:"idpClientIdMappingDisabled,omitempty" json:"idpClientIdMappingDisabled,omitempty"`
+
+	EnableJWE             bool   `bson:"enableJWE,omitempty" json:"enableJWE,omitempty"`
+	JWEDecryptionKey      string `bson:"jweDecryptionKey,omitempty" json:"jweDecryptionKey,omitempty"`
+	JWEDecryptionMethod   string `bson:"jweDecryptionMethod,omitempty" json:"jweDecryptionMethod,omitempty"`
+	JWEDecryptionKeyIsPEM bool   `bson:"jweDecryptionKeyIsPEM,omitempty" json:"jweDecryptionKeyIsPEM,omitempty"`
 }
 
 // Import populates *JWT based on arguments.
@@ -230,6 +235,10 @@ func (s *OAS) fillJWT(api apidef.APIDefinition) {
 	jwt.NotBeforeValidationSkew = api.JWTNotBeforeValidationSkew
 	jwt.ExpiresAtValidationSkew = api.JWTExpiresAtValidationSkew
 	jwt.IDPClientIDMappingDisabled = api.IDPClientIDMappingDisabled
+	jwt.EnableJWE = api.EnableJWE
+	jwt.JWEDecryptionKey = api.JWEDecryptionKey
+	jwt.JWEDecryptionMethod = api.JWEDecryptionMethod
+	jwt.JWEDecryptionKeyIsPEM = api.JWEDecryptionKeyIsPEM
 
 	s.getTykSecuritySchemes()[ac.Name] = jwt
 
@@ -261,6 +270,11 @@ func (s *OAS) extractJWTTo(api *apidef.APIDefinition, name string) {
 	api.JWTNotBeforeValidationSkew = jwt.NotBeforeValidationSkew
 	api.JWTExpiresAtValidationSkew = jwt.ExpiresAtValidationSkew
 	api.IDPClientIDMappingDisabled = jwt.IDPClientIDMappingDisabled
+
+	api.EnableJWE = jwt.EnableJWE
+	api.JWEDecryptionKey = jwt.JWEDecryptionKey
+	api.JWEDecryptionMethod = jwt.JWEDecryptionMethod
+	api.JWEDecryptionKeyIsPEM = jwt.JWEDecryptionKeyIsPEM
 
 	api.AuthConfigs[apidef.JWTType] = ac
 }
