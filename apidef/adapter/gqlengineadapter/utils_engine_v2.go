@@ -21,7 +21,7 @@ type createGraphQLDataSourceFactoryParams struct {
 	streamingClient           *http.Client
 }
 
-func graphqlDataSourceConfiguration(url string, method string, headers map[string]string, subscriptionType apidef.SubscriptionType, sseUsePost bool) graphqldatasource.Configuration {
+func graphqlDataSourceConfiguration(url string, method string, headers map[string]string, subscriptionType apidef.SubscriptionType) graphqldatasource.Configuration {
 	dataSourceHeaders := make(map[string]string)
 	for name, value := range headers {
 		dataSourceHeaders[name] = value
@@ -39,9 +39,8 @@ func graphqlDataSourceConfiguration(url string, method string, headers map[strin
 			Header: ConvertApiDefinitionHeadersToHttpHeaders(dataSourceHeaders),
 		},
 		Subscription: graphqldatasource.SubscriptionConfiguration{
-			URL:           url,
-			UseSSE:        subscriptionType == apidef.GQLSubscriptionSSE,
-			SSEMethodPost: sseUsePost,
+			URL:    url,
+			UseSSE: subscriptionType == apidef.GQLSubscriptionSSE,
 		},
 	}
 
