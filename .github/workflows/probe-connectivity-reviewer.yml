@@ -1,0 +1,24 @@
+name: Probe Connectivity reviewer handler
+
+on:
+  issue_comment:
+    types: [created]          
+
+# Define permissions needed for the workflow
+permissions:
+  issues: write
+  pull-requests: write
+  contents: write
+
+jobs:
+  trigger_probe_implement:
+    uses: buger/probe/.github/workflows/probe.yml@main
+    with:
+      command_prefix: "/connectivity-reviewer"
+      allow_edit: true
+      prompt: ./.probe/connectivity-reviewer.md
+    secrets:
+      ANTHROPIC_API_KEY: ${{ secrets.PROBE_ANTHROPIC_API_KEY }}
+      ANTHROPIC_API_URL: ${{ secrets.PROBE_ANTHROPIC_URL }}
+      APP_ID: ${{ secrets.PROBE_APP_ID }}
+      APP_PRIVATE_KEY: ${{ secrets.PROBE_APP_PRIVATE_KEY }}
