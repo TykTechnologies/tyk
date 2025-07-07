@@ -148,6 +148,7 @@ func (s *OAS) fillPathsAndOperations(ep apidef.ExtendedPathsSet) error {
 	}
 
 	mapper, err := pathnormalizer.NewMapper(s.Paths)
+
 	if err != nil {
 		return err
 	}
@@ -178,7 +179,7 @@ func (s *OAS) fillPathsAndOperations(ep apidef.ExtendedPathsSet) error {
 		return s.fillMockResponsePaths(ep, mapper)
 	})
 
-	return nil
+	return collector.Err()
 }
 
 // fillMockResponsePaths converts classic API mock responses to OAS format.
@@ -201,13 +202,13 @@ func (s *OAS) fillMockResponsePaths(
 ) error {
 
 	for _, mock := range ep.MockResponse {
-		tykOperation, entry, err := s.getOrCreateOpByNormalized(mock.Path, mock.Method, mapper)
+		tykOperation, entry, err := s.getOrCreateOp(mock.Path, mock.Method, mapper)
 
 		if err != nil {
 			return err
 		}
 
-		pathItem := s.Paths.Find(entry.Extended)
+		pathItem := s.Paths.Value(entry.Extended)
 
 		if pathItem == nil {
 			pathItem = &openapi3.PathItem{}
@@ -317,7 +318,7 @@ func (s *OAS) fillAllowance(
 ) error {
 
 	for _, em := range srcList {
-		operation, _, err := s.getOrCreateOpByNormalized(em.Path, em.Method, mapper)
+		operation, _, err := s.getOrCreateOp(em.Path, em.Method, mapper)
 
 		if err != nil {
 			return err
@@ -357,7 +358,16 @@ func newAllowance(prev **Allowance) *Allowance {
 	return *prev
 }
 
-func filler[T any](
+// pathAndMethod structs that contain with struct { Method, Path string }
+type pathAndMethod interface {
+	// ensure struct has Path and Method fields of type string
+	apidef.MethodTransformMeta | apidef.TemplateMeta | apidef.HeaderInjectionMeta | apidef.CacheMeta |
+		apidef.HardTimeoutMeta | apidef.URLRewriteMeta | apidef.InternalMeta | apidef.VirtualMeta |
+		apidef.GoPluginMeta | apidef.CircuitBreakerMeta | apidef.TrackEndpointMeta | apidef.RequestSizeMeta |
+		apidef.RateLimitMeta | struct{ Path, Method string }
+}
+
+func filler[T pathAndMethod](
 	dest *OAS,
 	src []T,
 	mapper *pathnormalizer.Mapper,
@@ -372,7 +382,7 @@ func filler[T any](
 			return fmt.Errorf("%s.%s has not filed Path with type string", typ.PkgPath(), typ.Name())
 		}
 
-		methodField, ok := typ.FieldByName("Path")
+		methodField, ok := typ.FieldByName("Method")
 
 		if !ok || methodField.Type.Kind() != reflect.String {
 			return fmt.Errorf("%s.%s has not filed Method with type string", typ.PkgPath(), typ.Name())
@@ -382,7 +392,7 @@ func filler[T any](
 			path := reflect.ValueOf(item).FieldByName("Path").String()
 			method := reflect.ValueOf(item).FieldByName("Method").String()
 
-			operation, _, err := dest.getOrCreateOpByNormalized(path, method, mapper)
+			operation, _, err := dest.getOrCreateOp(path, method, mapper)
 
 			if err != nil {
 				return err
@@ -587,20 +597,6 @@ func (o *Operation) extractRequestSizeLimitTo(ep *apidef.ExtendedPathsSet, path 
 	ep.SizeLimit = append(ep.SizeLimit, meta)
 }
 
-type pathPart struct {
-	name    string
-	value   string
-	isRegex bool
-}
-
-func (p pathPart) String() string {
-	if p.isRegex {
-		return "{" + p.name + "}"
-	}
-
-	return p.value
-}
-
 func (s *OAS) getOrCreatePathItem(path string) *openapi3.PathItem {
 	if s.Paths.Value(path) == nil {
 		s.Paths.Set(path, &openapi3.PathItem{})
@@ -710,7 +706,7 @@ func convertSchema(mapSchema map[string]interface{}) (*openapi3.Schema, error) {
 
 func (s *OAS) fillOASValidateRequest(metas []apidef.ValidatePathMeta, mapper *pathnormalizer.Mapper) error {
 	for _, meta := range metas {
-		if _, _, err := s.getOrCreateOpByNormalized(meta.Path, meta.Method, mapper); err != nil {
+		if _, _, err := s.getOrCreateOp(meta.Path, meta.Method, mapper); err != nil {
 			// this op is necessary cause if it's ensures collisions does not occur
 			return err
 		}
@@ -862,8 +858,8 @@ func (o *Operation) extractVirtualEndpointTo(ep *apidef.ExtendedPathsSet, path s
 	ep.Virtual = append(ep.Virtual, meta)
 }
 
-// getOrCreateOpByNormalized gets or creates new operation during to mappings.
-func (s *OAS) getOrCreateOpByNormalized(
+// getOrCreateOp gets or creates new operation during to mappings.
+func (s *OAS) getOrCreateOp(
 	path, method string,
 	mapper *pathnormalizer.Mapper,
 ) (*Operation, pathnormalizer.Entry, error) {
