@@ -5,6 +5,7 @@ import (
 	"github.com/TykTechnologies/tyk/internal/reflect"
 	"github.com/TykTechnologies/tyk/internal/utils"
 	"github.com/getkin/kin-openapi/openapi3"
+	"regexp"
 )
 
 // Mapper
@@ -57,12 +58,12 @@ func newMapper(in *openapi3.Paths) (*Mapper, error) {
 		extractParametersFromPath(&pathItem.Parameters, normalized.ParameterRefs())
 		normalizedPaths.Set(normalized.path, pathItem)
 
-		for method, pItem := range item.Operations() {
+		for method, op := range item.Operations() {
 			if err = mapper.add(Entry{
 				Method:      method,
 				Extended:    item.Path,
 				Normalized:  normalized.path,
-				OperationID: pItem.OperationID,
+				OperationID: defaultIdIfNotDefined(op.OperationID, item.Path, method),
 				parameters:  &pathItem.Parameters,
 			}); err != nil {
 				return nil, err
@@ -91,15 +92,15 @@ func (m *Mapper) add(newEntry Entry) error {
 	newEntry.mapper = m
 
 	if existent, ok := m.operationsMap[newEntry.OperationID]; ok {
-		return newCollisionError(*existent, newEntry)
+		return newCollisionError(*existent, newEntry, collisionAtOperationId)
 	}
 
 	if existent, ok := m.extendedMap[newEntry.extendedEndpoint()]; ok {
-		return newCollisionError(*existent, newEntry)
+		return newCollisionError(*existent, newEntry, collisionAtNormalized)
 	}
 
 	if existent, ok := m.normalizedMap[newEntry.normalizedEndpoint()]; ok {
-		return newCollisionError(*existent, newEntry)
+		return newCollisionError(*existent, newEntry, collisionAtNormalized)
 	}
 
 	m.operationsMap[newEntry.OperationID] = &newEntry
@@ -228,3 +229,13 @@ func countPathsEntries(in *openapi3.Paths) int {
 func extractParametersFromPath(in *openapi3.Parameters, src openapi3.Parameters) {
 	wrapParameters(in).extendBy(src)
 }
+
+func defaultIdIfNotDefined(opId string, path, method string) string {
+	if emptyStringRe.MatchString(opId) {
+		return utils.OperationId(path, method)
+	}
+
+	return opId
+}
+
+var emptyStringRe = regexp.MustCompile(`^\s*$`)
