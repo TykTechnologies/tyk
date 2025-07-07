@@ -1759,6 +1759,7 @@ func Start() {
 	gw := NewGateway(gwConfig, ctx)
 	gwConfig = gw.GetConfig()
 
+	shutdownComplete := make(chan struct{})
 	go func() {
 		sig := <-sigChan
 		mainLog.Infof("Shutdown signal received: %v. Initiating graceful shutdown...", sig)
@@ -1775,7 +1776,7 @@ func Start() {
 		if err := gw.gracefulShutdown(shutdownCtx); err != nil {
 			mainLog.Errorf("Graceful shutdown error: %v", err)
 		}
-		os.Exit(0)
+		close(shutdownComplete)
 	}()
 
 	if err := gw.initSystem(); err != nil {
@@ -1884,6 +1885,7 @@ func Start() {
 		mainLog.WithError(err).Error("waiting")
 	}
 	time.Sleep(time.Second)
+	<-shutdownComplete
 	os.Exit(0)
 }
 
