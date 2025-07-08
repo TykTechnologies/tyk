@@ -1754,6 +1754,10 @@ func Start() {
 	gw := NewGateway(gwConfig, ctx)
 	gwConfig = gw.GetConfig()
 
+	if err := gw.initSystem(); err != nil {
+		mainLog.Fatalf("Error initialising system: %v", err)
+	}
+
 	shutdownComplete := make(chan struct{})
 	go func() {
 		sig := <-sigChan
@@ -1773,10 +1777,6 @@ func Start() {
 		}
 		close(shutdownComplete)
 	}()
-
-	if err := gw.initSystem(); err != nil {
-		mainLog.Fatalf("Error initialising system: %v", err)
-	}
 
 	if !gw.isRunningTests() && gwConfig.ControlAPIPort == 0 {
 		mainLog.Warn("The control_api_port should be changed for production")
