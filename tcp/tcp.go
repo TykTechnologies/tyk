@@ -161,9 +161,9 @@ func (p *Proxy) Serve(l net.Listener) error {
 			return err
 		}
 
+		p.activeConns.Add(1)
 		go func() {
 			// Track this connection only when we actually start handling it
-			p.activeConns.Add(1)
 			defer p.activeConns.Done()
 			if err := p.handleConn(conn); err != nil {
 				log.WithError(err).Warning("Can't handle connection")
