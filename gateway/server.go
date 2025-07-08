@@ -2113,7 +2113,11 @@ func (gw *Gateway) gracefulShutdown(ctx context.Context) error {
 				defer wg.Done()
 				mainLog.Infof("Shutting down TCP proxy on port %d (%s)", port, protocol)
 
-				// For TCP proxies, close the listener to stop accepting new connections
+				// Set the shutdown context to signal existing connections to terminate gracefully
+				proxy.SetShutdownContext(ctx)
+
+				// Close the listener to stop accepting new connections
+				// Note: This will cause Serve() to exit, but existing connections continue
 				if err := listener.Close(); err != nil {
 					mainLog.Errorf("Error shutting down TCP proxy listener on port %d: %v", port, err)
 					select {
@@ -2123,12 +2127,9 @@ func (gw *Gateway) gracefulShutdown(ctx context.Context) error {
 					}
 				}
 
-				// Set the shutdown context from the graceful shutdown
-				proxy.SetShutdownContext(ctx)
-
-				// Use the TCP proxy's graceful shutdown method
+				// Wait for all active connections to finish or timeout
 				if err := proxy.Shutdown(ctx); err != nil {
-					mainLog.Warnf("TCP proxy shutdown error on port %d: %v", port, err)
+					mainLog.Warnf("TCP proxy shutdown timeout on port %d: %v", port, err)
 				} else {
 					mainLog.Debugf("TCP proxy gracefully shut down on port %d", port)
 				}
