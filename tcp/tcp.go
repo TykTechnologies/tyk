@@ -112,12 +112,6 @@ func (p *Proxy) RemoveDomainHandler(domain string) {
 
 // Shutdown initiates graceful shutdown and waits for all connections to finish
 func (p *Proxy) Shutdown(ctx context.Context) error {
-	p.Lock()
-	if p.shutdown != nil {
-		p.shutdown()
-	}
-	p.Unlock()
-
 	// Wait for all connections to finish or timeout
 	done := make(chan struct{})
 	go func() {
@@ -130,7 +124,13 @@ func (p *Proxy) Shutdown(ctx context.Context) error {
 		log.Debug("All TCP connections gracefully closed")
 		return nil
 	case <-ctx.Done():
-		log.Warning("TCP proxy shutdown timeout reached, some connections may still be active")
+		log.Warning("TCP proxy shutdown timeout reached, forcing connection termination")
+		// Only now force cancel all connections
+		p.Lock()
+		if p.shutdown != nil {
+			p.shutdown()
+		}
+		p.Unlock()
 		return ctx.Err()
 	}
 }
