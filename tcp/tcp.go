@@ -70,6 +70,11 @@ type Proxy struct {
 	SyncStats func(Stat)
 	// Duration in which connection stats will be flushed. Defaults to one second.
 	StatsSyncInterval time.Duration
+
+	// Connection tracking for graceful shutdown
+	activeConns sync.WaitGroup
+	shutdownCtx context.Context
+	shutdown    context.CancelFunc
 }
 
 func (p *Proxy) AddDomainHandler(domain, target string, modifier *Modifier) {
@@ -105,14 +110,56 @@ func (p *Proxy) RemoveDomainHandler(domain string) {
 	delete(p.muxer, domain)
 }
 
+// Shutdown initiates graceful shutdown and waits for all connections to finish
+func (p *Proxy) Shutdown(ctx context.Context) error {
+	p.Lock()
+	if p.shutdown != nil {
+		p.shutdown()
+	}
+	p.Unlock()
+
+	// Wait for all connections to finish or timeout
+	done := make(chan struct{})
+	go func() {
+		p.activeConns.Wait()
+		close(done)
+	}()
+
+	select {
+	case <-done:
+		log.Debug("All TCP connections gracefully closed")
+		return nil
+	case <-ctx.Done():
+		log.Warning("TCP proxy shutdown timeout reached, some connections may still be active")
+		return ctx.Err()
+	}
+}
+
+// SetShutdownContext sets the shutdown context from the caller
+func (p *Proxy) SetShutdownContext(ctx context.Context) {
+	p.Lock()
+	defer p.Unlock()
+	p.shutdownCtx, p.shutdown = context.WithCancel(ctx)
+}
+
 func (p *Proxy) Serve(l net.Listener) error {
+	// Ensure shutdown context is initialized
+	if p.shutdownCtx == nil {
+		// Fallback to background context if not set
+		p.SetShutdownContext(context.Background())
+	}
+
 	for {
 		conn, err := l.Accept()
 		if err != nil {
 			log.WithError(err).Warning("Can't accept connection")
 			return err
 		}
+
+		// Track this connection
+		p.activeConns.Add(1)
 		go func() {
+			defer p.activeConns.Done()
 			if err := p.handleConn(conn); err != nil {
 				log.WithError(err).Warning("Can't handle connection")
 			}
@@ -344,6 +391,14 @@ func (p *Proxy) pipe(src, dst net.Conn, opts pipeOpts) {
 	buf := make([]byte, 65535)
 
 	for {
+		// Check if shutdown has been initiated
+		select {
+		case <-p.shutdownCtx.Done():
+			log.Debug("TCP connection terminating due to graceful shutdown")
+			return
+		default:
+		}
+
 		var readDeadline time.Time
 		if p.ReadTimeout != 0 {
 			readDeadline = time.Now().Add(p.ReadTimeout)

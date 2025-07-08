@@ -22,6 +22,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/TykTechnologies/tyk/tcp"
 	"github.com/TykTechnologies/tyk/trace"
 
 	"sync/atomic"
@@ -2085,7 +2086,7 @@ func (gw *Gateway) gracefulShutdown(ctx context.Context) error {
 	var wg sync.WaitGroup
 	errChan := make(chan error, 10) // Buffer for potential errors
 
-	// Shutdown all HTTP servers in the proxy mux
+	// Shutdown all HTTP servers and TCP proxies in the proxy mux
 	gw.DefaultProxyMux.Lock()
 	for _, p := range gw.DefaultProxyMux.proxies {
 		if p.httpServer != nil {
@@ -2106,6 +2107,33 @@ func (gw *Gateway) gracefulShutdown(ctx context.Context) error {
 				}
 			}(p.httpServer, p.port)
 		}
+		if p.tcpProxy != nil && p.listener != nil {
+			wg.Add(1)
+			go func(listener net.Listener, port int, protocol string, proxy *tcp.Proxy) {
+				defer wg.Done()
+				mainLog.Infof("Shutting down TCP proxy on port %d (%s)", port, protocol)
+
+				// For TCP proxies, close the listener to stop accepting new connections
+				if err := listener.Close(); err != nil {
+					mainLog.Errorf("Error shutting down TCP proxy listener on port %d: %v", port, err)
+					select {
+					case errChan <- err:
+					default:
+						// Channel closed, ignore
+					}
+				}
+
+				// Set the shutdown context from the graceful shutdown
+				proxy.SetShutdownContext(ctx)
+
+				// Use the TCP proxy's graceful shutdown method
+				if err := proxy.Shutdown(ctx); err != nil {
+					mainLog.Warnf("TCP proxy shutdown error on port %d: %v", port, err)
+				} else {
+					mainLog.Debugf("TCP proxy gracefully shut down on port %d", port)
+				}
+			}(p.listener, p.port, p.protocol, p.tcpProxy)
+		}
 	}
 	gw.DefaultProxyMux.Unlock()
 
@@ -2118,7 +2146,7 @@ func (gw *Gateway) gracefulShutdown(ctx context.Context) error {
 
 	select {
 	case <-serverShutdownDone:
-		mainLog.Info("All HTTP servers gracefully shut down")
+		mainLog.Info("All HTTP servers and TCP proxies gracefully shut down")
 	case <-ctx.Done():
 		mainLog.Warning("Shutdown timeout reached, some connections may have been terminated")
 		// Wait for goroutines to finish even after timeout to prevent panic
