@@ -97,7 +97,17 @@ For each category below, check whether the necessary updates in other repositori
 Response Format
 ---------------
 
-Plain textANTLR4BashCC#CSSCoffeeScriptCMakeDartDjangoDockerEJSErlangGitGoGraphQLGroovyHTMLJavaJavaScriptJSONJSXKotlinLaTeXLessLuaMakefileMarkdownMATLABMarkupObjective-CPerlPHPPowerShell.propertiesProtocol BuffersPythonRRubySass (Sass)Sass (Scss)SchemeSQLShellSwiftSVGTSXTypeScriptWebAssemblyYAMLXML`   ## Impact Assessment  [Detailed analysis of how the changes in tyk might impact each downstream repository]  ## Required Updates  [Specific files or components in downstream repositories that need to be updated]  ## Compatibility Concerns  [Any potential backward compatibility issues that need to be addressed]  ## Summary & Recommendations  [Overall assessment and specific recommendations for ensuring cross-project compatibility]   `
+## Impact Assessment
+[Detailed analysis of how the changes in tyk might impact each downstream repository]
+
+## Required Updates
+[Specific files or components in downstream repositories that need to be updated]
+
+## Compatibility Concerns
+[Any potential backward compatibility issues that need to be addressed]
+
+## Summary & Recommendations
+[Overall assessment and specific recommendations for ensuring cross-project compatibility]
 
 Guidelines
 ----------
