@@ -142,12 +142,17 @@ func (p *Proxy) SetShutdownContext(ctx context.Context) {
 	p.shutdownCtx, p.shutdown = context.WithCancel(ctx)
 }
 
-func (p *Proxy) Serve(l net.Listener) error {
-	// Ensure shutdown context is initialized
+// initShutdownContext initializes the shutdown context if not already done
+func (p *Proxy) initShutdownContext() {
+	p.Lock()
+	defer p.Unlock()
 	if p.shutdownCtx == nil {
-		// Fallback to background context if not set
-		p.SetShutdownContext(context.Background())
+		p.shutdownCtx, p.shutdown = context.WithCancel(context.Background())
 	}
+}
+
+func (p *Proxy) Serve(l net.Listener) error {
+	p.initShutdownContext()
 
 	for {
 		conn, err := l.Accept()
@@ -156,9 +161,9 @@ func (p *Proxy) Serve(l net.Listener) error {
 			return err
 		}
 
-		// Track this connection
-		p.activeConns.Add(1)
 		go func() {
+			// Track this connection only when we actually start handling it
+			p.activeConns.Add(1)
 			defer p.activeConns.Done()
 			if err := p.handleConn(conn); err != nil {
 				log.WithError(err).Warning("Can't handle connection")
