@@ -711,8 +711,8 @@ type APIDefinition struct {
 	JWTSkipKid                 bool     `bson:"jwt_skip_kid" json:"jwt_skip_kid"`
 	EnableJWE                  bool     `bson:"enable_jwe" json:"enable_jwe"`
 	JWEDecryptionKey           string   `bson:"jwe_decryption_key" json:"jwe_decryption_key"`
+	JWEDecryptionCertID        string   `bson:"jwe_decryption_cert_id" json:"jwe_decryption_cert_id,omitempty"`
 	JWEDecryptionMethod        string   `bson:"jwe_decryption_method" json:"jwe_decryption_method"`
-	JWEDecryptionKeyIsPEM      bool     `bson:"jwe_decryption_key_is_pem" json:"jwe_decryption_key_is_pem"`
 
 	Scopes                               Scopes                 `bson:"scopes" json:"scopes,omitempty"`
 	IDPClientIDMappingDisabled           bool                   `bson:"idp_client_id_mapping_disabled" json:"idp_client_id_mapping_disabled"`

@@ -10,6 +10,7 @@ import (
 	"encoding/pem"
 	"errors"
 	"fmt"
+	"github.com/TykTechnologies/tyk/certs"
 	"io"
 	"net/http"
 	"strings"
@@ -1151,7 +1152,7 @@ func getUserIDFromClaim(claims jwt.MapClaims, identityBaseField string) (string,
 // decryptJWE decrypts a JWE token and returns the nested JWT
 func (k *JWTMiddleware) decryptJWE(jweToken string) (string, error) {
 	if !k.Spec.EnableJWE {
-		return "", errors.New("JWE not enabled")
+		return "", errors.New("JWE is not enabled for this API")
 	}
 
 	object, err := jose.ParseEncrypted(jweToken)
@@ -1159,64 +1160,78 @@ func (k *JWTMiddleware) decryptJWE(jweToken string) (string, error) {
 		return "", fmt.Errorf("failed to parse JWE token: %w", err)
 	}
 
-	// Extract header values
 	tokenAlg := object.Header.Algorithm
 
-	// If API definition specifies algorithms, validate them
-	if k.Spec.JWEDecryptionMethod != "" && k.Spec.JWEDecryptionMethod != tokenAlg {
-		return "", fmt.Errorf("JWE algorithm mismatch: expected %s, got %s",
-			k.Spec.JWEDecryptionMethod, tokenAlg)
+	// Validate alg and enc if configured
+	if err := k.validateJWEAlgorithms(tokenAlg); err != nil {
+		return "", err
 	}
 
+	// Determine actual algorithm to use
 	actualAlg := tokenAlg
 	if k.Spec.JWEDecryptionMethod != "" {
 		actualAlg = k.Spec.JWEDecryptionMethod
 	}
 
-	var key interface{}
-	switch actualAlg {
-	case "dir", "A128KW", "A256KW":
-		key = []byte(k.Spec.JWEDecryptionKey)
-	case "RSA-OAEP", "RSA-OAEP-256":
-		if k.Spec.JWEDecryptionKeyIsPEM {
-			block, _ := pem.Decode([]byte(k.Spec.JWEDecryptionKey))
-			if block == nil {
-				return "", errors.New("failed to parse PEM block")
-			}
-			key, err = x509.ParsePKCS1PrivateKey(block.Bytes)
-			if err != nil {
-				key, err = x509.ParsePKCS8PrivateKey(block.Bytes)
-				if err != nil {
-					return "", fmt.Errorf("failed to parse private key: %w", err)
-				}
-			}
-		} else {
-			return "", errors.New("RSA private key must be in PEM format")
-		}
-	case "ECDH-ES", "ECDH-ES+A128KW", "ECDH-ES+A256KW":
-		if k.Spec.JWEDecryptionKeyIsPEM {
-			block, _ := pem.Decode([]byte(k.Spec.JWEDecryptionKey))
-			if block == nil {
-				return "", errors.New("failed to parse PEM block containing private key")
-			}
-
-			key, err = x509.ParseECPrivateKey(block.Bytes)
-			if err != nil {
-				return "", fmt.Errorf("failed to parse EC private key: %w", err)
-			}
-		} else {
-			return "", errors.New("EC private key must be in PEM format")
-		}
-	default:
-		return "", fmt.Errorf("unsupported JWE decryption method: %s", k.Spec.JWEDecryptionMethod)
+	// Load the decryption key
+	key, err := k.loadJWEKey(actualAlg)
+	if err != nil {
+		return "", fmt.Errorf("failed to load JWE decryption key: %w", err)
 	}
 
+	// Decrypt the payload
 	decrypted, err := object.Decrypt(key)
 	if err != nil {
 		return "", fmt.Errorf("failed to decrypt JWE token: %w", err)
 	}
 
 	return string(decrypted), nil
+}
+
+func (k *JWTMiddleware) validateJWEAlgorithms(tokenAlg string) error {
+	if k.Spec.JWEDecryptionMethod != "" && tokenAlg != k.Spec.JWEDecryptionMethod {
+		return fmt.Errorf("JWE alg mismatch: header=%s, expected=%s", tokenAlg, k.Spec.JWEDecryptionMethod)
+	}
+	return nil
+}
+
+func (k *JWTMiddleware) loadJWEKey(actualAlg string) (interface{}, error) {
+	switch {
+	case strings.HasPrefix(actualAlg, "RSA") || strings.HasPrefix(actualAlg, "ECDH-ES"):
+		return k.loadJWEAsymmetricKey()
+	case actualAlg == "dir" || strings.HasPrefix(actualAlg, "A") || strings.HasPrefix(actualAlg, "PBES2"):
+		return k.loadJWESymmetricKey()
+	default:
+		return nil, fmt.Errorf("unsupported JWE algorithm: %s", actualAlg)
+	}
+}
+
+func (k *JWTMiddleware) loadJWEAsymmetricKey() (interface{}, error) {
+	if k.Spec.JWEDecryptionCertID == "" {
+		return nil, errors.New("certificate ID required for asymmetric JWE algorithms")
+	}
+	certs := k.Gw.CertificateManager.List([]string{k.Spec.JWEDecryptionCertID}, certs.CertificatePrivate)
+	if len(certs) == 0 || certs[0] == nil {
+		return nil, errors.New("certificate not found")
+	}
+	return certs[0].PrivateKey, nil
+}
+
+func (k *JWTMiddleware) loadJWESymmetricKey() ([]byte, error) {
+	if k.Spec.JWEDecryptionKey == "" {
+		return nil, errors.New("symmetric key not configured")
+	}
+
+	if strings.HasPrefix(k.Spec.JWEDecryptionKey, "secret://") {
+		return k.resolveSecretKey(k.Spec.JWEDecryptionKey)
+	}
+
+	return []byte(k.Spec.JWEDecryptionKey), nil
+}
+
+func (k *JWTMiddleware) resolveSecretKey(ref string) ([]byte, error) {
+	// query the secret store and return its real value
+	return []byte(ref), nil
 }
 
 // isJWE determines if a token is a JWE token

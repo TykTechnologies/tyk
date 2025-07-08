@@ -171,10 +171,10 @@ type JWT struct {
 	// Tyk classic API definition: `idp_client_id_mapping_disabled`.
 	IDPClientIDMappingDisabled bool `bson:"idpClientIdMappingDisabled,omitempty" json:"idpClientIdMappingDisabled,omitempty"`
 
-	EnableJWE             bool   `bson:"enableJWE,omitempty" json:"enableJWE,omitempty"`
-	JWEDecryptionKey      string `bson:"jweDecryptionKey,omitempty" json:"jweDecryptionKey,omitempty"`
-	JWEDecryptionMethod   string `bson:"jweDecryptionMethod,omitempty" json:"jweDecryptionMethod,omitempty"`
-	JWEDecryptionKeyIsPEM bool   `bson:"jweDecryptionKeyIsPEM,omitempty" json:"jweDecryptionKeyIsPEM,omitempty"`
+	EnableJWE           bool   `bson:"enableJWE,omitempty" json:"enableJWE,omitempty"`
+	JWEDecryptionKey    string `bson:"jweDecryptionKey,omitempty" json:"jweDecryptionKey,omitempty"`
+	JWEDecryptionMethod string `bson:"jweDecryptionMethod,omitempty" json:"jweDecryptionMethod,omitempty"`
+	JWEDecryptionCertID string `bson:"jwe_decryption_cert_id" json:"jwe_decryption_cert_id,omitempty"`
 }
 
 // Import populates *JWT based on arguments.
@@ -238,7 +238,7 @@ func (s *OAS) fillJWT(api apidef.APIDefinition) {
 	jwt.EnableJWE = api.EnableJWE
 	jwt.JWEDecryptionKey = api.JWEDecryptionKey
 	jwt.JWEDecryptionMethod = api.JWEDecryptionMethod
-	jwt.JWEDecryptionKeyIsPEM = api.JWEDecryptionKeyIsPEM
+	jwt.JWEDecryptionCertID = api.JWEDecryptionCertID
 
 	s.getTykSecuritySchemes()[ac.Name] = jwt
 
@@ -273,8 +273,8 @@ func (s *OAS) extractJWTTo(api *apidef.APIDefinition, name string) {
 
 	api.EnableJWE = jwt.EnableJWE
 	api.JWEDecryptionKey = jwt.JWEDecryptionKey
+	api.JWEDecryptionCertID = jwt.JWEDecryptionCertID
 	api.JWEDecryptionMethod = jwt.JWEDecryptionMethod
-	api.JWEDecryptionKeyIsPEM = jwt.JWEDecryptionKeyIsPEM
 
 	api.AuthConfigs[apidef.JWTType] = ac
 }
