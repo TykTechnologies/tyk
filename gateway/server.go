@@ -2078,6 +2078,64 @@ func (gw *Gateway) SetConfig(conf config.Config, skipReload ...bool) {
 	gw.configMu.Unlock()
 }
 
+// shutdownHTTPServer gracefully shuts down an HTTP server
+func (gw *Gateway) shutdownHTTPServer(ctx context.Context, server *http.Server, port int, wg *sync.WaitGroup, errChan chan<- error) {
+	if server == nil {
+		return
+	}
+
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		mainLog.Infof("Shutting down HTTP server on %s", server.Addr)
+
+		// Server.Shutdown gracefully shuts down the server without
+		// interrupting any active connections
+		if err := server.Shutdown(ctx); err != nil {
+			mainLog.Errorf("Error shutting down HTTP server on port %d: %v", port, err)
+			select {
+			case errChan <- err:
+			default:
+				// Channel closed, ignore
+			}
+		}
+	}()
+}
+
+// shutdownTCPProxy gracefully shuts down a TCP proxy
+func (gw *Gateway) shutdownTCPProxy(ctx context.Context, listener net.Listener, port int, protocol string, proxy *tcp.Proxy, wg *sync.WaitGroup, errChan chan<- error) {
+	if proxy == nil || listener == nil {
+		return
+	}
+
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		mainLog.Infof("Shutting down TCP proxy on port %d (%s)", port, protocol)
+
+		// Set the shutdown context to signal existing connections to terminate gracefully
+		proxy.SetShutdownContext(ctx)
+
+		// Close the listener to stop accepting new connections
+		// Note: This will cause Serve() to exit, but existing connections continue
+		if err := listener.Close(); err != nil {
+			mainLog.Errorf("Error shutting down TCP proxy listener on port %d: %v", port, err)
+			select {
+			case errChan <- err:
+			default:
+				// Channel closed, ignore
+			}
+		}
+
+		// Wait for all active connections to finish or timeout
+		if err := proxy.Shutdown(ctx); err != nil {
+			mainLog.Warnf("TCP proxy shutdown timeout on port %d: %v", port, err)
+		} else {
+			mainLog.Debugf("TCP proxy gracefully shut down on port %d", port)
+		}
+	}()
+}
+
 // gracefulShutdown performs a graceful shutdown of all services
 func (gw *Gateway) gracefulShutdown(ctx context.Context) error {
 	mainLog.Info("Stop signal received.")
@@ -2090,50 +2148,10 @@ func (gw *Gateway) gracefulShutdown(ctx context.Context) error {
 	gw.DefaultProxyMux.Lock()
 	for _, p := range gw.DefaultProxyMux.proxies {
 		if p.httpServer != nil {
-			wg.Add(1)
-			go func(server *http.Server, port int) {
-				defer wg.Done()
-				mainLog.Infof("Shutting down HTTP server on %s", server.Addr)
-
-				// Server.Shutdown gracefully shuts down the server without
-				// interrupting any active connections
-				if err := server.Shutdown(ctx); err != nil {
-					mainLog.Errorf("Error shutting down HTTP server on port %d: %v", port, err)
-					select {
-					case errChan <- err:
-					default:
-						// Channel closed, ignore
-					}
-				}
-			}(p.httpServer, p.port)
+			gw.shutdownHTTPServer(ctx, p.httpServer, p.port, &wg, errChan)
 		}
 		if p.tcpProxy != nil && p.listener != nil {
-			wg.Add(1)
-			go func(listener net.Listener, port int, protocol string, proxy *tcp.Proxy) {
-				defer wg.Done()
-				mainLog.Infof("Shutting down TCP proxy on port %d (%s)", port, protocol)
-
-				// Set the shutdown context to signal existing connections to terminate gracefully
-				proxy.SetShutdownContext(ctx)
-
-				// Close the listener to stop accepting new connections
-				// Note: This will cause Serve() to exit, but existing connections continue
-				if err := listener.Close(); err != nil {
-					mainLog.Errorf("Error shutting down TCP proxy listener on port %d: %v", port, err)
-					select {
-					case errChan <- err:
-					default:
-						// Channel closed, ignore
-					}
-				}
-
-				// Wait for all active connections to finish or timeout
-				if err := proxy.Shutdown(ctx); err != nil {
-					mainLog.Warnf("TCP proxy shutdown timeout on port %d: %v", port, err)
-				} else {
-					mainLog.Debugf("TCP proxy gracefully shut down on port %d", port)
-				}
-			}(p.listener, p.port, p.protocol, p.tcpProxy)
+			gw.shutdownTCPProxy(ctx, p.listener, p.port, p.protocol, p.tcpProxy, &wg, errChan)
 		}
 	}
 	gw.DefaultProxyMux.Unlock()
