@@ -102,7 +102,7 @@ func (m *Mapper) add(newEntry Entry) error {
 	}
 
 	if existent, ok := m.normalizedMap[newEntry.normalizedEndpoint()]; ok {
-		return newCollisionError(*existent, newEntry, collisionAtNormalized)
+		return newCollisionError(*existent, newEntry, collisionAtExtended)
 	}
 
 	m.operationsMap[newEntry.OperationID] = &newEntry
