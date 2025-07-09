@@ -3,6 +3,7 @@ package tcp
 import (
 	"context"
 	"crypto/tls"
+	"errors"
 	"net"
 	"reflect"
 	"sync"
@@ -258,7 +259,7 @@ func TestProxy_Shutdown(t *testing.T) {
 				return context.WithTimeout(context.Background(), 5*time.Second)
 			},
 			expectError: false,
-			beforeShutdown: func(proxy *Proxy, listener net.Listener) {
+			beforeShutdown: func(proxy *Proxy, _ net.Listener) {
 				// Simulate active connections by calling activeConns.Add
 				proxy.activeConns.Add(2)
 
@@ -280,7 +281,7 @@ func TestProxy_Shutdown(t *testing.T) {
 			},
 			expectError: true,
 			errorType:   context.DeadlineExceeded,
-			beforeShutdown: func(proxy *Proxy, listener net.Listener) {
+			beforeShutdown: func(proxy *Proxy, _ net.Listener) {
 				// Simulate slow connections that don't complete in time
 				proxy.activeConns.Add(1)
 				// Don't call Done() to simulate hanging connection
@@ -322,7 +323,7 @@ func TestProxy_Shutdown(t *testing.T) {
 					t.Errorf("expected error but got none")
 					return
 				}
-				if tt.errorType != nil && err != tt.errorType {
+				if tt.errorType != nil && !errors.Is(err, tt.errorType) {
 					t.Errorf("expected error type %v, got %v", tt.errorType, err)
 				}
 			} else {
@@ -349,7 +350,7 @@ func TestProxy_SetShutdownContext(t *testing.T) {
 			setupCtx: func() context.Context {
 				return context.Background()
 			},
-			validateCtx: func(t *testing.T, p *Proxy, originalCtx context.Context) {
+			validateCtx: func(t *testing.T, p *Proxy, _ context.Context) {
 				if p.shutdownCtx == nil {
 					t.Error("shutdown context should not be nil after setting")
 				}
@@ -371,7 +372,7 @@ func TestProxy_SetShutdownContext(t *testing.T) {
 			setupCtx: func() context.Context {
 				return context.Background()
 			},
-			validateCtx: func(t *testing.T, p *Proxy, originalCtx context.Context) {
+			validateCtx: func(t *testing.T, p *Proxy, _ context.Context) {
 				if p.shutdownCtx == nil {
 					t.Error("shutdown context should not be nil after overwriting")
 				}
@@ -451,7 +452,7 @@ func TestProxy_initShutdownContext(t *testing.T) {
 
 func TestProxy_ServeWithGracefulShutdown(t *testing.T) {
 	// Test that Serve properly tracks connections and responds to shutdown
-	upstream := test.TcpMock(false, func(in []byte, err error) (out []byte) {
+	upstream := test.TcpMock(false, func(in []byte, _ error) (out []byte) {
 		// Simulate slow response to test connection tracking
 		time.Sleep(100 * time.Millisecond)
 		return in
@@ -526,7 +527,7 @@ func TestProxy_ServeWithGracefulShutdown(t *testing.T) {
 
 	// Test graceful shutdown
 	err = proxy.Shutdown(shutdownCtx)
-	if err != nil && err != context.Canceled && err != context.DeadlineExceeded {
+	if err != nil && !errors.Is(err, context.Canceled) && !errors.Is(err, context.DeadlineExceeded) {
 		t.Errorf("Unexpected shutdown error: %v", err)
 	}
 
@@ -574,7 +575,7 @@ func TestProxy_ConcurrentConnectionTracking(t *testing.T) {
 
 func TestProxy_ShutdownIntegration(t *testing.T) {
 	// Test that TCP proxy properly shuts down connections when shutdown context is cancelled
-	upstream := test.TcpMock(false, func(in []byte, err error) (out []byte) {
+	upstream := test.TcpMock(false, func(in []byte, _ error) (out []byte) {
 		// Simulate slow response to test shutdown during active connection
 		time.Sleep(200 * time.Millisecond)
 		return in
