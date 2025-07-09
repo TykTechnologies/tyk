@@ -1,0 +1,23 @@
+name: Connectivity Review
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+  issue_comment:
+    types: [created]
+
+# Define permissions needed for the workflow
+permissions:
+  issues: write
+  pull-requests: write
+  contents: read
+
+jobs:
+  connectivity_review:
+    uses: buger/probe/.github/workflows/probe.yml@main
+    with:
+      command_prefix: "/connectivity"
+      prompt: ".probe/connectivity-reviewer.md"
+    secrets:
+      ANTHROPIC_API_KEY: ${{ secrets.PROBE_ANTHROPIC_API_KEY }}
+      ANTHROPIC_API_URL: ${{ secrets.PROBE_ANTHROPIC_URL }}
