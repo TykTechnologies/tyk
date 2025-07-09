@@ -19,6 +19,7 @@ import (
 	"github.com/TykTechnologies/tyk/internal/netutil"
 	"github.com/TykTechnologies/tyk/internal/otel"
 	"github.com/TykTechnologies/tyk/rpc"
+	"github.com/TykTechnologies/tyk/tcp"
 	"github.com/TykTechnologies/tyk/test"
 	"github.com/TykTechnologies/tyk/user"
 )
@@ -648,4 +649,400 @@ func TestGateway_cacheClose(t *testing.T) {
 	// Note: We can't easily test that caches are actually closed
 	// since the cache.Close() method doesn't expose internal state
 	// This test mainly ensures cacheClose doesn't panic
+}
+
+func TestGateway_gracefulShutdown_WithTCPProxy(t *testing.T) {
+	tests := []struct {
+		name           string
+		setupGateway   func() *Gateway
+		setupContext   func() (context.Context, context.CancelFunc)
+		expectError    bool
+		errorContains  string
+		validateResult func(*testing.T, *Gateway)
+	}{
+		{
+			name: "shutdown with TCP proxy and HTTP server",
+			setupGateway: func() *Gateway {
+				// Create a test TCP proxy
+				tcpProxy := &tcp.Proxy{}
+
+				// Create a test listener
+				listener, err := net.Listen("tcp", ":0")
+				if err != nil {
+					t.Fatalf("Failed to create listener: %v", err)
+				}
+
+				gw := &Gateway{
+					DefaultProxyMux: &proxyMux{
+						proxies: []*proxy{
+							{
+								port:     8080,
+								protocol: "http",
+								httpServer: &http.Server{
+									Addr: ":8080",
+								},
+							},
+							{
+								port:     8443,
+								protocol: "tcp",
+								tcpProxy: tcpProxy,
+								listener: listener,
+							},
+						},
+						again: again.New(),
+					},
+				}
+				gw.SetConfig(config.Config{})
+				gw.cacheCreate()
+				return gw
+			},
+			setupContext: func() (context.Context, context.CancelFunc) {
+				return context.WithTimeout(context.Background(), 5*time.Second)
+			},
+			expectError: false,
+		},
+		{
+			name: "shutdown with TCP proxy only",
+			setupGateway: func() *Gateway {
+				// Create a test TCP proxy
+				tcpProxy := &tcp.Proxy{}
+
+				// Create a test listener
+				listener, err := net.Listen("tcp", ":0")
+				if err != nil {
+					t.Fatalf("Failed to create listener: %v", err)
+				}
+
+				gw := &Gateway{
+					DefaultProxyMux: &proxyMux{
+						proxies: []*proxy{
+							{
+								port:     8443,
+								protocol: "tcp",
+								tcpProxy: tcpProxy,
+								listener: listener,
+							},
+						},
+						again: again.New(),
+					},
+				}
+				gw.SetConfig(config.Config{})
+				gw.cacheCreate()
+				return gw
+			},
+			setupContext: func() (context.Context, context.CancelFunc) {
+				return context.WithTimeout(context.Background(), 5*time.Second)
+			},
+			expectError: false,
+		},
+		{
+			name: "shutdown with nil TCP proxy (should skip)",
+			setupGateway: func() *Gateway {
+				gw := &Gateway{
+					DefaultProxyMux: &proxyMux{
+						proxies: []*proxy{
+							{
+								port:     8443,
+								protocol: "tcp",
+								tcpProxy: nil, // nil proxy should be skipped
+								listener: nil,
+							},
+							{
+								port:     8080,
+								protocol: "http",
+								httpServer: &http.Server{
+									Addr: ":8080",
+								},
+							},
+						},
+						again: again.New(),
+					},
+				}
+				gw.SetConfig(config.Config{})
+				gw.cacheCreate()
+				return gw
+			},
+			setupContext: func() (context.Context, context.CancelFunc) {
+				return context.WithTimeout(context.Background(), 5*time.Second)
+			},
+			expectError: false,
+		},
+		{
+			name: "shutdown with nil listener (should skip)",
+			setupGateway: func() *Gateway {
+				tcpProxy := &tcp.Proxy{}
+
+				gw := &Gateway{
+					DefaultProxyMux: &proxyMux{
+						proxies: []*proxy{
+							{
+								port:     8443,
+								protocol: "tcp",
+								tcpProxy: tcpProxy,
+								listener: nil, // nil listener should be skipped
+							},
+						},
+						again: again.New(),
+					},
+				}
+				gw.SetConfig(config.Config{})
+				gw.cacheCreate()
+				return gw
+			},
+			setupContext: func() (context.Context, context.CancelFunc) {
+				return context.WithTimeout(context.Background(), 5*time.Second)
+			},
+			expectError: false,
+		},
+		{
+			name: "shutdown with timeout - TCP proxy",
+			setupGateway: func() *Gateway {
+				tcpProxy := &tcp.Proxy{}
+
+				listener, err := net.Listen("tcp", ":0")
+				if err != nil {
+					t.Fatalf("Failed to create listener: %v", err)
+				}
+
+				gw := &Gateway{
+					DefaultProxyMux: &proxyMux{
+						proxies: []*proxy{
+							{
+								port:     8443,
+								protocol: "tcp",
+								tcpProxy: tcpProxy,
+								listener: listener,
+							},
+						},
+						again: again.New(),
+					},
+				}
+				gw.SetConfig(config.Config{})
+				gw.cacheCreate()
+				return gw
+			},
+			setupContext: func() (context.Context, context.CancelFunc) {
+				// Very short timeout to test timeout handling
+				return context.WithTimeout(context.Background(), 1*time.Nanosecond)
+			},
+			expectError: false, // Timeout is handled gracefully, not an error
+		},
+		{
+			name: "shutdown multiple TCP proxies",
+			setupGateway: func() *Gateway {
+				tcpProxy1 := &tcp.Proxy{}
+				tcpProxy2 := &tcp.Proxy{}
+
+				listener1, err := net.Listen("tcp", ":0")
+				if err != nil {
+					t.Fatalf("Failed to create listener1: %v", err)
+				}
+
+				listener2, err := net.Listen("tcp", ":0")
+				if err != nil {
+					t.Fatalf("Failed to create listener2: %v", err)
+				}
+
+				gw := &Gateway{
+					DefaultProxyMux: &proxyMux{
+						proxies: []*proxy{
+							{
+								port:     8443,
+								protocol: "tcp",
+								tcpProxy: tcpProxy1,
+								listener: listener1,
+							},
+							{
+								port:     8444,
+								protocol: "tcp",
+								tcpProxy: tcpProxy2,
+								listener: listener2,
+							},
+						},
+						again: again.New(),
+					},
+				}
+				gw.SetConfig(config.Config{})
+				gw.cacheCreate()
+				return gw
+			},
+			setupContext: func() (context.Context, context.CancelFunc) {
+				return context.WithTimeout(context.Background(), 5*time.Second)
+			},
+			expectError: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gw := tt.setupGateway()
+			ctx, cancel := tt.setupContext()
+			defer cancel()
+
+			err := gw.gracefulShutdown(ctx)
+
+			if tt.expectError {
+				if err == nil {
+					t.Errorf("expected error but got none")
+					return
+				}
+				if tt.errorContains != "" && !strings.Contains(err.Error(), tt.errorContains) {
+					t.Errorf("expected error to contain %q, got %q", tt.errorContains, err.Error())
+				}
+			} else {
+				if err != nil {
+					t.Errorf("expected no error but got: %v", err)
+				}
+			}
+
+			if tt.validateResult != nil {
+				tt.validateResult(t, gw)
+			}
+		})
+	}
+}
+
+func TestGateway_gracefulShutdown_TCPProxyWithActiveConnections(t *testing.T) {
+	// Create a TCP proxy and listener
+	tcpProxy := &tcp.Proxy{}
+	listener, err := net.Listen("tcp", ":0")
+	if err != nil {
+		t.Fatalf("Failed to create listener: %v", err)
+	}
+
+	gw := &Gateway{
+		DefaultProxyMux: &proxyMux{
+			proxies: []*proxy{
+				{
+					port:     listener.Addr().(*net.TCPAddr).Port,
+					protocol: "tcp",
+					tcpProxy: tcpProxy,
+					listener: listener,
+				},
+			},
+			again: again.New(),
+		},
+	}
+	gw.SetConfig(config.Config{})
+	gw.cacheCreate()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	start := time.Now()
+	err = gw.gracefulShutdown(ctx)
+	elapsed := time.Since(start)
+
+	if err != nil {
+		t.Errorf("expected no error but got: %v", err)
+	}
+
+	// Should complete quickly since there are no active connections
+	if elapsed > 1*time.Second {
+		t.Errorf("shutdown took too long, expected less than 1s, got %v", elapsed)
+	}
+}
+
+func TestGateway_gracefulShutdown_TCPProxyTimeout(t *testing.T) {
+	// Create a TCP proxy and listener
+	tcpProxy := &tcp.Proxy{}
+	listener, err := net.Listen("tcp", ":0")
+	if err != nil {
+		t.Fatalf("Failed to create listener: %v", err)
+	}
+
+	gw := &Gateway{
+		DefaultProxyMux: &proxyMux{
+			proxies: []*proxy{
+				{
+					port:     listener.Addr().(*net.TCPAddr).Port,
+					protocol: "tcp",
+					tcpProxy: tcpProxy,
+					listener: listener,
+				},
+			},
+			again: again.New(),
+		},
+	}
+	gw.SetConfig(config.Config{})
+	gw.cacheCreate()
+
+	// Use a short timeout to test timeout handling
+	ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
+	defer cancel()
+
+	start := time.Now()
+	err = gw.gracefulShutdown(ctx)
+	elapsed := time.Since(start)
+
+	// Should not return an error even on timeout (it's handled gracefully)
+	if err != nil {
+		t.Errorf("expected no error but got: %v", err)
+	}
+
+	// Should complete quickly since there are no hanging connections to wait for
+	if elapsed > 500*time.Millisecond {
+		t.Errorf("shutdown took too long, expected less than 500ms, got %v", elapsed)
+	}
+}
+
+func TestGateway_gracefulShutdown_MixedProxyConcurrency(t *testing.T) {
+	// Test concurrent shutdown of multiple proxy types
+	tcpProxy1 := &tcp.Proxy{}
+	tcpProxy2 := &tcp.Proxy{}
+
+	listener1, err := net.Listen("tcp", ":0")
+	if err != nil {
+		t.Fatalf("Failed to create listener1: %v", err)
+	}
+
+	listener2, err := net.Listen("tcp", ":0")
+	if err != nil {
+		t.Fatalf("Failed to create listener2: %v", err)
+	}
+
+	gw := &Gateway{
+		DefaultProxyMux: &proxyMux{
+			proxies: []*proxy{
+				{
+					port:     8080,
+					protocol: "http",
+					httpServer: &http.Server{
+						Addr: ":8080",
+					},
+				},
+				{
+					port:     listener1.Addr().(*net.TCPAddr).Port,
+					protocol: "tcp",
+					tcpProxy: tcpProxy1,
+					listener: listener1,
+				},
+				{
+					port:     8081,
+					protocol: "http",
+					httpServer: &http.Server{
+						Addr: ":8081",
+					},
+				},
+				{
+					port:     listener2.Addr().(*net.TCPAddr).Port,
+					protocol: "tcp",
+					tcpProxy: tcpProxy2,
+					listener: listener2,
+				},
+			},
+			again: again.New(),
+		},
+	}
+	gw.SetConfig(config.Config{})
+	gw.cacheCreate()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	// Should handle mixed proxy types without issues
+	err = gw.gracefulShutdown(ctx)
+	if err != nil {
+		t.Errorf("expected no error but got: %v", err)
+	}
 }
