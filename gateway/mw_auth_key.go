@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/TykTechnologies/tyk/apidef"
-	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/internal/crypto"
 	"github.com/TykTechnologies/tyk/internal/httpctx"
 	"github.com/TykTechnologies/tyk/internal/otel"
@@ -35,27 +34,27 @@ const (
 )
 
 func initAuthKeyErrors() {
-	TykErrors[ErrAuthAuthorizationFieldMissing] = config.TykError{
+	TykErrors[ErrAuthAuthorizationFieldMissing] = apidef.TykError{
 		Message: MsgAuthFieldMissing,
 		Code:    http.StatusUnauthorized,
 	}
 
-	TykErrors[ErrAuthKeyNotFound] = config.TykError{
+	TykErrors[ErrAuthKeyNotFound] = apidef.TykError{
 		Message: MsgApiAccessDisallowed,
 		Code:    http.StatusForbidden,
 	}
 
-	TykErrors[ErrAuthCertNotFound] = config.TykError{
+	TykErrors[ErrAuthCertNotFound] = apidef.TykError{
 		Message: MsgApiAccessDisallowed,
 		Code:    http.StatusForbidden,
 	}
 
-	TykErrors[ErrAuthKeyIsInvalid] = config.TykError{
+	TykErrors[ErrAuthKeyIsInvalid] = apidef.TykError{
 		Message: MsgApiAccessDisallowed,
 		Code:    http.StatusForbidden,
 	}
 
-	TykErrors[ErrAuthCertExpired] = config.TykError{
+	TykErrors[ErrAuthCertExpired] = apidef.TykError{
 		Message: MsgCertificateExpired,
 		Code:    http.StatusForbidden,
 	}
