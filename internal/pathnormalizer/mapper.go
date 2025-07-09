@@ -59,6 +59,8 @@ func newMapper(in *openapi3.Paths) (*Mapper, error) {
 		normalizedPaths.Set(normalized.path, pathItem)
 
 		for method, op := range item.Operations() {
+			extractParametersFromPath(&op.Parameters, normalized.ParameterRefs())
+
 			if err = mapper.add(Entry{
 				Method:      method,
 				Extended:    item.Path,

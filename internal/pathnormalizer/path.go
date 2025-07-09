@@ -43,10 +43,6 @@ func (o NormalizedPath) Parameters() []*openapi3.Parameter {
 
 // ParameterRefs slices of path-based params.
 func (o NormalizedPath) ParameterRefs() []*openapi3.ParameterRef {
-	if len(o.parameters) == 0 {
-		return nil
-	}
-
 	res := make([]*openapi3.ParameterRef, 0, len(o.parameters))
 
 	for _, p := range o.parameters {
