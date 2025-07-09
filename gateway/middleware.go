@@ -740,7 +740,7 @@ func handleResponseChain(chain []TykResponseHandler, rw http.ResponseWriter, res
 	for _, rh := range chain {
 		if err := handleResponse(rh, rw, res, req, ses, traceIsEnabled); err != nil {
 			// Store error in context
-			ctx.SetErrorInfo(req, "", err.Error(), 0, err)
+			ctx.SetErrorInfo(req, "", err)
 
 			// Apply error overrides if the spec is available
 			if spec := rh.Base().Spec; spec != nil {

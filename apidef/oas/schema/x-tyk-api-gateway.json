@@ -528,6 +528,20 @@
     "X-Tyk-Global": {
       "type": "object",
       "properties": {
+        "override_messages": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/definitions/X-Tyk-Error"
+          },
+          "description": "API-level error overrides configuration"
+        },
+        "endpoint_error_messages": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/X-Tyk-EndpointErrorMessage"
+          },
+          "description": "Endpoint-level error overrides configuration"
+        },
         "pluginConfig": {
           "$ref": "#/definitions/X-Tyk-PluginConfig"
         },
@@ -2566,6 +2580,39 @@
         },
         "url": {
           "type": "string"
+        }
+      }
+    },
+    "X-Tyk-Error": {
+      "type": "object",
+      "properties": {
+        "code": {
+          "type": "integer",
+          "description": "HTTP status code to return"
+        },
+        "message": {
+          "type": "string",
+          "description": "Error message to return"
+        }
+      }
+    },
+    "X-Tyk-EndpointErrorMessage": {
+      "type": "object",
+      "properties": {
+        "errors": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/definitions/X-Tyk-Error"
+          },
+          "description": "Map of error IDs to error configurations"
+        },
+        "method": {
+          "type": "string",
+          "description": "HTTP method for which the error messages applies"
+        },
+        "path": {
+          "type": "string",
+          "description": "Path for which the error messages applies"
         }
       }
     },

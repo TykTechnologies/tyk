@@ -120,6 +120,13 @@ type Global struct {
 	// SkipQuotaReset indicates if quota limits should not be reset when creating or updating quotas for the API.
 	// Tyk classic API definition: `dont_set_quota_on_create`.
 	SkipQuotaReset bool `bson:"skipQuotaReset,omitempty" json:"skipQuotaReset,omitempty"`
+
+	// ErrorMessages defines the API-level error message configurations.
+	ErrorMessages map[string]apidef.TykError `bson:"error_messages,omitempty" json:"error_messages,omitempty"`
+
+	// PathErrorMessages defines the path-level error message configurations.
+	// Renamed from EndpointErrorMessages for consistency
+	PathErrorMessages []apidef.ErrorOverrideMeta `bson:"path_error_messages,omitempty" json:"path_error_messages,omitempty"`
 }
 
 // MarshalJSON is a custom JSON marshaller for the Global struct. It is implemented
@@ -226,6 +233,7 @@ func (g *Global) Fill(api apidef.APIDefinition) {
 		AddHeaders:    vInfo.GlobalHeaders,
 		DeleteHeaders: vInfo.GlobalHeadersRemove,
 	})
+
 	if ShouldOmit(g.TransformRequestHeaders) {
 		g.TransformRequestHeaders = nil
 	}
@@ -252,6 +260,28 @@ func (g *Global) Fill(api apidef.APIDefinition) {
 	g.fillRequestSizeLimit(api)
 
 	g.fillSkips(api)
+
+	g.fillErrorMessages(api)
+
+}
+
+func (g *Global) fillErrorMessages(api apidef.APIDefinition) {
+	// Fill error messages
+	g.ErrorMessages = api.ErrorMessages
+
+	// Fill path error messages
+	if len(api.VersionData.Versions) > 0 {
+		for _, version := range api.VersionData.Versions {
+			for _, override := range version.ExtendedPaths.ErrorOverrides {
+				pathError := apidef.ErrorOverrideMeta{
+					Errors: override.Errors,
+					Method: override.Method,
+					Path:   override.Path,
+				}
+				g.PathErrorMessages = append(g.PathErrorMessages, pathError)
+			}
+		}
+	}
 }
 
 func (g *Global) fillTrafficLogs(api apidef.APIDefinition) {
@@ -370,6 +400,27 @@ func (g *Global) ExtractTo(api *apidef.APIDefinition) {
 	g.extractRequestSizeLimitTo(api)
 
 	g.extractSkipsTo(api)
+	g.extractErrorMessages(api)
+}
+
+func (g *Global) extractErrorMessages(api *apidef.APIDefinition) {
+	api.ErrorMessages = g.ErrorMessages
+	// Extract path error messages
+	if len(g.PathErrorMessages) > 0 {
+		for _, pathError := range g.PathErrorMessages {
+			override := apidef.ErrorOverrideMeta{
+				Errors: pathError.Errors,
+				Method: pathError.Method,
+				Path:   pathError.Path,
+			}
+
+			// Add to all versions or specific version as needed
+			for versionName, version := range api.VersionData.Versions {
+				version.ExtendedPaths.ErrorOverrides = append(version.ExtendedPaths.ErrorOverrides, override)
+				api.VersionData.Versions[versionName] = version
+			}
+		}
+	}
 }
 
 func (g *Global) extractTrafficLogsTo(api *apidef.APIDefinition) {

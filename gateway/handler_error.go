@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/base64"
 	"errors"
-	"github.com/TykTechnologies/tyk/ctx"
 	htmltemplate "html/template"
 	"io"
 	"io/ioutil"
@@ -88,15 +87,6 @@ type TemplateExecutor interface {
 
 // HandleError is the actual error handler and will store the error details in analytics if analytics processing is enabled.
 func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMsg string, errCode int, writeResponse bool) {
-	errorID := ""
-	for id, err := range TykErrors {
-		if err.Message == errMsg && err.Code == errCode {
-			errorID = id
-			break
-		}
-	}
-	ctx.SetErrorInfo(r, errorID, errMsg, errCode, nil)
-
 	// Apply error overrides
 	errorOverrideMw := &ErrorOverrideMiddleware{BaseMiddleware: e.BaseMiddleware}
 	errMsg, errCode = errorOverrideMw.ApplyErrorOverride(r, errMsg, errCode)

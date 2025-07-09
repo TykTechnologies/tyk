@@ -72,12 +72,10 @@ func GetErrorInfo(r *http.Request) *ErrorContext {
 	return nil
 }
 
-func SetErrorInfo(r *http.Request, errorID string, message string, code int, originalErr error) {
+func SetErrorInfo(r *http.Request, errorID string, originalErr error) {
 	ctx := r.Context()
 	ctx = context.WithValue(ctx, ErrorInfo, &ErrorContext{
 		ErrorID:     errorID,
-		Message:     message,
-		Code:        code,
 		OriginalErr: originalErr,
 	})
 	core.SetContext(r, ctx)

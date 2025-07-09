@@ -5,6 +5,7 @@ import (
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/ctx"
 	"net/http"
+	"strings"
 )
 
 type ErrorOverrideMiddleware struct {
@@ -20,15 +21,15 @@ func (e *ErrorOverrideMiddleware) EnabledForSpec() bool {
 }
 
 func (e *ErrorOverrideMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
+
 	errorInfo := ctx.GetErrorInfo(r)
 	if errorInfo == nil {
 		return nil, http.StatusOK
 	}
 
 	newMsg, newCode := e.ApplyErrorOverride(r, errorInfo.Message, errorInfo.Code)
-
 	if newMsg != errorInfo.Message || newCode != errorInfo.Code {
-		ctx.SetErrorInfo(r, errorInfo.ErrorID, newMsg, newCode, errorInfo.OriginalErr)
+		ctx.SetErrorInfo(r, errorInfo.ErrorID, errorInfo.OriginalErr)
 	}
 
 	return errors.New(newMsg), newCode
@@ -39,12 +40,17 @@ func (e *ErrorOverrideMiddleware) ApplyErrorOverride(r *http.Request, errMsg str
 	errorInfo := ctx.GetErrorInfo(r)
 	errorID := ""
 
+	//ToDo this error must be injected in context from other middlewares
+	errorID = ErrAuthKeyNotFound
+	//ToDo: test with request validation
+	// ToDo: add headers
+
 	if errorInfo != nil && errorInfo.ErrorID != "" {
 		errorID = errorInfo.ErrorID
 	} else {
 		errorID = e.determineErrorID(errMsg, errCode)
 	}
-
+	errorID = ErrAuthKeyNotFound
 	if errorID == "" {
 		return errMsg, errCode
 	}
@@ -62,7 +68,7 @@ func (e *ErrorOverrideMiddleware) ApplyErrorOverride(r *http.Request, errMsg str
 	}
 
 	// Fall back to API-level overrides
-	if override, exists := e.Spec.GlobalConfig.OverrideMessages[errorID]; exists {
+	if override, exists := e.Spec.ErrorMessages[errorID]; exists {
 		if override.Message != "" {
 			errMsg = override.Message
 		}
@@ -103,22 +109,12 @@ func (e *ErrorOverrideMiddleware) determineErrorID(errMsg string, errCode int) s
 func (e *ErrorOverrideMiddleware) findEndpointErrorOverride(r *http.Request, versionName, errorID string) (apidef.TykError, bool) {
 	if versionInfo, ok := e.Spec.VersionData.Versions[versionName]; ok {
 		path := r.URL.Path
-		if e.Spec.Proxy.StripListenPath {
-			path = e.Spec.StripListenPath(path)
-		}
+		path = e.Spec.StripListenPath(path)
+		path = strings.TrimPrefix(path, "/")
 
 		// Try exact path and method match
 		for _, override := range versionInfo.ExtendedPaths.ErrorOverrides {
 			if override.Path == path && (override.Method == r.Method || override.Method == "") {
-				if errorOverride, exists := override.Errors[errorID]; exists {
-					return errorOverride, true
-				}
-			}
-		}
-
-		// Try path-only match
-		for _, override := range versionInfo.ExtendedPaths.ErrorOverrides {
-			if override.Path == path && override.Method == "" {
 				if errorOverride, exists := override.Errors[errorID]; exists {
 					return errorOverride, true
 				}
