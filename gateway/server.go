@@ -22,6 +22,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/TykTechnologies/tyk/tcp"
 	"github.com/TykTechnologies/tyk/trace"
 
 	"sync/atomic"
@@ -1759,6 +1760,10 @@ func Start() {
 	gw := NewGateway(gwConfig, ctx)
 	gwConfig = gw.GetConfig()
 
+	if err := gw.initSystem(); err != nil {
+		mainLog.Fatalf("Error initialising system: %v", err)
+	}
+
 	shutdownComplete := make(chan struct{})
 	go func() {
 		sig := <-sigChan
@@ -1778,10 +1783,6 @@ func Start() {
 		}
 		close(shutdownComplete)
 	}()
-
-	if err := gw.initSystem(); err != nil {
-		mainLog.Fatalf("Error initialising system: %v", err)
-	}
 
 	if !gw.isRunningTests() && gwConfig.ControlAPIPort == 0 {
 		mainLog.Warn("The control_api_port should be changed for production")
@@ -2083,6 +2084,64 @@ func (gw *Gateway) SetConfig(conf config.Config, skipReload ...bool) {
 	gw.configMu.Unlock()
 }
 
+// shutdownHTTPServer gracefully shuts down an HTTP server
+func (gw *Gateway) shutdownHTTPServer(ctx context.Context, server *http.Server, port int, wg *sync.WaitGroup, errChan chan<- error) {
+	if server == nil {
+		return
+	}
+
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		mainLog.Infof("Shutting down HTTP server on %s", server.Addr)
+
+		// Server.Shutdown gracefully shuts down the server without
+		// interrupting any active connections
+		if err := server.Shutdown(ctx); err != nil {
+			mainLog.Errorf("Error shutting down HTTP server on port %d: %v", port, err)
+			select {
+			case errChan <- err:
+			default:
+				// Channel closed, ignore
+			}
+		}
+	}()
+}
+
+// shutdownTCPProxy gracefully shuts down a TCP proxy
+func (gw *Gateway) shutdownTCPProxy(ctx context.Context, listener net.Listener, port int, protocol string, proxy *tcp.Proxy, wg *sync.WaitGroup, errChan chan<- error) {
+	if proxy == nil || listener == nil {
+		return
+	}
+
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		mainLog.Infof("Shutting down TCP proxy on port %d (%s)", port, protocol)
+
+		// Set the shutdown context to signal existing connections to terminate gracefully
+		proxy.SetShutdownContext(ctx)
+
+		// Close the listener to stop accepting new connections
+		// Note: This will cause Serve() to exit, but existing connections continue
+		if err := listener.Close(); err != nil {
+			mainLog.Errorf("Error shutting down TCP proxy listener on port %d: %v", port, err)
+			select {
+			case errChan <- err:
+			default:
+				// Channel closed, ignore
+			}
+		}
+
+		// Wait for all active connections to finish or timeout
+		if err := proxy.Shutdown(ctx); err != nil {
+			mainLog.Warnf("TCP proxy shutdown timeout on port %d: %v", port, err)
+		} else {
+			mainLog.Debugf("TCP proxy gracefully shut down on port %d", port)
+		}
+	}()
+}
+
 // gracefulShutdown performs a graceful shutdown of all services
 func (gw *Gateway) gracefulShutdown(ctx context.Context) error {
 	mainLog.Info("Stop signal received.")
@@ -2091,26 +2150,14 @@ func (gw *Gateway) gracefulShutdown(ctx context.Context) error {
 	var wg sync.WaitGroup
 	errChan := make(chan error, 10) // Buffer for potential errors
 
-	// Shutdown all HTTP servers in the proxy mux
+	// Shutdown all HTTP servers and TCP proxies in the proxy mux
 	gw.DefaultProxyMux.Lock()
 	for _, p := range gw.DefaultProxyMux.proxies {
 		if p.httpServer != nil {
-			wg.Add(1)
-			go func(server *http.Server, port int) {
-				defer wg.Done()
-				mainLog.Infof("Shutting down HTTP server on %s", server.Addr)
-
-				// Server.Shutdown gracefully shuts down the server without
-				// interrupting any active connections
-				if err := server.Shutdown(ctx); err != nil {
-					mainLog.Errorf("Error shutting down HTTP server on port %d: %v", port, err)
-					select {
-					case errChan <- err:
-					default:
-						// Channel closed, ignore
-					}
-				}
-			}(p.httpServer, p.port)
+			gw.shutdownHTTPServer(ctx, p.httpServer, p.port, &wg, errChan)
+		}
+		if p.tcpProxy != nil && p.listener != nil {
+			gw.shutdownTCPProxy(ctx, p.listener, p.port, p.protocol, p.tcpProxy, &wg, errChan)
 		}
 	}
 	gw.DefaultProxyMux.Unlock()
@@ -2124,7 +2171,7 @@ func (gw *Gateway) gracefulShutdown(ctx context.Context) error {
 
 	select {
 	case <-serverShutdownDone:
-		mainLog.Info("All HTTP servers gracefully shut down")
+		mainLog.Info("All HTTP servers and TCP proxies gracefully shut down")
 	case <-ctx.Done():
 		mainLog.Warning("Shutdown timeout reached, some connections may have been terminated")
 		// Wait for goroutines to finish even after timeout to prevent panic
