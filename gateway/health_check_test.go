@@ -9,6 +9,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/TykTechnologies/gorpc"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
@@ -708,6 +709,66 @@ func TestGateway_evaluateHealthChecks(t *testing.T) {
 			assert.Equal(t, tt.expectedCriticalFailure, criticalFailure)
 		})
 	}
+}
+
+func TestEmergencyModeHealthChecks(t *testing.T) {
+	// Test that RPC failures are not critical in emergency mode
+	conf := config.Config{}
+	conf.Policies.PolicySource = "rpc"
+	gw := NewGateway(conf, nil)
+	
+	component := "rpc"
+	
+	// Test normal mode - RPC failure should be critical
+	rpc.SetEmergencyMode(t, false)
+	assert.True(t, gw.isCriticalFailure(component))
+	
+	// Test emergency mode - RPC failure should NOT be critical
+	rpc.SetEmergencyMode(t, true)
+	assert.False(t, gw.isCriticalFailure(component))
+}
+
+func TestHealthCheckWithMockedRPC(t *testing.T) {
+	// Setup gateway with RPC policy source
+	conf := func(globalConf *config.Config) {
+		globalConf.Policies.PolicySource = "rpc"
+		globalConf.HealthCheck.EnableHealthChecks = true
+	}
+	ts := StartTest(conf)
+	defer ts.Close()
+	
+	// Mock RPC
+	dispatcher := gorpc.NewDispatcher()
+	dispatcher.AddFunc("Login", func(clientAddr, userKey string) bool {
+		return true
+	})
+	rpcMock, _ := startRPCMock(dispatcher)
+	defer stopRPCMock(rpcMock)
+	
+	// Test health check in normal mode
+	recorder := httptest.NewRecorder()
+	req := httptest.NewRequest("GET", "/"+ts.Gw.GetConfig().HealthCheckEndpointName, nil)
+	ts.Gw.liveCheckHandler(recorder, req)
+	assert.Equal(t, http.StatusOK, recorder.Code)
+	
+	// Force emergency mode and RPC failure
+	rpc.SetEmergencyMode(t, true)
+	ts.Gw.healthCheckInfo.Store(map[string]HealthCheckItem{
+		"redis": {Status: Pass, ComponentType: Datastore},
+		"rpc": {Status: Fail, ComponentType: System},
+	})
+	
+	// Test health check in emergency mode
+	recorder = httptest.NewRecorder()
+	req = httptest.NewRequest("GET", "/"+ts.Gw.GetConfig().HealthCheckEndpointName, nil)
+	ts.Gw.liveCheckHandler(recorder, req)
+	
+	// Should still return 200 OK with warning status
+	assert.Equal(t, http.StatusOK, recorder.Code)
+	
+	var response HealthCheckResponse
+	json.Unmarshal(recorder.Body.Bytes(), &response)
+	assert.Equal(t, Warn, response.Status)
 }
 
 func TestGateway_determineHealthStatus(t *testing.T) {
