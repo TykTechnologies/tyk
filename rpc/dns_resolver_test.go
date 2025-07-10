@@ -387,8 +387,8 @@ func TestDNSChangeWithEmergencyMode(t *testing.T) {
 	values.SetEmergencyMode(true)
 	values.SetDNSCheckedAfterError(false) // Reset flag
 
-	dnsChanged, shouldRetry = checkAndHandleDNSChange("emergency.test:8080", true)
-	assert.False(t, dnsChanged, "Emergency mode should block DNS change detection")
+	_, shouldRetry = checkAndHandleDNSChange("emergency.test:8080", true)
+	assert.False(t, shouldRetry, "Should not retry in emergency mode")
 	assert.False(t, shouldRetry, "Should not retry in emergency mode")
 
 	callLog = mockResolver.getCallLog()

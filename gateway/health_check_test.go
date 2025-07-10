@@ -938,7 +938,7 @@ func TestRealisticEmergencyModeRecovery(t *testing.T) {
 	dispatcher.AddFunc("Login", func(_, _ string) bool {
 		return true
 	})
-	dispatcher.AddFunc("GetApiDefinitions", func(_, _ interface{}) (string, error) {
+	dispatcher.AddFunc("GetApiDefinitions", func(_ string, _ *model.DefRequest) (string, error) {
 		return "[]", nil
 	})
 	dispatcher.AddFunc("GetPolicies", func(_, _ string) (string, error) {
@@ -990,9 +990,9 @@ func TestRealisticEmergencyModeRecovery(t *testing.T) {
 	defer stopRPCMock(rpcMock)
 
 	// Update connection string to point to new server
-	conf := ts.Gw.GetConfig()
-	conf.SlaveOptions.ConnectionString = connectionString
-	ts.Gw.SetConfig(conf)
+	globalConf := ts.Gw.GetConfig()
+	globalConf.SlaveOptions.ConnectionString = connectionString
+	ts.Gw.SetConfig(globalConf)
 
 	// Wait for system to recover from emergency mode
 	maxWait := 3 * time.Second
@@ -1023,7 +1023,7 @@ func TestRealisticReadinessDuringRPCFailure(t *testing.T) {
 	dispatcher.AddFunc("Login", func(_, _ string) bool {
 		return true
 	})
-	dispatcher.AddFunc("GetApiDefinitions", func(_, _ interface{}) (string, error) {
+	dispatcher.AddFunc("GetApiDefinitions", func(_ string, _ *model.DefRequest) (string, error) {
 		return "[]", nil
 	})
 	dispatcher.AddFunc("GetPolicies", func(_, _ string) (string, error) {
@@ -1739,7 +1739,7 @@ func testRapidRPCRestart(t *testing.T) {
 	dispatcher.AddFunc("Login", func(_, _ string) bool {
 		return true
 	})
-	dispatcher.AddFunc("GetApiDefinitions", func(_, _ interface{}) (string, error) {
+	dispatcher.AddFunc("GetApiDefinitions", func(_ string, _ *model.DefRequest) (string, error) {
 		return "[]", nil
 	})
 	dispatcher.AddFunc("GetPolicies", func(_, _ string) (string, error) {
@@ -1768,9 +1768,9 @@ func testRapidRPCRestart(t *testing.T) {
 		rpcMock, connectionString := startRPCMock(dispatcher)
 
 		// Update connection string
-		conf := ts.Gw.GetConfig()
-		conf.SlaveOptions.ConnectionString = connectionString
-		ts.Gw.SetConfig(conf)
+		globalConf := ts.Gw.GetConfig()
+		globalConf.SlaveOptions.ConnectionString = connectionString
+		ts.Gw.SetConfig(globalConf)
 
 		// Track emergency mode state
 		stateTrackingMu.Lock()
@@ -1827,7 +1827,7 @@ func testNetworkFlapping(t *testing.T) {
 		// Simulate network flapping - fail randomly
 		return localCount%3 != 0 // Fail every 3rd call
 	})
-	dispatcher.AddFunc("GetApiDefinitions", func(_, _ interface{}) (string, error) {
+	dispatcher.AddFunc("GetApiDefinitions", func(_ string, _ *model.DefRequest) (string, error) {
 		if callCount%3 == 0 {
 			return "", errors.New("network error")
 		}
@@ -1979,13 +1979,13 @@ func testDNSChangeRapidFire(t *testing.T) {
 
 	for time.Since(startTime) < testDuration {
 		// Alternate between valid and invalid connection strings
-		conf := ts.Gw.GetConfig()
+		globalConf := ts.Gw.GetConfig()
 		if changeCount%2 == 0 {
-			conf.SlaveOptions.ConnectionString = connectionString
+			globalConf.SlaveOptions.ConnectionString = connectionString
 		} else {
-			conf.SlaveOptions.ConnectionString = "127.0.0.1:0" // Invalid
+			globalConf.SlaveOptions.ConnectionString = "127.0.0.1:0" // Invalid
 		}
-		ts.Gw.SetConfig(conf)
+		ts.Gw.SetConfig(globalConf)
 
 		changeCount++
 		time.Sleep(50 * time.Millisecond)

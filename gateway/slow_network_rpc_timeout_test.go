@@ -416,9 +416,9 @@ func TestSlowNetworkRecovery(t *testing.T) {
 	defer stopSlowRPCMock(fastRPCMock)
 
 	// Update connection string to point to fast server
-	conf := ts.Gw.GetConfig()
-	conf.SlaveOptions.ConnectionString = fastConnectionString
-	ts.Gw.SetConfig(conf)
+	globalConf := ts.Gw.GetConfig()
+	globalConf.SlaveOptions.ConnectionString = fastConnectionString
+	ts.Gw.SetConfig(globalConf)
 
 	// Phase 3: Wait for recovery
 	// Wait for system to recover from emergency mode
