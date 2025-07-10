@@ -2575,39 +2575,6 @@
         }
       }
     },
-    "X-Tyk-Error": {
-      "type": "object",
-      "properties": {
-        "code": {
-          "type": "integer",
-          "description": "HTTP status code to return"
-        },
-        "message": {
-          "type": "string",
-          "description": "Error message to return"
-        }
-      }
-    },
-    "X-Tyk-EndpointErrorMessage": {
-      "type": "object",
-      "properties": {
-        "errors": {
-          "type": "object",
-          "additionalProperties": {
-            "$ref": "#/definitions/X-Tyk-Error"
-          },
-          "description": "Map of error IDs to error configurations"
-        },
-        "method": {
-          "type": "string",
-          "description": "HTTP method for which the error messages applies"
-        },
-        "path": {
-          "type": "string",
-          "description": "Path for which the error messages applies"
-        }
-      }
-    },
     "X-Tyk-UptimeTests": {
       "type": "object",
       "properties": {
@@ -2652,6 +2619,19 @@
         "url",
         "weight"
       ]
+    },
+    "X-Tyk-Error": {
+      "type": "object",
+      "properties": {
+        "code": {
+          "type": "integer",
+          "description": "HTTP status code to return"
+        },
+        "message": {
+          "type": "string",
+          "description": "Error message to return"
+        }
+      }
     },
     "X-Tyk-ErrorMessage": {
       "type": "object",
