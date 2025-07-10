@@ -146,6 +146,9 @@ func recordGraphDetails(rec *analytics.AnalyticsRecord, r *http.Request, resp *h
 		respBody, err = io.ReadAll(resp.Body)
 		defer func() {
 			_ = resp.Body.Close()
+			// Create a new Reader and assign it to the response body, otherwise
+			// respBodyReader fails to decompress the body for further processing.
+			resp.Body = io.NopCloser(bytes.NewBuffer(respBody))
 			resp.Body = respBodyReader(r, resp)
 		}()
 		if err != nil {
