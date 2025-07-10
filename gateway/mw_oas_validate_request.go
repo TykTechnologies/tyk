@@ -3,6 +3,7 @@ package gateway
 import (
 	"context"
 	"fmt"
+	"github.com/TykTechnologies/tyk/ctx"
 	"net/http"
 	"time"
 
@@ -96,6 +97,7 @@ func (k *ValidateRequest) ProcessRequest(w http.ResponseWriter, r *http.Request,
 
 	err := openapi3filter.ValidateRequest(r.Context(), requestValidationInput)
 	if err != nil {
+		ctx.SetErrorInfo(r, ErrNotValidSchema, err)
 		return fmt.Errorf("request validation error: %w", err), errResponseCode
 	}
 

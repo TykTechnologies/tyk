@@ -29,6 +29,8 @@ const (
 	ErrAuthCertExpired               = "auth.cert_expired"
 	ErrAuthKeyIsInvalid              = "auth.key_is_invalid"
 
+	ErrNotValidSchema = "oas.schema_invalid"
+
 	MsgNonExistentKey  = "Attempted access with non-existent key."
 	MsgNonExistentCert = "Attempted access with non-existent cert."
 	MsgInvalidKey      = "Attempted access with invalid key."

@@ -2,7 +2,6 @@ package gateway
 
 import (
 	"errors"
-	"fmt"
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/ctx"
 	"net/http"
@@ -63,7 +62,6 @@ func (e *ErrorOverrideMiddleware) ApplyErrorOverride(r *http.Request, errMsg str
 	}
 
 	// Fall back to API-level overrides
-	fmt.Println("looking for: ", errorID, " in the custom error responses: ", e.Spec.CustomErrorResponses)
 	if override, exists := e.Spec.CustomErrorResponses[errorID]; exists {
 		if override.Message != "" {
 			errMsg = override.Message
@@ -72,6 +70,8 @@ func (e *ErrorOverrideMiddleware) ApplyErrorOverride(r *http.Request, errMsg str
 			errCode = override.Code
 		}
 	}
+
+	// here we might set the gw level errors
 
 	return errMsg, errCode
 }
