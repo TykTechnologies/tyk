@@ -86,7 +86,7 @@ type Operation struct {
 	RateLimit *RateLimitEndpoint `bson:"rateLimit,omitempty" json:"rateLimit,omitempty"`
 
 	// ErrorMessage defines the error message configuration for this operation.
-	ErrorOverrideMessage *ErrorMessage `bson:"customErrorResponses,omitempty" json:"customErrorResponses,omitempty"`
+	ErrorOverrideMessage map[string]apidef.TykError `bson:"customErrorResponses,omitempty" json:"customErrorResponses,omitempty"`
 }
 
 type ErrorMessage map[string]apidef.TykError
@@ -990,7 +990,7 @@ func (o *Operation) extractErrorsOverrideTo(ep *apidef.ExtendedPathsSet, path st
 		return
 	}
 	meta := apidef.ErrorOverrideMeta{Path: path, Method: method}
-	o.ErrorOverrideMessage.ExtractTo(&meta)
+	meta.Errors = o.ErrorOverrideMessage
 	ep.ErrorOverrides = append(ep.ErrorOverrides, meta)
 }
 
@@ -1009,10 +1009,12 @@ func (s *OAS) fillErrorsOverrides(metas []apidef.ErrorOverrideMeta) {
 		operationID := s.getOperationID(meta.Path, meta.Method)
 		operation := s.GetTykExtension().getOperation(operationID)
 		if operation.ErrorOverrideMessage == nil {
-			operation.ErrorOverrideMessage = &ErrorMessage{}
+			operation.ErrorOverrideMessage = make(map[string]apidef.TykError)
 		}
 
-		operation.ErrorOverrideMessage.Fill(meta)
+		for k, v := range meta.Errors {
+			operation.ErrorOverrideMessage[k] = v
+		}
 		if ShouldOmit(operation.ErrorOverrideMessage) {
 			operation.ErrorOverrideMessage = nil
 		}

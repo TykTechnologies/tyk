@@ -122,7 +122,7 @@ type Global struct {
 	SkipQuotaReset bool `bson:"skipQuotaReset,omitempty" json:"skipQuotaReset,omitempty"`
 
 	// ErrorMessages defines the API-level error message configurations.
-	CustomErrorResponses *ErrorMessage `bson:"customErrorResponses,omitempty" json:"customErrorResponses,omitempty"`
+	CustomErrorResponses map[string]apidef.TykError `bson:"customErrorResponses,omitempty" json:"customErrorResponses,omitempty"`
 }
 
 // MarshalJSON is a custom JSON marshaller for the Global struct. It is implemented
@@ -164,7 +164,6 @@ func (g *Global) MarshalJSON() ([]byte, error) {
 
 // Fill fills *Global from apidef.APIDefinition.
 func (g *Global) Fill(api apidef.APIDefinition) {
-
 	if g.PluginConfig == nil {
 		g.PluginConfig = &PluginConfig{}
 	}
@@ -230,7 +229,6 @@ func (g *Global) Fill(api apidef.APIDefinition) {
 		AddHeaders:    vInfo.GlobalHeaders,
 		DeleteHeaders: vInfo.GlobalHeadersRemove,
 	})
-
 	if ShouldOmit(g.TransformRequestHeaders) {
 		g.TransformRequestHeaders = nil
 	}
@@ -259,16 +257,15 @@ func (g *Global) Fill(api apidef.APIDefinition) {
 	g.fillSkips(api)
 
 	g.fillErrorMessages(api)
-
 }
 
 func (g *Global) fillErrorMessages(api apidef.APIDefinition) {
 	// Fill error messages
 	if g.CustomErrorResponses == nil {
-		g.CustomErrorResponses = &ErrorMessage{}
+		g.CustomErrorResponses = make(map[string]apidef.TykError)
 	}
 	for k, v := range api.CustomErrorResponses {
-		(*g.CustomErrorResponses)[k] = v
+		g.CustomErrorResponses[k] = v
 	}
 
 	if ShouldOmit(g.CustomErrorResponses) {
@@ -401,7 +398,7 @@ func (g *Global) extractErrorMessages(api *apidef.APIDefinition) {
 	if g.CustomErrorResponses == nil {
 		return
 	}
-	api.CustomErrorResponses = *g.CustomErrorResponses
+	api.CustomErrorResponses = g.CustomErrorResponses
 }
 
 func (g *Global) extractTrafficLogsTo(api *apidef.APIDefinition) {
@@ -1687,10 +1684,6 @@ func (cb *CircuitBreaker) Fill(circuitBreaker apidef.CircuitBreakerMeta) {
 	cb.SampleSize = int(circuitBreaker.Samples)
 	cb.CoolDownPeriod = circuitBreaker.ReturnToServiceAfter
 	cb.HalfOpenStateEnabled = !circuitBreaker.DisableHalfOpenState
-}
-
-func (eo *ErrorMessage) ExtractTo(eov *apidef.ErrorOverrideMeta) {
-	eov.Errors = *eo
 }
 
 // ExtractTo extracts *CircuitBreaker into *apidef.CircuitBreakerMeta.
