@@ -737,46 +737,74 @@ func TestEmergencyModeHealthChecks(t *testing.T) {
 }
 
 func TestHealthCheckWithMockedRPC(t *testing.T) {
-	// Setup gateway with RPC policy source
+	// Reset emergency mode at start
+	rpc.ResetEmergencyMode()
+	
+	// Setup RPC mock server BEFORE creating the gateway
+	dispatcher := gorpc.NewDispatcher()
+	dispatcher.AddFunc("Login", func(_, _ string) bool {
+		return true
+	})
+	rpcMock, connectionString := startRPCMock(dispatcher)
+	defer stopRPCMock(rpcMock)
+
+	// Setup gateway with RPC policy source pointing to our mock
 	conf := func(globalConf *config.Config) {
 		globalConf.Policies.PolicySource = "rpc"
 		globalConf.HealthCheck.EnableHealthChecks = true
+		globalConf.SlaveOptions.UseRPC = true
+		globalConf.SlaveOptions.ConnectionString = connectionString
+		globalConf.SlaveOptions.RPCKey = "test_org"
+		globalConf.SlaveOptions.APIKey = "test"
 	}
 	ts := StartTest(conf)
 	defer ts.Close()
-	
-	// Mock RPC
-	dispatcher := gorpc.NewDispatcher()
-	dispatcher.AddFunc("Login", func(clientAddr, userKey string) bool {
-		return true
-	})
-	rpcMock, _ := startRPCMock(dispatcher)
-	defer stopRPCMock(rpcMock)
+	defer rpc.ResetEmergencyMode() // Cleanup
 	
 	// Test health check in normal mode
 	recorder := httptest.NewRecorder()
 	req := httptest.NewRequest("GET", "/"+ts.Gw.GetConfig().HealthCheckEndpointName, nil)
 	ts.Gw.liveCheckHandler(recorder, req)
 	assert.Equal(t, http.StatusOK, recorder.Code)
-	
-	// Force emergency mode and RPC failure
+
+	// Force emergency mode
 	rpc.SetEmergencyMode(t, true)
-	ts.Gw.healthCheckInfo.Store(map[string]HealthCheckItem{
-		"redis": {Status: apidef.Pass, ComponentType: string(apidef.Datastore)},
-		"rpc": {Status: apidef.Fail, ComponentType: string(apidef.System)},
-	})
-	
-	// Test health check in emergency mode
+
+	// Create health check info with multiple checks where only RPC fails
+	// This will test that non-critical RPC failure in emergency mode returns Warn (not Fail)
+	healthInfo := map[string]HealthCheckItem{
+		"redis": {Status: Pass, ComponentType: Datastore}, // Redis passing
+		"rpc":   {Status: Fail, ComponentType: System},    // RPC failing (non-critical in emergency mode)
+	}
+	ts.Gw.healthCheckInfo.Store(healthInfo)
+
+	// Test health check in emergency mode - should be Warn because not all checks failed
 	recorder = httptest.NewRecorder()
-	req = httptest.NewRequest("GET", "/"+ts.Gw.GetConfig().HealthCheckEndpointName, nil)
+	req = httptest.NewRequest("GET", "/tyk/health", nil)
 	ts.Gw.liveCheckHandler(recorder, req)
-	
-	// Should still return 200 OK with warning status
+
+	// Should return 200 OK with warning status because RPC is non-critical in emergency mode
 	assert.Equal(t, http.StatusOK, recorder.Code)
-	
+
 	var response HealthCheckResponse
 	json.Unmarshal(recorder.Body.Bytes(), &response)
-	assert.Equal(t, "warn", string(response.Status))
+	assert.Equal(t, HealthCheckStatus("warn"), response.Status)
+
+	// Test the case where only RPC check exists and fails (all checks fail scenario)
+	singleRPCInfo := map[string]HealthCheckItem{
+		"rpc": {Status: Fail, ComponentType: System}, // Only RPC check failing
+	}
+	ts.Gw.healthCheckInfo.Store(singleRPCInfo)
+
+	recorder = httptest.NewRecorder()
+	req = httptest.NewRequest("GET", "/tyk/health", nil)
+	ts.Gw.liveCheckHandler(recorder, req)
+
+	// When ALL checks fail (even non-critical), it should return Fail/503
+	assert.Equal(t, http.StatusServiceUnavailable, recorder.Code)
+
+	json.Unmarshal(recorder.Body.Bytes(), &response)
+	assert.Equal(t, HealthCheckStatus("fail"), response.Status)
 }
 
 func TestReadinessEndpointInEmergencyMode(t *testing.T) {
@@ -800,11 +828,15 @@ func TestReadinessEndpointInEmergencyMode(t *testing.T) {
 	ts := StartTest(conf)
 	defer ts.Close()
 	
-	// Force emergency mode and RPC failure
+	// Force emergency mode and RPC failure, but keep Redis healthy
 	rpc.SetEmergencyMode(t, true)
+	defer rpc.ResetEmergencyMode()
+
+	// The readiness handler only cares about Redis and successful reload
+	// RPC failures don't affect readiness endpoint behavior
 	ts.Gw.healthCheckInfo.Store(map[string]HealthCheckItem{
-		"redis": {Status: apidef.Pass, ComponentType: string(apidef.Datastore)},
-		"rpc": {Status: apidef.Fail, ComponentType: string(apidef.System)},
+		"redis": {Status: Pass, ComponentType: Datastore}, // Redis must be healthy for readiness
+		"rpc":   {Status: Fail, ComponentType: System},    // RPC can fail in emergency mode
 	})
 	
 	// Set performedSuccessfulReload to true so readiness check passes
@@ -815,7 +847,8 @@ func TestReadinessEndpointInEmergencyMode(t *testing.T) {
 	req := httptest.NewRequest("GET", "/"+ts.Gw.GetConfig().ReadinessCheckEndpointName, nil)
 	ts.Gw.readinessHandler(recorder, req)
 	
-	// Should return 200 OK even in emergency mode
+	// Should return 200 OK because Redis is healthy and reload was successful
+	// Readiness handler doesn't consider RPC failures even in emergency mode
 	assert.Equal(t, http.StatusOK, recorder.Code)
 }
 
@@ -1147,121 +1180,6 @@ func TestGateway_determineHealthStatus(t *testing.T) {
 	}
 }
 
-func TestHealthCheckWithMockedRPC(t *testing.T) {
-	// Reset emergency mode at start
-	rpc.ResetEmergencyMode()
-
-	// Setup RPC mock server BEFORE creating the gateway
-	dispatcher := gorpc.NewDispatcher()
-	dispatcher.AddFunc("Login", func(_, _ string) bool {
-		return true
-	})
-	rpcMock, connectionString := startRPCMock(dispatcher)
-	defer stopRPCMock(rpcMock)
-
-	// Now setup gateway with RPC configuration pointing to our mock
-	conf := func(globalConf *config.Config) {
-		globalConf.Policies.PolicySource = "rpc"
-		globalConf.HealthCheck.EnableHealthChecks = true
-		globalConf.SlaveOptions.UseRPC = true
-		globalConf.SlaveOptions.ConnectionString = connectionString
-		globalConf.SlaveOptions.RPCKey = "test_org"
-		globalConf.SlaveOptions.APIKey = "test"
-	}
-	ts := StartTest(conf)
-	defer ts.Close()
-	defer rpc.ResetEmergencyMode() // Cleanup
-
-	// Test health check in normal mode
-	recorder := httptest.NewRecorder()
-	req := httptest.NewRequest("GET", "/tyk/health", nil)
-	ts.Gw.liveCheckHandler(recorder, req)
-	assert.Equal(t, http.StatusOK, recorder.Code)
-
-	// Force emergency mode
-	rpc.SetEmergencyMode(t, true)
-
-	// Create health check info with multiple checks where only RPC fails
-	// This will test that non-critical RPC failure in emergency mode returns Warn (not Fail)
-	healthInfo := map[string]HealthCheckItem{
-		"redis": {Status: Pass, ComponentType: Datastore}, // Redis passing
-		"rpc":   {Status: Fail, ComponentType: System},    // RPC failing (non-critical in emergency mode)
-	}
-	ts.Gw.healthCheckInfo.Store(healthInfo)
-
-	// Test health check in emergency mode - should be Warn because not all checks failed
-	recorder = httptest.NewRecorder()
-	req = httptest.NewRequest("GET", "/tyk/health", nil)
-	ts.Gw.liveCheckHandler(recorder, req)
-
-	// Should return 200 OK with warning status because RPC is non-critical in emergency mode
-	assert.Equal(t, http.StatusOK, recorder.Code)
-
-	var response HealthCheckResponse
-	json.Unmarshal(recorder.Body.Bytes(), &response)
-	assert.Equal(t, HealthCheckStatus("warn"), response.Status)
-
-	// Test the case where only RPC check exists and fails (all checks fail scenario)
-	singleRPCInfo := map[string]HealthCheckItem{
-		"rpc": {Status: Fail, ComponentType: System}, // Only RPC check failing
-	}
-	ts.Gw.healthCheckInfo.Store(singleRPCInfo)
-
-	recorder = httptest.NewRecorder()
-	req = httptest.NewRequest("GET", "/tyk/health", nil)
-	ts.Gw.liveCheckHandler(recorder, req)
-
-	// When ALL checks fail (even non-critical), it should return Fail/503
-	assert.Equal(t, http.StatusServiceUnavailable, recorder.Code)
-
-	json.Unmarshal(recorder.Body.Bytes(), &response)
-	assert.Equal(t, HealthCheckStatus("fail"), response.Status)
-}
-
-func TestReadinessEndpointInEmergencyMode(t *testing.T) {
-	// Setup RPC mock server BEFORE creating the gateway
-	dispatcher := gorpc.NewDispatcher()
-	dispatcher.AddFunc("Login", func(_, _ string) bool {
-		return true
-	})
-	rpcMock, connectionString := startRPCMock(dispatcher)
-	defer stopRPCMock(rpcMock)
-
-	// Setup gateway with RPC policy source pointing to mock
-	conf := func(globalConf *config.Config) {
-		globalConf.Policies.PolicySource = "rpc"
-		globalConf.HealthCheck.EnableHealthChecks = true
-		globalConf.SlaveOptions.UseRPC = true
-		globalConf.SlaveOptions.ConnectionString = connectionString
-		globalConf.SlaveOptions.RPCKey = "test_org"
-		globalConf.SlaveOptions.APIKey = "test"
-	}
-	ts := StartTest(conf)
-	defer ts.Close()
-
-	// Force emergency mode and RPC failure, but keep Redis healthy
-	rpc.SetEmergencyMode(t, true)
-	defer rpc.ResetEmergencyMode()
-
-	// The readiness handler only cares about Redis and successful reload
-	// RPC failures don't affect readiness endpoint behavior
-	ts.Gw.healthCheckInfo.Store(map[string]HealthCheckItem{
-		"redis": {Status: Pass, ComponentType: Datastore}, // Redis must be healthy for readiness
-		"rpc":   {Status: Fail, ComponentType: System},    // RPC can fail in emergency mode
-	})
-
-	// Set performedSuccessfulReload to true for this test to pass
-	ts.Gw.performedSuccessfulReload = true
-
-	// Test readiness endpoint
-	recorder := httptest.NewRecorder()
-	req := httptest.NewRequest("GET", "/tyk/ready", nil)
-	ts.Gw.readinessHandler(recorder, req)
-
-	// Should return 200 OK because Redis is healthy and reload was successful
-	// Readiness handler doesn't consider RPC failures even in emergency mode
-	assert.Equal(t, http.StatusOK, recorder.Code)
-}
 
 func TestConnectionFailureToEmergencyMode(t *testing.T) {
 	// Reset emergency mode to ensure clean state
