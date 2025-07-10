@@ -31,10 +31,12 @@ func TestOAS(t *testing.T) {
 		emptyOASPaths.SetTykExtension(&XTykAPIGateway{})
 
 		var convertedAPI apidef.APIDefinition
-		emptyOASPaths.ExtractTo(&convertedAPI)
+		err := emptyOASPaths.ExtractTo(&convertedAPI)
+		assert.NoError(t, err)
 
 		var resultOAS OAS
-		resultOAS.Fill(convertedAPI)
+		err = resultOAS.Fill(convertedAPI)
+		assert.NoError(t, err)
 
 		// This tests that zero-value extensions are cleared
 		emptyOASPaths.Extensions = nil
@@ -49,10 +51,12 @@ func TestOAS(t *testing.T) {
 		nilOASPaths.SetTykExtension(&XTykAPIGateway{})
 
 		var convertedAPI apidef.APIDefinition
-		nilOASPaths.ExtractTo(&convertedAPI)
+		err := nilOASPaths.ExtractTo(&convertedAPI)
+		assert.NoError(t, err)
 
 		var resultOAS OAS
-		resultOAS.Fill(convertedAPI)
+		err = resultOAS.Fill(convertedAPI)
+		assert.NoError(t, err)
 
 		// No paths in base OAS produce empty paths{} when converted back
 		nilOASPaths.Paths = openapi3.NewPaths()
@@ -90,10 +94,12 @@ func TestOAS(t *testing.T) {
 		})
 
 		var convertedAPI apidef.APIDefinition
-		oasWithPaths.ExtractTo(&convertedAPI)
+		err := oasWithPaths.ExtractTo(&convertedAPI)
+		assert.NoError(t, err)
 
 		var resultOAS OAS
-		resultOAS.Fill(convertedAPI)
+		err = resultOAS.Fill(convertedAPI)
+		assert.NoError(t, err)
 
 		assert.Equal(t, oasWithPaths, resultOAS)
 	})
@@ -109,10 +115,12 @@ func TestOAS(t *testing.T) {
 		api.AuthConfigs[apidef.AuthTokenType] = a
 
 		sw := &OAS{}
-		sw.Fill(api)
+		err := sw.Fill(api)
+		assert.NoError(t, err)
 
 		var converted apidef.APIDefinition
-		sw.ExtractTo(&converted)
+		err = sw.ExtractTo(&converted)
+		assert.NoError(t, err)
 
 		assert.Equal(t, api.AuthConfigs, converted.AuthConfigs)
 	})
@@ -131,7 +139,8 @@ func TestOAS_ExtractTo_DontTouchExistingClassicFields(t *testing.T) {
 	}
 
 	var s OAS
-	s.ExtractTo(&api)
+	err := s.ExtractTo(&api)
+	assert.NoError(t, err)
 
 	assert.Len(t, api.VersionData.Versions[Main].ExtendedPaths.PersistGraphQL, 1)
 }
@@ -172,7 +181,8 @@ func TestOAS_ExtractTo_ResetAPIDefinition(t *testing.T) {
 	}
 
 	var s OAS
-	s.ExtractTo(&a)
+	err := s.ExtractTo(&a)
+	assert.NoError(t, err)
 
 	a.UseKeylessAccess = false
 	a.UpstreamCertificatesDisabled = false
@@ -710,6 +720,7 @@ func TestOAS_MarshalJSON(t *testing.T) {
 					},
 				},
 			},
+			false,
 		}
 
 		t.Run("int", func(t *testing.T) {
@@ -907,7 +918,8 @@ func TestMigrateAndFillOAS(t *testing.T) {
 							},
 						},
 					},
-				}},
+				},
+			},
 		}
 		_, _, err = MigrateAndFillOAS(&api)
 		assert.ErrorContains(t, err, "version API Furkan-v2 migrated OAS is not valid")
@@ -1461,7 +1473,7 @@ func TestOAS_ValidateSecurity(t *testing.T) {
 				assert.NoError(t, err)
 			} else {
 				assert.Error(t, err)
-				assert.Contains(t, err.Error(), tt.expectedError)
+				assert.ErrorContains(t, err, tt.expectedError)
 			}
 		})
 	}

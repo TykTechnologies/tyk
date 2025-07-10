@@ -22,35 +22,25 @@ func (i *TrackEndpoint) ExtractTo(meta *apidef.TrackEndpointMeta) {
 	meta.Disabled = !i.Enabled
 }
 
-func (s *OAS) fillTrackEndpoint(metas []apidef.TrackEndpointMeta) {
-	for _, meta := range metas {
-		operationID := s.getOperationID(meta.Path, meta.Method)
-		operation := s.GetTykExtension().getOperation(operationID)
+func fillTrackEndpoint(meta apidef.TrackEndpointMeta, operation *Operation) {
+	if operation.TrackEndpoint == nil {
+		operation.TrackEndpoint = &TrackEndpoint{}
+	}
 
-		if operation.TrackEndpoint == nil {
-			operation.TrackEndpoint = &TrackEndpoint{}
-		}
-
-		operation.TrackEndpoint.Fill(meta)
-		if ShouldOmit(operation.TrackEndpoint) {
-			operation.TrackEndpoint = nil
-		}
+	operation.TrackEndpoint.Fill(meta)
+	if ShouldOmit(operation.TrackEndpoint) {
+		operation.TrackEndpoint = nil
 	}
 }
 
-func (s *OAS) fillDoNotTrackEndpoint(metas []apidef.TrackEndpointMeta) {
-	for _, meta := range metas {
-		operationID := s.getOperationID(meta.Path, meta.Method)
-		operation := s.GetTykExtension().getOperation(operationID)
+func fillDoNotTrackEndpoint(meta apidef.TrackEndpointMeta, operation *Operation) {
+	if operation.DoNotTrackEndpoint == nil {
+		operation.DoNotTrackEndpoint = &TrackEndpoint{}
+	}
 
-		if operation.DoNotTrackEndpoint == nil {
-			operation.DoNotTrackEndpoint = &TrackEndpoint{}
-		}
-
-		operation.DoNotTrackEndpoint.Fill(meta)
-		if ShouldOmit(operation.DoNotTrackEndpoint) {
-			operation.DoNotTrackEndpoint = nil
-		}
+	operation.DoNotTrackEndpoint.Fill(meta)
+	if ShouldOmit(operation.DoNotTrackEndpoint) {
+		operation.DoNotTrackEndpoint = nil
 	}
 }
 

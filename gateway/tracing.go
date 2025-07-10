@@ -176,7 +176,12 @@ func (gw *Gateway) traceHandler(w http.ResponseWriter, r *http.Request) {
 
 	if traceReq.OAS != nil {
 		var newDef apidef.APIDefinition
-		traceReq.OAS.ExtractTo(&newDef)
+
+		if err := traceReq.OAS.ExtractTo(&newDef); err != nil {
+			log.Error("Failed to extract OAS")
+			doJSONWrite(w, http.StatusBadRequest, apiError("Failed to extract OAS: "+err.Error()))
+		}
+
 		traceReq.Spec = &newDef
 	}
 

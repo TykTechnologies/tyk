@@ -1750,7 +1750,12 @@ func BuildOASAPI(oasGens ...func(oasDef *oas.OAS)) (specs []*APISpec) {
 		gen(&oasAPI)
 
 		var nativeAPIDefinition apidef.APIDefinition
-		oasAPI.ExtractTo(&nativeAPIDefinition)
+
+		if err := oasAPI.ExtractTo(&nativeAPIDefinition); err != nil {
+			log.WithError(err).Errorf("failed to load api")
+			continue
+		}
+
 		nativeAPIDefinition.IsOAS = true
 		spec := &APISpec{APIDefinition: &nativeAPIDefinition, OAS: oasAPI}
 		specs = append(specs, spec)

@@ -91,16 +91,13 @@ func (m *mockResponseMiddleware) ProcessRequest(rw http.ResponseWriter, r *http.
 
 func (m *mockResponseMiddleware) mockResponse(r *http.Request) (*http.Response, error) {
 	// if response is nil we go further
-	operation := m.Spec.findOperation(r)
+	op := m.Spec.findOperation(r)
 
-	if operation == nil {
+	if op == nil || op.MockResponse == nil || !op.MockResponse.Enabled {
 		return nil, nil
 	}
 
-	mockResponse := operation.MockResponse
-	if mockResponse == nil || !mockResponse.Enabled {
-		return nil, nil
-	}
+	mockResponse := op.MockResponse
 
 	res := &http.Response{Header: http.Header{}}
 
@@ -111,11 +108,10 @@ func (m *mockResponseMiddleware) mockResponse(r *http.Request) (*http.Response, 
 	var err error
 
 	if mockResponse.FromOASExamples != nil && mockResponse.FromOASExamples.Enabled {
-		code, contentType, body, headers, err = mockFromOAS(r, operation.route.Operation, mockResponse.FromOASExamples)
+		code, contentType, body, headers, err = mockFromOAS(r, op.route.Operation, mockResponse.FromOASExamples)
 		res.StatusCode = code
 		if err != nil {
-			err = fmt.Errorf("mock: %w", err)
-			return res, err
+			return res, fmt.Errorf("mock: %w", err)
 		}
 	} else {
 		code, body, headers = mockFromConfig(mockResponse)
