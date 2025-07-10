@@ -86,7 +86,7 @@ type Operation struct {
 	RateLimit *RateLimitEndpoint `bson:"rateLimit,omitempty" json:"rateLimit,omitempty"`
 
 	// ErrorMessage defines the error message configuration for this operation.
-	ErrorOverrideMessage *ErrorMessage `bson:"errorOverrideMessage,omitempty" json:"errorOverrideMessage,omitempty"`
+	ErrorOverrideMessage *ErrorMessage `bson:"customErrorResponses,omitempty" json:"customErrorResponses,omitempty"`
 }
 
 type ErrorMessage struct {

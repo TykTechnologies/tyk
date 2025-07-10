@@ -1060,7 +1060,7 @@
         "rateLimit": {
           "$ref": "#/definitions/X-Tyk-RateLimit"
         },
-        "errorOverrideMessages": {
+        "customErrorResponses": {
           "$ref": "#/definitions/X-Tyk-ErrorMessage"
         }
       }

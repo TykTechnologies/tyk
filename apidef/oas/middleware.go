@@ -398,9 +398,10 @@ func (g *Global) ExtractTo(api *apidef.APIDefinition) {
 }
 
 func (g *Global) extractErrorMessages(api *apidef.APIDefinition) {
-	for k, v := range api.CustomErrorResponses {
-		g.CustomErrorResponses.ErrorsOverride[k] = v
+	if g.CustomErrorResponses == nil {
+		return
 	}
+	api.CustomErrorResponses = g.CustomErrorResponses.ErrorsOverride
 }
 
 func (g *Global) extractTrafficLogsTo(api *apidef.APIDefinition) {
