@@ -2,7 +2,6 @@ package oas
 
 import (
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"sort"
 	"strings"
@@ -123,11 +122,7 @@ type Global struct {
 	SkipQuotaReset bool `bson:"skipQuotaReset,omitempty" json:"skipQuotaReset,omitempty"`
 
 	// ErrorMessages defines the API-level error message configurations.
-	ErrorMessages map[string]apidef.TykError `bson:"error_messages,omitempty" json:"error_messages,omitempty"`
-
-	// PathErrorMessages defines the path-level error message configurations.
-	// Renamed from EndpointErrorMessages for consistency
-	PathErrorMessages []apidef.ErrorOverrideMeta `bson:"path_error_messages,omitempty" json:"path_error_messages,omitempty"`
+	CustomErrorResponses *ErrorMessage `bson:"customErrorResponses,omitempty" json:"customErrorResponses,omitempty"`
 }
 
 // MarshalJSON is a custom JSON marshaller for the Global struct. It is implemented
@@ -269,21 +264,15 @@ func (g *Global) Fill(api apidef.APIDefinition) {
 
 func (g *Global) fillErrorMessages(api apidef.APIDefinition) {
 	// Fill error messages
-	g.ErrorMessages = api.ErrorMessages
+	if g.CustomErrorResponses == nil {
+		g.CustomErrorResponses = &ErrorMessage{}
+	}
+	for k, v := range api.CustomErrorResponses {
+		g.CustomErrorResponses.ErrorsOverride[k] = v
+	}
 
-	// Fill path error messages
-	g.PathErrorMessages = []apidef.ErrorOverrideMeta{}
-	if len(api.VersionData.Versions) > 0 {
-		for _, version := range api.VersionData.Versions {
-			for _, override := range version.ExtendedPaths.ErrorOverrides {
-				pathError := apidef.ErrorOverrideMeta{
-					Errors: override.Errors,
-					Method: override.Method,
-					Path:   override.Path,
-				}
-				g.PathErrorMessages = append(g.PathErrorMessages, pathError)
-			}
-		}
+	if ShouldOmit(g.CustomErrorResponses) {
+		g.CustomErrorResponses = nil
 	}
 }
 
@@ -409,32 +398,9 @@ func (g *Global) ExtractTo(api *apidef.APIDefinition) {
 }
 
 func (g *Global) extractErrorMessages(api *apidef.APIDefinition) {
-	api.ErrorMessages = g.ErrorMessages
-	// Extract path error messages
-	if len(g.PathErrorMessages) > 0 {
-
-		// Add to all versions or specific version as needed
-		for versionName, versionInfo := range api.VersionData.Versions {
-			if versionInfo.ExtendedPaths.ErrorOverrides == nil {
-				versionInfo.ExtendedPaths.ErrorOverrides = []apidef.ErrorOverrideMeta{}
-			}
-
-			// Add each path error message
-			for _, pathError := range g.PathErrorMessages {
-				override := apidef.ErrorOverrideMeta{
-					Path:   pathError.Path,
-					Method: pathError.Method,
-					Errors: pathError.Errors,
-				}
-
-				versionInfo.ExtendedPaths.ErrorOverrides = append(
-					versionInfo.ExtendedPaths.ErrorOverrides, override)
-			}
-			api.VersionData.Versions[versionName] = versionInfo
-			fmt.Println("for ", versionName, " we set the errors: ", versionInfo.ExtendedPaths.ErrorOverrides)
-		}
+	for k, v := range api.CustomErrorResponses {
+		g.CustomErrorResponses.ErrorsOverride[k] = v
 	}
-
 }
 
 func (g *Global) extractTrafficLogsTo(api *apidef.APIDefinition) {

@@ -528,19 +528,8 @@
     "X-Tyk-Global": {
       "type": "object",
       "properties": {
-        "override_messages": {
-          "type": "object",
-          "additionalProperties": {
-            "$ref": "#/definitions/X-Tyk-Error"
-          },
-          "description": "API-level error overrides configuration"
-        },
-        "endpoint_error_messages": {
-          "type": "array",
-          "items": {
-            "$ref": "#/definitions/X-Tyk-EndpointErrorMessage"
-          },
-          "description": "Endpoint-level error overrides configuration"
+        "customErrorResponses": {
+          "$ref": "#/definitions/X-Tyk-ErrorMessage"
         },
         "pluginConfig": {
           "$ref": "#/definitions/X-Tyk-PluginConfig"
@@ -1071,7 +1060,7 @@
         "rateLimit": {
           "$ref": "#/definitions/X-Tyk-RateLimit"
         },
-        "errorOverrideMessage": {
+        "errorOverrideMessages": {
           "$ref": "#/definitions/X-Tyk-ErrorMessage"
         }
       }

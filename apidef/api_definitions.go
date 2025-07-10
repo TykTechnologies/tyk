@@ -785,7 +785,7 @@ type APIDefinition struct {
 	// UpstreamAuth stores information about authenticating against upstream.
 	UpstreamAuth UpstreamAuth `bson:"upstream_auth" json:"upstream_auth"`
 
-	ErrorMessages map[string]TykError `bson:"error_messages,omitempty" json:"error_messages,omitempty"`
+	CustomErrorResponses map[string]TykError `bson:"custom_error_responses,omitempty" json:"custom_error_responses,omitempty"`
 }
 
 type JWK struct {
