@@ -30,6 +30,8 @@ testapps/
 /go.work
 /go.work.sum
 
+# Claude Code settings
+.claude/settings.local.json
 
 /tyk
 logs/
