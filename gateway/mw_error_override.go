@@ -6,7 +6,6 @@ import (
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/ctx"
 	"net/http"
-	"strings"
 )
 
 type ErrorOverrideMiddleware struct {
@@ -52,11 +51,13 @@ func (e *ErrorOverrideMiddleware) ApplyErrorOverride(r *http.Request, errMsg str
 	}
 
 	if e.Spec.IsOAS {
-		fmt.Println(e.Spec)
+
 	}
 	// Check endpoint-level overrides first
 	vInfo, _ := e.Spec.Version(r)
+	fmt.Printf("\nextended paths: %+v\n", vInfo.ExtendedPaths)
 	if override, found := e.findEndpointErrorOverride(r, vInfo.Name, errorID); found {
+		fmt.Println("---------found-------")
 		if override.Message != "" {
 			errMsg = override.Message
 		}
@@ -107,15 +108,19 @@ func (e *ErrorOverrideMiddleware) determineErrorID(errMsg string, errCode int) s
 
 func (e *ErrorOverrideMiddleware) findEndpointErrorOverride(r *http.Request, versionName, errorID string) (apidef.TykError, bool) {
 
+	fmt.Printf("\n e.Spec.VersionData.Versions[versionName]:%+v", e.Spec.VersionData.Versions[versionName])
 	if versionInfo, ok := e.Spec.VersionData.Versions[versionName]; ok {
+		fmt.Println("versionName:", versionName)
 		path := r.URL.Path
 		path = e.Spec.StripListenPath(path)
-		path = strings.TrimPrefix(path, "/")
-
-		// Try exact path and method match
+		//path = strings.TrimPrefix(path, "/") -> oas use / but classic doesnt
 
 		for _, override := range versionInfo.ExtendedPaths.ErrorOverrides {
+			fmt.Println("override:", override)
+			fmt.Println("oveeride path:", override.Path, "  path:", path)
+			fmt.Println("override.method:", override.Method, "  method:", r.Method)
 			if override.Path == path && (override.Method == r.Method || override.Method == "") {
+				fmt.Println("Error iD:", errorID)
 				if errorOverride, exists := override.Errors[errorID]; exists {
 					return errorOverride, true
 				}
