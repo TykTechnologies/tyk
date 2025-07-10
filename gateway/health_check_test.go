@@ -823,7 +823,7 @@ func TestHealthCheckWithMockedRPC(t *testing.T) {
 
 	// Setup RPC mock server BEFORE creating the gateway
 	dispatcher := gorpc.NewDispatcher()
-	dispatcher.AddFunc("Login", func(clientAddr, userKey string) bool {
+	dispatcher.AddFunc("Login", func(_, _ string) bool {
 		return true
 	})
 	rpcMock, connectionString := startRPCMock(dispatcher)
@@ -891,7 +891,7 @@ func TestHealthCheckWithMockedRPC(t *testing.T) {
 func TestReadinessEndpointInEmergencyMode(t *testing.T) {
 	// Setup RPC mock server BEFORE creating the gateway
 	dispatcher := gorpc.NewDispatcher()
-	dispatcher.AddFunc("Login", func(clientAddr, userKey string) bool {
+	dispatcher.AddFunc("Login", func(_, _ string) bool {
 		return true
 	})
 	rpcMock, connectionString := startRPCMock(dispatcher)
@@ -939,7 +939,7 @@ func TestConnectionFailureToEmergencyMode(t *testing.T) {
 
 	// Start with a working RPC server
 	dispatcher := gorpc.NewDispatcher()
-	dispatcher.AddFunc("Login", func(clientAddr, userKey string) bool {
+	dispatcher.AddFunc("Login", func(_, _ string) bool {
 		return true
 	})
 	rpcMock, connectionString := startRPCMock(dispatcher)
@@ -987,7 +987,7 @@ func TestConnectionFailureToEmergencyMode(t *testing.T) {
 func TestRecoveryFromEmergencyMode(t *testing.T) {
 	// Start with a working RPC server
 	dispatcher := gorpc.NewDispatcher()
-	dispatcher.AddFunc("Login", func(clientAddr, userKey string) bool {
+	dispatcher.AddFunc("Login", func(_, _ string) bool {
 		return true
 	})
 	rpcMock, connectionString := startRPCMock(dispatcher)
@@ -1052,7 +1052,7 @@ func TestRecoveryFromEmergencyMode(t *testing.T) {
 func TestKubernetesProbes(t *testing.T) {
 	// Setup RPC mock server BEFORE creating the gateway
 	dispatcher := gorpc.NewDispatcher()
-	dispatcher.AddFunc("Login", func(clientAddr, userKey string) bool {
+	dispatcher.AddFunc("Login", func(_, _ string) bool {
 		return true
 	})
 	rpcMock, connectionString := startRPCMock(dispatcher)
