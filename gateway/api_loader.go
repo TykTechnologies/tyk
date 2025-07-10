@@ -594,6 +594,8 @@ func (d *DummyProxyHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		ctxSetTransformRequestMethod(r, "")
 	}
 	if found, err := isLoop(r); found {
+		log.WithField("url", r.URL.String()).Debug("Loop detected in request")
+
 		if err != nil {
 			handler := ErrorHandler{d.SH.Base()}
 			handler.HandleError(w, r, err.Error(), http.StatusInternalServerError, true)
@@ -606,29 +608,41 @@ func (d *DummyProxyHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 
 		var handler http.Handler
+		loopType := "unknown"
+		targetAPIID := ""
+
 		if r.URL.Hostname() == "self" {
+			loopType = "self"
+			targetAPIID = d.SH.Spec.APIID
 			httpctx.SetSelfLooping(r, true)
 			if h, found := d.Gw.apisHandlesByID.Load(d.SH.Spec.APIID); found {
 				if chain, ok := h.(*ChainObject); ok {
 					handler = chain.ThisHandler
 				} else {
-					log.WithFields(logrus.Fields{"api_id": d.SH.Spec.APIID}).Debug("failed to cast stored api handles to *ChainObject")
+					log.WithFields(logrus.Fields{"api_id": d.SH.Spec.APIID}).Debug("failed to cast stored api handles to *ChainObject for self-loop")
 				}
+			} else {
+				log.WithFields(logrus.Fields{"api_id": d.SH.Spec.APIID}).Debug("API handle not found for self-loop")
 			}
 		} else {
+			loopType = "target"
 			ctxSetVersionInfo(r, nil)
-
-			if targetAPI := d.Gw.fuzzyFindAPI(r.URL.Hostname()); targetAPI != nil {
+			targetHostname := r.URL.Hostname()
+			if targetAPI := d.Gw.fuzzyFindAPI(targetHostname); targetAPI != nil {
+				targetAPIID = targetAPI.APIID
 				if h, found := d.Gw.apisHandlesByID.Load(targetAPI.APIID); found {
 					if chain, ok := h.(*ChainObject); ok {
 						handler = chain.ThisHandler
 					} else {
-						log.WithFields(logrus.Fields{"api_id": d.SH.Spec.APIID}).Debug("failed to cast stored api handles to *ChainObject")
+						log.WithFields(logrus.Fields{"target_api_id": targetAPI.APIID, "hostname": targetHostname}).Debug("failed to cast stored api handles to *ChainObject for target-loop")
 					}
+				} else {
+					log.WithFields(logrus.Fields{"target_api_id": targetAPI.APIID, "hostname": targetHostname}).Debug("API handle not found for target-loop")
 				}
 			} else {
-				handler := ErrorHandler{d.SH.Base()}
-				handler.HandleError(w, r, "Can't detect loop target", http.StatusInternalServerError, true)
+				log.WithFields(logrus.Fields{"hostname": targetHostname}).Debug("FuzzyFindAPI failed to find target for loop")
+				errHandler := ErrorHandler{d.SH.Base()}
+				errHandler.HandleError(w, r, "Can't detect loop target", http.StatusInternalServerError, true)
 				return
 			}
 		}
@@ -644,7 +658,26 @@ func (d *DummyProxyHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 
 		ctxIncLoopLevel(r, loopLevelLimit)
-		handler.ServeHTTP(w, r)
+
+		if handler != nil {
+			log.WithFields(logrus.Fields{
+				"loop_type":      loopType,
+				"target_api_id":  targetAPIID,
+				"current_api_id": d.SH.Spec.APIID,
+				"loop_level":     ctxLoopLevel(r),
+			}).Debug("Executing tyk:// loop")
+			handler.ServeHTTP(w, r)
+		} else {
+			log.WithFields(logrus.Fields{
+				"loop_type":      loopType,
+				"target_api_id":  targetAPIID,
+				"current_api_id": d.SH.Spec.APIID,
+				"loop_level":     ctxLoopLevel(r),
+			}).Error("Looping attempted, but no handler was found. This should not happen if target detection succeeded.")
+			// Potentially return an error to the client, as this is an unexpected state
+			errHandler := ErrorHandler{d.SH.Base()}
+			errHandler.HandleError(w, r, "Internal server error: loop handler not found", http.StatusInternalServerError, true)
+		}
 		return
 	}
 

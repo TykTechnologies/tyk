@@ -279,8 +279,13 @@ func (gw *Gateway) forceResponse(
 		if err != nil {
 			logger.WithError(err).WithField("loop", loc).Error("Failed to parse loop url")
 		} else {
+			originalURL := r.URL.String()
 			ctxSetOrigRequestURL(r, r.URL)
 			r.URL = loopURL
+			logger.WithFields(logrus.Fields{
+				"original_url": originalURL,
+				"loop_to_url":  loopURL.String(),
+			}).Info("Loop detected, redirecting request internally")
 		}
 
 		return nil
@@ -299,7 +304,6 @@ func (gw *Gateway) forceResponse(
 	return newResponse
 }
 
-// ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail
 func (d *VirtualEndpoint) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
 	vmeta := d.getMetaFromRequest(r)
 	if vmeta == nil {
@@ -307,7 +311,9 @@ func (d *VirtualEndpoint) ProcessRequest(w http.ResponseWriter, r *http.Request,
 		return nil, http.StatusOK
 	}
 
-	if _, err := d.ServeHTTPForCache(w, r, vmeta); err != nil {
+	// Capture the response object from ServeHTTPForCache
+	response, err := d.ServeHTTPForCache(w, r, vmeta)
+	if err != nil {
 		message := "Error during virtual endpoint execution. Contact Administrator for more details."
 		d.Logger().WithError(err).WithField("vmeta", vmeta).Error(message)
 
@@ -318,6 +324,14 @@ func (d *VirtualEndpoint) ProcessRequest(w http.ResponseWriter, r *http.Request,
 		return errors.New(message), http.StatusInternalServerError
 	}
 
+	// If the response is nil, a loop was detected and the request URL was modified.
+	// We must continue the middleware chain for the loop to be handled.
+	if response == nil {
+		return nil, http.StatusOK
+	}
+
+	// If the response is not nil, a response was already sent to the client.
+	// We must stop the middleware chain.
 	return nil, mwStatusRespond
 }
 
