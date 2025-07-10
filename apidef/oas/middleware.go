@@ -268,7 +268,7 @@ func (g *Global) fillErrorMessages(api apidef.APIDefinition) {
 		g.CustomErrorResponses = &ErrorMessage{}
 	}
 	for k, v := range api.CustomErrorResponses {
-		g.CustomErrorResponses.ErrorsOverride[k] = v
+		(*g.CustomErrorResponses)[k] = v
 	}
 
 	if ShouldOmit(g.CustomErrorResponses) {
@@ -401,7 +401,7 @@ func (g *Global) extractErrorMessages(api *apidef.APIDefinition) {
 	if g.CustomErrorResponses == nil {
 		return
 	}
-	api.CustomErrorResponses = g.CustomErrorResponses.ErrorsOverride
+	api.CustomErrorResponses = *g.CustomErrorResponses
 }
 
 func (g *Global) extractTrafficLogsTo(api *apidef.APIDefinition) {
@@ -1690,7 +1690,7 @@ func (cb *CircuitBreaker) Fill(circuitBreaker apidef.CircuitBreakerMeta) {
 }
 
 func (eo *ErrorMessage) ExtractTo(eov *apidef.ErrorOverrideMeta) {
-	eov.Errors = eo.ErrorsOverride
+	eov.Errors = *eo
 }
 
 // ExtractTo extracts *CircuitBreaker into *apidef.CircuitBreakerMeta.

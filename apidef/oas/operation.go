@@ -89,13 +89,12 @@ type Operation struct {
 	ErrorOverrideMessage *ErrorMessage `bson:"customErrorResponses,omitempty" json:"customErrorResponses,omitempty"`
 }
 
-type ErrorMessage struct {
-	// ErrorsOverride defines the error overrides for this operation.
-	ErrorsOverride map[string]apidef.TykError `bson:"errors_override,omitempty" json:"errors_override,omitempty"`
-}
+type ErrorMessage map[string]apidef.TykError
 
 func (m *ErrorMessage) Fill(meta apidef.ErrorOverrideMeta) {
-	m.ErrorsOverride = meta.Errors
+	for k, v := range meta.Errors {
+		(*m)[k] = v
+	}
 }
 
 // AllowanceType holds the valid allowance types values.

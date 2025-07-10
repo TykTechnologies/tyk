@@ -2656,13 +2656,10 @@
     "X-Tyk-ErrorMessage": {
       "type": "object",
       "properties": {
-        "errors_override": {
-          "type": "object",
           "additionalProperties": {
             "$ref": "#/definitions/X-Tyk-Error"
           }
-        }
       }
-    },
+    }
   }
 }
