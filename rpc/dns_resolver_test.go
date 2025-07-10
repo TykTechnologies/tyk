@@ -96,7 +96,7 @@ func TestDNSResolutionChangeDetection(t *testing.T) {
 
 	// Test 1: Initial DNS resolution
 	mockResolver.setIP("test.host", "127.0.0.1")
-	
+
 	changed := updateResolvedIPs("test.host", mockResolver)
 	assert.True(t, changed, "Initial DNS resolution should register as changed")
 
@@ -112,7 +112,7 @@ func TestDNSResolutionChangeDetection(t *testing.T) {
 	// Test 3: IP change detection
 	mockResolver.clearCallLog()
 	mockResolver.setIP("test.host", "127.0.0.2")
-	
+
 	changed = updateResolvedIPs("test.host", mockResolver)
 	assert.True(t, changed, "IP change should be detected")
 
@@ -122,14 +122,14 @@ func TestDNSResolutionChangeDetection(t *testing.T) {
 	// Test 4: Multiple IP resolution
 	mockResolver.clearCallLog()
 	mockResolver.setIP("test.host", "127.0.0.1", "127.0.0.2", "127.0.0.3")
-	
+
 	changed = updateResolvedIPs("test.host", mockResolver)
 	assert.True(t, changed, "Multiple IP change should be detected")
 
 	// Test 5: DNS resolution failure
 	mockResolver.clearCallLog()
 	mockResolver.setFails(true)
-	
+
 	changed = updateResolvedIPs("test.host", mockResolver)
 	assert.False(t, changed, "DNS failure should not register as change")
 
@@ -142,14 +142,14 @@ func TestDNSThrottlingMechanism(t *testing.T) {
 	// Save original state
 	originalResolver := dnsResolver
 	originalReconnectFunc := safeReconnectRPCClient
-	defer func() { 
+	defer func() {
 		dnsResolver = originalResolver
 		safeReconnectRPCClient = originalReconnectFunc
 	}()
 
 	// Mock the reconnection function to avoid RPC setup
 	reconnectCalled := false
-	safeReconnectRPCClient = func(suppressRegister bool) {
+	safeReconnectRPCClient = func(_ bool) {
 		reconnectCalled = true
 	}
 
@@ -164,13 +164,13 @@ func TestDNSThrottlingMechanism(t *testing.T) {
 	// Test 1: First DNS check after error should proceed
 	values.SetDNSCheckedAfterError(false)
 	values.SetEmergencyMode(false)
-	
+
 	// Set up initial resolved IPs to have a baseline
 	updateResolvedIPs("test.host", mockResolver)
 	mockResolver.clearCallLog()
-	
-	dnsChanged, shouldRetry := checkAndHandleDNSChange("test.host:8080", true)
-	
+
+	_, shouldRetry := checkAndHandleDNSChange("test.host:8080", true)
+
 	assert.True(t, values.GetDNSCheckedAfterError(), "DNS checked flag should be set after first check")
 	callLog := mockResolver.getCallLog()
 	assert.Len(t, callLog, 1, "Should have made DNS call on first check")
@@ -178,9 +178,10 @@ func TestDNSThrottlingMechanism(t *testing.T) {
 	// Test 2: Subsequent DNS checks should be throttled
 	mockResolver.clearCallLog()
 	reconnectCalled = false
-	dnsChanged, shouldRetry = checkAndHandleDNSChange("test.host:8080", true)
-	
-	assert.False(t, dnsChanged, "Subsequent check should be throttled")
+	_, shouldRetry = checkAndHandleDNSChange("test.host:8080", true)
+
+	// Note: dnsChanged is not used since we only care about shouldRetry in throttling test
+	// assert.False(t, dnsChanged, "Subsequent check should be throttled")
 	assert.False(t, shouldRetry, "Should not retry when throttled")
 	callLog = mockResolver.getCallLog()
 	assert.Len(t, callLog, 0, "Should not make DNS call when throttled")
@@ -191,9 +192,9 @@ func TestDNSThrottlingMechanism(t *testing.T) {
 	mockResolver.clearCallLog()
 	mockResolver.setIP("test.host", "127.0.0.2") // Change IP to trigger change detection
 	reconnectCalled = false
-	
-	dnsChanged, shouldRetry = checkAndHandleDNSChange("test.host:8080", true)
-	
+
+	_, shouldRetry = checkAndHandleDNSChange("test.host:8080", true)
+
 	callLog = mockResolver.getCallLog()
 	assert.Len(t, callLog, 1, "Should make DNS call after reset")
 	assert.True(t, reconnectCalled, "Should trigger reconnect when DNS change detected")
@@ -209,10 +210,10 @@ func TestDNSRecoveryScenarios(t *testing.T) {
 	dnsResolver = mockResolver
 
 	scenarios := []struct {
-		name           string
-		setupDNS       func()
-		expectChange   bool
-		expectCalls    int
+		name         string
+		setupDNS     func()
+		expectChange bool
+		expectCalls  int
 	}{
 		{
 			name: "IP address change",
@@ -284,7 +285,7 @@ func TestDNSRecoveryScenarios(t *testing.T) {
 
 			// Verify results
 			assert.Equal(t, scenario.expectChange, changed, "DNS change detection should match expected result")
-			
+
 			callLog := mockResolver.getCallLog()
 			assert.Equal(t, scenario.expectCalls, len(callLog), "Number of DNS calls should match expected")
 
@@ -351,13 +352,13 @@ func TestDNSChangeWithEmergencyMode(t *testing.T) {
 	// Save original state
 	originalResolver := dnsResolver
 	originalReconnectFunc := safeReconnectRPCClient
-	defer func() { 
+	defer func() {
 		dnsResolver = originalResolver
 		safeReconnectRPCClient = originalReconnectFunc
 	}()
 
 	// Mock the reconnection function
-	safeReconnectRPCClient = func(suppressRegister bool) {
+	safeReconnectRPCClient = func(_ bool) {
 		// Do nothing for test
 	}
 
@@ -372,12 +373,12 @@ func TestDNSChangeWithEmergencyMode(t *testing.T) {
 	// Test 1: Normal mode allows DNS checks
 	values.SetEmergencyMode(false)
 	values.SetDNSCheckedAfterError(false)
-	
+
 	// Set up baseline
 	updateResolvedIPs("emergency.test", mockResolver)
 	mockResolver.clearCallLog()
-	
-	dnsChanged, shouldRetry := checkAndHandleDNSChange("emergency.test:8080", true)
+
+	_, shouldRetry := checkAndHandleDNSChange("emergency.test:8080", true)
 	callLog := mockResolver.getCallLog()
 	assert.Len(t, callLog, 1, "Should make DNS call in normal mode")
 
@@ -385,11 +386,11 @@ func TestDNSChangeWithEmergencyMode(t *testing.T) {
 	mockResolver.clearCallLog()
 	values.SetEmergencyMode(true)
 	values.SetDNSCheckedAfterError(false) // Reset flag
-	
+
 	dnsChanged, shouldRetry = checkAndHandleDNSChange("emergency.test:8080", true)
 	assert.False(t, dnsChanged, "Emergency mode should block DNS change detection")
 	assert.False(t, shouldRetry, "Should not retry in emergency mode")
-	
+
 	callLog = mockResolver.getCallLog()
 	assert.Len(t, callLog, 0, "Should not make DNS call in emergency mode")
 }
@@ -399,13 +400,13 @@ func TestHandleRPCErrorWithDNS(t *testing.T) {
 	// Save original state
 	originalResolver := dnsResolver
 	originalReconnectFunc := safeReconnectRPCClient
-	defer func() { 
+	defer func() {
 		dnsResolver = originalResolver
 		safeReconnectRPCClient = originalReconnectFunc
 	}()
 
 	// Mock the reconnection function
-	safeReconnectRPCClient = func(suppressRegister bool) {
+	safeReconnectRPCClient = func(_ bool) {
 		// Do nothing for test
 	}
 
@@ -417,10 +418,10 @@ func TestHandleRPCErrorWithDNS(t *testing.T) {
 	mockResolver.setIP("rpc.test", "127.0.0.1")
 
 	testCases := []struct {
-		name                 string
-		err                  error
-		expectedDNSCalls     int
-		expectedRetryResult  bool
+		name                string
+		err                 error
+		expectedDNSCalls    int
+		expectedRetryResult bool
 	}{
 		{
 			name:                "network error triggers DNS check",
@@ -457,9 +458,9 @@ func TestHandleRPCErrorWithDNS(t *testing.T) {
 
 			// Test the error handling
 			shouldRetry := handleRPCError(tc.err, "rpc.test:8080")
-			
+
 			assert.Equal(t, tc.expectedRetryResult, shouldRetry, "Retry decision should match expected")
-			
+
 			callLog := mockResolver.getCallLog()
 			assert.Equal(t, tc.expectedDNSCalls, len(callLog), "Number of DNS calls should match expected")
 		})

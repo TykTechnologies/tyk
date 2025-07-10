@@ -12,9 +12,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/TykTechnologies/gorpc"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/TykTechnologies/gorpc"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
@@ -724,13 +724,13 @@ func TestEmergencyModeHealthChecks(t *testing.T) {
 	conf := config.Config{}
 	conf.Policies.PolicySource = "rpc"
 	gw := NewGateway(conf, nil)
-	
+
 	component := "rpc"
-	
+
 	// Test normal mode - RPC failure should be critical
 	rpc.SetEmergencyMode(t, false)
 	assert.True(t, gw.isCriticalFailure(component))
-	
+
 	// Test emergency mode - RPC failure should NOT be critical
 	rpc.SetEmergencyMode(t, true)
 	assert.False(t, gw.isCriticalFailure(component))
@@ -739,7 +739,7 @@ func TestEmergencyModeHealthChecks(t *testing.T) {
 func TestHealthCheckWithMockedRPC(t *testing.T) {
 	// Reset emergency mode at start
 	rpc.ResetEmergencyMode()
-	
+
 	// Setup RPC mock server BEFORE creating the gateway
 	dispatcher := gorpc.NewDispatcher()
 	dispatcher.AddFunc("Login", func(_, _ string) bool {
@@ -760,7 +760,7 @@ func TestHealthCheckWithMockedRPC(t *testing.T) {
 	ts := StartTest(conf)
 	defer ts.Close()
 	defer rpc.ResetEmergencyMode() // Cleanup
-	
+
 	// Test health check in normal mode
 	recorder := httptest.NewRecorder()
 	req := httptest.NewRequest("GET", "/"+ts.Gw.GetConfig().HealthCheckEndpointName, nil)
@@ -810,12 +810,12 @@ func TestHealthCheckWithMockedRPC(t *testing.T) {
 func TestReadinessEndpointInEmergencyMode(t *testing.T) {
 	// Mock RPC
 	dispatcher := gorpc.NewDispatcher()
-	dispatcher.AddFunc("Login", func(clientAddr, userKey string) bool {
+	dispatcher.AddFunc("Login", func(_, _ string) bool {
 		return true
 	})
 	rpcMock, connectionString := startRPCMock(dispatcher)
 	defer stopRPCMock(rpcMock)
-	
+
 	// Setup gateway with RPC policy source using the connection string
 	conf := func(globalConf *config.Config) {
 		globalConf.SlaveOptions.UseRPC = true
@@ -827,7 +827,7 @@ func TestReadinessEndpointInEmergencyMode(t *testing.T) {
 	}
 	ts := StartTest(conf)
 	defer ts.Close()
-	
+
 	// Force emergency mode and RPC failure, but keep Redis healthy
 	rpc.SetEmergencyMode(t, true)
 	defer rpc.ResetEmergencyMode()
@@ -838,15 +838,15 @@ func TestReadinessEndpointInEmergencyMode(t *testing.T) {
 		"redis": {Status: Pass, ComponentType: Datastore}, // Redis must be healthy for readiness
 		"rpc":   {Status: Fail, ComponentType: System},    // RPC can fail in emergency mode
 	})
-	
+
 	// Set performedSuccessfulReload to true so readiness check passes
 	ts.Gw.performedSuccessfulReload = true
-	
+
 	// Test readiness endpoint
 	recorder := httptest.NewRecorder()
 	req := httptest.NewRequest("GET", "/"+ts.Gw.GetConfig().ReadinessCheckEndpointName, nil)
 	ts.Gw.readinessHandler(recorder, req)
-	
+
 	// Should return 200 OK because Redis is healthy and reload was successful
 	// Readiness handler doesn't consider RPC failures even in emergency mode
 	assert.Equal(t, http.StatusOK, recorder.Code)
@@ -861,7 +861,7 @@ func TestRealisticEmergencyModeBehavior(t *testing.T) {
 	// Ensure clean emergency mode state
 	rpc.ResetEmergencyMode()
 	defer rpc.ResetEmergencyMode()
-	
+
 	// Setup gateway with RPC policy source but with invalid connection string
 	// This will cause RPC to fail and emergency mode to remain active
 	conf := func(globalConf *config.Config) {
@@ -875,55 +875,55 @@ func TestRealisticEmergencyModeBehavior(t *testing.T) {
 	}
 	ts := StartTest(conf)
 	defer ts.Close()
-	
+
 	// Wait for initial setup and health checks to run
 	time.Sleep(500 * time.Millisecond)
-	
+
 	// VERIFY: System should be in emergency mode due to RPC connection failures
 	assert.True(t, rpc.IsEmergencyMode(), "System should be in emergency mode when RPC connections fail")
-	
+
 	// VERIFY: Health check endpoint should still return 200 OK in emergency mode
 	// because RPC failures are not considered critical when in emergency mode
 	recorder := httptest.NewRecorder()
 	req := httptest.NewRequest("GET", "/"+ts.Gw.GetConfig().HealthCheckEndpointName, nil)
 	ts.Gw.liveCheckHandler(recorder, req)
-	
+
 	// The key insight: Health checks should return 200 OK even when RPC is failing
 	// because the isCriticalFailure() method considers emergency mode
 	assert.Equal(t, http.StatusOK, recorder.Code, "Health check should return OK in emergency mode")
-	
+
 	// Parse response to verify the overall status
 	var response HealthCheckResponse
 	err := json.Unmarshal(recorder.Body.Bytes(), &response)
 	assert.NoError(t, err)
-	
+
 	// Force health checks to run if they haven't run yet
 	if len(response.Details) == 0 {
 		ts.Gw.gatherHealthChecks()
 		time.Sleep(100 * time.Millisecond)
-		
+
 		recorder = httptest.NewRecorder()
 		req = httptest.NewRequest("GET", "/"+ts.Gw.GetConfig().HealthCheckEndpointName, nil)
 		ts.Gw.liveCheckHandler(recorder, req)
-		
+
 		err = json.Unmarshal(recorder.Body.Bytes(), &response)
 		assert.NoError(t, err)
 	}
-	
+
 	// In emergency mode with RPC failing, the status should be Warn (not Fail)
 	// because RPC failures are not critical in emergency mode
 	assert.Equal(t, "warn", string(response.Status), "Should show warning status when in emergency mode")
-	
+
 	// VERIFY: The health check details should show RPC as failed
 	if rpcCheck, exists := response.Details["rpc"]; exists {
 		assert.Equal(t, "fail", string(rpcCheck.Status), "RPC health check should show as failed")
 	}
-	
+
 	// VERIFY: Readiness should also be OK in emergency mode
 	recorder = httptest.NewRecorder()
 	req = httptest.NewRequest("GET", "/"+ts.Gw.GetConfig().ReadinessCheckEndpointName, nil)
 	ts.Gw.readinessHandler(recorder, req)
-	
+
 	// Readiness might be 503 initially due to no successful reload, but let's check
 	// In a real scenario with emergency mode, the system would have loaded from backup
 	// For this test, we're demonstrating the emergency mode behavior
@@ -935,18 +935,18 @@ func TestRealisticEmergencyModeBehavior(t *testing.T) {
 func TestRealisticEmergencyModeRecovery(t *testing.T) {
 	// Setup RPC mock with proper responses
 	dispatcher := gorpc.NewDispatcher()
-	dispatcher.AddFunc("Login", func(clientAddr, userKey string) bool {
+	dispatcher.AddFunc("Login", func(_, _ string) bool {
 		return true
 	})
-	dispatcher.AddFunc("GetApiDefinitions", func(clientAddr string, dr interface{}) (string, error) {
+	dispatcher.AddFunc("GetApiDefinitions", func(_, _ interface{}) (string, error) {
 		return "[]", nil
 	})
-	dispatcher.AddFunc("GetPolicies", func(clientAddr string, orgid string) (string, error) {
+	dispatcher.AddFunc("GetPolicies", func(_, _ string) (string, error) {
 		return "[]", nil
 	})
-	
+
 	rpcMock, connectionString := startRPCMock(dispatcher)
-	
+
 	// Setup gateway with RPC policy source
 	conf := func(globalConf *config.Config) {
 		globalConf.SlaveOptions.UseRPC = true
@@ -960,40 +960,40 @@ func TestRealisticEmergencyModeRecovery(t *testing.T) {
 	}
 	ts := StartTest(conf)
 	defer ts.Close()
-	
+
 	// PHASE 1: Normal operation
 	time.Sleep(200 * time.Millisecond)
 	assert.False(t, rpc.IsEmergencyMode(), "Should start in normal mode")
-	
+
 	// Get baseline health check - should be all good
 	healthInfo := ts.Gw.getHealthCheckInfo()
 	if rpcCheck, exists := healthInfo["rpc"]; exists {
 		assert.Equal(t, Pass, rpcCheck.Status, "RPC should be healthy initially")
 	}
-	
+
 	// PHASE 2: Trigger emergency mode by stopping RPC
 	stopRPCMock(rpcMock)
-	
+
 	// Wait for emergency mode to be triggered naturally
 	time.Sleep(500 * time.Millisecond)
 	assert.True(t, rpc.IsEmergencyMode(), "Emergency mode should be triggered")
-	
+
 	// Verify health checks now show RPC as failed
 	healthInfo = ts.Gw.getHealthCheckInfo()
 	if rpcCheck, exists := healthInfo["rpc"]; exists {
 		assert.Equal(t, Fail, rpcCheck.Status, "RPC should be failed in emergency mode")
 	}
-	
+
 	// PHASE 3: Test recovery by restarting RPC
 	// Restart RPC server
 	rpcMock, _ = startRPCMock(dispatcher)
 	defer stopRPCMock(rpcMock)
-	
+
 	// Update connection string to point to new server
-	config := ts.Gw.GetConfig()
-	config.SlaveOptions.ConnectionString = connectionString
-	ts.Gw.SetConfig(config)
-	
+	conf := ts.Gw.GetConfig()
+	conf.SlaveOptions.ConnectionString = connectionString
+	ts.Gw.SetConfig(conf)
+
 	// Wait for system to recover from emergency mode
 	maxWait := 3 * time.Second
 	startTime := time.Now()
@@ -1003,10 +1003,10 @@ func TestRealisticEmergencyModeRecovery(t *testing.T) {
 		}
 		time.Sleep(100 * time.Millisecond)
 	}
-	
+
 	// Verify recovery from emergency mode
 	assert.False(t, rpc.IsEmergencyMode(), "Should recover from emergency mode when RPC is back")
-	
+
 	// Verify health checks show RPC as healthy again
 	time.Sleep(200 * time.Millisecond) // Allow health checks to run
 	healthInfo = ts.Gw.getHealthCheckInfo()
@@ -1020,18 +1020,18 @@ func TestRealisticEmergencyModeRecovery(t *testing.T) {
 func TestRealisticReadinessDuringRPCFailure(t *testing.T) {
 	// Setup RPC mock
 	dispatcher := gorpc.NewDispatcher()
-	dispatcher.AddFunc("Login", func(clientAddr, userKey string) bool {
+	dispatcher.AddFunc("Login", func(_, _ string) bool {
 		return true
 	})
-	dispatcher.AddFunc("GetApiDefinitions", func(clientAddr string, dr interface{}) (string, error) {
+	dispatcher.AddFunc("GetApiDefinitions", func(_, _ interface{}) (string, error) {
 		return "[]", nil
 	})
-	dispatcher.AddFunc("GetPolicies", func(clientAddr string, orgid string) (string, error) {
+	dispatcher.AddFunc("GetPolicies", func(_, _ string) (string, error) {
 		return "[]", nil
 	})
-	
+
 	rpcMock, connectionString := startRPCMock(dispatcher)
-	
+
 	// Setup gateway
 	conf := func(globalConf *config.Config) {
 		globalConf.SlaveOptions.UseRPC = true
@@ -1044,22 +1044,22 @@ func TestRealisticReadinessDuringRPCFailure(t *testing.T) {
 	}
 	ts := StartTest(conf)
 	defer ts.Close()
-	
+
 	// Wait for gateway to initialize and perform successful reload
 	time.Sleep(500 * time.Millisecond)
-	
+
 	// Test readiness when everything is working
 	recorder := httptest.NewRecorder()
 	req := httptest.NewRequest("GET", "/"+ts.Gw.GetConfig().ReadinessCheckEndpointName, nil)
 	ts.Gw.readinessHandler(recorder, req)
 	assert.Equal(t, http.StatusOK, recorder.Code, "Readiness should be OK when RPC is working")
-	
+
 	// NOW simulate RPC failure
 	stopRPCMock(rpcMock)
-	
+
 	// Wait for emergency mode to be triggered by actual failures
 	time.Sleep(500 * time.Millisecond)
-	
+
 	// Test readiness during emergency mode
 	// Readiness should still be OK because:
 	// 1. Redis is still working
@@ -1069,7 +1069,7 @@ func TestRealisticReadinessDuringRPCFailure(t *testing.T) {
 	req = httptest.NewRequest("GET", "/"+ts.Gw.GetConfig().ReadinessCheckEndpointName, nil)
 	ts.Gw.readinessHandler(recorder, req)
 	assert.Equal(t, http.StatusOK, recorder.Code, "Readiness should still be OK in emergency mode")
-	
+
 	// Verify we're actually in emergency mode
 	assert.True(t, rpc.IsEmergencyMode(), "Should be in emergency mode after RPC failure")
 }
@@ -1179,7 +1179,6 @@ func TestGateway_determineHealthStatus(t *testing.T) {
 		})
 	}
 }
-
 
 func TestConnectionFailureToEmergencyMode(t *testing.T) {
 	// Reset emergency mode to ensure clean state
@@ -1380,7 +1379,7 @@ func TestRPCCompletelyUnavailable(t *testing.T) {
 	// VERIFICATION 1: System should be in emergency mode immediately
 	// The gateway should detect RPC unavailability and enter emergency mode
 	assert.True(t, rpc.IsEmergencyMode(), "System should be in emergency mode when RPC is completely unavailable")
-	
+
 	// Wait for health checks to run at least once
 	time.Sleep(200 * time.Millisecond)
 
@@ -1404,12 +1403,12 @@ func TestRPCCompletelyUnavailable(t *testing.T) {
 		// Force health checks to run
 		ts.Gw.gatherHealthChecks()
 		time.Sleep(100 * time.Millisecond)
-		
+
 		// Re-run health check
 		healthRecorder = httptest.NewRecorder()
 		healthReq = httptest.NewRequest("GET", "/"+ts.Gw.GetConfig().HealthCheckEndpointName, nil)
 		ts.Gw.liveCheckHandler(healthRecorder, healthReq)
-		
+
 		err = json.Unmarshal(healthRecorder.Body.Bytes(), &healthResponse)
 		require.NoError(t, err, "Should be able to parse health check response after forced run")
 	}
@@ -1443,7 +1442,7 @@ func TestRPCCompletelyUnavailable(t *testing.T) {
 	ts.Gw.readinessHandler(readinessRecorder, readinessReq)
 
 	t.Logf("Readiness status during RPC unavailability: %d", readinessRecorder.Code)
-	
+
 	// The readiness endpoint behavior depends on whether a successful reload has occurred
 	// In emergency mode, this might be 503 until backup loading completes
 	// This is expected behavior - the test documents the actual system behavior
@@ -1452,10 +1451,10 @@ func TestRPCCompletelyUnavailable(t *testing.T) {
 		var errorResponse apiStatusMessage
 		err := json.Unmarshal(readinessRecorder.Body.Bytes(), &errorResponse)
 		require.NoError(t, err, "Should be able to parse readiness error response")
-		
+
 		// Should fail due to no successful reload, not due to RPC being down
 		// This demonstrates that readiness is more strict than liveness
-		assert.Equal(t, "A successful API reload did not happen", errorResponse.Message, 
+		assert.Equal(t, "A successful API reload did not happen", errorResponse.Message,
 			"Readiness should fail due to no successful reload, not RPC failure")
 	}
 
@@ -1478,7 +1477,7 @@ func TestRPCCompletelyUnavailable(t *testing.T) {
 	// In emergency mode, the system should try to load from backup data
 	// This is indicated by the EmergencyModeLoaded flag
 	rpc.SetEmergencyMode(t, true) // Ensure emergency mode is set for test
-	
+
 	// The load count should be 0 since no successful RPC connections were made
 	assert.Equal(t, 0, rpc.LoadCount(), "Load count should be 0 when RPC is completely unavailable")
 
@@ -1540,7 +1539,7 @@ func TestColdStartWithoutBackups(t *testing.T) {
 	// Use DeleteScanMatch to handle pattern matching for tags
 	apiBackupCleared := store.DeleteScanMatch(BackupApiKeyBase + "*")
 	policyBackupCleared := store.DeleteScanMatch(BackupPolicyKeyBase + "*")
-	
+
 	t.Logf("Backup data cleared - API backups: %v, Policy backups: %v", apiBackupCleared, policyBackupCleared)
 
 	// Allow time for gateway initialization and connection attempts
@@ -1586,11 +1585,11 @@ func TestColdStartWithoutBackups(t *testing.T) {
 		t.Log("Health checks haven't run yet, forcing them to run")
 		ts.Gw.gatherHealthChecks()
 		time.Sleep(200 * time.Millisecond)
-		
+
 		healthRecorder = httptest.NewRecorder()
 		healthReq = httptest.NewRequest("GET", "/"+ts.Gw.GetConfig().HealthCheckEndpointName, nil)
 		ts.Gw.liveCheckHandler(healthRecorder, healthReq)
-		
+
 		err = json.Unmarshal(healthRecorder.Body.Bytes(), &healthResponse)
 		require.NoError(t, err, "Should be able to parse health check response after forced run")
 	}
@@ -1620,13 +1619,13 @@ func TestColdStartWithoutBackups(t *testing.T) {
 
 	// Readiness should be 503 because no successful reload occurred
 	// This is expected behavior in a cold start scenario without backup data
-	assert.Equal(t, http.StatusServiceUnavailable, readinessRecorder.Code, 
+	assert.Equal(t, http.StatusServiceUnavailable, readinessRecorder.Code,
 		"Readiness should be 503 in cold start scenario with no successful API loading")
 
 	var readinessError apiStatusMessage
 	err = json.Unmarshal(readinessRecorder.Body.Bytes(), &readinessError)
 	require.NoError(t, err, "Should be able to parse readiness error response")
-	
+
 	assert.Equal(t, "A successful API reload did not happen", readinessError.Message,
 		"Readiness should fail due to no successful reload in cold start scenario")
 
@@ -1634,16 +1633,16 @@ func TestColdStartWithoutBackups(t *testing.T) {
 	// Test that we can still perform basic storage operations
 	testKey := "test-storage-key"
 	testValue := "test-value"
-	
+
 	// Test basic storage operations to ensure connection is functional
 	storeRef := ts.Gw.GlobalSessionManager.Store()
 	err = storeRef.SetKey(testKey, testValue, 60)
 	assert.NoError(t, err, "Should be able to set key in storage")
-	
+
 	retrievedValue, err := storeRef.GetKey(testKey)
 	assert.NoError(t, err, "Should be able to get key from storage")
 	assert.Equal(t, testValue, retrievedValue, "Storage operations should work correctly")
-	
+
 	// Clean up test key
 	deleted := storeRef.DeleteKey(testKey)
 	assert.True(t, deleted, "Should be able to delete key from storage")
@@ -1658,7 +1657,7 @@ func TestColdStartWithoutBackups(t *testing.T) {
 	// VERIFICATION 12: Ensure system logs appropriate warnings
 	// The test framework captures logs, so we verify the system continues to function
 	// despite the critical lack of configuration data
-	
+
 	t.Log("=== Cold Start Test Completed Successfully ===")
 	t.Log("Critical failure scenario verified:")
 	t.Log("✓ Emergency mode activated immediately")
@@ -1681,25 +1680,25 @@ func TestColdStartWithoutBackups(t *testing.T) {
 //
 // The test covers 5 critical fault tolerance scenarios:
 //
-// 1. **Rapid RPC Restart**: Tests system behavior when RPC servers start and stop rapidly (10 cycles),
-//    simulating infrastructure restarts or rolling deployments. Validates state tracking during
-//    rapid connection establishment and termination.
+//  1. **Rapid RPC Restart**: Tests system behavior when RPC servers start and stop rapidly (10 cycles),
+//     simulating infrastructure restarts or rolling deployments. Validates state tracking during
+//     rapid connection establishment and termination.
 //
-// 2. **Network Flapping**: Simulates intermittent network connectivity with random failures,
-//    where RPC calls succeed or fail unpredictably. Tests emergency mode oscillation and
-//    system stability during network instability.
+//  2. **Network Flapping**: Simulates intermittent network connectivity with random failures,
+//     where RPC calls succeed or fail unpredictably. Tests emergency mode oscillation and
+//     system stability during network instability.
 //
-// 3. **Concurrent State Changes**: Tests race condition protection by having multiple goroutines
-//    simultaneously attempt to change emergency mode state. Validates thread safety and
-//    state consistency under concurrent access.
+//  3. **Concurrent State Changes**: Tests race condition protection by having multiple goroutines
+//     simultaneously attempt to change emergency mode state. Validates thread safety and
+//     state consistency under concurrent access.
 //
-// 4. **DNS Change Rapid Fire**: Simulates rapid DNS resolution changes by quickly alternating
-//    between valid and invalid connection strings. Tests DNS change detection throttling
-//    and connection string update handling.
+//  4. **DNS Change Rapid Fire**: Simulates rapid DNS resolution changes by quickly alternating
+//     between valid and invalid connection strings. Tests DNS change detection throttling
+//     and connection string update handling.
 //
-// 5. **State Corruption Protection**: Comprehensive test of state integrity under extreme
-//    concurrent load with 10 goroutines performing 20 operations each (200 total operations).
-//    Validates that rapid state changes don't corrupt the emergency mode state.
+//  5. **State Corruption Protection**: Comprehensive test of state integrity under extreme
+//     concurrent load with 10 goroutines performing 20 operations each (200 total operations).
+//     Validates that rapid state changes don't corrupt the emergency mode state.
 //
 // Each test verifies:
 // - Emergency mode state remains consistent and readable
@@ -1727,7 +1726,7 @@ func TestEmergencyModeRapidToggling(t *testing.T) {
 			// Reset emergency mode state before each test
 			rpc.ResetEmergencyMode()
 			defer rpc.ResetEmergencyMode()
-			
+
 			scenario.testFunc(t)
 		})
 	}
@@ -1737,13 +1736,13 @@ func TestEmergencyModeRapidToggling(t *testing.T) {
 func testRapidRPCRestart(t *testing.T) {
 	// Setup basic RPC dispatcher
 	dispatcher := gorpc.NewDispatcher()
-	dispatcher.AddFunc("Login", func(clientAddr, userKey string) bool {
+	dispatcher.AddFunc("Login", func(_, _ string) bool {
 		return true
 	})
-	dispatcher.AddFunc("GetApiDefinitions", func(clientAddr string, dr interface{}) (string, error) {
+	dispatcher.AddFunc("GetApiDefinitions", func(_, _ interface{}) (string, error) {
 		return "[]", nil
 	})
-	dispatcher.AddFunc("GetPolicies", func(clientAddr string, orgid string) (string, error) {
+	dispatcher.AddFunc("GetPolicies", func(_, _ string) (string, error) {
 		return "[]", nil
 	})
 
@@ -1767,31 +1766,31 @@ func testRapidRPCRestart(t *testing.T) {
 	for i := 0; i < 10; i++ {
 		// Start RPC server
 		rpcMock, connectionString := startRPCMock(dispatcher)
-		
+
 		// Update connection string
-		config := ts.Gw.GetConfig()
-		config.SlaveOptions.ConnectionString = connectionString
-		ts.Gw.SetConfig(config)
-		
+		conf := ts.Gw.GetConfig()
+		conf.SlaveOptions.ConnectionString = connectionString
+		ts.Gw.SetConfig(conf)
+
 		// Track emergency mode state
 		stateTrackingMu.Lock()
 		stateTransitions = append(stateTransitions, rpc.IsEmergencyMode())
 		stateTrackingMu.Unlock()
-		
+
 		// Wait briefly for connection
 		time.Sleep(100 * time.Millisecond)
-		
+
 		// Stop RPC server safely
 		if rpcMock != nil {
 			rpcMock.Listener.Close()
 			rpcMock.Stop()
 		}
-		
+
 		// Track emergency mode state after stop
 		stateTrackingMu.Lock()
 		stateTransitions = append(stateTransitions, rpc.IsEmergencyMode())
 		stateTrackingMu.Unlock()
-		
+
 		// Brief pause between cycles
 		time.Sleep(100 * time.Millisecond)
 	}
@@ -1799,16 +1798,16 @@ func testRapidRPCRestart(t *testing.T) {
 	// Verify state consistency - no corruption
 	stateTrackingMu.Lock()
 	defer stateTrackingMu.Unlock()
-	
+
 	// Verify we have recorded state transitions
 	assert.Greater(t, len(stateTransitions), 0, "Should have recorded state transitions")
-	
+
 	// Verify health checks remain responsive
 	recorder := httptest.NewRecorder()
 	req := httptest.NewRequest("GET", "/"+ts.Gw.GetConfig().HealthCheckEndpointName, nil)
 	ts.Gw.liveCheckHandler(recorder, req)
 	assert.Equal(t, http.StatusOK, recorder.Code, "Health checks should remain responsive")
-	
+
 	t.Log("Rapid RPC restart test completed successfully")
 }
 
@@ -1816,19 +1815,19 @@ func testRapidRPCRestart(t *testing.T) {
 func testNetworkFlapping(t *testing.T) {
 	var callCount int32
 	var callCountMu sync.Mutex
-	
+
 	// Setup RPC dispatcher with random failures
 	dispatcher := gorpc.NewDispatcher()
-	dispatcher.AddFunc("Login", func(clientAddr, userKey string) bool {
+	dispatcher.AddFunc("Login", func(_, _ string) bool {
 		callCountMu.Lock()
 		callCount++
 		localCount := callCount
 		callCountMu.Unlock()
-		
+
 		// Simulate network flapping - fail randomly
 		return localCount%3 != 0 // Fail every 3rd call
 	})
-	dispatcher.AddFunc("GetApiDefinitions", func(clientAddr string, dr interface{}) (string, error) {
+	dispatcher.AddFunc("GetApiDefinitions", func(_, _ interface{}) (string, error) {
 		if callCount%3 == 0 {
 			return "", errors.New("network error")
 		}
@@ -1859,10 +1858,10 @@ func testNetworkFlapping(t *testing.T) {
 	// Test network flapping for a period
 	testDuration := 2 * time.Second
 	startTime := time.Now()
-	
+
 	var stateChecks []bool
 	var stateChecksMu sync.Mutex
-	
+
 	// Monitor emergency mode state during flapping
 	go func() {
 		for time.Since(startTime) < testDuration {
@@ -1872,21 +1871,21 @@ func testNetworkFlapping(t *testing.T) {
 			time.Sleep(50 * time.Millisecond)
 		}
 	}()
-	
+
 	// Wait for test duration
 	time.Sleep(testDuration)
-	
+
 	// Verify system remains stable
 	stateChecksMu.Lock()
 	assert.Greater(t, len(stateChecks), 0, "Should have collected state checks")
 	stateChecksMu.Unlock()
-	
+
 	// Verify health checks still work
 	recorder := httptest.NewRecorder()
 	req := httptest.NewRequest("GET", "/"+ts.Gw.GetConfig().HealthCheckEndpointName, nil)
 	ts.Gw.liveCheckHandler(recorder, req)
 	assert.Equal(t, http.StatusOK, recorder.Code, "Health checks should work during network flapping")
-	
+
 	t.Log("Network flapping test completed successfully")
 }
 
@@ -1908,39 +1907,39 @@ func testConcurrentStateChanges(t *testing.T) {
 	// Multiple goroutines trying to change emergency mode state
 	var wg sync.WaitGroup
 	concurrentOperations := 20
-	
+
 	for i := 0; i < concurrentOperations; i++ {
 		wg.Add(1)
 		go func(id int) {
 			defer wg.Done()
-			
+
 			// Alternate between setting and resetting emergency mode
 			if id%2 == 0 {
 				rpc.SetEmergencyMode(t, true)
 			} else {
 				rpc.SetEmergencyMode(t, false)
 			}
-			
+
 			// Brief pause
 			time.Sleep(10 * time.Millisecond)
-			
+
 			// Check state is readable (no corruption)
 			_ = rpc.IsEmergencyMode()
 		}(i)
 	}
-	
+
 	wg.Wait()
-	
+
 	// Verify system is still functional
 	finalState := rpc.IsEmergencyMode()
 	t.Logf("Final emergency mode state after concurrent changes: %v", finalState)
-	
+
 	// Verify health checks still work
 	recorder := httptest.NewRecorder()
 	req := httptest.NewRequest("GET", "/"+ts.Gw.GetConfig().HealthCheckEndpointName, nil)
 	ts.Gw.liveCheckHandler(recorder, req)
 	assert.Equal(t, http.StatusOK, recorder.Code, "Health checks should work after concurrent state changes")
-	
+
 	t.Log("Concurrent state changes test completed successfully")
 }
 
@@ -1948,7 +1947,7 @@ func testConcurrentStateChanges(t *testing.T) {
 func testDNSChangeRapidFire(t *testing.T) {
 	// Setup RPC dispatcher
 	dispatcher := gorpc.NewDispatcher()
-	dispatcher.AddFunc("Login", func(clientAddr, userKey string) bool {
+	dispatcher.AddFunc("Login", func(_, _ string) bool {
 		return true
 	})
 
@@ -1977,32 +1976,32 @@ func testDNSChangeRapidFire(t *testing.T) {
 	testDuration := 1 * time.Second
 	startTime := time.Now()
 	changeCount := 0
-	
+
 	for time.Since(startTime) < testDuration {
 		// Alternate between valid and invalid connection strings
-		config := ts.Gw.GetConfig()
+		conf := ts.Gw.GetConfig()
 		if changeCount%2 == 0 {
-			config.SlaveOptions.ConnectionString = connectionString
+			conf.SlaveOptions.ConnectionString = connectionString
 		} else {
-			config.SlaveOptions.ConnectionString = "127.0.0.1:0" // Invalid
+			conf.SlaveOptions.ConnectionString = "127.0.0.1:0" // Invalid
 		}
-		ts.Gw.SetConfig(config)
-		
+		ts.Gw.SetConfig(conf)
+
 		changeCount++
 		time.Sleep(50 * time.Millisecond)
 	}
-	
+
 	t.Logf("Performed %d rapid connection string changes", changeCount)
-	
+
 	// Verify system stability
 	assert.Greater(t, changeCount, 5, "Should have made multiple rapid changes")
-	
+
 	// Verify health checks remain responsive
 	recorder := httptest.NewRecorder()
 	req := httptest.NewRequest("GET", "/"+ts.Gw.GetConfig().HealthCheckEndpointName, nil)
 	ts.Gw.liveCheckHandler(recorder, req)
 	assert.Equal(t, http.StatusOK, recorder.Code, "Health checks should remain responsive")
-	
+
 	t.Log("DNS change rapid fire test completed successfully")
 }
 
@@ -2024,63 +2023,63 @@ func testStateCorruptionProtection(t *testing.T) {
 	// Track state consistency across rapid changes
 	stateHistory := make([]bool, 0)
 	var stateMu sync.Mutex
-	
+
 	// Create multiple goroutines that rapidly toggle state and check consistency
 	var wg sync.WaitGroup
 	goroutineCount := 10
 	operationsPerGoroutine := 20
-	
+
 	for i := 0; i < goroutineCount; i++ {
 		wg.Add(1)
 		go func(goroutineID int) {
 			defer wg.Done()
-			
+
 			for j := 0; j < operationsPerGoroutine; j++ {
 				// Set emergency mode state
 				newState := (goroutineID+j)%2 == 0
 				rpc.SetEmergencyMode(t, newState)
-				
+
 				// Immediately read state and verify consistency
 				readState := rpc.IsEmergencyMode()
-				
+
 				stateMu.Lock()
 				stateHistory = append(stateHistory, readState)
 				stateMu.Unlock()
-				
+
 				// Brief pause to allow race conditions to manifest
 				time.Sleep(1 * time.Millisecond)
 			}
 		}(i)
 	}
-	
+
 	wg.Wait()
-	
+
 	// Verify we collected state history
 	stateMu.Lock()
 	totalOperations := len(stateHistory)
 	stateMu.Unlock()
-	
+
 	expectedOperations := goroutineCount * operationsPerGoroutine
 	assert.Equal(t, expectedOperations, totalOperations, "Should have recorded all state operations")
-	
+
 	// Verify final state is readable and valid
 	finalState := rpc.IsEmergencyMode()
 	assert.IsType(t, bool(true), finalState, "Final state should be a valid boolean")
-	
+
 	// Verify system remains functional after rapid state changes
 	recorder := httptest.NewRecorder()
 	req := httptest.NewRequest("GET", "/"+ts.Gw.GetConfig().HealthCheckEndpointName, nil)
 	ts.Gw.liveCheckHandler(recorder, req)
 	assert.Equal(t, http.StatusOK, recorder.Code, "Health checks should work after state corruption protection test")
-	
+
 	// Verify readiness endpoint also remains functional
 	readinessRecorder := httptest.NewRecorder()
 	readinessReq := httptest.NewRequest("GET", "/"+ts.Gw.GetConfig().ReadinessCheckEndpointName, nil)
 	ts.Gw.readinessHandler(readinessRecorder, readinessReq)
 	// Readiness might be 503 due to no successful reload, but it should respond
-	assert.Contains(t, []int{http.StatusOK, http.StatusServiceUnavailable}, readinessRecorder.Code, 
+	assert.Contains(t, []int{http.StatusOK, http.StatusServiceUnavailable}, readinessRecorder.Code,
 		"Readiness endpoint should respond properly")
-	
+
 	t.Logf("State corruption protection test completed - performed %d state operations", totalOperations)
 	t.Log("✓ No race conditions detected")
 	t.Log("✓ State remained consistent")
@@ -2088,13 +2087,13 @@ func testStateCorruptionProtection(t *testing.T) {
 	t.Log("✓ System stability maintained under rapid state transitions")
 }
 
-// TestColdStartWithCorruptedBackups tests the fault tolerance scenario where 
+// TestColdStartWithCorruptedBackups tests the fault tolerance scenario where
 // RPC is unavailable but backup data exists in Redis that is corrupted or invalid.
 // This validates the backup recovery mechanisms when backup data is present but corrupted.
 //
 // The test covers multiple corruption scenarios:
 // 1. Corrupted Encrypted Data: Valid key structure but garbled encrypted content
-// 2. Invalid JSON: Decrypts successfully but contains invalid JSON  
+// 2. Invalid JSON: Decrypts successfully but contains invalid JSON
 // 3. Wrong Encryption Key: Data encrypted with different key than gateway expects
 // 4. Partial Data: Backup data is truncated/incomplete
 // 5. Empty Backup: Backup key exists but contains empty/null data
@@ -2146,7 +2145,7 @@ func TestColdStartWithCorruptedBackups(t *testing.T) {
 		t.Run(scenario.name, func(t *testing.T) {
 			// Reset emergency mode for each test
 			rpc.ResetEmergencyMode()
-			
+
 			// SETUP: Configure gateway with RPC policy source but NO RPC server
 			// This forces the gateway to rely on backup data which we will corrupt
 			conf := func(globalConf *config.Config) {
@@ -2207,11 +2206,11 @@ func TestColdStartWithCorruptedBackups(t *testing.T) {
 				t.Log("Health checks haven't run yet, forcing them to run")
 				ts.Gw.gatherHealthChecks()
 				time.Sleep(200 * time.Millisecond)
-				
+
 				healthRecorder = httptest.NewRecorder()
 				healthReq = httptest.NewRequest("GET", "/"+ts.Gw.GetConfig().HealthCheckEndpointName, nil)
 				ts.Gw.liveCheckHandler(healthRecorder, healthReq)
-				
+
 				err = json.Unmarshal(healthRecorder.Body.Bytes(), &healthResponse)
 				require.NoError(t, err, "Should be able to parse health check response after forced run")
 			}
@@ -2236,13 +2235,13 @@ func TestColdStartWithCorruptedBackups(t *testing.T) {
 			readinessReq := httptest.NewRequest("GET", "/"+ts.Gw.GetConfig().ReadinessCheckEndpointName, nil)
 			ts.Gw.readinessHandler(readinessRecorder, readinessReq)
 
-			assert.Equal(t, http.StatusServiceUnavailable, readinessRecorder.Code, 
+			assert.Equal(t, http.StatusServiceUnavailable, readinessRecorder.Code,
 				"Readiness should be 503 with corrupted backup data")
 
 			var readinessError apiStatusMessage
 			err = json.Unmarshal(readinessRecorder.Body.Bytes(), &readinessError)
 			require.NoError(t, err, "Should be able to parse readiness error response")
-			
+
 			assert.Equal(t, "A successful API reload did not happen", readinessError.Message,
 				"Readiness should fail due to no successful reload with corrupted backups")
 
@@ -2250,15 +2249,15 @@ func TestColdStartWithCorruptedBackups(t *testing.T) {
 			// Test basic storage operations to ensure system stability
 			testKey := "test-storage-" + scenario.name
 			testValue := "test-value"
-			
+
 			storeRef := ts.Gw.GlobalSessionManager.Store()
 			err = storeRef.SetKey(testKey, testValue, 60)
 			assert.NoError(t, err, "Should be able to perform storage operations despite backup corruption")
-			
+
 			retrievedValue, err := storeRef.GetKey(testKey)
 			assert.NoError(t, err, "Should be able to retrieve keys despite backup corruption")
 			assert.Equal(t, testValue, retrievedValue, "Storage operations should work correctly")
-			
+
 			// Clean up test key
 			deleted := storeRef.DeleteKey(testKey)
 			assert.True(t, deleted, "Should be able to delete key from storage")
@@ -2294,13 +2293,13 @@ func setupCorruptedEncryption(ts *Test) {
 
 	// Create garbled encrypted data that looks like valid base64 but is corrupted
 	corruptedData := "SGVsbG8gV29ybGQhIFRoaXMgaXMgY29ycnVwdGVkIGRhdGEgdGhhdCBsb29rcyBsaWtlIGJhc2U2NCBidXQgaXMgZ2FyYmxlZA=="
-	
+
 	// Store corrupted data in both backup keys
 	err := store.SetKey(apiBackupKey, corruptedData, -1)
 	if err != nil {
 		panic("Failed to set corrupted API backup: " + err.Error())
 	}
-	
+
 	err = store.SetKey(policyBackupKey, corruptedData, -1)
 	if err != nil {
 		panic("Failed to set corrupted policy backup: " + err.Error())
@@ -2325,17 +2324,17 @@ func setupInvalidJSON(ts *Test) {
 	invalidJSON := `{"api_id": "corrupted", "malformed": json data without proper closing`
 	secret := crypto.GetPaddedString(ts.Gw.GetConfig().Secret)
 	encryptedInvalidJSON := crypto.Encrypt([]byte(secret), invalidJSON)
-	
+
 	// Store encrypted invalid JSON in both backup keys
 	err := store.SetKey(apiBackupKey, encryptedInvalidJSON, -1)
 	if err != nil {
 		panic("Failed to set invalid JSON API backup: " + err.Error())
 	}
-	
+
 	// For policies, create different invalid JSON
 	invalidPolicyJSON := `[{"_id": "policy1", "rate": "invalid_number"`
 	encryptedInvalidPolicyJSON := crypto.Encrypt([]byte(secret), invalidPolicyJSON)
-	
+
 	err = store.SetKey(policyBackupKey, encryptedInvalidPolicyJSON, -1)
 	if err != nil {
 		panic("Failed to set invalid JSON policy backup: " + err.Error())
@@ -2359,18 +2358,18 @@ func setupWrongEncryptionKey(ts *Test) {
 	// Create valid JSON data but encrypt it with wrong key
 	validAPIJSON := `[{"api_id": "test", "name": "Test API"}]`
 	validPolicyJSON := `[{"_id": "policy1", "rate": 1000}]`
-	
+
 	// Use a different secret key for encryption
 	wrongSecret := crypto.GetPaddedString("wrong_secret_key_12345")
 	encryptedWithWrongKey := crypto.Encrypt([]byte(wrongSecret), validAPIJSON)
 	encryptedPolicyWithWrongKey := crypto.Encrypt([]byte(wrongSecret), validPolicyJSON)
-	
+
 	// Store data encrypted with wrong key in both backup keys
 	err := store.SetKey(apiBackupKey, encryptedWithWrongKey, -1)
 	if err != nil {
 		panic("Failed to set wrong key API backup: " + err.Error())
 	}
-	
+
 	err = store.SetKey(policyBackupKey, encryptedPolicyWithWrongKey, -1)
 	if err != nil {
 		panic("Failed to set wrong key policy backup: " + err.Error())
@@ -2394,21 +2393,21 @@ func setupPartialData(ts *Test) {
 	// Create valid JSON data and encrypt it properly
 	validAPIJSON := `[{"api_id": "test", "name": "Test API", "proxy": {"target_url": "http://example.com"}}]`
 	validPolicyJSON := `[{"_id": "policy1", "rate": 1000, "per": 60}]`
-	
+
 	secret := crypto.GetPaddedString(ts.Gw.GetConfig().Secret)
 	encryptedAPI := crypto.Encrypt([]byte(secret), validAPIJSON)
 	encryptedPolicy := crypto.Encrypt([]byte(secret), validPolicyJSON)
-	
+
 	// Truncate the encrypted data to simulate partial corruption
-	truncatedAPIData := encryptedAPI[:len(encryptedAPI)/2] // Cut in half
+	truncatedAPIData := encryptedAPI[:len(encryptedAPI)/2]          // Cut in half
 	truncatedPolicyData := encryptedPolicy[:len(encryptedPolicy)/3] // Cut to 1/3
-	
+
 	// Store truncated data in both backup keys
 	err := store.SetKey(apiBackupKey, truncatedAPIData, -1)
 	if err != nil {
 		panic("Failed to set truncated API backup: " + err.Error())
 	}
-	
+
 	err = store.SetKey(policyBackupKey, truncatedPolicyData, -1)
 	if err != nil {
 		panic("Failed to set truncated policy backup: " + err.Error())
@@ -2434,7 +2433,7 @@ func setupEmptyBackup(ts *Test) {
 	if err != nil {
 		panic("Failed to set empty API backup: " + err.Error())
 	}
-	
+
 	err = store.SetKey(policyBackupKey, "", -1)
 	if err != nil {
 		panic("Failed to set empty policy backup: " + err.Error())
@@ -2446,24 +2445,24 @@ func setupEmptyBackup(ts *Test) {
 func TestBackupRecoveryAfterRPCFailure(t *testing.T) {
 	// This test is modeled after the existing TestSyncAPISpecsRPCSuccess
 	rpc.UseSyncLoginRPC = true
-	
+
 	testAPIID := "test-backup-api"
 	testPolicyID := "test-backup-policy"
 
 	dispatcher := gorpc.NewDispatcher()
-	dispatcher.AddFunc("GetApiDefinitions", func(clientAddr string, dr *model.DefRequest) (string, error) {
+	dispatcher.AddFunc("GetApiDefinitions", func(_, _ *model.DefRequest) (string, error) {
 		return jsonMarshalString(BuildAPI(func(spec *APISpec) {
 			spec.UseKeylessAccess = false
 			spec.APIID = testAPIID
 		})), nil
 	})
-	dispatcher.AddFunc("GetPolicies", func(clientAddr, orgid string) (string, error) {
+	dispatcher.AddFunc("GetPolicies", func(_, _ string) (string, error) {
 		return `[{"_id":"` + testPolicyID + `", "rate":1, "per":1}]`, nil
 	})
-	dispatcher.AddFunc("Login", func(clientAddr, userKey string) bool {
+	dispatcher.AddFunc("Login", func(_, _ string) bool {
 		return true
 	})
-	dispatcher.AddFunc("GetKey", func(clientAddr, key string) (string, error) {
+	dispatcher.AddFunc("GetKey", func(_, _ string) (string, error) {
 		return jsonMarshalString(CreateStandardSession()), nil
 	})
 
@@ -2503,12 +2502,12 @@ func TestBackupRecoveryAfterRPCFailure(t *testing.T) {
 		t.Fatalf("Expected 1 policy in backup, got %d", len(policyBackup))
 	}
 
-	t.Logf("Phase 1 complete: %d APIs loaded, backup contains %d APIs and %d policies", 
+	t.Logf("Phase 1 complete: %d APIs loaded, backup contains %d APIs and %d policies",
 		ts.Gw.apisByIDLen(), len(apiBackup), len(policyBackup))
 
 	// Phase 2: Simulate RPC failure and test backup recovery
 	stopRPCMock(rpcMock)
-	rpcMock = nil
+	_ = rpcMock
 
 	// Force reload to trigger emergency mode
 	ts.Gw.DoReload()
@@ -2555,7 +2554,7 @@ func TestBackupRecoveryAfterRPCFailure(t *testing.T) {
 }
 
 // verifyNormalOperation checks that the system is operating normally with RPC
-func verifyNormalOperation(t *testing.T, ts *Test, expectedAPI, expectedPolicy string) {
+func verifyNormalOperation(t *testing.T, ts *Test, _, _ string) {
 	t.Helper()
 
 	// Don't call sync functions directly if we're not in the initial phase
@@ -2644,7 +2643,7 @@ func waitForNormalMode(t *testing.T, timeout time.Duration) {
 }
 
 // verifyBackupRecovery checks that the system successfully recovers from backup
-func verifyBackupRecovery(t *testing.T, ts *Test, expectedAPI, expectedPolicy string) {
+func verifyBackupRecovery(t *testing.T, ts *Test, _, _ string) {
 	t.Helper()
 
 	// Wait for backup recovery to complete
@@ -2744,7 +2743,7 @@ func testAPIFunctionalityFromBackup(t *testing.T, ts *Test) {
 }
 
 // verifyDataConsistency checks that data is consistent after RPC restoration
-func verifyDataConsistency(t *testing.T, ts *Test, expectedAPI, expectedPolicy string) {
+func verifyDataConsistency(t *testing.T, ts *Test, _, _ string) {
 	t.Helper()
 
 	// Wait for data to be reloaded from RPC
@@ -2901,6 +2900,7 @@ func stopRPCServerSafely(server *gorpc.Server) {
 		defer func() {
 			if r := recover(); r != nil {
 				// Ignore panics from stopping already stopped servers
+				_ = r
 			}
 		}()
 		server.Stop()
@@ -2909,13 +2909,13 @@ func stopRPCServerSafely(server *gorpc.Server) {
 
 func createTestDispatcher() *gorpc.Dispatcher {
 	dispatcher := gorpc.NewDispatcher()
-	dispatcher.AddFunc("Login", func(clientAddr, userKey string) bool {
+	dispatcher.AddFunc("Login", func(_, _ string) bool {
 		return true
 	})
-	dispatcher.AddFunc("GetApiDefinitions", func(clientAddr string, dr *model.DefRequest) (string, error) {
+	dispatcher.AddFunc("GetApiDefinitions", func(_, _ *model.DefRequest) (string, error) {
 		return `[{"api_id": "test-api", "name": "Test API"}]`, nil
 	})
-	dispatcher.AddFunc("GetPolicies", func(clientAddr string, orgid string) (string, error) {
+	dispatcher.AddFunc("GetPolicies", func(_, _ string) (string, error) {
 		return `[{"_id": "test-policy", "name": "Test Policy"}]`, nil
 	})
 	return dispatcher
@@ -2975,7 +2975,7 @@ func testSingleIPChange(t *testing.T) {
 
 	// Verify DNS was checked after the errors
 	callLog := mockResolver.getCallLog()
-	
+
 	// The DNS should be checked at least once due to connection errors
 	// But throttling should limit excessive checks
 	assert.True(t, len(callLog) >= 1, "DNS should have been checked at least once after connection errors, got %d", len(callLog))
@@ -3284,7 +3284,7 @@ func TestHealthCheckDuringCascadingFailures(t *testing.T) {
 func simulateRedisFailure(ts *Test) {
 	// First try disabling storage
 	ts.Gw.StorageConnectionHandler.DisableStorage(true)
-	
+
 	// If that doesn't work, manually set the health check to failed
 	// This ensures the test can proceed to validate the cascading failure logic
 	healthInfo := map[string]HealthCheckItem{
@@ -3301,7 +3301,7 @@ func simulateRedisFailure(ts *Test) {
 // simulateRedisRecovery simulates Redis recovery by re-enabling storage
 func simulateRedisRecovery(ts *Test) {
 	ts.Gw.StorageConnectionHandler.DisableStorage(false)
-	
+
 	// Manually set the health check to recovered
 	healthInfo := map[string]HealthCheckItem{
 		"redis": {
@@ -3344,7 +3344,7 @@ func (m *MockDashboardService) Init() error {
 	return nil
 }
 
-func (m *MockDashboardService) Register(ctx context.Context) error {
+func (m *MockDashboardService) Register(_ context.Context) error {
 	return nil
 }
 
@@ -3352,7 +3352,7 @@ func (m *MockDashboardService) DeRegister() error {
 	return nil
 }
 
-func (m *MockDashboardService) StartBeating(ctx context.Context) error {
+func (m *MockDashboardService) StartBeating(_ context.Context) error {
 	return nil
 }
 
@@ -3382,13 +3382,13 @@ func (m *MockDashboardService) SetShouldFail(shouldFail bool) {
 func waitForHealthCheck(ts *Test) (map[string]HealthCheckItem, error) {
 	// Wait for health check to complete
 	time.Sleep(200 * time.Millisecond)
-	
+
 	// Get current health check info
 	healthInfo := ts.Gw.getHealthCheckInfo()
 	if healthInfo == nil {
 		return nil, errors.New("health check info not available")
 	}
-	
+
 	return healthInfo, nil
 }
 
@@ -3397,13 +3397,13 @@ func getHealthCheckResponse(ts *Test) (*http.Response, HealthCheckResponse, erro
 	recorder := httptest.NewRecorder()
 	req := httptest.NewRequest("GET", "/"+ts.Gw.GetConfig().HealthCheckEndpointName, nil)
 	ts.Gw.liveCheckHandler(recorder, req)
-	
+
 	var response HealthCheckResponse
 	err := json.Unmarshal(recorder.Body.Bytes(), &response)
 	if err != nil {
 		return nil, response, err
 	}
-	
+
 	return &http.Response{StatusCode: recorder.Code}, response, nil
 }
 
@@ -3412,13 +3412,13 @@ func getReadinessResponse(ts *Test) (*http.Response, HealthCheckResponse, error)
 	recorder := httptest.NewRecorder()
 	req := httptest.NewRequest("GET", "/"+ts.Gw.GetConfig().ReadinessCheckEndpointName, nil)
 	ts.Gw.readinessHandler(recorder, req)
-	
+
 	var response HealthCheckResponse
 	err := json.Unmarshal(recorder.Body.Bytes(), &response)
 	if err != nil {
 		return nil, response, err
 	}
-	
+
 	return &http.Response{StatusCode: recorder.Code}, response, nil
 }
 
@@ -3442,7 +3442,7 @@ func testRedisCascadeSimulation(t *testing.T) {
 		},
 	}
 	ts.Gw.setCurrentHealthCheckInfo(healthInfo)
-	
+
 	// Get health check endpoint response
 	httpResp, healthResp, err := getHealthCheckResponse(ts)
 	require.NoError(t, err)
@@ -3463,13 +3463,13 @@ func testRedisCascadeSimulation(t *testing.T) {
 		Time:          time.Now().Format(time.RFC3339),
 	}
 	ts.Gw.setCurrentHealthCheckInfo(healthInfo)
-	
+
 	// Verify multiple failures are handled gracefully
 	httpResp, healthResp, err = getHealthCheckResponse(ts)
 	require.NoError(t, err)
 	assert.Equal(t, http.StatusServiceUnavailable, httpResp.StatusCode, "Health check should remain 503 with multiple failures")
 	assert.Equal(t, "fail", string(healthResp.Status), "Overall health status should remain 'fail'")
-	
+
 	// Verify all failures are reported in details
 	assert.GreaterOrEqual(t, len(healthResp.Details), 2, "Multiple failures should be reported")
 	redisDetail, redisFound := healthResp.Details["redis"]
@@ -3491,23 +3491,23 @@ func testCriticalFailureLogic(t *testing.T) {
 
 	// Test critical failure logic directly
 	assert.True(t, ts.Gw.isCriticalFailure("redis"), "Redis failure should always be critical")
-	
+
 	// Test evaluateHealthChecks with various combinations
 	checks := map[string]HealthCheckItem{
-		"redis": {Status: Fail},
-		"rpc":   {Status: Fail}, 
+		"redis":     {Status: Fail},
+		"rpc":       {Status: Fail},
 		"dashboard": {Status: Fail},
 	}
-	
+
 	failCount, criticalFailure := ts.Gw.evaluateHealthChecks(checks)
 	assert.Equal(t, 3, failCount, "Should count 3 failed components")
 	assert.True(t, criticalFailure, "Should detect critical failure due to Redis")
-	
+
 	// Test with only non-critical failures
 	checksNonCritical := map[string]HealthCheckItem{
 		"rpc": {Status: Fail}, // Non-critical when not using RPC policy source
 	}
-	
+
 	failCount, criticalFailure = ts.Gw.evaluateHealthChecks(checksNonCritical)
 	assert.Equal(t, 1, failCount, "Should count 1 failed component")
 	assert.False(t, criticalFailure, "Should not detect critical failure without Redis or critical components")
@@ -3533,12 +3533,12 @@ func testHealthStatusTransitions(t *testing.T) {
 		},
 	}
 	ts.Gw.setCurrentHealthCheckInfo(healthInfo)
-	
+
 	httpResp, healthResp, err := getHealthCheckResponse(ts)
 	require.NoError(t, err)
 	assert.Equal(t, http.StatusOK, httpResp.StatusCode, "Health check should return 200 OK when healthy")
 	assert.Equal(t, "pass", string(healthResp.Status), "Overall health status should be 'pass'")
-	
+
 	// STEP 2: Transition to failure state
 	healthInfo["redis"] = HealthCheckItem{
 		Status:        Fail,
@@ -3547,12 +3547,12 @@ func testHealthStatusTransitions(t *testing.T) {
 		Time:          time.Now().Format(time.RFC3339),
 	}
 	ts.Gw.setCurrentHealthCheckInfo(healthInfo)
-	
+
 	httpResp, healthResp, err = getHealthCheckResponse(ts)
 	require.NoError(t, err)
 	assert.Equal(t, http.StatusServiceUnavailable, httpResp.StatusCode, "Health check should return 503 when Redis fails")
 	assert.Equal(t, "fail", string(healthResp.Status), "Overall health status should be 'fail'")
-	
+
 	// STEP 3: Transition back to healthy state
 	healthInfo["redis"] = HealthCheckItem{
 		Status:        Pass,
@@ -3561,7 +3561,7 @@ func testHealthStatusTransitions(t *testing.T) {
 		Time:          time.Now().Format(time.RFC3339),
 	}
 	ts.Gw.setCurrentHealthCheckInfo(healthInfo)
-	
+
 	httpResp, healthResp, err = getHealthCheckResponse(ts)
 	require.NoError(t, err)
 	assert.Equal(t, http.StatusOK, httpResp.StatusCode, "Health check should return 200 OK after recovery")
@@ -3580,15 +3580,15 @@ func testEmergencyModeProtection(t *testing.T) {
 
 	// Verify the isCriticalFailure logic for Redis (always critical)
 	assert.True(t, ts.Gw.isCriticalFailure("redis"), "Redis failure should always be critical")
-	
+
 	// Verify the isCriticalFailure logic for RPC (depends on emergency mode and policy source)
 	// When not using RPC policy source, RPC failure should not be critical
 	assert.False(t, ts.Gw.isCriticalFailure("rpc"), "RPC failure should not be critical when not using RPC policy source")
-	
-	// Test with RPC policy source in non-emergency mode  
+
+	// Test with RPC policy source in non-emergency mode
 	// Note: Config modification is done in test setup, here we just verify the logic works
 	// Emergency mode logic is tested in the main RPC tests
-	
+
 	// Simulate Redis failure to test critical failure behavior
 	healthInfo := map[string]HealthCheckItem{
 		"redis": {
@@ -3599,7 +3599,7 @@ func testEmergencyModeProtection(t *testing.T) {
 		},
 	}
 	ts.Gw.setCurrentHealthCheckInfo(healthInfo)
-	
+
 	httpResp, healthResp, err := getHealthCheckResponse(ts)
 	require.NoError(t, err)
 	assert.Equal(t, http.StatusServiceUnavailable, httpResp.StatusCode, "Health check should return 503 when Redis fails")
@@ -3609,7 +3609,7 @@ func testEmergencyModeProtection(t *testing.T) {
 // testDashboardFailureImpact tests dashboard failure impact based on UseDBAppConfigs
 func testDashboardFailureImpact(t *testing.T) {
 	// Test the critical failure logic for dashboard component
-	
+
 	// Test 1: UseDBAppConfigs disabled
 	t.Run("UseDBAppConfigs_disabled", func(t *testing.T) {
 		conf := func(globalConf *config.Config) {
@@ -3623,7 +3623,7 @@ func testDashboardFailureImpact(t *testing.T) {
 		// Verify dashboard failure is not critical when UseDBAppConfigs=false
 		assert.False(t, ts.Gw.isCriticalFailure("dashboard"), "Dashboard failure should not be critical when UseDBAppConfigs=false")
 	})
-	
+
 	// Test 2: UseDBAppConfigs enabled
 	t.Run("UseDBAppConfigs_enabled", func(t *testing.T) {
 		conf := func(globalConf *config.Config) {
