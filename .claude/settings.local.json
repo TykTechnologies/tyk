@@ -2,7 +2,20 @@
   "permissions": {
     "allow": [
       "Bash(rg:*)",
-      "Bash(go test:*)"
+      "Bash(go test:*)",
+      "Bash(TYK_LOGLEVEL=debug go test -run TestReadinessEndpointInEmergencyMode ./gateway -v)",
+      "Bash(grep:*)",
+      "Bash(TYK_LOGLEVEL=debug go test -run TestRealisticEmergencyModeTriggeredByRPCFailure ./gateway -v)",
+      "Bash(git add:*)",
+      "Bash(find:*)",
+      "Bash(timeout 30s go test -v -run TestHealthCheckDuringCascadingFailures/redis_then_rpc_cascade ./gateway)",
+      "Bash(timeout 30s go test -v -run TestHealthCheckDuringCascadingFailures ./gateway)",
+      "Bash(timeout 60s go test -v -run TestHealthCheckDuringCascadingFailures ./gateway)",
+      "Bash(timeout 30s go test -v -run TestHealthCheckDuringCascadingFailures/recovery_order_matters ./gateway)",
+      "Bash(timeout 90s go test -v -run TestHealthCheckDuringCascadingFailures ./gateway)",
+      "Bash(timeout 30s go test -v -run TestHealthCheckDuringCascadingFailures/redis_cascade_simulation ./gateway)",
+      "Bash(timeout 30s go test -v -run TestHealthCheckDuringCascadingFailures/critical_failure_logic ./gateway)",
+      "Bash(timeout 30s go test -v -run TestHealthCheckDuringCascadingFailures/health_status_transitions ./gateway)"
     ],
     "deny": []
   }

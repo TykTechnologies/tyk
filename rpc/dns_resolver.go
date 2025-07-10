@@ -105,6 +105,14 @@ func checkAndHandleDNSChange(connectionString string, suppressRegister bool) (dn
 	return false, false // DNS unchanged, should not retry
 }
 
+// SetDNSResolver sets the DNS resolver for testing purposes
+// Returns the previous resolver so it can be restored
+func SetDNSResolver(resolver DNSResolver) DNSResolver {
+	old := dnsResolver
+	dnsResolver = resolver
+	return old
+}
+
 func defaultSafeReconnectRPCClient(suppressRegister bool) {
 	// Stop existing client
 	if clientSingleton != nil {
