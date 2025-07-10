@@ -2,6 +2,7 @@ package oas
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"sort"
 	"strings"
@@ -168,6 +169,7 @@ func (g *Global) MarshalJSON() ([]byte, error) {
 
 // Fill fills *Global from apidef.APIDefinition.
 func (g *Global) Fill(api apidef.APIDefinition) {
+
 	if g.PluginConfig == nil {
 		g.PluginConfig = &PluginConfig{}
 	}
@@ -270,6 +272,7 @@ func (g *Global) fillErrorMessages(api apidef.APIDefinition) {
 	g.ErrorMessages = api.ErrorMessages
 
 	// Fill path error messages
+	g.PathErrorMessages = []apidef.ErrorOverrideMeta{}
 	if len(api.VersionData.Versions) > 0 {
 		for _, version := range api.VersionData.Versions {
 			for _, override := range version.ExtendedPaths.ErrorOverrides {
@@ -366,6 +369,8 @@ func (g *Global) ExtractTo(api *apidef.APIDefinition) {
 
 	g.extractTrafficLogsTo(api)
 
+	g.extractErrorMessages(api)
+
 	if g.TransformRequestHeaders == nil {
 		g.TransformRequestHeaders = &TransformHeaders{}
 		defer func() {
@@ -400,27 +405,36 @@ func (g *Global) ExtractTo(api *apidef.APIDefinition) {
 	g.extractRequestSizeLimitTo(api)
 
 	g.extractSkipsTo(api)
-	g.extractErrorMessages(api)
+
 }
 
 func (g *Global) extractErrorMessages(api *apidef.APIDefinition) {
 	api.ErrorMessages = g.ErrorMessages
 	// Extract path error messages
 	if len(g.PathErrorMessages) > 0 {
-		for _, pathError := range g.PathErrorMessages {
-			override := apidef.ErrorOverrideMeta{
-				Errors: pathError.Errors,
-				Method: pathError.Method,
-				Path:   pathError.Path,
+
+		// Add to all versions or specific version as needed
+		for versionName, versionInfo := range api.VersionData.Versions {
+			if versionInfo.ExtendedPaths.ErrorOverrides == nil {
+				versionInfo.ExtendedPaths.ErrorOverrides = []apidef.ErrorOverrideMeta{}
 			}
 
-			// Add to all versions or specific version as needed
-			for versionName, version := range api.VersionData.Versions {
-				version.ExtendedPaths.ErrorOverrides = append(version.ExtendedPaths.ErrorOverrides, override)
-				api.VersionData.Versions[versionName] = version
+			// Add each path error message
+			for _, pathError := range g.PathErrorMessages {
+				override := apidef.ErrorOverrideMeta{
+					Path:   pathError.Path,
+					Method: pathError.Method,
+					Errors: pathError.Errors,
+				}
+
+				versionInfo.ExtendedPaths.ErrorOverrides = append(
+					versionInfo.ExtendedPaths.ErrorOverrides, override)
 			}
+			api.VersionData.Versions[versionName] = versionInfo
+			fmt.Println("for ", versionName, " we set the errors: ", versionInfo.ExtendedPaths.ErrorOverrides)
 		}
 	}
+
 }
 
 func (g *Global) extractTrafficLogsTo(api *apidef.APIDefinition) {
@@ -1706,6 +1720,10 @@ func (cb *CircuitBreaker) Fill(circuitBreaker apidef.CircuitBreakerMeta) {
 	cb.SampleSize = int(circuitBreaker.Samples)
 	cb.CoolDownPeriod = circuitBreaker.ReturnToServiceAfter
 	cb.HalfOpenStateEnabled = !circuitBreaker.DisableHalfOpenState
+}
+
+func (eo *ErrorMessage) ExtractTo(eov *apidef.ErrorOverrideMeta) {
+	eov.Errors = eo.ErrorsOverride
 }
 
 // ExtractTo extracts *CircuitBreaker into *apidef.CircuitBreakerMeta.

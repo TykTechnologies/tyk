@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"errors"
+	"fmt"
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/ctx"
 	"net/http"
@@ -40,21 +41,19 @@ func (e *ErrorOverrideMiddleware) ApplyErrorOverride(r *http.Request, errMsg str
 	errorInfo := ctx.GetErrorInfo(r)
 	errorID := ""
 
-	//ToDo this error must be injected in context from other middlewares
-	errorID = ErrAuthKeyNotFound
-	//ToDo: test with request validation
-	// ToDo: add headers
-
 	if errorInfo != nil && errorInfo.ErrorID != "" {
 		errorID = errorInfo.ErrorID
 	} else {
 		errorID = e.determineErrorID(errMsg, errCode)
 	}
-	errorID = ErrAuthKeyNotFound
+
 	if errorID == "" {
 		return errMsg, errCode
 	}
 
+	if e.Spec.IsOAS {
+		fmt.Println(e.Spec)
+	}
 	// Check endpoint-level overrides first
 	vInfo, _ := e.Spec.Version(r)
 	if override, found := e.findEndpointErrorOverride(r, vInfo.Name, errorID); found {
@@ -107,12 +106,14 @@ func (e *ErrorOverrideMiddleware) determineErrorID(errMsg string, errCode int) s
 }
 
 func (e *ErrorOverrideMiddleware) findEndpointErrorOverride(r *http.Request, versionName, errorID string) (apidef.TykError, bool) {
+
 	if versionInfo, ok := e.Spec.VersionData.Versions[versionName]; ok {
 		path := r.URL.Path
 		path = e.Spec.StripListenPath(path)
 		path = strings.TrimPrefix(path, "/")
 
 		// Try exact path and method match
+
 		for _, override := range versionInfo.ExtendedPaths.ErrorOverrides {
 			if override.Path == path && (override.Method == r.Method || override.Method == "") {
 				if errorOverride, exists := override.Errors[errorID]; exists {

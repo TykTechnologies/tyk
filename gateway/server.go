@@ -565,9 +565,6 @@ func (gw *Gateway) syncAPISpecs() (int, error) {
 	}
 	var filter []*APISpec
 	for _, v := range s {
-		if v.Name == "api-midd" {
-			fmt.Printf("\n\n Default Error Override: %+v\n\n", v.VersionData.Versions["Default"].ExtendedPaths.ErrorOverrides)
-		}
 		if err := v.Validate(gw.GetConfig().OAS); err != nil {
 			mainLog.WithError(err).WithField("spec", v.Name).Error("Skipping loading spec because it failed validation")
 			continue
