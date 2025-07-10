@@ -637,6 +637,20 @@
         },
         "body": {
           "type": "string"
+        },
+        "errors_override": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "message": {
+                "type": "string"
+              },
+              "code": {
+                "type": "integer"
+              }
+            }
+          }
         }
       },
       "anyOf": [
