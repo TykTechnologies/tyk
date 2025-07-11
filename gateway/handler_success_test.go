@@ -122,7 +122,7 @@ func TestRecordDetail(t *testing.T) {
 
 func TestAnalyticRecord_GraphStats(t *testing.T) {
 
-	apiDef := BuildAPI(func(spec *APISpec) {
+	generateApiDefinition := func(spec *APISpec) {
 		spec.Name = "graphql API"
 		spec.APIID = "graphql-api"
 		spec.Proxy.TargetURL = testGraphQLProxyUpstream
@@ -133,7 +133,7 @@ func TestAnalyticRecord_GraphStats(t *testing.T) {
 			Version:       apidef.GraphQLConfigVersion2,
 			Schema:        gqlProxyUpstreamSchema,
 		}
-	})[0]
+	}
 
 	testCases := []struct {
 		name      string
@@ -244,7 +244,7 @@ func TestAnalyticRecord_GraphStats(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			spec := apiDef
+			spec := BuildAPI(generateApiDefinition)[0]
 			if tc.reloadAPI != nil {
 				tc.reloadAPI(spec)
 			}

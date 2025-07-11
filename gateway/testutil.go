@@ -653,6 +653,7 @@ func graphqlProxyUpstreamHandler(w http.ResponseWriter, r *http.Request) {
 		defer func() {
 			_ = gz.Close()
 		}()
+		w.WriteHeader(responseCode)
 		_, _ = gz.Write(response)
 		return
 	}
