@@ -1806,7 +1806,11 @@ func (g *GlobalRequestSizeLimit) ExtractTo(api *apidef.APIDefinition) {
 
 // ContextVariables holds the configuration related to Tyk context variables.
 type ContextVariables struct {
+<<<<<<< HEAD
 	// Enabled enables context variables to be passed to Tyk middlewares.
+=======
+	// Enabled provides access to context variables from specific Tyk middleware (URL rewrite, header and body transform).
+>>>>>>> e398eced6... TT-14838 Addressed comments on GW docs improvements (#7225)
 	//
 	// Tyk classic API definition: `enable_context_vars`.
 	Enabled bool `json:"enabled" bson:"enabled"`
