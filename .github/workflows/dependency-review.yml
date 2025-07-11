@@ -18,6 +18,8 @@ jobs:
     with:
       command_prefix: "/dependency"
       prompt: ".probe/dependency-impact-reviewer.md"
+      update_existing_comment: "true"
+      update_comment_marker: "Tyk Gateway Dependency Impact Reviewer"
     secrets:
       ANTHROPIC_API_KEY: ${{ secrets.PROBE_ANTHROPIC_API_KEY }}
       ANTHROPIC_API_URL: ${{ secrets.PROBE_ANTHROPIC_URL }}
