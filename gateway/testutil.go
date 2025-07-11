@@ -638,13 +638,26 @@ func graphqlProxyUpstreamHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	w.WriteHeader(responseCode)
-	_, _ = w.Write([]byte(`{
+	response := []byte(`{
 		"data": {
 			"hello": "` + name + `",
 			"httpMethod": "` + r.Method + `",
 		}
-	}`))
+	}`)
+
+	// Only supports GZIP for testing purposes
+	acceptEncodingHeader := r.Header.Get("Accept-Encoding")
+	if acceptEncodingHeader != "" && strings.Contains(acceptEncodingHeader, "gzip") {
+		w.Header().Set("Content-Encoding", "gzip")
+		gz := gzip.NewWriter(w)
+		defer func() {
+			_ = gz.Close()
+		}()
+		_, _ = gz.Write(response)
+		return
+	}
+	w.WriteHeader(responseCode)
+	_, _ = w.Write(response)
 }
 
 func graphqlDataSourceHandler(w http.ResponseWriter, r *http.Request) {

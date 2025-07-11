@@ -141,6 +141,7 @@ func TestAnalyticRecord_GraphStats(t *testing.T) {
 		request   graphql.Request
 		checkFunc func(*testing.T, *analytics.AnalyticsRecord)
 		reloadAPI func(*APISpec)
+		headers   map[string]string
 	}{
 		{
 			name: "successfully generate stats",
@@ -221,6 +222,24 @@ func TestAnalyticRecord_GraphStats(t *testing.T) {
 				}, record.GraphQLStats.Errors)
 			},
 		},
+		{
+			name: "successfully generate stats for compressed request body",
+			code: http.StatusOK,
+			request: graphql.Request{
+				Query: `{ hello(name: "World") httpMethod }`,
+			},
+			headers: map[string]string{
+				httpclient.AcceptEncodingHeader: "gzip",
+			},
+			checkFunc: func(t *testing.T, record *analytics.AnalyticsRecord) {
+				t.Helper()
+				assert.True(t, record.GraphQLStats.IsGraphQL)
+				assert.False(t, record.GraphQLStats.HasErrors)
+				assert.ElementsMatch(t, []string{"hello", "httpMethod"}, record.GraphQLStats.RootFields)
+				assert.Equal(t, map[string][]string{}, record.GraphQLStats.Types)
+				assert.Equal(t, analytics.OperationQuery, record.GraphQLStats.OperationType)
+			},
+		},
 	}
 
 	for _, tc := range testCases {
@@ -237,13 +256,17 @@ func TestAnalyticRecord_GraphStats(t *testing.T) {
 			ts.Gw.Analytics.mockRecordHit = func(record *analytics.AnalyticsRecord) {
 				tc.checkFunc(t, record)
 			}
+			var headers = map[string]string{
+				httpclient.AcceptEncodingHeader: "",
+			}
+			if tc.headers != nil {
+				headers = tc.headers
+			}
 			_, err := ts.Run(t, test.TestCase{
-				Data:   tc.request,
-				Method: http.MethodPost,
-				Code:   tc.code,
-				Headers: map[string]string{
-					httpclient.AcceptEncodingHeader: "",
-				},
+				Data:    tc.request,
+				Method:  http.MethodPost,
+				Code:    tc.code,
+				Headers: headers,
 			})
 			assert.NoError(t, err)
 		})
