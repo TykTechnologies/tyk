@@ -122,7 +122,7 @@ func TestRecordDetail(t *testing.T) {
 
 func TestAnalyticRecord_GraphStats(t *testing.T) {
 
-	apiDef := BuildAPI(func(spec *APISpec) {
+	generateApiDefinition := func(spec *APISpec) {
 		spec.Name = "graphql API"
 		spec.APIID = "graphql-api"
 		spec.Proxy.TargetURL = testGraphQLProxyUpstream
@@ -133,7 +133,7 @@ func TestAnalyticRecord_GraphStats(t *testing.T) {
 			Version:       apidef.GraphQLConfigVersion2,
 			Schema:        gqlProxyUpstreamSchema,
 		}
-	})[0]
+	}
 
 	testCases := []struct {
 		name      string
@@ -141,6 +141,7 @@ func TestAnalyticRecord_GraphStats(t *testing.T) {
 		request   graphql.Request
 		checkFunc func(*testing.T, *analytics.AnalyticsRecord)
 		reloadAPI func(*APISpec)
+		headers   map[string]string
 	}{
 		{
 			name: "successfully generate stats",
@@ -221,11 +222,29 @@ func TestAnalyticRecord_GraphStats(t *testing.T) {
 				}, record.GraphQLStats.Errors)
 			},
 		},
+		{
+			name: "successfully generate stats for compressed request body",
+			code: http.StatusOK,
+			request: graphql.Request{
+				Query: `{ hello(name: "World") httpMethod }`,
+			},
+			headers: map[string]string{
+				httpclient.AcceptEncodingHeader: "gzip",
+			},
+			checkFunc: func(t *testing.T, record *analytics.AnalyticsRecord) {
+				t.Helper()
+				assert.True(t, record.GraphQLStats.IsGraphQL)
+				assert.False(t, record.GraphQLStats.HasErrors)
+				assert.ElementsMatch(t, []string{"hello", "httpMethod"}, record.GraphQLStats.RootFields)
+				assert.Equal(t, map[string][]string{}, record.GraphQLStats.Types)
+				assert.Equal(t, analytics.OperationQuery, record.GraphQLStats.OperationType)
+			},
+		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			spec := apiDef
+			spec := BuildAPI(generateApiDefinition)[0]
 			if tc.reloadAPI != nil {
 				tc.reloadAPI(spec)
 			}
@@ -237,13 +256,17 @@ func TestAnalyticRecord_GraphStats(t *testing.T) {
 			ts.Gw.Analytics.mockRecordHit = func(record *analytics.AnalyticsRecord) {
 				tc.checkFunc(t, record)
 			}
+			var headers = map[string]string{
+				httpclient.AcceptEncodingHeader: "",
+			}
+			if tc.headers != nil {
+				headers = tc.headers
+			}
 			_, err := ts.Run(t, test.TestCase{
-				Data:   tc.request,
-				Method: http.MethodPost,
-				Code:   tc.code,
-				Headers: map[string]string{
-					httpclient.AcceptEncodingHeader: "",
-				},
+				Data:    tc.request,
+				Method:  http.MethodPost,
+				Code:    tc.code,
+				Headers: headers,
 			})
 			assert.NoError(t, err)
 		})

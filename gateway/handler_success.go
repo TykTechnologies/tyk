@@ -143,10 +143,14 @@ func recordGraphDetails(rec *analytics.AnalyticsRecord, r *http.Request, resp *h
 	)
 	if resp.Body != nil {
 		httputil.RemoveResponseTransferEncoding(resp, "chunked")
+		// respBodyReader tries to decompress the response body if the Accept-Encoding
+		// header is a non-empty string.
+		resp.Body = respBodyReader(r, resp)
 		respBody, err = io.ReadAll(resp.Body)
 		defer func() {
 			_ = resp.Body.Close()
-			resp.Body = respBodyReader(r, resp)
+			// Create a new Reader and assign it to the response body.
+			resp.Body = io.NopCloser(bytes.NewBuffer(respBody))
 		}()
 		if err != nil {
 			logger.WithError(err).Error("error recording graph analytics")
