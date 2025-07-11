@@ -56,31 +56,6 @@ const (
 	ErrorInfo
 )
 
-type ErrorContext struct {
-	ErrorID     string
-	Message     string
-	Code        int
-	OriginalErr error
-}
-
-func GetErrorInfo(r *http.Request) *ErrorContext {
-	if v := r.Context().Value(ErrorInfo); v != nil {
-		if val, ok := v.(*ErrorContext); ok {
-			return val
-		}
-	}
-	return nil
-}
-
-func SetErrorInfo(r *http.Request, errorID string, originalErr error) {
-	ctx := r.Context()
-	ctx = context.WithValue(ctx, ErrorInfo, &ErrorContext{
-		ErrorID:     errorID,
-		OriginalErr: originalErr,
-	})
-	core.SetContext(r, ctx)
-}
-
 func ctxSetSession(r *http.Request, s *user.SessionState, scheduleUpdate bool, hashKey bool) {
 	if s == nil {
 		panic("setting a nil context SessionData")

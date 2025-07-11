@@ -118,7 +118,7 @@ func (k *AuthKey) ProcessRequest(_ http.ResponseWriter, r *http.Request, _ inter
 		key = k.Gw.generateToken(k.Spec.OrgID, certHash)
 	} else {
 		k.Logger().Info("Attempted access with malformed header, no auth header found.")
-		ctx.SetErrorInfo(r, ErrAuthAuthorizationFieldMissing, nil)
+		ctx.SetErrorInfo(r, ErrAuthAuthorizationFieldMissing, nil, nil)
 		return errorAndStatusCode(ErrAuthAuthorizationFieldMissing)
 	}
 
@@ -128,7 +128,7 @@ func (k *AuthKey) ProcessRequest(_ http.ResponseWriter, r *http.Request, _ inter
 		// fallback to search by cert
 		session, keyExists = k.CheckSessionAndIdentityForValidKey(certHash, r)
 		if !keyExists {
-			ctx.SetErrorInfo(r, ErrAuthKeyNotFound, nil)
+			ctx.SetErrorInfo(r, ErrAuthKeyNotFound, nil, nil)
 			return k.reportInvalidKey(key, r, MsgNonExistentKey, ErrAuthKeyNotFound)
 		}
 	}

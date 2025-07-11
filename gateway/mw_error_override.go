@@ -1,10 +1,12 @@
 package gateway
 
 import (
+	"bytes"
 	"errors"
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/ctx"
 	"net/http"
+	"text/template"
 )
 
 type ErrorOverrideMiddleware struct {
@@ -20,7 +22,6 @@ func (e *ErrorOverrideMiddleware) EnabledForSpec() bool {
 }
 
 func (e *ErrorOverrideMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
-
 	errorInfo := ctx.GetErrorInfo(r)
 	if errorInfo == nil {
 		return nil, http.StatusOK
@@ -28,7 +29,7 @@ func (e *ErrorOverrideMiddleware) ProcessRequest(w http.ResponseWriter, r *http.
 
 	newMsg, newCode := e.ApplyErrorOverride(r, errorInfo.Message, errorInfo.Code)
 	if newMsg != errorInfo.Message || newCode != errorInfo.Code {
-		ctx.SetErrorInfo(r, errorInfo.ErrorID, errorInfo.OriginalErr)
+		ctx.SetErrorInfo(r, errorInfo.ErrorID, errorInfo.OriginalErr, nil)
 	}
 
 	return errors.New(newMsg), newCode
@@ -37,43 +38,69 @@ func (e *ErrorOverrideMiddleware) ProcessRequest(w http.ResponseWriter, r *http.
 func (e *ErrorOverrideMiddleware) ApplyErrorOverride(r *http.Request, errMsg string, errCode int) (string, int) {
 	// Get error ID from context or determine it
 	errorInfo := ctx.GetErrorInfo(r)
-	errorID := ""
 
-	if errorInfo != nil && errorInfo.ErrorID != "" {
-		errorID = errorInfo.ErrorID
-	} else {
-		errorID = e.determineErrorID(errMsg, errCode)
-	}
-
+	errorID := e.extractErrorID(errorInfo, errMsg, errCode)
 	if errorID == "" {
 		return errMsg, errCode
 	}
 
-	// Check endpoint-level overrides first
-	vInfo, _ := e.Spec.Version(r)
-	if override, found := e.findEndpointErrorOverride(r, vInfo.Name, errorID); found {
-		if override.Message != "" {
-			errMsg = override.Message
-		}
-		if override.Code != 0 {
-			errCode = override.Code
-		}
-		return errMsg, errCode
+	details := map[string]interface{}{}
+	if errorInfo != nil {
+		details = errorInfo.Details
 	}
 
-	// Fall back to API-level overrides
-	if override, exists := e.Spec.CustomErrorResponses[errorID]; exists {
-		if override.Message != "" {
-			errMsg = override.Message
-		}
-		if override.Code != 0 {
-			errCode = override.Code
+	// Endpoint-level override
+	if vInfo, _ := e.Spec.Version(r); vInfo != nil {
+		if override, found := e.findEndpointErrorOverride(r, vInfo.Name, errorID); found {
+			return e.applyOverride(override, errMsg, errCode, details)
 		}
 	}
 
-	// here we might set the gw level errors
+	// API-level override
+	if override, found := e.Spec.CustomErrorResponses[errorID]; found {
+		return e.applyOverride(override, errMsg, errCode, details)
+	}
+
+	// here we might set the gw level errors¿
 
 	return errMsg, errCode
+}
+
+func (e *ErrorOverrideMiddleware) extractErrorID(info *ctx.ErrorContext, fallbackMsg string, fallbackCode int) string {
+	if info != nil && info.ErrorID != "" {
+		return info.ErrorID
+	}
+	return e.determineErrorID(fallbackMsg, fallbackCode)
+}
+
+func (e *ErrorOverrideMiddleware) applyOverride(override apidef.TykError, defaultMsg string, defaultCode int, details map[string]interface{}) (string, int) {
+	msg := defaultMsg
+	code := defaultCode
+
+	if override.Message != "" {
+		rendered, err := renderMessage(override.Message, details)
+		if err == nil {
+			msg = rendered
+		}
+		// If render fails, fall back to default message
+	}
+	if override.Code != 0 {
+		code = override.Code
+	}
+
+	return msg, code
+}
+
+func renderMessage(tmplStr string, data any) (string, error) {
+	tmpl, err := template.New("msg").Parse(tmplStr)
+	if err != nil {
+		return "", err
+	}
+	var buf bytes.Buffer
+	if err := tmpl.Execute(&buf, data); err != nil {
+		return "", err
+	}
+	return buf.String(), nil
 }
 
 // determineErrorID attempts to identify the error type based on message and code
