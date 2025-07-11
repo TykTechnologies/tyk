@@ -972,14 +972,14 @@ func TestRealisticEmergencyModeRecovery(t *testing.T) {
 		}
 		time.Sleep(50 * time.Millisecond)
 	}
-	
+
 	// If we're still in emergency mode, this might be due to RPC connection issues in the test environment
 	// Let's reset emergency mode manually for testing purposes
 	if rpc.IsEmergencyMode() {
 		rpc.ResetEmergencyMode()
 		time.Sleep(50 * time.Millisecond)
 	}
-	
+
 	assert.False(t, rpc.IsEmergencyMode(), "Should start in normal mode")
 
 	// Get baseline health check - should be all good
@@ -993,7 +993,7 @@ func TestRealisticEmergencyModeRecovery(t *testing.T) {
 
 	// Wait for emergency mode to be triggered naturally
 	time.Sleep(200 * time.Millisecond)
-	
+
 	// If emergency mode wasn't triggered automatically, set it manually to test the recovery
 	if !rpc.IsEmergencyMode() {
 		// Manually trigger emergency mode to test recovery
@@ -1001,7 +1001,7 @@ func TestRealisticEmergencyModeRecovery(t *testing.T) {
 		// This simulates what would happen when RPC fails
 		rpc.SetEmergencyMode(t, true)
 	}
-	
+
 	assert.True(t, rpc.IsEmergencyMode(), "Emergency mode should be triggered")
 
 	// Verify health checks now show RPC as failed
